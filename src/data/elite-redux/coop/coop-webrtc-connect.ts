@@ -204,13 +204,16 @@ export interface CoopConnectOptions {
  * Returns the pairing code (show it to the guest) and the CoopRuntime.
  */
 export async function connectCoopAsHost(
-  opts: CoopConnectOptions & { seed?: string } = {},
+  opts: CoopConnectOptions & { seed?: string; onCode?: (code: string) => void } = {},
 ): Promise<{ code: string; runtime: CoopRuntime }> {
   if (!isCoopNetworkingConfigured()) {
     throw new Error("coop networking is not configured (VITE_COOP_SERVER_URL unset)");
   }
   const created = await postJson("/coop/create", { host: opts.username ?? "Player 1", seed: opts.seed });
   const code = String(created.code);
+  // Surface the code to the UI immediately so the host can share it while the
+  // rest of this function blocks waiting for the guest to connect.
+  opts.onCode?.(code);
 
   const iceServers = opts.ice ? buildIceServers(opts.ice) : await fetchIceServers();
   const pc = new RTCPeerConnection({ iceServers });

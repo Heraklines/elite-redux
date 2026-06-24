@@ -9,7 +9,9 @@ import { Phase } from "#app/phase";
 import { bypassLogin, isBeta, isDev } from "#constants/app-constants";
 import { getDailyRunStarters, startDailyEventChallenges } from "#data/daily-seed/daily-run";
 import { modifierTypes } from "#data/data-lists";
+import { formatPairingCode, isValidPairingCode, normalizePairingCode } from "#data/elite-redux/coop/coop-pairing";
 import { startLocalCoopSession } from "#data/elite-redux/coop/coop-runtime";
+import { connectCoopAsGuest, connectCoopAsHost } from "#data/elite-redux/coop/coop-webrtc-connect";
 import { Gender } from "#data/gender";
 import { BattleType } from "#enums/battle-type";
 import { GameModes } from "#enums/game-modes";
@@ -135,10 +137,8 @@ export class TitlePhase extends Phase {
               },
             });
           }
-          // Co-op (#633): a 2-player shared run. Until the real WebRTC transport
-          // lands (P6) this is a LOCAL hotseat - the human hosts and a spoofed
-          // partner stands in for player 2 - so it is shown only where dev tools
-          // appear (local + staging), never in a production build.
+          // Co-op (#633): a 2-player shared run. Shown only where dev tools appear
+          // (local + staging), never in a production build, until it is flipped on.
           // VITE_DEV_TOOLS is set on the staging build (mirrors the dev-tools
           // registry gate); cast since it's not in the typed ImportMetaEnv.
           const devToolsEnabled =
@@ -147,8 +147,87 @@ export class TitlePhase extends Phase {
             options.push({
               label: GameMode.getModeName(GameModes.COOP),
               handler: () => {
-                startLocalCoopSession({ username: loggedInUser?.username });
-                setModeAndEnd(GameModes.COOP);
+                const username = loggedInUser?.username;
+                // Surface a connection failure, then bounce back to the title.
+                const failed = (e: unknown) => {
+                  const msg = e instanceof Error ? e.message : String(e);
+                  globalScene.ui.showText(
+                    `Co-op connection failed:\n${msg}`,
+                    null,
+                    () => {
+                      globalScene.phaseManager.toTitleScreen();
+                      super.end();
+                    },
+                    null,
+                    true,
+                  );
+                };
+                // The data channel is open: confirm to the player, then start.
+                const connected = () => {
+                  globalScene.ui.showText(
+                    "Connected to your partner!\nPress to start co-op.",
+                    null,
+                    () => setModeAndEnd(GameModes.COOP),
+                    null,
+                    true,
+                  );
+                };
+                // Co-op lobby: HOST (get + share a code) / JOIN (enter a code) over
+                // the real WebRTC transport, or SOLO against a CPU stand-in partner.
+                const lobbyOptions: OptionSelectItem[] = [
+                  {
+                    label: "Host Game",
+                    handler: () => {
+                      globalScene.ui.setMode(UiMode.MESSAGE);
+                      globalScene.ui.showText("Creating co-op game...", null);
+                      connectCoopAsHost({
+                        username,
+                        onCode: code =>
+                          globalScene.ui.showText(
+                            `Your co-op code:\n${formatPairingCode(code)}\n\nShare it with your partner,\nthen wait here for them to join.`,
+                            null,
+                          ),
+                      })
+                        .then(connected)
+                        .catch(failed);
+                      return true;
+                    },
+                  },
+                  {
+                    label: "Join Game",
+                    handler: () => {
+                      const raw =
+                        typeof window === "undefined" ? null : window.prompt("Enter your partner's co-op code:");
+                      const code = raw ? normalizePairingCode(raw) : "";
+                      if (!code) {
+                        return true; // cancelled the prompt -> stay on the lobby menu
+                      }
+                      if (!isValidPairingCode(code)) {
+                        failed(new Error("that code doesn't look right"));
+                        return true;
+                      }
+                      globalScene.ui.setMode(UiMode.MESSAGE);
+                      globalScene.ui.showText("Connecting to your partner...", null);
+                      connectCoopAsGuest(code, { username }).then(connected).catch(failed);
+                      return true;
+                    },
+                  },
+                  {
+                    label: "Solo (CPU partner)",
+                    handler: () => {
+                      startLocalCoopSession({ username });
+                      setModeAndEnd(GameModes.COOP);
+                      return true;
+                    },
+                  },
+                  {
+                    label: i18next.t("menu:cancel"),
+                    handler: () => true,
+                  },
+                ];
+                globalScene.ui.showText("Co-op: host a game or join your partner.", null, () =>
+                  globalScene.ui.setOverlayMode(UiMode.OPTION_SELECT, { options: lobbyOptions }),
+                );
                 return true;
               },
             });
