@@ -3,6 +3,8 @@ import { getPokemonNameWithAffix } from "#app/messages";
 import Overrides from "#app/overrides";
 import { initMoveAnim, loadMoveAnimAssets } from "#data/battle-anims";
 import { allMoves } from "#data/data-lists";
+import { getCoopController, getCoopInteractionRelay, getCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
+import type { CoopRole } from "#data/elite-redux/coop/coop-transport";
 import { SpeciesFormChangeMoveLearnedTrigger } from "#data/form-change-triggers";
 import { LearnMoveType } from "#enums/learn-move-type";
 import { MoveId } from "#enums/move-id";
@@ -13,6 +15,14 @@ import { PlayerPartyMemberPokemonPhase } from "#phases/player-party-member-pokem
 import { EvolutionSceneUiHandler } from "#ui/evolution-scene-ui-handler";
 import { SummaryUiMode } from "#ui/summary-ui-handler";
 import i18next from "i18next";
+
+// Co-op (#633): the move-replace ("which move to forget") menu is an OWNED, shared screen.
+// Only the player whose mon is learning the move drives it; the partner watches and mirrors
+// the result so both clients transition together. All relayed on one dedicated seq (FIFO,
+// distinct from the small interaction-turn seqs the reward shop uses).
+const COOP_LEARN_MOVE_SEQ = 9_000_001;
+/** How long the watcher waits for the owner's move-replace decision before giving up. */
+const COOP_LEARN_MOVE_WAIT_MS = 300_000;
 
 export class LearnMovePhase extends PlayerPartyMemberPokemonPhase {
   public readonly phaseName = "LearnMovePhase";
@@ -58,9 +68,95 @@ export class LearnMovePhase extends PlayerPartyMemberPokemonPhase {
     // Otherwise the phase checks if the player wants to replace a move. The cap is normally 4 but ER's
     // "5th move slot" consumable can raise it (see Pokemon.getMaxMoveCount).
     if (currentMoveset.length < pokemon.getMaxMoveCount()) {
+      // Empty slot: the move auto-learns identically on both clients (deterministic), so
+      // co-op needs no relay here.
       this.learnMove(currentMoveset.length, move, pokemon);
+    } else if (this.coopLearnMoveRole(pokemon) === "watcher") {
+      // Co-op (#633): the move-replace menu is OWNED by this mon's player. The PARTNER
+      // watches: it shows a non-interactive notice and mirrors the owner's relayed result
+      // (which move was forgotten, or none), so both transition together and only the
+      // owner picks. The owner / solo / hotseat(spoof) path opens the real menu below.
+      void this.coopWatchLearnMove(move, pokemon);
     } else {
       this.replaceMoveCheck(move, pokemon);
+    }
+  }
+
+  /**
+   * Co-op (#633): who controls THIS mon's move-replace menu. Returns "watcher" when the
+   * local player does NOT own the learning mon (they mirror the result), "owner" when they
+   * do (they drive it). Returns null outside a live co-op run; the hotseat (SpoofGuest)
+   * path has no partner screen, so the local human always owns it.
+   */
+  private coopLearnMoveRole(pokemon: Pokemon): "owner" | "watcher" | null {
+    if (!globalScene.gameMode.isCoop) {
+      return null;
+    }
+    const controller = getCoopController();
+    if (controller == null) {
+      return null;
+    }
+    if (getCoopRuntime()?.spoof != null) {
+      return "owner";
+    }
+    const owner = (pokemon as { coopOwner?: CoopRole }).coopOwner ?? "host";
+    return owner === controller.role ? "owner" : "watcher";
+  }
+
+  /**
+   * Co-op (#633) OWNER: relay the move-replace decision to the partner. `moveIndex` is the
+   * forgotten move's slot, or `getMaxMoveCount()` to signal "did not learn". No-op in solo
+   * and on the partner (only the mon-owner relays).
+   */
+  private coopRelayLearnResult(moveIndex: number): void {
+    if (!globalScene.gameMode.isCoop) {
+      return;
+    }
+    const controller = getCoopController();
+    if (controller == null) {
+      return;
+    }
+    const owner = (this.getPokemon() as { coopOwner?: CoopRole }).coopOwner ?? "host";
+    if (owner !== controller.role) {
+      return;
+    }
+    getCoopInteractionRelay()?.sendInteractionChoice(COOP_LEARN_MOVE_SEQ, "learnMove", moveIndex);
+  }
+
+  /**
+   * Co-op (#633) WATCHER: show a non-interactive notice while the owner picks, then apply
+   * the relayed result against this client's identical mon - the same slot is replaced (or
+   * nothing) - and end, so both clients leave the screen together.
+   */
+  private async coopWatchLearnMove(move: Move, pokemon: Pokemon): Promise<void> {
+    globalScene.ui.setMode(this.messageMode);
+    await globalScene.ui.showTextPromise(
+      i18next.t("battle:coopPartnerChoosingMove", {
+        defaultValue: "Your partner is choosing a move for {{pokemonName}}...",
+        pokemonName: getPokemonNameWithAffix(pokemon),
+      }),
+      undefined,
+      true,
+    );
+    const relay = getCoopInteractionRelay();
+    if (relay == null) {
+      return this.end();
+    }
+    const res = await relay.awaitInteractionChoice(COOP_LEARN_MOVE_SEQ, COOP_LEARN_MOVE_WAIT_MS);
+    // A null result (partner gone / timeout) means "did not learn" so the run never hangs.
+    const moveIndex = res?.choice ?? pokemon.getMaxMoveCount();
+    if (moveIndex >= 0 && moveIndex < pokemon.getMaxMoveCount()) {
+      this.learnMove(moveIndex, move, pokemon);
+    } else {
+      await globalScene.ui.showTextPromise(
+        i18next.t("battle:learnMoveNotLearned", {
+          pokemonName: getPokemonNameWithAffix(pokemon),
+          moveName: move.name,
+        }),
+        undefined,
+        true,
+      );
+      this.end();
     }
   }
 
@@ -132,6 +228,8 @@ export class LearnMovePhase extends PlayerPartyMemberPokemonPhase {
         const fullText = [i18next.t("battle:countdownPoof"), forgetSuccessText, i18next.t("battle:learnMoveAnd")].join(
           "$",
         );
+        // Co-op (#633): relay the owner's chosen forget-slot so the partner mirrors it.
+        this.coopRelayLearnResult(moveIndex);
         globalScene.ui.setMode(this.messageMode).then(() => this.learnMove(moveIndex, move, pokemon, fullText));
       },
     );
@@ -157,6 +255,9 @@ export class LearnMovePhase extends PlayerPartyMemberPokemonPhase {
       UiMode.CONFIRM,
       () => {
         globalScene.ui.setMode(this.messageMode);
+        // Co-op (#633): relay "did not learn" (sentinel = the move cap) so the partner
+        // mirrors the no-op and both leave the screen together.
+        this.coopRelayLearnResult(pokemon.getMaxMoveCount());
         globalScene.ui
           .showTextPromise(
             i18next.t("battle:learnMoveNotLearned", {
