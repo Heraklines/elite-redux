@@ -77,6 +77,8 @@ export class CoopBattleStreamer {
 
   private enemyPartyHandler: ((wave: number, enemies: CoopSerializedEnemy[]) => void) | null = null;
   private checkpointHandler: ((reason: string, checkpoint: CoopBattleCheckpoint) => void) | null = null;
+  /** wave -> resolver for an in-flight {@linkcode awaitEnemyParty}. */
+  private readonly enemyPartyWaiters = new Map<number, (res: CoopSerializedEnemy[] | null) => void>();
   /** Latest authoritative checkpoint the guest has not yet applied (consumed at a turn boundary). */
   private lastCheckpoint: CoopBattleCheckpoint | null = null;
   /** Latest enemy party the guest has not yet adopted (consumed at the wave's first turn). */
@@ -125,6 +127,43 @@ export class CoopBattleStreamer {
     }
     this.lastEnemyParty = null;
     return buffered.enemies;
+  }
+
+  /**
+   * GUEST: await the host's authoritative enemy party for `wave` (#633, LIVE-D6).
+   * Resolves immediately with the buffered party if the host already sent it, else
+   * waits for it to arrive, or resolves `null` on timeout (the guest then falls back
+   * to generating its own enemies - divergent but never a hang). The guest calls this
+   * at encounter time, BEFORE building its own party, so it adopts the host's enemies
+   * verbatim and the two clients fight identical mons (species included). The host
+   * only knows its enemies AFTER it clears its own save-slot screen, so a real wait
+   * is expected; the timeout is generous.
+   */
+  awaitEnemyParty(wave: number, timeoutMs = this.timeoutMs): Promise<CoopSerializedEnemy[] | null> {
+    // Already buffered for this wave -> consume + return immediately.
+    const buffered = this.consumeEnemyParty(wave);
+    if (buffered != null) {
+      return Promise.resolve(buffered);
+    }
+    // Supersede any stale waiter for this wave.
+    this.enemyPartyWaiters.get(wave)?.(null);
+    return new Promise<CoopSerializedEnemy[] | null>(resolve => {
+      let settled = false;
+      let cancelTimer: () => void = () => {};
+      const finish = (res: CoopSerializedEnemy[] | null) => {
+        if (settled) {
+          return;
+        }
+        settled = true;
+        cancelTimer();
+        if (this.enemyPartyWaiters.get(wave) === finish) {
+          this.enemyPartyWaiters.delete(wave);
+        }
+        resolve(res);
+      };
+      this.enemyPartyWaiters.set(wave, finish);
+      cancelTimer = this.schedule(() => finish(null), timeoutMs);
+    });
   }
 
   /** GUEST: handle an out-of-turn authoritative checkpoint. */
@@ -184,7 +223,11 @@ export class CoopBattleStreamer {
     for (const finish of [...this.pending.values()]) {
       finish(null);
     }
+    for (const finish of [...this.enemyPartyWaiters.values()]) {
+      finish(null);
+    }
     this.pending.clear();
+    this.enemyPartyWaiters.clear();
     this.inbox.clear();
     this.lastCheckpoint = null;
     this.lastEnemyParty = null;
@@ -194,12 +237,20 @@ export class CoopBattleStreamer {
 
   private handle(msg: CoopMessage): void {
     switch (msg.t) {
-      case "enemyPartySync":
-        // Buffer for the guest to adopt at the wave's first turn boundary, and fire
-        // any live handler.
+      case "enemyPartySync": {
+        // Hand it straight to a parked awaitEnemyParty (consumed), else buffer for the
+        // next consume/await. Either way fire any live handler.
+        const waiter = this.enemyPartyWaiters.get(msg.wave);
+        if (waiter) {
+          this.lastEnemyParty = null;
+          this.enemyPartyHandler?.(msg.wave, msg.enemies);
+          waiter(msg.enemies);
+          return;
+        }
         this.lastEnemyParty = { wave: msg.wave, enemies: msg.enemies };
         this.enemyPartyHandler?.(msg.wave, msg.enemies);
         return;
+      }
       case "turnResolution": {
         const res: CoopTurnResolution = { turn: msg.turn, events: msg.events, checkpoint: msg.checkpoint };
         const resolver = this.pending.get(msg.turn);

@@ -27,11 +27,13 @@
 
 import { getGameMode } from "#app/game-mode";
 import { globalScene } from "#app/global-scene";
+import { captureCoopEnemies } from "#data/elite-redux/coop/coop-battle-engine";
 import { clearCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
 import { COOP_SAVE_SLOT_COUNT, coopGuestSessionSlot } from "#data/elite-redux/coop/coop-session";
 import { GameModes } from "#enums/game-modes";
 import { SpeciesId } from "#enums/species-id";
 import { UiMode } from "#enums/ui-mode";
+import { buildCoopEnemy } from "#phases/encounter-phase";
 import { SelectStarterPhase } from "#phases/select-starter-phase";
 import { GameManager } from "#test/framework/game-manager";
 import Phaser from "phaser";
@@ -106,5 +108,28 @@ describe.skipIf(!RUN)("co-op launch (#633) - real phase launch decision (hang fi
     // ...and does NOT launch until the human has chosen a slot (the mocked picker
     // never fires its callback here).
     expect(initSpy).not.toHaveBeenCalled();
+  });
+
+  it("the guest reconstructs the host's EXACT enemy party from the stream (species divergence fix)", () => {
+    // The host's generated enemy party, serialized for the wire (LIVE-D6).
+    const hostParty = globalScene.getEnemyParty();
+    expect(hostParty.length).toBeGreaterThan(0);
+    const serialized = captureCoopEnemies();
+    expect(serialized.length).toBe(hostParty.length);
+
+    // The guest rebuilds each enemy from the host's serialized identity. Even though
+    // the guest's own RNG would roll DIFFERENT mons (the live host-Hoothoot /
+    // guest-Venonat divergence), the rebuilt party matches the host's exactly -
+    // species, ability slot, nature, IVs, and moveset - so both clients fight the
+    // same enemies.
+    serialized.forEach((entry, i) => {
+      const rebuilt = buildCoopEnemy(entry.data, 5);
+      expect(rebuilt).not.toBeNull();
+      expect(rebuilt?.species.speciesId).toBe(hostParty[i].species.speciesId);
+      expect(rebuilt?.abilityIndex).toBe(hostParty[i].abilityIndex);
+      expect(rebuilt?.nature).toBe(hostParty[i].nature);
+      expect(rebuilt?.ivs).toEqual(hostParty[i].ivs);
+      expect(rebuilt?.getMoveset().map(m => m.moveId)).toEqual(hostParty[i].getMoveset().map(m => m.moveId));
+    });
   });
 });

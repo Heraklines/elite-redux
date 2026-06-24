@@ -40,6 +40,69 @@ describe("co-op host-authoritative battle stream (#633, LIVE-D)", () => {
     expect(got).toEqual({ wave: 7, count: 2 });
   });
 
+  it("awaitEnemyParty resolves with the host's party when the guest is parked first (LIVE-D6)", async () => {
+    const { host, guest } = createLoopbackPair();
+    const hostStream = new CoopBattleStreamer(host);
+    const guestStream = new CoopBattleStreamer(guest);
+
+    // Guest reaches its encounter and waits BEFORE the host (still at its save-slot
+    // screen) has generated - the realistic order with the launch-hang fix.
+    const awaited = guestStream.awaitEnemyParty(7);
+    hostStream.sendEnemyParty(7, [{ fieldIndex: 2, data: { speciesId: 163 } }]);
+
+    const res = await awaited;
+    expect(res).not.toBeNull();
+    expect(res?.[0]?.data.speciesId).toBe(163);
+  });
+
+  it("awaitEnemyParty returns a party that arrived BEFORE the await (race buffer)", async () => {
+    const { host, guest } = createLoopbackPair();
+    const hostStream = new CoopBattleStreamer(host);
+    const guestStream = new CoopBattleStreamer(guest);
+
+    hostStream.sendEnemyParty(9, [{ fieldIndex: 2, data: { speciesId: 1 } }]);
+    await new Promise(r => setTimeout(r, 0)); // let it land in the guest buffer
+
+    const res = await guestStream.awaitEnemyParty(9);
+    expect(res?.[0]?.data.speciesId).toBe(1);
+  });
+
+  it("awaitEnemyParty resolves null on timeout (guest then generates its own - never hangs)", async () => {
+    const { guest } = createLoopbackPair();
+    let fire: (() => void) | null = null;
+    const guestStream = new CoopBattleStreamer(guest, {
+      schedule: cb => {
+        fire = cb;
+        return () => {};
+      },
+    });
+
+    const awaited = guestStream.awaitEnemyParty(3, 1000);
+    expect(fire).not.toBeNull();
+    fire?.(); // simulate the timeout firing
+    expect(await awaited).toBeNull();
+  });
+
+  it("awaitEnemyParty for one wave is NOT satisfied by a stale OTHER wave's party", async () => {
+    const { host, guest } = createLoopbackPair();
+    const hostStream = new CoopBattleStreamer(host);
+    let fire: (() => void) | null = null;
+    const guestStream = new CoopBattleStreamer(guest, {
+      schedule: cb => {
+        fire = cb;
+        return () => {};
+      },
+    });
+
+    // Host sends wave 5; the guest is waiting on wave 6 -> the stale party never
+    // satisfies it, and it times out to null (then rolls its own).
+    hostStream.sendEnemyParty(5, [{ fieldIndex: 2, data: { speciesId: 1 } }]);
+    const awaited = guestStream.awaitEnemyParty(6, 1000);
+    await new Promise(r => setTimeout(r, 0));
+    fire?.();
+    expect(await awaited).toBeNull();
+  });
+
   it("a turn resolution the guest is awaiting is delivered (host -> guest lockstep replacement)", async () => {
     const { host, guest } = createLoopbackPair();
     const hostStream = new CoopBattleStreamer(host);

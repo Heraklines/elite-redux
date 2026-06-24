@@ -7,12 +7,16 @@ import Overrides from "#app/overrides";
 import { handleTutorial, Tutorial } from "#app/tutorial";
 import { initEncounterAnims, loadEncounterAnimAssets } from "#data/battle-anims";
 import { getCharVariantFromDialogue } from "#data/dialogue";
+import { captureCoopEnemies } from "#data/elite-redux/coop/coop-battle-engine";
+import { getCoopBattleStreamer, getCoopController } from "#data/elite-redux/coop/coop-runtime";
+import type { CoopSerializedEnemy, CoopSerializedPokemon } from "#data/elite-redux/coop/coop-transport";
 import { erBiomeForcedTerrain, erBiomeForcedWeather } from "#data/elite-redux/er-biome-rules";
 import { getErFinalBossSpecies, isErFinalBossSpecies } from "#data/elite-redux/er-final-boss";
 import { consumeErCarriedWeather } from "#data/elite-redux/er-map-nodes";
 import { erApplyCovenantHeal, erLookoutPreviewEnemy, erQuartermasterTick } from "#data/elite-redux/er-relics";
 import { getErDifficulty } from "#data/elite-redux/er-run-difficulty";
 import { CASCOON_ANGELS_WRATH_MOVES } from "#data/elite-redux/init-elite-redux-movesets";
+import type { Gender } from "#data/gender";
 import { getNatureName } from "#data/nature";
 import { BattleType } from "#enums/battle-type";
 import { BattlerIndex } from "#enums/battler-index";
@@ -20,6 +24,7 @@ import { BiomeId } from "#enums/biome-id";
 import { FieldPosition } from "#enums/field-position";
 import { ModifierPoolType } from "#enums/modifier-pool-type";
 import { MysteryEncounterMode } from "#enums/mystery-encounter-mode";
+import type { Nature } from "#enums/nature";
 import { PlayerGender } from "#enums/player-gender";
 import { SpeciesId } from "#enums/species-id";
 import { TrainerSlot } from "#enums/trainer-slot";
@@ -81,6 +86,77 @@ function buildDevEnemy(spec: DevEnemyMonSpec, fallbackLevel: number, trainerBatt
   return enemy;
 }
 
+/**
+ * How long a co-op GUEST waits for the host's enemy party before falling back to
+ * generating its own (#633, LIVE-D6). Generous: the host only knows its enemies
+ * after a human clears its save-slot screen, which can take a while.
+ */
+const COOP_ENEMY_PARTY_WAIT_MS = 120_000;
+
+/** Read a number field from an opaque serialized blob, or undefined if absent/wrong type. */
+function coopNum(blob: CoopSerializedPokemon, key: string): number | undefined {
+  const v = blob[key];
+  return typeof v === "number" ? v : undefined;
+}
+
+/**
+ * Co-op GUEST (#633, LIVE-D6): reconstruct ONE enemy from the host's serialized
+ * identity so the guest fights the host's EXACT mon (species / form / level /
+ * ability / nature / gender / IVs / moveset) instead of rolling its own from a
+ * diverged RNG. Mirrors {@linkcode buildDevEnemy}. Returns null when the species
+ * doesn't resolve, so the caller leaves the slot for normal generation.
+ */
+export function buildCoopEnemy(data: CoopSerializedPokemon, fallbackLevel: number): EnemyPokemon | null {
+  const speciesId = coopNum(data, "speciesId");
+  if (speciesId === undefined) {
+    return null;
+  }
+  const species = getPokemonSpecies(speciesId);
+  if (!species) {
+    return null;
+  }
+  const level = Math.max(1, Math.floor(coopNum(data, "level") ?? fallbackLevel));
+  const enemy = globalScene.addEnemyPokemon(species, level, TrainerSlot.NONE, false);
+  const formIndex = coopNum(data, "formIndex");
+  if (formIndex !== undefined) {
+    enemy.formIndex = formIndex;
+  }
+  const abilityIndex = coopNum(data, "abilityIndex");
+  if (abilityIndex !== undefined) {
+    enemy.abilityIndex = abilityIndex;
+  }
+  const nature = coopNum(data, "nature");
+  if (nature !== undefined) {
+    enemy.nature = nature as Nature;
+  }
+  const gender = coopNum(data, "gender");
+  if (gender !== undefined) {
+    enemy.gender = gender as Gender;
+  }
+  if (Array.isArray(data.ivs)) {
+    const ivs = (data.ivs as unknown[]).filter((n): n is number => typeof n === "number").slice(0, 6);
+    if (ivs.length === 6) {
+      enemy.ivs = ivs;
+    }
+  }
+  if (Array.isArray(data.moveset)) {
+    const moveIds = (data.moveset as unknown[]).filter((n): n is number => typeof n === "number");
+    if (moveIds.length > 0) {
+      const moves = moveIds.map(id => new PokemonMove(id));
+      enemy.moveset = moves;
+      enemy.summonData.moveset = moves.slice();
+    }
+  }
+  // Form / nature / IVs changed -> recompute stats + name, then align current hp.
+  enemy.calculateStats();
+  enemy.generateName();
+  const hp = coopNum(data, "hp");
+  if (hp !== undefined) {
+    enemy.hp = Math.max(0, Math.min(hp, enemy.getMaxHp()));
+  }
+  return enemy;
+}
+
 export class EncounterPhase extends BattlePhase {
   // Union type is necessary as this is subclassed, and typescript will otherwise complain
   public readonly phaseName: "EncounterPhase" | "NextEncounterPhase" | "NewBiomeEncounterPhase" = "EncounterPhase";
@@ -96,6 +172,102 @@ export class EncounterPhase extends BattlePhase {
   start() {
     super.start();
 
+    // Co-op GUEST (#633, LIVE-D6): adopt the host's authoritative enemy party BEFORE
+    // generating our own, so both clients fight byte-identical enemies (species
+    // included). The host only knows its enemies after it clears its own save-slot
+    // screen, so the guest waits (bounded; falls back to normal generation on
+    // timeout, never hangs). Solo / host / loaded runs go straight to runEncounter()
+    // synchronously below - byte-for-byte unchanged from before.
+    if (this.shouldAdoptCoopEnemyParty()) {
+      void this.runEncounterAfterCoopAdopt();
+      return;
+    }
+
+    this.runEncounter();
+  }
+
+  /** Whether THIS client must wait for + adopt the host's enemy party (co-op GUEST only). */
+  private shouldAdoptCoopEnemyParty(): boolean {
+    if (this.loaded || !globalScene.gameMode.isCoop) {
+      return false;
+    }
+    const controller = getCoopController();
+    const streamer = getCoopBattleStreamer();
+    if (controller == null || streamer == null || controller.role !== "guest") {
+      return false;
+    }
+    const battle = globalScene.currentBattle;
+    // Only WILD battles roll a random party that can diverge; trainer parties and
+    // mystery encounters are deterministic / handled elsewhere.
+    return battle != null && battle.battleType === BattleType.WILD && !battle.isBattleMysteryEncounter();
+  }
+
+  /** Co-op guest: wait for + adopt the host's enemy party, then run the encounter. */
+  private async runEncounterAfterCoopAdopt(): Promise<void> {
+    await this.adoptCoopHostEnemyParty();
+    this.runEncounter();
+  }
+
+  /**
+   * Co-op GUEST (#633, LIVE-D6): pull the host's authoritative enemy party off the
+   * stream and pre-populate `battle.enemyParty` from it, so {@linkcode runEncounter}'s
+   * generation loop SKIPS rolling our own (its `!battle.enemyParty[e]` guard) and we
+   * fight the host's exact mons. Fully guarded: a timeout / bad entry simply leaves
+   * the slot empty so the guest generates normally (divergent but never broken).
+   */
+  private async adoptCoopHostEnemyParty(): Promise<void> {
+    const streamer = getCoopBattleStreamer();
+    const battle = globalScene.currentBattle;
+    if (streamer == null || battle == null) {
+      return;
+    }
+    let enemies: CoopSerializedEnemy[] | null = null;
+    try {
+      enemies = await streamer.awaitEnemyParty(battle.waveIndex, COOP_ENEMY_PARTY_WAIT_MS);
+    } catch {
+      enemies = null;
+    }
+    if (enemies == null) {
+      return;
+    }
+    const levels = battle.enemyLevels ?? [];
+    for (const entry of enemies) {
+      if (battle.enemyParty[entry.fieldIndex] != null) {
+        continue;
+      }
+      try {
+        const built = buildCoopEnemy(entry.data, levels[entry.fieldIndex] ?? 1);
+        if (built != null) {
+          battle.enemyParty[entry.fieldIndex] = built;
+        }
+      } catch {
+        /* one enemy failed to reconstruct; leave the slot for normal generation */
+      }
+    }
+  }
+
+  /**
+   * Co-op HOST (#633, LIVE-D6): broadcast the just-generated enemy party so the guest
+   * (which paused its own encounter to wait) adopts these exact mons. No-op for solo /
+   * non-host. Best-effort + guarded - never blocks or breaks the host's encounter.
+   */
+  private broadcastCoopEnemyParty(): void {
+    if (!globalScene.gameMode.isCoop) {
+      return;
+    }
+    const controller = getCoopController();
+    const streamer = getCoopBattleStreamer();
+    if (controller == null || streamer == null || controller.role !== "host") {
+      return;
+    }
+    try {
+      streamer.sendEnemyParty(globalScene.currentBattle.waveIndex, captureCoopEnemies());
+    } catch {
+      /* a serialize/send failure must never break the host's encounter */
+    }
+  }
+
+  private runEncounter() {
     globalScene.updateGameInfo();
 
     globalScene.initSession();
@@ -276,6 +448,12 @@ export class EncounterPhase extends BattlePhase {
       console.log("Moveset:", moveset);
       return true;
     });
+
+    // Co-op HOST (#633, LIVE-D6): the enemy party is now generated - stream it so the
+    // waiting guest adopts these exact mons (no-op for solo / guest / loaded).
+    if (!this.loaded) {
+      this.broadcastCoopEnemyParty();
+    }
 
     if (globalScene.getPlayerParty().filter(p => p.isShiny()).length === PLAYER_PARTY_MAX_SIZE) {
       globalScene.validateAchv(achvs.SHINY_PARTY);
