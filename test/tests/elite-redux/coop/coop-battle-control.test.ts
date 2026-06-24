@@ -155,27 +155,36 @@ describe.skipIf(!RUN)("co-op battle control (#633, P2) - real engine (double bat
     expect(openedCommandForGuest).toBe(false);
   });
 
-  it("the HOST's OWN FIGHT command is BROADCAST over the transport (lockstep, LIVE-C)", async () => {
+  it("the HOST's OWN FIGHT command is BROADCAST with its RESOLVED target (lockstep, LIVE-C)", async () => {
     await startCoopDouble();
 
     // The host commits its own slot's move; in co-op that command must be broadcast
-    // as a `command` message for the LOCAL field index, so a real peer's partner-
-    // slot await resolves with the host's actual pick instead of its AI.
+    // as a `command` message for the LOCAL field index, so a real peer's partner-slot
+    // await resolves with the host's actual pick instead of its AI. Crucially the
+    // broadcast must carry the RESOLVED single target, NOT the multi-candidate set:
+    // TACKLE in a double has several legal targets (both foes + the ally), and the
+    // partner must not re-open target-select on a mon it does not control. For such a
+    // move the broadcast is DEFERRED until the human picks the target (sent from
+    // SelectTargetPhase) - this is the live "guest got the target cursor for the host's
+    // mon and was stuck choosing its own move" fix.
     const sendSpy = vi.spyOn(getCoopRuntime()!.localTransport, "send");
-    globalScene.currentBattle.turnCommands = {};
 
-    const hostPhase = game.scene.phaseManager.create("CommandPhase", COOP_HOST_FIELD_INDEX) as CommandPhase;
-    // Drive the host's own command directly (simulates the human's FIGHT pick).
-    hostPhase.handleCommand(Command.FIGHT, 0);
+    // Drive a REAL turn: the human picks TACKLE for the host slot (single-target,
+    // multiple candidates -> goes through target selection); the guest auto-resolves.
+    game.move.select(MoveId.TACKLE, COOP_HOST_FIELD_INDEX);
+    await game.phaseInterceptor.to("TurnEndPhase");
 
-    const broadcast = sendSpy.mock.calls.some(
-      ([msg]) =>
-        msg.t === "command" && msg.fieldIndex === COOP_HOST_FIELD_INDEX && msg.command.command === Command.FIGHT,
-    );
-    expect(broadcast).toBe(true);
-    // The local slot's turn command is set (the host's own pick), proving this is
-    // the local-commit path, not the partner await.
-    expect(globalScene.currentBattle.turnCommands[COOP_HOST_FIELD_INDEX]?.command).toBe(Command.FIGHT);
+    const hostBroadcasts = sendSpy.mock.calls
+      .map(([msg]) => msg)
+      .filter(
+        msg => msg.t === "command" && msg.fieldIndex === COOP_HOST_FIELD_INDEX && msg.command.command === Command.FIGHT,
+      );
+    // The host's own pick reached the wire as a FIGHT command for the local slot...
+    expect(hostBroadcasts.length).toBeGreaterThan(0);
+    // ...carrying exactly ONE resolved target (the chosen mon), never the candidate set.
+    const lastBroadcast = hostBroadcasts.at(-1);
+    expect(lastBroadcast?.t === "command" ? lastBroadcast.command.targets : undefined).toBeDefined();
+    expect(lastBroadcast?.t === "command" ? lastBroadcast.command.targets?.length : -1).toBe(1);
   });
 
   it("a SOLO (non-coop) FIGHT command is NOT broadcast (guard holds)", async () => {

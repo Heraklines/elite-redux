@@ -18,12 +18,14 @@
 // constructed over a real WebRTC transport instead and nothing here changes.
 // =============================================================================
 
+import { globalScene } from "#app/global-scene";
 import { CoopBattleStreamer } from "#data/elite-redux/coop/coop-battle-stream";
 import { CoopBattleSync } from "#data/elite-redux/coop/coop-battle-sync";
 import { CoopInteractionRelay } from "#data/elite-redux/coop/coop-interaction-relay";
+import { coopOwnerOfFieldIndex } from "#data/elite-redux/coop/coop-session";
 import { CoopSessionController } from "#data/elite-redux/coop/coop-session-controller";
 import { SpoofGuest } from "#data/elite-redux/coop/coop-spoof-guest";
-import { type CoopTransport, createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
+import { type CoopTransport, createLoopbackPair, type SerializedCommand } from "#data/elite-redux/coop/coop-transport";
 
 /** Everything tied to one live co-op session. */
 export interface CoopRuntime {
@@ -78,6 +80,27 @@ export function getCoopInteractionRelay(): CoopInteractionRelay | null {
 /** Whether a co-op session is currently active. */
 export function isCoopRuntimeActive(): boolean {
   return active != null;
+}
+
+/**
+ * Broadcast the LOCAL human's RESOLVED own-slot FIGHT command to the partner (#633).
+ * Shared by {@linkcode CommandPhase} (moves with no target prompt) and
+ * {@linkcode SelectTargetPhase} (the deferred broadcast once the human has actually
+ * picked the target), so the partner applies the EXACT chosen target instead of
+ * re-resolving a multi-candidate single-target move on a mon it does not control.
+ *
+ * Hard no-op unless we are in a live co-op run AND `fieldIndex` is the local player's
+ * OWN slot (the partner slot is the one we AWAIT, never broadcast) - so the solo path
+ * and the partner-slot path are byte-for-byte unaffected.
+ */
+export function broadcastCoopOwnSlotCommand(fieldIndex: number, command: SerializedCommand): void {
+  if (!globalScene.gameMode.isCoop || active == null) {
+    return;
+  }
+  if (coopOwnerOfFieldIndex(fieldIndex) !== active.controller.role) {
+    return;
+  }
+  active.battleSync.broadcastLocalCommand(fieldIndex, command);
 }
 
 /**

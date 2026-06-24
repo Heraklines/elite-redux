@@ -1,5 +1,6 @@
 import { globalScene } from "#app/global-scene";
 import { allMoves } from "#data/data-lists";
+import { broadcastCoopOwnSlotCommand } from "#data/elite-redux/coop/coop-runtime";
 import type { BattlerIndex } from "#enums/battler-index";
 import { Command } from "#enums/command";
 import { UiMode } from "#enums/ui-mode";
@@ -58,6 +59,21 @@ export class SelectTargetPhase extends PokemonPhase {
           globalScene.phaseManager.unshiftNew("CommandPhase", this.fieldIndex);
         } else {
           turnCommand.targets = targets;
+          // Co-op (#633): now that the LOCAL human has picked the actual target, relay
+          // this OWN-slot FIGHT command with the RESOLVED target. CommandPhase deferred
+          // the broadcast for exactly this reason, so the partner applies the chosen
+          // target verbatim instead of re-opening target-select on a mon it doesn't
+          // control (the live "stuck choosing for the partner's mon" bug). The helper
+          // is a hard no-op in solo and for the partner's slot.
+          if (turnCommand.command === Command.FIGHT && turnCommand.move) {
+            broadcastCoopOwnSlotCommand(this.fieldIndex, {
+              command: Command.FIGHT,
+              cursor: turnCommand.cursor ?? -1,
+              moveId: turnCommand.move.move,
+              targets,
+              useMode: turnCommand.move.useMode,
+            });
+          }
         }
         if (turnCommand.command === Command.BALL && this.fieldIndex) {
           globalScene.currentBattle.turnCommands[this.fieldIndex - 1]!.skip = true;

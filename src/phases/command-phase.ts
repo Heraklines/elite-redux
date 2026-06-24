@@ -425,8 +425,23 @@ export class CommandPhase extends FieldPhase {
       getPokemonNameWithAffix(playerPokemon),
     );
 
-    if (moveTargets.targets.length > 1 && moveTargets.multiple) {
+    // Co-op (#633): a RELAYED PARTNER command (a forced `move` on the field slot the
+    // local player does NOT control) carries the partner's already-RESOLVED targets -
+    // they are authoritative. Never open the interactive target-select for a mon we
+    // don't own (the live "guest got the target cursor for the host's Bulbasaur, then
+    // was stuck choosing Charmander's move" bug). Solo / own-slot / queued-move paths
+    // are unaffected: `coopController` is null outside a live co-op run.
+    const coopController = move !== undefined && globalScene.gameMode.isCoop ? getCoopController() : null;
+    const isCoopPartnerApply = coopController != null && coopOwnerOfFieldIndex(this.fieldIndex) !== coopController.role;
+
+    // Whether an interactive SelectTargetPhase was queued for THIS (own) command, so
+    // the co-op broadcast of our own pick is DEFERRED until SelectTargetPhase resolves
+    // the actual target (relaying the chosen target, not the candidate set).
+    let selectTargetQueued = false;
+
+    if (!isCoopPartnerApply && moveTargets.targets.length > 1 && moveTargets.multiple) {
       globalScene.phaseManager.unshiftNew("SelectTargetPhase", this.fieldIndex);
+      selectTargetQueued = true;
     }
 
     if (turnCommand.move && (moveTargets.targets.length <= 1 || moveTargets.multiple)) {
@@ -437,14 +452,24 @@ export class CommandPhase extends FieldPhase {
       && playerPokemon.getMoveQueue().length > 0
     ) {
       turnCommand.move.targets = playerPokemon.getMoveQueue()[0].targets;
+    } else if (isCoopPartnerApply && turnCommand.move) {
+      // Multi-candidate single-target partner move: apply the partner's resolved
+      // targets verbatim instead of opening target-select on a mon we don't control.
+      turnCommand.move.targets = moveTargets.targets;
     } else {
       globalScene.phaseManager.unshiftNew("SelectTargetPhase", this.fieldIndex);
+      selectTargetQueued = true;
     }
 
     globalScene.currentBattle.preTurnCommands[this.fieldIndex] = preTurnCommand;
     globalScene.currentBattle.turnCommands[this.fieldIndex] = turnCommand;
 
-    this.broadcastLocalCoopCommand(turnCommand, moveId, moveTargets.targets, useMode);
+    // Broadcast our own-slot command now ONLY if its target is already final. When an
+    // interactive SelectTargetPhase was queued, that phase broadcasts the RESOLVED
+    // command instead, so the partner never re-opens target-select / re-picks.
+    if (!selectTargetQueued) {
+      this.broadcastLocalCoopCommand(turnCommand, moveId, moveTargets.targets, useMode);
+    }
 
     return true;
   }
