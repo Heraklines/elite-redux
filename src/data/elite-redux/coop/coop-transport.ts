@@ -77,6 +77,83 @@ export interface CoopSerializedStarter {
   erBlackShiny?: boolean | undefined;
 }
 
+// =============================================================================
+// Host-authoritative battle STREAMING shapes (#633, LIVE-D). The host is the only
+// resolution engine; the guest renders these. All plain JSON so they serialize over
+// the real WebRTC transport, and structural (no engine-type import) so the transport
+// stays the lowest layer. `bi` = battler index (0 host lead, 1 guest lead, 2/3 enemies).
+// =============================================================================
+
+/**
+ * An opaque, JSON-safe serialized Pokemon: the host's `PokemonData` blob, which the
+ * guest reconstructs verbatim (same species/form/level/ability/IVs/moves/hp). Typed
+ * structurally so the transport layer imports no engine type; the host/guest code
+ * (which may import `PokemonData`) does the (de)serialization.
+ */
+export type CoopSerializedPokemon = Record<string, unknown>;
+
+/** One enemy mon the guest adopts verbatim instead of regenerating (no RNG on the guest). */
+export interface CoopSerializedEnemy {
+  /** Field slot this enemy occupies (2 or 3). */
+  fieldIndex: number;
+  /** The host's serialized enemy Pokemon. */
+  data: CoopSerializedPokemon;
+}
+
+/** The mutable per-turn battle state of ONE field mon (the guest already has the mon object). */
+export interface CoopSerializedMonState {
+  /** Battler index of this field mon. */
+  bi: number;
+  hp: number;
+  maxHp: number;
+  /** `StatusEffect` enum value (0 = none). */
+  status: number;
+  /** The 7 stat stages (ATK..ACC/EVA), absolute values. */
+  statStages: number[];
+  fainted: boolean;
+  /** Present only when the mon's form changed this turn. */
+  formIndex?: number | undefined;
+  /** Present only when the mon's active ability changed this turn (`AbilityId`). */
+  abilityId?: number | undefined;
+}
+
+/** Authoritative post-turn snapshot: enough to set the guest's field state exactly. */
+export interface CoopBattleCheckpoint {
+  /** Every occupied field mon's mutable state. */
+  field: CoopSerializedMonState[];
+  /** `WeatherType` enum value (0 = none) + turns remaining. */
+  weather: number;
+  weatherTurnsLeft: number;
+  /** `TerrainType` enum value (0 = none) + turns remaining. */
+  terrain: number;
+  terrainTurnsLeft: number;
+}
+
+/**
+ * One ordered visible thing that happened during a turn. The MVP renders only
+ * `message` (narration) and relies on the checkpoint for outcomes; the richer kinds
+ * drive per-move animation fidelity in a later pass.
+ */
+export type CoopBattleEvent =
+  /** A battle-log line, ALREADY localized by the host (the guest shows it verbatim). */
+  | { k: "message"; text: string }
+  /** A mon used a move (cue the "X used Y!" + move animation). */
+  | { k: "moveUsed"; bi: number; moveId: number; targets: number[] }
+  /** Set + tween a mon's hp to this value. */
+  | { k: "hp"; bi: number; hp: number; maxHp: number }
+  /** A mon fainted. */
+  | { k: "faint"; bi: number }
+  /** A mon's stat stage changed to this absolute value (`Stat` enum). */
+  | { k: "statStage"; bi: number; stat: number; value: number }
+  /** A mon's status changed (`StatusEffect` enum, 0 = cured). */
+  | { k: "status"; bi: number; status: number }
+  /** Weather changed (`WeatherType` enum). */
+  | { k: "weather"; weather: number; turnsLeft: number }
+  /** Terrain changed (`TerrainType` enum). */
+  | { k: "terrain"; terrain: number; turnsLeft: number }
+  /** A mon switched out for the party member at `partySlot`. */
+  | { k: "switch"; bi: number; partySlot: number };
+
 /**
  * The co-op wire protocol: a discriminated union on `t`. This GROWS per
  * implementation phase. Rule: every addition is a NEW `t` value with a typed
@@ -139,6 +216,23 @@ export type CoopMessage =
   | { t: "interaction"; screen: string; choice: unknown }
   /** Host -> guest authoritative state checkpoint: a compressed SessionSaveData blob (P2/P5). */
   | { t: "stateSync"; blob: string; seq: number }
+  /**
+   * Host -> guest (#633, LIVE-D): the EXACT enemy party the host generated for this
+   * `wave`. The guest adopts these verbatim instead of regenerating (so it never rolls
+   * its own enemy species/ability/IVs). Sent at encounter start.
+   */
+  | { t: "enemyPartySync"; wave: number; enemies: CoopSerializedEnemy[] }
+  /**
+   * Host -> guest (#633, LIVE-D): a fully-resolved turn. `events` is the ordered visible
+   * log the guest narrates/animates; `checkpoint` is the AUTHORITATIVE post-turn state the
+   * guest applies so it can never drift. The guest computes none of this itself.
+   */
+  | { t: "turnResolution"; turn: number; events: CoopBattleEvent[]; checkpoint: CoopBattleCheckpoint }
+  /**
+   * Host -> guest (#633, LIVE-D): an out-of-turn authoritative checkpoint (after a
+   * switch / capture / encounter start / resume). `reason` is a short tag for logging.
+   */
+  | { t: "battleCheckpoint"; reason: string; checkpoint: CoopBattleCheckpoint }
   /** Session lifecycle signal (P5). */
   | { t: "lifecycle"; event: CoopLifecycleEvent };
 
