@@ -25,6 +25,7 @@
 import { globalScene } from "#app/global-scene";
 import { EncoreTag } from "#data/battler-tags";
 import { allMoves } from "#data/data-lists";
+import type { SerializedCommand } from "#data/elite-redux/coop/coop-transport";
 import { BattlerIndex } from "#enums/battler-index";
 import { Command } from "#enums/command";
 import { MoveId } from "#enums/move-id";
@@ -149,5 +150,45 @@ export function resolvePartnerSlotCommand(partner: PlayerPokemon, slot: number):
       targets: resolvePartnerTargets(partner, move.moveId),
       useMode: MoveUseMode.NORMAL,
     },
+  };
+}
+
+/**
+ * Apply a partner's command received over the transport in LOCKSTEP (#633, LIVE-C),
+ * EXACTLY as the partner chose - the key to two engines staying in sync:
+ *  - the move is matched by MOVE ID, not the wire `cursor` index, because the two
+ *    clients' movesets can be ordered differently (index N != the same move), which
+ *    was making the partner use the wrong move (e.g. Sappy Seed vs Vine Whip);
+ *  - the partner's EXACT `targets` are used verbatim - NO seeded `randBattleSeedInt`
+ *    re-roll - so both engines consume the shared battle-RNG stream identically
+ *    (a host-side re-roll here shifted the stream and desynced damage/crits/faints).
+ * Returns `null` if the move can't be found in this client's moveset (caller then
+ * falls back to the AI picker so the turn never stalls).
+ */
+export function applyWiredPartnerCommand(
+  partner: PlayerPokemon,
+  cmd: SerializedCommand,
+): ResolvedPartnerCommand | null {
+  const moveset = partner.getMoveset();
+  let moveIndex = -1;
+  if (cmd.moveId != null && cmd.moveId !== MoveId.NONE) {
+    moveIndex = moveset.findIndex(m => m.moveId === cmd.moveId);
+  }
+  if (moveIndex < 0 && cmd.cursor >= 0 && cmd.cursor < moveset.length) {
+    moveIndex = cmd.cursor;
+  }
+  const move = moveIndex >= 0 ? moveset[moveIndex] : undefined;
+  if (move == null) {
+    return null;
+  }
+  // Use the partner's wired targets verbatim; only resolve host-side if none came.
+  const targets =
+    cmd.targets === undefined ? resolvePartnerTargets(partner, move.moveId) : (cmd.targets as BattlerIndex[]);
+  // `useMode` crosses the wire as a raw number; it IS a MoveUseMode enum value.
+  const useMode = (cmd.useMode ?? MoveUseMode.NORMAL) as MoveUseMode;
+  return {
+    command: Command.FIGHT,
+    moveIndex,
+    turnMove: { move: move.moveId, targets, useMode },
   };
 }

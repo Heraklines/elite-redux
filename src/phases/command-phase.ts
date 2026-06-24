@@ -6,9 +6,9 @@ import { TrappedTag } from "#data/battler-tags";
 import { getDailyEventSeedBoss } from "#data/daily-seed/daily-run";
 import { isDailyFinalBoss } from "#data/daily-seed/daily-seed-utils";
 import {
+  applyWiredPartnerCommand,
   type ResolvedPartnerCommand,
   resolvePartnerCommand,
-  resolvePartnerSlotCommand,
 } from "#data/elite-redux/coop/coop-partner-ai";
 import { getCoopBattleSync, getCoopController } from "#data/elite-redux/coop/coop-runtime";
 import { coopOwnerOfFieldIndex } from "#data/elite-redux/coop/coop-session";
@@ -215,14 +215,15 @@ export class CommandPhase extends FieldPhase {
       apply(fallback());
       return true;
     }
-    // Offer the legal move slots WE computed and await the partner's pick. The host
-    // re-validates the reply ({@linkcode resolvePartnerSlotCommand}); a missing /
-    // slow reply resolves null -> AI fallback.
+    // Offer the legal move slots WE computed and await the partner's pick. The
+    // partner's command is applied EXACTLY ({@linkcode applyWiredPartnerCommand}:
+    // matched by move ID + verbatim targets, no RNG re-roll) so both engines stay
+    // in lockstep; a missing / slow reply (or an unfindable move) -> AI fallback.
     const moveset = partner.getMoveset();
     const moveSlots = moveset.map((m, i) => (m.isUsable(partner, false, true)[0] ? i : -1)).filter(i => i >= 0);
     void sync
       .requestPartnerCommand(this.fieldIndex, globalScene.currentBattle.turn, moveSlots)
-      .then(cmd => apply(cmd == null ? fallback() : resolvePartnerSlotCommand(partner, cmd.cursor)));
+      .then(cmd => apply((cmd && applyWiredPartnerCommand(partner, cmd)) || fallback()));
     return true;
   }
 
