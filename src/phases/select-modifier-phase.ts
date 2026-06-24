@@ -6,7 +6,12 @@ import {
   COOP_INTERACTION_REROLL,
   type CoopInteractionChoice,
 } from "#data/elite-redux/coop/coop-interaction-relay";
-import { getCoopController, getCoopInteractionRelay, getCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
+import {
+  getCoopController,
+  getCoopInteractionRelay,
+  getCoopRuntime,
+  getCoopUiMirror,
+} from "#data/elite-redux/coop/coop-runtime";
 import { erBalanceArr, erBalanceNum } from "#data/elite-redux/er-balance-tuning";
 import { erScrapMagnetExtraRewards } from "#data/elite-redux/er-relics";
 import { BattleType } from "#enums/battle-type";
@@ -146,6 +151,7 @@ export class SelectModifierPhase extends BattlePhase {
               globalScene.ui.revertMode();
               globalScene.ui.setMode(UiMode.MESSAGE);
               // Co-op (#633): relay the skip to the watcher, then advance the turn.
+              this.coopEndMirror();
               this.coopRelaySend(COOP_INTERACTION_LEAVE, undefined, "skip");
               super.end();
               this.coopAdvanceInteractionIfHost();
@@ -198,6 +204,8 @@ export class SelectModifierPhase extends BattlePhase {
           `[coop-reward] OWNER drives reward screen (turn=${coopController.interactionCounter()} role=${coopController.role} spoof=${spoofed} wave=${globalScene.currentBattle?.waveIndex})`,
         );
         this.resetModifierSelect(modifierSelectCallback);
+        // Co-op (#633): relay our cursor so the partner's screen mirrors it live.
+        this.coopBeginMirror("owner");
       } else {
         console.log(
           `[coop-reward] WATCHER waits for partner's reward picks (turn=${coopController.interactionCounter()} role=${coopController.role} wave=${globalScene.currentBattle?.waveIndex})`,
@@ -216,6 +224,7 @@ export class SelectModifierPhase extends BattlePhase {
       globalScene.ui.clearText();
       globalScene.ui.setMode(UiMode.MESSAGE);
       // Co-op (#633): no reward to pick is the same as leaving - relay + advance.
+      this.coopEndMirror();
       this.coopRelaySend(COOP_INTERACTION_LEAVE, undefined, "skip");
       super.end();
       this.coopAdvanceInteractionIfHost();
@@ -438,6 +447,9 @@ export class SelectModifierPhase extends BattlePhase {
         globalScene.ui.playError();
       }
     } else {
+      // Co-op (#633): the reward screen is closing - stop mirroring the cursor (a queued
+      // move-learn continuation re-opens it via the copy phase, which re-begins the mirror).
+      this.coopEndMirror();
       globalScene.ui.clearText();
       globalScene.ui.setMode(UiMode.MESSAGE);
       super.end();
@@ -754,32 +766,68 @@ export class SelectModifierPhase extends BattlePhase {
     this.coopPendingKind = null;
   }
 
-  /** WATCHER: show a non-interactive "partner is choosing" message and mirror the
-   *  owner's relayed picks against this client's identical pool until they leave. */
+  /**
+   * Co-op (#633) live-cursor mirror seq for THIS reward screen. Combines the interaction
+   * turn with the reroll count so each reroll round gets its own cursor stream (stale
+   * cosmetic buttons from a prior round can never leak in). Owner and watcher compute it
+   * identically (same interaction counter + same rerollCount on the re-created phase).
+   */
+  private coopMirrorSeq(): number {
+    const controller = getCoopController();
+    return controller == null ? -1 : controller.interactionCounter() * 64 + Math.min(this.rerollCount, 63);
+  }
+
+  /**
+   * Co-op (#633): begin mirroring the top-level reward-screen cursor. The OWNER relays each
+   * button; the WATCHER replays them onto its identical screen. Bound to MODIFIER_SELECT, so
+   * it auto-goes-inert while a sub-menu (party target / fusion) is open and resumes on
+   * return. Hard no-op outside a live co-op run.
+   */
+  private coopBeginMirror(role: "owner" | "watcher"): void {
+    if (!globalScene.gameMode.isCoop || getCoopController() == null) {
+      return;
+    }
+    getCoopUiMirror()?.beginSession(role, UiMode.MODIFIER_SELECT, this.coopMirrorSeq());
+  }
+
+  /** Co-op (#633): stop mirroring (interaction left / rerolled / timed out). No-op in solo. */
+  private coopEndMirror(): void {
+    if (globalScene.gameMode.isCoop) {
+      getCoopUiMirror()?.endSession();
+    }
+  }
+
+  /** WATCHER: open the SAME reward screen the owner drives (read-only, cursor-mirrored) and
+   *  apply the owner's relayed picks against this client's identical pool until they leave. */
   private async startCoopWatch(): Promise<void> {
     this.coopWatcher = true;
     const controller = getCoopController();
     const relay = getCoopInteractionRelay();
-    await globalScene.ui.setMode(UiMode.MESSAGE);
-    globalScene.ui.showText(
-      i18next.t("battle:coopPartnerChoosingReward", {
-        defaultValue: "Your partner is choosing the wave reward...",
-      }),
-      null,
-      () => {},
-      null,
-      true,
-    );
     if (controller == null || relay == null) {
       // No live session: fail safe by leaving the screen so the run never hangs.
-      globalScene.ui.setMode(UiMode.MESSAGE).then(() => super.end());
+      await globalScene.ui.setMode(UiMode.MESSAGE);
+      super.end();
       return;
     }
+    // Open the SAME reward screen the owner drives (identical seeded options/prices/money),
+    // with a NO-OP callback: the watcher's local input is blocked at the UI layer, replayed
+    // owner buttons only move the cursor, and the AUTHORITATIVE outcome is the relayed action
+    // loop below. The watcher's apply path never touches this handler (all `!coopWatcher`
+    // guarded), so the open screen is purely a cosmetic, cursor-mirrored projection.
+    await globalScene.ui.setMode(
+      UiMode.MODIFIER_SELECT,
+      this.isPlayer(),
+      this.typeOptions,
+      () => false,
+      this.getRerollCost(globalScene.lockModifierTiers),
+    );
+    this.coopBeginMirror("watcher");
     const seq = controller.interactionCounter();
     for (;;) {
       const action = await relay.awaitInteractionChoice(seq, COOP_REWARD_WAIT_MS);
       if (action == null) {
         console.log("[coop-reward] WATCHER timed out waiting for partner -> leaving reward screen");
+        this.coopEndMirror();
         globalScene.ui.setMode(UiMode.MESSAGE).then(() => super.end());
         this.coopAdvanceInteractionIfHost();
         return;
@@ -798,13 +846,16 @@ export class SelectModifierPhase extends BattlePhase {
   private applyRelayedRewardAction(action: CoopInteractionChoice): boolean {
     const noop: ModifierSelectCallback = () => false;
     if (action.choice === COOP_INTERACTION_LEAVE) {
+      this.coopEndMirror();
       globalScene.ui.setMode(UiMode.MESSAGE).then(() => super.end());
       this.coopAdvanceInteractionIfHost();
       return true;
     }
     if (action.choice === COOP_INTERACTION_REROLL) {
-      // rerollModifiers unshifts a fresh SelectModifierPhase (which re-enters watch on
-      // the same seq) and ends this one.
+      // rerollModifiers unshifts a fresh SelectModifierPhase (which re-enters watch on the
+      // same interaction seq, but a NEW mirror seq since rerollCount bumps) and ends this
+      // one - so end this round's cursor stream before the new screen opens.
+      this.coopEndMirror();
       this.rerollModifiers();
       return true;
     }
