@@ -5733,6 +5733,20 @@ export class StarterSelectUiHandler extends MessageUiHandler {
               // roster tier for the whole run) and reset the per-run "already
               // encountered" ER trainer set so the new run starts fresh.
               setErDifficulty(difficulty);
+              // Co-op (#633): the HOST publishes the authoritative run config
+              // (difficulty + challenges) so the guest mirrors it - the run stays
+              // coherent (both players get the same difficulty + challenge set).
+              const coopHost = getCoopController();
+              if (coopHost?.role === "host") {
+                coopHost.broadcastRunConfig({
+                  difficulty,
+                  challenges: globalScene.gameMode.challenges.map(c => ({
+                    id: c.id,
+                    value: c.value,
+                    severity: c.severity,
+                  })),
+                });
+              }
               resetErRunTrainerTracking();
               resetErGhostRunState();
               resetErMapNodes();
@@ -5768,6 +5782,36 @@ export class StarterSelectUiHandler extends MessageUiHandler {
                 return true;
               },
             });
+            // Co-op (#633): the GUEST does not choose - it follows the HOST's
+            // broadcast difficulty + challenges so the run is coherent. Apply the
+            // host's config and launch; if it hasn't arrived yet, wait for it.
+            const coopGuest = getCoopController();
+            if (coopGuest?.role === "guest") {
+              const applyHostConfig = (): boolean => {
+                const cfg = coopGuest.runConfig();
+                if (!cfg) {
+                  return false;
+                }
+                for (const ch of cfg.challenges) {
+                  const match = globalScene.gameMode.challenges.find(c => c.id === ch.id);
+                  if (match) {
+                    match.value = ch.value;
+                    match.severity = ch.severity;
+                  }
+                }
+                startRun(cfg.difficulty as ErDifficulty);
+                return true;
+              };
+              if (!applyHostConfig()) {
+                this.showText("Waiting for the host to choose difficulty...");
+                const off = coopGuest.onChange(() => {
+                  if (applyHostConfig()) {
+                    off();
+                  }
+                });
+              }
+              return;
+            }
             ui.setOverlayMode(UiMode.OPTION_SELECT, {
               // Without supportHover the option-select handler NEVER invokes
               // onHover - the mode descriptions were silently dead (#368).
