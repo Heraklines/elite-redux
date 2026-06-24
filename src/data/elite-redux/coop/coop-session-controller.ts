@@ -93,6 +93,8 @@ export interface CoopSessionOptions {
   username?: string | undefined;
   /** Protocol/game version for the handshake (clients are version-gated at pairing). */
   version?: string | undefined;
+  /** Injectable role-tiebreak nonce (tests); defaults to a random value per client. */
+  tiebreak?: number | undefined;
 }
 
 /**
@@ -100,8 +102,14 @@ export interface CoopSessionOptions {
  * instance per client; the host's instance is the authority that builds the run.
  */
 export class CoopSessionController {
-  readonly role: CoopRole;
-  readonly partnerRoleId: CoopRole;
+  // NOT readonly: a role CONFLICT (lobby assigned both clients the same role) is
+  // reconciled deterministically on the `hello` handshake (#633), which reassigns
+  // these. Reconciliation happens before roster/battle, so downstream role-keyed
+  // state is unaffected.
+  role: CoopRole;
+  partnerRoleId: CoopRole;
+  /** Per-client random nonce broadcast in `hello` to break a role tie deterministically. */
+  private readonly tiebreak: number;
   private readonly transport: CoopTransport;
   private readonly username: string;
   private readonly version: string;
@@ -124,6 +132,7 @@ export class CoopSessionController {
     this.transport = transport;
     this.role = transport.role;
     this.partnerRoleId = coopPartnerRole(transport.role);
+    this.tiebreak = opts.tiebreak ?? Math.random();
     this.username = opts.username ?? (transport.role === "host" ? "Player 1" : "Player 2");
     this.version = opts.version ?? "1";
     this.offMessage = transport.onMessage(msg => this.handleMessage(msg));
@@ -131,7 +140,13 @@ export class CoopSessionController {
 
   /** Announce ourselves to the partner. Call once the transport is connected. */
   connect(): void {
-    this.transport.send({ t: "hello", version: this.version, username: this.username, role: this.role });
+    this.transport.send({
+      t: "hello",
+      version: this.version,
+      username: this.username,
+      role: this.role,
+      tiebreak: this.tiebreak,
+    });
   }
 
   /**
@@ -311,13 +326,32 @@ export class CoopSessionController {
 
   private handleMessage(msg: CoopMessage): void {
     switch (msg.t) {
-      case "hello":
-        if (msg.role === this.partnerRoleId) {
-          this._partnerConnected = true;
-          this._partnerName = msg.username;
-          this.emit();
+      case "hello": {
+        // Deterministic role reconciliation (#633): if the peer claims the SAME role
+        // as us (the lobby race assigned both clients the same role - the live "both
+        // wait, nobody commands the 2nd slot, 30s stall" bug), break the tie IDENTICALLY
+        // on both clients so exactly one ends up host (field 0) and the other guest
+        // (field 1). Lower tiebreak nonce -> host; ties fall back to the username, then
+        // to the existing role. Runs on the handshake, before roster/battle, so all
+        // role-keyed state downstream sees the corrected role.
+        if (msg.role === this.role) {
+          const peerTie = typeof msg.tiebreak === "number" ? msg.tiebreak : Number.POSITIVE_INFINITY;
+          let iAmHost: boolean;
+          if (this.tiebreak !== peerTie) {
+            iAmHost = this.tiebreak < peerTie;
+          } else if (this.username === msg.username) {
+            iAmHost = this.role === "host"; // degenerate: identical everything; keep as-is
+          } else {
+            iAmHost = this.username < msg.username;
+          }
+          this.role = iAmHost ? "host" : "guest";
+          this.partnerRoleId = coopPartnerRole(this.role);
         }
+        this._partnerConnected = true;
+        this._partnerName = msg.username;
+        this.emit();
         break;
+      }
       case "rosterSync":
         if (msg.role === this.partnerRoleId) {
           this.roster.replace(this.partnerRoleId, msg.entries);

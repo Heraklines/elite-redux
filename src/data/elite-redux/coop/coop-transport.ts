@@ -161,8 +161,15 @@ export type CoopBattleEvent =
  * version-gated at pairing, but forward-compat keeps reconnects safe).
  */
 export type CoopMessage =
-  /** Handshake on connect: protocol/game version + the sender's account name + role. */
-  | { t: "hello"; version: string; username: string; role: CoopRole }
+  /**
+   * Handshake on connect: protocol/game version + the sender's account name + role.
+   * `tiebreak` (#633) is a per-client random nonce used to DETERMINISTICALLY resolve a
+   * role CONFLICT: if the lobby ever assigns both clients the same role, each side
+   * independently picks host = the lower tiebreak, so exactly one drives field slot 0
+   * and the other slot 1 (without it, both await the other slot and the turn stalls).
+   * Optional + additive (older clients omit it; reconciliation then falls back to name).
+   */
+  | { t: "hello"; version: string; username: string; role: CoopRole; tiebreak?: number }
   /** Keepalive / latency probe. */
   | { t: "ping"; ts: number }
   | { t: "pong"; ts: number }

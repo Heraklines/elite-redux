@@ -10,7 +10,7 @@ import { bypassLogin, isBeta, isDev } from "#constants/app-constants";
 import { getDailyRunStarters, startDailyEventChallenges } from "#data/daily-seed/daily-run";
 import { modifierTypes } from "#data/data-lists";
 import { CoopLobbyController, type LobbyPlayer } from "#data/elite-redux/coop/coop-lobby";
-import { startLocalCoopSession } from "#data/elite-redux/coop/coop-runtime";
+import { getCoopController, startLocalCoopSession } from "#data/elite-redux/coop/coop-runtime";
 import { Gender } from "#data/gender";
 import { BattleType } from "#enums/battle-type";
 import { GameModes } from "#enums/game-modes";
@@ -480,10 +480,12 @@ export class TitlePhase extends Phase {
       if (this.gameMode === GameModes.LLM_DIRECTOR) {
         globalScene.phaseManager.pushNew("LLMDirectorStartPhase");
       }
-      if (this.gameMode === GameModes.CHALLENGE || this.gameMode === GameModes.COOP) {
-        // Co-op (#633) routes through the challenge-select screen too, so challenges
-        // are selectable inside co-op (the screen's Start unshifts SelectStarterPhase,
-        // which then takes the co-op branch). Pick nothing = plain co-op.
+      // Co-op (#633): only the HOST picks challenges; the GUEST skips the
+      // challenge-select screen entirely and mirrors the host's choice via the
+      // runConfig sync (the host's Start broadcasts difficulty + challenges). Without
+      // this the guest also saw + picked its own challenges, which was incoherent.
+      const isCoopGuest = this.gameMode === GameModes.COOP && getCoopController()?.role === "guest";
+      if ((this.gameMode === GameModes.CHALLENGE || this.gameMode === GameModes.COOP) && !isCoopGuest) {
         globalScene.phaseManager.pushNew("SelectChallengePhase");
       } else {
         globalScene.phaseManager.pushNew("SelectStarterPhase");
