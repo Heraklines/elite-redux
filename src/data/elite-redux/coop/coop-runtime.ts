@@ -26,6 +26,7 @@ import { coopOwnerOfFieldIndex } from "#data/elite-redux/coop/coop-session";
 import { CoopSessionController } from "#data/elite-redux/coop/coop-session-controller";
 import { SpoofGuest } from "#data/elite-redux/coop/coop-spoof-guest";
 import { type CoopTransport, createLoopbackPair, type SerializedCommand } from "#data/elite-redux/coop/coop-transport";
+import { CoopUiMirror } from "#data/elite-redux/coop/coop-ui-mirror";
 
 /** Everything tied to one live co-op session. */
 export interface CoopRuntime {
@@ -37,6 +38,8 @@ export interface CoopRuntime {
   battleStream: CoopBattleStreamer;
   /** Owner->watcher relay for alternating reward/shop/ME interactions (#633). */
   interactionRelay: CoopInteractionRelay;
+  /** Owner->watcher COSMETIC live-cursor mirror for shared interaction screens (#633). */
+  uiMirror: CoopUiMirror;
   /** The local client's transport endpoint. */
   localTransport: CoopTransport;
   /** The spoofed partner's transport endpoint (local dev only; absent for real peers). */
@@ -75,6 +78,11 @@ export function getCoopBattleStreamer(): CoopBattleStreamer | null {
 /** Convenience: the alternating-interaction relay, or null when not in a co-op run. */
 export function getCoopInteractionRelay(): CoopInteractionRelay | null {
   return active?.interactionRelay ?? null;
+}
+
+/** Convenience: the live-cursor UI mirror, or null when not in a co-op run. */
+export function getCoopUiMirror(): CoopUiMirror | null {
+  return active?.uiMirror ?? null;
 }
 
 /** Whether a co-op session is currently active. */
@@ -117,12 +125,14 @@ export function startLocalCoopSession(opts: { username?: string | undefined } = 
   const battleSync = new CoopBattleSync(host);
   const battleStream = new CoopBattleStreamer(host);
   const interactionRelay = new CoopInteractionRelay(host);
+  const uiMirror = new CoopUiMirror(host);
   const spoof = new SpoofGuest(guest);
   const runtime: CoopRuntime = {
     controller,
     battleSync,
     battleStream,
     interactionRelay,
+    uiMirror,
     localTransport: host,
     partnerTransport: guest,
     spoof,
@@ -149,7 +159,15 @@ export function connectCoopSession(
   const battleSync = new CoopBattleSync(transport);
   const battleStream = new CoopBattleStreamer(transport);
   const interactionRelay = new CoopInteractionRelay(transport);
-  const runtime: CoopRuntime = { controller, battleSync, battleStream, interactionRelay, localTransport: transport };
+  const uiMirror = new CoopUiMirror(transport);
+  const runtime: CoopRuntime = {
+    controller,
+    battleSync,
+    battleStream,
+    interactionRelay,
+    uiMirror,
+    localTransport: transport,
+  };
   setCoopRuntime(runtime);
   controller.connect();
   return runtime;
@@ -164,6 +182,7 @@ export function clearCoopRuntime(): void {
   active.battleSync.dispose();
   active.battleStream.dispose();
   active.interactionRelay.dispose();
+  active.uiMirror.dispose();
   active.spoof?.dispose();
   active.localTransport.close();
   active = null;

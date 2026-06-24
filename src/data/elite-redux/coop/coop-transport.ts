@@ -251,6 +251,20 @@ export type CoopMessage =
    *  - `data`   optional extra indices (e.g. party-target slot, ME sub-option)
    */
   | { t: "interactionChoice"; seq: number; kind: string; choice: number; data?: number[] }
+  /**
+   * Owner -> watcher (#633): a COSMETIC live-cursor button on a shared interaction
+   * screen. The watcher replays `button` into its identical screen so the partner
+   * sees the cursor move / sub-panels open in real time. This is a VISUAL stream
+   * only - the authoritative outcome is still the `interactionChoice` commit, so a
+   * dropped/late/out-of-order `uiInput` can never change the run, only stutter the
+   * cursor.
+   *  - `seq`    the shared-screen session id (matches the interaction-counter)
+   *  - `n`      monotonic per-session index (FIFO order; dedup; gap detection)
+   *  - `button` the Button enum value the owner pressed
+   *  - `mode`   the owner's UiMode BEFORE processing it (resync barrier; the watcher
+   *             stops mirroring if its mode no longer matches, then the commit drives)
+   */
+  | { t: "uiInput"; seq: number; n: number; button: number; mode: number }
   /** Session lifecycle signal (P5). */
   | { t: "lifecycle"; event: CoopLifecycleEvent };
 

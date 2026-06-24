@@ -1,4 +1,6 @@
 import { globalScene } from "#app/global-scene";
+import { getCoopUiMirror } from "#data/elite-redux/coop/coop-runtime";
+import type { CoopUiMirrorEngine } from "#data/elite-redux/coop/coop-ui-mirror";
 import type { Button } from "#enums/buttons";
 import { Device } from "#enums/devices";
 import { PlayerGender } from "#enums/player-gender";
@@ -136,6 +138,9 @@ export class UI extends Phaser.GameObjects.Container {
   private tooltipContent: Phaser.GameObjects.Text;
 
   private overlayActive: boolean;
+
+  /** Co-op (#633): cached engine surface for the live-cursor UI mirror (lazily built). */
+  private _coopMirrorEngine: CoopUiMirrorEngine | null = null;
 
   constructor() {
     super(globalScene, 0, globalScene.scaledCanvas.height);
@@ -279,6 +284,27 @@ export class UI extends Phaser.GameObjects.Container {
    * @returns true if the input attempt succeeds
    */
   processInput(button: Button): boolean {
+    // Co-op (#633): on a SHARED interaction screen the live-cursor mirror governs input -
+    // the WATCHER's local presses are blocked, and the OWNER's presses are relayed for the
+    // partner to replay so the cursor mirrors live. HARD no-op everywhere else: `isCoop`
+    // short-circuits in solo, and `isActive(this.mode)` is false on any non-shared screen
+    // (incl. the battle command menu), so the dispatch below is byte-for-byte unchanged.
+    if (globalScene.gameMode.isCoop) {
+      const mirror = getCoopUiMirror();
+      if (mirror != null && mirror.isActive(this.mode)) {
+        if (mirror.isWatcher()) {
+          return false; // the partner drives this screen; ignore the watcher's local input
+        }
+        const result = this.processInputInner(button); // OWNER: drive locally...
+        mirror.relayOwnerButton(button, this.mode); // ...then relay the cursor for the partner
+        return result;
+      }
+    }
+    return this.processInputInner(button);
+  }
+
+  /** The original input dispatch, reused by the co-op mirror's owner + replay paths (#633). */
+  private processInputInner(button: Button): boolean {
     if (this.overlayActive) {
       return false;
     }
@@ -290,6 +316,17 @@ export class UI extends Phaser.GameObjects.Container {
     }
 
     return handler.processInput(button);
+  }
+
+  /** Stable engine surface handed to the co-op UI mirror (created once, reused) (#633). */
+  private coopMirrorEngine(): CoopUiMirrorEngine {
+    if (this._coopMirrorEngine == null) {
+      this._coopMirrorEngine = {
+        getMode: () => this.mode,
+        applyButton: (b: Button) => this.processInputInner(b),
+      };
+    }
+    return this._coopMirrorEngine;
   }
 
   showTextPromise(text: string, callbackDelay = 0, prompt = true, promptDelay?: number | null): Promise<void> {
@@ -550,6 +587,12 @@ export class UI extends Phaser.GameObjects.Container {
     chainMode: boolean,
     args: any[],
   ): Promise<void> {
+    // Co-op (#633): keep the live-cursor mirror's engine surface attached so the WATCHER
+    // can replay the owner's relayed buttons even while the local human is idle (its screen
+    // opens via setMode, not via local input). Cheap + idempotent; hard no-op in solo.
+    if (globalScene.gameMode.isCoop) {
+      getCoopUiMirror()?.attach(this.coopMirrorEngine());
+    }
     return new Promise(resolve => {
       if (this.mode === mode && !forceTransition) {
         resolve();
