@@ -1,4 +1,20 @@
 {
+  "SPECIES_ARCANINE_MEGA_REDUX": {
+    "hidden": 1,
+    "innates": [
+      5733,
+      55,
+      17
+    ]
+  },
+  "SPECIES_ARCANINE_REDUX": {
+    "hidden": 1,
+    "innates": [
+      5075,
+      181,
+      18
+    ]
+  },
   "SPECIES_BISHARP_REDUX": {
     "ability1": 128,
     "ability2": 101,
@@ -39,6 +55,24 @@
       5020
     ]
   },
+  "SPECIES_EMPOLEON_REDUX_MEGA": {
+    "ability1": 190,
+    "ability2": 117,
+    "hidden": 5564,
+    "innates": [
+      185,
+      5206,
+      5563
+    ]
+  },
+  "SPECIES_GROWLITHE_REDUX": {
+    "hidden": 1,
+    "innates": [
+      5075,
+      181,
+      18
+    ]
+  },
   "SPECIES_HISUI_ZORUA": {
     "ability1": 5171,
     "ability2": 5333,
@@ -47,6 +81,13 @@
       5526,
       5014,
       290
+    ]
+  },
+  "SPECIES_HYDREIGON_REDUX_MEGA": {
+    "innates": [
+      5355,
+      5085,
+      5426
     ]
   },
   "SPECIES_KINGAMBIT_REDUX": {
