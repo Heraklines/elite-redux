@@ -1,0 +1,86 @@
+url:      https://elite-redux-staging.pages.dev/
+build:    mqsgmwpv-1dl2
+mode:     6  wave:1
+seed:     YCTICi9AuCnE9WTd6U9LbbXQ
+party:    Bulbasaur(L5 21hp f0), Charmander(L5 20hp f0), Squirtle(L5 21hp f0), Chikorita(L5 20hp f0), Caterpie(L5 21hp f0)
+enemy:    Rattata(L2), Fletchling(L2)
+
+----- COMMENT -----
+Stuck on go charmander
+
+----- CONSOLE -----
+[19:50:23.367] LOG: %c %c %c %c %c Phaser v3.90.0 (WebGL | Web Audio) %c https://phaser.io/v390 background: #ff0000 background: #ffff00 background: #00ff00 background: #00ffff color: #ffffff; background: #000000 background: transparent
+[19:50:23.889] LOG: [ER] build mqsgmwpv-1dl2
+[19:50:24.314] LOG: [dev-tools] loaded — 306 scenarios + Send Logs button
+[19:50:56.098] DEBUG: Destroying loading scene
+[19:50:56.098] DEBUG: Destroyed loading scene
+[19:50:56.197] LOG: Seed: NxYZ3domEWhYLvMU5Kl4naPL
+[19:50:56.197] LOG: Wave Seed: NxYZ3domEWhYLvMU5Kl4naPL 0
+[19:50:57.707] LOG: %cStart Phase LoginPhase color:green;
+[19:54:00.439] LOG: Client Session: woqPrua1GKKyVsVc9IP0DTBhLrQRq53b
+[19:54:01.326] LOG: %cStart Phase TitlePhase color:green;
+[19:54:01.327] LOG: Getting Session Slot id: %d 0
+[19:54:01.691] LOG: use seasonal splash messages true
+[19:54:01.691] LOG: Adding 2 Pride Month splash messages (weight: x15)
+[19:54:41.212] LOG: [coop-launch] title challenge-gate: role=guest isCoopGuest=true -> SelectStarterPhase
+[19:54:41.213] LOG: %cStart Phase SelectStarterPhase color:green;
+[19:54:41.213] LOG: [coop-launch] startCoopSelect role=guest partnerConnected=true partnerReady=false
+[19:54:49.579] LOG: [coop-launch] proceedIfReady launched=false localTeam=0 bothReady=false role=guest partnerReady=false
+[19:54:49.609] LOG: [coop-launch] proceedIfReady launched=false localTeam=0 bothReady=false role=guest partnerReady=false
+[19:54:49.613] LOG: [coop-launch] proceedIfReady launched=false localTeam=0 bothReady=false role=guest partnerReady=true
+[19:54:56.690] WARN: cry/1 not found
+[19:54:57.450] WARN: cry/167 not found
+[19:55:04.335] WARN: cry/4 not found
+[19:55:08.326] WARN: cry/152 not found
+[19:55:13.420] LOG: Wave Seed: YCTICi9AuCnE9WTd6U9LbbXQ 0
+[19:55:13.420] LOG: [coop-launch] local team locked in: 2 mons, role=guest
+[19:55:13.420] LOG: [coop-launch] proceedIfReady launched=false localTeam=2 bothReady=false role=guest partnerReady=true
+[19:55:13.421] LOG: [coop-launch] proceedIfReady launched=false localTeam=2 bothReady=true role=guest partnerReady=true
+[19:55:13.421] LOG: [coop-launch] launchCoopMergedParty role=guest merged=5 slot=0
+[19:55:13.421] LOG: [coop-launch] guest: clearing STARTER_SELECT -> MESSAGE, then initBattle
+[19:55:13.421] LOG: [coop-launch] proceedIfReady launched=true localTeam=2 bothReady=true role=guest partnerReady=true
+[19:55:14.627] LOG: Wave Seed: ZDUJDj:BvDoF:XUe7V:MccYR 1
+[19:55:14.629] LOG: %cStart Phase EncounterPhase color:green;
+[19:55:20.432] LOG: Pokemon: Wild Rattata | Species ID: 19 | Level: 2 | Nature: Brave (+Atk/-Spd)
+[19:55:20.432] LOG: Stats (IVs): HP: 13 (18), Atk: 8 (16), Def: 6 (2), Spatk: 6 (8), Spdef: 6 (8), Spd: 6 (5)
+[19:55:20.433] LOG: Ability: Hustle | Passive Ability: Guts 
+[19:55:20.433] LOG: Moveset: ["Quick Attack","Fire Fang","After You","Thunder Fang"]
+[19:55:20.433] LOG: Pokemon: Wild Fletchling | Species ID: 661 | Level: 2 | Nature: Lax (+Def/-SpDef)
+[19:55:20.433] LOG: Stats (IVs): HP: 14 (20), Atk: 7 (10), Def: 8 (18), Spatk: 6 (17), Spdef: 5 (21), Spd: 7 (23)
+[19:55:20.433] LOG: Ability: Gale Wings | Passive Ability: Flock 
+[19:55:20.433] LOG: Moveset: ["Air Cutter","Growl","Peck","Flail"]
+[19:55:25.044] DEBUG: Session data saved to slot 0!
+[19:55:40.058] WARN: Could not update all savedata! AbortError: signal is aborted without reason
+AbortError: signal is aborted without reason
+    at https://elite-redux-staging.pages.dev/assets/BBCodeText-nCxk5Ccz.js:1:22449
+[19:55:40.059] ERROR: Unknown error
+[19:55:40.060] LOG: Wave Seed: ZDUJDj:BvDoF:XUe7V:MccYR 1
+[19:55:41.575] LOG: %cStart Phase SummonPhase color:green;
+[19:55:42.158] WARN: cry/1 not found
+[19:55:42.508] LOG: %cStart Phase ShinySparklePhase color:green;
+[19:55:42.858] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[19:55:42.858] LOG: %cStart Phase SummonPhase color:green;
+[19:55:43.458] WARN: cry/4 not found
+[19:55:43.808] LOG: %cStart Phase CheckSwitchPhase color:green;
+[19:55:43.808] LOG: %cStart Phase CheckSwitchPhase color:green;
+[19:55:43.808] LOG: %cStart Phase InitEncounterPhase color:green;
+[19:55:43.811] LOG: %cStart Phase PostSummonPhase color:green;
+[19:55:43.812] LOG: Ran PSP for: Charmander
+[19:55:43.815] LOG: %cStart Phase PostSummonPhase color:green;
+[19:55:43.815] LOG: %cStart Phase PostSummonPhase color:green;
+[19:55:43.815] LOG: Ran PSP for: Bulbasaur
+[19:55:43.816] LOG: %cStart Phase PostSummonPhase color:green;
+[19:55:43.817] LOG: %cStart Phase PostSummonPhase color:green;
+[19:55:43.817] LOG: Ran PSP for: Fletchling
+[19:55:43.817] LOG: %cStart Phase PostSummonPhase color:green;
+[19:55:43.817] LOG: %cStart Phase PostSummonPhase color:green;
+[19:55:43.818] LOG: %cStart Phase PostSummonPhase color:green;
+[19:55:43.818] LOG: Ran PSP for: Rattata
+[19:55:43.818] LOG: %cStart Phase PostSummonPhase color:green;
+[19:55:43.818] LOG: %cStart Phase PostSummonPhase color:green;
+[19:55:43.818] LOG: %cStart Phase TurnInitPhase color:green;
+[19:55:43.818] LOG: %cStart Phase CommandPhase color:green;
+[19:55:43.820] LOG: Move: MALIGNANT_CHAIN Move targets: {"targets":[2,3,1],"multiple":false} 
+Player Pokemon: Bulbasaur
+[19:55:43.820] LOG: %cStart Phase SelectTargetPhase color:green;
+[19:55:54.868] LOG: %cStart Phase CommandPhase color:green;
