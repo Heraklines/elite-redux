@@ -1,0 +1,113 @@
+url:      https://elite-redux-staging.pages.dev/
+build:    mqs7cl5d-9ylc
+mode:     6  wave:1
+seed:     Bk7KItPFIF0YzwqoJvM86Ks6
+party:    Bulbasaur(L5 21hp f0), Bulbasaur(L5 20hp f0), Squirtle(L5 21hp f0), Chikorita(L5 20hp f0), Weedle(L5 20hp f0)
+enemy:    Cleffa(L2), Blipbug(L2)
+
+----- COMMENT -----
+p2
+
+----- CONSOLE -----
+[15:04:11.675] LOG: %c %c %c %c %c Phaser v3.90.0 (WebGL | Web Audio) %c https://phaser.io/v390 background: #ff0000 background: #ffff00 background: #00ff00 background: #00ffff color: #ffffff; background: #000000 background: transparent
+[15:04:12.051] LOG: [ER] build mqs7cl5d-9ylc
+[15:04:12.093] LOG: [dev-tools] loaded — 306 scenarios + Send Logs button
+[15:04:35.694] DEBUG: Destroying loading scene
+[15:04:35.694] DEBUG: Destroyed loading scene
+[15:04:36.001] LOG: Seed: Bk7KItPFIF0YzwqoJvM86Ks6
+[15:04:36.001] LOG: Wave Seed: Bk7KItPFIF0YzwqoJvM86Ks6 0
+[15:04:42.381] LOG: %cStart Phase LoginPhase color:green;
+[15:04:42.689] LOG: Client Session: KOMLUdbC38N6gju9FGDko7lQYjmsvxZM
+[15:04:43.265] LOG: %cStart Phase TitlePhase color:green;
+[15:04:43.266] LOG: Getting Session Slot id: %d 4
+[15:04:43.281] LOG: use seasonal splash messages true
+[15:04:43.281] LOG: Adding 2 Pride Month splash messages (weight: x15)
+[15:05:51.325] LOG: %cStart Phase SelectChallengePhase color:green;
+[15:05:55.537] LOG: %cStart Phase SelectStarterPhase color:green;
+[15:06:04.061] WARN: cry/1 not found
+[15:06:04.789] WARN: cry/7 not found
+[15:06:05.763] WARN: cry/13 not found
+[15:06:09.904] LOG: Getting Session Slot id: %d 0
+[15:06:09.920] LOG: Getting Session Slot id: %d 1
+[15:06:09.929] LOG: Getting Session Slot id: %d 2
+[15:06:09.937] LOG: Getting Session Slot id: %d 3
+[15:06:09.944] LOG: Getting Session Slot id: %d 4
+[15:06:10.183] LOG: Getting Session Slot id: %d 4
+[15:06:17.085] DEBUG: %cSending a request to delete session in slot %d color: blue 4
+[15:06:17.773] LOG: Wave Seed: Cl8LJuQGJG1Z{xrpKwN97Lt7 1
+[15:06:17.776] LOG: %cStart Phase EncounterPhase color:green;
+[15:06:17.784] LOG: Starting species pool tier: RARE
+[15:06:17.814] LOG: Pokemon: Wild Cleffa | Species ID: 173 | Level: 2 | Nature: Naughty (+Atk/-SpDef)
+[15:06:17.815] LOG: Stats (IVs): HP: 14 (25), Atk: 7 (27), Def: 6 (29), Spatk: 7 (15), Spdef: 6 (0), Spd: 5 (2)
+[15:06:17.815] LOG: Ability: Fairy Aura | Passive Ability: Wonder Skin 
+[15:06:17.815] LOG: Moveset: ["Disarming Voice","Teleport","Encore","Follow Me"]
+[15:06:17.815] LOG: Starting species pool tier: COMMON
+[15:06:17.838] LOG: Pokemon: Wild Blipbug | Species ID: 824 | Level: 2 | Nature: Timid (+Spd/-Atk)
+[15:06:17.838] LOG: Stats (IVs): HP: 13 (0), Atk: 5 (10), Def: 6 (31), Spatk: 6 (18), Spdef: 7 (24), Spd: 8 (27)
+[15:06:17.838] LOG: Ability: Anticipation | Passive Ability: Simple 
+[15:06:17.838] LOG: Moveset: ["Lunge","Infestation"]
+[15:06:18.694] DEBUG: Session data saved to slot 4!
+[15:06:20.014] LOG: Wave Seed: Cl8LJuQGJG1Z{xrpKwN97Lt7 1
+[15:06:20.456] LOG: %cStart Phase SummonPhase color:green;
+[15:06:20.638] WARN: cry/1 not found
+[15:06:20.742] LOG: %cStart Phase ShinySparklePhase color:green;
+[15:06:20.843] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[15:06:20.844] LOG: %cStart Phase SummonPhase color:green;
+[15:06:21.031] WARN: cry/1 not found
+[15:06:21.155] LOG: %cStart Phase CheckSwitchPhase color:green;
+[15:06:27.300] LOG: %cStart Phase CheckSwitchPhase color:green;
+[15:06:27.654] LOG: %cStart Phase InitEncounterPhase color:green;
+[15:06:27.657] LOG: %cStart Phase PostSummonPhase color:green;
+[15:06:27.658] LOG: Ran PSP for: Bulbasaur
+[15:06:27.662] LOG: %cStart Phase PostSummonPhase color:green;
+[15:06:27.664] LOG: %cStart Phase PostSummonPhase color:green;
+[15:06:27.665] LOG: %cStart Phase PostSummonPhase color:green;
+[15:06:27.665] LOG: Ran PSP for: Bulbasaur
+[15:06:27.666] LOG: %cStart Phase PostSummonPhase color:green;
+[15:06:27.667] LOG: %cStart Phase PostSummonPhase color:green;
+[15:06:27.667] LOG: %cStart Phase PostSummonPhase color:green;
+[15:06:27.667] LOG: Ran PSP for: Blipbug
+[15:06:27.669] LOG: %cStart Phase PostSummonPhase color:green;
+[15:06:27.670] LOG: %cStart Phase PostSummonPhase color:green;
+[15:06:27.670] LOG: %cStart Phase PostSummonPhase color:green;
+[15:06:27.670] LOG: Ran PSP for: Cleffa
+[15:06:27.671] LOG: %cStart Phase PostSummonPhase color:green;
+[15:06:27.671] LOG: %cStart Phase ShowAbilityPhase color:green;
+[15:06:27.835] LOG: %cStart Phase MessagePhase color:green;
+[15:06:28.078] LOG: %cStart Phase HideAbilityPhase color:green;
+[15:06:28.100] LOG: %cStart Phase PostSummonPhase color:green;
+[15:06:28.101] LOG: %cStart Phase TurnInitPhase color:green;
+[15:06:28.101] LOG: %cStart Phase CommandPhase color:green;
+[15:06:29.694] LOG: Move: SAPPY_SEED Move targets: {"targets":[2,3,1],"multiple":false} 
+Player Pokemon: Bulbasaur
+[15:06:29.696] LOG: %cStart Phase SelectTargetPhase color:green;
+[15:06:30.319] LOG: %cStart Phase CommandPhase color:green;
+[15:07:00.323] LOG: Battle Seed: rYomW6HEiVNDyyBB
+[15:07:00.323] LOG: Move: GROWL Move targets: {"targets":[2,3],"multiple":true} 
+Player Pokemon: Bulbasaur
+[15:07:00.323] LOG: %cStart Phase SelectTargetPhase color:green;
+[15:07:12.398] LOG: %cStart Phase EnemyCommandPhase color:green;
+[15:07:12.403] WARN: BattlerTag CENTER_OF_ATTENTION is missing a score!
+[15:07:12.406] WARN: BattlerTag CENTER_OF_ATTENTION is missing a score!
+[15:07:12.406] LOG: Move Pool: ["Disarming Voice","Teleport","Encore","Follow Me"]
+[15:07:12.406] LOG: Move Scores: [8.625,-20,-20,0]
+[15:07:12.407] LOG: Sorted Move Pool: ["Disarming Voice","Follow Me","Teleport","Encore"]
+[15:07:12.407] LOG: Chosen Move: Disarming Voice
+[15:07:12.407] LOG: %cStart Phase EnemyCommandPhase color:green;
+[15:07:12.415] LOG: Move Pool: ["Lunge","Infestation"]
+[15:07:12.415] LOG: Move Scores: [27,18]
+[15:07:12.415] LOG: Sorted Move Pool: ["Lunge","Infestation"]
+[15:07:12.415] LOG: Chosen Move: Infestation
+[15:07:12.415] LOG: %cStart Phase TurnStartPhase color:green;
+[15:07:12.423] LOG: %cStart Phase MovePhase color:green;
+[15:07:12.423] LOG: %cUser: Bulbasaur
+Move: SAPPY_SEED
+Use Mode: NORMAL color:orchid
+[15:07:12.428] LOG: %cStart Phase MessagePhase color:green;
+[15:07:12.512] LOG: %cStart Phase MoveEffectPhase color:green;
+[15:07:12.862] LOG: crit stage: +0
+[15:07:12.865] LOG: Move: Sappy Seed | Base damage: 19.6 | Power: 120 | Source attack: 11 | Target defense: 6
+[15:07:12.867] LOG: Move: Sappy Seed | Attack damage: 22
+[15:07:12.869] LOG: %cStart Phase DamageAnimPhase color:green;
+[15:07:12.885] LOG: %cStart Phase FaintPhase color:green;
+[15:07:12.949] LOG: %cStart Phase MessagePhase color:green;
