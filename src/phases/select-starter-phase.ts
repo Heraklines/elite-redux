@@ -135,7 +135,20 @@ export class SelectStarterPhase extends Phase {
         })),
       );
       controller.setLocalReady(true);
-      proceedIfReady();
+      if (controller.bothReady()) {
+        // Partner already locked in -> launch straight away.
+        proceedIfReady();
+      } else {
+        // Partner hasn't confirmed their team yet. LEAVE the starter-select screen
+        // (else its "Begin with these Pokemon?" confirm keeps re-prompting in a loop -
+        // the live bug) and show a WAITING notice. The onChange listener fires
+        // proceedIfReady the moment the partner readies, which then launches (host ->
+        // SAVE_SLOT, guest -> battle) (#633).
+        console.log("[coop-launch] local ready, partner NOT ready -> waiting screen");
+        void globalScene.ui
+          .setMode(UiMode.MESSAGE)
+          .then(() => globalScene.ui.showText("Waiting for your partner to choose their team...", null, () => {}));
+      }
     });
   }
 
