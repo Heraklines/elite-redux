@@ -26,6 +26,16 @@ export class CheckSwitchPhase extends BattlePhase {
 
     // End this phase early...
 
+    // ...in co-op (#633): the "Will you switch?" prompt is interactive and runs
+    // INDEPENDENTLY on both clients, so when one player dismisses it and the other
+    // hasn't, the two clients desync (the stuck client even sees the partner's
+    // target cursor bleed through). Skip it entirely - it's a battle-start
+    // convenience; a player can still switch via the in-battle POKEMON command.
+    if (globalScene.gameMode.isCoop) {
+      this.end();
+      return;
+    }
+
     // ...if the user is playing in Set Mode
     if (globalScene.battleStyle === BattleStyle.SET) {
       this.end();
