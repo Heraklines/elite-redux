@@ -22,6 +22,20 @@ import type { CoopRole } from "#data/elite-redux/coop/coop-transport";
 /** Max party members per player in co-op. */
 export const COOP_SLOTS_PER_PLAYER = 3;
 
+/** The number of real save slots (0..4). */
+export const COOP_SAVE_SLOT_COUNT = 5;
+
+/**
+ * The slot a co-op GUEST launches its (non-authoritative) local run into (#633).
+ * The guest never runs the interactive SAVE_SLOT picker (only the host is the
+ * persistence authority), so it reuses whatever slot it already had selected from
+ * the title/continue flow, clamped to a real slot, defaulting to slot 0 when the
+ * current value is unset/invalid. Pure so the launch decision is unit-testable.
+ */
+export function coopGuestSessionSlot(current: number): number {
+  return Number.isInteger(current) && current >= 0 && current < COOP_SAVE_SLOT_COUNT ? current : 0;
+}
+
 /** Field slot of the host's active mon in the co-op double. */
 export const COOP_HOST_FIELD_INDEX = 0;
 /** Field slot of the guest's active mon in the co-op double. */

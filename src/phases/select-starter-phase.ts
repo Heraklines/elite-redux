@@ -11,6 +11,7 @@ const DEV_SCENARIO_SLOT = 4;
 
 import type { CoopRosterEntry } from "#data/elite-redux/coop/coop-roster";
 import { getCoopController, getCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
+import { coopGuestSessionSlot } from "#data/elite-redux/coop/coop-session";
 import type { CoopRole, CoopSerializedStarter } from "#data/elite-redux/coop/coop-transport";
 import { SpeciesFormChangeMoveLearnedTrigger } from "#data/form-change-triggers";
 import { Gender } from "#data/gender";
@@ -107,22 +108,7 @@ export class SelectStarterPhase extends Phase {
         controller.partnerEntries(),
       );
       globalScene.ui.clearText();
-      globalScene.ui.setMode(UiMode.SAVE_SLOT, SaveSlotUiMode.SAVE, (slotId: number) => {
-        if (slotId === -1) {
-          globalScene.phaseManager.toTitleScreen();
-          this.end();
-          return;
-        }
-        globalScene.sessionSlotId = slotId;
-        // ignoreMovesetValidation=true (#633, LIVE-D): the merged party is rebuilt from
-        // each player's FULL serialized starter (exact moveset included). The default
-        // starter-legality validation STRIPS any move it deems illegal, which made the
-        // host's rebuilt copy of the guest's mon lose moves the guest actually had
-        // (e.g. a dev/black-shiny move) - so the move-by-ID command relay couldn't match
-        // and fell back to AI, desyncing the partner's move. Preserve the wire moveset
-        // verbatim so both clients' parties are truly byte-identical.
-        this.initBattle(merged, true, owners);
-      });
+      this.launchCoopMergedParty(merged, owners, controller.role);
     };
     // Re-check readiness whenever the partner's state changes (real-peer path).
     controller.onChange(() => proceedIfReady());
@@ -143,6 +129,44 @@ export class SelectStarterPhase extends Phase {
       );
       controller.setLocalReady(true);
       proceedIfReady();
+    });
+  }
+
+  /**
+   * Launch the merged co-op party into the run (#633). Only the HOST is the
+   * persistence authority, so only the host runs the interactive SAVE_SLOT picker
+   * (choose a slot, overwrite-confirm, etc.). The GUEST skips that screen entirely
+   * and drops straight into the merged battle on its current slot.
+   *
+   * WHY the guest skips it (the live "guest stuck on loading" hang): SAVE_SLOT is
+   * an INTERACTIVE modal that runs INDEPENDENTLY on each client - the same class of
+   * desync we already removed for the battle-start "switch?" prompt (#633,
+   * CheckSwitchPhase) and the host-only challenge screen. On the guest it either
+   * stalls waiting for a second human to navigate + confirm the overwrite, or its
+   * `deleteSession` overwrite path returns false and triggers `globalScene.reset()`
+   * - both of which present as the guest never reaching EncounterPhase. The guest's
+   * local slot is not the authoritative save (that is the host's job; co-op runs
+   * persist host-side), so launching directly is correct. `ignoreMovesetValidation`
+   * stays true (LIVE-D): the merged party is rebuilt from each player's FULL
+   * serialized starter, and the legality pass would strip moves and desync the relay.
+   *
+   * Guarded by `role`: solo and the host are byte-for-byte unaffected (the host path
+   * below is the exact pre-existing SAVE_SLOT flow).
+   */
+  launchCoopMergedParty(merged: Starter[], owners: CoopRole[], role: CoopRole): void {
+    if (role === "guest") {
+      globalScene.sessionSlotId = coopGuestSessionSlot(globalScene.sessionSlotId);
+      this.initBattle(merged, true, owners);
+      return;
+    }
+    globalScene.ui.setMode(UiMode.SAVE_SLOT, SaveSlotUiMode.SAVE, (slotId: number) => {
+      if (slotId === -1) {
+        globalScene.phaseManager.toTitleScreen();
+        this.end();
+        return;
+      }
+      globalScene.sessionSlotId = slotId;
+      this.initBattle(merged, true, owners);
     });
   }
 
