@@ -225,6 +225,19 @@ export class CommandPhase extends FieldPhase {
     // partner's command is applied EXACTLY ({@linkcode applyWiredPartnerCommand}:
     // matched by move ID + verbatim targets, no RNG re-roll) so both engines stay
     // in lockstep; a missing / slow reply (or an unfindable move) -> AI fallback.
+    // Co-op (#633): the local human has nothing to do for the PARTNER's slot, so show a
+    // clear "your partner is choosing" notice while we await their pick (instead of a
+    // stale command menu / blank screen). The relayed command then transitions the turn.
+    globalScene.ui.setMode(UiMode.MESSAGE);
+    globalScene.ui.showText(
+      i18next.t("battle:coopPartnerChoosingMoveBattle", {
+        defaultValue: "Your partner is choosing a move...",
+      }),
+      null,
+      () => {},
+      null,
+      true,
+    );
     const moveset = partner.getMoveset();
     const moveSlots = moveset.map((m, i) => (m.isUsable(partner, false, true)[0] ? i : -1)).filter(i => i >= 0);
     void sync
