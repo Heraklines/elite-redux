@@ -1,0 +1,145 @@
+url:      https://elite-redux-staging.pages.dev/
+build:    mqsc5x73-79s0
+mode:     6  wave:1
+seed:     ewHXcK7RRlXk1I1dfcu13Mzp
+party:    Bisasam(L5 14hp f0), Bisasam(L5 11hp f0), Raupy(L5 21hp f0), Endivie(L5 20hp f0), Hornliu(L5 20hp f0)
+enemy:    Waumpel(L2), Nagelotz(L2)
+
+----- COMMENT -----
+p1
+
+----- CONSOLE -----
+[18:08:42.816] LOG: %c %c %c %c %c Phaser v3.90.0 (WebGL | Web Audio) %c https://phaser.io/v390 background: #ff0000 background: #ffff00 background: #00ff00 background: #00ffff color: #ffffff; background: #000000 background: transparent
+[18:08:43.261] LOG: [ER] build mqsc5x73-79s0
+[18:08:43.495] LOG: [dev-tools] loaded — 306 scenarios + Send Logs button
+[18:09:00.336] DEBUG: Destroying loading scene
+[18:09:00.336] DEBUG: Destroyed loading scene
+[18:09:00.459] LOG: Seed: fBvhCNRM33VCTnNDbqZoDSgH
+[18:09:00.459] LOG: Wave Seed: fBvhCNRM33VCTnNDbqZoDSgH 0
+[18:09:04.369] LOG: %cStart Phase LoginPhase color:green;
+[18:09:14.269] WARN: Login failed! 401 
+[18:09:23.547] LOG: Client Session: iZyCWMy2sEqi4EzqD7JEtHqmjy9Fslgj
+[18:09:23.881] LOG: %cStart Phase TitlePhase color:green;
+[18:09:23.894] LOG: use seasonal splash messages true
+[18:09:23.894] LOG: Adding 2 Pride Month splash messages (weight: x15)
+[18:09:31.820] LOG: %cStart Phase SelectStarterPhase color:green;
+[18:09:33.720] WARN: cry/1 not found
+[18:09:34.538] WARN: cry/152 not found
+[18:09:47.800] LOG: Wave Seed: ewHXcK7RRlXk1I1dfcu13Mzp 0
+[18:09:47.801] LOG: Wave Seed: ewHXcK7RRlXk1I1dfcu13Mzp 0
+[18:09:48.341] LOG: Wave Seed: fxIYdL8SSmYl2J2egdv24N{q 1
+[18:09:48.343] LOG: %cStart Phase EncounterPhase color:green;
+[18:09:54.098] LOG: Pokemon: Waumpel (wild) | Species ID: 265 | Level: 2 | Nature: Ernst (-)
+[18:09:54.098] LOG: Stats (IVs): HP: 14 (27), Atk: 7 (18), Def: 6 (2), Spatk: 6 (21), Spdef: 6 (17), Spd: 6 (20)
+[18:09:54.098] LOG: Ability: Saugnapf | Passive Ability: Hexaplaga 
+[18:09:54.099] LOG: Moveset: ["Käfertrutz","Web Shot","Tackle","Giftstachel"]
+[18:09:54.100] LOG: Pokemon: Nagelotz (wild) | Species ID: 504 | Level: 2 | Nature: Frech (+Ang/-SpVert)
+[18:09:54.100] LOG: Stats (IVs): HP: 14 (31), Atk: 8 (13), Def: 6 (8), Spatk: 6 (29), Spdef: 5 (21), Spd: 8 (10)
+[18:09:54.100] LOG: Ability: Angsthase | Passive Ability: Analyse 
+[18:09:54.100] LOG: Moveset: ["Hyperzahn","Energiefokus","Silberblick","Backenstopfer"]
+[18:09:54.782] DEBUG: Session data saved to slot 0!
+[18:09:55.536] LOG: Wave Seed: fxIYdL8SSmYl2J2egdv24N{q 1
+[18:09:57.017] LOG: %cStart Phase SummonPhase color:green;
+[18:09:57.585] WARN: cry/1 not found
+[18:09:57.921] LOG: %cStart Phase ShinySparklePhase color:green;
+[18:09:58.258] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[18:09:58.260] LOG: %cStart Phase SummonPhase color:green;
+[18:09:58.878] WARN: cry/1 not found
+[18:09:59.232] LOG: %cStart Phase CheckSwitchPhase color:green;
+[18:09:59.233] LOG: %cStart Phase CheckSwitchPhase color:green;
+[18:09:59.233] LOG: %cStart Phase InitEncounterPhase color:green;
+[18:09:59.238] LOG: %cStart Phase PostSummonPhase color:green;
+[18:09:59.238] LOG: Ran PSP for: Bisasam
+[18:09:59.242] LOG: %cStart Phase PostSummonPhase color:green;
+[18:09:59.243] LOG: %cStart Phase PostSummonPhase color:green;
+[18:09:59.243] LOG: Ran PSP for: Bisasam
+[18:09:59.245] LOG: %cStart Phase PostSummonPhase color:green;
+[18:09:59.245] LOG: %cStart Phase PostSummonPhase color:green;
+[18:09:59.246] LOG: Ran PSP for: Nagelotz
+[18:09:59.246] LOG: %cStart Phase PostSummonPhase color:green;
+[18:09:59.247] LOG: %cStart Phase PostSummonPhase color:green;
+[18:09:59.247] LOG: %cStart Phase PostSummonPhase color:green;
+[18:09:59.247] LOG: Ran PSP for: Waumpel
+[18:09:59.247] LOG: %cStart Phase PostSummonPhase color:green;
+[18:09:59.247] LOG: %cStart Phase PostSummonPhase color:green;
+[18:09:59.247] LOG: %cStart Phase TurnInitPhase color:green;
+[18:09:59.248] LOG: %cStart Phase CommandPhase color:green;
+[18:10:02.366] LOG: Move: SAPPY_SEED Move targets: {"targets":[2,3,1],"multiple":true} 
+Player Pokemon: Bisasam
+[18:10:02.366] LOG: %cStart Phase SelectTargetPhase color:green;
+[18:10:04.463] LOG: %cStart Phase CommandPhase color:green;
+[18:10:06.401] LOG: Move: VINE_WHIP Move targets: {"targets":[2,3,0],"multiple":false} 
+Player Pokemon: Bisasam
+[18:10:06.402] LOG: %cStart Phase SelectTargetPhase color:green;
+[18:10:07.735] LOG: %cStart Phase EnemyCommandPhase color:green;
+[18:10:07.753] LOG: Battle Seed: R0ITcM2MUPTWhWMg
+[18:10:07.760] LOG: Move Pool: ["Käfertrutz","Web Shot","Tackle","Giftstachel"]
+[18:10:07.760] LOG: Move Scores: [31.5,22.5,8,8]
+[18:10:07.760] LOG: Sorted Move Pool: ["Käfertrutz","Web Shot","Tackle","Giftstachel"]
+[18:10:07.760] LOG: Chosen Move: Käfertrutz
+[18:10:07.760] LOG: %cStart Phase EnemyCommandPhase color:green;
+[18:10:07.765] LOG: Move Pool: ["Hyperzahn","Energiefokus","Silberblick"]
+[18:10:07.765] LOG: Move Scores: [28.5,5,2]
+[18:10:07.765] LOG: Sorted Move Pool: ["Hyperzahn","Energiefokus","Silberblick"]
+[18:10:07.765] LOG: Chosen Move: Hyperzahn
+[18:10:07.765] LOG: %cStart Phase TurnStartPhase color:green;
+[18:10:07.773] LOG: %cStart Phase MovePhase color:green;
+[18:10:07.773] LOG: %cUser: Bisasam
+Move: SAPPY_SEED
+Use Mode: NORMAL color:orchid
+[18:10:07.779] LOG: %cStart Phase MessagePhase color:green;
+[18:10:08.132] LOG: %cStart Phase MoveEffectPhase color:green;
+[18:10:08.990] LOG: crit stage: +0
+[18:10:08.991] LOG: Move: Sprießbomben | Base damage: 16.666666666666668 | Power: 100 | Source attack: 11 | Target defense: 6
+[18:10:08.991] LOG: Move: Sprießbomben | Attack damage: 10
+[18:10:08.994] LOG: %cStart Phase DamageAnimPhase color:green;
+[18:10:09.004] LOG: %cStart Phase MessagePhase color:green;
+[18:10:09.708] LOG: %cStart Phase MessagePhase color:green;
+[18:10:10.445] LOG: %cStart Phase MoveEndPhase color:green;
+[18:10:10.446] LOG: %cStart Phase MovePhase color:green;
+[18:10:10.446] LOG: %cUser: Bisasam
+Move: VINE_WHIP
+Use Mode: NORMAL color:orchid
+[18:10:10.452] LOG: %cStart Phase MessagePhase color:green;
+[18:10:10.833] LOG: %cStart Phase MoveEffectPhase color:green;
+[18:10:11.218] LOG: crit stage: +0
+[18:10:11.219] LOG: Move: Rankenhieb | Base damage: 12.666666666666668 | Power: 80 | Source attack: 10 | Target defense: 6
+[18:10:11.219] LOG: Move: Rankenhieb | Attack damage: 18
+[18:10:11.220] LOG: %cStart Phase DamageAnimPhase color:green;
+[18:10:11.237] LOG: %cStart Phase FaintPhase color:green;
+[18:10:12.080] LOG: %cStart Phase MessagePhase color:green;
+[18:10:14.268] LOG: %cStart Phase VictoryPhase color:green;
+[18:10:14.268] LOG: %cStart Phase ExpPhase color:green;
+[18:10:14.891] LOG: %cStart Phase ExpPhase color:green;
+[18:10:15.475] LOG: %cStart Phase MoveEndPhase color:green;
+[18:10:15.475] LOG: %cStart Phase MovePhase color:green;
+[18:10:15.475] LOG: %cStart Phase MoveEndPhase color:green;
+[18:10:15.475] LOG: %cStart Phase MovePhase color:green;
+[18:10:15.475] LOG: %cUser: Waumpel
+Move: STRUGGLE_BUG
+Use Mode: NORMAL color:orchid
+[18:10:15.479] LOG: %cStart Phase MessagePhase color:green;
+[18:10:15.913] LOG: %cStart Phase MoveEffectPhase color:green;
+[18:10:16.591] LOG: crit stage: +0
+[18:10:16.592] LOG: Move: Käfertrutz | Base damage: 5.721846153846154 | Power: 144 | Source attack: 6 | Target defense: 13
+[18:10:16.592] LOG: Move: Käfertrutz | Attack damage: 8
+[18:10:16.593] LOG: crit stage: +0
+[18:10:16.594] LOG: Move: Käfertrutz | Base damage: 6.032 | Power: 144 | Source attack: 6 | Target defense: 12
+[18:10:16.594] LOG: Move: Käfertrutz | Attack damage: 9
+[18:10:16.595] LOG: %cStart Phase DamageAnimPhase color:green;
+[18:10:16.608] LOG: %cStart Phase MessagePhase color:green;
+[18:10:17.244] LOG: %cStart Phase DamageAnimPhase color:green;
+[18:10:17.265] LOG: %cStart Phase MessagePhase color:green;
+[18:10:17.876] LOG: %cStart Phase MoveEndPhase color:green;
+[18:10:17.876] LOG: %cStart Phase CheckInterludePhase color:green;
+[18:10:17.876] LOG: %cStart Phase WeatherEffectPhase color:green;
+[18:10:17.877] LOG: %cStart Phase PositionalTagPhase color:green;
+[18:10:17.877] LOG: %cStart Phase BerryPhase color:green;
+[18:10:17.878] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[18:10:17.880] LOG: %cStart Phase TurnEndPhase color:green;
+[18:10:17.882] LOG: %cStart Phase CommonAnimPhase color:green;
+[18:10:18.288] LOG: %cStart Phase DamageAnimPhase color:green;
+[18:10:18.289] LOG: %cStart Phase PokemonHealPhase color:green;
+[18:10:18.290] LOG: %cStart Phase MessagePhase color:green;
+[18:10:19.140] LOG: %cStart Phase TurnInitPhase color:green;
+[18:10:19.140] LOG: %cStart Phase CommandPhase color:green;
