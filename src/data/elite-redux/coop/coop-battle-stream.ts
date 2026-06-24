@@ -77,6 +77,8 @@ export class CoopBattleStreamer {
 
   private enemyPartyHandler: ((wave: number, enemies: CoopSerializedEnemy[]) => void) | null = null;
   private checkpointHandler: ((reason: string, checkpoint: CoopBattleCheckpoint) => void) | null = null;
+  /** Latest authoritative checkpoint the guest has not yet applied (consumed at a turn boundary). */
+  private lastCheckpoint: CoopBattleCheckpoint | null = null;
 
   constructor(transport: CoopTransport, opts: CoopBattleStreamerOptions = {}) {
     this.transport = transport;
@@ -112,6 +114,17 @@ export class CoopBattleStreamer {
   /** GUEST: handle an out-of-turn authoritative checkpoint. */
   onCheckpoint(handler: (reason: string, checkpoint: CoopBattleCheckpoint) => void): void {
     this.checkpointHandler = handler;
+  }
+
+  /**
+   * GUEST: take + clear the latest authoritative checkpoint, if any. The guest applies
+   * it at a SAFE turn boundary (start of its next command phase) rather than mid-
+   * resolution, so a snap to the host's post-turn state can never fight a running phase.
+   */
+  consumeCheckpoint(): CoopBattleCheckpoint | null {
+    const cp = this.lastCheckpoint;
+    this.lastCheckpoint = null;
+    return cp;
   }
 
   /**

@@ -114,7 +114,14 @@ export class SelectStarterPhase extends Phase {
           return;
         }
         globalScene.sessionSlotId = slotId;
-        this.initBattle(merged, false, owners);
+        // ignoreMovesetValidation=true (#633, LIVE-D): the merged party is rebuilt from
+        // each player's FULL serialized starter (exact moveset included). The default
+        // starter-legality validation STRIPS any move it deems illegal, which made the
+        // host's rebuilt copy of the guest's mon lose moves the guest actually had
+        // (e.g. a dev/black-shiny move) - so the move-by-ID command relay couldn't match
+        // and fell back to AI, desyncing the partner's move. Preserve the wire moveset
+        // verbatim so both clients' parties are truly byte-identical.
+        this.initBattle(merged, true, owners);
       });
     };
     // Re-check readiness whenever the partner's state changes (real-peer path).

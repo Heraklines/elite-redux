@@ -5,12 +5,13 @@ import { speciesStarterCosts } from "#balance/starters";
 import { TrappedTag } from "#data/battler-tags";
 import { getDailyEventSeedBoss } from "#data/daily-seed/daily-run";
 import { isDailyFinalBoss } from "#data/daily-seed/daily-seed-utils";
+import { applyCoopCheckpoint, captureCoopCheckpoint } from "#data/elite-redux/coop/coop-battle-engine";
 import {
   applyWiredPartnerCommand,
   type ResolvedPartnerCommand,
   resolvePartnerCommand,
 } from "#data/elite-redux/coop/coop-partner-ai";
-import { getCoopBattleSync, getCoopController } from "#data/elite-redux/coop/coop-runtime";
+import { getCoopBattleStreamer, getCoopBattleSync, getCoopController } from "#data/elite-redux/coop/coop-runtime";
 import { coopOwnerOfFieldIndex } from "#data/elite-redux/coop/coop-session";
 import { AbilityId } from "#enums/ability-id";
 import { ArenaTagSide } from "#enums/arena-tag-side";
@@ -227,8 +228,45 @@ export class CommandPhase extends FieldPhase {
     return true;
   }
 
+  /**
+   * Co-op host-authoritative sync (#633, LIVE-D), run at each turn boundary (the
+   * field is stable here - no resolution in flight). The HOST broadcasts the
+   * authoritative post-previous-turn state once per turn (at field slot 0, turn 2+);
+   * the GUEST snaps to the latest such checkpoint, so both screens converge on the
+   * same hp / status / stages / weather every turn instead of drifting apart. Fully
+   * guarded: no-op outside a live co-op session, and the apply/capture are themselves
+   * wrapped so a sync hiccup can never break the turn.
+   */
+  private tryCoopCheckpointSync(): void {
+    if (!globalScene.gameMode.isCoop) {
+      return;
+    }
+    const controller = getCoopController();
+    const streamer = getCoopBattleStreamer();
+    if (controller == null || streamer == null) {
+      return;
+    }
+    if (controller.role === "host") {
+      // Once per turn (the first command phase) after turn 1: snapshot + broadcast.
+      if (this.fieldIndex === 0 && globalScene.currentBattle.turn > 1) {
+        const checkpoint = captureCoopCheckpoint();
+        if (checkpoint != null) {
+          streamer.sendCheckpoint("turn", checkpoint);
+        }
+      }
+    } else {
+      // Guest: apply the host's latest authoritative checkpoint at this safe boundary.
+      const checkpoint = streamer.consumeCheckpoint();
+      if (checkpoint != null) {
+        applyCoopCheckpoint(checkpoint);
+      }
+    }
+  }
+
   public override start(): void {
     super.start();
+
+    this.tryCoopCheckpointSync();
 
     globalScene.updateGameInfo();
     this.resetCursorIfNeeded();
