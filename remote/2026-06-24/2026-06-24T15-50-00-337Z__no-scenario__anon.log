@@ -1,0 +1,80 @@
+url:      https://elite-redux-staging.pages.dev/
+build:    mqs8pg8u-9u38
+mode:     6  wave:1
+seed:     RzU8CUAILMNiA5Q0I69u5dI6
+party:    Bisasam(L5 20hp f0), Raupy(L5 21hp f0), Endivie(L5 20hp f0), Hornliu(L5 20hp f0), Rattfratz(L5 19hp f0)
+enemy:    Sensect(L2), Hoothoot(L2)
+
+----- COMMENT -----
+p1
+
+----- CONSOLE -----
+[15:44:27.933] LOG: %c %c %c %c %c Phaser v3.90.0 (WebGL | Web Audio) %c https://phaser.io/v390 background: #ff0000 background: #ffff00 background: #00ff00 background: #00ffff color: #ffffff; background: #000000 background: transparent
+[15:44:28.272] LOG: [ER] build mqs8pg8u-9u38
+[15:44:28.531] LOG: [dev-tools] loaded — 306 scenarios + Send Logs button
+[15:44:45.205] DEBUG: Destroying loading scene
+[15:44:45.205] DEBUG: Destroyed loading scene
+[15:44:45.266] LOG: Seed: RzU8CUAILMNiA5Q0I69u5dI6
+[15:44:45.266] LOG: Wave Seed: RzU8CUAILMNiA5Q0I69u5dI6 0
+[15:44:47.885] LOG: %cStart Phase LoginPhase color:green;
+[15:44:48.127] LOG: Client Session: 0NBXbub7Kbu7Q3zxJJVfrRLRVytSiu2I
+[15:44:48.410] LOG: %cStart Phase TitlePhase color:green;
+[15:44:48.411] LOG: Getting Session Slot id: %d 0
+[15:44:48.429] LOG: use seasonal splash messages true
+[15:44:48.429] LOG: Adding 2 Pride Month splash messages (weight: x15)
+[15:48:48.164] LOG: %cStart Phase SelectChallengePhase color:green;
+[15:48:50.667] LOG: %cStart Phase SelectStarterPhase color:green;
+[15:48:59.769] WARN: cry/1 not found
+[15:49:00.770] WARN: cry/152 not found
+[15:49:05.065] LOG: Getting Session Slot id: %d 0
+[15:49:05.079] LOG: Getting Session Slot id: %d 1
+[15:49:05.081] LOG: Getting Session Slot id: %d 2
+[15:49:05.082] LOG: Getting Session Slot id: %d 3
+[15:49:05.084] LOG: Getting Session Slot id: %d 4
+[15:49:05.086] LOG: Getting Session Slot id: %d 0
+[15:49:05.336] ERROR: Invalid save data JSON detected! Session not found.
+[15:49:05.336] ERROR: Invalid save data JSON detected! Session not found.
+[15:49:05.337] ERROR: Invalid save data JSON detected! Session not found.
+[15:49:05.773] ERROR: Invalid save data JSON detected! Session not found.
+[15:49:09.894] DEBUG: %cSending a request to delete session in slot %d color: blue 0
+[15:49:12.150] LOG: Wave Seed: S{V9DVBJMNOjB6R1J7:v6eJ7 1
+[15:49:12.153] LOG: %cStart Phase EncounterPhase color:green;
+[15:49:12.160] LOG: Starting species pool tier: COMMON
+[15:49:12.186] LOG: Pokemon: Sensect (wild) | Species ID: 824 | Level: 2 | Nature: Lasch (+Vert/-SpVert)
+[15:49:12.186] LOG: Stats (IVs): HP: 13 (18), Atk: 6 (18), Def: 6 (0), Spatk: 6 (4), Spdef: 5 (9), Spd: 7 (21)
+[15:49:12.186] LOG: Ability: Facettenauge | Passive Ability: Wankelmut 
+[15:49:12.186] LOG: Moveset: ["Anfallen","Plage"]
+[15:49:12.186] LOG: Starting species pool tier: COMMON
+[15:49:12.204] LOG: Pokemon: Hoothoot (wild) | Species ID: 163 | Level: 2 | Nature: Mäßig (+SpAng/-Ang)
+[15:49:12.204] LOG: Stats (IVs): HP: 14 (20), Atk: 5 (19), Def: 6 (24), Spatk: 7 (7), Spdef: 7 (8), Spd: 7 (17)
+[15:49:12.204] LOG: Ability: Spectralize | Passive Ability: Flock 
+[15:49:12.204] LOG: Moveset: ["Pikser","Hypnose","Horrorblick","Tackle"]
+[15:49:13.064] DEBUG: Session data saved to slot 0!
+[15:49:13.066] LOG: Wave Seed: S{V9DVBJMNOjB6R1J7:v6eJ7 1
+[15:49:14.561] LOG: %cStart Phase SummonPhase color:green;
+[15:49:15.120] WARN: cry/1 not found
+[15:49:15.451] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[15:49:15.453] LOG: %cStart Phase SummonPhase color:green;
+[15:49:16.361] LOG: %cStart Phase ShinySparklePhase color:green;
+[15:49:16.702] LOG: %cStart Phase CheckSwitchPhase color:green;
+[15:49:16.702] LOG: %cStart Phase CheckSwitchPhase color:green;
+[15:49:16.702] LOG: %cStart Phase InitEncounterPhase color:green;
+[15:49:16.706] LOG: %cStart Phase PostSummonPhase color:green;
+[15:49:16.706] LOG: Ran PSP for: Raupy
+[15:49:16.710] LOG: %cStart Phase PostSummonPhase color:green;
+[15:49:16.712] LOG: %cStart Phase ShowAbilityPhase color:green;
+[15:49:17.216] LOG: %cStart Phase MessagePhase color:green;
+[15:49:17.861] LOG: %cStart Phase HideAbilityPhase color:green;
+[15:49:17.933] LOG: %cStart Phase PostSummonPhase color:green;
+[15:49:17.933] LOG: Ran PSP for: Bisasam
+[15:49:17.935] LOG: %cStart Phase PostSummonPhase color:green;
+[15:49:17.935] LOG: %cStart Phase PostSummonPhase color:green;
+[15:49:17.935] LOG: Ran PSP for: Sensect
+[15:49:17.936] LOG: %cStart Phase PostSummonPhase color:green;
+[15:49:17.936] LOG: %cStart Phase PostSummonPhase color:green;
+[15:49:17.937] LOG: %cStart Phase PostSummonPhase color:green;
+[15:49:17.937] LOG: Ran PSP for: Hoothoot
+[15:49:17.938] LOG: %cStart Phase PostSummonPhase color:green;
+[15:49:17.938] LOG: %cStart Phase PostSummonPhase color:green;
+[15:49:17.938] LOG: %cStart Phase TurnInitPhase color:green;
+[15:49:17.939] LOG: %cStart Phase CommandPhase color:green;
