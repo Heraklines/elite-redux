@@ -1,0 +1,144 @@
+url:      https://elite-redux-staging.pages.dev/
+build:    mqs3jxcp-2aug
+mode:     6  wave:1
+seed:     ojUlZjJVNojzt0Tt1hSn9xnW
+party:    Bisasam(L5 0hp f0), Bisasam(L5 21hp f0), Endivie(L5 20hp f0), Schiggy(L5 21hp f0), Raupy(L5 21hp f0)
+enemy:    Waumpel(L2), Hoothoot(L2)
+
+----- COMMENT -----
+p1
+
+----- CONSOLE -----
+[13:17:46.382] LOG: %c %c %c %c %c Phaser v3.90.0 (WebGL | Web Audio) %c https://phaser.io/v390 background: #ff0000 background: #ffff00 background: #00ff00 background: #00ffff color: #ffffff; background: #000000 background: transparent
+[13:17:47.170] LOG: [ER] build mqs3jxcp-2aug
+[13:17:47.430] LOG: [dev-tools] loaded — 306 scenarios + Send Logs button
+[13:18:20.785] DEBUG: Destroying loading scene
+[13:18:20.787] DEBUG: Destroyed loading scene
+[13:18:20.892] LOG: Seed: ojUlZjJVNojzt0Tt1hSn9xnW
+[13:18:20.893] LOG: Wave Seed: ojUlZjJVNojzt0Tt1hSn9xnW 0
+[13:18:27.902] LOG: %cStart Phase LoginPhase color:green;
+[13:18:28.159] LOG: Client Session: aPIy7RIvtPoxxv3n91O0A9qBA4I0Nj0s
+[13:18:28.529] LOG: %cStart Phase TitlePhase color:green;
+[13:18:28.529] LOG: Getting Session Slot id: %d 0
+[13:18:28.544] LOG: use seasonal splash messages true
+[13:18:28.545] LOG: Adding 2 Pride Month splash messages (weight: x15)
+[13:18:51.492] LOG: %cStart Phase SelectChallengePhase color:green;
+[13:18:53.895] LOG: %cStart Phase SelectStarterPhase color:green;
+[13:18:56.416] WARN: cry/1 not found
+[13:18:57.623] WARN: cry/152 not found
+[13:19:11.215] LOG: Getting Session Slot id: %d 0
+[13:19:11.227] LOG: Getting Session Slot id: %d 1
+[13:19:11.229] LOG: Getting Session Slot id: %d 2
+[13:19:11.232] LOG: Getting Session Slot id: %d 3
+[13:19:11.234] LOG: Getting Session Slot id: %d 4
+[13:19:11.237] LOG: Getting Session Slot id: %d 0
+[13:19:11.430] ERROR: Invalid save data JSON detected! Session not found.
+[13:19:11.431] ERROR: Invalid save data JSON detected! Session not found.
+[13:19:11.440] ERROR: Invalid save data JSON detected! Session not found.
+[13:19:11.441] ERROR: Invalid save data JSON detected! Session not found.
+[13:19:20.611] DEBUG: %cSending a request to delete session in slot %d color: blue 0
+[13:19:21.099] LOG: Wave Seed: pkVm[kKWOpk{u1Uu2iTo:yoX 1
+[13:19:21.104] LOG: %cStart Phase EncounterPhase color:green;
+[13:19:21.112] LOG: Starting species pool tier: COMMON
+[13:19:21.162] LOG: Pokemon: Waumpel (wild) | Species ID: 265 | Level: 2 | Nature: Sacht (+SpVert/-SpAng)
+[13:19:21.162] LOG: Stats (IVs): HP: 14 (23), Atk: 6 (7), Def: 6 (29), Spatk: 4 (1), Spdef: 7 (30), Spd: 6 (24)
+[13:19:21.163] LOG: Ability: Saugnapf | Passive Ability: Hexaplaga 
+[13:19:21.163] LOG: Moveset: ["Käfertrutz","Web Shot","Tackle","Giftstachel"]
+[13:19:21.165] LOG: Starting species pool tier: COMMON
+[13:19:21.190] LOG: Pokemon: Hoothoot (wild) | Species ID: 163 | Level: 2 | Nature: Zaghaft (-)
+[13:19:21.191] LOG: Stats (IVs): HP: 14 (27), Atk: 6 (19), Def: 6 (22), Spatk: 6 (19), Spdef: 7 (9), Spd: 7 (23)
+[13:19:21.192] LOG: Ability: Aufwertung | Passive Ability: Flock 
+[13:19:21.192] LOG: Moveset: ["Pikser","Hypnose","Horrorblick","Heuler"]
+[13:19:22.100] DEBUG: Session data saved to slot 0!
+[13:19:22.969] LOG: Wave Seed: pkVm[kKWOpk{u1Uu2iTo:yoX 1
+[13:19:24.470] LOG: %cStart Phase SummonPhase color:green;
+[13:19:25.040] WARN: cry/1 not found
+[13:19:25.392] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[13:19:25.393] LOG: %cStart Phase SummonPhase color:green;
+[13:19:25.997] WARN: cry/1 not found
+[13:19:26.332] LOG: %cStart Phase ShinySparklePhase color:green;
+[13:19:26.707] LOG: %cStart Phase CheckSwitchPhase color:green;
+[13:19:28.848] LOG: %cStart Phase CheckSwitchPhase color:green;
+[13:19:29.362] LOG: %cStart Phase InitEncounterPhase color:green;
+[13:19:29.368] LOG: %cStart Phase PostSummonPhase color:green;
+[13:19:29.368] LOG: Ran PSP for: Bisasam
+[13:19:29.373] LOG: %cStart Phase PostSummonPhase color:green;
+[13:19:29.374] LOG: %cStart Phase PostSummonPhase color:green;
+[13:19:29.375] LOG: Ran PSP for: Bisasam
+[13:19:29.377] LOG: %cStart Phase PostSummonPhase color:green;
+[13:19:29.378] LOG: %cStart Phase PostSummonPhase color:green;
+[13:19:29.379] LOG: Ran PSP for: Hoothoot
+[13:19:29.381] LOG: %cStart Phase PostSummonPhase color:green;
+[13:19:29.382] LOG: %cStart Phase PostSummonPhase color:green;
+[13:19:29.384] LOG: %cStart Phase PostSummonPhase color:green;
+[13:19:29.385] LOG: Ran PSP for: Waumpel
+[13:19:29.387] LOG: %cStart Phase PostSummonPhase color:green;
+[13:19:29.387] LOG: %cStart Phase PostSummonPhase color:green;
+[13:19:29.388] LOG: %cStart Phase TurnInitPhase color:green;
+[13:19:29.390] LOG: %cStart Phase CommandPhase color:green;
+[13:19:33.513] LOG: Move: TACKLE Move targets: {"targets":[2,3,1],"multiple":false} 
+Player Pokemon: Bisasam
+[13:19:33.517] LOG: %cStart Phase SelectTargetPhase color:green;
+[13:19:33.949] LOG: %cStart Phase CommandPhase color:green;
+[13:19:40.419] LOG: Battle Seed: ugQTxND7odYyNzcw
+[13:19:40.419] LOG: Move: VINE_WHIP Move targets: {"targets":[0],"multiple":false} 
+Player Pokemon: Bisasam
+[13:19:40.420] LOG: %cStart Phase EnemyCommandPhase color:green;
+[13:19:40.456] LOG: Move Pool: ["Käfertrutz","Web Shot","Tackle","Giftstachel"]
+[13:19:40.456] LOG: Move Scores: [31.5,22.5,8,8]
+[13:19:40.457] LOG: Sorted Move Pool: ["Käfertrutz","Web Shot","Tackle","Giftstachel"]
+[13:19:40.457] LOG: Chosen Move: Käfertrutz
+[13:19:40.457] LOG: %cStart Phase EnemyCommandPhase color:green;
+[13:19:40.473] LOG: Move Pool: ["Pikser","Hypnose","Horrorblick","Heuler"]
+[13:19:40.473] LOG: Move Scores: [66,10,3,2]
+[13:19:40.473] LOG: Sorted Move Pool: ["Pikser","Hypnose","Horrorblick","Heuler"]
+[13:19:40.474] LOG: Chosen Move: Pikser
+[13:19:40.474] LOG: %cStart Phase TurnStartPhase color:green;
+[13:19:40.490] LOG: %cStart Phase MovePhase color:green;
+[13:19:40.491] LOG: %cUser: Bisasam
+Move: VINE_WHIP
+Use Mode: NORMAL color:orchid
+[13:19:40.501] LOG: %cStart Phase MessagePhase color:green;
+[13:19:40.889] LOG: %cStart Phase MoveEffectPhase color:green;
+[13:19:41.277] LOG: crit stage: +0
+[13:19:41.279] LOG: Move: Rankenhieb | Base damage: 9.04 | Power: 80 | Source attack: 11 | Target defense: 10
+[13:19:41.279] LOG: Move: Rankenhieb | Attack damage: 3
+[13:19:41.281] LOG: %cStart Phase DamageAnimPhase color:green;
+[13:19:41.294] LOG: %cStart Phase MessagePhase color:green;
+[13:19:42.016] LOG: %cStart Phase MoveEndPhase color:green;
+[13:19:42.018] LOG: %cStart Phase MovePhase color:green;
+[13:19:42.019] LOG: %cUser: Bisasam
+Move: TACKLE
+Use Mode: NORMAL color:orchid
+[13:19:42.030] LOG: %cStart Phase MessagePhase color:green;
+[13:19:42.374] LOG: %cStart Phase MoveEffectPhase color:green;
+[13:19:42.579] LOG: crit stage: +0
+[13:19:42.580] LOG: Move: Tackle | Base damage: 7.333333333333334 | Power: 40 | Source attack: 10 | Target defense: 6
+[13:19:42.582] LOG: Move: Tackle | Attack damage: 6
+[13:19:42.584] LOG: %cStart Phase DamageAnimPhase color:green;
+[13:19:42.602] LOG: %cStart Phase MoveEndPhase color:green;
+[13:19:42.602] LOG: %cStart Phase MovePhase color:green;
+[13:19:42.602] LOG: %cUser: Hoothoot
+Move: PECK
+Use Mode: NORMAL color:orchid
+[13:19:42.608] LOG: %cStart Phase MessagePhase color:green;
+[13:19:43.013] LOG: %cStart Phase MoveEffectPhase color:green;
+[13:19:43.263] LOG: crit stage: +0
+[13:19:43.265] LOG: Move: Pikser | Base damage: 3.008 | Power: 30 | Source attack: 6 | Target defense: 10
+[13:19:43.266] LOG: Move: Pikser | Attack damage: 7
+[13:19:43.268] LOG: %cStart Phase DamageAnimPhase color:green;
+[13:19:43.285] LOG: %cStart Phase MoveEffectPhase color:green;
+[13:19:43.539] LOG: crit stage: +0
+[13:19:43.541] LOG: Move: Pikser | Base damage: 3.008 | Power: 30 | Source attack: 6 | Target defense: 10
+[13:19:43.543] LOG: Move: Pikser | Attack damage: 7
+[13:19:43.545] LOG: %cStart Phase DamageAnimPhase color:green;
+[13:19:43.559] LOG: %cStart Phase MoveEffectPhase color:green;
+[13:19:43.828] LOG: crit stage: +0
+[13:19:43.831] LOG: Move: Pikser | Base damage: 3.008 | Power: 30 | Source attack: 6 | Target defense: 10
+[13:19:43.833] LOG: Move: Pikser | Attack damage: 8
+[13:19:43.835] LOG: %cStart Phase DamageAnimPhase color:green;
+[13:19:43.853] LOG: %cStart Phase MessagePhase color:green;
+[13:19:44.533] LOG: %cStart Phase MessagePhase color:green;
+[13:19:45.174] LOG: %cStart Phase FaintPhase color:green;
+[13:19:45.179] WARN: cry/1 not found
+[13:19:45.356] LOG: %cStart Phase MessagePhase color:green;
