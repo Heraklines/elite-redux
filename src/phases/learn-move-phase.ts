@@ -3,7 +3,12 @@ import { getPokemonNameWithAffix } from "#app/messages";
 import Overrides from "#app/overrides";
 import { initMoveAnim, loadMoveAnimAssets } from "#data/battle-anims";
 import { allMoves } from "#data/data-lists";
-import { getCoopController, getCoopInteractionRelay, getCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
+import {
+  getCoopController,
+  getCoopInteractionRelay,
+  getCoopRuntime,
+  getCoopUiMirror,
+} from "#data/elite-redux/coop/coop-runtime";
 import type { CoopRole } from "#data/elite-redux/coop/coop-transport";
 import { SpeciesFormChangeMoveLearnedTrigger } from "#data/form-change-triggers";
 import { LearnMoveType } from "#enums/learn-move-type";
@@ -73,9 +78,10 @@ export class LearnMovePhase extends PlayerPartyMemberPokemonPhase {
       this.learnMove(currentMoveset.length, move, pokemon);
     } else if (this.coopLearnMoveRole(pokemon) === "watcher") {
       // Co-op (#633): the move-replace menu is OWNED by this mon's player. The PARTNER
-      // watches: it shows a non-interactive notice and mirrors the owner's relayed result
-      // (which move was forgotten, or none), so both transition together and only the
-      // owner picks. The owner / solo / hotseat(spoof) path opens the real menu below.
+      // opens the SAME menu and mirrors the owner's live cursor (cosmetic), then applies the
+      // owner's relayed result (which move was forgotten, or none) - so both see the cursor
+      // move and transition together while only the owner actually picks. The owner / solo /
+      // hotseat(spoof) path opens the real, interactive menu below.
       void this.coopWatchLearnMove(move, pokemon);
     } else {
       this.replaceMoveCheck(move, pokemon);
@@ -124,30 +130,42 @@ export class LearnMovePhase extends PlayerPartyMemberPokemonPhase {
   }
 
   /**
-   * Co-op (#633) WATCHER: show a non-interactive notice while the owner picks, then apply
-   * the relayed result against this client's identical mon - the same slot is replaced (or
-   * nothing) - and end, so both clients leave the screen together.
+   * Co-op (#633) WATCHER: open the SAME move-forget menu the owner is driving (the shared
+   * #563 screen) and MIRROR the owner's live cursor onto it, so the partner sees the
+   * selection happen in real time instead of a static notice. The screen is opened with a
+   * NO-OP selection callback and the watcher's local input is blocked at the UI layer, so the
+   * replayed buttons are purely cosmetic - the AUTHORITATIVE result is the relayed choice
+   * (applied below against this client's byte-identical mon). A null result (partner gone /
+   * timeout) means "did not learn" so the run never hangs.
    */
   private async coopWatchLearnMove(move: Move, pokemon: Pokemon): Promise<void> {
-    globalScene.ui.setMode(this.messageMode);
-    await globalScene.ui.showTextPromise(
-      i18next.t("battle:coopPartnerChoosingMove", {
-        defaultValue: "Your partner is choosing a move for {{pokemonName}}...",
-        pokemonName: getPokemonNameWithAffix(pokemon),
-      }),
-      undefined,
-      true,
-    );
     const relay = getCoopInteractionRelay();
     if (relay == null) {
       return this.end();
     }
+    const mirror = getCoopUiMirror();
+    // Open the real move-forget menu (no-op callback: the replayed owner button can fire it,
+    // but the outcome is committed from the relay, never from this callback).
+    await globalScene.ui.setModeWithoutClear(UiMode.SUMMARY, pokemon, SummaryUiMode.LEARN_MOVE, move, () => {});
+    // Mirror the owner's cursor onto this screen; adopts any owner buttons that arrived first.
+    mirror?.beginSession("watcher", UiMode.SUMMARY, COOP_LEARN_MOVE_SEQ);
+
     const res = await relay.awaitInteractionChoice(COOP_LEARN_MOVE_SEQ, COOP_LEARN_MOVE_WAIT_MS);
-    // A null result (partner gone / timeout) means "did not learn" so the run never hangs.
+    mirror?.endSession();
     const moveIndex = res?.choice ?? pokemon.getMaxMoveCount();
     if (moveIndex >= 0 && moveIndex < pokemon.getMaxMoveCount()) {
-      this.learnMove(moveIndex, move, pokemon);
+      // Build the same "1... 2... and Poof! forgot X. And..." chain the owner sees, so the
+      // result message matches (read the forgotten move's name BEFORE setMove replaces it).
+      const forgetSuccessText = i18next.t("battle:learnMoveForgetSuccess", {
+        pokemonName: getPokemonNameWithAffix(pokemon),
+        moveName: pokemon.moveset[moveIndex]!.getName(),
+      });
+      const fullText = [i18next.t("battle:countdownPoof"), forgetSuccessText, i18next.t("battle:learnMoveAnd")].join(
+        "$",
+      );
+      this.learnMove(moveIndex, move, pokemon, fullText);
     } else {
+      await globalScene.ui.setMode(this.messageMode);
       await globalScene.ui.showTextPromise(
         i18next.t("battle:learnMoveNotLearned", {
           pokemonName: getPokemonNameWithAffix(pokemon),
@@ -208,12 +226,19 @@ export class LearnMovePhase extends PlayerPartyMemberPokemonPhase {
   async forgetMoveProcess(move: Move, pokemon: Pokemon) {
     globalScene.ui.setMode(this.messageMode);
     await globalScene.ui.showTextPromise(i18next.t("battle:learnMoveForgetQuestion"), undefined, true);
+    // Co-op (#633): if WE own this mon, drive the shared move-forget menu and relay each
+    // cursor button so the partner's mirror moves live. Hard no-op in solo (mirror is null).
+    if (this.coopLearnMoveRole(pokemon) === "owner") {
+      getCoopUiMirror()?.beginSession("owner", UiMode.SUMMARY, COOP_LEARN_MOVE_SEQ);
+    }
     await globalScene.ui.setModeWithoutClear(
       UiMode.SUMMARY,
       pokemon,
       SummaryUiMode.LEARN_MOVE,
       move,
       (moveIndex: number) => {
+        // Co-op (#633): selection made - stop mirroring our cursor (no-op in solo).
+        getCoopUiMirror()?.endSession();
         // The summary returns the "new move" row index to signal rejection. That
         // row sits below the existing moves, so it equals the move cap (4, or 5
         // with ER's extra slot).
