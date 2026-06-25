@@ -39,6 +39,8 @@ export interface CoopTurnResolution {
   checkpoint: CoopBattleCheckpoint;
   /** The host's full-state checksum at this boundary (#633, TRACK-2). */
   checksum: string;
+  /** The host's canonical state pre-image the `checksum` hashed (#633, diagnostics); optional. */
+  preimage?: string;
 }
 
 /** An out-of-turn authoritative checkpoint + the host's matching full-state checksum. */
@@ -139,10 +141,25 @@ export class CoopBattleStreamer {
 
   /**
    * HOST: send a fully-resolved turn (ordered events + authoritative checkpoint + the
-   * host's full-state `checksum` the guest verifies against, #633 TRACK-2).
+   * host's full-state `checksum` the guest verifies against, #633 TRACK-2). The optional
+   * `preimage` is the canonical state string the checksum hashed (#633, diagnostics); when
+   * present the guest can deep-diff it against its own on a mismatch to find the drift field.
    */
-  emitTurn(turn: number, events: CoopBattleEvent[], checkpoint: CoopBattleCheckpoint, checksum: string): void {
-    this.transport.send({ t: "turnResolution", turn, events, checkpoint, checksum });
+  emitTurn(
+    turn: number,
+    events: CoopBattleEvent[],
+    checkpoint: CoopBattleCheckpoint,
+    checksum: string,
+    preimage?: string,
+  ): void {
+    this.transport.send({
+      t: "turnResolution",
+      turn,
+      events,
+      checkpoint,
+      checksum,
+      ...(preimage === undefined ? {} : { preimage }),
+    });
   }
 
   /**
@@ -398,6 +415,7 @@ export class CoopBattleStreamer {
           events: msg.events,
           checkpoint: msg.checkpoint,
           checksum: msg.checksum,
+          ...(msg.preimage === undefined ? {} : { preimage: msg.preimage }),
         };
         const resolver = this.pending.get(msg.turn);
         if (resolver) {

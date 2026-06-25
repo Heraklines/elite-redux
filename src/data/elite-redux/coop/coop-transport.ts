@@ -20,6 +20,9 @@
 // co-op session costs effectively nothing on CF.
 // =============================================================================
 
+// TYPE-ONLY import (erased at runtime): the data-fingerprint diagnostic message carries a
+// plain-JSON `ErDataFingerprint` (#633 diagnostics), so the transport stays the lowest layer.
+import type { ErDataFingerprint } from "#data/elite-redux/coop/coop-data-fingerprint";
 // TYPE-ONLY import (fully erased at runtime by `import type`, so this file stays the
 // zero-runtime-import lowest layer): the ghost-pool message carries plain-JSON
 // `GhostTeamSnapshot`s, which already live in er-ghost-teams (#633 ghost-pool sync).
@@ -405,6 +408,11 @@ export type CoopMessage =
    * `checksum` (#633, TRACK-2) is the host's 64-bit fingerprint of its FULL post-turn
    * state (computed at the SAME boundary the guest reads). The guest recomputes its own
    * and, on a mismatch, requests a `stateSync`. Required (the host always stamps it).
+   *
+   * `preimage` (#633, diagnostics) is the host's CANONICAL state string the `checksum` was
+   * hashed from. Optional + additive: the host always sends it on the authoritative path so
+   * that on a mismatch the guest can deep-DIFF the host's pre-image against its own and log
+   * the exact divergent field(s). Older clients omit it and ignore it on receipt.
    */
   | {
       t: "turnResolution";
@@ -412,6 +420,7 @@ export type CoopMessage =
       events: CoopBattleEvent[];
       checkpoint: CoopBattleCheckpoint;
       checksum: string;
+      preimage?: string;
     }
   /**
    * Host -> guest (#633, LIVE-D): an out-of-turn authoritative checkpoint (after a
@@ -469,7 +478,15 @@ export type CoopMessage =
    */
   | { t: "uiInput"; seq: number; n: number; button: number; mode: number }
   /** Session lifecycle signal (P5). */
-  | { t: "lifecycle"; event: CoopLifecycleEvent };
+  | { t: "lifecycle"; event: CoopLifecycleEvent }
+  /**
+   * Either client -> peer (#633, diagnostics): this client's ER DATA-TABLE FINGERPRINT,
+   * exchanged once on connect. `fp` is the per-section hash of the move id-map / live moves /
+   * level-up movesets / abilities tables both clients build at boot. The peer diffs it against
+   * its own to surface the ROOT data drift (the "host remapped 67 / guest remapped 1" class)
+   * BEFORE any battle runs. Plain JSON; an older client ignores it via the default arm.
+   */
+  | { t: "dataFingerprint"; fp: ErDataFingerprint };
 
 /** A transport moves {@linkcode CoopMessage}s between two paired clients. */
 export interface CoopTransport {

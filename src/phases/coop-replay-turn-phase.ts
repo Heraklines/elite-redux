@@ -6,12 +6,14 @@
 
 import { globalScene } from "#app/global-scene";
 import { Phase } from "#app/phase";
-import { COOP_CHECKSUM_SENTINEL } from "#data/elite-redux/coop/coop-battle-checksum";
+import { COOP_CHECKSUM_SENTINEL, canonicalize } from "#data/elite-redux/coop/coop-battle-checksum";
 import {
   applyCoopCheckpoint,
   applyCoopFullSnapshot,
   captureCoopChecksum,
+  captureCoopChecksumState,
 } from "#data/elite-redux/coop/coop-battle-engine";
+import { logCanonicalDiff } from "#data/elite-redux/coop/coop-data-fingerprint";
 import { getCoopBattleStreamer } from "#data/elite-redux/coop/coop-runtime";
 import type { CoopBattleEvent, CoopFullBattleSnapshot } from "#data/elite-redux/coop/coop-transport";
 import { decompressFromBase64 } from "lz-string";
@@ -54,7 +56,7 @@ export class CoopReplayTurnPhase extends Phase {
         if (res != null) {
           this.renderEvents(res.events);
           applyCoopCheckpoint(res.checkpoint);
-          this.verifyChecksum(res.checksum);
+          this.verifyChecksum(res.checksum, res.preimage);
         }
       } catch {
         // A bad stream payload must never hang the guest's turn.
@@ -77,9 +79,11 @@ export class CoopReplayTurnPhase extends Phase {
   /**
    * Verify our post-apply full-state checksum against the host's; on a mismatch request +
    * adopt the host's full authoritative snapshot (Phase A auto-resync). A sentinel on
-   * either side (a read failure) skips the comparison.
+   * either side (a read failure) skips the comparison. When the host streamed its canonical
+   * `hostPreimage` (#633, diagnostics) we deep-DIFF it against ours to log the exact field(s)
+   * that diverged - both at the initial mismatch and again if the snapshot fails to heal it.
    */
-  private verifyChecksum(hostChecksum: string): void {
+  private verifyChecksum(hostChecksum: string, hostPreimage?: string): void {
     const streamer = getCoopBattleStreamer();
     if (streamer == null) {
       return;
@@ -92,6 +96,14 @@ export class CoopReplayTurnPhase extends Phase {
       return;
     }
     console.warn(`[coop-desync] turn=${this.turn} host=${hostChecksum} guest=${guestChecksum}`);
+    // DIAGNOSTIC (#633): log WHICH field(s) diverged by deep-diffing the host's pre-image
+    // (the canonical state its checksum hashed) against the guest's own. Only the opaque
+    // hashes cross the wire normally; the pre-image makes the divergent field observable.
+    const hostObj = this.parseCanonical(hostPreimage);
+    if (hostObj !== undefined) {
+      const guestObj = this.parseCanonical(canonicalize(captureCoopChecksumState()));
+      logCanonicalDiff(`[coop-cs] turn=${this.turn}`, hostObj, guestObj);
+    }
     void streamer.requestStateSync(this.turn).then(blob => {
       if (blob == null) {
         return;
@@ -104,11 +116,33 @@ export class CoopReplayTurnPhase extends Phase {
           console.info(`[coop-resync] turn=${this.turn} ok`);
         } else {
           console.warn(`[coop-resync] turn=${this.turn} still-diverged host=${hostChecksum} guest=${healed}`);
+          // DIAGNOSTIC (#633): the snapshot did NOT heal the divergence - log WHAT it failed
+          // to repair by diffing the host pre-image against the guest's POST-APPLY state.
+          if (hostObj !== undefined) {
+            const guestPostApplyObj = this.parseCanonical(canonicalize(captureCoopChecksumState()));
+            logCanonicalDiff(`[coop-resync] turn=${this.turn} UNHEALED`, hostObj, guestPostApplyObj);
+            console.warn(
+              "[coop-resync] note: snapshot does NOT re-apply party/modifiers/arenaTags or force maxHp -"
+                + " a diff in those is a data-table drift, not a heal bug",
+            );
+          }
         }
       } catch {
         /* a malformed resync blob must never crash the guest's battle */
       }
     });
+  }
+
+  /** Parse a canonical state string into a plain object, or undefined on absence/failure. */
+  private parseCanonical(canonical: string | undefined): unknown {
+    if (canonical === undefined) {
+      return;
+    }
+    try {
+      return JSON.parse(canonical);
+    } catch {
+      return;
+    }
   }
 
   /** Queue the guest's own end-of-turn phases (so the run loops) and end this phase. */

@@ -21,6 +21,12 @@
 // a SpoofGuest standing in for player 2 during local dev).
 // =============================================================================
 
+import {
+  computeErDataFingerprint,
+  diffErDataFingerprint,
+  type ErDataFingerprint,
+  logErDataFingerprint,
+} from "#data/elite-redux/coop/coop-data-fingerprint";
 import { CoopRoster, type CoopRosterEntry } from "#data/elite-redux/coop/coop-roster";
 import { CoopInteractionTurn } from "#data/elite-redux/coop/coop-session";
 import type { CoopMessage, CoopNetcodeMode, CoopRole, CoopTransport } from "#data/elite-redux/coop/coop-transport";
@@ -137,6 +143,12 @@ export class CoopSessionController {
   private _partnerReady = false;
   private _partnerConnected = false;
   private _partnerName: string | null = null;
+  /**
+   * This client's ER data-table fingerprint (#633, diagnostics), computed once on
+   * {@linkcode connect} and retained so the inbound peer `dataFingerprint` can be diffed
+   * against it. Null until computed (computed lazily on receipt if the peer's arrives first).
+   */
+  private _localDataFingerprint: ErDataFingerprint | null = null;
 
   private readonly changeHandlers = new Set<(snap: CoopSessionSnapshot) => void>();
   private readonly offMessage: () => void;
@@ -160,6 +172,14 @@ export class CoopSessionController {
       role: this.role,
       tiebreak: this.tiebreak,
     });
+    // ER data-table fingerprint exchange (#633, diagnostics): compute + log + send OUR
+    // fingerprint once, and retain it so the peer's inbound `dataFingerprint` is diffed
+    // against it. This is the ROOT-cause catcher for the "two browsers, same build,
+    // different move tables" desync - surfaced here, before any battle runs.
+    const fp = computeErDataFingerprint();
+    this._localDataFingerprint = fp;
+    logErDataFingerprint("local", fp);
+    this.transport.send({ t: "dataFingerprint", fp });
   }
 
   /**
@@ -468,6 +488,30 @@ export class CoopSessionController {
           this.broadcastRunConfig(this._runConfig);
         }
         break;
+      case "dataFingerprint": {
+        // The peer's ER data-table fingerprint (#633, diagnostics). Diff it against OUR
+        // local one (computed lazily if the peer's arrived before our connect() ran) to
+        // surface the ROOT data drift that makes the two clients' move tables disagree.
+        if (this._localDataFingerprint == null) {
+          this._localDataFingerprint = computeErDataFingerprint();
+        }
+        const local = this._localDataFingerprint;
+        const peer = msg.fp;
+        const diff = diffErDataFingerprint(local, peer);
+        if (diff.length === 0) {
+          console.info("[coop-fp] MATCH - data tables identical across clients");
+        } else {
+          const detail = diff
+            .map(
+              name =>
+                `${name} local=${local[name as keyof ErDataFingerprint].hash}(${local[name as keyof ErDataFingerprint].n})`
+                + ` peer=${peer[name as keyof ErDataFingerprint].hash}(${peer[name as keyof ErDataFingerprint].n})`,
+            )
+            .join(" ");
+          console.warn(`[coop-fp] MISMATCH sections=${diff.join(",")} - ${detail}`);
+        }
+        break;
+      }
       default:
         // ping/pong/command/switchChoice/stateSync/lifecycle are not part of the
         // P1/P4 controller flow; ignore them here.

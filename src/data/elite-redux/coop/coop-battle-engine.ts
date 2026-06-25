@@ -62,11 +62,7 @@ import { ModifierData } from "#system/modifier-data";
  * ER conditions could never be re-synced once anything drifts. Bleed is HP chip; frostbite /
  * fear are flag-bearing tags. Held as a literal list so the read + repair stay narrow + cheap.
  */
-const COOP_REPAIRABLE_ER_TAGS = [
-  BattlerTagType.ER_BLEED,
-  BattlerTagType.ER_FROSTBITE,
-  BattlerTagType.ER_FEAR,
-] as const;
+const COOP_REPAIRABLE_ER_TAGS = [BattlerTagType.ER_BLEED, BattlerTagType.ER_FROSTBITE, BattlerTagType.ER_FEAR] as const;
 
 /** Read the ER bleed/frost/fear tags currently on a mon into the checkpoint shape. */
 function readErTags(mon: ReturnType<typeof globalScene.getField>[number]): { type: string; turns: number }[] {
@@ -455,7 +451,7 @@ function readChecksumMon(mon: Pokemon): CoopChecksumMon {
  * ONLY at a stable turn boundary (start of CommandPhase) - never mid-resolution - so
  * both clients hash the same logical instant. Field mons are sorted by battler index.
  */
-function captureCoopChecksumState(): CoopChecksumState {
+export function captureCoopChecksumState(): CoopChecksumState {
   const arena = globalScene.arena;
   const field = globalScene
     .getField(true)

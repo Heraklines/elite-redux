@@ -530,6 +530,25 @@ export interface CSourceCorrectionResult {
 }
 
 /**
+ * Co-op desync diagnostic (#633): how many times {@linkcode remapEliteReduxMoveIdsByName}
+ * has run this boot. The remap MUTATES the shared `ER_ID_MAP.moves` singleton and runs TWICE
+ * per init (an early pass + an idempotent safety net), so logging the call number + a hash of
+ * the map state BEFORE/AFTER each call reveals whether the two clients enter the remap with
+ * different map states (and whether the second call corrupts it). 2 cheap log lines at boot.
+ */
+let erRemapCallCount = 0;
+
+/** Tiny inline FNV-1a 32-bit over a string, hex - a cheap stable fingerprint for the boot log. */
+function cheapFnv32Hex(s: string): string {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < s.length; i++) {
+    h ^= s.charCodeAt(i);
+    h = Math.imul(h, 0x01000193);
+  }
+  return (h >>> 0).toString(16).padStart(8, "0");
+}
+
+/**
  * Repair vanilla ER move ids that the build mapped to the WRONG pokerogue move.
  *
  * Two failure modes from the beta-JSON build:
@@ -554,6 +573,13 @@ export interface CSourceCorrectionResult {
  */
 export function remapEliteReduxMoveIdsByName(): number {
   const movesMap = ER_ID_MAP.moves as Record<number, number>;
+  // Co-op desync diagnostic (#633): fingerprint the shared move id-map state on ENTRY so two
+  // clients' boot logs can be compared (do they enter the remap with the same map?).
+  const callNo = ++erRemapCallCount;
+  console.info(
+    `[er-remap] call#${callNo} mapEntries=${Object.keys(movesMap).length}`
+      + ` sampleHashBefore=${cheapFnv32Hex(JSON.stringify(movesMap))}`,
+  );
   const idByName = new Map<string, number>();
   for (const mv of allMoves) {
     if (mv !== undefined) {
@@ -577,6 +603,11 @@ export function remapEliteReduxMoveIdsByName(): number {
   if (remapped > 0) {
     console.info(`[er-csrc] remapped ${remapped} ER moves to their real MoveIds (by name)`);
   }
+  // Co-op desync diagnostic (#633): fingerprint the map state on EXIT, with the change count,
+  // so we can see whether this call mutated the shared singleton (and how the two clients diverge).
+  console.info(
+    `[er-remap] call#${callNo} changed=${remapped} sampleHashAfter=${cheapFnv32Hex(JSON.stringify(movesMap))}`,
+  );
   return remapped;
 }
 

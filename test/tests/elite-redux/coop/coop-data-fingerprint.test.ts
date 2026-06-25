@@ -1,0 +1,131 @@
+/*
+ * SPDX-FileCopyrightText: 2024-2026 Pagefault Games
+ * SPDX-License-Identifier: AGPL-3.0-only
+ */
+
+// Co-op ER DATA-TABLE FINGERPRINT (#633, diagnostics). The root-cause catcher for the
+// "two browsers booted the same build but built DIFFERENT move tables" desync: each client
+// hashes its ER data tables, exchanges the fingerprint, and diffs section-by-section. These
+// lock in the two properties the diagnostic relies on - the hash is DETERMINISTIC (stable
+// across calls, so a real difference is a real data drift, never hash noise) and the diff +
+// the canonical leaf-diff pinpoint exactly WHICH table / field diverged. Engine-FREE (it
+// reads the data registries + pure helpers, never boots the game).
+
+import {
+  computeErDataFingerprint,
+  diffErDataFingerprint,
+  type ErDataFingerprint,
+  logCanonicalDiff,
+  logErDataFingerprint,
+} from "#data/elite-redux/coop/coop-data-fingerprint";
+import { afterEach, describe, expect, it, vi } from "vitest";
+
+/** Structured-clone a fingerprint so a hand-mutation can't alias the original. */
+const clone = (fp: ErDataFingerprint): ErDataFingerprint => JSON.parse(JSON.stringify(fp));
+
+describe("co-op ER data-table fingerprint (#633, diagnostics)", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  describe("computeErDataFingerprint", () => {
+    it("is DETERMINISTIC: two calls produce the identical fingerprint", () => {
+      const a = computeErDataFingerprint();
+      const b = computeErDataFingerprint();
+      // Every section's count + hash matches across the two calls (no Math.random / Date).
+      expect(b).toEqual(a);
+      expect(diffErDataFingerprint(a, b)).toEqual([]);
+    });
+
+    it("returns a 16-char hex hash + a numeric count for every section", () => {
+      const fp = computeErDataFingerprint();
+      for (const section of [fp.moveMap, fp.moves, fp.movesets, fp.abilities]) {
+        expect(section.hash).toMatch(/^[0-9a-f]{16}$/);
+        expect(typeof section.n).toBe("number");
+        expect(section.n).toBeGreaterThanOrEqual(0);
+      }
+      // The ER move id-map is a STATIC table (always populated), so its section is non-empty
+      // even headlessly - proving the fingerprint reads the real registry, not just zeros.
+      expect(fp.moveMap.n).toBeGreaterThan(0);
+    });
+  });
+
+  describe("diffErDataFingerprint", () => {
+    it("returns [] for two identical fingerprints", () => {
+      const fp = computeErDataFingerprint();
+      expect(diffErDataFingerprint(fp, clone(fp))).toEqual([]);
+    });
+
+    it("names the ONE section whose hash a client mutated", () => {
+      const fp = computeErDataFingerprint();
+      const drifted = clone(fp);
+      drifted.moveMap.hash = "ffffffffffffffff";
+      expect(diffErDataFingerprint(fp, drifted)).toEqual(["moveMap"]);
+    });
+
+    it("names a section whose entry COUNT differs (n drift, hash unchanged)", () => {
+      const fp = computeErDataFingerprint();
+      const drifted = clone(fp);
+      drifted.moves.n = fp.moves.n + 598; // the guest's "598 dropped" class
+      expect(diffErDataFingerprint(fp, drifted)).toEqual(["moves"]);
+    });
+
+    it("names EVERY differing section (multi-table drift)", () => {
+      const fp = computeErDataFingerprint();
+      const drifted = clone(fp);
+      drifted.moveMap.hash = "0000000000000001";
+      drifted.moves.hash = "0000000000000002";
+      drifted.movesets.hash = "0000000000000003";
+      expect(diffErDataFingerprint(fp, drifted)).toEqual(["moveMap", "moves", "movesets"]);
+    });
+  });
+
+  describe("logErDataFingerprint", () => {
+    it("logs one grep-able [coop-fp] line with each section's hash(count)", () => {
+      const info = vi.spyOn(console, "info").mockImplementation(() => {});
+      const fp = computeErDataFingerprint();
+      logErDataFingerprint("local", fp);
+      expect(info).toHaveBeenCalledTimes(1);
+      const line = info.mock.calls[0][0] as string;
+      expect(line).toContain("[coop-fp] local");
+      expect(line).toContain(`moveMap=${fp.moveMap.hash}(${fp.moveMap.n})`);
+      expect(line).toContain(`abilities=${fp.abilities.hash}(${fp.abilities.n})`);
+    });
+  });
+
+  describe("logCanonicalDiff", () => {
+    it("finds a known LEAF difference between two parsed canonical objects", () => {
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+      const host = { field: [{ bi: 0, hp: 20, abilityId: 65 }], money: 1000 };
+      const guest = { field: [{ bi: 0, hp: 17, abilityId: 65 }], money: 1000 };
+      logCanonicalDiff("[coop-cs] turn=3", host, guest);
+
+      const lines = warn.mock.calls.map(c => String(c[0]));
+      // The header names the tag + a non-zero field count.
+      expect(lines.some(l => l.startsWith("[coop-cs] turn=3") && /differing field/.test(l))).toBe(true);
+      // The exact divergent leaf path is reported with both sides' values.
+      const hpLine = lines.find(l => l.includes("field.0.hp"));
+      expect(hpLine).toBeDefined();
+      expect(hpLine).toContain("host=20");
+      expect(hpLine).toContain("guest=17");
+      // A leaf that MATCHES is never reported.
+      expect(lines.some(l => l.includes("abilityId"))).toBe(false);
+      expect(lines.some(l => l.includes("money"))).toBe(false);
+    });
+
+    it("reports 'no leaf differences' when the two objects are identical", () => {
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+      const same = { a: 1, b: { c: 2 } };
+      logCanonicalDiff("[coop-cs] turn=9", same, clone(same as unknown as ErDataFingerprint));
+      expect(warn).toHaveBeenCalledTimes(1);
+      expect(String(warn.mock.calls[0][0])).toContain("no leaf differences");
+    });
+
+    it("never throws on malformed / mismatched-shape input", () => {
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+      expect(() => logCanonicalDiff("[coop-cs] turn=1", { a: [1, 2] }, { a: 3 })).not.toThrow();
+      // A leaf-vs-array shape mismatch is still reported as a difference.
+      expect(warn.mock.calls.some(c => String(c[0]).includes("differing field"))).toBe(true);
+    });
+  });
+});

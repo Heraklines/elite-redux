@@ -1,7 +1,12 @@
 import { applyAbAttrs } from "#abilities/apply-ab-attrs";
 import { globalScene } from "#app/global-scene";
 import { getPokemonNameWithAffix } from "#app/messages";
-import { captureCoopCheckpoint, captureCoopChecksum } from "#data/elite-redux/coop/coop-battle-engine";
+import { canonicalize } from "#data/elite-redux/coop/coop-battle-checksum";
+import {
+  captureCoopCheckpoint,
+  captureCoopChecksum,
+  captureCoopChecksumState,
+} from "#data/elite-redux/coop/coop-battle-engine";
 import { getCoopBattleStreamer, getCoopController, getCoopNetcodeMode } from "#data/elite-redux/coop/coop-runtime";
 import { endCoopRecording } from "#data/elite-redux/coop/coop-turn-recorder";
 import { getErBiomeRule } from "#data/elite-redux/er-biome-rules";
@@ -159,7 +164,11 @@ export class TurnEndPhase extends FieldPhase {
     try {
       const checkpoint = captureCoopCheckpoint();
       if (checkpoint != null) {
-        streamer.emitTurn(recording.turn, recording.events, checkpoint, captureCoopChecksum());
+        // Send the canonical state PRE-IMAGE alongside the checksum (#633, diagnostics): the
+        // guest deep-diffs it against its own on a mismatch to pinpoint the divergent field.
+        // Small payload on the already-gated authoritative path, so always include it.
+        const preimage = canonicalize(captureCoopChecksumState());
+        streamer.emitTurn(recording.turn, recording.events, checkpoint, captureCoopChecksum(), preimage);
       }
     } catch {
       /* a stream/capture failure must never break the host's turn */
