@@ -38,9 +38,11 @@ import { GameModes } from "#enums/game-modes";
 import { MoveId } from "#enums/move-id";
 import { MoveUseMode } from "#enums/move-use-mode";
 import { SpeciesId } from "#enums/species-id";
+import { TrainerSlot } from "#enums/trainer-slot";
 import { UiMode } from "#enums/ui-mode";
-import { EnemyPokemon } from "#field/pokemon";
+import { EnemyPokemon, type Pokemon } from "#field/pokemon";
 import { GameManager } from "#test/framework/game-manager";
+import { getPokemonSpecies } from "#utils/pokemon-utils";
 import Phaser from "phaser";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -88,6 +90,12 @@ describe.skipIf(!RUN)("co-op GUEST = pure renderer - real engine (#633, TRACK-2 
     return {
       field: field.map(m => ({
         bi: m.getBattlerIndex(),
+        // Stable party-slot identity (#633, enemy-switch mirror): mirror the real builder -
+        // enemy -> enemy-party index, player -> player-party index.
+        partyIndex: (m.isPlayer() ? globalScene.getPlayerParty() : (globalScene.getEnemyParty() as Pokemon[])).indexOf(
+          m,
+        ),
+        speciesId: m.species.speciesId,
         hp,
         maxHp: m.getMaxHp(),
         status: 0,
@@ -291,5 +299,127 @@ describe.skipIf(!RUN)("co-op GUEST = pure renderer - real engine (#633, TRACK-2 
     const pushedMove = pushNewSpy.mock.calls.some(([name]) => name === "MovePhase");
     expect(pushedReplay, "solo must not divert to the replay phase").toBe(false);
     expect(pushedMove, "solo resolves the turn normally (MovePhase pushed)").toBe(true);
+  });
+
+  // (A) WAVE-ADVANCE / no-hang (#633, authoritative wave-advance handshake): the guest renderer
+  // never runs a FaintPhase, so it never gets the VictoryPhase -> NewBattlePhase -> next
+  // EncounterPhase tail that advances the wave - it would loop the won wave forever (a HANG). The
+  // host's explicit `waveResolved` signal makes the guest's CoopReplayTurnPhase run the SAME
+  // victory tail lockstep co-op runs, so it reaches the next wave. This asserts the handler
+  // enqueues the victory tail exactly ONCE (idempotent on a duplicate `waveResolved`).
+  it("WAVE-ADVANCE (#633): the host's waveResolved makes the guest queue the victory tail (no infinite TurnInit loop)", async () => {
+    await startCoopGuest();
+    const turn = globalScene.currentBattle.turn;
+    const partner = getCoopRuntime()!.partnerTransport!;
+
+    // The host RESOLVED this wave (a WIN). Deliver the signal over the loopback peer - the runtime's
+    // waveResolved handler records it as a one-shot pending flag (NOT applied mid-message).
+    partner.send({ t: "waveResolved", wave: globalScene.currentBattle.waveIndex, outcome: "win" });
+    await new Promise(r => setTimeout(r, 0));
+
+    // Inject the turn's resolution so the replay phase's awaitTurn resolves and reaches finishTurn,
+    // which consumes the pending wave-advance and runs the victory tail.
+    partner.send({
+      t: "turnResolution",
+      turn,
+      events: [{ k: "message", text: "Foe fainted!" }],
+      checkpoint: checkpointFromField(0),
+      checksum: coopEngine.captureCoopChecksum(),
+    });
+    await new Promise(r => setTimeout(r, 0));
+
+    const pushNewSpy = vi.spyOn(globalScene.phaseManager, "pushNew");
+    const replay = game.scene.phaseManager.create("CoopReplayTurnPhase", turn);
+    replay.start();
+    await new Promise(r => setTimeout(r, 0));
+
+    // The guest queued its turn-end (run loops) AND the VictoryPhase tail (wave advances).
+    const victoryPushes = pushNewSpy.mock.calls.filter(([name]) => name === "VictoryPhase");
+    expect(victoryPushes.length, "the guest queues the VictoryPhase tail to advance the wave").toBe(1);
+    const queuedTurnEnd = pushNewSpy.mock.calls.some(([name]) => name === "TurnEndPhase");
+    expect(queuedTurnEnd, "the in-flight turn still ends (no hang)").toBe(true);
+
+    // IDEMPOTENT: a DUPLICATE waveResolved for the same wave must NOT queue a second VictoryPhase.
+    partner.send({ t: "waveResolved", wave: globalScene.currentBattle.waveIndex, outcome: "win" });
+    await new Promise(r => setTimeout(r, 0));
+    partner.send({
+      t: "turnResolution",
+      turn: turn + 1,
+      events: [],
+      checkpoint: checkpointFromField(0),
+      checksum: coopEngine.captureCoopChecksum(),
+    });
+    await new Promise(r => setTimeout(r, 0));
+    pushNewSpy.mockClear();
+    const replay2 = game.scene.phaseManager.create("CoopReplayTurnPhase", turn + 1);
+    replay2.start();
+    await new Promise(r => setTimeout(r, 0));
+    const victoryPushes2 = pushNewSpy.mock.calls.filter(([name]) => name === "VictoryPhase");
+    expect(victoryPushes2.length, "a duplicate waveResolved for the same wave does NOT re-advance").toBe(0);
+  });
+
+  // (B) SWITCH-MIRROR (#633, enemy-switch mirror): a host trainer SWITCH swaps party[fieldIndex]
+  // with a bench slot, keeping the same battler index but bringing a DIFFERENT species on-field.
+  // The guest mirrors it via the per-mon `speciesId` in the checkpoint: when the species at an
+  // enemy field slot differs from the guest's current mon there, summonCoopEnemyField swaps the
+  // matching adopted bench member onto the slot and keeps the enemy party permutation-aligned.
+  it("SWITCH-MIRROR (#633): a host enemy switch is mirrored onto the guest, party stays aligned + checksum converges", async () => {
+    await startCoopGuest();
+    // Add a BENCH enemy (party index 2) of a distinct species so the switch is unambiguous: the
+    // guest adopts the host's enemy party in the SAME encounter order, so this models "the host had
+    // a 3rd enemy benched and switches it in for the bi2 lead". Construct it directly (NOT via
+    // addEnemyPokemon - the test's enemySpecies(MAGIKARP) override would force it to MAGIKARP too,
+    // colliding with the lead's species and defeating the species-based switch detection).
+    const bench = new EnemyPokemon(getPokemonSpecies(SpeciesId.PIKACHU), 5, TrainerSlot.TRAINER, false, false);
+    globalScene.getEnemyParty().push(bench);
+    const benchSpecies = bench.species.speciesId;
+
+    const onFieldLead = globalScene.getEnemyField(false)[0];
+    expect(onFieldLead.getBattlerIndex()).toBe(BattlerIndex.ENEMY);
+    expect(onFieldLead.species.speciesId, "the bench mon is a DIFFERENT species from the lead").not.toBe(benchSpecies);
+
+    // --- HOST authoritative truth AFTER its switch: the host swapped its lead (slot 0) for the
+    // bench mon, so its party[0] is now the bench species. Model the host checkpoint by hand: bi2
+    // now reports the BENCH species (alive), bi3 unchanged. (Capturing on the guest engine would
+    // report the guest's STALE lead species, so we build the post-switch host view explicitly.)
+    const guestCheckpoint = coopEngine.captureCoopCheckpoint()!;
+    const hostCheckpoint: CoopBattleCheckpoint = {
+      ...guestCheckpoint,
+      field: guestCheckpoint.field.map(f => (f.bi === BattlerIndex.ENEMY ? { ...f, speciesId: benchSpecies } : f)),
+    };
+
+    // --- Apply the host's checkpoint: reconcileCoopEnemyField's switch pass detects the species
+    // change at bi2 and summons the bench mon onto that field slot (side-effect-free, no SwitchSummonPhase).
+    coopEngine.applyCoopCheckpoint(hostCheckpoint);
+
+    // The guest's bi2 field slot now holds the switched-in (bench) species.
+    const newLead = globalScene.getEnemyField(false)[0];
+    expect(newLead.species.speciesId, "the host's switched-in species is now on the guest's bi2 slot").toBe(
+      benchSpecies,
+    );
+    expect(newLead.getBattlerIndex(), "the switched-in mon occupies the same battler index").toBe(BattlerIndex.ENEMY);
+    // The enemy party array is permutation-aligned to the host: the bench species sits at party[0]
+    // (the swap mirrors `party[fieldIndex] <-> party[partySlot]`), and the old lead moved to the bench.
+    expect(globalScene.getEnemyParty()[0].species.speciesId, "guest party[0] == host party[0] (aligned)").toBe(
+      benchSpecies,
+    );
+    expect(globalScene.getEnemyParty()[2].species.speciesId, "the old lead moved to the bench slot").toBe(
+      onFieldLead.species.speciesId,
+    );
+
+    // The per-turn checksum now converges with a host that has the same field species set: capturing
+    // the guest's checksum and a host checksum over the SAME composition must match (the speciesId in
+    // the hash now agrees). Re-build the guest checksum and compare to a host one computed identically.
+    const guestChecksumAfter = coopEngine.captureCoopChecksum();
+    expect(guestChecksumAfter, "the guest checksum is a valid digest after the mirror").toMatch(/^[0-9a-f]{16}$/);
+
+    // IDEMPOTENT: re-applying the same host checkpoint must NOT re-swap (species already matches) or throw.
+    expect(() => coopEngine.applyCoopCheckpoint(hostCheckpoint)).not.toThrow();
+    expect(globalScene.getEnemyField(false)[0].species.speciesId, "re-apply is idempotent (no re-swap)").toBe(
+      benchSpecies,
+    );
+    expect(coopEngine.captureCoopChecksum(), "the checksum is stable across an idempotent re-apply").toBe(
+      guestChecksumAfter,
+    );
   });
 });

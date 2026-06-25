@@ -1,6 +1,7 @@
 import { timedEventManager } from "#app/global-event-manager";
 import { globalScene } from "#app/global-scene";
 import { modifierTypes } from "#data/data-lists";
+import { broadcastCoopWaveResolved } from "#data/elite-redux/coop/coop-runtime";
 import { erBiomeOverstay } from "#data/elite-redux/er-biome-notoriety";
 import { erBiomeRoutingActive } from "#data/elite-redux/er-biome-routing";
 import { erShouldRaiseCrossroads } from "#data/elite-redux/er-biome-structure";
@@ -52,6 +53,15 @@ export class VictoryPhase extends PokemonPhase {
         .getEnemyParty()
         .find(p => (globalScene.currentBattle.battleType === BattleType.WILD ? p.isOnField() : !p?.isFainted(true)))
     ) {
+      // Co-op (#633, authoritative wave-advance handshake): this is the real WIN / wave-clear
+      // branch (not the exp-only / mystery-encounter paths, which returned above). The host is
+      // the sole engine; signal the guest renderer that this wave RESOLVED so it runs the same
+      // post-battle tail (the guest never hits a FaintPhase, so it would otherwise loop the won
+      // wave forever). Hard no-op for solo / non-host / lockstep. Emitted BEFORE the host queues
+      // its own BattleEnd -> rewards -> biome -> NewBattle tail (the order is irrelevant to the
+      // guest - it carries the wave number, guarded against a double-advance on the guest side).
+      broadcastCoopWaveResolved("win");
+
       globalScene.phaseManager.pushNew("BattleEndPhase", true);
       if (globalScene.currentBattle.battleType === BattleType.TRAINER) {
         globalScene.phaseManager.pushNew("TrainerVictoryPhase");

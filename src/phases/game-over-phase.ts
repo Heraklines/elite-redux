@@ -5,6 +5,7 @@ import { pokemonEvolutions } from "#balance/pokemon-evolutions";
 import { bypassLogin } from "#constants/app-constants";
 import { modifierTypes } from "#data/data-lists";
 import { getCharVariantFromDialogue } from "#data/dialogue";
+import { broadcastCoopWaveResolved } from "#data/elite-redux/coop/coop-runtime";
 import { recordGhostTeamOnGameOver } from "#data/elite-redux/er-ghost-teams";
 import type { PokemonSpecies } from "#data/pokemon-species";
 import { BattleType } from "#enums/battle-type";
@@ -50,6 +51,12 @@ export class GameOverPhase extends BattlePhase {
 
   start() {
     super.start();
+
+    // Co-op (#633, authoritative wave-advance handshake): the host's run ended. Signal the guest
+    // renderer so the protocol is complete. The guest currently treats `gameOver` as terminal
+    // (it does not run the next-wave victory tail; the full guest game-over render is a TODO) -
+    // the wave guard still consumes it safely. Hard no-op for solo / non-host / lockstep.
+    broadcastCoopWaveResolved("gameOver");
 
     globalScene.phaseManager.hideAbilityBar();
 

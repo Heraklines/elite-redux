@@ -32,7 +32,7 @@ import { CoopMePump } from "#data/elite-redux/coop/coop-me-pump";
 import { coopOwnerOfFieldIndex } from "#data/elite-redux/coop/coop-session";
 import { CoopSessionController } from "#data/elite-redux/coop/coop-session-controller";
 import { SpoofGuest } from "#data/elite-redux/coop/coop-spoof-guest";
-import type { CoopFullBattleSnapshot, CoopNetcodeMode } from "#data/elite-redux/coop/coop-transport";
+import type { CoopFullBattleSnapshot, CoopNetcodeMode, CoopWaveOutcome } from "#data/elite-redux/coop/coop-transport";
 import { type CoopTransport, createLoopbackPair, type SerializedCommand } from "#data/elite-redux/coop/coop-transport";
 import { CoopUiMirror } from "#data/elite-redux/coop/coop-ui-mirror";
 import { setCoopGhostFetchSuppressed, setCoopGhostPool, setGhostPoolPublisher } from "#data/elite-redux/er-ghost-teams";
@@ -81,6 +81,58 @@ function wireCoopResyncResponder(controller: CoopSessionController, battleStream
       battleStream.sendStateSync(compressToBase64(JSON.stringify(snapshot)), seq);
     } catch {
       /* a resync serialize/send failure must never break the host's turn */
+    }
+  });
+}
+
+/**
+ * Co-op authoritative WAVE-ADVANCE handshake (#633): a one-shot pending outcome the GUEST
+ * has been told the host RESOLVED, plus the last wave it already advanced past (the
+ * double-advance guard). The guest is a pure renderer - it removes KOd enemies WITHOUT a
+ * FaintPhase / AttemptCapturePhase, so it never gets the victory tail those phases queue and
+ * would loop the won wave forever. {@linkcode wireCoopWaveResolved} sets `pendingWaveAdvance`
+ * on receipt; {@linkcode consumeCoopPendingWaveAdvance} hands it to the guest's
+ * `CoopReplayTurnPhase` at the next SAFE turn boundary (NEVER mid-replay) so it runs the tail.
+ */
+let pendingWaveAdvance: { wave: number; outcome: CoopWaveOutcome } | null = null;
+/** The last wave the guest already ran the victory tail for (guards a duplicate `waveResolved`). */
+let lastResolvedWave = -1;
+
+/**
+ * GUEST: take + clear any pending wave-advance the host signaled (#633). Returns the
+ * outcome to run the victory tail for, or null when none is pending or this wave was
+ * already advanced past. Called by `CoopReplayTurnPhase` at a safe boundary. Bumps the
+ * double-advance guard so a duplicate `waveResolved` for the same wave is a no-op.
+ */
+export function consumeCoopPendingWaveAdvance(): { wave: number; outcome: CoopWaveOutcome } | null {
+  const pending = pendingWaveAdvance;
+  pendingWaveAdvance = null;
+  if (pending == null || pending.wave <= lastResolvedWave) {
+    return null;
+  }
+  lastResolvedWave = pending.wave;
+  return pending;
+}
+
+/**
+ * Co-op authoritative wave-advance responder (#633): the GUEST records the host's
+ * `waveResolved` signal as a one-shot pending flag (guarded against a double-advance by
+ * wave number). It is consumed at the next safe turn boundary by `CoopReplayTurnPhase`
+ * (NOT applied here mid-message) so an in-flight replay turn finishes first. Gated on the
+ * live GUEST role in the AUTHORITATIVE netcode; a host / solo / lockstep client ignores it.
+ */
+function wireCoopWaveResolved(controller: CoopSessionController, battleStream: CoopBattleStreamer): void {
+  battleStream.onWaveResolved((wave, outcome) => {
+    if (controller.role !== "guest" || getCoopNetcodeMode() !== "authoritative") {
+      return;
+    }
+    // Already advanced past this wave (a duplicate signal) -> ignore.
+    if (wave <= lastResolvedWave) {
+      return;
+    }
+    // Latest signal wins (a later wave supersedes an unconsumed earlier one).
+    if (pendingWaveAdvance == null || wave >= pendingWaveAdvance.wave) {
+      pendingWaveAdvance = { wave, outcome };
     }
   });
 }
@@ -221,6 +273,28 @@ export function broadcastCoopOwnSlotCommand(fieldIndex: number, command: Seriali
 }
 
 /**
+ * HOST -> GUEST (#633, authoritative wave-advance handshake): tell the guest the host
+ * RESOLVED the current wave's battle end (`outcome` = why). The guest - a pure renderer that
+ * removes KOd enemies WITHOUT a FaintPhase - runs the matching post-battle tail so it reaches
+ * the next wave instead of looping the won wave forever (the HANG). Carries the current
+ * `currentBattle.waveIndex`. Hard no-op unless we are in a live AUTHORITATIVE co-op run as the
+ * HOST, so solo / non-host / lockstep play is byte-for-byte unaffected. Best-effort + guarded.
+ */
+export function broadcastCoopWaveResolved(outcome: CoopWaveOutcome): void {
+  if (!globalScene.gameMode.isCoop || active == null || getCoopNetcodeMode() !== "authoritative") {
+    return;
+  }
+  if (active.controller.role !== "host") {
+    return;
+  }
+  try {
+    active.battleStream.sendWaveResolved(globalScene.currentBattle.waveIndex, outcome);
+  } catch {
+    /* a wave-resolved send failure must never break the host's post-battle flow */
+  }
+}
+
+/**
  * Set up a LOCAL co-op session: the human is the host, paired with a
  * {@linkcode SpoofGuest} stand-in player 2 over an in-process LoopbackTransport.
  * Registers it as the active runtime and sends the host's opening `hello`. This
@@ -255,6 +329,7 @@ export function startLocalCoopSession(
   };
   wireCoopGhostPoolSync(controller, battleStream);
   wireCoopResyncResponder(controller, battleStream);
+  wireCoopWaveResolved(controller, battleStream);
   wireCoopMeChecksumCheck(battleStream);
   setCoopRuntime(runtime);
   controller.connect();
@@ -295,6 +370,7 @@ export function connectCoopSession(
   };
   wireCoopGhostPoolSync(controller, battleStream);
   wireCoopResyncResponder(controller, battleStream);
+  wireCoopWaveResolved(controller, battleStream);
   wireCoopMeChecksumCheck(battleStream);
   setCoopRuntime(runtime);
   controller.connect();
@@ -317,5 +393,8 @@ export function clearCoopRuntime(): void {
   // Clear the co-op ghost-pool hooks so a subsequent SOLO run fetches normally (#633).
   setGhostPoolPublisher(null);
   setCoopGhostFetchSuppressed(null);
+  // Reset the authoritative wave-advance state so a subsequent run starts clean (#633).
+  pendingWaveAdvance = null;
+  lastResolvedWave = -1;
   active = null;
 }

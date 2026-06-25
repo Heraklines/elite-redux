@@ -99,6 +99,25 @@ function repairErTags(
   }
 }
 
+/**
+ * STABLE party-slot identity of a field mon (#633, enemy-switch mirror). The host's enemy
+ * switch swaps `party[fieldIndex]` <-> a bench slot, keeping the same battler index but bringing
+ * a DIFFERENT party member on-field; the streamed `bi` is only a POSITION, so this carries the
+ * mon's index in its OWNING party (enemy -> `getEnemyParty()`, player -> `getPlayerParty()`) so
+ * the guest can DETECT the switch + mirror it. NOT `mon.id` (per-client random + remapped). A
+ * mon not found in its party serializes as -1 (defensive; the guest treats it as no-switch).
+ */
+function readPartyIndex(mon: Pokemon): number {
+  try {
+    const party = mon.isPlayer()
+      ? (globalScene.getPlayerParty() as Pokemon[])
+      : (globalScene.getEnemyParty() as Pokemon[]);
+    return party.indexOf(mon);
+  } catch {
+    return -1;
+  }
+}
+
 /** Read a live field mon into the pure checkpoint view. */
 function readMonView(mon: ReturnType<typeof globalScene.getField>[number]): CoopFieldMonView | null {
   if (mon == null) {
@@ -107,6 +126,8 @@ function readMonView(mon: ReturnType<typeof globalScene.getField>[number]): Coop
   const erTags = readErTags(mon);
   return {
     bi: mon.getBattlerIndex(),
+    partyIndex: readPartyIndex(mon),
+    speciesId: mon.species?.speciesId ?? 0,
     hp: mon.hp,
     maxHp: mon.getMaxHp(),
     status: mon.status?.effect ?? 0,
@@ -188,7 +209,7 @@ export function captureCoopCheckpoint(): CoopBattleCheckpoint | null {
  * so re-applying the same checkpoint (or the resync mirror) can never double-remove. Fully guarded so
  * one bad removal can't break the rest of the heal.
  */
-export function reconcileCoopEnemyField(hostField: { bi: number; fainted: boolean }[]): void {
+export function reconcileCoopEnemyField(hostField: { bi: number; fainted: boolean; speciesId?: number }[]): void {
   try {
     // Enemy battler indices the host reports PRESENT-AND-ALIVE (slot present, not fainted).
     const hostAliveEnemies = new Set<number>();
@@ -197,7 +218,7 @@ export function reconcileCoopEnemyField(hostField: { bi: number; fainted: boolea
         hostAliveEnemies.add(entry.bi);
       }
     }
-    // Remove every guest enemy that is on-field-and-active but NOT alive on the host.
+    // PASS 1 - REMOVE: drop every guest enemy that is on-field-and-active but NOT alive on the host.
     for (const enemy of globalScene.getEnemyField(true)) {
       if (enemy == null) {
         continue;
@@ -223,8 +244,94 @@ export function reconcileCoopEnemyField(hostField: { bi: number; fainted: boolea
         /* one enemy removal failed; leave it and continue the reconcile */
       }
     }
+    // PASS 2 - SWAP/SUMMON: mirror a host ENEMY SWITCH (#633, enemy-switch mirror). For each enemy
+    // bi the host reports ALIVE with a `speciesId`, if the guest's mon at that field slot is a
+    // DIFFERENT species (a switch happened), summon the matching adopted party member onto the slot
+    // (the guest's enemy party is in the SAME encounter order as the host, so the species identifies
+    // which member). speciesId 0 / absent (an older payload or a player slot) is skipped. The
+    // `partyIndex` stream field can NOT drive this - for an on-field mon it always equals the field
+    // slot, so it carries no switch info (Oracle-verified); species is the robust signal.
+    for (const entry of hostField) {
+      if (entry.bi < BattlerIndex.ENEMY || entry.fainted) {
+        continue;
+      }
+      const speciesId = entry.speciesId ?? 0;
+      if (speciesId <= 0) {
+        continue;
+      }
+      const fieldSlot = entry.bi - BattlerIndex.ENEMY;
+      const party = globalScene.getEnemyParty();
+      const current = party[fieldSlot];
+      // No-op if the correct species is already on this field slot (idempotent re-apply).
+      if (current != null && current.species?.speciesId === speciesId) {
+        continue;
+      }
+      // Bench starts after the on-field slots (getEnemyField is party.slice(0, double?2:1)).
+      const onFieldCount = globalScene.getEnemyField(false).length;
+      // Find the adopted party member of the host's reported species that is NOT already on-field
+      // (a bench slot), so we bring in the switched-in mon, not re-place an on-field duplicate.
+      const partySlot = party.findIndex((p, i) => p != null && i >= onFieldCount && p.species?.speciesId === speciesId);
+      if (partySlot < 0) {
+        continue;
+      }
+      summonCoopEnemyField(fieldSlot, partySlot);
+    }
   } catch {
     // A malformed host field must never crash the guest's battle.
+  }
+}
+
+/**
+ * GUEST: place the enemy party member at `partySlot` onto enemy field slot `fieldIndex`, mirroring
+ * the host's switch (#633, enemy-switch mirror). Side-effect-free + idempotent: it does the SAME
+ * array swap the host's `SwitchSummonPhase` does (`party[fieldIndex] <-> party[partySlot]`, so the
+ * guest's `getEnemyParty()` stays PERMUTATION-IDENTICAL to the host across subsequent turns) and the
+ * VISUAL placement subset of `summonWild` (NOT the pokeball-throw `summon`, NOT switch-summon's
+ * ability/hazard/baton pipeline - that would re-enter the resolution engine authoritative mode
+ * exists to bypass). `loadAssets` is fire-and-forget (the sprite pops in a frame late - fine for a
+ * renderer; mirrors the existing `void enemy.loadAssets(false)` adopt path). Fully guarded.
+ */
+export function summonCoopEnemyField(fieldIndex: number, partySlot: number): void {
+  try {
+    const party = globalScene.getEnemyParty();
+    const incoming = party[partySlot];
+    const outgoing = party[fieldIndex];
+    // Guard: both party entries must exist and the slots must differ.
+    if (incoming == null || outgoing == null || partySlot === fieldIndex) {
+      return;
+    }
+    // Idempotency: if the correct mon is already on-field at this slot, nothing to do.
+    if (party[fieldIndex] === incoming) {
+      return;
+    }
+    // SWAP the guest's enemy party array EXACTLY like the host (switch-summon-phase.ts:223-224),
+    // so getEnemyParty() index alignment stays permutation-identical to the host next turn.
+    [party[fieldIndex], party[partySlot]] = [party[partySlot], party[fieldIndex]];
+    // Remove the outgoing mon from the field, side-effect-free (no FaintPhase / SwitchPhase).
+    try {
+      outgoing.leaveField(true, true, false);
+    } catch {
+      /* leaving the outgoing mon failed; continue and still place the incoming one */
+    }
+    // Place the incoming mon: reset summon data, (re)load its sprite (fire-and-forget), add it to
+    // the field below the player's mon, show its info + sprite, then field-setup (clears
+    // switchOutStatus so it reads as ON-FIELD). Mirrors the summonWild placement subset.
+    incoming.resetSummonData();
+    void incoming.loadAssets(true);
+    globalScene.field.add(incoming);
+    // Cast to the common base so `moveBelow<T>` (which constrains both args to one T) accepts an
+    // EnemyPokemon below a PlayerPokemon - exactly as summon-phase.ts does for the wild summon.
+    const playerPokemon: Pokemon | undefined = globalScene.getPlayerPokemon();
+    if (playerPokemon != null) {
+      globalScene.field.moveBelow(incoming as Pokemon, playerPokemon);
+    }
+    incoming.showInfo();
+    incoming.setVisible(true);
+    incoming.getSprite()?.setVisible(true);
+    incoming.fieldSetup(true);
+    globalScene.updateFieldScale();
+  } catch {
+    // A malformed switch mirror must never crash the guest's battle.
   }
 }
 
@@ -235,6 +342,13 @@ export function reconcileCoopEnemyField(hostField: { bi: number; fainted: boolea
  */
 export function applyCoopCheckpoint(checkpoint: CoopBattleCheckpoint): void {
   try {
+    // Reconcile the enemy field COMPOSITION to the host's FIRST (#633): drop any guest enemy the
+    // host KOd this turn (it rides the checkpoint with fainted:true) AND mirror any host enemy
+    // SWITCH (a different species now at a slot -> summon the matching adopted member). Done BEFORE
+    // the per-mon numeric apply below so the freshly-summoned switched-in mon at a slot RECEIVES the
+    // host's hp/status/stages for that bi (otherwise the numeric state writes onto the wrong, pre-swap
+    // mon - Oracle ordering). Strictly enemy slots; side-effect-free; idempotent.
+    reconcileCoopEnemyField(checkpoint.field);
     for (const mon of globalScene.getField(true)) {
       if (mon == null) {
         continue;
@@ -262,10 +376,6 @@ export function applyCoopCheckpoint(checkpoint: CoopBattleCheckpoint): void {
         /* one mon's correction failed; leave it and continue */
       }
     }
-    // Reconcile the enemy field to the host's composition (#633): drop any guest enemy the
-    // host KOd this turn (it rides the checkpoint with fainted:true) so the field-composition
-    // matches and the per-turn checksum converges. Strictly enemy slots; side-effect-free.
-    reconcileCoopEnemyField(checkpoint.field);
     // Correct weather / terrain type if it drifted (turn counts are approximate).
     const arena = globalScene.arena;
     if ((arena.weather?.weatherType ?? 0) !== checkpoint.weather) {
@@ -519,6 +629,8 @@ function readModifiers(): [string, number][] {
 function readChecksumMon(mon: Pokemon): CoopChecksumMon {
   return {
     bi: mon.getBattlerIndex(),
+    partyIndex: readPartyIndex(mon),
+    speciesId: mon.species?.speciesId ?? 0,
     hp: mon.hp,
     maxHp: mon.getMaxHp(),
     status: mon.status?.effect ?? 0,
@@ -572,6 +684,8 @@ export function captureCoopChecksum(): string {
 function readFullMon(mon: Pokemon): CoopFullMonSnapshot {
   return {
     bi: mon.getBattlerIndex(),
+    partyIndex: readPartyIndex(mon),
+    speciesId: mon.species?.speciesId ?? 0,
     hp: mon.hp,
     maxHp: mon.getMaxHp(),
     status: mon.status?.effect ?? 0,
@@ -689,6 +803,11 @@ function applyFullMon(mon: Pokemon, snap: CoopFullMonSnapshot): void {
  */
 export function applyCoopFullSnapshot(snapshot: CoopFullBattleSnapshot): void {
   try {
+    // Heal the enemy-field COMPOSITION first (#633): drop any just-fainted enemy (fainted:true) and
+    // mirror any host enemy SWITCH (a different species now at a slot). Done BEFORE the per-mon heal
+    // below so the freshly-summoned switched-in mon is the one the snapshot's per-bi state lands on.
+    // Side-effect-free, idempotent, enemy slots only.
+    reconcileCoopEnemyField(snapshot.field);
     const byIndex = new Map(
       globalScene
         .getField(true)
@@ -701,10 +820,6 @@ export function applyCoopFullSnapshot(snapshot: CoopFullBattleSnapshot): void {
         applyFullMon(mon, snap);
       }
     }
-    // Mirror the per-turn reconcile on the resync path (#633): the snapshot also carries any
-    // just-fainted enemy (fainted:true), so heal the enemy-field composition too - a guest that
-    // never saw the KO drops the dead foe here. Side-effect-free, idempotent, enemy slots only.
-    reconcileCoopEnemyField(snapshot.field);
     const arena = globalScene.arena;
     if ((arena.weather?.weatherType ?? 0) !== snapshot.weather) {
       arena.trySetWeather(snapshot.weather as WeatherType);

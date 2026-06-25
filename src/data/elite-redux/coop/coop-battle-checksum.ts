@@ -33,6 +33,19 @@
 export interface CoopChecksumMon {
   /** Battler index (0 host lead, 1 guest lead, 2/3 enemies). */
   bi: number;
+  /**
+   * STABLE party-slot identity (#633, enemy-switch mirror): the host's `getEnemyParty().indexOf`
+   * (player: `getPlayerParty().indexOf`). For an on-field mon this equals its field slot, so it
+   * does not by itself detect a switch; {@linkcode speciesId} below is the detectable identity.
+   */
+  partyIndex: number;
+  /**
+   * `species.speciesId` (#633, enemy-switch mirror). Hashing it is INTENDED: a host enemy switch
+   * keeps the same `bi` but swaps in a different SPECIES, so without this the checksum could miss a
+   * switch between two mons of identical hp/stats. A switch now changes the checksum (detectable)
+   * and re-converges once the guest mirrors the switch.
+   */
+  speciesId: number;
   hp: number;
   maxHp: number;
   /** `StatusEffect` enum value (0 = none). */

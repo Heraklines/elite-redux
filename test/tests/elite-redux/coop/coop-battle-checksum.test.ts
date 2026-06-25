@@ -20,6 +20,8 @@ import { describe, expect, it } from "vitest";
 
 const mon = (over: Partial<CoopChecksumMon> = {}): CoopChecksumMon => ({
   bi: 0,
+  partyIndex: 0,
+  speciesId: 1,
   hp: 20,
   maxHp: 21,
   status: 0,

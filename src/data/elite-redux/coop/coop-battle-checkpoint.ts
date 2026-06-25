@@ -23,6 +23,10 @@ import type { CoopBattleCheckpoint, CoopSerializedMonState } from "#data/elite-r
 export interface CoopFieldMonView {
   /** Battler index (0 host lead, 1 guest lead, 2/3 enemies). */
   bi: number;
+  /** STABLE party-slot identity (#633, enemy-switch mirror); see {@linkcode CoopSerializedMonState.partyIndex}. */
+  partyIndex: number;
+  /** `species.speciesId` (#633, enemy-switch mirror); the robust switch-detection identity. */
+  speciesId: number;
   hp: number;
   maxHp: number;
   /** `StatusEffect` enum value (0 = none). */
@@ -57,6 +61,12 @@ export function serializeMonState(mon: CoopFieldMonView): CoopSerializedMonState
   const hp = Math.max(0, Math.min(maxHp, Math.trunc(mon.hp)));
   const state: CoopSerializedMonState = {
     bi: mon.bi,
+    // Carry the stable party-slot identity through (#633, enemy-switch mirror). Defensively
+    // truncated; a missing value (-1) is preserved so the guest treats it as "no switch".
+    partyIndex: Math.trunc(mon.partyIndex ?? -1),
+    // Carry the species identity through (#633, enemy-switch mirror): the robust switch-detection
+    // signal the guest compares per enemy field slot. Defaults to 0 (the guest then skips it).
+    speciesId: Math.max(0, Math.trunc(mon.speciesId ?? 0)),
     hp,
     maxHp,
     status: Math.max(0, Math.trunc(mon.status)),
@@ -106,6 +116,8 @@ export function monStateByIndex(checkpoint: CoopBattleCheckpoint, bi: number): C
 export function normalizeMonState(state: CoopSerializedMonState): CoopSerializedMonState {
   return serializeMonState({
     bi: state.bi,
+    partyIndex: state.partyIndex,
+    speciesId: state.speciesId,
     hp: state.hp,
     maxHp: state.maxHp,
     status: state.status,

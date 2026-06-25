@@ -22,6 +22,8 @@ const arena: CoopArenaView = { weather: 3, weatherTurnsLeft: 5, terrain: 0, terr
 
 const mon = (over: Partial<CoopFieldMonView> = {}): CoopFieldMonView => ({
   bi: 0,
+  partyIndex: 0,
+  speciesId: 1,
   hp: 20,
   maxHp: 21,
   status: 0,
@@ -70,6 +72,8 @@ describe("co-op battle checkpoint pure core (#633, LIVE-D)", () => {
   it("normalizeMonState re-clamps a received (possibly corrupt) state before the guest applies it", () => {
     const safe = normalizeMonState({
       bi: 2,
+      partyIndex: 0,
+      speciesId: 1,
       hp: 9999,
       maxHp: 14,
       status: -1,
@@ -86,9 +90,17 @@ describe("co-op battle checkpoint pure core (#633, LIVE-D)", () => {
   describe("ER bleed/frost/fear tags (#633 Fix #4h)", () => {
     it("carries erTags through serialize, sanitizing turns (>=0 integer)", () => {
       const s = serializeMonState(
-        mon({ erTags: [{ type: "ER_BLEED", turns: 3.9 }, { type: "ER_FROSTBITE", turns: -2 }] }),
+        mon({
+          erTags: [
+            { type: "ER_BLEED", turns: 3.9 },
+            { type: "ER_FROSTBITE", turns: -2 },
+          ],
+        }),
       );
-      expect(s.erTags).toEqual([{ type: "ER_BLEED", turns: 3 }, { type: "ER_FROSTBITE", turns: 0 }]);
+      expect(s.erTags).toEqual([
+        { type: "ER_BLEED", turns: 3 },
+        { type: "ER_FROSTBITE", turns: 0 },
+      ]);
     });
 
     it("omits erTags entirely when the mon has none (tagless wire shape unchanged)", () => {
@@ -99,6 +111,8 @@ describe("co-op battle checkpoint pure core (#633, LIVE-D)", () => {
     it("normalizeMonState round-trips the erTags the guest will repair", () => {
       const safe = normalizeMonState({
         bi: 2,
+        partyIndex: 0,
+        speciesId: 1,
         hp: 10,
         maxHp: 14,
         status: 0,

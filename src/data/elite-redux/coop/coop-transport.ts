@@ -157,6 +157,24 @@ export interface CoopSerializedRewardOption {
 export interface CoopSerializedMonState {
   /** Battler index of this field mon. */
   bi: number;
+  /**
+   * STABLE party-slot identity of this field mon (#633, enemy-switch mirror). The host's
+   * `getEnemyParty().indexOf(mon)` (player side: `getPlayerParty().indexOf(mon)`). NOT `mon.id`
+   * (per-client random + remapped). NOTE: for an ON-FIELD mon this always equals its field slot
+   * (`bi - ENEMY`), so it can NOT by itself detect a switch (an on-field mon's array index reverts
+   * to the field slot after the host's swap) - {@linkcode speciesId} drives the actual detection.
+   * Carried for diagnostics / future per-slot identity use.
+   */
+  partyIndex: number;
+  /**
+   * The mon's `species.speciesId` (#633, enemy-switch mirror). The robust identity the guest uses
+   * to DETECT a host enemy switch: the streamed `bi` is only a field POSITION, so a host switch
+   * (swaps `party[fieldIndex]` <-> a bench slot) keeps the same `bi` but brings in a DIFFERENT
+   * species. When the species at an enemy field slot differs from the guest's current mon there, a
+   * switch happened; the guest then summons the matching adopted party member (same encounter
+   * order on both clients). Carried for enemy slots (drives the reconcile); harmless for players.
+   */
+  speciesId: number;
   hp: number;
   maxHp: number;
   /** `StatusEffect` enum value (0 = none). */
@@ -203,6 +221,10 @@ export interface CoopBattleCheckpoint {
 export interface CoopFullMonSnapshot {
   /** Battler index (0 host lead, 1 guest lead, 2/3 enemies). */
   bi: number;
+  /** STABLE party-slot identity (#633, enemy-switch mirror); see {@linkcode CoopSerializedMonState.partyIndex}. */
+  partyIndex: number;
+  /** `species.speciesId` (#633, enemy-switch mirror); the robust switch-detection identity. */
+  speciesId: number;
   hp: number;
   maxHp: number;
   /** `StatusEffect` enum value (0 = none). */
@@ -289,6 +311,17 @@ export type CoopInteractionOutcome =
   | { k: "reroll"; moneyDelta: number }
   /** The owner left the screen with no further outcome (a terminal). */
   | { k: "leave" };
+
+/**
+ * How a wave's battle ended (#633, authoritative wave-advance handshake). The host
+ * resolves the battle end (it is the sole engine) and tells the guest WHY so the guest
+ * runs the matching post-battle tail:
+ *  - `win`      every enemy was KOd (the host's `VictoryPhase` wave-clear branch)
+ *  - `capture`  the active wild enemy was caught (`AttemptCapturePhase`)
+ *  - `flee`     the player fled / the enemy fled (reserved; not yet emitted)
+ *  - `gameOver` the run ended (the host's `GameOverPhase`)
+ */
+export type CoopWaveOutcome = "win" | "capture" | "flee" | "gameOver";
 
 /**
  * The co-op wire protocol: a discriminated union on `t`. This GROWS per
@@ -486,7 +519,19 @@ export type CoopMessage =
    * its own to surface the ROOT data drift (the "host remapped 67 / guest remapped 1" class)
    * BEFORE any battle runs. Plain JSON; an older client ignores it via the default arm.
    */
-  | { t: "dataFingerprint"; fp: ErDataFingerprint };
+  | { t: "dataFingerprint"; fp: ErDataFingerprint }
+  /**
+   * Host -> guest (#633, authoritative wave-advance handshake): the host RESOLVED the
+   * `wave`'s battle end (it is the sole engine). In authoritative netcode the GUEST is a
+   * pure renderer that removes KOd enemies WITHOUT a FaintPhase / AttemptCapturePhase, so
+   * it never gets the `VictoryPhase` -> `NewBattlePhase` -> next `EncounterPhase` tail those
+   * phases queue - it would loop the won wave forever (a HANG). This explicit signal lets
+   * the guest run the SAME post-battle tail lockstep co-op runs (queue `VictoryPhase`), so it
+   * traverses BattleEnd -> the alternation-relayed reward shop -> biome -> the next encounter.
+   * `outcome` is WHY the wave ended (see {@linkcode CoopWaveOutcome}); the guest guards against
+   * a double-advance by `wave` (it only runs the tail once per wave number).
+   */
+  | { t: "waveResolved"; wave: number; outcome: CoopWaveOutcome };
 
 /** A transport moves {@linkcode CoopMessage}s between two paired clients. */
 export interface CoopTransport {

@@ -3,6 +3,7 @@ import { timedEventManager } from "#app/global-event-manager";
 import { globalScene } from "#app/global-scene";
 import { IS_TEST, isBeta, isDev } from "#constants/app-constants";
 import { SubstituteTag } from "#data/battler-tags";
+import { broadcastCoopWaveResolved } from "#data/elite-redux/coop/coop-runtime";
 import { coopAttributeNewMon } from "#data/elite-redux/coop/coop-session";
 import { erCollectorsAlbumRecordCatch } from "#data/elite-redux/er-relics";
 import { Gender } from "#data/gender";
@@ -285,6 +286,11 @@ export class AttemptCapturePhase extends PokemonPhase {
       null,
       () => {
         const end = () => {
+          // Co-op (#633, authoritative wave-advance handshake): the host caught the wild enemy,
+          // which clears the wave. Signal the guest renderer so it runs the same post-battle tail
+          // (it removes the captured enemy without a FaintPhase, so it never queues that tail
+          // itself). Hard no-op for solo / non-host / lockstep; guarded against a double-advance.
+          broadcastCoopWaveResolved("capture");
           globalScene.phaseManager.unshiftNew("VictoryPhase", this.battlerIndex);
           globalScene.pokemonInfoContainer.hide();
           this.removePb();

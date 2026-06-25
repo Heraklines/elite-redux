@@ -14,8 +14,9 @@ import {
   captureCoopChecksumState,
 } from "#data/elite-redux/coop/coop-battle-engine";
 import { logCanonicalDiff } from "#data/elite-redux/coop/coop-data-fingerprint";
-import { getCoopBattleStreamer } from "#data/elite-redux/coop/coop-runtime";
+import { consumeCoopPendingWaveAdvance, getCoopBattleStreamer } from "#data/elite-redux/coop/coop-runtime";
 import type { CoopBattleEvent, CoopFullBattleSnapshot } from "#data/elite-redux/coop/coop-transport";
+import { BattlerIndex } from "#enums/battler-index";
 import { decompressFromBase64 } from "lz-string";
 
 /**
@@ -145,9 +146,53 @@ export class CoopReplayTurnPhase extends Phase {
     }
   }
 
-  /** Queue the guest's own end-of-turn phases (so the run loops) and end this phase. */
+  /**
+   * Queue the guest's own end-of-turn phases (so the run loops) and end this phase. If the host
+   * signaled this wave RESOLVED (#633, authoritative wave-advance), also run the normal victory
+   * tail AFTER the turn-end phases drain - this is the SAFE boundary (the in-flight replay turn
+   * has finished here, never mid-replay).
+   */
   private finishTurn(): void {
     globalScene.phaseManager.queueTurnEndPhases();
+    // The turn-end phases were pushed to the back of the queue above; pushing the victory tail
+    // here runs it AFTER they drain (the in-flight turn finishes first, per the Oracle ordering).
+    this.maybeRunCoopWaveAdvance();
     this.end();
+  }
+
+  /**
+   * GUEST (#633, authoritative wave-advance handshake): if the host told us this wave RESOLVED
+   * (win / capture / gameOver), run the SAME post-battle tail lockstep co-op runs - queue
+   * `VictoryPhase` exactly as `FaintPhase`/`AttemptCapturePhase` do (faint-phase.ts:189). That
+   * tail runs BattleEnd -> the alternation-relayed reward shop -> biome -> `NewBattlePhase` ->
+   * the next `EncounterPhase` (-> `adoptCoopHostEnemyParty` for wave N+1), so the guest reaches
+   * the next wave instead of looping the won wave forever. A pure renderer never queues this
+   * tail itself (it removes KOd enemies without a FaintPhase). One-shot + wave-guarded by
+   * {@linkcode consumeCoopPendingWaveAdvance}; a duplicate `waveResolved` is a no-op. Fully
+   * guarded so a missing-pokemon edge can never hang the guest.
+   */
+  private maybeRunCoopWaveAdvance(): void {
+    const pending = consumeCoopPendingWaveAdvance();
+    if (pending == null) {
+      return;
+    }
+    // Only WIN / CAPTURE advance to a NEXT wave via the victory tail. `gameOver` (run end) and
+    // `flee` are terminal / not-yet-rendered on the pure guest; consuming them above still bumps
+    // the wave guard, so they are a safe no-op here (the full guest game-over render is a TODO).
+    if (pending.outcome !== "win" && pending.outcome !== "capture") {
+      return;
+    }
+    try {
+      // VictoryPhase reads exp off the resolved mon. After the checkpoint reconcile the KOd
+      // enemies are off-field but still present in the enemy party, so address one by its `id`
+      // (>3 -> getPokemonById, which finds an off-field party member) - never a dead field slot.
+      // Fall back to the player lead's battler index when no enemy party member remains
+      // (e.g. a capture that cleared the slot), so getPokemon() always resolves a live mon.
+      const lastEnemy = globalScene.getEnemyParty().at(-1);
+      const battlerArg = lastEnemy == null ? BattlerIndex.PLAYER : lastEnemy.id;
+      globalScene.phaseManager.pushNew("VictoryPhase", battlerArg);
+    } catch {
+      // The victory tail is best-effort; a failure here must never hang the guest's run.
+    }
   }
 }

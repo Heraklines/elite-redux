@@ -28,6 +28,7 @@ import type {
   CoopMessage,
   CoopSerializedEnemy,
   CoopTransport,
+  CoopWaveOutcome,
 } from "#data/elite-redux/coop/coop-transport";
 // TYPE-ONLY (erased at runtime): the host's ghost-team pool the guest adopts (#633).
 import type { GhostTeamSnapshot } from "#data/elite-redux/er-ghost-teams";
@@ -114,6 +115,8 @@ export class CoopBattleStreamer {
   private stateSyncSeq = 0;
   /** WATCHER: handler for the owner's ME-boundary checksum (#633, TRACK-2 Phase C). */
   private meChecksumHandler: ((seq: number, checksum: string) => void) | null = null;
+  /** GUEST: handler for the host's wave-resolved signal (#633, authoritative wave-advance). */
+  private waveResolvedHandler: ((wave: number, outcome: CoopWaveOutcome) => void) | null = null;
 
   constructor(transport: CoopTransport, opts: CoopBattleStreamerOptions = {}) {
     this.transport = transport;
@@ -173,6 +176,16 @@ export class CoopBattleStreamer {
   /** HOST: send the authoritative full-state snapshot answering a guest's `requestStateSync`. */
   sendStateSync(blob: string, seq: number): void {
     this.transport.send({ t: "stateSync", blob, seq });
+  }
+
+  /**
+   * HOST: signal that the host RESOLVED the `wave`'s battle end (#633, authoritative
+   * wave-advance handshake). The guest - a pure renderer that removes KOd enemies without a
+   * FaintPhase - uses this to run the normal post-battle tail and reach the next wave (it
+   * would otherwise loop the won wave forever). `outcome` is WHY the wave ended.
+   */
+  sendWaveResolved(wave: number, outcome: CoopWaveOutcome): void {
+    this.transport.send({ t: "waveResolved", wave, outcome });
   }
 
   /**
@@ -275,6 +288,15 @@ export class CoopBattleStreamer {
   /** GUEST: handle an out-of-turn authoritative checkpoint. */
   onCheckpoint(handler: (reason: string, checkpoint: CoopBattleCheckpoint) => void): void {
     this.checkpointHandler = handler;
+  }
+
+  /**
+   * GUEST: subscribe to the host's wave-resolved signal (#633, authoritative wave-advance).
+   * The handler runs the guest's normal post-battle tail so it reaches the next wave's
+   * encounter (the pure renderer never queues that tail itself).
+   */
+  onWaveResolved(handler: (wave: number, outcome: CoopWaveOutcome) => void): void {
+    this.waveResolvedHandler = handler;
   }
 
   /**
@@ -391,6 +413,7 @@ export class CoopBattleStreamer {
     this.lastGhostPool = null;
     this.stateSyncRequestHandler = null;
     this.meChecksumHandler = null;
+    this.waveResolvedHandler = null;
   }
 
   private handle(msg: CoopMessage): void {
@@ -449,6 +472,10 @@ export class CoopBattleStreamer {
       case "meChecksum":
         // WATCHER: the owner's ME-boundary checksum - verify + heal on mismatch.
         this.meChecksumHandler?.(msg.seq, msg.checksum);
+        return;
+      case "waveResolved":
+        // GUEST: the host cleared/ended this wave - run the normal post-battle tail.
+        this.waveResolvedHandler?.(msg.wave, msg.outcome);
         return;
       case "ghostPool":
         // Deliver to a live handler, else buffer (the broadcast can land before the

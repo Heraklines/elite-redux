@@ -65,8 +65,26 @@ describe("co-op host-authoritative streaming protocol (#633, LIVE-D)", () => {
     ];
     const checkpoint: CoopBattleCheckpoint = {
       field: [
-        { bi: 0, hp: 17, maxHp: 21, status: 0, statStages: [0, 0, 0, 0, 0, 0, 0], fainted: false },
-        { bi: 2, hp: 0, maxHp: 14, status: 0, statStages: [0, 0, 0, 0, 0, 0, 0], fainted: true },
+        {
+          bi: 0,
+          partyIndex: 0,
+          speciesId: 1,
+          hp: 17,
+          maxHp: 21,
+          status: 0,
+          statStages: [0, 0, 0, 0, 0, 0, 0],
+          fainted: false,
+        },
+        {
+          bi: 2,
+          partyIndex: 0,
+          speciesId: 1,
+          hp: 0,
+          maxHp: 14,
+          status: 0,
+          statStages: [0, 0, 0, 0, 0, 0, 0],
+          fainted: true,
+        },
       ],
       weather: 3,
       weatherTurnsLeft: 5,
@@ -97,7 +115,18 @@ describe("co-op host-authoritative streaming protocol (#633, LIVE-D)", () => {
   it("battleCheckpoint carries an out-of-turn authoritative sync", async () => {
     const { host, received } = captureGuestInbox();
     const checkpoint: CoopBattleCheckpoint = {
-      field: [{ bi: 1, hp: 20, maxHp: 21, status: 4, statStages: [1, 0, 0, 0, 0, 0, 0], fainted: false }],
+      field: [
+        {
+          bi: 1,
+          partyIndex: 0,
+          speciesId: 1,
+          hp: 20,
+          maxHp: 21,
+          status: 4,
+          statStages: [1, 0, 0, 0, 0, 0, 0],
+          fainted: false,
+        },
+      ],
       weather: 0,
       weatherTurnsLeft: 0,
       terrain: 0,
