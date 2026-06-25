@@ -14,6 +14,7 @@ import {
   type CoopFieldMonView,
   monStateByIndex,
   normalizeMonState,
+  serializeArenaTag,
   serializeMonState,
 } from "#data/elite-redux/coop/coop-battle-checkpoint";
 import { describe, expect, it } from "vitest";
@@ -67,6 +68,36 @@ describe("co-op battle checkpoint pure core (#633, LIVE-D)", () => {
     expect(cp.weatherTurnsLeft).toBe(5);
     expect(monStateByIndex(cp, 1)?.fainted).toBe(true);
     expect(monStateByIndex(cp, 9)).toBeUndefined();
+  });
+
+  // GAP 1 (#633): the checkpoint carries arena tags (hazards / screens / tailwind) so the guest
+  // can reconcile them - they're set by host MoveEffectPhases the pure-renderer guest never runs.
+  describe("arena tags (#633 GAP 1)", () => {
+    it("serializeArenaTag sanitizes side/turnCount (>=0) and layers (>=1, integer)", () => {
+      expect(serializeArenaTag({ tagType: "SPIKES", side: 1.9, turnCount: -5, layers: 0 })).toEqual({
+        tagType: "SPIKES",
+        side: 1,
+        turnCount: 0,
+        layers: 1,
+      });
+      expect(serializeArenaTag({ tagType: "SPIKES", side: 2, turnCount: 4, layers: 3.7 })).toEqual({
+        tagType: "SPIKES",
+        side: 2,
+        turnCount: 4,
+        layers: 3,
+      });
+    });
+
+    it("buildCheckpoint carries arena tags when present, omits them when empty", () => {
+      const withTags: CoopArenaView = {
+        ...arena,
+        arenaTags: [{ tagType: "STEALTH_ROCK", side: 2, turnCount: 0, layers: 1 }],
+      };
+      const cp = buildCheckpoint([mon()], withTags);
+      expect(cp.arenaTags).toEqual([{ tagType: "STEALTH_ROCK", side: 2, turnCount: 0, layers: 1 }]);
+      // A tagless arena leaves the field absent (older host / guest leaves its tags alone).
+      expect(buildCheckpoint([mon()], arena).arenaTags).toBeUndefined();
+    });
   });
 
   it("normalizeMonState re-clamps a received (possibly corrupt) state before the guest applies it", () => {

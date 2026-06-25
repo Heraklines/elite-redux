@@ -153,6 +153,26 @@ export interface CoopSerializedRewardOption {
   pregenArgs?: number[] | undefined;
 }
 
+/**
+ * One arena tag carried in the per-turn checkpoint (#633 GAP 1). Hazards / screens / tailwind
+ * (Stealth Rock, Spikes, Reflect, Light Screen, Tailwind, ...) are set by host MoveEffectPhases
+ * the guest never runs, so without carrying them the guest never gains them and the checksum -
+ * which hashes `(tagType, side)` - resync-loops every turn. The guest reconciles its arena to
+ * this set by `(tagType, side)`. `turnCount` / `layers` are FORCE-SET (never hashed) so a screen
+ * the host refreshed or a multi-layer Spikes stack renders correctly without re-introducing the
+ * intentionally-excluded turn-counter desyncs.
+ */
+export interface CoopSerializedArenaTag {
+  /** `ArenaTagType` string key. */
+  tagType: string;
+  /** `ArenaTagSide` enum value (0 BOTH, 1 PLAYER, 2 ENEMY). */
+  side: number;
+  /** Turns the host's tag has left (force-set on the guest; NEVER hashed - excluded by design). */
+  turnCount: number;
+  /** Entry-hazard layer count (Spikes / Toxic Spikes); 1 for non-stacking tags. Force-set only. */
+  layers: number;
+}
+
 /** The mutable per-turn battle state of ONE field mon (the guest already has the mon object). */
 export interface CoopSerializedMonState {
   /** Battler index of this field mon. */
@@ -205,6 +225,12 @@ export interface CoopBattleCheckpoint {
   /** `TerrainType` enum value (0 = none) + turns remaining. */
   terrain: number;
   terrainTurnsLeft: number;
+  /**
+   * Arena tags the host has (#633 GAP 1): hazards / screens / tailwind the guest's
+   * MoveEffectPhases never set. The guest reconciles its arena to this set by `(tagType, side)`.
+   * Optional + additive: an older payload omits it and the guest leaves its arena tags alone.
+   */
+  arenaTags?: CoopSerializedArenaTag[];
 }
 
 // =============================================================================
@@ -236,6 +262,10 @@ export interface CoopFullMonSnapshot {
   abilityId: number;
   /** Current form index. */
   formIndex: number;
+  /** Whether this mon is Terastallized (#633 GAP 7); forced on the guest in the snapshot apply. */
+  isTerastallized?: boolean;
+  /** Tera type (`PokemonType` enum) (#633 GAP 7); forced alongside `isTerastallized`. */
+  teraType?: number;
   /** Each move slot as `[moveId, ppUsed]`, in moveset slot order. */
   moves: [number, number][];
   /** Battler-tag TYPE ids present on the mon (identity only). */
@@ -252,8 +282,12 @@ export interface CoopFullBattleSnapshot {
   /** `TerrainType` enum value (0 = none) + turns remaining. */
   terrain: number;
   terrainTurnsLeft: number;
-  /** Arena tag identities as `[tagType, side]`. */
-  arenaTags: [number, number][];
+  /**
+   * Arena tags the host has (#633 GAP 1): each `{ tagType, side, turnCount, layers }` so the
+   * resync path reconciles the guest's arena identically to the per-turn checkpoint (hazards /
+   * screens / tailwind). `turnCount` / `layers` are force-set, never hashed.
+   */
+  arenaTags: CoopSerializedArenaTag[];
   /** Player party `speciesId`s in slot order. */
   party: number[];
   money: number;

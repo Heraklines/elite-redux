@@ -57,6 +57,15 @@ export interface CoopChecksumMon {
   abilityId: number;
   /** Current form index; 0 when absent. */
   formIndex: number;
+  /**
+   * Whether this mon is Terastallized (#633 GAP 7). Hashing it is INTENDED: a Tera command the
+   * guest dropped changes the mon's type/STAB on the host but not the guest, so without this the
+   * checksum could miss a Tera divergence. A drop now changes the checksum (detectable) and
+   * re-converges once the guest's snapshot apply forces the host's tera state.
+   */
+  isTerastallized: boolean;
+  /** Tera type (`PokemonType` enum); 0 when not relevant. Carried so a wrong-type Tera is detected. */
+  teraType: number;
   /** Each move slot as `[moveId, ppUsed]`, in moveset slot order (NOT sorted). */
   moves: [number, number][];
   /** Sorted ascending list of the battler-tag TYPE ids present (identity only, no counters). */

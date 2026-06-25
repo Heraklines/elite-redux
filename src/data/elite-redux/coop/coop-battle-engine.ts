@@ -21,6 +21,7 @@
 // =============================================================================
 
 import { globalScene } from "#app/global-scene";
+import { EntryHazardTag } from "#data/arena-tag";
 import {
   buildCheckpoint,
   type CoopArenaView,
@@ -38,6 +39,7 @@ import type {
   CoopBattleCheckpoint,
   CoopFullBattleSnapshot,
   CoopFullMonSnapshot,
+  CoopSerializedArenaTag,
   CoopSerializedEnemy,
 } from "#data/elite-redux/coop/coop-transport";
 import { resolveErModifierClass } from "#data/elite-redux/er-persistent-modifiers";
@@ -45,15 +47,19 @@ import type { Gender } from "#data/gender";
 import { Status } from "#data/status-effect";
 import type { TerrainType } from "#data/terrain";
 import type { AbilityId } from "#enums/ability-id";
+import type { ArenaTagSide } from "#enums/arena-tag-side";
+import type { ArenaTagType } from "#enums/arena-tag-type";
 import { BattlerIndex } from "#enums/battler-index";
 import { BattlerTagType } from "#enums/battler-tag-type";
+import type { MoveId } from "#enums/move-id";
 import type { Nature } from "#enums/nature";
+import { Stat } from "#enums/stat";
 import type { StatusEffect } from "#enums/status-effect";
 import type { WeatherType } from "#enums/weather-type";
 import type { Pokemon } from "#field/pokemon";
 // biome-ignore lint/performance/noNamespaceImport: held-item reconstruction resolves the modifier class by serialized name (`Modifier[className]`), exactly like the save-load path in game-data.ts.
 import * as Modifier from "#modifiers/modifier";
-import { PokemonHeldItemModifier } from "#modifiers/modifier";
+import { PersistentModifier, PokemonHeldItemModifier } from "#modifiers/modifier";
 import { PokemonMove } from "#moves/pokemon-move";
 import { ModifierData } from "#system/modifier-data";
 
@@ -161,7 +167,13 @@ function getCoopSerializableField(): Pokemon[] {
   return [...playerField, ...enemyField];
 }
 
-/** Read the arena's weather + terrain into the pure checkpoint view. */
+/**
+ * Read the arena's weather + terrain + tags into the pure checkpoint view (#633 GAP 1). ALWAYS
+ * sets `arenaTags` (an empty array when the arena has none) - a NEW host that supports arena-tag
+ * sync signals it by carrying the array, so the guest can converge to the EMPTY set (remove a
+ * screen the host cleared), not just gain tags. An OLDER host omits the field entirely, and the
+ * guest then leaves its tags alone (the `undefined` skip in {@linkcode reconcileArenaTags}).
+ */
 function readArenaView(): CoopArenaView {
   const arena = globalScene.arena;
   return {
@@ -169,7 +181,32 @@ function readArenaView(): CoopArenaView {
     weatherTurnsLeft: arena.weather?.turnsLeft ?? 0,
     terrain: arena.terrain?.terrainType ?? 0,
     terrainTurnsLeft: arena.terrain?.turnsLeft ?? 0,
+    arenaTags: readArenaTagViews(),
   };
+}
+
+/**
+ * Read the arena's tags into the rich checkpoint view (#633 GAP 1). Carries `(tagType, side)` -
+ * the identity the checksum hashes - PLUS `turnCount` + entry-hazard `layers` so the guest can
+ * FORCE-SET them (turn counts are intentionally NOT hashed, so carrying them here can never
+ * re-introduce a false desync; they only make a host-refreshed screen / multi-layer Spikes
+ * render correctly). Sorted by `(tagType, side)` for a stable wire order. Fully guarded.
+ */
+function readArenaTagViews(): CoopSerializedArenaTag[] {
+  try {
+    return globalScene.arena.tags
+      .map(
+        (t): CoopSerializedArenaTag => ({
+          tagType: t.tagType as unknown as string,
+          side: t.side as unknown as number,
+          turnCount: t.turnCount,
+          layers: t instanceof EntryHazardTag ? t.layers : 1,
+        }),
+      )
+      .sort((a, b) => (a.tagType < b.tagType ? -1 : a.tagType > b.tagType ? 1 : a.side - b.side));
+  } catch {
+    return [];
+  }
 }
 
 /**
@@ -480,6 +517,79 @@ export function summonCoopPlayerField(fieldIndex: number, partySlot: number): vo
 }
 
 /**
+ * GUEST: reconcile the live arena tags to exactly the host's set (#633 GAP 1). Hazards / screens
+ * / tailwind (Stealth Rock, Spikes, Reflect, Light Screen, Tailwind, ...) are set by host
+ * MoveEffectPhases the pure-renderer guest never runs, so the guest never gains them and the
+ * per-turn checksum (which hashes `(tagType, side)`) resync-loops forever. This matches the guest's
+ * `arena.tags` to the host's by `(tagType, side)`:
+ *  - ADD any host tag the guest lacks (`arena.addTag`, then force the host's `turnCount`; for a
+ *    multi-layer entry hazard, replay `onOverlap` up to the host's layer count).
+ *  - REMOVE any guest tag the host doesn't have (`arena.removeTagOnSide`).
+ *  - For a tag present on BOTH, force the host's `turnCount` (a screen the host refreshed) without
+ *    touching anything the checksum hashes - turn counts are excluded by design, so this only fixes
+ *    rendering and can never trip a false desync.
+ * Idempotent (re-applying the same set is a no-op once converged). The `addTag` / `removeTagOnSide`
+ * APIs may queue an on-add / on-remove message + animation; that is acceptable for a renderer. Fully
+ * guarded so one bad tag can't break the rest of the heal. A `null`/`undefined` `hostTags` (an older
+ * payload that never carried tags) is a hard skip - the guest's tags are left exactly as they were.
+ */
+export function reconcileArenaTags(hostTags: CoopSerializedArenaTag[] | undefined): void {
+  if (hostTags == null) {
+    return;
+  }
+  try {
+    const arena = globalScene.arena;
+    // Key a tag by (tagType, side) - the checksum's identity. The host set is the source of truth.
+    const keyOf = (tagType: string, side: number): string => `${tagType}|${side}`;
+    const wanted = new Map<string, CoopSerializedArenaTag>();
+    for (const t of hostTags) {
+      if (typeof t.tagType === "string") {
+        wanted.set(keyOf(t.tagType, t.side), t);
+      }
+    }
+    // REMOVE: drop every guest tag the host no longer has (iterate a snapshot - removal mutates the array).
+    for (const tag of [...arena.tags]) {
+      const k = keyOf(tag.tagType as unknown as string, tag.side as unknown as number);
+      if (!wanted.has(k)) {
+        try {
+          arena.removeTagOnSide(tag.tagType, tag.side, true);
+        } catch {
+          /* one tag removal failed; continue */
+        }
+      }
+    }
+    // ADD / REFRESH: ensure every host tag exists with the host's turnCount + layers.
+    for (const want of wanted.values()) {
+      try {
+        const tagType = want.tagType as unknown as ArenaTagType;
+        const side = want.side as unknown as ArenaTagSide;
+        let existing = arena.getTagOnSide(tagType, side);
+        if (existing == null) {
+          // Side-effect-quiet add (no source move / id needed for a render of an already-resolved tag).
+          arena.addTag(tagType, Math.max(0, Math.trunc(want.turnCount)), undefined as unknown as MoveId, 0, side, true);
+          existing = arena.getTagOnSide(tagType, side);
+          // Replay overlaps to reach the host's entry-hazard layer count (Spikes / Toxic Spikes).
+          if (existing instanceof EntryHazardTag) {
+            for (let i = existing.layers; i < want.layers; i++) {
+              existing.onOverlap();
+            }
+          }
+        }
+        // Force the host's turnCount (a refreshed screen / pinch-restored hazard). Excluded from
+        // the hash, so this only corrects rendering and never causes a false desync.
+        if (existing != null) {
+          existing.turnCount = Math.max(0, Math.trunc(want.turnCount));
+        }
+      } catch {
+        /* one tag add/refresh failed; continue with the rest */
+      }
+    }
+  } catch {
+    // A malformed arena-tag set must never crash the guest's battle.
+  }
+}
+
+/**
  * GUEST: snap the live field + arena to the host's authoritative `checkpoint`. Applied
  * at a turn boundary. Conservative + fully guarded: corrects numeric state only, and a
  * per-mon failure is swallowed so one bad entry can't break the rest of the battle.
@@ -534,6 +644,10 @@ export function applyCoopCheckpoint(checkpoint: CoopBattleCheckpoint): void {
     if ((arena.terrain?.terrainType ?? 0) !== checkpoint.terrain) {
       arena.trySetTerrain(checkpoint.terrain as TerrainType, true);
     }
+    // Reconcile arena tags (#633 GAP 1): add hazards/screens/tailwind the guest's MoveEffectPhases
+    // never set, remove ones the host cleared. This is the top resync-loop fix - the checksum hashes
+    // `(tagType, side)`, so converging the SET is what makes it stop diverging every turn.
+    reconcileArenaTags(checkpoint.arenaTags);
   } catch {
     // A malformed checkpoint must never crash the guest's battle.
   }
@@ -775,8 +889,18 @@ function readModifiers(): [string, number][] {
   }
 }
 
+/** Read a live mon's Tera state (#633 GAP 7): whether Terastallized + the tera type (0 on error). */
+function readTeraState(mon: Pokemon): { isTerastallized: boolean; teraType: number } {
+  try {
+    return { isTerastallized: mon.isTerastallized === true, teraType: (mon.teraType as unknown as number) ?? 0 };
+  } catch {
+    return { isTerastallized: false, teraType: 0 };
+  }
+}
+
 /** Build the canonical checksum view of ONE live field mon. */
 function readChecksumMon(mon: Pokemon): CoopChecksumMon {
+  const tera = readTeraState(mon);
   return {
     bi: mon.getBattlerIndex(),
     partyIndex: readPartyIndex(mon),
@@ -788,6 +912,9 @@ function readChecksumMon(mon: Pokemon): CoopChecksumMon {
     fainted: mon.isFainted(),
     abilityId: readAbilityId(mon),
     formIndex: mon.formIndex ?? 0,
+    // Tera state (#633 GAP 7): a dropped Tera command is now a hashed identity divergence.
+    isTerastallized: tera.isTerastallized,
+    teraType: tera.teraType,
     moves: readMoves(mon),
     tags: readTagTypes(mon),
   };
@@ -832,6 +959,7 @@ export function captureCoopChecksum(): string {
 
 /** Build ONE field mon's full resync snapshot (superset of the checkpoint). */
 function readFullMon(mon: Pokemon): CoopFullMonSnapshot {
+  const tera = readTeraState(mon);
   return {
     bi: mon.getBattlerIndex(),
     partyIndex: readPartyIndex(mon),
@@ -843,6 +971,9 @@ function readFullMon(mon: Pokemon): CoopFullMonSnapshot {
     fainted: mon.isFainted(),
     abilityId: readAbilityId(mon),
     formIndex: mon.formIndex ?? 0,
+    // Tera state (#633 GAP 7): forced in the snapshot apply so a dropped Tera command heals.
+    isTerastallized: tera.isTerastallized,
+    teraType: tera.teraType,
     moves: readMoves(mon),
     tags: readTagTypes(mon),
   };
@@ -872,7 +1003,9 @@ export function captureCoopFullSnapshot(): CoopFullBattleSnapshot | null {
       weatherTurnsLeft: arena.weather?.turnsLeft ?? 0,
       terrain: arena.terrain?.terrainType ?? 0,
       terrainTurnsLeft: arena.terrain?.turnsLeft ?? 0,
-      arenaTags: readArenaTags(),
+      // Rich arena tags (#633 GAP 1): the resync path reconciles the guest's arena identically to
+      // the per-turn checkpoint (hazards / screens / tailwind), carrying turnCount + layers.
+      arenaTags: readArenaTagViews(),
       party: globalScene.getPlayerParty().map(p => p.species.speciesId),
       money: globalScene.money,
       modifiers: readModifiers(),
@@ -904,7 +1037,38 @@ function reconcileTags(mon: Pokemon, wantTagTypes: number[]): void {
   }
 }
 
-/** Apply ONE full mon snapshot onto a live mon (ability/form FIRST, then stats, then hp). */
+/**
+ * GUEST: rebuild a mon's moveset from the host's move IDs when they STRUCTURALLY differ (#633
+ * GAP 7), preserving the host's ppUsed per slot. Mirrors how {@linkcode applyCoopEnemies} rebuilds
+ * an enemy moveset. A pure ppUsed-only divergence is left to the per-slot align below (no rebuild).
+ * Returns true when it rebuilt (so the caller skips the per-slot ppUsed align). Fully guarded.
+ */
+function rebuildMovesetIfStructurallyDiverged(mon: Pokemon, snapMoves: [number, number][]): boolean {
+  try {
+    const localIds = mon.getMoveset().map(m => m.moveId);
+    const hostIds = snapMoves.map(([id]) => id).filter(id => typeof id === "number" && id > 0);
+    if (hostIds.length === 0) {
+      return false;
+    }
+    const sameStructure = localIds.length === hostIds.length && localIds.every((id, i) => id === hostIds[i]);
+    if (sameStructure) {
+      return false;
+    }
+    // Move IDs differ - rebuild from the host's list (not just align PP), then set each ppUsed.
+    mon.moveset = snapMoves
+      .filter(([id]) => typeof id === "number" && id > 0)
+      .map(([id, ppUsed]) => {
+        const pm = new PokemonMove(id);
+        pm.ppUsed = Math.max(0, Math.trunc(ppUsed ?? 0));
+        return pm;
+      });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** Apply ONE full mon snapshot onto a live mon (ability/form/tera FIRST, then stats, then hp). */
 function applyFullMon(mon: Pokemon, snap: CoopFullMonSnapshot): void {
   try {
     // Ability / form first so a stat recompute uses the authoritative values.
@@ -917,17 +1081,39 @@ function applyFullMon(mon: Pokemon, snap: CoopFullMonSnapshot): void {
     if (snap.abilityId !== 0 && mon.getAbility().id !== snap.abilityId) {
       mon.summonData.ability = snap.abilityId as AbilityId;
     }
-    // Per-move PP: align ppUsed on the matching slot (moveset structure already matches
-    // in lockstep; we only correct the used count, never rebuild the moveset).
-    const moveset = mon.getMoveset();
-    for (let i = 0; i < moveset.length && i < snap.moves.length; i++) {
-      const [, ppUsed] = snap.moves[i];
-      if (moveset[i] != null && typeof ppUsed === "number") {
-        moveset[i].ppUsed = Math.max(0, ppUsed);
+    // Tera state (#633 GAP 7): force the host's authoritative Tera state so a dropped/extra Tera
+    // command heals (it changes the mon's type/STAB, which the per-turn checkpoint can't carry).
+    // Set BEFORE calculateStats so a tera-driven stat path uses the authoritative flag.
+    if (snap.isTerastallized !== undefined) {
+      mon.isTerastallized = snap.isTerastallized;
+    }
+    if (snap.teraType !== undefined) {
+      mon.teraType = snap.teraType as unknown as Pokemon["teraType"];
+    }
+    // Moveset: REBUILD from the host's move IDs when they structurally differ (#633 GAP 7); else
+    // only align ppUsed per slot (the lockstep-identical common case).
+    const rebuilt = rebuildMovesetIfStructurallyDiverged(mon, snap.moves);
+    if (!rebuilt) {
+      const moveset = mon.getMoveset();
+      for (let i = 0; i < moveset.length && i < snap.moves.length; i++) {
+        const [, ppUsed] = snap.moves[i];
+        if (moveset[i] != null && typeof ppUsed === "number") {
+          moveset[i].ppUsed = Math.max(0, ppUsed);
+        }
       }
     }
     reconcileTags(mon, snap.tags);
     mon.calculateStats();
+    // maxHp force (#633 GAP 3): the checkpoint clamps hp to the LOCAL getMaxHp(); if maxHp itself
+    // diverged (IV / level / form / stat-calc mismatch) hp clamps to the wrong ceiling and the
+    // snapshot only setting hp leaves a permanent loop. After the recompute, if our maxHp still
+    // differs from the host's, FORCE the HP stat to the host value so getMaxHp() matches and hp
+    // clamps correctly. A loud warn surfaces the UPSTREAM stat divergence for a later root-cause fix
+    // (forcing maxHp stops the loop but MASKS the real cause; the log makes it findable).
+    if (typeof snap.maxHp === "number" && snap.maxHp > 0 && mon.getMaxHp() !== Math.trunc(snap.maxHp)) {
+      console.warn(`[coop-maxhp] divergence bi=${snap.bi} host=${Math.trunc(snap.maxHp)} guest=${mon.getMaxHp()}`);
+      mon.setStat(Stat.HP, Math.trunc(snap.maxHp));
+    }
     // Status.
     mon.status = snap.status ? new Status(snap.status as StatusEffect) : null;
     // Stat stages (7).
@@ -935,7 +1121,7 @@ function applyFullMon(mon: Pokemon, snap: CoopFullMonSnapshot): void {
     for (let i = 0; i < 7 && i < stages.length; i++) {
       stages[i] = Math.max(-6, Math.min(6, Math.trunc(snap.statStages[i] ?? 0)));
     }
-    // HP last, clamped to the (recomputed) max.
+    // HP last, clamped to the (now host-forced) max.
     mon.hp = Math.max(0, Math.min(Math.trunc(snap.hp), mon.getMaxHp()));
     void mon.updateInfo();
   } catch {
@@ -944,12 +1130,127 @@ function applyFullMon(mon: Pokemon, snap: CoopFullMonSnapshot): void {
 }
 
 /**
+ * GUEST: reconcile player persistent-modifier STACK COUNTS to the host's (#633 GAP 2). A
+ * relic / persistent-modifier stack-count divergence is hashed (`[typeId, stackCount]`), so it
+ * is a permanent `still-diverged` resync-loop the per-turn checkpoint can't fix. This heals the
+ * SAFE subset mid-battle:
+ *  - For each non-held-item player persistent modifier (relics, EXP charms, lures, candy jar, ...),
+ *    match by `type.id` to the host's `[typeId, stackCount]` and SET our `stackCount` to the host's.
+ *    Persistent-modifier effects read `stackCount` at apply time (they don't accumulate on a set),
+ *    so a direct set is side-effect-free - it never double-applies an effect.
+ *  - REMOVE a non-held modifier the host no longer has (stackCount 0 / absent typeId).
+ *
+ * INTENTIONALLY skips `PokemonHeldItemModifier`s: they are `pokemonId`-bound and the snapshot's
+ * aggregate `[typeId, stackCount]` carries NO pokemonId, so a mid-battle re-bind would corrupt the
+ * binding. Held-item structure converges at the wave boundary via the enemy/party adopt; here we
+ * only touch the count-only global modifiers that the GAP-2 divergence is actually about. Does NOT
+ * ADD a brand-new global modifier mid-battle (rebuilding a generator-typed modifier from a bare
+ * typeId can need pregen RNG); a genuinely-missing global modifier is a wave-boundary adopt. After
+ * any change, `updateModifiers` refreshes the bar. Fully guarded.
+ */
+export function reconcileCoopModifierStacks(hostModifiers: [string, number][] | undefined): void {
+  if (hostModifiers == null) {
+    return;
+  }
+  try {
+    // Host stack count per typeId (the snapshot pre-sorts; an item may appear once with its count).
+    const wantByType = new Map<string, number>();
+    for (const [typeId, stackCount] of hostModifiers) {
+      if (typeof typeId === "string") {
+        wantByType.set(typeId, Math.max(0, Math.trunc(stackCount)));
+      }
+    }
+    let changed = false;
+    // Iterate a snapshot of the player modifier list (a removal mutates it).
+    for (const modifier of [...globalScene.modifiers]) {
+      // Held items are pokemonId-bound - never reconcile them from the aggregate count here.
+      if (modifier instanceof PokemonHeldItemModifier || !(modifier instanceof PersistentModifier)) {
+        continue;
+      }
+      const want = wantByType.get(modifier.type.id);
+      if (want === undefined || want <= 0) {
+        // The host no longer has this global modifier -> drop it (count-only, side-effect-free).
+        if (globalScene.removeModifier(modifier)) {
+          changed = true;
+        }
+        continue;
+      }
+      if (modifier.stackCount !== want) {
+        modifier.stackCount = want;
+        changed = true;
+      }
+    }
+    if (changed) {
+      globalScene.updateModifiers(true);
+    }
+  } catch {
+    // A malformed modifier list must never crash the guest's battle.
+  }
+}
+
+/**
+ * GUEST (wave boundary): adopt the host's player-party ORDER (#633 GAP 4). The checksum hashes
+ * `party = getPlayerParty().map(speciesId)` in slot order, so a party-order divergence (e.g. the
+ * two clients merged the shared roster in a slightly different bench order) is a permanent
+ * resync-loop. Mirrors the enemy `adoptCoopHostEnemyParty` reorder-by-identity pattern, but is
+ * deliberately OFF-FIELD ONLY + run at a WAVE BOUNDARY (a mid-battle reorder of on-field mons is
+ * unsafe): it permutes ONLY the BENCH slots (>= the on-field count) so the resulting full speciesId
+ * sequence best matches the host's, never touching the on-field leads (those are the field
+ * reconcile's job). Stable identity is `speciesId`; ties keep the first-available bench mon. A
+ * party whose on-field leads already differ from the host is left to the field reconcile. Fully
+ * guarded so a malformed order can never crash the guest. Returns true if it reordered anything.
+ */
+export function adoptCoopHostPlayerPartyOrder(hostParty: number[] | undefined): boolean {
+  if (!Array.isArray(hostParty) || hostParty.length === 0) {
+    return false;
+  }
+  try {
+    const party = globalScene.getPlayerParty() as Pokemon[];
+    // Number of on-field leads (a single in singles, two in a double): never reordered here.
+    const onFieldCount = globalScene.getPlayerField(false).length;
+    if (party.length <= onFieldCount + 1) {
+      return false; // 0 or 1 bench mon -> nothing to reorder.
+    }
+    // Build the desired BENCH order from the host's speciesId sequence at slots >= onFieldCount,
+    // matching each against the guest's actual bench mons by speciesId (first-available wins).
+    const bench = party.slice(onFieldCount);
+    const remaining = [...bench];
+    const desired: Pokemon[] = [];
+    for (let i = onFieldCount; i < hostParty.length; i++) {
+      const wantSpecies = hostParty[i];
+      const idx = remaining.findIndex(p => (p.species?.speciesId ?? -1) === wantSpecies);
+      if (idx >= 0) {
+        desired.push(remaining[idx]);
+        remaining.splice(idx, 1);
+      }
+    }
+    // Append any guest bench mons the host order didn't account for (defensive; keeps every mon).
+    desired.push(...remaining);
+    // No change? (already aligned) -> done.
+    const changed = desired.some((p, i) => p !== bench[i]);
+    if (!changed) {
+      return false;
+    }
+    // Write the reordered bench back in place (on-field leads untouched at the head).
+    for (let i = 0; i < desired.length; i++) {
+      party[onFieldCount + i] = desired[i];
+    }
+    return true;
+  } catch {
+    // A malformed party order must never crash the guest's run.
+    return false;
+  }
+}
+
+/**
  * GUEST: adopt the host's full authoritative snapshot wholesale to HEAL a desync (#633,
  * TRACK-2). Applies field mons (ability/form before stat recompute), then arena weather /
- * terrain, then money - field-by-field onto the LIVE objects (never a session reload, which
- * would tear down the running battle). Party order + modifier stacks are intentionally NOT
- * rewritten here (structural changes mid-battle are unsafe); they converge at the next wave
- * boundary's normal sync. Fully guarded so a malformed snapshot can never crash the guest.
+ * terrain / TAGS (#633 GAP 1), then money, then the SAFE subset of persistent-modifier stack
+ * counts (#633 GAP 2) - field-by-field onto the LIVE objects (never a session reload, which
+ * would tear down the running battle). Held-item structure is intentionally NOT rewritten
+ * mid-battle (it converges at the wave boundary via the enemy/party adopt); the player party
+ * ORDER is adopted OFF-FIELD ONLY here (#633 GAP 4, {@linkcode adoptCoopHostPlayerPartyOrder} -
+ * bench-only, safe at any boundary). Fully guarded so a malformed snapshot can never crash the guest.
  */
 export function applyCoopFullSnapshot(snapshot: CoopFullBattleSnapshot): void {
   try {
@@ -982,7 +1283,16 @@ export function applyCoopFullSnapshot(snapshot: CoopFullBattleSnapshot): void {
     if ((arena.terrain?.terrainType ?? 0) !== snapshot.terrain) {
       arena.trySetTerrain(snapshot.terrain as TerrainType, true);
     }
+    // Reconcile arena tags (#633 GAP 1): the full snapshot now HEALS hazards / screens / tailwind,
+    // not just the per-turn checkpoint - so a guest that resyncs on a mismatch converges its arena.
+    reconcileArenaTags(snapshot.arenaTags);
     globalScene.money = snapshot.money;
+    // Reconcile persistent modifier / relic stacks (#633 GAP 2): a stack-count divergence is hashed
+    // -> a permanent still-diverged loop; heal it by adopting the host's stack counts (safe subset).
+    reconcileCoopModifierStacks(snapshot.modifiers);
+    // Adopt the host's player party ORDER (#633 GAP 4): OFF-FIELD-only bench reorder (safe at any
+    // boundary) so the hashed `party` speciesId sequence converges. On-field leads are untouched.
+    adoptCoopHostPlayerPartyOrder(snapshot.party);
   } catch {
     // A malformed snapshot must never crash the guest's battle.
   }

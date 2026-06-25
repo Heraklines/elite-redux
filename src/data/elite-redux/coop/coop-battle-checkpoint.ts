@@ -17,7 +17,11 @@
 // shape logic is verifiable without booting the game.
 // =============================================================================
 
-import type { CoopBattleCheckpoint, CoopSerializedMonState } from "#data/elite-redux/coop/coop-transport";
+import type {
+  CoopBattleCheckpoint,
+  CoopSerializedArenaTag,
+  CoopSerializedMonState,
+} from "#data/elite-redux/coop/coop-transport";
 
 /** A readable snapshot of ONE live field mon (extracted from a `Pokemon` at the call site). */
 export interface CoopFieldMonView {
@@ -42,12 +46,24 @@ export interface CoopFieldMonView {
   erTags?: { type: string; turns: number }[];
 }
 
-/** A readable snapshot of the arena's weather + terrain. */
+/** A readable snapshot of the arena's weather + terrain (+ tags, #633 GAP 1). */
 export interface CoopArenaView {
   weather: number;
   weatherTurnsLeft: number;
   terrain: number;
   terrainTurnsLeft: number;
+  /** Arena tags currently on the field (Stealth Rock / Spikes / screens / tailwind / ...). */
+  arenaTags?: CoopSerializedArenaTag[];
+}
+
+/** Sanitize one arena tag for the wire: a string tagType + non-negative integer scalars. */
+export function serializeArenaTag(tag: CoopSerializedArenaTag): CoopSerializedArenaTag {
+  return {
+    tagType: tag.tagType,
+    side: Math.max(0, Math.trunc(tag.side)),
+    turnCount: Math.max(0, Math.trunc(tag.turnCount)),
+    layers: Math.max(1, Math.trunc(tag.layers)),
+  };
 }
 
 /** Clamp a single stat stage into the engine's legal [-6, 6] range. */
@@ -93,13 +109,21 @@ export function serializeMonState(mon: CoopFieldMonView): CoopSerializedMonState
 
 /** Build the authoritative post-turn checkpoint from the live field + arena views. */
 export function buildCheckpoint(mons: CoopFieldMonView[], arena: CoopArenaView): CoopBattleCheckpoint {
-  return {
+  const checkpoint: CoopBattleCheckpoint = {
     field: mons.map(serializeMonState),
     weather: Math.max(0, Math.trunc(arena.weather)),
     weatherTurnsLeft: Math.max(0, Math.trunc(arena.weatherTurnsLeft)),
     terrain: Math.max(0, Math.trunc(arena.terrain)),
     terrainTurnsLeft: Math.max(0, Math.trunc(arena.terrainTurnsLeft)),
   };
+  // Carry arena tags whenever the view PROVIDES the field (#633 GAP 1), INCLUDING an empty array:
+  // a NEW host always sends it (even `[]`) so the guest can converge to the empty set (remove a
+  // screen the host cleared), while an OLDER host omits the field and the guest leaves its tags
+  // alone (the `undefined` skip in reconcileArenaTags). The empty-array case is the intended signal.
+  if (arena.arenaTags !== undefined) {
+    checkpoint.arenaTags = arena.arenaTags.filter(t => typeof t.tagType === "string").map(serializeArenaTag);
+  }
+  return checkpoint;
 }
 
 /** Find the authoritative state for the mon at battler index `bi` (undefined if absent). */

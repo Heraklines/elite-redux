@@ -29,6 +29,8 @@ const mon = (over: Partial<CoopChecksumMon> = {}): CoopChecksumMon => ({
   fainted: false,
   abilityId: 65,
   formIndex: 0,
+  isTerastallized: false,
+  teraType: 0,
   moves: [
     [33, 0],
     [22, 1],
@@ -147,6 +149,12 @@ describe("co-op battle checksum pure core (#633, TRACK-2)", () => {
     });
     it("a changed battler tag set", () => {
       expect(checksumState(state({ field: [mon({ tags: [10] })] }))).not.toBe(base);
+    });
+    it("a changed Terastallized flag (#633 GAP 7)", () => {
+      expect(checksumState(state({ field: [mon({ isTerastallized: true })] }))).not.toBe(base);
+    });
+    it("a changed tera type (#633 GAP 7)", () => {
+      expect(checksumState(state({ field: [mon({ teraType: 5 })] }))).not.toBe(base);
     });
     it("a changed weather type", () => {
       expect(checksumState(state({ weather: 3 }))).not.toBe(base);
