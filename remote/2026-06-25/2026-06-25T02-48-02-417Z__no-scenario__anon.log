@@ -1,0 +1,272 @@
+url:      https://elite-redux-staging.pages.dev/
+build:    mqsw9b7c-4yin
+mode:     6  wave:4
+seed:     Mjjxs1WrV2WOMfCuznlLE0GJ
+party:    Charmander(L6 23hp f0), Fennekin(L6 15hp f0), Bulbasaur(L5 0hp f0), Chikorita(L5 20hp f0), Squirtle(L5 21hp f0)
+enemy:    Slowpoke(L3), Stunky(L3)
+
+----- COMMENT -----
+coop test p1
+
+----- CONSOLE -----
+[02:45:18.497] LOG: %cStart Phase MessagePhase color:green;
+[02:45:18.708] LOG: %cStart Phase ShowAbilityPhase color:green;
+[02:45:18.869] LOG: %cStart Phase HideAbilityPhase color:green;
+[02:45:18.897] LOG: %cStart Phase FaintPhase color:green;
+[02:45:18.960] LOG: %cStart Phase MessagePhase color:green;
+[02:45:19.357] LOG: %cStart Phase VictoryPhase color:green;
+[02:45:19.358] LOG: %cStart Phase ExpPhase color:green;
+[02:45:19.668] LOG: %cStart Phase ExpPhase color:green;
+[02:45:19.980] LOG: %cStart Phase MoveEndPhase color:green;
+[02:45:19.981] LOG: %cStart Phase MovePhase color:green;
+[02:45:19.981] LOG: %cStart Phase MoveEndPhase color:green;
+[02:45:19.981] LOG: %cStart Phase MovePhase color:green;
+[02:45:19.981] LOG: %cUser: Fennekin
+Move: TRI_ATTACK
+Use Mode: NORMAL color:orchid
+[02:45:19.983] LOG: %cStart Phase MessagePhase color:green;
+[02:45:20.097] LOG: %cStart Phase MoveEffectPhase color:green;
+[02:45:20.751] LOG: crit stage: +0
+[02:45:20.752] LOG: Move: Tri Attack | Base damage: 22.736 | Power: 129.6 | Source attack: 12 | Target defense: 6
+[02:45:20.752] LOG: Move: Tri Attack | Attack damage: 29
+[02:45:20.752] LOG: %cStart Phase DamageAnimPhase color:green;
+[02:45:20.765] LOG: %cStart Phase FaintPhase color:green;
+[02:45:20.827] LOG: %cStart Phase MessagePhase color:green;
+[02:45:21.669] LOG: %cStart Phase VictoryPhase color:green;
+[02:45:21.669] LOG: %cStart Phase ExpPhase color:green;
+[02:45:22.140] LOG: %cStart Phase ExpPhase color:green;
+[02:45:22.369] LOG: %cStart Phase MoveEndPhase color:green;
+[02:45:22.369] LOG: %cStart Phase CheckInterludePhase color:green;
+[02:45:22.369] LOG: %cStart Phase WeatherEffectPhase color:green;
+[02:45:22.369] LOG: %cStart Phase PositionalTagPhase color:green;
+[02:45:22.369] LOG: %cStart Phase BerryPhase color:green;
+[02:45:22.369] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[02:45:22.369] LOG: %cStart Phase TurnEndPhase color:green;
+[02:45:22.370] LOG: %cStart Phase BattleEndPhase color:green;
+[02:45:22.370] LOG: Battle Score: 26 (1 Turns x1)
+[02:45:22.370] LOG: Total Score: 47
+[02:45:22.376] LOG: %cStart Phase EggLapsePhase color:green;
+[02:45:22.376] LOG: %cStart Phase SelectModifierPhase color:green;
+[02:45:22.376] LOG: Wave Seed: Ollzu3YtX4YQOhEw|pnNG2IL 2
+[02:45:22.378] LOG: 7 5 [2,3,4,5,6]
+[02:45:22.378] LOG: {"id":"TEMP_STAT_STAGE_BOOSTER","localeKey":"","iconImage":"x_defense","soundName":"se/restore","tier":0,"stat":2,"nameKey":"x_defense","quantityKey":"percentage"} 
+[02:45:22.378] LOG: 7 5 [2,3,4,5,6]
+[02:45:22.378] LOG: {"id":"TEMP_STAT_STAGE_BOOSTER","localeKey":"","iconImage":"x_sp_atk","soundName":"se/restore","tier":0,"stat":3,"nameKey":"x_sp_atk","quantityKey":"percentage"} 
+[02:45:22.378] LOG: 0 0 [2,3,4,5,6]
+[02:45:22.378] LOG: {"id":"POKEBALL","localeKey":"","iconImage":"pb","group":"pb","soundName":"se/pb_bounce_1","tier":0,"pokeballType":0,"count":5} 
+[02:45:22.378] LOG: 7 5 [2,3,4,5,6]
+[02:45:22.378] LOG: {"id":"TEMP_STAT_STAGE_BOOSTER","localeKey":"","iconImage":"x_defense","soundName":"se/restore","tier":0,"stat":2,"nameKey":"x_defense","quantityKey":"percentage"} 
+[02:45:22.379] LOG: 1 0 [2,3,4,5,6]
+[02:45:22.379] LOG: {"id":"RARE_CANDY","localeKey":"modifierType:ModifierType.RARE_CANDY","iconImage":"rare_candy","soundName":"se/restore","tier":0} 
+[02:45:22.379] LOG: 0 0 [2,3,4,5,6]
+[02:45:22.379] LOG: {"id":"POKEBALL","localeKey":"","iconImage":"pb","group":"pb","soundName":"se/pb_bounce_1","tier":0,"pokeballType":0,"count":5} 
+[02:45:22.379] LOG: 8 5 [2,3,4,5,6]
+[02:45:22.379] LOG: {"id":"BERRY","localeKey":"","iconImage":"ganlon_berry","group":"berry","soundName":"se/restore","tier":0,"berryType":4} 
+[02:45:22.379] LOG: [coop-reward] WATCHER waits for partner's reward picks (turn=1 role=host wave=2)
+[02:45:58.992] LOG: %cStart Phase NewBattlePhase color:green;
+[02:45:58.992] LOG: Wave Seed: Pmm{v4ZuY5ZRPiFx}qoOH3JM 3
+[02:45:58.993] LOG: %cStart Phase NextEncounterPhase color:green;
+[02:45:58.994] LOG: Starting species pool tier: UNCOMMON
+[02:45:59.004] LOG: Pokemon: Wild Pawmi | Species ID: 921 | Level: 3 | Nature: Relaxed (+Def/-Spd)
+[02:45:59.004] LOG: Stats (IVs): HP: 16 (13), Atk: 8 (1), Def: 7 (16), Spatk: 7 (0), Spdef: 6 (14), Spd: 8 (1)
+[02:45:59.004] LOG: Ability: Iron Fist | Passive Ability: Volt Absorb 
+[02:45:59.004] LOG: Moveset: ["Thunder Shock","Quick Attack"]
+[02:45:59.004] LOG: Starting species pool tier: COMMON
+[02:45:59.012] LOG: Pokemon: Wild Pidove | Species ID: 519 | Level: 3 | Nature: Rash (+SpAtk/-SpDef)
+[02:45:59.012] LOG: Stats (IVs): HP: 17 (16), Atk: 8 (4), Def: 8 (0), Spatk: 8 (11), Spdef: 5 (3), Spd: 7 (3)
+[02:45:59.012] LOG: Ability: Super Luck | Passive Ability: Keen Eye 
+[02:45:59.013] LOG: Moveset: ["Air Cutter","Growl","Amnesia","Sharpen"]
+[02:45:59.013] LOG: [coop-reward] advance interaction (role=host from=1 counter=1)
+[02:45:59.013] LOG: [coop-launch] proceedIfReady launched=true localTeam=3 bothReady=true role=host partnerReady=true
+[02:45:59.039] LOG: [coop-launch] proceedIfReady launched=true localTeam=3 bothReady=true role=host partnerReady=true
+[02:45:59.533] DEBUG: Session data saved to slot 4!
+[02:45:59.534] LOG: Wave Seed: Pmm{v4ZuY5ZRPiFx}qoOH3JM 3
+[02:45:59.968] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[02:45:59.968] LOG: %cStart Phase CheckSwitchPhase color:green;
+[02:45:59.968] LOG: %cStart Phase CheckSwitchPhase color:green;
+[02:45:59.968] LOG: %cStart Phase InitEncounterPhase color:green;
+[02:45:59.969] LOG: %cStart Phase PostSummonPhase color:green;
+[02:45:59.969] LOG: Ran PSP for: Pawmi
+[02:45:59.969] LOG: %cStart Phase PostSummonPhase color:green;
+[02:45:59.970] LOG: %cStart Phase PostSummonPhase color:green;
+[02:45:59.970] LOG: %cStart Phase PostSummonPhase color:green;
+[02:45:59.970] LOG: Ran PSP for: Pidove
+[02:45:59.970] LOG: %cStart Phase PostSummonPhase color:green;
+[02:45:59.970] LOG: %cStart Phase PostSummonPhase color:green;
+[02:45:59.970] LOG: %cStart Phase TurnInitPhase color:green;
+[02:45:59.970] LOG: %cStart Phase CommandPhase color:green;
+[02:46:01.977] LOG: Move: BITTER_BLADE Move targets: {"targets":[2,3,1],"multiple":false} 
+Player Pokemon: Charmander
+[02:46:01.979] LOG: %cStart Phase SelectTargetPhase color:green;
+[02:46:02.758] LOG: %cStart Phase CommandPhase color:green;
+[02:46:05.396] LOG: Move: TRI_ATTACK Move targets: {"targets":[3],"multiple":false} 
+Player Pokemon: Fennekin
+[02:46:05.396] LOG: %cStart Phase EnemyCommandPhase color:green;
+[02:46:05.399] LOG: Battle Seed: 9zyABxuPKklDkl9J
+[02:46:05.400] LOG: Move Pool: ["Thunder Shock","Quick Attack"]
+[02:46:05.400] LOG: Move Scores: [25.5,8]
+[02:46:05.400] LOG: Sorted Move Pool: ["Thunder Shock","Quick Attack"]
+[02:46:05.400] LOG: Chosen Move: Thunder Shock
+[02:46:05.400] LOG: %cStart Phase EnemyCommandPhase color:green;
+[02:46:05.404] LOG: Move Pool: ["Air Cutter","Growl","Amnesia","Sharpen"]
+[02:46:05.404] LOG: Move Scores: [25.5,2,6,2]
+[02:46:05.404] LOG: Sorted Move Pool: ["Air Cutter","Amnesia","Growl","Sharpen"]
+[02:46:05.404] LOG: Chosen Move: Growl
+[02:46:05.405] LOG: %cStart Phase TurnStartPhase color:green;
+[02:46:05.408] LOG: %cStart Phase MovePhase color:green;
+[02:46:05.408] LOG: %cUser: Pawmi
+Move: THUNDER_SHOCK
+Use Mode: NORMAL color:orchid
+[02:46:05.413] LOG: %cStart Phase MessagePhase color:green;
+[02:46:05.508] LOG: %cStart Phase MoveEffectPhase color:green;
+[02:46:05.731] LOG: crit stage: +0
+[02:46:05.732] LOG: Move: Thunder Shock | Base damage: 5.258181818181818 | Power: 80 | Source attack: 7 | Target defense: 11
+[02:46:05.732] LOG: Move: Thunder Shock | Attack damage: 6
+[02:46:05.733] LOG: %cStart Phase DamageAnimPhase color:green;
+[02:46:05.745] LOG: %cStart Phase MoveEndPhase color:green;
+[02:46:05.746] LOG: %cStart Phase MovePhase color:green;
+[02:46:05.746] LOG: %cUser: Charmander
+Move: BITTER_BLADE
+Use Mode: NORMAL color:orchid
+[02:46:05.749] LOG: %cStart Phase MessagePhase color:green;
+[02:46:05.870] LOG: %cStart Phase MoveEffectPhase color:green;
+[02:46:06.161] LOG: crit stage: +0
+[02:46:06.162] LOG: Move: Bitter Blade | Base damage: 17.444000000000003 | Power: 108 | Source attack: 13 | Target defense: 8
+[02:46:06.162] LOG: Move: Bitter Blade | Attack damage: 23
+[02:46:06.162] LOG: %cStart Phase DamageAnimPhase color:green;
+[02:46:06.176] LOG: %cStart Phase PokemonHealPhase color:green;
+[02:46:06.177] LOG: %cStart Phase MessagePhase color:green;
+[02:46:06.390] LOG: %cStart Phase FaintPhase color:green;
+[02:46:06.447] LOG: %cStart Phase MessagePhase color:green;
+[02:46:14.149] LOG: %cStart Phase VictoryPhase color:green;
+[02:46:14.150] LOG: %cStart Phase ExpPhase color:green;
+[02:46:14.363] LOG: %cStart Phase ExpPhase color:green;
+[02:46:14.613] LOG: %cStart Phase MoveEndPhase color:green;
+[02:46:14.613] LOG: %cStart Phase MovePhase color:green;
+[02:46:14.613] LOG: %cStart Phase MoveEndPhase color:green;
+[02:46:14.614] LOG: %cStart Phase MovePhase color:green;
+[02:46:14.614] LOG: %cUser: Fennekin
+Move: TRI_ATTACK
+Use Mode: NORMAL color:orchid
+[02:46:14.615] LOG: %cStart Phase MessagePhase color:green;
+[02:46:14.730] LOG: %cStart Phase MoveEffectPhase color:green;
+[02:46:15.384] LOG: crit stage: +0
+[02:46:15.385] LOG: Move: Tri Attack | Base damage: 22.736 | Power: 129.6 | Source attack: 12 | Target defense: 6
+[02:46:15.386] LOG: Move: Tri Attack | Attack damage: 30
+[02:46:15.386] LOG: %cStart Phase DamageAnimPhase color:green;
+[02:46:15.398] LOG: %cStart Phase FaintPhase color:green;
+[02:46:15.460] LOG: %cStart Phase MessagePhase color:green;
+[02:46:25.855] LOG: %cStart Phase VictoryPhase color:green;
+[02:46:25.855] LOG: %cStart Phase ExpPhase color:green;
+[02:46:26.162] LOG: %cStart Phase ExpPhase color:green;
+[02:46:26.544] LOG: %cStart Phase LevelUpPhase color:green;
+[02:46:26.545] LOG: %cStart Phase MoveEndPhase color:green;
+[02:46:26.545] LOG: %cStart Phase CheckInterludePhase color:green;
+[02:46:26.545] LOG: %cStart Phase WeatherEffectPhase color:green;
+[02:46:26.545] LOG: %cStart Phase PositionalTagPhase color:green;
+[02:46:26.545] LOG: %cStart Phase BerryPhase color:green;
+[02:46:26.545] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[02:46:26.545] LOG: %cStart Phase TurnEndPhase color:green;
+[02:46:26.546] LOG: %cStart Phase BattleEndPhase color:green;
+[02:46:26.546] LOG: Battle Score: 27 (1 Turns x1)
+[02:46:26.546] LOG: Total Score: 74
+[02:46:26.552] LOG: %cStart Phase EggLapsePhase color:green;
+[02:46:26.552] LOG: %cStart Phase SelectModifierPhase color:green;
+[02:46:26.552] LOG: Wave Seed: Pmm{v4ZuY5ZRPiFx}qoOH3JM 3
+[02:46:26.555] LOG: 0 0 [2,3,4,5,6]
+[02:46:26.555] LOG: {"id":"POKEBALL","localeKey":"","iconImage":"pb","group":"pb","soundName":"se/pb_bounce_1","tier":0,"pokeballType":0,"count":5} 
+[02:46:26.555] LOG: 7 5 [2,3,4,5,6]
+[02:46:26.555] LOG: {"id":"TEMP_STAT_STAGE_BOOSTER","localeKey":"","iconImage":"x_speed","soundName":"se/restore","tier":0,"stat":5,"nameKey":"x_speed","quantityKey":"percentage"} 
+[02:46:26.556] LOG: 0 0 [2,3,4,5,6]
+[02:46:26.556] LOG: {"id":"POKEBALL","localeKey":"","iconImage":"pb","group":"pb","soundName":"se/pb_bounce_1","tier":0,"pokeballType":0,"count":5} 
+[02:46:26.556] LOG: 9 5 [2,3,4,5,6]
+[02:46:26.556] LOG: {"id":"TM_COMMON","localeKey":"","iconImage":"tm_ice","group":"tm","soundName":"se/restore","tier":0,"moveId":114} 
+[02:46:26.556] LOG: [coop-reward] OWNER drives reward screen (turn=2 role=host spoof=false wave=3)
+[02:46:38.867] LOG: %cStart Phase NewBattlePhase color:green;
+[02:46:38.867] LOG: Wave Seed: Qnn|w5[vZ6[SQjGy~rpPI4KN 4
+[02:46:38.867] LOG: Starting trainer pool tier: COMMON
+[02:46:38.870] LOG: %cStart Phase MessagePhase color:green;
+[02:46:38.871] LOG: [coop-reward] advance interaction (role=host from=2 counter=2)
+[02:46:38.871] LOG: [coop-launch] proceedIfReady launched=true localTeam=3 bothReady=true role=host partnerReady=true
+[02:46:39.099] LOG: Applied X Speed 
+[02:46:39.100] LOG: Applied X Speed 
+[02:46:39.100] LOG: %cStart Phase ReturnPhase color:green;
+[02:46:39.114] LOG: [coop-launch] proceedIfReady launched=true localTeam=3 bothReady=true role=host partnerReady=true
+[02:46:39.127] LOG: Applied X Speed 
+[02:46:39.127] LOG: Applied X Speed 
+[02:46:39.203] LOG: %cStart Phase ReturnPhase color:green;
+[02:46:39.231] LOG: Applied X Speed 
+[02:46:39.231] LOG: Applied X Speed 
+[02:46:39.307] LOG: %cStart Phase ShowTrainerPhase color:green;
+[02:46:39.411] LOG: %cStart Phase NextEncounterPhase color:green;
+[02:46:39.418] LOG: ER #419: elite BST cap (420 @ w4) - replacing Slowbro (490) with Slowpoke (340)
+[02:46:39.430] LOG: Pokemon: Foe Slowpoke | Species ID: 79 | Level: 3 | Nature: Relaxed (+Def/-Spd)
+[02:46:39.430] LOG: Stats (IVs): HP: 18 (31), Atk: 9 (31), Def: 8 (31), Spatk: 9 (31), Spdef: 7 (31), Spd: 7 (0)
+[02:46:39.430] LOG: Ability: Damp | Passive Ability: Oblivious 
+[02:46:39.430] LOG: Moveset: ["Scald","Ice Beam","Slack Off","Toxic"]
+[02:46:39.434] LOG: ER #419: elite BST cap (420 @ w4) - replacing Kecleon (440) with Stunky (343)
+[02:46:39.441] LOG: Pokemon: Foe Stunky | Species ID: 434 | Level: 3 | Nature: Brave (+Atk/-Spd)
+[02:46:39.441] LOG: Stats (IVs): HP: 16 (31), Atk: 7 (31), Def: 8 (31), Spatk: 9 (31), Spdef: 7 (31), Spd: 9 (0)
+[02:46:39.441] LOG: Ability: Poison Point | Passive Ability: Aftermath 
+[02:46:39.442] LOG: Moveset: ["Sucker Punch","Return","Fire Punch","Trick Room"]
+[02:46:40.285] LOG: Battle Seed: wIqERJnOBbtNAs3w
+[02:46:40.286] LOG: Generated AI funcs
+[02:46:40.356] DEBUG: Session data saved to slot 4!
+[02:46:40.357] LOG: Wave Seed: Qnn|w5[vZ6[SQjGy~rpPI4KN 4
+[02:46:40.565] LOG: Beginners Ken & Lurleen
+[02:46:41.226] LOG: Dialogue saved as seen: dialogue:youngster.encounter.9
+[02:46:41.260] LOG: Beginners Ken & Lurleen
+[02:46:41.571] LOG: %cStart Phase SummonPhase color:green;
+[02:46:41.571] LOG: Ken
+[02:46:41.834] LOG: %cStart Phase SummonPhase color:green;
+[02:46:41.835] LOG: Lurleen
+[02:46:42.098] LOG: %cStart Phase SummonPhase color:green;
+[02:46:42.280] WARN: cry/4 not found
+[02:46:42.383] LOG: %cStart Phase ShinySparklePhase color:green;
+[02:46:42.487] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[02:46:42.488] LOG: %cStart Phase SummonPhase color:green;
+[02:46:42.765] LOG: %cStart Phase InitEncounterPhase color:green;
+[02:46:42.766] LOG: Applied X Speed 
+[02:46:42.766] LOG: Applied X Speed 
+[02:46:42.766] LOG: Applied X Speed 
+[02:46:42.766] LOG: Applied X Speed 
+[02:46:42.766] LOG: %cStart Phase PostSummonPhase color:green;
+[02:46:42.766] LOG: Ran PSP for: Charmander
+[02:46:42.767] LOG: Applied X Speed 
+[02:46:42.767] LOG: Applied X Speed 
+[02:46:42.767] LOG: Applied X Speed 
+[02:46:42.767] LOG: Applied X Speed 
+[02:46:42.767] LOG: Applied X Speed 
+[02:46:42.768] LOG: Applied X Speed 
+[02:46:42.768] LOG: %cStart Phase PostSummonPhase color:green;
+[02:46:42.768] LOG: Applied X Speed 
+[02:46:42.768] LOG: Applied X Speed 
+[02:46:42.768] LOG: Applied X Speed 
+[02:46:42.768] LOG: Applied X Speed 
+[02:46:42.769] LOG: %cStart Phase PostSummonPhase color:green;
+[02:46:42.769] LOG: Applied X Speed 
+[02:46:42.769] LOG: Applied X Speed 
+[02:46:42.769] LOG: %cStart Phase PostSummonPhase color:green;
+[02:46:42.769] LOG: Ran PSP for: Fennekin
+[02:46:42.769] LOG: Applied X Speed 
+[02:46:42.770] LOG: Applied X Speed 
+[02:46:42.770] LOG: Applied X Speed 
+[02:46:42.770] LOG: Applied X Speed 
+[02:46:42.770] LOG: %cStart Phase PostSummonPhase color:green;
+[02:46:42.771] LOG: Applied X Speed 
+[02:46:42.771] LOG: Applied X Speed 
+[02:46:42.771] LOG: %cStart Phase PostSummonPhase color:green;
+[02:46:42.771] LOG: %cStart Phase PostSummonPhase color:green;
+[02:46:42.771] LOG: Ran PSP for: Stunky
+[02:46:42.772] LOG: %cStart Phase PostSummonPhase color:green;
+[02:46:42.772] LOG: %cStart Phase PostSummonPhase color:green;
+[02:46:42.772] LOG: %cStart Phase PostSummonPhase color:green;
+[02:46:42.772] LOG: Ran PSP for: Slowpoke
+[02:46:42.773] LOG: %cStart Phase PostSummonPhase color:green;
+[02:46:42.773] LOG: %cStart Phase PostSummonPhase color:green;
+[02:46:42.773] LOG: %cStart Phase TurnInitPhase color:green;
+[02:46:42.773] LOG: %cStart Phase CommandPhase color:green;
+[02:47:06.535] LOG: Move: BITTER_BLADE Move targets: {"targets":[2,3,1],"multiple":false} 
+Player Pokemon: Charmander
+[02:47:06.536] LOG: %cStart Phase SelectTargetPhase color:green;
+[02:47:07.400] LOG: %cStart Phase CommandPhase color:green;
