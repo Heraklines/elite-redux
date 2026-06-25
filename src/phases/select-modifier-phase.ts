@@ -6,6 +6,7 @@ import {
   COOP_INTERACTION_REROLL,
   type CoopInteractionChoice,
 } from "#data/elite-redux/coop/coop-interaction-relay";
+import { reconstructRewardOptions, serializeRewardOptions } from "#data/elite-redux/coop/coop-reward-options";
 import {
   getCoopController,
   getCoopInteractionRelay,
@@ -120,6 +121,17 @@ export class SelectModifierPhase extends BattlePhase {
       this.coopInteractionStart = coopController.interactionCounter();
     }
 
+    // Co-op (#633 Fix #2): is THIS client the WATCHER of this reward interaction? The watcher
+    // must NOT roll its own option pool - party luck changes the number of seeded upgrade
+    // draws getNewModifierTypeOption consumes, so a local roll would (a) diverge from the
+    // owner's pool and (b) shift the shared RNG cursor differently. The watcher instead
+    // adopts the owner's streamed list (coopAdoptOwnerRewardOptions). The spoof/hotseat path
+    // has no real peer, so the local human always OWNS (never a watcher).
+    const coopIsWatcher =
+      coopController != null
+      && getCoopRuntime()?.spoof == null
+      && !coopController.isLocalOwnerAtCounter(this.coopInteractionStart);
+
     // Dev test-suite "start in the store" scenarios stage guaranteed reward
     // options (e.g. a Rare Candy, or a Form-Change Item that resolves to a
     // single-mon party's mega stone). consumePendingDevShop() returns null in
@@ -152,7 +164,10 @@ export class SelectModifierPhase extends BattlePhase {
     }
     const modifierCount = this.getModifierCount();
 
-    this.typeOptions = this.getModifierTypeOptions(modifierCount);
+    // Co-op WATCHER (#633 Fix #2): do NOT roll the pool - that would consume luck-divergent
+    // seeded draws and shift this client's RNG cursor away from the owner's. Start empty;
+    // startCoopWatch() fills typeOptions from the owner's streamed list before the screen opens.
+    this.typeOptions = coopIsWatcher ? [] : this.getModifierTypeOptions(modifierCount);
 
     const modifierSelectCallback = (rowCursor: number, cursor: number) => {
       if (rowCursor < 0 || cursor < 0) {
@@ -219,6 +234,12 @@ export class SelectModifierPhase extends BattlePhase {
         console.log(
           `[coop-reward] OWNER drives reward screen (start=${this.coopInteractionStart} role=${coopController.role} spoof=${spoofed} wave=${globalScene.currentBattle?.waveIndex})`,
         );
+        // Co-op (#633 Fix #2): stream the EXACT option list we rolled so the watcher rebuilds
+        // it instead of re-rolling (party luck would otherwise diverge the pools + the shared
+        // RNG cursor). Not sent in the spoof/hotseat path (no real peer watcher).
+        if (!spoofed) {
+          this.coopSendRewardOptions();
+        }
         this.resetModifierSelect(modifierSelectCallback);
         // Co-op (#633): relay our cursor so the partner's screen mirrors it live.
         this.coopBeginMirror("owner");
@@ -756,6 +777,50 @@ export class SelectModifierPhase extends BattlePhase {
     getCoopInteractionRelay()?.sendInteractionChoice(this.coopInteractionStart, label, choice, data);
   }
 
+  /** OWNER (#633 Fix #2): stream the rolled reward-option list for THIS reroll round so the
+   *  watcher rebuilds it instead of re-rolling (luck-divergent pool / RNG-cursor poisoning).
+   *  Keyed by the pinned interaction counter + this reroll round (matches the watcher await). */
+  private coopSendRewardOptions(): void {
+    if (this.coopInteractionStart < 0) {
+      return;
+    }
+    try {
+      getCoopInteractionRelay()?.sendRewardOptions(
+        this.coopInteractionStart,
+        this.rerollCount,
+        serializeRewardOptions(this.typeOptions),
+      );
+    } catch {
+      /* a serialize/send failure must never break the owner's reward screen */
+    }
+  }
+
+  /** WATCHER (#633 Fix #2): replace our locally-rolled options with the owner's streamed list
+   *  for THIS reroll round. On timeout / unknown id, keep our own list (never hangs). */
+  private async coopAdoptOwnerRewardOptions(): Promise<void> {
+    if (this.coopInteractionStart < 0) {
+      return;
+    }
+    const relay = getCoopInteractionRelay();
+    if (relay == null) {
+      return;
+    }
+    try {
+      const serialized = await relay.awaitRewardOptions(this.coopInteractionStart, this.rerollCount, COOP_REWARD_WAIT_MS);
+      if (serialized == null) {
+        return;
+      }
+      const rebuilt = reconstructRewardOptions(serialized, globalScene.getPlayerParty());
+      if (rebuilt != null) {
+        this.typeOptions = rebuilt;
+      } else {
+        console.log("[coop-reward] WATCHER could not reconstruct owner's options -> keeping local roll");
+      }
+    } catch {
+      /* an await/reconstruct failure leaves our own list in place; never hang */
+    }
+  }
+
   /** Advance the alternating-interaction turn once the reward screen is left for good.
    *  BOTH clients advance LOCALLY (deterministic, lockstep) - the old host-only broadcast
    *  raced the next interaction's synchronous start and froze the ME watcher. Idempotent
@@ -857,11 +922,17 @@ export class SelectModifierPhase extends BattlePhase {
       super.end();
       return;
     }
-    // Open the SAME reward screen the owner drives (identical seeded options/prices/money),
-    // with a NO-OP callback: the watcher's local input is blocked at the UI layer, replayed
-    // owner buttons only move the cursor, and the AUTHORITATIVE outcome is the relayed action
-    // loop below. The watcher's apply path never touches this handler (all `!coopWatcher`
-    // guarded), so the open screen is purely a cosmetic, cursor-mirrored projection.
+    // Co-op (#633 Fix #2): adopt the owner's EXACT rolled option list instead of the one we
+    // rolled in start() - party luck changes the number of seeded upgrade draws, so our local
+    // pool (and the shared RNG cursor) could diverge from the owner's. We wait briefly for the
+    // owner's streamed list; on timeout / unknown id we keep our own (divergent but no hang).
+    await this.coopAdoptOwnerRewardOptions();
+    // Open the SAME reward screen the owner drives (identical options/prices/money - now
+    // guaranteed identical by the adopted list), with a NO-OP callback: the watcher's local
+    // input is blocked at the UI layer, replayed owner buttons only move the cursor, and the
+    // AUTHORITATIVE outcome is the relayed action loop below. The watcher's apply path never
+    // touches this handler (all `!coopWatcher` guarded), so the open screen is purely a
+    // cosmetic, cursor-mirrored projection.
     await globalScene.ui.setMode(
       UiMode.MODIFIER_SELECT,
       this.isPlayer(),

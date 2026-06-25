@@ -25,7 +25,11 @@
 // LoopbackTransport, exactly like CoopBattleStreamer.
 // =============================================================================
 
-import type { CoopMessage, CoopTransport } from "#data/elite-redux/coop/coop-transport";
+import type {
+  CoopMessage,
+  CoopSerializedRewardOption,
+  CoopTransport,
+} from "#data/elite-redux/coop/coop-transport";
 
 /** Sentinel choices shared across interaction screens. */
 export const COOP_INTERACTION_LEAVE = -1;
@@ -74,6 +78,11 @@ export class CoopInteractionRelay {
   private readonly inbox = new Map<number, CoopInteractionChoice[]>();
   /** seq -> resolver for the in-flight {@linkcode awaitInteractionChoice} (one at a time). */
   private readonly pending = new Map<number, (res: CoopInteractionChoice | null) => void>();
+
+  /** "seq:reroll" -> the owner's rolled reward-option list that arrived before its waiter (#633 Fix #2). */
+  private readonly rewardOptionsInbox = new Map<string, CoopSerializedRewardOption[]>();
+  /** "seq:reroll" -> resolver for the in-flight {@linkcode awaitRewardOptions}. */
+  private readonly rewardOptionsPending = new Map<string, (res: CoopSerializedRewardOption[] | null) => void>();
 
   constructor(transport: CoopTransport, opts: CoopInteractionRelayOptions = {}) {
     this.transport = transport;
@@ -128,17 +137,76 @@ export class CoopInteractionRelay {
     });
   }
 
+  /** OWNER: stream the exact reward-option list rolled for `seq` / `reroll` (#633 Fix #2). */
+  sendRewardOptions(seq: number, reroll: number, options: CoopSerializedRewardOption[]): void {
+    this.transport.send({ t: "rewardOptions", seq, reroll, options });
+  }
+
+  /**
+   * WATCHER: take the owner's rolled reward-option list for `seq` / `reroll`. Resolves
+   * immediately if it already arrived (buffered), else waits for it, or resolves `null`
+   * on timeout (the watcher then falls back to its own locally-rolled options - divergent
+   * but never a hang).
+   */
+  awaitRewardOptions(
+    seq: number,
+    reroll: number,
+    timeoutMs = this.timeoutMs,
+  ): Promise<CoopSerializedRewardOption[] | null> {
+    const key = `${seq}:${reroll}`;
+    const buffered = this.rewardOptionsInbox.get(key);
+    if (buffered !== undefined) {
+      this.rewardOptionsInbox.delete(key);
+      return Promise.resolve(buffered);
+    }
+    // Supersede any stale waiter on this key.
+    this.rewardOptionsPending.get(key)?.(null);
+    return new Promise<CoopSerializedRewardOption[] | null>(resolve => {
+      let settled = false;
+      let cancelTimer: () => void = () => {};
+      const finish = (res: CoopSerializedRewardOption[] | null) => {
+        if (settled) {
+          return;
+        }
+        settled = true;
+        cancelTimer();
+        if (this.rewardOptionsPending.get(key) === finish) {
+          this.rewardOptionsPending.delete(key);
+        }
+        resolve(res);
+      };
+      this.rewardOptionsPending.set(key, finish);
+      cancelTimer = this.schedule(() => finish(null), timeoutMs);
+    });
+  }
+
   /** Stop listening and fail any in-flight waits. */
   dispose(): void {
     this.offMessage();
     for (const finish of [...this.pending.values()]) {
       finish(null);
     }
+    for (const finish of [...this.rewardOptionsPending.values()]) {
+      finish(null);
+    }
     this.pending.clear();
     this.inbox.clear();
+    this.rewardOptionsPending.clear();
+    this.rewardOptionsInbox.clear();
   }
 
   private handle(msg: CoopMessage): void {
+    if (msg.t === "rewardOptions") {
+      const key = `${msg.seq}:${msg.reroll}`;
+      const waiter = this.rewardOptionsPending.get(key);
+      if (waiter) {
+        waiter(msg.options);
+        return;
+      }
+      // No waiter yet - buffer (latest wins per key) for the next awaitRewardOptions.
+      this.rewardOptionsInbox.set(key, msg.options);
+      return;
+    }
     if (msg.t !== "interactionChoice") {
       return;
     }

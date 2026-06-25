@@ -107,6 +107,27 @@ export interface CoopSerializedEnemy {
   data: CoopSerializedPokemon;
 }
 
+/**
+ * One rolled reward-screen option the OWNER streams to the WATCHER (#633 Fix #2). Party
+ * LUCK changes the NUMBER of seeded upgrade draws when rolling the pool, so the two
+ * clients' independently-rolled pools could differ - and that shifts the whole shared
+ * RNG stream after the first shop. The owner therefore rolls ONCE and streams the
+ * resolved option list; the watcher rebuilds these exact options instead of re-rolling
+ * (so it consumes no luck-dependent RNG). All plain JSON for the wire.
+ *  - `id`         the ModifierType registry key (e.g. "RARE_CANDY"); rebuild via `modifierTypes[id]()`
+ *  - `tier`       the resolved ModifierTier
+ *  - `upgradeCount` luck-driven tier upgrades applied (for the option's upgrade animation)
+ *  - `cost`       the option's price (shop) / 0 (free reward)
+ *  - `pregenArgs` a generator type's pregen args (TM move id, form item, etc.), when applicable
+ */
+export interface CoopSerializedRewardOption {
+  id: string;
+  tier: number;
+  upgradeCount: number;
+  cost: number;
+  pregenArgs?: number[] | undefined;
+}
+
 /** The mutable per-turn battle state of ONE field mon (the guest already has the mon object). */
 export interface CoopSerializedMonState {
   /** Battler index of this field mon. */
@@ -276,6 +297,13 @@ export type CoopMessage =
    *  - `data`   optional extra indices (e.g. party-target slot, ME sub-option)
    */
   | { t: "interactionChoice"; seq: number; kind: string; choice: number; data?: number[] }
+  /**
+   * Owner -> watcher (#633 Fix #2): the EXACT reward-screen option list the owner rolled
+   * for interaction `seq`. The watcher rebuilds these instead of re-rolling its own pool
+   * (party luck would otherwise make the two pools - and the shared RNG cursor - diverge).
+   * `reroll` is the reroll round these options belong to (a fresh roll per reroll).
+   */
+  | { t: "rewardOptions"; seq: number; reroll: number; options: CoopSerializedRewardOption[] }
   /**
    * Owner -> watcher (#633): a COSMETIC live-cursor button on a shared interaction
    * screen. The watcher replays `button` into its identical screen so the partner
