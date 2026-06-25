@@ -1,0 +1,185 @@
+url:      https://elite-redux-staging.pages.dev/
+build:    mqtkwu1u-7c6p
+mode:     6  wave:1
+seed:     12lMAp66jBRowu3cX61Jz6sZ
+party:    Bisasam(L5 1hp f0), Schiggy(L5 21hp f0), Endivie(L5 20hp f0), Habitak(L5 20hp f0), Rettan(L5 22hp f0)
+enemy:    Waumpel(L2), Dartiri(L2)
+
+----- COMMENT -----
+post locale fix
+
+----- CONSOLE -----
+[14:12:15.721] LOG: %c %c %c %c %c Phaser v3.90.0 (WebGL | Web Audio) %c https://phaser.io/v390 background: #ff0000 background: #ffff00 background: #00ff00 background: #00ffff color: #ffffff; background: #000000 background: transparent
+[14:12:16.476] LOG: [ER] build mqtkwu1u-7c6p
+[14:12:16.896] LOG: [dev-tools] loaded — 306 scenarios + Send Logs button
+[14:12:53.576] DEBUG: Destroying loading scene
+[14:12:53.581] DEBUG: Destroyed loading scene
+[14:12:53.721] LOG: Seed: 12lMAp66jBRowu3cX61Jz6sZ
+[14:12:53.721] LOG: Wave Seed: 12lMAp66jBRowu3cX61Jz6sZ 0
+[14:12:59.509] LOG: %cStart Phase LoginPhase color:green;
+[14:12:59.980] LOG: Client Session: fe3teRIpn3Tb2Gi9IzQDjsLLPUP5xfHf
+[14:13:00.449] LOG: %cStart Phase TitlePhase color:green;
+[14:13:00.451] LOG: Getting Session Slot id: %d 0
+[14:13:00.479] LOG: use seasonal splash messages true
+[14:13:00.479] LOG: Adding 2 Pride Month splash messages (weight: x15)
+[14:13:17.840] WARN: [coop-fp] MISMATCH sections=moves,abilities - moves local=c20a02635a5e3c05(1107) peer=ca83cec603ca5e7e(1107) abilities local=1670a4f3df00cb38(1046) peer=1412a816005397a3(1046)
+[14:13:26.889] LOG: [coop-launch] title challenge-gate: role=host isCoopGuest=false -> SelectChallengePhase
+[14:13:26.891] LOG: %cStart Phase SelectChallengePhase color:green;
+[14:13:29.454] LOG: %cStart Phase SelectStarterPhase color:green;
+[14:13:29.455] LOG: [coop-launch] startCoopSelect role=host partnerConnected=true partnerReady=false
+[14:13:31.230] WARN: cry/1 not found
+[14:13:32.540] WARN: cry/152 not found
+[14:13:35.981] LOG: [coop-runconfig] startRun role=host willBroadcast=true difficulty=elite
+[14:13:35.981] LOG: [coop-runconfig] host broadcast difficulty=elite netcode=authoritative (role=host)
+[14:13:35.981] LOG: [coop-launch] proceedIfReady launched=false localTeam=0 bothReady=false role=host partnerReady=false
+[14:13:35.983] LOG: [coop-launch] local team locked in: 2 mons, role=host
+[14:13:35.985] LOG: [coop-launch] proceedIfReady launched=false localTeam=2 bothReady=false role=host partnerReady=false
+[14:13:35.986] LOG: [coop-launch] proceedIfReady launched=false localTeam=2 bothReady=false role=host partnerReady=false
+[14:13:35.986] LOG: [coop-launch] local ready, partner NOT ready -> waiting screen
+[14:13:43.174] LOG: [coop-launch] proceedIfReady launched=false localTeam=2 bothReady=false role=host partnerReady=false
+[14:13:43.175] LOG: [coop-launch] proceedIfReady launched=false localTeam=2 bothReady=true role=host partnerReady=true
+[14:13:43.177] LOG: [coop-launch] launchCoopMergedParty role=host merged=5 slot=0
+[14:13:43.177] LOG: [coop-launch] host: opening SAVE_SLOT picker
+[14:13:43.314] LOG: Getting Session Slot id: %d 0
+[14:13:43.335] LOG: Getting Session Slot id: %d 1
+[14:13:43.338] LOG: Getting Session Slot id: %d 2
+[14:13:43.341] LOG: Getting Session Slot id: %d 3
+[14:13:43.345] LOG: Getting Session Slot id: %d 4
+[14:13:43.351] LOG: Getting Session Slot id: %d 0
+[14:13:43.650] ERROR: Invalid save data JSON detected! Session not found.
+[14:13:43.651] ERROR: Invalid save data JSON detected! Session not found.
+[14:13:43.653] ERROR: Invalid save data JSON detected! Session not found.
+[14:13:43.705] ERROR: Invalid save data JSON detected! Session not found.
+[14:13:49.540] DEBUG: %cSending a request to delete session in slot %d color: blue 0
+[14:13:52.107] LOG: Wave Seed: 23mNBq77kCSpxv4dY72K{7t[ 1
+[14:13:52.112] LOG: %cStart Phase EncounterPhase color:green;
+[14:13:52.123] LOG: Starting species pool tier: COMMON
+[14:13:52.125] LOG: Replaced SILCOON with WURMPLE
+[14:13:52.170] LOG: Pokemon: Waumpel (wild) | Species ID: 265 | Level: 2 | Nature: Mild (+SpAng/-Vert)
+[14:13:52.171] LOG: Stats (IVs): HP: 14 (18), Atk: 7 (20), Def: 5 (4), Spatk: 7 (24), Spdef: 6 (16), Spd: 5 (1)
+[14:13:52.171] LOG: Ability: Puderabwehr | Passive Ability: Hexaplaga 
+[14:13:52.171] LOG: Moveset: ["Käfertrutz","Web Shot","Tackle","Giftstachel"]
+[14:13:52.173] LOG: Starting species pool tier: COMMON
+[14:13:52.191] LOG: Pokemon: Dartiri (wild) | Species ID: 661 | Level: 2 | Nature: Solo (+Ang/-Vert)
+[14:13:52.192] LOG: Stats (IVs): HP: 14 (12), Atk: 8 (21), Def: 5 (12), Spatk: 6 (5), Spdef: 6 (6), Spd: 7 (18)
+[14:13:52.192] LOG: Ability: Rivalität | Passive Ability: Flock 
+[14:13:52.192] LOG: Moveset: ["Windschnitt","Dreschflegel","Pikser","Heuler"]
+[14:13:55.670] DEBUG: Session data saved to slot 0!
+[14:13:57.241] LOG: Wave Seed: 23mNBq77kCSpxv4dY72K{7t[ 1
+[14:13:58.761] LOG: %cStart Phase SummonPhase color:green;
+[14:13:59.360] WARN: cry/1 not found
+[14:13:59.721] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[14:13:59.722] LOG: %cStart Phase SummonPhase color:green;
+[14:14:00.679] LOG: %cStart Phase ShinySparklePhase color:green;
+[14:14:01.028] LOG: %cStart Phase CheckSwitchPhase color:green;
+[14:14:01.028] LOG: %cStart Phase CheckSwitchPhase color:green;
+[14:14:01.028] LOG: %cStart Phase InitEncounterPhase color:green;
+[14:14:01.040] LOG: %cStart Phase PostSummonPhase color:green;
+[14:14:01.040] LOG: Ran PSP for: Schiggy
+[14:14:01.049] LOG: %cStart Phase PostSummonPhase color:green;
+[14:14:01.049] LOG: Ran PSP for: Bisasam
+[14:14:01.053] LOG: %cStart Phase PostSummonPhase color:green;
+[14:14:01.057] LOG: %cStart Phase PostSummonPhase color:green;
+[14:14:01.061] LOG: %cStart Phase PostSummonPhase color:green;
+[14:14:01.063] LOG: %cStart Phase ShowAbilityPhase color:green;
+[14:14:01.577] LOG: %cStart Phase MovePhase color:green;
+[14:14:01.578] LOG: %cUser: Schiggy
+Move: AQUA_RING
+Use Mode: INDIRECT color:orchid
+[14:14:01.586] LOG: %cStart Phase MessagePhase color:green;
+[14:14:02.004] LOG: %cStart Phase MoveEffectPhase color:green;
+[14:14:02.030] LOG: %cStart Phase MessagePhase color:green;
+[14:14:02.879] LOG: %cStart Phase MoveEndPhase color:green;
+[14:14:02.879] LOG: %cStart Phase HideAbilityPhase color:green;
+[14:14:02.962] LOG: %cStart Phase PostSummonPhase color:green;
+[14:14:02.962] LOG: Ran PSP for: Dartiri
+[14:14:02.963] LOG: %cStart Phase PostSummonPhase color:green;
+[14:14:02.965] LOG: %cStart Phase PostSummonPhase color:green;
+[14:14:02.966] LOG: %cStart Phase PostSummonPhase color:green;
+[14:14:02.966] LOG: Ran PSP for: Waumpel
+[14:14:02.967] LOG: %cStart Phase PostSummonPhase color:green;
+[14:14:02.967] LOG: %cStart Phase PostSummonPhase color:green;
+[14:14:02.968] LOG: %cStart Phase TurnInitPhase color:green;
+[14:14:02.969] LOG: %cStart Phase CommandPhase color:green;
+[14:14:11.520] LOG: Move: VINE_WHIP Move targets: {"targets":[2,3,1],"multiple":false} 
+Player Pokemon: Bisasam
+[14:14:11.523] LOG: %cStart Phase SelectTargetPhase color:green;
+[14:14:12.381] LOG: %cStart Phase CommandPhase color:green;
+[14:14:12.386] LOG: Move: BUBBLE_BEAM Move targets: {"targets":[2],"multiple":false} 
+Player Pokemon: Schiggy
+[14:14:12.386] LOG: %cStart Phase EnemyCommandPhase color:green;
+[14:14:12.419] LOG: Battle Seed: ONYMjbxLLWfzrUVH
+[14:14:12.430] LOG: Move Pool: ["Käfertrutz","Web Shot","Tackle","Giftstachel"]
+[14:14:12.430] LOG: Move Scores: [31.5,22.5,8,11]
+[14:14:12.431] LOG: Sorted Move Pool: ["Käfertrutz","Web Shot","Giftstachel","Tackle"]
+[14:14:12.431] LOG: Chosen Move: Tackle
+[14:14:12.432] LOG: %cStart Phase EnemyCommandPhase color:green;
+[14:14:12.451] LOG: Move Pool: ["Windschnitt","Dreschflegel","Pikser","Heuler"]
+[14:14:12.452] LOG: Move Scores: [63,6,72,2]
+[14:14:12.452] LOG: Sorted Move Pool: ["Pikser","Windschnitt","Dreschflegel","Heuler"]
+[14:14:12.452] LOG: Chosen Move: Pikser
+[14:14:12.452] LOG: %cStart Phase TurnStartPhase color:green;
+[14:14:12.461] LOG: %cStart Phase MovePhase color:green;
+[14:14:12.462] LOG: %cUser: Schiggy
+Move: BUBBLE_BEAM
+Use Mode: NORMAL color:orchid
+[14:14:12.473] LOG: %cStart Phase MessagePhase color:green;
+[14:14:12.858] LOG: %cStart Phase MoveEffectPhase color:green;
+[14:14:13.763] LOG: crit stage: +0
+[14:14:13.764] LOG: Move: Blubbstrahl | Base damage: 6.4 | Power: 30 | Source attack: 11 | Target defense: 6
+[14:14:13.765] LOG: Move: Blubbstrahl | Attack damage: 8
+[14:14:13.767] LOG: %cStart Phase DamageAnimPhase color:green;
+[14:14:13.822] LOG: %cStart Phase MoveEffectPhase color:green;
+[14:14:14.842] LOG: crit stage: +0
+[14:14:14.844] LOG: Move: Blubbstrahl | Base damage: 6.4 | Power: 30 | Source attack: 11 | Target defense: 6
+[14:14:14.845] LOG: Move: Blubbstrahl | Attack damage: 9
+[14:14:14.848] LOG: %cStart Phase DamageAnimPhase color:green;
+[14:14:14.877] LOG: %cStart Phase MessagePhase color:green;
+[14:14:15.532] LOG: %cStart Phase FaintPhase color:green;
+[14:14:16.446] LOG: %cStart Phase MessagePhase color:green;
+[14:14:17.298] LOG: %cStart Phase VictoryPhase color:green;
+[14:14:17.301] LOG: %cStart Phase ExpPhase color:green;
+[14:14:17.677] LOG: %cStart Phase ExpPhase color:green;
+[14:14:18.243] LOG: %cStart Phase MoveEndPhase color:green;
+[14:14:18.247] LOG: %cStart Phase MovePhase color:green;
+[14:14:18.248] LOG: %cUser: Bisasam
+Move: VINE_WHIP
+Use Mode: NORMAL color:orchid
+[14:14:18.254] LOG: %cStart Phase MessagePhase color:green;
+[14:14:18.665] LOG: %cStart Phase MoveEffectPhase color:green;
+[14:14:19.119] LOG: crit stage: +0
+[14:14:19.122] LOG: Move: Rankenhieb | Base damage: 14.8 | Power: 80 | Source attack: 10 | Target defense: 5
+[14:14:19.122] LOG: Move: Rankenhieb | Attack damage: 9
+[14:14:19.124] LOG: %cStart Phase DamageAnimPhase color:green;
+[14:14:19.166] LOG: %cStart Phase MessagePhase color:green;
+[14:14:19.892] LOG: %cStart Phase MoveEndPhase color:green;
+[14:14:19.893] LOG: %cStart Phase MovePhase color:green;
+[14:14:19.894] LOG: %cUser: Dartiri
+Move: PECK
+Use Mode: NORMAL color:orchid
+[14:14:19.900] LOG: %cStart Phase MessagePhase color:green;
+[14:14:20.298] LOG: %cStart Phase MoveEffectPhase color:green;
+[14:14:20.565] LOG: crit stage: +0
+[14:14:20.567] LOG: Move: Pikser | Base damage: 3.6799999999999997 | Power: 37.5 | Source attack: 8 | Target defense: 10
+[14:14:20.569] LOG: Move: Pikser | Attack damage: 9
+[14:14:20.570] LOG: %cStart Phase DamageAnimPhase color:green;
+[14:14:20.599] LOG: %cStart Phase MoveEffectPhase color:green;
+[14:14:20.883] LOG: crit stage: +0
+[14:14:20.884] LOG: Move: Pikser | Base damage: 3.6799999999999997 | Power: 37.5 | Source attack: 8 | Target defense: 10
+[14:14:20.885] LOG: Move: Pikser | Attack damage: 10
+[14:14:20.886] LOG: %cStart Phase DamageAnimPhase color:green;
+[14:14:20.917] LOG: %cStart Phase MessagePhase color:green;
+[14:14:21.629] LOG: %cStart Phase MessagePhase color:green;
+[14:14:22.277] LOG: %cStart Phase MoveEndPhase color:green;
+[14:14:22.277] LOG: %cStart Phase MovePhase color:green;
+[14:14:22.277] LOG: %cStart Phase MoveEndPhase color:green;
+[14:14:22.278] LOG: %cStart Phase CheckInterludePhase color:green;
+[14:14:22.278] LOG: %cStart Phase WeatherEffectPhase color:green;
+[14:14:22.279] LOG: %cStart Phase PositionalTagPhase color:green;
+[14:14:22.279] LOG: %cStart Phase BerryPhase color:green;
+[14:14:22.281] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[14:14:22.284] LOG: %cStart Phase TurnEndPhase color:green;
+[14:14:22.290] LOG: %cStart Phase PokemonHealPhase color:green;
+[14:14:22.291] LOG: %cStart Phase MessagePhase color:green;
+[14:14:22.975] LOG: %cStart Phase TurnInitPhase color:green;
+[14:14:22.976] LOG: %cStart Phase CommandPhase color:green;
