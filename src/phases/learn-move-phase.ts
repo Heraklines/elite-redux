@@ -26,8 +26,9 @@ import i18next from "i18next";
 // the result so both clients transition together. All relayed on one dedicated seq (FIFO,
 // distinct from the small interaction-turn seqs the reward shop uses).
 const COOP_LEARN_MOVE_SEQ = 9_000_001;
-/** How long the watcher waits for the owner's move-replace decision before giving up. */
-const COOP_LEARN_MOVE_WAIT_MS = 300_000;
+/** How long the watcher waits for the owner's move-replace decision before giving up.
+ *  20min: "wait for the human" - a slow decision must never trip a premature give-up (desync). */
+const COOP_LEARN_MOVE_WAIT_MS = 1_200_000;
 
 export class LearnMovePhase extends PlayerPartyMemberPokemonPhase {
   public readonly phaseName = "LearnMovePhase";

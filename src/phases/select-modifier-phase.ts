@@ -58,8 +58,10 @@ const COOP_ACT_REWARD = 0;
 const COOP_ACT_SHOP = 1;
 const COOP_ACT_TRANSFER = 2;
 const COOP_ACT_LOCK = 3;
-/** How long the WATCHER waits for the owner's next reward pick before leaving (never hangs). */
-const COOP_REWARD_WAIT_MS = 300_000;
+/** How long the WATCHER waits for the owner's next reward pick before leaving (never hangs).
+ *  20min: "wait for the human" - a slow shopper must never trip the watcher's premature leave
+ *  (which would land the watcher in the next wave while the owner is still shopping = desync). */
+const COOP_REWARD_WAIT_MS = 1_200_000;
 
 export class SelectModifierPhase extends BattlePhase {
   public readonly phaseName = "SelectModifierPhase";
@@ -580,6 +582,14 @@ export class SelectModifierPhase extends BattlePhase {
       modifierCountHolder.value += erScrapMagnetExtraRewards();
     }
 
+    // ER (#134): the EARNED extra reward slots (Golden Ball / Greater Golden Ball /
+    // Scrap Magnet, i.e. the bump above the base 3) must SURVIVE a bundled/guaranteed
+    // reward override - otherwise the Greater Golden Ball silently does nothing in every
+    // customModifierSettings reward (mystery encounters, the Bargain, fixed battles, LLM
+    // victory bundles). Capture them before the override and re-add after (paired with
+    // the fill change in getPlayerModifierTypeOptions so the extra slots are generated).
+    const earnedExtraRewards = Math.max(0, modifierCountHolder.value - 3);
+
     // If custom modifiers are specified, overrides default item count
     if (this.customModifierSettings) {
       const newItemCount =
@@ -590,7 +600,7 @@ export class SelectModifierPhase extends BattlePhase {
         const originalCount = modifierCountHolder.value;
         modifierCountHolder.value = originalCount > newItemCount ? originalCount : newItemCount;
       } else {
-        modifierCountHolder.value = newItemCount;
+        modifierCountHolder.value = newItemCount + earnedExtraRewards;
       }
     }
 

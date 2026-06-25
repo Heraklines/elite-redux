@@ -48,8 +48,10 @@ export interface CoopInteractionRelayOptions {
 }
 
 // The owner is a human shopping / reading an ME, so the watcher's wait must comfortably
-// exceed human deliberation. Generous; a timeout just falls back to "leave".
-const DEFAULT_TIMEOUT_MS = 180_000;
+// exceed human deliberation - a premature timeout makes the watcher LEAVE while the owner
+// is still deciding (desync). 20min effectively means "wait for the human"; a timeout is
+// then only a genuinely-disconnected-partner safety net, not a deliberation timer.
+const DEFAULT_TIMEOUT_MS = 1_200_000;
 
 function defaultSchedule(cb: () => void, ms: number): () => void {
   const id = setTimeout(cb, ms);

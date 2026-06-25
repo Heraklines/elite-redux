@@ -45,9 +45,12 @@ export interface CoopBattleStreamerOptions {
   schedule?: (cb: () => void, ms: number) => () => void;
 }
 
-// The host runs the WHOLE turn (animations + messages) before it can send the
-// resolution, so the guest's wait must comfortably exceed a slow turn. 60s.
-const DEFAULT_TIMEOUT_MS = 60_000;
+// The host runs the WHOLE turn before it can send the resolution - and a turn does
+// not resolve until BOTH players' commands are in, which itself waits up to the 20min
+// partner-command grace (coop-battle-sync). So the guest's wait MUST exceed that, or a
+// slow thinker trips this 60s give-up and the guest desyncs (one player lands in the
+// shop while the other is still choosing). Match the 20min command grace.
+const DEFAULT_TIMEOUT_MS = 1_200_000;
 
 function defaultSchedule(cb: () => void, ms: number): () => void {
   const id = setTimeout(cb, ms);
