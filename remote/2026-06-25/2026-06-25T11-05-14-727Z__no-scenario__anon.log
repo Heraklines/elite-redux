@@ -1,0 +1,176 @@
+url:      https://elite-redux-staging.pages.dev/
+build:    mqte1k6u-3mc1
+mode:     6  wave:1
+seed:     yn7Vyy1jvPjP5FgnxLm5kmjb
+party:    Bulbasaur(L5 21hp f0), Bulbasaur(L5 21hp f0), Charmander(L5 20hp f0), Charmander(L5 20hp f0), Squirtle(L5 21hp f0), Squirtle(L5 21hp f0)
+enemy:    Poochyena(L2), Ledyba(L2)
+
+----- COMMENT -----
+last test
+
+----- CONSOLE -----
+[11:02:24.312] LOG: %c %c %c %c %c Phaser v3.90.0 (WebGL | Web Audio) %c https://phaser.io/v390 background: #ff0000 background: #ffff00 background: #00ff00 background: #00ffff color: #ffffff; background: #000000 background: transparent
+[11:02:25.230] LOG: [ER] build mqte1k6u-3mc1
+[11:02:25.753] LOG: [dev-tools] loaded — 306 scenarios + Send Logs button
+[11:02:52.305] DEBUG: Destroying loading scene
+[11:02:52.305] DEBUG: Destroyed loading scene
+[11:02:52.534] LOG: Seed: yn7Vyy1jvPjP5FgnxLm5kmjb
+[11:02:52.534] LOG: Wave Seed: yn7Vyy1jvPjP5FgnxLm5kmjb 0
+[11:02:57.542] LOG: %cStart Phase LoginPhase color:green;
+[11:02:57.863] LOG: Client Session: AmAtSWvyp7fqkUYpWJJUxOJzR2433O42
+[11:02:58.321] LOG: %cStart Phase TitlePhase color:green;
+[11:02:58.322] LOG: Getting Session Slot id: %d 4
+[11:02:58.336] LOG: use seasonal splash messages true
+[11:02:58.336] LOG: Adding 2 Pride Month splash messages (weight: x15)
+[11:03:55.412] LOG: [coop-launch] title challenge-gate: role=host isCoopGuest=false -> SelectChallengePhase
+[11:03:55.413] LOG: %cStart Phase SelectChallengePhase color:green;
+[11:03:58.104] LOG: %cStart Phase SelectStarterPhase color:green;
+[11:03:58.105] LOG: [coop-launch] startCoopSelect role=host partnerConnected=true partnerReady=false
+[11:04:05.901] WARN: cry/1 not found
+[11:04:06.470] WARN: cry/4 not found
+[11:04:06.957] WARN: cry/7 not found
+[11:04:11.177] LOG: [coop-runconfig] startRun role=host willBroadcast=true difficulty=elite
+[11:04:11.177] LOG: [coop-runconfig] host broadcast difficulty=elite (role=host)
+[11:04:11.177] LOG: [coop-launch] proceedIfReady launched=false localTeam=0 bothReady=false role=host partnerReady=false
+[11:04:11.178] LOG: [coop-launch] local team locked in: 3 mons, role=host
+[11:04:11.179] LOG: [coop-launch] proceedIfReady launched=false localTeam=3 bothReady=false role=host partnerReady=false
+[11:04:11.179] LOG: [coop-launch] proceedIfReady launched=false localTeam=3 bothReady=false role=host partnerReady=false
+[11:04:11.179] LOG: [coop-launch] local ready, partner NOT ready -> waiting screen
+[11:04:16.408] LOG: [coop-launch] proceedIfReady launched=false localTeam=3 bothReady=false role=host partnerReady=false
+[11:04:16.408] LOG: [coop-launch] proceedIfReady launched=false localTeam=3 bothReady=true role=host partnerReady=true
+[11:04:16.409] LOG: [coop-launch] launchCoopMergedParty role=host merged=6 slot=4
+[11:04:16.409] LOG: [coop-launch] host: opening SAVE_SLOT picker
+[11:04:16.461] LOG: Getting Session Slot id: %d 0
+[11:04:16.483] LOG: Getting Session Slot id: %d 1
+[11:04:16.492] LOG: Getting Session Slot id: %d 2
+[11:04:16.502] LOG: Getting Session Slot id: %d 3
+[11:04:16.507] LOG: Getting Session Slot id: %d 4
+[11:04:16.772] LOG: Getting Session Slot id: %d 4
+[11:04:23.374] DEBUG: %cSending a request to delete session in slot %d color: blue 4
+[11:04:23.813] LOG: Wave Seed: zo8Wzz2kwQkQ6GhoyMn6lnkc 1
+[11:04:23.816] LOG: %cStart Phase EncounterPhase color:green;
+[11:04:23.823] LOG: Starting species pool tier: UNCOMMON
+[11:04:23.849] LOG: Pokemon: Wild Poochyena | Species ID: 261 | Level: 2 | Nature: Relaxed (+Def/-Spd)
+[11:04:23.849] LOG: Stats (IVs): HP: 14 (30), Atk: 8 (21), Def: 7 (14), Spatk: 6 (16), Spdef: 7 (10), Spd: 7 (19)
+[11:04:23.849] LOG: Ability: Intimidate | Passive Ability: Nocturnal 
+[11:04:23.849] LOG: Moveset: ["Hyper Fang","Roar","Howl","Odor Sleuth"]
+[11:04:23.850] LOG: Starting species pool tier: COMMON
+[11:04:23.862] LOG: Pokemon: Wild Ledyba | Species ID: 165 | Level: 2 | Nature: Hardy (-)
+[11:04:23.862] LOG: Stats (IVs): HP: 13 (1), Atk: 7 (14), Def: 6 (26), Spatk: 6 (17), Spdef: 8 (13), Spd: 8 (22)
+[11:04:23.862] LOG: Ability: Rattled | Passive Ability: Pollinate 
+[11:04:23.862] LOG: Moveset: ["Insect Impact","Dizzy Punch","Rock Smash","Dual Wingbeat"]
+[11:04:26.197] DEBUG: Session data saved to slot 4!
+[11:04:28.118] LOG: Wave Seed: zo8Wzz2kwQkQ6GhoyMn6lnkc 1
+[11:04:28.566] LOG: %cStart Phase SummonPhase color:green;
+[11:04:28.754] WARN: cry/1 not found
+[11:04:28.850] LOG: %cStart Phase ShinySparklePhase color:green;
+[11:04:28.951] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[11:04:28.952] LOG: %cStart Phase SummonPhase color:green;
+[11:04:29.140] WARN: cry/1 not found
+[11:04:29.240] LOG: %cStart Phase ShinySparklePhase color:green;
+[11:04:29.342] LOG: %cStart Phase CheckSwitchPhase color:green;
+[11:04:29.342] LOG: %cStart Phase CheckSwitchPhase color:green;
+[11:04:29.342] LOG: %cStart Phase InitEncounterPhase color:green;
+[11:04:29.347] LOG: %cStart Phase PostSummonPhase color:green;
+[11:04:29.348] LOG: Ran PSP for: Bulbasaur
+[11:04:29.353] LOG: %cStart Phase PostSummonPhase color:green;
+[11:04:29.356] LOG: %cStart Phase PostSummonPhase color:green;
+[11:04:29.357] LOG: %cStart Phase PostSummonPhase color:green;
+[11:04:29.357] LOG: Ran PSP for: Bulbasaur
+[11:04:29.359] LOG: %cStart Phase PostSummonPhase color:green;
+[11:04:29.360] LOG: %cStart Phase PostSummonPhase color:green;
+[11:04:29.361] LOG: %cStart Phase PostSummonPhase color:green;
+[11:04:29.361] LOG: Ran PSP for: Ledyba
+[11:04:29.363] LOG: %cStart Phase PostSummonPhase color:green;
+[11:04:29.363] LOG: %cStart Phase PostSummonPhase color:green;
+[11:04:29.364] LOG: %cStart Phase PostSummonPhase color:green;
+[11:04:29.364] LOG: Ran PSP for: Poochyena
+[11:04:29.365] LOG: %cStart Phase PostSummonPhase color:green;
+[11:04:29.367] LOG: %cStart Phase ShowAbilityPhase color:green;
+[11:04:29.537] LOG: %cStart Phase StatStageChangePhase color:green;
+[11:04:29.730] LOG: %cStart Phase MessagePhase color:green;
+[11:04:29.934] LOG: %cStart Phase StatStageChangePhase color:green;
+[11:04:30.132] LOG: %cStart Phase MessagePhase color:green;
+[11:04:30.326] LOG: %cStart Phase HideAbilityPhase color:green;
+[11:04:30.350] LOG: %cStart Phase PostSummonPhase color:green;
+[11:04:30.350] LOG: %cStart Phase TurnInitPhase color:green;
+[11:04:30.350] LOG: %cStart Phase CommandPhase color:green;
+[11:04:31.521] LOG: Move: SAPPY_SEED Move targets: {"targets":[2,3,1],"multiple":false} 
+Player Pokemon: Bulbasaur
+[11:04:31.523] LOG: %cStart Phase SelectTargetPhase color:green;
+[11:04:31.876] LOG: %cStart Phase CommandPhase color:green;
+[11:04:35.221] LOG: Move: MALIGNANT_CHAIN Move targets: {"targets":[3],"multiple":false} 
+Player Pokemon: Bulbasaur
+[11:04:35.222] LOG: %cStart Phase EnemyCommandPhase color:green;
+[11:04:35.233] LOG: Battle Seed: 4ULZDosTukMHnO6z
+[11:04:35.234] WARN: BattlerTag IGNORE_GHOST is missing a score!
+[11:04:35.235] WARN: BattlerTag IGNORE_GHOST is missing a score!
+[11:04:35.235] WARN: BattlerTag IGNORE_GHOST is missing a score!
+[11:04:35.236] WARN: BattlerTag IGNORE_GHOST is missing a score!
+[11:04:35.236] LOG: Move Pool: ["Hyper Fang","Roar","Howl","Odor Sleuth"]
+[11:04:35.236] LOG: Move Scores: [19,-20,2,0]
+[11:04:35.236] LOG: Sorted Move Pool: ["Hyper Fang","Howl","Odor Sleuth","Roar"]
+[11:04:35.236] LOG: Chosen Move: Hyper Fang
+[11:04:35.236] LOG: %cStart Phase EnemyCommandPhase color:green;
+[11:04:35.256] LOG: Move Pool: ["Insect Impact","Dizzy Punch","Rock Smash","Dual Wingbeat"]
+[11:04:35.256] LOG: Move Scores: [27,15,6.625,75]
+[11:04:35.256] LOG: Sorted Move Pool: ["Dual Wingbeat","Insect Impact","Dizzy Punch","Rock Smash"]
+[11:04:35.256] LOG: Chosen Move: Insect Impact
+[11:04:35.256] LOG: %cStart Phase TurnStartPhase color:green;
+[11:04:35.264] LOG: %cStart Phase MovePhase color:green;
+[11:04:35.264] LOG: %cUser: Bulbasaur
+Move: SAPPY_SEED
+Use Mode: NORMAL color:orchid
+[11:04:35.270] LOG: %cStart Phase MessagePhase color:green;
+[11:04:35.361] LOG: %cStart Phase MoveEffectPhase color:green;
+[11:04:35.739] LOG: crit stage: +0
+[11:04:35.743] LOG: Move: Sappy Seed | Base damage: 11.6 | Power: 120 | Source attack: 7 | Target defense: 7
+[11:04:35.745] LOG: Move: Sappy Seed | Attack damage: 16
+[11:04:35.747] LOG: %cStart Phase DamageAnimPhase color:green;
+[11:04:35.761] LOG: %cStart Phase FaintPhase color:green;
+[11:04:35.824] LOG: %cStart Phase MessagePhase color:green;
+[11:04:37.655] LOG: %cStart Phase VictoryPhase color:green;
+[11:04:37.659] LOG: %cStart Phase ExpPhase color:green;
+[11:04:38.199] LOG: %cStart Phase ExpPhase color:green;
+[11:04:38.472] LOG: %cStart Phase MoveEndPhase color:green;
+[11:04:38.474] LOG: %cStart Phase MovePhase color:green;
+[11:04:38.474] LOG: %cUser: Bulbasaur
+Move: MALIGNANT_CHAIN
+Use Mode: NORMAL color:orchid
+[11:04:38.476] LOG: %cStart Phase MessagePhase color:green;
+[11:04:38.600] LOG: %cStart Phase MoveEffectPhase color:green;
+[11:04:38.755] LOG: crit stage: +0
+[11:04:38.756] LOG: Move: Malignant Chain | Base damage: 15 | Power: 100 | Source attack: 13 | Target defense: 8
+[11:04:38.756] LOG: Move: Malignant Chain | Attack damage: 22
+[11:04:38.759] LOG: %cStart Phase DamageAnimPhase color:green;
+[11:04:38.771] LOG: %cStart Phase FaintPhase color:green;
+[11:04:38.838] LOG: %cStart Phase MessagePhase color:green;
+[11:04:41.238] LOG: %cStart Phase VictoryPhase color:green;
+[11:04:41.239] LOG: %cStart Phase ExpPhase color:green;
+[11:04:43.956] LOG: %cStart Phase ExpPhase color:green;
+[11:04:44.308] LOG: %cStart Phase MoveEndPhase color:green;
+[11:04:44.309] LOG: %cStart Phase MovePhase color:green;
+[11:04:44.309] LOG: %cStart Phase MoveEndPhase color:green;
+[11:04:44.309] LOG: %cStart Phase MovePhase color:green;
+[11:04:44.309] LOG: %cStart Phase MoveEndPhase color:green;
+[11:04:44.309] LOG: %cStart Phase CheckInterludePhase color:green;
+[11:04:44.310] LOG: %cStart Phase WeatherEffectPhase color:green;
+[11:04:44.310] LOG: %cStart Phase PositionalTagPhase color:green;
+[11:04:44.310] LOG: %cStart Phase BerryPhase color:green;
+[11:04:44.312] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[11:04:44.312] LOG: %cStart Phase TurnEndPhase color:green;
+[11:04:44.315] LOG: %cStart Phase BattleEndPhase color:green;
+[11:04:44.316] LOG: Battle Score: 23 (1 Turns x1)
+[11:04:44.316] LOG: Total Score: 23
+[11:04:44.330] LOG: %cStart Phase EggLapsePhase color:green;
+[11:04:44.332] LOG: %cStart Phase SelectModifierPhase color:green;
+[11:04:44.332] LOG: Wave Seed: zo8Wzz2kwQkQ6GhoyMn6lnkc 1
+[11:04:44.341] LOG: 20 10 [2,3,4,5,6,7,8,9,10,12,23]
+[11:04:44.341] LOG: {"id":"ER_ABILITY_CAPSULE","localeKey":"","iconImage":"ability_capsule","soundName":"se/restore","tier":1} 
+[11:04:44.341] LOG: 7 5 [2,3,4,5,6]
+[11:04:44.341] LOG: {"id":"TEMP_STAT_STAGE_BOOSTER","localeKey":"","iconImage":"x_defense","soundName":"se/restore","tier":0,"stat":2,"nameKey":"x_defense","quantityKey":"percentage"} 
+[11:04:44.341] LOG: 8 5 [2,3,4,5,6]
+[11:04:44.342] LOG: {"id":"BERRY","localeKey":"","iconImage":"sitrus_berry","group":"berry","soundName":"se/restore","tier":0,"berryType":0} 
+[11:04:44.342] LOG: 0 0 [2,3,4,5,6]
+[11:04:44.342] LOG: {"id":"POKEBALL","localeKey":"","iconImage":"pb","group":"pb","soundName":"se/pb_bounce_1","tier":0,"pokeballType":0,"count":5} 
+[11:04:44.342] LOG: [coop-reward] OWNER drives reward screen (start=0 role=host spoof=false wave=1)
