@@ -194,6 +194,77 @@ describe.skipIf(!RUN)("co-op GUEST = pure renderer - real engine (#633, TRACK-2 
     expect(queuedTurnEnd, "replay phase queues the guest's turn-end (run loops)").toBe(true);
   });
 
+  it("ENEMY-FIELD RECONCILE (#633): a host-KOd enemy the guest still has ALIVE is removed + the checksum converges", async () => {
+    await startCoopGuest();
+    // The two enemies on the double field. enemy0 = bi2, enemy1 = bi3.
+    const enemy0 = globalScene.getEnemyField(false)[0];
+    const enemy1 = globalScene.getEnemyField(false)[1];
+    expect(enemy0?.getBattlerIndex()).toBe(BattlerIndex.ENEMY);
+    expect(enemy1?.getBattlerIndex()).toBe(BattlerIndex.ENEMY_2);
+
+    // --- HOST authoritative truth: model the host KOing enemy bi2 this turn. Zeroing hp makes it
+    // isFainted -> not isActive, so getField(true)/getEnemyField(true) drop it exactly as a real KO
+    // does. The Part-1 capture serializes player-active + enemy-SLOT-PRESENT mons, so the host
+    // checkpoint still CARRIES bi2 (with fainted:true), which is what drives the guest's removal.
+    enemy0.hp = 0;
+    const hostCheckpoint = coopEngine.captureCoopCheckpoint();
+    const hostChecksum = coopEngine.captureCoopChecksum();
+    expect(hostCheckpoint).not.toBeNull();
+    // The checkpoint carries the dead enemy as a fainted slot entry (Part 1)...
+    const bi2Entry = hostCheckpoint!.field.find(f => f.bi === BattlerIndex.ENEMY);
+    expect(bi2Entry, "host checkpoint carries the KOd enemy as a fainted slot entry").toBeDefined();
+    expect(bi2Entry?.fainted).toBe(true);
+    // ...but the CHECKSUM (Part 3) hashes only the survivor set {0,1,3} (active-only).
+    expect(hostChecksum).toMatch(/^[0-9a-f]{16}$/);
+
+    // --- GUEST divergence: the guest never saw the KO, so on its field bi2 is still ALIVE. Restore
+    // its hp to model exactly the real 2-client log (host enemy field = {bi3}; guest = {bi2 alive, bi3}).
+    enemy0.hp = enemy0.getMaxHp();
+    expect(enemy0.isActive(), "guest still has the host-KOd enemy alive (the desync)").toBe(true);
+    const guestEnemyBefore = globalScene.getEnemyField(true).map(e => e.getBattlerIndex());
+    expect(guestEnemyBefore).toContain(BattlerIndex.ENEMY);
+    // The diverged guest checksum disagrees with the host's (different field composition).
+    expect(coopEngine.captureCoopChecksum(), "guest desync detected before reconcile").not.toBe(hostChecksum);
+
+    // --- Apply the host's authoritative checkpoint: applyCoopCheckpoint runs reconcileCoopEnemyField,
+    // which removes the host-KOd enemy from the guest's field (side-effect-free, no FaintPhase).
+    coopEngine.applyCoopCheckpoint(hostCheckpoint!);
+
+    // The guest's enemy field no longer contains bi2; it equals the host's enemy survivor set ({bi3}).
+    const guestEnemyAfter = globalScene.getEnemyField(true).map(e => e.getBattlerIndex());
+    expect(guestEnemyAfter, "the host-KOd enemy is gone from the guest's field").not.toContain(BattlerIndex.ENEMY);
+    expect(guestEnemyAfter).toEqual([BattlerIndex.ENEMY_2]);
+    expect(enemy0.isActive(), "the removed enemy is no longer active on the guest").toBe(false);
+    // The per-turn checksum now MATCHES the host's: both hash the SAME survivor set {0,1,3}.
+    expect(coopEngine.captureCoopChecksum(), "checksum converges after the enemy-field reconcile").toBe(hostChecksum);
+
+    // --- IDEMPOTENT: re-applying the same host field must not double-remove or throw; bi2 is already
+    // off-field, bi3 stays. The checksum holds at the converged value.
+    expect(() => coopEngine.reconcileCoopEnemyField(hostCheckpoint!.field)).not.toThrow();
+    const guestEnemyAfter2 = globalScene.getEnemyField(true).map(e => e.getBattlerIndex());
+    expect(guestEnemyAfter2, "reconcile is idempotent on a second apply").toEqual([BattlerIndex.ENEMY_2]);
+    expect(coopEngine.captureCoopChecksum()).toBe(hostChecksum);
+  });
+
+  it("ENEMY-FIELD RECONCILE (#633): NEVER removes an enemy the host reports alive, and NEVER touches player slots", async () => {
+    const field = await startCoopGuest();
+    // Both enemies alive on host AND guest: a no-op reconcile must leave the field untouched.
+    const hostCheckpoint = coopEngine.captureCoopCheckpoint();
+    expect(hostCheckpoint).not.toBeNull();
+    const enemiesBefore = globalScene.getEnemyField(true).map(e => e.getBattlerIndex());
+    expect(enemiesBefore).toEqual([BattlerIndex.ENEMY, BattlerIndex.ENEMY_2]);
+
+    coopEngine.reconcileCoopEnemyField(hostCheckpoint!.field);
+
+    // No enemy was removed (host reports both alive), and the two PLAYER mons are untouched.
+    expect(globalScene.getEnemyField(true).map(e => e.getBattlerIndex())).toEqual([
+      BattlerIndex.ENEMY,
+      BattlerIndex.ENEMY_2,
+    ]);
+    expect(field[COOP_HOST_FIELD_INDEX].isActive(), "player host mon untouched by enemy reconcile").toBe(true);
+    expect(field[COOP_GUEST_FIELD_INDEX].isActive(), "player guest mon untouched by enemy reconcile").toBe(true);
+  });
+
   it("SOLO guard: outside co-op TurnStartPhase resolves normally (no divert, MovePhase pushed)", async () => {
     const field = await startCoopGuest();
     // Flip OUT of co-op: the guest-divert must be skipped, so the normal resolution runs -

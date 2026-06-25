@@ -39,7 +39,7 @@ describe("co-op ER data-table fingerprint (#633, diagnostics)", () => {
 
     it("returns a 16-char hex hash + a numeric count for every section", () => {
       const fp = computeErDataFingerprint();
-      for (const section of [fp.moveMap, fp.moves, fp.movesets, fp.abilities]) {
+      for (const section of [fp.moveMap, fp.movesData, fp.movesName, fp.movesets, fp.abilitiesData, fp.abilitiesName]) {
         expect(section.hash).toMatch(/^[0-9a-f]{16}$/);
         expect(typeof section.n).toBe("number");
         expect(section.n).toBeGreaterThanOrEqual(0);
@@ -47,6 +47,14 @@ describe("co-op ER data-table fingerprint (#633, diagnostics)", () => {
       // The ER move id-map is a STATIC table (always populated), so its section is non-empty
       // even headlessly - proving the fingerprint reads the real registry, not just zeros.
       expect(fp.moveMap.n).toBeGreaterThan(0);
+    });
+
+    it("the DATA / NAME split sections cover the SAME table: equal entry counts", () => {
+      const fp = computeErDataFingerprint();
+      // movesData + movesName are two views of `allMoves`; abilitiesData + abilitiesName of
+      // `allAbilities`. The split must not drop rows - each pair counts the same table.
+      expect(fp.movesData.n).toBe(fp.movesName.n);
+      expect(fp.abilitiesData.n).toBe(fp.abilitiesName.n);
     });
   });
 
@@ -66,17 +74,28 @@ describe("co-op ER data-table fingerprint (#633, diagnostics)", () => {
     it("names a section whose entry COUNT differs (n drift, hash unchanged)", () => {
       const fp = computeErDataFingerprint();
       const drifted = clone(fp);
-      drifted.moves.n = fp.moves.n + 598; // the guest's "598 dropped" class
-      expect(diffErDataFingerprint(fp, drifted)).toEqual(["moves"]);
+      drifted.movesData.n = fp.movesData.n + 598; // the guest's "598 dropped" class
+      expect(diffErDataFingerprint(fp, drifted)).toEqual(["movesData"]);
     });
 
-    it("names EVERY differing section (multi-table drift)", () => {
+    it("names EVERY differing section (multi-table drift), in the stable section order", () => {
       const fp = computeErDataFingerprint();
       const drifted = clone(fp);
       drifted.moveMap.hash = "0000000000000001";
-      drifted.moves.hash = "0000000000000002";
+      drifted.movesData.hash = "0000000000000002";
       drifted.movesets.hash = "0000000000000003";
-      expect(diffErDataFingerprint(fp, drifted)).toEqual(["moveMap", "moves", "movesets"]);
+      expect(diffErDataFingerprint(fp, drifted)).toEqual(["moveMap", "movesData", "movesets"]);
+    });
+
+    it("SPLIT diagnostic: a NAME-only drift names movesName but NOT movesData (cosmetic vs real)", () => {
+      const fp = computeErDataFingerprint();
+      const drifted = clone(fp);
+      // Localized move name differs but the data fields are byte-identical: the split must
+      // pinpoint movesName ALONE so the diagnostic reads "cosmetic, not a mechanic drift".
+      drifted.movesName.hash = "0000000000000abc";
+      const diff = diffErDataFingerprint(fp, drifted);
+      expect(diff).toEqual(["movesName"]);
+      expect(diff).not.toContain("movesData");
     });
   });
 
@@ -89,7 +108,11 @@ describe("co-op ER data-table fingerprint (#633, diagnostics)", () => {
       const line = info.mock.calls[0][0] as string;
       expect(line).toContain("[coop-fp] local");
       expect(line).toContain(`moveMap=${fp.moveMap.hash}(${fp.moveMap.n})`);
-      expect(line).toContain(`abilities=${fp.abilities.hash}(${fp.abilities.n})`);
+      // The split sections are logged separately (the #633 cosmetic-vs-real diagnostic).
+      expect(line).toContain(`movesData=${fp.movesData.hash}(${fp.movesData.n})`);
+      expect(line).toContain(`movesName=${fp.movesName.hash}(${fp.movesName.n})`);
+      expect(line).toContain(`abilitiesData=${fp.abilitiesData.hash}(${fp.abilitiesData.n})`);
+      expect(line).toContain(`abilitiesName=${fp.abilitiesName.hash}(${fp.abilitiesName.n})`);
     });
   });
 

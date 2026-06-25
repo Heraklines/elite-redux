@@ -45,6 +45,7 @@ import type { Gender } from "#data/gender";
 import { Status } from "#data/status-effect";
 import type { TerrainType } from "#data/terrain";
 import type { AbilityId } from "#enums/ability-id";
+import { BattlerIndex } from "#enums/battler-index";
 import { BattlerTagType } from "#enums/battler-tag-type";
 import type { Nature } from "#enums/nature";
 import type { StatusEffect } from "#enums/status-effect";
@@ -116,6 +117,27 @@ function readMonView(mon: ReturnType<typeof globalScene.getField>[number]): Coop
   };
 }
 
+/**
+ * HOST: the field mons to SERIALIZE for the guest (#633, enemy-field reconcile fix). The
+ * naive `getField(true)` drops fainted mons (its `.filter(p => p.isActive())` -> isAllowedInBattle
+ * -> `!isFainted()`), so a foe the host KOs mid-turn vanishes from every payload and the guest -
+ * which only matches by battler index off its OWN live field and never removes - keeps that foe
+ * ALIVE forever (a turn-1 field-composition desync the resync can't heal). The fix: serialize the
+ * player side as the live ACTIVE player mons, but the enemy side as the SLOT-PRESENT enemies
+ * (`getEnemyField(false)` - the enemy party slice WITHOUT the isActive filter), so a just-fainted
+ * enemy still appears in the payload with `fainted:true` + hp 0. That fainted entry is what DRIVES
+ * the guest's enemy-field reconcile ({@linkcode reconcileCoopEnemyField}). Player faints stay out
+ * of scope (a separate relayed switch flow), so the player side keeps the active-only accessor.
+ */
+function getCoopSerializableField(): Pokemon[] {
+  // Both accessors return non-null arrays (their own `.filter`/`.slice` guarantees it): the
+  // player side filters to ACTIVE mons; the enemy side is the slot-present slice (no isActive
+  // filter), so a just-fainted enemy is still included with hp 0 / fainted:true.
+  const playerField = globalScene.getPlayerField(true);
+  const enemyField = globalScene.getEnemyField(false);
+  return [...playerField, ...enemyField];
+}
+
 /** Read the arena's weather + terrain into the pure checkpoint view. */
 function readArenaView(): CoopArenaView {
   const arena = globalScene.arena;
@@ -133,8 +155,10 @@ function readArenaView(): CoopArenaView {
  */
 export function captureCoopCheckpoint(): CoopBattleCheckpoint | null {
   try {
-    const mons = globalScene
-      .getField(true)
+    // Serialize player ACTIVE mons + enemy SLOT-PRESENT mons (incl. just-fainted ones) so a
+    // foe the host KOd this turn still rides the payload with fainted:true (#633 enemy-field
+    // reconcile) - that entry drives the guest's removal of the dead enemy.
+    const mons = getCoopSerializableField()
       .map(readMonView)
       .filter((v): v is CoopFieldMonView => v != null);
     if (mons.length === 0) {
@@ -144,6 +168,63 @@ export function captureCoopCheckpoint(): CoopBattleCheckpoint | null {
   } catch {
     // Never let a capture failure break the host's turn.
     return null;
+  }
+}
+
+/**
+ * GUEST: reconcile the live ENEMY field to the host's authoritative composition (#633
+ * enemy-field reconcile fix). The host serializes player-active + enemy-SLOT-PRESENT mons (so a
+ * just-fainted foe rides the payload with `fainted:true`), but the guest's per-mon numeric apply
+ * only matches by battler index and never REMOVES. So a foe the host KOd mid-turn stays ALIVE on
+ * the guest forever - a turn-1 field-composition desync. This helper closes that gap: from the
+ * host's serialized `hostField` it computes the set of ENEMY battler indices (bi >= ENEMY, i.e.
+ * 2/3) the host reports PRESENT-AND-ALIVE (`!fainted`), then for every enemy currently ON the
+ * guest's active field whose `bi` is NOT in that set, it does a side-effect-free field removal
+ * (set hp 0 then {@linkcode Pokemon.leaveField} - visual removal + `field.remove` + switchOutStatus,
+ * NO FaintPhase / VictoryPhase / SwitchPhase, so the engine resolution pipeline is never re-entered).
+ *
+ * STRICTLY enemy slots (bi >= ENEMY); player faints (bi 0/1) are a separate relayed switch flow and
+ * are never touched here. Idempotent: a mon already not `isActive()` / not `isOnField()` is skipped,
+ * so re-applying the same checkpoint (or the resync mirror) can never double-remove. Fully guarded so
+ * one bad removal can't break the rest of the heal.
+ */
+export function reconcileCoopEnemyField(hostField: { bi: number; fainted: boolean }[]): void {
+  try {
+    // Enemy battler indices the host reports PRESENT-AND-ALIVE (slot present, not fainted).
+    const hostAliveEnemies = new Set<number>();
+    for (const entry of hostField) {
+      if (entry.bi >= BattlerIndex.ENEMY && !entry.fainted) {
+        hostAliveEnemies.add(entry.bi);
+      }
+    }
+    // Remove every guest enemy that is on-field-and-active but NOT alive on the host.
+    for (const enemy of globalScene.getEnemyField(true)) {
+      if (enemy == null) {
+        continue;
+      }
+      const bi = enemy.getBattlerIndex();
+      if (bi < BattlerIndex.ENEMY) {
+        continue;
+      }
+      // Idempotency guard: already off-field / inactive -> nothing to remove (re-apply safe).
+      if (!enemy.isActive() || !enemy.isOnField()) {
+        continue;
+      }
+      if (hostAliveEnemies.has(bi)) {
+        continue;
+      }
+      try {
+        // Side-effect-free removal: zero hp so it reads as fainted, then leaveField (no
+        // FaintPhase / resolution pipeline - that would re-introduce the engine divergence
+        // authoritative mode exists to prevent).
+        enemy.hp = 0;
+        enemy.leaveField(true, true, false);
+      } catch {
+        /* one enemy removal failed; leave it and continue the reconcile */
+      }
+    }
+  } catch {
+    // A malformed host field must never crash the guest's battle.
   }
 }
 
@@ -181,6 +262,10 @@ export function applyCoopCheckpoint(checkpoint: CoopBattleCheckpoint): void {
         /* one mon's correction failed; leave it and continue */
       }
     }
+    // Reconcile the enemy field to the host's composition (#633): drop any guest enemy the
+    // host KOd this turn (it rides the checkpoint with fainted:true) so the field-composition
+    // matches and the per-turn checksum converges. Strictly enemy slots; side-effect-free.
+    reconcileCoopEnemyField(checkpoint.field);
     // Correct weather / terrain type if it drifted (turn counts are approximate).
     const arena = globalScene.arena;
     if ((arena.weather?.weatherType ?? 0) !== checkpoint.weather) {
@@ -508,9 +593,10 @@ function readFullMon(mon: Pokemon): CoopFullMonSnapshot {
 export function captureCoopFullSnapshot(): CoopFullBattleSnapshot | null {
   try {
     const arena = globalScene.arena;
-    const field = globalScene
-      .getField(true)
-      .filter((m): m is Pokemon => m != null)
+    // Same survivors-plus-fainted-enemy serialization as the per-turn checkpoint (#633 enemy-field
+    // reconcile): the resync payload must also carry a just-fainted enemy so a guest healing via the
+    // snapshot removes the dead foe, not just the per-turn checkpoint path.
+    const field = getCoopSerializableField()
       .map(readFullMon)
       .sort((a, b) => a.bi - b.bi);
     if (field.length === 0) {
@@ -615,6 +701,10 @@ export function applyCoopFullSnapshot(snapshot: CoopFullBattleSnapshot): void {
         applyFullMon(mon, snap);
       }
     }
+    // Mirror the per-turn reconcile on the resync path (#633): the snapshot also carries any
+    // just-fainted enemy (fainted:true), so heal the enemy-field composition too - a guest that
+    // never saw the KO drops the dead foe here. Side-effect-free, idempotent, enemy slots only.
+    reconcileCoopEnemyField(snapshot.field);
     const arena = globalScene.arena;
     if ((arena.weather?.weatherType ?? 0) !== snapshot.weather) {
       arena.trySetWeather(snapshot.weather as WeatherType);

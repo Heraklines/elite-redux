@@ -42,16 +42,40 @@ export interface ErDataFingerprintSection {
 export interface ErDataFingerprint {
   /** `ER_ID_MAP.moves` (the ER move id -> pokerogue MoveId remap that the boot remap mutates). */
   moveMap: ErDataFingerprintSection;
-  /** The live `allMoves` table (id/name/power/type/category/accuracy/pp/priority per move). */
-  moves: ErDataFingerprintSection;
+  /**
+   * The live `allMoves` table's DATA fields (`[id, power, type, category, accuracy, pp, priority]`,
+   * NAME EXCLUDED). Split out from {@linkcode movesName} (#633 diagnostic) so a residual mismatch
+   * proves whether the moves actually DRIFTED (this section differs -> real drift to chase) or only
+   * their localized `name` differs (this section MATCHES, `movesName` differs -> cosmetic only).
+   */
+  movesData: ErDataFingerprintSection;
+  /** The live `allMoves` table's NAME mapping (`[id, name]` per move) - the cosmetic half. */
+  movesName: ErDataFingerprintSection;
   /** The per-species level-up movesets registry (`pokemonSpeciesLevelMoves`). */
   movesets: ErDataFingerprintSection;
-  /** The live `allAbilities` table (id/name per ability). */
-  abilities: ErDataFingerprintSection;
+  /**
+   * The live `allAbilities` table's DATA fields (`[id, generation, postSummonPriority]` - the public
+   * non-name fields the table carries). Split from {@linkcode abilitiesName} (#633 diagnostic) so a
+   * residual mismatch separates real ability drift (this section differs) from a localized-name-only
+   * difference (this section MATCHES, `abilitiesName` differs). Also pins the id-set + count.
+   */
+  abilitiesData: ErDataFingerprintSection;
+  /** The live `allAbilities` table's NAME mapping (`[id, name]` per ability) - the cosmetic half. */
+  abilitiesName: ErDataFingerprintSection;
 }
 
 /** An all-zeros section used when a table read fails (so the fingerprint never throws). */
 const ZERO_SECTION: ErDataFingerprintSection = { n: 0, hash: fnv1a64("") };
+
+/** A fully-zeroed fingerprint (every section the read-failure sentinel). */
+const ZERO_FINGERPRINT: ErDataFingerprint = {
+  moveMap: ZERO_SECTION,
+  movesData: ZERO_SECTION,
+  movesName: ZERO_SECTION,
+  movesets: ZERO_SECTION,
+  abilitiesData: ZERO_SECTION,
+  abilitiesName: ZERO_SECTION,
+};
 
 /** Hash a value through the shared canonical stringifier + FNV core. */
 function hashOf(value: unknown): string {
@@ -72,12 +96,29 @@ function fingerprintMoveMap(): ErDataFingerprintSection {
   }
 }
 
-/** Fingerprint `allMoves`: real moves only, sorted by id -> per-move identity tuple. */
-function fingerprintMoves(): ErDataFingerprintSection {
+/**
+ * Fingerprint `allMoves` DATA fields: real moves only, sorted by id -> `[id, power, type,
+ * category, accuracy, pp, priority]` (NAME EXCLUDED). This is the "did the moves actually drift?"
+ * half - a difference here is a REAL mechanic divergence, not a locale skin (#633 diagnostic).
+ */
+function fingerprintMovesData(): ErDataFingerprintSection {
   try {
     const rows = allMoves
       .filter(mv => mv != null)
-      .map(mv => [mv.id, mv.name ?? "", mv.power, mv.type, mv.category, mv.accuracy, mv.pp, mv.priority] as const)
+      .map(mv => [mv.id, mv.power, mv.type, mv.category, mv.accuracy, mv.pp, mv.priority] as const)
+      .sort((a, b) => a[0] - b[0]);
+    return { n: rows.length, hash: hashOf(rows) };
+  } catch {
+    return ZERO_SECTION;
+  }
+}
+
+/** Fingerprint `allMoves` NAMES: real moves only, sorted by id -> `[id, name]` (the cosmetic half). */
+function fingerprintMovesName(): ErDataFingerprintSection {
+  try {
+    const rows = allMoves
+      .filter(mv => mv != null)
+      .map(mv => [mv.id, mv.name ?? ""] as const)
       .sort((a, b) => a[0] - b[0]);
     return { n: rows.length, hash: hashOf(rows) };
   } catch {
@@ -99,8 +140,25 @@ function fingerprintMovesets(): ErDataFingerprintSection {
   }
 }
 
-/** Fingerprint `allAbilities`: real abilities only, sorted by id -> `[id, name]`. */
-function fingerprintAbilities(): ErDataFingerprintSection {
+/**
+ * Fingerprint `allAbilities` DATA fields: real abilities only, sorted by id -> `[id, generation,
+ * postSummonPriority]` (the public non-name fields the table carries; NAME EXCLUDED). This + its
+ * count is the "did the abilities actually drift / id-set differ?" half (#633 diagnostic).
+ */
+function fingerprintAbilitiesData(): ErDataFingerprintSection {
+  try {
+    const rows = allAbilities
+      .filter(ab => ab != null)
+      .map(ab => [ab.id, ab.generation, ab.postSummonPriority] as const)
+      .sort((a, b) => a[0] - b[0]);
+    return { n: rows.length, hash: hashOf(rows) };
+  } catch {
+    return ZERO_SECTION;
+  }
+}
+
+/** Fingerprint `allAbilities` NAMES: real abilities only, sorted by id -> `[id, name]` (cosmetic half). */
+function fingerprintAbilitiesName(): ErDataFingerprintSection {
   try {
     const rows = allAbilities
       .filter(ab => ab != null)
@@ -121,17 +179,26 @@ export function computeErDataFingerprint(): ErDataFingerprint {
   try {
     return {
       moveMap: fingerprintMoveMap(),
-      moves: fingerprintMoves(),
+      movesData: fingerprintMovesData(),
+      movesName: fingerprintMovesName(),
       movesets: fingerprintMovesets(),
-      abilities: fingerprintAbilities(),
+      abilitiesData: fingerprintAbilitiesData(),
+      abilitiesName: fingerprintAbilitiesName(),
     };
   } catch {
-    return { moveMap: ZERO_SECTION, moves: ZERO_SECTION, movesets: ZERO_SECTION, abilities: ZERO_SECTION };
+    return { ...ZERO_FINGERPRINT };
   }
 }
 
-/** The four section names in a stable order (for diffing + logging). */
-const FINGERPRINT_SECTIONS = ["moveMap", "moves", "movesets", "abilities"] as const;
+/** The six section names in a stable order (for diffing + logging). */
+const FINGERPRINT_SECTIONS = [
+  "moveMap",
+  "movesData",
+  "movesName",
+  "movesets",
+  "abilitiesData",
+  "abilitiesName",
+] as const;
 
 /**
  * The names of the sections whose `{n,hash}` differ between two fingerprints (e.g.
@@ -153,8 +220,11 @@ export function diffErDataFingerprint(a: ErDataFingerprint, b: ErDataFingerprint
 /** Log one client's full fingerprint, one line, grep-able under the `[coop-fp]` tag. */
 export function logErDataFingerprint(tag: string, fp: ErDataFingerprint): void {
   console.info(
-    `[coop-fp] ${tag} moveMap=${fp.moveMap.hash}(${fp.moveMap.n}) moves=${fp.moves.hash}(${fp.moves.n})`
-      + ` movesets=${fp.movesets.hash}(${fp.movesets.n}) abilities=${fp.abilities.hash}(${fp.abilities.n})`,
+    `[coop-fp] ${tag} moveMap=${fp.moveMap.hash}(${fp.moveMap.n})`
+      + ` movesData=${fp.movesData.hash}(${fp.movesData.n}) movesName=${fp.movesName.hash}(${fp.movesName.n})`
+      + ` movesets=${fp.movesets.hash}(${fp.movesets.n})`
+      + ` abilitiesData=${fp.abilitiesData.hash}(${fp.abilitiesData.n})`
+      + ` abilitiesName=${fp.abilitiesName.hash}(${fp.abilitiesName.n})`,
   );
 }
 
