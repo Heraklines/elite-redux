@@ -1,0 +1,268 @@
+url:      https://elite-redux-staging.pages.dev/
+build:    mqts7m06-d8y
+mode:     6  wave:4
+seed:     vwzHnUpc49VyJU3s5YZI5rsr
+party:    Bulbasaur(L5 1hp f0), Bulbasaur(L5 7hp f0), Chikorita(L5 20hp f0), Squirtle(L5 21hp f0), Weedle(L5 20hp f0)
+enemy:    Tentacool(L3), Wingull(L3)
+
+----- COMMENT -----
+coop test2
+
+----- CONSOLE -----
+[18:20:51.060] WARN: [coop-cs] turn=2 6 differing field(s):
+[18:20:51.060] WARN:   field.0.hp: host=22 guest=20
+[18:20:51.060] WARN:   field.0.maxHp: host=22 guest=20
+[18:20:51.060] WARN:   field.0.moves.1.1: host=1 guest=0
+[18:20:51.060] WARN:   field.1.hp: host=22 guest=21
+[18:20:51.060] WARN:   field.1.maxHp: host=23 guest=21
+[18:20:51.060] WARN:   field.1.moves.1.1: host=3 guest=2
+[18:20:51.060] LOG: %cStart Phase MessagePhase color:green;
+[18:20:51.093] WARN: [coop-resync] turn=2 still-diverged host=6ef76e81d6c04ee4 guest=d386a5310d2334ed
+[18:20:51.093] WARN: [coop-resync] turn=2 UNHEALED 4 differing field(s):
+[18:20:51.093] WARN:   field.0.hp: host=22 guest=20
+[18:20:51.093] WARN:   field.0.maxHp: host=22 guest=20
+[18:20:51.094] WARN:   field.1.hp: host=22 guest=21
+[18:20:51.094] WARN:   field.1.maxHp: host=23 guest=21
+[18:20:51.094] WARN: [coop-resync] note: snapshot does NOT re-apply party/modifiers/arenaTags or force maxHp - a diff in those is a data-table drift, not a heal bug
+[18:20:51.283] LOG: %cStart Phase MessagePhase color:green;
+[18:20:51.503] LOG: %cStart Phase MessagePhase color:green;
+[18:20:51.718] LOG: %cStart Phase MessagePhase color:green;
+[18:20:51.988] LOG: %cStart Phase WeatherEffectPhase color:green;
+[18:20:51.989] LOG: %cStart Phase PositionalTagPhase color:green;
+[18:20:51.989] LOG: %cStart Phase BerryPhase color:green;
+[18:20:51.989] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[18:20:51.989] LOG: %cStart Phase TurnEndPhase color:green;
+[18:20:51.990] LOG: %cStart Phase VictoryPhase color:green;
+[18:20:51.990] LOG: %cStart Phase ExpPhase color:green;
+[18:20:52.575] LOG: %cStart Phase ExpPhase color:green;
+[18:20:52.867] LOG: %cStart Phase BattleEndPhase color:green;
+[18:20:52.867] LOG: Battle Score: 0 (2 Turns x0.84)
+[18:20:52.867] LOG: Total Score: 0
+[18:20:52.878] LOG: %cStart Phase EggLapsePhase color:green;
+[18:20:52.879] LOG: %cStart Phase SelectModifierPhase color:green;
+[18:20:52.879] LOG: Wave Seed: xy|JpWre6;X{LW5u7[\K7tut 2
+[18:20:52.885] LOG: 8 3 [2,3,6]
+[18:20:52.885] LOG: {"id":"BERRY","localeKey":"","iconImage":"starf_berry","group":"berry","soundName":"se/restore","tier":0,"berryType":9} 
+[18:20:52.886] LOG: 23 9 [2,3,4,5,6,7,8,12,22]
+[18:20:52.886] LOG: {"id":"VOUCHER","localeKey":"","iconImage":"coupon","group":"voucher","soundName":"se/restore","tier":1,"voucherType":0,"count":1} 
+[18:20:52.887] LOG: 0 0 [9,17]
+[18:20:52.887] LOG: {"id":"ROGUE_BALL","localeKey":"","iconImage":"rb","group":"pb","soundName":"se/pb_bounce_1","tier":3,"pokeballType":3,"count":5} 
+[18:20:52.888] LOG: [coop-reward] OWNER drives reward screen (start=1 role=guest spoof=false wave=2)
+[18:20:58.506] LOG: %cStart Phase NewBattlePhase color:green;
+[18:20:58.506] LOG: Wave Seed: yz}KqXsf7<Y|MX6v8\]L8uvu 3
+[18:20:58.507] LOG: %cStart Phase NextEncounterPhase color:green;
+[18:20:58.507] LOG: [coop-reward] advance interaction (role=guest from=1 counter=1)
+[18:20:58.507] LOG: [coop-launch] proceedIfReady launched=true localTeam=3 bothReady=true role=guest partnerReady=true
+[18:20:58.552] LOG: [coop-launch] proceedIfReady launched=true localTeam=3 bothReady=true role=guest partnerReady=true
+[18:21:01.309] LOG: Pokemon: Wild Lechonk | Species ID: 915 | Level: 3 | Nature: Lonely (+Atk/-Def)
+[18:21:01.309] LOG: Stats (IVs): HP: 16 (9), Atk: 10 (21), Def: 7 (1), Spatk: 7 (10), Spdef: 8 (10), Spd: 7 (1)
+[18:21:01.310] LOG: Ability: Lingering Aroma | Passive Ability: Thick Fat 
+[18:21:01.310] LOG: Moveset: ["Hyper Fang","Quick Attack","Tail Whip","Sweet Scent"]
+[18:21:01.312] LOG: Pokemon: Wild Taillow | Species ID: 276 | Level: 3 | Nature: Relaxed (+Def/-Spd)
+[18:21:01.312] LOG: Stats (IVs): HP: 15 (1), Atk: 9 (24), Def: 8 (7), Spatk: 8 (20), Spdef: 7 (29), Spd: 9 (4)
+[18:21:01.312] LOG: Ability: Air Blower | Passive Ability: Flock 
+[18:21:01.312] LOG: Moveset: ["Quick Attack","Double Hit","Quick Guard","Focus Energy"]
+[18:21:02.107] DEBUG: Session data saved to slot 4!
+[18:21:02.107] LOG: Wave Seed: yz}KqXsf7<Y|MX6v8\]L8uvu 3
+[18:21:02.556] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[18:21:02.556] LOG: %cStart Phase CheckSwitchPhase color:green;
+[18:21:02.556] LOG: %cStart Phase CheckSwitchPhase color:green;
+[18:21:02.557] LOG: %cStart Phase InitEncounterPhase color:green;
+[18:21:02.558] LOG: %cStart Phase PostSummonPhase color:green;
+[18:21:02.558] LOG: Ran PSP for: Taillow
+[18:21:02.560] LOG: %cStart Phase PostSummonPhase color:green;
+[18:21:02.561] LOG: %cStart Phase MovePhase color:green;
+[18:21:02.561] LOG: %cUser: Taillow
+Move: TAILWIND
+Use Mode: INDIRECT color:orchid
+[18:21:02.567] LOG: %cStart Phase MessagePhase color:green;
+[18:21:02.677] LOG: %cStart Phase MoveEffectPhase color:green;
+[18:21:02.688] LOG: %cStart Phase MessagePhase color:green;
+[18:21:02.955] LOG: %cStart Phase MoveEndPhase color:green;
+[18:21:02.955] LOG: %cStart Phase PostSummonPhase color:green;
+[18:21:02.955] LOG: %cStart Phase PostSummonPhase color:green;
+[18:21:02.955] LOG: Ran PSP for: Lechonk
+[18:21:02.956] LOG: %cStart Phase PostSummonPhase color:green;
+[18:21:02.956] LOG: %cStart Phase PostSummonPhase color:green;
+[18:21:02.956] LOG: %cStart Phase TurnInitPhase color:green;
+[18:21:02.956] LOG: %cStart Phase CommandPhase color:green;
+[18:21:02.959] LOG: %cStart Phase CommandPhase color:green;
+[18:21:07.791] LOG: Move: MALIGNANT_CHAIN Move targets: {"targets":[2,3,0],"multiple":false} 
+Player Pokemon: Bulbasaur
+[18:21:07.794] LOG: %cStart Phase SelectTargetPhase color:green;
+[18:21:08.159] LOG: %cStart Phase EnemyCommandPhase color:green;
+[18:21:08.160] LOG: %cStart Phase EnemyCommandPhase color:green;
+[18:21:08.160] LOG: %cStart Phase TurnStartPhase color:green;
+[18:21:08.160] LOG: %cStart Phase CoopReplayTurnPhase color:green;
+[18:21:12.242] WARN: [coop-desync] turn=1 host=343961d730cfc0c2 guest=2e2189458f71f2bc
+[18:21:12.243] WARN: [coop-cs] turn=1 7 differing field(s):
+[18:21:12.243] WARN:   field.0.maxHp: host=22 guest=20
+[18:21:12.243] WARN:   field.0.moves.0.1: host=4 guest=3
+[18:21:12.243] WARN:   field.1.hp: host=22 guest=21
+[18:21:12.243] WARN:   field.1.maxHp: host=23 guest=21
+[18:21:12.243] WARN:   field.1.moves.1.1: host=4 guest=3
+[18:21:12.243] WARN:   field.2.moves.3.1: host=1 guest=0
+[18:21:12.243] WARN:   field.2.tags.0: host=CRIT_BOOST guest=<absent>
+[18:21:12.243] LOG: %cStart Phase MessagePhase color:green;
+[18:21:12.253] WARN: [coop-resync] turn=1 still-diverged host=343961d730cfc0c2 guest=e9e0ceaa4416c4cd
+[18:21:12.253] WARN: [coop-resync] turn=1 UNHEALED 3 differing field(s):
+[18:21:12.253] WARN:   field.0.maxHp: host=22 guest=20
+[18:21:12.253] WARN:   field.1.hp: host=22 guest=21
+[18:21:12.253] WARN:   field.1.maxHp: host=23 guest=21
+[18:21:12.253] WARN: [coop-resync] note: snapshot does NOT re-apply party/modifiers/arenaTags or force maxHp - a diff in those is a data-table drift, not a heal bug
+[18:21:12.476] LOG: %cStart Phase MessagePhase color:green;
+[18:21:12.703] LOG: %cStart Phase MessagePhase color:green;
+[18:21:12.963] LOG: %cStart Phase MessagePhase color:green;
+[18:21:13.214] LOG: %cStart Phase MessagePhase color:green;
+[18:21:13.442] LOG: %cStart Phase MessagePhase color:green;
+[18:21:13.673] LOG: %cStart Phase MessagePhase color:green;
+[18:21:13.906] LOG: %cStart Phase MessagePhase color:green;
+[18:21:14.134] LOG: %cStart Phase WeatherEffectPhase color:green;
+[18:21:14.134] LOG: %cStart Phase PositionalTagPhase color:green;
+[18:21:14.134] LOG: %cStart Phase BerryPhase color:green;
+[18:21:14.138] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[18:21:14.140] LOG: %cStart Phase TurnEndPhase color:green;
+[18:21:14.143] LOG: %cStart Phase TurnInitPhase color:green;
+[18:21:14.143] LOG: %cStart Phase CommandPhase color:green;
+[18:21:14.146] LOG: %cStart Phase CommandPhase color:green;
+[18:21:16.494] LOG: Move: MALIGNANT_CHAIN Move targets: {"targets":[3,0],"multiple":false} 
+Player Pokemon: Bulbasaur
+[18:21:16.496] LOG: %cStart Phase SelectTargetPhase color:green;
+[18:21:16.904] LOG: %cStart Phase EnemyCommandPhase color:green;
+[18:21:16.904] LOG: %cStart Phase TurnStartPhase color:green;
+[18:21:16.904] LOG: %cStart Phase CoopReplayTurnPhase color:green;
+[18:21:23.716] WARN: [coop-desync] turn=2 host=2dcad31ab9f481c0 guest=64ff223df8aeb77c
+[18:21:23.716] WARN: [coop-cs] turn=2 4 differing field(s):
+[18:21:23.716] WARN:   field.0.maxHp: host=22 guest=20
+[18:21:23.716] WARN:   field.0.moves.0.1: host=5 guest=4
+[18:21:23.716] WARN:   field.1.maxHp: host=23 guest=21
+[18:21:23.716] WARN:   field.1.moves.1.1: host=5 guest=4
+[18:21:23.716] LOG: %cStart Phase MessagePhase color:green;
+[18:21:23.761] WARN: [coop-resync] turn=2 still-diverged host=2dcad31ab9f481c0 guest=6f4e8c9450452080
+[18:21:23.761] WARN: [coop-resync] turn=2 UNHEALED 2 differing field(s):
+[18:21:23.761] WARN:   field.0.maxHp: host=22 guest=20
+[18:21:23.761] WARN:   field.1.maxHp: host=23 guest=21
+[18:21:23.761] WARN: [coop-resync] note: snapshot does NOT re-apply party/modifiers/arenaTags or force maxHp - a diff in those is a data-table drift, not a heal bug
+[18:21:23.977] LOG: %cStart Phase MessagePhase color:green;
+[18:21:24.174] LOG: %cStart Phase MessagePhase color:green;
+[18:21:24.383] LOG: %cStart Phase MessagePhase color:green;
+[18:21:24.593] LOG: %cStart Phase MessagePhase color:green;
+[18:21:24.889] LOG: %cStart Phase MessagePhase color:green;
+[18:21:25.091] LOG: %cStart Phase MessagePhase color:green;
+[18:21:25.358] LOG: %cStart Phase MessagePhase color:green;
+[18:21:25.584] LOG: %cStart Phase MessagePhase color:green;
+[18:21:25.816] LOG: %cStart Phase WeatherEffectPhase color:green;
+[18:21:25.817] LOG: %cStart Phase PositionalTagPhase color:green;
+[18:21:25.817] LOG: %cStart Phase BerryPhase color:green;
+[18:21:25.817] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[18:21:25.817] LOG: %cStart Phase TurnEndPhase color:green;
+[18:21:25.819] LOG: %cStart Phase VictoryPhase color:green;
+[18:21:25.819] LOG: %cStart Phase ExpPhase color:green;
+[18:21:26.288] LOG: %cStart Phase ExpPhase color:green;
+[18:21:26.589] LOG: %cStart Phase BattleEndPhase color:green;
+[18:21:26.589] LOG: Battle Score: 0 (2 Turns x0.84)
+[18:21:26.589] LOG: Total Score: 0
+[18:21:26.598] LOG: %cStart Phase EggLapsePhase color:green;
+[18:21:26.599] LOG: %cStart Phase SelectModifierPhase color:green;
+[18:21:26.599] LOG: Wave Seed: yz}KqXsf7<Y|MX6v8\]L8uvu 3
+[18:21:26.603] LOG: [coop-reward] WATCHER waits for partner's reward picks (start=2 role=guest wave=3)
+[18:21:29.420] LOG: %cStart Phase NewBattlePhase color:green;
+[18:21:29.420] LOG: Wave Seed: z{~LrYtg8=Z}NY7w9]^M9vwv 4
+[18:21:29.420] LOG: Starting trainer pool tier: COMMON
+[18:21:29.427] LOG: %cStart Phase MessagePhase color:green;
+[18:21:29.427] LOG: [coop-reward] advance interaction (role=guest from=2 counter=2)
+[18:21:29.427] LOG: [coop-launch] proceedIfReady launched=true localTeam=3 bothReady=true role=guest partnerReady=true
+[18:21:29.431] LOG: [coop-launch] proceedIfReady launched=true localTeam=3 bothReady=true role=guest partnerReady=true
+[18:21:29.674] LOG: %cStart Phase ReturnPhase color:green;
+[18:21:29.794] LOG: %cStart Phase ReturnPhase color:green;
+[18:21:29.911] LOG: %cStart Phase ShowTrainerPhase color:green;
+[18:21:30.015] LOG: %cStart Phase NextEncounterPhase color:green;
+[18:21:35.303] LOG: Pokemon: Foe Tentacool | Species ID: 72 | Level: 3 | Nature: Timid (+Spd/-Atk)
+[18:21:35.304] LOG: Stats (IVs): HP: 16 (31), Atk: 7 (31), Def: 8 (31), Spatk: 8 (31), Spdef: 11 (31), Spd: 11 (31)
+[18:21:35.304] LOG: Ability: Water Veil | Passive Ability: Clear Body 
+[18:21:35.304] LOG: Moveset: ["Hydro Pump","Psychic","Sludge Wave","Knock Off"]
+[18:21:35.305] LOG: Pokemon: Foe Wingull | Species ID: 278 | Level: 3 | Nature: Modest (+SpAtk/-Atk)
+[18:21:35.305] LOG: Stats (IVs): HP: 16 (31), Atk: 6 (31), Def: 7 (31), Spatk: 10 (31), Spdef: 7 (31), Spd: 11 (31)
+[18:21:35.305] LOG: Ability: Aerodynamics | Passive Ability: Keen Eye 
+[18:21:35.305] LOG: Moveset: ["Air Slash","Hydro Pump","Shock Wave","Ice Beam"]
+[18:21:36.012] LOG: Generated AI funcs
+[18:21:36.151] DEBUG: Session data saved to slot 4!
+[18:21:36.152] LOG: Wave Seed: z{~LrYtg8=Z}NY7w9]^M9vwv 4
+[18:21:36.360] LOG: Beginners Billy & Sara
+[18:21:39.286] LOG: Dialogue saved as seen: dialogue:youngster.encounter.12
+[18:21:39.316] LOG: Beginners Billy & Sara
+[18:21:39.744] LOG: %cStart Phase SummonPhase color:green;
+[18:21:39.745] LOG: Billy
+[18:21:40.027] LOG: %cStart Phase SummonPhase color:green;
+[18:21:40.027] LOG: Sara
+[18:21:40.301] LOG: %cStart Phase SummonPhase color:green;
+[18:21:40.475] WARN: cry/1 not found
+[18:21:40.572] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[18:21:40.572] LOG: %cStart Phase SummonPhase color:green;
+[18:21:40.756] WARN: cry/1 not found
+[18:21:40.863] LOG: %cStart Phase ShinySparklePhase color:green;
+[18:21:40.965] LOG: %cStart Phase InitEncounterPhase color:green;
+[18:21:40.968] LOG: %cStart Phase PostSummonPhase color:green;
+[18:21:40.968] LOG: Ran PSP for: Bulbasaur
+[18:21:40.970] LOG: %cStart Phase PostSummonPhase color:green;
+[18:21:40.970] LOG: Ran PSP for: Tentacool
+[18:21:40.972] LOG: %cStart Phase PostSummonPhase color:green;
+[18:21:40.972] LOG: Ran PSP for: Wingull
+[18:21:40.974] LOG: %cStart Phase PostSummonPhase color:green;
+[18:21:40.976] LOG: %cStart Phase PostSummonPhase color:green;
+[18:21:40.978] LOG: %cStart Phase ShowAbilityPhase color:green;
+[18:21:41.137] LOG: %cStart Phase MovePhase color:green;
+[18:21:41.138] LOG: %cUser: Tentacool
+Move: AQUA_RING
+Use Mode: INDIRECT color:orchid
+[18:21:41.142] LOG: %cStart Phase MessagePhase color:green;
+[18:21:41.268] LOG: %cStart Phase MoveEffectPhase color:green;
+[18:21:41.277] LOG: %cStart Phase MessagePhase color:green;
+[18:21:41.566] LOG: %cStart Phase MoveEndPhase color:green;
+[18:21:41.566] LOG: %cStart Phase HideAbilityPhase color:green;
+[18:21:41.594] LOG: %cStart Phase PostSummonPhase color:green;
+[18:21:41.595] LOG: %cStart Phase PostSummonPhase color:green;
+[18:21:41.595] LOG: %cStart Phase PostSummonPhase color:green;
+[18:21:41.596] LOG: %cStart Phase PostSummonPhase color:green;
+[18:21:41.596] LOG: %cStart Phase PostSummonPhase color:green;
+[18:21:41.596] LOG: Ran PSP for: Bulbasaur
+[18:21:41.596] LOG: %cStart Phase PostSummonPhase color:green;
+[18:21:41.596] LOG: %cStart Phase TurnInitPhase color:green;
+[18:21:41.596] LOG: %cStart Phase CommandPhase color:green;
+[18:21:41.598] LOG: %cStart Phase CommandPhase color:green;
+[18:21:49.309] LOG: Move: EARTH_POWER Move targets: {"targets":[2,3,0],"multiple":false} 
+Player Pokemon: Bulbasaur
+[18:21:49.310] LOG: %cStart Phase SelectTargetPhase color:green;
+[18:21:49.692] LOG: %cStart Phase EnemyCommandPhase color:green;
+[18:21:49.692] LOG: %cStart Phase EnemyCommandPhase color:green;
+[18:21:49.693] LOG: %cStart Phase TurnStartPhase color:green;
+[18:21:49.693] LOG: %cStart Phase CoopReplayTurnPhase color:green;
+[18:21:57.692] WARN: [coop-desync] turn=1 host=abac0f3854b83fe0 guest=c26598f6e71d3c24
+[18:21:57.693] WARN: [coop-cs] turn=1 4 differing field(s):
+[18:21:57.693] WARN:   field.0.maxHp: host=22 guest=20
+[18:21:57.693] WARN:   field.0.moves.0.1: host=6 guest=5
+[18:21:57.693] WARN:   field.1.maxHp: host=23 guest=21
+[18:21:57.693] WARN:   field.1.moves.2.1: host=2 guest=1
+[18:21:57.693] LOG: %cStart Phase MessagePhase color:green;
+[18:21:57.710] WARN: [coop-resync] turn=1 still-diverged host=abac0f3854b83fe0 guest=da39a82152adfe10
+[18:21:57.710] WARN: [coop-resync] turn=1 UNHEALED 2 differing field(s):
+[18:21:57.710] WARN:   field.0.maxHp: host=22 guest=20
+[18:21:57.710] WARN:   field.1.maxHp: host=23 guest=21
+[18:21:57.710] WARN: [coop-resync] note: snapshot does NOT re-apply party/modifiers/arenaTags or force maxHp - a diff in those is a data-table drift, not a heal bug
+[18:21:57.923] LOG: %cStart Phase MessagePhase color:green;
+[18:21:58.144] LOG: %cStart Phase MessagePhase color:green;
+[18:21:58.380] LOG: %cStart Phase MessagePhase color:green;
+[18:21:58.714] LOG: %cStart Phase MessagePhase color:green;
+[18:21:58.906] LOG: %cStart Phase MessagePhase color:green;
+[18:21:59.130] LOG: %cStart Phase MessagePhase color:green;
+[18:21:59.366] LOG: %cStart Phase WeatherEffectPhase color:green;
+[18:21:59.366] LOG: %cStart Phase PositionalTagPhase color:green;
+[18:21:59.366] LOG: %cStart Phase BerryPhase color:green;
+[18:21:59.368] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[18:21:59.369] LOG: %cStart Phase TurnEndPhase color:green;
+[18:21:59.369] LOG: %cStart Phase VictoryPhase color:green;
+[18:21:59.370] LOG: %cStart Phase ExpPhase color:green;
+[18:22:01.666] LOG: %cStart Phase ExpPhase color:green;
+[18:22:01.888] LOG: %cStart Phase TurnInitPhase color:green;
+[18:22:01.888] LOG: %cStart Phase CommandPhase color:green;
+[18:22:01.889] LOG: %cStart Phase CommandPhase color:green;
