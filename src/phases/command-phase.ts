@@ -245,7 +245,10 @@ export class CommandPhase extends FieldPhase {
       // A relayed BALL / RUN (the partner threw a Poke Ball or fled) is applied
       // verbatim, NOT routed through the move path: its `cursor` is a ball type,
       // not a move slot, so applyWiredPartnerCommand would mis-read it as a move.
-      if (cmd != null && (cmd.command === Command.BALL || cmd.command === Command.RUN)) {
+      if (
+        cmd != null
+        && (cmd.command === Command.BALL || cmd.command === Command.RUN || cmd.command === Command.POKEMON)
+      ) {
         this.applyRelayedActionCommand(cmd);
         return;
       }
@@ -877,6 +880,14 @@ export class CommandPhase extends FieldPhase {
       // path (handleFightCommand / SelectTargetPhase); here we cover BALL + RUN.
       if (command === Command.BALL || command === Command.RUN) {
         this.broadcastLocalCoopActionCommand(command, cursor);
+      } else if (command === Command.POKEMON) {
+        // Co-op (#633): a SWITCH chosen on our OWN slot must also reach the partner.
+        // Before, only FIGHT/BALL/RUN were relayed, so a switch never crossed: the
+        // partner's await for our slot timed out and its AI fired a MOVE there instead -
+        // one client switched, the other attacked, and the merged party diverged (the
+        // live wave-4 "he switched and we desynced" report). `cursor` is the party slot
+        // (the merged party is identical on both clients), and the Baton flag rides along.
+        this.broadcastLocalCoopActionCommand(command, cursor, typeof useMode === "boolean" ? useMode : false);
       }
       this.end();
     }
@@ -885,13 +896,18 @@ export class CommandPhase extends FieldPhase {
   }
 
   /**
-   * Co-op (#633): broadcast a BALL / RUN command the local human chose for THEIR
-   * OWN field slot, so the partner's client mirrors it instead of timing out and
-   * auto-resolving a move there (which caught / fled on one client only). No-op
-   * outside a live co-op run or for the partner slot (that slot is awaited, never
-   * broadcast). The partner applies it verbatim via {@linkcode applyRelayedActionCommand}.
+   * Co-op (#633): broadcast a BALL / RUN / POKEMON(switch) command the local human
+   * chose for THEIR OWN field slot, so the partner's client mirrors it instead of
+   * timing out and auto-resolving a MOVE there (which caught / fled / kept the old mon
+   * in on one client only). No-op outside a live co-op run or for the partner slot
+   * (that slot is awaited, never broadcast). The partner applies it verbatim via
+   * {@linkcode applyRelayedActionCommand}.
    */
-  private broadcastLocalCoopActionCommand(command: Command.BALL | Command.RUN, cursor: number): void {
+  private broadcastLocalCoopActionCommand(
+    command: Command.BALL | Command.RUN | Command.POKEMON,
+    cursor: number,
+    baton = false,
+  ): void {
     if (!globalScene.gameMode.isCoop) {
       return;
     }
@@ -910,7 +926,12 @@ export class CommandPhase extends FieldPhase {
             .filter(p => p.isActive(true))
             .map(p => p.getBattlerIndex())
         : [];
-    sync.broadcastLocalCommand(this.fieldIndex, { command, cursor, targets });
+    sync.broadcastLocalCommand(this.fieldIndex, {
+      command,
+      cursor,
+      targets,
+      ...(command === Command.POKEMON ? { baton } : {}),
+    });
   }
 
   /**
@@ -927,6 +948,14 @@ export class CommandPhase extends FieldPhase {
     const battle = globalScene.currentBattle;
     if (cmd.command === Command.RUN) {
       battle.turnCommands[this.fieldIndex] = { command: Command.RUN };
+    } else if (cmd.command === Command.POKEMON) {
+      // Mirror the partner's SWITCH verbatim: same party-slot cursor + Baton flag, so
+      // both clients run the SAME SwitchSummonPhase and the merged party stays identical.
+      battle.turnCommands[this.fieldIndex] = {
+        command: Command.POKEMON,
+        cursor: cmd.cursor,
+        args: [cmd.baton ?? false],
+      };
     } else {
       const targets =
         (cmd.targets as BattlerIndex[] | undefined)

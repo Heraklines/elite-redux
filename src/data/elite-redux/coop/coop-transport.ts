@@ -52,6 +52,8 @@ export interface SerializedCommand {
   targets?: number[];
   /** `MoveUseMode` enum value. */
   useMode?: number;
+  /** For POKEMON (switch): whether it is a Baton switch (passes stat changes) (#633). */
+  baton?: boolean;
 }
 
 /**
