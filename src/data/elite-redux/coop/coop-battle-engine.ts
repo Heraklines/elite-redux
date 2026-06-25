@@ -29,13 +29,18 @@ import {
   normalizeMonState,
 } from "#data/elite-redux/coop/coop-battle-checkpoint";
 import type { CoopBattleCheckpoint, CoopSerializedEnemy } from "#data/elite-redux/coop/coop-transport";
+import { resolveErModifierClass } from "#data/elite-redux/er-persistent-modifiers";
 import type { Gender } from "#data/gender";
 import { Status } from "#data/status-effect";
 import type { TerrainType } from "#data/terrain";
 import type { Nature } from "#enums/nature";
 import type { StatusEffect } from "#enums/status-effect";
 import type { WeatherType } from "#enums/weather-type";
+// biome-ignore lint/performance/noNamespaceImport: held-item reconstruction resolves the modifier class by serialized name (`Modifier[className]`), exactly like the save-load path in game-data.ts.
+import * as Modifier from "#modifiers/modifier";
+import { PokemonHeldItemModifier } from "#modifiers/modifier";
 import { PokemonMove } from "#moves/pokemon-move";
+import { ModifierData } from "#system/modifier-data";
 
 /** Read a live field mon into the pure checkpoint view. */
 function readMonView(mon: ReturnType<typeof globalScene.getField>[number]): CoopFieldMonView | null {
@@ -159,10 +164,72 @@ export function captureCoopEnemies(): CoopSerializedEnemy[] {
         // authoritative roll so the guest renders + catches the EXACT same mon.
         shiny: enemy.shiny,
         variant: enemy.variant,
+        // Held items (#633): for TRAINER waves the host's `trainer.genModifiers` (and the
+        // wild held-item roll) attach held modifiers the guest would otherwise regenerate
+        // from its own RNG (double/divergent items). Serialize each as a `ModifierData`
+        // (plain-JSON, the same shape the save system round-trips) so the guest rebuilds
+        // the EXACT same items and suppresses its own roll. `pokemonId` is the host's
+        // runtime id - the guest remaps it to its own enemy id on reconstruction.
+        heldItems: captureEnemyHeldItems(enemy),
       },
     }));
   } catch {
     return [];
+  }
+}
+
+/**
+ * HOST: serialize one enemy's held-item modifiers as plain `ModifierData` blobs (#633).
+ * Reads the enemy modifier list (player=false) filtered to this mon. Each entry survives
+ * the JSON transport as a flat object; the guest reconstructs it via {@linkcode ModifierData.toModifier}.
+ */
+function captureEnemyHeldItems(enemy: ReturnType<typeof globalScene.getEnemyParty>[number]): Record<string, unknown>[] {
+  try {
+    return globalScene
+      .findModifiers(m => m instanceof PokemonHeldItemModifier && m.pokemonId === enemy.id, false)
+      .map(m => {
+        const data = new ModifierData(m, false);
+        return {
+          typeId: data.typeId,
+          className: data.className,
+          args: data.args,
+          stackCount: data.stackCount,
+          ...(data.typePregenArgs === undefined ? {} : { typePregenArgs: data.typePregenArgs }),
+        };
+      });
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * GUEST: reconstruct + attach the host's serialized held-item modifiers onto an adopted
+ * enemy (#633). Mirrors the save-load path (game-data.ts): resolve the class from the
+ * vanilla `Modifier` namespace (or the ER fallback), rebuild via {@linkcode ModifierData.toModifier},
+ * remap `pokemonId` to THIS client's enemy id, then `addEnemyModifier`. Fully guarded per item
+ * so one bad entry can't break the encounter. `enemyId` is the live `EnemyPokemon.id`.
+ */
+export function applyCoopEnemyHeldItems(enemyId: number, heldItems: unknown): void {
+  if (!Array.isArray(heldItems)) {
+    return;
+  }
+  for (const raw of heldItems) {
+    if (raw == null || typeof raw !== "object") {
+      continue;
+    }
+    try {
+      const data = new ModifierData(raw, false);
+      const modifier = data.toModifier(
+        Modifier[data.className as keyof typeof Modifier] ?? resolveErModifierClass(data.className),
+      );
+      if (modifier instanceof PokemonHeldItemModifier) {
+        // The serialized id is the HOST's runtime id; this client's enemy has its own id.
+        modifier.pokemonId = enemyId;
+        void globalScene.addEnemyModifier(modifier, true);
+      }
+    } catch {
+      /* one held item failed to reconstruct; skip it, keep the rest */
+    }
   }
 }
 

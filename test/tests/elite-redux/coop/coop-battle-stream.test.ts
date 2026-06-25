@@ -245,4 +245,38 @@ describe("co-op host-authoritative battle stream (#633, LIVE-D)", () => {
       expect((got as { id: string }[] | null)?.length).toBe(3);
     });
   });
+
+  // Fix #1 (#633): the enemy-party stream carries each enemy's HELD ITEMS (serialized
+  // ModifierData blobs) for TRAINER + wild waves, so the guest reconstructs the host's
+  // exact items instead of rolling its own (which double / diverged the items). We assert
+  // the held-item payload survives the wire AND a JSON round-trip (the real WebRTC transport
+  // structured-clones / JSON-encodes), since that is the shape buildCoopEnemy reconstructs.
+  describe("enemy held-item carry (#633 Fix #1)", () => {
+    const heldItems = [
+      { typeId: "LEFTOVERS", className: "TurnHealModifier", args: [999], stackCount: 1 },
+      { typeId: "BERRY", className: "BerryModifier", args: [999], stackCount: 2, typePregenArgs: [4] },
+    ];
+
+    it("the host's serialized held items reach the guest verbatim", async () => {
+      const { host, guest } = createLoopbackPair();
+      const hostStream = new CoopBattleStreamer(host);
+      const guestStream = new CoopBattleStreamer(guest);
+
+      hostStream.sendEnemyParty(4, [{ fieldIndex: 0, data: { speciesId: 163, heldItems } }]);
+      await new Promise(r => setTimeout(r, 0));
+
+      const enemies = guestStream.consumeEnemyParty(4);
+      const carried = enemies?.[0]?.data.heldItems as typeof heldItems | undefined;
+      expect(carried).toBeDefined();
+      expect(carried).toEqual(heldItems);
+    });
+
+    it("the held-item payload survives a JSON round-trip (real transport encoding)", () => {
+      // buildCoopEnemy -> applyCoopEnemyHeldItems reconstructs `new ModifierData(blob, false)`
+      // from exactly these plain fields, so the wire encoding must preserve them losslessly.
+      const round = JSON.parse(JSON.stringify({ speciesId: 163, heldItems }));
+      expect(round.heldItems).toEqual(heldItems);
+      expect(round.heldItems[1].typePregenArgs).toEqual([4]);
+    });
+  });
 });

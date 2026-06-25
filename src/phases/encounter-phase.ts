@@ -7,7 +7,7 @@ import Overrides from "#app/overrides";
 import { handleTutorial, Tutorial } from "#app/tutorial";
 import { initEncounterAnims, loadEncounterAnimAssets } from "#data/battle-anims";
 import { getCharVariantFromDialogue } from "#data/dialogue";
-import { captureCoopEnemies } from "#data/elite-redux/coop/coop-battle-engine";
+import { applyCoopEnemyHeldItems, captureCoopEnemies } from "#data/elite-redux/coop/coop-battle-engine";
 import { getCoopBattleStreamer, getCoopController } from "#data/elite-redux/coop/coop-runtime";
 import type { CoopSerializedEnemy, CoopSerializedPokemon } from "#data/elite-redux/coop/coop-transport";
 import { erBiomeForcedTerrain, erBiomeForcedWeather } from "#data/elite-redux/er-biome-rules";
@@ -106,7 +106,11 @@ function coopNum(blob: CoopSerializedPokemon, key: string): number | undefined {
  * diverged RNG. Mirrors {@linkcode buildDevEnemy}. Returns null when the species
  * doesn't resolve, so the caller leaves the slot for normal generation.
  */
-export function buildCoopEnemy(data: CoopSerializedPokemon, fallbackLevel: number): EnemyPokemon | null {
+export function buildCoopEnemy(
+  data: CoopSerializedPokemon,
+  fallbackLevel: number,
+  trainerSlot: TrainerSlot = TrainerSlot.NONE,
+): EnemyPokemon | null {
   const speciesId = coopNum(data, "speciesId");
   if (speciesId === undefined) {
     return null;
@@ -116,7 +120,7 @@ export function buildCoopEnemy(data: CoopSerializedPokemon, fallbackLevel: numbe
     return null;
   }
   const level = Math.max(1, Math.floor(coopNum(data, "level") ?? fallbackLevel));
-  const enemy = globalScene.addEnemyPokemon(species, level, TrainerSlot.NONE, false);
+  const enemy = globalScene.addEnemyPokemon(species, level, trainerSlot, false);
   const formIndex = coopNum(data, "formIndex");
   if (formIndex !== undefined) {
     enemy.formIndex = formIndex;
@@ -165,6 +169,10 @@ export function buildCoopEnemy(data: CoopSerializedPokemon, fallbackLevel: numbe
   if (hp !== undefined) {
     enemy.hp = Math.max(0, Math.min(hp, enemy.getMaxHp()));
   }
+  // Held items (#633): reconstruct the host's serialized held modifiers onto THIS enemy
+  // (remapping pokemonId to the live id). The adopt path suppresses the guest's own
+  // generateEnemyModifiers for these enemies, so this is the sole source of their items.
+  applyCoopEnemyHeldItems(enemy.id, data.heldItems);
   return enemy;
 }
 
@@ -173,6 +181,11 @@ export class EncounterPhase extends BattlePhase {
   public readonly phaseName: "EncounterPhase" | "NextEncounterPhase" | "NewBiomeEncounterPhase" = "EncounterPhase";
 
   private readonly loaded: boolean;
+
+  /** Co-op GUEST (#633): set when this client adopted the host's enemy party verbatim
+   *  (incl. host-streamed held items), so {@linkcode runEncounter} skips its own enemy
+   *  modifier generation - otherwise the held items would double / diverge. */
+  private coopAdoptedEnemyParty = false;
 
   constructor(loaded = false) {
     super();
@@ -208,9 +221,15 @@ export class EncounterPhase extends BattlePhase {
       return false;
     }
     const battle = globalScene.currentBattle;
-    // Only WILD battles roll a random party that can diverge; trainer parties and
-    // mystery encounters are deterministic / handled elsewhere.
-    return battle != null && battle.battleType === BattleType.WILD && !battle.isBattleMysteryEncounter();
+    if (battle == null || battle.isBattleMysteryEncounter()) {
+      return false;
+    }
+    // Adopt for BOTH wild and trainer battles (#633). Wild parties roll a random
+    // species; trainer parties roll unseeded gender / double-battle flags and an
+    // unseeded species-pool pick (the latent wave-4 trainer desync). Ghost waves are
+    // BattleType.TRAINER, so they're covered here too. Mystery encounters are excluded
+    // (handled elsewhere) by the guard above.
+    return battle.battleType === BattleType.WILD || battle.battleType === BattleType.TRAINER;
   }
 
   /** Co-op guest: wait for + adopt the host's enemy party, then run the encounter. */
@@ -242,14 +261,20 @@ export class EncounterPhase extends BattlePhase {
       return;
     }
     const levels = battle.enemyLevels ?? [];
+    // Trainer enemies belong in TrainerSlot.TRAINER; wild enemies in NONE.
+    const trainerSlot = battle.battleType === BattleType.TRAINER ? TrainerSlot.TRAINER : TrainerSlot.NONE;
     for (const entry of enemies) {
       if (battle.enemyParty[entry.fieldIndex] != null) {
         continue;
       }
       try {
-        const built = buildCoopEnemy(entry.data, levels[entry.fieldIndex] ?? 1);
+        const built = buildCoopEnemy(entry.data, levels[entry.fieldIndex] ?? 1, trainerSlot);
         if (built != null) {
           battle.enemyParty[entry.fieldIndex] = built;
+          // We adopted at least one enemy verbatim (incl. its host-streamed held items),
+          // so the generation loop must NOT roll its own modifiers for this party (#633):
+          // that would double / diverge the held items. Suppressed in runEncounter.
+          this.coopAdoptedEnemyParty = true;
         }
       } catch {
         /* one enemy failed to reconstruct; leave the slot for normal generation */
@@ -460,11 +485,10 @@ export class EncounterPhase extends BattlePhase {
       return true;
     });
 
-    // Co-op HOST (#633, LIVE-D6): the enemy party is now generated - stream it so the
-    // waiting guest adopts these exact mons (no-op for solo / guest / loaded).
-    if (!this.loaded) {
-      this.broadcastCoopEnemyParty();
-    }
+    // Co-op HOST (#633): the enemy party's IDENTITY is generated here, but its HELD ITEMS
+    // are not attached until generateEnemyModifiers() runs in the loadEnemyAssets.then()
+    // block below. So the broadcast (which must carry the host's held items so the guest
+    // doesn't roll its own) is deferred to AFTER that generation - see below.
 
     if (globalScene.getPlayerParty().filter(p => p.isShiny()).length === PLAYER_PARTY_MAX_SIZE) {
       globalScene.validateAchv(achvs.SHINY_PARTY);
@@ -540,7 +564,11 @@ export class EncounterPhase extends BattlePhase {
         return true;
       });
 
-      if (!this.loaded && battle.battleType !== BattleType.MYSTERY_ENCOUNTER) {
+      // Co-op GUEST (#633): when we adopted the host's enemy party verbatim, its held items
+      // were already reconstructed from the host's stream (buildCoopEnemy). Rolling our own
+      // here would DOUBLE / diverge them (a fresh seeded modifier roll on top of the adopted
+      // set), so skip the whole generation block. Solo / host / non-adopt runs are unchanged.
+      if (!this.loaded && battle.battleType !== BattleType.MYSTERY_ENCOUNTER && !this.coopAdoptedEnemyParty) {
         // generate modifiers for MEs, overriding prior ones as applicable
         regenerateModifierPoolThresholds(
           globalScene.getEnemyField(),
@@ -552,6 +580,14 @@ export class EncounterPhase extends BattlePhase {
         for (const enemy of globalScene.getEnemyField()) {
           overrideHeldItems(enemy, false);
         }
+      }
+
+      // Co-op HOST (#633): NOW that the enemy party's held items are attached (the sync
+      // generateEnemyModifiers above), stream the full party - identity + held items - so
+      // the waiting guest adopts these exact mons and SUPPRESSES its own modifier roll
+      // (no double / divergent items). No-op for solo / guest / loaded.
+      if (!this.loaded) {
+        this.broadcastCoopEnemyParty();
       }
 
       if (battle.battleType === BattleType.TRAINER && globalScene.currentBattle.trainer) {

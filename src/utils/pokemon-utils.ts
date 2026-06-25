@@ -18,8 +18,12 @@ import { randSeedItem } from "#utils/common";
  */
 export function getPokemonSpecies(species: SpeciesId | SpeciesId[]): PokemonSpecies {
   if (Array.isArray(species)) {
-    // TODO: this RNG roll should not be handled by this function
-    species = species[Math.floor(Math.random() * species.length)];
+    // Co-op (#633): seed this pool pick. The unseeded `Math.random()` here made the
+    // species choice for named-trainer / spawn pools diverge between two clients sharing
+    // a seed (one of the latent trainer-wave desync roots). `randSeedItem` reads the
+    // active battle/global seed - deterministic across clients - and is a no-op draw for
+    // single-element pools (the common case), so the solo RNG stream is unchanged there.
+    species = randSeedItem(species);
   }
   if (species >= 2000) {
     // the `!` is safe, `allSpecies` is static and contains all `SpeciesId`s
