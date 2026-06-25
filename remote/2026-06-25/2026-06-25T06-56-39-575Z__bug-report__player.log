@@ -1,0 +1,68 @@
+----- BUG REPORT (in-game) -----
+version:  1.11.19
+url:      https://elite-redux.pages.dev/
+ua:       Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36
+mode:     0  wave:72  difficulty:youngster
+seed:     UFsJSyrOLeGLGgIweiW0mV15
+party:    Arachtres(L58 186/186), Wigglytuff(L58 164/222), Pangoro(L57 184/184), Pidgeot(L57 164/164), Venusaur(L61 189/189), Weezing(L57 171/171)
+
+----- DESCRIPTION -----
+Lilligant insta-killed both my Pokemon after it was put to sleep.
+
+----- CONSOLE -----
+[06:55:01.780] LOG: %c %c %c %c %c Phaser v3.90.0 (WebGL | Web Audio) %c https://phaser.io/v390 background: #ff0000 background: #ffff00 background: #00ff00 background: #00ffff color: #ffffff; background: #000000 background: transparent
+[06:55:02.149] LOG: [ER] build mqnz75l2-jypp
+[06:55:06.115] DEBUG: Destroying loading scene
+[06:55:06.115] DEBUG: Destroyed loading scene
+[06:55:06.188] LOG: Seed: nfVw7YIeAJKd975xjIyyflgc
+[06:55:06.188] LOG: Wave Seed: nfVw7YIeAJKd975xjIyyflgc 0
+[06:55:07.401] LOG: %cStart Phase LoginPhase color:green;
+[06:55:07.828] LOG: Client Session: Pxka1wmzpkJPPe2nIM2buFMdgZPgVYUs
+[06:55:08.171] LOG: %cStart Phase TitlePhase color:green;
+[06:55:08.171] LOG: Getting Session Slot id: %d 0
+[06:55:08.176] LOG: use seasonal splash messages true
+[06:55:08.176] LOG: Adding 2 Pride Month splash messages (weight: x15)
+[06:55:09.775] LOG: Getting Session Slot id: %d 0
+[06:55:09.779] LOG: Wave Seed: UFsJSyrOLeGLGgIweiW0mV15 0
+[06:55:09.779] LOG: Seed: UFsJSyrOLeGLGgIweiW0mV15
+[06:55:09.800] LOG: Wave Seed: »Áº­¯¿­±xµy} 72
+[06:55:09.813] LOG: Applied Protein 
+[06:55:09.813] LOG: Applied Zinc 
+[06:55:09.817] LOG: Applied Protein 
+[06:55:09.817] LOG: Applied Zinc 
+[06:55:09.820] LOG: Applied Protein 
+[06:55:09.820] LOG: Applied Zinc 
+[06:55:09.928] LOG: %cStart Phase EncounterPhase color:green;
+[06:55:09.930] LOG: Pokemon: Wild Lilligant | Species ID: 549 | Level: 46 | Nature: Hasty (+Spd/-Def)
+[06:55:09.930] LOG: Stats (IVs): HP: 132 (7), Atk: 68 (19), Def: 80 (24), Spatk: 109 (8), Spdef: 78 (0), Spd: 103 (13)
+[06:55:09.930] LOG: Ability: Dancer | Passive Ability: Chlorophyll 
+[06:55:09.930] LOG: Moveset: ["Quiver Dance","Petal Dance","Pollen Puff","Grass Pledge"]
+[06:55:09.930] LOG: Pokemon: Wild Breloom | Species ID: 286 | Level: 51 | Nature: Adamant (+Atk/-SpAtk)
+[06:55:09.930] LOG: Stats (IVs): HP: 125 (7), Atk: 158 (11), Def: 88 (4), Spatk: 71 (26), Spdef: 69 (7), Spd: 87 (22)
+[06:55:09.930] LOG: Ability: Poison Heal | Passive Ability: Effect Spore 
+[06:55:09.930] LOG: Moveset: ["Sky Uppercut","Synthesis","Spore","Revenge"]
+[06:55:10.258] LOG: Wave Seed: »Áº­¯¿­±xµy} 72
+[06:55:11.338] LOG: %cStart Phase SummonPhase color:green;
+[06:55:11.699] LOG: Applied Protein 
+[06:55:11.700] LOG: Applied Zinc 
+[06:55:11.762] WARN: cry/10003 not found
+[06:55:12.011] LOG: %cStart Phase SummonPhase color:green;
+[06:55:12.373] LOG: Applied Protein 
+[06:55:12.373] LOG: Applied Zinc 
+[06:55:12.685] LOG: %cStart Phase CheckSwitchPhase color:green;
+[06:55:15.213] LOG: %cStart Phase CheckSwitchPhase color:green;
+[06:55:17.742] LOG: %cStart Phase InitEncounterPhase color:green;
+[06:55:17.742] LOG: %cStart Phase PostSummonPhase color:green;
+[06:55:17.743] LOG: Ran PSP for: Lilligant
+[06:55:17.743] LOG: %cStart Phase PostSummonPhase color:green;
+[06:55:17.744] LOG: %cStart Phase PostSummonPhase color:green;
+[06:55:17.744] LOG: %cStart Phase PostSummonPhase color:green;
+[06:55:17.744] LOG: Ran PSP for: Breloom
+[06:55:17.744] LOG: %cStart Phase PostSummonPhase color:green;
+[06:55:17.744] LOG: %cStart Phase PostSummonPhase color:green;
+[06:55:17.744] LOG: %cStart Phase TurnInitPhase color:green;
+[06:55:17.744] LOG: %cStart Phase CommandPhase color:green;
+[06:55:40.108] LOG: Move: DIRE_CLAW Move targets: {"targets":[2,3,1],"multiple":false} 
+Player Pokemon: Arachtres
+[06:55:40.109] LOG: %cStart Phase SelectTargetPhase color:green;
+[06:55:43.150] LOG: %cStart Phase CommandPhase color:green;
