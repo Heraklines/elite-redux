@@ -1,0 +1,283 @@
+url:      https://elite-redux-staging.pages.dev/
+build:    mqsw9b7c-4yin
+mode:     6  wave:2
+seed:     WBojRYEv668sXCL6B3AMIias
+party:    Bulbasaur(L5 21hp f0), Totodile(L5 15hp f0), Charmander(L5 20hp f0), Chikorita(L5 20hp f0), Squirtle(L5 21hp f0)
+enemy:    Blipbug(L2), Weedle(L3)
+
+----- COMMENT -----
+coop test 2
+
+----- CONSOLE -----
+[02:53:36.179] LOG: %cStart Phase StatStageChangePhase color:green;
+[02:53:36.365] LOG: %cStart Phase MessagePhase color:green;
+[02:53:36.569] LOG: %cStart Phase HideAbilityPhase color:green;
+[02:53:36.590] LOG: %cStart Phase PostSummonPhase color:green;
+[02:53:36.590] LOG: %cStart Phase PostSummonPhase color:green;
+[02:53:36.590] LOG: Ran PSP for: Fletchling
+[02:53:36.590] LOG: %cStart Phase PostSummonPhase color:green;
+[02:53:36.590] LOG: %cStart Phase PostSummonPhase color:green;
+[02:53:36.591] LOG: %cStart Phase TurnInitPhase color:green;
+[02:53:36.591] LOG: %cStart Phase CommandPhase color:green;
+[02:53:40.981] LOG: Move: MALIGNANT_CHAIN Move targets: {"targets":[2,3,1],"multiple":false} 
+Player Pokemon: Bulbasaur
+[02:53:40.983] LOG: %cStart Phase SelectTargetPhase color:green;
+[02:53:42.626] LOG: %cStart Phase CommandPhase color:green;
+[02:53:57.376] LOG: Move: ICE_FANG Move targets: {"targets":[2],"multiple":false} 
+Player Pokemon: Totodile
+[02:53:57.376] LOG: %cStart Phase EnemyCommandPhase color:green;
+[02:53:57.387] LOG: Battle Seed: IkdJDcddMkBmkQFX
+[02:53:57.390] LOG: Move Pool: ["Growl","Air Cutter","Peck","Flail"]
+[02:53:57.390] LOG: Move Scores: [2,57,30,6]
+[02:53:57.390] LOG: Sorted Move Pool: ["Air Cutter","Peck","Flail","Growl"]
+[02:53:57.390] LOG: Chosen Move: Flail
+[02:53:57.390] LOG: %cStart Phase EnemyCommandPhase color:green;
+[02:53:57.392] WARN: BattlerTag IGNORE_GHOST is missing a score!
+[02:53:57.392] WARN: BattlerTag IGNORE_GHOST is missing a score!
+[02:53:57.392] WARN: BattlerTag IGNORE_GHOST is missing a score!
+[02:53:57.393] WARN: BattlerTag IGNORE_GHOST is missing a score!
+[02:53:57.394] LOG: Move Pool: ["Odor Sleuth","Roar","Hyper Fang","Howl"]
+[02:53:57.394] LOG: Move Scores: [0,-20,19,2]
+[02:53:57.394] LOG: Sorted Move Pool: ["Hyper Fang","Howl","Odor Sleuth","Roar"]
+[02:53:57.394] LOG: Chosen Move: Hyper Fang
+[02:53:57.394] LOG: %cStart Phase TurnStartPhase color:green;
+[02:53:57.399] LOG: %cStart Phase MovePhase color:green;
+[02:53:57.399] LOG: %cUser: Bulbasaur
+Move: MALIGNANT_CHAIN
+Use Mode: NORMAL color:orchid
+[02:53:57.403] LOG: %cStart Phase MessagePhase color:green;
+[02:53:57.499] LOG: %cStart Phase MoveEffectPhase color:green;
+[02:53:57.646] LOG: crit stage: +0
+[02:53:57.647] LOG: Move: Malignant Chain | Base damage: 16.857142857142858 | Power: 100 | Source attack: 13 | Target defense: 7
+[02:53:57.647] LOG: Move: Malignant Chain | Attack damage: 25
+[02:53:57.648] LOG: %cStart Phase DamageAnimPhase color:green;
+[02:53:57.660] LOG: %cStart Phase FaintPhase color:green;
+[02:53:57.724] LOG: %cStart Phase MessagePhase color:green;
+[02:54:00.361] LOG: %cStart Phase VictoryPhase color:green;
+[02:54:00.362] LOG: %cStart Phase ExpPhase color:green;
+[02:54:00.597] LOG: %cStart Phase ExpPhase color:green;
+[02:54:00.805] LOG: %cStart Phase MoveEndPhase color:green;
+[02:54:00.806] LOG: %cStart Phase MovePhase color:green;
+[02:54:00.806] LOG: %cUser: Totodile
+Move: ICE_FANG
+Use Mode: NORMAL color:orchid
+[02:54:00.807] LOG: %cStart Phase MessagePhase color:green;
+[02:54:00.916] LOG: %cStart Phase MoveEffectPhase color:green;
+[02:54:01.041] LOG: crit stage: +0
+[02:54:01.042] LOG: Move: Ice Fang | Base damage: 11.508571428571429 | Power: 104 | Source attack: 8 | Target defense: 7
+[02:54:01.042] LOG: Move: Ice Fang | Attack damage: 11
+[02:54:01.043] LOG: %cStart Phase DamageAnimPhase color:green;
+[02:54:01.055] LOG: %cStart Phase MoveEndPhase color:green;
+[02:54:01.056] LOG: %cStart Phase MovePhase color:green;
+[02:54:01.056] LOG: %cUser: Poochyena
+Move: HYPER_FANG
+Use Mode: NORMAL color:orchid
+[02:54:01.056] LOG: %cStart Phase MessagePhase color:green;
+[02:54:01.263] LOG: %cStart Phase MoveEndPhase color:green;
+[02:54:01.263] LOG: %cStart Phase MovePhase color:green;
+[02:54:01.263] LOG: %cStart Phase MoveEndPhase color:green;
+[02:54:01.263] LOG: %cStart Phase CheckInterludePhase color:green;
+[02:54:01.263] LOG: %cStart Phase WeatherEffectPhase color:green;
+[02:54:01.264] LOG: %cStart Phase PositionalTagPhase color:green;
+[02:54:01.264] LOG: %cStart Phase BerryPhase color:green;
+[02:54:01.265] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[02:54:01.266] LOG: %cStart Phase TurnEndPhase color:green;
+[02:54:01.268] LOG: %cStart Phase TurnInitPhase color:green;
+[02:54:01.268] LOG: %cStart Phase CommandPhase color:green;
+[02:54:02.011] LOG: Move: MALIGNANT_CHAIN Move targets: {"targets":[3,1],"multiple":false} 
+Player Pokemon: Bulbasaur
+[02:54:02.012] LOG: %cStart Phase SelectTargetPhase color:green;
+[02:54:02.344] LOG: %cStart Phase CommandPhase color:green;
+[02:54:07.449] LOG: Move: HONE_CLAWS Move targets: {"targets":[1],"multiple":false} 
+Player Pokemon: Totodile
+[02:54:07.449] LOG: %cStart Phase EnemyCommandPhase color:green;
+[02:54:07.452] WARN: BattlerTag IGNORE_GHOST is missing a score!
+[02:54:07.452] WARN: BattlerTag IGNORE_GHOST is missing a score!
+[02:54:07.452] LOG: Battle Seed: IkdJDcddMkBmkQFX
+[02:54:07.453] WARN: BattlerTag IGNORE_GHOST is missing a score!
+[02:54:07.454] LOG: Move Pool: ["Odor Sleuth","Roar","Hyper Fang","Howl"]
+[02:54:07.454] LOG: Move Scores: [0,-20,19,2]
+[02:54:07.454] LOG: Sorted Move Pool: ["Hyper Fang","Howl","Odor Sleuth","Roar"]
+[02:54:07.454] LOG: Chosen Move: Hyper Fang
+[02:54:07.454] LOG: %cStart Phase TurnStartPhase color:green;
+[02:54:07.455] LOG: %cStart Phase MovePhase color:green;
+[02:54:07.455] LOG: %cUser: Bulbasaur
+Move: MALIGNANT_CHAIN
+Use Mode: NORMAL color:orchid
+[02:54:07.456] LOG: %cStart Phase MessagePhase color:green;
+[02:54:07.571] LOG: %cStart Phase MoveEffectPhase color:green;
+[02:54:07.711] LOG: crit stage: +0
+[02:54:07.712] LOG: Move: Malignant Chain | Base damage: 19.333333333333332 | Power: 100 | Source attack: 13 | Target defense: 6
+[02:54:07.712] LOG: Move: Malignant Chain | Attack damage: 26
+[02:54:07.713] LOG: %cStart Phase DamageAnimPhase color:green;
+[02:54:07.725] LOG: %cStart Phase FaintPhase color:green;
+[02:54:07.788] LOG: %cStart Phase MessagePhase color:green;
+[02:54:08.187] LOG: %cStart Phase VictoryPhase color:green;
+[02:54:08.187] LOG: %cStart Phase ExpPhase color:green;
+[02:54:08.461] LOG: %cStart Phase ExpPhase color:green;
+[02:54:08.760] LOG: %cStart Phase MoveEndPhase color:green;
+[02:54:08.760] LOG: %cStart Phase MovePhase color:green;
+[02:54:08.760] LOG: %cUser: Totodile
+Move: HONE_CLAWS
+Use Mode: NORMAL color:orchid
+[02:54:08.760] LOG: %cStart Phase MessagePhase color:green;
+[02:54:08.877] LOG: %cStart Phase MoveEffectPhase color:green;
+[02:54:09.023] LOG: %cStart Phase StatStageChangePhase color:green;
+[02:54:09.023] LOG: %cStart Phase StatStageChangePhase color:green;
+[02:54:09.204] LOG: %cStart Phase MessagePhase color:green;
+[02:54:09.412] LOG: %cStart Phase StatStageChangePhase color:green;
+[02:54:09.593] LOG: %cStart Phase MessagePhase color:green;
+[02:54:09.807] LOG: %cStart Phase MoveEndPhase color:green;
+[02:54:09.808] LOG: %cStart Phase MovePhase color:green;
+[02:54:09.808] LOG: %cStart Phase MoveEndPhase color:green;
+[02:54:09.808] LOG: %cStart Phase CheckInterludePhase color:green;
+[02:54:09.808] LOG: %cStart Phase WeatherEffectPhase color:green;
+[02:54:09.808] LOG: %cStart Phase PositionalTagPhase color:green;
+[02:54:09.808] LOG: %cStart Phase BerryPhase color:green;
+[02:54:09.808] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[02:54:09.808] LOG: %cStart Phase TurnEndPhase color:green;
+[02:54:09.808] LOG: %cStart Phase BattleEndPhase color:green;
+[02:54:09.809] LOG: Battle Score: 20 (2 Turns x0.84)
+[02:54:09.809] LOG: Total Score: 20
+[02:54:09.813] LOG: %cStart Phase EggLapsePhase color:green;
+[02:54:09.814] LOG: %cStart Phase SelectModifierPhase color:green;
+[02:54:09.814] LOG: Wave Seed: XCpkSZFw779tYDM7C4BNJjbt 1
+[02:54:09.819] LOG: 7 5 [2,3,4,5,6]
+[02:54:09.819] LOG: {"id":"TEMP_STAT_STAGE_BOOSTER","localeKey":"","iconImage":"x_defense","soundName":"se/restore","tier":0,"stat":2,"nameKey":"x_defense","quantityKey":"percentage"} 
+[02:54:09.819] LOG: 7 5 [2,3,4,5,6]
+[02:54:09.819] LOG: {"id":"TEMP_STAT_STAGE_BOOSTER","localeKey":"","iconImage":"x_accuracy","soundName":"se/restore","tier":0,"stat":6,"nameKey":"x_accuracy","quantityKey":"stage"} 
+[02:54:09.819] LOG: 8 5 [2,3,4,5,6]
+[02:54:09.819] LOG: {"id":"BERRY","localeKey":"","iconImage":"ganlon_berry","group":"berry","soundName":"se/restore","tier":0,"berryType":4} 
+[02:54:09.819] LOG: 0 0 [2,3,4,5,6]
+[02:54:09.819] LOG: {"id":"POKEBALL","localeKey":"","iconImage":"pb","group":"pb","soundName":"se/pb_bounce_1","tier":0,"pokeballType":0,"count":5} 
+[02:54:09.820] LOG: [coop-reward] OWNER drives reward screen (turn=0 role=host spoof=false wave=1)
+[02:54:59.951] LOG: %cStart Phase NewBattlePhase color:green;
+[02:54:59.951] LOG: Wave Seed: YDqlT[Gx88:uZEN8D5COKkcu 2
+[02:54:59.952] LOG: %cStart Phase NextEncounterPhase color:green;
+[02:54:59.953] LOG: Starting species pool tier: COMMON
+[02:54:59.962] LOG: Pokemon: Wild Blipbug | Species ID: 824 | Level: 2 | Nature: Naughty (+Atk/-SpDef)
+[02:54:59.962] LOG: Stats (IVs): HP: 13 (2), Atk: 7 (29), Def: 6 (15), Spatk: 6 (17), Spdef: 5 (2), Spd: 6 (5)
+[02:54:59.962] LOG: Ability: Anticipation | Passive Ability: Simple 
+[02:54:59.962] LOG: Moveset: ["Lunge","Infestation"]
+[02:54:59.962] LOG: Starting species pool tier: COMMON
+[02:54:59.970] LOG: Pokemon: Wild Weedle | Species ID: 13 | Level: 3 | Nature: Timid (+Spd/-Atk)
+[02:54:59.970] LOG: Stats (IVs): HP: 16 (20), Atk: 6 (26), Def: 7 (13), Spatk: 6 (21), Spdef: 6 (6), Spd: 9 (19)
+[02:54:59.970] LOG: Ability: Infiltrator | Passive Ability: Swarm 
+[02:54:59.970] LOG: Moveset: ["Lunge","Poison Sting"]
+[02:54:59.970] LOG: [coop-reward] advance interaction (role=host from=0 counter=0)
+[02:54:59.970] LOG: [coop-launch] proceedIfReady launched=true localTeam=3 bothReady=true role=host partnerReady=true
+[02:55:00.163] LOG: [coop-launch] proceedIfReady launched=true localTeam=3 bothReady=true role=host partnerReady=true
+[02:55:00.496] DEBUG: Session data saved to slot 4!
+[02:55:00.496] LOG: Wave Seed: YDqlT[Gx88:uZEN8D5COKkcu 2
+[02:55:00.940] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[02:55:00.940] LOG: %cStart Phase CheckSwitchPhase color:green;
+[02:55:00.940] LOG: %cStart Phase CheckSwitchPhase color:green;
+[02:55:00.940] LOG: %cStart Phase InitEncounterPhase color:green;
+[02:55:00.941] LOG: %cStart Phase PostSummonPhase color:green;
+[02:55:00.941] LOG: Ran PSP for: Weedle
+[02:55:00.941] LOG: %cStart Phase PostSummonPhase color:green;
+[02:55:00.942] LOG: %cStart Phase PostSummonPhase color:green;
+[02:55:00.942] LOG: %cStart Phase PostSummonPhase color:green;
+[02:55:00.942] LOG: Ran PSP for: Blipbug
+[02:55:00.942] LOG: %cStart Phase PostSummonPhase color:green;
+[02:55:00.942] LOG: %cStart Phase PostSummonPhase color:green;
+[02:55:00.943] LOG: %cStart Phase TurnInitPhase color:green;
+[02:55:00.943] LOG: %cStart Phase CommandPhase color:green;
+[02:55:19.585] LOG: Move: MALIGNANT_CHAIN Move targets: {"targets":[2,3,1],"multiple":false} 
+Player Pokemon: Bulbasaur
+[02:55:19.587] LOG: %cStart Phase SelectTargetPhase color:green;
+[02:55:19.874] LOG: %cStart Phase CommandPhase color:green;
+[02:55:54.288] LOG: Move: ICE_FANG Move targets: {"targets":[3],"multiple":false} 
+Player Pokemon: Totodile
+[02:55:54.288] LOG: %cStart Phase EnemyCommandPhase color:green;
+[02:55:54.290] LOG: Applied X Defense 
+[02:55:54.291] LOG: Applied X Defense 
+[02:55:54.295] LOG: Battle Seed: 7VHHVAXIwvuzXfQS
+[02:55:54.296] LOG: Move Pool: ["Lunge","Infestation"]
+[02:55:54.297] LOG: Move Scores: [27,18]
+[02:55:54.297] LOG: Sorted Move Pool: ["Lunge","Infestation"]
+[02:55:54.297] LOG: Chosen Move: Lunge
+[02:55:54.297] LOG: %cStart Phase EnemyCommandPhase color:green;
+[02:55:54.298] LOG: Applied X Defense 
+[02:55:54.299] LOG: Applied X Defense 
+[02:55:54.300] LOG: Applied X Defense 
+[02:55:54.300] LOG: Applied X Defense 
+[02:55:54.303] LOG: Move Pool: ["Lunge","Poison Sting"]
+[02:55:54.303] LOG: Move Scores: [27,16.5]
+[02:55:54.303] LOG: Sorted Move Pool: ["Lunge","Poison Sting"]
+[02:55:54.303] LOG: Chosen Move: Poison Sting
+[02:55:54.303] LOG: %cStart Phase TurnStartPhase color:green;
+[02:55:54.307] LOG: %cStart Phase MovePhase color:green;
+[02:55:54.307] LOG: %cUser: Weedle
+Move: POISON_STING
+Use Mode: NORMAL color:orchid
+[02:55:54.311] LOG: %cStart Phase MessagePhase color:green;
+[02:55:54.407] LOG: %cStart Phase MoveEffectPhase color:green;
+[02:55:54.637] LOG: crit stage: +0
+[02:55:54.638] LOG: Applied X Defense 
+[02:55:54.638] LOG: Move: Poison Sting | Base damage: 3.097142857142857 | Power: 40 | Source attack: 6 | Target defense: 14
+[02:55:54.638] LOG: Move: Poison Sting | Attack damage: 3
+[02:55:54.639] LOG: %cStart Phase DamageAnimPhase color:green;
+[02:55:54.651] LOG: %cStart Phase ObtainStatusEffectPhase color:green;
+[02:55:54.824] LOG: %cStart Phase MessagePhase color:green;
+[02:55:55.032] LOG: %cStart Phase ShowAbilityPhase color:green;
+[02:55:55.193] LOG: %cStart Phase MessagePhase color:green;
+[02:55:55.435] LOG: %cStart Phase DamageAnimPhase color:green;
+[02:55:55.437] LOG: %cStart Phase HideAbilityPhase color:green;
+[02:55:55.463] LOG: %cStart Phase MoveEndPhase color:green;
+[02:55:55.464] LOG: %cStart Phase MovePhase color:green;
+[02:55:55.464] LOG: %cUser: Bulbasaur
+Move: MALIGNANT_CHAIN
+Use Mode: NORMAL color:orchid
+[02:55:55.467] LOG: %cStart Phase MessagePhase color:green;
+[02:55:55.588] LOG: %cStart Phase MoveEffectPhase color:green;
+[02:55:55.727] LOG: crit stage: +0
+[02:55:55.729] LOG: Move: Malignant Chain | Base damage: 22.8 | Power: 100 | Source attack: 13 | Target defense: 5
+[02:55:55.729] LOG: Move: Malignant Chain | Attack damage: 45
+[02:55:55.730] LOG: %cStart Phase DamageAnimPhase color:green;
+[02:55:55.745] LOG: %cStart Phase MessagePhase color:green;
+[02:55:55.935] LOG: %cStart Phase FaintPhase color:green;
+[02:55:55.992] LOG: %cStart Phase MessagePhase color:green;
+[02:55:58.661] LOG: %cStart Phase VictoryPhase color:green;
+[02:55:58.663] LOG: %cStart Phase ExpPhase color:green;
+[02:55:59.026] LOG: %cStart Phase ExpPhase color:green;
+[02:55:59.221] LOG: %cStart Phase MoveEndPhase color:green;
+[02:55:59.222] LOG: %cStart Phase MovePhase color:green;
+[02:55:59.222] LOG: %cUser: Totodile
+Move: ICE_FANG
+Use Mode: NORMAL color:orchid
+[02:55:59.225] LOG: %cStart Phase MessagePhase color:green;
+[02:55:59.331] LOG: %cStart Phase MoveEffectPhase color:green;
+[02:55:59.478] LOG: crit stage: +0
+[02:55:59.479] LOG: Move: Ice Fang | Base damage: 16.262857142857143 | Power: 104 | Source attack: 12 | Target defense: 7
+[02:55:59.479] LOG: Move: Ice Fang | Attack damage: 14
+[02:55:59.479] LOG: %cStart Phase DamageAnimPhase color:green;
+[02:55:59.493] LOG: %cStart Phase FaintPhase color:green;
+[02:55:59.555] LOG: %cStart Phase MessagePhase color:green;
+[02:56:00.145] LOG: %cStart Phase VictoryPhase color:green;
+[02:56:00.146] LOG: %cStart Phase ExpPhase color:green;
+[02:56:00.477] LOG: %cStart Phase ExpPhase color:green;
+[02:56:00.776] LOG: %cStart Phase MoveEndPhase color:green;
+[02:56:00.776] LOG: %cStart Phase MovePhase color:green;
+[02:56:00.776] LOG: %cStart Phase MoveEndPhase color:green;
+[02:56:00.776] LOG: %cStart Phase CheckInterludePhase color:green;
+[02:56:00.776] LOG: %cStart Phase WeatherEffectPhase color:green;
+[02:56:00.776] LOG: %cStart Phase PositionalTagPhase color:green;
+[02:56:00.776] LOG: %cStart Phase BerryPhase color:green;
+[02:56:00.776] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[02:56:00.777] LOG: %cStart Phase PostTurnStatusEffectPhase color:green;
+[02:56:00.949] LOG: %cStart Phase MessagePhase color:green;
+[02:56:01.164] LOG: %cStart Phase TurnEndPhase color:green;
+[02:56:01.164] LOG: %cStart Phase BattleEndPhase color:green;
+[02:56:01.164] LOG: Battle Score: 20 (1 Turns x1)
+[02:56:01.165] LOG: Total Score: 40
+[02:56:01.171] LOG: %cStart Phase EggLapsePhase color:green;
+[02:56:01.171] LOG: %cStart Phase SelectModifierPhase color:green;
+[02:56:01.171] LOG: Wave Seed: YDqlT[Gx88:uZEN8D5COKkcu 2
+[02:56:01.174] LOG: 0 0 [2,3,6]
+[02:56:01.174] LOG: {"id":"POKEBALL","localeKey":"","iconImage":"pb","group":"pb","soundName":"se/pb_bounce_1","tier":0,"pokeballType":0,"count":5} 
+[02:56:01.174] LOG: 4 2 [2,3,6]
+[02:56:01.174] LOG: {"id":"ETHER","localeKey":"modifierType:ModifierType.ETHER","iconImage":"ether","group":"ether","soundName":"se/restore","tier":0,"restorePoints":10} 
+[02:56:01.174] LOG: 7 3 [2,3,6]
+[02:56:01.174] LOG: {"id":"TEMP_STAT_STAGE_BOOSTER","localeKey":"","iconImage":"x_defense","soundName":"se/restore","tier":0,"stat":2,"nameKey":"x_defense","quantityKey":"percentage"} 
+[02:56:01.174] LOG: [coop-reward] WATCHER waits for partner's reward picks (turn=1 role=host wave=2)
