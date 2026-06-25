@@ -54,6 +54,8 @@ export interface SerializedCommand {
   useMode?: number;
   /** For POKEMON (switch): whether it is a Baton switch (passes stat changes) (#633). */
   baton?: boolean;
+  /** For FIGHT: whether the mon Terastallizes this turn (Command.TERA) (#633 Fix #4a). */
+  tera?: boolean;
 }
 
 /**
@@ -82,6 +84,14 @@ export interface CoopSerializedStarter {
   ivs: number[];
   /** ER Black Shinies (#349): start this mon as a t4 black shiny. */
   erBlackShiny?: boolean | undefined;
+  /**
+   * Co-op (#633 Fix #3): the picking player's per-account innate-unlock snapshot for this
+   * mon - one `passiveAttr` bitmask per ER innate slot (0,1,2). Carried so the partner's
+   * client gates this shared mon's active innates by the OWNER's candy unlocks, not its own.
+   */
+  coopPassiveAttr?: number[] | undefined;
+  /** Co-op (#633 Fix #3): the picking player's canonical luck for this mon (owner-authoritative). */
+  coopLuck?: number | undefined;
 }
 
 // =============================================================================
@@ -107,6 +117,27 @@ export interface CoopSerializedEnemy {
   data: CoopSerializedPokemon;
 }
 
+/**
+ * One rolled reward-screen option the OWNER streams to the WATCHER (#633 Fix #2). Party
+ * LUCK changes the NUMBER of seeded upgrade draws when rolling the pool, so the two
+ * clients' independently-rolled pools could differ - and that shifts the whole shared
+ * RNG stream after the first shop. The owner therefore rolls ONCE and streams the
+ * resolved option list; the watcher rebuilds these exact options instead of re-rolling
+ * (so it consumes no luck-dependent RNG). All plain JSON for the wire.
+ *  - `id`         the ModifierType registry key (e.g. "RARE_CANDY"); rebuild via `modifierTypes[id]()`
+ *  - `tier`       the resolved ModifierTier
+ *  - `upgradeCount` luck-driven tier upgrades applied (for the option's upgrade animation)
+ *  - `cost`       the option's price (shop) / 0 (free reward)
+ *  - `pregenArgs` a generator type's pregen args (TM move id, form item, etc.), when applicable
+ */
+export interface CoopSerializedRewardOption {
+  id: string;
+  tier: number;
+  upgradeCount: number;
+  cost: number;
+  pregenArgs?: number[] | undefined;
+}
+
 /** The mutable per-turn battle state of ONE field mon (the guest already has the mon object). */
 export interface CoopSerializedMonState {
   /** Battler index of this field mon. */
@@ -122,6 +153,13 @@ export interface CoopSerializedMonState {
   formIndex?: number | undefined;
   /** Present only when the mon's active ability changed this turn (`AbilityId`). */
   abilityId?: number | undefined;
+  /**
+   * ER bleed / frost / fear BattlerTags on this mon (#633 Fix #4h). These are BattlerTags,
+   * NOT StatusEffects, so the `status` field above can't carry them - once anything desyncs
+   * they could never be repaired. Each entry is `{ type, turns }` (the BattlerTagType key +
+   * turns remaining). Absent / empty => none of the three ER tags are present.
+   */
+  erTags?: { type: string; turns: number }[] | undefined;
 }
 
 /** Authoritative post-turn snapshot: enough to set the guest's field state exactly. */
@@ -391,6 +429,13 @@ export type CoopMessage =
    * state") becomes self-checking + self-healing instead of silently corrupting both runs.
    */
   | { t: "meChecksum"; seq: number; checksum: string }
+  /**
+   * Owner -> watcher (#633 Fix #2): the EXACT reward-screen option list the owner rolled
+   * for interaction `seq`. The watcher rebuilds these instead of re-rolling its own pool
+   * (party luck would otherwise make the two pools - and the shared RNG cursor - diverge).
+   * `reroll` is the reroll round these options belong to (a fresh roll per reroll).
+   */
+  | { t: "rewardOptions"; seq: number; reroll: number; options: CoopSerializedRewardOption[] }
   /**
    * Owner -> watcher (#633): a COSMETIC live-cursor button on a shared interaction
    * screen. The watcher replays `button` into its identical screen so the partner

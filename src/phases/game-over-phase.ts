@@ -89,7 +89,11 @@ export class GameOverPhase extends BattlePhase {
         0,
         fixedInt(3000),
       );
-    } else if (this.isVictory || !globalScene.enableRetries) {
+    } else if (this.isVictory || !globalScene.enableRetries || globalScene.gameMode.isCoop) {
+      // Co-op (#633 Fix #4f): never open the per-client "retry?" prompt in co-op. It would
+      // reset + reload THIS client's session independently of the partner (loadSession +
+      // re-push EncounterPhase), desyncing the shared run / hanging the partner. Go straight
+      // to game-over so both clients end together. Solo keeps the enableRetries prompt.
       this.handleGameOver();
     } else {
       globalScene.ui.showText(i18next.t("battle:retryBattle"), null, () => {

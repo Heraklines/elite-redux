@@ -36,7 +36,8 @@ import type { TurnMove } from "#types/turn-move";
 
 /** A partner command resolved for one field slot, shaped for `CommandPhase.handleCommand`. */
 export interface ResolvedPartnerCommand {
-  command: Command.FIGHT;
+  /** FIGHT, or TERA when the partner Terastallized this turn (#633 Fix #4a). */
+  command: Command.FIGHT | Command.TERA;
   /** Index of the chosen move in the partner's moveset, or -1 for Struggle. */
   moveIndex: number;
   /** The full move record (move + resolved targets + use mode) the engine reuses. */
@@ -187,7 +188,9 @@ export function applyWiredPartnerCommand(
   // `useMode` crosses the wire as a raw number; it IS a MoveUseMode enum value.
   const useMode = (cmd.useMode ?? MoveUseMode.NORMAL) as MoveUseMode;
   return {
-    command: Command.FIGHT,
+    // #633 Fix #4a: a relayed TERA command teras the partner's mon (handleCommand's TERA
+    // case sets the preTurnCommand), so the watcher's engine matches the owner's.
+    command: cmd.tera === true ? Command.TERA : Command.FIGHT,
     moveIndex,
     turnMove: { move: move.moveId, targets, useMode },
   };

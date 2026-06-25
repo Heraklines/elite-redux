@@ -30,7 +30,6 @@ import type { TurnMove } from "#types/turn-move";
 import {
   isBetween,
   NumberHolder,
-  randInt,
   randomString,
   randSeedFloat,
   randSeedInt,
@@ -620,7 +619,11 @@ export function getRandomTrainerFunc(
 
     let trainerGender = TrainerVariant.DEFAULT;
     if (randomGender) {
-      trainerGender = randInt(2) === 0 ? TrainerVariant.FEMALE : TrainerVariant.DEFAULT;
+      // Co-op (#633): seed the gender roll. This closure runs inside `executeWithSeedOffset`
+      // (battle-scene.resolveFixedBattle), so the unseeded `randInt(2)` was the divergence
+      // point that gave the two clients different evil-grunt genders. `randSeedInt` reads the
+      // shared seed, matching the surrounding `randSeedItem` picks and keeping clients aligned.
+      trainerGender = randSeedInt(2) === 0 ? TrainerVariant.FEMALE : TrainerVariant.DEFAULT;
     }
 
     /* 1/3 chance for evil team grunts to be double battles */
@@ -639,7 +642,10 @@ export function getRandomTrainerFunc(
     const isEvilTeamGrunt = evilTeamGrunts.includes(choice);
 
     if (trainerConfigs[choice].hasDouble && isEvilTeamGrunt) {
-      return new Trainer(choice, randInt(3) === 0 ? TrainerVariant.DOUBLE : trainerGender);
+      // Co-op (#633): seed the double-battle roll for the same reason as the gender roll
+      // above - the unseeded `randInt(3)` made one client field a double evil-grunt battle
+      // and the other a single, desyncing the whole wave. `randSeedInt` keeps it deterministic.
+      return new Trainer(choice, randSeedInt(3) === 0 ? TrainerVariant.DOUBLE : trainerGender);
     }
 
     return new Trainer(choice, trainerGender);

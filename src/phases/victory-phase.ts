@@ -148,7 +148,13 @@ export class VictoryPhase extends PokemonPhase {
           // else the slot is the normal biome market. (The bargain screen was
           // previously staging/dev gated while its handler was polished; that gate
           // is now removed, so the event is live in production too.)
-          if (globalScene.arena.biomeId === BiomeId.ABYSS) {
+          // Co-op (#633 Fix #4e): Giratina's Bargain is an interactive, shared-party event
+          // that would run INDEPENDENTLY on each client (both mutating the one shared party
+          // from their own picks -> divergent species/levels/candy). Until it is driven
+          // host-authoritatively, co-op routes the Abyss slot to the BiomeShopPhase, which
+          // already self-skips in co-op - so both clients deterministically move on together.
+          // Solo / non-coop keeps the bargain.
+          if (globalScene.arena.biomeId === BiomeId.ABYSS && !gameMode.isCoop) {
             globalScene.phaseManager.pushNew("TheBargainPhase");
           } else {
             globalScene.phaseManager.pushNew("BiomeShopPhase");

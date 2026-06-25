@@ -2120,6 +2120,13 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
    * @returns The luck value of this Pokemon.
    */
   getLuck(): number {
+    // Co-op (#633 Fix #3): a merged co-op mon uses its OWNER's canonical luck (snapshotted at
+    // merge time), so the shared party's total luck is identical on both clients instead of
+    // each deriving the partner mon's luck from ITS OWN dex unlocks. Gated to co-op + a present
+    // snapshot; solo / non-merged mons fall through to the unchanged derivation below.
+    if (globalScene.gameMode.isCoop && this.customPokemonData?.coopLuck != null) {
+      return this.customPokemonData.coopLuck;
+    }
     const base = this.luck + (this.isFusion() ? this.fusionLuck : 0);
     // ER (#432): a Black Shiny is the rarest shiny tier and grants a flat
     // Luck 5 (a regular shiny caps at 3). DERIVED here, never stored - the
@@ -2938,6 +2945,14 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
    * keeping "shown locked" in sync with "actually live".
    */
   public innateSlotPassiveAttr(slot: 0 | 1 | 2): number {
+    // Co-op (#633 Fix #3): a merged co-op mon carries its OWNER's per-account innate-unlock
+    // snapshot. Read that instead of THIS client's local `starterData` - otherwise the same
+    // shared mon's active innates would be gated by each player's own candy unlocks (a
+    // divergent per-account state). Gated strictly to co-op + a present snapshot, so solo /
+    // non-merged mons fall through to the unchanged local-account read below.
+    if (globalScene.gameMode.isCoop && this.customPokemonData?.coopPassiveAttr != null) {
+      return this.customPokemonData.coopPassiveAttr[slot] ?? 0;
+    }
     const owner =
       this.isFusion() && this.fusionSpecies && (slot === 0 || slot === 2) ? this.fusionSpecies : this.species;
     return globalScene.gameData.starterData[owner.getRootSpeciesId()]?.passiveAttr ?? 0;

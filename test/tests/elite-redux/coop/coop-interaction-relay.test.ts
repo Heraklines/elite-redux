@@ -82,4 +82,71 @@ describe("co-op alternating-interaction relay (#633)", () => {
     timer.fire?.();
     expect(await awaited).toBeNull();
   });
+
+  // Fix #2 (#633): the OWNER host-streams its rolled reward-option list so the WATCHER
+  // rebuilds it instead of re-rolling (party luck would diverge the pools + the RNG cursor).
+  describe("reward-option streaming (#633 Fix #2)", () => {
+    const options = [
+      { id: "RARE_CANDY", tier: 1, upgradeCount: 0, cost: 0 },
+      { id: "TM_NORMAL", tier: 2, upgradeCount: 1, cost: 0, pregenArgs: [33] },
+    ];
+
+    it("delivers the owner's rolled option list to a parked watcher", async () => {
+      const { host, guest } = createLoopbackPair();
+      const owner = new CoopInteractionRelay(host);
+      const watcher = new CoopInteractionRelay(guest);
+
+      const awaited = watcher.awaitRewardOptions(7, 0);
+      owner.sendRewardOptions(7, 0, options);
+
+      const res = await awaited;
+      expect(res).toEqual(options);
+    });
+
+    it("buffers options that arrive before the watcher awaits (race fix)", async () => {
+      const { host, guest } = createLoopbackPair();
+      const owner = new CoopInteractionRelay(host);
+      const watcher = new CoopInteractionRelay(guest);
+
+      owner.sendRewardOptions(7, 0, options);
+      await new Promise(r => setTimeout(r, 0)); // let it buffer
+      const res = await watcher.awaitRewardOptions(7, 0);
+      expect(res).toEqual(options);
+    });
+
+    it("keys options by (seq, reroll) - a different reroll round does not satisfy the wait", async () => {
+      const { host, guest } = createLoopbackPair();
+      const owner = new CoopInteractionRelay(host);
+      const timer: { fire?: () => void } = {};
+      const watcher = new CoopInteractionRelay(guest, {
+        schedule: cb => {
+          timer.fire = cb;
+          return () => {};
+        },
+      });
+
+      // Owner streams the reroll-0 list; the watcher is waiting on reroll 1.
+      owner.sendRewardOptions(7, 0, options);
+      const awaited = watcher.awaitRewardOptions(7, 1, 1000);
+      await new Promise(r => setTimeout(r, 0));
+      timer.fire?.();
+      expect(await awaited).toBeNull();
+    });
+
+    it("times out to null so the watcher falls back to its own roll (never hangs)", async () => {
+      const { guest } = createLoopbackPair();
+      const timer: { fire?: () => void } = {};
+      const watcher = new CoopInteractionRelay(guest, {
+        schedule: cb => {
+          timer.fire = cb;
+          return () => {};
+        },
+      });
+
+      const awaited = watcher.awaitRewardOptions(2, 0, 1000);
+      expect(timer.fire).toBeDefined();
+      timer.fire?.();
+      expect(await awaited).toBeNull();
+    });
+  });
 });
