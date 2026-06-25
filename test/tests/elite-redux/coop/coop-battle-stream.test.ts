@@ -109,7 +109,7 @@ describe("co-op host-authoritative battle stream (#633, LIVE-D)", () => {
     const guestStream = new CoopBattleStreamer(guest);
 
     const awaited = guestStream.awaitTurn(1);
-    hostStream.emitTurn(1, [{ k: "message", text: "Bulbasaur fainted!" }], emptyCheckpoint());
+    hostStream.emitTurn(1, [{ k: "message", text: "Bulbasaur fainted!" }], emptyCheckpoint(), "deadbeefdeadbeef");
 
     const res = await awaited;
     expect(res).not.toBeNull();
@@ -123,7 +123,7 @@ describe("co-op host-authoritative battle stream (#633, LIVE-D)", () => {
     const guestStream = new CoopBattleStreamer(guest);
 
     // Host is faster: it sends turn 2 before the guest reaches its await.
-    hostStream.emitTurn(2, [{ k: "faint", bi: 2 }], emptyCheckpoint());
+    hostStream.emitTurn(2, [{ k: "faint", bi: 2 }], emptyCheckpoint(), "deadbeefdeadbeef");
     await new Promise(r => setTimeout(r, 0)); // let it land in the guest buffer
 
     const res = await guestStream.awaitTurn(2);
@@ -153,7 +153,7 @@ describe("co-op host-authoritative battle stream (#633, LIVE-D)", () => {
 
     const first = guestStream.awaitTurn(1);
     const second = guestStream.awaitTurn(1);
-    hostStream.emitTurn(1, [], emptyCheckpoint());
+    hostStream.emitTurn(1, [], emptyCheckpoint(), "deadbeefdeadbeef");
 
     expect(await first).toBeNull();
     expect(await second).not.toBeNull();
@@ -185,7 +185,7 @@ describe("co-op host-authoritative battle stream (#633, LIVE-D)", () => {
     guestStream.onCheckpoint(r => {
       reason = r;
     });
-    hostStream.sendCheckpoint("switch", emptyCheckpoint());
+    hostStream.sendCheckpoint("switch", emptyCheckpoint(), "deadbeefdeadbeef");
     await new Promise(r => setTimeout(r, 0));
     expect(reason).toBe("switch");
   });
@@ -204,7 +204,7 @@ describe("co-op host-authoritative battle stream (#633, LIVE-D)", () => {
     guestStream.onCheckpoint(() => {
       fired = true;
     });
-    hostStream.sendCheckpoint("post-dispose", emptyCheckpoint());
+    hostStream.sendCheckpoint("post-dispose", emptyCheckpoint(), "deadbeefdeadbeef");
     await new Promise(r => setTimeout(r, 0));
     expect(fired).toBe(false);
   });
@@ -243,6 +243,83 @@ describe("co-op host-authoritative battle stream (#633, LIVE-D)", () => {
         got = p as unknown as { id: string }[];
       });
       expect((got as { id: string }[] | null)?.length).toBe(3);
+    });
+  });
+
+  describe("checksum-driven resync handshake (#633, TRACK-2)", () => {
+    it("emitTurn / sendCheckpoint carry the host's checksum to the guest's await/consume", async () => {
+      const { host, guest } = createLoopbackPair();
+      const hostStream = new CoopBattleStreamer(host);
+      const guestStream = new CoopBattleStreamer(guest);
+
+      const awaited = guestStream.awaitTurn(1);
+      hostStream.emitTurn(1, [], emptyCheckpoint(), "feedface00000001");
+      const res = await awaited;
+      expect(res?.checksum).toBe("feedface00000001");
+
+      hostStream.sendCheckpoint("switch", emptyCheckpoint(), "feedface00000002");
+      await new Promise(r => setTimeout(r, 0));
+      const envelope = guestStream.consumeCheckpoint();
+      expect(envelope?.checksum).toBe("feedface00000002");
+      expect(envelope?.reason).toBe("switch");
+      // One-shot: consumed.
+      expect(guestStream.consumeCheckpoint()).toBeNull();
+    });
+
+    it("a guest requestStateSync round-trips to the host and back as a stateSync blob", async () => {
+      const { host, guest } = createLoopbackPair();
+      const hostStream = new CoopBattleStreamer(host);
+      const guestStream = new CoopBattleStreamer(guest);
+
+      // Host answers the guest's resync request with a blob (echoing the seq).
+      let sawTurn = -1;
+      hostStream.onStateSyncRequest((turn, seq) => {
+        sawTurn = turn;
+        hostStream.sendStateSync(`blob-for-turn-${turn}`, seq);
+      });
+
+      const blob = await guestStream.requestStateSync(7);
+      expect(sawTurn).toBe(7);
+      expect(blob).toBe("blob-for-turn-7");
+    });
+
+    it("a stale stateSync (older seq) never satisfies the newest resync request", async () => {
+      const { host, guest } = createLoopbackPair();
+      const hostStream = new CoopBattleStreamer(host);
+      const guestStream = new CoopBattleStreamer(guest);
+
+      // The host answers the FIRST request late + the SECOND promptly. The first request
+      // is superseded by the second (one in flight at a time), so the late seq-1 reply is
+      // dropped and only the seq-2 reply satisfies the live await.
+      const seqs: number[] = [];
+      hostStream.onStateSyncRequest((_turn, seq) => {
+        seqs.push(seq);
+        if (seq === 2) {
+          hostStream.sendStateSync("fresh", seq);
+        }
+      });
+
+      const first = guestStream.requestStateSync(1); // seq 1 - superseded
+      const second = guestStream.requestStateSync(2); // seq 2 - the live one
+      // The stale seq-1 reply, were it to arrive, must not satisfy `second`.
+      hostStream.sendStateSync("stale", 1);
+
+      expect(await first).toBeNull();
+      expect(await second).toBe("fresh");
+      expect(seqs).toEqual([1, 2]);
+    });
+
+    it("a resync that never gets answered times out to null (degraded, never hung)", async () => {
+      const { host, guest } = createLoopbackPair();
+      new CoopBattleStreamer(host); // host installs no responder
+      const guestStream = new CoopBattleStreamer(guest, {
+        timeoutMs: 1,
+        schedule: cb => {
+          cb();
+          return () => {};
+        },
+      });
+      expect(await guestStream.requestStateSync(3)).toBeNull();
     });
   });
 });

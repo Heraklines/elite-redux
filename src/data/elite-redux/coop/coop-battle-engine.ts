@@ -28,13 +28,27 @@ import {
   monStateByIndex,
   normalizeMonState,
 } from "#data/elite-redux/coop/coop-battle-checkpoint";
-import type { CoopBattleCheckpoint, CoopSerializedEnemy } from "#data/elite-redux/coop/coop-transport";
+import {
+  COOP_CHECKSUM_SENTINEL,
+  type CoopChecksumMon,
+  type CoopChecksumState,
+  checksumState,
+} from "#data/elite-redux/coop/coop-battle-checksum";
+import type {
+  CoopBattleCheckpoint,
+  CoopFullBattleSnapshot,
+  CoopFullMonSnapshot,
+  CoopSerializedEnemy,
+} from "#data/elite-redux/coop/coop-transport";
 import type { Gender } from "#data/gender";
 import { Status } from "#data/status-effect";
 import type { TerrainType } from "#data/terrain";
+import type { AbilityId } from "#enums/ability-id";
+import type { BattlerTagType } from "#enums/battler-tag-type";
 import type { Nature } from "#enums/nature";
 import type { StatusEffect } from "#enums/status-effect";
 import type { WeatherType } from "#enums/weather-type";
+import type { Pokemon } from "#field/pokemon";
 import { PokemonMove } from "#moves/pokemon-move";
 
 /** Read a live field mon into the pure checkpoint view. */
@@ -242,5 +256,262 @@ export function applyCoopEnemies(enemies: CoopSerializedEnemy[]): void {
     }
   } catch {
     // A malformed enemy-party message must never break the encounter.
+  }
+}
+
+// =============================================================================
+// Per-turn state CHECKSUM + full-state RESYNC (#633, TRACK-2). The host stamps a
+// 64-bit fingerprint of its FULL authoritative state on each turn; the guest
+// recomputes the same fingerprint over its own state and, on a MISMATCH, requests a
+// full snapshot the host serializes here and the guest adopts field-by-field. This
+// makes ANY divergence (incl. the ability/form/PP/tag drift the numeric checkpoint
+// can't carry) detectable + self-healing. The hash/canonicalize logic is the pure
+// `coop-battle-checksum.ts`; this file just READS the live engine into its view.
+// =============================================================================
+
+/** Read a live field mon's active ability id (0 if unreadable). */
+function readAbilityId(mon: Pokemon): number {
+  try {
+    return mon.getAbility().id;
+  } catch {
+    return 0;
+  }
+}
+
+/** Read a live mon's moveset as `[moveId, ppUsed]` in slot order. */
+function readMoves(mon: Pokemon): [number, number][] {
+  try {
+    return mon.getMoveset().map(m => [m.moveId, m.ppUsed]);
+  } catch {
+    return [];
+  }
+}
+
+/** Read a live mon's battler-tag TYPE ids, sorted ascending (identity only, no counters). */
+function readTagTypes(mon: Pokemon): number[] {
+  try {
+    return mon.summonData.tags.map(t => t.tagType as unknown as number).sort((a, b) => a - b);
+  } catch {
+    return [];
+  }
+}
+
+/** Read the arena's tag identities as `[tagType, side]`, sorted (turn counts excluded). */
+function readArenaTags(): [number, number][] {
+  try {
+    return globalScene.arena.tags
+      .map(t => [t.tagType as unknown as number, t.side as unknown as number] as [number, number])
+      .sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+  } catch {
+    return [];
+  }
+}
+
+/** Read the player's persistent modifiers as `[typeId, stackCount]`, sorted by id. */
+function readModifiers(): [string, number][] {
+  try {
+    return globalScene.modifiers
+      .map(m => [m.type.id, m.stackCount] as [string, number])
+      .sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : a[1] - b[1]));
+  } catch {
+    return [];
+  }
+}
+
+/** Build the canonical checksum view of ONE live field mon. */
+function readChecksumMon(mon: Pokemon): CoopChecksumMon {
+  return {
+    bi: mon.getBattlerIndex(),
+    hp: mon.hp,
+    maxHp: mon.getMaxHp(),
+    status: mon.status?.effect ?? 0,
+    statStages: [...mon.getStatStages()],
+    fainted: mon.isFainted(),
+    abilityId: readAbilityId(mon),
+    formIndex: mon.formIndex ?? 0,
+    moves: readMoves(mon),
+    tags: readTagTypes(mon),
+  };
+}
+
+/**
+ * Capture the full authoritative battle state into its canonical checksum view. Read
+ * ONLY at a stable turn boundary (start of CommandPhase) - never mid-resolution - so
+ * both clients hash the same logical instant. Field mons are sorted by battler index.
+ */
+function captureCoopChecksumState(): CoopChecksumState {
+  const arena = globalScene.arena;
+  const field = globalScene
+    .getField(true)
+    .filter((m): m is Pokemon => m != null)
+    .map(readChecksumMon)
+    .sort((a, b) => a.bi - b.bi);
+  return {
+    field,
+    weather: arena.weather?.weatherType ?? 0,
+    terrain: arena.terrain?.terrainType ?? 0,
+    arenaTags: readArenaTags(),
+    party: globalScene.getPlayerParty().map(p => p.species.speciesId),
+    money: globalScene.money,
+    modifiers: readModifiers(),
+  };
+}
+
+/**
+ * HOST + GUEST: the 64-bit fingerprint of the full authoritative battle state. The host
+ * stamps it on each turn/checkpoint; the guest recomputes + compares. Returns the
+ * read-failure sentinel on any error so the comparison is SKIPPED (never a resync on a
+ * transient read failure).
+ */
+export function captureCoopChecksum(): string {
+  try {
+    return checksumState(captureCoopChecksumState());
+  } catch {
+    return COOP_CHECKSUM_SENTINEL;
+  }
+}
+
+/** Build ONE field mon's full resync snapshot (superset of the checkpoint). */
+function readFullMon(mon: Pokemon): CoopFullMonSnapshot {
+  return {
+    bi: mon.getBattlerIndex(),
+    hp: mon.hp,
+    maxHp: mon.getMaxHp(),
+    status: mon.status?.effect ?? 0,
+    statStages: [...mon.getStatStages()],
+    fainted: mon.isFainted(),
+    abilityId: readAbilityId(mon),
+    formIndex: mon.formIndex ?? 0,
+    moves: readMoves(mon),
+    tags: readTagTypes(mon),
+  };
+}
+
+/**
+ * HOST: serialize the FULL authoritative battle state to heal a guest desync (#633,
+ * TRACK-2). Carries every detail the per-turn checkpoint can't: ability, form, per-move
+ * PP, battler tags, arena tags, party order, money, modifier stacks. Returns null when
+ * there is no live field (defensive). The guest adopts it via {@linkcode applyCoopFullSnapshot}.
+ */
+export function captureCoopFullSnapshot(): CoopFullBattleSnapshot | null {
+  try {
+    const arena = globalScene.arena;
+    const field = globalScene
+      .getField(true)
+      .filter((m): m is Pokemon => m != null)
+      .map(readFullMon)
+      .sort((a, b) => a.bi - b.bi);
+    if (field.length === 0) {
+      return null;
+    }
+    return {
+      field,
+      weather: arena.weather?.weatherType ?? 0,
+      weatherTurnsLeft: arena.weather?.turnsLeft ?? 0,
+      terrain: arena.terrain?.terrainType ?? 0,
+      terrainTurnsLeft: arena.terrain?.turnsLeft ?? 0,
+      arenaTags: readArenaTags(),
+      party: globalScene.getPlayerParty().map(p => p.species.speciesId),
+      money: globalScene.money,
+      modifiers: readModifiers(),
+    };
+  } catch {
+    return null;
+  }
+}
+
+/** Reconcile a live mon's battler tags to exactly the snapshot's tag-type set. */
+function reconcileTags(mon: Pokemon, wantTagTypes: number[]): void {
+  try {
+    const want = new Set(wantTagTypes);
+    const have = new Set(mon.summonData.tags.map(t => t.tagType as unknown as number));
+    // Drop tags the host no longer has.
+    for (const have_t of [...have]) {
+      if (!want.has(have_t)) {
+        mon.removeTag(have_t as unknown as BattlerTagType);
+      }
+    }
+    // Add tags the host has that we don't (best-effort: identity only, no source-move).
+    for (const want_t of want) {
+      if (!have.has(want_t)) {
+        mon.addTag(want_t as unknown as BattlerTagType);
+      }
+    }
+  } catch {
+    /* tag reconciliation is best-effort; never break the heal */
+  }
+}
+
+/** Apply ONE full mon snapshot onto a live mon (ability/form FIRST, then stats, then hp). */
+function applyFullMon(mon: Pokemon, snap: CoopFullMonSnapshot): void {
+  try {
+    // Ability / form first so a stat recompute uses the authoritative values.
+    if (mon.formIndex !== snap.formIndex) {
+      mon.formIndex = snap.formIndex;
+    }
+    // Active ability: if the host's authoritative active ability differs from what this
+    // mon currently resolves, pin it via the summon-data override slot so getAbility()
+    // returns the host's value exactly (0 = unreadable on the host -> leave ours alone).
+    if (snap.abilityId !== 0 && mon.getAbility().id !== snap.abilityId) {
+      mon.summonData.ability = snap.abilityId as AbilityId;
+    }
+    // Per-move PP: align ppUsed on the matching slot (moveset structure already matches
+    // in lockstep; we only correct the used count, never rebuild the moveset).
+    const moveset = mon.getMoveset();
+    for (let i = 0; i < moveset.length && i < snap.moves.length; i++) {
+      const [, ppUsed] = snap.moves[i];
+      if (moveset[i] != null && typeof ppUsed === "number") {
+        moveset[i].ppUsed = Math.max(0, ppUsed);
+      }
+    }
+    reconcileTags(mon, snap.tags);
+    mon.calculateStats();
+    // Status.
+    mon.status = snap.status ? new Status(snap.status as StatusEffect) : null;
+    // Stat stages (7).
+    const stages = mon.getStatStages();
+    for (let i = 0; i < 7 && i < stages.length; i++) {
+      stages[i] = Math.max(-6, Math.min(6, Math.trunc(snap.statStages[i] ?? 0)));
+    }
+    // HP last, clamped to the (recomputed) max.
+    mon.hp = Math.max(0, Math.min(Math.trunc(snap.hp), mon.getMaxHp()));
+    void mon.updateInfo();
+  } catch {
+    /* one mon's heal failed; leave it and continue */
+  }
+}
+
+/**
+ * GUEST: adopt the host's full authoritative snapshot wholesale to HEAL a desync (#633,
+ * TRACK-2). Applies field mons (ability/form before stat recompute), then arena weather /
+ * terrain, then money - field-by-field onto the LIVE objects (never a session reload, which
+ * would tear down the running battle). Party order + modifier stacks are intentionally NOT
+ * rewritten here (structural changes mid-battle are unsafe); they converge at the next wave
+ * boundary's normal sync. Fully guarded so a malformed snapshot can never crash the guest.
+ */
+export function applyCoopFullSnapshot(snapshot: CoopFullBattleSnapshot): void {
+  try {
+    const byIndex = new Map(
+      globalScene
+        .getField(true)
+        .filter((m): m is Pokemon => m != null)
+        .map(m => [m.getBattlerIndex(), m]),
+    );
+    for (const snap of snapshot.field) {
+      const mon = byIndex.get(snap.bi);
+      if (mon != null) {
+        applyFullMon(mon, snap);
+      }
+    }
+    const arena = globalScene.arena;
+    if ((arena.weather?.weatherType ?? 0) !== snapshot.weather) {
+      arena.trySetWeather(snapshot.weather as WeatherType);
+    }
+    if ((arena.terrain?.terrainType ?? 0) !== snapshot.terrain) {
+      arena.trySetTerrain(snapshot.terrain as TerrainType, true);
+    }
+    globalScene.money = snapshot.money;
+  } catch {
+    // A malformed snapshot must never crash the guest's battle.
   }
 }

@@ -37,6 +37,16 @@ export interface CoopTurnResolution {
   turn: number;
   events: CoopBattleEvent[];
   checkpoint: CoopBattleCheckpoint;
+  /** The host's full-state checksum at this boundary (#633, TRACK-2). */
+  checksum: string;
+}
+
+/** An out-of-turn authoritative checkpoint + the host's matching full-state checksum. */
+export interface CoopCheckpointEnvelope {
+  reason: string;
+  checkpoint: CoopBattleCheckpoint;
+  /** The host's full-state checksum at this boundary (#633, TRACK-2). */
+  checksum: string;
 }
 
 /** Options for {@linkcode CoopBattleStreamer} (timer injection for tests). */
@@ -84,14 +94,22 @@ export class CoopBattleStreamer {
   private checkpointHandler: ((reason: string, checkpoint: CoopBattleCheckpoint) => void) | null = null;
   /** wave -> resolver for an in-flight {@linkcode awaitEnemyParty}. */
   private readonly enemyPartyWaiters = new Map<number, (res: CoopSerializedEnemy[] | null) => void>();
-  /** Latest authoritative checkpoint the guest has not yet applied (consumed at a turn boundary). */
-  private lastCheckpoint: CoopBattleCheckpoint | null = null;
+  /** Latest authoritative checkpoint (+ checksum) the guest has not yet applied. */
+  private lastCheckpoint: CoopCheckpointEnvelope | null = null;
   /** Latest enemy party the guest has not yet adopted (consumed at the wave's first turn). */
   private lastEnemyParty: { wave: number; enemies: CoopSerializedEnemy[] } | null = null;
   /** GUEST: handler for the host's authoritative ghost-team pool (#633 ghost-pool sync). */
   private ghostPoolHandler: ((pool: GhostTeamSnapshot[]) => void) | null = null;
   /** GUEST: the host's ghost pool that arrived before a handler subscribed (delivered on subscribe). */
   private lastGhostPool: GhostTeamSnapshot[] | null = null;
+  /** HOST: handler answering the guest's `requestStateSync` (#633, TRACK-2 resync). */
+  private stateSyncRequestHandler: ((turn: number, seq: number) => void) | null = null;
+  /** GUEST: seq -> resolver for an in-flight {@linkcode awaitStateSync}. */
+  private readonly stateSyncWaiters = new Map<number, (blob: string | null) => void>();
+  /** GUEST: a `stateSync` blob that arrived before its waiter (race buffer), keyed by seq. */
+  private readonly stateSyncInbox = new Map<number, string>();
+  /** GUEST: monotonic resync request counter (each desync request bumps it). */
+  private stateSyncSeq = 0;
 
   constructor(transport: CoopTransport, opts: CoopBattleStreamerOptions = {}) {
     this.transport = transport;
@@ -117,14 +135,34 @@ export class CoopBattleStreamer {
     this.transport.send({ t: "ghostPool", pool });
   }
 
-  /** HOST: send a fully-resolved turn (ordered events + authoritative checkpoint). */
-  emitTurn(turn: number, events: CoopBattleEvent[], checkpoint: CoopBattleCheckpoint): void {
-    this.transport.send({ t: "turnResolution", turn, events, checkpoint });
+  /**
+   * HOST: send a fully-resolved turn (ordered events + authoritative checkpoint + the
+   * host's full-state `checksum` the guest verifies against, #633 TRACK-2).
+   */
+  emitTurn(turn: number, events: CoopBattleEvent[], checkpoint: CoopBattleCheckpoint, checksum: string): void {
+    this.transport.send({ t: "turnResolution", turn, events, checkpoint, checksum });
   }
 
-  /** HOST: send an out-of-turn authoritative checkpoint (after a switch / capture / resume). */
-  sendCheckpoint(reason: string, checkpoint: CoopBattleCheckpoint): void {
-    this.transport.send({ t: "battleCheckpoint", reason, checkpoint });
+  /**
+   * HOST: send an out-of-turn authoritative checkpoint (after a switch / capture / resume),
+   * stamped with the host's full-state `checksum` for the guest to verify (#633, TRACK-2).
+   */
+  sendCheckpoint(reason: string, checkpoint: CoopBattleCheckpoint, checksum: string): void {
+    this.transport.send({ t: "battleCheckpoint", reason, checkpoint, checksum });
+  }
+
+  /** HOST: send the authoritative full-state snapshot answering a guest's `requestStateSync`. */
+  sendStateSync(blob: string, seq: number): void {
+    this.transport.send({ t: "stateSync", blob, seq });
+  }
+
+  /**
+   * HOST: subscribe to the guest's resync requests. The handler receives the desynced
+   * `turn` + the request `seq` it must echo on the `stateSync` reply (so the guest can
+   * drop a stale answer). Returns immediately; the host builds + sends the blob.
+   */
+  onStateSyncRequest(handler: (turn: number, seq: number) => void): void {
+    this.stateSyncRequestHandler = handler;
   }
 
   // --- GUEST side -------------------------------------------------------------
@@ -205,11 +243,12 @@ export class CoopBattleStreamer {
   }
 
   /**
-   * GUEST: take + clear the latest authoritative checkpoint, if any. The guest applies
-   * it at a SAFE turn boundary (start of its next command phase) rather than mid-
-   * resolution, so a snap to the host's post-turn state can never fight a running phase.
+   * GUEST: take + clear the latest authoritative checkpoint (+ the host's checksum), if
+   * any. The guest applies it at a SAFE turn boundary (start of its next command phase)
+   * rather than mid-resolution, so a snap to the host's post-turn state can never fight a
+   * running phase. The `checksum` lets the guest verify it converged after applying.
    */
-  consumeCheckpoint(): CoopBattleCheckpoint | null {
+  consumeCheckpoint(): CoopCheckpointEnvelope | null {
     const cp = this.lastCheckpoint;
     this.lastCheckpoint = null;
     return cp;
@@ -248,6 +287,48 @@ export class CoopBattleStreamer {
     });
   }
 
+  /**
+   * GUEST: request the host's authoritative full state after a checksum mismatch at
+   * `turn`, then await the answering `stateSync` blob (#633, TRACK-2). Returns the
+   * compressed blob to adopt, or `null` on timeout (the guest then keeps its current
+   * state and re-checks next turn - degraded but never hung). One request is in flight
+   * at a time: a new request supersedes any older waiter (resolves it null), so a
+   * multi-turn divergence can't fan out into overlapping resyncs.
+   */
+  requestStateSync(turn: number): Promise<string | null> {
+    // Supersede every older in-flight resync (the newest desync is the one to heal).
+    for (const finish of [...this.stateSyncWaiters.values()]) {
+      finish(null);
+    }
+    this.stateSyncWaiters.clear();
+    const seq = ++this.stateSyncSeq;
+    // The host may have already answered this exact seq (race) - consume it if so.
+    const buffered = this.stateSyncInbox.get(seq);
+    if (buffered !== undefined) {
+      this.stateSyncInbox.delete(seq);
+      this.transport.send({ t: "requestStateSync", turn, seq });
+      return Promise.resolve(buffered);
+    }
+    return new Promise<string | null>(resolve => {
+      let settled = false;
+      let cancelTimer: () => void = () => {};
+      const finish = (blob: string | null) => {
+        if (settled) {
+          return;
+        }
+        settled = true;
+        cancelTimer();
+        if (this.stateSyncWaiters.get(seq) === finish) {
+          this.stateSyncWaiters.delete(seq);
+        }
+        resolve(blob);
+      };
+      this.stateSyncWaiters.set(seq, finish);
+      cancelTimer = this.schedule(() => finish(null), this.timeoutMs);
+      this.transport.send({ t: "requestStateSync", turn, seq });
+    });
+  }
+
   // --- shared -----------------------------------------------------------------
 
   /** Stop listening and fail any in-flight awaits. */
@@ -259,8 +340,13 @@ export class CoopBattleStreamer {
     for (const finish of [...this.enemyPartyWaiters.values()]) {
       finish(null);
     }
+    for (const finish of [...this.stateSyncWaiters.values()]) {
+      finish(null);
+    }
     this.pending.clear();
     this.enemyPartyWaiters.clear();
+    this.stateSyncWaiters.clear();
+    this.stateSyncInbox.clear();
     this.inbox.clear();
     this.lastCheckpoint = null;
     this.lastEnemyParty = null;
@@ -268,6 +354,7 @@ export class CoopBattleStreamer {
     this.checkpointHandler = null;
     this.ghostPoolHandler = null;
     this.lastGhostPool = null;
+    this.stateSyncRequestHandler = null;
   }
 
   private handle(msg: CoopMessage): void {
@@ -287,7 +374,12 @@ export class CoopBattleStreamer {
         return;
       }
       case "turnResolution": {
-        const res: CoopTurnResolution = { turn: msg.turn, events: msg.events, checkpoint: msg.checkpoint };
+        const res: CoopTurnResolution = {
+          turn: msg.turn,
+          events: msg.events,
+          checkpoint: msg.checkpoint,
+          checksum: msg.checksum,
+        };
         const resolver = this.pending.get(msg.turn);
         if (resolver) {
           resolver(res);
@@ -298,8 +390,25 @@ export class CoopBattleStreamer {
         return;
       }
       case "battleCheckpoint":
+        // Buffer for the guest's next consumeCheckpoint() (applied at a turn boundary),
+        // carrying the host's checksum so the guest can verify convergence after applying.
+        this.lastCheckpoint = { reason: msg.reason, checkpoint: msg.checkpoint, checksum: msg.checksum };
         this.checkpointHandler?.(msg.reason, msg.checkpoint);
         return;
+      case "requestStateSync":
+        // HOST: the guest detected a desync - hand the request to the host's builder.
+        this.stateSyncRequestHandler?.(msg.turn, msg.seq);
+        return;
+      case "stateSync": {
+        // GUEST: deliver to a parked awaiter for this seq, else buffer it (race).
+        const waiter = this.stateSyncWaiters.get(msg.seq);
+        if (waiter) {
+          waiter(msg.blob);
+        } else {
+          this.stateSyncInbox.set(msg.seq, msg.blob);
+        }
+        return;
+      }
       case "ghostPool":
         // Deliver to a live handler, else buffer (the broadcast can land before the
         // guest's runtime wiring subscribes - it's sent eagerly on prefetch-resolve).

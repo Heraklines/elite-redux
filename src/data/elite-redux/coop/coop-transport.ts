@@ -136,6 +136,56 @@ export interface CoopBattleCheckpoint {
   terrainTurnsLeft: number;
 }
 
+// =============================================================================
+// Host-authoritative FULL battle snapshot (#633, TRACK-2). The heavy `stateSync`
+// payload the host sends when the guest detects a checksum MISMATCH: every field
+// detail the per-turn checkpoint can't carry (active ability, form, per-move PP,
+// battler tags) PLUS arena tags, the player party order, money, and modifier stacks.
+// The guest adopts it field-by-field (NEVER a full session reload mid-battle - that
+// tears down the live field), so a divergence is healed wholesale and the next turn's
+// checksum re-converges. All plain JSON so it compresses + crosses the real transport.
+// =============================================================================
+
+/** One field mon's FULL authoritative state for a resync (superset of the checkpoint). */
+export interface CoopFullMonSnapshot {
+  /** Battler index (0 host lead, 1 guest lead, 2/3 enemies). */
+  bi: number;
+  hp: number;
+  maxHp: number;
+  /** `StatusEffect` enum value (0 = none). */
+  status: number;
+  /** The 7 stat stages (ATK..ACC/EVA). */
+  statStages: number[];
+  fainted: boolean;
+  /** Active ability id (`AbilityId`); 0 when unknown. */
+  abilityId: number;
+  /** Current form index. */
+  formIndex: number;
+  /** Each move slot as `[moveId, ppUsed]`, in moveset slot order. */
+  moves: [number, number][];
+  /** Battler-tag TYPE ids present on the mon (identity only). */
+  tags: number[];
+}
+
+/** The full authoritative battle state the host sends to heal a desync. */
+export interface CoopFullBattleSnapshot {
+  /** Every occupied field mon's full state, by battler index. */
+  field: CoopFullMonSnapshot[];
+  /** `WeatherType` enum value (0 = none) + turns remaining. */
+  weather: number;
+  weatherTurnsLeft: number;
+  /** `TerrainType` enum value (0 = none) + turns remaining. */
+  terrain: number;
+  terrainTurnsLeft: number;
+  /** Arena tag identities as `[tagType, side]`. */
+  arenaTags: [number, number][];
+  /** Player party `speciesId`s in slot order. */
+  party: number[];
+  money: number;
+  /** Persistent modifiers as `[typeId, stackCount]`. */
+  modifiers: [string, number][];
+}
+
 /**
  * One ordered visible thing that happened during a turn. The MVP renders only
  * `message` (narration) and relies on the checkpoint for outcomes; the richer kinds
@@ -236,8 +286,19 @@ export type CoopMessage =
   | { t: "requestRunConfig" }
   /** A choice on an alternation-owned interaction screen (reward / shop / ME) (P4). */
   | { t: "interaction"; screen: string; choice: unknown }
-  /** Host -> guest authoritative state checkpoint: a compressed SessionSaveData blob (P2/P5). */
+  /**
+   * Host -> guest (#633, TRACK-2): the AUTHORITATIVE full battle snapshot, sent to HEAL
+   * a checksum mismatch. `blob` is an lz-string-compressed JSON {@linkcode CoopFullBattleSnapshot}
+   * the guest decompresses + adopts field-by-field (never a session reload mid-battle).
+   * `seq` echoes the `requestStateSync` it answers, so a stale reply is ignored.
+   */
   | { t: "stateSync"; blob: string; seq: number }
+  /**
+   * Guest -> host (#633, TRACK-2): "my post-turn checksum disagreed with yours at `turn`;
+   * send me the authoritative full state". `seq` is a monotonic guest-side counter so the
+   * host's `stateSync` reply can be matched + a stale one dropped (one request in flight).
+   */
+  | { t: "requestStateSync"; turn: number; seq: number }
   /**
    * Host -> guest (#633, LIVE-D): the EXACT enemy party the host generated for this
    * `wave`. The guest adopts these verbatim instead of regenerating (so it never rolls
@@ -258,13 +319,24 @@ export type CoopMessage =
    * Host -> guest (#633, LIVE-D): a fully-resolved turn. `events` is the ordered visible
    * log the guest narrates/animates; `checkpoint` is the AUTHORITATIVE post-turn state the
    * guest applies so it can never drift. The guest computes none of this itself.
+   *
+   * `checksum` (#633, TRACK-2) is the host's 64-bit fingerprint of its FULL post-turn
+   * state (computed at the SAME boundary the guest reads). The guest recomputes its own
+   * and, on a mismatch, requests a `stateSync`. Required (the host always stamps it).
    */
-  | { t: "turnResolution"; turn: number; events: CoopBattleEvent[]; checkpoint: CoopBattleCheckpoint }
+  | {
+      t: "turnResolution";
+      turn: number;
+      events: CoopBattleEvent[];
+      checkpoint: CoopBattleCheckpoint;
+      checksum: string;
+    }
   /**
    * Host -> guest (#633, LIVE-D): an out-of-turn authoritative checkpoint (after a
    * switch / capture / encounter start / resume). `reason` is a short tag for logging.
+   * `checksum` (#633, TRACK-2): the host's full-state fingerprint at this boundary.
    */
-  | { t: "battleCheckpoint"; reason: string; checkpoint: CoopBattleCheckpoint }
+  | { t: "battleCheckpoint"; reason: string; checkpoint: CoopBattleCheckpoint; checksum: string }
   /**
    * Owner -> watcher (#633): the owner's pick on an ALTERNATING-control interaction
    * screen (reward shop / biome shop / mystery encounter). Same seed -> both clients

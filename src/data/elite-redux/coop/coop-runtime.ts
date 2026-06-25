@@ -19,6 +19,7 @@
 // =============================================================================
 
 import { globalScene } from "#app/global-scene";
+import { captureCoopFullSnapshot } from "#data/elite-redux/coop/coop-battle-engine";
 import { CoopBattleStreamer } from "#data/elite-redux/coop/coop-battle-stream";
 import { CoopBattleSync } from "#data/elite-redux/coop/coop-battle-sync";
 import { CoopInteractionRelay } from "#data/elite-redux/coop/coop-interaction-relay";
@@ -29,6 +30,7 @@ import { SpoofGuest } from "#data/elite-redux/coop/coop-spoof-guest";
 import { type CoopTransport, createLoopbackPair, type SerializedCommand } from "#data/elite-redux/coop/coop-transport";
 import { CoopUiMirror } from "#data/elite-redux/coop/coop-ui-mirror";
 import { setCoopGhostFetchSuppressed, setCoopGhostPool, setGhostPoolPublisher } from "#data/elite-redux/er-ghost-teams";
+import { compressToBase64 } from "lz-string";
 
 /**
  * Co-op ghost-pool sync (#633): the HOST broadcasts its server-fetched ghost-team
@@ -48,6 +50,31 @@ function wireCoopGhostPoolSync(controller: CoopSessionController, battleStream: 
   battleStream.onGhostPool(pool => {
     if (controller.role === "guest") {
       setCoopGhostPool(pool);
+    }
+  });
+}
+
+/**
+ * Co-op resync responder (#633, TRACK-2): the HOST answers a guest's `requestStateSync`
+ * (sent when the guest's post-turn checksum disagreed with the host's) by serializing its
+ * FULL authoritative battle state, lz-compressing it, and streaming it back stamped with
+ * the request `seq`. The guest decompresses + adopts it field-by-field. Gated on the live
+ * HOST role so a guest/solo client never answers. Best-effort + guarded - a serialize
+ * failure never breaks the host's turn.
+ */
+function wireCoopResyncResponder(controller: CoopSessionController, battleStream: CoopBattleStreamer): void {
+  battleStream.onStateSyncRequest((_turn, seq) => {
+    if (controller.role !== "host") {
+      return;
+    }
+    try {
+      const snapshot = captureCoopFullSnapshot();
+      if (snapshot == null) {
+        return;
+      }
+      battleStream.sendStateSync(compressToBase64(JSON.stringify(snapshot)), seq);
+    } catch {
+      /* a resync serialize/send failure must never break the host's turn */
     }
   });
 }
@@ -171,6 +198,7 @@ export function startLocalCoopSession(opts: { username?: string | undefined } = 
     spoof,
   };
   wireCoopGhostPoolSync(controller, battleStream);
+  wireCoopResyncResponder(controller, battleStream);
   setCoopRuntime(runtime);
   controller.connect();
   return runtime;
@@ -205,6 +233,7 @@ export function connectCoopSession(
     localTransport: transport,
   };
   wireCoopGhostPoolSync(controller, battleStream);
+  wireCoopResyncResponder(controller, battleStream);
   setCoopRuntime(runtime);
   controller.connect();
   return runtime;

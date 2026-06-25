@@ -73,7 +73,7 @@ describe("co-op host-authoritative streaming protocol (#633, LIVE-D)", () => {
       terrain: 0,
       terrainTurnsLeft: 0,
     };
-    host.send({ t: "turnResolution", turn: 1, events, checkpoint });
+    host.send({ t: "turnResolution", turn: 1, events, checkpoint, checksum: "abcd1234abcd1234" });
     await flush();
 
     const msg = received[0];
@@ -103,7 +103,7 @@ describe("co-op host-authoritative streaming protocol (#633, LIVE-D)", () => {
       terrain: 0,
       terrainTurnsLeft: 0,
     };
-    host.send({ t: "battleCheckpoint", reason: "switch", checkpoint });
+    host.send({ t: "battleCheckpoint", reason: "switch", checkpoint, checksum: "abcd1234abcd1234" });
     await flush();
 
     const msg = received[0];
@@ -136,6 +136,7 @@ describe("co-op host-authoritative streaming protocol (#633, LIVE-D)", () => {
         turn: 1,
         events: [],
         checkpoint: { field: [], weather: 0, weatherTurnsLeft: 0, terrain: 0, terrainTurnsLeft: 0 },
+        checksum: "abcd1234abcd1234",
       }),
     ).not.toThrow();
     host.send({ t: "ping", ts: 1 });
