@@ -55,6 +55,7 @@ import type { Nature } from "#enums/nature";
 import { TrainerType } from "#enums/trainer-type";
 import type { EnemyPartyConfig, EnemyPokemonConfig } from "#mystery-encounters/encounter-phase-utils";
 import type { Variant } from "#sprites/variant";
+import { randSeedInt, randSeedItem } from "#utils/common";
 import { getPokemonSpecies } from "#utils/pokemon-utils";
 
 /** Rounds in the gauntlet. */
@@ -165,17 +166,19 @@ const V_GHOST_CLASS: TrainerType[] = [
   TrainerType.RANGER,
 ];
 
+// Seeded RNG (NOT Math.random) so the rolled gauntlet is deterministic per run seed - required
+// for co-op (#633): both clients must roll the IDENTICAL roster, and it makes the gauntlet replayable.
 function shuffle<T>(arr: readonly T[]): T[] {
   const a = [...arr];
   for (let i = a.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
+    const j = randSeedInt(i + 1);
     [a[i], a[j]] = [a[j], a[i]];
   }
   return a;
 }
 
 function pick<T>(arr: readonly T[]): T {
-  return arr[Math.floor(Math.random() * arr.length)];
+  return randSeedItem(arr);
 }
 
 /** The atlas key + sprite for a trainer class (single, non-double, default gender). */
@@ -319,8 +322,9 @@ export async function buildColosseumGauntlet(): Promise<ColosseumChallenger[]> {
     if (!list || list.length === 0) {
       return [];
     }
-    // Pick from the stronger half for boss/gym/champion punch.
-    const e = list[Math.floor(list.length / 2 + Math.random() * (list.length / 2))] ?? list.at(-1);
+    // Pick from the stronger half for boss/gym/champion punch (seeded for co-op/replay determinism).
+    const half = Math.floor(list.length / 2);
+    const e = list[half + randSeedInt(list.length - half)] ?? list.at(-1);
     return e ? selectErRoster(e, tier).map(erMember) : [];
   };
 

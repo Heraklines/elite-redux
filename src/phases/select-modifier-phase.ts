@@ -744,6 +744,13 @@ export class SelectModifierPhase extends BattlePhase {
     if (!globalScene.gameMode.isCoop) {
       return;
     }
+    // Co-op (#633): when this reward shop is the END-OF-MYSTERY-ENCOUNTER reward (an ME is still
+    // active), the encounter OWNS the single alternation advance (fired by PostMysteryEncounterPhase),
+    // so the embedded shop must NOT advance too - else the turn counter double-advances and the
+    // owner/watcher calc desyncs. A normal wave shop has no active ME, so it advances as usual.
+    if (globalScene.currentBattle.mysteryEncounter != null) {
+      return;
+    }
     const controller = getCoopController();
     if (controller?.role === "host") {
       console.log(`[coop-reward] host advances interaction turn from ${controller.interactionCounter()}`);

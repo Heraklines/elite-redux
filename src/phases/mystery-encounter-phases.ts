@@ -2,6 +2,7 @@ import { consumeClearMeOverrideAfterFirst } from "#app/dev-tools/registry";
 import { globalScene } from "#app/global-scene";
 import { Phase } from "#app/phase";
 import { getCharVariantFromDialogue } from "#data/dialogue";
+import { getCoopController, getCoopMePump, getCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
 import { ArenaTagSide } from "#enums/arena-tag-side";
 import { BattlerTagLapseType } from "#enums/battler-tag-lapse-type";
 import { BattlerTagType } from "#enums/battler-tag-type";
@@ -12,12 +13,96 @@ import { UiMode } from "#enums/ui-mode";
 import { IvScannerModifier } from "#modifiers/modifier";
 import { getEncounterText } from "#mystery-encounters/encounter-dialogue-utils";
 import type { OptionSelectSettings } from "#mystery-encounters/encounter-phase-utils";
-import { transitionMysteryEncounterIntroVisuals } from "#mystery-encounters/encounter-phase-utils";
+import {
+  leaveEncounterWithoutBattle,
+  transitionMysteryEncounterIntroVisuals,
+} from "#mystery-encounters/encounter-phase-utils";
 import type { MysteryEncounterOption, OptionPhaseCallback } from "#mystery-encounters/mystery-encounter-option";
 import { SeenEncounterData } from "#mystery-encounters/mystery-encounter-save-data";
 import { randSeedItem } from "#utils/common";
 import { inSpeedOrder } from "#utils/speed-order-generator";
 import i18next from "i18next";
+
+// =============================================================================
+// Co-op (#633): a whole mystery encounter is ONE alternating interaction. The OWNER
+// drives every interactive screen and relays each button; the WATCHER replays them
+// (via the CoopMePump) so both run the identical encounter and get identical rewards.
+// The pump rides a dedicated seq range (distinct from the reward-shop seqs) keyed by
+// the interaction counter, so owner + watcher agree on it and it is unique per ME.
+// The embedded battle + the end-of-ME reward shop keep their own co-op owners (the
+// battle command relay / the shop relay); the pump auto-suspends for them via the
+// phase gate in ui.ts.
+// =============================================================================
+const COOP_ME_PUMP_SEQ_BASE = 8_000_000;
+
+/** Co-op (#633): whether the CURRENT phase is a mystery-encounter INTERACTIVE phase (NOT the
+ *  embedded battle / reward shop). Used to guard the watcher's fast-forward so it never fires
+ *  once the encounter has already been left. */
+function coopInMeInteractivePhase(): boolean {
+  const pn = globalScene.phaseManager.getCurrentPhase()?.phaseName;
+  return (
+    pn === "MysteryEncounterPhase"
+    || pn === "MysteryEncounterOptionSelectedPhase"
+    || pn === "MysteryEncounterRewardsPhase"
+    || pn === "PostMysteryEncounterPhase"
+  );
+}
+
+/**
+ * Co-op (#633): open the ME input pump for this client. The OWNER (whose alternating turn it
+ * is, or the host in the dev/spoof path) drives + relays; the WATCHER replays. Idempotent across
+ * nested option-selects (same seq). Hard no-op in solo / outside a live co-op run.
+ */
+function coopBeginMePump(): void {
+  if (!globalScene.gameMode.isCoop) {
+    return;
+  }
+  const controller = getCoopController();
+  const pump = getCoopMePump();
+  if (controller == null || pump == null) {
+    return;
+  }
+  const seq = COOP_ME_PUMP_SEQ_BASE + controller.interactionCounter();
+  const spoofed = getCoopRuntime()?.spoof != null;
+  if (spoofed || controller.isLocalInteractionTurn()) {
+    pump.beginOwner(seq);
+  } else {
+    // On the leave sentinel / timeout / partner-gone, fast-forward to the next wave IF still in
+    // the encounter (the rewards were already applied by the relayed picks; only the final outro
+    // is skipped). The HOST also advances the alternation turn here when it is the watcher and
+    // the fast-forward fires - the owner's terminal advance only runs when the host is the owner.
+    pump.beginWatcher(seq, () => {
+      if (!coopInMeInteractivePhase()) {
+        return; // already auto-completed past the encounter; its terminal already advanced
+      }
+      leaveEncounterWithoutBattle();
+      if (controller.role === "host") {
+        controller.advanceInteraction();
+      }
+    });
+  }
+}
+
+/**
+ * Co-op (#633): close the ME input pump at the encounter terminal. The OWNER sends the leave
+ * sentinel (the watcher fast-forwards to the next wave); the HOST advances the alternation turn
+ * ONCE for the whole encounter (its embedded reward shop suppresses its own advance while an ME
+ * is active, so this is the single advance).
+ */
+function coopEndMePump(): void {
+  if (!globalScene.gameMode.isCoop) {
+    return;
+  }
+  const controller = getCoopController();
+  const pump = getCoopMePump();
+  if (controller == null || pump == null) {
+    return;
+  }
+  pump.endOwner();
+  if (controller.role === "host") {
+    controller.advanceInteraction();
+  }
+}
 
 /**
  * Will handle (in order):
@@ -67,6 +152,10 @@ export class MysteryEncounterPhase extends Phase {
 
     // Initiates encounter dialogue window and option select
     globalScene.ui.setMode(UiMode.MYSTERY_ENCOUNTER, this.optionSelectSettings);
+    // Co-op (#633): open the input pump so the owner drives + relays this encounter and the
+    // watcher replays it in lockstep (synced choices -> synced rewards). Idempotent across a
+    // re-entered/nested option-select; no-op in solo.
+    coopBeginMePump();
   }
 
   /**
@@ -602,6 +691,11 @@ export class PostMysteryEncounterPhase extends Phase {
    */
   continueEncounter() {
     const endPhase = () => {
+      // Co-op (#633): the encounter is over - close the input pump (owner sends the leave
+      // sentinel; host advances the alternation turn once for the whole encounter). Done before
+      // queuing the next wave so the watcher's loop ends cleanly. No-op in solo.
+      coopEndMePump();
+
       if (globalScene.gameMode.hasRandomBiomes || globalScene.isNewBiome()) {
         globalScene.phaseManager.pushNew("SelectBiomePhase");
       }

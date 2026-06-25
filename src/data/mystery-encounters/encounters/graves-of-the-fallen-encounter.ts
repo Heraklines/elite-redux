@@ -65,7 +65,7 @@ import { MysteryEncounterBuilder } from "#mystery-encounters/mystery-encounter";
 import { MysteryEncounterOptionBuilder } from "#mystery-encounters/mystery-encounter-option";
 import type { Variant } from "#sprites/variant";
 import type { ModifierTypeFunc } from "#types/modifier-types";
-import { randSeedShuffle } from "#utils/common";
+import { randSeedItem, randSeedShuffle } from "#utils/common";
 import { getPokemonSpecies } from "#utils/pokemon-utils";
 
 const namespace = "mysteryEncounters/gravesOfTheFallen";
@@ -262,7 +262,8 @@ function resolvableHeldItemFuncs(grave: GhostTeamSnapshot): ModifierTypeFunc[] {
 function payRespects(grave: GhostTeamSnapshot): void {
   const funcs = resolvableHeldItemFuncs(grave);
   if (funcs.length > 0) {
-    const chosen = funcs[Math.floor(Math.random() * funcs.length)];
+    // Seeded (NOT Math.random) so co-op clients grant the IDENTICAL memento + it is replayable.
+    const chosen = randSeedItem(funcs);
     setEncounterRewards({ guaranteedModifierTypeFuncs: [chosen], fillRemaining: false });
   } else {
     setEncounterRewards({ guaranteedModifierTiers: [FALLBACK_TIER], fillRemaining: false });

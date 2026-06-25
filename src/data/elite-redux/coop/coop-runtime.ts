@@ -22,6 +22,7 @@ import { globalScene } from "#app/global-scene";
 import { CoopBattleStreamer } from "#data/elite-redux/coop/coop-battle-stream";
 import { CoopBattleSync } from "#data/elite-redux/coop/coop-battle-sync";
 import { CoopInteractionRelay } from "#data/elite-redux/coop/coop-interaction-relay";
+import { CoopMePump } from "#data/elite-redux/coop/coop-me-pump";
 import { coopOwnerOfFieldIndex } from "#data/elite-redux/coop/coop-session";
 import { CoopSessionController } from "#data/elite-redux/coop/coop-session-controller";
 import { SpoofGuest } from "#data/elite-redux/coop/coop-spoof-guest";
@@ -40,6 +41,8 @@ export interface CoopRuntime {
   interactionRelay: CoopInteractionRelay;
   /** Owner->watcher COSMETIC live-cursor mirror for shared interaction screens (#633). */
   uiMirror: CoopUiMirror;
+  /** Owner->watcher AUTHORITATIVE input pump for whole mystery-encounter lockstep (#633). */
+  mePump: CoopMePump;
   /** The local client's transport endpoint. */
   localTransport: CoopTransport;
   /** The spoofed partner's transport endpoint (local dev only; absent for real peers). */
@@ -85,6 +88,11 @@ export function getCoopUiMirror(): CoopUiMirror | null {
   return active?.uiMirror ?? null;
 }
 
+/** Convenience: the mystery-encounter input pump, or null when not in a co-op run. */
+export function getCoopMePump(): CoopMePump | null {
+  return active?.mePump ?? null;
+}
+
 /** Whether a co-op session is currently active. */
 export function isCoopRuntimeActive(): boolean {
   return active != null;
@@ -126,6 +134,7 @@ export function startLocalCoopSession(opts: { username?: string | undefined } = 
   const battleStream = new CoopBattleStreamer(host);
   const interactionRelay = new CoopInteractionRelay(host);
   const uiMirror = new CoopUiMirror(host);
+  const mePump = new CoopMePump(interactionRelay);
   const spoof = new SpoofGuest(guest);
   const runtime: CoopRuntime = {
     controller,
@@ -133,6 +142,7 @@ export function startLocalCoopSession(opts: { username?: string | undefined } = 
     battleStream,
     interactionRelay,
     uiMirror,
+    mePump,
     localTransport: host,
     partnerTransport: guest,
     spoof,
@@ -160,12 +170,14 @@ export function connectCoopSession(
   const battleStream = new CoopBattleStreamer(transport);
   const interactionRelay = new CoopInteractionRelay(transport);
   const uiMirror = new CoopUiMirror(transport);
+  const mePump = new CoopMePump(interactionRelay);
   const runtime: CoopRuntime = {
     controller,
     battleSync,
     battleStream,
     interactionRelay,
     uiMirror,
+    mePump,
     localTransport: transport,
   };
   setCoopRuntime(runtime);
@@ -183,6 +195,7 @@ export function clearCoopRuntime(): void {
   active.battleStream.dispose();
   active.interactionRelay.dispose();
   active.uiMirror.dispose();
+  active.mePump.endSession();
   active.spoof?.dispose();
   active.localTransport.close();
   active = null;

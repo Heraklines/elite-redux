@@ -172,15 +172,14 @@ export class CoopMePump {
         if (this.ended || this.seq !== seq) {
           return;
         }
-        if (action == null) {
-          // Timeout / partner gone: end + let the caller skip this ME to a safe terminal.
-          const degrade = this.onDegrade;
+        // A leave sentinel (owner reached the encounter terminal) OR a null (timeout / partner
+        // gone) both mean "stop watching": end + let the caller reconcile to where the run now
+        // is (fast-forward the encounter to the next wave if we are still in it - the rewards
+        // were already applied by the relayed picks; only the final outro is skipped).
+        if (action == null || action.choice === COOP_INTERACTION_LEAVE) {
+          const onEnd = this.onDegrade;
           this.endSession();
-          degrade?.();
-          return;
-        }
-        if (action.choice === COOP_INTERACTION_LEAVE) {
-          this.endSession();
+          onEnd?.();
           return;
         }
         const engine = this.engine;

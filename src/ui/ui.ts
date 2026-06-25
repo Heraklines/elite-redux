@@ -1,5 +1,6 @@
 import { globalScene } from "#app/global-scene";
-import { getCoopUiMirror } from "#data/elite-redux/coop/coop-runtime";
+import type { CoopMePumpEngine } from "#data/elite-redux/coop/coop-me-pump";
+import { getCoopMePump, getCoopUiMirror } from "#data/elite-redux/coop/coop-runtime";
 import type { CoopUiMirrorEngine } from "#data/elite-redux/coop/coop-ui-mirror";
 import type { Button } from "#enums/buttons";
 import { Device } from "#enums/devices";
@@ -141,6 +142,8 @@ export class UI extends Phaser.GameObjects.Container {
 
   /** Co-op (#633): cached engine surface for the live-cursor UI mirror (lazily built). */
   private _coopMirrorEngine: CoopUiMirrorEngine | null = null;
+  /** Co-op (#633): cached engine surface for the mystery-encounter input pump (lazily built). */
+  private _coopMePumpEngine: CoopMePumpEngine | null = null;
 
   constructor() {
     super(globalScene, 0, globalScene.scaledCanvas.height);
@@ -290,6 +293,24 @@ export class UI extends Phaser.GameObjects.Container {
     // short-circuits in solo, and `isActive(this.mode)` is false on any non-shared screen
     // (incl. the battle command menu), so the dispatch below is byte-for-byte unchanged.
     if (globalScene.gameMode.isCoop) {
+      // Co-op (#633): inside a MYSTERY-ENCOUNTER interactive phase, the input PUMP governs
+      // input AUTHORITATIVELY - the WATCHER's local presses are blocked, and the OWNER relays
+      // every handler-READY press (never a scroll-skip) for the partner to replay in lockstep,
+      // so the whole encounter (options, sub-choices, quiz answers, dialogue, cursor) + its
+      // rewards stay identical. Gated on the ME-interactive phase set, so embedded battles +
+      // the end-of-ME reward shop fall through to their own owners.
+      const mePump = getCoopMePump();
+      if (mePump != null && mePump.isSessionActive() && this.coopMeInteractivePhase()) {
+        if (mePump.isWatcher()) {
+          return false; // the partner drives the encounter; ignore the watcher's local input
+        }
+        const wasReady = this.coopMeReady(); // only relay presses the handler will ACT on
+        const result = this.processInputInner(button);
+        if (wasReady) {
+          mePump.relayOwnerButton(button);
+        }
+        return result;
+      }
       const mirror = getCoopUiMirror();
       if (mirror != null && mirror.isActive(this.mode)) {
         if (mirror.isWatcher()) {
@@ -301,6 +322,36 @@ export class UI extends Phaser.GameObjects.Container {
       }
     }
     return this.processInputInner(button);
+  }
+
+  /**
+   * Co-op (#633): whether the CURRENT phase is a mystery-encounter INTERACTIVE phase the input
+   * pump should drive. Excludes the embedded battle ({@linkcode MysteryEncounterBattlePhase}) and
+   * the end-of-ME reward shop ({@linkcode SelectModifierPhase}) - those keep their own co-op
+   * owners (battle command relay / shop relay), so the pump auto-suspends for them.
+   */
+  private coopMeInteractivePhase(): boolean {
+    const phaseName = globalScene.phaseManager.getCurrentPhase()?.phaseName;
+    return (
+      phaseName === "MysteryEncounterPhase"
+      || phaseName === "MysteryEncounterOptionSelectedPhase"
+      || phaseName === "MysteryEncounterRewardsPhase"
+      || phaseName === "PostMysteryEncounterPhase"
+    );
+  }
+
+  /**
+   * Co-op (#633): whether the active handler will ACT on a button NOW (a menu, or a message whose
+   * text has finished scrolling + prompt is up). The OWNER relays only ready presses (so a
+   * scroll-skip stays owner-local), and the WATCHER applies a relayed press only when ready - so
+   * both perform exactly one advance per press and the lockstep never drifts.
+   */
+  private coopMeReady(): boolean {
+    const handler = this.getHandler();
+    if (handler instanceof MessageUiHandler) {
+      return !handler.isTextAnimationInProgress() && !handler.pendingPrompt;
+    }
+    return true;
   }
 
   /** The original input dispatch, reused by the co-op mirror's owner + replay paths (#633). */
@@ -327,6 +378,17 @@ export class UI extends Phaser.GameObjects.Container {
       };
     }
     return this._coopMirrorEngine;
+  }
+
+  /** Stable engine surface handed to the co-op ME input pump (created once, reused) (#633). */
+  private coopMePumpEngine(): CoopMePumpEngine {
+    if (this._coopMePumpEngine == null) {
+      this._coopMePumpEngine = {
+        applyButton: (b: Button) => this.processInputInner(b),
+        isReady: () => this.coopMeReady(),
+      };
+    }
+    return this._coopMePumpEngine;
   }
 
   showTextPromise(text: string, callbackDelay = 0, prompt = true, promptDelay?: number | null): Promise<void> {
@@ -592,6 +654,7 @@ export class UI extends Phaser.GameObjects.Container {
     // opens via setMode, not via local input). Cheap + idempotent; hard no-op in solo.
     if (globalScene.gameMode.isCoop) {
       getCoopUiMirror()?.attach(this.coopMirrorEngine());
+      getCoopMePump()?.attach(this.coopMePumpEngine());
     }
     return new Promise(resolve => {
       if (this.mode === mode && !forceTransition) {
