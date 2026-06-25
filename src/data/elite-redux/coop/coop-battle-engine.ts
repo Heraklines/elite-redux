@@ -405,7 +405,9 @@ export function summonCoopEnemyField(fieldIndex: number, partySlot: number): voi
  * different `speciesId` now at a player bi -> summon the matching party member. Fully guarded so one
  * bad removal/summon can't break the rest of the heal.
  */
-export function reconcileCoopPlayerField(hostField: { bi: number; fainted: boolean; speciesId?: number }[]): void {
+export function reconcileCoopPlayerField(
+  hostField: { bi: number; fainted: boolean; speciesId?: number; partyIndex?: number }[],
+): void {
   try {
     // Player battler indices the host reports PRESENT-AND-ALIVE (slot present, not fainted).
     const hostAlivePlayers = new Set<number>();
@@ -443,11 +445,16 @@ export function reconcileCoopPlayerField(hostField: { bi: number; fainted: boole
         /* one player removal failed; leave it and continue the reconcile */
       }
     }
-    // PASS 2 - SWAP/SUMMON: mirror a host partner REPLACEMENT (#633 partner-death sync, HALF B). For
-    // each player bi the host reports ALIVE with a `speciesId`, if the guest's mon at that field slot
-    // is a DIFFERENT species (a replacement happened), summon the matching player party member onto the
-    // slot (the merged party is in the SAME order on both clients, so the species identifies which
-    // member). speciesId 0 / absent (an older payload or an enemy slot) is skipped.
+    // PASS 2 - SWAP/SUMMON: REPOSITION the host's reported mon onto each player field slot (#633:
+    // mirror a host partner REPLACEMENT from the bench AND repair a field/party-order divergence -
+    // e.g. a guest SELF-SWITCH that was dropped, leaving the right mon ON-FIELD but at the WRONG
+    // slot). For each player bi the host reports ALIVE with a `speciesId`, if the guest's mon at that
+    // field slot is a DIFFERENT species, find the matching member ANYWHERE in the guest party
+    // (bench OR on-field at the wrong slot) and REPOSITION it to the slot via the side-effect-free
+    // swap - REPOSITION, never remove-then-resummon (a failed resummon would softlock the field).
+    // Duplicate species are DISAMBIGUATED by the host's serialized `partyIndex` (the stable party-slot
+    // identity the checksum hashes), not first-species-wins, so two same-species mons can't be crossed.
+    // speciesId 0 / absent (an older payload or an enemy slot) is skipped.
     for (const entry of hostField) {
       if (entry.bi >= BattlerIndex.ENEMY || entry.fainted) {
         continue;
@@ -459,15 +466,31 @@ export function reconcileCoopPlayerField(hostField: { bi: number; fainted: boole
       const fieldSlot = entry.bi;
       const party = globalScene.getPlayerParty();
       const current = party[fieldSlot];
-      // No-op if the correct species is already on this field slot (idempotent re-apply).
-      if (current != null && current.species?.speciesId === speciesId) {
+      // No-op if the correct species is already on this field slot (idempotent re-apply). When the host
+      // disambiguates by partyIndex, also require the SAME party-slot identity so a same-species
+      // duplicate at this slot is still repositioned to the host's exact member.
+      const hostPartyIndex = typeof entry.partyIndex === "number" ? entry.partyIndex : -1;
+      if (
+        current != null
+        && current.species?.speciesId === speciesId
+        && (hostPartyIndex < 0 || party.indexOf(current) === hostPartyIndex)
+      ) {
         continue;
       }
-      // Bench starts after the on-field slots (getPlayerField is party.slice(0, double?2:1)).
-      const onFieldCount = globalScene.getPlayerField(false).length;
-      // Find the party member of the host's reported species that is NOT already on-field (a bench
-      // slot), so we bring in the replacement mon, not re-place an on-field duplicate.
-      const partySlot = party.findIndex((p, i) => p != null && i >= onFieldCount && p.species?.speciesId === speciesId);
+      // Find the matching member ANYWHERE in the party (bench OR on-field at the wrong slot), so a mon
+      // that is on-field-but-mis-slotted is repositioned (the dropped-self-switch case), not just a
+      // bench replacement. Prefer the host's exact partyIndex slot to disambiguate duplicate species;
+      // fall back to the first species match (older payloads without a usable partyIndex).
+      let partySlot = -1;
+      if (
+        hostPartyIndex >= 0
+        && hostPartyIndex !== fieldSlot
+        && party[hostPartyIndex]?.species?.speciesId === speciesId
+      ) {
+        partySlot = hostPartyIndex;
+      } else {
+        partySlot = party.findIndex((p, i) => p != null && i !== fieldSlot && p.species?.speciesId === speciesId);
+      }
       if (partySlot < 0) {
         continue;
       }

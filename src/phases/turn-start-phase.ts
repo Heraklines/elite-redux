@@ -1,7 +1,9 @@
 import { applyAbAttrs } from "#abilities/apply-ab-attrs";
 import type { TurnCommand } from "#app/battle";
 import { globalScene } from "#app/global-scene";
+import { summonCoopPlayerField } from "#data/elite-redux/coop/coop-battle-engine";
 import { getCoopController, getCoopNetcodeMode } from "#data/elite-redux/coop/coop-runtime";
+import { COOP_GUEST_FIELD_INDEX } from "#data/elite-redux/coop/coop-session";
 import { beginCoopRecording } from "#data/elite-redux/coop/coop-turn-recorder";
 import { ArenaTagSide } from "#enums/arena-tag-side";
 import type { BattlerIndex } from "#enums/battler-index";
@@ -89,6 +91,20 @@ export class TurnStartPhase extends FieldPhase {
         `[coop-diag] turn-start authoritative guard mode=${getCoopNetcodeMode()} role=${role ?? "none"} turn=${globalScene.currentBattle.turn} diverts=${role === "guest"}`,
       );
       if (role === "guest") {
+        // SELF-SWITCH MIRROR (#633, coop-me-authoritative): the guest is a pure renderer that diverts
+        // the WHOLE turn here BEFORE the handleTurnCommand loop below - the ONLY place SwitchSummonPhase
+        // is ever queued. So the guest's OWN voluntary switch (its `turnCommands[guestSlot] = {command:
+        // POKEMON, cursor}`, written by command-phase tryLeaveField) was silently discarded: its on-field
+        // composition kept the OLD lead while the host (which simulates with the guest's relayed command
+        // and runs a real SwitchSummonPhase for that slot) swapped in the new mon. The positional
+        // getPlayerField serialization then shifted by one, the per-turn checksum mismatched EVERY turn,
+        // and the numeric-only resync heal could not reposition an on-field mon (so it never self-healed).
+        // Mirror the guest's own switch with the SIDE-EFFECT-FREE summonCoopPlayerField (the SAME
+        // `party[fieldIndex] <-> party[slotIndex]` swap + visual summon the host's SwitchSummonPhase does,
+        // but with NO resolution pipeline + NO fresh RNG - a real SwitchSummonPhase / handleTurnCommand
+        // would re-draw RNG + re-fire hazards/abilities and cause FRESH divergence). After this, the
+        // guest's positional getPlayerField realigns with the host's and the checksum converges.
+        this.mirrorGuestOwnSwitch();
         globalScene.phaseManager.pushNew("CoopReplayTurnPhase", globalScene.currentBattle.turn);
         this.end();
         return;
@@ -158,6 +174,38 @@ export class TurnStartPhase extends FieldPhase {
      * This is important since stuff like `SwitchSummonPhase`, `AttemptRunPhase`, and `AttemptCapturePhase` break the "flow" and should take precedence
      */
     this.end();
+  }
+
+  /**
+   * GUEST (authoritative, #633): mirror the guest's OWN voluntary switch BEFORE diverting the turn to
+   * CoopReplayTurnPhase. The guest owns exactly one player field slot ({@linkcode COOP_GUEST_FIELD_INDEX});
+   * its queued `turnCommands[slot]` carries the switch (`command === Command.POKEMON`, `cursor` = the target
+   * party slot) written by command-phase `tryLeaveField`. Perform the SAME side-effect-free
+   * `party[fieldIndex] <-> party[cursor]` swap + visual summon the host's SwitchSummonPhase does via
+   * {@linkcode summonCoopPlayerField} (NO resolution pipeline / NO fresh RNG), so the guest's positional
+   * field serialization realigns with the host's. ONLY the guest's own slot + ONLY a POKEMON command is
+   * acted on (BALL / RUN are not a field-composition change and ride the host's authoritative outcome).
+   * Fully guarded so a malformed command can never block the divert.
+   */
+  private mirrorGuestOwnSwitch(): void {
+    try {
+      const guestSlot = COOP_GUEST_FIELD_INDEX;
+      const turnCommand = globalScene.currentBattle.turnCommands[guestSlot];
+      // A voluntary switch carries the target party slot in `cursor`. Anything else (FIGHT/BALL/RUN,
+      // a skipped command, or no cursor) is not a self-switch and rides the host's authoritative outcome.
+      if (turnCommand == null || turnCommand.skip || turnCommand.command !== Command.POKEMON) {
+        return;
+      }
+      const targetSlot = turnCommand.cursor;
+      if (typeof targetSlot !== "number" || targetSlot < 0) {
+        return;
+      }
+      // Identical swap to the host's SwitchSummonPhase (`party[fieldIndex] <-> party[slotIndex]`), but
+      // side-effect-free: no SwitchSummonPhase / handleTurnCommand resolution, no RNG, no hazard/ability re-fire.
+      summonCoopPlayerField(guestSlot, targetSlot);
+    } catch {
+      // A malformed self-switch command must never block the guest's turn divert.
+    }
   }
 
   private handleTurnCommand(turnCommand: TurnCommand, pokemon: Pokemon) {

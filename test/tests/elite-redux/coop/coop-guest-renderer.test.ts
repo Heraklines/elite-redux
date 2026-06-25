@@ -813,4 +813,206 @@ describe.skipIf(!RUN)("co-op GUEST = pure renderer - real engine (#633, TRACK-2 
       "the guest's own account is credited the egg voucher (per-account, full amount)",
     ).toBe(before + 1);
   });
+
+  // (G) SELF-SWITCH MIRROR (#633, coop-me-authoritative): the headline regression. The guest's
+  // TurnStartPhase diverts the WHOLE turn to CoopReplayTurnPhase BEFORE the handleTurnCommand loop -
+  // the ONLY place a SwitchSummonPhase is ever queued - so the guest's OWN voluntary switch
+  // (`turnCommands[guestSlot] = {command: POKEMON, cursor}`) was silently discarded: its on-field
+  // composition kept the OLD lead while the host swapped in the new mon. The positional getPlayerField
+  // serialization shifted by one and the per-turn checksum mismatched EVERY turn (the live "desync after
+  // switching"). The fix mirrors the guest's own switch with the side-effect-free summonCoopPlayerField
+  // (the SAME party swap the host's SwitchSummonPhase does, NO RNG / NO resolution pipeline) inside the
+  // divert. This asserts: after the divert, (1) the guest's on-field composition + party order MATCH the
+  // host's post-switch state, and (2) the per-turn checksum MATCHES (no desync) - a switch no longer desyncs.
+  it("SELF-SWITCH MIRROR (#633): the guest mirrors its OWN switch on divert; composition + party order + checksum match the host", async () => {
+    const field = await startCoopGuest();
+    const hostMon = field[COOP_HOST_FIELD_INDEX];
+    const guestLead = field[COOP_GUEST_FIELD_INDEX];
+    expect(guestLead.getBattlerIndex()).toBe(BattlerIndex.PLAYER_2);
+
+    // The guest has a bench replacement at party slot 2 (a DISTINCT species so the switch is observable),
+    // tagged guest-owned (a legal target for the guest's own slot).
+    const bench = globalScene.addPlayerPokemon(getPokemonSpecies(SpeciesId.PIKACHU), 5);
+    bench.coopOwner = "guest";
+    globalScene.getPlayerParty().push(bench);
+    const benchSlot = globalScene.getPlayerParty().indexOf(bench);
+    expect(benchSlot, "the bench mon is party slot 2").toBe(2);
+    const oldLeadSpecies = guestLead.species.speciesId;
+    const benchSpecies = bench.species.speciesId;
+    expect(benchSpecies, "the bench mon is a different species from the guest's lead").not.toBe(oldLeadSpecies);
+
+    // --- HOST authoritative truth AFTER the guest's switch: the host simulates with the guest's relayed
+    // command and runs a real SwitchSummonPhase for the guest's slot, so its party[1] is now the bench mon.
+    // Model it with the SAME side-effect-free swap (its own inverse), capture the post-switch checksum +
+    // composition, then revert so the guest still starts PRE-switch (the divert must re-derive this state).
+    coopEngine.summonCoopPlayerField(COOP_GUEST_FIELD_INDEX, benchSlot);
+    const hostChecksum = coopEngine.captureCoopChecksum();
+    const hostParty = globalScene.getPlayerParty().map(p => p.species.speciesId);
+    const hostFieldByBi = globalScene
+      .getField(true)
+      .filter((m): m is Pokemon => m != null)
+      .map(m => [m.getBattlerIndex(), m.species.speciesId] as const);
+    // Revert to the pre-switch state (summonCoopPlayerField is its own inverse on the party array).
+    coopEngine.summonCoopPlayerField(COOP_GUEST_FIELD_INDEX, benchSlot);
+    expect(
+      globalScene.getPlayerField()[COOP_GUEST_FIELD_INDEX].species.speciesId,
+      "reverted to the pre-switch lead",
+    ).toBe(oldLeadSpecies);
+    // The PRE-switch guest checksum DISAGREES with the host's post-switch one (the desync a dropped switch causes).
+    expect(coopEngine.captureCoopChecksum(), "pre-switch guest desyncs from the host's post-switch state").not.toBe(
+      hostChecksum,
+    );
+
+    // --- GUEST turn: it queued a voluntary switch for its OWN slot (what command-phase tryLeaveField writes),
+    // plus inert commands for the others. Driving TurnStartPhase diverts to CoopReplayTurnPhase AND mirrors
+    // the switch first.
+    const inert = {
+      command: Command.FIGHT,
+      move: { move: MoveId.NONE, targets: [], useMode: MoveUseMode.NORMAL },
+      skip: true,
+    };
+    globalScene.currentBattle.turnCommands = {
+      [COOP_HOST_FIELD_INDEX]: { ...inert },
+      [COOP_GUEST_FIELD_INDEX]: { command: Command.POKEMON, cursor: benchSlot, args: [false] },
+      [BattlerIndex.ENEMY]: { ...inert },
+      [BattlerIndex.ENEMY_2]: { ...inert },
+    };
+
+    const pushNewSpy = vi.spyOn(globalScene.phaseManager, "pushNew");
+    const turnStart = game.scene.phaseManager.create("TurnStartPhase");
+    turnStart.start();
+
+    // It still diverts (pure renderer: no MovePhase / SwitchSummonPhase / RNG resolution) ...
+    expect(
+      pushNewSpy.mock.calls.some(([name]) => name === "CoopReplayTurnPhase"),
+      "the guest still diverts to the replay phase",
+    ).toBe(true);
+    expect(
+      pushNewSpy.mock.calls.some(([name]) => name === "SwitchSummonPhase"),
+      "the mirror queues NO real SwitchSummonPhase (no RNG / hazard re-fire)",
+    ).toBe(false);
+    expect(
+      pushNewSpy.mock.calls.some(([name]) => name === "MovePhase"),
+      "no MovePhase resolution on the guest",
+    ).toBe(false);
+
+    // (1) The guest's on-field composition + party order now MATCH the host's post-switch state.
+    expect(
+      globalScene.getPlayerField()[COOP_GUEST_FIELD_INDEX].species.speciesId,
+      "the bench mon is now on the guest's slot",
+    ).toBe(benchSpecies);
+    expect(
+      globalScene.getPlayerField()[COOP_HOST_FIELD_INDEX].species.speciesId,
+      "the host's own lead is untouched",
+    ).toBe(hostMon.species.speciesId);
+    expect(
+      globalScene.getPlayerParty().map(p => p.species.speciesId),
+      "party order matches the host's post-switch order",
+    ).toEqual(hostParty);
+    const guestFieldByBi = globalScene
+      .getField(true)
+      .filter((m): m is Pokemon => m != null)
+      .map(m => [m.getBattlerIndex(), m.species.speciesId] as const);
+    expect(guestFieldByBi, "on-field composition (bi -> species) matches the host").toEqual(hostFieldByBi);
+
+    // (2) The per-turn checksum now MATCHES the host's: a switch no longer desyncs.
+    expect(coopEngine.captureCoopChecksum(), "checksum converges with the host after the self-switch mirror").toBe(
+      hostChecksum,
+    );
+  });
+
+  // (H) SELF-SWITCH MIRROR is gated to the GUEST only: a BALL/RUN command on the guest's own slot is NOT a
+  // field-composition change, so the divert must NOT swap the party for it (those ride the host's outcome).
+  it("SELF-SWITCH MIRROR (#633): a non-POKEMON command on the guest's slot does NOT swap the party", async () => {
+    const field = await startCoopGuest();
+    const leadSpecies = field[COOP_GUEST_FIELD_INDEX].species.speciesId;
+    const bench = globalScene.addPlayerPokemon(getPokemonSpecies(SpeciesId.PIKACHU), 5);
+    bench.coopOwner = "guest";
+    globalScene.getPlayerParty().push(bench);
+
+    const inert = {
+      command: Command.FIGHT,
+      move: { move: MoveId.NONE, targets: [], useMode: MoveUseMode.NORMAL },
+      skip: true,
+    };
+    // A RUN command on the guest's own slot (cursor present is irrelevant - only POKEMON is mirrored).
+    globalScene.currentBattle.turnCommands = {
+      [COOP_HOST_FIELD_INDEX]: { ...inert },
+      [COOP_GUEST_FIELD_INDEX]: { command: Command.RUN },
+      [BattlerIndex.ENEMY]: { ...inert },
+      [BattlerIndex.ENEMY_2]: { ...inert },
+    };
+
+    const turnStart = game.scene.phaseManager.create("TurnStartPhase");
+    turnStart.start();
+
+    // The guest's lead is unchanged (no swap for a non-switch command).
+    expect(
+      globalScene.getPlayerField()[COOP_GUEST_FIELD_INDEX].species.speciesId,
+      "RUN does not swap the guest's lead",
+    ).toBe(leadSpecies);
+  });
+
+  // (I) HEAL REPAIR (#633, FIX b): the secondary safety net. If the guest's field is ALREADY misaligned -
+  // the host's reported species for a player slot is present in the guest party but at the WRONG slot
+  // (on-field, not just on the bench) - reconcileCoopPlayerField PASS 2 must REPOSITION it to the host's
+  // slot via the side-effect-free swap (reposition, never remove-then-resummon), disambiguating by the
+  // host's serialized partyIndex. This proves the heal can repair a field/party-order divergence, not just
+  // a bench replacement.
+  it("HEAL REPAIR (#633, FIX b): reconcileCoopPlayerField repositions an on-field-but-wrong-slot mon to match the host", async () => {
+    const field = await startCoopGuest();
+    const hostLead = field[COOP_HOST_FIELD_INDEX];
+    const guestLead = field[COOP_GUEST_FIELD_INDEX];
+
+    // --- HOST authoritative truth: the host's bi0 holds hostLead's species, bi1 holds guestLead's species
+    // (each at its own party slot). The heal repositions via summonCoopPlayerField (leaveField +
+    // resetSummonData + a fresh summon), exactly as the host's REAL SwitchSummonPhase does in production, so
+    // capture the reference AFTER an even (no-op) double-swap through the SAME primitive - both sides then
+    // carry identical post-summon state and only the composition (the thing under test) can differ.
+    coopEngine.summonCoopPlayerField(COOP_HOST_FIELD_INDEX, COOP_GUEST_FIELD_INDEX);
+    coopEngine.summonCoopPlayerField(COOP_HOST_FIELD_INDEX, COOP_GUEST_FIELD_INDEX);
+    const hostCheckpoint = coopEngine.captureCoopCheckpoint();
+    const hostChecksum = coopEngine.captureCoopChecksum();
+    expect(hostCheckpoint).not.toBeNull();
+    expect(
+      globalScene.getPlayerField()[COOP_HOST_FIELD_INDEX].species.speciesId,
+      "double-swap is a no-op (bi0 still the host's species)",
+    ).toBe(hostLead.species.speciesId);
+
+    // --- GUEST divergence: SWAP the two on-field player mons so the right mons are present but at the WRONG
+    // slots (bi0 now holds the guest's lead species, bi1 the host's). This is the dropped-self-switch shape:
+    // both mons on-field, mis-slotted. The numeric-only heal can't fix it; PASS 2's broadened search must.
+    const party = globalScene.getPlayerParty();
+    [party[COOP_HOST_FIELD_INDEX], party[COOP_GUEST_FIELD_INDEX]] = [
+      party[COOP_GUEST_FIELD_INDEX],
+      party[COOP_HOST_FIELD_INDEX],
+    ];
+    expect(
+      globalScene.getPlayerField()[COOP_HOST_FIELD_INDEX].species.speciesId,
+      "guest mis-slotted: bi0 holds the wrong species",
+    ).toBe(guestLead.species.speciesId);
+    expect(coopEngine.captureCoopChecksum(), "the mis-slotted guest desyncs from the host").not.toBe(hostChecksum);
+
+    // --- Heal: reconcileCoopPlayerField PASS 2 repositions each on-field mon to the host's reported slot.
+    coopEngine.reconcileCoopPlayerField(hostCheckpoint!.field);
+
+    // The guest's field composition is realigned: bi0 = host's species, bi1 = guest's species (per-slot).
+    expect(
+      globalScene.getPlayerField()[COOP_HOST_FIELD_INDEX].species.speciesId,
+      "bi0 repositioned to the host's species",
+    ).toBe(hostLead.species.speciesId);
+    expect(
+      globalScene.getPlayerField()[COOP_GUEST_FIELD_INDEX].species.speciesId,
+      "bi1 repositioned to the guest's species",
+    ).toBe(guestLead.species.speciesId);
+    // The per-turn checksum converges with the host's (the heal repaired the field/party-order divergence).
+    expect(
+      coopEngine.captureCoopChecksum(),
+      "checksum converges after the heal repositions the mis-slotted field",
+    ).toBe(hostChecksum);
+
+    // IDEMPOTENT: re-applying the same host field must not re-swap or throw (the slots already match).
+    expect(() => coopEngine.reconcileCoopPlayerField(hostCheckpoint!.field)).not.toThrow();
+    expect(coopEngine.captureCoopChecksum(), "the checksum is stable across an idempotent re-apply").toBe(hostChecksum);
+  });
 });

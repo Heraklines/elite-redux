@@ -287,15 +287,54 @@ function collectLeafDiffs(host: unknown, guest: unknown, path: string, out: stri
 }
 
 /**
+ * Re-key a parsed canonical state's `field` array by battler index (#633, coop-me-authoritative
+ * diagnostic). The hashed state's `field` is POSITION-indexed (an array sorted by `bi`), so a single
+ * composition gap (a dropped switch/faint) shifts every later entry and RENUMBERS the whole array -
+ * the diff then reports "25+ differing fields" for what is really ONE missing mon. Rekeying `field`
+ * to an object keyed by `bi#<n>` aligns the two sides by battler index instead of array slot, so a
+ * present-on-one-side bi shows as a single `<absent>` leaf that points straight at the real gap.
+ * DIAGNOSTIC-ONLY: this transforms a COPY for the diff walk and NEVER touches the hashed state, so
+ * the checksum is unaffected. A non-state shape (no `field` array) is returned unchanged. Never throws.
+ */
+function rekeyFieldByBi(state: unknown): unknown {
+  try {
+    if (!isWalkable(state) || Array.isArray(state)) {
+      return state;
+    }
+    const obj = state as Record<string, unknown>;
+    const field = obj.field;
+    if (!Array.isArray(field)) {
+      return state;
+    }
+    const byBi: Record<string, unknown> = {};
+    field.forEach((mon, i) => {
+      // Key by the mon's own battler index when present; fall back to the array slot so a malformed
+      // entry without a `bi` still appears (never silently dropped from the diagnostic).
+      const bi =
+        isWalkable(mon) && typeof (mon as Record<string, unknown>).bi === "number"
+          ? (mon as Record<string, unknown>).bi
+          : `pos${i}`;
+      byBi[`bi#${bi}`] = mon;
+    });
+    return { ...obj, field: byBi };
+  } catch {
+    return state;
+  }
+}
+
+/**
  * Log up to ~25 differing LEAF paths between two JSON-parsed canonical state objects under
  * `tag` (e.g. `"[coop-cs] turn=3"`). Prints the `tag` header then one indented line per
  * differing leaf (`  <path>: host=<v> guest=<v>`), or a "no leaf differences" note when the
- * walk finds none (the divergence was structural / already healed). Never throws.
+ * walk finds none (the divergence was structural / already healed). The `field` array is
+ * re-keyed by battler index first (#633), so a single composition gap points at the real
+ * missing bi (`field.bi#1: host=... guest=<absent>`) instead of renumbering every entry.
+ * Never throws.
  */
 export function logCanonicalDiff(tag: string, host: unknown, guest: unknown): void {
   try {
     const out: string[] = [];
-    collectLeafDiffs(host, guest, "", out);
+    collectLeafDiffs(rekeyFieldByBi(host), rekeyFieldByBi(guest), "", out);
     if (out.length === 0) {
       console.warn(`${tag} no leaf differences found (structural / already converged)`);
       return;

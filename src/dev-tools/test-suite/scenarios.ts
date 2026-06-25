@@ -8843,6 +8843,43 @@ export const DEV_SCENARIOS: DevScenario[] = [
       ];
     },
   },
+  // Co-op - GUEST's OWN switch no longer desyncs (#633, coop-me-authoritative, 2 clients)
+  {
+    label: "(note) Co-op: GUEST switch no longer desyncs (#633)",
+    description:
+      "#633 co-op AUTHORITATIVE GUEST SELF-SWITCH - NOT stageable in one client (it needs TWO\n"
+      + "live engines + a transport; the headless repro lives in\n"
+      + "test/tests/elite-redux/coop/coop-guest-renderer.test.ts -> 'SELF-SWITCH MIRROR' +\n"
+      + "'HEAL REPAIR').\n"
+      + "THE BUG: in authoritative co-op the GUEST is a pure renderer - its TurnStartPhase diverts\n"
+      + "the WHOLE turn to CoopReplayTurnPhase BEFORE the loop that is the ONLY place a switch is\n"
+      + "executed. So when the GUEST switched a Pokemon, the guest never mirrored its OWN switch:\n"
+      + "its on-field composition kept the OLD lead while the host (which simulates with the guest's\n"
+      + "relayed command) swapped in the new mon. The serialized field array shifted by one, the\n"
+      + "per-turn checksum mismatched EVERY turn, and the numeric-only resync heal could not move an\n"
+      + "on-field mon, so it never self-healed (the live 'desync after switching' / 'UNHEALED 25+\n"
+      + "fields').\n"
+      + "THE FIX: the guest now mirrors its OWN switch inside the divert with the SAME side-effect-free\n"
+      + "party swap the host does (no fresh RNG, no re-fired hazards/abilities), so its field realigns\n"
+      + "with the host's and the checksum converges. A heal safety net also repositions an on-field\n"
+      + "mon that is at the WRONG slot (not just a bench replacement).\n"
+      + "DO (needs 2 clients on the staging build, AUTHORITATIVE netcode): start a co-op double; on the\n"
+      + "GUEST client, take a turn and pick Pokemon -> Switch on the guest's OWN (RIGHT) lead, swapping\n"
+      + "in a bench mon. Take a few more turns afterward.\n"
+      + "EXPECT: both clients show the SAME mon in the guest's slot immediately after the switch, the\n"
+      + "guest's bench/party order matches the host's, and there are NO recurring [coop-desync] /\n"
+      + "[coop-resync] UNHEALED lines on EITHER client for the turns after the switch (before the fix a\n"
+      + "guest switch desynced every subsequent turn). VERIFY this (note) is the final 2-client check -\n"
+      + "the single-client suite cannot reproduce the cross-client switch desync.",
+    setup: () => {
+      resetDevOverrides();
+      return [
+        makeStarter(SpeciesId.SNORLAX, {
+          moveset: [MoveId.BODY_SLAM, MoveId.CRUNCH, MoveId.EARTHQUAKE, MoveId.REST],
+        }),
+      ];
+    },
+  },
   // Co-op - arena-tag (hazard / screen) SYNC (#633 GAP 1)
   {
     label: "Co-op: hazards / screens sync to the guest (#633 GAP 1)",

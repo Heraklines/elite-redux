@@ -117,7 +117,7 @@ describe("co-op ER data-table fingerprint (#633, diagnostics)", () => {
   });
 
   describe("logCanonicalDiff", () => {
-    it("finds a known LEAF difference between two parsed canonical objects", () => {
+    it("finds a known LEAF difference between two parsed canonical objects (field keyed by bi)", () => {
       const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
       const host = { field: [{ bi: 0, hp: 20, abilityId: 65 }], money: 1000 };
       const guest = { field: [{ bi: 0, hp: 17, abilityId: 65 }], money: 1000 };
@@ -126,14 +126,42 @@ describe("co-op ER data-table fingerprint (#633, diagnostics)", () => {
       const lines = warn.mock.calls.map(c => String(c[0]));
       // The header names the tag + a non-zero field count.
       expect(lines.some(l => l.startsWith("[coop-cs] turn=3") && /differing field/.test(l))).toBe(true);
-      // The exact divergent leaf path is reported with both sides' values.
-      const hpLine = lines.find(l => l.includes("field.0.hp"));
+      // The exact divergent leaf path is reported with both sides' values. The `field` array is now
+      // re-keyed by battler index (#633, FIX c), so a per-mon leaf is `field.bi#<n>.<leaf>` - a single
+      // composition gap then shows the real missing bi instead of renumbering every array slot.
+      const hpLine = lines.find(l => l.includes("field.bi#0.hp"));
       expect(hpLine).toBeDefined();
       expect(hpLine).toContain("host=20");
       expect(hpLine).toContain("guest=17");
       // A leaf that MATCHES is never reported.
       expect(lines.some(l => l.includes("abilityId"))).toBe(false);
       expect(lines.some(l => l.includes("money"))).toBe(false);
+    });
+
+    it("keys a composition gap by battler index: a present-on-one-side bi shows a single <absent> leaf (#633, FIX c)", () => {
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+      // The host has bi 0 AND 1 on field; the guest dropped bi 0 (a dropped switch/faint), so its
+      // field array shifts - position-indexed this would renumber EVERY entry. Keyed by bi, the gap is
+      // a single `field.bi#0` <absent> leaf and bi#1 (same on both) is NOT reported.
+      const host = {
+        field: [
+          { bi: 0, hp: 20 },
+          { bi: 1, hp: 30 },
+        ],
+        money: 5,
+      };
+      const guest = { field: [{ bi: 1, hp: 30 }], money: 5 };
+      logCanonicalDiff("[coop-cs] turn=4", host, guest);
+
+      const lines = warn.mock.calls.map(c => String(c[0]));
+      // The missing bi#0 is reported (guest=<absent>) ...
+      const absentLine = lines.find(l => l.includes("field.bi#0") && l.includes("<absent>"));
+      expect(absentLine, "the dropped bi is keyed by battler index, not array position").toBeDefined();
+      // ... and the bi present + identical on BOTH sides (bi#1) is NOT a difference.
+      expect(
+        lines.some(l => l.includes("field.bi#1")),
+        "the matching bi is not renumbered into a false diff",
+      ).toBe(false);
     });
 
     it("reports 'no leaf differences' when the two objects are identical", () => {
