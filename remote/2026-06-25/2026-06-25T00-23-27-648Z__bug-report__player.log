@@ -1,0 +1,273 @@
+----- BUG REPORT (in-game) -----
+version:  1.11.19
+url:      https://elite-redux.pages.dev/
+ua:       Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36 OPR/132.0.0.0
+mode:     0  wave:79  difficulty:elite
+seed:     khszLNoHZBVycYBSS5J3blQt
+party:    Lumbering Sloth Engulfed(L64 56/233), Hydroar(L65 225/225), Cormoth(L64 215/215), Gyarevelry(L64 234/234), Flygon Redux B(L64 206/206), Gargablox(L64 215/215)
+
+----- DESCRIPTION -----
+Eterna Burmy popped up in the Jungle Temple challenge event
+
+----- CONSOLE -----
+[00:04:11.740] LOG: Move: BLAZE_KICK Move targets: {"targets":[2],"multiple":false} 
+Player Pokemon: Lumbering Sloth Engulfed
+[00:04:11.741] LOG: %cStart Phase EnemyCommandPhase color:green;
+[00:04:11.744] LOG: Move Pool: ["Petal Dance","Grass Pledge","Double-Edge","Leaf Storm"]
+[00:04:11.744] LOG: Move Scores: [8.578125,6.328125,19,7.078125]
+[00:04:11.744] LOG: Sorted Move Pool: ["Double-Edge","Petal Dance","Leaf Storm","Grass Pledge"]
+[00:04:11.744] LOG: Chosen Move: Double-Edge
+[00:04:11.744] LOG: %cStart Phase TurnStartPhase color:green;
+[00:04:11.744] LOG: %cStart Phase MovePhase color:green;
+[00:04:11.744] LOG: %cUser: Lumbering Sloth Engulfed
+Move: BLAZE_KICK
+Use Mode: NORMAL color:orchid
+[00:04:11.745] LOG: %cStart Phase MessagePhase color:green;
+[00:04:12.004] LOG: %cStart Phase MoveEffectPhase color:green;
+[00:04:12.397] LOG: crit stage: +1
+[00:04:12.397] LOG: Move: Blaze Kick | Base damage: 137.01361797752813 | Power: 110.5 | Source attack: 197 | Target defense: 89
+[00:04:12.397] LOG: Move: Blaze Kick | Attack damage: 402
+[00:04:12.398] LOG: %cStart Phase ShowAbilityPhase color:green;
+[00:04:12.715] LOG: %cStart Phase HideAbilityPhase color:green;
+[00:04:12.777] LOG: %cStart Phase DamageAnimPhase color:green;
+[00:04:12.818] LOG: %cStart Phase MessagePhase color:green;
+[00:04:13.255] LOG: %cStart Phase MessagePhase color:green;
+[00:04:13.654] LOG: %cStart Phase FaintPhase color:green;
+[00:04:15.192] LOG: %cStart Phase MessagePhase color:green;
+[00:04:15.448] LOG: %cStart Phase VictoryPhase color:green;
+[00:04:15.448] LOG: %cStart Phase MoveEndPhase color:green;
+[00:04:15.448] LOG: %cStart Phase MovePhase color:green;
+[00:04:15.448] LOG: %cStart Phase MoveEndPhase color:green;
+[00:04:15.448] LOG: %cStart Phase CheckInterludePhase color:green;
+[00:04:15.448] LOG: %cStart Phase WeatherEffectPhase color:green;
+[00:04:15.448] LOG: %cStart Phase PositionalTagPhase color:green;
+[00:04:15.448] LOG: %cStart Phase BerryPhase color:green;
+[00:04:15.448] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[00:04:15.448] LOG: %cStart Phase TurnEndPhase color:green;
+[00:04:15.449] LOG: %cStart Phase PokemonHealPhase color:green;
+[00:04:15.743] LOG: %cStart Phase MessagePhase color:green;
+[00:04:16.256] LOG: %cStart Phase BattleEndPhase color:green;
+[00:04:16.256] LOG: Battle Score: 133 (1 Turns x1)
+[00:04:16.256] LOG: Total Score: 13289
+[00:04:16.258] LOG: Applied Calcium 
+[00:04:16.258] LOG: %cStart Phase EggLapsePhase color:green;
+[00:04:16.258] LOG: %cStart Phase SelectModifierPhase color:green;
+[00:04:16.258] LOG: Wave Seed: ¹¶ÁÈ½¨¤Ç±§¡¡°ºÂ 78
+[00:04:16.260] LOG: Applied Golden Poké Ball 
+[00:04:16.260] LOG: 6 2 [2,3]
+[00:04:16.260] LOG: {"id":"LURE","localeKey":"modifierType:ModifierType.LURE","iconImage":"lure","group":"lure","soundName":"se/restore","tier":0,"maxBattles":10} 
+[00:04:16.260] LOG: 7 2 [2,3]
+[00:04:16.260] LOG: {"id":"TEMP_STAT_STAGE_BOOSTER","localeKey":"","iconImage":"x_accuracy","soundName":"se/restore","tier":0,"stat":6,"nameKey":"x_accuracy","quantityKey":"stage"} 
+[00:04:16.260] LOG: 4 2 [2,3]
+[00:04:16.260] LOG: {"id":"ETHER","localeKey":"modifierType:ModifierType.ETHER","iconImage":"ether","group":"ether","soundName":"se/restore","tier":0,"restorePoints":10} 
+[00:04:16.260] LOG: 0 0 [2,3,4,5,6,7,8,16,23]
+[00:04:16.260] LOG: {"id":"GREAT_BALL","localeKey":"","iconImage":"gb","group":"pb","soundName":"se/pb_bounce_1","tier":1,"pokeballType":1,"count":5} 
+[00:04:18.659] LOG: %cStart Phase NewBattlePhase color:green;
+[00:04:18.659] LOG: Wave Seed: º·ÂÉ¾©¥È²¨¢¢±» Ã 79
+[00:04:18.659] LOG: %cStart Phase ReturnPhase color:green;
+[00:04:18.853] LOG: %cStart Phase ShowTrainerPhase color:green;
+[00:04:19.053] LOG: %cStart Phase NextEncounterPhase color:green;
+[00:04:19.162] DEBUG: Session data saved to slot 0!
+[00:04:19.162] LOG: Wave Seed: º·ÂÉ¾©¥È²¨¢¢±» Ã 79
+[00:04:26.919] LOG: %cStart Phase MysteryEncounterPhase color:green;
+[00:05:04.438] LOG: %cStart Phase MysteryEncounterOptionSelectedPhase color:green;
+[00:05:05.749] LOG: %cStart Phase MysteryEncounterPhase color:green;
+[00:05:06.309] LOG: %cStart Phase MysteryEncounterOptionSelectedPhase color:green;
+[00:05:06.479] LOG: Pokemon: Wild Araquanid | Species ID: 752 | Level: 71 | Nature: Adamant (+Atk/-SpAtk) | Friendship: 50
+[00:05:06.479] LOG: Stats (IVs): HP: 179 (3), Atk: 159 (16), Def: 167 (5), Spatk: 82 (23), Spdef: 80 (3), Spd: 135 (20)
+[00:05:06.479] LOG: Ability: Water Absorb | Passive Ability: Deep Freeze 
+[00:05:06.480] LOG: Moveset: ["Avalanche","Fury Cutter","Guillotine","Aqua Fang"]
+[00:05:06.870] LOG: Battle Seed: 9HFGUVcKGcQ2pkOZ
+[00:05:06.871] LOG: %cStart Phase MessagePhase color:green;
+[00:05:10.500] LOG: %cStart Phase MysteryEncounterBattlePhase color:green;
+[00:05:10.620] LOG: %cStart Phase SummonPhase color:green;
+[00:05:10.837] WARN: cry/752 not found
+[00:05:11.036] LOG: %cStart Phase SummonPhase color:green;
+[00:05:11.337] LOG: Applied Calcium 
+[00:05:11.386] WARN: cry/10439 not found
+[00:05:11.602] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[00:05:11.603] LOG: %cStart Phase CheckSwitchPhase color:green;
+[00:05:12.598] LOG: %cStart Phase InitEncounterPhase color:green;
+[00:05:12.599] LOG: %cStart Phase PostSummonPhase color:green;
+[00:05:12.599] LOG: Ran PSP for: Lumbering Sloth Engulfed
+[00:05:12.600] LOG: %cStart Phase PostSummonPhase color:green;
+[00:05:12.600] LOG: %cStart Phase PostSummonPhase color:green;
+[00:05:12.600] LOG: Ran PSP for: Araquanid
+[00:05:12.600] LOG: %cStart Phase PostSummonPhase color:green;
+[00:05:12.600] LOG: %cStart Phase PostSummonPhase color:green;
+[00:05:12.600] LOG: %cStart Phase PostSummonPhase color:green;
+[00:05:12.600] LOG: %cStart Phase TurnInitPhase color:green;
+[00:05:12.600] LOG: %cStart Phase MysteryEncounterBattleStartCleanupPhase color:green;
+[00:05:12.600] LOG: %cStart Phase CommandPhase color:green;
+[00:05:13.414] LOG: Move: BLAZE_KICK Move targets: {"targets":[2],"multiple":false} 
+Player Pokemon: Lumbering Sloth Engulfed
+[00:05:13.415] LOG: %cStart Phase EnemyCommandPhase color:green;
+[00:05:13.416] LOG: Applied Damage Token (enemy)
+[00:05:13.417] LOG: Applied Damage Token (enemy)
+[00:05:13.417] LOG: Applied Damage Token (enemy)
+[00:05:13.418] LOG: Applied Damage Token (enemy)
+[00:05:13.419] LOG: Move Pool: ["Avalanche","Fury Cutter","Guillotine","Aqua Fang"]
+[00:05:13.419] LOG: Move Scores: [18,13.5,33,18]
+[00:05:13.419] LOG: Sorted Move Pool: ["Guillotine","Avalanche","Aqua Fang","Fury Cutter"]
+[00:05:13.419] LOG: Chosen Move: Guillotine
+[00:05:13.419] LOG: %cStart Phase TurnStartPhase color:green;
+[00:05:13.420] LOG: %cStart Phase MovePhase color:green;
+[00:05:13.420] LOG: %cUser: Lumbering Sloth Engulfed
+Move: BLAZE_KICK
+Use Mode: NORMAL color:orchid
+[00:05:13.420] LOG: %cStart Phase MessagePhase color:green;
+[00:05:13.672] LOG: %cStart Phase MoveEffectPhase color:green;
+[00:05:14.085] LOG: crit stage: +1
+[00:05:14.086] LOG: Move: Blaze Kick | Base damage: 73.95336526946109 | Power: 110.5 | Source attack: 197 | Target defense: 167
+[00:05:14.086] LOG: Applied Protection Token (enemy)
+[00:05:14.086] LOG: Move: Blaze Kick | Attack damage: 198
+[00:05:14.087] LOG: %cStart Phase ShowAbilityPhase color:green;
+[00:05:14.397] LOG: %cStart Phase HideAbilityPhase color:green;
+[00:05:14.463] LOG: %cStart Phase DamageAnimPhase color:green;
+[00:05:14.505] LOG: %cStart Phase MessagePhase color:green;
+[00:05:14.927] LOG: %cStart Phase ShowAbilityPhase color:green;
+[00:05:15.252] LOG: %cStart Phase MessagePhase color:green;
+[00:05:15.782] LOG: %cStart Phase DamageAnimPhase color:green;
+[00:05:15.784] LOG: %cStart Phase HideAbilityPhase color:green;
+[00:05:15.848] LOG: %cStart Phase MessagePhase color:green;
+[00:05:16.241] LOG: %cStart Phase FaintPhase color:green;
+[00:05:16.242] WARN: cry/752 not found
+[00:05:16.353] LOG: %cStart Phase MessagePhase color:green;
+[00:05:16.681] LOG: %cStart Phase VictoryPhase color:green;
+[00:05:16.681] LOG: %cStart Phase MoveEndPhase color:green;
+[00:05:16.681] LOG: %cStart Phase MovePhase color:green;
+[00:05:16.681] LOG: %cStart Phase MoveEndPhase color:green;
+[00:05:16.681] LOG: %cStart Phase CheckInterludePhase color:green;
+[00:05:16.682] LOG: %cStart Phase WeatherEffectPhase color:green;
+[00:05:16.682] LOG: %cStart Phase PositionalTagPhase color:green;
+[00:05:16.682] LOG: %cStart Phase BerryPhase color:green;
+[00:05:16.682] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[00:05:16.682] LOG: %cStart Phase TurnEndPhase color:green;
+[00:05:16.682] LOG: %cStart Phase PokemonHealPhase color:green;
+[00:05:16.991] LOG: %cStart Phase MessagePhase color:green;
+[00:05:17.492] LOG: %cStart Phase BattleEndPhase color:green;
+[00:05:17.492] LOG: Battle Score: 168 (1 Turns x1)
+[00:05:17.492] LOG: Total Score: 13457
+[00:05:17.495] LOG: Applied Calcium 
+[00:05:17.495] LOG: %cStart Phase MysteryEncounterRewardsPhase color:green;
+[00:05:19.548] LOG: %cStart Phase MysteryEncounterPhase color:green;
+[00:05:20.265] LOG: %cStart Phase MysteryEncounterOptionSelectedPhase color:green;
+[00:05:20.648] LOG: %cStart Phase MessagePhase color:green;
+[00:05:21.002] LOG: %cStart Phase MysteryEncounterPhase color:green;
+[00:05:21.466] LOG: %cStart Phase MysteryEncounterOptionSelectedPhase color:green;
+[00:05:21.646] LOG: Pokemon: Wild Sawsbuck | Species ID: 586 | Level: 77 | Nature: Timid (+Spd/-Atk) | Friendship: 70
+[00:05:21.646] LOG: Stats (IVs): HP: 225 (20), Atk: 148 (8), Def: 128 (21), Spatk: 120 (30), Spdef: 132 (25), Spd: 175 (10)
+[00:05:21.646] LOG: Ability: Skill Link | Passive Ability: Mighty Horn 
+[00:05:21.646] LOG: Moveset: ["Hyper Drill","Megahorn","High Jump Kick","Baton Pass"]
+[00:05:21.967] LOG: Battle Seed: 9HFGUVcKGcQ2pkOZ
+[00:05:21.968] LOG: %cStart Phase MessagePhase color:green;
+[00:05:26.376] LOG: %cStart Phase MysteryEncounterBattlePhase color:green;
+[00:05:26.487] LOG: %cStart Phase SummonPhase color:green;
+[00:05:26.889] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[00:05:26.890] LOG: %cStart Phase CheckSwitchPhase color:green;
+[00:05:27.393] LOG: %cStart Phase SwitchPhase color:green;
+[00:05:28.039] LOG: %cStart Phase InitEncounterPhase color:green;
+[00:05:28.040] LOG: %cStart Phase PostSummonPhase color:green;
+[00:05:28.040] LOG: Ran PSP for: Sawsbuck
+[00:05:28.040] LOG: %cStart Phase PostSummonPhase color:green;
+[00:05:28.040] LOG: %cStart Phase PostSummonPhase color:green;
+[00:05:28.040] LOG: %cStart Phase TurnInitPhase color:green;
+[00:05:28.040] LOG: %cStart Phase CommandPhase color:green;
+[00:05:28.559] LOG: Move: BLAZE_KICK Move targets: {"targets":[2],"multiple":false} 
+Player Pokemon: Lumbering Sloth Engulfed
+[00:05:28.560] LOG: %cStart Phase EnemyCommandPhase color:green;
+[00:05:28.561] LOG: Applied Damage Token (enemy)
+[00:05:28.561] LOG: Applied Damage Token (enemy)
+[00:05:28.562] LOG: Applied Damage Token (enemy)
+[00:05:28.562] LOG: Move Pool: ["Hyper Drill"]
+[00:05:28.562] LOG: Move Scores: [30]
+[00:05:28.562] LOG: Sorted Move Pool: ["Hyper Drill"]
+[00:05:28.562] LOG: Chosen Move: Hyper Drill
+[00:05:28.562] LOG: %cStart Phase TurnStartPhase color:green;
+[00:05:28.563] LOG: %cStart Phase MovePhase color:green;
+[00:05:28.563] LOG: %cUser: Sawsbuck
+Move: HYPER_DRILL
+Use Mode: NORMAL color:orchid
+[00:05:28.563] LOG: %cStart Phase MessagePhase color:green;
+[00:05:28.785] LOG: %cStart Phase MoveEffectPhase color:green;
+[00:05:29.801] LOG: crit stage: +0
+[00:05:29.801] LOG: Move: Hyper Drill | Base damage: 118.86518518518518 | Power: 130 | Source attack: 148 | Target defense: 108
+[00:05:29.802] LOG: Applied Damage Token (enemy)
+[00:05:29.802] LOG: Move: Hyper Drill | Attack damage: 176
+[00:05:29.802] LOG: %cStart Phase DamageAnimPhase color:green;
+[00:05:29.848] LOG: %cStart Phase MoveEndPhase color:green;
+[00:05:29.848] LOG: %cStart Phase MovePhase color:green;
+[00:05:29.848] LOG: %cUser: Lumbering Sloth Engulfed
+Move: BLAZE_KICK
+Use Mode: NORMAL color:orchid
+[00:05:29.851] LOG: %cStart Phase MessagePhase color:green;
+[00:05:30.167] LOG: %cStart Phase MoveEffectPhase color:green;
+[00:05:30.558] LOG: crit stage: +1
+[00:05:30.559] LOG: Move: Blaze Kick | Base damage: 95.87665625000001 | Power: 110.5 | Source attack: 197 | Target defense: 128
+[00:05:30.559] LOG: Applied Protection Token (enemy)
+[00:05:30.559] LOG: Move: Blaze Kick | Attack damage: 276
+[00:05:30.559] LOG: %cStart Phase ShowAbilityPhase color:green;
+[00:05:30.877] LOG: %cStart Phase HideAbilityPhase color:green;
+[00:05:30.941] LOG: %cStart Phase DamageAnimPhase color:green;
+[00:05:30.985] LOG: %cStart Phase MessagePhase color:green;
+[00:05:31.399] LOG: %cStart Phase MessagePhase color:green;
+[00:05:31.809] LOG: %cStart Phase FaintPhase color:green;
+[00:05:33.224] LOG: %cStart Phase MessagePhase color:green;
+[00:05:33.555] LOG: %cStart Phase VictoryPhase color:green;
+[00:05:33.555] LOG: %cStart Phase MoveEndPhase color:green;
+[00:05:33.555] LOG: %cStart Phase CheckInterludePhase color:green;
+[00:05:33.555] LOG: %cStart Phase WeatherEffectPhase color:green;
+[00:05:33.555] LOG: %cStart Phase PositionalTagPhase color:green;
+[00:05:33.555] LOG: %cStart Phase BerryPhase color:green;
+[00:05:33.555] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[00:05:33.555] LOG: %cStart Phase TurnEndPhase color:green;
+[00:05:33.556] LOG: %cStart Phase PokemonHealPhase color:green;
+[00:05:33.862] LOG: %cStart Phase MessagePhase color:green;
+[00:05:34.381] LOG: %cStart Phase BattleEndPhase color:green;
+[00:05:34.381] LOG: Battle Score: 319 (2 Turns x0.84)
+[00:05:34.381] LOG: Total Score: 13776
+[00:05:34.382] LOG: Applied Calcium 
+[00:05:34.384] LOG: Applied Calcium 
+[00:05:34.385] LOG: %cStart Phase ShowAbilityPhase color:green;
+[00:05:34.385] LOG: %cStart Phase MessagePhase color:green;
+[00:05:34.839] LOG: %cStart Phase HideAbilityPhase color:green;
+[00:05:34.883] LOG: %cStart Phase MysteryEncounterRewardsPhase color:green;
+[00:05:36.625] LOG: %cStart Phase MysteryEncounterPhase color:green;
+[00:05:37.082] LOG: %cStart Phase MysteryEncounterOptionSelectedPhase color:green;
+[00:05:39.880] LOG: %cStart Phase MessagePhase color:green;
+[00:05:42.768] LOG: %cStart Phase MysteryEncounterPhase color:green;
+[00:05:45.130] LOG: %cStart Phase MysteryEncounterOptionSelectedPhase color:green;
+[00:05:46.311] LOG: %cStart Phase MessagePhase color:green;
+[00:05:47.038] LOG: %cStart Phase MysteryEncounterPhase color:green;
+[00:05:47.448] LOG: %cStart Phase MysteryEncounterOptionSelectedPhase color:green;
+[00:05:47.611] LOG: Pokemon: Wild Burmy Eterna | Species ID: 10042 | Level: 83 | Nature: Lax (+Def/-SpDef) | Friendship: 50
+[00:05:47.611] LOG: Stats (IVs): HP: 454 (15), Atk: 156 (23), Def: 387 (19), Spatk: 449 (27), Spdef: 327 (23), Spd: 166 (28)
+[00:05:47.611] LOG: Ability: Anticipation | Passive Ability: Half Drake | Boss Bars: 3
+[00:05:47.611] LOG: Moveset: ["Eternabeam","Sticky Web"]
+[00:05:47.941] LOG: {"id":"BERRY","localeKey":"","iconImage":"leppa_berry","group":"berry","soundName":"se/restore","tier":0,"berryType":10} (enemy)
+[00:05:47.941] LOG: {"id":"BASE_STAT_BOOSTER","localeKey":"","iconImage":"iron","soundName":"se/restore","tier":1,"stat":2,"key":"iron"} (enemy)
+[00:05:47.941] LOG: {"id":"BERRY","localeKey":"","iconImage":"enigma_berry","group":"berry","soundName":"se/restore","tier":0,"berryType":2} (enemy)
+[00:05:47.941] LOG: {"id":"BERRY","localeKey":"","iconImage":"apicot_berry","group":"berry","soundName":"se/restore","tier":0,"berryType":6} (enemy)
+[00:05:47.941] LOG: Battle Seed: 9HFGUVcKGcQ2pkOZ
+[00:05:47.941] LOG: Applied Iron (enemy)
+[00:05:47.941] LOG: Applied Iron (enemy)
+[00:05:47.942] LOG: Applied Iron (enemy)
+[00:05:47.942] LOG: %cStart Phase MessagePhase color:green;
+[00:05:49.416] LOG: %cStart Phase MysteryEncounterBattlePhase color:green;
+[00:05:49.551] LOG: %cStart Phase SummonPhase color:green;
+[00:05:49.551] LOG: Applied Iron (enemy)
+[00:05:49.769] WARN: cry/10042 not found
+[00:05:49.988] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[00:05:49.988] LOG: %cStart Phase CheckSwitchPhase color:green;
+[00:22:19.239] LOG: %cStart Phase InitEncounterPhase color:green;
+[00:22:19.239] LOG: %cStart Phase PostSummonPhase color:green;
+[00:22:19.239] LOG: Ran PSP for: Burmy Eterna
+[00:22:19.239] LOG: %cStart Phase PostSummonPhase color:green;
+[00:22:19.240] LOG: %cStart Phase ShowAbilityPhase color:green;
+[00:22:19.589] LOG: %cStart Phase MessagePhase color:green;
+[00:22:20.047] LOG: %cStart Phase HideAbilityPhase color:green;
+[00:22:20.110] LOG: %cStart Phase PostSummonPhase color:green;
+[00:22:20.111] LOG: %cStart Phase ShowAbilityPhase color:green;
+[00:22:20.459] LOG: %cStart Phase HideAbilityPhase color:green;
+[00:22:20.547] LOG: %cStart Phase TurnInitPhase color:green;
+[00:22:20.547] LOG: %cStart Phase CommandPhase color:green;
