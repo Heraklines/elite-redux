@@ -20,6 +20,11 @@
 // co-op session costs effectively nothing on CF.
 // =============================================================================
 
+// TYPE-ONLY import (fully erased at runtime by `import type`, so this file stays the
+// zero-runtime-import lowest layer): the ghost-pool message carries plain-JSON
+// `GhostTeamSnapshot`s, which already live in er-ghost-teams (#633 ghost-pool sync).
+import type { GhostTeamSnapshot } from "#data/elite-redux/er-ghost-teams";
+
 /** Which side of a co-op session a client is. Auto-assigned at pairing time (the
  *  player never chooses); the run is host-authoritative, so `host` is the engine
  *  source of truth and `guest` is the thin client. */
@@ -229,6 +234,16 @@ export type CoopMessage =
    * its own enemy species/ability/IVs). Sent at encounter start.
    */
   | { t: "enemyPartySync"; wave: number; enemies: CoopSerializedEnemy[] }
+  /**
+   * Host -> guest (#633): the host's fetched GHOST-TEAM POOL. Ghost teams are pulled
+   * per-client from the shared server pool, so the two clients otherwise download
+   * DIFFERENT teams and field divergent ghost trainers (desync). The host broadcasts
+   * its pool once (on prefetch-resolve, well ahead of the first ghost wave); the guest
+   * adopts it verbatim and skips its own fetch, so `takeGhostForWave`'s seeded pick is
+   * deterministic on both. `pool` is plain-JSON `GhostTeamSnapshot[]` (type-only import,
+   * no value dependency, so the transport stays the lowest layer).
+   */
+  | { t: "ghostPool"; pool: GhostTeamSnapshot[] }
   /**
    * Host -> guest (#633, LIVE-D): a fully-resolved turn. `events` is the ordered visible
    * log the guest narrates/animates; `checkpoint` is the AUTHORITATIVE post-turn state the

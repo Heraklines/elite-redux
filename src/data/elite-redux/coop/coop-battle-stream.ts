@@ -29,6 +29,8 @@ import type {
   CoopSerializedEnemy,
   CoopTransport,
 } from "#data/elite-redux/coop/coop-transport";
+// TYPE-ONLY (erased at runtime): the host's ghost-team pool the guest adopts (#633).
+import type { GhostTeamSnapshot } from "#data/elite-redux/er-ghost-teams";
 
 /** A fully-resolved turn the guest renders: ordered events + the authoritative state. */
 export interface CoopTurnResolution {
@@ -86,6 +88,10 @@ export class CoopBattleStreamer {
   private lastCheckpoint: CoopBattleCheckpoint | null = null;
   /** Latest enemy party the guest has not yet adopted (consumed at the wave's first turn). */
   private lastEnemyParty: { wave: number; enemies: CoopSerializedEnemy[] } | null = null;
+  /** GUEST: handler for the host's authoritative ghost-team pool (#633 ghost-pool sync). */
+  private ghostPoolHandler: ((pool: GhostTeamSnapshot[]) => void) | null = null;
+  /** GUEST: the host's ghost pool that arrived before a handler subscribed (delivered on subscribe). */
+  private lastGhostPool: GhostTeamSnapshot[] | null = null;
 
   constructor(transport: CoopTransport, opts: CoopBattleStreamerOptions = {}) {
     this.transport = transport;
@@ -99,6 +105,16 @@ export class CoopBattleStreamer {
   /** HOST: send the exact enemy party the guest must adopt verbatim for `wave`. */
   sendEnemyParty(wave: number, enemies: CoopSerializedEnemy[]): void {
     this.transport.send({ t: "enemyPartySync", wave, enemies });
+  }
+
+  /**
+   * HOST: broadcast the authoritative ghost-team pool (#633). Ghost teams are fetched
+   * per-client from the shared server pool, so the two clients otherwise field divergent
+   * ghosts. The guest adopts this pool verbatim (and skips its own fetch), making
+   * `takeGhostForWave`'s seeded pick deterministic on both. Sent once on prefetch-resolve.
+   */
+  sendGhostPool(pool: GhostTeamSnapshot[]): void {
+    this.transport.send({ t: "ghostPool", pool });
   }
 
   /** HOST: send a fully-resolved turn (ordered events + authoritative checkpoint). */
@@ -116,6 +132,20 @@ export class CoopBattleStreamer {
   /** GUEST: handle the host's enemy party (adopt it verbatim). */
   onEnemyPartySync(handler: (wave: number, enemies: CoopSerializedEnemy[]) => void): void {
     this.enemyPartyHandler = handler;
+  }
+
+  /**
+   * GUEST: subscribe to the host's authoritative ghost pool (#633). If the pool already
+   * arrived before this subscribe (the prefetch broadcast is early + one-shot), it is
+   * delivered immediately so it is never missed.
+   */
+  onGhostPool(handler: (pool: GhostTeamSnapshot[]) => void): void {
+    this.ghostPoolHandler = handler;
+    if (this.lastGhostPool != null) {
+      const pool = this.lastGhostPool;
+      this.lastGhostPool = null;
+      handler(pool);
+    }
   }
 
   /**
@@ -236,6 +266,8 @@ export class CoopBattleStreamer {
     this.lastEnemyParty = null;
     this.enemyPartyHandler = null;
     this.checkpointHandler = null;
+    this.ghostPoolHandler = null;
+    this.lastGhostPool = null;
   }
 
   private handle(msg: CoopMessage): void {
@@ -267,6 +299,15 @@ export class CoopBattleStreamer {
       }
       case "battleCheckpoint":
         this.checkpointHandler?.(msg.reason, msg.checkpoint);
+        return;
+      case "ghostPool":
+        // Deliver to a live handler, else buffer (the broadcast can land before the
+        // guest's runtime wiring subscribes - it's sent eagerly on prefetch-resolve).
+        if (this.ghostPoolHandler == null) {
+          this.lastGhostPool = msg.pool;
+        } else {
+          this.ghostPoolHandler(msg.pool);
+        }
         return;
       default:
         // Not a stream message - ignored (other layers handle ping/command/etc.).

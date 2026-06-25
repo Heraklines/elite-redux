@@ -28,6 +28,29 @@ import { CoopSessionController } from "#data/elite-redux/coop/coop-session-contr
 import { SpoofGuest } from "#data/elite-redux/coop/coop-spoof-guest";
 import { type CoopTransport, createLoopbackPair, type SerializedCommand } from "#data/elite-redux/coop/coop-transport";
 import { CoopUiMirror } from "#data/elite-redux/coop/coop-ui-mirror";
+import { setCoopGhostFetchSuppressed, setCoopGhostPool, setGhostPoolPublisher } from "#data/elite-redux/er-ghost-teams";
+
+/**
+ * Co-op ghost-pool sync (#633): the HOST broadcasts its server-fetched ghost-team
+ * pool over the battle stream; the GUEST adopts it verbatim and skips its own fetch,
+ * so `takeGhostForWave`'s seeded pick is deterministic on both clients (they otherwise
+ * download divergent pools and field different ghost trainers = high-wave desync).
+ * Gated on the LIVE controller role at send/receive time, so a pre-battle role
+ * reconciliation is handled. Cleared in {@linkcode clearCoopRuntime}.
+ */
+function wireCoopGhostPoolSync(controller: CoopSessionController, battleStream: CoopBattleStreamer): void {
+  setGhostPoolPublisher(pool => {
+    if (controller.role === "host") {
+      battleStream.sendGhostPool(pool);
+    }
+  });
+  setCoopGhostFetchSuppressed(() => controller.role === "guest");
+  battleStream.onGhostPool(pool => {
+    if (controller.role === "guest") {
+      setCoopGhostPool(pool);
+    }
+  });
+}
 
 /** Everything tied to one live co-op session. */
 export interface CoopRuntime {
@@ -147,6 +170,7 @@ export function startLocalCoopSession(opts: { username?: string | undefined } = 
     partnerTransport: guest,
     spoof,
   };
+  wireCoopGhostPoolSync(controller, battleStream);
   setCoopRuntime(runtime);
   controller.connect();
   return runtime;
@@ -180,6 +204,7 @@ export function connectCoopSession(
     mePump,
     localTransport: transport,
   };
+  wireCoopGhostPoolSync(controller, battleStream);
   setCoopRuntime(runtime);
   controller.connect();
   return runtime;
@@ -198,5 +223,8 @@ export function clearCoopRuntime(): void {
   active.mePump.endSession();
   active.spoof?.dispose();
   active.localTransport.close();
+  // Clear the co-op ghost-pool hooks so a subsequent SOLO run fetches normally (#633).
+  setGhostPoolPublisher(null);
+  setCoopGhostFetchSuppressed(null);
   active = null;
 }

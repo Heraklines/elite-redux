@@ -208,4 +208,41 @@ describe("co-op host-authoritative battle stream (#633, LIVE-D)", () => {
     await new Promise(r => setTimeout(r, 0));
     expect(fired).toBe(false);
   });
+
+  describe("ghost-pool sync (#633)", () => {
+    // A minimal pool - the streamer relays it verbatim (order preserved), which is what
+    // makes the guest's seeded ghost pick land on the same team as the host.
+    // biome-ignore lint/suspicious/noExplicitAny: minimal fixtures; the streamer is shape-agnostic
+    const pool = [{ id: "a" }, { id: "b" }, { id: "c" }] as any;
+
+    it("the guest receives the host's ghost pool verbatim + in order", async () => {
+      const { host, guest } = createLoopbackPair();
+      const hostStream = new CoopBattleStreamer(host);
+      const guestStream = new CoopBattleStreamer(guest);
+
+      let got: { id: string }[] | null = null;
+      guestStream.onGhostPool(p => {
+        got = p as unknown as { id: string }[];
+      });
+      hostStream.sendGhostPool(pool);
+      await new Promise(r => setTimeout(r, 0));
+      expect((got as { id: string }[] | null)?.map(t => t.id)).toEqual(["a", "b", "c"]);
+    });
+
+    it("buffers a pool that arrives BEFORE the guest subscribes (eager broadcast)", async () => {
+      const { host, guest } = createLoopbackPair();
+      const hostStream = new CoopBattleStreamer(host);
+      const guestStream = new CoopBattleStreamer(guest);
+
+      // Host broadcasts on prefetch-resolve, possibly before the guest's runtime wires its
+      // handler - the message must be buffered + delivered on subscribe, never lost.
+      hostStream.sendGhostPool(pool);
+      await new Promise(r => setTimeout(r, 0));
+      let got: { id: string }[] | null = null;
+      guestStream.onGhostPool(p => {
+        got = p as unknown as { id: string }[];
+      });
+      expect((got as { id: string }[] | null)?.length).toBe(3);
+    });
+  });
 });

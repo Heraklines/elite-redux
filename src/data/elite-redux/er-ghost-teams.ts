@@ -616,6 +616,46 @@ let prefetchStarted = false;
 const usedGhostIds = new Set<string>();
 const ghostByWave = new Map<number, GhostTeamSnapshot>();
 
+// =============================================================================
+// Co-op ghost-pool sync (#633). The ghost POOL is fetched per-client from the shared
+// server pool, so the two clients otherwise download DIFFERENT teams and field
+// divergent ghost trainers (high-wave desync). Fix: the HOST broadcasts its fetched
+// pool, the GUEST adopts it verbatim + skips its own fetch, so `takeGhostForWave`'s
+// seeded pick is deterministic on both. Wired via CALLBACKS (set from coop-runtime)
+// so this module stays free of coop value-imports (circular-init hazard, see header).
+// All hooks are gated on the LIVE role by the registrar, so role reconciliation is safe.
+// =============================================================================
+
+/** Co-op GUEST: when this returns true, skip the local server fetch (use the host's pool). */
+let coopGhostFetchSuppressed: (() => boolean) | null = null;
+/** Co-op HOST: fired whenever `prefetched` is (re)published, to broadcast it to the guest. */
+let onGhostPoolPublished: ((pool: GhostTeamSnapshot[]) => void) | null = null;
+
+/** Register the co-op guest fetch-suppression predicate (null = solo / clear). */
+export function setCoopGhostFetchSuppressed(predicate: (() => boolean) | null): void {
+  coopGhostFetchSuppressed = predicate;
+}
+
+/** Register the co-op host ghost-pool broadcast hook (null = solo / clear). */
+export function setGhostPoolPublisher(cb: ((pool: GhostTeamSnapshot[]) => void) | null): void {
+  onGhostPoolPublished = cb;
+}
+
+/**
+ * Co-op GUEST: adopt the host's authoritative ghost pool verbatim (#633). Ignored once
+ * picking has started (`ghostByWave` non-empty) - a late pool swap would corrupt the
+ * deterministic pick sequence; the host broadcasts eagerly on prefetch-resolve so the
+ * pool is virtually always present before the first ghost pick. Order is preserved
+ * (no re-sort) so `pickGhost`'s seeded index lands on the same team as the host.
+ */
+export function setCoopGhostPool(pool: GhostTeamSnapshot[]): void {
+  if (ghostByWave.size > 0) {
+    return;
+  }
+  prefetched = pool.filter(isErGhostTeamLegal);
+  prefetchStarted = true;
+}
+
 function isValidSnapshot(s: unknown): s is GhostTeamSnapshot {
   return (
     !!s
@@ -666,6 +706,13 @@ export function maybePrefetchGhostTeams(waveIndex: number): void {
   if (prefetchStarted) {
     return;
   }
+  // Co-op GUEST (#633): never fetch from the server; the host broadcasts its
+  // authoritative pool and the guest adopts it (setCoopGhostPool), so both clients'
+  // seeded ghost picks are identical. Mark started so the lazy fetch never fires.
+  if (coopGhostFetchSuppressed?.()) {
+    prefetchStarted = true;
+    return;
+  }
   // ER (#422): Ghost Trainers challenge - ghosts can appear from wave 1, so
   // prefetch a full batch immediately (floor 1). The pool endpoint filters by
   // DIFFICULTY, and a difficulty with few stored runs (Ace!) starved the
@@ -708,6 +755,9 @@ export function maybePrefetchGhostTeams(waveIndex: number): void {
           perUploader.set(k, n + 1);
           return true;
         });
+        // Co-op HOST (#633): broadcast the (incrementally grown) pool so the guest
+        // adopts the SAME teams - no-op solo / on the guest.
+        onGhostPoolPublished?.(prefetched);
         if (collected.length >= 30) {
           break;
         }
@@ -748,6 +798,10 @@ export function maybePrefetchGhostTeams(waveIndex: number): void {
       // here no matter which source (server pool / legacy endpoint / local)
       // they came from.
       prefetched = teams.filter(isErGhostTeamLegal);
+      // Co-op HOST (#633): broadcast the authoritative pool to the guest (~15 waves
+      // ahead of the first ghost wave) so its seeded pick is deterministic. No-op
+      // solo / on the guest.
+      onGhostPoolPublished?.(prefetched);
     })
     .catch(() => {
       prefetched = [];
