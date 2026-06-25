@@ -36,6 +36,46 @@ export function coopGuestSessionSlot(current: number): number {
   return Number.isInteger(current) && current >= 0 && current < COOP_SAVE_SLOT_COUNT ? current : 0;
 }
 
+/**
+ * Clamp a raw `current` slot to a real save slot (0..4), defaulting to 0 when it
+ * is unset / out-of-range / non-integer. The HOST's all-slots-full FALLBACK (#633):
+ * mirrors {@linkcode coopGuestSessionSlot} so the pure clamp is shared + unit-testable.
+ */
+export function coopHostFallbackSlot(current: number): number {
+  return Number.isInteger(current) && current >= 0 && current < COOP_SAVE_SLOT_COUNT ? current : 0;
+}
+
+/**
+ * The slot a co-op HOST launches its (authoritative) run into (#633). The host is
+ * the persistence authority, but the interactive SAVE_SLOT picker hard-stalled the
+ * launch (its per-slot cloud loads dead-end on empty slots and the callback never
+ * fires, so the run never starts and the guest waits forever). So the host now
+ * AUTO-PICKS a slot the same way the guest skips the picker, and co-op starts
+ * immediately after difficulty.
+ *
+ * SAFE pick: probe slots 0..4 IN ORDER and select the FIRST EMPTY one. Falls back
+ * to the host's CURRENT slot (clamped) ONLY when all 5 slots are non-empty.
+ *
+ * DATA SAFETY (critical): an empty pick must NEVER overwrite a real run, so `probeHasData`
+ * MUST report occupancy from a source that cannot false-empty - the caller probes
+ * localStorage DIRECTLY (a real LOCAL run is always present there; a cloud round-trip can
+ * transiently fail and wrongly read as empty). `probeHasData(slot)` resolves `true` when the
+ * slot holds data. Engine-free (the probe is injected) so the launch decision is unit-testable.
+ */
+export async function coopHostSessionSlot(
+  probeHasData: (slot: number) => Promise<boolean>,
+  current: number,
+): Promise<number> {
+  for (let slot = 0; slot < COOP_SAVE_SLOT_COUNT; slot++) {
+    if (!(await probeHasData(slot))) {
+      return slot;
+    }
+  }
+  // All 5 slots are occupied: the maintainer-sanctioned fallback is the host's
+  // current slot (it WILL overwrite, but every choice does when nothing is free).
+  return coopHostFallbackSlot(current);
+}
+
 /** Field slot of the host's active mon in the co-op double. */
 export const COOP_HOST_FIELD_INDEX = 0;
 /** Field slot of the guest's active mon in the co-op double. */

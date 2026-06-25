@@ -1,3 +1,4 @@
+import { getSessionDataLocalStorageKey } from "#app/account";
 import { consumePendingDevStarters } from "#app/dev-tools/registry";
 import { globalScene } from "#app/global-scene";
 import Overrides from "#app/overrides";
@@ -11,7 +12,7 @@ const DEV_SCENARIO_SLOT = 4;
 
 import type { CoopRosterEntry } from "#data/elite-redux/coop/coop-roster";
 import { getCoopController, getCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
-import { coopGuestSessionSlot } from "#data/elite-redux/coop/coop-session";
+import { coopGuestSessionSlot, coopHostSessionSlot } from "#data/elite-redux/coop/coop-session";
 import type { CoopRole, CoopSerializedStarter } from "#data/elite-redux/coop/coop-transport";
 import { SpeciesFormChangeMoveLearnedTrigger } from "#data/form-change-triggers";
 import { Gender } from "#data/gender";
@@ -166,33 +167,42 @@ export class SelectStarterPhase extends Phase {
   }
 
   /**
-   * Launch the merged co-op party into the run (#633). Only the HOST is the
-   * persistence authority, so only the host runs the interactive SAVE_SLOT picker
-   * (choose a slot, overwrite-confirm, etc.). The GUEST skips that screen entirely
-   * and drops straight into the merged battle on its current slot.
+   * Launch the merged co-op party into the run (#633). NEITHER client runs the
+   * interactive SAVE_SLOT picker any more - both AUTO-PICK a slot and drop straight
+   * into the merged battle, so co-op starts immediately after the difficulty pick.
    *
-   * WHY the guest skips it (the live "guest stuck on loading" hang): SAVE_SLOT is
-   * an INTERACTIVE modal that runs INDEPENDENTLY on each client - the same class of
-   * desync we already removed for the battle-start "switch?" prompt (#633,
-   * CheckSwitchPhase) and the host-only challenge screen. On the guest it either
-   * stalls waiting for a second human to navigate + confirm the overwrite, or its
-   * `deleteSession` overwrite path returns false and triggers `globalScene.reset()`
-   * - both of which present as the guest never reaching EncounterPhase. The guest's
-   * local slot is not the authoritative save (that is the host's job; co-op runs
-   * persist host-side), so launching directly is correct. `ignoreMovesetValidation`
-   * stays true (LIVE-D): the merged party is rebuilt from each player's FULL
-   * serialized starter, and the legality pass would strip moves and desync the relay.
+   * WHY no picker (the live launch hang, twice over): SAVE_SLOT is an INTERACTIVE
+   * modal that runs INDEPENDENTLY on each client - the same class of desync we
+   * already removed for the battle-start "switch?" prompt (#633, CheckSwitchPhase)
+   * and the host-only challenge screen.
+   *   - GUEST: it stalls waiting for a second human to navigate + confirm the
+   *     overwrite, or its `deleteSession` overwrite path returns false and triggers
+   *     `globalScene.reset()` - both present as the guest never reaching EncounterPhase.
+   *   - HOST: its per-slot loads dead-end ("Session not found." on every empty slot),
+   *     the picker callback never fires, so `initBattle` never runs and the guest
+   *     waits forever. The HOST is the persistence authority, but a human-driven slot
+   *     pick mid-launch is not safe to require, so it auto-picks too.
    *
-   * Guarded by `role`: solo and the host are byte-for-byte unaffected (the host path
-   * below is the exact pre-existing SAVE_SLOT flow).
+   * The HOST picks a SAFE slot: the FIRST EMPTY slot (so an existing solo/other run is
+   * NEVER overwritten), falling back to its current slot only when all 5 are occupied
+   * ({@linkcode coopHostSessionSlot}). Emptiness is read from localStorage DIRECTLY (a
+   * real LOCAL run is always present there; a cloud round-trip can transiently fail and
+   * false-read an occupied slot as empty - which would silently overwrite it). The GUEST
+   * reuses its current slot ({@linkcode coopGuestSessionSlot}); its save is
+   * non-authoritative (co-op runs persist host-side). `ignoreMovesetValidation` stays
+   * true (LIVE-D): the merged party is rebuilt from each player's FULL serialized
+   * starter, and the legality pass would strip moves and desync the relay.
+   *
+   * Guarded by `role`: the SOLO SAVE_SLOT flow (in {@linkcode start}) is byte-for-byte
+   * unaffected - only the co-op launch skips the picker.
    */
-  launchCoopMergedParty(merged: Starter[], owners: CoopRole[], role: CoopRole): void {
+  async launchCoopMergedParty(merged: Starter[], owners: CoopRole[], role: CoopRole): Promise<void> {
     console.log(
       `[coop-launch] launchCoopMergedParty role=${role} merged=${merged.length} slot=${globalScene.sessionSlotId}`,
     );
     if (role === "guest") {
       globalScene.sessionSlotId = coopGuestSessionSlot(globalScene.sessionSlotId);
-      // The guest skips the SAVE_SLOT screen - but on the host/solo path it is that
+      // The guest skips the SAVE_SLOT screen - but on the solo path it is that
       // setMode(SAVE_SLOT) which TEARS DOWN the starter-select UI. Without leaving
       // STARTER_SELECT here, the starter-select handler stays active and re-fires its
       // "Begin with these Pokemon?" confirm in a loop (#633 guest launch-loop). Move
@@ -201,16 +211,20 @@ export class SelectStarterPhase extends Phase {
       void globalScene.ui.setMode(UiMode.MESSAGE).then(() => this.initBattle(merged, true, owners));
       return;
     }
-    console.log("[coop-launch] host: opening SAVE_SLOT picker");
-    globalScene.ui.setMode(UiMode.SAVE_SLOT, SaveSlotUiMode.SAVE, (slotId: number) => {
-      if (slotId === -1) {
-        globalScene.phaseManager.toTitleScreen();
-        this.end();
-        return;
-      }
-      globalScene.sessionSlotId = slotId;
-      this.initBattle(merged, true, owners);
-    });
+    // HOST: auto-pick the first EMPTY slot (never overwrite an existing run); fall back
+    // to the current slot only when all 5 are full. Occupancy is read from localStorage
+    // DIRECTLY so a transient cloud failure can never false-empty an occupied slot.
+    const slot = await coopHostSessionSlot(
+      async s => localStorage.getItem(getSessionDataLocalStorageKey(s)) != null,
+      globalScene.sessionSlotId,
+    );
+    const allFull = localStorage.getItem(getSessionDataLocalStorageKey(slot)) != null;
+    if (allFull) {
+      console.warn(`[coop-launch] host: all 5 save slots full, falling back to current slot ${slot} (will overwrite)`);
+    }
+    globalScene.sessionSlotId = slot;
+    console.log(`[coop-launch] host: auto-picked slot ${slot} (no picker), clearing STARTER_SELECT -> MESSAGE`);
+    void globalScene.ui.setMode(UiMode.MESSAGE).then(() => this.initBattle(merged, true, owners));
   }
 
   /**

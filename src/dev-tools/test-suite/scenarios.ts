@@ -8808,6 +8808,41 @@ export const DEV_SCENARIOS: DevScenario[] = [
       ];
     },
   },
+  // Co-op - HOST launch no longer stalls on the SAVE_SLOT picker (#633, 2 clients)
+  {
+    label: "(note) Co-op: host launches with NO save-slot picker (#633)",
+    description:
+      "#633 co-op HOST LAUNCH - NOT stageable in one client (it is a 2-client launch\n"
+      + "handoff; the headless repro lives in test/tests/elite-redux/coop/coop-launch.test.ts).\n"
+      + "THE BUG: after team-select + difficulty, the run did not start. The HOST opened the\n"
+      + "INTERACTIVE SAVE_SLOT picker mid-launch; its per-slot cloud loads dead-ended\n"
+      + "('Invalid save data JSON detected! Session not found.' on every empty slot), the\n"
+      + "picker callback NEVER fired, so initBattle never ran. The guest had already\n"
+      + "auto-picked its slot and reached the wave-1 EncounterPhase, so it waited forever.\n"
+      + "(This interactive save-slot step blocked co-op launch TWICE - a stale-text overlay\n"
+      + "first, then these empty-slot loads.)\n"
+      + "THE FIX: NEITHER client runs the picker now. Both AUTO-PICK a slot and drop straight\n"
+      + "into the merged battle. The HOST (persistence authority) picks the FIRST EMPTY save\n"
+      + "slot, read DIRECTLY from localStorage so an existing solo/other run is NEVER\n"
+      + "overwritten; it falls back to its current slot only when all 5 slots are full. The\n"
+      + "guest reuses its current slot (its save is non-authoritative). The SOLO save-slot\n"
+      + "picker is unchanged.\n"
+      + "DO (needs 2 clients on the staging build, AUTHORITATIVE netcode): start a co-op run -\n"
+      + "host + guest each pick a team, then pick the difficulty.\n"
+      + "EXPECT: the run STARTS IMMEDIATELY after the difficulty pick - NO save-slot screen on\n"
+      + "EITHER client, both drop into the wave-1 double, and neither hangs. DATA SAFETY: if the\n"
+      + "host had an existing solo run in a slot, that run is untouched (the co-op run lands in\n"
+      + "the first EMPTY slot). Confirm the prior run is still there afterward. VERIFY this (note)\n"
+      + "is the final check - the single-client suite cannot reproduce the 2-client launch hang.",
+    setup: () => {
+      resetDevOverrides();
+      return [
+        makeStarter(SpeciesId.SNORLAX, {
+          moveset: [MoveId.BODY_SLAM, MoveId.CRUNCH, MoveId.EARTHQUAKE, MoveId.REST],
+        }),
+      ];
+    },
+  },
   // Co-op - arena-tag (hazard / screen) SYNC (#633 GAP 1)
   {
     label: "Co-op: hazards / screens sync to the guest (#633 GAP 1)",
