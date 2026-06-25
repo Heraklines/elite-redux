@@ -5,15 +5,7 @@ import { speciesStarterCosts } from "#balance/starters";
 import { TrappedTag } from "#data/battler-tags";
 import { getDailyEventSeedBoss } from "#data/daily-seed/daily-run";
 import { isDailyFinalBoss } from "#data/daily-seed/daily-seed-utils";
-import { COOP_CHECKSUM_SENTINEL } from "#data/elite-redux/coop/coop-battle-checksum";
-import {
-  applyCoopCheckpoint,
-  applyCoopEnemies,
-  applyCoopFullSnapshot,
-  captureCoopCheckpoint,
-  captureCoopChecksum,
-  captureCoopEnemies,
-} from "#data/elite-redux/coop/coop-battle-engine";
+import { applyCoopEnemies, captureCoopEnemies } from "#data/elite-redux/coop/coop-battle-engine";
 import {
   applyWiredPartnerCommand,
   type ResolvedPartnerCommand,
@@ -21,7 +13,7 @@ import {
 } from "#data/elite-redux/coop/coop-partner-ai";
 import { getCoopBattleStreamer, getCoopBattleSync, getCoopController } from "#data/elite-redux/coop/coop-runtime";
 import { coopOwnerOfFieldIndex } from "#data/elite-redux/coop/coop-session";
-import type { CoopFullBattleSnapshot, SerializedCommand } from "#data/elite-redux/coop/coop-transport";
+import type { SerializedCommand } from "#data/elite-redux/coop/coop-transport";
 import { AbilityId } from "#enums/ability-id";
 import { ArenaTagSide } from "#enums/arena-tag-side";
 import { ArenaTagType } from "#enums/arena-tag-type";
@@ -42,7 +34,6 @@ import { FieldPhase } from "#phases/field-phase";
 import type { MoveTargetSet } from "#types/move-target-set";
 import type { TurnMove } from "#types/turn-move";
 import i18next from "i18next";
-import { decompressFromBase64 } from "lz-string";
 
 export class CommandPhase extends FieldPhase {
   public readonly phaseName = "CommandPhase";
@@ -213,6 +204,22 @@ export class CommandPhase extends FieldPhase {
       return false;
     }
 
+    // Co-op (#633, TRACK-2 Phase B): on the GUEST, the partner slot is the HOST's mon.
+    // The guest is a pure renderer - it must NOT await or AI-resolve the host's slot (the
+    // host simulates the whole turn). Write an inert, skipped command so the phase queue
+    // stays well-formed; TurnStartPhase then diverts the turn to CoopReplayTurnPhase, which
+    // renders the host's authoritative outcome. (The HOST keeps awaiting the guest's real
+    // command over the relay below, so it simulates with the guest's actual pick.)
+    if (controller.role === "guest") {
+      globalScene.currentBattle.turnCommands[this.fieldIndex] = {
+        command: Command.FIGHT,
+        move: { move: MoveId.NONE, targets: [], useMode: MoveUseMode.NORMAL },
+        skip: true,
+      };
+      this.end();
+      return true;
+    }
+
     const partner = this.getPokemon();
     // Passing the full `move` arg makes handleFightCommand reuse the resolved
     // targets and SKIP the interactive SelectTargetPhase.
@@ -282,75 +289,21 @@ export class CommandPhase extends FieldPhase {
     const { turn, waveIndex } = globalScene.currentBattle;
     if (controller.role === "host") {
       // Turn 1 of each wave (first command phase): broadcast the authoritative enemy
-      // party so the guest's enemies match exactly (ability/moveset/IVs/nature).
+      // party so the guest's enemies match exactly (ability/moveset/IVs/nature). The
+      // PER-TURN authoritative state (checkpoint + checksum) now streams via emitTurn at
+      // TurnEnd (#633, TRACK-2 Phase B), so it is NOT re-sent here.
       if (this.fieldIndex === 0 && turn === 1) {
         streamer.sendEnemyParty(waveIndex, captureCoopEnemies());
       }
-      // Once per turn after turn 1: snapshot + broadcast the post-turn state, stamped
-      // with the host's full-state checksum (computed at THIS same boundary the guest
-      // reads, so both fingerprint the identical logical instant) (#633, TRACK-2).
-      if (this.fieldIndex === 0 && turn > 1) {
-        const checkpoint = captureCoopCheckpoint();
-        if (checkpoint != null) {
-          streamer.sendCheckpoint("turn", checkpoint, captureCoopChecksum());
-        }
-      }
-    } else {
-      // Guest: at the wave's first turn, adopt the host's exact enemy party.
-      if (turn === 1) {
-        const enemies = streamer.consumeEnemyParty(waveIndex);
-        if (enemies != null) {
-          applyCoopEnemies(enemies);
-        }
-      }
-      // Apply the host's latest authoritative checkpoint at this safe boundary, then
-      // verify our state converged against the host's checksum (#633, TRACK-2).
-      const envelope = streamer.consumeCheckpoint();
-      if (envelope != null) {
-        applyCoopCheckpoint(envelope.checkpoint);
-        this.verifyCoopChecksum(turn, envelope.checksum);
+    } else if (turn === 1) {
+      // Guest: at the wave's first turn, adopt the host's exact enemy party (a belt-and-
+      // suspenders for the encounter-phase adopt; one-shot). The per-turn checkpoint +
+      // checksum verification is owned by CoopReplayTurnPhase now (Phase B), not here.
+      const enemies = streamer.consumeEnemyParty(waveIndex);
+      if (enemies != null) {
+        applyCoopEnemies(enemies);
       }
     }
-  }
-
-  /**
-   * Co-op GUEST checksum verification + auto-resync (#633, TRACK-2). After applying the
-   * host's checkpoint, recompute our OWN full-state checksum and compare it to the host's.
-   * On a MISMATCH (the checkpoint healed the numeric drift but ability/form/PP/tag drift
-   * remains) log `[coop-desync] turn=N host=H guest=G`, request the host's full authoritative
-   * snapshot, and adopt it wholesale - so the next turn re-converges. A sentinel on either
-   * side (a read failure) SKIPS the comparison so a transient hiccup never forces a resync.
-   */
-  private verifyCoopChecksum(turn: number, hostChecksum: string): void {
-    const streamer = getCoopBattleStreamer();
-    if (streamer == null) {
-      return;
-    }
-    const guestChecksum = captureCoopChecksum();
-    if (hostChecksum === COOP_CHECKSUM_SENTINEL || guestChecksum === COOP_CHECKSUM_SENTINEL) {
-      return;
-    }
-    if (hostChecksum === guestChecksum) {
-      return;
-    }
-    console.warn(`[coop-desync] turn=${turn} host=${hostChecksum} guest=${guestChecksum}`);
-    void streamer.requestStateSync(turn).then(blob => {
-      if (blob == null) {
-        return;
-      }
-      try {
-        const snapshot = JSON.parse(decompressFromBase64(blob)) as CoopFullBattleSnapshot;
-        applyCoopFullSnapshot(snapshot);
-        const healed = captureCoopChecksum();
-        if (healed === hostChecksum) {
-          console.info(`[coop-resync] turn=${turn} ok`);
-        } else {
-          console.warn(`[coop-resync] turn=${turn} still-diverged host=${hostChecksum} guest=${healed}`);
-        }
-      } catch {
-        /* a malformed resync blob must never crash the guest's battle */
-      }
-    });
   }
 
   public override start(): void {

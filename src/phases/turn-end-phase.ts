@@ -1,6 +1,9 @@
 import { applyAbAttrs } from "#abilities/apply-ab-attrs";
 import { globalScene } from "#app/global-scene";
 import { getPokemonNameWithAffix } from "#app/messages";
+import { captureCoopCheckpoint, captureCoopChecksum } from "#data/elite-redux/coop/coop-battle-engine";
+import { getCoopBattleStreamer, getCoopController } from "#data/elite-redux/coop/coop-runtime";
+import { endCoopRecording } from "#data/elite-redux/coop/coop-turn-recorder";
 import { getErBiomeRule } from "#data/elite-redux/er-biome-rules";
 import { erApplyFieldMedic } from "#data/elite-redux/er-relics";
 import { TerrainType } from "#data/terrain";
@@ -127,6 +130,37 @@ export class TurnEndPhase extends FieldPhase {
       globalScene.arena.trySetTerrain(TerrainType.NONE);
     }
 
+    this.emitCoopTurn();
+
     this.end();
+  }
+
+  /**
+   * Co-op HOST (#633, TRACK-2 Phase B): the host is the sole engine; at the settled
+   * post-turn boundary it STREAMS this turn's ordered narration events (recorded since
+   * TurnStart) + the authoritative checkpoint + the full-state checksum. The guest's
+   * CoopReplayTurnPhase awaits + renders them. Emitted with the turn number STAMPED at
+   * TurnStart (incrementTurn() already ran above, so `currentBattle.turn` is now N+1) so
+   * the host's emit-turn matches the guest's await-turn exactly. Hard no-op for solo /
+   * non-host; the recording is closed either way so it never leaks into the next turn.
+   */
+  private emitCoopTurn(): void {
+    const recording = endCoopRecording();
+    if (!globalScene.gameMode.isCoop) {
+      return;
+    }
+    const controller = getCoopController();
+    const streamer = getCoopBattleStreamer();
+    if (controller == null || streamer == null || controller.role !== "host" || recording.turn < 0) {
+      return;
+    }
+    try {
+      const checkpoint = captureCoopCheckpoint();
+      if (checkpoint != null) {
+        streamer.emitTurn(recording.turn, recording.events, checkpoint, captureCoopChecksum());
+      }
+    } catch {
+      /* a stream/capture failure must never break the host's turn */
+    }
   }
 }

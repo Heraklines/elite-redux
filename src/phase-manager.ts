@@ -12,6 +12,7 @@ import { DynamicQueueManager } from "#app/dynamic-queue-manager";
 import { globalScene } from "#app/global-scene";
 import type { Phase } from "#app/phase";
 import { PhaseTree } from "#app/phase-tree";
+import { isCoopRecording, recordCoopMessage } from "#data/elite-redux/coop/coop-turn-recorder";
 import { MovePhaseTimingModifier } from "#enums/move-phase-timing-modifier";
 import type { Pokemon } from "#field/pokemon";
 import { AddEnemyBuffModifierPhase } from "#phases/add-enemy-buff-modifier-phase";
@@ -27,6 +28,7 @@ import { CheckSwitchPhase } from "#phases/check-switch-phase";
 import { ColosseumChoicePhase } from "#phases/colosseum-choice-phase";
 import { CommandPhase } from "#phases/command-phase";
 import { CommonAnimPhase } from "#phases/common-anim-phase";
+import { CoopReplayTurnPhase } from "#phases/coop-replay-turn-phase";
 import { DamageAnimPhase } from "#phases/damage-anim-phase";
 import { DynamicPhaseMarker } from "#phases/dynamic-phase-marker";
 import { EggHatchPhase } from "#phases/egg-hatch-phase";
@@ -154,6 +156,7 @@ const PHASES = Object.freeze({
   CheckStatusEffectPhase,
   CheckSwitchPhase,
   CommandPhase,
+  CoopReplayTurnPhase,
   CommonAnimPhase,
   DamageAnimPhase,
   DynamicPhaseMarker,
@@ -468,6 +471,13 @@ export class PhaseManager {
     promptDelay?: number | null,
     defer?: boolean | null,
   ) {
+    // Co-op host turn recorder (#633, TRACK-2 Phase B): while the host is resolving a
+    // turn it records each narration line so it can stream the ordered events to the
+    // guest (which renders them + computes nothing). Inert unless a recording is open
+    // (only the host, mid-turn, in a live co-op run) - solo is byte-for-byte unaffected.
+    if (isCoopRecording()) {
+      recordCoopMessage(message);
+    }
     const phase = new MessagePhase(message, callbackDelay, prompt, promptDelay);
     if (defer) {
       this.pushPhase(phase);

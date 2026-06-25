@@ -208,9 +208,13 @@ export class EncounterPhase extends BattlePhase {
       return false;
     }
     const battle = globalScene.currentBattle;
-    // Only WILD battles roll a random party that can diverge; trainer parties and
-    // mystery encounters are deterministic / handled elsewhere.
-    return battle != null && battle.battleType === BattleType.WILD && !battle.isBattleMysteryEncounter();
+    // Co-op (#633, TRACK-2 Phase B): the GUEST is a pure renderer - it NEVER rolls its own
+    // enemies for ANY battle type. It awaits + adopts the host's authoritative party for
+    // wild AND trainer AND mystery-encounter battles (the host serializes + streams the
+    // generated party regardless of type), pre-filling battle.enemyParty so the encounter's
+    // own generation loop SKIPS (its `!enemyParty[e]` guard). The trainer object / ME
+    // encounter the guest still builds locally for RENDERING only - the MONS are the host's.
+    return battle != null;
   }
 
   /** Co-op guest: wait for + adopt the host's enemy party, then run the encounter. */
