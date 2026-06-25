@@ -151,6 +151,14 @@ export function captureCoopEnemies(): CoopSerializedEnemy[] {
         ivs: [...enemy.ivs],
         moveset: enemy.getMoveset().map(m => m.moveId),
         hp: enemy.hp,
+        // Shiny + variant are rolled in the Pokemon constructor from the wave RNG,
+        // but the guest's adopt path (buildCoopEnemy) consumes the RNG in a different
+        // order than the host's normal generation, so its independent roll diverged -
+        // one client saw a shiny wild mon, the other a normal one (and a caught mon
+        // then carried the wrong shininess into that player's save). Carry the host's
+        // authoritative roll so the guest renders + catches the EXACT same mon.
+        shiny: enemy.shiny,
+        variant: enemy.variant,
       },
     }));
   } catch {
@@ -199,6 +207,21 @@ export function applyCoopEnemies(enemies: CoopSerializedEnemy[]): void {
         const gender = num(d, "gender");
         if (gender !== undefined) {
           enemy.gender = gender as Gender;
+        }
+        // Adopt the host's authoritative shiny + variant (#633). This corrector runs
+        // at the wave's first turn boundary (sprite already summoned), so if the
+        // shininess actually changed, reload the sprite so the rendered mon matches.
+        const prevShiny = enemy.shiny;
+        const prevVariant = enemy.variant;
+        if (typeof d.shiny === "boolean") {
+          enemy.shiny = d.shiny;
+        }
+        const variant = num(d, "variant");
+        if (variant !== undefined) {
+          enemy.variant = variant as 0 | 1 | 2;
+        }
+        if (enemy.shiny !== prevShiny || enemy.variant !== prevVariant) {
+          void enemy.loadAssets(false);
         }
         if (Array.isArray(d.moveset)) {
           const moveIds = (d.moveset as unknown[]).filter((n): n is number => typeof n === "number");

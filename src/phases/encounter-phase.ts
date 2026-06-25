@@ -133,6 +133,17 @@ export function buildCoopEnemy(data: CoopSerializedPokemon, fallbackLevel: numbe
   if (gender !== undefined) {
     enemy.gender = gender as Gender;
   }
+  // Adopt the host's authoritative shiny + variant (#633): the constructor already
+  // rolled its own from a divergent RNG cursor, so override it here - BEFORE the
+  // encounter loop calls loadAssets() - and both clients render (and catch) the same
+  // mon. `typeof === "boolean"` so an explicit `false` still overrides a rolled shiny.
+  if (typeof data.shiny === "boolean") {
+    enemy.shiny = data.shiny;
+  }
+  const variant = coopNum(data, "variant");
+  if (variant !== undefined) {
+    enemy.variant = variant as 0 | 1 | 2;
+  }
   if (Array.isArray(data.ivs)) {
     const ivs = (data.ivs as unknown[]).filter((n): n is number => typeof n === "number").slice(0, 6);
     if (ivs.length === 6) {
