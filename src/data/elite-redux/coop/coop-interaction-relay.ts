@@ -25,7 +25,7 @@
 // LoopbackTransport, exactly like CoopBattleStreamer.
 // =============================================================================
 
-import type { CoopMessage, CoopTransport } from "#data/elite-redux/coop/coop-transport";
+import type { CoopInteractionOutcome, CoopMessage, CoopTransport } from "#data/elite-redux/coop/coop-transport";
 
 /** Sentinel choices shared across interaction screens. */
 export const COOP_INTERACTION_LEAVE = -1;
@@ -74,6 +74,10 @@ export class CoopInteractionRelay {
   private readonly inbox = new Map<number, CoopInteractionChoice[]>();
   /** seq -> resolver for the in-flight {@linkcode awaitInteractionChoice} (one at a time). */
   private readonly pending = new Map<number, (res: CoopInteractionChoice | null) => void>();
+  /** seq -> FIFO queue of OUTCOMES that arrived before their waiter (#633, TRACK-2 Phase C). */
+  private readonly outcomeInbox = new Map<number, CoopInteractionOutcome[]>();
+  /** seq -> resolver for the in-flight {@linkcode awaitInteractionOutcome} (one at a time). */
+  private readonly outcomePending = new Map<number, (res: CoopInteractionOutcome | null) => void>();
 
   constructor(transport: CoopTransport, opts: CoopInteractionRelayOptions = {}) {
     this.transport = transport;
@@ -128,17 +132,80 @@ export class CoopInteractionRelay {
     });
   }
 
+  /**
+   * OWNER (#633, TRACK-2 Phase C): stream the HOST-resolved authoritative OUTCOME of one
+   * pick for interaction `seq` (`kind` is routing/logging only). The watcher adopts it
+   * verbatim instead of re-deriving from its own pool, so a pool divergence can never
+   * change the result. Same FIFO-per-seq semantics as the choice relay.
+   */
+  sendInteractionOutcome(seq: number, kind: string, outcome: CoopInteractionOutcome): void {
+    this.transport.send({ t: "interactionOutcome", seq, kind, outcome });
+  }
+
+  /**
+   * WATCHER (#633, TRACK-2 Phase C): take the next host-resolved outcome for interaction
+   * `seq` (FIFO). Resolves immediately if one is buffered, else waits for the next, or
+   * resolves `null` on timeout (the watcher then leaves, never hangs). Mirrors
+   * {@linkcode awaitInteractionChoice} exactly.
+   */
+  awaitInteractionOutcome(seq: number, timeoutMs = this.timeoutMs): Promise<CoopInteractionOutcome | null> {
+    const queue = this.outcomeInbox.get(seq);
+    if (queue !== undefined && queue.length > 0) {
+      const next = queue.shift()!;
+      if (queue.length === 0) {
+        this.outcomeInbox.delete(seq);
+      }
+      return Promise.resolve(next);
+    }
+    // Supersede any stale waiter parked on this seq.
+    this.outcomePending.get(seq)?.(null);
+    return new Promise<CoopInteractionOutcome | null>(resolve => {
+      let settled = false;
+      let cancelTimer: () => void = () => {};
+      const finish = (res: CoopInteractionOutcome | null) => {
+        if (settled) {
+          return;
+        }
+        settled = true;
+        cancelTimer();
+        if (this.outcomePending.get(seq) === finish) {
+          this.outcomePending.delete(seq);
+        }
+        resolve(res);
+      };
+      this.outcomePending.set(seq, finish);
+      cancelTimer = this.schedule(() => finish(null), timeoutMs);
+    });
+  }
+
   /** Stop listening and fail any in-flight waits. */
   dispose(): void {
     this.offMessage();
     for (const finish of [...this.pending.values()]) {
       finish(null);
     }
+    for (const finish of [...this.outcomePending.values()]) {
+      finish(null);
+    }
     this.pending.clear();
     this.inbox.clear();
+    this.outcomePending.clear();
+    this.outcomeInbox.clear();
   }
 
   private handle(msg: CoopMessage): void {
+    if (msg.t === "interactionOutcome") {
+      const waiter = this.outcomePending.get(msg.seq);
+      if (waiter) {
+        waiter(msg.outcome);
+        return;
+      }
+      // No waiter yet - buffer FIFO for the next awaitInteractionOutcome(seq).
+      const queue = this.outcomeInbox.get(msg.seq) ?? [];
+      queue.push(msg.outcome);
+      this.outcomeInbox.set(msg.seq, queue);
+      return;
+    }
     if (msg.t !== "interactionChoice") {
       return;
     }

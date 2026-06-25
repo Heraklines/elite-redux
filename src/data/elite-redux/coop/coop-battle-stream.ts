@@ -110,6 +110,8 @@ export class CoopBattleStreamer {
   private readonly stateSyncInbox = new Map<number, string>();
   /** GUEST: monotonic resync request counter (each desync request bumps it). */
   private stateSyncSeq = 0;
+  /** WATCHER: handler for the owner's ME-boundary checksum (#633, TRACK-2 Phase C). */
+  private meChecksumHandler: ((seq: number, checksum: string) => void) | null = null;
 
   constructor(transport: CoopTransport, opts: CoopBattleStreamerOptions = {}) {
     this.transport = transport;
@@ -154,6 +156,22 @@ export class CoopBattleStreamer {
   /** HOST: send the authoritative full-state snapshot answering a guest's `requestStateSync`. */
   sendStateSync(blob: string, seq: number): void {
     this.transport.send({ t: "stateSync", blob, seq });
+  }
+
+  /**
+   * OWNER (#633, TRACK-2 Phase C): stamp the owner's full-state checksum at a mystery-encounter
+   * boundary so the watcher can verify its ME state is identical before the pump replays.
+   */
+  sendMeChecksum(seq: number, checksum: string): void {
+    this.transport.send({ t: "meChecksum", seq, checksum });
+  }
+
+  /**
+   * WATCHER (#633, TRACK-2 Phase C): subscribe to the owner's ME-boundary checksum. The handler
+   * verifies it against the watcher's own + triggers a `stateSync` heal on a mismatch.
+   */
+  onMeChecksum(handler: (seq: number, checksum: string) => void): void {
+    this.meChecksumHandler = handler;
   }
 
   /**
@@ -355,6 +373,7 @@ export class CoopBattleStreamer {
     this.ghostPoolHandler = null;
     this.lastGhostPool = null;
     this.stateSyncRequestHandler = null;
+    this.meChecksumHandler = null;
   }
 
   private handle(msg: CoopMessage): void {
@@ -409,6 +428,10 @@ export class CoopBattleStreamer {
         }
         return;
       }
+      case "meChecksum":
+        // WATCHER: the owner's ME-boundary checksum - verify + heal on mismatch.
+        this.meChecksumHandler?.(msg.seq, msg.checksum);
+        return;
       case "ghostPool":
         // Deliver to a live handler, else buffer (the broadcast can land before the
         // guest's runtime wiring subscribes - it's sent eagerly on prefetch-resolve).

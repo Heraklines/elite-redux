@@ -211,6 +211,32 @@ export type CoopBattleEvent =
   /** A mon switched out for the party member at `partySlot`. */
   | { k: "switch"; bi: number; partySlot: number };
 
+// =============================================================================
+// Host-authoritative INTERACTION OUTCOME (#633, TRACK-2 Phase C). Today the owner
+// relays only a CHOICE INDEX into a pool BOTH clients regenerate identically; if the
+// pools ever diverge (the same RNG-order / stale-build / locale drift Phases A/B
+// defeat for battle) the index applies to a DIFFERENT pool -> a different item. The
+// fix: the OWNER's client resolves the pick against the HOST's pool and STREAMS the
+// authoritative OUTCOME, which the watcher adopts verbatim - so the watcher's own pool
+// can never change the result. Plain JSON (enum VALUES / registry id strings, never
+// engine TYPES), so the transport stays the lowest layer; the engine-coupled
+// (de)serialization lives in the reward/ME phases.
+// =============================================================================
+
+/** The authoritative outcome of one owner interaction pick, adopted by the watcher. */
+export type CoopInteractionOutcome =
+  /**
+   * An item / modifier was granted. `modifierTypeId` is the registry key string (the same
+   * stable identity the checksum hashes in `modifiers: [string, number][]`); `args` carries
+   * the modifier-type generator scalars (empty for the common case); `partySlot` is the
+   * target party slot (-1 for a non-party item); `moneyDelta` is the signed money change.
+   */
+  | { k: "rewardGrant"; modifierTypeId: string; args: number[]; partySlot: number; moneyDelta: number }
+  /** A reroll happened: no item, just the signed money change (the watcher never recomputes the fee). */
+  | { k: "reroll"; moneyDelta: number }
+  /** The owner left the screen with no further outcome (a terminal). */
+  | { k: "leave" };
+
 /**
  * The co-op wire protocol: a discriminated union on `t`. This GROWS per
  * implementation phase. Rule: every addition is a NEW `t` value with a typed
@@ -348,6 +374,23 @@ export type CoopMessage =
    *  - `data`   optional extra indices (e.g. party-target slot, ME sub-option)
    */
   | { t: "interactionChoice"; seq: number; kind: string; choice: number; data?: number[] }
+  /**
+   * Owner -> watcher (#633, TRACK-2 Phase C): the HOST-resolved AUTHORITATIVE outcome of one
+   * interaction pick (reward grant / reroll / leave). The watcher ADOPTS this verbatim instead
+   * of re-deriving from its own pool, so a pool divergence can never change the result. Pinned
+   * to the SAME `seq` the choice relay uses (the interaction counter at screen-open), so a
+   * mid-interaction reconcile can't move the watcher's await off the owner's send seq.
+   */
+  | { t: "interactionOutcome"; seq: number; kind: string; outcome: CoopInteractionOutcome }
+  /**
+   * Owner -> watcher (#633, TRACK-2 Phase C): the owner's full-state CHECKSUM at a mystery-
+   * encounter boundary (`seq` = the ME interaction seq). The ME pump replays the owner's
+   * button stream into the watcher's OWN ME state, which is safe ONLY if that state is
+   * identical. The watcher compares this digest to its own; on a MISMATCH it requests the
+   * authoritative `stateSync` BEFORE replaying, so the pump's one assumption ("identical ME
+   * state") becomes self-checking + self-healing instead of silently corrupting both runs.
+   */
+  | { t: "meChecksum"; seq: number; checksum: string }
   /**
    * Owner -> watcher (#633): a COSMETIC live-cursor button on a shared interaction
    * screen. The watcher replays `button` into its identical screen so the partner

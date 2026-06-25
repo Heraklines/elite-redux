@@ -19,7 +19,12 @@
 // =============================================================================
 
 import { globalScene } from "#app/global-scene";
-import { captureCoopFullSnapshot } from "#data/elite-redux/coop/coop-battle-engine";
+import { COOP_CHECKSUM_SENTINEL } from "#data/elite-redux/coop/coop-battle-checksum";
+import {
+  applyCoopFullSnapshot,
+  captureCoopChecksum,
+  captureCoopFullSnapshot,
+} from "#data/elite-redux/coop/coop-battle-engine";
 import { CoopBattleStreamer } from "#data/elite-redux/coop/coop-battle-stream";
 import { CoopBattleSync } from "#data/elite-redux/coop/coop-battle-sync";
 import { CoopInteractionRelay } from "#data/elite-redux/coop/coop-interaction-relay";
@@ -27,10 +32,11 @@ import { CoopMePump } from "#data/elite-redux/coop/coop-me-pump";
 import { coopOwnerOfFieldIndex } from "#data/elite-redux/coop/coop-session";
 import { CoopSessionController } from "#data/elite-redux/coop/coop-session-controller";
 import { SpoofGuest } from "#data/elite-redux/coop/coop-spoof-guest";
+import type { CoopFullBattleSnapshot } from "#data/elite-redux/coop/coop-transport";
 import { type CoopTransport, createLoopbackPair, type SerializedCommand } from "#data/elite-redux/coop/coop-transport";
 import { CoopUiMirror } from "#data/elite-redux/coop/coop-ui-mirror";
 import { setCoopGhostFetchSuppressed, setCoopGhostPool, setGhostPoolPublisher } from "#data/elite-redux/er-ghost-teams";
-import { compressToBase64 } from "lz-string";
+import { compressToBase64, decompressFromBase64 } from "lz-string";
 
 /**
  * Co-op ghost-pool sync (#633): the HOST broadcasts its server-fetched ghost-team
@@ -76,6 +82,40 @@ function wireCoopResyncResponder(controller: CoopSessionController, battleStream
     } catch {
       /* a resync serialize/send failure must never break the host's turn */
     }
+  });
+}
+
+/**
+ * Co-op ME-state self-check (#633, TRACK-2 Phase C): the WATCHER verifies the owner's
+ * full-state checksum at a mystery-encounter boundary against its OWN. The ME pump replays
+ * the owner's button stream into the watcher's own ME state - safe ONLY if that state is
+ * identical. On a MISMATCH the watcher requests the authoritative `stateSync` and adopts it,
+ * turning the pump's silent "identical state" assumption into detect-and-heal (reusing the
+ * Phase A machinery). Additive: on a match nothing changes, so the working pump is intact.
+ */
+function wireCoopMeChecksumCheck(battleStream: CoopBattleStreamer): void {
+  battleStream.onMeChecksum((seq, ownerChecksum) => {
+    const ours = captureCoopChecksum();
+    if (ownerChecksum === COOP_CHECKSUM_SENTINEL || ours === COOP_CHECKSUM_SENTINEL || ownerChecksum === ours) {
+      return;
+    }
+    console.warn(`[coop-desync] me-entry seq=${seq} owner=${ownerChecksum} watcher=${ours}`);
+    void battleStream.requestStateSync(seq).then(blob => {
+      if (blob == null) {
+        return;
+      }
+      try {
+        applyCoopFullSnapshot(JSON.parse(decompressFromBase64(blob)) as CoopFullBattleSnapshot);
+        const healed = captureCoopChecksum();
+        console.info(
+          healed === ownerChecksum
+            ? `[coop-resync] me-entry seq=${seq} ok`
+            : `[coop-resync] me-entry seq=${seq} still-diverged owner=${ownerChecksum} watcher=${healed}`,
+        );
+      } catch {
+        /* a malformed resync blob must never crash the ME flow */
+      }
+    });
   });
 }
 
@@ -199,6 +239,7 @@ export function startLocalCoopSession(opts: { username?: string | undefined } = 
   };
   wireCoopGhostPoolSync(controller, battleStream);
   wireCoopResyncResponder(controller, battleStream);
+  wireCoopMeChecksumCheck(battleStream);
   setCoopRuntime(runtime);
   controller.connect();
   return runtime;
@@ -234,6 +275,7 @@ export function connectCoopSession(
   };
   wireCoopGhostPoolSync(controller, battleStream);
   wireCoopResyncResponder(controller, battleStream);
+  wireCoopMeChecksumCheck(battleStream);
   setCoopRuntime(runtime);
   controller.connect();
   return runtime;

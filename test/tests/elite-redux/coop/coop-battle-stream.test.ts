@@ -321,5 +321,19 @@ describe("co-op host-authoritative battle stream (#633, LIVE-D)", () => {
       });
       expect(await guestStream.requestStateSync(3)).toBeNull();
     });
+
+    it("the owner's ME-boundary checksum reaches the watcher's handler (#633 Phase C)", async () => {
+      const { host, guest } = createLoopbackPair();
+      const ownerStream = new CoopBattleStreamer(host);
+      const watcherStream = new CoopBattleStreamer(guest);
+
+      let got: { seq: number; checksum: string } | null = null;
+      watcherStream.onMeChecksum((seq, checksum) => {
+        got = { seq, checksum };
+      });
+      ownerStream.sendMeChecksum(42, "cafebabecafebabe");
+      await new Promise(r => setTimeout(r, 0));
+      expect(got).toEqual({ seq: 42, checksum: "cafebabecafebabe" });
+    });
   });
 });
