@@ -1,0 +1,272 @@
+url:      https://elite-redux-staging.pages.dev/
+build:    mqu230pe-cqae
+mode:     6  wave:3
+seed:     TMViGobJTsFBCUPRIyWShCYO
+party:    Vulpix(L5 20hp f0), Chikorita(L5 7hp f0), Magnemite(L5 0hp f0), Turtwig(L5 0hp f0), Spearow(L5 20hp f0)
+enemy:    Venonat(L3), Taillow(L3)
+
+----- COMMENT -----
+desync after switch in
+
+----- CONSOLE -----
+[22:17:57.959] LOG: %cStart Phase MessagePhase color:green;
+[22:17:58.219] LOG: %cStart Phase MoveEndPhase color:green;
+[22:17:58.220] LOG: Applied X Speed 
+[22:17:58.220] LOG: Applied X Speed 
+[22:17:58.221] LOG: %cStart Phase MovePhase color:green;
+[22:17:58.221] LOG: %cUser: Magnemite
+Move: FLAMETHROWER
+Use Mode: NORMAL color:orchid
+[22:17:58.223] LOG: Applied X Defense 
+[22:17:58.224] LOG: %cStart Phase MessagePhase color:green;
+[22:17:58.452] LOG: %cStart Phase CommonAnimPhase color:green;
+[22:17:58.802] LOG: %cStart Phase MessagePhase color:green;
+[22:17:59.052] LOG: %cStart Phase DamageAnimPhase color:green;
+[22:17:59.088] LOG: %cStart Phase MoveEndPhase color:green;
+[22:17:59.088] LOG: %cStart Phase MovePhase color:green;
+[22:17:59.088] LOG: %cStart Phase MoveEndPhase color:green;
+[22:17:59.088] LOG: %cStart Phase CheckInterludePhase color:green;
+[22:17:59.088] LOG: %cStart Phase WeatherEffectPhase color:green;
+[22:17:59.088] LOG: %cStart Phase PositionalTagPhase color:green;
+[22:17:59.088] LOG: %cStart Phase BerryPhase color:green;
+[22:17:59.089] LOG: Applied X Speed 
+[22:17:59.091] LOG: Applied X Speed 
+[22:17:59.091] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[22:17:59.092] LOG: Applied X Speed 
+[22:17:59.093] LOG: Applied X Speed 
+[22:17:59.093] LOG: %cStart Phase TurnEndPhase color:green;
+[22:17:59.096] LOG: Applied X Speed 
+[22:17:59.098] LOG: Applied X Speed 
+[22:17:59.099] LOG: %cStart Phase SwitchPhase color:green;
+[22:17:59.100] LOG: %cStart Phase SwitchSummonPhase color:green;
+[22:17:59.322] LOG: Applied X Speed 
+[22:17:59.322] LOG: Applied X Speed 
+[22:17:59.323] LOG: Applied X Speed 
+[22:17:59.324] LOG: Applied X Speed 
+[22:17:59.327] LOG: Applied X Speed 
+[22:17:59.330] LOG: Applied X Speed 
+[22:17:59.330] LOG: Applied X Speed 
+[22:17:59.331] LOG: Applied X Speed 
+[22:17:59.332] LOG: Applied X Speed 
+[22:17:59.332] LOG: Applied X Speed 
+[22:17:59.333] LOG: Applied X Speed 
+[22:17:59.333] LOG: %cStart Phase PostSummonPhase color:green;
+[22:17:59.333] LOG: Ran PSP for: Chikorita
+[22:17:59.334] LOG: Applied X Speed 
+[22:17:59.335] LOG: Applied X Speed 
+[22:17:59.336] LOG: %cStart Phase PostSummonPhase color:green;
+[22:17:59.336] LOG: %cStart Phase TurnInitPhase color:green;
+[22:17:59.336] LOG: %cStart Phase CommandPhase color:green;
+[22:18:01.326] LOG: Move: FLAMETHROWER Move targets: {"targets":[2,3,1],"multiple":false} 
+Player Pokemon: Magnemite
+[22:18:01.330] LOG: %cStart Phase SelectTargetPhase color:green;
+[22:18:01.699] LOG: %cStart Phase CommandPhase color:green;
+[22:18:11.574] LOG: Move: POISON_POWDER Move targets: {"targets":[3],"multiple":false} 
+Player Pokemon: Chikorita
+[22:18:11.575] LOG: %cStart Phase EnemyCommandPhase color:green;
+[22:18:11.578] LOG: Applied X Speed 
+[22:18:11.579] LOG: Applied X Speed 
+[22:18:11.581] LOG: Applied X Speed 
+[22:18:11.582] LOG: Applied X Speed 
+[22:18:11.584] LOG: Applied X Speed 
+[22:18:11.584] LOG: Applied X Speed 
+[22:18:11.586] LOG: Applied X Defense 
+[22:18:11.587] LOG: Applied X Speed 
+[22:18:11.588] LOG: Applied X Speed 
+[22:18:11.590] LOG: Applied X Defense 
+[22:18:11.590] LOG: Applied X Speed 
+[22:18:11.590] LOG: Applied X Speed 
+[22:18:11.592] LOG: Battle Seed: 01CL2RYwlr1sdDX1
+[22:18:11.593] LOG: Move Pool: ["Signal Beam"]
+[22:18:11.593] LOG: Move Scores: [54]
+[22:18:11.593] LOG: Sorted Move Pool: ["Signal Beam"]
+[22:18:11.593] LOG: Chosen Move: Signal Beam
+[22:18:11.593] LOG: %cStart Phase EnemyCommandPhase color:green;
+[22:18:11.595] LOG: Applied X Defense 
+[22:18:11.596] LOG: Applied X Defense 
+[22:18:11.598] LOG: Applied X Defense 
+[22:18:11.600] LOG: Applied X Defense 
+[22:18:11.602] LOG: Applied X Defense 
+[22:18:11.603] LOG: Applied X Defense 
+[22:18:11.611] LOG: Move Pool: ["Quick Attack","Focus Energy","Double Hit","Peck"]
+[22:18:11.612] LOG: Move Scores: [12,5,16.125,7.078125]
+[22:18:11.612] LOG: Sorted Move Pool: ["Double Hit","Quick Attack","Peck","Focus Energy"]
+[22:18:11.612] LOG: Chosen Move: Double Hit
+[22:18:11.612] LOG: %cStart Phase TurnStartPhase color:green;
+[22:18:11.612] LOG: Applied X Speed 
+[22:18:11.613] LOG: Applied X Speed 
+[22:18:11.613] LOG: Applied X Speed 
+[22:18:11.614] LOG: Applied X Speed 
+[22:18:11.614] LOG: Applied X Speed 
+[22:18:11.615] LOG: Applied X Speed 
+[22:18:11.616] LOG: Applied X Speed 
+[22:18:11.616] LOG: Applied X Speed 
+[22:18:11.617] LOG: Applied X Speed 
+[22:18:11.617] LOG: Applied X Speed 
+[22:18:11.617] LOG: Applied X Speed 
+[22:18:11.617] LOG: Applied X Speed 
+[22:18:11.617] LOG: Applied X Speed 
+[22:18:11.618] LOG: Applied X Speed 
+[22:18:11.618] LOG: Applied X Speed 
+[22:18:11.618] LOG: Applied X Speed 
+[22:18:11.619] LOG: Applied X Speed 
+[22:18:11.619] LOG: Applied X Speed 
+[22:18:11.619] LOG: Applied X Speed 
+[22:18:11.620] LOG: Applied X Speed 
+[22:18:11.620] LOG: Applied X Speed 
+[22:18:11.620] LOG: Applied X Speed 
+[22:18:11.620] LOG: Applied X Speed 
+[22:18:11.621] LOG: Applied X Speed 
+[22:18:11.621] LOG: Applied X Speed 
+[22:18:11.621] LOG: Applied X Speed 
+[22:18:11.622] LOG: Applied X Speed 
+[22:18:11.622] LOG: %cStart Phase MovePhase color:green;
+[22:18:11.622] LOG: %cUser: Taillow
+Move: DOUBLE_HIT
+Use Mode: NORMAL color:orchid
+[22:18:11.623] LOG: Applied X Speed 
+[22:18:11.623] LOG: Applied X Speed 
+[22:18:11.623] LOG: Applied X Speed 
+[22:18:11.624] LOG: Applied X Speed 
+[22:18:11.624] LOG: Applied X Speed 
+[22:18:11.625] LOG: Applied X Speed 
+[22:18:11.625] LOG: Applied X Speed 
+[22:18:11.625] LOG: Applied X Speed 
+[22:18:11.625] LOG: Applied X Speed 
+[22:18:11.626] LOG: Applied X Speed 
+[22:18:11.626] LOG: Applied X Speed 
+[22:18:11.629] LOG: Applied X Speed 
+[22:18:11.629] LOG: Applied X Speed 
+[22:18:11.630] LOG: Applied X Speed 
+[22:18:11.631] LOG: Applied X Speed 
+[22:18:11.631] LOG: Applied X Speed 
+[22:18:11.632] LOG: Applied X Speed 
+[22:18:11.633] LOG: Applied X Speed 
+[22:18:11.633] LOG: Applied X Speed 
+[22:18:11.634] LOG: Applied X Speed 
+[22:18:11.634] LOG: Applied X Speed 
+[22:18:11.635] LOG: Applied X Speed 
+[22:18:11.635] LOG: %cStart Phase MessagePhase color:green;
+[22:18:11.786] LOG: %cStart Phase MoveEffectPhase color:green;
+[22:18:12.072] LOG: crit stage: +1
+[22:18:12.074] LOG: Applied X Defense 
+[22:18:12.074] LOG: Move: Double Hit | Base damage: 3.3440000000000003 | Power: 35 | Source attack: 9 | Target defense: 15
+[22:18:12.075] LOG: Applied X Speed 
+[22:18:12.075] LOG: Applied X Speed 
+[22:18:12.075] LOG: Move: Double Hit | Attack damage: 2
+[22:18:12.076] LOG: %cStart Phase DamageAnimPhase color:green;
+[22:18:12.122] LOG: %cStart Phase MoveEffectPhase color:green;
+[22:18:12.421] LOG: crit stage: +1
+[22:18:12.422] LOG: Applied X Defense 
+[22:18:12.422] LOG: Move: Double Hit | Base damage: 3.3440000000000003 | Power: 35 | Source attack: 9 | Target defense: 15
+[22:18:12.423] LOG: Applied X Speed 
+[22:18:12.423] LOG: Applied X Speed 
+[22:18:12.424] LOG: Move: Double Hit | Attack damage: 3
+[22:18:12.424] LOG: %cStart Phase DamageAnimPhase color:green;
+[22:18:12.453] LOG: %cStart Phase MessagePhase color:green;
+[22:18:12.735] LOG: %cStart Phase MessagePhase color:green;
+[22:18:13.019] LOG: %cStart Phase MessagePhase color:green;
+[22:18:13.268] LOG: %cStart Phase FaintPhase color:green;
+[22:18:13.270] LOG: Applied X Speed 
+[22:18:13.271] LOG: Applied X Speed 
+[22:18:13.271] WARN: cry/81 not found
+[22:18:13.336] LOG: Applied X Speed 
+[22:18:13.337] LOG: Applied X Speed 
+[22:18:13.338] LOG: %cStart Phase MessagePhase color:green;
+[22:18:13.537] LOG: %cStart Phase MoveEndPhase color:green;
+[22:18:13.538] LOG: Applied X Speed 
+[22:18:13.538] LOG: Applied X Speed 
+[22:18:13.539] LOG: Applied X Speed 
+[22:18:13.539] LOG: Applied X Speed 
+[22:18:13.539] LOG: %cStart Phase MovePhase color:green;
+[22:18:13.539] LOG: %cUser: Venonat
+Move: SIGNAL_BEAM
+Use Mode: NORMAL color:orchid
+[22:18:13.539] LOG: Applied X Speed 
+[22:18:13.540] LOG: Applied X Speed 
+[22:18:13.542] LOG: Applied X Speed 
+[22:18:13.543] LOG: Applied X Speed 
+[22:18:13.543] LOG: %cStart Phase MessagePhase color:green;
+[22:18:13.688] LOG: %cStart Phase MoveEffectPhase color:green;
+[22:18:14.288] LOG: crit stage: +0
+[22:18:14.289] LOG: Move: Signal Beam | Base damage: 5.2 | Power: 75 | Source attack: 8 | Target defense: 12
+[22:18:14.290] LOG: Move: Signal Beam | Attack damage: 13
+[22:18:14.291] LOG: %cStart Phase DamageAnimPhase color:green;
+[22:18:14.336] LOG: %cStart Phase MessagePhase color:green;
+[22:18:14.669] LOG: %cStart Phase CommonAnimPhase color:green;
+[22:18:15.119] LOG: %cStart Phase MessagePhase color:green;
+[22:18:15.368] LOG: %cStart Phase MoveEndPhase color:green;
+[22:18:15.369] LOG: Applied X Speed 
+[22:18:15.369] LOG: Applied X Speed 
+[22:18:15.369] LOG: %cStart Phase MovePhase color:green;
+[22:18:15.369] LOG: %cStart Phase MoveEndPhase color:green;
+[22:18:15.369] LOG: %cStart Phase MovePhase color:green;
+[22:18:15.369] LOG: %cUser: Chikorita
+Move: POISON_POWDER
+Use Mode: NORMAL color:orchid
+[22:18:15.370] LOG: Applied X Speed 
+[22:18:15.370] LOG: Applied X Speed 
+[22:18:15.371] LOG: Applied X Speed 
+[22:18:15.372] LOG: Applied X Speed 
+[22:18:15.372] LOG: %cStart Phase MessagePhase color:green;
+[22:18:15.601] LOG: %cStart Phase CommonAnimPhase color:green;
+[22:18:15.935] LOG: %cStart Phase MessagePhase color:green;
+[22:18:16.068] LOG: %cStart Phase MoveEffectPhase color:green;
+[22:18:16.070] LOG: %cStart Phase MessagePhase color:green;
+[22:18:16.302] LOG: %cStart Phase MoveEndPhase color:green;
+[22:18:16.302] LOG: %cStart Phase CheckInterludePhase color:green;
+[22:18:16.302] LOG: %cStart Phase WeatherEffectPhase color:green;
+[22:18:16.302] LOG: %cStart Phase PositionalTagPhase color:green;
+[22:18:16.302] LOG: %cStart Phase BerryPhase color:green;
+[22:18:16.303] LOG: Applied X Speed 
+[22:18:16.304] LOG: Applied X Speed 
+[22:18:16.304] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[22:18:16.304] LOG: Applied X Speed 
+[22:18:16.305] LOG: Applied X Speed 
+[22:18:16.305] LOG: %cStart Phase TurnEndPhase color:green;
+[22:18:16.306] LOG: Applied X Speed 
+[22:18:16.307] LOG: Applied X Speed 
+[22:18:16.308] LOG: %cStart Phase SwitchPhase color:green;
+[22:18:18.326] LOG: %cStart Phase SwitchSummonPhase color:green;
+[22:18:18.452] WARN: cry/37 not found
+[22:18:18.569] LOG: Applied X Speed 
+[22:18:18.571] LOG: Applied X Speed 
+[22:18:18.572] LOG: Applied X Speed 
+[22:18:18.573] LOG: Applied X Speed 
+[22:18:18.574] LOG: Applied X Speed 
+[22:18:18.574] LOG: Applied X Speed 
+[22:18:18.575] LOG: Applied X Speed 
+[22:18:18.575] LOG: Applied X Speed 
+[22:18:18.575] LOG: Applied X Speed 
+[22:18:18.576] LOG: Applied X Speed 
+[22:18:18.577] LOG: Applied X Speed 
+[22:18:18.577] LOG: Applied X Speed 
+[22:18:18.578] LOG: %cStart Phase ShinySparklePhase color:green;
+[22:18:18.668] LOG: %cStart Phase PostSummonPhase color:green;
+[22:18:18.668] LOG: Ran PSP for: Vulpix
+[22:18:18.669] LOG: Applied X Speed 
+[22:18:18.669] LOG: Applied X Speed 
+[22:18:18.670] LOG: %cStart Phase PostSummonPhase color:green;
+[22:18:18.673] LOG: Applied X Speed 
+[22:18:18.674] LOG: Applied X Speed 
+[22:18:18.674] LOG: Applied X Speed 
+[22:18:18.675] LOG: Applied X Speed 
+[22:18:18.675] LOG: Applied X Speed 
+[22:18:18.676] LOG: Applied X Speed 
+[22:18:18.677] LOG: Applied X Speed 
+[22:18:18.677] LOG: Applied X Speed 
+[22:18:18.678] LOG: Applied X Speed 
+[22:18:18.678] LOG: Applied X Speed 
+[22:18:18.679] LOG: Applied X Speed 
+[22:18:18.679] LOG: Applied X Speed 
+[22:18:18.679] LOG: %cStart Phase ShowAbilityPhase color:green;
+[22:18:18.837] LOG: %cStart Phase CommonAnimPhase color:green;
+[22:18:19.188] LOG: %cStart Phase MessagePhase color:green;
+[22:18:19.432] LOG: %cStart Phase HideAbilityPhase color:green;
+[22:18:19.471] LOG: %cStart Phase PostSummonPhase color:green;
+[22:18:19.472] LOG: %cStart Phase TurnInitPhase color:green;
+[22:18:19.472] LOG: %cStart Phase CommandPhase color:green;
+[22:18:27.302] LOG: Move: INFERNAL_PARADE Move targets: {"targets":[2,3,1],"multiple":false} 
+Player Pokemon: Vulpix
+[22:18:27.305] LOG: %cStart Phase SelectTargetPhase color:green;
+[22:18:28.140] LOG: %cStart Phase CommandPhase color:green;
