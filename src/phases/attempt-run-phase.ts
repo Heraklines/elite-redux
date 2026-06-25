@@ -1,6 +1,7 @@
 import { applyAbAttrs } from "#abilities/apply-ab-attrs";
 import { globalScene } from "#app/global-scene";
 import Overrides from "#app/overrides";
+import { broadcastCoopWaveResolved } from "#data/elite-redux/coop/coop-runtime";
 import { getErBiomeRule } from "#data/elite-redux/er-biome-rules";
 import { ArenaTagSide } from "#enums/arena-tag-side";
 import { Stat } from "#enums/stat";
@@ -28,6 +29,14 @@ export class AttemptRunPhase extends FieldPhase {
     }
 
     if (escapeRoll < escapeChance.value) {
+      // Co-op (#633 GAP 5): the host RESOLVED a successful flee (it is the sole engine). Signal the
+      // guest renderer that this wave RESOLVED as a FLEE so it runs the SAME post-battle tail the
+      // host queues below (BattleEnd -> optional biome -> NewBattle); without this the guest - which
+      // never runs an AttemptRunPhase - would loop the fled wave forever. Hard no-op for
+      // solo / non-host / lockstep. Emitted BEFORE the host queues its own tail (order is irrelevant
+      // to the guest - it carries the wave number, guarded against a double-advance on the guest side).
+      broadcastCoopWaveResolved("flee");
+
       enemyField.forEach(pokemon => applyAbAttrs("PreLeaveFieldAbAttr", { pokemon }));
 
       globalScene.playSound("se/flee");

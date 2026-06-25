@@ -8677,4 +8677,67 @@ export const DEV_SCENARIOS: DevScenario[] = [
       );
     },
   },
+  // Co-op - arena-tag (hazard / screen) SYNC (#633 GAP 1)
+  {
+    label: "Co-op: hazards / screens sync to the guest (#633 GAP 1)",
+    description:
+      "#633 co-op ARENA-TAG SYNC (GAP 1) - hazards (Stealth Rock, Spikes), screens (Reflect,\n"
+      + "Light Screen) and Tailwind are set by host MoveEffectPhases the PURE-RENDERER guest\n"
+      + "never runs. They WERE detected by the per-turn checksum but NOT carried in the\n"
+      + "checkpoint, so the guest never gained them -> a resync-loop EVERY turn (the most\n"
+      + "frequent co-op desync). The per-turn checkpoint now carries arena tags and the guest\n"
+      + "reconciles its arena to the host's set by (tagType, side).\n"
+      + "DO: set up the co-op double, then use Stealth Rock (and Spikes / a screen) and take a\n"
+      + "few turns. Watch the console for the per-turn [coop-desync] / [coop-resync] lines.\n"
+      + "EXPECT: NO recurring [coop-desync] every turn from arena tags - the guest gains the\n"
+      + "host's hazard / screen and the checksum CONVERGES (a one-time resync at most, then\n"
+      + "quiet). Clearing a screen on the host (it lapses) likewise removes it on the guest.\n"
+      + "(Before the fix the run logged a fresh checksum mismatch + still-diverged resync on\n"
+      + "every single turn while any hazard / screen was up.)",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 40,
+        STARTING_WAVE_OVERRIDE: 5,
+        BATTLE_STYLE_OVERRIDE: "double",
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.SNORLAX,
+        ENEMY_LEVEL_OVERRIDE: 50,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+      });
+      // Host half = slots 0-2, guest half = slots 3-5. The leads carry the hazard / screen
+      // setters so the host's MoveEffectPhases lay them and the guest must sync to them.
+      return [
+        makeStarter(SpeciesId.GARCHOMP, {
+          moveset: [MoveId.STEALTH_ROCK, MoveId.EARTHQUAKE, MoveId.DRAGON_CLAW, MoveId.STONE_EDGE],
+        }),
+        makeStarter(SpeciesId.SKARMORY, {
+          moveset: [MoveId.SPIKES, MoveId.LIGHT_SCREEN, MoveId.REFLECT, MoveId.BRAVE_BIRD],
+        }),
+        makeStarter(SpeciesId.GYARADOS, {
+          moveset: [MoveId.WATERFALL, MoveId.CRUNCH, MoveId.EARTHQUAKE, MoveId.DRAGON_DANCE],
+        }),
+        makeStarter(SpeciesId.ALAKAZAM, {
+          moveset: [MoveId.PSYCHIC, MoveId.SHADOW_BALL, MoveId.FOCUS_BLAST, MoveId.RECOVER],
+        }),
+      ];
+    },
+    onBattleStart: () => {
+      // Flip the live run into authoritative co-op so the per-turn checkpoint + arena-tag
+      // reconcile engage. Host = slots 0-2, guest = slots 3-5.
+      globalScene.gameMode = getGameMode(GameModes.COOP);
+      if (getCoopController() == null) {
+        startLocalCoopSession({ username: loggedInUser?.username, netcodeMode: "authoritative" });
+      }
+      const party = globalScene.getPlayerParty();
+      party.forEach((mon, i) => {
+        mon.coopOwner = i < 3 ? "host" : "guest";
+      });
+      console.log(
+        "[#633 co-op hazard-sync] tags: "
+          + party.map(m => `${m.getNameToRender()}=${m.coopOwner}`).join(", ")
+          + ` | local role=${getCoopController()?.role} `
+          + "(use Stealth Rock / Spikes / a screen; the checksum should CONVERGE, not loop every turn)",
+      );
+    },
+  },
 ];

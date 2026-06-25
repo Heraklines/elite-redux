@@ -34,6 +34,8 @@ import {
 } from "#data/elite-redux/coop/coop-runtime";
 import { COOP_GUEST_FIELD_INDEX, COOP_HOST_FIELD_INDEX } from "#data/elite-redux/coop/coop-session";
 import type { CoopBattleCheckpoint } from "#data/elite-redux/coop/coop-transport";
+import { ArenaTagSide } from "#enums/arena-tag-side";
+import { ArenaTagType } from "#enums/arena-tag-type";
 import { BattlerIndex } from "#enums/battler-index";
 import { Command } from "#enums/command";
 import { GameModes } from "#enums/game-modes";
@@ -600,5 +602,136 @@ describe.skipIf(!RUN)("co-op GUEST = pure renderer - real engine (#633, TRACK-2 
     expect(coopEngine.captureCoopChecksum(), "the checksum is stable across an idempotent re-apply").toBe(
       guestChecksumAfter,
     );
+  });
+
+  // (C) ARENA-TAG RECONCILE (#633 GAP 1): hazards / screens / tailwind are set by host
+  // MoveEffectPhases the pure-renderer guest never runs, so the guest never has them and the
+  // per-turn checksum (which hashes (tagType, side)) resync-loops every turn. The per-turn
+  // CHECKPOINT now carries + reconciles them via applyCoopCheckpoint.
+  it("ARENA-TAG RECONCILE (#633 GAP 1): a host hazard the guest lacks is added by the checkpoint + the checksum converges", async () => {
+    await startCoopGuest();
+    // HOST truth: the host laid Stealth Rock (a MoveEffectPhase the guest never ran). Capture the
+    // checkpoint + checksum WITH the hazard, then remove it to model the guest that lacks it.
+    globalScene.arena.addTag(ArenaTagType.STEALTH_ROCK, 0, MoveId.STEALTH_ROCK, 0, ArenaTagSide.ENEMY, true);
+    const hostCheckpoint = coopEngine.captureCoopCheckpoint();
+    const hostChecksum = coopEngine.captureCoopChecksum();
+    expect(hostCheckpoint).not.toBeNull();
+    expect(
+      hostCheckpoint!.arenaTags?.some(t => t.tagType === ArenaTagType.STEALTH_ROCK),
+      "the checkpoint carries the host's hazard",
+    ).toBe(true);
+
+    // GUEST divergence: remove the hazard so the guest's arena lacks it (the checksum mismatches).
+    globalScene.arena.removeTagOnSide(ArenaTagType.STEALTH_ROCK, ArenaTagSide.ENEMY, true);
+    expect(globalScene.arena.getTagOnSide(ArenaTagType.STEALTH_ROCK, ArenaTagSide.ENEMY)).toBeUndefined();
+    expect(coopEngine.captureCoopChecksum(), "guest desync detected before the arena reconcile").not.toBe(hostChecksum);
+
+    // Apply the host's checkpoint: applyCoopCheckpoint reconciles arena tags, adding the hazard.
+    coopEngine.applyCoopCheckpoint(hostCheckpoint!);
+    expect(
+      globalScene.arena.getTagOnSide(ArenaTagType.STEALTH_ROCK, ArenaTagSide.ENEMY),
+      "the host hazard the guest lacked was added by the checkpoint",
+    ).toBeDefined();
+    expect(coopEngine.captureCoopChecksum(), "checksum converges after the arena-tag reconcile").toBe(hostChecksum);
+
+    // IDEMPOTENT: re-applying the same checkpoint must not double-add or throw.
+    expect(() => coopEngine.applyCoopCheckpoint(hostCheckpoint!)).not.toThrow();
+    expect(coopEngine.captureCoopChecksum()).toBe(hostChecksum);
+  });
+
+  it("ARENA-TAG RECONCILE (#633 GAP 1): a screen the host cleared is REMOVED from the guest by the checkpoint", async () => {
+    await startCoopGuest();
+    // HOST truth (post-clear): the host has NO Light Screen. Capture that checkpoint/checksum first.
+    const hostCheckpoint = coopEngine.captureCoopCheckpoint();
+    const hostChecksum = coopEngine.captureCoopChecksum();
+
+    // GUEST divergence: the guest still has a Light Screen the host already cleared.
+    globalScene.arena.addTag(ArenaTagType.LIGHT_SCREEN, 5, MoveId.LIGHT_SCREEN, 0, ArenaTagSide.PLAYER, true);
+    expect(globalScene.arena.getTagOnSide(ArenaTagType.LIGHT_SCREEN, ArenaTagSide.PLAYER)).toBeDefined();
+    expect(coopEngine.captureCoopChecksum(), "the extra screen is detected").not.toBe(hostChecksum);
+
+    // Apply: the checkpoint reconcile removes the host-absent screen + the checksum re-converges.
+    coopEngine.applyCoopCheckpoint(hostCheckpoint!);
+    expect(
+      globalScene.arena.getTagOnSide(ArenaTagType.LIGHT_SCREEN, ArenaTagSide.PLAYER),
+      "the screen the host cleared is gone from the guest",
+    ).toBeUndefined();
+    expect(coopEngine.captureCoopChecksum(), "checksum converges after the screen removal").toBe(hostChecksum);
+  });
+
+  // (D) FLEE TERMINAL (#633 GAP 5): a successful flee on the host emits waveResolved("flee"); the
+  // guest renderer never runs an AttemptRunPhase, so without handling it the guest loops the fled
+  // wave. The guest's maybeRunCoopWaveAdvance now mirrors the host's flee tail (BattleEnd ->
+  // optional biome -> NewBattle), NOT VictoryPhase (a flee gives no exp / rewards).
+  it('FLEE TERMINAL (#633 GAP 5): waveResolved("flee") makes the guest run the flee tail (BattleEnd + NewBattle, no VictoryPhase)', async () => {
+    await startCoopGuest();
+    const turn = globalScene.currentBattle.turn;
+    const partner = getCoopRuntime()!.partnerTransport!;
+
+    // The host RESOLVED this wave as a FLEE. Deliver the signal, then the turn resolution so the
+    // replay phase reaches finishTurn (which consumes the pending wave-advance).
+    partner.send({ t: "waveResolved", wave: globalScene.currentBattle.waveIndex, outcome: "flee" });
+    await new Promise(r => setTimeout(r, 0));
+    partner.send({
+      t: "turnResolution",
+      turn,
+      events: [{ k: "message", text: "Got away safely!" }],
+      checkpoint: checkpointFromField(10),
+      checksum: coopEngine.captureCoopChecksum(),
+    });
+    await new Promise(r => setTimeout(r, 0));
+
+    const pushNewSpy = vi.spyOn(globalScene.phaseManager, "pushNew");
+    const replay = game.scene.phaseManager.create("CoopReplayTurnPhase", turn);
+    replay.start();
+    await new Promise(r => setTimeout(r, 0));
+
+    // The guest ran the flee tail (BattleEnd -> NewBattle) and did NOT grant a VictoryPhase.
+    const pushedBattleEnd = pushNewSpy.mock.calls.some(([name]) => name === "BattleEndPhase");
+    const pushedNewBattle = pushNewSpy.mock.calls.some(([name]) => name === "NewBattlePhase");
+    const pushedVictory = pushNewSpy.mock.calls.some(([name]) => name === "VictoryPhase");
+    expect(pushedBattleEnd, "the guest queues BattleEndPhase for the flee").toBe(true);
+    expect(pushedNewBattle, "the guest queues NewBattlePhase to advance past the fled wave").toBe(true);
+    expect(pushedVictory, "a flee grants NO VictoryPhase (no exp / rewards)").toBe(false);
+    // The in-flight turn still ended (no hang).
+    expect(
+      pushNewSpy.mock.calls.some(([name]) => name === "TurnEndPhase"),
+      "the turn still ends",
+    ).toBe(true);
+  });
+
+  // (E) GAME-OVER RENDER (#633 GAP 6): the host's run ended; the guest renderer must show the
+  // game-over screen instead of hanging the lost wave. waveResolved("gameOver") now queues the
+  // guest's GameOverPhase (isVictory=false) - the coop-safe render path (no per-client retry prompt).
+  it('GAME-OVER RENDER (#633 GAP 6): waveResolved("gameOver") makes the guest queue GameOverPhase', async () => {
+    await startCoopGuest();
+    const turn = globalScene.currentBattle.turn;
+    const partner = getCoopRuntime()!.partnerTransport!;
+
+    partner.send({ t: "waveResolved", wave: globalScene.currentBattle.waveIndex, outcome: "gameOver" });
+    await new Promise(r => setTimeout(r, 0));
+    partner.send({
+      t: "turnResolution",
+      turn,
+      events: [{ k: "message", text: "The run ended." }],
+      checkpoint: checkpointFromField(0),
+      checksum: coopEngine.captureCoopChecksum(),
+    });
+    await new Promise(r => setTimeout(r, 0));
+
+    const pushNewSpy = vi.spyOn(globalScene.phaseManager, "pushNew");
+    const replay = game.scene.phaseManager.create("CoopReplayTurnPhase", turn);
+    replay.start();
+    await new Promise(r => setTimeout(r, 0));
+
+    // The guest queued the game-over render (so a lost run shows the screen, not a hang), and NOT a
+    // wave-advancing VictoryPhase.
+    const gameOverPush = pushNewSpy.mock.calls.find(([name]) => name === "GameOverPhase");
+    expect(gameOverPush, "the guest queues GameOverPhase to render the game-over screen").toBeDefined();
+    expect(gameOverPush?.[1], "isVictory=false (a lost run)").toBe(false);
+    expect(
+      pushNewSpy.mock.calls.some(([name]) => name === "VictoryPhase"),
+      "no wave-advancing VictoryPhase",
+    ).toBe(false);
   });
 });

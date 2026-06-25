@@ -161,38 +161,63 @@ export class CoopReplayTurnPhase extends Phase {
   }
 
   /**
-   * GUEST (#633, authoritative wave-advance handshake): if the host told us this wave RESOLVED
-   * (win / capture / gameOver), run the SAME post-battle tail lockstep co-op runs - queue
-   * `VictoryPhase` exactly as `FaintPhase`/`AttemptCapturePhase` do (faint-phase.ts:189). That
-   * tail runs BattleEnd -> the alternation-relayed reward shop -> biome -> `NewBattlePhase` ->
-   * the next `EncounterPhase` (-> `adoptCoopHostEnemyParty` for wave N+1), so the guest reaches
-   * the next wave instead of looping the won wave forever. A pure renderer never queues this
-   * tail itself (it removes KOd enemies without a FaintPhase). One-shot + wave-guarded by
-   * {@linkcode consumeCoopPendingWaveAdvance}; a duplicate `waveResolved` is a no-op. Fully
-   * guarded so a missing-pokemon edge can never hang the guest.
+   * GUEST (#633, authoritative wave-advance handshake): if the host told us this wave RESOLVED, run
+   * the SAME post-battle tail the host's resolution queues, so the guest reaches the next state
+   * instead of looping the resolved wave forever (a pure renderer never runs a FaintPhase /
+   * AttemptCapturePhase / AttemptRunPhase / GameOverPhase itself). By outcome:
+   *  - `win` / `capture`: queue `VictoryPhase` exactly as `FaintPhase` / `AttemptCapturePhase` do
+   *    (faint-phase.ts:189) - it runs BattleEnd -> the alternation-relayed reward shop -> biome ->
+   *    `NewBattlePhase` -> the next `EncounterPhase` (-> `adoptCoopHostEnemyParty` for wave N+1).
+   *  - `flee` (#633 GAP 5): a successful run gives NO exp / rewards on the host (AttemptRunPhase
+   *    queues `BattleEndPhase(false)` -> optional `SelectBiomePhase` -> `NewBattlePhase`); MIRROR
+   *    exactly that (NOT VictoryPhase, which would grant exp / rewards the host never gave).
+   *  - `gameOver` (#633 GAP 6): the run ended; queue `GameOverPhase` so the guest RENDERS the
+   *    game-over screen (it would otherwise hang on the lost wave). Coop-safe: GameOverPhase's
+   *    `isCoop` branch goes straight to `handleGameOver` (no per-client retry prompt), and its
+   *    own `broadcastCoopWaveResolved` is a no-op on the guest, so no host-only outcome logic re-runs.
+   * One-shot + wave-guarded by {@linkcode consumeCoopPendingWaveAdvance}; a duplicate `waveResolved`
+   * is a no-op. Fully guarded so a missing-pokemon edge can never hang the guest.
    */
   private maybeRunCoopWaveAdvance(): void {
     const pending = consumeCoopPendingWaveAdvance();
     if (pending == null) {
       return;
     }
-    // Only WIN / CAPTURE advance to a NEXT wave via the victory tail. `gameOver` (run end) and
-    // `flee` are terminal / not-yet-rendered on the pure guest; consuming them above still bumps
-    // the wave guard, so they are a safe no-op here (the full guest game-over render is a TODO).
-    if (pending.outcome !== "win" && pending.outcome !== "capture") {
-      return;
-    }
     try {
-      // VictoryPhase reads exp off the resolved mon. After the checkpoint reconcile the KOd
-      // enemies are off-field but still present in the enemy party, so address one by its `id`
-      // (>3 -> getPokemonById, which finds an off-field party member) - never a dead field slot.
-      // Fall back to the player lead's battler index when no enemy party member remains
-      // (e.g. a capture that cleared the slot), so getPokemon() always resolves a live mon.
-      const lastEnemy = globalScene.getEnemyParty().at(-1);
-      const battlerArg = lastEnemy == null ? BattlerIndex.PLAYER : lastEnemy.id;
-      globalScene.phaseManager.pushNew("VictoryPhase", battlerArg);
+      switch (pending.outcome) {
+        case "win":
+        case "capture": {
+          // VictoryPhase reads exp off the resolved mon. After the checkpoint reconcile the KOd
+          // enemies are off-field but still present in the enemy party, so address one by its `id`
+          // (>3 -> getPokemonById, which finds an off-field party member) - never a dead field slot.
+          // Fall back to the player lead's battler index when no enemy party member remains
+          // (e.g. a capture that cleared the slot), so getPokemon() always resolves a live mon.
+          const lastEnemy = globalScene.getEnemyParty().at(-1);
+          const battlerArg = lastEnemy == null ? BattlerIndex.PLAYER : lastEnemy.id;
+          globalScene.phaseManager.pushNew("VictoryPhase", battlerArg);
+          break;
+        }
+        case "flee": {
+          // Mirror the host's AttemptRunPhase tail (no exp / rewards): BattleEnd -> optional biome
+          // select -> NewBattle. NewBattlePhase ends the wave and drives the next EncounterPhase
+          // (-> adoptCoopHostEnemyParty for the next wave), so the guest advances past the fled wave.
+          globalScene.phaseManager.pushNew("BattleEndPhase", false);
+          if (globalScene.gameMode.hasRandomBiomes || globalScene.isNewBiome()) {
+            globalScene.phaseManager.pushNew("SelectBiomePhase");
+          }
+          globalScene.phaseManager.pushNew("NewBattlePhase");
+          break;
+        }
+        case "gameOver": {
+          // Render the game-over screen on the guest (#633 GAP 6). isVictory=false: a lost run.
+          // GameOverPhase's isCoop branch renders the screen without re-running host-only outcome
+          // logic or opening a per-client retry prompt.
+          globalScene.phaseManager.pushNew("GameOverPhase", false);
+          break;
+        }
+      }
     } catch {
-      // The victory tail is best-effort; a failure here must never hang the guest's run.
+      // The post-battle tail is best-effort; a failure here must never hang the guest's run.
     }
   }
 }
