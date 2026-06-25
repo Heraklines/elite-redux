@@ -80,4 +80,33 @@ describe("co-op battle checkpoint pure core (#633, LIVE-D)", () => {
     expect(safe.status).toBe(0);
     expect(safe.statStages[0]).toBe(6);
   });
+
+  // Fix #4h (#633): ER bleed/frost/fear tags ride the checkpoint so the guest can repair them
+  // (they are BattlerTags, not StatusEffects, so the `status` field can't carry them).
+  describe("ER bleed/frost/fear tags (#633 Fix #4h)", () => {
+    it("carries erTags through serialize, sanitizing turns (>=0 integer)", () => {
+      const s = serializeMonState(
+        mon({ erTags: [{ type: "ER_BLEED", turns: 3.9 }, { type: "ER_FROSTBITE", turns: -2 }] }),
+      );
+      expect(s.erTags).toEqual([{ type: "ER_BLEED", turns: 3 }, { type: "ER_FROSTBITE", turns: 0 }]);
+    });
+
+    it("omits erTags entirely when the mon has none (tagless wire shape unchanged)", () => {
+      expect(serializeMonState(mon()).erTags).toBeUndefined();
+      expect(serializeMonState(mon({ erTags: [] })).erTags).toBeUndefined();
+    });
+
+    it("normalizeMonState round-trips the erTags the guest will repair", () => {
+      const safe = normalizeMonState({
+        bi: 2,
+        hp: 10,
+        maxHp: 14,
+        status: 0,
+        statStages: [0, 0, 0, 0, 0, 0, 0],
+        fainted: false,
+        erTags: [{ type: "ER_FEAR", turns: 2 }],
+      });
+      expect(safe.erTags).toEqual([{ type: "ER_FEAR", turns: 2 }]);
+    });
+  });
 });

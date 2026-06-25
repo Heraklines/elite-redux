@@ -492,7 +492,10 @@ export class CommandPhase extends FieldPhase {
     // interactive SelectTargetPhase was queued, that phase broadcasts the RESOLVED
     // command instead, so the partner never re-opens target-select / re-picks.
     if (!selectTargetQueued) {
-      this.broadcastLocalCoopCommand(turnCommand, moveId, moveTargets.targets, useMode);
+      // Co-op (#633 Fix #4a): carry the Terastallize flag (Command.TERA) so the watcher
+      // teras the partner's mon too. Without it the broadcast hardcoded FIGHT and the
+      // partner never terastallized -> the two engines diverged (type/STAB/stat changes).
+      this.broadcastLocalCoopCommand(turnCommand, moveId, moveTargets.targets, useMode, command === Command.TERA);
     }
 
     return true;
@@ -525,6 +528,7 @@ export class CommandPhase extends FieldPhase {
     moveId: MoveId,
     targets: BattlerIndex[],
     useMode: MoveUseMode,
+    tera = false,
   ): void {
     if (!globalScene.gameMode.isCoop) {
       return;
@@ -547,6 +551,8 @@ export class CommandPhase extends FieldPhase {
       moveId,
       targets,
       useMode,
+      // #633 Fix #4a: carry the Terastallize flag so the watcher teras the partner's mon.
+      ...(tera ? { tera: true } : {}),
     });
   }
 

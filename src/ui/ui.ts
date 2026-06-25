@@ -337,6 +337,10 @@ export class UI extends Phaser.GameObjects.Container {
       || phaseName === "MysteryEncounterOptionSelectedPhase"
       || phaseName === "MysteryEncounterRewardsPhase"
       || phaseName === "PostMysteryEncounterPhase"
+      // ER quiz (#633 Fix #4b): the quiz answer is an interactive choice that must be relayed,
+      // else each client answers independently -> different rewards. Route it through the same
+      // owner-drives / watcher-mirrors pump as the ME screens.
+      || phaseName === "ErQuizPhase"
     );
   }
 

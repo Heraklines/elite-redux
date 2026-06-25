@@ -34,6 +34,8 @@ export interface CoopFieldMonView {
   formIndex?: number;
   /** Only when the active ability changed this turn (`AbilityId`). */
   abilityId?: number;
+  /** ER bleed/frost/fear BattlerTags on this mon (#633 Fix #4h): `{ type, turns }` each. */
+  erTags?: { type: string; turns: number }[];
 }
 
 /** A readable snapshot of the arena's weather + terrain. */
@@ -68,6 +70,13 @@ export function serializeMonState(mon: CoopFieldMonView): CoopSerializedMonState
   }
   if (mon.abilityId !== undefined) {
     state.abilityId = mon.abilityId;
+  }
+  // ER bleed/frost/fear tags (#633 Fix #4h): carry them through, sanitized (string type +
+  // non-negative integer turns). Omitted when empty so a tagless mon's wire shape is unchanged.
+  if (mon.erTags !== undefined && mon.erTags.length > 0) {
+    state.erTags = mon.erTags
+      .filter(t => typeof t.type === "string")
+      .map(t => ({ type: t.type, turns: Math.max(0, Math.trunc(t.turns)) }));
   }
   return state;
 }
@@ -104,5 +113,6 @@ export function normalizeMonState(state: CoopSerializedMonState): CoopSerialized
     fainted: state.fainted,
     ...(state.formIndex === undefined ? {} : { formIndex: state.formIndex }),
     ...(state.abilityId === undefined ? {} : { abilityId: state.abilityId }),
+    ...(state.erTags === undefined ? {} : { erTags: state.erTags }),
   });
 }

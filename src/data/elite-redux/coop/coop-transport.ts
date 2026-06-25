@@ -54,6 +54,8 @@ export interface SerializedCommand {
   useMode?: number;
   /** For POKEMON (switch): whether it is a Baton switch (passes stat changes) (#633). */
   baton?: boolean;
+  /** For FIGHT: whether the mon Terastallizes this turn (Command.TERA) (#633 Fix #4a). */
+  tera?: boolean;
 }
 
 /**
@@ -151,6 +153,13 @@ export interface CoopSerializedMonState {
   formIndex?: number | undefined;
   /** Present only when the mon's active ability changed this turn (`AbilityId`). */
   abilityId?: number | undefined;
+  /**
+   * ER bleed / frost / fear BattlerTags on this mon (#633 Fix #4h). These are BattlerTags,
+   * NOT StatusEffects, so the `status` field above can't carry them - once anything desyncs
+   * they could never be repaired. Each entry is `{ type, turns }` (the BattlerTagType key +
+   * turns remaining). Absent / empty => none of the three ER tags are present.
+   */
+  erTags?: { type: string; turns: number }[] | undefined;
 }
 
 /** Authoritative post-turn snapshot: enough to set the guest's field state exactly. */

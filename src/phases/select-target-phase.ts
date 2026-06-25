@@ -66,12 +66,17 @@ export class SelectTargetPhase extends PokemonPhase {
           // control (the live "stuck choosing for the partner's mon" bug). The helper
           // is a hard no-op in solo and for the partner's slot.
           if (turnCommand.command === Command.FIGHT && turnCommand.move) {
+            // #633 Fix #4a: the Terastallize flag lives on the preTurnCommand (the turnCommand
+            // is always FIGHT), so read it from there to relay tera on a spread/multi-target
+            // move whose broadcast was deferred to this resolved-target phase.
+            const tera = globalScene.currentBattle.preTurnCommands[this.fieldIndex]?.command === Command.TERA;
             broadcastCoopOwnSlotCommand(this.fieldIndex, {
               command: Command.FIGHT,
               cursor: turnCommand.cursor ?? -1,
               moveId: turnCommand.move.move,
               targets,
               useMode: turnCommand.move.useMode,
+              ...(tera ? { tera: true } : {}),
             });
           }
         }

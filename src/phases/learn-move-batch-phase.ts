@@ -80,6 +80,19 @@ export class LearnMoveBatchPhase extends PlayerPartyMemberPokemonPhase {
       return;
     }
 
+    // Co-op (#633 Fix #4d): the batch Move Learn panel has NO co-op relay - both clients would
+    // open it independently for the SAME shared mon and each pick a different move to overwrite,
+    // diverging the moveset. The per-move LearnMovePhase, by contrast, IS fully relayed (owner
+    // drives, watcher mirrors). So in co-op, route each new move through LearnMovePhase instead
+    // of the panel. Solo keeps the QoL batch panel unchanged.
+    if (globalScene.gameMode.isCoop) {
+      for (const id of learnable) {
+        globalScene.phaseManager.unshiftNew("LearnMovePhase", this.partyMemberIndex, id);
+      }
+      this.end();
+      return;
+    }
+
     const returnMode =
       globalScene.ui.getHandler() instanceof EvolutionSceneUiHandler ? UiMode.EVOLUTION_SCENE : UiMode.MESSAGE;
     const learnedIds: MoveId[] = [];

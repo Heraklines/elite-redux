@@ -33,6 +33,7 @@ import { resolveErModifierClass } from "#data/elite-redux/er-persistent-modifier
 import type { Gender } from "#data/gender";
 import { Status } from "#data/status-effect";
 import type { TerrainType } from "#data/terrain";
+import { BattlerTagType } from "#enums/battler-tag-type";
 import type { Nature } from "#enums/nature";
 import type { StatusEffect } from "#enums/status-effect";
 import type { WeatherType } from "#enums/weather-type";
@@ -42,11 +43,58 @@ import { PokemonHeldItemModifier } from "#modifiers/modifier";
 import { PokemonMove } from "#moves/pokemon-move";
 import { ModifierData } from "#system/modifier-data";
 
+/**
+ * ER BattlerTags carried in the co-op checkpoint (#633 Fix #4h). These are BattlerTags, not
+ * StatusEffects, so the checkpoint's `status` field can't repair them - without this the three
+ * ER conditions could never be re-synced once anything drifts. Bleed is HP chip; frostbite /
+ * fear are flag-bearing tags. Held as a literal list so the read + repair stay narrow + cheap.
+ */
+const COOP_REPAIRABLE_ER_TAGS = [
+  BattlerTagType.ER_BLEED,
+  BattlerTagType.ER_FROSTBITE,
+  BattlerTagType.ER_FEAR,
+] as const;
+
+/** Read the ER bleed/frost/fear tags currently on a mon into the checkpoint shape. */
+function readErTags(mon: ReturnType<typeof globalScene.getField>[number]): { type: string; turns: number }[] {
+  const out: { type: string; turns: number }[] = [];
+  for (const type of COOP_REPAIRABLE_ER_TAGS) {
+    const tag = mon.getTag(type);
+    if (tag != null) {
+      out.push({ type, turns: tag.turnCount });
+    }
+  }
+  return out;
+}
+
+/**
+ * GUEST: repair the three ER bleed/frost/fear tags to match the host's checkpoint (#633 Fix
+ * #4h). For each repairable tag: add it if the host has it and we don't; remove it if the
+ * host doesn't and we do. Only these three tags are touched - every other BattlerTag is left
+ * exactly as the lockstep engine computed it. Fully guarded by the caller.
+ */
+function repairErTags(
+  mon: ReturnType<typeof globalScene.getField>[number],
+  erTags: { type: string; turns: number }[] | undefined,
+): void {
+  const wanted = new Map<string, number>((erTags ?? []).map(t => [t.type, t.turns]));
+  for (const type of COOP_REPAIRABLE_ER_TAGS) {
+    const has = mon.getTag(type) != null;
+    const want = wanted.has(type);
+    if (want && !has) {
+      mon.addTag(type, wanted.get(type) ?? 0);
+    } else if (!want && has) {
+      mon.removeTag(type);
+    }
+  }
+}
+
 /** Read a live field mon into the pure checkpoint view. */
 function readMonView(mon: ReturnType<typeof globalScene.getField>[number]): CoopFieldMonView | null {
   if (mon == null) {
     return null;
   }
+  const erTags = readErTags(mon);
   return {
     bi: mon.getBattlerIndex(),
     hp: mon.hp,
@@ -55,6 +103,7 @@ function readMonView(mon: ReturnType<typeof globalScene.getField>[number]): Coop
     // getStatStages() returns the live 7-length array; clone so the checkpoint never aliases it.
     statStages: [...mon.getStatStages()],
     fainted: mon.isFainted(),
+    ...(erTags.length > 0 ? { erTags } : {}),
   };
 }
 
@@ -116,6 +165,7 @@ export function applyCoopCheckpoint(checkpoint: CoopBattleCheckpoint): void {
           for (let i = 0; i < 7 && i < stages.length; i++) {
             stages[i] = state.statStages[i];
           }
+          repairErTags(mon, state.erTags);
           void mon.updateInfo();
         }
       } catch {

@@ -85,27 +85,26 @@ export class SwitchPhase extends BattlePhase {
         void coopRelay.awaitInteractionChoice(seq, COOP_SWITCH_WAIT_MS).then(res => {
           const slotIndex = res?.choice ?? -1;
           if (slotIndex >= globalScene.currentBattle.getBattlerCount() && slotIndex < 6) {
-            globalScene.phaseManager.unshiftNew(
-              "SwitchSummonPhase",
-              this.switchType,
-              fieldIndex,
-              slotIndex,
-              this.doReturn,
-            );
+            // Co-op (#633 Fix #4g): carry the BATON_PASS flag relayed in data[0]. Without it the
+            // watcher always applied a PLAIN switch, dropping the owner's Baton Pass (stat changes
+            // not passed) -> the two engines diverged the moment a baton switch happened.
+            const switchType = res?.data?.[0] === 1 ? SwitchType.BATON_PASS : this.switchType;
+            globalScene.phaseManager.unshiftNew("SwitchSummonPhase", switchType, fieldIndex, slotIndex, this.doReturn);
           }
           globalScene.ui.setMode(UiMode.MESSAGE).then(() => super.end());
         });
         return;
       }
-      // OWNER: pick normally, and relay the chosen slot so the watcher mirrors it.
+      // OWNER: pick normally, and relay the chosen slot (+ baton flag) so the watcher mirrors it.
       globalScene.ui.setMode(
         UiMode.PARTY,
         this.isModal ? PartyUiMode.FAINT_SWITCH : PartyUiMode.POST_BATTLE_SWITCH,
         fieldIndex,
         (slotIndex: number, option: PartyOption) => {
-          coopRelay.sendInteractionChoice(seq, "switch", slotIndex);
+          const isBaton = option === PartyOption.PASS_BATON;
+          coopRelay.sendInteractionChoice(seq, "switch", slotIndex, isBaton ? [1] : [0]);
           if (slotIndex >= globalScene.currentBattle.getBattlerCount() && slotIndex < 6) {
-            const switchType = option === PartyOption.PASS_BATON ? SwitchType.BATON_PASS : this.switchType;
+            const switchType = isBaton ? SwitchType.BATON_PASS : this.switchType;
             globalScene.phaseManager.unshiftNew("SwitchSummonPhase", switchType, fieldIndex, slotIndex, this.doReturn);
           }
           globalScene.ui.setMode(UiMode.MESSAGE).then(() => super.end());

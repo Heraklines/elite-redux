@@ -455,8 +455,19 @@ export class TitlePhase extends Phase {
             console.error("Failed to load daily run:\n", err);
           });
       } else {
-        // Grab first 10 chars of ISO date format (YYYY-MM-DD) and convert to base64
+        // Grab first 10 chars of ISO date format (YYYY-MM-DD) and convert to base64.
+        // toISOString() is UTC, so two players normally agree - but at the UTC-midnight
+        // rollover one client can land on the next day, producing a DIFFERENT daily seed
+        // and desyncing the co-op run from wave 1.
         let seed: string = btoa(new Date().toISOString().slice(0, 10));
+        // Co-op (#633 Fix #4i): the GUEST adopts the HOST's authoritative run seed (mirrored
+        // via runConfig) for the offline daily, so both clients share ONE date string even
+        // across the rollover edge. Falls back to the local UTC date when no host seed is
+        // available yet. Solo / host keep the local-date path unchanged.
+        const coopHostSeed = getCoopController()?.runConfig()?.seed;
+        if (coopHostSeed != null && getCoopController()?.role === "guest") {
+          seed = coopHostSeed;
+        }
         if (Overrides.DAILY_RUN_SEED_OVERRIDE != null) {
           seed =
             typeof Overrides.DAILY_RUN_SEED_OVERRIDE === "string"

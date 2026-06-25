@@ -281,17 +281,27 @@ export class EvolutionPhase extends Phase {
     // cancelling the evolution outright. Done after entering the evolution scene
     // so we are in a known UI mode that supports the prompt overlay.
     if (this.evolutionChoices.length > 1) {
-      const chosen = await this.promptEvolutionChoice();
-      if (!chosen) {
-        // Same as the validate()-fail bail above: we are in EVOLUTION_SCENE
-        // mode, so we must route through EndEvolutionPhase to hand the UI back
-        // to MESSAGE. Cancelling Eevee (its branched evolutions trigger this
-        // prompt) otherwise froze the game.
-        globalScene.phaseManager.unshiftNew("EndEvolutionPhase");
-        return this.end();
+      // Co-op (#633 Fix #4c): the branched-evolution prompt + the cancel are interactive
+      // choices on a SHARED mon - each client could pick a DIFFERENT branch (divergent
+      // species) or one cancel + one evolve. There is no relay for this, so co-op resolves
+      // it DETERMINISTICALLY: take the FIRST valid evolution (identical on both clients) and
+      // never prompt. Solo keeps the interactive branch picker.
+      if (globalScene.gameMode.isCoop) {
+        this.evolution = this.evolutionChoices[0];
+        this.fusionSpeciesEvolved = this.evolution instanceof FusionSpeciesFormEvolution;
+      } else {
+        const chosen = await this.promptEvolutionChoice();
+        if (!chosen) {
+          // Same as the validate()-fail bail above: we are in EVOLUTION_SCENE
+          // mode, so we must route through EndEvolutionPhase to hand the UI back
+          // to MESSAGE. Cancelling Eevee (its branched evolutions trigger this
+          // prompt) otherwise froze the game.
+          globalScene.phaseManager.unshiftNew("EndEvolutionPhase");
+          return this.end();
+        }
+        this.evolution = chosen;
+        this.fusionSpeciesEvolved = chosen instanceof FusionSpeciesFormEvolution;
       }
-      this.evolution = chosen;
-      this.fusionSpeciesEvolved = chosen instanceof FusionSpeciesFormEvolution;
     }
     this.setupEvolutionAssets();
     this.setupPokemonSprites();
@@ -357,7 +367,9 @@ export class EvolutionPhase extends Phase {
   private prepareForCycle(evolvedPokemon: Pokemon): void {
     globalScene.time.delayedCall(1500, () => {
       this.pokemonEvoTintSprite.setScale(0.25).setVisible(true);
-      this.evolutionHandler.canCancel = this.canCancel;
+      // Co-op (#633 Fix #4c): never allow cancel in co-op - one client cancelling while the
+      // other evolves diverges the shared mon's species. Force-evolve deterministically.
+      this.evolutionHandler.canCancel = this.canCancel && !globalScene.gameMode.isCoop;
       globalScene.animations.doCycle(1, 15, this.pokemonTintSprite, this.pokemonEvoTintSprite).then(() => {
         if (this.evolutionHandler.cancelled) {
           this.handleFailedEvolution(evolvedPokemon);
@@ -560,7 +572,8 @@ export class EvolutionPhase extends Phase {
     globalScene.animations.doCircleInward(this.evolutionBaseBg, this.evolutionContainer);
 
     globalScene.time.delayedCall(900, () => {
-      this.evolutionHandler.canCancel = this.canCancel;
+      // Co-op (#633 Fix #4c): keep cancel disabled in co-op for the same determinism reason.
+      this.evolutionHandler.canCancel = this.canCancel && !globalScene.gameMode.isCoop;
 
       this.pokemon.evolve(this.evolution, this.pokemon.species).then(() => this.postEvolve(evolvedPokemon));
     });
