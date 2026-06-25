@@ -1,0 +1,61 @@
+url:      https://elite-redux-staging.pages.dev/
+build:    mqu0qkmv-7p2i
+mode:     6  wave:?
+seed:     SuJnQn2ibjTBDuRqMMPkhlLN
+party:    
+enemy:    
+
+----- COMMENT -----
+stuck after choosing difficulty
+
+----- CONSOLE -----
+[21:35:33.878] LOG: %c %c %c %c %c Phaser v3.90.0 (WebGL | Web Audio) %c https://phaser.io/v390 background: #ff0000 background: #ffff00 background: #00ff00 background: #00ffff color: #ffffff; background: #000000 background: transparent
+[21:35:34.254] LOG: [ER] build mqu0qkmv-7p2i
+[21:35:34.587] LOG: [dev-tools] loaded — 322 scenarios + Send Logs button
+[21:35:54.448] DEBUG: Destroying loading scene
+[21:35:54.448] DEBUG: Destroyed loading scene
+[21:35:54.631] LOG: Seed: SuJnQn2ibjTBDuRqMMPkhlLN
+[21:35:54.631] LOG: Wave Seed: SuJnQn2ibjTBDuRqMMPkhlLN 0
+[21:35:56.616] LOG: %cStart Phase LoginPhase color:green;
+[21:36:06.361] LOG: Client Session: z4y5g2jMJyunsuUBMo5nmJuyMmCmJ4yD
+[21:36:06.742] LOG: %cStart Phase TitlePhase color:green;
+[21:36:06.743] LOG: Getting Session Slot id: %d 0
+[21:36:07.517] LOG: use seasonal splash messages true
+[21:36:07.517] LOG: Adding 2 Pride Month splash messages (weight: x15)
+[21:36:17.946] LOG: %cStart Phase TitlePhase color:green;
+[21:36:17.946] LOG: Getting Session Slot id: %d 0
+[21:36:17.958] LOG: use seasonal splash messages true
+[21:36:17.958] LOG: Adding 2 Pride Month splash messages (weight: x15)
+[21:37:10.540] LOG: %cStart Phase TitlePhase color:green;
+[21:37:10.541] LOG: Getting Session Slot id: %d 0
+[21:37:10.561] LOG: use seasonal splash messages true
+[21:37:10.561] LOG: Adding 2 Pride Month splash messages (weight: x15)
+[21:37:24.566] WARN: [coop-fp] MISMATCH sections=movesName,abilitiesName - movesName local=30e2bf626b99790e(1107) peer=fad7fe8932ec09a1(1107) abilitiesName local=1670a4f3df00cb38(1046) peer=1412a816005397a3(1046)
+[21:37:25.142] LOG: [coop-launch] title challenge-gate: role=host isCoopGuest=false -> SelectChallengePhase
+[21:37:25.143] LOG: %cStart Phase SelectChallengePhase color:green;
+[21:37:30.374] LOG: %cStart Phase SelectStarterPhase color:green;
+[21:37:30.374] LOG: [coop-launch] startCoopSelect role=host partnerConnected=true partnerReady=false
+[21:37:42.639] WARN: cry/725 not found
+[21:37:44.499] WARN: cry/152 not found
+[21:37:48.057] LOG: [coop-runconfig] startRun role=host willBroadcast=true difficulty=elite
+[21:37:48.058] LOG: [coop-runconfig] host broadcast difficulty=elite netcode=authoritative (role=host)
+[21:37:48.058] LOG: [coop-launch] proceedIfReady launched=false localTeam=0 bothReady=false role=host partnerReady=false
+[21:37:48.059] LOG: [coop-launch] local team locked in: 2 mons, role=host
+[21:37:48.060] LOG: [coop-launch] proceedIfReady launched=false localTeam=2 bothReady=false role=host partnerReady=false
+[21:37:48.060] LOG: [coop-launch] proceedIfReady launched=false localTeam=2 bothReady=false role=host partnerReady=false
+[21:37:48.060] LOG: [coop-launch] local ready, partner NOT ready -> waiting screen
+[21:37:48.063] LOG: [coop-launch] proceedIfReady launched=false localTeam=2 bothReady=false role=host partnerReady=false
+[21:37:48.063] LOG: [coop-launch] proceedIfReady launched=false localTeam=2 bothReady=true role=host partnerReady=true
+[21:37:48.064] LOG: [coop-launch] launchCoopMergedParty role=host merged=5 slot=0
+[21:37:48.064] LOG: [coop-launch] host: opening SAVE_SLOT picker
+[21:37:48.123] LOG: Getting Session Slot id: %d 0
+[21:37:48.133] LOG: Getting Session Slot id: %d 1
+[21:37:48.134] LOG: Getting Session Slot id: %d 2
+[21:37:48.136] LOG: Getting Session Slot id: %d 3
+[21:37:48.137] LOG: Getting Session Slot id: %d 4
+[21:37:48.139] LOG: Getting Session Slot id: %d 0
+[21:37:48.213] LOG: [coop-launch] partner readied during setMode gap -> skip stale waiting text
+[21:37:48.365] ERROR: Invalid save data JSON detected! Session not found.
+[21:37:48.365] ERROR: Invalid save data JSON detected! Session not found.
+[21:37:48.378] ERROR: Invalid save data JSON detected! Session not found.
+[21:37:48.380] ERROR: Invalid save data JSON detected! Session not found.
