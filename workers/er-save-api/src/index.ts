@@ -1122,6 +1122,19 @@ async function handleGhostNotifications(
   return json({ items: items.slice(0, 50) }, 200, cors);
 }
 
+/** Row shape returned by the ghost-sample query. */
+type RunSampleRow = {
+  id: string;
+  username: string | null;
+  outcome: string | null;
+  difficulty: string | null;
+  wave: number | null;
+  created_at: number;
+  player_team: string;
+  opponent_name: string | null;
+  opponent_team: string | null;
+};
+
 /** Sample winning runs (excluding the caller's own) as ghost-team snapshots. */
 async function handleRunSample(
   url: URL,
@@ -1143,24 +1156,42 @@ async function handleRunSample(
   // compat and as a display fallback but no longer restricts the pool.) The wave
   // floor + re-levelling on spawn keep the opponent appropriately strong
   // regardless of its origin tier.
-  const { results } = await env.DB.prepare(
-    `SELECT id, username, outcome, difficulty, wave, created_at, player_team, opponent_name, opponent_team
-       FROM runs
-       WHERE user_id != ?1 AND wave >= ?2
-       ORDER BY RANDOM() LIMIT ?3`,
+  // ER (#131): the old `ORDER BY RANDOM() LIMIT ?` had NO usable index for its
+  // `user_id != ? AND wave >= ?` filter, so D1 read the ENTIRE runs table on every
+  // ghost fetch. Once the table grew to thousands of rows this blew past D1's rows-read
+  // budget; the query errored and the client SILENTLY fell back to the player's OWN
+  // teams ("same ghost over and over", affecting everyone, with thousands of ghosts
+  // unused). Replace it with a random-rowid-window sample: seek to a random rowid (a
+  // cheap MAX(rowid)) and walk forward in primary-key order taking the first `count`
+  // eligible rows, wrapping to the start of the table to top up. This reads ~count rows
+  // via the integer-primary-key index instead of scanning the whole table, and EVERY
+  // row stays reachable because the start offset spans [0, MAX(rowid)].
+  const cols = "id, username, outcome, difficulty, wave, created_at, player_team, opponent_name, opponent_team";
+  const maxRow = await env.DB.prepare("SELECT MAX(rowid) AS m FROM runs").first<{ m: number | null }>();
+  const maxRowId = maxRow?.m ?? 0;
+  const startRowId = maxRowId > 0 ? Math.floor(Math.random() * (maxRowId + 1)) : 0;
+
+  const forward = await env.DB.prepare(
+    `SELECT ${cols} FROM runs
+       WHERE rowid >= ?1 AND user_id != ?2 AND wave >= ?3
+       ORDER BY rowid LIMIT ?4`,
   )
-    .bind(auth.uid, minWave, count)
-    .all<{
-      id: string;
-      username: string | null;
-      outcome: string | null;
-      difficulty: string | null;
-      wave: number | null;
-      created_at: number;
-      player_team: string;
-      opponent_name: string | null;
-      opponent_team: string | null;
-    }>();
+    .bind(startRowId, auth.uid, minWave, count)
+    .all<RunSampleRow>();
+  let results: RunSampleRow[] = forward.results ?? [];
+
+  if (results.length < count) {
+    // Wrap around to the start of the table to fill the remainder (the random offset
+    // landed near the end, or the eligible set is sparse from there onward).
+    const wrap = await env.DB.prepare(
+      `SELECT ${cols} FROM runs
+         WHERE rowid < ?1 AND user_id != ?2 AND wave >= ?3
+         ORDER BY rowid LIMIT ?4`,
+    )
+      .bind(startRowId, auth.uid, minWave, count - results.length)
+      .all<RunSampleRow>();
+    results = results.concat(wrap.results ?? []);
+  }
   const teams = (results ?? [])
     .map(row => {
       try {

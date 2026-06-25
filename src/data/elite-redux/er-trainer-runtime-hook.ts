@@ -57,8 +57,8 @@ import { ER_ID_MAP } from "#data/elite-redux/er-id-map";
 import { erBattleFormDumpToBaseSpeciesId } from "#data/elite-redux/init-elite-redux-er-custom-form-changes";
 import { ER_MEGA_FORMS } from "#data/elite-redux/er-mega-forms";
 import { ER_MEGA_STONE_NAME_BY_ITEM } from "#data/elite-redux/er-mega-stone-item-ids";
-import { maybeAssignErResistBerry } from "#data/elite-redux/er-resist-berries";
-import { maybeAssignErWardStone } from "#data/elite-redux/er-ward-stones";
+import { grantErResistBerries, maybeAssignErResistBerry } from "#data/elite-redux/er-resist-berries";
+import { grantErWardStone, maybeAssignErWardStone } from "#data/elite-redux/er-ward-stones";
 import { erDifficultyToRosterTier, getErDifficulty, isErVanillaDifficulty } from "#data/elite-redux/er-run-difficulty";
 import { type ErRosterTier, selectErRoster } from "#data/elite-redux/er-trainer-overlay";
 import { resolveErTrainerItem } from "#data/elite-redux/er-trainer-item-map";
@@ -864,6 +864,78 @@ export function applyErTrainerHeldItems(party: readonly EnemyPokemon[]): void {
     if (modifier) {
       globalScene.addEnemyModifier(modifier, true, true);
     }
+  }
+  // ER (#135): Hell post-wave-100 trainer difficulty buff. Layered LAST so the
+  // BST scan sees each mon's FINAL battle form (after the early-mega revert and
+  // any forceErMega above).
+  applyErHellTrainerBossBuff(party);
+}
+
+/**
+ * Earliest wave the HELL post-100 trainer buff applies (#135 Tier 1). Mirrors
+ * the Ward Stone Hell spawn gate (wave 100+) so the boss buff and the stones
+ * that ride it switch on together.
+ */
+const ER_HELL_TRAINER_BUFF_FROM_WAVE = 100;
+
+/**
+ * TODO (#135 Tier 2 — BLOCKED on the maintainer's start wave): from wave
+ * {@linkcode ER_HELL_TRAINER_TIER2_FROM_WAVE} every Hell trainer fields TWO mons
+ * with 2 boss bars AND the highest-BST mon with 3 bars, all carrying PRIME
+ * (unstealable) Ward Stones + resist berries. Do NOT implement until the start
+ * wave is confirmed — this constant is only the placeholder threshold so the
+ * gate is wired and obvious. (-1 disables the tier entirely.)
+ */
+const ER_HELL_TRAINER_TIER2_FROM_WAVE = -1;
+void ER_HELL_TRAINER_TIER2_FROM_WAVE;
+
+/**
+ * ER (#135 Tier 1): on HELL after wave 100, the trainer's HIGHEST-BST mon is
+ * promoted to a 2-bar boss carrying a GUARANTEED (stealable) Greater Ward Stone
+ * and GUARANTEED resist berries matching each of its type weaknesses. The buff
+ * is trainer-only and applies to the single apex mon (ties -> lowest party
+ * index). Idempotent and roll-free, so a re-run of the modifier pipeline (MEs /
+ * co-op) re-selects the same mon and no-ops. Never throws.
+ */
+function applyErHellTrainerBossBuff(party: readonly EnemyPokemon[]): void {
+  try {
+    if (getErDifficulty() !== "hell") {
+      return;
+    }
+    const wave = globalScene.currentBattle?.waveIndex ?? 0;
+    if (wave <= ER_HELL_TRAINER_BUFF_FROM_WAVE || !globalScene.currentBattle?.trainer) {
+      return;
+    }
+    if (party.length === 0) {
+      return;
+    }
+    // The team's apex by ACTIVE-form BST (the same notion the encounter phase
+    // uses for its BST sum / segment scaling). Strict `>` keeps the FIRST max on
+    // a tie.
+    let boss = party[0];
+    let bestBst = boss.getSpeciesForm().baseTotal;
+    for (let i = 1; i < party.length; i++) {
+      const bst = party[i].getSpeciesForm().baseTotal;
+      if (bst > bestBst) {
+        bestBst = bst;
+        boss = party[i];
+      }
+    }
+    // Force the 2-health-bar boss. Guard re-entry: a second setBoss() mid-fight
+    // would reset bossSegmentIndex, so only promote a mon that isn't a boss yet.
+    if (!boss.isBoss()) {
+      boss.setBoss(true, 2);
+      // Re-render its Battle Info so the HP bar shows the 2 segments + boss chrome
+      // (idempotent: reuses the existing battleInfo built at asset-load).
+      boss.initBattleInfo();
+    }
+    // GUARANTEED Greater Ward Stone (regular/stealable tier; Prime stays Tier 2)
+    // + every weakness-matching resist berry. Both are idempotent no-ops if the
+    // mon already carries them.
+    grantErWardStone(boss, "greater");
+    grantErResistBerries(boss);
+  } catch {
+    // The difficulty buff must never break trainer generation.
   }
 }
 

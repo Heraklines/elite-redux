@@ -28,6 +28,7 @@ import { MysteryEncounterBuilder } from "#mystery-encounters/mystery-encounter";
 import { MysteryEncounterOptionBuilder } from "#mystery-encounters/mystery-encounter-option";
 import { MoneyRequirement } from "#mystery-encounters/mystery-encounter-requirements";
 import { PokemonData } from "#system/pokemon-data";
+import { isSpeciesAllowedByActiveChallenges } from "#utils/challenge-utils";
 import { randSeedInt, randSeedItem } from "#utils/common";
 import { getPokemonSpecies } from "#utils/pokemon-utils";
 
@@ -257,7 +258,14 @@ export const ThePokemonSalesmanEncounter: MysteryEncounter = MysteryEncounterBui
  * @returns A random species that has at most 5 starter cost and is not Mythical, Paradox, etc.
  */
 export function getSalesmanSpeciesOffer(): PokemonSpecies {
-  return getPokemonSpecies(
-    getRandomSpeciesByStarterCost([0, 5], NON_LEGEND_PARADOX_POKEMON, undefined, false, false, false),
-  );
+  // ER (#126): the salesman grants the offered mon via catchPokemon(isObtain=true),
+  // which BYPASSES the POKEMON_ADD_TO_PARTY catch gate. In a roster challenge run we
+  // must not sell an illegal species, so we exclude every challenge-illegal starter
+  // from the roll (reusing getRandomSpeciesByStarterCost's own exclusion mechanism).
+  // With no active challenge the illegal set is empty, so behavior is unchanged.
+  const challengeIllegalStarters = Object.keys(speciesStarterCosts)
+    .map(s => Number.parseInt(s) as SpeciesId)
+    .filter(speciesId => !isSpeciesAllowedByActiveChallenges(getPokemonSpecies(speciesId)));
+  const excludedSpecies = [...NON_LEGEND_PARADOX_POKEMON, ...challengeIllegalStarters];
+  return getPokemonSpecies(getRandomSpeciesByStarterCost([0, 5], excludedSpecies, undefined, false, false, false));
 }

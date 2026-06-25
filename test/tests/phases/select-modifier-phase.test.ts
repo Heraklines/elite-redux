@@ -271,4 +271,28 @@ describe("SelectModifierPhase", () => {
     expect(modifierSelectHandler.options[0].modifierTypeOption.type.id).toEqual("MEMORY_MUSHROOM");
     expect(modifierSelectHandler.options[1].modifierTypeOption.type.tier).toEqual(ModifierTier.MASTER);
   });
+
+  // ER (#134): a Greater Golden Ball grants +2 EARNED reward slots that must survive a
+  // bundled reward even when fillRemaining is FALSE - previously the count override
+  // discarded them, so the ball was a no-op in every customModifierSettings reward. 1
+  // guaranteed func + 2 earned = 3 options; before the fix this was 1.
+  it("ER: a Greater Golden Ball adds its earned slots to a fillRemaining:false bundle (#134)", async () => {
+    await game.classicMode.startBattle(SpeciesId.ABRA, SpeciesId.VOLCARONA);
+    scene.money = 1000000;
+    await scene.addModifier(modifierTypes.ER_GREATER_GOLDEN_BALL().newModifier());
+
+    const customModifiers: CustomModifierSettings = {
+      guaranteedModifierTypeFuncs: [modifierTypes.MEMORY_MUSHROOM],
+      fillRemaining: false,
+    };
+    scene.phaseManager.unshiftPhase(new SelectModifierPhase(0, undefined, customModifiers));
+    game.move.select(MoveId.SPLASH);
+    await game.phaseInterceptor.to("SelectModifierPhase");
+
+    const modifierSelectHandler = scene.ui.handlers.find(
+      h => h instanceof ModifierSelectUiHandler,
+    ) as ModifierSelectUiHandler;
+    expect(modifierSelectHandler.options.length).toEqual(3); // 1 guaranteed + 2 earned (Greater Golden Ball)
+    expect(modifierSelectHandler.options[0].modifierTypeOption.type.id).toEqual("MEMORY_MUSHROOM");
+  });
 });

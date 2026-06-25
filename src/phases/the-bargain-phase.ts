@@ -34,9 +34,9 @@ import {
   bargainSinAvailable,
   bargainWipeCandy,
   DISABLED_BARGAIN_SINS,
+  LUST_CANDY_COST,
   pickBargainSins,
 } from "#data/elite-redux/er-bargain-sins";
-import { applyErBlackShinyKit } from "#data/elite-redux/er-black-shinies";
 import { EggSourceType } from "#enums/egg-source-types";
 import { EggTier } from "#enums/egg-type";
 import { Stat } from "#enums/stat";
@@ -235,18 +235,27 @@ export class TheBargainPhase extends Phase {
         break;
       }
       case "lust": {
-        // Disabled (see DISABLED_BARGAIN_SINS); never offered. Kept for completeness.
-        const target = await this.pickPokemon();
+        // Surrender everything a single mon earned (its levels, its IVs, its whole
+        // candy hoard) and Giratina makes it a PERMANENT tier-1 shiny. No black shiny
+        // here - that stays an apex-challenge-only reward.
+        const target = await this.pickPokemon(p =>
+          globalScene.gameData.getStarterDataEntry(p.species.speciesId).candyCount >= LUST_CANDY_COST
+            ? null
+            : "This Pokémon needs 100 candy.",
+        );
         if (!target) {
           return false;
         }
         pokeName = target.getNameToRender();
-        for (const mon of globalScene.getPlayerParty()) {
-          bargainCurseRandomStat(mon);
-        }
-        applyErBlackShinyKit(target);
+        // Cost: zero the IVs FIRST so the Lv 1 stat recompute reads them, then drop to
+        // Lv 1 and spend the entire candy stock.
+        target.ivs = [0, 0, 0, 0, 0, 0];
+        bargainResetToLevelOne(target);
+        bargainWipeCandy(target);
+        // Payoff: a normal tier-1 shiny (variant 0, Luck 1) for the run.
         target.shiny = true;
-        target.variant = 2;
+        target.variant = 0;
+        target.luck = 1;
         await target.loadAssets();
         target.updateInfo(true);
         break;

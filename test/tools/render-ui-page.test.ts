@@ -25,16 +25,21 @@
 // =============================================================================
 
 import { getGameMode } from "#app/game-mode";
+import { modifierTypes } from "#data/data-lists";
 import { Egg } from "#data/egg";
 import { EggHatchData } from "#data/egg-hatch-data";
 import { startLocalCoopSession } from "#data/elite-redux/coop/coop-runtime";
+import { applyErBlackShinyKit } from "#data/elite-redux/er-black-shinies";
+import { STORMGLASS_WEATHER_CHOICES } from "#data/elite-redux/er-relics";
+import { AbilityId } from "#enums/ability-id";
+import { BiomeId } from "#enums/biome-id";
 import { Button } from "#enums/buttons";
 import { DexAttr } from "#enums/dex-attr";
 import { GameModes } from "#enums/game-modes";
 import { MysteryEncounterType } from "#enums/mystery-encounter-type";
 import { SpeciesId } from "#enums/species-id";
 import { UiMode } from "#enums/ui-mode";
-import { getPlayerShopModifierTypeOptionsForWave } from "#modifiers/modifier-type";
+import { type ErTmCaseModifierType, getPlayerShopModifierTypeOptionsForWave } from "#modifiers/modifier-type";
 import { allMysteryEncounters } from "#mystery-encounters/mystery-encounters";
 import type { GameManager } from "#test/framework/game-manager";
 import { GameManager as GameManagerClass } from "#test/framework/game-manager";
@@ -48,6 +53,8 @@ import {
   repointGlobalScene,
   restoreGlobalScene,
 } from "#test/tools/render-harness";
+import { PartyUiMode } from "#ui/party-ui-handler";
+import { getModifierType } from "#utils/modifier-utils";
 import { getPokemonSpecies } from "#utils/pokemon-utils";
 import { copyFileSync, existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
@@ -123,6 +130,31 @@ function caughtSpecies(game: GameManager, id: SpeciesId) {
     starter.abilityAttr = 1;
   }
   return getPokemonSpecies(id);
+}
+
+/** Page.ABILITIES is module-local (not exported) in summary-ui-handler; its value is 1. */
+const SUMMARY_PAGE_ABILITIES = 1;
+/** Three clearly-distinct gift choices so the cycled row's NAME visibly changes each press. */
+const GIFT_CHOICES: [AbilityId, AbilityId, AbilityId] = [AbilityId.STURDY, AbilityId.LEVITATE, AbilityId.INTIMIDATE];
+
+/**
+ * Start a battle whose player lead is a BLACK SHINY (#349) with a deterministic 3-choice
+ * gift slot at index 0, and return that PlayerPokemon. Used by the `summary` recipe + the
+ * gift-cycle before/after verification below. We seed the kit (sets erBlackShiny) then pin
+ * the gift list explicitly so the cycled ability name is predictable (the natural roll is a
+ * random pool draw).
+ */
+async function startBattleWithBlackShinyLead(game: GameManager) {
+  await game.classicMode.startBattle(SpeciesId.GARCHOMP);
+  const mon = game.scene.getPlayerPokemon();
+  if (!mon) {
+    throw new Error("summary recipe: no player pokemon after startBattle");
+  }
+  applyErBlackShinyKit(mon); // flips customPokemonData.erBlackShiny = true
+  mon.customPokemonData.erBlackShiny = true;
+  mon.customPokemonData.erGiftAbilities = [...GIFT_CHOICES];
+  mon.customPokemonData.erGiftIndex = 0;
+  return mon;
 }
 
 function bargainArgs(): any[] {
@@ -244,6 +276,22 @@ const RECIPES: Record<string, Recipe> = {
     },
     steps: [Button.RIGHT, Button.RIGHT, Button.RIGHT, Button.DOWN],
   },
+  // The party SUMMARY screen on its ER ABILITIES page, with a BLACK SHINY (#349) lead so the
+  // violet-italic GIFT row ("Gift 1/3 (R)") is present. steps fires R (Button.CYCLE_SHINY):
+  // before the fix the data advanced but the page-cursor re-render dropped the forced-refresh
+  // flag so the row never redrew; after the fix the handler redraws the page in place, so the
+  // gift NAME + idx/choices counter change. The dedicated before/after assertion test below
+  // ("summary gift-cycle redraws...") checks that change explicitly; this recipe gives the
+  // golden render + the post-R `summary-step0.png` so any future regression of the page shows.
+  summary: {
+    mode: UiMode.SUMMARY,
+    prepare: async game => {
+      const mon = await startBattleWithBlackShinyLead(game);
+      return [mon, undefined /* SummaryUiMode.DEFAULT */, SUMMARY_PAGE_ABILITIES];
+    },
+    steps: [Button.CYCLE_SHINY],
+    diffTolerance: 40000, // live animated mon sprite in the summary box - see Recipe.diffTolerance
+  },
   // Phase-flow bridge demo: drive a real battle (startBattle runs the encounter phases) and
   // render WHATEVER screen the pipeline left active - here the in-battle command menu. Proves
   // mid-run screens reached through the phase system are renderable. (The battlefield sprites
@@ -254,6 +302,68 @@ const RECIPES: Record<string, Recipe> = {
       await game.classicMode.startBattle(SpeciesId.RATTATA);
       return []; // captureActive ignores this; satisfies the prepare return type
     },
+  },
+  // The Stormglass relic (#130) weather PICKER - the one-time OPTION_SELECT the
+  // ErStormglassPickerPhase opens when a held Stormglass has no chosen weather. It
+  // lists the 5 weather choices (Sun, Rain, Sandstorm, Hail, Fog); DOWN,ACTION drives
+  // the cursor onto Rain and selects it. The golden render confirms all 5 options
+  // render legibly; the step snapshot shows the cursor moved + the pick committed.
+  "stormglass-picker": {
+    mode: UiMode.OPTION_SELECT,
+    prepare: () => [
+      {
+        // Nudge the right/bottom-anchored menu toward screen-centre so the whole list
+        // (all 5 labels) sits inside the blank render canvas - there is no other screen
+        // underneath it here, unlike the in-game overlay.
+        xOffset: 140,
+        yOffset: -8,
+        options: STORMGLASS_WEATHER_CHOICES.map(choice => ({
+          label: choice.label,
+          handler: () => true,
+        })),
+      },
+    ],
+    // DOWN walks the cursor onto "Rain" (the player selecting a weather); the menu stays
+    // open so the final PNG shows all 5 options legibly. The full confirm-and-record path
+    // (ACTION -> setStormglassWeather) is exercised by er-stormglass-picker.test.ts.
+    steps: [Button.DOWN],
+  },
+  // The ER World Map route picker (#129). Starts a battle so arena/currentBattle
+  // exist, then opens UiMode.ER_MAP in PICK mode with three effect-rich onward
+  // biomes. The new Conditions footer lists the HIGHLIGHTED onward biome's rules;
+  // RIGHT,RIGHT walks the cursor across the tiles so the step snapshots show the
+  // footer re-listing per biome (Volcano -> Grass -> Ice Cave).
+  "er-map": {
+    mode: UiMode.ER_MAP,
+    prepare: async game => {
+      await game.classicMode.startBattle(SpeciesId.RATTATA);
+      const origin = game.scene.arena.biomeId;
+      const nodes = [
+        { biome: BiomeId.VOLCANO, revealed: true, source: "base" as const },
+        { biome: BiomeId.GRASS, revealed: true, source: "base" as const },
+        { biome: BiomeId.ICE_CAVE, revealed: true, source: "base" as const },
+      ];
+      return [{ nodes, origin, onSelect: () => {} }];
+    },
+    steps: [Button.RIGHT, Button.RIGHT],
+  },
+  // ER TM Case move-select: open the PARTY screen in the dedicated
+  // ER_TM_CASE_MODIFIER mode (the universal single-use TM), then ACTION on the
+  // lead Snorlax to reveal its COMPATIBLE TM move list (the moves the TM Case
+  // can teach). The step PNG shows the scrollable move list - this is the screen
+  // the player picks a TM move from. Snorlax has a 3-move set so the list is rich.
+  "tm-case-party": {
+    mode: UiMode.PARTY,
+    prepare: async game => {
+      await game.classicMode.startBattle(SpeciesId.SNORLAX);
+      // The TM Case's own type carries the selectFilter (a mon with no learnable
+      // TMs is greyed out). Snorlax's compatible-TM list is long, so the picker
+      // shows a rich, scrollable move list to choose from.
+      const type = getModifierType(modifierTypes.TM_CASE) as ErTmCaseModifierType;
+      return [PartyUiMode.ER_TM_CASE_MODIFIER, -1, () => {}, type.selectFilter];
+    },
+    // ACTION selects the lead mon, opening its TM move list (the pick screen).
+    steps: [Button.ACTION],
   },
 };
 
@@ -450,4 +560,125 @@ describe.skipIf(!RUN)("render-ui-page", () => {
       }
     }
   }, 180000);
+
+  // ===========================================================================
+  // #349 - black-shiny GIFT cycle visibly refreshes the SUMMARY Abilities page.
+  // This is the explicit before/after VERIFICATION for the fix (the `summary`
+  // recipe above gives the golden render; this drives R and asserts the gift row
+  // actually changed). Before the fix the data advanced but the page-cursor
+  // re-render dropped the forced-refresh flag, so the rendered row never redrew:
+  // name + idx/choices stayed put. After the fix the handler redraws the page in
+  // place, so both change. We assert on the rebuilt `abilitiesRows` (the gift is
+  // the LAST row) AND pixel-diff the before/after frames (the row text changed).
+  // ===========================================================================
+  it.skipIf(!(PAGES.includes("summary") || PAGE_ARG === "all"))(
+    "summary gift-cycle (R) redraws the black-shiny gift row in place (#349)",
+    async () => {
+      // Whitebox view of the handler's private state under test (the established
+      // pattern in test/tests/ui/summary-ui-3-passive-slots.test.ts - a typed
+      // double-cast, NOT `as any`). These are exactly the fields the ABILITIES
+      // page render + the gift-cycle handler touch.
+      type GiftRow = { ability: { id: AbilityId; name: string }; y: number; locked: boolean };
+      type SummaryGiftInternals = {
+        pokemon: unknown;
+        cursor: number;
+        abilitiesRows: GiftRow[];
+        setup(): void;
+        show(args: any[]): boolean;
+        processInput(button: Button): boolean;
+      };
+
+      // Batch-run hygiene: hand the real UI back before a new GameManager re-instruments it.
+      if (lastScene) {
+        restoreGlobalScene(lastScene);
+      }
+      const game = new GameManagerClass(phaserGame);
+      lastScene = game.scene;
+
+      // Build the black-shiny lead on the ORIGINAL scene (full data + phases), capture the
+      // registered handler CLASS, THEN re-point rendering at the canvas (mirrors the recipe path).
+      const mon = await startBattleWithBlackShinyLead(game);
+      const registered: any = game.scene.ui.handlers[UiMode.SUMMARY];
+      expect(registered, "SUMMARY handler must be registered").toBeDefined();
+      const HandlerClass: any = registered.constructor;
+
+      repointGlobalScene(game.scene, ctx);
+      await sleep(0);
+
+      // A fresh handler per the harness convention (the registered instance's children are
+      // MockSprites from boot and crash when re-added to a real Container). It opens directly
+      // on the ABILITIES page with our black shiny.
+      let handler: SummaryGiftInternals;
+      const build = () => {
+        // HandlerClass is `any` (from the registered instance's constructor), so the new
+        // instance flows into the typed view without an `as any` cast. Fall back to the
+        // registered instance if the ctor needs args.
+        let h: SummaryGiftInternals;
+        try {
+          h = new HandlerClass();
+        } catch {
+          h = registered;
+        }
+        h.setup();
+        h.show([mon, undefined /* SummaryUiMode.DEFAULT */, SUMMARY_PAGE_ABILITIES]);
+        handler = h;
+      };
+
+      // Two-pass render so textures resolve, then settle - this is the BEFORE state.
+      await renderTwoPass(ctx, build);
+      expect(handler!.cursor, "handler should be on the ABILITIES page").toBe(SUMMARY_PAGE_ABILITIES);
+      const giftBefore = handler!.abilitiesRows.at(-1);
+      expect(giftBefore, "a gift row must be present for a black shiny").toBeDefined();
+      // Sanity: the gift row is our index-0 choice (STURDY) before any cycle.
+      expect(giftBefore!.ability.id).toBe(GIFT_CHOICES[0]);
+      freezeAnimations(ctx.uiInner);
+      ctx.step();
+      const beforePng = join("dev-logs", "ui-pages", "summary-before.png");
+      ctx.snapshot(beforePng);
+      const nameBefore = giftBefore!.ability.name;
+      const idBefore = giftBefore!.ability.id;
+
+      // Press R (Button.CYCLE_SHINY) - the gift-cycle handler advances the gift AND (after the
+      // fix) redraws the page in place. Settle the same way the recipe step-driver does.
+      ctx.missing.clear();
+      const pressed = handler!.processInput(Button.CYCLE_SHINY);
+      expect(pressed, "R on the ABILITIES page of a player black shiny should be handled").toBe(true);
+      ctx.step();
+      await injectMissing(ctx);
+      for (let s = 0; s < 4; s++) {
+        ctx.step();
+        await sleep(10);
+      }
+      freezeAnimations(ctx.uiInner);
+      ctx.step();
+      const afterPng = join("dev-logs", "ui-pages", "summary-after.png");
+      ctx.snapshot(afterPng);
+
+      // The rebuilt gift row must now show the NEXT choice (LEVITATE), with a different name+id.
+      const giftAfter = handler!.abilitiesRows.at(-1);
+      expect(giftAfter, "gift row must still be present after the cycle").toBeDefined();
+      const nameAfter = giftAfter!.ability.name;
+      const idAfter = giftAfter!.ability.id;
+      // biome-ignore lint/suspicious/noConsole: harness diagnostics (the before/after EVIDENCE)
+      console.log(`SUMMARY GIFT CYCLE #349  before="${nameBefore}"(${idBefore})  after="${nameAfter}"(${idAfter})`);
+
+      // THE FIX: the rendered gift row's ability changed. Before the fix idAfter === idBefore
+      // (the display was stuck on Sturdy / "Gift 1/3") even though the data advanced.
+      expect(idAfter, "the gift row's ability id must advance to the next choice").toBe(GIFT_CHOICES[1]);
+      expect(idAfter, "the gift row's ability id must change after R").not.toBe(idBefore);
+      expect(nameAfter, "the gift row's ability NAME must change after R").not.toBe(nameBefore);
+
+      // And the pixels changed: the rebuilt row text differs, so the before/after frames diff.
+      const { changed, dimsMatch } = await pixelDiff(
+        afterPng,
+        beforePng,
+        join("dev-logs", "ui-pages", "summary-cycle-diff.png"),
+      );
+      // biome-ignore lint/suspicious/noConsole: harness diagnostics
+      console.log(`SUMMARY GIFT CYCLE #349  pixels changed before->after: ${changed} (dimsMatch=${dimsMatch})`);
+      expect(dimsMatch, "frames must share dimensions").toBe(true);
+      expect(changed, "the gift row redraw must change rendered pixels").toBeGreaterThan(0);
+    },
+    180000,
+  );
 });

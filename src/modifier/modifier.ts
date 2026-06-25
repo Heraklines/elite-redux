@@ -2488,10 +2488,20 @@ export class ErCommunityItemModifier extends PokemonHeldItemModifier {
  */
 export class ErRelicModifier extends PersistentModifier {
   public readonly kind: ErRelicKind;
+  /**
+   * Stormglass's player-CHOSEN weather (a {@linkcode WeatherType} numeric enum),
+   * persisted via getArgs so it round-trips through the save serializer exactly like
+   * the kind (the #61 save-fix discipline). null/undefined for every other relic and
+   * for a freshly-granted Stormglass before the player picks. Mirrors the way
+   * {@linkcode ErCommunityItemModifier} carries extra serialized state (constructor
+   * param BEFORE the trailing optional stackCount, emitted by getArgs in that order).
+   */
+  public chosenWeather: number | null;
 
-  constructor(type: ModifierType, kind: ErRelicKind, stackCount?: number) {
+  constructor(type: ModifierType, kind: ErRelicKind, chosenWeather: number | null = null, stackCount?: number) {
     super(type, stackCount);
     this.kind = kind;
+    this.chosenWeather = chosenWeather;
   }
 
   match(modifier: Modifier): boolean {
@@ -2499,11 +2509,11 @@ export class ErRelicModifier extends PersistentModifier {
   }
 
   clone(): ErRelicModifier {
-    return new ErRelicModifier(this.type, this.kind, this.stackCount);
+    return new ErRelicModifier(this.type, this.kind, this.chosenWeather, this.stackCount);
   }
 
   override getArgs(): any[] {
-    return [this.kind];
+    return [this.kind, this.chosenWeather ?? null];
   }
 
   override apply(): boolean {
@@ -2690,6 +2700,37 @@ export class ErLearnersShroomModifier extends ConsumablePokemonModifier {
       moveId,
       LearnMoveType.MEMORY,
       cost,
+    );
+    return true;
+  }
+}
+
+/**
+ * ER TM Case (COMMON tier): teaches the chosen Pokemon ONE move from its
+ * compatible-TM list, run-only. `moveIndex` indexes
+ * {@linkcode PlayerPokemon.getErTmCaseMoves} (the list the ER_TM_CASE_MODIFIER
+ * party-UI mode displayed). Learned via {@linkcode LearnMoveType.TM} - it IS a
+ * TM, so it records into `usedTMs` and the LearnMovePhase TM branch removes the
+ * queued reward-screen continuation on a successful learn (back-out safe, #25).
+ */
+export class ErTmCaseModifier extends ConsumablePokemonModifier {
+  public moveIndex: number;
+
+  constructor(type: ModifierType, pokemonId: number, moveIndex: number) {
+    super(type, pokemonId);
+    this.moveIndex = moveIndex;
+  }
+
+  override apply(playerPokemon: PlayerPokemon): boolean {
+    const moveId = playerPokemon.getErTmCaseMoves()[this.moveIndex];
+    if (moveId == null) {
+      return false;
+    }
+    globalScene.phaseManager.unshiftNew(
+      "LearnMovePhase",
+      globalScene.getPlayerParty().indexOf(playerPokemon),
+      moveId,
+      LearnMoveType.TM,
     );
     return true;
   }

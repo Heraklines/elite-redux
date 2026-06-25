@@ -41,6 +41,7 @@ import { EnemyCommandPhase } from "#phases/enemy-command-phase";
 import { ErCrossroadsPhase } from "#phases/er-crossroads-phase";
 import { ErDexNavPhase } from "#phases/er-dex-nav-phase";
 import { ErQuizPhase } from "#phases/er-quiz-phase";
+import { ErStormglassPickerPhase } from "#phases/er-stormglass-picker-phase";
 import { EvolutionPhase } from "#phases/evolution-phase";
 import { ExoticShopPhase } from "#phases/exotic-shop-phase";
 import { ExpPhase } from "#phases/exp-phase";
@@ -152,6 +153,7 @@ const PHASES = Object.freeze({
   ImportBazaarShopPhase,
   ErCrossroadsPhase,
   ErQuizPhase,
+  ErStormglassPickerPhase,
   CheckInterludePhase,
   CheckStatusEffectPhase,
   CheckSwitchPhase,

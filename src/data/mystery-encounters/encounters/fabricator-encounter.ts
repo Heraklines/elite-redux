@@ -55,6 +55,7 @@ const FABRICATOR_RELICS: ModifierTypeFunc[] = [
   modifierTypes.ER_RELIC_SCRAP_MAGNET,
   modifierTypes.ER_RELIC_QUARTERMASTER,
   modifierTypes.ER_RELIC_COLLECTORS_ALBUM,
+  modifierTypes.ER_RELIC_MOMENTUM_ENGINE,
 ];
 
 /** Most items a single visit can feed (keeps the picker loop bounded). */

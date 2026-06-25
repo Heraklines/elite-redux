@@ -50,7 +50,12 @@ const GUARDIAN_SPECIES: SpeciesId[] = [SpeciesId.CONKELDURR, SpeciesId.BRONZONG,
  * relic funcs that were silently dropped from the reward (#616).
  */
 function trialRelicFuncs(): ModifierTypeFunc[] {
-  return [modifierTypes.ER_RELIC_ANCHOR, modifierTypes.ER_RELIC_MORALE_BANNER, modifierTypes.ER_RELIC_SECOND_WIND];
+  return [
+    modifierTypes.ER_RELIC_ANCHOR,
+    modifierTypes.ER_RELIC_MORALE_BANNER,
+    modifierTypes.ER_RELIC_SECOND_WIND,
+    modifierTypes.ER_RELIC_MERCHANTS_SEAL,
+  ];
 }
 
 /** Enemy level for the guardian: the player's strongest mon plus a margin. */

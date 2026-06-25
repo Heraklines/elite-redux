@@ -513,6 +513,19 @@ export class SingleGenerationChallenge extends Challenge {
     return false;
   }
 
+  // ER: block CATCHING an out-of-generation mon (capture -> POKEMON_ADD_TO_PARTY).
+  override applyPokemonAddToParty(pokemon: EnemyPokemon, isValid: BooleanHolder): boolean {
+    const baseGeneration = erChallengeGeneration(getPokemonSpecies(pokemon.species.speciesId));
+    const fusionGeneration = pokemon.isFusion()
+      ? erChallengeGeneration(getPokemonSpecies(pokemon.fusionSpecies!.speciesId))
+      : 0;
+    if (baseGeneration !== this.value || (pokemon.isFusion() && fusionGeneration !== this.value)) {
+      isValid.value = false;
+      return true;
+    }
+    return false;
+  }
+
   applyFixedBattle(waveIndex: number, battleConfig: FixedBattleConfig): boolean {
     // RDX (#408): the ER-custom pseudo-gen has no canonical evil team / Elite
     // Four, and every per-gen lookup below indexes 9-entry tables with
@@ -845,6 +858,23 @@ export class SingleTypeChallenge extends Challenge {
       )
     ) {
       valid.value = false;
+      return true;
+    }
+    return false;
+  }
+
+  // ER: block CATCHING an off-type mon (capture -> POKEMON_ADD_TO_PARTY). Mirrors the
+  // in-battle check on the wild EnemyPokemon, without the isPlayer gate.
+  override applyPokemonAddToParty(pokemon: EnemyPokemon, isValid: BooleanHolder): boolean {
+    if (
+      !pokemon.isOfType(this.value - 1, false, false, true)
+      && !SingleTypeChallenge.TYPE_OVERRIDES.some(
+        o =>
+          o.type === this.value - 1
+          && (pokemon.isFusion() && o.fusion ? pokemon.fusionSpecies! : pokemon.species).speciesId === o.species,
+      )
+    ) {
+      isValid.value = false;
       return true;
     }
     return false;
@@ -1343,6 +1373,17 @@ export class UsageTierChallenge extends Challenge {
     return false;
   }
 
+  // ER: also block CATCHING an out-of-tier mon (the capture phase calls this via
+  // ChallengeType.POKEMON_ADD_TO_PARTY). The caught mon is the wild EnemyPokemon, so
+  // there is no isPlayer gate - we check the line's tier legality directly.
+  override applyPokemonAddToParty(pokemon: EnemyPokemon, isValid: BooleanHolder): boolean {
+    if (!isErLineLegalForUsageTier(pokemon.species.getRootSpeciesId(), this.value)) {
+      isValid.value = false;
+      return true;
+    }
+    return false;
+  }
+
   static override loadChallenge(source: UsageTierChallenge | any): UsageTierChallenge {
     const newChallenge = new UsageTierChallenge();
     newChallenge.value = source.value;
@@ -1383,6 +1424,20 @@ export class MonoColorChallenge extends Challenge {
         && erSpeciesMatchesColor(pokemon.fusionSpecies.speciesId, this.value - 1));
     if (!matches) {
       valid.value = false;
+      return true;
+    }
+    return false;
+  }
+
+  // ER: block CATCHING an off-color mon (capture -> POKEMON_ADD_TO_PARTY).
+  override applyPokemonAddToParty(pokemon: EnemyPokemon, isValid: BooleanHolder): boolean {
+    const matches =
+      erSpeciesMatchesColor(pokemon.species.speciesId, this.value - 1)
+      || (pokemon.isFusion()
+        && pokemon.fusionSpecies != null
+        && erSpeciesMatchesColor(pokemon.fusionSpecies.speciesId, this.value - 1));
+    if (!matches) {
+      isValid.value = false;
       return true;
     }
     return false;

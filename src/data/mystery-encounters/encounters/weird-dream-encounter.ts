@@ -4,7 +4,6 @@ import { isErGenericPoolBanned } from "#data/elite-redux/er-generic-pool-bans";
 import { getLevelTotalExp } from "#data/exp";
 import type { PokemonSpecies } from "#data/pokemon-species";
 import { AbilityId } from "#enums/ability-id";
-import { Challenges } from "#enums/challenges";
 import { ModifierTier } from "#enums/modifier-tier";
 import { MysteryEncounterOptionMode } from "#enums/mystery-encounter-option-mode";
 import { MysteryEncounterTier } from "#enums/mystery-encounter-tier";
@@ -41,6 +40,7 @@ import { PokemonData } from "#system/pokemon-data";
 import { trainerConfigs } from "#trainers/trainer-config";
 import { TrainerPartyTemplate } from "#trainers/trainer-party-template";
 import type { HeldModifierConfig } from "#types/held-modifier-config";
+import { isSpeciesAllowedByActiveChallenges } from "#utils/challenge-utils";
 import { NumberHolder, randSeedInt, randSeedShuffle } from "#utils/common";
 import { getPokemonSpecies } from "#utils/pokemon-utils";
 import i18next from "i18next";
@@ -127,7 +127,10 @@ export const WeirdDreamEncounter: MysteryEncounter = MysteryEncounterBuilder.wit
   MysteryEncounterType.WEIRD_DREAM,
 )
   .withEncounterTier(MysteryEncounterTier.ROGUE)
-  .withDisallowedChallenges(Challenges.SINGLE_TYPE, Challenges.SINGLE_GENERATION)
+  // ER (#126): this ME no longer refuses to spawn under Mono Type / Mono Generation.
+  // Instead the transform-target pool in getTransformedSpecies is filtered to
+  // challenge-legal species (incl. Mono Color / Usage Tier), so the ME still runs
+  // but can only ever transform party mons INTO species the challenge permits.
   .withSceneWaveRangeRequirement(30, 140)
   .withScenePartySizeRequirement(3, 6)
   .withMaxAllowedEncounters(1)
@@ -627,7 +630,9 @@ function shouldGetOldGateau(pokemon: Pokemon): boolean {
   return pokemon.getSpeciesForm().getBaseStatTotal() < NON_LEGENDARY_BST_THRESHOLD;
 }
 
-function getTransformedSpecies(
+// ER (#126): exported so the roster-challenge legality regression test can drive
+// the transform-target roll directly (see er-mystery-encounter-challenge-legality.test.ts).
+export function getTransformedSpecies(
   originalBst: number,
   bstSearchRange: [number, number],
   hasPokemonBstHigherThan600: boolean,
@@ -635,6 +640,10 @@ function getTransformedSpecies(
   alreadyUsedSpecies: PokemonSpecies[],
 ): PokemonSpecies {
   let newSpecies: PokemonSpecies | undefined;
+  // ER (#126): hard cap on BST-window widening so a tight roster-challenge pool can
+  // never spin forever - once the window has fully widened, accept whatever legal
+  // species remain (see the iterations branch below).
+  let iterations = 0;
   while (newSpecies == null) {
     const bstCap = originalBst + bstSearchRange[1];
     const bstMin = Math.max(originalBst + bstSearchRange[0], 0);
@@ -658,15 +667,22 @@ function getTransformedSpecies(
         bstInRange
         && validBst
         && !EXCLUDED_TRANSFORMATION_SPECIES.includes(s.speciesId)
-        && !isErGenericPoolBanned(s.speciesId, s.name)
+        && !isErGenericPoolBanned(s.speciesId, s.name) // ER (#126): in a roster challenge run, only transform party mons INTO
+        && // challenge-legal species (cheapest term, so it short-circuits last).
+        isSpeciesAllowedByActiveChallenges(s)
       );
     });
 
-    // There must be at least 20 species available before it will choose one
-    if (validSpecies?.length > 20) {
+    // There must be at least 20 species available before it will choose one.
+    // After the window has fully widened (iterations cap), accept any non-empty
+    // legal pool so a narrow challenge can't hang the transform.
+    if (validSpecies.length > 20 || (iterations >= 50 && validSpecies.length > 0)) {
       validSpecies = randSeedShuffle(validSpecies);
       newSpecies = validSpecies.pop();
-      while (newSpecies == null || alreadyUsedSpecies.includes(newSpecies)) {
+      // Guard `validSpecies.length > 0`: if dedup against alreadyUsedSpecies drains
+      // the shuffled pool, leave newSpecies null and let the outer loop widen/rebuild
+      // instead of spinning on pop() === undefined.
+      while ((newSpecies == null || alreadyUsedSpecies.includes(newSpecies)) && validSpecies.length > 0) {
         newSpecies = validSpecies.pop();
       }
     } else {
@@ -674,6 +690,7 @@ function getTransformedSpecies(
       bstSearchRange[0] -= 10;
       bstSearchRange[1] += 10;
     }
+    iterations++;
   }
 
   return newSpecies;

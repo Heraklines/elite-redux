@@ -726,7 +726,14 @@ export class SummaryUiHandler extends UiHandler {
       // the player's own black shiny, re-rendering the page in place.
       if (this.pokemon?.isPlayer() && isErBlackShiny(this.pokemon)) {
         cycleErGiftAbility(this.pokemon);
-        this.setCursor(this.cursor, true);
+        // Redraw the abilities page content in place so the gift row's name +
+        // `idx/choices` counter refresh. We deliberately do NOT route through
+        // setCursor(samePage): its page branch drops the overrideChanged flag
+        // (changed is recomputed as `this.cursor !== cursor`, i.e. false), so
+        // the re-render is skipped — and even when forced it runs the full tab
+        // re-animation / abilitiesSelectMode reset / detail teardown. Rebuilding
+        // just this page's container keeps the cursor + select-mode intact.
+        this.populatePageContainer(this.summaryPageContainer);
         success = true;
       } else {
         error = true;

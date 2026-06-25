@@ -14,7 +14,11 @@ import {
   getCoopUiMirror,
 } from "#data/elite-redux/coop/coop-runtime";
 import { erBalanceArr, erBalanceNum } from "#data/elite-redux/er-balance-tuning";
-import { erScrapMagnetExtraRewards } from "#data/elite-redux/er-relics";
+import {
+  erMerchantsSealExtraSlots,
+  erMerchantsSealRerollMultiplier,
+  erScrapMagnetExtraRewards,
+} from "#data/elite-redux/er-relics";
 import { BattleType } from "#enums/battle-type";
 import { ModifierPoolType } from "#enums/modifier-pool-type";
 import type { ModifierTier } from "#enums/modifier-tier";
@@ -29,6 +33,7 @@ import {
 import type { CustomModifierSettings, ModifierType, ModifierTypeOption } from "#modifiers/modifier-type";
 import {
   ErLearnersShroomModifierType,
+  ErTmCaseModifierType,
   FusePokemonModifierType,
   getPlayerModifierTypeOptions,
   getPlayerShopModifierTypeOptionsForWave,
@@ -460,7 +465,8 @@ export class SelectModifierPhase extends BattlePhase {
     const queuesContinuation =
       modifier.type instanceof RememberMoveModifierType
       || modifier.type instanceof TmModifierType
-      || modifier.type instanceof ErLearnersShroomModifierType;
+      || modifier.type instanceof ErLearnersShroomModifierType
+      || modifier.type instanceof ErTmCaseModifierType;
     if (queuesContinuation) {
       globalScene.phaseManager.unshiftPhase(this.copy());
     }
@@ -557,6 +563,9 @@ export class SelectModifierPhase extends BattlePhase {
     // ER Learner's Shroom (#404): same flow as remember-move, but the party UI
     // lists the species' EGG MOVES instead of learnable level moves.
     const isErLearnersShroom = modifierType instanceof ErLearnersShroomModifierType;
+    // ER TM Case: same flow as remember-move, but the party UI lists the mon's
+    // compatible-TM moves it can still learn.
+    const isErTmCase = modifierType instanceof ErTmCaseModifierType;
     const isPpRestoreModifier =
       modifierType instanceof PokemonPpRestoreModifierType || modifierType instanceof PokemonPpUpModifierType;
     const partyUiMode = isMoveModifier
@@ -569,7 +578,9 @@ export class SelectModifierPhase extends BattlePhase {
             ? PartyUiMode.REMEMBER_MOVE_MODIFIER
             : isErLearnersShroom
               ? PartyUiMode.ER_LEARNERS_SHROOM_MODIFIER
-              : PartyUiMode.MODIFIER;
+              : isErTmCase
+                ? PartyUiMode.ER_TM_CASE_MODIFIER
+                : PartyUiMode.MODIFIER;
     const tmMoveId = isTmModifier ? (modifierType as TmModifierType).moveId : undefined;
     // Co-op (#633) WATCHER: apply the owner's relayed target slot + sub-option directly,
     // never opening the party UI on a mon it does not drive.
@@ -616,6 +627,10 @@ export class SelectModifierPhase extends BattlePhase {
     if (globalScene.currentBattle?.battleType === BattleType.TRAINER) {
       modifierCountHolder.value += erScrapMagnetExtraRewards();
     }
+
+    // ER relic (#439): Merchant's Seal - every reward screen offers one extra item
+    // slot (mirrors Scrap Magnet, but on EVERY battle, not just trainers).
+    modifierCountHolder.value += erMerchantsSealExtraSlots();
 
     // ER (#134): the EARNED extra reward slots (Golden Ball / Greater Golden Ball /
     // Scrap Magnet, i.e. the bump above the base 3) must SURVIVE a bundled/guaranteed
@@ -696,7 +711,10 @@ export class SelectModifierPhase extends BattlePhase {
     // Apply Black Sludge to reroll cost
     const modifiedRerollCost = new NumberHolder(baseMultiplier);
     globalScene.applyModifier(HealShopCostModifier, true, modifiedRerollCost);
-    return modifiedRerollCost.value;
+    // ER relic (#439): Merchant's Seal halves the reroll cost. Applied last so it
+    // composes with the wave/rerollCount scaling and any Black-Sludge adjustment;
+    // floored to a whole ₽. 1x (untouched) unless the relic is held.
+    return Math.floor(modifiedRerollCost.value * erMerchantsSealRerollMultiplier());
   }
 
   getPoolType(): ModifierPoolType {
@@ -755,6 +773,7 @@ export class SelectModifierPhase extends BattlePhase {
       modifierType instanceof RememberMoveModifierType
       || modifierType instanceof PokemonAddMoveSlotModifierType
       || modifierType instanceof ErLearnersShroomModifierType
+      || modifierType instanceof ErTmCaseModifierType
     ) {
       return modifierType.newModifier(target, option);
     }
@@ -806,15 +825,19 @@ export class SelectModifierPhase extends BattlePhase {
       return;
     }
     try {
-      const serialized = await relay.awaitRewardOptions(this.coopInteractionStart, this.rerollCount, COOP_REWARD_WAIT_MS);
+      const serialized = await relay.awaitRewardOptions(
+        this.coopInteractionStart,
+        this.rerollCount,
+        COOP_REWARD_WAIT_MS,
+      );
       if (serialized == null) {
         return;
       }
       const rebuilt = reconstructRewardOptions(serialized, globalScene.getPlayerParty());
-      if (rebuilt != null) {
-        this.typeOptions = rebuilt;
-      } else {
+      if (rebuilt == null) {
         console.log("[coop-reward] WATCHER could not reconstruct owner's options -> keeping local roll");
+      } else {
+        this.typeOptions = rebuilt;
       }
     } catch {
       /* an await/reconstruct failure leaves our own list in place; never hang */

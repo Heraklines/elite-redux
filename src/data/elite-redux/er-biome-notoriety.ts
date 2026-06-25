@@ -27,6 +27,7 @@
 // =============================================================================
 
 import { erBiomeOverstayAnchor, erInLateGameZone } from "#data/elite-redux/er-biome-structure";
+import { erTrailblazerLootMultiplier, erTrailblazerOverstayScale } from "#data/elite-redux/er-relics";
 
 /** In-biome waves that run the global curve untouched. Past this = notoriety. */
 export const NOTORIETY_FREE_WAVES = 10;
@@ -72,6 +73,18 @@ export function erHasNotoriety(waveIndex: number): boolean {
 }
 
 /**
+ * The notoriety overstay that drives the ESCALATION ramps (BST/level/rate/loot),
+ * after the Trailblazer's Mark relic's slow-down. Trailblazer scales the overstay by
+ * {@linkcode erTrailblazerOverstayScale} (0.5 = builds half as fast), so a player who
+ * deliberately lingers escalates more gently. Kept SEPARATE from the raw
+ * {@linkcode erBiomeOverstay} so the every-wave notoriety WARNING and Crossroads
+ * cadence (which test `erBiomeOverstay === 1`) are unaffected by the relic.
+ */
+function escalationOverstay(waveIndex: number): number {
+  return erBiomeOverstay(waveIndex) * erTrailblazerOverstayScale();
+}
+
+/**
  * 0..1 ramp from the start of notoriety to the ceiling-hold point. Linear over
  * NOTORIETY_RAMP_WAVES, then clamped to 1 (held). Pure function of overstay.
  */
@@ -87,7 +100,7 @@ function notorietyRamp(overstay: number): number {
  * Climbs to +100 by ~10 waves over the free window, then HOLDS.
  */
 export function erNotorietyBstBonus(waveIndex: number): number {
-  const overstay = erBiomeOverstay(waveIndex);
+  const overstay = escalationOverstay(waveIndex);
   return Math.round(notorietyRamp(overstay) * NOTORIETY_MAX_BST_BONUS);
 }
 
@@ -97,7 +110,7 @@ export function erNotorietyBstBonus(waveIndex: number): number {
  * the same point as the +100 BST ceiling. The GLOBAL level cap itself is untouched.
  */
 export function erNotorietyOverLevel(waveIndex: number): number {
-  const overstay = erBiomeOverstay(waveIndex);
+  const overstay = escalationOverstay(waveIndex);
   return Math.round(notorietyRamp(overstay) * NOTORIETY_MAX_OVER_LEVEL);
 }
 
@@ -107,11 +120,13 @@ export function erNotorietyOverLevel(waveIndex: number): number {
  * gear-rich enemies without certainty). Pure function of overstay.
  */
 export function erNotorietyItemRateMult(waveIndex: number): number {
-  const overstay = erBiomeOverstay(waveIndex);
+  const overstay = escalationOverstay(waveIndex);
   if (overstay <= 0) {
     return 1;
   }
-  return Math.min(3, 1 + overstay * 0.1);
+  // Base notoriety drop bonus, then the Trailblazer's Mark "linger longer, loot
+  // better" payoff stacked on top (1x unless that relic is held and over-stayed).
+  return Math.min(3, 1 + overstay * 0.1) * erTrailblazerLootMultiplier(overstay);
 }
 
 /**
@@ -123,7 +138,7 @@ export function erNotorietyItemRateMult(waveIndex: number): number {
  * Returns 0..100. Pure function of overstay.
  */
 export function erNotorietyBossChancePct(waveIndex: number): number {
-  const overstay = erBiomeOverstay(waveIndex);
+  const overstay = escalationOverstay(waveIndex);
   if (overstay <= 0) {
     return 0;
   }
@@ -143,7 +158,7 @@ export function erNotorietyBossChancePct(waveIndex: number): number {
  * Returns 0..100. Pure function of overstay.
  */
 export function erNotorietyTrainerChancePct(waveIndex: number): number {
-  const overstay = erBiomeOverstay(waveIndex);
+  const overstay = escalationOverstay(waveIndex);
   if (overstay <= 0) {
     return 0;
   }

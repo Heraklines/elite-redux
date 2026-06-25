@@ -13,7 +13,14 @@ import type { CoopSerializedEnemy, CoopSerializedPokemon } from "#data/elite-red
 import { erBiomeForcedTerrain, erBiomeForcedWeather } from "#data/elite-redux/er-biome-rules";
 import { getErFinalBossSpecies, isErFinalBossSpecies } from "#data/elite-redux/er-final-boss";
 import { consumeErCarriedWeather } from "#data/elite-redux/er-map-nodes";
-import { erApplyCovenantHeal, erLookoutPreviewEnemy, erQuartermasterTick } from "#data/elite-redux/er-relics";
+import {
+  erApplyCovenantHeal,
+  erLookoutPreviewEnemy,
+  erQuartermasterTick,
+  erStormglassApplyChosenWeather,
+  getStormglassWeather,
+  hasErRelic,
+} from "#data/elite-redux/er-relics";
 import { getErDifficulty } from "#data/elite-redux/er-run-difficulty";
 import { CASCOON_ANGELS_WRATH_MOVES } from "#data/elite-redux/init-elite-redux-movesets";
 import type { Gender } from "#data/gender";
@@ -626,6 +633,20 @@ export class EncounterPhase extends BattlePhase {
           // Set weather and terrain before session gets saved
           this.trySetWeatherIfNewBiome();
           this.trySetTerrainIfNewBiome();
+          // ER relics (#439/#130): Stormglass - force the player's chosen weather for
+          // 5 turns at the start of EVERY battle. Runs AFTER the biome's ambient weather
+          // so the chosen weather wins (mirrors #486's carried-weather override). On a
+          // reload (this.loaded) the arena weather is restored from the save, so no
+          // re-apply is needed. The FIRST time a held Stormglass has no chosen weather
+          // yet, enqueue the one-time weather PICKER instead (it prompts, records the
+          // pick via setStormglassWeather, then applies it - so the choice takes effect
+          // this same battle). Path-independent: this single chokepoint fires no matter
+          // how the relic was granted, so no per-grant-site prompt is needed.
+          if (hasErRelic("stormglass") && getStormglassWeather() == null) {
+            globalScene.phaseManager.unshiftNew("ErStormglassPickerPhase");
+          } else {
+            erStormglassApplyChosenWeather();
+          }
           globalScene.gameData
             .saveAll(true, battle.waveIndex % 20 === 1 || (globalScene.lastSavePlayTime ?? 0) >= 1200)
             .then(success => {

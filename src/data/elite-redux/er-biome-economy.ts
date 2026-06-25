@@ -162,7 +162,9 @@ export const ER_SHOP_CATEGORY_POOL: Record<ErShopCategory, (keyof typeof modifie
   BALLS: ["POKEBALL", "GREAT_BALL", "ULTRA_BALL", "ROGUE_BALL"],
   BATTLE: ["TEMP_STAT_STAGE_BOOSTER", "DIRE_HIT"],
   BERRY: ["BERRY"],
-  TM: ["TM_COMMON", "TM_GREAT", "TM_ULTRA"],
+  // ER TM Case: the universal single-use TM replaces the per-move
+  // TM_COMMON/GREAT/ULTRA in the biome market too (it carries TMs).
+  TM: ["TM_CASE"],
   HELD: [
     "ER_CHILI_SAMPLE",
     "ER_COPPER_ROD",

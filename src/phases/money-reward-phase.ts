@@ -1,5 +1,7 @@
 import { globalScene } from "#app/global-scene";
+import { erGamblersCoinPayoutMultiplier } from "#data/elite-redux/er-relics";
 import { ArenaTagType } from "#enums/arena-tag-type";
+import { BattleType } from "#enums/battle-type";
 import { MoneyMultiplierModifier } from "#modifiers/modifier";
 import { BattlePhase } from "#phases/battle-phase";
 import { NumberHolder } from "#utils/common";
@@ -24,6 +26,21 @@ export class MoneyRewardPhase extends BattlePhase {
       moneyAmount.value *= 2;
     }
 
+    // ER relic (#439): Gambler's Coin - after a TRAINER battle, the payout is doubled
+    // 50% of the time and lost (zeroed) the other 50%. The coin flip is seeded per wave
+    // so it's stable across reward rerolls / a reload. 1x (untouched) on non-trainer
+    // money or when the relic isn't held.
+    let gambled = false;
+    let gambleWon = false;
+    if (globalScene.currentBattle?.battleType === BattleType.TRAINER) {
+      const coin = erGamblersCoinPayoutMultiplier();
+      if (coin !== 1) {
+        gambled = true;
+        gambleWon = coin > 1;
+        moneyAmount.value = Math.floor(moneyAmount.value * coin);
+      }
+    }
+
     globalScene.addMoney(moneyAmount.value);
 
     const userLocale = navigator.language || "en-US";
@@ -33,5 +50,14 @@ export class MoneyRewardPhase extends BattlePhase {
     });
 
     globalScene.ui.showText(message, null, () => this.end(), null, true);
+    // ER custom relic - English-only (shared locales submodule). Queue a short note so
+    // the player sees the coin flip's outcome after the money line.
+    if (gambled) {
+      globalScene.phaseManager.queueMessage(
+        gambleWon
+          ? "The Gambler's Coin came up heads - the spoils are doubled!"
+          : "The Gambler's Coin came up tails - the spoils slip away!",
+      );
+    }
   }
 }

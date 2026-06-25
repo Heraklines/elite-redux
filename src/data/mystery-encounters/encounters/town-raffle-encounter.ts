@@ -60,6 +60,8 @@ function formationRelicFuncs(): ModifierTypeFunc[] {
     modifierTypes.ER_RELIC_LOOKOUT,
     modifierTypes.ER_RELIC_ANCHOR,
     modifierTypes.ER_RELIC_TWIN_LINK,
+    modifierTypes.ER_RELIC_MERCHANTS_SEAL,
+    modifierTypes.ER_RELIC_GAMBLERS_COIN,
   ];
 }
 

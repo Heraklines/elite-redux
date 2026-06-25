@@ -5,7 +5,7 @@ import { allMoves } from "#data/data-lists";
 import { classicFinalBossDialogue } from "#data/dialogue";
 import { erBalanceNum } from "#data/elite-redux/er-balance-tuning";
 import { recordErStreakFaint } from "#data/elite-redux/er-money-streak";
-import { erRelicRecordPlayerFaint, erTryAnchorLastStand } from "#data/elite-redux/er-relics";
+import { erMomentumEngineOnEnemyKo, erRelicRecordPlayerFaint, erTryAnchorLastStand } from "#data/elite-redux/er-relics";
 import { SpeciesFormChangeActiveTrigger } from "#data/form-change-triggers";
 import { ArenaTagSide } from "#enums/arena-tag-side";
 import { BattleType } from "#enums/battle-type";
@@ -110,6 +110,9 @@ export class FaintPhase extends PokemonPhase {
       });
     } else {
       globalScene.currentBattle.enemyFaints += 1;
+      // ER relics (#439): Momentum Engine - each enemy KO grants the active player
+      // mon +1 Speed stage (resets each battle). No-op unless the relic is held.
+      erMomentumEngineOnEnemyKo();
       globalScene.currentBattle.enemyFaintsHistory.push({
         pokemon,
         turn: globalScene.currentBattle.turn,

@@ -71,6 +71,8 @@ function guardianRelics(): ModifierTypeFunc[] {
     modifierTypes.ER_RELIC_ANCHOR,
     modifierTypes.ER_RELIC_WEATHERVANE,
     modifierTypes.ER_RELIC_MYSTERY_CHARM,
+    modifierTypes.ER_RELIC_CARTOGRAPHERS_LENS,
+    modifierTypes.ER_RELIC_TRAILBLAZERS_MARK,
   ];
 }
 

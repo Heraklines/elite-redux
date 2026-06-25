@@ -46,6 +46,13 @@ const RELIC_KEYS = [
   "ER_RELIC_PHARAOH_ANKH",
   "ER_RELIC_COVENANT",
   "ER_RELIC_CURSED_IDOL",
+  "ER_RELIC_BLOOD_PACT",
+  "ER_RELIC_MOMENTUM_ENGINE",
+  "ER_RELIC_STORMGLASS",
+  "ER_RELIC_CARTOGRAPHERS_LENS",
+  "ER_RELIC_TRAILBLAZERS_MARK",
+  "ER_RELIC_MERCHANTS_SEAL",
+  "ER_RELIC_GAMBLERS_COIN",
 ] as const;
 
 /** Build a relic ModifierType by its registry key (resolved at call time). */
@@ -88,7 +95,8 @@ describe("ER relic save persistence", () => {
     const type = modifierTypes.ER_RELIC_CURSED_IDOL();
     const kind = (type.newModifier() as ErRelicModifier).kind as ErRelicKind;
     // Stack two (clamped to the relic's max inside toModifier, which we stay under).
-    const granted = new ErRelicModifier(type, kind, 1);
+    // chosenWeather is the 3rd ctor arg (null for non-Stormglass relics), stackCount 4th.
+    const granted = new ErRelicModifier(type, kind, null, 1);
     granted.stackCount = Math.min(2, granted.getMaxStackCount());
 
     const restored = new ModifierData(granted, true).toModifier(ErRelicModifier) as ErRelicModifier | null;

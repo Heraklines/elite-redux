@@ -38,6 +38,7 @@ import { erResistBerryModifierType } from "#data/elite-redux/er-resist-berries";
 import { setErDifficulty, setErDifficulty as setErDifficultyForScenario } from "#data/elite-redux/er-run-difficulty";
 import { erWardStoneModifierType } from "#data/elite-redux/er-ward-stones";
 import { AbilityId } from "#enums/ability-id";
+import { BattleType } from "#enums/battle-type";
 import { BerryType } from "#enums/berry-type";
 import { BiomeId } from "#enums/biome-id";
 import { ErAbilityId } from "#enums/er-ability-id";
@@ -174,6 +175,10 @@ const DEV_OVERRIDE_DEFAULTS = {
   // scenarios set this true so the wave is guaranteed wild; reset here so it
   // never leaks into a normal run (which would have NO trainers).
   DISABLE_STANDARD_TRAINERS_OVERRIDE: false,
+  // ER (#135): the Hell trainer-boss-buff scenario forces a TRAINER wave; reset
+  // both so a forced battle type / trainer doesn't leak into the next run.
+  BATTLE_TYPE_OVERRIDE: null,
+  RANDOM_TRAINER_OVERRIDE: null,
   // ER #486: clear the Treasure-Map fragment seed so it never leaks between runs.
   ER_TREASURE_FRAGMENTS_OVERRIDE: 0,
 } as const;
@@ -1988,8 +1993,10 @@ export const DEV_SCENARIOS: DevScenario[] = [
       + "   half HP (verify in the next fight).\n"
       + " - Sloth: 2 chosen mons drop to Lv 1 + lose candy -> COVENANT OF REST relic (full\n"
       + "   team heal every 7th wave).\n"
-      + " - Lust (TEMPORARILY DISABLED - will NOT appear until the black-shiny in-battle\n"
-      + "   bug is fixed): curse a random stat team-wide -> a black-shiny reroll.\n"
+      + " - Lust (appears ONLY if a party mon's species has 100+ candy banked): that mon\n"
+      + "   surrenders its levels (-> Lv 1), ALL its IVs (zeroed), and its whole candy hoard\n"
+      + "   -> it becomes a PERMANENT tier-1 shiny (a NORMAL shiny, never a black shiny).\n"
+      + "   On a fresh dev mon with no candy it will NOT be offered; bring a 100+ candy mon.\n"
       + "Leave = Giratina's parting line, no cost. Party: shiny Garchomp + 3-item holder,\n"
       + "all Lv 30 so every offerable Sin can come up (6 active sins; 3 shown per visit).",
     setup: () => {
@@ -4474,6 +4481,34 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
   },
   {
+    label: "Hell trainer boss buff (#135 T1)",
+    description:
+      "#135 Tier 1 - on HELL, after wave 100, every trainer's HIGHEST-BST mon is\n"
+      + "promoted to a 2-health-bar BOSS that carries a GUARANTEED (stealable)\n"
+      + "Greater Ward Stone + a resist berry for EACH of its type weaknesses. This\n"
+      + "forces a Hell TRAINER fight at wave 112.\n"
+      + "DO: send out the trainer's team. Find the strongest mon (highest base-stat\n"
+      + "total). EXPECT: it has TWO HP bars (boss shield), a cyan Greater Ward Stone\n"
+      + "in its item row, and one or more resist berries (Occa/Passho/... matching\n"
+      + "its weaknesses) - THIEF/Covet them to confirm. The OTHER, weaker mons must\n"
+      + "NOT get the forced 2-bar boss treatment. Tier 2 (3-bar apex + a 2nd boss,\n"
+      + "all PRIME stones) is NOT live yet - do not expect it.",
+    setup: () => {
+      resetDevOverrides();
+      setErDifficulty("hell");
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 90,
+        STARTING_WAVE_OVERRIDE: 112, // a Hell trainer wave past the 100 gate
+        BATTLE_TYPE_OVERRIDE: BattleType.TRAINER, // guarantee the trainer fight
+      });
+      return [
+        makeStarter(SpeciesId.GARCHOMP, {
+          moveset: [MoveId.THIEF, MoveId.EARTHQUAKE, MoveId.DRAGON_CLAW, MoveId.STONE_EDGE],
+        }),
+      ];
+    },
+  },
+  {
     label: "Chili Sample (#387)",
     description:
       "#387 CHILI SAMPLE - the holder's DAMAGING moves gain a 10% burn chance,\n"
@@ -4933,6 +4968,63 @@ export const DEV_SCENARIOS: DevScenario[] = [
       ];
     },
     shopItems: [modifierTypes.ER_LEARNERS_SHROOM],
+  },
+  {
+    label: "TM Case: universal single-use TM (COMMON)",
+    description:
+      "TM Case replaces the old TM_COMMON/GREAT/ULTRA in the reward pool + biome\n"
+      + "shop. It is a single-use universal TM: pick a party Pokemon, then pick ANY\n"
+      + "ONE move from that Pokemon's COMPATIBLE TM LIST (moves it can still learn,\n"
+      + "minus what it already knows). Snorlax has a 3-move set here so the new move\n"
+      + "drops into the empty 4th slot with no forget prompt.\n"
+      + "DO: KO the Magikarp, BUY/take the TM CASE, pick Snorlax, pick any TM move\n"
+      + "(e.g. Ice Beam, Thunderbolt), confirm.\n"
+      + "EXPECT: the move list shows Snorlax's TM-learnable moves (NOT level-up-only\n"
+      + "moves), the chosen move is taught into the open slot, and the reward screen\n"
+      + "CLOSES (the TM Case is CONSUMED - it does not reappear).",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 50,
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.MAGIKARP,
+        ENEMY_LEVEL_OVERRIDE: 3,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+      });
+      return [
+        makeStarter(SpeciesId.SNORLAX, {
+          moveset: [MoveId.BODY_SLAM, MoveId.CRUNCH, MoveId.REST],
+        }),
+      ];
+    },
+    shopItems: [modifierTypes.TM_CASE],
+  },
+  {
+    label: "TM Case: back-out doesn't consume it (#25)",
+    description:
+      "Like the Learner's Shroom (#25), backing out of the move-learn after picking\n"
+      + "a TM Case must NOT consume it. Snorlax starts with a FULL 4-move set so the\n"
+      + "'forget which move?' screen appears.\n"
+      + "DO: KO the Magikarp, take the TM CASE, pick Snorlax, pick any TM move, then\n"
+      + "at 'forget which move?' BACK OUT (cancel / pick the new-move row / answer No\n"
+      + "to 'stop teaching').\n"
+      + "EXPECT: you are returned to the SAME reward screen with the TM Case STILL\n"
+      + "AVAILABLE to pick again - it is NOT consumed. (If you DO teach a move, the\n"
+      + "reward screen closes normally.)",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 50,
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.MAGIKARP,
+        ENEMY_LEVEL_OVERRIDE: 3,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+      });
+      return [
+        makeStarter(SpeciesId.SNORLAX, {
+          moveset: [MoveId.BODY_SLAM, MoveId.CRUNCH, MoveId.EARTHQUAKE, MoveId.REST],
+        }),
+      ];
+    },
+    shopItems: [modifierTypes.TM_CASE],
   },
   {
     label: "Black shiny: REDUX form (#393)",
@@ -6755,6 +6847,11 @@ export const DEV_SCENARIOS: DevScenario[] = [
       + "epic eggs banned too), PU < 0.5% (15 Favour, rare eggs banned, Favour\n"
       + "shiny cap rises 3x -> 5x), NU < 0.25% (20 Favour, common eggs only,\n"
       + "5x cap). Tiers self-update nightly from real player runs.\n"
+      + "CATCH BLOCK (#125): in ANY roster challenge (Usage Tier / Mono Type / Mono\n"
+      + "Color / Mono Gen), throwing a ball at a wild mon OUTSIDE the restriction now\n"
+      + "registers it in the Pokedex but does NOT add it to your party - the message\n"
+      + "reads 'caught, but it cannot join you in this challenge'. A legal wild mon is\n"
+      + "caught normally.\n"
       + "Pass/Fail this entry once checked.",
     setup: () => {
       resetDevOverrides();
@@ -8738,6 +8835,252 @@ export const DEV_SCENARIOS: DevScenario[] = [
           + ` | local role=${getCoopController()?.role} `
           + "(use Stealth Rock / Spikes / a screen; the checksum should CONVERGE, not loop every turn)",
       );
+    },
+  },
+  {
+    label: "(note) Black-shiny gift cycle refreshes on summary (#349)",
+    description:
+      "#349 - on the party SUMMARY screen's Abilities page, pressing R to cycle\n"
+      + "your black shiny's GIFT now REDRAWS the gift row in place. Before the fix\n"
+      + "the data advanced but the display was stuck: the row kept showing 'Gift\n"
+      + "1/3' and the first ability no matter how many times you pressed R (the\n"
+      + "page-cursor re-render dropped the forced-refresh flag). UI-only fix.\n"
+      + "CHECK: this Garchomp is a black shiny. Open it in the party SUMMARY,\n"
+      + "tab to the Abilities page (the violet italic 'Gift 1/3 (R)' row), and\n"
+      + "press R a few times - EXPECT the counter step 1/3 -> 2/3 -> 3/3 -> 1/3\n"
+      + "AND the shown gift ability NAME change with each press, every time, with\n"
+      + "no tab flicker and without leaving ability-selection mode if you entered\n"
+      + "it. (The in-battle Battle Info overlay already refreshed correctly - this\n"
+      + "fix is specifically the summary page.)",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 60,
+        STARTING_WAVE_OVERRIDE: 5,
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.BLISSEY,
+        ENEMY_LEVEL_OVERRIDE: 55,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.THUNDER_WAVE],
+        ER_BLACK_SHINY_PLAYER_OVERRIDE: SpeciesId.GARCHOMP,
+      });
+      return [
+        makeStarter(SpeciesId.GARCHOMP, {
+          moveset: [MoveId.EARTHQUAKE, MoveId.DRAGON_CLAW, MoveId.SWORDS_DANCE, MoveId.PROTECT],
+        }),
+      ];
+    },
+  },
+  {
+    label: "(note) MEs respect roster challenge (#126)",
+    description:
+      "#126 - three VANILLA mystery encounters could hand you (or transform you\n"
+      + "into) a mon that BREAKS the active roster challenge, because they grant /\n"
+      + "transform OUTSIDE the catch gate. Now each filters its species pool through\n"
+      + "the same legality the starter grid uses, so a challenge run stays within\n"
+      + "bounds. NOT battle-testable here - it needs a REAL challenge run. CHECK:\n"
+      + "start a new run with a Mono Type challenge (e.g. WATER), then trigger each\n"
+      + "of these MEs and confirm no off-type mon is ever offered / granted /\n"
+      + "transformed-into:\n"
+      + "  1. The Pokemon Salesman - the mon it SELLS must be the chosen type (this\n"
+      + "     one fully bypassed the catch gate; most important).\n"
+      + "  2. Global Trade System - both the per-mon trade options AND the Wonder\n"
+      + "     Trade result must be the chosen type.\n"
+      + "  3. Weird Dream - it now SPAWNS under Mono Type / Mono Generation (it used\n"
+      + "     to refuse), and EVERY party member it transforms must come out as the\n"
+      + "     chosen type. Repeat with a Mono Color or Mono Generation challenge - same\n"
+      + "     result. With NO challenge active, all three behave exactly as before\n"
+      + "     (unrestricted). Regression-covered by\n"
+      + "     er-mystery-encounter-challenge-legality.test.ts.",
+    setup: () => {
+      resetDevOverrides();
+      return [
+        makeStarter(SpeciesId.SQUIRTLE, {
+          moveset: [MoveId.SURF, MoveId.ICE_BEAM, MoveId.PROTECT, MoveId.RAPID_SPIN],
+        }),
+      ];
+    },
+  },
+  {
+    label: "(note) World Map biome Conditions panel (#129)",
+    description:
+      "#129 - the World Map route picker now shows a 'Conditions' footer listing the\n"
+      + "highlighted biome's special rules (forced weather/terrain, ambush, double-battle\n"
+      + "bias, type boost, entry status, field rules, shop/berry notes, dominant gem).\n"
+      + "NOT battle-testable here - open it from a real run. CHECK: in a Classic run,\n"
+      + "finish a biome to open the World Map route picker, then move the cursor LEFT/\n"
+      + "RIGHT across the onward biome tiles. EXPECT the Conditions panel to update to the\n"
+      + "highlighted biome and match its rules - e.g. Volcano = 'Always sunny' + 'Fire\n"
+      + "moves +20%' + '10% burn on entry'; Grass = 'Grassy terrain' + 'Double battles\n"
+      + "twice as likely'; Desert = 'Always a sandstorm'; Abyss = 'No shop here'. A plain\n"
+      + "biome shows 'No special conditions'. ALSO press J in-battle to open the read-only\n"
+      + "World Map; its Conditions panel describes the CURRENT biome (the gold HERE tile).",
+    setup: () => {
+      resetDevOverrides();
+      return [
+        makeStarter(SpeciesId.SQUIRTLE, {
+          moveset: [MoveId.TACKLE, MoveId.WATER_GUN, MoveId.TAIL_WHIP, MoveId.PROTECT],
+        }),
+      ];
+    },
+  },
+  // ===========================================================================
+  // ER relics batch (#130) - Blood Pact, Momentum Engine, Stormglass, Cartographer's
+  // Lens, Trailblazer's Mark, Merchant's Seal, Gambler's Coin.
+  // ===========================================================================
+  {
+    label: "Relic: Blood Pact (+20% dealt, +15% taken)",
+    description:
+      "#130 Blood Pact relic. Your team deals 20% more damage but also TAKES 15% more.\n"
+      + "DO: with the Blood Pact held, attack the Magikarp with Tackle, and let it Tackle\n"
+      + "you back. EXPECT: your Tackle hits noticeably harder than an un-pacted hit, and\n"
+      + "the damage you TAKE is ~15% higher than normal. (Both edges are live at once.)",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 50,
+        STARTING_WAVE_OVERRIDE: 5,
+        STARTING_MODIFIER_OVERRIDE: [{ name: "ER_RELIC_BLOOD_PACT" }],
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.MAGIKARP,
+        ENEMY_LEVEL_OVERRIDE: 50,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.TACKLE],
+      });
+      return [
+        makeStarter(SpeciesId.SNORLAX, {
+          moveset: [MoveId.TACKLE, MoveId.BODY_SLAM, MoveId.REST, MoveId.PROTECT],
+        }),
+      ];
+    },
+  },
+  {
+    label: "Relic: Momentum Engine (+1 Speed per KO)",
+    description:
+      "#130 Momentum Engine relic. Each foe your team KOs grants your active mon +1\n"
+      + "Speed stage (resets each battle). DO: in this DOUBLE battle, KO the two Magikarp.\n"
+      + "EXPECT: after each faints, your active Snorlax gains +1 Speed ('the Momentum\n"
+      + "Engine drives Snorlax faster!'), stacking to +2. Speed resets to 0 next battle.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 80,
+        STARTING_WAVE_OVERRIDE: 5,
+        BATTLE_STYLE_OVERRIDE: "double",
+        STARTING_MODIFIER_OVERRIDE: [{ name: "ER_RELIC_MOMENTUM_ENGINE" }],
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.MAGIKARP,
+        ENEMY_LEVEL_OVERRIDE: 5,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+      });
+      return [
+        makeStarter(SpeciesId.SNORLAX, {
+          moveset: [MoveId.BODY_SLAM, MoveId.CRUNCH, MoveId.EARTHQUAKE, MoveId.PROTECT],
+        }),
+        makeStarter(SpeciesId.BLISSEY, {
+          moveset: [MoveId.SEISMIC_TOSS, MoveId.SOFT_BOILED, MoveId.PROTECT, MoveId.TOXIC],
+        }),
+      ];
+    },
+  },
+  {
+    label: "Relic: Stormglass (sets chosen weather 5 turns)",
+    description:
+      "#130 Stormglass relic. At the start of EACH battle it conjures a weather of\n"
+      + "your choice for 5 turns. The FIRST battle PROMPTS you to choose the weather\n"
+      + "(see the dedicated 'Stormglass weather PICKER' scenario); the pick then persists\n"
+      + "for the run. DO: enter the battle holding Stormglass and pick a weather. EXPECT:\n"
+      + "that weather appears at battle start (rain/sun/sandstorm/hail/fog) and counts\n"
+      + "down over 5 turns, overriding the biome's ambient. It re-applies each new battle.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 50,
+        STARTING_WAVE_OVERRIDE: 5,
+        STARTING_MODIFIER_OVERRIDE: [{ name: "ER_RELIC_STORMGLASS" }],
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.MAGIKARP,
+        ENEMY_LEVEL_OVERRIDE: 50,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+      });
+      return [
+        makeStarter(SpeciesId.SNORLAX, {
+          moveset: [MoveId.BODY_SLAM, MoveId.CRUNCH, MoveId.REST, MoveId.PROTECT],
+        }),
+      ];
+    },
+  },
+  {
+    label: "Relic shop: Merchant's Seal + Gambler's Coin",
+    description:
+      "#130 economy relics. WIN the opening battle to reach the shop; the Merchant's\n"
+      + "Seal and Gambler's Coin are guaranteed reward options. Merchant's Seal: the\n"
+      + "reroll cost is HALVED and the reward screen shows ONE extra item slot. Gambler's\n"
+      + "Coin: after each TRAINER battle, the money reward is doubled half the time and\n"
+      + "lost the other half (seeded per wave - stable across rerolls). CHECK both relics\n"
+      + "appear in the shop and the reroll price is half normal once Merchant's Seal is taken.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 50,
+        STARTING_WAVE_OVERRIDE: 5,
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.MAGIKARP,
+        ENEMY_LEVEL_OVERRIDE: 5,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+      });
+      return [
+        makeStarter(SpeciesId.SNORLAX, {
+          moveset: [MoveId.BODY_SLAM, MoveId.CRUNCH, MoveId.REST, MoveId.PROTECT],
+        }),
+      ];
+    },
+    shopItems: [modifierTypes.ER_RELIC_MERCHANTS_SEAL, modifierTypes.ER_RELIC_GAMBLERS_COIN],
+  },
+  {
+    label: "(note) Relic: Cartographer's Lens + Trailblazer's Mark (map)",
+    description:
+      "#130 map relics - NOT battle-testable; check from a real Classic run.\n"
+      + "Cartographer's Lens: on the World Map, ONE extra onward biome NODE is revealed\n"
+      + "(base reveals 2; with the Lens, 3). CHECK: finish a biome to open the route\n"
+      + "picker, count the lit onward tiles, and cursor the extra one to read its\n"
+      + "Conditions.\n"
+      + "Trailblazer's Mark: biome notoriety builds 50% slower. CHECK: at a Crossroads\n"
+      + "choose to STAY past the free window; the over-cap enemy level/BST climbs about\n"
+      + "half as fast as without the relic, and over-stayed enemies drop more loot.\n"
+      + "Both are granted off-pool (Dormant Guardian, Buried City, Bog Witch).",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_MODIFIER_OVERRIDE: [{ name: "ER_RELIC_CARTOGRAPHERS_LENS" }, { name: "ER_RELIC_TRAILBLAZERS_MARK" }],
+      });
+      return [
+        makeStarter(SpeciesId.SQUIRTLE, {
+          moveset: [MoveId.TACKLE, MoveId.WATER_GUN, MoveId.TAIL_WHIP, MoveId.PROTECT],
+        }),
+      ];
+    },
+  },
+  {
+    label: "Relic: Stormglass weather PICKER (#130)",
+    description:
+      "#130 Stormglass picker - on first battle you should be prompted to choose a\n"
+      + "weather; it then persists for the run.\n"
+      + "DO: start the battle holding ER_RELIC_STORMGLASS. At the very start a prompt\n"
+      + "appears ('The Stormglass hums. Choose the weather it conjures for 5 turns.')\n"
+      + "with FIVE options: Sun, Rain, Sandstorm, Hail, Fog. Pick one (e.g. Rain).\n"
+      + "EXPECT: that weather is set for 5 turns THIS battle (the chosen weather wins\n"
+      + "over the biome's ambient). You are NEVER prompted again - on every later\n"
+      + "battle the same chosen weather is reapplied for 5 turns, and it survives Save\n"
+      + "& Quit (the choice is stored on the relic). Before the fix the relic silently\n"
+      + "auto-picked a default and never asked.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 50,
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.MAGIKARP,
+        ENEMY_LEVEL_OVERRIDE: 5,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+        STARTING_MODIFIER_OVERRIDE: [{ name: "ER_RELIC_STORMGLASS" }],
+      });
+      return [
+        makeStarter(SpeciesId.SNORLAX, {
+          moveset: [MoveId.BODY_SLAM, MoveId.CRUNCH, MoveId.REST, MoveId.PROTECT],
+        }),
+      ];
     },
   },
 ];

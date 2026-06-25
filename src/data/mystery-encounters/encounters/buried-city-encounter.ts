@@ -177,6 +177,11 @@ function bankCityRewards(deepestLevel: number, beatBoss: boolean): void {
   if (beatBoss) {
     funcs.push(modifierTypes.ER_RELIC_PHARAOH_ANKH);
   }
+  // A deep dig also unearths a Cartographer's Lens - the buried city's old maps,
+  // a fitting map-reveal relic for reaching the deepest levels (#439).
+  if (deep) {
+    funcs.push(modifierTypes.ER_RELIC_CARTOGRAPHERS_LENS);
+  }
   const picks = Math.min(1 + Math.floor(deepestLevel / 2), 3);
   const tiers = new Array(picks).fill(deep || beatBoss ? ModifierTier.ULTRA : ModifierTier.GREAT);
   setEncounterRewards({
