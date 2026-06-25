@@ -1,0 +1,276 @@
+url:      https://elite-redux-staging.pages.dev/
+build:    mqsql8oa-6pk0
+mode:     6  wave:5
+seed:     l3bCSeDqOpUjb6NJC3suQIgh
+party:    Bulbasaur(L7 10hp f0), Arctovish(L7 22hp f0), Caterpie(L5 21hp f0), Yamask(L5 20hp f0), Spearow(L5 20hp f0), Zigzagoon(L5 20hp f0)
+enemy:    Wispywaspy(L4), Mawile(L4)
+
+----- CONSOLE -----
+[00:13:09.007] LOG: %cStart Phase WeatherEffectPhase color:green;
+[00:13:09.007] LOG: %cStart Phase PositionalTagPhase color:green;
+[00:13:09.007] LOG: %cStart Phase BerryPhase color:green;
+[00:13:09.008] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[00:13:09.008] LOG: %cStart Phase TurnEndPhase color:green;
+[00:13:09.008] LOG: %cStart Phase BattleEndPhase color:green;
+[00:13:09.008] LOG: Battle Score: 69 (1 Turns x1)
+[00:13:09.008] LOG: Total Score: 143
+[00:13:09.012] LOG: %cStart Phase TrainerVictoryPhase color:green;
+[00:13:09.013] LOG: Youngster Cordell
+[00:13:09.346] LOG: Youngster Cordell
+[00:13:09.575] LOG: Dialogue saved as seen: dialogue:youngster.victory.5
+[00:13:09.576] LOG: %cStart Phase MoneyRewardPhase color:green;
+[00:13:09.772] LOG: %cStart Phase ModifierRewardPhase color:green;
+[00:13:10.019] LOG: %cStart Phase ModifierRewardPhase color:green;
+[00:13:10.275] LOG: %cStart Phase EggLapsePhase color:green;
+[00:13:10.276] LOG: %cStart Phase SelectModifierPhase color:green;
+[00:13:10.276] LOG: Wave Seed: p7fGWiHuStYnf:RNG7wyUMkl 4
+[00:13:10.280] LOG: 1 0 [2,3,4,5,6]
+[00:13:10.280] LOG: {"id":"RARE_CANDY","localeKey":"modifierType:ModifierType.RARE_CANDY","iconImage":"rare_candy","soundName":"se/restore","tier":0} 
+[00:13:10.280] LOG: 15 10 [2,3,4,5,6,7,8,9,10,12,16,23]
+[00:13:10.280] LOG: GREAT 1
+[00:13:10.280] LOG: 21 11 [2,3,4,5,6,7,8,9,10,12,16,23]
+[00:13:10.280] LOG: {"id":"BASE_STAT_BOOSTER","localeKey":"","iconImage":"protein","soundName":"se/restore","tier":1,"stat":1,"key":"protein"} 
+[00:13:10.280] LOG: 11 9 [2,3,4,5,6,7,8,9,10,12,16,23]
+[00:13:10.280] LOG: {"id":"DIRE_HIT","localeKey":"modifierType:ModifierType.DIRE_HIT","iconImage":"dire_hit","soundName":"se/restore","tier":1} 
+[00:13:10.280] LOG: 14 10 [2,3,4,5,6,7,8,9,10,12,16,23]
+[00:13:10.280] LOG: GREAT 1
+[00:13:10.280] LOG: 1 0 [2,3,4,5,6,7,8,9,10,12,16,23]
+[00:13:10.280] LOG: {"id":"PP_UP","localeKey":"modifierType:ModifierType.PP_UP","iconImage":"pp_up","group":"ppUp","soundName":"se/restore","tier":1,"upPoints":1} 
+[00:13:10.280] LOG: 8 5 [2,3,4,5,6]
+[00:13:10.280] LOG: {"id":"BERRY","localeKey":"","iconImage":"leppa_berry","group":"berry","soundName":"se/restore","tier":0,"berryType":10} 
+[00:13:10.281] LOG: [coop-reward] OWNER drives reward screen (turn=3 role=guest spoof=false wave=4)
+[00:13:18.104] LOG: %cStart Phase NewBattlePhase color:green;
+[00:13:18.104] LOG: Wave Seed: q8gHXjIvTuZog;SOH8xzVNlm 5
+[00:13:18.105] LOG: %cStart Phase ReturnPhase color:green;
+[00:13:18.265] LOG: %cStart Phase ReturnPhase color:green;
+[00:13:18.404] LOG: [coop-launch] proceedIfReady launched=true localTeam=3 bothReady=true role=guest partnerReady=true
+[00:13:18.415] LOG: %cStart Phase ShowTrainerPhase color:green;
+[00:13:18.564] LOG: %cStart Phase NextEncounterPhase color:green;
+[00:13:18.576] LOG: Pokemon: Foe Wispywaspy | Species ID: 10065 | Level: 4 | Nature: Jolly (+Spd/-SpAtk)
+[00:13:18.576] LOG: Stats (IVs): HP: 18 (31), Atk: 6 (31), Def: 7 (31), Spatk: 7 (31), Spdef: 7 (31), Spd: 10 (31)
+[00:13:18.576] LOG: Ability: Early Grave | Passive Ability: Locust Swarm 
+[00:13:18.576] LOG: Moveset: ["Seed Flare","Skitter Smack","Ember","Safe Passage"]
+[00:13:18.581] LOG: Pokemon: Foe Mawile | Species ID: 303 | Level: 4 | Nature: Relaxed (+Def/-Spd)
+[00:13:18.581] LOG: Stats (IVs): HP: 20 (31), Atk: 8 (31), Def: 14 (31), Spatk: 9 (31), Spdef: 11 (31), Spd: 9 (31)
+[00:13:18.581] LOG: Ability: Intimidate | Passive Ability: Multi-Headed 
+[00:13:18.581] LOG: Moveset: ["Astonish","Sucker Punch","Tickle","Shadow Claw"]
+[00:13:20.591] LOG: Battle Seed: gYVTuUJ9Jc5VJapH
+[00:13:20.592] LOG: Generated AI funcs
+[00:13:20.656] DEBUG: Session data saved to slot 0!
+[00:13:20.656] LOG: Wave Seed: q8gHXjIvTuZog;SOH8xzVNlm 5
+[00:13:20.948] LOG: Lass Elsa
+[00:13:21.557] LOG: Dialogue saved as seen: dialogue:lass.encounter.7
+[00:13:21.608] LOG: Lass Elsa
+[00:13:22.156] LOG: %cStart Phase SummonPhase color:green;
+[00:13:22.157] LOG: Elsa
+[00:13:22.390] WARN: cry/65 not found
+[00:13:22.539] LOG: %cStart Phase SummonPhase color:green;
+[00:13:22.540] LOG: Elsa
+[00:13:22.906] LOG: %cStart Phase SummonPhase color:green;
+[00:13:23.156] WARN: cry/1 not found
+[00:13:23.306] LOG: %cStart Phase ShinySparklePhase color:green;
+[00:13:23.456] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[00:13:23.457] LOG: %cStart Phase SummonPhase color:green;
+[00:13:23.706] WARN: cry/883 not found
+[00:13:23.856] LOG: %cStart Phase ShinySparklePhase color:green;
+[00:13:24.006] LOG: %cStart Phase InitEncounterPhase color:green;
+[00:13:24.008] LOG: %cStart Phase PostSummonPhase color:green;
+[00:13:24.008] LOG: Ran PSP for: Arctovish
+[00:13:24.009] LOG: %cStart Phase PostSummonPhase color:green;
+[00:13:24.010] LOG: %cStart Phase PostSummonPhase color:green;
+[00:13:24.010] LOG: %cStart Phase PostSummonPhase color:green;
+[00:13:24.010] LOG: Ran PSP for: Bulbasaur
+[00:13:24.011] LOG: %cStart Phase PostSummonPhase color:green;
+[00:13:24.012] LOG: %cStart Phase PostSummonPhase color:green;
+[00:13:24.013] LOG: %cStart Phase PostSummonPhase color:green;
+[00:13:24.013] LOG: Ran PSP for: Wispywaspy
+[00:13:24.013] LOG: %cStart Phase PostSummonPhase color:green;
+[00:13:24.014] LOG: %cStart Phase PostSummonPhase color:green;
+[00:13:24.014] LOG: %cStart Phase PostSummonPhase color:green;
+[00:13:24.014] LOG: Ran PSP for: Mawile
+[00:13:24.014] LOG: %cStart Phase PostSummonPhase color:green;
+[00:13:24.015] LOG: %cStart Phase ShowAbilityPhase color:green;
+[00:13:24.241] LOG: %cStart Phase StatStageChangePhase color:green;
+[00:13:24.498] LOG: %cStart Phase MessagePhase color:green;
+[00:13:24.798] LOG: %cStart Phase StatStageChangePhase color:green;
+[00:13:25.049] LOG: %cStart Phase MessagePhase color:green;
+[00:13:25.347] LOG: %cStart Phase HideAbilityPhase color:green;
+[00:13:25.381] LOG: %cStart Phase PostSummonPhase color:green;
+[00:13:25.382] LOG: %cStart Phase TurnInitPhase color:green;
+[00:13:25.382] LOG: %cStart Phase CommandPhase color:green;
+[00:13:31.642] LOG: Move: MALIGNANT_CHAIN Move targets: {"targets":[2],"multiple":false} 
+Player Pokemon: Bulbasaur
+[00:13:31.642] LOG: %cStart Phase CommandPhase color:green;
+[00:13:32.740] LOG: Move: HIGH_HORSEPOWER Move targets: {"targets":[2,3,0],"multiple":false} 
+Player Pokemon: Arctovish
+[00:13:32.741] LOG: %cStart Phase SelectTargetPhase color:green;
+[00:13:33.199] LOG: %cStart Phase EnemyCommandPhase color:green;
+[00:13:33.214] LOG: Move Pool: ["Seed Flare","Skitter Smack","Ember","Safe Passage"]
+[00:13:33.214] LOG: Move Scores: [0.41576086956521735,2.641304347826087,0.8035714285714285,-20]
+[00:13:33.215] LOG: Sorted Move Pool: ["Skitter Smack","Ember","Seed Flare","Safe Passage"]
+[00:13:33.215] LOG: Chosen Move: Skitter Smack
+[00:13:33.215] LOG: ER AI: standard brain (sharpness 0.85)
+[00:13:33.215] LOG: %cStart Phase EnemyCommandPhase color:green;
+[00:13:33.226] LOG: Move Pool: ["Astonish","Sucker Punch","Tickle","Shadow Claw"]
+[00:13:33.226] LOG: Move Scores: [2.6785714285714284,2.6785714285714284,4,0.40178571428571425]
+[00:13:33.226] LOG: Sorted Move Pool: ["Tickle","Astonish","Sucker Punch","Shadow Claw"]
+[00:13:33.226] LOG: Chosen Move: Astonish
+[00:13:33.226] LOG: ER AI: standard brain (sharpness 0.85)
+[00:13:33.226] LOG: %cStart Phase TurnStartPhase color:green;
+[00:13:33.230] LOG: %cStart Phase MovePhase color:green;
+[00:13:33.230] LOG: %cUser: Mawile
+Move: ASTONISH
+Use Mode: NORMAL color:orchid
+[00:13:33.233] LOG: %cStart Phase MessagePhase color:green;
+[00:13:33.364] LOG: %cStart Phase MoveEffectPhase color:green;
+[00:13:33.523] LOG: crit stage: +0
+[00:13:33.524] LOG: Move: Astonish | Base damage: 3.44 | Power: 40 | Source attack: 9 | Target defense: 18
+[00:13:33.524] LOG: Move: Astonish | Attack damage: 2
+[00:13:33.525] LOG: %cStart Phase DamageAnimPhase color:green;
+[00:13:33.540] LOG: %cStart Phase MoveEffectPhase color:green;
+[00:13:33.698] LOG: crit stage: +0
+[00:13:33.698] LOG: Move: Astonish | Base damage: 3.44 | Power: 40 | Source attack: 9 | Target defense: 18
+[00:13:33.699] LOG: Move: Astonish | Attack damage: 1
+[00:13:33.699] LOG: %cStart Phase DamageAnimPhase color:green;
+[00:13:33.715] LOG: %cStart Phase MessagePhase color:green;
+[00:13:33.989] LOG: %cStart Phase MoveEndPhase color:green;
+[00:13:33.991] LOG: %cStart Phase MovePhase color:green;
+[00:13:33.991] LOG: %cUser: Arctovish
+Move: HIGH_HORSEPOWER
+Use Mode: NORMAL color:orchid
+[00:13:33.991] LOG: %cStart Phase MessagePhase color:green;
+[00:13:34.272] LOG: %cStart Phase MoveEndPhase color:green;
+[00:13:34.273] LOG: %cStart Phase MovePhase color:green;
+[00:13:34.273] LOG: %cUser: Bulbasaur
+Move: MALIGNANT_CHAIN
+Use Mode: NORMAL color:orchid
+[00:13:34.276] LOG: %cStart Phase MessagePhase color:green;
+[00:13:34.456] LOG: %cStart Phase MoveEffectPhase color:green;
+[00:13:34.631] LOG: crit stage: +0
+[00:13:34.633] LOG: Move: Malignant Chain | Base damage: 19.6 | Power: 100 | Source attack: 14 | Target defense: 7
+[00:13:34.633] LOG: Move: Malignant Chain | Attack damage: 13
+[00:13:34.634] LOG: %cStart Phase DamageAnimPhase color:green;
+[00:13:34.648] LOG: %cStart Phase MessagePhase color:green;
+[00:13:34.947] LOG: %cStart Phase ObtainStatusEffectPhase color:green;
+[00:13:35.123] LOG: %cStart Phase MessagePhase color:green;
+[00:13:35.456] LOG: %cStart Phase QuietFormChangePhase color:green;
+[00:13:37.189] LOG: %cStart Phase MoveEndPhase color:green;
+[00:13:37.189] LOG: %cStart Phase MovePhase color:green;
+[00:13:37.189] LOG: %cUser: Wispywaspy
+Move: SKITTER_SMACK
+Use Mode: NORMAL color:orchid
+[00:13:37.194] LOG: %cStart Phase MessagePhase color:green;
+[00:13:37.381] LOG: %cStart Phase MoveEffectPhase color:green;
+[00:13:37.723] LOG: crit stage: +0
+[00:13:37.724] LOG: Move: Skitter Smack | Base damage: 7.04 | Power: 70 | Source attack: 14 | Target defense: 14
+[00:13:37.724] LOG: Move: Skitter Smack | Attack damage: 9
+[00:13:37.724] LOG: %cStart Phase DamageAnimPhase color:green;
+[00:13:37.740] LOG: %cStart Phase StatStageChangePhase color:green;
+[00:13:37.991] LOG: %cStart Phase MessagePhase color:green;
+[00:13:38.297] LOG: %cStart Phase MoveEndPhase color:green;
+[00:13:38.297] LOG: %cStart Phase CheckInterludePhase color:green;
+[00:13:38.297] LOG: %cStart Phase WeatherEffectPhase color:green;
+[00:13:38.297] LOG: %cStart Phase PositionalTagPhase color:green;
+[00:13:38.297] LOG: %cStart Phase BerryPhase color:green;
+[00:13:38.299] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[00:13:38.301] LOG: %cStart Phase PostTurnStatusEffectPhase color:green;
+[00:13:38.481] LOG: %cStart Phase MessagePhase color:green;
+[00:13:38.805] LOG: %cStart Phase TurnEndPhase color:green;
+[00:13:38.807] LOG: %cStart Phase TurnInitPhase color:green;
+[00:13:38.808] LOG: %cStart Phase CommandPhase color:green;
+[00:14:14.606] LOG: Move: MALIGNANT_CHAIN Move targets: {"targets":[2],"multiple":false} 
+Player Pokemon: Bulbasaur
+[00:14:14.606] LOG: %cStart Phase CommandPhase color:green;
+[00:14:16.304] LOG: Move: HIGH_HORSEPOWER Move targets: {"targets":[2,3,0],"multiple":false} 
+Player Pokemon: Arctovish
+[00:14:16.305] LOG: %cStart Phase SelectTargetPhase color:green;
+[00:14:16.771] LOG: %cStart Phase EnemyCommandPhase color:green;
+[00:14:16.777] LOG: Battle Seed: gYVTuUJ9Jc5VJapH
+[00:14:16.780] LOG: Move Pool: ["Seed Flare","Skitter Smack"]
+[00:14:16.780] LOG: Move Scores: [895.5357142857143,24.107142857142858]
+[00:14:16.780] LOG: Sorted Move Pool: ["Seed Flare","Skitter Smack"]
+[00:14:16.780] LOG: Chosen Move: Seed Flare
+[00:14:16.780] LOG: ER AI: standard brain (sharpness 0.85)
+[00:14:16.780] LOG: %cStart Phase EnemyCommandPhase color:green;
+[00:14:16.790] LOG: Move Pool: ["Astonish","Sucker Punch","Tickle","Shadow Claw"]
+[00:14:16.790] LOG: Move Scores: [-20,2.6785714285714284,4,3.260869565217391]
+[00:14:16.790] LOG: Sorted Move Pool: ["Tickle","Shadow Claw","Sucker Punch","Astonish"]
+[00:14:16.790] LOG: Chosen Move: Tickle
+[00:14:16.790] LOG: ER AI: standard brain (sharpness 0.85)
+[00:14:16.790] LOG: %cStart Phase TurnStartPhase color:green;
+[00:14:16.793] LOG: %cStart Phase MovePhase color:green;
+[00:14:16.793] LOG: %cUser: Arctovish
+Move: HIGH_HORSEPOWER
+Use Mode: NORMAL color:orchid
+[00:14:16.797] LOG: %cStart Phase MessagePhase color:green;
+[00:14:16.946] LOG: %cStart Phase MoveEffectPhase color:green;
+[00:14:17.355] LOG: crit stage: +0
+[00:14:17.356] LOG: Move: High Horsepower | Base damage: 15.08094117647059 | Power: 133 | Source attack: 19 | Target defense: 17
+[00:14:17.356] LOG: Move: High Horsepower | Attack damage: 38
+[00:14:17.357] LOG: %cStart Phase DamageAnimPhase color:green;
+[00:14:17.373] LOG: %cStart Phase MessagePhase color:green;
+[00:14:17.646] LOG: %cStart Phase MessagePhase color:green;
+[00:14:17.938] LOG: %cStart Phase FaintPhase color:green;
+[00:14:18.881] LOG: %cStart Phase MessagePhase color:green;
+[00:14:21.232] LOG: %cStart Phase VictoryPhase color:green;
+[00:14:21.232] LOG: %cStart Phase ExpPhase color:green;
+[00:14:21.755] LOG: %cStart Phase LevelUpPhase color:green;
+[00:14:22.872] LOG: %cStart Phase ExpPhase color:green;
+[00:14:23.438] LOG: %cStart Phase LevelUpPhase color:green;
+[00:14:24.048] LOG: %cStart Phase MoveEndPhase color:green;
+[00:14:24.048] LOG: %cStart Phase MovePhase color:green;
+[00:14:24.049] LOG: %cUser: Wispywaspy
+Move: SEED_FLARE
+Use Mode: NORMAL color:orchid
+[00:14:24.051] LOG: %cStart Phase MessagePhase color:green;
+[00:14:24.229] LOG: %cStart Phase MoveEffectPhase color:green;
+[00:14:24.230] LOG: %cStart Phase MessagePhase color:green;
+[00:14:24.546] LOG: %cStart Phase MoveEndPhase color:green;
+[00:14:24.547] LOG: %cStart Phase MovePhase color:green;
+[00:14:24.547] LOG: %cUser: Bulbasaur
+Move: MALIGNANT_CHAIN
+Use Mode: NORMAL color:orchid
+[00:14:24.549] LOG: %cStart Phase MessagePhase color:green;
+[00:14:24.729] LOG: %cStart Phase MoveEffectPhase color:green;
+[00:14:24.905] LOG: crit stage: +0
+[00:14:24.906] LOG: Move: Malignant Chain | Base damage: 8.4 | Power: 100 | Source attack: 10 | Target defense: 15
+[00:14:24.907] LOG: Move: Malignant Chain | Attack damage: 6
+[00:14:24.907] LOG: %cStart Phase DamageAnimPhase color:green;
+[00:14:24.922] LOG: %cStart Phase MessagePhase color:green;
+[00:14:25.221] LOG: %cStart Phase FaintPhase color:green;
+[00:14:25.222] WARN: cry/10065 not found
+[00:14:25.297] LOG: %cStart Phase MessagePhase color:green;
+[00:14:25.632] LOG: %cStart Phase VictoryPhase color:green;
+[00:14:25.633] LOG: %cStart Phase ExpPhase color:green;
+[00:14:26.096] LOG: %cStart Phase ExpPhase color:green;
+[00:14:26.455] LOG: %cStart Phase MoveEndPhase color:green;
+[00:14:26.455] LOG: %cStart Phase MovePhase color:green;
+[00:14:26.455] LOG: %cStart Phase MoveEndPhase color:green;
+[00:14:26.455] LOG: %cStart Phase CheckInterludePhase color:green;
+[00:14:26.455] LOG: %cStart Phase WeatherEffectPhase color:green;
+[00:14:26.455] LOG: %cStart Phase PositionalTagPhase color:green;
+[00:14:26.455] LOG: %cStart Phase BerryPhase color:green;
+[00:14:26.456] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[00:14:26.456] LOG: %cStart Phase TurnEndPhase color:green;
+[00:14:26.456] LOG: %cStart Phase BattleEndPhase color:green;
+[00:14:26.456] LOG: Battle Score: 96 (2 Turns x0.84)
+[00:14:26.456] LOG: Total Score: 239
+[00:14:26.462] LOG: %cStart Phase TrainerVictoryPhase color:green;
+[00:14:26.463] LOG: Lass Elsa
+[00:14:26.853] LOG: Lass Elsa
+[00:14:27.053] LOG: Dialogue saved as seen: dialogue:lass.victory.7
+[00:14:27.053] LOG: %cStart Phase MoneyRewardPhase color:green;
+[00:14:27.282] LOG: %cStart Phase ModifierRewardPhase color:green;
+[00:14:27.600] LOG: %cStart Phase ModifierRewardPhase color:green;
+[00:14:27.902] LOG: %cStart Phase EggLapsePhase color:green;
+[00:14:27.903] LOG: %cStart Phase SelectModifierPhase color:green;
+[00:14:27.903] LOG: Wave Seed: q8gHXjIvTuZog;SOH8xzVNlm 5
+[00:14:27.906] LOG: 2 0 []
+[00:14:27.906] LOG: {"id":"HEALING_CHARM","localeKey":"modifierType:ModifierType.HEALING_CHARM","iconImage":"healing_charm","soundName":"se/restore","tier":4} 
+[00:14:27.906] LOG: 1 0 [3,4,5,6]
+[00:14:27.906] LOG: {"id":"RARE_CANDY","localeKey":"modifierType:ModifierType.RARE_CANDY","iconImage":"rare_candy","soundName":"se/restore","tier":0} 
+[00:14:27.906] LOG: 8 4 [3,4,5,6]
+[00:14:27.906] LOG: {"id":"BERRY","localeKey":"","iconImage":"sitrus_berry","group":"berry","soundName":"se/restore","tier":0,"berryType":0} 
+[00:14:27.906] LOG: 0 0 [3,4,5,6]
+[00:14:27.906] LOG: {"id":"POKEBALL","localeKey":"","iconImage":"pb","group":"pb","soundName":"se/pb_bounce_1","tier":0,"pokeballType":0,"count":5} 
+[00:14:27.906] LOG: [coop-reward] WATCHER waits for partner's reward picks (turn=4 role=guest wave=5)
