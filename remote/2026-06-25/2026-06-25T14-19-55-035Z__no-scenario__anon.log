@@ -1,0 +1,142 @@
+url:      https://elite-redux-staging.pages.dev/
+build:    mqtkwu1u-7c6p
+mode:     6  wave:1
+seed:     12lMAp66jBRowu3cX61Jz6sZ
+party:    Bulbasaur(L5 1hp f0), Squirtle(L5 21hp f0), Chikorita(L5 20hp f0), Spearow(L5 20hp f0), Ekans(L5 22hp f0)
+enemy:    Wurmple(L2), Fletchling(L2)
+
+----- COMMENT -----
+post locale fix
+
+----- CONSOLE -----
+[14:11:37.577] LOG: %c %c %c %c %c Phaser v3.90.0 (WebGL | Web Audio) %c https://phaser.io/v390 background: #ff0000 background: #ffff00 background: #00ff00 background: #00ffff color: #ffffff; background: #000000 background: transparent
+[14:11:38.450] LOG: [ER] build mqtkwu1u-7c6p
+[14:11:40.010] LOG: [dev-tools] loaded — 306 scenarios + Send Logs button
+[14:11:58.624] DEBUG: Destroying loading scene
+[14:11:58.626] DEBUG: Destroyed loading scene
+[14:11:58.892] LOG: Seed: QcbzjdjSv0CMpldB7naYjKnN
+[14:11:58.892] LOG: Wave Seed: QcbzjdjSv0CMpldB7naYjKnN 0
+[14:12:02.117] LOG: %cStart Phase LoginPhase color:green;
+[14:12:02.455] LOG: Client Session: N53QX82aSKVUiDQyJN7Lwp8uZ3QIR415
+[14:12:03.170] LOG: %cStart Phase TitlePhase color:green;
+[14:12:03.171] LOG: Getting Session Slot id: %d 4
+[14:12:03.192] LOG: use seasonal splash messages true
+[14:12:03.192] LOG: Adding 2 Pride Month splash messages (weight: x15)
+[14:13:17.842] WARN: [coop-fp] MISMATCH sections=moves,abilities - moves local=ca83cec603ca5e7e(1107) peer=c20a02635a5e3c05(1107) abilities local=1412a816005397a3(1046) peer=1670a4f3df00cb38(1046)
+[14:13:24.959] LOG: [coop-launch] title challenge-gate: role=guest isCoopGuest=true -> SelectStarterPhase
+[14:13:24.960] LOG: %cStart Phase SelectStarterPhase color:green;
+[14:13:24.962] LOG: [coop-launch] startCoopSelect role=guest partnerConnected=true partnerReady=false
+[14:13:35.982] LOG: [coop-runconfig] guest received difficulty=elite netcode=authoritative
+[14:13:35.983] LOG: [coop-launch] proceedIfReady launched=false localTeam=0 bothReady=false role=guest partnerReady=false
+[14:13:35.986] LOG: [coop-launch] proceedIfReady launched=false localTeam=0 bothReady=false role=guest partnerReady=false
+[14:13:35.988] LOG: [coop-launch] proceedIfReady launched=false localTeam=0 bothReady=false role=guest partnerReady=true
+[14:13:38.680] WARN: cry/7 not found
+[14:13:40.665] WARN: cry/21 not found
+[14:13:41.193] WARN: cry/23 not found
+[14:13:43.170] LOG: Wave Seed: 12lMAp66jBRowu3cX61Jz6sZ 0
+[14:13:43.170] LOG: [coop-runconfig] startRun role=guest willBroadcast=false difficulty=elite
+[14:13:43.172] LOG: [coop-launch] local team locked in: 3 mons, role=guest
+[14:13:43.173] LOG: [coop-launch] proceedIfReady launched=false localTeam=3 bothReady=false role=guest partnerReady=true
+[14:13:43.173] LOG: [coop-launch] proceedIfReady launched=false localTeam=3 bothReady=true role=guest partnerReady=true
+[14:13:43.175] LOG: [coop-launch] launchCoopMergedParty role=guest merged=5 slot=4
+[14:13:43.176] LOG: [coop-launch] guest: clearing STARTER_SELECT -> MESSAGE, then initBattle
+[14:13:43.178] LOG: [coop-launch] proceedIfReady launched=true localTeam=3 bothReady=true role=guest partnerReady=true
+[14:13:45.039] LOG: Wave Seed: 23mNBq77kCSpxv4dY72K{7t[ 1
+[14:13:45.045] LOG: %cStart Phase EncounterPhase color:green;
+[14:13:55.558] LOG: Pokemon: Wild Wurmple | Species ID: 265 | Level: 2 | Nature: Mild (+SpAtk/-Def)
+[14:13:55.559] LOG: Stats (IVs): HP: 14 (18), Atk: 7 (20), Def: 5 (4), Spatk: 7 (24), Spdef: 6 (16), Spd: 5 (1)
+[14:13:55.559] LOG: Ability: Shield Dust | Passive Ability: Swarm 
+[14:13:55.559] LOG: Moveset: ["Struggle Bug","Web Shot","Tackle","Poison Sting"]
+[14:13:55.561] LOG: Pokemon: Wild Fletchling | Species ID: 661 | Level: 2 | Nature: Lonely (+Atk/-Def)
+[14:13:55.562] LOG: Stats (IVs): HP: 14 (12), Atk: 8 (21), Def: 5 (12), Spatk: 6 (5), Spdef: 6 (6), Spd: 7 (18)
+[14:13:55.562] LOG: Ability: Rivalry | Passive Ability: Flock 
+[14:13:55.562] LOG: Moveset: ["Air Cutter","Flail","Peck","Growl"]
+[14:13:56.672] DEBUG: Session data saved to slot 4!
+[14:13:58.549] LOG: Wave Seed: 23mNBq77kCSpxv4dY72K{7t[ 1
+[14:13:59.013] LOG: %cStart Phase SummonPhase color:green;
+[14:13:59.211] WARN: cry/1 not found
+[14:13:59.327] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[14:13:59.329] LOG: %cStart Phase SummonPhase color:green;
+[14:13:59.544] WARN: cry/7 not found
+[14:13:59.676] LOG: %cStart Phase ShinySparklePhase color:green;
+[14:13:59.805] LOG: %cStart Phase CheckSwitchPhase color:green;
+[14:13:59.806] LOG: %cStart Phase CheckSwitchPhase color:green;
+[14:13:59.806] LOG: %cStart Phase InitEncounterPhase color:green;
+[14:13:59.817] LOG: %cStart Phase PostSummonPhase color:green;
+[14:13:59.819] LOG: Ran PSP for: Squirtle
+[14:13:59.827] LOG: %cStart Phase PostSummonPhase color:green;
+[14:13:59.828] LOG: Ran PSP for: Bulbasaur
+[14:13:59.837] LOG: %cStart Phase PostSummonPhase color:green;
+[14:13:59.843] LOG: %cStart Phase PostSummonPhase color:green;
+[14:13:59.846] LOG: %cStart Phase PostSummonPhase color:green;
+[14:13:59.848] LOG: %cStart Phase ShowAbilityPhase color:green;
+[14:14:00.024] LOG: %cStart Phase MovePhase color:green;
+[14:14:00.025] LOG: %cUser: Squirtle
+Move: AQUA_RING
+Use Mode: INDIRECT color:orchid
+[14:14:00.036] LOG: %cStart Phase MessagePhase color:green;
+[14:14:00.171] LOG: %cStart Phase MoveEffectPhase color:green;
+[14:14:00.190] LOG: %cStart Phase MessagePhase color:green;
+[14:14:00.488] LOG: %cStart Phase MoveEndPhase color:green;
+[14:14:00.489] LOG: %cStart Phase HideAbilityPhase color:green;
+[14:14:00.523] LOG: %cStart Phase PostSummonPhase color:green;
+[14:14:00.524] LOG: Ran PSP for: Fletchling
+[14:14:00.525] LOG: %cStart Phase PostSummonPhase color:green;
+[14:14:00.526] LOG: %cStart Phase PostSummonPhase color:green;
+[14:14:00.526] LOG: %cStart Phase PostSummonPhase color:green;
+[14:14:00.526] LOG: Ran PSP for: Wurmple
+[14:14:00.529] LOG: %cStart Phase PostSummonPhase color:green;
+[14:14:00.530] LOG: %cStart Phase PostSummonPhase color:green;
+[14:14:00.530] LOG: %cStart Phase TurnInitPhase color:green;
+[14:14:00.532] LOG: %cStart Phase CommandPhase color:green;
+[14:14:00.538] LOG: %cStart Phase CommandPhase color:green;
+[14:14:05.638] LOG: Move: BUBBLE_BEAM Move targets: {"targets":[2,3,0],"multiple":false} 
+Player Pokemon: Squirtle
+[14:14:05.642] LOG: %cStart Phase SelectTargetPhase color:green;
+[14:14:06.216] LOG: %cStart Phase EnemyCommandPhase color:green;
+[14:14:06.217] LOG: %cStart Phase EnemyCommandPhase color:green;
+[14:14:06.217] LOG: %cStart Phase TurnStartPhase color:green;
+[14:14:06.219] LOG: %cStart Phase CoopReplayTurnPhase color:green;
+[14:14:22.296] WARN: [coop-desync] turn=1 host=d034a0f54fe91c23 guest=e9adaefa9f4953b4
+[14:14:22.297] WARN: [coop-cs] turn=1 11 differing field(s):
+[14:14:22.298] WARN:   field.0.moves.0.1: host=1 guest=0
+[14:14:22.298] WARN:   field.1.moves.0.1: host=1 guest=0
+[14:14:22.299] WARN:   field.2.abilityId: host=79 guest=19
+[14:14:22.299] WARN:   field.2.bi: host=3 guest=2
+[14:14:22.299] WARN:   field.2.hp: host=5 guest=14
+[14:14:22.299] WARN:   field.2.moves.0.0: host=314 guest=522
+[14:14:22.299] WARN:   field.2.moves.1.0: host=175 guest=5048
+[14:14:22.299] WARN:   field.2.moves.2.0: host=64 guest=33
+[14:14:22.300] WARN:   field.2.moves.2.1: host=1 guest=0
+[14:14:22.300] WARN:   field.2.moves.3.0: host=45 guest=40
+[14:14:22.300] WARN:   field.3: host=<absent> guest={"abilityId":79,"bi":3,"fainted":false,"formIndex":0,"hp":5,"maxHp":14,"moves":[[314,0],[175,0],[64,0],[45,0]],"statStages":[0,0,0,0,0,0,0],"status":0,"tags":[]}
+[14:14:22.301] LOG: %cStart Phase MessagePhase color:green;
+[14:14:22.308] WARN: [coop-resync] turn=1 still-diverged host=d034a0f54fe91c23 guest=904df789d128054d
+[14:14:22.309] WARN: [coop-resync] turn=1 UNHEALED 9 differing field(s):
+[14:14:22.310] WARN:   field.2.abilityId: host=79 guest=19
+[14:14:22.310] WARN:   field.2.bi: host=3 guest=2
+[14:14:22.310] WARN:   field.2.hp: host=5 guest=14
+[14:14:22.310] WARN:   field.2.moves.0.0: host=314 guest=522
+[14:14:22.311] WARN:   field.2.moves.1.0: host=175 guest=5048
+[14:14:22.311] WARN:   field.2.moves.2.0: host=64 guest=33
+[14:14:22.311] WARN:   field.2.moves.2.1: host=1 guest=0
+[14:14:22.311] WARN:   field.2.moves.3.0: host=45 guest=40
+[14:14:22.311] WARN:   field.3: host=<absent> guest={"abilityId":79,"bi":3,"fainted":false,"formIndex":0,"hp":5,"maxHp":14,"moves":[[314,0],[175,0],[64,1],[45,0]],"statStages":[0,0,0,0,0,0,0],"status":0,"tags":[]}
+[14:14:22.311] WARN: [coop-resync] note: snapshot does NOT re-apply party/modifiers/arenaTags or force maxHp - a diff in those is a data-table drift, not a heal bug
+[14:14:22.620] LOG: %cStart Phase MessagePhase color:green;
+[14:14:22.848] LOG: %cStart Phase MessagePhase color:green;
+[14:14:23.097] LOG: %cStart Phase MessagePhase color:green;
+[14:14:23.357] LOG: %cStart Phase MessagePhase color:green;
+[14:14:23.608] LOG: %cStart Phase MessagePhase color:green;
+[14:14:23.951] LOG: %cStart Phase MessagePhase color:green;
+[14:14:24.194] LOG: %cStart Phase MessagePhase color:green;
+[14:14:24.457] LOG: %cStart Phase WeatherEffectPhase color:green;
+[14:14:24.458] LOG: %cStart Phase PositionalTagPhase color:green;
+[14:14:24.458] LOG: %cStart Phase BerryPhase color:green;
+[14:14:24.467] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[14:14:24.474] LOG: %cStart Phase TurnEndPhase color:green;
+[14:14:24.483] LOG: %cStart Phase PokemonHealPhase color:green;
+[14:14:24.484] LOG: %cStart Phase MessagePhase color:green;
+[14:14:24.752] LOG: %cStart Phase TurnInitPhase color:green;
+[14:14:24.753] LOG: %cStart Phase CommandPhase color:green;
+[14:14:24.755] LOG: %cStart Phase CommandPhase color:green;
