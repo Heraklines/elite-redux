@@ -225,6 +225,19 @@ export class CoopSessionController {
     return this.interactionTurn.isOwner(this.role);
   }
 
+  /**
+   * Whether the LOCAL player owns the interaction whose counter is `pinnedCounter` (#633).
+   * The phases capture the counter ONCE when an interaction's screen opens and resolve the
+   * owner from THAT pinned value (not the live `isLocalInteractionTurn`, which re-reads a
+   * counter that an inbound reconcile broadcast can bump mid-interaction). This keeps the
+   * owner + relay/cursor seq STABLE for the whole interaction so the watcher never starts
+   * following a seq the owner stopped sending on - the cursor-mirror invariant the live
+   * "wrong cursor / watcher stuck" regression broke. Mirrors the parity rule in one place.
+   */
+  isLocalOwnerAtCounter(pinnedCounter: number): boolean {
+    return CoopInteractionTurn.ownerOf(pinnedCounter) === this.role;
+  }
+
   /** The raw interaction counter (persisted with the run so a resume continues the order). */
   interactionCounter(): number {
     return this.interactionTurn.toJSON();

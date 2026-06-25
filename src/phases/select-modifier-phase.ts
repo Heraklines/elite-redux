@@ -211,16 +211,20 @@ export class SelectModifierPhase extends BattlePhase {
       // interaction, so the local human (host) OWNS every reward screen. Only a REAL peer
       // alternates control. The counter still advances so persistence stays coherent.
       const spoofed = getCoopRuntime()?.spoof != null;
-      if (spoofed || coopController.isLocalInteractionTurn()) {
+      // Co-op (#633): the OWNER is resolved from the counter PINNED when this shop opened
+      // (coopInteractionStart), NOT the live counter - an inbound reconcile broadcast can
+      // bump the live counter mid-interaction, which would flip the owner/seq calc and make
+      // the watcher follow a seq the owner stopped sending on ("cursor at the wrong spots").
+      if (spoofed || coopController.isLocalOwnerAtCounter(this.coopInteractionStart)) {
         console.log(
-          `[coop-reward] OWNER drives reward screen (turn=${coopController.interactionCounter()} role=${coopController.role} spoof=${spoofed} wave=${globalScene.currentBattle?.waveIndex})`,
+          `[coop-reward] OWNER drives reward screen (start=${this.coopInteractionStart} role=${coopController.role} spoof=${spoofed} wave=${globalScene.currentBattle?.waveIndex})`,
         );
         this.resetModifierSelect(modifierSelectCallback);
         // Co-op (#633): relay our cursor so the partner's screen mirrors it live.
         this.coopBeginMirror("owner");
       } else {
         console.log(
-          `[coop-reward] WATCHER waits for partner's reward picks (turn=${coopController.interactionCounter()} role=${coopController.role} wave=${globalScene.currentBattle?.waveIndex})`,
+          `[coop-reward] WATCHER waits for partner's reward picks (start=${this.coopInteractionStart} role=${coopController.role} wave=${globalScene.currentBattle?.waveIndex})`,
         );
         void this.startCoopWatch();
       }
@@ -736,16 +740,20 @@ export class SelectModifierPhase extends BattlePhase {
     return modifierType.newModifier(target);
   }
 
-  /** OWNER only: relay one reward-screen pick to the watcher on this interaction's seq. */
+  /** OWNER only: relay one reward-screen pick to the watcher on this interaction's seq.
+   *  The seq + owner check are PINNED to the counter this shop opened on (#633): the live
+   *  counter can be bumped mid-interaction by an inbound reconcile broadcast, which would
+   *  send a later pick on a DIFFERENT seq than the watcher's captured await seq (the watcher
+   *  then stops following the owner's picks - the live cursor/relay desync). */
   private coopRelaySend(choice: number, data: number[] | undefined, label: string): void {
     if (!globalScene.gameMode.isCoop) {
       return;
     }
     const controller = getCoopController();
-    if (controller == null || !controller.isLocalInteractionTurn()) {
+    if (controller == null || !controller.isLocalOwnerAtCounter(this.coopInteractionStart)) {
       return;
     }
-    getCoopInteractionRelay()?.sendInteractionChoice(controller.interactionCounter(), label, choice, data);
+    getCoopInteractionRelay()?.sendInteractionChoice(this.coopInteractionStart, label, choice, data);
   }
 
   /** Advance the alternating-interaction turn once the reward screen is left for good.
@@ -779,7 +787,8 @@ export class SelectModifierPhase extends BattlePhase {
    *  target (if any) resolves. No-op for the watcher (it applies the relayed target). */
   private coopBeginPending(kind: "reward" | "shop", cursor: number, row: number): void {
     const controller = globalScene.gameMode.isCoop ? getCoopController() : null;
-    if (controller != null && controller.isLocalInteractionTurn()) {
+    // Pinned-counter owner check (#633): same stability rule as coopRelaySend.
+    if (controller?.isLocalOwnerAtCounter(this.coopInteractionStart)) {
       this.coopPendingKind = kind;
       this.coopPendingCursor = cursor;
       this.coopPendingRow = row;
@@ -804,11 +813,16 @@ export class SelectModifierPhase extends BattlePhase {
    * Co-op (#633) live-cursor mirror seq for THIS reward screen. Combines the interaction
    * turn with the reroll count so each reroll round gets its own cursor stream (stale
    * cosmetic buttons from a prior round can never leak in). Owner and watcher compute it
-   * identically (same interaction counter + same rerollCount on the re-created phase).
+   * identically from the counter PINNED when the shop opened (coopInteractionStart) + the
+   * rerollCount on the re-created phase - NEVER the live counter, which an inbound reconcile
+   * broadcast can bump mid-interaction (that drift desynced the owner/watcher seqs and is
+   * exactly the "watcher's cursor at the wrong spots" regression).
    */
   private coopMirrorSeq(): number {
-    const controller = getCoopController();
-    return controller == null ? -1 : controller.interactionCounter() * 64 + Math.min(this.rerollCount, 63);
+    if (getCoopController() == null || this.coopInteractionStart < 0) {
+      return -1;
+    }
+    return this.coopInteractionStart * 64 + Math.min(this.rerollCount, 63);
   }
 
   /**
@@ -856,7 +870,11 @@ export class SelectModifierPhase extends BattlePhase {
       this.getRerollCost(globalScene.lockModifierTiers),
     );
     this.coopBeginMirror("watcher");
-    const seq = controller.interactionCounter();
+    // Await on the PINNED interaction counter (#633), matching the owner's pinned send seq.
+    // Reading the live counter here would let an inbound reconcile broadcast (which can bump
+    // it mid-interaction) move our await seq off the owner's send seq -> we'd stop receiving
+    // the owner's picks and hang ("watcher stuck / cursor at the wrong spots").
+    const seq = this.coopInteractionStart;
     for (;;) {
       const action = await relay.awaitInteractionChoice(seq, COOP_REWARD_WAIT_MS);
       if (action == null) {

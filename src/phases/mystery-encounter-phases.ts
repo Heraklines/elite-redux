@@ -73,7 +73,10 @@ function coopBeginMePump(): void {
   coopMeInteractionStart = controller.interactionCounter();
   const seq = COOP_ME_PUMP_SEQ_BASE + coopMeInteractionStart;
   const spoofed = getCoopRuntime()?.spoof != null;
-  if (spoofed || controller.isLocalInteractionTurn()) {
+  // Resolve the ME owner from the PINNED start counter (#633), not the live counter - an
+  // inbound reconcile broadcast can bump the live counter mid-encounter, which would flip
+  // the owner/seq calc and desync the pump (the same drift that broke the cursor mirror).
+  if (spoofed || controller.isLocalOwnerAtCounter(coopMeInteractionStart)) {
     pump.beginOwner(seq);
   } else {
     // On the leave sentinel / timeout / partner-gone, fast-forward to the next wave IF still in

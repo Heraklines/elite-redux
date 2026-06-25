@@ -216,12 +216,23 @@ export class CoopInteractionTurn {
 
   /** The role that owns the current interaction. */
   current(): CoopRole {
-    return this.counter % 2 === 0 ? "host" : "guest";
+    return CoopInteractionTurn.ownerOf(this.counter);
   }
 
   /** Whether `role` owns the current interaction. */
   isOwner(role: CoopRole): boolean {
     return this.current() === role;
+  }
+
+  /**
+   * The role that owns the interaction whose counter is `n` (parity rule). Co-op (#633):
+   * exposed STATICALLY so a phase can resolve the owner from the counter it PINNED at the
+   * interaction's start - never from the live counter, which can be bumped mid-interaction
+   * by an inbound reconcile broadcast (the cursor-mirror / choice-relay seq + owner must be
+   * STABLE for the whole interaction, or the watcher follows the wrong seq).
+   */
+  static ownerOf(counter: number): CoopRole {
+    return counter % 2 === 0 ? "host" : "guest";
   }
 
   /**
