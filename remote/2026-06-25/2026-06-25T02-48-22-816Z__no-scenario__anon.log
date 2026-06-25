@@ -1,0 +1,270 @@
+url:      https://elite-redux-staging.pages.dev/
+build:    mqsw9b7c-4yin
+mode:     6  wave:4
+seed:     Mjjxs1WrV2WOMfCuznlLE0GJ
+party:    Charmander(L6 13hp f0), Chikorita(L5 15hp f0), Bulbasaur(L5 0hp f0), Fennekin(L6 15hp f0), Squirtle(L5 21hp f0)
+enemy:    Slowpoke(L3), Stunky(L3)
+
+----- COMMENT -----
+Co’op test
+
+----- CONSOLE -----
+[02:46:40.489] LOG: Pokemon: Foe Slowpoke | Species ID: 79 | Level: 3 | Nature: Relaxed (+Def/-Spd)
+[02:46:40.489] LOG: Stats (IVs): HP: 18 (31), Atk: 9 (31), Def: 8 (31), Spatk: 9 (31), Spdef: 7 (31), Spd: 7 (0)
+[02:46:40.489] LOG: Ability: Damp | Passive Ability: Oblivious 
+[02:46:40.489] LOG: Moveset: ["Scald","Ice Beam","Slack Off","Toxic"]
+[02:46:40.496] LOG: ER #419: elite BST cap (420 @ w4) - replacing Kecleon (440) with Stunky (343)
+[02:46:40.528] LOG: Pokemon: Foe Stunky | Species ID: 434 | Level: 3 | Nature: Brave (+Atk/-Spd)
+[02:46:40.528] LOG: Stats (IVs): HP: 16 (31), Atk: 7 (31), Def: 8 (31), Spatk: 9 (31), Spdef: 7 (31), Spd: 9 (0)
+[02:46:40.528] LOG: Ability: Poison Point | Passive Ability: Aftermath 
+[02:46:40.528] LOG: Moveset: ["Sucker Punch","Return","Fire Punch","Trick Room"]
+[02:46:41.113] LOG: Battle Seed: wIqERJnOBbtNAs3w
+[02:46:41.126] LOG: Generated AI funcs
+[02:46:41.194] DEBUG: Session data saved to slot 0!
+[02:46:41.196] LOG: Wave Seed: Qnn|w5[vZ6[SQjGy~rpPI4KN 4
+[02:46:41.883] LOG: Beginners Ken & Lurleen
+[02:46:42.733] LOG: Dialogue saved as seen: dialogue:youngster.encounter.9
+[02:46:42.833] LOG: Beginners Ken & Lurleen
+[02:46:44.595] LOG: %cStart Phase SummonPhase color:green;
+[02:46:44.596] LOG: Ken
+[02:46:45.458] LOG: %cStart Phase SummonPhase color:green;
+[02:46:45.458] LOG: Lurleen
+[02:46:46.340] LOG: %cStart Phase SummonPhase color:green;
+[02:46:46.940] WARN: cry/4 not found
+[02:46:47.272] LOG: %cStart Phase ShinySparklePhase color:green;
+[02:46:47.621] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[02:46:47.623] LOG: %cStart Phase SummonPhase color:green;
+[02:46:48.221] WARN: cry/653 not found
+[02:46:48.553] LOG: %cStart Phase InitEncounterPhase color:green;
+[02:46:48.556] LOG: Applied X Speed 
+[02:46:48.557] LOG: Applied X Speed 
+[02:46:48.558] LOG: Applied X Speed 
+[02:46:48.559] LOG: Applied X Speed 
+[02:46:48.559] LOG: %cStart Phase PostSummonPhase color:green;
+[02:46:48.559] LOG: Ran PSP for: Charmander
+[02:46:48.560] LOG: Applied X Speed 
+[02:46:48.561] LOG: Applied X Speed 
+[02:46:48.561] LOG: Applied X Speed 
+[02:46:48.562] LOG: Applied X Speed 
+[02:46:48.563] LOG: Applied X Speed 
+[02:46:48.563] LOG: Applied X Speed 
+[02:46:48.564] LOG: %cStart Phase PostSummonPhase color:green;
+[02:46:48.565] LOG: Applied X Speed 
+[02:46:48.566] LOG: Applied X Speed 
+[02:46:48.566] LOG: %cStart Phase PostSummonPhase color:green;
+[02:46:48.566] LOG: Ran PSP for: Fennekin
+[02:46:48.567] LOG: Applied X Speed 
+[02:46:48.567] LOG: Applied X Speed 
+[02:46:48.568] LOG: Applied X Speed 
+[02:46:48.569] LOG: Applied X Speed 
+[02:46:48.569] LOG: %cStart Phase PostSummonPhase color:green;
+[02:46:48.570] LOG: %cStart Phase PostSummonPhase color:green;
+[02:46:48.570] LOG: Ran PSP for: Stunky
+[02:46:48.571] LOG: %cStart Phase PostSummonPhase color:green;
+[02:46:48.571] LOG: %cStart Phase PostSummonPhase color:green;
+[02:46:48.571] LOG: %cStart Phase PostSummonPhase color:green;
+[02:46:48.571] LOG: Ran PSP for: Slowpoke
+[02:46:48.572] LOG: %cStart Phase PostSummonPhase color:green;
+[02:46:48.572] LOG: %cStart Phase PostSummonPhase color:green;
+[02:46:48.572] LOG: %cStart Phase TurnInitPhase color:green;
+[02:46:48.573] LOG: %cStart Phase CommandPhase color:green;
+[02:46:59.805] ERROR: [unhandledrejection] InvalidStateError: Failed to start the audio device
+[02:46:59.898] ERROR: [unhandledrejection] InvalidStateError: Failed to start the audio device
+[02:47:07.091] LOG: Move: BITTER_BLADE Move targets: {"targets":[3],"multiple":false} 
+Player Pokemon: Charmander
+[02:47:07.092] LOG: %cStart Phase CommandPhase color:green;
+[02:47:18.520] LOG: %cStart Phase EnemyCommandPhase color:green;
+[02:47:18.521] LOG: Applied X Speed 
+[02:47:18.521] LOG: Applied X Speed 
+[02:47:18.532] LOG: Move Pool: ["Scald"]
+[02:47:18.532] LOG: Move Scores: [1057.142857142857]
+[02:47:18.532] LOG: Sorted Move Pool: ["Scald"]
+[02:47:18.532] LOG: Chosen Move: Scald
+[02:47:18.532] LOG: ER AI: standard brain (sharpness 0.85)
+[02:47:18.533] LOG: %cStart Phase EnemyCommandPhase color:green;
+[02:47:18.533] LOG: Applied X Speed 
+[02:47:18.533] LOG: Applied X Speed 
+[02:47:18.543] LOG: Applied X Speed 
+[02:47:18.546] LOG: Applied X Speed 
+[02:47:18.551] LOG: Move Pool: ["Sucker Punch","Return","Fire Punch","Trick Room"]
+[02:47:18.551] LOG: Move Scores: [26.08695652173913,1.607142857142857,0.9782608695652173,0]
+[02:47:18.551] LOG: Sorted Move Pool: ["Sucker Punch","Return","Fire Punch","Trick Room"]
+[02:47:18.551] LOG: Chosen Move: Sucker Punch
+[02:47:18.551] LOG: ER AI: standard brain (sharpness 0.85)
+[02:47:18.551] LOG: %cStart Phase TurnStartPhase color:green;
+[02:47:18.551] LOG: Applied X Speed 
+[02:47:18.551] LOG: Applied X Speed 
+[02:47:18.552] LOG: Applied X Speed 
+[02:47:18.552] LOG: Applied X Speed 
+[02:47:18.552] LOG: Applied X Speed 
+[02:47:18.552] LOG: Applied X Speed 
+[02:47:18.553] LOG: Applied X Speed 
+[02:47:18.553] LOG: Applied X Speed 
+[02:47:18.553] LOG: Applied X Speed 
+[02:47:18.553] LOG: Applied X Speed 
+[02:47:18.554] LOG: Applied X Speed 
+[02:47:18.554] LOG: Applied X Speed 
+[02:47:18.555] LOG: %cStart Phase SwitchSummonPhase color:green;
+[02:47:18.660] LOG: Applied X Speed 
+[02:47:18.660] LOG: Applied X Speed 
+[02:47:18.660] LOG: Applied X Speed 
+[02:47:18.661] LOG: Applied X Speed 
+[02:47:18.661] LOG: Applied X Speed 
+[02:47:18.661] LOG: Applied X Speed 
+[02:47:19.240] WARN: cry/152 not found
+[02:47:19.583] LOG: Applied X Speed 
+[02:47:19.583] LOG: Applied X Speed 
+[02:47:19.584] LOG: Applied X Speed 
+[02:47:19.584] LOG: Applied X Speed 
+[02:47:19.585] LOG: Applied X Speed 
+[02:47:19.586] LOG: Applied X Speed 
+[02:47:19.587] LOG: %cStart Phase PostSummonPhase color:green;
+[02:47:19.587] LOG: Ran PSP for: Chikorita
+[02:47:19.587] LOG: Applied X Speed 
+[02:47:19.588] LOG: Applied X Speed 
+[02:47:19.588] LOG: %cStart Phase PostSummonPhase color:green;
+[02:47:19.589] LOG: Applied X Speed 
+[02:47:19.589] LOG: Applied X Speed 
+[02:47:19.590] LOG: %cStart Phase MovePhase color:green;
+[02:47:19.590] LOG: %cUser: Stunky
+Move: SUCKER_PUNCH
+Use Mode: NORMAL color:orchid
+[02:47:19.591] LOG: Applied X Speed 
+[02:47:19.591] LOG: Applied X Speed 
+[02:47:19.592] LOG: Applied X Speed 
+[02:47:19.592] LOG: Applied X Speed 
+[02:47:19.593] LOG: Applied X Speed 
+[02:47:19.593] LOG: Applied X Speed 
+[02:47:19.598] LOG: Applied X Speed 
+[02:47:19.598] LOG: Applied X Speed 
+[02:47:19.598] LOG: Applied X Speed 
+[02:47:19.599] LOG: Applied X Speed 
+[02:47:19.599] LOG: Applied X Speed 
+[02:47:19.600] LOG: Applied X Speed 
+[02:47:19.600] LOG: %cStart Phase MessagePhase color:green;
+[02:47:19.988] LOG: %cStart Phase MoveEffectPhase color:green;
+[02:47:20.506] LOG: crit stage: +0
+[02:47:20.508] LOG: Move: Sucker Punch | Base damage: 5.359999999999999 | Power: 70 | Source attack: 9 | Target defense: 12
+[02:47:20.509] LOG: Move: Sucker Punch | Attack damage: 7
+[02:47:20.509] LOG: %cStart Phase DamageAnimPhase color:green;
+[02:47:20.548] LOG: %cStart Phase MoveEndPhase color:green;
+[02:47:20.549] LOG: Applied X Speed 
+[02:47:20.549] LOG: %cStart Phase MovePhase color:green;
+[02:47:20.549] LOG: %cUser: Charmander
+Move: BITTER_BLADE
+Use Mode: NORMAL color:orchid
+[02:47:20.550] LOG: Applied X Speed 
+[02:47:20.550] LOG: Applied X Speed 
+[02:47:20.550] LOG: Applied X Speed 
+[02:47:20.551] LOG: Applied X Speed 
+[02:47:20.552] LOG: Applied X Speed 
+[02:47:20.552] LOG: Applied X Speed 
+[02:47:20.554] LOG: Applied X Speed 
+[02:47:20.554] LOG: Applied X Speed 
+[02:47:20.555] LOG: Applied X Speed 
+[02:47:20.555] LOG: Applied X Speed 
+[02:47:20.556] LOG: Applied X Speed 
+[02:47:20.557] LOG: Applied X Speed 
+[02:47:20.558] LOG: %cStart Phase MessagePhase color:green;
+[02:47:20.945] LOG: %cStart Phase MoveEffectPhase color:green;
+[02:47:21.721] LOG: crit stage: +0
+[02:47:21.722] LOG: Applied X Speed 
+[02:47:21.723] LOG: Applied X Speed 
+[02:47:21.723] LOG: Move: Bitter Blade | Base damage: 14.870000000000003 | Power: 90 | Source attack: 13 | Target defense: 8
+[02:47:21.727] LOG: Move: Bitter Blade | Attack damage: 21
+[02:47:21.728] LOG: Applied X Speed 
+[02:47:21.728] LOG: Applied X Speed 
+[02:47:21.729] LOG: Applied X Speed 
+[02:47:21.729] LOG: Applied X Speed 
+[02:47:21.730] LOG: %cStart Phase ShowAbilityPhase color:green;
+[02:47:22.253] LOG: %cStart Phase HideAbilityPhase color:green;
+[02:47:22.353] LOG: %cStart Phase DamageAnimPhase color:green;
+[02:47:22.395] LOG: %cStart Phase MessagePhase color:green;
+[02:47:23.117] LOG: %cStart Phase PokemonHealPhase color:green;
+[02:47:23.123] LOG: %cStart Phase MessagePhase color:green;
+[02:47:23.849] LOG: %cStart Phase ShowAbilityPhase color:green;
+[02:47:24.383] LOG: %cStart Phase ObtainStatusEffectPhase color:green;
+[02:47:24.848] LOG: %cStart Phase MessagePhase color:green;
+[02:47:25.563] LOG: %cStart Phase HideAbilityPhase color:green;
+[02:47:25.647] LOG: %cStart Phase MoveEndPhase color:green;
+[02:47:25.649] LOG: %cStart Phase MovePhase color:green;
+[02:47:25.649] LOG: %cUser: Stunky
+Move: EXPLOSION
+Use Mode: FOLLOW_UP color:orchid
+[02:47:25.651] LOG: Applied X Speed 
+[02:47:25.652] LOG: Applied X Speed 
+[02:47:25.652] LOG: Applied X Speed 
+[02:47:25.653] LOG: Applied X Speed 
+[02:47:25.654] LOG: Applied X Speed 
+[02:47:25.654] LOG: Applied X Speed 
+[02:47:25.655] LOG: %cStart Phase MessagePhase color:green;
+[02:47:26.029] LOG: %cStart Phase MoveEffectPhase color:green;
+[02:47:26.063] LOG: crit stage: +0
+[02:47:26.065] LOG: Move: Explosion | Base damage: 7.333333333333334 | Power: 100 | Source attack: 10 | Target defense: 12
+[02:47:26.066] LOG: Move: Explosion | Attack damage: 8
+[02:47:26.067] LOG: Applied X Speed 
+[02:47:26.067] LOG: Applied X Speed 
+[02:47:26.068] LOG: crit stage: +0
+[02:47:26.069] LOG: Move: Explosion | Base damage: 7.333333333333334 | Power: 100 | Source attack: 10 | Target defense: 12
+[02:47:26.069] LOG: Move: Explosion | Attack damage: 5
+[02:47:26.070] LOG: Applied X Speed 
+[02:47:26.070] LOG: Applied X Speed 
+[02:47:26.071] LOG: crit stage: +0
+[02:47:26.072] LOG: Move: Explosion | Base damage: 10 | Power: 100 | Source attack: 10 | Target defense: 8
+[02:47:26.072] LOG: Move: Explosion | Attack damage: 7
+[02:47:26.081] LOG: %cStart Phase DamageAnimPhase color:green;
+[02:47:26.104] LOG: %cStart Phase MessagePhase color:green;
+[02:47:26.745] LOG: %cStart Phase DamageAnimPhase color:green;
+[02:47:26.800] LOG: %cStart Phase DamageAnimPhase color:green;
+[02:47:26.820] LOG: %cStart Phase DamageAnimPhase color:green;
+[02:47:26.821] LOG: %cStart Phase FaintPhase color:green;
+[02:47:26.823] LOG: Applied X Speed 
+[02:47:26.824] LOG: Applied X Speed 
+[02:47:26.824] LOG: Applied X Speed 
+[02:47:26.824] LOG: Applied X Speed 
+[02:47:26.824] LOG: Applied X Speed 
+[02:47:31.060] ERROR: [unhandledrejection] InvalidStateError: Failed to start the audio device
+[02:47:31.871] LOG: Applied X Speed 
+[02:47:31.872] LOG: Applied X Speed 
+[02:47:31.872] LOG: Applied X Speed 
+[02:47:31.872] LOG: Applied X Speed 
+[02:47:31.874] LOG: Applied X Speed 
+[02:47:31.883] LOG: %cStart Phase MessagePhase color:green;
+[02:47:33.388] LOG: %cStart Phase VictoryPhase color:green;
+[02:47:33.391] LOG: %cStart Phase ExpPhase color:green;
+[02:47:34.134] LOG: %cStart Phase ExpPhase color:green;
+[02:47:34.900] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[02:47:35.603] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[02:47:35.799] LOG: %cStart Phase MoveEndPhase color:green;
+[02:47:35.800] LOG: %cStart Phase MovePhase color:green;
+[02:47:35.800] LOG: %cUser: Slowpoke
+Move: SCALD
+Use Mode: NORMAL color:orchid
+[02:47:35.801] LOG: %cStart Phase MessagePhase color:green;
+[02:47:36.496] LOG: %cStart Phase MoveEndPhase color:green;
+[02:47:36.496] LOG: %cStart Phase CheckInterludePhase color:green;
+[02:47:36.496] LOG: %cStart Phase WeatherEffectPhase color:green;
+[02:47:36.496] LOG: %cStart Phase PositionalTagPhase color:green;
+[02:47:36.496] LOG: %cStart Phase BerryPhase color:green;
+[02:47:36.498] LOG: Applied X Speed 
+[02:47:36.498] LOG: Applied X Speed 
+[02:47:36.498] LOG: Applied X Speed 
+[02:47:36.499] LOG: Applied X Speed 
+[02:47:36.500] LOG: Applied X Speed 
+[02:47:36.500] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[02:47:36.500] LOG: Applied X Speed 
+[02:47:36.501] LOG: Applied X Speed 
+[02:47:36.501] LOG: Applied X Speed 
+[02:47:36.501] LOG: Applied X Speed 
+[02:47:36.502] LOG: Applied X Speed 
+[02:47:36.502] LOG: %cStart Phase PostTurnStatusEffectPhase color:green;
+[02:47:36.963] LOG: %cStart Phase MessagePhase color:green;
+[02:47:37.711] LOG: %cStart Phase TurnEndPhase color:green;
+[02:47:37.713] LOG: Applied X Speed 
+[02:47:37.713] LOG: Applied X Speed 
+[02:47:37.714] LOG: Applied X Speed 
+[02:47:37.715] LOG: Applied X Speed 
+[02:47:37.716] LOG: Applied X Speed 
+[02:47:37.716] LOG: %cStart Phase TurnInitPhase color:green;
+[02:47:37.717] LOG: %cStart Phase CommandPhase color:green;
+[02:48:01.776] ERROR: [unhandledrejection] InvalidStateError: Failed to start the audio device
