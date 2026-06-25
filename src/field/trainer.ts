@@ -291,7 +291,17 @@ export class Trainer extends Phaser.GameObjects.Container {
     // double, but only double-VARIANT trainers grew their party to 2 here.
     // A single-mon trainer in a forced double battle left the second enemy
     // slot permanently unfillable and the battle froze (community report).
-    const erForcedDouble = globalScene.gameMode?.hasChallenge?.(Challenges.DOUBLES_ONLY) ?? false;
+    //
+    // ER (#633 co-op): co-op ALSO forces every trainer battle to a double
+    // (so each of the two players controls one enemy-facing slot) - via
+    // `battle.double`, NOT the DOUBLES_ONLY challenge - so an early single
+    // trainer (e.g. the first wave-4/5 trainer) hit the exact same unfillable
+    // 2nd-slot freeze on EVERY co-op run. Gate the party-size bump on the
+    // actual forced-double state too. Solo / normal play is unaffected (its
+    // early trainers stay single, so this branch never runs there).
+    const erForcedDouble =
+      (globalScene.gameMode?.hasChallenge?.(Challenges.DOUBLES_ONLY) ?? false)
+      || (globalScene.gameMode?.isCoop ?? false);
     if ((this.isDouble() || erForcedDouble) && partyTemplate.size < 2) {
       partyTemplate.size = 2;
     }
