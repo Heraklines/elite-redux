@@ -1,0 +1,275 @@
+url:      https://elite-redux-staging.pages.dev/
+build:    mqsql8oa-6pk0
+mode:     6  wave:4
+seed:     KfHk4yE8Y7hgHnkkn4ZkNLMU
+party:    Tynamo(L5 16hp f0), Flygon Redux B(L5 20hp f0), Whismur Redux(L5 24hp f0), Bubbleo(L5 23hp f0), Oricorio(L5 24hp f0), Larvesta Redux(L5 21hp f0)
+enemy:    Zigzagoon(L4), Fletchling(L4)
+
+----- CONSOLE -----
+[00:35:13.302] LOG: %cStart Phase ShowAbilityPhase color:green;
+[00:35:13.600] LOG: %cStart Phase HideAbilityPhase color:green;
+[00:35:13.648] LOG: %cStart Phase MessagePhase color:green;
+[00:35:14.060] LOG: %cStart Phase DamageAnimPhase color:green;
+[00:35:14.074] LOG: %cStart Phase PokemonHealPhase color:green;
+[00:35:14.074] LOG: %cStart Phase MessagePhase color:green;
+[00:35:14.508] LOG: %cStart Phase DamageAnimPhase color:green;
+[00:35:14.524] LOG: %cStart Phase PokemonHealPhase color:green;
+[00:35:14.524] LOG: %cStart Phase MessagePhase color:green;
+[00:35:14.957] LOG: %cStart Phase FaintPhase color:green;
+[00:35:15.060] LOG: %cStart Phase MessagePhase color:green;
+[00:35:15.290] LOG: %cStart Phase VictoryPhase color:green;
+[00:35:15.291] LOG: %cStart Phase ExpPhase color:green;
+[00:35:15.722] LOG: %cStart Phase ExpPhase color:green;
+[00:35:16.176] LOG: %cStart Phase FaintPhase color:green;
+[00:35:16.177] WARN: cry/161 not found
+[00:35:16.285] LOG: %cStart Phase MessagePhase color:green;
+[00:35:16.655] LOG: %cStart Phase VictoryPhase color:green;
+[00:35:16.656] LOG: %cStart Phase ExpPhase color:green;
+[00:35:17.527] LOG: %cStart Phase ExpPhase color:green;
+[00:35:17.855] LOG: %cStart Phase MoveEndPhase color:green;
+[00:35:17.856] LOG: %cStart Phase MovePhase color:green;
+[00:35:17.856] LOG: %cUser: Tynamo
+Move: SCALD
+Use Mode: NORMAL color:orchid
+[00:35:17.856] LOG: %cStart Phase MessagePhase color:green;
+[00:35:18.036] LOG: %cStart Phase MessagePhase color:green;
+[00:35:18.405] LOG: %cStart Phase MoveEndPhase color:green;
+[00:35:18.406] LOG: %cStart Phase MovePhase color:green;
+[00:35:18.406] LOG: %cStart Phase MoveEndPhase color:green;
+[00:35:18.406] LOG: %cStart Phase MovePhase color:green;
+[00:35:18.406] LOG: %cStart Phase MoveEndPhase color:green;
+[00:35:18.406] LOG: %cStart Phase CheckInterludePhase color:green;
+[00:35:18.406] LOG: %cStart Phase WeatherEffectPhase color:green;
+[00:35:18.406] LOG: %cStart Phase PositionalTagPhase color:green;
+[00:35:18.406] LOG: %cStart Phase BerryPhase color:green;
+[00:35:18.407] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[00:35:18.407] LOG: %cStart Phase TurnEndPhase color:green;
+[00:35:18.408] LOG: %cStart Phase BattleEndPhase color:green;
+[00:35:18.409] LOG: Battle Score: 19 (1 Turns x1)
+[00:35:18.409] LOG: Total Score: 43
+[00:35:18.414] LOG: %cStart Phase EggLapsePhase color:green;
+[00:35:18.415] LOG: %cStart Phase SelectModifierPhase color:green;
+[00:35:18.415] LOG: Wave Seed: MhJm6{G:[9jiJpmmp6\mPNOW 2
+[00:35:18.419] LOG: 4 1 [1,11,12,13,15,25]
+[00:35:18.419] LOG: {"id":"MINT","localeKey":"","iconImage":"mint_spatk","group":"mint","soundName":"se/restore","tier":2,"nature":16} 
+[00:35:18.419] LOG: 9 5 [2,3,4,5,6]
+[00:35:18.420] LOG: {"id":"TM_COMMON","localeKey":"","iconImage":"tm_normal","group":"tm","soundName":"se/restore","tier":0,"moveId":219} 
+[00:35:18.420] LOG: 0 0 [2,3,4,5,6]
+[00:35:18.420] LOG: {"id":"POKEBALL","localeKey":"","iconImage":"pb","group":"pb","soundName":"se/pb_bounce_1","tier":0,"pokeballType":0,"count":5} 
+[00:35:18.420] LOG: [coop-reward] WATCHER waits for partner's reward picks (turn=1 role=host wave=2)
+[00:35:22.718] LOG: %cStart Phase NewBattlePhase color:green;
+[00:35:22.718] LOG: Wave Seed: NiKn7|H;\:kjKqnnq7]nQOPX 3
+[00:35:22.718] LOG: %cStart Phase NextEncounterPhase color:green;
+[00:35:22.721] LOG: Starting species pool tier: UNCOMMON
+[00:35:22.729] LOG: Pokemon: Wild Pawmi | Species ID: 921 | Level: 3 | Nature: Docile (-)
+[00:35:22.729] LOG: Stats (IVs): HP: 16 (21), Atk: 8 (12), Def: 6 (8), Spatk: 8 (20), Spdef: 7 (22), Spd: 9 (11)
+[00:35:22.729] LOG: Ability: Adrenaline Rush | Passive Ability: Volt Absorb 
+[00:35:22.729] LOG: Moveset: ["Thunder Shock","Quick Attack"]
+[00:35:22.729] LOG: Starting species pool tier: COMMON
+[00:35:22.734] LOG: Pokemon: Wild Lillipup | Species ID: 506 | Level: 3 | Nature: Modest (+SpAtk/-Atk)
+[00:35:22.734] LOG: Stats (IVs): HP: 15 (4), Atk: 8 (12), Def: 8 (26), Spatk: 7 (14), Spdef: 7 (2), Spd: 9 (10)
+[00:35:22.734] LOG: Ability: Vital Spirit | Passive Ability: Fluffy 
+[00:35:22.734] LOG: Moveset: ["Growl","Odor Sleuth","Roar","Tackle"]
+[00:35:22.734] LOG: [coop-reward] host advances interaction turn from 1
+[00:35:22.734] LOG: [coop-launch] proceedIfReady launched=true localTeam=3 bothReady=true role=host partnerReady=true
+[00:35:24.208] DEBUG: Session data saved to slot 0!
+[00:35:24.208] LOG: Wave Seed: NiKn7|H;\:kjKqnnq7]nQOPX 3
+[00:35:25.066] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[00:35:25.066] LOG: %cStart Phase CheckSwitchPhase color:green;
+[00:35:25.066] LOG: %cStart Phase CheckSwitchPhase color:green;
+[00:35:25.066] LOG: %cStart Phase InitEncounterPhase color:green;
+[00:35:25.067] LOG: %cStart Phase PostSummonPhase color:green;
+[00:35:25.067] LOG: Ran PSP for: Lillipup
+[00:35:25.067] LOG: %cStart Phase PostSummonPhase color:green;
+[00:35:25.067] LOG: Ran PSP for: Pawmi
+[00:35:25.067] LOG: %cStart Phase PostSummonPhase color:green;
+[00:35:25.068] LOG: %cStart Phase PostSummonPhase color:green;
+[00:35:25.068] LOG: %cStart Phase PostSummonPhase color:green;
+[00:35:25.068] LOG: %cStart Phase PostSummonPhase color:green;
+[00:35:25.068] LOG: %cStart Phase TurnInitPhase color:green;
+[00:35:25.068] LOG: %cStart Phase CommandPhase color:green;
+[00:35:26.162] LOG: Move: SCALD Move targets: {"targets":[2,3,1],"multiple":false} 
+Player Pokemon: Tynamo
+[00:35:26.164] LOG: %cStart Phase SelectTargetPhase color:green;
+[00:35:26.739] LOG: %cStart Phase CommandPhase color:green;
+[00:35:29.695] LOG: Move: EARTH_POWER Move targets: {"targets":[2],"multiple":false} 
+Player Pokemon: Flygon Redux B
+[00:35:29.695] LOG: %cStart Phase EnemyCommandPhase color:green;
+[00:35:29.698] LOG: Battle Seed: 7n5PkQlePCEDrqKy
+[00:35:29.701] LOG: Move Pool: ["Thunder Shock","Quick Attack"]
+[00:35:29.701] LOG: Move Scores: [12.375,8]
+[00:35:29.701] LOG: Sorted Move Pool: ["Thunder Shock","Quick Attack"]
+[00:35:29.701] LOG: Chosen Move: Thunder Shock
+[00:35:29.701] LOG: %cStart Phase EnemyCommandPhase color:green;
+[00:35:29.706] WARN: BattlerTag IGNORE_GHOST is missing a score!
+[00:35:29.706] WARN: BattlerTag IGNORE_GHOST is missing a score!
+[00:35:29.706] WARN: BattlerTag IGNORE_GHOST is missing a score!
+[00:35:29.707] WARN: BattlerTag IGNORE_GHOST is missing a score!
+[00:35:29.708] LOG: Move Pool: ["Growl","Odor Sleuth","Roar","Tackle"]
+[00:35:29.708] LOG: Move Scores: [2,0,-20,12]
+[00:35:29.708] LOG: Sorted Move Pool: ["Tackle","Growl","Odor Sleuth","Roar"]
+[00:35:29.708] LOG: Chosen Move: Growl
+[00:35:29.708] LOG: %cStart Phase TurnStartPhase color:green;
+[00:35:29.711] LOG: %cStart Phase MovePhase color:green;
+[00:35:29.711] LOG: %cUser: Flygon Redux B
+Move: EARTH_POWER
+Use Mode: NORMAL color:orchid
+[00:35:29.714] LOG: %cStart Phase MessagePhase color:green;
+[00:35:29.931] LOG: %cStart Phase MoveEffectPhase color:green;
+[00:35:30.818] LOG: crit stage: +0
+[00:35:30.819] LOG: Applied X Sp. Atk 
+[00:35:30.820] LOG: Move: Earth Power | Base damage: 23.6 | Power: 90 | Source attack: 21 | Target defense: 7
+[00:35:30.820] LOG: Move: Earth Power | Attack damage: 44
+[00:35:30.821] LOG: %cStart Phase DamageAnimPhase color:green;
+[00:35:30.831] LOG: %cStart Phase MessagePhase color:green;
+[00:35:31.224] LOG: %cStart Phase FaintPhase color:green;
+[00:35:31.327] LOG: %cStart Phase MessagePhase color:green;
+[00:35:31.926] LOG: %cStart Phase VictoryPhase color:green;
+[00:35:31.926] LOG: %cStart Phase ExpPhase color:green;
+[00:35:32.211] LOG: %cStart Phase ExpPhase color:green;
+[00:35:32.673] LOG: %cStart Phase MoveEndPhase color:green;
+[00:35:32.674] LOG: %cStart Phase MovePhase color:green;
+[00:35:32.674] LOG: %cUser: Tynamo
+Move: SCALD
+Use Mode: NORMAL color:orchid
+[00:35:32.675] LOG: %cStart Phase MessagePhase color:green;
+[00:35:32.854] LOG: %cStart Phase MoveEffectPhase color:green;
+[00:35:33.180] LOG: crit stage: +0
+[00:35:33.181] LOG: Applied X Sp. Atk 
+[00:35:33.181] LOG: Move: Scald | Base damage: 13.885714285714286 | Power: 80 | Source attack: 13 | Target defense: 7
+[00:35:33.182] LOG: Move: Scald | Attack damage: 12
+[00:35:33.182] LOG: %cStart Phase DamageAnimPhase color:green;
+[00:35:33.194] LOG: %cStart Phase MoveEndPhase color:green;
+[00:35:33.194] LOG: %cStart Phase MovePhase color:green;
+[00:35:33.194] LOG: %cUser: Lillipup
+Move: GROWL
+Use Mode: NORMAL color:orchid
+[00:35:33.196] LOG: %cStart Phase MessagePhase color:green;
+[00:35:33.405] LOG: %cStart Phase MoveEffectPhase color:green;
+[00:35:33.617] LOG: crit stage: +0
+[00:35:33.618] LOG: Move: Growl | Base damage: 4.443636363636363 | Power: 60 | Source attack: 7 | Target defense: 11
+[00:35:33.618] LOG: Move: Growl | Attack damage: 4
+[00:35:33.619] LOG: crit stage: +0
+[00:35:33.620] LOG: Move: Growl | Base damage: 3.92 | Power: 60 | Source attack: 7 | Target defense: 14
+[00:35:33.620] LOG: Move: Growl | Attack damage: 5
+[00:35:33.622] LOG: %cStart Phase DamageAnimPhase color:green;
+[00:35:33.631] LOG: %cStart Phase StatStageChangePhase color:green;
+[00:35:33.634] LOG: %cStart Phase ShowAbilityPhase color:green;
+[00:35:33.944] LOG: %cStart Phase MessagePhase color:green;
+[00:35:34.477] LOG: %cStart Phase HideAbilityPhase color:green;
+[00:35:34.522] LOG: %cStart Phase DamageAnimPhase color:green;
+[00:35:34.532] LOG: %cStart Phase MessagePhase color:green;
+[00:35:34.902] LOG: %cStart Phase StatStageChangePhase color:green;
+[00:35:35.255] LOG: %cStart Phase MessagePhase color:green;
+[00:35:35.646] LOG: %cStart Phase MoveEndPhase color:green;
+[00:35:35.647] LOG: %cStart Phase MovePhase color:green;
+[00:35:35.647] LOG: %cStart Phase MoveEndPhase color:green;
+[00:35:35.647] LOG: %cStart Phase CheckInterludePhase color:green;
+[00:35:35.647] LOG: %cStart Phase WeatherEffectPhase color:green;
+[00:35:35.647] LOG: %cStart Phase PositionalTagPhase color:green;
+[00:35:35.647] LOG: %cStart Phase BerryPhase color:green;
+[00:35:35.648] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[00:35:35.648] LOG: %cStart Phase TurnEndPhase color:green;
+[00:35:35.651] LOG: %cStart Phase TurnInitPhase color:green;
+[00:35:35.651] LOG: %cStart Phase CommandPhase color:green;
+[00:35:36.623] LOG: Move: SCALD Move targets: {"targets":[3,1],"multiple":false} 
+Player Pokemon: Tynamo
+[00:35:36.625] LOG: %cStart Phase SelectTargetPhase color:green;
+[00:35:37.042] LOG: %cStart Phase CommandPhase color:green;
+[00:35:38.892] LOG: Move: NASTY_PLOT Move targets: {"targets":[1],"multiple":false} 
+Player Pokemon: Flygon Redux B
+[00:35:38.892] LOG: %cStart Phase EnemyCommandPhase color:green;
+[00:35:38.895] WARN: BattlerTag IGNORE_GHOST is missing a score!
+[00:35:38.895] WARN: BattlerTag IGNORE_GHOST is missing a score!
+[00:35:38.895] LOG: Battle Seed: 7n5PkQlePCEDrqKy
+[00:35:38.896] WARN: BattlerTag IGNORE_GHOST is missing a score!
+[00:35:38.896] LOG: Move Pool: ["Growl","Odor Sleuth","Roar","Tackle"]
+[00:35:38.896] LOG: Move Scores: [2,0,-20,12]
+[00:35:38.896] LOG: Sorted Move Pool: ["Tackle","Growl","Odor Sleuth","Roar"]
+[00:35:38.896] LOG: Chosen Move: Tackle
+[00:35:38.896] LOG: %cStart Phase TurnStartPhase color:green;
+[00:35:38.899] LOG: %cStart Phase MovePhase color:green;
+[00:35:38.899] LOG: %cUser: Flygon Redux B
+Move: NASTY_PLOT
+Use Mode: NORMAL color:orchid
+[00:35:38.901] LOG: %cStart Phase MessagePhase color:green;
+[00:35:39.125] LOG: %cStart Phase MoveEffectPhase color:green;
+[00:35:39.503] LOG: %cStart Phase StatStageChangePhase color:green;
+[00:35:39.856] LOG: %cStart Phase MessagePhase color:green;
+[00:35:40.320] LOG: %cStart Phase MoveEndPhase color:green;
+[00:35:40.322] LOG: %cStart Phase MovePhase color:green;
+[00:35:40.322] LOG: %cUser: Tynamo
+Move: SCALD
+Use Mode: NORMAL color:orchid
+[00:35:40.324] LOG: %cStart Phase MessagePhase color:green;
+[00:35:40.501] LOG: %cStart Phase MoveEffectPhase color:green;
+[00:35:40.828] LOG: crit stage: +0
+[00:35:40.829] LOG: Applied X Sp. Atk 
+[00:35:40.829] LOG: Move: Scald | Base damage: 13.885714285714286 | Power: 80 | Source attack: 13 | Target defense: 7
+[00:35:40.829] LOG: Move: Scald | Attack damage: 17
+[00:35:40.830] LOG: %cStart Phase DamageAnimPhase color:green;
+[00:35:40.842] LOG: %cStart Phase MessagePhase color:green;
+[00:35:41.210] LOG: %cStart Phase FaintPhase color:green;
+[00:35:41.314] LOG: %cStart Phase MessagePhase color:green;
+[00:35:41.454] LOG: %cStart Phase VictoryPhase color:green;
+[00:35:41.454] LOG: %cStart Phase ExpPhase color:green;
+[00:35:41.721] LOG: %cStart Phase ExpPhase color:green;
+[00:35:41.974] LOG: %cStart Phase MoveEndPhase color:green;
+[00:35:41.974] LOG: %cStart Phase MovePhase color:green;
+[00:35:41.974] LOG: %cStart Phase MoveEndPhase color:green;
+[00:35:41.974] LOG: %cStart Phase CheckInterludePhase color:green;
+[00:35:41.974] LOG: %cStart Phase WeatherEffectPhase color:green;
+[00:35:41.974] LOG: %cStart Phase PositionalTagPhase color:green;
+[00:35:41.974] LOG: %cStart Phase BerryPhase color:green;
+[00:35:41.975] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[00:35:41.975] LOG: %cStart Phase TurnEndPhase color:green;
+[00:35:41.976] LOG: %cStart Phase BattleEndPhase color:green;
+[00:35:41.977] LOG: Battle Score: 27 (2 Turns x0.84)
+[00:35:41.977] LOG: Total Score: 70
+[00:35:41.981] LOG: %cStart Phase EggLapsePhase color:green;
+[00:35:41.981] LOG: %cStart Phase SelectModifierPhase color:green;
+[00:35:41.981] LOG: Wave Seed: NiKn7|H;\:kjKqnnq7]nQOPX 3
+[00:35:41.984] LOG: 1 0 [2,3,4,5,6]
+[00:35:41.984] LOG: {"id":"RARE_CANDY","localeKey":"modifierType:ModifierType.RARE_CANDY","iconImage":"rare_candy","soundName":"se/restore","tier":0} 
+[00:35:41.984] LOG: 16 10 [2,3,4,5,6,7,8,9,10,12,23]
+[00:35:41.984] LOG: {"id":"ER_UPGRADED_MAP","localeKey":"","iconImage":"map","iconTint":16765514,"soundName":"se/restore","tier":1} 
+[00:35:41.984] LOG: 0 0 [2,3,4,5,6,7,8,9,10,12,23]
+[00:35:41.984] LOG: {"id":"GREAT_BALL","localeKey":"","iconImage":"gb","group":"pb","soundName":"se/pb_bounce_1","tier":1,"pokeballType":1,"count":5} 
+[00:35:41.984] LOG: 8 5 [2,3,4,5,6]
+[00:35:41.984] LOG: {"id":"BERRY","localeKey":"","iconImage":"lansat_berry","group":"berry","soundName":"se/restore","tier":0,"berryType":8} 
+[00:35:41.985] LOG: [coop-reward] OWNER drives reward screen (turn=2 role=host spoof=false wave=3)
+[00:35:49.704] LOG: %cStart Phase NewBattlePhase color:green;
+[00:35:49.704] LOG: Wave Seed: OjLo8}I<];lkLroor8^oRPQY 4
+[00:35:49.704] LOG: %cStart Phase NextEncounterPhase color:green;
+[00:35:49.705] LOG: Starting species pool tier: COMMON
+[00:35:49.714] LOG: Pokemon: Wild Zigzagoon | Species ID: 263 | Level: 4 | Nature: Bold (+Def/-Atk)
+[00:35:49.714] LOG: Stats (IVs): HP: 17 (8), Atk: 9 (8), Def: 9 (9), Spatk: 8 (22), Spdef: 8 (13), Spd: 11 (29)
+[00:35:49.714] LOG: Ability: Momentum | Passive Ability: Pickup 
+[00:35:49.714] LOG: Moveset: ["Double-Edge","Stomping Tantrum","Mud Sport","Odor Sleuth"]
+[00:35:49.714] LOG: Starting species pool tier: COMMON
+[00:35:49.723] LOG: Pokemon: Wild Fletchling | Species ID: 661 | Level: 4 | Nature: Quirky (-)
+[00:35:49.723] LOG: Stats (IVs): HP: 18 (14), Atk: 9 (20), Def: 9 (25), Spatk: 8 (3), Spdef: 8 (17), Spd: 11 (28)
+[00:35:49.723] LOG: Ability: Rivalry | Passive Ability: Flock 
+[00:35:49.723] LOG: Moveset: ["Growl","Air Cutter","Peck","Flail"]
+[00:35:49.723] LOG: [coop-reward] host advances interaction turn from 2
+[00:35:49.723] LOG: [coop-launch] proceedIfReady launched=true localTeam=3 bothReady=true role=host partnerReady=true
+[00:35:50.380] DEBUG: Session data saved to slot 0!
+[00:35:50.380] LOG: Wave Seed: OjLo8}I<];lkLroor8^oRPQY 4
+[00:35:51.265] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[00:35:51.265] LOG: %cStart Phase CheckSwitchPhase color:green;
+[00:35:51.265] LOG: %cStart Phase CheckSwitchPhase color:green;
+[00:35:51.265] LOG: %cStart Phase InitEncounterPhase color:green;
+[00:35:51.265] LOG: %cStart Phase PostSummonPhase color:green;
+[00:35:51.265] LOG: Ran PSP for: Fletchling
+[00:35:51.266] LOG: %cStart Phase PostSummonPhase color:green;
+[00:35:51.266] LOG: Ran PSP for: Zigzagoon
+[00:35:51.266] LOG: %cStart Phase PostSummonPhase color:green;
+[00:35:51.266] LOG: %cStart Phase PostSummonPhase color:green;
+[00:35:51.267] LOG: %cStart Phase PostSummonPhase color:green;
+[00:35:51.267] LOG: %cStart Phase PostSummonPhase color:green;
+[00:35:51.267] LOG: %cStart Phase TurnInitPhase color:green;
+[00:35:51.267] LOG: %cStart Phase CommandPhase color:green;
+[00:35:54.186] LOG: Move: SCALD Move targets: {"targets":[2,3,1],"multiple":false} 
+Player Pokemon: Tynamo
+[00:35:54.188] LOG: %cStart Phase SelectTargetPhase color:green;
+[00:35:54.579] LOG: %cStart Phase CommandPhase color:green;
