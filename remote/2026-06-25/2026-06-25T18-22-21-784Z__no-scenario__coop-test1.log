@@ -1,0 +1,285 @@
+url:      https://elite-redux-staging.pages.dev/
+build:    mqts7m06-d8y
+mode:     6  wave:4
+seed:     vwzHnUpc49VyJU3s5YZI5rsr
+party:    Bisasam(L6 1hp f0), Bisasam(L6 7hp f0), Endivie(L5 20hp f0), Schiggy(L5 21hp f0), Hornliu(L5 20hp f0)
+enemy:    Tentacha(L3), Wingull(L3)
+
+----- COMMENT -----
+coop test 1
+
+----- CONSOLE -----
+[18:21:08.511] LOG: %cUser: Schwalbini
+Move: FOCUS_ENERGY
+Use Mode: NORMAL color:orchid
+[18:21:08.519] LOG: %cStart Phase MessagePhase color:green;
+[18:21:08.668] LOG: %cStart Phase MoveEffectPhase color:green;
+[18:21:08.863] LOG: %cStart Phase MessagePhase color:green;
+[18:21:09.115] LOG: %cStart Phase MoveEndPhase color:green;
+[18:21:09.115] LOG: %cStart Phase MovePhase color:green;
+[18:21:09.116] LOG: %cUser: Bisasam
+Move: MALIGNANT_CHAIN
+Use Mode: NORMAL color:orchid
+[18:21:09.120] LOG: %cStart Phase MessagePhase color:green;
+[18:21:09.250] LOG: %cStart Phase MoveEffectPhase color:green;
+[18:21:09.417] LOG: crit stage: +0
+[18:21:09.418] LOG: Move: Giftkettung | Base damage: 17.400000000000002 | Power: 100 | Source attack: 14 | Target defense: 8
+[18:21:09.419] LOG: Move: Giftkettung | Attack damage: 24
+[18:21:09.420] LOG: %cStart Phase DamageAnimPhase color:green;
+[18:21:09.435] LOG: %cStart Phase FaintPhase color:green;
+[18:21:10.542] LOG: %cStart Phase MessagePhase color:green;
+[18:21:10.903] LOG: %cStart Phase VictoryPhase color:green;
+[18:21:10.906] LOG: %cStart Phase ExpPhase color:green;
+[18:21:11.417] LOG: %cStart Phase ExpPhase color:green;
+[18:21:11.699] LOG: %cStart Phase MoveEndPhase color:green;
+[18:21:11.700] LOG: %cStart Phase MovePhase color:green;
+[18:21:11.700] LOG: %cUser: Bisasam
+Move: VINE_WHIP
+Use Mode: NORMAL color:orchid
+[18:21:11.703] LOG: %cStart Phase MessagePhase color:green;
+[18:21:11.824] LOG: %cStart Phase MoveEffectPhase color:green;
+[18:21:11.991] LOG: crit stage: +0
+[18:21:11.992] LOG: Move: Rankenhieb | Base damage: 11.68 | Power: 80 | Source attack: 11 | Target defense: 8
+[18:21:11.992] LOG: Move: Rankenhieb | Attack damage: 7
+[18:21:11.992] LOG: %cStart Phase DamageAnimPhase color:green;
+[18:21:12.005] LOG: %cStart Phase MessagePhase color:green;
+[18:21:12.230] LOG: %cStart Phase MoveEndPhase color:green;
+[18:21:12.230] LOG: %cStart Phase CheckInterludePhase color:green;
+[18:21:12.230] LOG: %cStart Phase WeatherEffectPhase color:green;
+[18:21:12.231] LOG: %cStart Phase PositionalTagPhase color:green;
+[18:21:12.231] LOG: %cStart Phase BerryPhase color:green;
+[18:21:12.232] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[18:21:12.232] LOG: %cStart Phase TurnEndPhase color:green;
+[18:21:12.236] LOG: %cStart Phase TurnInitPhase color:green;
+[18:21:12.236] LOG: %cStart Phase CommandPhase color:green;
+[18:21:19.223] LOG: Move: VINE_WHIP Move targets: {"targets":[3,1],"multiple":false} 
+Player Pokemon: Bisasam
+[18:21:19.225] LOG: %cStart Phase SelectTargetPhase color:green;
+[18:21:19.604] LOG: %cStart Phase CommandPhase color:green;
+[18:21:19.605] LOG: Move: MALIGNANT_CHAIN Move targets: {"targets":[3],"multiple":false} 
+Player Pokemon: Bisasam
+[18:21:19.606] LOG: %cStart Phase EnemyCommandPhase color:green;
+[18:21:19.608] LOG: Battle Seed: bHJLZxk4cfvrvESH
+[18:21:19.609] LOG: Move Pool: ["Ruckzuckhieb","Doppelschlag","Rapidschutz","Energiefokus"]
+[18:21:19.609] LOG: Move Scores: [12,33,-20,-20]
+[18:21:19.609] LOG: Sorted Move Pool: ["Doppelschlag","Ruckzuckhieb","Rapidschutz","Energiefokus"]
+[18:21:19.609] LOG: Chosen Move: Doppelschlag
+[18:21:19.609] LOG: %cStart Phase TurnStartPhase color:green;
+[18:21:19.613] LOG: %cStart Phase MovePhase color:green;
+[18:21:19.613] LOG: %cUser: Schwalbini
+Move: DOUBLE_HIT
+Use Mode: NORMAL color:orchid
+[18:21:19.616] LOG: %cStart Phase MessagePhase color:green;
+[18:21:19.744] LOG: %cStart Phase MoveEffectPhase color:green;
+[18:21:19.871] LOG: crit stage: +3
+[18:21:19.872] LOG: Move: Doppelschlag | Base damage: 3.6799999999999997 | Power: 35 | Source attack: 9 | Target defense: 12
+[18:21:19.872] LOG: Move: Doppelschlag | Attack damage: 8
+[18:21:19.873] LOG: %cStart Phase DamageAnimPhase color:green;
+[18:21:19.893] LOG: %cStart Phase MessagePhase color:green;
+[18:21:20.085] LOG: %cStart Phase MoveEffectPhase color:green;
+[18:21:20.212] LOG: crit stage: +3
+[18:21:20.213] LOG: Move: Doppelschlag | Base damage: 3.6799999999999997 | Power: 35 | Source attack: 9 | Target defense: 12
+[18:21:20.213] LOG: Move: Doppelschlag | Attack damage: 7
+[18:21:20.214] LOG: %cStart Phase DamageAnimPhase color:green;
+[18:21:20.229] LOG: %cStart Phase MessagePhase color:green;
+[18:21:20.427] LOG: %cStart Phase MessagePhase color:green;
+[18:21:20.623] LOG: %cStart Phase MoveEndPhase color:green;
+[18:21:20.623] LOG: %cStart Phase MovePhase color:green;
+[18:21:20.623] LOG: %cUser: Bisasam
+Move: MALIGNANT_CHAIN
+Use Mode: NORMAL color:orchid
+[18:21:20.625] LOG: %cStart Phase MessagePhase color:green;
+[18:21:20.750] LOG: %cStart Phase MoveEffectPhase color:green;
+[18:21:20.917] LOG: crit stage: +0
+[18:21:20.918] LOG: Move: Giftkettung | Base damage: 19.6 | Power: 100 | Source attack: 14 | Target defense: 7
+[18:21:20.919] LOG: Move: Giftkettung | Attack damage: 40
+[18:21:20.920] LOG: %cStart Phase DamageAnimPhase color:green;
+[18:21:20.936] LOG: %cStart Phase MessagePhase color:green;
+[18:21:21.132] LOG: %cStart Phase FaintPhase color:green;
+[18:21:21.693] LOG: %cStart Phase MessagePhase color:green;
+[18:21:22.884] LOG: %cStart Phase VictoryPhase color:green;
+[18:21:22.884] LOG: %cStart Phase ExpPhase color:green;
+[18:21:23.167] LOG: %cStart Phase ExpPhase color:green;
+[18:21:23.375] LOG: %cStart Phase MoveEndPhase color:green;
+[18:21:23.376] LOG: %cStart Phase MovePhase color:green;
+[18:21:23.376] LOG: %cUser: Bisasam
+Move: VINE_WHIP
+Use Mode: NORMAL color:orchid
+[18:21:23.377] LOG: %cStart Phase MessagePhase color:green;
+[18:21:23.496] LOG: %cStart Phase MessagePhase color:green;
+[18:21:23.709] LOG: %cStart Phase MoveEndPhase color:green;
+[18:21:23.709] LOG: %cStart Phase CheckInterludePhase color:green;
+[18:21:23.709] LOG: %cStart Phase WeatherEffectPhase color:green;
+[18:21:23.709] LOG: %cStart Phase PositionalTagPhase color:green;
+[18:21:23.709] LOG: %cStart Phase BerryPhase color:green;
+[18:21:23.710] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[18:21:23.710] LOG: %cStart Phase TurnEndPhase color:green;
+[18:21:23.713] LOG: %cStart Phase BattleEndPhase color:green;
+[18:21:23.713] LOG: Battle Score: 26 (2 Turns x0.84)
+[18:21:23.713] LOG: Total Score: 91
+[18:21:23.728] LOG: %cStart Phase EggLapsePhase color:green;
+[18:21:23.728] LOG: %cStart Phase SelectModifierPhase color:green;
+[18:21:23.728] LOG: Wave Seed: yz}KqXsf7<Y|MX6v8\]L8uvu 3
+[18:21:23.736] LOG: 2 1 [1,9,11,12,13,15,24]
+[18:21:23.736] LOG: {"id":"BIG_NUGGET","localeKey":"modifierType:ModifierType.BIG_NUGGET","iconImage":"big_nugget","group":"money","soundName":"se/buy","tier":2,"moneyMultiplier":2.5,"moneyMultiplierDescriptorKey":"modifierType:ModifierType.MoneyRewardModifierType.extra.moderate"} 
+[18:21:23.737] LOG: 7 2 [3,6]
+[18:21:23.737] LOG: {"id":"TEMP_STAT_STAGE_BOOSTER","localeKey":"","iconImage":"x_defense","soundName":"se/restore","tier":0,"stat":2,"nameKey":"x_defense","quantityKey":"percentage"} 
+[18:21:23.737] LOG: 7 2 [3,6]
+[18:21:23.737] LOG: {"id":"TEMP_STAT_STAGE_BOOSTER","localeKey":"","iconImage":"x_accuracy","soundName":"se/restore","tier":0,"stat":6,"nameKey":"x_accuracy","quantityKey":"stage"} 
+[18:21:23.737] LOG: 1 0 [3,6]
+[18:21:23.737] LOG: {"id":"RARE_CANDY","localeKey":"modifierType:ModifierType.RARE_CANDY","iconImage":"rare_candy","soundName":"se/restore","tier":0} 
+[18:21:23.737] LOG: 0 0 [3,6]
+[18:21:23.737] LOG: {"id":"POKEBALL","localeKey":"","iconImage":"pb","group":"pb","soundName":"se/pb_bounce_1","tier":0,"pokeballType":0,"count":5} 
+[18:21:23.737] LOG: [coop-reward] OWNER drives reward screen (start=2 role=host spoof=false wave=3)
+[18:21:29.419] LOG: %cStart Phase NewBattlePhase color:green;
+[18:21:29.419] LOG: Wave Seed: z{~LrYtg8=Z}NY7w9]^M9vwv 4
+[18:21:29.419] LOG: Starting trainer pool tier: COMMON
+[18:21:29.424] LOG: %cStart Phase MessagePhase color:green;
+[18:21:29.424] LOG: [coop-reward] advance interaction (role=host from=2 counter=2)
+[18:21:29.424] LOG: [coop-launch] proceedIfReady launched=true localTeam=2 bothReady=true role=host partnerReady=true
+[18:21:29.428] LOG: [coop-launch] proceedIfReady launched=true localTeam=2 bothReady=true role=host partnerReady=true
+[18:21:29.696] LOG: %cStart Phase ReturnPhase color:green;
+[18:21:29.807] LOG: %cStart Phase ReturnPhase color:green;
+[18:21:29.913] LOG: %cStart Phase ShowTrainerPhase color:green;
+[18:21:30.013] LOG: %cStart Phase NextEncounterPhase color:green;
+[18:21:30.027] LOG: ER #419: elite BST cap (420 @ w4) - replacing Tentoxa (515) with Tentacha (335)
+[18:21:30.046] LOG: Pokemon: Tentacha (Gegner) | Species ID: 72 | Level: 3 | Nature: Scheu (+Init/-Ang)
+[18:21:30.046] LOG: Stats (IVs): HP: 16 (31), Atk: 8 (31), Def: 6 (31), Spatk: 8 (31), Spdef: 11 (31), Spd: 9 (31)
+[18:21:30.046] LOG: Ability: Aquahülle | Passive Ability: Neutraltorso 
+[18:21:30.046] LOG: Moveset: ["Hydropumpe","Psychokinese","Schlammwoge","Abschlag"]
+[18:21:30.047] LOG: ER #419: elite BST cap (420 @ w4) - replacing Pelipper (440) with Wingull (270)
+[18:21:30.057] LOG: Pokemon: Wingull (Gegner) | Species ID: 278 | Level: 3 | Nature: Mäßig (+SpAng/-Ang)
+[18:21:30.057] LOG: Stats (IVs): HP: 16 (31), Atk: 8 (31), Def: 7 (31), Spatk: 9 (31), Spdef: 7 (31), Spd: 9 (31)
+[18:21:30.057] LOG: Ability: Aerodynamics | Passive Ability: Adlerauge 
+[18:21:30.057] LOG: Moveset: ["Luftschnitt","Hydropumpe","Schockwelle","Eisstrahl"]
+[18:21:35.267] LOG: Battle Seed: Jd6QDDUi1nLRXGHq
+[18:21:35.269] LOG: Generated AI funcs
+[18:21:35.341] DEBUG: Session data saved to slot 0!
+[18:21:35.342] LOG: Wave Seed: z{~LrYtg8=Z}NY7w9]^M9vwv 4
+[18:21:35.549] LOG: Anfänger Fridolin & Sally
+[18:21:35.975] LOG: Dialogue saved as seen: dialogue:youngster.encounter.12
+[18:21:36.013] LOG: Anfänger Fridolin & Sally
+[18:21:36.377] LOG: %cStart Phase SummonPhase color:green;
+[18:21:36.377] LOG: Fridolin
+[18:21:36.692] LOG: %cStart Phase SummonPhase color:green;
+[18:21:36.692] LOG: Sally
+[18:21:36.971] LOG: %cStart Phase SummonPhase color:green;
+[18:21:37.154] WARN: cry/1 not found
+[18:21:37.252] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[18:21:37.252] LOG: %cStart Phase SummonPhase color:green;
+[18:21:37.450] WARN: cry/1 not found
+[18:21:37.523] LOG: %cStart Phase ShinySparklePhase color:green;
+[18:21:37.633] LOG: %cStart Phase InitEncounterPhase color:green;
+[18:21:37.636] LOG: %cStart Phase PostSummonPhase color:green;
+[18:21:37.636] LOG: Ran PSP for: Bisasam
+[18:21:37.640] LOG: %cStart Phase PostSummonPhase color:green;
+[18:21:37.642] LOG: %cStart Phase PostSummonPhase color:green;
+[18:21:37.645] LOG: %cStart Phase PostSummonPhase color:green;
+[18:21:37.645] LOG: Ran PSP for: Wingull
+[18:21:37.646] LOG: %cStart Phase PostSummonPhase color:green;
+[18:21:37.646] LOG: Ran PSP for: Tentacha
+[18:21:37.647] LOG: %cStart Phase PostSummonPhase color:green;
+[18:21:37.649] LOG: %cStart Phase PostSummonPhase color:green;
+[18:21:37.651] LOG: %cStart Phase ShowAbilityPhase color:green;
+[18:21:37.807] LOG: %cStart Phase MovePhase color:green;
+[18:21:37.807] LOG: %cUser: Tentacha
+Move: AQUA_RING
+Use Mode: INDIRECT color:orchid
+[18:21:37.809] LOG: %cStart Phase MessagePhase color:green;
+[18:21:37.946] LOG: %cStart Phase MoveEffectPhase color:green;
+[18:21:37.957] LOG: %cStart Phase MessagePhase color:green;
+[18:21:38.219] LOG: %cStart Phase MoveEndPhase color:green;
+[18:21:38.219] LOG: %cStart Phase HideAbilityPhase color:green;
+[18:21:38.242] LOG: %cStart Phase PostSummonPhase color:green;
+[18:21:38.242] LOG: %cStart Phase PostSummonPhase color:green;
+[18:21:38.242] LOG: Ran PSP for: Bisasam
+[18:21:38.243] LOG: %cStart Phase PostSummonPhase color:green;
+[18:21:38.243] LOG: %cStart Phase PostSummonPhase color:green;
+[18:21:38.243] LOG: %cStart Phase TurnInitPhase color:green;
+[18:21:38.244] LOG: %cStart Phase CommandPhase color:green;
+[18:21:44.294] LOG: Move: VINE_WHIP Move targets: {"targets":[2,3,1],"multiple":false} 
+Player Pokemon: Bisasam
+[18:21:44.297] LOG: %cStart Phase SelectTargetPhase color:green;
+[18:21:44.762] LOG: %cStart Phase CommandPhase color:green;
+[18:21:49.694] LOG: Move: EARTH_POWER Move targets: {"targets":[2],"multiple":false} 
+Player Pokemon: Bisasam
+[18:21:49.694] LOG: %cStart Phase EnemyCommandPhase color:green;
+[18:21:49.708] LOG: Move Pool: ["Psychokinese"]
+[18:21:49.708] LOG: Move Scores: [1032.608695652174]
+[18:21:49.708] LOG: Sorted Move Pool: ["Psychokinese"]
+[18:21:49.708] LOG: Chosen Move: Psychokinese
+[18:21:49.708] LOG: ER AI: standard brain (sharpness 0.85)
+[18:21:49.708] LOG: %cStart Phase EnemyCommandPhase color:green;
+[18:21:49.724] LOG: Move Pool: ["Luftschnitt","Eisstrahl"]
+[18:21:49.724] LOG: Move Scores: [1057.9545454545455,1039.1304347826087]
+[18:21:49.724] LOG: Sorted Move Pool: ["Luftschnitt","Eisstrahl"]
+[18:21:49.724] LOG: Chosen Move: Luftschnitt
+[18:21:49.724] LOG: ER AI: standard brain (sharpness 0.85)
+[18:21:49.724] LOG: %cStart Phase TurnStartPhase color:green;
+[18:21:49.728] LOG: %cStart Phase MovePhase color:green;
+[18:21:49.728] LOG: %cUser: Bisasam
+Move: EARTH_POWER
+Use Mode: NORMAL color:orchid
+[18:21:49.731] LOG: %cStart Phase MessagePhase color:green;
+[18:21:49.827] LOG: %cStart Phase MoveEffectPhase color:green;
+[18:21:50.438] LOG: crit stage: +0
+[18:21:50.439] LOG: Move: Erdkräfte | Base damage: 12.080000000000002 | Power: 90 | Source attack: 14 | Target defense: 11
+[18:21:50.439] LOG: Move: Erdkräfte | Attack damage: 23
+[18:21:50.440] LOG: %cStart Phase DamageAnimPhase color:green;
+[18:21:50.453] LOG: %cStart Phase MessagePhase color:green;
+[18:21:50.663] LOG: %cStart Phase FaintPhase color:green;
+[18:21:52.086] LOG: %cStart Phase MessagePhase color:green;
+[18:21:52.290] LOG: %cStart Phase VictoryPhase color:green;
+[18:21:52.290] LOG: %cStart Phase ExpPhase color:green;
+[18:21:52.525] LOG: %cStart Phase ExpPhase color:green;
+[18:21:52.721] LOG: %cStart Phase MoveEndPhase color:green;
+[18:21:52.722] LOG: %cStart Phase MovePhase color:green;
+[18:21:52.722] LOG: %cUser: Wingull
+Move: AIR_SLASH
+Use Mode: NORMAL color:orchid
+[18:21:52.726] LOG: %cStart Phase MessagePhase color:green;
+[18:21:52.865] LOG: %cStart Phase MoveEffectPhase color:green;
+[18:21:53.119] LOG: crit stage: +0
+[18:21:53.119] LOG: Move: Luftschnitt | Base damage: 5.692307692307692 | Power: 75 | Source attack: 10 | Target defense: 13
+[18:21:53.119] LOG: Move: Luftschnitt | Attack damage: 15
+[18:21:53.120] LOG: %cStart Phase DamageAnimPhase color:green;
+[18:21:53.134] LOG: %cStart Phase MessagePhase color:green;
+[18:21:53.343] LOG: %cStart Phase MoveEndPhase color:green;
+[18:21:53.343] LOG: %cStart Phase MovePhase color:green;
+[18:21:53.343] LOG: %cUser: Bisasam
+Move: VINE_WHIP
+Use Mode: NORMAL color:orchid
+[18:21:53.345] LOG: %cStart Phase MessagePhase color:green;
+[18:21:53.474] LOG: %cStart Phase MoveEffectPhase color:green;
+[18:21:53.640] LOG: crit stage: +0
+[18:21:53.641] LOG: Move: Rankenhieb | Base damage: 13.062857142857142 | Power: 80 | Source attack: 11 | Target defense: 7
+[18:21:53.642] LOG: Move: Rankenhieb | Attack damage: 19
+[18:21:53.642] LOG: %cStart Phase DamageAnimPhase color:green;
+[18:21:53.655] LOG: %cStart Phase FaintPhase color:green;
+[18:21:54.523] LOG: %cStart Phase MessagePhase color:green;
+[18:21:56.870] LOG: %cStart Phase VictoryPhase color:green;
+[18:21:56.870] LOG: %cStart Phase ExpPhase color:green;
+[18:21:57.286] LOG: %cStart Phase ExpPhase color:green;
+[18:21:57.677] LOG: %cStart Phase MoveEndPhase color:green;
+[18:21:57.678] LOG: %cStart Phase MovePhase color:green;
+[18:21:57.678] LOG: %cStart Phase MoveEndPhase color:green;
+[18:21:57.678] LOG: %cStart Phase CheckInterludePhase color:green;
+[18:21:57.678] LOG: %cStart Phase WeatherEffectPhase color:green;
+[18:21:57.678] LOG: %cStart Phase PositionalTagPhase color:green;
+[18:21:57.678] LOG: %cStart Phase BerryPhase color:green;
+[18:21:57.679] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[18:21:57.680] LOG: %cStart Phase TurnEndPhase color:green;
+[18:21:57.681] LOG: %cStart Phase BattleEndPhase color:green;
+[18:21:57.681] LOG: Battle Score: 45 (1 Turns x1)
+[18:21:57.681] LOG: Total Score: 136
+[18:21:57.695] LOG: %cStart Phase TrainerVictoryPhase color:green;
+[18:21:57.700] LOG: Anfänger Fridolin & Sally
+[18:22:00.257] LOG: Knirps Fridolin
+[18:22:00.615] LOG: Dialogue saved as seen: dialogue:youngster.victory.12
+[18:22:00.616] LOG: %cStart Phase MoneyRewardPhase color:green;
+[18:22:03.158] LOG: %cStart Phase ModifierRewardPhase color:green;
+[18:22:03.461] LOG: %cStart Phase ModifierRewardPhase color:green;
+[18:22:03.754] LOG: %cStart Phase EggLapsePhase color:green;
+[18:22:03.754] LOG: %cStart Phase SelectModifierPhase color:green;
+[18:22:03.754] LOG: Wave Seed: z{~LrYtg8=Z}NY7w9]^M9vwv 4
+[18:22:03.760] LOG: [coop-reward] WATCHER waits for partner's reward picks (start=3 role=host wave=4)
