@@ -1,0 +1,274 @@
+url:      https://elite-redux-staging.pages.dev/
+build:    mqsymop2-45c1
+mode:     4  wave:119
+seed:     bbdUFAqHFL9yvIjGQPoGYk3F
+party:    Dracovish(L104 389hp f1), Basculegion F(L104 379hp f0), Pelipper(L104 257hp f0), Starmie(L104 273hp f1), Dewgong(L104 332hp f1), Golduck(L104 146hp f0)
+enemy:    Barbaracle(L92)
+
+----- COMMENT -----
+Sending logs on the Staying bug
+
+----- CONSOLE -----
+[04:17:52.062] LOG: %cStart Phase HideAbilityPhase color:green;
+[04:17:52.087] LOG: %cStart Phase ShowAbilityPhase color:green;
+[04:17:52.250] LOG: %cStart Phase MessagePhase color:green;
+[04:17:52.480] LOG: %cStart Phase HideAbilityPhase color:green;
+[04:17:52.505] LOG: %cStart Phase ShowAbilityPhase color:green;
+[04:17:52.668] LOG: %cStart Phase MovePhase color:green;
+[04:17:52.668] LOG: %cUser: Mega Dracovish
+Move: AQUA_RING
+Use Mode: INDIRECT color:orchid
+[04:17:52.669] LOG: %cStart Phase MessagePhase color:green;
+[04:17:52.928] LOG: %cStart Phase MoveEndPhase color:green;
+[04:17:52.928] LOG: %cStart Phase HideAbilityPhase color:green;
+[04:17:52.953] LOG: %cStart Phase PostSummonPhase color:green;
+[04:17:52.953] LOG: Ran PSP for: Kingler
+[04:17:52.953] LOG: %cStart Phase PostSummonPhase color:green;
+[04:17:52.954] LOG: %cStart Phase PostSummonPhase color:green;
+[04:17:52.954] LOG: %cStart Phase TurnInitPhase color:green;
+[04:17:52.954] LOG: %cStart Phase CommandPhase color:green;
+[04:17:53.771] LOG: Move: THUNDER_FANG Move targets: {"targets":[2],"multiple":false} 
+Player Pokemon: Mega Dracovish
+[04:17:53.772] LOG: %cStart Phase EnemyCommandPhase color:green;
+[04:17:53.775] LOG: Battle Seed: Yvn5tWypXYjPJNbN
+[04:17:53.777] LOG: Move Pool: ["Wave Crash","Hammer Arm","Stomp","Fury Cutter"]
+[04:17:53.777] LOG: Move Scores: [5.90625,18,15,9]
+[04:17:53.777] LOG: Sorted Move Pool: ["Hammer Arm","Stomp","Fury Cutter","Wave Crash"]
+[04:17:53.777] LOG: Chosen Move: Hammer Arm
+[04:17:53.777] LOG: %cStart Phase TurnStartPhase color:green;
+[04:17:53.777] LOG: %cStart Phase MovePhase color:green;
+[04:17:53.777] LOG: %cUser: Mega Dracovish
+Move: THUNDER_FANG
+Use Mode: NORMAL color:orchid
+[04:17:53.778] LOG: %cStart Phase MessagePhase color:green;
+[04:17:53.898] LOG: %cStart Phase MoveEffectPhase color:green;
+[04:17:54.050] LOG: crit stage: +0
+[04:17:54.051] LOG: Applied X Attack 
+[04:17:54.051] LOG: Move: Thunder Fang | Base damage: 250.58140845070423 | Power: 80 | Source attack: 759 | Target defense: 213
+[04:17:54.051] LOG: Move: Thunder Fang | Attack damage: 348
+[04:17:54.051] LOG: Applied Shell Bell 
+[04:17:54.051] LOG: %cStart Phase ShowAbilityPhase color:green;
+[04:17:54.208] LOG: %cStart Phase HideAbilityPhase color:green;
+[04:17:54.238] LOG: %cStart Phase DamageAnimPhase color:green;
+[04:17:54.251] LOG: %cStart Phase MessagePhase color:green;
+[04:17:54.450] LOG: %cStart Phase MessagePhase color:green;
+[04:17:54.637] LOG: %cStart Phase FaintPhase color:green;
+[04:17:54.692] LOG: %cStart Phase MessagePhase color:green;
+[04:17:54.759] LOG: %cStart Phase VictoryPhase color:green;
+[04:17:54.759] LOG: Applied Soothe Bell 
+[04:17:54.759] LOG: %cStart Phase MoveEndPhase color:green;
+[04:17:54.759] LOG: %cStart Phase MovePhase color:green;
+[04:17:54.759] LOG: %cStart Phase MoveEndPhase color:green;
+[04:17:54.759] LOG: %cStart Phase CheckInterludePhase color:green;
+[04:17:54.759] LOG: %cStart Phase WeatherEffectPhase color:green;
+[04:17:54.760] LOG: %cStart Phase PositionalTagPhase color:green;
+[04:17:54.760] LOG: %cStart Phase BerryPhase color:green;
+[04:17:54.760] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[04:17:54.760] LOG: %cStart Phase TurnEndPhase color:green;
+[04:17:54.760] LOG: %cStart Phase BattleEndPhase color:green;
+[04:17:54.760] LOG: Battle Score: 137 (1 Turns x1)
+[04:17:54.760] LOG: Total Score: 18412
+[04:17:54.762] LOG: Applied Zinc 
+[04:17:54.762] LOG: Applied HP Up 
+[04:17:54.762] LOG: Applied Iron 
+[04:17:54.762] LOG: Applied Carbos 
+[04:17:54.762] LOG: Applied Soul Dew 
+[04:17:54.762] LOG: Applied Soul Dew 
+[04:17:54.762] LOG: Applied Zinc 
+[04:17:54.762] LOG: Applied Calcium 
+[04:17:54.763] LOG: Applied Carbos 
+[04:17:54.763] LOG: Applied HP Up 
+[04:17:54.763] LOG: Applied Protein 
+[04:17:54.763] LOG: Applied Iron 
+[04:17:54.763] LOG: Applied Calcium 
+[04:17:54.766] LOG: %cStart Phase EggLapsePhase color:green;
+[04:17:54.766] LOG: %cStart Phase SelectModifierPhase color:green;
+[04:17:54.766] LOG: Wave Seed: ØØÚË¼·ç¾¼Â¯ïì¿à½ÇÆå½Ïá©¼ 118
+[04:17:54.768] LOG: Applied Golden Poké Ball 
+[04:17:54.768] LOG: 3 0 [4,5]
+[04:17:54.768] LOG: {"id":"SUPER_POTION","localeKey":"modifierType:ModifierType.SUPER_POTION","iconImage":"super_potion","group":"potion","soundName":"se/restore","tier":0,"restorePoints":50,"restorePercent":25,"healStatus":false} 
+[04:17:54.768] LOG: 12 7 [2,3,4,5,8,9,10,16,23]
+[04:17:54.768] LOG: {"id":"SUPER_LURE","localeKey":"modifierType:ModifierType.SUPER_LURE","iconImage":"super_lure","group":"lure","soundName":"se/restore","tier":1,"maxBattles":15} 
+[04:17:54.768] LOG: 0 0 [4,5]
+[04:17:54.768] LOG: {"id":"POKEBALL","localeKey":"","iconImage":"pb","group":"pb","soundName":"se/pb_bounce_1","tier":0,"pokeballType":0,"count":5} 
+[04:17:54.768] LOG: 11 7 [2,3,4,5,8,9,10,16,23]
+[04:17:54.768] LOG: {"id":"DIRE_HIT","localeKey":"modifierType:ModifierType.DIRE_HIT","iconImage":"dire_hit","soundName":"se/restore","tier":1} 
+[04:17:54.768] LOG: 20 8 [2,3,4,5,8,9,10,16,23]
+[04:17:54.768] LOG: {"id":"ER_ABILITY_CAPSULE","localeKey":"","iconImage":"ability_capsule","soundName":"se/restore","tier":1} 
+[04:17:54.768] LOG: 1 0 [2,3,4,5,8,9,10,16,23]
+[04:17:54.768] LOG: {"id":"PP_UP","localeKey":"modifierType:ModifierType.PP_UP","iconImage":"pp_up","group":"ppUp","soundName":"se/restore","tier":1,"upPoints":1} 
+[04:17:54.768] LOG: Applied Black Sludge 
+[04:17:54.769] LOG: Applied Black Sludge 
+[04:17:58.190] LOG: %cStart Phase ErCrossroadsPhase color:green;
+[04:18:00.553] LOG: %cStart Phase NewBattlePhase color:green;
+[04:18:00.553] LOG: Wave Seed: ÙÙÛÌ½¸è¿½Ã°ðíÀá¾ÈÇæ¾Ðâª½ 119
+[04:18:00.553] LOG: %cStart Phase NextEncounterPhase color:green;
+[04:18:00.554] LOG: Starting species pool tier: COMMON
+[04:18:00.554] LOG: Replaced BINACLE with BARBARACLE
+[04:18:00.554] LOG: Applied Ability Charm 
+[04:18:00.561] LOG: Pokemon: Wild Barbaracle | Species ID: 689 | Level: 92 | Nature: Quirky (-)
+[04:18:00.561] LOG: Stats (IVs): HP: 262 (30), Atk: 206 (9), Def: 227 (12), Spatk: 120 (18), Spdef: 180 (19), Spd: 147 (19)
+[04:18:00.561] LOG: Ability: Pickpocket | Passive Ability: Multi-Headed 
+[04:18:00.561] LOG: Moveset: ["Waterfall","First Impression","Sharpen","Brick Break"]
+[04:18:00.562] LOG: {"id":"BERRY","localeKey":"","iconImage":"sitrus_berry","group":"berry","soundName":"se/restore","tier":0,"berryType":0} (enemy)
+[04:18:00.611] DEBUG: Session data saved to slot 2!
+[04:18:00.611] LOG: Wave Seed: ÙÙÛÌ½¸è¿½Ã°ðíÀá¾ÈÇæ¾Ðâª½ 119
+[04:18:01.026] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[04:18:01.026] LOG: %cStart Phase CheckSwitchPhase color:green;
+[04:18:01.390] LOG: %cStart Phase InitEncounterPhase color:green;
+[04:18:01.391] LOG: %cStart Phase PostSummonPhase color:green;
+[04:18:01.391] LOG: Ran PSP for: Barbaracle
+[04:18:01.391] LOG: %cStart Phase PostSummonPhase color:green;
+[04:18:01.391] LOG: %cStart Phase PostSummonPhase color:green;
+[04:18:01.391] LOG: %cStart Phase TurnInitPhase color:green;
+[04:18:01.391] LOG: %cStart Phase CommandPhase color:green;
+[04:18:02.170] LOG: Move: THUNDER_FANG Move targets: {"targets":[2],"multiple":false} 
+Player Pokemon: Mega Dracovish
+[04:18:02.172] LOG: %cStart Phase EnemyCommandPhase color:green;
+[04:18:02.174] LOG: Battle Seed: FzOHmIvNYeKp3yCk
+[04:18:02.175] LOG: Move Pool: ["Waterfall","First Impression","Sharpen","Brick Break"]
+[04:18:02.175] LOG: Move Scores: [5.90625,23,2,17]
+[04:18:02.175] LOG: Sorted Move Pool: ["First Impression","Brick Break","Waterfall","Sharpen"]
+[04:18:02.175] LOG: Chosen Move: First Impression
+[04:18:02.175] LOG: %cStart Phase TurnStartPhase color:green;
+[04:18:02.176] LOG: %cStart Phase MovePhase color:green;
+[04:18:02.176] LOG: %cUser: Barbaracle
+Move: FIRST_IMPRESSION
+Use Mode: NORMAL color:orchid
+[04:18:02.177] LOG: %cStart Phase MessagePhase color:green;
+[04:18:02.310] LOG: %cStart Phase MoveEffectPhase color:green;
+[04:18:02.425] LOG: crit stage: +0
+[04:18:02.426] LOG: Move: First Impression | Base damage: 67.39563636363636 | Power: 117 | Source attack: 206 | Target defense: 286
+[04:18:02.426] LOG: Move: First Impression | Attack damage: 57
+[04:18:02.426] LOG: %cStart Phase DamageAnimPhase color:green;
+[04:18:02.438] LOG: %cStart Phase MoveEffectPhase color:green;
+[04:18:02.559] LOG: crit stage: +0
+[04:18:02.559] LOG: Move: First Impression | Base damage: 67.39563636363636 | Power: 117 | Source attack: 206 | Target defense: 286
+[04:18:02.560] LOG: Move: First Impression | Attack damage: 12
+[04:18:02.560] LOG: %cStart Phase DamageAnimPhase color:green;
+[04:18:02.571] LOG: %cStart Phase MoveEffectPhase color:green;
+[04:18:02.692] LOG: crit stage: +0
+[04:18:02.693] LOG: Move: First Impression | Base damage: 67.39563636363636 | Power: 117 | Source attack: 206 | Target defense: 286
+[04:18:02.693] LOG: Move: First Impression | Attack damage: 8
+[04:18:02.693] LOG: %cStart Phase DamageAnimPhase color:green;
+[04:18:02.705] LOG: %cStart Phase MessagePhase color:green;
+[04:18:02.891] LOG: %cStart Phase MoveEndPhase color:green;
+[04:18:02.892] LOG: %cStart Phase MovePhase color:green;
+[04:18:02.892] LOG: %cUser: Mega Dracovish
+Move: THUNDER_FANG
+Use Mode: NORMAL color:orchid
+[04:18:02.892] LOG: %cStart Phase MessagePhase color:green;
+[04:18:03.097] LOG: %cStart Phase MoveEndPhase color:green;
+[04:18:03.097] LOG: %cStart Phase MessagePhase color:green;
+[04:18:03.328] LOG: %cStart Phase CheckInterludePhase color:green;
+[04:18:03.328] LOG: %cStart Phase WeatherEffectPhase color:green;
+[04:18:03.328] LOG: %cStart Phase PositionalTagPhase color:green;
+[04:18:03.328] LOG: %cStart Phase BerryPhase color:green;
+[04:18:03.328] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[04:18:03.329] LOG: %cStart Phase TurnEndPhase color:green;
+[04:18:03.329] LOG: Applied Leftovers 
+[04:18:03.329] LOG: %cStart Phase PokemonHealPhase color:green;
+[04:18:03.427] LOG: %cStart Phase MessagePhase color:green;
+[04:18:03.698] LOG: %cStart Phase TurnInitPhase color:green;
+[04:18:03.698] LOG: %cStart Phase CommandPhase color:green;
+[04:18:04.267] LOG: Move: THUNDER_FANG Move targets: {"targets":[2],"multiple":false} 
+Player Pokemon: Mega Dracovish
+[04:18:04.269] LOG: %cStart Phase EnemyCommandPhase color:green;
+[04:18:04.270] LOG: Battle Seed: FzOHmIvNYeKp3yCk
+[04:18:04.271] LOG: Move Pool: ["Waterfall","First Impression","Sharpen","Brick Break"]
+[04:18:04.271] LOG: Move Scores: [5.90625,-20,2,17]
+[04:18:04.272] LOG: Sorted Move Pool: ["Brick Break","Waterfall","Sharpen","First Impression"]
+[04:18:04.272] LOG: Chosen Move: Brick Break
+[04:18:04.272] LOG: %cStart Phase TurnStartPhase color:green;
+[04:18:04.272] LOG: %cStart Phase MovePhase color:green;
+[04:18:04.272] LOG: %cUser: Mega Dracovish
+Move: THUNDER_FANG
+Use Mode: NORMAL color:orchid
+[04:18:04.273] LOG: %cStart Phase MessagePhase color:green;
+[04:18:04.394] LOG: %cStart Phase MoveEffectPhase color:green;
+[04:18:04.546] LOG: crit stage: +0
+[04:18:04.546] LOG: Applied X Attack 
+[04:18:04.547] LOG: Move: Thunder Fang | Base damage: 235.25039647577094 | Power: 80 | Source attack: 759 | Target defense: 227
+[04:18:04.547] LOG: Move: Thunder Fang | Attack damage: 461
+[04:18:04.547] LOG: Applied Shell Bell 
+[04:18:04.547] LOG: %cStart Phase ShowAbilityPhase color:green;
+[04:18:04.704] LOG: %cStart Phase HideAbilityPhase color:green;
+[04:18:04.735] LOG: %cStart Phase DamageAnimPhase color:green;
+[04:18:04.748] LOG: %cStart Phase MessagePhase color:green;
+[04:18:04.946] LOG: %cStart Phase MessagePhase color:green;
+[04:18:05.134] LOG: %cStart Phase PokemonHealPhase color:green;
+[04:18:05.233] LOG: %cStart Phase MessagePhase color:green;
+[04:18:05.503] LOG: %cStart Phase FaintPhase color:green;
+[04:18:05.559] LOG: %cStart Phase MessagePhase color:green;
+[04:18:05.728] LOG: %cStart Phase ShowAbilityPhase color:green;
+[04:18:05.892] LOG: %cStart Phase PokemonHealPhase color:green;
+[04:18:05.996] LOG: %cStart Phase MessagePhase color:green;
+[04:18:06.255] LOG: %cStart Phase HideAbilityPhase color:green;
+[04:18:06.280] LOG: %cStart Phase VictoryPhase color:green;
+[04:18:06.280] LOG: Applied Soothe Bell 
+[04:18:06.281] LOG: %cStart Phase MoveEndPhase color:green;
+[04:18:06.281] LOG: %cStart Phase MovePhase color:green;
+[04:18:06.281] LOG: %cStart Phase MoveEndPhase color:green;
+[04:18:06.281] LOG: %cStart Phase CheckInterludePhase color:green;
+[04:18:06.281] LOG: %cStart Phase WeatherEffectPhase color:green;
+[04:18:06.281] LOG: %cStart Phase PositionalTagPhase color:green;
+[04:18:06.281] LOG: %cStart Phase BerryPhase color:green;
+[04:18:06.281] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[04:18:06.281] LOG: %cStart Phase TurnEndPhase color:green;
+[04:18:06.281] LOG: %cStart Phase BattleEndPhase color:green;
+[04:18:06.281] LOG: Battle Score: 135 (2 Turns x0.84)
+[04:18:06.281] LOG: Total Score: 18547
+[04:18:06.283] LOG: Applied Zinc 
+[04:18:06.283] LOG: Applied HP Up 
+[04:18:06.283] LOG: Applied Iron 
+[04:18:06.283] LOG: Applied Carbos 
+[04:18:06.283] LOG: Applied Soul Dew 
+[04:18:06.283] LOG: Applied Soul Dew 
+[04:18:06.283] LOG: Applied Zinc 
+[04:18:06.283] LOG: Applied Calcium 
+[04:18:06.283] LOG: Applied Carbos 
+[04:18:06.283] LOG: Applied HP Up 
+[04:18:06.283] LOG: Applied Protein 
+[04:18:06.284] LOG: Applied Iron 
+[04:18:06.284] LOG: Applied Calcium 
+[04:18:06.285] LOG: %cStart Phase EggLapsePhase color:green;
+[04:18:06.286] LOG: %cStart Phase SelectModifierPhase color:green;
+[04:18:06.286] LOG: Wave Seed: ÙÙÛÌ½¸è¿½Ã°ðíÀá¾ÈÇæ¾Ðâª½ 119
+[04:18:06.287] LOG: Applied Golden Poké Ball 
+[04:18:06.287] LOG: 6 2 [4,5]
+[04:18:06.287] LOG: {"id":"LURE","localeKey":"modifierType:ModifierType.LURE","iconImage":"lure","group":"lure","soundName":"se/restore","tier":0,"maxBattles":10} 
+[04:18:06.287] LOG: 22 8 [2,3,4,5,8,9,10,16,23]
+[04:18:06.287] LOG: {"id":"TERA_SHARD","localeKey":"","iconImage":"flying_tera_shard","group":"tera_shard","soundName":"se/restore","tier":1,"teraType":2} 
+[04:18:06.287] LOG: 9 2 [4,5]
+[04:18:06.288] LOG: {"id":"TM_COMMON","localeKey":"","iconImage":"tm_psychic","group":"tm","soundName":"se/restore","tier":0,"moveId":678} 
+[04:18:06.288] LOG: 15 7 [2,3,4,5,8,9,10,16,23]
+[04:18:06.288] LOG: GREAT 0
+[04:18:06.288] LOG: 22 8 [2,3,4,5,8,9,10,16,23]
+[04:18:06.288] LOG: {"id":"TERA_SHARD","localeKey":"","iconImage":"rock_tera_shard","group":"tera_shard","soundName":"se/restore","tier":1,"teraType":5} 
+[04:18:06.288] LOG: 11 7 [2,3,4,5,8,9,10,16,23]
+[04:18:06.288] LOG: {"id":"DIRE_HIT","localeKey":"modifierType:ModifierType.DIRE_HIT","iconImage":"dire_hit","soundName":"se/restore","tier":1} 
+[04:18:06.288] LOG: 6 2 [4,5]
+[04:18:06.288] LOG: {"id":"LURE","localeKey":"modifierType:ModifierType.LURE","iconImage":"lure","group":"lure","soundName":"se/restore","tier":0,"maxBattles":10} 
+[04:18:06.288] LOG: 6 2 [4,5]
+[04:18:06.288] LOG: {"id":"LURE","localeKey":"modifierType:ModifierType.LURE","iconImage":"lure","group":"lure","soundName":"se/restore","tier":0,"maxBattles":10} 
+[04:18:06.288] LOG: 6 2 [4,5]
+[04:18:06.288] LOG: {"id":"LURE","localeKey":"modifierType:ModifierType.LURE","iconImage":"lure","group":"lure","soundName":"se/restore","tier":0,"maxBattles":10} 
+[04:18:06.288] LOG: 0 0 [4,5]
+[04:18:06.288] LOG: {"id":"POKEBALL","localeKey":"","iconImage":"pb","group":"pb","soundName":"se/pb_bounce_1","tier":0,"pokeballType":0,"count":5} 
+[04:18:06.288] LOG: Applied Black Sludge 
+[04:18:06.289] LOG: Applied Black Sludge 
+[04:18:10.086] LOG: Applied Zinc 
+[04:18:10.086] LOG: Applied HP Up 
+[04:18:10.086] LOG: Applied Iron 
+[04:18:10.086] LOG: Applied Carbos 
+[04:18:10.086] LOG: Applied Soul Dew 
+[04:18:10.086] LOG: Applied Soul Dew 
+[04:18:10.086] LOG: Applied Zinc 
+[04:18:10.086] LOG: Applied Calcium 
+[04:18:10.086] LOG: Applied Carbos 
+[04:18:10.086] LOG: Applied HP Up 
+[04:18:10.087] LOG: Applied Protein 
+[04:18:10.087] LOG: Applied Iron 
+[04:18:10.087] LOG: Applied Calcium 
+[04:18:10.093] LOG: %cStart Phase SelectBiomePhase color:green;
+[04:18:10.093] LOG: Wave Seed: ÙÙÛÌ½¸è¿½Ã°ðíÀá¾ÈÇæ¾Ðâª½ 119
