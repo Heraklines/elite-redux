@@ -4,6 +4,7 @@ import { getPokemonNameWithAffix } from "#app/messages";
 import { handleTutorial, Tutorial } from "#app/tutorial";
 import type { ArenaTag } from "#data/arena-tag";
 import { OctolockTag } from "#data/battler-tags";
+import { isCoopRecording, recordCoopEvent } from "#data/elite-redux/coop/coop-turn-recorder";
 import { ArenaTagSide } from "#enums/arena-tag-side";
 import { ArenaTagType } from "#enums/arena-tag-type";
 import type { BattlerIndex } from "#enums/battler-index";
@@ -226,6 +227,20 @@ export class StatStageChangePhase extends PokemonPhase {
         }
 
         pokemon.setStatStage(s, pokemon.getStatStage(s) + stages.value);
+
+        // Co-op host turn recorder (#633, TRACK-2 Phase B - animation layer): record the NEW absolute
+        // stage as a structured `statStage` event so the AUTHORITATIVE guest plays the stat tween +
+        // message and snaps the absolute stage (NOT the full compute path, which re-runs Mirror-Armor /
+        // filtering). Recorded AFTER setStatStage so `getStatStage(s)` is the post-change absolute value.
+        // Inert unless a recording is open (only the host, mid-turn, in a live co-op run) - solo is unaffected.
+        if (isCoopRecording()) {
+          recordCoopEvent({
+            k: "statStage",
+            bi: this.battlerIndex,
+            stat: s,
+            value: pokemon.getStatStage(s),
+          });
+        }
       }
 
       if (stages.value > 0 && this.canBeCopied) {

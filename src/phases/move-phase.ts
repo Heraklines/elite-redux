@@ -5,6 +5,7 @@ import { getPokemonNameWithAffix } from "#app/messages";
 import Overrides from "#app/overrides";
 import { PokemonPhase } from "#app/phases/pokemon-phase";
 import { CenterOfAttentionTag, type EncoreTag } from "#data/battler-tags";
+import { isCoopRecording, recordCoopEvent } from "#data/elite-redux/coop/coop-turn-recorder";
 import { SpeciesFormChangePreMoveTrigger } from "#data/form-change-triggers";
 import { getStatusEffectActivationText } from "#data/status-effect";
 import { getTerrainBlockMessage } from "#data/terrain";
@@ -701,6 +702,20 @@ export class MovePhase extends PokemonPhase {
       }),
       500,
     );
+
+    // Co-op host turn recorder (#633, TRACK-2 Phase B - animation layer): record the move usage as a
+    // structured `moveUsed` event so the AUTHORITATIVE guest can play the RNG-free move animation. The
+    // "X used Y!" line above already rode as a `message` event via the queueMessage tap (it precedes this
+    // event in the recording), so the guest narrates the text then plays the anim. Inert unless a recording
+    // is open (only the host, mid-turn, in a live co-op run) - solo / non-host is byte-for-byte unaffected.
+    if (isCoopRecording()) {
+      recordCoopEvent({
+        k: "moveUsed",
+        bi: pokemon.getBattlerIndex(),
+        moveId,
+        targets: [...this.targets],
+      });
+    }
 
     // Moves with pre-use messages (Magnitude, Chilly Reception, Fickle Beam, etc.) always display their messages even on failure
     // TODO: This assumes single target for message funcs - is this sustainable?
