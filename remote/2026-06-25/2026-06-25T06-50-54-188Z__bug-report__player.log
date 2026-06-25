@@ -1,0 +1,262 @@
+----- BUG REPORT (in-game) -----
+version:  1.11.19
+url:      https://elite-redux.pages.dev/
+ua:       Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36
+mode:     0  wave:71  difficulty:youngster
+seed:     UFsJSyrOLeGLGgIweiW0mV15
+party:    Arachtres(L57 183/183), Venusaur(L60 187/187), Pangoro(L57 184/184), Pidgeot(L57 164/164), Wigglytuff(L57 218/218), Weezing(L57 171/171)
+
+----- DESCRIPTION -----
+Pidgeotto and Pidgeot still retain Big Pecks ability from Pidgey upon evolution. Does not change to Speed Boost as intended.
+
+----- CONSOLE -----
+[06:44:03.276] LOG: %cStart Phase MessagePhase color:green;
+[06:44:03.560] LOG: %cStart Phase MoveEffectPhase color:green;
+[06:44:03.574] LOG: crit stage: +0
+[06:44:03.574] LOG: Move: Explosion | Base damage: 35.82857142857143 | Power: 100 | Source attack: 74 | Target defense: 105
+[06:44:03.574] LOG: Move: Explosion | Attack damage: 33
+[06:44:03.575] LOG: %cStart Phase DamageAnimPhase color:green;
+[06:44:03.588] LOG: %cStart Phase DamageAnimPhase color:green;
+[06:44:03.589] LOG: %cStart Phase FaintPhase color:green;
+[06:44:05.366] LOG: %cStart Phase MessagePhase color:green;
+[06:44:06.248] LOG: %cStart Phase VictoryPhase color:green;
+[06:44:06.248] LOG: %cStart Phase MoveEndPhase color:green;
+[06:44:06.248] LOG: %cStart Phase CheckInterludePhase color:green;
+[06:44:06.249] LOG: %cStart Phase PositionalTagPhase color:green;
+[06:44:06.249] LOG: %cStart Phase TurnEndPhase color:green;
+[06:44:06.249] LOG: %cStart Phase BattleEndPhase color:green;
+[06:44:06.249] LOG: Battle Score: 301 (1 Turns x1)
+[06:44:06.249] LOG: Total Score: 6740
+[06:44:06.251] LOG: Applied Protein 
+[06:44:06.251] LOG: Applied Zinc 
+[06:44:06.253] LOG: %cStart Phase EggLapsePhase color:green;
+[06:44:06.253] LOG: %cStart Phase ModifierRewardPhase color:green;
+[06:44:06.254] LOG: Applied Protein 
+[06:44:06.254] LOG: Applied Zinc 
+[06:44:07.971] LOG: %cStart Phase SelectModifierPhase color:green;
+[06:44:31.545] WARN: cry/10003 not found
+[06:44:35.903] WARN: cry/10003 not found
+[06:47:30.708] LOG: Applied Protein 
+[06:47:30.708] LOG: Applied Soothe Bell 
+[06:47:30.708] LOG: Applied Zinc 
+[06:47:40.913] LOG: Applied Soothe Bell 
+[06:47:40.913] LOG: Applied Zinc 
+[06:47:46.435] LOG: Applied Soothe Bell 
+[06:47:46.435] LOG: Applied Zinc 
+[06:47:48.192] LOG: Applied Soothe Bell 
+[06:47:48.193] LOG: Applied Zinc 
+[06:47:51.423] LOG: Applied X Speed 
+[06:47:51.423] LOG: Applied X Speed 
+[06:47:51.423] LOG: Applied X Speed 
+[06:47:51.423] LOG: Applied X Speed 
+[06:47:51.423] LOG: Applied X Speed 
+[06:47:51.423] LOG: Applied X Speed 
+[06:47:51.423] LOG: Applied X Speed 
+[06:47:51.423] LOG: Applied X Speed 
+[06:47:51.423] LOG: Applied X Speed 
+[06:47:51.423] LOG: Applied X Speed 
+[06:47:51.423] LOG: Applied X Speed 
+[06:47:51.423] LOG: Applied X Speed 
+[06:47:51.423] LOG: Applied X Speed 
+[06:47:51.424] LOG: Applied X Speed 
+[06:47:51.424] LOG: Applied X Speed 
+[06:47:51.424] LOG: Applied X Speed 
+[06:47:51.424] LOG: Applied X Speed 
+[06:47:51.424] LOG: Applied X Speed 
+[06:47:51.424] LOG: Applied X Speed 
+[06:47:51.424] LOG: Applied X Speed 
+[06:47:51.424] LOG: Applied X Speed 
+[06:47:51.424] LOG: Applied X Speed 
+[06:47:51.424] LOG: Applied X Speed 
+[06:47:51.424] LOG: Applied X Speed 
+[06:47:51.424] LOG: Applied X Speed 
+[06:47:51.424] LOG: Applied X Speed 
+[06:47:51.424] LOG: Applied X Speed 
+[06:47:51.424] LOG: Applied X Speed 
+[06:47:51.424] LOG: %cStart Phase LevelUpPhase color:green;
+[06:47:51.425] LOG: Applied X Speed 
+[06:47:51.425] LOG: Applied X Speed 
+[06:47:51.425] LOG: Applied X Speed 
+[06:47:51.425] LOG: Applied X Speed 
+[06:47:51.425] LOG: Applied X Speed 
+[06:47:51.425] LOG: Applied X Speed 
+[06:47:51.425] LOG: Applied X Speed 
+[06:47:51.425] LOG: Applied X Speed 
+[06:47:51.425] LOG: Applied X Speed 
+[06:47:51.425] LOG: Applied X Speed 
+[06:47:51.425] LOG: Applied X Speed 
+[06:47:51.425] LOG: Applied X Speed 
+[06:47:51.425] LOG: Applied X Speed 
+[06:47:51.426] LOG: Applied X Speed 
+[06:47:51.426] LOG: %cStart Phase LevelUpPhase color:green;
+[06:47:51.426] LOG: Applied X Speed 
+[06:47:51.426] LOG: Applied X Speed 
+[06:47:51.426] LOG: Applied X Speed 
+[06:47:51.426] LOG: Applied X Speed 
+[06:47:51.426] LOG: Applied X Speed 
+[06:47:51.426] LOG: Applied X Speed 
+[06:47:51.426] LOG: Applied X Speed 
+[06:47:51.426] LOG: Applied X Speed 
+[06:47:51.426] LOG: %cStart Phase LevelUpPhase color:green;
+[06:47:51.427] LOG: Applied X Speed 
+[06:47:51.427] LOG: Applied X Speed 
+[06:47:51.427] LOG: Applied X Speed 
+[06:47:51.427] LOG: Applied X Speed 
+[06:47:51.427] LOG: Applied X Speed 
+[06:47:51.427] LOG: Applied X Speed 
+[06:47:51.427] LOG: Applied X Speed 
+[06:47:51.427] LOG: Applied X Speed 
+[06:47:51.427] LOG: %cStart Phase LevelUpPhase color:green;
+[06:47:51.427] LOG: Applied X Speed 
+[06:47:51.427] LOG: Applied X Speed 
+[06:47:51.427] LOG: Applied X Speed 
+[06:47:51.427] LOG: Applied X Speed 
+[06:47:51.427] LOG: Applied X Speed 
+[06:47:51.428] LOG: Applied X Speed 
+[06:47:51.428] LOG: Applied X Speed 
+[06:47:51.428] LOG: Applied X Speed 
+[06:47:51.428] LOG: %cStart Phase LevelUpPhase color:green;
+[06:47:51.428] LOG: Applied X Speed 
+[06:47:51.428] LOG: Applied X Speed 
+[06:47:51.428] LOG: Applied X Speed 
+[06:47:51.428] LOG: Applied X Speed 
+[06:47:51.428] LOG: Applied X Speed 
+[06:47:51.428] LOG: Applied X Speed 
+[06:47:51.428] LOG: Applied X Speed 
+[06:47:51.428] LOG: Applied X Speed 
+[06:47:51.428] LOG: %cStart Phase LevelUpPhase color:green;
+[06:47:51.428] LOG: Applied X Speed 
+[06:47:51.428] LOG: Applied X Speed 
+[06:47:51.429] LOG: Applied X Speed 
+[06:47:51.429] LOG: Applied X Speed 
+[06:47:51.429] LOG: %cStart Phase LevelUpPhase color:green;
+[06:47:51.429] LOG: Applied X Speed 
+[06:47:51.429] LOG: Applied X Speed 
+[06:47:51.429] LOG: %cStart Phase LevelUpPhase color:green;
+[06:47:51.429] LOG: %cStart Phase LevelUpPhase color:green;
+[06:47:51.429] LOG: %cStart Phase PartyHealPhase color:green;
+[06:47:54.094] LOG: %cStart Phase ResetStatusPhase color:green;
+[06:47:54.095] LOG: %cStart Phase ResetStatusPhase color:green;
+[06:47:54.095] LOG: %cStart Phase ResetStatusPhase color:green;
+[06:47:54.095] LOG: %cStart Phase ResetStatusPhase color:green;
+[06:47:54.095] LOG: %cStart Phase ResetStatusPhase color:green;
+[06:47:54.095] LOG: %cStart Phase ResetStatusPhase color:green;
+[06:47:54.095] LOG: %cStart Phase ErCrossroadsPhase color:green;
+[06:47:58.303] LOG: %cStart Phase SelectBiomePhase color:green;
+[06:47:58.304] LOG: Wave Seed: ¹¿¸«­½«¯v³w{ 70
+[06:48:08.730] LOG: %cStart Phase PartyHealPhase color:green;
+[06:48:11.327] LOG: %cStart Phase ResetStatusPhase color:green;
+[06:48:11.327] LOG: %cStart Phase ResetStatusPhase color:green;
+[06:48:11.327] LOG: %cStart Phase ResetStatusPhase color:green;
+[06:48:11.327] LOG: %cStart Phase ResetStatusPhase color:green;
+[06:48:11.327] LOG: %cStart Phase ResetStatusPhase color:green;
+[06:48:11.327] LOG: %cStart Phase ResetStatusPhase color:green;
+[06:48:11.328] LOG: %cStart Phase SwitchBiomePhase color:green;
+[06:48:12.139] LOG: %cStart Phase NewBattlePhase color:green;
+[06:48:12.139] LOG: Wave Seed: ºÀ¹¬®¾¬°w´x| 71
+[06:48:12.140] LOG: Applied Super Lure 
+[06:48:12.140] LOG: %cStart Phase ReturnPhase color:green;
+[06:48:12.195] LOG: Applied X Speed 
+[06:48:12.195] LOG: Applied X Speed 
+[06:48:12.348] LOG: %cStart Phase ShowTrainerPhase color:green;
+[06:48:12.549] LOG: %cStart Phase NewBiomeEncounterPhase color:green;
+[06:48:12.550] LOG: Starting species pool tier: UNCOMMON
+[06:48:12.550] LOG: Replaced SEEDOT with NUZLEAF
+[06:48:12.556] LOG: Pokemon: Wild Nuzleaf | Species ID: 274 | Level: 48 | Nature: Jolly (+Spd/-SpAtk)
+[06:48:12.556] LOG: Stats (IVs): HP: 133 (17), Atk: 95 (29), Def: 48 (10), Spatk: 64 (1), Spdef: 53 (21), Spd: 82 (24)
+[06:48:12.556] LOG: Ability: Moxie | Passive Ability: Overgrow 
+[06:48:12.556] LOG: Moveset: ["Giga Drain","Grassy Glide","Grass Whistle","Perish Song"]
+[06:48:12.556] LOG: Starting species pool tier: COMMON
+[06:48:12.556] LOG: Replaced COTTONEE with WHIMSICOTT
+[06:48:12.560] LOG: Pokemon: Wild Whimsicott | Species ID: 547 | Level: 47 | Nature: Quirky (-)
+[06:48:12.560] LOG: Stats (IVs): HP: 146 (31), Atk: 67 (19), Def: 96 (25), Spatk: 80 (7), Spdef: 99 (30), Spd: 122 (17)
+[06:48:12.560] LOG: Ability: Prankster | Passive Ability: Infiltrator 
+[06:48:12.560] LOG: Moveset: ["Grassy Glide","Tickle","Strength Sap","Encore"]
+[06:48:12.726] LOG: {"id":"BERRY","localeKey":"","iconImage":"sitrus_berry","group":"berry","soundName":"se/restore","tier":0,"berryType":0} (enemy)
+[06:48:12.726] LOG: Battle Seed: Bhxjb7A8DTptt04c
+[06:48:12.727] LOG: Applied X Speed 
+[06:48:12.728] LOG: Applied X Speed 
+[06:48:12.728] LOG: Applied X Speed 
+[06:48:12.728] LOG: Applied X Speed 
+[06:48:12.729] LOG: Applied X Speed 
+[06:48:12.729] LOG: Applied X Speed 
+[06:48:12.730] LOG: Applied X Speed 
+[06:48:12.731] LOG: Applied X Speed 
+[06:48:12.772] DEBUG: Session data saved to slot 0!
+[06:48:12.773] LOG: Wave Seed: ºÀ¹¬®¾¬°w´x| 71
+[06:48:13.647] LOG: %cStart Phase CommonAnimPhase color:green;
+[06:48:13.647] LOG: %cStart Phase MessagePhase color:green;
+[06:48:14.105] LOG: %cStart Phase LevelCapPhase color:green;
+[06:48:14.106] LOG: Applied X Speed 
+[06:48:14.106] LOG: Applied X Speed 
+[06:48:14.106] LOG: Applied X Speed 
+[06:48:14.107] LOG: Applied X Speed 
+[06:48:14.107] LOG: Applied X Speed 
+[06:48:14.107] LOG: Applied X Speed 
+[06:48:14.108] LOG: Applied X Speed 
+[06:48:14.108] LOG: Applied X Speed 
+[06:48:15.362] LOG: %cStart Phase SummonPhase color:green;
+[06:48:15.654] LOG: Applied Protein 
+[06:48:15.655] LOG: Applied Zinc 
+[06:48:15.709] WARN: cry/10003 not found
+[06:48:15.911] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[06:48:15.911] LOG: %cStart Phase SummonPhase color:green;
+[06:48:16.203] LOG: Applied Protein 
+[06:48:16.203] LOG: Applied Zinc 
+[06:48:16.460] LOG: %cStart Phase CheckSwitchPhase color:green;
+[06:48:29.588] LOG: %cStart Phase CheckSwitchPhase color:green;
+[06:48:33.943] LOG: %cStart Phase SwitchPhase color:green;
+[06:48:35.646] LOG: %cStart Phase SwitchSummonPhase color:green;
+[06:48:35.707] LOG: Applied X Speed 
+[06:48:35.708] LOG: Applied X Speed 
+[06:48:35.708] LOG: Applied X Speed 
+[06:48:35.708] LOG: Applied X Speed 
+[06:48:35.709] LOG: Applied X Speed 
+[06:48:35.709] LOG: Applied X Speed 
+[06:48:35.709] LOG: Applied X Speed 
+[06:48:35.710] LOG: Applied X Speed 
+[06:48:35.999] LOG: Applied Zinc 
+[06:48:35.999] LOG: Applied Protein 
+[06:48:36.256] LOG: Applied X Speed 
+[06:48:36.256] LOG: Applied X Speed 
+[06:48:36.256] LOG: Applied X Speed 
+[06:48:36.257] LOG: Applied X Speed 
+[06:48:36.257] LOG: Applied X Speed 
+[06:48:36.258] LOG: Applied X Speed 
+[06:48:36.258] LOG: %cStart Phase PostSummonPhase color:green;
+[06:48:36.258] LOG: Ran PSP for: Venusaur
+[06:48:36.258] LOG: Applied X Speed 
+[06:48:36.258] LOG: Applied X Speed 
+[06:48:36.258] LOG: %cStart Phase PostSummonPhase color:green;
+[06:48:36.258] LOG: %cStart Phase PostSummonPhase color:green;
+[06:48:36.258] LOG: %cStart Phase InitEncounterPhase color:green;
+[06:48:36.259] LOG: Applied X Speed 
+[06:48:36.259] LOG: Applied X Speed 
+[06:48:36.259] LOG: %cStart Phase PostSummonPhase color:green;
+[06:48:36.259] LOG: Ran PSP for: Arachtres
+[06:48:36.259] LOG: Applied X Speed 
+[06:48:36.259] LOG: Applied X Speed 
+[06:48:36.260] LOG: Applied X Speed 
+[06:48:36.260] LOG: Applied X Speed 
+[06:48:36.260] LOG: %cStart Phase PostSummonPhase color:green;
+[06:48:36.261] LOG: Applied X Speed 
+[06:48:36.261] LOG: Applied X Speed 
+[06:48:36.261] LOG: %cStart Phase PostSummonPhase color:green;
+[06:48:36.261] LOG: %cStart Phase ShowAbilityPhase color:green;
+[06:48:36.569] LOG: %cStart Phase StatStageChangePhase color:green;
+[06:48:36.923] LOG: %cStart Phase MessagePhase color:green;
+[06:48:37.394] LOG: %cStart Phase StatStageChangePhase color:green;
+[06:48:37.749] LOG: %cStart Phase MessagePhase color:green;
+[06:48:38.207] LOG: %cStart Phase HideAbilityPhase color:green;
+[06:48:38.249] LOG: %cStart Phase PostSummonPhase color:green;
+[06:48:38.249] LOG: Ran PSP for: Whimsicott
+[06:48:38.250] LOG: %cStart Phase PostSummonPhase color:green;
+[06:48:38.250] LOG: %cStart Phase PostSummonPhase color:green;
+[06:48:38.250] LOG: %cStart Phase PostSummonPhase color:green;
+[06:48:38.250] LOG: Ran PSP for: Nuzleaf
+[06:48:38.251] LOG: %cStart Phase PostSummonPhase color:green;
+[06:48:38.251] LOG: %cStart Phase PostSummonPhase color:green;
+[06:48:38.251] LOG: %cStart Phase TurnInitPhase color:green;
+[06:48:38.251] LOG: %cStart Phase CommandPhase color:green;
+[06:48:41.896] WARN: cry/10003 not found
+[06:48:45.778] WARN: cry/10003 not found
