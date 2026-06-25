@@ -86,6 +86,22 @@ export class CustomPokemonData {
    * and lifted at the Cleansing Font (#515). Run-scoped (serialized).
    */
   public erCursedStat = -1;
+  /**
+   * Co-op (#633 Fix #3): the OWNER's per-account innate-unlock snapshot for this mon, one
+   * `passiveAttr` bitmask per ER innate slot (0,1,2). On a merged co-op party every client
+   * would otherwise gate a SHARED mon's active innates by ITS OWN candy unlocks (a divergent
+   * per-account state), so this captures the owning player's unlocks at merge time and the
+   * battle-time gate reads from here instead of local `starterData`. `undefined` => not a
+   * co-op-snapshotted mon (every solo / non-merged mon), so all other modes are untouched.
+   */
+  public coopPassiveAttr?: number[] | undefined;
+  /**
+   * Co-op (#633 Fix #3): the OWNER's canonical luck for this mon, captured at merge time.
+   * `Pokemon.getLuck()` reads it in co-op so a shared party's total luck (which drives the
+   * reward-pool upgrade odds + other rolls) is identical on both clients, instead of each
+   * deriving the partner mon's luck from ITS OWN dex unlocks. `undefined` => not snapshotted.
+   */
+  public coopLuck?: number | undefined;
 
   constructor(data?: CustomPokemonData | Partial<CustomPokemonData>) {
     this.spriteScale = data?.spriteScale ?? -1;
@@ -103,6 +119,8 @@ export class CustomPokemonData {
     this.erGiftIndex = data?.erGiftIndex ?? 0;
     this.erInnateShrineUnlocked = data?.erInnateShrineUnlocked ?? false;
     this.erCursedStat = data?.erCursedStat ?? -1;
+    this.coopPassiveAttr = data?.coopPassiveAttr ?? undefined;
+    this.coopLuck = data?.coopLuck ?? undefined;
   }
 }
 

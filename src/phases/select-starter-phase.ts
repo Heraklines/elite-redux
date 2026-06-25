@@ -291,6 +291,16 @@ export class SelectStarterPhase extends Phase {
       // so solo modes are untouched.
       if (coopOwners !== undefined && globalScene.gameMode.isCoop) {
         starterPokemon.coopOwner = coopOwners[i];
+        // Co-op (#633 Fix #3): thread the owner's innate-unlock + luck snapshot into
+        // customPokemonData (which round-trips through serialization), so the battle-time
+        // innate gate + getLuck read the OWNER's per-account state, identically on both
+        // clients, instead of each deriving it from its own dex/candy unlocks.
+        if (starter.coopPassiveAttr !== undefined) {
+          starterPokemon.customPokemonData.coopPassiveAttr = [...starter.coopPassiveAttr];
+        }
+        if (starter.coopLuck !== undefined) {
+          starterPokemon.customPokemonData.coopLuck = starter.coopLuck;
+        }
       }
       const chalApplied = applyChallenges(ChallengeType.STARTER_MODIFY, starterPokemon);
       party.push(starterPokemon);
@@ -341,6 +351,9 @@ export class SelectStarterPhase extends Phase {
  * struct that crosses the transport never aliases live engine state.
  */
 function serializeCoopStarter(s: Starter): CoopSerializedStarter {
+  // Co-op (#633 Fix #3): capture this picker's OWN per-account innate-unlock + luck snapshot
+  // so the partner's client gates this shared mon by the OWNER's state, not its own.
+  const snap = coopOwnerSnapshot(s);
   return {
     speciesId: s.speciesId,
     shiny: s.shiny,
@@ -356,6 +369,8 @@ function serializeCoopStarter(s: Starter): CoopSerializedStarter {
     teraType: s.teraType,
     ivs: [...s.ivs],
     erBlackShiny: s.erBlackShiny,
+    coopPassiveAttr: snap.coopPassiveAttr,
+    coopLuck: snap.coopLuck,
   };
 }
 
@@ -382,6 +397,10 @@ function rebuildCoopStarter(blob: CoopSerializedStarter): Starter {
     teraType: blob.teraType as Starter["teraType"],
     ivs: [...blob.ivs],
     erBlackShiny: blob.erBlackShiny,
+    // Co-op (#633 Fix #3): carry the OWNER's innate-unlock + luck snapshot through so the
+    // partner mon is gated by its owner's state (threaded into customPokemonData in initBattle).
+    coopPassiveAttr: blob.coopPassiveAttr ? [...blob.coopPassiveAttr] : undefined,
+    coopLuck: blob.coopLuck,
   };
 }
 
@@ -409,6 +428,34 @@ function partnerEntryToStarter(e: CoopRosterEntry): Starter {
 }
 
 /**
+ * Co-op (#633 Fix #3): compute the LOCAL player's per-account innate-unlock + luck snapshot
+ * for one of its own starters. The merged party gates a shared mon's active innates + total
+ * luck by the OWNER's per-account state, so each player captures that for the mons IT picks
+ * (the partner's mons carry their owner's snapshot over the wire). Returns `passiveAttr` per
+ * ER innate slot (0/1/2 - all from the base species root; a launch mon is never fused) + the
+ * canonical luck (the dex-attr luck the starter spawns with, mirroring initBattle's `.luck`).
+ */
+function coopOwnerSnapshot(s: Starter): { coopPassiveAttr: number[]; coopLuck: number } {
+  const species = getPokemonSpecies(s.speciesId);
+  const rootId = species.getRootSpeciesId();
+  const passiveAttr = globalScene.gameData.starterData[rootId]?.passiveAttr ?? 0;
+  const caughtAttr = globalScene.gameData.dexData[species.speciesId]?.caughtAttr ?? 0;
+  const luck = globalScene.gameData.getDexAttrLuck(caughtAttr);
+  return { coopPassiveAttr: [passiveAttr, passiveAttr, passiveAttr], coopLuck: luck };
+}
+
+/** Co-op (#633 Fix #3): attach the local owner's snapshot to each of the local starters,
+ *  in place. Called only in co-op for the LOCAL half of the merge (partner mons carry their
+ *  own owner's snapshot from the wire blob). */
+function attachCoopOwnerSnapshots(starters: Starter[]): void {
+  for (const s of starters) {
+    const snap = coopOwnerSnapshot(s);
+    s.coopPassiveAttr = snap.coopPassiveAttr;
+    s.coopLuck = snap.coopLuck;
+  }
+}
+
+/**
  * Build the merged co-op launch party (#633), INTERLEAVED: host0, guest0, host1,
  * guest1, ... so the two double leads (party[0]/party[1] = field slots 0/1) are
  * each player's FIRST mon - the host commands field 0, the guest field 1, from
@@ -432,6 +479,10 @@ function buildCoopMergedStarters(
   partnerEntries: readonly CoopRosterEntry[],
 ): { starters: Starter[]; owners: CoopRole[] } {
   const partnerStarters = partnerEntries.map(partnerEntryToStarter);
+  // Co-op (#633 Fix #3): the LOCAL half carries no snapshot yet (it's used as raw Starter
+  // objects, not round-tripped through the wire), so attach the local owner's snapshot here.
+  // The partner half already carries its owner's snapshot from rebuildCoopStarter.
+  attachCoopOwnerSnapshots(localStarters);
   // Resolve each role's half from local vs partner so the result is identical on
   // both machines (host half first, guest half second).
   const hostHalf = localRole === "host" ? localStarters : partnerStarters;

@@ -196,6 +196,15 @@ export interface Starter {
   ivs: number[];
   /** ER Black Shinies (#349): start this mon as a t4 black shiny. */
   erBlackShiny?: boolean | undefined;
+  /**
+   * Co-op (#633 Fix #3): the owning player's per-account innate-unlock snapshot (one
+   * `passiveAttr` bitmask per ER innate slot 0/1/2), threaded into `customPokemonData` at
+   * launch so a shared merged mon's active innates are gated by the OWNER's unlocks, not the
+   * local client's. `undefined` for every solo / non-co-op starter (all other modes untouched).
+   */
+  coopPassiveAttr?: number[] | undefined;
+  /** Co-op (#633 Fix #3): the owning player's canonical luck for this mon. */
+  coopLuck?: number | undefined;
 }
 
 // TODO: What type of number does this store?

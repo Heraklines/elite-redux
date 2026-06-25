@@ -82,6 +82,14 @@ export interface CoopSerializedStarter {
   ivs: number[];
   /** ER Black Shinies (#349): start this mon as a t4 black shiny. */
   erBlackShiny?: boolean | undefined;
+  /**
+   * Co-op (#633 Fix #3): the picking player's per-account innate-unlock snapshot for this
+   * mon - one `passiveAttr` bitmask per ER innate slot (0,1,2). Carried so the partner's
+   * client gates this shared mon's active innates by the OWNER's candy unlocks, not its own.
+   */
+  coopPassiveAttr?: number[] | undefined;
+  /** Co-op (#633 Fix #3): the picking player's canonical luck for this mon (owner-authoritative). */
+  coopLuck?: number | undefined;
 }
 
 // =============================================================================
