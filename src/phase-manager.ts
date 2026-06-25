@@ -28,6 +28,13 @@ import { CheckSwitchPhase } from "#phases/check-switch-phase";
 import { ColosseumChoicePhase } from "#phases/colosseum-choice-phase";
 import { CommandPhase } from "#phases/command-phase";
 import { CommonAnimPhase } from "#phases/common-anim-phase";
+import {
+  CoopFaintReplayPhase,
+  CoopHpDrainReplayPhase,
+  CoopMoveAnimReplayPhase,
+  CoopStatStageReplayPhase,
+  CoopStatusReplayPhase,
+} from "#phases/coop-replay-phases";
 import { CoopReplayTurnPhase } from "#phases/coop-replay-turn-phase";
 import { DamageAnimPhase } from "#phases/damage-anim-phase";
 import { DynamicPhaseMarker } from "#phases/dynamic-phase-marker";
@@ -159,6 +166,11 @@ const PHASES = Object.freeze({
   CheckSwitchPhase,
   CommandPhase,
   CoopReplayTurnPhase,
+  CoopFaintReplayPhase,
+  CoopHpDrainReplayPhase,
+  CoopMoveAnimReplayPhase,
+  CoopStatStageReplayPhase,
+  CoopStatusReplayPhase,
   CommonAnimPhase,
   DamageAnimPhase,
   DynamicPhaseMarker,

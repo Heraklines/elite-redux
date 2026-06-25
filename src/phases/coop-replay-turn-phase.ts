@@ -67,14 +67,62 @@ export class CoopReplayTurnPhase extends Phase {
     });
   }
 
-  /** Narrate the host's ordered visible events. MVP renders `message` lines verbatim. */
+  /**
+   * Drive the host's ordered visible events as an AWAITED animation pump (#633, animation layer):
+   * for each event in order, UNSHIFT the matching PRESENTATION-ONLY phase so it replays at real pace
+   * when the queue drains - the move animation, the HP-bar drain, the stat tween, the status anim, the
+   * faint cry+drop. All unshifted in event order land on the SAME queue level and drain FIFO (phase-tree
+   * semantics), so the guest WATCHES the fight in order instead of reading a silent summary.
+   *
+   * CRITICAL ORDERING (no desync): this runs BEFORE `applyCoopCheckpoint` in the caller, so the live
+   * `mon.hp` here is still the PRE-turn value - it is baked into each HP-drain phase as the "from" so the
+   * bar visibly drains to the host's value. The checkpoint then snaps every field mon to the host's
+   * authoritative values INLINE (the source of truth, unchanged), and the checksum is captured at that
+   * same instant - BEFORE any of these presentation phases play. Each phase ENDS at the host's value
+   * (idempotent with the checkpoint), so the animations can never leave drift for the next turn's
+   * checksum. Presentation phases NEVER recompute / draw RNG and NEVER run a real
+   * MovePhase/MoveEffectPhase/FaintPhase/StatStageChangePhase. weather / terrain / switch ride the
+   * checkpoint, so they are not animated here. Each unshift is guarded so one garbled event can never
+   * hang the turn - the checkpoint still corrects its state.
+   */
   private renderEvents(events: CoopBattleEvent[]): void {
+    // Running per-mon hp so multi-hit drains chain (hit1: cur->hp1, hit2: hp1->hp2, ...). Seeded
+    // lazily from the live (pre-checkpoint) hp the first time a mon is seen.
+    const fromHpByBi = new Map<number, number>();
+    const pm = globalScene.phaseManager;
     for (const event of events) {
-      if (event.k === "message") {
-        globalScene.phaseManager.queueMessage(event.text);
+      try {
+        switch (event.k) {
+          case "message":
+            pm.queueMessage(event.text);
+            break;
+          case "moveUsed":
+            pm.unshiftNew("CoopMoveAnimReplayPhase", event.bi, event.moveId, [...event.targets]);
+            break;
+          case "hp": {
+            const seeded = fromHpByBi.has(event.bi)
+              ? (fromHpByBi.get(event.bi) ?? event.hp)
+              : (globalScene.getField()[event.bi]?.hp ?? event.hp);
+            fromHpByBi.set(event.bi, event.hp);
+            pm.unshiftNew("CoopHpDrainReplayPhase", event.bi, seeded, event.hp, event.maxHp);
+            break;
+          }
+          case "statStage":
+            pm.unshiftNew("CoopStatStageReplayPhase", event.bi, event.stat, event.value);
+            break;
+          case "status":
+            pm.unshiftNew("CoopStatusReplayPhase", event.bi, event.status);
+            break;
+          case "faint":
+            pm.unshiftNew("CoopFaintReplayPhase", event.bi);
+            break;
+          default:
+            // weather / terrain / switch ride the authoritative checkpoint, not the animation pump.
+            break;
+        }
+      } catch {
+        // A garbled event must never hang the guest's turn; the checkpoint still corrects its state.
       }
-      // Richer event kinds (moveUsed/hp/faint/statStage/...) are a later animation layer;
-      // the checkpoint already carries the authoritative outcome, so they are optional.
     }
   }
 
