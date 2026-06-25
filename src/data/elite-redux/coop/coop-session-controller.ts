@@ -267,6 +267,7 @@ export class CoopSessionController {
    */
   broadcastRunConfig(config: CoopRunConfig): void {
     this._runConfig = config;
+    console.log(`[coop-runconfig] host broadcast difficulty=${config.difficulty} (role=${this.role})`);
     this.transport.send({
       t: "runConfig",
       difficulty: config.difficulty,
@@ -275,6 +276,17 @@ export class CoopSessionController {
       ...(config.seed === undefined ? {} : { seed: config.seed }),
     });
     this.emit();
+  }
+
+  /**
+   * GUEST: ask the host to (re)send the runConfig (#633). The host broadcasts it once
+   * when it picks difficulty; this is the guest's self-healing retry so a single dropped
+   * or mistimed `runConfig` can't strand it forever on the "choosing difficulty" screen.
+   * Harmless on the host / before the host has picked (the host only answers once it has
+   * a config). No-op shape-wise apart from the wire send.
+   */
+  requestRunConfig(): void {
+    this.transport.send({ t: "requestRunConfig" });
   }
 
   /**
@@ -387,8 +399,17 @@ export class CoopSessionController {
         // so the run is coherent and both engines stay in lockstep (#633, LIVE-A/C).
         // Only honour it FROM the host.
         if (this.role === "guest") {
+          console.log(`[coop-runconfig] guest received difficulty=${msg.difficulty}`);
           this._runConfig = { difficulty: msg.difficulty, challenges: msg.challenges, seed: msg.seed };
           this.emit();
+        }
+        break;
+      case "requestRunConfig":
+        // Guest asked us to (re)send the runConfig (#633 self-healing handshake). Only the
+        // HOST is the authority, and only once it has actually decided (picked difficulty).
+        if (this.role === "host" && this._runConfig != null) {
+          console.log("[coop-runconfig] host re-broadcast on guest request");
+          this.broadcastRunConfig(this._runConfig);
         }
         break;
       default:

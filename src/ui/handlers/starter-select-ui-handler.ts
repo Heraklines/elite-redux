@@ -5662,6 +5662,14 @@ export class StarterSelectUiHandler extends MessageUiHandler {
       dexAttr |=
         saved.variant === 2 ? DexAttr.VARIANT_3 : saved.variant === 1 ? DexAttr.VARIANT_2 : DexAttr.DEFAULT_VARIANT;
       dexAttr |= globalScene.gameData.getFormAttr(saved.formIndex);
+      // ER (#133): drop any saved mon the active challenge forbids, so "Use Last Team"
+      // cannot smuggle an off-type / off-tier / off-color / off-gen mon into a challenge
+      // run - the same gate the starter grid greys illegal mons out with.
+      if (
+        !checkStarterValidForChallenge(species, globalScene.gameData.getSpeciesDexAttrProps(species, dexAttr), true)
+      ) {
+        continue;
+      }
       entries.push({ saved, species, dexAttr });
     }
     if (entries.length === 0) {
@@ -5737,6 +5745,11 @@ export class StarterSelectUiHandler extends MessageUiHandler {
               // (difficulty + challenges) so the guest mirrors it - the run stays
               // coherent (both players get the same difficulty + challenge set).
               const coopHost = getCoopController();
+              if (coopHost != null) {
+                console.log(
+                  `[coop-runconfig] startRun role=${coopHost.role} willBroadcast=${coopHost.role === "host"} difficulty=${difficulty}`,
+                );
+              }
               if (coopHost?.role === "host") {
                 coopHost.broadcastRunConfig({
                   difficulty,
@@ -5819,8 +5832,25 @@ export class StarterSelectUiHandler extends MessageUiHandler {
               };
               if (!applyHostConfig()) {
                 this.showText("Waiting for the host to choose difficulty...");
+                // Co-op (#633): the host broadcasts the runConfig exactly ONCE when it
+                // picks difficulty. If that single message is dropped or arrives in a
+                // bad window the guest used to wait here FOREVER (the live "stuck on
+                // difficulty" hang). Make it self-healing: actively (re)request the
+                // config until it lands. The host re-broadcasts on every request (a
+                // harmless no-op before it has picked); onChange applies it the instant
+                // it arrives, and we stop requesting then.
+                console.log("[coop-runconfig] guest waiting - requesting runConfig from host");
+                coopGuest.requestRunConfig();
+                const retry = setInterval(() => {
+                  if (applyHostConfig()) {
+                    clearInterval(retry);
+                    return;
+                  }
+                  coopGuest.requestRunConfig();
+                }, 2000);
                 const off = coopGuest.onChange(() => {
                   if (applyHostConfig()) {
+                    clearInterval(retry);
                     off();
                   }
                 });

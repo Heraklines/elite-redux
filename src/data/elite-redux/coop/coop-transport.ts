@@ -224,6 +224,14 @@ export type CoopMessage =
       challenges: { id: number; value: number; severity: number }[];
       seed?: string;
     }
+  /**
+   * Guest -> host (#633): "(re)send me the runConfig". The host broadcasts `runConfig`
+   * ONCE when it picks difficulty; if that single message is dropped or mistimed the
+   * guest would wait forever on its "choosing difficulty" screen. So the waiting guest
+   * actively (re)requests until it lands, and the host re-broadcasts on every request -
+   * a self-healing handshake (harmless no-op before the host has picked).
+   */
+  | { t: "requestRunConfig" }
   /** A choice on an alternation-owned interaction screen (reward / shop / ME) (P4). */
   | { t: "interaction"; screen: string; choice: unknown }
   /** Host -> guest authoritative state checkpoint: a compressed SessionSaveData blob (P2/P5). */
