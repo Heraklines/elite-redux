@@ -1,0 +1,204 @@
+url:      https://elite-redux-staging.pages.dev/
+build:    mqtxpk7a-b69e
+mode:     6  wave:2
+seed:     whG8HCvYLUWh5UAKRiRB9lpH
+party:    Schiggy(L5 20hp f0), Flamiau(L5 20hp f0), Raupy(L5 21hp f0), Endivie(L5 20hp f0), Vulpix(L5 20hp f0)
+enemy:    Pamo(L3)
+
+----- COMMENT -----
+coop me 2
+
+----- CONSOLE -----
+[20:11:24.660] LOG: %c %c %c %c %c Phaser v3.90.0 (WebGL | Web Audio) %c https://phaser.io/v390 background: #ff0000 background: #ffff00 background: #00ff00 background: #00ffff color: #ffffff; background: #000000 background: transparent
+[20:11:25.671] LOG: [ER] build mqtxpk7a-b69e
+[20:11:26.515] LOG: [dev-tools] loaded — 321 scenarios + Send Logs button
+[20:12:12.356] DEBUG: Destroying loading scene
+[20:12:12.356] DEBUG: Destroyed loading scene
+[20:12:12.864] LOG: Seed: jeYx2L38xp7b5UufzNo60JJu
+[20:12:12.864] LOG: Wave Seed: jeYx2L38xp7b5UufzNo60JJu 0
+[20:12:19.011] LOG: %cStart Phase LoginPhase color:green;
+[20:12:19.246] LOG: Client Session: 80cbX16oQRvgfeh50MkZKIckGj8ImUEC
+[20:12:20.270] LOG: %cStart Phase TitlePhase color:green;
+[20:12:20.275] LOG: Getting Session Slot id: %d 0
+[20:12:20.362] LOG: use seasonal splash messages true
+[20:12:20.362] LOG: Adding 2 Pride Month splash messages (weight: x15)
+[20:14:00.213] WARN: [coop-fp] MISMATCH sections=movesName,abilitiesName - movesName local=30e2bf626b99790e(1107) peer=fad7fe8932ec09a1(1107) abilitiesName local=1670a4f3df00cb38(1046) peer=1412a816005397a3(1046)
+[20:14:01.793] LOG: [coop-launch] title challenge-gate: role=guest isCoopGuest=true -> SelectStarterPhase
+[20:14:01.796] LOG: %cStart Phase SelectStarterPhase color:green;
+[20:14:01.800] LOG: [coop-launch] startCoopSelect role=guest partnerConnected=true partnerReady=false
+[20:14:09.224] WARN: cry/725 not found
+[20:14:10.739] WARN: cry/152 not found
+[20:14:12.001] WARN: cry/152 not found
+[20:14:22.285] LOG: [coop-runconfig] guest received difficulty=elite netcode=authoritative
+[20:14:22.286] LOG: [coop-launch] proceedIfReady launched=false localTeam=0 bothReady=false role=guest partnerReady=false
+[20:14:22.288] LOG: [coop-launch] proceedIfReady launched=false localTeam=0 bothReady=false role=guest partnerReady=false
+[20:14:22.290] LOG: [coop-launch] proceedIfReady launched=false localTeam=0 bothReady=false role=guest partnerReady=true
+[20:14:27.026] LOG: Wave Seed: whG8HCvYLUWh5UAKRiRB9lpH 0
+[20:14:27.026] LOG: [coop-runconfig] startRun role=guest willBroadcast=false difficulty=elite
+[20:14:27.030] LOG: [coop-launch] local team locked in: 2 mons, role=guest
+[20:14:27.031] LOG: [coop-launch] proceedIfReady launched=false localTeam=2 bothReady=false role=guest partnerReady=true
+[20:14:27.031] LOG: [coop-launch] proceedIfReady launched=false localTeam=2 bothReady=true role=guest partnerReady=true
+[20:14:27.032] LOG: [coop-launch] launchCoopMergedParty role=guest merged=5 slot=0
+[20:14:27.032] LOG: [coop-launch] guest: clearing STARTER_SELECT -> MESSAGE, then initBattle
+[20:14:27.034] LOG: [coop-launch] proceedIfReady launched=true localTeam=2 bothReady=true role=guest partnerReady=true
+[20:14:31.725] LOG: Wave Seed: xiH9IDwZMVXi6VBLSjSC:mqI 1
+[20:14:31.733] LOG: %cStart Phase EncounterPhase color:green;
+[20:14:41.273] LOG: Pokemon: Raffel (wild) | Species ID: 819 | Level: 2 | Nature: Mäßig (+SpAng/-Ang)
+[20:14:41.273] LOG: Stats (IVs): HP: 15 (22), Atk: 6 (19), Def: 7 (28), Spatk: 7 (6), Spdef: 6 (14), Spd: 6 (3)
+[20:14:41.273] LOG: Ability: Cheap Tactics | Passive Ability: Völlerei 
+[20:14:41.273] LOG: Moveset: ["Tackle","Berry Smash","Einigler","Backenstopfer"]
+[20:14:41.276] LOG: Pokemon: Hoppspross (wild) | Species ID: 187 | Level: 2 | Nature: Hastig (+Init/-Vert)
+[20:14:41.276] LOG: Stats (IVs): HP: 13 (25), Atk: 7 (29), Def: 6 (26), Spatk: 7 (25), Spdef: 7 (2), Spd: 9 (27)
+[20:14:41.276] LOG: Ability: Floraschild | Passive Ability: Chloroplast 
+[20:14:41.276] LOG: Moveset: ["Megasauger","Stachelspore","Verzögerung","Giftpuder"]
+[20:14:42.151] DEBUG: Session data saved to slot 0!
+[20:14:42.891] LOG: Wave Seed: xiH9IDwZMVXi6VBLSjSC:mqI 1
+[20:14:43.417] LOG: %cStart Phase SummonPhase color:green;
+[20:14:43.742] LOG: %cStart Phase ShinySparklePhase color:green;
+[20:14:43.832] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[20:14:43.833] LOG: %cStart Phase SummonPhase color:green;
+[20:14:44.052] WARN: cry/725 not found
+[20:14:44.175] LOG: %cStart Phase CheckSwitchPhase color:green;
+[20:14:44.176] LOG: %cStart Phase CheckSwitchPhase color:green;
+[20:14:44.176] LOG: %cStart Phase InitEncounterPhase color:green;
+[20:14:44.194] LOG: %cStart Phase PostSummonPhase color:green;
+[20:14:44.195] LOG: Ran PSP for: Flamiau
+[20:14:44.206] LOG: %cStart Phase PostSummonPhase color:green;
+[20:14:44.210] LOG: %cStart Phase ShowAbilityPhase color:green;
+[20:14:44.378] LOG: %cStart Phase StatStageChangePhase color:green;
+[20:14:44.591] LOG: %cStart Phase MessagePhase color:green;
+[20:14:44.877] LOG: %cStart Phase StatStageChangePhase color:green;
+[20:14:45.081] LOG: %cStart Phase MessagePhase color:green;
+[20:14:45.377] LOG: %cStart Phase HideAbilityPhase color:green;
+[20:14:45.409] LOG: %cStart Phase PostSummonPhase color:green;
+[20:14:45.409] LOG: Ran PSP for: Schiggy
+[20:14:45.413] LOG: %cStart Phase PostSummonPhase color:green;
+[20:14:45.415] LOG: %cStart Phase PostSummonPhase color:green;
+[20:14:45.420] LOG: %cStart Phase ShowAbilityPhase color:green;
+[20:14:45.596] LOG: %cStart Phase MovePhase color:green;
+[20:14:45.596] LOG: %cUser: Schiggy
+Move: AQUA_RING
+Use Mode: INDIRECT color:orchid
+[20:14:45.616] LOG: %cStart Phase MessagePhase color:green;
+[20:14:45.747] LOG: %cStart Phase MoveEffectPhase color:green;
+[20:14:45.774] LOG: %cStart Phase MessagePhase color:green;
+[20:14:46.039] LOG: %cStart Phase MoveEndPhase color:green;
+[20:14:46.039] LOG: %cStart Phase HideAbilityPhase color:green;
+[20:14:46.065] LOG: %cStart Phase PostSummonPhase color:green;
+[20:14:46.065] LOG: Ran PSP for: Hoppspross
+[20:14:46.067] LOG: %cStart Phase PostSummonPhase color:green;
+[20:14:46.069] LOG: %cStart Phase PostSummonPhase color:green;
+[20:14:46.069] LOG: %cStart Phase PostSummonPhase color:green;
+[20:14:46.069] LOG: Ran PSP for: Raffel
+[20:14:46.070] LOG: %cStart Phase PostSummonPhase color:green;
+[20:14:46.074] LOG: %cStart Phase MovePhase color:green;
+[20:14:46.075] LOG: %cUser: Raffel
+Move: SCRATCH
+Use Mode: INDIRECT color:orchid
+[20:14:46.104] LOG: %cStart Phase MessagePhase color:green;
+[20:14:46.264] LOG: %cStart Phase MoveEffectPhase color:green;
+[20:14:46.269] LOG: Battle Seed: 1Na6W675BPTKBcaD
+[20:14:46.441] LOG: crit stage: +0
+[20:14:46.452] LOG: Move: Kratzer | Base damage: 3.033846153846154 | Power: 40 | Source attack: 6 | Target defense: 13
+[20:14:46.457] LOG: Move: Kratzer | Attack damage: 2
+[20:14:46.462] LOG: %cStart Phase DamageAnimPhase color:green;
+[20:14:46.477] LOG: %cStart Phase ShowAbilityPhase color:green;
+[20:14:46.646] LOG: %cStart Phase StatStageChangePhase color:green;
+[20:14:46.875] LOG: %cStart Phase MessagePhase color:green;
+[20:14:47.108] LOG: %cStart Phase HideAbilityPhase color:green;
+[20:14:47.142] LOG: %cStart Phase MoveEndPhase color:green;
+[20:14:47.144] LOG: %cStart Phase PostSummonPhase color:green;
+[20:14:47.145] LOG: %cStart Phase TurnInitPhase color:green;
+[20:14:47.147] LOG: %cStart Phase CommandPhase color:green;
+[20:14:47.184] LOG: %cStart Phase CommandPhase color:green;
+[20:14:53.248] LOG: Move: FIRE_FANG Move targets: {"targets":[2,3,0],"multiple":false} 
+Player Pokemon: Flamiau
+[20:14:53.255] LOG: %cStart Phase SelectTargetPhase color:green;
+[20:14:53.999] LOG: %cStart Phase EnemyCommandPhase color:green;
+[20:14:54.000] LOG: %cStart Phase EnemyCommandPhase color:green;
+[20:14:54.000] LOG: %cStart Phase TurnStartPhase color:green;
+[20:14:54.001] LOG: %cStart Phase CoopReplayTurnPhase color:green;
+[20:15:00.476] WARN: [coop-desync] turn=1 host=0d8faf6708fcf042 guest=15ff9135b90664f8
+[20:15:00.477] WARN: [coop-cs] turn=1 2 differing field(s):
+[20:15:00.477] WARN:   field.0.moves.0.1: host=1 guest=0
+[20:15:00.477] WARN:   field.1.moves.2.1: host=1 guest=0
+[20:15:00.479] LOG: %cStart Phase MessagePhase color:green;
+[20:15:00.823] LOG: %cStart Phase MessagePhase color:green;
+[20:15:01.023] LOG: %cStart Phase MessagePhase color:green;
+[20:15:01.225] LOG: %cStart Phase MessagePhase color:green;
+[20:15:01.446] LOG: %cStart Phase MessagePhase color:green;
+[20:15:01.648] LOG: %cStart Phase MessagePhase color:green;
+[20:15:01.883] LOG: %cStart Phase WeatherEffectPhase color:green;
+[20:15:01.884] LOG: %cStart Phase PositionalTagPhase color:green;
+[20:15:01.885] LOG: %cStart Phase BerryPhase color:green;
+[20:15:01.888] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[20:15:01.889] LOG: %cStart Phase TurnEndPhase color:green;
+[20:15:01.894] LOG: %cStart Phase PokemonHealPhase color:green;
+[20:15:02.096] LOG: %cStart Phase MessagePhase color:green;
+[20:15:02.481] LOG: %cStart Phase VictoryPhase color:green;
+[20:15:02.488] LOG: %cStart Phase ExpPhase color:green;
+[20:15:03.577] LOG: %cStart Phase ExpPhase color:green;
+[20:15:03.831] LOG: %cStart Phase BattleEndPhase color:green;
+[20:15:03.832] LOG: Battle Score: 0 (1 Turns x1)
+[20:15:03.832] LOG: Total Score: 0
+[20:15:03.870] LOG: %cStart Phase EggLapsePhase color:green;
+[20:15:03.872] LOG: %cStart Phase SelectModifierPhase color:green;
+[20:15:03.872] LOG: Wave Seed: xiH9IDwZMVXi6VBLSjSC:mqI 1
+[20:15:04.015] LOG: [coop-reward] WATCHER waits for partner's reward picks (start=0 role=guest wave=1)
+[20:15:10.270] LOG: Applied Kalzium 
+[20:15:10.281] LOG: %cStart Phase NewBattlePhase color:green;
+[20:15:10.282] LOG: Wave Seed: yjI:JEx[NWYj7WCMTkTD;nrJ 2
+[20:15:10.284] LOG: %cStart Phase ReturnPhase color:green;
+[20:15:10.285] LOG: [coop-reward] advance interaction (role=guest from=0 counter=0)
+[20:15:10.285] LOG: [coop-launch] proceedIfReady launched=true localTeam=2 bothReady=true role=guest partnerReady=true
+[20:15:10.440] LOG: [coop-launch] proceedIfReady launched=true localTeam=2 bothReady=true role=guest partnerReady=true
+[20:15:10.555] LOG: %cStart Phase ReturnPhase color:green;
+[20:15:10.677] LOG: %cStart Phase ShowTrainerPhase color:green;
+[20:15:10.781] LOG: %cStart Phase NextEncounterPhase color:green;
+[20:15:13.589] LOG: Starting species pool tier: UNCOMMON
+[20:15:13.601] LOG: 17 10 [2,3,4,5,6,7,8,9,10,12,22]
+[20:15:13.602] LOG: {"id":"SOOTHE_BELL","localeKey":"modifierType:ModifierType.SOOTHE_BELL","iconImage":"soothe_bell","soundName":"se/restore","tier":1} 
+[20:15:14.662] DEBUG: Session data saved to slot 0!
+[20:15:14.664] LOG: Wave Seed: yjI:JEx[NWYj7WCMTkTD;nrJ 2
+[20:15:21.707] LOG: %cStart Phase MysteryEncounterPhase color:green;
+[20:15:27.744] LOG: %cStart Phase MysteryEncounterOptionSelectedPhase color:green;
+[20:15:27.941] LOG: Pokemon: Pamo (wild) | Species ID: 921 | Level: 3 | Nature: Lasch (+Vert/-SpVert) | Friendship: 50
+[20:15:27.941] LOG: Stats (IVs): HP: 16 (14), Atk: 8 (10), Def: 7 (12), Spatk: 8 (30), Spdef: 5 (3), Spd: 9 (1)
+[20:15:27.941] LOG: Ability: Eisenfaust | Passive Ability: Voltabsorber | Boss Bars: 2
+[20:15:27.942] LOG: Moveset: ["Donnerschock","Ruckzuckhieb"]
+[20:15:30.115] LOG: %cStart Phase MysteryEncounterBattlePhase color:green;
+[20:15:30.130] LOG: %cStart Phase SummonPhase color:green;
+[20:15:30.241] WARN: cry/921 not found
+[20:15:30.343] LOG: %cStart Phase SummonPhase color:green;
+[20:15:30.532] LOG: Applied Kalzium 
+[20:15:30.685] LOG: %cStart Phase ShinySparklePhase color:green;
+[20:15:30.808] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[20:15:30.813] LOG: %cStart Phase CheckSwitchPhase color:green;
+[20:15:30.813] LOG: %cStart Phase InitEncounterPhase color:green;
+[20:15:30.823] LOG: %cStart Phase PostSummonPhase color:green;
+[20:15:30.824] LOG: Ran PSP for: Schiggy
+[20:15:30.833] LOG: %cStart Phase PostSummonPhase color:green;
+[20:15:30.837] LOG: %cStart Phase PostSummonPhase color:green;
+[20:15:30.839] LOG: %cStart Phase ShowAbilityPhase color:green;
+[20:15:31.034] LOG: %cStart Phase MovePhase color:green;
+[20:15:31.034] LOG: %cUser: Schiggy
+Move: AQUA_RING
+Use Mode: INDIRECT color:orchid
+[20:15:31.038] LOG: %cStart Phase MessagePhase color:green;
+[20:15:31.224] LOG: %cStart Phase MoveEffectPhase color:green;
+[20:15:31.234] LOG: %cStart Phase MessagePhase color:green;
+[20:15:31.551] LOG: %cStart Phase MoveEndPhase color:green;
+[20:15:31.552] LOG: %cStart Phase HideAbilityPhase color:green;
+[20:15:31.623] LOG: %cStart Phase PostSummonPhase color:green;
+[20:15:31.624] LOG: Ran PSP for: Pamo
+[20:15:31.625] LOG: %cStart Phase MessagePhase color:green;
+[20:15:33.269] LOG: %cStart Phase StatStageChangePhase color:green;
+[20:15:33.589] LOG: %cStart Phase MessagePhase color:green;
+[20:15:33.866] LOG: %cStart Phase PostSummonPhase color:green;
+[20:15:33.866] LOG: %cStart Phase PostSummonPhase color:green;
+[20:15:33.867] LOG: %cStart Phase TurnInitPhase color:green;
+[20:15:33.867] LOG: %cStart Phase MysteryEncounterBattleStartCleanupPhase color:green;
+[20:15:33.870] LOG: %cStart Phase CommandPhase color:green;
+[20:15:33.899] LOG: %cStart Phase EnemyCommandPhase color:green;
+[20:15:33.899] LOG: %cStart Phase TurnStartPhase color:green;
+[20:15:33.899] LOG: %cStart Phase CoopReplayTurnPhase color:green;
