@@ -53,8 +53,30 @@ export interface CoopMePumpEngine {
 
 type PumpRole = "owner" | "watcher";
 
+/**
+ * The watcher's terminal callbacks (#633 ME battle handoff). The pump can reach TWO distinct
+ * terminals, which the watcher must handle DIFFERENTLY:
+ *  - {@linkcode onLeave}: the owner left a NON-battle ME (the normal LEAVE sentinel, a timeout,
+ *    or a gone partner). The watcher fast-forwards / skips to the next wave (no battle to run).
+ *  - {@linkcode onBattleHandoff}: the owner's option spawned a BATTLE. The watcher must NOT leave
+ *    the encounter - it ends the pump and lets the spawned battle run host-authoritatively (the
+ *    host streams the boss, the guest adopts it; both flow through the normal battle path).
+ */
+export interface CoopMeWatcherCallbacks {
+  onLeave: () => void;
+  onBattleHandoff: () => void;
+}
+
 /** Routing tag for relayed ME buttons (distinguishes them on the wire / in logs). */
 const ME_PUMP_KIND = "meBtn";
+/**
+ * Sentinel the OWNER relays when its option spawned a BATTLE (#633 ME battle handoff): tells the
+ * watcher to END the pump WITHOUT leaving the encounter, so the spawned battle runs (the host
+ * drives it + streams the boss; the guest adopts + replays). Distinct from {@linkcode
+ * COOP_INTERACTION_LEAVE} (which means "the ME ended, skip to the next wave"). Negative so it can
+ * never collide with a real button code, and distinct from the other interaction sentinels.
+ */
+export const COOP_ME_BATTLE_HANDOFF = -1000;
 /** Default watcher wait for the owner's next button before degrading (20min: "wait for the
  *  human" - a slow owner reading dialogue must never trip the watcher's safe-skip). */
 const DEFAULT_ME_WAIT_MS = 1_200_000;
@@ -80,7 +102,10 @@ export class CoopMePump {
   private seq = -1;
   private ended = true;
   private loopRunning = false;
-  private onDegrade: (() => void) | null = null;
+  /** Watcher terminal: the owner left a NON-battle ME (LEAVE / timeout / gone) -> skip to next wave. */
+  private onLeave: (() => void) | null = null;
+  /** Watcher terminal: the owner's option spawned a BATTLE -> end the pump, let the battle run (#633). */
+  private onBattleHandoff: (() => void) | null = null;
 
   constructor(relay: CoopInteractionRelay, opts: { waitMs?: number; tick?: () => Promise<void> } = {}) {
     this.relay = relay;
@@ -109,17 +134,26 @@ export class CoopMePump {
   /**
    * WATCHER: begin replaying the owner's buttons for ME interaction `seq`, and start the
    * (single) replay loop. Idempotent on an already-active same-seq session (nested
-   * option-selects re-enter here and must NOT spawn a second loop). `onDegrade` is the
-   * safe-skip the loop calls on timeout / partner-gone so the run never hangs.
+   * option-selects re-enter here and must NOT spawn a second loop).
+   *
+   * `callbacks` carries the two distinct terminals (#633 ME battle handoff):
+   *  - `onLeave` (the safe-skip): a LEAVE sentinel / timeout / gone partner -> the run never hangs.
+   *  - `onBattleHandoff`: the owner's option spawned a battle -> end the pump WITHOUT leaving the
+   *    encounter so the spawned battle runs host-authoritatively.
+   * A bare function is accepted as the legacy `onLeave`-only form (lockstep callers / unit tests),
+   * with `onBattleHandoff` defaulting to a no-op.
    */
-  beginWatcher(seq: number, onDegrade: () => void): void {
+  beginWatcher(seq: number, callbacks: CoopMeWatcherCallbacks | (() => void)): void {
+    const onLeave = typeof callbacks === "function" ? callbacks : callbacks.onLeave;
+    const onBattleHandoff = typeof callbacks === "function" ? () => {} : callbacks.onBattleHandoff;
     if (this.role === "watcher" && this.seq === seq && !this.ended) {
       return;
     }
     this.role = "watcher";
     this.seq = seq;
     this.ended = false;
-    this.onDegrade = onDegrade;
+    this.onLeave = onLeave;
+    this.onBattleHandoff = onBattleHandoff;
     if (!this.loopRunning) {
       this.loopRunning = true;
       void this.runWatcherLoop(seq);
@@ -148,6 +182,21 @@ export class CoopMePump {
     this.relay.sendInteractionChoice(this.seq, ME_PUMP_KIND, button);
   }
 
+  /**
+   * OWNER (#633 ME battle handoff): the option just spawned a BATTLE. Relay the battle-handoff
+   * sentinel so the watcher ENDS the pump WITHOUT leaving the encounter, then end our own
+   * session. The spawned battle then runs host-authoritatively on BOTH clients (the host streams
+   * the boss, the guest adopts it; both flow through the normal host-drives / guest-replays
+   * path). Unlike {@linkcode endOwner}, this does NOT mean the ME is over - the battle + its
+   * reward shop still run; the interaction-counter advance happens at the TRUE ME terminal.
+   */
+  relayMeBattleHandoff(): void {
+    if (this.role === "owner" && !this.ended) {
+      this.relay.sendInteractionChoice(this.seq, ME_PUMP_KIND, COOP_ME_BATTLE_HANDOFF);
+    }
+    this.endSession();
+  }
+
   /** OWNER: the ME reached its terminal - send the leave sentinel so the watcher loop ends. */
   endOwner(): void {
     if (this.role === "owner" && !this.ended) {
@@ -160,6 +209,8 @@ export class CoopMePump {
   endSession(): void {
     this.ended = true;
     this.role = null;
+    this.onLeave = null;
+    this.onBattleHandoff = null;
   }
 
   private async runWatcherLoop(seq: number): Promise<void> {
@@ -172,12 +223,22 @@ export class CoopMePump {
         if (this.ended || this.seq !== seq) {
           return;
         }
+        // A BATTLE-HANDOFF sentinel (#633): the owner's option spawned a battle. End the pump
+        // but do NOT leave the encounter - the spawned battle must run (host-authoritative on
+        // both clients). The watcher's input gate auto-suspends for the battle phase, so once
+        // we end here the battle command relay takes over normally.
+        if (action != null && action.choice === COOP_ME_BATTLE_HANDOFF) {
+          const onHandoff = this.onBattleHandoff;
+          this.endSession();
+          onHandoff?.();
+          return;
+        }
         // A leave sentinel (owner reached the encounter terminal) OR a null (timeout / partner
         // gone) both mean "stop watching": end + let the caller reconcile to where the run now
         // is (fast-forward the encounter to the next wave if we are still in it - the rewards
         // were already applied by the relayed picks; only the final outro is skipped).
         if (action == null || action.choice === COOP_INTERACTION_LEAVE) {
-          const onEnd = this.onDegrade;
+          const onEnd = this.onLeave;
           this.endSession();
           onEnd?.();
           return;

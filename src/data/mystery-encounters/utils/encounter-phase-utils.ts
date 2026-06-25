@@ -7,6 +7,13 @@ import { initMoveAnim, loadMoveAnimAssets } from "#data/battle-anims";
 import { modifierTypes } from "#data/data-lists";
 import type { IEggOptions } from "#data/egg";
 import { Egg } from "#data/egg";
+import { buildCoopEnemy } from "#data/elite-redux/coop/coop-enemy-builder";
+import {
+  coopGuestAwaitMeBattleParty,
+  coopGuestShouldAdoptMeBattleParty,
+  coopHostStreamMeBattleParty,
+  coopMeOwnerRelayBattleHandoff,
+} from "#data/elite-redux/coop/coop-runtime";
 import type { Gender } from "#data/gender";
 import { getNatureName } from "#data/nature";
 import type { CustomPokemonData } from "#data/pokemon-data";
@@ -422,6 +429,18 @@ export async function initBattleWithEnemyConfig(partyConfig: EnemyPartyConfig): 
     console.log("Moveset:", moveset);
   });
 
+  // Co-op AUTHORITATIVE ME battle handoff (#633): the ME interaction is owner-alternated but the
+  // SPAWNED battle must be HOST-AUTHORITATIVE. The HOST streams the boss party it just generated
+  // (keyed by the ME interaction) + the OWNER tells the watcher's pump to end without leaving the
+  // encounter; the GUEST discards its own locally-rolled party and adopts the host's verbatim, so
+  // the boss is identical on both clients. Hard no-op in solo / lockstep / non-coop. Done BEFORE the
+  // battle phase is pushed so the adopted mons' assets load below.
+  coopHostStreamMeBattleParty();
+  coopMeOwnerRelayBattleHandoff();
+  if (coopGuestShouldAdoptMeBattleParty()) {
+    await adoptCoopMeBattleParty(battle, loadEnemyAssets);
+  }
+
   globalScene.phaseManager.pushNew("MysteryEncounterBattlePhase", partyConfig.disableSwitch);
 
   await Promise.all(loadEnemyAssets);
@@ -444,6 +463,57 @@ export async function initBattleWithEnemyConfig(partyConfig: EnemyPartyConfig): 
       ?.filter(config => config?.modifierConfigs)
       .map(config => config.modifierConfigs!);
     globalScene.generateEnemyModifiers(customModifierTypes);
+  }
+}
+
+/**
+ * Co-op AUTHORITATIVE GUEST (#633 ME battle handoff): await the host's authoritative ME-spawned-
+ * battle party and REBUILD `battle.enemyParty` from it, replacing the guest's locally-rolled mons
+ * so both clients fight the host's exact boss. Mirrors {@linkcode buildCoopEnemy}'s adopt path
+ * (used at wave start) but keyed by the ME interaction since the battle spawns mid-wave. Fully
+ * guarded: a timeout / bad entry leaves the locally-generated party in place (divergent but never
+ * a hang). Pushes the adopted mons' load promises onto `loadEnemyAssets` (awaited by the caller).
+ */
+async function adoptCoopMeBattleParty(battle: Battle, loadEnemyAssets: Promise<void>[]): Promise<void> {
+  const enemies = await coopGuestAwaitMeBattleParty();
+  if (enemies == null || enemies.length === 0) {
+    return; // no host party (timeout / not applicable) - keep the locally-generated one.
+  }
+  const trainerSlot = battle.battleType === BattleType.TRAINER ? TrainerSlot.TRAINER : TrainerSlot.NONE;
+  const rebuilt: EnemyPokemon[] = [];
+  for (const entry of enemies) {
+    const fallbackLevel = battle.enemyParty[entry.fieldIndex]?.level ?? battle.enemyLevels?.[entry.fieldIndex] ?? 1;
+    let built: EnemyPokemon | null = null;
+    try {
+      built = buildCoopEnemy(entry.data, fallbackLevel, trainerSlot);
+    } catch {
+      built = null;
+    }
+    if (built != null) {
+      rebuilt[entry.fieldIndex] = built;
+    }
+  }
+  // Only swap in the host's party if we reconstructed at least the lead - otherwise keep ours.
+  if (rebuilt[0] == null) {
+    return;
+  }
+  // Tear the locally-rolled mons off the field, then install the host's verbatim.
+  for (const local of battle.enemyParty) {
+    if (local != null && !rebuilt.includes(local)) {
+      try {
+        local.leaveField(true, true, true);
+      } catch {
+        /* a stray local mon failing to leave must not abort the adopt */
+      }
+    }
+  }
+  battle.enemyParty = rebuilt.filter((m): m is EnemyPokemon => m != null);
+  // Replace the stale local load promises with the adopted mons' (the caller awaits these).
+  loadEnemyAssets.length = 0;
+  for (const enemy of battle.enemyParty) {
+    enemy.hp = enemy.getMaxHp();
+    enemy.status = null;
+    loadEnemyAssets.push(enemy.loadAssets());
   }
 }
 

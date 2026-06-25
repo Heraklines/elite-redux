@@ -23,16 +23,23 @@ import { COOP_CHECKSUM_SENTINEL } from "#data/elite-redux/coop/coop-battle-check
 import {
   applyCoopFullSnapshot,
   captureCoopChecksum,
+  captureCoopEnemies,
   captureCoopFullSnapshot,
 } from "#data/elite-redux/coop/coop-battle-engine";
 import { CoopBattleStreamer } from "#data/elite-redux/coop/coop-battle-stream";
 import { CoopBattleSync } from "#data/elite-redux/coop/coop-battle-sync";
 import { CoopInteractionRelay } from "#data/elite-redux/coop/coop-interaction-relay";
+import { meBattleHandoffKey } from "#data/elite-redux/coop/coop-me-battle-handoff";
 import { CoopMePump } from "#data/elite-redux/coop/coop-me-pump";
 import { coopOwnerOfFieldIndex } from "#data/elite-redux/coop/coop-session";
 import { CoopSessionController } from "#data/elite-redux/coop/coop-session-controller";
 import { SpoofGuest } from "#data/elite-redux/coop/coop-spoof-guest";
-import type { CoopFullBattleSnapshot, CoopNetcodeMode, CoopWaveOutcome } from "#data/elite-redux/coop/coop-transport";
+import type {
+  CoopFullBattleSnapshot,
+  CoopNetcodeMode,
+  CoopSerializedEnemy,
+  CoopWaveOutcome,
+} from "#data/elite-redux/coop/coop-transport";
 import { type CoopTransport, createLoopbackPair, type SerializedCommand } from "#data/elite-redux/coop/coop-transport";
 import { CoopUiMirror } from "#data/elite-redux/coop/coop-ui-mirror";
 import { setCoopGhostFetchSuppressed, setCoopGhostPool, setGhostPoolPublisher } from "#data/elite-redux/er-ghost-teams";
@@ -327,6 +334,104 @@ export function broadcastCoopWaveResolved(outcome: CoopWaveOutcome): void {
   }
 }
 
+// =============================================================================
+// Co-op AUTHORITATIVE mystery-encounter BATTLE HANDOFF (#633). An ME option can spawn a
+// battle MID-wave; the interaction is owner-alternated but the spawned battle must be
+// HOST-AUTHORITATIVE. At the single chokepoint every ME battle funnels through
+// (`initBattleWithEnemyConfig`), the HOST streams the just-generated boss party keyed by
+// the ME interaction; the GUEST discards its own locally-rolled party and adopts the
+// host's verbatim. Both then flow through the existing host-drives / guest-replays battle
+// path, so the boss is identical regardless of who OWNED the encounter. Hard no-op in
+// solo / lockstep / non-coop.
+// =============================================================================
+
+/** The interaction-counter value the in-progress ME opened on (pinned by mystery-encounter-phases),
+ *  or -1 when not in an ME. The ME battle handoff key is derived from it so both clients agree. */
+let coopMeBattleInteractionCounter = -1;
+
+/**
+ * Co-op (#633 ME battle handoff): pin the interaction counter the current ME opened on, so a
+ * battle the ME spawns can be keyed identically on both clients. Set by mystery-encounter-phases
+ * at ME entry; reset (`-1`) at the ME terminal. Pure state - no transport, safe in solo.
+ */
+export function setCoopMeBattleInteractionCounter(counter: number): void {
+  coopMeBattleInteractionCounter = counter;
+}
+
+/** Whether a co-op ME battle handoff applies right now (live AUTHORITATIVE session, inside an ME). */
+function coopMeHandoffActive(): boolean {
+  return (
+    active != null
+    && globalScene.gameMode.isCoop
+    && getCoopNetcodeMode() === "authoritative"
+    && coopMeBattleInteractionCounter >= 0
+  );
+}
+
+/**
+ * HOST (#633 ME battle handoff): stream the just-generated ME-spawned-battle enemy party so the
+ * guest adopts it verbatim, keyed by the ME interaction. Called from `initBattleWithEnemyConfig`
+ * after the host built its boss party. Hard no-op unless we are the HOST of a live AUTHORITATIVE
+ * session inside an ME. Best-effort + guarded - never breaks the host's encounter.
+ */
+export function coopHostStreamMeBattleParty(): void {
+  if (!coopMeHandoffActive() || active!.controller.role !== "host") {
+    return;
+  }
+  try {
+    const key = meBattleHandoffKey(globalScene.currentBattle.waveIndex, coopMeBattleInteractionCounter);
+    active!.battleStream.sendMeBattleEnemyParty(key, captureCoopEnemies());
+  } catch {
+    /* a serialize/send failure must never break the host's ME battle setup */
+  }
+}
+
+/**
+ * GUEST (#633 ME battle handoff): await the host's authoritative ME-spawned-battle enemy party,
+ * keyed by the ME interaction. Returns the host's serialized enemies for the caller to rebuild
+ * `battle.enemyParty` from, or `null` when not applicable / on timeout (the guest then keeps its
+ * own locally-rolled party - divergent but never a hang). Called from `initBattleWithEnemyConfig`.
+ */
+export async function coopGuestAwaitMeBattleParty(timeoutMs?: number): Promise<CoopSerializedEnemy[] | null> {
+  if (!coopMeHandoffActive() || active!.controller.role !== "guest") {
+    return null;
+  }
+  const key = meBattleHandoffKey(globalScene.currentBattle.waveIndex, coopMeBattleInteractionCounter);
+  try {
+    return await active!.battleStream.awaitMeBattleEnemyParty(key, timeoutMs);
+  } catch {
+    return null;
+  }
+}
+
+/** Whether THIS client must await + adopt the host's ME-spawned-battle party (authoritative guest). */
+export function coopGuestShouldAdoptMeBattleParty(): boolean {
+  return coopMeHandoffActive() && active!.controller.role === "guest";
+}
+
+/**
+ * OWNER (#633 ME battle handoff): if THIS client owns the in-progress ME and its option just
+ * spawned a battle, relay the BATTLE-HANDOFF sentinel so the WATCHER's pump ends WITHOUT leaving
+ * the encounter (it then runs the spawned battle host-authoritatively). No-op when we are the
+ * watcher / not in an ME pump session. Solo / lockstep keep their own pump behavior untouched
+ * (this is only invoked on the authoritative handoff path). Best-effort + guarded.
+ */
+export function coopMeOwnerRelayBattleHandoff(): void {
+  if (active == null) {
+    return;
+  }
+  const pump = active.mePump;
+  // Only the OWNER of an active pump session relays the sentinel; the watcher receives it.
+  if (!pump.isSessionActive() || pump.isWatcher()) {
+    return;
+  }
+  try {
+    pump.relayMeBattleHandoff();
+  } catch {
+    /* a relay failure must never break the owner's ME battle setup */
+  }
+}
+
 /**
  * Set up a LOCAL co-op session: the human is the host, paired with a
  * {@linkcode SpoofGuest} stand-in player 2 over an in-process LoopbackTransport.
@@ -429,6 +534,8 @@ export function clearCoopRuntime(): void {
   // Reset the authoritative wave-advance state so a subsequent run starts clean (#633).
   pendingWaveAdvance = null;
   lastResolvedWave = -1;
+  // Reset the ME battle handoff counter so a subsequent run starts clean (#633).
+  coopMeBattleInteractionCounter = -1;
   // Drop the authoritative latch so a subsequent solo / lockstep run is not forced authoritative.
   authoritativeLatched = false;
   active = null;

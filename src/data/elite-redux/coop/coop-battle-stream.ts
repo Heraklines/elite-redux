@@ -97,6 +97,10 @@ export class CoopBattleStreamer {
   private checkpointHandler: ((reason: string, checkpoint: CoopBattleCheckpoint) => void) | null = null;
   /** wave -> resolver for an in-flight {@linkcode awaitEnemyParty}. */
   private readonly enemyPartyWaiters = new Map<number, (res: CoopSerializedEnemy[] | null) => void>();
+  /** ME-battle key -> resolver for an in-flight {@linkcode awaitMeBattleEnemyParty} (#633 ME handoff). */
+  private readonly meBattlePartyWaiters = new Map<string, (res: CoopSerializedEnemy[] | null) => void>();
+  /** ME-battle key -> a party that arrived before its waiter (race buffer, #633 ME handoff). */
+  private readonly meBattlePartyInbox = new Map<string, CoopSerializedEnemy[]>();
   /** Latest authoritative checkpoint (+ checksum) the guest has not yet applied. */
   private lastCheckpoint: CoopCheckpointEnvelope | null = null;
   /** Latest enemy party the guest has not yet adopted (consumed at the wave's first turn). */
@@ -130,6 +134,18 @@ export class CoopBattleStreamer {
   /** HOST: send the exact enemy party the guest must adopt verbatim for `wave`. */
   sendEnemyParty(wave: number, enemies: CoopSerializedEnemy[]): void {
     this.transport.send({ t: "enemyPartySync", wave, enemies });
+  }
+
+  /**
+   * HOST (#633, authoritative ME battle handoff): send the exact enemy party the guest must
+   * adopt verbatim for a mystery-encounter-SPAWNED battle, keyed by the ME interaction `key`
+   * (see `meBattleHandoffKey`) rather than a plain waveIndex - the battle spawns MID-wave, so
+   * the wave key would collide with the wave's own encounter party. The guest discards its
+   * locally-rolled ME party and adopts these, so the spawned boss is host-authoritative
+   * regardless of who OWNED the encounter.
+   */
+  sendMeBattleEnemyParty(key: string, enemies: CoopSerializedEnemy[]): void {
+    this.transport.send({ t: "meBattleEnemyPartySync", key, enemies });
   }
 
   /**
@@ -285,6 +301,42 @@ export class CoopBattleStreamer {
     });
   }
 
+  /**
+   * GUEST (#633, authoritative ME battle handoff): await the host's authoritative enemy party
+   * for an ME-spawned battle keyed by `key` (`meBattleHandoffKey`). Resolves immediately with
+   * the buffered party if the host already sent it, else waits for it, or resolves `null` on
+   * timeout (the guest then keeps its locally-rolled party - divergent but never a hang). The
+   * guest calls this at the ME battle handoff, BEFORE entering the battle, so it adopts the
+   * host's boss verbatim. Mirrors {@linkcode awaitEnemyParty} exactly, keyed by string.
+   */
+  awaitMeBattleEnemyParty(key: string, timeoutMs = this.timeoutMs): Promise<CoopSerializedEnemy[] | null> {
+    // Already buffered for this key (the host raced ahead) -> consume + return immediately.
+    const buffered = this.meBattlePartyInbox.get(key);
+    if (buffered !== undefined) {
+      this.meBattlePartyInbox.delete(key);
+      return Promise.resolve(buffered);
+    }
+    // Supersede any stale waiter for this key.
+    this.meBattlePartyWaiters.get(key)?.(null);
+    return new Promise<CoopSerializedEnemy[] | null>(resolve => {
+      let settled = false;
+      let cancelTimer: () => void = () => {};
+      const finish = (res: CoopSerializedEnemy[] | null) => {
+        if (settled) {
+          return;
+        }
+        settled = true;
+        cancelTimer();
+        if (this.meBattlePartyWaiters.get(key) === finish) {
+          this.meBattlePartyWaiters.delete(key);
+        }
+        resolve(res);
+      };
+      this.meBattlePartyWaiters.set(key, finish);
+      cancelTimer = this.schedule(() => finish(null), timeoutMs);
+    });
+  }
+
   /** GUEST: handle an out-of-turn authoritative checkpoint. */
   onCheckpoint(handler: (reason: string, checkpoint: CoopBattleCheckpoint) => void): void {
     this.checkpointHandler = handler;
@@ -397,11 +449,16 @@ export class CoopBattleStreamer {
     for (const finish of [...this.enemyPartyWaiters.values()]) {
       finish(null);
     }
+    for (const finish of [...this.meBattlePartyWaiters.values()]) {
+      finish(null);
+    }
     for (const finish of [...this.stateSyncWaiters.values()]) {
       finish(null);
     }
     this.pending.clear();
     this.enemyPartyWaiters.clear();
+    this.meBattlePartyWaiters.clear();
+    this.meBattlePartyInbox.clear();
     this.stateSyncWaiters.clear();
     this.stateSyncInbox.clear();
     this.inbox.clear();
@@ -430,6 +487,18 @@ export class CoopBattleStreamer {
         }
         this.lastEnemyParty = { wave: msg.wave, enemies: msg.enemies };
         this.enemyPartyHandler?.(msg.wave, msg.enemies);
+        return;
+      }
+      case "meBattleEnemyPartySync": {
+        // Hand it straight to a parked awaitMeBattleEnemyParty (consumed), else buffer for the
+        // next await (the host may race ahead of the guest reaching the handoff). Keyed by the
+        // ME interaction so two ME battles in a wave never collide (#633 ME handoff).
+        const waiter = this.meBattlePartyWaiters.get(msg.key);
+        if (waiter) {
+          waiter(msg.enemies);
+          return;
+        }
+        this.meBattlePartyInbox.set(msg.key, msg.enemies);
         return;
       }
       case "turnResolution": {

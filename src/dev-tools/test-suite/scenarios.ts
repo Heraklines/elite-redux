@@ -8774,6 +8774,40 @@ export const DEV_SCENARIOS: DevScenario[] = [
       );
     },
   },
+  // Co-op - AUTHORITATIVE mystery-encounter that spawns a BOSS battle (#633 ME battle handoff)
+  {
+    label: "(note) Co-op: ME boss-spawn handoff (2 clients, authoritative)",
+    description:
+      "#633 co-op AUTHORITATIVE ME BATTLE HANDOFF - NOT stageable in one client (it is a\n"
+      + "cross-client deadlock that needs TWO live engines + a transport; the headless repro\n"
+      + "lives in test/tests/elite-redux/coop/coop-me-battle-handoff.test.ts).\n"
+      + "THE BUG: a mystery encounter whose option spawns a wild BOSS battle hung. The GUEST\n"
+      + "owned the ME (alternation parity), drove the option, then forked into the spawned\n"
+      + "battle - so the HOST (the button-replay watcher) STALLED at the ME option screen\n"
+      + "forever (the owner's button stream dried up at the encounter -> battle boundary) and\n"
+      + "the guest waited in the battle for the host to drive it. Both screens froze.\n"
+      + "THE FIX: at the encounter -> battle boundary the ME owner relays a BATTLE-HANDOFF\n"
+      + "signal (the watcher ends its pump WITHOUT leaving the encounter), and the HOST streams\n"
+      + "the boss party keyed by the ME interaction; the GUEST adopts it verbatim. The battle\n"
+      + "then runs host-authoritatively (host drives, guest replays via CoopReplayTurnPhase).\n"
+      + "DO (needs 2 clients on the staging build, AUTHORITATIVE netcode): play to a wave where\n"
+      + "an ME spawns and pick the option that starts a BOSS/wild battle - first on the GUEST's\n"
+      + "alternation turn (guest owns the ME), then on the HOST's turn (host owns the ME).\n"
+      + "EXPECT (both owner cases): NO freeze. The owner picks the option, both clients enter\n"
+      + "the SAME boss battle (identical species/level - the host's party), the host drives it\n"
+      + "and the guest renders it, and the run continues to the reward shop + next wave.\n"
+      + "VERIFY post-ME the two clients still agree (no recurring [coop-desync] lines; the\n"
+      + "meChecksum / state matches). This (note) flags that a live 2-client run is the final\n"
+      + "validation - the single-client suite cannot reproduce the deadlock.",
+    setup: () => {
+      resetDevOverrides();
+      return [
+        makeStarter(SpeciesId.SNORLAX, {
+          moveset: [MoveId.BODY_SLAM, MoveId.CRUNCH, MoveId.EARTHQUAKE, MoveId.REST],
+        }),
+      ];
+    },
+  },
   // Co-op - arena-tag (hazard / screen) SYNC (#633 GAP 1)
   {
     label: "Co-op: hazards / screens sync to the guest (#633 GAP 1)",

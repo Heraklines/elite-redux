@@ -9,6 +9,7 @@ import {
   getCoopMePump,
   getCoopNetcodeMode,
   getCoopRuntime,
+  setCoopMeBattleInteractionCounter,
 } from "#data/elite-redux/coop/coop-runtime";
 import { ArenaTagSide } from "#enums/arena-tag-side";
 import { BattlerTagLapseType } from "#enums/battler-tag-lapse-type";
@@ -78,6 +79,11 @@ function coopBeginMePump(): void {
   // Capture the alternation counter at the ME's start (== seq - BASE). The ME terminal
   // advances the turn ONCE per client, idempotently keyed to this value (#633).
   coopMeInteractionStart = controller.interactionCounter();
+  // Pin the same counter for the ME BATTLE HANDOFF key (#633): if this ME's option spawns a
+  // battle, the host streams the boss party keyed by (waveIndex, this counter) and the guest
+  // adopts it, so the spawned boss is identical + host-authoritative on both clients. Reset at
+  // the ME terminal (coopEndMePump).
+  setCoopMeBattleInteractionCounter(coopMeInteractionStart);
   const seq = COOP_ME_PUMP_SEQ_BASE + coopMeInteractionStart;
   const spoofed = getCoopRuntime()?.spoof != null;
   // Resolve the ME owner from the PINNED start counter (#633), not the live counter - an
@@ -100,12 +106,24 @@ function coopBeginMePump(): void {
     // is skipped). Both clients advance the alternation turn LOCALLY + idempotently (keyed to the
     // ME's start counter), so whichever terminal fires first (this fast-forward or the owner's
     // coopEndMePump) advances exactly once and the other no-ops.
-    pump.beginWatcher(seq, () => {
-      if (!coopInMeInteractivePhase()) {
-        return; // already auto-completed past the encounter; its terminal already advanced
-      }
-      leaveEncounterWithoutBattle();
-      controller.advanceInteraction(coopMeInteractionStart);
+    //
+    // On a BATTLE HANDOFF (#633): the owner's option spawned a battle. Do NOT leave the encounter
+    // and do NOT advance the interaction counter - the spawned battle (+ its reward shop) still
+    // runs, and the SINGLE ME advance happens at the true ME terminal (coopEndMePump) after it.
+    // The watcher's input gate auto-suspends for the battle phase, so the battle command relay
+    // takes over and the host drives the battle host-authoritatively.
+    pump.beginWatcher(seq, {
+      onLeave: () => {
+        if (!coopInMeInteractivePhase()) {
+          return; // already auto-completed past the encounter; its terminal already advanced
+        }
+        leaveEncounterWithoutBattle();
+        controller.advanceInteraction(coopMeInteractionStart);
+      },
+      onBattleHandoff: () => {
+        // No-op beyond ending the pump: the spawned battle runs via the existing host-drives /
+        // guest-replays path; the counter advance is deferred to the true ME terminal.
+      },
     });
   }
 }
@@ -131,6 +149,8 @@ function coopEndMePump(): void {
   // as exactly ONE alternation step on each client - no host-broadcast race (#633).
   controller.advanceInteraction(coopMeInteractionStart);
   coopMeInteractionStart = -1;
+  // Clear the ME battle handoff key now the encounter is fully over (#633).
+  setCoopMeBattleInteractionCounter(-1);
 }
 
 /**

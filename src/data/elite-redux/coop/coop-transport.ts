@@ -458,6 +458,17 @@ export type CoopMessage =
    */
   | { t: "enemyPartySync"; wave: number; enemies: CoopSerializedEnemy[] }
   /**
+   * Host -> guest (#633, authoritative ME battle handoff): the EXACT enemy party the host
+   * generated for a mystery-encounter-SPAWNED battle. Unlike `enemyPartySync` (keyed by the
+   * wave's starting encounter), an ME battle spawns MID-wave from an option pick, so it is
+   * keyed by an ME-interaction `key` (see `meBattleHandoffKey`: waveIndex + the ME interaction
+   * counter) - two ME battles in the same wave never collide, and a stale wave's party is never
+   * adopted. The guest (which forwarded its option pick when it owned the ME) discards its own
+   * locally-rolled party and adopts these verbatim, so the spawned boss is identical + the
+   * battle is host-authoritative regardless of who OWNED the encounter.
+   */
+  | { t: "meBattleEnemyPartySync"; key: string; enemies: CoopSerializedEnemy[] }
+  /**
    * Host -> guest (#633): the host's fetched GHOST-TEAM POOL. Ghost teams are pulled
    * per-client from the shared server pool, so the two clients otherwise download
    * DIFFERENT teams and field divergent ghost trainers (desync). The host broadcasts

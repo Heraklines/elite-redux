@@ -28,12 +28,12 @@
 import { getGameMode } from "#app/game-mode";
 import { globalScene } from "#app/global-scene";
 import { captureCoopEnemies } from "#data/elite-redux/coop/coop-battle-engine";
+import { buildCoopEnemy } from "#data/elite-redux/coop/coop-enemy-builder";
 import { clearCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
 import { COOP_SAVE_SLOT_COUNT, coopGuestSessionSlot } from "#data/elite-redux/coop/coop-session";
 import { GameModes } from "#enums/game-modes";
 import { SpeciesId } from "#enums/species-id";
 import { UiMode } from "#enums/ui-mode";
-import { buildCoopEnemy } from "#phases/encounter-phase";
 import { SelectStarterPhase } from "#phases/select-starter-phase";
 import { GameManager } from "#test/framework/game-manager";
 import Phaser from "phaser";
