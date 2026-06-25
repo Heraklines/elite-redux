@@ -1,4 +1,5 @@
 import { globalScene } from "#app/global-scene";
+import { isCoopAuthoritativeGuest } from "#data/elite-redux/coop/coop-runtime";
 import { erGamblersCoinPayoutMultiplier } from "#data/elite-redux/er-relics";
 import { ArenaTagType } from "#enums/arena-tag-type";
 import { BattleType } from "#enums/battle-type";
@@ -41,7 +42,16 @@ export class MoneyRewardPhase extends BattlePhase {
       }
     }
 
-    globalScene.addMoney(moneyAmount.value);
+    // Co-op (#633 trainer-victory deadlock): `globalScene.money` is ONE shared pool that is
+    // host-authoritative in the authoritative netcode (the guest reconciles to the host's snapshot).
+    // The guest now runs the full TrainerVictoryPhase -> MoneyRewardPhase chain (so its account gets
+    // the per-account vouchers), but it must NOT also ADD to the shared money - that would transiently
+    // double it until the next resync corrects it. So the authoritative GUEST renders the "money won"
+    // line WITHOUT mutating the pool. LOCKSTEP is unchanged: both clients add the same amount
+    // deterministically (the shared pool stays correct). Solo / host add as before.
+    if (!isCoopAuthoritativeGuest()) {
+      globalScene.addMoney(moneyAmount.value);
+    }
 
     const userLocale = navigator.language || "en-US";
     const formattedMoneyAmount = moneyAmount.value.toLocaleString(userLocale);

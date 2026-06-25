@@ -16,6 +16,7 @@ import {
 import { logCanonicalDiff } from "#data/elite-redux/coop/coop-data-fingerprint";
 import { consumeCoopPendingWaveAdvance, getCoopBattleStreamer } from "#data/elite-redux/coop/coop-runtime";
 import type { CoopBattleEvent, CoopFullBattleSnapshot } from "#data/elite-redux/coop/coop-transport";
+import { BattleType } from "#enums/battle-type";
 import { BattlerIndex } from "#enums/battler-index";
 import { decompressFromBase64 } from "lz-string";
 
@@ -183,6 +184,13 @@ export class CoopReplayTurnPhase extends Phase {
     if (pending == null) {
       return;
     }
+    // DIAGNOSTIC (#633 trainer-victory deadlock): log the outcome + the guest's battleType so a live
+    // capture confirms the guest queues the right tail. For a "win" on a TRAINER wave the VictoryPhase
+    // it queues MUST go on to push TrainerVictoryPhase + SelectModifierPhase (the guest becomes the
+    // reward-shop OWNER so the host's WATCHER wait resolves).
+    console.info(
+      `[coop-diag] guest wave-advance outcome=${pending.outcome} wave=${pending.wave} battleType=${BattleType[globalScene.currentBattle.battleType]} queues=${pending.outcome === "win" || pending.outcome === "capture" ? "VictoryPhase" : pending.outcome === "flee" ? "BattleEnd+NewBattle" : "GameOverPhase"}`,
+    );
     try {
       switch (pending.outcome) {
         case "win":

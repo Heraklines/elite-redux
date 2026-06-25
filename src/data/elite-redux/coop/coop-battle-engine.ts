@@ -54,7 +54,7 @@ import { BattlerTagType } from "#enums/battler-tag-type";
 import type { MoveId } from "#enums/move-id";
 import type { Nature } from "#enums/nature";
 import { Stat } from "#enums/stat";
-import type { StatusEffect } from "#enums/status-effect";
+import { StatusEffect } from "#enums/status-effect";
 import type { WeatherType } from "#enums/weather-type";
 import type { Pokemon } from "#field/pokemon";
 // biome-ignore lint/performance/noNamespaceImport: held-item reconstruction resolves the modifier class by serialized name (`Modifier[className]`), exactly like the save-load path in game-data.ts.
@@ -278,6 +278,16 @@ export function reconcileCoopEnemyField(hostField: { bi: number; fainted: boolea
         // FaintPhase / resolution pipeline - that would re-introduce the engine divergence
         // authoritative mode exists to prevent).
         enemy.hp = 0;
+        // Also stamp the FAINT status (#633 trainer-victory deadlock): the host's real FaintPhase
+        // calls doSetStatus(FAINT) before leaveField, so on the host a KOd enemy reads
+        // isFainted(true)===true. VictoryPhase's win-branch guard is `!getEnemyParty().find(p =>
+        // !p.isFainted(true))` - it checks the STATUS, not just hp. Without this the off-field KOd
+        // enemy (still in getEnemyParty) reads isFainted(true)===false on the guest, so the find
+        // returns it, the guard is false, and the guest's VictoryPhase SKIPS the entire trainer
+        // reward chain + SelectModifierPhase (the deadlock: the host parks as the reward WATCHER
+        // waiting for the guest/OWNER's picks the guest never makes). doSetStatus(FAINT) is a pure
+        // field assignment (no phase / RNG), so it stays side-effect-free like the rest of the removal.
+        enemy.doSetStatus(StatusEffect.FAINT);
         enemy.leaveField(true, true, false);
       } catch {
         /* one enemy removal failed; leave it and continue the reconcile */
@@ -425,6 +435,9 @@ export function reconcileCoopPlayerField(hostField: { bi: number; fainted: boole
         // FaintPhase / resolution pipeline - that would re-introduce the engine divergence
         // authoritative mode exists to prevent).
         mon.hp = 0;
+        // Stamp FAINT status for the same reason as the enemy side (#633 trainer-victory deadlock):
+        // VictoryPhase / isFainted(true) checks the status, not just hp. Mirrors the host FaintPhase.
+        mon.doSetStatus(StatusEffect.FAINT);
         mon.leaveField(true, true, false);
       } catch {
         /* one player removal failed; leave it and continue the reconcile */

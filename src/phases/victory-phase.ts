@@ -1,7 +1,7 @@
 import { timedEventManager } from "#app/global-event-manager";
 import { globalScene } from "#app/global-scene";
 import { modifierTypes } from "#data/data-lists";
-import { broadcastCoopWaveResolved } from "#data/elite-redux/coop/coop-runtime";
+import { broadcastCoopWaveResolved, getCoopController } from "#data/elite-redux/coop/coop-runtime";
 import { erBiomeOverstay } from "#data/elite-redux/er-biome-notoriety";
 import { erBiomeRoutingActive } from "#data/elite-redux/er-biome-routing";
 import { erShouldRaiseCrossroads } from "#data/elite-redux/er-biome-structure";
@@ -62,8 +62,23 @@ export class VictoryPhase extends PokemonPhase {
       // guest - it carries the wave number, guarded against a double-advance on the guest side).
       broadcastCoopWaveResolved("win");
 
+      const isTrainerWin = globalScene.currentBattle.battleType === BattleType.TRAINER;
+      // DIAGNOSTIC (#633 trainer-victory deadlock): log the win-branch entry on a co-op run so a live
+      // capture shows the battleType and whether the trainer reward chain is queued. On the GUEST this
+      // MUST read TRAINER + queue=TrainerVictoryPhase for a trainer wave - if the guest's KOd enemy was
+      // not stamped FAINT, this whole branch is skipped and the guest deadlocks the host's reward WATCHER.
+      if (globalScene.gameMode.isCoop) {
+        const willSelectModifier =
+          (globalScene.gameMode.isEndless || !globalScene.gameMode.isWaveFinal(globalScene.currentBattle.waveIndex))
+          && globalScene.currentBattle.waveIndex % 10 !== 0;
+        const coopRole = getCoopController()?.role ?? "none";
+        console.info(
+          `[coop-diag] VictoryPhase win-branch role=${coopRole} battleType=${BattleType[globalScene.currentBattle.battleType]} queuesTrainerVictory=${isTrainerWin} queuesSelectModifier=${willSelectModifier} wave=${globalScene.currentBattle.waveIndex}`,
+        );
+      }
+
       globalScene.phaseManager.pushNew("BattleEndPhase", true);
-      if (globalScene.currentBattle.battleType === BattleType.TRAINER) {
+      if (isTrainerWin) {
         globalScene.phaseManager.pushNew("TrainerVictoryPhase");
       }
 

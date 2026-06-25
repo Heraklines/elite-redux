@@ -8838,6 +8838,36 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
   },
   {
+    label: "(note) Co-op TRAINER-VICTORY deadlock (#633)",
+    description:
+      "#633 co-op AUTHORITATIVE TRAINER-WIN (2-client flow, not single-client testable). After\n"
+      + "beating a TRAINER, the HOST ran the full tail (VictoryPhase -> BattleEnd -> TrainerVictory\n"
+      + "-> Money/Voucher rewards -> EggLapse -> SelectModifierPhase) and parked as the reward-shop\n"
+      + "WATCHER. The GUEST, however, ran only VictoryPhase -> ExpPhase -> next wave's CommandPhase:\n"
+      + "it SKIPPED the entire trainer reward chain + the reward shop and advanced a wave -> DEADLOCK\n"
+      + "(host waits at the shop for the guest/OWNER's picks; guest is a wave ahead) AND the guest\n"
+      + "got NO egg/AG vouchers. ROOT CAUSE: the guest removes a host-KOd enemy with hp=0 but never\n"
+      + "stamped StatusEffect.FAINT, so VictoryPhase's win-branch guard (which checks isFainted(TRUE)\n"
+      + "= hp<=0 AND status===FAINT) saw a 'still-alive' enemy and skipped the whole reward branch.\n"
+      + "FIX: reconcileCoopEnemyField/PlayerField now stamp FAINT (mirroring the host's FaintPhase),\n"
+      + "so the guest's VictoryPhase enters the win branch and queues TrainerVictoryPhase +\n"
+      + "SelectModifierPhase. Both clients run TrainerVictoryPhase, so EACH credits its OWN account\n"
+      + "the full ER voucher amount (Youngster 0 / Ace 1 / Elite 2 / Hell 3); the shared money pool\n"
+      + "is host-authoritative so the guest renders the money line WITHOUT re-adding (no double money).\n"
+      + "CHECK (needs a REAL 2-client authoritative session): beat a trainer wave; BOTH players must\n"
+      + "land on the SAME reward shop (one drives as OWNER, the other watches), neither jumps ahead a\n"
+      + "wave, and BOTH accounts gain the trainer's egg vouchers. (Regression unit test:\n"
+      + "test/tests/elite-redux/coop/coop-guest-renderer.test.ts 'TRAINER-VICTORY' + 'VOUCHER CREDIT'.)",
+    setup: () => {
+      resetDevOverrides();
+      return [
+        makeStarter(SpeciesId.SNORLAX, {
+          moveset: [MoveId.BODY_SLAM, MoveId.CRUNCH, MoveId.EARTHQUAKE, MoveId.REST],
+        }),
+      ];
+    },
+  },
+  {
     label: "(note) Black-shiny gift cycle refreshes on summary (#349)",
     description:
       "#349 - on the party SUMMARY screen's Abilities page, pressing R to cycle\n"

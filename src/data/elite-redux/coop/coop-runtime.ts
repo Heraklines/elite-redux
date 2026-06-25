@@ -195,6 +195,17 @@ export interface CoopRuntime {
 
 let active: CoopRuntime | null = null;
 
+/**
+ * Authoritative LATCH (#633 trainer-victory deadlock): once an active co-op session has been
+ * observed in "authoritative" netcode, an active session STAYS authoritative for the rest of
+ * the run. Guards the guest from silently falling back to "lockstep" mid-run (e.g. a transient
+ * read where the controller's `_netcodeMode` had not yet adopted the host's runConfig, or a
+ * controller re-read race) - which would make TurnStartPhase NOT divert to CoopReplayTurnPhase
+ * and the guest run its OWN engine + the waveResolved tail (a double-advance / desync). Reset in
+ * {@linkcode clearCoopRuntime} so a subsequent run (incl. a solo / lockstep one) starts clean.
+ */
+let authoritativeLatched = false;
+
 /** Register the live co-op session (called when a co-op run is being set up). */
 export function setCoopRuntime(runtime: CoopRuntime): void {
   active = runtime;
@@ -218,7 +229,29 @@ export function getCoopController(): CoopSessionController | null {
  * read so the engine-free unit tests can call it.
  */
 export function getCoopNetcodeMode(): CoopNetcodeMode {
-  return getCoopController()?.netcodeMode ?? "lockstep";
+  // No live session -> lockstep (solo / non-coop / lockstep run, byte-for-byte unchanged).
+  if (active == null) {
+    return "lockstep";
+  }
+  const mode = active.controller.netcodeMode;
+  // Latch authoritative (#633 trainer-victory deadlock): once an active session is authoritative,
+  // keep returning it for the rest of the run so a transient controller read (pre-runConfig, a
+  // re-read race) can NEVER flip the guest back to "lockstep" and make it run its own engine.
+  if (mode === "authoritative") {
+    authoritativeLatched = true;
+    return "authoritative";
+  }
+  return authoritativeLatched ? "authoritative" : mode;
+}
+
+/**
+ * Whether THIS client is the GUEST of a live AUTHORITATIVE co-op session (#633). The single read
+ * point for the "guest renders, host is authoritative" gates that must NOT mutate shared
+ * host-owned state (e.g. the shared money pool). Hard `false` for solo / lockstep / the host, so
+ * those paths are byte-for-byte unaffected.
+ */
+export function isCoopAuthoritativeGuest(): boolean {
+  return active != null && getCoopNetcodeMode() === "authoritative" && active.controller.role === "guest";
 }
 
 /** Convenience: the live battle-command relay, or null when not in a co-op run. */
@@ -396,5 +429,7 @@ export function clearCoopRuntime(): void {
   // Reset the authoritative wave-advance state so a subsequent run starts clean (#633).
   pendingWaveAdvance = null;
   lastResolvedWave = -1;
+  // Drop the authoritative latch so a subsequent solo / lockstep run is not forced authoritative.
+  authoritativeLatched = false;
   active = null;
 }

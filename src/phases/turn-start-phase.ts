@@ -82,6 +82,12 @@ export class TurnStartPhase extends FieldPhase {
     // / non-co-op play is byte-for-byte unchanged.
     if (globalScene.gameMode.isCoop && getCoopNetcodeMode() === "authoritative") {
       const role = getCoopController()?.role;
+      // DIAGNOSTIC (#633 trainer-victory deadlock): log the authoritative guest-diversion guard so a
+      // live capture shows the mode+role at the divert decision - a silent "lockstep" fallback here is
+      // exactly the failure where the guest runs its OWN engine instead of CoopReplayTurnPhase.
+      console.info(
+        `[coop-diag] turn-start authoritative guard mode=${getCoopNetcodeMode()} role=${role ?? "none"} turn=${globalScene.currentBattle.turn} diverts=${role === "guest"}`,
+      );
       if (role === "guest") {
         globalScene.phaseManager.pushNew("CoopReplayTurnPhase", globalScene.currentBattle.turn);
         this.end();

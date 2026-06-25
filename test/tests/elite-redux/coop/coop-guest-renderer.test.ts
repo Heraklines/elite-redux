@@ -23,6 +23,7 @@
 
 import { getGameMode } from "#app/game-mode";
 import { globalScene } from "#app/global-scene";
+import { modifierTypes } from "#data/data-lists";
 import * as coopEngine from "#data/elite-redux/coop/coop-battle-engine";
 import { CoopInteractionRelay } from "#data/elite-redux/coop/coop-interaction-relay";
 import {
@@ -36,6 +37,7 @@ import { COOP_GUEST_FIELD_INDEX, COOP_HOST_FIELD_INDEX } from "#data/elite-redux
 import type { CoopBattleCheckpoint } from "#data/elite-redux/coop/coop-transport";
 import { ArenaTagSide } from "#enums/arena-tag-side";
 import { ArenaTagType } from "#enums/arena-tag-type";
+import { BattleType } from "#enums/battle-type";
 import { BattlerIndex } from "#enums/battler-index";
 import { Command } from "#enums/command";
 import { GameModes } from "#enums/game-modes";
@@ -46,6 +48,7 @@ import { SwitchType } from "#enums/switch-type";
 import { TrainerSlot } from "#enums/trainer-slot";
 import { UiMode } from "#enums/ui-mode";
 import { EnemyPokemon, type Pokemon } from "#field/pokemon";
+import { VoucherType } from "#system/voucher";
 import { GameManager } from "#test/framework/game-manager";
 import { getPokemonSpecies } from "#utils/pokemon-utils";
 import Phaser from "phaser";
@@ -733,5 +736,81 @@ describe.skipIf(!RUN)("co-op GUEST = pure renderer - real engine (#633, TRACK-2 
       pushNewSpy.mock.calls.some(([name]) => name === "VictoryPhase"),
       "no wave-advancing VictoryPhase",
     ).toBe(false);
+  });
+
+  // (F) TRAINER-VICTORY DEADLOCK (#633 trainer-victory deadlock): after a host KOs the last enemy in
+  // an authoritative TRAINER battle, the guest's host-KOd enemy is removed by reconcileCoopEnemyField
+  // with hp=0. BEFORE the fix that removal did NOT stamp StatusEffect.FAINT, so VictoryPhase's
+  // win-branch guard (`!getEnemyParty().find(p => !p.isFainted(true))`, which checks the STATUS not
+  // just hp) saw a "still-alive" enemy and SKIPPED the entire trainer reward chain + the reward shop -
+  // the guest jumped to the next wave's CommandPhase while the host parked as the reward WATCHER (the
+  // deadlock). The fix stamps FAINT in the reconcile, so the guest's VictoryPhase enters the win branch
+  // and queues TrainerVictoryPhase + SelectModifierPhase (the guest becomes the reward OWNER).
+  it("TRAINER-VICTORY (#633): the guest's VictoryPhase queues TrainerVictoryPhase + SelectModifierPhase (reaches the reward shop, no next-wave deadlock)", async () => {
+    await startCoopGuest();
+    // Force a TRAINER battle on the guest (deterministic on both clients via isWaveTrainer; here we set
+    // it directly so the harness's wild double becomes a trainer win). A non-x0 wave so the reward shop
+    // (SelectModifierPhase) is part of the tail (`waveIndex % 10`).
+    globalScene.currentBattle.battleType = BattleType.TRAINER;
+    globalScene.currentBattle.waveIndex = 7;
+    expect(globalScene.currentBattle.battleType, "the guest sees a TRAINER battle").toBe(BattleType.TRAINER);
+
+    // Model the host KOing BOTH enemies this turn: build the host's authoritative checkpoint reporting
+    // both enemy slots fainted, then apply it. reconcileCoopEnemyField removes the guest's host-KOd
+    // enemies - now stamping StatusEffect.FAINT so they read isFainted(true)===true off-field.
+    for (const enemy of globalScene.getEnemyField(false)) {
+      enemy.hp = 0;
+    }
+    const hostCheckpoint = coopEngine.captureCoopCheckpoint()!;
+    // Restore guest hp so we exercise the REAL removal+FAINT-stamp path (model the desync: the guest
+    // never saw the KO, so its enemies are alive until the host's checkpoint reconciles them).
+    for (const enemy of globalScene.getEnemyField(false)) {
+      enemy.hp = enemy.getMaxHp();
+    }
+    coopEngine.applyCoopCheckpoint(hostCheckpoint);
+
+    // Every enemy party member is now off-field AND reads as fainted-with-status (the fix). This is the
+    // exact precondition VictoryPhase's win-branch guard checks.
+    for (const enemy of globalScene.getEnemyParty()) {
+      expect(enemy.isFainted(true), "the host-KOd enemy reads isFainted(true) on the guest (FAINT stamped)").toBe(true);
+    }
+
+    // Drive the guest's VictoryPhase exactly as maybeRunCoopWaveAdvance("win") does (address the last
+    // enemy party member by id so getPokemon() resolves a real mon).
+    const lastEnemy = globalScene.getEnemyParty().at(-1)!;
+    const pushNewSpy = vi.spyOn(globalScene.phaseManager, "pushNew");
+    const victory = game.scene.phaseManager.create("VictoryPhase", lastEnemy.id);
+    victory.start();
+
+    // The guest entered the WIN branch: it queued BattleEndPhase (so the run does NOT continue to a
+    // same-wave CommandPhase), TrainerVictoryPhase (the per-account voucher + money chain), and
+    // SelectModifierPhase (the reward shop - the guest becomes the OWNER, resolving the host's WATCHER).
+    const pushed = (name: string) => pushNewSpy.mock.calls.some(([n]) => n === name);
+    expect(pushed("BattleEndPhase"), "the guest queues BattleEndPhase (win branch entered)").toBe(true);
+    expect(pushed("TrainerVictoryPhase"), "the guest queues TrainerVictoryPhase (the reward chain)").toBe(true);
+    expect(pushed("SelectModifierPhase"), "the guest reaches the reward shop (no deadlock)").toBe(true);
+    // It does NOT skip straight to a next-wave CommandPhase (the deadlock symptom).
+    expect(pushed("CommandPhase"), "the guest does NOT jump to a next-wave CommandPhase").toBe(false);
+  });
+
+  // (F2) VOUCHER CREDIT (#633 trainer-victory deadlock): because the guest now runs its OWN
+  // TrainerVictoryPhase, its OWN account credits the full ER-difficulty egg-voucher amount. The voucher
+  // grant is a `ModifierRewardPhase(modifierTypes.VOUCHER)` whose AddVoucherModifier bumps the LOCAL
+  // gameData.voucherCounts on apply. Both clients running the chain => BOTH accounts get the full amount
+  // (not shared, not alternated) - a per-account reward, so no relay is needed.
+  it("VOUCHER CREDIT (#633): a voucher ModifierRewardPhase credits the guest's own gameData.voucherCounts", async () => {
+    await startCoopGuest();
+    const before = globalScene.gameData.voucherCounts[VoucherType.REGULAR];
+
+    // Run the exact phase TrainerVictoryPhase queues for the ER per-trainer egg voucher (the Ace 1 /
+    // Elite 2 / Hell 3 grant). Its AddVoucherModifier applies immediately, crediting voucherCounts.
+    const rewardPhase = game.scene.phaseManager.create("ModifierRewardPhase", modifierTypes.VOUCHER);
+    rewardPhase.start();
+    await new Promise(r => setTimeout(r, 0));
+
+    expect(
+      globalScene.gameData.voucherCounts[VoucherType.REGULAR],
+      "the guest's own account is credited the egg voucher (per-account, full amount)",
+    ).toBe(before + 1);
   });
 });
