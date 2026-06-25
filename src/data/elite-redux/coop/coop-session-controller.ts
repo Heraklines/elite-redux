@@ -23,7 +23,7 @@
 
 import { CoopRoster, type CoopRosterEntry } from "#data/elite-redux/coop/coop-roster";
 import { CoopInteractionTurn } from "#data/elite-redux/coop/coop-session";
-import type { CoopMessage, CoopRole, CoopTransport } from "#data/elite-redux/coop/coop-transport";
+import type { CoopMessage, CoopNetcodeMode, CoopRole, CoopTransport } from "#data/elite-redux/coop/coop-transport";
 
 /** Reserved {@linkcode CoopMessage} `screen` tag carrying the interaction-turn
  *  counter (host-authoritative; the guest mirrors it). Distinct from a real
@@ -50,6 +50,12 @@ export interface CoopRunConfig {
    * own seed, the legacy behavior).
    */
   seed?: string | undefined;
+  /**
+   * The host's chosen co-op netcode (#633, selectable A/B): `"lockstep"` or
+   * `"authoritative"`. The guest adopts it so both clients run the same
+   * implementation. Optional + additive (absent -> `"lockstep"`, the default).
+   */
+  netcodeMode?: CoopNetcodeMode | undefined;
 }
 
 /** The other role: host's partner is guest and vice-versa. */
@@ -120,6 +126,13 @@ export class CoopSessionController {
   private interactionTurn = new CoopInteractionTurn();
   /** The host-authoritative run config once received/known (#633, LIVE-C). */
   private _runConfig: CoopRunConfig | null = null;
+  /**
+   * The active co-op netcode (#633, selectable A/B). Defaults to `"lockstep"` (the
+   * safe live default that keeps the visible move synced). The HOST sets it at
+   * session start via {@linkcode setNetcodeMode}; the GUEST adopts the host's value
+   * off the `runConfig`. Every co-op gate reads this single source of truth.
+   */
+  private _netcodeMode: CoopNetcodeMode = "lockstep";
   private _localReady = false;
   private _partnerReady = false;
   private _partnerConnected = false;
@@ -279,14 +292,22 @@ export class CoopSessionController {
    * too. No-op shape-wise on the guest (the guest receives it via the transport).
    */
   broadcastRunConfig(config: CoopRunConfig): void {
-    this._runConfig = config;
-    console.log(`[coop-runconfig] host broadcast difficulty=${config.difficulty} (role=${this.role})`);
+    // Pin the active netcode (#633, selectable A/B) into the retained config so the
+    // self-healing `requestRunConfig` re-broadcast (and any later read) carries it.
+    const netcodeMode = config.netcodeMode ?? this._netcodeMode;
+    this._runConfig = { ...config, netcodeMode };
+    this._netcodeMode = netcodeMode;
+    console.log(
+      `[coop-runconfig] host broadcast difficulty=${config.difficulty} netcode=${netcodeMode} (role=${this.role})`,
+    );
     this.transport.send({
       t: "runConfig",
       difficulty: config.difficulty,
       challenges: config.challenges,
       // The host's run seed (#633, LIVE-A) rides along so the guest pins to it.
       ...(config.seed === undefined ? {} : { seed: config.seed }),
+      // The host's chosen netcode (#633, selectable A/B) so the guest adopts it.
+      netcodeMode,
     });
     this.emit();
   }
@@ -309,6 +330,24 @@ export class CoopSessionController {
    */
   runConfig(): CoopRunConfig | null {
     return this._runConfig;
+  }
+
+  /**
+   * The active co-op netcode (#633, selectable A/B). `"lockstep"` by default; the
+   * HOST sets it at session start and the GUEST adopts the host's value via the
+   * `runConfig`. The single read point for every co-op gate.
+   */
+  get netcodeMode(): CoopNetcodeMode {
+    return this._netcodeMode;
+  }
+
+  /**
+   * Set the co-op netcode (#633, selectable A/B). The HOST calls this at session
+   * start; the chosen mode then rides along in {@linkcode broadcastRunConfig} so the
+   * guest adopts the same implementation.
+   */
+  setNetcodeMode(mode: CoopNetcodeMode): void {
+    this._netcodeMode = mode;
   }
 
   /** Current state snapshot from the local point of view. */
@@ -412,8 +451,12 @@ export class CoopSessionController {
         // so the run is coherent and both engines stay in lockstep (#633, LIVE-A/C).
         // Only honour it FROM the host.
         if (this.role === "guest") {
-          console.log(`[coop-runconfig] guest received difficulty=${msg.difficulty}`);
-          this._runConfig = { difficulty: msg.difficulty, challenges: msg.challenges, seed: msg.seed };
+          // The guest adopts the host's chosen netcode (#633, selectable A/B); an
+          // absent value (an in-flight save from before this field) means "lockstep".
+          const netcodeMode = msg.netcodeMode ?? "lockstep";
+          console.log(`[coop-runconfig] guest received difficulty=${msg.difficulty} netcode=${netcodeMode}`);
+          this._netcodeMode = netcodeMode;
+          this._runConfig = { difficulty: msg.difficulty, challenges: msg.challenges, seed: msg.seed, netcodeMode };
           this.emit();
         }
         break;

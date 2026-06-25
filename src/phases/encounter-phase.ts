@@ -8,7 +8,7 @@ import { handleTutorial, Tutorial } from "#app/tutorial";
 import { initEncounterAnims, loadEncounterAnimAssets } from "#data/battle-anims";
 import { getCharVariantFromDialogue } from "#data/dialogue";
 import { applyCoopEnemyHeldItems, captureCoopEnemies } from "#data/elite-redux/coop/coop-battle-engine";
-import { getCoopBattleStreamer, getCoopController } from "#data/elite-redux/coop/coop-runtime";
+import { getCoopBattleStreamer, getCoopController, getCoopNetcodeMode } from "#data/elite-redux/coop/coop-runtime";
 import type { CoopSerializedEnemy, CoopSerializedPokemon } from "#data/elite-redux/coop/coop-transport";
 import { erBiomeForcedTerrain, erBiomeForcedWeather } from "#data/elite-redux/er-biome-rules";
 import { getErFinalBossSpecies, isErFinalBossSpecies } from "#data/elite-redux/er-final-boss";
@@ -221,13 +221,25 @@ export class EncounterPhase extends BattlePhase {
       return false;
     }
     const battle = globalScene.currentBattle;
-    // Co-op (#633, TRACK-2 Phase B): the GUEST is a pure renderer - it NEVER rolls its own
-    // enemies for ANY battle type. It awaits + adopts the host's authoritative party for
-    // wild AND trainer AND mystery-encounter battles (the host serializes + streams the
-    // generated party regardless of type), pre-filling battle.enemyParty so the encounter's
-    // own generation loop SKIPS (its `!enemyParty[e]` guard). The trainer object / ME
-    // encounter the guest still builds locally for RENDERING only - the MONS are the host's.
-    return battle != null;
+    if (getCoopNetcodeMode() === "authoritative") {
+      // Co-op AUTHORITATIVE netcode (#633, TRACK-2 Phase B): the GUEST is a pure renderer -
+      // it NEVER rolls its own enemies for ANY battle type. It awaits + adopts the host's
+      // authoritative party for wild AND trainer AND mystery-encounter battles (the host
+      // serializes + streams the generated party regardless of type), pre-filling
+      // battle.enemyParty so the encounter's own generation loop SKIPS (its `!enemyParty[e]`
+      // guard). The trainer object / ME encounter the guest still builds locally for
+      // RENDERING only - the MONS are the host's.
+      return battle != null;
+    }
+    // LOCKSTEP netcode (#633): adopt only for WILD and TRAINER battles (the 778b192dd gate).
+    // Wild parties roll a random species; trainer parties roll unseeded gender / double-
+    // battle flags and an unseeded species-pool pick (the latent wave-4 trainer desync).
+    // Ghost waves are BattleType.TRAINER, so they're covered here too. Mystery encounters
+    // are excluded (handled elsewhere) by the guard.
+    if (battle == null || battle.isBattleMysteryEncounter()) {
+      return false;
+    }
+    return battle.battleType === BattleType.WILD || battle.battleType === BattleType.TRAINER;
   }
 
   /** Co-op guest: wait for + adopt the host's enemy party, then run the encounter. */

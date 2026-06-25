@@ -32,7 +32,7 @@ import { CoopMePump } from "#data/elite-redux/coop/coop-me-pump";
 import { coopOwnerOfFieldIndex } from "#data/elite-redux/coop/coop-session";
 import { CoopSessionController } from "#data/elite-redux/coop/coop-session-controller";
 import { SpoofGuest } from "#data/elite-redux/coop/coop-spoof-guest";
-import type { CoopFullBattleSnapshot } from "#data/elite-redux/coop/coop-transport";
+import type { CoopFullBattleSnapshot, CoopNetcodeMode } from "#data/elite-redux/coop/coop-transport";
 import { type CoopTransport, createLoopbackPair, type SerializedCommand } from "#data/elite-redux/coop/coop-transport";
 import { CoopUiMirror } from "#data/elite-redux/coop/coop-ui-mirror";
 import { setCoopGhostFetchSuppressed, setCoopGhostPool, setGhostPoolPublisher } from "#data/elite-redux/er-ghost-teams";
@@ -158,6 +158,17 @@ export function getCoopController(): CoopSessionController | null {
   return active?.controller ?? null;
 }
 
+/**
+ * The active co-op netcode (#633, selectable A/B), or `"lockstep"` when there is no
+ * live session. This is the SINGLE read point every co-op gate uses to decide
+ * between the lockstep (both engines resolve) and authoritative (guest renders)
+ * implementations. Deliberately does NOT touch globalScene - it is a pure controller
+ * read so the engine-free unit tests can call it.
+ */
+export function getCoopNetcodeMode(): CoopNetcodeMode {
+  return getCoopController()?.netcodeMode ?? "lockstep";
+}
+
 /** Convenience: the live battle-command relay, or null when not in a co-op run. */
 export function getCoopBattleSync(): CoopBattleSync | null {
   return active?.battleSync ?? null;
@@ -216,10 +227,15 @@ export function broadcastCoopOwnSlotCommand(fieldIndex: number, command: Seriali
  * is the dev/hotseat entry; the real-peer path (P6) builds the same controller
  * over a WebRTC transport instead. Any prior session is torn down first.
  */
-export function startLocalCoopSession(opts: { username?: string | undefined } = {}): CoopRuntime {
+export function startLocalCoopSession(
+  opts: { username?: string | undefined; netcodeMode?: CoopNetcodeMode | undefined } = {},
+): CoopRuntime {
   clearCoopRuntime();
   const { host, guest } = createLoopbackPair();
   const controller = new CoopSessionController(host, { username: opts.username });
+  // This client is the HOST here; pin the chosen netcode (#633, selectable A/B) so
+  // it rides along in broadcastRunConfig and the guest adopts it. Default lockstep.
+  controller.setNetcodeMode(opts.netcodeMode ?? "lockstep");
   const battleSync = new CoopBattleSync(host);
   const battleStream = new CoopBattleStreamer(host);
   const interactionRelay = new CoopInteractionRelay(host);
@@ -255,10 +271,14 @@ export function startLocalCoopSession(opts: { username?: string | undefined } = 
  */
 export function connectCoopSession(
   transport: CoopTransport,
-  opts: { username?: string | undefined } = {},
+  opts: { username?: string | undefined; netcodeMode?: CoopNetcodeMode | undefined } = {},
 ): CoopRuntime {
   clearCoopRuntime();
   const controller = new CoopSessionController(transport, { username: opts.username });
+  // Pin the chosen netcode (#633, selectable A/B). On the HOST this is the source of
+  // truth that rides along in broadcastRunConfig; on the GUEST it is only the pre-
+  // runConfig default (the host's value overwrites it on receipt). Default lockstep.
+  controller.setNetcodeMode(opts.netcodeMode ?? "lockstep");
   const battleSync = new CoopBattleSync(transport);
   const battleStream = new CoopBattleStreamer(transport);
   const interactionRelay = new CoopInteractionRelay(transport);

@@ -5,13 +5,24 @@ import { speciesStarterCosts } from "#balance/starters";
 import { TrappedTag } from "#data/battler-tags";
 import { getDailyEventSeedBoss } from "#data/daily-seed/daily-run";
 import { isDailyFinalBoss } from "#data/daily-seed/daily-seed-utils";
-import { applyCoopEnemies, captureCoopEnemies } from "#data/elite-redux/coop/coop-battle-engine";
+import {
+  applyCoopCheckpoint,
+  applyCoopEnemies,
+  captureCoopCheckpoint,
+  captureCoopChecksum,
+  captureCoopEnemies,
+} from "#data/elite-redux/coop/coop-battle-engine";
 import {
   applyWiredPartnerCommand,
   type ResolvedPartnerCommand,
   resolvePartnerCommand,
 } from "#data/elite-redux/coop/coop-partner-ai";
-import { getCoopBattleStreamer, getCoopBattleSync, getCoopController } from "#data/elite-redux/coop/coop-runtime";
+import {
+  getCoopBattleStreamer,
+  getCoopBattleSync,
+  getCoopController,
+  getCoopNetcodeMode,
+} from "#data/elite-redux/coop/coop-runtime";
 import { coopOwnerOfFieldIndex } from "#data/elite-redux/coop/coop-session";
 import type { SerializedCommand } from "#data/elite-redux/coop/coop-transport";
 import { AbilityId } from "#enums/ability-id";
@@ -204,13 +215,17 @@ export class CommandPhase extends FieldPhase {
       return false;
     }
 
-    // Co-op (#633, TRACK-2 Phase B): on the GUEST, the partner slot is the HOST's mon.
-    // The guest is a pure renderer - it must NOT await or AI-resolve the host's slot (the
-    // host simulates the whole turn). Write an inert, skipped command so the phase queue
-    // stays well-formed; TurnStartPhase then diverts the turn to CoopReplayTurnPhase, which
-    // renders the host's authoritative outcome. (The HOST keeps awaiting the guest's real
-    // command over the relay below, so it simulates with the guest's actual pick.)
-    if (controller.role === "guest") {
+    // Co-op AUTHORITATIVE netcode only (#633, TRACK-2 Phase B): on the GUEST, the partner
+    // slot is the HOST's mon. The guest is a pure renderer - it must NOT await or AI-resolve
+    // the host's slot (the host simulates the whole turn). Write an inert, skipped command so
+    // the phase queue stays well-formed; TurnStartPhase then diverts the turn to
+    // CoopReplayTurnPhase, which renders the host's authoritative outcome. (The HOST keeps
+    // awaiting the guest's real command over the relay below, so it simulates with the
+    // guest's actual pick.) In LOCKSTEP the guest FALLS THROUGH to the SAME request+apply
+    // path the host uses below (requestPartnerCommand -> applyWiredPartnerCommand /
+    // applyRelayedActionCommand + AI fallback), so the partner's move is relayed + applied
+    // on both clients and the visible move stays synced (the move-sync fix).
+    if (controller.role === "guest" && getCoopNetcodeMode() === "authoritative") {
       globalScene.currentBattle.turnCommands[this.fieldIndex] = {
         command: Command.FIGHT,
         move: { move: MoveId.NONE, targets: [], useMode: MoveUseMode.NORMAL },
@@ -287,6 +302,47 @@ export class CommandPhase extends FieldPhase {
       return;
     }
     const { turn, waveIndex } = globalScene.currentBattle;
+    // LOCKSTEP netcode (#633): heal state exactly as 778b192dd did - the HOST broadcasts
+    // the authoritative post-previous-turn checkpoint once per turn (slot 0, turn 2+), and
+    // the GUEST snaps to the latest such checkpoint at this safe boundary, so both screens
+    // converge on the same hp / status / stages / weather every turn. (In AUTHORITATIVE the
+    // per-turn checkpoint + checksum verification is owned by CoopReplayTurnPhase / emitTurn,
+    // so it is NOT re-sent here - the Track-2 path below.)
+    if (getCoopNetcodeMode() === "lockstep") {
+      if (controller.role === "host") {
+        // Turn 1 of each wave (first command phase): broadcast the authoritative enemy
+        // party so the guest's enemies match exactly (ability/moveset/IVs/nature).
+        if (this.fieldIndex === 0 && turn === 1) {
+          streamer.sendEnemyParty(waveIndex, captureCoopEnemies());
+        }
+        // Once per turn after turn 1: snapshot + broadcast the post-turn state. The
+        // streamer API now also carries the host's full-state checksum (#633, TRACK-2);
+        // passing it keeps lockstep on the current API while the BEHAVIOR (per-turn
+        // checkpoint broadcast/adopt) matches 778b192dd exactly.
+        if (this.fieldIndex === 0 && turn > 1) {
+          const checkpoint = captureCoopCheckpoint();
+          if (checkpoint != null) {
+            streamer.sendCheckpoint("turn", checkpoint, captureCoopChecksum());
+          }
+        }
+      } else {
+        // Guest: at the wave's first turn, adopt the host's exact enemy party.
+        if (turn === 1) {
+          const enemies = streamer.consumeEnemyParty(waveIndex);
+          if (enemies != null) {
+            applyCoopEnemies(enemies);
+          }
+        }
+        // Apply the host's latest authoritative checkpoint at this safe boundary. The
+        // current streamer returns an envelope (checkpoint + checksum); lockstep applies
+        // the checkpoint exactly as 778b192dd did.
+        const envelope = streamer.consumeCheckpoint();
+        if (envelope != null) {
+          applyCoopCheckpoint(envelope.checkpoint);
+        }
+      }
+      return;
+    }
     if (controller.role === "host") {
       // Turn 1 of each wave (first command phase): broadcast the authoritative enemy
       // party so the guest's enemies match exactly (ability/moveset/IVs/nature). The

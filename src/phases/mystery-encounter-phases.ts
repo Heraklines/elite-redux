@@ -7,6 +7,7 @@ import {
   getCoopBattleStreamer,
   getCoopController,
   getCoopMePump,
+  getCoopNetcodeMode,
   getCoopRuntime,
 } from "#data/elite-redux/coop/coop-runtime";
 import { ArenaTagSide } from "#enums/arena-tag-side";
@@ -84,11 +85,15 @@ function coopBeginMePump(): void {
   // the owner/seq calc and desync the pump (the same drift that broke the cursor mirror).
   if (spoofed || controller.isLocalOwnerAtCounter(coopMeInteractionStart)) {
     pump.beginOwner(seq);
-    // Co-op (#633, TRACK-2 Phase C): stamp the owner's authoritative full-state checksum at
-    // ME entry so the watcher can verify its ME state is identical BEFORE the pump replays the
-    // button stream into it (the pump's one load-bearing assumption, now self-checking). The
-    // watcher's verify+heal handler is wired once in the runtime.
-    getCoopBattleStreamer()?.sendMeChecksum(seq, captureCoopChecksum());
+    // Co-op AUTHORITATIVE netcode only (#633, TRACK-2 Phase C): stamp the owner's
+    // authoritative full-state checksum at ME entry so the watcher can verify its ME state
+    // is identical BEFORE the pump replays the button stream into it (the pump's one
+    // load-bearing assumption, now self-checking). The watcher's verify+heal handler is
+    // wired once in the runtime. In LOCKSTEP both clients run the full engine on the shared
+    // seed, so the ME state already matches and no checksum stamp is sent (778b192dd path).
+    if (getCoopNetcodeMode() === "authoritative") {
+      getCoopBattleStreamer()?.sendMeChecksum(seq, captureCoopChecksum());
+    }
   } else {
     // On the leave sentinel / timeout / partner-gone, fast-forward to the next wave IF still in
     // the encounter (the rewards were already applied by the relayed picks; only the final outro

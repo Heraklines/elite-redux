@@ -30,6 +30,18 @@ import type { GhostTeamSnapshot } from "#data/elite-redux/er-ghost-teams";
  *  source of truth and `guest` is the thin client. */
 export type CoopRole = "host" | "guest";
 
+/**
+ * Which co-op netcode the run uses (#633, selectable A/B). Two complete
+ * implementations live side by side:
+ *  - `"lockstep"` (DEFAULT): both clients run the FULL battle engine on the host's
+ *    seed; only human CHOICES are relayed and the guest APPLIES the host's relayed
+ *    move, so the visible move stays synced. This is the safe live default.
+ *  - `"authoritative"`: the guest is a PURE RENDERER - it computes nothing and just
+ *    renders the host's streamed turn + checksum/resync (the TRACK-2 path).
+ * The HOST decides which one and the guest adopts it from the `runConfig`.
+ */
+export type CoopNetcodeMode = "lockstep" | "authoritative";
+
 /** Connection lifecycle of a transport. */
 export type CoopConnectionState = "connecting" | "connected" | "disconnected" | "closed";
 
@@ -333,12 +345,18 @@ export type CoopMessage =
    *
    * `seed` (#633, LIVE-A) is the HOST's run seed: the guest pins its engine to the
    * SAME seed so both clients roll identical enemies / RNG and stay in lockstep.
-   * Optional + additive (older clients fall back to their own seed). */
+   * Optional + additive (older clients fall back to their own seed).
+   *
+   * `netcodeMode` (#633, selectable A/B) is the HOST's chosen co-op netcode
+   * (`"lockstep"` | `"authoritative"`); the guest adopts it so both run the same
+   * implementation. Optional + additive (an absent value means `"lockstep"`, the
+   * default - so an in-flight save from before this field stays valid). */
   | {
       t: "runConfig";
       difficulty: string;
       challenges: { id: number; value: number; severity: number }[];
       seed?: string;
+      netcodeMode?: CoopNetcodeMode;
     }
   /**
    * Guest -> host (#633): "(re)send me the runConfig". The host broadcasts `runConfig`

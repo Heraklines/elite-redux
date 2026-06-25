@@ -1,7 +1,7 @@
 import { applyAbAttrs } from "#abilities/apply-ab-attrs";
 import type { TurnCommand } from "#app/battle";
 import { globalScene } from "#app/global-scene";
-import { getCoopController } from "#data/elite-redux/coop/coop-runtime";
+import { getCoopController, getCoopNetcodeMode } from "#data/elite-redux/coop/coop-runtime";
 import { beginCoopRecording } from "#data/elite-redux/coop/coop-turn-recorder";
 import { ArenaTagSide } from "#enums/arena-tag-side";
 import type { BattlerIndex } from "#enums/battler-index";
@@ -72,13 +72,15 @@ export class TurnStartPhase extends FieldPhase {
   start() {
     super.start();
 
-    // Co-op (#633, TRACK-2 Phase B): the GUEST is a pure renderer - it diverts the WHOLE
-    // turn resolution to CoopReplayTurnPhase (which awaits the host's authoritative
-    // outcome stream + applies the checkpoint) and queues NO MovePhase / capture / enemy
-    // resolution. The HOST falls through and resolves the turn normally, opening a turn
-    // recording so its narration is captured + streamed. Both gated on a live co-op role,
-    // so solo / non-co-op play is byte-for-byte unchanged.
-    if (globalScene.gameMode.isCoop) {
+    // Co-op AUTHORITATIVE netcode only (#633, TRACK-2 Phase B): the GUEST is a pure
+    // renderer - it diverts the WHOLE turn resolution to CoopReplayTurnPhase (which
+    // awaits the host's authoritative outcome stream + applies the checkpoint) and
+    // queues NO MovePhase / capture / enemy resolution. The HOST falls through and
+    // resolves the turn normally, opening a turn recording so its narration is captured
+    // + streamed. In LOCKSTEP this block is SKIPPED entirely so both engines resolve the
+    // turn normally (the move stays visibly synced). Gated on a live co-op role, so solo
+    // / non-co-op play is byte-for-byte unchanged.
+    if (globalScene.gameMode.isCoop && getCoopNetcodeMode() === "authoritative") {
       const role = getCoopController()?.role;
       if (role === "guest") {
         globalScene.phaseManager.pushNew("CoopReplayTurnPhase", globalScene.currentBattle.turn);

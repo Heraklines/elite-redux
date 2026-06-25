@@ -1,5 +1,5 @@
 import { globalScene } from "#app/global-scene";
-import { getCoopController } from "#data/elite-redux/coop/coop-runtime";
+import { getCoopController, getCoopNetcodeMode } from "#data/elite-redux/coop/coop-runtime";
 import { ER_DOOMED_SWITCH_THRESHOLD_MULT, erAssessThreat, getErAiProfile } from "#data/elite-redux/er-enemy-ai";
 import { AbilityId } from "#enums/ability-id";
 import { BattlerIndex } from "#enums/battler-index";
@@ -36,12 +36,18 @@ export class EnemyCommandPhase extends FieldPhase {
   start() {
     super.start();
 
-    // Co-op (#633, TRACK-2 Phase B): the GUEST never resolves enemies - the host is the
-    // sole engine. Rolling the AI here (getNextMove / getMatchupScore) would draw battle
-    // RNG and desync. Write an inert, skipped command so the phase queue stays well-formed
-    // and the guest's TurnStartPhase diverts the whole turn to CoopReplayTurnPhase. Gated
-    // on the live guest role, so solo / host play is byte-for-byte unchanged.
-    if (globalScene.gameMode.isCoop && getCoopController()?.role === "guest") {
+    // Co-op AUTHORITATIVE netcode only (#633, TRACK-2 Phase B): the GUEST never resolves
+    // enemies - the host is the sole engine. Rolling the AI here (getNextMove /
+    // getMatchupScore) would draw battle RNG and desync. Write an inert, skipped command so
+    // the phase queue stays well-formed and the guest's TurnStartPhase diverts the whole
+    // turn to CoopReplayTurnPhase. In LOCKSTEP the guest rolls the enemy AI NORMALLY (both
+    // engines resolve on the shared seed, so they stay in lockstep). Gated on the live guest
+    // role, so solo / host play is byte-for-byte unchanged.
+    if (
+      globalScene.gameMode.isCoop
+      && getCoopNetcodeMode() === "authoritative"
+      && getCoopController()?.role === "guest"
+    ) {
       globalScene.currentBattle.turnCommands[this.fieldIndex + BattlerIndex.ENEMY] = {
         command: Command.FIGHT,
         move: { move: MoveId.NONE, targets: [], useMode: MoveUseMode.NORMAL },

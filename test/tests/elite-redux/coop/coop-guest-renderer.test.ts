@@ -70,7 +70,9 @@ describe.skipIf(!RUN)("co-op GUEST = pure renderer - real engine (#633, TRACK-2 
   /** Start a co-op double, then flip the LOCAL engine into the GUEST role. */
   const startCoopGuest = async () => {
     await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
-    startLocalCoopSession({ username: "Guest" });
+    // The pure-renderer behavior is the AUTHORITATIVE netcode; opt in explicitly since the
+    // selectable default is now "lockstep" (#633, A/B - both engines resolve in lockstep).
+    startLocalCoopSession({ username: "Guest", netcodeMode: "authoritative" });
     game.scene.gameMode = getGameMode(GameModes.COOP);
     const field = game.scene.getPlayerField();
     field[COOP_HOST_FIELD_INDEX].coopOwner = "host";

@@ -11,6 +11,7 @@ import { getDailyRunStarters, startDailyEventChallenges } from "#data/daily-seed
 import { modifierTypes } from "#data/data-lists";
 import { CoopLobbyController, type LobbyPlayer } from "#data/elite-redux/coop/coop-lobby";
 import { getCoopController, startLocalCoopSession } from "#data/elite-redux/coop/coop-runtime";
+import type { CoopNetcodeMode } from "#data/elite-redux/coop/coop-transport";
 import { Gender } from "#data/gender";
 import { BattleType } from "#enums/battle-type";
 import { GameModes } from "#enums/game-modes";
@@ -120,10 +121,21 @@ export class TitlePhase extends Phase {
           const devToolsEnabled =
             (import.meta.env as unknown as Record<string, string | undefined>).VITE_DEV_TOOLS === "1";
           if (isDev || isBeta || devToolsEnabled) {
+            // Two SELECTABLE co-op netcodes (#633, A/B): "lockstep" (default - both
+            // engines resolve, the visible move stays synced) and "authoritative"
+            // (the guest is a pure renderer of the host's streamed turn). Same
+            // dev/beta/devTools gate; the host's pick is adopted by the guest.
             options.push({
               label: GameMode.getModeName(GameModes.COOP),
               handler: () => {
-                this.openCoopLobby(setModeAndEnd);
+                this.openCoopLobby(setModeAndEnd, "lockstep");
+                return true;
+              },
+            });
+            options.push({
+              label: `${GameMode.getModeName(GameModes.COOP)} (Authoritative)`,
+              handler: () => {
+                this.openCoopLobby(setModeAndEnd, "authoritative");
                 return true;
               },
             });
@@ -231,8 +243,12 @@ export class TitlePhase extends Phase {
    * connects (the WORKER silently assigns host/guest - irrelevant to players).
    * "Play vs CPU" runs a local spoof partner; Cancel backs out to the title.
    * `setModeAndEnd` is the newGame helper that launches the chosen GameMode.
+   *
+   * `netcodeMode` (#633, selectable A/B) is the co-op netcode the HOST picked from
+   * the mode menu ("lockstep" | "authoritative"); it is threaded into both the local
+   * spoof session and the real-match host controller so the guest adopts it.
    */
-  private openCoopLobby(setModeAndEnd: (gameMode: GameModes) => void): void {
+  private openCoopLobby(setModeAndEnd: (gameMode: GameModes) => void, netcodeMode: CoopNetcodeMode): void {
     const username = loggedInUser?.username ?? "Player";
     let listSig: string | null = null;
     let controller: CoopLobbyController | null = null;
@@ -259,7 +275,7 @@ export class TitlePhase extends Phase {
           label: "▶ Play vs CPU",
           handler: () => {
             controller?.cancel();
-            startLocalCoopSession({ username });
+            startLocalCoopSession({ username, netcodeMode });
             setModeAndEnd(GameModes.COOP);
             return true;
           },
@@ -293,7 +309,14 @@ export class TitlePhase extends Phase {
         globalScene.ui.resetModeChain();
         globalScene.ui.showText("Connecting to your partner...", null);
       },
-      onConnected: () => {
+      onConnected: runtime => {
+        // The lobby just built the live CoopRuntime. If THIS client is the host, pin
+        // the chosen netcode (#633, selectable A/B) onto its controller now, before it
+        // broadcasts the runConfig - the guest adopts the host's value off that config,
+        // so the guest never needs to set it here. Default lockstep on a missing pick.
+        if (runtime.controller.role === "host") {
+          runtime.controller.setNetcodeMode(netcodeMode);
+        }
         globalScene.ui.showText(
           "Connected to your partner!\nPress to start co-op.",
           null,

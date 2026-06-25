@@ -68,7 +68,9 @@ describe.skipIf(!RUN)("co-op battle checksum + resync - real engine (#633, TRACK
   /** Start a co-op double (host-local spoof path) and tag field ownership. */
   const startCoopDouble = async () => {
     await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
-    startLocalCoopSession({ username: "Host" });
+    // The checksum + full-snapshot resync is the AUTHORITATIVE netcode's machinery; opt in
+    // explicitly since the selectable default is now "lockstep" (#633, A/B).
+    startLocalCoopSession({ username: "Host", netcodeMode: "authoritative" });
     game.scene.gameMode = getGameMode(GameModes.COOP);
     expect(game.scene.gameMode.isCoop).toBe(true);
     const field = game.scene.getPlayerField();

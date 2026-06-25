@@ -2,7 +2,7 @@ import { applyAbAttrs } from "#abilities/apply-ab-attrs";
 import { globalScene } from "#app/global-scene";
 import { getPokemonNameWithAffix } from "#app/messages";
 import { captureCoopCheckpoint, captureCoopChecksum } from "#data/elite-redux/coop/coop-battle-engine";
-import { getCoopBattleStreamer, getCoopController } from "#data/elite-redux/coop/coop-runtime";
+import { getCoopBattleStreamer, getCoopController, getCoopNetcodeMode } from "#data/elite-redux/coop/coop-runtime";
 import { endCoopRecording } from "#data/elite-redux/coop/coop-turn-recorder";
 import { getErBiomeRule } from "#data/elite-redux/er-biome-rules";
 import { erApplyFieldMedic } from "#data/elite-redux/er-relics";
@@ -136,17 +136,19 @@ export class TurnEndPhase extends FieldPhase {
   }
 
   /**
-   * Co-op HOST (#633, TRACK-2 Phase B): the host is the sole engine; at the settled
-   * post-turn boundary it STREAMS this turn's ordered narration events (recorded since
-   * TurnStart) + the authoritative checkpoint + the full-state checksum. The guest's
-   * CoopReplayTurnPhase awaits + renders them. Emitted with the turn number STAMPED at
-   * TurnStart (incrementTurn() already ran above, so `currentBattle.turn` is now N+1) so
-   * the host's emit-turn matches the guest's await-turn exactly. Hard no-op for solo /
-   * non-host; the recording is closed either way so it never leaks into the next turn.
+   * Co-op HOST, AUTHORITATIVE netcode only (#633, TRACK-2 Phase B): the host is the sole
+   * engine; at the settled post-turn boundary it STREAMS this turn's ordered narration
+   * events (recorded since TurnStart) + the authoritative checkpoint + the full-state
+   * checksum. The guest's CoopReplayTurnPhase awaits + renders them. Emitted with the turn
+   * number STAMPED at TurnStart (incrementTurn() already ran above, so `currentBattle.turn`
+   * is now N+1) so the host's emit-turn matches the guest's await-turn exactly. In LOCKSTEP
+   * there is NO emit (both engines resolve; the per-turn checkpoint heals via CommandPhase).
+   * Hard no-op for solo / non-host; the recording is closed either way so it never leaks
+   * into the next turn.
    */
   private emitCoopTurn(): void {
     const recording = endCoopRecording();
-    if (!globalScene.gameMode.isCoop) {
+    if (!globalScene.gameMode.isCoop || getCoopNetcodeMode() !== "authoritative") {
       return;
     }
     const controller = getCoopController();
