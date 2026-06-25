@@ -1,0 +1,134 @@
+url:      https://elite-redux-staging.pages.dev/
+build:    mqsw9b7c-4yin
+mode:     6  wave:3
+seed:     gK0sWs02AWzGHGlZGMhbkN0A
+party:    Chikorita(L5 6hp f0), Bulbasaur(L6 0hp f0), Fennekin(L5 6hp f0), Charmander(L5 20hp f0)
+enemy:    Rattata(L3), Wooloo(L3)
+
+----- COMMENT -----
+CPU won't send out there second Pokemon after their first one Faints - CO-OP Doubles only.
+
+----- CONSOLE -----
+[02:58:32.846] LOG: %c %c %c %c %c Phaser v3.90.0 (WebGL | Web Audio) %c https://phaser.io/v390 background: #ff0000 background: #ffff00 background: #00ff00 background: #00ffff color: #ffffff; background: #000000 background: transparent
+[02:58:34.358] LOG: [ER] build mqsw9b7c-4yin
+[02:58:34.501] LOG: [dev-tools] loaded — 306 scenarios + Send Logs button
+[02:59:11.964] DEBUG: Destroying loading scene
+[02:59:11.964] DEBUG: Destroyed loading scene
+[02:59:12.505] LOG: Seed: bRGLLkKlN0sit9jEwMkKa7fA
+[02:59:12.505] LOG: Wave Seed: bRGLLkKlN0sit9jEwMkKa7fA 0
+[02:59:18.459] LOG: %cStart Phase LoginPhase color:green;
+[02:59:18.843] LOG: Client Session: 60Ime570aORHtAWE4K8WWOPSE13Gx693
+[02:59:19.621] DEBUG: Using cached system data
+[02:59:20.201] LOG: %cStart Phase TitlePhase color:green;
+[02:59:20.202] LOG: Getting Session Slot id: %d 0
+[02:59:20.264] LOG: use seasonal splash messages true
+[02:59:20.265] LOG: Adding 2 Pride Month splash messages (weight: x15)
+[02:59:33.933] LOG: Getting Session Slot id: %d 0
+[02:59:33.946] LOG: Wave Seed: gK0sWs02AWzGHGlZGMhbkN0A 0
+[02:59:33.946] LOG: Seed: gK0sWs02AWzGHGlZGMhbkN0A
+[02:59:34.007] LOG: Wave Seed: jN3vZv35DZ}JKJo]JPkenQ3D 3
+[02:59:34.046] LOG: Applied HP Up 
+[02:59:34.048] LOG: Applied HP Up 
+[02:59:34.050] LOG: Applied HP Up 
+[02:59:34.249] LOG: %cStart Phase EncounterPhase color:green;
+[02:59:34.258] LOG: Pokemon: Wild Rattata | Species ID: 19 | Level: 3 | Nature: Naughty (+Atk/-SpDef)
+[02:59:34.258] LOG: Stats (IVs): HP: 15 (15), Atk: 9 (11), Def: 7 (29), Spatk: 6 (8), Spdef: 6 (15), Spd: 10 (26)
+[02:59:34.258] LOG: Ability: Normalize | Passive Ability: Guts 
+[02:59:34.258] LOG: Moveset: ["Tackle","Thunder Fang","Fire Fang","Ice Fang"]
+[02:59:34.259] LOG: Pokemon: Wild Wooloo | Species ID: 831 | Level: 3 | Nature: Lonely (+Atk/-Def)
+[02:59:34.259] LOG: Stats (IVs): HP: 15 (15), Atk: 9 (4), Def: 7 (7), Spatk: 8 (1), Spdef: 8 (18), Spd: 8 (12)
+[02:59:34.259] LOG: Ability: Sap Sipper | Passive Ability: Let's Roll 
+[02:59:34.259] LOG: Moveset: ["Tackle","Rollout (P)","Guard Split","Yawn"]
+[02:59:35.084] LOG: Wave Seed: jN3vZv35DZ}JKJo]JPkenQ3D 3
+[02:59:36.548] LOG: %cStart Phase SummonPhase color:green;
+[02:59:37.050] LOG: Applied HP Up 
+[02:59:37.588] LOG: %cStart Phase SummonPhase color:green;
+[02:59:37.982] LOG: Applied HP Up 
+[02:59:38.430] LOG: %cStart Phase CheckSwitchPhase color:green;
+[02:59:38.430] LOG: %cStart Phase CheckSwitchPhase color:green;
+[02:59:38.431] LOG: %cStart Phase InitEncounterPhase color:green;
+[02:59:38.434] LOG: %cStart Phase PostSummonPhase color:green;
+[02:59:38.434] LOG: Ran PSP for: Rattata
+[02:59:38.437] LOG: %cStart Phase PostSummonPhase color:green;
+[02:59:38.438] LOG: %cStart Phase PostSummonPhase color:green;
+[02:59:38.438] LOG: %cStart Phase PostSummonPhase color:green;
+[02:59:38.438] LOG: Ran PSP for: Wooloo
+[02:59:38.439] LOG: %cStart Phase PostSummonPhase color:green;
+[02:59:38.439] LOG: %cStart Phase PostSummonPhase color:green;
+[02:59:38.440] LOG: %cStart Phase MovePhase color:green;
+[02:59:38.440] LOG: %cUser: Wooloo
+Move: DEFENSE_CURL
+Use Mode: INDIRECT color:orchid
+[02:59:38.447] LOG: %cStart Phase MessagePhase color:green;
+[02:59:38.846] LOG: %cStart Phase MoveEffectPhase color:green;
+[02:59:38.865] LOG: %cStart Phase StatStageChangePhase color:green;
+[02:59:39.468] LOG: %cStart Phase MessagePhase color:green;
+[02:59:40.197] LOG: %cStart Phase MoveEndPhase color:green;
+[02:59:40.198] LOG: %cStart Phase TurnInitPhase color:green;
+[02:59:40.198] LOG: %cStart Phase CommandPhase color:green;
+[02:59:41.969] LOG: %cStart Phase CommandPhase color:green;
+[02:59:41.971] LOG: Battle Seed: 83bbjRJOIz6MOHzq
+[02:59:41.971] LOG: Move: STRUGGLE Move targets: {"targets":[3],"multiple":false} 
+Player Pokemon: Bulbasaur
+[02:59:41.971] LOG: %cStart Phase EnemyCommandPhase color:green;
+[02:59:42.001] LOG: Move Pool: ["Tackle","Thunder Fang","Fire Fang","Ice Fang"]
+[02:59:42.001] LOG: Move Scores: [12,18,17,22]
+[02:59:42.001] LOG: Sorted Move Pool: ["Ice Fang","Thunder Fang","Fire Fang","Tackle"]
+[02:59:42.001] LOG: Chosen Move: Ice Fang
+[02:59:42.001] LOG: %cStart Phase EnemyCommandPhase color:green;
+[02:59:42.009] LOG: Move Pool: ["Tackle","Rollout (P)"]
+[02:59:42.009] LOG: Move Scores: [12,20]
+[02:59:42.009] LOG: Sorted Move Pool: ["Rollout (P)","Tackle"]
+[02:59:42.009] LOG: Chosen Move: Rollout (P)
+[02:59:42.009] LOG: %cStart Phase TurnStartPhase color:green;
+[02:59:42.016] LOG: %cStart Phase SwitchSummonPhase color:green;
+[02:59:42.614] LOG: Applied HP Up 
+[02:59:43.051] LOG: %cStart Phase PostSummonPhase color:green;
+[02:59:43.051] LOG: Ran PSP for: Chikorita
+[02:59:43.052] LOG: %cStart Phase PostSummonPhase color:green;
+[02:59:43.052] LOG: %cStart Phase PostSummonPhase color:green;
+[02:59:43.053] LOG: %cStart Phase MovePhase color:green;
+[02:59:43.053] LOG: %cUser: Bulbasaur
+Move: STRUGGLE
+Use Mode: NORMAL color:orchid
+[02:59:43.061] LOG: %cStart Phase MessagePhase color:green;
+[02:59:43.429] LOG: %cStart Phase MessagePhase color:green;
+[02:59:43.946] LOG: %cStart Phase MoveEffectPhase color:green;
+[02:59:44.281] LOG: crit stage: +0
+[02:59:44.283] LOG: Move: Struggle | Base damage: 5.5200000000000005 | Power: 50 | Source attack: 8 | Target defense: 10
+[02:59:44.284] LOG: Move: Struggle | Attack damage: 5
+[02:59:44.285] LOG: %cStart Phase DamageAnimPhase color:green;
+[02:59:44.316] LOG: %cStart Phase DamageAnimPhase color:green;
+[02:59:44.316] LOG: %cStart Phase MessagePhase color:green;
+[02:59:45.113] LOG: %cStart Phase FaintPhase color:green;
+[02:59:48.316] LOG: %cStart Phase MessagePhase color:green;
+[02:59:48.713] LOG: %cStart Phase MoveEndPhase color:green;
+[02:59:48.715] LOG: %cStart Phase MovePhase color:green;
+[02:59:48.715] LOG: %cUser: Rattata
+Move: ICE_FANG
+Use Mode: NORMAL color:orchid
+[02:59:48.719] LOG: %cStart Phase MessagePhase color:green;
+[02:59:49.113] LOG: %cStart Phase MoveEffectPhase color:green;
+[02:59:49.465] LOG: crit stage: +0
+[02:59:49.468] LOG: Move: Ice Fang | Base damage: 6.6080000000000005 | Power: 96 | Source attack: 9 | Target defense: 12
+[02:59:49.469] LOG: Move: Ice Fang | Attack damage: 9
+[02:59:49.470] LOG: %cStart Phase DamageAnimPhase color:green;
+[02:59:49.498] LOG: %cStart Phase MoveEndPhase color:green;
+[02:59:49.498] LOG: %cStart Phase MovePhase color:green;
+[02:59:49.498] LOG: %cUser: Wooloo
+Move: ROLLOUT
+Use Mode: NORMAL color:orchid
+[02:59:49.503] LOG: %cStart Phase MessagePhase color:green;
+[02:59:49.913] LOG: %cStart Phase MoveEffectPhase color:green;
+[02:59:50.981] LOG: crit stage: +0
+[02:59:50.983] LOG: Move: Rollout (P) | Base damage: 5.84 | Power: 80 | Source attack: 9 | Target defense: 12
+[02:59:50.984] LOG: Move: Rollout (P) | Attack damage: 5
+[02:59:50.984] LOG: %cStart Phase DamageAnimPhase color:green;
+[02:59:51.015] LOG: %cStart Phase MoveEndPhase color:green;
+[02:59:51.015] LOG: %cStart Phase CheckInterludePhase color:green;
+[02:59:51.015] LOG: %cStart Phase WeatherEffectPhase color:green;
+[02:59:51.015] LOG: %cStart Phase PositionalTagPhase color:green;
+[02:59:51.015] LOG: %cStart Phase BerryPhase color:green;
+[02:59:51.017] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[02:59:51.018] LOG: %cStart Phase TurnEndPhase color:green;
+[02:59:51.020] LOG: %cStart Phase SwitchPhase color:green;
