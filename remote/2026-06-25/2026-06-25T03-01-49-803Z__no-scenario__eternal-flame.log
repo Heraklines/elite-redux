@@ -1,0 +1,192 @@
+url:      https://elite-redux-staging.pages.dev/
+build:    mqsw9b7c-4yin
+mode:     6  wave:5
+seed:     gUKywQijMTRRhxjrHaWH577V
+party:    Spearow(L5 20hp f0), Pawniard Redux(L6 0hp f0), Vulpix(L6 0hp f0), Deerling(L5 22hp f0), Nidoran♂(L5 0hp f0), Merrykarp(L5 20hp f0)
+enemy:    Larvesta Redux(L5), Merrykarp(L5), Kipmodo(L5), Piplup Redux(L5), Marbeep(L5)
+
+----- COMMENT -----
+Partner AI attacked my mon then froze after their mon got destroyed
+
+----- CONSOLE -----
+[03:00:38.781] LOG: %c %c %c %c %c Phaser v3.90.0 (WebGL | Web Audio) %c https://phaser.io/v390 background: #ff0000 background: #ffff00 background: #00ff00 background: #00ffff color: #ffffff; background: #000000 background: transparent
+[03:00:39.082] LOG: [ER] build mqsw9b7c-4yin
+[03:00:39.117] LOG: [dev-tools] loaded — 306 scenarios + Send Logs button
+[03:00:50.126] DEBUG: Destroying loading scene
+[03:00:50.126] DEBUG: Destroyed loading scene
+[03:00:50.164] LOG: Seed: TJQ8W7qIjvgAb5sYscoFTR4i
+[03:00:50.164] LOG: Wave Seed: TJQ8W7qIjvgAb5sYscoFTR4i 0
+[03:00:51.477] LOG: %cStart Phase LoginPhase color:green;
+[03:00:51.921] LOG: Client Session: JG1sexj5kTYdIBuCKtwviEjhedhueHZz
+[03:00:52.201] DEBUG: Using cached system data
+[03:00:52.254] LOG: %cStart Phase TitlePhase color:green;
+[03:00:52.254] LOG: Getting Session Slot id: %d 0
+[03:00:52.265] LOG: use seasonal splash messages true
+[03:00:52.265] LOG: Adding 2 Pride Month splash messages (weight: x15)
+[03:00:54.968] LOG: Getting Session Slot id: %d 0
+[03:00:54.972] LOG: Getting Session Slot id: %d 1
+[03:00:54.976] LOG: Getting Session Slot id: %d 2
+[03:00:54.978] LOG: Getting Session Slot id: %d 3
+[03:00:54.981] LOG: Getting Session Slot id: %d 4
+[03:00:54.983] LOG: Getting Session Slot id: %d 0
+[03:00:55.015] LOG: Getting Session Slot id: %d 2
+[03:00:55.630] ERROR: TypeError: undefined is not a constructor
+TypeError: undefined is not a constructor
+    at ModifierData.toModifier (https://elite-redux-staging.pages.dev/assets/battle-scene-fVVYN0Q7.js:22:100238)
+    at SessionSlot.setupWithData (https://elite-redux-staging.pages.dev/assets/battle-scene-fVVYN0Q7.js:1043:3574)
+[03:00:56.972] LOG: Getting Session Slot id: %d 0
+[03:00:56.975] LOG: Wave Seed: gUKywQijMTRRhxjrHaWH577V 0
+[03:00:56.976] LOG: Seed: gUKywQijMTRRhxjrHaWH577V
+[03:00:56.998] LOG: Wave Seed: lZP~|VnoRYWWm}owMf\M:<<[ 5
+[03:00:57.091] LOG: %cStart Phase EncounterPhase color:green;
+[03:00:57.094] LOG: Pokemon: Foe Larvesta Redux | Species ID: 10664 | Level: 5 | Nature: Brave (+Atk/-Spd)
+[03:00:57.094] LOG: Stats (IVs): HP: 20 (29), Atk: 11 (27), Def: 11 (30), Spatk: 13 (21), Spdef: 15 (18), Spd: 9 (21)
+[03:00:57.094] LOG: Ability: Illuminate | Passive Ability: Phantom 
+[03:00:57.094] LOG: Moveset: ["Steamroller","Harden","Moonlight","Quiver Dance"]
+[03:00:57.095] LOG: Pokemon: Foe Merrykarp | Species ID: 10856 | Level: 5 | Nature: Modest (+SpAtk/-Atk)
+[03:00:57.095] LOG: Stats (IVs): HP: 20 (31), Atk: 6 (22), Def: 8 (31), Spatk: 13 (29), Spdef: 8 (31), Spd: 12 (28)
+[03:00:57.095] LOG: Ability: Blaze | Passive Ability: Levitate 
+[03:00:57.095] LOG: Moveset: ["Tackle","Flamethrower","Moonblast"]
+[03:00:57.095] LOG: Pokemon: Foe Kipmodo | Species ID: 10612 | Level: 5 | Nature: Naive (+Spd/-SpDef)
+[03:00:57.095] LOG: Stats (IVs): HP: 21 (23), Atk: 11 (15), Def: 11 (17), Spatk: 9 (8), Spdef: 9 (27), Spd: 15 (28)
+[03:00:57.095] LOG: Ability: Dragon’s Maw | Passive Ability: Amphibious 
+[03:00:57.095] LOG: Moveset: ["Poison Sting","Sucker Punch","Fury Attack","Tail Whip"]
+[03:00:57.095] LOG: Pokemon: Foe Piplup Redux | Species ID: 10785 | Level: 5 | Nature: Modest (+SpAtk/-Atk)
+[03:00:57.095] LOG: Stats (IVs): HP: 21 (27), Atk: 8 (29), Def: 10 (29), Spatk: 15 (28), Spdef: 11 (18), Spd: 13 (31)
+[03:00:57.095] LOG: Ability: Pyromancy | Passive Ability: Antarctic Bird 
+[03:00:57.095] LOG: Moveset: ["Earth Power","Gust","Ice Shard","Growl"]
+[03:00:57.095] LOG: Pokemon: Foe Marbeep | Species ID: 10029 | Level: 5 | Nature: Jolly (+Spd/-SpAtk)
+[03:00:57.095] LOG: Stats (IVs): HP: 23 (21), Atk: 10 (25), Def: 10 (18), Spatk: 10 (22), Spdef: 10 (13), Spd: 9 (14)
+[03:00:57.095] LOG: Ability: Gooey | Passive Ability: Levitate 
+[03:00:57.095] LOG: Moveset: ["Growl","Poison Sting","Pounce","Tail Glow"]
+[03:00:57.968] LOG: Generated AI funcs
+[03:00:57.969] LOG: Wave Seed: lZP~|VnoRYWWm}owMf\M:<<[ 5
+[03:00:58.173] LOG: Musician Marcos
+[03:00:58.173] LOG: Dialogue dialogue:musician.encounter.1 skipped
+[03:00:58.210] LOG: Musician Marcos
+[03:01:00.785] LOG: %cStart Phase SummonPhase color:green;
+[03:01:00.785] LOG: Marcos
+[03:01:00.960] WARN: cry/10664 not found
+[03:01:01.063] LOG: %cStart Phase SummonPhase color:green;
+[03:01:01.063] LOG: Marcos
+[03:01:01.226] WARN: cry/10856 not found
+[03:01:01.329] LOG: %cStart Phase SummonPhase color:green;
+[03:01:01.608] LOG: %cStart Phase ShinySparklePhase color:green;
+[03:01:01.711] LOG: %cStart Phase SummonPhase color:green;
+[03:01:01.887] WARN: cry/10733 not found
+[03:01:01.990] LOG: %cStart Phase InitEncounterPhase color:green;
+[03:01:01.992] LOG: %cStart Phase PostSummonPhase color:green;
+[03:01:01.992] LOG: Ran PSP for: Pawniard Redux
+[03:01:01.994] LOG: %cStart Phase PostSummonPhase color:green;
+[03:01:01.995] LOG: %cStart Phase PostSummonPhase color:green;
+[03:01:01.996] LOG: %cStart Phase PostSummonPhase color:green;
+[03:01:01.996] LOG: Ran PSP for: Merrykarp
+[03:01:01.997] LOG: %cStart Phase PostSummonPhase color:green;
+[03:01:01.997] LOG: %cStart Phase PostSummonPhase color:green;
+[03:01:01.998] LOG: %cStart Phase PostSummonPhase color:green;
+[03:01:01.998] LOG: Ran PSP for: Nidoran♂
+[03:01:01.998] LOG: %cStart Phase PostSummonPhase color:green;
+[03:01:01.998] LOG: %cStart Phase PostSummonPhase color:green;
+[03:01:01.998] LOG: Ran PSP for: Larvesta Redux
+[03:01:01.998] LOG: %cStart Phase PostSummonPhase color:green;
+[03:01:01.998] LOG: %cStart Phase PostSummonPhase color:green;
+[03:01:01.999] LOG: %cStart Phase ShowAbilityPhase color:green;
+[03:01:02.154] LOG: %cStart Phase HideAbilityPhase color:green;
+[03:01:02.184] LOG: %cStart Phase TurnInitPhase color:green;
+[03:01:02.185] LOG: %cStart Phase CommandPhase color:green;
+[03:01:05.226] LOG: Move: CAPTIVATE Move targets: {"targets":[2,3],"multiple":true} 
+Player Pokemon: Nidoran♂
+[03:01:05.228] LOG: %cStart Phase SelectTargetPhase color:green;
+[03:01:05.524] LOG: %cStart Phase CommandPhase color:green;
+[03:01:05.526] LOG: Battle Seed: iqs2932NR2wrhWwo
+[03:01:05.526] LOG: Move: TRIPLE_TREMOR Move targets: {"targets":[0],"multiple":false} 
+Player Pokemon: Pawniard Redux
+[03:01:05.526] LOG: %cStart Phase EnemyCommandPhase color:green;
+[03:01:05.529] LOG: Applied X Attack 
+[03:01:05.531] LOG: Applied X Attack 
+[03:01:05.532] LOG: Applied X Attack 
+[03:01:05.532] LOG: Applied X Attack 
+[03:01:05.536] LOG: Applied X Attack 
+[03:01:05.537] LOG: Applied X Attack 
+[03:01:05.538] LOG: Applied X Attack 
+[03:01:05.538] LOG: Applied X Attack 
+[03:01:05.539] LOG: Move Pool: ["Steamroller","Harden","Moonlight","Quiver Dance"]
+[03:01:05.539] LOG: Move Scores: [6.521739130434782,20,-7,20]
+[03:01:05.539] LOG: Sorted Move Pool: ["Harden","Quiver Dance","Steamroller","Moonlight"]
+[03:01:05.539] LOG: Chosen Move: Harden
+[03:01:05.539] LOG: ER AI: standard brain (sharpness 0.85)
+[03:01:05.539] LOG: %cStart Phase EnemyCommandPhase color:green;
+[03:01:05.541] LOG: Applied X Attack 
+[03:01:05.542] LOG: Applied X Attack 
+[03:01:05.543] LOG: Applied X Attack 
+[03:01:05.543] LOG: Applied X Attack 
+[03:01:05.543] LOG: Applied X Attack 
+[03:01:05.549] LOG: Move Pool: ["Flamethrower","Moonblast"]
+[03:01:05.549] LOG: Move Scores: [67.85714285714286,1052.1739130434783]
+[03:01:05.549] LOG: Sorted Move Pool: ["Moonblast","Flamethrower"]
+[03:01:05.549] LOG: Chosen Move: Moonblast
+[03:01:05.549] LOG: ER AI: standard brain (sharpness 0.85)
+[03:01:05.549] LOG: %cStart Phase TurnStartPhase color:green;
+[03:01:05.553] LOG: %cStart Phase MovePhase color:green;
+[03:01:05.553] LOG: %cUser: Pawniard Redux
+Move: TRIPLE_TREMOR
+Use Mode: NORMAL color:orchid
+[03:01:05.557] LOG: %cStart Phase MessagePhase color:green;
+[03:01:05.662] LOG: %cStart Phase MoveEffectPhase color:green;
+[03:01:06.088] LOG: crit stage: +0
+[03:01:06.088] LOG: Applied X Attack 
+[03:01:06.088] LOG: Move: Triple Tremor | Base damage: 4.640000000000001 | Power: 20 | Source attack: 15 | Target defense: 10
+[03:01:06.089] LOG: Move: Triple Tremor | Attack damage: 9
+[03:01:06.089] LOG: %cStart Phase DamageAnimPhase color:green;
+[03:01:06.100] LOG: %cStart Phase MoveEffectPhase color:green;
+[03:01:06.518] LOG: crit stage: +0
+[03:01:06.518] LOG: Applied X Attack 
+[03:01:06.518] LOG: Move: Triple Tremor | Base damage: 7.28 | Power: 40 | Source attack: 15 | Target defense: 10
+[03:01:06.518] LOG: Move: Triple Tremor | Attack damage: 13
+[03:01:06.519] LOG: %cStart Phase DamageAnimPhase color:green;
+[03:01:06.530] LOG: %cStart Phase MessagePhase color:green;
+[03:01:06.729] LOG: %cStart Phase MessagePhase color:green;
+[03:01:06.917] LOG: %cStart Phase FaintPhase color:green;
+[03:01:06.973] LOG: %cStart Phase MessagePhase color:green;
+[03:01:08.911] LOG: %cStart Phase MoveEndPhase color:green;
+[03:01:08.912] LOG: %cStart Phase MovePhase color:green;
+[03:01:08.912] LOG: %cUser: Merrykarp
+Move: MOONBLAST
+Use Mode: NORMAL color:orchid
+[03:01:08.914] LOG: %cStart Phase MessagePhase color:green;
+[03:01:09.032] LOG: %cStart Phase MoveEffectPhase color:green;
+[03:01:09.517] LOG: crit stage: +0
+[03:01:09.518] LOG: Move: Moonblast | Base damage: 10.98181818181818 | Power: 95 | Source attack: 13 | Target defense: 11
+[03:01:09.518] LOG: Move: Moonblast | Attack damage: 15
+[03:01:09.519] LOG: %cStart Phase DamageAnimPhase color:green;
+[03:01:09.530] LOG: %cStart Phase FaintPhase color:green;
+[03:01:09.530] WARN: cry/10733 not found
+[03:01:09.590] LOG: %cStart Phase MessagePhase color:green;
+[03:01:09.947] LOG: %cStart Phase MoveEndPhase color:green;
+[03:01:09.948] LOG: %cStart Phase MovePhase color:green;
+[03:01:09.948] LOG: %cStart Phase MoveEndPhase color:green;
+[03:01:09.948] LOG: %cStart Phase MovePhase color:green;
+[03:01:09.948] LOG: %cUser: Larvesta Redux
+Move: HARDEN
+Use Mode: NORMAL color:orchid
+[03:01:09.949] LOG: %cStart Phase MessagePhase color:green;
+[03:01:10.074] LOG: %cStart Phase MoveEffectPhase color:green;
+[03:01:10.178] LOG: %cStart Phase StatStageChangePhase color:green;
+[03:01:10.355] LOG: %cStart Phase MessagePhase color:green;
+[03:01:10.583] LOG: %cStart Phase MoveEndPhase color:green;
+[03:01:10.583] LOG: %cStart Phase CheckInterludePhase color:green;
+[03:01:10.584] LOG: %cStart Phase WeatherEffectPhase color:green;
+[03:01:10.584] LOG: %cStart Phase PositionalTagPhase color:green;
+[03:01:10.584] LOG: %cStart Phase BerryPhase color:green;
+[03:01:10.584] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[03:01:10.584] LOG: %cStart Phase TurnEndPhase color:green;
+[03:01:10.585] LOG: %cStart Phase SwitchPhase color:green;
+[03:01:16.060] LOG: %cStart Phase SwitchSummonPhase color:green;
+[03:01:16.276] LOG: %cStart Phase ShinySparklePhase color:green;
+[03:01:16.377] LOG: %cStart Phase PostSummonPhase color:green;
+[03:01:16.377] LOG: Ran PSP for: Spearow
+[03:01:16.377] LOG: %cStart Phase PostSummonPhase color:green;
+[03:01:16.377] LOG: %cStart Phase PostSummonPhase color:green;
+[03:01:16.379] LOG: %cStart Phase ShowAbilityPhase color:green;
+[03:01:16.536] LOG: %cStart Phase HideAbilityPhase color:green;
+[03:01:16.566] LOG: %cStart Phase SwitchPhase color:green;
