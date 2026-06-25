@@ -440,6 +440,24 @@ node scripts/pull-dev-logs.mjs        # one-shot; only downloads NEW files
   `grep -rl -A3 "DESCRIPTION" dev-logs/remote/<date>/`.
 - To find what scored/crashed: read the `----- CONSOLE -----` tail of the file.
 
+**Quick peek WITHOUT the pull script (fastest for a one-off triage).** The captures
+are plain files committed on the `dev-logs` branch, so read the newest ones straight
+from git (no download, works from any worktree):
+
+```
+export GH_TOKEN="$(tr -d ' \r\n' < /c/Users/Hafida/Desktop/github_token.txt)"
+git -c credential.helper='!f(){ echo "username=x"; echo "password=$GH_TOKEN"; };f' fetch heraklines dev-logs --quiet
+git log --pretty='%h %ci %s' -15 heraklines/dev-logs        # newest commit = newest log; "(by <name>)" = the tester
+git show --name-only --pretty='' <commit>                   # the file path that commit added
+git show heraklines/dev-logs:remote/<YYYY-MM-DD>/<ts>__<scenario>__<tester>.log   # print the capture
+```
+
+- The `<tester>` is whatever the in-game `getTesterName()` returned. **Co-op clients
+  show up as e.g. `coop-test1` and (unnamed partner) `anon`** - the two clients of ONE
+  session land as two back-to-back commits seconds apart, so read BOTH (host + guest).
+- Grep just the co-op handshake/sync state across a capture:
+  `git show heraklines/dev-logs:<path> | grep -iE "coop-launch|coop-runconfig|coop-fp|role=|bothReady|partnerReady|MISMATCH|EncounterPhase|SAVE_SLOT"`.
+
 ### Scraping the Discord bug channels (bulk triage)
 
 For a multi-day sweep of the Discord (`#bugs`, `#bug-reports`, `#suggestions`, etc.),

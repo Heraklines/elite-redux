@@ -145,9 +145,22 @@ export class SelectStarterPhase extends Phase {
         // proceedIfReady the moment the partner readies, which then launches (host ->
         // SAVE_SLOT, guest -> battle) (#633).
         console.log("[coop-launch] local ready, partner NOT ready -> waiting screen");
-        void globalScene.ui
-          .setMode(UiMode.MESSAGE)
-          .then(() => globalScene.ui.showText("Waiting for your partner to choose their team...", null, () => {}));
+        void globalScene.ui.setMode(UiMode.MESSAGE).then(() => {
+          // RACE GUARD (#633, live hang): both players lock in within a few ms of
+          // each other right after the difficulty pick, so the partner can become
+          // READY during this async setMode -> showText gap. If proceedIfReady has
+          // already launched (or both are ready now), do NOT paint the waiting notice:
+          // it would land ON TOP of the just-launched screen (host SAVE_SLOT picker /
+          // guest battle) with a never-advancing callback, leaving BOTH screens stuck
+          // on "Waiting for your partner..." over a live battle. The non-race path
+          // (partner readies later) still paints + is cleared by proceedIfReady's
+          // clearText() before launch.
+          if (launched || controller.bothReady()) {
+            console.log("[coop-launch] partner readied during setMode gap -> skip stale waiting text");
+            return;
+          }
+          globalScene.ui.showText("Waiting for your partner to choose their team...", null, () => {});
+        });
       }
     });
   }
