@@ -62,6 +62,11 @@ function defaultSchedule(cb: () => void, ms: number): () => void {
   return () => clearTimeout(id);
 }
 
+/** Inbox / pending key: a command is matched by BOTH slot AND turn (#633 desync fix). */
+function commandKey(fieldIndex: number, turn: number): string {
+  return `${fieldIndex}:${turn}`;
+}
+
 /**
  * Rides on a {@linkcode CoopTransport} to relay the partner's battle command. One
  * instance per client. The host calls {@linkcode requestPartnerCommand}; the peer
@@ -72,19 +77,24 @@ export class CoopBattleSync {
   private readonly transport: CoopTransport;
   private readonly timeoutMs: number;
   private readonly schedule: (cb: () => void, ms: number) => () => void;
-  /** fieldIndex -> resolver for the in-flight request on that slot. */
-  private readonly pending = new Map<number, (cmd: SerializedCommand | null) => void>();
+  /** `fieldIndex:turn` -> resolver for the in-flight request on that slot+turn. */
+  private readonly pending = new Map<string, (cmd: SerializedCommand | null) => void>();
   /**
-   * fieldIndex -> a `command` that arrived with NO pending request yet (#633,
-   * LIVE-C). In lockstep the two clients are NOT time-locked: the peer may
-   * broadcast its move before this client reaches that slot's await. Buffer it so
-   * the next {@linkcode requestPartnerCommand} for that slot resolves instantly
-   * instead of dropping the move and timing out -> AI (the live "stuck 30s then
-   * desync" bug). The turn barrier (each side awaits the other's command before the
-   * turn resolves) keeps the two clients within one turn, so a per-slot, latest-wins
-   * buffer consumed on request is correct.
+   * `fieldIndex:turn` -> a `command` that arrived with NO pending request yet (#633,
+   * LIVE-C). In lockstep the two clients are NOT time-locked: the peer may broadcast
+   * its move before this client reaches that slot's await. Buffer it so the next
+   * {@linkcode requestPartnerCommand} for that slot resolves instantly instead of
+   * dropping the move and timing out -> AI (the live "stuck 30s then desync" bug).
+   *
+   * Keyed by `(fieldIndex, TURN)`, NOT fieldIndex alone (#633 desync fix): a peer
+   * that races ahead can broadcast turn N then turn N+1 (or a switch then a move on
+   * the same slot) before the awaiter consumes turn N. A fieldIndex-only latest-wins
+   * buffer silently overwrote the earlier one, so the awaiter applied the WRONG turn's
+   * command -> one client switched/moved while the other did something else (the live
+   * move/switch/target desync). Turn-keying makes an await for turn N accept ONLY the
+   * turn-N command; stale older-turn entries are pruned on request.
    */
-  private readonly inbox = new Map<number, SerializedCommand>();
+  private readonly inbox = new Map<string, SerializedCommand>();
   private responder: CoopCommandResponder | null = null;
   private readonly offMessage: () => void;
 
@@ -102,13 +112,30 @@ export class CoopBattleSync {
    * A second request for the same slot supersedes the first (resolves it null).
    */
   requestPartnerCommand(fieldIndex: number, turn: number, moveSlots: number[]): Promise<SerializedCommand | null> {
-    // Supersede any stale in-flight request on this slot.
-    this.pending.get(fieldIndex)?.(null);
-    // The peer may have already broadcast its move (lockstep, no time-lock). If so,
-    // consume the buffered command immediately - no request, no wait.
-    const buffered = this.inbox.get(fieldIndex);
+    const key = commandKey(fieldIndex, turn);
+    const slotPrefix = `${fieldIndex}:`;
+    // Supersede any stale in-flight request on this SLOT (the turn has moved on, so an
+    // older-turn await is moot) and prune any stale older-turn buffered command for it,
+    // so a request for turn N can never resolve with a turn != N command (#633 desync fix).
+    for (const [k, finish] of [...this.pending]) {
+      if (k.startsWith(slotPrefix)) {
+        finish(null);
+      }
+    }
+    for (const k of [...this.inbox.keys()]) {
+      // Prune only OLDER-turn buffers for this slot. A FUTURE-turn command can be
+      // legitimately buffered here (a fast peer broadcast turn N+1 before we reached
+      // turn N's await) and must be kept for that turn's await - dropping it would
+      // re-introduce the very desync this keying fixes.
+      if (k.startsWith(slotPrefix) && Number(k.slice(slotPrefix.length)) < turn) {
+        this.inbox.delete(k);
+      }
+    }
+    // The peer may have already broadcast its move for THIS turn (lockstep, no
+    // time-lock). If so, consume the buffered command immediately - no request, no wait.
+    const buffered = this.inbox.get(key);
     if (buffered !== undefined) {
-      this.inbox.delete(fieldIndex);
+      this.inbox.delete(key);
       return Promise.resolve(buffered);
     }
     return new Promise<SerializedCommand | null>(resolve => {
@@ -120,12 +147,12 @@ export class CoopBattleSync {
         }
         settled = true;
         cancelTimer();
-        if (this.pending.get(fieldIndex) === finish) {
-          this.pending.delete(fieldIndex);
+        if (this.pending.get(key) === finish) {
+          this.pending.delete(key);
         }
         resolve(cmd);
       };
-      this.pending.set(fieldIndex, finish);
+      this.pending.set(key, finish);
       cancelTimer = this.schedule(() => finish(null), this.timeoutMs);
       this.transport.send({ t: "commandRequest", fieldIndex, turn, moveSlots });
     });
@@ -145,8 +172,8 @@ export class CoopBattleSync {
    * makes two real humans trade actual moves: each client commands only its own
    * slot interactively and broadcasts it; the other client awaits and applies it.
    */
-  broadcastLocalCommand(fieldIndex: number, command: SerializedCommand): void {
-    this.transport.send({ t: "command", fieldIndex, command });
+  broadcastLocalCommand(fieldIndex: number, turn: number, command: SerializedCommand): void {
+    this.transport.send({ t: "command", fieldIndex, turn, command });
   }
 
   /** Whether a responder is installed (this client can answer requests). */
@@ -172,17 +199,20 @@ export class CoopBattleSync {
         return;
       }
       const command = responder({ fieldIndex: msg.fieldIndex, turn: msg.turn, moveSlots: msg.moveSlots });
-      this.transport.send({ t: "command", fieldIndex: msg.fieldIndex, command });
+      // Echo the request's turn so the awaiter matches by (fieldIndex, turn) (#633).
+      this.transport.send({ t: "command", fieldIndex: msg.fieldIndex, turn: msg.turn, command });
       return;
     }
     if (msg.t === "command") {
-      const resolver = this.pending.get(msg.fieldIndex);
+      const key = commandKey(msg.fieldIndex, msg.turn);
+      const resolver = this.pending.get(key);
       if (resolver) {
         resolver(msg.command);
       } else {
-        // No one is awaiting this slot yet - buffer it (latest wins) so the next
-        // request for this slot resolves instantly (#633, LIVE-C race fix).
-        this.inbox.set(msg.fieldIndex, msg.command);
+        // No one is awaiting this slot+turn yet - buffer it (keyed by turn, so a
+        // later turn can't clobber an unconsumed earlier one) so the next request
+        // for THIS turn resolves instantly (#633, LIVE-C race fix + desync fix).
+        this.inbox.set(key, msg.command);
       }
     }
   }

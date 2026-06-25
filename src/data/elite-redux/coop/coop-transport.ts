@@ -188,7 +188,7 @@ export type CoopMessage =
    */
   | { t: "commandRequest"; fieldIndex: number; turn: number; moveSlots: number[] }
   /** A player's battle command for their own field slot (phase P2 / LIVE-C reply). */
-  | { t: "command"; fieldIndex: number; command: SerializedCommand }
+  | { t: "command"; fieldIndex: number; turn: number; command: SerializedCommand }
   /** A forced/voluntary switch replacement: bring in party `partySlot` to `fieldIndex` (P2). */
   | { t: "switchChoice"; fieldIndex: number; partySlot: number }
   /**

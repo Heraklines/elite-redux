@@ -541,7 +541,7 @@ export class CommandPhase extends FieldPhase {
     if (sync == null) {
       return;
     }
-    sync.broadcastLocalCommand(this.fieldIndex, {
+    sync.broadcastLocalCommand(this.fieldIndex, globalScene.currentBattle.turn, {
       command: Command.FIGHT,
       cursor: turnCommand.cursor ?? -1,
       moveId,
@@ -926,7 +926,7 @@ export class CommandPhase extends FieldPhase {
             .filter(p => p.isActive(true))
             .map(p => p.getBattlerIndex())
         : [];
-    sync.broadcastLocalCommand(this.fieldIndex, {
+    sync.broadcastLocalCommand(this.fieldIndex, globalScene.currentBattle.turn, {
       command,
       cursor,
       targets,

@@ -66,7 +66,7 @@ describe("co-op battle command relay (#633, LIVE-C)", () => {
     // That `command` message matches the host's pending request by fieldIndex and
     // resolves it with the exact move the human chose - no AI fallback.
     const awaited = hostSync.requestPartnerCommand(1, 0, [0, 1, 2]);
-    guestSync.broadcastLocalCommand(1, { command: Command.FIGHT, cursor: 2, moveId: 999, targets: [2] });
+    guestSync.broadcastLocalCommand(1, 0, { command: Command.FIGHT, cursor: 2, moveId: 999, targets: [2] });
 
     const cmd = await awaited;
     expect(cmd).not.toBeNull();
@@ -83,7 +83,7 @@ describe("co-op battle command relay (#633, LIVE-C)", () => {
     // The peer is FASTER: it broadcasts its slot-1 move before this client has
     // even reached that slot's await. Without buffering this dropped -> the host
     // timed out 30s -> AI (the live "stuck then desync" bug). Now it's buffered.
-    guestSync.broadcastLocalCommand(1, { command: Command.FIGHT, cursor: 3, moveId: 42 });
+    guestSync.broadcastLocalCommand(1, 0, { command: Command.FIGHT, cursor: 3, moveId: 42 });
     await new Promise(r => setTimeout(r, 0)); // let the broadcast land in the host inbox
 
     const cmd = await hostSync.requestPartnerCommand(1, 0, [0, 1, 2, 3]);
@@ -107,10 +107,37 @@ describe("co-op battle command relay (#633, LIVE-C)", () => {
     // fieldIndex, so slot 1's await is untouched and falls through to the timeout
     // (null -> the caller's AI fallback).
     const awaited = hostSync.requestPartnerCommand(1, 0, [0]);
-    guestSync.broadcastLocalCommand(0, { command: Command.FIGHT, cursor: 0 });
+    guestSync.broadcastLocalCommand(0, 0, { command: Command.FIGHT, cursor: 0 });
 
     const cmd = await awaited;
     expect(cmd).toBeNull();
+  });
+
+  it("a fast peer that broadcasts turn N then N+1 does NOT clobber turn N's command (desync fix, #633)", async () => {
+    const { host, guest } = createLoopbackPair();
+    const hostSync = new CoopBattleSync(host);
+    const guestSync = new CoopBattleSync(guest);
+
+    // The peer races ahead and broadcasts BOTH this turn's and the next turn's command
+    // for slot 1 before the host reaches the await. A fieldIndex-only latest-wins inbox
+    // kept only the LAST (turn 6) and handed it to the host's turn-5 await -> one client
+    // acted a turn out of step = the live move/switch/target desync. Turn-keying keeps
+    // each turn's command separate so the right one resolves the right await.
+    guestSync.broadcastLocalCommand(1, 5, { command: Command.FIGHT, cursor: 1, moveId: 50, targets: [2] });
+    guestSync.broadcastLocalCommand(1, 6, { command: Command.FIGHT, cursor: 2, moveId: 60, targets: [3] });
+    await new Promise(r => setTimeout(r, 0)); // both land in the host inbox
+
+    // The await for turn 5 gets turn 5's command (move 50 / target [2]), NOT turn 6's.
+    const t5 = await hostSync.requestPartnerCommand(1, 5, [0, 1, 2]);
+    expect(t5?.moveId).toBe(50);
+    expect(t5?.cursor).toBe(1);
+    expect(t5?.targets).toEqual([2]);
+
+    // ...and turn 6's command is still there for turn 6's await (not pruned as "stale").
+    const t6 = await hostSync.requestPartnerCommand(1, 6, [0, 1, 2]);
+    expect(t6?.moveId).toBe(60);
+    expect(t6?.cursor).toBe(2);
+    expect(t6?.targets).toEqual([3]);
   });
 
   it("a superseding request for the same slot resolves the stale one null", async () => {

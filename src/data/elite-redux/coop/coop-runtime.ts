@@ -139,7 +139,7 @@ export function broadcastCoopOwnSlotCommand(fieldIndex: number, command: Seriali
   if (coopOwnerOfFieldIndex(fieldIndex) !== active.controller.role) {
     return;
   }
-  active.battleSync.broadcastLocalCommand(fieldIndex, command);
+  active.battleSync.broadcastLocalCommand(fieldIndex, globalScene.currentBattle.turn, command);
 }
 
 /**
