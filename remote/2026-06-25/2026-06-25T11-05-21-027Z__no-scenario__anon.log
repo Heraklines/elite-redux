@@ -1,0 +1,109 @@
+url:      https://elite-redux-staging.pages.dev/
+build:    mqte1k6u-3mc1
+mode:     6  wave:1
+seed:     yn7Vyy1jvPjP5FgnxLm5kmjb
+party:    Bulbasaur(L5 21hp f0), Bulbasaur(L5 21hp f0), Charmander(L5 20hp f0), Charmander(L5 20hp f0), Squirtle(L5 21hp f0), Squirtle(L5 21hp f0)
+enemy:    Poochyena(L2), Ledyba(L2)
+
+----- COMMENT -----
+last test2
+
+----- CONSOLE -----
+[11:03:18.179] LOG: %c %c %c %c %c Phaser v3.90.0 (WebGL | Web Audio) %c https://phaser.io/v390 background: #ff0000 background: #ffff00 background: #00ff00 background: #00ffff color: #ffffff; background: #000000 background: transparent
+[11:03:18.881] LOG: [ER] build mqte1k6u-3mc1
+[11:03:19.115] LOG: [dev-tools] loaded — 306 scenarios + Send Logs button
+[11:03:32.130] DEBUG: Destroying loading scene
+[11:03:32.131] DEBUG: Destroyed loading scene
+[11:03:32.217] LOG: Seed: pzi9BHrvRzt1l5Zioxl0rogG
+[11:03:32.217] LOG: Wave Seed: pzi9BHrvRzt1l5Zioxl0rogG 0
+[11:03:37.856] LOG: %cStart Phase LoginPhase color:green;
+[11:03:37.990] LOG: Client Session: UUhurlVzlfk9LSP64A0pcEOcL08CkRht
+[11:03:38.368] LOG: %cStart Phase TitlePhase color:green;
+[11:03:38.369] LOG: Getting Session Slot id: %d 4
+[11:03:38.387] LOG: use seasonal splash messages true
+[11:03:38.387] LOG: Adding 2 Pride Month splash messages (weight: x15)
+[11:03:59.770] LOG: [coop-launch] title challenge-gate: role=guest isCoopGuest=true -> SelectStarterPhase
+[11:03:59.771] LOG: %cStart Phase SelectStarterPhase color:green;
+[11:03:59.772] LOG: [coop-launch] startCoopSelect role=guest partnerConnected=true partnerReady=false
+[11:04:02.618] WARN: cry/1 not found
+[11:04:03.123] WARN: cry/4 not found
+[11:04:11.182] LOG: [coop-runconfig] guest received difficulty=elite
+[11:04:11.182] LOG: [coop-launch] proceedIfReady launched=false localTeam=0 bothReady=false role=guest partnerReady=false
+[11:04:11.183] LOG: [coop-launch] proceedIfReady launched=false localTeam=0 bothReady=false role=guest partnerReady=false
+[11:04:11.185] LOG: [coop-launch] proceedIfReady launched=false localTeam=0 bothReady=false role=guest partnerReady=true
+[11:04:16.393] LOG: Wave Seed: yn7Vyy1jvPjP5FgnxLm5kmjb 0
+[11:04:16.393] LOG: [coop-runconfig] startRun role=guest willBroadcast=false difficulty=elite
+[11:04:16.394] LOG: [coop-launch] local team locked in: 3 mons, role=guest
+[11:04:16.394] LOG: [coop-launch] proceedIfReady launched=false localTeam=3 bothReady=false role=guest partnerReady=true
+[11:04:16.395] LOG: [coop-launch] proceedIfReady launched=false localTeam=3 bothReady=true role=guest partnerReady=true
+[11:04:16.396] LOG: [coop-launch] launchCoopMergedParty role=guest merged=6 slot=4
+[11:04:16.396] LOG: [coop-launch] guest: clearing STARTER_SELECT -> MESSAGE, then initBattle
+[11:04:16.397] LOG: [coop-launch] proceedIfReady launched=true localTeam=3 bothReady=true role=guest partnerReady=true
+[11:04:21.672] LOG: Wave Seed: zo8Wzz2kwQkQ6GhoyMn6lnkc 1
+[11:04:21.675] LOG: %cStart Phase EncounterPhase color:green;
+[11:04:26.076] LOG: Pokemon: Wild Poochyena | Species ID: 261 | Level: 2 | Nature: Relaxed (+Def/-Spd)
+[11:04:26.076] LOG: Stats (IVs): HP: 14 (30), Atk: 8 (21), Def: 7 (14), Spatk: 6 (16), Spdef: 7 (10), Spd: 7 (19)
+[11:04:26.076] LOG: Ability: Intimidate | Passive Ability: Nocturnal 
+[11:04:26.076] LOG: Moveset: ["Hyper Fang","Roar","Howl","Odor Sleuth"]
+[11:04:26.079] LOG: Pokemon: Wild Ledyba | Species ID: 165 | Level: 2 | Nature: Hardy (-)
+[11:04:26.079] LOG: Stats (IVs): HP: 13 (1), Atk: 7 (14), Def: 6 (26), Spatk: 6 (17), Spdef: 8 (13), Spd: 8 (22)
+[11:04:26.079] LOG: Ability: Rattled | Passive Ability: Pollinate 
+[11:04:26.079] LOG: Moveset: ["Insect Impact","Dizzy Punch","Rock Smash","Dual Wingbeat"]
+[11:04:26.533] DEBUG: Session data saved to slot 4!
+[11:04:28.128] LOG: Wave Seed: zo8Wzz2kwQkQ6GhoyMn6lnkc 1
+[11:04:28.577] LOG: %cStart Phase SummonPhase color:green;
+[11:04:28.763] WARN: cry/1 not found
+[11:04:28.864] LOG: %cStart Phase ShinySparklePhase color:green;
+[11:04:28.965] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[11:04:28.966] LOG: %cStart Phase SummonPhase color:green;
+[11:04:29.152] WARN: cry/1 not found
+[11:04:29.255] LOG: %cStart Phase ShinySparklePhase color:green;
+[11:04:29.360] LOG: %cStart Phase CheckSwitchPhase color:green;
+[11:04:29.360] LOG: %cStart Phase CheckSwitchPhase color:green;
+[11:04:29.360] LOG: %cStart Phase InitEncounterPhase color:green;
+[11:04:29.366] LOG: %cStart Phase PostSummonPhase color:green;
+[11:04:29.367] LOG: Ran PSP for: Bulbasaur
+[11:04:29.373] LOG: %cStart Phase PostSummonPhase color:green;
+[11:04:29.377] LOG: %cStart Phase PostSummonPhase color:green;
+[11:04:29.378] LOG: %cStart Phase PostSummonPhase color:green;
+[11:04:29.378] LOG: Ran PSP for: Bulbasaur
+[11:04:29.380] LOG: %cStart Phase PostSummonPhase color:green;
+[11:04:29.380] LOG: %cStart Phase PostSummonPhase color:green;
+[11:04:29.381] LOG: %cStart Phase PostSummonPhase color:green;
+[11:04:29.381] LOG: Ran PSP for: Ledyba
+[11:04:29.383] LOG: %cStart Phase PostSummonPhase color:green;
+[11:04:29.384] LOG: %cStart Phase PostSummonPhase color:green;
+[11:04:29.384] LOG: %cStart Phase PostSummonPhase color:green;
+[11:04:29.384] LOG: Ran PSP for: Poochyena
+[11:04:29.385] LOG: %cStart Phase PostSummonPhase color:green;
+[11:04:29.387] LOG: %cStart Phase ShowAbilityPhase color:green;
+[11:04:29.561] LOG: %cStart Phase StatStageChangePhase color:green;
+[11:04:29.777] LOG: %cStart Phase MessagePhase color:green;
+[11:04:29.976] LOG: %cStart Phase StatStageChangePhase color:green;
+[11:04:30.175] LOG: %cStart Phase MessagePhase color:green;
+[11:04:30.379] LOG: %cStart Phase HideAbilityPhase color:green;
+[11:04:30.401] LOG: %cStart Phase PostSummonPhase color:green;
+[11:04:30.401] LOG: %cStart Phase TurnInitPhase color:green;
+[11:04:30.401] LOG: %cStart Phase CommandPhase color:green;
+[11:04:30.404] LOG: %cStart Phase CommandPhase color:green;
+[11:04:34.540] LOG: Move: MALIGNANT_CHAIN Move targets: {"targets":[2,3,0],"multiple":false} 
+Player Pokemon: Bulbasaur
+[11:04:34.543] LOG: %cStart Phase SelectTargetPhase color:green;
+[11:04:35.222] LOG: %cStart Phase EnemyCommandPhase color:green;
+[11:04:35.223] LOG: %cStart Phase EnemyCommandPhase color:green;
+[11:04:35.223] LOG: %cStart Phase TurnStartPhase color:green;
+[11:04:35.223] LOG: %cStart Phase CoopReplayTurnPhase color:green;
+[11:04:44.322] WARN: [coop-desync] turn=1 host=adf6a5119ff66063 guest=5b580994d328b887
+[11:04:44.323] LOG: %cStart Phase MessagePhase color:green;
+[11:04:44.380] WARN: [coop-resync] turn=1 still-diverged host=adf6a5119ff66063 guest=67697a26e4ef5d3f
+[11:04:44.539] LOG: %cStart Phase MessagePhase color:green;
+[11:04:44.755] LOG: %cStart Phase MessagePhase color:green;
+[11:04:45.034] LOG: %cStart Phase MessagePhase color:green;
+[11:04:45.237] LOG: %cStart Phase WeatherEffectPhase color:green;
+[11:04:45.237] LOG: %cStart Phase PositionalTagPhase color:green;
+[11:04:45.237] LOG: %cStart Phase BerryPhase color:green;
+[11:04:45.241] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[11:04:45.246] LOG: %cStart Phase TurnEndPhase color:green;
+[11:04:45.250] LOG: %cStart Phase TurnInitPhase color:green;
+[11:04:45.250] LOG: %cStart Phase CommandPhase color:green;
+[11:04:45.253] LOG: %cStart Phase CommandPhase color:green;
