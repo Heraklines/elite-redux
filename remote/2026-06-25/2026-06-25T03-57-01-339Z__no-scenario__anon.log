@@ -1,0 +1,215 @@
+url:      https://elite-redux-staging.pages.dev/
+build:    mqsymop2-45c1
+mode:     6  wave:1
+seed:     JSi4yoKOMu1EhkI4FThvJryg
+party:    Bisasam(L5 21hp f0), Bisasam(L5 14hp f0), Glumanda(L5 20hp f0), Endivie(L5 20hp f0), Schiggy(L5 21hp f0)
+enemy:    Knilz(L2), Webarak(L2)
+
+----- COMMENT -----
+second log for shop desync
+
+----- CONSOLE -----
+[03:54:16.481] LOG: %c %c %c %c %c Phaser v3.90.0 (WebGL | Web Audio) %c https://phaser.io/v390 background: #ff0000 background: #ffff00 background: #00ff00 background: #00ffff color: #ffffff; background: #000000 background: transparent
+[03:54:16.903] LOG: [ER] build mqsymop2-45c1
+[03:54:17.155] LOG: [dev-tools] loaded — 306 scenarios + Send Logs button
+[03:54:34.345] DEBUG: Destroying loading scene
+[03:54:34.345] DEBUG: Destroyed loading scene
+[03:54:34.434] LOG: Seed: TZqLRm5hOHCdDwXmMFvQV4K0
+[03:54:34.434] LOG: Wave Seed: TZqLRm5hOHCdDwXmMFvQV4K0 0
+[03:54:39.127] LOG: %cStart Phase LoginPhase color:green;
+[03:54:49.245] LOG: Client Session: iXL5ZLF878R5Y7ckR3HbI601Hn9dlTJi
+[03:54:49.517] LOG: %cStart Phase TitlePhase color:green;
+[03:54:49.518] LOG: Getting Session Slot id: %d 0
+[03:54:49.977] LOG: use seasonal splash messages true
+[03:54:49.978] LOG: Adding 2 Pride Month splash messages (weight: x15)
+[03:54:58.681] LOG: [coop-launch] title challenge-gate: role=guest isCoopGuest=true -> SelectStarterPhase
+[03:54:58.682] LOG: %cStart Phase SelectStarterPhase color:green;
+[03:54:58.683] LOG: [coop-launch] startCoopSelect role=guest partnerConnected=true partnerReady=false
+[03:55:10.301] LOG: [coop-runconfig] guest received difficulty=elite
+[03:55:10.302] LOG: [coop-launch] proceedIfReady launched=false localTeam=0 bothReady=false role=guest partnerReady=false
+[03:55:10.303] LOG: [coop-launch] proceedIfReady launched=false localTeam=0 bothReady=false role=guest partnerReady=false
+[03:55:10.303] LOG: [coop-launch] proceedIfReady launched=false localTeam=0 bothReady=false role=guest partnerReady=true
+[03:55:13.365] WARN: cry/1 not found
+[03:55:14.599] WARN: cry/152 not found
+[03:55:18.304] LOG: Wave Seed: JSi4yoKOMu1EhkI4FThvJryg 0
+[03:55:18.304] LOG: [coop-runconfig] startRun role=guest willBroadcast=false difficulty=elite
+[03:55:18.305] LOG: [coop-launch] local team locked in: 2 mons, role=guest
+[03:55:18.306] LOG: [coop-launch] proceedIfReady launched=false localTeam=2 bothReady=false role=guest partnerReady=true
+[03:55:18.306] LOG: [coop-launch] proceedIfReady launched=false localTeam=2 bothReady=true role=guest partnerReady=true
+[03:55:18.307] LOG: [coop-launch] launchCoopMergedParty role=guest merged=5 slot=0
+[03:55:18.307] LOG: [coop-launch] guest: clearing STARTER_SELECT -> MESSAGE, then initBattle
+[03:55:18.308] LOG: [coop-launch] proceedIfReady launched=true localTeam=2 bothReady=true role=guest partnerReady=true
+[03:55:21.530] LOG: Wave Seed: KTj5zpLPNv2FilJ5GUiwKszh 1
+[03:55:21.536] LOG: %cStart Phase EncounterPhase color:green;
+[03:55:30.981] LOG: Pokemon: Knilz (wild) | Species ID: 285 | Level: 2 | Nature: Kauzig (-)
+[03:55:30.981] LOG: Stats (IVs): HP: 14 (21), Atk: 7 (31), Def: 7 (0), Spatk: 6 (6), Spdef: 7 (8), Spd: 6 (5)
+[03:55:30.981] LOG: Ability: Aufheber | Passive Ability: Sporenwirt 
+[03:55:30.981] LOG: Moveset: ["Wegbereiter","Stachelspore","Megasauger","Giftpuder"]
+[03:55:30.982] LOG: Pokemon: Webarak (wild) | Species ID: 167 | Level: 2 | Nature: Hitzig (+SpAng/-SpVert)
+[03:55:30.982] LOG: Stats (IVs): HP: 14 (20), Atk: 7 (12), Def: 7 (4), Spatk: 7 (6), Spdef: 6 (12), Spd: 7 (18)
+[03:55:30.982] LOG: Ability: Strolch | Passive Ability: Giftgriff 
+[03:55:30.982] LOG: Moveset: ["Anspringen","Giftfaden","Giftstachel","Kratzfurie"]
+[03:55:31.664] DEBUG: Session data saved to slot 0!
+[03:55:32.252] LOG: Wave Seed: KTj5zpLPNv2FilJ5GUiwKszh 1
+[03:55:33.735] LOG: %cStart Phase SummonPhase color:green;
+[03:55:34.304] WARN: cry/1 not found
+[03:55:34.650] LOG: %cStart Phase ShinySparklePhase color:green;
+[03:55:34.986] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[03:55:34.987] LOG: %cStart Phase SummonPhase color:green;
+[03:55:35.563] WARN: cry/1 not found
+[03:55:35.899] LOG: %cStart Phase CheckSwitchPhase color:green;
+[03:55:35.899] LOG: %cStart Phase CheckSwitchPhase color:green;
+[03:55:35.899] LOG: %cStart Phase InitEncounterPhase color:green;
+[03:55:35.904] LOG: %cStart Phase PostSummonPhase color:green;
+[03:55:35.904] LOG: Ran PSP for: Bisasam
+[03:55:35.907] LOG: %cStart Phase PostSummonPhase color:green;
+[03:55:35.909] LOG: %cStart Phase PostSummonPhase color:green;
+[03:55:35.909] LOG: Ran PSP for: Bisasam
+[03:55:35.911] LOG: %cStart Phase PostSummonPhase color:green;
+[03:55:35.912] LOG: %cStart Phase PostSummonPhase color:green;
+[03:55:35.912] LOG: Ran PSP for: Webarak
+[03:55:35.914] LOG: %cStart Phase PostSummonPhase color:green;
+[03:55:35.915] LOG: %cStart Phase PostSummonPhase color:green;
+[03:55:35.915] LOG: %cStart Phase PostSummonPhase color:green;
+[03:55:35.915] LOG: Ran PSP for: Knilz
+[03:55:35.916] LOG: %cStart Phase PostSummonPhase color:green;
+[03:55:35.916] LOG: %cStart Phase PostSummonPhase color:green;
+[03:55:35.916] LOG: %cStart Phase TurnInitPhase color:green;
+[03:55:35.917] LOG: %cStart Phase CommandPhase color:green;
+[03:55:37.680] LOG: Move: SAPPY_SEED Move targets: {"targets":[2],"multiple":false} 
+Player Pokemon: Bisasam
+[03:55:37.680] LOG: %cStart Phase CommandPhase color:green;
+[03:55:44.705] LOG: Move: TACKLE Move targets: {"targets":[2,3,0],"multiple":false} 
+Player Pokemon: Bisasam
+[03:55:44.707] LOG: %cStart Phase SelectTargetPhase color:green;
+[03:55:45.135] LOG: %cStart Phase EnemyCommandPhase color:green;
+[03:55:45.149] LOG: Battle Seed: WoszhTXJx7q9a3Dv
+[03:55:45.159] LOG: Move Pool: ["Wegbereiter","Stachelspore","Megasauger","Giftpuder"]
+[03:55:45.159] LOG: Move Scores: [7.9921875,10,3.328125,0]
+[03:55:45.159] LOG: Sorted Move Pool: ["Stachelspore","Wegbereiter","Megasauger","Giftpuder"]
+[03:55:45.159] LOG: Chosen Move: Megasauger
+[03:55:45.159] LOG: %cStart Phase EnemyCommandPhase color:green;
+[03:55:45.175] LOG: Move Pool: ["Anspringen","Giftfaden","Giftstachel","Kratzfurie"]
+[03:55:45.175] LOG: Move Scores: [18,2,12,23]
+[03:55:45.175] LOG: Sorted Move Pool: ["Kratzfurie","Anspringen","Giftstachel","Giftfaden"]
+[03:55:45.175] LOG: Chosen Move: Kratzfurie
+[03:55:45.175] LOG: %cStart Phase TurnStartPhase color:green;
+[03:55:45.180] LOG: %cStart Phase MovePhase color:green;
+[03:55:45.180] LOG: %cUser: Bisasam
+Move: SAPPY_SEED
+Use Mode: NORMAL color:orchid
+[03:55:45.187] LOG: %cStart Phase MessagePhase color:green;
+[03:55:45.519] LOG: %cStart Phase MoveEffectPhase color:green;
+[03:55:46.364] LOG: crit stage: +0
+[03:55:46.365] LOG: Move: Sprießbomben | Base damage: 14.571428571428571 | Power: 100 | Source attack: 11 | Target defense: 7
+[03:55:46.366] LOG: Move: Sprießbomben | Attack damage: 10
+[03:55:46.368] LOG: %cStart Phase DamageAnimPhase color:green;
+[03:55:46.381] LOG: %cStart Phase MessagePhase color:green;
+[03:55:47.091] LOG: %cStart Phase MoveEndPhase color:green;
+[03:55:47.093] LOG: %cStart Phase MovePhase color:green;
+[03:55:47.093] LOG: %cUser: Bisasam
+Move: TACKLE
+Use Mode: NORMAL color:orchid
+[03:55:47.102] LOG: %cStart Phase MessagePhase color:green;
+[03:55:47.444] LOG: %cStart Phase MoveEffectPhase color:green;
+[03:55:47.653] LOG: crit stage: +0
+[03:55:47.653] LOG: Move: Tackle | Base damage: 6.571428571428572 | Power: 40 | Source attack: 10 | Target defense: 7
+[03:55:47.654] LOG: Move: Tackle | Attack damage: 5
+[03:55:47.654] LOG: %cStart Phase DamageAnimPhase color:green;
+[03:55:47.668] LOG: %cStart Phase FaintPhase color:green;
+[03:55:48.557] LOG: %cStart Phase MessagePhase color:green;
+[03:55:50.111] LOG: %cStart Phase VictoryPhase color:green;
+[03:55:50.114] LOG: %cStart Phase ExpPhase color:green;
+[03:55:51.020] LOG: %cStart Phase ExpPhase color:green;
+[03:55:51.932] LOG: %cStart Phase MoveEndPhase color:green;
+[03:55:51.932] LOG: %cStart Phase MovePhase color:green;
+[03:55:51.932] LOG: %cUser: Webarak
+Move: FURY_SWIPES
+Use Mode: NORMAL color:orchid
+[03:55:51.936] LOG: %cStart Phase MessagePhase color:green;
+[03:55:52.363] LOG: %cStart Phase MoveEffectPhase color:green;
+[03:55:52.666] LOG: crit stage: +1
+[03:55:52.667] LOG: Move: Kratzfurie | Base damage: 2.98 | Power: 25 | Source attack: 7 | Target defense: 10
+[03:55:52.667] LOG: Move: Kratzfurie | Attack damage: 2
+[03:55:52.670] LOG: %cStart Phase DamageAnimPhase color:green;
+[03:55:52.682] LOG: %cStart Phase MoveEffectPhase color:green;
+[03:55:52.996] LOG: crit stage: +1
+[03:55:52.996] LOG: Move: Kratzfurie | Base damage: 2.98 | Power: 25 | Source attack: 7 | Target defense: 10
+[03:55:52.997] LOG: Move: Kratzfurie | Attack damage: 2
+[03:55:52.997] LOG: %cStart Phase DamageAnimPhase color:green;
+[03:55:53.011] LOG: %cStart Phase MoveEffectPhase color:green;
+[03:55:53.315] LOG: crit stage: +1
+[03:55:53.316] LOG: Move: Kratzfurie | Base damage: 2.98 | Power: 25 | Source attack: 7 | Target defense: 10
+[03:55:53.316] LOG: Move: Kratzfurie | Attack damage: 2
+[03:55:53.317] LOG: %cStart Phase DamageAnimPhase color:green;
+[03:55:53.330] LOG: %cStart Phase MessagePhase color:green;
+[03:55:53.959] LOG: %cStart Phase MoveEndPhase color:green;
+[03:55:53.959] LOG: %cStart Phase MovePhase color:green;
+[03:55:53.959] LOG: %cStart Phase MoveEndPhase color:green;
+[03:55:53.959] LOG: %cStart Phase CheckInterludePhase color:green;
+[03:55:53.959] LOG: %cStart Phase WeatherEffectPhase color:green;
+[03:55:53.959] LOG: %cStart Phase PositionalTagPhase color:green;
+[03:55:53.959] LOG: %cStart Phase BerryPhase color:green;
+[03:55:53.961] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[03:55:53.962] LOG: %cStart Phase TurnEndPhase color:green;
+[03:55:53.967] LOG: %cStart Phase TurnInitPhase color:green;
+[03:55:53.967] LOG: %cStart Phase CommandPhase color:green;
+[03:56:07.014] LOG: Move: EARTH_POWER Move targets: {"targets":[3],"multiple":false} 
+Player Pokemon: Bisasam
+[03:56:07.014] LOG: %cStart Phase CommandPhase color:green;
+[03:56:11.892] LOG: Move: TACKLE Move targets: {"targets":[3,0],"multiple":false} 
+Player Pokemon: Bisasam
+[03:56:11.894] LOG: %cStart Phase SelectTargetPhase color:green;
+[03:56:12.298] LOG: %cStart Phase EnemyCommandPhase color:green;
+[03:56:12.306] LOG: Battle Seed: WoszhTXJx7q9a3Dv
+[03:56:12.314] LOG: Move Pool: ["Anspringen","Giftfaden","Giftstachel","Kratzfurie"]
+[03:56:12.314] LOG: Move Scores: [18,2,12,23]
+[03:56:12.314] LOG: Sorted Move Pool: ["Kratzfurie","Anspringen","Giftstachel","Giftfaden"]
+[03:56:12.315] LOG: Chosen Move: Kratzfurie
+[03:56:12.315] LOG: %cStart Phase TurnStartPhase color:green;
+[03:56:12.321] LOG: %cStart Phase MovePhase color:green;
+[03:56:12.321] LOG: %cUser: Bisasam
+Move: EARTH_POWER
+Use Mode: NORMAL color:orchid
+[03:56:12.326] LOG: %cStart Phase MessagePhase color:green;
+[03:56:12.716] LOG: %cStart Phase MoveEffectPhase color:green;
+[03:56:14.207] LOG: crit stage: +0
+[03:56:14.208] LOG: Move: Erdkräfte | Base damage: 17.6 | Power: 90 | Source attack: 13 | Target defense: 6
+[03:56:14.209] LOG: Move: Erdkräfte | Attack damage: 16
+[03:56:14.209] LOG: %cStart Phase DamageAnimPhase color:green;
+[03:56:14.219] LOG: %cStart Phase FaintPhase color:green;
+[03:56:15.366] LOG: %cStart Phase MessagePhase color:green;
+[03:56:19.065] LOG: %cStart Phase VictoryPhase color:green;
+[03:56:19.065] LOG: %cStart Phase ExpPhase color:green;
+[03:56:19.503] LOG: %cStart Phase ExpPhase color:green;
+[03:56:19.978] LOG: %cStart Phase MoveEndPhase color:green;
+[03:56:19.978] LOG: %cStart Phase MovePhase color:green;
+[03:56:19.978] LOG: %cUser: Bisasam
+Move: TACKLE
+Use Mode: NORMAL color:orchid
+[03:56:19.980] LOG: %cStart Phase MessagePhase color:green;
+[03:56:20.333] LOG: %cStart Phase MessagePhase color:green;
+[03:56:21.004] LOG: %cStart Phase MoveEndPhase color:green;
+[03:56:21.005] LOG: %cStart Phase MovePhase color:green;
+[03:56:21.005] LOG: %cStart Phase MoveEndPhase color:green;
+[03:56:21.005] LOG: %cStart Phase CheckInterludePhase color:green;
+[03:56:21.005] LOG: %cStart Phase WeatherEffectPhase color:green;
+[03:56:21.005] LOG: %cStart Phase PositionalTagPhase color:green;
+[03:56:21.005] LOG: %cStart Phase BerryPhase color:green;
+[03:56:21.005] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[03:56:21.005] LOG: %cStart Phase TurnEndPhase color:green;
+[03:56:21.005] LOG: %cStart Phase BattleEndPhase color:green;
+[03:56:21.006] LOG: Battle Score: 19 (2 Turns x0.84)
+[03:56:21.006] LOG: Total Score: 19
+[03:56:21.014] LOG: %cStart Phase EggLapsePhase color:green;
+[03:56:21.014] LOG: %cStart Phase SelectModifierPhase color:green;
+[03:56:21.015] LOG: Wave Seed: KTj5zpLPNv2FilJ5GUiwKszh 1
+[03:56:21.023] LOG: 9 5 [2,3,4,5,6]
+[03:56:21.024] LOG: {"id":"TM_COMMON","localeKey":"","iconImage":"tm_fairy","group":"tm","soundName":"se/restore","tier":0,"moveId":581} 
+[03:56:21.025] LOG: 0 0 [2,3,4,5,6]
+[03:56:21.025] LOG: {"id":"POKEBALL","localeKey":"","iconImage":"pb","group":"pb","soundName":"se/pb_bounce_1","tier":0,"pokeballType":0,"count":5} 
+[03:56:21.026] LOG: 0 0 [2,3,4,5,6]
+[03:56:21.026] LOG: {"id":"POKEBALL","localeKey":"","iconImage":"pb","group":"pb","soundName":"se/pb_bounce_1","tier":0,"pokeballType":0,"count":5} 
+[03:56:21.026] LOG: 1 0 [2,3,4,5,6]
+[03:56:21.026] LOG: {"id":"RARE_CANDY","localeKey":"modifierType:ModifierType.RARE_CANDY","iconImage":"rare_candy","soundName":"se/restore","tier":0} 
+[03:56:21.026] LOG: [coop-reward] WATCHER waits for partner's reward picks (start=0 role=guest wave=1)
