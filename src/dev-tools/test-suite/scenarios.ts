@@ -8609,4 +8609,72 @@ export const DEV_SCENARIOS: DevScenario[] = [
       );
     },
   },
+  {
+    label: "Co-op: partner death syncs + auto-replaces (#633)",
+    description:
+      "#633 co-op PARTNER-DEATH SYNC - in the authoritative co-op forced-DOUBLE, a\n"
+      + "PLAYER-side faint (one of the two leads, field slot 0/1) used to NOT propagate\n"
+      + "to the guest renderer: the host captured only ACTIVE player mons, so a\n"
+      + "just-fainted partner was DROPPED from the checkpoint and the guest kept it on\n"
+      + "field forever -> field composition diverged from the first move. On top of that,\n"
+      + "when the GUEST's mon fainted the host waited 300s for a replacement choice the\n"
+      + "pure-renderer guest never sends (a stall).\n"
+      + "DO: take a turn and let the RIGHT (guest, Gengar) lead FAINT (the foe is strong;\n"
+      + "or pick a move that lets it drop). Watch the field after it faints.\n"
+      + "EXPECT: the fainted partner is removed cleanly and its BENCH replacement\n"
+      + "(Alakazam) is auto-sent into the RIGHT slot with NO 300s hang and NO desync -\n"
+      + "the host auto-picks the guest's first legal bench mon and the guest's field\n"
+      + "renders the same species at that slot. (Before the fix the slot stayed empty /\n"
+      + "the guest still showed the dead mon and the run desynced.) The host's own\n"
+      + "(LEFT) faint already worked; this scenario covers the partner / guest-owned\n"
+      + "side. Console prints the ownership tags.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 30,
+        STARTING_WAVE_OVERRIDE: 5,
+        BATTLE_STYLE_OVERRIDE: "double",
+        // A hard-hitting foe so the partner (guest) lead can be KO'd this turn, exercising the
+        // player-faint propagation + the host's auto-pick replacement for the guest's slot.
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.MACHAMP,
+        ENEMY_LEVEL_OVERRIDE: 70,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.CLOSE_COMBAT],
+      });
+      // Host half = slots 0-2 (Snorlax lead + Gyarados bench), guest half = slots 3-5
+      // (Gengar lead + Alakazam bench) - the guest's Alakazam is the auto-pick replacement.
+      return [
+        makeStarter(SpeciesId.SNORLAX, {
+          moveset: [MoveId.BODY_SLAM, MoveId.CRUNCH, MoveId.EARTHQUAKE, MoveId.REST],
+        }),
+        makeStarter(SpeciesId.GENGAR, {
+          moveset: [MoveId.SHADOW_BALL, MoveId.SLUDGE_BOMB, MoveId.THUNDERBOLT, MoveId.DAZZLING_GLEAM],
+        }),
+        makeStarter(SpeciesId.GYARADOS, {
+          moveset: [MoveId.WATERFALL, MoveId.CRUNCH, MoveId.EARTHQUAKE, MoveId.DRAGON_DANCE],
+        }),
+        makeStarter(SpeciesId.ALAKAZAM, {
+          moveset: [MoveId.PSYCHIC, MoveId.SHADOW_BALL, MoveId.FOCUS_BLAST, MoveId.RECOVER],
+        }),
+      ];
+    },
+    onBattleStart: () => {
+      // Flip the live run into co-op and register the local (host) session so the partner-death
+      // propagation + the host's authoritative auto-pick replacement engage. Host = slots 0-2,
+      // guest = slots 3-5.
+      globalScene.gameMode = getGameMode(GameModes.COOP);
+      if (getCoopController() == null) {
+        startLocalCoopSession({ username: loggedInUser?.username });
+      }
+      const party = globalScene.getPlayerParty();
+      party.forEach((mon, i) => {
+        mon.coopOwner = i < 3 ? "host" : "guest";
+      });
+      console.log(
+        "[#633 co-op partner-death] tags: "
+          + party.map(m => `${m.getNameToRender()}=${m.coopOwner}`).join(", ")
+          + ` | local role=${getCoopController()?.role} `
+          + "(let the RIGHT/guest Gengar faint; its Alakazam bench should auto-replace, no hang)",
+      );
+    },
+  },
 ];

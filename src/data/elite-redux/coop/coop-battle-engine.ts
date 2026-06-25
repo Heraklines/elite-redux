@@ -139,22 +139,24 @@ function readMonView(mon: ReturnType<typeof globalScene.getField>[number]): Coop
 }
 
 /**
- * HOST: the field mons to SERIALIZE for the guest (#633, enemy-field reconcile fix). The
+ * HOST: the field mons to SERIALIZE for the guest (#633, faint-field reconcile fix). The
  * naive `getField(true)` drops fainted mons (its `.filter(p => p.isActive())` -> isAllowedInBattle
- * -> `!isFainted()`), so a foe the host KOs mid-turn vanishes from every payload and the guest -
- * which only matches by battler index off its OWN live field and never removes - keeps that foe
- * ALIVE forever (a turn-1 field-composition desync the resync can't heal). The fix: serialize the
- * player side as the live ACTIVE player mons, but the enemy side as the SLOT-PRESENT enemies
- * (`getEnemyField(false)` - the enemy party slice WITHOUT the isActive filter), so a just-fainted
- * enemy still appears in the payload with `fainted:true` + hp 0. That fainted entry is what DRIVES
- * the guest's enemy-field reconcile ({@linkcode reconcileCoopEnemyField}). Player faints stay out
- * of scope (a separate relayed switch flow), so the player side keeps the active-only accessor.
+ * -> `!isFainted()`), so a mon the host KOs mid-turn vanishes from every payload and the guest -
+ * which only matches by battler index off its OWN live field and never removes - keeps that mon
+ * ALIVE forever (a turn-1 field-composition desync the resync can't heal). The fix: serialize BOTH
+ * sides as the SLOT-PRESENT slices (no isActive filter) - `getPlayerField(false)` for the player
+ * side and `getEnemyField(false)` for the enemy side - so a just-fainted mon on EITHER side still
+ * appears in the payload with `fainted:true` + hp 0. That fainted entry is what DRIVES the guest's
+ * field reconcile ({@linkcode reconcileCoopEnemyField} for enemy slots, {@linkcode reconcileCoopPlayerField}
+ * for player slots). A co-op partner faint (a player mon at bi 0/1 in the forced double) was the
+ * gap that broke field composition from the first move; the player side now matches the enemy
+ * side's slot-present capture so it propagates too.
  */
 function getCoopSerializableField(): Pokemon[] {
-  // Both accessors return non-null arrays (their own `.filter`/`.slice` guarantees it): the
-  // player side filters to ACTIVE mons; the enemy side is the slot-present slice (no isActive
-  // filter), so a just-fainted enemy is still included with hp 0 / fainted:true.
-  const playerField = globalScene.getPlayerField(true);
+  // Both accessors return non-null arrays (their own `.filter`/`.slice` guarantees it): each is
+  // the slot-present party slice (no isActive filter), so a just-fainted mon on either side is
+  // still included with hp 0 / fainted:true and drives the guest's field reconcile.
+  const playerField = globalScene.getPlayerField(false);
   const enemyField = globalScene.getEnemyField(false);
   return [...playerField, ...enemyField];
 }
@@ -336,6 +338,148 @@ export function summonCoopEnemyField(fieldIndex: number, partySlot: number): voi
 }
 
 /**
+ * GUEST: reconcile the live PLAYER field to the host's authoritative composition (#633
+ * partner-death sync). The mirror of {@linkcode reconcileCoopEnemyField} for the PLAYER side: in
+ * the authoritative co-op double a partner's mon (a player mon at battler index 0/1) can FAINT on
+ * the host, but the per-mon numeric apply only matches by battler index and never REMOVES, so the
+ * just-fainted partner stays ALIVE on the guest forever - a field-composition desync from the
+ * first move. With the host now serializing the player side SLOT-PRESENT (so a just-fainted partner
+ * rides the checkpoint with `fainted:true`), this helper closes the gap: from the host's serialized
+ * `hostField` it computes the set of PLAYER battler indices (bi < ENEMY, i.e. 0/1) the host reports
+ * PRESENT-AND-ALIVE (`!fainted`), then for every player mon currently ON the guest's active field
+ * whose `bi` is NOT in that set, it does a side-effect-free field removal (set hp 0 then
+ * {@linkcode Pokemon.leaveField} - NO FaintPhase / SwitchPhase, so the engine resolution pipeline is
+ * never re-entered).
+ *
+ * STRICTLY player slots (bi < ENEMY); enemy faints (bi 2/3) are the enemy reconcile's job and are
+ * never touched here. Idempotent: a mon already not `isActive()` / not `isOnField()` is skipped, so
+ * re-applying the same checkpoint (or the resync mirror) can never double-remove. PASS 2 mirrors a
+ * host REPLACEMENT (a partner's bench mon sent in for a fainted slot - HALF B's host auto-pick): a
+ * different `speciesId` now at a player bi -> summon the matching party member. Fully guarded so one
+ * bad removal/summon can't break the rest of the heal.
+ */
+export function reconcileCoopPlayerField(hostField: { bi: number; fainted: boolean; speciesId?: number }[]): void {
+  try {
+    // Player battler indices the host reports PRESENT-AND-ALIVE (slot present, not fainted).
+    const hostAlivePlayers = new Set<number>();
+    for (const entry of hostField) {
+      if (entry.bi < BattlerIndex.ENEMY && !entry.fainted) {
+        hostAlivePlayers.add(entry.bi);
+      }
+    }
+    // PASS 1 - REMOVE: drop every guest player mon that is on-field-and-active but NOT alive on the host.
+    for (const mon of globalScene.getPlayerField(true)) {
+      if (mon == null) {
+        continue;
+      }
+      const bi = mon.getBattlerIndex();
+      if (bi >= BattlerIndex.ENEMY) {
+        continue;
+      }
+      // Idempotency guard: already off-field / inactive -> nothing to remove (re-apply safe).
+      if (!mon.isActive() || !mon.isOnField()) {
+        continue;
+      }
+      if (hostAlivePlayers.has(bi)) {
+        continue;
+      }
+      try {
+        // Side-effect-free removal: zero hp so it reads as fainted, then leaveField (no
+        // FaintPhase / resolution pipeline - that would re-introduce the engine divergence
+        // authoritative mode exists to prevent).
+        mon.hp = 0;
+        mon.leaveField(true, true, false);
+      } catch {
+        /* one player removal failed; leave it and continue the reconcile */
+      }
+    }
+    // PASS 2 - SWAP/SUMMON: mirror a host partner REPLACEMENT (#633 partner-death sync, HALF B). For
+    // each player bi the host reports ALIVE with a `speciesId`, if the guest's mon at that field slot
+    // is a DIFFERENT species (a replacement happened), summon the matching player party member onto the
+    // slot (the merged party is in the SAME order on both clients, so the species identifies which
+    // member). speciesId 0 / absent (an older payload or an enemy slot) is skipped.
+    for (const entry of hostField) {
+      if (entry.bi >= BattlerIndex.ENEMY || entry.fainted) {
+        continue;
+      }
+      const speciesId = entry.speciesId ?? 0;
+      if (speciesId <= 0) {
+        continue;
+      }
+      const fieldSlot = entry.bi;
+      const party = globalScene.getPlayerParty();
+      const current = party[fieldSlot];
+      // No-op if the correct species is already on this field slot (idempotent re-apply).
+      if (current != null && current.species?.speciesId === speciesId) {
+        continue;
+      }
+      // Bench starts after the on-field slots (getPlayerField is party.slice(0, double?2:1)).
+      const onFieldCount = globalScene.getPlayerField(false).length;
+      // Find the party member of the host's reported species that is NOT already on-field (a bench
+      // slot), so we bring in the replacement mon, not re-place an on-field duplicate.
+      const partySlot = party.findIndex((p, i) => p != null && i >= onFieldCount && p.species?.speciesId === speciesId);
+      if (partySlot < 0) {
+        continue;
+      }
+      summonCoopPlayerField(fieldSlot, partySlot);
+    }
+  } catch {
+    // A malformed host field must never crash the guest's battle.
+  }
+}
+
+/**
+ * GUEST: place the player party member at `partySlot` onto player field slot `fieldIndex`, mirroring
+ * the host's partner replacement (#633 partner-death sync, HALF B). The PLAYER-side mirror of
+ * {@linkcode summonCoopEnemyField}: side-effect-free + idempotent, it does the SAME array swap the
+ * host's `SwitchSummonPhase` does (`party[fieldIndex] <-> party[partySlot]`, so the guest's
+ * `getPlayerParty()` stays PERMUTATION-IDENTICAL to the host across subsequent turns) and the VISUAL
+ * placement subset of a summon (NO FaintPhase / SwitchSummonPhase resolution pipeline - that would
+ * re-enter the engine authoritative mode exists to bypass). Unlike the enemy mirror it OMITS the
+ * `field.moveBelow(...)` z-order call: a player mon renders on TOP and its back sprite is automatic
+ * for a PlayerPokemon via `loadAssets`, so no extra ordering flag is needed. `loadAssets` is
+ * fire-and-forget (the sprite pops in a frame late - fine for a renderer). Fully guarded.
+ */
+export function summonCoopPlayerField(fieldIndex: number, partySlot: number): void {
+  try {
+    const party = globalScene.getPlayerParty();
+    const incoming = party[partySlot];
+    const outgoing = party[fieldIndex];
+    // Guard: both party entries must exist and the slots must differ.
+    if (incoming == null || outgoing == null || partySlot === fieldIndex) {
+      return;
+    }
+    // Idempotency: if the correct mon is already on-field at this slot, nothing to do.
+    if (party[fieldIndex] === incoming) {
+      return;
+    }
+    // SWAP the guest's player party array EXACTLY like the host (switch-summon-phase.ts:223-224),
+    // so getPlayerParty() index alignment stays permutation-identical to the host next turn.
+    [party[fieldIndex], party[partySlot]] = [party[partySlot], party[fieldIndex]];
+    // Remove the outgoing mon from the field, side-effect-free (no FaintPhase / SwitchPhase).
+    try {
+      outgoing.leaveField(true, true, false);
+    } catch {
+      /* leaving the outgoing mon failed; continue and still place the incoming one */
+    }
+    // Place the incoming mon: reset summon data, (re)load its sprite (fire-and-forget; the back
+    // sprite is automatic for a PlayerPokemon), add it to the field, show its info + sprite, then
+    // field-setup (clears switchOutStatus so it reads as ON-FIELD). No moveBelow - the player mon
+    // renders on top.
+    incoming.resetSummonData();
+    void incoming.loadAssets(true);
+    globalScene.field.add(incoming);
+    incoming.showInfo();
+    incoming.setVisible(true);
+    incoming.getSprite()?.setVisible(true);
+    incoming.fieldSetup(true);
+    globalScene.updateFieldScale();
+  } catch {
+    // A malformed replacement mirror must never crash the guest's battle.
+  }
+}
+
+/**
  * GUEST: snap the live field + arena to the host's authoritative `checkpoint`. Applied
  * at a turn boundary. Conservative + fully guarded: corrects numeric state only, and a
  * per-mon failure is swallowed so one bad entry can't break the rest of the battle.
@@ -349,6 +493,12 @@ export function applyCoopCheckpoint(checkpoint: CoopBattleCheckpoint): void {
     // host's hp/status/stages for that bi (otherwise the numeric state writes onto the wrong, pre-swap
     // mon - Oracle ordering). Strictly enemy slots; side-effect-free; idempotent.
     reconcileCoopEnemyField(checkpoint.field);
+    // ...and the PLAYER field COMPOSITION too (#633 partner-death sync): drop any guest partner the
+    // host KOd this turn (it rides the checkpoint with fainted:true) AND mirror a host partner
+    // REPLACEMENT (a different species now at a player slot -> summon the matching member). Same
+    // BEFORE-the-numeric-apply ordering as the enemy reconcile so the freshly-summoned replacement
+    // RECEIVES the host's hp/status/stages for that bi. Strictly player slots; side-effect-free; idempotent.
+    reconcileCoopPlayerField(checkpoint.field);
     for (const mon of globalScene.getField(true)) {
       if (mon == null) {
         continue;
@@ -808,6 +958,11 @@ export function applyCoopFullSnapshot(snapshot: CoopFullBattleSnapshot): void {
     // below so the freshly-summoned switched-in mon is the one the snapshot's per-bi state lands on.
     // Side-effect-free, idempotent, enemy slots only.
     reconcileCoopEnemyField(snapshot.field);
+    // ...and the PLAYER-field COMPOSITION (#633 partner-death sync): drop any just-fainted partner
+    // (fainted:true) and mirror a host partner REPLACEMENT (a different species now at a player
+    // slot). Done BEFORE the per-mon heal below so the freshly-summoned replacement is the one the
+    // snapshot's per-bi state lands on. Side-effect-free, idempotent, player slots only.
+    reconcileCoopPlayerField(snapshot.field);
     const byIndex = new Map(
       globalScene
         .getField(true)

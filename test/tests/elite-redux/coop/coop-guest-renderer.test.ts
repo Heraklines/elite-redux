@@ -24,9 +24,11 @@
 import { getGameMode } from "#app/game-mode";
 import { globalScene } from "#app/global-scene";
 import * as coopEngine from "#data/elite-redux/coop/coop-battle-engine";
+import { CoopInteractionRelay } from "#data/elite-redux/coop/coop-interaction-relay";
 import {
   clearCoopRuntime,
   getCoopController,
+  getCoopInteractionRelay,
   getCoopRuntime,
   startLocalCoopSession,
 } from "#data/elite-redux/coop/coop-runtime";
@@ -38,6 +40,7 @@ import { GameModes } from "#enums/game-modes";
 import { MoveId } from "#enums/move-id";
 import { MoveUseMode } from "#enums/move-use-mode";
 import { SpeciesId } from "#enums/species-id";
+import { SwitchType } from "#enums/switch-type";
 import { TrainerSlot } from "#enums/trainer-slot";
 import { UiMode } from "#enums/ui-mode";
 import { EnemyPokemon, type Pokemon } from "#field/pokemon";
@@ -271,6 +274,182 @@ describe.skipIf(!RUN)("co-op GUEST = pure renderer - real engine (#633, TRACK-2 
     ]);
     expect(field[COOP_HOST_FIELD_INDEX].isActive(), "player host mon untouched by enemy reconcile").toBe(true);
     expect(field[COOP_GUEST_FIELD_INDEX].isActive(), "player guest mon untouched by enemy reconcile").toBe(true);
+  });
+
+  // (A) PLAYER-FAINT RENDER (#633 partner-death sync, HALF A): the PLAYER-side mirror of the
+  // enemy-field reconcile. In the authoritative double a co-op partner's mon (a player mon at bi 0/1)
+  // can FAINT on the host, but the guest's per-mon numeric apply only matches by bi and never REMOVES,
+  // so the just-fainted partner stays ALIVE on the guest forever. The host now serializes the PLAYER
+  // side SLOT-PRESENT (getPlayerField(false)), so a just-fainted partner rides the checkpoint with
+  // fainted:true; applyCoopCheckpoint -> reconcileCoopPlayerField removes it (side-effect-free, no
+  // FaintPhase) and the checksum converges. Idempotent on re-apply.
+  it("PLAYER-FAINT RENDER (#633): a host-KOd partner the guest still has ALIVE is removed + the checksum converges", async () => {
+    const field = await startCoopGuest();
+    // The two player leads on the double field. host = bi0, guest(partner) = bi1.
+    const hostMon = field[COOP_HOST_FIELD_INDEX];
+    const partnerMon = field[COOP_GUEST_FIELD_INDEX];
+    expect(hostMon.getBattlerIndex()).toBe(BattlerIndex.PLAYER);
+    expect(partnerMon.getBattlerIndex()).toBe(BattlerIndex.PLAYER_2);
+
+    // --- HOST authoritative truth: model the host's partner (bi1) fainting this turn. Zeroing hp makes
+    // it isFainted -> not isActive, so getField(true) drops it; but getPlayerField(false) (the new
+    // slot-present player capture) still CARRIES bi1 with fainted:true, which drives the removal.
+    partnerMon.hp = 0;
+    const hostCheckpoint = coopEngine.captureCoopCheckpoint();
+    const hostChecksum = coopEngine.captureCoopChecksum();
+    expect(hostCheckpoint).not.toBeNull();
+    // The checkpoint carries the dead partner as a fainted slot entry (HALF A's slot-present capture).
+    const bi1Entry = hostCheckpoint!.field.find(f => f.bi === BattlerIndex.PLAYER_2);
+    expect(bi1Entry, "host checkpoint carries the KOd partner as a fainted player slot entry").toBeDefined();
+    expect(bi1Entry?.fainted).toBe(true);
+    // The host's lead (bi0) is still alive and present in the checkpoint.
+    const bi0Entry = hostCheckpoint!.field.find(f => f.bi === BattlerIndex.PLAYER);
+    expect(bi0Entry?.fainted).toBe(false);
+    expect(hostChecksum).toMatch(/^[0-9a-f]{16}$/);
+
+    // --- GUEST divergence: the guest never resolved the faint, so on its field bi1 is still ALIVE.
+    // Restore its hp to model exactly the desync (host player field = {bi0}; guest = {bi0, bi1 alive}).
+    partnerMon.hp = partnerMon.getMaxHp();
+    expect(partnerMon.isActive(), "guest still has the host-KOd partner alive (the desync)").toBe(true);
+    const guestPlayerBefore = globalScene.getPlayerField(true).map(p => p.getBattlerIndex());
+    expect(guestPlayerBefore).toContain(BattlerIndex.PLAYER_2);
+    // The diverged guest checksum disagrees with the host's (different player field composition).
+    expect(coopEngine.captureCoopChecksum(), "guest desync detected before reconcile").not.toBe(hostChecksum);
+
+    // --- Apply the host's authoritative checkpoint: applyCoopCheckpoint runs reconcileCoopPlayerField,
+    // which removes the host-KOd partner from the guest's field (side-effect-free, no FaintPhase).
+    coopEngine.applyCoopCheckpoint(hostCheckpoint!);
+
+    // The guest's player field no longer contains bi1; it equals the host's player survivor set ({bi0}).
+    const guestPlayerAfter = globalScene.getPlayerField(true).map(p => p.getBattlerIndex());
+    expect(guestPlayerAfter, "the host-KOd partner is gone from the guest's field").not.toContain(
+      BattlerIndex.PLAYER_2,
+    );
+    expect(guestPlayerAfter).toEqual([BattlerIndex.PLAYER]);
+    expect(partnerMon.isActive(), "the removed partner is no longer active on the guest").toBe(false);
+    // The host's own mon (bi0) is untouched (it is alive on both sides).
+    expect(hostMon.isActive(), "the host's lead is untouched by the player reconcile").toBe(true);
+    // The per-turn checksum now MATCHES the host's: both hash the SAME survivor set {0,2,3}.
+    expect(coopEngine.captureCoopChecksum(), "checksum converges after the player-field reconcile").toBe(hostChecksum);
+
+    // --- IDEMPOTENT: re-applying the same host field must not double-remove or throw; bi1 is already
+    // off-field, bi0 stays. The checksum holds at the converged value.
+    expect(() => coopEngine.reconcileCoopPlayerField(hostCheckpoint!.field)).not.toThrow();
+    const guestPlayerAfter2 = globalScene.getPlayerField(true).map(p => p.getBattlerIndex());
+    expect(guestPlayerAfter2, "reconcile is idempotent on a second apply").toEqual([BattlerIndex.PLAYER]);
+    expect(coopEngine.captureCoopChecksum()).toBe(hostChecksum);
+  });
+
+  // (A2) PLAYER-FIELD RECONCILE never touches a partner the host reports ALIVE, nor enemy slots.
+  it("PLAYER-FIELD RECONCILE (#633): NEVER removes a partner the host reports alive, and NEVER touches enemy slots", async () => {
+    const field = await startCoopGuest();
+    // Both player leads alive on host AND guest: a no-op reconcile must leave the field untouched.
+    const hostCheckpoint = coopEngine.captureCoopCheckpoint();
+    expect(hostCheckpoint).not.toBeNull();
+    const playersBefore = globalScene.getPlayerField(true).map(p => p.getBattlerIndex());
+    expect(playersBefore).toEqual([BattlerIndex.PLAYER, BattlerIndex.PLAYER_2]);
+
+    coopEngine.reconcileCoopPlayerField(hostCheckpoint!.field);
+
+    // No player was removed (host reports both alive), and the two ENEMY mons are untouched.
+    expect(globalScene.getPlayerField(true).map(p => p.getBattlerIndex())).toEqual([
+      BattlerIndex.PLAYER,
+      BattlerIndex.PLAYER_2,
+    ]);
+    expect(field[COOP_HOST_FIELD_INDEX].isActive(), "host lead untouched by player reconcile").toBe(true);
+    expect(field[COOP_GUEST_FIELD_INDEX].isActive(), "partner mon untouched by player reconcile").toBe(true);
+    expect(
+      globalScene.getEnemyField(true).map(e => e.getBattlerIndex()),
+      "enemy slots untouched",
+    ).toEqual([BattlerIndex.ENEMY, BattlerIndex.ENEMY_2]);
+  });
+
+  // (B) PLAYER REPLACEMENT auto-pick (#633 partner-death sync, HALF B): when the GUEST's mon (bi1)
+  // faints, the host's FaintPhase queues a SwitchPhase(SWITCH, 1, ...). The host is the WATCHER for
+  // that guest-owned slot, but the authoritative guest is a pure renderer in CoopReplayTurnPhase and
+  // NEVER reaches SwitchPhase to relay a choice. In LOCKSTEP the host would await 300s then apply
+  // nothing (a stall + desync). HALF B makes the host AUTO-PICK a replacement from the OWNER's (guest's)
+  // bench and apply it locally - no await. This asserts the SwitchPhase unshifts a SwitchSummonPhase for
+  // the guest's bench mon WITHOUT calling awaitInteractionChoice.
+  it("PLAYER REPLACEMENT (#633, HALF B): the host auto-picks a guest bench replacement WITHOUT awaiting", async () => {
+    const field = await startCoopGuest();
+    // This is the HOST simulating the turn (the watcher of the guest-owned slot 1). Flip local role.
+    getCoopController()!.role = "host";
+
+    // Tag field ownership: bi0 = host's mon, bi1 = guest's (partner) mon.
+    field[COOP_HOST_FIELD_INDEX].coopOwner = "host";
+    field[COOP_GUEST_FIELD_INDEX].coopOwner = "guest";
+
+    // Give the GUEST a bench replacement (party slot 2, beyond the 2 on-field leads) of a distinct
+    // species, tagged guest-owned so the half-lock gate accepts it as a legal replacement.
+    const bench = globalScene.addPlayerPokemon(getPokemonSpecies(SpeciesId.PIKACHU), 5);
+    bench.coopOwner = "guest";
+    globalScene.getPlayerParty().push(bench);
+    const benchPartySlot = globalScene.getPlayerParty().indexOf(bench);
+    expect(benchPartySlot, "the bench mon is a real off-field party slot").toBeGreaterThanOrEqual(
+      globalScene.currentBattle.getBattlerCount(),
+    );
+
+    // Model the guest's mon (bi1) fainting: zero hp so SwitchPhase's revive/space guards pass and it
+    // proceeds to choose a replacement for the empty slot.
+    field[COOP_GUEST_FIELD_INDEX].hp = 0;
+
+    // Spy: the host must NOT await the guest's relayed choice in authoritative mode (the 300s stall).
+    const awaitSpy = vi.spyOn(CoopInteractionRelay.prototype, "awaitInteractionChoice");
+    const relay = getCoopInteractionRelay();
+    expect(relay, "a live interaction relay exists").not.toBeNull();
+    const unshiftSpy = vi.spyOn(globalScene.phaseManager, "unshiftNew");
+
+    // Drive the host's SwitchPhase for the guest-owned slot 1 (exactly what FaintPhase queues).
+    const switchPhase = game.scene.phaseManager.create(
+      "SwitchPhase",
+      SwitchType.SWITCH,
+      COOP_GUEST_FIELD_INDEX,
+      true,
+      false,
+    );
+    switchPhase.start();
+
+    // The host did NOT await the guest's relayed choice (no 300s stall) ...
+    expect(awaitSpy, "authoritative host does not await the guest's relayed switch choice").not.toHaveBeenCalled();
+    // ... and it auto-unshifted a SwitchSummonPhase for the guest's bench mon at the correct slot.
+    const switchSummon = unshiftSpy.mock.calls.find(([name]) => name === "SwitchSummonPhase");
+    expect(switchSummon, "the host auto-picked a replacement (queued a SwitchSummonPhase)").toBeDefined();
+    // SwitchSummonPhase args: (switchType, fieldIndex, slotIndex, doReturn). The slotIndex is the
+    // guest's bench party slot; the fieldIndex is the guest's field slot (1).
+    expect(switchSummon?.[2], "the replacement fills the guest's field slot (1)").toBe(COOP_GUEST_FIELD_INDEX);
+    expect(switchSummon?.[3], "the auto-picked replacement is the guest's bench party slot").toBe(benchPartySlot);
+  });
+
+  // (B2) The auto-pick honors OWNERSHIP: it never pulls the HOST's bench into the guest's slot.
+  it("PLAYER REPLACEMENT (#633, HALF B): the auto-pick refuses a host-owned bench for a guest slot", async () => {
+    const field = await startCoopGuest();
+    getCoopController()!.role = "host";
+    field[COOP_HOST_FIELD_INDEX].coopOwner = "host";
+    field[COOP_GUEST_FIELD_INDEX].coopOwner = "guest";
+
+    // The only bench mon belongs to the HOST half - it is NOT a legal replacement for the guest's slot.
+    const hostBench = globalScene.addPlayerPokemon(getPokemonSpecies(SpeciesId.PIKACHU), 5);
+    hostBench.coopOwner = "host";
+    globalScene.getPlayerParty().push(hostBench);
+
+    field[COOP_GUEST_FIELD_INDEX].hp = 0;
+    const unshiftSpy = vi.spyOn(globalScene.phaseManager, "unshiftNew");
+    const awaitSpy = vi.spyOn(CoopInteractionRelay.prototype, "awaitInteractionChoice");
+
+    const switchPhase = game.scene.phaseManager.create(
+      "SwitchPhase",
+      SwitchType.SWITCH,
+      COOP_GUEST_FIELD_INDEX,
+      true,
+      false,
+    );
+    switchPhase.start();
+
+    // No await (still authoritative), and NO SwitchSummonPhase (the host has no legal guest bench mon).
+    expect(awaitSpy, "still no await in authoritative mode").not.toHaveBeenCalled();
+    const switchSummon = unshiftSpy.mock.calls.find(([name]) => name === "SwitchSummonPhase");
+    expect(switchSummon, "no replacement queued when the only bench is the wrong owner's half").toBeUndefined();
   });
 
   it("SOLO guard: outside co-op TurnStartPhase resolves normally (no divert, MovePhase pushed)", async () => {

@@ -1,6 +1,6 @@
 import { globalScene } from "#app/global-scene";
-import { getCoopController, getCoopInteractionRelay } from "#data/elite-redux/coop/coop-runtime";
-import { coopOwnerOfFieldIndex } from "#data/elite-redux/coop/coop-session";
+import { getCoopController, getCoopInteractionRelay, getCoopNetcodeMode } from "#data/elite-redux/coop/coop-runtime";
+import { coopOwnerOfFieldIndex, coopSwitchBlocksMon } from "#data/elite-redux/coop/coop-session";
 import { SwitchType } from "#enums/switch-type";
 import { UiMode } from "#enums/ui-mode";
 import { BattlePhase } from "#phases/battle-phase";
@@ -81,7 +81,28 @@ export class SwitchPhase extends BattlePhase {
     if (coopController != null && coopRelay != null) {
       const seq = (globalScene.currentBattle.turn ?? 0) * 4 + this.fieldIndex;
       if (coopOwnerOfFieldIndex(this.fieldIndex) !== coopController.role) {
-        // WATCHER: do not open the picker; apply the owner's relayed replacement.
+        // AUTHORITATIVE netcode (#633 partner-death sync, HALF B): the WATCHER here is the HOST
+        // simulating the whole turn, and the slot's OWNER is the GUEST - but the authoritative guest
+        // is a pure renderer in CoopReplayTurnPhase and NEVER reaches its own SwitchPhase, so it can
+        // never relay a choice. Awaiting it would stall the host for COOP_SWITCH_WAIT_MS (300s) then
+        // apply nothing, leaving the slot empty (a hang + desync). Instead AUTO-PICK a replacement
+        // from the owner's party half and apply it LOCALLY, so the host's post-turn checkpoint shows
+        // the new mon at this slot - which HALF A's reconcileCoopPlayerField then renders on the guest.
+        // (LOCKSTEP is unchanged: both clients run the real SwitchPhase and fall through to the relay.)
+        if (getCoopNetcodeMode() === "authoritative") {
+          const slotIndex = this.coopAutoPickReplacement();
+          if (slotIndex >= globalScene.currentBattle.getBattlerCount() && slotIndex < 6) {
+            globalScene.phaseManager.unshiftNew(
+              "SwitchSummonPhase",
+              this.switchType,
+              fieldIndex,
+              slotIndex,
+              this.doReturn,
+            );
+          }
+          return super.end();
+        }
+        // LOCKSTEP WATCHER: do not open the picker; apply the owner's relayed replacement.
         void coopRelay.awaitInteractionChoice(seq, COOP_SWITCH_WAIT_MS).then(res => {
           const slotIndex = res?.choice ?? -1;
           if (slotIndex >= globalScene.currentBattle.getBattlerCount() && slotIndex < 6) {
@@ -126,6 +147,27 @@ export class SwitchPhase extends BattlePhase {
         globalScene.ui.setMode(UiMode.MESSAGE).then(() => super.end());
       },
       PartyUiHandler.FilterNonFainted,
+    );
+  }
+
+  /**
+   * Co-op AUTHORITATIVE (#633 partner-death sync, HALF B): auto-pick a replacement party slot for a
+   * fainted field slot whose OWNER is the partner the host can't await. Mirrors exactly the choices
+   * the owner's interactive picker would allow: the FIRST party member that is a BENCH slot (index
+   * `>= getBattlerCount()`, i.e. not already on-field), is allowed in battle (non-fainted, same as
+   * the picker's `FilterNonFainted`), and belongs to the slot's OWNER half (same `coopSwitchBlocksMon`
+   * gate the picker enforces, so the host never pulls the host's own bench into the guest's slot).
+   * Returns the chosen party slot, or -1 when the owner has no legal bench replacement (the caller
+   * then leaves the slot empty exactly as a no-reply relay would). No await, no menu, no RNG.
+   */
+  private coopAutoPickReplacement(): number {
+    const battlerCount = globalScene.currentBattle.getBattlerCount();
+    const party = globalScene.getPlayerParty();
+    // Ownership is keyed off the ORIGINAL slot (this.fieldIndex), matching the watcher gate above -
+    // the override-to-0 `fieldIndex` only affects where the summon lands, not whose half is legal.
+    return party.findIndex(
+      (mon, i) =>
+        i >= battlerCount && i < 6 && mon.isAllowedInBattle() && !coopSwitchBlocksMon(this.fieldIndex, mon.coopOwner),
     );
   }
 }
