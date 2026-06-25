@@ -1,0 +1,282 @@
+----- BUG REPORT (in-game) -----
+version:  1.11.19
+url:      https://elite-redux.pages.dev/
+ua:       Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36
+mode:     0  wave:66  difficulty:youngster
+seed:     UFsJSyrOLeGLGgIweiW0mV15
+party:    Arachtres(L53 48/171), Pangoro(L56 145/181), Wigglytuff(L55 51/211), Pidgeot(L53 153/153), Weezing(L53 160/160), Venusaur(L56 165/175)
+
+----- DESCRIPTION -----
+Web Shot does not set up sticky web as per move description.
+
+----- CONSOLE -----
+[06:26:28.612] LOG: Applied Carbos (enemy)
+[06:26:28.612] LOG: Applied Calcium (enemy)
+[06:26:28.612] LOG: Applied Calcium (enemy)
+[06:26:28.612] LOG: Applied Carbos (enemy)
+[06:26:28.612] LOG: Applied Carbos (enemy)
+[06:26:28.711] LOG: %cStart Phase EncounterPhase color:green;
+[06:26:28.714] LOG: Pokemon: Foe Glimmora | Species ID: 970 | Level: 47 | Nature: Brave (+Atk/-Spd)
+[06:26:28.714] LOG: Stats (IVs): HP: 144 (21), Atk: 70 (15), Def: 100 (24), Spatk: 150 (23), Spdef: 94 (13), Spd: 85 (20)
+[06:26:28.714] LOG: Ability: Sturdy | Passive Ability: Toxic Debris 
+[06:26:28.714] LOG: Moveset: ["Gem Missile","Venoshock","Substitute","Karma"]
+[06:26:28.714] LOG: Pokemon: Foe Golbat | Species ID: 42 | Level: 47 | Nature: Careful (+SpDef/-SpAtk)
+[06:26:28.714] LOG: Stats (IVs): HP: 141 (29), Atk: 86 (14), Def: 84 (29), Spatk: 72 (13), Spdef: 97 (28), Spd: 92 (6)
+[06:26:28.714] LOG: Ability: Scavenger | Passive Ability: Sniper 
+[06:26:28.714] LOG: Moveset: ["Dual Wingbeat","Super Fang","Poison Fang","Giga Drain"]
+[06:26:28.714] LOG: Pokemon: Foe Nidoqueen | Species ID: 31 | Level: 47 | Nature: Docile (-)
+[06:26:28.714] LOG: Stats (IVs): HP: 150 (18), Atk: 83 (17), Def: 100 (30), Spatk: 110 (21), Spdef: 87 (23), Spd: 107 (17)
+[06:26:28.714] LOG: Ability: Thick Fat | Passive Ability: Poison Point 
+[06:26:28.714] LOG: Moveset: ["Bad Egg","Guillotine","Flatter","Calm Mind"]
+[06:26:28.714] LOG: Pokemon: Foe Toxapex | Species ID: 748 | Level: 50 | Nature: Lax (+Def/-SpDef)
+[06:26:28.714] LOG: Stats (IVs): HP: 141 (12), Atk: 79 (22), Def: 188 (27), Spatk: 76 (27), Spdef: 135 (8), Spd: 50 (21)
+[06:26:28.714] LOG: Ability: Fort Knox | Passive Ability: Poison Touch 
+[06:26:28.714] LOG: Moveset: ["Venom Bolt","Water Pulse","Toxic Spikes","Baneful Bunker"]
+[06:26:28.715] LOG: Pokemon: Foe Muk | Species ID: 2089 | Level: 50 | Nature: Naive (+Spd/-SpDef)
+[06:26:28.715] LOG: Stats (IVs): HP: 178 (26), Atk: 121 (22), Def: 95 (11), Spatk: 78 (16), Spdef: 111 (19), Spd: 72 (10)
+[06:26:28.715] LOG: Ability: Regenerator | Passive Ability: Liquified 
+[06:26:28.715] LOG: Moveset: ["Sucker Punch","Secret Power","Poison Fang","Karma"]
+[06:26:28.715] LOG: Pokemon: Foe Salazzle | Species ID: 758 | Level: 52 | Nature: Naive (+Spd/-SpDef)
+[06:26:28.715] LOG: Stats (IVs): HP: 136 (8), Atk: 84 (25), Def: 71 (8), Spatk: 129 (18), Spdef: 74 (31), Spd: 163 (20)
+[06:26:28.715] LOG: Ability: Merciless | Passive Ability: Corrosion 
+[06:26:28.715] LOG: Moveset: ["Scorched Earth","Sludge Wave","Metronome","Torment"]
+[06:26:29.003] LOG: Generated AI funcs
+[06:26:29.003] LOG: Applied Calcium (enemy)
+[06:26:29.003] LOG: Applied Zinc (enemy)
+[06:26:29.003] LOG: Applied Carbos (enemy)
+[06:26:29.003] LOG: Applied Calcium (enemy)
+[06:26:29.004] LOG: Applied Calcium (enemy)
+[06:26:29.004] LOG: Applied Carbos (enemy)
+[06:26:29.004] LOG: Applied Carbos (enemy)
+[06:26:29.004] LOG: Wave Seed: µ»´§©¹§«r¯sw 66
+[06:26:29.509] LOG: Team Skull Admin Plumeria
+[06:26:29.509] LOG: Dialogue dialogue:plumeria.encounter.3 skipped
+[06:26:29.585] LOG: Team Skull Admin Plumeria
+[06:26:30.390] LOG: %cStart Phase SummonPhase color:green;
+[06:26:30.391] LOG: Plumeria
+[06:26:30.710] LOG: Applied Calcium (enemy)
+[06:26:30.710] LOG: Applied Zinc (enemy)
+[06:26:30.710] LOG: Applied Carbos (enemy)
+[06:26:30.710] LOG: Applied Calcium (enemy)
+[06:26:30.710] LOG: Applied Calcium (enemy)
+[06:26:30.710] LOG: Applied Carbos (enemy)
+[06:26:30.710] LOG: Applied Carbos (enemy)
+[06:26:31.022] LOG: %cStart Phase SummonPhase color:green;
+[06:26:31.383] LOG: Applied Protein 
+[06:26:31.384] LOG: Applied Zinc 
+[06:26:31.702] LOG: %cStart Phase InitEncounterPhase color:green;
+[06:26:31.703] LOG: %cStart Phase PostSummonPhase color:green;
+[06:26:31.703] LOG: Ran PSP for: Glimmora
+[06:26:31.704] LOG: %cStart Phase PostSummonPhase color:green;
+[06:26:31.704] LOG: %cStart Phase PostSummonPhase color:green;
+[06:26:31.704] LOG: %cStart Phase PostSummonPhase color:green;
+[06:26:31.704] LOG: Ran PSP for: Wigglytuff
+[06:26:31.704] LOG: %cStart Phase PostSummonPhase color:green;
+[06:26:31.704] LOG: %cStart Phase PostSummonPhase color:green;
+[06:26:31.704] LOG: %cStart Phase TurnInitPhase color:green;
+[06:26:31.704] LOG: %cStart Phase CommandPhase color:green;
+[06:26:33.613] LOG: Move: SING Move targets: {"targets":[2],"multiple":false} 
+Player Pokemon: Wigglytuff
+[06:26:33.614] LOG: %cStart Phase EnemyCommandPhase color:green;
+[06:26:33.616] LOG: Applied Hard Stone (enemy)
+[06:26:33.617] LOG: Battle Seed: tSOp6O2aCwXI3Q59
+[06:26:33.618] LOG: Move Pool: ["Gem Missile","Venoshock","Substitute","Karma"]
+[06:26:33.618] LOG: Move Scores: [12,51,5,0]
+[06:26:33.618] LOG: Sorted Move Pool: ["Venoshock","Gem Missile","Substitute","Karma"]
+[06:26:33.618] LOG: Chosen Move: Venoshock
+[06:26:33.618] LOG: %cStart Phase TurnStartPhase color:green;
+[06:26:33.619] LOG: %cStart Phase MovePhase color:green;
+[06:26:33.619] LOG: %cUser: Glimmora
+Move: VENOSHOCK
+Use Mode: NORMAL color:orchid
+[06:26:33.621] LOG: %cStart Phase MessagePhase color:green;
+[06:26:33.890] LOG: %cStart Phase MoveEffectPhase color:green;
+[06:26:34.592] LOG: crit stage: +0
+[06:26:34.593] LOG: Move: Venoshock | Base damage: 42.96969696969697 | Power: 65 | Source attack: 150 | Target defense: 99
+[06:26:34.593] LOG: Move: Venoshock | Attack damage: 125
+[06:26:34.594] LOG: %cStart Phase DamageAnimPhase color:green;
+[06:26:34.606] LOG: %cStart Phase MessagePhase color:green;
+[06:26:35.099] LOG: %cStart Phase MoveEndPhase color:green;
+[06:26:35.099] LOG: %cStart Phase MovePhase color:green;
+[06:26:35.099] LOG: %cUser: Wigglytuff
+Move: SING
+Use Mode: NORMAL color:orchid
+[06:26:35.100] LOG: %cStart Phase MessagePhase color:green;
+[06:26:35.342] LOG: %cStart Phase MoveEffectPhase color:green;
+[06:26:36.600] LOG: %cStart Phase ObtainStatusEffectPhase color:green;
+[06:26:36.912] LOG: %cStart Phase MessagePhase color:green;
+[06:26:37.419] LOG: %cStart Phase MoveEndPhase color:green;
+[06:26:37.419] LOG: %cStart Phase CheckInterludePhase color:green;
+[06:26:37.419] LOG: %cStart Phase WeatherEffectPhase color:green;
+[06:26:37.419] LOG: %cStart Phase PositionalTagPhase color:green;
+[06:26:37.419] LOG: %cStart Phase BerryPhase color:green;
+[06:26:37.419] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[06:26:37.420] LOG: %cStart Phase TurnEndPhase color:green;
+[06:26:37.420] LOG: %cStart Phase TurnInitPhase color:green;
+[06:26:37.420] LOG: %cStart Phase CommandPhase color:green;
+[06:26:44.499] LOG: %cStart Phase EnemyCommandPhase color:green;
+[06:26:44.501] LOG: Applied Hard Stone (enemy)
+[06:26:44.502] LOG: Battle Seed: tSOp6O2aCwXI3Q59
+[06:26:44.502] LOG: Move Pool: ["Venoshock"]
+[06:26:44.502] LOG: Move Scores: [51]
+[06:26:44.502] LOG: Sorted Move Pool: ["Venoshock"]
+[06:26:44.502] LOG: Chosen Move: Venoshock
+[06:26:44.502] LOG: %cStart Phase TurnStartPhase color:green;
+[06:26:44.502] LOG: %cStart Phase SwitchSummonPhase color:green;
+[06:26:44.935] LOG: Applied Protein 
+[06:26:44.935] LOG: Applied Zinc 
+[06:26:44.997] WARN: cry/10003 not found
+[06:26:45.247] LOG: %cStart Phase PostSummonPhase color:green;
+[06:26:45.248] LOG: Ran PSP for: Arachtres
+[06:26:45.248] LOG: %cStart Phase PostSummonPhase color:green;
+[06:26:45.248] LOG: %cStart Phase PostSummonPhase color:green;
+[06:26:45.248] LOG: %cStart Phase ShowAbilityPhase color:green;
+[06:26:45.629] LOG: %cStart Phase StatStageChangePhase color:green;
+[06:26:46.074] LOG: %cStart Phase MessagePhase color:green;
+[06:26:46.636] LOG: %cStart Phase HideAbilityPhase color:green;
+[06:26:46.692] LOG: %cStart Phase MovePhase color:green;
+[06:26:46.692] LOG: %cUser: Glimmora
+Move: VENOSHOCK
+Use Mode: NORMAL color:orchid
+[06:26:46.692] LOG: %cStart Phase MessagePhase color:green;
+[06:26:47.220] LOG: %cStart Phase CommonAnimPhase color:green;
+[06:26:47.532] LOG: %cStart Phase MoveEndPhase color:green;
+[06:26:47.532] LOG: %cStart Phase CheckInterludePhase color:green;
+[06:26:47.532] LOG: %cStart Phase WeatherEffectPhase color:green;
+[06:26:47.532] LOG: %cStart Phase PositionalTagPhase color:green;
+[06:26:47.532] LOG: %cStart Phase BerryPhase color:green;
+[06:26:47.533] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[06:26:47.533] LOG: %cStart Phase TurnEndPhase color:green;
+[06:26:47.533] LOG: %cStart Phase TurnInitPhase color:green;
+[06:26:47.533] LOG: %cStart Phase CommandPhase color:green;
+[06:26:48.616] LOG: Move: WEB_SHOT Move targets: {"targets":[2],"multiple":false} 
+Player Pokemon: Arachtres
+[06:26:48.617] LOG: %cStart Phase EnemyCommandPhase color:green;
+[06:26:48.618] LOG: Applied Hard Stone (enemy)
+[06:26:48.620] LOG: Battle Seed: tSOp6O2aCwXI3Q59
+[06:26:48.621] LOG: Move Pool: ["Gem Missile","Venoshock","Substitute","Karma"]
+[06:26:48.621] LOG: Move Scores: [30,9.375,5,0]
+[06:26:48.621] LOG: Sorted Move Pool: ["Gem Missile","Venoshock","Substitute","Karma"]
+[06:26:48.621] LOG: Chosen Move: Gem Missile
+[06:26:48.621] LOG: %cStart Phase TurnStartPhase color:green;
+[06:26:48.621] LOG: %cStart Phase MovePhase color:green;
+[06:26:48.621] LOG: %cUser: Glimmora
+Move: GEM_MISSILE
+Use Mode: NORMAL color:orchid
+[06:26:48.621] LOG: %cStart Phase MessagePhase color:green;
+[06:26:49.144] LOG: %cStart Phase CommonAnimPhase color:green;
+[06:26:49.456] LOG: %cStart Phase MoveEndPhase color:green;
+[06:26:49.456] LOG: %cStart Phase MovePhase color:green;
+[06:26:49.456] LOG: %cUser: Arachtres
+Move: WEB_SHOT
+Use Mode: NORMAL color:orchid
+[06:26:49.457] LOG: %cStart Phase MessagePhase color:green;
+[06:26:49.713] LOG: %cStart Phase MoveEffectPhase color:green;
+[06:26:50.304] LOG: crit stage: +0
+[06:26:50.305] LOG: Applied X Attack 
+[06:26:50.305] LOG: Move: Web Shot | Base damage: 61.508 | Power: 75 | Source attack: 171 | Target defense: 100
+[06:26:50.305] LOG: Move: Web Shot | Attack damage: 89
+[06:26:50.306] LOG: %cStart Phase DamageAnimPhase color:green;
+[06:26:50.318] LOG: %cStart Phase MessagePhase color:green;
+[06:26:50.776] LOG: %cStart Phase MessagePhase color:green;
+[06:26:51.283] LOG: %cStart Phase ShowAbilityPhase color:green;
+[06:26:51.658] LOG: %cStart Phase MessagePhase color:green;
+[06:26:52.366] LOG: %cStart Phase HideAbilityPhase color:green;
+[06:26:52.422] LOG: %cStart Phase MoveEndPhase color:green;
+[06:26:52.422] LOG: %cStart Phase CheckInterludePhase color:green;
+[06:26:52.422] LOG: %cStart Phase WeatherEffectPhase color:green;
+[06:26:52.422] LOG: %cStart Phase PositionalTagPhase color:green;
+[06:26:52.422] LOG: %cStart Phase BerryPhase color:green;
+[06:26:52.423] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[06:26:52.423] LOG: %cStart Phase TurnEndPhase color:green;
+[06:26:52.423] LOG: %cStart Phase TurnInitPhase color:green;
+[06:26:52.423] LOG: %cStart Phase CommandPhase color:green;
+[06:26:54.957] LOG: Move: WEB_SHOT Move targets: {"targets":[2],"multiple":false} 
+Player Pokemon: Arachtres
+[06:26:54.958] LOG: %cStart Phase EnemyCommandPhase color:green;
+[06:26:54.960] LOG: %cStart Phase TurnStartPhase color:green;
+[06:26:54.960] LOG: %cStart Phase SwitchSummonPhase color:green;
+[06:26:54.961] LOG: Plumeria
+[06:26:55.596] LOG: Plumeria
+[06:26:55.763] LOG: Applied Carbos (enemy)
+[06:26:55.764] LOG: Applied Carbos (enemy)
+[06:26:55.764] LOG: Applied Calcium (enemy)
+[06:26:55.764] LOG: Applied Calcium (enemy)
+[06:26:55.764] LOG: Applied Carbos (enemy)
+[06:26:55.764] LOG: Applied Calcium (enemy)
+[06:26:55.764] LOG: Applied Zinc (enemy)
+[06:26:56.083] LOG: %cStart Phase PostSummonPhase color:green;
+[06:26:56.083] LOG: Ran PSP for: Salazzle
+[06:26:56.083] LOG: %cStart Phase PostSummonPhase color:green;
+[06:26:56.083] LOG: %cStart Phase PostSummonPhase color:green;
+[06:26:56.083] LOG: %cStart Phase ShowAbilityPhase color:green;
+[06:26:56.465] LOG: %cStart Phase HideAbilityPhase color:green;
+[06:26:56.527] LOG: %cStart Phase MovePhase color:green;
+[06:26:56.527] LOG: %cUser: Arachtres
+Move: WEB_SHOT
+Use Mode: NORMAL color:orchid
+[06:26:56.528] LOG: %cStart Phase MessagePhase color:green;
+[06:26:56.784] LOG: %cStart Phase MoveEffectPhase color:green;
+[06:26:56.784] LOG: Battle Seed: tSOp6O2aCwXI3Q59
+[06:26:57.375] LOG: crit stage: +0
+[06:26:57.375] LOG: Applied X Attack 
+[06:26:57.375] LOG: Move: Web Shot | Base damage: 85.81408450704227 | Power: 75 | Source attack: 171 | Target defense: 71
+[06:26:57.376] LOG: Move: Web Shot | Attack damage: 31
+[06:26:57.376] LOG: %cStart Phase DamageAnimPhase color:green;
+[06:26:57.389] LOG: %cStart Phase MessagePhase color:green;
+[06:26:57.895] LOG: %cStart Phase MoveEndPhase color:green;
+[06:26:57.895] LOG: %cStart Phase CheckInterludePhase color:green;
+[06:26:57.895] LOG: %cStart Phase WeatherEffectPhase color:green;
+[06:26:57.895] LOG: %cStart Phase PositionalTagPhase color:green;
+[06:26:57.895] LOG: %cStart Phase BerryPhase color:green;
+[06:26:57.896] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[06:26:57.896] LOG: %cStart Phase TurnEndPhase color:green;
+[06:26:57.897] LOG: %cStart Phase TurnInitPhase color:green;
+[06:26:57.897] LOG: %cStart Phase CommandPhase color:green;
+[06:27:00.806] WARN: cry/10003 not found
+[06:27:34.757] LOG: Move: WEB_SHOT Move targets: {"targets":[2],"multiple":false} 
+Player Pokemon: Arachtres
+[06:27:34.758] LOG: %cStart Phase EnemyCommandPhase color:green;
+[06:27:34.761] LOG: Battle Seed: tSOp6O2aCwXI3Q59
+[06:27:34.761] WARN: BattlerTag TORMENT is missing a score!
+[06:27:34.762] WARN: BattlerTag TORMENT is missing a score!
+[06:27:34.762] LOG: Move Pool: ["Scorched Earth","Sludge Wave","Metronome","Torment"]
+[06:27:34.762] LOG: Move Scores: [57,14.25,0,0]
+[06:27:34.762] LOG: Sorted Move Pool: ["Scorched Earth","Sludge Wave","Metronome","Torment"]
+[06:27:34.762] LOG: Chosen Move: Scorched Earth
+[06:27:34.762] LOG: %cStart Phase TurnStartPhase color:green;
+[06:27:34.763] LOG: %cStart Phase MovePhase color:green;
+[06:27:34.763] LOG: %cUser: Salazzle
+Move: SCORCHED_EARTH
+Use Mode: NORMAL color:orchid
+[06:27:34.763] LOG: %cStart Phase MessagePhase color:green;
+[06:27:35.056] LOG: %cStart Phase MoveEffectPhase color:green;
+[06:27:35.438] LOG: crit stage: +0
+[06:27:35.439] LOG: Move: Scorched Earth | Base damage: 48.26606741573034 | Power: 70 | Source attack: 129 | Target defense: 89
+[06:27:35.439] LOG: Move: Scorched Earth | Attack damage: 123
+[06:27:35.440] LOG: %cStart Phase DamageAnimPhase color:green;
+[06:27:35.452] LOG: %cStart Phase MessagePhase color:green;
+[06:27:35.945] LOG: %cStart Phase ShowAbilityPhase color:green;
+[06:27:36.327] LOG: %cStart Phase HideAbilityPhase color:green;
+[06:27:36.390] LOG: %cStart Phase MoveEndPhase color:green;
+[06:27:36.390] LOG: %cStart Phase MovePhase color:green;
+[06:27:36.390] LOG: %cUser: Arachtres
+Move: WEB_SHOT
+Use Mode: NORMAL color:orchid
+[06:27:36.390] LOG: %cStart Phase MessagePhase color:green;
+[06:27:36.646] LOG: %cStart Phase MoveEffectPhase color:green;
+[06:27:37.237] LOG: crit stage: +0
+[06:27:37.238] LOG: Applied X Attack 
+[06:27:37.238] LOG: Move: Web Shot | Base damage: 85.81408450704227 | Power: 75 | Source attack: 171 | Target defense: 71
+[06:27:37.238] LOG: Move: Web Shot | Attack damage: 45
+[06:27:37.238] LOG: %cStart Phase DamageAnimPhase color:green;
+[06:27:37.252] LOG: %cStart Phase MessagePhase color:green;
+[06:27:37.758] LOG: %cStart Phase MoveEndPhase color:green;
+[06:27:37.758] LOG: %cStart Phase CheckInterludePhase color:green;
+[06:27:37.758] LOG: %cStart Phase WeatherEffectPhase color:green;
+[06:27:37.758] LOG: %cStart Phase PositionalTagPhase color:green;
+[06:27:37.758] LOG: %cStart Phase BerryPhase color:green;
+[06:27:37.758] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[06:27:37.758] LOG: %cStart Phase TurnEndPhase color:green;
+[06:27:37.759] LOG: %cStart Phase TurnInitPhase color:green;
+[06:27:37.759] LOG: %cStart Phase CommandPhase color:green;
