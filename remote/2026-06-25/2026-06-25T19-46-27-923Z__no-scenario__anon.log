@@ -1,0 +1,49 @@
+url:      https://elite-redux-staging.pages.dev/
+build:    mqtvxj3d-478j
+mode:     6  wave:?
+seed:     gEuwhjsgpL2J0xC5e1jUppFR
+party:    
+enemy:    
+
+----- COMMENT -----
+coop test, regression
+
+----- CONSOLE -----
+[19:19:19.589] LOG: %c %c %c %c %c Phaser v3.90.0 (WebGL | Web Audio) %c https://phaser.io/v390 background: #ff0000 background: #ffff00 background: #00ff00 background: #00ffff color: #ffffff; background: #000000 background: transparent
+[19:19:21.624] LOG: [ER] build mqtvxj3d-478j
+[19:19:22.046] LOG: [dev-tools] loaded — 321 scenarios + Send Logs button
+[19:45:03.692] DEBUG: Destroying loading scene
+[19:45:03.692] DEBUG: Destroyed loading scene
+[19:45:04.145] LOG: Seed: gEuwhjsgpL2J0xC5e1jUppFR
+[19:45:04.145] LOG: Wave Seed: gEuwhjsgpL2J0xC5e1jUppFR 0
+[19:45:15.736] LOG: %cStart Phase LoginPhase color:green;
+[19:45:16.112] LOG: Client Session: ik7bOQS2QVlvW9c4J4Y87MY8J86wp0TR
+[19:45:16.806] DEBUG: Using cached system data
+[19:45:17.067] LOG: %cStart Phase TitlePhase color:green;
+[19:45:17.068] LOG: Getting Session Slot id: %d 4
+[19:45:17.099] LOG: use seasonal splash messages true
+[19:45:17.099] LOG: Adding 2 Pride Month splash messages (weight: x15)
+[19:45:30.479] WARN: [coop-fp] MISMATCH sections=movesName,abilitiesName - movesName local=fad7fe8932ec09a1(1107) peer=30e2bf626b99790e(1107) abilitiesName local=1412a816005397a3(1046) peer=1670a4f3df00cb38(1046)
+[19:45:32.546] LOG: [coop-launch] title challenge-gate: role=host isCoopGuest=false -> SelectChallengePhase
+[19:45:32.548] LOG: %cStart Phase SelectChallengePhase color:green;
+[19:45:34.861] LOG: %cStart Phase SelectStarterPhase color:green;
+[19:45:34.863] LOG: [coop-launch] startCoopSelect role=host partnerConnected=true partnerReady=false
+[19:45:47.373] WARN: cry/1 not found
+[19:45:50.289] WARN: cry/21 not found
+[19:45:55.786] LOG: [coop-runconfig] startRun role=host willBroadcast=true difficulty=elite
+[19:45:55.786] LOG: [coop-runconfig] host broadcast difficulty=elite netcode=authoritative (role=host)
+[19:45:55.787] LOG: [coop-launch] proceedIfReady launched=false localTeam=0 bothReady=false role=host partnerReady=false
+[19:45:55.790] LOG: [coop-launch] local team locked in: 3 mons, role=host
+[19:45:55.791] LOG: [coop-launch] proceedIfReady launched=false localTeam=3 bothReady=false role=host partnerReady=false
+[19:45:55.791] LOG: [coop-launch] proceedIfReady launched=false localTeam=3 bothReady=false role=host partnerReady=false
+[19:45:55.791] LOG: [coop-launch] local ready, partner NOT ready -> waiting screen
+[19:45:55.801] LOG: [coop-launch] proceedIfReady launched=false localTeam=3 bothReady=false role=host partnerReady=false
+[19:45:55.802] LOG: [coop-launch] proceedIfReady launched=false localTeam=3 bothReady=true role=host partnerReady=true
+[19:45:55.804] LOG: [coop-launch] launchCoopMergedParty role=host merged=5 slot=4
+[19:45:55.804] LOG: [coop-launch] host: opening SAVE_SLOT picker
+[19:45:55.849] LOG: Getting Session Slot id: %d 0
+[19:45:55.866] LOG: Getting Session Slot id: %d 1
+[19:45:55.877] LOG: Getting Session Slot id: %d 2
+[19:45:55.891] LOG: Getting Session Slot id: %d 3
+[19:45:55.899] LOG: Getting Session Slot id: %d 4
+[19:45:55.909] LOG: Getting Session Slot id: %d 0
