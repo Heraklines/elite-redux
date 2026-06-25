@@ -18,6 +18,7 @@ import {
 } from "#data/elite-redux/coop/coop-partner-ai";
 import { getCoopBattleStreamer, getCoopBattleSync, getCoopController } from "#data/elite-redux/coop/coop-runtime";
 import { coopOwnerOfFieldIndex } from "#data/elite-redux/coop/coop-session";
+import type { SerializedCommand } from "#data/elite-redux/coop/coop-transport";
 import { AbilityId } from "#enums/ability-id";
 import { ArenaTagSide } from "#enums/arena-tag-side";
 import { ArenaTagType } from "#enums/arena-tag-type";
@@ -240,9 +241,16 @@ export class CommandPhase extends FieldPhase {
     );
     const moveset = partner.getMoveset();
     const moveSlots = moveset.map((m, i) => (m.isUsable(partner, false, true)[0] ? i : -1)).filter(i => i >= 0);
-    void sync
-      .requestPartnerCommand(this.fieldIndex, globalScene.currentBattle.turn, moveSlots)
-      .then(cmd => apply((cmd && applyWiredPartnerCommand(partner, cmd)) || fallback()));
+    void sync.requestPartnerCommand(this.fieldIndex, globalScene.currentBattle.turn, moveSlots).then(cmd => {
+      // A relayed BALL / RUN (the partner threw a Poke Ball or fled) is applied
+      // verbatim, NOT routed through the move path: its `cursor` is a ball type,
+      // not a move slot, so applyWiredPartnerCommand would mis-read it as a move.
+      if (cmd != null && (cmd.command === Command.BALL || cmd.command === Command.RUN)) {
+        this.applyRelayedActionCommand(cmd);
+        return;
+      }
+      apply((cmd && applyWiredPartnerCommand(partner, cmd)) || fallback());
+    });
     return true;
   }
 
@@ -861,10 +869,74 @@ export class CommandPhase extends FieldPhase {
     }
 
     if (success) {
+      // Co-op (#633): relay a BALL / RUN chosen on OUR OWN slot to the partner.
+      // Only FIGHT moves were broadcast before, so a thrown Poke Ball (or a flee)
+      // never reached the partner's client - its await for our slot timed out and
+      // the partner-AI fired a MOVE there instead, so the wild mon was caught on
+      // ONE client only (the reported catch desync). FIGHT relays through its own
+      // path (handleFightCommand / SelectTargetPhase); here we cover BALL + RUN.
+      if (command === Command.BALL || command === Command.RUN) {
+        this.broadcastLocalCoopActionCommand(command, cursor);
+      }
       this.end();
     }
 
     return success;
+  }
+
+  /**
+   * Co-op (#633): broadcast a BALL / RUN command the local human chose for THEIR
+   * OWN field slot, so the partner's client mirrors it instead of timing out and
+   * auto-resolving a move there (which caught / fled on one client only). No-op
+   * outside a live co-op run or for the partner slot (that slot is awaited, never
+   * broadcast). The partner applies it verbatim via {@linkcode applyRelayedActionCommand}.
+   */
+  private broadcastLocalCoopActionCommand(command: Command.BALL | Command.RUN, cursor: number): void {
+    if (!globalScene.gameMode.isCoop) {
+      return;
+    }
+    const controller = getCoopController();
+    if (controller == null || coopOwnerOfFieldIndex(this.fieldIndex) !== controller.role) {
+      return;
+    }
+    const sync = getCoopBattleSync();
+    if (sync == null) {
+      return;
+    }
+    const targets =
+      command === Command.BALL
+        ? globalScene
+            .getEnemyField()
+            .filter(p => p.isActive(true))
+            .map(p => p.getBattlerIndex())
+        : [];
+    sync.broadcastLocalCommand(this.fieldIndex, { command, cursor, targets });
+  }
+
+  /**
+   * Co-op (#633): apply a partner's relayed BALL / RUN command on this (partner)
+   * slot by setting the turn command DIRECTLY - NOT by re-running handleBallCommand,
+   * whose `checkCanUseBall` reads per-PLAYER save state (dex caughtAttr / starter
+   * counts) that legitimately differs between the two clients and could diverge in
+   * the END biome. The catcher already validated the throw; we mirror their exact
+   * resolved command so both clients run the SAME AttemptCapturePhase (seeded catch
+   * RNG -> identical outcome). The ally slot is skipped by the other slot's
+   * {@linkcode handleFieldIndexLogic}, which already keys off an ally BALL/RUN.
+   */
+  private applyRelayedActionCommand(cmd: SerializedCommand): void {
+    const battle = globalScene.currentBattle;
+    if (cmd.command === Command.RUN) {
+      battle.turnCommands[this.fieldIndex] = { command: Command.RUN };
+    } else {
+      const targets =
+        (cmd.targets as BattlerIndex[] | undefined)
+        ?? globalScene
+          .getEnemyField()
+          .filter(p => p.isActive(true))
+          .map(p => p.getBattlerIndex());
+      battle.turnCommands[this.fieldIndex] = { command: Command.BALL, cursor: cmd.cursor ?? 0, targets };
+    }
+    this.end();
   }
 
   cancel() {
