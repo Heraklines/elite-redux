@@ -1,0 +1,48 @@
+url:      https://elite-redux-staging.pages.dev/
+build:    mqtvxj3d-478j
+mode:     6  wave:1
+seed:     gEuwhjsgpL2J0xC5e1jUppFR
+party:    Bisasam(L5 21hp f0), Flamiau(L5 20hp f0), Habitak(L5 20hp f0), Endivie(L5 20hp f0), Magnetilo(L5 19hp f0)
+enemy:    
+
+----- COMMENT -----
+coop test regression 2
+
+----- CONSOLE -----
+[19:20:41.973] LOG: %c %c %c %c %c Phaser v3.90.0 (WebGL | Web Audio) %c https://phaser.io/v390 background: #ff0000 background: #ffff00 background: #00ff00 background: #00ffff color: #ffffff; background: #000000 background: transparent
+[19:20:42.319] LOG: [ER] build mqtvxj3d-478j
+[19:20:42.589] LOG: [dev-tools] loaded — 321 scenarios + Send Logs button
+[19:21:06.361] DEBUG: Destroying loading scene
+[19:21:06.361] DEBUG: Destroyed loading scene
+[19:21:06.420] LOG: Seed: NXEwOSfECEZmDcGJetS2w1rz
+[19:21:06.420] LOG: Wave Seed: NXEwOSfECEZmDcGJetS2w1rz 0
+[19:21:08.841] LOG: %cStart Phase LoginPhase color:green;
+[19:21:08.989] LOG: Client Session: O8d9lR8M9B5uTCQQP8PddAiJjqO95P1c
+[19:21:09.307] DEBUG: Using cached system data
+[19:21:09.406] LOG: %cStart Phase TitlePhase color:green;
+[19:21:09.406] LOG: Getting Session Slot id: %d 0
+[19:21:09.418] LOG: use seasonal splash messages true
+[19:21:09.418] LOG: Adding 2 Pride Month splash messages (weight: x15)
+[19:45:30.469] WARN: [coop-fp] MISMATCH sections=movesName,abilitiesName - movesName local=30e2bf626b99790e(1107) peer=fad7fe8932ec09a1(1107) abilitiesName local=1670a4f3df00cb38(1046) peer=1412a816005397a3(1046)
+[19:45:30.860] LOG: [coop-launch] title challenge-gate: role=guest isCoopGuest=true -> SelectStarterPhase
+[19:45:30.865] LOG: %cStart Phase SelectStarterPhase color:green;
+[19:45:30.867] LOG: [coop-launch] startCoopSelect role=guest partnerConnected=true partnerReady=false
+[19:45:38.624] WARN: cry/1 not found
+[19:45:42.309] WARN: cry/152 not found
+[19:45:44.755] LOG: [coop-runconfig] guest waiting - requesting runConfig from host
+[19:45:55.788] LOG: [coop-runconfig] guest received difficulty=elite netcode=authoritative
+[19:45:55.788] LOG: [coop-launch] proceedIfReady launched=false localTeam=0 bothReady=false role=guest partnerReady=false
+[19:45:55.789] LOG: Wave Seed: gEuwhjsgpL2J0xC5e1jUppFR 0
+[19:45:55.790] LOG: [coop-runconfig] startRun role=guest willBroadcast=false difficulty=elite
+[19:45:55.791] LOG: [coop-launch] local team locked in: 2 mons, role=guest
+[19:45:55.793] LOG: [coop-launch] proceedIfReady launched=false localTeam=2 bothReady=false role=guest partnerReady=false
+[19:45:55.794] LOG: Wave Seed: gEuwhjsgpL2J0xC5e1jUppFR 0
+[19:45:55.794] LOG: [coop-runconfig] startRun role=guest willBroadcast=false difficulty=elite
+[19:45:55.795] LOG: [coop-launch] proceedIfReady launched=false localTeam=2 bothReady=false role=guest partnerReady=false
+[19:45:55.795] LOG: [coop-launch] local ready, partner NOT ready -> waiting screen
+[19:45:55.798] LOG: [coop-launch] proceedIfReady launched=false localTeam=2 bothReady=false role=guest partnerReady=false
+[19:45:55.798] LOG: [coop-launch] proceedIfReady launched=false localTeam=2 bothReady=true role=guest partnerReady=true
+[19:45:55.801] LOG: [coop-launch] launchCoopMergedParty role=guest merged=5 slot=0
+[19:45:55.801] LOG: [coop-launch] guest: clearing STARTER_SELECT -> MESSAGE, then initBattle
+[19:45:58.281] LOG: Wave Seed: hFvxikthqM3K1yD6f2kVqqGS 1
+[19:45:58.287] LOG: %cStart Phase EncounterPhase color:green;
