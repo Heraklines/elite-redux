@@ -1,0 +1,277 @@
+----- BUG REPORT (in-game) -----
+version:  1.11.19
+url:      https://elite-redux.pages.dev/
+ua:       Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Mobile Safari/537.36
+mode:     4  wave:114  difficulty:youngster
+seed:     Olb3F6JBGtdA48Hk3SofOO24
+party:    Dracovish(L103 325/325), Starmie(L92 240/240), Meowscarada(L85 230/254), Durant(L100 0/275), Kecleon(L96 155/250), Amphybuzz(L83 301/301)
+
+----- DESCRIPTION -----
+Mega Starmie's Break It Down's Rapid Spin does not increase speed by 1 stage when used
+
+----- CONSOLE -----
+[22:30:19.091] LOG: %cStart Phase ShinySparklePhase color:green;
+[22:30:19.182] LOG: %cStart Phase PostSummonPhase color:green;
+[22:30:19.182] LOG: Ran PSP for: Mega Starmie
+[22:30:19.184] LOG: %cStart Phase PostSummonPhase color:green;
+[22:30:19.184] LOG: %cStart Phase PostSummonPhase color:green;
+[22:30:19.187] LOG: %cStart Phase MovePhase color:green;
+[22:30:19.187] LOG: %cUser: Durant
+Move: FIRST_IMPRESSION
+Use Mode: NORMAL color:orchid
+[22:30:19.201] LOG: %cStart Phase MessagePhase color:green;
+[22:30:19.315] LOG: %cStart Phase MoveEffectPhase color:green;
+[22:30:19.317] LOG: Applied Wide Lens 
+[22:30:19.599] LOG: crit stage: +0
+[22:30:19.603] LOG: Move: First Impression | Base damage: 154.32 | Power: 108 | Source attack: 272 | Target defense: 162
+[22:30:19.603] LOG: Move: First Impression | Attack damage: 177
+[22:30:19.605] LOG: %cStart Phase DamageAnimPhase color:green;
+[22:30:19.634] LOG: %cStart Phase ShowAbilityPhase color:green;
+[22:30:19.799] LOG: %cStart Phase HideAbilityPhase color:green;
+[22:30:19.849] LOG: %cStart Phase MoveEndPhase color:green;
+[22:30:19.850] LOG: %cStart Phase MovePhase color:green;
+[22:30:19.850] LOG: %cUser: Slowking
+Move: EXPANDING_FORCE
+Use Mode: NORMAL color:orchid
+[22:30:19.851] LOG: %cStart Phase MessagePhase color:green;
+[22:30:20.065] LOG: %cStart Phase MoveEndPhase color:green;
+[22:30:20.066] LOG: %cStart Phase MovePhase color:green;
+[22:30:20.066] LOG: %cUser: Reuniclus
+Move: ASTRAL_HAND
+Use Mode: NORMAL color:orchid
+[22:30:20.084] LOG: %cStart Phase MessagePhase color:green;
+[22:30:20.198] LOG: %cStart Phase MoveEffectPhase color:green;
+[22:30:20.500] LOG: crit stage: +0
+[22:30:20.503] LOG: Move: Astral Hand | Base damage: 63.7324031007752 | Power: 85 | Source attack: 239 | Target defense: 258
+[22:30:20.503] LOG: Move: Astral Hand | Attack damage: 177
+[22:30:20.504] LOG: %cStart Phase DamageAnimPhase color:green;
+[22:30:20.534] LOG: %cStart Phase MessagePhase color:green;
+[22:30:20.749] LOG: %cStart Phase FaintPhase color:green;
+[22:30:22.211] LOG: %cStart Phase MessagePhase color:green;
+[22:30:23.151] LOG: %cStart Phase MoveEndPhase color:green;
+[22:30:23.151] LOG: %cStart Phase CheckInterludePhase color:green;
+[22:30:23.151] LOG: %cStart Phase WeatherEffectPhase color:green;
+[22:30:23.209] LOG: %cStart Phase PositionalTagPhase color:green;
+[22:30:23.209] LOG: %cStart Phase BerryPhase color:green;
+[22:30:23.211] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[22:30:23.213] LOG: %cStart Phase TurnEndPhase color:green;
+[22:30:23.216] LOG: %cStart Phase ShowAbilityPhase color:green;
+[22:30:23.384] LOG: %cStart Phase MessagePhase color:green;
+[22:30:23.648] LOG: %cStart Phase HideAbilityPhase color:green;
+[22:30:23.683] LOG: %cStart Phase SwitchPhase color:green;
+[22:30:26.557] LOG: %cStart Phase SwitchSummonPhase color:green;
+[22:30:26.642] LOG: Applied Carbos 
+[22:30:26.642] LOG: Applied Soul Dew 
+[22:30:26.642] LOG: Applied Soul Dew 
+[22:30:26.800] LOG: %cStart Phase PostSummonPhase color:green;
+[22:30:26.800] LOG: Ran PSP for: Dracovish
+[22:30:26.801] LOG: %cStart Phase PostSummonPhase color:green;
+[22:30:26.801] LOG: %cStart Phase PostSummonPhase color:green;
+[22:30:26.801] LOG: %cStart Phase TurnInitPhase color:green;
+[22:30:26.801] LOG: %cStart Phase CommandPhase color:green;
+[22:30:27.788] LOG: Move: FISHIOUS_REND Move targets: {"targets":[2,3,1],"multiple":false} 
+Player Pokemon: Dracovish
+[22:30:27.789] LOG: %cStart Phase SelectTargetPhase color:green;
+[22:30:29.104] LOG: %cStart Phase CommandPhase color:green;
+[22:30:30.304] LOG: Move: HIGH_JUMP_KICK Move targets: {"targets":[2,3,0],"multiple":false} 
+Player Pokemon: Mega Starmie
+[22:30:30.306] LOG: %cStart Phase SelectTargetPhase color:green;
+[22:30:30.930] LOG: %cStart Phase EnemyCommandPhase color:green;
+[22:30:30.939] LOG: %cStart Phase EnemyCommandPhase color:green;
+[22:30:30.953] LOG: Battle Seed: P9n4ggXFFWdJzhL1
+[22:30:30.956] LOG: Move Pool: ["Astral Hand","Reflect Type","Acid Armor","Hammer Arm"]
+[22:30:30.956] LOG: Move Scores: [25.5,0,6,18]
+[22:30:30.956] LOG: Sorted Move Pool: ["Astral Hand","Hammer Arm","Acid Armor","Reflect Type"]
+[22:30:30.956] LOG: Chosen Move: Astral Hand
+[22:30:30.956] LOG: %cStart Phase TurnStartPhase color:green;
+[22:30:30.963] LOG: %cStart Phase SwitchSummonPhase color:green;
+[22:30:30.963] LOG: Faba
+[22:30:31.224] LOG: Faba
+[22:30:31.307] LOG: Applied Iron (enemy)
+[22:30:31.308] LOG: Applied Protein (enemy)
+[22:30:31.308] LOG: Applied Zinc (enemy)
+[22:30:31.309] LOG: Applied Zinc (enemy)
+[22:30:31.309] LOG: Applied Protein (enemy)
+[22:30:31.309] LOG: Applied Zinc (enemy)
+[22:30:31.309] LOG: Applied Carbos (enemy)
+[22:30:31.309] LOG: Applied Iron (enemy)
+[22:30:31.309] LOG: Applied Iron (enemy)
+[22:30:31.310] LOG: Applied Zinc (enemy)
+[22:30:31.310] LOG: Applied Carbos (enemy)
+[22:30:31.310] LOG: Applied Iron (enemy)
+[22:30:31.450] LOG: %cStart Phase PostSummonPhase color:green;
+[22:30:31.450] LOG: Ran PSP for: Slowbro
+[22:30:31.451] LOG: %cStart Phase PostSummonPhase color:green;
+[22:30:31.451] LOG: %cStart Phase PostSummonPhase color:green;
+[22:30:31.454] LOG: %cStart Phase MovePhase color:green;
+[22:30:31.454] LOG: %cUser: Mega Starmie
+Move: HIGH_JUMP_KICK
+Use Mode: NORMAL color:orchid
+[22:30:31.465] LOG: %cStart Phase MessagePhase color:green;
+[22:30:31.582] LOG: %cStart Phase MoveEffectPhase color:green;
+[22:30:31.583] LOG: Applied Wide Lens 
+[22:30:31.933] LOG: crit stage: +0
+[22:30:31.937] LOG: Move: High Jump Kick | Base damage: 266.75081712062257 | Power: 195 | Source attack: 464 | Target defense: 257
+[22:30:31.937] LOG: Move: High Jump Kick | Attack damage: 296
+[22:30:31.938] LOG: %cStart Phase DamageAnimPhase color:green;
+[22:30:31.967] LOG: %cStart Phase MessagePhase color:green;
+[22:30:32.190] LOG: %cStart Phase MoveEndPhase color:green;
+[22:30:32.194] LOG: %cStart Phase MovePhase color:green;
+[22:30:32.194] LOG: %cUser: Mega Starmie
+Move: RAPID_SPIN
+Use Mode: INDIRECT color:orchid
+[22:30:32.204] LOG: %cStart Phase MessagePhase color:green;
+[22:30:32.332] LOG: %cStart Phase MoveEffectPhase color:green;
+[22:30:32.333] LOG: Applied Wide Lens 
+[22:30:32.349] LOG: crit stage: +0
+[22:30:32.352] LOG: Move: Rapid Spin | Base damage: 42.73089494163424 | Power: 30 | Source attack: 464 | Target defense: 257
+[22:30:32.353] LOG: Move: Rapid Spin | Attack damage: 25
+[22:30:32.354] LOG: %cStart Phase DamageAnimPhase color:green;
+[22:30:32.383] LOG: %cStart Phase FaintPhase color:green;
+[22:30:33.528] LOG: %cStart Phase MessagePhase color:green;
+[22:30:33.687] LOG: %cStart Phase VictoryPhase color:green;
+[22:30:33.687] LOG: Applied Soothe Bell 
+[22:30:33.688] LOG: Applied Soothe Bell 
+[22:30:33.688] LOG: %cStart Phase ExpPhase color:green;
+[22:30:33.688] LOG: Applied Super EXP. Charm 
+[22:30:33.688] LOG: Applied EXP. Charm 
+[22:30:33.983] LOG: %cStart Phase LevelUpPhase color:green;
+[22:30:33.984] LOG: Applied Carbos 
+[22:30:33.984] LOG: Applied Soul Dew 
+[22:30:33.984] LOG: Applied Soul Dew 
+[22:30:33.984] LOG: %cStart Phase ExpPhase color:green;
+[22:30:33.985] LOG: Applied Super EXP. Charm 
+[22:30:33.985] LOG: Applied EXP. Charm 
+[22:30:34.433] LOG: %cStart Phase LevelUpPhase color:green;
+[22:30:34.433] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[22:30:34.433] LOG: Applied Super EXP. Charm 
+[22:30:34.433] LOG: Applied EXP. Charm 
+[22:30:34.434] LOG: %cStart Phase LevelUpPhase color:green;
+[22:30:34.434] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[22:30:34.434] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[22:30:34.434] LOG: Applied Super EXP. Charm 
+[22:30:34.434] LOG: Applied EXP. Charm 
+[22:30:34.434] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[22:30:34.434] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[22:30:34.434] LOG: Applied Super EXP. Charm 
+[22:30:34.434] LOG: Applied EXP. Charm 
+[22:30:34.434] LOG: %cStart Phase LevelUpPhase color:green;
+[22:30:34.434] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[22:30:34.434] LOG: %cStart Phase MoveEndPhase color:green;
+[22:30:34.435] LOG: %cStart Phase MovePhase color:green;
+[22:30:34.435] LOG: %cUser: Dracovish
+Move: FISHIOUS_REND
+Use Mode: NORMAL color:orchid
+[22:30:34.440] LOG: %cStart Phase MessagePhase color:green;
+[22:30:34.582] LOG: %cStart Phase MoveEffectPhase color:green;
+[22:30:35.050] LOG: crit stage: +0
+[22:30:35.051] LOG: Applied Mystic Water 
+[22:30:35.052] LOG: Move: Fishious Rend | Base damage: 345.53803468208093 | Power: 265 | Source attack: 262 | Target defense: 173
+[22:30:35.053] LOG: Move: Fishious Rend | Attack damage: 360
+[22:30:35.055] LOG: Applied Golden Punch 
+[22:30:35.056] LOG: Applied Iron (enemy)
+[22:30:35.056] LOG: Applied Protein (enemy)
+[22:30:35.056] LOG: Applied Zinc (enemy)
+[22:30:35.056] LOG: Applied Zinc (enemy)
+[22:30:35.056] LOG: Applied Protein (enemy)
+[22:30:35.057] LOG: Applied Zinc (enemy)
+[22:30:35.057] LOG: Applied Carbos (enemy)
+[22:30:35.057] LOG: Applied Iron (enemy)
+[22:30:35.057] LOG: Applied Iron (enemy)
+[22:30:35.057] LOG: Applied Zinc (enemy)
+[22:30:35.057] LOG: Applied Carbos (enemy)
+[22:30:35.057] LOG: Applied Iron (enemy)
+[22:30:35.059] LOG: Applied Carbos 
+[22:30:35.059] LOG: Applied Soul Dew 
+[22:30:35.060] LOG: Applied Soul Dew 
+[22:30:35.068] LOG: Applied Grip Claw 
+[22:30:35.068] LOG: Applied Shell Bell 
+[22:30:35.068] LOG: %cStart Phase DamageAnimPhase color:green;
+[22:30:35.082] LOG: %cStart Phase MessagePhase color:green;
+[22:30:35.398] LOG: %cStart Phase FaintPhase color:green;
+[22:30:36.733] LOG: %cStart Phase MessagePhase color:green;
+[22:30:36.820] LOG: %cStart Phase VictoryPhase color:green;
+[22:30:36.820] LOG: Applied Soothe Bell 
+[22:30:36.820] LOG: Applied Soothe Bell 
+[22:30:36.820] LOG: %cStart Phase ExpPhase color:green;
+[22:30:36.820] LOG: Applied Super EXP. Charm 
+[22:30:36.820] LOG: Applied EXP. Charm 
+[22:30:37.124] LOG: %cStart Phase LevelUpPhase color:green;
+[22:30:37.125] LOG: Applied Carbos 
+[22:30:37.125] LOG: Applied Soul Dew 
+[22:30:37.125] LOG: Applied Soul Dew 
+[22:30:37.126] LOG: %cStart Phase ExpPhase color:green;
+[22:30:37.126] LOG: Applied Super EXP. Charm 
+[22:30:37.126] LOG: Applied EXP. Charm 
+[22:30:37.425] LOG: %cStart Phase LevelUpPhase color:green;
+[22:30:37.426] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[22:30:37.426] LOG: Applied Super EXP. Charm 
+[22:30:37.426] LOG: Applied EXP. Charm 
+[22:30:37.426] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[22:30:37.426] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[22:30:37.426] LOG: Applied Super EXP. Charm 
+[22:30:37.426] LOG: Applied EXP. Charm 
+[22:30:37.426] LOG: %cStart Phase LevelUpPhase color:green;
+[22:30:37.427] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[22:30:37.427] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[22:30:37.427] LOG: Applied Super EXP. Charm 
+[22:30:37.427] LOG: Applied EXP. Charm 
+[22:30:37.427] LOG: %cStart Phase LevelUpPhase color:green;
+[22:30:37.427] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[22:30:37.427] LOG: %cStart Phase MoveEndPhase color:green;
+[22:30:37.428] LOG: %cStart Phase MovePhase color:green;
+[22:30:37.428] LOG: %cStart Phase MoveEndPhase color:green;
+[22:30:37.428] LOG: %cStart Phase CheckInterludePhase color:green;
+[22:30:37.428] LOG: %cStart Phase WeatherEffectPhase color:green;
+[22:30:37.499] WARN: Texture "%s" has no frame "%s" PRAS- Confuse Ray 1
+[22:30:37.998] LOG: %cStart Phase PositionalTagPhase color:green;
+[22:30:37.998] LOG: %cStart Phase BerryPhase color:green;
+[22:30:38.000] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[22:30:38.000] LOG: %cStart Phase TurnEndPhase color:green;
+[22:30:38.004] LOG: %cStart Phase SwitchSummonPhase color:green;
+[22:30:38.249] LOG: Faba
+[22:30:38.333] LOG: Applied Zinc (enemy)
+[22:30:38.333] LOG: Applied Carbos (enemy)
+[22:30:38.333] LOG: Applied Iron (enemy)
+[22:30:38.333] LOG: Applied Zinc (enemy)
+[22:30:38.334] LOG: Applied Zinc (enemy)
+[22:30:38.334] LOG: Applied Protein (enemy)
+[22:30:38.334] LOG: Applied Zinc (enemy)
+[22:30:38.334] LOG: Applied Carbos (enemy)
+[22:30:38.334] LOG: Applied Iron (enemy)
+[22:30:38.334] LOG: Applied Iron (enemy)
+[22:30:38.334] LOG: Applied Iron (enemy)
+[22:30:38.334] LOG: Applied Protein (enemy)
+[22:30:38.469] LOG: %cStart Phase PostSummonPhase color:green;
+[22:30:38.469] LOG: Ran PSP for: Hypno
+[22:30:38.470] LOG: %cStart Phase PostSummonPhase color:green;
+[22:30:38.470] LOG: %cStart Phase PostSummonPhase color:green;
+[22:30:38.470] LOG: %cStart Phase SwitchSummonPhase color:green;
+[22:30:38.698] LOG: Faba
+[22:30:38.779] LOG: Applied Zinc (enemy)
+[22:30:38.779] LOG: Applied Carbos (enemy)
+[22:30:38.779] LOG: Applied Iron (enemy)
+[22:30:38.780] LOG: Applied Zinc (enemy)
+[22:30:38.780] LOG: Applied Carbos (enemy)
+[22:30:38.780] LOG: Applied Iron (enemy)
+[22:30:38.780] LOG: Applied Zinc (enemy)
+[22:30:38.780] LOG: Applied Protein (enemy)
+[22:30:38.780] LOG: Applied Zinc (enemy)
+[22:30:38.781] LOG: Applied Iron (enemy)
+[22:30:38.781] LOG: Applied Iron (enemy)
+[22:30:38.781] LOG: Applied Protein (enemy)
+[22:30:38.925] LOG: %cStart Phase PostSummonPhase color:green;
+[22:30:38.925] LOG: Ran PSP for: Bruxish
+[22:30:38.926] LOG: %cStart Phase PostSummonPhase color:green;
+[22:30:38.926] LOG: %cStart Phase PostSummonPhase color:green;
+[22:30:38.926] LOG: %cStart Phase ShowAbilityPhase color:green;
+[22:30:39.083] LOG: %cStart Phase MessagePhase color:green;
+[22:30:39.315] LOG: %cStart Phase HideAbilityPhase color:green;
+[22:30:39.350] LOG: %cStart Phase TurnInitPhase color:green;
+[22:30:39.350] LOG: %cStart Phase CommandPhase color:green;
+[22:30:40.883] WARN: cry/121-mega not found
+[22:30:46.021] LOG: Move: FISHIOUS_REND Move targets: {"targets":[2,3,1],"multiple":false} 
+Player Pokemon: Dracovish
+[22:30:46.022] LOG: %cStart Phase SelectTargetPhase color:green;
+[22:30:46.896] LOG: %cStart Phase CommandPhase color:green;
+[22:30:59.324] WARN: cry/121-mega not found
