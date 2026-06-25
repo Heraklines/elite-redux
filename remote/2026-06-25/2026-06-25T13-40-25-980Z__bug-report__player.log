@@ -1,0 +1,287 @@
+----- BUG REPORT (in-game) -----
+version:  1.11.19
+url:      https://elite-redux.pages.dev/
+ua:       Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Mobile Safari/537.36
+mode:     4  wave:40  difficulty:hell
+seed:     hTjKO89zPpeBZjbBkMKbid0t
+party:    Iron Moth(L32 102/102), Volcanion(L32 101/101), Ivysaur(L32 92/92)
+
+----- DESCRIPTION -----
+Mismagius typing
+
+----- CONSOLE -----
+[13:39:54.877] LOG: %cStart Phase FaintPhase color:green;
+[13:39:54.946] LOG: %cStart Phase MessagePhase color:green;
+[13:39:55.544] LOG: %cStart Phase MoveEndPhase color:green;
+[13:39:55.544] LOG: %cStart Phase CheckInterludePhase color:green;
+[13:39:55.544] LOG: %cStart Phase WeatherEffectPhase color:green;
+[13:39:55.587] LOG: %cStart Phase PositionalTagPhase color:green;
+[13:39:55.587] LOG: %cStart Phase BerryPhase color:green;
+[13:39:55.588] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[13:39:55.588] LOG: %cStart Phase TurnEndPhase color:green;
+[13:39:55.590] LOG: %cStart Phase SwitchPhase color:green;
+[13:39:56.650] LOG: %cStart Phase SwitchSummonPhase color:green;
+[13:39:56.890] LOG: Applied X Speed 
+[13:39:56.891] LOG: %cStart Phase PostSummonPhase color:green;
+[13:39:56.891] LOG: Ran PSP for: Volcanion
+[13:39:56.891] LOG: %cStart Phase PostSummonPhase color:green;
+[13:39:56.891] LOG: %cStart Phase PostSummonPhase color:green;
+[13:39:56.891] LOG: %cStart Phase TurnInitPhase color:green;
+[13:39:56.891] LOG: %cStart Phase CommandPhase color:green;
+[13:39:57.360] LOG: Move: PROTECT Move targets: {"targets":[0],"multiple":false} 
+Player Pokemon: Volcanion
+[13:39:57.361] LOG: %cStart Phase EnemyCommandPhase color:green;
+[13:39:57.366] LOG: Battle Seed: KUHSsEw5KdgNs2Bn
+[13:39:57.369] LOG: Applied X Speed 
+[13:39:57.373] LOG: Move Pool: ["High Horsepower","Mega Punch","Strength","Superpower"]
+[13:39:57.373] LOG: Move Scores: [-61.62769891446976,-97.2712632709054,-80.43958010258856,-107.1722533699153]
+[13:39:57.373] LOG: Sorted Move Pool: ["High Horsepower","Strength","Mega Punch","Superpower"]
+[13:39:57.373] LOG: Chosen Move: High Horsepower
+[13:39:57.373] LOG: ER AI: experimental brain (sharpness 1)
+[13:39:57.373] LOG: %cStart Phase TurnStartPhase color:green;
+[13:39:57.373] LOG: Applied X Speed 
+[13:39:57.374] LOG: Applied X Speed 
+[13:39:57.374] LOG: Applied X Speed 
+[13:39:57.374] LOG: %cStart Phase MovePhase color:green;
+[13:39:57.374] LOG: %cUser: Volcanion
+Move: PROTECT
+Use Mode: NORMAL color:orchid
+[13:39:57.375] LOG: Applied X Speed 
+[13:39:57.375] LOG: Applied X Speed 
+[13:39:57.376] LOG: %cStart Phase MessagePhase color:green;
+[13:39:57.480] LOG: %cStart Phase MoveEffectPhase color:green;
+[13:39:57.483] LOG: %cStart Phase MessagePhase color:green;
+[13:39:57.714] LOG: %cStart Phase MoveEndPhase color:green;
+[13:39:57.714] LOG: %cStart Phase MovePhase color:green;
+[13:39:57.714] LOG: %cUser: Golett
+Move: HIGH_HORSEPOWER
+Use Mode: NORMAL color:orchid
+[13:39:57.715] LOG: Applied X Speed 
+[13:39:57.717] LOG: Applied X Speed 
+[13:39:57.717] LOG: %cStart Phase MessagePhase color:green;
+[13:39:57.839] LOG: %cStart Phase MoveEffectPhase color:green;
+[13:39:57.840] LOG: %cStart Phase MessagePhase color:green;
+[13:39:58.081] LOG: %cStart Phase MoveEndPhase color:green;
+[13:39:58.081] LOG: %cStart Phase CheckInterludePhase color:green;
+[13:39:58.081] LOG: %cStart Phase WeatherEffectPhase color:green;
+[13:39:58.157] LOG: Applied X Speed 
+[13:39:58.158] LOG: %cStart Phase PositionalTagPhase color:green;
+[13:39:58.158] LOG: %cStart Phase BerryPhase color:green;
+[13:39:58.158] LOG: Applied X Speed 
+[13:39:58.159] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[13:39:58.159] LOG: Applied X Speed 
+[13:39:58.159] LOG: %cStart Phase TurnEndPhase color:green;
+[13:39:58.161] LOG: Applied X Speed 
+[13:39:58.161] LOG: %cStart Phase TurnInitPhase color:green;
+[13:39:58.161] LOG: %cStart Phase CommandPhase color:green;
+[13:39:58.479] LOG: Move: PROTECT Move targets: {"targets":[0],"multiple":false} 
+Player Pokemon: Volcanion
+[13:39:58.480] LOG: %cStart Phase EnemyCommandPhase color:green;
+[13:39:58.485] LOG: Battle Seed: KUHSsEw5KdgNs2Bn
+[13:39:58.489] LOG: Applied X Speed 
+[13:39:58.495] LOG: Move Pool: ["High Horsepower","Mega Punch","Strength","Superpower"]
+[13:39:58.495] LOG: Move Scores: [-61.62769891446976,-97.2712632709054,-80.43958010258856,-107.1722533699153]
+[13:39:58.495] LOG: Sorted Move Pool: ["High Horsepower","Strength","Mega Punch","Superpower"]
+[13:39:58.495] LOG: Chosen Move: High Horsepower
+[13:39:58.495] LOG: ER AI: experimental brain (sharpness 1)
+[13:39:58.495] LOG: %cStart Phase TurnStartPhase color:green;
+[13:39:58.495] LOG: Applied X Speed 
+[13:39:58.495] LOG: Applied X Speed 
+[13:39:58.496] LOG: Applied X Speed 
+[13:39:58.496] LOG: %cStart Phase MovePhase color:green;
+[13:39:58.496] LOG: %cUser: Volcanion
+Move: PROTECT
+Use Mode: NORMAL color:orchid
+[13:39:58.496] LOG: Applied X Speed 
+[13:39:58.497] LOG: %cStart Phase MessagePhase color:green;
+[13:39:58.589] LOG: %cStart Phase MessagePhase color:green;
+[13:39:58.798] LOG: %cStart Phase MoveEndPhase color:green;
+[13:39:58.799] LOG: %cStart Phase MovePhase color:green;
+[13:39:58.799] LOG: %cUser: Golett
+Move: HIGH_HORSEPOWER
+Use Mode: NORMAL color:orchid
+[13:39:58.800] LOG: Applied X Speed 
+[13:39:58.801] LOG: Applied X Speed 
+[13:39:58.802] LOG: %cStart Phase MessagePhase color:green;
+[13:39:58.954] LOG: %cStart Phase MoveEffectPhase color:green;
+[13:39:58.956] LOG: crit stage: +0
+[13:39:58.957] LOG: Move: High Horsepower | Base damage: 26.01258426966292 | Power: 95 | Source attack: 76 | Target defense: 89
+[13:39:58.958] LOG: Move: High Horsepower | Attack damage: 76
+[13:39:58.959] LOG: %cStart Phase DamageAnimPhase color:green;
+[13:39:58.982] LOG: %cStart Phase MessagePhase color:green;
+[13:39:59.198] LOG: %cStart Phase MoveEndPhase color:green;
+[13:39:59.198] LOG: %cStart Phase CheckInterludePhase color:green;
+[13:39:59.198] LOG: %cStart Phase WeatherEffectPhase color:green;
+[13:39:59.274] LOG: Applied X Speed 
+[13:39:59.275] LOG: %cStart Phase PositionalTagPhase color:green;
+[13:39:59.275] LOG: %cStart Phase BerryPhase color:green;
+[13:39:59.275] LOG: Applied X Speed 
+[13:39:59.275] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[13:39:59.276] LOG: Applied X Speed 
+[13:39:59.276] LOG: %cStart Phase TurnEndPhase color:green;
+[13:39:59.277] LOG: Applied X Speed 
+[13:39:59.277] LOG: %cStart Phase TurnInitPhase color:green;
+[13:39:59.277] LOG: %cStart Phase CommandPhase color:green;
+[13:39:59.522] LOG: Move: PROTECT Move targets: {"targets":[0],"multiple":false} 
+Player Pokemon: Volcanion
+[13:39:59.523] LOG: %cStart Phase EnemyCommandPhase color:green;
+[13:39:59.527] LOG: Battle Seed: KUHSsEw5KdgNs2Bn
+[13:39:59.529] LOG: Applied X Speed 
+[13:39:59.534] LOG: Move Pool: ["High Horsepower","Mega Punch","Strength","Superpower"]
+[13:39:59.534] LOG: Move Scores: [36.14457831325302,36.14457831325302,36.14457831325302,36.14457831325302]
+[13:39:59.534] LOG: Sorted Move Pool: ["High Horsepower","Mega Punch","Strength","Superpower"]
+[13:39:59.534] LOG: Chosen Move: High Horsepower
+[13:39:59.534] LOG: ER AI: experimental brain (sharpness 1)
+[13:39:59.534] LOG: %cStart Phase TurnStartPhase color:green;
+[13:39:59.535] LOG: Applied X Speed 
+[13:39:59.535] LOG: Applied X Speed 
+[13:39:59.536] LOG: Applied X Speed 
+[13:39:59.536] LOG: %cStart Phase MovePhase color:green;
+[13:39:59.536] LOG: %cUser: Volcanion
+Move: PROTECT
+Use Mode: NORMAL color:orchid
+[13:39:59.536] LOG: Applied X Speed 
+[13:39:59.537] LOG: Applied X Speed 
+[13:39:59.537] LOG: %cStart Phase MessagePhase color:green;
+[13:39:59.632] LOG: %cStart Phase MoveEffectPhase color:green;
+[13:39:59.633] LOG: %cStart Phase MessagePhase color:green;
+[13:39:59.865] LOG: %cStart Phase MoveEndPhase color:green;
+[13:39:59.866] LOG: %cStart Phase MovePhase color:green;
+[13:39:59.866] LOG: %cUser: Golett
+Move: HIGH_HORSEPOWER
+Use Mode: NORMAL color:orchid
+[13:39:59.867] LOG: Applied X Speed 
+[13:39:59.868] LOG: Applied X Speed 
+[13:39:59.868] LOG: %cStart Phase MessagePhase color:green;
+[13:40:00.021] LOG: %cStart Phase MoveEffectPhase color:green;
+[13:40:00.022] LOG: %cStart Phase MessagePhase color:green;
+[13:40:00.257] LOG: %cStart Phase MoveEndPhase color:green;
+[13:40:00.257] LOG: %cStart Phase CheckInterludePhase color:green;
+[13:40:00.257] LOG: %cStart Phase WeatherEffectPhase color:green;
+[13:40:00.334] LOG: Applied X Speed 
+[13:40:00.334] LOG: %cStart Phase PositionalTagPhase color:green;
+[13:40:00.334] LOG: %cStart Phase BerryPhase color:green;
+[13:40:00.335] LOG: Applied X Speed 
+[13:40:00.335] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[13:40:00.335] LOG: Applied X Speed 
+[13:40:00.335] LOG: %cStart Phase TurnEndPhase color:green;
+[13:40:00.337] LOG: Applied X Speed 
+[13:40:00.337] LOG: %cStart Phase TurnInitPhase color:green;
+[13:40:00.337] LOG: %cStart Phase CommandPhase color:green;
+[13:40:00.747] LOG: Move: PROTECT Move targets: {"targets":[0],"multiple":false} 
+Player Pokemon: Volcanion
+[13:40:00.749] LOG: %cStart Phase EnemyCommandPhase color:green;
+[13:40:00.754] LOG: Battle Seed: KUHSsEw5KdgNs2Bn
+[13:40:00.757] LOG: Applied X Speed 
+[13:40:00.763] LOG: Move Pool: ["High Horsepower","Mega Punch","Strength","Superpower"]
+[13:40:00.763] LOG: Move Scores: [36.14457831325302,36.14457831325302,36.14457831325302,36.14457831325302]
+[13:40:00.763] LOG: Sorted Move Pool: ["High Horsepower","Mega Punch","Strength","Superpower"]
+[13:40:00.763] LOG: Chosen Move: High Horsepower
+[13:40:00.763] LOG: ER AI: experimental brain (sharpness 1)
+[13:40:00.763] LOG: %cStart Phase TurnStartPhase color:green;
+[13:40:00.764] LOG: Applied X Speed 
+[13:40:00.764] LOG: Applied X Speed 
+[13:40:00.765] LOG: Applied X Speed 
+[13:40:00.765] LOG: %cStart Phase MovePhase color:green;
+[13:40:00.765] LOG: %cUser: Volcanion
+Move: PROTECT
+Use Mode: NORMAL color:orchid
+[13:40:00.765] LOG: Applied X Speed 
+[13:40:00.766] LOG: Applied X Speed 
+[13:40:00.766] LOG: %cStart Phase MessagePhase color:green;
+[13:40:00.858] LOG: %cStart Phase MoveEffectPhase color:green;
+[13:40:00.859] LOG: %cStart Phase MessagePhase color:green;
+[13:40:01.091] LOG: %cStart Phase MoveEndPhase color:green;
+[13:40:01.092] LOG: %cStart Phase MovePhase color:green;
+[13:40:01.092] LOG: %cUser: Golett
+Move: HIGH_HORSEPOWER
+Use Mode: NORMAL color:orchid
+[13:40:01.092] LOG: Applied X Speed 
+[13:40:01.094] LOG: Applied X Speed 
+[13:40:01.094] LOG: %cStart Phase MessagePhase color:green;
+[13:40:01.250] LOG: %cStart Phase MoveEffectPhase color:green;
+[13:40:01.251] LOG: %cStart Phase MessagePhase color:green;
+[13:40:01.476] LOG: %cStart Phase MoveEndPhase color:green;
+[13:40:01.476] LOG: %cStart Phase CheckInterludePhase color:green;
+[13:40:01.476] LOG: %cStart Phase WeatherEffectPhase color:green;
+[13:40:01.559] LOG: Applied X Speed 
+[13:40:01.560] LOG: %cStart Phase PositionalTagPhase color:green;
+[13:40:01.560] LOG: %cStart Phase BerryPhase color:green;
+[13:40:01.560] LOG: Applied X Speed 
+[13:40:01.560] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[13:40:01.560] LOG: Applied X Speed 
+[13:40:01.560] LOG: %cStart Phase TurnEndPhase color:green;
+[13:40:01.560] LOG: Applied X Speed 
+[13:40:01.561] LOG: Applied X Speed 
+[13:40:01.561] LOG: Applied X Speed 
+[13:40:01.561] LOG: %cStart Phase MessagePhase color:green;
+[13:40:01.767] LOG: %cStart Phase TurnInitPhase color:green;
+[13:40:01.767] LOG: %cStart Phase CommandPhase color:green;
+[13:40:02.090] LOG: Move: PROTECT Move targets: {"targets":[0],"multiple":false} 
+Player Pokemon: Volcanion
+[13:40:02.091] LOG: %cStart Phase EnemyCommandPhase color:green;
+[13:40:02.095] LOG: Battle Seed: KUHSsEw5KdgNs2Bn
+[13:40:02.099] LOG: Applied X Speed 
+[13:40:02.103] LOG: Move Pool: ["High Horsepower","Mega Punch","Strength","Superpower"]
+[13:40:02.103] LOG: Move Scores: [49.39759036144578,49.39759036144578,49.39759036144578,49.39759036144578]
+[13:40:02.103] LOG: Sorted Move Pool: ["High Horsepower","Mega Punch","Strength","Superpower"]
+[13:40:02.103] LOG: Chosen Move: High Horsepower
+[13:40:02.103] LOG: ER AI: experimental brain (sharpness 1)
+[13:40:02.104] LOG: %cStart Phase TurnStartPhase color:green;
+[13:40:02.104] LOG: Applied X Speed 
+[13:40:02.104] LOG: Applied X Speed 
+[13:40:02.104] LOG: Applied X Speed 
+[13:40:02.105] LOG: %cStart Phase MovePhase color:green;
+[13:40:02.105] LOG: %cUser: Volcanion
+Move: PROTECT
+Use Mode: NORMAL color:orchid
+[13:40:02.105] LOG: Applied X Speed 
+[13:40:02.105] LOG: %cStart Phase MessagePhase color:green;
+[13:40:02.201] LOG: %cStart Phase MessagePhase color:green;
+[13:40:02.401] LOG: %cStart Phase MoveEndPhase color:green;
+[13:40:02.401] LOG: %cStart Phase MovePhase color:green;
+[13:40:02.402] LOG: %cUser: Golett
+Move: HIGH_HORSEPOWER
+Use Mode: NORMAL color:orchid
+[13:40:02.402] LOG: Applied X Speed 
+[13:40:02.403] LOG: Applied X Speed 
+[13:40:02.404] LOG: %cStart Phase MessagePhase color:green;
+[13:40:02.560] LOG: %cStart Phase MoveEffectPhase color:green;
+[13:40:02.561] LOG: crit stage: +0
+[13:40:02.562] LOG: Move: High Horsepower | Base damage: 26.01258426966292 | Power: 95 | Source attack: 76 | Target defense: 89
+[13:40:02.563] LOG: Move: High Horsepower | Attack damage: 70
+[13:40:02.563] LOG: %cStart Phase DamageAnimPhase color:green;
+[13:40:02.587] LOG: %cStart Phase MessagePhase color:green;
+[13:40:02.802] LOG: %cStart Phase FaintPhase color:green;
+[13:40:02.869] LOG: %cStart Phase MessagePhase color:green;
+[13:40:03.108] LOG: %cStart Phase GameOverPhase color:green;
+[13:40:04.504] LOG: Seed: 7RBjwUo6CcfjK1LbWVO79xMt
+[13:40:04.504] LOG: Wave Seed: 7RBjwUo6CcfjK1LbWVO79xMt 0
+[13:40:04.506] LOG: Getting Session Slot id: %d 0
+[13:40:04.522] LOG: Wave Seed: hTjKO89zPpeBZjbBkMKbid0t 0
+[13:40:04.522] LOG: Seed: hTjKO89zPpeBZjbBkMKbid0t
+[13:40:04.537] LOG: Wave Seed: |sw`a¢xjjusX 40
+[13:40:04.547] LOG: %cStart Phase EncounterPhase color:green;
+[13:40:04.548] LOG: Pokemon: Wild Golett | Species ID: 622 | Level: 32 | Nature: Mild (+SpAtk/-Def)
+[13:40:04.548] LOG: Stats (IVs): HP: 83 (11), Atk: 67 (26), Def: 46 (27), Spatk: 36 (15), Spdef: 50 (23), Spd: 33 (19)
+[13:40:04.548] LOG: Ability: Power Fists | Passive Ability: Vengeance | Boss Bars: 2
+[13:40:04.548] LOG: Moveset: ["High Horsepower","Mega Punch","Strength","Superpower"]
+[13:40:04.549] LOG: Wave Seed: |sw`a¢xjjusX 40
+[13:40:04.972] LOG: %cStart Phase SummonPhase color:green;
+[13:40:05.271] LOG: %cStart Phase CheckSwitchPhase color:green;
+[13:40:05.931] LOG: %cStart Phase SwitchPhase color:green;
+[13:40:06.710] LOG: %cStart Phase SwitchSummonPhase color:green;
+[13:40:06.749] LOG: Applied X Speed 
+[13:40:07.049] LOG: Applied X Speed 
+[13:40:07.050] LOG: %cStart Phase PostSummonPhase color:green;
+[13:40:07.050] LOG: Ran PSP for: Iron Moth
+[13:40:07.050] LOG: %cStart Phase PostSummonPhase color:green;
+[13:40:07.050] LOG: %cStart Phase PostSummonPhase color:green;
+[13:40:07.050] LOG: %cStart Phase ScanIvsPhase color:green;
+[13:40:07.817] LOG: %cStart Phase InitEncounterPhase color:green;
+[13:40:07.817] LOG: %cStart Phase PostSummonPhase color:green;
+[13:40:07.817] LOG: Ran PSP for: Golett
+[13:40:07.818] LOG: %cStart Phase PostSummonPhase color:green;
+[13:40:07.818] LOG: %cStart Phase PostSummonPhase color:green;
+[13:40:07.818] LOG: %cStart Phase TurnInitPhase color:green;
+[13:40:07.818] LOG: %cStart Phase CommandPhase color:green;
