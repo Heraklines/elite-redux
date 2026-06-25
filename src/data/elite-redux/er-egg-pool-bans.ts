@@ -42,6 +42,7 @@ import { pokemonPrevolutions } from "#balance/pokemon-evolutions";
 import { speciesEggTiers } from "#balance/species-egg-tiers";
 import { speciesStarterCosts } from "#balance/starters";
 import { allSpecies } from "#data/data-lists";
+import { enSpeciesName } from "#data/elite-redux/er-canonical-names";
 import type { EggTier } from "#enums/egg-type";
 import { SpeciesId } from "#enums/species-id";
 import type { GameData } from "#system/game-data";
@@ -218,10 +219,14 @@ let removedIdTargets: ReadonlyMap<number, SpeciesId> | null = null;
 /** Resolve the banned display names to live ER species ids (id >= 10000). */
 export function getErRemovedFormIdTargets(): ReadonlyMap<number, SpeciesId> {
   if (removedIdTargets === null) {
+    // #633: key on the locale-INVARIANT (forced-English) name so co-op clients in
+    // any language resolve the same ids. The GET side (`name`) comes from the
+    // hardcoded-English `ER_REMOVED_EGG_FORMS` list, so it already matches these
+    // English keys - leave it (sp is a live PokemonSpecies; its `.name` is localized).
     const byName = new Map<string, number>();
     for (const sp of allSpecies) {
       if (sp.speciesId >= VANILLA_ID_CUTOFF) {
-        byName.set(sp.name, sp.speciesId);
+        byName.set(enSpeciesName(sp), sp.speciesId);
       }
     }
     const map = new Map<number, SpeciesId>();

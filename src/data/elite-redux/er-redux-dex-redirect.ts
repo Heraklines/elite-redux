@@ -34,6 +34,7 @@
 
 import { pokemonPrevolutions } from "#balance/pokemon-evolutions";
 import { allSpecies } from "#data/data-lists";
+import { enSpeciesName } from "#data/elite-redux/er-canonical-names";
 import { DexAttr } from "#enums/dex-attr";
 import type { SpeciesId } from "#enums/species-id";
 import type { GameData } from "#system/game-data";
@@ -50,7 +51,9 @@ function buildReduxCounterparts(): Map<number, readonly [number, number]> {
   const customByName = new Map<string, number>();
   for (const sp of allSpecies) {
     if (sp.speciesId >= VANILLA_ID_CUTOFF) {
-      customByName.set(sp.name.toLowerCase(), sp.speciesId);
+      // #633: locale-INVARIANT (forced-English) key so co-op clients in any
+      // language build the same redux-counterpart map (sp is a live PokemonSpecies).
+      customByName.set(enSpeciesName(sp).toLowerCase(), sp.speciesId);
     }
   }
   const map = new Map<number, readonly [number, number]>();
@@ -62,7 +65,7 @@ function buildReduxCounterparts(): Map<number, readonly [number, number]> {
     if (reduxFormIndex < 0) {
       continue;
     }
-    const counterpartId = customByName.get(`${sp.name.toLowerCase()} redux`);
+    const counterpartId = customByName.get(`${enSpeciesName(sp).toLowerCase()} redux`);
     if (counterpartId !== undefined) {
       map.set(sp.speciesId, [reduxFormIndex, counterpartId]);
     }

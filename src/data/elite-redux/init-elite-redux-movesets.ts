@@ -35,6 +35,7 @@
 
 import { pokemonFormLevelMoves, pokemonSpeciesLevelMoves } from "#balance/pokemon-level-moves";
 import { allMoves, allSpecies } from "#data/data-lists";
+import { enSpeciesName } from "#data/elite-redux/er-canonical-names";
 import { ER_ID_MAP } from "#data/elite-redux/er-id-map";
 import { ER_SPECIES } from "#data/elite-redux/er-species";
 import { MoveId } from "#enums/move-id";
@@ -183,7 +184,9 @@ function installReduxFormLevelMoves(table: Record<number, LevelMoves>): void {
   const customByName = new Map<string, number>();
   for (const sp of allSpecies) {
     if (sp.speciesId >= 10000) {
-      customByName.set(sp.name.toLowerCase(), sp.speciesId);
+      // #633: key on the locale-INVARIANT (forced-English) species name so co-op
+      // clients in different languages match identically (sp is a live PokemonSpecies).
+      customByName.set(enSpeciesName(sp).toLowerCase(), sp.speciesId);
     }
   }
   const formTable = pokemonFormLevelMoves as Record<number, Record<number, LevelMoves>>;
@@ -195,7 +198,7 @@ function installReduxFormLevelMoves(table: Record<number, LevelMoves>): void {
     if (reduxFormIndex < 0) {
       continue;
     }
-    const counterpartId = customByName.get(`${sp.name.toLowerCase()} redux`);
+    const counterpartId = customByName.get(`${enSpeciesName(sp).toLowerCase()} redux`);
     if (counterpartId === undefined) {
       continue;
     }

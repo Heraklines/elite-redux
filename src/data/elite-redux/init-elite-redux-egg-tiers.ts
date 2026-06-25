@@ -29,6 +29,7 @@ import { pokemonPrevolutions } from "#balance/pokemon-evolutions";
 import { speciesEggTiers } from "#balance/species-egg-tiers";
 import { speciesStarterCosts } from "#balance/starters";
 import { allSpecies } from "#data/data-lists";
+import { enSpeciesName } from "#data/elite-redux/er-canonical-names";
 import { applyErEggPoolBans } from "#data/elite-redux/er-egg-pool-bans";
 import { findErFormChangeByTarget } from "#data/elite-redux/er-form-change-overlay";
 import { ER_ID_MAP } from "#data/elite-redux/er-id-map";
@@ -201,16 +202,23 @@ export function initEliteReduxEggTiers(): InitEliteReduxEggTiersResult {
   // prevolution is an evolved stage and must not hatch. (Chimchar Redux →
   // "chimchar" has no prevo → still hatches; Infernape Redux → "infernape" has
   // a prevo → skipped.)
+  // #633: build BOTH name maps from the locale-INVARIANT (forced-English) name so
+  // co-op clients in any language resolve the same vanilla bases. `idToName`'s
+  // values are later compared against `erCustomNames` (static English draft names),
+  // and `vanillaByName` is queried with static-English `draft.name` - so both must
+  // hold English keys/values to match cross-locale (sp is a live PokemonSpecies).
   const vanillaByName = new Map<string, number>();
   const idToName = new Map<number, string>();
   for (const sp of allSpecies) {
-    idToName.set(sp.speciesId, sp.name);
+    const enName = enSpeciesName(sp);
+    idToName.set(sp.speciesId, enName);
     if (sp.speciesId < VANILLA_ID_CUTOFF) {
-      vanillaByName.set(sp.name.toLowerCase(), sp.speciesId);
+      vanillaByName.set(enName.toLowerCase(), sp.speciesId);
     }
   }
   // Registered ER-custom species names (lowercased) — to detect whether a
-  // LOWER-stage custom of the same form exists in a line.
+  // LOWER-stage custom of the same form exists in a line. `d` iterates ER_SPECIES
+  // drafts, whose `.name` is already static English (locale-invariant) - leave as is.
   const erCustomNames = new Set<string>();
   for (const d of ER_SPECIES) {
     const id = ER_ID_MAP.species[d.id];
@@ -368,12 +376,16 @@ let erEggWeightDivisors: ReadonlyMap<number, number> | null = null;
 
 function buildErEggWeightDivisors(): Map<number, number> {
   const tiers = speciesEggTiers as Record<number, EggTier | undefined>;
+  // #633: locale-INVARIANT (forced-English) names so the family grouping is the
+  // same on every co-op client. `idToName`'s values feed `familyKey`, which is
+  // compared against `vanillaNames` - so both must hold English (sp is live).
   const vanillaNames = new Set<string>();
   const idToName = new Map<number, string>();
   for (const sp of allSpecies) {
-    idToName.set(sp.speciesId, sp.name);
+    const enName = enSpeciesName(sp);
+    idToName.set(sp.speciesId, enName);
     if (sp.speciesId < VANILLA_ID_CUTOFF) {
-      vanillaNames.add(sp.name.toLowerCase());
+      vanillaNames.add(enName.toLowerCase());
     }
   }
   // ER-custom multi-form families with NO vanilla name prefix (the vanilla

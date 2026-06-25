@@ -23,6 +23,7 @@
 import { speciesEggTiers } from "#balance/species-egg-tiers";
 import { speciesStarterCosts } from "#balance/starters";
 import { allSpecies } from "#data/data-lists";
+import { enSpeciesName } from "#data/elite-redux/er-canonical-names";
 import { EggTier } from "#enums/egg-type";
 
 /** First ER-custom species id. Vanilla mons (< this) are never touched. */
@@ -154,13 +155,18 @@ export function initEliteReduxStarterCosts(): InitEliteReduxStarterCostsResult {
     if (id < ER_CUSTOM_ID_FLOOR || !Object.hasOwn(starterCosts, id)) {
       continue;
     }
-    if (REMOVE_FROM_GRID_AND_EGGS.some(re => re.test(species.name))) {
+    // #633: match on the locale-INVARIANT (forced-English) name. The removal
+    // regexes and `COST_OVERRIDES`/banding keys below are all English literals,
+    // so a non-English co-op client must compare against the English species name
+    // or it builds different starter-cost / egg-tier tables (species is live).
+    const enName = enSpeciesName(species);
+    if (REMOVE_FROM_GRID_AND_EGGS.some(re => re.test(enName))) {
       delete starterCosts[id]; // out of the starter grid
       delete eggTiers[id]; // out of the egg pool
       result.removed++;
       continue;
     }
-    const cost = resolveCost(species.name, species.baseTotal);
+    const cost = resolveCost(enName, species.baseTotal);
     starterCosts[id] = cost;
     result.recosted++;
     // High-cost customs (8-12: legendaries + AG mons) hatch from Legendary eggs.

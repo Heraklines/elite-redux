@@ -24,6 +24,7 @@
 // =============================================================================
 
 import { allMoves } from "#data/data-lists";
+import { enMoveName } from "#data/elite-redux/er-canonical-names";
 import { ER_FLAG_NAMES_LIST, ER_FLAG_TO_MOVE_FLAG } from "#data/elite-redux/er-flag-mapping";
 import { ER_ID_MAP } from "#data/elite-redux/er-id-map";
 import { ER_MOVES } from "#data/elite-redux/er-moves";
@@ -583,7 +584,9 @@ export function remapEliteReduxMoveIdsByName(): number {
   const idByName = new Map<string, number>();
   for (const mv of allMoves) {
     if (mv !== undefined) {
-      idByName.set(mv.name.toLowerCase(), mv.id);
+      // #633: match on the locale-INVARIANT (forced-English) name so co-op
+      // clients in different languages build the same id-map (mv is a live Move).
+      idByName.set(enMoveName(mv).toLowerCase(), mv.id);
     }
   }
   let remapped = 0;
