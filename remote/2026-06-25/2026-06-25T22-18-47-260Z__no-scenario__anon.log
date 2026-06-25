@@ -1,0 +1,266 @@
+url:      https://elite-redux-staging.pages.dev/
+build:    mqu230pe-cqae
+mode:     6  wave:3
+seed:     TMViGobJTsFBCUPRIyWShCYO
+party:    Magnetilo(L5 0hp f0), Endivie(L5 7hp f0), Vulpix(L5 20hp f0), Chelast(L5 0hp f0), Habitak(L5 20hp f0)
+enemy:    Bluzuk(L3), Schwalbini(L3)
+
+----- COMMENT -----
+desync after switching 2
+
+----- CONSOLE -----
+[22:17:22.725] LOG: %cStart Phase MessagePhase color:green;
+[22:17:22.939] LOG: %cStart Phase WeatherEffectPhase color:green;
+[22:17:22.939] LOG: %cStart Phase PositionalTagPhase color:green;
+[22:17:22.939] LOG: %cStart Phase BerryPhase color:green;
+[22:17:22.942] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[22:17:22.944] LOG: %cStart Phase TurnEndPhase color:green;
+[22:17:22.948] LOG: %cStart Phase TurnInitPhase color:green;
+[22:17:22.948] LOG: %cStart Phase CommandPhase color:green;
+[22:17:22.951] LOG: %cStart Phase CommandPhase color:green;
+[22:17:26.001] LOG: Move: BULLET_SEED Move targets: {"targets":[3,0],"multiple":false} 
+Player Pokemon: Chelast
+[22:17:26.003] LOG: %cStart Phase SelectTargetPhase color:green;
+[22:17:26.185] LOG: %cStart Phase EnemyCommandPhase color:green;
+[22:17:26.185] LOG: %cStart Phase TurnStartPhase color:green;
+[22:17:26.185] LOG: %cStart Phase CoopReplayTurnPhase color:green;
+[22:17:34.197] WARN: [coop-desync] turn=2 host=9a9fa322e64383a4 guest=af339d15ba79af01
+[22:17:34.198] WARN: [coop-cs] turn=2 1 differing field(s):
+[22:17:34.198] WARN:   field.0.moves.0.1: host=3 guest=2
+[22:17:34.198] LOG: %cStart Phase MessagePhase color:green;
+[22:17:34.438] LOG: %cStart Phase MessagePhase color:green;
+[22:17:34.738] LOG: %cStart Phase MessagePhase color:green;
+[22:17:34.983] LOG: %cStart Phase MessagePhase color:green;
+[22:17:35.256] LOG: %cStart Phase MessagePhase color:green;
+[22:17:35.495] LOG: %cStart Phase MessagePhase color:green;
+[22:17:35.796] LOG: %cStart Phase MessagePhase color:green;
+[22:17:36.121] LOG: %cStart Phase WeatherEffectPhase color:green;
+[22:17:36.122] LOG: %cStart Phase PositionalTagPhase color:green;
+[22:17:36.122] LOG: %cStart Phase BerryPhase color:green;
+[22:17:36.122] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[22:17:36.123] LOG: %cStart Phase TurnEndPhase color:green;
+[22:17:36.123] LOG: %cStart Phase VictoryPhase color:green;
+[22:17:36.124] LOG: %cStart Phase ExpPhase color:green;
+[22:17:37.872] LOG: %cStart Phase ExpPhase color:green;
+[22:17:38.256] LOG: %cStart Phase BattleEndPhase color:green;
+[22:17:38.256] LOG: Battle Score: 0 (2 Turns x0.84)
+[22:17:38.256] LOG: Total Score: 0
+[22:17:38.269] LOG: %cStart Phase EggLapsePhase color:green;
+[22:17:38.269] LOG: %cStart Phase SelectModifierPhase color:green;
+[22:17:38.269] LOG: Wave Seed: VOXkIqdLVuHDEWRTK{YUjE[Q 2
+[22:17:38.275] LOG: 0 0 [2,3,4,5,6]
+[22:17:38.275] LOG: {"id":"POKEBALL","localeKey":"","iconImage":"pb","group":"pb","soundName":"se/pb_bounce_1","tier":0,"pokeballType":0,"count":5} 
+[22:17:38.275] LOG: 0 0 [2,3,4,5,6]
+[22:17:38.275] LOG: {"id":"POKEBALL","localeKey":"","iconImage":"pb","group":"pb","soundName":"se/pb_bounce_1","tier":0,"pokeballType":0,"count":5} 
+[22:17:38.275] LOG: 0 0 [2,3,4,5,6]
+[22:17:38.275] LOG: {"id":"POKEBALL","localeKey":"","iconImage":"pb","group":"pb","soundName":"se/pb_bounce_1","tier":0,"pokeballType":0,"count":5} 
+[22:17:38.276] LOG: 0 0 [2,3,4,5,6]
+[22:17:38.276] LOG: {"id":"POKEBALL","localeKey":"","iconImage":"pb","group":"pb","soundName":"se/pb_bounce_1","tier":0,"pokeballType":0,"count":5} 
+[22:17:38.276] LOG: 7 5 [2,3,4,5,6]
+[22:17:38.276] LOG: {"id":"TEMP_STAT_STAGE_BOOSTER","localeKey":"","iconImage":"x_speed","soundName":"se/restore","tier":0,"stat":5,"nameKey":"x_speed","quantityKey":"percentage"} 
+[22:17:38.276] LOG: 11 9 [2,3,4,5,6,7,8,9,10,12,22]
+[22:17:38.276] LOG: {"id":"DIRE_HIT","localeKey":"modifierType:ModifierType.DIRE_HIT","iconImage":"dire_hit","soundName":"se/restore","tier":1} 
+[22:17:38.276] LOG: 20 10 [2,3,4,5,6,7,8,9,10,12,22]
+[22:17:38.276] LOG: {"id":"BASE_STAT_BOOSTER","localeKey":"","iconImage":"carbos","soundName":"se/restore","tier":1,"stat":5,"key":"carbos"} 
+[22:17:38.277] LOG: 11 9 [2,3,4,5,6,7,8,9,10,12,22]
+[22:17:38.277] LOG: {"id":"DIRE_HIT","localeKey":"modifierType:ModifierType.DIRE_HIT","iconImage":"dire_hit","soundName":"se/restore","tier":1} 
+[22:17:38.277] LOG: 23 11 [2,3,4,5,6,7,8,9,10,12,22]
+[22:17:38.277] LOG: {"id":"VOUCHER","localeKey":"","iconImage":"coupon","group":"voucher","soundName":"se/restore","tier":1,"voucherType":0,"count":1} 
+[22:17:38.277] LOG: [coop-reward] OWNER drives reward screen (start=1 role=guest spoof=false wave=2)
+[22:17:42.370] LOG: %cStart Phase NewBattlePhase color:green;
+[22:17:42.370] LOG: Wave Seed: WPYlJreMWvIEFXSUL|ZVkF\R 3
+[22:17:42.370] LOG: %cStart Phase NextEncounterPhase color:green;
+[22:17:42.371] LOG: [coop-reward] advance interaction (role=guest from=1 counter=1)
+[22:17:42.371] LOG: [coop-launch] proceedIfReady launched=true localTeam=2 bothReady=true role=guest partnerReady=true
+[22:17:42.420] LOG: [coop-launch] proceedIfReady launched=true localTeam=2 bothReady=true role=guest partnerReady=true
+[22:17:45.753] LOG: Pokemon: Bluzuk (wild) | Species ID: 48 | Level: 3 | Nature: Mutig (+Ang/-Init)
+[22:17:45.753] LOG: Stats (IVs): HP: 17 (24), Atk: 9 (0), Def: 8 (13), Spatk: 8 (12), Spdef: 8 (23), Spd: 8 (28)
+[22:17:45.753] LOG: Ability: Aufwertung | Passive Ability: Facettenauge 
+[22:17:45.753] LOG: Moveset: ["Ampelleuchte","Giftpuder","Konfusion","Tackle"]
+[22:17:45.755] LOG: Pokemon: Schwalbini (wild) | Species ID: 276 | Level: 3 | Nature: Ernst (-)
+[22:17:45.755] LOG: Stats (IVs): HP: 16 (24), Atk: 9 (25), Def: 6 (0), Spatk: 9 (29), Spdef: 7 (26), Spd: 11 (31)
+[22:17:45.755] LOG: Ability: Air Blower | Passive Ability: Flock 
+[22:17:45.755] LOG: Moveset: ["Ruckzuckhieb","Energiefokus","Doppelschlag","Pikser"]
+[22:17:46.596] DEBUG: Session data saved to slot 0!
+[22:17:46.596] LOG: Wave Seed: WPYlJreMWvIEFXSUL|ZVkF\R 3
+[22:17:47.103] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[22:17:47.103] LOG: %cStart Phase CheckSwitchPhase color:green;
+[22:17:47.103] LOG: %cStart Phase CheckSwitchPhase color:green;
+[22:17:47.103] LOG: %cStart Phase InitEncounterPhase color:green;
+[22:17:47.104] LOG: %cStart Phase PostSummonPhase color:green;
+[22:17:47.104] LOG: Ran PSP for: Schwalbini
+[22:17:47.105] LOG: %cStart Phase PostSummonPhase color:green;
+[22:17:47.106] LOG: %cStart Phase MovePhase color:green;
+[22:17:47.106] LOG: %cUser: Schwalbini
+Move: TAILWIND
+Use Mode: INDIRECT color:orchid
+[22:17:47.107] LOG: Applied X-Tempo 
+[22:17:47.108] LOG: Applied X-Tempo 
+[22:17:47.108] LOG: Applied X-Tempo 
+[22:17:47.108] LOG: Applied X-Tempo 
+[22:17:47.109] LOG: Applied X-Tempo 
+[22:17:47.110] LOG: Applied X-Tempo 
+[22:17:47.111] LOG: Applied X-Tempo 
+[22:17:47.112] LOG: Applied X-Tempo 
+[22:17:47.112] LOG: Applied X-Tempo 
+[22:17:47.114] LOG: %cStart Phase MessagePhase color:green;
+[22:17:47.269] LOG: %cStart Phase MoveEffectPhase color:green;
+[22:17:47.293] LOG: %cStart Phase MessagePhase color:green;
+[22:17:47.602] LOG: %cStart Phase MoveEndPhase color:green;
+[22:17:47.604] LOG: %cStart Phase PostSummonPhase color:green;
+[22:17:47.604] LOG: %cStart Phase PostSummonPhase color:green;
+[22:17:47.604] LOG: Ran PSP for: Bluzuk
+[22:17:47.605] LOG: %cStart Phase PostSummonPhase color:green;
+[22:17:47.605] LOG: %cStart Phase PostSummonPhase color:green;
+[22:17:47.605] LOG: %cStart Phase TurnInitPhase color:green;
+[22:17:47.605] LOG: %cStart Phase CommandPhase color:green;
+[22:17:47.607] LOG: %cStart Phase CommandPhase color:green;
+[22:17:53.855] LOG: Move: FERTILE_FANGS Move targets: {"targets":[2,3,0],"multiple":false} 
+Player Pokemon: Chelast
+[22:17:53.857] LOG: %cStart Phase SelectTargetPhase color:green;
+[22:17:54.545] LOG: %cStart Phase EnemyCommandPhase color:green;
+[22:17:54.545] LOG: %cStart Phase EnemyCommandPhase color:green;
+[22:17:54.545] LOG: %cStart Phase TurnStartPhase color:green;
+[22:17:54.545] LOG: %cStart Phase CoopReplayTurnPhase color:green;
+[22:17:59.105] LOG: Applied X-Tempo 
+[22:17:59.107] LOG: Applied X-Tempo 
+[22:17:59.111] WARN: [coop-desync] turn=1 host=e3b6ebbabb757b2e guest=bb0a5475ff275eab
+[22:17:59.112] WARN: [coop-cs] turn=1 3 differing field(s):
+[22:17:59.112] WARN:   field.0.tags.0: host=CONFUSED guest=<absent>
+[22:17:59.112] WARN:   field.1.moves.0.1: host=1 guest=0
+[22:17:59.112] WARN:   field.2.moves.3.1: host=1 guest=0
+[22:17:59.113] LOG: %cStart Phase MessagePhase color:green;
+[22:17:59.138] LOG: Applied X-Tempo 
+[22:17:59.140] LOG: Applied X-Tempo 
+[22:17:59.140] LOG: Applied X-Tempo 
+[22:17:59.141] LOG: Applied X-Tempo 
+[22:17:59.142] LOG: Applied X-Tempo 
+[22:17:59.143] LOG: Applied X-Tempo 
+[22:17:59.145] LOG: Applied X-Tempo 
+[22:17:59.146] LOG: Applied X-Tempo 
+[22:17:59.146] LOG: Applied X-Tempo 
+[22:17:59.147] LOG: Applied X-Tempo 
+[22:17:59.156] LOG: Applied X-Tempo 
+[22:17:59.157] LOG: Applied X-Tempo 
+[22:17:59.159] WARN: [coop-resync] turn=1 still-diverged host=e3b6ebbabb757b2e guest=255dee0ac728004c
+[22:17:59.160] WARN: [coop-resync] turn=1 UNHEALED 25+ differing field(s):
+[22:17:59.160] WARN:   field.1.abilityId: host=110 guest=144
+[22:17:59.160] WARN:   field.1.bi: host=2 guest=1
+[22:17:59.160] WARN:   field.1.hp: host=17 guest=20
+[22:17:59.160] WARN:   field.1.maxHp: host=17 guest=20
+[22:17:59.160] WARN:   field.1.moves.0.0: host=324 guest=45
+[22:17:59.160] WARN:   field.1.moves.0.1: host=1 guest=0
+[22:17:59.160] WARN:   field.1.moves.1.0: host=77 guest=72
+[22:17:59.160] WARN:   field.1.moves.2.0: host=93 guest=77
+[22:17:59.160] WARN:   field.1.moves.3.0: host=33 guest=230
+[22:17:59.160] WARN:   field.1.partyIndex: host=0 guest=1
+[22:17:59.160] WARN:   field.1.speciesId: host=48 guest=152
+[22:17:59.160] WARN:   field.1.teraType: host=6 guest=11
+[22:17:59.160] WARN:   field.2.abilityId: host=5058 guest=110
+[22:17:59.160] WARN:   field.2.bi: host=3 guest=2
+[22:17:59.160] WARN:   field.2.hp: host=16 guest=17
+[22:17:59.160] WARN:   field.2.maxHp: host=16 guest=17
+[22:17:59.160] WARN:   field.2.moves.0.0: host=98 guest=324
+[22:17:59.160] WARN:   field.2.moves.0.1: host=0 guest=1
+[22:17:59.160] WARN:   field.2.moves.1.0: host=116 guest=77
+[22:17:59.160] WARN:   field.2.moves.2.0: host=458 guest=93
+[22:17:59.160] WARN:   field.2.moves.3.0: host=64 guest=33
+[22:17:59.160] WARN:   field.2.moves.3.1: host=1 guest=0
+[22:17:59.160] WARN:   field.2.partyIndex: host=1 guest=0
+[22:17:59.160] WARN:   field.2.speciesId: host=276 guest=48
+[22:17:59.160] WARN:   field.2.teraType: host=0 guest=6
+[22:17:59.160] WARN: [coop-resync] note: snapshot does NOT re-apply party/modifiers/arenaTags or force maxHp - a diff in those is a data-table drift, not a heal bug
+[22:17:59.343] LOG: %cStart Phase CommonAnimPhase color:green;
+[22:17:59.674] LOG: %cStart Phase MessagePhase color:green;
+[22:17:59.984] LOG: %cStart Phase MessagePhase color:green;
+[22:18:00.324] LOG: %cStart Phase MessagePhase color:green;
+[22:18:00.615] LOG: %cStart Phase MessagePhase color:green;
+[22:18:00.835] LOG: %cStart Phase MessagePhase color:green;
+[22:18:01.085] LOG: %cStart Phase MessagePhase color:green;
+[22:18:01.318] LOG: %cStart Phase MessagePhase color:green;
+[22:18:01.569] LOG: %cStart Phase MessagePhase color:green;
+[22:18:01.809] LOG: %cStart Phase MessagePhase color:green;
+[22:18:02.113] LOG: %cStart Phase WeatherEffectPhase color:green;
+[22:18:02.113] LOG: %cStart Phase PositionalTagPhase color:green;
+[22:18:02.113] LOG: %cStart Phase BerryPhase color:green;
+[22:18:02.114] LOG: Applied X-Tempo 
+[22:18:02.115] LOG: Applied X-Tempo 
+[22:18:02.115] LOG: Applied X-Tempo 
+[22:18:02.116] LOG: Applied X-Tempo 
+[22:18:02.117] LOG: Applied X-Tempo 
+[22:18:02.118] LOG: Applied X-Tempo 
+[22:18:02.119] LOG: Applied X-Tempo 
+[22:18:02.120] LOG: Applied X-Tempo 
+[22:18:02.120] LOG: Applied X-Tempo 
+[22:18:02.121] LOG: Applied X-Tempo 
+[22:18:02.121] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[22:18:02.121] LOG: Applied X-Tempo 
+[22:18:02.122] LOG: Applied X-Tempo 
+[22:18:02.123] LOG: Applied X-Tempo 
+[22:18:02.124] LOG: Applied X-Tempo 
+[22:18:02.125] LOG: Applied X-Tempo 
+[22:18:02.126] LOG: Applied X-Tempo 
+[22:18:02.126] LOG: Applied X-Tempo 
+[22:18:02.127] LOG: Applied X-Tempo 
+[22:18:02.127] LOG: Applied X-Tempo 
+[22:18:02.127] LOG: Applied X-Tempo 
+[22:18:02.127] LOG: %cStart Phase TurnEndPhase color:green;
+[22:18:02.129] LOG: Applied X-Tempo 
+[22:18:02.129] LOG: Applied X-Tempo 
+[22:18:02.129] LOG: Applied X-Tempo 
+[22:18:02.130] LOG: Applied X-Tempo 
+[22:18:02.131] LOG: Applied X-Tempo 
+[22:18:02.132] LOG: Applied X-Tempo 
+[22:18:02.132] LOG: Applied X-Tempo 
+[22:18:02.132] LOG: Applied X-Tempo 
+[22:18:02.133] LOG: Applied X-Tempo 
+[22:18:02.133] LOG: Applied X-Tempo 
+[22:18:02.135] LOG: Applied X-Tempo 
+[22:18:02.135] LOG: %cStart Phase TurnInitPhase color:green;
+[22:18:02.136] LOG: %cStart Phase CommandPhase color:green;
+[22:18:02.137] LOG: %cStart Phase CommandPhase color:green;
+[22:18:10.915] LOG: Move: POISON_POWDER Move targets: {"targets":[2,3,0],"multiple":false} 
+Player Pokemon: Endivie
+[22:18:10.917] LOG: %cStart Phase SelectTargetPhase color:green;
+[22:18:11.573] LOG: %cStart Phase EnemyCommandPhase color:green;
+[22:18:11.573] LOG: %cStart Phase EnemyCommandPhase color:green;
+[22:18:11.573] LOG: %cStart Phase TurnStartPhase color:green;
+[22:18:11.573] LOG: %cStart Phase CoopReplayTurnPhase color:green;
+[22:18:16.311] LOG: Applied X-Tempo 
+[22:18:16.312] LOG: Applied X-Tempo 
+[22:18:16.313] WARN: [coop-desync] turn=2 host=86d14c75ca0e8635 guest=e79c27907685d409
+[22:18:16.313] WARN: [coop-cs] turn=2 4 differing field(s):
+[22:18:16.313] WARN:   field.0.moves.2.1: host=1 guest=0
+[22:18:16.313] WARN:   field.0.tags.0: host=CONFUSED guest=<absent>
+[22:18:16.313] WARN:   field.1.moves.0.1: host=2 guest=1
+[22:18:16.313] WARN:   field.2.moves.2.1: host=1 guest=0
+[22:18:16.314] LOG: %cStart Phase MessagePhase color:green;
+[22:18:16.674] LOG: %cStart Phase CommonAnimPhase color:green;
+[22:18:17.073] LOG: %cStart Phase MessagePhase color:green;
+[22:18:17.424] LOG: %cStart Phase MessagePhase color:green;
+[22:18:17.749] LOG: %cStart Phase MessagePhase color:green;
+[22:18:18.024] LOG: %cStart Phase MessagePhase color:green;
+[22:18:18.268] LOG: %cStart Phase MessagePhase color:green;
+[22:18:18.501] LOG: %cStart Phase MessagePhase color:green;
+[22:18:18.751] LOG: %cStart Phase MessagePhase color:green;
+[22:18:18.984] LOG: %cStart Phase MessagePhase color:green;
+[22:18:19.254] LOG: %cStart Phase MessagePhase color:green;
+[22:18:19.618] LOG: %cStart Phase MessagePhase color:green;
+[22:18:19.875] LOG: %cStart Phase MessagePhase color:green;
+[22:18:20.210] LOG: %cStart Phase WeatherEffectPhase color:green;
+[22:18:20.210] LOG: %cStart Phase PositionalTagPhase color:green;
+[22:18:20.210] LOG: %cStart Phase BerryPhase color:green;
+[22:18:20.210] LOG: Applied X-Tempo 
+[22:18:20.211] LOG: Applied X-Tempo 
+[22:18:20.211] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[22:18:20.211] LOG: Applied X-Tempo 
+[22:18:20.212] LOG: Applied X-Tempo 
+[22:18:20.212] LOG: %cStart Phase TurnEndPhase color:green;
+[22:18:20.214] LOG: Applied X-Tempo 
+[22:18:20.215] LOG: Applied X-Tempo 
+[22:18:20.215] LOG: %cStart Phase TurnInitPhase color:green;
+[22:18:20.215] LOG: %cStart Phase CommandPhase color:green;
+[22:18:20.217] LOG: %cStart Phase EnemyCommandPhase color:green;
+[22:18:20.217] LOG: %cStart Phase EnemyCommandPhase color:green;
+[22:18:20.217] LOG: %cStart Phase TurnStartPhase color:green;
+[22:18:20.217] LOG: %cStart Phase CoopReplayTurnPhase color:green;
