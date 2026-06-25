@@ -171,21 +171,62 @@ export function applyErResistBerry(
  * (seeded pick, stable per battle).
  */
 export function pickErResistBerryType(pokemon: Pokemon): PokemonType | null {
-  const defTypes = pokemon.getTypes(false, false, true);
-  if (defTypes.length === 0) {
+  const weaknesses = erResistBerryWeaknesses(pokemon);
+  if (weaknesses.length === 0) {
     return null;
   }
-  const weaknesses = [...ER_RESIST_BERRY_BY_TYPE.keys()].filter(attackType => {
+  return weaknesses[pokemon.randBattleSeedInt(weaknesses.length)];
+}
+
+/**
+ * The covered attack types `pokemon` is weak to (>=2x), i.e. every resist berry
+ * that would matter for it. Roseli/Fairy is absent from the berry map (no atlas
+ * icon) and so is silently excluded. Order follows the berry map.
+ */
+function erResistBerryWeaknesses(pokemon: Pokemon): PokemonType[] {
+  const defTypes = pokemon.getTypes(false, false, true);
+  if (defTypes.length === 0) {
+    return [];
+  }
+  return [...ER_RESIST_BERRY_BY_TYPE.keys()].filter(attackType => {
     let mult = 1;
     for (const defType of defTypes) {
       mult *= getTypeDamageMultiplier(attackType, defType);
     }
     return mult >= 2;
   });
-  if (weaknesses.length === 0) {
-    return null;
+}
+
+/** Find a mon's resist berry of `resistType` (its side's modifier list). */
+function findErResistBerry(pokemon: Pokemon, resistType: PokemonType): ErResistBerryModifier | undefined {
+  return globalScene.findModifier(
+    m => m instanceof ErResistBerryModifier && m.pokemonId === pokemon.id && m.resistType === resistType,
+    pokemon.isPlayer(),
+  ) as ErResistBerryModifier | undefined;
+}
+
+/**
+ * GUARANTEED resist-berry grant — instead of the single ~chance roll, attaches
+ * ONE resist berry for EVERY covered type-weakness of `enemy` (distinct types
+ * stack as separate modifiers — they don't match each other). Used by the Hell
+ * post-100 trainer-boss buff (#135 Tier 1) on the highest-BST trainer mon.
+ * Idempotent: a weakness type the mon already holds a berry for is skipped, so
+ * re-running the modifier pipeline can't double up. Never throws.
+ */
+export function grantErResistBerries(enemy: EnemyPokemon): void {
+  try {
+    for (const resistType of erResistBerryWeaknesses(enemy)) {
+      if (findErResistBerry(enemy, resistType)) {
+        continue;
+      }
+      const modifier = erResistBerryModifierType(resistType).newModifier(enemy) as PokemonHeldItemModifier | null;
+      if (modifier) {
+        globalScene.addEnemyModifier(modifier, true, true);
+      }
+    }
+  } catch {
+    // Forced grants must never break enemy generation.
   }
-  return weaknesses[pokemon.randBattleSeedInt(weaknesses.length)];
 }
 
 /**

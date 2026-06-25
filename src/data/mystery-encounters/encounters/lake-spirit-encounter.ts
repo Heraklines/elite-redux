@@ -50,7 +50,12 @@ const PERFECT_CANDY_PER_MON = 5;
  * `undefined` relic funcs that were silently dropped from the reward (#616).
  */
 function blessingRelicFuncs(): ModifierTypeFunc[] {
-  return [modifierTypes.ER_RELIC_MYSTERY_CHARM, modifierTypes.ER_RELIC_MORALE_BANNER, modifierTypes.ER_RELIC_TWIN_LINK];
+  return [
+    modifierTypes.ER_RELIC_MYSTERY_CHARM,
+    modifierTypes.ER_RELIC_MORALE_BANNER,
+    modifierTypes.ER_RELIC_TWIN_LINK,
+    modifierTypes.ER_RELIC_STORMGLASS,
+  ];
 }
 
 /**

@@ -102,6 +102,12 @@ export enum PartyUiMode {
    */
   ER_LEARNERS_SHROOM_MODIFIER,
   /**
+   * ER TM Case: like REMEMBER_MOVE_MODIFIER, but the move list is the mon's
+   * COMPATIBLE TM moves (the ER TM/tutor compatibility list) that it doesn't
+   * already know.
+   */
+  ER_TM_CASE_MODIFIER,
+  /**
    * Indicates that the party UI is open to transfer items between mons.  This
    * type of selection can be cancelled.
    */
@@ -798,14 +804,19 @@ export class PartyUiHandler extends MessageUiHandler {
     return (
       this.partyUiMode === PartyUiMode.REMEMBER_MOVE_MODIFIER
       || this.partyUiMode === PartyUiMode.ER_LEARNERS_SHROOM_MODIFIER
+      || this.partyUiMode === PartyUiMode.ER_TM_CASE_MODIFIER
     );
   }
 
   /** The selectable move list for the current remember-move-like mode. */
   private getRememberableMoves(pokemon: PlayerPokemon): MoveId[] {
-    return this.partyUiMode === PartyUiMode.ER_LEARNERS_SHROOM_MODIFIER
-      ? pokemon.getErLearnableShroomMoves()
-      : pokemon.getLearnableLevelMoves();
+    if (this.partyUiMode === PartyUiMode.ER_LEARNERS_SHROOM_MODIFIER) {
+      return pokemon.getErLearnableShroomMoves();
+    }
+    if (this.partyUiMode === PartyUiMode.ER_TM_CASE_MODIFIER) {
+      return pokemon.getErTmCaseMoves();
+    }
+    return pokemon.getLearnableLevelMoves();
   }
 
   private processRememberMoveModeInput(pokemon: PlayerPokemon) {
@@ -1653,6 +1664,7 @@ export class PartyUiHandler extends MessageUiHandler {
         break;
       case PartyUiMode.REMEMBER_MOVE_MODIFIER:
       case PartyUiMode.ER_LEARNERS_SHROOM_MODIFIER:
+      case PartyUiMode.ER_TM_CASE_MODIFIER:
         this.updateOptionsWithRememberMoveModifierMode(pokemon);
         break;
       case PartyUiMode.MODIFIER_TRANSFER:

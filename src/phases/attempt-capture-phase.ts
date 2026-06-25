@@ -27,7 +27,7 @@ import { achvs } from "#system/achv";
 import type { PartyOption } from "#ui/party-ui-handler";
 import { PartyUiMode } from "#ui/party-ui-handler";
 import { SummaryUiMode } from "#ui/summary-ui-handler";
-import { applyChallenges } from "#utils/challenge-utils";
+import { applyChallenges, isSpeciesAllowedByActiveChallenges } from "#utils/challenge-utils";
 import { BooleanHolder } from "#utils/common";
 import i18next from "i18next";
 
@@ -278,6 +278,13 @@ export class AttemptCapturePhase extends PokemonPhase {
 
     const addStatus = new BooleanHolder(true);
     applyChallenges(ChallengeType.POKEMON_ADD_TO_PARTY, pokemon, addStatus);
+    // ER (#132): also gate on the unified roster legality - the SAME check starter
+    // select and the party "can't use this mon in this challenge" message use - so EVERY
+    // active challenge blocks an out-of-challenge catch, not only the ones that ship a
+    // bespoke applyPokemonAddToParty override. No-op outside challenges.
+    if (addStatus.value && !isSpeciesAllowedByActiveChallenges(pokemon.species)) {
+      addStatus.value = false;
+    }
 
     globalScene.ui.showText(
       i18next.t(addStatus.value ? "battle:pokemonCaught" : "battle:pokemonCaughtButChallenge", {

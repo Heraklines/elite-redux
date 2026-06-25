@@ -88,6 +88,8 @@ import {
 } from "#data/elite-redux/er-enemy-ai";
 import { isErFinalBossSpecies } from "#data/elite-redux/er-final-boss";
 import {
+  erBloodPactDealMultiplier,
+  erBloodPactTakeMultiplier,
   erCapacitorElectricMultiplier,
   erMoltenCoreFireMultiplier,
   erMoraleBannerMultiplier,
@@ -5026,15 +5028,25 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
     /**
      * ER relics (#439): team-wide damage buffs that apply only to PLAYER
      * attackers. Morale Banner = +15% while the team is faint-free this biome;
-     * Twin Link = +15% for moves of the type shared by party slots 2 and 3. Both
-     * return 1 when their relic isn't held or the condition isn't met.
+     * Twin Link = +15% for moves of the type shared by party slots 2 and 3;
+     * Blood Pact = +20% on ALL of the team's hits. All return 1 when their relic
+     * isn't held or the condition isn't met.
      */
     const erRelicMultiplier = source.isPlayer()
       ? erMoraleBannerMultiplier()
         * erTwinLinkMultiplier(moveType)
         * erMoltenCoreFireMultiplier(moveType)
         * erCapacitorElectricMultiplier(moveType)
+        * erBloodPactDealMultiplier()
       : 1;
+
+    /**
+     * ER relics (#439): Blood Pact's double edge - while held, the player's mons
+     * (the DEFENDER `this` here) take +15% damage. 1 for enemy defenders / when the
+     * relic isn't held. Multiplies with the offensive bonus only on the rare
+     * player-vs-player hit.
+     */
+    const erRelicDefenderMultiplier = this.isPlayer() ? erBloodPactTakeMultiplier() : 1;
 
     damage.value = toDmgValue(
       baseDamage
@@ -5052,7 +5064,8 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
         * screenMultiplier.value
         * hitsTagMultiplier.value
         * mistyTerrainMultiplier
-        * erRelicMultiplier,
+        * erRelicMultiplier
+        * erRelicDefenderMultiplier,
     );
 
     // ER Overrule 815: on a CRITICAL hit, the holder's attacks deal double damage
@@ -7392,6 +7405,24 @@ export class PlayerPokemon extends Pokemon {
         this.compatibleTms.push(moveId);
       }
     }
+  }
+
+  /**
+   * ER TM Case: every move this Pokemon can still learn from a TM, i.e. its
+   * COMPATIBLE TM moves ({@linkcode PlayerPokemon.compatibleTms}, the ER TM/tutor
+   * compatibility list) minus any move already in its moveset. This is the list
+   * the ER_TM_CASE_MODIFIER party-UI mode displays.
+   */
+  public getErTmCaseMoves(): MoveId[] {
+    const seen = new Set<MoveId>();
+    const out: MoveId[] = [];
+    for (const m of this.compatibleTms) {
+      if (m && !seen.has(m) && !this.moveset.some(pm => pm?.moveId === m)) {
+        seen.add(m);
+        out.push(m);
+      }
+    }
+    return out;
   }
 
   /**

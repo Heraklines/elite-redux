@@ -395,6 +395,23 @@ export function checkStarterValidForChallenge(species: PokemonSpecies, props: De
 }
 
 /**
+ * ER: thin roster-legality predicate for code paths that GRANT or TRANSFORM-INTO a
+ * species OUTSIDE the catch hook (e.g. several vanilla mystery encounters). Reuses the
+ * single source of truth {@linkcode checkStarterValidForChallenge} (soft) so a run with
+ * an active roster challenge (Mono Type / Mono Generation / Mono Color / Usage Tier) can
+ * never be handed a party member that violates the challenge.
+ *
+ * `soft` is used so a species whose evolution becomes legal still counts as allowed,
+ * matching starter-select behavior. With no active challenge the underlying predicate
+ * returns `true` for everything, so this is a no-op outside challenges.
+ * @param species - The {@linkcode PokemonSpecies} being offered/granted/transformed-into.
+ * @returns `true` if the species is legal under every active challenge.
+ */
+export function isSpeciesAllowedByActiveChallenges(species: PokemonSpecies): boolean {
+  return checkStarterValidForChallenge(species, { shiny: false, female: false, variant: 0, formIndex: 0 }, true);
+}
+
+/**
  * Apply all challenges to the given species (and form) to check its validity.
  * Differs from {@linkcode checkStarterValidForChallenge} which also checks evolutions.
  * @param species - The {@linkcode PokemonSpecies} to check the validity of.

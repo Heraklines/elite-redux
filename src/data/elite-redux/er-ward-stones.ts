@@ -411,6 +411,25 @@ function addWardStone(enemy: EnemyPokemon, tier: ErWardStoneTier): void {
   }
 }
 
+/**
+ * GUARANTEED Ward Stone grant — bypasses the per-mon random roll and the wave
+ * gate, attaching `tier` to `enemy` unconditionally. Used by the Hell post-100
+ * trainer-boss buff (#135 Tier 1), which forces the regular/stealable `greater`
+ * tier onto the highest-BST trainer mon. Idempotent: a mon that already carries
+ * a stone (from the normal roll, or a prior call) is left alone, so re-running
+ * the modifier pipeline can't stack a second stone. Never throws.
+ */
+export function grantErWardStone(enemy: EnemyPokemon, tier: ErWardStoneTier): void {
+  try {
+    if (findErWardStone(enemy)) {
+      return;
+    }
+    addWardStone(enemy, tier);
+  } catch {
+    // Forced grants must never break enemy generation.
+  }
+}
+
 // -----------------------------------------------------------------------------
 // Wave charging — player-held stones refill over won waves.
 // -----------------------------------------------------------------------------

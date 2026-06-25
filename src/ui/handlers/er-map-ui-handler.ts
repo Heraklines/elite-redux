@@ -18,9 +18,11 @@
 // =============================================================================
 
 import { globalScene } from "#app/global-scene";
+import { getErBiomeEffectLines } from "#data/elite-redux/er-biome-effects-display";
 import type { ErRouteNode } from "#data/elite-redux/er-biome-routing";
 import { getErPendingNodes } from "#data/elite-redux/er-biome-routing";
 import { getErBiomeHistory, getTreasureFragments, TREASURE_FRAGMENTS_FOR_REWARD } from "#data/elite-redux/er-map-nodes";
+import { erCartographersLensExtraNodes } from "#data/elite-redux/er-relics";
 import type { BiomeId } from "#enums/biome-id";
 import { Button } from "#enums/buttons";
 import { TextStyle } from "#enums/text-style";
@@ -35,7 +37,10 @@ import { getBiomeName } from "#utils/common";
 export type ErMapCloseCallback = () => void;
 
 const PANEL_W = 284;
-const PANEL_H = 176;
+// Tall enough for the journey + onward rows AND the Conditions footer (#129):
+// the old 176 left a dead band under the routes row; the footer fills it with
+// the highlighted biome's special rules. The hint bar (y = PANEL_H - 13) tracks.
+const PANEL_H = 221;
 const GOLD = 0xf8d030;
 const INK = 0xe8ecf8;
 const DIM = 0x90a0c0;
@@ -54,6 +59,15 @@ const TILE_W = 38;
 const TILE_H = 22;
 const TILE_GAP = 8;
 
+/** Conditions footer (#129): a full-width panel listing the highlighted biome's
+ *  special rules, filling the band under the onward-routes row. */
+const FOOTER_Y = 140;
+const FOOTER_H = 62;
+const FOOTER_PAD = 6;
+/** First Conditions line baseline + per-line step (6 lines fit the footer body). */
+const COND_FIRST_Y = FOOTER_Y + 13;
+const COND_LINE_H = 8;
+
 export class ErMapUiHandler extends UiHandler {
   private container: Phaser.GameObjects.Container;
   private card: Phaser.GameObjects.Container;
@@ -65,8 +79,17 @@ export class ErMapUiHandler extends UiHandler {
   private emptyText: Phaser.GameObjects.Text;
   private hintText: Phaser.GameObjects.Text;
   private graphics: Phaser.GameObjects.Graphics;
+  /** Conditions footer (#129): static panel bg + "Conditions" label (built once). */
+  private footerPanel: Phaser.GameObjects.NineSlice;
+  private footerLabel: Phaser.GameObjects.Text;
   /** Per-render tiles / labels destroyed on refresh + clear. */
   private transient: Phaser.GameObjects.GameObject[] = [];
+  /** The Conditions text lines (#129), rebuilt for the highlighted biome on
+   *  refresh + on pick-cursor move (kept apart from {@linkcode transient} so a
+   *  cursor move can re-list conditions without rebuilding the whole map). */
+  private condLines: Phaser.GameObjects.GameObject[] = [];
+  /** The biome the footer is currently describing (avoids a needless rebuild). */
+  private condBiome: BiomeId | undefined;
 
   private onClose: ErMapCloseCallback | null = null;
   private resolved = false;
@@ -146,6 +169,26 @@ export class ErMapUiHandler extends UiHandler {
     this.routesLabel.setOrigin(0, 0);
     this.routesLabel.setTint(DIM);
     this.card.add(this.routesLabel);
+
+    // Conditions footer (#129): a full-width inner panel + a "Conditions" header,
+    // both static chrome. The per-biome effect lines are filled in refresh() /
+    // on pick-cursor move (they live in this.condLines, rebuilt per biome).
+    this.footerPanel = addWindow(FOOTER_PAD, FOOTER_Y, PANEL_W - FOOTER_PAD * 2, FOOTER_H);
+    this.card.add(this.footerPanel);
+    // Dark inner fill behind the Conditions text. It lifts contrast for the light body
+    // text in-game; and because the 2D render harness rasterizes the window frame as a
+    // light fill (no dark window texture), this dark backing is what makes the light
+    // text legible in harness captures - so the panel is actually visually verifiable.
+    const footerFill = globalScene.add
+      .rectangle(FOOTER_PAD + 3, FOOTER_Y + 3, PANEL_W - (FOOTER_PAD + 3) * 2, FOOTER_H - 6, 0x1c2438)
+      .setOrigin(0, 0);
+    this.card.add(footerFill);
+    this.footerLabel = addTextObject(FOOTER_PAD + 6, FOOTER_Y + 3, "Conditions", TextStyle.WINDOW, {
+      fontSize: "38px",
+    });
+    this.footerLabel.setOrigin(0, 0);
+    this.footerLabel.setTint(GOLD);
+    this.card.add(this.footerLabel);
 
     this.emptyText = addTextObject(PANEL_W / 2, ErMapUiHandler.ROUTES_Y, "", TextStyle.WINDOW, {
       fontSize: "38px",
@@ -326,7 +369,9 @@ export class ErMapUiHandler extends UiHandler {
     // fanning out from below the current biome, and each tile is coloured by why
     // it is shown (gold = normal, green = Map-Upgrade route, blue = a foretold
     // mystery-event route).
-    const onwardCount = Math.min(5, this.onward.length);
+    // Cap the drawn onward row at 5, but raise it by the Cartographer's Lens relic's
+    // extra-node reveal so the extra onward node it reveals (#439) isn't truncated.
+    const onwardCount = Math.min(5 + erCartographersLensExtraNodes(), this.onward.length);
     if (onwardCount > 0 && currentBiome !== undefined) {
       const oRowW = onwardCount * TILE_W + Math.max(0, onwardCount - 1) * TILE_GAP;
       const oStartX = (PANEL_W - oRowW) / 2 + TILE_W / 2;
@@ -387,6 +432,58 @@ export class ErMapUiHandler extends UiHandler {
     if (nothing) {
       this.emptyText.setText("Your journey begins...");
     }
+
+    // Conditions footer (#129): describe the HIGHLIGHTED biome - in pick mode the
+    // onward node under the cursor (placePickCursor above already listed it when
+    // there are onward tiles; fall back to the cursor's biome here so a full
+    // refresh always repaints the footer), otherwise the current biome (the
+    // J-overlay "HERE" tile).
+    this.renderConditions(this.pickMode ? this.onward[this.pickCursor]?.biome : currentBiome, true);
+  }
+
+  /**
+   * Rebuild the Conditions footer (#129) for `biome`: its special mechanical
+   * effect lines (or "No special conditions" when there are none). Only rebuilds
+   * when the biome actually changed (cheap to call on every cursor move), unless
+   * `force` (a fresh refresh()) is set.
+   */
+  private renderConditions(biome: BiomeId | undefined, force = false): void {
+    if (!force && biome === this.condBiome) {
+      return;
+    }
+    this.condBiome = biome;
+    for (const o of this.condLines) {
+      o.destroy();
+    }
+    this.condLines = [];
+
+    const lines = biome === undefined ? [] : getErBiomeEffectLines(biome);
+    if (lines.length === 0) {
+      const none = addTextObject(FOOTER_PAD + 6, COND_FIRST_Y, "No special conditions", TextStyle.WINDOW, {
+        fontSize: "34px",
+      });
+      none.setOrigin(0, 0);
+      none.setTint(DIM);
+      this.card.add(none);
+      this.condLines.push(none);
+      return;
+    }
+    for (let i = 0; i < lines.length; i++) {
+      const line = addTextObject(FOOTER_PAD + 6, COND_FIRST_Y + i * COND_LINE_H, lines[i], TextStyle.WINDOW, {
+        fontSize: "34px",
+      });
+      line.setOrigin(0, 0);
+      line.setTint(INK);
+      this.card.add(line);
+      this.condLines.push(line);
+    }
+
+    // (Cartographer's Lens's "lookahead" is delivered by revealing one EXTRA onward
+    // route node above, whose Conditions the player reads by cursoring it - NOT by a
+    // speculative two-hop preview. Previewing biomes two hops out would call
+    // rollErNextBiomeNodes for an un-rolled biome, consuming the seeded route RNG and
+    // mutating event-reveal state, which DESYNCS the real route roll - the #616-class
+    // hazard. Do not re-add a two-hop preview here without a pure, side-effect-free peek.)
   }
 
   /** Position the gold selection box on the cursored onward tile (pick mode). */
@@ -400,6 +497,9 @@ export class ErMapUiHandler extends UiHandler {
     this.pickRing.setPosition(this.onwardTileX[this.pickCursor], this.onwardRowY);
     this.pickRing.setVisible(true);
     this.card.bringToTop(this.pickRing);
+    // Pick mode (#129): the footer follows the cursor - list the conditions of the
+    // onward biome the cursor is over (so the player compares routes by their rules).
+    this.renderConditions(this.onward[this.pickCursor]?.biome);
   }
 
   processInput(button: Button): boolean {
@@ -497,6 +597,11 @@ export class ErMapUiHandler extends UiHandler {
       o.destroy();
     }
     this.transient = [];
+    for (const o of this.condLines) {
+      o.destroy();
+    }
+    this.condLines = [];
+    this.condBiome = undefined;
     this.graphics.clear();
     this.onClose = null;
     this.onPick = null;

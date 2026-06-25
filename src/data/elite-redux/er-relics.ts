@@ -33,7 +33,8 @@ import { MoveId } from "#enums/move-id";
 import { PokemonType } from "#enums/pokemon-type";
 import type { SpeciesId } from "#enums/species-id";
 import type { BattleStat } from "#enums/stat";
-import { BATTLE_STATS } from "#enums/stat";
+import { BATTLE_STATS, Stat } from "#enums/stat";
+import { WeatherType } from "#enums/weather-type";
 import type { Pokemon } from "#field/pokemon";
 import { ErRelicModifier, PokemonHeldItemModifier } from "#modifiers/modifier";
 import { toDmgValue } from "#utils/common";
@@ -57,7 +58,14 @@ export type ErRelicKind =
   | "capacitor"
   | "pharaohAnkh"
   | "covenant"
-  | "cursedIdol";
+  | "cursedIdol"
+  | "bloodPact"
+  | "momentumEngine"
+  | "stormglass"
+  | "cartographersLens"
+  | "trailblazersMark"
+  | "merchantsSeal"
+  | "gamblersCoin";
 
 export interface ErRelicConfig {
   name: string;
@@ -211,10 +219,101 @@ export const ER_RELIC_CONFIG: Readonly<Record<ErRelicKind, ErRelicConfig>> = {
     tint: 0x7030a0,
     maxStack: 1,
   },
+  bloodPact: {
+    name: "Blood Pact",
+    description: "A pact sealed in blood. Your team deals 20% more damage, but also takes 15% more damage.",
+    // Bespoke icon (pokesprite Life Orb): a blood-magenta power orb for the +dmg/self-cost pact.
+    icon: "muscle_band",
+    tint: 0xd03030,
+    maxStack: 1,
+    texture: "er_blood_pact",
+  },
+  momentumEngine: {
+    name: "Momentum Engine",
+    description: "Each foe your team knocks out raises your active Pokémon's Speed by 1 stage. Resets each battle.",
+    // Bespoke icon (pokesprite Quick Claw): a golden speed claw for the on-KO Speed engine.
+    icon: "quick_claw",
+    tint: 0x60d8e0,
+    maxStack: 1,
+    texture: "er_momentum_engine",
+  },
+  stormglass: {
+    name: "Stormglass",
+    description: "At the start of each battle, conjures a weather of your choice for 5 turns.",
+    // Bespoke icon (pokesprite Lustrous Orb): a pale-blue glass weather orb.
+    icon: "mystical_rock",
+    tint: 0x70a0d0,
+    maxStack: 1,
+    texture: "er_stormglass",
+  },
+  cartographersLens: {
+    name: "Cartographer's Lens",
+    description: "On the World Map, reveals one extra onward route, so you can scout and compare one more of your next biome choices before you pick.",
+    // Bespoke icon (pokesprite Scope Lens): a literal lens for scouting routes.
+    icon: "scope_lens",
+    tint: 0xa0c890,
+    maxStack: 1,
+    texture: "er_cartographers_lens",
+  },
+  trailblazersMark: {
+    name: "Trailblazer's Mark",
+    description: "Biome notoriety builds 50% slower, so you can linger longer, and over-stayed enemies drop more loot.",
+    // Bespoke icon (pokesprite Mark Charm): a ribbon-mark charm for the trailblazer's mark.
+    icon: "ribbon_rock",
+    tint: 0xc09050,
+    maxStack: 1,
+    texture: "er_trailblazers_mark",
+  },
+  merchantsSeal: {
+    name: "Merchant's Seal",
+    description: "Shop rerolls cost half, and every reward screen offers one extra item slot.",
+    // Bespoke icon (pokesprite Relic Gold): a gold coin/seal for the merchant's seal.
+    icon: "coin_case",
+    tint: 0xf0c850,
+    maxStack: 1,
+    texture: "er_merchants_seal",
+  },
+  gamblersCoin: {
+    name: "Gambler's Coin",
+    description: "After each trainer battle, the money reward is doubled half the time and lost the other half.",
+    // Bespoke icon (pokesprite Amulet Coin): a gold coin on a string for the gambler's coin.
+    icon: "golden_punch",
+    tint: 0xe0b020,
+    maxStack: 1,
+    texture: "er_gamblers_coin",
+  },
 };
 
-/** Every relic kind, in display order (used by the type registry). */
-export const ER_RELIC_KINDS: readonly ErRelicKind[] = ["fieldMedic", "warmIncubator"];
+/** Every relic kind, in display order (used by the type registry). Kept complete
+ * so it stays a faithful enumeration of {@linkcode ER_RELIC_CONFIG}'s keys. */
+export const ER_RELIC_KINDS: readonly ErRelicKind[] = [
+  "fieldMedic",
+  "warmIncubator",
+  "coinPurse",
+  "mysteryCharm",
+  "moraleBanner",
+  "secondWind",
+  "twinLink",
+  "anchor",
+  "scrapMagnet",
+  "weathervane",
+  "bondedCharm",
+  "collectorsAlbum",
+  "quartermaster",
+  "lookout",
+  "moltenCore",
+  "capacitor",
+  "pharaohAnkh",
+  "covenant",
+  "cursedIdol",
+  "bloodPact",
+  "momentumEngine",
+  "stormglass",
+  "cartographersLens",
+  "trailblazersMark",
+  "merchantsSeal",
+  "gamblersCoin",
+];
 
 /** Field Medic: heal cadence (every N turns) and heal fraction (1/denominator). */
 const FIELD_MEDIC_TURN_CADENCE = 3;
@@ -242,6 +341,26 @@ const COLLECTORS_ALBUM_CADENCE = 3;
 const COLLECTORS_ALBUM_CANDY = 3;
 /** Quartermaster: copy one held item to slot 5 every N waves. */
 const QUARTERMASTER_WAVE_CADENCE = 10;
+/** Blood Pact: percent extra damage the team DEALS (offensive multiplier). */
+const BLOOD_PACT_DEAL_PERCENT = 20;
+/** Blood Pact: percent extra damage the team TAKES (defensive multiplier). */
+const BLOOD_PACT_TAKE_PERCENT = 15;
+/** Momentum Engine: Speed stages granted to the active mon per enemy KO. */
+const MOMENTUM_ENGINE_SPEED_PER_KO = 1;
+/** Stormglass: weather duration (turns) forced at each battle start. */
+const STORMGLASS_WEATHER_TURNS = 5;
+/** Trailblazer's Mark: notoriety overstay accrues at this fraction of normal. */
+const TRAILBLAZER_OVERSTAY_SCALE = 0.5;
+/** Trailblazer's Mark: extra multiplier on over-stayed enemy loot drop rates. */
+const TRAILBLAZER_LOOT_MULT = 1.5;
+/** Cartographer's Lens: extra onward map nodes revealed per stack. */
+const CARTOGRAPHERS_LENS_EXTRA_NODES = 1;
+/** Merchant's Seal: shop reroll cost is multiplied by this (half price). */
+const MERCHANTS_SEAL_REROLL_MULT = 0.5;
+/** Merchant's Seal: extra reward-screen item slots while held. */
+const MERCHANTS_SEAL_EXTRA_SLOTS = 1;
+/** Gambler's Coin: percent chance (out of 100) the trainer payout is doubled. */
+const GAMBLERS_COIN_WIN_PCT = 50;
 
 /** Total stacks of the given relic the player currently holds (team-wide). */
 export function getErRelicStacks(kind: ErRelicKind): number {
@@ -467,6 +586,27 @@ export function erCapacitorElectricMultiplier(moveType: PokemonType): number {
 }
 
 /**
+ * Blood Pact (relic): OFFENSIVE multiplier. While held, every player attacker deals
+ * {@linkcode BLOOD_PACT_DEAL_PERCENT}% more damage. Queried alongside the other
+ * player-attacker relic multipliers in {@linkcode Pokemon.getAttackDamage} (gated to
+ * a player SOURCE there). Returns 1 when the relic isn't held.
+ */
+export function erBloodPactDealMultiplier(): number {
+  return hasErRelic("bloodPact") ? 1 + BLOOD_PACT_DEAL_PERCENT / 100 : 1;
+}
+
+/**
+ * Blood Pact (relic): DEFENSIVE multiplier. While held, every player DEFENDER takes
+ * {@linkcode BLOOD_PACT_TAKE_PERCENT}% more damage. Queried in
+ * {@linkcode Pokemon.getAttackDamage} when the TARGET (`this`) is a player. Returns 1
+ * when the relic isn't held. The double-edge: it stacks multiplicatively with the
+ * offensive bonus on a player-vs-player hit, which only happens in odd modes.
+ */
+export function erBloodPactTakeMultiplier(): number {
+  return hasErRelic("bloodPact") ? 1 + BLOOD_PACT_TAKE_PERCENT / 100 : 1;
+}
+
+/**
  * Second Wind (relic): when a player Pokémon is about to take lethal damage,
  * returns true (consuming the once-per-biome charge) so the caller clamps it to
  * survive at 1 HP. Returns false if the relic isn't held, already used this
@@ -500,6 +640,33 @@ export function erTryPharaohAnkh(pokemon: Pokemon): boolean {
     `${pokemon.getNameToRender()} was pulled back from the brink by the Pharaoh's Ankh!`,
   );
   return true;
+}
+
+/**
+ * Momentum Engine (relic): called from FaintPhase when an ENEMY Pokemon faints. While
+ * held, grants the player's currently-active (lead, on-field) Pokemon +1 Speed stage
+ * per KO via a {@linkcode StatStageChangePhase} (clamped to +6 by the phase). The boost
+ * naturally "resets each battle" because stat stages are wiped on summon, so no extra
+ * per-battle state is tracked. No-op when the relic isn't held or there is no living
+ * active player mon. In doubles the spec's "your active mon" targets the slot-0 lead.
+ */
+export function erMomentumEngineOnEnemyKo(): void {
+  if (!hasErRelic("momentumEngine")) {
+    return;
+  }
+  const active = globalScene.getPlayerField().find(p => p?.isActive(true));
+  if (!active) {
+    return;
+  }
+  globalScene.phaseManager.unshiftNew(
+    "StatStageChangePhase",
+    active.getBattlerIndex(),
+    true,
+    [Stat.SPD],
+    MOMENTUM_ENGINE_SPEED_PER_KO,
+  );
+  // ER custom relic - English-only (shared locales submodule).
+  globalScene.phaseManager.queueMessage(`The Momentum Engine drives ${active.getNameToRender()} faster!`);
 }
 
 /**
@@ -555,6 +722,93 @@ export function erScrapMagnetExtraRewards(): number {
  */
 export function erWeathervaneBlocksWeatherDamage(): boolean {
   return hasErRelic("weathervane");
+}
+
+/** Weather choices Stormglass may set (5-turn timed weathers; primal/immutable
+ * weathers and NONE are excluded - their turn timer is meaningless). HAIL is used
+ * rather than SNOW per ER convention. */
+export const STORMGLASS_WEATHER_CHOICES: readonly { label: string; weather: WeatherType }[] = [
+  { label: "Sun", weather: WeatherType.SUNNY },
+  { label: "Rain", weather: WeatherType.RAIN },
+  { label: "Sandstorm", weather: WeatherType.SANDSTORM },
+  { label: "Hail", weather: WeatherType.HAIL },
+  { label: "Fog", weather: WeatherType.FOG },
+];
+
+/** The held Stormglass relic instance (the chosen-weather carrier), or undefined. */
+function getStormglassModifier(): ErRelicModifier | undefined {
+  return globalScene?.findModifier(
+    m => m instanceof ErRelicModifier && (m as ErRelicModifier).kind === "stormglass",
+    true,
+  ) as ErRelicModifier | undefined;
+}
+
+/** The weather the player chose for Stormglass (persisted on the relic), or null. */
+export function getStormglassWeather(): WeatherType | null {
+  const mod = getStormglassModifier();
+  return mod != null && mod.chosenWeather != null ? (mod.chosenWeather as WeatherType) : null;
+}
+
+/**
+ * Record the weather the player chose when acquiring Stormglass. Stored ON the relic
+ * instance ({@linkcode ErRelicModifier.chosenWeather}) so it round-trips through the
+ * save serializer exactly like the relic's kind (the #61 save-fix discipline), then
+ * refreshes the modifier bar. No-op when the relic isn't held.
+ */
+export function setStormglassWeather(weather: WeatherType): void {
+  const mod = getStormglassModifier();
+  if (!mod) {
+    return;
+  }
+  mod.chosenWeather = weather;
+  globalScene.updateModifiers(true);
+}
+
+/**
+ * Ensure a held Stormglass has a chosen weather. The relic is meant to be configured
+ * "when acquired", but relics are granted off-pool through several paths (reward
+ * screen, Giratina's Bargain, encounters), so a full grant-time weather-PICKER UI on
+ * every path is out of scope for this batch (TODO(#439): add an option-select prompt
+ * at the grant site, mirroring the Bargain Sin chooser). Until then, lazily assign a
+ * STABLE seeded default the first time the relic fires, persisted onto the relic so it
+ * round-trips and never silently does nothing. Returns the resolved weather, or null
+ * if the relic isn't held.
+ */
+function erEnsureStormglassWeather(): WeatherType | null {
+  const mod = getStormglassModifier();
+  if (!mod) {
+    return null;
+  }
+  if (mod.chosenWeather == null) {
+    // Seed the default off the run's starting seed so it's deterministic + save-stable.
+    const idx = globalScene.randBattleSeedInt(STORMGLASS_WEATHER_CHOICES.length);
+    mod.chosenWeather = STORMGLASS_WEATHER_CHOICES[idx].weather;
+  }
+  return mod.chosenWeather as WeatherType;
+}
+
+/**
+ * Stormglass (relic): at the START of each battle, force the player's chosen weather
+ * for {@linkcode STORMGLASS_WEATHER_TURNS} turns. Called from EncounterPhase AFTER the
+ * biome's own ambient weather is applied, so the chosen weather wins (mirrors how the
+ * #486 carried weather overrides the ambient). No-op when the relic isn't held or the
+ * choice can't be set over an immutable weather. We set the weather with no `user` (so
+ * it isn't extended by Damp-Rock-style items) and then pin its duration to exactly 5
+ * turns - the established ER post-set patch, since `arena.trySetWeather` otherwise
+ * leaves a user-less weather permanent.
+ */
+export function erStormglassApplyChosenWeather(): void {
+  const weather = erEnsureStormglassWeather();
+  if (weather == null || weather === WeatherType.NONE) {
+    return;
+  }
+  if (!globalScene.arena.trySetWeather(weather)) {
+    return;
+  }
+  if (globalScene.arena.weather) {
+    globalScene.arena.weather.turnsLeft = STORMGLASS_WEATHER_TURNS;
+    globalScene.arena.weather.maxDuration = STORMGLASS_WEATHER_TURNS;
+  }
 }
 
 /** A captured set of positive stat stages, carried across a Bonded Charm switch. */
@@ -805,3 +1059,82 @@ function applyCursedIdolEntrant(pokemon: Pokemon): void {
     }
   }
 }
+
+// =============================================================================
+// Map relics (queried from the World Map routing / UI, NOT a battle phase).
+// =============================================================================
+
+/**
+ * Cartographer's Lens (relic): extra ONWARD map nodes revealed on the World Map,
+ * added to the base/Map-Upgrade reveal count in {@linkcode rollErNextBiomeNodes}.
+ * 0 when the relic isn't held.
+ */
+export function erCartographersLensExtraNodes(): number {
+  return getErRelicStacks("cartographersLens") * CARTOGRAPHERS_LENS_EXTRA_NODES;
+}
+
+// =============================================================================
+// Trailblazer's Mark (relic): biome notoriety builds slower. The notoriety system
+// (er-biome-notoriety) derives EVERYTHING from `overstay` = waves lingered past the
+// free window. Scaling that overstay by 0.5 makes BST/level/boss/trainer/loot ramps
+// all build 50% slower from one choke-point. The over-stayed loot bonus stacks on
+// top of the notoriety item-rate multiplier.
+// =============================================================================
+
+/** Trailblazer's Mark (relic): scale applied to the notoriety overstay count
+ * (< 1 = notoriety builds slower). 1 when the relic isn't held. */
+export function erTrailblazerOverstayScale(): number {
+  return hasErRelic("trailblazersMark") ? TRAILBLAZER_OVERSTAY_SCALE : 1;
+}
+
+/** Trailblazer's Mark (relic): extra multiplier on over-stayed enemy loot drop
+ * rates (the "linger longer, loot better" payoff). 1 when the relic isn't held or
+ * the biome isn't over-stayed. `overstay` is the (already Trailblazer-scaled)
+ * notoriety overstay at the current wave. */
+export function erTrailblazerLootMultiplier(overstay: number): number {
+  return overstay > 0 && hasErRelic("trailblazersMark") ? TRAILBLAZER_LOOT_MULT : 1;
+}
+
+// =============================================================================
+// Economy relics (queried from the reward/shop phases).
+// =============================================================================
+
+/**
+ * Merchant's Seal (relic): multiplier applied to the shop REROLL cost. Half price
+ * while held, else 1. Queried from SelectModifierPhase.getRerollCost.
+ */
+export function erMerchantsSealRerollMultiplier(): number {
+  return hasErRelic("merchantsSeal") ? MERCHANTS_SEAL_REROLL_MULT : 1;
+}
+
+/**
+ * Merchant's Seal (relic): extra reward-screen item slots while held (mirrors the
+ * Scrap Magnet extra-reward hook). 0 when the relic isn't held. Queried from
+ * SelectModifierPhase.getModifierCount.
+ */
+export function erMerchantsSealExtraSlots(): number {
+  return getErRelicStacks("merchantsSeal") * MERCHANTS_SEAL_EXTRA_SLOTS;
+}
+
+/**
+ * Gambler's Coin (relic): the multiplier applied to a TRAINER battle's money reward.
+ * Returns 2 (doubled) {@linkcode GAMBLERS_COIN_WIN_PCT}% of the time and 0 (lost) the
+ * rest; returns 1 (untouched) when the relic isn't held. The coin flip is SEEDED per
+ * wave (cached so a reward reroll / reload re-reads the same flip), like Scrap Magnet.
+ * The caller is responsible for only invoking this on trainer-battle money.
+ */
+export function erGamblersCoinPayoutMultiplier(): number {
+  if (!hasErRelic("gamblersCoin")) {
+    return 1;
+  }
+  const wave = globalScene.currentBattle?.waveIndex ?? -1;
+  if (wave !== GAMBLERS_COIN_ROLLED_WAVE) {
+    GAMBLERS_COIN_ROLLED_WAVE = wave;
+    GAMBLERS_COIN_WON = globalScene.randBattleSeedInt(100) < GAMBLERS_COIN_WIN_PCT;
+  }
+  return GAMBLERS_COIN_WON ? 2 : 0;
+}
+
+/** waveIndex -> rolled Gambler's Coin result, cached so rerolls/reloads are stable. */
+let GAMBLERS_COIN_ROLLED_WAVE = -1;
+let GAMBLERS_COIN_WON = false;

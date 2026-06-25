@@ -67,6 +67,7 @@ import {
   ErDexNavModifier,
   ErLearnersShroomModifier,
   ErRelicModifier,
+  ErTmCaseModifier,
   EvolutionItemModifier,
   EvolutionStatBoosterModifier,
   EvoTrackerModifier,
@@ -948,6 +949,38 @@ export class ErLearnersShroomModifierType extends PokemonModifierType {
 
   getDescription(): string {
     return "Teaches a Pokémon any move it can learn from TMs, tutors or egg moves, your choice. Future level-up moves stay locked.";
+  }
+}
+
+/**
+ * ER TM Case: a single-use universal TM. The player picks a party Pokemon, then
+ * picks ANY ONE move from that Pokemon's COMPATIBLE TM list (the moves it can
+ * still learn, see {@linkcode PlayerPokemon.getErTmCaseMoves}), and it is taught
+ * via {@linkcode LearnMovePhase}. Consumed after teaching one move. Mirrors the
+ * Learner's Shroom flow, but the move list is the compatible-TM list instead of
+ * everything-learnable. Opens the dedicated ER_TM_CASE_MODIFIER party-UI mode.
+ */
+export class ErTmCaseModifierType extends PokemonModifierType {
+  constructor() {
+    super(
+      "",
+      "tm_case",
+      (type, args) => new ErTmCaseModifier(type, (args[0] as PlayerPokemon).id, args[1] as number),
+      (pokemon: PlayerPokemon) => {
+        if (pokemon.getErTmCaseMoves().length === 0) {
+          return PartyUiHandler.NoEffectMessage;
+        }
+        return null;
+      },
+    );
+  }
+
+  get name(): string {
+    return "TM Case";
+  }
+
+  getDescription(): string {
+    return "Teach a Pokemon any one move from its TM list.";
   }
 }
 
@@ -2251,6 +2284,11 @@ const modifierTypeInitObj = Object.freeze({
   ER_LEARNERS_SHROOM: () => new ErLearnersShroomModifierType(),
   ER_DEX_NAV: () => new ErDexNavModifierType(),
 
+  // ER TM Case (COMMON tier): single-use universal TM. Replaces the per-move
+  // TM_COMMON/GREAT/ULTRA in the reward pool + biome shop. Mirrors the Learner's
+  // Shroom flow but its move list is the mon's compatible-TM moves.
+  TM_CASE: () => new ErTmCaseModifierType(),
+
   // ER reward ball: Greater Golden Ball. Like the vanilla Golden Poke Ball (which
   // grants +1 item option at the end of every battle via ExtraModifierModifier),
   // but +2. Seeds the ExtraModifierModifier at stack 2; it shares/merges with the
@@ -2285,6 +2323,13 @@ const modifierTypeInitObj = Object.freeze({
   ER_RELIC_PHARAOH_ANKH: () => erRelicModifierType("pharaohAnkh"),
   ER_RELIC_COVENANT: () => erRelicModifierType("covenant"),
   ER_RELIC_CURSED_IDOL: () => erRelicModifierType("cursedIdol"),
+  ER_RELIC_BLOOD_PACT: () => erRelicModifierType("bloodPact"),
+  ER_RELIC_MOMENTUM_ENGINE: () => erRelicModifierType("momentumEngine"),
+  ER_RELIC_STORMGLASS: () => erRelicModifierType("stormglass"),
+  ER_RELIC_CARTOGRAPHERS_LENS: () => erRelicModifierType("cartographersLens"),
+  ER_RELIC_TRAILBLAZERS_MARK: () => erRelicModifierType("trailblazersMark"),
+  ER_RELIC_MERCHANTS_SEAL: () => erRelicModifierType("merchantsSeal"),
+  ER_RELIC_GAMBLERS_COIN: () => erRelicModifierType("gamblersCoin"),
 
   /*REPEL: () => new DoubleBattleChanceBoosterModifierType('Repel', 5),
   SUPER_REPEL: () => new DoubleBattleChanceBoosterModifierType('Super Repel', 10),
@@ -2968,8 +3013,14 @@ export function getPlayerModifierTypeOptions(
       }
     }
 
-    // Fill remaining
-    if (options.length < count && customModifierSettings.fillRemaining) {
+    // Fill remaining up to `count`. `count` is authoritative: for the post-battle reward
+    // it is SelectModifierPhase.getModifierCount(), which equals the guaranteed length
+    // UNLESS the player earned extra reward slots (Golden Ball / Greater Golden Ball /
+    // Scrap Magnet) - those extras must be filled even when fillRemaining is false (ER
+    // #134), otherwise the ball is a no-op in every bundled reward. With no earned extras
+    // (or a fixed count like the MEs' count=1) count === options.length here, so this
+    // stays a no-op for ordinary fillRemaining:false bundles.
+    if (options.length < count) {
       while (options.length < count) {
         options.push(getModifierTypeOptionWithRetry(options, retryCount, party, undefined));
       }

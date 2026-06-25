@@ -131,7 +131,10 @@ function initCommonModifierPool() {
     new WeightedModifierType(modifierTypes.LURE, lureWeightFunc(10, 2)),
     new WeightedModifierType(modifierTypes.TEMP_STAT_STAGE_BOOSTER, 4),
     new WeightedModifierType(modifierTypes.BERRY, 2),
-    new WeightedModifierType(modifierTypes.TM_COMMON, 2),
+    // ER TM Case (COMMON): the universal single-use TM replaces the per-move
+    // TM_COMMON/GREAT/ULTRA across ALL reward tiers. Kept at TM_COMMON's old
+    // weight so a TM-like option still appears at the same common rate.
+    new WeightedModifierType(modifierTypes.TM_CASE, 2),
   ].map(m => {
     m.setTier(ModifierTier.COMMON);
     return m;
@@ -294,7 +297,6 @@ function initGreatModifierPool() {
       2,
     ),
     new WeightedModifierType(modifierTypes.SOOTHE_BELL, 2),
-    new WeightedModifierType(modifierTypes.TM_GREAT, 3),
     new WeightedModifierType(
       modifierTypes.MEMORY_MUSHROOM,
       (party: Pokemon[]) => {
@@ -575,7 +577,6 @@ function initUltraModifierPool() {
     new WeightedModifierType(modifierTypes.REVIVER_SEED, 4),
     new WeightedModifierType(modifierTypes.CANDY_JAR, skipInLastClassicWaveOrDefault(5)),
     new WeightedModifierType(modifierTypes.ATTACK_TYPE_BOOSTER, 9),
-    new WeightedModifierType(modifierTypes.TM_ULTRA, 11),
     new WeightedModifierType(modifierTypes.RARER_CANDY, 4),
     new WeightedModifierType(modifierTypes.GOLDEN_PUNCH, skipInLastClassicWaveOrDefault(2)),
     new WeightedModifierType(modifierTypes.IV_SCANNER, skipInLastClassicWaveOrDefault(4)),

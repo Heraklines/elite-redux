@@ -15,7 +15,7 @@
 
 import { globalScene } from "#app/global-scene";
 import { modifierTypes } from "#data/data-lists";
-import { playerHasErBlackShiny, resetErBlackShinyState } from "#data/elite-redux/er-black-shinies";
+import { resetErBlackShinyState } from "#data/elite-redux/er-black-shinies";
 import { getLevelTotalExp } from "#data/exp";
 import { Stat } from "#enums/stat";
 import type { PlayerPokemon } from "#field/pokemon";
@@ -36,13 +36,16 @@ export const BARGAIN_SIN_ORDER: readonly BargainSinKey[] = [
   "lust",
 ];
 
+/** Candy a single mon must hold for the Lust deal to be offered + accepted. */
+export const LUST_CANDY_COST = 100;
+
 /**
- * Sins temporarily withheld from the offered pool because their reward/cost rides
- * a system with an open bug. Re-enable by removing the key.
- *   - "lust": its black-shiny reroll depends on the black-shiny system, which has an
- *     open in-battle regression (black shinies showing as red / Luck 3).
+ * Sins temporarily withheld from the offered pool because their reward/cost rides a
+ * system with an open bug. Re-enable by removing the key. (None right now: Lust was
+ * re-enabled once it stopped touching the black-shiny system - it now grants a normal
+ * tier-1 shiny at a Lv1 + zero-IV + candy-wipe cost.)
  */
-export const DISABLED_BARGAIN_SINS: ReadonlySet<BargainSinKey> = new Set<BargainSinKey>(["lust"]);
+export const DISABLED_BARGAIN_SINS: ReadonlySet<BargainSinKey> = new Set<BargainSinKey>();
 
 /** Stat choices offered for the Pride boost (HP excluded - a chosen combat stat). */
 export const BARGAIN_STAT_CHOICES: { label: string; stat: Stat }[] = [
@@ -53,12 +56,13 @@ export const BARGAIN_STAT_CHOICES: { label: string; stat: Stat }[] = [
   { label: "Speed", stat: Stat.SPD },
 ];
 
-/** Relics offered by Envy (the strong + the double-edged Cursed Idol). */
+/** Relics offered by Envy (the strong + the double-edged Cursed Idol / Gambler's Coin). */
 export const BARGAIN_RELIC_CHOICES: { label: string; make: () => ModifierType }[] = [
   { label: "Cursed Idol", make: () => modifierTypes.ER_RELIC_CURSED_IDOL() },
   { label: "Second Wind", make: () => modifierTypes.ER_RELIC_SECOND_WIND() },
   { label: "Molten Core", make: () => modifierTypes.ER_RELIC_MOLTEN_CORE() },
   { label: "Capacitor", make: () => modifierTypes.ER_RELIC_CAPACITOR() },
+  { label: "Gambler's Coin", make: () => modifierTypes.ER_RELIC_GAMBLERS_COIN() },
 ];
 
 /** Non-form-change held items a mon carries (the strippable ones for Envy). */
@@ -81,7 +85,9 @@ export function bargainSinAvailable(key: BargainSinKey): boolean {
     case "envy":
       return party.some(p => bargainHeldCount(p) >= 3);
     case "lust":
-      return party.length > 0 && !playerHasErBlackShiny();
+      return party.some(
+        p => globalScene.gameData.getStarterDataEntry(p.species.speciesId).candyCount >= LUST_CANDY_COST,
+      );
   }
 }
 

@@ -45,6 +45,7 @@ import {
 import type { MysteryEncounter } from "#mystery-encounters/mystery-encounter";
 import { MysteryEncounterBuilder } from "#mystery-encounters/mystery-encounter";
 import { MysteryEncounterOptionBuilder } from "#mystery-encounters/mystery-encounter-option";
+import type { ModifierTypeFunc } from "#types/modifier-types";
 import type { OptionSelectItem } from "#ui/abstract-option-select-ui-handler";
 import { randSeedInt, randSeedItem } from "#utils/common";
 
@@ -52,6 +53,21 @@ const namespace = "mysteryEncounters/bogWitch";
 
 /** The combat stats the bog's curse can rot (never HP). */
 const CURSABLE_STATS = [Stat.ATK, Stat.DEF, Stat.SPATK, Stat.SPDEF, Stat.SPD] as const;
+
+/**
+ * The relics the pleased bog witch may grant: the swamp-ward Weathervane plus the
+ * darker "deal with a price" relics that fit her bargain (a blood pact, and a mark
+ * that lets you linger longer in a biome). Resolved at CALL time, not module load:
+ * `modifierTypes` is populated lazily at game init, so capturing the funcs in a
+ * module const would freeze in `undefined` and be silently dropped (#616).
+ */
+function bogWitchRelicFuncs(): ModifierTypeFunc[] {
+  return [
+    modifierTypes.ER_RELIC_WEATHERVANE,
+    modifierTypes.ER_RELIC_BLOOD_PACT,
+    modifierTypes.ER_RELIC_TRAILBLAZERS_MARK,
+  ];
+}
 
 /** Short display labels for the cursed stat (for the curse message). */
 const STAT_LABEL: Record<(typeof CURSABLE_STATS)[number], string> = {
@@ -158,7 +174,7 @@ export const BogWitchEncounter: MysteryEncounter = MysteryEncounterBuilder.withE
           }
           queueEncounterMessage(`${namespace}:blessed`);
           setEncounterRewards({
-            guaranteedModifierTypeFuncs: [modifierTypes.ER_RELIC_WEATHERVANE],
+            guaranteedModifierTypeFuncs: [randSeedItem(bogWitchRelicFuncs())],
             fillRemaining: false,
           });
           leaveEncounterWithoutBattle(false);

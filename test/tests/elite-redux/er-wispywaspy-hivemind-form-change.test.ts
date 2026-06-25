@@ -7,10 +7,12 @@
 // Elite Redux — Wispywaspy "Hivemind" form change (Locust Swarm, ability 884).
 //
 // ER's Locust Swarm (er id 884 -> ErAbilityId.LOCUST_SWARM): "Changes into
-// Hivemind form until 1/4 HP or less." The HpThresholdFormChangeAbAttr (wired
-// in archetype-dispatcher case 884) fires on being hit:
-//   - at ≤ 1/4 HP and not yet Hivemind -> transform into "hivemind"
-//   - recovered above 1/4 HP while Hivemind -> revert to the base form
+// Hivemind form until 1/4 HP or less" - Wishiwashi-style School. The holder is in
+// Hivemind ABOVE 1/4 HP and reverts to base only once it drops to 1/4 or below.
+// The HpThresholdFormChangeAbAttr (archetype-dispatcher case 884, formAboveThreshold
+// :true) fires on being hit:
+//   - ABOVE 1/4 HP and not yet Hivemind -> transform into "hivemind"
+//   - dropped to <= 1/4 HP while Hivemind -> revert to the base form
 // This requires the "hivemind" FORM injected on base Wispywaspy (pkrg 10065)
 // plus the `<base> -> hivemind` / `hivemind -> ""` form-change edges, which
 // init-elite-redux-er-custom-form-changes.ts registers.
@@ -73,23 +75,22 @@ describe("ER - Wispywaspy Hivemind form change (Locust Swarm)", () => {
     expect(out, "Wispywaspy should have a hivemind -> base revert edge").toBeDefined();
   });
 
-  it("transforms into Hivemind when hit at <= 1/4 HP, and reverts when healed above it", async () => {
-    await game.classicMode.startBattle([WISPYWASPY_ID]);
+  it("schools into Hivemind while ABOVE 1/4 HP, and reverts to base only below it", async () => {
+    await game.classicMode.startBattle(WISPYWASPY_ID);
 
     const wispy = game.field.getPlayerPokemon();
     expect(wispy.getFormKey()).toBe("");
 
-    // Drop to the 1/4 threshold so the next (survivable chip) hit triggers the
-    // transform. The HpThreshold attr checks hp/maxHp <= 0.25. The holder uses a
-    // Ghost move (Lick) which the Normal-type enemy is immune to, so the enemy
-    // survives to land its (tiny) Water Gun and fire the PostDefend transform.
-    wispy.hp = Math.max(2, Math.floor(wispy.getMaxHp() * 0.25));
+    // ABOVE 1/4 HP (full, minus the enemy's tiny Water Gun): a landed hit schools it
+    // into Hivemind. The holder uses a Ghost move (Lick) the Normal-type enemy is
+    // immune to, so the enemy survives to land its hit and fire the PostDefend trigger.
     game.move.use(MoveId.LICK);
     await game.toEndOfTurn();
     expect(wispy.getFormKey()).toBe("hivemind");
 
-    // Heal back above the threshold; the next hit should revert it.
-    wispy.hp = wispy.getMaxHp();
+    // Drop BELOW 1/4 HP: the next landed hit reverts it to base (it stays Hivemind from
+    // full HP all the way down to 1/4 - only crossing to 1/4-or-below reverts it).
+    wispy.hp = Math.max(1, Math.floor(wispy.getMaxHp() * 0.25) - 1);
     game.move.use(MoveId.LICK);
     await game.toEndOfTurn();
     expect(wispy.getFormKey()).toBe("");

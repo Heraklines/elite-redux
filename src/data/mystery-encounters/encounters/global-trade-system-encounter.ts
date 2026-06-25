@@ -38,6 +38,7 @@ import { PartySizeRequirement } from "#mystery-encounters/mystery-encounter-requ
 import { PokemonData } from "#system/pokemon-data";
 import { MusicPreference } from "#system/settings";
 import type { OptionSelectItem } from "#ui/abstract-option-select-ui-handler";
+import { isSpeciesAllowedByActiveChallenges } from "#utils/challenge-utils";
 import { randInt, randSeedInt, randSeedItem, randSeedShuffle } from "#utils/common";
 import { getEnumKeys } from "#utils/enums";
 import { getRandomLocaleEntry } from "#utils/i18n";
@@ -521,7 +522,9 @@ function getPokemonTradeOptions(): Map<number, EnemyPokemon[]> {
   return tradeOptionsMap;
 }
 
-function generateTradeOption(alreadyUsedSpecies: PokemonSpecies[], originalBst?: number): PokemonSpecies {
+// ER (#126): exported so the roster-challenge legality regression test can drive
+// the random-species roll directly (see er-mystery-encounter-challenge-legality.test.ts).
+export function generateTradeOption(alreadyUsedSpecies: PokemonSpecies[], originalBst?: number): PokemonSpecies {
   let newSpecies: PokemonSpecies | undefined;
   let bstCap = 9999;
   let bstMin = 0;
@@ -543,7 +546,9 @@ function generateTradeOption(alreadyUsedSpecies: PokemonSpecies[], originalBst?:
         !isLegendaryOrMythical
         && bstInRange
         && !EXCLUDED_TRADE_SPECIES.includes(s.speciesId)
-        && !isErGenericPoolBanned(s.speciesId, s.name)
+        && !isErGenericPoolBanned(s.speciesId, s.name) // ER (#126): in a roster challenge run, only offer/receive challenge-legal
+        && // species so a GTS trade can't inject an off-type/color/gen/tier mon.
+        isSpeciesAllowedByActiveChallenges(s)
       );
     });
 

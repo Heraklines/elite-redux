@@ -54,6 +54,7 @@ const FORGE_RELICS: ModifierTypeFunc[] = [
   modifierTypes.ER_RELIC_SECOND_WIND,
   modifierTypes.ER_RELIC_ANCHOR,
   modifierTypes.ER_RELIC_WEATHERVANE,
+  modifierTypes.ER_RELIC_MOMENTUM_ENGINE,
 ];
 
 /** Tempering above MASTER yields a RELIC (this is the "tier" just past MASTER). */

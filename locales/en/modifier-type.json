@@ -175,6 +175,7 @@
     "MAX_LURE": { "name": "Max Lure" },
 
     "MEMORY_MUSHROOM": { "name": "Memory Mushroom", "description": "Recall one Pokémon’s forgotten move." },
+    "TM_CASE": { "name": "TM Case", "description": "Teach a Pokémon any one move from its TM list." },
 
     "EXP_SHARE": { "name": "EXP. All", "description": "Non-participants receive 20% of a single participant’s EXP. Points." },
     "EXP_BALANCE": { "name": "EXP. Balance", "description": "Weighs EXP. Points received from battles towards lower-leveled party members." },

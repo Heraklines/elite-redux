@@ -27,6 +27,7 @@
 
 import { globalScene } from "#app/global-scene";
 import { allBiomes } from "#data/data-lists";
+import { erCartographersLensExtraNodes } from "#data/elite-redux/er-relics";
 import { BiomeId } from "#enums/biome-id";
 import { MapModifier } from "#modifiers/modifier";
 import { randSeedInt } from "#utils/common";
@@ -287,11 +288,12 @@ export function rollErNextBiomeNodes(current: BiomeId, prev: BiomeId | null): Er
     chosen.push(fallback);
   }
 
-  // Visibility: base Map reveals BASE_VISIBLE_NODES; each Map Upgrade tier +1. The
-  // first node is always revealed so the player can never be soft-locked. A node
-  // revealed only because of the upgrade band is tagged "upgrade" (green); the
-  // base-visible ones are "base" (gold). Hidden ones render dim "???".
-  const visibleCount = Math.max(1, BASE_VISIBLE_NODES + erMapUpgradeTier());
+  // Visibility: base Map reveals BASE_VISIBLE_NODES; each Map Upgrade tier +1, plus
+  // the Cartographer's Lens relic's +1 onward node (#439). The first node is always
+  // revealed so the player can never be soft-locked. A node revealed only because of
+  // the upgrade band is tagged "upgrade" (green); the base-visible ones are "base"
+  // (gold). Hidden ones render dim "???".
+  const visibleCount = Math.max(1, BASE_VISIBLE_NODES + erMapUpgradeTier() + erCartographersLensExtraNodes());
   const nodes: ErRouteNode[] = chosen.map((biome, i) => ({
     biome,
     revealed: i < visibleCount,

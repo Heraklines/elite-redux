@@ -217,7 +217,11 @@ function buildFight(big: boolean): EnemyPartyConfig {
 /** Take the bet: spend the ante, set the payout, warn of the dirty fight, then brawl. */
 async function takeBet(big: boolean): Promise<void> {
   updatePlayerMoney(-ante(big ? BIG_ANTE_MULT : SMALL_ANTE_MULT), true, false);
+  // The high-stakes brawl also stakes a Blood Pact - a fitting "more risk, more
+  // reward" relic for the ring. The small bet stays tier-only.
+  const relicFuncs: ModifierTypeFunc[] = big ? [modifierTypes.ER_RELIC_BLOOD_PACT] : [];
   setEncounterRewards({
+    ...(relicFuncs.length > 0 ? { guaranteedModifierTypeFuncs: relicFuncs } : {}),
     guaranteedModifierTiers: big
       ? [ModifierTier.ROGUE, ModifierTier.ULTRA, ModifierTier.GREAT]
       : [ModifierTier.ULTRA, ModifierTier.GREAT],

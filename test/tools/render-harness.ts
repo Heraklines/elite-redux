@@ -588,6 +588,10 @@ function makeUiSurface(ctx: RenderContext, originalUi: any): any {
     hideTooltip: () => {},
     getMessageHandler: () => msg,
     getHandler: () => active ?? undefined,
+    // Some handlers branch on the current mode during render (e.g. the OPTION_SELECT
+    // handler widens for AUTO_COMPLETE). Report the active handler's mode so that
+    // check resolves correctly; undefined for the base/no-handler case.
+    getMode: () => active?.mode ?? undefined,
     // --- harness hooks (not part of the real UI surface) ---
     setActiveHandler: (h: any) => {
       active = h;

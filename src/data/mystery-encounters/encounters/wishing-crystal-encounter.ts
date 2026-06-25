@@ -32,18 +32,28 @@ import type { MysteryEncounter } from "#mystery-encounters/mystery-encounter";
 import { MysteryEncounterBuilder } from "#mystery-encounters/mystery-encounter";
 import { MysteryEncounterOptionBuilder } from "#mystery-encounters/mystery-encounter-option";
 import type { ModifierTypeFunc } from "#types/modifier-types";
-import { randSeedInt } from "#utils/common";
+import { randSeedInt, randSeedItem } from "#utils/common";
 
 const namespace = "mysteryEncounters/wishingCrystal";
 
 type Blessing = "power" | "fortune" | "protection";
 
-/** The fairy relic each blessing throws in on a high (Ultra+) roll. */
-const BLESSING_RELIC: Record<Blessing, ModifierTypeFunc> = {
-  power: modifierTypes.ER_RELIC_MORALE_BANNER,
-  fortune: modifierTypes.ER_RELIC_COIN_PURSE,
-  protection: modifierTypes.ER_RELIC_FIELD_MEDIC,
-};
+/** The fairy relic each blessing throws in on a high (Ultra+) roll. The "power"
+ * blessing rolls one of a small pool (Morale Banner or the storm-summoning
+ * Stormglass), the others a fixed relic. */
+const POWER_RELICS: ModifierTypeFunc[] = [modifierTypes.ER_RELIC_MORALE_BANNER, modifierTypes.ER_RELIC_STORMGLASS];
+
+/** Resolve the relic func a blessing grants (seeded for the power pool). */
+function blessingRelicFunc(blessing: Blessing): ModifierTypeFunc {
+  switch (blessing) {
+    case "power":
+      return randSeedItem(POWER_RELICS);
+    case "fortune":
+      return modifierTypes.ER_RELIC_COIN_PURSE;
+    case "protection":
+      return modifierTypes.ER_RELIC_FIELD_MEDIC;
+  }
+}
 
 const TIER_NAME: Record<number, string> = {
   [ModifierTier.GREAT]: "Great",
@@ -60,7 +70,7 @@ interface CrystalState {
 async function grantBlessing(blessing: Blessing): Promise<void> {
   const { tier } = globalScene.currentBattle.mysteryEncounter!.misc as CrystalState;
   const picks = tier === ModifierTier.ROGUE ? 3 : tier === ModifierTier.ULTRA ? 2 : 1;
-  const funcs: ModifierTypeFunc[] = tier >= ModifierTier.ULTRA ? [BLESSING_RELIC[blessing]] : [];
+  const funcs: ModifierTypeFunc[] = tier >= ModifierTier.ULTRA ? [blessingRelicFunc(blessing)] : [];
   setEncounterRewards({
     ...(funcs.length > 0 ? { guaranteedModifierTypeFuncs: funcs } : {}),
     guaranteedModifierTiers: new Array(picks).fill(tier),
