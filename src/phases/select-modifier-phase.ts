@@ -82,6 +82,11 @@ export class SelectModifierPhase extends BattlePhase {
   /** Watcher-side: the owner's relayed party-target slot + sub-option for the pick being replayed. */
   private coopRelayedSlot = -1;
   private coopRelayedOption = 0;
+  /** The interaction-turn counter observed when THIS shop opened (#633). Makes the
+   *  alternation advance idempotent: the advance only fires while the counter is still
+   *  at this value, so the owner's terminal + the watcher's terminal + a reconcile
+   *  broadcast can't double-count this one interaction. -1 = solo / not captured. */
+  private coopInteractionStart = -1;
 
   constructor(
     rerollCount = 0,
@@ -109,6 +114,11 @@ export class SelectModifierPhase extends BattlePhase {
     // own identical pool (same seed -> identical options/prices/money). Resolved once
     // here; solo / non-coop keeps the original flow untouched.
     const coopController = globalScene.gameMode.isCoop ? getCoopController() : null;
+    // Capture the alternation counter this shop opened on, so its terminal advance is
+    // idempotent (both clients advance locally now; this stops a double-count) (#633).
+    if (coopController != null && this.coopInteractionStart < 0) {
+      this.coopInteractionStart = coopController.interactionCounter();
+    }
 
     // Dev test-suite "start in the store" scenarios stage guaranteed reward
     // options (e.g. a Rare Candy, or a Form-Change Item that resolves to a
@@ -156,7 +166,7 @@ export class SelectModifierPhase extends BattlePhase {
               this.coopEndMirror();
               this.coopRelaySend(COOP_INTERACTION_LEAVE, undefined, "skip");
               super.end();
-              this.coopAdvanceInteractionIfHost();
+              this.coopAdvanceInteraction();
             },
             () => this.resetModifierSelect(modifierSelectCallback),
           );
@@ -229,7 +239,7 @@ export class SelectModifierPhase extends BattlePhase {
       this.coopEndMirror();
       this.coopRelaySend(COOP_INTERACTION_LEAVE, undefined, "skip");
       super.end();
-      this.coopAdvanceInteractionIfHost();
+      this.coopAdvanceInteraction();
       return true;
     }
     const modifierType = this.typeOptions[cursor].type;
@@ -459,7 +469,7 @@ export class SelectModifierPhase extends BattlePhase {
       // continuation ends the whole interaction -> advance the alternation turn
       // (host-authoritative; a no-op off the host / outside co-op).
       if (!queuesContinuation) {
-        this.coopAdvanceInteractionIfHost();
+        this.coopAdvanceInteraction();
       }
     }
   }
@@ -739,8 +749,11 @@ export class SelectModifierPhase extends BattlePhase {
   }
 
   /** Advance the alternating-interaction turn once the reward screen is left for good.
-   *  Host-authoritative (the host broadcasts the new counter; the guest mirrors it). */
-  private coopAdvanceInteractionIfHost(): void {
+   *  BOTH clients advance LOCALLY (deterministic, lockstep) - the old host-only broadcast
+   *  raced the next interaction's synchronous start and froze the ME watcher. Idempotent
+   *  via the counter this shop opened on, so the owner's terminal, the watcher's terminal,
+   *  and the reconcile broadcast can't double-count. */
+  private coopAdvanceInteraction(): void {
     if (!globalScene.gameMode.isCoop) {
       return;
     }
@@ -752,10 +765,14 @@ export class SelectModifierPhase extends BattlePhase {
       return;
     }
     const controller = getCoopController();
-    if (controller?.role === "host") {
-      console.log(`[coop-reward] host advances interaction turn from ${controller.interactionCounter()}`);
-      controller.advanceInteraction();
+    if (controller == null) {
+      return;
     }
+    const from = this.coopInteractionStart >= 0 ? this.coopInteractionStart : undefined;
+    console.log(
+      `[coop-reward] advance interaction (role=${controller.role} from=${this.coopInteractionStart} counter=${controller.interactionCounter()})`,
+    );
+    controller.advanceInteraction(from);
   }
 
   /** OWNER: stash the current reward/shop selection so it is relayed once the party
@@ -846,7 +863,7 @@ export class SelectModifierPhase extends BattlePhase {
         console.log("[coop-reward] WATCHER timed out waiting for partner -> leaving reward screen");
         this.coopEndMirror();
         globalScene.ui.setMode(UiMode.MESSAGE).then(() => super.end());
-        this.coopAdvanceInteractionIfHost();
+        this.coopAdvanceInteraction();
         return;
       }
       if (this.applyRelayedRewardAction(action)) {
@@ -865,7 +882,7 @@ export class SelectModifierPhase extends BattlePhase {
     if (action.choice === COOP_INTERACTION_LEAVE) {
       this.coopEndMirror();
       globalScene.ui.setMode(UiMode.MESSAGE).then(() => super.end());
-      this.coopAdvanceInteractionIfHost();
+      this.coopAdvanceInteraction();
       return true;
     }
     if (action.choice === COOP_INTERACTION_REROLL) {

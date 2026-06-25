@@ -35,6 +35,12 @@ import i18next from "i18next";
 // =============================================================================
 const COOP_ME_PUMP_SEQ_BASE = 8_000_000;
 
+/** Co-op (#633): the alternation counter this ME opened on. Both clients advance the
+ *  turn LOCALLY + idempotently at the ME terminal (keyed to this value), so the ME's
+ *  single advance can never double-count regardless of whether the owner's terminal or
+ *  the watcher's fast-forward fires first. -1 = not in an ME. */
+let coopMeInteractionStart = -1;
+
 /** Co-op (#633): whether the CURRENT phase is a mystery-encounter INTERACTIVE phase (NOT the
  *  embedded battle / reward shop). Used to guard the watcher's fast-forward so it never fires
  *  once the encounter has already been left. */
@@ -62,23 +68,25 @@ function coopBeginMePump(): void {
   if (controller == null || pump == null) {
     return;
   }
-  const seq = COOP_ME_PUMP_SEQ_BASE + controller.interactionCounter();
+  // Capture the alternation counter at the ME's start (== seq - BASE). The ME terminal
+  // advances the turn ONCE per client, idempotently keyed to this value (#633).
+  coopMeInteractionStart = controller.interactionCounter();
+  const seq = COOP_ME_PUMP_SEQ_BASE + coopMeInteractionStart;
   const spoofed = getCoopRuntime()?.spoof != null;
   if (spoofed || controller.isLocalInteractionTurn()) {
     pump.beginOwner(seq);
   } else {
     // On the leave sentinel / timeout / partner-gone, fast-forward to the next wave IF still in
     // the encounter (the rewards were already applied by the relayed picks; only the final outro
-    // is skipped). The HOST also advances the alternation turn here when it is the watcher and
-    // the fast-forward fires - the owner's terminal advance only runs when the host is the owner.
+    // is skipped). Both clients advance the alternation turn LOCALLY + idempotently (keyed to the
+    // ME's start counter), so whichever terminal fires first (this fast-forward or the owner's
+    // coopEndMePump) advances exactly once and the other no-ops.
     pump.beginWatcher(seq, () => {
       if (!coopInMeInteractivePhase()) {
         return; // already auto-completed past the encounter; its terminal already advanced
       }
       leaveEncounterWithoutBattle();
-      if (controller.role === "host") {
-        controller.advanceInteraction();
-      }
+      controller.advanceInteraction(coopMeInteractionStart);
     });
   }
 }
@@ -99,9 +107,11 @@ function coopEndMePump(): void {
     return;
   }
   pump.endOwner();
-  if (controller.role === "host") {
-    controller.advanceInteraction();
-  }
+  // Both clients advance LOCALLY + idempotently (keyed to the ME's start counter), so the
+  // whole ME (encounter + its embedded reward shop, which suppresses its own advance) counts
+  // as exactly ONE alternation step on each client - no host-broadcast race (#633).
+  controller.advanceInteraction(coopMeInteractionStart);
+  coopMeInteractionStart = -1;
 }
 
 /**

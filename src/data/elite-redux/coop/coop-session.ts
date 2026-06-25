@@ -224,9 +224,35 @@ export class CoopInteractionTurn {
     return this.current() === role;
   }
 
-  /** Advance to the next interaction's owner. Call once per COMPLETED interaction. */
-  advance(): void {
+  /**
+   * Advance to the next interaction's owner. Call once per COMPLETED interaction.
+   *
+   * Co-op (#633): IDEMPOTENT when `fromCounter` is supplied - the advance only fires
+   * if the counter is STILL at the value observed when the interaction started, so a
+   * second call for the same interaction (the owner's terminal AND the watcher's, or
+   * a terminal that already ran after the reconcile broadcast bumped the counter) is
+   * a no-op. Returns whether it actually advanced. With no arg it advances
+   * unconditionally (legacy callers).
+   */
+  advance(fromCounter?: number): boolean {
+    if (fromCounter !== undefined && fromCounter !== this.counter) {
+      return false;
+    }
     this.counter += 1;
+    return true;
+  }
+
+  /**
+   * Co-op (#633): reconcile this counter against a peer's broadcast value, MONOTONIC-
+   * MAX (never moves backward). Both clients advance the counter LOCALLY in lockstep,
+   * so the broadcast is only a safety net: a late / stale / duplicated `interaction`
+   * message can never clobber a correct local counter or rewind the alternation - it
+   * can only pull a genuinely-behind client forward.
+   */
+  mergeRemote(remote: number): void {
+    if (Number.isInteger(remote) && remote > this.counter) {
+      this.counter = remote;
+    }
   }
 
   /** Serialize for the persistent run record. */

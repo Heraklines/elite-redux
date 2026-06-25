@@ -231,17 +231,26 @@ export class CoopSessionController {
   }
 
   /**
-   * Advance to the next interaction's owner (#633, P4). Call ONCE per completed
-   * interaction (a multi-step ME counts as one). Host-authoritative: broadcasts the
-   * new counter so the partner mirrors the same order.
+   * Advance to the next interaction's owner (#633, P4). Call once per completed
+   * interaction (a multi-step ME counts as one). BOTH clients advance LOCALLY +
+   * deterministically (they process the same interactions in lockstep), so the
+   * owner-parity + relay seq agree WITHOUT waiting on the network - the old
+   * host-only-broadcast counter raced the synchronous interaction start (the guest
+   * read a stale counter for an ME firing right after a shop advance -> owner/seq
+   * disagreement -> watcher froze). `fromCounter` makes the advance idempotent (the
+   * counter observed when the interaction began): a duplicate call for the same
+   * interaction is a no-op, so the local advance + the reconcile broadcast can't
+   * double-count. The broadcast is kept as a monotonic-max safety net only.
    */
-  advanceInteraction(): void {
-    this.interactionTurn.advance();
-    this.transport.send({
-      t: "interaction",
-      screen: COOP_INTERACTION_TURN_SCREEN,
-      choice: this.interactionTurn.toJSON(),
-    });
+  advanceInteraction(fromCounter?: number): void {
+    const advanced = this.interactionTurn.advance(fromCounter);
+    if (advanced) {
+      this.transport.send({
+        t: "interaction",
+        screen: COOP_INTERACTION_TURN_SCREEN,
+        choice: this.interactionTurn.toJSON(),
+      });
+    }
     this.emit();
   }
 
@@ -364,7 +373,12 @@ export class CoopSessionController {
         // agree on whose turn it is (#633, P4). A real interaction CHOICE (any
         // other screen) is handled by the encounter layer, not here.
         if (msg.screen === COOP_INTERACTION_TURN_SCREEN && typeof msg.choice === "number") {
-          this.interactionTurn = CoopInteractionTurn.fromJSON(msg.choice);
+          // MONOTONIC-MAX, never a blind overwrite (#633): both clients advance the
+          // counter locally in lockstep, so this broadcast is only a reconcile safety
+          // net - it pulls a genuinely-behind client forward but can never rewind a
+          // correct local counter (the old blind overwrite let a stale/late broadcast
+          // clobber the counter and desync the owner/seq calc -> the ME-watcher freeze).
+          this.interactionTurn.mergeRemote(msg.choice);
           this.emit();
         }
         break;

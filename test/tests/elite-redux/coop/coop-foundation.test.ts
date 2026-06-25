@@ -107,5 +107,41 @@ describe("co-op foundation (#633)", () => {
       expect(CoopInteractionTurn.fromJSON(5).current()).toBe("guest"); // odd -> guest
       expect(CoopInteractionTurn.fromJSON(-3).current()).toBe("host"); // bad input clamps to host
     });
+
+    it("advance is IDEMPOTENT per interaction (keyed to the observed counter) (#633)", () => {
+      const turn = new CoopInteractionTurn();
+      // First completion of interaction 0 advances 0 -> 1 and reports it advanced.
+      expect(turn.advance(0)).toBe(true);
+      expect(turn.toJSON()).toBe(1);
+      // A SECOND call for the SAME interaction (still keyed to 0) is a no-op - this is
+      // what stops the owner's terminal + the watcher's terminal + the reconcile
+      // broadcast from double-counting one interaction.
+      expect(turn.advance(0)).toBe(false);
+      expect(turn.toJSON()).toBe(1);
+      // The next interaction (keyed to 1) advances 1 -> 2.
+      expect(turn.advance(1)).toBe(true);
+      expect(turn.toJSON()).toBe(2);
+      // No-arg advance stays unconditional (legacy callers).
+      expect(turn.advance()).toBe(true);
+      expect(turn.toJSON()).toBe(3);
+    });
+
+    it("mergeRemote is MONOTONIC-MAX - a stale/late broadcast can never rewind (#633)", () => {
+      const turn = new CoopInteractionTurn();
+      turn.advance(); // counter = 1 (locally advanced)
+      turn.advance(); // counter = 2
+      // A late broadcast carrying an OLDER value must NOT clobber the correct local
+      // counter (the old blind overwrite is exactly what desynced the ME owner/seq).
+      turn.mergeRemote(1);
+      expect(turn.toJSON()).toBe(2);
+      turn.mergeRemote(0);
+      expect(turn.toJSON()).toBe(2);
+      // A genuinely-ahead peer pulls a behind client forward.
+      turn.mergeRemote(5);
+      expect(turn.toJSON()).toBe(5);
+      // Garbage is ignored.
+      turn.mergeRemote(Number.NaN);
+      expect(turn.toJSON()).toBe(5);
+    });
   });
 });
