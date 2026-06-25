@@ -2,6 +2,10 @@ import { timedEventManager } from "#app/global-event-manager";
 import { globalScene } from "#app/global-scene";
 import { modifierTypes } from "#data/data-lists";
 import { getCharVariantFromDialogue } from "#data/dialogue";
+import {
+  coopShouldQueueBossVoucherReward,
+  coopVictoryDialogueDecision,
+} from "#data/elite-redux/coop/coop-trainer-victory";
 import { hasErGhostOverride } from "#data/elite-redux/er-ghost-teams";
 import { getErDifficulty } from "#data/elite-redux/er-run-difficulty";
 import { BiomeId } from "#enums/biome-id";
@@ -36,11 +40,25 @@ export class TrainerVictoryPhase extends BattlePhase {
     }
 
     const trainerType = globalScene.currentBattle.trainer?.config.trainerType!; // TODO: is this bang correct?
-    // Validate Voucher for boss trainers
+    const isCoop = globalScene.gameMode.isCoop;
+    // Validate Voucher for boss trainers.
+    //
+    // The per-account voucher CREDIT (validateVoucher's side effect: voucherUnlocks +
+    // voucherCounts + achvBar) must still run on every client - vouchers are per-account,
+    // not shared. Keep its guard as `Object.hasOwn(vouchers, ...)` ALONE (NOT `&& isBoss`)
+    // so the solo side-effect set is byte-for-byte identical to before; only boss types ever
+    // land in the voucher registry, so this matches today's effective behavior.
+    //
+    // The QUEUE decision for the repeat-win bonus ModifierRewardPhase is the divergence
+    // source: `!validateVoucher(...)` reads per-account save history, so two co-op clients
+    // queue a different number of phases -> lockstep desync. In co-op we suppress the bonus
+    // phase on BOTH clients (see coopShouldQueueBossVoucherReward); solo is unchanged.
+    const hasBossVoucher = Object.hasOwn(vouchers, TrainerType[trainerType]);
+    const creditedFirstTime = hasBossVoucher ? globalScene.validateVoucher(vouchers[TrainerType[trainerType]]) : false;
     if (
-      Object.hasOwn(vouchers, TrainerType[trainerType])
-      && !globalScene.validateVoucher(vouchers[TrainerType[trainerType]])
+      hasBossVoucher
       && globalScene.currentBattle.trainer?.config.isBoss
+      && coopShouldQueueBossVoucherReward(isCoop, creditedFirstTime)
     ) {
       if (timedEventManager.getUpgradeUnlockedVouchers()) {
         globalScene.phaseManager.unshiftNew(
@@ -80,6 +98,21 @@ export class TrainerVictoryPhase extends BattlePhase {
       }),
       null,
       () => {
+        // CO-OP (lockstep) determinism: the victory-message block below has TWO per-account
+        // decision points - the call-site `ui.shouldSkipDialogue(message)` (gates the
+        // char-sprite overlay async branch) AND `ui.showDialogue`'s OWN internal per-account
+        // skip (gated by `skipSeenDialogues` + `gameData.getSeenDialogues()`, with the page
+        // count further driven by per-account `gameData.gender`). Two accounts almost never
+        // match, so one client takes the async overlay/dialogue path while the other ends
+        // synchronously -> the clients leave this phase with a DIFFERENT number of async UI
+        // waits and HANG. We skip the entire flavor block on BOTH clients (ALWAYS-SKIP) so the
+        // async-wait count is a constant 0, provably identical regardless of per-account state.
+        // This is the only policy that stays identical without editing ui.ts. Solo / authoritative
+        // are untouched (the decision returns null and the original per-account logic runs).
+        if (coopVictoryDialogueDecision(globalScene.gameMode.isCoop) === false) {
+          this.end();
+          return;
+        }
         const victoryMessages = globalScene.currentBattle.trainer?.getVictoryMessages()!; // TODO: is this bang correct?
         let message: string;
         globalScene.executeWithSeedOffset(

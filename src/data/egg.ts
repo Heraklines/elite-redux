@@ -38,6 +38,30 @@ import i18next from "i18next";
 export const EGG_SEED = 1073741824;
 
 /**
+ * CO-OP (lockstep) determinism (#633): per-wave monotonic counter so multiple eggs
+ * created in the SAME wave get DISTINCT-but-deterministic seeds. Both clients run the
+ * full engine in step and create the same eggs in the same order within a wave, so this
+ * counter advances identically on both. Keyed to the current shared `waveSeed`; resets
+ * when the wave (and therefore the seed) changes. Untouched in solo / authoritative.
+ */
+let coopEggSeqWaveSeed: string | undefined;
+let coopEggSeqCounter = 0;
+
+/**
+ * The next deterministic per-egg offset for the current wave, derived purely from shared
+ * state (the wave seed gates the reset; the counter is the in-wave egg index). Identical
+ * on both lockstep clients. Co-op only - never called on the solo / authoritative path.
+ */
+function nextCoopEggSeqOffset(): number {
+  const waveSeed = globalScene.waveSeed;
+  if (coopEggSeqWaveSeed !== waveSeed) {
+    coopEggSeqWaveSeed = waveSeed;
+    coopEggSeqCounter = 0;
+  }
+  return coopEggSeqCounter++;
+}
+
+/**
  * ER Redux Up gacha (#409): per-species weight multiplier applied to ER customs
  * (speciesId >= 10000) when rolling species for an egg pulled from the Redux Up
  * machine. With ~100+ customs spread across the tiers this makes the large
@@ -172,6 +196,14 @@ export class Egg {
   ////
 
   constructor(eggOptions?: IEggOptions) {
+    // CO-OP (lockstep) determinism (#633): in solo, the egg id (randInt) and the property
+    // seed (randomString) are UNSEEDED (Math.random), so the two clients would generate
+    // DIFFERENT eggs (species/shiny/variant/id) on the shared trainer-win path -> gameData
+    // divergence. In co-op we derive BOTH from the SHARED wave seed so both clients produce
+    // byte-identical eggs. Solo / authoritative are byte-for-byte unchanged.
+    const isCoop = globalScene.gameMode.isCoop;
+    const coopSeqOffset = isCoop ? nextCoopEggSeqOffset() : 0;
+
     const generateEggProperties = (eggOptions?: IEggOptions) => {
       //if (eggOptions.tier && eggOptions.species) throw Error("Error egg can't have species and tier as option. only choose one of them.")
 
@@ -184,7 +216,14 @@ export class Egg {
         this.checkForPityTierOverrides();
       }
 
-      this._id = eggOptions?.id ?? randInt(EGG_SEED, EGG_SEED * this._tier);
+      // In co-op the property block runs under the deterministic wave-seed override below, so
+      // a SEEDED id draw (randSeedInt) is identical on both clients; solo keeps the original
+      // unseeded randInt so its id space is byte-for-byte unchanged. Both span the same range
+      // [EGG_SEED * tier, EGG_SEED * tier + EGG_SEED): randInt(range, min) and
+      // randSeedInt(range, min) share the (range, min) convention.
+      this._id =
+        eggOptions?.id
+        ?? (isCoop ? randSeedInt(EGG_SEED, EGG_SEED * this._tier) : randInt(EGG_SEED, EGG_SEED * this._tier));
 
       this._sourceType = eggOptions?.sourceType ?? undefined;
       this._hatchWaves = eggOptions?.hatchWaves ?? this.getEggTierDefaultHatchWaves();
@@ -216,7 +255,20 @@ export class Egg {
       }
     };
 
-    const seedOverride = randomString(24);
+    // CO-OP: derive the property seed deterministically from the SHARED wave seed + the
+    // per-wave egg sequence offset (a seeded randomString drawn under the wave seed), so both
+    // clients seed the property block identically. SOLO / AUTHORITATIVE keep the unseeded
+    // Math.random seed (byte-for-byte unchanged).
+    let seedOverride = randomString(24);
+    if (isCoop) {
+      globalScene.executeWithSeedOffset(
+        () => {
+          seedOverride = randomString(24, true);
+        },
+        coopSeqOffset,
+        globalScene.waveSeed,
+      );
+    }
     globalScene.executeWithSeedOffset(
       () => {
         generateEggProperties(eggOptions);
@@ -498,7 +550,15 @@ export class Egg {
       );
 
     // If this is the 10th egg without unlocking something new, attempt to force it.
-    if (globalScene.gameData.unlockPity[this.tier] >= 9) {
+    // CO-OP (lockstep) determinism (#633): this narrowing reads PER-ACCOUNT
+    // unlockPity/dexData/eggs, so it would shrink/reorder the species pool differently on
+    // the two clients and make the SAME shared seeded `rand` resolve to a DIFFERENT species
+    // -> gameData divergence on the trainer-win egg path. In co-op we skip the narrowing so
+    // both clients roll over the IDENTICAL full shared-tier pool. The per-account pity
+    // MUTATION below is untouched (it only biases FUTURE rolls, never this egg's species).
+    // Solo is byte-for-byte unchanged. Cost: co-op loses the rare 10th-egg "force a new
+    // unlock" nudge - an acceptable trade for a non-desyncing run.
+    if (!globalScene.gameMode.isCoop && globalScene.gameData.unlockPity[this.tier] >= 9) {
       const lockedPool = speciesPool.filter(
         s => !globalScene.gameData.dexData[s].caughtAttr && !globalScene.gameData.eggs.some(e => e.species === s),
       );
