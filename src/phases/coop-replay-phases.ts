@@ -40,7 +40,11 @@ import {
 } from "#data/elite-redux/coop/coop-battle-engine";
 import { logCanonicalDiff } from "#data/elite-redux/coop/coop-data-fingerprint";
 import { coopLog, coopWarn, isCoopDebug } from "#data/elite-redux/coop/coop-debug";
-import { consumeCoopPendingWaveAdvance, getCoopBattleStreamer } from "#data/elite-redux/coop/coop-runtime";
+import {
+  consumeCoopPendingWaveAdvance,
+  getCoopBattleStreamer,
+  isCoopAuthoritativeGuest,
+} from "#data/elite-redux/coop/coop-runtime";
 import type { CoopBattleCheckpoint, CoopFullBattleSnapshot } from "#data/elite-redux/coop/coop-transport";
 import { BattleType } from "#enums/battle-type";
 import { BattlerIndex } from "#enums/battler-index";
@@ -145,7 +149,10 @@ export class CoopHpDrainReplayPhase extends PokemonPhase {
   public override start(): void {
     super.start();
     if (isCoopDebug()) {
-      coopLog("replay", `present hp bi=${this.battlerIndex} ${Math.trunc(this.fromHp)}->${Math.trunc(this.toHp)}/${Math.trunc(this.maxHp)}`);
+      coopLog(
+        "replay",
+        `present hp bi=${this.battlerIndex} ${Math.trunc(this.fromHp)}->${Math.trunc(this.toHp)}/${Math.trunc(this.maxHp)}`,
+      );
     }
     try {
       const mon = fieldMon(this.battlerIndex);
@@ -495,30 +502,22 @@ export class CoopFinalizeTurnPhase extends Phase {
     }
     void streamer.requestStateSync(this.turn).then(blob => {
       if (blob == null) {
-        coopWarn("resync", `turn=${this.turn} no snapshot received (timeout) -> keep current state, re-check next turn`);
+        coopWarn(
+          "resync",
+          `turn=${this.turn} no snapshot received (timeout) -> keep current state, re-check next turn`,
+        );
         return;
       }
       try {
         const snapshot = JSON.parse(decompressFromBase64(blob)) as CoopFullBattleSnapshot;
-        coopLog("resync", `turn=${this.turn} applying full snapshot (blobLen=${blob.length})`);
-        applyCoopFullSnapshot(snapshot);
-        const healed = captureCoopChecksum();
-        if (healed === hostChecksum) {
-          coopLog("resync", `turn=${this.turn} ok (healed host=guest=${hostChecksum})`);
-        } else {
-          coopWarn("resync", `turn=${this.turn} still-diverged host=${hostChecksum} guest=${healed}`);
-          // DIAGNOSTIC (#633): the snapshot did NOT heal the divergence - log WHAT it failed
-          // to repair by diffing the host pre-image against the guest's POST-APPLY state.
-          if (hostObj !== undefined) {
-            const guestPostApplyObj = this.parseCanonical(canonicalize(captureCoopChecksumState()));
-            logCanonicalDiff(`[coop-resync] turn=${this.turn} UNHEALED`, hostObj, guestPostApplyObj);
-            coopWarn(
-              "resync",
-              "note: snapshot does NOT re-apply party/modifiers/arenaTags or force maxHp -"
-                + " a diff in those is a data-table drift, not a heal bug",
-            );
-          }
-        }
+        coopLog("resync", `turn=${this.turn} queueing full snapshot apply (blobLen=${blob.length})`);
+        // BLOCKING-1 (#633, async resync race guard): the apply now re-summons field mons, vacates
+        // slots, and rebuilds boss bars - running THAT inline here (a detached promise continuation,
+        // very likely mid-way through the next turn's animation replay) could teardown a live sprite
+        // while a CoopHpDrainReplayPhase animates against it. Route it through a queued one-shot phase
+        // so the heavy rebuild lands at a real inter-phase boundary, never mid-drain. The heal-check +
+        // UNHEALED diagnostics moved INTO the phase (they must run AFTER the deferred apply).
+        globalScene.phaseManager.pushPhase(new CoopApplyResyncPhase(snapshot, this.turn, hostChecksum, hostObj));
       } catch {
         /* a malformed resync blob must never crash the guest's battle */
         coopWarn("resync", `turn=${this.turn} malformed snapshot blob (handled)`);
@@ -623,5 +622,117 @@ export class CoopFinalizeTurnPhase extends Phase {
     } catch {
       // The post-battle tail is best-effort; a failure here must never hang the guest's run.
     }
+  }
+}
+
+/**
+ * MINOR-1 (#633, converge-or-give-up cap): the count of CONSECUTIVE resyncs whose target divergence
+ * (the host's checksum = the "dimensions" being healed) failed to heal. Keyed by host checksum so a
+ * NEW divergence resets the counter. After {@linkcode COOP_RESYNC_RESUMMON_GIVE_UP} failures on the
+ * SAME dimensions, the comprehensive apply STOPS re-summoning (keeps the cheap scalar writes) so an
+ * unclosable divergence degrades to a static wrong-bar instead of a per-turn re-summon flicker storm.
+ */
+let coopResyncUnhealedChecksum: string | undefined;
+let coopResyncUnhealedCount = 0;
+/** After this many consecutive UNHEALED resyncs on the SAME host checksum, suppress the re-summon. */
+const COOP_RESYNC_RESUMMON_GIVE_UP = 2;
+
+/** Parse a canonical state string into a plain object, or undefined on absence/failure. */
+function parseCoopCanonical(canonical: string | undefined): unknown {
+  if (canonical === undefined) {
+    return;
+  }
+  try {
+    return JSON.parse(canonical);
+  } catch {
+    return;
+  }
+}
+
+/**
+ * GUEST (#633, BLOCKING-1 - async resync race guard): a one-shot phase that applies a full
+ * authoritative resync snapshot at a REAL inter-phase boundary, verifies it healed, then ends. The
+ * resync blob arrives via a genuine network round-trip ({@linkcode CoopFinalizeTurnPhase.verifyChecksum}'s
+ * `requestStateSync(...).then(...)`), so by the time it resolves the guest is very likely mid-way
+ * through the NEXT turn's replay, pumping `CoopMoveAnimReplayPhase` / `CoopHpDrainReplayPhase` against
+ * the live field. The comprehensive snapshot apply re-summons field mons, vacates slots, and rebuilds
+ * boss bars ({@linkcode applyCoopFullSnapshot}) - running THAT inline in a bare `.then` could teardown
+ * a live sprite WHILE a drain is animating against it (a live-sprite-teardown race).
+ *
+ * Routing the apply through this queued phase lands the heavy re-summon/boss-rebuild at an
+ * inter-phase boundary, never interleaved with a half-drained HP bar. The heal-check + UNHEALED
+ * diagnostics live here (they must run AFTER the deferred apply, not in the `.then` that enqueues it).
+ *
+ * MINOR-1 converge-or-give-up: after {@linkcode COOP_RESYNC_RESUMMON_GIVE_UP} consecutive UNHEALED
+ * resyncs on the SAME host checksum, the heavy field/boss re-summon is suppressed (cheap scalar writes
+ * still run) so a genuinely-unclosable divergence does not become a per-turn re-summon storm.
+ *
+ * Hardened to always reach `end()` so a malformed snapshot can never hang the guest's run.
+ */
+export class CoopApplyResyncPhase extends Phase {
+  public readonly phaseName = "CoopApplyResyncPhase";
+
+  constructor(
+    private readonly snapshot: CoopFullBattleSnapshot,
+    private readonly turn: number,
+    private readonly hostChecksum: string,
+    private readonly hostObj: unknown,
+  ) {
+    super();
+  }
+
+  public override start(): void {
+    super.start();
+    try {
+      // MINOR-1: if we've already failed to heal THIS divergence twice in a row, skip the heavy
+      // field/boss re-summon (it isn't closing the gap and a per-turn rebuild is a flicker storm) -
+      // keep only the cheap scalar writes so we don't regress hp/status/stages.
+      const suppressResummon =
+        coopResyncUnhealedChecksum === this.hostChecksum && coopResyncUnhealedCount >= COOP_RESYNC_RESUMMON_GIVE_UP;
+      if (suppressResummon) {
+        coopWarn("resync", `turn=${this.turn} persistent divergence, suppressing re-summon`);
+      }
+      coopLog("resync", `turn=${this.turn} applying full snapshot (suppressResummon=${suppressResummon})`);
+      // Pass the isCoopAuthoritativeGuest() gate from here (cycle-free) so the engine's level/exp +
+      // boss re-assert branches stay guest-only without the engine importing the runtime.
+      applyCoopFullSnapshot(this.snapshot, isCoopAuthoritativeGuest(), suppressResummon);
+      const healed = captureCoopChecksum();
+      if (healed === this.hostChecksum) {
+        coopLog("resync", `turn=${this.turn} ok (healed host=guest=${this.hostChecksum})`);
+        // Healed: reset the give-up tracker so a fresh future divergence gets the full re-summon again.
+        coopResyncUnhealedChecksum = undefined;
+        coopResyncUnhealedCount = 0;
+      } else {
+        coopWarn("resync", `turn=${this.turn} still-diverged host=${this.hostChecksum} guest=${healed}`);
+        // Track consecutive UNHEALED on the SAME dimensions (host checksum) for the give-up cap.
+        if (coopResyncUnhealedChecksum === this.hostChecksum) {
+          coopResyncUnhealedCount++;
+        } else {
+          coopResyncUnhealedChecksum = this.hostChecksum;
+          coopResyncUnhealedCount = 1;
+        }
+        // DIAGNOSTIC (#633): the snapshot did NOT heal the divergence - log WHAT it failed to repair
+        // by diffing the host pre-image against the guest's POST-APPLY state.
+        if (this.hostObj !== undefined) {
+          const guestPostApplyObj = parseCoopCanonical(canonicalize(captureCoopChecksumState()));
+          logCanonicalDiff(`[coop-resync] turn=${this.turn} UNHEALED`, this.hostObj, guestPostApplyObj);
+          // The authoritative full snapshot re-applies field composition, per-mon
+          // maxHp/level/exp/ppUsed/boss-segments, arena weather/terrain/tags, money, modifier stacks,
+          // and bench party order; only held-item structure converges at the wave boundary. So a
+          // residual diff in those re-applied dimensions is a real heal bug to chase; a diff in
+          // held-item structure is expected to converge next wave, not here.
+          coopWarn(
+            "resync",
+            "note: snapshot re-applies field composition + per-mon maxHp/level/exp/ppUsed/boss-segments"
+              + " + arena tags + money + modifier stacks + bench order; only held-item structure"
+              + " converges at the wave boundary",
+          );
+        }
+      }
+    } catch {
+      // A malformed resync snapshot must never hang the guest's turn.
+      coopWarn("resync", `turn=${this.turn} CoopApplyResyncPhase: apply/verify threw (handled)`);
+    }
+    this.end();
   }
 }

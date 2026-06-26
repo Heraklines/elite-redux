@@ -18,6 +18,7 @@
 
 import { globalScene } from "#app/global-scene";
 import { applyCoopEnemyHeldItems } from "#data/elite-redux/coop/coop-battle-engine";
+import { coopLog } from "#data/elite-redux/coop/coop-debug";
 import type { CoopSerializedPokemon } from "#data/elite-redux/coop/coop-transport";
 import type { Gender } from "#data/gender";
 import type { Nature } from "#enums/nature";
@@ -98,9 +99,34 @@ export function buildCoopEnemy(
   // Form / nature / IVs changed -> recompute stats + name, then align current hp.
   enemy.calculateStats();
   enemy.generateName();
+  // Boss adopt (#633, A/BLOCKING-2): boss state lives ONLY on EnemyPokemon and `addEnemyPokemon`
+  // reconstructs with boss hardcoded `false`, so an adopted boss renders normal bars. Re-assert the
+  // host's authoritative boss state AFTER calculateStats (so getMaxHp/segment-size are right) and
+  // BEFORE the hp clamp below. Pass the EXPLICIT host segment count to setBoss so the
+  // `?? getEncounterBossSegments` fallback can NEVER re-roll segments from the guest's diverged wave
+  // RNG, then restore the host's bossSegmentIndex (the count alone renders the wrong shield dividers)
+  // and initBattleInfo() so the segmented bar renders. Self-gating: only fires when the host streamed
+  // bossSegments>0 (solo never produces it), so no extra authoritative gate is needed here.
+  const bossSegments = coopNum(data, "bossSegments");
+  if (bossSegments !== undefined && bossSegments > 0) {
+    enemy.setBoss(true, bossSegments);
+    const bsi = coopNum(data, "bossSegmentIndex");
+    if (bsi !== undefined) {
+      enemy.bossSegmentIndex = bsi;
+    }
+    enemy.initBattleInfo();
+    coopLog(
+      "replay",
+      `guest adopt enemy bi=${trainerSlot} isBoss segments=${bossSegments} index=${enemy.bossSegmentIndex}`,
+    );
+  }
+  // Clamp current hp to the host's authoritative maxHp ceiling when present (so an adopted boss/normal
+  // mon whose maxHp diverged at adopt time still clamps correctly), else our freshly-computed maxHp.
   const hp = coopNum(data, "hp");
   if (hp !== undefined) {
-    enemy.hp = Math.max(0, Math.min(hp, enemy.getMaxHp()));
+    const maxHp = coopNum(data, "maxHp");
+    const ceiling = maxHp !== undefined && maxHp > 0 ? maxHp : enemy.getMaxHp();
+    enemy.hp = Math.max(0, Math.min(hp, ceiling));
   }
   // Held items (#633): reconstruct the host's serialized held modifiers onto THIS enemy
   // (remapping pokemonId to the live id). The adopt path suppresses the guest's own

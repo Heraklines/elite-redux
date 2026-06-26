@@ -58,7 +58,7 @@ import type { Nature } from "#enums/nature";
 import { Stat } from "#enums/stat";
 import { StatusEffect } from "#enums/status-effect";
 import type { WeatherType } from "#enums/weather-type";
-import type { Pokemon } from "#field/pokemon";
+import { EnemyPokemon, type Pokemon } from "#field/pokemon";
 // biome-ignore lint/performance/noNamespaceImport: held-item reconstruction resolves the modifier class by serialized name (`Modifier[className]`), exactly like the save-load path in game-data.ts.
 import * as Modifier from "#modifiers/modifier";
 import { PersistentModifier, PokemonHeldItemModifier } from "#modifiers/modifier";
@@ -237,6 +237,24 @@ export function captureCoopCheckpoint(): CoopBattleCheckpoint | null {
 }
 
 /**
+ * GUEST (#633): side-effect-free field removal of one mon - zero hp so it reads as fainted, stamp the
+ * FAINT status (VictoryPhase / isFainted(true) checks the status, not just hp - mirrors the host
+ * FaintPhase, see #633 trainer-victory deadlock), then leaveField (NO FaintPhase / SwitchPhase /
+ * resolution pipeline - that would re-introduce the engine divergence authoritative mode exists to
+ * prevent). Shared by the player/enemy reconcile PASS 1 + the non-optional post-PASS-2 orphan sweep.
+ * Fully guarded so one bad removal can't break the rest of the reconcile.
+ */
+function coopRemoveFromField(mon: Pokemon): void {
+  try {
+    mon.hp = 0;
+    mon.doSetStatus(StatusEffect.FAINT);
+    mon.leaveField(true, true, false);
+  } catch {
+    /* one removal failed; leave it and continue the reconcile */
+  }
+}
+
+/**
  * GUEST: reconcile the live ENEMY field to the host's authoritative composition (#633
  * enemy-field reconcile fix). The host serializes player-active + enemy-SLOT-PRESENT mons (so a
  * just-fainted foe rides the payload with `fainted:true`), but the guest's per-mon numeric apply
@@ -278,25 +296,10 @@ export function reconcileCoopEnemyField(hostField: { bi: number; fainted: boolea
       if (hostAliveEnemies.has(bi)) {
         continue;
       }
-      try {
-        // Side-effect-free removal: zero hp so it reads as fainted, then leaveField (no
-        // FaintPhase / resolution pipeline - that would re-introduce the engine divergence
-        // authoritative mode exists to prevent).
-        enemy.hp = 0;
-        // Also stamp the FAINT status (#633 trainer-victory deadlock): the host's real FaintPhase
-        // calls doSetStatus(FAINT) before leaveField, so on the host a KOd enemy reads
-        // isFainted(true)===true. VictoryPhase's win-branch guard is `!getEnemyParty().find(p =>
-        // !p.isFainted(true))` - it checks the STATUS, not just hp. Without this the off-field KOd
-        // enemy (still in getEnemyParty) reads isFainted(true)===false on the guest, so the find
-        // returns it, the guard is false, and the guest's VictoryPhase SKIPS the entire trainer
-        // reward chain + SelectModifierPhase (the deadlock: the host parks as the reward WATCHER
-        // waiting for the guest/OWNER's picks the guest never makes). doSetStatus(FAINT) is a pure
-        // field assignment (no phase / RNG), so it stays side-effect-free like the rest of the removal.
-        enemy.doSetStatus(StatusEffect.FAINT);
-        enemy.leaveField(true, true, false);
-      } catch {
-        /* one enemy removal failed; leave it and continue the reconcile */
-      }
+      // Side-effect-free removal via the shared helper (#633 trainer-victory deadlock): it stamps
+      // doSetStatus(FAINT) before leaveField exactly like the host FaintPhase, so the off-field KOd
+      // enemy reads isFainted(true)===true - VictoryPhase's win guard checks the STATUS, not just hp.
+      coopRemoveFromField(enemy);
     }
     // PASS 2 - SWAP/SUMMON: mirror a host ENEMY SWITCH (#633, enemy-switch mirror). For each enemy
     // bi the host reports ALIVE with a `speciesId`, if the guest's mon at that field slot is a
@@ -330,6 +333,21 @@ export function reconcileCoopEnemyField(hostField: { bi: number; fainted: boolea
       }
       summonCoopEnemyField(fieldSlot, partySlot);
     }
+    // C.2 (#633, MAJOR-3) - NON-OPTIONAL post-PASS-2 orphan sweep: PASS 2's swap (and the incoming-vacate
+    // inside summonCoopEnemyField) can leave a fresh on-field orphan at an enemy slot the host reports
+    // NOT alive. PASS 1 only saw the pre-PASS-2 state, so re-run the removal for any on-field guest enemy
+    // whose bi is not in the host's alive set.
+    for (const enemy of globalScene.getEnemyField(true)) {
+      if (enemy == null || !enemy.isActive() || !enemy.isOnField()) {
+        continue;
+      }
+      const bi = enemy.getBattlerIndex();
+      if (bi < BattlerIndex.ENEMY || hostAliveEnemies.has(bi)) {
+        continue;
+      }
+      coopLog("field", `enemy post-PASS2 orphan sweep removing bi=${bi} speciesId=${enemy.species?.speciesId ?? 0}`);
+      coopRemoveFromField(enemy);
+    }
   } catch {
     // A malformed host field must never crash the guest's battle.
   }
@@ -357,6 +375,17 @@ export function summonCoopEnemyField(fieldIndex: number, partySlot: number): voi
     // Idempotency: if the correct mon is already on-field at this slot, nothing to do.
     if (party[fieldIndex] === incoming) {
       return;
+    }
+    // C.2 (#633, "switched in on top"): if the incoming mon is currently on-field at a DIFFERENT slot,
+    // VACATE that slot first - the swap below moves it to `fieldIndex` but leaves its OLD field slot
+    // pointing at a still-on-field sprite (a stale occupant). Side-effect-free (no FaintPhase /
+    // SwitchPhase). The post-PASS-2 removal sweep in reconcileCoopEnemyField clears any orphan it leaves.
+    if (incoming.isOnField() && party.indexOf(incoming) !== partySlot) {
+      try {
+        incoming.leaveField(true, true, false);
+      } catch {
+        /* vacating the incoming's old slot failed; the post-PASS-2 sweep still clears the orphan */
+      }
     }
     // SWAP the guest's enemy party array EXACTLY like the host (switch-summon-phase.ts:223-224),
     // so getEnemyParty() index alignment stays permutation-identical to the host next turn.
@@ -437,18 +466,9 @@ export function reconcileCoopPlayerField(
       if (hostAlivePlayers.has(bi)) {
         continue;
       }
-      try {
-        // Side-effect-free removal: zero hp so it reads as fainted, then leaveField (no
-        // FaintPhase / resolution pipeline - that would re-introduce the engine divergence
-        // authoritative mode exists to prevent).
-        mon.hp = 0;
-        // Stamp FAINT status for the same reason as the enemy side (#633 trainer-victory deadlock):
-        // VictoryPhase / isFainted(true) checks the status, not just hp. Mirrors the host FaintPhase.
-        mon.doSetStatus(StatusEffect.FAINT);
-        mon.leaveField(true, true, false);
-      } catch {
-        /* one player removal failed; leave it and continue the reconcile */
-      }
+      // Side-effect-free removal (no FaintPhase / resolution pipeline - that would re-introduce the
+      // engine divergence authoritative mode exists to prevent).
+      coopRemoveFromField(mon);
     }
     // PASS 2 - SWAP/SUMMON: REPOSITION the host's reported mon onto each player field slot (#633:
     // mirror a host partner REPLACEMENT from the bench AND repair a field/party-order divergence -
@@ -499,7 +519,30 @@ export function reconcileCoopPlayerField(
       if (partySlot < 0) {
         continue;
       }
+      // C.1 diagnostic (#633): PASS 2 is repositioning this mon to a DIFFERENT slot than where it
+      // currently sits (partySlot -> fieldSlot). Logged so a future capture shows whether PASS 2 ever
+      // DISAGREES with the eager self-switch swap in turn-start-phase (if it never logs for the guest's
+      // own switch, the eager swap already matched the host and the orphan fix below is the real cure).
+      coopLog(
+        "field",
+        `player PASS2 reposition speciesId=${speciesId} from=${partySlot} to=${fieldSlot} bi=${entry.bi}`,
+      );
       summonCoopPlayerField(fieldSlot, partySlot);
+    }
+    // C.2 (#633, MAJOR-3) - NON-OPTIONAL post-PASS-2 orphan sweep: PASS 2's repositioning swap (and the
+    // incoming-vacate inside summonCoopPlayerField) can leave a fresh on-field orphan at a slot the host
+    // reports NOT alive - the "switched in on top" stale sprite. PASS 1 only saw the pre-PASS-2 state, so
+    // re-run the removal for any on-field guest player mon whose bi is not in the host's alive set.
+    for (const mon of globalScene.getPlayerField(true)) {
+      if (mon == null || !mon.isActive() || !mon.isOnField()) {
+        continue;
+      }
+      const bi = mon.getBattlerIndex();
+      if (bi >= BattlerIndex.ENEMY || hostAlivePlayers.has(bi)) {
+        continue;
+      }
+      coopLog("field", `player post-PASS2 orphan sweep removing bi=${bi} speciesId=${mon.species?.speciesId ?? 0}`);
+      coopRemoveFromField(mon);
     }
   } catch {
     // A malformed host field must never crash the guest's battle.
@@ -530,6 +573,18 @@ export function summonCoopPlayerField(fieldIndex: number, partySlot: number): vo
     // Idempotency: if the correct mon is already on-field at this slot, nothing to do.
     if (party[fieldIndex] === incoming) {
       return;
+    }
+    // C.2 (#633, "switched in on top"): if the incoming mon is currently on-field at a DIFFERENT slot,
+    // VACATE that slot first - the swap below moves it to `fieldIndex` but leaves its OLD field slot
+    // pointing at a still-on-field sprite, the stale occupant the player sees "switched in on top of"
+    // their mon's position. Side-effect-free (no FaintPhase / SwitchPhase). The post-PASS-2 removal
+    // sweep in reconcileCoopPlayerField then force-clears any orphan this leaves.
+    if (incoming.isOnField() && party.indexOf(incoming) !== partySlot) {
+      try {
+        incoming.leaveField(true, true, false);
+      } catch {
+        /* vacating the incoming's old slot failed; the post-PASS-2 sweep still clears the orphan */
+      }
     }
     // SWAP the guest's player party array EXACTLY like the host (switch-summon-phase.ts:223-224),
     // so getPlayerParty() index alignment stays permutation-identical to the host next turn.
@@ -719,6 +774,15 @@ export function captureCoopEnemies(): CoopSerializedEnemy[] {
         ivs: [...enemy.ivs],
         moveset: enemy.getMoveset().map(m => m.moveId),
         hp: enemy.hp,
+        // Boss adopt (#633, A/BLOCKING-2): boss state lives ONLY on EnemyPokemon and is hardcoded
+        // `false` on the guest's `addEnemyPokemon` reconstruct, so an adopted boss renders normal
+        // bars. Carry the host's authoritative segment count + current index + maxHp ceiling so the
+        // guest can `setBoss` with the EXPLICIT count (never re-rolling from its diverged wave RNG)
+        // and render the right shield dividers. Additive: solo never streams this.
+        isBoss: enemy.isBoss(),
+        bossSegments: enemy.bossSegments,
+        bossSegmentIndex: enemy.bossSegmentIndex,
+        maxHp: enemy.getMaxHp(),
         // Shiny + variant are rolled in the Pokemon constructor from the wave RNG,
         // but the guest's adopt path (buildCoopEnemy) consumes the RNG in a different
         // order than the host's normal generation, so its independent roll diverged -
@@ -861,9 +925,25 @@ export function applyCoopEnemies(enemies: CoopSerializedEnemy[]): void {
         }
         // IVs / nature changed -> recompute stats, then align current hp.
         enemy.calculateStats();
+        // Boss adopt mirror (#633, A/MINOR-2): the mid-wave by-index overwrite must ALSO re-assert
+        // boss state, with the EXPLICIT host count (never the diverged-RNG `getEncounterBossSegments`
+        // fallback) + the host's index. This path runs at the wave's first-turn boundary with the bar
+        // ALREADY SHOWN, so `initBattleInfo()` (which, on an existing battleInfo, dispatches to
+        // `updateBossSegments` rather than rebuilding) re-renders the segmented bar in place.
+        const bossSegments = num(d, "bossSegments");
+        if (bossSegments !== undefined && bossSegments > 0) {
+          enemy.setBoss(true, bossSegments);
+          const bsi = num(d, "bossSegmentIndex");
+          if (bsi !== undefined) {
+            enemy.bossSegmentIndex = bsi;
+          }
+          enemy.initBattleInfo();
+        }
         const hp = num(d, "hp");
         if (hp !== undefined) {
-          enemy.hp = Math.max(0, Math.min(hp, enemy.getMaxHp()));
+          const maxHp = num(d, "maxHp");
+          const ceiling = maxHp !== undefined && maxHp > 0 ? maxHp : enemy.getMaxHp();
+          enemy.hp = Math.max(0, Math.min(hp, ceiling));
         }
         void enemy.updateInfo();
       } catch {
@@ -934,6 +1014,22 @@ function readModifiers(): [string, number][] {
   }
 }
 
+/**
+ * Read a live mon's boss state (#633, A/BLOCKING-2): `[bossSegments, bossSegmentIndex]`. Player mons
+ * (and any non-enemy) read `[0, 0]` - boss state lives only on `EnemyPokemon`. Carried in the checksum
+ * + the resync so a missing/diverged-boss guest is detectable + healable.
+ */
+function readBossState(mon: Pokemon): { bossSegments: number; bossSegmentIndex: number } {
+  try {
+    if (mon instanceof EnemyPokemon) {
+      return { bossSegments: mon.bossSegments ?? 0, bossSegmentIndex: mon.bossSegmentIndex ?? 0 };
+    }
+  } catch {
+    /* fall through to the non-boss default */
+  }
+  return { bossSegments: 0, bossSegmentIndex: 0 };
+}
+
 /** Read a live mon's Tera state (#633 GAP 7): whether Terastallized + the tera type (0 on error). */
 function readTeraState(mon: Pokemon): { isTerastallized: boolean; teraType: number } {
   try {
@@ -946,6 +1042,7 @@ function readTeraState(mon: Pokemon): { isTerastallized: boolean; teraType: numb
 /** Build the canonical checksum view of ONE live field mon. */
 function readChecksumMon(mon: Pokemon): CoopChecksumMon {
   const tera = readTeraState(mon);
+  const boss = readBossState(mon);
   return {
     bi: mon.getBattlerIndex(),
     partyIndex: readPartyIndex(mon),
@@ -960,6 +1057,9 @@ function readChecksumMon(mon: Pokemon): CoopChecksumMon {
     // Tera state (#633 GAP 7): a dropped Tera command is now a hashed identity divergence.
     isTerastallized: tera.isTerastallized,
     teraType: tera.teraType,
+    // Boss state (#633, A/BLOCKING-2): a missing/diverged boss (count OR index) is now detectable.
+    bossSegments: boss.bossSegments,
+    bossSegmentIndex: boss.bossSegmentIndex,
     moves: readMoves(mon),
     tags: readTagTypes(mon),
   };
@@ -1006,6 +1106,7 @@ export function captureCoopChecksum(): string {
 /** Build ONE field mon's full resync snapshot (superset of the checkpoint). */
 function readFullMon(mon: Pokemon): CoopFullMonSnapshot {
   const tera = readTeraState(mon);
+  const boss = readBossState(mon);
   return {
     bi: mon.getBattlerIndex(),
     partyIndex: readPartyIndex(mon),
@@ -1020,6 +1121,13 @@ function readFullMon(mon: Pokemon): CoopFullMonSnapshot {
     // Tera state (#633 GAP 7): forced in the snapshot apply so a dropped Tera command heals.
     isTerastallized: tera.isTerastallized,
     teraType: tera.teraType,
+    // Authoritative level + exp (#633, B): forced TOGETHER on the guest so the stat recompute uses the
+    // authoritative base (closes maxHp at root). `levelExp` is a derived getter, so no stale field.
+    level: mon.level,
+    exp: mon.exp,
+    // Boss state (#633, A/BLOCKING-2): re-asserted on resync so boss bars + shield dividers heal.
+    bossSegments: boss.bossSegments,
+    bossSegmentIndex: boss.bossSegmentIndex,
     moves: readMoves(mon),
     tags: readTagTypes(mon),
   };
@@ -1114,9 +1222,35 @@ function rebuildMovesetIfStructurallyDiverged(mon: Pokemon, snapMoves: [number, 
   }
 }
 
-/** Apply ONE full mon snapshot onto a live mon (ability/form/tera FIRST, then stats, then hp). */
-function applyFullMon(mon: Pokemon, snap: CoopFullMonSnapshot): void {
+/**
+ * Apply ONE full mon snapshot onto a live mon (ability/form/tera/level FIRST, then stats, then hp,
+ * then boss). `authoritativeGuest` (#633): the {@linkcode isCoopAuthoritativeGuest} gate result,
+ * computed by the cycle-free caller (the engine must NOT import the runtime - that would create an
+ * import cycle) and threaded down; the level/exp + boss re-assert branches fire ONLY when true, so
+ * solo / host / lockstep stay byte-identical. `suppressResummon` (#633, MINOR-1): when a divergence
+ * has failed to heal twice in a row on the same dimensions, skip the heavy boss bar rebuild (keep the
+ * cheap scalar writes) so an unclosable boss divergence degrades to a static wrong-bar instead of a
+ * per-turn re-render storm.
+ */
+function applyFullMon(
+  mon: Pokemon,
+  snap: CoopFullMonSnapshot,
+  authoritativeGuest: boolean,
+  suppressResummon = false,
+): void {
   try {
+    // Authoritative level + exp (#633, B): the guest is a pure renderer; adopt the host's level/exp
+    // so the stat recompute below uses the authoritative base (closes maxHp at ROOT, not just masked
+    // by the setStat force below). Forced TOGETHER + ONLY when level differs: `levelExp` is a derived
+    // getter (exp - getLevelTotalExp(level)), so setting both consistent values keeps it consistent
+    // and the guest never independently levels (it runs no ExpPhase, so no spurious LevelUpPhase).
+    if (authoritativeGuest && typeof snap.level === "number" && snap.level > 0 && mon.level !== snap.level) {
+      coopWarn("resync", `level force bi=${snap.bi} host=${snap.level} guest=${mon.level}`);
+      mon.level = snap.level;
+      if (typeof snap.exp === "number") {
+        mon.exp = snap.exp;
+      }
+    }
     // Ability / form first so a stat recompute uses the authoritative values.
     if (mon.formIndex !== snap.formIndex) {
       mon.formIndex = snap.formIndex;
@@ -1169,6 +1303,28 @@ function applyFullMon(mon: Pokemon, snap: CoopFullMonSnapshot): void {
     }
     // HP last, clamped to the (now host-forced) max.
     mon.hp = Math.max(0, Math.min(Math.trunc(snap.hp), mon.getMaxHp()));
+    // Boss re-assert (#633, A/BLOCKING-2), AFTER hp so the index derives from the correct hp. The host
+    // decrements bossSegmentIndex as shields break, but the guest sets hp by direct assignment (never
+    // via damage()), so its index would freeze and the dividers render wrong + the dimension loops
+    // forever. Re-assert the EXPLICIT host segment COUNT (never the diverged-RNG getEncounterBossSegments
+    // fallback), then DERIVE the index from the now-correct hp via getBossSegmentIndex() so the boss
+    // dimension STOPS diverging each apply instead of looping. Gated authoritative; enemy-only.
+    if (authoritativeGuest && mon instanceof EnemyPokemon && typeof snap.bossSegments === "number") {
+      const want = snap.bossSegments;
+      if (mon.bossSegments !== want) {
+        coopWarn("resync", `boss divergence bi=${snap.bi} host.segments=${want} guest.segments=${mon.bossSegments}`);
+      }
+      mon.setBoss(want > 0, want > 0 ? want : undefined);
+      if (want > 0) {
+        // Derive the index from hp (self-correcting), not the host's raw index (which can lag a turn).
+        mon.bossSegmentIndex = mon.getBossSegmentIndex();
+        // Re-render the segmented bar UNLESS we're in give-up mode (a persistent divergence shouldn't
+        // re-render every turn). initBattleInfo() on an existing bar dispatches to updateBossSegments.
+        if (!suppressResummon) {
+          mon.initBattleInfo();
+        }
+      }
+    }
     void mon.updateInfo();
   } catch {
     /* one mon's heal failed; leave it and continue */
@@ -1297,23 +1453,37 @@ export function adoptCoopHostPlayerPartyOrder(hostParty: number[] | undefined): 
  * mid-battle (it converges at the wave boundary via the enemy/party adopt); the player party
  * ORDER is adopted OFF-FIELD ONLY here (#633 GAP 4, {@linkcode adoptCoopHostPlayerPartyOrder} -
  * bench-only, safe at any boundary). Fully guarded so a malformed snapshot can never crash the guest.
+ *
+ * `authoritativeGuest` (#633): the {@linkcode isCoopAuthoritativeGuest} gate result, computed by the
+ * cycle-free CALLER (the engine must not import the runtime - that is an import cycle) and threaded to
+ * {@linkcode applyFullMon} so the level/exp + boss re-assert branches stay guest-only (solo / host /
+ * lockstep are byte-identical). Defaults `false` so a non-gated call can never fire a guest branch.
  */
-export function applyCoopFullSnapshot(snapshot: CoopFullBattleSnapshot): void {
+export function applyCoopFullSnapshot(
+  snapshot: CoopFullBattleSnapshot,
+  authoritativeGuest = false,
+  suppressResummon = false,
+): void {
   try {
     coopLog(
       "resync",
-      `guest applyFullSnapshot field=${snapshot.field?.length ?? 0} weather=${snapshot.weather} terrain=${snapshot.terrain} arenaTags=${snapshot.arenaTags?.length ?? 0} modifiers=${snapshot.modifiers?.length ?? 0} party=${snapshot.party?.length ?? 0} money=${snapshot.money}`,
+      `guest applyFullSnapshot field=${snapshot.field?.length ?? 0} weather=${snapshot.weather} terrain=${snapshot.terrain} arenaTags=${snapshot.arenaTags?.length ?? 0} modifiers=${snapshot.modifiers?.length ?? 0} party=${snapshot.party?.length ?? 0} money=${snapshot.money} suppressResummon=${suppressResummon}`,
     );
-    // Heal the enemy-field COMPOSITION first (#633): drop any just-fainted enemy (fainted:true) and
-    // mirror any host enemy SWITCH (a different species now at a slot). Done BEFORE the per-mon heal
-    // below so the freshly-summoned switched-in mon is the one the snapshot's per-bi state lands on.
-    // Side-effect-free, idempotent, enemy slots only.
-    reconcileCoopEnemyField(snapshot.field);
-    // ...and the PLAYER-field COMPOSITION (#633 partner-death sync): drop any just-fainted partner
-    // (fainted:true) and mirror a host partner REPLACEMENT (a different species now at a player
-    // slot). Done BEFORE the per-mon heal below so the freshly-summoned replacement is the one the
-    // snapshot's per-bi state lands on. Side-effect-free, idempotent, player slots only.
-    reconcileCoopPlayerField(snapshot.field);
+    // MINOR-1 (#633, converge-or-give-up): when a divergence has failed to heal twice on the same
+    // dimensions, SKIP the heavy field-composition re-summon (it isn't closing the gap and a per-turn
+    // teardown/rebuild is a flicker + asset-reload storm). The cheap per-mon scalar writes still run.
+    if (!suppressResummon) {
+      // Heal the enemy-field COMPOSITION first (#633): drop any just-fainted enemy (fainted:true) and
+      // mirror any host enemy SWITCH (a different species now at a slot). Done BEFORE the per-mon heal
+      // below so the freshly-summoned switched-in mon is the one the snapshot's per-bi state lands on.
+      // Side-effect-free, idempotent, enemy slots only.
+      reconcileCoopEnemyField(snapshot.field);
+      // ...and the PLAYER-field COMPOSITION (#633 partner-death sync): drop any just-fainted partner
+      // (fainted:true) and mirror a host partner REPLACEMENT (a different species now at a player
+      // slot). Done BEFORE the per-mon heal below so the freshly-summoned replacement is the one the
+      // snapshot's per-bi state lands on. Side-effect-free, idempotent, player slots only.
+      reconcileCoopPlayerField(snapshot.field);
+    }
     const byIndex = new Map(
       globalScene
         .getField(true)
@@ -1323,7 +1493,7 @@ export function applyCoopFullSnapshot(snapshot: CoopFullBattleSnapshot): void {
     for (const snap of snapshot.field) {
       const mon = byIndex.get(snap.bi);
       if (mon != null) {
-        applyFullMon(mon, snap);
+        applyFullMon(mon, snap, authoritativeGuest, suppressResummon);
       }
     }
     const arena = globalScene.arena;

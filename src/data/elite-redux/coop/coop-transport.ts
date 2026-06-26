@@ -267,6 +267,18 @@ export interface CoopFullMonSnapshot {
   isTerastallized?: boolean;
   /** Tera type (`PokemonType` enum) (#633 GAP 7); forced alongside `isTerastallized`. */
   teraType?: number;
+  /**
+   * Authoritative level (#633, B): drives the guest's stat recompute so maxHp converges at the ROOT
+   * (the host owns leveling; the guest is a pure renderer that adopts it), not just masked by the
+   * maxHp setStat force. Optional + additive (older host payloads omit it; guest guards `!== undefined`).
+   */
+  level?: number;
+  /** Authoritative exp (#633, B); forced TOGETHER with `level` so `levelExp` (a derived getter) stays consistent. */
+  exp?: number;
+  /** Boss segment COUNT (#633, A/BLOCKING-2); re-asserted on resync so boss bars heal mid-battle. */
+  bossSegments?: number;
+  /** Boss segment INDEX (#633, A/BLOCKING-2); re-asserted on resync so the shield dividers heal mid-battle. */
+  bossSegmentIndex?: number;
   /** Each move slot as `[moveId, ppUsed]`, in moveset slot order. */
   moves: [number, number][];
   /** Battler-tag TYPE ids present on the mon (identity only). */

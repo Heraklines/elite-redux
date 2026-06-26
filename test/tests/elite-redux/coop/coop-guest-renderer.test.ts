@@ -25,6 +25,7 @@ import { getGameMode } from "#app/game-mode";
 import { globalScene } from "#app/global-scene";
 import { modifierTypes } from "#data/data-lists";
 import * as coopEngine from "#data/elite-redux/coop/coop-battle-engine";
+import { buildCoopEnemy } from "#data/elite-redux/coop/coop-enemy-builder";
 import { CoopInteractionRelay } from "#data/elite-redux/coop/coop-interaction-relay";
 import {
   clearCoopRuntime,
@@ -1048,5 +1049,79 @@ describe.skipIf(!RUN)("co-op GUEST = pure renderer - real engine (#633, TRACK-2 
     // IDEMPOTENT: re-applying the same host field must not re-swap or throw (the slots already match).
     expect(() => coopEngine.reconcileCoopPlayerField(hostCheckpoint!.field)).not.toThrow();
     expect(coopEngine.captureCoopChecksum(), "the checksum is stable across an idempotent re-apply").toBe(hostChecksum);
+  });
+
+  // (J) BOSS-SEGMENT ROUND-TRIP (#633, A/BLOCKING-2): the core of the boss-adopt fix. Boss state lives
+  // ONLY on EnemyPokemon and `addEnemyPokemon` reconstructs with boss hardcoded `false`, so an adopted
+  // boss rendered NORMAL bars + lost the segment-damage split. This asserts the full serialize ->
+  // reconstruct path: captureCoopEnemies (HOST) carries the explicit segment COUNT + INDEX + maxHp, and
+  // buildCoopEnemy (GUEST) re-asserts them via setBoss(count) + the host's bossSegmentIndex - so the
+  // adopted boss has isBoss()===true and the EXACT host segments/index (no diverged-RNG re-roll), and
+  // a NON-boss enemy round-trips with bossSegments===0 (the additive path: solo/normal mons unaffected).
+  it("BOSS-SEGMENT ROUND-TRIP (#633): captureCoopEnemies -> buildCoopEnemy re-asserts the host's bossSegments + index + isBoss", async () => {
+    await startCoopGuest();
+    // HOST authoritative truth: promote the bi2 enemy to a boss with an EXPLICIT segment count, then
+    // model mid-fight shields broken by decrementing the index (so the count alone would render the
+    // WRONG dividers - the exact case bossSegmentIndex was added to carry). setBoss(true, 4) sets
+    // bossSegments=4 / bossSegmentIndex=3 (all shields up); we drop the index to 1 (2 shields broken).
+    const hostBoss = globalScene.getEnemyField(false)[0];
+    expect(hostBoss.getBattlerIndex(), "bi2 is the enemy lead").toBe(BattlerIndex.ENEMY);
+    const hostNonBoss = globalScene.getEnemyField(false)[1];
+    expect(hostNonBoss.getBattlerIndex(), "bi3 is the second enemy (left a normal mon)").toBe(BattlerIndex.ENEMY_2);
+
+    hostBoss.setBoss(true, 4);
+    hostBoss.bossSegmentIndex = 1;
+    expect(hostBoss.isBoss(), "the host's bi2 enemy is a boss").toBe(true);
+    expect(hostNonBoss.isBoss(), "the host's bi3 enemy is NOT a boss").toBe(false);
+    const hostBossMaxHp = hostBoss.getMaxHp();
+
+    // --- SERIALIZE (host): captureCoopEnemies streams the per-enemy identity, now including the boss
+    // fields. Match the enemies by speciesId+index is ambiguous (both Magikarp), so key by fieldIndex:
+    // the enemy party is [bi2-lead, bi3] in order, so fieldIndex 0 is the boss, 1 is the non-boss.
+    const serialized = coopEngine.captureCoopEnemies();
+    expect(serialized.length, "both enemies serialized").toBeGreaterThanOrEqual(2);
+    const bossBlob = serialized.find(e => e.fieldIndex === 0)!.data;
+    const nonBossBlob = serialized.find(e => e.fieldIndex === 1)!.data;
+
+    // The serialized blob carries the host's authoritative boss fields (+ the maxHp ceiling).
+    expect(bossBlob.isBoss, "the serialized boss carries isBoss=true").toBe(true);
+    expect(bossBlob.bossSegments, "the serialized boss carries the explicit host segment COUNT").toBe(4);
+    expect(bossBlob.bossSegmentIndex, "the serialized boss carries the host's decremented INDEX").toBe(1);
+    expect(bossBlob.maxHp, "the serialized boss carries the host's maxHp ceiling").toBe(hostBossMaxHp);
+    // The non-boss enemy serializes isBoss=false and a NON-POSITIVE bossSegments (0 or, for a
+    // never-promoted mon in this harness, undefined) - either way the guest's self-gating reconstruct
+    // (bossSegments !== undefined && > 0) skips setBoss, so a normal enemy is never spuriously promoted.
+    expect(nonBossBlob.isBoss, "the non-boss enemy serializes isBoss=false").toBe(false);
+    const nonBossSegments = nonBossBlob.bossSegments;
+    const nonBossSegmentsIsPositive = typeof nonBossSegments === "number" && nonBossSegments > 0;
+    expect(
+      nonBossSegmentsIsPositive,
+      "the non-boss enemy serializes a non-positive bossSegments (self-gating skips setBoss)",
+    ).toBe(false);
+
+    // --- RECONSTRUCT (guest): buildCoopEnemy rebuilds a fresh EnemyPokemon from the blob. Without the
+    // fix the rebuilt boss would have bossSegments=0 (addEnemyPokemon hardcodes boss `false`); WITH it,
+    // the rebuilt mon re-asserts the host's EXACT count + index and reads isBoss()===true.
+    const rebuiltBoss = buildCoopEnemy(bossBlob, hostBoss.level, TrainerSlot.TRAINER);
+    expect(rebuiltBoss, "the boss reconstructed (species resolved)").not.toBeNull();
+    expect(rebuiltBoss!.isBoss(), "the reconstructed guest enemy is a boss (bars + segment split restored)").toBe(true);
+    expect(rebuiltBoss!.bossSegments, "the reconstructed boss has the host's EXACT segment count (no RNG re-roll)").toBe(
+      4,
+    );
+    expect(rebuiltBoss!.bossSegmentIndex, "the reconstructed boss has the host's decremented index").toBe(1);
+
+    // --- RECONSTRUCT a NON-boss (additive path): the rebuilt normal enemy stays a normal mon - the
+    // boss block is self-gating on bossSegments>0, so solo / normal enemies are byte-identical.
+    const rebuiltNonBoss = buildCoopEnemy(nonBossBlob, hostNonBoss.level, TrainerSlot.TRAINER);
+    expect(rebuiltNonBoss, "the non-boss reconstructed").not.toBeNull();
+    // isBoss() is `!!this.bossSegments`, so it reads false for both 0 and the never-promoted undefined -
+    // the load-bearing guarantee: a normal enemy round-trips as a normal mon, no spurious boss bars.
+    expect(rebuiltNonBoss!.isBoss(), "a non-boss enemy round-trips as a normal mon (no spurious boss)").toBe(false);
+    const rebuiltSegments = rebuiltNonBoss!.bossSegments;
+    const rebuiltSegmentsIsPositive = typeof rebuiltSegments === "number" && rebuiltSegments > 0;
+    expect(
+      rebuiltSegmentsIsPositive,
+      "a non-boss enemy round-trips with no positive bossSegments (the self-gating reconstruct skipped setBoss)",
+    ).toBe(false);
   });
 });

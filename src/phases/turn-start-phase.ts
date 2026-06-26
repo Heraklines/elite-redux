@@ -2,6 +2,7 @@ import { applyAbAttrs } from "#abilities/apply-ab-attrs";
 import type { TurnCommand } from "#app/battle";
 import { globalScene } from "#app/global-scene";
 import { summonCoopPlayerField } from "#data/elite-redux/coop/coop-battle-engine";
+import { coopLog } from "#data/elite-redux/coop/coop-debug";
 import { getCoopController, getCoopNetcodeMode } from "#data/elite-redux/coop/coop-runtime";
 import { COOP_GUEST_FIELD_INDEX } from "#data/elite-redux/coop/coop-session";
 import { beginCoopRecording } from "#data/elite-redux/coop/coop-turn-recorder";
@@ -200,6 +201,12 @@ export class TurnStartPhase extends FieldPhase {
       if (typeof targetSlot !== "number" || targetSlot < 0) {
         return;
       }
+      // C.1 diagnostic (#633): KEEP this eager swap (it gives the guest immediate visual feedback on
+      // its OWN switch). Log it so a future capture can compare it against the host-checkpoint
+      // reconcileCoopPlayerField PASS 2 reposition log - if PASS 2 ever moves this same mon to a
+      // DIFFERENT slot, the eager swap and the host's authoritative placement disagreed (the real
+      // orphan fix is the post-PASS-2 sweep + incoming-vacate in coop-battle-engine, not disabling this).
+      coopLog("field", `guest eager self-switch slot=${guestSlot} -> party=${targetSlot}`);
       // Identical swap to the host's SwitchSummonPhase (`party[fieldIndex] <-> party[slotIndex]`), but
       // side-effect-free: no SwitchSummonPhase / handleTurnCommand resolution, no RNG, no hazard/ability re-fire.
       summonCoopPlayerField(guestSlot, targetSlot);

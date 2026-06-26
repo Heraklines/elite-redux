@@ -148,7 +148,10 @@ export function consumeCoopPendingWaveAdvance(): { wave: number; outcome: CoopWa
     }
     return null;
   }
-  coopLog("runtime", `consume wave-advance wave=${pending.wave} outcome=${pending.outcome} (lastResolved ${lastResolvedWave} -> ${pending.wave})`);
+  coopLog(
+    "runtime",
+    `consume wave-advance wave=${pending.wave} outcome=${pending.outcome} (lastResolved ${lastResolvedWave} -> ${pending.wave})`,
+  );
   lastResolvedWave = pending.wave;
   return pending;
 }
@@ -162,7 +165,10 @@ export function consumeCoopPendingWaveAdvance(): { wave: number; outcome: CoopWa
  */
 function wireCoopWaveResolved(controller: CoopSessionController, battleStream: CoopBattleStreamer): void {
   battleStream.onWaveResolved((wave, outcome) => {
-    coopLog("runtime", `recv waveResolved wave=${wave} outcome=${outcome} role=${controller.role} netcode=${getCoopNetcodeMode()}`);
+    coopLog(
+      "runtime",
+      `recv waveResolved wave=${wave} outcome=${outcome} role=${controller.role} netcode=${getCoopNetcodeMode()}`,
+    );
     if (controller.role !== "guest" || getCoopNetcodeMode() !== "authoritative") {
       coopLog("runtime", `ignore waveResolved wave=${wave} (not authoritative guest)`);
       return;
@@ -209,7 +215,10 @@ function wireCoopMeChecksumCheck(battleStream: CoopBattleStreamer): void {
       }
       coopLog("resync", `await stateSync resolve seq=${seq} blob=${blob.length}b -> applying`);
       try {
-        applyCoopFullSnapshot(JSON.parse(decompressFromBase64(blob)) as CoopFullBattleSnapshot);
+        applyCoopFullSnapshot(
+          JSON.parse(decompressFromBase64(blob)) as CoopFullBattleSnapshot,
+          isCoopAuthoritativeGuest(),
+        );
         const healed = captureCoopChecksum();
         if (healed === ownerChecksum) {
           coopLog("resync", `me-entry seq=${seq} ok (healed=${healed})`);
@@ -300,7 +309,10 @@ export function getCoopNetcodeMode(): CoopNetcodeMode {
   }
   if (authoritativeLatched && isCoopDebug()) {
     // Controller momentarily reads lockstep but the latch holds authoritative (re-read race / pre-runConfig).
-    coopWarn("runtime", `netcode read=${mode} but latched authoritative role=${active.controller.role} -> authoritative`);
+    coopWarn(
+      "runtime",
+      `netcode read=${mode} but latched authoritative role=${active.controller.role} -> authoritative`,
+    );
   }
   return authoritativeLatched ? "authoritative" : mode;
 }
@@ -424,7 +436,10 @@ let coopMeBattleInteractionCounter = -1;
 export function setCoopMeBattleInteractionCounter(counter: number): void {
   if (counter !== coopMeBattleInteractionCounter) {
     // State CHANGE: ME begin (counter>=0) / ME terminal (-1).
-    coopLog("me", `interaction-counter ${coopMeBattleInteractionCounter} -> ${counter} (${counter >= 0 ? "ME begin" : "ME end"})`);
+    coopLog(
+      "me",
+      `interaction-counter ${coopMeBattleInteractionCounter} -> ${counter} (${counter >= 0 ? "ME begin" : "ME end"})`,
+    );
   }
   coopMeBattleInteractionCounter = counter;
 }
@@ -543,10 +558,7 @@ export function coopMeOwnerRelayBattleHandoff(): void {
   const pump = active.mePump;
   // Only the OWNER of an active pump session relays the sentinel; the watcher receives it.
   if (!pump.isSessionActive() || pump.isWatcher()) {
-    coopLog(
-      "me",
-      `owner-relay battle-handoff SKIP (active=${pump.isSessionActive()} watcher=${pump.isWatcher()})`,
-    );
+    coopLog("me", `owner-relay battle-handoff SKIP (active=${pump.isSessionActive()} watcher=${pump.isWatcher()})`);
     return;
   }
   try {
@@ -568,7 +580,10 @@ export function coopMeOwnerRelayBattleHandoff(): void {
 export function startLocalCoopSession(
   opts: { username?: string | undefined; netcodeMode?: CoopNetcodeMode | undefined } = {},
 ): CoopRuntime {
-  coopLog("launch", `startLocalCoopSession username=${opts.username ?? "(default)"} netcode=${opts.netcodeMode ?? "lockstep"}`);
+  coopLog(
+    "launch",
+    `startLocalCoopSession username=${opts.username ?? "(default)"} netcode=${opts.netcodeMode ?? "lockstep"}`,
+  );
   clearCoopRuntime();
   const { host, guest } = createLoopbackPair();
   const controller = new CoopSessionController(host, { username: opts.username });

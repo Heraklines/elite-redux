@@ -31,6 +31,8 @@ const mon = (over: Partial<CoopChecksumMon> = {}): CoopChecksumMon => ({
   formIndex: 0,
   isTerastallized: false,
   teraType: 0,
+  bossSegments: 0,
+  bossSegmentIndex: 0,
   moves: [
     [33, 0],
     [22, 1],
@@ -155,6 +157,12 @@ describe("co-op battle checksum pure core (#633, TRACK-2)", () => {
     });
     it("a changed tera type (#633 GAP 7)", () => {
       expect(checksumState(state({ field: [mon({ teraType: 5 })] }))).not.toBe(base);
+    });
+    it("a changed boss segment count (#633 A/BLOCKING-2 - a missing-boss guest is now detectable)", () => {
+      expect(checksumState(state({ field: [mon({ bossSegments: 2 })] }))).not.toBe(base);
+    });
+    it("a changed boss segment index (#633 A/BLOCKING-2 - a frozen-divider guest is now detectable)", () => {
+      expect(checksumState(state({ field: [mon({ bossSegments: 3, bossSegmentIndex: 1 })] }))).not.toBe(base);
     });
     it("a changed weather type", () => {
       expect(checksumState(state({ weather: 3 }))).not.toBe(base);

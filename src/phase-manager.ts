@@ -30,6 +30,7 @@ import { CommandPhase } from "#phases/command-phase";
 import { CommonAnimPhase } from "#phases/common-anim-phase";
 import { CoopReplayMePhase } from "#phases/coop-replay-me-phase";
 import {
+  CoopApplyResyncPhase,
   CoopFaintReplayPhase,
   CoopFinalizeTurnPhase,
   CoopHpDrainReplayPhase,
@@ -175,6 +176,7 @@ const PHASES = Object.freeze({
   CommandPhase,
   CoopReplayTurnPhase,
   CoopReplayMePhase,
+  CoopApplyResyncPhase,
   CoopFinalizeTurnPhase,
   CoopFaintReplayPhase,
   CoopHpDrainReplayPhase,

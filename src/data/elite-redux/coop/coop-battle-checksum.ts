@@ -66,6 +66,19 @@ export interface CoopChecksumMon {
   isTerastallized: boolean;
   /** Tera type (`PokemonType` enum); 0 when not relevant. Carried so a wrong-type Tera is detected. */
   teraType: number;
+  /**
+   * Boss segment COUNT (#633, A/BLOCKING-2); 0 = not a boss. Hashing it makes a missing-boss guest
+   * (bossSegments=0 vs host=N) detectable - without it a missing-boss guest with a matching maxHp is
+   * invisible to the checksum, so the bars silently never render and no resync is ever triggered.
+   */
+  bossSegments: number;
+  /**
+   * Boss segment INDEX (#633, A/BLOCKING-2): how many shields are still up. The shield dividers render
+   * from THIS, not the count, and the host decrements it as segments break while the guest's HP-drain
+   * replay sets hp by direct assignment (never via `damage()`), so the index can diverge with a
+   * matching count. Hashing it makes that divergence detectable + re-convergeable on resync.
+   */
+  bossSegmentIndex: number;
   /** Each move slot as `[moveId, ppUsed]`, in moveset slot order (NOT sorted). */
   moves: [number, number][];
   /** Sorted ascending list of the battler-tag TYPE ids present (identity only, no counters). */
