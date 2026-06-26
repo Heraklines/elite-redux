@@ -1,0 +1,274 @@
+----- BUG REPORT (in-game) -----
+version:  1.11.19
+url:      https://elite-redux.pages.dev/
+ua:       Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Mobile Safari/537.36
+mode:     4  wave:67  difficulty:hell
+seed:     75J9U3De8D2D9DjgaRx3CuGz
+party:    Braviary(L56 194/194), Brambleghast(L56 127/155), Roserade(L56 149/149), Gorebyss(L56 155/155), Mothim(L56 155/155), Mandibuzz(L56 0/205)
+
+----- DESCRIPTION -----
+Attempted greater ability capsule and pressing canceled forced the next battle
+
+----- CONSOLE -----
+[08:42:31.227] LOG: Move: Last Respects | Attack damage: 277
+[08:42:31.228] LOG: %cStart Phase DamageAnimPhase color:green;
+[08:42:31.257] LOG: %cStart Phase MessagePhase color:green;
+[08:42:31.481] LOG: %cStart Phase FaintPhase color:green;
+[08:42:33.016] LOG: %cStart Phase MessagePhase color:green;
+[08:42:33.146] LOG: %cStart Phase VictoryPhase color:green;
+[08:42:33.147] LOG: Applied Soothe Bell 
+[08:42:33.147] LOG: %cStart Phase MoveEndPhase color:green;
+[08:42:33.147] LOG: %cStart Phase MovePhase color:green;
+[08:42:33.147] LOG: %cStart Phase MoveEndPhase color:green;
+[08:42:33.147] LOG: %cStart Phase CheckInterludePhase color:green;
+[08:42:33.147] LOG: %cStart Phase WeatherEffectPhase color:green;
+[08:42:33.147] LOG: %cStart Phase PositionalTagPhase color:green;
+[08:42:33.147] LOG: %cStart Phase BerryPhase color:green;
+[08:42:33.148] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[08:42:33.149] LOG: %cStart Phase TurnEndPhase color:green;
+[08:42:33.150] LOG: [coop:replay] host recorder: end turn=-1 events=0
+[08:42:33.150] LOG: %cStart Phase SwitchSummonPhase color:green;
+[08:42:33.364] LOG: Shelly
+[08:42:33.449] LOG: Applied Iron (enemy)
+[08:42:33.450] LOG: Applied Carbos (enemy)
+[08:42:33.450] LOG: Applied Carbos (enemy)
+[08:42:33.450] LOG: Applied Carbos (enemy)
+[08:42:33.599] LOG: %cStart Phase PostSummonPhase color:green;
+[08:42:33.599] LOG: Ran PSP for: Gorebyss
+[08:42:33.599] LOG: %cStart Phase PostSummonPhase color:green;
+[08:42:33.599] LOG: %cStart Phase PostSummonPhase color:green;
+[08:42:33.599] LOG: %cStart Phase SwitchSummonPhase color:green;
+[08:42:33.685] LOG: %cStart Phase PostSummonPhase color:green;
+[08:42:33.685] LOG: Ran PSP for: Crawdaunt
+[08:42:33.685] LOG: %cStart Phase PostSummonPhase color:green;
+[08:42:33.685] LOG: %cStart Phase PostSummonPhase color:green;
+[08:42:33.686] LOG: %cStart Phase TurnInitPhase color:green;
+[08:42:33.686] LOG: %cStart Phase CommandPhase color:green;
+[08:42:38.703] LOG: Move: ESPER_WING Move targets: {"targets":[2,1],"multiple":false} 
+Player Pokemon: Braviary
+[08:42:38.706] LOG: %cStart Phase SelectTargetPhase color:green;
+[08:42:39.147] LOG: %cStart Phase CommandPhase color:green;
+[08:42:46.427] LOG: Move: TAILWIND Move targets: {"targets":[1,0],"multiple":true} 
+Player Pokemon: Brambleghast
+[08:42:46.429] LOG: %cStart Phase SelectTargetPhase color:green;
+[08:42:46.610] LOG: %cStart Phase EnemyCommandPhase color:green;
+[08:42:46.618] LOG: Battle Seed: Mcq5pgFzOGO9L4gt
+[08:42:46.619] LOG: Move Pool: ["Razor Shell"]
+[08:42:46.620] LOG: Move Scores: [1084.1935483870968]
+[08:42:46.620] LOG: Sorted Move Pool: ["Razor Shell"]
+[08:42:46.620] LOG: Chosen Move: Razor Shell
+[08:42:46.620] LOG: ER AI: experimental brain (sharpness 1)
+[08:42:46.620] LOG: %cStart Phase TurnStartPhase color:green;
+[08:42:46.623] LOG: %cStart Phase MovePhase color:green;
+[08:42:46.623] LOG: %cUser: Braviary
+Move: ESPER_WING
+Use Mode: NORMAL color:orchid
+[08:42:46.625] LOG: %cStart Phase MessagePhase color:green;
+[08:42:46.730] LOG: %cStart Phase MoveEffectPhase color:green;
+[08:42:46.731] LOG: Applied Wide Lens 
+[08:42:46.747] WARN: Texture "%s" has no frame "%s" PRAS- Psycho Cut 1
+[08:42:46.764] WARN: Texture "%s" has no frame "%s" PRAS- Psycho Cut 1
+[08:42:46.797] WARN: Texture "%s" has no frame "%s" PRAS- Psycho Cut 1
+[08:42:46.839] WARN: Texture "%s" has no frame "%s" PRAS- Psycho Cut 1
+[08:42:47.040] LOG: crit stage: +1
+[08:42:47.043] LOG: Move: Esper Wing | Base damage: 120.57104424778761 | Power: 104 | Source attack: 264 | Target defense: 113
+[08:42:47.044] LOG: Move: Esper Wing | Attack damage: 155
+[08:42:47.045] LOG: Applied Shell Bell 
+[08:42:47.045] LOG: %cStart Phase DamageAnimPhase color:green;
+[08:42:47.075] LOG: %cStart Phase StatStageChangePhase color:green;
+[08:42:47.266] LOG: %cStart Phase MessagePhase color:green;
+[08:42:47.489] LOG: %cStart Phase PokemonHealPhase color:green;
+[08:42:47.489] LOG: %cStart Phase MessagePhase color:green;
+[08:42:47.731] LOG: %cStart Phase FaintPhase color:green;
+[08:42:49.190] LOG: %cStart Phase MessagePhase color:green;
+[08:42:49.311] LOG: %cStart Phase VictoryPhase color:green;
+[08:42:49.312] LOG: Applied Soothe Bell 
+[08:42:49.312] LOG: %cStart Phase MoveEndPhase color:green;
+[08:42:49.313] LOG: %cStart Phase MovePhase color:green;
+[08:42:49.313] LOG: %cUser: Brambleghast
+Move: TAILWIND
+Use Mode: NORMAL color:orchid
+[08:42:49.314] LOG: %cStart Phase MessagePhase color:green;
+[08:42:49.430] LOG: %cStart Phase MoveEffectPhase color:green;
+[08:42:50.403] LOG: %cStart Phase MessagePhase color:green;
+[08:42:50.647] LOG: %cStart Phase ShowAbilityPhase color:green;
+[08:42:50.815] LOG: %cStart Phase StatStageChangePhase color:green;
+[08:42:50.983] LOG: %cStart Phase MessagePhase color:green;
+[08:42:51.222] LOG: %cStart Phase HideAbilityPhase color:green;
+[08:42:51.255] LOG: %cStart Phase MoveEndPhase color:green;
+[08:42:51.255] LOG: %cStart Phase MovePhase color:green;
+[08:42:51.255] LOG: %cStart Phase MoveEndPhase color:green;
+[08:42:51.255] LOG: %cStart Phase CheckInterludePhase color:green;
+[08:42:51.255] LOG: %cStart Phase WeatherEffectPhase color:green;
+[08:42:51.256] LOG: %cStart Phase PositionalTagPhase color:green;
+[08:42:51.256] LOG: %cStart Phase BerryPhase color:green;
+[08:42:51.256] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[08:42:51.256] LOG: %cStart Phase TurnEndPhase color:green;
+[08:42:51.261] LOG: [coop:replay] host recorder: end turn=-1 events=0
+[08:42:51.261] LOG: %cStart Phase BattleEndPhase color:green;
+[08:42:51.261] LOG: Battle Score: 677 (7 Turns x0.6)
+[08:42:51.261] LOG: Total Score: 22029
+[08:42:51.275] LOG: Applied Protein 
+[08:42:51.280] LOG: %cStart Phase TrainerVictoryPhase color:green;
+[08:42:51.281] LOG: Team Aqua Admin Shelly
+[08:42:51.661] LOG: Team Aqua Admin Shelly
+[08:42:51.664] LOG: Dialogue dialogue:shelly.victory.1 skipped
+[08:42:51.664] LOG: %cStart Phase MoneyRewardPhase color:green;
+[08:42:51.664] LOG: Applied Amulet Coin 
+[08:42:51.986] LOG: %cStart Phase ModifierRewardPhase color:green;
+[08:42:52.311] LOG: %cStart Phase ModifierRewardPhase color:green;
+[08:42:52.619] LOG: %cStart Phase ModifierRewardPhase color:green;
+[08:42:52.910] LOG: %cStart Phase EggLapsePhase color:green;
+[08:42:52.910] LOG: %cStart Phase SelectModifierPhase color:green;
+[08:42:52.910] LOG: Wave Seed: yw{u§zt{¬©£ºu·¼ 66
+[08:42:52.929] LOG: Applied Golden Poké Ball 
+[08:42:52.929] LOG: 17 5 [2,5,8,14,16,22]
+[08:42:52.929] LOG: {"id":"SOOTHE_BELL","localeKey":"modifierType:ModifierType.SOOTHE_BELL","iconImage":"soothe_bell","soundName":"se/restore","tier":1} 
+[08:42:52.929] LOG: 7 0 []
+[08:42:52.930] LOG: {"id":"TEMP_STAT_STAGE_BOOSTER","localeKey":"","iconImage":"x_attack","soundName":"se/restore","tier":0,"stat":1,"nameKey":"x_attack","quantityKey":"percentage"} 
+[08:42:52.930] LOG: 2 0 []
+[08:42:52.930] LOG: {"id":"POTION","localeKey":"modifierType:ModifierType.POTION","iconImage":"potion","group":"potion","soundName":"se/restore","tier":0,"restorePoints":20,"restorePercent":10,"healStatus":false} 
+[08:42:52.930] LOG: 7 0 []
+[08:42:52.930] LOG: {"id":"TEMP_STAT_STAGE_BOOSTER","localeKey":"","iconImage":"x_attack","soundName":"se/restore","tier":0,"stat":1,"nameKey":"x_attack","quantityKey":"percentage"} 
+[08:42:52.930] LOG: 0 0 []
+[08:42:52.930] LOG: {"id":"POKEBALL","localeKey":"","iconImage":"pb","group":"pb","soundName":"se/pb_bounce_1","tier":0,"pokeballType":0,"count":5} 
+[08:42:52.930] LOG: 0 0 []
+[08:42:52.930] LOG: {"id":"POKEBALL","localeKey":"","iconImage":"pb","group":"pb","soundName":"se/pb_bounce_1","tier":0,"pokeballType":0,"count":5} 
+[08:42:52.930] LOG: 6 0 []
+[08:42:52.930] LOG: {"id":"LURE","localeKey":"modifierType:ModifierType.LURE","iconImage":"lure","group":"lure","soundName":"se/restore","tier":0,"maxBattles":10} 
+[08:43:02.386] LOG: %cStart Phase SelectModifierPhase color:green;
+[08:43:02.393] LOG: Applied Golden Poké Ball 
+[08:43:02.394] LOG: 4 1 [3]
+[08:43:02.394] LOG: {"id":"ETHER","localeKey":"modifierType:ModifierType.ETHER","iconImage":"ether","group":"ether","soundName":"se/restore","tier":0,"restorePoints":10} 
+[08:43:02.394] LOG: 35 6 [8,10,11,12,14,23]
+[08:43:02.394] LOG: {"id":"ER_GREATER_ABILITY_CAPSULE","localeKey":"","iconImage":"ability_capsule","iconTint":10112224,"soundName":"se/restore","tier":2} 
+[08:43:02.394] LOG: 4 1 [3]
+[08:43:02.394] LOG: {"id":"ETHER","localeKey":"modifierType:ModifierType.ETHER","iconImage":"ether","group":"ether","soundName":"se/restore","tier":0,"restorePoints":10} 
+[08:43:02.394] LOG: 0 0 [3]
+[08:43:02.394] LOG: {"id":"POKEBALL","localeKey":"","iconImage":"pb","group":"pb","soundName":"se/pb_bounce_1","tier":0,"pokeballType":0,"count":5} 
+[08:43:02.394] LOG: 0 0 [3]
+[08:43:02.394] LOG: {"id":"POKEBALL","localeKey":"","iconImage":"pb","group":"pb","soundName":"se/pb_bounce_1","tier":0,"pokeballType":0,"count":5} 
+[08:43:02.394] LOG: 0 0 [3]
+[08:43:02.395] LOG: {"id":"POKEBALL","localeKey":"","iconImage":"pb","group":"pb","soundName":"se/pb_bounce_1","tier":0,"pokeballType":0,"count":5} 
+[08:43:02.395] LOG: 0 0 [3]
+[08:43:02.395] LOG: {"id":"POKEBALL","localeKey":"","iconImage":"pb","group":"pb","soundName":"se/pb_bounce_1","tier":0,"pokeballType":0,"count":5} 
+[08:43:02.395] LOG: 8 1 [3]
+[08:43:02.395] LOG: {"id":"BERRY","localeKey":"","iconImage":"sitrus_berry","group":"berry","soundName":"se/restore","tier":0,"berryType":0} 
+[08:43:35.806] LOG: %cStart Phase ErGreaterAbilityCapsulePhase color:green;
+[08:43:45.088] LOG: %cStart Phase NewBattlePhase color:green;
+[08:43:45.088] LOG: Wave Seed: zx|v¨{u|­ª¤»v¸½ 67
+[08:43:45.089] LOG: Applied Max Lure 
+[08:43:45.090] LOG: %cStart Phase NextEncounterPhase color:green;
+[08:43:45.092] LOG: Starting species pool tier: COMMON
+[08:43:45.113] LOG: Pokemon: Wild Beautifly | Species ID: 267 | Level: 56 | Nature: Quirky (-)
+[08:43:45.113] LOG: Stats (IVs): HP: 153 (26), Atk: 73 (22), Def: 88 (29), Spatk: 128 (30), Spdef: 127 (29), Spd: 103 (6)
+[08:43:45.113] LOG: Ability: Giant Wings | Passive Ability: Majestic Moth 
+[08:43:45.113] LOG: Moveset: ["Struggle Bug","Quiver Dance","Air Cutter","Skitter Smack"]
+[08:43:45.113] LOG: Starting species pool tier: COMMON
+[08:43:45.113] LOG: Replaced NYMBLE with LOKIX
+[08:43:45.125] LOG: Pokemon: Wild Lokix | Species ID: 920 | Level: 56 | Nature: Rash (+SpAtk/-SpDef)
+[08:43:45.125] LOG: Stats (IVs): HP: 160 (26), Atk: 129 (19), Def: 109 (30), Spatk: 81 (18), Spdef: 71 (23), Spd: 111 (6)
+[08:43:45.125] LOG: Ability: Avenger | Passive Ability: Showdown Mode 
+[08:43:45.125] LOG: Moveset: ["Assurance","High Jump Kick","Axe Kick","Fell Stinger"]
+[08:43:45.513] LOG: {"id":"BERRY","localeKey":"","iconImage":"sitrus_berry","group":"berry","soundName":"se/restore","tier":0,"berryType":0} (enemy)
+[08:43:45.513] LOG: Battle Seed: TQGDaJm3EDSFE2gz
+[08:43:45.584] DEBUG: Session data saved to slot 1!
+[08:43:45.585] LOG: Wave Seed: zx|v¨{u|­ª¤»v¸½ 67
+[08:43:46.049] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[08:43:46.049] LOG: %cStart Phase CheckSwitchPhase color:green;
+[08:43:46.050] LOG: %cStart Phase CheckSwitchPhase color:green;
+[08:43:49.301] LOG: %cStart Phase InitEncounterPhase color:green;
+[08:43:49.302] LOG: %cStart Phase PostSummonPhase color:green;
+[08:43:49.302] LOG: Ran PSP for: Lokix
+[08:43:49.303] LOG: %cStart Phase PostSummonPhase color:green;
+[08:43:49.304] LOG: %cStart Phase PostSummonPhase color:green;
+[08:43:49.304] LOG: %cStart Phase PostSummonPhase color:green;
+[08:43:49.304] LOG: Ran PSP for: Beautifly
+[08:43:49.305] LOG: %cStart Phase PostSummonPhase color:green;
+[08:43:49.305] LOG: %cStart Phase PostSummonPhase color:green;
+[08:43:49.305] LOG: %cStart Phase ShowAbilityPhase color:green;
+[08:43:49.475] LOG: %cStart Phase StatStageChangePhase color:green;
+[08:43:49.654] LOG: %cStart Phase MessagePhase color:green;
+[08:43:49.889] LOG: %cStart Phase HideAbilityPhase color:green;
+[08:43:49.924] LOG: %cStart Phase TurnInitPhase color:green;
+[08:43:49.926] LOG: %cStart Phase CommandPhase color:green;
+[08:43:52.270] LOG: Move: AURA_SPHERE Move targets: {"targets":[2,3,1],"multiple":false} 
+Player Pokemon: Braviary
+[08:43:52.272] LOG: %cStart Phase SelectTargetPhase color:green;
+[08:43:53.370] LOG: %cStart Phase CommandPhase color:green;
+[08:43:55.160] LOG: Move: LAST_RESPECTS Move targets: {"targets":[2,3,0],"multiple":false} 
+Player Pokemon: Brambleghast
+[08:43:55.162] LOG: %cStart Phase SelectTargetPhase color:green;
+[08:43:55.736] LOG: %cStart Phase EnemyCommandPhase color:green;
+[08:43:55.754] LOG: Move Pool: ["Struggle Bug"]
+[08:43:55.754] LOG: Move Scores: [31.5]
+[08:43:55.754] LOG: Sorted Move Pool: ["Struggle Bug"]
+[08:43:55.754] LOG: Chosen Move: Struggle Bug
+[08:43:55.754] LOG: %cStart Phase EnemyCommandPhase color:green;
+[08:43:55.768] LOG: Move Pool: ["High Jump Kick"]
+[08:43:55.768] LOG: Move Scores: [236]
+[08:43:55.768] LOG: Sorted Move Pool: ["High Jump Kick"]
+[08:43:55.768] LOG: Chosen Move: High Jump Kick
+[08:43:55.768] LOG: %cStart Phase TurnStartPhase color:green;
+[08:43:55.783] LOG: %cStart Phase MovePhase color:green;
+[08:43:55.783] LOG: %cUser: Braviary
+Move: AURA_SPHERE
+Use Mode: NORMAL color:orchid
+[08:43:55.790] LOG: %cStart Phase MessagePhase color:green;
+[08:43:55.864] LOG: %cStart Phase MoveEffectPhase color:green;
+[08:43:56.616] LOG: crit stage: +0
+[08:43:56.619] LOG: Move: Aura Sphere | Base damage: 83.1540157480315 | Power: 80 | Source attack: 264 | Target defense: 127
+[08:43:56.621] LOG: Move: Aura Sphere | Attack damage: 286
+[08:43:56.622] LOG: Applied Shell Bell 
+[08:43:56.622] LOG: %cStart Phase DamageAnimPhase color:green;
+[08:43:56.650] LOG: %cStart Phase MessagePhase color:green;
+[08:43:56.863] LOG: %cStart Phase FaintPhase color:green;
+[08:43:57.577] LOG: %cStart Phase MessagePhase color:green;
+[08:43:57.820] LOG: %cStart Phase ShowAbilityPhase color:green;
+[08:43:57.990] LOG: %cStart Phase HideAbilityPhase color:green;
+[08:43:58.033] LOG: %cStart Phase VictoryPhase color:green;
+[08:43:58.033] LOG: Applied Soothe Bell 
+[08:43:58.033] LOG: %cStart Phase MoveEndPhase color:green;
+[08:43:58.037] LOG: %cStart Phase MovePhase color:green;
+[08:43:58.037] LOG: %cUser: Brambleghast
+Move: LAST_RESPECTS
+Use Mode: NORMAL color:orchid
+[08:43:58.042] LOG: %cStart Phase MessagePhase color:green;
+[08:43:58.189] LOG: %cStart Phase MoveEffectPhase color:green;
+[08:43:58.465] LOG: crit stage: +0
+[08:43:58.467] LOG: Move: Last Respects | Base damage: 201.0502752293578 | Power: 180 | Source attack: 247 | Target defense: 109
+[08:43:58.467] LOG: Move: Last Respects | Attack damage: 603
+[08:43:58.468] LOG: %cStart Phase DamageAnimPhase color:green;
+[08:43:58.499] LOG: %cStart Phase MessagePhase color:green;
+[08:43:58.722] LOG: %cStart Phase FaintPhase color:green;
+[08:44:00.141] LOG: %cStart Phase MessagePhase color:green;
+[08:44:00.212] LOG: %cStart Phase VictoryPhase color:green;
+[08:44:00.212] LOG: Applied Soothe Bell 
+[08:44:00.214] LOG: %cStart Phase MoveEndPhase color:green;
+[08:44:00.215] LOG: %cStart Phase MovePhase color:green;
+[08:44:00.215] LOG: %cStart Phase MoveEndPhase color:green;
+[08:44:00.215] LOG: %cStart Phase MovePhase color:green;
+[08:44:00.215] LOG: %cStart Phase MoveEndPhase color:green;
+[08:44:00.215] LOG: %cStart Phase CheckInterludePhase color:green;
+[08:44:00.215] LOG: %cStart Phase WeatherEffectPhase color:green;
+[08:44:00.215] LOG: %cStart Phase PositionalTagPhase color:green;
+[08:44:00.215] LOG: %cStart Phase BerryPhase color:green;
+[08:44:00.216] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[08:44:00.217] LOG: %cStart Phase TurnEndPhase color:green;
+[08:44:00.226] LOG: [coop:replay] host recorder: end turn=-1 events=0
+[08:44:00.226] LOG: %cStart Phase BattleEndPhase color:green;
+[08:44:00.226] LOG: Battle Score: 387 (1 Turns x1)
+[08:44:00.226] LOG: Total Score: 22416
+[08:44:00.232] LOG: Applied Protein 
+[08:44:00.237] LOG: %cStart Phase EggLapsePhase color:green;
+[08:44:00.237] LOG: %cStart Phase SelectModifierPhase color:green;
+[08:44:00.237] LOG: Wave Seed: zx|v¨{u|­ª¤»v¸½ 67
+[08:44:00.242] LOG: Applied Golden Poké Ball 
+[08:44:00.242] LOG: 23 8 [2,5,6,7,8,14,16,22]
+[08:44:00.242] LOG: {"id":"VOUCHER","localeKey":"","iconImage":"coupon","group":"voucher","soundName":"se/restore","tier":1,"voucherType":0,"count":1} 
+[08:44:00.242] LOG: 2 0 [3]
+[08:44:00.242] LOG: {"id":"POTION","localeKey":"modifierType:ModifierType.POTION","iconImage":"potion","group":"potion","soundName":"se/restore","tier":0,"restorePoints":20,"restorePercent":10,"healStatus":false} 
+[08:44:00.242] LOG: 0 0 [3]
+[08:44:00.242] LOG: {"id":"POKEBALL","localeKey":"","iconImage":"pb","group":"pb","soundName":"se/pb_bounce_1","tier":0,"pokeballType":0,"count":5} 
+[08:44:00.242] LOG: 9 5 [2,5,6,7,8,14,16,22]
+[08:44:00.242] LOG: {"id":"ELIXIR","localeKey":"modifierType:ModifierType.ELIXIR","iconImage":"elixir","group":"elixir","soundName":"se/restore","tier":1,"restorePoints":10} 
