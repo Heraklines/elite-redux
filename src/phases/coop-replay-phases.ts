@@ -594,8 +594,11 @@ export class CoopFinalizeTurnPhase extends Phase {
           // Co-op (#633 B1/B2/B3): adopt the host's post-catch party BEFORE the VictoryPhase tail so
           // the caught mon is present (B1), attributed to the host-resolved owner (B2), and credited
           // to the guest's OWN dex (B3). Safe at this boundary: it only reconciles the BENCH (off-field
-          // mons), never the live on-field leads. A no-op for a plain "win" (captureParty is absent).
-          if (pending.outcome === "capture" && pending.captureParty != null) {
+          // mons), never the live on-field leads. Apply whenever a captureParty is present REGARDLESS
+          // of outcome: a co-op DOUBLE battle resolves one wave with both a "capture" (party) and a
+          // "win" (none); the merge in mergeCoopPendingWaveAdvance carries the party onto whichever
+          // outcome ultimately advances the wave, so a "win" pending can legitimately carry it.
+          if (pending.captureParty != null) {
             applyCoopCaptureParty(pending.captureParty);
           }
           // VictoryPhase reads exp off the resolved mon. After the checkpoint reconcile the KOd

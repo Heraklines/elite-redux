@@ -14,7 +14,7 @@
 
 import { getGameMode } from "#app/game-mode";
 import { applyCoopCaptureParty } from "#data/elite-redux/coop/coop-battle-engine";
-import { clearCoopRuntime, startLocalCoopSession } from "#data/elite-redux/coop/coop-runtime";
+import { clearCoopRuntime, mergeCoopPendingWaveAdvance, startLocalCoopSession } from "#data/elite-redux/coop/coop-runtime";
 import type { CoopMessage } from "#data/elite-redux/coop/coop-transport";
 import { GameModes } from "#enums/game-modes";
 import { SpeciesId } from "#enums/species-id";
@@ -40,6 +40,38 @@ describe("co-op capture handshake (#633 B1/B2/B3) - wire round-trip", () => {
     const round = JSON.parse(JSON.stringify(msg)) as Extract<CoopMessage, { t: "waveResolved" }>;
     expect(round.outcome).toBe("win");
     expect(round.captureParty).toBeUndefined();
+  });
+});
+
+// #633 B1 REGRESSION (live softlock): a co-op DOUBLE wild battle resolves ONE wave with BOTH a
+// "capture" (carrying the party) and a "win" (carrying none); the later message must NOT discard the
+// captured party (it did, so the caught mon never reached the guest -> party desync -> ME softlock).
+describe("co-op wave-advance merge preserves captureParty across a same-wave supersession (#633 B1)", () => {
+  const PARTY = ['{"species":143}', '{"species":25}'];
+
+  it("a later same-wave 'win' (no party) does NOT clobber an earlier 'capture' party", () => {
+    const afterCapture = mergeCoopPendingWaveAdvance(null, 2, "capture", PARTY);
+    expect(afterCapture).toEqual({ wave: 2, outcome: "capture", captureParty: PARTY });
+    const afterWin = mergeCoopPendingWaveAdvance(afterCapture, 2, "win", undefined);
+    expect(afterWin).toEqual({ wave: 2, outcome: "win", captureParty: PARTY }); // party carried onto win
+  });
+
+  it("a later same-wave 'capture' supplies the party when 'win' arrived first", () => {
+    const afterWin = mergeCoopPendingWaveAdvance(null, 2, "win", undefined);
+    expect(afterWin?.captureParty).toBeUndefined();
+    const afterCapture = mergeCoopPendingWaveAdvance(afterWin, 2, "capture", PARTY);
+    expect(afterCapture).toEqual({ wave: 2, outcome: "capture", captureParty: PARTY });
+  });
+
+  it("a NEW wave's signal does NOT inherit the previous wave's party", () => {
+    const wave2 = mergeCoopPendingWaveAdvance(null, 2, "capture", PARTY);
+    const wave3 = mergeCoopPendingWaveAdvance(wave2, 3, "win", undefined);
+    expect(wave3).toEqual({ wave: 3, outcome: "win", captureParty: undefined });
+  });
+
+  it("a STALE earlier-wave signal keeps the existing later-wave pending (returns null)", () => {
+    const wave3 = mergeCoopPendingWaveAdvance(null, 3, "win", undefined);
+    expect(mergeCoopPendingWaveAdvance(wave3, 2, "capture", PARTY)).toBeNull();
   });
 });
 

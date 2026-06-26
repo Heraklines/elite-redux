@@ -163,6 +163,29 @@ export function consumeCoopPendingWaveAdvance(): {
 }
 
 /**
+ * Merge an incoming `waveResolved` into the existing pending one (#633 B1 fix). The latest signal for
+ * a NEW (>=) wave wins, BUT a `captureParty` is PRESERVED across a SAME-WAVE supersession: a co-op
+ * DOUBLE wild battle resolves ONE wave with BOTH a `"capture"` (carrying the caught party) AND a
+ * `"win"` (carrying none) - they arrive back-to-back, and before this the later message (whichever
+ * order) clobbered the captured party, so the caught mon never reached the guest. This keeps whichever
+ * message carried the party. Returns the pending to store, or `null` to KEEP the existing later-wave
+ * pending unchanged (a stale earlier-wave signal). Pure - exported for unit testing.
+ */
+export function mergeCoopPendingWaveAdvance(
+  prev: { wave: number; outcome: CoopWaveOutcome; captureParty?: string[] | undefined } | null,
+  wave: number,
+  outcome: CoopWaveOutcome,
+  captureParty: string[] | undefined,
+): { wave: number; outcome: CoopWaveOutcome; captureParty?: string[] | undefined } | null {
+  if (prev != null && wave < prev.wave) {
+    return null; // a stale earlier-wave signal: keep the existing later-wave pending.
+  }
+  // Carry forward a captureParty from the same wave's other message (either arrival order).
+  const carriedCapture = captureParty ?? (prev != null && prev.wave === wave ? prev.captureParty : undefined);
+  return { wave, outcome, captureParty: carriedCapture };
+}
+
+/**
  * Co-op authoritative wave-advance responder (#633): the GUEST records the host's
  * `waveResolved` signal as a one-shot pending flag (guarded against a double-advance by
  * wave number). It is consumed at the next safe turn boundary by `CoopReplayTurnPhase`
@@ -184,15 +207,17 @@ function wireCoopWaveResolved(controller: CoopSessionController, battleStream: C
       coopLog("runtime", `ignore waveResolved wave=${wave} <= lastResolved=${lastResolvedWave} (duplicate)`);
       return;
     }
-    // Latest signal wins (a later wave supersedes an unconsumed earlier one).
-    if (pendingWaveAdvance == null || wave >= pendingWaveAdvance.wave) {
+    // Latest signal wins (a later wave supersedes an unconsumed earlier one), but a captureParty is
+    // PRESERVED across a same-wave supersession (see mergeCoopPendingWaveAdvance).
+    const merged = mergeCoopPendingWaveAdvance(pendingWaveAdvance, wave, outcome, captureParty);
+    if (merged != null) {
       coopLog(
         "runtime",
-        `pend waveResolved wave=${wave} outcome=${outcome}${captureParty != null ? ` captureParty=${captureParty.length}` : ""} (prevPending=${pendingWaveAdvance?.wave ?? "none"})`,
+        `pend waveResolved wave=${wave} outcome=${outcome}${merged.captureParty != null ? ` captureParty=${merged.captureParty.length}` : ""} (prevPending=${pendingWaveAdvance?.wave ?? "none"})`,
       );
-      pendingWaveAdvance = { wave, outcome, captureParty };
+      pendingWaveAdvance = merged;
     } else {
-      coopWarn("runtime", `waveResolved wave=${wave} stale vs pending=${pendingWaveAdvance.wave} -> kept pending`);
+      coopWarn("runtime", `waveResolved wave=${wave} stale vs pending=${pendingWaveAdvance?.wave} -> kept pending`);
     }
   });
 }
