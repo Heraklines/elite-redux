@@ -108,8 +108,19 @@ export function serializeMonState(mon: CoopFieldMonView): CoopSerializedMonState
   return state;
 }
 
-/** Build the authoritative post-turn checkpoint from the live field + arena views. */
-export function buildCheckpoint(mons: CoopFieldMonView[], arena: CoopArenaView): CoopBattleCheckpoint {
+/**
+ * Build the authoritative post-turn checkpoint from the live field + arena views.
+ *
+ * `money` (#633/#698 money transient) is the host's authoritative money at this boundary, carried so
+ * the guest can mirror it continuously instead of lagging until a resync heals it. Optional + additive:
+ * an undefined value (an older caller / a context with no money) omits the field, and the guest then
+ * leaves its money alone (no regression). Non-finite / negative values are dropped (treated as absent).
+ */
+export function buildCheckpoint(
+  mons: CoopFieldMonView[],
+  arena: CoopArenaView,
+  money?: number,
+): CoopBattleCheckpoint {
   const checkpoint: CoopBattleCheckpoint = {
     field: mons.map(serializeMonState),
     weather: Math.max(0, Math.trunc(arena.weather)),
@@ -117,6 +128,12 @@ export function buildCheckpoint(mons: CoopFieldMonView[], arena: CoopArenaView):
     terrain: Math.max(0, Math.trunc(arena.terrain)),
     terrainTurnsLeft: Math.max(0, Math.trunc(arena.terrainTurnsLeft)),
   };
+  // Carry the host's money whenever a finite, non-negative value is provided (#633/#698 money transient):
+  // the guest force-sets it so a between-wave reward-shop spend / in-battle Pay Day mirrors within one
+  // turn. Omitted for a missing / malformed value so an older host's payload shape is unchanged.
+  if (money !== undefined && Number.isFinite(money) && money >= 0) {
+    checkpoint.money = Math.trunc(money);
+  }
   // Carry arena tags whenever the view PROVIDES the field (#633 GAP 1), INCLUDING an empty array:
   // a NEW host always sends it (even `[]`) so the guest can converge to the empty set (remove a
   // screen the host cleared), while an OLDER host omits the field and the guest leaves its tags
@@ -132,6 +149,7 @@ export function buildCheckpoint(mons: CoopFieldMonView[], arena: CoopArenaView):
       "checkpoint",
       `build field=${checkpoint.field.length} weather=${checkpoint.weather}/${checkpoint.weatherTurnsLeft} `
         + `terrain=${checkpoint.terrain}/${checkpoint.terrainTurnsLeft} arenaTags=${checkpoint.arenaTags?.length ?? "none"} `
+        + `money=${checkpoint.money ?? "none"} `
         + `mons=[${checkpoint.field
           .map(f => `bi${f.bi}:sp${f.speciesId}/hp${f.hp}-${f.maxHp}/st${f.status}/fnt${f.fainted ? 1 : 0}`)
           .join(" ")}]`,

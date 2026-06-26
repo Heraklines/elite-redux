@@ -22,6 +22,7 @@
 
 import { globalScene } from "#app/global-scene";
 import { EntryHazardTag } from "#data/arena-tag";
+import { isCoopAuthoritativeGuestGated } from "#data/elite-redux/coop/coop-authoritative-gate";
 import {
   buildCheckpoint,
   type CoopArenaView,
@@ -231,12 +232,24 @@ export function captureCoopCheckpoint(): CoopBattleCheckpoint | null {
     if (mons.length === 0) {
       return null;
     }
-    const checkpoint = buildCheckpoint(mons, readArenaView());
+    // Carry the host's authoritative money in EVERY per-turn checkpoint (#633/#698 money transient): the
+    // pure-renderer guest never runs the host-only money mutations (between-wave reward-shop BUY, in-battle
+    // Pay Day / scattered-money pickup), so without this its money lags the host until the next full resync
+    // heals it - the visible "host=824 guest=1000" transient. The guest force-sets it (gated), so the first
+    // turn of the wave after a shop spend snaps money. Read live + guarded so a bad read can't break capture.
+    let money: number | undefined;
+    try {
+      money = globalScene.money;
+    } catch {
+      money = undefined;
+    }
+    const checkpoint = buildCheckpoint(mons, readArenaView(), money);
     // Per-turn-HOT: build the summary only when debug is on. Reads the just-built checkpoint, never mutates.
     if (isCoopDebug()) {
       coopLog(
         "checkpoint",
         `host capture field=${checkpoint.field.length} weather=${checkpoint.weather} terrain=${checkpoint.terrain} `
+          + `money=${checkpoint.money ?? "none"} `
           + `arenaTags=${checkpoint.arenaTags?.length ?? 0} mons=[${checkpoint.field
             .map(f => `bi${f.bi}:sp${f.speciesId}/hp${f.hp}-${f.maxHp}/st${f.status}/fnt${f.fainted ? 1 : 0}`)
             .join(" ")}]`,
@@ -389,6 +402,13 @@ export function summonCoopEnemyField(fieldIndex: number, partySlot: number): voi
     if (party[fieldIndex] === incoming) {
       return;
     }
+    // #633 ("sprites shifting right / superimposing on switch-in"): the coop summon has no pokeball-throw
+    // to land the incoming mon's ABSOLUTE position, and resetSummonData() does NOT reset x/y/fieldPosition,
+    // so without re-seating it the incoming sprite renders at a stale offset on top of the on-field mon.
+    // Capture the VACATED slot's exact placement now (before any mutation) and copy it onto the incoming.
+    const slotX = outgoing.x;
+    const slotY = outgoing.y;
+    const slotFieldPosition = outgoing.fieldPosition;
     // C.2 (#633, "switched in on top"): if the incoming mon is currently on-field at a DIFFERENT slot,
     // VACATE that slot first - the swap below moves it to `fieldIndex` but leaves its OLD field slot
     // pointing at a still-on-field sprite (a stale occupant). Side-effect-free (no FaintPhase /
@@ -413,6 +433,11 @@ export function summonCoopEnemyField(fieldIndex: number, partySlot: number): voi
     // the field below the player's mon, show its info + sprite, then field-setup (clears
     // switchOutStatus so it reads as ON-FIELD). Mirrors the summonWild placement subset.
     incoming.resetSummonData();
+    // Re-seat at the vacated slot's exact position + field-position (setFieldPosition is RELATIVE and
+    // no-ops when the position already matches, so set the public field directly + place the container)
+    // - without this the sprite keeps its stale x and lands shifted-right, superimposed on the old mon.
+    incoming.fieldPosition = slotFieldPosition;
+    incoming.setPosition(slotX, slotY);
     void incoming.loadAssets(true);
     globalScene.field.add(incoming);
     // Cast to the common base so `moveBelow<T>` (which constrains both args to one T) accepts an
@@ -587,6 +612,13 @@ export function summonCoopPlayerField(fieldIndex: number, partySlot: number): vo
     if (party[fieldIndex] === incoming) {
       return;
     }
+    // #633 ("sprites shifting right / superimposing on switch-in"): the coop summon has no pokeball-throw
+    // to land the incoming mon's ABSOLUTE position, and resetSummonData() does NOT reset x/y/fieldPosition,
+    // so without re-seating it the incoming sprite renders at a stale offset on top of the on-field mon.
+    // Capture the VACATED slot's exact placement now (before any mutation) and copy it onto the incoming.
+    const slotX = outgoing.x;
+    const slotY = outgoing.y;
+    const slotFieldPosition = outgoing.fieldPosition;
     // C.2 (#633, "switched in on top"): if the incoming mon is currently on-field at a DIFFERENT slot,
     // VACATE that slot first - the swap below moves it to `fieldIndex` but leaves its OLD field slot
     // pointing at a still-on-field sprite, the stale occupant the player sees "switched in on top of"
@@ -613,6 +645,11 @@ export function summonCoopPlayerField(fieldIndex: number, partySlot: number): vo
     // field-setup (clears switchOutStatus so it reads as ON-FIELD). No moveBelow - the player mon
     // renders on top.
     incoming.resetSummonData();
+    // Re-seat at the vacated slot's exact position + field-position (setFieldPosition is RELATIVE and
+    // no-ops when the position already matches, so set the public field directly + place the container)
+    // - without this the sprite keeps its stale x and lands shifted-right, superimposed on the old mon.
+    incoming.fieldPosition = slotFieldPosition;
+    incoming.setPosition(slotX, slotY);
     void incoming.loadAssets(true);
     globalScene.field.add(incoming);
     incoming.showInfo();
@@ -781,6 +818,20 @@ export function applyCoopCheckpoint(checkpoint: CoopBattleCheckpoint): void {
     // never set, remove ones the host cleared. This is the top resync-loop fix - the checksum hashes
     // `(tagType, side)`, so converging the SET is what makes it stop diverging every turn.
     reconcileArenaTags(checkpoint.arenaTags);
+    // Mirror the host's authoritative MONEY (#633/#698 money transient). The pure-renderer guest never
+    // runs the host-only money mutations (between-wave reward-shop BUY, in-battle Pay Day / scattered-money
+    // pickup), so its money lags until a full resync heals it. Force-SETTING the host's value every turn
+    // mirrors it continuously, so the visible "host=824 guest=1000" transient never shows (the first turn
+    // of the wave after a shop spend snaps it). GATED to the authoritative GUEST so solo / host / lockstep
+    // never touch money here (the host owns + computes its own money; only the renderer adopts it). Additive:
+    // an older host omits `money` (undefined) and the guest leaves its money alone (no regression).
+    if (checkpoint.money !== undefined && isCoopAuthoritativeGuestGated()) {
+      if (globalScene.money !== checkpoint.money) {
+        coopWarn("checkpoint", `money host=${checkpoint.money} guest=${globalScene.money} -> applied`);
+        globalScene.money = checkpoint.money;
+        globalScene.updateMoneyText();
+      }
+    }
   } catch {
     // A malformed checkpoint must never crash the guest's battle.
   }

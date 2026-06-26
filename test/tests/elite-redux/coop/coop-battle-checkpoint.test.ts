@@ -100,6 +100,25 @@ describe("co-op battle checkpoint pure core (#633, LIVE-D)", () => {
     });
   });
 
+  // #633/#698 money transient: the checkpoint carries the host's authoritative money so the
+  // pure-renderer guest mirrors it continuously (a between-wave reward-shop spend / in-battle Pay Day),
+  // instead of lagging until a full resync heals the visible "host=824 guest=1000" desync.
+  describe("money (#633/#698 money transient)", () => {
+    it("buildCheckpoint carries money when a finite non-negative value is provided, truncated", () => {
+      expect(buildCheckpoint([mon()], arena, 824).money).toBe(824);
+      expect(buildCheckpoint([mon()], arena, 0).money).toBe(0);
+      expect(buildCheckpoint([mon()], arena, 999.9).money).toBe(999);
+    });
+
+    it("buildCheckpoint omits money for a missing / malformed value (older host shape unchanged)", () => {
+      expect(buildCheckpoint([mon()], arena).money).toBeUndefined();
+      expect(buildCheckpoint([mon()], arena, undefined).money).toBeUndefined();
+      expect(buildCheckpoint([mon()], arena, -50).money).toBeUndefined();
+      expect(buildCheckpoint([mon()], arena, Number.NaN).money).toBeUndefined();
+      expect(buildCheckpoint([mon()], arena, Number.POSITIVE_INFINITY).money).toBeUndefined();
+    });
+  });
+
   it("normalizeMonState re-clamps a received (possibly corrupt) state before the guest applies it", () => {
     const safe = normalizeMonState({
       bi: 2,

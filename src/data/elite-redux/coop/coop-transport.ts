@@ -257,6 +257,16 @@ export interface CoopBattleCheckpoint {
    * Optional + additive: an older payload omits it and the guest leaves its arena tags alone.
    */
   arenaTags?: CoopSerializedArenaTag[];
+  /**
+   * The host's authoritative MONEY at this checkpoint (#633/#698 money transient). The pure-renderer
+   * guest never runs the host-only money mutations (a reward-shop BUY between waves, in-battle Pay Day /
+   * money-scatter pickup), so its money lags the host until the next full resync heals it - the visible
+   * "host=824 guest=1000" transient. Carrying it in EVERY per-turn checkpoint makes the guest MIRROR the
+   * host's money continuously (the first turn of the wave after a shop spend snaps it), so the transient
+   * never shows. Force-SET on the authoritative guest only (never hashed - the checksum + full resync
+   * already cover money). Optional + additive: an OLDER host omits it and the guest leaves money alone.
+   */
+  money?: number;
 }
 
 // =============================================================================

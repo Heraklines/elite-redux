@@ -766,6 +766,32 @@ describe.skipIf(!RUN)("co-op GUEST = pure renderer - real engine (#633, TRACK-2 
     expect(coopEngine.captureCoopChecksum(), "checksum converges after the screen removal").toBe(hostChecksum);
   });
 
+  // (C2) MONEY MIRROR (#633/#698 money transient): the host's authoritative money rides EVERY per-turn
+  // checkpoint so the pure-renderer guest mirrors it continuously - a between-wave reward-shop BUY / an
+  // in-battle Pay Day on the host snaps onto the guest within one turn, instead of lagging until a full
+  // resync heals the visible "host=824 guest=1000" desync. Gated to the authoritative guest.
+  it("MONEY MIRROR (#633/#698): a host money change rides the checkpoint and the guest adopts the host's value", async () => {
+    await startCoopGuest();
+    // HOST truth: the host spent in the reward shop (money 1000 -> 824). Capture the checkpoint WITH
+    // the host's settled money, which the per-turn capture now carries.
+    globalScene.money = 824;
+    const hostCheckpoint = coopEngine.captureCoopCheckpoint();
+    expect(hostCheckpoint).not.toBeNull();
+    expect(hostCheckpoint!.money, "the checkpoint carries the host's money").toBe(824);
+
+    // GUEST divergence: the pure-renderer guest never ran the host-only shop BUY, so its money lags.
+    globalScene.money = 1000;
+    expect(globalScene.money).toBe(1000);
+
+    // Apply the host's checkpoint: the gated authoritative guest force-sets the host's money.
+    coopEngine.applyCoopCheckpoint(hostCheckpoint!);
+    expect(globalScene.money, "the guest adopted the host's authoritative money").toBe(824);
+
+    // IDEMPOTENT: re-applying the same checkpoint keeps the money at the host's value (no throw / drift).
+    expect(() => coopEngine.applyCoopCheckpoint(hostCheckpoint!)).not.toThrow();
+    expect(globalScene.money).toBe(824);
+  });
+
   // (D) FLEE TERMINAL (#633 GAP 5): a successful flee on the host emits waveResolved("flee"); the
   // guest renderer never runs an AttemptRunPhase, so without handling it the guest loops the fled
   // wave. The guest's maybeRunCoopWaveAdvance now mirrors the host's flee tail (BattleEnd ->
