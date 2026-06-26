@@ -514,4 +514,70 @@ describe.skipIf(!RUN)("co-op richer battle events + guest animation pump (#633, 
     expect(enemy0.isOnField(), "the KOd enemy left the field by turn end").toBe(false);
     expect(field[COOP_HOST_FIELD_INDEX].isOnField(), "the host's mon survives").toBe(true);
   });
+
+  // ===========================================================================
+  // (Step 2) recording gaps: a KO from a NON-move source (end-of-turn poison) now emits
+  // hp(to 0) + faint via the UNIVERSAL damage chokepoint (Pokemon.damage), so the guest
+  // animates the faint instead of the mon silently vanishing.
+  // ===========================================================================
+
+  it("(Step 2) an END-OF-TURN POISON KO records hp(to 0) + faint at the universal chokepoint", async () => {
+    await startCoopHost();
+    expect(getCoopController()?.role).toBe("host");
+
+    // A frail enemy poisoned to 1 HP: the end-of-turn poison tick will KO it. BEFORE Step 2 this KO
+    // had NO events (hp/faint were recorded only on the direct move-hit path), so the guest saw it
+    // vanish. Now Pokemon.damage records both, so a poison/status/weather/recoil/hazard KO animates.
+    const enemy0 = globalScene.getEnemyField(false)[0];
+    enemy0.hp = 1;
+    enemy0.doSetStatus(StatusEffect.POISON);
+    const koBi = enemy0.getBattlerIndex();
+
+    // Open a recording exactly as the host's TurnStartPhase does, then run the REAL end-of-turn poison
+    // phase (PostTurnStatusEffectPhase -> pokemon.damage, the universal chokepoint). No move is involved.
+    beginCoopRecording(globalScene.currentBattle.turn);
+    const poisonPhase = game.scene.phaseManager.create("PostTurnStatusEffectPhase", koBi);
+    poisonPhase.start();
+    await new Promise(r => setTimeout(r, 0));
+    const recording = endCoopRecording();
+
+    // The poison KO recorded BOTH an hp event (to 0) and a faint event for the enemy - from a source
+    // with NO move-hit path, proving the chokepoint move closed the recording gap.
+    const hpEvent = recording.events.find(e => e.k === "hp" && e.bi === koBi);
+    expect(hpEvent, "the poison tick recorded an hp event for the KOd enemy").toBeDefined();
+    expect(hpEvent?.k === "hp" ? hpEvent.hp : -1, "the recorded hp is the authoritative post-tick value (0)").toBe(0);
+    const faintEvent = recording.events.find(e => e.k === "faint" && e.bi === koBi);
+    expect(faintEvent, "the poison KO recorded a faint event (no longer a silent vanish)").toBeDefined();
+    // Exactly ONE faint for this mon (damage() no-ops once fainted, so no duplicate).
+    expect(recording.events.filter(e => e.k === "faint" && e.bi === koBi).length, "exactly one faint event").toBe(1);
+  });
+
+  it("(Step 2) the guest ANIMATES a poison-KO faint stream (hp drain + faint) without throwing", async () => {
+    const field = await startCoopGuest();
+    const turn = globalScene.currentBattle.turn;
+    const enemy0 = globalScene.getEnemyField(false)[0];
+    const koBi = enemy0.getBattlerIndex();
+
+    // The host's recorded stream for an end-of-turn poison KO: a message, the hp drain to 0, the faint -
+    // NO moveUsed (poison is not a move). The checkpoint marks the enemy fainted (its end state).
+    const partner = getCoopRuntime()!.partnerTransport!;
+    partner.send({
+      t: "turnResolution",
+      turn,
+      events: [
+        { k: "message", text: "The enemy is hurt by poison!" },
+        { k: "hp", bi: koBi, hp: 0, maxHp: enemy0.getMaxHp() },
+        { k: "faint", bi: koBi },
+      ],
+      checkpoint: checkpointKO(koBi),
+      checksum: coopEngine.captureCoopChecksum(),
+    });
+    await new Promise(r => setTimeout(r, 0));
+
+    // The whole pump (hp drain + faint animation + deferred checkpoint) must not throw or hang, and the
+    // poison-KO'd enemy leaves the field by turn end.
+    await expect(driveReplayTurn(turn), "a poison-KO faint stream never throws").resolves.not.toThrow();
+    expect(enemy0.isOnField(), "the poison-KO'd enemy left the field (the faint animated + removed it)").toBe(false);
+    expect(field[COOP_HOST_FIELD_INDEX].isOnField(), "the host's mon survives the poison turn").toBe(true);
+  });
 });
