@@ -123,7 +123,8 @@ export class TurnInitPhase extends FieldPhase {
     if (battle.turn !== 1 || battle.battleType !== BattleType.WILD) {
       return;
     }
-    const chance = getErBiomeRule(globalScene.arena.biomeId)?.ambushChance;
+    const rule = getErBiomeRule(globalScene.arena.biomeId);
+    const chance = rule?.ambushChance;
     if (!chance) {
       return;
     }
@@ -132,8 +133,13 @@ export class TurnInitPhase extends FieldPhase {
     if (!enemy?.isActive(true) || !player?.isActive(true)) {
       return;
     }
-    // Reacted in time: a lead that is at least as fast prevents the ambush.
-    if (player.getEffectiveStat(Stat.SPD, enemy) >= enemy.getEffectiveStat(Stat.SPD, player)) {
+    // Reacted in time: the ambush is prevented when your lead holds the line.
+    // Ruins (ambushDefenseGate): your lead's Defense >= the foe's Attack. Forest /
+    // Snowy Forest: your lead is at least as fast as the foe.
+    const avoided = rule.ambushDefenseGate
+      ? player.getEffectiveStat(Stat.DEF, enemy) >= enemy.getEffectiveStat(Stat.ATK, player)
+      : player.getEffectiveStat(Stat.SPD, enemy) >= enemy.getEffectiveStat(Stat.SPD, player);
+    if (avoided) {
       return;
     }
     if (globalScene.randBattleSeedInt(100) >= chance) {
@@ -166,5 +172,12 @@ export class TurnInitPhase extends FieldPhase {
         globalScene.phaseManager.unshiftNew("SwitchPhase", SwitchType.SWITCH, playerMon.getFieldIndex(), true, false);
       }
     }
+    // ER ambush signal (#439 §3): the free enemy move is otherwise a mystery (the
+    // foe just acts before the player). Announce it so the player knows they were
+    // ambushed. Unshifted LAST -> a non-MovePhase prepends to the queue front, so
+    // it shows BEFORE the ambush move resolves (the no-op modal switches above are
+    // invisible while the lead is still standing). Applies to Forest, Snowy Forest,
+    // and Ruins (every biome with an ambushChance).
+    globalScene.phaseManager.unshiftNew("MessagePhase", "You were ambushed! The foe strikes first!", null, true);
   }
 }

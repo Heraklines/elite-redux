@@ -66,6 +66,14 @@ export class MockGraphics implements MockGameObject {
     return this;
   }
 
+  fillTriangle(_x0, _y0, _x1, _y1, _x2, _y2): this {
+    return this;
+  }
+
+  fillGradientStyle(_tl, _tr, _bl, _br, _alpha): this {
+    return this;
+  }
+
   clear(): this {
     return this;
   }

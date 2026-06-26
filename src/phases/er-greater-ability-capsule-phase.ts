@@ -1,0 +1,233 @@
+/*
+ * SPDX-FileCopyrightText: 2024-2026 Pagefault Games
+ *
+ * SPDX-License-Identifier: AGPL-3.0-only
+ */
+
+// =============================================================================
+// ER Greater Ability Capsule picker - the rarer, stronger Ability Capsule (a
+// violet reskin). Unshifted from ErGreaterAbilityCapsuleModifier.apply(). Offers a
+// small option-select:
+//   (A) "Permanently unlock an innate" -> an ability-slot pick restricted to the
+//       mon's currently-LOCKED innate slots, then PERMANENTLY unlocks the chosen
+//       slot (the real candy-style starterData.passiveAttr unlock - stays unlocked
+//       in starter-select + future runs). See #data/elite-redux/er-greater-ability-capsule.
+//   (B) "Run-unlock two innates" -> pick TWO of the mon's currently-LOCKED innate
+//       slots (one at a time), then run-unlocks BOTH for THIS RUN ONLY (the normal
+//       Ability Capsule's run-unlock, applied to two slots - never the permanent unlock).
+//
+// Mirrors ErAbilityCapsulePhase exactly: same OPTION_SELECT/party-UI flow, the same
+// awaited-restore-before-resolve softlock avoidance (#550), and the same #25 back-out
+// safety - the reward screen queues a continuation copy (SelectModifierPhase.applyModifier),
+// removed here (tryRemovePhase) ONLY once a choice is committed, so backing out at any
+// step leaves the capsule un-consumed and re-offered.
+// =============================================================================
+
+import { globalScene } from "#app/global-scene";
+import { Phase } from "#app/phase";
+import { erRunUnlockableInnateSlots } from "#data/elite-redux/er-ability-capsule";
+import {
+  GREATER_CAPSULE_RUN_UNLOCK_COUNT,
+  greaterCapsuleCanPermanentlyUnlock,
+  greaterCapsuleCanRunUnlockTwo,
+  greaterCapsulePermanentlyUnlockInnate,
+  greaterCapsuleRunUnlockInnates,
+  greaterCapsuleUnlockableInnateSlots,
+} from "#data/elite-redux/er-greater-ability-capsule";
+import { UiMode } from "#enums/ui-mode";
+import type { PlayerPokemon } from "#field/pokemon";
+import type { OptionSelectItem } from "#ui/abstract-option-select-ui-handler";
+import { PartyOption, PartyUiMode } from "#ui/party-ui-handler";
+import i18next from "i18next";
+
+const ns = "modifierType";
+
+export class ErGreaterAbilityCapsulePhase extends Phase {
+  public readonly phaseName = "ErGreaterAbilityCapsulePhase";
+
+  /** Index into the player party of the mon the capsule was used on. */
+  private readonly partyIndex: number;
+  /** The UI mode active when this phase started; sub-menus restore to it. */
+  private baseMode: UiMode = UiMode.MESSAGE;
+
+  constructor(partyIndex: number) {
+    super();
+    this.partyIndex = partyIndex;
+  }
+
+  start(): void {
+    super.start();
+    this.baseMode = globalScene.ui.getMode();
+    const mon = globalScene.getPlayerParty()[this.partyIndex];
+    if (mon == null) {
+      // The target vanished (should not happen mid-shop); leave the continuation
+      // copy in place so the player is returned to the reward screen.
+      this.end();
+      return;
+    }
+    this.openChoice(mon);
+  }
+
+  /** The top-level "Permanently unlock an innate" / "Run-unlock two innates" menu. */
+  private openChoice(mon: PlayerPokemon): void {
+    const canPermanent = greaterCapsuleCanPermanentlyUnlock(mon);
+    const canRunTwo = greaterCapsuleCanRunUnlockTwo(mon);
+
+    // The modifier-type select filter already requires at least one locked innate,
+    // so the permanent option is always available here. Guard anyway.
+    if (!canPermanent) {
+      this.end();
+      return;
+    }
+
+    const options: OptionSelectItem[] = [];
+    options.push({
+      label: i18next.t(`${ns}:erGreaterAbilityCapsule.permanentUnlock`),
+      handler: () => {
+        this.restore(() => this.openPermanentPicker(mon));
+        return true;
+      },
+    });
+    if (canRunTwo) {
+      options.push({
+        label: i18next.t(`${ns}:erGreaterAbilityCapsule.runUnlockTwo`),
+        handler: () => {
+          this.restore(() => this.openRunUnlockPicker(mon, []));
+          return true;
+        },
+      });
+    }
+    options.push({
+      label: i18next.t("menu:cancel"),
+      handler: () => {
+        // Leave the continuation copy -> back to the reward screen, capsule kept.
+        this.restore(() => this.end());
+        return true;
+      },
+    });
+
+    globalScene.ui.setMode(UiMode.OPTION_SELECT, { options });
+  }
+
+  /**
+   * Option (A): pick ONE currently-locked innate slot, then PERMANENTLY unlock it.
+   * An invalid pick (the active ability or an already-unlocked innate) shows a short
+   * message and reopens the picker. Cancelling returns to the top-level choice.
+   */
+  private openPermanentPicker(mon: PlayerPokemon): void {
+    const unlockable = greaterCapsuleUnlockableInnateSlots(mon);
+    if (unlockable.length === 0) {
+      this.openChoice(mon);
+      return;
+    }
+    const unlockableSlots = new Set(unlockable.map(u => u.slot));
+
+    globalScene.ui.setMode(
+      UiMode.PARTY,
+      PartyUiMode.ABILITY_MODIFIER,
+      -1,
+      (slotIndex: number, option: PartyOption) => {
+        const party = globalScene.getPlayerParty();
+        const picked = slotIndex >= 0 && slotIndex < party.length ? party[slotIndex] : null;
+        if (picked !== mon || option < PartyOption.ABILITY_SLOT_0) {
+          globalScene.ui.setMode(this.baseMode).then(() => this.openChoice(mon));
+          return;
+        }
+        const slot = option - PartyOption.ABILITY_SLOT_0;
+        if (!unlockableSlots.has(slot)) {
+          globalScene.ui.setMode(this.baseMode).then(() => {
+            globalScene.ui.showText(
+              i18next.t(`${ns}:erGreaterAbilityCapsule.notLockedInnate`),
+              null,
+              () => this.openPermanentPicker(mon),
+              null,
+              true,
+            );
+          });
+          return;
+        }
+        // Commit the PERMANENT unlock and consume the capsule.
+        globalScene.ui.setMode(this.baseMode).then(() => {
+          greaterCapsulePermanentlyUnlockInnate(mon, slot);
+          this.commitAndEnd();
+        });
+      },
+      (p: PlayerPokemon) => (p === mon ? null : i18next.t(`${ns}:erGreaterAbilityCapsule.chooseSameMon`)),
+    );
+  }
+
+  /**
+   * Option (B): pick TWO currently-locked innate slots (one per picker open), then
+   * run-unlock BOTH for the run. `picked` accumulates the slots chosen so far; once
+   * {@linkcode GREATER_CAPSULE_RUN_UNLOCK_COUNT} are chosen we commit. Re-derives the
+   * still-locked set each open (so an already-picked slot is never offered twice).
+   * Cancelling at any point returns to the top-level choice (nothing applied yet).
+   */
+  private openRunUnlockPicker(mon: PlayerPokemon, picked: number[]): void {
+    // Only slots that are still LOCKED and not already chosen this session are valid.
+    const remaining = erRunUnlockableInnateSlots(mon).filter(u => !picked.includes(u.slot));
+    if (remaining.length === 0) {
+      // Nothing left to pick; if we have not yet gathered enough, fall back to the
+      // choice rather than committing a partial unlock.
+      this.openChoice(mon);
+      return;
+    }
+    const remainingSlots = new Set(remaining.map(u => u.slot));
+
+    globalScene.ui.setMode(
+      UiMode.PARTY,
+      PartyUiMode.ABILITY_MODIFIER,
+      -1,
+      (slotIndex: number, option: PartyOption) => {
+        const party = globalScene.getPlayerParty();
+        const target = slotIndex >= 0 && slotIndex < party.length ? party[slotIndex] : null;
+        if (target !== mon || option < PartyOption.ABILITY_SLOT_0) {
+          globalScene.ui.setMode(this.baseMode).then(() => this.openChoice(mon));
+          return;
+        }
+        const slot = option - PartyOption.ABILITY_SLOT_0;
+        if (!remainingSlots.has(slot)) {
+          globalScene.ui.setMode(this.baseMode).then(() => {
+            globalScene.ui.showText(
+              i18next.t(`${ns}:erGreaterAbilityCapsule.notLockedInnate`),
+              null,
+              () => this.openRunUnlockPicker(mon, picked),
+              null,
+              true,
+            );
+          });
+          return;
+        }
+        const next = [...picked, slot];
+        if (next.length < GREATER_CAPSULE_RUN_UNLOCK_COUNT) {
+          // Need a second slot - reopen the picker for the next pick.
+          globalScene.ui.setMode(this.baseMode).then(() => this.openRunUnlockPicker(mon, next));
+          return;
+        }
+        // Commit both run-unlocks and consume the capsule.
+        globalScene.ui.setMode(this.baseMode).then(() => {
+          greaterCapsuleRunUnlockInnates(mon, next);
+          this.commitAndEnd();
+        });
+      },
+      (p: PlayerPokemon) => (p === mon ? null : i18next.t(`${ns}:erGreaterAbilityCapsule.chooseSameMon`)),
+    );
+  }
+
+  /**
+   * Remove the reward-screen continuation copy so the capsule is consumed (the
+   * choice was committed), then end this phase.
+   */
+  private commitAndEnd(): void {
+    globalScene.phaseManager.tryRemovePhase("SelectModifierPhase");
+    this.end();
+  }
+
+  /**
+   * Tear the current OPTION_SELECT back down to the base mode BEFORE running the
+   * next step (the #550 softlock avoidance).
+   */
+  private restore(next: () => void): void {
+    globalScene.ui.setMode(this.baseMode).then(() => next());
+  }
+}

@@ -5,6 +5,7 @@ import { handleTutorial, Tutorial } from "#app/tutorial";
 import type { ArenaTag } from "#data/arena-tag";
 import { OctolockTag } from "#data/battler-tags";
 import { isCoopRecording, recordCoopEvent } from "#data/elite-redux/coop/coop-turn-recorder";
+import { getErBiomeRule } from "#data/elite-redux/er-biome-rules";
 import { ArenaTagSide } from "#enums/arena-tag-side";
 import { ArenaTagType } from "#enums/arena-tag-type";
 import type { BattlerIndex } from "#enums/battler-index";
@@ -61,6 +62,14 @@ export class StatStageChangePhase extends PokemonPhase {
   }
 
   start() {
+    // ER Temple (#439 §3): hallowed stillness - stat stages are FROZEN here, so
+    // NEITHER side can raise or lower a stage. No-op the whole change (no message,
+    // no state mutation) while in this biome. Gated on the biome rule so every
+    // other biome behaves normally.
+    if (getErBiomeRule(globalScene.arena.biomeId)?.statStageFreeze) {
+      return this.end();
+    }
+
     // Check if multiple stats are being changed at the same time, then run SSCPhase for each of them
     if (this.stats.length > 1) {
       for (const stat of this.stats) {

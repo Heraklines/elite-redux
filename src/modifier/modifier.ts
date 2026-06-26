@@ -2554,17 +2554,39 @@ export class ErRelicModifier extends PersistentModifier {
 }
 
 /**
- * ER Ability Capsule (#387, community batch): cycles the targeted Pokemon's
- * ACTIVE ability through the species' legal abilities (ability 1 -> ability 2
- * -> hidden -> ability 1). REPEATABLE - it is a consumable, so each use spends one
- * capsule and advances ONE step; cycling all the way to the hidden ability takes
- * multiple capsules (this is what the item's "1 => 2 => Hidden" description
- * promises). Previously a single-use-per-Pokemon flag blocked every use after the
- * first, so you could never reach the hidden ability ("only works the first time").
- * The innate slots are untouched (that is the Ability Randomizer's job).
+ * ER Ability Capsule (#387, community batch): on use, offers a CHOICE -
+ *  (A) "Change ability": cycle the targeted Pokemon's ACTIVE ability through the
+ *      species' legal abilities (ability 1 -> ability 2 -> hidden -> ability 1).
+ *      REPEATABLE - it is a consumable, so each use spends one capsule and advances
+ *      ONE step; cycling all the way to the hidden ability takes multiple capsules
+ *      (this is what the item's "1 => 2 => Hidden" description promises).
+ *  (B) "Unlock an innate for the run" (maintainer request): force-unlock one of the
+ *      mon's currently-LOCKED innate slots for THIS RUN ONLY - see
+ *      {@linkcode module:#data/elite-redux/er-ability-capsule}. Run-scoped, never a
+ *      permanent candy unlock.
+ *
+ * Because the choice + sub-picker are interactive (async UI), `apply()` unshifts the
+ * dedicated {@linkcode ErAbilityCapsulePhase} (mirroring how the move-learn consumables
+ * unshift LearnMovePhase) and returns `true`; that phase drives the option-select +
+ * party-UI flow. The capsule is back-out safe (#25): the shop queues a continuation
+ * copy (see {@linkcode SelectModifierPhase.applyModifier}), and the phase only removes
+ * that copy once a choice is actually committed - cancelling re-offers the capsule.
  */
 export class ErAbilityCapsuleModifier extends ConsumablePokemonModifier {
-  override apply(playerPokemon: PlayerPokemon): boolean {
+  /** Whether the capsule's "Change ability" (active-ability cycle) option is available for `mon`. */
+  static canCycleActiveAbility(mon: PlayerPokemon): boolean {
+    const form = mon.getSpeciesForm();
+    const distinct = new Set([form.ability1, form.ability2, form.abilityHidden].filter(a => a !== AbilityId.NONE));
+    return distinct.size >= 2;
+  }
+
+  /**
+   * Option (A): cycle `mon`'s ACTIVE ability to the next species-legal ability and
+   * register it in the dex. Returns `true` if it cycled, `false` if the species has
+   * fewer than 2 legal abilities (nothing to cycle). Unchanged from the original
+   * capsule behaviour - just extracted so {@linkcode ErAbilityCapsulePhase} can call it.
+   */
+  static cycleActiveAbility(playerPokemon: PlayerPokemon): boolean {
     const custom = playerPokemon.customPokemonData;
     const form = playerPokemon.getSpeciesForm();
     const candidates = [form.ability1, form.ability2, form.abilityHidden].filter(
@@ -2595,6 +2617,63 @@ export class ErAbilityCapsuleModifier extends ConsumablePokemonModifier {
       globalScene.gameData.getStarterDataEntry(playerPokemon.species.speciesId).abilityAttr |= unlockBit;
     }
     playerPokemon.updateInfo();
+    return true;
+  }
+
+  override apply(playerPokemon: PlayerPokemon): boolean {
+    // Hand off to the interactive picker phase (option-select -> cycle, or the
+    // run-unlock innate sub-picker). Unshifted so it owns its own UI after the
+    // reward screen tears down (the LearnMovePhase precedent).
+    globalScene.phaseManager.unshiftNew("ErAbilityCapsulePhase", globalScene.getPlayerParty().indexOf(playerPokemon));
+    return true;
+  }
+}
+
+/**
+ * ER Greater Ability Capsule (the rarer, stronger Ability Capsule - a violet
+ * reskin). On use, offers a CHOICE between two stronger innate unlocks:
+ *  (A) PERMANENTLY unlock ONE innate slot (writes the real candy-style innate
+ *      unlock to starterData.passiveAttr, so it stays unlocked in starter-select
+ *      and future runs - see {@linkcode module:#data/elite-redux/er-greater-ability-capsule}).
+ *  (B) RUN-unlock TWO innate slots for THIS RUN ONLY (the normal capsule's
+ *      run-unlock, but two slots; never the permanent unlock).
+ *
+ * Like the normal capsule, the choice + sub-pickers are interactive, so `apply()`
+ * unshifts the dedicated {@linkcode ErGreaterAbilityCapsulePhase} and returns
+ * `true`. Back-out safe (#25): the reward screen queues a continuation copy (see
+ * {@linkcode SelectModifierPhase.applyModifier}), removed by the phase only once a
+ * choice is committed.
+ */
+export class ErGreaterAbilityCapsuleModifier extends ConsumablePokemonModifier {
+  override apply(playerPokemon: PlayerPokemon): boolean {
+    globalScene.phaseManager.unshiftNew(
+      "ErGreaterAbilityCapsulePhase",
+      globalScene.getPlayerParty().indexOf(playerPokemon),
+    );
+    return true;
+  }
+}
+
+/**
+ * ER Greater Ability Randomizer (Master-Ball tier - a pink reskin of the Ability
+ * Randomizer). On use the player picks ANY of the mon's ability/innate slots, is
+ * shown 4 RANDOM abilities (with descriptions) in the Bargain-styled picker, picks
+ * one, and it REPLACES that slot. No lock cost - it is Curiosity's reward half,
+ * simplified to 4 options + a chosen slot.
+ *
+ * The choice flow is interactive (slot pick -> 4-ability picker), so `apply()`
+ * unshifts the dedicated {@linkcode ErGreaterAbilityRandomizerPhase} and returns
+ * `true`. The replacement is run-state (a customPokemonData override via
+ * {@linkcode PlayerPokemon.setAbilityOverrideForSlot}), persisted for the run by
+ * the session save - NOT a permanent dex unlock. Back-out safe (#25): the reward
+ * screen queues a continuation copy, removed by the phase only once committed.
+ */
+export class ErGreaterAbilityRandomizerModifier extends ConsumablePokemonModifier {
+  override apply(playerPokemon: PlayerPokemon): boolean {
+    globalScene.phaseManager.unshiftNew(
+      "ErGreaterAbilityRandomizerPhase",
+      globalScene.getPlayerParty().indexOf(playerPokemon),
+    );
     return true;
   }
 }

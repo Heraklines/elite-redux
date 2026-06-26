@@ -276,6 +276,26 @@
     "MYSTERY_ENCOUNTER_OLD_GATEAU": { "name": "Old Gateau", "description": "Increases some of the holder’s stats." },
     "MYSTERY_ENCOUNTER_GOLDEN_BUG_NET": { "name": "Golden Bug Net", "description": "Imbues the owner with luck to find Bug Type Pokémon more often. Has a strange heft to it." }
   },
+  "erAbilityCapsule": {
+    "changeAbility": "Change ability",
+    "unlockInnate": "Unlock an innate for the run",
+    "notLockedInnate": "That slot is already unlocked. Pick a locked innate.",
+    "chooseSameMon": "Choose the same Pokémon."
+  },
+  "erGreaterAbilityCapsule": {
+    "name": "Greater Ability Capsule",
+    "description": "Permanently unlock one of a Pokémon's locked innates, or unlock two of them for the run.",
+    "permanentUnlock": "Permanently unlock an innate",
+    "runUnlockTwo": "Unlock two innates for the run",
+    "notLockedInnate": "That slot is already unlocked. Pick a locked innate.",
+    "chooseSameMon": "Choose the same Pokémon."
+  },
+  "erGreaterAbilityRandomizer": {
+    "name": "Greater Ability Randomizer",
+    "description": "Pick a Pokémon's ability or innate, then choose one of four random abilities to replace it.",
+    "pickAbility": "Four powers, drawn at random. Choose the one to graft into the chosen slot.",
+    "chooseSameMon": "Choose the same Pokémon."
+  },
   "SpeciesBoosterItem": {
     "LIGHT_BALL": { "name": "Light Ball", "description": "It’s a mysterious orb that boosts Pikachu’s Attack and Sp. Atk stats." },
     "THICK_CLUB": { "name": "Thick Club", "description": "This hard bone of unknown origin boosts Cubone or Marowak’s Attack stat." },

@@ -4,6 +4,7 @@ import { getPokemonNameWithAffix } from "#app/messages";
 import { allMoves } from "#data/data-lists";
 import { classicFinalBossDialogue } from "#data/dialogue";
 import { erBalanceNum } from "#data/elite-redux/er-balance-tuning";
+import { getErBiomeRule } from "#data/elite-redux/er-biome-rules";
 import { recordErStreakFaint } from "#data/elite-redux/er-money-streak";
 import { erMomentumEngineOnEnemyKo, erRelicRecordPlayerFaint, erTryAnchorLastStand } from "#data/elite-redux/er-relics";
 import { SpeciesFormChangeActiveTrigger } from "#data/form-change-triggers";
@@ -17,7 +18,7 @@ import { SpeciesId } from "#enums/species-id";
 import { StatusEffect } from "#enums/status-effect";
 import { SwitchType } from "#enums/switch-type";
 import type { EnemyPokemon, PlayerPokemon, Pokemon } from "#field/pokemon";
-import { PokemonInstantReviveModifier } from "#modifiers/modifier";
+import { type PokemonHeldItemModifier, PokemonInstantReviveModifier } from "#modifiers/modifier";
 import { PokemonMove } from "#moves/pokemon-move";
 import { PokemonPhase } from "#phases/pokemon-phase";
 import { achvs } from "#system/achv";
@@ -96,6 +97,23 @@ export class FaintPhase extends PokemonPhase {
     // Track total times pokemon have been KO'd for Last Respects/Supreme Overlord
     if (pokemon.isPlayer()) {
       globalScene.arena.playerFaints += 1;
+      // ER Slum (#439 §3): the den - every ALLY that faints in a TRAINER battle
+      // costs you a slice of your money (2% of the current purse). Trainer battles
+      // only (a wild faint is free); gated on the biome rule so it only bites here.
+      const moneyLossPct = getErBiomeRule(globalScene.arena.biomeId)?.moneyLossPctPerFaint;
+      if (moneyLossPct && globalScene.currentBattle.battleType === BattleType.TRAINER && globalScene.money > 0) {
+        const loss = Math.floor((globalScene.money * moneyLossPct) / 100);
+        if (loss > 0) {
+          globalScene.money = Math.max(0, globalScene.money - loss);
+          globalScene.updateMoneyText();
+          globalScene.animateMoneyChanged(false);
+          globalScene.phaseManager.queueMessage(
+            `In the chaos of the slum, you lost ₽${loss} when ${getPokemonNameWithAffix(pokemon)} fell!`,
+            null,
+            true,
+          );
+        }
+      }
       // ER money streak (#348): a faint breaks this mon's faint-free streak.
       recordErStreakFaint(pokemon);
       // ER relics (#439): a player faint breaks Morale Banner's faint-free bonus
@@ -228,6 +246,10 @@ export class FaintPhase extends PokemonPhase {
             globalScene.currentBattle.removeFaintedParticipant(pokemon as PlayerPokemon);
           } else {
             globalScene.addFaintedEnemyScore(pokemon as EnemyPokemon);
+            // ER Wasteland: pull the guaranteed wild drop FIRST (while the mon's
+            // items still carry its pokemonId), THEN sweep the rest to post-battle
+            // loot (which nulls the pokemonId for the ability-gated steal pool).
+            this.applyErWastelandWildDrop(pokemon as EnemyPokemon);
             globalScene.currentBattle.addPostBattleLoot(pokemon as EnemyPokemon);
           }
           pokemon.leaveField();
@@ -254,5 +276,39 @@ export class FaintPhase extends PokemonPhase {
     enemy.hp++;
     phaseManager.unshiftNew("DamageAnimPhase", enemy.getBattlerIndex(), 0, HitResult.INDIRECT);
     this.end();
+  }
+
+  /**
+   * ER Wasteland (#439 §3): scarcity has a flip side - a defeated WILD mon drops a
+   * fixed number of its held items to your lead, guaranteed (not ability-gated like
+   * the normal post-battle steal pool). Transfers up to `wildItemDropCount` of the
+   * fainted wild mon's transferable held items onto the first living player mon, one
+   * stack each, with a message. WILD battles only; gated on the biome rule so other
+   * biomes are unaffected. Never throws.
+   */
+  private applyErWastelandWildDrop(enemy: EnemyPokemon): void {
+    const dropCount = getErBiomeRule(globalScene.arena.biomeId)?.wildItemDropCount;
+    if (!dropCount || globalScene.currentBattle.battleType !== BattleType.WILD) {
+      return;
+    }
+    const recipient = globalScene.getPlayerField().find(p => p?.isActive(true)) ?? globalScene.getPlayerPokemon();
+    if (!recipient) {
+      return;
+    }
+    const drops = globalScene
+      .findModifiers(m => m.is("PokemonHeldItemModifier") && m.pokemonId === enemy.id && m.isTransferable, false)
+      .slice(0, dropCount) as PokemonHeldItemModifier[];
+    for (const item of drops) {
+      if (!globalScene.canTransferHeldItemModifier(item, recipient, 1)) {
+        continue;
+      }
+      if (globalScene.tryTransferHeldItemModifier(item, recipient, false, 1, true, undefined, true)) {
+        globalScene.phaseManager.queueMessage(
+          `${getPokemonNameWithAffix(recipient)} scavenged ${item.type.name} from the wreckage!`,
+          null,
+          true,
+        );
+      }
+    }
   }
 }

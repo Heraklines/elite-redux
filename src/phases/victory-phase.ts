@@ -5,12 +5,15 @@ import { broadcastCoopWaveResolved, getCoopController } from "#data/elite-redux/
 import { erBiomeOverstay } from "#data/elite-redux/er-biome-notoriety";
 import { erBiomeRoutingActive } from "#data/elite-redux/er-biome-routing";
 import { erShouldRaiseCrossroads } from "#data/elite-redux/er-biome-structure";
+import { hasErGhostOverride } from "#data/elite-redux/er-ghost-teams";
 import { BattleType } from "#enums/battle-type";
 import type { BattlerIndex } from "#enums/battler-index";
 import { BiomeId } from "#enums/biome-id";
 import { ClassicFixedBossWaves } from "#enums/fixed-boss-waves";
 import { GameModes } from "#enums/game-modes";
+import { ModifierTier } from "#enums/modifier-tier";
 import { UiMode } from "#enums/ui-mode";
+import type { CustomModifierSettings } from "#modifiers/modifier-type";
 import { type ModifierType, ModifierTypeOption } from "#modifiers/modifier-type";
 import { generateModifierType, handleMysteryEncounterVictory } from "#mystery-encounters/encounter-phase-utils";
 import { PokemonPhase } from "#phases/pokemon-phase";
@@ -18,6 +21,7 @@ import { applyEffects } from "#system/llm-director/consequence-effects";
 import { logEffectApplied } from "#system/llm-director/director-log";
 import { getDirectorRuntime } from "#system/llm-director/director-runtime";
 import { paginateAndJoin } from "#system/llm-director/text-pagination";
+import { randSeedInt } from "#utils/common";
 
 export class VictoryPhase extends PokemonPhase {
   public readonly phaseName = "VictoryPhase";
@@ -111,11 +115,17 @@ export class VictoryPhase extends PokemonPhase {
           }
         }
         if (currentWaveIndex % 10) {
+          // ER (#217): a cross-player GHOST-team trainer rolls a per-victory reward
+          // TIER for the whole reward screen (60% Great, 10% Common, 30% Ultra),
+          // BEFORE luck (luck still upgrades from there). Reuses the rival/boss
+          // guaranteedModifierTiers routine. Otherwise the fixed-battle config's
+          // reward settings (rival/boss) or undefined (a normal trainer/wild).
+          const ghostRewards = buildErGhostRewardSettings();
           globalScene.phaseManager.pushNew(
             "SelectModifierPhase",
             undefined,
             undefined,
-            gameMode.getFixedBattle(currentWaveIndex)?.customModifierRewardSettings,
+            ghostRewards ?? gameMode.getFixedBattle(currentWaveIndex)?.customModifierRewardSettings,
           );
         } else if (gameMode.isDaily) {
           globalScene.phaseManager.pushNew("ModifierRewardPhase", modifierTypes.EXP_CHARM);
@@ -234,6 +244,41 @@ export class VictoryPhase extends PokemonPhase {
 
     this.end();
   }
+}
+
+/** Number of reward slots a ghost victory fills at the rolled tier (the base
+ *  reward count; earned extra slots are added on top by getModifierCount). */
+const ER_GHOST_REWARD_SLOTS = 3;
+
+/**
+ * ER (#217): if the just-defeated trainer is a cross-player GHOST team, roll a
+ * per-victory reward TIER and return the `customModifierSettings` that guarantee
+ * the WHOLE reward screen at that tier. 60% Great, 30% Ultra, 10% Common. The roll
+ * is BEFORE luck (`allowLuckUpgrades` left default-true), so luck still upgrades
+ * from there. Reuses the rival/boss `guaranteedModifierTiers` routine. Returns
+ * `undefined` for a non-ghost / non-trainer victory (normal reward flow). Seeded
+ * per wave so a reroll/reload re-reads the same tier.
+ *
+ * Exported for the #217 reward-tier regression test (it drives this exact seam
+ * with a ghost-marked currentBattle.trainer, avoiding a full trainer fight).
+ */
+export function buildErGhostRewardSettings(): CustomModifierSettings | undefined {
+  const battle = globalScene.currentBattle;
+  const trainer = battle?.trainer;
+  if (battle?.battleType !== BattleType.TRAINER || !trainer || !hasErGhostOverride(trainer)) {
+    return;
+  }
+  let tier = ModifierTier.GREAT;
+  globalScene.executeWithSeedOffset(
+    () => {
+      const roll = randSeedInt(100);
+      // 60% Great, 30% Ultra, 10% Common.
+      tier = roll < 60 ? ModifierTier.GREAT : roll < 90 ? ModifierTier.ULTRA : ModifierTier.COMMON;
+    },
+    battle.waveIndex,
+    "er-ghost-reward-tier",
+  );
+  return { guaranteedModifierTiers: new Array(ER_GHOST_REWARD_SLOTS).fill(tier) };
 }
 
 /**

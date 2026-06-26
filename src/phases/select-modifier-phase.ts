@@ -14,6 +14,7 @@ import {
   getCoopUiMirror,
 } from "#data/elite-redux/coop/coop-runtime";
 import { erBalanceArr, erBalanceNum } from "#data/elite-redux/er-balance-tuning";
+import { getErBiomeRule } from "#data/elite-redux/er-biome-rules";
 import {
   erMerchantsSealExtraSlots,
   erMerchantsSealRerollMultiplier,
@@ -32,6 +33,7 @@ import {
 } from "#modifiers/modifier";
 import type { CustomModifierSettings, ModifierType, ModifierTypeOption } from "#modifiers/modifier-type";
 import {
+  ErAbilityCapsuleModifierType,
   ErLearnersShroomModifierType,
   ErTmCaseModifierType,
   FusePokemonModifierType,
@@ -462,11 +464,17 @@ export class SelectModifierPhase extends BattlePhase {
     // (LearnMoveType.MEMORY) and was missing here, so backing out of its
     // move-select consumed it without granting a move (#25). The successful-learn
     // cleanup (learn-move-phase MEMORY branch) removes this copy.
+    //
+    // The ER Ability Capsule joins this list: its apply() unshifts ErAbilityCapsulePhase
+    // (the option-select + run-unlock innate sub-picker), which runs BEFORE this copy and
+    // removes it (tryRemovePhase) only once a choice is committed - so backing out of the
+    // capsule's choice / sub-picker re-offers the capsule, identical to #25.
     const queuesContinuation =
       modifier.type instanceof RememberMoveModifierType
       || modifier.type instanceof TmModifierType
       || modifier.type instanceof ErLearnersShroomModifierType
-      || modifier.type instanceof ErTmCaseModifierType;
+      || modifier.type instanceof ErTmCaseModifierType
+      || modifier.type instanceof ErAbilityCapsuleModifierType;
     if (queuesContinuation) {
       globalScene.phaseManager.unshiftPhase(this.copy());
     }
@@ -631,6 +639,11 @@ export class SelectModifierPhase extends BattlePhase {
     // ER relic (#439): Merchant's Seal - every reward screen offers one extra item
     // slot (mirrors Scrap Magnet, but on EVERY battle, not just trainers).
     modifierCountHolder.value += erMerchantsSealExtraSlots();
+
+    // ER Construction Site (#439 §3): the busy work site grants one extra reward
+    // slot on every battle here (mirrors Merchant's Seal, but biome-gated). Folded
+    // into the "earned" bump below so it survives a guaranteed/bundled override.
+    modifierCountHolder.value += getErBiomeRule(globalScene.arena.biomeId)?.extraRewardSlots ?? 0;
 
     // ER (#134): the EARNED extra reward slots (Golden Ball / Greater Golden Ball /
     // Scrap Magnet, i.e. the bump above the base 3) must SURVIVE a bundled/guaranteed

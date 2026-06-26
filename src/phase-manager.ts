@@ -46,8 +46,11 @@ import { EncounterPhase } from "#phases/encounter-phase";
 import { EndCardPhase } from "#phases/end-card-phase";
 import { EndEvolutionPhase } from "#phases/end-evolution-phase";
 import { EnemyCommandPhase } from "#phases/enemy-command-phase";
+import { ErAbilityCapsulePhase } from "#phases/er-ability-capsule-phase";
 import { ErCrossroadsPhase } from "#phases/er-crossroads-phase";
 import { ErDexNavPhase } from "#phases/er-dex-nav-phase";
+import { ErGreaterAbilityCapsulePhase } from "#phases/er-greater-ability-capsule-phase";
+import { ErGreaterAbilityRandomizerPhase } from "#phases/er-greater-ability-randomizer-phase";
 import { ErQuizPhase } from "#phases/er-quiz-phase";
 import { ErStormglassPickerPhase } from "#phases/er-stormglass-picker-phase";
 import { EvolutionPhase } from "#phases/evolution-phase";
@@ -159,6 +162,9 @@ const PHASES = Object.freeze({
   TheBargainPhase,
   ExoticShopPhase,
   ImportBazaarShopPhase,
+  ErAbilityCapsulePhase,
+  ErGreaterAbilityCapsulePhase,
+  ErGreaterAbilityRandomizerPhase,
   ErCrossroadsPhase,
   ErQuizPhase,
   ErStormglassPickerPhase,

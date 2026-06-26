@@ -24,18 +24,22 @@ import {
   BARGAIN_RELIC_CHOICES,
   BARGAIN_SIN_ORDER,
   BARGAIN_STAT_CHOICES,
+  type BargainAbilityChoice,
   type BargainSinKey,
   bargainBestCombatStat,
   bargainCurseRandomStat,
   bargainDullShine,
   bargainGrantStatBoost,
   bargainHeldCount,
+  bargainLockAbilitySlot,
+  bargainReplaceAbilitySlot,
   bargainResetToLevelOne,
   bargainSinAvailable,
   bargainWipeCandy,
   DISABLED_BARGAIN_SINS,
   LUST_CANDY_COST,
   pickBargainSins,
+  rollCuriosityAbilities,
 } from "#data/elite-redux/er-bargain-sins";
 import { EggSourceType } from "#enums/egg-source-types";
 import { EggTier } from "#enums/egg-type";
@@ -44,7 +48,7 @@ import { UiMode } from "#enums/ui-mode";
 import type { PlayerPokemon } from "#field/pokemon";
 import { PokemonFormChangeItemModifier } from "#modifiers/modifier";
 import { achvs } from "#system/achv";
-import { PartyUiMode } from "#ui/party-ui-handler";
+import { PartyOption, PartyUiMode } from "#ui/party-ui-handler";
 import i18next from "i18next";
 
 const ns = "mysteryEncounters/theBargain";
@@ -145,7 +149,7 @@ export class TheBargainPhase extends Phase {
    * of the first pick before anything was applied (so the caller can reopen the
    * choices); true once the deal has gone through.
    */
-  // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: a 7-Sin dispatch switch; each case is a small self-contained deal, clearer kept inline than split across seven helpers
+  // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: an 8-deal dispatch switch; each case is a small self-contained deal, clearer kept inline than split across eight helpers
   private async applySin(key: BargainSinKey): Promise<boolean> {
     let pokeName = "";
 
@@ -260,6 +264,40 @@ export class TheBargainPhase extends Phase {
         target.updateInfo(true);
         break;
       }
+      case "curiosity": {
+        // The ability gamble. Gather every choice BEFORE mutating so any back-out
+        // leaves the mon untouched (return false -> the choices reopen):
+        //   1. pick the mon + the slot to LOCK (the party ability path).
+        //   2. roll 7 random abilities; pick one in the Bargain-styled picker.
+        //   3. pick which slot the chosen ability replaces. The locked slot is NOT
+        //      excluded - the player may overwrite it (their mistake to make).
+        // Only once all three are chosen do we lock + write the override.
+        await this.giratina(`${ns}:sins.curiosity.lockPrompt`);
+        const target = await this.pickAbilitySlot();
+        if (!target) {
+          return false;
+        }
+        const { mon, slot: lockSlot } = target;
+        pokeName = mon.getNameToRender();
+        // Roll 7 abilities, excluding what the surviving slots already hold so the
+        // gamble never offers a duplicate of a slot it could land in.
+        const remaining = mon.getAbilitySlots().filter(s => s.slot !== lockSlot);
+        const choices = rollCuriosityAbilities(remaining.map(s => s.ability.id));
+        const chosen = await this.pickCuriosityAbility(choices);
+        if (chosen === null) {
+          return false;
+        }
+        await this.giratina(`${ns}:sins.curiosity.replacePrompt`);
+        const replaceTarget = await this.pickAbilitySlot(p => (p === mon ? null : "Choose the same Pokémon."));
+        if (!replaceTarget) {
+          return false;
+        }
+        // Commit: lock the cost slot (run-only, never the permanent unlock) and
+        // write the rolled ability into the chosen slot.
+        bargainLockAbilitySlot(mon, lockSlot);
+        bargainReplaceAbilitySlot(mon, replaceTarget.slot, chosen.abilityId);
+        break;
+      }
     }
 
     globalScene.currentBattle.mysteryEncounter?.setDialogueToken("pokeName", pokeName);
@@ -289,6 +327,59 @@ export class TheBargainPhase extends Phase {
         },
         filter,
       );
+    });
+  }
+
+  /**
+   * Open the party in the ER ability-slot mode (the same path the Ability
+   * Randomizer uses): pick a mon, then one of its ability slots. Resolves to the
+   * chosen `{ mon, slot }` (slot is the ER slot index: 0 = active ability, 1-3 =
+   * innates), or null if backed out. Restores the prior mode before resolving so
+   * the dialogue/picker that follows never races a dead party screen (#550).
+   */
+  private pickAbilitySlot(
+    filter?: (p: PlayerPokemon) => string | null,
+  ): Promise<{ mon: PlayerPokemon; slot: number } | null> {
+    return new Promise(resolve => {
+      const exitMode = globalScene.ui.getMode();
+      globalScene.ui.setMode(
+        UiMode.PARTY,
+        PartyUiMode.ABILITY_MODIFIER,
+        -1,
+        async (slotIndex: number, option: PartyOption) => {
+          await globalScene.ui.setMode(exitMode);
+          const party = globalScene.getPlayerParty();
+          const mon = slotIndex >= 0 && slotIndex < party.length ? party[slotIndex] : null;
+          if (!mon || option < PartyOption.ABILITY_SLOT_0) {
+            resolve(null);
+            return;
+          }
+          resolve({ mon, slot: option - PartyOption.ABILITY_SLOT_0 });
+        },
+        filter,
+      );
+    });
+  }
+
+  /**
+   * Show the 7 rolled abilities (+ descriptions) on the Bargain-styled picker.
+   * Resolves to the chosen ability, or null on cancel. Restores the prior mode
+   * before resolving (same softlock-avoidance as the party / option menus).
+   */
+  private pickCuriosityAbility(choices: BargainAbilityChoice[]): Promise<BargainAbilityChoice | null> {
+    return new Promise(resolve => {
+      const exitMode = globalScene.ui.getMode();
+      const restore = (value: BargainAbilityChoice | null): void => {
+        globalScene.ui.setMode(exitMode).then(() => resolve(value));
+      };
+      globalScene.ui.setMode(UiMode.ER_BARGAIN, {
+        picker: true,
+        title: i18next.t(`${ns}:sins.curiosity.name`).toUpperCase(),
+        greeting: i18next.t(`${ns}:sins.curiosity.pickAbility`),
+        options: choices.map(c => ({ label: c.name, description: c.description })),
+        onPick: (index: number) => restore(choices[index] ?? null),
+        onCancel: () => restore(null),
+      });
     });
   }
 

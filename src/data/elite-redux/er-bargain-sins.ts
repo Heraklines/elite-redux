@@ -7,23 +7,29 @@
 // =============================================================================
 // ER Abyss "Seven Sins" - the shared, UI-agnostic deal logic for Giratina's
 // Bargain. The presentation lives in TheBargainPhase (a dialogue event that fires
-// in the Abyss at the every-10-waves shop slot). Everything here is pure run-state
+// in the Abyss at the every-10-waves shop slot). Most sins are pure run-state
 // mutation (stat curses, vitamins, candy, level, shiny fields) - no party size
-// change, no new serialized save state - so the save / ghost / trainer systems are
-// untouched. i18n strings live under the `mysteryEncounters/theBargain` namespace.
+// change - so the save / ghost / trainer systems are untouched. The 8th deal,
+// Curiosity, adds PER-MON run-state (an ability-slot lock + a chosen-ability
+// override) stored on the mon's customPokemonData, so it round-trips through the
+// SESSION save like the other per-mon run state (erInnateShrineUnlocked /
+// erCursedStat) and NEVER writes the permanent starterData ability unlock. i18n
+// strings live under the `mysteryEncounters/theBargain` namespace.
 // =============================================================================
 
 import { globalScene } from "#app/global-scene";
-import { modifierTypes } from "#data/data-lists";
+import { allAbilities, modifierTypes } from "#data/data-lists";
+import { getErAbilityDescription, getErAbilityRomDescription } from "#data/elite-redux/er-ability-descriptions";
 import { resetErBlackShinyState } from "#data/elite-redux/er-black-shinies";
 import { getLevelTotalExp } from "#data/exp";
+import { AbilityId } from "#enums/ability-id";
 import { Stat } from "#enums/stat";
 import type { PlayerPokemon } from "#field/pokemon";
 import { PokemonFormChangeItemModifier } from "#modifiers/modifier";
 import type { ModifierType, ModifierTypeGenerator } from "#modifiers/modifier-type";
-import { randSeedInt } from "#utils/common";
+import { randSeedInt, randSeedShuffle } from "#utils/common";
 
-export type BargainSinKey = "greed" | "gluttony" | "pride" | "wrath" | "envy" | "sloth" | "lust";
+export type BargainSinKey = "greed" | "gluttony" | "pride" | "wrath" | "envy" | "sloth" | "lust" | "curiosity";
 
 /** All sins, in canonical order. */
 export const BARGAIN_SIN_ORDER: readonly BargainSinKey[] = [
@@ -34,6 +40,7 @@ export const BARGAIN_SIN_ORDER: readonly BargainSinKey[] = [
   "envy",
   "sloth",
   "lust",
+  "curiosity",
 ];
 
 /** Candy a single mon must hold for the Lust deal to be offered + accepted. */
@@ -88,7 +95,16 @@ export function bargainSinAvailable(key: BargainSinKey): boolean {
       return party.some(
         p => globalScene.gameData.getStarterDataEntry(p.species.speciesId).candyCount >= LUST_CANDY_COST,
       );
+    case "curiosity":
+      // Needs a mon with at least 2 usable ability slots: one to LOCK (the cost)
+      // and at least one remaining to REPLACE with the rolled ability (the reward).
+      return party.some(p => bargainUsableAbilitySlotCount(p) >= 2);
   }
+}
+
+/** How many ER ability slots (active + present innates) this mon exposes. */
+export function bargainUsableAbilitySlotCount(pokemon: PlayerPokemon): number {
+  return pokemon.getAbilitySlots().length;
 }
 
 /** Seeded Fisher-Yates pick of up to `count` keys. */
@@ -164,5 +180,93 @@ export function bargainDullShine(pokemon: PlayerPokemon): void {
 export function bargainCurseRandomStat(pokemon: PlayerPokemon): void {
   pokemon.customPokemonData.erCursedStat = randSeedInt(6) as Stat;
   pokemon.calculateStats();
+  pokemon.updateInfo();
+}
+
+// --- Curiosity (the 8th deal: the ability gamble) ---
+
+/** How many random abilities the Curiosity gamble rolls for the player to choose from. */
+export const CURIOSITY_ABILITY_CHOICES = 7;
+
+/**
+ * Abilities the Curiosity roll never offers - the same pure-downside set the ER
+ * Ability Randomizer excludes (gambling FOR one of these is never a "reward").
+ */
+const CURIOSITY_EXCLUDED_ABILITIES: ReadonlySet<AbilityId> = new Set<AbilityId>([
+  AbilityId.NONE,
+  AbilityId.TRUANT,
+  AbilityId.SLOW_START,
+]);
+
+/** A rolled Curiosity choice: the ability id, its display name, and its description. */
+export interface BargainAbilityChoice {
+  abilityId: AbilityId;
+  name: string;
+  description: string;
+}
+
+/**
+ * The detailed description shown for a rolled ability, resolved exactly like the
+ * in-game ability "Detail" view / abilities menu: the full ER ROM text, then the
+ * short ER description, then pokerogue's own description.
+ */
+export function bargainAbilityDescription(abilityId: AbilityId): string {
+  const ability = allAbilities[abilityId];
+  if (!ability) {
+    return "";
+  }
+  return getErAbilityRomDescription(ability.name) ?? getErAbilityDescription(abilityId) ?? ability.description ?? "";
+}
+
+/**
+ * Seeded roll of `count` DISTINCT abilities from the real registered ability pool
+ * (minus the pure-downside set). Each comes with its resolved name + description for
+ * the picker. Excludes the abilities passed in `exclude` (e.g. the abilities the
+ * mon's surviving slots already hold) so a roll never offers a duplicate of what it
+ * would replace. Order is shuffled via the global seed for reproducibility.
+ *
+ * `count` defaults to {@linkcode CURIOSITY_ABILITY_CHOICES} (7) for Curiosity; the
+ * Greater Ability Randomizer reuses this with a count of 4 (its simplified, no-lock
+ * "Curiosity reward half"). The same exclusion + pure-downside filtering applies to
+ * both, so the two share one roller instead of duplicating the picker logic.
+ */
+export function rollCuriosityAbilities(
+  exclude: Iterable<AbilityId> = [],
+  count: number = CURIOSITY_ABILITY_CHOICES,
+): BargainAbilityChoice[] {
+  const blocked = new Set<AbilityId>(CURIOSITY_EXCLUDED_ABILITIES);
+  for (const id of exclude) {
+    blocked.add(id);
+  }
+  const pool = allAbilities.filter(a => a != null && !blocked.has(a.id)).map(a => a.id);
+  const shuffled = randSeedShuffle(pool);
+  return shuffled.slice(0, count).map(abilityId => ({
+    abilityId,
+    name: allAbilities[abilityId]?.name ?? "",
+    description: bargainAbilityDescription(abilityId),
+  }));
+}
+
+/**
+ * Lock one of the mon's ability slots for the REST OF THE RUN (the Curiosity cost).
+ * Stored on customPokemonData (run-scoped, serialized) - it disables that slot in
+ * battle + on the ability panels but NEVER touches the permanent starterData
+ * ability unlock, so the ability stays unlocked in starter-select and future runs.
+ */
+export function bargainLockAbilitySlot(pokemon: PlayerPokemon, slot: number): void {
+  const locked = pokemon.customPokemonData.erLockedAbilitySlots;
+  if (!locked.includes(slot)) {
+    locked.push(slot);
+  }
+  pokemon.updateInfo();
+}
+
+/**
+ * Write the player-chosen rolled ability into one of the mon's ability slots (the
+ * Curiosity reward), reusing the same per-mon override path as the ER Ability
+ * Randomizer ({@linkcode Pokemon.setAbilityOverrideForSlot} -> customPokemonData).
+ */
+export function bargainReplaceAbilitySlot(pokemon: PlayerPokemon, slot: number, abilityId: AbilityId): void {
+  pokemon.setAbilityOverrideForSlot(slot, abilityId);
   pokemon.updateInfo();
 }

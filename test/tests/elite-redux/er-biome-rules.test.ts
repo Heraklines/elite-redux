@@ -84,4 +84,36 @@ describe.skipIf(!RUN)("ER biome battle identity - ambient weather/terrain (#439 
     // Snowy Forest keeps its snow ambient alongside the ambush.
     expect(erBiomeForcedWeather(BiomeId.SNOWY_FOREST)).toBe(WeatherType.SNOW);
   });
+
+  // --- #439 §3 second batch: ten new biome field/economy effects -------------
+
+  it("Group G: the new per-biome field/economy fields are set on the right biomes", () => {
+    expect(getErBiomeRule(BiomeId.LABORATORY)?.wildFusionChancePct).toBe(50);
+    expect(getErBiomeRule(BiomeId.TEMPLE)?.statStageFreeze).toBe(true);
+    expect(erBiomeForcedTerrain(BiomeId.TEMPLE)).toBe(TerrainType.MISTY);
+    expect(getErBiomeRule(BiomeId.METROPOLIS)?.doubleBattleMult).toBeGreaterThanOrEqual(4);
+    expect(getErBiomeRule(BiomeId.DOJO)?.typeBoost).toEqual({ type: PokemonType.FIGHTING, mult: 1.2 });
+    expect(getErBiomeRule(BiomeId.DOJO)?.unresistedType).toBe(PokemonType.FIGHTING);
+    expect(getErBiomeRule(BiomeId.FACTORY)?.wildItemCount).toEqual({ guaranteed: 1, secondPct: 50, thirdPct: 30 });
+    expect(getErBiomeRule(BiomeId.RUINS)?.darkness).toBe(true);
+    expect(getErBiomeRule(BiomeId.RUINS)?.ambushChance).toBe(15);
+    expect(getErBiomeRule(BiomeId.RUINS)?.ambushDefenseGate).toBe(true);
+    expect(getErBiomeRule(BiomeId.WASTELAND)?.shopNoHeal).toBe(true);
+    expect(getErBiomeRule(BiomeId.WASTELAND)?.wildItemDropCount).toBe(2);
+    expect(getErBiomeRule(BiomeId.CONSTRUCTION_SITE)?.extraRewardSlots).toBe(1);
+    expect(getErBiomeRule(BiomeId.SLUM)?.moneyLossPctPerFaint).toBe(2);
+    expect(getErBiomeRule(BiomeId.LAKE)?.berrySaveChance).toBe(25);
+    expect(getErBiomeRule(BiomeId.LAKE)?.perTurnHealFraction).toBeCloseTo(1 / 16);
+    // Fairy Cave keeps its blessing AND now forces Misty terrain.
+    expect(getErBiomeRule(BiomeId.FAIRY_CAVE)?.fairyBlessing).toBe(true);
+    expect(erBiomeForcedTerrain(BiomeId.FAIRY_CAVE)).toBe(TerrainType.MISTY);
+  });
+
+  it("Group G effects do NOT bleed into Town (unchanged) or unrelated biomes", () => {
+    expect(getErBiomeRule(BiomeId.TOWN)).toBeUndefined();
+    expect(getErBiomeRule(BiomeId.PLAINS)?.statStageFreeze).toBeUndefined();
+    expect(getErBiomeRule(BiomeId.PLAINS)?.wildFusionChancePct).toBeUndefined();
+    expect(getErBiomeRule(BiomeId.FOREST)?.ambushDefenseGate).toBeUndefined();
+    expect(getErBiomeRule(BiomeId.GRASS)?.unresistedType).toBeUndefined();
+  });
 });

@@ -3660,6 +3660,40 @@ export class BattleScene extends SceneBase {
       // ER: layer the soft ER → PokeRogue held-item conversion on top of the
       // baseline roll for any ER-roster trainer mons in the party.
       applyErTrainerHeldItems(party);
+      // ER Factory (#439 §3): the production line - every WILD mon is GUARANTEED
+      // to hold at least one item, with stacking chances for a 2nd/3rd. Tops up
+      // each wild mon's baseline roll to the floor (never reduces a luckier roll).
+      // WILD battles only (trainer mons keep their config'd items); gated on the
+      // biome rule so other biomes are untouched.
+      if (this.currentBattle.battleType === BattleType.WILD && !heldModifiersConfigs) {
+        const itemCount = getErBiomeRule(this.arena.biomeId)?.wildItemCount;
+        if (itemCount) {
+          for (const enemyPokemon of party) {
+            const have = this.enemyModifiers.filter(
+              m => m instanceof PokemonHeldItemModifier && m.pokemonId === enemyPokemon.id,
+            ).length;
+            let target = itemCount.guaranteed;
+            if (randSeedInt(100) < itemCount.secondPct) {
+              target++;
+              if (randSeedInt(100) < itemCount.thirdPct) {
+                target++;
+              }
+            }
+            const add = Math.max(0, target - have);
+            if (add > 0) {
+              for (const mt of getEnemyModifierTypesForWave(
+                difficultyWaveIndex,
+                add,
+                [enemyPokemon],
+                ModifierPoolType.WILD,
+              )) {
+                // The WILD pool can yield an undefined type on a given draw; skip it.
+                mt?.newModifier(enemyPokemon).add(this.enemyModifiers, false);
+              }
+            }
+          }
+        }
+      }
       this.updateModifiers(false);
       resolve();
     });

@@ -25,11 +25,13 @@
 // =============================================================================
 
 import { getGameMode } from "#app/game-mode";
-import { modifierTypes } from "#data/data-lists";
+import { allAbilities, modifierTypes } from "#data/data-lists";
 import { Egg } from "#data/egg";
 import { EggHatchData } from "#data/egg-hatch-data";
 import { startLocalCoopSession } from "#data/elite-redux/coop/coop-runtime";
+import { bargainAbilityDescription } from "#data/elite-redux/er-bargain-sins";
 import { applyErBlackShinyKit } from "#data/elite-redux/er-black-shinies";
+import { recordErBiomeVisited } from "#data/elite-redux/er-map-nodes";
 import { STORMGLASS_WEATHER_CHOICES } from "#data/elite-redux/er-relics";
 import { AbilityId } from "#enums/ability-id";
 import { BiomeId } from "#enums/biome-id";
@@ -58,6 +60,7 @@ import { getModifierType } from "#utils/modifier-utils";
 import { getPokemonSpecies } from "#utils/pokemon-utils";
 import { copyFileSync, existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import i18next from "i18next";
 import Phaser from "phaser";
 import { beforeAll, describe, expect, it } from "vitest";
 
@@ -181,10 +184,76 @@ function bargainArgs(): any[] {
   ];
 }
 
+/**
+ * The Curiosity 7-ability picker (the 8th Bargain deal), driving ErBargainUiHandler
+ * in its generic PICKER mode. Seven real abilities with their resolved in-game
+ * descriptions, in the Bargain aesthetic (void backdrop, Giratina, violet frames,
+ * focused-row description sub-box). Fixed abilities keep the golden deterministic.
+ */
+function curiosityPickerArgs(): any[] {
+  const abilities = [
+    AbilityId.INTIMIDATE,
+    AbilityId.DROUGHT,
+    AbilityId.LEVITATE,
+    AbilityId.MOXIE,
+    AbilityId.MAGIC_GUARD,
+    AbilityId.REGENERATOR,
+    AbilityId.PROTEAN,
+  ];
+  return [
+    {
+      picker: true,
+      title: "CURIOSITY",
+      greeting: "Seven powers, drawn from the dark at random. Choose the one you would graft.",
+      options: abilities.map(id => ({
+        label: allAbilities[id]?.name ?? "",
+        description: bargainAbilityDescription(id),
+      })),
+      onPick: () => {},
+      onCancel: () => {},
+    },
+  ];
+}
+
+/**
+ * The ER Greater Ability Randomizer 4-ability picker (Master-Ball tier), driving
+ * ErBargainUiHandler in its generic PICKER mode - the SAME chooser Curiosity uses,
+ * generalized to 4 options. Four real abilities with their resolved in-game
+ * descriptions, in the Bargain aesthetic. Fixed abilities keep the golden deterministic.
+ */
+function greaterRandomizerPickerArgs(): any[] {
+  const abilities = [AbilityId.DROUGHT, AbilityId.MAGIC_GUARD, AbilityId.REGENERATOR, AbilityId.PROTEAN];
+  return [
+    {
+      picker: true,
+      title: i18next.t("modifierType:erGreaterAbilityRandomizer.name").toUpperCase(),
+      greeting: i18next.t("modifierType:erGreaterAbilityRandomizer.pickAbility"),
+      options: abilities.map(id => ({
+        label: allAbilities[id]?.name ?? "",
+        description: bargainAbilityDescription(id),
+      })),
+      onPick: () => {},
+      onCancel: () => {},
+    },
+  ];
+}
+
 const RECIPES: Record<string, Recipe> = {
   bargain: {
     mode: UiMode.ER_BARGAIN,
     prepare: () => bargainArgs(),
+  },
+  "bargain-curiosity": {
+    mode: UiMode.ER_BARGAIN,
+    prepare: () => curiosityPickerArgs(),
+  },
+  // The ER Greater Ability Randomizer 4-ability picker (Master-Ball tier). Reuses the
+  // generalized Bargain PICKER chooser with 4 options, each with its in-game ability
+  // description. The golden render confirms the 4 rows + the focused-row description
+  // sub-box render legibly in the right aesthetic.
+  "greater-ability-randomizer-picker": {
+    mode: UiMode.ER_BARGAIN,
+    prepare: () => greaterRandomizerPickerArgs(),
   },
   "biome-shop": {
     mode: UiMode.BIOME_SHOP,
@@ -328,6 +397,48 @@ const RECIPES: Record<string, Recipe> = {
     // (ACTION -> setStormglassWeather) is exercised by er-stormglass-picker.test.ts.
     steps: [Button.DOWN],
   },
+  // The ER Ability Capsule top-level choice (maintainer request). ErAbilityCapsulePhase
+  // shows this OPTION_SELECT first: "Change ability" (cycle) / "Unlock an innate for the
+  // run" / Cancel. The golden render confirms both option labels render legibly; DOWN walks
+  // the cursor onto the run-unlock option. The full pick paths (cycle + the run-unlock
+  // sub-picker) are exercised by er-ability-capsule-run-unlock.test.ts.
+  "er-ability-capsule": {
+    mode: UiMode.OPTION_SELECT,
+    prepare: () => [
+      {
+        // Nudge the right/bottom-anchored menu toward screen-centre so the whole list
+        // sits inside the otherwise-blank render canvas (no screen underneath here).
+        xOffset: 140,
+        yOffset: -8,
+        options: [
+          { label: i18next.t("modifierType:erAbilityCapsule.changeAbility"), handler: () => true },
+          { label: i18next.t("modifierType:erAbilityCapsule.unlockInnate"), handler: () => true },
+          { label: i18next.t("menu:cancel"), handler: () => true },
+        ],
+      },
+    ],
+    steps: [Button.DOWN],
+  },
+  // The ER Greater Ability Capsule top-level choice. ErGreaterAbilityCapsulePhase shows
+  // this OPTION_SELECT first: "Permanently unlock an innate" / "Unlock two innates for
+  // the run" / Cancel. The golden render confirms both option labels render legibly; DOWN
+  // walks the cursor onto the run-unlock-two option. The full pick paths (permanent unlock
+  // + the run-unlock-two sub-picker) are exercised by er-greater-ability-capsule.test.ts.
+  "er-greater-ability-capsule": {
+    mode: UiMode.OPTION_SELECT,
+    prepare: () => [
+      {
+        xOffset: 140,
+        yOffset: -8,
+        options: [
+          { label: i18next.t("modifierType:erGreaterAbilityCapsule.permanentUnlock"), handler: () => true },
+          { label: i18next.t("modifierType:erGreaterAbilityCapsule.runUnlockTwo"), handler: () => true },
+          { label: i18next.t("menu:cancel"), handler: () => true },
+        ],
+      },
+    ],
+    steps: [Button.DOWN],
+  },
   // The ER World Map route picker (#129). Starts a battle so arena/currentBattle
   // exist, then opens UiMode.ER_MAP in PICK mode with three effect-rich onward
   // biomes. The new Conditions footer lists the HIGHLIGHTED onward biome's rules;
@@ -337,6 +448,11 @@ const RECIPES: Record<string, Recipe> = {
     mode: UiMode.ER_MAP,
     prepare: async game => {
       await game.classicMode.startBattle(SpeciesId.RATTATA);
+      // Seed a short journey so the "Your journey" chain renders (last = current = HERE).
+      recordErBiomeVisited(BiomeId.TOWN);
+      recordErBiomeVisited(BiomeId.PLAINS);
+      recordErBiomeVisited(BiomeId.GRASS);
+      recordErBiomeVisited(game.scene.arena.biomeId);
       const origin = game.scene.arena.biomeId;
       const nodes = [
         { biome: BiomeId.VOLCANO, revealed: true, source: "base" as const },

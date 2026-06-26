@@ -15,7 +15,7 @@
 //  - Omni Gem doubles exactly ONE real damage calc per battle, simulated
 //    calcs never consume it, newBattle resets the charge;
 //  - Frostbite Orb frostbites the holder at turn end (Ice-types immune);
-//  - Ability Capsule cycles the active ability once per Pokemon;
+//  - Ability Capsule option A cycles the active ability (repeatable);
 //  - Dex Nav: the biome species pool is non-empty and deduped.
 //
 // Gated behind ER_SCENARIO=1.
@@ -41,6 +41,7 @@ import { SpeciesId } from "#enums/species-id";
 import { StatusEffect } from "#enums/status-effect";
 import type { Pokemon } from "#field/pokemon";
 import type { ErCommunityItemModifier, PokemonHeldItemModifier } from "#modifiers/modifier";
+import { ErAbilityCapsuleModifier } from "#modifiers/modifier";
 import { erCommunityItemModifierType } from "#modifiers/modifier-type";
 import { GameManager } from "#test/framework/game-manager";
 import * as Utils from "#utils/common";
@@ -241,27 +242,30 @@ describe.skipIf(!RUN)("ER community item batch (#387/#392)", () => {
     expect(player.status?.effect).toBeUndefined(); // it is the TAG status, not a vanilla one
   });
 
-  it("Ability Capsule: cycles the active ability to the species' next legal one, once per Pokemon", () => {
+  it("Ability Capsule: cycles the active ability to the species' next legal one (option A)", () => {
+    // The capsule now offers a CHOICE on use (cycle the active ability, OR run-unlock
+    // an innate - see er-ability-capsule-run-unlock.test.ts + the render harness). Option
+    // A's cycle is the EXACT unchanged logic, extracted to cycleActiveAbility() so the
+    // option-select phase can call it; assert it here directly (apply() now unshifts the
+    // interactive picker phase instead of cycling synchronously).
     const player = game.scene.getPlayerPokemon()!;
     const form = player.getSpeciesForm();
     const candidates = [form.ability1, form.ability2, form.abilityHidden].filter(
       (a, i, arr) => arr.indexOf(a) === i && a !== 0,
     );
     expect(candidates.length).toBeGreaterThanOrEqual(2);
+    expect(ErAbilityCapsuleModifier.canCycleActiveAbility(player)).toBe(true);
 
     const before = player.getAbility().id;
-    const capsule = getModifierType(modifierTypes.ER_ABILITY_CAPSULE).newModifier(player) as {
-      apply: (p: Pokemon) => boolean;
-    };
-    expect(capsule.apply(player)).toBe(true);
+    expect(ErAbilityCapsuleModifier.cycleActiveAbility(player)).toBe(true);
     const after = player.getAbility().id;
     expect(after).not.toBe(before);
     expect(candidates).toContain(after);
 
-    // REPEATABLE (a consumable in-game): a SECOND use cycles to the next legal
-    // ability instead of being blocked, so the player can reach the hidden
-    // ability (it was single-use-per-mon before, which capped you after one step).
-    expect(capsule.apply(player)).toBe(true);
+    // REPEATABLE (a consumable in-game): a SECOND cycle advances to the next legal
+    // ability instead of being blocked, so the player can reach the hidden ability
+    // (it was single-use-per-mon before, which capped you after one step).
+    expect(ErAbilityCapsuleModifier.cycleActiveAbility(player)).toBe(true);
     const afterSecond = player.getAbility().id;
     expect(afterSecond).not.toBe(after);
     expect(candidates).toContain(afterSecond);

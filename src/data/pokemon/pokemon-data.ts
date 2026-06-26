@@ -87,6 +87,31 @@ export class CustomPokemonData {
    */
   public erCursedStat = -1;
   /**
+   * ER Giratina's Bargain - Curiosity (#544 8th deal): the ability slots this mon
+   * has LOCKED (disabled) for the rest of the run as the cost of the Curiosity
+   * gamble. Each entry is an ER ability-slot index matching
+   * {@linkcode Pokemon.getAbilitySlots} (0 = active ability, 1-3 = innate slots).
+   * A locked slot's ability never fires in battle (gated in
+   * {@linkcode Pokemon.canApplyAbility}) and reads "Locked" on the ability panels.
+   * Run-scoped (serialized with the session), NEVER an account unlock - the
+   * candy-unlocked ability stays unlocked in starter-select and future runs.
+   */
+  public erLockedAbilitySlots: number[] = [];
+  /**
+   * ER Ability Capsule run-unlock (maintainer request): the innate ability slots a
+   * player has FORCE-UNLOCKED for the rest of the run via the capsule's "unlock an
+   * innate for the run" option. The INVERSE of {@linkcode erLockedAbilitySlots}: each
+   * entry is an ER ability-slot index matching {@linkcode Pokemon.getAbilitySlots}
+   * (only innate slots 1-3 are ever stored here; slot 0 is the active ability and is
+   * never run-unlocked). A run-unlocked innate fires in battle even without the candy
+   * `passiveAttr` unlock (OR-ed into the candy gate in {@linkcode Pokemon.canApplyAbility}),
+   * but a {@linkcode erLockedAbilitySlots | Curiosity-locked} slot still wins and stays
+   * dead. Run-scoped (serialized with the session), NEVER an account unlock - the
+   * permanent candy unlock (`starterData[...].passiveAttr`) is untouched, so the innate
+   * still reads LOCKED in starter-select and future runs.
+   */
+  public erRunUnlockedAbilitySlots: number[] = [];
+  /**
    * Co-op (#633 Fix #3): the OWNER's per-account innate-unlock snapshot for this mon, one
    * `passiveAttr` bitmask per ER innate slot (0,1,2). On a merged co-op party every client
    * would otherwise gate a SHARED mon's active innates by ITS OWN candy unlocks (a divergent
@@ -119,6 +144,8 @@ export class CustomPokemonData {
     this.erGiftIndex = data?.erGiftIndex ?? 0;
     this.erInnateShrineUnlocked = data?.erInnateShrineUnlocked ?? false;
     this.erCursedStat = data?.erCursedStat ?? -1;
+    this.erLockedAbilitySlots = data?.erLockedAbilitySlots ?? [];
+    this.erRunUnlockedAbilitySlots = data?.erRunUnlockedAbilitySlots ?? [];
     this.coopPassiveAttr = data?.coopPassiveAttr ?? undefined;
     this.coopLuck = data?.coopLuck ?? undefined;
   }

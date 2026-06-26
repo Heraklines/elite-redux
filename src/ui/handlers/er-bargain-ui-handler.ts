@@ -34,9 +34,41 @@ import { addTextObject } from "#ui/text";
 import { UiHandler } from "#ui/ui-handler";
 import { addWindow } from "#ui/ui-theme";
 import { getPokemonSpecies } from "#utils/pokemon-utils";
+import i18next from "i18next";
 
 /** Confirm the bargain at `sinIndex` (after its offer line is acknowledged). */
 export type ErBargainConfirmCallback = (sinIndex: number) => void;
+
+/**
+ * One choosable row for the generic Bargain-styled PICKER (the Curiosity 7-ability
+ * chooser): a label plus the description shown in the focused-row sub-box.
+ */
+export interface ErBargainPickerOption {
+  label: string;
+  description: string;
+}
+
+/**
+ * Drives the Bargain screen as a generic scrollable PICKER instead of the Sins
+ * list - reused for Curiosity's "pick 1 of 7 random abilities" step. Mirrors the
+ * exact aesthetic (void backdrop, Giratina portrait, violet frames, focused-row
+ * description sub-box) but ACTION picks a row directly (no offer-speak two-step)
+ * and CANCEL backs out. Detected by {@linkcode ErBargainUiHandler.show} from the
+ * single-object arg shape.
+ */
+export interface ErBargainPickerConfig {
+  picker: true;
+  /** Title bar text (e.g. "CURIOSITY"). */
+  title: string;
+  /** Giratina's framing line shown in the dialogue box. */
+  greeting: string;
+  /** The choosable rows (label + description). */
+  options: ErBargainPickerOption[];
+  /** Called with the chosen row index on ACTION. */
+  onPick: (index: number) => void;
+  /** Called on CANCEL (backing out). */
+  onCancel: () => void;
+}
 
 /** Giratina Origin forme index (0 = Altered, 1 = Origin) for the battle sprite. */
 const GIRATINA_ORIGIN_FORM = 1;
@@ -79,6 +111,17 @@ export class ErBargainUiHandler extends UiHandler {
   private speakingIndex = 0;
   /** Wall-clock time (ms) the current offer line began showing. */
   private spokeAt = 0;
+
+  // --- Generic picker mode (Curiosity 7-ability chooser) ---
+  /** When set, the screen is a generic scrollable picker, not the Sins list. */
+  private picker: ErBargainPickerConfig | null = null;
+  /** Index of the topmost visible row when the picker list scrolls. */
+  private pickerScrollTop = 0;
+  /**
+   * Max picker rows shown at once before the list scrolls. 4 keeps the lowest row
+   * (ROW_Y0 + 3*ROW_STEP = 74) clear of the description sub-box (DESC_Y = 82).
+   */
+  private static readonly PICKER_VISIBLE_ROWS = 4;
 
   // Layout (logical 320x180 screen; container at y=-h so child (0,0) == top-left).
   private static readonly OPT_X = 150;
@@ -227,6 +270,10 @@ export class ErBargainUiHandler extends UiHandler {
   }
 
   show(args: any[]): boolean {
+    // Generic picker mode (Curiosity): a single config object with `picker: true`.
+    if (args.length > 0 && this.isPickerConfig(args[0])) {
+      return this.showPicker(args[0] as ErBargainPickerConfig);
+    }
     if (
       !(
         args.length >= 6
@@ -238,6 +285,7 @@ export class ErBargainUiHandler extends UiHandler {
     ) {
       return false;
     }
+    this.picker = null;
     this.labels = args[0] as string[];
     this.descs = args[1] as string[];
     this.greeting = (args[2] as string) ?? "";
@@ -269,6 +317,55 @@ export class ErBargainUiHandler extends UiHandler {
     const showCheck = this.onCheckTeam !== null;
     this.checkTeamWindow.setVisible(showCheck);
     this.checkTeamText.setVisible(showCheck);
+
+    this.loadGiratina();
+    this.buildRows();
+    this.cursor = 0;
+    this.moveCursorTo(0);
+
+    this.openedAt = performance.now();
+    this.container.setVisible(true);
+    this.active = true;
+    return true;
+  }
+
+  /** Whether `arg` is a generic picker config (Curiosity 7-ability chooser). */
+  private isPickerConfig(arg: unknown): arg is ErBargainPickerConfig {
+    return (
+      typeof arg === "object"
+      && arg !== null
+      && (arg as ErBargainPickerConfig).picker === true
+      && Array.isArray((arg as ErBargainPickerConfig).options)
+      && typeof (arg as ErBargainPickerConfig).onPick === "function"
+      && typeof (arg as ErBargainPickerConfig).onCancel === "function"
+    );
+  }
+
+  /** Render the screen as a generic scrollable picker (Curiosity 7-ability chooser). */
+  private showPicker(config: ErBargainPickerConfig): boolean {
+    this.picker = config;
+    this.speaking = false;
+    // No Sins / offers / Check Team in picker mode.
+    this.labels = config.options.map(o => o.label);
+    this.descs = config.options.map(o => o.description);
+    this.offers = [];
+    this.onConfirm = null;
+    this.onLeave = null;
+    this.onCheckTeam = null;
+    this.greeting = config.greeting;
+    this.pickerScrollTop = 0;
+
+    this.titleText.setText(config.title);
+    this.dialogueText.setText(config.greeting);
+
+    this.giratina.setTexture("er_bargain_giratina");
+    this.fitGiratina();
+
+    this.optionsWindow.setVisible(true);
+    this.descWindow.setVisible(true);
+    this.descText.setVisible(true);
+    this.checkTeamWindow.setVisible(false);
+    this.checkTeamText.setVisible(false);
 
     this.loadGiratina();
     this.buildRows();
@@ -330,6 +427,10 @@ export class ErBargainUiHandler extends UiHandler {
       row.destroy();
     }
     this.rows = [];
+    if (this.picker) {
+      this.buildPickerRows();
+      return;
+    }
     this.labels.forEach((label, i) => {
       const row = addTextObject(
         ErBargainUiHandler.OPT_X + 12,
@@ -344,8 +445,53 @@ export class ErBargainUiHandler extends UiHandler {
     });
   }
 
+  /**
+   * Picker rows: a scrolled window of at most {@linkcode PICKER_VISIBLE_ROWS}
+   * option rows plus a trailing "Cancel" row, each fixed to a visual slot so the
+   * list stays inside the panel for any option count. Up/down arrows hint that
+   * the list scrolls. The full-list cursor index maps to a visual slot in
+   * {@linkcode moveCursorToPicker} (slot = cursor - scrollTop).
+   */
+  private buildPickerRows(): void {
+    const visible = ErBargainUiHandler.PICKER_VISIBLE_ROWS;
+    // The Cancel virtual item lives just after the last option; clamp the scroll
+    // window so it always shows the focused row and (when at the end) Cancel.
+    const totalItems = this.labels.length + 1; // options + Cancel
+    const maxTop = Math.max(0, totalItems - visible);
+    this.pickerScrollTop = Math.max(0, Math.min(this.pickerScrollTop, maxTop));
+
+    for (let slot = 0; slot < visible; slot++) {
+      const itemIndex = this.pickerScrollTop + slot;
+      if (itemIndex >= totalItems) {
+        break;
+      }
+      const isCancel = itemIndex === this.labels.length;
+      let label = isCancel ? i18next.t("menu:cancel") : this.labels[itemIndex];
+      // Scroll affordance: mark the top/bottom visible row with an arrow when the
+      // list extends past it.
+      if (slot === 0 && this.pickerScrollTop > 0) {
+        label = `▲ ${label}`;
+      } else if (slot === visible - 1 && this.pickerScrollTop + visible < totalItems) {
+        label = `${label} ▼`;
+      }
+      const row = addTextObject(
+        ErBargainUiHandler.OPT_X + 12,
+        ErBargainUiHandler.ROW_Y0 + slot * ErBargainUiHandler.ROW_STEP,
+        label,
+        TextStyle.WINDOW,
+        { fontSize: "56px" },
+      );
+      row.setOrigin(0, 0.5);
+      this.container.add(row);
+      this.rows.push(row);
+    }
+  }
+
   /** Total navigable items: the option rows plus the Check Team button (if any). */
   private navCount(): number {
+    if (this.picker) {
+      return this.labels.length + 1; // options + Cancel
+    }
     return this.rows.length + (this.onCheckTeam ? 1 : 0);
   }
 
@@ -356,6 +502,11 @@ export class ErBargainUiHandler extends UiHandler {
       return;
     }
     const i = Math.max(0, Math.min(index, total - 1));
+
+    if (this.picker) {
+      this.moveCursorToPicker(i);
+      return;
+    }
 
     // The Check Team button (the virtual last item) - move the cursor onto it.
     if (this.onCheckTeam !== null && i === this.rows.length) {
@@ -376,6 +527,37 @@ export class ErBargainUiHandler extends UiHandler {
     this.descText.setText(this.descs[i] ?? "");
     this.rows.forEach((row, r) => row.setAlpha(r === i ? 1 : 0.55));
     this.checkTeamText.setAlpha(0.55);
+  }
+
+  /**
+   * Position the cursor for picker mode (cursor index `i` is over the FULL item
+   * list: options then Cancel). Scrolls the visible window to keep `i` on screen,
+   * rebuilds the rows when the window shifts, then highlights the matching visual
+   * slot and shows the focused option's description (blank for Cancel).
+   */
+  private moveCursorToPicker(i: number): void {
+    const visible = ErBargainUiHandler.PICKER_VISIBLE_ROWS;
+    // Scroll so the focused item is within [scrollTop, scrollTop+visible).
+    let scrollTop = this.pickerScrollTop;
+    if (i < scrollTop) {
+      scrollTop = i;
+    } else if (i >= scrollTop + visible) {
+      scrollTop = i - visible + 1;
+    }
+    if (scrollTop !== this.pickerScrollTop) {
+      this.pickerScrollTop = scrollTop;
+      this.buildRows();
+    }
+    const slot = i - this.pickerScrollTop;
+    const y = ErBargainUiHandler.ROW_Y0 + slot * ErBargainUiHandler.ROW_STEP;
+    this.cursorObj.setSize(ErBargainUiHandler.OPT_W - 16, ErBargainUiHandler.ROW_STEP);
+    this.cursorObj.setPosition(ErBargainUiHandler.OPT_X + 7, y);
+    this.cursorObj.setVisible(true);
+    const isCancel = i === this.labels.length;
+    this.descText.setText(isCancel ? "" : (this.descs[i] ?? ""));
+    // Highlight the focused VISUAL slot (the Cancel row carries optionIndex -1, so
+    // matching on optionIndex would never light it when selected).
+    this.rows.forEach((row, r) => row.setAlpha(r === slot ? 1 : 0.55));
   }
 
   override setCursor(cursor: number): boolean {
@@ -427,6 +609,16 @@ export class ErBargainUiHandler extends UiHandler {
     if (this.navCount() === 0) {
       return;
     }
+    // Picker mode: ACTION on an option picks it directly; the trailing Cancel row
+    // (the virtual last item, index === options length) backs out.
+    if (this.picker) {
+      if (this.cursor >= this.labels.length) {
+        this.picker.onCancel();
+      } else {
+        this.picker.onPick(this.cursor);
+      }
+      return;
+    }
     // Check Team (the virtual last item).
     if (this.onCheckTeam !== null && this.cursor === this.rows.length) {
       this.onCheckTeam();
@@ -474,7 +666,11 @@ export class ErBargainUiHandler extends UiHandler {
         this.activate();
         return true;
       case Button.CANCEL:
-        this.onLeave?.();
+        if (this.picker) {
+          this.picker.onCancel();
+        } else {
+          this.onLeave?.();
+        }
         return true;
       case Button.UP:
         if (this.cursor > 0) {
@@ -510,5 +706,10 @@ export class ErBargainUiHandler extends UiHandler {
     this.onConfirm = null;
     this.onLeave = null;
     this.onCheckTeam = null;
+    // Reset picker state + the (possibly picker-overridden) title for the next
+    // open, which may be the regular Sins list.
+    this.picker = null;
+    this.pickerScrollTop = 0;
+    this.titleText.setText("GIRATINA'S BARGAIN");
   }
 }
