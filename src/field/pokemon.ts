@@ -57,6 +57,7 @@ import { isDailyEventSeed, isDailyFinalBoss } from "#data/daily-seed/daily-seed-
 import { allAbilities, allMoves } from "#data/data-lists";
 import { PersistentFieldAuraAbAttr } from "#data/elite-redux/archetypes/persistent-field-aura";
 import { suppressesOpponentDamageBoosts } from "#data/elite-redux/archetypes/post-defend-suppress-opponent-damage-boost";
+import { isCoopAuthoritativeGuestGated } from "#data/elite-redux/coop/coop-authoritative-gate";
 import { coopAttributeNewMon, coopHalfIsFull } from "#data/elite-redux/coop/coop-session";
 import type { CoopRole } from "#data/elite-redux/coop/coop-transport";
 import { isCoopRecording, recordCoopEvent } from "#data/elite-redux/coop/coop-turn-recorder";
@@ -7850,7 +7851,13 @@ export class PlayerPokemon extends Pokemon {
     if (evoSpecies?.speciesId === SpeciesId.NINCADA && evolution.speciesId === SpeciesId.NINJASK) {
       const newEvolution = pokemonEvolutions[evoSpecies.speciesId][1];
 
-      if (validateShedinjaEvo()) {
+      // Co-op authoritative (#633 B6): the GUEST is a pure renderer; the bonus Shedinja is a
+      // STRUCTURAL party-add with a per-client random id + per-client-bound cloned held items, so it
+      // must be added by the HOST alone and adopted by the guest via the snapshot benchParty reconcile
+      // (B4). Skip on the authoritative guest; solo / host / lockstep are unaffected. Read through the
+      // cycle-free gate (coop-authoritative-gate.ts) - importing coop-runtime here would close a
+      // value-level import cycle (runtime -> coop-battle-engine -> #field/pokemon).
+      if (validateShedinjaEvo() && !isCoopAuthoritativeGuestGated()) {
         const newPokemon = globalScene.addPlayerPokemon(
           this.species,
           this.level,

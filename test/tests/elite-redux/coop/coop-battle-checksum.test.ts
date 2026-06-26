@@ -47,6 +47,7 @@ const state = (over: Partial<CoopChecksumState> = {}): CoopChecksumState => ({
   terrain: 0,
   arenaTags: [],
   party: [1, 4],
+  partyLevels: [50, 48],
   money: 1000,
   modifiers: [["EXP_CHARM", 1]],
   ...over,
@@ -100,6 +101,7 @@ describe("co-op battle checksum pure core (#633, TRACK-2)", () => {
         terrain: 0,
         field: [mon()],
         party: [1, 4],
+        partyLevels: [50, 48],
         arenaTags: [],
         modifiers: [["EXP_CHARM", 1]],
       };
@@ -109,6 +111,7 @@ describe("co-op battle checksum pure core (#633, TRACK-2)", () => {
         weather: 0,
         arenaTags: [],
         party: [1, 4],
+        partyLevels: [50, 48],
         modifiers: [["EXP_CHARM", 1]],
         money: 1000,
       };
@@ -175,6 +178,11 @@ describe("co-op battle checksum pure core (#633, TRACK-2)", () => {
     });
     it("a changed party order", () => {
       expect(checksumState(state({ party: [4, 1] }))).not.toBe(base);
+    });
+    it("a changed party LEVEL (#633 B4 - a bench-mon level/revive drift the speciesId list misses)", () => {
+      // The live revive-in-shop desync: same species at every slot (so `party` is unchanged) but a
+      // bench mon's LEVEL differs between host + guest. partyLevels makes that detectable -> resync.
+      expect(checksumState(state({ partyLevels: [51, 48] }))).not.toBe(base);
     });
     it("a changed money", () => {
       expect(checksumState(state({ money: 999 }))).not.toBe(base);

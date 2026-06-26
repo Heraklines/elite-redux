@@ -1,4 +1,5 @@
 import { globalScene } from "#app/global-scene";
+import { isCoopAuthoritativeGuestGated } from "#data/elite-redux/coop/coop-authoritative-gate";
 import { modifierTypes } from "#data/data-lists";
 import { Egg } from "#data/egg";
 import type { ConsequenceEffect, TargetSpec } from "#data/llm-director/beat-schema";
@@ -516,6 +517,13 @@ function applyLevelUp(effect: { target?: TargetSpec; levels: number }): void {
 }
 
 function applyGiveXp(effect: { target?: TargetSpec; amount: number }): void {
+  // Co-op (#633 B5, defensive): the authoritative guest mirrors the host's exp via the expResolved
+  // channel and must NEVER grant exp independently - an ungated ExpPhase here would re-introduce the
+  // exp-divergence class. Hard no-op outside an authoritative co-op session (the cycle-free gate's
+  // predicate is null), so solo Story Mode is byte-identical.
+  if (isCoopAuthoritativeGuestGated()) {
+    return;
+  }
   const targets = resolveTargets(effect.target, getParty());
   for (const p of targets) {
     const partyIndex = getParty().indexOf(p);

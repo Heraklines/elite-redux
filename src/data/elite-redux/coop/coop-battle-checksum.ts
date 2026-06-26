@@ -102,6 +102,14 @@ export interface CoopChecksumState {
   arenaTags: [number, number][];
   /** Player party `speciesId`s in slot order (order is meaningful - do NOT sort). */
   party: number[];
+  /**
+   * Player party LEVELS in slot order (#633 B4): detects BENCH-mon level drift the speciesId-only
+   * `party` list misses - e.g. a bench mon REVIVED / level-changed in the shop on the host but not
+   * the guest (the live revive desync), or a pre-evolution level-boundary divergence. Integer, slot
+   * order, settled at the CommandPhase boundary (the host's B5 exp delivery lands in BattleEndPhase,
+   * many phases before the next wave's checksum), so it is deterministic and never a false-resync.
+   */
+  partyLevels: number[];
   money: number;
   /** Persistent modifiers as `[typeId, stackCount]`, sorted by `typeId`. */
   modifiers: [string, number][];

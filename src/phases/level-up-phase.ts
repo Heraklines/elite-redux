@@ -1,5 +1,6 @@
 import { globalScene } from "#app/global-scene";
 import { getPokemonNameWithAffix } from "#app/messages";
+import { isCoopAuthoritativeGuest } from "#data/elite-redux/coop/coop-runtime";
 import { ExpNotification } from "#enums/exp-notification";
 import type { PlayerPokemon } from "#field/pokemon";
 import { PlayerPartyMemberPokemonPhase } from "#phases/player-party-member-pokemon-phase";
@@ -91,7 +92,12 @@ export class LevelUpPhase extends PlayerPartyMemberPokemonPhase {
         );
       }
     }
-    if (!this.pokemon.pauseEvolutions) {
+    // Co-op authoritative (#633 B6): the GUEST is a pure renderer; the HOST owns evolution. A
+    // guest-side evolve would construct a per-client mon (its own RNG id / form path) and diverge -
+    // the guest adopts the host's evolved species + moveset via the B5 exp deltas (same slot) / the
+    // resync benchParty (the evolving slot's species heals there, gated by the exp-delta speciesId
+    // guard until then). Skip on the authoritative guest ONLY; solo / host / lockstep are unchanged.
+    if (!this.pokemon.pauseEvolutions && !isCoopAuthoritativeGuest()) {
       const evolutions = this.pokemon.getValidEvolutions();
       if (evolutions.length > 0) {
         this.pokemon.breakIllusion();

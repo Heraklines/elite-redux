@@ -8960,6 +8960,42 @@ export const DEV_SCENARIOS: DevScenario[] = [
       ];
     },
   },
+  // Co-op - AUTHORITATIVE exp + bench-revive + evolution (#633 B5/B4/B6, 2 clients)
+  {
+    label: "(note) Co-op: exp authority + bench revive + evolution (#633 B5/B4/B6)",
+    description:
+      "#633 co-op AUTHORITATIVE PROGRESSION - NOT stageable in one client (it needs TWO live\n"
+      + "engines + a transport; the headless repros live in test/tests/elite-redux/coop/\n"
+      + "coop-exp-authoritative.test.ts, coop-bench-drift.test.ts, coop-evolution-authoritative.test.ts).\n"
+      + "THE BUGS (build mqv07ocq): (1) REVIVE desync - a player revives a fainted BENCH mon in the\n"
+      + "shop; the HOST shows it fainted (0 hp), the GUEST shows it alive (22 hp). The per-turn\n"
+      + "checksum + comprehensive resync healed ON-FIELD mons but NOT bench-mon hp/level/exp/form.\n"
+      + "(2) LEARN-MOVE on the WRONG mon - learn-move is relayed by party slot, but the guest COMPUTED\n"
+      + "its own exp, so its level/evolution path diverged and the relayed slot hit a different mon.\n"
+      + "THE FIX: B5 - the GUEST's applyPartyExp is gated off; the HOST streams each slot's SETTLED\n"
+      + "exp/level/moveset (in its BattleEndPhase, after the exp/level/evolution chain drains) on a new\n"
+      + "`expResolved` message; the guest mirrors it (so both VictoryPhase -> LevelUp -> LearnMove hit\n"
+      + "the SAME mon). B4 - the resync now carries the WHOLE party as PokemonData (`benchParty`) +\n"
+      + "hashes `partyLevels`, so a bench-mon hp/level/exp/form drift (the revive) is DETECTED + HEALED.\n"
+      + "B6 - the guest skips evolution (it would build a per-client mon); it adopts the host's evolved\n"
+      + "species via benchParty on the next resync.\n"
+      + "DO (needs 2 clients on the staging build, AUTHORITATIVE netcode): play a co-op double a few\n"
+      + "waves; (a) let a BENCH mon faint, reach the shop, and REVIVE it on one client; (b) let a mon\n"
+      + "LEVEL UP and LEARN a move; (c) let a mon EVOLVE on level-up.\n"
+      + "EXPECT: after the revive both clients agree the bench mon is ALIVE at the same hp/level (no\n"
+      + "host=fainted / guest=alive split); the learned move lands on the RIGHT mon on BOTH clients;\n"
+      + "the evolved species matches on both. NO recurring [coop-desync] / [coop-resync] UNHEALED lines\n"
+      + "for the party after these events. VERIFY this (note) is the final 2-client check - the\n"
+      + "single-client suite cannot reproduce the cross-client progression desync.",
+    setup: () => {
+      resetDevOverrides();
+      return [
+        makeStarter(SpeciesId.SNORLAX, {
+          moveset: [MoveId.BODY_SLAM, MoveId.CRUNCH, MoveId.EARTHQUAKE, MoveId.REST],
+        }),
+      ];
+    },
+  },
   // Co-op - arena-tag (hazard / screen) SYNC (#633 GAP 1)
   {
     label: "Co-op: hazards / screens sync to the guest (#633 GAP 1)",

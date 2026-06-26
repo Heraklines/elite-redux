@@ -26,6 +26,7 @@ import { coopLog, coopWarn, isCoopDebug } from "#data/elite-redux/coop/coop-debu
 import type {
   CoopBattleCheckpoint,
   CoopBattleEvent,
+  CoopExpDelta,
   CoopMessage,
   CoopSerializedEnemy,
   CoopTransport,
@@ -143,6 +144,8 @@ export class CoopBattleStreamer {
   /** GUEST: handler for the host's wave-resolved signal (#633, authoritative wave-advance). */
   private waveResolvedHandler: ((wave: number, outcome: CoopWaveOutcome, captureParty?: string[]) => void) | null =
     null;
+  /** GUEST: handler for the host's settled post-exp per-slot deltas (#633 B5, authoritative EXP). */
+  private expResolvedHandler: ((wave: number, deltas: CoopExpDelta[]) => void) | null = null;
 
   constructor(transport: CoopTransport, opts: CoopBattleStreamerOptions = {}) {
     this.transport = transport;
@@ -252,6 +255,26 @@ export class CoopBattleStreamer {
       `host SEND waveResolved wave=${wave} outcome=${outcome}${captureParty != null ? ` captureParty=${captureParty.length}` : ""}`,
     );
     this.transport.send({ t: "waveResolved", wave, outcome, captureParty });
+  }
+
+  /**
+   * HOST (#633 B5, authoritative EXP): stream the SETTLED per-slot exp / level / moveset for `wave`,
+   * captured AFTER the wave's exp/level/evolution chain drained (in the host's BattleEndPhase). The
+   * guest adopts them verbatim (its own applyPartyExp is gated off), so both clients' party
+   * progression converges. Orthogonal to `waveResolved` (that handshake arm is untouched).
+   */
+  sendExpResolved(wave: number, deltas: CoopExpDelta[]): void {
+    coopLog("replay", `host SEND expResolved wave=${wave} deltas=${deltas.length}`);
+    this.transport.send({ t: "expResolved", wave, deltas });
+  }
+
+  /**
+   * GUEST (#633 B5): subscribe to the host's settled post-exp per-slot deltas. The handler stores a
+   * one-shot pending payload the guest's `BattleEndPhase` consumes + applies (the guest skipped its
+   * own exp compute, so it mirrors the host's exp/level/moveset instead). Wave-guarded by the caller.
+   */
+  onExpResolved(handler: (wave: number, deltas: CoopExpDelta[]) => void): void {
+    this.expResolvedHandler = handler;
   }
 
   /**
@@ -607,6 +630,7 @@ export class CoopBattleStreamer {
     this.meChecksumHandler = null;
     this.meMessageHandler = null;
     this.waveResolvedHandler = null;
+    this.expResolvedHandler = null;
   }
 
   private handle(msg: CoopMessage): void {
@@ -720,6 +744,11 @@ export class CoopBattleStreamer {
           `guest RECV waveResolved wave=${msg.wave} outcome=${msg.outcome}${msg.captureParty != null ? ` captureParty=${msg.captureParty.length}` : ""}`,
         );
         this.waveResolvedHandler?.(msg.wave, msg.outcome, msg.captureParty);
+        return;
+      case "expResolved":
+        // GUEST: the host's settled post-exp per-slot deltas - the guest adopts them in BattleEndPhase.
+        coopLog("replay", `guest RECV expResolved wave=${msg.wave} deltas=${msg.deltas.length}`);
+        this.expResolvedHandler?.(msg.wave, msg.deltas);
         return;
       case "ghostPool":
         // Deliver to a live handler, else buffer (the broadcast can land before the

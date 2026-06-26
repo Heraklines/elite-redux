@@ -38,6 +38,7 @@ import {
 import { coopLog, coopWarn } from "#data/elite-redux/coop/coop-debug";
 import type {
   CoopBattleCheckpoint,
+  CoopExpDelta,
   CoopFullBattleSnapshot,
   CoopFullMonSnapshot,
   CoopInteractionOutcome,
@@ -1083,6 +1084,9 @@ export function captureCoopChecksumState(): CoopChecksumState {
     terrain: arena.terrain?.terrainType ?? 0,
     arenaTags: readArenaTags(),
     party: globalScene.getPlayerParty().map(p => p.species.speciesId),
+    // Party LEVELS in slot order (#633 B4): detect a bench-mon level drift the speciesId-only
+    // `party` list misses (the live revive-in-shop desync). Settled at the CommandPhase boundary.
+    partyLevels: globalScene.getPlayerParty().map(p => p.level),
     money: globalScene.money,
     modifiers: readModifiers(),
   };
@@ -1163,6 +1167,11 @@ export function captureCoopFullSnapshot(): CoopFullBattleSnapshot | null {
       party: globalScene.getPlayerParty().map(p => p.species.speciesId),
       money: globalScene.money,
       modifiers: readModifiers(),
+      // Full per-mon PokemonData for the WHOLE party (#633 B4): the resync now carries bench-mon
+      // level / exp / form / friendship / moveset (+ a host off-field evolution's species) so the
+      // revive-in-shop desync heals - the on-field-only `field` + speciesId-only `party` cannot.
+      // Reuses the capture-handshake serialize; applied (gated guest-only) in applyCoopFullSnapshot.
+      benchParty: captureCoopCaptureParty(),
     };
   } catch {
     return null;
@@ -1513,8 +1522,98 @@ export function applyCoopFullSnapshot(
     // Adopt the host's player party ORDER (#633 GAP 4): OFF-FIELD-only bench reorder (safe at any
     // boundary) so the hashed `party` speciesId sequence converges. On-field leads are untouched.
     adoptCoopHostPlayerPartyOrder(snapshot.party);
+    // B4 (#633): heal bench-mon level / exp / form / friendship / moveset (+ a host off-field
+    // evolution's species) by reconciling the WHOLE party to the host's PokemonData (the live
+    // revive-in-shop desync: the host shows a bench mon fainted, the guest shows it alive). Reuses
+    // the capture-handshake reconcile (preserves on-field leads + matched objects + held items,
+    // constructs new mons, releases removed). GUEST-ONLY: gated on the `authoritativeGuest` param
+    // (false for host / solo / lockstep), so those paths never run it. Runs LAST so its full per-mon
+    // field-apply is the authoritative final word over the speciesId-only order-adopt above.
+    if (authoritativeGuest && Array.isArray(snapshot.benchParty) && snapshot.benchParty.length > 0) {
+      applyCoopCaptureParty(snapshot.benchParty);
+    }
   } catch {
     // A malformed snapshot must never crash the guest's battle.
+  }
+}
+
+// =============================================================================
+// Co-op authoritative EXP (#633 B5). The HOST is the sole battle engine: it computes
+// exp/level/evolution; the GUEST's own applyPartyExp is gated OFF (victory-phase.ts).
+// After the wave's whole exp/level/evolution chain has DRAINED (in the host's
+// BattleEndPhase), the host captures each party slot's SETTLED exp/level/moveset and
+// streams it; the guest SETS them verbatim so both clients' VictoryPhase -> LevelUp ->
+// LearnMove target the SAME mon (the live learn-move-on-the-wrong-mon desync, rooted in
+// the guest independently computing a DIVERGENT exp -> a different level/evolution path).
+// =============================================================================
+
+/**
+ * HOST (#633 B5): capture each party slot's SETTLED post-exp exp / level / moveset. Called from the
+ * host's `BattleEndPhase.start()` - AFTER the wave's `ExpPhase` / `ShowPartyExpBarPhase` /
+ * `LevelUpPhase` / `EvolutionPhase` chain has fully drained (those phases are unshifted ahead of the
+ * pushed `BattleEndPhase`), so the values are the fully-credited authoritative ones, NOT the pre-wave
+ * snapshot (`applyPartyExp` only QUEUES the exp phases; the mutation happens later inside them). Keyed
+ * by STABLE party-SLOT index + validated by speciesId on apply. Fully guarded (a read failure yields
+ * an empty list = a no-op on the guest).
+ */
+export function captureCoopExpDeltas(): CoopExpDelta[] {
+  try {
+    return globalScene.getPlayerParty().map((p, slot) => ({
+      slot,
+      speciesId: p.species?.speciesId ?? 0,
+      exp: p.exp,
+      level: p.level,
+      moveset: (p.moveset ?? [])
+        .filter((m): m is PokemonMove => m != null)
+        .map(m => ({ moveId: m.moveId, ppUsed: m.ppUsed, ppUp: m.ppUp })),
+    }));
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * GUEST (#633 B5): adopt the host's settled per-slot exp / level / moveset ({@linkcode captureCoopExpDeltas}).
+ * Called from the guest's `BattleEndPhase.start()`. For each delta it matches the slot by index +
+ * GUARDS on speciesId: a slot whose guest species disagrees is SKIPPED (e.g. a host-evolved mon the
+ * guest has not evolved - writing the host's evolved exp onto a pre-evolution mon would be wrong; that
+ * slot heals via the resync `benchParty` instead). Sets level + exp + moveset (the moveset carries the
+ * level-up moves the guest never learned, since it runs no `LevelUpPhase`), then recomputes stats so
+ * the derived `levelExp` getter + maxHp stay consistent. Mirrors {@linkcode applyCoopMeMonFields}'s
+ * "set level+exp+moveset then calculateStats" shape. Fully guarded - a malformed delta is a no-op.
+ */
+export function applyCoopExpDeltas(deltas: CoopExpDelta[] | undefined): void {
+  if (!Array.isArray(deltas)) {
+    return;
+  }
+  try {
+    const party = globalScene.getPlayerParty();
+    for (const d of deltas) {
+      const mon = party[d.slot];
+      if (mon == null || (mon.species?.speciesId ?? -1) !== d.speciesId) {
+        continue; // slot / species disagreement -> leave for the resync benchParty heal.
+      }
+      if (typeof d.level === "number" && d.level > 0) {
+        mon.level = d.level;
+      }
+      if (typeof d.exp === "number") {
+        mon.exp = d.exp;
+      }
+      // Adopt the host moveset (covers the level-up moves the guest never learned - it runs no
+      // LevelUpPhase). Only rebuild when the host actually sent one (an empty list leaves ours alone).
+      if (Array.isArray(d.moveset) && d.moveset.length > 0) {
+        mon.moveset = d.moveset.map(m => {
+          const pm = new PokemonMove(m.moveId);
+          pm.ppUsed = Math.max(0, Math.trunc(m.ppUsed ?? 0));
+          pm.ppUp = Math.max(0, Math.trunc(m.ppUp ?? 0));
+          return pm;
+        });
+      }
+      mon.calculateStats();
+      void mon.updateInfo();
+    }
+  } catch {
+    /* malformed exp deltas must never crash the guest's run */
   }
 }
 

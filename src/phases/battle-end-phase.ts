@@ -1,5 +1,11 @@
 import { applyAbAttrs } from "#abilities/apply-ab-attrs";
 import { globalScene } from "#app/global-scene";
+import { applyCoopExpDeltas } from "#data/elite-redux/coop/coop-battle-engine";
+import {
+  broadcastCoopExpResolved,
+  consumeCoopPendingExpDeltas,
+  isCoopAuthoritativeGuest,
+} from "#data/elite-redux/coop/coop-runtime";
 import { erAdvanceCommunityItemCharges } from "#data/elite-redux/er-community-items";
 import { advanceErMoneyStreaks } from "#data/elite-redux/er-money-streak";
 import { advanceErWardStoneCharges } from "#data/elite-redux/er-ward-stones";
@@ -19,6 +25,20 @@ export class BattleEndPhase extends BattlePhase {
 
   start() {
     super.start();
+
+    // Co-op authoritative (#633 B5): EXP authority lands HERE, after the wave's whole exp/level/
+    // evolution chain has drained (those phases are unshifted ahead of this pushed BattleEndPhase).
+    //  - HOST: stream each party slot's SETTLED exp/level/moveset so the guest can mirror it (the
+    //    pre-exp `waveResolved` win-broadcast would carry STALE values - `applyPartyExp` only QUEUES
+    //    the exp phases; the mutation happens later inside them).
+    //  - GUEST: its own `applyPartyExp` is gated off (victory-phase.ts), so adopt the host's settled
+    //    deltas here - level/exp + the level-up moves it never learned (it runs no LevelUpPhase).
+    // Both are hard no-ops off the authoritative path (host gate internal; guest gate explicit), so
+    // solo / host-owner / lockstep are byte-for-byte unchanged.
+    broadcastCoopExpResolved();
+    if (isCoopAuthoritativeGuest()) {
+      applyCoopExpDeltas(consumeCoopPendingExpDeltas() ?? undefined);
+    }
 
     // cull any extra `BattleEnd` phases from the queue.
     this.isVictory ||= globalScene.phaseManager.hasPhaseOfType(

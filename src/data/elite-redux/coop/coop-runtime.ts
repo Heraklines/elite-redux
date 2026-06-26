@@ -19,12 +19,14 @@
 // =============================================================================
 
 import { globalScene } from "#app/global-scene";
+import { setCoopAuthoritativeGuestPredicate } from "#data/elite-redux/coop/coop-authoritative-gate";
 import { COOP_CHECKSUM_SENTINEL } from "#data/elite-redux/coop/coop-battle-checksum";
 import {
   applyCoopFullSnapshot,
   captureCoopCaptureParty,
   captureCoopChecksum,
   captureCoopEnemies,
+  captureCoopExpDeltas,
   captureCoopFullSnapshot,
 } from "#data/elite-redux/coop/coop-battle-engine";
 import { CoopBattleStreamer } from "#data/elite-redux/coop/coop-battle-stream";
@@ -37,6 +39,7 @@ import { coopOwnerOfFieldIndex } from "#data/elite-redux/coop/coop-session";
 import { CoopSessionController } from "#data/elite-redux/coop/coop-session-controller";
 import { SpoofGuest } from "#data/elite-redux/coop/coop-spoof-guest";
 import type {
+  CoopExpDelta,
   CoopFullBattleSnapshot,
   CoopNetcodeMode,
   CoopSerializedEnemy,
@@ -136,6 +139,35 @@ let pendingWaveAdvance: { wave: number; outcome: CoopWaveOutcome; captureParty?:
 let lastResolvedWave = -1;
 
 /**
+ * Co-op authoritative EXP (#633 B5): the host's settled per-slot exp / level / moveset for a wave the
+ * GUEST has not yet applied, plus the last wave it already applied (the double-apply guard). The host
+ * streams `expResolved` from its `BattleEndPhase` (after the exp chain drained); the guest stores it
+ * here ({@linkcode wireCoopExpResolved}) and CONSUMES it in its OWN `BattleEndPhase`
+ * ({@linkcode consumeCoopPendingExpDeltas}). Kept SEPARATE from the wave-advance handshake so that
+ * proven path is byte-identical; this is an orthogonal, idempotent, additive exp-only channel.
+ */
+let pendingExpDeltas: { wave: number; deltas: CoopExpDelta[] } | null = null;
+/** The last wave the guest already applied exp deltas for (guards a duplicate `expResolved`). */
+let lastExpResolvedWave = -1;
+
+/**
+ * GUEST: take + clear any pending host exp deltas (#633 B5). Returns the host's settled per-slot
+ * exp / level / moveset to apply, or null when none is pending or this wave was already applied.
+ * Called by the guest's `BattleEndPhase`. Bumps the double-apply guard so a duplicate `expResolved`
+ * for the same wave is a no-op.
+ */
+export function consumeCoopPendingExpDeltas(): CoopExpDelta[] | null {
+  const pending = pendingExpDeltas;
+  pendingExpDeltas = null;
+  if (pending == null || pending.wave <= lastExpResolvedWave) {
+    return null;
+  }
+  lastExpResolvedWave = pending.wave;
+  coopLog("runtime", `consume expResolved wave=${pending.wave} deltas=${pending.deltas.length}`);
+  return pending.deltas;
+}
+
+/**
  * GUEST: take + clear any pending wave-advance the host signaled (#633). Returns the
  * outcome to run the victory tail for, or null when none is pending or this wave was
  * already advanced past. Called by `CoopReplayTurnPhase` at a safe boundary. Bumps the
@@ -223,6 +255,30 @@ function wireCoopWaveResolved(controller: CoopSessionController, battleStream: C
 }
 
 /**
+ * Co-op authoritative EXP responder (#633 B5): the GUEST records the host's `expResolved` (the
+ * settled per-slot exp / level / moveset) as a one-shot pending payload (guarded against a
+ * double-apply by wave number). It is consumed in the guest's own `BattleEndPhase` (NOT applied here
+ * mid-message) so it lands at a real phase boundary, AFTER the guest's VictoryPhase tail queues
+ * BattleEnd. Gated on the live GUEST role in the AUTHORITATIVE netcode; host / solo / lockstep ignore.
+ */
+function wireCoopExpResolved(controller: CoopSessionController, battleStream: CoopBattleStreamer): void {
+  battleStream.onExpResolved((wave, deltas) => {
+    if (controller.role !== "guest" || getCoopNetcodeMode() !== "authoritative") {
+      return;
+    }
+    // Already applied past this wave (a duplicate signal) -> ignore.
+    if (wave <= lastExpResolvedWave) {
+      return;
+    }
+    // Latest wave's deltas win (a later wave supersedes an unconsumed earlier one).
+    if (pendingExpDeltas == null || wave >= pendingExpDeltas.wave) {
+      coopLog("runtime", `pend expResolved wave=${wave} deltas=${deltas.length}`);
+      pendingExpDeltas = { wave, deltas };
+    }
+  });
+}
+
+/**
  * Co-op ME-state self-check (#633, TRACK-2 Phase C): the WATCHER verifies the owner's
  * full-state checksum at a mystery-encounter boundary against its OWN. The ME pump replays
  * the owner's button stream into the watcher's own ME state - safe ONLY if that state is
@@ -302,6 +358,9 @@ let authoritativeLatched = false;
 /** Register the live co-op session (called when a co-op run is being set up). */
 export function setCoopRuntime(runtime: CoopRuntime): void {
   active = runtime;
+  // Install the cycle-free authoritative-guest predicate (#633 B6) so `field/pokemon.ts` can gate the
+  // Shedinja party-add without importing this module (which would close a value-level import cycle).
+  setCoopAuthoritativeGuestPredicate(isCoopAuthoritativeGuest);
 }
 
 /** The live co-op session, or null when not in a co-op run. */
@@ -448,6 +507,33 @@ export function broadcastCoopWaveResolved(outcome: CoopWaveOutcome): void {
   } catch (e) {
     /* a wave-resolved send failure must never break the host's post-battle flow */
     coopWarn("runtime", `send waveResolved failed wave=${wave} outcome=${outcome}`, e);
+  }
+}
+
+/**
+ * HOST -> GUEST (#633 B5, authoritative EXP): stream the host's SETTLED per-slot exp / level / moveset
+ * after the wave's exp/level/evolution chain has DRAINED. Emitted from the host's `BattleEndPhase`
+ * (the unshifted ExpPhase / LevelUpPhase / EvolutionPhase chain runs before the pushed BattleEndPhase,
+ * so the values are fully credited here - NOT at the pre-exp `waveResolved` win-broadcast). The guest
+ * adopts them in its own BattleEndPhase so its progression converges. Hard no-op unless we are the
+ * HOST of a live AUTHORITATIVE co-op run, so solo / non-host / lockstep play is byte-for-byte
+ * unaffected. Best-effort + guarded - a send failure never breaks the host's post-battle flow.
+ */
+export function broadcastCoopExpResolved(): void {
+  if (!globalScene.gameMode.isCoop || active == null || getCoopNetcodeMode() !== "authoritative") {
+    return;
+  }
+  if (active.controller.role !== "host") {
+    return;
+  }
+  const wave = globalScene.currentBattle.waveIndex;
+  try {
+    const deltas = captureCoopExpDeltas();
+    coopLog("runtime", `send expResolved wave=${wave} deltas=${deltas.length} (host)`);
+    active.battleStream.sendExpResolved(wave, deltas);
+  } catch (e) {
+    /* an exp-resolved send failure must never break the host's post-battle flow */
+    coopWarn("runtime", `send expResolved failed wave=${wave}`, e);
   }
 }
 
@@ -648,6 +734,7 @@ export function startLocalCoopSession(
   wireCoopGhostPoolSync(controller, battleStream);
   wireCoopResyncResponder(controller, battleStream);
   wireCoopWaveResolved(controller, battleStream);
+  wireCoopExpResolved(controller, battleStream);
   wireCoopMeChecksumCheck(battleStream);
   wireCoopLiveEvents(controller, battleStream);
   setCoopRuntime(runtime);
@@ -695,6 +782,7 @@ export function connectCoopSession(
   wireCoopGhostPoolSync(controller, battleStream);
   wireCoopResyncResponder(controller, battleStream);
   wireCoopWaveResolved(controller, battleStream);
+  wireCoopExpResolved(controller, battleStream);
   wireCoopMeChecksumCheck(battleStream);
   wireCoopLiveEvents(controller, battleStream);
   setCoopRuntime(runtime);
@@ -725,9 +813,14 @@ export function clearCoopRuntime(): void {
   // Reset the authoritative wave-advance state so a subsequent run starts clean (#633).
   pendingWaveAdvance = null;
   lastResolvedWave = -1;
+  // Reset the authoritative EXP delta state so a subsequent run starts clean (#633 B5).
+  pendingExpDeltas = null;
+  lastExpResolvedWave = -1;
   // Reset the ME battle handoff counter so a subsequent run starts clean (#633).
   coopMeBattleInteractionCounter = -1;
   // Drop the authoritative latch so a subsequent solo / lockstep run is not forced authoritative.
   authoritativeLatched = false;
+  // Clear the cycle-free authoritative-guest predicate so a subsequent solo / lockstep run reads false.
+  setCoopAuthoritativeGuestPredicate(null);
   active = null;
 }

@@ -1,7 +1,7 @@
 import { timedEventManager } from "#app/global-event-manager";
 import { globalScene } from "#app/global-scene";
 import { modifierTypes } from "#data/data-lists";
-import { broadcastCoopWaveResolved, getCoopController } from "#data/elite-redux/coop/coop-runtime";
+import { broadcastCoopWaveResolved, getCoopController, isCoopAuthoritativeGuest } from "#data/elite-redux/coop/coop-runtime";
 import { erBiomeOverstay } from "#data/elite-redux/er-biome-notoriety";
 import { erBiomeRoutingActive } from "#data/elite-redux/er-biome-routing";
 import { erShouldRaiseCrossroads } from "#data/elite-redux/er-biome-structure";
@@ -44,8 +44,19 @@ export class VictoryPhase extends PokemonPhase {
       globalScene.gameData.gameStats.pokemonDefeated++;
     }
 
-    const expValue = this.getPokemon().getExpValue();
-    globalScene.applyPartyExp(expValue, true);
+    // Co-op authoritative (#633 B5): the guest is a PURE RENDERER; the HOST computes exp and streams
+    // the SETTLED per-slot exp/level/moveset on `expResolved` (applied in the guest's BattleEndPhase).
+    // Running applyPartyExp here would re-derive a DIVERGENT amount (different participantIds; one
+    // VictoryPhase per wave vs the host's one per faint) -> a different level/evolution path -> the
+    // relayed learn-move slot hits a DIFFERENT mon on the guest (the live learn-move-on-the-wrong-mon
+    // desync). Skip for the authoritative GUEST only; solo / host / lockstep are unchanged.
+    // KNOWN RESIDUAL (cosmetic): the guest no longer animates the exp bar / "grew to Lv. N" / level-up
+    // move-learn prompt. State is still correct (the deltas carry exp/level/moveset); the host streams
+    // narration via the event channel. Consistent with the authoritative renderer model.
+    if (!isCoopAuthoritativeGuest()) {
+      const expValue = this.getPokemon().getExpValue();
+      globalScene.applyPartyExp(expValue, true);
+    }
 
     if (isMysteryEncounter) {
       handleMysteryEncounterVictory(false, this.isExpOnly);

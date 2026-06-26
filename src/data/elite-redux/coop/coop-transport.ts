@@ -155,6 +155,31 @@ export interface CoopSerializedRewardOption {
 }
 
 /**
+ * One party member's HOST-AUTHORITATIVE POST-EXP result (#633 B5). Captured AFTER the wave's
+ * ExpPhase / ShowPartyExpBarPhase / LevelUpPhase / EvolutionPhase chain has fully drained (in the
+ * host's BattleEndPhase), so `exp` / `level` / `moveset` are the settled, fully-credited
+ * authoritative values - NOT the pre-wave snapshot (`applyPartyExp` only QUEUES the exp phases; the
+ * mutation happens later inside them, so a capture at VictoryPhase's win-broadcast would be stale).
+ * Keyed by STABLE party-SLOT index (host & guest parties are permutation-identical via order-adopt /
+ * capture / ME reconcile), validated by `speciesId` (a slot whose species disagrees is SKIPPED, e.g.
+ * a host-evolved mon the guest has not evolved - that slot heals via the resync `benchParty` instead).
+ * The guest SETS these verbatim instead of running its own divergent `applyPartyExp` (which would
+ * compute a different amount: different participantIds, one VictoryPhase per wave vs one per faint).
+ */
+export interface CoopExpDelta {
+  /** Party slot index in `getPlayerParty()` order (host-authoritative). */
+  slot: number;
+  /** `speciesId` at that slot (the guest SKIPS a slot whose species disagrees). */
+  speciesId: number;
+  /** Host's settled absolute exp after the whole wave's exp chain ran. */
+  exp: number;
+  /** Host's settled absolute level. */
+  level: number;
+  /** Host's settled moveset (`moveId` + `ppUsed` + `ppUp`) so guest-skipped level-up moves converge. */
+  moveset: { moveId: number; ppUsed: number; ppUp: number }[];
+}
+
+/**
  * One arena tag carried in the per-turn checkpoint (#633 GAP 1). Hazards / screens / tailwind
  * (Stealth Rock, Spikes, Reflect, Light Screen, Tailwind, ...) are set by host MoveEffectPhases
  * the guest never runs, so without carrying them the guest never gains them and the checksum -
@@ -306,6 +331,15 @@ export interface CoopFullBattleSnapshot {
   money: number;
   /** Persistent modifiers as `[typeId, stackCount]`. */
   modifiers: [string, number][];
+  /**
+   * Full per-mon `PokemonData` JSON for the WHOLE player party (#633 B4): heals BENCH-mon
+   * level / exp / form / friendship / moveset (+ a host off-field evolution's species) the
+   * on-field-only `field` + speciesId-only `party` cannot carry - the live REVIVE-in-shop
+   * desync (host shows a bench mon fainted, guest shows it alive). The guest reconciles by
+   * species + coopOwner via the capture-handshake machinery ({@linkcode applyCoopCaptureParty}).
+   * Optional + additive: an older host omits it and the guest leaves its bench alone.
+   */
+  benchParty?: string[] | undefined;
 }
 
 /**
@@ -652,7 +686,17 @@ export type CoopMessage =
    * B2) and crediting the catch to its OWN gameData (B3) - because a pure renderer never runs the
    * `AttemptCapturePhase` that grows the party. Absent for non-capture outcomes (a hard no-op).
    */
-  | { t: "waveResolved"; wave: number; outcome: CoopWaveOutcome; captureParty?: string[] | undefined };
+  | { t: "waveResolved"; wave: number; outcome: CoopWaveOutcome; captureParty?: string[] | undefined }
+  /**
+   * Host -> guest (#633 B5, authoritative EXP): the host's SETTLED per-slot exp / level / moveset
+   * after the wave's whole exp/level/evolution chain drained (emitted from the host's
+   * `BattleEndPhase`, NOT the pre-exp `waveResolved`). The guest - whose own `applyPartyExp` is
+   * gated off - ADOPTS these verbatim so its exp/level/moveset converge with the host's; this makes
+   * both clients' VictoryPhase -> LevelUp -> LearnMove target the SAME mon (the live learn-move-on-
+   * the-wrong-mon desync). Orthogonal to the proven `waveResolved` handshake (that arm is untouched);
+   * an older client ignores an unknown `t`. Idempotent: absolute SETs guarded by per-slot speciesId.
+   */
+  | { t: "expResolved"; wave: number; deltas: CoopExpDelta[] };
 
 /** A transport moves {@linkcode CoopMessage}s between two paired clients. */
 export interface CoopTransport {
@@ -723,6 +767,8 @@ function summarizeCoopMessage(msg: CoopMessage): string {
       return `ts=${msg.ts}`;
     case "waveResolved":
       return `wave=${msg.wave} outcome=${msg.outcome}`;
+    case "expResolved":
+      return `wave=${msg.wave} deltas=${msg.deltas.length}`;
     case "dataFingerprint":
       return "fp";
     default:
