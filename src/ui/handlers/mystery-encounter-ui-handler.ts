@@ -8,6 +8,13 @@ import { UiMode } from "#enums/ui-mode";
 import { getEncounterText } from "#mystery-encounters/encounter-dialogue-utils";
 import type { OptionSelectSettings } from "#mystery-encounters/encounter-phase-utils";
 import type { MysteryEncounterOption } from "#mystery-encounters/mystery-encounter-option";
+// Co-op authoritative non-battle ME (#633 BLOCK-2 / P0 / ADD-1b / ADD-4): on the guest path the
+// current phase is CoopReplayMePhase (a guest-owned ME forwards the pick to it), and the host streams
+// its authoritative presentation so the handler reads per-option enablement / labels from there
+// instead of re-deriving off the guest's diverged party. Solo / host / lockstep => returns null /
+// never the CoopReplayMePhase branch. The cast is TYPE-only; the runtime check is the phaseName string.
+import type { CoopReplayMePhase } from "#phases/coop-replay-me-phase";
+import { getCoopMeHostPresentation } from "#phases/coop-replay-me-phase";
 import type { MysteryEncounterPhase } from "#phases/mystery-encounter-phases";
 import { PartyUiMode } from "#ui/party-ui-handler";
 import { addBBCodeTextObject, getBBCodeFrag } from "#ui/text";
@@ -154,12 +161,20 @@ export class MysteryEncounterUiHandler extends UiHandler {
               || selected.optionMode === MysteryEncounterOptionMode.DISABLED_OR_SPECIAL))
         ) {
           success = false;
-        } else if (
-          (globalScene.phaseManager.getCurrentPhase() as MysteryEncounterPhase).handleOptionSelect(selected, cursor)
-        ) {
-          success = true;
         } else {
-          ui.playError();
+          const phase = globalScene.phaseManager.getCurrentPhase();
+          if (phase?.phaseName === "CoopReplayMePhase") {
+            // Co-op guest-owned ME (#633 BLOCK-3): forward the chosen index to the replay phase (which
+            // relays it to the host, the sole engine). No local engine resolution on the guest; the
+            // current phase here is CoopReplayMePhase, not MysteryEncounterPhase. View-party stays local
+            // (handled above at the viewPartyIndex branch).
+            (phase as CoopReplayMePhase).handleGuestOptionSelect(cursor);
+            success = true;
+          } else if ((phase as MysteryEncounterPhase).handleOptionSelect(selected, cursor)) {
+            success = true;
+          } else {
+            ui.playError();
+          }
         }
       } else {
         // TODO: If we need to handle cancel option? Maybe default logic to leave/run from encounter idk
@@ -397,12 +412,22 @@ export class MysteryEncounterUiHandler extends UiHandler {
           break;
       }
 
-      this.optionsMeetsReqs.push(option.meetsRequirements());
+      // Co-op authoritative non-battle ME (#633 BLOCK-2 / P0 / ADD-4): on the guest path the host
+      // streams its authoritative per-option enablement + resolved label, because the guest's own
+      // option.meetsRequirements() / disabledButtonLabel re-derivation reads its DIVERGED party. When
+      // a host presentation is present, use its meetsReqs[i] / labels[i]; else (solo / host-owned /
+      // lockstep, or a host stall) fall back to the local re-derivation, byte-identical to before.
+      const hostPres = getCoopMeHostPresentation();
+      const meets =
+        hostPres == null ? option.meetsRequirements() : (hostPres.meetsReqs[i] ?? option.meetsRequirements());
+      this.optionsMeetsReqs.push(meets);
       const optionDialogue = option.dialogue!;
-      const label =
+      const localLabel =
         !this.optionsMeetsReqs[i] && optionDialogue.disabledButtonLabel
           ? optionDialogue.disabledButtonLabel
           : optionDialogue.buttonLabel;
+      const hostLabel = hostPres == null ? undefined : hostPres.labels[i];
+      const label = hostLabel ?? localLabel;
       let text: string | null;
       if (
         option.hasRequirements()

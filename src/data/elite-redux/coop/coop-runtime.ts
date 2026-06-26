@@ -376,6 +376,19 @@ export function setCoopMeBattleInteractionCounter(counter: number): void {
   coopMeBattleInteractionCounter = counter;
 }
 
+/**
+ * Co-op (#633): whether a mystery encounter is currently in progress (the STABLE in-ME pin,
+ * mirrored here from `mystery-encounter-phases` so `select-modifier-phase` can read it WITHOUT a
+ * circular import). `coopMeBattleInteractionCounter` is set/reset on the exact same ME entry/terminal
+ * lines as `coopMeInteractionStart`, so it is an equivalent phase-ordering-independent signal. The
+ * embedded end-of-ME reward shop reads it to suppress its own alternation advance, so the ME's single
+ * advance stays owned by PostMysteryEncounterPhase. `true` for solo MEs too (same as the old
+ * `currentBattle.mysteryEncounter != null` guard), so solo / lockstep stay byte-identical.
+ */
+export function coopMeInProgress(): boolean {
+  return coopMeBattleInteractionCounter >= 0;
+}
+
 /** Whether a co-op ME battle handoff applies right now (live AUTHORITATIVE session, inside an ME). */
 function coopMeHandoffActive(): boolean {
   return (
@@ -425,6 +438,27 @@ export async function coopGuestAwaitMeBattleParty(timeoutMs?: number): Promise<C
 /** Whether THIS client must await + adopt the host's ME-spawned-battle party (authoritative guest). */
 export function coopGuestShouldAdoptMeBattleParty(): boolean {
   return coopMeHandoffActive() && active!.controller.role === "guest";
+}
+
+/**
+ * HOST (#633, TRACK-2 Phase C, non-battle ME narration): stream one ME dialogue/text line to the
+ * guest's CoopReplayMePhase so its screen matches the host-run encounter. Hard no-op off the live
+ * AUTHORITATIVE host (solo / guest / lockstep never emit), so those paths are byte-for-byte
+ * unaffected. Cosmetic - the reward alternation + the per-ME full-state snapshot carry the OUTCOME,
+ * so a dropped/late line can only blank a narration line, never desync. Best-effort + guarded.
+ */
+export function coopHostStreamMeMessage(text: string): void {
+  if (!globalScene.gameMode.isCoop || active == null || getCoopNetcodeMode() !== "authoritative") {
+    return;
+  }
+  if (active.controller.role !== "host") {
+    return;
+  }
+  try {
+    active.battleStream.sendMeMessage(text);
+  } catch {
+    /* an ME narration send failure must never break the host's encounter */
+  }
 }
 
 /**

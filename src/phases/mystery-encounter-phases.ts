@@ -2,19 +2,24 @@ import { consumeClearMeOverrideAfterFirst } from "#app/dev-tools/registry";
 import { globalScene } from "#app/global-scene";
 import { Phase } from "#app/phase";
 import { getCharVariantFromDialogue } from "#data/dialogue";
-import { captureCoopChecksum } from "#data/elite-redux/coop/coop-battle-engine";
+import { captureCoopChecksum, captureCoopMeOutcome } from "#data/elite-redux/coop/coop-battle-engine";
+import { COOP_ME_TERM_SEQ_BASE } from "#data/elite-redux/coop/coop-me-pump";
 import {
   getCoopBattleStreamer,
   getCoopController,
+  getCoopInteractionRelay,
   getCoopMePump,
   getCoopNetcodeMode,
   getCoopRuntime,
+  isCoopAuthoritativeGuest,
   setCoopMeBattleInteractionCounter,
 } from "#data/elite-redux/coop/coop-runtime";
+import type { CoopInteractionOutcome } from "#data/elite-redux/coop/coop-transport";
 import { ArenaTagSide } from "#enums/arena-tag-side";
 import { BattlerTagLapseType } from "#enums/battler-tag-lapse-type";
 import { BattlerTagType } from "#enums/battler-tag-type";
 import { MysteryEncounterMode } from "#enums/mystery-encounter-mode";
+import { MysteryEncounterType } from "#enums/mystery-encounter-type";
 import { SwitchType } from "#enums/switch-type";
 import { TrainerSlot } from "#enums/trainer-slot";
 import { UiMode } from "#enums/ui-mode";
@@ -22,6 +27,7 @@ import { IvScannerModifier } from "#modifiers/modifier";
 import { getEncounterText } from "#mystery-encounters/encounter-dialogue-utils";
 import type { OptionSelectSettings } from "#mystery-encounters/encounter-phase-utils";
 import {
+  COOP_AUTHORITATIVE_BESPOKE_SUB_ME,
   leaveEncounterWithoutBattle,
   transitionMysteryEncounterIntroVisuals,
 } from "#mystery-encounters/encounter-phase-utils";
@@ -42,6 +48,10 @@ import i18next from "i18next";
 // phase gate in ui.ts.
 // =============================================================================
 const COOP_ME_PUMP_SEQ_BASE = 8_000_000;
+/** Co-op authoritative non-battle ME (#633): the DISCONNECT ceiling for every host<->guest await
+ *  (mirrors `CoopReplayMePhase` / the interaction relay default). NOT a deliberation timer - steady
+ *  state resolves on the relayed message; this only fires for a genuinely disconnected partner. */
+const COOP_ME_REPLAY_WAIT_MS = 1_200_000;
 
 /** Co-op (#633): the alternation counter this ME opened on. Both clients advance the
  *  turn LOCALLY + idempotently at the ME terminal (keyed to this value), so the ME's
@@ -60,6 +70,46 @@ function coopInMeInteractivePhase(): boolean {
     || pn === "MysteryEncounterRewardsPhase"
     || pn === "PostMysteryEncounterPhase"
   );
+}
+
+/** Co-op (#633): the interaction counter the in-progress ME opened on, or -1 when not in an
+ *  ME. The single STABLE in-ME signal (phase-ordering-independent, unlike
+ *  `currentBattle.mysteryEncounter`): the embedded end-of-ME reward shop reads it to suppress
+ *  its own alternation advance, so the ME's single advance stays owned by PostMysteryEncounterPhase. */
+export function coopMeInProgress(): boolean {
+  return coopMeInteractionStart >= 0;
+}
+
+/**
+ * Co-op authoritative non-battle ME (#633, ADD-2): the interaction counter the in-progress ME
+ * pinned on (== `seq - COOP_ME_PUMP_SEQ_BASE`), or -1 when not in an ME. The host's await-and-apply
+ * path + the engine sub-prompt relays (encounter-phase-utils) and the host input block (ui.ts) read
+ * it to key their seq channels onto the SAME pinned counter the pump opened on, never the live
+ * counter (an inbound reconcile broadcast can bump the live counter mid-ME).
+ */
+export function coopMeInteractionStartValue(): number {
+  return coopMeInteractionStart;
+}
+
+/**
+ * Co-op authoritative GUEST (#633, CHANGE-3): pin the ME interaction counter at the guest's ME
+ * ENTRY (independent of who owns it), so `coopMeInProgress()` is TRUE for the guest's WHOLE ME.
+ * That keeps the embedded reward-shop counter-guard AND the reward-owner override firing across the
+ * guest's full encounter (incl. the in-flight watcher shop). The host pins the same counter in
+ * `coopBeginMePump`; the guest never reaches that path (it diverts to CoopReplayMePhase), so the pin
+ * is set here instead. Cleared at the guest's true post-ME boundary (the PostMysteryEncounterPhase
+ * guest guard), NOT at leaveDefensive (MAJOR-3).
+ */
+export function coopSetMePinForGuest(counter: number): void {
+  coopMeInteractionStart = counter;
+  setCoopMeBattleInteractionCounter(counter);
+}
+
+/** Co-op authoritative GUEST (#633, CHANGE-3): clear the guest's ME pin at the true post-ME
+ *  boundary (after the embedded watcher reward shop has drained). */
+export function coopClearMePinForGuest(): void {
+  coopMeInteractionStart = -1;
+  setCoopMeBattleInteractionCounter(-1);
 }
 
 /**
@@ -86,21 +136,39 @@ function coopBeginMePump(): void {
   setCoopMeBattleInteractionCounter(coopMeInteractionStart);
   const seq = COOP_ME_PUMP_SEQ_BASE + coopMeInteractionStart;
   const spoofed = getCoopRuntime()?.spoof != null;
+  // Co-op AUTHORITATIVE netcode (#633, ADD-2): the HOST is the SOLE ME engine for EVERY non-battle
+  // ME - host- AND guest-owned alike (the guest's diverged RNG must never run encounter logic). So
+  // in authoritative mode the HOST always drives the engine (beginOwner), even when the guest OWNS
+  // the ME; it then awaits the guest's relayed option index and applies it programmatically (the
+  // host-await block below in MysteryEncounterPhase.start). The guest already diverted to
+  // CoopReplayMePhase at :202, so only the HOST ever reaches coopBeginMePump in authoritative mode.
+  // In LOCKSTEP (either client) the owner/watcher split stands byte-identical (both run the engine).
+  const authoritative = getCoopNetcodeMode() === "authoritative";
+  const hostDrives = authoritative
+    ? controller.role === "host"
+    : spoofed || controller.isLocalOwnerAtCounter(coopMeInteractionStart);
   // Resolve the ME owner from the PINNED start counter (#633), not the live counter - an
   // inbound reconcile broadcast can bump the live counter mid-encounter, which would flip
   // the owner/seq calc and desync the pump (the same drift that broke the cursor mirror).
-  if (spoofed || controller.isLocalOwnerAtCounter(coopMeInteractionStart)) {
-    pump.beginOwner(seq);
+  if (spoofed || hostDrives) {
+    // #633 MAJOR-1 / B-1: in AUTHORITATIVE mode the host sends its TERMINAL sentinels (LEAVE /
+    // battle-handoff) on the DEDICATED 9M terminal seq, where the authoritative guest's
+    // CoopReplayMePhase.awaitHostTerminal listens (disjoint from the 8M guest->host pick relay).
+    // In LOCKSTEP the terminal stays on `seq` (8M) so the watcher loop catches it byte-identically.
+    const termSeq = authoritative ? COOP_ME_TERM_SEQ_BASE + coopMeInteractionStart : seq;
+    pump.beginOwner(seq, termSeq);
     // Co-op AUTHORITATIVE netcode only (#633, TRACK-2 Phase C): stamp the owner's
     // authoritative full-state checksum at ME entry so the watcher can verify its ME state
     // is identical BEFORE the pump replays the button stream into it (the pump's one
     // load-bearing assumption, now self-checking). The watcher's verify+heal handler is
     // wired once in the runtime. In LOCKSTEP both clients run the full engine on the shared
     // seed, so the ME state already matches and no checksum stamp is sent (778b192dd path).
-    if (getCoopNetcodeMode() === "authoritative") {
+    if (authoritative) {
       getCoopBattleStreamer()?.sendMeChecksum(seq, captureCoopChecksum());
     }
   } else {
+    // LOCKSTEP non-owner only (#633, ADD-2): in authoritative mode the guest diverted at :202 and
+    // never reaches here, so this watcher path is lockstep-only and stays byte-identical.
     // On the leave sentinel / timeout / partner-gone, fast-forward to the next wave IF still in
     // the encounter (the rewards were already applied by the relayed picks; only the final outro
     // is skipped). Both clients advance the alternation turn LOCALLY + idempotently (keyed to the
@@ -182,6 +250,25 @@ export class MysteryEncounterPhase extends Phase {
   start() {
     super.start();
 
+    // Co-op AUTHORITATIVE netcode (#633, TRACK-2 Phase C): the guest's ME engine/RNG is diverged
+    // from the host's, so the guest must NOT run the encounter engine. Divert to CoopReplayMePhase:
+    // a pure renderer + choice-forwarder that awaits the host's authoritative ME outcome (narration
+    // via the message stream, rewards via the reward alternation, side effects via the full-state
+    // snapshot) and forwards the guest's choice when the guest OWNS this ME. Hard-gated to the live
+    // authoritative GUEST, so solo / lockstep / host run the engine unchanged. A battle-spawning ME
+    // is transparent: CoopReplayMePhase ends on the battle-handoff sentinel and the existing
+    // host-authoritative ME-battle path takes over.
+    if (isCoopAuthoritativeGuest()) {
+      const interactionCounter = getCoopController()?.interactionCounter() ?? -1;
+      // CHANGE-3: pin the ME interaction counter for the guest's WHOLE ME (so coopMeInProgress() is
+      // TRUE across the embedded watcher reward shop too). Cleared at the PostMysteryEncounterPhase
+      // guest guard, AFTER the shop drains (MAJOR-3), never at leaveDefensive.
+      coopSetMePinForGuest(interactionCounter);
+      globalScene.phaseManager.pushNew("CoopReplayMePhase", interactionCounter);
+      this.end();
+      return;
+    }
+
     // Clears out queued phases that are part of standard battle
     globalScene.phaseManager.clearPhaseQueue();
 
@@ -205,6 +292,111 @@ export class MysteryEncounterPhase extends Phase {
     // watcher replays it in lockstep (synced choices -> synced rewards). Idempotent across a
     // re-entered/nested option-select; no-op in solo.
     coopBeginMePump();
+    // Co-op AUTHORITATIVE host (#633, P0 / BLOCK-2): stream the host's authoritative presentation
+    // (dialogue tokens + per-option enablement + resolved labels) so the guest renders off it, not
+    // its own diverged-party re-derivation. No-op off the live authoritative host.
+    this.coopHostStreamPresentation();
+    // Co-op AUTHORITATIVE host on a GUEST-OWNED ME (#633, ADD-2): the host is the sole engine, so it
+    // awaits the guest's relayed option INDEX and applies it programmatically (input-free). No-op
+    // when the host owns this ME (it drives the engine off its own local input) or off authoritative.
+    this.coopHostAwaitGuestIndex();
+  }
+
+  /**
+   * Co-op AUTHORITATIVE host (#633, P0 / BLOCK-2): the guest's `onInit` / `meetsRequirements` read
+   * its DIVERGED party (bench order / held items / luck), so it would render different option labels
+   * / enablement / dialogue tokens (itemName, selectedPokemon). Stream the host's authoritative
+   * presentation so the guest renders off it. Hard-gated to the live authoritative host; solo /
+   * lockstep / guest never emit, so those paths are byte-for-byte unchanged. Best-effort + guarded.
+   */
+  private coopHostStreamPresentation(): void {
+    if (
+      !globalScene.gameMode.isCoop
+      || getCoopNetcodeMode() !== "authoritative"
+      || getCoopController()?.role !== "host"
+      || !coopMeInProgress()
+    ) {
+      return;
+    }
+    try {
+      const enc = globalScene.currentBattle.mysteryEncounter!;
+      // Ensure tokens + per-option meetsReqs are computed off the host party before snapshotting.
+      enc.populateDialogueTokensFromRequirements();
+      const present: CoopInteractionOutcome = {
+        k: "mePresent",
+        tokens: { ...enc.dialogueTokens },
+        meetsReqs: enc.options.map(o => o.meetsRequirements()),
+        labels: enc.options.map(o => {
+          const d = o.dialogue;
+          if (d == null) {
+            return "";
+          }
+          const ok = o.meetsRequirements();
+          return getEncounterText(!ok && d.disabledButtonLabel ? d.disabledButtonLabel : d.buttonLabel) ?? "";
+        }),
+      };
+      const seqMe = COOP_ME_PUMP_SEQ_BASE + coopMeInteractionStartValue();
+      getCoopInteractionRelay()?.sendInteractionOutcome(seqMe, "mePresent", present);
+    } catch {
+      /* a presentation send failure must never break the host's encounter; the guest degrades to
+         its local re-derivation, never a hang */
+    }
+  }
+
+  /**
+   * Co-op AUTHORITATIVE host on a GUEST-OWNED ME (#633, ADD-2 / D1): the host runs the sole ME
+   * engine but the GUEST makes the top-level pick, so the host awaits the guest's relayed option
+   * INDEX and applies it programmatically via {@linkcode handleOptionSelect} (input-free). A null
+   * resolution (a genuinely disconnected guest) safe-leaves the encounter + closes the pump so the
+   * host never hangs; steady state resolves on the human pick. Hard-gated: no-op when the host owns
+   * this ME, off authoritative, or in solo / lockstep.
+   */
+  private coopHostAwaitGuestIndex(): void {
+    if (
+      !globalScene.gameMode.isCoop
+      || getCoopNetcodeMode() !== "authoritative"
+      || getCoopController()?.role !== "host"
+      || (getCoopController()?.isLocalOwnerAtCounter(coopMeInteractionStartValue()) ?? true)
+    ) {
+      return; // host owns this ME (drives off local input) / not the authoritative host
+    }
+    const relay = getCoopInteractionRelay();
+    if (relay == null) {
+      return;
+    }
+    const seqMe = COOP_ME_PUMP_SEQ_BASE + coopMeInteractionStartValue();
+    void relay.awaitInteractionChoice(seqMe, COOP_ME_REPLAY_WAIT_MS).then(choice => {
+      if (choice == null || choice.choice < 0) {
+        // D1 null-end: a disconnected guest must never hang the host's engine - safe-leave + close.
+        leaveEncounterWithoutBattle();
+        coopEndMePump();
+        return;
+      }
+      const encounter = globalScene.currentBattle.mysteryEncounter!;
+      const options = this.optionSelectSettings?.overrideOptions ?? encounter.options;
+      const opt = options[choice.choice];
+      if (opt == null) {
+        leaveEncounterWithoutBattle();
+        coopEndMePump();
+        return;
+      }
+      // ADD-2c (BLOCK-3 residual): an ME whose option chain pushes a BESPOKE interactive sub-UI
+      // (ErQuizPhase / a custom OPTION_SELECT) has no generic host relay site, so resolving it on a
+      // guest-owned ME would HANG the host on an un-relayed sub-screen. SAFE-DEGRADE instead: leave
+      // the encounter at its default branch + close the pump, logged. Gated + closed-list; never a hang.
+      if (COOP_AUTHORITATIVE_BESPOKE_SUB_ME.has(encounter.encounterType)) {
+        console.log(
+          `[coop-me] bespoke sub-UI on guest-owned ME ${MysteryEncounterType[encounter.encounterType]}; safe-degraded`,
+        );
+        leaveEncounterWithoutBattle();
+        coopEndMePump();
+        return;
+      }
+      // Input-free option apply (the same path the local handler uses): drives onPre / onOption /
+      // onPost; the engine sub-prompts (party target / secondary menu) await the guest's relayed
+      // sub-picks at their own sites (encounter-phase-utils ADD-2b).
+      this.handleOptionSelect(opt, choice.choice);
+    });
   }
 
   /**
@@ -325,6 +517,13 @@ export class MysteryEncounterOptionSelectedPhase extends Phase {
    */
   start() {
     super.start();
+    // Co-op AUTHORITATIVE GUEST (#633): the guest runs no ME engine (its RNG is diverged). If a
+    // nested/re-entered ME phase is ever queued on the guest, end it immediately - CoopReplayMePhase
+    // is the guest's sole ME driver. Solo / lockstep / host unaffected.
+    if (isCoopAuthoritativeGuest()) {
+      this.end();
+      return;
+    }
     if (globalScene.currentBattle.mysteryEncounter?.autoHideIntroVisuals) {
       transitionMysteryEncounterIntroVisuals().then(() => {
         globalScene.executeWithSeedOffset(() => {
@@ -654,6 +853,29 @@ export class MysteryEncounterRewardsPhase extends Phase {
    */
   start() {
     super.start();
+    // Co-op AUTHORITATIVE GUEST (#633, CHANGE-1 / B1): do NOT blanket early-end. The guest must run
+    // the embedded reward shop as the reward WATCHER (CHANGE-2 forces host=owner, so the guest
+    // adopts the host's exact streamed items). Skip the host-only engine work (onRewards /
+    // doEncounterExp run on the host inside executeWithSeedOffset); only unshift the SelectModifier
+    // shop the watcher runs, then push the post phase (which ends via its guest guard at :765). The
+    // host-streamed reward options OVERRIDE whatever pool doEncounterRewards locally installs
+    // (startCoopWatch fills typeOptions from the host's list), so running doEncounterRewards WITHOUT
+    // onRewards is safe. The genuinely-interactive engine phases (OptionSelected, Post) stay diverted.
+    if (isCoopAuthoritativeGuest()) {
+      const guestEncounter = globalScene.currentBattle.mysteryEncounter!;
+      if (guestEncounter.doEncounterRewards) {
+        guestEncounter.doEncounterRewards(); // unshifts the SelectModifierPhase the watcher runs
+      } else if (this.addHealPhase) {
+        globalScene.phaseManager.removeAllPhasesOfType("SelectModifierPhase");
+        globalScene.phaseManager.unshiftNew("SelectModifierPhase", 0, undefined, {
+          fillRemaining: false,
+          rerollMultiplier: -1,
+        });
+      }
+      globalScene.phaseManager.pushNew("PostMysteryEncounterPhase"); // ends via its guest guard (:765)
+      this.end();
+      return;
+    }
     const encounter = globalScene.currentBattle.mysteryEncounter!;
 
     if (encounter.doContinueEncounter) {
@@ -721,6 +943,16 @@ export class PostMysteryEncounterPhase extends Phase {
    */
   start() {
     super.start();
+    // Co-op AUTHORITATIVE GUEST (#633): the guest runs no ME engine (its RNG is diverged). End this
+    // phase immediately - CoopReplayMePhase is the guest's sole ME driver. CHANGE-3 (MAJOR-3): clear
+    // the guest's ME pin HERE - the true post-ME boundary, AFTER the embedded watcher reward shop has
+    // drained - so coopMeInProgress() stays TRUE across leaveDefensive -> the shop -> here, closing
+    // the double-advance window. Solo / lockstep / host unaffected.
+    if (isCoopAuthoritativeGuest()) {
+      coopClearMePinForGuest();
+      this.end();
+      return;
+    }
 
     if (this.onPostOptionSelect) {
       globalScene.executeWithSeedOffset(async () => {
@@ -740,6 +972,20 @@ export class PostMysteryEncounterPhase extends Phase {
    */
   continueEncounter() {
     const endPhase = () => {
+      // Co-op AUTHORITATIVE host (#633, CHANGE-4 / P4): UNCONDITIONALLY stream the comprehensive
+      // ME-terminal resync (full party / ME-save weighting / RNG cursor / dex) AFTER all side
+      // effects, BEFORE coopEndMePump. The host is the sole engine for every authoritative ME
+      // (host- and guest-owned alike), so the guest's run only converges via this blob; it adopts it
+      // before its leave terminal. No-op off the live authoritative host (solo / lockstep / guest).
+      if (
+        globalScene.gameMode.isCoop
+        && getCoopNetcodeMode() === "authoritative"
+        && getCoopController()?.role === "host"
+        && coopMeInProgress()
+      ) {
+        const seqMe = COOP_ME_PUMP_SEQ_BASE + coopMeInteractionStartValue();
+        getCoopInteractionRelay()?.sendInteractionOutcome(seqMe, "meResync", captureCoopMeOutcome());
+      }
       // Co-op (#633): the encounter is over - close the input pump (owner sends the leave
       // sentinel; host advances the alternation turn once for the whole encounter). Done before
       // queuing the next wave so the watcher's loop ends cleanly. No-op in solo.

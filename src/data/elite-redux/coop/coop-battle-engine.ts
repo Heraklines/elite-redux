@@ -39,6 +39,7 @@ import type {
   CoopBattleCheckpoint,
   CoopFullBattleSnapshot,
   CoopFullMonSnapshot,
+  CoopInteractionOutcome,
   CoopSerializedArenaTag,
   CoopSerializedEnemy,
 } from "#data/elite-redux/coop/coop-transport";
@@ -62,6 +63,9 @@ import * as Modifier from "#modifiers/modifier";
 import { PersistentModifier, PokemonHeldItemModifier } from "#modifiers/modifier";
 import { PokemonMove } from "#moves/pokemon-move";
 import { ModifierData } from "#system/modifier-data";
+import { PokemonData } from "#system/pokemon-data";
+import type { StarterDataEntry } from "#types/save-data";
+import { compressToBase64, decompressFromBase64 } from "lz-string";
 
 /**
  * ER BattlerTags carried in the co-op checkpoint (#633 Fix #4h). These are BattlerTags, not
@@ -1331,5 +1335,281 @@ export function applyCoopFullSnapshot(snapshot: CoopFullBattleSnapshot): void {
     adoptCoopHostPlayerPartyOrder(snapshot.party);
   } catch {
     // A malformed snapshot must never crash the guest's battle.
+  }
+}
+
+// =============================================================================
+// Co-op authoritative non-battle ME outcome (#633, CHANGE-4 / P4). In authoritative
+// co-op the HOST is the SOLE non-battle-ME engine: every side effect (party changes,
+// ME-save tier weighting, RNG advance, dex / starter unlocks) lands ONLY on the host.
+// At the ME terminal the host captures a COMPREHENSIVE resync blob and streams it; the
+// guest applies it FIELD-BY-FIELD onto its LIVE objects so its run converges with the
+// host's, exactly as the per-turn checkpoint heals battle drift. Pure JSON / scalars on
+// the wire (bigint dex fields round-trip via string); every apply is fully guarded so a
+// bad blob can never hang or crash the guest.
+// =============================================================================
+
+/**
+ * HOST: serialize the WHOLE `gameData.dexData` + `starterData` into a compact, bigint-safe
+ * blob (#633 MAJOR-2). `DexEntry.seenAttr` / `caughtAttr` are `bigint`, which JSON cannot carry,
+ * so they are string-encoded via `.toString()` (decoded with `BigInt(...)` on apply). The whole
+ * dex is serialized (a per-species "touched" diff is a future optimization; a full blob is correct
+ * and small after lz-string). `starterData` is plain scalars / arrays, carried as-is. Fully guarded.
+ */
+export function captureCoopDexDelta(): string {
+  try {
+    const dex: Record<
+      number,
+      {
+        seenAttr: string;
+        caughtAttr: string;
+        natureAttr: number;
+        seenCount: number;
+        caughtCount: number;
+        hatchedCount: number;
+        ivs: number[];
+      }
+    > = {};
+    for (const [id, e] of Object.entries(globalScene.gameData.dexData)) {
+      dex[Number(id)] = {
+        seenAttr: e.seenAttr.toString(),
+        caughtAttr: e.caughtAttr.toString(),
+        natureAttr: e.natureAttr,
+        seenCount: e.seenCount,
+        caughtCount: e.caughtCount,
+        hatchedCount: e.hatchedCount,
+        ivs: [...e.ivs],
+      };
+    }
+    return compressToBase64(JSON.stringify({ dex, starter: globalScene.gameData.starterData }));
+  } catch {
+    // A dex read failure must never break the outcome send; an empty blob is a no-op on apply.
+    return "";
+  }
+}
+
+/**
+ * GUEST: merge the host's dex / starter blob ({@linkcode captureCoopDexDelta}) onto the local
+ * `gameData` (#633 MAJOR-2). Decodes the bigint `seenAttr` / `caughtAttr` via `BigInt(...)`,
+ * sets the numeric counts, and merges `starterData`. Fully guarded so a malformed / empty blob
+ * is a no-op (the per-turn checksum + the next ME terminal re-sync any residual drift).
+ */
+export function applyCoopDexDelta(blob: string): void {
+  if (typeof blob !== "string" || blob.length === 0) {
+    return;
+  }
+  try {
+    const decompressed = decompressFromBase64(blob);
+    if (decompressed == null || decompressed.length === 0) {
+      return;
+    }
+    const parsed = JSON.parse(decompressed) as {
+      dex?: Record<
+        string,
+        {
+          seenAttr: string;
+          caughtAttr: string;
+          natureAttr: number;
+          seenCount: number;
+          caughtCount: number;
+          hatchedCount: number;
+          ivs: number[];
+        }
+      >;
+      starter?: Record<string, StarterDataEntry>;
+    };
+    const dexData = globalScene.gameData.dexData;
+    for (const [id, e] of Object.entries(parsed.dex ?? {})) {
+      const entry = dexData[Number(id)];
+      if (entry == null) {
+        continue;
+      }
+      entry.seenAttr = BigInt(e.seenAttr);
+      entry.caughtAttr = BigInt(e.caughtAttr);
+      entry.natureAttr = e.natureAttr;
+      entry.seenCount = e.seenCount;
+      entry.caughtCount = e.caughtCount;
+      entry.hatchedCount = e.hatchedCount;
+      if (Array.isArray(e.ivs)) {
+        entry.ivs = [...e.ivs];
+      }
+    }
+    // Merge starter entries field-by-field onto the live starterData (candy / friendship / egg
+    // moves / ability+passive unlocks an ME can grant), leaving any local-only entry alone.
+    const starterData = globalScene.gameData.starterData;
+    for (const [id, s] of Object.entries(parsed.starter ?? {})) {
+      if (s != null && typeof s === "object") {
+        const key = Number(id);
+        starterData[key] = { ...(starterData[key] ?? {}), ...s };
+      }
+    }
+  } catch {
+    // A malformed dex blob must never crash the guest; the checksum / next ME terminal re-sync.
+  }
+}
+
+/**
+ * GUEST: reconcile the player party from the host's serialized {@linkcode PokemonData} list
+ * (#633 MAJOR-2). Applies the per-mon SCALAR fields FIELD-BY-FIELD onto the matched LIVE
+ * `PlayerPokemon` (NOT a wholesale new-object swap, which would break the phase / UI references
+ * that hold the live mon), then recomputes stats. A mon the host added that the guest does not
+ * have (e.g. a gift ME) is the ONLY case that constructs a new object - appended at the BENCH
+ * TAIL, where a fresh mon has no dangling references. Matching is by party INDEX (the host and
+ * guest party order is kept permutation-identical by the order-adopt / checkpoint paths). Fully
+ * guarded so a malformed entry can never crash the guest.
+ */
+export function applyCoopMePartyFromData(serializedParty: string[]): void {
+  if (!Array.isArray(serializedParty)) {
+    return;
+  }
+  try {
+    // Widen to Pokemon[] (the existing engine reads do the same): the field-apply takes a Pokemon
+    // and a freshly-constructed player mon (`toPokemon` -> a PlayerPokemon) appends type-cleanly.
+    const party = globalScene.getPlayerParty() as Pokemon[];
+    for (let i = 0; i < serializedParty.length; i++) {
+      let data: PokemonData;
+      try {
+        data = new PokemonData(JSON.parse(serializedParty[i]));
+      } catch {
+        continue; // one bad blob entry; leave that slot and keep going.
+      }
+      const live = party[i];
+      if (live != null && (live.species?.speciesId ?? -1) === data.species) {
+        applyCoopMeMonFields(live, data);
+      } else if (live == null) {
+        // A NEW mon the host added (gift ME): construct from data and append at the bench tail.
+        // A fresh mon has no dangling phase / UI references, so construction is safe here only.
+        try {
+          const added = data.toPokemon();
+          party.push(added);
+        } catch {
+          // A construction failure must never crash the guest; the wave-boundary adopt re-syncs.
+        }
+      }
+      // A species MISMATCH at an existing slot is left to the wave-boundary order-adopt /
+      // field reconcile (a mid-ME swap of an existing live mon is unsafe).
+    }
+    // #633 M-1: a release / sacrifice / trade ME SHRINKS the host party. The append-only pass above
+    // never drops a stale live mon, so without this the guest party ends LONGER than the host's - a
+    // party-length divergence that breaks the per-turn replay (index alignment). Truncate the live
+    // party back to the host's length, releasing each surplus BENCH mon via the canonical removal
+    // path (which also detaches its held-item modifiers). Safe here: a non-battle ME terminal resync
+    // runs OFF-FIELD, so every surplus mon is a bench mon with no live phase / field reference. We
+    // never trim BELOW the on-field count (a defensive floor; the host party can't be shorter than
+    // the shared on-field leads at an off-field ME terminal).
+    const onFieldFloor = globalScene.getPlayerField(false).length;
+    const targetLen = Math.max(serializedParty.length, onFieldFloor);
+    // Remove from the tail inward so each splice keeps the lower indices stable.
+    while (globalScene.getPlayerParty().length > targetLen) {
+      const live = globalScene.getPlayerParty();
+      const surplus = live[live.length - 1];
+      if (surplus == null) {
+        break;
+      }
+      globalScene.removePokemonFromPlayerParty(surplus, true);
+    }
+  } catch {
+    // A malformed party list must never crash the guest's run.
+  }
+}
+
+/** Apply ONE mon's host-authoritative SCALAR fields onto a LIVE mon (no object swap). */
+function applyCoopMeMonFields(mon: Pokemon, data: PokemonData): void {
+  try {
+    mon.formIndex = data.formIndex;
+    mon.abilityIndex = data.abilityIndex;
+    mon.shiny = data.shiny;
+    mon.variant = data.variant;
+    mon.level = data.level;
+    mon.exp = data.exp;
+    mon.gender = data.gender;
+    mon.nature = data.nature;
+    mon.luck = data.luck;
+    mon.friendship = data.friendship;
+    mon.pauseEvolutions = data.pauseEvolutions;
+    mon.pokerus = data.pokerus;
+    mon.metLevel = data.metLevel;
+    mon.metBiome = data.metBiome;
+    mon.metSpecies = data.metSpecies;
+    mon.metWave = data.metWave;
+    mon.usedTMs = [...data.usedTMs];
+    if (Array.isArray(data.ivs)) {
+      mon.ivs = [...data.ivs];
+    }
+    if (typeof data.nickname === "string") {
+      mon.nickname = data.nickname;
+    }
+    // Moveset: adopt the host's moves + per-slot ppUsed (an ME can teach / overwrite a move).
+    if (Array.isArray(data.moveset) && data.moveset.length > 0) {
+      mon.moveset = data.moveset.map(m => {
+        const pm = new PokemonMove(m.moveId);
+        pm.ppUsed = Math.max(0, Math.trunc(m.ppUsed ?? 0));
+        pm.ppUp = Math.max(0, Math.trunc(m.ppUp ?? 0));
+        return pm;
+      });
+    }
+    // Stats last (uses the now-authoritative level / form / ivs / nature), then hp + status.
+    mon.calculateStats();
+    if (Array.isArray(data.stats) && data.stats.length > 0) {
+      mon.stats = [...data.stats];
+    }
+    mon.status = data.status
+      ? new Status(data.status.effect, data.status.toxicTurnCount, data.status.sleepTurnsRemaining)
+      : null;
+    mon.hp = Math.max(0, Math.min(Math.trunc(data.hp), mon.getMaxHp()));
+    void mon.updateInfo();
+  } catch {
+    // One mon's reconcile failed; leave it and continue (the checksum re-syncs residual drift).
+  }
+}
+
+/**
+ * HOST: capture the comprehensive non-battle-ME terminal resync (#633, P4). Bundles the existing
+ * full-battle snapshot (field / arena / money / modifier counts), the FULL per-mon party as
+ * serialized {@linkcode PokemonData} JSON, the ME-save tier-weighting events, the run-RNG cursor
+ * (`seed` / `waveSeed`), and the bigint-safe dex / starter blob. ME-terminal-only - it does NOT
+ * bloat the per-turn snapshot. The guest adopts it via {@linkcode applyCoopMeOutcome}.
+ */
+export function captureCoopMeOutcome(): Extract<CoopInteractionOutcome, { k: "meResync" }> {
+  return {
+    k: "meResync",
+    base: captureCoopFullSnapshot(),
+    party: globalScene.getPlayerParty().map(p => JSON.stringify(new PokemonData(p))),
+    meSaveData: JSON.stringify(globalScene.mysteryEncounterSaveData.encounteredEvents),
+    seed: globalScene.seed,
+    waveSeed: globalScene.waveSeed,
+    dex: captureCoopDexDelta(),
+  };
+}
+
+/**
+ * GUEST: adopt the host's comprehensive ME-terminal resync (#633, P4). Applies the full-battle
+ * snapshot (existing covered fields), then reconciles the party FIELD-BY-FIELD onto live objects,
+ * replaces the ME-save events wholesale (plain data), restores the RNG cursor so the guest's seed
+ * pointer matches after the host alone consumed `randSeedInt`, and merges the dex / starter blob.
+ * Fully guarded as a WHOLE so a partial-blob apply can never hang or crash the guest - the per-turn
+ * checksum re-syncs any residual drift.
+ */
+export function applyCoopMeOutcome(o: Extract<CoopInteractionOutcome, { k: "meResync" }>): void {
+  try {
+    if (o.base != null) {
+      applyCoopFullSnapshot(o.base);
+    }
+    applyCoopMePartyFromData(o.party);
+    // mysteryEncounterSaveData: replace encounteredEvents wholesale (it is plain data).
+    if (typeof o.meSaveData === "string" && o.meSaveData.length > 0) {
+      globalScene.mysteryEncounterSaveData.encounteredEvents = JSON.parse(o.meSaveData);
+    }
+    // RNG cursor: restore so the guest's seed pointer matches after the host alone advanced it.
+    if (typeof o.seed === "string") {
+      globalScene.setSeed(o.seed);
+    }
+    if (typeof o.waveSeed === "string") {
+      globalScene.waveSeed = o.waveSeed;
+      Phaser.Math.RND.sow([o.waveSeed]);
+    }
+    applyCoopDexDelta(o.dex);
+  } catch {
+    // A resync apply failure must NEVER hang or crash the guest; the per-turn checksum re-syncs.
   }
 }

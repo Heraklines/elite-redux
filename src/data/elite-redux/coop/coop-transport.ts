@@ -344,7 +344,44 @@ export type CoopInteractionOutcome =
   /** A reroll happened: no item, just the signed money change (the watcher never recomputes the fee). */
   | { k: "reroll"; moneyDelta: number }
   /** The owner left the screen with no further outcome (a terminal). */
-  | { k: "leave" };
+  | { k: "leave" }
+  /**
+   * Co-op authoritative non-battle ME (#633 BLOCK-2 / P0): the HOST streams its authoritative
+   * encounter PRESENTATION so the guest renders off it instead of its own diverged party
+   * re-derivation. `tokens` is the flat dialogue-token map (itemName, selectedPokemon, ...);
+   * `meetsReqs[i]` / `labels[i]` are the host-resolved per-option enablement + button label.
+   * The optional `subPrompt` is streamed as a FOLLOW-UP `mePresent` right before the host opens
+   * an engine sub-prompt (party target / secondary menu), telling the guest which local capture
+   * screen to open. Plain JSON only (strings / booleans), no engine types.
+   */
+  | {
+      k: "mePresent";
+      tokens: Record<string, string>;
+      meetsReqs: boolean[];
+      labels: string[];
+      subPrompt?: { kind: "party" } | { kind: "secondary"; labels: string[] };
+    }
+  /**
+   * Co-op authoritative non-battle ME (#633 B2 / MAJOR-2 / P4): the comprehensive ME-terminal
+   * resync the HOST sends UNCONDITIONALLY after all side effects so the guest's party / save data
+   * / RNG cursor / dex converge with the sole-engine host. `base` is the existing full-battle
+   * snapshot (field / arena / money / modifier counts) or null when there is no live field;
+   * `party[i]` is one serialized {@linkcode PokemonData} JSON string (full per-mon, applied
+   * field-by-field onto the live mon); `meSaveData` is the JSON of
+   * `mysteryEncounterSaveData.encounteredEvents` (ME tier weighting); `seed` / `waveSeed` are the
+   * run-RNG cursor; `dex` is the lz-string-compressed, bigint-safe dex / starter blob
+   * ({@linkcode captureCoopDexDelta}). All strings / scalars, no engine types - bigint round-trips
+   * via string.
+   */
+  | {
+      k: "meResync";
+      base: CoopFullBattleSnapshot | null;
+      party: string[];
+      meSaveData: string;
+      seed: string;
+      waveSeed: string;
+      dex: string;
+    };
 
 /**
  * How a wave's battle ended (#633, authoritative wave-advance handshake). The host
@@ -546,6 +583,14 @@ export type CoopMessage =
    * state") becomes self-checking + self-healing instead of silently corrupting both runs.
    */
   | { t: "meChecksum"; seq: number; checksum: string }
+  /**
+   * Host -> guest (#633, TRACK-2 Phase C, NON-BATTLE ME narration): one mystery-encounter
+   * dialogue/text line the host's authoritative ME engine produced, ALREADY localized by the host
+   * (the guest's CoopReplayMePhase queues it verbatim so its screen matches the host-run encounter).
+   * Cosmetic only - the reward alternation + the full-state snapshot carry the OUTCOME, so a
+   * dropped/late `meMessage` can only blank a narration line, never desync the run.
+   */
+  | { t: "meMessage"; text: string }
   /**
    * Owner -> watcher (#633 Fix #2): the EXACT reward-screen option list the owner rolled
    * for interaction `seq`. The watcher rebuilds these instead of re-rolling its own pool

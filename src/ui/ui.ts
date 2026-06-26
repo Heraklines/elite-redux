@@ -1,6 +1,13 @@
 import { globalScene } from "#app/global-scene";
 import type { CoopMePumpEngine } from "#data/elite-redux/coop/coop-me-pump";
-import { getCoopMePump, getCoopUiMirror } from "#data/elite-redux/coop/coop-runtime";
+import {
+  coopHostStreamMeMessage,
+  getCoopController,
+  getCoopMePump,
+  getCoopNetcodeMode,
+  getCoopUiMirror,
+} from "#data/elite-redux/coop/coop-runtime";
+import { coopMeInProgress, coopMeInteractionStartValue } from "#phases/mystery-encounter-phases";
 import type { CoopUiMirrorEngine } from "#data/elite-redux/coop/coop-ui-mirror";
 import type { Button } from "#enums/buttons";
 import { Device } from "#enums/devices";
@@ -301,6 +308,19 @@ export class UI extends Phaser.GameObjects.Container {
       // the end-of-ME reward shop fall through to their own owners.
       const mePump = getCoopMePump();
       if (mePump != null && mePump.isSessionActive() && this.coopMeInteractivePhase()) {
+        // Co-op AUTHORITATIVE host on a GUEST-OWNED ME (#633, ADD-2): the host runs the sole engine
+        // (beginOwner, never a watcher in authoritative mode), but the GUEST makes the pick - the
+        // host applies the relayed index PROGRAMMATICALLY (mystery-encounter-phases coopHostAwaitGuestIndex).
+        // So the local host's own presses must NOT also select. Hard-gated to authoritative host on a
+        // guest-owned ME; solo / lockstep / host-owned fall through BYTE-IDENTICAL.
+        if (
+          getCoopNetcodeMode() === "authoritative"
+          && getCoopController()?.role === "host"
+          && coopMeInProgress()
+          && !(getCoopController()?.isLocalOwnerAtCounter(coopMeInteractionStartValue()) ?? true)
+        ) {
+          return false; // the guest owns this ME; the host applies the relayed index programmatically
+        }
         if (mePump.isWatcher()) {
           return false; // the partner drives the encounter; ignore the watcher's local input
         }
@@ -430,6 +450,13 @@ export class UI extends Phaser.GameObjects.Container {
       for (let p = 0; p < globalScene.getPlayerField().length; p++) {
         text = text.split(repname[p]).join(pokename[p]);
       }
+      // Co-op AUTHORITATIVE host (#633, ADD-3): stream the resolved ME narration line so the guest's
+      // CoopReplayMePhase renders it. Hard-gated (coopMeInProgress() false in solo / outside an ME;
+      // coopHostStreamMeMessage no-ops off the live authoritative host), so solo / lockstep / guest
+      // are byte-identical. Streamed at the terminal render (not the `$`-page-split recursion above).
+      if (globalScene.gameMode.isCoop && coopMeInProgress()) {
+        coopHostStreamMeMessage(text);
+      }
       if (handler instanceof MessageUiHandler) {
         (handler as MessageUiHandler).showText(text, delay, callback, callbackDelay, prompt, promptDelay);
       } else {
@@ -478,6 +505,11 @@ export class UI extends Phaser.GameObjects.Container {
       showMessageAndCallback();
     } else {
       const handler = this.getHandler();
+      // Co-op AUTHORITATIVE host (#633, ADD-3): stream the resolved ME dialogue line to the guest.
+      // Same hard gate as showText - byte-identical in solo / lockstep / off the authoritative host.
+      if (globalScene.gameMode.isCoop && coopMeInProgress()) {
+        coopHostStreamMeMessage(text);
+      }
       if (handler instanceof MessageUiHandler) {
         (handler as MessageUiHandler).showDialogue(
           text,

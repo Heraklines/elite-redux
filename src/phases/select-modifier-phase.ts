@@ -8,8 +8,10 @@ import {
 } from "#data/elite-redux/coop/coop-interaction-relay";
 import { reconstructRewardOptions, serializeRewardOptions } from "#data/elite-redux/coop/coop-reward-options";
 import {
+  coopMeInProgress,
   getCoopController,
   getCoopInteractionRelay,
+  getCoopNetcodeMode,
   getCoopRuntime,
   getCoopUiMirror,
 } from "#data/elite-redux/coop/coop-runtime";
@@ -69,6 +71,31 @@ const COOP_ACT_LOCK = 3;
  *  (which would land the watcher in the next wave while the owner is still shopping = desync). */
 const COOP_REWARD_WAIT_MS = 1_200_000;
 
+/**
+ * Co-op (#633 BLOCK-1 / CHANGE-2): inside an AUTHORITATIVE mystery encounter the HOST is the SOLE
+ * engine and granted the actual rewards, so the HOST must OWN the embedded ME reward shop and the
+ * GUEST must WATCH it - regardless of whose ALTERNATING turn the ME itself is. Without this override
+ * a guest-owned ME would make the GUEST the reward owner: it would roll a luck/party-divergent pool
+ * and stream it to the host, granting items the host never rolled. Outside an ME (the normal wave
+ * shop) this returns null and the existing {@linkcode isLocalOwnerAtCounter} alternation stands
+ * BYTE-IDENTICAL. The spoof/hotseat path (local human owns everything) is also left unchanged.
+ *
+ * Returns: `true` => this client is the forced reward OWNER; `false` => forced WATCHER; `null` => no
+ * override (outside an authoritative ME / solo / lockstep / hotseat).
+ */
+function coopMeRewardOwnerOverride(): boolean | null {
+  if (!globalScene.gameMode.isCoop || getCoopNetcodeMode() !== "authoritative") {
+    return null;
+  }
+  if (!coopMeInProgress()) {
+    return null;
+  }
+  if (getCoopRuntime()?.spoof != null) {
+    return null; // hotseat: the local human owns everything (unchanged)
+  }
+  return getCoopController()?.role === "host";
+}
+
 export class SelectModifierPhase extends BattlePhase {
   public readonly phaseName = "SelectModifierPhase";
   private rerollCount: number;
@@ -126,6 +153,12 @@ export class SelectModifierPhase extends BattlePhase {
       this.coopInteractionStart = coopController.interactionCounter();
     }
 
+    // Co-op (#633 BLOCK-1 / CHANGE-2): inside an authoritative ME the HOST is the forced reward
+    // OWNER and the GUEST the forced WATCHER (it streams the items the host actually rolled).
+    // Outside an ME this is null and the existing alternation stands byte-identical. Hoisted so the
+    // owner-resolution branch below (:239) shares the same decision.
+    const rewardOverride = coopMeRewardOwnerOverride();
+
     // Co-op (#633 Fix #2): is THIS client the WATCHER of this reward interaction? The watcher
     // must NOT roll its own option pool - party luck changes the number of seeded upgrade
     // draws getNewModifierTypeOption consumes, so a local roll would (a) diverge from the
@@ -135,7 +168,9 @@ export class SelectModifierPhase extends BattlePhase {
     const coopIsWatcher =
       coopController != null
       && getCoopRuntime()?.spoof == null
-      && !coopController.isLocalOwnerAtCounter(this.coopInteractionStart);
+      && (rewardOverride != null
+        ? !rewardOverride // authoritative ME: forced owner=host => the guest watches
+        : !coopController.isLocalOwnerAtCounter(this.coopInteractionStart));
 
     // Dev test-suite "start in the store" scenarios stage guaranteed reward
     // options (e.g. a Rare Candy, or a Form-Change Item that resolves to a
@@ -235,7 +270,10 @@ export class SelectModifierPhase extends BattlePhase {
       // (coopInteractionStart), NOT the live counter - an inbound reconcile broadcast can
       // bump the live counter mid-interaction, which would flip the owner/seq calc and make
       // the watcher follow a seq the owner stopped sending on ("cursor at the wrong spots").
-      if (spoofed || coopController.isLocalOwnerAtCounter(this.coopInteractionStart)) {
+      // CHANGE-2: inside an authoritative ME, rewardOverride forces host=owner / guest=watcher.
+      const ownsThisShop =
+        rewardOverride != null ? rewardOverride : coopController.isLocalOwnerAtCounter(this.coopInteractionStart);
+      if (spoofed || ownsThisShop) {
         console.log(
           `[coop-reward] OWNER drives reward screen (start=${this.coopInteractionStart} role=${coopController.role} spoof=${spoofed} wave=${globalScene.currentBattle?.waveIndex})`,
         );
@@ -853,11 +891,15 @@ export class SelectModifierPhase extends BattlePhase {
     if (!globalScene.gameMode.isCoop) {
       return;
     }
-    // Co-op (#633): when this reward shop is the END-OF-MYSTERY-ENCOUNTER reward (an ME is still
-    // active), the encounter OWNS the single alternation advance (fired by PostMysteryEncounterPhase),
-    // so the embedded shop must NOT advance too - else the turn counter double-advances and the
-    // owner/watcher calc desyncs. A normal wave shop has no active ME, so it advances as usual.
-    if (globalScene.currentBattle.mysteryEncounter != null) {
+    // Co-op (#633): when this reward shop is the END-OF-MYSTERY-ENCOUNTER reward, the encounter OWNS
+    // the single alternation advance (fired by PostMysteryEncounterPhase). The embedded shop must NOT
+    // advance too - else the counter double-advances and the owner/watcher calc desyncs into a
+    // DUPLICATE reward screen. Keyed to the STABLE ME pin (coopMeInProgress), not
+    // `currentBattle.mysteryEncounter`: under the authoritative divert the ME phases can settle out of
+    // order and transiently null that field, which let the shop slip past the old guard. The pin is set
+    // at ME entry and cleared only at the true ME terminal, so it can never be missed. A normal wave
+    // shop has no active ME, so it advances as usual (solo/lockstep byte-identical).
+    if (coopMeInProgress()) {
       return;
     }
     const controller = getCoopController();

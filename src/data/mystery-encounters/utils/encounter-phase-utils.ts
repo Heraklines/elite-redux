@@ -13,7 +13,11 @@ import {
   coopGuestShouldAdoptMeBattleParty,
   coopHostStreamMeBattleParty,
   coopMeOwnerRelayBattleHandoff,
+  getCoopController,
+  getCoopInteractionRelay,
+  getCoopNetcodeMode,
 } from "#data/elite-redux/coop/coop-runtime";
+import type { CoopInteractionOutcome } from "#data/elite-redux/coop/coop-transport";
 import type { Gender } from "#data/gender";
 import { getNatureName } from "#data/nature";
 import type { CustomPokemonData } from "#data/pokemon-data";
@@ -26,6 +30,7 @@ import { FieldPosition } from "#enums/field-position";
 import { ModifierPoolType } from "#enums/modifier-pool-type";
 import type { MoveId } from "#enums/move-id";
 import { MysteryEncounterMode } from "#enums/mystery-encounter-mode";
+import { MysteryEncounterType } from "#enums/mystery-encounter-type";
 import type { Nature } from "#enums/nature";
 import { PokemonType } from "#enums/pokemon-type";
 import { StatusEffect } from "#enums/status-effect";
@@ -46,6 +51,7 @@ import {
 import { PokemonMove } from "#moves/pokemon-move";
 import { showEncounterText } from "#mystery-encounters/encounter-dialogue-utils";
 import type { MysteryEncounter } from "#mystery-encounters/mystery-encounter";
+import { coopMeInProgress, coopMeInteractionStartValue } from "#phases/mystery-encounter-phases";
 import type { MysteryEncounterOption } from "#mystery-encounters/mystery-encounter-option";
 import type { Variant } from "#sprites/variant";
 import type { PokemonData } from "#system/pokemon-data";
@@ -60,6 +66,57 @@ import { coerceArray } from "#utils/array";
 import { BooleanHolder, randSeedInt, randSeedItem } from "#utils/common";
 import { getPokemonSpecies } from "#utils/pokemon-utils";
 import i18next from "i18next";
+
+// =============================================================================
+// Co-op authoritative non-battle ME sub-prompt forwarding (#633, ADD-2b / ADD-2c). When the HOST
+// runs the sole engine for a GUEST-OWNED ME, its `selectPokemonForOption` sub-prompt (party target /
+// secondary menu) must await the GUEST's relayed pick instead of opening a LOCAL host party screen.
+// The host streams a `subPrompt` descriptor (which capture screen to open) and awaits the slot /
+// secondary index on the guest->host pick channel (`seq_me`). Every await has the disconnect-ceiling
+// null-end routing to the not-selected / default branch (no host hang).
+// =============================================================================
+/** Same guest->host pick channel base the ME pump uses (`seq_me = BASE + coopMeInteractionStart`). */
+const COOP_ME_PUMP_SEQ_BASE = 8_000_000;
+/** Disconnect ceiling for every host<->guest ME await; steady state resolves on the relayed pick. */
+const COOP_ME_REPLAY_WAIT_MS = 1_200_000;
+/**
+ * Co-op authoritative non-battle ME (#633, ADD-2c): MEs whose selected-option chain pushes a BESPOKE
+ * interactive sub-phase / sub-UI that does NOT route through the generic `selectPokemonForOption`
+ * party screen + secondary menu (the two sites ADD-2b relays). On a GUEST-OWNED ME of one of these
+ * the host has no generic relay site, so rather than HANG it SAFE-DEGRADES (runs the option's
+ * not-selected / default branch + the terminal, logged). Enumerated from grepping the encounters:
+ *  - ErQuizPhase sub-phase (8): TRACKS_IN_THE_SNOW / GUESSING_BOOTH / SCRAMBLED_POKEDEX / SEALED_DOOR
+ *    / SALVAGE_YARD / LAKE_SPIRIT / FROZEN_SHAPES / DORMANT_GUARDIAN.
+ *  - Bespoke OPTION_SELECT yes/no prompt (1): CLOWNING_AROUND (displayYesNoOptions).
+ * NOT an open deferral - a closed list; the host always reaches a terminal.
+ */
+export const COOP_AUTHORITATIVE_BESPOKE_SUB_ME: ReadonlySet<MysteryEncounterType> = new Set([
+  MysteryEncounterType.ER_TRACKS_IN_THE_SNOW,
+  MysteryEncounterType.ER_GUESSING_BOOTH,
+  MysteryEncounterType.ER_SCRAMBLED_POKEDEX,
+  MysteryEncounterType.ER_SEALED_DOOR,
+  MysteryEncounterType.ER_SALVAGE_YARD,
+  MysteryEncounterType.ER_LAKE_SPIRIT,
+  MysteryEncounterType.ER_FROZEN_SHAPES,
+  MysteryEncounterType.ER_DORMANT_GUARDIAN,
+  MysteryEncounterType.CLOWNING_AROUND,
+]);
+
+/**
+ * Co-op authoritative non-battle ME (#633, ADD-2b): is THIS client the HOST running the sole engine
+ * on a GUEST-OWNED ME? Then a `selectPokemonForOption` sub-prompt must await the guest's relayed pick
+ * (not open a local host party screen). Hard `false` off the live authoritative host, when the host
+ * OWNS this ME (it drives off local input), and in solo / lockstep - so those paths are byte-identical.
+ */
+function coopHostAwaitsGuestSubPick(): boolean {
+  return (
+    globalScene.gameMode.isCoop
+    && getCoopNetcodeMode() === "authoritative"
+    && getCoopController()?.role === "host"
+    && coopMeInProgress()
+    && !(getCoopController()?.isLocalOwnerAtCounter(coopMeInteractionStartValue()) ?? true)
+  );
+}
 
 /**
  * Animates exclamation sprite over trainer's head at start of encounter
@@ -609,6 +666,58 @@ export function selectPokemonForOption(
 ): Promise<boolean> {
   return new Promise(resolve => {
     const modeToSetOnExit = globalScene.ui.getMode();
+
+    // Co-op AUTHORITATIVE host on a GUEST-OWNED ME (#633, ADD-2b): the host runs the sole engine, so
+    // the party target + any secondary index come from the GUEST's relayed picks, NOT a local host
+    // party screen. Stream the `subPrompt` descriptor (which capture screen the guest opens) and
+    // await each pick on `seq_me` (FIFO). Each await null-ends to the not-selected / default branch
+    // (disconnect ceiling only - steady state resolves on the human pick), so the host never hangs.
+    if (coopHostAwaitsGuestSubPick()) {
+      const seqMe = COOP_ME_PUMP_SEQ_BASE + coopMeInteractionStartValue();
+      const relay = getCoopInteractionRelay();
+      const partyPrompt: CoopInteractionOutcome = {
+        k: "mePresent",
+        tokens: {},
+        meetsReqs: [],
+        labels: [],
+        subPrompt: { kind: "party" },
+      };
+      relay?.sendInteractionOutcome(seqMe, "mePresent", partyPrompt);
+      void relay?.awaitInteractionChoice(seqMe, COOP_ME_REPLAY_WAIT_MS).then(async pick => {
+        // A null (disconnected guest) maps past the party tail => the not-selected branch.
+        const slotIndex = pick?.choice ?? globalScene.getPlayerParty().length;
+        if (slotIndex >= globalScene.getPlayerParty().length) {
+          onPokemonNotSelected?.();
+          resolve(false);
+          return;
+        }
+        const pokemon = globalScene.getPlayerParty()[slotIndex];
+        const secondaryOptions = onPokemonSelected(pokemon);
+        if (!secondaryOptions) {
+          globalScene.currentBattle.mysteryEncounter!.setDialogueToken("selectedPokemon", pokemon.getNameToRender());
+          resolve(true);
+          return;
+        }
+        // Secondary menu: stream its labels, then await the guest's secondary index (another P1b).
+        const secondaryPrompt: CoopInteractionOutcome = {
+          k: "mePresent",
+          tokens: {},
+          meetsReqs: [],
+          labels: [],
+          subPrompt: { kind: "secondary", labels: secondaryOptions.map(o => o.label) },
+        };
+        relay?.sendInteractionOutcome(seqMe, "mePresent", secondaryPrompt);
+        void relay?.awaitInteractionChoice(seqMe, COOP_ME_REPLAY_WAIT_MS).then(sec => {
+          globalScene.currentBattle.mysteryEncounter!.setDialogueToken("selectedPokemon", pokemon.getNameToRender());
+          const idx = sec?.choice ?? -1;
+          if (idx >= 0 && idx < secondaryOptions.length) {
+            secondaryOptions[idx].handler();
+          }
+          resolve(true);
+        });
+      });
+      return; // do NOT open the local host UiMode.PARTY
+    }
 
     // Open party screen to choose pokemon
     globalScene.ui.setMode(

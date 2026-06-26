@@ -77,6 +77,14 @@ const ME_PUMP_KIND = "meBtn";
  * never collide with a real button code, and distinct from the other interaction sentinels.
  */
 export const COOP_ME_BATTLE_HANDOFF = -1000;
+/**
+ * Co-op authoritative non-battle ME (#633 MAJOR-1): the HOST->GUEST terminal / battle-handoff
+ * sentinel rides a DEDICATED seq `COOP_ME_TERM_SEQ_BASE + coopMeInteractionStart` so it can never
+ * FIFO-collide with the guest->host option/sub-pick relay (which stays on `COOP_ME_PUMP_SEQ_BASE +
+ * start`). Three disjoint seq channels: `8_000_000 + start` (guest->host picks + host present /
+ * resync outcomes), `9_000_000 + start` (host->guest terminal / handoff), RAW `start` (reward shop).
+ */
+export const COOP_ME_TERM_SEQ_BASE = 9_000_000;
 /** Default watcher wait for the owner's next button before degrading (20min: "wait for the
  *  human" - a slow owner reading dialogue must never trip the watcher's safe-skip). */
 const DEFAULT_ME_WAIT_MS = 1_200_000;
@@ -100,6 +108,17 @@ export class CoopMePump {
 
   private role: PumpRole | null = null;
   private seq = -1;
+  /**
+   * Seq the OWNER sends its TERMINAL sentinels (LEAVE / battle-handoff) on (#633 MAJOR-1 / B-1).
+   * In LOCKSTEP this stays == {@linkcode seq} (8M), so the watcher loop - which awaits the owner's
+   * button stream AND its terminal on the SAME seq - keeps catching the terminal byte-identically.
+   * In AUTHORITATIVE mode the host passes a DEDICATED `COOP_ME_TERM_SEQ_BASE + start` (9M) so the
+   * terminal rides a channel disjoint from the guest->host pick/sub-pick relay (which stays on 8M),
+   * matching where the authoritative guest's `CoopReplayMePhase.awaitHostTerminal` listens. Without
+   * this split the host's LEAVE/HANDOFF buffered on 8M forever and the 9M guest waiter only resolved
+   * via the ~20-min disconnect timeout (every authoritative non-battle ME hung the guest).
+   */
+  private termSeq = -1;
   private ended = true;
   private loopRunning = false;
   /** Watcher terminal: the owner left a NON-battle ME (LEAVE / timeout / gone) -> skip to next wave. */
@@ -121,13 +140,23 @@ export class CoopMePump {
   /**
    * OWNER: begin relaying our buttons for ME interaction `seq`. Idempotent on an
    * already-active same-seq session (a nested option-select re-enters here).
+   *
+   * `termSeq` (#633 MAJOR-1 / B-1) is the seq the OWNER sends its TERMINAL sentinels
+   * (LEAVE / battle-handoff) on. Defaults to `seq` so LOCKSTEP stays byte-identical (the watcher
+   * loop catches the terminal on the same seq as the buttons). The AUTHORITATIVE host passes
+   * `COOP_ME_TERM_SEQ_BASE + start` so the terminal reaches the guest's `CoopReplayMePhase`
+   * (which awaits the terminal on the dedicated 9M seq, disjoint from the 8M pick relay).
    */
-  beginOwner(seq: number): void {
+  beginOwner(seq: number, termSeq: number = seq): void {
     if (this.role === "owner" && this.seq === seq && !this.ended) {
+      // Keep the terminal seq in sync on a nested re-entry (the start counter is stable, so this
+      // is the same value, but never let a re-entry leave a stale termSeq behind).
+      this.termSeq = termSeq;
       return;
     }
     this.role = "owner";
     this.seq = seq;
+    this.termSeq = termSeq;
     this.ended = false;
   }
 
@@ -151,6 +180,7 @@ export class CoopMePump {
     }
     this.role = "watcher";
     this.seq = seq;
+    this.termSeq = seq;
     this.ended = false;
     this.onLeave = onLeave;
     this.onBattleHandoff = onBattleHandoff;
@@ -192,7 +222,9 @@ export class CoopMePump {
    */
   relayMeBattleHandoff(): void {
     if (this.role === "owner" && !this.ended) {
-      this.relay.sendInteractionChoice(this.seq, ME_PUMP_KIND, COOP_ME_BATTLE_HANDOFF);
+      // Terminal sentinel rides `termSeq` (#633 MAJOR-1 / B-1): == seq in lockstep (watcher loop),
+      // the dedicated 9M terminal seq in authoritative mode (CoopReplayMePhase.awaitHostTerminal).
+      this.relay.sendInteractionChoice(this.termSeq, ME_PUMP_KIND, COOP_ME_BATTLE_HANDOFF);
     }
     this.endSession();
   }
@@ -200,7 +232,9 @@ export class CoopMePump {
   /** OWNER: the ME reached its terminal - send the leave sentinel so the watcher loop ends. */
   endOwner(): void {
     if (this.role === "owner" && !this.ended) {
-      this.relay.sendInteractionChoice(this.seq, ME_PUMP_KIND, COOP_INTERACTION_LEAVE);
+      // Terminal sentinel rides `termSeq` (#633 MAJOR-1 / B-1): == seq in lockstep (watcher loop),
+      // the dedicated 9M terminal seq in authoritative mode (CoopReplayMePhase.awaitHostTerminal).
+      this.relay.sendInteractionChoice(this.termSeq, ME_PUMP_KIND, COOP_INTERACTION_LEAVE);
     }
     this.endSession();
   }
@@ -209,6 +243,7 @@ export class CoopMePump {
   endSession(): void {
     this.ended = true;
     this.role = null;
+    this.termSeq = -1;
     this.onLeave = null;
     this.onBattleHandoff = null;
   }

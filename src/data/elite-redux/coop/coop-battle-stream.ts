@@ -137,6 +137,8 @@ export class CoopBattleStreamer {
   private stateSyncSeq = 0;
   /** WATCHER: handler for the owner's ME-boundary checksum (#633, TRACK-2 Phase C). */
   private meChecksumHandler: ((seq: number, checksum: string) => void) | null = null;
+  /** GUEST: handler for the host's ME narration lines (#633, TRACK-2 Phase C, non-battle ME). */
+  private meMessageHandler: ((text: string) => void) | null = null;
   /** GUEST: handler for the host's wave-resolved signal (#633, authoritative wave-advance). */
   private waveResolvedHandler: ((wave: number, outcome: CoopWaveOutcome) => void) | null = null;
 
@@ -247,6 +249,30 @@ export class CoopBattleStreamer {
    */
   onMeChecksum(handler: (seq: number, checksum: string) => void): void {
     this.meChecksumHandler = handler;
+  }
+
+  /**
+   * HOST (#633, TRACK-2 Phase C, non-battle ME narration): stream one ME dialogue/text line to the
+   * guest's CoopReplayMePhase so its screen matches the host-run encounter. Cosmetic - the outcome
+   * rides the reward alternation + the full-state snapshot, so a dropped line never desyncs.
+   */
+  sendMeMessage(text: string): void {
+    this.transport.send({ t: "meMessage", text });
+  }
+
+  /**
+   * GUEST (#633, TRACK-2 Phase C, non-battle ME narration): subscribe to the host's ME narration
+   * lines. The handler queues each one (verbatim, already localized by the host) so the diverted
+   * guest's encounter screen renders the same text the host's authoritative ME engine produced.
+   * Returns an unsubscribe function (CoopReplayMePhase drops it when the encounter terminal fires).
+   */
+  onMeMessage(handler: (text: string) => void): () => void {
+    this.meMessageHandler = handler;
+    return () => {
+      if (this.meMessageHandler === handler) {
+        this.meMessageHandler = null;
+      }
+    };
   }
 
   /**
@@ -539,6 +565,7 @@ export class CoopBattleStreamer {
     this.lastGhostPool = null;
     this.stateSyncRequestHandler = null;
     this.meChecksumHandler = null;
+    this.meMessageHandler = null;
     this.waveResolvedHandler = null;
   }
 
@@ -622,6 +649,10 @@ export class CoopBattleStreamer {
       case "meChecksum":
         // WATCHER: the owner's ME-boundary checksum - verify + heal on mismatch.
         this.meChecksumHandler?.(msg.seq, msg.checksum);
+        return;
+      case "meMessage":
+        // GUEST: one host-authoritative ME narration line - the diverted CoopReplayMePhase queues it.
+        this.meMessageHandler?.(msg.text);
         return;
       case "waveResolved":
         // GUEST: the host cleared/ended this wave - run the normal post-battle tail.

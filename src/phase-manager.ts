@@ -28,6 +28,7 @@ import { CheckSwitchPhase } from "#phases/check-switch-phase";
 import { ColosseumChoicePhase } from "#phases/colosseum-choice-phase";
 import { CommandPhase } from "#phases/command-phase";
 import { CommonAnimPhase } from "#phases/common-anim-phase";
+import { CoopReplayMePhase } from "#phases/coop-replay-me-phase";
 import {
   CoopFaintReplayPhase,
   CoopFinalizeTurnPhase,
@@ -167,6 +168,7 @@ const PHASES = Object.freeze({
   CheckSwitchPhase,
   CommandPhase,
   CoopReplayTurnPhase,
+  CoopReplayMePhase,
   CoopFinalizeTurnPhase,
   CoopFaintReplayPhase,
   CoopHpDrainReplayPhase,
@@ -494,6 +496,10 @@ export class PhaseManager {
     if (isCoopRecording()) {
       recordCoopMessage(message);
     }
+    // Co-op ME narration (#633, ADD-3) is streamed to the guest from `ui.showText` / `ui.showDialogue`
+    // at the actual render site, NOT here: every queued message flows through `MessagePhase` ->
+    // `ui.showText`, so hooking here too would stream each ME line TWICE (the guest would render the
+    // duplicate). The render-site hook is the single, in-order source of truth.
     const phase = new MessagePhase(message, callbackDelay, prompt, promptDelay);
     if (defer) {
       this.pushPhase(phase);
