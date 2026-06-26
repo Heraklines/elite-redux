@@ -14,8 +14,10 @@
 
 import { allChallenges, GhostTrainersChallenge } from "#data/challenge";
 import {
+  applyErGhostOverride,
   type GhostTeamSnapshot,
   hasErGhostOverride,
+  markTrainerAsGhost,
   setPrefetchedGhostTeamsForTests,
   takeGhostForWave,
 } from "#data/elite-redux/er-ghost-teams";
@@ -172,5 +174,69 @@ describe.skipIf(!RUN)("ER Ghost Trainers challenge (#422)", () => {
     expect(first).not.toBeNull();
     expect(second).not.toBeNull();
     expect(first?.trainerName).not.toBe(second?.trainerName);
+  });
+});
+
+// Separate block: NO enemySpecies override (it would force every addEnemyPokemon to
+// Magikarp), so we can assert the ACTUAL species applyErGhostOverride builds.
+describe.skipIf(!RUN)("ER ghost devolve gate past wave 100 (#422 follow-up)", () => {
+  let phaserGame: Phaser.Game;
+  let game: GameManager;
+
+  beforeAll(() => {
+    phaserGame = new Phaser.Game({ type: Phaser.HEADLESS });
+  });
+  beforeEach(() => {
+    game = new GameManager(phaserGame);
+    game.override.battleStyle("single").startingWave(5).startingLevel(10).ability(AbilityId.BALL_FETCH);
+  });
+  afterEach(() => {
+    setPrefetchedGhostTeamsForTests([]);
+    for (const c of game.scene.gameMode?.challenges ?? []) {
+      c.value = 0;
+    }
+  });
+
+  it("a deep team is fielded FULLY EVOLVED past wave 100, but still devolved early", async () => {
+    // The "not-fully-evolved ghosts at wave 137+" bug: a deep (wave-200) team drawn for
+    // a high challenge wave was devolved to base forms. Past wave 100 the player already
+    // faces fully-evolved enemies, so applyErGhostOverride must only re-level it, not
+    // devolve. Below wave 100 the fairness devolve still applies.
+    const deepEvolved: GhostTeamSnapshot = {
+      ...SNAPSHOT,
+      id: "er-test-evolved",
+      waveReached: 200,
+      party: [
+        {
+          speciesId: SpeciesId.GARCHOMP, // 3-stage line: Garchomp -> Gabite -> Gible
+          formIndex: 0,
+          abilityIndex: 0,
+          ivs: [31, 31, 31, 31, 31, 31],
+          nature: 0,
+          level: 100,
+          gender: 0,
+          shiny: false,
+          variant: 0,
+          passive: false,
+          moves: [MoveId.TACKLE],
+        },
+      ],
+    };
+    setPrefetchedGhostTeamsForTests([deepEvolved]);
+    game.challengeMode.addChallenge(Challenges.GHOST_TRAINERS, 1, 1);
+    await game.challengeMode.startBattle(SpeciesId.SNORLAX);
+    const host = game.scene.currentBattle.trainer;
+    expect(host).not.toBeNull();
+    markTrainerAsGhost(host!, deepEvolved);
+
+    // Wave 137 (>= 100): fully evolved, only re-levelled to the wave.
+    game.scene.currentBattle.waveIndex = 137;
+    game.scene.currentBattle.enemyLevels = [137];
+    expect(applyErGhostOverride(host!, 0)?.species.speciesId).toBe(SpeciesId.GARCHOMP);
+
+    // Wave 80 (< 100): overshoot 200 - (80 + 40) = 80 -> 3 stages -> base form (Gible).
+    game.scene.currentBattle.waveIndex = 80;
+    game.scene.currentBattle.enemyLevels = [80];
+    expect(applyErGhostOverride(host!, 0)?.species.speciesId).toBe(SpeciesId.GIBLE);
   });
 });
