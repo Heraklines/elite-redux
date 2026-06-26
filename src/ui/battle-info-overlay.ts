@@ -25,6 +25,7 @@ import {
   getErSharedGiftAbilityIdsFor,
   isErGiftCycleAllowed,
 } from "#data/elite-redux/er-black-shinies";
+import { getErDamagePreview } from "#data/elite-redux/er-damage-preview";
 import { erYoungsterFreeInnateSlots } from "#data/elite-redux/er-run-difficulty";
 import { getNatureName, getNatureStatMultiplier } from "#data/nature";
 import { TerrainType as TerrainTypeEnum } from "#data/terrain";
@@ -722,15 +723,14 @@ export class BattleInfoOverlay {
       if (move.category === MoveCategory.STATUS || move.power <= 0) {
         info = "—  (status)";
       } else {
-        let dmg = 0;
-        try {
-          dmg = target.getAttackDamage({ source: mon, move, simulated: true }).damage;
-        } catch {
-          dmg = 0;
-        }
-        const pct = Math.max(0, Math.round((dmg / Math.max(1, target.getMaxHp())) * 100));
-        const ko = dmg >= target.hp ? "  KO!" : "";
-        info = `${dmg} dmg (${pct}%)${ko}`;
+        // Shared preview: real per-hit damage scaled for multi-hit (MultiHitAttr
+        // moves + ER Multi-Headed) so multi-strike moves aren't undercounted here.
+        // Same layout as before, just the corrected total (the fight-menu DMG CALC
+        // panel carries the hit-count + crit breakdown).
+        const { max } = getErDamagePreview(mon, target, move);
+        const pct = Math.max(0, Math.round((max / Math.max(1, target.getMaxHp())) * 100));
+        const ko = max >= target.hp ? "  KO!" : "";
+        info = `${max} dmg (${pct}%)${ko}`;
       }
       const meta = addTextObject(230, by + 11, info, TextStyle.WINDOW_ALT, { fontSize: "40px" });
       meta.setOrigin(1, 0);
