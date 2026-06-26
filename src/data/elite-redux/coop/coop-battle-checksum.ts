@@ -113,6 +113,21 @@ export interface CoopChecksumState {
   money: number;
   /** Persistent modifiers as `[typeId, stackCount]`, sorted by `typeId`. */
   modifiers: [string, number][];
+  /**
+   * Active `BiomeId` (B7). Hashing it makes an independent biome re-roll (a host/guest seed or
+   * waveIndex drift that landed the two clients in DIFFERENT biomes) detectable. Settled by
+   * SwitchBiomePhase's newArena (tween-deferred, but the phase queue blocks the next turn-boundary
+   * checksum until that phase ends), so it is stable + identical across healthy clients at the read
+   * point - it can ONLY differ on a real split.
+   */
+  biomeId: number;
+  /**
+   * Run seed (B8): the master determinism input. runConfig-pinned identical across clients, mutated
+   * only by setSeed (never mid-turn; the RNG cursor advances separately and is deliberately excluded),
+   * so it is stable + identical across healthy clients and only differs on a real seed split that a
+   * no-ME run segment would otherwise leave permanent + silent.
+   */
+  seed: string;
 }
 
 /** A read-failure sentinel digest. Both sides agree to SKIP the comparison on it. */

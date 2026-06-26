@@ -50,6 +50,8 @@ const state = (over: Partial<CoopChecksumState> = {}): CoopChecksumState => ({
   partyLevels: [50, 48],
   money: 1000,
   modifiers: [["EXP_CHARM", 1]],
+  biomeId: 0,
+  seed: "SEED",
   ...over,
 });
 
@@ -104,16 +106,20 @@ describe("co-op battle checksum pure core (#633, TRACK-2)", () => {
         partyLevels: [50, 48],
         arenaTags: [],
         modifiers: [["EXP_CHARM", 1]],
+        seed: "SEED",
+        biomeId: 0,
       };
       const b: CoopChecksumState = {
         field: [mon()],
         terrain: 0,
         weather: 0,
         arenaTags: [],
+        biomeId: 0,
         party: [1, 4],
         partyLevels: [50, 48],
         modifiers: [["EXP_CHARM", 1]],
         money: 1000,
+        seed: "SEED",
       };
       expect(checksumState(a)).toBe(checksumState(b));
     });

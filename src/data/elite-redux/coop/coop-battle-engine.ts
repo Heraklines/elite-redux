@@ -53,6 +53,7 @@ import type { AbilityId } from "#enums/ability-id";
 import type { ArenaTagSide } from "#enums/arena-tag-side";
 import type { ArenaTagType } from "#enums/arena-tag-type";
 import { BattlerIndex } from "#enums/battler-index";
+import type { BiomeId } from "#enums/biome-id";
 import { BattlerTagType } from "#enums/battler-tag-type";
 import type { MoveId } from "#enums/move-id";
 import type { Nature } from "#enums/nature";
@@ -1089,6 +1090,13 @@ export function captureCoopChecksumState(): CoopChecksumState {
     partyLevels: globalScene.getPlayerParty().map(p => p.level),
     money: globalScene.money,
     modifiers: readModifiers(),
+    // Active biome (B7): an independent biome re-roll (a seed/waveIndex drift that landed the two
+    // clients in DIFFERENT biomes) is otherwise invisible to the field-only checkpoint. Settled at
+    // the turn boundary (SwitchBiomePhase's newArena blocks the next checksum until it ends).
+    biomeId: arena.biomeId ?? 0,
+    // Run seed (B8): the master determinism input. runConfig-pinned identical across healthy clients;
+    // only setSeed mutates it (never mid-turn), so it differs ONLY on a real seed split.
+    seed: globalScene.seed ?? "",
   };
 }
 
@@ -1172,6 +1180,12 @@ export function captureCoopFullSnapshot(): CoopFullBattleSnapshot | null {
       // revive-in-shop desync heals - the on-field-only `field` + speciesId-only `party` cannot.
       // Reuses the capture-handshake serialize; applied (gated guest-only) in applyCoopFullSnapshot.
       benchParty: captureCoopCaptureParty(),
+      // Biome + run seed (B7/B8): the guest heals a biome split (newArena) + re-pins the run seed /
+      // wave seed on ANY resync. `?? ""` / `?? 0` so the literal never carries an explicit undefined
+      // into a `?: T` field (exactOptional safety); the apply's length-guard skips an empty seed.
+      biomeId: arena.biomeId ?? 0,
+      seed: globalScene.seed ?? "",
+      waveSeed: globalScene.waveSeed ?? "",
     };
   } catch {
     return null;
@@ -1478,6 +1492,18 @@ export function applyCoopFullSnapshot(
       "resync",
       `guest applyFullSnapshot field=${snapshot.field?.length ?? 0} weather=${snapshot.weather} terrain=${snapshot.terrain} arenaTags=${snapshot.arenaTags?.length ?? 0} modifiers=${snapshot.modifiers?.length ?? 0} party=${snapshot.party?.length ?? 0} money=${snapshot.money} suppressResummon=${suppressResummon}`,
     );
+    // Biome heal (B7): a hashed biome split (a seed/waveIndex drift that landed the clients in
+    // DIFFERENT biomes) is healed by rebuilding the arena to the host's biome. MUST run BEFORE the
+    // weather/terrain/arenaTags reconcile below (a fresh Arena has none) so they land on the right
+    // arena; its position vs. the field re-summon is immaterial (newArena swaps only globalScene.arena
+    // DATA, never globalScene.field sprites). newArena is heavy, so gate to a genuine mismatch - a
+    // no-op (and same arena object identity) when biome already matches, the overwhelmingly common case.
+    // NOTE: newArena does NOT call arena.init(), so the visible background is not refreshed until the
+    // next real SwitchBiomePhase; the checksum reads only arena.biomeId (data), which this DOES fix.
+    if (typeof snapshot.biomeId === "number" && (globalScene.arena?.biomeId ?? -1) !== snapshot.biomeId) {
+      coopWarn("resync", `biome force host=${snapshot.biomeId} guest=${globalScene.arena?.biomeId}`);
+      globalScene.newArena(snapshot.biomeId as BiomeId);
+    }
     // MINOR-1 (#633, converge-or-give-up): when a divergence has failed to heal twice on the same
     // dimensions, SKIP the heavy field-composition re-summon (it isn't closing the gap and a per-turn
     // teardown/rebuild is a flicker + asset-reload storm). The cheap per-mon scalar writes still run.
@@ -1519,6 +1545,16 @@ export function applyCoopFullSnapshot(
     // Reconcile persistent modifier / relic stacks (#633 GAP 2): a stack-count divergence is hashed
     // -> a permanent still-diverged loop; heal it by adopting the host's stack counts (safe subset).
     reconcileCoopModifierStacks(snapshot.modifiers);
+    // Run-seed heal (B8): the hashed master determinism input is now healed on ANY resync, not only at
+    // an ME terminal (where applyCoopMeOutcome re-pins it separately + idempotently). Length-guarded so
+    // an empty "" seed is never pinned; re-pinning the same seed is a no-op, safe in the common case.
+    if (typeof snapshot.seed === "string" && snapshot.seed.length > 0) {
+      globalScene.setSeed(snapshot.seed);
+    }
+    if (typeof snapshot.waveSeed === "string" && snapshot.waveSeed.length > 0) {
+      globalScene.waveSeed = snapshot.waveSeed;
+      Phaser.Math.RND.sow([snapshot.waveSeed]);
+    }
     // Adopt the host's player party ORDER (#633 GAP 4): OFF-FIELD-only bench reorder (safe at any
     // boundary) so the hashed `party` speciesId sequence converges. On-field leads are untouched.
     adoptCoopHostPlayerPartyOrder(snapshot.party);

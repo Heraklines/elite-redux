@@ -340,6 +340,12 @@ export interface CoopFullBattleSnapshot {
    * Optional + additive: an older host omits it and the guest leaves its bench alone.
    */
   benchParty?: string[] | undefined;
+  /** Active `BiomeId` (B7); the guest heals a biome split via `newArena(biomeId)` on resync. */
+  biomeId?: number;
+  /** Run seed (B8); the guest re-pins `setSeed(seed)` on ANY resync (not just at an ME terminal). */
+  seed?: string;
+  /** Derived wave seed (B8); re-sown alongside `seed` so the guest's RNG cursor matches the host. */
+  waveSeed?: string;
 }
 
 /**
