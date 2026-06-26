@@ -1,0 +1,262 @@
+url:      https://elite-redux-staging.pages.dev/
+build:    mqvgyr45-afqk
+mode:     6  wave:2
+seed:     GRLb8ba1UtrauYMfFRook8eP
+party:    Gible Redux(L5 21hp f0), Zigzagoon(L5 20hp f0), Larvesta Redux(L5 21hp f0), Absol(L5 22hp f0), Ursaluna(L5 27hp f0)
+enemy:    Happiny(L3), Wooloo(L3)
+
+----- COMMENT -----
+co-op bug.mp5, game froze after defeating a spearow in a double with e-speed.
+
+----- CONSOLE -----
+[22:00:12.541] LOG: [coop:replay] guest replay turn=1: present k=moveUsed
+[22:00:12.541] LOG: [coop:replay] guest replay turn=1: present k=hp
+[22:00:12.541] LOG: [coop:replay] guest replay turn=1: present k=message
+[22:00:12.541] LOG: [coop:replay] guest replay turn=1: present k=message
+[22:00:12.542] LOG: [coop:replay] guest replay turn=1: present k=message
+[22:00:12.542] LOG: [coop:replay] guest replay turn=1: present k=moveUsed
+[22:00:12.542] LOG: [coop:replay] guest replay turn=1: present k=hp
+[22:00:12.542] LOG: [coop:replay] guest replay turn=1: present k=faint
+[22:00:12.542] LOG: [coop:replay] guest replay turn=1: present k=message
+[22:00:12.542] LOG: [coop:replay] guest replay turn=1: present k=statStage
+[22:00:12.543] LOG: [coop:replay] guest replay turn=1: present k=message
+[22:00:12.543] LOG: [coop:replay] guest replay turn=1: present k=statStage
+[22:00:12.543] LOG: [coop:replay] guest replay turn=1: present k=message
+[22:00:12.543] LOG: [coop:replay] guest replay turn=1: present k=message
+[22:00:12.544] LOG: [coop:replay] guest replay turn=1: rendered phases [message=8 moveUsed=2 hp=2 faint=1 statStage=2]
+[22:00:12.544] LOG: [coop:replay] guest replay turn=1: unshift CoopFinalizeTurnPhase (checkpoint apply deferred)
+[22:00:12.544] LOG: %cStart Phase MessagePhase color:green;
+[22:00:12.806] LOG: %cStart Phase CoopMoveAnimReplayPhase color:green;
+[22:00:12.807] LOG: [coop:replay] present move bi=1 moveId=609 targets=1
+[22:00:13.259] LOG: %cStart Phase CoopHpDrainReplayPhase color:green;
+[22:00:13.260] LOG: [coop:replay] present hp bi=3 13->8/13
+[22:00:13.287] LOG: %cStart Phase MessagePhase color:green;
+[22:00:13.553] LOG: %cStart Phase MessagePhase color:green;
+[22:00:13.925] LOG: %cStart Phase MessagePhase color:green;
+[22:00:14.386] LOG: %cStart Phase CoopMoveAnimReplayPhase color:green;
+[22:00:14.388] LOG: [coop:replay] present move bi=0 moveId=838 targets=1
+[22:00:14.721] LOG: %cStart Phase CoopHpDrainReplayPhase color:green;
+[22:00:14.722] LOG: [coop:replay] present hp bi=2 14->0/14
+[22:00:14.743] LOG: %cStart Phase CoopFaintReplayPhase color:green;
+[22:00:14.744] LOG: [coop:replay] present faint bi=2
+[22:00:15.207] LOG: %cStart Phase MessagePhase color:green;
+[22:00:15.486] LOG: %cStart Phase CoopStatStageReplayPhase color:green;
+[22:00:15.487] LOG: [coop:replay] present statStage bi=0 stat=2 -> -1
+[22:00:15.880] LOG: [coop:webrtc] raw rx role=guest t=command bytes=101 handlers=5
+[22:00:15.881] LOG: [coop:relay] recv command fieldIndex=0 turn=2 command=2 -> BUFFERED (no awaiter yet)
+[22:00:15.976] LOG: [coop:webrtc] raw rx role=guest t=commandRequest bytes=68 handlers=5
+[22:00:15.976] WARN: [coop:relay] peer recv commandRequest fieldIndex=1 turn=2 but NO responder installed -> dropped
+[22:00:16.020] LOG: %cStart Phase MessagePhase color:green;
+[22:00:16.347] LOG: %cStart Phase CoopStatStageReplayPhase color:green;
+[22:00:16.348] LOG: [coop:replay] present statStage bi=0 stat=4 -> -1
+[22:00:16.814] LOG: %cStart Phase MessagePhase color:green;
+[22:00:17.086] LOG: %cStart Phase MessagePhase color:green;
+[22:00:17.405] LOG: %cStart Phase CoopFinalizeTurnPhase color:green;
+[22:00:17.405] LOG: [coop:checksum] guest finalize turn=1: apply checkpoint + verify checksum=dc19a356defd419a
+[22:00:17.406] LOG: [coop:checkpoint] guest apply field=4 weather=0 terrain=0 arenaTags=0
+[22:00:17.409] WARN: [coop:checkpoint] mon bi=3 hp host=8 guest=8 status host=3 guest=0 -> applied
+[22:00:17.410] LOG: [coop:session] isCoopAuthoritativeGuestGated -> true (authoritative GUEST gates a structural mutation)
+[22:00:17.413] LOG: [coop:checksum] capture digest=aa302f8ac891fcd6 field=3 biome=0 seed=GRLb8ba1UtrauYMfFRook8eP weather=0 terrain=0 money=1000 party=[8901,263,10664,359,10727] partyLevels=[5,5,5,5,5] arenaTags=0 modifiers=1 heldItemsDigest=0 pokeballs=[0:5,1:0,2:0,3:0,4:0] mons=[bi0:sp8901/hp27-27/st0/ab299/form0/tera0:4/boss0:0 bi1:sp263/hp20-20/st0/ab113/form0/tera0:0/boss0:0 bi3:sp21/hp8-13/st3/ab5205/form0/tera0:2/boss0:0]
+[22:00:17.413] WARN: [coop:checksum] turn=1 MISMATCH host=dc19a356defd419a guest=aa302f8ac891fcd6 -> resync
+[22:00:17.416] WARN: [coop-cs] turn=1 3 differing field(s):
+[22:00:17.416] WARN:   field.bi#0.moves.0.1: host=1 guest=0
+[22:00:17.416] WARN:   field.bi#1.moves.1.1: host=1 guest=0
+[22:00:17.416] WARN:   field.bi#3.teraType: host=0 guest=2
+[22:00:17.417] LOG: [coop:resync] guest requestStateSync turn=1 seq=1 START timeout=1200000ms
+[22:00:17.417] LOG: [coop:webrtc] raw tx role=guest t=requestStateSync bytes=41
+[22:00:17.419] LOG: [coop:replay] guest finalize turn=1: END (checkpoint applied, turn-end queued)
+[22:00:17.419] LOG: %cStart Phase WeatherEffectPhase color:green;
+[22:00:17.420] LOG: %cStart Phase PositionalTagPhase color:green;
+[22:00:17.420] LOG: %cStart Phase BerryPhase color:green;
+[22:00:17.430] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[22:00:17.436] LOG: %cStart Phase TurnEndPhase color:green;
+[22:00:17.445] WARN: [coop:turn] host recorder: finalize with NO open recording -> turn=-1 events=0 (caller decides not to emit)
+[22:00:17.445] LOG: %cStart Phase TurnInitPhase color:green;
+[22:00:17.446] LOG: %cStart Phase CommandPhase color:green;
+[22:00:17.451] LOG: %cStart Phase CommandPhase color:green;
+[22:00:17.827] LOG: [coop:webrtc] raw rx role=guest t=stateSync bytes=6551 handlers=5
+[22:00:17.827] LOG: [coop:resync] guest RECV stateSync seq=1 blobLen=6516 -> parked waiter
+[22:00:17.828] LOG: [coop:resync] guest requestStateSync turn=1 seq=1 RESOLVE blobLen=6516
+[22:00:17.835] LOG: [coop:resync] turn=1 queueing full snapshot apply (blobLen=6516)
+[22:00:32.521] LOG: Move: EXTREME_SPEED Move targets: {"targets":[3,0],"multiple":false} 
+Player Pokemon: Zigzagoon
+[22:00:32.526] LOG: %cStart Phase SelectTargetPhase color:green;
+[22:00:33.349] LOG: [coop:owner] broadcast own-slot fi=1 turn=2 role=guest cmd=0
+[22:00:33.349] LOG: [coop:relay] broadcastLocalCommand SEND fieldIndex=1 turn=2 command=0 cursor=2 moveId=245 targets=[3]
+[22:00:33.349] LOG: [coop:webrtc] raw tx role=guest t=command bytes=113
+[22:00:33.349] LOG: %cStart Phase EnemyCommandPhase color:green;
+[22:00:33.349] LOG: %cStart Phase TurnStartPhase color:green;
+[22:00:33.352] LOG: %cStart Phase CoopApplyResyncPhase color:green;
+[22:00:33.353] LOG: [coop:resync] turn=1 applying full snapshot (suppressResummon=false)
+[22:00:33.356] LOG: [coop:resync] guest applyFullSnapshot field=4 weather=0 terrain=0 arenaTags=0 modifiers=1 party=5 money=1000 suppressResummon=false
+[22:00:33.361] WARN: [coop:heal] teraType bi=3 host=0 guest=2 -> applied
+[22:00:33.362] WARN: [coop:resync] boss divergence bi=3 host.segments=0 guest.segments=undefined
+[22:00:33.375] LOG: [coop:heal] benchParty reconcile host=5 mons guest=5 -> applyCaptureParty
+[22:00:33.382] LOG: [coop:party] guest applied capture party: 5 mons (kept=5 added=0 released=0 onFieldSafety=0, host target=5)
+[22:00:33.383] LOG: [coop:resync] guest applyFullSnapshot DONE authoritativeGuest=true suppressResummon=false
+[22:00:33.388] LOG: [coop:checksum] capture digest=dc19a356defd419a field=3 biome=0 seed=GRLb8ba1UtrauYMfFRook8eP weather=0 terrain=0 money=1000 party=[8901,263,10664,359,10727] partyLevels=[5,5,5,5,5] arenaTags=0 modifiers=1 heldItemsDigest=0 pokeballs=[0:5,1:0,2:0,3:0,4:0] mons=[bi0:sp8901/hp27-27/st0/ab299/form0/tera0:4/boss0:0 bi1:sp263/hp20-20/st0/ab113/form0/tera0:0/boss0:0 bi3:sp21/hp8-13/st3/ab5205/form0/tera0:0/boss0:0]
+[22:00:33.389] LOG: [coop:resync] turn=1 ok (healed host=guest=dc19a356defd419a)
+[22:00:33.390] LOG: %cStart Phase CoopReplayTurnPhase color:green;
+[22:00:33.390] LOG: [coop:replay] guest replay turn=2: awaiting host resolution
+[22:00:33.391] LOG: [coop:replay] guest awaitTurn turn=2 START timeout=1200000ms
+[22:00:34.367] LOG: [coop:webrtc] raw rx role=guest t=battleEvent bytes=112 handlers=5
+[22:00:34.368] LOG: [coop:replay] guest RECV live battleEvent turn=2 seq=0 k=message
+[22:00:35.246] LOG: [coop:webrtc] raw rx role=guest t=battleEvent bytes=100 handlers=5
+[22:00:35.247] LOG: [coop:replay] guest RECV live battleEvent turn=2 seq=1 k=message
+[22:00:35.247] LOG: [coop:webrtc] raw rx role=guest t=battleEvent bytes=95 handlers=5
+[22:00:35.247] LOG: [coop:replay] guest RECV live battleEvent turn=2 seq=2 k=moveUsed
+[22:00:36.056] LOG: [coop:webrtc] raw rx role=guest t=battleEvent bytes=80 handlers=5
+[22:00:36.057] LOG: [coop:replay] guest RECV live battleEvent turn=2 seq=3 k=hp
+[22:00:36.066] LOG: [coop:webrtc] raw rx role=guest t=battleEvent bytes=65 handlers=5
+[22:00:36.067] LOG: [coop:replay] guest RECV live battleEvent turn=2 seq=4 k=faint
+[22:00:36.069] LOG: [coop:webrtc] raw rx role=guest t=battleEvent bytes=91 handlers=5
+[22:00:36.069] LOG: [coop:replay] guest RECV live battleEvent turn=2 seq=5 k=message
+[22:00:36.868] LOG: [coop:webrtc] raw rx role=guest t=waveResolved bytes=45 handlers=5
+[22:00:36.869] LOG: [coop:replay] guest RECV waveResolved wave=1 outcome=win
+[22:00:36.870] LOG: [coop:runtime] recv waveResolved wave=1 outcome=win role=guest netcode=authoritative
+[22:00:36.871] LOG: [coop:runtime] pend waveResolved wave=1 outcome=win (prevPending=none)
+[22:00:37.563] LOG: [coop:webrtc] raw rx role=guest t=turnResolution bytes=1859 handlers=5
+[22:00:37.563] LOG: [coop:replay] guest RECV turnResolution turn=2 events=6 checksum=52aee804693495b2 -> parked waiter
+[22:00:37.564] LOG: [coop:replay] guest awaitTurn turn=2 RESOLVE events=6 checksum=52aee804693495b2
+[22:00:37.564] LOG: [coop:replay] guest consume live events turn=2 count=6
+[22:00:37.564] LOG: [coop:replay] guest replay turn=2: RESOLVE live=6 batch=6 merged=6
+[22:00:37.564] LOG: [coop:replay] guest replay turn=2: rendering 6 event(s)
+[22:00:37.565] LOG: [coop:replay] guest replay turn=2: present k=message
+[22:00:37.565] LOG: [coop:replay] guest replay turn=2: present k=message
+[22:00:37.565] LOG: [coop:replay] guest replay turn=2: present k=moveUsed
+[22:00:37.566] LOG: [coop:replay] guest replay turn=2: present k=hp
+[22:00:37.566] LOG: [coop:replay] guest replay turn=2: present k=faint
+[22:00:37.566] LOG: [coop:replay] guest replay turn=2: present k=message
+[22:00:37.566] LOG: [coop:replay] guest replay turn=2: rendered phases [message=3 moveUsed=1 hp=1 faint=1]
+[22:00:37.567] LOG: [coop:replay] guest replay turn=2: unshift CoopFinalizeTurnPhase (checkpoint apply deferred)
+[22:00:37.567] LOG: %cStart Phase MessagePhase color:green;
+[22:00:37.568] LOG: [coop:webrtc] raw rx role=guest t=expResolved bytes=1040 handlers=5
+[22:00:37.568] LOG: [coop:replay] guest RECV expResolved wave=1 deltas=5
+[22:00:37.569] LOG: [coop:runtime] pend expResolved wave=1 deltas=5
+[22:00:37.569] LOG: [coop:webrtc] raw rx role=guest t=rewardOptions bytes=213 handlers=5
+[22:00:37.569] LOG: [coop:relay] RECV rewardOptions key=0:0 -> BUFFER rewardOptionsInbox (latest-wins) count=3
+[22:00:37.836] LOG: %cStart Phase MessagePhase color:green;
+[22:00:38.069] LOG: %cStart Phase CoopMoveAnimReplayPhase color:green;
+[22:00:38.069] LOG: [coop:replay] present move bi=1 moveId=245 targets=1
+[22:00:38.586] LOG: %cStart Phase CoopHpDrainReplayPhase color:green;
+[22:00:38.587] LOG: [coop:replay] present hp bi=3 8->0/13
+[22:00:38.597] LOG: %cStart Phase CoopFaintReplayPhase color:green;
+[22:00:38.597] LOG: [coop:replay] present faint bi=3
+[22:00:38.597] WARN: cry/21 not found
+[22:00:38.690] LOG: %cStart Phase MessagePhase color:green;
+[22:00:38.920] LOG: %cStart Phase CoopFinalizeTurnPhase color:green;
+[22:00:38.920] LOG: [coop:checksum] guest finalize turn=2: apply checkpoint + verify checksum=52aee804693495b2
+[22:00:38.920] LOG: [coop:checkpoint] guest apply field=4 weather=0 terrain=0 arenaTags=0
+[22:00:38.920] LOG: [coop:field] player PASS2 reposition speciesId=10727 from=4 to=0 bi=0
+[22:00:38.927] LOG: [coop:session] isCoopAuthoritativeGuestGated -> true (authoritative GUEST gates a structural mutation)
+[22:00:38.927] LOG: [coop:checksum] capture digest=33ebdb5557930559 field=2 biome=0 seed=GRLb8ba1UtrauYMfFRook8eP weather=0 terrain=0 money=1000 party=[10727,263,10664,359,8901] partyLevels=[5,5,5,5,5] arenaTags=0 modifiers=1 heldItemsDigest=0 pokeballs=[0:5,1:0,2:0,3:0,4:0] mons=[bi0:sp10727/hp21-21/st0/ab5101/form0/tera0:10/boss0:0 bi1:sp263/hp20-20/st0/ab113/form0/tera0:0/boss0:0]
+[22:00:38.928] WARN: [coop:checksum] turn=2 MISMATCH host=52aee804693495b2 guest=33ebdb5557930559 -> resync
+[22:00:38.928] WARN: [coop-cs] turn=2 1 differing field(s):
+[22:00:38.928] WARN:   field.bi#1.moves.2.1: host=1 guest=0
+[22:00:38.929] LOG: [coop:resync] guest requestStateSync turn=2 seq=2 START timeout=1200000ms
+[22:00:38.929] LOG: [coop:webrtc] raw tx role=guest t=requestStateSync bytes=41
+[22:00:38.929] LOG: [coop:runtime] consume wave-advance wave=1 outcome=win (lastResolved -1 -> 1)
+[22:00:38.929] LOG: [coop:replay] guest wave-advance outcome=win wave=1 battleType=WILD queues=VictoryPhase
+[22:00:38.930] LOG: [coop:replay] guest finalize turn=2: END (checkpoint applied, turn-end queued)
+[22:00:38.930] LOG: %cStart Phase WeatherEffectPhase color:green;
+[22:00:38.930] LOG: %cStart Phase PositionalTagPhase color:green;
+[22:00:38.930] LOG: %cStart Phase BerryPhase color:green;
+[22:00:38.933] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[22:00:38.938] LOG: %cStart Phase TurnEndPhase color:green;
+[22:00:38.940] WARN: [coop:turn] host recorder: finalize with NO open recording -> turn=-1 events=0 (caller decides not to emit)
+[22:00:38.940] LOG: %cStart Phase VictoryPhase color:green;
+[22:00:38.942] LOG: [coop:progression] GUEST applyPartyExp SKIP wave=1 koMon=Spearow (awaiting host expResolved)
+[22:00:38.946] LOG: %cStart Phase BattleEndPhase color:green;
+[22:00:38.946] LOG: [coop:progression] expResolved BROADCAST wave=1 (host streams settled deltas)
+[22:00:38.947] LOG: [coop:runtime] consume expResolved wave=1 deltas=5
+[22:00:38.947] LOG: [coop:progression] GUEST applyExpDeltas APPLY wave=1 count=5 slots=[0:lv5:exp132,1:lv5:exp144,2:lv5:exp125,3:lv5:exp128,4:lv5:exp144]
+[22:00:38.948] LOG: [coop:progression] expDelta exp slot=0 sp=10727 host=132 guest=125 -> applied
+[22:00:38.949] LOG: [coop:progression] expDelta exp slot=1 sp=263 host=144 guest=125 -> applied
+[22:00:38.952] LOG: [coop:progression] expDelta exp slot=4 sp=8901 host=144 guest=125 -> applied
+[22:00:38.955] LOG: Battle Score: 0 (2 Turns x0.84)
+[22:00:38.955] LOG: Total Score: 0
+[22:00:38.987] LOG: %cStart Phase EggLapsePhase color:green;
+[22:00:38.988] LOG: %cStart Phase SelectModifierPhase color:green;
+[22:00:38.989] LOG: [coop:interaction] interactionCounter() read -> 0 (role=guest)
+[22:00:38.990] LOG: [coop:owner] ownerOf(counter=0) parity=0 -> owner=host
+[22:00:38.990] LOG: [coop:owner] isLocalOwnerAtCounter(pinnedCounter=0) parity=0 owner=host role=guest -> false
+[22:00:38.990] LOG: Wave Seed: HSMc9cb2VusbvZNgGSppl9fQ 1
+[22:00:39.032] LOG: [coop:owner] ownerOf(counter=0) parity=0 -> owner=host
+[22:00:39.038] LOG: [coop:owner] isLocalOwnerAtCounter(pinnedCounter=0) parity=0 owner=host role=guest -> false
+[22:00:39.038] LOG: [coop:interaction] interactionCounter() read -> 0 (role=guest)
+[22:00:39.039] LOG: [coop:reward] owner/watcher decision: pinnedStart=0 liveCounter=0 parity=0 role=guest override=none spoof=false -> WATCHER
+[22:00:39.040] LOG: [coop:reward] WATCHER waits for partner's reward picks (start=0 role=guest wave=1)
+[22:00:39.041] LOG: [coop:reward] WATCHER awaiting owner reward options (start=0 reroll=0 localCount=0)
+[22:00:39.041] LOG: [coop:relay] AWAIT rewardOptions key=0:0 timeoutMs=1200000 -> BUFFER-HIT resolve count=3
+[22:00:39.048] ERROR: [uncaught] Uncaught TypeError: Cannot read properties of undefined (reading 'displayHeight') @ https://elite-redux-staging.pages.dev/assets/er-ghost-teams-BjzLLXPy.js:4:76478
+[22:00:39.049] LOG: [coop:shop] reconstructRewardOptions OK count=3 ids=[POKEBALL,HEALING_CHARM,PP_UP]
+[22:00:39.049] LOG: [coop:reward] WATCHER ADOPTED owner reward options (was=0 now=3 ids=[POKEBALL,HEALING_CHARM,PP_UP])
+[22:00:39.149] LOG: [coop:interaction] mirror begin role=watcher mirrorSeq=0 interactionStart=0 reroll=0
+[22:00:39.152] LOG: [coop:interaction] uiMirror beginSession role=watcher mode=6 seq=0 early=0
+[22:00:39.154] LOG: [coop:relay] AWAIT interactionChoice seq=0 timeoutMs=1200000 -> network-wait
+[22:00:39.157] LOG: [coop:webrtc] raw rx role=guest t=uiInput bytes=49 handlers=5
+[22:00:39.158] LOG: [coop:interaction] uiMirror WATCHER apply n=0 button=3 mode=6
+[22:00:39.364] LOG: [coop:webrtc] raw rx role=guest t=stateSync bytes=6479 handlers=5
+[22:00:39.365] LOG: [coop:resync] guest RECV stateSync seq=2 blobLen=6444 -> parked waiter
+[22:00:39.366] LOG: [coop:resync] guest requestStateSync turn=2 seq=2 RESOLVE blobLen=6444
+[22:00:39.370] LOG: [coop:resync] turn=2 queueing full snapshot apply (blobLen=6444)
+[22:00:43.526] LOG: [coop:webrtc] raw rx role=guest t=uiInput bytes=49 handlers=5
+[22:00:43.526] LOG: [coop:interaction] uiMirror WATCHER apply n=1 button=3 mode=6
+[22:00:45.535] LOG: [coop:webrtc] raw rx role=guest t=uiInput bytes=49 handlers=5
+[22:00:45.536] LOG: [coop:interaction] uiMirror WATCHER apply n=2 button=4 mode=6
+[22:00:45.536] LOG: [coop:webrtc] raw rx role=guest t=uiInput bytes=49 handlers=5
+[22:00:45.536] LOG: [coop:interaction] uiMirror WATCHER apply n=3 button=5 mode=6
+[22:00:51.651] LOG: [coop:webrtc] raw rx role=guest t=interactionChoice bytes=78 handlers=5
+[22:00:51.652] LOG: [coop:relay] RECV interactionChoice seq=0 -> deliver-to-waiter choice=2 data=[0,4,3003]
+[22:00:51.653] LOG: [coop:relay] AWAIT interactionChoice seq=0 RESOLVE choice=2 data=[0,4,3003]
+[22:00:51.655] LOG: [coop:reward] WATCHER applying relayed action seq=0 act=REWARD choice=2 data=[0,4,3003]
+[22:00:51.656] LOG: [coop:owner] ownerOf(counter=0) parity=0 -> owner=host
+[22:00:51.656] LOG: [coop:owner] isLocalOwnerAtCounter(pinnedCounter=0) parity=0 owner=host role=guest -> false
+[22:00:51.675] LOG: %cStart Phase NewBattlePhase color:green;
+[22:00:51.676] LOG: Wave Seed: ITNd:dc3Wvtcw[OhHTqqm:gR 2
+[22:00:51.678] LOG: %cStart Phase CoopApplyResyncPhase color:green;
+[22:00:51.678] LOG: [coop:resync] turn=2 applying full snapshot (suppressResummon=false)
+[22:00:51.678] LOG: [coop:resync] guest applyFullSnapshot field=4 weather=0 terrain=0 arenaTags=0 modifiers=1 party=5 money=1000 suppressResummon=false
+[22:00:51.681] WARN: [coop:heal] waveSeed host=HSMc9cb2VusbvZNgGSppl9fQ guest=ITNd:dc3Wvtcw[OhHTqqm:gR -> applied
+[22:00:51.682] LOG: [coop:heal] benchParty reconcile host=5 mons guest=5 -> applyCaptureParty
+[22:00:51.686] LOG: [coop:party] guest applied capture party: 5 mons (kept=5 added=0 released=0 onFieldSafety=0, host target=5)
+[22:00:51.686] LOG: [coop:resync] guest applyFullSnapshot DONE authoritativeGuest=true suppressResummon=false
+[22:00:51.687] LOG: [coop:checksum] capture digest=52aee804693495b2 field=2 biome=0 seed=GRLb8ba1UtrauYMfFRook8eP weather=0 terrain=0 money=1000 party=[10727,263,10664,359,8901] partyLevels=[5,5,5,5,5] arenaTags=0 modifiers=1 heldItemsDigest=0 pokeballs=[0:5,1:0,2:0,3:0,4:0] mons=[bi0:sp10727/hp21-21/st0/ab5101/form0/tera0:10/boss0:0 bi1:sp263/hp20-20/st0/ab113/form0/tera0:0/boss0:0]
+[22:00:51.687] LOG: [coop:resync] turn=2 ok (healed host=guest=52aee804693495b2)
+[22:00:51.687] LOG: %cStart Phase NextEncounterPhase color:green;
+[22:00:51.687] LOG: [coop:stream] guest consumeEnemyParty wave=2 -> null (buffered=none)
+[22:00:51.688] LOG: [coop:stream] guest awaitEnemyParty wave=2 START timeout=120000ms
+[22:00:51.688] LOG: [coop:interaction] interactionCounter() read -> 0 (role=guest)
+[22:00:51.688] LOG: [coop:interaction] CoopInteractionTurn.advance INCREMENT (fromCounter=0) counter 0 -> 1
+[22:00:51.688] LOG: [coop:interaction] advanceInteraction ADVANCED+BROADCAST (fromCounter=0) counter 0 -> 1 role=guest; send interaction screen=__turn__ choice=1
+[22:00:51.688] LOG: [coop:webrtc] raw tx role=guest t=interaction bytes=50
+[22:00:51.689] LOG: [coop:owner] ownerOf(counter=1) parity=1 -> owner=guest
+[22:00:51.689] LOG: [coop:owner] ownerOf(counter=1) parity=1 -> owner=guest
+[22:00:51.689] LOG: [coop-launch] proceedIfReady launched=true localTeam=2 bothReady=true role=guest partnerReady=true
+[22:00:51.689] LOG: [coop:interaction] interactionCounter() read -> 1 (role=guest)
+[22:00:51.689] LOG: [coop:reward] advance interaction (role=guest from=0 counter 0 -> 1)
+[22:00:51.690] LOG: [coop:webrtc] raw rx role=guest t=interaction bytes=50 handlers=5
+[22:00:51.690] LOG: [coop:interaction] RECV interaction broadcast (monotonic-max net) received=1 localBefore=1 role=guest -> no bump (local >= received)
+[22:00:51.690] WARN: [coop:interaction] CoopInteractionTurn.mergeRemote NO-CHANGE (remote=1, before=1, remote<=before) counter stays 1
+[22:00:51.691] LOG: [coop:owner] ownerOf(counter=1) parity=1 -> owner=guest
+[22:00:51.691] LOG: [coop:owner] ownerOf(counter=1) parity=1 -> owner=guest
+[22:00:51.691] LOG: [coop-launch] proceedIfReady launched=true localTeam=2 bothReady=true role=guest partnerReady=true
+[22:00:52.486] LOG: [coop:webrtc] raw rx role=guest t=enemyPartySync bytes=505 handlers=5
+[22:00:52.486] LOG: [coop:replay] guest RECV enemyPartySync wave=2 count=2 -> parked waiter
+[22:00:52.486] LOG: [coop:stream] guest awaitEnemyParty wave=2 RESOLVE count=2
+[22:00:52.547] LOG: [coop:enemy] buildCoopEnemy ADOPT bi=0 species=440 form=0 lv=3 abilityIdx=1 nature=24 gender=1 shiny=false hp=19/19 moves=4 heldItems=0
+[22:00:52.605] LOG: [coop:enemy] buildCoopEnemy ADOPT bi=0 species=831 form=0 lv=3 abilityIdx=0 nature=10 gender=1 shiny=false hp=15/15 moves=4 heldItems=0
+[22:00:52.615] LOG: Pokemon: Wild Happiny | Species ID: 440 | Level: 3 | Nature: Quirky (-)
+[22:00:52.616] LOG: Stats (IVs): HP: 19 (31), Atk: 5 (21), Def: 5 (6), Spatk: 6 (9), Spdef: 9 (21), Spd: 7 (8)
+[22:00:52.616] LOG: Ability: Serene Grace | Passive Ability: Cute Charm 
+[22:00:52.616] LOG: Moveset: ["Growl","Tail Whip","Defense Curl","Tackle"]
+[22:00:52.624] LOG: Pokemon: Wild Wooloo | Species ID: 831 | Level: 3 | Nature: Timid (+Spd/-Atk)
+[22:00:52.624] LOG: Stats (IVs): HP: 15 (8), Atk: 8 (25), Def: 8 (15), Spatk: 9 (25), Spdef: 8 (30), Spd: 10 (23)
+[22:00:52.624] LOG: Ability: Sap Sipper | Passive Ability: Let's Roll 
+[22:00:52.624] LOG: Moveset: ["Growl","Yawn","Defense Curl","Guard Split"]
+[22:00:54.752] LOG: [coop:webrtc] raw rx role=guest t=enemyPartySync bytes=505 handlers=5
+[22:00:54.752] LOG: [coop:replay] guest RECV enemyPartySync wave=2 count=2 -> buffered (no waiter)
+[22:00:58.409] LOG: [coop:webrtc] raw rx role=guest t=command bytes=113 handlers=5
+[22:00:58.411] LOG: [coop:relay] recv command fieldIndex=0 turn=1 command=0 -> BUFFERED (no awaiter yet)
+[22:00:58.412] LOG: [coop:webrtc] raw rx role=guest t=commandRequest bytes=68 handlers=5
+[22:00:58.412] WARN: [coop:relay] peer recv commandRequest fieldIndex=1 turn=1 but NO responder installed -> dropped
