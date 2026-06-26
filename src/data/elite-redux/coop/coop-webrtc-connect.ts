@@ -160,6 +160,8 @@ function waitForIceComplete(pc: RTCPeerConnection): Promise<void> {
 
 /** Push this side's SDP blob to the signaling worker. */
 async function pushSignal(code: string, role: CoopRole, signal: string): Promise<void> {
+  // Summarize the SDP by length only (#633): never dump the full blob / ICE candidates.
+  coopLog("launch", `pushSignal code=${code} role=${role} sdpBytes=${signal.length}`);
   await postJson("/coop/signal", { code, role, signal });
 }
 
@@ -241,7 +243,10 @@ async function exchangeAndOpenChannel(code: string, role: CoopRole, ice?: CoopIc
   }
 
   const channelPromise = new Promise<RTCDataChannel>(resolve => {
-    pc.addEventListener("datachannel", ev => resolve(ev.channel));
+    pc.addEventListener("datachannel", ev => {
+      coopLog("launch", `guest datachannel event label=${ev.channel.label} state=${ev.channel.readyState} code=${code}`);
+      resolve(ev.channel);
+    });
   });
   const offer = await pollPeerSignal(code, "guest");
   coopLog("launch", `guest received offer code=${code} -> answering`);

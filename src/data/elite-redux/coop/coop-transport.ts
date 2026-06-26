@@ -741,7 +741,7 @@ export interface CoopTransport {
 function summarizeCoopMessage(msg: CoopMessage): string {
   switch (msg.t) {
     case "command":
-      return `fi=${msg.fieldIndex} turn=${msg.turn} cmd=${msg.command.command}`;
+      return `fi=${msg.fieldIndex} turn=${msg.turn} cmd=${msg.command.command} cursor=${msg.command.cursor} move=${msg.command.moveId ?? "-"}`;
     case "commandRequest":
       return `fi=${msg.fieldIndex} turn=${msg.turn} slots=${msg.moveSlots.length}`;
     case "switchChoice":
@@ -786,13 +786,17 @@ function summarizeCoopMessage(msg: CoopMessage): string {
     case "pong":
       return `ts=${msg.ts}`;
     case "waveResolved":
-      return `wave=${msg.wave} outcome=${msg.outcome}`;
+      return `wave=${msg.wave} outcome=${msg.outcome} captureParty=${msg.captureParty?.length ?? "-"}`;
     case "expResolved":
       return `wave=${msg.wave} deltas=${msg.deltas.length}`;
     case "dataFingerprint":
       return "fp";
+    case "interaction":
+      return `screen=${msg.screen}`;
+    case "requestRunConfig":
+      return "(re)request";
     default:
-      return "";
+      return `t=${(msg as { t?: string }).t ?? "?"}`;
   }
 }
 

@@ -115,6 +115,12 @@ export class CoopMoveAnimReplayPhase extends Phase {
       const targetBi = this.targets[0] ?? this.bi;
       // No live user / move animations disabled -> nothing to play; end immediately.
       if (user == null || !globalScene.moveAnimations) {
+        if (isCoopDebug()) {
+          coopLog(
+            "replay",
+            `present move bi=${this.bi} moveId=${this.moveId} NO-OP end (user=${user != null} anims=${globalScene.moveAnimations})`,
+          );
+        }
         this.end();
         return;
       }
@@ -122,6 +128,7 @@ export class CoopMoveAnimReplayPhase extends Phase {
       new MoveAnim(this.moveId as MoveId, user, targetBi as BattlerIndex).play(false, finish);
     } catch {
       // A bad / un-loaded move anim must never strand the queue.
+      coopWarn("replay", `present move bi=${this.bi} moveId=${this.moveId} anim threw -> finish (handled)`);
       finish();
     }
   }
@@ -159,6 +166,9 @@ export class CoopHpDrainReplayPhase extends PokemonPhase {
       const mon = fieldMon(this.battlerIndex);
       if (mon == null) {
         // The checkpoint already removed this mon - nothing to drain; end.
+        if (isCoopDebug()) {
+          coopLog("replay", `present hp bi=${this.battlerIndex} NO-OP end (mon absent)`);
+        }
         this.end();
         return;
       }
@@ -174,6 +184,7 @@ export class CoopHpDrainReplayPhase extends PokemonPhase {
       void mon.updateInfo().then(() => this.end());
     } catch {
       // A bad hp value / missing sprite must never strand the queue.
+      coopWarn("replay", `present hp bi=${this.battlerIndex} threw -> end (handled)`);
       this.end();
     }
   }
@@ -220,6 +231,9 @@ export class CoopStatStageReplayPhase extends PokemonPhase {
     try {
       const pokemon = fieldMon(this.battlerIndex);
       if (pokemon == null) {
+        if (isCoopDebug()) {
+          coopLog("replay", `present statStage bi=${this.battlerIndex} stat=${this.stat} NO-OP end (mon absent)`);
+        }
         this.end();
         return;
       }
@@ -236,9 +250,16 @@ export class CoopStatStageReplayPhase extends PokemonPhase {
         watchdog = globalScene.time.delayedCall(COOP_REPLAY_WATCHDOG_MS, finish);
         this.playStatTween(pokemon, delta, finish);
       } else {
+        if (isCoopDebug()) {
+          coopLog(
+            "replay",
+            `present statStage bi=${this.battlerIndex} stat=${this.stat} set to ${target} NO tween (delta=${delta} anims=${globalScene.moveAnimations})`,
+          );
+        }
         this.end();
       }
     } catch {
+      coopWarn("replay", `present statStage bi=${this.battlerIndex} stat=${this.stat} threw -> finish (handled)`);
       finish();
     }
   }
@@ -327,6 +348,12 @@ export class CoopStatusReplayPhase extends PokemonPhase {
       const effect = this.status as StatusEffect;
       // No mon / cure / FAINT (the faint event handles that) -> nothing to animate.
       if (pokemon == null || effect === StatusEffect.NONE || effect === StatusEffect.FAINT) {
+        if (isCoopDebug()) {
+          coopLog(
+            "replay",
+            `present status bi=${this.battlerIndex} status=${this.status} NO-OP end (mon=${pokemon != null} none/faint=${effect === StatusEffect.NONE || effect === StatusEffect.FAINT})`,
+          );
+        }
         this.end();
         return;
       }
@@ -336,6 +363,7 @@ export class CoopStatusReplayPhase extends PokemonPhase {
       // CommonAnim.POISON + (effect - 1) is the established status-anim mapping (obtain-status-effect-phase.ts).
       new CommonBattleAnim(CommonAnim.POISON + (effect - 1), pokemon).play(false, finish);
     } catch {
+      coopWarn("replay", `present status bi=${this.battlerIndex} status=${this.status} anim threw -> finish (handled)`);
       finish();
     }
   }
@@ -381,6 +409,9 @@ export class CoopFaintReplayPhase extends PokemonPhase {
       const pokemon = fieldMon(this.battlerIndex);
       // Already removed (defensive: a duplicate faint, or a mon off-field) - nothing to animate.
       if (pokemon == null || !pokemon.isOnField()) {
+        if (isCoopDebug()) {
+          coopLog("replay", `present faint bi=${this.battlerIndex} NO-OP end (already removed/off-field)`);
+        }
         this.end();
         return;
       }
@@ -406,7 +437,8 @@ export class CoopFaintReplayPhase extends PokemonPhase {
                 pokemon.doSetStatus(StatusEffect.FAINT);
                 pokemon.leaveField(true, true, false);
               } catch {
-                /* the removal is best-effort; the checkpoint reconcile still corrects the slot */
+                // the removal is best-effort; the checkpoint reconcile still corrects the slot
+                coopWarn("replay", `present faint bi=${this.battlerIndex} removal threw (handled, checkpoint reconciles)`);
               }
               finish();
             },
@@ -481,6 +513,7 @@ export class CoopFinalizeTurnPhase extends Phase {
   private verifyChecksum(hostChecksum: string, hostPreimage?: string): void {
     const streamer = getCoopBattleStreamer();
     if (streamer == null) {
+      coopWarn("checksum", `guest verify turn=${this.turn}: no streamer -> verification skipped`);
       return;
     }
     const guestChecksum = captureCoopChecksum();
@@ -552,7 +585,9 @@ export class CoopFinalizeTurnPhase extends Phase {
       this.maybeRunCoopWaveAdvance();
     } catch {
       // The turn-end queue / wave-advance is best-effort; a failure here must never hang the turn.
+      coopWarn("replay", `guest finalize turn=${this.turn}: finishTurn (queue turn-end / wave-advance) threw (handled)`);
     }
+    coopLog("replay", `guest finalize turn=${this.turn}: END (checkpoint applied, turn-end queued)`);
     this.end();
   }
 
@@ -632,6 +667,10 @@ export class CoopFinalizeTurnPhase extends Phase {
       }
     } catch {
       // The post-battle tail is best-effort; a failure here must never hang the guest's run.
+      coopWarn(
+        "replay",
+        `guest wave-advance outcome=${pending.outcome} wave=${pending.wave}: post-battle tail queue threw (handled)`,
+      );
     }
   }
 }

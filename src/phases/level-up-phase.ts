@@ -1,5 +1,6 @@
 import { globalScene } from "#app/global-scene";
 import { getPokemonNameWithAffix } from "#app/messages";
+import { coopLog } from "#data/elite-redux/coop/coop-debug";
 import { isCoopAuthoritativeGuest } from "#data/elite-redux/coop/coop-runtime";
 import { ExpNotification } from "#enums/exp-notification";
 import type { PlayerPokemon } from "#field/pokemon";
@@ -97,8 +98,25 @@ export class LevelUpPhase extends PlayerPartyMemberPokemonPhase {
     // the guest adopts the host's evolved species + moveset via the B5 exp deltas (same slot) / the
     // resync benchParty (the evolving slot's species heals there, gated by the exp-delta speciesId
     // guard until then). Skip on the authoritative guest ONLY; solo / host / lockstep are unchanged.
+    // Co-op authoritative GUEST: SKIP the evolution gate (host owns evolution; guest adopts the
+    // evolved species via B5 exp deltas / resync benchParty). Log on the guest only - solo / host /
+    // lockstep never enter this branch (isCoopAuthoritativeGuest() is hard false there).
+    if (isCoopAuthoritativeGuest()) {
+      coopLog(
+        "progression",
+        `GUEST EvolutionPhase SKIP slot=${this.partyMemberIndex} mon=${this.pokemon.name} lv=${this.pokemon.level} (host owns evolution)`,
+      );
+    }
     if (!this.pokemon.pauseEvolutions && !isCoopAuthoritativeGuest()) {
       const evolutions = this.pokemon.getValidEvolutions();
+      if (evolutions.length > 0 && globalScene.gameMode.isCoop) {
+        // HOST in co-op drives the real evolve; log the candidate so the guest's adopted species
+        // can be checked against it. Solo stays silent (the isCoop guard).
+        coopLog(
+          "progression",
+          `HOST EvolutionPhase DRIVE slot=${this.partyMemberIndex} mon=${this.pokemon.name} -> evo=${evolutions[0].speciesId} candidates=${evolutions.length}`,
+        );
+      }
       if (evolutions.length > 0) {
         this.pokemon.breakIllusion();
         // Pass the full candidate set so the phase prompts for a path when the

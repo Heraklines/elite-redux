@@ -30,8 +30,10 @@ import {
   COOP_ABILITY_OP,
   COOP_ABILITY_OUTCOME,
   COOP_ABILITY_WAIT_MS,
+  coopAbilityOpName,
   coopAbilityPickerSeq,
 } from "#data/elite-redux/coop/coop-ability-picker-relay";
+import { coopLog } from "#data/elite-redux/coop/coop-debug";
 import { getCoopInteractionRelay } from "#data/elite-redux/coop/coop-runtime";
 import { erRunUnlockableInnateSlots } from "#data/elite-redux/er-ability-capsule";
 import {
@@ -82,8 +84,18 @@ export class ErGreaterAbilityCapsulePhase extends Phase {
     }
     // Co-op (#633 B9c) WATCHER: apply the owner's literal outcome, never opening a picker.
     if (this.coopIsWatcher) {
+      coopLog(
+        "ability",
+        `greaterCapsule WATCHER-APPLIES-RELAYED seq=${this.coopSeq} slot=${this.partyIndex} mon=${mon.name} (no local picker)`,
+      );
       void this.coopApplyRelayedOutcome(mon);
       return;
+    }
+    if (this.coopSeq >= 0) {
+      coopLog(
+        "ability",
+        `greaterCapsule OWNER-DRIVES-PICKER seq=${this.coopSeq} slot=${this.partyIndex} mon=${mon.name}`,
+      );
     }
     this.openChoice(mon);
   }
@@ -268,6 +280,10 @@ export class ErGreaterAbilityCapsulePhase extends Phase {
     if (this.coopSeq < 0) {
       return;
     }
+    coopLog(
+      "ability",
+      `greaterCapsule OWNER relay OUTCOME seq=${this.coopSeq} op=${coopAbilityOpName(this.coopOutcome[0])} data=[${this.coopOutcome.join(",")}]`,
+    );
     getCoopInteractionRelay()?.sendInteractionChoice(
       coopAbilityPickerSeq(this.coopSeq),
       COOP_ABILITY_KIND,
@@ -286,6 +302,10 @@ export class ErGreaterAbilityCapsulePhase extends Phase {
     const action = await relay.awaitInteractionChoice(coopAbilityPickerSeq(this.coopSeq), COOP_ABILITY_WAIT_MS);
     const data = action?.data ?? [COOP_ABILITY_OP.CANCEL];
     const op = data[0];
+    coopLog(
+      "ability",
+      `greaterCapsule WATCHER apply OUTCOME seq=${this.coopSeq} op=${coopAbilityOpName(op)} data=[${data.join(",")}] timedOut=${action == null} mon=${mon.name}`,
+    );
     if (op !== COOP_ABILITY_OP.CANCEL) {
       if (op === COOP_ABILITY_OP.GCAP_PERM) {
         greaterCapsulePermanentlyUnlockInnate(mon, data[1]);

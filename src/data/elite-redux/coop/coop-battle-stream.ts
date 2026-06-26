@@ -152,6 +152,7 @@ export class CoopBattleStreamer {
     this.timeoutMs = opts.timeoutMs ?? DEFAULT_TIMEOUT_MS;
     this.schedule = opts.schedule ?? defaultSchedule;
     this.offMessage = transport.onMessage(msg => this.handle(msg));
+    coopLog("stream", `streamer CONSTRUCT timeout=${this.timeoutMs}ms onMessage registered`);
   }
 
   // --- HOST side --------------------------------------------------------------
@@ -274,6 +275,7 @@ export class CoopBattleStreamer {
    * own exp compute, so it mirrors the host's exp/level/moveset instead). Wave-guarded by the caller.
    */
   onExpResolved(handler: (wave: number, deltas: CoopExpDelta[]) => void): void {
+    coopLog("stream", `guest REGISTER onExpResolved handler (was=${this.expResolvedHandler != null})`);
     this.expResolvedHandler = handler;
   }
 
@@ -291,6 +293,7 @@ export class CoopBattleStreamer {
    * verifies it against the watcher's own + triggers a `stateSync` heal on a mismatch.
    */
   onMeChecksum(handler: (seq: number, checksum: string) => void): void {
+    coopLog("stream", `watcher REGISTER onMeChecksum handler (was=${this.meChecksumHandler != null})`);
     this.meChecksumHandler = handler;
   }
 
@@ -313,9 +316,11 @@ export class CoopBattleStreamer {
    * Returns an unsubscribe function (CoopReplayMePhase drops it when the encounter terminal fires).
    */
   onMeMessage(handler: (text: string) => void): () => void {
+    coopLog("stream", `guest REGISTER onMeMessage handler (was=${this.meMessageHandler != null})`);
     this.meMessageHandler = handler;
     return () => {
       if (this.meMessageHandler === handler) {
+        coopLog("stream", "guest UNREGISTER onMeMessage handler (null-out)");
         this.meMessageHandler = null;
       }
     };
@@ -327,6 +332,7 @@ export class CoopBattleStreamer {
    * drop a stale answer). Returns immediately; the host builds + sends the blob.
    */
   onStateSyncRequest(handler: (turn: number, seq: number) => void): void {
+    coopLog("stream", `host REGISTER onStateSyncRequest handler (was=${this.stateSyncRequestHandler != null})`);
     this.stateSyncRequestHandler = handler;
   }
 
@@ -334,6 +340,7 @@ export class CoopBattleStreamer {
 
   /** GUEST: handle the host's enemy party (adopt it verbatim). */
   onEnemyPartySync(handler: (wave: number, enemies: CoopSerializedEnemy[]) => void): void {
+    coopLog("stream", `guest REGISTER onEnemyPartySync handler (was=${this.enemyPartyHandler != null})`);
     this.enemyPartyHandler = handler;
   }
 
@@ -343,10 +350,12 @@ export class CoopBattleStreamer {
    * delivered immediately so it is never missed.
    */
   onGhostPool(handler: (pool: GhostTeamSnapshot[]) => void): void {
+    coopLog("stream", `guest REGISTER onGhostPool handler (bufferedEarly=${this.lastGhostPool != null})`);
     this.ghostPoolHandler = handler;
     if (this.lastGhostPool != null) {
       const pool = this.lastGhostPool;
       this.lastGhostPool = null;
+      coopLog("stream", `guest onGhostPool: delivering buffered-early pool count=${pool.length}`);
       handler(pool);
     }
   }
@@ -359,9 +368,16 @@ export class CoopBattleStreamer {
   consumeEnemyParty(wave: number): CoopSerializedEnemy[] | null {
     const buffered = this.lastEnemyParty;
     if (buffered == null || buffered.wave !== wave) {
+      if (isCoopDebug()) {
+        coopLog(
+          "stream",
+          `guest consumeEnemyParty wave=${wave} -> null (buffered=${buffered == null ? "none" : `wave ${buffered.wave}`})`,
+        );
+      }
       return null;
     }
     this.lastEnemyParty = null;
+    coopLog("stream", `guest consumeEnemyParty wave=${wave} -> ${buffered.enemies.length} enemies`);
     return buffered.enemies;
   }
 
@@ -379,10 +395,16 @@ export class CoopBattleStreamer {
     // Already buffered for this wave -> consume + return immediately.
     const buffered = this.consumeEnemyParty(wave);
     if (buffered != null) {
+      coopLog("stream", `guest awaitEnemyParty wave=${wave} RESOLVE (buffered race) count=${buffered.length}`);
       return Promise.resolve(buffered);
     }
     // Supersede any stale waiter for this wave.
-    this.enemyPartyWaiters.get(wave)?.(null);
+    const stale = this.enemyPartyWaiters.get(wave);
+    if (stale != null) {
+      coopWarn("stream", `guest awaitEnemyParty wave=${wave} superseding stale waiter`);
+      stale(null);
+    }
+    coopLog("stream", `guest awaitEnemyParty wave=${wave} START timeout=${timeoutMs}ms`);
     return new Promise<CoopSerializedEnemy[] | null>(resolve => {
       let settled = false;
       let cancelTimer: () => void = () => {};
@@ -394,6 +416,11 @@ export class CoopBattleStreamer {
         cancelTimer();
         if (this.enemyPartyWaiters.get(wave) === finish) {
           this.enemyPartyWaiters.delete(wave);
+        }
+        if (res == null) {
+          coopWarn("stream", `guest awaitEnemyParty wave=${wave} -> null (timeout/superseded), guest will self-generate enemies`);
+        } else {
+          coopLog("stream", `guest awaitEnemyParty wave=${wave} RESOLVE count=${res.length}`);
         }
         resolve(res);
       };
@@ -415,10 +442,16 @@ export class CoopBattleStreamer {
     const buffered = this.meBattlePartyInbox.get(key);
     if (buffered !== undefined) {
       this.meBattlePartyInbox.delete(key);
+      coopLog("stream", `guest awaitMeBattleEnemyParty key=${key} RESOLVE (buffered race) count=${buffered.length}`);
       return Promise.resolve(buffered);
     }
     // Supersede any stale waiter for this key.
-    this.meBattlePartyWaiters.get(key)?.(null);
+    const stale = this.meBattlePartyWaiters.get(key);
+    if (stale != null) {
+      coopWarn("stream", `guest awaitMeBattleEnemyParty key=${key} superseding stale waiter`);
+      stale(null);
+    }
+    coopLog("stream", `guest awaitMeBattleEnemyParty key=${key} START timeout=${timeoutMs}ms`);
     return new Promise<CoopSerializedEnemy[] | null>(resolve => {
       let settled = false;
       let cancelTimer: () => void = () => {};
@@ -431,6 +464,11 @@ export class CoopBattleStreamer {
         if (this.meBattlePartyWaiters.get(key) === finish) {
           this.meBattlePartyWaiters.delete(key);
         }
+        if (res == null) {
+          coopWarn("stream", `guest awaitMeBattleEnemyParty key=${key} -> null (timeout/superseded), guest keeps locally-rolled party`);
+        } else {
+          coopLog("stream", `guest awaitMeBattleEnemyParty key=${key} RESOLVE count=${res.length}`);
+        }
         resolve(res);
       };
       this.meBattlePartyWaiters.set(key, finish);
@@ -440,6 +478,7 @@ export class CoopBattleStreamer {
 
   /** GUEST: handle an out-of-turn authoritative checkpoint. */
   onCheckpoint(handler: (reason: string, checkpoint: CoopBattleCheckpoint) => void): void {
+    coopLog("stream", `guest REGISTER onCheckpoint handler (was=${this.checkpointHandler != null})`);
     this.checkpointHandler = handler;
   }
 
@@ -449,6 +488,7 @@ export class CoopBattleStreamer {
    * encounter (the pure renderer never queues that tail itself).
    */
   onWaveResolved(handler: (wave: number, outcome: CoopWaveOutcome, captureParty?: string[]) => void): void {
+    coopLog("stream", `guest REGISTER onWaveResolved handler (was=${this.waveResolvedHandler != null})`);
     this.waveResolvedHandler = handler;
   }
 
@@ -471,9 +511,11 @@ export class CoopBattleStreamer {
    * consumed at the turn boundary by {@linkcode consumeLiveEvents}. Returns an unsubscribe function.
    */
   onLiveEvent(handler: (turn: number, seq: number, event: CoopBattleEvent) => void): () => void {
+    coopLog("stream", `guest REGISTER onLiveEvent handler (was=${this.liveEventHandler != null})`);
     this.liveEventHandler = handler;
     return () => {
       if (this.liveEventHandler === handler) {
+        coopLog("stream", "guest UNREGISTER onLiveEvent handler (null-out)");
         this.liveEventHandler = null;
       }
     };
@@ -513,7 +555,11 @@ export class CoopBattleStreamer {
    */
   awaitTurn(turn: number): Promise<CoopTurnResolution | null> {
     // Supersede any stale waiter for this turn.
-    this.pending.get(turn)?.(null);
+    const staleTurn = this.pending.get(turn);
+    if (staleTurn != null) {
+      coopWarn("stream", `guest awaitTurn turn=${turn} superseding stale waiter`);
+      staleTurn(null);
+    }
     const buffered = this.inbox.get(turn);
     if (buffered !== undefined) {
       this.inbox.delete(turn);
@@ -555,6 +601,10 @@ export class CoopBattleStreamer {
    */
   requestStateSync(turn: number): Promise<string | null> {
     // Supersede every older in-flight resync (the newest desync is the one to heal).
+    const inFlight = this.stateSyncWaiters.size;
+    if (inFlight > 0) {
+      coopWarn("resync", `guest requestStateSync turn=${turn} superseding ${inFlight} older in-flight resync(s)`);
+    }
     for (const finish of [...this.stateSyncWaiters.values()]) {
       finish(null);
     }
@@ -598,6 +648,11 @@ export class CoopBattleStreamer {
 
   /** Stop listening and fail any in-flight awaits. */
   dispose(): void {
+    coopLog(
+      "stream",
+      `streamer DISPOSE: cancel pending(turns=${this.pending.size} enemyParty=${this.enemyPartyWaiters.size}`
+        + ` meBattle=${this.meBattlePartyWaiters.size} stateSync=${this.stateSyncWaiters.size}) + null-out all handlers`,
+    );
     this.offMessage();
     for (const finish of [...this.pending.values()]) {
       finish(null);
@@ -658,6 +713,10 @@ export class CoopBattleStreamer {
         // next await (the host may race ahead of the guest reaching the handoff). Keyed by the
         // ME interaction so two ME battles in a wave never collide (#633 ME handoff).
         const waiter = this.meBattlePartyWaiters.get(msg.key);
+        coopLog(
+          "stream",
+          `guest RECV meBattleEnemyPartySync key=${msg.key} count=${msg.enemies.length} ${waiter ? "-> parked waiter" : "-> buffered (no waiter)"}`,
+        );
         if (waiter) {
           waiter(msg.enemies);
           return;
@@ -682,6 +741,9 @@ export class CoopBattleStreamer {
           resolver(res);
         } else {
           // No waiter yet - buffer (latest per turn wins) for the next awaitTurn.
+          if (this.inbox.has(msg.turn)) {
+            coopWarn("stream", `guest RECV turnResolution turn=${msg.turn} superseding earlier buffered (no waiter, latest wins)`);
+          }
           this.inbox.set(msg.turn, res);
         }
         return;
@@ -712,6 +774,9 @@ export class CoopBattleStreamer {
       case "requestStateSync":
         // HOST: the guest detected a desync - hand the request to the host's builder.
         coopLog("resync", `host RECV requestStateSync turn=${msg.turn} seq=${msg.seq}`);
+        if (this.stateSyncRequestHandler == null) {
+          coopWarn("resync", `host RECV requestStateSync turn=${msg.turn} seq=${msg.seq} DROPPED (no handler registered)`);
+        }
         this.stateSyncRequestHandler?.(msg.turn, msg.seq);
         return;
       case "stateSync": {
@@ -731,10 +796,17 @@ export class CoopBattleStreamer {
       case "meChecksum":
         // WATCHER: the owner's ME-boundary checksum - verify + heal on mismatch.
         coopLog("checksum", `watcher RECV meChecksum seq=${msg.seq} checksum=${msg.checksum}`);
+        if (this.meChecksumHandler == null) {
+          coopWarn("checksum", `watcher RECV meChecksum seq=${msg.seq} DROPPED (no handler registered)`);
+        }
         this.meChecksumHandler?.(msg.seq, msg.checksum);
         return;
       case "meMessage":
         // GUEST: one host-authoritative ME narration line - the diverted CoopReplayMePhase queues it.
+        // HOT PATH (per narration line): build the trace string only when debug is on.
+        if (isCoopDebug()) {
+          coopLog("stream", `guest RECV meMessage len=${msg.text.length} ${this.meMessageHandler != null ? "-> handler" : "-> DROPPED (no handler)"}`);
+        }
         this.meMessageHandler?.(msg.text);
         return;
       case "waveResolved":
@@ -743,16 +815,26 @@ export class CoopBattleStreamer {
           "replay",
           `guest RECV waveResolved wave=${msg.wave} outcome=${msg.outcome}${msg.captureParty != null ? ` captureParty=${msg.captureParty.length}` : ""}`,
         );
+        if (this.waveResolvedHandler == null) {
+          coopWarn("replay", `guest RECV waveResolved wave=${msg.wave} DROPPED (no handler registered)`);
+        }
         this.waveResolvedHandler?.(msg.wave, msg.outcome, msg.captureParty);
         return;
       case "expResolved":
         // GUEST: the host's settled post-exp per-slot deltas - the guest adopts them in BattleEndPhase.
         coopLog("replay", `guest RECV expResolved wave=${msg.wave} deltas=${msg.deltas.length}`);
+        if (this.expResolvedHandler == null) {
+          coopWarn("replay", `guest RECV expResolved wave=${msg.wave} DROPPED (no handler registered)`);
+        }
         this.expResolvedHandler?.(msg.wave, msg.deltas);
         return;
       case "ghostPool":
         // Deliver to a live handler, else buffer (the broadcast can land before the
         // guest's runtime wiring subscribes - it's sent eagerly on prefetch-resolve).
+        coopLog(
+          "stream",
+          `guest RECV ghostPool count=${msg.pool.length} ${this.ghostPoolHandler == null ? "-> buffered (no handler yet)" : "-> handler"}`,
+        );
         if (this.ghostPoolHandler == null) {
           this.lastGhostPool = msg.pool;
         } else {

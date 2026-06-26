@@ -31,8 +31,10 @@ import {
   COOP_ABILITY_OP,
   COOP_ABILITY_OUTCOME,
   COOP_ABILITY_WAIT_MS,
+  coopAbilityOpName,
   coopAbilityPickerSeq,
 } from "#data/elite-redux/coop/coop-ability-picker-relay";
+import { coopLog } from "#data/elite-redux/coop/coop-debug";
 import { getCoopInteractionRelay } from "#data/elite-redux/coop/coop-runtime";
 import type { BargainAbilityChoice } from "#data/elite-redux/er-bargain-sins";
 import {
@@ -78,8 +80,18 @@ export class ErGreaterAbilityRandomizerPhase extends Phase {
     // Co-op (#633 B9c) WATCHER: apply the owner's literal outcome - never opening a picker AND
     // never rolling RNG (the host rolled once; the watcher must not advance its seed cursor).
     if (this.coopIsWatcher) {
+      coopLog(
+        "ability",
+        `greaterRandomizer WATCHER-APPLIES-RELAYED seq=${this.coopSeq} slot=${this.partyIndex} mon=${mon.name} (no local picker, NO reroll)`,
+      );
       void this.coopApplyRelayedOutcome(mon);
       return;
+    }
+    if (this.coopSeq >= 0) {
+      coopLog(
+        "ability",
+        `greaterRandomizer OWNER-DRIVES-PICKER seq=${this.coopSeq} slot=${this.partyIndex} mon=${mon.name} (rolls RNG)`,
+      );
     }
     this.openSlotPicker(mon);
   }
@@ -174,6 +186,12 @@ export class ErGreaterAbilityRandomizerPhase extends Phase {
     if (this.coopSeq < 0) {
       return;
     }
+    // GRAND outcome carries [op, slot, abilityId]; log all three so the watcher's applied ability
+    // can be checked against the host's rolled one (the highest-value divergence point here).
+    coopLog(
+      "ability",
+      `greaterRandomizer OWNER relay OUTCOME seq=${this.coopSeq} op=${coopAbilityOpName(this.coopOutcome[0])} slot=${this.coopOutcome[1] ?? "-"} abilityId=${this.coopOutcome[2] ?? "-"} data=[${this.coopOutcome.join(",")}]`,
+    );
     getCoopInteractionRelay()?.sendInteractionChoice(
       coopAbilityPickerSeq(this.coopSeq),
       COOP_ABILITY_KIND,
@@ -197,6 +215,10 @@ export class ErGreaterAbilityRandomizerPhase extends Phase {
     const action = await relay.awaitInteractionChoice(coopAbilityPickerSeq(this.coopSeq), COOP_ABILITY_WAIT_MS);
     const data = action?.data ?? [COOP_ABILITY_OP.CANCEL];
     const op = data[0];
+    coopLog(
+      "ability",
+      `greaterRandomizer WATCHER apply OUTCOME seq=${this.coopSeq} op=${coopAbilityOpName(op)} slot=${data[1] ?? "-"} abilityId=${data[2] ?? "-"} timedOut=${action == null} mon=${mon.name}`,
+    );
     if (op === COOP_ABILITY_OP.GRAND) {
       greaterRandomizerReplaceSlot(mon, data[1], data[2]);
       globalScene.phaseManager.tryRemovePhase("SelectModifierPhase");

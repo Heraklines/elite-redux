@@ -17,6 +17,7 @@
 // shape logic is verifiable without booting the game.
 // =============================================================================
 
+import { coopLog, isCoopDebug } from "#data/elite-redux/coop/coop-debug";
 import type {
   CoopBattleCheckpoint,
   CoopSerializedArenaTag,
@@ -122,6 +123,19 @@ export function buildCheckpoint(mons: CoopFieldMonView[], arena: CoopArenaView):
   // alone (the `undefined` skip in reconcileArenaTags). The empty-array case is the intended signal.
   if (arena.arenaTags !== undefined) {
     checkpoint.arenaTags = arena.arenaTags.filter(t => typeof t.tagType === "string").map(serializeArenaTag);
+  }
+  // Per-turn-HOT (build runs every checkpoint capture): assemble the key-field summary only when debug
+  // is on. Pure read of the just-built checkpoint - never mutates it. Pairs with the engine's host/guest
+  // capture+apply logs so a checkpoint can be eyeballed at every stage of its lifecycle.
+  if (isCoopDebug()) {
+    coopLog(
+      "checkpoint",
+      `build field=${checkpoint.field.length} weather=${checkpoint.weather}/${checkpoint.weatherTurnsLeft} `
+        + `terrain=${checkpoint.terrain}/${checkpoint.terrainTurnsLeft} arenaTags=${checkpoint.arenaTags?.length ?? "none"} `
+        + `mons=[${checkpoint.field
+          .map(f => `bi${f.bi}:sp${f.speciesId}/hp${f.hp}-${f.maxHp}/st${f.status}/fnt${f.fainted ? 1 : 0}`)
+          .join(" ")}]`,
+    );
   }
   return checkpoint;
 }

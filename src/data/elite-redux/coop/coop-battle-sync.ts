@@ -25,6 +25,7 @@
 // protocol then runs unchanged over the real WebRTC transport.
 // =============================================================================
 
+import { coopLog, coopWarn, isCoopDebug } from "#data/elite-redux/coop/coop-debug";
 import type { CoopMessage, CoopTransport, SerializedCommand } from "#data/elite-redux/coop/coop-transport";
 
 /** The inbound request a responder answers (the legal move slots the host offers). */
@@ -136,6 +137,12 @@ export class CoopBattleSync {
     const buffered = this.inbox.get(key);
     if (buffered !== undefined) {
       this.inbox.delete(key);
+      if (isCoopDebug()) {
+        coopLog(
+          "relay",
+          `host requestPartnerCommand fieldIndex=${fieldIndex} turn=${turn} moveSlots=[${moveSlots.join(",")}] -> consumed BUFFERED command kind=${buffered.command}`,
+        );
+      }
       return Promise.resolve(buffered);
     }
     return new Promise<SerializedCommand | null>(resolve => {
@@ -153,7 +160,19 @@ export class CoopBattleSync {
         resolve(cmd);
       };
       this.pending.set(key, finish);
-      cancelTimer = this.schedule(() => finish(null), this.timeoutMs);
+      cancelTimer = this.schedule(() => {
+        coopWarn(
+          "relay",
+          `host requestPartnerCommand TIMEOUT fieldIndex=${fieldIndex} turn=${turn} after=${this.timeoutMs}ms -> resolving null (caller falls back to AI)`,
+        );
+        finish(null);
+      }, this.timeoutMs);
+      if (isCoopDebug()) {
+        coopLog(
+          "relay",
+          `host requestPartnerCommand SEND fieldIndex=${fieldIndex} turn=${turn} moveSlots=[${moveSlots.join(",")}] (awaiting peer)`,
+        );
+      }
       this.transport.send({ t: "commandRequest", fieldIndex, turn, moveSlots });
     });
   }
@@ -173,6 +192,12 @@ export class CoopBattleSync {
    * slot interactively and broadcasts it; the other client awaits and applies it.
    */
   broadcastLocalCommand(fieldIndex: number, turn: number, command: SerializedCommand): void {
+    if (isCoopDebug()) {
+      coopLog(
+        "relay",
+        `broadcastLocalCommand SEND fieldIndex=${fieldIndex} turn=${turn} command=${command.command} cursor=${command.cursor} moveId=${command.moveId ?? "-"} targets=[${(command.targets ?? []).join(",")}]`,
+      );
+    }
     this.transport.send({ t: "command", fieldIndex, turn, command });
   }
 
@@ -196,9 +221,21 @@ export class CoopBattleSync {
     if (msg.t === "commandRequest") {
       const responder = this.responder;
       if (responder == null) {
+        if (isCoopDebug()) {
+          coopWarn(
+            "relay",
+            `peer recv commandRequest fieldIndex=${msg.fieldIndex} turn=${msg.turn} but NO responder installed -> dropped`,
+          );
+        }
         return;
       }
       const command = responder({ fieldIndex: msg.fieldIndex, turn: msg.turn, moveSlots: msg.moveSlots });
+      if (isCoopDebug()) {
+        coopLog(
+          "relay",
+          `peer recv commandRequest fieldIndex=${msg.fieldIndex} turn=${msg.turn} moveSlots=[${msg.moveSlots.join(",")}] -> reply command=${command.command} cursor=${command.cursor} moveId=${command.moveId ?? "-"}`,
+        );
+      }
       // Echo the request's turn so the awaiter matches by (fieldIndex, turn) (#633).
       this.transport.send({ t: "command", fieldIndex: msg.fieldIndex, turn: msg.turn, command });
       return;
@@ -207,8 +244,20 @@ export class CoopBattleSync {
       const key = commandKey(msg.fieldIndex, msg.turn);
       const resolver = this.pending.get(key);
       if (resolver) {
+        if (isCoopDebug()) {
+          coopLog(
+            "relay",
+            `recv command fieldIndex=${msg.fieldIndex} turn=${msg.turn} command=${msg.command.command} -> resolved awaiting request`,
+          );
+        }
         resolver(msg.command);
       } else {
+        if (isCoopDebug()) {
+          coopLog(
+            "relay",
+            `recv command fieldIndex=${msg.fieldIndex} turn=${msg.turn} command=${msg.command.command} -> BUFFERED (no awaiter yet)`,
+          );
+        }
         // No one is awaiting this slot+turn yet - buffer it (keyed by turn, so a
         // later turn can't clobber an unconsumed earlier one) so the next request
         // for THIS turn resolves instantly (#633, LIVE-C race fix + desync fix).

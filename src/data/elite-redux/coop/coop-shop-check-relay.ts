@@ -47,3 +47,29 @@ export const COOP_CHECK_OP_FORM_ITEM = 6; // [slot, formItemIndex]
 
 /** The relay `kind`/label (routing + logging only) for a CHECK-mode mutation. */
 export const COOP_CHECK_KIND = "check";
+
+/**
+ * Reverse-map a `COOP_CHECK_OP_*` numeric op code (data[1] of a relayed CHECK mutation) to its NAME
+ * for greppable owner-relay / watcher-apply logging - so a misrouted/garbled CHECK op shows up as a
+ * name in the captured log instead of a bare integer, making a misroute obvious. Log-only.
+ */
+export function coopCheckOpName(op: number): string {
+  switch (op) {
+    case COOP_CHECK_OP_REORDER:
+      return "REORDER";
+    case COOP_CHECK_OP_GIVE:
+      return "GIVE";
+    case COOP_CHECK_OP_RELEASE:
+      return "RELEASE";
+    case COOP_CHECK_OP_UNSPLICE:
+      return "UNSPLICE";
+    case COOP_CHECK_OP_RENAME:
+      return "RENAME";
+    case COOP_CHECK_OP_UNPAUSE_EVO:
+      return "UNPAUSE_EVO";
+    case COOP_CHECK_OP_FORM_ITEM:
+      return "FORM_ITEM";
+    default:
+      return `UNKNOWN(${op})`;
+  }
+}

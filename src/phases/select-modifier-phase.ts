@@ -1,7 +1,7 @@
 import { consumePendingDevShop } from "#app/dev-tools/registry";
 import { globalScene } from "#app/global-scene";
 import Overrides from "#app/overrides";
-import { coopLog, coopWarn } from "#data/elite-redux/coop/coop-debug";
+import { coopLog, coopWarn, isCoopDebug } from "#data/elite-redux/coop/coop-debug";
 import {
   COOP_INTERACTION_LEAVE,
   COOP_INTERACTION_REROLL,
@@ -85,6 +85,29 @@ const COOP_ACT_REWARD = 0;
 const COOP_ACT_SHOP = 1;
 const COOP_ACT_TRANSFER = 2;
 const COOP_ACT_LOCK = 3;
+
+/** Co-op (#633): decode a relayed CHECK-team op code to a greppable name for the watcher-apply
+ *  diagnostic log in {@linkcode SelectModifierPhase.applyRelayedCheckOp}. Logging-only / pure. */
+function coopCheckOpName(op: number): string {
+  switch (op) {
+    case COOP_CHECK_OP_REORDER:
+      return "REORDER";
+    case COOP_CHECK_OP_GIVE:
+      return "GIVE";
+    case COOP_CHECK_OP_RELEASE:
+      return "RELEASE";
+    case COOP_CHECK_OP_UNSPLICE:
+      return "UNSPLICE";
+    case COOP_CHECK_OP_RENAME:
+      return "RENAME";
+    case COOP_CHECK_OP_UNPAUSE_EVO:
+      return "UNPAUSE_EVO";
+    case COOP_CHECK_OP_FORM_ITEM:
+      return "FORM_ITEM";
+    default:
+      return "UNKNOWN";
+  }
+}
 // Co-op (#633 B9b): the "Check Team" party-mutation action code + op codes live in the engine-free
 // coop-shop-check-relay module so the owner relay (here) and the per-mutation source hooks
 // (PartyUiHandler) share them without a phase<->handler import cycle. Why they are load-bearing for
@@ -447,6 +470,10 @@ export class SelectModifierPhase extends BattlePhase {
    */
   private openCheckTeamScreen(modifierSelectCallback: ModifierSelectCallback): boolean {
     if (this.coopWatcher) {
+      // WATCHER short-circuit: never open PARTY/CHECK (would un-block local input + let the
+      // watcher mutate the shared party off-script). It stays on its watch loop and applies the
+      // owner's relayed CHECK ops instead. Only reached in co-op on the watcher.
+      coopLog("party", `WATCHER openCheckTeam SHORT-CIRCUIT seq=${this.coopInteractionStart} (stays on watch loop)`);
       return true;
     }
     globalScene.ui.setModeWithoutClear(UiMode.PARTY, PartyUiMode.CHECK, -1, () => {
@@ -847,9 +874,17 @@ export class SelectModifierPhase extends BattlePhase {
    * relayEnd() no-ops and the picker opens exactly as today (byte-identical).
    */
   public coopAbilityContext(): { seq: number; watcher: boolean } {
-    return globalScene.gameMode.isCoop && getCoopController() != null
-      ? { seq: this.coopInteractionStart, watcher: this.coopWatcher }
-      : { seq: -1, watcher: false };
+    const inCoop = globalScene.gameMode.isCoop && getCoopController() != null;
+    const ctx = inCoop ? { seq: this.coopInteractionStart, watcher: this.coopWatcher } : { seq: -1, watcher: false };
+    if (inCoop) {
+      // Only log when actually in a live co-op shop (solo / lockstep => seq=-1, no log) so this
+      // threads cleanly into the picker phase: the picker outcome relay is keyed by this seq.
+      coopLog(
+        "ability",
+        `abilityContext threaded seq=${ctx.seq} role=${ctx.watcher ? "watcher" : "owner"} (picker routes outcome on this seq)`,
+      );
+    }
+    return ctx;
   }
 
   copy(): SelectModifierPhase {
@@ -923,6 +958,16 @@ export class SelectModifierPhase extends BattlePhase {
     const controller = getCoopController();
     if (controller == null || !controller.isLocalOwnerAtCounter(this.coopInteractionStart)) {
       return;
+    }
+    // Past the co-op + pinned-owner fence: this client OWNS this shop interaction and is the
+    // relay source. Log the exact send (seq + label + choice + payload) so the watcher's apply
+    // can be matched against it in the captured log. Hot-ish (per reward action) - guard the
+    // string build behind isCoopDebug().
+    if (isCoopDebug()) {
+      coopLog(
+        "relay",
+        `OWNER send seq=${this.coopInteractionStart} kind=${label} choice=${choice} data=[${data?.join(",") ?? ""}] role=${controller.role}`,
+      );
     }
     getCoopInteractionRelay()?.sendInteractionChoice(this.coopInteractionStart, label, choice, data);
   }
@@ -1073,6 +1118,12 @@ export class SelectModifierPhase extends BattlePhase {
     if (!globalScene.gameMode.isCoop || getCoopController() == null) {
       return;
     }
+    // Past the co-op fence: log which cursor-mirror role this client took + the mirror seq, so the
+    // owner's relay stream and the watcher's replay can be paired in the captured log.
+    coopLog(
+      "interaction",
+      `mirror begin role=${role} mirrorSeq=${this.coopMirrorSeq()} interactionStart=${this.coopInteractionStart} reroll=${this.rerollCount}`,
+    );
     getCoopUiMirror()?.beginSession(role, UiMode.MODIFIER_SELECT, this.coopMirrorSeq());
   }
 
@@ -1141,9 +1192,26 @@ export class SelectModifierPhase extends BattlePhase {
    */
   private applyRelayedRewardAction(action: CoopInteractionChoice): boolean {
     const noop: ModifierSelectCallback = () => false;
+    const actCode = action.data?.[0];
+    const actName =
+      actCode === COOP_ACT_REWARD
+        ? "REWARD"
+        : actCode === COOP_ACT_SHOP
+          ? "SHOP"
+          : actCode === COOP_ACT_TRANSFER
+            ? "TRANSFER"
+            : actCode === COOP_ACT_LOCK
+              ? "LOCK"
+              : actCode === COOP_ACT_CHECK
+                ? "CHECK"
+                : action.choice === COOP_INTERACTION_LEAVE
+                  ? "LEAVE"
+                  : action.choice === COOP_INTERACTION_REROLL
+                    ? "REROLL"
+                    : "?";
     coopLog(
       "reward",
-      `WATCHER applying relayed action seq=${this.coopInteractionStart} choice=${action.choice} data=${action.data === undefined ? "-" : `[${action.data.join(",")}]`}`,
+      `WATCHER applying relayed action seq=${this.coopInteractionStart} act=${actName} choice=${action.choice} data=${action.data === undefined ? "-" : `[${action.data.join(",")}]`}`,
     );
     if (action.choice === COOP_INTERACTION_LEAVE) {
       this.coopEndMirror();
@@ -1226,6 +1294,13 @@ export class SelectModifierPhase extends BattlePhase {
 
   private applyRelayedCheckOp(op: number, rest: number[]): void {
     const party = globalScene.getPlayerParty();
+    // WATCHER applies one relayed owner CHECK-team mutation against its identical party. Log the
+    // decoded op + payload + the pre-op party length so a divergence in this stream is visible.
+    // Only the watcher reaches this (the owner mutates via its own PartyUiHandler), so unguarded.
+    coopLog(
+      "party",
+      `WATCHER applyCheckOp op=${coopCheckOpName(op)}(${op}) rest=[${rest.join(",")}] partyLen=${party.length}`,
+    );
     switch (op) {
       case COOP_CHECK_OP_REORDER: {
         const [src, dst] = rest;

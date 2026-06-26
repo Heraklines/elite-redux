@@ -29,6 +29,8 @@
 // `coop-runtime.ts` (`coopHandoffMeBattle`).
 // =============================================================================
 
+import { coopLog } from "#data/elite-redux/coop/coop-debug";
+
 /**
  * The stream key for an ME-spawned battle's enemy party. An ME battle spawns MID-wave from
  * an option pick (NOT at the wave's starting encounter), so `enemyPartySync`'s plain
@@ -38,5 +40,9 @@
  * clients), so each ME battle has a unique, stable key both clients agree on.
  */
 export function meBattleHandoffKey(waveIndex: number, meInteractionCounter: number): string {
-  return `me:${waveIndex}:${meInteractionCounter}`;
+  const key = `me:${waveIndex}:${meInteractionCounter}`;
+  // Per ME-spawned battle (not hot): log the derived stream key so a host-capture / guest-adopt of
+  // an ME battle can be paired (both clients must agree on this key for the handoff to land).
+  coopLog("me", `meBattleHandoffKey wave=${waveIndex} meCounter=${meInteractionCounter} -> key=${key}`);
+  return key;
 }

@@ -25,7 +25,7 @@
 // already-declared CoopBattleEvent kinds without changing this model.
 // =============================================================================
 
-import { coopLog, isCoopDebug } from "#data/elite-redux/coop/coop-debug";
+import { coopLog, coopWarn, isCoopDebug } from "#data/elite-redux/coop/coop-debug";
 import type { CoopBattleEvent } from "#data/elite-redux/coop/coop-transport";
 
 /** The open recording: the turn number stamped at start + the ordered events + the per-turn live seq. */
@@ -50,6 +50,7 @@ let liveEmitter: CoopLiveEmitter | null = null;
 
 /** HOST: register (or clear with null) the live-event emitter the runtime wires to the battle stream. */
 export function setCoopLiveEmitter(emitter: CoopLiveEmitter | null): void {
+  coopLog("turn", `host recorder: ${emitter != null ? "REGISTER" : "CLEAR (null-out)"} live emitter (was=${liveEmitter != null})`);
   liveEmitter = emitter;
 }
 
@@ -60,7 +61,16 @@ export function setCoopLiveEmitter(emitter: CoopLiveEmitter | null): void {
  * `seq` resets to 0 so each turn's events number from the start.
  */
 export function beginCoopRecording(turn: number): void {
-  coopLog("replay", `host recorder: begin turn=${turn} (replaces=${recording != null})`);
+  if (recording != null) {
+    // A turn should never overlap another; an open recording at begin means the prior turn never
+    // finalized (endCoopRecording was missed) - its buffered events are discarded by the replace.
+    coopWarn(
+      "turn",
+      `host recorder: begin turn=${turn} REPLACES open recording turn=${recording.turn} events=${recording.events.length} (prior turn never finalized)`,
+    );
+  } else {
+    coopLog("turn", `host recorder: begin turn=${turn} (no prior open recording)`);
+  }
   recording = { turn, events: [], seq: 0 };
 }
 
@@ -90,13 +100,17 @@ export function recordCoopEvent(event: CoopBattleEvent): void {
   recording.events.push(event);
   // HOT PATH (per recorded battle event): build the trace string only when debug is on.
   if (isCoopDebug()) {
-    coopLog("replay", `host recorder: record turn=${recording.turn} seq=${seq} k=${event.k} live=${liveEmitter != null}`);
+    coopLog(
+      "turn",
+      `host recorder: append turn=${recording.turn} seq=${seq} k=${event.k} total=${recording.events.length} live=${liveEmitter != null}`,
+    );
   }
   if (liveEmitter != null) {
     try {
       liveEmitter(recording.turn, seq, event);
     } catch {
-      /* a live-emit failure must never break the host's turn - the turn-end batch + checkpoint still go */
+      // a live-emit failure must never break the host's turn - the turn-end batch + checkpoint still go
+      coopWarn("turn", `host recorder: live emit threw turn=${recording.turn} seq=${seq} k=${event.k} (handled, batch still sent)`);
     }
   }
 }
@@ -107,7 +121,11 @@ export function recordCoopEvent(event: CoopBattleEvent): void {
  */
 export function endCoopRecording(): CoopRecording {
   const done = recording ?? { turn: -1, events: [], seq: 0 };
-  coopLog("replay", `host recorder: end turn=${done.turn} events=${done.events.length}`);
+  if (recording == null) {
+    coopWarn("turn", "host recorder: finalize with NO open recording -> turn=-1 events=0 (caller decides not to emit)");
+  } else {
+    coopLog("turn", `host recorder: finalize turn=${done.turn} events=${done.events.length} seq=${done.seq}`);
+  }
   recording = null;
   return done;
 }

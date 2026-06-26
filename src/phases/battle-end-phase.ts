@@ -1,6 +1,7 @@
 import { applyAbAttrs } from "#abilities/apply-ab-attrs";
 import { globalScene } from "#app/global-scene";
 import { applyCoopExpDeltas } from "#data/elite-redux/coop/coop-battle-engine";
+import { coopLog } from "#data/elite-redux/coop/coop-debug";
 import {
   broadcastCoopExpResolved,
   consumeCoopPendingExpDeltas,
@@ -35,9 +36,20 @@ export class BattleEndPhase extends BattlePhase {
     //    deltas here - level/exp + the level-up moves it never learned (it runs no LevelUpPhase).
     // Both are hard no-ops off the authoritative path (host gate internal; guest gate explicit), so
     // solo / host-owner / lockstep are byte-for-byte unchanged.
+    // HOST: stream settled per-slot exp deltas (internally no-op off host). Log on co-op only so
+    // solo / lockstep stay silent; the broadcast itself decides whether anything goes on the wire.
+    if (globalScene.gameMode.isCoop) {
+      coopLog("progression", `expResolved BROADCAST wave=${globalScene.currentBattle.waveIndex} (host streams settled deltas)`);
+    }
     broadcastCoopExpResolved();
     if (isCoopAuthoritativeGuest()) {
-      applyCoopExpDeltas(consumeCoopPendingExpDeltas() ?? undefined);
+      // GUEST: adopt the host's settled deltas (level/exp + level-up moves it never learned).
+      const deltas = consumeCoopPendingExpDeltas() ?? undefined;
+      coopLog(
+        "progression",
+        `GUEST applyExpDeltas APPLY wave=${globalScene.currentBattle.waveIndex} count=${deltas?.length ?? 0} slots=[${deltas?.map(d => `${d.slot}:lv${d.level}:exp${d.exp}`).join(",") ?? ""}]`,
+      );
+      applyCoopExpDeltas(deltas);
     }
 
     // cull any extra `BattleEnd` phases from the queue.

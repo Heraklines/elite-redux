@@ -25,7 +25,7 @@
 // LoopbackTransport, exactly like CoopBattleStreamer.
 // =============================================================================
 
-import { coopLog, isCoopDebug } from "#data/elite-redux/coop/coop-debug";
+import { coopLog, coopWarn, isCoopDebug } from "#data/elite-redux/coop/coop-debug";
 import type {
   CoopInteractionOutcome,
   CoopMessage,
@@ -157,6 +157,9 @@ export class CoopInteractionRelay {
     }
     coopLog("relay", `AWAIT interactionChoice seq=${seq} timeoutMs=${timeoutMs} -> network-wait`);
     // Supersede any stale waiter parked on this seq.
+    if (this.pending.has(seq)) {
+      coopWarn("relay", `AWAIT interactionChoice seq=${seq} SUPERSEDE stale waiter -> resolved null`);
+    }
     this.pending.get(seq)?.(null);
     return new Promise<CoopInteractionChoice | null>(resolve => {
       let settled = false;
@@ -170,10 +173,11 @@ export class CoopInteractionRelay {
         if (this.pending.get(seq) === finish) {
           this.pending.delete(seq);
         }
-        coopLog(
-          "relay",
-          `AWAIT interactionChoice seq=${seq} RESOLVE ${res === null ? "timeout->null" : summarizeChoice(res)}`,
-        );
+        if (res === null) {
+          coopWarn("relay", `AWAIT interactionChoice seq=${seq} RESOLVE null (TIMEOUT or supersede) -> watcher leaves`);
+        } else {
+          coopLog("relay", `AWAIT interactionChoice seq=${seq} RESOLVE ${summarizeChoice(res)}`);
+        }
         resolve(res);
       };
       this.pending.set(seq, finish);
@@ -217,6 +221,9 @@ export class CoopInteractionRelay {
     }
     coopLog("relay", `AWAIT interactionOutcome seq=${seq} timeoutMs=${timeoutMs} -> network-wait`);
     // Supersede any stale waiter parked on this seq.
+    if (this.outcomePending.has(seq)) {
+      coopWarn("relay", `AWAIT interactionOutcome seq=${seq} SUPERSEDE stale waiter -> resolved null`);
+    }
     this.outcomePending.get(seq)?.(null);
     return new Promise<CoopInteractionOutcome | null>(resolve => {
       let settled = false;
@@ -230,10 +237,11 @@ export class CoopInteractionRelay {
         if (this.outcomePending.get(seq) === finish) {
           this.outcomePending.delete(seq);
         }
-        coopLog(
-          "relay",
-          `AWAIT interactionOutcome seq=${seq} RESOLVE ${res === null ? "timeout->null" : summarizeOutcome(res)}`,
-        );
+        if (res === null) {
+          coopWarn("relay", `AWAIT interactionOutcome seq=${seq} RESOLVE null (TIMEOUT or supersede) -> watcher leaves`);
+        } else {
+          coopLog("relay", `AWAIT interactionOutcome seq=${seq} RESOLVE ${summarizeOutcome(res)}`);
+        }
         resolve(res);
       };
       this.outcomePending.set(seq, finish);
@@ -277,6 +285,9 @@ export class CoopInteractionRelay {
     }
     coopLog("relay", `AWAIT rewardOptions key=${key} timeoutMs=${timeoutMs} -> network-wait`);
     // Supersede any stale waiter on this key.
+    if (this.rewardOptionsPending.has(key)) {
+      coopWarn("relay", `AWAIT rewardOptions key=${key} SUPERSEDE stale waiter -> resolved null`);
+    }
     this.rewardOptionsPending.get(key)?.(null);
     return new Promise<CoopSerializedRewardOption[] | null>(resolve => {
       let settled = false;
@@ -290,10 +301,14 @@ export class CoopInteractionRelay {
         if (this.rewardOptionsPending.get(key) === finish) {
           this.rewardOptionsPending.delete(key);
         }
-        coopLog(
-          "relay",
-          `AWAIT rewardOptions key=${key} RESOLVE ${res === null ? "timeout->null" : `count=${res.length}`}`,
-        );
+        if (res === null) {
+          coopWarn(
+            "relay",
+            `AWAIT rewardOptions key=${key} RESOLVE null (TIMEOUT or supersede) -> watcher falls back to own roll (DIVERGENT)`,
+          );
+        } else {
+          coopLog("relay", `AWAIT rewardOptions key=${key} RESOLVE count=${res.length}`);
+        }
         resolve(res);
       };
       this.rewardOptionsPending.set(key, finish);
@@ -303,6 +318,15 @@ export class CoopInteractionRelay {
 
   /** Stop listening and fail any in-flight waits. */
   dispose(): void {
+    const inFlight = this.pending.size + this.outcomePending.size + this.rewardOptionsPending.size;
+    if (inFlight > 0) {
+      coopWarn(
+        "relay",
+        `dispose() failing inFlightWaiters=${inFlight} (choice=${this.pending.size} outcome=${this.outcomePending.size} rewardOptions=${this.rewardOptionsPending.size}) -> all resolve null`,
+      );
+    } else {
+      coopLog("relay", "dispose() (no in-flight waiters)");
+    }
     this.offMessage();
     for (const finish of [...this.pending.values()]) {
       finish(null);

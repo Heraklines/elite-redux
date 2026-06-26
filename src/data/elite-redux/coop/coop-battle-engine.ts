@@ -35,7 +35,7 @@ import {
   type CoopChecksumState,
   checksumState,
 } from "#data/elite-redux/coop/coop-battle-checksum";
-import { coopLog, coopWarn } from "#data/elite-redux/coop/coop-debug";
+import { coopLog, coopWarn, isCoopDebug } from "#data/elite-redux/coop/coop-debug";
 import type {
   CoopBattleCheckpoint,
   CoopExpDelta,
@@ -231,7 +231,18 @@ export function captureCoopCheckpoint(): CoopBattleCheckpoint | null {
     if (mons.length === 0) {
       return null;
     }
-    return buildCheckpoint(mons, readArenaView());
+    const checkpoint = buildCheckpoint(mons, readArenaView());
+    // Per-turn-HOT: build the summary only when debug is on. Reads the just-built checkpoint, never mutates.
+    if (isCoopDebug()) {
+      coopLog(
+        "checkpoint",
+        `host capture field=${checkpoint.field.length} weather=${checkpoint.weather} terrain=${checkpoint.terrain} `
+          + `arenaTags=${checkpoint.arenaTags?.length ?? 0} mons=[${checkpoint.field
+            .map(f => `bi${f.bi}:sp${f.speciesId}/hp${f.hp}-${f.maxHp}/st${f.status}/fnt${f.fainted ? 1 : 0}`)
+            .join(" ")}]`,
+      );
+    }
+    return checkpoint;
   } catch {
     // Never let a capture failure break the host's turn.
     return null;
@@ -649,6 +660,10 @@ export function reconcileArenaTags(hostTags: CoopSerializedArenaTag[] | undefine
     for (const tag of [...arena.tags]) {
       const k = keyOf(tag.tagType as unknown as string, tag.side as unknown as number);
       if (!wanted.has(k)) {
+        coopWarn(
+          "heal",
+          `arenaTag REMOVE tagType=${tag.tagType} side=${tag.side} (host lacks it) -> removed`,
+        );
         try {
           arena.removeTagOnSide(tag.tagType, tag.side, true);
         } catch {
@@ -663,6 +678,10 @@ export function reconcileArenaTags(hostTags: CoopSerializedArenaTag[] | undefine
         const side = want.side as unknown as ArenaTagSide;
         let existing = arena.getTagOnSide(tagType, side);
         if (existing == null) {
+          coopWarn(
+            "heal",
+            `arenaTag ADD tagType=${want.tagType} side=${want.side} layers=${want.layers} turnCount=${want.turnCount} (guest lacked it) -> added`,
+          );
           // Side-effect-quiet add (no source move / id needed for a render of an already-resolved tag).
           arena.addTag(tagType, Math.max(0, Math.trunc(want.turnCount)), undefined as unknown as MoveId, 0, side, true);
           existing = arena.getTagOnSide(tagType, side);
@@ -695,8 +714,8 @@ export function reconcileArenaTags(hostTags: CoopSerializedArenaTag[] | undefine
 export function applyCoopCheckpoint(checkpoint: CoopBattleCheckpoint): void {
   try {
     coopLog(
-      "checksum",
-      `guest applyCheckpoint field=${checkpoint.field?.length ?? 0} weather=${checkpoint.weather} terrain=${checkpoint.terrain} arenaTags=${checkpoint.arenaTags?.length ?? 0}`,
+      "checkpoint",
+      `guest apply field=${checkpoint.field?.length ?? 0} weather=${checkpoint.weather} terrain=${checkpoint.terrain} arenaTags=${checkpoint.arenaTags?.length ?? 0}`,
     );
     // Reconcile the enemy field COMPOSITION to the host's FIRST (#633): drop any guest enemy the
     // host KOd this turn (it rides the checkpoint with fainted:true) AND mirror any host enemy
@@ -725,6 +744,16 @@ export function applyCoopCheckpoint(checkpoint: CoopBattleCheckpoint): void {
         // corrected - a 0-hp host mon the guest hasn't fainted is left for the relayed
         // commands to resolve, not force-fainted here.
         if (!mon.isFainted()) {
+          if (isCoopDebug()) {
+            const wantHp = Math.min(state.hp, mon.getMaxHp());
+            const guestStatus = mon.status?.effect ?? 0;
+            if (mon.hp !== wantHp || guestStatus !== (state.status ?? 0)) {
+              coopWarn(
+                "checkpoint",
+                `mon bi=${mon.getBattlerIndex()} hp host=${wantHp} guest=${mon.hp} status host=${state.status ?? 0} guest=${guestStatus} -> applied`,
+              );
+            }
+          }
           mon.hp = Math.min(state.hp, mon.getMaxHp());
           mon.status = state.status ? new Status(state.status as StatusEffect) : null;
           const stages = mon.getStatStages();
@@ -741,9 +770,11 @@ export function applyCoopCheckpoint(checkpoint: CoopBattleCheckpoint): void {
     // Correct weather / terrain type if it drifted (turn counts are approximate).
     const arena = globalScene.arena;
     if ((arena.weather?.weatherType ?? 0) !== checkpoint.weather) {
+      coopWarn("checkpoint", `weather host=${checkpoint.weather} guest=${arena.weather?.weatherType ?? 0} -> applied`);
       arena.trySetWeather(checkpoint.weather as WeatherType);
     }
     if ((arena.terrain?.terrainType ?? 0) !== checkpoint.terrain) {
+      coopWarn("checkpoint", `terrain host=${checkpoint.terrain} guest=${arena.terrain?.terrainType ?? 0} -> applied`);
       arena.trySetTerrain(checkpoint.terrain as TerrainType, true);
     }
     // Reconcile arena tags (#633 GAP 1): add hazards/screens/tailwind the guest's MoveEffectPhases
@@ -889,6 +920,11 @@ function applyCoopHeldItemsForMon(mon: Pokemon, heldItems: unknown): boolean {
     return false;
   }
   let changed = false;
+  // Per-mon diagnostic accumulators (#633): which held-item typeIds we removed/re-added on this mon, so
+  // a tester reading the log sees the EXACT held-item rebind a Knock-Off / Grip-Claw / Covet desync caused.
+  const debug = isCoopDebug();
+  const removedTypeIds: string[] = [];
+  const addedTypeIds: string[] = [];
   try {
     const isPlayer = mon.isPlayer();
     // 1) remove existing held items on this mon (each guarded by the removeModifier return).
@@ -897,6 +933,9 @@ function applyCoopHeldItemsForMon(mon: Pokemon, heldItems: unknown): boolean {
       isPlayer,
     )) {
       if (globalScene.removeModifier(m, !isPlayer)) {
+        if (debug) {
+          removedTypeIds.push(m.type.id);
+        }
         changed = true;
       }
     }
@@ -936,6 +975,9 @@ function applyCoopHeldItemsForMon(mon: Pokemon, heldItems: unknown): boolean {
         } else {
           void globalScene.addEnemyModifier(modifier, true);
         }
+        if (debug) {
+          addedTypeIds.push(modifier.type.id);
+        }
         changed = true;
       } catch {
         /* one item failed to reconstruct; keep the rest */
@@ -943,6 +985,12 @@ function applyCoopHeldItemsForMon(mon: Pokemon, heldItems: unknown): boolean {
     }
   } catch {
     /* never break the heal */
+  }
+  if (debug && changed) {
+    coopWarn(
+      "heal",
+      `heldItems monId=${mon.id} bi=${mon.getBattlerIndex()} removed=[${removedTypeIds.join(",")}] added=[${addedTypeIds.join(",")}] -> applied`,
+    );
   }
   return changed;
 }
@@ -1239,7 +1287,30 @@ export function captureCoopChecksumState(): CoopChecksumState {
  */
 export function captureCoopChecksum(): string {
   try {
-    return checksumState(captureCoopChecksumState());
+    const state = captureCoopChecksumState();
+    const digest = checksumState(state);
+    // Per-turn-HOT: guard the whole summary build so the (large) key=value string is only ever
+    // assembled when debug logging is on. Reads `state` only - never mutates it. This lets the two
+    // clients' captures be eyeballed side-by-side in the log to find WHICH field fed a divergent hash.
+    if (isCoopDebug()) {
+      coopLog(
+        "checksum",
+        `capture digest=${digest} `
+          + `field=${state.field.length} biome=${state.biomeId} seed=${state.seed} `
+          + `weather=${state.weather} terrain=${state.terrain} money=${state.money} `
+          + `party=[${state.party.join(",")}] partyLevels=[${state.partyLevels.join(",")}] `
+          + `arenaTags=${state.arenaTags.length} modifiers=${state.modifiers.length} `
+          + `heldItemsDigest=${state.heldItems.length} pokeballs=[${state.pokeballCounts.map(([t, c]) => `${t}:${c}`).join(",")}] `
+          + `mons=[${state.field
+            .map(
+              m =>
+                `bi${m.bi}:sp${m.speciesId}/hp${m.hp}-${m.maxHp}/st${m.status}/ab${m.abilityId}/form${m.formIndex}`
+                + `/tera${m.isTerastallized ? 1 : 0}:${m.teraType}/boss${m.bossSegments}:${m.bossSegmentIndex}`,
+            )
+            .join(" ")}]`,
+      );
+    }
+    return digest;
   } catch {
     coopWarn("checksum", "captureCoopChecksum read failed -> sentinel (comparison skipped)");
     return COOP_CHECKSUM_SENTINEL;
@@ -1413,21 +1484,32 @@ function applyFullMon(
     }
     // Ability / form first so a stat recompute uses the authoritative values.
     if (mon.formIndex !== snap.formIndex) {
+      coopWarn("heal", `formIndex bi=${snap.bi} host=${snap.formIndex} guest=${mon.formIndex} -> applied`);
       mon.formIndex = snap.formIndex;
     }
     // Active ability: if the host's authoritative active ability differs from what this
     // mon currently resolves, pin it via the summon-data override slot so getAbility()
     // returns the host's value exactly (0 = unreadable on the host -> leave ours alone).
     if (snap.abilityId !== 0 && mon.getAbility().id !== snap.abilityId) {
+      coopWarn("heal", `abilityId bi=${snap.bi} host=${snap.abilityId} guest=${mon.getAbility().id} -> applied`);
       mon.summonData.ability = snap.abilityId as AbilityId;
     }
     // Tera state (#633 GAP 7): force the host's authoritative Tera state so a dropped/extra Tera
     // command heals (it changes the mon's type/STAB, which the per-turn checkpoint can't carry).
     // Set BEFORE calculateStats so a tera-driven stat path uses the authoritative flag.
     if (snap.isTerastallized !== undefined) {
+      if (mon.isTerastallized !== snap.isTerastallized) {
+        coopWarn(
+          "heal",
+          `tera bi=${snap.bi} host=${snap.isTerastallized ? 1 : 0} guest=${mon.isTerastallized ? 1 : 0} -> applied`,
+        );
+      }
       mon.isTerastallized = snap.isTerastallized;
     }
     if (snap.teraType !== undefined) {
+      if ((mon.teraType as unknown as number) !== snap.teraType) {
+        coopWarn("heal", `teraType bi=${snap.bi} host=${snap.teraType} guest=${mon.teraType} -> applied`);
+      }
       mon.teraType = snap.teraType as unknown as Pokemon["teraType"];
     }
     // Moveset: REBUILD from the host's move IDs when they structurally differ (#633 GAP 7); else
@@ -1448,7 +1530,15 @@ function applyFullMon(
     // recompute. Gated authoritative (solo / host / lockstep never run it); the per-mon bar refresh is
     // deferred to ONE updateModifiers call after the field loop in applyCoopFullSnapshot (C4).
     if (authoritativeGuest && snap.heldItems !== undefined) {
-      applyCoopHeldItemsForMon(mon, snap.heldItems);
+      const heldChanged = applyCoopHeldItemsForMon(mon, snap.heldItems);
+      if (heldChanged) {
+        const hostTypeIds = Array.isArray(snap.heldItems)
+          ? snap.heldItems
+              .map(h => (h != null && typeof h === "object" ? (h as Record<string, unknown>).typeId : undefined))
+              .filter((t): t is string => typeof t === "string")
+          : [];
+        coopWarn("heal", `heldItems bi=${snap.bi} host=[${hostTypeIds.join(",")}] -> applied (rewrote to host set)`);
+      }
     }
     mon.calculateStats();
     // maxHp force (#633 GAP 3): the checkpoint clamps hp to the LOCAL getMaxHp(); if maxHp itself
@@ -1462,14 +1552,35 @@ function applyFullMon(
       mon.setStat(Stat.HP, Math.trunc(snap.maxHp));
     }
     // Status.
+    const prevStatus = mon.status?.effect ?? 0;
+    if (prevStatus !== (snap.status ?? 0)) {
+      coopWarn("heal", `status bi=${snap.bi} host=${snap.status ?? 0} guest=${prevStatus} -> applied`);
+    }
     mon.status = snap.status ? new Status(snap.status as StatusEffect) : null;
     // Stat stages (7).
     const stages = mon.getStatStages();
+    if (isCoopDebug()) {
+      const wantStages = Array.from({ length: 7 }, (_, i) =>
+        Math.max(-6, Math.min(6, Math.trunc(snap.statStages[i] ?? 0))),
+      );
+      const prevStages = [...stages].slice(0, 7);
+      if (wantStages.some((v, i) => v !== prevStages[i])) {
+        coopWarn(
+          "heal",
+          `statStages bi=${snap.bi} host=[${wantStages.join(",")}] guest=[${prevStages.join(",")}] -> applied`,
+        );
+      }
+    }
     for (let i = 0; i < 7 && i < stages.length; i++) {
       stages[i] = Math.max(-6, Math.min(6, Math.trunc(snap.statStages[i] ?? 0)));
     }
     // HP last, clamped to the (now host-forced) max.
-    mon.hp = Math.max(0, Math.min(Math.trunc(snap.hp), mon.getMaxHp()));
+    const prevHp = mon.hp;
+    const wantHp = Math.max(0, Math.min(Math.trunc(snap.hp), mon.getMaxHp()));
+    if (prevHp !== wantHp) {
+      coopWarn("heal", `hp bi=${snap.bi} host=${wantHp} guest=${prevHp} (maxHp=${mon.getMaxHp()}) -> applied`);
+    }
+    mon.hp = wantHp;
     // Boss re-assert (#633, A/BLOCKING-2), AFTER hp so the index derives from the correct hp. The host
     // decrements bossSegmentIndex as shields break, but the guest sets hp by direct assignment (never
     // via damage()), so its index would freeze and the dividers render wrong + the dimension loops
@@ -1540,6 +1651,10 @@ export function reconcileCoopModifierStacks(hostModifiers: [string, number][] | 
       }
       const want = wantByType.get(modifier.type.id);
       if (want === undefined || want <= 0) {
+        coopWarn(
+          "heal",
+          `modifier REMOVE typeId=${modifier.type.id} host=0/absent guest.stack=${modifier.stackCount} -> removed`,
+        );
         // The host no longer has this global modifier -> drop it (count-only, side-effect-free).
         if (globalScene.removeModifier(modifier)) {
           changed = true;
@@ -1547,6 +1662,7 @@ export function reconcileCoopModifierStacks(hostModifiers: [string, number][] | 
         continue;
       }
       if (modifier.stackCount !== want) {
+        coopWarn("heal", `modifier stack typeId=${modifier.type.id} host=${want} guest=${modifier.stackCount} -> applied`);
         modifier.stackCount = want;
         changed = true;
       }
@@ -1689,14 +1805,19 @@ export function applyCoopFullSnapshot(
     }
     const arena = globalScene.arena;
     if ((arena.weather?.weatherType ?? 0) !== snapshot.weather) {
+      coopWarn("heal", `weather host=${snapshot.weather} guest=${arena.weather?.weatherType ?? 0} -> applied`);
       arena.trySetWeather(snapshot.weather as WeatherType);
     }
     if ((arena.terrain?.terrainType ?? 0) !== snapshot.terrain) {
+      coopWarn("heal", `terrain host=${snapshot.terrain} guest=${arena.terrain?.terrainType ?? 0} -> applied`);
       arena.trySetTerrain(snapshot.terrain as TerrainType, true);
     }
     // Reconcile arena tags (#633 GAP 1): the full snapshot now HEALS hazards / screens / tailwind,
     // not just the per-turn checkpoint - so a guest that resyncs on a mismatch converges its arena.
     reconcileArenaTags(snapshot.arenaTags);
+    if (globalScene.money !== snapshot.money) {
+      coopWarn("heal", `money host=${snapshot.money} guest=${globalScene.money} -> applied`);
+    }
     globalScene.money = snapshot.money;
     // Ball-inventory heal (#633 RISKY #4): the host decrements the ball count host-only in
     // AttemptCapturePhase (which the pure-renderer guest never runs), so the guest's inventory drifts
@@ -1705,7 +1826,12 @@ export function applyCoopFullSnapshot(
     if (authoritativeGuest && snapshot.pokeballCounts !== undefined) {
       for (const [type, count] of snapshot.pokeballCounts) {
         if (typeof type === "number" && typeof count === "number") {
-          globalScene.pokeballCounts[type] = Math.max(0, Math.trunc(count));
+          const want = Math.max(0, Math.trunc(count));
+          const guestCount = globalScene.pokeballCounts[type];
+          if (guestCount !== want) {
+            coopWarn("heal", `pokeballCounts ballType=${type} host=${want} guest=${guestCount} -> applied`);
+          }
+          globalScene.pokeballCounts[type] = want;
         }
       }
     }
@@ -1716,15 +1842,30 @@ export function applyCoopFullSnapshot(
     // an ME terminal (where applyCoopMeOutcome re-pins it separately + idempotently). Length-guarded so
     // an empty "" seed is never pinned; re-pinning the same seed is a no-op, safe in the common case.
     if (typeof snapshot.seed === "string" && snapshot.seed.length > 0) {
+      if (globalScene.seed !== snapshot.seed) {
+        coopWarn("heal", `seed host=${snapshot.seed} guest=${globalScene.seed} -> applied`);
+      }
       globalScene.setSeed(snapshot.seed);
     }
     if (typeof snapshot.waveSeed === "string" && snapshot.waveSeed.length > 0) {
+      if (globalScene.waveSeed !== snapshot.waveSeed) {
+        coopWarn("heal", `waveSeed host=${snapshot.waveSeed} guest=${globalScene.waveSeed} -> applied`);
+      }
       globalScene.waveSeed = snapshot.waveSeed;
       Phaser.Math.RND.sow([snapshot.waveSeed]);
     }
     // Adopt the host's player party ORDER (#633 GAP 4): OFF-FIELD-only bench reorder (safe at any
     // boundary) so the hashed `party` speciesId sequence converges. On-field leads are untouched.
-    adoptCoopHostPlayerPartyOrder(snapshot.party);
+    const reordered = adoptCoopHostPlayerPartyOrder(snapshot.party);
+    if (reordered) {
+      coopWarn(
+        "heal",
+        `party-order adopt host=[${(snapshot.party ?? []).join(",")}] guest=[${globalScene
+          .getPlayerParty()
+          .map(p => p.species?.speciesId ?? 0)
+          .join(",")}] -> reordered bench`,
+      );
+    }
     // B4 (#633): heal bench-mon level / exp / form / friendship / moveset (+ a host off-field
     // evolution's species) by reconciling the WHOLE party to the host's PokemonData (the live
     // revive-in-shop desync: the host shows a bench mon fainted, the guest shows it alive). Reuses
@@ -1733,8 +1874,13 @@ export function applyCoopFullSnapshot(
     // (false for host / solo / lockstep), so those paths never run it. Runs LAST so its full per-mon
     // field-apply is the authoritative final word over the speciesId-only order-adopt above.
     if (authoritativeGuest && Array.isArray(snapshot.benchParty) && snapshot.benchParty.length > 0) {
+      coopLog(
+        "heal",
+        `benchParty reconcile host=${snapshot.benchParty.length} mons guest=${globalScene.getPlayerParty().length} -> applyCaptureParty`,
+      );
       applyCoopCaptureParty(snapshot.benchParty);
     }
+    coopLog("resync", `guest applyFullSnapshot DONE authoritativeGuest=${authoritativeGuest} suppressResummon=${suppressResummon}`);
   } catch {
     // A malformed snapshot must never crash the guest's battle.
   }
@@ -1794,12 +1940,22 @@ export function applyCoopExpDeltas(deltas: CoopExpDelta[] | undefined): void {
     for (const d of deltas) {
       const mon = party[d.slot];
       if (mon == null || (mon.species?.speciesId ?? -1) !== d.speciesId) {
+        coopLog(
+          "progression",
+          `expDelta SKIP slot=${d.slot} hostSpecies=${d.speciesId} guestSpecies=${mon?.species?.speciesId ?? -1} (left for benchParty heal)`,
+        );
         continue; // slot / species disagreement -> leave for the resync benchParty heal.
       }
       if (typeof d.level === "number" && d.level > 0) {
+        if (mon.level !== d.level) {
+          coopWarn("progression", `expDelta level slot=${d.slot} sp=${d.speciesId} host=${d.level} guest=${mon.level} -> applied`);
+        }
         mon.level = d.level;
       }
       if (typeof d.exp === "number") {
+        if (mon.exp !== d.exp) {
+          coopLog("progression", `expDelta exp slot=${d.slot} sp=${d.speciesId} host=${d.exp} guest=${mon.exp} -> applied`);
+        }
         mon.exp = d.exp;
       }
       // Adopt the host moveset (covers the level-up moves the guest never learned - it runs no
@@ -1988,6 +2144,10 @@ export function applyCoopMePartyFromData(serializedParty: string[]): void {
       if (surplus == null) {
         break;
       }
+      coopLog(
+        "party",
+        `meParty TRUNCATE release bench sp=${surplus.species?.speciesId ?? 0} (host len=${serializedParty.length} guest len=${live.length})`,
+      );
       globalScene.removePokemonFromPlayerParty(surplus, true);
     }
   } catch {
@@ -2137,12 +2297,20 @@ export function applyCoopCaptureParty(serializedParty: string[]): void {
         }
       }
     }
+    // Matched (kept) live mons = everything claimed off `unclaimed` that landed in `result` minus the
+    // freshly-constructed ones. Snapshot it before the release pass mutates `result`.
+    const keptCount = result.length - constructed.length;
     // Release mons the host no longer has (a party-full release during the catch). NEVER an on-field mon.
+    let releasedCount = 0;
+    let keptOnFieldSafety = 0;
     for (const m of unclaimed) {
       if (onField.has(m)) {
         result.push(m); // safety: a live on-field mon is never torn down here.
+        keptOnFieldSafety++;
       } else {
+        coopLog("party", `captureParty RELEASE bench sp=${m.species?.speciesId ?? 0} owner=${m.coopOwner} (host dropped it)`);
         globalScene.removePokemonFromPlayerParty(m, true);
+        releasedCount++;
       }
     }
     // Rebuild the party in the host's order (the on-field leads stay at the FRONT because the host
@@ -2162,8 +2330,8 @@ export function applyCoopCaptureParty(serializedParty: string[]): void {
       void globalScene.gameData.setPokemonCaught(mon, true, false, false).catch(() => {});
     }
     coopLog(
-      "replay",
-      `guest applied capture party: ${party.length} mons (${constructed.length} new, host target=${target.length})`,
+      "party",
+      `guest applied capture party: ${party.length} mons (kept=${keptCount} added=${constructed.length} released=${releasedCount} onFieldSafety=${keptOnFieldSafety}, host target=${target.length})`,
     );
   } catch {
     // A malformed capture party must never crash the guest's run.

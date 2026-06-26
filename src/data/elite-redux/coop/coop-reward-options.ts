@@ -20,6 +20,7 @@
 // =============================================================================
 
 import { modifierTypes } from "#data/data-lists";
+import { coopLog, coopWarn } from "#data/elite-redux/coop/coop-debug";
 import type { CoopSerializedRewardOption } from "#data/elite-redux/coop/coop-transport";
 import type { ModifierTier } from "#enums/modifier-tier";
 import type { Pokemon } from "#field/pokemon";
@@ -34,7 +35,7 @@ import { ModifierTypeGenerator, ModifierTypeOption as ModifierTypeOptionCtor } f
  * falls back to its own roll for the whole list if ANY is missing - see the phase).
  */
 export function serializeRewardOptions(options: ModifierTypeOption[]): CoopSerializedRewardOption[] {
-  return options.map(opt => {
+  const out = options.map(opt => {
     const type = opt.type;
     const pregenArgs = readPregenArgs(type);
     return {
@@ -45,6 +46,12 @@ export function serializeRewardOptions(options: ModifierTypeOption[]): CoopSeria
       ...(pregenArgs === undefined ? {} : { pregenArgs }),
     };
   });
+  // Per-shop-roll (not hot): the OWNER's authoritative option list crossing the wire.
+  coopLog(
+    "shop",
+    `serializeRewardOptions count=${out.length} ids=[${out.map(o => o.id).join(",")}] tiers=[${out.map(o => o.tier).join(",")}]`,
+  );
+  return out;
 }
 
 /** Read a generated type's pregen args, or undefined for a non-generated type. */
@@ -73,10 +80,13 @@ export function reconstructRewardOptions(
   for (const s of serialized) {
     const func = modifierTypes[s.id];
     if (func == null) {
+      // Unknown registry id => the WATCHER falls back to its OWN roll (DIVERGENT pool). Surface it.
+      coopWarn("shop", `reconstructRewardOptions FAIL id=${s.id} (unknown registry key) -> watcher falls back to own roll`);
       return null;
     }
     let type: ModifierType | null = func();
     if (type == null) {
+      coopWarn("shop", `reconstructRewardOptions FAIL id=${s.id} (factory returned null) -> watcher falls back to own roll`);
       return null;
     }
     type.id = s.id;
@@ -84,6 +94,10 @@ export function reconstructRewardOptions(
     if (type instanceof ModifierTypeGenerator) {
       const generated = type.generateType(party, s.pregenArgs);
       if (generated == null) {
+        coopWarn(
+          "shop",
+          `reconstructRewardOptions FAIL id=${s.id} (generator returned null, pregenArgs=[${s.pregenArgs?.join(",") ?? ""}]) -> watcher falls back to own roll`,
+        );
         return null;
       }
       generated.id = s.id;
@@ -92,5 +106,7 @@ export function reconstructRewardOptions(
     }
     out.push(new ModifierTypeOptionCtor(type, s.upgradeCount, s.cost));
   }
+  // Per-shop-roll (not hot): the WATCHER successfully rebuilt the owner's exact pool (no own RNG).
+  coopLog("shop", `reconstructRewardOptions OK count=${out.length} ids=[${serialized.map(s => s.id).join(",")}]`);
   return out;
 }

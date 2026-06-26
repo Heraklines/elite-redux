@@ -21,6 +21,7 @@
 // model, so `toMergedParty()` yields the launch order the run is built from.
 // =============================================================================
 
+import { coopLog, coopWarn } from "#data/elite-redux/coop/coop-debug";
 import { COOP_SLOTS_PER_PLAYER, coopPartySlotRange } from "#data/elite-redux/coop/coop-session";
 import type { CoopRole, CoopSerializedStarter } from "#data/elite-redux/coop/coop-transport";
 
@@ -124,6 +125,17 @@ export class CoopRoster {
       // party can rebuild the partner's mons exactly; falls back to undefined for
       // budget-only entries.
       this.picks[role].push({ speciesId: entry.speciesId, cost: entry.cost, starter: entry.starter });
+      coopLog(
+        "roster",
+        `add ACCEPT role=${role} speciesId=${entry.speciesId} cost=${entry.cost} hasStarter=${entry.starter !== undefined} `
+          + `-> count=${this.count(role)} spent=${this.spent(role)} remaining=${this.remaining(role)}`,
+      );
+    } else {
+      coopWarn(
+        "roster",
+        `add REJECT role=${role} speciesId=${entry.speciesId} cost=${entry.cost} reason=${check.reason} `
+          + `(count=${this.count(role)} spent=${this.spent(role)} remaining=${this.remaining(role)})`,
+      );
     }
     return check;
   }
@@ -140,6 +152,11 @@ export class CoopRoster {
     for (const e of entries) {
       this.add(role, e);
     }
+    coopLog(
+      "roster",
+      `replace role=${role} requested=${entries.length} accepted=${this.count(role)} `
+        + `spent=${this.spent(role)} species=[${this.picks[role].map(e => e.speciesId).join(",")}]`,
+    );
     return [...this.picks[role]];
   }
 
@@ -173,6 +190,16 @@ export class CoopRoster {
         party[start + i] = entry;
       });
     }
+    // MERGED-PARTY BUILD (#633, launch anchor): log the composition per slot so a
+    // reader can confirm both clients assembled the identical launch party (slot ->
+    // speciesId + coopOwner). slots 0..2 = host, 3..5 = guest.
+    coopLog(
+      "roster",
+      `toMergedParty build hostCount=${this.count("host")} guestCount=${this.count("guest")} bothReady=${this.bothReady()} `
+        + `slots=[${party
+          .map((e, i) => `${i}:${e === null ? "empty" : `sp${e.speciesId}/${i < COOP_SLOTS_PER_PLAYER ? "host" : "guest"}`}`)
+          .join(" ")}]`,
+    );
     return party;
   }
 }

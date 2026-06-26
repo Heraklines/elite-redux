@@ -22,6 +22,7 @@
 // outside this module; once the channel is open, this is all the game needs.
 // =============================================================================
 
+import { coopLog, coopWarn, isCoopDebug } from "#data/elite-redux/coop/coop-debug";
 import type { CoopConnectionState, CoopMessage, CoopRole, CoopTransport } from "#data/elite-redux/coop/coop-transport";
 
 /**
@@ -61,8 +62,15 @@ export class WebRtcTransport implements CoopTransport {
     this.role = role;
     this.wire = wire;
     this._state = wire.readyState === "open" ? "connected" : "connecting";
-    wire.onOpen(() => this.setState("connected"));
-    wire.onClose(() => this.setState("disconnected"));
+    coopLog("webrtc", `ctor role=${role} readyState=${wire.readyState} state=${this._state}`);
+    wire.onOpen(() => {
+      coopLog("webrtc", `channel OPEN role=${this.role}`);
+      this.setState("connected");
+    });
+    wire.onClose(() => {
+      coopLog("webrtc", `channel CLOSE role=${this.role} state=${this._state}`);
+      this.setState("disconnected");
+    });
     wire.onMessage(data => this.receive(data));
   }
 
@@ -72,9 +80,19 @@ export class WebRtcTransport implements CoopTransport {
 
   send(msg: CoopMessage): void {
     if (this._state !== "connected" || this.wire.readyState !== "open") {
+      if (isCoopDebug()) {
+        coopWarn(
+          "webrtc",
+          `raw send DROP (not open) role=${this.role} t=${msg.t} state=${this._state} readyState=${this.wire.readyState}`,
+        );
+      }
       return;
     }
-    this.wire.send(JSON.stringify(msg));
+    const frame = JSON.stringify(msg);
+    if (isCoopDebug()) {
+      coopLog("webrtc", `raw tx role=${this.role} t=${msg.t} bytes=${frame.length}`);
+    }
+    this.wire.send(frame);
   }
 
   onMessage(handler: (msg: CoopMessage) => void): () => void {
@@ -92,6 +110,7 @@ export class WebRtcTransport implements CoopTransport {
   }
 
   close(): void {
+    coopLog("webrtc", `close() role=${this.role} state=${this._state}`);
     this.setState("closed");
     this.wire.close();
     this.msgHandlers.clear();
@@ -104,6 +123,7 @@ export class WebRtcTransport implements CoopTransport {
     if (this._state === state || this._state === "closed") {
       return;
     }
+    coopLog("webrtc", `state role=${this.role} ${this._state} -> ${state}`);
     this._state = state;
     for (const h of [...this.stateHandlers]) {
       h(state);
@@ -115,13 +135,24 @@ export class WebRtcTransport implements CoopTransport {
     try {
       parsed = JSON.parse(data);
     } catch {
-      return; // malformed JSON - ignore (a bad frame can't take us down)
+      // malformed JSON - ignore (a bad frame can't take us down) - but surface it: a desync
+      // born from dropped/truncated frames is otherwise invisible.
+      coopWarn("webrtc", `raw rx DECODE FAIL role=${this.role} bytes=${data.length} (malformed JSON, dropped)`);
+      return;
     }
     if (parsed != null && typeof parsed === "object" && typeof (parsed as { t?: unknown }).t === "string") {
       const msg = parsed as CoopMessage;
+      if (isCoopDebug()) {
+        coopLog("webrtc", `raw rx role=${this.role} t=${msg.t} bytes=${data.length} handlers=${this.msgHandlers.size}`);
+      }
       for (const h of [...this.msgHandlers]) {
         h(msg);
       }
+    } else {
+      coopWarn(
+        "webrtc",
+        `raw rx UNKNOWN frame role=${this.role} bytes=${data.length} (no string .t discriminant, dropped)`,
+      );
     }
   }
 }
@@ -131,6 +162,12 @@ export class WebRtcTransport implements CoopTransport {
  * this once the signaling handshake has produced an open (or opening) data channel.
  */
 export function webRtcTransportFromChannel(role: CoopRole, channel: RTCDataChannel): WebRtcTransport {
+  // Log-only: surface the raw channel error event (NOT wired into message flow / state), so a live
+  // DataChannel error is visible in the captured log instead of being silently swallowed.
+  channel.addEventListener("error", ev => {
+    const errLike = (ev as { error?: { message?: string } }).error;
+    coopWarn("webrtc", `channel ERROR role=${role} readyState=${channel.readyState} err=${errLike?.message ?? "?"}`);
+  });
   const wire: CoopWireChannel = {
     get readyState() {
       return channel.readyState;

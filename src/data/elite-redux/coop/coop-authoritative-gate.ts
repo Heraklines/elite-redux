@@ -16,6 +16,8 @@
 // before any session it is a hard `false`, so solo / host / lockstep are unaffected.
 // =============================================================================
 
+import { coopLog, isCoopDebug } from "#data/elite-redux/coop/coop-debug";
+
 /** The live predicate, installed by coop-runtime; `null` (the default) reads as `false`. */
 let predicate: (() => boolean) | null = null;
 
@@ -25,6 +27,9 @@ let predicate: (() => boolean) | null = null;
  * lockstep run reads `false`.
  */
 export function setCoopAuthoritativeGuestPredicate(fn: (() => boolean) | null): void {
+  // One-shot (session register / teardown) - log install vs clear so a stale-gate bug (a predicate
+  // surviving into a later solo / lockstep run) is visible in the captured log.
+  coopLog("session", `coopAuthoritativeGuestPredicate ${fn == null ? "CLEARED (-> solo/host/lockstep reads false)" : "INSTALLED"}`);
   predicate = fn;
 }
 
@@ -36,7 +41,13 @@ export function setCoopAuthoritativeGuestPredicate(fn: (() => boolean) | null): 
  */
 export function isCoopAuthoritativeGuestGated(): boolean {
   try {
-    return predicate?.() === true;
+    const result = predicate?.() === true;
+    // HOT (read on every gated structural party mutation): only log the rare TRUE result, and only
+    // when debug is on, so the common solo/host FALSE path stays a single boolean check.
+    if (result && isCoopDebug()) {
+      coopLog("session", "isCoopAuthoritativeGuestGated -> true (authoritative GUEST gates a structural mutation)");
+    }
+    return result;
   } catch {
     return false;
   }

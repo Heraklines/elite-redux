@@ -21,6 +21,8 @@
 // live battle (mirrors coop-reward-options.ts).
 // =============================================================================
 
+import { coopLog } from "#data/elite-redux/coop/coop-debug";
+
 /**
  * Whether to SHOW the trainer victory-dialogue flavor line.
  *
@@ -43,7 +45,13 @@
  * call-site logic in solo / authoritative.
  */
 export function coopVictoryDialogueDecision(isCoop: boolean): false | null {
-  return isCoop ? false : null;
+  if (isCoop) {
+    // CO-OP fence: ALWAYS-SKIP so the async-wait count is a CONSTANT 0 on both lockstep clients
+    // (the divergence source this centralizes). Solo / authoritative defer silently (null).
+    coopLog("progression", "coopVictoryDialogue DECISION isCoop=true -> SKIP (constant 0 awaits, lockstep-safe)");
+    return false;
+  }
+  return null;
 }
 
 /**
@@ -72,6 +80,13 @@ export function coopVictoryDialogueDecision(isCoop: boolean): false | null {
  */
 export function coopShouldQueueBossVoucherReward(isCoop: boolean, creditedFirstTime: boolean): boolean {
   if (isCoop) {
+    // CO-OP fence: NEVER queue the repeat-win voucher reward phase, so the queue length is
+    // structurally identical (constant 0 extra phases) on both clients. The per-account voucher
+    // CREDIT still happened at the call site. Solo defers to the per-account gate silently.
+    coopLog(
+      "progression",
+      `coopBossVoucherReward DECISION isCoop=true creditedFirstTime=${creditedFirstTime} -> NO-QUEUE (lockstep queue-len parity)`,
+    );
     return false;
   }
   return !creditedFirstTime;

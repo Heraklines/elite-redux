@@ -25,6 +25,7 @@
 import { globalScene } from "#app/global-scene";
 import { EncoreTag } from "#data/battler-tags";
 import { allMoves } from "#data/data-lists";
+import { coopLog, isCoopDebug } from "#data/elite-redux/coop/coop-debug";
 import type { SerializedCommand } from "#data/elite-redux/coop/coop-transport";
 import { BattlerIndex } from "#enums/battler-index";
 import { Command } from "#enums/command";
@@ -106,24 +107,40 @@ export function resolvePartnerCommand(partner: PlayerPokemon): ResolvedPartnerCo
 
   if (chosen === undefined) {
     // No usable move -> Struggle, targets resolved like the engine's own fallback.
+    const struggleTargets = resolvePartnerTargets(partner, MoveId.STRUGGLE);
+    if (isCoopDebug()) {
+      coopLog(
+        "ai",
+        `resolvePartnerCommand partner=${partner.species.speciesId} usable=0 encore=${encoreTag != null} `
+          + `-> STRUGGLE moveIndex=-1 targets=[${struggleTargets.join(",")}]`,
+      );
+    }
     return {
       command: Command.FIGHT,
       moveIndex: -1,
       turnMove: {
         move: MoveId.STRUGGLE,
-        targets: resolvePartnerTargets(partner, MoveId.STRUGGLE),
+        targets: struggleTargets,
         useMode: MoveUseMode.NORMAL,
       },
     };
   }
 
   const moveIndex = moveset.findIndex(m => m.moveId === chosen!.moveId);
+  const targets = resolvePartnerTargets(partner, chosen.moveId);
+  if (isCoopDebug()) {
+    coopLog(
+      "ai",
+      `resolvePartnerCommand partner=${partner.species.speciesId} usable=${usable.length} `
+        + `encored=${encoreTag != null} -> moveId=${chosen.moveId} moveIndex=${moveIndex} targets=[${targets.join(",")}]`,
+    );
+  }
   return {
     command: Command.FIGHT,
     moveIndex,
     turnMove: {
       move: chosen.moveId,
-      targets: resolvePartnerTargets(partner, chosen.moveId),
+      targets,
       useMode: MoveUseMode.NORMAL,
     },
   };
@@ -141,14 +158,29 @@ export function resolvePartnerSlotCommand(partner: PlayerPokemon, slot: number):
   const moveset = partner.getMoveset();
   const move = slot >= 0 && slot < moveset.length ? moveset[slot] : undefined;
   if (move == null || !move.isUsable(partner, false, true)[0]) {
+    if (isCoopDebug()) {
+      coopLog(
+        "ai",
+        `resolvePartnerSlotCommand partner=${partner.species.speciesId} slot=${slot} `
+          + `${move == null ? "out-of-range" : "not-usable"} -> re-pick locally (host re-validate)`,
+      );
+    }
     return resolvePartnerCommand(partner);
+  }
+  const slotTargets = resolvePartnerTargets(partner, move.moveId);
+  if (isCoopDebug()) {
+    coopLog(
+      "ai",
+      `resolvePartnerSlotCommand partner=${partner.species.speciesId} slot=${slot} moveId=${move.moveId} `
+        + `targets=[${slotTargets.join(",")}] (peer pick valid)`,
+    );
   }
   return {
     command: Command.FIGHT,
     moveIndex: slot,
     turnMove: {
       move: move.moveId,
-      targets: resolvePartnerTargets(partner, move.moveId),
+      targets: slotTargets,
       useMode: MoveUseMode.NORMAL,
     },
   };
@@ -180,6 +212,13 @@ export function applyWiredPartnerCommand(
   }
   const move = moveIndex >= 0 ? moveset[moveIndex] : undefined;
   if (move == null) {
+    if (isCoopDebug()) {
+      coopLog(
+        "ai",
+        `applyWiredPartnerCommand partner=${partner.species.speciesId} wiredMoveId=${cmd.moveId ?? "none"} `
+          + `cursor=${cmd.cursor} -> move NOT FOUND in local moveset; caller falls back to AI`,
+      );
+    }
     return null;
   }
   // Use the partner's wired targets verbatim; only resolve host-side if none came.
@@ -187,6 +226,14 @@ export function applyWiredPartnerCommand(
     cmd.targets === undefined ? resolvePartnerTargets(partner, move.moveId) : (cmd.targets as BattlerIndex[]);
   // `useMode` crosses the wire as a raw number; it IS a MoveUseMode enum value.
   const useMode = (cmd.useMode ?? MoveUseMode.NORMAL) as MoveUseMode;
+  if (isCoopDebug()) {
+    coopLog(
+      "ai",
+      `applyWiredPartnerCommand partner=${partner.species.speciesId} wiredMoveId=${cmd.moveId ?? "none"} cursor=${cmd.cursor} `
+        + `-> moveId=${move.moveId} moveIndex=${moveIndex} tera=${cmd.tera === true} `
+        + `targets=[${targets.join(",")}] targetsFrom=${cmd.targets === undefined ? "host-resolved" : "wire-verbatim"} useMode=${useMode}`,
+    );
+  }
   return {
     // #633 Fix #4a: a relayed TERA command teras the partner's mon (handleCommand's TERA
     // case sets the preTurnCommand), so the watcher's engine matches the owner's.

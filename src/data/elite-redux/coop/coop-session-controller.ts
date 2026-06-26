@@ -166,6 +166,11 @@ export class CoopSessionController {
 
   /** Announce ourselves to the partner. Call once the transport is connected. */
   connect(): void {
+    coopLog(
+      "launch",
+      `session connect role=${this.role} partnerRole=${this.partnerRoleId} netcode=${this._netcodeMode} `
+        + `username=${this.username} version=${this.version} tiebreak=${this.tiebreak}`,
+    );
     this.transport.send({
       t: "hello",
       version: this.version,
@@ -201,6 +206,11 @@ export class CoopSessionController {
       return;
     }
     this._localReady = ready;
+    coopLog(
+      "roster",
+      `setLocalReady role=${this.role} localReady=${ready} localCount=${this.roster.count(this.role)} `
+        + `partnerReady=${this._partnerReady} -> bothReady=${this.bothReady()}`,
+    );
     this.broadcastLocal();
     this.emit();
   }
@@ -242,7 +252,21 @@ export class CoopSessionController {
    * authoritative state. Only meaningful once {@linkcode bothReady} is true.
    */
   mergedLaunchParty(): (CoopRosterEntry | null)[] {
-    return this.roster.toMergedParty();
+    const merged = this.roster.toMergedParty();
+    // LAUNCH / ROLE ANCHOR (#633): the single line that anchors every later log -
+    // role, netcode, run seed, difficulty, and the MERGED-PARTY composition per slot
+    // (speciesId + coopOwner). slots 0..2 = host, 3..5 = guest. coop-roster's
+    // toMergedParty() also logs the slot table; this adds the run-config context.
+    coopLog(
+      "launch",
+      `mergedLaunchParty role=${this.role} netcode=${this._netcodeMode} `
+        + `seed=${this._runConfig?.seed ?? "(none)"} difficulty=${this._runConfig?.difficulty ?? "(none)"} `
+        + `bothReady=${this.bothReady()} `
+        + `party=[${merged
+          .map((e, i) => `${i}:${e === null ? "empty" : `sp${e.speciesId}/${i < 3 ? "host" : "guest"}`}`)
+          .join(" ")}]`,
+    );
+    return merged;
   }
 
   /**
@@ -449,6 +473,11 @@ export class CoopSessionController {
   }
 
   private broadcastLocal(): void {
+    coopLog(
+      "roster",
+      `rosterSync SEND role=${this.role} entries=${this.roster.count(this.role)} ready=${this._localReady} `
+        + `spent=${this.roster.spent(this.role)} species=[${this.roster.entries(this.role).map(e => e.speciesId).join(",")}]`,
+    );
     this.transport.send({
       t: "rosterSync",
       role: this.role,
@@ -474,6 +503,7 @@ export class CoopSessionController {
         // to the existing role. Runs on the handshake, before roster/battle, so all
         // role-keyed state downstream sees the corrected role.
         if (msg.role === this.role) {
+          const beforeRole = this.role;
           const peerTie = typeof msg.tiebreak === "number" ? msg.tiebreak : Number.POSITIVE_INFINITY;
           let iAmHost: boolean;
           if (this.tiebreak !== peerTie) {
@@ -485,6 +515,13 @@ export class CoopSessionController {
           }
           this.role = iAmHost ? "host" : "guest";
           this.partnerRoleId = coopPartnerRole(this.role);
+          coopWarn(
+            "launch",
+            `hello ROLE-CONFLICT both claimed role=${msg.role}; tiebreak local=${this.tiebreak} peer=${peerTie} `
+              + `username local=${this.username} peer=${msg.username} -> resolved role ${beforeRole}->${this.role}`,
+          );
+        } else {
+          coopLog("launch", `hello recv partner=${msg.username} partnerRole=${msg.role} (local role=${this.role}; no conflict)`);
         }
         this._partnerConnected = true;
         this._partnerName = msg.username;
@@ -495,7 +532,17 @@ export class CoopSessionController {
         if (msg.role === this.partnerRoleId) {
           this.roster.replace(this.partnerRoleId, msg.entries);
           this._partnerReady = msg.ready;
+          coopLog(
+            "roster",
+            `rosterSync RECV partner=${this.partnerRoleId} entries=${msg.entries.length} partnerReady=${msg.ready} `
+              + `partnerCount=${this.roster.count(this.partnerRoleId)} -> bothReady=${this.bothReady()} (local role=${this.role})`,
+          );
           this.emit();
+        } else {
+          coopWarn(
+            "roster",
+            `rosterSync RECV IGNORED role=${msg.role} != partnerRole=${this.partnerRoleId} (local role=${this.role})`,
+          );
         }
         break;
       case "interaction":

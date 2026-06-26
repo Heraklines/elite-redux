@@ -28,6 +28,8 @@
 // well clear of the COOP_ACT_* range (defense-in-depth). The `choice` is also a dedicated sentinel.
 // =============================================================================
 
+import { coopLog } from "#data/elite-redux/coop/coop-debug";
+
 /**
  * Sentinel `choice` for a relayed ER ability-picker OUTCOME. Distinct from every reward/shop
  * cursor (>= 0) and from the reward-shop LEAVE(-1) / REROLL(-2) sentinels (coop-interaction-relay.ts),
@@ -72,7 +74,25 @@ export const COOP_ABILITY_OP = {
  */
 export const COOP_ABILITY_SEQ_BASE = 6_000_000;
 export function coopAbilityPickerSeq(shopSeq: number): number {
-  return shopSeq < 0 ? -1 : COOP_ABILITY_SEQ_BASE + shopSeq;
+  const derived = shopSeq < 0 ? -1 : COOP_ABILITY_SEQ_BASE + shopSeq;
+  // Per-ability-picker (not hot): log the seq derivation so a misrouted/colliding ability-picker
+  // outcome is traceable (the dedicated derived seq is the channel-isolation guarantee).
+  coopLog("ability", `coopAbilityPickerSeq shopSeq=${shopSeq} -> derivedSeq=${derived} base=${COOP_ABILITY_SEQ_BASE}`);
+  return derived;
+}
+
+/**
+ * Reverse-map a {@linkcode COOP_ABILITY_OP} numeric code to its name for greppable logging at the
+ * relay's owner-send / watcher-apply sites - so a misrouted op (a code reaching the wrong dispatch)
+ * is visible as a name in the captured log instead of a bare integer. Log-only; never alters flow.
+ */
+export function coopAbilityOpName(op: number): string {
+  for (const [name, code] of Object.entries(COOP_ABILITY_OP)) {
+    if (code === op) {
+      return name;
+    }
+  }
+  return `UNKNOWN(${op})`;
 }
 
 /**

@@ -18,7 +18,7 @@
 
 import { globalScene } from "#app/global-scene";
 import { applyCoopEnemyHeldItems } from "#data/elite-redux/coop/coop-battle-engine";
-import { coopLog } from "#data/elite-redux/coop/coop-debug";
+import { coopLog, coopWarn } from "#data/elite-redux/coop/coop-debug";
 import type { CoopSerializedPokemon } from "#data/elite-redux/coop/coop-transport";
 import type { Gender } from "#data/gender";
 import type { Nature } from "#enums/nature";
@@ -47,10 +47,14 @@ export function buildCoopEnemy(
 ): EnemyPokemon | null {
   const speciesId = coopNum(data, "speciesId");
   if (speciesId === undefined) {
+    // Fallback: no species in the host blob -> caller rolls its own (divergence risk). Warn so the
+    // log shows the guest did NOT adopt the host's mon here.
+    coopWarn("enemy", `buildCoopEnemy FALLBACK bi=${trainerSlot} reason=no-speciesId (guest rolls own)`);
     return null;
   }
   const species = getPokemonSpecies(speciesId);
   if (!species) {
+    coopWarn("enemy", `buildCoopEnemy FALLBACK bi=${trainerSlot} reason=species-unresolved speciesId=${speciesId}`);
     return null;
   }
   const level = Math.max(1, Math.floor(coopNum(data, "level") ?? fallbackLevel));
@@ -132,5 +136,12 @@ export function buildCoopEnemy(
   // (remapping pokemonId to the live id). The adopt path suppresses the guest's own
   // generateEnemyModifiers for these enemies, so this is the sole source of their items.
   applyCoopEnemyHeldItems(enemy.id, data.heldItems);
+  // Per-enemy adopt summary (per-wave-ish, not a tight loop): the host-authoritative identity the
+  // guest reconstructed, so a divergence (wrong species/form/ability/level/hp on the guest) is
+  // visible. heldItems summarized by count (the full reconcile logs in applyCoopEnemyHeldItems).
+  coopLog(
+    "enemy",
+    `buildCoopEnemy ADOPT bi=${trainerSlot} species=${speciesId} form=${enemy.formIndex} lv=${enemy.level} abilityIdx=${enemy.abilityIndex} nature=${enemy.nature} gender=${enemy.gender} shiny=${enemy.shiny} hp=${enemy.hp}/${enemy.getMaxHp()} moves=${enemy.moveset.length} heldItems=${Array.isArray(data.heldItems) ? data.heldItems.length : 0}`,
+  );
   return enemy;
 }

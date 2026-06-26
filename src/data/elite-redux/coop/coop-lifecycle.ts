@@ -20,6 +20,7 @@
 // in at P6; nothing here changes.
 // =============================================================================
 
+import { coopLog, coopWarn } from "#data/elite-redux/coop/coop-debug";
 import type { CoopRole } from "#data/elite-redux/coop/coop-transport";
 
 /** Default disconnect grace window: 2 minutes for the peer to reconnect. */
@@ -93,10 +94,18 @@ export class CoopLifecycle {
    * already present; it is accepted for call-site symmetry with {@linkcode disconnect}.
    */
   connect(role: CoopRole, _atMs = 0): void {
+    const fromState = this.state(_atMs);
+    const wasPresent = this.isPresent(role);
     this.setPresent(role, true);
     if (this.bothPresent()) {
       this.disconnectedAtMs = null;
     }
+    const toState = this.state(_atMs);
+    coopLog(
+      "lifecycle",
+      `connect role=${role} atMs=${_atMs} wasPresent=${wasPresent} state ${fromState}->${toState} `
+        + `bothPresent=${this.bothPresent()} canResume=${this.canResume()}`,
+    );
   }
 
   /**
@@ -105,10 +114,18 @@ export class CoopLifecycle {
    * restart it).
    */
   disconnect(role: CoopRole, atMs: number): void {
+    const fromState = this.state(atMs);
+    const graceWasOpen = this.disconnectedAtMs !== null;
     this.setPresent(role, false);
     if (this.disconnectedAtMs === null) {
       this.disconnectedAtMs = atMs;
     }
+    const toState = this.state(atMs);
+    coopWarn(
+      "lifecycle",
+      `disconnect role=${role} atMs=${atMs} state ${fromState}->${toState} `
+        + `graceWasOpen=${graceWasOpen} graceMs=${this.graceMs} graceOpenedAt=${this.disconnectedAtMs}`,
+    );
   }
 
   /** The lifecycle state at time `nowMs`. */

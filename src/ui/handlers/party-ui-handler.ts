@@ -2,6 +2,7 @@ import { globalScene } from "#app/global-scene";
 import { getPokemonNameWithAffix } from "#app/messages";
 import { pokemonEvolutions } from "#balance/pokemon-evolutions";
 import { allMoves } from "#data/data-lists";
+import { coopLog } from "#data/elite-redux/coop/coop-debug";
 import { coopGiveMonToPartner } from "#data/elite-redux/coop/coop-party-ops";
 import { coopGiveToPartner, coopSwitchBlocksMon } from "#data/elite-redux/coop/coop-session";
 import {
@@ -52,6 +53,31 @@ const DISCARD_BUTTON_Y = -73;
 const DISCARD_BUTTON_Y_DOUBLES = -58;
 
 const defaultMessage = i18next.t("partyUiHandler:choosePokemon");
+
+/**
+ * Co-op (#633): decode a `COOP_CHECK_OP_*` op code to a stable, greppable name for the
+ * relay diagnostic log in {@linkcode PartyUiHandler.coopReportCheckToPhase}. Pure / logging-only.
+ */
+function coopCheckOpName(op: number): string {
+  switch (op) {
+    case COOP_CHECK_OP_REORDER:
+      return "REORDER";
+    case COOP_CHECK_OP_GIVE:
+      return "GIVE";
+    case COOP_CHECK_OP_RELEASE:
+      return "RELEASE";
+    case COOP_CHECK_OP_UNSPLICE:
+      return "UNSPLICE";
+    case COOP_CHECK_OP_RENAME:
+      return "RENAME";
+    case COOP_CHECK_OP_UNPAUSE_EVO:
+      return "UNPAUSE_EVO";
+    case COOP_CHECK_OP_FORM_ITEM:
+      return "FORM_ITEM";
+    default:
+      return "UNKNOWN";
+  }
+}
 
 /**
  * Indicates the reason why the party UI is being opened.
@@ -2192,6 +2218,14 @@ export class PartyUiHandler extends MessageUiHandler {
       return;
     }
     const phase = globalScene.phaseManager.getCurrentPhase();
+    // Past the isCoop + CHECK fence: log every relayed CHECK-mode owner mutation (op + payload
+    // slots) so the captured dev-log shows WHICH op each owner relayed and to which slot. Decode
+    // the op to a stable name so the line is greppable. Gated to co-op CHECK only - solo / lockstep
+    // returned above, so the solo/host party hot path never reaches this log.
+    coopLog(
+      "party",
+      `coopCheck relay op=${coopCheckOpName(op)}(${op}) data=[${data.join(",")}] toPhase=${phase.is("SelectModifierPhase") ? "SelectModifierPhase" : phase.phaseName}`,
+    );
     if (phase.is("SelectModifierPhase")) {
       // Structural reach-through, mirroring this file's existing `as CommandPhase` precedent
       // (line ~1057, the PASS_BATON/SEND_OUT handleCommand call). No `as any` / `@ts-expect-error`.

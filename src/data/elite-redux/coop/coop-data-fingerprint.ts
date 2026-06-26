@@ -25,6 +25,7 @@
 import { pokemonSpeciesLevelMoves } from "#balance/pokemon-level-moves";
 import { allAbilities, allMoves } from "#data/data-lists";
 import { canonicalize, fnv1a64 } from "#data/elite-redux/coop/coop-battle-checksum";
+import { coopLog } from "#data/elite-redux/coop/coop-debug";
 import { ER_ID_MAP } from "#data/elite-redux/er-id-map";
 
 /** One data table's section: the entry count + the stable hash over its sorted entries. */
@@ -177,7 +178,7 @@ function fingerprintAbilitiesName(): ErDataFingerprintSection {
  */
 export function computeErDataFingerprint(): ErDataFingerprint {
   try {
-    return {
+    const fp: ErDataFingerprint = {
       moveMap: fingerprintMoveMap(),
       movesData: fingerprintMovesData(),
       movesName: fingerprintMovesName(),
@@ -185,6 +186,15 @@ export function computeErDataFingerprint(): ErDataFingerprint {
       abilitiesData: fingerprintAbilitiesData(),
       abilitiesName: fingerprintAbilitiesName(),
     };
+    // Compute trace (#633): one grep-able line of the per-section counts so a reader can see
+    // BOTH clients computed the fingerprint and how big each table is BEFORE any wire diff.
+    coopLog(
+      "checksum",
+      `dataFingerprint compute moveMap=${fp.moveMap.hash}(${fp.moveMap.n}) movesData=${fp.movesData.hash}(${fp.movesData.n}) `
+        + `movesName=${fp.movesName.hash}(${fp.movesName.n}) movesets=${fp.movesets.hash}(${fp.movesets.n}) `
+        + `abilitiesData=${fp.abilitiesData.hash}(${fp.abilitiesData.n}) abilitiesName=${fp.abilitiesName.hash}(${fp.abilitiesName.n})`,
+    );
+    return fp;
   } catch {
     return { ...ZERO_FINGERPRINT };
   }

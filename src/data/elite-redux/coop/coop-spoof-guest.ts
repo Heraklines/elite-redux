@@ -21,6 +21,7 @@
 // =============================================================================
 
 import { CoopBattleSync } from "#data/elite-redux/coop/coop-battle-sync";
+import { coopLog, isCoopDebug } from "#data/elite-redux/coop/coop-debug";
 import type { CoopRosterEntry } from "#data/elite-redux/coop/coop-roster";
 import type { CoopTransport } from "#data/elite-redux/coop/coop-transport";
 import { Command } from "#enums/command";
@@ -69,14 +70,28 @@ export class SpoofGuest {
     // empty offer means only Struggle is legal - cursor 0 + the host's own
     // no-usable-move fallback resolves it to Struggle.
     this.battleSync = new CoopBattleSync(transport);
-    this.battleSync.onCommandRequest(({ moveSlots }) => ({
-      command: Command.FIGHT,
-      cursor: moveSlots.length > 0 ? moveSlots[0] : 0,
-    }));
+    this.battleSync.onCommandRequest(({ moveSlots }) => {
+      const cursor = moveSlots.length > 0 ? moveSlots[0] : 0;
+      if (isCoopDebug()) {
+        coopLog(
+          "ai",
+          `spoof command request offeredSlots=[${moveSlots.join(",")}] -> auto-pick FIGHT cursor=${cursor}`,
+        );
+      }
+      return {
+        command: Command.FIGHT,
+        cursor,
+      };
+    });
   }
 
   /** Announce the spoofed partner (mirrors a real client's opening `hello`). */
   connect(): void {
+    coopLog(
+      "ai",
+      `spoof connect role=${this.transport.role} username=${this.username} version=${this.version} `
+        + `rosterSpecies=[${this.roster.map(e => e.speciesId).join(",")}]`,
+    );
     this.transport.send({ t: "hello", version: this.version, username: this.username, role: this.transport.role });
   }
 
@@ -108,6 +123,7 @@ export class SpoofGuest {
   }
 
   private sendRoster(ready: boolean): void {
+    coopLog("ai", `spoof sendRoster ready=${ready} count=${this.roster.length} role=${this.transport.role}`);
     this.transport.send({
       t: "rosterSync",
       role: this.transport.role,

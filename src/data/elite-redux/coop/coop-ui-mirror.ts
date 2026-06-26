@@ -24,6 +24,7 @@
 // other co-op relays.
 // =============================================================================
 
+import { coopLog, isCoopDebug } from "#data/elite-redux/coop/coop-debug";
 import type { CoopMessage, CoopTransport } from "#data/elite-redux/coop/coop-transport";
 
 /** The live-engine surface the watcher needs, injected so the module stays unit-testable. */
@@ -78,6 +79,7 @@ export class CoopUiMirror {
 
   /** Open a shared-screen mirror session. `mode` binds it; `seq` ids it on the wire. */
   beginSession(role: MirrorRole, mode: number, seq: number): void {
+    coopLog("interaction", `uiMirror beginSession role=${role} mode=${mode} seq=${seq} early=${this.early.length}`);
     this.session = { role, mode, seq, n: 0 };
     this.inbox.clear();
     if (role === "watcher") {
@@ -117,6 +119,10 @@ export class CoopUiMirror {
     const s = this.session;
     if (s == null || s.role !== "owner") {
       return;
+    }
+    // HOT (per owner button) - guard the string build. Past the owner-session fence.
+    if (isCoopDebug()) {
+      coopLog("interaction", `uiMirror OWNER send seq=${s.seq} n=${s.n} button=${button} modeBefore=${modeBefore}`);
     }
     this.transport.send({ t: "uiInput", seq: s.seq, n: s.n++, button, mode: modeBefore });
   }
@@ -163,8 +169,18 @@ export class CoopUiMirror {
       // Resync barrier: only replay if the watcher's screen is still where the owner
       // was when they pressed it. If it drifted, drop the visual; the authoritative
       // choice-commit will snap the screen to the correct result.
-      if (engine.getMode() === next.mode) {
+      const liveMode = engine.getMode();
+      if (liveMode === next.mode) {
+        if (isCoopDebug()) {
+          coopLog("interaction", `uiMirror WATCHER apply n=${s.n - 1} button=${next.button} mode=${next.mode}`);
+        }
         engine.applyButton(next.button);
+      } else if (isCoopDebug()) {
+        // Cosmetic drift drop (harmless; the choice-commit heals the screen) - still log it.
+        coopLog(
+          "interaction",
+          `uiMirror WATCHER DROP n=${s.n - 1} button=${next.button} ownerMode=${next.mode} liveMode=${liveMode} (cursor drift)`,
+        );
       }
     }
   }

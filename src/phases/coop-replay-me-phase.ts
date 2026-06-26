@@ -398,14 +398,16 @@ export class CoopReplayMePhase extends Phase {
       // the next wave instead of looping the ME.
       leaveEncounterWithoutBattle();
     } catch {
-      /* the encounter teardown is best-effort; a failure must never hang the run */
+      // the encounter teardown is best-effort; a failure must never hang the run
+      coopWarn("me", "leaveEncounterWithoutBattle threw at ME terminal (handled)", { counter: this.interactionCounter });
     }
     // The single ME alternation advance: idempotent (keyed to this ME's start counter), so it
     // no-ops if the host's terminal / a reconcile broadcast already advanced.
     try {
       controller?.advanceInteraction(this.interactionCounter);
     } catch {
-      /* advance is idempotent + best-effort */
+      // advance is idempotent + best-effort
+      coopWarn("me", "advanceInteraction threw at ME terminal (handled, idempotent)", { counter: this.interactionCounter });
     }
     this.end();
   }

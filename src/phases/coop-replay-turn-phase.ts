@@ -158,7 +158,11 @@ export class CoopReplayTurnPhase extends Phase {
     // lazily from the live (pre-checkpoint) hp the first time a mon is seen.
     const fromHpByBi = new Map<number, number>();
     const pm = globalScene.phaseManager;
+    // Per-turn tally of the presentation phases unshifted, so the guest's log shows the exact
+    // replay-phase sequence it ran for this turn (move/hp/stat/status/faint/message counts).
+    const tally: Record<string, number> = {};
     for (const event of events) {
+      tally[event.k] = (tally[event.k] ?? 0) + 1;
       try {
         // HOT LOOP (per battle event): build the per-event trace only when debug is on.
         if (isCoopDebug()) {
@@ -197,6 +201,10 @@ export class CoopReplayTurnPhase extends Phase {
         coopWarn("replay", `guest replay turn=${this.turn}: garbled event k=${event.k} skipped`);
       }
     }
+    const breakdown = Object.entries(tally)
+      .map(([k, n]) => `${k}=${n}`)
+      .join(" ");
+    coopLog("replay", `guest replay turn=${this.turn}: rendered phases [${breakdown || "none"}]`);
   }
 
   /**

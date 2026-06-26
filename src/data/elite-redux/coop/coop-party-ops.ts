@@ -14,6 +14,7 @@
 // =============================================================================
 
 import { globalScene } from "#app/global-scene";
+import { coopLog, coopWarn } from "#data/elite-redux/coop/coop-debug";
 import { type CoopGiveResult, coopGiveToPartner, coopInterleaveOrder } from "#data/elite-redux/coop/coop-session";
 import type { PlayerPokemon } from "#field/pokemon";
 
@@ -28,6 +29,12 @@ export function coopReorderParty(): void {
   }
   const party = globalScene.getPlayerParty();
   const ordered = coopInterleaveOrder(party);
+  // Past the isCoop fence: log the interleave so an owner/watcher party-order divergence (party
+  // order is per-turn-checksum hashed) is visible. Cheap derived summary (per-slot owner).
+  coopLog(
+    "party",
+    `coopReorderParty interleave len=${party.length} order=[${ordered.map(m => `${m.coopOwner ?? "?"}:${m.species.speciesId}`).join(",")}]`,
+  );
   party.length = 0;
   party.push(...ordered);
 }
@@ -42,9 +49,15 @@ export function coopReorderParty(): void {
 export function coopGiveMonToPartner(mon: PlayerPokemon): CoopGiveResult {
   const result = coopGiveToPartner(globalScene.getPlayerParty(), mon.coopOwner);
   if (!result.ok) {
+    coopWarn(
+      "party",
+      `coopGiveMonToPartner REJECT mon=${mon.species.speciesId} from=${mon.coopOwner} reason=${result.reason}`,
+    );
     return result;
   }
+  const from = mon.coopOwner;
   mon.coopOwner = mon.coopOwner === "host" ? "guest" : "host";
+  coopLog("party", `coopGiveMonToPartner OK mon=${mon.species.speciesId} ${from}->${mon.coopOwner}`);
   coopReorderParty();
   return result;
 }
