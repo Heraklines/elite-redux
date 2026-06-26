@@ -1,0 +1,266 @@
+----- BUG REPORT (in-game) -----
+version:  1.11.19
+url:      https://elite-redux.pages.dev/
+ua:       Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36
+mode:     0  wave:85  difficulty:youngster
+seed:     UFsJSyrOLeGLGgIweiW0mV15
+party:    Venusaur(L71 219/219), Pidgeot(L69 196/196), Weezing(L69 117/205), Wigglytuff(L68 258/258), Pangoro(L67 149/215), Arachtres(L70 40/222)
+
+----- DESCRIPTION -----
+Trainer sprite remains on screen after swapping Pokemon positions in team menu.
+
+----- CONSOLE -----
+[07:55:37.759] LOG: %c %c %c %c %c Phaser v3.90.0 (WebGL | Web Audio) %c https://phaser.io/v390 background: #ff0000 background: #ffff00 background: #00ff00 background: #00ffff color: #ffffff; background: #000000 background: transparent
+[07:55:38.162] LOG: [ER] build mqummgcn-g8mc
+[07:55:42.054] DEBUG: Destroying loading scene
+[07:55:42.055] DEBUG: Destroyed loading scene
+[07:55:42.130] LOG: Seed: iaXOSZy6nEtAfBSLZ6JmXPyd
+[07:55:42.130] LOG: Wave Seed: iaXOSZy6nEtAfBSLZ6JmXPyd 0
+[07:55:43.357] LOG: %cStart Phase LoginPhase color:green;
+[07:55:43.789] LOG: Client Session: XN9aHQ6qwCX3BzpcaHIc8h3G9s6tPS4u
+[07:55:44.041] DEBUG: Using cached system data
+[07:55:44.095] LOG: %cStart Phase TitlePhase color:green;
+[07:55:44.095] LOG: Getting Session Slot id: %d 0
+[07:55:44.102] LOG: use seasonal splash messages true
+[07:55:44.102] LOG: Adding 2 Pride Month splash messages (weight: x15)
+[07:55:44.614] LOG: Getting Session Slot id: %d 0
+[07:55:44.618] LOG: Wave Seed: UFsJSyrOLeGLGgIweiW0mV15 0
+[07:55:44.618] LOG: Seed: UFsJSyrOLeGLGgIweiW0mV15
+[07:55:44.641] LOG: Wave Seed: ¨Æ¦ÌÅ¢¸ºÊ¸¼ªÀ© 83
+[07:55:44.649] LOG: Applied Protein 
+[07:55:44.649] LOG: Applied Zinc 
+[07:55:44.650] LOG: Applied Protein 
+[07:55:44.650] LOG: Applied Zinc 
+[07:55:44.651] LOG: Applied Protein 
+[07:55:44.651] LOG: Applied Zinc 
+[07:55:44.766] LOG: %cStart Phase EncounterPhase color:green;
+[07:55:44.768] LOG: Pokemon: Wild Lokix | Species ID: 920 | Level: 59 | Nature: Modest (+SpAtk/-Atk)
+[07:55:44.768] LOG: Stats (IVs): HP: 156 (7), Atk: 118 (12), Def: 115 (31), Spatk: 85 (19), Spdef: 83 (23), Spd: 130 (29)
+[07:55:44.768] LOG: Ability: Avenger | Passive Ability: Showdown Mode 
+[07:55:44.768] LOG: Moveset: ["Sucker Punch","High Jump Kick","Insect Impact","First Impression"]
+[07:55:45.209] LOG: Wave Seed: ¨Æ¦ÌÅ¢¸ºÊ¸¼ªÀ© 83
+[07:55:46.211] LOG: %cStart Phase SummonPhase color:green;
+[07:55:46.572] LOG: Applied Protein 
+[07:55:46.572] LOG: Applied Zinc 
+[07:55:46.634] WARN: cry/10003 not found
+[07:55:46.884] LOG: %cStart Phase CheckSwitchPhase color:green;
+[07:55:48.440] LOG: %cStart Phase InitEncounterPhase color:green;
+[07:55:48.440] LOG: %cStart Phase PostSummonPhase color:green;
+[07:55:48.440] LOG: Ran PSP for: Lokix
+[07:55:48.441] LOG: %cStart Phase PostSummonPhase color:green;
+[07:55:48.441] LOG: %cStart Phase PostSummonPhase color:green;
+[07:55:48.441] LOG: %cStart Phase TurnInitPhase color:green;
+[07:55:48.441] LOG: Battle Seed: UvDhH72lW8TfCHoa
+[07:55:48.446] LOG: Move Pool: ["Sucker Punch","High Jump Kick","Insect Impact","First Impression"]
+[07:55:48.446] LOG: Move Scores: [21,5.1875,12.75,16.5]
+[07:55:48.446] LOG: Sorted Move Pool: ["Sucker Punch","First Impression","Insect Impact","High Jump Kick"]
+[07:55:48.446] LOG: Chosen Move: Sucker Punch
+[07:55:48.446] LOG: %cStart Phase MovePhase color:green;
+[07:55:48.446] LOG: %cUser: Lokix
+Move: SUCKER_PUNCH
+Use Mode: NORMAL color:orchid
+[07:55:48.447] LOG: %cStart Phase MessagePhase color:green;
+[07:55:48.718] LOG: %cStart Phase MessagePhase color:green;
+[07:55:49.176] LOG: %cStart Phase MoveEndPhase color:green;
+[07:55:49.176] LOG: %cStart Phase SwitchPhase color:green;
+[07:55:49.177] LOG: %cStart Phase MessagePhase color:green;
+[07:55:51.275] LOG: %cStart Phase CommandPhase color:green;
+[07:55:55.469] LOG: Move: HORN_DRILL Move targets: {"targets":[2],"multiple":false} 
+Player Pokemon: Arachtres
+[07:55:55.470] LOG: %cStart Phase EnemyCommandPhase color:green;
+[07:55:55.473] LOG: Move Pool: ["Sucker Punch","High Jump Kick","Insect Impact","First Impression"]
+[07:55:55.473] LOG: Move Scores: [21,5.1875,12.75,16.5]
+[07:55:55.473] LOG: Sorted Move Pool: ["Sucker Punch","First Impression","Insect Impact","High Jump Kick"]
+[07:55:55.473] LOG: Chosen Move: First Impression
+[07:55:55.473] LOG: %cStart Phase TurnStartPhase color:green;
+[07:55:55.474] LOG: %cStart Phase MovePhase color:green;
+[07:55:55.474] LOG: %cUser: Lokix
+Move: FIRST_IMPRESSION
+Use Mode: NORMAL color:orchid
+[07:55:55.475] LOG: %cStart Phase MessagePhase color:green;
+[07:55:55.768] LOG: %cStart Phase MoveEffectPhase color:green;
+[07:55:56.018] LOG: crit stage: +0
+[07:55:56.019] LOG: Move: First Impression | Base damage: 53.37738582677166 | Power: 108 | Source attack: 118 | Target defense: 127
+[07:55:56.019] LOG: Move: First Impression | Attack damage: 67
+[07:55:56.020] LOG: %cStart Phase MessagePhase color:green;
+[07:55:56.594] LOG: %cStart Phase DamageAnimPhase color:green;
+[07:55:56.609] LOG: %cStart Phase MessagePhase color:green;
+[07:55:57.067] LOG: %cStart Phase MessagePhase color:green;
+[07:55:57.574] LOG: %cStart Phase MoveEndPhase color:green;
+[07:55:57.574] LOG: %cStart Phase MovePhase color:green;
+[07:55:57.574] LOG: %cUser: Arachtres
+Move: HORN_DRILL
+Use Mode: NORMAL color:orchid
+[07:55:57.574] LOG: %cStart Phase MessagePhase color:green;
+[07:55:58.053] LOG: %cStart Phase MoveEndPhase color:green;
+[07:55:58.053] LOG: %cStart Phase CheckInterludePhase color:green;
+[07:55:58.053] LOG: %cStart Phase WeatherEffectPhase color:green;
+[07:55:58.164] WARN: Texture "%s" has no frame "%s" PRAS- Confuse Ray 1
+[07:55:58.685] LOG: %cStart Phase PositionalTagPhase color:green;
+[07:55:58.685] LOG: %cStart Phase BerryPhase color:green;
+[07:55:58.686] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[07:55:58.686] LOG: %cStart Phase TurnEndPhase color:green;
+[07:55:58.686] LOG: [coop:replay] host recorder: end turn=-1 events=0
+[07:55:58.687] LOG: %cStart Phase TurnInitPhase color:green;
+[07:55:58.687] LOG: %cStart Phase CommandPhase color:green;
+[07:55:59.185] LOG: Move: HORN_DRILL Move targets: {"targets":[2],"multiple":false} 
+Player Pokemon: Arachtres
+[07:55:59.186] LOG: %cStart Phase EnemyCommandPhase color:green;
+[07:55:59.188] LOG: Battle Seed: UvDhH72lW8TfCHoa
+[07:55:59.189] LOG: Move Pool: ["Sucker Punch","High Jump Kick","Insect Impact","First Impression"]
+[07:55:59.189] LOG: Move Scores: [21,5.1875,12.75,-20]
+[07:55:59.189] LOG: Sorted Move Pool: ["Sucker Punch","Insect Impact","High Jump Kick","First Impression"]
+[07:55:59.189] LOG: Chosen Move: Sucker Punch
+[07:55:59.189] LOG: %cStart Phase TurnStartPhase color:green;
+[07:55:59.189] LOG: %cStart Phase MovePhase color:green;
+[07:55:59.189] LOG: %cUser: Lokix
+Move: SUCKER_PUNCH
+Use Mode: NORMAL color:orchid
+[07:55:59.190] LOG: %cStart Phase MessagePhase color:green;
+[07:55:59.463] LOG: %cStart Phase MoveEffectPhase color:green;
+[07:55:59.845] LOG: crit stage: +0
+[07:55:59.846] LOG: Move: Sucker Punch | Base damage: 35.30015748031496 | Power: 70 | Source attack: 118 | Target defense: 127
+[07:55:59.846] LOG: Move: Sucker Punch | Attack damage: 46
+[07:55:59.846] LOG: %cStart Phase DamageAnimPhase color:green;
+[07:55:59.859] LOG: %cStart Phase MoveEndPhase color:green;
+[07:55:59.859] LOG: %cStart Phase MovePhase color:green;
+[07:55:59.860] LOG: %cUser: Arachtres
+Move: HORN_DRILL
+Use Mode: NORMAL color:orchid
+[07:55:59.860] LOG: %cStart Phase MessagePhase color:green;
+[07:56:00.123] LOG: %cStart Phase MoveEffectPhase color:green;
+[07:56:01.318] LOG: crit stage: +1
+[07:56:01.318] LOG: Move: Horn Drill | Base damage: 112.29982608695653 | Power: 120 | Source attack: 181 | Target defense: 115
+[07:56:01.318] LOG: Move: Horn Drill | Attack damage: 112
+[07:56:01.319] LOG: %cStart Phase DamageAnimPhase color:green;
+[07:56:01.332] LOG: %cStart Phase MoveEndPhase color:green;
+[07:56:01.332] LOG: %cStart Phase CheckInterludePhase color:green;
+[07:56:01.332] LOG: %cStart Phase WeatherEffectPhase color:green;
+[07:56:01.443] WARN: Texture "%s" has no frame "%s" PRAS- Confuse Ray 1
+[07:56:01.964] LOG: %cStart Phase PositionalTagPhase color:green;
+[07:56:01.964] LOG: %cStart Phase BerryPhase color:green;
+[07:56:01.964] LOG: Applied Sitrus Berry (enemy)
+[07:56:01.965] LOG: %cStart Phase CommonAnimPhase color:green;
+[07:56:02.255] LOG: %cStart Phase PokemonHealPhase color:green;
+[07:56:02.472] LOG: %cStart Phase MessagePhase color:green;
+[07:56:03.123] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[07:56:03.124] LOG: %cStart Phase TurnEndPhase color:green;
+[07:56:03.124] LOG: [coop:replay] host recorder: end turn=-1 events=0
+[07:56:03.124] LOG: %cStart Phase TurnInitPhase color:green;
+[07:56:03.124] LOG: %cStart Phase CommandPhase color:green;
+[07:56:10.536] LOG: %cStart Phase EnemyCommandPhase color:green;
+[07:56:10.538] LOG: Battle Seed: UvDhH72lW8TfCHoa
+[07:56:10.539] LOG: Move Pool: ["Sucker Punch","Insect Impact"]
+[07:56:10.539] LOG: Move Scores: [21,12.75]
+[07:56:10.539] LOG: Sorted Move Pool: ["Sucker Punch","Insect Impact"]
+[07:56:10.539] LOG: Chosen Move: Sucker Punch
+[07:56:10.539] LOG: %cStart Phase TurnStartPhase color:green;
+[07:56:10.539] LOG: %cStart Phase AttemptCapturePhase color:green;
+[07:56:37.703] LOG: %cStart Phase VictoryPhase color:green;
+[07:56:37.703] LOG: %cStart Phase ExpPhase color:green;
+[07:56:37.703] LOG: Applied Super EXP. Charm 
+[07:56:37.703] LOG: Applied EXP. Charm 
+[07:56:39.701] LOG: %cStart Phase LevelUpPhase color:green;
+[07:56:39.701] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[07:56:39.701] LOG: Applied Super EXP. Charm 
+[07:56:39.701] LOG: Applied EXP. Charm 
+[07:56:39.944] LOG: %cStart Phase LevelUpPhase color:green;
+[07:56:39.944] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[07:56:40.076] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[07:56:40.076] LOG: Applied Super EXP. Charm 
+[07:56:40.076] LOG: Applied EXP. Charm 
+[07:56:40.319] LOG: %cStart Phase LevelUpPhase color:green;
+[07:56:40.320] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[07:56:40.451] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[07:56:40.451] LOG: Applied Super EXP. Charm 
+[07:56:40.451] LOG: Applied EXP. Charm 
+[07:56:40.695] LOG: %cStart Phase LevelUpPhase color:green;
+[07:56:40.695] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[07:56:40.826] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[07:56:40.826] LOG: Applied Super EXP. Charm 
+[07:56:40.826] LOG: Applied EXP. Charm 
+[07:56:40.826] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[07:56:40.826] LOG: %cStart Phase MovePhase color:green;
+[07:56:40.826] LOG: %cStart Phase MoveEndPhase color:green;
+[07:56:40.827] LOG: %cStart Phase CheckInterludePhase color:green;
+[07:56:40.827] LOG: %cStart Phase WeatherEffectPhase color:green;
+[07:56:40.937] WARN: Texture "%s" has no frame "%s" PRAS- Confuse Ray 1
+[07:56:41.458] LOG: %cStart Phase PositionalTagPhase color:green;
+[07:56:41.458] LOG: %cStart Phase BerryPhase color:green;
+[07:56:41.458] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[07:56:41.458] LOG: %cStart Phase TurnEndPhase color:green;
+[07:56:41.459] LOG: [coop:replay] host recorder: end turn=-1 events=0
+[07:56:41.459] LOG: %cStart Phase BattleEndPhase color:green;
+[07:56:41.459] LOG: Battle Score: 93 (3 Turns x0.69)
+[07:56:41.459] LOG: Total Score: 8951
+[07:56:41.460] LOG: Applied Protein 
+[07:56:41.460] LOG: Applied Zinc 
+[07:56:41.461] LOG: %cStart Phase EggLapsePhase color:green;
+[07:56:41.461] LOG: %cStart Phase SelectModifierPhase color:green;
+[07:56:41.461] LOG: Wave Seed: ¨Æ¦ÌÅ¢¸ºÊ¸¼ªÀ© 83
+[07:56:41.463] LOG: Applied Golden Poké Ball 
+[07:56:41.463] LOG: 20 5 [8,10,11,12,14,23]
+[07:56:41.463] LOG: {"id":"IV_SCANNER","localeKey":"modifierType:ModifierType.IV_SCANNER","iconImage":"scanner","soundName":"se/restore","tier":2} 
+[07:56:41.463] LOG: 7 2 [4,5]
+[07:56:41.463] LOG: {"id":"TEMP_STAT_STAGE_BOOSTER","localeKey":"","iconImage":"x_defense","soundName":"se/restore","tier":0,"stat":2,"nameKey":"x_defense","quantityKey":"percentage"} 
+[07:56:41.463] LOG: 3 0 [4,5]
+[07:56:41.463] LOG: {"id":"SUPER_POTION","localeKey":"modifierType:ModifierType.SUPER_POTION","iconImage":"super_potion","group":"potion","soundName":"se/restore","tier":0,"restorePoints":50,"restorePercent":25,"healStatus":false} 
+[07:56:41.463] LOG: 7 2 [2,5,8,9,10,16,22]
+[07:56:41.463] LOG: {"id":"MAX_POTION","localeKey":"modifierType:ModifierType.MAX_POTION","iconImage":"max_potion","group":"potion","soundName":"se/restore","tier":1,"restorePoints":0,"restorePercent":100,"healStatus":false} 
+[07:56:41.463] LOG: 6 2 [2,5,8,9,10,16,22]
+[07:56:41.463] LOG: {"id":"HYPER_POTION","localeKey":"modifierType:ModifierType.HYPER_POTION","iconImage":"hyper_potion","group":"potion","soundName":"se/restore","tier":1,"restorePoints":200,"restorePercent":50,"healStatus":false} 
+[07:56:41.463] LOG: 3 1 [2,5,8,9,10,16,22]
+[07:56:41.463] LOG: {"id":"REVIVE","localeKey":"modifierType:ModifierType.REVIVE","iconImage":"revive","group":"revive","soundName":"se/restore","tier":1,"restorePoints":0,"restorePercent":50,"healStatus":false} 
+[07:56:41.463] LOG: 15 5 [2,5,8,9,10,16,22]
+[07:56:41.463] LOG: GREAT 0
+[07:56:41.463] LOG: 0 0 [2,5,8,9,10,16,22]
+[07:56:41.463] LOG: {"id":"GREAT_BALL","localeKey":"","iconImage":"gb","group":"pb","soundName":"se/pb_bounce_1","tier":1,"pokeballType":1,"count":5} 
+[07:56:55.069] LOG: %cStart Phase NewBattlePhase color:green;
+[07:56:55.069] LOG: Wave Seed: ©Ç§ÍÆ£ ¹ »Ë¹½«Áª 84
+[07:56:55.070] LOG: %cStart Phase ReturnPhase color:green;
+[07:56:55.336] LOG: %cStart Phase ShowTrainerPhase color:green;
+[07:56:55.586] LOG: %cStart Phase NextEncounterPhase color:green;
+[07:56:56.397] DEBUG: Session data saved to slot 0!
+[07:56:56.397] LOG: Wave Seed: ©Ç§ÍÆ£ ¹ »Ë¹½«Áª 84
+[07:57:06.617] LOG: %cStart Phase MysteryEncounterPhase color:green;
+[07:57:30.143] LOG: Applied Protein 
+[07:57:30.143] LOG: Applied Zinc 
+[07:57:30.144] LOG: Applied Protein 
+[07:57:30.144] LOG: Applied Zinc 
+[07:57:38.186] LOG: %cStart Phase MysteryEncounterOptionSelectedPhase color:green;
+[07:57:38.186] LOG: %cStart Phase MysteryEncounterRewardsPhase color:green;
+[07:57:38.186] LOG: %cStart Phase SelectModifierPhase color:green;
+[07:57:38.186] LOG: Wave Seed: ©Ç§ÍÆ£ ¹ »Ë¹½«Áª 84
+[07:57:38.188] LOG: Applied Golden Poké Ball 
+[07:57:38.188] LOG: 2 0 [4,5]
+[07:57:38.188] LOG: {"id":"POTION","localeKey":"modifierType:ModifierType.POTION","iconImage":"potion","group":"potion","soundName":"se/restore","tier":0,"restorePoints":20,"restorePercent":10,"healStatus":false} 
+[07:58:28.706] LOG: %cStart Phase EggLapsePhase color:green;
+[07:58:28.706] LOG: %cStart Phase PostMysteryEncounterPhase color:green;
+[07:58:29.209] LOG: Encounter animations do not support targets
+[07:58:29.209] LOG: Encounter animations do not support targets
+[07:58:31.898] LOG: %cStart Phase NewBattlePhase color:green;
+[07:58:31.898] LOG: Wave Seed: ªÈ¨ÎÇ¤¡º¡¼Ìº¾¬Â« 85
+[07:58:31.898] LOG: %cStart Phase NextEncounterPhase color:green;
+[07:58:31.899] LOG: Starting species pool tier: UNCOMMON
+[07:58:31.899] LOG: Replaced BURMY with MOTHIM
+[07:58:31.906] LOG: Pokemon: Wild Mothim | Species ID: 414 | Level: 60 | Nature: Bashful (-)
+[07:58:31.906] LOG: Stats (IVs): HP: 162 (24), Atk: 125 (1), Def: 96 (22), Spatk: 127 (4), Spdef: 84 (3), Spd: 131 (30)
+[07:58:31.906] LOG: Ability: Overcoat | Passive Ability: Tinted Lens 
+[07:58:31.906] LOG: Moveset: ["Web Shot","Victory Dance","Venoshock","Reflect Type"]
+[07:58:32.458] LOG: {"id":"BERRY","localeKey":"","iconImage":"salac_berry","group":"berry","soundName":"se/restore","tier":0,"berryType":7} (enemy)
+[07:58:32.459] LOG: Battle Seed: KRk0Ub3blpTg0KyJ
+[07:58:32.509] DEBUG: Session data saved to slot 0!
+[07:58:32.509] LOG: Wave Seed: ªÈ¨ÎÇ¤¡º¡¼Ìº¾¬Â« 85
+[07:58:33.516] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[07:58:33.516] LOG: %cStart Phase CheckSwitchPhase color:green;
+[07:58:36.218] LOG: %cStart Phase InitEncounterPhase color:green;
+[07:58:36.219] LOG: %cStart Phase PostSummonPhase color:green;
+[07:58:36.219] LOG: Ran PSP for: Mothim
+[07:58:36.219] LOG: %cStart Phase PostSummonPhase color:green;
+[07:58:36.219] LOG: %cStart Phase PostSummonPhase color:green;
+[07:58:36.219] LOG: %cStart Phase ShowAbilityPhase color:green;
+[07:58:36.600] LOG: %cStart Phase StatStageChangePhase color:green;
+[07:58:37.046] LOG: %cStart Phase MessagePhase color:green;
+[07:58:37.551] LOG: %cStart Phase HideAbilityPhase color:green;
+[07:58:37.607] LOG: %cStart Phase TurnInitPhase color:green;
+[07:58:37.608] LOG: %cStart Phase CommandPhase color:green;
