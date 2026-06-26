@@ -579,6 +579,73 @@ describe.skipIf(!RUN)("co-op GUEST = pure renderer - real engine (#633, TRACK-2 
     expect(victoryPushes2.length, "a duplicate waveResolved for the same wave does NOT re-advance").toBe(0);
   });
 
+  // (A2) POST-BATTLE SOFTLOCK / phantom turn (#633/#698/#696/#697): the live "frozen after battle"
+  // deadlock. On the wave's FINAL turn the host sends waveResolved(win) for wave N BEFORE the final
+  // turnResolution, then ends the battle + parks as the reward WATCHER. On the guest the racy order is:
+  // an EARLIER turn's finalize consumes the pending wave-advance and runs the VictoryPhase tail (wave
+  // advanced, lastResolvedWave := N), THEN the wave's FINAL turn's late turnResolution is replayed. Its
+  // finalize must be TERMINAL - it must STILL render the final turn + apply the checkpoint, but must NOT
+  // queueTurnEndPhases (whose trailing TurnEndPhase loops into a phantom next CommandPhase for turn N+1
+  // the host already passed; the guest would then broadcast a command + awaitTurn for that phantom turn
+  // the host never resolves -> deadlock). This asserts: the final turn renders + finalizes, runs NO second
+  // VictoryPhase, and queues NO TurnEndPhase (no phantom turn).
+  it("POST-BATTLE SOFTLOCK (#633): the final turn after a wave-advance is TERMINAL (no phantom turn-end loop)", async () => {
+    await startCoopGuest();
+    const earlierTurn = globalScene.currentBattle.turn;
+    const finalTurn = earlierTurn + 1;
+    const wave = globalScene.currentBattle.waveIndex;
+    const partner = getCoopRuntime()!.partnerTransport!;
+
+    // The host RESOLVED this wave (WIN) BEFORE the final turn's resolution (the live racy order).
+    partner.send({ t: "waveResolved", wave, outcome: "win" });
+    await new Promise(r => setTimeout(r, 0));
+
+    // EARLIER turn resolves: its finalize consumes the pending wave-advance and runs VictoryPhase,
+    // AND queues turn-end (the run legitimately loops to the wave's FINAL turn). lastResolvedWave := N.
+    partner.send({
+      t: "turnResolution",
+      turn: earlierTurn,
+      events: [{ k: "message", text: "Foe fainted!" }],
+      checkpoint: checkpointFromField(0),
+      checksum: coopEngine.captureCoopChecksum(),
+    });
+    await new Promise(r => setTimeout(r, 0));
+    await driveReplayTurn(earlierTurn);
+
+    // Now the wave's FINAL turn's LATE turnResolution arrives (after the wave already advanced).
+    partner.send({
+      t: "turnResolution",
+      turn: finalTurn,
+      events: [{ k: "message", text: "Critical hit!" }],
+      checkpoint: checkpointFromField(0),
+      checksum: coopEngine.captureCoopChecksum(),
+    });
+    await new Promise(r => setTimeout(r, 0));
+
+    const pushNewSpy = vi.spyOn(globalScene.phaseManager, "pushNew");
+    const queueMessageSpy = vi.spyOn(globalScene.phaseManager, "queueMessage");
+    const queueTurnEndSpy = vi.spyOn(globalScene.phaseManager, "queueTurnEndPhases");
+    // Drive the FINAL turn's replay + its deferred finalize. With the fix it is terminal.
+    await driveReplayTurn(finalTurn);
+
+    // The final turn STILL rendered its events (a `message` event renders via queueMessage) - the
+    // guest does not skip the KO turn's animation.
+    const renderedFinalTurnEvent = queueMessageSpy.mock.calls.some(([text]) => text === "Critical hit!");
+    expect(renderedFinalTurnEvent, "the final turn still renders its events (no skipped KO turn)").toBe(true);
+    // It did NOT queue the guest's turn-end phases -> NO phantom next turn -> no command broadcast /
+    // awaitTurn for turn N+1 the host already passed (the deadlock is broken).
+    expect(queueTurnEndSpy, "the terminal final turn does NOT loop into a phantom turn-end").not.toHaveBeenCalled();
+    expect(
+      pushNewSpy.mock.calls.some(([name]) => name === "TurnEndPhase"),
+      "no TurnEndPhase queued on the terminal final turn (no phantom turn N+1)",
+    ).toBe(false);
+    // The wave already advanced on the earlier turn; the final turn must NOT re-advance it.
+    expect(
+      pushNewSpy.mock.calls.filter(([name]) => name === "VictoryPhase").length,
+      "the already-advanced wave is not re-advanced by the final turn",
+    ).toBe(0);
+  });
+
   // (B) SWITCH-MIRROR (#633, enemy-switch mirror): a host trainer SWITCH swaps party[fieldIndex]
   // with a bench slot, keeping the same battler index but bringing a DIFFERENT species on-field.
   // The guest mirrors it via the per-mon `speciesId` in the checkpoint: when the species at an

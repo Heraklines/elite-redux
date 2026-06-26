@@ -43,6 +43,7 @@ import { logCanonicalDiff } from "#data/elite-redux/coop/coop-data-fingerprint";
 import { coopLog, coopWarn, isCoopDebug } from "#data/elite-redux/coop/coop-debug";
 import {
   consumeCoopPendingWaveAdvance,
+  coopWaveAdvanceSignaledFor,
   getCoopBattleStreamer,
   isCoopAuthoritativeGuest,
 } from "#data/elite-redux/coop/coop-runtime";
@@ -576,13 +577,43 @@ export class CoopFinalizeTurnPhase extends Phase {
    * signaled this wave RESOLVED (#633, authoritative wave-advance), also run the normal victory
    * tail AFTER the turn-end phases drain - this is the SAFE boundary (the in-flight replay turn
    * has finished here, never mid-replay).
+   *
+   * POST-BATTLE SOFTLOCK (#633/#698/#696/#697): on the wave's FINAL turn the host sends
+   * `waveResolved(win/loss/capture/flee)` for wave N BEFORE the final `turnResolution`, then ends the
+   * battle and parks as the reward WATCHER. The guest's racy order is: an EARLIER turn's finalize
+   * consumes the pending wave-advance and queues the VictoryPhase / flee / game-over tail (the wave
+   * advances, `lastResolvedWave := N`), THEN this wave's FINAL (post-KO) turn's late `turnResolution`
+   * is replayed. That final-turn finalize must be TERMINAL: render its events (already done in
+   * `start()`), apply the checkpoint (already done), and STOP - it must NOT `queueTurnEndPhases()`,
+   * whose trailing `TurnEndPhase` increments the turn and loops into a phantom next `CommandPhase` for
+   * a turn the host already passed (the guest then broadcasts a command + `awaitTurn` for turn N+1 the
+   * host never resolves -> deadlock). So: when this wave's advance has ALREADY run
+   * ({@linkcode coopWaveAdvanceSignaledFor}, i.e. `lastResolvedWave >= N`), SUPPRESS the turn-end loop;
+   * otherwise loop normally (the run continues to the wave's final turn, or to the next turn).
+   *
+   * Deliberately keyed on the ALREADY-RUN guard, NOT a still-pending signal: the EARLIER turn finalizes
+   * while the advance is merely pending (it consumes + runs the tail itself), and that turn's turn-end
+   * loop is legitimately needed to reach the wave's final turn - so it must NOT be suppressed there.
    */
   private finishTurn(): void {
     try {
-      globalScene.phaseManager.queueTurnEndPhases();
-      // The turn-end phases were pushed to the back of the queue above; pushing the victory tail
-      // here runs it AFTER they drain (the in-flight turn finishes first, per the Oracle ordering).
-      this.maybeRunCoopWaveAdvance();
+      const wave = globalScene.currentBattle.waveIndex;
+      const waveEnding = coopWaveAdvanceSignaledFor(wave);
+      if (waveEnding) {
+        // FINAL turn of an already-/about-to-be-resolved wave: be TERMINAL. Run the wave-advance tail
+        // (VictoryPhase / BattleEnd / GameOver - exactly once, one-shot + wave-guarded) and DO NOT queue
+        // the guest's turn-end phases - that would loop into a phantom next turn the host already passed.
+        coopWarn(
+          "replay",
+          `guest finalize turn=${this.turn}: suppressing phantom turn after wave-advance signaled wave=${wave} (terminal final turn, NOT queuing turn-end)`,
+        );
+        this.maybeRunCoopWaveAdvance();
+      } else {
+        globalScene.phaseManager.queueTurnEndPhases();
+        // The turn-end phases were pushed to the back of the queue above; pushing the victory tail
+        // here runs it AFTER they drain (the in-flight turn finishes first, per the Oracle ordering).
+        this.maybeRunCoopWaveAdvance();
+      }
     } catch {
       // The turn-end queue / wave-advance is best-effort; a failure here must never hang the turn.
       coopWarn("replay", `guest finalize turn=${this.turn}: finishTurn (queue turn-end / wave-advance) threw (handled)`);

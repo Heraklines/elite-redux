@@ -236,6 +236,30 @@ export function consumeCoopPendingWaveAdvance(): {
 }
 
 /**
+ * GUEST (#633/#698/#696/#697 post-battle softlock): whether `wave`'s authoritative WAVE-ADVANCE has
+ * ALREADY been consumed/run (`lastResolvedWave >= wave`) - i.e. a prior finalize already queued this
+ * wave's victory/flee/game-over tail. In that state the wave has ENDED on the host, so the guest must
+ * NOT loop back into a new battle turn for it: a `turnResolution` for that wave's FINAL (post-KO) turn
+ * that the guest replays AFTER the tail was queued must be TERMINAL (render the events + apply the
+ * checkpoint, both already done by the finalize) and must NOT queue the guest's turn-end phases (whose
+ * trailing `TurnEndPhase` increments the turn and loops into a phantom next `CommandPhase` for a turn
+ * the host already passed -> the guest broadcasts a command + `awaitTurn` for turn N+1 the host never
+ * resolves -> the deadlock).
+ *
+ * Deliberately checks ONLY the ALREADY-RUN guard (`lastResolvedWave`), NOT a still-PENDING signal: an
+ * EARLIER turn of the wave can finalize while a `waveResolved` is merely pending (it consumes + runs the
+ * tail itself), and that earlier turn's turn-end loop is legitimately needed to reach the wave's FINAL
+ * (KO) turn - suppressing it there would skip rendering the KO turn. Only once the tail has actually run
+ * (the guard is bumped) is a further same-wave finalize a post-resolution phantom to suppress.
+ *
+ * Read-only (no mutation, never bumps the guard). Hard-gated by the caller to the authoritative guest,
+ * so host / solo / lockstep never reach it. Pure on its `wave` argument.
+ */
+export function coopWaveAdvanceSignaledFor(wave: number): boolean {
+  return wave <= lastResolvedWave;
+}
+
+/**
  * Merge an incoming `waveResolved` into the existing pending one (#633 B1 fix). The latest signal for
  * a NEW (>=) wave wins, BUT a `captureParty` is PRESERVED across a SAME-WAVE supersession: a co-op
  * DOUBLE wild battle resolves ONE wave with BOTH a `"capture"` (carrying the caught party) AND a
