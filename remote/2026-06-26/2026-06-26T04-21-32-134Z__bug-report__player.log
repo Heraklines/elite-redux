@@ -1,0 +1,280 @@
+----- BUG REPORT (in-game) -----
+version:  1.11.19
+url:      https://elite-redux.pages.dev/
+ua:       Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Mobile Safari/537.36
+mode:     4  wave:30  difficulty:hell
+seed:     0nKFtiCg8QIYZJqUugqIZkdO
+party:    Roselia(L26 59/69), Bramblin(L24 21/64), Basculin(L24 74/74), Rufflet(L24 74/74), Clamperl(L24 0/59)
+
+----- DESCRIPTION -----
+Sap Sipper should be redirected to Girafarig and raise its highest atk
+
+----- CONSOLE -----
+[04:20:17.477] LOG: %cStart Phase MessagePhase color:green;
+[04:20:17.689] LOG: %cStart Phase MessagePhase color:green;
+[04:20:17.914] LOG: %cStart Phase MoveEndPhase color:green;
+[04:20:17.914] LOG: %cStart Phase CheckInterludePhase color:green;
+[04:20:17.914] LOG: %cStart Phase WeatherEffectPhase color:green;
+[04:20:17.914] LOG: %cStart Phase PositionalTagPhase color:green;
+[04:20:17.914] LOG: %cStart Phase BerryPhase color:green;
+[04:20:17.915] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[04:20:17.916] LOG: %cStart Phase TurnEndPhase color:green;
+[04:20:17.927] LOG: %cStart Phase PokemonHealPhase color:green;
+[04:20:18.154] LOG: %cStart Phase MessagePhase color:green;
+[04:20:18.397] LOG: %cStart Phase PokemonHealPhase color:green;
+[04:20:18.603] LOG: %cStart Phase MessagePhase color:green;
+[04:20:18.831] LOG: %cStart Phase SwitchPhase color:green;
+[04:20:21.315] LOG: %cStart Phase SwitchSummonPhase color:green;
+[04:20:21.399] LOG: Applied HP Up 
+[04:20:21.551] LOG: %cStart Phase PostSummonPhase color:green;
+[04:20:21.551] LOG: Ran PSP for: Rufflet
+[04:20:21.552] LOG: %cStart Phase PostSummonPhase color:green;
+[04:20:21.552] LOG: %cStart Phase PostSummonPhase color:green;
+[04:20:21.552] LOG: %cStart Phase TurnInitPhase color:green;
+[04:20:21.553] LOG: %cStart Phase CommandPhase color:green;
+[04:20:22.948] LOG: Move: GUST Move targets: {"targets":[3,1],"multiple":false} 
+Player Pokemon: Rufflet
+[04:20:22.950] LOG: %cStart Phase SelectTargetPhase color:green;
+[04:20:23.147] LOG: %cStart Phase CommandPhase color:green;
+[04:20:24.030] LOG: Move: FLOWER_TRICK Move targets: {"targets":[3,0],"multiple":false} 
+Player Pokemon: Bramblin
+[04:20:24.033] LOG: %cStart Phase SelectTargetPhase color:green;
+[04:20:24.228] LOG: %cStart Phase EnemyCommandPhase color:green;
+[04:20:24.234] LOG: Battle Seed: CCzABRPnlBtX9zuG
+[04:20:24.240] LOG: Move Pool: ["Trailblaze","Superpower","Leaf Blade"]
+[04:20:24.240] LOG: Move Scores: [1129.7297297297298,1165.234375,1243.75]
+[04:20:24.240] LOG: Sorted Move Pool: ["Leaf Blade","Superpower","Trailblaze"]
+[04:20:24.240] LOG: Chosen Move: Leaf Blade
+[04:20:24.240] LOG: ER AI: experimental brain (sharpness 1)
+[04:20:24.241] LOG: %cStart Phase TurnStartPhase color:green;
+[04:20:24.243] LOG: %cStart Phase MovePhase color:green;
+[04:20:24.243] LOG: %cUser: Rufflet
+Move: GUST
+Use Mode: NORMAL color:orchid
+[04:20:24.245] LOG: %cStart Phase MessagePhase color:green;
+[04:20:24.338] LOG: %cStart Phase MoveEffectPhase color:green;
+[04:20:24.892] LOG: crit stage: +0
+[04:20:24.895] LOG: Move: Gust | Base damage: 6.64 | Power: 40 | Source attack: 27 | Target defense: 54
+[04:20:24.896] LOG: Move: Gust | Attack damage: 4
+[04:20:24.897] LOG: %cStart Phase DamageAnimPhase color:green;
+[04:20:24.923] LOG: %cStart Phase MessagePhase color:green;
+[04:20:25.139] LOG: %cStart Phase MoveEndPhase color:green;
+[04:20:25.140] LOG: %cStart Phase MovePhase color:green;
+[04:20:25.140] LOG: %cUser: Lurantis
+Move: LEAF_BLADE
+Use Mode: NORMAL color:orchid
+[04:20:25.144] LOG: %cStart Phase MessagePhase color:green;
+[04:20:25.281] LOG: %cStart Phase MoveEffectPhase color:green;
+[04:20:25.782] LOG: crit stage: +2
+[04:20:25.783] LOG: Move: Leaf Blade | Base damage: 53.5076923076923 | Power: 90 | Source attack: 93 | Target defense: 39
+[04:20:25.785] LOG: Move: Leaf Blade | Attack damage: 187
+[04:20:25.785] LOG: %cStart Phase DamageAnimPhase color:green;
+[04:20:25.816] LOG: %cStart Phase MessagePhase color:green;
+[04:20:26.030] LOG: %cStart Phase FaintPhase color:green;
+[04:20:28.801] LOG: %cStart Phase MessagePhase color:green;
+[04:20:28.894] LOG: %cStart Phase ShowAbilityPhase color:green;
+[04:20:29.065] LOG: %cStart Phase PokemonHealPhase color:green;
+[04:20:29.288] LOG: %cStart Phase MessagePhase color:green;
+[04:20:29.555] LOG: %cStart Phase HideAbilityPhase color:green;
+[04:20:29.592] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[04:20:29.675] LOG: %cStart Phase MoveEndPhase color:green;
+[04:20:29.675] LOG: %cStart Phase MovePhase color:green;
+[04:20:29.675] LOG: %cStart Phase MoveEndPhase color:green;
+[04:20:29.676] LOG: %cStart Phase CheckInterludePhase color:green;
+[04:20:29.676] LOG: %cStart Phase WeatherEffectPhase color:green;
+[04:20:29.676] LOG: %cStart Phase PositionalTagPhase color:green;
+[04:20:29.676] LOG: %cStart Phase BerryPhase color:green;
+[04:20:29.677] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[04:20:29.678] LOG: %cStart Phase TurnEndPhase color:green;
+[04:20:29.690] LOG: %cStart Phase PokemonHealPhase color:green;
+[04:20:29.920] LOG: %cStart Phase MessagePhase color:green;
+[04:20:30.164] LOG: %cStart Phase TurnInitPhase color:green;
+[04:20:30.164] LOG: %cStart Phase CommandPhase color:green;
+[04:20:32.148] LOG: Move: BODY_SLAM Move targets: {"targets":[3],"multiple":false} 
+Player Pokemon: Rufflet
+[04:20:32.150] LOG: %cStart Phase EnemyCommandPhase color:green;
+[04:20:32.154] LOG: Battle Seed: CCzABRPnlBtX9zuG
+[04:20:32.159] LOG: Move Pool: ["Trailblaze","Superpower","Leaf Blade"]
+[04:20:32.159] LOG: Move Scores: [1129.7297297297298,1077.027027027027,1228.0405405405404]
+[04:20:32.159] LOG: Sorted Move Pool: ["Leaf Blade","Trailblaze","Superpower"]
+[04:20:32.159] LOG: Chosen Move: Leaf Blade
+[04:20:32.159] LOG: ER AI: experimental brain (sharpness 1)
+[04:20:32.159] LOG: %cStart Phase TurnStartPhase color:green;
+[04:20:32.160] LOG: %cStart Phase MovePhase color:green;
+[04:20:32.160] LOG: %cUser: Lurantis
+Move: LEAF_BLADE
+Use Mode: NORMAL color:orchid
+[04:20:32.161] LOG: %cStart Phase MessagePhase color:green;
+[04:20:32.272] LOG: %cStart Phase MoveEffectPhase color:green;
+[04:20:32.774] LOG: crit stage: +2
+[04:20:32.775] LOG: Move: Leaf Blade | Base damage: 57.8 | Power: 90 | Source attack: 93 | Target defense: 36
+[04:20:32.776] LOG: Move: Leaf Blade | Attack damage: 300
+[04:20:32.777] LOG: %cStart Phase DamageAnimPhase color:green;
+[04:20:32.807] LOG: %cStart Phase MessagePhase color:green;
+[04:20:33.022] LOG: %cStart Phase MessagePhase color:green;
+[04:20:33.255] LOG: %cStart Phase FaintPhase color:green;
+[04:20:33.934] LOG: %cStart Phase MessagePhase color:green;
+[04:20:34.164] LOG: %cStart Phase ShowAbilityPhase color:green;
+[04:20:34.342] LOG: %cStart Phase PokemonHealPhase color:green;
+[04:20:34.551] LOG: %cStart Phase MessagePhase color:green;
+[04:20:34.814] LOG: %cStart Phase HideAbilityPhase color:green;
+[04:20:34.839] LOG: %cStart Phase GameOverPhase color:green;
+[04:20:36.296] LOG: Seed: DSvI78fflIEsnbjCIFXKAgIS
+[04:20:36.296] LOG: Wave Seed: DSvI78fflIEsnbjCIFXKAgIS 0
+[04:20:36.298] LOG: Getting Session Slot id: %d 1
+[04:20:36.301] LOG: Wave Seed: 0nKFtiCg8QIYZJqUugqIZkdO 0
+[04:20:36.301] LOG: Seed: 0nKFtiCg8QIYZJqUugqIZkdO
+[04:20:36.314] LOG: Wave Seed: NidaVogwxhsgxm 30
+[04:20:36.328] LOG: Applied HP Up 
+[04:20:36.328] LOG: Applied HP Up 
+[04:20:36.329] LOG: Applied HP Up 
+[04:20:36.330] LOG: %cStart Phase EncounterPhase color:green;
+[04:20:36.331] LOG: Pokemon: Wild Girafarig | Species ID: 203 | Level: 25 | Nature: Relaxed (+Def/-Spd)
+[04:20:36.331] LOG: Stats (IVs): HP: 74 (16), Atk: 47 (11), Def: 48 (25), Spatk: 52 (9), Spdef: 44 (27), Spd: 47 (23)
+[04:20:36.331] LOG: Ability: Hubris | Passive Ability: Multi-Headed | Boss Bars: 1
+[04:20:36.331] LOG: Moveset: ["Confusion","Body Slam","Psychic Fangs","Guard Swap"]
+[04:20:36.331] LOG: Pokemon: Wild Lurantis | Species ID: 754 | Level: 25 | Nature: Quiet (+SpAtk/-Spd)
+[04:20:36.331] LOG: Stats (IVs): HP: 85 (20), Atk: 62 (28), Def: 55 (13), Spatk: 43 (18), Spdef: 54 (17), Spd: 49 (11)
+[04:20:36.331] LOG: Ability: Tinted Lens | Passive Ability: Predator | Boss Bars: 2
+[04:20:36.331] LOG: Moveset: ["Trailblaze","Superpower","Synthesis","Leaf Blade"]
+[04:20:36.332] LOG: Wave Seed: NidaVogwxhsgxm 30
+[04:20:36.768] LOG: %cStart Phase SummonPhase color:green;
+[04:20:36.916] LOG: Applied HP Up 
+[04:20:36.949] WARN: cry/315 not found
+[04:20:37.047] LOG: %cStart Phase SummonPhase color:green;
+[04:20:37.201] LOG: Applied HP Up 
+[04:20:37.330] LOG: %cStart Phase CheckSwitchPhase color:green;
+[04:20:40.583] LOG: %cStart Phase CheckSwitchPhase color:green;
+[04:20:41.300] LOG: %cStart Phase InitEncounterPhase color:green;
+[04:20:41.301] LOG: %cStart Phase PostSummonPhase color:green;
+[04:20:41.302] LOG: Ran PSP for: Lurantis
+[04:20:41.304] LOG: %cStart Phase PostSummonPhase color:green;
+[04:20:41.306] LOG: %cStart Phase PostSummonPhase color:green;
+[04:20:41.306] LOG: %cStart Phase PostSummonPhase color:green;
+[04:20:41.306] LOG: Ran PSP for: Girafarig
+[04:20:41.307] LOG: %cStart Phase PostSummonPhase color:green;
+[04:20:41.307] LOG: %cStart Phase PostSummonPhase color:green;
+[04:20:41.307] LOG: %cStart Phase TurnInitPhase color:green;
+[04:20:41.307] LOG: %cStart Phase CommandPhase color:green;
+[04:20:43.047] LOG: Move: PETAL_BLIZZARD Move targets: {"targets":[2,3,1],"multiple":true} 
+Player Pokemon: Roselia
+[04:20:43.051] LOG: %cStart Phase SelectTargetPhase color:green;
+[04:20:43.337] LOG: %cStart Phase CommandPhase color:green;
+[04:20:44.531] LOG: %cStart Phase CommandPhase color:green;
+[04:20:45.394] LOG: Move: BULLET_SEED Move targets: {"targets":[2,3,1],"multiple":false} 
+Player Pokemon: Roselia
+[04:20:45.396] LOG: %cStart Phase SelectTargetPhase color:green;
+[04:20:46.015] LOG: %cStart Phase CommandPhase color:green;
+[04:20:48.435] LOG: Move: TAILWIND Move targets: {"targets":[1,0],"multiple":true} 
+Player Pokemon: Bramblin
+[04:20:48.437] LOG: %cStart Phase SelectTargetPhase color:green;
+[04:20:48.670] LOG: %cStart Phase EnemyCommandPhase color:green;
+[04:20:48.674] LOG: Applied Eviolite 
+[04:20:48.681] LOG: Applied Eviolite 
+[04:20:48.686] LOG: Applied Eviolite 
+[04:20:48.691] LOG: Battle Seed: CCzABRPnlBtX9zuG
+[04:20:48.706] LOG: Applied Eviolite 
+[04:20:48.707] LOG: Applied Eviolite 
+[04:20:48.707] LOG: Move Pool: ["Confusion","Body Slam","Psychic Fangs","Guard Swap"]
+[04:20:48.707] LOG: Move Scores: [9.375,7.608695652173914,3.260869565217391,0]
+[04:20:48.707] LOG: Sorted Move Pool: ["Confusion","Body Slam","Psychic Fangs","Guard Swap"]
+[04:20:48.707] LOG: Chosen Move: Confusion
+[04:20:48.707] LOG: ER AI: experimental brain (sharpness 1)
+[04:20:48.707] LOG: %cStart Phase EnemyCommandPhase color:green;
+[04:20:48.708] LOG: Applied Eviolite 
+[04:20:48.710] LOG: Applied Eviolite 
+[04:20:48.712] LOG: Applied Eviolite 
+[04:20:48.720] LOG: Applied Eviolite 
+[04:20:48.721] LOG: Applied Eviolite 
+[04:20:48.722] LOG: Applied Eviolite 
+[04:20:48.722] LOG: Move Pool: ["Trailblaze","Superpower","Leaf Blade"]
+[04:20:48.722] LOG: Move Scores: [1133.695652173913,1076.0869565217392,1227.1739130434783]
+[04:20:48.722] LOG: Sorted Move Pool: ["Leaf Blade","Trailblaze","Superpower"]
+[04:20:48.722] LOG: Chosen Move: Leaf Blade
+[04:20:48.722] LOG: ER AI: experimental brain (sharpness 1)
+[04:20:48.722] LOG: %cStart Phase TurnStartPhase color:green;
+[04:20:48.727] LOG: %cStart Phase MovePhase color:green;
+[04:20:48.727] LOG: %cUser: Roselia
+Move: BULLET_SEED
+Use Mode: NORMAL color:orchid
+[04:20:48.731] LOG: %cStart Phase MessagePhase color:green;
+[04:20:48.805] LOG: %cStart Phase MoveEffectPhase color:green;
+[04:20:49.092] LOG: crit stage: +0
+[04:20:49.095] LOG: Move: Bullet Seed | Base damage: 9.98109090909091 | Power: 30 | Source attack: 59 | Target defense: 55
+[04:20:49.096] LOG: Move: Bullet Seed | Attack damage: 33
+[04:20:49.097] LOG: %cStart Phase DamageAnimPhase color:green;
+[04:20:49.123] LOG: %cStart Phase MoveEffectPhase color:green;
+[04:20:49.415] LOG: crit stage: +0
+[04:20:49.418] LOG: Move: Bullet Seed | Base damage: 9.98109090909091 | Power: 30 | Source attack: 59 | Target defense: 55
+[04:20:49.419] LOG: Move: Bullet Seed | Attack damage: 38
+[04:20:49.420] LOG: Applied King’s Rock 
+[04:20:49.421] LOG: %cStart Phase DamageAnimPhase color:green;
+[04:20:49.449] LOG: %cStart Phase StatStageChangePhase color:green;
+[04:20:49.636] LOG: %cStart Phase MessagePhase color:green;
+[04:20:49.863] LOG: %cStart Phase MoveEffectPhase color:green;
+[04:20:50.150] LOG: crit stage: +0
+[04:20:50.154] LOG: Move: Bullet Seed | Base damage: 9.98109090909091 | Power: 30 | Source attack: 59 | Target defense: 55
+[04:20:50.155] LOG: Move: Bullet Seed | Attack damage: 33
+[04:20:50.157] LOG: %cStart Phase DamageAnimPhase color:green;
+[04:20:50.183] LOG: %cStart Phase MoveEffectPhase color:green;
+[04:20:50.474] LOG: crit stage: +0
+[04:20:50.480] LOG: Move: Bullet Seed | Base damage: 9.98109090909091 | Power: 30 | Source attack: 59 | Target defense: 55
+[04:20:50.481] LOG: Move: Bullet Seed | Attack damage: 33
+[04:20:50.483] LOG: %cStart Phase DamageAnimPhase color:green;
+[04:20:50.506] LOG: %cStart Phase MessagePhase color:green;
+[04:20:50.722] LOG: %cStart Phase MessagePhase color:green;
+[04:20:50.922] LOG: %cStart Phase FaintPhase color:green;
+[04:20:52.302] LOG: %cStart Phase MessagePhase color:green;
+[04:20:52.469] LOG: %cStart Phase VictoryPhase color:green;
+[04:20:52.470] LOG: %cStart Phase MoveEndPhase color:green;
+[04:20:52.472] LOG: %cStart Phase MovePhase color:green;
+[04:20:52.472] LOG: %cStart Phase MoveEndPhase color:green;
+[04:20:52.474] LOG: %cStart Phase MovePhase color:green;
+[04:20:52.474] LOG: %cUser: Girafarig
+Move: CONFUSION
+Use Mode: NORMAL color:orchid
+[04:20:52.480] LOG: %cStart Phase MessagePhase color:green;
+[04:20:52.593] LOG: %cStart Phase MoveEffectPhase color:green;
+[04:20:53.216] LOG: crit stage: +0
+[04:20:53.218] LOG: Move: Confusion | Base damage: 23.517241379310345 | Power: 50 | Source attack: 52 | Target defense: 29
+[04:20:53.218] LOG: Move: Confusion | Attack damage: 47
+[04:20:53.219] LOG: %cStart Phase DamageAnimPhase color:green;
+[04:20:53.249] LOG: %cStart Phase MessagePhase color:green;
+[04:20:53.472] LOG: %cStart Phase MoveEffectPhase color:green;
+[04:20:54.108] LOG: crit stage: +0
+[04:20:54.111] LOG: Move: Confusion | Base damage: 23.517241379310345 | Power: 50 | Source attack: 52 | Target defense: 29
+[04:20:54.113] LOG: Move: Confusion | Attack damage: 8
+[04:20:54.114] LOG: %cStart Phase DamageAnimPhase color:green;
+[04:20:54.140] LOG: %cStart Phase MessagePhase color:green;
+[04:20:54.355] LOG: %cStart Phase MoveEndPhase color:green;
+[04:20:54.356] LOG: %cStart Phase MovePhase color:green;
+[04:20:54.356] LOG: %cUser: Bramblin
+Move: TAILWIND
+Use Mode: NORMAL color:orchid
+[04:20:54.362] LOG: %cStart Phase MessagePhase color:green;
+[04:20:54.489] LOG: %cStart Phase MoveEffectPhase color:green;
+[04:20:55.511] LOG: %cStart Phase MessagePhase color:green;
+[04:20:55.755] LOG: %cStart Phase ShowAbilityPhase color:green;
+[04:20:55.924] LOG: %cStart Phase StatStageChangePhase color:green;
+[04:20:56.109] LOG: %cStart Phase MessagePhase color:green;
+[04:20:56.322] LOG: %cStart Phase HideAbilityPhase color:green;
+[04:20:56.359] LOG: %cStart Phase MoveEndPhase color:green;
+[04:20:56.359] LOG: %cStart Phase CheckInterludePhase color:green;
+[04:20:56.359] LOG: %cStart Phase WeatherEffectPhase color:green;
+[04:20:56.359] LOG: %cStart Phase PositionalTagPhase color:green;
+[04:20:56.359] LOG: %cStart Phase BerryPhase color:green;
+[04:20:56.364] LOG: Applied Sitrus Berry 
+[04:20:56.365] LOG: Applied HP Up 
+[04:20:56.372] LOG: %cStart Phase CommonAnimPhase color:green;
+[04:20:56.372] LOG: %cStart Phase PokemonHealPhase color:green;
+[04:20:56.594] LOG: %cStart Phase MessagePhase color:green;
+[04:20:56.872] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[04:20:56.875] LOG: %cStart Phase TurnEndPhase color:green;
+[04:20:56.895] LOG: %cStart Phase PokemonHealPhase color:green;
+[04:20:57.144] LOG: %cStart Phase MessagePhase color:green;
+[04:20:57.372] LOG: %cStart Phase PokemonHealPhase color:green;
+[04:20:57.593] LOG: %cStart Phase MessagePhase color:green;
+[04:20:57.839] LOG: %cStart Phase PokemonHealPhase color:green;
+[04:20:57.839] LOG: %cStart Phase MessagePhase color:green;
+[04:20:58.072] LOG: %cStart Phase TurnInitPhase color:green;
+[04:20:58.072] LOG: %cStart Phase CommandPhase color:green;
