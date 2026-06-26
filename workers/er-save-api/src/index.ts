@@ -1383,10 +1383,12 @@ async function ensureRunStatColumns(env: Env): Promise<void> {
 
 // =============================================================================
 // ER (#384) - nightly usage-tier aggregation (cron). ONE invocation per day:
-// scans the 30-day run window, computes deduped per-player usage + shrunken
-// per-difficulty wave lift per starter LINE, and commits usage-tiers.json to
-// Heraklines/er-assets (served to clients by jsDelivr - zero worker reads).
-// Skips silently when ER_ASSETS_TOKEN is unset.
+// scans the 30-day run window and commits per-starter-LINE signals to
+// usage-tiers.json on Heraklines/er-assets (jsDelivr-served, zero worker reads):
+// deduped usage %, raw win % + avg wave, and the SKILL-ADJUSTED win/wave lift
+// (each run scored vs the picking player's OWN average, EB-shrunk, to strip the
+// player-skill confound). The CLIENT bins these into OU/UU/RU/PU/NU (rank ->
+// blend -> quantile -> usage-cap -> egg gate). Skips when ER_ASSETS_TOKEN unset.
 // =============================================================================
 const USAGE_TIER_CHALLENGE_ID = 12; // Challenges.USAGE_TIER - excluded from usage stats
 
@@ -1397,22 +1399,22 @@ async function computeAndPublishUsageTiers(env: Env): Promise<void> {
   await ensureRunStatColumns(env);
   const since = Date.now() - 30 * 24 * 3600 * 1000;
   const { results } = await env.DB.prepare(
-    "SELECT user_id, starters, challenges, difficulty, wave, outcome FROM runs WHERE created_at >= ?1 AND starters IS NOT NULL",
+    "SELECT user_id, starters, challenges, wave, outcome FROM runs WHERE created_at >= ?1 AND starters IS NOT NULL",
   )
     .bind(since)
     .all<{
       user_id: string;
       starters: string;
       challenges: string | null;
-      difficulty: string | null;
       wave: number | null;
       outcome: string;
     }>();
 
-  const players = new Set<string>();
-  const linePlayers = new Map<number, Set<string>>();
-  const stratWaves = new Map<string, number[]>();
-  const lineWaves = new Map<number, Map<string, number[]>>();
+  // Parse each run once. A usage-tier-CHALLENGE run is a FORCED pick inside a
+  // restricted pool, so it is kept OUT of the usage numerator (counting it would
+  // feed the tiers back into themselves); its win/wave still inform performance.
+  type Run = { uid: string; lines: number[]; inUsageTier: boolean; win: number; wave: number };
+  const runs: Run[] = [];
   for (const row of results ?? []) {
     let starters: number[];
     let challenges: [number, number][] = [];
@@ -1425,64 +1427,106 @@ async function computeAndPublishUsageTiers(env: Env): Promise<void> {
     if (!Array.isArray(starters) || starters.length === 0) {
       continue;
     }
-    const inUsageTierRun = challenges.some(([cid, value]) => cid === USAGE_TIER_CHALLENGE_ID && value > 0);
-    const diff = row.difficulty ?? "unknown";
-    const wave = row.wave ?? 0;
-    players.add(row.user_id);
-    let sw = stratWaves.get(diff);
-    if (!sw) {
-      sw = [];
-      stratWaves.set(diff, sw);
+    const lineIds = [...new Set(starters.filter(x => typeof x === "number"))];
+    if (lineIds.length === 0) {
+      continue;
     }
-    sw.push(wave);
-    for (const line of new Set(starters)) {
-      // Usage-tier-challenge runs are FORCED picks within a restricted pool;
-      // counting them would feed the tiers back into themselves. Their
-      // PERFORMANCE still counts (cleanest in-tier signal).
-      if (!inUsageTierRun) {
-        let lp = linePlayers.get(line);
-        if (!lp) {
-          lp = new Set();
-          linePlayers.set(line, lp);
-        }
-        lp.add(row.user_id);
-      }
-      let byDiff = lineWaves.get(line);
-      if (!byDiff) {
-        byDiff = new Map();
-        lineWaves.set(line, byDiff);
-      }
-      let lw = byDiff.get(diff);
-      if (!lw) {
-        lw = [];
-        byDiff.set(diff, lw);
-      }
-      lw.push(wave);
+    runs.push({
+      uid: row.user_id,
+      lines: lineIds,
+      inUsageTier: challenges.some(([cid, value]) => cid === USAGE_TIER_CHALLENGE_ID && value > 0),
+      win: row.outcome === "victory" ? 1 : 0,
+      wave: row.wave ?? 0,
+    });
+  }
+
+  // Per-player baseline (win rate + avg wave, classic/challenge waves <=200 only).
+  // The SKILL-ADJUSTED lift below scores each run against the SAME player's own
+  // average, so a starter piloted mostly by beginners is judged vs those beginners,
+  // not the field - removing the player-skill confound. The client turns these
+  // signals into the actual tiers (rank -> blend -> bin -> usage-cap -> egg gate).
+  const players = new Map<string, { n: number; winSum: number; waveSum: number; waveN: number }>();
+  for (const r of runs) {
+    let p = players.get(r.uid);
+    if (!p) {
+      p = { n: 0, winSum: 0, waveSum: 0, waveN: 0 };
+      players.set(r.uid, p);
+    }
+    p.n++;
+    p.winSum += r.win;
+    if (r.wave <= 200) {
+      p.waveSum += r.wave;
+      p.waveN++;
     }
   }
   if (players.size === 0) {
     return; // No starter-tagged runs yet - keep the seed file as-is.
   }
-
-  const stratMean = new Map<string, number>();
-  for (const [diff, waves] of stratWaves) {
-    stratMean.set(diff, waves.reduce((a, b) => a + b, 0) / waves.length);
-  }
-  const lines: Record<number, { usagePct: number; lift: number; sample: number }> = {};
-  for (const [line, byDiff] of lineWaves) {
-    let liftSum = 0;
-    let n = 0;
-    for (const [diff, waves] of byDiff) {
-      const mu = stratMean.get(diff) ?? 0;
-      // Empirical-Bayes shrinkage: 25 phantom runs at the stratum mean.
-      const shrunk = (waves.reduce((a, b) => a + b, 0) + 25 * mu) / (waves.length + 25);
-      liftSum += (shrunk - mu) * waves.length;
-      n += waves.length;
+  let gWinSum = 0;
+  let gWaveSum = 0;
+  let gWaveN = 0;
+  for (const r of runs) {
+    gWinSum += r.win;
+    if (r.wave <= 200) {
+      gWaveSum += r.wave;
+      gWaveN++;
     }
+  }
+
+  // Per-line aggregate: deduped usage players (non-usage-tier runs), raw win/wave,
+  // and the skill-adjusted win/wave lift (run result minus the player's own mean).
+  type Agg = {
+    usagePlayers: Set<string>;
+    runs: number;
+    wins: number;
+    waveSum: number;
+    waveN: number;
+    winLift: number;
+    waveLift: number;
+    waveLiftN: number;
+  };
+  const agg = new Map<number, Agg>();
+  for (const r of runs) {
+    const p = players.get(r.uid)!;
+    const pWin = p.winSum / p.n;
+    const pWave = p.waveN ? p.waveSum / p.waveN : 0;
+    for (const line of r.lines) {
+      let o = agg.get(line);
+      if (!o) {
+        o = { usagePlayers: new Set(), runs: 0, wins: 0, waveSum: 0, waveN: 0, winLift: 0, waveLift: 0, waveLiftN: 0 };
+        agg.set(line, o);
+      }
+      if (!r.inUsageTier) {
+        o.usagePlayers.add(r.uid);
+      }
+      o.runs++;
+      o.wins += r.win;
+      o.winLift += r.win - pWin;
+      if (r.wave <= 200) {
+        o.waveSum += r.wave;
+        o.waveN++;
+        o.waveLift += r.wave - pWave;
+        o.waveLiftN++;
+      }
+    }
+  }
+
+  // Empirical-Bayes shrinkage: K phantom runs pull a small-sample line toward the
+  // no-signal mean (its lift toward 0), so a 1-pick line can't sit at an extreme.
+  const K = 20;
+  const r2 = (n: number) => Math.round(n * 100) / 100;
+  const lines: Record<
+    number,
+    { usagePct: number; win: number; wave: number; winLift: number; waveLift: number; sample: number }
+  > = {};
+  for (const [line, o] of agg) {
     lines[line] = {
-      usagePct: Math.round((100 * (linePlayers.get(line)?.size ?? 0) * 1000) / players.size) / 1000,
-      lift: n > 0 ? Math.round((liftSum / n) * 100) / 100 : 0,
-      sample: n,
+      usagePct: Math.round((100 * o.usagePlayers.size * 1000) / players.size) / 1000,
+      win: Math.round((1000 * o.wins) / o.runs) / 10,
+      wave: o.waveN ? Math.round(o.waveSum / o.waveN) : 0,
+      winLift: r2((o.winLift / (o.runs + K)) * 100),
+      waveLift: r2(o.waveLiftN ? o.waveLift / (o.waveLiftN + K) : 0),
+      sample: o.runs,
     };
   }
 
@@ -1490,7 +1534,9 @@ async function computeAndPublishUsageTiers(env: Env): Promise<void> {
     generatedAt: new Date().toISOString(),
     windowDays: 30,
     players: players.size,
-    runs: results?.length ?? 0,
+    runs: runs.length,
+    baseWinPct: r2((100 * gWinSum) / runs.length),
+    globalWave: gWaveN ? Math.round((10 * gWaveSum) / gWaveN) / 10 : 0,
     lines,
   };
   const body = btoa(String.fromCharCode(...new TextEncoder().encode(JSON.stringify(payload, null, 1))));

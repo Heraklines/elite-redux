@@ -1088,6 +1088,37 @@ export const DEV_SCENARIOS: DevScenario[] = [
     shopItems: [modifierTypes.TM_CASE],
   },
   {
+    label: "Usage-tier NU redesign (performance-based) + grandfather (#384)",
+    description:
+      "#384 - the Usage Tier challenge no longer collapses. NU used to be 'usage < 0.25%',\n"
+      + "which shrank to ~1 eligible mon once the playerbase grew. It is now PERFORMANCE-\n"
+      + "based: each common-egg line is ranked by a skill-adjusted win + wave-distance score\n"
+      + "(judged vs the PICKING player's own average, so beginners' starters aren't unfairly\n"
+      + "sunk), with a popularity cap and a raw-win floor - a stable ~100-mon NU pool of\n"
+      + "genuinely weak / off-meta lines.\n"
+      + "DO (verify the pool): start a NEW GAME, Challenge -> Usage Tier -> NU, open the\n"
+      + "starter grid: ~100+ mons are selectable (Magikarp, Geodude, Togepi, Tangela...), NOT\n"
+      + "a handful. UU/RU/PU are likewise repopulated.\n"
+      + "GRANDFATHER (note): a line you STARTED a usage-tier run with stays legal for THAT\n"
+      + "run even if the nightly re-tier later moves it, so a multi-day run never benches your\n"
+      + "openers mid-stream. Only observable across a real overnight tier change; the tier\n"
+      + "math + grandfather are unit-tested in test/tests/elite-redux/er-usage-tiers.test.ts.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 50,
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.MAGIKARP,
+        ENEMY_LEVEL_OVERRIDE: 3,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+      });
+      return [
+        makeStarter(SpeciesId.SNORLAX, {
+          moveset: [MoveId.BODY_SLAM, MoveId.CRUNCH, MoveId.EARTHQUAKE, MoveId.REST],
+        }),
+      ];
+    },
+  },
+  {
     label: "Fusion ability slot ownership",
     description:
       "Bulbasaur is fused with Charmander. Open SUMMARY and inspect Abilities.\n"

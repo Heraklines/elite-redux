@@ -1359,6 +1359,15 @@ export class DoublesOnlyChallenge extends Challenge {
  * (er-shiny-favour.ts).
  */
 export class UsageTierChallenge extends Challenge {
+  // ER (#384 grandfather): the canonical root ids the run STARTED with. A line you
+  // began the run with stays legal for THIS run even if the nightly tiers later
+  // reclassify it, so a multi-day run never breaks mid-stream. Captured lazily at
+  // the first battle (the wave-1 party IS the opening party) and persisted via
+  // ChallengeData. Mons acquired DURING the run (catch / mystery encounter) are NOT
+  // grandfathered - only the in-battle bench net consults this set.
+  public startingRoots: number[] = [];
+  private startingRootsCaptured = false;
+
   constructor() {
     super(Challenges.USAGE_TIER, 4);
     // The screen kicks off the once-per-session tier-data fetch (jsDelivr
@@ -1367,28 +1376,60 @@ export class UsageTierChallenge extends Challenge {
   }
 
   /**
-   * Resolve a live species to the CANONICAL line that governs its usage tier,
-   * then ask {@linkcode isErLineLegalForUsageTier}. Mirrors the candy/passive
-   * resolution in `game-data.ts` `getStarterDataEntry`: an ER custom MEGA is a
-   * standalone species with its OWN id and no prevolution, so a plain
-   * `getRootSpeciesId()` returns the mega itself (wrong line); resolve mega->base
-   * FIRST, then walk the evolution root. (Redux variants ride their base species
-   * id in live battle, so the evolution root already collapses them.)
-   *
-   * FAIL-SAFE: returns `true` (legal, do NOT bench) whenever the species cannot
-   * be resolved to a real {@linkcode PokemonSpecies}. A mon we cannot confidently
-   * judge is never benched - only a positively out-of-tier line is.
-   * @param species - The live species (may be a custom mega / Redux form).
-   * @returns Whether the species' canonical line is legal under this tier value.
+   * Resolve a live species to the CANONICAL line root that governs its usage tier.
+   * Mirrors the candy/passive resolution in `game-data.ts` `getStarterDataEntry`: an
+   * ER custom MEGA is a standalone species with its OWN id and no prevolution, so a
+   * plain `getRootSpeciesId()` returns the mega itself (wrong line); resolve
+   * mega->base FIRST, then walk the evolution root. (Redux variants ride their base
+   * species id in live battle, so the evolution root already collapses them.)
+   * @returns The root species id, or `undefined` if the species cannot be resolved.
+   */
+  private resolveRoot(species: PokemonSpecies): number | undefined {
+    const baseId = erMegaTargetToBaseSpeciesId(species.speciesId) ?? species.speciesId;
+    return getPokemonSpecies(baseId)?.getRootSpeciesId();
+  }
+
+  /**
+   * Whether the species' canonical line is legal under this tier value by the LIVE
+   * table. FAIL-SAFE: an unresolvable species is treated as legal (never benched).
    */
   private isSpeciesUsageTierLegal(species: PokemonSpecies): boolean {
-    const baseId = erMegaTargetToBaseSpeciesId(species.speciesId) ?? species.speciesId;
-    const baseSpecies = getPokemonSpecies(baseId);
-    // Resolution failed (synthetic / unknown id): fail open, treat as allowed.
-    if (!baseSpecies) {
+    const root = this.resolveRoot(species);
+    return root === undefined || isErLineLegalForUsageTier(root, this.value);
+  }
+
+  /**
+   * Live-table legality OR grandfathered (a line the run STARTED with). Used by the
+   * in-battle bench net ONLY, so a nightly re-tier can't eject an opening-party mon.
+   */
+  private isGrandfatheredOrLegal(species: PokemonSpecies): boolean {
+    const root = this.resolveRoot(species);
+    if (root === undefined) {
       return true;
     }
-    return isErLineLegalForUsageTier(baseSpecies.getRootSpeciesId(), this.value);
+    return this.startingRoots.includes(root) || isErLineLegalForUsageTier(root, this.value);
+  }
+
+  /** Snapshot the opening party's line roots once, at the first battle (grandfather). */
+  private captureStartingRoots(): void {
+    if (this.startingRootsCaptured) {
+      return;
+    }
+    this.startingRootsCaptured = true;
+    const roots = new Set<number>();
+    for (const mon of globalScene.getPlayerParty()) {
+      const root = this.resolveRoot(mon.species);
+      if (root !== undefined) {
+        roots.add(root);
+      }
+      if (mon.isFusion() && mon.fusionSpecies != null) {
+        const fusionRoot = this.resolveRoot(mon.fusionSpecies);
+        if (fusionRoot !== undefined) {
+          roots.add(fusionRoot);
+        }
+      }
+    }
+    this.startingRoots = [...roots];
   }
 
   applyStarterChoice(species: PokemonSpecies, isValid: BooleanHolder): boolean {
@@ -1422,9 +1463,10 @@ export class UsageTierChallenge extends Challenge {
     if (!pokemon.isPlayer()) {
       return false;
     }
-    const baseLegal = this.isSpeciesUsageTierLegal(pokemon.species);
+    this.captureStartingRoots();
+    const baseLegal = this.isGrandfatheredOrLegal(pokemon.species);
     const fusionLegal =
-      !pokemon.isFusion() || pokemon.fusionSpecies == null || this.isSpeciesUsageTierLegal(pokemon.fusionSpecies);
+      !pokemon.isFusion() || pokemon.fusionSpecies == null || this.isGrandfatheredOrLegal(pokemon.fusionSpecies);
     if (!baseLegal || !fusionLegal) {
       valid.value = false;
       return true;
@@ -1436,6 +1478,10 @@ export class UsageTierChallenge extends Challenge {
     const newChallenge = new UsageTierChallenge();
     newChallenge.value = source.value;
     newChallenge.severity = source.severity;
+    newChallenge.startingRoots = Array.isArray(source.startingRoots) ? [...source.startingRoots] : [];
+    // A reloaded run already has its opening set - don't re-snapshot the (possibly
+    // evolved/changed) current party over it.
+    newChallenge.startingRootsCaptured = newChallenge.startingRoots.length > 0;
     return newChallenge;
   }
 }
