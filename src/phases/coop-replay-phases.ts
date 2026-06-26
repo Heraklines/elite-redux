@@ -30,6 +30,7 @@
 
 import { globalScene } from "#app/global-scene";
 import { Phase } from "#app/phase";
+import { CommonBattleAnim, MoveAnim } from "#data/battle-anims";
 import { COOP_CHECKSUM_SENTINEL, canonicalize } from "#data/elite-redux/coop/coop-battle-checksum";
 import {
   applyCoopCheckpoint,
@@ -47,30 +48,32 @@ import {
 import type { CoopBattleCheckpoint, CoopFullBattleSnapshot } from "#data/elite-redux/coop/coop-transport";
 import { BattleType } from "#enums/battle-type";
 import { BattlerIndex } from "#enums/battler-index";
-import type { BattleStat } from "#enums/stat";
-import {
-  playCoopFaintCosmetic,
-  playCoopHpDrainCosmetic,
-  playCoopMoveAnimCosmetic,
-  playCoopStatTweenCosmetic,
-  playCoopStatusCosmetic,
-} from "#phases/coop-replay-cosmetics";
+import { HitResult } from "#enums/hit-result";
+import { CommonAnim } from "#enums/move-anims-common";
+import type { MoveId } from "#enums/move-id";
+import { type BattleStat, Stat } from "#enums/stat";
+import { StatusEffect } from "#enums/status-effect";
 import { PokemonPhase } from "#phases/pokemon-phase";
+import { fixedInt } from "#utils/common";
 import { decompressFromBase64 } from "lz-string";
 
-// PRESENTATION-ONLY COSMETIC PRIMITIVES (#633, near-real-time replay redesign) live in
-// `coop-replay-cosmetics.ts` (a runtime-import-free module so the live sequencer can import them
-// WITHOUT forming an import cycle through coop-runtime). The batch replay phases below delegate to
-// them with their commit* flag TRUE (byte-identical to the pre-redesign behavior); the sequencer
-// calls them with commit*=false (presentation-only, I2). Re-exported here so external callers and
-// the "primitives live with the replay phases" contract both hold.
-export {
-  playCoopFaintCosmetic,
-  playCoopHpDrainCosmetic,
-  playCoopMoveAnimCosmetic,
-  playCoopStatTweenCosmetic,
-  playCoopStatusCosmetic,
-};
+/** Generous watchdog: a presentation phase whose anim callback never fires ends after this. */
+const COOP_REPLAY_WATCHDOG_MS = 5000;
+
+/**
+ * Resolve the live field mon for a streamed battler index, or null if absent (a mon the
+ * checkpoint already removed, or an out-of-range index). Pure read; never throws.
+ */
+function fieldMon(bi: number): ReturnType<typeof globalScene.getField>[number] | null {
+  try {
+    if (bi < 0 || bi > BattlerIndex.ENEMY_2) {
+      return null;
+    }
+    return globalScene.getField()[bi] ?? null;
+  } catch {
+    return null;
+  }
+}
 
 /**
  * GUEST: play the RNG-free move animation for a host `moveUsed` event (#633). Uses the
@@ -96,8 +99,30 @@ export class CoopMoveAnimReplayPhase extends Phase {
     if (isCoopDebug()) {
       coopLog("replay", `present move bi=${this.bi} moveId=${this.moveId} targets=${this.targets.length}`);
     }
-    // Delegate to the shared cosmetic core (also reused live by the sequencer). Presentation-only.
-    playCoopMoveAnimCosmetic(this.bi, this.moveId, this.targets[0] ?? this.bi, () => this.end());
+    let ended = false;
+    let watchdog: Phaser.Time.TimerEvent | undefined;
+    const finish = () => {
+      if (ended) {
+        return;
+      }
+      ended = true;
+      watchdog?.remove();
+      this.end();
+    };
+    try {
+      const user = fieldMon(this.bi);
+      const targetBi = this.targets[0] ?? this.bi;
+      // No live user / move animations disabled -> nothing to play; end immediately.
+      if (user == null || !globalScene.moveAnimations) {
+        this.end();
+        return;
+      }
+      watchdog = globalScene.time.delayedCall(COOP_REPLAY_WATCHDOG_MS, finish);
+      new MoveAnim(this.moveId as MoveId, user, targetBi as BattlerIndex).play(false, finish);
+    } catch {
+      // A bad / un-loaded move anim must never strand the queue.
+      finish();
+    }
   }
 }
 
@@ -129,11 +154,27 @@ export class CoopHpDrainReplayPhase extends PokemonPhase {
         `present hp bi=${this.battlerIndex} ${Math.trunc(this.fromHp)}->${Math.trunc(this.toHp)}/${Math.trunc(this.maxHp)}`,
       );
     }
-    // Delegate to the shared cosmetic core with commitHp=true (batch path: leaves mon.hp == toHp,
-    // idempotent with the checkpoint - byte-identical to the pre-redesign behavior).
-    playCoopHpDrainCosmetic(this.battlerIndex, this.fromHp, this.toHp, this.maxHp, /* commitHp */ true, () =>
-      this.end(),
-    );
+    try {
+      const mon = fieldMon(this.battlerIndex);
+      if (mon == null) {
+        // The checkpoint already removed this mon - nothing to drain; end.
+        this.end();
+        return;
+      }
+      const amount = Math.max(0, Math.trunc(this.fromHp) - Math.trunc(this.toHp));
+      // Restore the pre-hit value so the bar visibly drains from it to the host's hp.
+      mon.hp = Math.max(0, Math.min(Math.trunc(this.fromHp), Math.trunc(this.maxHp) || mon.getMaxHp()));
+      if (amount > 0) {
+        globalScene.playSound("se/hit");
+        globalScene.damageNumberHandler.add(mon, amount, HitResult.EFFECTIVE, false);
+      }
+      // Snap to the host's authoritative hp (idempotent with the checkpoint) and redraw.
+      mon.hp = Math.max(0, Math.min(Math.trunc(this.toHp), Math.trunc(this.maxHp) || mon.getMaxHp()));
+      void mon.updateInfo().then(() => this.end());
+    } catch {
+      // A bad hp value / missing sprite must never strand the queue.
+      this.end();
+    }
   }
 }
 
@@ -165,9 +206,85 @@ export class CoopStatStageReplayPhase extends PokemonPhase {
     if (isCoopDebug()) {
       coopLog("replay", `present statStage bi=${this.battlerIndex} stat=${this.stat} -> ${this.value}`);
     }
-    // Delegate to the shared cosmetic core with commitStage=true (batch path: sets the authoritative
-    // absolute stage, idempotent with the checkpoint - byte-identical to the pre-redesign behavior).
-    playCoopStatTweenCosmetic(this.battlerIndex, this.stat, this.value, /* commitStage */ true, () => this.end());
+    let ended = false;
+    let watchdog: Phaser.Time.TimerEvent | undefined;
+    const finish = () => {
+      if (ended) {
+        return;
+      }
+      ended = true;
+      watchdog?.remove();
+      this.end();
+    };
+    try {
+      const pokemon = fieldMon(this.battlerIndex);
+      if (pokemon == null) {
+        this.end();
+        return;
+      }
+      const prevStage = pokemon.getStatStage(this.stat);
+      const target = Math.max(-6, Math.min(6, Math.trunc(this.value)));
+      const delta = target - prevStage;
+      // Set the authoritative absolute stage (idempotent with the checkpoint). The CHANGE TEXT
+      // already rode as a `message` event ahead of this in the stream (the host's StatStageChangePhase
+      // queues it before recording the stage), so this phase plays the tween only - no duplicate line.
+      pokemon.setStatStage(this.stat, target);
+      void pokemon.updateInfo();
+      // Visual tween (the red/blue stat sprite), gated like the real phase on moveAnimations.
+      if (delta !== 0 && globalScene.moveAnimations) {
+        watchdog = globalScene.time.delayedCall(COOP_REPLAY_WATCHDOG_MS, finish);
+        this.playStatTween(pokemon, delta, finish);
+      } else {
+        this.end();
+      }
+    } catch {
+      finish();
+    }
+  }
+
+  /** Play the up/down stat sprite sweep (the visual subset of stat-stage-change-phase.ts:264-310). */
+  private playStatTween(
+    pokemon: ReturnType<typeof globalScene.getField>[number],
+    delta: number,
+    onDone: () => void,
+  ): void {
+    try {
+      pokemon.enableMask();
+      const pokemonMaskSprite = pokemon.maskSprite;
+      const up = delta >= 1;
+      const tileX = (this.player ? 106 : 236) * pokemon.getSpriteScale() * globalScene.field.scale;
+      const tileY = ((this.player ? 148 : 84) + (up ? 160 : 0)) * pokemon.getSpriteScale() * globalScene.field.scale;
+      const tileWidth = 156 * globalScene.field.scale * pokemon.getSpriteScale();
+      const tileHeight = 316 * globalScene.field.scale * pokemon.getSpriteScale();
+      const spriteColor = up ? Stat[Stat.ATK].toLowerCase() : Stat[Stat.SPD].toLowerCase();
+      const statSprite = globalScene.add.tileSprite(tileX, tileY, tileWidth, tileHeight, "battle_stats", spriteColor);
+      statSprite.setPipeline(globalScene.fieldSpritePipeline);
+      statSprite.setAlpha(0);
+      statSprite.setScale(6);
+      statSprite.setOrigin(0.5, 1);
+      globalScene.playSound(`se/stat_${up ? "up" : "down"}`);
+      statSprite.setMask(new Phaser.Display.Masks.BitmapMask(globalScene, pokemonMaskSprite ?? undefined));
+      globalScene.tweens.add({
+        targets: statSprite,
+        duration: 250,
+        alpha: 0.8375,
+        onComplete: () => {
+          globalScene.tweens.add({ targets: statSprite, delay: 1000, duration: 250, alpha: 0 });
+        },
+      });
+      globalScene.tweens.add({ targets: statSprite, duration: 1500, y: `${up ? "-" : "+"}=${160 * 6}` });
+      globalScene.time.delayedCall(fixedInt(1750), () => {
+        try {
+          pokemon.disableMask();
+          statSprite.destroy();
+        } catch {
+          /* sprite teardown best-effort */
+        }
+        onDone();
+      });
+    } catch {
+      onDone();
+    }
   }
 }
 
@@ -194,8 +311,32 @@ export class CoopStatusReplayPhase extends PokemonPhase {
     if (isCoopDebug()) {
       coopLog("replay", `present status bi=${this.battlerIndex} status=${this.status}`);
     }
-    // Delegate to the shared cosmetic core (presentation-only on both paths - never doSetStatus).
-    playCoopStatusCosmetic(this.battlerIndex, this.status, () => this.end());
+    let ended = false;
+    let watchdog: Phaser.Time.TimerEvent | undefined;
+    const finish = () => {
+      if (ended) {
+        return;
+      }
+      ended = true;
+      watchdog?.remove();
+      this.end();
+    };
+    try {
+      const pokemon = fieldMon(this.battlerIndex);
+      const effect = this.status as StatusEffect;
+      // No mon / cure / FAINT (the faint event handles that) -> nothing to animate.
+      if (pokemon == null || effect === StatusEffect.NONE || effect === StatusEffect.FAINT) {
+        this.end();
+        return;
+      }
+      // The obtain TEXT already rides as a `message` event (the host's status message rides the
+      // queueMessage tap), so this phase plays the status common-anim only - no duplicate line.
+      watchdog = globalScene.time.delayedCall(COOP_REPLAY_WATCHDOG_MS, finish);
+      // CommonAnim.POISON + (effect - 1) is the established status-anim mapping (obtain-status-effect-phase.ts).
+      new CommonBattleAnim(CommonAnim.POISON + (effect - 1), pokemon).play(false, finish);
+    } catch {
+      finish();
+    }
   }
 }
 
@@ -222,13 +363,60 @@ export class CoopFaintReplayPhase extends PokemonPhase {
 
   public override start(): void {
     super.start();
+    let ended = false;
+    let watchdog: Phaser.Time.TimerEvent | undefined;
+    const finish = () => {
+      if (ended) {
+        return;
+      }
+      ended = true;
+      watchdog?.remove();
+      this.end();
+    };
     if (isCoopDebug()) {
       coopLog("replay", `present faint bi=${this.battlerIndex}`);
     }
-    // Delegate to the shared cosmetic core with commitRemoval=true (batch path: performs the same
-    // side-effect-free removal the checkpoint reconcile does, so the end-of-turn hashed state is
-    // byte-identical to the pre-redesign behavior).
-    playCoopFaintCosmetic(this.battlerIndex, /* commitRemoval */ true, () => this.end());
+    try {
+      const pokemon = fieldMon(this.battlerIndex);
+      // Already removed (defensive: a duplicate faint, or a mon off-field) - nothing to animate.
+      if (pokemon == null || !pokemon.isOnField()) {
+        this.end();
+        return;
+      }
+      watchdog = globalScene.time.delayedCall(COOP_REPLAY_WATCHDOG_MS, finish);
+      pokemon.faintCry(() => {
+        try {
+          pokemon.hideInfo();
+          globalScene.playSound("se/faint");
+          globalScene.tweens.add({
+            targets: pokemon,
+            duration: 500,
+            y: pokemon.y + 150,
+            ease: "Sine.easeIn",
+            onComplete: () => {
+              // Restore the tweened y, then PERFORM the same side-effect-free removal the checkpoint
+              // reconcile does (hp 0 -> FAINT status -> leaveField). This makes the mon drop + leave the
+              // field at the host's KO instant; the deferred checkpoint reconcile is then a no-op for this
+              // slot (its isActive/isOnField guards skip an already-removed mon), so the end-of-turn hashed
+              // state - and the per-turn checksum - stays byte-identical to the snap-first path.
+              try {
+                pokemon.y -= 150;
+                pokemon.hp = 0;
+                pokemon.doSetStatus(StatusEffect.FAINT);
+                pokemon.leaveField(true, true, false);
+              } catch {
+                /* the removal is best-effort; the checkpoint reconcile still corrects the slot */
+              }
+              finish();
+            },
+          });
+        } catch {
+          finish();
+        }
+      });
+    } catch {
+      finish();
+    }
   }
 }
 

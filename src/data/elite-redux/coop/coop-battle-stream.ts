@@ -479,21 +479,6 @@ export class CoopBattleStreamer {
   }
 
   /**
-   * GUEST: NON-consuming PEEK of the live events buffered for `turn`, in ascending `seq` order (#633,
-   * near-real-time replay). Used by {@linkcode CoopReplayTurnPhase} to seed the per-turn sequencer with
-   * any host-ahead events that landed BEFORE the guest reached the replay phase (the host-ahead race);
-   * the live {@linkcode onLiveEvent} handler then feeds every FUTURE arrival. Does NOT clear the buffer -
-   * the turn-end {@linkcode consumeLiveEvents} still consumes + de-dupes it against the batch.
-   */
-  peekLiveEvents(turn: number): { seq: number; event: CoopBattleEvent }[] {
-    const perTurn = this.liveEvents.get(turn);
-    if (perTurn == null) {
-      return [];
-    }
-    return [...perTurn.entries()].sort((a, b) => a[0] - b[0]).map(([seq, event]) => ({ seq, event }));
-  }
-
-  /**
    * GUEST: await the host's resolution for `turn`. Resolves with the streamed turn,
    * or `null` if it does not arrive within the timeout (the guest then shows a
    * "waiting for host" notice and applies the next checkpoint when it lands). If the
@@ -524,10 +509,7 @@ export class CoopBattleStreamer {
         if (res == null) {
           coopWarn("replay", `guest awaitTurn turn=${turn} STALL -> null (timeout/superseded)`);
         } else {
-          coopLog(
-            "replay",
-            `guest awaitTurn turn=${turn} RESOLVE events=${res.events.length} checksum=${res.checksum}`,
-          );
+          coopLog("replay", `guest awaitTurn turn=${turn} RESOLVE events=${res.events.length} checksum=${res.checksum}`);
         }
         resolve(res);
       };
@@ -555,10 +537,7 @@ export class CoopBattleStreamer {
     const buffered = this.stateSyncInbox.get(seq);
     if (buffered !== undefined) {
       this.stateSyncInbox.delete(seq);
-      coopLog(
-        "resync",
-        `guest requestStateSync turn=${turn} seq=${seq} RESOLVE (buffered race) blobLen=${buffered.length}`,
-      );
+      coopLog("resync", `guest requestStateSync turn=${turn} seq=${seq} RESOLVE (buffered race) blobLen=${buffered.length}`);
       this.transport.send({ t: "requestStateSync", turn, seq });
       return Promise.resolve(buffered);
     }

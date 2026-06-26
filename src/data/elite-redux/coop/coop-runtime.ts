@@ -43,7 +43,6 @@ import type {
 } from "#data/elite-redux/coop/coop-transport";
 import { type CoopTransport, createLoopbackPair, type SerializedCommand } from "#data/elite-redux/coop/coop-transport";
 import { setCoopLiveEmitter } from "#data/elite-redux/coop/coop-turn-recorder";
-import { getCoopTurnSequencer } from "#data/elite-redux/coop/coop-turn-sequencer";
 import { CoopUiMirror } from "#data/elite-redux/coop/coop-ui-mirror";
 import { setCoopGhostFetchSuppressed, setCoopGhostPool, setGhostPoolPublisher } from "#data/elite-redux/er-ghost-teams";
 import { compressToBase64, decompressFromBase64 } from "lz-string";
@@ -87,32 +86,6 @@ function wireCoopLiveEvents(controller: CoopSessionController, battleStream: Coo
       coopLog("runtime", `ME-stream live-event host turn=${turn} seq=${seq} k=${event.k}`);
     }
     battleStream.emitEvent(turn, seq, event);
-  });
-}
-
-/**
- * Co-op GUEST near-real-time RENDER wiring (#633): subscribe to the host's LIVE battle events and feed
- * each into the OPEN per-turn presentation sequencer ({@linkcode CoopTurnSequencer}) so the guest WATCHES
- * the fight unfold one event at a time - TEXT -> anim -> hp drain -> faint - at a watchable pace while its
- * phase queue stays parked on CoopReplayTurnPhase. PRESENTATION ONLY: the turn-end checkpoint is still the
- * source of truth, so a dropped / late live event only stutters. Gated on the live GUEST role in the
- * AUTHORITATIVE netcode (mirrors the host emit gate + the waveResolved gate); a host / solo / lockstep
- * client never registers a sequencer, so {@linkcode getCoopTurnSequencer} returns null and this is a hard
- * no-op for them (byte-identical). `onLiveEvent` is single-subscriber and currently UNUSED on the guest
- * (wireCoopLiveEvents only sets the host-side emitter), so the slot is free; asserted at wire time so a
- * future second guest subscriber can never silently clobber this handler. Cleared via the streamer's
- * dispose() in {@linkcode clearCoopRuntime}.
- */
-function wireCoopLiveRender(controller: CoopSessionController, battleStream: CoopBattleStreamer): void {
-  battleStream.onLiveEvent((turn, seq, event) => {
-    if (controller.role !== "guest" || getCoopNetcodeMode() !== "authoritative") {
-      return; // GATE: guest + authoritative only.
-    }
-    const sequencer = getCoopTurnSequencer(turn);
-    if (sequencer == null) {
-      return; // turn not open / already finalized -> consumeLiveEvents + the batch cover it.
-    }
-    sequencer.offer(seq, event);
   });
 }
 
@@ -639,7 +612,6 @@ export function startLocalCoopSession(
   wireCoopWaveResolved(controller, battleStream);
   wireCoopMeChecksumCheck(battleStream);
   wireCoopLiveEvents(controller, battleStream);
-  wireCoopLiveRender(controller, battleStream);
   setCoopRuntime(runtime);
   coopLog("launch", `local session ready role=${controller.role} netcode=${controller.netcodeMode} -> connecting`);
   controller.connect();
@@ -687,7 +659,6 @@ export function connectCoopSession(
   wireCoopWaveResolved(controller, battleStream);
   wireCoopMeChecksumCheck(battleStream);
   wireCoopLiveEvents(controller, battleStream);
-  wireCoopLiveRender(controller, battleStream);
   setCoopRuntime(runtime);
   coopLog("launch", `peer session ready role=${controller.role} netcode=${controller.netcodeMode} -> connecting`);
   controller.connect();
