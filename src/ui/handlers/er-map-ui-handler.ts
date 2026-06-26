@@ -30,28 +30,34 @@ import { UiMode } from "#enums/ui-mode";
 import { getBiomeKey } from "#field/arena";
 import { addTextObject } from "#ui/text";
 import { UiHandler } from "#ui/ui-handler";
-import { addWindow } from "#ui/ui-theme";
 import { getBiomeName } from "#utils/common";
 
 /** Optional callback fired when the overlay is dismissed. */
 export type ErMapCloseCallback = () => void;
 
 const PANEL_W = 284;
-// Tall enough for the journey + onward rows AND the Conditions footer (#129):
-// the old 176 left a dead band under the routes row; the footer fills it with
-// the highlighted biome's special rules. The hint bar (y = PANEL_H - 13) tracks.
-const PANEL_H = 221;
-const GOLD = 0xf8d030;
-const INK = 0xe8ecf8;
-const DIM = 0x90a0c0;
-const LINE = 0x6878a0;
-/** Onward-route node colours by source (match the route picker). */
-const GREEN = 0x68d068; // a route a Map Upgrade revealed
-const BLUE = 0x68b0f0; // a route a mystery event (e.g. Fortune Teller) foretold
+// Sized to FIT the 180-tall logical screen (scaledCanvas.height) with the journey
+// row, the onward row AND the Conditions footer (#129) all visible. An earlier 221
+// overflowed the screen and clipped the header (top) and the hint bar (bottom); the
+// dead band that used to sit between the journey and routes rows is reclaimed instead.
+const PANEL_H = 178;
+// --- Ancient treasure-map palette (aged parchment + sepia ink) -------------
+const PARCH_BASE = 0xe2d2ab; // aged paper
+const FRAME_DARK = 0x4a3217; // leather map border
+const FRAME_MID = 0x6e4d28; // inner rule + tile frames
+const INK = "#33240f"; // body text (dark sepia) - text FILL colour, set directly
+const INK_HEAD = "#7a3410"; // section headings (burnt sienna ink)
+const DIM = "#8a7044"; // faint sepia (hints / older-biomes arrow)
+const MAP_RED = 0xb23320; // current biome + hovered route - tile BORDERS (numeric)
+const MAP_RED_HEX = "#b23320"; // ... and the matching current/hovered NAME colour
+const ROUTE = 0x946127; // traveled path + a base onward path (brown trail)
+/** Onward-route node colours by source (muted so they read as map ink). */
+const GREEN = 0x4a7a2a; // a route a Map Upgrade revealed
+const BLUE = 0x2f5f93; // a route a mystery event (e.g. Fortune Teller) foretold
 
 /** Colour for an onward route by why it is shown. */
 function routeColor(source?: string): number {
-  return source === "event" ? BLUE : source === "upgrade" ? GREEN : GOLD;
+  return source === "event" ? BLUE : source === "upgrade" ? GREEN : ROUTE;
 }
 
 /** Thumbnail tile size (keeps the 320:180 arena aspect, scaled tiny). */
@@ -61,17 +67,118 @@ const TILE_GAP = 8;
 
 /** Conditions footer (#129): a full-width panel listing the highlighted biome's
  *  special rules, filling the band under the onward-routes row. */
-const FOOTER_Y = 140;
-const FOOTER_H = 62;
+const FOOTER_Y = 107;
+const FOOTER_H = 58;
 const FOOTER_PAD = 6;
 /** First Conditions line baseline + per-line step (6 lines fit the footer body). */
-const COND_FIRST_Y = FOOTER_Y + 13;
+const COND_FIRST_Y = FOOTER_Y + 9;
 const COND_LINE_H = 8;
+
+/** Draw a faded compass-rose watermark (an 8-point star + two rings). */
+function drawErCompass(
+  g: Phaser.GameObjects.Graphics,
+  cx: number,
+  cy: number,
+  r: number,
+  color: number,
+  alpha: number,
+): void {
+  g.lineStyle(1, color, alpha);
+  g.strokeCircle(cx, cy, r);
+  g.strokeCircle(cx, cy, r * 0.6);
+  g.fillStyle(color, alpha);
+  const spoke = (len: number, dirs: [number, number][]): void => {
+    const wbase = r * 0.14;
+    for (const [dx, dy] of dirs) {
+      const tipX = cx + dx * len;
+      const tipY = cy + dy * len;
+      const px = -dy * wbase;
+      const py = dx * wbase;
+      g.fillTriangle(tipX, tipY, cx + px, cy + py, cx, cy);
+      g.fillTriangle(tipX, tipY, cx - px, cy - py, cx, cy);
+    }
+  };
+  spoke(r, [
+    [0, -1],
+    [1, 0],
+    [0, 1],
+    [-1, 0],
+  ]); // long cardinal points
+  const d = 0.707;
+  spoke(r * 0.5, [
+    [d, -d],
+    [d, d],
+    [-d, d],
+    [-d, -d],
+  ]); // short diagonal points
+  g.fillCircle(cx, cy, r * 0.1);
+}
+
+/** Draw the parchment panel: aged paper, leather frame, corner ticks, a compass
+ *  watermark, and the inset Conditions cartouche. Static chrome (drawn once). */
+function drawErParchment(g: Phaser.GameObjects.Graphics): void {
+  g.clear();
+  // Aged paper, lighter toward the top, darker toward the worn bottom edge.
+  g.fillStyle(PARCH_BASE, 1);
+  g.fillRect(0, 0, PANEL_W, PANEL_H);
+  g.fillStyle(0xefe4c6, 0.45);
+  g.fillRect(5, 5, PANEL_W - 10, 48);
+  g.fillStyle(0xc2aa76, 0.4);
+  g.fillRect(5, PANEL_H - 56, PANEL_W - 10, 51);
+  g.lineStyle(7, 0xab9061, 0.13); // soft edge vignette
+  g.strokeRect(4, 4, PANEL_W - 8, PANEL_H - 8);
+  drawErCompass(g, PANEL_W / 2, 64, 38, FRAME_MID, 0.1); // faint watermark behind the map
+  // Leather map frame: a heavy outer border + a fine inner rule.
+  g.lineStyle(4, FRAME_DARK, 1);
+  g.strokeRect(2, 2, PANEL_W - 4, PANEL_H - 4);
+  g.lineStyle(1, FRAME_MID, 0.9);
+  g.strokeRect(7, 7, PANEL_W - 14, PANEL_H - 14);
+  // Corner ticks.
+  g.lineStyle(2, FRAME_DARK, 1);
+  const m = 7;
+  const c = 10;
+  for (const [ox, sx] of [
+    [m, 1],
+    [PANEL_W - m, -1],
+  ] as [number, number][]) {
+    for (const [oy, sy] of [
+      [m, 1],
+      [PANEL_H - m, -1],
+    ] as [number, number][]) {
+      g.lineBetween(ox, oy + sy * c, ox, oy);
+      g.lineBetween(ox, oy, ox + sx * c, oy);
+    }
+  }
+  // Conditions cartouche (the inset footer box).
+  const fw = PANEL_W - FOOTER_PAD * 2;
+  g.fillStyle(0xd7c48d, 1);
+  g.fillRect(FOOTER_PAD, FOOTER_Y, fw, FOOTER_H);
+  g.lineStyle(2, FRAME_MID, 1);
+  g.strokeRect(FOOTER_PAD, FOOTER_Y, fw, FOOTER_H);
+  g.lineStyle(1, FRAME_DARK, 0.45);
+  g.strokeRect(FOOTER_PAD + 2, FOOTER_Y + 2, fw - 4, FOOTER_H - 4);
+}
+
+/** Create a parchment text label. The colour is set as the FILL directly (NOT via
+ *  setTint - which also darkens the WINDOW drop-shadow, doubling each glyph on the
+ *  light paper), and the drop-shadow is removed so the ink reads crisp. */
+function erInkText(
+  x: number,
+  y: number,
+  content: string,
+  color: string,
+  fontSize: string,
+  align: "left" | "center" = "left",
+): Phaser.GameObjects.Text {
+  const t = addTextObject(x, y, content, TextStyle.WINDOW, { fontSize, align, color });
+  t.setShadow(0, 0, "rgba(0,0,0,0)", 0, false, false);
+  return t;
+}
 
 export class ErMapUiHandler extends UiHandler {
   private container: Phaser.GameObjects.Container;
   private card: Phaser.GameObjects.Container;
-  private panel: Phaser.GameObjects.NineSlice;
+  private parchment: Phaser.GameObjects.Graphics;
   private headerText: Phaser.GameObjects.Text;
   private fragmentText: Phaser.GameObjects.Text;
   private journeyLabel: Phaser.GameObjects.Text;
@@ -79,8 +186,7 @@ export class ErMapUiHandler extends UiHandler {
   private emptyText: Phaser.GameObjects.Text;
   private hintText: Phaser.GameObjects.Text;
   private graphics: Phaser.GameObjects.Graphics;
-  /** Conditions footer (#129): static panel bg + "Conditions" label (built once). */
-  private footerPanel: Phaser.GameObjects.NineSlice;
+  /** Conditions cartouche (#129) label; the inset box itself is drawn on the parchment. */
   private footerLabel: Phaser.GameObjects.Text;
   /** Per-render tiles / labels destroyed on refresh + clear. */
   private transient: Phaser.GameObjects.GameObject[] = [];
@@ -111,13 +217,16 @@ export class ErMapUiHandler extends UiHandler {
   private onwardTileX: number[] = [];
   /** Screen-y of the onward tile row (set during refresh). */
   private onwardRowY = 0;
-  /** Gold selection box around the cursored onward tile (pick mode). */
-  private pickRing: Phaser.GameObjects.Rectangle;
+  /** The cursored onward tile is marked by reddening its OWN border + name (pick
+   * mode), so these per-render arrays are recolored on cursor move - no extra box. */
+  private onwardBorders: Phaser.GameObjects.Rectangle[] = [];
+  private onwardNames: Phaser.GameObjects.Text[] = [];
+  private onwardColors: number[] = [];
 
   /** How many journey tiles fit across the panel. */
   private static readonly VISIBLE = Math.floor((PANEL_W - 20) / (TILE_W + TILE_GAP));
-  private static readonly JOURNEY_Y = 56;
-  private static readonly ROUTES_Y = 116;
+  private static readonly JOURNEY_Y = 44;
+  private static readonly ROUTES_Y = 84;
 
   constructor() {
     super(UiMode.ER_MAP);
@@ -134,84 +243,53 @@ export class ErMapUiHandler extends UiHandler {
     this.container.setVisible(false);
     ui.add(this.container);
 
-    const dim = globalScene.add.rectangle(0, 0, w, h, 0x000000, 0.6).setOrigin(0, 0);
+    // Warm, parchment-friendly dim behind the modal.
+    const dim = globalScene.add.rectangle(0, 0, w, h, 0x140d06, 0.62).setOrigin(0, 0);
     this.container.add(dim);
 
     this.card = globalScene.add.container(px, py);
     this.container.add(this.card);
 
-    this.panel = addWindow(0, 0, PANEL_W, PANEL_H);
-    this.card.add(this.panel);
+    // The aged-parchment panel, leather frame, compass watermark + Conditions
+    // cartouche, all drawn once with Graphics (so the ancient-map look is ours,
+    // not the default window theme).
+    this.parchment = globalScene.add.graphics();
+    drawErParchment(this.parchment);
+    this.card.add(this.parchment);
 
-    this.headerText = addTextObject(PANEL_W / 2, 5, "World Map", TextStyle.WINDOW, {
-      fontSize: "60px",
-      align: "center",
-    });
+    this.headerText = erInkText(PANEL_W / 2, 6, "World Map", INK_HEAD, "60px", "center");
     this.headerText.setOrigin(0.5, 0);
-    this.headerText.setTint(GOLD);
     this.card.add(this.headerText);
 
-    this.fragmentText = addTextObject(PANEL_W / 2, 22, "", TextStyle.WINDOW, { fontSize: "38px", align: "center" });
+    this.fragmentText = erInkText(PANEL_W / 2, 18, "", INK, "38px", "center");
     this.fragmentText.setOrigin(0.5, 0);
-    this.fragmentText.setTint(INK);
     this.card.add(this.fragmentText);
 
     // Connector graphics sit UNDER the tiles (added before the transient sprites).
     this.graphics = globalScene.add.graphics();
     this.card.add(this.graphics);
 
-    this.journeyLabel = addTextObject(10, 38, "Your journey", TextStyle.WINDOW, { fontSize: "38px" });
+    this.journeyLabel = erInkText(11, 30, "Your journey", INK_HEAD, "38px");
     this.journeyLabel.setOrigin(0, 0);
-    this.journeyLabel.setTint(DIM);
     this.card.add(this.journeyLabel);
 
-    this.routesLabel = addTextObject(10, 98, "Routes ahead", TextStyle.WINDOW, { fontSize: "38px" });
+    this.routesLabel = erInkText(11, 67, "Routes ahead", INK_HEAD, "38px");
     this.routesLabel.setOrigin(0, 0);
-    this.routesLabel.setTint(DIM);
     this.card.add(this.routesLabel);
 
-    // Conditions footer (#129): a full-width inner panel + a "Conditions" header,
-    // both static chrome. The per-biome effect lines are filled in refresh() /
-    // on pick-cursor move (they live in this.condLines, rebuilt per biome).
-    this.footerPanel = addWindow(FOOTER_PAD, FOOTER_Y, PANEL_W - FOOTER_PAD * 2, FOOTER_H);
-    this.card.add(this.footerPanel);
-    // Dark inner fill behind the Conditions text. It lifts contrast for the light body
-    // text in-game; and because the 2D render harness rasterizes the window frame as a
-    // light fill (no dark window texture), this dark backing is what makes the light
-    // text legible in harness captures - so the panel is actually visually verifiable.
-    const footerFill = globalScene.add
-      .rectangle(FOOTER_PAD + 3, FOOTER_Y + 3, PANEL_W - (FOOTER_PAD + 3) * 2, FOOTER_H - 6, 0x1c2438)
-      .setOrigin(0, 0);
-    this.card.add(footerFill);
-    this.footerLabel = addTextObject(FOOTER_PAD + 6, FOOTER_Y + 3, "Conditions", TextStyle.WINDOW, {
-      fontSize: "38px",
-    });
+    // Conditions cartouche label (the inset box itself is drawn on the parchment).
+    this.footerLabel = erInkText(FOOTER_PAD + 6, FOOTER_Y + 3, "Conditions", INK_HEAD, "38px");
     this.footerLabel.setOrigin(0, 0);
-    this.footerLabel.setTint(GOLD);
     this.card.add(this.footerLabel);
 
-    this.emptyText = addTextObject(PANEL_W / 2, ErMapUiHandler.ROUTES_Y, "", TextStyle.WINDOW, {
-      fontSize: "38px",
-      align: "center",
-    });
+    this.emptyText = erInkText(PANEL_W / 2, ErMapUiHandler.ROUTES_Y, "", DIM, "38px", "center");
     this.emptyText.setOrigin(0.5, 0.5);
-    this.emptyText.setTint(DIM);
     this.emptyText.setVisible(false);
     this.card.add(this.emptyText);
 
-    this.hintText = addTextObject(PANEL_W / 2, PANEL_H - 13, "< > Scroll    B: Close", TextStyle.WINDOW, {
-      fontSize: "36px",
-      align: "center",
-    });
+    this.hintText = erInkText(PANEL_W / 2, PANEL_H - 12, "< > Scroll    B: Close", DIM, "36px", "center");
     this.hintText.setOrigin(0.5, 0);
-    this.hintText.setTint(DIM);
     this.card.add(this.hintText);
-
-    // Selection box for pick mode (sized to a tile; positioned per cursor move).
-    this.pickRing = globalScene.add.rectangle(0, 0, TILE_W + 6, TILE_H + 6, 0xffffff, 0).setOrigin(0.5);
-    this.pickRing.setStrokeStyle(2, GOLD);
-    this.pickRing.setVisible(false);
-    this.card.add(this.pickRing);
 
     installErMapHotkey();
   }
@@ -273,35 +351,31 @@ export class ErMapUiHandler extends UiHandler {
       this.card.add(tile);
       this.transient.push(tile);
     } else {
-      const ph = globalScene.add.rectangle(cx, cy, TILE_W, TILE_H, 0x33405c).setOrigin(0.5);
+      const ph = globalScene.add.rectangle(cx, cy, TILE_W, TILE_H, 0x7a663f).setOrigin(0.5);
       this.card.add(ph);
       this.transient.push(ph);
     }
-    // Border: gold + thicker for the current biome, thin grey otherwise.
+    // Tile frame: a red "you are here" border for the current biome, a thin brown
+    // map frame otherwise.
     const border = globalScene.add.rectangle(cx, cy, TILE_W + 2, TILE_H + 2, 0xffffff, 0).setOrigin(0.5);
-    border.setStrokeStyle(highlight ? 2 : 1, highlight ? GOLD : LINE);
+    border.setStrokeStyle(highlight ? 2 : 1, highlight ? MAP_RED : FRAME_MID);
     this.card.add(border);
     this.transient.push(border);
 
-    const name = addTextObject(cx, cy + TILE_H / 2 + 1, getBiomeName(biome), TextStyle.WINDOW, {
-      fontSize: "32px",
-      align: "center",
-    });
+    const name = erInkText(
+      cx,
+      cy + TILE_H / 2 + 1,
+      getBiomeName(biome),
+      highlight ? MAP_RED_HEX : INK,
+      "32px",
+      "center",
+    );
     name.setOrigin(0.5, 0);
-    name.setTint(highlight ? GOLD : INK);
     this.card.add(name);
     this.transient.push(name);
-
-    if (highlight) {
-      const here = addTextObject(cx, cy - TILE_H / 2 - 9, "HERE", TextStyle.WINDOW, {
-        fontSize: "30px",
-        align: "center",
-      });
-      here.setOrigin(0.5, 0);
-      here.setTint(GOLD);
-      this.card.add(here);
-      this.transient.push(here);
-    }
+    // The current biome reads as current from its red frame + red name (and, in pick
+    // mode, the red route cursor sits in the routes row below) - no extra "HERE" tag,
+    // which would crowd the now-compact top band.
   }
 
   /** Draw a dashed line on the connector graphics (for not-yet-taken routes). */
@@ -330,6 +404,9 @@ export class ErMapUiHandler extends UiHandler {
     }
     this.transient = [];
     this.graphics.clear();
+    this.onwardBorders = [];
+    this.onwardNames = [];
+    this.onwardColors = [];
 
     const total = this.history.length;
     const currentBiome = total > 0 ? this.history[total - 1] : globalScene.arena?.biomeId;
@@ -350,16 +427,15 @@ export class ErMapUiHandler extends UiHandler {
       }
       // Connector from the previous tile.
       if (i > 0) {
-        this.graphics.lineStyle(2, LINE, 0.9);
+        this.graphics.lineStyle(2, ROUTE, 1);
         this.graphics.lineBetween(tileX[i - 1] + TILE_W / 2, cy, cx - TILE_W / 2, cy);
       }
       this.makeTile(biome, cx, cy, histIndex === total - 1);
     }
     // "older biomes" hint when the window is scrolled off the start.
     if (this.scroll > 0 && count > 0) {
-      const more = addTextObject(4, cy, "<", TextStyle.WINDOW, { fontSize: "44px" });
+      const more = erInkText(4, cy, "<", DIM, "44px");
       more.setOrigin(0, 0.5);
-      more.setTint(DIM);
       this.card.add(more);
       this.transient.push(more);
     }
@@ -398,7 +474,7 @@ export class ErMapUiHandler extends UiHandler {
           this.card.add(tile);
           this.transient.push(tile);
         } else {
-          const ph = globalScene.add.rectangle(cx, oy, TILE_W, TILE_H, 0x33405c).setOrigin(0.5);
+          const ph = globalScene.add.rectangle(cx, oy, TILE_W, TILE_H, 0x7a663f).setOrigin(0.5);
           this.card.add(ph);
           this.transient.push(ph);
         }
@@ -406,24 +482,22 @@ export class ErMapUiHandler extends UiHandler {
         border.setStrokeStyle(1, color);
         this.card.add(border);
         this.transient.push(border);
-        const name = addTextObject(cx, oy + TILE_H / 2 + 1, getBiomeName(node.biome), TextStyle.WINDOW, {
-          fontSize: "32px",
-          align: "center",
-        });
+        const name = erInkText(cx, oy + TILE_H / 2 + 1, getBiomeName(node.biome), INK, "32px", "center");
         name.setOrigin(0.5, 0);
-        name.setTint(color);
         this.card.add(name);
         this.transient.push(name);
+        // Track this tile's frame + name + base colour so the pick cursor can redden
+        // the hovered option's OWN border (no separate moving box).
+        this.onwardBorders.push(border);
+        this.onwardNames.push(name);
+        this.onwardColors.push(color);
       }
       this.routesLabel.setVisible(true);
       if (this.pickMode) {
         this.placePickCursor();
-      } else {
-        this.pickRing.setVisible(false);
       }
     } else {
       this.routesLabel.setVisible(false);
-      this.pickRing.setVisible(false);
     }
 
     // Empty state: a brand-new run with nothing to show yet.
@@ -459,21 +533,15 @@ export class ErMapUiHandler extends UiHandler {
 
     const lines = biome === undefined ? [] : getErBiomeEffectLines(biome);
     if (lines.length === 0) {
-      const none = addTextObject(FOOTER_PAD + 6, COND_FIRST_Y, "No special conditions", TextStyle.WINDOW, {
-        fontSize: "34px",
-      });
+      const none = erInkText(FOOTER_PAD + 6, COND_FIRST_Y, "No special conditions", DIM, "34px");
       none.setOrigin(0, 0);
-      none.setTint(DIM);
       this.card.add(none);
       this.condLines.push(none);
       return;
     }
     for (let i = 0; i < lines.length; i++) {
-      const line = addTextObject(FOOTER_PAD + 6, COND_FIRST_Y + i * COND_LINE_H, lines[i], TextStyle.WINDOW, {
-        fontSize: "34px",
-      });
+      const line = erInkText(FOOTER_PAD + 6, COND_FIRST_Y + i * COND_LINE_H, lines[i], INK, "34px");
       line.setOrigin(0, 0);
-      line.setTint(INK);
       this.card.add(line);
       this.condLines.push(line);
     }
@@ -486,17 +554,19 @@ export class ErMapUiHandler extends UiHandler {
     // hazard. Do not re-add a two-hop preview here without a pure, side-effect-free peek.)
   }
 
-  /** Position the gold selection box on the cursored onward tile (pick mode). */
+  /** Mark the cursored onward tile by reddening its OWN border + name (pick mode);
+   *  every other tile reverts to its base route colour. No separate selection box. */
   private placePickCursor(): void {
-    const count = this.onwardTileX.length;
+    const count = this.onwardBorders.length;
     if (count === 0) {
-      this.pickRing.setVisible(false);
       return;
     }
     this.pickCursor = Math.max(0, Math.min(this.pickCursor, count - 1));
-    this.pickRing.setPosition(this.onwardTileX[this.pickCursor], this.onwardRowY);
-    this.pickRing.setVisible(true);
-    this.card.bringToTop(this.pickRing);
+    for (let i = 0; i < count; i++) {
+      const sel = i === this.pickCursor;
+      this.onwardBorders[i].setStrokeStyle(sel ? 2 : 1, sel ? MAP_RED : (this.onwardColors[i] ?? FRAME_MID));
+      this.onwardNames[i]?.setColor(sel ? MAP_RED_HEX : INK);
+    }
     // Pick mode (#129): the footer follows the cursor - list the conditions of the
     // onward biome the cursor is over (so the player compares routes by their rules).
     this.renderConditions(this.onward[this.pickCursor]?.biome);
@@ -606,11 +676,13 @@ export class ErMapUiHandler extends UiHandler {
     this.onClose = null;
     this.onPick = null;
     this.pickMode = false;
-    this.pickRing.setVisible(false);
     this.resolved = false;
     this.history = [];
     this.onward = [];
     this.onwardTileX = [];
+    this.onwardBorders = [];
+    this.onwardNames = [];
+    this.onwardColors = [];
   }
 }
 

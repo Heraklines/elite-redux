@@ -82,6 +82,33 @@ export interface ErBiomeRule {
   /** % chance a consumed berry is preserved instead (Beach Harvest-like, 0-100). */
   berrySaveChance?: number;
 
+  // --- GROUP G: ER biome field/economy effects (#439 §3 second batch) ---
+  /** Temple: stat stages are FROZEN - neither side can raise OR lower a stat stage
+   *  (StatStageChangePhase no-ops every change while in this biome). */
+  statStageFreeze?: boolean;
+  /** Dojo: moves of this type are NEVER resisted - the type-effectiveness floor is
+   *  clamped up to 1x for this attacking type (immunities/resistances become >=1x). */
+  unresistedType?: PokemonType;
+  /** Lake: fraction of max HP every party mon recovers at each turn end (e.g. 1/16). */
+  perTurnHealFraction?: number;
+  /** Slum: % of the player's money lost per ALLY faint in a TRAINER battle (0-100). */
+  moneyLossPctPerFaint?: number;
+  /** Wasteland: the every-wave shop sells NO healing items here. */
+  shopNoHeal?: boolean;
+  /** Wasteland: every WILD mon drops this many held items on defeat (post-battle loot). */
+  wildItemDropCount?: number;
+  /** Construction Site: extra reward-screen item slots offered after each battle. */
+  extraRewardSlots?: number;
+  /** Ruins: the ambush is AVOIDED when your lead's Def >= the foe's Atk (instead of
+   *  the Forest/Snowy Forest speed gate). Pairs with an `ambushChance`. */
+  ambushDefenseGate?: boolean;
+
+  // --- Wild-generation shape (#439 §3 second batch) ---
+  /** Laboratory: % chance a WILD encounter is a FUSION (biases the wild fusion roll). */
+  wildFusionChancePct?: number;
+  /** Factory: every WILD mon holds >=1 item, with stacking chances for a 2nd/3rd. */
+  wildItemCount?: { guaranteed: number; secondPct: number; thirdPct: number };
+
   // --- Encounter shape (generation-layer, not the in-battle field) ---
   /** Multiplier on the WILD double-battle probability (Grass/Tall Grass = 2x). */
   doubleBattleMult?: number;
@@ -143,10 +170,32 @@ const ER_BIOME_RULES: Partial<Record<BiomeId, ErBiomeRule>> = {
   [BiomeId.PLAINS]: { runNeverFails: true },
   // Abyss: dread - Dark-type attackers get +1 crit stage (darkness shop rules elsewhere).
   [BiomeId.ABYSS]: { darkCritBoost: true },
-  // Fairy Cave: blessed - infatuation immunity + faster status recovery.
-  [BiomeId.FAIRY_CAVE]: { fairyBlessing: true },
+  // Fairy Cave: blessed - infatuation immunity + faster status recovery + Misty terrain.
+  [BiomeId.FAIRY_CAVE]: { fairyBlessing: true, terrain: TerrainType.MISTY },
   // Island: exotic imports - boosts regional variants + Redux forms in the wild.
   [BiomeId.ISLAND]: { regionalBoost: true, reduxFormBoost: true },
+
+  // GROUP G - ER biome field/economy identities (#439 §3 second batch) ----------
+  // Laboratory: experiments - ~50% of wild encounters are FUSIONS.
+  [BiomeId.LABORATORY]: { wildFusionChancePct: 50 },
+  // Temple: hallowed stillness - Misty terrain + stat stages FROZEN for both sides.
+  [BiomeId.TEMPLE]: { terrain: TerrainType.MISTY, statStageFreeze: true },
+  // Metropolis: the crowd - nearly every battle is a double.
+  [BiomeId.METROPOLIS]: { doubleBattleMult: 8 },
+  // Dojo: martial mastery - Fighting +20% AND Fighting moves are never resisted.
+  [BiomeId.DOJO]: { typeBoost: { type: PokemonType.FIGHTING, mult: 1.2 }, unresistedType: PokemonType.FIGHTING },
+  // Factory: production line - every wild mon holds >=1 item (50% a 2nd, 30% a 3rd).
+  [BiomeId.FACTORY]: { wildItemCount: { guaranteed: 1, secondPct: 50, thirdPct: 30 } },
+  // Ruins: darkness + a Def-gated ambush (your lead's Def vs the foe's Atk).
+  [BiomeId.RUINS]: { darkness: true, ambushChance: 15, ambushDefenseGate: true },
+  // Wasteland: scarcity - the shop sells no healing + every wild mon drops 2 items.
+  [BiomeId.WASTELAND]: { shopNoHeal: true, wildItemDropCount: 2 },
+  // Construction Site: a busy site - one extra reward slot (50% cheaper shop via economy).
+  [BiomeId.CONSTRUCTION_SITE]: { extraRewardSlots: 1 },
+  // Slum: the den - lose 2% of your money per ally faint in a TRAINER battle.
+  [BiomeId.SLUM]: { moneyLossPctPerFaint: 2 },
+  // Lake: calm waters - keep an eaten berry (25%) + the party heals a little each turn.
+  [BiomeId.LAKE]: { berrySaveChance: 25, perTurnHealFraction: 1 / 16 },
 };
 
 /** The full battle-identity rule for a biome, or undefined (vanilla behavior). */

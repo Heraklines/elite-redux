@@ -18,7 +18,6 @@ import {
   DamageCalculatorModifier,
   DoubleBattleChanceBoosterModifier,
   SpeciesCritBoosterModifier,
-  SpeedOrderModifier,
   TurnStatusEffectModifier,
 } from "#modifiers/modifier";
 import {
@@ -359,8 +358,6 @@ function initUltraModifierPool() {
     new WeightedModifierType(modifierTypes.BIG_NUGGET, skipInLastClassicWaveOrDefault(12)),
     new WeightedModifierType(modifierTypes.PP_MAX, 3),
     new WeightedModifierType(modifierTypes.MINT, 4),
-    // ER: unlocks the Speed Order page in the in-battle Info screen (once).
-    new WeightedModifierType(modifierTypes.SPEED_ORDER, () => (hasSpeedOrder() ? 0 : 4), 4),
     new WeightedModifierType(
       modifierTypes.RARE_EVOLUTION_ITEM,
       () => Math.min(Math.ceil(globalScene.currentBattle.waveIndex / 15) * 4, 32),
@@ -604,6 +601,10 @@ function initUltraModifierPool() {
     new WeightedModifierType(modifierTypes.ER_POWER_HERB, 4),
     // ER Learner's Shroom (#404): ULTRA per maintainer (2026-06-12).
     new WeightedModifierType(modifierTypes.ER_LEARNERS_SHROOM, 4),
+    // ER Greater Ability Capsule: ULTRA - the rarer, stronger Ability Capsule
+    // (permanently unlock one innate, or run-unlock two). Rarer than the GREAT-tier
+    // normal capsule, so a lower weight.
+    new WeightedModifierType(modifierTypes.ER_GREATER_ABILITY_CAPSULE, 2),
   ].map(m => {
     m.setTier(ModifierTier.ULTRA);
     return m;
@@ -696,6 +697,9 @@ function initMasterModifierPool() {
           : 0,
       1,
     ),
+    // ER Greater Ability Randomizer: MASTER (maintainer specified) - pick a slot,
+    // choose 1 of 4 random abilities to replace it (Curiosity's reward half, no lock).
+    new WeightedModifierType(modifierTypes.ER_GREATER_ABILITY_RANDOMIZER, 8),
   ].map(m => {
     m.setTier(ModifierTier.MASTER);
     return m;
@@ -914,9 +918,4 @@ function hasMaximumBalls(ballType: PokeballType): boolean {
 /** @returns whether the player already owns the ER Damage Calculator unlock. */
 function hasDamageCalculator(): boolean {
   return !!globalScene.findModifier(m => m instanceof DamageCalculatorModifier);
-}
-
-/** @returns whether the player already owns the ER Speed Order unlock. */
-function hasSpeedOrder(): boolean {
-  return !!globalScene.findModifier(m => m instanceof SpeedOrderModifier);
 }

@@ -9,10 +9,13 @@ import { tmPoolTiers } from "#balance/tms";
 import { getBerryEffectDescription, getBerryName } from "#data/berry";
 import { getDailyEventSeedLuck } from "#data/daily-seed/daily-run";
 import { allMoves, modifierTypes } from "#data/data-lists";
+import { erHasRunUnlockableInnate } from "#data/elite-redux/er-ability-capsule";
 import { erBiomeShopResolveTier, erBiomeTierPrice, rollErBiomeShopStock } from "#data/elite-redux/er-biome-economy";
+import { getErBiomeRule } from "#data/elite-redux/er-biome-rules";
 import { ER_COMMUNITY_ITEM_CONFIG, type ErCommunityItemKind } from "#data/elite-redux/er-community-items";
 import { erGemItemType } from "#data/elite-redux/er-elemental-gems";
 import { getErTemporaryLuck } from "#data/elite-redux/er-fairy-luck";
+import { greaterCapsuleHasAnyOption } from "#data/elite-redux/er-greater-ability-capsule";
 import { erMegaStoneIconFrame, isErMegaStone } from "#data/elite-redux/er-mega-stones";
 import { erReactiveItemType } from "#data/elite-redux/er-reactive-items";
 import { ER_ASSAULT_VEST_TYPE, ER_LIFE_ORB_TYPE, ER_ROCKY_HELMET_TYPE } from "#data/elite-redux/er-recreated-items";
@@ -23,7 +26,6 @@ import { getNatureName, getNatureStatMultiplier } from "#data/nature";
 import { getPokeballCatchMultiplier, getPokeballName } from "#data/pokeball";
 import { pokemonFormChanges, SpeciesFormChangeCondition } from "#data/pokemon-forms";
 import { getStatusEffectDescriptor } from "#data/status-effect";
-import { AbilityId } from "#enums/ability-id";
 import { BattlerTagType } from "#enums/battler-tag-type";
 import { BerryType } from "#enums/berry-type";
 import { ChallengeType } from "#enums/challenge-type";
@@ -65,6 +67,8 @@ import {
   ErAbilityCapsuleModifier,
   ErCommunityItemModifier,
   ErDexNavModifier,
+  ErGreaterAbilityCapsuleModifier,
+  ErGreaterAbilityRandomizerModifier,
   ErLearnersShroomModifier,
   ErRelicModifier,
   ErTmCaseModifier,
@@ -783,6 +787,38 @@ export class PokemonRandomizeAbilityModifierType extends PokemonAbilityModifierT
 }
 
 /**
+ * ER Greater Ability Randomizer (Master-Ball tier - a pink reskin of the Ability
+ * Randomizer). Unlike the Randomizer (which instantly rolls one ability into the
+ * chosen slot), this one is interactive: the player picks a slot, is shown 4 random
+ * abilities WITH descriptions in a chooser, and picks one to replace that slot.
+ * Because of the chooser step it is a plain {@linkcode PokemonModifierType} (it only
+ * picks the mon on the reward screen); the slot pick + 4-ability picker are driven by
+ * {@linkcode ErGreaterAbilityRandomizerPhase}. Pink reskin via `iconTint`.
+ */
+export class ErGreaterAbilityRandomizerModifierType extends PokemonModifierType {
+  constructor() {
+    super(
+      "",
+      "ability_randomizer",
+      (type, args) => new ErGreaterAbilityRandomizerModifier(type, (args[0] as PlayerPokemon).id),
+      undefined,
+      "ability_capsule",
+    );
+    // Pink reskin of the (already vitamin-reskinned) Ability Randomizer frame so
+    // the reward shop + biome shop show the recolored icon (the #437 type-tint path).
+    this.iconTint = 0xff7ad0;
+  }
+
+  get name(): string {
+    return i18next.t("modifierType:erGreaterAbilityRandomizer.name");
+  }
+
+  getDescription(): string {
+    return i18next.t("modifierType:erGreaterAbilityRandomizer.description");
+  }
+}
+
+/**
  * ER Rogue-tier consumable: grants a Pokémon a permanent 5th move slot. Only
  * applicable once per Pokémon (the select filter blocks re-use).
  */
@@ -892,9 +928,13 @@ export function erRelicModifierType(kind: ErRelicKind): ModifierType {
 }
 
 /**
- * ER Ability Capsule (#387, community batch): cycles a Pokémon's ACTIVE
- * ability through its species' legal abilities (1 -> 2 -> hidden). Single-use
- * per Pokémon. English hardcoded (ER-custom item, no shared locale entry).
+ * ER Ability Capsule (#387, community batch): on use, offers a CHOICE - cycle the
+ * mon's ACTIVE ability through its species' legal abilities (1 -> 2 -> hidden), OR
+ * "unlock an innate for the run" (force-unlock one currently-LOCKED innate slot for
+ * THIS RUN ONLY; never a permanent candy unlock). The choice + sub-picker are driven
+ * by {@linkcode ErAbilityCapsulePhase}. Applicable to any mon that can do EITHER. The
+ * name + the two option labels are English hardcoded / i18n'd under the `modifierType`
+ * namespace (ER-custom item, no shared locale entry).
  */
 export class ErAbilityCapsuleModifierType extends PokemonModifierType {
   constructor() {
@@ -903,9 +943,9 @@ export class ErAbilityCapsuleModifierType extends PokemonModifierType {
       "ability_capsule",
       (type, args) => new ErAbilityCapsuleModifier(type, (args[0] as PlayerPokemon).id),
       (pokemon: PlayerPokemon) => {
-        const form = pokemon.getSpeciesForm();
-        const distinct = new Set([form.ability1, form.ability2, form.abilityHidden].filter(a => a !== AbilityId.NONE));
-        if (distinct.size < 2) {
+        // Usable if the mon can cycle its active ability (>= 2 distinct legal
+        // abilities) OR has at least one currently-locked innate to run-unlock.
+        if (!ErAbilityCapsuleModifier.canCycleActiveAbility(pokemon) && !erHasRunUnlockableInnate(pokemon)) {
           return PartyUiHandler.NoEffectMessage;
         }
         return null;
@@ -918,7 +958,44 @@ export class ErAbilityCapsuleModifierType extends PokemonModifierType {
   }
 
   getDescription(): string {
-    return "Switches a Pokémon's active ability to its species' next legal ability (1 -> 2 -> hidden). Works once per Pokémon.";
+    return "Change a Pokémon's active ability (1 -> 2 -> hidden), or unlock one of its locked innates for the run.";
+  }
+}
+
+/**
+ * ER Greater Ability Capsule (the rarer, stronger Ability Capsule - a violet
+ * reskin). On use, offers a CHOICE: PERMANENTLY unlock ONE innate slot (the real
+ * candy-style unlock - stays unlocked in starter-select + future runs), OR
+ * run-unlock TWO innate slots for THIS RUN ONLY. Applicable to any mon with at
+ * least one currently-locked innate. The choice + sub-pickers are driven by
+ * {@linkcode ErGreaterAbilityCapsulePhase}. Violet reskin via `iconTint`.
+ */
+export class ErGreaterAbilityCapsuleModifierType extends PokemonModifierType {
+  constructor() {
+    super(
+      "",
+      "ability_capsule",
+      (type, args) => new ErGreaterAbilityCapsuleModifier(type, (args[0] as PlayerPokemon).id),
+      (pokemon: PlayerPokemon) => {
+        // Usable only if the mon has at least one currently-locked innate to act on
+        // (both options - permanent-unlock-one and run-unlock-two - draw from that set).
+        if (!greaterCapsuleHasAnyOption(pokemon)) {
+          return PartyUiHandler.NoEffectMessage;
+        }
+        return null;
+      },
+    );
+    // Violet reskin of the Ability Capsule frame so the reward + biome shop show
+    // the recolored icon (the #437 type-tint path).
+    this.iconTint = 0x9a4ce0;
+  }
+
+  get name(): string {
+    return i18next.t("modifierType:erGreaterAbilityCapsule.name");
+  }
+
+  getDescription(): string {
+    return i18next.t("modifierType:erGreaterAbilityCapsule.description");
   }
 }
 
@@ -2230,6 +2307,10 @@ const modifierTypeInitObj = Object.freeze({
   ABILITY_RANDOMIZER: () => new PokemonRandomizeAbilityModifierType(),
   MOVE_SLOT_EXPANDER: () => new PokemonAddMoveSlotModifierType(),
 
+  // ER Greater Ability Randomizer (Master-Ball tier): pink reskin of the Ability
+  // Randomizer; pick a slot, choose 1 of 4 random abilities to replace it.
+  ER_GREATER_ABILITY_RANDOMIZER: () => new ErGreaterAbilityRandomizerModifierType(),
+
   // ER community item batch (#387/#392).
   ER_CHILI_SAMPLE: () => erCommunityItemModifierType("chiliSample"),
   ER_COPPER_ROD: () => erCommunityItemModifierType("copperRod"),
@@ -2281,6 +2362,9 @@ const modifierTypeInitObj = Object.freeze({
   ER_STEEL_GEM: () => erGemItemType(PokemonType.STEEL),
   ER_FAIRY_GEM: () => erGemItemType(PokemonType.FAIRY),
   ER_ABILITY_CAPSULE: () => new ErAbilityCapsuleModifierType(),
+  // ER Greater Ability Capsule (Ultra tier): violet reskin of the Ability Capsule;
+  // permanently unlock ONE innate, or run-unlock TWO innates.
+  ER_GREATER_ABILITY_CAPSULE: () => new ErGreaterAbilityCapsuleModifierType(),
   ER_LEARNERS_SHROOM: () => new ErLearnersShroomModifierType(),
   ER_DEX_NAV: () => new ErDexNavModifierType(),
 
@@ -3157,6 +3241,13 @@ export function getPlayerShopModifierTypeOptionsForWave(
     // Boss (x0) waves have no vanilla reward shop row - their shop is the biome
     // market (above, via the dedicated phase). Returning [] keeps the vanilla
     // reward screen from rendering uncapped, re-buyable market stock.
+    return [];
+  }
+
+  // ER Wasteland (#439 §3): scarcity - the every-wave shop here sells NO healing.
+  // The whole vanilla shop row is heals/revives/cures, so the row is empty in this
+  // biome. Gated on the biome rule; every other biome keeps its heal row.
+  if (globalScene.currentBattle != null && getErBiomeRule(globalScene.arena.biomeId)?.shopNoHeal) {
     return [];
   }
 

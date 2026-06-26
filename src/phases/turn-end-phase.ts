@@ -100,6 +100,22 @@ export class TurnEndPhase extends FieldPhase {
           }
         }
 
+        // ER Lake (#439 §3): calm waters - the player's active mons recover a
+        // small fraction of max HP each turn end (e.g. 1/16). Player side only,
+        // skips full-HP / fainted mons. Gated on the biome rule.
+        const perTurnHeal = getErBiomeRule(globalScene.arena.biomeId)?.perTurnHealFraction;
+        if (perTurnHeal && pokemon.isPlayer() && !pokemon.isFullHp() && pokemon.hp > 0) {
+          globalScene.phaseManager.unshiftNew(
+            "PokemonHealPhase",
+            pokemon.getBattlerIndex(),
+            Math.max(Math.floor(pokemon.getMaxHp() * perTurnHeal), 1),
+            i18next.t("battle:turnEndHpRestore", {
+              pokemonName: getPokemonNameWithAffix(pokemon),
+            }),
+            true,
+          );
+        }
+
         if (!pokemon.isPlayer()) {
           globalScene.applyModifiers(EnemyTurnHealModifier, false, pokemon);
           globalScene.applyModifier(EnemyStatusEffectHealChanceModifier, false, pokemon);

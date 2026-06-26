@@ -38,7 +38,7 @@ import { type EffectiveStat, Stat } from "#enums/stat";
 import { TextStyle } from "#enums/text-style";
 import { WeatherType } from "#enums/weather-type";
 import type { Pokemon } from "#field/pokemon";
-import { DamageCalculatorModifier, SpeedOrderModifier } from "#modifiers/modifier";
+import { DamageCalculatorModifier } from "#modifiers/modifier";
 import { addTextObject, getTextColor } from "#ui/text";
 import { isSlotEnabled, isSlotUnlocked, type PassiveSlot } from "#utils/passive-utils";
 
@@ -181,9 +181,9 @@ export class BattleInfoOverlay {
     if (globalScene.findModifier(m => m instanceof DamageCalculatorModifier)) {
       pages.push("damage-calc");
     }
-    if (globalScene.findModifier(m => m instanceof SpeedOrderModifier)) {
-      pages.push("speed-order");
-    }
+    // ER: the Speed Order page is ALWAYS available now (the Speed Order unlock item was
+    // removed - it is a free in-battle info aid, no longer gated behind owning the item).
+    pages.push("speed-order");
     return pages;
   }
 
@@ -544,9 +544,16 @@ export class BattleInfoOverlay {
 
   private renderAbilitiesInner(c: Phaser.GameObjects.Container, mon: Pokemon): void {
     const rows: { label: string; abilityId: number; locked: boolean; gift?: boolean }[] = [];
+    // ER Giratina's Bargain - Curiosity (#544): slots the player sealed for this run.
+    // The ER slot index is 0 (active ability) or `innateSlot + 1` (innate), matching
+    // Pokemon.getAbilitySlots / canApplyAbility. Player-only, like the battle gate.
+    const isPlayerMon = mon.isPlayer?.() === true;
+    const runLocked = (abilitySlot: number): boolean =>
+      isPlayerMon && mon.customPokemonData?.erLockedAbilitySlots?.includes(abilitySlot) === true;
     const main = mon.getAbility(true);
     if (main) {
-      rows.push({ label: "Ability", abilityId: main.id, locked: false });
+      const lockedByRun = runLocked(0);
+      rows.push({ label: lockedByRun ? "Ability (Locked)" : "Ability", abilityId: main.id, locked: lockedByRun });
     }
 
     // Innate slots are NOT all active just because they exist: for the player
@@ -576,7 +583,11 @@ export class BattleInfoOverlay {
       const passiveSlot = slot as PassiveSlot;
       let label = "Innate";
       let locked = false;
-      if (isEnemy) {
+      if (runLocked(slot + 1)) {
+        // Sealed by the Curiosity bargain - dead this run regardless of candy/level.
+        locked = true;
+        label = "Innate (Locked)";
+      } else if (isEnemy) {
         const levelReq = enemyLevelForSlot[passiveSlot] ?? 0;
         if (mon.level < levelReq) {
           locked = true;

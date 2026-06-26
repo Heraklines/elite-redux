@@ -496,6 +496,16 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
         const fused = new BooleanHolder(globalScene.gameMode.isSplicedOnly);
         if (!fused.value && this.isEnemy() && !this.hasTrainer()) {
           globalScene.applyModifier(EnemyFusionChanceModifier, false, fused);
+          // ER Laboratory (#439 §3): the experiment biome biases the WILD fusion
+          // roll - ~half of wild encounters here come out as fusions. Only the
+          // chokepoint wild path (enemy + no trainer) is touched; trainer mons and
+          // spliced-only runs are unaffected.
+          if (!fused.value && globalScene.currentBattle) {
+            const fusionPct = getErBiomeRule(globalScene.arena.biomeId)?.wildFusionChancePct;
+            if (fusionPct && randSeedInt(100) < fusionPct) {
+              fused.value = true;
+            }
+          }
         }
 
         if (fused.value) {
@@ -2851,7 +2861,11 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
       basePassive =
         ([0, 1, 2] as const).some(s => isSlotActive(this.innateSlotPassiveAttr(s), s))
         || ((erYoungsterFreeInnateSlots(this.level) > 0 || gameMode.isDaily)
-          && this.getPassiveAbilities().some(a => a != null)) // ER (#381): a TRUANT innate is always live (it is a nerf).
+          && this.getPassiveAbilities().some(a => a != null)) // ER (#381): a TRUANT innate is always live (it is a nerf). // ER Ability Capsule run-unlock (maintainer request): a run-unlocked innate
+        || // makes the mon "have a passive" this run, so the candy-unlock gate at the
+        // top of canApplyAbility (which short-circuits when hasPassive() is false)
+        // lets the run-only innate through. Run-scoped; never a permanent unlock.
+        (this.customPokemonData?.erRunUnlockedAbilitySlots?.length ?? 0) > 0
         || this.getPassiveAbilities()
           .slice(0, 3)
           .some(a => a?.id === AbilityId.TRUANT);
@@ -2971,6 +2985,18 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
     if (!ability) {
       return false;
     }
+    // ER Giratina's Bargain - Curiosity (#544): a slot the player LOCKED via the
+    // Curiosity gamble is dead for the rest of the run. The ER ability-slot index
+    // is 0 for the active ability and `passiveSlot + 1` for an innate slot
+    // (matching {@linkcode getAbilitySlots}). This wins over the form-change
+    // exemption below - the player explicitly chose to disable THIS slot, so even
+    // a relocated Stance Change / Forecast innate goes silent. Player-only: enemy
+    // innate gating is by level, and a copied/transformed enemy must not inherit a
+    // player's lock set. Run-scoped (serialized on customPokemonData), never an
+    // account unlock.
+    if (this.isPlayer() && this.customPokemonData?.erLockedAbilitySlots?.includes(passive ? passiveSlot + 1 : 0)) {
+      return false;
+    }
     // Form-change-driving innates (Forecast/Hunger Switch/Flower Gift/… relocated
     // by ER into an innate slot) are species identity and must never be gated
     // behind the candy passive unlock — see {@linkcode abilityDrivesFormChange}.
@@ -3004,7 +3030,14 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
         const freeInnate =
           passiveSlot < erYoungsterFreeInnateSlots(this.level)
           || globalScene.gameMode?.isDaily === true // ER Innate Shrine (#514): a mon attuned at the Temple shrine has all its // innate slots unlocked for the run.
-          || this.customPokemonData?.erInnateShrineUnlocked === true
+          || this.customPokemonData?.erInnateShrineUnlocked === true // ER Ability Capsule run-unlock (maintainer request): the INVERSE of the
+          || // Curiosity lock - a slot the player paid a capsule to "unlock an innate for
+          // the run" fires this run without the permanent candy unlock. Stored as the
+          // ER slot index (passiveSlot + 1), serialized run-only on customPokemonData;
+          // never writes starterData.passiveAttr. The Curiosity lock above (which
+          // returns false before reaching here) still wins, so a run-unlocked slot that
+          // is ALSO Curiosity-locked stays dead.
+          this.customPokemonData?.erRunUnlockedAbilitySlots?.includes(passiveSlot + 1) === true
           || ability.id === AbilityId.TRUANT;
         if (!freeInnate && !isSlotActive(passiveAttr, passiveSlot as 0 | 1 | 2)) {
           return false;
@@ -3551,6 +3584,17 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
     // multiplier (resistances and immunities) is clamped up to neutral. Its
     // weaknesses (already pure Ice via the type override) still apply.
     if (multi.value < 1 && this.getTag(BattlerTagType.ER_ICE_STATUE) != null) {
+      multi.value = 1;
+    }
+    // ER Dojo (#439 §3): martial mastery - moves of the biome's `unresistedType`
+    // (Fighting) are NEVER resisted here. Any sub-neutral matchup (resistances AND
+    // immunities, i.e. <1x including 0x) is floored to 1x; weaknesses are untouched.
+    // Gated on an active attacker so it only affects real offense in this biome.
+    if (
+      multi.value < 1
+      && source?.isActive(true)
+      && getErBiomeRule(globalScene.arena.biomeId)?.unresistedType === moveType
+    ) {
       multi.value = 1;
     }
     return multi.value as TypeDamageMultiplier;

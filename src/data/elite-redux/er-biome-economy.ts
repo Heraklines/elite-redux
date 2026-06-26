@@ -125,10 +125,12 @@ export const ER_BIOME_ECONOMY: Partial<Record<BiomeId, ErBiomeEconomy>> = {
   // Cosmic mutation: the observatory tinkers with abilities/moves (ARCANE).
   [BiomeId.SPACE]: { cheap: ["HELD", "ARCANE"], dear: ["BERRY", "TM"], signature: ["MINI_BLACK_HOLE", "MULTI_LENS", "ER_PSYCHIC_SEED"], priceMod: 1.2 },
   [BiomeId.CONSTRUCTION_SITE]: {
+    // The work site: heavy discount (everything 50% off) + one extra reward slot
+    // (see ErBiomeRule.extraRewardSlots) - a place to stock up cheaply.
     cheap: ["BATTLE", "VITAMIN"],
     dear: ["MINT"],
     signature: ["GOLDEN_PUNCH", "FOCUS_BAND", "ER_STEEL_GEM"],
-    priceMod: 1,
+    priceMod: 0.5,
   },
   [BiomeId.JUNGLE]: { cheap: ["BERRY", "CANDY"], dear: ["BALLS"], signature: ["LUCKY_EGG", "BERRY", "ER_GRASS_GEM", "ER_GRASSY_SEED"], priceMod: 1.1 },
   [BiomeId.FAIRY_CAVE]: { cheap: ["MINT"], dear: ["BATTLE"], signature: ["ER_LUCKY_HEART", "SOOTHE_BELL", "ER_FAIRY_GEM", "ER_MISTY_SEED"], priceMod: 1 },

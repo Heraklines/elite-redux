@@ -208,7 +208,7 @@ describe.skipIf(!RUN)("ER new relics (#130) - effects", () => {
       // Distinct wave so the per-wave roll cache (module-scoped, persists across
       // tests) doesn't carry over from a sibling test.
       globalScene.currentBattle.waveIndex = 41;
-      // Force the per-wave coin flip to "win" (< 50): randBattleSeedInt -> 0.
+      // Force the per-wave coin flip to "win" (< 55): randBattleSeedInt -> 0.
       vi.spyOn(globalScene, "randBattleSeedInt").mockReturnValue(0);
       expect(erGamblersCoinPayoutMultiplier()).toBe(2);
     });
@@ -217,7 +217,7 @@ describe.skipIf(!RUN)("ER new relics (#130) - effects", () => {
       grantRelic("ER_RELIC_GAMBLERS_COIN");
       // Distinct wave (vs the winning-flip test) so the cached roll doesn't bleed.
       globalScene.currentBattle.waveIndex = 42;
-      // Force the per-wave coin flip to "lose" (>= 50): randBattleSeedInt -> 99.
+      // Force the per-wave coin flip to "lose" (>= 55): randBattleSeedInt -> 99.
       vi.spyOn(globalScene, "randBattleSeedInt").mockReturnValue(99);
       expect(erGamblersCoinPayoutMultiplier()).toBe(0);
     });

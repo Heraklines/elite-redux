@@ -4,6 +4,7 @@ import type { GameMode } from "#app/game-mode";
 import { globalScene } from "#app/global-scene";
 import { defaultStarterSpeciesAndEvolutions } from "#balance/pokemon-evolutions";
 import { type StarterSpeciesId, speciesStarterCosts } from "#balance/starters";
+import { erMegaTargetToBaseSpeciesId } from "#data/elite-redux/er-generic-pool-bans";
 import { ER_COLOR_HEX, erSpeciesMatchesColor } from "#data/elite-redux/er-monocolor";
 import { ER_COLOR_NAMES } from "#data/elite-redux/er-species-colors";
 import { isErLineLegalForUsageTier, preloadErUsageTiers } from "#data/elite-redux/er-usage-tiers";
@@ -1365,8 +1366,33 @@ export class UsageTierChallenge extends Challenge {
     preloadErUsageTiers();
   }
 
+  /**
+   * Resolve a live species to the CANONICAL line that governs its usage tier,
+   * then ask {@linkcode isErLineLegalForUsageTier}. Mirrors the candy/passive
+   * resolution in `game-data.ts` `getStarterDataEntry`: an ER custom MEGA is a
+   * standalone species with its OWN id and no prevolution, so a plain
+   * `getRootSpeciesId()` returns the mega itself (wrong line); resolve mega->base
+   * FIRST, then walk the evolution root. (Redux variants ride their base species
+   * id in live battle, so the evolution root already collapses them.)
+   *
+   * FAIL-SAFE: returns `true` (legal, do NOT bench) whenever the species cannot
+   * be resolved to a real {@linkcode PokemonSpecies}. A mon we cannot confidently
+   * judge is never benched - only a positively out-of-tier line is.
+   * @param species - The live species (may be a custom mega / Redux form).
+   * @returns Whether the species' canonical line is legal under this tier value.
+   */
+  private isSpeciesUsageTierLegal(species: PokemonSpecies): boolean {
+    const baseId = erMegaTargetToBaseSpeciesId(species.speciesId) ?? species.speciesId;
+    const baseSpecies = getPokemonSpecies(baseId);
+    // Resolution failed (synthetic / unknown id): fail open, treat as allowed.
+    if (!baseSpecies) {
+      return true;
+    }
+    return isErLineLegalForUsageTier(baseSpecies.getRootSpeciesId(), this.value);
+  }
+
   applyStarterChoice(species: PokemonSpecies, isValid: BooleanHolder): boolean {
-    if (!isErLineLegalForUsageTier(species.getRootSpeciesId(), this.value)) {
+    if (!this.isSpeciesUsageTierLegal(species)) {
       isValid.value = false;
       return true;
     }
@@ -1377,8 +1403,30 @@ export class UsageTierChallenge extends Challenge {
   // ChallengeType.POKEMON_ADD_TO_PARTY). The caught mon is the wild EnemyPokemon, so
   // there is no isPlayer gate - we check the line's tier legality directly.
   override applyPokemonAddToParty(pokemon: EnemyPokemon, isValid: BooleanHolder): boolean {
-    if (!isErLineLegalForUsageTier(pokemon.species.getRootSpeciesId(), this.value)) {
+    if (!this.isSpeciesUsageTierLegal(pokemon.species)) {
       isValid.value = false;
+      return true;
+    }
+    return false;
+  }
+
+  // ER (anti-cheat #384 Phase A): re-validate the usage tier at BATTLE time via
+  // the existing POKEMON_IN_BATTLE bench net (turn-init-phase + summon-phase ->
+  // pokemon.isAllowedInBattle()). UsageTier previously gated only at add-time
+  // (starter / catch), so a tier-illegal mon that reached the team some OTHER way
+  // (egg, event, mystery encounter, or a cheated save) was never benched. Mirror
+  // the sibling roster challenges (SingleType / SingleGeneration / MonoColor):
+  // player-only, fusion-aware, and bench ONLY a positively out-of-tier mon (the
+  // resolver is fail-open, so a legit mega / Redux form / unresolvable mon stays).
+  applyPokemonInBattle(pokemon: Pokemon, valid: BooleanHolder): boolean {
+    if (!pokemon.isPlayer()) {
+      return false;
+    }
+    const baseLegal = this.isSpeciesUsageTierLegal(pokemon.species);
+    const fusionLegal =
+      !pokemon.isFusion() || pokemon.fusionSpecies == null || this.isSpeciesUsageTierLegal(pokemon.fusionSpecies);
+    if (!baseLegal || !fusionLegal) {
+      valid.value = false;
       return true;
     }
     return false;

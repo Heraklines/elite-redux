@@ -71,6 +71,15 @@
       "tooltip": "(-) One Pokémon with 100+ candy drops to Lv 1, loses every IV, and spends all its candy\n(+) It becomes a permanent shiny",
       "offer": "You crave the shine, do you not. Lay one of yours bare before me, its years, its gifts, the hoard it has gathered, and I will make it beautiful for as long as it draws breath.",
       "result": "Stripped of all it earned, {{pokeName}} gleams with a borrowed light, a shine that will never fade."
+    },
+    "curiosity": {
+      "name": "Curiosity",
+      "tooltip": "(-) Seal one of a Pokémon's ability slots for this run\n(+) Roll 7 random abilities and graft one into another slot",
+      "offer": "You wonder what else it might have become. Seal away one of its gifts, and I will pour seven unknown powers before you. Take one. Graft it where you will.",
+      "result": "One of {{pokeName}}'s gifts is sealed shut, and a stranger power takes root in its place.",
+      "lockPrompt": "Choose the Pokémon, and the gift it will surrender. That slot stays sealed until this run ends.",
+      "pickAbility": "Seven powers, drawn from the dark at random. Choose the one you would graft.",
+      "replacePrompt": "Now choose where it takes root."
     }
   },
   "outro": "The presence withdraws, satisfied in a way you cannot name. The dark loosens its grip, and lets you pass."

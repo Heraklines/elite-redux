@@ -1739,6 +1739,12 @@ export class SummaryUiHandler extends UiHandler {
     // are level-gated in this port; players get all slots.
     const isEnemy = mon.isEnemy?.() === true;
     const enemyLevelForSlot = [0, 15, 24];
+    // ER Giratina's Bargain - Curiosity (#544): slots the player sealed for this run
+    // (ER slot index 0 = active ability, innateSlot + 1 = innate). Player-only,
+    // matching the battle gate in Pokemon.canApplyAbility.
+    const isPlayerMon = mon.isPlayer?.() === true;
+    const runLocked = (abilitySlot: number): boolean =>
+      isPlayerMon && mon.customPokemonData?.erLockedAbilitySlots?.includes(abilitySlot) === true;
 
     interface Row {
       label: string;
@@ -1813,7 +1819,12 @@ export class SummaryUiHandler extends UiHandler {
       let locked = false;
       let lockIconKey: string | null = null;
       let reason = "";
-      if (row.slot !== undefined) {
+      // Curiosity-sealed slots win over every candy/level state: dead this run.
+      if (runLocked(row.slot === undefined ? 0 : row.slot + 1)) {
+        locked = true;
+        lockIconKey = "icon_lock";
+        reason = i18next.t("pokemonSummary:abilitySealedRun");
+      } else if (row.slot !== undefined) {
         const unlocked = isSlotUnlocked(passiveAttr, row.slot);
         const enabled = isSlotEnabled(passiveAttr, row.slot);
         const levelReq = isEnemy ? enemyLevelForSlot[row.slot] : 0;

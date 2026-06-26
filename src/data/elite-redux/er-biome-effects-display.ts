@@ -115,12 +115,25 @@ export function getErBiomeEffectLines(biomeId: BiomeId): string[] {
 
   // --- Ambush --------------------------------------------------------------
   if (rule?.ambushChance) {
-    lines.push(`${rule.ambushChance}% ambush if the foe outspeeds your lead`);
+    // Ruins gates the ambush on your lead's Def vs the foe's Atk; Forest/Snowy
+    // Forest gate it on Speed. Name the right condition so the player knows it.
+    lines.push(
+      rule.ambushDefenseGate
+        ? `${rule.ambushChance}% ambush unless your lead's Defense holds`
+        : `${rule.ambushChance}% ambush if the foe outspeeds your lead`,
+    );
   }
 
   // --- Double-battle bias --------------------------------------------------
   if (rule?.doubleBattleMult && rule.doubleBattleMult > 1) {
-    lines.push("Double battles twice as likely");
+    // A strong multiplier (Metropolis) reads as "almost always"; the soft 2x
+    // (Grass fields) reads as "twice as likely".
+    lines.push(rule.doubleBattleMult >= 4 ? "Almost every battle is a double" : "Double battles twice as likely");
+  }
+
+  // --- Wild fusions (Laboratory) -------------------------------------------
+  if (rule?.wildFusionChancePct) {
+    lines.push(`${rule.wildFusionChancePct}% of wild Pokemon are fusions`);
   }
 
   // --- Type damage boost ---------------------------------------------------
@@ -159,6 +172,30 @@ export function getErBiomeEffectLines(biomeId: BiomeId): string[] {
   }
   if (rule?.berrySaveChance) {
     lines.push(`${rule.berrySaveChance}% to keep an eaten berry`);
+  }
+  if (rule?.statStageFreeze) {
+    lines.push("Stat stages are frozen for both sides");
+  }
+  if (rule?.unresistedType) {
+    lines.push(`${typeName(rule.unresistedType)} moves are never resisted`);
+  }
+  if (rule?.perTurnHealFraction) {
+    lines.push("Your party heals a little each turn");
+  }
+  if (rule?.wildItemCount) {
+    lines.push("Wild Pokemon always hold an item");
+  }
+  if (rule?.wildItemDropCount) {
+    lines.push(`Wild Pokemon drop ${rule.wildItemDropCount} held items`);
+  }
+  if (rule?.moneyLossPctPerFaint) {
+    lines.push(`Lose ${rule.moneyLossPctPerFaint}% money per ally that faints to a trainer`);
+  }
+  if (rule?.shopNoHeal) {
+    lines.push("The shop sells no healing here");
+  }
+  if (rule?.extraRewardSlots) {
+    lines.push(`${rule.extraRewardSlots} extra reward slot`);
   }
   if (rule?.runNeverFails) {
     lines.push("You can always escape");

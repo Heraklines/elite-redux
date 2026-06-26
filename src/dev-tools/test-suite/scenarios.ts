@@ -6852,6 +6852,18 @@ export const DEV_SCENARIOS: DevScenario[] = [
       + "registers it in the Pokedex but does NOT add it to your party - the message\n"
       + "reads 'caught, but it cannot join you in this challenge'. A legal wild mon is\n"
       + "caught normally.\n"
+      + "IN-BATTLE BENCH (#384 anti-cheat Phase A): Usage Tier previously only gated at\n"
+      + "ADD time (starter / catch). Now a tier-illegal mon is also BLOCKED at battle\n"
+      + "time, like Mono Type / Mono Color / Mono Gen already are - no matter HOW it\n"
+      + "reached your team (egg, event, mystery encounter, or an edited save).\n"
+      + "DO: in a USAGE TIER (NU) run, get a clearly high-tier mon onto the team (e.g.\n"
+      + "a Legendary via an egg / event), then try to send it out or switch it in.\n"
+      + "EXPECT: it is treated as 'not eligible for this challenge' and cannot enter\n"
+      + "battle (the same bench the other roster challenges use). A legal NU-tier mon\n"
+      + "is unaffected, AND a Redux form / custom MEGA of an NU-legal base (e.g. a\n"
+      + "Flygon mega) is STILL usable - the mega resolves to its base line's tier, it\n"
+      + "is not wrongly benched. (Fail-safe: a mon whose tier cannot be resolved is\n"
+      + "never benched.)\n"
       + "Pass/Fail this entry once checked.",
     setup: () => {
       resetDevOverrides();
@@ -9184,8 +9196,8 @@ export const DEV_SCENARIOS: DevScenario[] = [
       "#130 economy relics. WIN the opening battle to reach the shop; the Merchant's\n"
       + "Seal and Gambler's Coin are guaranteed reward options. Merchant's Seal: the\n"
       + "reroll cost is HALVED and the reward screen shows ONE extra item slot. Gambler's\n"
-      + "Coin: after each TRAINER battle, the money reward is doubled half the time and\n"
-      + "lost the other half (seeded per wave - stable across rerolls). CHECK both relics\n"
+      + "Coin: after each TRAINER battle, the money reward is doubled 55% of the time and\n"
+      + "lost the other 45% (seeded per wave - stable across rerolls). CHECK both relics\n"
       + "appear in the shop and the reroll price is half normal once Merchant's Seal is taken.",
     setup: () => {
       resetDevOverrides();
@@ -9256,5 +9268,254 @@ export const DEV_SCENARIOS: DevScenario[] = [
         }),
       ];
     },
+  },
+  {
+    label: "ER Abyss: Curiosity bargain (#544 8th deal)",
+    description:
+      "#544 - Curiosity, the 8th Giratina's Bargain deal (the ability gamble). WIN this\n"
+      + "wave-10 Abyss battle and Giratina's Bargain fires post-victory. The party is a\n"
+      + "SINGLE mon (no shiny, no 3-item holder, no 100+ candy), so only Greed + Curiosity\n"
+      + "are offerable -> Curiosity is ALWAYS shown.\n"
+      + "DO: pick Curiosity. The flow is:\n"
+      + " 1. Pick the mon, then the ability slot to LOCK (the party ability screen, like\n"
+      + "    the Ability Randomizer item - active ability or an innate).\n"
+      + " 2. Seven RANDOM abilities appear in a Bargain-styled picker, each with its\n"
+      + "    description. Pick one.\n"
+      + " 3. Pick which slot the chosen ability replaces (it may even be the slot you\n"
+      + "    just locked - your call, not forced).\n"
+      + "EXPECT:\n"
+      + " - The locked slot reads 'Locked' on the in-battle Abilities panel (press R ->\n"
+      + "   Abilities) and on SUMMARY, and that ability does NOTHING this run.\n"
+      + " - The grafted ability sits in the replace slot and is LIVE.\n"
+      + " - CRITICAL: the lock is RUN-ONLY. Open starter-select for this species - the\n"
+      + "   locked ability is STILL shown UNLOCKED there (the candy unlock is untouched),\n"
+      + "   and a Save & Quit + reload keeps the lock + grafted ability for the run.\n"
+      + "Garchomp is Lv 30 with 3 innate slots so there is always a slot to lock + one to\n"
+      + "replace. (note) The starter-select unlock + reload checks are out-of-battle.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 30,
+        // Start ON a x0 wave in the Abyss: win this battle and the Abyss shop slot
+        // fires Giratina's Bargain (TheBargainPhase) post-victory.
+        STARTING_WAVE_OVERRIDE: 10,
+        STARTING_BIOME_OVERRIDE: BiomeId.ABYSS,
+      });
+      // Single mon, nothing that unlocks the other sins -> only Greed + Curiosity
+      // are offerable, so Curiosity is guaranteed in the (max 3) shown bargains.
+      return [
+        makeStarter(SpeciesId.GARCHOMP, {
+          moveset: [MoveId.EARTHQUAKE, MoveId.DRAGON_CLAW, MoveId.STONE_EDGE, MoveId.SWORDS_DANCE],
+        }),
+      ];
+    },
+  },
+  // ===========================================================================
+  // Combat — Spiky Shield causes BLEEDING on contact (ER 2.65 dex id 596)
+  // ===========================================================================
+  {
+    label: "Spiky Shield: bleeds the attacker on contact",
+    description:
+      "Spiky Shield fix. The ER 2.65 dex says it 'protects the user and causes bleeding\n"
+      + "on contact' - i.e. Protect PLUS ER_BLEED on any attacker that makes CONTACT, NOT\n"
+      + "vanilla's 1/8 chip damage. Your bulky Blissey knows Spiky Shield; the foe Snorlax\n"
+      + "(Normal, bleed-eligible) uses Tackle (a contact move).\n"
+      + "DO: select SPIKY SHIELD, then let Snorlax attack into it. Pass a couple more turns\n"
+      + "(Splash) to watch the bleed tick.\n"
+      + "EXPECT:\n"
+      + " - Blissey is fully protected (takes no damage from Tackle).\n"
+      + " - The foe Snorlax gains BLEED and loses ~1/16 max HP at every turn-end (a DoT),\n"
+      + "   NOT a single 1/8 chip. A NON-contact move would NOT cause it, and a Rock/Ghost\n"
+      + "   attacker is immune (try swapping the foe to verify).",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        // Wave 113 (past the #419 BST cap ladder) so the 540-BST Snorlax isn't
+        // devolved, and a plain wild single battle (no fixed trainer/boss wave).
+        STARTING_WAVE_OVERRIDE: 113,
+        STARTING_LEVEL_OVERRIDE: 80,
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.SNORLAX,
+        ENEMY_LEVEL_OVERRIDE: 80,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.TACKLE], // contact move -> triggers the bleed-on-contact
+      });
+      return [
+        makeStarter(SpeciesId.BLISSEY, {
+          moveset: [MoveId.SPIKY_SHIELD, MoveId.SOFT_BOILED, MoveId.SEISMIC_TOSS, MoveId.ICE_BEAM],
+        }),
+      ];
+    },
+  },
+  // ===========================================================================
+  // Item - Ability Capsule can ALSO unlock an innate for the run (maintainer request)
+  // ===========================================================================
+  {
+    label: "Ability Capsule: unlock an innate for the run",
+    description:
+      "The Ability Capsule now offers a CHOICE on use. Garchomp has three recognizable\n"
+      + "innates forced into its slots (Innate 1 = STURDY, 2 = DRIZZLE, 3 = MOXIE), and NO\n"
+      + "candy innate unlock - so every innate starts LOCKED (dead in battle).\n"
+      + "DO: KO Magikarp, then in the FIRST shop take the ABILITY CAPSULE and APPLY it to\n"
+      + "Garchomp. Pick from the two options:\n"
+      + " (A) 'Change ability' - cycles Garchomp's ACTIVE ability to the next legal one\n"
+      + "     (Sand Veil -> Rough Skin -> Sand Force -> ...), exactly as before.\n"
+      + " (B) 'Unlock an innate for the run' - opens the ability-slot picker (the same one\n"
+      + "     the Ability Randomizer uses); pick a LOCKED innate (e.g. Innate 1 STURDY).\n"
+      + "EXPECT for (B):\n"
+      + " - That innate is now ACTIVE this run: open the in-battle Info -> Abilities panel\n"
+      + "   (R, then Abilities) - the picked Innate row reads LIVE (not 'Innate (Locked)'),\n"
+      + "   and its effect fires (e.g. STURDY survives a lethal hit at 1 HP).\n"
+      + " - It is RUN-ONLY: in starter-select that same innate STILL reads LOCKED (the\n"
+      + "   permanent candy unlock is untouched), and a future run starts it locked again.\n"
+      + " - It SURVIVES a mid-run reload: Save & Quit, then Continue - the innate is still\n"
+      + "   active this run.\n"
+      + " - Backing out of the option-select or the slot picker (B) does NOT consume the\n"
+      + "   capsule (you return to the shop with it still offered).",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 40,
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.MAGIKARP,
+        ENEMY_LEVEL_OVERRIDE: 3,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+      });
+      return [
+        makeStarter(SpeciesId.GARCHOMP, {
+          moveset: [MoveId.EARTHQUAKE, MoveId.DRAGON_CLAW, MoveId.STONE_EDGE, MoveId.SWORDS_DANCE],
+        }),
+      ];
+    },
+    onBattleStart: () => {
+      const player = globalScene.getPlayerPokemon();
+      if (!player) {
+        return;
+      }
+      // Force recognizable abilities into the 3 innate slots so the picker + Abilities
+      // panel show clear rows (Innate 1 = STURDY, 2 = DRIZZLE, 3 = MOXIE).
+      player.setAbilityOverrideForSlot(1, AbilityId.STURDY);
+      player.setAbilityOverrideForSlot(2, AbilityId.DRIZZLE);
+      player.setAbilityOverrideForSlot(3, AbilityId.MOXIE);
+      // No candy innate unlock: every innate slot starts LOCKED, so the capsule's
+      // run-unlock is the only way to light one up this run (classic mode, so no
+      // Youngster free-innate slots interfere). Leaving passiveAttr at 0 is also what
+      // makes starter-select keep showing the innate LOCKED after the run-unlock.
+      const sd = globalScene.gameData.starterData;
+      const root = player.species.getRootSpeciesId();
+      if (sd[root]) {
+        sd[root].passiveAttr = 0;
+      }
+      player.updateInfo();
+    },
+    shopItems: [modifierTypes.ER_ABILITY_CAPSULE],
+  },
+  // ===========================================================================
+  // Item - Greater Ability Capsule (violet reskin; ULTRA tier): permanently unlock
+  // ONE innate, OR run-unlock TWO innates for the run.
+  // ===========================================================================
+  {
+    label: "Greater Ability Capsule: permanent vs run-unlock",
+    description:
+      "The GREATER ABILITY CAPSULE (a VIOLET reskin of the Ability Capsule, ULTRA tier)\n"
+      + "offers a stronger CHOICE. Garchomp has three recognizable innates forced into its\n"
+      + "slots (Innate 1 = STURDY, 2 = DRIZZLE, 3 = MOXIE), NO candy unlock - all LOCKED.\n"
+      + "DO: KO Magikarp; in the FIRST shop take a GREATER ABILITY CAPSULE (violet) and APPLY\n"
+      + "it to Garchomp. Two options:\n"
+      + " (A) 'Permanently unlock an innate' - pick a LOCKED innate (e.g. Innate 1 STURDY).\n"
+      + " (B) 'Unlock two innates for the run' - pick TWO locked innates, one after the other\n"
+      + "     (e.g. Innate 2 DRIZZLE then Innate 3 MOXIE).\n"
+      + "EXPECT for (A) - the PERMANENT unlock:\n"
+      + " - That innate is LIVE this run (Info -> Abilities (R): the picked Innate row reads\n"
+      + "   LIVE, not 'Innate (Locked)'; STURDY survives a lethal hit at 1 HP).\n"
+      + " - It is PERMANENT: EXIT to title -> starter select -> Garchomp shows that SAME innate\n"
+      + "   as UNLOCKED (selectable, not greyed), and a future run starts it unlocked - exactly\n"
+      + "   like a candy innate unlock.\n"
+      + "EXPECT for (B) - the RUN-unlock (two slots):\n"
+      + " - BOTH picked innates are LIVE this run (Info -> Abilities: both rows read LIVE).\n"
+      + " - It is RUN-ONLY: in starter-select those innates STILL read LOCKED (no permanent\n"
+      + "   unlock written), and a future run starts them locked again. It survives a mid-run\n"
+      + "   reload (Save & Quit -> Continue).\n"
+      + " - Backing out of the option-select or either slot pick does NOT consume the capsule.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 40,
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.MAGIKARP,
+        ENEMY_LEVEL_OVERRIDE: 3,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+      });
+      return [
+        makeStarter(SpeciesId.GARCHOMP, {
+          moveset: [MoveId.EARTHQUAKE, MoveId.DRAGON_CLAW, MoveId.STONE_EDGE, MoveId.SWORDS_DANCE],
+        }),
+      ];
+    },
+    onBattleStart: () => {
+      const player = globalScene.getPlayerPokemon();
+      if (!player) {
+        return;
+      }
+      // Recognizable innates so the picker + Abilities panel show clear rows.
+      player.setAbilityOverrideForSlot(1, AbilityId.STURDY);
+      player.setAbilityOverrideForSlot(2, AbilityId.DRIZZLE);
+      player.setAbilityOverrideForSlot(3, AbilityId.MOXIE);
+      // No candy innate unlock: every innate starts LOCKED. This is also what makes the
+      // RUN-unlock (B) keep showing LOCKED in starter-select, and lets the PERMANENT
+      // unlock (A) flip the picked slot to UNLOCKED there.
+      const sd = globalScene.gameData.starterData;
+      const root = player.species.getRootSpeciesId();
+      if (sd[root]) {
+        sd[root].passiveAttr = 0;
+      }
+      player.updateInfo();
+    },
+    shopItems: [modifierTypes.ER_GREATER_ABILITY_CAPSULE, modifierTypes.ER_GREATER_ABILITY_CAPSULE],
+  },
+  // ===========================================================================
+  // Item - Greater Ability Randomizer (pink reskin; MASTER tier): pick a slot, then
+  // choose 1 of 4 random abilities to replace it (run-only, no lock cost).
+  // ===========================================================================
+  {
+    label: "Greater Ability Randomizer: pick 1 of 4",
+    description:
+      "The GREATER ABILITY RANDOMIZER (a PINK reskin of the Ability Randomizer, MASTER tier)\n"
+      + "is Curiosity's reward half, simplified: you choose the slot AND choose the ability.\n"
+      + "DO: KO Magikarp; in the FIRST shop take a GREATER ABILITY RANDOMIZER (pink) and APPLY\n"
+      + "it to Garchomp.\n"
+      + " 1) Pick ANY of Garchomp's ability/innate slots (active Sand Veil, or Innate 1/2/3).\n"
+      + " 2) A chooser shows FOUR random abilities WITH descriptions (the same Bargain-styled\n"
+      + "    picker Curiosity uses, with 4 rows). Pick one.\n"
+      + "EXPECT:\n"
+      + " - The chosen ability REPLACES the picked slot (Info -> Abilities (R), or SUMMARY:\n"
+      + "   that slot now shows the picked ability and it fires in battle).\n"
+      + " - It is RUN-ONLY: NO permanent dex unlock is written - in starter-select Garchomp's\n"
+      + "   abilities/innates are unchanged, and a future run is back to normal. It survives a\n"
+      + "   mid-run reload (Save & Quit -> Continue).\n"
+      + " - There is NO lock cost (unlike Curiosity, nothing is disabled).\n"
+      + " - Backing out of the slot pick or the 4-ability chooser does NOT consume the item.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 40,
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.MAGIKARP,
+        ENEMY_LEVEL_OVERRIDE: 3,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+      });
+      return [
+        makeStarter(SpeciesId.GARCHOMP, {
+          moveset: [MoveId.EARTHQUAKE, MoveId.DRAGON_CLAW, MoveId.STONE_EDGE, MoveId.SWORDS_DANCE],
+        }),
+      ];
+    },
+    onBattleStart: () => {
+      const player = globalScene.getPlayerPokemon();
+      if (!player) {
+        return;
+      }
+      // Recognizable innates so a REPLACE on an innate slot is easy to see in the panel.
+      player.setAbilityOverrideForSlot(1, AbilityId.STURDY);
+      player.setAbilityOverrideForSlot(2, AbilityId.DRIZZLE);
+      player.setAbilityOverrideForSlot(3, AbilityId.MOXIE);
+      player.updateInfo();
+    },
+    shopItems: [modifierTypes.ER_GREATER_ABILITY_RANDOMIZER, modifierTypes.ER_GREATER_ABILITY_RANDOMIZER],
   },
 ];

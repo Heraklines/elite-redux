@@ -1914,6 +1914,12 @@ export abstract class ContactProtectedTag extends ProtectedTag {
  * `BattlerTag` class for moves that block damaging moves damage the enemy if the enemy's move makes contact
  * Used by {@linkcode MoveId.SPIKY_SHIELD}
  *
+ * @remarks
+ * Vanilla pokerogue uses this for Spiky Shield (1/8 chip on contact). Elite
+ * Redux replaces that chip with {@linkcode ContactBleedProtectedTag} (ER_BLEED
+ * on contact) per the 2.65 dex, so this class is retained only for reference /
+ * vanilla parity and is no longer wired to any move here.
+ *
  * @sealed
  */
 export class ContactDamageProtectedTag extends ContactProtectedTag {
@@ -1938,6 +1944,39 @@ export class ContactDamageProtectedTag extends ContactProtectedTag {
         result: HitResult.INDIRECT,
       });
     }
+  }
+}
+
+/**
+ * Elite Redux `BattlerTag` class for Spiky Shield. Per the ER 2.65 dex (move id
+ * 596): "Evades attack, and causes bleeding if struck." / "This prickly shield
+ * protects the user and causes bleeding on contact." So ER's Spiky Shield is
+ * Protect (blocks the move) PLUS {@linkcode BattlerTagType.ER_BLEED} on any
+ * attacker that makes CONTACT — replacing vanilla's 1/8 chip damage.
+ *
+ * The bleed is applied via {@linkcode Pokemon.addTag}, exactly like the
+ * on-contact ER_BLEED abilities (e.g. Blood Stain's
+ * {@linkcode ChanceBattlerTagOnHitAbAttr}): `addTag` constructs a real
+ * {@linkcode ErBleedTag} and honors its `canAdd` (Rock/Ghost immunity) and the
+ * "already bleeding" overlap handling, so no immunity logic is duplicated here.
+ *
+ * @sealed
+ */
+export class ContactBleedProtectedTag extends ContactProtectedTag {
+  public override readonly tagType = BattlerTagType.SPIKY_SHIELD;
+
+  constructor(sourceMove: MoveId) {
+    super(sourceMove, BattlerTagType.SPIKY_SHIELD);
+  }
+
+  /**
+   * Inflict ER_BLEED on the attacker. Rock/Ghost immunity and the
+   * already-bleeding case are handled inside {@linkcode Pokemon.addTag}.
+   * @param attacker - The pokemon using the contact move
+   * @param user - The pokemon that is being attacked and has the tag
+   */
+  override onContact(attacker: Pokemon, user: Pokemon): void {
+    attacker.addTag(BattlerTagType.ER_BLEED, undefined, this.sourceMove, user.id);
   }
 }
 
@@ -4076,7 +4115,9 @@ export function getBattlerTag(
     case BattlerTagType.PROTECTED:
       return new ProtectedTag(sourceMove);
     case BattlerTagType.SPIKY_SHIELD:
-      return new ContactDamageProtectedTag(sourceMove, 8);
+      // ER (2.65 dex id 596): Spiky Shield protects AND causes bleeding on
+      // contact (ER_BLEED), not vanilla's 1/8 chip damage.
+      return new ContactBleedProtectedTag(sourceMove);
     case BattlerTagType.KINGS_SHIELD:
       return new ContactStatStageChangeProtectedTag(sourceMove, tagType, Stat.ATK, -1);
     case BattlerTagType.OBSTRUCT:
@@ -4281,7 +4322,7 @@ export type BattlerTagTypeMap = {
   [BattlerTagType.THUNDER_CAGE]: ThunderCageTag;
   [BattlerTagType.INFESTATION]: InfestationTag;
   [BattlerTagType.PROTECTED]: ProtectedTag;
-  [BattlerTagType.SPIKY_SHIELD]: ContactDamageProtectedTag;
+  [BattlerTagType.SPIKY_SHIELD]: ContactBleedProtectedTag;
   [BattlerTagType.KINGS_SHIELD]: ContactStatStageChangeProtectedTag;
   [BattlerTagType.OBSTRUCT]: ContactStatStageChangeProtectedTag;
   [BattlerTagType.SILK_TRAP]: ContactStatStageChangeProtectedTag;
