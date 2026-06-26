@@ -5930,6 +5930,27 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
   },
   {
+    label: "(note) Enemy vitamins mirror your stacking",
+    description:
+      "ER anti-stack: in EVERY trainer battle, the trainer's single HIGHEST-BST\n"
+      + "mon now gets the same number of vitamins (base-stat boosters) as the MOST\n"
+      + "you have piled onto any ONE of your own mons, randomly spread across its\n"
+      + "stats. Stack 15 vitamins on one lead and every enemy ace also gets 15.\n"
+      + "It reads your live vitamins, so it is nothing early and grows over the run;\n"
+      + "spread them thin and the effect shrinks. CHECK: pile several vitamins\n"
+      + "(Protein/Iron/Calcium/...) onto one mon, then fight any trainer - their\n"
+      + "strongest mon should be noticeably tankier/stronger than its level implies.\n"
+      + "Unit-tested in test/tests/elite-redux/er-trainer-vitamins.test.ts.",
+    setup: () => {
+      resetDevOverrides();
+      return [
+        makeStarter(SpeciesId.SNORLAX, {
+          moveset: [MoveId.BODY_SLAM, MoveId.REST, MoveId.CRUNCH, MoveId.PROTECT],
+        }),
+      ];
+    },
+  },
+  {
     label: "(note) Biome-leave heals only every 10 waves",
     description:
       "Full-heal cadence fix. The biome REST (full heal) is supposed to be every 10\n"
