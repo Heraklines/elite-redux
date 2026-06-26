@@ -1,0 +1,277 @@
+url:      https://elite-redux-staging.pages.dev/
+build:    mquddsk0-4omf
+mode:     6  wave:6
+seed:     AEMx6kvUYt99WTaMt2z10taV
+party:    Endivie(L6 14hp f0), Kangama(L7 33hp f0), Flamiau(L6 22hp f0), Magnetilo(L5 19hp f0), Vulpix(L5 20hp f0)
+enemy:    Ferkuli(L4), Zigzachs(L5)
+
+----- COMMENT -----
+trainer desync 2
+
+----- CONSOLE -----
+[03:49:53.491] LOG: Battle Score: 56 (2 Turns x0.84)
+[03:49:53.491] LOG: Total Score: 125
+[03:49:53.500] LOG: %cStart Phase TrainerVictoryPhase color:green;
+[03:49:53.502] LOG: Göre Laura
+[03:49:57.535] LOG: %cStart Phase MoneyRewardPhase color:green;
+[03:49:57.914] LOG: %cStart Phase ModifierRewardPhase color:green;
+[03:49:58.238] LOG: %cStart Phase ModifierRewardPhase color:green;
+[03:49:58.523] LOG: %cStart Phase EggLapsePhase color:green;
+[03:49:58.523] LOG: %cStart Phase SelectModifierPhase color:green;
+[03:49:58.523] LOG: Wave Seed: EIQ|:ozY]x==[XeQx6~54xeZ 4
+[03:49:58.527] LOG: [coop-reward] WATCHER waits for partner's reward picks (start=3 role=host wave=4)
+[03:50:12.585] LOG: %cStart Phase NewBattlePhase color:green;
+[03:50:12.585] LOG: Wave Seed: FJR};p{Z^y>>\YfRy765yf[ 5
+[03:50:12.588] LOG: %cStart Phase ReturnPhase color:green;
+[03:50:12.589] LOG: [coop-reward] advance interaction (role=host from=3 counter=3)
+[03:50:12.589] LOG: [coop-launch] proceedIfReady launched=true localTeam=2 bothReady=true role=host partnerReady=true
+[03:50:12.598] LOG: [coop-launch] proceedIfReady launched=true localTeam=2 bothReady=true role=host partnerReady=true
+[03:50:12.694] LOG: %cStart Phase ReturnPhase color:green;
+[03:50:12.804] LOG: %cStart Phase ShowTrainerPhase color:green;
+[03:50:12.908] LOG: %cStart Phase NextEncounterPhase color:green;
+[03:50:12.916] LOG: ER #419: elite BST cap (420 @ w5) - replacing Relicanth (505) with Zobiris (410)
+[03:50:12.935] LOG: Pokemon: Zobiris (Gegner) | Species ID: 302 | Level: 4 | Nature: Hart (+Ang/-SpAng)
+[03:50:12.935] LOG: Stats (IVs): HP: 20 (31), Atk: 11 (31), Def: 14 (31), Spatk: 11 (31), Spdef: 9 (31), Spd: 9 (31)
+[03:50:12.935] LOG: Ability: Strolch | Passive Ability: Analyse 
+[03:50:12.935] LOG: Moveset: ["Nassschweif","Steinhagel","Erdbeben","Risikotackle"]
+[03:50:12.936] LOG: ER #419: elite BST cap (420 @ w5) - replacing Pelipper (440) with Wingull (270)
+[03:50:12.949] LOG: Pokemon: Wingull (Gegner) | Species ID: 278 | Level: 4 | Nature: Mäßig (+SpAng/-Ang)
+[03:50:12.949] LOG: Stats (IVs): HP: 17 (31), Atk: 7 (31), Def: 8 (31), Spatk: 8 (31), Spdef: 8 (31), Spd: 12 (31)
+[03:50:12.950] LOG: Ability: Niesel | Passive Ability: Adlerauge 
+[03:50:12.950] LOG: Moveset: ["Ruheort","Rückenwind","Meteorologe","Rundumschutz"]
+[03:50:14.282] LOG: Battle Seed: WrnEcWbocLCcXkjk
+[03:50:14.283] LOG: Generated AI funcs
+[03:50:14.354] DEBUG: Session data saved to slot 1!
+[03:50:14.355] LOG: Wave Seed: FJR};p{Z^y>>\YfRy765yf[ 5
+[03:50:14.558] LOG: Knirps Jonathan
+[03:50:18.135] LOG: Dialogue saved as seen: dialogue:youngster.encounter.10
+[03:50:18.166] LOG: Knirps Jonathan
+[03:50:18.487] LOG: %cStart Phase SummonPhase color:green;
+[03:50:18.487] LOG: Jonathan
+[03:50:18.766] LOG: %cStart Phase SummonPhase color:green;
+[03:50:18.766] LOG: Jonathan
+[03:50:19.041] LOG: %cStart Phase SummonPhase color:green;
+[03:50:19.224] WARN: cry/152 not found
+[03:50:19.330] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[03:50:19.331] LOG: %cStart Phase SummonPhase color:green;
+[03:50:19.612] LOG: %cStart Phase ShinySparklePhase color:green;
+[03:50:19.715] LOG: %cStart Phase InitEncounterPhase color:green;
+[03:50:19.716] LOG: %cStart Phase PostSummonPhase color:green;
+[03:50:19.717] LOG: Ran PSP for: Kangama
+[03:50:19.718] LOG: %cStart Phase PostSummonPhase color:green;
+[03:50:19.720] LOG: %cStart Phase PostSummonPhase color:green;
+[03:50:19.720] LOG: %cStart Phase PostSummonPhase color:green;
+[03:50:19.720] LOG: Ran PSP for: Wingull
+[03:50:19.721] LOG: %cStart Phase PostSummonPhase color:green;
+[03:50:19.726] LOG: %cStart Phase ShowAbilityPhase color:green;
+[03:50:19.887] LOG: %cStart Phase CommonAnimPhase color:green;
+[03:50:20.275] LOG: %cStart Phase MessagePhase color:green;
+[03:50:20.484] LOG: %cStart Phase HideAbilityPhase color:green;
+[03:50:20.515] LOG: %cStart Phase PostSummonPhase color:green;
+[03:50:20.515] LOG: %cStart Phase PostSummonPhase color:green;
+[03:50:20.515] LOG: Ran PSP for: Endivie
+[03:50:20.515] LOG: %cStart Phase PostSummonPhase color:green;
+[03:50:20.515] LOG: Ran PSP for: Zobiris
+[03:50:20.516] LOG: %cStart Phase PostSummonPhase color:green;
+[03:50:20.516] LOG: %cStart Phase PostSummonPhase color:green;
+[03:50:20.516] LOG: %cStart Phase PostSummonPhase color:green;
+[03:50:20.516] LOG: %cStart Phase TurnInitPhase color:green;
+[03:50:20.516] LOG: %cStart Phase CommandPhase color:green;
+[03:50:28.451] LOG: Move: MEGA_DRAIN Move targets: {"targets":[2,3,1],"multiple":false} 
+Player Pokemon: Endivie
+[03:50:28.453] LOG: %cStart Phase SelectTargetPhase color:green;
+[03:50:29.909] LOG: %cStart Phase CommandPhase color:green;
+[03:50:29.911] LOG: Move: FAKE_OUT Move targets: {"targets":[3],"multiple":false} 
+Player Pokemon: Kangama
+[03:50:29.912] LOG: %cStart Phase EnemyCommandPhase color:green;
+[03:50:29.939] LOG: Move Pool: ["Nassschweif","Steinhagel","Erdbeben","Risikotackle"]
+[03:50:29.939] LOG: Move Scores: [35,26.25,17.5,60]
+[03:50:29.939] LOG: Sorted Move Pool: ["Risikotackle","Nassschweif","Steinhagel","Erdbeben"]
+[03:50:29.939] LOG: Chosen Move: Risikotackle
+[03:50:29.939] LOG: ER AI: standard brain (sharpness 0.85)
+[03:50:29.939] LOG: %cStart Phase EnemyCommandPhase color:green;
+[03:50:29.942] WARN: BattlerTag ROOSTED is missing a score!
+[03:50:29.944] WARN: BattlerTag ROOSTED is missing a score!
+[03:50:29.954] LOG: Move Pool: ["Ruheort","Rückenwind","Meteorologe","Rundumschutz"]
+[03:50:29.954] LOG: Move Scores: [-7,0,5.0625,-20]
+[03:50:29.954] LOG: Sorted Move Pool: ["Meteorologe","Rückenwind","Ruheort","Rundumschutz"]
+[03:50:29.954] LOG: Chosen Move: Meteorologe
+[03:50:29.954] LOG: ER AI: standard brain (sharpness 0.85)
+[03:50:29.954] LOG: %cStart Phase TurnStartPhase color:green;
+[03:50:29.960] LOG: %cStart Phase MovePhase color:green;
+[03:50:29.960] LOG: %cUser: Kangama
+Move: FAKE_OUT
+Use Mode: NORMAL color:orchid
+[03:50:29.966] LOG: %cStart Phase MessagePhase color:green;
+[03:50:30.060] LOG: %cStart Phase MoveEffectPhase color:green;
+[03:50:30.306] LOG: crit stage: +0
+[03:50:30.307] LOG: Move: Mogelhieb | Base damage: 9.92 | Power: 40 | Source attack: 18 | Target defense: 8
+[03:50:30.307] LOG: Move: Mogelhieb | Attack damage: 13
+[03:50:30.309] LOG: %cStart Phase ShowAbilityPhase color:green;
+[03:50:30.471] LOG: %cStart Phase HideAbilityPhase color:green;
+[03:50:30.505] LOG: %cStart Phase DamageAnimPhase color:green;
+[03:50:30.522] LOG: %cStart Phase MoveEffectPhase color:green;
+[03:50:30.776] LOG: crit stage: +0
+[03:50:30.777] LOG: Move: Mogelhieb | Base damage: 9.92 | Power: 40 | Source attack: 18 | Target defense: 8
+[03:50:30.777] LOG: Move: Mogelhieb | Attack damage: 3
+[03:50:30.778] LOG: %cStart Phase DamageAnimPhase color:green;
+[03:50:30.793] LOG: %cStart Phase MessagePhase color:green;
+[03:50:30.990] LOG: %cStart Phase MoveEndPhase color:green;
+[03:50:30.991] LOG: %cStart Phase MovePhase color:green;
+[03:50:30.991] LOG: %cUser: Wingull
+Move: WEATHER_BALL
+Use Mode: NORMAL color:orchid
+[03:50:30.992] LOG: %cStart Phase MessagePhase color:green;
+[03:50:31.282] LOG: %cStart Phase MoveEndPhase color:green;
+[03:50:31.283] LOG: %cStart Phase MovePhase color:green;
+[03:50:31.283] LOG: %cUser: Endivie
+Move: MEGA_DRAIN
+Use Mode: NORMAL color:orchid
+[03:50:31.289] LOG: %cStart Phase MessagePhase color:green;
+[03:50:31.411] LOG: %cStart Phase MoveEffectPhase color:green;
+[03:50:31.745] LOG: crit stage: +0
+[03:50:31.747] LOG: Move: Megasauger | Base damage: 5.636363636363637 | Power: 50 | Source attack: 10 | Target defense: 11
+[03:50:31.747] LOG: Move: Megasauger | Attack damage: 8
+[03:50:31.748] LOG: %cStart Phase DamageAnimPhase color:green;
+[03:50:31.760] LOG: %cStart Phase PokemonHealPhase color:green;
+[03:50:31.761] LOG: %cStart Phase MessagePhase color:green;
+[03:50:32.004] LOG: %cStart Phase MoveEndPhase color:green;
+[03:50:32.004] LOG: %cStart Phase MovePhase color:green;
+[03:50:32.004] LOG: %cUser: Zobiris
+Move: DOUBLE_EDGE
+Use Mode: NORMAL color:orchid
+[03:50:32.012] LOG: %cStart Phase MessagePhase color:green;
+[03:50:32.162] LOG: %cStart Phase MoveEffectPhase color:green;
+[03:50:32.478] LOG: crit stage: +0
+[03:50:32.480] LOG: Move: Risikotackle | Base damage: 16.196 | Power: 169 | Source attack: 14 | Target defense: 12
+[03:50:32.480] LOG: Move: Risikotackle | Attack damage: 14
+[03:50:32.482] LOG: %cStart Phase DamageAnimPhase color:green;
+[03:50:32.495] LOG: %cStart Phase DamageAnimPhase color:green;
+[03:50:32.496] LOG: %cStart Phase MessagePhase color:green;
+[03:50:32.768] LOG: %cStart Phase MoveEndPhase color:green;
+[03:50:32.768] LOG: %cStart Phase CheckInterludePhase color:green;
+[03:50:32.768] LOG: %cStart Phase WeatherEffectPhase color:green;
+[03:50:33.200] LOG: %cStart Phase PositionalTagPhase color:green;
+[03:50:33.200] LOG: %cStart Phase BerryPhase color:green;
+[03:50:33.202] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[03:50:33.203] LOG: %cStart Phase TurnEndPhase color:green;
+[03:50:33.207] LOG: %cStart Phase TurnInitPhase color:green;
+[03:50:33.207] LOG: %cStart Phase CommandPhase color:green;
+[03:50:42.048] LOG: Move: MEGA_DRAIN Move targets: {"targets":[2,3,1],"multiple":false} 
+Player Pokemon: Endivie
+[03:50:42.050] LOG: %cStart Phase SelectTargetPhase color:green;
+[03:50:42.601] LOG: %cStart Phase CommandPhase color:green;
+[03:50:42.602] LOG: Move: DOUBLE_HIT Move targets: {"targets":[3],"multiple":false} 
+Player Pokemon: Kangama
+[03:50:42.602] LOG: %cStart Phase EnemyCommandPhase color:green;
+[03:50:42.606] LOG: Battle Seed: WrnEcWbocLCcXkjk
+[03:50:42.613] LOG: Move Pool: ["Nassschweif","Steinhagel","Risikotackle"]
+[03:50:42.613] LOG: Move Scores: [1033.75,1026.25,1060]
+[03:50:42.613] LOG: Sorted Move Pool: ["Risikotackle","Nassschweif","Steinhagel"]
+[03:50:42.613] LOG: Chosen Move: Risikotackle
+[03:50:42.613] LOG: ER AI: standard brain (sharpness 0.85)
+[03:50:42.613] LOG: %cStart Phase EnemyCommandPhase color:green;
+[03:50:42.618] LOG: Move Pool: ["Meteorologe"]
+[03:50:42.619] LOG: Move Scores: [37.5]
+[03:50:42.619] LOG: Sorted Move Pool: ["Meteorologe"]
+[03:50:42.619] LOG: Chosen Move: Meteorologe
+[03:50:42.619] LOG: ER AI: standard brain (sharpness 0.85)
+[03:50:42.619] LOG: %cStart Phase TurnStartPhase color:green;
+[03:50:42.624] LOG: %cStart Phase MovePhase color:green;
+[03:50:42.624] LOG: %cUser: Kangama
+Move: DOUBLE_HIT
+Use Mode: NORMAL color:orchid
+[03:50:42.628] LOG: %cStart Phase MessagePhase color:green;
+[03:50:42.727] LOG: %cStart Phase MoveEffectPhase color:green;
+[03:50:42.847] LOG: crit stage: +1
+[03:50:42.847] LOG: Move: Doppelschlag | Base damage: 8.93 | Power: 35 | Source attack: 18 | Target defense: 8
+[03:50:42.848] LOG: Move: Doppelschlag | Attack damage: 11
+[03:50:42.848] LOG: %cStart Phase DamageAnimPhase color:green;
+[03:50:42.867] LOG: %cStart Phase MessagePhase color:green;
+[03:50:43.066] LOG: %cStart Phase FaintPhase color:green;
+[03:50:43.126] LOG: %cStart Phase MessagePhase color:green;
+[03:50:43.360] LOG: %cStart Phase VictoryPhase color:green;
+[03:50:43.360] LOG: %cStart Phase ExpPhase color:green;
+[03:50:43.621] LOG: %cStart Phase LevelUpPhase color:green;
+[03:50:44.155] LOG: %cStart Phase ExpPhase color:green;
+[03:50:44.388] LOG: %cStart Phase MoveEndPhase color:green;
+[03:50:44.388] LOG: %cStart Phase MovePhase color:green;
+[03:50:44.388] LOG: %cStart Phase MoveEndPhase color:green;
+[03:50:44.388] LOG: %cStart Phase MovePhase color:green;
+[03:50:44.388] LOG: %cUser: Endivie
+Move: MEGA_DRAIN
+Use Mode: NORMAL color:orchid
+[03:50:44.391] LOG: %cStart Phase MessagePhase color:green;
+[03:50:44.514] LOG: %cStart Phase MoveEffectPhase color:green;
+[03:50:44.829] LOG: crit stage: +0
+[03:50:44.829] LOG: Move: Megasauger | Base damage: 6.4 | Power: 50 | Source attack: 11 | Target defense: 11
+[03:50:44.830] LOG: Move: Megasauger | Attack damage: 8
+[03:50:44.831] LOG: %cStart Phase DamageAnimPhase color:green;
+[03:50:44.846] LOG: %cStart Phase PokemonHealPhase color:green;
+[03:50:44.847] LOG: %cStart Phase MessagePhase color:green;
+[03:50:45.091] LOG: %cStart Phase FaintPhase color:green;
+[03:50:45.144] LOG: %cStart Phase MessagePhase color:green;
+[03:50:45.231] LOG: %cStart Phase VictoryPhase color:green;
+[03:50:45.232] LOG: %cStart Phase ExpPhase color:green;
+[03:50:45.559] LOG: %cStart Phase ExpPhase color:green;
+[03:50:45.963] LOG: %cStart Phase LevelUpPhase color:green;
+[03:50:46.417] LOG: %cStart Phase MoveEndPhase color:green;
+[03:50:46.417] LOG: %cStart Phase MovePhase color:green;
+[03:50:46.417] LOG: %cStart Phase MoveEndPhase color:green;
+[03:50:46.417] LOG: %cStart Phase CheckInterludePhase color:green;
+[03:50:46.417] LOG: %cStart Phase WeatherEffectPhase color:green;
+[03:50:46.822] LOG: %cStart Phase PositionalTagPhase color:green;
+[03:50:46.822] LOG: %cStart Phase BerryPhase color:green;
+[03:50:46.823] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[03:50:46.823] LOG: %cStart Phase TurnEndPhase color:green;
+[03:50:46.825] LOG: %cStart Phase BattleEndPhase color:green;
+[03:50:46.825] LOG: Battle Score: 76 (2 Turns x0.84)
+[03:50:46.825] LOG: Total Score: 201
+[03:50:46.834] LOG: %cStart Phase TrainerVictoryPhase color:green;
+[03:50:46.836] LOG: Knirps Jonathan
+[03:50:47.308] LOG: %cStart Phase MoneyRewardPhase color:green;
+[03:50:47.526] LOG: %cStart Phase ModifierRewardPhase color:green;
+[03:50:47.724] LOG: %cStart Phase ModifierRewardPhase color:green;
+[03:50:47.912] LOG: %cStart Phase EggLapsePhase color:green;
+[03:50:47.913] LOG: %cStart Phase SelectModifierPhase color:green;
+[03:50:47.913] LOG: Wave Seed: FJR};p{Z^y>>\YfRy765yf[ 5
+[03:50:47.916] LOG: 0 0 [2,3,4,5,6]
+[03:50:47.916] LOG: {"id":"POKEBALL","localeKey":"","iconImage":"pb","group":"pb","soundName":"se/pb_bounce_1","tier":0,"pokeballType":0,"count":5} 
+[03:50:47.916] LOG: 8 5 [2,3,4,5,6]
+[03:50:47.916] LOG: {"id":"BERRY","localeKey":"","iconImage":"leppa_berry","group":"berry","soundName":"se/restore","tier":0,"berryType":10} 
+[03:50:47.917] LOG: 0 0 [2,3,4,5,6]
+[03:50:47.917] LOG: {"id":"POKEBALL","localeKey":"","iconImage":"pb","group":"pb","soundName":"se/pb_bounce_1","tier":0,"pokeballType":0,"count":5} 
+[03:50:47.917] LOG: 7 5 [2,3,4,5,6]
+[03:50:47.918] LOG: {"id":"TEMP_STAT_STAGE_BOOSTER","localeKey":"","iconImage":"x_attack","soundName":"se/restore","tier":0,"stat":1,"nameKey":"x_attack","quantityKey":"percentage"} 
+[03:50:47.918] LOG: [coop-reward] OWNER drives reward screen (start=4 role=host spoof=false wave=5)
+[03:50:48.343] LOG: %cStart Phase NewBattlePhase color:green;
+[03:50:48.343] LOG: Wave Seed: GKS~<q|[_z??]ZgSz876zg\ 6
+[03:50:48.344] LOG: %cStart Phase NextEncounterPhase color:green;
+[03:50:48.345] LOG: Starting species pool tier: COMMON
+[03:50:48.359] LOG: Pokemon: Ferkuli (wild) | Species ID: 915 | Level: 4 | Nature: Solo (+Ang/-Vert)
+[03:50:48.359] LOG: Stats (IVs): HP: 19 (17), Atk: 11 (17), Def: 9 (8), Spatk: 8 (6), Spdef: 9 (6), Spd: 8 (14)
+[03:50:48.359] LOG: Ability: Titankiefer | Passive Ability: Speckschicht 
+[03:50:48.360] LOG: Moveset: ["Hyperzahn","Rutenschlag","Ruckzuckhieb","Kehrschelle"]
+[03:50:48.360] LOG: Starting species pool tier: COMMON
+[03:50:48.374] LOG: Pokemon: Zigzachs (wild) | Species ID: 263 | Level: 5 | Nature: Kühn (+Vert/-Ang)
+[03:50:48.374] LOG: Stats (IVs): HP: 20 (28), Atk: 9 (15), Def: 11 (27), Spatk: 9 (30), Spdef: 9 (17), Spd: 13 (25)
+[03:50:48.375] LOG: Ability: Rauflust | Passive Ability: Mitnahme 
+[03:50:48.375] LOG: Moveset: ["Risikotackle","Fruststampfer","Schnüffler","Lehmsuhler"]
+[03:50:48.375] LOG: [coop-reward] advance interaction (role=host from=4 counter=4)
+[03:50:48.375] LOG: [coop-launch] proceedIfReady launched=true localTeam=2 bothReady=true role=host partnerReady=true
+[03:50:49.339] DEBUG: Session data saved to slot 1!
+[03:50:49.339] LOG: Wave Seed: GKS~<q|[_z??]ZgSz876zg\ 6
+[03:50:49.800] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[03:50:49.800] LOG: %cStart Phase CheckSwitchPhase color:green;
+[03:50:49.800] LOG: %cStart Phase CheckSwitchPhase color:green;
+[03:50:49.800] LOG: %cStart Phase InitEncounterPhase color:green;
+[03:50:49.801] LOG: %cStart Phase PostSummonPhase color:green;
+[03:50:49.801] LOG: Ran PSP for: Zigzachs
+[03:50:49.802] LOG: %cStart Phase PostSummonPhase color:green;
+[03:50:49.803] LOG: %cStart Phase PostSummonPhase color:green;
+[03:50:49.803] LOG: %cStart Phase PostSummonPhase color:green;
+[03:50:49.803] LOG: Ran PSP for: Ferkuli
+[03:50:49.803] LOG: %cStart Phase PostSummonPhase color:green;
+[03:50:49.803] LOG: %cStart Phase PostSummonPhase color:green;
+[03:50:49.803] LOG: %cStart Phase TurnInitPhase color:green;
+[03:50:49.803] LOG: %cStart Phase CommandPhase color:green;
