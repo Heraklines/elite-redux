@@ -1,0 +1,262 @@
+url:      https://elite-redux-staging.pages.dev/
+build:    mqufww20-hlan
+mode:     6  wave:10
+seed:     53nWiK10VVODddaeoZ6GUsKh
+party:    Litten(L8 23hp f0), Kangaskhan(L7 37hp f0), Chikorita(L5 20hp f0), Magnemite(L5 19hp f0), Vulpix(L5 20hp f0)
+enemy:    Lillipup(L8), Whismur(L7)
+
+----- COMMENT -----
+boos bars
+
+----- CONSOLE -----
+[04:51:56.459] LOG: [coop:replay] guest replay turn=1: present k=message
+[04:51:56.459] LOG: [coop:replay] guest replay turn=1: present k=moveUsed
+[04:51:56.459] LOG: [coop:replay] guest replay turn=1: present k=hp
+[04:51:56.460] LOG: [coop:replay] guest replay turn=1: present k=faint
+[04:51:56.460] LOG: [coop:replay] guest replay turn=1: present k=message
+[04:51:56.460] LOG: [coop:replay] guest replay turn=1: present k=hp
+[04:51:56.460] LOG: [coop:replay] guest replay turn=1: present k=faint
+[04:51:56.460] LOG: [coop:replay] guest replay turn=1: present k=message
+[04:51:56.460] LOG: [coop:replay] guest replay turn=1: present k=message
+[04:51:56.460] LOG: [coop:replay] guest replay turn=1: present k=message
+[04:51:56.460] LOG: [coop:replay] guest replay turn=1: unshift CoopFinalizeTurnPhase (checkpoint apply deferred)
+[04:51:56.460] LOG: %cStart Phase MessagePhase color:green;
+[04:51:56.687] LOG: %cStart Phase CoopMoveAnimReplayPhase color:green;
+[04:51:56.687] LOG: [coop:replay] present move bi=1 moveId=252 targets=1
+[04:51:56.908] LOG: %cStart Phase CoopHpDrainReplayPhase color:green;
+[04:51:56.908] LOG: [coop:replay] present hp bi=2 25->0/25
+[04:51:56.913] LOG: %cStart Phase CoopHpDrainReplayPhase color:green;
+[04:51:56.913] LOG: [coop:replay] present hp bi=3 22->6/22
+[04:51:56.916] LOG: %cStart Phase MessagePhase color:green;
+[04:51:57.106] LOG: %cStart Phase MessagePhase color:green;
+[04:51:57.334] LOG: %cStart Phase CoopMoveAnimReplayPhase color:green;
+[04:51:57.334] LOG: [coop:replay] present move bi=0 moveId=257 targets=2
+[04:51:57.678] LOG: %cStart Phase CoopHpDrainReplayPhase color:green;
+[04:51:57.678] LOG: [coop:replay] present hp bi=3 6->2/22
+[04:51:57.681] LOG: %cStart Phase CoopFaintReplayPhase color:green;
+[04:51:57.681] LOG: [coop:replay] present faint bi=2
+[04:51:57.741] LOG: %cStart Phase MessagePhase color:green;
+[04:51:57.947] LOG: %cStart Phase CoopHpDrainReplayPhase color:green;
+[04:51:57.947] LOG: [coop:replay] present hp bi=3 2->0/22
+[04:51:57.951] LOG: %cStart Phase CoopFaintReplayPhase color:green;
+[04:51:57.951] LOG: [coop:replay] present faint bi=3
+[04:51:58.010] LOG: %cStart Phase MessagePhase color:green;
+[04:51:58.239] LOG: %cStart Phase MessagePhase color:green;
+[04:51:58.447] LOG: %cStart Phase MessagePhase color:green;
+[04:51:58.675] LOG: %cStart Phase CoopFinalizeTurnPhase color:green;
+[04:51:58.675] LOG: [coop:checksum] guest finalize turn=1: apply checkpoint + verify checksum=754bbc34ae523c82
+[04:51:58.675] LOG: [coop:checksum] guest applyCheckpoint field=4 weather=0 terrain=0 arenaTags=0
+[04:51:58.675] WARN: [coop:checksum] turn=1 MISMATCH host=754bbc34ae523c82 guest=1ea48fe60cb87c65 -> resync
+[04:51:58.675] WARN: [coop-cs] turn=1 11 differing field(s):
+[04:51:58.675] WARN:   field.bi#0.hp: host=28 guest=24
+[04:51:58.675] WARN:   field.bi#0.maxHp: host=28 guest=24
+[04:51:58.675] WARN:   field.bi#0.moves.0.1: host=2 guest=1
+[04:51:58.675] WARN:   field.bi#1.hp: host=37 guest=33
+[04:51:58.675] WARN:   field.bi#1.maxHp: host=37 guest=33
+[04:51:58.675] WARN:   field.bi#1.moves.1.1: host=9 guest=8
+[04:51:58.675] WARN:   modifiers.1.0: host=ER_UPGRADED_MAP guest=BERRY
+[04:51:58.675] WARN:   modifiers.2.0: host=EXP_SHARE guest=ER_UPGRADED_MAP
+[04:51:58.675] WARN:   modifiers.3.0: host=MAP guest=EXP_SHARE
+[04:51:58.675] WARN:   modifiers.4.0: host=SUPER_EXP_CHARM guest=MAP
+[04:51:58.675] WARN:   modifiers.5: host=<absent> guest=["SUPER_EXP_CHARM",1]
+[04:51:58.676] LOG: [coop:resync] guest requestStateSync turn=1 seq=15 START timeout=1200000ms
+[04:51:58.676] LOG: [coop:runtime] consume wave-advance wave=9 outcome=win (lastResolved 8 -> 9)
+[04:51:58.676] LOG: [coop:replay] guest wave-advance outcome=win wave=9 battleType=WILD queues=VictoryPhase
+[04:51:58.676] LOG: %cStart Phase WeatherEffectPhase color:green;
+[04:51:58.676] LOG: %cStart Phase PositionalTagPhase color:green;
+[04:51:58.676] LOG: %cStart Phase BerryPhase color:green;
+[04:51:58.676] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[04:51:58.676] LOG: %cStart Phase TurnEndPhase color:green;
+[04:51:58.677] LOG: [coop:replay] host recorder: end turn=-1 events=0
+[04:51:58.677] LOG: %cStart Phase VictoryPhase color:green;
+[04:51:58.678] LOG: %cStart Phase ExpPhase color:green;
+[04:51:58.678] LOG: Applied Super EXP. Charm 
+[04:51:58.680] LOG: [coop:resync] guest RECV stateSync seq=15 blobLen=860 -> parked waiter
+[04:51:58.680] LOG: [coop:resync] guest requestStateSync turn=1 seq=15 RESOLVE blobLen=860
+[04:51:58.680] LOG: [coop:resync] turn=1 applying full snapshot (blobLen=860)
+[04:51:58.680] LOG: [coop:resync] guest applyFullSnapshot field=4 weather=0 terrain=0 arenaTags=0 modifiers=5 party=5 money=2146
+[04:51:58.681] WARN: [coop:resync] maxhp divergence bi=0 host=28 guest=24
+[04:51:58.681] WARN: [coop:resync] maxhp divergence bi=1 host=37 guest=33
+[04:51:58.682] WARN: [coop:resync] turn=1 still-diverged host=754bbc34ae523c82 guest=8aedafab516c8ae7
+[04:51:58.682] WARN: [coop-resync] turn=1 UNHEALED 5 differing field(s):
+[04:51:58.682] WARN:   modifiers.1.0: host=ER_UPGRADED_MAP guest=BERRY
+[04:51:58.682] WARN:   modifiers.2.0: host=EXP_SHARE guest=ER_UPGRADED_MAP
+[04:51:58.682] WARN:   modifiers.3.0: host=MAP guest=EXP_SHARE
+[04:51:58.682] WARN:   modifiers.4.0: host=SUPER_EXP_CHARM guest=MAP
+[04:51:58.682] WARN:   modifiers.5: host=<absent> guest=["SUPER_EXP_CHARM",1]
+[04:51:58.682] WARN: [coop:resync] note: snapshot does NOT re-apply party/modifiers/arenaTags or force maxHp - a diff in those is a data-table drift, not a heal bug
+[04:51:58.850] LOG: %cStart Phase LevelUpPhase color:green;
+[04:51:58.850] LOG: %cStart Phase ExpPhase color:green;
+[04:51:58.850] LOG: Applied Super EXP. Charm 
+[04:51:59.019] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[04:51:59.019] LOG: Applied Super EXP. Charm 
+[04:51:59.020] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[04:51:59.020] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[04:51:59.020] LOG: Applied Super EXP. Charm 
+[04:51:59.021] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[04:51:59.021] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[04:51:59.021] LOG: Applied Super EXP. Charm 
+[04:51:59.022] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[04:51:59.022] LOG: %cStart Phase BattleEndPhase color:green;
+[04:51:59.022] LOG: Battle Score: 0 (1 Turns x1)
+[04:51:59.022] LOG: Total Score: 0
+[04:51:59.029] LOG: %cStart Phase EggLapsePhase color:green;
+[04:51:59.029] LOG: %cStart Phase SelectModifierPhase color:green;
+[04:51:59.029] LOG: [coop:interaction] interactionCounter() read -> 7 (role=guest)
+[04:51:59.030] LOG: [coop:owner] ownerOf(counter=7) parity=1 -> owner=guest
+[04:51:59.030] LOG: [coop:owner] isLocalOwnerAtCounter(pinnedCounter=7) parity=1 owner=guest role=guest -> true
+[04:51:59.030] LOG: Wave Seed: ><w`rT:9__XMmmjnxc?P^|Tq 9
+[04:51:59.033] LOG: 0 0 [2,3,6]
+[04:51:59.033] LOG: {"id":"POKEBALL","localeKey":"","iconImage":"pb","group":"pb","soundName":"se/pb_bounce_1","tier":0,"pokeballType":0,"count":5} 
+[04:51:59.033] LOG: 8 3 [2,3,6]
+[04:51:59.033] LOG: {"id":"BERRY","localeKey":"","iconImage":"apicot_berry","group":"berry","soundName":"se/restore","tier":0,"berryType":6} 
+[04:51:59.034] LOG: 0 0 [2,3,4,5,6,7,8,12,16,22]
+[04:51:59.034] LOG: {"id":"GREAT_BALL","localeKey":"","iconImage":"gb","group":"pb","soundName":"se/pb_bounce_1","tier":1,"pokeballType":1,"count":5} 
+[04:51:59.034] LOG: 13 8 [2,3,4,5,6,7,8,12,16,22]
+[04:51:59.034] LOG: {"id":"NUGGET","localeKey":"modifierType:ModifierType.NUGGET","iconImage":"nugget","group":"money","soundName":"se/buy","tier":1,"moneyMultiplier":1,"moneyMultiplierDescriptorKey":"modifierType:ModifierType.MoneyRewardModifierType.extra.small"} 
+[04:51:59.034] LOG: [coop:owner] ownerOf(counter=7) parity=1 -> owner=guest
+[04:51:59.034] LOG: [coop:owner] isLocalOwnerAtCounter(pinnedCounter=7) parity=1 owner=guest role=guest -> true
+[04:51:59.034] LOG: [coop:interaction] interactionCounter() read -> 7 (role=guest)
+[04:51:59.034] LOG: [coop:reward] owner/watcher decision: pinnedStart=7 liveCounter=7 parity=1 role=guest override=none spoof=false -> OWNER
+[04:51:59.034] LOG: [coop:reward] OWNER drives reward screen (start=7 role=guest spoof=false wave=9)
+[04:51:59.034] LOG: [coop:reward] OWNER streams reward options (start=7 reroll=0 count=3 ids=[POKEBALL,BERRY,NUGGET])
+[04:51:59.034] LOG: [coop:relay] SEND rewardOptions seq=7 reroll=0 count=3 ids=[POKEBALL,BERRY,NUGGET]
+[04:52:00.769] LOG: [coop:owner] ownerOf(counter=7) parity=1 -> owner=guest
+[04:52:00.769] LOG: [coop:owner] isLocalOwnerAtCounter(pinnedCounter=7) parity=1 owner=guest role=guest -> true
+[04:52:00.769] LOG: [coop:owner] ownerOf(counter=7) parity=1 -> owner=guest
+[04:52:00.769] LOG: [coop:owner] isLocalOwnerAtCounter(pinnedCounter=7) parity=1 owner=guest role=guest -> true
+[04:52:00.769] LOG: [coop:relay] SEND interactionChoice seq=7 kind=reward choice=2 data=[0]
+[04:52:00.772] LOG: %cStart Phase NewBattlePhase color:green;
+[04:52:00.773] LOG: Wave Seed: ?=xasU;:``YNnnkoyd@Q_}Ur 10
+[04:52:00.773] LOG: %cStart Phase NextEncounterPhase color:green;
+[04:52:00.773] LOG: [coop:interaction] interactionCounter() read -> 7 (role=guest)
+[04:52:00.773] LOG: [coop:interaction] CoopInteractionTurn.advance INCREMENT (fromCounter=7) counter 7 -> 8
+[04:52:00.773] LOG: [coop:interaction] advanceInteraction ADVANCED+BROADCAST (fromCounter=7) counter 7 -> 8 role=guest; send interaction screen=__turn__ choice=8
+[04:52:00.774] LOG: [coop:owner] ownerOf(counter=8) parity=0 -> owner=host
+[04:52:00.774] LOG: [coop:owner] ownerOf(counter=8) parity=0 -> owner=host
+[04:52:00.774] LOG: [coop-launch] proceedIfReady launched=true localTeam=3 bothReady=true role=guest partnerReady=true
+[04:52:00.774] LOG: [coop:interaction] interactionCounter() read -> 8 (role=guest)
+[04:52:00.774] LOG: [coop:reward] advance interaction (role=guest from=7 counter 7 -> 8)
+[04:52:00.808] LOG: [coop:interaction] RECV interaction broadcast (monotonic-max net) received=8 localBefore=8 role=guest -> no bump (local >= received)
+[04:52:00.808] WARN: [coop:interaction] CoopInteractionTurn.mergeRemote NO-CHANGE (remote=8, before=8, remote<=before) counter stays 8
+[04:52:00.808] LOG: [coop:owner] ownerOf(counter=8) parity=0 -> owner=host
+[04:52:00.808] LOG: [coop:owner] ownerOf(counter=8) parity=0 -> owner=host
+[04:52:00.808] LOG: [coop-launch] proceedIfReady launched=true localTeam=3 bothReady=true role=guest partnerReady=true
+[04:52:01.467] LOG: [coop:replay] guest RECV enemyPartySync wave=10 count=2 -> parked waiter
+[04:52:01.496] LOG: Pokemon: Wild Lillipup | Species ID: 506 | Level: 8 | Nature: Naive (+Spd/-SpDef)
+[04:52:01.496] LOG: Stats (IVs): HP: 27 (27), Atk: 17 (18), Def: 13 (16), Spatk: 10 (15), Spdef: 11 (19), Spd: 19 (29)
+[04:52:01.496] LOG: Ability: Pickup | Passive Ability: Fluffy 
+[04:52:01.496] LOG: Moveset: ["Growl","Tackle","Roar","Howl"]
+[04:52:01.497] LOG: Pokemon: Wild Whismur | Species ID: 293 | Level: 7 | Nature: Careful (+SpDef/-SpAtk)
+[04:52:01.497] LOG: Stats (IVs): HP: 29 (29), Atk: 13 (24), Def: 10 (15), Spatk: 14 (18), Spdef: 13 (21), Spd: 11 (20)
+[04:52:01.497] LOG: Ability: Scrappy | Passive Ability: Soundproof 
+[04:52:01.497] LOG: Moveset: ["Growl","Howl","Screech","Astonish"]
+[04:52:02.048] LOG: [coop:replay] guest RECV enemyPartySync wave=10 count=2 -> buffered (no waiter)
+[04:52:02.534] DEBUG: Session data saved to slot 4!
+[04:52:02.535] LOG: Wave Seed: ?=xasU;:``YNnnkoyd@Q_}Ur 10
+[04:52:02.982] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[04:52:02.982] LOG: %cStart Phase CheckSwitchPhase color:green;
+[04:52:02.982] LOG: %cStart Phase CheckSwitchPhase color:green;
+[04:52:02.982] LOG: %cStart Phase InitEncounterPhase color:green;
+[04:52:02.982] LOG: %cStart Phase PostSummonPhase color:green;
+[04:52:02.982] LOG: Ran PSP for: Lillipup
+[04:52:02.983] LOG: %cStart Phase PostSummonPhase color:green;
+[04:52:02.984] LOG: %cStart Phase PostSummonPhase color:green;
+[04:52:02.985] LOG: %cStart Phase PostSummonPhase color:green;
+[04:52:02.985] LOG: Ran PSP for: Whismur
+[04:52:02.985] LOG: %cStart Phase PostSummonPhase color:green;
+[04:52:02.985] LOG: %cStart Phase PostSummonPhase color:green;
+[04:52:02.985] LOG: %cStart Phase TurnInitPhase color:green;
+[04:52:02.986] LOG: %cStart Phase CommandPhase color:green;
+[04:52:02.987] LOG: %cStart Phase CommandPhase color:green;
+[04:52:07.995] LOG: Move: FAKE_OUT Move targets: {"targets":[2,3,0],"multiple":false} 
+Player Pokemon: Kangaskhan
+[04:52:07.996] LOG: %cStart Phase SelectTargetPhase color:green;
+[04:52:08.392] LOG: [coop:owner] broadcast own-slot fi=1 turn=1 role=guest cmd=0
+[04:52:08.392] LOG: %cStart Phase EnemyCommandPhase color:green;
+[04:52:08.392] LOG: %cStart Phase EnemyCommandPhase color:green;
+[04:52:08.392] LOG: %cStart Phase TurnStartPhase color:green;
+[04:52:08.393] LOG: %cStart Phase CoopReplayTurnPhase color:green;
+[04:52:08.393] LOG: [coop:replay] guest replay turn=1: awaiting host resolution
+[04:52:08.393] LOG: [coop:replay] guest awaitTurn turn=1 START timeout=1200000ms
+[04:52:08.434] LOG: [coop:replay] guest RECV live battleEvent turn=1 seq=0 k=message
+[04:52:08.434] LOG: [coop:replay] guest RECV live battleEvent turn=1 seq=1 k=moveUsed
+[04:52:08.765] LOG: [coop:replay] guest RECV live battleEvent turn=1 seq=2 k=hp
+[04:52:09.205] LOG: [coop:replay] guest RECV live battleEvent turn=1 seq=3 k=hp
+[04:52:09.208] LOG: [coop:replay] guest RECV live battleEvent turn=1 seq=4 k=message
+[04:52:09.423] LOG: [coop:replay] guest RECV live battleEvent turn=1 seq=5 k=message
+[04:52:09.423] LOG: [coop:replay] guest RECV live battleEvent turn=1 seq=6 k=moveUsed
+[04:52:09.750] LOG: [coop:replay] guest RECV live battleEvent turn=1 seq=7 k=hp
+[04:52:09.766] LOG: [coop:replay] guest RECV live battleEvent turn=1 seq=8 k=message
+[04:52:10.057] LOG: [coop:replay] guest RECV live battleEvent turn=1 seq=9 k=message
+[04:52:10.338] LOG: [coop:replay] guest RECV turnResolution turn=1 events=10 checksum=73ca187b66a67ebc -> parked waiter
+[04:52:10.338] LOG: [coop:replay] guest awaitTurn turn=1 RESOLVE events=10 checksum=73ca187b66a67ebc
+[04:52:10.338] LOG: [coop:replay] guest consume live events turn=1 count=10
+[04:52:10.338] LOG: [coop:replay] guest replay turn=1: RESOLVE live=10 batch=10 merged=10
+[04:52:10.338] LOG: [coop:replay] guest replay turn=1: rendering 10 event(s)
+[04:52:10.338] LOG: [coop:replay] guest replay turn=1: present k=message
+[04:52:10.338] LOG: [coop:replay] guest replay turn=1: present k=moveUsed
+[04:52:10.338] LOG: [coop:replay] guest replay turn=1: present k=hp
+[04:52:10.338] LOG: [coop:replay] guest replay turn=1: present k=hp
+[04:52:10.338] LOG: [coop:replay] guest replay turn=1: present k=message
+[04:52:10.338] LOG: [coop:replay] guest replay turn=1: present k=message
+[04:52:10.338] LOG: [coop:replay] guest replay turn=1: present k=moveUsed
+[04:52:10.338] LOG: [coop:replay] guest replay turn=1: present k=hp
+[04:52:10.338] LOG: [coop:replay] guest replay turn=1: present k=message
+[04:52:10.338] LOG: [coop:replay] guest replay turn=1: present k=message
+[04:52:10.338] LOG: [coop:replay] guest replay turn=1: unshift CoopFinalizeTurnPhase (checkpoint apply deferred)
+[04:52:10.338] LOG: %cStart Phase MessagePhase color:green;
+[04:52:10.553] LOG: %cStart Phase CoopMoveAnimReplayPhase color:green;
+[04:52:10.553] LOG: [coop:replay] present move bi=1 moveId=252 targets=1
+[04:52:10.790] LOG: %cStart Phase CoopHpDrainReplayPhase color:green;
+[04:52:10.790] LOG: [coop:replay] present hp bi=2 27->21/27
+[04:52:10.795] LOG: %cStart Phase CoopHpDrainReplayPhase color:green;
+[04:52:10.795] LOG: [coop:replay] present hp bi=2 21->20/27
+[04:52:10.797] LOG: %cStart Phase MessagePhase color:green;
+[04:52:10.987] LOG: %cStart Phase MessagePhase color:green;
+[04:52:11.229] LOG: %cStart Phase CoopMoveAnimReplayPhase color:green;
+[04:52:11.229] LOG: [coop:replay] present move bi=3 moveId=310 targets=1
+[04:52:11.423] LOG: %cStart Phase CoopHpDrainReplayPhase color:green;
+[04:52:11.423] LOG: [coop:replay] present hp bi=0 26->23/28
+[04:52:11.426] LOG: %cStart Phase MessagePhase color:green;
+[04:52:11.714] LOG: %cStart Phase MessagePhase color:green;
+[04:52:11.985] LOG: %cStart Phase CoopFinalizeTurnPhase color:green;
+[04:52:11.986] LOG: [coop:checksum] guest finalize turn=1: apply checkpoint + verify checksum=73ca187b66a67ebc
+[04:52:11.986] LOG: [coop:checksum] guest applyCheckpoint field=4 weather=0 terrain=0 arenaTags=0
+[04:52:11.986] WARN: [coop:checksum] turn=1 MISMATCH host=73ca187b66a67ebc guest=9dc6941da2753b6b -> resync
+[04:52:11.986] WARN: [coop-cs] turn=1 11 differing field(s):
+[04:52:11.986] WARN:   field.bi#0.maxHp: host=28 guest=26
+[04:52:11.986] WARN:   field.bi#1.hp: host=37 guest=33
+[04:52:11.986] WARN:   field.bi#1.maxHp: host=37 guest=33
+[04:52:11.986] WARN:   field.bi#1.moves.1.1: host=10 guest=9
+[04:52:11.986] WARN:   field.bi#3.moves.3.1: host=1 guest=0
+[04:52:11.986] WARN:   field.bi#3.teraType: host=0 guest=7
+[04:52:11.986] WARN:   modifiers.1.0: host=ER_UPGRADED_MAP guest=BERRY
+[04:52:11.986] WARN:   modifiers.2.0: host=EXP_SHARE guest=ER_UPGRADED_MAP
+[04:52:11.986] WARN:   modifiers.3.0: host=MAP guest=EXP_SHARE
+[04:52:11.986] WARN:   modifiers.4.0: host=SUPER_EXP_CHARM guest=MAP
+[04:52:11.986] WARN:   modifiers.5: host=<absent> guest=["SUPER_EXP_CHARM",1]
+[04:52:11.986] LOG: [coop:resync] guest requestStateSync turn=1 seq=16 START timeout=1200000ms
+[04:52:11.987] LOG: %cStart Phase WeatherEffectPhase color:green;
+[04:52:11.987] LOG: %cStart Phase PositionalTagPhase color:green;
+[04:52:11.987] LOG: %cStart Phase BerryPhase color:green;
+[04:52:11.990] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[04:52:11.994] LOG: %cStart Phase TurnEndPhase color:green;
+[04:52:11.998] LOG: [coop:replay] host recorder: end turn=-1 events=0
+[04:52:11.998] LOG: %cStart Phase TurnInitPhase color:green;
+[04:52:11.999] LOG: %cStart Phase CommandPhase color:green;
+[04:52:12.001] LOG: %cStart Phase CommandPhase color:green;
+[04:52:12.003] LOG: [coop:resync] guest RECV stateSync seq=16 blobLen=864 -> parked waiter
+[04:52:12.003] LOG: [coop:resync] guest requestStateSync turn=1 seq=16 RESOLVE blobLen=864
+[04:52:12.003] LOG: [coop:resync] turn=1 applying full snapshot (blobLen=864)
+[04:52:12.003] LOG: [coop:resync] guest applyFullSnapshot field=4 weather=0 terrain=0 arenaTags=0 modifiers=5 party=5 money=2446
+[04:52:12.003] WARN: [coop:resync] maxhp divergence bi=0 host=28 guest=26
+[04:52:12.004] WARN: [coop:resync] maxhp divergence bi=1 host=37 guest=33
+[04:52:12.005] WARN: [coop:resync] turn=1 still-diverged host=73ca187b66a67ebc guest=959aa754466c09bd
+[04:52:12.006] WARN: [coop-resync] turn=1 UNHEALED 5 differing field(s):
+[04:52:12.006] WARN:   modifiers.1.0: host=ER_UPGRADED_MAP guest=BERRY
+[04:52:12.006] WARN:   modifiers.2.0: host=EXP_SHARE guest=ER_UPGRADED_MAP
+[04:52:12.006] WARN:   modifiers.3.0: host=MAP guest=EXP_SHARE
+[04:52:12.006] WARN:   modifiers.4.0: host=SUPER_EXP_CHARM guest=MAP
+[04:52:12.006] WARN:   modifiers.5: host=<absent> guest=["SUPER_EXP_CHARM",1]
+[04:52:12.006] WARN: [coop:resync] note: snapshot does NOT re-apply party/modifiers/arenaTags or force maxHp - a diff in those is a data-table drift, not a heal bug
