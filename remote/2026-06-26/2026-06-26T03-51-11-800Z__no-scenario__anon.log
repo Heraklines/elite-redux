@@ -1,0 +1,265 @@
+url:      https://elite-redux-staging.pages.dev/
+build:    mquddsk0-4omf
+mode:     6  wave:5
+seed:     AEMx6kvUYt99WTaMt2z10taV
+party:    Chikorita(L5 14hp f0), Kangaskhan(L6 30hp f0), Litten(L5 16hp f0), Magnemite(L5 19hp f0), Vulpix(L5 20hp f0)
+enemy:    Sableye(L4), Wingull(L4)
+
+----- COMMENT -----
+trainer desync
+
+----- CONSOLE -----
+[03:49:24.022] LOG: %cStart Phase MessagePhase color:green;
+[03:49:24.230] LOG: %cStart Phase StatStageChangePhase color:green;
+[03:49:24.429] LOG: %cStart Phase MessagePhase color:green;
+[03:49:24.666] LOG: %cStart Phase HideAbilityPhase color:green;
+[03:49:24.692] LOG: %cStart Phase PostSummonPhase color:green;
+[03:49:24.693] LOG: Ran PSP for: Stunky
+[03:49:24.694] LOG: %cStart Phase PostSummonPhase color:green;
+[03:49:24.694] LOG: %cStart Phase TurnInitPhase color:green;
+[03:49:24.694] LOG: %cStart Phase CommandPhase color:green;
+[03:49:24.695] LOG: %cStart Phase CommandPhase color:green;
+[03:49:30.052] LOG: Move: FAKE_OUT Move targets: {"targets":[2,3,0],"multiple":false} 
+Player Pokemon: Kangaskhan
+[03:49:30.053] LOG: %cStart Phase SelectTargetPhase color:green;
+[03:49:30.556] LOG: %cStart Phase EnemyCommandPhase color:green;
+[03:49:30.556] LOG: %cStart Phase EnemyCommandPhase color:green;
+[03:49:30.556] LOG: %cStart Phase TurnStartPhase color:green;
+[03:49:30.556] LOG: %cStart Phase CoopReplayTurnPhase color:green;
+[03:49:40.549] LOG: %cStart Phase MessagePhase color:green;
+[03:49:40.779] LOG: %cStart Phase CoopMoveAnimReplayPhase color:green;
+[03:49:41.009] LOG: %cStart Phase CoopHpDrainReplayPhase color:green;
+[03:49:41.012] LOG: %cStart Phase MessagePhase color:green;
+[03:49:41.298] LOG: %cStart Phase CoopHpDrainReplayPhase color:green;
+[03:49:41.304] LOG: %cStart Phase MessagePhase color:green;
+[03:49:41.522] LOG: %cStart Phase MessagePhase color:green;
+[03:49:41.762] LOG: %cStart Phase CoopMoveAnimReplayPhase color:green;
+[03:49:41.770] LOG: %cStart Phase CoopHpDrainReplayPhase color:green;
+[03:49:41.773] LOG: %cStart Phase CoopHpDrainReplayPhase color:green;
+[03:49:41.774] LOG: %cStart Phase CoopHpDrainReplayPhase color:green;
+[03:49:41.776] LOG: %cStart Phase CoopHpDrainReplayPhase color:green;
+[03:49:41.778] LOG: %cStart Phase CoopFaintReplayPhase color:green;
+[03:49:41.832] LOG: %cStart Phase MessagePhase color:green;
+[03:49:42.061] LOG: %cStart Phase MessagePhase color:green;
+[03:49:42.307] LOG: %cStart Phase CoopStatStageReplayPhase color:green;
+[03:49:42.808] LOG: %cStart Phase MessagePhase color:green;
+[03:49:43.100] LOG: %cStart Phase CoopFinalizeTurnPhase color:green;
+[03:49:43.108] WARN: [coop-desync] turn=1 host=509762dd62e4926a guest=493c3205bbe458f5
+[03:49:43.108] WARN: [coop-cs] turn=1 1 differing field(s):
+[03:49:43.108] WARN:   field.bi#1.moves.1.1: host=3 guest=2
+[03:49:43.108] LOG: %cStart Phase WeatherEffectPhase color:green;
+[03:49:43.108] LOG: %cStart Phase PositionalTagPhase color:green;
+[03:49:43.108] LOG: %cStart Phase BerryPhase color:green;
+[03:49:43.110] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[03:49:43.111] LOG: %cStart Phase TurnEndPhase color:green;
+[03:49:43.113] LOG: %cStart Phase TurnInitPhase color:green;
+[03:49:43.113] LOG: %cStart Phase CommandPhase color:green;
+[03:49:43.115] LOG: %cStart Phase CommandPhase color:green;
+[03:49:44.742] LOG: Move: DOUBLE_HIT Move targets: {"targets":[3,0],"multiple":false} 
+Player Pokemon: Kangaskhan
+[03:49:44.744] LOG: %cStart Phase SelectTargetPhase color:green;
+[03:49:45.108] LOG: %cStart Phase EnemyCommandPhase color:green;
+[03:49:45.108] LOG: %cStart Phase TurnStartPhase color:green;
+[03:49:45.108] LOG: %cStart Phase CoopReplayTurnPhase color:green;
+[03:49:53.493] LOG: %cStart Phase MessagePhase color:green;
+[03:49:53.717] LOG: %cStart Phase CoopMoveAnimReplayPhase color:green;
+[03:49:53.928] LOG: %cStart Phase CoopHpDrainReplayPhase color:green;
+[03:49:53.931] LOG: %cStart Phase CoopFaintReplayPhase color:green;
+[03:49:53.991] LOG: %cStart Phase MessagePhase color:green;
+[03:49:54.195] LOG: %cStart Phase MessagePhase color:green;
+[03:49:54.455] LOG: %cStart Phase MessagePhase color:green;
+[03:49:54.675] LOG: %cStart Phase CoopMoveAnimReplayPhase color:green;
+[03:49:54.675] LOG: %cStart Phase MessagePhase color:green;
+[03:49:54.883] LOG: %cStart Phase CoopFinalizeTurnPhase color:green;
+[03:49:54.884] WARN: [coop-desync] turn=2 host=efabc1518b4dd3c5 guest=c5a1b9d7890bdb99
+[03:49:54.884] WARN: [coop-cs] turn=2 2 differing field(s):
+[03:49:54.884] WARN:   field.bi#0.moves.1.1: host=1 guest=0
+[03:49:54.884] WARN:   field.bi#1.moves.0.1: host=4 guest=3
+[03:49:54.885] LOG: %cStart Phase WeatherEffectPhase color:green;
+[03:49:54.885] LOG: %cStart Phase PositionalTagPhase color:green;
+[03:49:54.885] LOG: %cStart Phase BerryPhase color:green;
+[03:49:54.886] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[03:49:54.887] LOG: %cStart Phase TurnEndPhase color:green;
+[03:49:54.887] LOG: %cStart Phase VictoryPhase color:green;
+[03:49:54.888] LOG: %cStart Phase ExpPhase color:green;
+[03:49:55.204] LOG: %cStart Phase ExpPhase color:green;
+[03:49:55.546] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[03:49:55.547] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[03:49:55.547] LOG: %cStart Phase BattleEndPhase color:green;
+[03:49:55.547] LOG: Battle Score: 0 (2 Turns x0.84)
+[03:49:55.547] LOG: Total Score: 0
+[03:49:55.554] LOG: %cStart Phase TrainerVictoryPhase color:green;
+[03:49:55.557] LOG: Lass Madison
+[03:49:59.631] LOG: %cStart Phase MoneyRewardPhase color:green;
+[03:49:59.973] LOG: %cStart Phase ModifierRewardPhase color:green;
+[03:50:00.401] LOG: %cStart Phase ModifierRewardPhase color:green;
+[03:50:00.677] LOG: %cStart Phase EggLapsePhase color:green;
+[03:50:00.677] LOG: %cStart Phase SelectModifierPhase color:green;
+[03:50:00.677] LOG: Wave Seed: EIQ|:ozY]x==[XeQx6~54xeZ 4
+[03:50:00.685] LOG: 16 3 [1,10,12,23]
+[03:50:00.685] LOG: {"id":"CANDY_JAR","localeKey":"modifierType:ModifierType.CANDY_JAR","iconImage":"candy_jar","soundName":"se/restore","tier":2} 
+[03:50:00.685] LOG: 7 4 [3,4,5,6]
+[03:50:00.685] LOG: {"id":"TEMP_STAT_STAGE_BOOSTER","localeKey":"","iconImage":"x_accuracy","soundName":"se/restore","tier":0,"stat":6,"nameKey":"x_accuracy","quantityKey":"stage"} 
+[03:50:00.686] LOG: 9 4 [3,4,5,6]
+[03:50:00.686] LOG: {"id":"TM_CASE","localeKey":"","iconImage":"tm_case","soundName":"se/restore","tier":0} 
+[03:50:00.686] LOG: 2 0 [3,4,5,6]
+[03:50:00.686] LOG: {"id":"POTION","localeKey":"modifierType:ModifierType.POTION","iconImage":"potion","group":"potion","soundName":"se/restore","tier":0,"restorePoints":20,"restorePercent":10,"healStatus":false} 
+[03:50:00.686] LOG: 8 4 [3,4,5,6]
+[03:50:00.686] LOG: {"id":"BERRY","localeKey":"","iconImage":"lum_berry","group":"berry","soundName":"se/restore","tier":0,"berryType":1} 
+[03:50:00.686] LOG: [coop-reward] OWNER drives reward screen (start=3 role=guest spoof=false wave=4)
+[03:50:12.594] LOG: %cStart Phase NewBattlePhase color:green;
+[03:50:12.594] LOG: Wave Seed: FJR};p{Z^y>>\YfRy765yf[ 5
+[03:50:12.596] LOG: %cStart Phase ReturnPhase color:green;
+[03:50:12.597] LOG: [coop-reward] advance interaction (role=guest from=3 counter=3)
+[03:50:12.597] LOG: [coop-launch] proceedIfReady launched=true localTeam=3 bothReady=true role=guest partnerReady=true
+[03:50:12.601] LOG: [coop-launch] proceedIfReady launched=true localTeam=3 bothReady=true role=guest partnerReady=true
+[03:50:12.698] LOG: %cStart Phase ReturnPhase color:green;
+[03:50:12.814] LOG: %cStart Phase ShowTrainerPhase color:green;
+[03:50:12.920] LOG: %cStart Phase NextEncounterPhase color:green;
+[03:50:14.310] LOG: Pokemon: Foe Sableye | Species ID: 302 | Level: 4 | Nature: Adamant (+Atk/-SpAtk)
+[03:50:14.310] LOG: Stats (IVs): HP: 20 (31), Atk: 14 (31), Def: 12 (31), Spatk: 9 (31), Spdef: 11 (31), Spd: 10 (31)
+[03:50:14.310] LOG: Ability: Prankster | Passive Ability: Analytic 
+[03:50:14.310] LOG: Moveset: ["Aqua Tail","Rock Slide","Earthquake","Double-Edge"]
+[03:50:14.311] LOG: Pokemon: Foe Wingull | Species ID: 278 | Level: 4 | Nature: Modest (+SpAtk/-Atk)
+[03:50:14.311] LOG: Stats (IVs): HP: 18 (31), Atk: 7 (31), Def: 8 (31), Spatk: 11 (31), Spdef: 8 (31), Spd: 13 (31)
+[03:50:14.311] LOG: Ability: Drizzle | Passive Ability: Keen Eye 
+[03:50:14.311] LOG: Moveset: ["Roost","Tailwind","Weather Ball","Wide Guard"]
+[03:50:15.378] LOG: Generated AI funcs
+[03:50:15.500] DEBUG: Session data saved to slot 4!
+[03:50:15.501] LOG: Wave Seed: FJR};p{Z^y>>\YfRy765yf[ 5
+[03:50:15.708] LOG: Youngster Jonathan
+[03:50:16.005] LOG: Dialogue saved as seen: dialogue:youngster.encounter.10
+[03:50:16.042] LOG: Youngster Jonathan
+[03:50:16.371] LOG: %cStart Phase SummonPhase color:green;
+[03:50:16.371] LOG: Jonathan
+[03:50:16.631] LOG: %cStart Phase SummonPhase color:green;
+[03:50:16.631] LOG: Jonathan
+[03:50:16.902] LOG: %cStart Phase SummonPhase color:green;
+[03:50:17.190] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[03:50:17.191] LOG: %cStart Phase SummonPhase color:green;
+[03:50:17.368] WARN: cry/115 not found
+[03:50:17.471] LOG: %cStart Phase ShinySparklePhase color:green;
+[03:50:17.575] LOG: %cStart Phase InitEncounterPhase color:green;
+[03:50:17.576] LOG: %cStart Phase PostSummonPhase color:green;
+[03:50:17.576] LOG: Ran PSP for: Kangaskhan
+[03:50:17.578] LOG: %cStart Phase PostSummonPhase color:green;
+[03:50:17.579] LOG: %cStart Phase PostSummonPhase color:green;
+[03:50:17.579] LOG: %cStart Phase PostSummonPhase color:green;
+[03:50:17.579] LOG: Ran PSP for: Wingull
+[03:50:17.581] LOG: %cStart Phase PostSummonPhase color:green;
+[03:50:17.585] LOG: %cStart Phase ShowAbilityPhase color:green;
+[03:50:17.743] LOG: %cStart Phase CommonAnimPhase color:green;
+[03:50:18.144] LOG: %cStart Phase MessagePhase color:green;
+[03:50:18.339] LOG: %cStart Phase HideAbilityPhase color:green;
+[03:50:18.362] LOG: %cStart Phase PostSummonPhase color:green;
+[03:50:18.364] LOG: %cStart Phase PostSummonPhase color:green;
+[03:50:18.364] LOG: Ran PSP for: Chikorita
+[03:50:18.365] LOG: %cStart Phase PostSummonPhase color:green;
+[03:50:18.365] LOG: Ran PSP for: Sableye
+[03:50:18.365] LOG: %cStart Phase PostSummonPhase color:green;
+[03:50:18.365] LOG: %cStart Phase PostSummonPhase color:green;
+[03:50:18.365] LOG: %cStart Phase PostSummonPhase color:green;
+[03:50:18.366] LOG: %cStart Phase TurnInitPhase color:green;
+[03:50:18.366] LOG: %cStart Phase CommandPhase color:green;
+[03:50:18.366] LOG: %cStart Phase CommandPhase color:green;
+[03:50:23.455] LOG: Move: FAKE_OUT Move targets: {"targets":[2,3,0],"multiple":false} 
+Player Pokemon: Kangaskhan
+[03:50:23.458] LOG: %cStart Phase SelectTargetPhase color:green;
+[03:50:24.725] LOG: %cStart Phase EnemyCommandPhase color:green;
+[03:50:24.725] LOG: %cStart Phase EnemyCommandPhase color:green;
+[03:50:24.726] LOG: %cStart Phase TurnStartPhase color:green;
+[03:50:24.726] LOG: %cStart Phase CoopReplayTurnPhase color:green;
+[03:50:33.208] LOG: %cStart Phase MessagePhase color:green;
+[03:50:33.426] LOG: %cStart Phase CoopMoveAnimReplayPhase color:green;
+[03:50:33.658] LOG: %cStart Phase CoopHpDrainReplayPhase color:green;
+[03:50:33.664] LOG: %cStart Phase CoopHpDrainReplayPhase color:green;
+[03:50:33.666] LOG: %cStart Phase MessagePhase color:green;
+[03:50:33.849] LOG: %cStart Phase MessagePhase color:green;
+[03:50:34.191] LOG: %cStart Phase MessagePhase color:green;
+[03:50:34.400] LOG: %cStart Phase CoopMoveAnimReplayPhase color:green;
+[03:50:34.742] LOG: %cStart Phase CoopHpDrainReplayPhase color:green;
+[03:50:34.747] LOG: %cStart Phase MessagePhase color:green;
+[03:50:34.994] LOG: %cStart Phase MessagePhase color:green;
+[03:50:35.234] LOG: %cStart Phase CoopMoveAnimReplayPhase color:green;
+[03:50:35.537] LOG: %cStart Phase CoopHpDrainReplayPhase color:green;
+[03:50:35.541] LOG: %cStart Phase CoopHpDrainReplayPhase color:green;
+[03:50:35.542] LOG: %cStart Phase MessagePhase color:green;
+[03:50:35.802] LOG: %cStart Phase CoopFinalizeTurnPhase color:green;
+[03:50:35.803] WARN: [coop-desync] turn=1 host=665f9efa39927f92 guest=2b274697a08344db
+[03:50:35.803] WARN: [coop-cs] turn=1 6 differing field(s):
+[03:50:35.803] WARN:   field.bi#0.moves.1.1: host=2 guest=1
+[03:50:35.803] WARN:   field.bi#1.moves.1.1: host=4 guest=3
+[03:50:35.803] WARN:   field.bi#2.moves.3.1: host=1 guest=0
+[03:50:35.803] WARN:   field.bi#2.teraType: host=10 guest=7
+[03:50:35.803] WARN:   field.bi#3.teraType: host=10 guest=2
+[03:50:35.803] WARN:   money: host=1081 guest=971
+[03:50:35.804] LOG: %cStart Phase WeatherEffectPhase color:green;
+[03:50:36.238] LOG: %cStart Phase PositionalTagPhase color:green;
+[03:50:36.239] LOG: %cStart Phase BerryPhase color:green;
+[03:50:36.241] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[03:50:36.243] LOG: %cStart Phase TurnEndPhase color:green;
+[03:50:36.247] LOG: %cStart Phase TurnInitPhase color:green;
+[03:50:36.247] LOG: %cStart Phase CommandPhase color:green;
+[03:50:36.248] LOG: %cStart Phase CommandPhase color:green;
+[03:50:38.228] LOG: Move: DOUBLE_HIT Move targets: {"targets":[2,3,0],"multiple":false} 
+Player Pokemon: Kangaskhan
+[03:50:38.230] LOG: %cStart Phase SelectTargetPhase color:green;
+[03:50:39.456] LOG: %cStart Phase EnemyCommandPhase color:green;
+[03:50:39.456] LOG: %cStart Phase EnemyCommandPhase color:green;
+[03:50:39.456] LOG: %cStart Phase TurnStartPhase color:green;
+[03:50:39.456] LOG: %cStart Phase CoopReplayTurnPhase color:green;
+[03:50:46.827] LOG: %cStart Phase MessagePhase color:green;
+[03:50:47.066] LOG: %cStart Phase CoopMoveAnimReplayPhase color:green;
+[03:50:47.181] LOG: %cStart Phase CoopHpDrainReplayPhase color:green;
+[03:50:47.185] LOG: %cStart Phase CoopFaintReplayPhase color:green;
+[03:50:47.243] LOG: %cStart Phase MessagePhase color:green;
+[03:50:47.435] LOG: %cStart Phase MessagePhase color:green;
+[03:50:47.670] LOG: %cStart Phase MessagePhase color:green;
+[03:50:47.896] LOG: %cStart Phase CoopMoveAnimReplayPhase color:green;
+[03:50:48.220] LOG: %cStart Phase CoopHpDrainReplayPhase color:green;
+[03:50:48.224] LOG: %cStart Phase CoopFaintReplayPhase color:green;
+[03:50:48.285] LOG: %cStart Phase MessagePhase color:green;
+[03:50:48.378] LOG: [coop-launch] proceedIfReady launched=true localTeam=3 bothReady=true role=guest partnerReady=true
+[03:50:48.564] LOG: %cStart Phase MessagePhase color:green;
+[03:50:48.798] LOG: %cStart Phase CoopFinalizeTurnPhase color:green;
+[03:50:48.799] WARN: [coop-desync] turn=2 host=8b9b4a6e88b0b121 guest=b1dae1cc3fd5ef7b
+[03:50:48.799] WARN: [coop-cs] turn=2 5 differing field(s):
+[03:50:48.799] WARN:   field.bi#0.maxHp: host=22 guest=20
+[03:50:48.799] WARN:   field.bi#0.moves.1.1: host=3 guest=2
+[03:50:48.799] WARN:   field.bi#1.hp: host=33 guest=30
+[03:50:48.799] WARN:   field.bi#1.maxHp: host=33 guest=30
+[03:50:48.799] WARN:   field.bi#1.moves.0.1: host=5 guest=4
+[03:50:48.799] LOG: %cStart Phase WeatherEffectPhase color:green;
+[03:50:48.807] WARN: [coop-maxhp] divergence bi=0 host=22 guest=20
+[03:50:48.807] WARN: [coop-maxhp] divergence bi=1 host=33 guest=30
+[03:50:48.808] WARN: [coop-resync] turn=2 still-diverged host=8b9b4a6e88b0b121 guest=715b4c8781ecb24f
+[03:50:48.808] WARN: [coop-resync] turn=2 UNHEALED 1 differing field(s):
+[03:50:48.808] WARN:   money: host=1081 guest=1191
+[03:50:48.808] WARN: [coop-resync] note: snapshot does NOT re-apply party/modifiers/arenaTags or force maxHp - a diff in those is a data-table drift, not a heal bug
+[03:50:49.212] LOG: %cStart Phase PositionalTagPhase color:green;
+[03:50:49.212] LOG: %cStart Phase BerryPhase color:green;
+[03:50:49.212] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[03:50:49.213] LOG: %cStart Phase TurnEndPhase color:green;
+[03:50:49.215] LOG: %cStart Phase VictoryPhase color:green;
+[03:50:49.215] LOG: %cStart Phase ExpPhase color:green;
+[03:50:50.242] LOG: %cStart Phase ExpPhase color:green;
+[03:50:50.472] LOG: %cStart Phase BattleEndPhase color:green;
+[03:50:50.472] LOG: Battle Score: 0 (2 Turns x0.84)
+[03:50:50.472] LOG: Total Score: 0
+[03:50:50.480] LOG: %cStart Phase TrainerVictoryPhase color:green;
+[03:50:50.483] LOG: Youngster Jonathan
+[03:50:50.648] LOG: %cStart Phase MoneyRewardPhase color:green;
+[03:50:50.850] LOG: %cStart Phase ModifierRewardPhase color:green;
+[03:50:51.036] LOG: %cStart Phase ModifierRewardPhase color:green;
+[03:50:51.224] LOG: %cStart Phase EggLapsePhase color:green;
+[03:50:51.224] LOG: %cStart Phase SelectModifierPhase color:green;
+[03:50:51.224] LOG: Wave Seed: FJR};p{Z^y>>\YfRy765yf[ 5
+[03:50:51.227] LOG: 0 0 [2,3,4,5,6]
+[03:50:51.228] LOG: {"id":"POKEBALL","localeKey":"","iconImage":"pb","group":"pb","soundName":"se/pb_bounce_1","tier":0,"pokeballType":0,"count":5} 
+[03:50:51.228] LOG: 8 5 [2,3,4,5,6]
+[03:50:51.228] LOG: {"id":"BERRY","localeKey":"","iconImage":"leppa_berry","group":"berry","soundName":"se/restore","tier":0,"berryType":10} 
+[03:50:51.228] LOG: 0 0 [2,3,4,5,6]
+[03:50:51.228] LOG: {"id":"POKEBALL","localeKey":"","iconImage":"pb","group":"pb","soundName":"se/pb_bounce_1","tier":0,"pokeballType":0,"count":5} 
+[03:50:51.228] LOG: 7 5 [2,3,4,5,6]
+[03:50:51.228] LOG: {"id":"TEMP_STAT_STAGE_BOOSTER","localeKey":"","iconImage":"x_attack","soundName":"se/restore","tier":0,"stat":1,"nameKey":"x_attack","quantityKey":"percentage"} 
+[03:50:51.228] LOG: [coop-reward] OWNER drives reward screen (start=5 role=guest spoof=false wave=5)
