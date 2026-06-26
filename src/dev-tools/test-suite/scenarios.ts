@@ -9196,8 +9196,8 @@ export const DEV_SCENARIOS: DevScenario[] = [
       "#130 economy relics. WIN the opening battle to reach the shop; the Merchant's\n"
       + "Seal and Gambler's Coin are guaranteed reward options. Merchant's Seal: the\n"
       + "reroll cost is HALVED and the reward screen shows ONE extra item slot. Gambler's\n"
-      + "Coin: after each TRAINER battle, the money reward is doubled half the time and\n"
-      + "lost the other half (seeded per wave - stable across rerolls). CHECK both relics\n"
+      + "Coin: after each TRAINER battle, the money reward is doubled 55% of the time and\n"
+      + "lost the other 45% (seeded per wave - stable across rerolls). CHECK both relics\n"
       + "appear in the shop and the reroll price is half normal once Merchant's Seal is taken.",
     setup: () => {
       resetDevOverrides();

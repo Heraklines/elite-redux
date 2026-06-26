@@ -275,7 +275,7 @@ export const ER_RELIC_CONFIG: Readonly<Record<ErRelicKind, ErRelicConfig>> = {
   },
   gamblersCoin: {
     name: "Gambler's Coin",
-    description: "After each trainer battle, the money reward is doubled half the time and lost the other half.",
+    description: "After each trainer battle, the money reward is doubled 55% of the time and lost the other 45%.",
     // Bespoke icon (pokesprite Amulet Coin): a gold coin on a string for the gambler's coin.
     icon: "golden_punch",
     tint: 0xe0b020,
@@ -359,8 +359,10 @@ const CARTOGRAPHERS_LENS_EXTRA_NODES = 1;
 const MERCHANTS_SEAL_REROLL_MULT = 0.5;
 /** Merchant's Seal: extra reward-screen item slots while held. */
 const MERCHANTS_SEAL_EXTRA_SLOTS = 1;
-/** Gambler's Coin: percent chance (out of 100) the trainer payout is doubled. */
-const GAMBLERS_COIN_WIN_PCT = 50;
+/** Gambler's Coin: percent chance (out of 100) the trainer payout is doubled (the
+ *  rest, it is lost). 55 (not 50) so the EXPECTED value is +10%: a 50/50 double-or-
+ *  nothing is worth exactly the base payout in expectation (i.e. pointless). */
+const GAMBLERS_COIN_WIN_PCT = 55;
 
 /** Total stacks of the given relic the player currently holds (team-wide). */
 export function getErRelicStacks(kind: ErRelicKind): number {
