@@ -1,0 +1,265 @@
+url:      https://elite-redux-staging.pages.dev/
+build:    mqvgyr45-afqk
+mode:     6  wave:8
+seed:     uj4VLE2wjAFm2XcepV92Xx7T
+party:    Vulpix(L8 26hp f0), Fennekin(L8 17hp f0), Magnemite(L5 19hp f0), Chikorita(L5 20hp f0), Kangaskhan(L5 27hp f0)
+enemy:    Torchic(L7), Goomy(L6)
+
+----- COMMENT -----
+level up screen not wired, froze on lvl up
+
+----- CONSOLE -----
+[22:08:11.020] LOG: %cStart Phase VictoryPhase color:green;
+[22:08:11.020] LOG: [coop:progression] HOST applyPartyExp COMPUTE wave=7 expValue=56 koMon=Nidoran♂
+[22:08:11.020] LOG: [coop:runtime] send waveResolved wave=7 outcome=win (host)
+[22:08:11.020] LOG: [coop:replay] host SEND waveResolved wave=7 outcome=win
+[22:08:11.020] LOG: [coop:webrtc] raw tx role=host t=waveResolved bytes=45
+[22:08:11.020] LOG: %cStart Phase ExpPhase color:green;
+[22:08:11.179] LOG: %cStart Phase ExpPhase color:green;
+[22:08:11.304] LOG: %cStart Phase MoveEndPhase color:green;
+[22:08:11.305] LOG: %cStart Phase MovePhase color:green;
+[22:08:11.305] LOG: %cStart Phase MoveEndPhase color:green;
+[22:08:11.305] LOG: %cStart Phase MovePhase color:green;
+[22:08:11.305] LOG: %cStart Phase MoveEndPhase color:green;
+[22:08:11.305] LOG: %cStart Phase CheckInterludePhase color:green;
+[22:08:11.305] LOG: %cStart Phase WeatherEffectPhase color:green;
+[22:08:11.541] LOG: %cStart Phase PositionalTagPhase color:green;
+[22:08:11.541] LOG: %cStart Phase BerryPhase color:green;
+[22:08:11.541] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[22:08:11.541] LOG: %cStart Phase TurnEndPhase color:green;
+[22:08:11.542] LOG: [coop:turn] host recorder: finalize turn=1 events=10 seq=10
+[22:08:11.542] LOG: [coop:checkpoint] build field=4 weather=1/5 terrain=3/6 arenaTags=0 money=1253 mons=[bi0:sp37/hp24-24/st0/fnt0 bi1:sp653/hp14-23/st0/fnt0 bi2:sp261/hp0-20/st7/fnt1 bi3:sp32/hp0-21/st7/fnt1]
+[22:08:11.542] LOG: [coop:checkpoint] host capture field=4 weather=1 terrain=3 money=1253 arenaTags=0 mons=[bi0:sp37/hp24-24/st0/fnt0 bi1:sp653/hp14-23/st0/fnt0 bi2:sp261/hp0-20/st7/fnt1 bi3:sp32/hp0-21/st7/fnt1]
+[22:08:11.543] LOG: [coop:checksum] capture digest=2229dc8e0d585e0c field=2 biome=0 seed=uj4VLE2wjAFm2XcepV92Xx7T weather=1 terrain=3 money=1253 party=[37,653,81,152,115] partyLevels=[7,7,5,5,5] arenaTags=0 modifiers=2 heldItemsDigest=1 pokeballs=[0:10,1:0,2:0,3:0,4:0] mons=[bi0:sp37/hp24-24/st0/ab70/form0/tera0:9/boss0:0 bi1:sp653/hp14-23/st0/ab5017/form0/tera0:9/boss0:0]
+[22:08:11.543] LOG: [coop:replay] host SEND turnResolution turn=1 events=10 checksum=2229dc8e0d585e0c preimage=true
+[22:08:11.543] LOG: [coop:webrtc] raw tx role=host t=turnResolution bytes=2021
+[22:08:11.543] LOG: %cStart Phase PokemonHealPhase color:green;
+[22:08:11.543] LOG: %cStart Phase MessagePhase color:green;
+[22:08:11.741] LOG: %cStart Phase PokemonHealPhase color:green;
+[22:08:11.847] LOG: %cStart Phase MessagePhase color:green;
+[22:08:12.061] LOG: %cStart Phase BattleEndPhase color:green;
+[22:08:12.061] LOG: [coop:progression] expResolved BROADCAST wave=7 (host streams settled deltas)
+[22:08:12.061] LOG: [coop:runtime] send expResolved wave=7 deltas=5 (host)
+[22:08:12.061] LOG: [coop:replay] host SEND expResolved wave=7 deltas=5
+[22:08:12.061] LOG: [coop:webrtc] raw tx role=host t=expResolved bytes=1023
+[22:08:12.061] LOG: Battle Score: 60 (1 Turns x1)
+[22:08:12.061] LOG: Total Score: 287
+[22:08:12.064] LOG: Applied Calcium 
+[22:08:12.066] LOG: %cStart Phase EggLapsePhase color:green;
+[22:08:12.066] LOG: %cStart Phase SelectModifierPhase color:green;
+[22:08:12.066] LOG: [coop:interaction] interactionCounter() read -> 6 (role=host)
+[22:08:12.066] LOG: [coop:owner] ownerOf(counter=6) parity=0 -> owner=host
+[22:08:12.066] LOG: [coop:owner] isLocalOwnerAtCounter(pinnedCounter=6) parity=0 owner=host role=host -> true
+[22:08:12.066] LOG: Wave Seed: |q;]SL9~qHMt9_jlw]@9_>[ 7
+[22:08:12.069] LOG: 0 0 [2,3,6]
+[22:08:12.069] LOG: {"id":"POKEBALL","localeKey":"","iconImage":"pb","group":"pb","soundName":"se/pb_bounce_1","tier":0,"pokeballType":0,"count":5} 
+[22:08:12.069] LOG: 11 7 [2,3,4,5,6,7,8,12,22]
+[22:08:12.069] LOG: {"id":"DIRE_HIT","localeKey":"modifierType:ModifierType.DIRE_HIT","iconImage":"dire_hit","soundName":"se/restore","tier":1} 
+[22:08:12.069] LOG: 17 8 [2,3,4,5,6,7,8,12,22]
+[22:08:12.069] LOG: {"id":"SOOTHE_BELL","localeKey":"modifierType:ModifierType.SOOTHE_BELL","iconImage":"soothe_bell","soundName":"se/restore","tier":1} 
+[22:08:12.069] LOG: 19 8 [2,3,4,5,6,7,8,12,22]
+[22:08:12.069] LOG: {"id":"ER_ABILITY_CAPSULE","localeKey":"","iconImage":"ability_capsule","soundName":"se/restore","tier":1} 
+[22:08:12.069] LOG: 20 8 [2,3,4,5,6,7,8,12,22]
+[22:08:12.069] LOG: {"id":"BASE_STAT_BOOSTER","localeKey":"","iconImage":"protein","soundName":"se/restore","tier":1,"stat":1,"key":"protein"} 
+[22:08:12.069] LOG: 11 7 [2,3,4,5,6,7,8,12,22]
+[22:08:12.069] LOG: {"id":"DIRE_HIT","localeKey":"modifierType:ModifierType.DIRE_HIT","iconImage":"dire_hit","soundName":"se/restore","tier":1} 
+[22:08:12.069] LOG: 9 7 [2,3,4,5,6,7,8,12,22]
+[22:08:12.069] LOG: {"id":"ELIXIR","localeKey":"modifierType:ModifierType.ELIXIR","iconImage":"elixir","group":"elixir","soundName":"se/restore","tier":1,"restorePoints":10} 
+[22:08:12.070] LOG: [coop:owner] ownerOf(counter=6) parity=0 -> owner=host
+[22:08:12.070] LOG: [coop:owner] isLocalOwnerAtCounter(pinnedCounter=6) parity=0 owner=host role=host -> true
+[22:08:12.070] LOG: [coop:interaction] interactionCounter() read -> 6 (role=host)
+[22:08:12.070] LOG: [coop:reward] owner/watcher decision: pinnedStart=6 liveCounter=6 parity=0 role=host override=none spoof=false -> OWNER
+[22:08:12.070] LOG: [coop:reward] OWNER drives reward screen (start=6 role=host spoof=false wave=7)
+[22:08:12.070] LOG: [coop:shop] serializeRewardOptions count=3 ids=[POKEBALL,DIRE_HIT,ELIXIR] tiers=[0,1,1]
+[22:08:12.070] LOG: [coop:reward] OWNER streams reward options (start=6 reroll=0 count=3 ids=[POKEBALL,DIRE_HIT,ELIXIR])
+[22:08:12.070] LOG: [coop:relay] SEND rewardOptions seq=6 reroll=0 count=3 ids=[POKEBALL,DIRE_HIT,ELIXIR]
+[22:08:12.070] LOG: [coop:webrtc] raw tx role=host t=rewardOptions bytes=209
+[22:08:12.077] LOG: [coop:interaction] mirror begin role=owner mirrorSeq=384 interactionStart=6 reroll=0
+[22:08:12.077] LOG: [coop:interaction] uiMirror beginSession role=owner mode=6 seq=384 early=8
+[22:08:12.187] LOG: [coop:interaction] uiMirror OWNER send seq=384 n=0 button=5 modeBefore=6
+[22:08:12.187] LOG: [coop:webrtc] raw tx role=host t=uiInput bytes=51
+[22:08:13.330] LOG: [coop:interaction] uiMirror OWNER send seq=384 n=1 button=3 modeBefore=6
+[22:08:13.330] LOG: [coop:webrtc] raw tx role=host t=uiInput bytes=51
+[22:08:13.557] LOG: [coop:interaction] uiMirror OWNER send seq=384 n=2 button=3 modeBefore=6
+[22:08:13.558] LOG: [coop:webrtc] raw tx role=host t=uiInput bytes=51
+[22:08:14.099] LOG: [coop:interaction] uiMirror OWNER send seq=384 n=3 button=2 modeBefore=6
+[22:08:14.099] LOG: [coop:webrtc] raw tx role=host t=uiInput bytes=51
+[22:08:14.230] LOG: [coop:interaction] uiMirror OWNER send seq=384 n=4 button=2 modeBefore=6
+[22:08:14.230] LOG: [coop:webrtc] raw tx role=host t=uiInput bytes=51
+[22:08:14.713] LOG: [coop:owner] ownerOf(counter=6) parity=0 -> owner=host
+[22:08:14.713] LOG: [coop:owner] isLocalOwnerAtCounter(pinnedCounter=6) parity=0 owner=host role=host -> true
+[22:08:14.713] LOG: [coop:owner] ownerOf(counter=6) parity=0 -> owner=host
+[22:08:14.713] LOG: [coop:owner] isLocalOwnerAtCounter(pinnedCounter=6) parity=0 owner=host role=host -> true
+[22:08:14.713] LOG: [coop:relay] OWNER send seq=6 kind=reward choice=0 data=[0] role=host
+[22:08:14.713] LOG: [coop:relay] SEND interactionChoice seq=6 kind=reward choice=0 data=[0]
+[22:08:14.713] LOG: [coop:webrtc] raw tx role=host t=interactionChoice bytes=71
+[22:08:14.715] LOG: %cStart Phase NewBattlePhase color:green;
+[22:08:14.715] LOG: Wave Seed: }r<^TM:rINu:`kmx^A:`?\ 8
+[22:08:14.717] LOG: %cStart Phase MessagePhase color:green;
+[22:08:14.717] LOG: [coop:interaction] interactionCounter() read -> 6 (role=host)
+[22:08:14.717] LOG: [coop:interaction] CoopInteractionTurn.advance INCREMENT (fromCounter=6) counter 6 -> 7
+[22:08:14.717] LOG: [coop:interaction] advanceInteraction ADVANCED+BROADCAST (fromCounter=6) counter 6 -> 7 role=host; send interaction screen=__turn__ choice=7
+[22:08:14.717] LOG: [coop:webrtc] raw tx role=host t=interaction bytes=50
+[22:08:14.717] LOG: [coop:owner] ownerOf(counter=7) parity=1 -> owner=guest
+[22:08:14.717] LOG: [coop:owner] ownerOf(counter=7) parity=1 -> owner=guest
+[22:08:14.717] LOG: [coop-launch] proceedIfReady launched=true localTeam=3 bothReady=true role=host partnerReady=true
+[22:08:14.717] LOG: [coop:interaction] interactionCounter() read -> 7 (role=host)
+[22:08:14.717] LOG: [coop:reward] advance interaction (role=host from=6 counter 6 -> 7)
+[22:08:14.908] LOG: %cStart Phase MessagePhase color:green;
+[22:08:15.159] LOG: %cStart Phase ReturnPhase color:green;
+[22:08:15.263] LOG: %cStart Phase ReturnPhase color:green;
+[22:08:15.367] LOG: %cStart Phase ShowTrainerPhase color:green;
+[22:08:15.471] LOG: %cStart Phase NextEncounterPhase color:green;
+[22:08:15.480] LOG: Pokemon: Foe Torchic | Species ID: 255 | Level: 7 | Nature: Hasty (+Spd/-Def)
+[22:08:15.480] LOG: Stats (IVs): HP: 25 (31), Atk: 16 (31), Def: 9 (31), Spatk: 18 (31), Spdef: 12 (31), Spd: 11 (31)
+[22:08:15.480] LOG: Ability: Flock | Passive Ability: Blaze 
+[22:08:15.480] LOG: Moveset: ["Fire Blast","Wing Attack","Quick Attack","Endure"]
+[22:08:15.488] LOG: Pokemon: Foe Goomy | Species ID: 704 | Level: 6 | Nature: Modest (+SpAtk/-Atk)
+[22:08:15.488] LOG: Stats (IVs): HP: 21 (31), Atk: 14 (31), Def: 10 (31), Spatk: 9 (31), Spdef: 14 (31), Spd: 11 (31)
+[22:08:15.488] LOG: Ability: Poison Absorb | Passive Ability: Amphibious 
+[22:08:15.488] LOG: Moveset: ["Hidden Power","Mega Drain","Water Pulse","Protect"]
+[22:08:16.442] LOG: Battle Seed: HABwcbK0Mn945P7G
+[22:08:16.442] LOG: Applied HP Up (enemy)
+[22:08:16.442] LOG: Applied HP Up (enemy)
+[22:08:16.443] LOG: [coop:replay] host SEND enemyPartySync wave=8 count=2
+[22:08:16.443] LOG: [coop:webrtc] raw tx role=host t=enemyPartySync bytes=676
+[22:08:16.443] LOG: Generated AI funcs
+[22:08:16.518] DEBUG: Session data saved to slot 4!
+[22:08:16.519] LOG: Wave Seed: }r<^TM:rINu:`kmx^A:`?\ 8
+[22:08:16.866] LOG: Rival Ivy
+[22:08:17.340] LOG: [coop:webrtc] raw rx role=host t=requestStateSync bytes=41 handlers=5
+[22:08:17.340] LOG: [coop:resync] host RECV requestStateSync turn=1 seq=8
+[22:08:17.340] LOG: [coop:resync] recv requestStateSync turn=1 seq=8 role=host
+[22:08:17.343] LOG: [coop:resync] send stateSync seq=8 blob=6540b
+[22:08:17.343] LOG: [coop:resync] host SEND stateSync seq=8 blobLen=6540
+[22:08:17.343] LOG: [coop:webrtc] raw tx role=host t=stateSync bytes=6575
+[22:08:18.365] LOG: Dialogue saved as seen: dialogue:rivalFemale.encounter.1
+[22:08:18.480] LOG: Rival Ivy
+[22:08:18.846] LOG: %cStart Phase SummonPhase color:green;
+[22:08:18.846] LOG: Ivy
+[22:08:18.978] LOG: Applied HP Up (enemy)
+[22:08:19.109] LOG: %cStart Phase SummonPhase color:green;
+[22:08:19.110] LOG: Ivy
+[22:08:19.235] LOG: Applied HP Up (enemy)
+[22:08:19.366] LOG: %cStart Phase SummonPhase color:green;
+[22:08:19.520] LOG: Applied Calcium 
+[22:08:19.651] LOG: %cStart Phase ShinySparklePhase color:green;
+[22:08:19.755] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[22:08:19.756] LOG: %cStart Phase SummonPhase color:green;
+[22:08:19.909] LOG: Applied Calcium 
+[22:08:20.040] LOG: %cStart Phase InitEncounterPhase color:green;
+[22:08:20.041] LOG: %cStart Phase PostSummonPhase color:green;
+[22:08:20.041] LOG: Ran PSP for: Vulpix
+[22:08:20.042] LOG: %cStart Phase PostSummonPhase color:green;
+[22:08:20.044] LOG: %cStart Phase ShowAbilityPhase color:green;
+[22:08:20.201] LOG: %cStart Phase CommonAnimPhase color:green;
+[22:08:20.387] LOG: %cStart Phase MessagePhase color:green;
+[22:08:20.595] LOG: %cStart Phase HideAbilityPhase color:green;
+[22:08:20.618] LOG: %cStart Phase PostSummonPhase color:green;
+[22:08:20.618] LOG: %cStart Phase PostSummonPhase color:green;
+[22:08:20.618] LOG: Ran PSP for: Torchic
+[22:08:20.619] LOG: %cStart Phase PostSummonPhase color:green;
+[22:08:20.619] LOG: %cStart Phase PostSummonPhase color:green;
+[22:08:20.619] LOG: %cStart Phase PostSummonPhase color:green;
+[22:08:20.619] LOG: Ran PSP for: Fennekin
+[22:08:20.620] LOG: %cStart Phase PostSummonPhase color:green;
+[22:08:20.620] LOG: %cStart Phase PostSummonPhase color:green;
+[22:08:20.620] LOG: Ran PSP for: Goomy
+[22:08:20.620] LOG: %cStart Phase PostSummonPhase color:green;
+[22:08:20.620] LOG: %cStart Phase PostSummonPhase color:green;
+[22:08:20.621] LOG: %cStart Phase TurnInitPhase color:green;
+[22:08:20.621] LOG: %cStart Phase CommandPhase color:green;
+[22:08:20.621] LOG: [coop:replay] host SEND enemyPartySync wave=8 count=2
+[22:08:20.621] LOG: [coop:webrtc] raw tx role=host t=enemyPartySync bytes=676
+[22:08:21.341] LOG: [coop:webrtc] raw rx role=host t=rewardOptions bytes=209 handlers=5
+[22:08:21.341] LOG: [coop:relay] RECV rewardOptions key=7:0 -> BUFFER rewardOptionsInbox (latest-wins) count=3
+[22:08:25.139] LOG: Move: MOONBLAST Move targets: {"targets":[2,3,1],"multiple":false} 
+Player Pokemon: Vulpix
+[22:08:25.140] LOG: %cStart Phase SelectTargetPhase color:green;
+[22:08:25.834] LOG: [coop:owner] broadcast own-slot fi=0 turn=1 role=host cmd=0
+[22:08:25.834] LOG: [coop:relay] broadcastLocalCommand SEND fieldIndex=0 turn=1 command=0 cursor=2 moveId=585 targets=[3]
+[22:08:25.834] LOG: [coop:webrtc] raw tx role=host t=command bytes=113
+[22:08:25.834] LOG: %cStart Phase CommandPhase color:green;
+[22:08:25.835] LOG: [coop:relay] host requestPartnerCommand SEND fieldIndex=1 turn=1 moveSlots=[0,1,2,3] (awaiting peer)
+[22:08:25.835] LOG: [coop:webrtc] raw tx role=host t=commandRequest bytes=68
+[22:08:27.621] LOG: [coop:webrtc] raw rx role=host t=uiInput bytes=51 handlers=5
+[22:08:28.541] LOG: [coop:webrtc] raw rx role=host t=uiInput bytes=51 handlers=5
+[22:08:29.743] LOG: [coop:webrtc] raw rx role=host t=uiInput bytes=51 handlers=5
+[22:08:33.501] LOG: [coop:webrtc] raw rx role=host t=interactionChoice bytes=75 handlers=5
+[22:08:33.501] LOG: [coop:relay] RECV interactionChoice seq=7 -> BUFFER inbox depth=1 choice=2 data=[0,1,3]
+[22:08:33.541] LOG: [coop:webrtc] raw rx role=host t=interaction bytes=50 handlers=5
+[22:08:33.541] LOG: [coop:interaction] RECV interaction broadcast (monotonic-max net) received=8 localBefore=7 role=host -> WILL BUMP to 8
+[22:08:33.541] WARN: [coop:interaction] CoopInteractionTurn.mergeRemote BUMP (remote=8 > before=7) counter 7 -> 8
+[22:08:33.541] LOG: [coop:owner] ownerOf(counter=8) parity=0 -> owner=host
+[22:08:33.541] LOG: [coop:owner] ownerOf(counter=8) parity=0 -> owner=host
+[22:08:33.541] LOG: [coop-launch] proceedIfReady launched=true localTeam=3 bothReady=true role=host partnerReady=true
+[22:09:08.060] LOG: [coop:webrtc] raw rx role=host t=command bytes=115 handlers=5
+[22:09:08.061] LOG: [coop:relay] recv command fieldIndex=1 turn=1 command=0 -> resolved awaiting request
+[22:09:08.061] LOG: [coop:ai] applyWiredPartnerCommand partner=653 wiredMoveId=257 cursor=0 -> moveId=257 moveIndex=0 tera=false targets=[2,3] targetsFrom=wire-verbatim useMode=1
+[22:09:08.061] LOG: Move: HEAT_WAVE Move targets: {"targets":[2,3],"multiple":true} 
+Player Pokemon: Fennekin
+[22:09:08.061] LOG: %cStart Phase EnemyCommandPhase color:green;
+[22:09:08.070] LOG: Move Pool: ["Fire Blast","Wing Attack"]
+[22:09:08.070] LOG: Move Scores: [42.5,1048.9130434782608]
+[22:09:08.070] LOG: Sorted Move Pool: ["Wing Attack","Fire Blast"]
+[22:09:08.070] LOG: Chosen Move: Wing Attack
+[22:09:08.070] LOG: ER AI: standard brain (sharpness 0.85)
+[22:09:08.070] LOG: %cStart Phase EnemyCommandPhase color:green;
+[22:09:08.084] LOG: Move Pool: ["Hidden Power","Mega Drain","Water Pulse","Protect"]
+[22:09:08.084] LOG: Move Scores: [3.75,1.467391304347826,5.15625,-20]
+[22:09:08.084] LOG: Sorted Move Pool: ["Water Pulse","Hidden Power","Mega Drain","Protect"]
+[22:09:08.084] LOG: Chosen Move: Water Pulse
+[22:09:08.084] LOG: ER AI: standard brain (sharpness 0.85)
+[22:09:08.084] LOG: %cStart Phase TurnStartPhase color:green;
+[22:09:08.084] LOG: [coop:turn] host recorder: begin turn=1 (no prior open recording)
+[22:09:08.089] LOG: %cStart Phase MovePhase color:green;
+[22:09:08.089] LOG: %cUser: Vulpix
+Move: MOONBLAST
+Use Mode: NORMAL color:orchid
+[22:09:08.090] LOG: [coop:turn] host recorder: append turn=1 seq=0 k=message total=1 live=true
+[22:09:08.090] LOG: [coop:runtime] ME-stream live-event host turn=1 seq=0 k=message
+[22:09:08.090] LOG: [coop:replay] host EMIT live battleEvent turn=1 seq=0 k=message
+[22:09:08.090] LOG: [coop:webrtc] raw tx role=host t=battleEvent bytes=93
+[22:09:08.090] LOG: [coop:turn] host recorder: append turn=1 seq=1 k=moveUsed total=2 live=true
+[22:09:08.090] LOG: [coop:runtime] ME-stream live-event host turn=1 seq=1 k=moveUsed
+[22:09:08.090] LOG: [coop:replay] host EMIT live battleEvent turn=1 seq=1 k=moveUsed
+[22:09:08.090] LOG: [coop:webrtc] raw tx role=host t=battleEvent bytes=95
+[22:09:08.092] LOG: %cStart Phase MessagePhase color:green;
+[22:09:08.239] LOG: %cStart Phase MoveEffectPhase color:green;
+[22:09:08.782] LOG: crit stage: +0
+[22:09:08.783] LOG: Move: Moonblast | Base damage: 12.944 | Power: 95 | Source attack: 18 | Target defense: 15
+[22:09:08.783] LOG: Move: Moonblast | Attack damage: 24
+[22:09:08.783] LOG: [coop:turn] host recorder: append turn=1 seq=2 k=hp total=3 live=true
+[22:09:08.783] LOG: [coop:runtime] ME-stream live-event host turn=1 seq=2 k=hp
+[22:09:08.783] LOG: [coop:replay] host EMIT live battleEvent turn=1 seq=2 k=hp
+[22:09:08.783] LOG: [coop:webrtc] raw tx role=host t=battleEvent bytes=80
+[22:09:08.783] LOG: [coop:turn] host recorder: append turn=1 seq=3 k=faint total=4 live=true
+[22:09:08.783] LOG: [coop:runtime] ME-stream live-event host turn=1 seq=3 k=faint
+[22:09:08.783] LOG: [coop:replay] host EMIT live battleEvent turn=1 seq=3 k=faint
+[22:09:08.783] LOG: [coop:webrtc] raw tx role=host t=battleEvent bytes=65
+[22:09:08.783] LOG: [coop:turn] host recorder: append turn=1 seq=4 k=message total=5 live=true
+[22:09:08.783] LOG: [coop:runtime] ME-stream live-event host turn=1 seq=4 k=message
+[22:09:08.783] LOG: [coop:replay] host EMIT live battleEvent turn=1 seq=4 k=message
+[22:09:08.783] LOG: [coop:webrtc] raw tx role=host t=battleEvent bytes=91
+[22:09:08.784] LOG: %cStart Phase DamageAnimPhase color:green;
+[22:09:08.797] LOG: %cStart Phase MessagePhase color:green;
+[22:09:09.004] LOG: %cStart Phase FaintPhase color:green;
+[22:09:09.005] LOG: [coop:turn] host recorder: append turn=1 seq=5 k=message total=6 live=true
+[22:09:09.005] LOG: [coop:runtime] ME-stream live-event host turn=1 seq=5 k=message
+[22:09:09.005] LOG: [coop:replay] host EMIT live battleEvent turn=1 seq=5 k=message
+[22:09:09.005] LOG: [coop:webrtc] raw tx role=host t=battleEvent bytes=88
+[22:09:09.061] LOG: %cStart Phase MessagePhase color:green;
+[22:09:11.858] LOG: %cStart Phase VictoryPhase color:green;
+[22:09:11.858] LOG: [coop:progression] HOST applyPartyExp COMPUTE wave=8 expValue=73 koMon=Goomy
+[22:09:11.858] LOG: %cStart Phase ExpPhase color:green;
+[22:09:12.102] LOG: %cStart Phase LevelUpPhase color:green;
+[22:09:12.102] LOG: Applied Calcium 
+[22:09:12.102] LOG: %cStart Phase ExpPhase color:green;
+[22:09:12.254] LOG: %cStart Phase LevelUpPhase color:green;
+[22:09:12.255] LOG: %cStart Phase LearnMoveBatchPhase color:green;
+[22:09:12.255] LOG: %cStart Phase LearnMovePhase color:green;
+[22:09:12.319] LOG: [coop:interaction] uiMirror beginSession role=watcher mode=9 seq=9000001 early=11
+[22:09:12.319] LOG: [coop:relay] AWAIT interactionChoice seq=9000001 timeoutMs=1200000 -> network-wait
+[22:10:04.668] LOG: [coop:launch] iceConnectionState=disconnected code=44VM49 role=host
+[22:10:04.668] LOG: [coop:launch] pcConnectionState=disconnected code=44VM49 role=host
+[22:10:14.670] LOG: [coop:launch] pcConnectionState=failed code=44VM49 role=host
