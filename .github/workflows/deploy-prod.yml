@@ -40,6 +40,23 @@ jobs:
             echo "VITE_SERVER_URL=https://er-save-api.heraklines.workers.dev"
           } > .env.standalone.local
 
+      # ER (#431): resolve the CURRENT er-assets HEAD so this deploy's _redirects
+      # pin is never stale (mirrors deploy-staging.yml). Without this, prod kept the
+      # committed - and stale - pin, so brand-new atlas frames (e.g. the TM Case
+      # icon) 404'd / fell back to the wrong sprite while staging looked fine.
+      # Best-effort: an API failure keeps the committed pin and never blocks a deploy.
+      - name: Resolve er-assets HEAD for the jsDelivr pin
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          SHA=$(gh api repos/Heraklines/er-assets/commits/main --jq .sha || true)
+          if echo "$SHA" | grep -Eq '^[0-9a-f]{40}$'; then
+            echo "ER_ASSETS_SHA=$SHA" >> "$GITHUB_ENV"
+            echo "er-assets pin for this deploy: $SHA"
+          else
+            echo "WARNING: could not resolve er-assets HEAD - keeping the committed pin."
+          fi
+
       - name: Build standalone bundle
         run: |
           mkdir -p assets

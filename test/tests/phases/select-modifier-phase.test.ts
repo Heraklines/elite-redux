@@ -295,4 +295,42 @@ describe("SelectModifierPhase", () => {
     expect(modifierSelectHandler.options.length).toEqual(3); // 1 guaranteed + 2 earned (Greater Golden Ball)
     expect(modifierSelectHandler.options[0].modifierTypeOption.type.id).toEqual("MEMORY_MUSHROOM");
   });
+
+  // ER (#145): backing out of an item (TM Case / Memory / Ability Capsule / ...) re-shows the
+  // reward via SelectModifierPhase.copy(). The copy re-shows the CURRENT options, which ALREADY
+  // include the player's earned Golden Ball slots. copy() must pass `fillRemaining: true` so the
+  // screen is sized to those options (max(naturalCount, theseOptions) = theseOptions). Before the
+  // fix it omitted fillRemaining, so getModifierCount's #134 branch added `earnedExtraRewards` ON
+  // TOP of an option list that already contained them - every item-use -> back-out grew the slot
+  // count by G (the earned-slot count) without bound. The re-shown screen must keep the same size.
+  it("ER: backing out of an item does not grow the reward slot count (#145)", async () => {
+    await game.classicMode.startBattle(SpeciesId.ABRA, SpeciesId.VOLCARONA);
+    scene.money = 1000000;
+    // Greater Golden Ball = +2 earned reward slots; the leak grew by exactly this each cycle.
+    await scene.addModifier(modifierTypes.ER_GREATER_GOLDEN_BALL().newModifier());
+
+    scene.phaseManager.unshiftPhase(new SelectModifierPhase());
+    game.move.select(MoveId.SPLASH);
+    await game.phaseInterceptor.to("SelectModifierPhase");
+
+    const handler = scene.ui.handlers.find(h => h instanceof ModifierSelectUiHandler) as ModifierSelectUiHandler;
+    const firstCount = handler.options.length;
+    expect(firstCount).toBeGreaterThanOrEqual(5); // 3 base + 2 earned (Greater Golden Ball)
+
+    // Simulate use-item -> sub-menu -> back-out: the phase queues a copy of itself and re-shows it.
+    const phase = scene.phaseManager.getCurrentPhase() as SelectModifierPhase;
+    const copyPhase = phase.copy();
+    scene.phaseManager.unshiftPhase(copyPhase);
+    // The sub-menu transition routes the UI through MESSAGE first, which CLEARS the
+    // MODIFIER_SELECT handler (active -> false) so the copy's show() actually rebuilds the
+    // option sprites with its recomputed count - without this the handler early-returns and
+    // the grown count is invisible (exactly how it slips past a naive repro).
+    await scene.ui.setMode(UiMode.MESSAGE);
+    phase.end();
+    await game.phaseInterceptor.to("SelectModifierPhase");
+
+    const reHandler = scene.ui.handlers.find(h => h instanceof ModifierSelectUiHandler) as ModifierSelectUiHandler;
+    // Same number of slots, NOT firstCount + 2 (the #145 leak).
+    expect(reHandler.options.length).toBe(firstCount);
+  });
 });

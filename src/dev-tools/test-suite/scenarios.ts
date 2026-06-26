@@ -1056,6 +1056,38 @@ export const DEV_SCENARIOS: DevScenario[] = [
     shopItems: [modifierTypes.ER_RELIC_CURSED_IDOL, modifierTypes.ER_LEARNERS_SHROOM, modifierTypes.ER_OMNI_GEM],
   },
   {
+    label: "Reward slots must NOT grow on item-use + back-out (#145)",
+    description:
+      "#145 - using a reward that opens a sub-menu (TM CASE / Memory / Ability Capsule)\n"
+      + "and then BACKING OUT re-shows the reward screen via a phase COPY. The copy was\n"
+      + "double-counting the earned Golden Ball slots, so the reward grid GREW by the\n"
+      + "Golden Ball count every time you used an item and returned (here +3 per cycle).\n"
+      + "You start with 3 GOLDEN BALLS, so the first reward screen has extra item slots.\n"
+      + "DO: KO the Magikarp (one Body Slam). On the reward screen COUNT the item slots in\n"
+      + "the top row. Pick the TM CASE, then in the move-learn screen press B / Cancel to\n"
+      + "back OUT without learning a move - you return to the reward screen. COUNT again.\n"
+      + "Repeat (pick TM CASE, back out) a few times. Any item that opens a sub-menu and is\n"
+      + "cancelled (a TM, Memory Mushroom, Ability Capsule) reproduces it the same way.\n"
+      + "EXPECT: the slot count stays the SAME every time. Before the fix it grew by 3\n"
+      + "(your Golden Ball count) on every item-use + back-out, eventually flooding the grid.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 50,
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.MAGIKARP,
+        ENEMY_LEVEL_OVERRIDE: 3,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+        STARTING_MODIFIER_OVERRIDE: [{ name: "GOLDEN_POKEBALL", count: 3 }],
+      });
+      return [
+        makeStarter(SpeciesId.SNORLAX, {
+          moveset: [MoveId.BODY_SLAM, MoveId.CRUNCH, MoveId.EARTHQUAKE, MoveId.REST],
+        }),
+      ];
+    },
+    shopItems: [modifierTypes.TM_CASE],
+  },
+  {
     label: "Fusion ability slot ownership",
     description:
       "Bulbasaur is fused with Charmander. Open SUMMARY and inspect Abilities.\n"

@@ -795,7 +795,16 @@ export class SelectModifierPhase extends BattlePhase {
       this.rerollCount,
       this.modifierTiers,
       {
+        // The continuation copy re-shows the SAME options the player is mid-selecting
+        // (back-out safe, #25). `guaranteedModifierTypeOptions` ALREADY contains the
+        // earned extra slots (Golden Ball / Scrap Magnet / Merchant's Seal / etc.), so
+        // `fillRemaining: true` is REQUIRED: it sizes the screen to max(naturalCount,
+        // theseOptions) = theseOptions. Without it, getModifierCount's #134 branch adds
+        // `earnedExtraRewards` ON TOP of an option list that already includes them, so
+        // every item-use -> back-out grew the slot count by G (the Golden Ball bonus)
+        // without bound.
         guaranteedModifierTypeOptions: this.typeOptions,
+        fillRemaining: true,
         rerollMultiplier: this.customModifierSettings?.rerollMultiplier,
         allowLuckUpgrades: false,
       },
