@@ -2554,6 +2554,20 @@ export class ErRelicModifier extends PersistentModifier {
 }
 
 /**
+ * Co-op (#633 B9c): resolve the shop seq + watcher flag for an ER ability-picker unshift off the
+ * LIVE SelectModifierPhase (the running reward shop the capsule was used from). The three ER ability
+ * consumables' `apply()` thread the result into their picker phase's constructor so ONLY the shop
+ * owner drives the picker / rolls RNG and the watcher applies the owner's relayed outcome. `.is()`
+ * narrows to the concrete phase type, so `coopAbilityContext()` is called directly (no cast). Outside
+ * a co-op shop (solo / wrong phase) this returns `{ seq: -1, watcher: false }`, so the picker opens
+ * exactly as today and the picker's relayEnd() no-ops (byte-identical).
+ */
+function coopAbilityPickerContext(): { seq: number; watcher: boolean } {
+  const phase = globalScene.phaseManager.getCurrentPhase();
+  return phase.is("SelectModifierPhase") ? phase.coopAbilityContext() : { seq: -1, watcher: false };
+}
+
+/**
  * ER Ability Capsule (#387, community batch): on use, offers a CHOICE -
  *  (A) "Change ability": cycle the targeted Pokemon's ACTIVE ability through the
  *      species' legal abilities (ability 1 -> ability 2 -> hidden -> ability 1).
@@ -2624,7 +2638,16 @@ export class ErAbilityCapsuleModifier extends ConsumablePokemonModifier {
     // Hand off to the interactive picker phase (option-select -> cycle, or the
     // run-unlock innate sub-picker). Unshifted so it owns its own UI after the
     // reward screen tears down (the LearnMovePhase precedent).
-    globalScene.phaseManager.unshiftNew("ErAbilityCapsulePhase", globalScene.getPlayerParty().indexOf(playerPokemon));
+    // Co-op (#633 B9c): read the shop's seq + watcher flag off the live SelectModifierPhase and
+    // thread them in, so ONLY the owner drives the picker / rolls RNG and the watcher applies the
+    // owner's relayed outcome (both ran their own picker before -> diverged -> shop softlock).
+    const { seq, watcher } = coopAbilityPickerContext();
+    globalScene.phaseManager.unshiftNew(
+      "ErAbilityCapsulePhase",
+      globalScene.getPlayerParty().indexOf(playerPokemon),
+      seq,
+      watcher,
+    );
     return true;
   }
 }
@@ -2646,9 +2669,13 @@ export class ErAbilityCapsuleModifier extends ConsumablePokemonModifier {
  */
 export class ErGreaterAbilityCapsuleModifier extends ConsumablePokemonModifier {
   override apply(playerPokemon: PlayerPokemon): boolean {
+    // Co-op (#633 B9c): thread the shop seq + watcher flag in (see ErAbilityCapsuleModifier).
+    const { seq, watcher } = coopAbilityPickerContext();
     globalScene.phaseManager.unshiftNew(
       "ErGreaterAbilityCapsulePhase",
       globalScene.getPlayerParty().indexOf(playerPokemon),
+      seq,
+      watcher,
     );
     return true;
   }
@@ -2670,9 +2697,13 @@ export class ErGreaterAbilityCapsuleModifier extends ConsumablePokemonModifier {
  */
 export class ErGreaterAbilityRandomizerModifier extends ConsumablePokemonModifier {
   override apply(playerPokemon: PlayerPokemon): boolean {
+    // Co-op (#633 B9c): thread the shop seq + watcher flag in (see ErAbilityCapsuleModifier).
+    const { seq, watcher } = coopAbilityPickerContext();
     globalScene.phaseManager.unshiftNew(
       "ErGreaterAbilityRandomizerPhase",
       globalScene.getPlayerParty().indexOf(playerPokemon),
+      seq,
+      watcher,
     );
     return true;
   }

@@ -31,6 +31,14 @@
 import { globalScene } from "#app/global-scene";
 import { Phase } from "#app/phase";
 import {
+  COOP_ABILITY_KIND,
+  COOP_ABILITY_OP,
+  COOP_ABILITY_OUTCOME,
+  COOP_ABILITY_WAIT_MS,
+  coopAbilityPickerSeq,
+} from "#data/elite-redux/coop/coop-ability-picker-relay";
+import { getCoopInteractionRelay } from "#data/elite-redux/coop/coop-runtime";
+import {
   erHasRunUnlockableInnate,
   erRunUnlockAbilitySlot,
   erRunUnlockableInnateSlots,
@@ -52,9 +60,20 @@ export class ErAbilityCapsulePhase extends Phase {
   /** The UI mode active when this phase started; sub-menus restore to it. */
   private baseMode: UiMode = UiMode.MESSAGE;
 
-  constructor(partyIndex: number) {
+  // ---- Co-op (#633 B9c): owner-drives / watcher-applies ----
+  /** The shop's pinned interaction seq this picker belongs to (-1 = solo / not in co-op). */
+  private readonly coopSeq: number;
+  /** True only on the WATCHER's phase: it NEVER opens a picker - it applies the owner's outcome. */
+  private readonly coopIsWatcher: boolean;
+  /** OWNER-side outcome buffer, relayed exactly once at end. Default = CANCEL so EVERY non-commit
+   *  end-path (cancels, guards, mon-vanished) still relays an outcome and the watcher never stalls. */
+  private coopOutcome: number[] = [COOP_ABILITY_OP.CANCEL];
+
+  constructor(partyIndex: number, coopSeq = -1, coopIsWatcher = false) {
     super();
     this.partyIndex = partyIndex;
+    this.coopSeq = coopSeq;
+    this.coopIsWatcher = coopIsWatcher;
   }
 
   start(): void {
@@ -63,8 +82,14 @@ export class ErAbilityCapsulePhase extends Phase {
     const mon = globalScene.getPlayerParty()[this.partyIndex];
     if (mon == null) {
       // The target vanished (should not happen mid-shop); leave the continuation
-      // copy in place so the player is returned to the reward screen.
-      this.end();
+      // copy in place so the player is returned to the reward screen. Co-op (#633 B9c):
+      // the OWNER still relays a CANCEL so a parked watcher never stalls.
+      this.cancelAndEnd();
+      return;
+    }
+    // Co-op (#633 B9c) WATCHER: never open the picker - await + apply the owner's literal outcome.
+    if (this.coopIsWatcher) {
+      void this.coopApplyRelayedOutcome(mon);
       return;
     }
     this.openChoice(mon);
@@ -79,7 +104,8 @@ export class ErAbilityCapsulePhase extends Phase {
     // least one option is always present here. Guard anyway: if somehow neither
     // is available, just back out (capsule re-offered).
     if (!canCycle && !canRunUnlock) {
-      this.end();
+      // Co-op (#633 B9c): route through cancelAndEnd so the watcher gets a CANCEL outcome.
+      this.cancelAndEnd();
       return;
     }
 
@@ -106,7 +132,8 @@ export class ErAbilityCapsulePhase extends Phase {
       label: i18next.t("menu:cancel"),
       handler: () => {
         // Leave the continuation copy -> back to the reward screen, capsule kept.
-        this.restore(() => this.end());
+        // Co-op (#633 B9c): relay a CANCEL so a parked watcher re-offers in parity.
+        this.restore(() => this.cancelAndEnd());
         return true;
       },
     });
@@ -117,6 +144,8 @@ export class ErAbilityCapsulePhase extends Phase {
   /** Option (A): cycle the active ability, commit (consume the capsule), end. */
   private doCycle(mon: PlayerPokemon): void {
     ErAbilityCapsuleModifier.cycleActiveAbility(mon);
+    // Co-op (#633 B9c): record the committed outcome; commitAndEnd relays it (owner only).
+    this.coopOutcome = [COOP_ABILITY_OP.CAP_CYCLE];
     this.commitAndEnd();
   }
 
@@ -167,6 +196,8 @@ export class ErAbilityCapsulePhase extends Phase {
         // Commit the run-unlock and consume the capsule.
         globalScene.ui.setMode(this.baseMode).then(() => {
           erRunUnlockAbilitySlot(mon, slot);
+          // Co-op (#633 B9c): relay the resolved slot so the watcher run-unlocks the SAME slot.
+          this.coopOutcome = [COOP_ABILITY_OP.CAP_RUNUNLOCK, slot];
           this.commitAndEnd();
         });
       },
@@ -180,7 +211,65 @@ export class ErAbilityCapsulePhase extends Phase {
    * cleanup that drops the queued SelectModifierPhase on a successful learn.
    */
   private commitAndEnd(): void {
+    // Co-op (#633 B9c): OWNER relays the committed outcome (set by the caller) before consuming
+    // the copy, so the watcher applies the SAME pick. No-op off the owner / outside co-op.
+    if (!this.coopIsWatcher) {
+      this.relayEnd();
+    }
     globalScene.phaseManager.tryRemovePhase("SelectModifierPhase");
+    this.end();
+  }
+
+  /**
+   * Co-op (#633 B9c): every NON-committing owner end-path (cancel, the neither-option guard, the
+   * mon-vanished guard) routes here so the watcher always receives an outcome (CANCEL) and never
+   * stalls. Leaves the continuation copy in place, so the capsule is re-offered (back-out safe #25).
+   */
+  private cancelAndEnd(): void {
+    this.coopOutcome = [COOP_ABILITY_OP.CANCEL];
+    if (!this.coopIsWatcher) {
+      this.relayEnd();
+    }
+    this.end();
+  }
+
+  /** OWNER (#633 B9c): relay the buffered outcome on a DEDICATED derived seq (coopAbilityPickerSeq) the
+   *  shop watch loop never awaits - exactly once. No-op in solo (coopSeq < 0) / off the owner. */
+  private relayEnd(): void {
+    if (this.coopSeq < 0) {
+      return;
+    }
+    getCoopInteractionRelay()?.sendInteractionChoice(
+      coopAbilityPickerSeq(this.coopSeq),
+      COOP_ABILITY_KIND,
+      COOP_ABILITY_OUTCOME,
+      [...this.coopOutcome],
+    );
+  }
+
+  /**
+   * WATCHER (#633 B9c): await the owner's literal outcome and apply it - NEVER opening a picker.
+   * On a committed pick, remove the continuation copy (capsule consumed); on CANCEL / timeout,
+   * leave the copy so this client's continuation copy re-enters the shop watch in parity.
+   */
+  private async coopApplyRelayedOutcome(mon: PlayerPokemon): Promise<void> {
+    const relay = getCoopInteractionRelay();
+    if (this.coopSeq < 0 || relay == null) {
+      this.end();
+      return;
+    }
+    const action = await relay.awaitInteractionChoice(coopAbilityPickerSeq(this.coopSeq), COOP_ABILITY_WAIT_MS);
+    const data = action?.data ?? [COOP_ABILITY_OP.CANCEL];
+    const op = data[0];
+    if (op !== COOP_ABILITY_OP.CANCEL) {
+      if (op === COOP_ABILITY_OP.CAP_CYCLE) {
+        ErAbilityCapsuleModifier.cycleActiveAbility(mon);
+      } else if (op === COOP_ABILITY_OP.CAP_RUNUNLOCK) {
+        erRunUnlockAbilitySlot(mon, data[1]);
+      }
+      // Committed -> consume this client's continuation copy, matching the owner.
+      globalScene.phaseManager.tryRemovePhase("SelectModifierPhase");
+    }
     this.end();
   }
 

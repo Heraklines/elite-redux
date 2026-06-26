@@ -26,6 +26,14 @@
 
 import { globalScene } from "#app/global-scene";
 import { Phase } from "#app/phase";
+import {
+  COOP_ABILITY_KIND,
+  COOP_ABILITY_OP,
+  COOP_ABILITY_OUTCOME,
+  COOP_ABILITY_WAIT_MS,
+  coopAbilityPickerSeq,
+} from "#data/elite-redux/coop/coop-ability-picker-relay";
+import { getCoopInteractionRelay } from "#data/elite-redux/coop/coop-runtime";
 import type { BargainAbilityChoice } from "#data/elite-redux/er-bargain-sins";
 import {
   greaterRandomizerReplaceSlot,
@@ -46,9 +54,16 @@ export class ErGreaterAbilityRandomizerPhase extends Phase {
   /** The UI mode active when this phase started; sub-menus restore to it. */
   private baseMode: UiMode = UiMode.MESSAGE;
 
-  constructor(partyIndex: number) {
+  // ---- Co-op (#633 B9c): owner-drives / watcher-applies (see ErAbilityCapsulePhase) ----
+  private readonly coopSeq: number;
+  private readonly coopIsWatcher: boolean;
+  private coopOutcome: number[] = [COOP_ABILITY_OP.CANCEL];
+
+  constructor(partyIndex: number, coopSeq = -1, coopIsWatcher = false) {
     super();
     this.partyIndex = partyIndex;
+    this.coopSeq = coopSeq;
+    this.coopIsWatcher = coopIsWatcher;
   }
 
   start(): void {
@@ -57,7 +72,13 @@ export class ErGreaterAbilityRandomizerPhase extends Phase {
     const mon = globalScene.getPlayerParty()[this.partyIndex];
     if (mon == null) {
       // Target vanished - leave the continuation copy so the player returns to the shop.
-      this.end();
+      this.cancelAndEnd();
+      return;
+    }
+    // Co-op (#633 B9c) WATCHER: apply the owner's literal outcome - never opening a picker AND
+    // never rolling RNG (the host rolled once; the watcher must not advance its seed cursor).
+    if (this.coopIsWatcher) {
+      void this.coopApplyRelayedOutcome(mon);
       return;
     }
     this.openSlotPicker(mon);
@@ -77,7 +98,8 @@ export class ErGreaterAbilityRandomizerPhase extends Phase {
         const picked = slotIndex >= 0 && slotIndex < party.length ? party[slotIndex] : null;
         if (picked !== mon || option < PartyOption.ABILITY_SLOT_0) {
           // Backed out of the slot pick - nothing applied, capsule kept.
-          globalScene.ui.setMode(this.baseMode).then(() => this.end());
+          // Co-op (#633 B9c): relay a CANCEL so a parked watcher re-offers in parity.
+          globalScene.ui.setMode(this.baseMode).then(() => this.cancelAndEnd());
           return;
         }
         const slot = option - PartyOption.ABILITY_SLOT_0;
@@ -113,6 +135,9 @@ export class ErGreaterAbilityRandomizerPhase extends Phase {
         }
         this.restore(() => {
           greaterRandomizerReplaceSlot(mon, slot, chosen.abilityId);
+          // Co-op (#633 B9c): relay the slot + the host's LITERAL rolled abilityId so the watcher
+          // applies the SAME ability WITHOUT re-rolling (mirrors the watcher-doesn't-reroll contract).
+          this.coopOutcome = [COOP_ABILITY_OP.GRAND, slot, chosen.abilityId];
           this.commitAndEnd();
         });
       },
@@ -125,7 +150,57 @@ export class ErGreaterAbilityRandomizerPhase extends Phase {
    * replacement was committed), then end this phase.
    */
   private commitAndEnd(): void {
+    // Co-op (#633 B9c): OWNER relays the committed outcome (slot + literal abilityId) before
+    // consuming the copy, so the watcher replaces the SAME slot with the SAME ability.
+    if (!this.coopIsWatcher) {
+      this.relayEnd();
+    }
     globalScene.phaseManager.tryRemovePhase("SelectModifierPhase");
+    this.end();
+  }
+
+  /** Co-op (#633 B9c): every NON-committing owner end-path relays a CANCEL so the watcher never
+   *  stalls; leaves the continuation copy so the item is re-offered (back-out safe #25). */
+  private cancelAndEnd(): void {
+    this.coopOutcome = [COOP_ABILITY_OP.CANCEL];
+    if (!this.coopIsWatcher) {
+      this.relayEnd();
+    }
+    this.end();
+  }
+
+  /** OWNER (#633 B9c): relay the buffered outcome on the shop seq exactly once. No-op in solo. */
+  private relayEnd(): void {
+    if (this.coopSeq < 0) {
+      return;
+    }
+    getCoopInteractionRelay()?.sendInteractionChoice(
+      coopAbilityPickerSeq(this.coopSeq),
+      COOP_ABILITY_KIND,
+      COOP_ABILITY_OUTCOME,
+      [...this.coopOutcome],
+    );
+  }
+
+  /**
+   * WATCHER (#633 B9c): await + apply the owner's literal outcome. CRITICAL: it applies the host's
+   * relayed abilityId via greaterRandomizerReplaceSlot WITHOUT calling rollGreaterRandomizerAbilities,
+   * so the watcher's RNG seed cursor never advances (the host rolled once; the seed reconciles at the
+   * ME terminal / next stateSync - same contract as the reward-options watcher-doesn't-reroll path).
+   */
+  private async coopApplyRelayedOutcome(mon: PlayerPokemon): Promise<void> {
+    const relay = getCoopInteractionRelay();
+    if (this.coopSeq < 0 || relay == null) {
+      this.end();
+      return;
+    }
+    const action = await relay.awaitInteractionChoice(coopAbilityPickerSeq(this.coopSeq), COOP_ABILITY_WAIT_MS);
+    const data = action?.data ?? [COOP_ABILITY_OP.CANCEL];
+    const op = data[0];
+    if (op === COOP_ABILITY_OP.GRAND) {
+      greaterRandomizerReplaceSlot(mon, data[1], data[2]);
+      globalScene.phaseManager.tryRemovePhase("SelectModifierPhase");
+    }
     this.end();
   }
 

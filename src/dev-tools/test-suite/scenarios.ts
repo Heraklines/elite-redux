@@ -9581,4 +9581,47 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
     shopItems: [modifierTypes.ER_GREATER_ABILITY_RANDOMIZER, modifierTypes.ER_GREATER_ABILITY_RANDOMIZER],
   },
+  // Co-op - ER ability-picker shop softlock (#633 B9c). Single-client stages the shop + the item;
+  // the two-client divergence/softlock is the (note) part that needs a REAL session.
+  {
+    label: "(note) Co-op: Ability Capsule in shop, no softlock (#633)",
+    description:
+      "#633 co-op ER ABILITY-PICKER SHOP SOFTLOCK - the LIVE bug (build mqv07ocq). A player uses an\n"
+      + "ER ABILITY CAPSULE (or Greater Ability Capsule / Greater Ability Randomizer) in the co-op\n"
+      + "reward shop to unlock an innate / cycle an ability FOR THE RUN. THE BUG: BOTH clients ran\n"
+      + "ErAbilityCapsulePhase and opened their OWN ability picker; they picked INDEPENDENTLY -> the\n"
+      + "two runs DIVERGED -> the GUEST hung awaiting reward options the HOST (already advanced) never\n"
+      + "sent = SHOP SOFTLOCK.\n"
+      + "THE FIX (B9c): only the shop OWNER drives the picker + rolls RNG, then relays the resolved\n"
+      + "OUTCOME on the shop's interaction seq (the SAME owner/watcher channel reward picks use). The\n"
+      + "WATCHER never opens a picker (and the randomizer watcher never rolls RNG) - it applies the\n"
+      + "owner's LITERAL outcome. EVERY owner end-path (the cycle/run-unlock commit OR any cancel /\n"
+      + "guard / mon-vanished) relays an outcome (CANCEL when nothing committed), so the watcher never\n"
+      + "stalls; on the owner's CANCEL the watcher re-enters the shop watch via its surviving\n"
+      + "continuation copy (the capsule is re-offered, NOT consumed - back-out safe #25).\n"
+      + "DO (single client, just to reach the item): KO Magikarp; in the FIRST shop take the ER ABILITY\n"
+      + "CAPSULE and apply it to Garchomp - pick 'Change ability' OR 'Unlock an innate for the run', AND\n"
+      + "separately try BACKING OUT (cancel) of the choice. EXPECT (single client): the capsule works\n"
+      + "exactly as in solo - the ability cycles / the innate run-unlocks, and a cancel re-offers the\n"
+      + "capsule un-consumed. DO (needs a REAL 2-client AUTHORITATIVE session on staging): on each\n"
+      + "player's alternation turn, have the OWNER use the Ability Capsule and pick an ability; EXPECT\n"
+      + "BOTH clients show the SAME ability/innate on that mon, the shop continues for both with NO hang,\n"
+      + "and an owner CANCEL re-offers the capsule on both sides. VERIFY no [coop-desync] / no stall.\n"
+      + "(Regression unit test: test/tests/elite-redux/coop/coop-ability-picker-relay.test.ts.)",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 40,
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.MAGIKARP,
+        ENEMY_LEVEL_OVERRIDE: 3,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+      });
+      return [
+        makeStarter(SpeciesId.GARCHOMP, {
+          moveset: [MoveId.EARTHQUAKE, MoveId.DRAGON_CLAW, MoveId.STONE_EDGE, MoveId.SWORDS_DANCE],
+        }),
+      ];
+    },
+    shopItems: [modifierTypes.ER_ABILITY_CAPSULE],
+  },
 ];

@@ -25,6 +25,14 @@
 
 import { globalScene } from "#app/global-scene";
 import { Phase } from "#app/phase";
+import {
+  COOP_ABILITY_KIND,
+  COOP_ABILITY_OP,
+  COOP_ABILITY_OUTCOME,
+  COOP_ABILITY_WAIT_MS,
+  coopAbilityPickerSeq,
+} from "#data/elite-redux/coop/coop-ability-picker-relay";
+import { getCoopInteractionRelay } from "#data/elite-redux/coop/coop-runtime";
 import { erRunUnlockableInnateSlots } from "#data/elite-redux/er-ability-capsule";
 import {
   GREATER_CAPSULE_RUN_UNLOCK_COUNT,
@@ -50,9 +58,16 @@ export class ErGreaterAbilityCapsulePhase extends Phase {
   /** The UI mode active when this phase started; sub-menus restore to it. */
   private baseMode: UiMode = UiMode.MESSAGE;
 
-  constructor(partyIndex: number) {
+  // ---- Co-op (#633 B9c): owner-drives / watcher-applies (see ErAbilityCapsulePhase) ----
+  private readonly coopSeq: number;
+  private readonly coopIsWatcher: boolean;
+  private coopOutcome: number[] = [COOP_ABILITY_OP.CANCEL];
+
+  constructor(partyIndex: number, coopSeq = -1, coopIsWatcher = false) {
     super();
     this.partyIndex = partyIndex;
+    this.coopSeq = coopSeq;
+    this.coopIsWatcher = coopIsWatcher;
   }
 
   start(): void {
@@ -62,7 +77,12 @@ export class ErGreaterAbilityCapsulePhase extends Phase {
     if (mon == null) {
       // The target vanished (should not happen mid-shop); leave the continuation
       // copy in place so the player is returned to the reward screen.
-      this.end();
+      this.cancelAndEnd();
+      return;
+    }
+    // Co-op (#633 B9c) WATCHER: apply the owner's literal outcome, never opening a picker.
+    if (this.coopIsWatcher) {
+      void this.coopApplyRelayedOutcome(mon);
       return;
     }
     this.openChoice(mon);
@@ -76,7 +96,8 @@ export class ErGreaterAbilityCapsulePhase extends Phase {
     // The modifier-type select filter already requires at least one locked innate,
     // so the permanent option is always available here. Guard anyway.
     if (!canPermanent) {
-      this.end();
+      // Co-op (#633 B9c): relay a CANCEL so a parked watcher re-offers in parity.
+      this.cancelAndEnd();
       return;
     }
 
@@ -101,7 +122,8 @@ export class ErGreaterAbilityCapsulePhase extends Phase {
       label: i18next.t("menu:cancel"),
       handler: () => {
         // Leave the continuation copy -> back to the reward screen, capsule kept.
-        this.restore(() => this.end());
+        // Co-op (#633 B9c): relay a CANCEL so a parked watcher re-offers in parity.
+        this.restore(() => this.cancelAndEnd());
         return true;
       },
     });
@@ -149,6 +171,8 @@ export class ErGreaterAbilityCapsulePhase extends Phase {
         // Commit the PERMANENT unlock and consume the capsule.
         globalScene.ui.setMode(this.baseMode).then(() => {
           greaterCapsulePermanentlyUnlockInnate(mon, slot);
+          // Co-op (#633 B9c): relay the resolved slot so the watcher permanently unlocks the SAME one.
+          this.coopOutcome = [COOP_ABILITY_OP.GCAP_PERM, slot];
           this.commitAndEnd();
         });
       },
@@ -207,6 +231,8 @@ export class ErGreaterAbilityCapsulePhase extends Phase {
         // Commit both run-unlocks and consume the capsule.
         globalScene.ui.setMode(this.baseMode).then(() => {
           greaterCapsuleRunUnlockInnates(mon, next);
+          // Co-op (#633 B9c): relay BOTH resolved slots so the watcher run-unlocks the SAME pair.
+          this.coopOutcome = [COOP_ABILITY_OP.GCAP_RUN2, next[0], next[1]];
           this.commitAndEnd();
         });
       },
@@ -219,7 +245,55 @@ export class ErGreaterAbilityCapsulePhase extends Phase {
    * choice was committed), then end this phase.
    */
   private commitAndEnd(): void {
+    // Co-op (#633 B9c): OWNER relays the committed outcome before consuming the copy.
+    if (!this.coopIsWatcher) {
+      this.relayEnd();
+    }
     globalScene.phaseManager.tryRemovePhase("SelectModifierPhase");
+    this.end();
+  }
+
+  /** Co-op (#633 B9c): every NON-committing owner end-path relays a CANCEL so the watcher never
+   *  stalls; leaves the continuation copy so the capsule is re-offered (back-out safe #25). */
+  private cancelAndEnd(): void {
+    this.coopOutcome = [COOP_ABILITY_OP.CANCEL];
+    if (!this.coopIsWatcher) {
+      this.relayEnd();
+    }
+    this.end();
+  }
+
+  /** OWNER (#633 B9c): relay the buffered outcome on the shop seq exactly once. No-op in solo. */
+  private relayEnd(): void {
+    if (this.coopSeq < 0) {
+      return;
+    }
+    getCoopInteractionRelay()?.sendInteractionChoice(
+      coopAbilityPickerSeq(this.coopSeq),
+      COOP_ABILITY_KIND,
+      COOP_ABILITY_OUTCOME,
+      [...this.coopOutcome],
+    );
+  }
+
+  /** WATCHER (#633 B9c): await + apply the owner's literal outcome; never opens a picker. */
+  private async coopApplyRelayedOutcome(mon: PlayerPokemon): Promise<void> {
+    const relay = getCoopInteractionRelay();
+    if (this.coopSeq < 0 || relay == null) {
+      this.end();
+      return;
+    }
+    const action = await relay.awaitInteractionChoice(coopAbilityPickerSeq(this.coopSeq), COOP_ABILITY_WAIT_MS);
+    const data = action?.data ?? [COOP_ABILITY_OP.CANCEL];
+    const op = data[0];
+    if (op !== COOP_ABILITY_OP.CANCEL) {
+      if (op === COOP_ABILITY_OP.GCAP_PERM) {
+        greaterCapsulePermanentlyUnlockInnate(mon, data[1]);
+      } else if (op === COOP_ABILITY_OP.GCAP_RUN2) {
+        greaterCapsuleRunUnlockInnates(mon, [data[1], data[2]]);
+      }
+      globalScene.phaseManager.tryRemovePhase("SelectModifierPhase");
+    }
     this.end();
   }
 

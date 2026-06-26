@@ -171,9 +171,7 @@ export class SelectModifierPhase extends BattlePhase {
     const coopIsWatcher =
       coopController != null
       && getCoopRuntime()?.spoof == null
-      && (rewardOverride != null
-        ? !rewardOverride // authoritative ME: forced owner=host => the guest watches
-        : !coopController.isLocalOwnerAtCounter(this.coopInteractionStart));
+      && (rewardOverride == null ? !coopController.isLocalOwnerAtCounter(this.coopInteractionStart) : !rewardOverride); // authoritative ME: forced owner=host => the guest watches
 
     // Dev test-suite "start in the store" scenarios stage guaranteed reward
     // options (e.g. a Rare Candy, or a Form-Change Item that resolves to a
@@ -275,7 +273,7 @@ export class SelectModifierPhase extends BattlePhase {
       // the watcher follow a seq the owner stopped sending on ("cursor at the wrong spots").
       // CHANGE-2: inside an authoritative ME, rewardOverride forces host=owner / guest=watcher.
       const ownsThisShop =
-        rewardOverride != null ? rewardOverride : coopController.isLocalOwnerAtCounter(this.coopInteractionStart);
+        rewardOverride == null ? coopController.isLocalOwnerAtCounter(this.coopInteractionStart) : rewardOverride;
       const parity = ((this.coopInteractionStart % 2) + 2) % 2;
       coopLog(
         "reward",
@@ -787,6 +785,21 @@ export class SelectModifierPhase extends BattlePhase {
       globalScene.lockModifierTiers ? this.modifierTiers : undefined,
       this.customModifierSettings,
     );
+  }
+
+  /**
+   * Co-op (#633 B9c): the shop seq + watcher flag that the just-resolved ER ability-picker
+   * pick belongs to, so the picker phase it unshifts routes its outcome through the SAME relay
+   * seq this shop is pinned to. Read by the three picker modifiers' `apply()` (modifier.ts) off
+   * the LIVE SelectModifierPhase at unshift time and threaded into the picker phase's constructor
+   * - per-INSTANCE (never a process-global static), so two ability buys in one shop each carry
+   * their own context. Solo / host-owner / lockstep: no controller => `seq=-1`, so the picker's
+   * relayEnd() no-ops and the picker opens exactly as today (byte-identical).
+   */
+  public coopAbilityContext(): { seq: number; watcher: boolean } {
+    return globalScene.gameMode.isCoop && getCoopController() != null
+      ? { seq: this.coopInteractionStart, watcher: this.coopWatcher }
+      : { seq: -1, watcher: false };
   }
 
   copy(): SelectModifierPhase {
