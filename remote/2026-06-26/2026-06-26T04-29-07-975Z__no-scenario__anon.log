@@ -1,0 +1,182 @@
+url:      https://elite-redux-staging.pages.dev/
+build:    mque6w94-f19l
+mode:     4  wave:76
+seed:     DgV4tZaXMkYXdGdUQWUuhMPQ
+party:    Landorus(L64 81hp f0), Excadrill(L64 234hp f1), Quagsire(L64 160hp f0), Granbull(L64 209hp f1), Flygon(L62 154hp f0), Typhlosion(L64 186hp f0)
+enemy:    Electrode(L64), Swellow(L64), Swampert(L64), Breloom(L64)
+
+----- COMMENT -----
+Landorus shifting to the right, Rival has Fusions
+
+----- CONSOLE -----
+[04:28:20.773] LOG: %c %c %c %c %c Phaser v3.90.0 (WebGL | Web Audio) %c https://phaser.io/v390 background: #ff0000 background: #ffff00 background: #00ff00 background: #00ffff color: #ffffff; background: #000000 background: transparent
+[04:28:21.052] LOG: [ER] build mque6w94-f19l
+[04:28:21.156] LOG: [dev-tools] loaded — 330 scenarios + Send Logs button
+[04:28:27.084] DEBUG: Destroying loading scene
+[04:28:27.084] DEBUG: Destroyed loading scene
+[04:28:27.124] LOG: Seed: ZjBoUISx6MWjjxoP7FC5SoRF
+[04:28:27.124] LOG: Wave Seed: ZjBoUISx6MWjjxoP7FC5SoRF 0
+[04:28:27.588] LOG: %cStart Phase LoginPhase color:green;
+[04:28:27.908] LOG: Client Session: GjO2r6ZMWTuPxvahsUWNPvcwzhk2HPdC
+[04:28:28.142] DEBUG: Using cached system data
+[04:28:28.199] LOG: %cStart Phase TitlePhase color:green;
+[04:28:28.200] LOG: Getting Session Slot id: %d 2
+[04:28:28.221] LOG: use seasonal splash messages true
+[04:28:28.221] LOG: Adding 2 Pride Month splash messages (weight: x15)
+[04:28:30.493] LOG: Getting Session Slot id: %d 0
+[04:28:30.498] LOG: Getting Session Slot id: %d 1
+[04:28:30.499] LOG: Getting Session Slot id: %d 2
+[04:28:30.503] LOG: Getting Session Slot id: %d 3
+[04:28:30.503] LOG: Getting Session Slot id: %d 4
+[04:28:30.702] ERROR: Invalid save data JSON detected! Session not found.
+[04:28:30.702] ERROR: Invalid save data JSON detected! Session not found.
+[04:28:32.759] LOG: Getting Session Slot id: %d 2
+[04:28:32.764] LOG: Wave Seed: DgV4tZaXMkYXdGdUQWUuhMPQ 0
+[04:28:32.764] LOG: Seed: DgV4tZaXMkYXdGdUQWUuhMPQ
+[04:28:32.776] LOG: Wave Seed: ³¢À¦­¤·¥¤°°¡£¡Á´ 76
+[04:28:32.789] LOG: Applied Carbos 
+[04:28:32.789] LOG: Applied Protein 
+[04:28:32.789] LOG: Applied Soul Dew 
+[04:28:32.790] LOG: Applied Soul Dew 
+[04:28:32.790] LOG: Applied Zinc 
+[04:28:32.790] LOG: Applied Iron 
+[04:28:32.791] LOG: Applied Carbos 
+[04:28:32.791] LOG: Applied Protein 
+[04:28:32.791] LOG: Applied Soul Dew 
+[04:28:32.791] LOG: Applied Soul Dew 
+[04:28:32.791] LOG: Applied Zinc 
+[04:28:32.791] LOG: Applied Iron 
+[04:28:32.791] LOG: Applied Carbos 
+[04:28:32.792] LOG: Applied Protein 
+[04:28:32.792] LOG: Applied Soul Dew 
+[04:28:32.792] LOG: Applied Soul Dew 
+[04:28:32.792] LOG: Applied Zinc 
+[04:28:32.792] LOG: Applied Iron 
+[04:28:32.867] LOG: %cStart Phase EncounterPhase color:green;
+[04:28:32.869] LOG: Pokemon: Foe Swellow | Species ID: 277 | Level: 64 | Nature: Timid (+Spd/-Atk)
+[04:28:32.869] LOG: Stats (IVs): HP: 170 (31), Atk: 119 (31), Def: 101 (31), Spatk: 133 (31), Spdef: 88 (31), Spd: 203 (31)
+[04:28:32.869] LOG: Ability: Determination | Passive Ability: Flock 
+[04:28:32.869] LOG: Moveset: ["Boomburst","Protect","Heat Wave","Hurricane"]
+[04:28:32.869] LOG: Pokemon: Foe Eleshold | Species ID: 6101 | Level: 64 | Nature: Timid (+Spd/-Atk)
+[04:28:32.869] LOG: Stats (IVs): HP: 179 (31), Atk: 94 (31), Def: 114 (31), Spatk: 131 (31), Spdef: 124 (31), Spd: 212 (31)
+[04:28:32.869] LOG: Ability: Momentum | Passive Ability: Own Tempo 
+[04:28:32.869] LOG: Moveset: ["Fire Blast","Freeze-Dry","Air Slash","Flame Burst"]
+[04:28:32.869] LOG: Pokemon: Foe Toxtricity Swalow Key | Species ID: 260 | Level: 64 | Nature: Adamant (+Atk/-SpAtk)
+[04:28:32.869] LOG: Stats (IVs): HP: 206 (31), Atk: 158 (31), Def: 133 (31), Spatk: 126 (31), Spdef: 133 (31), Spd: 125 (31)
+[04:28:32.870] LOG: Ability: Stamina | Passive Ability: Punk Rock 
+[04:28:32.870] LOG: Moveset: ["Torrent Fist","Earthquake","Rock Slide","Ice Punch"]
+[04:28:32.870] LOG: Pokemon: Foe Breloom | Species ID: 286 | Level: 64 | Nature: Jolly (+Spd/-SpAtk)
+[04:28:32.870] LOG: Stats (IVs): HP: 170 (31), Atk: 191 (31), Def: 127 (31), Spatk: 90 (31), Spdef: 101 (31), Spd: 126 (31)
+[04:28:32.870] LOG: Ability: Poison Heal | Passive Ability: Effect Spore 
+[04:28:32.870] LOG: Moveset: ["Cross Chop","Poison Jab","Bullet Seed","Protect"]
+[04:28:37.923] LOG: Generated AI funcs
+[04:28:37.924] LOG: Wave Seed: ³¢À¦­¤·¥¤°°¡£¡Á´ 76
+[04:28:38.128] LOG: Rival Ivy
+[04:28:38.129] LOG: Dialogue dialogue:rival3Female.encounter.1 skipped
+[04:28:38.172] LOG: Rival Ivy
+[04:28:39.039] LOG: %cStart Phase SummonPhase color:green;
+[04:28:39.040] LOG: Ivy
+[04:28:39.328] LOG: %cStart Phase SummonPhase color:green;
+[04:28:39.493] LOG: Applied Carbos 
+[04:28:39.493] LOG: Applied Protein 
+[04:28:39.493] LOG: Applied Soul Dew 
+[04:28:39.493] LOG: Applied Soul Dew 
+[04:28:39.493] LOG: Applied Zinc 
+[04:28:39.493] LOG: Applied Iron 
+[04:28:39.660] LOG: %cStart Phase InitEncounterPhase color:green;
+[04:28:39.661] LOG: %cStart Phase PostSummonPhase color:green;
+[04:28:39.661] LOG: Ran PSP for: Swellow
+[04:28:39.661] LOG: %cStart Phase PostSummonPhase color:green;
+[04:28:39.662] LOG: %cStart Phase PostSummonPhase color:green;
+[04:28:39.662] LOG: %cStart Phase PostSummonPhase color:green;
+[04:28:39.662] LOG: Ran PSP for: Landorus
+[04:28:39.662] LOG: %cStart Phase PostSummonPhase color:green;
+[04:28:39.662] LOG: %cStart Phase PostSummonPhase color:green;
+[04:28:39.664] LOG: %cStart Phase ShowAbilityPhase color:green;
+[04:28:39.829] LOG: %cStart Phase CommonAnimPhase color:green;
+[04:28:40.339] LOG: %cStart Phase MessagePhase color:green;
+[04:28:40.567] LOG: %cStart Phase HideAbilityPhase color:green;
+[04:28:40.589] LOG: %cStart Phase ShowAbilityPhase color:green;
+[04:28:40.773] LOG: %cStart Phase MessagePhase color:green;
+[04:28:41.089] LOG: %cStart Phase HideAbilityPhase color:green;
+[04:28:41.110] LOG: %cStart Phase TurnInitPhase color:green;
+[04:28:41.111] LOG: %cStart Phase CommandPhase color:green;
+[04:28:42.185] LOG: Move: PEBBLE_SHOWER Move targets: {"targets":[2],"multiple":true} 
+Player Pokemon: Landorus
+[04:28:42.187] LOG: %cStart Phase EnemyCommandPhase color:green;
+[04:28:42.192] LOG: Applied Hard Stone 
+[04:28:42.196] LOG: Battle Seed: 16DBCCZM7u2Bqf2j
+[04:28:42.198] LOG: Applied Hard Stone 
+[04:28:42.200] LOG: Move Pool: ["Boomburst","Protect","Heat Wave","Hurricane"]
+[04:28:42.200] LOG: Move Scores: [-262.7450980392157,-1000000,-299.3627450980392,-280.7598039215686]
+[04:28:42.200] LOG: Sorted Move Pool: ["Boomburst","Hurricane","Heat Wave","Protect"]
+[04:28:42.200] LOG: Chosen Move: Boomburst
+[04:28:42.200] LOG: ER AI: experimental brain (sharpness 1)
+[04:28:42.200] LOG: %cStart Phase TurnStartPhase color:green;
+[04:28:42.201] LOG: %cStart Phase MovePhase color:green;
+[04:28:42.201] LOG: %cUser: Swellow
+Move: BOOMBURST
+Use Mode: NORMAL color:orchid
+[04:28:42.202] LOG: %cStart Phase MessagePhase color:green;
+[04:28:42.305] LOG: %cStart Phase MoveEffectPhase color:green;
+[04:28:42.820] LOG: crit stage: +0
+[04:28:42.821] LOG: Move: Boomburst | Base damage: 84.22592 | Power: 140 | Source attack: 133 | Target defense: 125
+[04:28:42.821] LOG: Move: Boomburst | Attack damage: 125
+[04:28:42.822] LOG: %cStart Phase DamageAnimPhase color:green;
+[04:28:42.864] LOG: %cStart Phase DamageAnimPhase color:green;
+[04:28:42.865] LOG: %cStart Phase MessagePhase color:green;
+[04:28:43.133] LOG: %cStart Phase MoveEndPhase color:green;
+[04:28:43.133] LOG: %cStart Phase MovePhase color:green;
+[04:28:43.133] LOG: %cUser: Landorus
+Move: PEBBLE_SHOWER
+Use Mode: NORMAL color:orchid
+[04:28:43.134] LOG: %cStart Phase MessagePhase color:green;
+[04:28:43.279] LOG: %cStart Phase MoveEffectPhase color:green;
+[04:28:43.808] LOG: crit stage: +0
+[04:28:43.808] LOG: Applied Hard Stone 
+[04:28:43.809] LOG: Move: Pebble Shower | Base damage: 96.02545454545454 | Power: 90 | Source attack: 169 | Target defense: 88
+[04:28:43.809] LOG: Move: Pebble Shower | Attack damage: 172
+[04:28:43.809] LOG: %cStart Phase DamageAnimPhase color:green;
+[04:28:43.851] LOG: %cStart Phase MessagePhase color:green;
+[04:28:44.098] LOG: %cStart Phase FaintPhase color:green;
+[04:28:44.162] LOG: %cStart Phase MessagePhase color:green;
+[04:28:44.509] LOG: %cStart Phase ShowAbilityPhase color:green;
+[04:28:44.712] LOG: %cStart Phase StatStageChangePhase color:green;
+[04:28:44.891] LOG: %cStart Phase MessagePhase color:green;
+[04:28:45.131] LOG: %cStart Phase HideAbilityPhase color:green;
+[04:28:45.172] LOG: %cStart Phase VictoryPhase color:green;
+[04:28:45.172] LOG: Applied Soothe Bell 
+[04:28:45.173] LOG: %cStart Phase ExpPhase color:green;
+[04:28:45.173] LOG: Applied Super EXP. Charm 
+[04:28:45.173] LOG: Applied EXP. Charm 
+[04:28:45.805] LOG: 272065 298022 283443
+[04:28:45.927] LOG: %cStart Phase LevelUpPhase color:green;
+[04:28:45.927] LOG: Applied Carbos 
+[04:28:45.928] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[04:28:45.928] LOG: Applied Super EXP. Charm 
+[04:28:45.928] LOG: Applied EXP. Charm 
+[04:28:45.928] LOG: 257797 283754 262144
+[04:28:45.928] LOG: %cStart Phase LevelUpPhase color:green;
+[04:28:45.928] LOG: Applied Zinc 
+[04:28:45.928] LOG: Applied Iron 
+[04:28:45.928] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[04:28:45.928] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[04:28:45.928] LOG: Applied Super EXP. Charm 
+[04:28:45.928] LOG: Applied EXP. Charm 
+[04:28:45.929] LOG: %cStart Phase LevelUpPhase color:green;
+[04:28:45.929] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[04:28:45.929] LOG: %cStart Phase MoveEndPhase color:green;
+[04:28:45.929] LOG: %cStart Phase CheckInterludePhase color:green;
+[04:28:45.929] LOG: %cStart Phase WeatherEffectPhase color:green;
+[04:28:46.469] LOG: %cStart Phase PositionalTagPhase color:green;
+[04:28:46.469] LOG: %cStart Phase BerryPhase color:green;
+[04:28:46.470] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[04:28:46.470] LOG: %cStart Phase TurnEndPhase color:green;
+[04:28:46.470] LOG: %cStart Phase SwitchSummonPhase color:green;
+[04:28:46.705] LOG: Ivy
+[04:28:46.937] LOG: %cStart Phase PostSummonPhase color:green;
+[04:28:46.937] LOG: Ran PSP for: Eleshold
+[04:28:46.937] LOG: %cStart Phase PostSummonPhase color:green;
+[04:28:46.937] LOG: %cStart Phase PostSummonPhase color:green;
+[04:28:46.937] LOG: %cStart Phase TurnInitPhase color:green;
+[04:28:46.937] LOG: %cStart Phase CommandPhase color:green;
