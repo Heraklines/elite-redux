@@ -10,7 +10,12 @@ import {
   getErAbilityRomDescription,
   getErCompositeDetailedDescription,
 } from "#data/elite-redux/er-ability-descriptions";
-import { cycleErGiftAbility, getErActiveGiftAbilityId, isErBlackShiny } from "#data/elite-redux/er-black-shinies";
+import {
+  cycleErGiftAbility,
+  getErActiveGiftAbilityId,
+  isErBlackShiny,
+  isErGiftCycleAllowed,
+} from "#data/elite-redux/er-black-shinies";
 import { erStreakBonusPercent } from "#data/elite-redux/er-money-streak";
 import { getErMoveDetailPages, type MoveDetailRow } from "#data/elite-redux/er-move-details";
 import { erYoungsterFreeInnateSlots } from "#data/elite-redux/er-run-difficulty";
@@ -722,9 +727,11 @@ export class SummaryUiHandler extends UiHandler {
         }
       }
     } else if (button === Button.CYCLE_SHINY && this.cursor === Page.ABILITIES) {
-      // ER Black Shinies (#349): R cycles the GIFT between its 3 choices for
-      // the player's own black shiny, re-rendering the page in place.
-      if (this.pokemon?.isPlayer() && isErBlackShiny(this.pokemon)) {
+      // ER Black Shinies (#349): R cycles the GIFT between its 3 choices for the
+      // player's own black shiny, re-rendering the page in place - but ONLY out of
+      // combat (the reward-shop check menus). The gift is LOCKED mid-battle so it
+      // can't be swapped to game the current fight (isErGiftCycleAllowed).
+      if (this.pokemon?.isPlayer() && isErBlackShiny(this.pokemon) && isErGiftCycleAllowed()) {
         cycleErGiftAbility(this.pokemon);
         // Redraw the abilities page content in place so the gift row's name +
         // `idx/choices` counter refresh. We deliberately do NOT route through

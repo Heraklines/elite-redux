@@ -236,6 +236,10 @@ export class UiInputs {
       // ER (#562): the fusion-preview's R (CYCLE_SHINY) flips which mon is the base.
       // Same swallow problem - PartyUiHandler must be whitelisted to receive it.
       PartyUiHandler,
+      // ER (#349): the Black Shiny GIFT row on the Pokemon summary's Abilities page
+      // cycles its 3 gift choices on R (CYCLE_SHINY). Same swallow - without this the
+      // gift-cycle handler in SummaryUiHandler.processInput was unreachable dead code.
+      SummaryUiHandler,
       StarterSelectUiHandler,
       PokedexUiHandler,
       PokedexPageUiHandler,

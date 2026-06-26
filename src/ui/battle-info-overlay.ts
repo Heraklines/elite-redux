@@ -23,6 +23,7 @@ import {
   cycleErGiftAbility,
   getErActiveGiftAbilityId,
   getErSharedGiftAbilityIdsFor,
+  isErGiftCycleAllowed,
 } from "#data/elite-redux/er-black-shinies";
 import { erYoungsterFreeInnateSlots } from "#data/elite-redux/er-run-difficulty";
 import { getNatureName, getNatureStatMultiplier } from "#data/nature";
@@ -221,13 +222,17 @@ export class BattleInfoOverlay {
         return true;
       }
       case Btn.CYCLE_SHINY: {
-        // ER Black Shinies (#349): on the Abilities page, R cycles the
-        // inspected PLAYER black shiny's GIFT between its 3 choices.
+        // ER Black Shinies (#349): on the Abilities page, R would cycle the
+        // inspected PLAYER black shiny's GIFT - but this overlay is the IN-BATTLE
+        // inspector, and the gift is LOCKED mid-combat (isErGiftCycleAllowed is
+        // always false here), so the cycle never fires and R just closes the
+        // overlay. The gift is switched out of combat on the summary instead.
         const mon = this.onField()[this.slotIndex];
         if (
           this.getPages()[this.pageIndex] === "abilities"
           && mon?.isPlayer()
           && getErActiveGiftAbilityId(mon) !== null
+          && isErGiftCycleAllowed()
         ) {
           cycleErGiftAbility(mon);
           this.render();

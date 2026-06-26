@@ -178,6 +178,18 @@ export function cycleErGiftAbility(pokemon: Pokemon): number | null {
 }
 
 /**
+ * Whether the gift slot may be CYCLED right now. Maintainer rule: ONLY in the
+ * out-of-combat reward-shop check menus, NEVER mid-combat - the player must not
+ * be able to swap the gift ability to game the current fight. The reward shop
+ * runs SelectModifierPhase; any active battle phase (command / move / etc.)
+ * blocks the cycle. Gates both the summary Abilities page and the in-battle
+ * Info overlay (the latter is always mid-combat, so this is always false there).
+ */
+export function isErGiftCycleAllowed(): boolean {
+  return globalScene.phaseManager.getCurrentPhase().is("SelectModifierPhase");
+}
+
+/**
  * GIFT SHARING — the extra ability ids active on `pokemon`:
  *  - its OWN active gift (if it is a black shiny), plus
  *  - the active gift of any black-shiny ALLY currently on the field with it.
