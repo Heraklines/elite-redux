@@ -45,10 +45,17 @@ import { GameModes } from "#enums/game-modes";
 import { MoveId } from "#enums/move-id";
 import { SpeciesId } from "#enums/species-id";
 import { Stat } from "#enums/stat";
+import { StatusEffect } from "#enums/status-effect";
 import type { Pokemon } from "#field/pokemon";
+import {
+  CoopFaintReplayPhase,
+  CoopFinalizeTurnPhase,
+  CoopHpDrainReplayPhase,
+  CoopMoveAnimReplayPhase,
+} from "#phases/coop-replay-phases";
 import { GameManager } from "#test/framework/game-manager";
 import Phaser from "phaser";
-import { afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 const RUN = process.env.ER_SCENARIO === "1";
 
@@ -113,6 +120,46 @@ describe.skipIf(!RUN)("co-op richer battle events + guest animation pump (#633, 
       terrain: 0,
       terrainTurnsLeft: 0,
     };
+  };
+
+  /**
+   * The presentation phases {@linkcode CoopReplayTurnPhase} unshifts (the anim pump + the deferred
+   * finalize), PLUS the MessagePhase a `message` event queues - all of which must drain to reach
+   * the deferred {@linkcode CoopFinalizeTurnPhase} that now applies the checkpoint.
+   */
+  const REPLAY_DRAIN_PHASES = [
+    "MessagePhase",
+    "CoopMoveAnimReplayPhase",
+    "CoopHpDrainReplayPhase",
+    "CoopStatStageReplayPhase",
+    "CoopStatusReplayPhase",
+    "CoopFaintReplayPhase",
+    "CoopFinalizeTurnPhase",
+  ] as const;
+
+  /**
+   * Start a guest {@linkcode CoopReplayTurnPhase} for `turn` and drain the presentation phases it
+   * unshifts PLUS the deferred {@linkcode CoopFinalizeTurnPhase} (which now applies the checkpoint +
+   * verifies the checksum - the checkpoint is no longer synchronous in the replay phase). The drain
+   * runs each phase to completion so the queue empties deterministically; the anim/tween work is
+   * hardened to end() headlessly, so this never hangs. Stops once the finalize phase has run.
+   */
+  const driveReplayTurn = async (turn: number): Promise<void> => {
+    const replay = game.scene.phaseManager.create("CoopReplayTurnPhase", turn);
+    replay.start();
+    await new Promise(r => setTimeout(r, 0));
+    for (let i = 0; i < 32; i++) {
+      const cur = game.scene.phaseManager.getCurrentPhase();
+      if (cur == null || !REPLAY_DRAIN_PHASES.some(name => cur.is(name))) {
+        break;
+      }
+      const wasFinalize = cur.is("CoopFinalizeTurnPhase");
+      cur.start();
+      await new Promise(r => setTimeout(r, 0));
+      if (wasFinalize) {
+        break;
+      }
+    }
   };
 
   // ===========================================================================
@@ -231,12 +278,12 @@ describe.skipIf(!RUN)("co-op richer battle events + guest animation pump (#633, 
     });
     await new Promise(r => setTimeout(r, 0));
 
-    const replay = game.scene.phaseManager.create("CoopReplayTurnPhase", turn);
-    // The whole pump (render the events + apply the checkpoint) must not throw.
-    expect(() => replay.start()).not.toThrow();
-    await new Promise(r => setTimeout(r, 0));
+    // The whole pump (render the events + drain the anim phases + apply the deferred checkpoint in
+    // CoopFinalizeTurnPhase) must not throw.
+    await expect(driveReplayTurn(turn)).resolves.not.toThrow();
 
-    // The checkpoint snapped every field mon to the host's hp (9) - the source of truth still applied.
+    // The checkpoint snapped every field mon to the host's hp (9) - the source of truth still applied
+    // (now in the deferred finalize phase, AFTER the animations).
     for (const mon of field) {
       expect(mon.hp, "guest field snaps to the host's streamed checkpoint hp").toBe(9);
     }
@@ -278,13 +325,11 @@ describe.skipIf(!RUN)("co-op richer battle events + guest animation pump (#633, 
     });
     await new Promise(r => setTimeout(r, 0));
 
-    const replay = game.scene.phaseManager.create("CoopReplayTurnPhase", turn);
-    replay.start();
-    await new Promise(r => setTimeout(r, 0));
+    await driveReplayTurn(turn);
 
     // The guest's hp + ATK stage now match the host's, and the post-render checksum CONVERGES exactly:
-    // the animation pump rendered cosmetics, the checkpoint snapped the authoritative state, and the
-    // checksum (captured at the same boundary the host stamped) re-converges. No desync, no stateSync.
+    // the animation pump rendered cosmetics, the deferred finalize checkpoint snapped the authoritative
+    // state, and the checksum (captured at the same boundary the host stamped) re-converges. No desync.
     expect(hostMon.hp, "the guest's hp matches the host's authoritative value").toBe(5);
     expect(hostMon.getStatStage(Stat.ATK), "the guest's ATK stage matches the host's").toBe(2);
     expect(coopEngine.captureCoopChecksum(), "the post-render checksum converges to the host's").toBe(hostChecksum);
@@ -312,13 +357,161 @@ describe.skipIf(!RUN)("co-op richer battle events + guest animation pump (#633, 
     });
     await new Promise(r => setTimeout(r, 0));
 
-    const replay = game.scene.phaseManager.create("CoopReplayTurnPhase", turn);
-    expect(() => replay.start(), "a garbled event stream never throws").not.toThrow();
-    await new Promise(r => setTimeout(r, 0));
+    // A garbled stream never throws or hangs; the deferred finalize checkpoint still corrects the field.
+    await expect(driveReplayTurn(turn), "a garbled event stream never throws").resolves.not.toThrow();
 
     // The checkpoint still applied: every mon snaps to the host's hp (8) despite the garbage events.
     for (const mon of field) {
       expect(mon.hp, "the checkpoint still corrects the field after garbled events").toBe(8);
     }
+  });
+
+  // ===========================================================================
+  // (Step 1) DEFERRED finalize: animations run against the ALIVE field; the checkpoint
+  // is applied LAST (in CoopFinalizeTurnPhase), so a host faint can animate + the checksum
+  // stays byte-identical. This is the must-ship gate (faints animate).
+  // ===========================================================================
+
+  /**
+   * Build a checkpoint that marks `koBi` fainted (hp 0) and snaps every OTHER field mon to its
+   * CURRENT live hp (a no-op for them). The KOd mon excluded by the host equals the KOd mon the
+   * guest's faint phase leaveField's, so the host checksum captured with `koBi` fainted matches the
+   * guest's post-finalize checksum exactly.
+   */
+  const checkpointKO = (koBi: number): CoopBattleCheckpoint => {
+    const live = globalScene.getField(true).filter((m): m is Pokemon => m != null);
+    return {
+      field: live.map(m => {
+        const bi = m.getBattlerIndex();
+        const ko = bi === koBi;
+        return {
+          bi,
+          partyIndex: (m.isPlayer()
+            ? globalScene.getPlayerParty()
+            : (globalScene.getEnemyParty() as Pokemon[])
+          ).indexOf(m),
+          speciesId: m.species.speciesId,
+          hp: ko ? 0 : m.hp,
+          maxHp: m.getMaxHp(),
+          status: m.status?.effect ?? 0,
+          // Preserve each surviving mon's CURRENT stat stages so the snap is a true no-op for them
+          // (the host hashes the same live stages); only the KOd mon is removed.
+          statStages: [...m.getStatStages()],
+          fainted: ko,
+        };
+      }),
+      weather: 0,
+      weatherTurnsLeft: 0,
+      terrain: 0,
+      terrainTurnsLeft: 0,
+    };
+  };
+
+  it("(Step 1) a host KO ANIMATES (MoveAnim->HpDrain->Faint->Finalize) with the mon PRESENT, and the checksum MATCHES", async () => {
+    const field = await startCoopGuest();
+    const turn = globalScene.currentBattle.turn;
+    const enemy0 = globalScene.getEnemyField(false)[0];
+    const koBi = enemy0.getBattlerIndex();
+
+    // HOST authoritative checksum: model the host's end-of-turn state where enemy0 is KOd. Mark it
+    // fainted (hp 0) so getField(true) excludes it - exactly what the host hashes after its FaintPhase
+    // leaveField'd the foe - capture the checksum, then RESTORE enemy0 alive (still on-field) so the
+    // guest starts the turn with the foe present and must animate the faint itself.
+    const koOrigHp = enemy0.hp;
+    enemy0.hp = 0;
+    enemy0.doSetStatus(StatusEffect.FAINT);
+    const hostChecksum = coopEngine.captureCoopChecksum();
+    const hostCheckpoint = checkpointKO(koBi);
+    enemy0.hp = koOrigHp;
+    enemy0.status = null;
+    expect(enemy0.isOnField(), "enemy0 is alive on the guest's pre-turn field").toBe(true);
+
+    // Record the ORDER the replay phases run + whether the FAINT phase saw the mon PRESENT (not snapped
+    // away on an empty field). Anim/drain phases short-circuit to end() (no headless tweens); the faint
+    // phase PERFORMS the real removal (so the field matches the host); the finalize phase runs for real.
+    const order: string[] = [];
+    let faintSawMonPresent: boolean | null = null;
+    const moveSpy = vi.spyOn(CoopMoveAnimReplayPhase.prototype, "start").mockImplementation(function (
+      this: CoopMoveAnimReplayPhase,
+    ) {
+      order.push("MoveAnim");
+      this.end();
+    });
+    const hpSpy = vi.spyOn(CoopHpDrainReplayPhase.prototype, "start").mockImplementation(function (
+      this: CoopHpDrainReplayPhase,
+    ) {
+      order.push("HpDrain");
+      this.end();
+    });
+    const faintSpy = vi.spyOn(CoopFaintReplayPhase.prototype, "start").mockImplementation(function (
+      this: CoopFaintReplayPhase,
+    ) {
+      order.push("Faint");
+      // The faint phase runs BEFORE the checkpoint, so the KOd mon MUST still be on-field here.
+      faintSawMonPresent = enemy0.isOnField();
+      // Perform the same side-effect-free removal the real faint phase does (so the field matches
+      // the host's end-of-turn composition before the finalize checkpoint reconciles it).
+      enemy0.hp = 0;
+      enemy0.doSetStatus(StatusEffect.FAINT);
+      enemy0.leaveField(true, true, false);
+      this.end();
+    });
+    const finalizeSpy = vi.spyOn(CoopFinalizeTurnPhase.prototype, "start");
+
+    const partner = getCoopRuntime()!.partnerTransport!;
+    partner.send({
+      t: "turnResolution",
+      turn,
+      events: [
+        { k: "moveUsed", bi: BattlerIndex.PLAYER, moveId: MoveId.TACKLE, targets: [koBi] },
+        { k: "hp", bi: koBi, hp: 0, maxHp: enemy0.getMaxHp() },
+        { k: "faint", bi: koBi },
+      ],
+      checkpoint: hostCheckpoint,
+      checksum: hostChecksum,
+    });
+    await new Promise(r => setTimeout(r, 0));
+
+    // Drive the guest replay turn, then drain the queued presentation + finalize phases in order.
+    const replay = game.scene.phaseManager.create("CoopReplayTurnPhase", turn);
+    replay.start();
+    await new Promise(r => setTimeout(r, 0));
+    // Drain the unshifted phases (MoveAnim -> HpDrain -> Faint -> Finalize) deterministically.
+    for (let i = 0; i < 8 && game.scene.phaseManager.getCurrentPhase() != null; i++) {
+      const cur = game.scene.phaseManager.getCurrentPhase();
+      if (
+        cur.is("CoopMoveAnimReplayPhase")
+        || cur.is("CoopHpDrainReplayPhase")
+        || cur.is("CoopFaintReplayPhase")
+        || cur.is("CoopFinalizeTurnPhase")
+      ) {
+        cur.start();
+        await new Promise(r => setTimeout(r, 0));
+      } else {
+        break;
+      }
+    }
+
+    moveSpy.mockRestore();
+    hpSpy.mockRestore();
+    faintSpy.mockRestore();
+
+    // The faint phase ran with the mon PRESENT (not early-returned on a snapped-empty field).
+    expect(faintSawMonPresent, "CoopFaintReplayPhase ran with the KOd mon still on-field").toBe(true);
+    // The phase order is MoveAnim -> HpDrain -> Faint -> Finalize (the checkpoint is LAST).
+    expect(order, "animations run in order, the finalize/checkpoint is deferred to last").toEqual([
+      "MoveAnim",
+      "HpDrain",
+      "Faint",
+    ]);
+    expect(finalizeSpy, "the deferred finalize phase ran after the animations").toHaveBeenCalledTimes(1);
+    finalizeSpy.mockRestore();
+
+    // NO-REGRESSION GATE: the post-turn checksum MATCHES the host's. The checkpoint re-asserted the
+    // exact end-of-turn state (enemy0 gone), so the per-turn checksum is byte-identical to the host's.
+    expect(coopEngine.captureCoopChecksum(), "the post-turn checksum matches the host (no desync)").toBe(hostChecksum);
+    // The KOd enemy left the field; the surviving mons are still present.
+    expect(enemy0.isOnField(), "the KOd enemy left the field by turn end").toBe(false);
+    expect(field[COOP_HOST_FIELD_INDEX].isOnField(), "the host's mon survives").toBe(true);
   });
 });

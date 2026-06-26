@@ -117,6 +117,47 @@ describe.skipIf(!RUN)("co-op GUEST = pure renderer - real engine (#633, TRACK-2 
     };
   };
 
+  /**
+   * The presentation phases {@linkcode CoopReplayTurnPhase} unshifts (anim pump + deferred finalize),
+   * plus the MessagePhase a `message` event queues. The checkpoint + wave-advance now run in the
+   * deferred {@linkcode CoopFinalizeTurnPhase} (which is LAST on the tree level), so a test must drain
+   * these to observe the checkpoint applied / the wave tail queued.
+   */
+  const REPLAY_DRAIN_PHASES = [
+    "MessagePhase",
+    "CoopMoveAnimReplayPhase",
+    "CoopHpDrainReplayPhase",
+    "CoopStatStageReplayPhase",
+    "CoopStatusReplayPhase",
+    "CoopFaintReplayPhase",
+    "CoopFinalizeTurnPhase",
+  ];
+
+  /**
+   * Start a guest {@linkcode CoopReplayTurnPhase} for `turn` and drain the presentation phases it
+   * unshifts PLUS the deferred {@linkcode CoopFinalizeTurnPhase} (which applies the checkpoint, verifies
+   * the checksum, queues turn-end + the wave-advance tail). The drain runs each phase to completion so
+   * the queue empties deterministically; the anim/tween work is hardened to end() headlessly. Stops
+   * once the finalize phase has run.
+   */
+  const driveReplayTurn = async (turn: number): Promise<void> => {
+    const replay = game.scene.phaseManager.create("CoopReplayTurnPhase", turn);
+    replay.start();
+    await new Promise(r => setTimeout(r, 0));
+    for (let i = 0; i < 32; i++) {
+      const cur = game.scene.phaseManager.getCurrentPhase();
+      if (cur == null || !REPLAY_DRAIN_PHASES.some(name => cur.is(name as Parameters<typeof cur.is>[0]))) {
+        break;
+      }
+      const wasFinalize = cur.is("CoopFinalizeTurnPhase");
+      cur.start();
+      await new Promise(r => setTimeout(r, 0));
+      if (wasFinalize) {
+        break;
+      }
+    }
+  };
+
   it("the guest's EnemyCommandPhase rolls NO AI (no getNextMove / RNG), writes an inert command", async () => {
     await startCoopGuest();
     globalScene.currentBattle.turnCommands = {};
@@ -196,18 +237,16 @@ describe.skipIf(!RUN)("co-op GUEST = pure renderer - real engine (#633, TRACK-2 
     await new Promise(r => setTimeout(r, 0));
 
     const pushNewSpy = vi.spyOn(globalScene.phaseManager, "pushNew");
-    const replay = game.scene.phaseManager.create("CoopReplayTurnPhase", turn);
-    replay.start();
-    // Let the awaitTurn promise + render resolve.
-    await new Promise(r => setTimeout(r, 0));
+    // Drive the replay turn + drain the deferred finalize (which now applies the checkpoint).
+    await driveReplayTurn(turn);
 
     // The field converged to the streamed checkpoint's hp (7) - the host's outcome rendered.
     for (const mon of field) {
       expect(mon.hp, "guest field snaps to the host's streamed checkpoint hp").toBe(7);
     }
-    // The replay phase queued the guest's OWN turn-end phases so the run loops (no hang).
+    // The finalize phase queued the guest's OWN turn-end phases so the run loops (no hang).
     const queuedTurnEnd = pushNewSpy.mock.calls.some(([name]) => name === "TurnEndPhase");
-    expect(queuedTurnEnd, "replay phase queues the guest's turn-end (run loops)").toBe(true);
+    expect(queuedTurnEnd, "the finalize phase queues the guest's turn-end (run loops)").toBe(true);
   });
 
   it("ENEMY-FIELD RECONCILE (#633): a host-KOd enemy the guest still has ALIVE is removed + the checksum converges", async () => {
@@ -513,11 +552,10 @@ describe.skipIf(!RUN)("co-op GUEST = pure renderer - real engine (#633, TRACK-2 
     await new Promise(r => setTimeout(r, 0));
 
     const pushNewSpy = vi.spyOn(globalScene.phaseManager, "pushNew");
-    const replay = game.scene.phaseManager.create("CoopReplayTurnPhase", turn);
-    replay.start();
-    await new Promise(r => setTimeout(r, 0));
+    // Drive the replay turn + drain the deferred finalize, which consumes the pending wave-advance.
+    await driveReplayTurn(turn);
 
-    // The guest queued its turn-end (run loops) AND the VictoryPhase tail (wave advances).
+    // The finalize phase queued its turn-end (run loops) AND the VictoryPhase tail (wave advances).
     const victoryPushes = pushNewSpy.mock.calls.filter(([name]) => name === "VictoryPhase");
     expect(victoryPushes.length, "the guest queues the VictoryPhase tail to advance the wave").toBe(1);
     const queuedTurnEnd = pushNewSpy.mock.calls.some(([name]) => name === "TurnEndPhase");
@@ -535,9 +573,7 @@ describe.skipIf(!RUN)("co-op GUEST = pure renderer - real engine (#633, TRACK-2 
     });
     await new Promise(r => setTimeout(r, 0));
     pushNewSpy.mockClear();
-    const replay2 = game.scene.phaseManager.create("CoopReplayTurnPhase", turn + 1);
-    replay2.start();
-    await new Promise(r => setTimeout(r, 0));
+    await driveReplayTurn(turn + 1);
     const victoryPushes2 = pushNewSpy.mock.calls.filter(([name]) => name === "VictoryPhase");
     expect(victoryPushes2.length, "a duplicate waveResolved for the same wave does NOT re-advance").toBe(0);
   });
@@ -685,9 +721,8 @@ describe.skipIf(!RUN)("co-op GUEST = pure renderer - real engine (#633, TRACK-2 
     await new Promise(r => setTimeout(r, 0));
 
     const pushNewSpy = vi.spyOn(globalScene.phaseManager, "pushNew");
-    const replay = game.scene.phaseManager.create("CoopReplayTurnPhase", turn);
-    replay.start();
-    await new Promise(r => setTimeout(r, 0));
+    // Drive the replay turn + drain the deferred finalize, which consumes the pending flee outcome.
+    await driveReplayTurn(turn);
 
     // The guest ran the flee tail (BattleEnd -> NewBattle) and did NOT grant a VictoryPhase.
     const pushedBattleEnd = pushNewSpy.mock.calls.some(([name]) => name === "BattleEndPhase");
@@ -723,9 +758,8 @@ describe.skipIf(!RUN)("co-op GUEST = pure renderer - real engine (#633, TRACK-2 
     await new Promise(r => setTimeout(r, 0));
 
     const pushNewSpy = vi.spyOn(globalScene.phaseManager, "pushNew");
-    const replay = game.scene.phaseManager.create("CoopReplayTurnPhase", turn);
-    replay.start();
-    await new Promise(r => setTimeout(r, 0));
+    // Drive the replay turn + drain the deferred finalize, which consumes the pending gameOver outcome.
+    await driveReplayTurn(turn);
 
     // The guest queued the game-over render (so a lost run shows the screen, not a hang), and NOT a
     // wave-advancing VictoryPhase.
