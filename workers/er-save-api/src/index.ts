@@ -1158,40 +1158,55 @@ async function handleRunSample(
   // regardless of its origin tier.
   // ER (#131): the old `ORDER BY RANDOM() LIMIT ?` had NO usable index for its
   // `user_id != ? AND wave >= ?` filter, so D1 read the ENTIRE runs table on every
-  // ghost fetch. Once the table grew to thousands of rows this blew past D1's rows-read
-  // budget; the query errored and the client SILENTLY fell back to the player's OWN
-  // teams ("same ghost over and over", affecting everyone, with thousands of ghosts
-  // unused). Replace it with a random-rowid-window sample: seek to a random rowid (a
-  // cheap MAX(rowid)) and walk forward in primary-key order taking the first `count`
-  // eligible rows, wrapping to the start of the table to top up. This reads ~count rows
-  // via the integer-primary-key index instead of scanning the whole table, and EVERY
-  // row stays reachable because the start offset spans [0, MAX(rowid)].
+  // ghost fetch and blew past the rows-read budget; the query errored and the client
+  // SILENTLY fell back to the player's OWN teams ("same ghost over and over").
+  // The first fix replaced it with ONE random-rowid window - a seek + walk forward for
+  // `count` CONSECUTIVE eligible rows. That reads ~count rows (good) but returns a
+  // temporally-adjacent BLOCK (bad): each run's pool was clustered, so the thin
+  // high-wave bands (wave 137/163) were missed ~half the time and the ghost challenge
+  // then fielded a far-deeper team that had to be devolved (the "unevolved ghosts").
+  // Now: many INDEPENDENT random-rowid seeks, each taking the FIRST eligible row at/after
+  // its point (LIMIT 1) via the PK index, run as one batch. Still ~constant rows read,
+  // but a uniform SPREAD across the whole table - diverse uploaders, every wave band
+  // reachable. Dedup by id; top up from the table start only if the eligible set is sparse.
   const cols = "id, username, outcome, difficulty, wave, created_at, player_team, opponent_name, opponent_team";
   const maxRow = await env.DB.prepare("SELECT MAX(rowid) AS m FROM runs").first<{ m: number | null }>();
   const maxRowId = maxRow?.m ?? 0;
-  const startRowId = maxRowId > 0 ? Math.floor(Math.random() * (maxRowId + 1)) : 0;
-
-  const forward = await env.DB.prepare(
-    `SELECT ${cols} FROM runs
-       WHERE rowid >= ?1 AND user_id != ?2 AND wave >= ?3
-       ORDER BY rowid LIMIT ?4`,
-  )
-    .bind(startRowId, auth.uid, minWave, count)
-    .all<RunSampleRow>();
-  let results: RunSampleRow[] = forward.results ?? [];
-
-  if (results.length < count) {
-    // Wrap around to the start of the table to fill the remainder (the random offset
-    // landed near the end, or the eligible set is sparse from there onward).
-    const wrap = await env.DB.prepare(
-      `SELECT ${cols} FROM runs
-         WHERE rowid < ?1 AND user_id != ?2 AND wave >= ?3
-         ORDER BY rowid LIMIT ?4`,
-    )
-      .bind(startRowId, auth.uid, minWave, count - results.length)
-      .all<RunSampleRow>();
-    results = results.concat(wrap.results ?? []);
+  const seen = new Set<string>();
+  let results: RunSampleRow[] = [];
+  if (maxRowId > 0) {
+    const seekStmt = (start: number) =>
+      env.DB.prepare(
+        `SELECT ${cols} FROM runs WHERE rowid >= ?1 AND user_id != ?2 AND wave >= ?3 ORDER BY rowid LIMIT 1`,
+      ).bind(start, auth.uid, minWave);
+    const seeks = Math.min(count * 2, 40);
+    const stmts = Array.from({ length: seeks }, () => seekStmt(Math.floor(Math.random() * (maxRowId + 1))));
+    const batched = await env.DB.batch<RunSampleRow>(stmts);
+    for (const r of batched) {
+      for (const row of r.results ?? []) {
+        if (!seen.has(row.id)) {
+          seen.add(row.id);
+          results.push(row);
+        }
+      }
+    }
+    if (results.length < count) {
+      // Sparse eligible set: some seeks landed past the last eligible row. Top up from
+      // the start of the table (a contiguous read of the shallow end) to reach `count`.
+      const fill = await env.DB.prepare(
+        `SELECT ${cols} FROM runs WHERE user_id != ?1 AND wave >= ?2 ORDER BY rowid LIMIT ?3`,
+      )
+        .bind(auth.uid, minWave, count * 2)
+        .all<RunSampleRow>();
+      for (const row of fill.results ?? []) {
+        if (!seen.has(row.id)) {
+          seen.add(row.id);
+          results.push(row);
+        }
+      }
+    }
   }
+  results = results.slice(0, count);
   const teams = (results ?? [])
     .map(row => {
       try {

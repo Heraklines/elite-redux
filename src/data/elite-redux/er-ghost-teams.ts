@@ -106,10 +106,23 @@ const LOCAL_STORE_CAP = 100;
 /** Prefetch this many waves ahead of the run's FIRST ghost wave (#364). */
 const PREFETCH_LEAD_WAVES = 15;
 /**
- * A ghost team fielded at wave W may only come from a run that ended at most
- * this many waves past W — no endgame teams crushing players at wave 87.
+ * A ghost team fielded at wave W is preferentially drawn from a run that ended
+ * within this many waves of W. Widened 20 -> 40 (#422 follow-up): the high ghost
+ * waves (137/163) have only a thin band of runs that ended right there, so a tight
+ * 20-wave band missed them constantly and the challenge fell through to fielding a
+ * far-deeper team that had to be devolved. A 40-wave band finds a wave-appropriate
+ * team far more often.
  */
-export const ER_GHOST_WAVE_WINDOW = 20;
+export const ER_GHOST_WAVE_WINDOW = 40;
+
+/**
+ * Past this wave the player already faces fully-evolved enemies (the #419 elite BST
+ * cap ladder ends ~here), so a ghost drawn from a deeper run must NOT be devolved -
+ * it is only re-levelled down to the wave (see applyErGhostOverride). Below it, the
+ * fairness devolve still applies so an endgame roster can't sweep an early ghost wave
+ * (hell 63/87). Maintainer rule: "at wave 100 there should be no un-evolved mons."
+ */
+export const ER_GHOST_NO_DEVOLVE_WAVE = 100;
 
 // -----------------------------------------------------------------------------
 // Pool integrity — hacked/impossible teams must never reach other players.
@@ -879,7 +892,7 @@ export function takeGhostForWave(waveIndex: number, trainerWave = false): GhostT
   // giving up. Scheduled ghost waves on normal runs keep the strict window.
   const challengeMode = isErGhostChallengeActive();
   const legal = pool.filter(s => isErGhostTeamLegal(s));
-  const windows = challengeMode ? [ER_GHOST_WAVE_WINDOW, 30, 40, 60] : [ER_GHOST_WAVE_WINDOW];
+  const windows = challengeMode ? [ER_GHOST_WAVE_WINDOW, 60, 80] : [ER_GHOST_WAVE_WINDOW];
   let next: GhostTeamSnapshot | undefined;
   for (const window of windows) {
     const eligible = legal.filter(s => s.waveReached >= waveIndex && s.waveReached <= waveIndex + window);
@@ -890,11 +903,10 @@ export function takeGhostForWave(waveIndex: number, trainerWave = false): GhostT
     }
   }
   // ER (#422): challenge last resort - the pool is dominated by DEEP runs
-  // (victories end at 200), so early waves can miss even the widest window
-  // and the player kept meeting normal trainers in ghost mode. Take the
-  // CLOSEST deeper team instead; applyErGhostOverride devolves its members
-  // by overshoot (up to base form past 60 waves) and re-levels them to the
-  // wave, so an endgame roster arrives as its early-game self.
+  // (victories end at 200), so a wave can miss even the widest window and the
+  // player kept meeting normal trainers in ghost mode. Take the CLOSEST deeper
+  // team instead; applyErGhostOverride re-levels it to the wave (and, below wave
+  // 100 only, devolves it by overshoot so an endgame roster can't sweep early).
   if (!next && challengeMode) {
     const anyDeeper = legal.filter(s => s.waveReached >= waveIndex);
     const unused = anyDeeper.filter(s => !usedGhostIds.has(s.id));
@@ -992,14 +1004,18 @@ export function applyErGhostOverride(trainer: Trainer, index: number): EnemyPoke
       return null;
     }
     const battle = globalScene.currentBattle;
-    // ER (#422): a team fielded from BEYOND the 20-wave fairness window
-    // (challenge widening / last resort) gets its members devolved - one stage
-    // for up to 20 waves of overshoot, two past that, all the way to the BASE
-    // form past 60 - so a deep team's fully evolved mons don't sweep an
-    // early-game player. Single-stagers stay.
-    const overshoot = Math.max(0, snapshot.waveReached - ((battle?.waveIndex ?? snapshot.waveReached) + ER_GHOST_WAVE_WINDOW));
+    const currentWave = battle?.waveIndex ?? snapshot.waveReached;
+    // ER (#422): a team fielded from BEYOND the fairness window (challenge widening
+    // / last resort) gets its members devolved - one stage per overshoot band, two
+    // past +20, base form past +60 - so a deep team's fully evolved mons don't sweep
+    // an early-game player. Single-stagers stay.
+    // ER (#422 follow-up): ONLY below wave 100 (ER_GHOST_NO_DEVOLVE_WAVE). Past there
+    // the player already faces fully-evolved enemies, so a deep ghost is just
+    // re-levelled down (level cap below), never devolved - that devolve was the cause
+    // of "not-fully-evolved ghost mons at wave 137+" in the Ghost Trainers challenge.
+    const overshoot = Math.max(0, snapshot.waveReached - (currentWave + ER_GHOST_WAVE_WINDOW));
     let devolved = false;
-    if (overshoot > 0) {
+    if (overshoot > 0 && currentWave < ER_GHOST_NO_DEVOLVE_WAVE) {
       const stages = overshoot > 60 ? 3 : overshoot > 20 ? 2 : 1;
       for (let i = 0; i < stages; i++) {
         const prevId = pokemonPrevolutions[species.speciesId as SpeciesId];
