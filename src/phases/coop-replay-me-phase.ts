@@ -7,6 +7,7 @@
 import { globalScene } from "#app/global-scene";
 import { Phase } from "#app/phase";
 import { applyCoopMeOutcome } from "#data/elite-redux/coop/coop-battle-engine";
+import { coopLog, coopWarn } from "#data/elite-redux/coop/coop-debug";
 import { COOP_ME_BATTLE_HANDOFF, COOP_ME_TERM_SEQ_BASE } from "#data/elite-redux/coop/coop-me-pump";
 import { getCoopBattleStreamer, getCoopController, getCoopInteractionRelay } from "#data/elite-redux/coop/coop-runtime";
 import type { CoopInteractionOutcome } from "#data/elite-redux/coop/coop-transport";
@@ -96,9 +97,16 @@ export class CoopReplayMePhase extends Phase {
 
   public override start(): void {
     super.start();
+    coopLog("me", "guest diverted into CoopReplayMePhase", {
+      counter: this.interactionCounter,
+      seqMe: this.seq,
+      seqTerm: this.seqTerm,
+      wave: globalScene.currentBattle?.waveIndex,
+    });
     const relay = getCoopInteractionRelay();
     if (relay == null) {
       // No live session (defensive): leave the encounter locally so the run never hangs.
+      coopWarn("me", "no interaction relay at ME start; defensive leave", { counter: this.interactionCounter });
       this.leaveDefensive();
       return;
     }
@@ -122,13 +130,25 @@ export class CoopReplayMePhase extends Phase {
       // the option selector renders off the host's `meetsReqs` / `labels` (the guest's own onInit /
       // meetsRequirements read its DIVERGED party). A null (host stall) falls through: the handler
       // re-derives locally (degraded but never a hang).
+      coopLog("me", "await host presentation (mePresent)", { seq: this.seq, timeoutMs: COOP_ME_REPLAY_WAIT_MS });
       const present = await relay.awaitInteractionOutcome(this.seq, COOP_ME_REPLAY_WAIT_MS);
       if (present != null && present.k === "mePresent") {
         const enc = globalScene.currentBattle.mysteryEncounter;
         if (enc != null) {
           enc.dialogueTokens = { ...enc.dialogueTokens, ...present.tokens }; // host tokens win (itemName etc.)
           coopMeHostPresentation = present; // the UI handler reads meetsReqs / labels from this
+          coopLog("me", "adopted host presentation", {
+            seq: this.seq,
+            opts: present.meetsReqs.length,
+            labels: present.labels.length,
+            tokens: Object.keys(present.tokens).length,
+          });
         }
+      } else {
+        coopWarn("me", "presentation await resolved without mePresent (host stall); local re-derivation", {
+          seq: this.seq,
+          got: present == null ? "null" : present.k,
+        });
       }
 
       // Ownership is resolved from the PINNED start counter (stable for the whole ME), never the live
@@ -137,6 +157,11 @@ export class CoopReplayMePhase extends Phase {
       // which relays it + drives the sub-pick loop + the terminal. When the HOST owns it, the guest is
       // a pure renderer: await the comprehensive outcome (P4) then the leave terminal.
       const ownsMe = getCoopController()?.isLocalOwnerAtCounter(this.interactionCounter) ?? false;
+      coopLog("me", "ME ownership resolved", {
+        counter: this.interactionCounter,
+        ownsMe,
+        branch: ownsMe ? "guest renders selector + relays picks" : "pure renderer (await outcome+terminal)",
+      });
       if (ownsMe) {
         // Same setMode call MysteryEncounterPhase.start uses; the handler renders off the streamed
         // presentation (getCoopMeHostPresentation) and captures the human's cursor.
@@ -155,9 +180,11 @@ export class CoopReplayMePhase extends Phase {
   public handleGuestOptionSelect(index: number): void {
     const relay = getCoopInteractionRelay();
     if (relay == null) {
+      coopWarn("me", "no relay on guest option select; defensive leave", { counter: this.interactionCounter, index });
       this.leaveDefensive();
       return;
     }
+    coopLog("me", "guest relays top-level ME pick", { seq: this.seq, kind: ME_CHOICE_KIND, index });
     relay.sendInteractionChoice(this.seq, ME_CHOICE_KIND, index); // P1 on seq_me
     this.awaitOutcomeThenTerminal(relay);
   }
@@ -167,6 +194,7 @@ export class CoopReplayMePhase extends Phase {
    * the SAME seq_me (CHOICE inbox, FIFO); the host consumes one per sub-prompt site (ADD-2b).
    */
   public relayGuestSubPick(value: number): void {
+    coopLog("me", "guest relays ME sub-pick", { seq: this.seq, kind: ME_SUBPICK_KIND, value });
     getCoopInteractionRelay()?.sendInteractionChoice(this.seq, ME_SUBPICK_KIND, value); // P1b on seq_me (FIFO)
   }
 
@@ -179,22 +207,38 @@ export class CoopReplayMePhase extends Phase {
    * to the leave terminal; the single `settled` guard fires the leave exactly once.
    */
   private awaitOutcomeThenTerminal(relay: NonNullable<ReturnType<typeof getCoopInteractionRelay>>): void {
+    coopLog("me", "await host outcome (mePresent subPrompt / meResync)", {
+      seq: this.seq,
+      timeoutMs: COOP_ME_REPLAY_WAIT_MS,
+    });
     void relay.awaitInteractionOutcome(this.seq, COOP_ME_REPLAY_WAIT_MS).then(outcome => {
       if (this.settled) {
+        coopLog("me", "outcome resolved after settled; ignoring", { seq: this.seq });
         return;
       }
       if (outcome != null && outcome.k === "mePresent" && outcome.subPrompt != null) {
         // ADD-1c: the host opened an engine sub-prompt. Open the matching local capture screen, relay
         // the human's pick, and loop for the next sub-prompt / the terminal resync.
+        coopLog("me", "host opened engine sub-prompt; opening local capture", {
+          seq: this.seq,
+          kind: outcome.subPrompt.kind,
+          labels: outcome.subPrompt.kind === "secondary" ? outcome.subPrompt.labels.length : undefined,
+        });
         this.openSubPickCapture(relay, outcome.subPrompt);
         return;
       }
       if (outcome != null && outcome.k === "meResync") {
+        coopLog("me", "host sent comprehensive outcome (meResync); applying", { seq: this.seq });
         try {
           applyCoopMeOutcome(outcome); // CHANGE-4 apply: party / save / RNG / dex converge with the host
         } catch {
-          /* a resync apply failure must never hang the guest; the per-turn checksum re-syncs */
+          coopWarn("me", "meResync apply threw; per-turn checksum will re-sync", { seq: this.seq });
         }
+      } else {
+        coopWarn("me", "outcome await resolved to terminal without meResync (host stall)", {
+          seq: this.seq,
+          got: outcome == null ? "null" : outcome.k,
+        });
       }
       // A null (host stall) OR the comprehensive resync both mean "proceed to the terminal".
       this.awaitHostTerminal(relay);
@@ -212,10 +256,12 @@ export class CoopReplayMePhase extends Phase {
   ): void {
     const restoreMode = globalScene.ui.getMode();
     if (subPrompt.kind === "party") {
+      coopLog("me", "opening local PARTY sub-pick capture", { seq: this.seq, restoreMode });
       // Party target: open the same PARTY/SELECT screen the host's selectPokemonForOption opens, capture
       // the chosen slot, relay it, and loop. The callback takes no engine action (the host's engine
       // resolves the target authoritatively from the relayed slot).
       void globalScene.ui.setMode(UiMode.PARTY, PartyUiMode.SELECT, -1, (slotIndex: number) => {
+        coopLog("me", "captured party sub-pick slot", { seq: this.seq, slotIndex });
         void globalScene.ui.setMode(restoreMode).then(() => {
           this.relayGuestSubPick(slotIndex);
           this.awaitOutcomeThenTerminal(relay);
@@ -223,6 +269,11 @@ export class CoopReplayMePhase extends Phase {
       });
       return;
     }
+    coopLog("me", "opening local SECONDARY sub-pick capture", {
+      seq: this.seq,
+      labels: subPrompt.labels.length,
+      restoreMode,
+    });
     // Secondary menu: open a MESSAGE-mode OPTION_SELECT list with the HOST-streamed labels, capture the
     // chosen index, relay it, and loop. A cancel option relays the out-of-range "not selected" index.
     const labels = subPrompt.labels;
@@ -253,6 +304,7 @@ export class CoopReplayMePhase extends Phase {
     restoreMode: UiMode,
     index: number,
   ): void {
+    coopLog("me", "captured secondary sub-pick index", { seq: this.seq, index });
     globalScene.ui.clearText();
     void globalScene.ui.setMode(restoreMode).then(() => {
       this.relayGuestSubPick(index);
@@ -266,17 +318,29 @@ export class CoopReplayMePhase extends Phase {
    * pick/outcome seq). A null (host stall / partner gone) defensively leaves the encounter.
    */
   private awaitHostTerminal(relay: NonNullable<ReturnType<typeof getCoopInteractionRelay>>): void {
+    coopLog("me", "await host terminal (leave / battle-handoff sentinel)", {
+      seqTerm: this.seqTerm,
+      timeoutMs: COOP_ME_REPLAY_WAIT_MS,
+    });
     void relay.awaitInteractionChoice(this.seqTerm, COOP_ME_REPLAY_WAIT_MS).then(action => {
+      coopLog("me", "host terminal resolved", {
+        seqTerm: this.seqTerm,
+        action: action == null ? "null" : action.choice,
+        isHandoff: action?.choice === COOP_ME_BATTLE_HANDOFF,
+      });
       try {
         // The host spawned a battle from this ME (#633 ME battle handoff): do NOT leave the
         // encounter. End here so the existing host-authoritative ME-battle path runs (the guest
         // already adopts the host's boss + replays the spawned battle via the battle relay).
         if (action != null && action.choice === COOP_ME_BATTLE_HANDOFF) {
+          coopLog("me", "battle-handoff sentinel on seq_term; finishing without leaving", {
+            seqTerm: this.seqTerm,
+          });
           this.finishWithoutLeaving();
           return;
         }
       } catch {
-        // A bad payload must never hang the guest's encounter.
+        coopWarn("me", "bad terminal payload; falling through to defensive leave", { seqTerm: this.seqTerm });
       }
       // A leave sentinel (host reached the ME terminal) OR a null (host stall / partner gone) both
       // mean "the encounter is over on the host": leave it locally + advance the alternation turn,
@@ -294,8 +358,12 @@ export class CoopReplayMePhase extends Phase {
    */
   private finishWithoutLeaving(): void {
     if (this.settled) {
+      coopLog("me", "finishWithoutLeaving no-op (already settled)", { counter: this.interactionCounter });
       return;
     }
+    coopLog("me", "ME terminal: battle-handoff, ending phase WITHOUT leaving encounter", {
+      counter: this.interactionCounter,
+    });
     this.settled = true;
     coopMeHostPresentation = null;
     this.offMeMessage?.();
@@ -313,8 +381,12 @@ export class CoopReplayMePhase extends Phase {
    */
   private leaveDefensive(): void {
     if (this.settled) {
+      coopLog("me", "leaveDefensive no-op (already settled)", { counter: this.interactionCounter });
       return;
     }
+    coopLog("me", "ME terminal: leaving encounter locally + advancing alternation", {
+      counter: this.interactionCounter,
+    });
     this.settled = true;
     coopMeHostPresentation = null;
     this.offMeMessage?.();

@@ -1,4 +1,5 @@
 import { globalScene } from "#app/global-scene";
+import { coopLog, isCoopDebug } from "#data/elite-redux/coop/coop-debug";
 import type { CoopMePumpEngine } from "#data/elite-redux/coop/coop-me-pump";
 import {
   coopHostStreamMeMessage,
@@ -319,15 +320,26 @@ export class UI extends Phaser.GameObjects.Container {
           && coopMeInProgress()
           && !(getCoopController()?.isLocalOwnerAtCounter(coopMeInteractionStartValue()) ?? true)
         ) {
+          if (isCoopDebug()) {
+            coopLog("me", "ui: host blocks local press on guest-owned ME (applies relayed index)", { button });
+          }
           return false; // the guest owns this ME; the host applies the relayed index programmatically
         }
         if (mePump.isWatcher()) {
+          if (isCoopDebug()) {
+            coopLog("me", "ui: watcher local press blocked (partner drives ME)", { button });
+          }
           return false; // the partner drives the encounter; ignore the watcher's local input
         }
         const wasReady = this.coopMeReady(); // only relay presses the handler will ACT on
         const result = this.processInputInner(button);
         if (wasReady) {
+          if (isCoopDebug()) {
+            coopLog("me", "ui: owner press consumed + relayed", { button });
+          }
           mePump.relayOwnerButton(button);
+        } else if (isCoopDebug()) {
+          coopLog("me", "ui: owner scroll-skip press NOT relayed (handler not ready)", { button });
         }
         return result;
       }
@@ -455,6 +467,9 @@ export class UI extends Phaser.GameObjects.Container {
       // coopHostStreamMeMessage no-ops off the live authoritative host), so solo / lockstep / guest
       // are byte-identical. Streamed at the terminal render (not the `$`-page-split recursion above).
       if (globalScene.gameMode.isCoop && coopMeInProgress()) {
+        if (isCoopDebug()) {
+          coopLog("me", "ui: host streams ME narration (showText)", { len: text.length, preview: text.slice(0, 40) });
+        }
         coopHostStreamMeMessage(text);
       }
       if (handler instanceof MessageUiHandler) {
@@ -508,6 +523,12 @@ export class UI extends Phaser.GameObjects.Container {
       // Co-op AUTHORITATIVE host (#633, ADD-3): stream the resolved ME dialogue line to the guest.
       // Same hard gate as showText - byte-identical in solo / lockstep / off the authoritative host.
       if (globalScene.gameMode.isCoop && coopMeInProgress()) {
+        if (isCoopDebug()) {
+          coopLog("me", "ui: host streams ME narration (showDialogue)", {
+            len: text.length,
+            preview: text.slice(0, 40),
+          });
+        }
         coopHostStreamMeMessage(text);
       }
       if (handler instanceof MessageUiHandler) {

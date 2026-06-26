@@ -28,6 +28,7 @@ import {
 } from "#data/elite-redux/coop/coop-battle-engine";
 import { CoopBattleStreamer } from "#data/elite-redux/coop/coop-battle-stream";
 import { CoopBattleSync } from "#data/elite-redux/coop/coop-battle-sync";
+import { coopLog, coopWarn, isCoopDebug } from "#data/elite-redux/coop/coop-debug";
 import { CoopInteractionRelay } from "#data/elite-redux/coop/coop-interaction-relay";
 import { meBattleHandoffKey } from "#data/elite-redux/coop/coop-me-battle-handoff";
 import { CoopMePump } from "#data/elite-redux/coop/coop-me-pump";
@@ -81,6 +82,9 @@ function wireCoopLiveEvents(controller: CoopSessionController, battleStream: Coo
     if (controller.role !== "host" || getCoopNetcodeMode() !== "authoritative") {
       return;
     }
+    if (isCoopDebug()) {
+      coopLog("runtime", `ME-stream live-event host turn=${turn} seq=${seq} k=${event.k}`);
+    }
     battleStream.emitEvent(turn, seq, event);
   });
 }
@@ -95,17 +99,23 @@ function wireCoopLiveEvents(controller: CoopSessionController, battleStream: Coo
  */
 function wireCoopResyncResponder(controller: CoopSessionController, battleStream: CoopBattleStreamer): void {
   battleStream.onStateSyncRequest((_turn, seq) => {
+    coopLog("resync", `recv requestStateSync turn=${_turn} seq=${seq} role=${controller.role}`);
     if (controller.role !== "host") {
+      coopLog("resync", `ignore requestStateSync seq=${seq} (not host, role=${controller.role})`);
       return;
     }
     try {
       const snapshot = captureCoopFullSnapshot();
       if (snapshot == null) {
+        coopWarn("resync", `host has no live snapshot for requestStateSync seq=${seq} -> no reply`);
         return;
       }
-      battleStream.sendStateSync(compressToBase64(JSON.stringify(snapshot)), seq);
-    } catch {
+      const blob = compressToBase64(JSON.stringify(snapshot));
+      coopLog("resync", `send stateSync seq=${seq} blob=${blob.length}b`);
+      battleStream.sendStateSync(blob, seq);
+    } catch (e) {
       /* a resync serialize/send failure must never break the host's turn */
+      coopWarn("resync", `host stateSync send failed seq=${seq}`, e);
     }
   });
 }
@@ -133,8 +143,12 @@ export function consumeCoopPendingWaveAdvance(): { wave: number; outcome: CoopWa
   const pending = pendingWaveAdvance;
   pendingWaveAdvance = null;
   if (pending == null || pending.wave <= lastResolvedWave) {
+    if (isCoopDebug() && pending != null) {
+      coopLog("runtime", `consume wave-advance SKIP wave=${pending.wave} <= lastResolved=${lastResolvedWave}`);
+    }
     return null;
   }
+  coopLog("runtime", `consume wave-advance wave=${pending.wave} outcome=${pending.outcome} (lastResolved ${lastResolvedWave} -> ${pending.wave})`);
   lastResolvedWave = pending.wave;
   return pending;
 }
@@ -148,16 +162,25 @@ export function consumeCoopPendingWaveAdvance(): { wave: number; outcome: CoopWa
  */
 function wireCoopWaveResolved(controller: CoopSessionController, battleStream: CoopBattleStreamer): void {
   battleStream.onWaveResolved((wave, outcome) => {
+    coopLog("runtime", `recv waveResolved wave=${wave} outcome=${outcome} role=${controller.role} netcode=${getCoopNetcodeMode()}`);
     if (controller.role !== "guest" || getCoopNetcodeMode() !== "authoritative") {
+      coopLog("runtime", `ignore waveResolved wave=${wave} (not authoritative guest)`);
       return;
     }
     // Already advanced past this wave (a duplicate signal) -> ignore.
     if (wave <= lastResolvedWave) {
+      coopLog("runtime", `ignore waveResolved wave=${wave} <= lastResolved=${lastResolvedWave} (duplicate)`);
       return;
     }
     // Latest signal wins (a later wave supersedes an unconsumed earlier one).
     if (pendingWaveAdvance == null || wave >= pendingWaveAdvance.wave) {
+      coopLog(
+        "runtime",
+        `pend waveResolved wave=${wave} outcome=${outcome} (prevPending=${pendingWaveAdvance?.wave ?? "none"})`,
+      );
       pendingWaveAdvance = { wave, outcome };
+    } else {
+      coopWarn("runtime", `waveResolved wave=${wave} stale vs pending=${pendingWaveAdvance.wave} -> kept pending`);
     }
   });
 }
@@ -174,23 +197,28 @@ function wireCoopMeChecksumCheck(battleStream: CoopBattleStreamer): void {
   battleStream.onMeChecksum((seq, ownerChecksum) => {
     const ours = captureCoopChecksum();
     if (ownerChecksum === COOP_CHECKSUM_SENTINEL || ours === COOP_CHECKSUM_SENTINEL || ownerChecksum === ours) {
+      coopLog("checksum", `recv meChecksum seq=${seq} MATCH owner=${ownerChecksum} watcher=${ours}`);
       return;
     }
-    console.warn(`[coop-desync] me-entry seq=${seq} owner=${ownerChecksum} watcher=${ours}`);
+    coopWarn("checksum", `me-entry MISMATCH seq=${seq} owner=${ownerChecksum} watcher=${ours} -> requesting stateSync`);
+    coopLog("resync", `await stateSync start seq=${seq}`);
     void battleStream.requestStateSync(seq).then(blob => {
       if (blob == null) {
+        coopWarn("resync", `await stateSync TIMEOUT/null seq=${seq}`);
         return;
       }
+      coopLog("resync", `await stateSync resolve seq=${seq} blob=${blob.length}b -> applying`);
       try {
         applyCoopFullSnapshot(JSON.parse(decompressFromBase64(blob)) as CoopFullBattleSnapshot);
         const healed = captureCoopChecksum();
-        console.info(
-          healed === ownerChecksum
-            ? `[coop-resync] me-entry seq=${seq} ok`
-            : `[coop-resync] me-entry seq=${seq} still-diverged owner=${ownerChecksum} watcher=${healed}`,
-        );
-      } catch {
+        if (healed === ownerChecksum) {
+          coopLog("resync", `me-entry seq=${seq} ok (healed=${healed})`);
+        } else {
+          coopWarn("resync", `me-entry seq=${seq} still-diverged owner=${ownerChecksum} watcher=${healed}`);
+        }
+      } catch (e) {
         /* a malformed resync blob must never crash the ME flow */
+        coopWarn("resync", `me-entry seq=${seq} malformed resync blob (ignored)`, e);
       }
     });
   });
@@ -263,8 +291,16 @@ export function getCoopNetcodeMode(): CoopNetcodeMode {
   // keep returning it for the rest of the run so a transient controller read (pre-runConfig, a
   // re-read race) can NEVER flip the guest back to "lockstep" and make it run its own engine.
   if (mode === "authoritative") {
+    if (!authoritativeLatched) {
+      // State CHANGE: log the one-time latch flip (NOT on every hot read).
+      coopLog("runtime", `netcode LATCH authoritative role=${active.controller.role} (was unlatched)`);
+    }
     authoritativeLatched = true;
     return "authoritative";
+  }
+  if (authoritativeLatched && isCoopDebug()) {
+    // Controller momentarily reads lockstep but the latch holds authoritative (re-read race / pre-runConfig).
+    coopWarn("runtime", `netcode read=${mode} but latched authoritative role=${active.controller.role} -> authoritative`);
   }
   return authoritativeLatched ? "authoritative" : mode;
 }
@@ -324,8 +360,18 @@ export function broadcastCoopOwnSlotCommand(fieldIndex: number, command: Seriali
   if (!globalScene.gameMode.isCoop || active == null) {
     return;
   }
-  if (coopOwnerOfFieldIndex(fieldIndex) !== active.controller.role) {
+  const owner = coopOwnerOfFieldIndex(fieldIndex);
+  if (owner !== active.controller.role) {
+    if (isCoopDebug()) {
+      coopLog("owner", `broadcast SKIP fi=${fieldIndex} owner=${owner} != role=${active.controller.role} (await slot)`);
+    }
     return;
+  }
+  if (isCoopDebug()) {
+    coopLog(
+      "owner",
+      `broadcast own-slot fi=${fieldIndex} turn=${globalScene.currentBattle.turn} role=${active.controller.role} cmd=${command.command}`,
+    );
   }
   active.battleSync.broadcastLocalCommand(fieldIndex, globalScene.currentBattle.turn, command);
 }
@@ -345,10 +391,13 @@ export function broadcastCoopWaveResolved(outcome: CoopWaveOutcome): void {
   if (active.controller.role !== "host") {
     return;
   }
+  const wave = globalScene.currentBattle.waveIndex;
   try {
-    active.battleStream.sendWaveResolved(globalScene.currentBattle.waveIndex, outcome);
-  } catch {
+    coopLog("runtime", `send waveResolved wave=${wave} outcome=${outcome} (host)`);
+    active.battleStream.sendWaveResolved(wave, outcome);
+  } catch (e) {
     /* a wave-resolved send failure must never break the host's post-battle flow */
+    coopWarn("runtime", `send waveResolved failed wave=${wave} outcome=${outcome}`, e);
   }
 }
 
@@ -373,6 +422,10 @@ let coopMeBattleInteractionCounter = -1;
  * at ME entry; reset (`-1`) at the ME terminal. Pure state - no transport, safe in solo.
  */
 export function setCoopMeBattleInteractionCounter(counter: number): void {
+  if (counter !== coopMeBattleInteractionCounter) {
+    // State CHANGE: ME begin (counter>=0) / ME terminal (-1).
+    coopLog("me", `interaction-counter ${coopMeBattleInteractionCounter} -> ${counter} (${counter >= 0 ? "ME begin" : "ME end"})`);
+  }
   coopMeBattleInteractionCounter = counter;
 }
 
@@ -411,9 +464,12 @@ export function coopHostStreamMeBattleParty(): void {
   }
   try {
     const key = meBattleHandoffKey(globalScene.currentBattle.waveIndex, coopMeBattleInteractionCounter);
-    active!.battleStream.sendMeBattleEnemyParty(key, captureCoopEnemies());
-  } catch {
+    const enemies = captureCoopEnemies();
+    coopLog("me", `host stream ME-battle party key=${key} enemies=${enemies.length}`);
+    active!.battleStream.sendMeBattleEnemyParty(key, enemies);
+  } catch (e) {
     /* a serialize/send failure must never break the host's ME battle setup */
+    coopWarn("me", "host stream ME-battle party failed", e);
   }
 }
 
@@ -428,9 +484,17 @@ export async function coopGuestAwaitMeBattleParty(timeoutMs?: number): Promise<C
     return null;
   }
   const key = meBattleHandoffKey(globalScene.currentBattle.waveIndex, coopMeBattleInteractionCounter);
+  coopLog("me", `guest await ME-battle party start key=${key} timeout=${timeoutMs ?? "default"}`);
   try {
-    return await active!.battleStream.awaitMeBattleEnemyParty(key, timeoutMs);
-  } catch {
+    const enemies = await active!.battleStream.awaitMeBattleEnemyParty(key, timeoutMs);
+    if (enemies == null) {
+      coopWarn("me", `guest await ME-battle party TIMEOUT key=${key} -> keeping local party`);
+    } else {
+      coopLog("me", `guest await ME-battle party resolve key=${key} enemies=${enemies.length}`);
+    }
+    return enemies;
+  } catch (e) {
+    coopWarn("me", `guest await ME-battle party failed key=${key}`, e);
     return null;
   }
 }
@@ -455,9 +519,13 @@ export function coopHostStreamMeMessage(text: string): void {
     return;
   }
   try {
+    if (isCoopDebug()) {
+      coopLog("me", `host stream ME-message len=${text.length}`);
+    }
     active.battleStream.sendMeMessage(text);
-  } catch {
+  } catch (e) {
     /* an ME narration send failure must never break the host's encounter */
+    coopWarn("me", "host stream ME-message failed", e);
   }
 }
 
@@ -475,12 +543,18 @@ export function coopMeOwnerRelayBattleHandoff(): void {
   const pump = active.mePump;
   // Only the OWNER of an active pump session relays the sentinel; the watcher receives it.
   if (!pump.isSessionActive() || pump.isWatcher()) {
+    coopLog(
+      "me",
+      `owner-relay battle-handoff SKIP (active=${pump.isSessionActive()} watcher=${pump.isWatcher()})`,
+    );
     return;
   }
   try {
+    coopLog("me", "owner-relay battle-handoff sentinel (end pump, run spawned battle)");
     pump.relayMeBattleHandoff();
-  } catch {
+  } catch (e) {
     /* a relay failure must never break the owner's ME battle setup */
+    coopWarn("me", "owner-relay battle-handoff failed", e);
   }
 }
 
@@ -494,6 +568,7 @@ export function coopMeOwnerRelayBattleHandoff(): void {
 export function startLocalCoopSession(
   opts: { username?: string | undefined; netcodeMode?: CoopNetcodeMode | undefined } = {},
 ): CoopRuntime {
+  coopLog("launch", `startLocalCoopSession username=${opts.username ?? "(default)"} netcode=${opts.netcodeMode ?? "lockstep"}`);
   clearCoopRuntime();
   const { host, guest } = createLoopbackPair();
   const controller = new CoopSessionController(host, { username: opts.username });
@@ -523,6 +598,7 @@ export function startLocalCoopSession(
   wireCoopMeChecksumCheck(battleStream);
   wireCoopLiveEvents(controller, battleStream);
   setCoopRuntime(runtime);
+  coopLog("launch", `local session ready role=${controller.role} netcode=${controller.netcodeMode} -> connecting`);
   controller.connect();
   return runtime;
 }
@@ -539,6 +615,10 @@ export function connectCoopSession(
   transport: CoopTransport,
   opts: { username?: string | undefined; netcodeMode?: CoopNetcodeMode | undefined } = {},
 ): CoopRuntime {
+  coopLog(
+    "launch",
+    `connectCoopSession role=${transport.role} state=${transport.state} username=${opts.username ?? "(default)"} netcode=${opts.netcodeMode ?? "lockstep"}`,
+  );
   clearCoopRuntime();
   const controller = new CoopSessionController(transport, { username: opts.username });
   // Pin the chosen netcode (#633, selectable A/B). On the HOST this is the source of
@@ -565,6 +645,7 @@ export function connectCoopSession(
   wireCoopMeChecksumCheck(battleStream);
   wireCoopLiveEvents(controller, battleStream);
   setCoopRuntime(runtime);
+  coopLog("launch", `peer session ready role=${controller.role} netcode=${controller.netcodeMode} -> connecting`);
   controller.connect();
   return runtime;
 }
@@ -574,6 +655,7 @@ export function clearCoopRuntime(): void {
   if (active == null) {
     return;
   }
+  coopLog("launch", `clearCoopRuntime role=${active.controller.role} netcode=${active.controller.netcodeMode}`);
   active.controller.dispose();
   active.battleSync.dispose();
   active.battleStream.dispose();

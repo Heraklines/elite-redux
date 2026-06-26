@@ -1,6 +1,7 @@
 import { consumePendingDevShop } from "#app/dev-tools/registry";
 import { globalScene } from "#app/global-scene";
 import Overrides from "#app/overrides";
+import { coopLog, coopWarn } from "#data/elite-redux/coop/coop-debug";
 import {
   COOP_INTERACTION_LEAVE,
   COOP_INTERACTION_REROLL,
@@ -275,9 +276,15 @@ export class SelectModifierPhase extends BattlePhase {
       // CHANGE-2: inside an authoritative ME, rewardOverride forces host=owner / guest=watcher.
       const ownsThisShop =
         rewardOverride != null ? rewardOverride : coopController.isLocalOwnerAtCounter(this.coopInteractionStart);
+      const parity = ((this.coopInteractionStart % 2) + 2) % 2;
+      coopLog(
+        "reward",
+        `owner/watcher decision: pinnedStart=${this.coopInteractionStart} liveCounter=${coopController.interactionCounter()} parity=${parity} role=${coopController.role} override=${rewardOverride ?? "none"} spoof=${spoofed} -> ${spoofed || ownsThisShop ? "OWNER" : "WATCHER"}`,
+      );
       if (spoofed || ownsThisShop) {
-        console.log(
-          `[coop-reward] OWNER drives reward screen (start=${this.coopInteractionStart} role=${coopController.role} spoof=${spoofed} wave=${globalScene.currentBattle?.waveIndex})`,
+        coopLog(
+          "reward",
+          `OWNER drives reward screen (start=${this.coopInteractionStart} role=${coopController.role} spoof=${spoofed} wave=${globalScene.currentBattle?.waveIndex})`,
         );
         // Co-op (#633 Fix #2): stream the EXACT option list we rolled so the watcher rebuilds
         // it instead of re-rolling (party luck would otherwise diverge the pools + the shared
@@ -289,8 +296,9 @@ export class SelectModifierPhase extends BattlePhase {
         // Co-op (#633): relay our cursor so the partner's screen mirrors it live.
         this.coopBeginMirror("owner");
       } else {
-        console.log(
-          `[coop-reward] WATCHER waits for partner's reward picks (start=${this.coopInteractionStart} role=${coopController.role} wave=${globalScene.currentBattle?.waveIndex})`,
+        coopLog(
+          "reward",
+          `WATCHER waits for partner's reward picks (start=${this.coopInteractionStart} role=${coopController.role} wave=${globalScene.currentBattle?.waveIndex})`,
         );
         void this.startCoopWatch();
       }
@@ -855,11 +863,12 @@ export class SelectModifierPhase extends BattlePhase {
       return;
     }
     try {
-      getCoopInteractionRelay()?.sendRewardOptions(
-        this.coopInteractionStart,
-        this.rerollCount,
-        serializeRewardOptions(this.typeOptions),
+      const serialized = serializeRewardOptions(this.typeOptions);
+      coopLog(
+        "reward",
+        `OWNER streams reward options (start=${this.coopInteractionStart} reroll=${this.rerollCount} count=${serialized.length} ids=[${serialized.map(o => o.id).join(",")}])`,
       );
+      getCoopInteractionRelay()?.sendRewardOptions(this.coopInteractionStart, this.rerollCount, serialized);
     } catch {
       /* a serialize/send failure must never break the owner's reward screen */
     }
@@ -876,18 +885,30 @@ export class SelectModifierPhase extends BattlePhase {
       return;
     }
     try {
+      coopLog(
+        "reward",
+        `WATCHER awaiting owner reward options (start=${this.coopInteractionStart} reroll=${this.rerollCount} localCount=${this.typeOptions.length})`,
+      );
       const serialized = await relay.awaitRewardOptions(
         this.coopInteractionStart,
         this.rerollCount,
         COOP_REWARD_WAIT_MS,
       );
       if (serialized == null) {
+        coopLog(
+          "reward",
+          `WATCHER got no owner options (timeout/null) -> keeping local roll (count=${this.typeOptions.length})`,
+        );
         return;
       }
       const rebuilt = reconstructRewardOptions(serialized, globalScene.getPlayerParty());
       if (rebuilt == null) {
-        console.log("[coop-reward] WATCHER could not reconstruct owner's options -> keeping local roll");
+        coopLog("reward", "WATCHER could not reconstruct owner's options -> keeping local roll");
       } else {
+        coopLog(
+          "reward",
+          `WATCHER ADOPTED owner reward options (was=${this.typeOptions.length} now=${rebuilt.length} ids=[${serialized.map(o => o.id).join(",")}])`,
+        );
         this.typeOptions = rebuilt;
       }
     } catch {
@@ -920,10 +941,12 @@ export class SelectModifierPhase extends BattlePhase {
       return;
     }
     const from = this.coopInteractionStart >= 0 ? this.coopInteractionStart : undefined;
-    console.log(
-      `[coop-reward] advance interaction (role=${controller.role} from=${this.coopInteractionStart} counter=${controller.interactionCounter()})`,
-    );
+    const before = controller.interactionCounter();
     controller.advanceInteraction(from);
+    coopLog(
+      "reward",
+      `advance interaction (role=${controller.role} from=${this.coopInteractionStart} counter ${before} -> ${controller.interactionCounter()})`,
+    );
   }
 
   /** OWNER: stash the current reward/shop selection so it is relayed once the party
@@ -1027,7 +1050,7 @@ export class SelectModifierPhase extends BattlePhase {
     for (;;) {
       const action = await relay.awaitInteractionChoice(seq, COOP_REWARD_WAIT_MS);
       if (action == null) {
-        console.log("[coop-reward] WATCHER timed out waiting for partner -> leaving reward screen");
+        coopLog("reward", "WATCHER timed out waiting for partner -> leaving reward screen");
         this.coopEndMirror();
         globalScene.ui.setMode(UiMode.MESSAGE).then(() => super.end());
         this.coopAdvanceInteraction();
@@ -1046,6 +1069,10 @@ export class SelectModifierPhase extends BattlePhase {
    */
   private applyRelayedRewardAction(action: CoopInteractionChoice): boolean {
     const noop: ModifierSelectCallback = () => false;
+    coopLog(
+      "reward",
+      `WATCHER applying relayed action seq=${this.coopInteractionStart} choice=${action.choice} data=${action.data === undefined ? "-" : `[${action.data.join(",")}]`}`,
+    );
     if (action.choice === COOP_INTERACTION_LEAVE) {
       this.coopEndMirror();
       globalScene.ui.setMode(UiMode.MESSAGE).then(() => super.end());
@@ -1082,7 +1109,7 @@ export class SelectModifierPhase extends BattlePhase {
       this.selectShopModifierOption(data[1], action.choice, noop);
       return false;
     }
-    console.log(`[coop-reward] WATCHER ignoring unknown reward action choice=${action.choice} data=${data.join(",")}`);
+    coopWarn("reward", `WATCHER ignoring unknown reward action choice=${action.choice} data=${data.join(",")}`);
     return false;
   }
 }

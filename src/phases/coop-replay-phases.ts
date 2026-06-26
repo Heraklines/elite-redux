@@ -39,6 +39,7 @@ import {
   captureCoopChecksumState,
 } from "#data/elite-redux/coop/coop-battle-engine";
 import { logCanonicalDiff } from "#data/elite-redux/coop/coop-data-fingerprint";
+import { coopLog, coopWarn, isCoopDebug } from "#data/elite-redux/coop/coop-debug";
 import { consumeCoopPendingWaveAdvance, getCoopBattleStreamer } from "#data/elite-redux/coop/coop-runtime";
 import type { CoopBattleCheckpoint, CoopFullBattleSnapshot } from "#data/elite-redux/coop/coop-transport";
 import { BattleType } from "#enums/battle-type";
@@ -91,6 +92,9 @@ export class CoopMoveAnimReplayPhase extends Phase {
 
   public override start(): void {
     super.start();
+    if (isCoopDebug()) {
+      coopLog("replay", `present move bi=${this.bi} moveId=${this.moveId} targets=${this.targets.length}`);
+    }
     let ended = false;
     let watchdog: Phaser.Time.TimerEvent | undefined;
     const finish = () => {
@@ -140,6 +144,9 @@ export class CoopHpDrainReplayPhase extends PokemonPhase {
 
   public override start(): void {
     super.start();
+    if (isCoopDebug()) {
+      coopLog("replay", `present hp bi=${this.battlerIndex} ${Math.trunc(this.fromHp)}->${Math.trunc(this.toHp)}/${Math.trunc(this.maxHp)}`);
+    }
     try {
       const mon = fieldMon(this.battlerIndex);
       if (mon == null) {
@@ -189,6 +196,9 @@ export class CoopStatStageReplayPhase extends PokemonPhase {
 
   public override start(): void {
     super.start();
+    if (isCoopDebug()) {
+      coopLog("replay", `present statStage bi=${this.battlerIndex} stat=${this.stat} -> ${this.value}`);
+    }
     let ended = false;
     let watchdog: Phaser.Time.TimerEvent | undefined;
     const finish = () => {
@@ -291,6 +301,9 @@ export class CoopStatusReplayPhase extends PokemonPhase {
 
   public override start(): void {
     super.start();
+    if (isCoopDebug()) {
+      coopLog("replay", `present status bi=${this.battlerIndex} status=${this.status}`);
+    }
     let ended = false;
     let watchdog: Phaser.Time.TimerEvent | undefined;
     const finish = () => {
@@ -353,6 +366,9 @@ export class CoopFaintReplayPhase extends PokemonPhase {
       watchdog?.remove();
       this.end();
     };
+    if (isCoopDebug()) {
+      coopLog("replay", `present faint bi=${this.battlerIndex}`);
+    }
     try {
       const pokemon = fieldMon(this.battlerIndex);
       // Already removed (defensive: a duplicate faint, or a mon off-field) - nothing to animate.
@@ -433,6 +449,7 @@ export class CoopFinalizeTurnPhase extends Phase {
 
   public override start(): void {
     super.start();
+    coopLog("checksum", `guest finalize turn=${this.turn}: apply checkpoint + verify checksum=${this.checksum}`);
     try {
       // Snap the field + arena to the host's authoritative post-turn state. This is the SAME apply the
       // old synchronous path did, only now it runs AFTER the animation phases drained - so a faint that
@@ -441,6 +458,7 @@ export class CoopFinalizeTurnPhase extends Phase {
       this.verifyChecksum(this.checksum, this.preimage);
     } catch {
       // A bad stream payload must never hang the guest's turn.
+      coopWarn("checksum", `guest finalize turn=${this.turn}: apply/verify threw (handled)`);
     }
     this.finishTurn();
   }
@@ -459,12 +477,14 @@ export class CoopFinalizeTurnPhase extends Phase {
     }
     const guestChecksum = captureCoopChecksum();
     if (hostChecksum === COOP_CHECKSUM_SENTINEL || guestChecksum === COOP_CHECKSUM_SENTINEL) {
+      coopLog("checksum", `guest verify turn=${this.turn}: sentinel (read failure) -> comparison skipped`);
       return;
     }
     if (hostChecksum === guestChecksum) {
+      coopLog("checksum", `guest verify turn=${this.turn}: MATCH host=guest=${hostChecksum}`);
       return;
     }
-    console.warn(`[coop-desync] turn=${this.turn} host=${hostChecksum} guest=${guestChecksum}`);
+    coopWarn("checksum", `turn=${this.turn} MISMATCH host=${hostChecksum} guest=${guestChecksum} -> resync`);
     // DIAGNOSTIC (#633): log WHICH field(s) diverged by deep-diffing the host's pre-image
     // (the canonical state its checksum hashed) against the guest's own. Only the opaque
     // hashes cross the wire normally; the pre-image makes the divergent field observable.
@@ -475,29 +495,33 @@ export class CoopFinalizeTurnPhase extends Phase {
     }
     void streamer.requestStateSync(this.turn).then(blob => {
       if (blob == null) {
+        coopWarn("resync", `turn=${this.turn} no snapshot received (timeout) -> keep current state, re-check next turn`);
         return;
       }
       try {
         const snapshot = JSON.parse(decompressFromBase64(blob)) as CoopFullBattleSnapshot;
+        coopLog("resync", `turn=${this.turn} applying full snapshot (blobLen=${blob.length})`);
         applyCoopFullSnapshot(snapshot);
         const healed = captureCoopChecksum();
         if (healed === hostChecksum) {
-          console.info(`[coop-resync] turn=${this.turn} ok`);
+          coopLog("resync", `turn=${this.turn} ok (healed host=guest=${hostChecksum})`);
         } else {
-          console.warn(`[coop-resync] turn=${this.turn} still-diverged host=${hostChecksum} guest=${healed}`);
+          coopWarn("resync", `turn=${this.turn} still-diverged host=${hostChecksum} guest=${healed}`);
           // DIAGNOSTIC (#633): the snapshot did NOT heal the divergence - log WHAT it failed
           // to repair by diffing the host pre-image against the guest's POST-APPLY state.
           if (hostObj !== undefined) {
             const guestPostApplyObj = this.parseCanonical(canonicalize(captureCoopChecksumState()));
             logCanonicalDiff(`[coop-resync] turn=${this.turn} UNHEALED`, hostObj, guestPostApplyObj);
-            console.warn(
-              "[coop-resync] note: snapshot does NOT re-apply party/modifiers/arenaTags or force maxHp -"
+            coopWarn(
+              "resync",
+              "note: snapshot does NOT re-apply party/modifiers/arenaTags or force maxHp -"
                 + " a diff in those is a data-table drift, not a heal bug",
             );
           }
         }
       } catch {
         /* a malformed resync blob must never crash the guest's battle */
+        coopWarn("resync", `turn=${this.turn} malformed snapshot blob (handled)`);
       }
     });
   }
@@ -559,8 +583,9 @@ export class CoopFinalizeTurnPhase extends Phase {
     // capture confirms the guest queues the right tail. For a "win" on a TRAINER wave the VictoryPhase
     // it queues MUST go on to push TrainerVictoryPhase + SelectModifierPhase (the guest becomes the
     // reward-shop OWNER so the host's WATCHER wait resolves).
-    console.info(
-      `[coop-diag] guest wave-advance outcome=${pending.outcome} wave=${pending.wave} battleType=${BattleType[globalScene.currentBattle.battleType]} queues=${pending.outcome === "win" || pending.outcome === "capture" ? "VictoryPhase" : pending.outcome === "flee" ? "BattleEnd+NewBattle" : "GameOverPhase"}`,
+    coopLog(
+      "replay",
+      `guest wave-advance outcome=${pending.outcome} wave=${pending.wave} battleType=${BattleType[globalScene.currentBattle.battleType]} queues=${pending.outcome === "win" || pending.outcome === "capture" ? "VictoryPhase" : pending.outcome === "flee" ? "BattleEnd+NewBattle" : "GameOverPhase"}`,
     );
     try {
       switch (pending.outcome) {

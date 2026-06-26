@@ -25,6 +25,7 @@
 // live RTCPeerConnection flow is browser-only (no headless harness).
 // =============================================================================
 
+import { coopLog, coopWarn } from "#data/elite-redux/coop/coop-debug";
 import type { CoopRuntime } from "#data/elite-redux/coop/coop-runtime";
 import { connectCoopSession } from "#data/elite-redux/coop/coop-runtime";
 import { webRtcTransportFromChannel } from "#data/elite-redux/coop/coop-webrtc-transport";
@@ -115,6 +116,7 @@ export async function fetchIceServers(): Promise<RTCIceServer[]> {
       if (res.ok) {
         const data = (await res.json()) as { iceServers?: RTCIceServer[] };
         if (data.iceServers && data.iceServers.length > 0) {
+          coopLog("launch", `ICE from worker /coop/ice servers=${data.iceServers.length}`);
           return data.iceServers;
         }
       }
@@ -122,6 +124,7 @@ export async function fetchIceServers(): Promise<RTCIceServer[]> {
       // fall through to the static config below
     }
   }
+  coopLog("launch", "ICE fallback to static env/STUN config");
   return buildIceServers(coopIceConfigFromEnv());
 }
 
@@ -162,29 +165,38 @@ async function pushSignal(code: string, role: CoopRole, signal: string): Promise
 
 /** Poll the worker for the PEER's SDP blob until it appears (or the timeout). */
 async function pollPeerSignal(code: string, role: CoopRole, timeoutMs = 60_000): Promise<string> {
+  coopLog("launch", `await peer signal start code=${code} role=${role} timeout=${timeoutMs}ms`);
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
     const res = await fetch(`${coopServerBase()}/coop/signal?code=${encodeURIComponent(code)}&role=${role}`);
     if (res.ok) {
       const body = (await res.json()) as { signal?: string | null };
       if (body.signal) {
+        coopLog("launch", `await peer signal resolve code=${code} role=${role} (${body.signal.length}b)`);
         return body.signal;
       }
     }
     await new Promise(r => setTimeout(r, 1000));
   }
+  coopWarn("launch", `await peer signal TIMEOUT code=${code} role=${role} after ${timeoutMs}ms`);
   throw new Error("coop: timed out waiting for the partner to connect");
 }
 
 /** Resolve with the data channel once it opens (or reject on timeout). */
 function waitForChannelOpen(channel: RTCDataChannel, timeoutMs = 30_000): Promise<RTCDataChannel> {
   if (channel.readyState === "open") {
+    coopLog("launch", "data channel already open");
     return Promise.resolve(channel);
   }
+  coopLog("launch", `await data channel open (state=${channel.readyState} timeout=${timeoutMs}ms)`);
   return new Promise((resolve, reject) => {
-    const timer = setTimeout(() => reject(new Error("coop: data channel did not open")), timeoutMs);
+    const timer = setTimeout(() => {
+      coopWarn("launch", `data channel did not open within ${timeoutMs}ms`);
+      reject(new Error("coop: data channel did not open"));
+    }, timeoutMs);
     channel.addEventListener("open", () => {
       clearTimeout(timer);
+      coopLog("launch", "data channel OPEN");
       resolve(channel);
     });
   });
@@ -204,17 +216,26 @@ export interface CoopConnectOptions {
  * by every connect entrypoint (manual host/guest + matchmaking).
  */
 async function exchangeAndOpenChannel(code: string, role: CoopRole, ice?: CoopIceConfig): Promise<RTCDataChannel> {
+  coopLog("launch", `exchange SDP start code=${code} role=${role} (ice=${ice ? "override" : "fetched"})`);
   const iceServers = ice ? buildIceServers(ice) : await fetchIceServers();
   const pc = new RTCPeerConnection({ iceServers });
+  pc.addEventListener("iceconnectionstatechange", () => {
+    coopLog("launch", `iceConnectionState=${pc.iceConnectionState} code=${code} role=${role}`);
+  });
+  pc.addEventListener("connectionstatechange", () => {
+    coopLog("launch", `pcConnectionState=${pc.connectionState} code=${code} role=${role}`);
+  });
 
   if (role === "host") {
     const channel = pc.createDataChannel("coop", { ordered: true });
     const offer = await pc.createOffer();
     await pc.setLocalDescription(offer);
     await waitForIceComplete(pc);
+    coopLog("launch", `host pushing offer code=${code} (ICE gathered)`);
     await pushSignal(code, "host", JSON.stringify(pc.localDescription));
 
     const answer = await pollPeerSignal(code, "host");
+    coopLog("launch", `host received answer code=${code} -> setRemoteDescription`);
     await pc.setRemoteDescription(JSON.parse(answer) as RTCSessionDescriptionInit);
     return waitForChannelOpen(channel);
   }
@@ -223,10 +244,12 @@ async function exchangeAndOpenChannel(code: string, role: CoopRole, ice?: CoopIc
     pc.addEventListener("datachannel", ev => resolve(ev.channel));
   });
   const offer = await pollPeerSignal(code, "guest");
+  coopLog("launch", `guest received offer code=${code} -> answering`);
   await pc.setRemoteDescription(JSON.parse(offer) as RTCSessionDescriptionInit);
   const answer = await pc.createAnswer();
   await pc.setLocalDescription(answer);
   await waitForIceComplete(pc);
+  coopLog("launch", `guest pushing answer code=${code} (ICE gathered)`);
   await pushSignal(code, "guest", JSON.stringify(pc.localDescription));
   return waitForChannelOpen(await channelPromise);
 }
@@ -243,8 +266,10 @@ export async function connectCoopWithCode(
   opts: CoopConnectOptions = {},
 ): Promise<CoopRuntime> {
   if (!isCoopNetworkingConfigured()) {
+    coopWarn("launch", "connectCoopWithCode aborted: coop networking not configured");
     throw new Error("coop networking is not configured (VITE_COOP_SERVER_URL unset)");
   }
+  coopLog("launch", `connectCoopWithCode code=${code} role=${role} username=${opts.username ?? "(default)"}`);
   const channel = await exchangeAndOpenChannel(code, role, opts.ice);
   return connectCoopSession(webRtcTransportFromChannel(role, channel), { username: opts.username });
 }
@@ -259,16 +284,20 @@ export async function connectCoopAsHost(
   opts: CoopConnectOptions & { seed?: string; onCode?: (code: string) => void } = {},
 ): Promise<{ code: string; runtime: CoopRuntime }> {
   if (!isCoopNetworkingConfigured()) {
+    coopWarn("launch", "connectCoopAsHost aborted: coop networking not configured");
     throw new Error("coop networking is not configured (VITE_COOP_SERVER_URL unset)");
   }
+  coopLog("launch", `connectCoopAsHost username=${opts.username ?? "(default)"} seed=${opts.seed != null}`);
   const created = await postJson("/coop/create", { host: opts.username ?? "Player 1", seed: opts.seed });
   const code = String(created.code);
+  coopLog("launch", `host run created code=${code}`);
   // Surface the code to the UI immediately so the host can share it while the
   // rest of this function blocks waiting for the guest to connect.
   opts.onCode?.(code);
 
   const channel = await exchangeAndOpenChannel(code, "host", opts.ice);
   const runtime = connectCoopSession(webRtcTransportFromChannel("host", channel), { username: opts.username });
+  coopLog("launch", `host session live code=${code}`);
   return { code, runtime };
 }
 
@@ -279,8 +308,10 @@ export async function connectCoopAsHost(
  */
 export async function connectCoopAsGuest(code: string, opts: CoopConnectOptions = {}): Promise<CoopRuntime> {
   if (!isCoopNetworkingConfigured()) {
+    coopWarn("launch", "connectCoopAsGuest aborted: coop networking not configured");
     throw new Error("coop networking is not configured (VITE_COOP_SERVER_URL unset)");
   }
+  coopLog("launch", `connectCoopAsGuest code=${code} username=${opts.username ?? "(default)"}`);
   await postJson("/coop/join", { code, guest: opts.username ?? "Player 2" });
   const channel = await exchangeAndOpenChannel(code, "guest", opts.ice);
   return connectCoopSession(webRtcTransportFromChannel("guest", channel), { username: opts.username });

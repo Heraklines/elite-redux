@@ -25,6 +25,7 @@
 // already-declared CoopBattleEvent kinds without changing this model.
 // =============================================================================
 
+import { coopLog, isCoopDebug } from "#data/elite-redux/coop/coop-debug";
 import type { CoopBattleEvent } from "#data/elite-redux/coop/coop-transport";
 
 /** The open recording: the turn number stamped at start + the ordered events + the per-turn live seq. */
@@ -59,6 +60,7 @@ export function setCoopLiveEmitter(emitter: CoopLiveEmitter | null): void {
  * `seq` resets to 0 so each turn's events number from the start.
  */
 export function beginCoopRecording(turn: number): void {
+  coopLog("replay", `host recorder: begin turn=${turn} (replaces=${recording != null})`);
   recording = { turn, events: [], seq: 0 };
 }
 
@@ -86,6 +88,10 @@ export function recordCoopEvent(event: CoopBattleEvent): void {
   }
   const seq = recording.seq++;
   recording.events.push(event);
+  // HOT PATH (per recorded battle event): build the trace string only when debug is on.
+  if (isCoopDebug()) {
+    coopLog("replay", `host recorder: record turn=${recording.turn} seq=${seq} k=${event.k} live=${liveEmitter != null}`);
+  }
   if (liveEmitter != null) {
     try {
       liveEmitter(recording.turn, seq, event);
@@ -101,6 +107,7 @@ export function recordCoopEvent(event: CoopBattleEvent): void {
  */
 export function endCoopRecording(): CoopRecording {
   const done = recording ?? { turn: -1, events: [], seq: 0 };
+  coopLog("replay", `host recorder: end turn=${done.turn} events=${done.events.length}`);
   recording = null;
   return done;
 }

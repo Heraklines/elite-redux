@@ -25,6 +25,7 @@
 // LoopbackTransport, exactly like CoopBattleStreamer.
 // =============================================================================
 
+import { coopLog, isCoopDebug } from "#data/elite-redux/coop/coop-debug";
 import type {
   CoopInteractionOutcome,
   CoopMessage,
@@ -63,6 +64,27 @@ function defaultSchedule(cb: () => void, ms: number): () => void {
   return () => clearTimeout(id);
 }
 
+/** Compact, log-safe one-line summary of a relayed choice (never dumps a blob). */
+function summarizeChoice(c: CoopInteractionChoice): string {
+  return `choice=${c.choice} data=${c.data === undefined ? "-" : `[${c.data.join(",")}]`}`;
+}
+
+/** Compact, log-safe one-line summary of a host-resolved interaction outcome (discriminated by `k`). */
+function summarizeOutcome(o: CoopInteractionOutcome): string {
+  switch (o.k) {
+    case "rewardGrant":
+      return `k=rewardGrant id=${o.modifierTypeId} slot=${o.partySlot} money=${o.moneyDelta} args=${o.args.length}`;
+    case "reroll":
+      return `k=reroll money=${o.moneyDelta}`;
+    case "leave":
+      return "k=leave";
+    case "mePresent":
+      return `k=mePresent opts=${o.meetsReqs.length}${o.subPrompt ? ` +subPrompt(${o.subPrompt.kind})` : ""}`;
+    default:
+      return `k=${(o as { k?: string }).k ?? "?"}`;
+  }
+}
+
 /**
  * Rides a {@linkcode CoopTransport} to relay alternating-interaction choices. One
  * instance per client. The OWNER calls {@linkcode sendInteractionChoice} per pick;
@@ -98,6 +120,12 @@ export class CoopInteractionRelay {
 
   /** OWNER: send one pick for interaction `seq` (`kind` is routing/logging only). */
   sendInteractionChoice(seq: number, kind: string, choice: number, data?: number[]): void {
+    if (isCoopDebug()) {
+      coopLog(
+        "relay",
+        `SEND interactionChoice seq=${seq} kind=${kind} ${summarizeChoice({ choice, data })}`,
+      );
+    }
     this.transport.send({
       t: "interactionChoice",
       seq,
@@ -119,8 +147,15 @@ export class CoopInteractionRelay {
       if (queue.length === 0) {
         this.inbox.delete(seq);
       }
+      if (isCoopDebug()) {
+        coopLog(
+          "relay",
+          `AWAIT interactionChoice seq=${seq} timeoutMs=${timeoutMs} -> BUFFER-HIT resolve ${summarizeChoice(next)}`,
+        );
+      }
       return Promise.resolve(next);
     }
+    coopLog("relay", `AWAIT interactionChoice seq=${seq} timeoutMs=${timeoutMs} -> network-wait`);
     // Supersede any stale waiter parked on this seq.
     this.pending.get(seq)?.(null);
     return new Promise<CoopInteractionChoice | null>(resolve => {
@@ -135,6 +170,10 @@ export class CoopInteractionRelay {
         if (this.pending.get(seq) === finish) {
           this.pending.delete(seq);
         }
+        coopLog(
+          "relay",
+          `AWAIT interactionChoice seq=${seq} RESOLVE ${res === null ? "timeout->null" : summarizeChoice(res)}`,
+        );
         resolve(res);
       };
       this.pending.set(seq, finish);
@@ -149,6 +188,9 @@ export class CoopInteractionRelay {
    * change the result. Same FIFO-per-seq semantics as the choice relay.
    */
   sendInteractionOutcome(seq: number, kind: string, outcome: CoopInteractionOutcome): void {
+    if (isCoopDebug()) {
+      coopLog("relay", `SEND interactionOutcome seq=${seq} kind=${kind} ${summarizeOutcome(outcome)}`);
+    }
     this.transport.send({ t: "interactionOutcome", seq, kind, outcome });
   }
 
@@ -165,8 +207,15 @@ export class CoopInteractionRelay {
       if (queue.length === 0) {
         this.outcomeInbox.delete(seq);
       }
+      if (isCoopDebug()) {
+        coopLog(
+          "relay",
+          `AWAIT interactionOutcome seq=${seq} timeoutMs=${timeoutMs} -> BUFFER-HIT resolve ${summarizeOutcome(next)}`,
+        );
+      }
       return Promise.resolve(next);
     }
+    coopLog("relay", `AWAIT interactionOutcome seq=${seq} timeoutMs=${timeoutMs} -> network-wait`);
     // Supersede any stale waiter parked on this seq.
     this.outcomePending.get(seq)?.(null);
     return new Promise<CoopInteractionOutcome | null>(resolve => {
@@ -181,6 +230,10 @@ export class CoopInteractionRelay {
         if (this.outcomePending.get(seq) === finish) {
           this.outcomePending.delete(seq);
         }
+        coopLog(
+          "relay",
+          `AWAIT interactionOutcome seq=${seq} RESOLVE ${res === null ? "timeout->null" : summarizeOutcome(res)}`,
+        );
         resolve(res);
       };
       this.outcomePending.set(seq, finish);
@@ -190,6 +243,12 @@ export class CoopInteractionRelay {
 
   /** OWNER: stream the exact reward-option list rolled for `seq` / `reroll` (#633 Fix #2). */
   sendRewardOptions(seq: number, reroll: number, options: CoopSerializedRewardOption[]): void {
+    if (isCoopDebug()) {
+      coopLog(
+        "relay",
+        `SEND rewardOptions seq=${seq} reroll=${reroll} count=${options.length} ids=[${options.map(o => o.id).join(",")}]`,
+      );
+    }
     this.transport.send({ t: "rewardOptions", seq, reroll, options });
   }
 
@@ -208,8 +267,15 @@ export class CoopInteractionRelay {
     const buffered = this.rewardOptionsInbox.get(key);
     if (buffered !== undefined) {
       this.rewardOptionsInbox.delete(key);
+      if (isCoopDebug()) {
+        coopLog(
+          "relay",
+          `AWAIT rewardOptions key=${key} timeoutMs=${timeoutMs} -> BUFFER-HIT resolve count=${buffered.length}`,
+        );
+      }
       return Promise.resolve(buffered);
     }
+    coopLog("relay", `AWAIT rewardOptions key=${key} timeoutMs=${timeoutMs} -> network-wait`);
     // Supersede any stale waiter on this key.
     this.rewardOptionsPending.get(key)?.(null);
     return new Promise<CoopSerializedRewardOption[] | null>(resolve => {
@@ -224,6 +290,10 @@ export class CoopInteractionRelay {
         if (this.rewardOptionsPending.get(key) === finish) {
           this.rewardOptionsPending.delete(key);
         }
+        coopLog(
+          "relay",
+          `AWAIT rewardOptions key=${key} RESOLVE ${res === null ? "timeout->null" : `count=${res.length}`}`,
+        );
         resolve(res);
       };
       this.rewardOptionsPending.set(key, finish);
@@ -255,6 +325,9 @@ export class CoopInteractionRelay {
     if (msg.t === "interactionOutcome") {
       const waiter = this.outcomePending.get(msg.seq);
       if (waiter) {
+        if (isCoopDebug()) {
+          coopLog("relay", `RECV interactionOutcome seq=${msg.seq} -> deliver-to-waiter ${summarizeOutcome(msg.outcome)}`);
+        }
         waiter(msg.outcome);
         return;
       }
@@ -262,17 +335,29 @@ export class CoopInteractionRelay {
       const queue = this.outcomeInbox.get(msg.seq) ?? [];
       queue.push(msg.outcome);
       this.outcomeInbox.set(msg.seq, queue);
+      if (isCoopDebug()) {
+        coopLog(
+          "relay",
+          `RECV interactionOutcome seq=${msg.seq} -> BUFFER outcomeInbox depth=${queue.length} ${summarizeOutcome(msg.outcome)}`,
+        );
+      }
       return;
     }
     if (msg.t === "rewardOptions") {
       const key = `${msg.seq}:${msg.reroll}`;
       const waiter = this.rewardOptionsPending.get(key);
       if (waiter) {
+        if (isCoopDebug()) {
+          coopLog("relay", `RECV rewardOptions key=${key} -> deliver-to-waiter count=${msg.options.length}`);
+        }
         waiter(msg.options);
         return;
       }
       // No waiter yet - buffer (latest wins per key) for the next awaitRewardOptions.
       this.rewardOptionsInbox.set(key, msg.options);
+      if (isCoopDebug()) {
+        coopLog("relay", `RECV rewardOptions key=${key} -> BUFFER rewardOptionsInbox (latest-wins) count=${msg.options.length}`);
+      }
       return;
     }
     if (msg.t !== "interactionChoice") {
@@ -281,6 +366,9 @@ export class CoopInteractionRelay {
     const choice: CoopInteractionChoice = { choice: msg.choice, data: msg.data };
     const waiter = this.pending.get(msg.seq);
     if (waiter) {
+      if (isCoopDebug()) {
+        coopLog("relay", `RECV interactionChoice seq=${msg.seq} -> deliver-to-waiter ${summarizeChoice(choice)}`);
+      }
       waiter(choice);
       return;
     }
@@ -288,5 +376,11 @@ export class CoopInteractionRelay {
     const queue = this.inbox.get(msg.seq) ?? [];
     queue.push(choice);
     this.inbox.set(msg.seq, queue);
+    if (isCoopDebug()) {
+      coopLog(
+        "relay",
+        `RECV interactionChoice seq=${msg.seq} -> BUFFER inbox depth=${queue.length} ${summarizeChoice(choice)}`,
+      );
+    }
   }
 }

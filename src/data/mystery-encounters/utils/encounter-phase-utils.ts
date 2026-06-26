@@ -7,6 +7,7 @@ import { initMoveAnim, loadMoveAnimAssets } from "#data/battle-anims";
 import { modifierTypes } from "#data/data-lists";
 import type { IEggOptions } from "#data/egg";
 import { Egg } from "#data/egg";
+import { coopLog, coopWarn } from "#data/elite-redux/coop/coop-debug";
 import { buildCoopEnemy } from "#data/elite-redux/coop/coop-enemy-builder";
 import {
   coopGuestAwaitMeBattleParty,
@@ -682,11 +683,22 @@ export function selectPokemonForOption(
         labels: [],
         subPrompt: { kind: "party" },
       };
+      coopLog("me", "host streams PARTY sub-prompt + awaits guest slot", { seq: seqMe });
       relay?.sendInteractionOutcome(seqMe, "mePresent", partyPrompt);
       void relay?.awaitInteractionChoice(seqMe, COOP_ME_REPLAY_WAIT_MS).then(async pick => {
         // A null (disconnected guest) maps past the party tail => the not-selected branch.
         const slotIndex = pick?.choice ?? globalScene.getPlayerParty().length;
+        coopLog("me", "host received guest party sub-pick", {
+          seq: seqMe,
+          slotIndex,
+          fromNull: pick == null,
+        });
         if (slotIndex >= globalScene.getPlayerParty().length) {
+          coopWarn("me", "host: party sub-pick out of range; not-selected branch", {
+            seq: seqMe,
+            slotIndex,
+            partySize: globalScene.getPlayerParty().length,
+          });
           onPokemonNotSelected?.();
           resolve(false);
           return;
@@ -694,6 +706,7 @@ export function selectPokemonForOption(
         const pokemon = globalScene.getPlayerParty()[slotIndex];
         const secondaryOptions = onPokemonSelected(pokemon);
         if (!secondaryOptions) {
+          coopLog("me", "host applied guest party pick (no secondary)", { seq: seqMe, slotIndex });
           globalScene.currentBattle.mysteryEncounter!.setDialogueToken("selectedPokemon", pokemon.getNameToRender());
           resolve(true);
           return;
@@ -706,10 +719,20 @@ export function selectPokemonForOption(
           labels: [],
           subPrompt: { kind: "secondary", labels: secondaryOptions.map(o => o.label) },
         };
+        coopLog("me", "host streams SECONDARY sub-prompt + awaits guest index", {
+          seq: seqMe,
+          slotIndex,
+          labels: secondaryOptions.length,
+        });
         relay?.sendInteractionOutcome(seqMe, "mePresent", secondaryPrompt);
         void relay?.awaitInteractionChoice(seqMe, COOP_ME_REPLAY_WAIT_MS).then(sec => {
           globalScene.currentBattle.mysteryEncounter!.setDialogueToken("selectedPokemon", pokemon.getNameToRender());
           const idx = sec?.choice ?? -1;
+          coopLog("me", "host received guest secondary sub-pick", {
+            seq: seqMe,
+            idx,
+            applied: idx >= 0 && idx < secondaryOptions.length,
+          });
           if (idx >= 0 && idx < secondaryOptions.length) {
             secondaryOptions[idx].handler();
           }

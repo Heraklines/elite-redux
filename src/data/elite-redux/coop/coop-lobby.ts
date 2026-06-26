@@ -19,6 +19,7 @@
 // live RTCPeerConnection leg is browser-only.
 // =============================================================================
 
+import { coopLog, coopWarn } from "#data/elite-redux/coop/coop-debug";
 import type { CoopRuntime } from "#data/elite-redux/coop/coop-runtime";
 import { connectCoopWithCode, coopServerBase } from "#data/elite-redux/coop/coop-webrtc-connect";
 
@@ -173,18 +174,23 @@ export class CoopLobbyController {
 
   /** Announce presence and begin polling. Connects immediately if already paired. */
   async start(): Promise<void> {
+    coopLog("lobby", `start announce name=${this.name}`);
     try {
       const { id, pairing } = await announceToLobby(this.name);
       if (this.stopped) {
+        coopLog("lobby", "start: announced but already stopped -> abort");
         return;
       }
       this.id = id;
       if (pairing) {
+        coopLog("lobby", `start: already paired on announce code=${pairing.code} role=${pairing.role} -> connect`);
         await this.connect(pairing);
         return;
       }
+      coopLog("lobby", `announced id=${id} -> begin polling`);
       this.scheduleNextPoll(0);
     } catch (e) {
+      coopWarn("lobby", `start failed: ${message(e)}`);
       this.callbacks.onError(message(e));
     }
   }
@@ -192,13 +198,20 @@ export class CoopLobbyController {
   /** The player picked someone from the list. */
   async pick(targetId: string): Promise<void> {
     if (!this.id || this.connecting || this.stopped) {
+      coopLog(
+        "lobby",
+        `pick IGNORED target=${targetId} (id=${this.id != null} connecting=${this.connecting} stopped=${this.stopped})`,
+      );
       return;
     }
+    coopLog("lobby", `pick target=${targetId} (self=${this.id})`);
     try {
       const pairing = await pickPlayer(this.id, targetId);
+      coopLog("lobby", `pick matched code=${pairing.code} role=${pairing.role} -> connect`);
       await this.connect(pairing);
     } catch (e) {
       // Transient (they got matched first / left): surface + keep browsing.
+      coopWarn("lobby", `pick failed (transient): ${message(e)} -> keep browsing`);
       this.callbacks.onError(message(e));
       this.scheduleNextPoll(POLL_INTERVAL_MS);
     }
@@ -206,6 +219,7 @@ export class CoopLobbyController {
 
   /** Back out: stop polling and drop my presence row. */
   cancel(): void {
+    coopLog("lobby", `cancel (id=${this.id ?? "none"} connecting=${this.connecting})`);
     this.stopped = true;
     this.clearTimer();
     if (this.id) {
@@ -238,9 +252,11 @@ export class CoopLobbyController {
         return;
       }
       if (pairing) {
+        coopLog("lobby", `poll matched code=${pairing.code} role=${pairing.role} -> connect`);
         await this.connect(pairing);
         return;
       }
+      coopLog("lobby", `poll players=${players.length}`);
       this.callbacks.onPlayers(players);
     } catch {
       // transient network blip; keep polling
@@ -250,18 +266,23 @@ export class CoopLobbyController {
 
   private async connect(pairing: LobbyPairing): Promise<void> {
     if (this.connecting) {
+      coopLog("lobby", `connect IGNORED code=${pairing.code} (already connecting)`);
       return;
     }
+    coopLog("launch", `lobby connect code=${pairing.code} role=${pairing.role} name=${this.name}`);
     this.connecting = true;
     this.clearTimer();
     this.callbacks.onConnecting();
     try {
       const runtime = await this.connectFn(pairing.code, pairing.role, { username: this.name });
       if (this.stopped) {
+        coopLog("launch", `lobby connect: runtime ready but stopped -> discard code=${pairing.code}`);
         return;
       }
+      coopLog("launch", `lobby connected code=${pairing.code} role=${pairing.role} -> onConnected`);
       this.callbacks.onConnected(runtime);
     } catch (e) {
+      coopWarn("launch", `lobby connect failed code=${pairing.code} role=${pairing.role}: ${message(e)}`);
       this.callbacks.onError(message(e));
     }
   }

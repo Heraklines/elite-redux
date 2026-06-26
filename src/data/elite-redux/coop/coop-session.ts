@@ -17,6 +17,7 @@
 // encounter screens take turns; a multi-step ME counts as one interaction).
 // =============================================================================
 
+import { coopLog, coopWarn, isCoopDebug } from "#data/elite-redux/coop/coop-debug";
 import type { CoopRole } from "#data/elite-redux/coop/coop-transport";
 
 /** Max party members per player in co-op. */
@@ -272,6 +273,11 @@ export class CoopInteractionTurn {
    * STABLE for the whole interaction, or the watcher follows the wrong seq).
    */
   static ownerOf(counter: number): CoopRole {
+    const parity = ((counter % 2) + 2) % 2;
+    const owner: CoopRole = counter % 2 === 0 ? "host" : "guest";
+    if (isCoopDebug()) {
+      coopLog("owner", `ownerOf(counter=${counter}) parity=${parity} -> owner=${owner}`);
+    }
     return counter % 2 === 0 ? "host" : "guest";
   }
 
@@ -287,9 +293,22 @@ export class CoopInteractionTurn {
    */
   advance(fromCounter?: number): boolean {
     if (fromCounter !== undefined && fromCounter !== this.counter) {
+      // Idempotent no-op: this interaction already advanced (a duplicate terminal,
+      // or the reconcile broadcast already bumped past `fromCounter`). The whole
+      // point of the guard - log WHY we skipped so a missing skip (a double-count)
+      // is unmissable in the next repro.
+      coopLog(
+        "interaction",
+        `CoopInteractionTurn.advance NO-OP idempotent (fromCounter=${fromCounter} != counter=${this.counter}); counter stays ${this.counter}`,
+      );
       return false;
     }
+    const before = this.counter;
     this.counter += 1;
+    coopLog(
+      "interaction",
+      `CoopInteractionTurn.advance INCREMENT (fromCounter=${fromCounter === undefined ? "none" : fromCounter}) counter ${before} -> ${this.counter}`,
+    );
     return true;
   }
 
@@ -301,9 +320,21 @@ export class CoopInteractionTurn {
    * can only pull a genuinely-behind client forward.
    */
   mergeRemote(remote: number): void {
-    if (Number.isInteger(remote) && remote > this.counter) {
+    const before = this.counter;
+    const valid = Number.isInteger(remote);
+    const bumped = valid && remote > before;
+    if (bumped) {
       this.counter = remote;
     }
+    // PRIME DOUBLE-COUNT SUSPECT: a remote that bumps the local counter on TOP of a
+    // local advance is exactly how the guest could end up one ahead. Log the
+    // received value, the local-before, and whether/why it moved.
+    coopWarn(
+      "interaction",
+      bumped
+        ? `CoopInteractionTurn.mergeRemote BUMP (remote=${remote} > before=${before}) counter ${before} -> ${this.counter}`
+        : `CoopInteractionTurn.mergeRemote NO-CHANGE (remote=${remote}, before=${before}, ${valid ? "remote<=before" : "remote not an integer"}) counter stays ${before}`,
+    );
   }
 
   /** Serialize for the persistent run record. */
@@ -313,6 +344,11 @@ export class CoopInteractionTurn {
 
   /** Restore from the persistent run record. */
   static fromJSON(counter: number): CoopInteractionTurn {
-    return new CoopInteractionTurn(Number.isInteger(counter) && counter >= 0 ? counter : 0);
+    const restored = Number.isInteger(counter) && counter >= 0 ? counter : 0;
+    coopLog(
+      "interaction",
+      `CoopInteractionTurn.fromJSON restore (raw=${counter}) -> counter=${restored}${restored === counter ? "" : " (clamped from invalid/negative)"}`,
+    );
+    return new CoopInteractionTurn(restored);
   }
 }

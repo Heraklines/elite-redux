@@ -23,6 +23,7 @@
 // TYPE-ONLY import (erased at runtime): the data-fingerprint diagnostic message carries a
 // plain-JSON `ErDataFingerprint` (#633 diagnostics), so the transport stays the lowest layer.
 import type { ErDataFingerprint } from "#data/elite-redux/coop/coop-data-fingerprint";
+import { coopLog, isCoopDebug } from "#data/elite-redux/coop/coop-debug";
 // TYPE-ONLY import (fully erased at runtime by `import type`, so this file stays the
 // zero-runtime-import lowest layer): the ghost-pool message carries plain-JSON
 // `GhostTeamSnapshot`s, which already live in er-ghost-teams (#633 ghost-pool sync).
@@ -650,6 +651,68 @@ export interface CoopTransport {
 }
 
 /**
+ * Build a SHORT, log-safe one-line summary of a wire message (#633 debug). The transport is the
+ * hottest path, so this only pulls a handful of discriminating scalars (seq/turn/wave/counts) per
+ * `t` and NEVER dumps the big blobs (snapshots / serialized parties / dex strings). Called only
+ * behind an `isCoopDebug()` guard so the string is not built when logging is off.
+ */
+function summarizeCoopMessage(msg: CoopMessage): string {
+  switch (msg.t) {
+    case "command":
+      return `fi=${msg.fieldIndex} turn=${msg.turn} cmd=${msg.command.command}`;
+    case "commandRequest":
+      return `fi=${msg.fieldIndex} turn=${msg.turn} slots=${msg.moveSlots.length}`;
+    case "switchChoice":
+      return `fi=${msg.fieldIndex} slot=${msg.partySlot}`;
+    case "rosterSync":
+      return `role=${msg.role} entries=${msg.entries.length} ready=${msg.ready}`;
+    case "runConfig":
+      return `diff=${msg.difficulty} netcode=${msg.netcodeMode ?? "(lockstep)"} seed=${msg.seed != null}`;
+    case "stateSync":
+      return `seq=${msg.seq} blob=${msg.blob.length}b`;
+    case "requestStateSync":
+      return `turn=${msg.turn} seq=${msg.seq}`;
+    case "enemyPartySync":
+      return `wave=${msg.wave} enemies=${msg.enemies.length}`;
+    case "meBattleEnemyPartySync":
+      return `key=${msg.key} enemies=${msg.enemies.length}`;
+    case "ghostPool":
+      return `pool=${msg.pool.length}`;
+    case "battleEvent":
+      return `turn=${msg.turn} seq=${msg.seq} k=${msg.event.k}`;
+    case "turnResolution":
+      return `turn=${msg.turn} events=${msg.events.length} checksum=${msg.checksum}`;
+    case "battleCheckpoint":
+      return `reason=${msg.reason} checksum=${msg.checksum}`;
+    case "interactionChoice":
+      return `seq=${msg.seq} kind=${msg.kind} choice=${msg.choice}`;
+    case "interactionOutcome":
+      return `seq=${msg.seq} kind=${msg.kind} outcome=${msg.outcome.k}`;
+    case "meChecksum":
+      return `seq=${msg.seq} checksum=${msg.checksum}`;
+    case "meMessage":
+      return `len=${msg.text.length}`;
+    case "rewardOptions":
+      return `seq=${msg.seq} reroll=${msg.reroll} options=${msg.options.length}`;
+    case "uiInput":
+      return `seq=${msg.seq} n=${msg.n} button=${msg.button} mode=${msg.mode}`;
+    case "lifecycle":
+      return `event=${msg.event}`;
+    case "hello":
+      return `role=${msg.role} v=${msg.version} tiebreak=${msg.tiebreak ?? "(none)"}`;
+    case "ping":
+    case "pong":
+      return `ts=${msg.ts}`;
+    case "waveResolved":
+      return `wave=${msg.wave} outcome=${msg.outcome}`;
+    case "dataFingerprint":
+      return "fp";
+    default:
+      return "";
+  }
+}
+
+/**
  * In-process transport: two endpoints wired directly to each other. Each `send`
  * is delivered to the peer's handlers on a microtask, so a handler can never
  * observe its own send re-entrantly (mimics a real async channel). Powers tests
@@ -680,6 +743,7 @@ class LoopbackTransport implements CoopTransport {
     if (this._state === state) {
       return;
     }
+    coopLog("transport", `state ${this.role} ${this._state} -> ${state}`);
     this._state = state;
     for (const h of [...this.stateHandlers]) {
       h(state);
@@ -689,11 +753,29 @@ class LoopbackTransport implements CoopTransport {
   send(msg: CoopMessage): void {
     const peer = this.peer;
     if (peer == null || this._state !== "connected") {
+      if (isCoopDebug()) {
+        coopLog(
+          "transport",
+          `send DROP (not connected) ${this.role} t=${msg.t} state=${this._state} peer=${peer != null}`,
+        );
+      }
       return;
+    }
+    if (isCoopDebug()) {
+      coopLog("transport", `send ${this.role} t=${msg.t} ${summarizeCoopMessage(msg)}`);
     }
     queueMicrotask(() => {
       if (peer._state !== "connected") {
+        if (isCoopDebug()) {
+          coopLog("transport", `deliver DROP (peer not connected) ->${peer.role} t=${msg.t} peerState=${peer._state}`);
+        }
         return;
+      }
+      if (isCoopDebug()) {
+        coopLog(
+          "transport",
+          `recv ${peer.role} t=${msg.t} ${summarizeCoopMessage(msg)} handlers=${peer.msgHandlers.size}`,
+        );
       }
       for (const h of [...peer.msgHandlers]) {
         h(msg);

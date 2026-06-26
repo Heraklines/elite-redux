@@ -3,6 +3,7 @@ import { globalScene } from "#app/global-scene";
 import { Phase } from "#app/phase";
 import { getCharVariantFromDialogue } from "#data/dialogue";
 import { captureCoopChecksum, captureCoopMeOutcome } from "#data/elite-redux/coop/coop-battle-engine";
+import { coopLog, coopWarn } from "#data/elite-redux/coop/coop-debug";
 import { COOP_ME_TERM_SEQ_BASE } from "#data/elite-redux/coop/coop-me-pump";
 import {
   getCoopBattleStreamer,
@@ -101,6 +102,7 @@ export function coopMeInteractionStartValue(): number {
  * guest guard), NOT at leaveDefensive (MAJOR-3).
  */
 export function coopSetMePinForGuest(counter: number): void {
+  coopLog("me", "coopSetMePinForGuest", { before: coopMeInteractionStart, after: counter });
   coopMeInteractionStart = counter;
   setCoopMeBattleInteractionCounter(counter);
 }
@@ -108,6 +110,7 @@ export function coopSetMePinForGuest(counter: number): void {
 /** Co-op authoritative GUEST (#633, CHANGE-3): clear the guest's ME pin at the true post-ME
  *  boundary (after the embedded watcher reward shop has drained). */
 export function coopClearMePinForGuest(): void {
+  coopLog("me", "coopClearMePinForGuest", { before: coopMeInteractionStart, after: -1 });
   coopMeInteractionStart = -1;
   setCoopMeBattleInteractionCounter(-1);
 }
@@ -147,6 +150,15 @@ function coopBeginMePump(): void {
   const hostDrives = authoritative
     ? controller.role === "host"
     : spoofed || controller.isLocalOwnerAtCounter(coopMeInteractionStart);
+  coopLog("me", "coopBeginMePump owner resolution", {
+    counter: coopMeInteractionStart,
+    seq,
+    role: controller.role,
+    netcode: authoritative ? "authoritative" : "lockstep",
+    spoofed,
+    hostDrives,
+    branch: spoofed || hostDrives ? "beginOwner" : "beginWatcher",
+  });
   // Resolve the ME owner from the PINNED start counter (#633), not the live counter - an
   // inbound reconcile broadcast can bump the live counter mid-encounter, which would flip
   // the owner/seq calc and desync the pump (the same drift that broke the cursor mirror).
@@ -157,6 +169,9 @@ function coopBeginMePump(): void {
     // In LOCKSTEP the terminal stays on `seq` (8M) so the watcher loop catches it byte-identically.
     const termSeq = authoritative ? COOP_ME_TERM_SEQ_BASE + coopMeInteractionStart : seq;
     pump.beginOwner(seq, termSeq);
+    if (authoritative) {
+      coopLog("me", "ME owner streamed entry checksum", { seq });
+    }
     // Co-op AUTHORITATIVE netcode only (#633, TRACK-2 Phase C): stamp the owner's
     // authoritative full-state checksum at ME entry so the watcher can verify its ME state
     // is identical BEFORE the pump replays the button stream into it (the pump's one
@@ -183,8 +198,10 @@ function coopBeginMePump(): void {
     pump.beginWatcher(seq, {
       onLeave: () => {
         if (!coopInMeInteractivePhase()) {
+          coopLog("me", "lockstep watcher onLeave no-op (already past encounter)", { counter: coopMeInteractionStart });
           return; // already auto-completed past the encounter; its terminal already advanced
         }
+        coopLog("me", "lockstep watcher onLeave: leave + advance alternation", { counter: coopMeInteractionStart });
         leaveEncounterWithoutBattle();
         controller.advanceInteraction(coopMeInteractionStart);
       },
@@ -211,6 +228,7 @@ function coopEndMePump(): void {
   if (controller == null || pump == null) {
     return;
   }
+  coopLog("me", "coopEndMePump: close pump + advance alternation", { counter: coopMeInteractionStart });
   pump.endOwner();
   // Both clients advance LOCALLY + idempotently (keyed to the ME's start counter), so the
   // whole ME (encounter + its embedded reward shop, which suppresses its own advance) counts
@@ -260,6 +278,10 @@ export class MysteryEncounterPhase extends Phase {
     // host-authoritative ME-battle path takes over.
     if (isCoopAuthoritativeGuest()) {
       const interactionCounter = getCoopController()?.interactionCounter() ?? -1;
+      coopLog("me", "authoritative guest: diverting MysteryEncounterPhase -> CoopReplayMePhase", {
+        counter: interactionCounter,
+        wave: globalScene.currentBattle?.waveIndex,
+      });
       // CHANGE-3: pin the ME interaction counter for the guest's WHOLE ME (so coopMeInProgress() is
       // TRUE across the embedded watcher reward shop too). Cleared at the PostMysteryEncounterPhase
       // guest guard, AFTER the shop drains (MAJOR-3), never at leaveDefensive.
@@ -336,10 +358,17 @@ export class MysteryEncounterPhase extends Phase {
         }),
       };
       const seqMe = COOP_ME_PUMP_SEQ_BASE + coopMeInteractionStartValue();
+      coopLog("me", "host streams ME presentation (mePresent)", {
+        seq: seqMe,
+        opts: present.meetsReqs.length,
+        labels: present.labels.length,
+        tokens: Object.keys(present.tokens).length,
+      });
       getCoopInteractionRelay()?.sendInteractionOutcome(seqMe, "mePresent", present);
     } catch {
-      /* a presentation send failure must never break the host's encounter; the guest degrades to
-         its local re-derivation, never a hang */
+      coopWarn("me", "host presentation send threw; guest degrades to local re-derivation", {
+        counter: coopMeInteractionStartValue(),
+      });
     }
   }
 
@@ -365,17 +394,28 @@ export class MysteryEncounterPhase extends Phase {
       return;
     }
     const seqMe = COOP_ME_PUMP_SEQ_BASE + coopMeInteractionStartValue();
+    coopLog("me", "host awaits guest ME option index", { seq: seqMe, timeoutMs: COOP_ME_REPLAY_WAIT_MS });
     void relay.awaitInteractionChoice(seqMe, COOP_ME_REPLAY_WAIT_MS).then(choice => {
       if (choice == null || choice.choice < 0) {
         // D1 null-end: a disconnected guest must never hang the host's engine - safe-leave + close.
+        coopWarn("me", "host await guest index null/negative (disconnected guest); safe-leave", {
+          seq: seqMe,
+          choice: choice == null ? "null" : choice.choice,
+        });
         leaveEncounterWithoutBattle();
         coopEndMePump();
         return;
       }
+      coopLog("me", "host received guest ME option index", { seq: seqMe, index: choice.choice });
       const encounter = globalScene.currentBattle.mysteryEncounter!;
       const options = this.optionSelectSettings?.overrideOptions ?? encounter.options;
       const opt = options[choice.choice];
       if (opt == null) {
+        coopWarn("me", "host: relayed index out of range; safe-leave", {
+          seq: seqMe,
+          index: choice.choice,
+          optionCount: options.length,
+        });
         leaveEncounterWithoutBattle();
         coopEndMePump();
         return;
@@ -385,13 +425,20 @@ export class MysteryEncounterPhase extends Phase {
       // guest-owned ME would HANG the host on an un-relayed sub-screen. SAFE-DEGRADE instead: leave
       // the encounter at its default branch + close the pump, logged. Gated + closed-list; never a hang.
       if (COOP_AUTHORITATIVE_BESPOKE_SUB_ME.has(encounter.encounterType)) {
-        console.log(
-          `[coop-me] bespoke sub-UI on guest-owned ME ${MysteryEncounterType[encounter.encounterType]}; safe-degraded`,
+        coopWarn(
+          "me",
+          `bespoke sub-UI on guest-owned ME ${MysteryEncounterType[encounter.encounterType]}; safe-degraded`,
+          { seq: seqMe, index: choice.choice },
         );
         leaveEncounterWithoutBattle();
         coopEndMePump();
         return;
       }
+      coopLog("me", "host applies relayed guest option programmatically", {
+        seq: seqMe,
+        index: choice.choice,
+        encounter: MysteryEncounterType[encounter.encounterType],
+      });
       // Input-free option apply (the same path the local handler uses): drives onPre / onOption /
       // onPost; the engine sub-prompts (party target / secondary menu) await the guest's relayed
       // sub-picks at their own sites (encounter-phase-utils ADD-2b).
@@ -521,6 +568,9 @@ export class MysteryEncounterOptionSelectedPhase extends Phase {
     // nested/re-entered ME phase is ever queued on the guest, end it immediately - CoopReplayMePhase
     // is the guest's sole ME driver. Solo / lockstep / host unaffected.
     if (isCoopAuthoritativeGuest()) {
+      coopLog("me", "authoritative guest: ending MysteryEncounterOptionSelectedPhase (no engine)", {
+        counter: coopMeInteractionStart,
+      });
       this.end();
       return;
     }
@@ -863,6 +913,11 @@ export class MysteryEncounterRewardsPhase extends Phase {
     // onRewards is safe. The genuinely-interactive engine phases (OptionSelected, Post) stay diverted.
     if (isCoopAuthoritativeGuest()) {
       const guestEncounter = globalScene.currentBattle.mysteryEncounter!;
+      coopLog("me", "reward-owner override: guest runs reward shop as WATCHER (host=owner)", {
+        counter: coopMeInteractionStart,
+        hasDoEncounterRewards: !!guestEncounter.doEncounterRewards,
+        addHealPhase: this.addHealPhase,
+      });
       if (guestEncounter.doEncounterRewards) {
         guestEncounter.doEncounterRewards(); // unshifts the SelectModifierPhase the watcher runs
       } else if (this.addHealPhase) {
@@ -949,6 +1004,9 @@ export class PostMysteryEncounterPhase extends Phase {
     // drained - so coopMeInProgress() stays TRUE across leaveDefensive -> the shop -> here, closing
     // the double-advance window. Solo / lockstep / host unaffected.
     if (isCoopAuthoritativeGuest()) {
+      coopLog("me", "authoritative guest: PostMysteryEncounterPhase terminal (clearing pin)", {
+        counter: coopMeInteractionStart,
+      });
       coopClearMePinForGuest();
       this.end();
       return;
@@ -984,6 +1042,10 @@ export class PostMysteryEncounterPhase extends Phase {
         && coopMeInProgress()
       ) {
         const seqMe = COOP_ME_PUMP_SEQ_BASE + coopMeInteractionStartValue();
+        coopLog("me", "host streams comprehensive ME-terminal resync (meResync)", {
+          seq: seqMe,
+          counter: coopMeInteractionStartValue(),
+        });
         getCoopInteractionRelay()?.sendInteractionOutcome(seqMe, "meResync", captureCoopMeOutcome());
       }
       // Co-op (#633): the encounter is over - close the input pump (owner sends the leave

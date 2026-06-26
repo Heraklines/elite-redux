@@ -41,6 +41,7 @@
 // unit-testable headlessly over a LoopbackTransport, exactly like the other co-op relays.
 // =============================================================================
 
+import { coopLog, coopWarn, isCoopDebug } from "#data/elite-redux/coop/coop-debug";
 import { COOP_INTERACTION_LEAVE, type CoopInteractionRelay } from "#data/elite-redux/coop/coop-interaction-relay";
 
 /** The live-engine surface the watcher needs, injected so the module stays unit-testable. */
@@ -151,9 +152,11 @@ export class CoopMePump {
     if (this.role === "owner" && this.seq === seq && !this.ended) {
       // Keep the terminal seq in sync on a nested re-entry (the start counter is stable, so this
       // is the same value, but never let a re-entry leave a stale termSeq behind).
+      coopLog("pump", "beginOwner re-entry (same seq); refreshing termSeq", { seq, termSeq });
       this.termSeq = termSeq;
       return;
     }
+    coopLog("pump", "begin OWNER session", { seq, termSeq, lockstepTerm: termSeq === seq });
     this.role = "owner";
     this.seq = seq;
     this.termSeq = termSeq;
@@ -176,8 +179,10 @@ export class CoopMePump {
     const onLeave = typeof callbacks === "function" ? callbacks : callbacks.onLeave;
     const onBattleHandoff = typeof callbacks === "function" ? () => {} : callbacks.onBattleHandoff;
     if (this.role === "watcher" && this.seq === seq && !this.ended) {
+      coopLog("pump", "beginWatcher re-entry (same seq); not spawning a second loop", { seq });
       return;
     }
+    coopLog("pump", "begin WATCHER session", { seq, loopAlreadyRunning: this.loopRunning });
     this.role = "watcher";
     this.seq = seq;
     this.termSeq = seq;
@@ -209,6 +214,9 @@ export class CoopMePump {
     if (this.role !== "owner" || this.ended) {
       return;
     }
+    if (isCoopDebug()) {
+      coopLog("pump", "relay OWNER button", { seq: this.seq, kind: ME_PUMP_KIND, button });
+    }
     this.relay.sendInteractionChoice(this.seq, ME_PUMP_KIND, button);
   }
 
@@ -222,6 +230,7 @@ export class CoopMePump {
    */
   relayMeBattleHandoff(): void {
     if (this.role === "owner" && !this.ended) {
+      coopLog("pump", "relay BATTLE-HANDOFF sentinel", { termSeq: this.termSeq, sentinel: COOP_ME_BATTLE_HANDOFF });
       // Terminal sentinel rides `termSeq` (#633 MAJOR-1 / B-1): == seq in lockstep (watcher loop),
       // the dedicated 9M terminal seq in authoritative mode (CoopReplayMePhase.awaitHostTerminal).
       this.relay.sendInteractionChoice(this.termSeq, ME_PUMP_KIND, COOP_ME_BATTLE_HANDOFF);
@@ -232,6 +241,10 @@ export class CoopMePump {
   /** OWNER: the ME reached its terminal - send the leave sentinel so the watcher loop ends. */
   endOwner(): void {
     if (this.role === "owner" && !this.ended) {
+      coopLog("pump", "OWNER terminal: relay LEAVE sentinel", {
+        termSeq: this.termSeq,
+        sentinel: COOP_INTERACTION_LEAVE,
+      });
       // Terminal sentinel rides `termSeq` (#633 MAJOR-1 / B-1): == seq in lockstep (watcher loop),
       // the dedicated 9M terminal seq in authoritative mode (CoopReplayMePhase.awaitHostTerminal).
       this.relay.sendInteractionChoice(this.termSeq, ME_PUMP_KIND, COOP_INTERACTION_LEAVE);
@@ -241,6 +254,7 @@ export class CoopMePump {
 
   /** Close the session (terminal / disconnect). The watcher loop unwinds on its next pass. */
   endSession(): void {
+    coopLog("pump", "end session", { wasRole: this.role, seq: this.seq, termSeq: this.termSeq });
     this.ended = true;
     this.role = null;
     this.termSeq = -1;
@@ -263,6 +277,7 @@ export class CoopMePump {
         // both clients). The watcher's input gate auto-suspends for the battle phase, so once
         // we end here the battle command relay takes over normally.
         if (action != null && action.choice === COOP_ME_BATTLE_HANDOFF) {
+          coopLog("pump", "WATCHER terminal: battle-handoff sentinel; ending pump (battle runs)", { seq });
           const onHandoff = this.onBattleHandoff;
           this.endSession();
           onHandoff?.();
@@ -273,6 +288,11 @@ export class CoopMePump {
         // is (fast-forward the encounter to the next wave if we are still in it - the rewards
         // were already applied by the relayed picks; only the final outro is skipped).
         if (action == null || action.choice === COOP_INTERACTION_LEAVE) {
+          if (action == null) {
+            coopWarn("pump", "WATCHER terminal: await null (timeout / partner gone); onLeave skip", { seq });
+          } else {
+            coopLog("pump", "WATCHER terminal: leave sentinel; onLeave fast-forward", { seq });
+          }
           const onEnd = this.onLeave;
           this.endSession();
           onEnd?.();
@@ -287,7 +307,16 @@ export class CoopMePump {
             guard++;
             await this.tick();
           }
+          if (guard >= READY_MAX_TICKS && isCoopDebug()) {
+            coopWarn("pump", "WATCHER readiness ceiling hit; applying button best-effort", {
+              seq,
+              button: action.choice,
+            });
+          }
           if (!this.ended) {
+            if (isCoopDebug()) {
+              coopLog("pump", "WATCHER apply relayed button", { seq, button: action.choice, waitedTicks: guard });
+            }
             engine.applyButton(action.choice);
           }
         }

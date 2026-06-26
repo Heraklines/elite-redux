@@ -22,6 +22,7 @@
 // a checkpoint lives in `coop-battle-checkpoint.ts`; this file is just the wire.
 // =============================================================================
 
+import { coopLog, coopWarn, isCoopDebug } from "#data/elite-redux/coop/coop-debug";
 import type {
   CoopBattleCheckpoint,
   CoopBattleEvent,
@@ -153,6 +154,7 @@ export class CoopBattleStreamer {
 
   /** HOST: send the exact enemy party the guest must adopt verbatim for `wave`. */
   sendEnemyParty(wave: number, enemies: CoopSerializedEnemy[]): void {
+    coopLog("replay", `host SEND enemyPartySync wave=${wave} count=${enemies.length}`);
     this.transport.send({ t: "enemyPartySync", wave, enemies });
   }
 
@@ -165,6 +167,7 @@ export class CoopBattleStreamer {
    * regardless of who OWNED the encounter.
    */
   sendMeBattleEnemyParty(key: string, enemies: CoopSerializedEnemy[]): void {
+    coopLog("replay", `host SEND meBattleEnemyPartySync key=${key} count=${enemies.length}`);
     this.transport.send({ t: "meBattleEnemyPartySync", key, enemies });
   }
 
@@ -175,6 +178,7 @@ export class CoopBattleStreamer {
    * `takeGhostForWave`'s seeded pick deterministic on both. Sent once on prefetch-resolve.
    */
   sendGhostPool(pool: GhostTeamSnapshot[]): void {
+    coopLog("replay", `host SEND ghostPool count=${pool.length}`);
     this.transport.send({ t: "ghostPool", pool });
   }
 
@@ -191,6 +195,10 @@ export class CoopBattleStreamer {
     checksum: string,
     preimage?: string,
   ): void {
+    coopLog(
+      "replay",
+      `host SEND turnResolution turn=${turn} events=${events.length} checksum=${checksum} preimage=${preimage !== undefined}`,
+    );
     this.transport.send({
       t: "turnResolution",
       turn,
@@ -209,6 +217,10 @@ export class CoopBattleStreamer {
    * checkpoint is still the source of truth, so a dropped / reordered live event only stutters.
    */
   emitEvent(turn: number, seq: number, event: CoopBattleEvent): void {
+    // HOT PATH (per battle event): build the trace string only when debug is on.
+    if (isCoopDebug()) {
+      coopLog("replay", `host EMIT live battleEvent turn=${turn} seq=${seq} k=${event.k}`);
+    }
     this.transport.send({ t: "battleEvent", turn, seq, event });
   }
 
@@ -217,11 +229,13 @@ export class CoopBattleStreamer {
    * stamped with the host's full-state `checksum` for the guest to verify (#633, TRACK-2).
    */
   sendCheckpoint(reason: string, checkpoint: CoopBattleCheckpoint, checksum: string): void {
+    coopLog("checksum", `host SEND battleCheckpoint reason=${reason} checksum=${checksum}`);
     this.transport.send({ t: "battleCheckpoint", reason, checkpoint, checksum });
   }
 
   /** HOST: send the authoritative full-state snapshot answering a guest's `requestStateSync`. */
   sendStateSync(blob: string, seq: number): void {
+    coopLog("resync", `host SEND stateSync seq=${seq} blobLen=${blob.length}`);
     this.transport.send({ t: "stateSync", blob, seq });
   }
 
@@ -232,6 +246,7 @@ export class CoopBattleStreamer {
    * would otherwise loop the won wave forever). `outcome` is WHY the wave ended.
    */
   sendWaveResolved(wave: number, outcome: CoopWaveOutcome): void {
+    coopLog("replay", `host SEND waveResolved wave=${wave} outcome=${outcome}`);
     this.transport.send({ t: "waveResolved", wave, outcome });
   }
 
@@ -240,6 +255,7 @@ export class CoopBattleStreamer {
    * boundary so the watcher can verify its ME state is identical before the pump replays.
    */
   sendMeChecksum(seq: number, checksum: string): void {
+    coopLog("checksum", `owner SEND meChecksum seq=${seq} checksum=${checksum}`);
     this.transport.send({ t: "meChecksum", seq, checksum });
   }
 
@@ -257,6 +273,9 @@ export class CoopBattleStreamer {
    * rides the reward alternation + the full-state snapshot, so a dropped line never desyncs.
    */
   sendMeMessage(text: string): void {
+    if (isCoopDebug()) {
+      coopLog("replay", `host SEND meMessage len=${text.length}`);
+    }
     this.transport.send({ t: "meMessage", text });
   }
 
@@ -451,9 +470,12 @@ export class CoopBattleStreamer {
       }
     }
     if (perTurn == null) {
+      coopLog("replay", `guest consume live events turn=${turn} count=0`);
       return [];
     }
-    return [...perTurn.entries()].sort((a, b) => a[0] - b[0]).map(([seq, event]) => ({ seq, event }));
+    const consumed = [...perTurn.entries()].sort((a, b) => a[0] - b[0]).map(([seq, event]) => ({ seq, event }));
+    coopLog("replay", `guest consume live events turn=${turn} count=${consumed.length}`);
+    return consumed;
   }
 
   /**
@@ -468,8 +490,10 @@ export class CoopBattleStreamer {
     const buffered = this.inbox.get(turn);
     if (buffered !== undefined) {
       this.inbox.delete(turn);
+      coopLog("replay", `guest awaitTurn turn=${turn} RESOLVE (buffered race) events=${buffered.events.length}`);
       return Promise.resolve(buffered);
     }
+    coopLog("replay", `guest awaitTurn turn=${turn} START timeout=${this.timeoutMs}ms`);
     return new Promise<CoopTurnResolution | null>(resolve => {
       let settled = false;
       let cancelTimer: () => void = () => {};
@@ -481,6 +505,11 @@ export class CoopBattleStreamer {
         cancelTimer();
         if (this.pending.get(turn) === finish) {
           this.pending.delete(turn);
+        }
+        if (res == null) {
+          coopWarn("replay", `guest awaitTurn turn=${turn} STALL -> null (timeout/superseded)`);
+        } else {
+          coopLog("replay", `guest awaitTurn turn=${turn} RESOLVE events=${res.events.length} checksum=${res.checksum}`);
         }
         resolve(res);
       };
@@ -508,9 +537,11 @@ export class CoopBattleStreamer {
     const buffered = this.stateSyncInbox.get(seq);
     if (buffered !== undefined) {
       this.stateSyncInbox.delete(seq);
+      coopLog("resync", `guest requestStateSync turn=${turn} seq=${seq} RESOLVE (buffered race) blobLen=${buffered.length}`);
       this.transport.send({ t: "requestStateSync", turn, seq });
       return Promise.resolve(buffered);
     }
+    coopLog("resync", `guest requestStateSync turn=${turn} seq=${seq} START timeout=${this.timeoutMs}ms`);
     return new Promise<string | null>(resolve => {
       let settled = false;
       let cancelTimer: () => void = () => {};
@@ -522,6 +553,11 @@ export class CoopBattleStreamer {
         cancelTimer();
         if (this.stateSyncWaiters.get(seq) === finish) {
           this.stateSyncWaiters.delete(seq);
+        }
+        if (blob == null) {
+          coopWarn("resync", `guest requestStateSync turn=${turn} seq=${seq} -> null (timeout/superseded)`);
+        } else {
+          coopLog("resync", `guest requestStateSync turn=${turn} seq=${seq} RESOLVE blobLen=${blob.length}`);
         }
         resolve(blob);
       };
@@ -575,6 +611,10 @@ export class CoopBattleStreamer {
         // Hand it straight to a parked awaitEnemyParty (consumed), else buffer for the
         // next consume/await. Either way fire any live handler.
         const waiter = this.enemyPartyWaiters.get(msg.wave);
+        coopLog(
+          "replay",
+          `guest RECV enemyPartySync wave=${msg.wave} count=${msg.enemies.length} ${waiter ? "-> parked waiter" : "-> buffered (no waiter)"}`,
+        );
         if (waiter) {
           this.lastEnemyParty = null;
           this.enemyPartyHandler?.(msg.wave, msg.enemies);
@@ -606,6 +646,10 @@ export class CoopBattleStreamer {
           ...(msg.preimage === undefined ? {} : { preimage: msg.preimage }),
         };
         const resolver = this.pending.get(msg.turn);
+        coopLog(
+          "replay",
+          `guest RECV turnResolution turn=${msg.turn} events=${msg.events.length} checksum=${msg.checksum} ${resolver ? "-> parked waiter" : "-> buffered (no waiter)"}`,
+        );
         if (resolver) {
           resolver(res);
         } else {
@@ -617,6 +661,10 @@ export class CoopBattleStreamer {
       case "battleEvent": {
         // GUEST: buffer the live event by (turn, seq) - de-duped (a re-sent seq overwrites identically)
         // and order-tolerant (the seq, not arrival order, drives replay). Then fire any live handler.
+        // HOT PATH (per battle event): build the trace string only when debug is on.
+        if (isCoopDebug()) {
+          coopLog("replay", `guest RECV live battleEvent turn=${msg.turn} seq=${msg.seq} k=${msg.event.k}`);
+        }
         let perTurn = this.liveEvents.get(msg.turn);
         if (perTurn == null) {
           perTurn = new Map<number, CoopBattleEvent>();
@@ -629,16 +677,22 @@ export class CoopBattleStreamer {
       case "battleCheckpoint":
         // Buffer for the guest's next consumeCheckpoint() (applied at a turn boundary),
         // carrying the host's checksum so the guest can verify convergence after applying.
+        coopLog("checksum", `guest RECV battleCheckpoint reason=${msg.reason} checksum=${msg.checksum}`);
         this.lastCheckpoint = { reason: msg.reason, checkpoint: msg.checkpoint, checksum: msg.checksum };
         this.checkpointHandler?.(msg.reason, msg.checkpoint);
         return;
       case "requestStateSync":
         // HOST: the guest detected a desync - hand the request to the host's builder.
+        coopLog("resync", `host RECV requestStateSync turn=${msg.turn} seq=${msg.seq}`);
         this.stateSyncRequestHandler?.(msg.turn, msg.seq);
         return;
       case "stateSync": {
         // GUEST: deliver to a parked awaiter for this seq, else buffer it (race).
         const waiter = this.stateSyncWaiters.get(msg.seq);
+        coopLog(
+          "resync",
+          `guest RECV stateSync seq=${msg.seq} blobLen=${msg.blob.length} ${waiter ? "-> parked waiter" : "-> buffered (no waiter)"}`,
+        );
         if (waiter) {
           waiter(msg.blob);
         } else {
@@ -648,6 +702,7 @@ export class CoopBattleStreamer {
       }
       case "meChecksum":
         // WATCHER: the owner's ME-boundary checksum - verify + heal on mismatch.
+        coopLog("checksum", `watcher RECV meChecksum seq=${msg.seq} checksum=${msg.checksum}`);
         this.meChecksumHandler?.(msg.seq, msg.checksum);
         return;
       case "meMessage":
@@ -656,6 +711,7 @@ export class CoopBattleStreamer {
         return;
       case "waveResolved":
         // GUEST: the host cleared/ended this wave - run the normal post-battle tail.
+        coopLog("replay", `guest RECV waveResolved wave=${msg.wave} outcome=${msg.outcome}`);
         this.waveResolvedHandler?.(msg.wave, msg.outcome);
         return;
       case "ghostPool":

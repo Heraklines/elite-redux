@@ -27,6 +27,7 @@ import {
   type ErDataFingerprint,
   logErDataFingerprint,
 } from "#data/elite-redux/coop/coop-data-fingerprint";
+import { coopLog, coopWarn, isCoopDebug } from "#data/elite-redux/coop/coop-debug";
 import { CoopRoster, type CoopRosterEntry } from "#data/elite-redux/coop/coop-roster";
 import { CoopInteractionTurn } from "#data/elite-redux/coop/coop-session";
 import type { CoopMessage, CoopNetcodeMode, CoopRole, CoopTransport } from "#data/elite-redux/coop/coop-transport";
@@ -250,12 +251,25 @@ export class CoopSessionController {
    * watches; ownership advances once per completed interaction.
    */
   interactionOwner(): CoopRole {
-    return this.interactionTurn.current();
+    const counter = this.interactionTurn.toJSON();
+    const owner = this.interactionTurn.current();
+    if (isCoopDebug()) {
+      coopLog("owner", `interactionOwner() read counter=${counter} -> owner=${owner} (role=${this.role})`);
+    }
+    return owner;
   }
 
   /** Whether it is the LOCAL player's turn to drive the current interaction. */
   isLocalInteractionTurn(): boolean {
-    return this.interactionTurn.isOwner(this.role);
+    const counter = this.interactionTurn.toJSON();
+    const result = this.interactionTurn.isOwner(this.role);
+    if (isCoopDebug()) {
+      coopLog(
+        "owner",
+        `isLocalInteractionTurn() read counter=${counter} role=${this.role} -> ${result}`,
+      );
+    }
+    return result;
   }
 
   /**
@@ -268,12 +282,25 @@ export class CoopSessionController {
    * "wrong cursor / watcher stuck" regression broke. Mirrors the parity rule in one place.
    */
   isLocalOwnerAtCounter(pinnedCounter: number): boolean {
-    return CoopInteractionTurn.ownerOf(pinnedCounter) === this.role;
+    const owner = CoopInteractionTurn.ownerOf(pinnedCounter);
+    const result = owner === this.role;
+    if (isCoopDebug()) {
+      const parity = ((pinnedCounter % 2) + 2) % 2;
+      coopLog(
+        "owner",
+        `isLocalOwnerAtCounter(pinnedCounter=${pinnedCounter}) parity=${parity} owner=${owner} role=${this.role} -> ${result}`,
+      );
+    }
+    return result;
   }
 
   /** The raw interaction counter (persisted with the run so a resume continues the order). */
   interactionCounter(): number {
-    return this.interactionTurn.toJSON();
+    const counter = this.interactionTurn.toJSON();
+    if (isCoopDebug()) {
+      coopLog("interaction", `interactionCounter() read -> ${counter} (role=${this.role})`);
+    }
+    return counter;
   }
 
   /**
@@ -289,20 +316,41 @@ export class CoopSessionController {
    * double-count. The broadcast is kept as a monotonic-max safety net only.
    */
   advanceInteraction(fromCounter?: number): void {
+    // THE ACTIVE DESYNC PATH (#633): the guest counter ran one AHEAD of the host so
+    // both drove their own reward screen. Log every call EXHAUSTIVELY - arg, before,
+    // whether the inner advance actually fired vs no-opped (idempotency), after, role,
+    // and whether we broadcast - so an extra advance is unmissable in the next repro.
+    const before = this.interactionTurn.toJSON();
     const advanced = this.interactionTurn.advance(fromCounter);
+    const after = this.interactionTurn.toJSON();
     if (advanced) {
+      const choice = this.interactionTurn.toJSON();
+      coopLog(
+        "interaction",
+        `advanceInteraction ADVANCED+BROADCAST (fromCounter=${fromCounter === undefined ? "none" : fromCounter}) counter ${before} -> ${after} role=${this.role}; send interaction screen=${COOP_INTERACTION_TURN_SCREEN} choice=${choice}`,
+      );
       this.transport.send({
         t: "interaction",
         screen: COOP_INTERACTION_TURN_SCREEN,
         choice: this.interactionTurn.toJSON(),
       });
+    } else {
+      coopLog(
+        "interaction",
+        `advanceInteraction NO-OP no-broadcast (fromCounter=${fromCounter === undefined ? "none" : fromCounter}) counter stays ${before} (==${after}) role=${this.role} - idempotent skip, no send`,
+      );
     }
     this.emit();
   }
 
   /** Restore the interaction order from the persisted run record (on resume). */
   restoreInteractionCounter(counter: number): void {
+    const before = this.interactionTurn.toJSON();
     this.interactionTurn = CoopInteractionTurn.fromJSON(counter);
+    coopLog(
+      "interaction",
+      `restoreInteractionCounter (resume) raw=${counter} counter ${before} -> ${this.interactionTurn.toJSON()} role=${this.role}`,
+    );
     this.emit();
   }
 
@@ -317,9 +365,7 @@ export class CoopSessionController {
     const netcodeMode = config.netcodeMode ?? this._netcodeMode;
     this._runConfig = { ...config, netcodeMode };
     this._netcodeMode = netcodeMode;
-    console.log(
-      `[coop-runconfig] host broadcast difficulty=${config.difficulty} netcode=${netcodeMode} (role=${this.role})`,
-    );
+    coopLog("runtime", `host broadcast difficulty=${config.difficulty} netcode=${netcodeMode} (role=${this.role})`);
     this.transport.send({
       t: "runConfig",
       difficulty: config.difficulty,
@@ -462,6 +508,19 @@ export class CoopSessionController {
           // net - it pulls a genuinely-behind client forward but can never rewind a
           // correct local counter (the old blind overwrite let a stale/late broadcast
           // clobber the counter and desync the owner/seq calc -> the ME-watcher freeze).
+          //
+          // PRIME DOUBLE-COUNT SUSPECT (the live guest=5 host=4 desync): this inbound
+          // bump landing ON TOP of a local advance is exactly how a client gets one
+          // ahead. Log received vs local-before and whether it bumped; mergeRemote
+          // itself logs the BUMP/NO-CHANGE decision.
+          const localBefore = this.interactionTurn.toJSON();
+          if (isCoopDebug()) {
+            const willBump = Number.isInteger(msg.choice) && msg.choice > localBefore;
+            coopLog(
+              "interaction",
+              `RECV interaction broadcast (monotonic-max net) received=${msg.choice} localBefore=${localBefore} role=${this.role} -> ${willBump ? `WILL BUMP to ${msg.choice}` : "no bump (local >= received)"}`,
+            );
+          }
           this.interactionTurn.mergeRemote(msg.choice);
           this.emit();
         }
@@ -474,7 +533,7 @@ export class CoopSessionController {
           // The guest adopts the host's chosen netcode (#633, selectable A/B); an
           // absent value (an in-flight save from before this field) means "lockstep".
           const netcodeMode = msg.netcodeMode ?? "lockstep";
-          console.log(`[coop-runconfig] guest received difficulty=${msg.difficulty} netcode=${netcodeMode}`);
+          coopLog("runtime", `guest received difficulty=${msg.difficulty} netcode=${netcodeMode}`);
           this._netcodeMode = netcodeMode;
           this._runConfig = { difficulty: msg.difficulty, challenges: msg.challenges, seed: msg.seed, netcodeMode };
           this.emit();
@@ -484,7 +543,7 @@ export class CoopSessionController {
         // Guest asked us to (re)send the runConfig (#633 self-healing handshake). Only the
         // HOST is the authority, and only once it has actually decided (picked difficulty).
         if (this.role === "host" && this._runConfig != null) {
-          console.log("[coop-runconfig] host re-broadcast on guest request");
+          coopLog("runtime", "host re-broadcast on guest request");
           this.broadcastRunConfig(this._runConfig);
         }
         break;
@@ -499,7 +558,7 @@ export class CoopSessionController {
         const peer = msg.fp;
         const diff = diffErDataFingerprint(local, peer);
         if (diff.length === 0) {
-          console.info("[coop-fp] MATCH - data tables identical across clients");
+          coopLog("checksum", "MATCH - data tables identical across clients");
         } else {
           const detail = diff
             .map(
@@ -508,7 +567,7 @@ export class CoopSessionController {
                 + ` peer=${peer[name as keyof ErDataFingerprint].hash}(${peer[name as keyof ErDataFingerprint].n})`,
             )
             .join(" ");
-          console.warn(`[coop-fp] MISMATCH sections=${diff.join(",")} - ${detail}`);
+          coopWarn("checksum", `MISMATCH sections=${diff.join(",")} - ${detail}`);
         }
         break;
       }

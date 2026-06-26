@@ -35,6 +35,7 @@ import {
   type CoopChecksumState,
   checksumState,
 } from "#data/elite-redux/coop/coop-battle-checksum";
+import { coopLog, coopWarn } from "#data/elite-redux/coop/coop-debug";
 import type {
   CoopBattleCheckpoint,
   CoopFullBattleSnapshot,
@@ -636,6 +637,10 @@ export function reconcileArenaTags(hostTags: CoopSerializedArenaTag[] | undefine
  */
 export function applyCoopCheckpoint(checkpoint: CoopBattleCheckpoint): void {
   try {
+    coopLog(
+      "checksum",
+      `guest applyCheckpoint field=${checkpoint.field?.length ?? 0} weather=${checkpoint.weather} terrain=${checkpoint.terrain} arenaTags=${checkpoint.arenaTags?.length ?? 0}`,
+    );
     // Reconcile the enemy field COMPOSITION to the host's FIRST (#633): drop any guest enemy the
     // host KOd this turn (it rides the checkpoint with fainted:true) AND mirror any host enemy
     // SWITCH (a different species now at a slot -> summon the matching adopted member). Done BEFORE
@@ -993,6 +998,7 @@ export function captureCoopChecksum(): string {
   try {
     return checksumState(captureCoopChecksumState());
   } catch {
+    coopWarn("checksum", "captureCoopChecksum read failed -> sentinel (comparison skipped)");
     return COOP_CHECKSUM_SENTINEL;
   }
 }
@@ -1151,7 +1157,7 @@ function applyFullMon(mon: Pokemon, snap: CoopFullMonSnapshot): void {
     // clamps correctly. A loud warn surfaces the UPSTREAM stat divergence for a later root-cause fix
     // (forcing maxHp stops the loop but MASKS the real cause; the log makes it findable).
     if (typeof snap.maxHp === "number" && snap.maxHp > 0 && mon.getMaxHp() !== Math.trunc(snap.maxHp)) {
-      console.warn(`[coop-maxhp] divergence bi=${snap.bi} host=${Math.trunc(snap.maxHp)} guest=${mon.getMaxHp()}`);
+      coopWarn("resync", `maxhp divergence bi=${snap.bi} host=${Math.trunc(snap.maxHp)} guest=${mon.getMaxHp()}`);
       mon.setStat(Stat.HP, Math.trunc(snap.maxHp));
     }
     // Status.
@@ -1294,6 +1300,10 @@ export function adoptCoopHostPlayerPartyOrder(hostParty: number[] | undefined): 
  */
 export function applyCoopFullSnapshot(snapshot: CoopFullBattleSnapshot): void {
   try {
+    coopLog(
+      "resync",
+      `guest applyFullSnapshot field=${snapshot.field?.length ?? 0} weather=${snapshot.weather} terrain=${snapshot.terrain} arenaTags=${snapshot.arenaTags?.length ?? 0} modifiers=${snapshot.modifiers?.length ?? 0} party=${snapshot.party?.length ?? 0} money=${snapshot.money}`,
+    );
     // Heal the enemy-field COMPOSITION first (#633): drop any just-fainted enemy (fainted:true) and
     // mirror any host enemy SWITCH (a different species now at a slot). Done BEFORE the per-mon heal
     // below so the freshly-summoned switched-in mon is the one the snapshot's per-bi state lands on.
