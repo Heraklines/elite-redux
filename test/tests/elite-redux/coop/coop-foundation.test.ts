@@ -126,22 +126,32 @@ describe("co-op foundation (#633)", () => {
       expect(turn.toJSON()).toBe(3);
     });
 
-    it("mergeRemote is MONOTONIC-MAX - a stale/late broadcast can never rewind (#633)", () => {
+    it("mergeRemote DEFERS (monotonic-max) - never moves the live counter, folds in at the next advance (#633, BUG2)", () => {
       const turn = new CoopInteractionTurn();
       turn.advance(); // counter = 1 (locally advanced)
       turn.advance(); // counter = 2
-      // A late broadcast carrying an OLDER value must NOT clobber the correct local
-      // counter (the old blind overwrite is exactly what desynced the ME owner/seq).
+      // BUG2: mergeRemote no longer mutates the LIVE counter. A late broadcast carrying an
+      // OLDER value must NOT clobber the correct local counter (it never touches it now).
       turn.mergeRemote(1);
       expect(turn.toJSON()).toBe(2);
       turn.mergeRemote(0);
       expect(turn.toJSON()).toBe(2);
-      // A genuinely-ahead peer pulls a behind client forward.
+      // A genuinely-ahead peer is PARKED (pendingRemote), not applied eagerly: the live
+      // counter stays put until THIS client's next deterministic advance reconciles it.
       turn.mergeRemote(5);
-      expect(turn.toJSON()).toBe(5);
-      // Garbage is ignored.
+      expect(turn.toJSON(), "a deferred catch-up does NOT move the live counter on receipt").toBe(2);
+      // The next LOCAL advance folds in the deferred target (monotonic-max), pulling a
+      // genuinely-behind client forward in a single jump (2 -> 3 -> max(3,5) = 5).
+      expect(turn.advance(2)).toBe(true);
+      expect(turn.toJSON(), "the deferred peer value folds in at the next advance").toBe(5);
+      // Garbage is ignored (never parked, never applied).
       turn.mergeRemote(Number.NaN);
       expect(turn.toJSON()).toBe(5);
+      // A stale deferred value (<= the current counter) is a no-op even after folding: the
+      // next advance just increments normally, never rewinds.
+      turn.mergeRemote(3);
+      expect(turn.advance(5)).toBe(true);
+      expect(turn.toJSON(), "a stale deferred target never rewinds the counter").toBe(6);
     });
   });
 });

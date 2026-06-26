@@ -3,9 +3,11 @@ import { getPokemonNameWithAffix } from "#app/messages";
 import Overrides from "#app/overrides";
 import { initMoveAnim, loadMoveAnimAssets } from "#data/battle-anims";
 import { allMoves } from "#data/data-lists";
+import { coopLog, coopWarn } from "#data/elite-redux/coop/coop-debug";
 import {
   getCoopController,
   getCoopInteractionRelay,
+  getCoopNetcodeMode,
   getCoopRuntime,
   getCoopUiMirror,
 } from "#data/elite-redux/coop/coop-runtime";
@@ -25,10 +27,18 @@ import i18next from "i18next";
 // Only the player whose mon is learning the move drives it; the partner watches and mirrors
 // the result so both clients transition together. All relayed on one dedicated seq (FIFO,
 // distinct from the small interaction-turn seqs the reward shop uses).
-const COOP_LEARN_MOVE_SEQ = 9_000_001;
+export const COOP_LEARN_MOVE_SEQ = 9_000_001;
 /** How long the watcher waits for the owner's move-replace decision before giving up.
  *  20min: "wait for the human" - a slow decision must never trip a premature give-up (desync). */
 const COOP_LEARN_MOVE_WAIT_MS = 1_200_000;
+
+// Co-op AUTHORITATIVE host->guest move-learn forward (#633 BUG3+5). Disjoint from the 9_000_001
+// lockstep relay and the 9_000_000 ME terminal channel so a buffered forward never FIFO-collides.
+// Per-slot keying lets two queued level-up learns for DIFFERENT mons not cross-consume.
+export const COOP_LEARN_MOVE_FWD_SEQ_BASE = 9_100_000;
+/** The host awaits the guest's forwarded pick. "Wait for the human" but bounded so a disconnected /
+ *  idle partner can never freeze the host: on a null / timeout the host keeps the mon's current moves. */
+export const COOP_LEARN_MOVE_FWD_WAIT_MS = 1_200_000;
 
 export class LearnMovePhase extends PlayerPartyMemberPokemonPhase {
   public readonly phaseName = "LearnMovePhase";
@@ -73,7 +83,13 @@ export class LearnMovePhase extends PlayerPartyMemberPokemonPhase {
     // If the Pokemon has an empty move slot, the new move is added to the largest empty moveset index.
     // Otherwise the phase checks if the player wants to replace a move. The cap is normally 4 but ER's
     // "5th move slot" consumable can raise it (see Pokemon.getMaxMoveCount).
-    if (currentMoveset.length < pokemon.getMaxMoveCount()) {
+    if (globalScene.gameMode.isCoop && getCoopNetcodeMode() === "authoritative") {
+      // Co-op AUTHORITATIVE (#633 BUG3+5): the HOST is the sole engine. This dispatch supersedes the
+      // lockstep owner/watcher mapping below (which assumes BOTH clients run a LearnMovePhase - false
+      // here: the guest is a pure renderer parked in CoopReplayTurnPhase). Reached ONLY when the
+      // netcode is authoritative, so solo / host-lockstep / lockstep stay byte-identical.
+      this.coopAuthoritativeLearnMove(currentMoveset, move, pokemon);
+    } else if (currentMoveset.length < pokemon.getMaxMoveCount()) {
       // Empty slot: the move auto-learns identically on both clients (deterministic), so
       // co-op needs no relay here.
       this.learnMove(currentMoveset.length, move, pokemon);
@@ -153,7 +169,17 @@ export class LearnMovePhase extends PlayerPartyMemberPokemonPhase {
 
     const res = await relay.awaitInteractionChoice(COOP_LEARN_MOVE_SEQ, COOP_LEARN_MOVE_WAIT_MS);
     mirror?.endSession();
-    const moveIndex = res?.choice ?? pokemon.getMaxMoveCount();
+    await this.applyForgetResult(res?.choice ?? pokemon.getMaxMoveCount(), move, pokemon);
+  }
+
+  /**
+   * Co-op (#633): apply a relayed move-forget RESULT (the owner's / guest's chosen slot, or the
+   * `getMaxMoveCount()` "did not learn" sentinel) on THIS client's byte-identical mon. Shared by the
+   * lockstep watcher ({@linkcode coopWatchLearnMove}) and the authoritative host forward
+   * ({@linkcode coopHostForwardLearnMove}). An out-of-range index means "did not learn", so a null /
+   * timeout result never hangs - it keeps the mon's current moves and ends.
+   */
+  private async applyForgetResult(moveIndex: number, move: Move, pokemon: Pokemon): Promise<void> {
     if (moveIndex >= 0 && moveIndex < pokemon.getMaxMoveCount()) {
       // Build the same "1... 2... and Poof! forgot X. And..." chain the owner sees, so the
       // result message matches (read the forgotten move's name BEFORE setMove replaces it).
@@ -177,6 +203,91 @@ export class LearnMovePhase extends PlayerPartyMemberPokemonPhase {
       );
       this.end();
     }
+  }
+
+  /**
+   * Co-op AUTHORITATIVE dispatch (#633 BUG3+5). The HOST is the sole battle engine; the GUEST is a pure
+   * renderer parked in CoopReplayTurnPhase whose own engine never produced this LearnMovePhase from a
+   * level-up (only the Shroom modifier-apply queues one on the guest). So:
+   *  - GUEST: end immediately (NO menu). The single renderer is the persistent-listener-spawned
+   *    {@linkcode CoopReplayLearnMovePhase} (wireCoopLearnMoveForward), so the picker opens EXACTLY once
+   *    per learn - the Shroom-queued guest LearnMovePhase must NOT also render (double-render guard).
+   *  - HOST + empty move slot: auto-learn directly (deterministic), exactly like solo - no forward.
+   *  - HOST + HOST-owned full moveset: open the real interactive picker (the host owns the mon + drives).
+   *  - HOST + GUEST-owned full moveset: forward the prompt to the guest and await its pick with a finite
+   *    fallback ({@linkcode coopHostForwardLearnMove}).
+   */
+  private coopAuthoritativeLearnMove(currentMoveset: ReturnType<Pokemon["getMoveset"]>, move: Move, pokemon: Pokemon) {
+    const controller = getCoopController();
+    if (controller?.role === "guest") {
+      // Pure renderer: the persistent listener's CoopReplayLearnMovePhase is the sole picker renderer.
+      // Ending here (no menu) is the double-render guard for the Shroom-queued guest LearnMovePhase.
+      coopLog("learnmove", "guest authoritative LearnMovePhase no-op end (single renderer is the listener)", {
+        slot: this.partyMemberIndex,
+        moveId: this.moveId,
+      });
+      this.end();
+      return;
+    }
+    // HOST from here on (host or solo-spoof drives the engine).
+    if (currentMoveset.length < pokemon.getMaxMoveCount()) {
+      // Empty slot auto-learn is deterministic - no human pick, so no forward needed.
+      this.learnMove(currentMoveset.length, move, pokemon);
+      return;
+    }
+    const owner = (pokemon as { coopOwner?: CoopRole }).coopOwner ?? "host";
+    if (owner === "guest") {
+      // The mon belongs to the partner: forward the prompt + await their pick (finite fallback).
+      void this.coopHostForwardLearnMove(move, pokemon);
+      return;
+    }
+    // Host-owned mon: the host drives the real interactive picker itself.
+    this.replaceMoveCheck(move, pokemon);
+  }
+
+  /**
+   * Co-op AUTHORITATIVE HOST (#633 BUG3+5): forward a GUEST-owned mon's move-forget prompt to the guest
+   * (the human who owns the mon) on the disjoint `9_100_000 + partySlot` channel, render the picker
+   * READ-ONLY locally so the host watches the partner's live cursor, then AWAIT the guest's chosen
+   * forget-slot with a FINITE timeout. On null (timeout / disconnect / superseded) the host applies
+   * "did not learn" (keeps current moves) and ends - it can NEVER hang. If the relay is missing it
+   * degrades to the interactive host-drives picker (no await), still never a hang.
+   */
+  private async coopHostForwardLearnMove(move: Move, pokemon: Pokemon): Promise<void> {
+    const relay = getCoopInteractionRelay();
+    if (relay == null) {
+      // Degraded but safe: no live relay -> the host drives the interactive picker itself (no await).
+      this.replaceMoveCheck(move, pokemon);
+      return;
+    }
+    const slot = this.partyMemberIndex;
+    const seq = COOP_LEARN_MOVE_FWD_SEQ_BASE + slot;
+    const maxMoveCount = pokemon.getMaxMoveCount();
+    coopLog("learnmove", "host forwards guest-owned move-learn prompt", {
+      slot,
+      seq,
+      moveId: this.moveId,
+      maxMoveCount,
+    });
+    relay.sendInteractionOutcome(seq, "learnMoveForward", {
+      k: "learnMoveForward",
+      partySlot: slot,
+      moveId: this.moveId,
+      maxMoveCount,
+    });
+    const mirror = getCoopUiMirror();
+    // Render the picker READ-ONLY (no-op callback: the outcome is the relayed pick, never this
+    // callback) and mirror the GUEST's live cursor so the host watches the partner choose.
+    await globalScene.ui.setModeWithoutClear(UiMode.SUMMARY, pokemon, SummaryUiMode.LEARN_MOVE, move, () => {});
+    mirror?.beginSession("watcher", UiMode.SUMMARY, COOP_LEARN_MOVE_SEQ);
+
+    const res = await relay.awaitInteractionChoice(seq, COOP_LEARN_MOVE_FWD_WAIT_MS);
+    mirror?.endSession();
+    if (res == null) {
+      coopWarn("learnmove", "guest forward pick null (timeout/disconnect); keeping current moves", { slot, seq });
+    }
+    // null -> getMaxMoveCount() sentinel -> applyForgetResult keeps current moves + ends (no hang).
+    await this.applyForgetResult(res?.choice ?? maxMoveCount, move, pokemon);
   }
 
   /**

@@ -86,6 +86,13 @@ const COOP_ACT_SHOP = 1;
 const COOP_ACT_TRANSFER = 2;
 const COOP_ACT_LOCK = 3;
 
+/** Co-op (#698): trailing wire marker. The two ints after it are [COOP_MONEY_TAG, hostMoney],
+ *  appended by the OWNER to a relayed spend action (reroll / shop buy / reward buy) so the
+ *  WATCHER sets money host-authoritatively instead of recomputing its own (divergent) cost.
+ *  0x4d4f ('MO'); only stripped when it sits at data[len-2], and every producer appends exactly
+ *  the [TAG, money] pair, so it cannot collide with a legitimate trailing positional value. */
+const COOP_MONEY_TAG = 0x4d4f;
+
 /** Co-op (#633): decode a relayed CHECK-team op code to a greppable name for the watcher-apply
  *  diagnostic log in {@linkcode SelectModifierPhase.applyRelayedCheckOp}. Logging-only / pure. */
 function coopCheckOpName(op: number): string {
@@ -166,6 +173,13 @@ export class SelectModifierPhase extends BattlePhase {
   /** Watcher-side: the owner's relayed party-target slot + sub-option for the pick being replayed. */
   private coopRelayedSlot = -1;
   private coopRelayedOption = 0;
+  /** Watcher-side (#698): the host's authoritative money AFTER this relayed spend, streamed on the
+   *  relay message. -1 = none streamed (older host / non-spend action) -> the watcher keeps its own
+   *  deduction (current behavior, no regression). Reset to -1 after each apply so it cannot bleed. */
+  private coopRelayedMoney = -1;
+  /** Owner-side (#698): the post-spend money to stream with the next relay send, or -1 to append
+   *  nothing. Transient: set just before the spend's relay send, consumed + reset inside it. */
+  private coopOwnerPostMoney = -1;
   /** The interaction-turn counter observed when THIS shop opened (#633). Makes the
    *  alternation advance idempotent: the advance only fires while the counter is still
    *  at this value, so the owner's terminal + the watcher's terminal + a reconcile
@@ -426,7 +440,7 @@ export class SelectModifierPhase extends BattlePhase {
     } else {
       // Co-op (#633): a non-party item resolves immediately - relay the pick now (the
       // party-target items relay from their menu callbacks once the slot is chosen).
-      this.coopFlushPending([]);
+      this.coopFlushPending([], cost);
       this.applyModifier(modifierType.newModifier()!, cost);
     }
     return cost === -1;
@@ -439,10 +453,6 @@ export class SelectModifierPhase extends BattlePhase {
       globalScene.ui.playError();
       return false;
     }
-    // Co-op (#633): relay the reroll so the watcher rerolls its identical pool too. Sent
-    // before the new phase is unshifted; the watcher reaches this same method on replay
-    // (where the send is a no-op, since the watcher is not the interaction owner).
-    this.coopRelaySend(COOP_INTERACTION_REROLL, undefined, "reroll");
     globalScene.reroll = true;
     globalScene.phaseManager.unshiftNew(
       "SelectModifierPhase",
@@ -452,10 +462,22 @@ export class SelectModifierPhase extends BattlePhase {
     globalScene.ui.clearText();
     globalScene.ui.setMode(UiMode.MESSAGE).then(() => super.end());
     if (!Overrides.WAIVE_ROLL_FEE_OVERRIDE) {
-      globalScene.money -= rerollCost;
+      if (this.coopWatcher && this.coopRelayedMoney >= 0) {
+        // Co-op (#698): host is authoritative - SET the streamed post-reroll money instead of
+        // recomputing/subtracting (avoids per-client cost divergence + double-deduct after a resync).
+        globalScene.money = this.coopRelayedMoney;
+      } else {
+        globalScene.money -= rerollCost;
+      }
       globalScene.updateMoneyText();
       globalScene.animateMoneyChanged(false);
     }
+    // Co-op (#633/#698): relay the reroll so the watcher rerolls its identical pool too. Sent
+    // AFTER the deduction above so the streamed money is the POST-reroll authoritative value (the
+    // watcher reaches this same method on replay, where the send is a no-op since it is not the
+    // interaction owner). coopOwnerPostMoney is read + reset inside coopRelaySend.
+    this.coopOwnerPostMoney = Overrides.WAIVE_ROLL_FEE_OVERRIDE ? -1 : Math.trunc(globalScene.money);
+    this.coopRelaySend(COOP_INTERACTION_REROLL, undefined, "reroll");
     globalScene.playSound("se/buy");
     return true;
   }
@@ -603,7 +625,13 @@ export class SelectModifierPhase extends BattlePhase {
     if (cost !== -1 && !(modifier.type instanceof RememberMoveModifierType)) {
       if (result) {
         if (!Overrides.WAIVE_ROLL_FEE_OVERRIDE) {
-          globalScene.money -= cost;
+          if (this.coopWatcher && this.coopRelayedMoney >= 0) {
+            // Co-op (#698): host is authoritative - SET the streamed post-buy money instead of
+            // recomputing/subtracting (avoids per-client cost divergence + double-deduct after a resync).
+            globalScene.money = this.coopRelayedMoney;
+          } else {
+            globalScene.money -= cost;
+          }
           globalScene.updateMoneyText();
           globalScene.animateMoneyChanged(false);
         }
@@ -663,7 +691,7 @@ export class SelectModifierPhase extends BattlePhase {
         ) {
           globalScene.ui.setMode(this.getModifierSelectMode(), this.isPlayer()).then(() => {
             // Co-op (#633): relay the resolved fusion pair so the watcher mirrors it.
-            this.coopFlushPending([fromSlotIndex, spliceSlotIndex]);
+            this.coopFlushPending([fromSlotIndex, spliceSlotIndex], cost);
             const modifier = modifierType.newModifier(party[fromSlotIndex], party[spliceSlotIndex])!; //TODO: is the bang correct?
             this.applyModifier(modifier, cost, true);
           });
@@ -728,7 +756,7 @@ export class SelectModifierPhase extends BattlePhase {
         if (slotIndex < 6) {
           globalScene.ui.setMode(this.getModifierSelectMode(), this.isPlayer()).then(() => {
             // Co-op (#633): relay the resolved target slot + sub-option to the watcher.
-            this.coopFlushPending([slotIndex, option]);
+            this.coopFlushPending([slotIndex, option], cost);
             const modifier = this.buildPokemonModifier(modifierType, slotIndex, option);
             this.applyModifier(modifier!, cost, true); // TODO: is the bang correct?
           });
@@ -963,13 +991,22 @@ export class SelectModifierPhase extends BattlePhase {
     // relay source. Log the exact send (seq + label + choice + payload) so the watcher's apply
     // can be matched against it in the captured log. Hot-ish (per reward action) - guard the
     // string build behind isCoopDebug().
+    // Co-op (#698): for a money-moving pick the owner stashes its POST-spend authoritative money in
+    // coopOwnerPostMoney just before this send; append it as a trailing [COOP_MONEY_TAG, money] pair
+    // so the watcher sets money verbatim (the watcher strips it before its positional decode). The
+    // tag rides the EXISTING message - no new packet / await. Consume + reset so it can't bleed.
+    let wire = data;
+    if (this.coopOwnerPostMoney >= 0) {
+      wire = [...(data ?? []), COOP_MONEY_TAG, Math.trunc(this.coopOwnerPostMoney)];
+    }
+    this.coopOwnerPostMoney = -1;
     if (isCoopDebug()) {
       coopLog(
         "relay",
-        `OWNER send seq=${this.coopInteractionStart} kind=${label} choice=${choice} data=[${data?.join(",") ?? ""}] role=${controller.role}`,
+        `OWNER send seq=${this.coopInteractionStart} kind=${label} choice=${choice} data=[${wire?.join(",") ?? ""}] role=${controller.role}`,
       );
     }
-    getCoopInteractionRelay()?.sendInteractionChoice(this.coopInteractionStart, label, choice, data);
+    getCoopInteractionRelay()?.sendInteractionChoice(this.coopInteractionStart, label, choice, wire);
   }
 
   /** OWNER (#633 Fix #2): stream the rolled reward-option list for THIS reroll round so the
@@ -1081,13 +1118,21 @@ export class SelectModifierPhase extends BattlePhase {
   }
 
   /** OWNER: relay the stashed selection now that the resolved `extra` (party slot +
-   *  sub-option, or empty for a non-party item) is known. */
-  private coopFlushPending(extra: number[]): void {
+   *  sub-option, or empty for a non-party item) is known. `cost` (#698) is the shop price the
+   *  owner is ABOUT to deduct (-1 = free reward, no spend); the post-spend money is streamed so
+   *  the watcher sets it verbatim. The flush runs BEFORE the applyModifier deduction, so the
+   *  post value is computed inline (money - cost) here rather than read live. */
+  private coopFlushPending(extra: number[], cost = -1): void {
     if (this.coopPendingKind == null) {
       return;
     }
     const data =
       this.coopPendingKind === "shop" ? [COOP_ACT_SHOP, this.coopPendingRow, ...extra] : [COOP_ACT_REWARD, ...extra];
+    // Stream post-spend money only for an actual paid pick (cost > 0). Free rewards (cost -1/0)
+    // and WAIVE_ROLL_FEE_OVERRIDE deduct nothing, so leave coopOwnerPostMoney at -1 -> no tag ->
+    // the watcher keeps its own (also-nothing) deduction.
+    this.coopOwnerPostMoney =
+      cost > 0 && !Overrides.WAIVE_ROLL_FEE_OVERRIDE ? Math.trunc(globalScene.money - cost) : -1;
     this.coopRelaySend(this.coopPendingCursor, data, this.coopPendingKind);
     this.coopPendingKind = null;
   }
@@ -1192,7 +1237,19 @@ export class SelectModifierPhase extends BattlePhase {
    */
   private applyRelayedRewardAction(action: CoopInteractionChoice): boolean {
     const noop: ModifierSelectCallback = () => false;
-    const actCode = action.data?.[0];
+    // Co-op (#698): peel the trailing [COOP_MONEY_TAG, hostMoney] pair (if the owner appended it)
+    // off the data BEFORE the positional decode below, so the existing slot/opt indices are read
+    // exactly as today. An older host that does not append it leaves coopRelayedMoney at -1, so the
+    // watcher falls back to its own deduction (current behavior, no regression). Consumed by
+    // rerollModifiers / applyModifier set-verbatim; reset to -1 at every return so it can't bleed.
+    let relayedMoney = -1;
+    let data = action.data ?? [];
+    if (data.length >= 2 && data[data.length - 2] === COOP_MONEY_TAG) {
+      relayedMoney = data[data.length - 1];
+      data = data.slice(0, -2);
+    }
+    this.coopRelayedMoney = relayedMoney;
+    const actCode = data.length > 0 ? data[0] : undefined;
     const actName =
       actCode === COOP_ACT_REWARD
         ? "REWARD"
@@ -1214,6 +1271,7 @@ export class SelectModifierPhase extends BattlePhase {
       `WATCHER applying relayed action seq=${this.coopInteractionStart} act=${actName} choice=${action.choice} data=${action.data === undefined ? "-" : `[${action.data.join(",")}]`}`,
     );
     if (action.choice === COOP_INTERACTION_LEAVE) {
+      this.coopRelayedMoney = -1;
       this.coopEndMirror();
       globalScene.ui.setMode(UiMode.MESSAGE).then(() => super.end());
       this.coopAdvanceInteraction();
@@ -1222,39 +1280,49 @@ export class SelectModifierPhase extends BattlePhase {
     if (action.choice === COOP_INTERACTION_REROLL) {
       // rerollModifiers unshifts a fresh SelectModifierPhase (which re-enters watch on the
       // same interaction seq, but a NEW mirror seq since rerollCount bumps) and ends this
-      // one - so end this round's cursor stream before the new screen opens.
+      // one - so end this round's cursor stream before the new screen opens. rerollModifiers
+      // reads coopRelayedMoney (set above) to set money host-authoritatively (#698).
       this.coopEndMirror();
       this.rerollModifiers();
+      this.coopRelayedMoney = -1;
       return true;
     }
-    const data = action.data ?? [];
     const act = data[0];
     if (act === COOP_ACT_LOCK) {
+      this.coopRelayedMoney = -1;
       this.toggleRerollLock();
       return false;
     }
     if (act === COOP_ACT_TRANSFER) {
+      this.coopRelayedMoney = -1;
       this.applyTransfer(data[1], data[2], data[3], data[4]);
       return false;
     }
     if (act === COOP_ACT_REWARD) {
       this.coopRelayedSlot = data[1] ?? -1;
       this.coopRelayedOption = data[2] ?? 0;
+      // coopRelayedMoney (set above) drives applyModifier's set-verbatim for a PAID reward (#698);
+      // -1 (free reward / older host) falls back to the unchanged deduction.
       this.selectRewardModifierOption(action.choice, noop);
+      this.coopRelayedMoney = -1;
       return true;
     }
     if (act === COOP_ACT_SHOP) {
       this.coopRelayedSlot = data[2] ?? -1;
       this.coopRelayedOption = data[3] ?? 0;
+      // coopRelayedMoney (set above) drives applyModifier's set-verbatim for the buy (#698).
       this.selectShopModifierOption(data[1], action.choice, noop);
+      this.coopRelayedMoney = -1;
       return false;
     }
     if (act === COOP_ACT_CHECK) {
       // CHECK ops are NON-terminal: the owner is still in the shop. Apply against our identical
       // party and keep watching for the next relayed pick / op / leave.
+      this.coopRelayedMoney = -1;
       this.applyRelayedCheckOp(data[1], data.slice(2));
       return false;
     }
+    this.coopRelayedMoney = -1;
     coopWarn("reward", `WATCHER ignoring unknown reward action choice=${action.choice} data=${data.join(",")}`);
     return false;
   }

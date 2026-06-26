@@ -174,8 +174,7 @@ function wireCoopEnemyPartyResponder(controller: CoopSessionController, battleSt
  * on receipt; {@linkcode consumeCoopPendingWaveAdvance} hands it to the guest's
  * `CoopReplayTurnPhase` at the next SAFE turn boundary (NEVER mid-replay) so it runs the tail.
  */
-let pendingWaveAdvance: { wave: number; outcome: CoopWaveOutcome; captureParty?: string[] | undefined } | null =
-  null;
+let pendingWaveAdvance: { wave: number; outcome: CoopWaveOutcome; captureParty?: string[] | undefined } | null = null;
 /** The last wave the guest already ran the victory tail for (guards a duplicate `waveResolved`). */
 let lastResolvedWave = -1;
 
@@ -307,14 +306,14 @@ function wireCoopWaveResolved(controller: CoopSessionController, battleStream: C
     // Latest signal wins (a later wave supersedes an unconsumed earlier one), but a captureParty is
     // PRESERVED across a same-wave supersession (see mergeCoopPendingWaveAdvance).
     const merged = mergeCoopPendingWaveAdvance(pendingWaveAdvance, wave, outcome, captureParty);
-    if (merged != null) {
+    if (merged == null) {
+      coopWarn("runtime", `waveResolved wave=${wave} stale vs pending=${pendingWaveAdvance?.wave} -> kept pending`);
+    } else {
       coopLog(
         "runtime",
-        `pend waveResolved wave=${wave} outcome=${outcome}${merged.captureParty != null ? ` captureParty=${merged.captureParty.length}` : ""} (prevPending=${pendingWaveAdvance?.wave ?? "none"})`,
+        `pend waveResolved wave=${wave} outcome=${outcome}${merged.captureParty == null ? "" : ` captureParty=${merged.captureParty.length}`} (prevPending=${pendingWaveAdvance?.wave ?? "none"})`,
       );
       pendingWaveAdvance = merged;
-    } else {
-      coopWarn("runtime", `waveResolved wave=${wave} stale vs pending=${pendingWaveAdvance?.wave} -> kept pending`);
     }
   });
 }
@@ -383,6 +382,61 @@ function wireCoopMeChecksumCheck(battleStream: CoopBattleStreamer): void {
       }
     });
   });
+}
+
+/**
+ * Co-op AUTHORITATIVE move-learn forward listener (#633 BUG3+5). Unsubscribe handle for the
+ * persistent transport listener that spawns the guest's {@linkcode CoopReplayLearnMovePhase}. Stored
+ * module-scoped so {@linkcode clearCoopRuntime} can drop it (and the in-flight slot set) on teardown.
+ */
+let offLearnMoveForward: (() => void) | null = null;
+/** Slots with a learn-move picker already spawned this session (prevents a duplicate-message re-open). */
+const learnMoveForwardInFlight = new Set<number>();
+
+/**
+ * Install the persistent AUTHORITATIVE-GUEST move-learn forward listener (#633 BUG3+5). Covers the
+ * LEVEL-UP case where the guest runs NO {@linkcode LearnMovePhase} (its engine is parked in
+ * CoopReplayTurnPhase): when the host streams a `learnMoveForward` interactionOutcome, the guest spawns
+ * a single {@linkcode CoopReplayLearnMovePhase} to render the move-forget picker and relay the human's
+ * index back on the disjoint `9_100_000 + partySlot` seq. It is the SOLE renderer (the guest's own
+ * Shroom-queued LearnMovePhase no-ops in authoritative mode), so the picker opens EXACTLY once per learn.
+ *
+ * Gated hard on {@linkcode isCoopAuthoritativeGuest} (false for solo / host / lockstep), so it is a
+ * dead no-op outside an authoritative-guest run. An in-flight slot guard ignores a duplicate message
+ * for a slot whose picker is still open. Cleared in {@linkcode clearCoopRuntime}.
+ */
+function wireCoopLearnMoveForward(transport: CoopTransport): void {
+  offLearnMoveForward = transport.onMessage(msg => {
+    if (msg.t !== "interactionOutcome" || msg.outcome.k !== "learnMoveForward") {
+      return;
+    }
+    if (!isCoopAuthoritativeGuest()) {
+      return;
+    }
+    const { partySlot, moveId, maxMoveCount } = msg.outcome;
+    if (learnMoveForwardInFlight.has(partySlot)) {
+      coopLog("learnmove", `recv learnMoveForward slot=${partySlot} IGNORE (picker already in-flight)`);
+      return;
+    }
+    coopLog(
+      "learnmove",
+      `recv learnMoveForward slot=${partySlot} moveId=${moveId} maxMoveCount=${maxMoveCount} -> spawn CoopReplayLearnMovePhase`,
+    );
+    learnMoveForwardInFlight.add(partySlot);
+    try {
+      globalScene.phaseManager.unshiftNew("CoopReplayLearnMovePhase", partySlot, moveId, maxMoveCount);
+    } catch (e) {
+      // A spawn failure must never hang the run: the host's own await times out to "keep current
+      // moves". Drop the in-flight mark so a retry/resend can re-spawn.
+      learnMoveForwardInFlight.delete(partySlot);
+      coopWarn("learnmove", `spawn CoopReplayLearnMovePhase failed slot=${partySlot} (host await falls back)`, e);
+    }
+  });
+}
+
+/** Co-op (#633 BUG3+5): clear a slot's in-flight learn-move picker mark once its phase ends. */
+export function clearCoopLearnMoveForwardInFlight(partySlot: number): void {
+  learnMoveForwardInFlight.delete(partySlot);
 }
 
 /** Everything tied to one live co-op session. */
@@ -566,7 +620,7 @@ export function broadcastCoopWaveResolved(outcome: CoopWaveOutcome): void {
     const captureParty = outcome === "capture" ? captureCoopCaptureParty() : undefined;
     coopLog(
       "runtime",
-      `send waveResolved wave=${wave} outcome=${outcome}${captureParty != null ? ` captureParty=${captureParty.length}` : ""} (host)`,
+      `send waveResolved wave=${wave} outcome=${outcome}${captureParty == null ? "" : ` captureParty=${captureParty.length}`} (host)`,
     );
     active.battleStream.sendWaveResolved(wave, outcome, captureParty);
   } catch (e) {
@@ -803,6 +857,7 @@ export function startLocalCoopSession(
   wireCoopExpResolved(controller, battleStream);
   wireCoopMeChecksumCheck(battleStream);
   wireCoopLiveEvents(controller, battleStream);
+  wireCoopLearnMoveForward(host);
   setCoopRuntime(runtime);
   coopLog("launch", `local session ready role=${controller.role} netcode=${controller.netcodeMode} -> connecting`);
   controller.connect();
@@ -852,6 +907,7 @@ export function connectCoopSession(
   wireCoopExpResolved(controller, battleStream);
   wireCoopMeChecksumCheck(battleStream);
   wireCoopLiveEvents(controller, battleStream);
+  wireCoopLearnMoveForward(transport);
   setCoopRuntime(runtime);
   coopLog("launch", `peer session ready role=${controller.role} netcode=${controller.netcodeMode} -> connecting`);
   controller.connect();
@@ -871,6 +927,11 @@ export function clearCoopRuntime(): void {
   active.uiMirror.dispose();
   active.mePump.endSession();
   active.spoof?.dispose();
+  // Drop the persistent move-learn forward listener + its in-flight slot set (#633 BUG3+5) so a
+  // subsequent solo / lockstep run has no listener and spawns no CoopReplayLearnMovePhase.
+  offLearnMoveForward?.();
+  offLearnMoveForward = null;
+  learnMoveForwardInFlight.clear();
   active.localTransport.close();
   // Clear the co-op ghost-pool hooks so a subsequent SOLO run fetches normally (#633).
   setGhostPoolPublisher(null);

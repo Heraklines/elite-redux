@@ -609,7 +609,22 @@ export class CoopFinalizeTurnPhase extends Phase {
         );
         this.maybeRunCoopWaveAdvance();
       } else {
-        globalScene.phaseManager.queueTurnEndPhases();
+        // BUG1 (faint auto-switch premature-victory deadlock): the authoritative guest is a PURE
+        // RENDERER and the checkpoint applied at the top of start() already carries the host's
+        // authoritative POST-turn-end state (hp / status / stages / tags / weather / terrain /
+        // arenaTags / field / money). Running the REAL damaging turn-end phases here lets the guest
+        // LOCALLY chip-damage a host-surviving hp=1 enemy to 0 -> a local FaintPhase -> a premature
+        // VictoryPhase / BattleEnd the host never resolved, parking the guest as a reward watcher while
+        // the host awaits its turn N+1 move (DEADLOCK). Advance the turn MINIMALLY instead - the only
+        // turn-end side effects the loop actually needs - so the empty queue auto-runs TurnInitPhase ->
+        // TurnStartPhase -> CoopReplayTurnPhase for turn N+1. Victory still arrives ONLY via the host's
+        // waveResolved -> maybeRunCoopWaveAdvance. Solo / host / lockstep keep the original turn-end run.
+        if (isCoopAuthoritativeGuest()) {
+          globalScene.currentBattle.incrementTurn();
+          globalScene.phaseManager.dynamicQueueManager.clearLastTurnOrder();
+        } else {
+          globalScene.phaseManager.queueTurnEndPhases();
+        }
         // The turn-end phases were pushed to the back of the queue above; pushing the victory tail
         // here runs it AFTER they drain (the in-flight turn finishes first, per the Oracle ordering).
         this.maybeRunCoopWaveAdvance();

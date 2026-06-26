@@ -1,0 +1,111 @@
+/*
+ * SPDX-FileCopyrightText: 2024-2026 Pagefault Games
+ *
+ * SPDX-License-Identifier: AGPL-3.0-only
+ */
+
+import { globalScene } from "#app/global-scene";
+import { Phase } from "#app/phase";
+import { allMoves } from "#data/data-lists";
+import { coopLog, coopWarn } from "#data/elite-redux/coop/coop-debug";
+import {
+  clearCoopLearnMoveForwardInFlight,
+  getCoopInteractionRelay,
+  getCoopUiMirror,
+} from "#data/elite-redux/coop/coop-runtime";
+import { UiMode } from "#enums/ui-mode";
+import { COOP_LEARN_MOVE_FWD_SEQ_BASE, COOP_LEARN_MOVE_SEQ } from "#phases/learn-move-phase";
+import { SummaryUiMode } from "#ui/summary-ui-handler";
+
+/** Routing tag for the guest->host relayed move-forget pick (distinguishes it on the wire / in logs). */
+const LEARN_MOVE_CHOICE_KIND = "learnMove";
+
+/**
+ * Co-op AUTHORITATIVE move-learn REPLAY (#633 BUG3+5). The HOST is the sole battle engine, so for a
+ * full-moveset GUEST-owned mon the host streams a `learnMoveForward` prompt and AWAITS the guest's
+ * chosen forget-slot. On the LEVEL-UP path the guest never runs its own {@linkcode LearnMovePhase}
+ * (its engine is parked in CoopReplayTurnPhase), so a persistent session listener
+ * (`wireCoopLearnMoveForward` in coop-runtime) spawns THIS phase to render the picker and relay the
+ * human's index back. It is the SINGLE renderer for both contexts: the guest's own (Shroom-queued)
+ * LearnMovePhase is a no-op-end in authoritative mode, so the picker opens EXACTLY once per learn.
+ *
+ * Pure renderer + choice-forwarder, mirroring {@linkcode CoopReplayMePhase}:
+ *  - It takes NO engine action (never calls `setMove`); the host applies the forget authoritatively and
+ *    the guest's moveset converges via the next exp-delta / per-turn resync.
+ *  - There is NO network await: the forward's scalars (slot / moveId / maxMoveCount) are read straight
+ *    off the listener's message and passed to the constructor, so the phase opens the picker immediately.
+ *    Its completion is driven by LOCAL human input or a B-cancel, both of which relay an index and end
+ *    the phase, so it can NEVER hang. (The HOST's await of the relayed index has the finite fallback.)
+ */
+export class CoopReplayLearnMovePhase extends Phase {
+  public readonly phaseName = "CoopReplayLearnMovePhase";
+
+  private readonly partySlot: number;
+  private readonly moveId: number;
+  private readonly maxMoveCount: number;
+  /** Disjoint from the 9_000_001 lockstep relay and the 9_000_000 ME terminal; per-slot keyed. */
+  private readonly seq: number;
+  /** Set in {@linkcode relayAndEnd} so the picker resolves the forward EXACTLY once. */
+  private settled = false;
+
+  constructor(partySlot: number, moveId: number, maxMoveCount: number) {
+    super();
+    this.partySlot = partySlot;
+    this.moveId = moveId;
+    this.maxMoveCount = maxMoveCount;
+    this.seq = COOP_LEARN_MOVE_FWD_SEQ_BASE + partySlot;
+  }
+
+  public override start(): void {
+    super.start();
+    coopLog("learnmove", "guest CoopReplayLearnMovePhase start", {
+      partySlot: this.partySlot,
+      moveId: this.moveId,
+      maxMoveCount: this.maxMoveCount,
+      seq: this.seq,
+    });
+
+    const relay = getCoopInteractionRelay();
+    const pokemon = globalScene.getPlayerParty()[this.partySlot];
+    if (relay == null || pokemon == null) {
+      // No live session / mon resolution failed (defensive): end so the run never hangs. The host's
+      // own await times out to "keep current moves", so nothing is lost.
+      coopWarn("learnmove", "no relay / mon at learn-move replay start; ending", {
+        partySlot: this.partySlot,
+        hasRelay: relay != null,
+      });
+      clearCoopLearnMoveForwardInFlight(this.partySlot);
+      this.end();
+      return;
+    }
+
+    const move = allMoves[this.moveId];
+    // Open the REAL interactive move-forget picker (the same shared #563 screen the lockstep owner
+    // drives). beginSession("owner", ...) so the HOST mirrors this client's live cursor (cosmetic).
+    void globalScene.ui
+      .setModeWithoutClear(UiMode.SUMMARY, pokemon, SummaryUiMode.LEARN_MOVE, move, (moveIndex: number) => {
+        // The summary returns the "new move" row (== the move cap) to signal "did not learn".
+        this.relayAndEnd(moveIndex);
+      })
+      .then(() => {
+        getCoopUiMirror()?.beginSession("owner", UiMode.SUMMARY, COOP_LEARN_MOVE_SEQ);
+      });
+  }
+
+  /**
+   * Relay the human's chosen forget-slot (or the "did not learn" sentinel) to the host (the sole
+   * engine) and end. The guest takes NO engine action; the host applies the result and the guest's
+   * moveset converges via the next exp-delta / resync. Runs EXACTLY once (guarded by `settled`).
+   */
+  private relayAndEnd(moveIndex: number): void {
+    if (this.settled) {
+      return;
+    }
+    this.settled = true;
+    getCoopUiMirror()?.endSession();
+    clearCoopLearnMoveForwardInFlight(this.partySlot);
+    coopLog("learnmove", "guest relays move-forget pick", { seq: this.seq, kind: LEARN_MOVE_CHOICE_KIND, moveIndex });
+    getCoopInteractionRelay()?.sendInteractionChoice(this.seq, LEARN_MOVE_CHOICE_KIND, moveIndex);
+    void globalScene.ui.setMode(UiMode.MESSAGE).then(() => this.end());
+  }
+}

@@ -9886,4 +9886,230 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
     shopItems: [modifierTypes.FORM_CHANGE_ITEM],
   },
+  // ===========================================================================
+  // CO-OP DESYNC FIXES (#698) - live-report batch: faint deadlock, alternation,
+  // move-learn forward, money sync. The netcode flows need 2 real clients; these
+  // set up the host-side party + ownership split and tell the tester what to verify.
+  // ===========================================================================
+  {
+    label: "Co-op: guest faint at hp=1 enemy survives - no false win (BUG1)",
+    description:
+      "BUG1 co-op FAINT AUTO-SWITCH PREMATURE-VICTORY DEADLOCK - in the authoritative\n"
+      + "co-op forced-DOUBLE, the host is the sole engine and the guest is a pure renderer\n"
+      + "that replays the host's turn then snaps to the per-turn checkpoint. The guest used\n"
+      + "to ALSO run its OWN damaging end-of-turn phases (weather / TurnEnd chip damage). On\n"
+      + "the turn the guest's mon faints while ONE enemy survives at hp=1 on the host, that\n"
+      + "local engine chipped the hp=1 enemy to 0 -> a LOCAL FaintPhase -> a premature\n"
+      + "VictoryPhase / BattleEnd the host never resolved. The guest parked as a reward\n"
+      + "watcher while the host correctly continued to turn 2 and awaited the guest's move:\n"
+      + "a hard DEADLOCK (host waits for the guest, guest waits for the host).\n"
+      + "DO: turn on sandstorm is preset; take ONE turn. Let the RIGHT (guest, Gengar) lead\n"
+      + "FAINT this turn (the foe hits hard), and leave at least one enemy alive at low hp so\n"
+      + "the chip damage would have finished it locally on the buggy build. Watch BOTH clients\n"
+      + "after the turn resolves.\n"
+      + "EXPECT: NO victory / reward screen on the guest, NO BattleEnd. The fainted guest mon\n"
+      + "is removed and its bench replacement (Alakazam) is auto-sent in by the host; the run\n"
+      + "advances to turn 2 on BOTH clients and the guest is prompted for its turn-2 move (no\n"
+      + "300s hang). A real wave win must arrive ONLY when the host actually KOs the last\n"
+      + "enemy and streams waveResolved - never from the guest's local turn-end. The headless\n"
+      + "regression lives in test/tests/elite-redux/coop/coop-guest-faint-no-local-victory.test.ts.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 30,
+        STARTING_WAVE_OVERRIDE: 5,
+        BATTLE_STYLE_OVERRIDE: "double",
+        WEATHER_OVERRIDE: WeatherType.SANDSTORM,
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.MACHAMP,
+        ENEMY_LEVEL_OVERRIDE: 70,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.CLOSE_COMBAT],
+      });
+      return [
+        makeStarter(SpeciesId.SNORLAX, {
+          moveset: [MoveId.BODY_SLAM, MoveId.CRUNCH, MoveId.EARTHQUAKE, MoveId.FALSE_SWIPE],
+        }),
+        makeStarter(SpeciesId.GENGAR, {
+          moveset: [MoveId.SHADOW_BALL, MoveId.SLUDGE_BOMB, MoveId.THUNDERBOLT, MoveId.DAZZLING_GLEAM],
+        }),
+        makeStarter(SpeciesId.GYARADOS, {
+          moveset: [MoveId.WATERFALL, MoveId.CRUNCH, MoveId.EARTHQUAKE, MoveId.DRAGON_DANCE],
+        }),
+        makeStarter(SpeciesId.ALAKAZAM, {
+          moveset: [MoveId.PSYCHIC, MoveId.SHADOW_BALL, MoveId.FOCUS_BLAST, MoveId.RECOVER],
+        }),
+      ];
+    },
+    onBattleStart: () => {
+      globalScene.gameMode = getGameMode(GameModes.COOP);
+      if (getCoopController() == null) {
+        startLocalCoopSession({ username: loggedInUser?.username });
+      }
+      const party = globalScene.getPlayerParty();
+      party.forEach((mon, i) => {
+        mon.coopOwner = i < 3 ? "host" : "guest";
+      });
+      console.log(
+        "[BUG1 co-op faint] tags: "
+          + party.map(m => `${m.getNameToRender()}=${m.coopOwner}`).join(", ")
+          + ` | local role=${getCoopController()?.role} `
+          + "(let the RIGHT guest mon faint with an enemy alive at low hp; expect NO local victory)",
+      );
+    },
+  },
+  {
+    label: "Co-op: level-up move-learn on partner mon (#633 BUG3+5)",
+    description:
+      "#633 BUG3+5 - AUTHORITATIVE co-op. The GUEST-owned mon (party slot 2) learns a\n"
+      + "new move by LEVEL-UP after the opening battle while holding a FULL moveset, so the\n"
+      + "move-forget menu must open. Before this fix the HOST hung forever awaiting a pick\n"
+      + "the guest (a pure renderer) never sent, and the WebRTC peer eventually dropped.\n"
+      + "DO (2 paired clients, authoritative netcode): win the opening battle so slot-2\n"
+      + "(the partner's mon) levels up and tries to learn a move with all slots full.\n"
+      + "EXPECT: the move-forget picker opens on the GUEST (the mon's owner), the HOST shows\n"
+      + "the same picker read-only and MIRRORS the guest's cursor, and after the guest picks\n"
+      + "(or cancels = keep current moves) BOTH clients advance to the reward shop. It must\n"
+      + "NOT freeze on either client. If the guest idles/disconnects, the host keeps the\n"
+      + "mon's current moves after a bounded wait and still advances (no hang).",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 5,
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.MAGIKARP,
+        ENEMY_LEVEL_OVERRIDE: 30,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+      });
+      return [
+        makeStarter(SpeciesId.PIKACHU, {
+          moveset: [MoveId.THUNDERBOLT, MoveId.QUICK_ATTACK, MoveId.IRON_TAIL, MoveId.THUNDER_WAVE],
+        }),
+        makeStarter(SpeciesId.GARCHOMP, {
+          moveset: [MoveId.TACKLE, MoveId.SAND_ATTACK, MoveId.DRAGON_RAGE, MoveId.BITE],
+        }),
+      ];
+    },
+    onBattleStart: () => {
+      globalScene.gameMode = getGameMode(GameModes.COOP);
+      if (getCoopController() == null) {
+        startLocalCoopSession({ username: loggedInUser?.username });
+      }
+      const party = globalScene.getPlayerParty();
+      if (party[0]) {
+        party[0].coopOwner = "host";
+      }
+      if (party[1]) {
+        party[1].coopOwner = "guest";
+      }
+    },
+  },
+  {
+    label: "Co-op: Learner's Shroom on partner mon (#633 BUG3+5)",
+    description:
+      "#633 BUG3+5 - AUTHORITATIVE co-op. Use LEARNER'S SHROOM on the PARTNER'S (guest-\n"
+      + "owned) full-moveset mon. Before this fix BOTH clients queued a LearnMovePhase: the\n"
+      + "host computed WATCHER and hung awaiting a pick, and the guest (a pure renderer) could\n"
+      + "not drive its own move-forget menu, so the human was stuck on the learn screen.\n"
+      + "DO (2 paired clients, authoritative netcode): win the opening battle, take the\n"
+      + "LEARNER'S SHROOM in the first shop, and use it on the GUEST-owned mon (slot 2),\n"
+      + "choosing a move it does not yet know so the forget menu opens.\n"
+      + "EXPECT: the move-forget picker opens on the GUEST (the owner) - the human CAN pick a\n"
+      + "move to forget (or cancel = keep current moves). The HOST mirrors the cursor read-\n"
+      + "only. The picker opens EXACTLY ONCE (no double menu). BOTH clients then advance. It\n"
+      + "must NOT freeze and the guest must NOT be stuck unable to act.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 40,
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.MAGIKARP,
+        ENEMY_LEVEL_OVERRIDE: 5,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+      });
+      return [
+        makeStarter(SpeciesId.PIKACHU, {
+          moveset: [MoveId.THUNDERBOLT, MoveId.QUICK_ATTACK, MoveId.IRON_TAIL, MoveId.THUNDER_WAVE],
+        }),
+        makeStarter(SpeciesId.SNORLAX, {
+          moveset: [MoveId.BODY_SLAM, MoveId.CRUNCH, MoveId.EARTHQUAKE, MoveId.REST],
+        }),
+      ];
+    },
+    onBattleStart: () => {
+      globalScene.gameMode = getGameMode(GameModes.COOP);
+      if (getCoopController() == null) {
+        startLocalCoopSession({ username: loggedInUser?.username });
+      }
+      const party = globalScene.getPlayerParty();
+      if (party[0]) {
+        party[0].coopOwner = "host";
+      }
+      if (party[1]) {
+        party[1].coopOwner = "guest";
+      }
+    },
+    shopItems: [modifierTypes.ER_LEARNERS_SHROOM],
+  },
+  {
+    label: "Co-op: reward-shop alternation stays in sync (note, BUG2)",
+    description:
+      "BUG2 reward-shop alternation drift. CO-OP ONLY (needs two clients - host + guest).\n"
+      + "DO: start a 2-player co-op run. Play through several waves so you hit a sequence of\n"
+      + "reward shops AND at least one mystery encounter, watching the inter-wave boundary (a\n"
+      + "checksum resync can fire there). On EACH reward shop note who is allowed to pick (the\n"
+      + "OWNER) and who is the WATCHER.\n"
+      + "EXPECT: ownership strictly ALTERNATES host -> guest -> host -> ... across consecutive\n"
+      + "shops, and on every shop EXACTLY ONE client drives (never 'both pick' / 'someone\n"
+      + "chooses twice', never 'nobody can pick'); the watcher's cursor mirrors the owner's\n"
+      + "real picks. Specifically: at a reward shop right after the previous interaction's\n"
+      + "advance (and across a wave-boundary resync) the two clients must agree on the owner -\n"
+      + "they must NOT drift one apart (host pins parity 0 / guest pins parity 1 -> both drive).\n"
+      + "Verify in console: '[coop:interaction] CoopInteractionTurn.mergeRemote DEFER ...'\n"
+      + "appears for inbound broadcasts (live counter NOT bumped on receipt) and the catch-up\n"
+      + "'CoopInteractionTurn.advance catch-up (pendingRemote=...)' only folds in at a LOCAL\n"
+      + "advance. Headless regression: test/tests/elite-redux/coop/coop-interaction-sync.test.ts\n"
+      + "(REWARD-SHOP PIN IMMUNE / GENUINE CATCH-UP / RESYNC-INTERLEAVE). This is a manual\n"
+      + "two-client check; the trivial battle below is only a launch shell for the banner.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 20,
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.MAGIKARP,
+        ENEMY_LEVEL_OVERRIDE: 5,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+      });
+      return [
+        makeStarter(SpeciesId.PIKACHU, {
+          moveset: [MoveId.THUNDERBOLT, MoveId.QUICK_ATTACK, MoveId.IRON_TAIL, MoveId.THUNDER_WAVE],
+        }),
+      ];
+    },
+  },
+  {
+    label: "Co-op: money sync - reward shop reroll/buy (note, BUG4)",
+    description:
+      "BUG4 #698. Two-client AUTHORITATIVE co-op (host = battle engine, guest = renderer).\n"
+      + "After winning the opening battle, in the reward shop the OWNER REROLLS once and then\n"
+      + "BUYS a shop item. EXPECT: the money counter is byte-identical on BOTH screens\n"
+      + "immediately after each reroll AND each purchase - no one-wave lag, and no\n"
+      + "'[coop:heal] money host=.. guest=..' resync warning on the next turn. Pre-fix the\n"
+      + "guest lagged a whole wave (checkpoint money is captured at turn-end, before the shop\n"
+      + "runs) and the watcher re-deducted its OWN reroll/shop cost, so a resync landing\n"
+      + "between the checkpoint and the relayed reroll double-deducted (capture: host=750 while\n"
+      + "guest=500). Fix: the host streams its exact post-spend money on the relayed pick; the\n"
+      + "watcher SETS money verbatim instead of recomputing. VERIFY against dev-logs: the guest\n"
+      + "capture for the shop wave must contain NO '[coop:heal] money host=.. guest=..' line.\n"
+      + "Manual two-client check on staging; the trivial battle below is only a launch shell.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 20,
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.MAGIKARP,
+        ENEMY_LEVEL_OVERRIDE: 5,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+      });
+      return [
+        makeStarter(SpeciesId.PIKACHU, {
+          moveset: [MoveId.THUNDERBOLT, MoveId.QUICK_ATTACK, MoveId.IRON_TAIL, MoveId.THUNDER_WAVE],
+        }),
+      ];
+    },
+  },
 ];

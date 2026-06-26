@@ -470,7 +470,20 @@ export type CoopInteractionOutcome =
       seed: string;
       waveSeed: string;
       dex: string;
-    };
+    }
+  /**
+   * Co-op AUTHORITATIVE move-learn forward (#633 BUG3+5): the HOST is the sole engine, but a
+   * GUEST-owned mon's "which move to forget" pick belongs to the human who owns that mon. When the
+   * host's {@linkcode LearnMovePhase} reaches a full-moveset GUEST-owned mon it streams this prompt
+   * to the guest (on the disjoint 9_100_000 + partySlot channel) and awaits the guest's chosen
+   * forget-slot; the guest opens the real picker, relays an index, and the host applies it (or, on a
+   * timeout / disconnect, keeps the mon's current moves). All scalars, no engine types - additive, so
+   * an older client harmlessly ignores an unknown `k`.
+   *  - `partySlot`    the learning mon's party slot (the guest resolves the SAME Pokemon).
+   *  - `moveId`       the move id being learned (cosmetic on the guest; the host applies it).
+   *  - `maxMoveCount` the mon's move-slot cap == the "did not learn" sentinel index.
+   */
+  | { k: "learnMoveForward"; partySlot: number; moveId: number; maxMoveCount: number };
 
 /**
  * How a wave's battle ended (#633, authoritative wave-advance handshake). The host

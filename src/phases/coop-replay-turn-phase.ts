@@ -7,7 +7,7 @@
 import { globalScene } from "#app/global-scene";
 import { Phase } from "#app/phase";
 import { coopLog, coopWarn, isCoopDebug } from "#data/elite-redux/coop/coop-debug";
-import { getCoopBattleStreamer } from "#data/elite-redux/coop/coop-runtime";
+import { getCoopBattleStreamer, isCoopAuthoritativeGuest } from "#data/elite-redux/coop/coop-runtime";
 import type { CoopBattleEvent } from "#data/elite-redux/coop/coop-transport";
 
 /**
@@ -218,7 +218,20 @@ export class CoopReplayTurnPhase extends Phase {
   private finishTurnNoStream(): void {
     coopLog("replay", `guest replay turn=${this.turn}: finishTurnNoStream (queue turn-end, no checkpoint)`);
     try {
-      globalScene.phaseManager.queueTurnEndPhases();
+      // BUG1 (faint auto-switch premature-victory deadlock): same hazard as CoopFinalizeTurnPhase. This
+      // is the host-stall fallback (awaitTurn resolved null). If the host stalls on the exact turn an
+      // hp=1 enemy survives, running the REAL damaging turn-end phases lets the authoritative guest
+      // LOCALLY faint that enemy -> a premature local VictoryPhase / BattleEnd -> the same deadlock. So
+      // on the authoritative guest advance the turn MINIMALLY (the guest re-syncs on the next
+      // checkpoint); victory only ever arrives via the host's waveResolved. Solo / host / lockstep keep
+      // the original turn-end run. (CoopReplayTurnPhase is guest-only; the gate is for symmetry and so a
+      // future lockstep guest is unaffected.)
+      if (isCoopAuthoritativeGuest()) {
+        globalScene.currentBattle.incrementTurn();
+        globalScene.phaseManager.dynamicQueueManager.clearLastTurnOrder();
+      } else {
+        globalScene.phaseManager.queueTurnEndPhases();
+      }
     } catch {
       // The turn-end queue is best-effort; a failure here must never hang the turn.
       coopWarn("replay", `guest replay turn=${this.turn}: queueTurnEndPhases failed`);

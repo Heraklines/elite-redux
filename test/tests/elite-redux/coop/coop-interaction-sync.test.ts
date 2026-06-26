@@ -23,6 +23,7 @@
 // =============================================================================
 
 import { COOP_INTERACTION_LEAVE, CoopInteractionRelay } from "#data/elite-redux/coop/coop-interaction-relay";
+import { CoopInteractionTurn } from "#data/elite-redux/coop/coop-session";
 import { CoopSessionController } from "#data/elite-redux/coop/coop-session-controller";
 import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
 import { CoopUiMirror, type CoopUiMirrorEngine } from "#data/elite-redux/coop/coop-ui-mirror";
@@ -306,7 +307,7 @@ describe("co-op interaction-sync (#633 regression harness)", () => {
   // and the other does not -> permanent counter drift -> every later cursor-mirror
   // seq mismatches. This test makes that asymmetry explicit.
   // ===========================================================================
-  it("ASYMMETRIC ADVANCE: if one side advances an interaction the other suppresses, the counters DRIFT", async () => {
+  it("ASYMMETRIC ADVANCE: the deferred reconcile catches the behind side up at ITS next advance (#633, BUG2)", async () => {
     const rig = makeRig();
     await flush();
 
@@ -320,13 +321,26 @@ describe("co-op interaction-sync (#633 regression harness)", () => {
     // mysteryEncounter read can produce if the ME-active state differs at shop-close.)
     rig.hostCtl.advanceInteraction(startHost); // host -> start+1, broadcasts start+1
     // guest suppresses (no advance)
-    await flush(); // host's broadcast lands on the guest: mergeRemote pulls it forward
+    await flush(); // host's broadcast lands on the guest: mergeRemote DEFERS it (parked)
 
-    // With a mergeRemote safety net, the broadcast SHOULD pull the guest forward so they
-    // re-converge. Without it (pure local advance), they drift permanently.
+    // BUG2: the broadcast is now DEFERRED, not applied eagerly - so the guest's LIVE counter
+    // is intentionally still behind here (the deferral's whole point: a stray broadcast in
+    // the inter-wave gap must NOT poison the guest's live counter / its next owner pin).
+    expect(
+      rig.guestCtl.interactionCounter(),
+      "the deferred broadcast does NOT eagerly bump the guest live counter",
+    ).toBe(startGuest);
+    expect(rig.hostCtl.interactionCounter()).toBe(startHost + 1);
+
+    // Convergence point MOVES to the guest's OWN next deterministic advance: the parked
+    // peer target folds in (monotonic-max) and the two re-converge. This timing shift is
+    // intentional - the guarantee is preserved, only its point moves from receipt to the
+    // next local advance.
+    rig.guestCtl.advanceInteraction(startGuest); // guest start -> start+1, folds pendingRemote
+    await flush();
     expect(
       rig.hostCtl.interactionCounter(),
-      "after an asymmetric advance the reconcile broadcast must re-converge the counters",
+      "the behind side catches up at its own next advance (deferred fold-in re-converges)",
     ).toBe(rig.guestCtl.interactionCounter());
 
     dispose(rig);
@@ -531,6 +545,132 @@ describe("co-op interaction-sync (#633 regression harness)", () => {
     await flush();
     expect(rig.hostCtl.isLocalOwnerAtCounter(0), "owner at counter 0 is stable after a live bump").toBe(true);
     expect(rig.guestCtl.isLocalOwnerAtCounter(0)).toBe(false);
+
+    dispose(rig);
+  });
+
+  // ===========================================================================
+  // BUG2 (reward-shop alternation drift): the live root cause. The host finishes the
+  // post-(counter-N)-shop advance (-> N+1) and broadcasts N+1. That broadcast lands on
+  // the guest DURING the inter-wave resync gap - BEFORE the guest opens its OWN next
+  // reward shop and pins its owner from the LIVE counter. With the OLD eager mergeRemote
+  // the broadcast bumped the guest's live counter to N+1, so the guest pinned the next
+  // shop's owner from N+1 (parity flipped) while the host pinned from N -> BOTH drove
+  // ("someone chooses twice"). The deferral fix parks the broadcast and folds it in only
+  // at the guest's OWN next deterministic advance, so the live counter the shop pins from
+  // is immune to the gap broadcast.
+  // ===========================================================================
+  it("REWARD-SHOP PIN IMMUNE TO INTER-WAVE BROADCAST: a gap broadcast does not poison the next owner pin (#633, BUG2)", async () => {
+    const rig = makeRig();
+    await flush();
+
+    // Both clients aligned at counter N (even -> host owns this shop).
+    const n = rig.hostCtl.interactionCounter();
+    expect(n).toBe(rig.guestCtl.interactionCounter());
+    expect(n % 2).toBe(0);
+    expect(rig.hostCtl.interactionOwner(), "even counter -> host owns").toBe("host");
+
+    // Host completes interaction N -> N+1 and broadcasts N+1.
+    rig.hostCtl.advanceInteraction(n); // host -> N+1, broadcasts N+1
+    await flush(); // the broadcast lands on the guest IN THE INTER-WAVE GAP (guest not yet advanced)
+
+    // BUG2 ASSERTION: the guest's LIVE counter is NOT bumped by the gap broadcast - it is
+    // deferred. So when the guest opens its next reward shop and pins the owner from the
+    // live counter, it pins from N (still host-owned), exactly like the host did.
+    expect(
+      rig.guestCtl.interactionCounter(),
+      "the gap broadcast must NOT bump the guest live counter (deferred)",
+    ).toBe(n);
+    expect(
+      rig.guestCtl.isLocalOwnerAtCounter(rig.guestCtl.interactionCounter()),
+      "guest pins WATCHER (host owns) at its un-poisoned live counter N",
+    ).toBe(false);
+    expect(CoopInteractionTurn.ownerOf(rig.guestCtl.interactionCounter())).toBe("host");
+
+    // Guest then reaches ITS terminal for interaction N and advances: the parked N+1 folds
+    // in (here it equals the local increment), and the two re-converge at N+1.
+    rig.guestCtl.advanceInteraction(n); // guest N -> N+1, folds pendingRemote
+    await flush();
+    expect(rig.hostCtl.interactionCounter(), "both re-converge at N+1 after the guest advances").toBe(
+      rig.guestCtl.interactionCounter(),
+    );
+    expect(rig.guestCtl.interactionCounter()).toBe(n + 1);
+
+    dispose(rig);
+  });
+
+  // ===========================================================================
+  // BUG2: a GENUINE missed-advance catch-up still works through the deferral. The guest
+  // misses interaction N entirely (never advances for it); the host advances N then N+1,
+  // broadcasting N+2 across two mergeRemote calls. When the guest finally advances ONCE
+  // (keyed to its stale start N), the deferred catch-up jumps it straight to the host's
+  // value - monotonic, no rewind, single fold.
+  // ===========================================================================
+  it("GENUINE CATCH-UP: a behind guest folds in a multi-step deferred target at its next advance (#633, BUG2)", async () => {
+    const rig = makeRig();
+    await flush();
+
+    const n = rig.hostCtl.interactionCounter();
+    expect(n).toBe(rig.guestCtl.interactionCounter());
+
+    // Host advances twice (N -> N+1 -> N+2), broadcasting after each. The guest misses both
+    // local advances; its mergeRemote parks the running max (N+2).
+    rig.hostCtl.advanceInteraction(n); // host -> N+1, broadcasts N+1
+    await flush();
+    rig.hostCtl.advanceInteraction(n + 1); // host -> N+2, broadcasts N+2
+    await flush();
+
+    // The guest is still at N (both broadcasts were deferred, never applied eagerly).
+    expect(rig.guestCtl.interactionCounter(), "two deferred broadcasts do not move the guest live counter").toBe(n);
+    expect(rig.hostCtl.interactionCounter()).toBe(n + 2);
+
+    // The guest advances ONCE (keyed to its stale start N): the parked N+2 folds in and the
+    // guest jumps straight to the host's value - monotonic, no rewind.
+    rig.guestCtl.advanceInteraction(n); // guest N -> N+1 -> folds to max(N+1, N+2) = N+2
+    await flush();
+    expect(rig.guestCtl.interactionCounter(), "the guest catches up to the host in one fold").toBe(n + 2);
+    expect(rig.hostCtl.interactionCounter(), "host unchanged by the guest's catch-up").toBe(n + 2);
+
+    dispose(rig);
+  });
+
+  // ===========================================================================
+  // BUG2: a RESYNC at the wave boundary (the live trace had a checksum resync there) must
+  // NOT reseed the interaction counter or break the pin immunity. The ONLY method that
+  // reseeds the counter is restoreInteractionCounter (called solely on RESUME, never in the
+  // snapshot-apply / resync path), so a resync round-trip cannot reset the alternation. We
+  // assert the counter survives a stray gap broadcast UNCHANGED across a resync-style flow.
+  // ===========================================================================
+  it("RESYNC-INTERLEAVE: a wave-boundary resync does not reseed the counter and the pin stays immune (#633, BUG2)", async () => {
+    const rig = makeRig();
+    await flush();
+
+    const n = rig.hostCtl.interactionCounter();
+    expect(n).toBe(rig.guestCtl.interactionCounter());
+
+    // Host advances and broadcasts during the gap (as in the live trace). At the wave
+    // boundary a checksum/data-fingerprint round-trip also runs - it drives a snapshot/diff
+    // (a pure diagnostic), NOT a counter reseed. The counter-reseed entry point
+    // restoreInteractionCounter is resume-only and is NEVER invoked on the message path, so
+    // a fingerprint exchange leaves the counter untouched.
+    rig.hostCtl.advanceInteraction(n); // host -> N+1, broadcasts N+1 (deferred on the guest)
+    rig.hostCtl.snapshot(); // a resync-style snapshot read is pure (no counter mutation)
+    rig.guestCtl.snapshot();
+    await flush();
+
+    // The guest's live counter is STILL N - neither the gap broadcast nor the resync touched
+    // it. The pin the next shop reads is immune.
+    expect(
+      rig.guestCtl.interactionCounter(),
+      "a wave-boundary resync does not reseed / bump the interaction counter",
+    ).toBe(n);
+    expect(rig.hostCtl.interactionCounter()).toBe(n + 1);
+
+    // restoreInteractionCounter (resume-only) is the ONLY thing that would reseed it; confirm
+    // it is a distinct, explicit path - calling it deliberately reseeds, proving the resync
+    // path (which does NOT call it) is what leaves the counter alone.
+    rig.guestCtl.restoreInteractionCounter(n); // explicit resume reseed (no-op here: already N)
+    expect(rig.guestCtl.interactionCounter(), "explicit resume reseed is the only counter-reset path").toBe(n);
 
     dispose(rig);
   });

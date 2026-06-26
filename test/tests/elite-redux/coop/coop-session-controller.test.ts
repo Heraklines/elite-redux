@@ -183,7 +183,7 @@ describe("co-op session controller (#633, P1)", () => {
       expect(g.isLocalInteractionTurn()).toBe(true); // now it's the guest's turn
     });
 
-    it("a host advance is mirrored to the partner so both agree on whose turn it is", async () => {
+    it("a host advance is DEFERRED on the partner and converges at the partner's own next advance (#698 BUG2)", async () => {
       const { host, guest } = createLoopbackPair();
       const h = new CoopSessionController(host);
       const g = new CoopSessionController(guest);
@@ -191,11 +191,25 @@ describe("co-op session controller (#633, P1)", () => {
       expect(g.interactionOwner()).toBe("host");
 
       // Host completes its interaction and advances; the broadcast crosses the wire.
+      // BUG2 fix: the inbound `interaction` broadcast no longer EAGERLY bumps the guest's
+      // live counter (that poisoned the next reward shop's owner pin when it landed in the
+      // inter-wave gap). It is DEFERRED into pendingRemote and folded in at the guest's own
+      // next deterministic advance. So immediately after the host's advance + flush the
+      // guest's LIVE counter is unchanged (still 0 / owner host) - the deferred target is parked.
       h.advanceInteraction();
       await flush();
       expect(h.interactionOwner()).toBe("guest");
-      expect(g.interactionOwner()).toBe("guest"); // mirrored from the host
+      expect(g.interactionCounter()).toBe(0); // NOT eagerly bumped - deferred
+      expect(g.interactionOwner()).toBe("host"); // guest's live owner is still itself-vs-host at 0
+
+      // Both clients advance LOCALLY + deterministically for the same logical interaction
+      // (the real lockstep flow). The guest's own advance increments 0 -> 1 and folds the
+      // deferred remote (1, equal -> no extra jump), so both now agree on whose turn it is.
+      g.advanceInteraction();
+      await flush();
       expect(g.interactionCounter()).toBe(1);
+      expect(g.interactionOwner()).toBe("guest");
+      expect(h.interactionOwner()).toBe("guest"); // both converged
     });
 
     it("the counter persists: restoreInteractionCounter resumes the order (round-trip)", () => {

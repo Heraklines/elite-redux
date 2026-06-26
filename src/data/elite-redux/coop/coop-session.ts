@@ -255,6 +255,20 @@ export function coopGiveToPartner(party: readonly CoopOwnedMon[], monOwner: Coop
 export class CoopInteractionTurn {
   constructor(private counter = 0) {}
 
+  /**
+   * A DEFERRED peer catch-up target (#633, BUG2). The live `counter` is moved ONLY by
+   * this client's own deterministic local advances; an inbound peer broadcast is parked
+   * here (monotonic-max) and folded in at the NEXT local advance rather than mutating the
+   * live counter eagerly. -1 means nothing is pending.
+   *
+   * Why: an eager live-counter write from a broadcast landing in the inter-wave GAP
+   * (after the prior interaction's terminal, BEFORE the next screen pins its owner) let
+   * the guest pin its reward-shop owner from a poisoned counter -> alternation drift.
+   * Deferring keeps the value SelectModifierPhase pins from moving only on the client's
+   * own idempotent advances, so both clients pin the same value for the same wave's shop.
+   */
+  private pendingRemote = -1;
+
   /** The role that owns the current interaction. */
   current(): CoopRole {
     return CoopInteractionTurn.ownerOf(this.counter);
@@ -309,31 +323,43 @@ export class CoopInteractionTurn {
       "interaction",
       `CoopInteractionTurn.advance INCREMENT (fromCounter=${fromCounter === undefined ? "none" : fromCounter}) counter ${before} -> ${this.counter}`,
     );
+    // Co-op (#633, BUG2): fold in a DEFERRED peer catch-up target (monotonic, never
+    // backward). A genuine missed advance parked by mergeRemote is reconciled here, at
+    // the client's OWN next deterministic advance - never in the inter-wave gap where it
+    // would poison the next screen's owner pin.
+    if (this.pendingRemote > this.counter) {
+      coopLog(
+        "interaction",
+        `CoopInteractionTurn.advance catch-up (pendingRemote=${this.pendingRemote} > counter=${this.counter}) counter ${this.counter} -> ${this.pendingRemote}`,
+      );
+      this.counter = this.pendingRemote;
+    }
+    this.pendingRemote = -1;
     return true;
   }
 
   /**
-   * Co-op (#633): reconcile this counter against a peer's broadcast value, MONOTONIC-
-   * MAX (never moves backward). Both clients advance the counter LOCALLY in lockstep,
-   * so the broadcast is only a safety net: a late / stale / duplicated `interaction`
-   * message can never clobber a correct local counter or rewind the alternation - it
-   * can only pull a genuinely-behind client forward.
+   * Co-op (#633, BUG2): reconcile this counter against a peer's broadcast value by
+   * DEFERRING it (monotonic-max) into {@linkcode pendingRemote} instead of writing the
+   * LIVE counter. Both clients advance the live counter LOCALLY in lockstep, so the
+   * broadcast is only a catch-up safety net - parked here and folded in at the NEXT local
+   * advance (see {@linkcode advance}). This stops a stray/early broadcast landing in the
+   * inter-wave gap (after the prior interaction's terminal, before the next screen pins
+   * its owner) from bumping the live counter and poisoning the next reward-shop owner pin
+   * - the alternation-drift root cause. A genuinely-behind client still catches up; a
+   * late / stale / duplicated message can never rewind anything (monotonic on both ends).
    */
   mergeRemote(remote: number): void {
     const before = this.counter;
     const valid = Number.isInteger(remote);
-    const bumped = valid && remote > before;
-    if (bumped) {
-      this.counter = remote;
+    if (valid && remote > this.pendingRemote) {
+      this.pendingRemote = remote;
     }
-    // PRIME DOUBLE-COUNT SUSPECT: a remote that bumps the local counter on TOP of a
-    // local advance is exactly how the guest could end up one ahead. Log the
-    // received value, the local-before, and whether/why it moved.
     coopWarn(
       "interaction",
-      bumped
-        ? `CoopInteractionTurn.mergeRemote BUMP (remote=${remote} > before=${before}) counter ${before} -> ${this.counter}`
-        : `CoopInteractionTurn.mergeRemote NO-CHANGE (remote=${remote}, before=${before}, ${valid ? "remote<=before" : "remote not an integer"}) counter stays ${before}`,
+      valid
+        ? `CoopInteractionTurn.mergeRemote DEFER (remote=${remote}, counter=${before}, pendingRemote=${this.pendingRemote}) live counter UNCHANGED (folds in at next advance if still ahead)`
+        : `CoopInteractionTurn.mergeRemote NO-CHANGE (remote=${remote} not an integer) counter stays ${before}`,
     );
   }
 

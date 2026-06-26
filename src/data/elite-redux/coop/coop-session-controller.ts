@@ -562,10 +562,14 @@ export class CoopSessionController {
           // itself logs the BUMP/NO-CHANGE decision.
           const localBefore = this.interactionTurn.toJSON();
           if (isCoopDebug()) {
-            const willBump = Number.isInteger(msg.choice) && msg.choice > localBefore;
+            // BUG2: mergeRemote now DEFERS the peer value into pendingRemote (folded in at
+            // the next LOCAL advance) instead of bumping the live counter here - so the
+            // live counter cannot be poisoned in the inter-wave gap. Log the DEFER, never
+            // assert a bump that no longer happens at receive time.
+            const willDefer = Number.isInteger(msg.choice) && msg.choice > localBefore;
             coopLog(
               "interaction",
-              `RECV interaction broadcast (monotonic-max net) received=${msg.choice} localBefore=${localBefore} role=${this.role} -> ${willBump ? `WILL BUMP to ${msg.choice}` : "no bump (local >= received)"}`,
+              `RECV interaction broadcast (deferred catch-up net) received=${msg.choice} localBefore=${localBefore} role=${this.role} -> ${willDefer ? `WILL DEFER to ${msg.choice} (folds in at next advance if still ahead)` : "no defer (local >= received)"}`,
             );
           }
           this.interactionTurn.mergeRemote(msg.choice);
