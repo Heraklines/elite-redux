@@ -114,6 +114,17 @@ export interface CoopChecksumState {
   /** Persistent modifiers as `[typeId, stackCount]`, sorted by `typeId`. */
   modifiers: [string, number][];
   /**
+   * ON-FIELD per-mon held-item identity digest (#633 RISKY #2/#3): each entry is
+   * `[bi, typeId, stackCount]`, sorted. `bi` is the battler index (the same key the snapshot heal lands
+   * on), never pokemonId. Makes a stack change (Bug-Bite/Knock-Off) AND a wrong-holder rebind among
+   * on-field mons (Grip Claw/Covet) - same global total - detectable, where the aggregate `modifiers`
+   * digest cannot. BENCH held items are intentionally excluded (the snapshot heals on-field only; bench
+   * drift converges at the wave boundary).
+   */
+  heldItems: [number, string, number][];
+  /** Ball inventory as `[ballType, count]`, sorted by ballType (#633 RISKY #4). Cheap + deterministic. */
+  pokeballCounts: [number, number][];
+  /**
    * Active `BiomeId` (B7). Hashing it makes an independent biome re-roll (a host/guest seed or
    * waveIndex drift that landed the two clients in DIFFERENT biomes) detectable. Settled by
    * SwitchBiomePhase's newArena (tween-deferred, but the phase queue blocks the next turn-boundary

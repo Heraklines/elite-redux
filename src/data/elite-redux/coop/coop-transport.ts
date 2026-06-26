@@ -308,6 +308,14 @@ export interface CoopFullMonSnapshot {
   moves: [number, number][];
   /** Battler-tag TYPE ids present on the mon (identity only). */
   tags: number[];
+  /**
+   * This mon's held-item modifiers as plain ModifierData blobs (#633 RISKY #1/#2/#3). Carried in the
+   * resync ONLY (never the per-turn checkpoint - too heavy; the checksum's compact held-item digest
+   * detects drift and this heals it). ON-FIELD mons only (the snapshot.field set). Reconstructed +
+   * remapped to the guest's live mon id via the applyCoopEnemyHeldItems reconstruct path. Optional +
+   * additive: an older host omits it and the guest leaves the mon's items alone.
+   */
+  heldItems?: Record<string, unknown>[] | undefined;
 }
 
 /** The full authoritative battle state the host sends to heal a desync. */
@@ -331,6 +339,12 @@ export interface CoopFullBattleSnapshot {
   money: number;
   /** Persistent modifiers as `[typeId, stackCount]`. */
   modifiers: [string, number][];
+  /**
+   * Ball inventory `[ballType, count]` (#633 RISKY #4). The host decrements it host-only in
+   * AttemptCapturePhase, which the pure-renderer guest never runs, so the guest's inventory drifts up.
+   * Carried in the resync so it heals. Optional + additive (older host omits it).
+   */
+  pokeballCounts?: [number, number][] | undefined;
   /**
    * Full per-mon `PokemonData` JSON for the WHOLE player party (#633 B4): heals BENCH-mon
    * level / exp / form / friendship / moveset (+ a host off-field evolution's species) the

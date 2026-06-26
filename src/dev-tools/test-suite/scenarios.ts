@@ -9080,6 +9080,71 @@ export const DEV_SCENARIOS: DevScenario[] = [
       );
     },
   },
+  // Co-op - per-mon HELD ITEMS + the ball inventory sync to the guest (#698 RISKY #1-#4)
+  {
+    label: "Co-op: held items + ball counts sync (#698 RISKY #1-#4)",
+    description:
+      "#698 co-op HELD-ITEM + BALL SYNC (RISKY #1-#4) - per-mon held-item binding and the\n"
+      + "pokeball inventory live OUTSIDE the per-turn checkpoint, so a host-only consume\n"
+      + "(Knock Off, Bug Bite), a rebind (Grip Claw / Covet stealing onto a different on-field\n"
+      + "mon), or a ball decrement (the host alone runs the catch) was invisible to the guest.\n"
+      + "The checksum now carries an ON-FIELD per-mon held-item digest (by battler index) plus a\n"
+      + "ball-count vector, and the resync snapshot heals both on the guest. Your lead holds Grip\n"
+      + "Claw and Knock Off; the foe Snorlax holds Leftovers and a Sitrus Berry.\n"
+      + "DO: in the co-op double, knock items off the foe and let Grip Claw steal one across a few\n"
+      + "turns, then watch the console for [coop-desync] / [coop-resync] lines.\n"
+      + "EXPECT: after each turn BOTH clients show identical held-item icons AND identical ball\n"
+      + "counts - the checksum CONVERGES (a one-time resync at most, then quiet), it does NOT loop\n"
+      + "every turn. BENCH-mon held items may lag until the next wave (deferred by design).",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 50,
+        // Wave 145: past the ER #419 elite BST-cap ladder so the bulky Snorlax spawns as itself.
+        STARTING_WAVE_OVERRIDE: 145,
+        BATTLE_STYLE_OVERRIDE: "double",
+        STARTING_HELD_ITEMS_OVERRIDE: [{ name: "GRIP_CLAW" }],
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.SNORLAX,
+        ENEMY_LEVEL_OVERRIDE: 50,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+        ENEMY_HELD_ITEMS_OVERRIDE: [{ name: "LEFTOVERS" }, { name: "BERRY", type: BerryType.SITRUS }],
+      });
+      // Host half = slots 0-2, guest half = slots 3-5. The host lead carries Grip Claw + Knock Off
+      // so the host's MoveEffectPhases mutate held-item binding the guest must sync to.
+      return [
+        makeStarter(SpeciesId.WEAVILE, {
+          moveset: [MoveId.KNOCK_OFF, MoveId.ICE_PUNCH, MoveId.FAKE_OUT, MoveId.SWORDS_DANCE],
+        }),
+        makeStarter(SpeciesId.GENGAR, {
+          moveset: [MoveId.SHADOW_BALL, MoveId.SLUDGE_BOMB, MoveId.THUNDERBOLT, MoveId.DAZZLING_GLEAM],
+        }),
+        makeStarter(SpeciesId.GYARADOS, {
+          moveset: [MoveId.WATERFALL, MoveId.CRUNCH, MoveId.EARTHQUAKE, MoveId.DRAGON_DANCE],
+        }),
+        makeStarter(SpeciesId.ALAKAZAM, {
+          moveset: [MoveId.PSYCHIC, MoveId.SHADOW_BALL, MoveId.FOCUS_BLAST, MoveId.RECOVER],
+        }),
+      ];
+    },
+    onBattleStart: () => {
+      // Flip the live run into authoritative co-op so the per-turn checkpoint + held-item / ball
+      // reconcile engage. Host = slots 0-2, guest = slots 3-5.
+      globalScene.gameMode = getGameMode(GameModes.COOP);
+      if (getCoopController() == null) {
+        startLocalCoopSession({ username: loggedInUser?.username, netcodeMode: "authoritative" });
+      }
+      const party = globalScene.getPlayerParty();
+      party.forEach((mon, i) => {
+        mon.coopOwner = i < 3 ? "host" : "guest";
+      });
+      console.log(
+        "[#698 co-op held-item-sync] tags: "
+          + party.map(m => `${m.getNameToRender()}=${m.coopOwner}`).join(", ")
+          + ` | local role=${getCoopController()?.role} `
+          + "(knock items off / let Grip Claw steal; held-item icons + ball counts should CONVERGE)",
+      );
+    },
+  },
   {
     label: "(note) Co-op TRAINER-VICTORY deadlock (#633)",
     description:

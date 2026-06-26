@@ -50,6 +50,11 @@ const state = (over: Partial<CoopChecksumState> = {}): CoopChecksumState => ({
   partyLevels: [50, 48],
   money: 1000,
   modifiers: [["EXP_CHARM", 1]],
+  heldItems: [[0, "LEFTOVERS", 1]],
+  pokeballCounts: [
+    [0, 5],
+    [1, 2],
+  ],
   biomeId: 0,
   seed: "SEED",
   ...over,
@@ -106,6 +111,11 @@ describe("co-op battle checksum pure core (#633, TRACK-2)", () => {
         partyLevels: [50, 48],
         arenaTags: [],
         modifiers: [["EXP_CHARM", 1]],
+        heldItems: [[0, "LEFTOVERS", 1]],
+        pokeballCounts: [
+          [0, 5],
+          [1, 2],
+        ],
         seed: "SEED",
         biomeId: 0,
       };
@@ -118,6 +128,11 @@ describe("co-op battle checksum pure core (#633, TRACK-2)", () => {
         party: [1, 4],
         partyLevels: [50, 48],
         modifiers: [["EXP_CHARM", 1]],
+        pokeballCounts: [
+          [0, 5],
+          [1, 2],
+        ],
+        heldItems: [[0, "LEFTOVERS", 1]],
         money: 1000,
         seed: "SEED",
       };
@@ -195,6 +210,26 @@ describe("co-op battle checksum pure core (#633, TRACK-2)", () => {
     });
     it("a changed modifier stack", () => {
       expect(checksumState(state({ modifiers: [["EXP_CHARM", 2]] }))).not.toBe(base);
+    });
+    it("a changed on-field held-item STACK (#633 RISKY #2 - Bug-Bite/Knock-Off)", () => {
+      expect(checksumState(state({ heldItems: [[0, "LEFTOVERS", 2]] }))).not.toBe(base);
+    });
+    it("an on-field held-item REBIND to a different battler index (#633 RISKY #3 - same global total)", () => {
+      // Same item, same count, moved from bi 0 to bi 1: the aggregate `modifiers` digest can't see it,
+      // but the per-bi held-item digest does -> detectable -> the snapshot held-item heal closes it.
+      expect(checksumState(state({ heldItems: [[1, "LEFTOVERS", 1]] }))).not.toBe(base);
+    });
+    it("a changed ball inventory count (#633 RISKY #4 - host-only AttemptCapturePhase decrement)", () => {
+      expect(
+        checksumState(
+          state({
+            pokeballCounts: [
+              [0, 4],
+              [1, 2],
+            ],
+          }),
+        ),
+      ).not.toBe(base);
     });
   });
 

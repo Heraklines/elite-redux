@@ -53,8 +53,8 @@ import type { AbilityId } from "#enums/ability-id";
 import type { ArenaTagSide } from "#enums/arena-tag-side";
 import type { ArenaTagType } from "#enums/arena-tag-type";
 import { BattlerIndex } from "#enums/battler-index";
-import type { BiomeId } from "#enums/biome-id";
 import { BattlerTagType } from "#enums/battler-tag-type";
+import type { BiomeId } from "#enums/biome-id";
 import type { MoveId } from "#enums/move-id";
 import type { Nature } from "#enums/nature";
 import { Stat } from "#enums/stat";
@@ -808,14 +808,16 @@ export function captureCoopEnemies(): CoopSerializedEnemy[] {
 }
 
 /**
- * HOST: serialize one enemy's held-item modifiers as plain `ModifierData` blobs (#633).
- * Reads the enemy modifier list (player=false) filtered to this mon. Each entry survives
- * the JSON transport as a flat object; the guest reconstructs it via {@linkcode ModifierData.toModifier}.
+ * HOST: serialize ONE live mon's held-item modifiers as plain `ModifierData` blobs (#633). Reads the
+ * mon's OWN side list (player list when `mon.isPlayer()`, else the enemy list) filtered to this mon by
+ * `pokemonId`. Each entry survives the JSON transport as a flat object; the guest reconstructs it via
+ * {@linkcode ModifierData.toModifier}. Used for both the enemy adopt (via {@linkcode captureEnemyHeldItems})
+ * and the on-field player/enemy resync snapshot (#633 RISKY #1/#2/#3).
  */
-function captureEnemyHeldItems(enemy: ReturnType<typeof globalScene.getEnemyParty>[number]): Record<string, unknown>[] {
+function captureCoopHeldItems(mon: Pokemon): Record<string, unknown>[] {
   try {
     return globalScene
-      .findModifiers(m => m instanceof PokemonHeldItemModifier && m.pokemonId === enemy.id, false)
+      .findModifiers(m => m instanceof PokemonHeldItemModifier && m.pokemonId === mon.id, mon.isPlayer())
       .map(m => {
         const data = new ModifierData(m, false);
         return {
@@ -829,6 +831,15 @@ function captureEnemyHeldItems(enemy: ReturnType<typeof globalScene.getEnemyPart
   } catch {
     return [];
   }
+}
+
+/**
+ * HOST: serialize one enemy's held-item modifiers as plain `ModifierData` blobs (#633). Thin wrapper
+ * over {@linkcode captureCoopHeldItems} so {@linkcode captureCoopEnemies} stays byte-identical (an enemy's
+ * `isPlayer()` is false -> the enemy list, exactly as before).
+ */
+function captureEnemyHeldItems(enemy: ReturnType<typeof globalScene.getEnemyParty>[number]): Record<string, unknown>[] {
+  return captureCoopHeldItems(enemy);
 }
 
 /**
@@ -860,6 +871,80 @@ export function applyCoopEnemyHeldItems(enemyId: number, heldItems: unknown): vo
       /* one held item failed to reconstruct; skip it, keep the rest */
     }
   }
+}
+
+/**
+ * GUEST (authoritative resync): set a LIVE on-field mon's held items to exactly the host's snapshot
+ * set (#633 RISKY #1/#2/#3). Removes the mon's current held items, then re-attaches the host's.
+ * Hardened vs {@linkcode applyCoopEnemyHeldItems} (which only runs on a fresh enemy): operates on a LIVE
+ * mon that may already hold items, so it (a) verifies each remove before re-adding to avoid a silent
+ * incrementStack MERGE, (b) sets stackCount explicitly from the blob, (c) NEVER re-attaches a
+ * `PokemonFormChangeItemModifier` (the form is authoritative via `snap.formIndex`; re-firing its apply()
+ * on the player side would trigger a spurious form change), and (d) uses ignoreUpdate so no per-mon bar
+ * re-render / "bag full" toast. Returns true if it changed anything (so the caller refreshes the right
+ * bar once). Fully guarded.
+ */
+function applyCoopHeldItemsForMon(mon: Pokemon, heldItems: unknown): boolean {
+  if (!Array.isArray(heldItems)) {
+    return false;
+  }
+  let changed = false;
+  try {
+    const isPlayer = mon.isPlayer();
+    // 1) remove existing held items on this mon (each guarded by the removeModifier return).
+    for (const m of globalScene.findModifiers(
+      x => x instanceof PokemonHeldItemModifier && x.pokemonId === mon.id,
+      isPlayer,
+    )) {
+      if (globalScene.removeModifier(m, !isPlayer)) {
+        changed = true;
+      }
+    }
+    // 2) re-attach the host's set.
+    for (const raw of heldItems) {
+      if (raw == null || typeof raw !== "object") {
+        continue;
+      }
+      try {
+        const data = new ModifierData(raw as Record<string, unknown>, false);
+        const modifier = data.toModifier(
+          Modifier[data.className as keyof typeof Modifier] ?? resolveErModifierClass(data.className),
+        );
+        // Held items ONLY; never re-fire a form-change item's apply() (the form is healed by snap.formIndex).
+        if (!(modifier instanceof PokemonHeldItemModifier)) {
+          continue;
+        }
+        if (modifier instanceof Modifier.PokemonFormChangeItemModifier) {
+          continue;
+        }
+        // The serialized id is the HOST's runtime id; remap to THIS client's live mon id.
+        modifier.pokemonId = mon.id;
+        // stackCount from the blob (toModifier already restores it; re-assert defensively).
+        if (typeof data.stackCount === "number") {
+          modifier.stackCount = data.stackCount;
+        }
+        // Skip if a same-type item somehow survived removal (avoid a silent stack MERGE / max-stack DROP).
+        const collides = globalScene.findModifier(
+          x => x instanceof PokemonHeldItemModifier && x.pokemonId === mon.id && x.type.id === modifier.type.id,
+          isPlayer,
+        );
+        if (collides) {
+          continue;
+        }
+        if (isPlayer) {
+          void globalScene.addModifier(modifier, true, false, false);
+        } else {
+          void globalScene.addEnemyModifier(modifier, true);
+        }
+        changed = true;
+      } catch {
+        /* one item failed to reconstruct; keep the rest */
+      }
+    }
+  } catch {
+    /* never break the heal */
+  }
+  return changed;
 }
 
 /** Read a number field from an opaque serialized blob, or undefined if absent/wrong type. */
@@ -1017,6 +1102,45 @@ function readModifiers(): [string, number][] {
 }
 
 /**
+ * ON-FIELD per-mon held-item identity digest as `[bi, typeId, stackCount]`, sorted (#633 RISKY #2/#3).
+ * Iterates the SAME `getField(true)` set the checksum already hashes (and the snapshot can heal), reading
+ * each mon's held items by `pokemonId` on that mon's OWN side list - so detection and heal cover identical
+ * mons (no detect-but-can't-heal loop; BENCH items are deliberately excluded). Deterministic: only `bi`,
+ * `type.id` (a stable string), and `stackCount` - never the per-client `pokemonId` or any RNG.
+ */
+function readHeldItemDigest(): [number, string, number][] {
+  try {
+    const out: [number, string, number][] = [];
+    for (const mon of globalScene.getField(true)) {
+      if (mon == null) {
+        continue;
+      }
+      const bi = mon.getBattlerIndex();
+      for (const m of globalScene.findModifiers(
+        x => x instanceof PokemonHeldItemModifier && x.pokemonId === mon.id,
+        mon.isPlayer(),
+      )) {
+        out.push([bi, m.type.id, m.stackCount]);
+      }
+    }
+    return out.sort((a, b) => a[0] - b[0] || (a[1] < b[1] ? -1 : a[1] > b[1] ? 1 : a[2] - b[2]));
+  } catch {
+    return [];
+  }
+}
+
+/** Ball inventory as `[ballType, count]`, sorted by ballType (#633 RISKY #4). Plain ints, no RNG. */
+function readPokeballCounts(): [number, number][] {
+  try {
+    return Object.entries(globalScene.pokeballCounts)
+      .map(([k, v]) => [Number(k), Number(v)] as [number, number])
+      .sort((a, b) => a[0] - b[0]);
+  } catch {
+    return [];
+  }
+}
+
+/**
  * Read a live mon's boss state (#633, A/BLOCKING-2): `[bossSegments, bossSegmentIndex]`. Player mons
  * (and any non-enemy) read `[0, 0]` - boss state lives only on `EnemyPokemon`. Carried in the checksum
  * + the resync so a missing/diverged-boss guest is detectable + healable.
@@ -1090,6 +1214,13 @@ export function captureCoopChecksumState(): CoopChecksumState {
     partyLevels: globalScene.getPlayerParty().map(p => p.level),
     money: globalScene.money,
     modifiers: readModifiers(),
+    // On-field per-mon held-item digest (#633 RISKY #2/#3): a stack change (Bug-Bite/Knock-Off) or a
+    // wrong-holder rebind (Grip Claw/Covet) among on-field mons - same global total, invisible to the
+    // aggregate `modifiers` digest - is now a hashed divergence the snapshot held-item heal can close.
+    heldItems: readHeldItemDigest(),
+    // Ball inventory (#633 RISKY #4): the host decrements it host-only in AttemptCapturePhase (which the
+    // pure-renderer guest never runs), so its inventory drifts; hashing it makes that drift detectable.
+    pokeballCounts: readPokeballCounts(),
     // Active biome (B7): an independent biome re-roll (a seed/waveIndex drift that landed the two
     // clients in DIFFERENT biomes) is otherwise invisible to the field-only checkpoint. Settled at
     // the turn boundary (SwitchBiomePhase's newArena blocks the next checksum until it ends).
@@ -1142,6 +1273,9 @@ function readFullMon(mon: Pokemon): CoopFullMonSnapshot {
     bossSegmentIndex: boss.bossSegmentIndex,
     moves: readMoves(mon),
     tags: readTagTypes(mon),
+    // On-field held items (#633 RISKY #1/#2/#3): the heavy ModifierData blobs the compact checksum
+    // digest can't carry; the gated guest heal sets the live mon's items to this exact set.
+    heldItems: captureCoopHeldItems(mon),
   };
 }
 
@@ -1175,6 +1309,9 @@ export function captureCoopFullSnapshot(): CoopFullBattleSnapshot | null {
       party: globalScene.getPlayerParty().map(p => p.species.speciesId),
       money: globalScene.money,
       modifiers: readModifiers(),
+      // Ball inventory (#633 RISKY #4): carried in the resync so the gated guest heal restores the
+      // host-only AttemptCapturePhase decrement the pure-renderer guest never applied.
+      pokeballCounts: readPokeballCounts(),
       // Full per-mon PokemonData for the WHOLE party (#633 B4): the resync now carries bench-mon
       // level / exp / form / friendship / moveset (+ a host off-field evolution's species) so the
       // revive-in-shop desync heals - the on-field-only `field` + speciesId-only `party` cannot.
@@ -1306,6 +1443,13 @@ function applyFullMon(
       }
     }
     reconcileTags(mon, snap.tags);
+    // On-field held-item heal (#633 RISKY #1/#2/#3): set the live mon's held items to exactly the host's
+    // snapshot set BEFORE calculateStats so a stat-affecting item (e.g. Eviolite) is present for the
+    // recompute. Gated authoritative (solo / host / lockstep never run it); the per-mon bar refresh is
+    // deferred to ONE updateModifiers call after the field loop in applyCoopFullSnapshot (C4).
+    if (authoritativeGuest && snap.heldItems !== undefined) {
+      applyCoopHeldItemsForMon(mon, snap.heldItems);
+    }
     mon.calculateStats();
     // maxHp force (#633 GAP 3): the checkpoint clamps hp to the LOCAL getMaxHp(); if maxHp itself
     // diverged (IV / level / form / stat-calc mismatch) hp clamps to the wrong ceiling and the
@@ -1367,8 +1511,10 @@ function applyFullMon(
  *
  * INTENTIONALLY skips `PokemonHeldItemModifier`s: they are `pokemonId`-bound and the snapshot's
  * aggregate `[typeId, stackCount]` carries NO pokemonId, so a mid-battle re-bind would corrupt the
- * binding. Held-item structure converges at the wave boundary via the enemy/party adopt; here we
- * only touch the count-only global modifiers that the GAP-2 divergence is actually about. Does NOT
+ * binding. On-field per-mon held items are now healed separately + precisely by
+ * {@linkcode applyCoopHeldItemsForMon} (#633 RISKY #1/#2/#3, keyed by battler index, not the aggregate
+ * count); BENCH held-item structure still converges at the wave boundary via the enemy/party adopt. Here
+ * we only touch the count-only global modifiers that the GAP-2 divergence is actually about. Does NOT
  * ADD a brand-new global modifier mid-battle (rebuilding a generator-typed modifier from a bare
  * typeId can need pregen RNG); a genuinely-missing global modifier is a wave-boundary adopt. After
  * any change, `updateModifiers` refreshes the bar. Fully guarded.
@@ -1472,10 +1618,12 @@ export function adoptCoopHostPlayerPartyOrder(hostParty: number[] | undefined): 
  * TRACK-2). Applies field mons (ability/form before stat recompute), then arena weather /
  * terrain / TAGS (#633 GAP 1), then money, then the SAFE subset of persistent-modifier stack
  * counts (#633 GAP 2) - field-by-field onto the LIVE objects (never a session reload, which
- * would tear down the running battle). Held-item structure is intentionally NOT rewritten
- * mid-battle (it converges at the wave boundary via the enemy/party adopt); the player party
- * ORDER is adopted OFF-FIELD ONLY here (#633 GAP 4, {@linkcode adoptCoopHostPlayerPartyOrder} -
- * bench-only, safe at any boundary). Fully guarded so a malformed snapshot can never crash the guest.
+ * would tear down the running battle). ON-FIELD per-mon held-item structure IS now rewritten to the
+ * host's set (#633 RISKY #1/#2/#3, {@linkcode applyCoopHeldItemsForMon}, gated authoritative) and the
+ * ball inventory healed (#633 RISKY #4); BENCH held items still converge at the wave boundary via the
+ * enemy/party adopt. The player party ORDER is adopted OFF-FIELD ONLY here (#633 GAP 4,
+ * {@linkcode adoptCoopHostPlayerPartyOrder} - bench-only, safe at any boundary). Fully guarded so a
+ * malformed snapshot can never crash the guest.
  *
  * `authoritativeGuest` (#633): the {@linkcode isCoopAuthoritativeGuest} gate result, computed by the
  * cycle-free CALLER (the engine must not import the runtime - that is an import cycle) and threaded to
@@ -1531,6 +1679,14 @@ export function applyCoopFullSnapshot(
         applyFullMon(mon, snap, authoritativeGuest, suppressResummon);
       }
     }
+    // On-field held-item bar refresh (#633 RISKY #1/#2/#3, C4): applyFullMon healed each mon's held items
+    // with ignoreUpdate (no per-mon re-render); refresh BOTH modifier bars ONCE here when the gated heal
+    // could have run (idempotent, gated authoritative; reconcileCoopModifierStacks refreshes the player
+    // bar separately on a stack change).
+    if (authoritativeGuest && snapshot.field.some(s => s.heldItems !== undefined)) {
+      globalScene.updateModifiers(true);
+      globalScene.updateModifiers(false);
+    }
     const arena = globalScene.arena;
     if ((arena.weather?.weatherType ?? 0) !== snapshot.weather) {
       arena.trySetWeather(snapshot.weather as WeatherType);
@@ -1542,6 +1698,17 @@ export function applyCoopFullSnapshot(
     // not just the per-turn checkpoint - so a guest that resyncs on a mismatch converges its arena.
     reconcileArenaTags(snapshot.arenaTags);
     globalScene.money = snapshot.money;
+    // Ball-inventory heal (#633 RISKY #4): the host decrements the ball count host-only in
+    // AttemptCapturePhase (which the pure-renderer guest never runs), so the guest's inventory drifts
+    // up; force the host's authoritative counts. Gated authoritative (solo / host / lockstep skip it -
+    // lockstep both decrement on their own AttemptCapturePhase, so the vector already matches).
+    if (authoritativeGuest && snapshot.pokeballCounts !== undefined) {
+      for (const [type, count] of snapshot.pokeballCounts) {
+        if (typeof type === "number" && typeof count === "number") {
+          globalScene.pokeballCounts[type] = Math.max(0, Math.trunc(count));
+        }
+      }
+    }
     // Reconcile persistent modifier / relic stacks (#633 GAP 2): a stack-count divergence is hashed
     // -> a permanent still-diverged loop; heal it by adopting the host's stack counts (safe subset).
     reconcileCoopModifierStacks(snapshot.modifiers);
@@ -1917,8 +2084,9 @@ export function captureCoopCaptureParty(): string[] {
  *
  * CAVEAT (pre-existing authoritative-model limitation, not introduced here): `captureParty` carries
  * only `PokemonData`, so the wild mon's transferred held items are NOT synced onto the guest's caught
- * mon here - the authoritative model deliberately omits `PokemonHeldItemModifier` from the snapshot /
- * stack reconcile, and those converge at the next wave-boundary adopt rather than at this handshake.
+ * mon at THIS handshake. Mid-battle ON-FIELD held-item drift is now healed via the snapshot path
+ * ({@linkcode applyCoopHeldItemsForMon}, #633 RISKY #1/#2/#3); the wild-mon-transfer-at-capture case (the
+ * caught mon lands on the bench) remains deferred - it converges at the next wave-boundary adopt.
  */
 export function applyCoopCaptureParty(serializedParty: string[]): void {
   if (!Array.isArray(serializedParty) || serializedParty.length === 0) {
@@ -2028,6 +2196,12 @@ export function captureCoopMeOutcome(): Extract<CoopInteractionOutcome, { k: "me
  * pointer matches after the host alone consumed `randSeedInt`, and merges the dex / starter blob.
  * Fully guarded as a WHOLE so a partial-blob apply can never hang or crash the guest - the per-turn
  * checksum re-syncs any residual drift.
+ *
+ * DEFERRED (#633 RISKY B4): this calls {@linkcode applyCoopFullSnapshot}`(o.base)` with `authoritativeGuest`
+ * defaulting to `false` (the engine must NOT import the runtime to compute the gate - that is an import
+ * cycle), so the new ON-FIELD held-item heal (#1/#2/#3) and ball-count heal (#4) do NOT fire at the ME
+ * terminal; they heal on the NEXT per-turn checkpoint resync instead. Threading an `authoritativeGuest`
+ * param through here from a cycle-free caller is a separate follow-up, not this batch.
  */
 export function applyCoopMeOutcome(o: Extract<CoopInteractionOutcome, { k: "meResync" }>): void {
   try {

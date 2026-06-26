@@ -23,16 +23,13 @@
 
 import { getGameMode } from "#app/game-mode";
 import { globalScene } from "#app/global-scene";
+import type { CoopChecksumMon } from "#data/elite-redux/coop/coop-battle-checksum";
+import { type CoopChecksumState, checksumState } from "#data/elite-redux/coop/coop-battle-checksum";
 import {
   applyCoopFullSnapshot,
   captureCoopChecksum,
   captureCoopFullSnapshot,
 } from "#data/elite-redux/coop/coop-battle-engine";
-import {
-  type CoopChecksumState,
-  checksumState,
-} from "#data/elite-redux/coop/coop-battle-checksum";
-import type { CoopChecksumMon } from "#data/elite-redux/coop/coop-battle-checksum";
 import { clearCoopRuntime, startLocalCoopSession } from "#data/elite-redux/coop/coop-runtime";
 import { COOP_GUEST_FIELD_INDEX, COOP_HOST_FIELD_INDEX } from "#data/elite-redux/coop/coop-session";
 import type { CoopFullBattleSnapshot } from "#data/elite-redux/coop/coop-transport";
@@ -81,6 +78,11 @@ const state = (over: Partial<CoopChecksumState> = {}): CoopChecksumState => ({
   partyLevels: [50, 48],
   money: 1000,
   modifiers: [["EXP_CHARM", 1]],
+  heldItems: [[0, "LEFTOVERS", 1]],
+  pokeballCounts: [
+    [0, 5],
+    [1, 2],
+  ],
   biomeId: 0,
   seed: "SEED",
   ...over,
@@ -114,6 +116,11 @@ describe("co-op run-flow sync pure core (#698, B7 + B8)", () => {
       partyLevels: [50, 48],
       arenaTags: [],
       modifiers: [["EXP_CHARM", 1]],
+      heldItems: [[0, "LEFTOVERS", 1]],
+      pokeballCounts: [
+        [0, 5],
+        [1, 2],
+      ],
     };
     const b: CoopChecksumState = {
       field: [mon()],
@@ -123,6 +130,11 @@ describe("co-op run-flow sync pure core (#698, B7 + B8)", () => {
       party: [1, 4],
       partyLevels: [50, 48],
       modifiers: [["EXP_CHARM", 1]],
+      pokeballCounts: [
+        [0, 5],
+        [1, 2],
+      ],
+      heldItems: [[0, "LEFTOVERS", 1]],
       money: 1000,
       biomeId: 7,
       seed: "SEED",
