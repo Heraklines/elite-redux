@@ -337,6 +337,115 @@ describe("co-op host-authoritative battle stream (#633, LIVE-D)", () => {
     });
   });
 
+  describe("enemy-party handoff robustness (#633/#698 re-request + retry)", () => {
+    it("a guest requestEnemyParty reaches the host's responder, which re-broadcasts the party", async () => {
+      const { host, guest } = createLoopbackPair();
+      const hostStream = new CoopBattleStreamer(host);
+      const guestStream = new CoopBattleStreamer(guest);
+
+      // Host responder: re-broadcast a fixed party for the requested wave (mirrors the
+      // runtime responder, which serializes captureCoopEnemies() once the host has it).
+      let sawRequest = -1;
+      hostStream.onEnemyPartyRequest(wave => {
+        sawRequest = wave;
+        hostStream.sendEnemyParty(wave, [{ fieldIndex: 2, data: { speciesId: 296 } }]);
+      });
+
+      guestStream.requestEnemyParty(4);
+      await new Promise(r => setTimeout(r, 0));
+      expect(sawRequest).toBe(4);
+
+      const enemies = guestStream.consumeEnemyParty(4);
+      expect(enemies?.[0]?.data.speciesId).toBe(296);
+    });
+
+    it("awaitEnemyPartyWithRetry re-requests on the interval and resolves when the host answers a retry", async () => {
+      const { host, guest } = createLoopbackPair();
+      const hostStream = new CoopBattleStreamer(host);
+
+      // Drive the retry timer manually; the underlying long await never fires its ceiling here.
+      const timers: (() => void)[] = [];
+      const guestStream = new CoopBattleStreamer(guest, {
+        schedule: cb => {
+          timers.push(cb);
+          return () => {};
+        },
+      });
+
+      // Host has NOT broadcast yet; it only answers a re-request (the lost-message case).
+      const requests: number[] = [];
+      hostStream.onEnemyPartyRequest(wave => {
+        requests.push(wave);
+        // Answer the SECOND retry to prove the loop keeps poking until the party lands.
+        if (requests.length === 2) {
+          hostStream.sendEnemyParty(wave, [{ fieldIndex: 2, data: { speciesId: 307 } }]);
+        }
+      });
+
+      const awaited = guestStream.awaitEnemyPartyWithRetry(4, w => guestStream.requestEnemyParty(w), {
+        timeoutMs: 120_000,
+        retryIntervalMs: 5_000,
+        maxRetries: 6,
+      });
+
+      // The first scheduled timer is the underlying await's 120s CEILING (the backstop); the
+      // retry-loop timers are scheduled after it. We never fire the ceiling here (that would
+      // resolve null) - we fire ONLY the retry timers, which are appended in order.
+      expect(timers.length).toBe(2); // [0] = ceiling, [1] = first retry
+      // Fire the first retry -> 1st re-request (host stays silent), schedules the next retry.
+      timers[1]?.();
+      await new Promise(r => setTimeout(r, 0));
+      // Fire the second retry -> 2nd re-request, which the host answers with the party.
+      timers[2]?.();
+      const res = await awaited;
+      expect(requests).toEqual([4, 4]);
+      expect(res?.[0]?.data.speciesId).toBe(307);
+    });
+
+    it("awaitEnemyPartyWithRetry resolves immediately from a party buffered BEFORE the await (no retry needed)", async () => {
+      const { host, guest } = createLoopbackPair();
+      const hostStream = new CoopBattleStreamer(host);
+      const guestStream = new CoopBattleStreamer(guest);
+
+      // The host's broadcast lands before the guest reaches its await -> consumed from the buffer.
+      hostStream.sendEnemyParty(4, [{ fieldIndex: 2, data: { speciesId: 296 } }]);
+      await new Promise(r => setTimeout(r, 0));
+
+      let requested = false;
+      const res = await guestStream.awaitEnemyPartyWithRetry(4, () => {
+        requested = true;
+      });
+      expect(res?.[0]?.data.speciesId).toBe(296);
+      expect(requested).toBe(false);
+    });
+
+    it("awaitEnemyPartyWithRetry resolves null after the ceiling when the host never answers (guest self-generates)", async () => {
+      const { guest } = createLoopbackPair();
+      // Every scheduled timer fires immediately: the retries re-request (no host), then the
+      // ceiling-await also fires immediately -> null. The guest then rolls its own enemies.
+      const guestStream = new CoopBattleStreamer(guest, {
+        schedule: cb => {
+          cb();
+          return () => {};
+        },
+      });
+      const res = await guestStream.awaitEnemyPartyWithRetry(4, () => {}, {
+        timeoutMs: 1,
+        retryIntervalMs: 1,
+        maxRetries: 2,
+      });
+      expect(res).toBeNull();
+    });
+
+    it("a requestEnemyParty with no host responder is a safe no-op (does not throw)", async () => {
+      const { host, guest } = createLoopbackPair();
+      new CoopBattleStreamer(host); // host installs no responder
+      const guestStream = new CoopBattleStreamer(guest);
+      expect(() => guestStream.requestEnemyParty(4)).not.toThrow();
+      await new Promise(r => setTimeout(r, 0));
+    });
+  });
+
   // Fix #1 (#633): the enemy-party stream carries each enemy's HELD ITEMS (serialized
   // ModifierData blobs) for TRAINER + wild waves, so the guest reconstructs the host's
   // exact items instead of rolling its own (which double / diverged the items). We assert

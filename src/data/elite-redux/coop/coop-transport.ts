@@ -574,6 +574,16 @@ export type CoopMessage =
    */
   | { t: "enemyPartySync"; wave: number; enemies: CoopSerializedEnemy[] }
   /**
+   * Guest -> host (#633/#698, enemy-party handoff robustness): "(re)send me the enemy party
+   * for `wave`". The host broadcasts `enemyPartySync` ONCE inside its EncounterPhase, AFTER the
+   * trainer/enemy assets load; if that single message is lost on the wire (or the host is still
+   * loading and has not broadcast yet), the waiting guest would otherwise hard-block the full
+   * 120s ceiling. So the guest re-requests on a short interval and the host re-broadcasts the
+   * moment its party for that wave exists - a self-healing handshake (a harmless no-op before
+   * the host has generated, and the parked guest waiter still consumes the eventual broadcast).
+   */
+  | { t: "requestEnemyParty"; wave: number }
+  /**
    * Host -> guest (#633, authoritative ME battle handoff): the EXACT enemy party the host
    * generated for a mystery-encounter-SPAWNED battle. Unlike `enemyPartySync` (keyed by the
    * wave's starting encounter), an ME battle spawns MID-wave from an option pick, so it is
@@ -768,6 +778,8 @@ function summarizeCoopMessage(msg: CoopMessage): string {
       return `turn=${msg.turn} seq=${msg.seq}`;
     case "enemyPartySync":
       return `wave=${msg.wave} enemies=${msg.enemies.length}`;
+    case "requestEnemyParty":
+      return `wave=${msg.wave}`;
     case "meBattleEnemyPartySync":
       return `key=${msg.key} enemies=${msg.enemies.length}`;
     case "ghostPool":

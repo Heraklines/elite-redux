@@ -186,7 +186,16 @@ export class EncounterPhase extends BattlePhase {
     }
     let enemies: CoopSerializedEnemy[] | null = null;
     try {
-      enemies = await streamer.awaitEnemyParty(battle.waveIndex, COOP_ENEMY_PARTY_WAIT_MS);
+      // #633/#698 handoff robustness: await the host's party for the FULL 120s ceiling
+      // (the backstop), but re-request it on a short interval so a single LOST
+      // `enemyPartySync` (or a host still loading its trainer assets) is recovered on
+      // demand instead of silently hard-locking the guest for two minutes. A pre-await
+      // or eventual arrival is still consumed via the existing wave-keyed buffer.
+      enemies = await streamer.awaitEnemyPartyWithRetry(
+        battle.waveIndex,
+        wave => streamer.requestEnemyParty(wave),
+        { timeoutMs: COOP_ENEMY_PARTY_WAIT_MS },
+      );
     } catch {
       enemies = null;
     }
