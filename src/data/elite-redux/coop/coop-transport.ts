@@ -645,8 +645,14 @@ export type CoopMessage =
    * traverses BattleEnd -> the alternation-relayed reward shop -> biome -> the next encounter.
    * `outcome` is WHY the wave ended (see {@linkcode CoopWaveOutcome}); the guest guards against
    * a double-advance by `wave` (it only runs the tail once per wave number).
+   *
+   * Co-op (#633 B1/B2/B3 capture handshake): on a `"capture"` outcome the host ALSO carries its
+   * full post-catch player party as serialized {@linkcode PokemonData} JSON (`captureParty`). The
+   * guest reconciles its bench to match - adding the caught mon (with the host-resolved `coopOwner`,
+   * B2) and crediting the catch to its OWN gameData (B3) - because a pure renderer never runs the
+   * `AttemptCapturePhase` that grows the party. Absent for non-capture outcomes (a hard no-op).
    */
-  | { t: "waveResolved"; wave: number; outcome: CoopWaveOutcome };
+  | { t: "waveResolved"; wave: number; outcome: CoopWaveOutcome; captureParty?: string[] | undefined };
 
 /** A transport moves {@linkcode CoopMessage}s between two paired clients. */
 export interface CoopTransport {

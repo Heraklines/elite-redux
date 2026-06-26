@@ -58,7 +58,7 @@ import type { Nature } from "#enums/nature";
 import { Stat } from "#enums/stat";
 import { StatusEffect } from "#enums/status-effect";
 import type { WeatherType } from "#enums/weather-type";
-import { EnemyPokemon, type Pokemon } from "#field/pokemon";
+import { EnemyPokemon, type PlayerPokemon, type Pokemon } from "#field/pokemon";
 // biome-ignore lint/performance/noNamespaceImport: held-item reconstruction resolves the modifier class by serialized name (`Modifier[className]`), exactly like the save-load path in game-data.ts.
 import * as Modifier from "#modifiers/modifier";
 import { PersistentModifier, PokemonHeldItemModifier } from "#modifiers/modifier";
@@ -1708,6 +1708,13 @@ function applyCoopMeMonFields(mon: Pokemon, data: PokemonData): void {
     mon.friendship = data.friendship;
     mon.pauseEvolutions = data.pauseEvolutions;
     mon.pokerus = data.pokerus;
+    // Co-op (#633 B2): mirror the host's per-account attribution so the per-player 3-cap, switch
+    // legality, and field-slot ownership stay identical on both clients. Never CLEAR a tag with an
+    // undefined (a solo-saved mon would have none); only adopt a host-resolved owner. `coopOwner`
+    // lives on PlayerPokemon and this reconcile only ever runs on the player party.
+    if (data.coopOwner !== undefined) {
+      (mon as PlayerPokemon).coopOwner = data.coopOwner;
+    }
     mon.metLevel = data.metLevel;
     mon.metBiome = data.metBiome;
     mon.metSpecies = data.metSpecies;
@@ -1740,6 +1747,123 @@ function applyCoopMeMonFields(mon: Pokemon, data: PokemonData): void {
     void mon.updateInfo();
   } catch {
     // One mon's reconcile failed; leave it and continue (the checksum re-syncs residual drift).
+  }
+}
+
+/**
+ * HOST (#633 B1/B2/B3 capture handshake): serialize the FULL post-catch player party as
+ * {@linkcode PokemonData} JSON. Rides the `waveResolved("capture")` signal so the GUEST - a pure
+ * renderer that never runs `AttemptCapturePhase` and so never grows its party on a catch - can
+ * reconcile its party to match (add the caught mon, mirror its `coopOwner`, release any party-full
+ * casualty) and credit the catch to its OWN gameData. Guarded so a serialize failure is a no-op
+ * (the next wave-boundary adopt + per-turn checksum re-sync any residual party drift).
+ */
+export function captureCoopCaptureParty(): string[] {
+  try {
+    return globalScene.getPlayerParty().map(p => JSON.stringify(new PokemonData(p)));
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * GUEST (#633 B1/B2/B3): adopt the host's post-catch player party ({@linkcode captureCoopCaptureParty}).
+ * A capture only ever touches the BENCH - it adds the caught mon and, when the catcher's half was
+ * full, releases one bench mon; the two on-field leads are never moved. So we reconcile by matching
+ * each host mon to an existing LIVE mon by species (+ `coopOwner`), which:
+ *  - PRESERVES every unchanged mon's object + its held-item modifiers (a matched reuse, not a rebuild),
+ *  - leaves a matched ON-FIELD lead fully untouched (its combat state is owned by the per-turn
+ *    checkpoint - we never field-apply or tear down a live field sprite here),
+ *  - CONSTRUCTS the genuinely-new caught mon (no live match) with the host-resolved `coopOwner` (B2),
+ *  - RELEASES any live BENCH mon the host no longer has (the party-full casualty), never an on-field mon.
+ * Each freshly-constructed mon is then credited to the GUEST's OWN `gameData` via `setPokemonCaught`
+ * (idempotent on the dex bitfield, #689 "credit both accounts") - silent, since the guest renders the
+ * host's catch narration from the battle-event stream, not a second toast. Fully guarded.
+ *
+ * CAVEAT (pre-existing authoritative-model limitation, not introduced here): `captureParty` carries
+ * only `PokemonData`, so the wild mon's transferred held items are NOT synced onto the guest's caught
+ * mon here - the authoritative model deliberately omits `PokemonHeldItemModifier` from the snapshot /
+ * stack reconcile, and those converge at the next wave-boundary adopt rather than at this handshake.
+ */
+export function applyCoopCaptureParty(serializedParty: string[]): void {
+  if (!Array.isArray(serializedParty) || serializedParty.length === 0) {
+    return;
+  }
+  try {
+    const target: PokemonData[] = [];
+    for (const s of serializedParty) {
+      try {
+        target.push(new PokemonData(JSON.parse(s)));
+      } catch {
+        // A corrupt party blob: do NOTHING rather than half-apply (the wave-boundary adopt re-syncs).
+        return;
+      }
+    }
+    const party = globalScene.getPlayerParty();
+    const onField = new Set<Pokemon>(globalScene.getPlayerField(false));
+    const unclaimed: PlayerPokemon[] = [...party];
+    const result: PlayerPokemon[] = [];
+    const constructed: PlayerPokemon[] = [];
+    for (const t of target) {
+      // Prefer a same-species + same-owner live mon (preserves its object + held items); relax to
+      // species-only so a give-to-partner re-attribution still matches the same physical mon.
+      let idx = unclaimed.findIndex(m => (m.species?.speciesId ?? -1) === t.species && m.coopOwner === t.coopOwner);
+      if (idx === -1) {
+        idx = unclaimed.findIndex(m => (m.species?.speciesId ?? -1) === t.species);
+      }
+      if (idx >= 0) {
+        const mon = unclaimed.splice(idx, 1)[0];
+        // A matched ON-FIELD lead stays untouched (per-turn checkpoint owns its live state); only a
+        // BENCH mon is field-applied so its scalar fields + owner match the host.
+        if (!onField.has(mon)) {
+          applyCoopMeMonFields(mon, t);
+        }
+        result.push(mon);
+      } else {
+        // No live match = the freshly caught mon (or an ME gift). Construct it with the host owner.
+        try {
+          const added = t.toPokemon() as PlayerPokemon;
+          if (t.coopOwner !== undefined) {
+            added.coopOwner = t.coopOwner;
+          }
+          added.setVisible(false);
+          result.push(added);
+          constructed.push(added);
+        } catch {
+          // One construction failure must not abort the reconcile; the wave-boundary adopt re-syncs.
+        }
+      }
+    }
+    // Release mons the host no longer has (a party-full release during the catch). NEVER an on-field mon.
+    for (const m of unclaimed) {
+      if (onField.has(m)) {
+        result.push(m); // safety: a live on-field mon is never torn down here.
+      } else {
+        globalScene.removePokemonFromPlayerParty(m, true);
+      }
+    }
+    // Rebuild the party in the host's order (the on-field leads stay at the FRONT because the host
+    // keeps them there and we iterate `target` in order).
+    party.length = 0;
+    party.push(...result);
+    // B3 (#689): credit the GUEST's OWN gameData for each freshly caught mon - registers the species
+    // (caughtAttr + candy + starter unlock), idempotent on the dex bitfield. `showMessage=false`: the
+    // guest renders the host's catch narration from the battle-event stream, not a second toast. The
+    // `.catch` is REQUIRED - setPokemonCaught is async + fire-and-forget here, so a rejection would
+    // escape the surrounding try (which only catches synchronous throws) as an unhandled rejection.
+    // We deliberately do NOT call updateSpeciesDexIvs: it routes through validateAchv -> the ER
+    // candy-reward + candy-bar UI, side-effects that don't belong on a silent wave-advance reconcile
+    // (and the species registration above is what B3 needs; the per-species best-IV record is a
+    // non-synced cosmetic dex detail).
+    for (const mon of constructed) {
+      void globalScene.gameData.setPokemonCaught(mon, true, false, false).catch(() => {});
+    }
+    coopLog(
+      "replay",
+      `guest applied capture party: ${party.length} mons (${constructed.length} new, host target=${target.length})`,
+    );
+  } catch {
+    // A malformed capture party must never crash the guest's run.
   }
 }
 

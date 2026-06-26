@@ -141,7 +141,8 @@ export class CoopBattleStreamer {
   /** GUEST: handler for the host's ME narration lines (#633, TRACK-2 Phase C, non-battle ME). */
   private meMessageHandler: ((text: string) => void) | null = null;
   /** GUEST: handler for the host's wave-resolved signal (#633, authoritative wave-advance). */
-  private waveResolvedHandler: ((wave: number, outcome: CoopWaveOutcome) => void) | null = null;
+  private waveResolvedHandler: ((wave: number, outcome: CoopWaveOutcome, captureParty?: string[]) => void) | null =
+    null;
 
   constructor(transport: CoopTransport, opts: CoopBattleStreamerOptions = {}) {
     this.transport = transport;
@@ -245,9 +246,12 @@ export class CoopBattleStreamer {
    * FaintPhase - uses this to run the normal post-battle tail and reach the next wave (it
    * would otherwise loop the won wave forever). `outcome` is WHY the wave ended.
    */
-  sendWaveResolved(wave: number, outcome: CoopWaveOutcome): void {
-    coopLog("replay", `host SEND waveResolved wave=${wave} outcome=${outcome}`);
-    this.transport.send({ t: "waveResolved", wave, outcome });
+  sendWaveResolved(wave: number, outcome: CoopWaveOutcome, captureParty?: string[]): void {
+    coopLog(
+      "replay",
+      `host SEND waveResolved wave=${wave} outcome=${outcome}${captureParty != null ? ` captureParty=${captureParty.length}` : ""}`,
+    );
+    this.transport.send({ t: "waveResolved", wave, outcome, captureParty });
   }
 
   /**
@@ -421,7 +425,7 @@ export class CoopBattleStreamer {
    * The handler runs the guest's normal post-battle tail so it reaches the next wave's
    * encounter (the pure renderer never queues that tail itself).
    */
-  onWaveResolved(handler: (wave: number, outcome: CoopWaveOutcome) => void): void {
+  onWaveResolved(handler: (wave: number, outcome: CoopWaveOutcome, captureParty?: string[]) => void): void {
     this.waveResolvedHandler = handler;
   }
 
@@ -711,8 +715,11 @@ export class CoopBattleStreamer {
         return;
       case "waveResolved":
         // GUEST: the host cleared/ended this wave - run the normal post-battle tail.
-        coopLog("replay", `guest RECV waveResolved wave=${msg.wave} outcome=${msg.outcome}`);
-        this.waveResolvedHandler?.(msg.wave, msg.outcome);
+        coopLog(
+          "replay",
+          `guest RECV waveResolved wave=${msg.wave} outcome=${msg.outcome}${msg.captureParty != null ? ` captureParty=${msg.captureParty.length}` : ""}`,
+        );
+        this.waveResolvedHandler?.(msg.wave, msg.outcome, msg.captureParty);
         return;
       case "ghostPool":
         // Deliver to a live handler, else buffer (the broadcast can land before the

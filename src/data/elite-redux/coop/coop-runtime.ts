@@ -22,6 +22,7 @@ import { globalScene } from "#app/global-scene";
 import { COOP_CHECKSUM_SENTINEL } from "#data/elite-redux/coop/coop-battle-checksum";
 import {
   applyCoopFullSnapshot,
+  captureCoopCaptureParty,
   captureCoopChecksum,
   captureCoopEnemies,
   captureCoopFullSnapshot,
@@ -129,7 +130,8 @@ function wireCoopResyncResponder(controller: CoopSessionController, battleStream
  * on receipt; {@linkcode consumeCoopPendingWaveAdvance} hands it to the guest's
  * `CoopReplayTurnPhase` at the next SAFE turn boundary (NEVER mid-replay) so it runs the tail.
  */
-let pendingWaveAdvance: { wave: number; outcome: CoopWaveOutcome } | null = null;
+let pendingWaveAdvance: { wave: number; outcome: CoopWaveOutcome; captureParty?: string[] | undefined } | null =
+  null;
 /** The last wave the guest already ran the victory tail for (guards a duplicate `waveResolved`). */
 let lastResolvedWave = -1;
 
@@ -139,7 +141,11 @@ let lastResolvedWave = -1;
  * already advanced past. Called by `CoopReplayTurnPhase` at a safe boundary. Bumps the
  * double-advance guard so a duplicate `waveResolved` for the same wave is a no-op.
  */
-export function consumeCoopPendingWaveAdvance(): { wave: number; outcome: CoopWaveOutcome } | null {
+export function consumeCoopPendingWaveAdvance(): {
+  wave: number;
+  outcome: CoopWaveOutcome;
+  captureParty?: string[] | undefined;
+} | null {
   const pending = pendingWaveAdvance;
   pendingWaveAdvance = null;
   if (pending == null || pending.wave <= lastResolvedWave) {
@@ -164,7 +170,7 @@ export function consumeCoopPendingWaveAdvance(): { wave: number; outcome: CoopWa
  * live GUEST role in the AUTHORITATIVE netcode; a host / solo / lockstep client ignores it.
  */
 function wireCoopWaveResolved(controller: CoopSessionController, battleStream: CoopBattleStreamer): void {
-  battleStream.onWaveResolved((wave, outcome) => {
+  battleStream.onWaveResolved((wave, outcome, captureParty) => {
     coopLog(
       "runtime",
       `recv waveResolved wave=${wave} outcome=${outcome} role=${controller.role} netcode=${getCoopNetcodeMode()}`,
@@ -182,9 +188,9 @@ function wireCoopWaveResolved(controller: CoopSessionController, battleStream: C
     if (pendingWaveAdvance == null || wave >= pendingWaveAdvance.wave) {
       coopLog(
         "runtime",
-        `pend waveResolved wave=${wave} outcome=${outcome} (prevPending=${pendingWaveAdvance?.wave ?? "none"})`,
+        `pend waveResolved wave=${wave} outcome=${outcome}${captureParty != null ? ` captureParty=${captureParty.length}` : ""} (prevPending=${pendingWaveAdvance?.wave ?? "none"})`,
       );
-      pendingWaveAdvance = { wave, outcome };
+      pendingWaveAdvance = { wave, outcome, captureParty };
     } else {
       coopWarn("runtime", `waveResolved wave=${wave} stale vs pending=${pendingWaveAdvance.wave} -> kept pending`);
     }
@@ -405,8 +411,15 @@ export function broadcastCoopWaveResolved(outcome: CoopWaveOutcome): void {
   }
   const wave = globalScene.currentBattle.waveIndex;
   try {
-    coopLog("runtime", `send waveResolved wave=${wave} outcome=${outcome} (host)`);
-    active.battleStream.sendWaveResolved(wave, outcome);
+    // Co-op (#633 B1/B2/B3): a CAPTURE grows/edits the host's party (the caught mon, and a party-full
+    // release) that the guest's pure-renderer tail never reproduces. Carry the full post-catch party
+    // so the guest can reconcile its bench + credit the catch. Other outcomes carry nothing (no-op).
+    const captureParty = outcome === "capture" ? captureCoopCaptureParty() : undefined;
+    coopLog(
+      "runtime",
+      `send waveResolved wave=${wave} outcome=${outcome}${captureParty != null ? ` captureParty=${captureParty.length}` : ""} (host)`,
+    );
+    active.battleStream.sendWaveResolved(wave, outcome, captureParty);
   } catch (e) {
     /* a wave-resolved send failure must never break the host's post-battle flow */
     coopWarn("runtime", `send waveResolved failed wave=${wave} outcome=${outcome}`, e);

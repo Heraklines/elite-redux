@@ -1,0 +1,129 @@
+/*
+ * SPDX-FileCopyrightText: 2024-2026 Pagefault Games
+ * SPDX-License-Identifier: AGPL-3.0-only
+ */
+
+// Co-op authoritative CAPTURE handshake (#633 B1/B2/B3). In authoritative co-op the HOST is the sole
+// engine; the GUEST is a pure renderer that never runs AttemptCapturePhase, so a caught mon never
+// reached its party (B1), and its dex never got credit (B3). The host now carries its full post-catch
+// party on the `waveResolved("capture")` signal; the guest reconciles its BENCH to match - adding the
+// caught mon with the host-resolved owner (B2), releasing any party-full casualty (B9a), preserving the
+// on-field leads + every unchanged bench mon's object - then credits each freshly caught mon to its OWN
+// gameData (B3). This verifies (1) the wire variant round-trips, and (2) the live reconcile over a
+// GameManager: append, owner-mirror, dex-credit, and the release-replace composition swap.
+
+import { getGameMode } from "#app/game-mode";
+import { applyCoopCaptureParty } from "#data/elite-redux/coop/coop-battle-engine";
+import { clearCoopRuntime, startLocalCoopSession } from "#data/elite-redux/coop/coop-runtime";
+import type { CoopMessage } from "#data/elite-redux/coop/coop-transport";
+import { GameModes } from "#enums/game-modes";
+import { SpeciesId } from "#enums/species-id";
+import { PokemonData } from "#system/pokemon-data";
+import { GameManager } from "#test/framework/game-manager";
+import { getPokemonSpecies } from "#utils/pokemon-utils";
+import Phaser from "phaser";
+import { afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
+
+describe("co-op capture handshake (#633 B1/B2/B3) - wire round-trip", () => {
+  it("the waveResolved capture message (with captureParty) survives a JSON round-trip byte-identical", () => {
+    const msg: CoopMessage = {
+      t: "waveResolved",
+      wave: 7,
+      outcome: "capture",
+      captureParty: ['{"species":143,"level":12}', '{"species":25,"level":20,"coopOwner":"guest"}'],
+    };
+    expect(JSON.parse(JSON.stringify(msg))).toEqual(msg);
+  });
+
+  it("a non-capture waveResolved omits captureParty (undefined survives the round-trip)", () => {
+    const msg: CoopMessage = { t: "waveResolved", wave: 3, outcome: "win" };
+    const round = JSON.parse(JSON.stringify(msg)) as Extract<CoopMessage, { t: "waveResolved" }>;
+    expect(round.outcome).toBe("win");
+    expect(round.captureParty).toBeUndefined();
+  });
+});
+
+const RUN = process.env.ER_SCENARIO === "1";
+
+describe.skipIf(!RUN)("co-op capture handshake (#633 B1/B2/B3) - live reconcile", () => {
+  let phaserGame: Phaser.Game;
+  let game: GameManager;
+
+  beforeAll(() => {
+    phaserGame = new Phaser.Game({ type: Phaser.HEADLESS });
+  });
+
+  beforeEach(() => {
+    game = new GameManager(phaserGame);
+  });
+
+  afterEach(() => {
+    clearCoopRuntime();
+  });
+
+  it("B1/B2/B3: a caught mon is appended to the guest party with the host owner + own-dex credit", async () => {
+    await game.classicMode.startBattle(SpeciesId.SNORLAX);
+    startLocalCoopSession({ username: "Host" });
+    game.scene.gameMode = getGameMode(GameModes.COOP);
+    expect(game.scene.gameMode.isCoop).toBe(true);
+    const scene = game.scene;
+
+    // The guest currently has just the lead. Build the host's POST-CATCH party: lead + a caught Pikachu.
+    const lead = scene.getPlayerParty()[0];
+    lead.coopOwner = "host";
+    const caught = scene.addPlayerPokemon(getPokemonSpecies(SpeciesId.PIKACHU), 18);
+    caught.coopOwner = "guest";
+    const target = [lead, caught].map(p => JSON.stringify(new PokemonData(p)));
+
+    // Wipe Pikachu's dex so the B3 credit is a clean nonzero-after assertion.
+    const pikachuDex = scene.gameData.dexData[SpeciesId.PIKACHU];
+    pikachuDex.caughtAttr = 0n;
+    pikachuDex.seenAttr = 0n;
+    expect(scene.getPlayerParty().length).toBe(1);
+
+    applyCoopCaptureParty(JSON.parse(JSON.stringify(target)));
+    // setPokemonCaught is fire-and-forget inside the reconcile; let its dex write settle.
+    await new Promise(resolve => setTimeout(resolve, 50));
+
+    const party = scene.getPlayerParty();
+    expect(party.length).toBe(2); // B1: the caught mon reached the guest's party
+    expect(party[1].species.speciesId).toBe(SpeciesId.PIKACHU);
+    expect(party[1].coopOwner).toBe("guest"); // B2: the host-resolved owner was mirrored, not re-derived
+    expect(party[0]).toBe(lead); // the on-field lead object is preserved untouched
+    expect(scene.gameData.dexData[SpeciesId.PIKACHU].caughtAttr).not.toBe(0n); // B3: credited to OWN dex
+  });
+
+  it("B9a: a party-full release (host dropped a bench mon, added the caught one) reconciles by composition", async () => {
+    await game.classicMode.startBattle(SpeciesId.SNORLAX);
+    startLocalCoopSession({ username: "Host" });
+    game.scene.gameMode = getGameMode(GameModes.COOP);
+    const scene = game.scene;
+
+    const lead = scene.getPlayerParty()[0];
+    lead.coopOwner = "host";
+    const benchKept = scene.addPlayerPokemon(getPokemonSpecies(SpeciesId.MAGIKARP), 10);
+    benchKept.coopOwner = "guest";
+    const benchReleased = scene.addPlayerPokemon(getPokemonSpecies(SpeciesId.PIDGEY), 12);
+    benchReleased.coopOwner = "guest";
+    scene.getPlayerParty().push(benchKept, benchReleased);
+    expect(scene.getPlayerParty().length).toBe(3);
+
+    // Host post-catch party: lead + the kept bench mon + a NEW Eevee (Pidgey was released to make room).
+    const caught = scene.addPlayerPokemon(getPokemonSpecies(SpeciesId.EEVEE), 15);
+    caught.coopOwner = "guest";
+    const target = [lead, benchKept, caught].map(p => JSON.stringify(new PokemonData(p)));
+
+    applyCoopCaptureParty(JSON.parse(JSON.stringify(target)));
+
+    const party = scene.getPlayerParty();
+    const species = party.map(p => p.species.speciesId);
+    expect(party.length).toBe(3);
+    expect(species).toContain(SpeciesId.SNORLAX); // lead
+    expect(species).toContain(SpeciesId.MAGIKARP); // kept bench mon
+    expect(species).toContain(SpeciesId.EEVEE); // caught mon added
+    expect(species).not.toContain(SpeciesId.PIDGEY); // released bench mon dropped
+    expect(party[0]).toBe(lead); // on-field lead preserved
+    // The kept bench mon is the SAME object (matched + reused, not reconstructed - held items survive).
+    expect(party.find(p => p.species.speciesId === SpeciesId.MAGIKARP)).toBe(benchKept);
+  });
+});

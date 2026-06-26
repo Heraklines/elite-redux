@@ -33,6 +33,7 @@ import { Phase } from "#app/phase";
 import { CommonBattleAnim, MoveAnim } from "#data/battle-anims";
 import { COOP_CHECKSUM_SENTINEL, canonicalize } from "#data/elite-redux/coop/coop-battle-checksum";
 import {
+  applyCoopCaptureParty,
   applyCoopCheckpoint,
   applyCoopFullSnapshot,
   captureCoopChecksum,
@@ -590,6 +591,13 @@ export class CoopFinalizeTurnPhase extends Phase {
       switch (pending.outcome) {
         case "win":
         case "capture": {
+          // Co-op (#633 B1/B2/B3): adopt the host's post-catch party BEFORE the VictoryPhase tail so
+          // the caught mon is present (B1), attributed to the host-resolved owner (B2), and credited
+          // to the guest's OWN dex (B3). Safe at this boundary: it only reconciles the BENCH (off-field
+          // mons), never the live on-field leads. A no-op for a plain "win" (captureParty is absent).
+          if (pending.outcome === "capture" && pending.captureParty != null) {
+            applyCoopCaptureParty(pending.captureParty);
+          }
           // VictoryPhase reads exp off the resolved mon. After the checkpoint reconcile the KOd
           // enemies are off-field but still present in the enemy party, so address one by its `id`
           // (>3 -> getPokemonById, which finds an off-field party member) - never a dead field slot.
