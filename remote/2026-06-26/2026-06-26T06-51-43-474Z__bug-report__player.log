@@ -1,0 +1,273 @@
+----- BUG REPORT (in-game) -----
+version:  1.11.19
+url:      https://elite-redux.pages.dev/
+ua:       Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Mobile Safari/537.36
+mode:     4  wave:32  difficulty:hell
+seed:     75J9U3De8D2D9DjgaRx3CuGz
+party:    Roselia(L26 69/69), Bramblin(L25 67/67), Vullaby(L24 74/74), Rufflet(L24 0/74), Clamperl(L25 60/60), Mothim(L25 75/75)
+
+----- DESCRIPTION -----
+Switched out Rufflet but it switched after Roselia's turn instead of immediately
+
+----- CONSOLE -----
+[06:49:08.591] LOG: %cStart Phase PostSummonPhase color:green;
+[06:49:08.591] LOG: Ran PSP for: Tropius
+[06:49:08.592] LOG: %cStart Phase PostSummonPhase color:green;
+[06:49:08.594] LOG: %cStart Phase MovePhase color:green;
+[06:49:08.594] LOG: %cUser: Roselia
+Move: TOXIC_NEEDLES
+Use Mode: NORMAL color:orchid
+[06:49:08.604] LOG: %cStart Phase MessagePhase color:green;
+[06:49:08.732] LOG: %cStart Phase MoveEffectPhase color:green;
+[06:49:09.100] LOG: crit stage: +0
+[06:49:09.103] LOG: Move: Toxic Needles | Base damage: 8.934782608695652 | Power: 25 | Source attack: 55 | Target defense: 46
+[06:49:09.104] LOG: Move: Toxic Needles | Attack damage: 4
+[06:49:09.105] LOG: %cStart Phase DamageAnimPhase color:green;
+[06:49:09.134] LOG: %cStart Phase MessagePhase color:green;
+[06:49:09.332] LOG: %cStart Phase MoveEffectPhase color:green;
+[06:49:09.700] LOG: crit stage: +0
+[06:49:09.703] LOG: Move: Toxic Needles | Base damage: 8.934782608695652 | Power: 25 | Source attack: 55 | Target defense: 46
+[06:49:09.703] LOG: Move: Toxic Needles | Attack damage: 3
+[06:49:09.704] LOG: %cStart Phase DamageAnimPhase color:green;
+[06:49:09.734] LOG: %cStart Phase MoveEffectPhase color:green;
+[06:49:10.116] LOG: crit stage: +0
+[06:49:10.119] LOG: Move: Toxic Needles | Base damage: 8.934782608695652 | Power: 25 | Source attack: 55 | Target defense: 46
+[06:49:10.120] LOG: Move: Toxic Needles | Attack damage: 2
+[06:49:10.120] LOG: %cStart Phase DamageAnimPhase color:green;
+[06:49:10.151] LOG: %cStart Phase MoveEffectPhase color:green;
+[06:49:10.533] LOG: crit stage: +0
+[06:49:10.536] LOG: Move: Toxic Needles | Base damage: 8.934782608695652 | Power: 25 | Source attack: 55 | Target defense: 46
+[06:49:10.536] LOG: Move: Toxic Needles | Attack damage: 4
+[06:49:10.537] LOG: %cStart Phase DamageAnimPhase color:green;
+[06:49:10.567] LOG: %cStart Phase MessagePhase color:green;
+[06:49:10.766] LOG: %cStart Phase MoveEffectPhase color:green;
+[06:49:11.133] LOG: crit stage: +0
+[06:49:11.136] LOG: Move: Toxic Needles | Base damage: 8.934782608695652 | Power: 25 | Source attack: 55 | Target defense: 46
+[06:49:11.136] LOG: Move: Toxic Needles | Attack damage: 3
+[06:49:11.137] LOG: %cStart Phase DamageAnimPhase color:green;
+[06:49:11.168] LOG: %cStart Phase MessagePhase color:green;
+[06:49:11.399] LOG: %cStart Phase MessagePhase color:green;
+[06:49:11.599] LOG: %cStart Phase MoveEndPhase color:green;
+[06:49:11.600] LOG: %cStart Phase PostSummonPhase color:green;
+[06:49:11.600] LOG: %cStart Phase SwitchSummonPhase color:green;
+[06:49:11.602] LOG: The_Waster715
+[06:49:11.883] LOG: The_Waster715
+[06:49:12.089] LOG: %cStart Phase PostSummonPhase color:green;
+[06:49:12.090] LOG: Ran PSP for: Ninetales
+[06:49:12.090] LOG: %cStart Phase PostSummonPhase color:green;
+[06:49:12.090] LOG: %cStart Phase PostSummonPhase color:green;
+[06:49:12.091] LOG: %cStart Phase MovePhase color:green;
+[06:49:12.091] LOG: %cUser: Rufflet
+Move: NO_RETREAT
+Use Mode: NORMAL color:orchid
+[06:49:12.102] LOG: %cStart Phase MessagePhase color:green;
+[06:49:12.216] LOG: %cStart Phase MoveEffectPhase color:green;
+[06:49:12.643] LOG: Applied Shell Bell 
+[06:49:12.644] LOG: %cStart Phase StatStageChangePhase color:green;
+[06:49:12.644] LOG: %cStart Phase StatStageChangePhase color:green;
+[06:49:12.827] LOG: %cStart Phase MessagePhase color:green;
+[06:49:13.041] LOG: %cStart Phase StatStageChangePhase color:green;
+[06:49:13.226] LOG: %cStart Phase MessagePhase color:green;
+[06:49:13.441] LOG: %cStart Phase StatStageChangePhase color:green;
+[06:49:13.627] LOG: %cStart Phase MessagePhase color:green;
+[06:49:13.857] LOG: %cStart Phase StatStageChangePhase color:green;
+[06:49:14.044] LOG: %cStart Phase MessagePhase color:green;
+[06:49:14.274] LOG: %cStart Phase StatStageChangePhase color:green;
+[06:49:14.461] LOG: %cStart Phase MessagePhase color:green;
+[06:49:14.691] LOG: %cStart Phase MessagePhase color:green;
+[06:49:14.924] LOG: %cStart Phase MoveEndPhase color:green;
+[06:49:14.924] LOG: %cStart Phase MovePhase color:green;
+[06:49:14.924] LOG: %cUser: Tropius
+Move: TAILWIND
+Use Mode: INDIRECT color:orchid
+[06:49:14.931] LOG: %cStart Phase MessagePhase color:green;
+[06:49:15.074] LOG: %cStart Phase MoveEffectPhase color:green;
+[06:49:16.082] LOG: %cStart Phase MessagePhase color:green;
+[06:49:16.333] LOG: %cStart Phase MoveEndPhase color:green;
+[06:49:16.334] LOG: %cStart Phase CheckInterludePhase color:green;
+[06:49:16.334] LOG: %cStart Phase WeatherEffectPhase color:green;
+[06:49:16.334] LOG: %cStart Phase PositionalTagPhase color:green;
+[06:49:16.334] LOG: %cStart Phase BerryPhase color:green;
+[06:49:16.345] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[06:49:16.352] LOG: %cStart Phase TurnEndPhase color:green;
+[06:49:16.360] LOG: %cStart Phase PokemonHealPhase color:green;
+[06:49:16.583] LOG: %cStart Phase MessagePhase color:green;
+[06:49:16.807] LOG: %cStart Phase TurnInitPhase color:green;
+[06:49:16.807] LOG: %cStart Phase CommandPhase color:green;
+[06:49:22.850] DEBUG: Session data saved to slot 1!
+[06:49:24.583] LOG: Seed: BRuysZbne2L6iMOartMBb4TO
+[06:49:24.583] LOG: Wave Seed: BRuysZbne2L6iMOartMBb4TO 0
+[06:49:24.684] WARN: AnimationManager key already exists: prompt
+[06:49:24.684] WARN: AnimationManager key already exists: tera_sparkle
+[06:49:24.684] LOG: Seed: 7aXwkSvAEfIfdDCBDPdgK0Ki
+[06:49:24.684] LOG: Wave Seed: 7aXwkSvAEfIfdDCBDPdgK0Ki 0
+[06:49:26.482] LOG: %cStart Phase LoginPhase color:green;
+[06:49:26.946] LOG: Client Session: 4SURa8mHBhmGhHjEUOOu8LsHFgI9wFOe
+[06:49:27.333] LOG: %cStart Phase TitlePhase color:green;
+[06:49:27.333] LOG: Getting Session Slot id: %d 1
+[06:49:27.337] LOG: use seasonal splash messages true
+[06:49:27.338] LOG: Adding 2 Pride Month splash messages (weight: x15)
+[06:49:27.844] LOG: Getting Session Slot id: %d 1
+[06:49:27.848] LOG: Wave Seed: 75J9U3De8D2D9DjgaRx3CuGz 0
+[06:49:27.848] LOG: Seed: 75J9U3De8D2D9DjgaRx3CuGz
+[06:49:27.865] LOG: Wave Seed: WUjYuSdXdRdYdrScg 32
+[06:49:28.004] LOG: %cStart Phase EncounterPhase color:green;
+[06:49:28.007] LOG: Pokemon: Foe Simipour | Species ID: 516 | Level: 23 | Nature: Careful (+SpDef/-SpAtk)
+[06:49:28.007] LOG: Stats (IVs): HP: 90 (29), Atk: 41 (13), Def: 38 (5), Spatk: 45 (18), Spdef: 47 (15), Spd: 51 (2)
+[06:49:28.008] LOG: Ability: Prankster | Passive Ability: Torrent 
+[06:49:28.008] LOG: Moveset: ["Bolt Strike","Shift Gear","Mountain Chunk","Asteroid Shot"]
+[06:49:28.008] LOG: Pokemon: Foe Ninetales | Species ID: 38 | Level: 23 | Nature: Bold (+Def/-Atk)
+[06:49:28.008] LOG: Stats (IVs): HP: 69 (13), Atk: 35 (0), Def: 50 (24), Spatk: 48 (7), Spdef: 54 (16), Spd: 55 (20)
+[06:49:28.008] LOG: Ability: Flaming Soul | Passive Ability: Pyromancy 
+[06:49:28.008] LOG: Moveset: ["Raging Souls","Mystical Fire","Psywave","Memento"]
+[06:49:28.009] LOG: Pokemon: Foe Nidoqueen | Species ID: 31 | Level: 23 | Nature: Sassy (+SpDef/-Spd)
+[06:49:28.009] LOG: Stats (IVs): HP: 78 (19), Atk: 44 (20), Def: 46 (5), Spatk: 48 (20), Spdef: 48 (16), Spd: 44 (9)
+[06:49:28.009] LOG: Ability: Thick Fat | Passive Ability: Poison Point 
+[06:49:28.009] LOG: Moveset: ["Sludge Wave","Crunch","Mystic Dance","Bad Egg"]
+[06:49:28.009] LOG: Pokemon: Foe Sandslash | Species ID: 2028 | Level: 23 | Nature: Quirky (-)
+[06:49:28.009] LOG: Stats (IVs): HP: 78 (9), Atk: 52 (7), Def: 63 (13), Spatk: 16 (0), Spdef: 38 (17), Spd: 37 (13)
+[06:49:28.009] LOG: Ability: Whiteout | Passive Ability: Let's Roll 
+[06:49:28.009] LOG: Moveset: ["Iron Tail","Ice Shard","Triple Axel","Hone Claws"]
+[06:49:28.009] LOG: Pokemon: Foe Tropius | Species ID: 357 | Level: 23 | Nature: Rash (+SpAtk/-SpDef)
+[06:49:28.009] LOG: Stats (IVs): HP: 81 (13), Atk: 42 (25), Def: 46 (14), Spatk: 43 (5), Spdef: 40 (1), Spd: 29 (5)
+[06:49:28.009] LOG: Ability: Air Blower | Passive Ability: Giant Wings 
+[06:49:28.009] LOG: Moveset: ["Gust","Dragon Energy","Growth","Leaf Storm"]
+[06:49:28.010] LOG: Pokemon: Foe Electabuzz | Species ID: 125 | Level: 23 | Nature: Careful (+SpDef/-SpAtk)
+[06:49:28.010] LOG: Stats (IVs): HP: 61 (2), Atk: 51 (0), Def: 31 (3), Spatk: 38 (1), Spdef: 52 (13), Spd: 54 (4)
+[06:49:28.010] LOG: Ability: Short Circuit | Passive Ability: Hyper Aggressive 
+[06:49:28.010] LOG: Moveset: ["Plasma Fists","Seismic Fist","Drain Punch","Quick Attack"]
+[06:49:28.063] LOG: Generated AI funcs
+[06:49:28.065] LOG: Wave Seed: WUjYuSdXdRdYdrScg 32
+[06:49:28.283] LOG: Musician Lonnie
+[06:49:28.284] LOG: Dialogue dialogue:musician.encounter.4 skipped
+[06:49:28.334] LOG: Musician Lonnie
+[06:49:28.583] LOG: %cStart Phase SummonPhase color:green;
+[06:49:28.584] LOG: Lonnie
+[06:49:28.874] LOG: %cStart Phase SummonPhase color:green;
+[06:49:28.874] LOG: Lonnie
+[06:49:29.141] LOG: %cStart Phase SummonPhase color:green;
+[06:49:29.416] LOG: %cStart Phase SummonPhase color:green;
+[06:49:29.699] LOG: %cStart Phase InitEncounterPhase color:green;
+[06:49:29.704] LOG: %cStart Phase PostSummonPhase color:green;
+[06:49:29.704] LOG: Ran PSP for: Roselia
+[06:49:29.708] LOG: %cStart Phase PostSummonPhase color:green;
+[06:49:29.710] LOG: %cStart Phase PostSummonPhase color:green;
+[06:49:29.712] LOG: %cStart Phase PostSummonPhase color:green;
+[06:49:29.712] LOG: Ran PSP for: Ninetales
+[06:49:29.714] LOG: %cStart Phase PostSummonPhase color:green;
+[06:49:29.715] LOG: %cStart Phase PostSummonPhase color:green;
+[06:49:29.716] LOG: %cStart Phase PostSummonPhase color:green;
+[06:49:29.716] LOG: Ran PSP for: Simipour
+[06:49:29.717] LOG: %cStart Phase PostSummonPhase color:green;
+[06:49:29.717] LOG: %cStart Phase PostSummonPhase color:green;
+[06:49:29.717] LOG: %cStart Phase PostSummonPhase color:green;
+[06:49:29.717] LOG: Ran PSP for: Rufflet
+[06:49:29.718] LOG: %cStart Phase PostSummonPhase color:green;
+[06:49:29.718] LOG: %cStart Phase PostSummonPhase color:green;
+[06:49:29.718] LOG: %cStart Phase TurnInitPhase color:green;
+[06:49:29.718] LOG: %cStart Phase CommandPhase color:green;
+[06:49:30.737] LOG: Move: PETAL_BLIZZARD Move targets: {"targets":[2,3,1],"multiple":true} 
+Player Pokemon: Roselia
+[06:49:30.739] LOG: %cStart Phase SelectTargetPhase color:green;
+[06:49:30.897] LOG: %cStart Phase CommandPhase color:green;
+[06:49:32.853] LOG: %cStart Phase EnemyCommandPhase color:green;
+[06:49:32.868] LOG: %cStart Phase EnemyCommandPhase color:green;
+[06:49:32.878] LOG: %cStart Phase TurnStartPhase color:green;
+[06:49:32.884] LOG: %cStart Phase SwitchSummonPhase color:green;
+[06:49:32.885] LOG: Lonnie
+[06:49:33.141] LOG: Lonnie
+[06:49:33.363] LOG: %cStart Phase PostSummonPhase color:green;
+[06:49:33.363] LOG: Ran PSP for: Tropius
+[06:49:33.364] LOG: %cStart Phase PostSummonPhase color:green;
+[06:49:33.365] LOG: %cStart Phase MovePhase color:green;
+[06:49:33.365] LOG: %cUser: Roselia
+Move: PETAL_BLIZZARD
+Use Mode: NORMAL color:orchid
+[06:49:33.369] LOG: %cStart Phase MessagePhase color:green;
+[06:49:33.499] LOG: %cStart Phase MoveEffectPhase color:green;
+[06:49:33.500] LOG: Battle Seed: mls3YMQ7ylLXuEgv
+[06:49:34.661] LOG: crit stage: +0
+[06:49:34.663] LOG: Move: Petal Blizzard | Base damage: 40.28 | Power: 108 | Source attack: 55 | Target defense: 36
+[06:49:34.664] LOG: Move: Petal Blizzard | Attack damage: 83
+[06:49:34.665] LOG: crit stage: +0
+[06:49:34.666] LOG: Move: Petal Blizzard | Base damage: 38.265263157894736 | Power: 108 | Source attack: 55 | Target defense: 38
+[06:49:34.666] LOG: Move: Petal Blizzard | Attack damage: 18
+[06:49:34.667] LOG: crit stage: +0
+[06:49:34.668] LOG: Move: Petal Blizzard | Base damage: 31.958260869565216 | Power: 108 | Source attack: 55 | Target defense: 46
+[06:49:34.668] LOG: Move: Petal Blizzard | Attack damage: 136
+[06:49:34.668] LOG: %cStart Phase DamageAnimPhase color:green;
+[06:49:34.693] LOG: %cStart Phase MessagePhase color:green;
+[06:49:34.907] LOG: %cStart Phase DamageAnimPhase color:green;
+[06:49:34.942] LOG: %cStart Phase MessagePhase color:green;
+[06:49:35.157] LOG: %cStart Phase DamageAnimPhase color:green;
+[06:49:35.193] LOG: %cStart Phase MessagePhase color:green;
+[06:49:35.407] LOG: %cStart Phase FaintPhase color:green;
+[06:49:36.092] LOG: %cStart Phase MessagePhase color:green;
+[06:49:36.412] LOG: %cStart Phase FaintPhase color:green;
+[06:49:38.459] LOG: %cStart Phase MessagePhase color:green;
+[06:49:38.812] LOG: %cStart Phase VictoryPhase color:green;
+[06:49:38.812] LOG: %cStart Phase ExpPhase color:green;
+[06:49:38.812] LOG: Applied Super EXP. Charm 
+[06:49:38.812] LOG: Applied EXP. Charm 
+[06:49:39.184] LOG: %cStart Phase LevelUpPhase color:green;
+[06:49:39.185] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[06:49:39.185] LOG: Applied Super EXP. Charm 
+[06:49:39.185] LOG: Applied EXP. Charm 
+[06:49:39.186] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[06:49:39.186] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[06:49:39.186] LOG: Applied Super EXP. Charm 
+[06:49:39.186] LOG: Applied EXP. Charm 
+[06:49:39.186] LOG: %cStart Phase LevelUpPhase color:green;
+[06:49:39.186] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[06:49:39.186] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[06:49:39.187] LOG: Applied Super EXP. Charm 
+[06:49:39.187] LOG: Applied EXP. Charm 
+[06:49:39.187] LOG: %cStart Phase LevelUpPhase color:green;
+[06:49:39.187] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[06:49:39.187] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[06:49:39.187] LOG: Applied Super EXP. Charm 
+[06:49:39.187] LOG: Applied EXP. Charm 
+[06:49:39.187] LOG: %cStart Phase LevelUpPhase color:green;
+[06:49:39.188] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[06:49:39.188] LOG: %cStart Phase MoveEndPhase color:green;
+[06:49:39.188] LOG: %cStart Phase PostSummonPhase color:green;
+[06:49:39.190] LOG: %cStart Phase SwitchSummonPhase color:green;
+[06:49:39.191] LOG: Lonnie
+[06:49:39.466] LOG: Lonnie
+[06:49:39.683] LOG: %cStart Phase PostSummonPhase color:green;
+[06:49:39.684] LOG: Ran PSP for: Ninetales
+[06:49:39.684] LOG: %cStart Phase PostSummonPhase color:green;
+[06:49:39.684] LOG: %cStart Phase PostSummonPhase color:green;
+[06:49:39.684] LOG: %cStart Phase SwitchSummonPhase color:green;
+[06:49:40.019] LOG: %cStart Phase PostSummonPhase color:green;
+[06:49:40.019] LOG: Ran PSP for: Bramblin
+[06:49:40.020] LOG: %cStart Phase PostSummonPhase color:green;
+[06:49:40.020] LOG: %cStart Phase PostSummonPhase color:green;
+[06:49:40.021] LOG: %cStart Phase MovePhase color:green;
+[06:49:40.022] LOG: %cUser: Bramblin
+Move: DEFENSE_CURL
+Use Mode: INDIRECT color:orchid
+[06:49:40.025] LOG: %cStart Phase MessagePhase color:green;
+[06:49:40.166] LOG: %cStart Phase MoveEffectPhase color:green;
+[06:49:40.449] LOG: %cStart Phase StatStageChangePhase color:green;
+[06:49:40.634] LOG: %cStart Phase MessagePhase color:green;
+[06:49:40.866] LOG: %cStart Phase MoveEndPhase color:green;
+[06:49:40.866] LOG: %cStart Phase MovePhase color:green;
+[06:49:40.866] LOG: %cStart Phase MoveEndPhase color:green;
+[06:49:40.866] LOG: %cStart Phase CheckInterludePhase color:green;
+[06:49:40.866] LOG: %cStart Phase WeatherEffectPhase color:green;
+[06:49:40.866] LOG: %cStart Phase PositionalTagPhase color:green;
+[06:49:40.866] LOG: %cStart Phase BerryPhase color:green;
+[06:49:40.869] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[06:49:40.872] LOG: %cStart Phase TurnEndPhase color:green;
+[06:49:40.875] LOG: %cStart Phase PokemonHealPhase color:green;
+[06:49:41.086] LOG: %cStart Phase MessagePhase color:green;
+[06:49:41.316] LOG: %cStart Phase SwitchPhase color:green;
+[06:49:41.316] LOG: %cStart Phase SwitchSummonPhase color:green;
+[06:49:41.566] LOG: Lonnie
+[06:49:41.790] LOG: %cStart Phase PostSummonPhase color:green;
+[06:49:41.790] LOG: Ran PSP for: Electabuzz
+[06:49:41.791] LOG: %cStart Phase PostSummonPhase color:green;
+[06:49:41.791] LOG: %cStart Phase PostSummonPhase color:green;
+[06:49:41.792] LOG: %cStart Phase TurnInitPhase color:green;
+[06:49:41.792] LOG: %cStart Phase CommandPhase color:green;
