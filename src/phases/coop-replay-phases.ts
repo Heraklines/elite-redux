@@ -31,6 +31,17 @@
 import { globalScene } from "#app/global-scene";
 import { Phase } from "#app/phase";
 import { CommonBattleAnim, MoveAnim } from "#data/battle-anims";
+import { COOP_CHECKSUM_SENTINEL, canonicalize } from "#data/elite-redux/coop/coop-battle-checksum";
+import {
+  applyCoopCheckpoint,
+  applyCoopFullSnapshot,
+  captureCoopChecksum,
+  captureCoopChecksumState,
+} from "#data/elite-redux/coop/coop-battle-engine";
+import { logCanonicalDiff } from "#data/elite-redux/coop/coop-data-fingerprint";
+import { consumeCoopPendingWaveAdvance, getCoopBattleStreamer } from "#data/elite-redux/coop/coop-runtime";
+import type { CoopBattleCheckpoint, CoopFullBattleSnapshot } from "#data/elite-redux/coop/coop-transport";
+import { BattleType } from "#enums/battle-type";
 import { BattlerIndex } from "#enums/battler-index";
 import { HitResult } from "#enums/hit-result";
 import { CommonAnim } from "#enums/move-anims-common";
@@ -39,6 +50,7 @@ import { type BattleStat, Stat } from "#enums/stat";
 import { StatusEffect } from "#enums/status-effect";
 import { PokemonPhase } from "#phases/pokemon-phase";
 import { fixedInt } from "#utils/common";
+import { decompressFromBase64 } from "lz-string";
 
 /** Generous watchdog: a presentation phase whose anim callback never fires ends after this. */
 const COOP_REPLAY_WATCHDOG_MS = 5000;
@@ -309,13 +321,22 @@ export class CoopStatusReplayPhase extends PokemonPhase {
 }
 
 /**
- * GUEST: play the COSMETIC faint subset for a `faint` event (#633): the faint cry + info-hide + the
- * drop tween, mirroring the VISUAL part of FaintPhase (faint-phase.ts:211-237) - NOT FaintPhase
- * itself (which re-queues Victory / Switch / GameOver + mutates tags / status / loot the checkpoint
- * owns). The authoritative checkpoint already removes the mon + stamps FAINT; this only adds the cry
- * + drop the snap skips. It mutates NO checksum-relevant state (no leaveField / doSetStatus /
- * lapseTags / loot / form / tera). Hardened to always reach `end()` (faintCry can swallow its own
- * callback when audio is muted, so a watchdog backs it).
+ * GUEST: PERFORM the visible faint for a host `faint` event (#633, animation-replay redesign). This
+ * phase now runs against the still-ALIVE pre-turn field (the checkpoint is deferred to
+ * {@linkcode CoopFinalizeTurnPhase}, which drains AFTER this), so it must do BOTH the cosmetic faint
+ * (cry + info-hide + drop tween, the VISUAL part of FaintPhase faint-phase.ts:211-237) AND the field
+ * removal, so the mon visibly drops + leaves the field exactly when the host KOd it - instead of the
+ * old behavior (snap removed it first, so this had nothing to drop and the faint never animated).
+ *
+ * It is NOT a real FaintPhase (no Victory / Switch / GameOver re-queue, no loot / score / friendship,
+ * no tag-lapse RNG). It performs ONLY the SAME side-effect-free removal the checkpoint reconcile does -
+ * `hp = 0`, `doSetStatus(FAINT)`, `leaveField(true, true, false)` (mirrors
+ * {@linkcode reconcileCoopEnemyField} / {@linkcode reconcileCoopPlayerField} exactly), so the end-of-turn
+ * state is byte-identical whether the faint animated here or the checkpoint reconciled it: the checksum
+ * is unchanged. The checkpoint's reconcile is IDEMPOTENT against the already-removed mon (its
+ * `isActive()/isOnField()` guards skip it), so the deferred finalize is a no-op for this slot. A mon the
+ * checkpoint somehow already removed (or an absent slot) is a no-op here too. Hardened to always reach
+ * `end()` (faintCry can swallow its own callback when audio is muted, so a watchdog backs it).
  */
 export class CoopFaintReplayPhase extends PokemonPhase {
   public readonly phaseName = "CoopFaintReplayPhase";
@@ -334,8 +355,7 @@ export class CoopFaintReplayPhase extends PokemonPhase {
     };
     try {
       const pokemon = fieldMon(this.battlerIndex);
-      // The checkpoint may already have removed the mon (it is the source of truth) - if there is no
-      // live, on-field sprite to drop, there is nothing cosmetic to play.
+      // Already removed (defensive: a duplicate faint, or a mon off-field) - nothing to animate.
       if (pokemon == null || !pokemon.isOnField()) {
         this.end();
         return;
@@ -351,13 +371,18 @@ export class CoopFaintReplayPhase extends PokemonPhase {
             y: pokemon.y + 150,
             ease: "Sine.easeIn",
             onComplete: () => {
-              // Restore the y so the checkpoint's authoritative leaveField / removal is not fighting a
-              // tweened position; we do NOT leaveField / set status / lapse tags here - the checkpoint owns
-              // every stateful part of a faint. Purely cosmetic.
+              // Restore the tweened y, then PERFORM the same side-effect-free removal the checkpoint
+              // reconcile does (hp 0 -> FAINT status -> leaveField). This makes the mon drop + leave the
+              // field at the host's KO instant; the deferred checkpoint reconcile is then a no-op for this
+              // slot (its isActive/isOnField guards skip an already-removed mon), so the end-of-turn hashed
+              // state - and the per-turn checksum - stays byte-identical to the snap-first path.
               try {
                 pokemon.y -= 150;
+                pokemon.hp = 0;
+                pokemon.doSetStatus(StatusEffect.FAINT);
+                pokemon.leaveField(true, true, false);
               } catch {
-                /* position restore best-effort */
+                /* the removal is best-effort; the checkpoint reconcile still corrects the slot */
               }
               finish();
             },
@@ -368,6 +393,210 @@ export class CoopFaintReplayPhase extends PokemonPhase {
       });
     } catch {
       finish();
+    }
+  }
+}
+
+/**
+ * GUEST: the END-OF-TURN authoritative finalize (#633, animation-replay redesign). This phase exists
+ * SOLELY so the checkpoint runs AFTER the per-event animation phases the turn replay unshifted, never
+ * before them. The bug it fixes: the old `CoopReplayTurnPhase` applied `applyCoopCheckpoint` SYNCHRONOUSLY
+ * in its `.then()` - which leaveField's a host-fainted mon - BEFORE the queued CoopMoveAnim / CoopHpDrain
+ * / CoopFaint phases drained, so the target was already gone and the move/damage/faint could not animate.
+ *
+ * The replay phase now UNSHIFTS this finalize phase LAST (after every animation phase) on the same tree
+ * level, so the phase-tree FIFO guarantees it drains BEHIND them. By the time it runs, every animation
+ * has played against the still-alive pre-turn field; this phase then snaps to the host's authoritative
+ * state (the LOAD-BEARING invariant: the end-of-turn hashed state is byte-identical to before, so the
+ * per-turn checksum still matches and no new desync is introduced), verifies the checksum (auto-resync on
+ * residual drift), queues the guest's own turn-end phases, runs any pending wave-advance, and ends. Every
+ * step is wrapped so a bad payload can never hang the guest's turn.
+ *
+ * STRUCTURAL GUARANTEE (never collapse this back to a synchronous checkpoint call): `applyCoopCheckpoint`
+ * runs ONLY here, and this phase is always LAST on its tree level - so it can never leaveField a mon whose
+ * faint has not yet animated.
+ */
+export class CoopFinalizeTurnPhase extends Phase {
+  public readonly phaseName = "CoopFinalizeTurnPhase";
+
+  private readonly turn: number;
+
+  constructor(
+    turn: number,
+    private readonly checkpoint: CoopBattleCheckpoint,
+    private readonly checksum: string,
+    private readonly preimage?: string,
+  ) {
+    super();
+    this.turn = turn;
+  }
+
+  public override start(): void {
+    super.start();
+    try {
+      // Snap the field + arena to the host's authoritative post-turn state. This is the SAME apply the
+      // old synchronous path did, only now it runs AFTER the animation phases drained - so a faint that
+      // already animated is reconciled as a no-op (the leaveField guards are idempotent on a removed mon).
+      applyCoopCheckpoint(this.checkpoint);
+      this.verifyChecksum(this.checksum, this.preimage);
+    } catch {
+      // A bad stream payload must never hang the guest's turn.
+    }
+    this.finishTurn();
+  }
+
+  /**
+   * Verify our post-apply full-state checksum against the host's; on a mismatch request +
+   * adopt the host's full authoritative snapshot (Phase A auto-resync). A sentinel on
+   * either side (a read failure) skips the comparison. When the host streamed its canonical
+   * `hostPreimage` (#633, diagnostics) we deep-DIFF it against ours to log the exact field(s)
+   * that diverged - both at the initial mismatch and again if the snapshot fails to heal it.
+   */
+  private verifyChecksum(hostChecksum: string, hostPreimage?: string): void {
+    const streamer = getCoopBattleStreamer();
+    if (streamer == null) {
+      return;
+    }
+    const guestChecksum = captureCoopChecksum();
+    if (hostChecksum === COOP_CHECKSUM_SENTINEL || guestChecksum === COOP_CHECKSUM_SENTINEL) {
+      return;
+    }
+    if (hostChecksum === guestChecksum) {
+      return;
+    }
+    console.warn(`[coop-desync] turn=${this.turn} host=${hostChecksum} guest=${guestChecksum}`);
+    // DIAGNOSTIC (#633): log WHICH field(s) diverged by deep-diffing the host's pre-image
+    // (the canonical state its checksum hashed) against the guest's own. Only the opaque
+    // hashes cross the wire normally; the pre-image makes the divergent field observable.
+    const hostObj = this.parseCanonical(hostPreimage);
+    if (hostObj !== undefined) {
+      const guestObj = this.parseCanonical(canonicalize(captureCoopChecksumState()));
+      logCanonicalDiff(`[coop-cs] turn=${this.turn}`, hostObj, guestObj);
+    }
+    void streamer.requestStateSync(this.turn).then(blob => {
+      if (blob == null) {
+        return;
+      }
+      try {
+        const snapshot = JSON.parse(decompressFromBase64(blob)) as CoopFullBattleSnapshot;
+        applyCoopFullSnapshot(snapshot);
+        const healed = captureCoopChecksum();
+        if (healed === hostChecksum) {
+          console.info(`[coop-resync] turn=${this.turn} ok`);
+        } else {
+          console.warn(`[coop-resync] turn=${this.turn} still-diverged host=${hostChecksum} guest=${healed}`);
+          // DIAGNOSTIC (#633): the snapshot did NOT heal the divergence - log WHAT it failed
+          // to repair by diffing the host pre-image against the guest's POST-APPLY state.
+          if (hostObj !== undefined) {
+            const guestPostApplyObj = this.parseCanonical(canonicalize(captureCoopChecksumState()));
+            logCanonicalDiff(`[coop-resync] turn=${this.turn} UNHEALED`, hostObj, guestPostApplyObj);
+            console.warn(
+              "[coop-resync] note: snapshot does NOT re-apply party/modifiers/arenaTags or force maxHp -"
+                + " a diff in those is a data-table drift, not a heal bug",
+            );
+          }
+        }
+      } catch {
+        /* a malformed resync blob must never crash the guest's battle */
+      }
+    });
+  }
+
+  /** Parse a canonical state string into a plain object, or undefined on absence/failure. */
+  private parseCanonical(canonical: string | undefined): unknown {
+    if (canonical === undefined) {
+      return;
+    }
+    try {
+      return JSON.parse(canonical);
+    } catch {
+      return;
+    }
+  }
+
+  /**
+   * Queue the guest's own end-of-turn phases (so the run loops) and end this phase. If the host
+   * signaled this wave RESOLVED (#633, authoritative wave-advance), also run the normal victory
+   * tail AFTER the turn-end phases drain - this is the SAFE boundary (the in-flight replay turn
+   * has finished here, never mid-replay).
+   */
+  private finishTurn(): void {
+    try {
+      globalScene.phaseManager.queueTurnEndPhases();
+      // The turn-end phases were pushed to the back of the queue above; pushing the victory tail
+      // here runs it AFTER they drain (the in-flight turn finishes first, per the Oracle ordering).
+      this.maybeRunCoopWaveAdvance();
+    } catch {
+      // The turn-end queue / wave-advance is best-effort; a failure here must never hang the turn.
+    }
+    this.end();
+  }
+
+  /**
+   * GUEST (#633, authoritative wave-advance handshake): if the host told us this wave RESOLVED, run
+   * the SAME post-battle tail the host's resolution queues, so the guest reaches the next state
+   * instead of looping the resolved wave forever (a pure renderer never runs a FaintPhase /
+   * AttemptCapturePhase / AttemptRunPhase / GameOverPhase itself). By outcome:
+   *  - `win` / `capture`: queue `VictoryPhase` exactly as `FaintPhase` / `AttemptCapturePhase` do
+   *    (faint-phase.ts:189) - it runs BattleEnd -> the alternation-relayed reward shop -> biome ->
+   *    `NewBattlePhase` -> the next `EncounterPhase` (-> `adoptCoopHostEnemyParty` for wave N+1).
+   *  - `flee` (#633 GAP 5): a successful run gives NO exp / rewards on the host (AttemptRunPhase
+   *    queues `BattleEndPhase(false)` -> optional `SelectBiomePhase` -> `NewBattlePhase`); MIRROR
+   *    exactly that (NOT VictoryPhase, which would grant exp / rewards the host never gave).
+   *  - `gameOver` (#633 GAP 6): the run ended; queue `GameOverPhase` so the guest RENDERS the
+   *    game-over screen (it would otherwise hang on the lost wave). Coop-safe: GameOverPhase's
+   *    `isCoop` branch goes straight to `handleGameOver` (no per-client retry prompt), and its
+   *    own `broadcastCoopWaveResolved` is a no-op on the guest, so no host-only outcome logic re-runs.
+   * One-shot + wave-guarded by {@linkcode consumeCoopPendingWaveAdvance}; a duplicate `waveResolved`
+   * is a no-op. Fully guarded so a missing-pokemon edge can never hang the guest.
+   */
+  private maybeRunCoopWaveAdvance(): void {
+    const pending = consumeCoopPendingWaveAdvance();
+    if (pending == null) {
+      return;
+    }
+    // DIAGNOSTIC (#633 trainer-victory deadlock): log the outcome + the guest's battleType so a live
+    // capture confirms the guest queues the right tail. For a "win" on a TRAINER wave the VictoryPhase
+    // it queues MUST go on to push TrainerVictoryPhase + SelectModifierPhase (the guest becomes the
+    // reward-shop OWNER so the host's WATCHER wait resolves).
+    console.info(
+      `[coop-diag] guest wave-advance outcome=${pending.outcome} wave=${pending.wave} battleType=${BattleType[globalScene.currentBattle.battleType]} queues=${pending.outcome === "win" || pending.outcome === "capture" ? "VictoryPhase" : pending.outcome === "flee" ? "BattleEnd+NewBattle" : "GameOverPhase"}`,
+    );
+    try {
+      switch (pending.outcome) {
+        case "win":
+        case "capture": {
+          // VictoryPhase reads exp off the resolved mon. After the checkpoint reconcile the KOd
+          // enemies are off-field but still present in the enemy party, so address one by its `id`
+          // (>3 -> getPokemonById, which finds an off-field party member) - never a dead field slot.
+          // Fall back to the player lead's battler index when no enemy party member remains
+          // (e.g. a capture that cleared the slot), so getPokemon() always resolves a live mon.
+          const lastEnemy = globalScene.getEnemyParty().at(-1);
+          const battlerArg = lastEnemy == null ? BattlerIndex.PLAYER : lastEnemy.id;
+          globalScene.phaseManager.pushNew("VictoryPhase", battlerArg);
+          break;
+        }
+        case "flee": {
+          // Mirror the host's AttemptRunPhase tail (no exp / rewards): BattleEnd -> optional biome
+          // select -> NewBattle. NewBattlePhase ends the wave and drives the next EncounterPhase
+          // (-> adoptCoopHostEnemyParty for the next wave), so the guest advances past the fled wave.
+          globalScene.phaseManager.pushNew("BattleEndPhase", false);
+          if (globalScene.gameMode.hasRandomBiomes || globalScene.isNewBiome()) {
+            globalScene.phaseManager.pushNew("SelectBiomePhase");
+          }
+          globalScene.phaseManager.pushNew("NewBattlePhase");
+          break;
+        }
+        case "gameOver": {
+          // Render the game-over screen on the guest (#633 GAP 6). isVictory=false: a lost run.
+          // GameOverPhase's isCoop branch renders the screen without re-running host-only outcome
+          // logic or opening a per-client retry prompt.
+          globalScene.phaseManager.pushNew("GameOverPhase", false);
+          break;
+        }
+      }
+    } catch {
+      // The post-battle tail is best-effort; a failure here must never hang the guest's run.
     }
   }
 }

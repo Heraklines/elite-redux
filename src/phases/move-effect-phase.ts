@@ -13,7 +13,6 @@ import {
   bypassesOpponentMultiHitSuppression,
   suppressesOpponentDamageBoosts,
 } from "#data/elite-redux/archetypes/post-defend-suppress-opponent-damage-boost";
-import { isCoopRecording, recordCoopEvent } from "#data/elite-redux/coop/coop-turn-recorder";
 import { erApplyCommunityOnHitItems } from "#data/elite-redux/er-community-items";
 import { erApplyReactiveOnHit } from "#data/elite-redux/er-reactive-items";
 import { applyErLifeOrbRecoil, applyErRockyHelmet } from "#data/elite-redux/er-recreated-items";
@@ -763,19 +762,10 @@ export class MoveEffectPhase extends PokemonPhase {
           source: user,
         });
 
-    // Co-op host turn recorder (#633, TRACK-2 Phase B - animation layer): record the target's
-    // post-hit hp as a structured `hp` event so the AUTHORITATIVE guest can drain its HP bar to the
-    // host's pre-computed value (no RNG, per hit). `damageAndUpdate` already applied the damage above,
-    // so `target.hp` is the authoritative post-hit value. Inert unless a recording is open (only the
-    // host, mid-turn, in a live co-op run) - solo / non-host is byte-for-byte unaffected.
-    if (!isBlockedBySubstitute && isCoopRecording()) {
-      recordCoopEvent({
-        k: "hp",
-        bi: target.getBattlerIndex(),
-        hp: target.hp,
-        maxHp: target.getMaxHp(),
-      });
-    }
+    // Co-op host turn recorder (#633, animation-replay redesign - Step 2): the post-hit `hp` event is
+    // now recorded at the UNIVERSAL damage chokepoint (Pokemon.damage), so a move hit, a status / weather
+    // chip, recoil, and an entry hazard all emit it uniformly - this move-only recorder is removed. A
+    // substitute hit stays excluded there too (it mutates substitute.hp directly, never calling damage()).
 
     if (isCritical) {
       globalScene.phaseManager.queueMessage(i18next.t("battle:hitResultCriticalHit"));
@@ -848,14 +838,10 @@ export class MoveEffectPhase extends PokemonPhase {
    * @param target - The {@linkcode Pokemon} that fainted
    */
   protected onFaintTarget(user: Pokemon, target: Pokemon): void {
-    // Co-op host turn recorder (#633, TRACK-2 Phase B - animation layer): record the faint as a
-    // structured `faint` event so the AUTHORITATIVE guest can play the cosmetic faint subset (cry +
-    // drop tween). The end-of-turn checkpoint still authoritatively removes the mon + stamps FAINT;
-    // this event only adds the cry/drop the snap skips. Inert unless a recording is open (only the
-    // host, mid-turn, in a live co-op run) - solo / non-host is byte-for-byte unaffected.
-    if (isCoopRecording()) {
-      recordCoopEvent({ k: "faint", bi: target.getBattlerIndex() });
-    }
+    // Co-op host turn recorder (#633, animation-replay redesign - Step 2): the `faint` event is now
+    // recorded at the UNIVERSAL damage chokepoint (Pokemon.damage, where the hit that drops a mon to 0
+    // emits it), so a KO from ANY source animates on the guest - not only a direct move hit. This
+    // move-only recorder is removed; `damage()` already emitted the faint before this runs.
 
     globalScene.phaseManager.queueFaintPhase(target.getBattlerIndex(), false, user);
 

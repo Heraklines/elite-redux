@@ -8973,6 +8973,44 @@ export const DEV_SCENARIOS: DevScenario[] = [
       ];
     },
   },
+  // Co-op - the AUTHORITATIVE guest now ANIMATES the host's combat step-by-step (#633, replay redesign)
+  {
+    label: "(note) Co-op: guest ANIMATES the fight + faints (#633)",
+    description:
+      "#633 co-op AUTHORITATIVE guest combat REPLAY - NOT single-client testable (it is the\n"
+      + "host->guest stream; the headless repro lives in\n"
+      + "test/tests/elite-redux/coop/coop-battle-events.test.ts 'Step 1' + the guest-renderer suite).\n"
+      + "THE BUG: on the GUEST the battle read as a still summary - a move's animation played, then the\n"
+      + "enemy just VANISHED ('flamethrower and that's it; how they fainted is not given'). ROOT CAUSE:\n"
+      + "CoopReplayTurnPhase applied the host's end-of-turn CHECKPOINT SYNCHRONOUSLY - it leaveField'd a\n"
+      + "host-fainted mon BEFORE the queued move/HP-drain/faint animation phases drained, so the target\n"
+      + "was already gone and the damage + faint could not animate. Faints from poison/weather/recoil/\n"
+      + "hazards had NO events at all (recorded only on the direct move-hit path), so those mons winked\n"
+      + "out silently.\n"
+      + "THE FIX: the checkpoint is DEFERRED into a new CoopFinalizeTurnPhase that is unshifted LAST, so\n"
+      + "it drains BEHIND the animation phases (which now play against the still-ALIVE pre-turn field) -\n"
+      + "the faint phase performs the visible cry+drop+leaveField at the host's KO instant, then the\n"
+      + "finalize checkpoint reconciles (a no-op for the already-removed mon). The hp + faint events are\n"
+      + "now recorded at the UNIVERSAL damage chokepoint (Pokemon.damage), so a KO from ANY source\n"
+      + "(move / status / weather / recoil / hazard / multi-KO) animates. The end-of-turn hashed state\n"
+      + "is byte-identical, so the per-turn checksum still matches (no new desync).\n"
+      + "CHECK (needs a REAL 2-client AUTHORITATIVE session on staging): as the HOST, KO an enemy with a\n"
+      + "damaging move, then KO another with end-of-turn POISON (Toxic) / a weather chip / Spikes on\n"
+      + "switch-in. On the GUEST screen EXPECT to WATCH each KO: the move animation, the HP bar draining\n"
+      + "to 0, then the fainting cry + drop - in order, for EVERY faint regardless of source - instead\n"
+      + "of the mon vanishing. VERIFY the two clients still agree afterward (no new [coop-desync] lines;\n"
+      + "the per-turn checksum still matches). This (note) flags that the visual fidelity + near-real-\n"
+      + "time feel are the final 2-client validation; the single-client suite proves the ordering +\n"
+      + "checksum invariant only.",
+    setup: () => {
+      resetDevOverrides();
+      return [
+        makeStarter(SpeciesId.SNORLAX, {
+          moveset: [MoveId.BODY_SLAM, MoveId.CRUNCH, MoveId.EARTHQUAKE, MoveId.REST],
+        }),
+      ];
+    },
+  },
   {
     label: "(note) Black-shiny gift cycle refreshes on summary (#349)",
     description:

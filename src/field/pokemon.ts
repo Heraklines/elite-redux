@@ -59,6 +59,7 @@ import { PersistentFieldAuraAbAttr } from "#data/elite-redux/archetypes/persiste
 import { suppressesOpponentDamageBoosts } from "#data/elite-redux/archetypes/post-defend-suppress-opponent-damage-boost";
 import { coopAttributeNewMon, coopHalfIsFull } from "#data/elite-redux/coop/coop-session";
 import type { CoopRole } from "#data/elite-redux/coop/coop-transport";
+import { isCoopRecording, recordCoopEvent } from "#data/elite-redux/coop/coop-turn-recorder";
 import { getErBiomeRule } from "#data/elite-redux/er-biome-rules";
 import {
   getErSharedGiftAbilityIdsFor,
@@ -5284,6 +5285,23 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
 
     damage = Math.min(damage, this.hp);
     this.hp -= damage;
+    // Co-op host turn recorder (#633, animation-replay redesign - Step 2): record the post-damage hp
+    // (and a faint when this hit KOs) at the UNIVERSAL damage chokepoint, so the AUTHORITATIVE guest
+    // can drain the HP bar + play the faint for a KO from ANY source - a move hit, end-of-turn status
+    // (poison/burn), weather chip, recoil, an entry hazard on switch-in, or a multi-KO - not only the
+    // direct move-hit path. `this.hp` here is the authoritative post-hit value (no RNG). The faint is
+    // emitted whenever this damage drops the mon to 0 (independent of `ignoreFaintPhase`, which only
+    // gates the HOST's FaintPhase, not the guest's animation event); since `damage()` no-ops once the
+    // mon is already fainted (the isFainted early-return above), the faint event fires EXACTLY once per
+    // KO. A substitute hit mutates `substitute.hp` directly and never calls this method, so it stays
+    // excluded. Inert unless a recording is open (only the host, mid-turn, in a live co-op run) - solo
+    // / non-host is byte-for-byte unaffected.
+    if (isCoopRecording()) {
+      recordCoopEvent({ k: "hp", bi: this.getBattlerIndex(), hp: this.hp, maxHp: this.getMaxHp() });
+      if (this.isFainted()) {
+        recordCoopEvent({ k: "faint", bi: this.getBattlerIndex() });
+      }
+    }
     if (this.isFainted() && !ignoreFaintPhase) {
       globalScene.phaseManager.queueFaintPhase(this.getBattlerIndex(), preventEndure);
       this.destroySubstitute();

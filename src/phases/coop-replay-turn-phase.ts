@@ -6,19 +6,8 @@
 
 import { globalScene } from "#app/global-scene";
 import { Phase } from "#app/phase";
-import { COOP_CHECKSUM_SENTINEL, canonicalize } from "#data/elite-redux/coop/coop-battle-checksum";
-import {
-  applyCoopCheckpoint,
-  applyCoopFullSnapshot,
-  captureCoopChecksum,
-  captureCoopChecksumState,
-} from "#data/elite-redux/coop/coop-battle-engine";
-import { logCanonicalDiff } from "#data/elite-redux/coop/coop-data-fingerprint";
-import { consumeCoopPendingWaveAdvance, getCoopBattleStreamer } from "#data/elite-redux/coop/coop-runtime";
-import type { CoopBattleEvent, CoopFullBattleSnapshot } from "#data/elite-redux/coop/coop-transport";
-import { BattleType } from "#enums/battle-type";
-import { BattlerIndex } from "#enums/battler-index";
-import { decompressFromBase64 } from "lz-string";
+import { getCoopBattleStreamer } from "#data/elite-redux/coop/coop-runtime";
+import type { CoopBattleEvent } from "#data/elite-redux/coop/coop-transport";
 
 /**
  * Co-op GUEST turn REPLAY (#633, TRACK-2 Phase B). The guest is a pure renderer: it
@@ -26,14 +15,20 @@ import { decompressFromBase64 } from "lz-string";
  * MovePhase / capture / enemy-AI resolution. This phase:
  *  1. Awaits the host's authoritative `turnResolution` for this turn (the host is the
  *     sole engine; it simulated the turn with the guest's relayed command).
- *  2. Narrates the ordered visible events the host streamed (MVP: `message` lines).
- *  3. Applies the host's post-turn CHECKPOINT so the field state matches EXACTLY, then
- *     verifies the full-state CHECKSUM and auto-resyncs on any residual drift (Phase A).
- *  4. Queues the guest's OWN turn-end phases + ends, so the run loops to the next turn.
+ *  2. ANIMATES the ordered visible events the host streamed (move anim, HP-bar drain, stat
+ *     tween, faint cry+drop) by UNSHIFTING a presentation phase per event onto the queue -
+ *     they drain FIFO against the still-ALIVE pre-turn field.
+ *  3. UNSHIFTS a {@linkcode CoopFinalizeTurnPhase} LAST (#633, animation-replay redesign): it
+ *     applies the host's post-turn CHECKPOINT, verifies the CHECKSUM (auto-resync on residual
+ *     drift), then queues the guest's OWN turn-end phases + wave-advance + ends. The finalize
+ *     phase being last on the tree level is the structural guarantee that the checkpoint can
+ *     never leaveField a host-fainted mon BEFORE its faint has animated.
  *
- * The guest draws no RNG and computes no outcome, so it cannot desync by construction.
- * A host stall resolves the await to null after the streamer's grace: the guest still
- * ends the turn (it re-syncs on the next checkpoint) rather than hanging forever.
+ * The guest draws no RNG and computes no outcome, so it cannot desync by construction. The
+ * checkpoint still re-asserts the host's exact end-of-turn state, so the per-turn checksum is
+ * byte-identical to before the redesign. A host stall resolves the await to null after the
+ * streamer's grace: the guest still ends the turn (it re-syncs on the next checkpoint) rather
+ * than hanging forever.
  */
 export class CoopReplayTurnPhase extends Phase {
   public readonly phaseName = "CoopReplayTurnPhase";
@@ -50,21 +45,77 @@ export class CoopReplayTurnPhase extends Phase {
     const streamer = getCoopBattleStreamer();
     if (streamer == null) {
       // No live session (defensive): just end the turn so the run never hangs.
-      this.finishTurn();
+      this.finishTurnNoStream();
       return;
     }
     void streamer.awaitTurn(this.turn).then(res => {
       try {
         if (res != null) {
-          this.renderEvents(res.events);
-          applyCoopCheckpoint(res.checkpoint);
-          this.verifyChecksum(res.checksum, res.preimage);
+          // ANIMATE first: unshift a presentation phase per host event against the still-ALIVE
+          // pre-turn field. These land FIFO on the tree level ABOVE this phase. The events are the
+          // EXACTLY-ONCE merge of the LIVE channel (#633, animation layer) and the turn-end batch:
+          // each was streamed live the instant the host recorded it (buffered by `(turn, seq)`), and
+          // the batch is the same ordered list. seq N == batch index N (the recorder stamps one seq
+          // per recorded event), so we de-dupe by index and render each event once, sourced from the
+          // live channel when it arrived, else filled from the batch (a dropped / late live event
+          // still renders). The checkpoint stays the final correction regardless, so any live gap
+          // only stutters the animation - it can never desync.
+          this.renderEvents(this.mergeLiveAndBatch(streamer.consumeLiveEvents(this.turn), res.events));
+          // Then unshift the END-OF-TURN finalize LAST (#633, animation-replay redesign). The
+          // phase-tree FIFO guarantees it drains BEHIND every animation phase just unshifted, so
+          // `applyCoopCheckpoint` (which leaveField's a host-fainted mon) runs only AFTER the faint
+          // has animated. THE STRUCTURAL GUARANTEE: applyCoopCheckpoint runs ONLY in
+          // CoopFinalizeTurnPhase, which is LAST on this tree level - it can never leaveField a mon
+          // whose faint has not animated. Never collapse this back to a synchronous applyCoopCheckpoint.
+          globalScene.phaseManager.unshiftNew(
+            "CoopFinalizeTurnPhase",
+            this.turn,
+            res.checkpoint,
+            res.checksum,
+            res.preimage,
+          );
+          this.end();
+          return;
         }
       } catch {
         // A bad stream payload must never hang the guest's turn.
       }
-      this.finishTurn();
+      // No resolution arrived (host stall) - end the turn defensively; the guest re-syncs on the
+      // next checkpoint rather than hanging forever.
+      this.finishTurnNoStream();
     });
+  }
+
+  /**
+   * EXACTLY-ONCE merge of the LIVE-channel events and the turn-end BATCH (#633, animation layer LIVE).
+   * The host streams each visible event live the instant it records it, stamped with a per-turn
+   * monotonic `seq`; the turn-end `turnResolution` carries the SAME ordered events as a batch, where
+   * INVARIANT seq N == batch index N (the recorder stamps one seq per recorded event). So we render
+   * each event POSITION exactly once, in order, sourced from the live channel when that seq arrived
+   * (already buffered + de-duped + order-tolerant by the streamer) and FILLED from the batch when it
+   * did not (a dropped / late live event still renders). Any extra live seq beyond the batch length
+   * (an out-of-band event the batch somehow lacks) is appended after, so nothing the host sent is lost.
+   * The result is the ordered list the animation pump replays; the checkpoint then corrects all state.
+   */
+  private mergeLiveAndBatch(
+    live: { seq: number; event: CoopBattleEvent }[],
+    batch: CoopBattleEvent[],
+  ): CoopBattleEvent[] {
+    const liveBySeq = new Map<number, CoopBattleEvent>();
+    for (const { seq, event } of live) {
+      liveBySeq.set(seq, event);
+    }
+    const merged: CoopBattleEvent[] = [];
+    // Render every batch POSITION exactly once, preferring the live-channel copy for that seq/index.
+    for (let i = 0; i < batch.length; i++) {
+      merged.push(liveBySeq.get(i) ?? batch[i]);
+      liveBySeq.delete(i);
+    }
+    // Append any live seqs the batch did not cover (defensive: out-of-band events), in seq order.
+    for (const seq of [...liveBySeq.keys()].sort((a, b) => a - b)) {
+      merged.push(liveBySeq.get(seq) as CoopBattleEvent);
+    }
+    return merged;
   }
 
   /**
@@ -127,153 +178,19 @@ export class CoopReplayTurnPhase extends Phase {
   }
 
   /**
-   * Verify our post-apply full-state checksum against the host's; on a mismatch request +
-   * adopt the host's full authoritative snapshot (Phase A auto-resync). A sentinel on
-   * either side (a read failure) skips the comparison. When the host streamed its canonical
-   * `hostPreimage` (#633, diagnostics) we deep-DIFF it against ours to log the exact field(s)
-   * that diverged - both at the initial mismatch and again if the snapshot fails to heal it.
+   * Defensive end-of-turn when NO host resolution is available (no live streamer, or the host
+   * stalled past the streamer's grace). There is no checkpoint to apply here, so we never reach
+   * {@linkcode CoopFinalizeTurnPhase}; just queue the guest's own turn-end phases so the run loops,
+   * then end. The guest re-syncs on the next checkpoint rather than hanging forever. A pending
+   * wave-advance (if any) is left for the next turn's finalize phase to consume (it is one-shot +
+   * wave-guarded), so it is never lost.
    */
-  private verifyChecksum(hostChecksum: string, hostPreimage?: string): void {
-    const streamer = getCoopBattleStreamer();
-    if (streamer == null) {
-      return;
-    }
-    const guestChecksum = captureCoopChecksum();
-    if (hostChecksum === COOP_CHECKSUM_SENTINEL || guestChecksum === COOP_CHECKSUM_SENTINEL) {
-      return;
-    }
-    if (hostChecksum === guestChecksum) {
-      return;
-    }
-    console.warn(`[coop-desync] turn=${this.turn} host=${hostChecksum} guest=${guestChecksum}`);
-    // DIAGNOSTIC (#633): log WHICH field(s) diverged by deep-diffing the host's pre-image
-    // (the canonical state its checksum hashed) against the guest's own. Only the opaque
-    // hashes cross the wire normally; the pre-image makes the divergent field observable.
-    const hostObj = this.parseCanonical(hostPreimage);
-    if (hostObj !== undefined) {
-      const guestObj = this.parseCanonical(canonicalize(captureCoopChecksumState()));
-      logCanonicalDiff(`[coop-cs] turn=${this.turn}`, hostObj, guestObj);
-    }
-    void streamer.requestStateSync(this.turn).then(blob => {
-      if (blob == null) {
-        return;
-      }
-      try {
-        const snapshot = JSON.parse(decompressFromBase64(blob)) as CoopFullBattleSnapshot;
-        applyCoopFullSnapshot(snapshot);
-        const healed = captureCoopChecksum();
-        if (healed === hostChecksum) {
-          console.info(`[coop-resync] turn=${this.turn} ok`);
-        } else {
-          console.warn(`[coop-resync] turn=${this.turn} still-diverged host=${hostChecksum} guest=${healed}`);
-          // DIAGNOSTIC (#633): the snapshot did NOT heal the divergence - log WHAT it failed
-          // to repair by diffing the host pre-image against the guest's POST-APPLY state.
-          if (hostObj !== undefined) {
-            const guestPostApplyObj = this.parseCanonical(canonicalize(captureCoopChecksumState()));
-            logCanonicalDiff(`[coop-resync] turn=${this.turn} UNHEALED`, hostObj, guestPostApplyObj);
-            console.warn(
-              "[coop-resync] note: snapshot does NOT re-apply party/modifiers/arenaTags or force maxHp -"
-                + " a diff in those is a data-table drift, not a heal bug",
-            );
-          }
-        }
-      } catch {
-        /* a malformed resync blob must never crash the guest's battle */
-      }
-    });
-  }
-
-  /** Parse a canonical state string into a plain object, or undefined on absence/failure. */
-  private parseCanonical(canonical: string | undefined): unknown {
-    if (canonical === undefined) {
-      return;
-    }
+  private finishTurnNoStream(): void {
     try {
-      return JSON.parse(canonical);
+      globalScene.phaseManager.queueTurnEndPhases();
     } catch {
-      return;
+      // The turn-end queue is best-effort; a failure here must never hang the turn.
     }
-  }
-
-  /**
-   * Queue the guest's own end-of-turn phases (so the run loops) and end this phase. If the host
-   * signaled this wave RESOLVED (#633, authoritative wave-advance), also run the normal victory
-   * tail AFTER the turn-end phases drain - this is the SAFE boundary (the in-flight replay turn
-   * has finished here, never mid-replay).
-   */
-  private finishTurn(): void {
-    globalScene.phaseManager.queueTurnEndPhases();
-    // The turn-end phases were pushed to the back of the queue above; pushing the victory tail
-    // here runs it AFTER they drain (the in-flight turn finishes first, per the Oracle ordering).
-    this.maybeRunCoopWaveAdvance();
     this.end();
-  }
-
-  /**
-   * GUEST (#633, authoritative wave-advance handshake): if the host told us this wave RESOLVED, run
-   * the SAME post-battle tail the host's resolution queues, so the guest reaches the next state
-   * instead of looping the resolved wave forever (a pure renderer never runs a FaintPhase /
-   * AttemptCapturePhase / AttemptRunPhase / GameOverPhase itself). By outcome:
-   *  - `win` / `capture`: queue `VictoryPhase` exactly as `FaintPhase` / `AttemptCapturePhase` do
-   *    (faint-phase.ts:189) - it runs BattleEnd -> the alternation-relayed reward shop -> biome ->
-   *    `NewBattlePhase` -> the next `EncounterPhase` (-> `adoptCoopHostEnemyParty` for wave N+1).
-   *  - `flee` (#633 GAP 5): a successful run gives NO exp / rewards on the host (AttemptRunPhase
-   *    queues `BattleEndPhase(false)` -> optional `SelectBiomePhase` -> `NewBattlePhase`); MIRROR
-   *    exactly that (NOT VictoryPhase, which would grant exp / rewards the host never gave).
-   *  - `gameOver` (#633 GAP 6): the run ended; queue `GameOverPhase` so the guest RENDERS the
-   *    game-over screen (it would otherwise hang on the lost wave). Coop-safe: GameOverPhase's
-   *    `isCoop` branch goes straight to `handleGameOver` (no per-client retry prompt), and its
-   *    own `broadcastCoopWaveResolved` is a no-op on the guest, so no host-only outcome logic re-runs.
-   * One-shot + wave-guarded by {@linkcode consumeCoopPendingWaveAdvance}; a duplicate `waveResolved`
-   * is a no-op. Fully guarded so a missing-pokemon edge can never hang the guest.
-   */
-  private maybeRunCoopWaveAdvance(): void {
-    const pending = consumeCoopPendingWaveAdvance();
-    if (pending == null) {
-      return;
-    }
-    // DIAGNOSTIC (#633 trainer-victory deadlock): log the outcome + the guest's battleType so a live
-    // capture confirms the guest queues the right tail. For a "win" on a TRAINER wave the VictoryPhase
-    // it queues MUST go on to push TrainerVictoryPhase + SelectModifierPhase (the guest becomes the
-    // reward-shop OWNER so the host's WATCHER wait resolves).
-    console.info(
-      `[coop-diag] guest wave-advance outcome=${pending.outcome} wave=${pending.wave} battleType=${BattleType[globalScene.currentBattle.battleType]} queues=${pending.outcome === "win" || pending.outcome === "capture" ? "VictoryPhase" : pending.outcome === "flee" ? "BattleEnd+NewBattle" : "GameOverPhase"}`,
-    );
-    try {
-      switch (pending.outcome) {
-        case "win":
-        case "capture": {
-          // VictoryPhase reads exp off the resolved mon. After the checkpoint reconcile the KOd
-          // enemies are off-field but still present in the enemy party, so address one by its `id`
-          // (>3 -> getPokemonById, which finds an off-field party member) - never a dead field slot.
-          // Fall back to the player lead's battler index when no enemy party member remains
-          // (e.g. a capture that cleared the slot), so getPokemon() always resolves a live mon.
-          const lastEnemy = globalScene.getEnemyParty().at(-1);
-          const battlerArg = lastEnemy == null ? BattlerIndex.PLAYER : lastEnemy.id;
-          globalScene.phaseManager.pushNew("VictoryPhase", battlerArg);
-          break;
-        }
-        case "flee": {
-          // Mirror the host's AttemptRunPhase tail (no exp / rewards): BattleEnd -> optional biome
-          // select -> NewBattle. NewBattlePhase ends the wave and drives the next EncounterPhase
-          // (-> adoptCoopHostEnemyParty for the next wave), so the guest advances past the fled wave.
-          globalScene.phaseManager.pushNew("BattleEndPhase", false);
-          if (globalScene.gameMode.hasRandomBiomes || globalScene.isNewBiome()) {
-            globalScene.phaseManager.pushNew("SelectBiomePhase");
-          }
-          globalScene.phaseManager.pushNew("NewBattlePhase");
-          break;
-        }
-        case "gameOver": {
-          // Render the game-over screen on the guest (#633 GAP 6). isVictory=false: a lost run.
-          // GameOverPhase's isCoop branch renders the screen without re-running host-only outcome
-          // logic or opening a per-client retry prompt.
-          globalScene.phaseManager.pushNew("GameOverPhase", false);
-          break;
-        }
-      }
-    } catch {
-      // The post-battle tail is best-effort; a failure here must never hang the guest's run.
-    }
   }
 }

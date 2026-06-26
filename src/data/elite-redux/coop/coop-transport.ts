@@ -479,6 +479,18 @@ export type CoopMessage =
    */
   | { t: "ghostPool"; pool: GhostTeamSnapshot[] }
   /**
+   * Host -> guest (#633, animation layer - LIVE): ONE visible battle event emitted the INSTANT
+   * the host records it (a move / per-hit hp / faint / stat change), so the guest can WATCH the
+   * fight unfold with minimal lag instead of waiting for the whole turn to batch at turn-end.
+   * Mirrors the cosmetic {@linkcode uiInput} ordering: `turn` scopes the event to its turn and
+   * `seq` is a PER-TURN MONOTONIC index so the guest replays them in exact order and DE-DUPES
+   * against the batch the turn-end `turnResolution` also carries (a live event already played is
+   * skipped). PRESENTATION ONLY - the authoritative post-turn CHECKPOINT in `turnResolution` is
+   * still the source of truth, so a dropped / reordered / late `battleEvent` only stutters the
+   * animation; it can never desync the guest (the checkpoint reconciles all state).
+   */
+  | { t: "battleEvent"; turn: number; seq: number; event: CoopBattleEvent }
+  /**
    * Host -> guest (#633, LIVE-D): a fully-resolved turn. `events` is the ordered visible
    * log the guest narrates/animates; `checkpoint` is the AUTHORITATIVE post-turn state the
    * guest applies so it can never drift. The guest computes none of this itself.
