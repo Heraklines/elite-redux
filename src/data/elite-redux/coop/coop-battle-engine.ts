@@ -927,7 +927,15 @@ function applyCoopHeldItemsForMon(mon: Pokemon, heldItems: unknown): boolean {
   const addedTypeIds: string[] = [];
   try {
     const isPlayer = mon.isPlayer();
-    // 1) remove existing held items on this mon (each guarded by the removeModifier return).
+    // 1) remove existing held items on this mon (each guarded by the removeModifier return). Track the
+    // GENUINE SURVIVORS - items whose removeModifier returned FALSE (never spliced from the list) - by
+    // object identity. Those, and ONLY those, are the pre-existing held items a re-add in step 2 must
+    // not re-introduce a duplicate of. An item this heal pass itself re-adds is NEVER a survivor, so it
+    // can never block a later same-type-id add (the #698 BERRY,BERRY drop). PokeRogue's PersistentModifier.
+    // add() already merges by matchType() (BerryModifier keys on berryType, AttackTypeBoosterModifier on
+    // moveType, etc.), so two DISTINCT same-type-id items (two different berries) are each pushed, while
+    // two truly-identical items arrive from the host as ONE blob with stackCount and are added once.
+    const survivors: PokemonHeldItemModifier[] = [];
     for (const m of globalScene.findModifiers(
       x => x instanceof PokemonHeldItemModifier && x.pokemonId === mon.id,
       isPlayer,
@@ -937,6 +945,10 @@ function applyCoopHeldItemsForMon(mon: Pokemon, heldItems: unknown): boolean {
           removedTypeIds.push(m.type.id);
         }
         changed = true;
+      } else {
+        // removeModifier returned false: this item was NOT in the list / not spliced -> a genuine
+        // pre-existing survivor that the host's set must not duplicate.
+        survivors.push(m as PokemonHeldItemModifier);
       }
     }
     // 2) re-attach the host's set.
@@ -962,12 +974,13 @@ function applyCoopHeldItemsForMon(mon: Pokemon, heldItems: unknown): boolean {
         if (typeof data.stackCount === "number") {
           modifier.stackCount = data.stackCount;
         }
-        // Skip if a same-type item somehow survived removal (avoid a silent stack MERGE / max-stack DROP).
-        const collides = globalScene.findModifier(
-          x => x instanceof PokemonHeldItemModifier && x.pokemonId === mon.id && x.type.id === modifier.type.id,
-          isPlayer,
-        );
-        if (collides) {
+        // Skip ONLY if a GENUINE SURVIVOR (an item step 1 could not remove) MATCH-TYPES this new item -
+        // i.e. addModifier would silently MERGE into it (a stack drift) instead of binding a fresh copy.
+        // Crucially this is matchType (the same predicate addModifier merges on), NOT type.id, so a second
+        // DISTINCT same-type-id item (the #698 two-berries case) is no longer falsely dropped, and an item
+        // THIS pass already re-added is never in `survivors` so it can never block a later same-type add.
+        const collidesSurvivor = survivors.some(s => modifier.matchType(s));
+        if (collidesSurvivor) {
           continue;
         }
         if (isPlayer) {
@@ -1144,6 +1157,39 @@ function readModifiers(): [string, number][] {
     return globalScene.modifiers
       .map(m => [m.type.id, m.stackCount] as [string, number])
       .sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : a[1] - b[1]));
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * HOST: serialize the player-wide PERSISTENT modifiers as plain `ModifierData` blobs (#698 / #633
+ * BUG 2). These are the NON-held-item `PersistentModifier`s on `globalScene.modifiers` (relics, EXP /
+ * temp-stat-stage boosters, lures, candy jar, ...). Carried in the resync so the gated guest heal can
+ * RECONSTRUCT one it is missing - the `[typeId, stackCount]` digest can't (a temp stat booster needs
+ * its stat arg, an attack-type booster its type). Held items are EXCLUDED (they ride per-mon in
+ * `field[].heldItems`); `PokemonFormChangeItemModifier`s are EXCLUDED too (healed via snap.formIndex).
+ * Mirrors the held-item / enemy ModifierData serialization (`new ModifierData(m, false)`). Fully guarded.
+ */
+function captureCoopPlayerModifiers(): Record<string, unknown>[] {
+  try {
+    return globalScene.modifiers
+      .filter(
+        m =>
+          m instanceof PersistentModifier
+          && !(m instanceof PokemonHeldItemModifier)
+          && !(m instanceof Modifier.PokemonFormChangeItemModifier),
+      )
+      .map(m => {
+        const data = new ModifierData(m, false);
+        return {
+          typeId: data.typeId,
+          className: data.className,
+          args: data.args,
+          stackCount: data.stackCount,
+          ...(data.typePregenArgs === undefined ? {} : { typePregenArgs: data.typePregenArgs }),
+        };
+      });
   } catch {
     return [];
   }
@@ -1380,6 +1426,12 @@ export function captureCoopFullSnapshot(): CoopFullBattleSnapshot | null {
       party: globalScene.getPlayerParty().map(p => p.species.speciesId),
       money: globalScene.money,
       modifiers: readModifiers(),
+      // Player-wide persistent modifier BLOBS (#698 / #633 BUG 2): the full ModifierData of the
+      // NON-held-item PersistentModifiers, so the gated guest heal can RECONSTRUCT a player-wide
+      // modifier it is MISSING (a temp stat booster, an EXP charm, ...) - the `[typeId, stackCount]`
+      // `modifiers` digest above can only fix a stack / remove an extra, never re-create one with args.
+      // Captured UNCONDITIONALLY (additive); only READ inside the gated authoritative heal.
+      playerModifiers: captureCoopPlayerModifiers(),
       // Ball inventory (#633 RISKY #4): carried in the resync so the gated guest heal restores the
       // host-only AttemptCapturePhase decrement the pure-renderer guest never applied.
       pokeballCounts: readPokeballCounts(),
@@ -1676,6 +1728,119 @@ export function reconcileCoopModifierStacks(hostModifiers: [string, number][] | 
 }
 
 /**
+ * GUEST (authoritative resync): reconcile the player-wide PERSISTENT modifiers to the host's FULL blob
+ * set (#698 / #633 BUG 2). The stack-only {@linkcode reconcileCoopModifierStacks} can fix a stack count
+ * or remove an extra, but it can NEVER CREATE a host modifier the guest is missing - so a host-only
+ * player-wide modifier (`TEMP_STAT_STAGE_BOOSTER`, `SUPER_EXP_CHARM`, ...) that needs args to rebuild
+ * stayed permanently `<absent>` on the guest, diverging the checksum every turn. This heals the WHOLE
+ * list the same proven way per-mon held items heal ({@linkcode applyCoopHeldItemsForMon}):
+ *  - ADD: for each host blob with no matching guest modifier (by `type.id`), RECONSTRUCT it via
+ *    {@linkcode ModifierData.toModifier} (the same reconstruct path the held-item heal uses) and
+ *    `addModifier` it (ignoreUpdate; the caller refreshes the bar once).
+ *  - STACK: a guest modifier that matches a host blob's `type.id` has its `stackCount` SET to the host's
+ *    (persistent-modifier effects read stackCount at apply time, so a direct set is side-effect-free).
+ *  - REMOVE: a guest player-wide persistent modifier the host's blob set lacks is dropped.
+ *
+ * NEVER touches `PokemonHeldItemModifier` (per-mon, healed elsewhere) or `PokemonFormChangeItemModifier`
+ * (form healed via snap.formIndex) - the host already excludes both from the blob set, and we re-guard
+ * here so a guest-only one is never removed by this path. Gated authoritative by the caller. Returns true
+ * if it changed anything (so the caller refreshes the bar once). Fully guarded.
+ */
+export function reconcileCoopPlayerModifiers(hostBlobs: Record<string, unknown>[] | undefined): boolean {
+  if (!Array.isArray(hostBlobs)) {
+    return false;
+  }
+  let changed = false;
+  try {
+    // Whether a live modifier is one this path is allowed to own (player-wide, non-held, non-form).
+    const isOwned = (m: PersistentModifier): boolean =>
+      m instanceof PersistentModifier
+      && !(m instanceof PokemonHeldItemModifier)
+      && !(m instanceof Modifier.PokemonFormChangeItemModifier);
+    // Host wanted stack per typeId (the host pre-filtered to owned modifiers).
+    const wantStackByType = new Map<string, number>();
+    for (const raw of hostBlobs) {
+      if (raw != null && typeof raw === "object") {
+        const typeId = (raw as Record<string, unknown>).typeId;
+        const stack = (raw as Record<string, unknown>).stackCount;
+        if (typeof typeId === "string") {
+          wantStackByType.set(typeId, typeof stack === "number" ? Math.max(0, Math.trunc(stack)) : 1);
+        }
+      }
+    }
+    // 1) REMOVE / STACK: iterate a snapshot of the guest's owned player-wide modifiers.
+    const haveTypeIds = new Set<string>();
+    for (const modifier of [...globalScene.modifiers]) {
+      if (!isOwned(modifier)) {
+        continue;
+      }
+      const want = wantStackByType.get(modifier.type.id);
+      if (want === undefined || want <= 0) {
+        coopWarn(
+          "heal",
+          `playerModifier REMOVE typeId=${modifier.type.id} host=0/absent guest.stack=${modifier.stackCount} -> removed`,
+        );
+        if (globalScene.removeModifier(modifier)) {
+          changed = true;
+        }
+        continue;
+      }
+      haveTypeIds.add(modifier.type.id);
+      if (modifier.stackCount !== want) {
+        coopWarn(
+          "heal",
+          `playerModifier stack typeId=${modifier.type.id} host=${want} guest=${modifier.stackCount} -> applied`,
+        );
+        modifier.stackCount = want;
+        changed = true;
+      }
+    }
+    // 2) ADD: reconstruct any host blob the guest is missing (by type.id), via the same ModifierData
+    // path the per-mon held-item heal uses. This is the BUG 2 fix - the missing-modifier case.
+    for (const raw of hostBlobs) {
+      if (raw == null || typeof raw !== "object") {
+        continue;
+      }
+      const typeId = (raw as Record<string, unknown>).typeId;
+      if (typeof typeId !== "string" || haveTypeIds.has(typeId)) {
+        continue;
+      }
+      try {
+        const data = new ModifierData(raw as Record<string, unknown>, false);
+        const modifier = data.toModifier(
+          Modifier[data.className as keyof typeof Modifier] ?? resolveErModifierClass(data.className),
+        );
+        // Re-guard: only a player-wide, non-held, non-form persistent modifier may be added by this path.
+        if (
+          !(modifier instanceof PersistentModifier)
+          || modifier instanceof PokemonHeldItemModifier
+          || modifier instanceof Modifier.PokemonFormChangeItemModifier
+        ) {
+          continue;
+        }
+        if (typeof data.stackCount === "number") {
+          modifier.stackCount = data.stackCount;
+        }
+        coopWarn(
+          "heal",
+          `playerModifier ADD typeId=${modifier.type.id} stack=${modifier.stackCount} (guest lacked it) -> added`,
+        );
+        globalScene.addModifier(modifier, true, false, false);
+        changed = true;
+      } catch {
+        /* one player-wide modifier failed to reconstruct; keep the rest */
+      }
+    }
+    if (changed) {
+      globalScene.updateModifiers(true);
+    }
+  } catch {
+    // A malformed player-wide modifier set must never crash the guest's battle.
+  }
+  return changed;
+}
+
+/**
  * GUEST (wave boundary): adopt the host's player-party ORDER (#633 GAP 4). The checksum hashes
  * `party = getPlayerParty().map(speciesId)` in slot order, so a party-order divergence (e.g. the
  * two clients merged the shared roster in a slightly different bench order) is a permanent
@@ -1835,9 +2000,17 @@ export function applyCoopFullSnapshot(
         }
       }
     }
-    // Reconcile persistent modifier / relic stacks (#633 GAP 2): a stack-count divergence is hashed
-    // -> a permanent still-diverged loop; heal it by adopting the host's stack counts (safe subset).
-    reconcileCoopModifierStacks(snapshot.modifiers);
+    // Reconcile player-wide persistent modifiers (#698 / #633 GAP 2 + BUG 2): the FULL-blob reconcile
+    // (add missing / remove extra / fix stacks) heals a host-only player-wide modifier the guest is
+    // MISSING (a temp stat booster, an EXP charm, ...) - the root divergence the stack-only path could
+    // never close. Gated authoritative + only when the (newer) host carried the blobs; an OLDER host
+    // (playerModifiers undefined) FALLS BACK to the proven stack-only reconcile (no regression). Held
+    // items stay per-mon (healed above); both paths skip them.
+    if (authoritativeGuest && snapshot.playerModifiers !== undefined) {
+      reconcileCoopPlayerModifiers(snapshot.playerModifiers);
+    } else {
+      reconcileCoopModifierStacks(snapshot.modifiers);
+    }
     // Run-seed heal (B8): the hashed master determinism input is now healed on ANY resync, not only at
     // an ME terminal (where applyCoopMeOutcome re-pins it separately + idempotently). Length-guarded so
     // an empty "" seed is never pinned; re-pinning the same seed is a no-op, safe in the common case.

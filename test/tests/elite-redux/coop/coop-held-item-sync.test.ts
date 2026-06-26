@@ -30,6 +30,7 @@ import { modifierTypes } from "#data/data-lists";
 import { type CoopChecksumState, checksumState } from "#data/elite-redux/coop/coop-battle-checksum";
 import {
   applyCoopFullSnapshot,
+  captureCoopChecksum,
   captureCoopChecksumState,
   captureCoopFullSnapshot,
 } from "#data/elite-redux/coop/coop-battle-engine";
@@ -40,7 +41,9 @@ import { GameModes } from "#enums/game-modes";
 import { MoveId } from "#enums/move-id";
 import { SpeciesId } from "#enums/species-id";
 import type { Pokemon } from "#field/pokemon";
-import { PokemonHeldItemModifier } from "#modifiers/modifier";
+import { BerryType } from "#enums/berry-type";
+import { BerryModifierType } from "#modifiers/modifier-type";
+import { BerryModifier, PokemonHeldItemModifier } from "#modifiers/modifier";
 import { GameManager } from "#test/framework/game-manager";
 import type { ModifierTypeFunc } from "#types/modifier-types";
 import Phaser from "phaser";
@@ -158,6 +161,46 @@ describe("co-op held-item + ball sync pure core (#698, RISKY #1-#4)", () => {
     // same: the digest never carries the per-client pokemonId, so a healthy lockstep pair agrees.
     expect(checksumState(state({ heldItems: [[0, "LEFTOVERS", 1]] }))).toBe(base);
   });
+
+  it("(#698 BUG 1) two DISTINCT same-type-id berries do NOT matchType - so the heal keeps BOTH", () => {
+    // The held-item heal's NEW collision guard skips a re-add only when it matchType()-matches a GENUINE
+    // SURVIVOR (an item that failed to remove). The bug was a guard keyed on `type.id`: every berry shares
+    // id "BERRY", so the SECOND distinct berry was dropped as a "collision" with the first (the live
+    // `host=[BERRY,BERRY] -> added=[BERRY]` proof). This asserts the INVARIANT the fix relies on: two
+    // berries of DIFFERENT berryType share `type.id` "BERRY" yet are NOT matchType-equal, so PokeRogue's
+    // addModifier() pushes a SECOND entry (no merge) and the guard never falsely drops it.
+    const sitrus = new BerryModifier(new BerryModifierType(BerryType.SITRUS), 1, BerryType.SITRUS);
+    const lum = new BerryModifier(new BerryModifierType(BerryType.LUM), 1, BerryType.LUM);
+    // Same registry id (the field the OLD broken guard compared) ...
+    expect(sitrus.type.id).toBe("BERRY");
+    expect(sitrus.type.id).toBe(lum.type.id);
+    // ... but NOT matchType (the field the NEW guard + addModifier's merge compare): each is kept.
+    expect(sitrus.matchType(lum)).toBe(false);
+    expect(lum.matchType(sitrus)).toBe(false);
+    // A truly-identical berry DOES matchType (it would merge into one stack, not be dropped wrongly).
+    const sitrus2 = new BerryModifier(new BerryModifierType(BerryType.SITRUS), 1, BerryType.SITRUS);
+    expect(sitrus.matchType(sitrus2)).toBe(true);
+  });
+
+  it("(#698 BUG 2) a player-wide modifier blob round-trips JSON byte-identical (full ModifierData shape)", () => {
+    // The snapshot now carries the host's player-wide PersistentModifiers as full ModifierData blobs so
+    // the guest can RECONSTRUCT one it is MISSING (a temp stat booster needs its stat arg; the bare
+    // `[typeId, stackCount]` digest can't rebuild it). Prove the blob shape survives the wire verbatim.
+    const snap: Partial<CoopFullBattleSnapshot> = {
+      playerModifiers: [
+        { typeId: "TEMP_STAT_STAGE_BOOSTER", className: "TempStatStageBoosterModifier", args: [1, 5], stackCount: 1 },
+        { typeId: "SUPER_EXP_CHARM", className: "ExpBoosterModifier", args: [60], stackCount: 1 },
+      ],
+    };
+    const rt = JSON.parse(JSON.stringify(snap)) as Partial<CoopFullBattleSnapshot>;
+    expect(rt.playerModifiers).toEqual(snap.playerModifiers);
+  });
+
+  it("(#698 BUG 2) an older host OMITTING playerModifiers round-trips it undefined (additive fallback)", () => {
+    const snap: Partial<CoopFullBattleSnapshot> = { money: 500 };
+    const rt = JSON.parse(JSON.stringify(snap)) as Partial<CoopFullBattleSnapshot>;
+    expect(rt.playerModifiers).toBeUndefined();
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -216,12 +259,27 @@ describe.skipIf(!RUN)("co-op held-item + ball heal - real engine (#698, RISKY #1
     }
   };
 
+  /** Attach a SPECIFIC berry (distinct `berryType`, shared `type.id` "BERRY") to `mon` (#698 BUG 1). */
+  const giveBerry = (mon: Pokemon, berryType: BerryType): void => {
+    const held = new BerryModifierType(berryType).newModifier(mon);
+    if (held != null) {
+      globalScene.addModifier(held, true);
+    }
+  };
+
   /** Held items the guest currently holds for `pokemonId`, as `[type.id, stackCount]`, sorted. */
   const heldOf = (pokemonId: number): [string, number][] =>
     globalScene
       .findModifiers(m => m instanceof PokemonHeldItemModifier && m.pokemonId === pokemonId, true)
       .map(m => [m.type.id, m.stackCount] as [string, number])
       .sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : a[1] - b[1]));
+
+  /** The guest's player-wide persistent modifier type.ids, sorted (held items excluded). */
+  const playerModifierIds = (): string[] =>
+    globalScene.modifiers
+      .filter(m => !(m instanceof PokemonHeldItemModifier))
+      .map(m => m.type.id)
+      .sort();
 
   it("(#1/#2) a STALE extra item on a live mon is REMOVED by the gated heal (set to host exactly)", async () => {
     const field = await startCoopDouble();
@@ -327,5 +385,97 @@ describe.skipIf(!RUN)("co-op held-item + ball heal - real engine (#698, RISKY #1
     // Give the BENCH mon an item: the ON-FIELD digest must be identical (bench excluded).
     giveHeld(bench, modifierTypes.LEFTOVERS);
     expect(JSON.stringify(captureCoopChecksumState().heldItems)).toBe(digestBefore);
+  });
+
+  it("(#698 BUG 1) a host mon with 2 DISTINCT same-type-id berries converges on the guest (both survive)", async () => {
+    const field = await startCoopDouble();
+    const lead = field[COOP_HOST_FIELD_INDEX];
+    // HOST truth: the lead holds TWO DISTINCT berries that SHARE type.id "BERRY" (SITRUS + LUM). The
+    // old guard kept only the first (the live `host=[BERRY,BERRY] -> added=[BERRY]`, guest digest 2 vs
+    // host 3, permanent mismatch). The heal must now re-add BOTH.
+    giveBerry(lead, BerryType.SITRUS);
+    giveBerry(lead, BerryType.LUM);
+    expect(heldOf(lead.id)).toEqual([
+      ["BERRY", 1],
+      ["BERRY", 1],
+    ]);
+    const snapshot = captureCoopFullSnapshot();
+    expect(snapshot).not.toBeNull();
+
+    // GUEST divergence: strip both, leaving the lead bare (the worst case the heal must rebuild).
+    for (const m of globalScene.findModifiers(
+      x => x instanceof PokemonHeldItemModifier && x.pokemonId === lead.id,
+      true,
+    )) {
+      globalScene.removeModifier(m);
+    }
+    globalScene.updateModifiers(true);
+    expect(heldOf(lead.id)).toEqual([]);
+
+    // Heal (gated authoritative): BOTH berries are re-added, not just one.
+    if (snapshot != null) {
+      applyCoopFullSnapshot(snapshot, true);
+    }
+    expect(heldOf(lead.id)).toEqual([
+      ["BERRY", 1],
+      ["BERRY", 1],
+    ]);
+  });
+
+  it("(#698 BUG 2) a host-only player-wide modifier is ADDED to the guest by the heal (checksum converges)", async () => {
+    await startCoopDouble();
+    // HOST truth: a player-wide EXP charm the guest does NOT have. The stack-only reconcile could never
+    // CREATE it (the `<absent>` permanent divergence); the full-blob reconcile reconstructs + adds it.
+    const charm = modifierTypes.SUPER_EXP_CHARM().withIdFromFunc(modifierTypes.SUPER_EXP_CHARM).newModifier();
+    expect(charm).not.toBeNull();
+    if (charm != null) {
+      globalScene.addModifier(charm, true);
+    }
+    expect(playerModifierIds()).toContain("SUPER_EXP_CHARM");
+    const hostChecksum = captureCoopChecksum();
+    const snapshot = captureCoopFullSnapshot();
+    expect(snapshot).not.toBeNull();
+    expect(snapshot?.playerModifiers?.some(b => b.typeId === "SUPER_EXP_CHARM")).toBe(true);
+
+    // GUEST divergence: remove the charm (the pure renderer never ran the reward grant that created it).
+    for (const m of [...globalScene.modifiers]) {
+      if (m.type.id === "SUPER_EXP_CHARM") {
+        globalScene.removeModifier(m);
+      }
+    }
+    globalScene.updateModifiers(true);
+    expect(playerModifierIds()).not.toContain("SUPER_EXP_CHARM");
+    expect(captureCoopChecksum()).not.toBe(hostChecksum);
+
+    // Heal (gated authoritative): the missing player-wide modifier is reconstructed + added back, and the
+    // post-heal checksum equals the host's.
+    if (snapshot != null) {
+      applyCoopFullSnapshot(snapshot, true);
+    }
+    expect(playerModifierIds()).toContain("SUPER_EXP_CHARM");
+    expect(captureCoopChecksum()).toBe(hostChecksum);
+  });
+
+  it("(#698 BUG 2 gate) authoritativeGuest=false does NOT add a missing player-wide modifier", async () => {
+    await startCoopDouble();
+    const charm = modifierTypes.SUPER_EXP_CHARM().withIdFromFunc(modifierTypes.SUPER_EXP_CHARM).newModifier();
+    if (charm != null) {
+      globalScene.addModifier(charm, true);
+    }
+    const snapshot = captureCoopFullSnapshot();
+    expect(snapshot).not.toBeNull();
+
+    // GUEST removes it; apply with the gate FALSE (solo/host/lockstep): the full-blob ADD must NOT run.
+    for (const m of [...globalScene.modifiers]) {
+      if (m.type.id === "SUPER_EXP_CHARM") {
+        globalScene.removeModifier(m);
+      }
+    }
+    globalScene.updateModifiers(true);
+    if (snapshot != null) {
+      applyCoopFullSnapshot(snapshot, false);
+    }
+    // The OLD stack-only reconcile (the false-gate fallback) never ADDS, so it stays absent - no regression.
+    expect(playerModifierIds()).not.toContain("SUPER_EXP_CHARM");
   });
 });

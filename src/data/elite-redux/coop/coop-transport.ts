@@ -340,6 +340,18 @@ export interface CoopFullBattleSnapshot {
   /** Persistent modifiers as `[typeId, stackCount]`. */
   modifiers: [string, number][];
   /**
+   * Full player-wide PERSISTENT modifier blobs (#698 / #633): the host's NON-held-item
+   * `PersistentModifier`s serialized as `ModifierData` (typeId / className / args / stackCount /
+   * typePregenArgs), so the guest can RECONSTRUCT a player-wide modifier it is missing (a temp
+   * stat booster's stat, an EXP charm, ...) - which the `[typeId, stackCount]` `modifiers` list above
+   * cannot do (it can fix a stack / remove an extra, but not re-create one that needs args). Held
+   * items are EXCLUDED here (they stay per-mon in `field[].heldItems`); form-change items are excluded
+   * too. Reconciled (add missing / remove extra / fix stacks) by the gated guest heal. Optional +
+   * additive: an OLDER host omits it and the guest falls back to the `[typeId, stackCount]`
+   * stack-only reconcile (no regression).
+   */
+  playerModifiers?: Record<string, unknown>[] | undefined;
+  /**
    * Ball inventory `[ballType, count]` (#633 RISKY #4). The host decrements it host-only in
    * AttemptCapturePhase, which the pure-renderer guest never runs, so the guest's inventory drifts up.
    * Carried in the resync so it heals. Optional + additive (older host omits it).
