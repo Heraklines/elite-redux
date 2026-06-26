@@ -8,6 +8,7 @@ import { globalScene } from "#app/global-scene";
 import { Phase } from "#app/phase";
 import { applyCoopMeOutcome } from "#data/elite-redux/coop/coop-battle-engine";
 import { coopLog, coopWarn } from "#data/elite-redux/coop/coop-debug";
+import type { CoopInteractionChoice } from "#data/elite-redux/coop/coop-interaction-relay";
 import { COOP_ME_BATTLE_HANDOFF, COOP_ME_TERM_SEQ_BASE } from "#data/elite-redux/coop/coop-me-pump";
 import { getCoopBattleStreamer, getCoopController, getCoopInteractionRelay } from "#data/elite-redux/coop/coop-runtime";
 import type { CoopInteractionOutcome } from "#data/elite-redux/coop/coop-transport";
@@ -203,22 +204,71 @@ export class CoopReplayMePhase extends Phase {
    * reaches each sub-prompt and streams a `mePresent` carrying a `subPrompt` descriptor right before it
    * opens that sub-screen; the guest opens the matching LOCAL capture screen, relays the pick, and loops
    * (FIFO on seq_me / outcome). When the host instead streams the comprehensive `meResync` (its ME
-   * terminal), the guest applies it and proceeds to the leave terminal. A null (host stall) falls through
-   * to the leave terminal; the single `settled` guard fires the leave exactly once.
+   * terminal), the guest applies it and proceeds to the leave terminal.
+   *
+   * MAJOR-2 (#633 softlock #693/#698): NOT every host ME terminal is preceded by a `meResync` on
+   * seq_me. A battle-spawning option ({@linkcode CoopMePump.relayMeBattleHandoff}) and the host's
+   * degrade paths ({@linkcode coopHostAwaitGuestIndex} null / out-of-range / bespoke sub-UI) fire the
+   * TERMINAL sentinel (LEAVE / battle-handoff) on `seq_term` (9M) WITHOUT ever streaming a `meResync`
+   * on `seq_me` (8M). If we awaited ONLY the 8M outcome here we would block forever while the terminal
+   * sat unconsumed on 9M (the live freeze: the guest parked on `awaitInteractionOutcome(8M)` while the
+   * host's `meBtn` picks buffered on the 8M CHOICE inbox, never the OUTCOME inbox we read). So we RACE
+   * the next 8M outcome against the 9M terminal:
+   *  - 8M outcome wins (sub-prompt -> capture+loop; `meResync` -> apply+loop to the terminal).
+   *  - 9M terminal wins (LEAVE / battle-handoff / null host stall) -> resolve the terminal directly,
+   *    NO `meResync` required (the next per-ME / per-turn checksum re-syncs any residual numeric drift,
+   *    exactly as the prior null-host-stall fall-through already did).
+   * The single `settled` guard fires the terminal exactly once; whichever arm loses is ignored.
    */
   private awaitOutcomeThenTerminal(relay: NonNullable<ReturnType<typeof getCoopInteractionRelay>>): void {
-    coopLog("me", "await host outcome (mePresent subPrompt / meResync)", {
+    coopLog("me", "await host outcome (mePresent subPrompt / meResync) racing terminal", {
       seq: this.seq,
+      seqTerm: this.seqTerm,
       timeoutMs: COOP_ME_REPLAY_WAIT_MS,
     });
-    void relay.awaitInteractionOutcome(this.seq, COOP_ME_REPLAY_WAIT_MS).then(outcome => {
-      if (this.settled) {
-        coopLog("me", "outcome resolved after settled; ignoring", { seq: this.seq });
+    // Two disjoint inboxes (8M OUTCOME vs 9M CHOICE), so the awaits never cross-consume. We start BOTH
+    // awaits now (each drains its own buffer synchronously) and race them. Key properties:
+    //  - The OUTCOME arm is raced FIRST so it WINS a both-buffered tie: when the host streamed a
+    //    meResync AND the terminal before the guest got here, we surface + apply the meResync rather
+    //    than skipping straight to leave. When only the terminal is buffered, it wins uncontested.
+    //  - Starting the terminal arm CONSUMES a buffered 9M terminal even if the outcome arm wins, so we
+    //    must NOT re-await 9M afterwards (that would block on an already-drained inbox). Instead, when an
+    //    outcome wins and we still need the terminal (after a meResync), we `await terminalArm` itself -
+    //    its (already-consumed) value - so nothing is lost. On a subPrompt win the terminal has not been
+    //    sent yet, so terminalArm stays pending; the next loop's fresh race supersedes it (the dangling
+    //    waiter resolves null, dropped by its own raceDone).
+    let raceDone = false;
+    const outcomeArm = relay
+      .awaitInteractionOutcome(this.seq, COOP_ME_REPLAY_WAIT_MS)
+      .then(outcome => ({ tag: "outcome" as const, outcome }));
+    const terminalArm = relay
+      .awaitInteractionChoice(this.seqTerm, COOP_ME_REPLAY_WAIT_MS)
+      .then(action => ({ tag: "terminal" as const, action }));
+    void Promise.race([outcomeArm, terminalArm]).then(winner => {
+      if (raceDone) {
         return;
       }
+      raceDone = true;
+      if (this.settled) {
+        coopLog("me", "outcome/terminal race resolved after settled; ignoring", { seq: this.seq });
+        return;
+      }
+      // The HOST reached its ME terminal on 9M (LEAVE / battle-handoff) WITHOUT a trailing meResync,
+      // or the host stalled (null): resolve the terminal directly. This is the softlock fix - we no
+      // longer block on an 8M outcome the host never sends for these terminals.
+      if (winner.tag === "terminal") {
+        coopLog("me", "terminal won the outcome/terminal race (no trailing meResync)", {
+          seqTerm: this.seqTerm,
+          action: winner.action == null ? "null" : winner.action.choice,
+        });
+        this.handleTerminalAction(winner.action);
+        return;
+      }
+      const outcome = winner.outcome;
       if (outcome != null && outcome.k === "mePresent" && outcome.subPrompt != null) {
         // ADD-1c: the host opened an engine sub-prompt. Open the matching local capture screen, relay
-        // the human's pick, and loop for the next sub-prompt / the terminal resync.
+        // the human's pick, and loop for the next sub-prompt / the terminal resync. (The pending
+        // terminalArm is superseded by the next loop's race - harmless.)
         coopLog("me", "host opened engine sub-prompt; opening local capture", {
           seq: this.seq,
           kind: outcome.subPrompt.kind,
@@ -234,14 +284,28 @@ export class CoopReplayMePhase extends Phase {
         } catch {
           coopWarn("me", "meResync apply threw; per-turn checksum will re-sync", { seq: this.seq });
         }
-      } else {
-        coopWarn("me", "outcome await resolved to terminal without meResync (host stall)", {
-          seq: this.seq,
-          got: outcome == null ? "null" : outcome.k,
+        // The comprehensive resync means "the host applied the option": resolve the terminal via the
+        // SAME terminalArm (its terminal, if any, is already drained into it) so we never re-await an
+        // emptied 9M inbox and hang. A still-pending terminalArm resolves on the real terminal / null.
+        void terminalArm.then(t => {
+          if (!this.settled) {
+            this.handleTerminalAction(t.action);
+          }
         });
+        return;
       }
-      // A null (host stall) OR the comprehensive resync both mean "proceed to the terminal".
-      this.awaitHostTerminal(relay);
+      // A non-subPrompt, non-resync outcome (a stray present, or a null/timeout on the OUTCOME arm
+      // winning the race): resolve the terminal via the SAME terminalArm (same reasoning as the
+      // meResync branch), so a LEAVE / battle-handoff already drained into it still ends the ME.
+      coopWarn("me", "outcome arm resolved without subPrompt/meResync; resolving via terminal arm", {
+        seq: this.seq,
+        got: outcome == null ? "null" : outcome.k,
+      });
+      void terminalArm.then(t => {
+        if (!this.settled) {
+          this.handleTerminalAction(t.action);
+        }
+      });
     });
   }
 
@@ -323,31 +387,41 @@ export class CoopReplayMePhase extends Phase {
       timeoutMs: COOP_ME_REPLAY_WAIT_MS,
     });
     void relay.awaitInteractionChoice(this.seqTerm, COOP_ME_REPLAY_WAIT_MS).then(action => {
-      coopLog("me", "host terminal resolved", {
-        seqTerm: this.seqTerm,
-        action: action == null ? "null" : action.choice,
-        isHandoff: action?.choice === COOP_ME_BATTLE_HANDOFF,
-      });
-      try {
-        // The host spawned a battle from this ME (#633 ME battle handoff): do NOT leave the
-        // encounter. End here so the existing host-authoritative ME-battle path runs (the guest
-        // already adopts the host's boss + replays the spawned battle via the battle relay).
-        if (action != null && action.choice === COOP_ME_BATTLE_HANDOFF) {
-          coopLog("me", "battle-handoff sentinel on seq_term; finishing without leaving", {
-            seqTerm: this.seqTerm,
-          });
-          this.finishWithoutLeaving();
-          return;
-        }
-      } catch {
-        coopWarn("me", "bad terminal payload; falling through to defensive leave", { seqTerm: this.seqTerm });
-      }
-      // A leave sentinel (host reached the ME terminal) OR a null (host stall / partner gone) both
-      // mean "the encounter is over on the host": leave it locally + advance the alternation turn,
-      // then end. The host already applied the rewards/side effects through the streams; the next
-      // checksum re-syncs any residual numeric drift, so this never desyncs and never hangs.
-      this.leaveDefensive();
+      this.handleTerminalAction(action);
     });
+  }
+
+  /**
+   * Resolve the host's ME terminal action (#633). Shared by {@linkcode awaitHostTerminal} (the
+   * sequential post-resync await) and the {@linkcode awaitOutcomeThenTerminal} race (when the host
+   * reached its terminal on 9M with NO trailing meResync). Runs the terminal exactly once via the
+   * `settled` guard inside finishWithoutLeaving / leaveDefensive.
+   */
+  private handleTerminalAction(action: CoopInteractionChoice | null): void {
+    coopLog("me", "host terminal resolved", {
+      seqTerm: this.seqTerm,
+      action: action == null ? "null" : action.choice,
+      isHandoff: action?.choice === COOP_ME_BATTLE_HANDOFF,
+    });
+    try {
+      // The host spawned a battle from this ME (#633 ME battle handoff): do NOT leave the
+      // encounter. End here so the existing host-authoritative ME-battle path runs (the guest
+      // already adopts the host's boss + replays the spawned battle via the battle relay).
+      if (action != null && action.choice === COOP_ME_BATTLE_HANDOFF) {
+        coopLog("me", "battle-handoff sentinel on seq_term; finishing without leaving", {
+          seqTerm: this.seqTerm,
+        });
+        this.finishWithoutLeaving();
+        return;
+      }
+    } catch {
+      coopWarn("me", "bad terminal payload; falling through to defensive leave", { seqTerm: this.seqTerm });
+    }
+    // A leave sentinel (host reached the ME terminal) OR a null (host stall / partner gone) both
+    // mean "the encounter is over on the host": leave it locally + advance the alternation turn,
+    // then end. The host already applied the rewards/side effects through the streams; the next
+    // checksum re-syncs any residual numeric drift, so this never desyncs and never hangs.
+    this.leaveDefensive();
   }
 
   /**
@@ -399,7 +473,9 @@ export class CoopReplayMePhase extends Phase {
       leaveEncounterWithoutBattle();
     } catch {
       // the encounter teardown is best-effort; a failure must never hang the run
-      coopWarn("me", "leaveEncounterWithoutBattle threw at ME terminal (handled)", { counter: this.interactionCounter });
+      coopWarn("me", "leaveEncounterWithoutBattle threw at ME terminal (handled)", {
+        counter: this.interactionCounter,
+      });
     }
     // The single ME alternation advance: idempotent (keyed to this ME's start counter), so it
     // no-ops if the host's terminal / a reconcile broadcast already advanced.
@@ -407,7 +483,9 @@ export class CoopReplayMePhase extends Phase {
       controller?.advanceInteraction(this.interactionCounter);
     } catch {
       // advance is idempotent + best-effort
-      coopWarn("me", "advanceInteraction threw at ME terminal (handled, idempotent)", { counter: this.interactionCounter });
+      coopWarn("me", "advanceInteraction threw at ME terminal (handled, idempotent)", {
+        counter: this.interactionCounter,
+      });
     }
     this.end();
   }
