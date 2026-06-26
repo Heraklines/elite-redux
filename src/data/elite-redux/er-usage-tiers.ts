@@ -92,7 +92,10 @@ interface UsageTierData {
   lines: Record<number, UsageTierLine>;
 }
 
-const TIER_DATA_URL = "https://cdn.jsdelivr.net/gh/Heraklines/er-assets@main/usage-tiers.json";
+// GitHub raw (Fastly-fronted, 5-min cache) NOT jsDelivr (@main is edge-cached ~12h per
+// region, which served a STALE pre-M5cap feed to some players -> the legacy fallback
+// collapsed their NU pool). A per-day query buster guarantees the freshest nightly file.
+const TIER_DATA_URL = "https://raw.githubusercontent.com/Heraklines/er-assets/main/usage-tiers.json";
 
 let tierData: UsageTierData | null = null;
 let fetchStarted = false;
@@ -109,7 +112,7 @@ export function preloadErUsageTiers(): void {
     return;
   }
   fetchStarted = true;
-  fetch(TIER_DATA_URL)
+  fetch(`${TIER_DATA_URL}?d=${new Date().toISOString().slice(0, 10)}`)
     .then(res => (res.ok ? res.json() : null))
     .then(data => {
       if (data && typeof data === "object" && data.lines) {
