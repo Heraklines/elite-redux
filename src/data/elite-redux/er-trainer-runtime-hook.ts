@@ -64,7 +64,9 @@ import { type ErRosterTier, selectErRoster } from "#data/elite-redux/er-trainer-
 import { resolveErTrainerItem } from "#data/elite-redux/er-trainer-item-map";
 import { SpeciesFormKey } from "#enums/species-form-key";
 import { SpeciesId } from "#enums/species-id";
-import type { PokemonHeldItemModifier } from "#modifiers/modifier";
+import { BaseStatModifier, type PokemonHeldItemModifier } from "#modifiers/modifier";
+import { BaseStatBoosterModifierType } from "#modifiers/modifier-type";
+import { PERMANENT_STATS } from "#enums/stat";
 import type { Nature } from "#enums/nature";
 import { PlayerGender } from "#enums/player-gender";
 import { TrainerSlot } from "#enums/trainer-slot";
@@ -865,10 +867,90 @@ export function applyErTrainerHeldItems(party: readonly EnemyPokemon[]): void {
       globalScene.addEnemyModifier(modifier, true, true);
     }
   }
+  // ER (anti-stack): every trainer's apex mon mirrors the player's vitamin
+  // investment. Runs before the Hell boss buff so a promoted boss bar already
+  // reflects the vitamin-boosted stats.
+  applyErTrainerVitaminCatchup(party);
   // ER (#135): Hell post-wave-100 trainer difficulty buff. Layered LAST so the
   // BST scan sees each mon's FINAL battle form (after the early-mega revert and
   // any forceErMega above).
   applyErHellTrainerBossBuff(party);
+}
+
+/**
+ * Per-mon guard so the vitamin mirror applies ONCE - addEnemyModifier MERGES
+ * same-stat stacks, so a second modifier-pipeline pass (mystery encounters /
+ * co-op re-run) would otherwise keep stacking more vitamins onto the same mon.
+ */
+const ER_VITAMINS_APPLIED = new WeakSet<EnemyPokemon>();
+
+/**
+ * ER (anti-vitamin-stacking): in every enemy TRAINER battle, the team's single
+ * HIGHEST-BST mon is given N base-stat boosters (vitamins) randomly distributed
+ * across its six stats, where N is the MOST vitamins the player has piled onto any
+ * ONE of their own mons. This kills the "dump every vitamin on one lead" strategy:
+ * the more you stack on a single mon, the stronger every enemy ace becomes. N is
+ * read from the player's live held vitamins, so it is a no-op early (you have none)
+ * and scales with the run. Each stat is capped at the enemy's IV for that stat (the
+ * normal per-stat vitamin ceiling); overflow spills to other stats. Trainer-only,
+ * never throws.
+ */
+export function applyErTrainerVitaminCatchup(party: readonly EnemyPokemon[]): void {
+  try {
+    if (!globalScene.currentBattle?.trainer || party.length === 0) {
+      return;
+    }
+    // N = the most vitamins (summed stack counts) on a SINGLE player mon.
+    const perMon = new Map<number, number>();
+    for (const m of globalScene.findModifiers(mod => mod instanceof BaseStatModifier, true)) {
+      const v = m as BaseStatModifier;
+      perMon.set(v.pokemonId, (perMon.get(v.pokemonId) ?? 0) + v.getStackCount());
+    }
+    const n = perMon.size > 0 ? Math.max(...perMon.values()) : 0;
+    if (n <= 0) {
+      return;
+    }
+    // Team apex by active-form BST (first max on ties), same notion as the Hell buff.
+    let boss = party[0];
+    let bestBst = boss.getSpeciesForm().baseTotal;
+    for (let i = 1; i < party.length; i++) {
+      const bst = party[i].getSpeciesForm().baseTotal;
+      if (bst > bestBst) {
+        bestBst = bst;
+        boss = party[i];
+      }
+    }
+    if (ER_VITAMINS_APPLIED.has(boss)) {
+      return;
+    }
+    // Randomly distribute N across the six stats, each capped at the mon's IV for
+    // that stat (the per-stat vitamin ceiling); overflow spills to the other stats.
+    const want = [0, 0, 0, 0, 0, 0];
+    let remaining = n;
+    for (let guard = 0; remaining > 0 && guard < n * 12; guard++) {
+      const s = boss.randBattleSeedInt(6);
+      if (want[s] < boss.ivs[s]) {
+        want[s]++;
+        remaining--;
+      } else if (PERMANENT_STATS.every(stat => want[stat] >= boss.ivs[stat])) {
+        break; // every stat is already at its IV cap
+      }
+    }
+    for (const stat of PERMANENT_STATS) {
+      if (want[stat] <= 0) {
+        continue;
+      }
+      const mod = new BaseStatBoosterModifierType(stat).newModifier(boss) as PokemonHeldItemModifier | null;
+      if (mod) {
+        mod.stackCount = want[stat];
+        globalScene.addEnemyModifier(mod, true, true);
+      }
+    }
+    ER_VITAMINS_APPLIED.add(boss);
+    boss.calculateStats(); // make the +10%/stack base-stat boost actually land
+  } catch {
+    // The vitamin mirror must never break trainer generation.
+  }
 }
 
 /**
