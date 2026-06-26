@@ -1,0 +1,253 @@
+url:      https://elite-redux-staging.pages.dev/
+build:    mqu80mnr-hy89
+mode:     6  wave:2
+seed:     VABALFpSt6gMfyj43vRS2atT
+party:    Magnemite(L5 19hp f0), Litten(L5 15hp f0), Vulpix(L5 20hp f0), Chikorita(L5 20hp f0), Kangaskhan(L5 27hp f0)
+enemy:    
+
+----- COMMENT -----
+mystery event desync
+
+----- CONSOLE -----
+[01:09:34.614] LOG: %c %c %c %c %c Phaser v3.90.0 (WebGL | Web Audio) %c https://phaser.io/v390 background: #ff0000 background: #ffff00 background: #00ff00 background: #00ffff color: #ffffff; background: #000000 background: transparent
+[01:09:35.198] LOG: [ER] build mqu80mnr-hy89
+[01:09:35.242] LOG: [dev-tools] loaded — 325 scenarios + Send Logs button
+[01:09:58.480] DEBUG: Destroying loading scene
+[01:09:58.480] DEBUG: Destroyed loading scene
+[01:09:58.873] LOG: Seed: VABALFpSt6gMfyj43vRS2atT
+[01:09:58.873] LOG: Wave Seed: VABALFpSt6gMfyj43vRS2atT 0
+[01:10:07.844] LOG: %cStart Phase LoginPhase color:green;
+[01:10:08.964] LOG: Client Session: uSz9qCC7hf8j4WdM2qMUriA7m12q5GMs
+[01:10:09.738] DEBUG: Using cached system data
+[01:10:09.944] LOG: %cStart Phase TitlePhase color:green;
+[01:10:09.945] LOG: Getting Session Slot id: %d 4
+[01:10:09.967] LOG: use seasonal splash messages true
+[01:10:09.967] LOG: Adding 2 Pride Month splash messages (weight: x15)
+[01:10:39.246] WARN: [coop-fp] MISMATCH sections=movesName,abilitiesName - movesName local=fad7fe8932ec09a1(1107) peer=30e2bf626b99790e(1107) abilitiesName local=1412a816005397a3(1046) peer=1670a4f3df00cb38(1046)
+[01:10:39.764] LOG: [coop-launch] title challenge-gate: role=host isCoopGuest=false -> SelectChallengePhase
+[01:10:39.765] LOG: %cStart Phase SelectChallengePhase color:green;
+[01:10:45.063] LOG: %cStart Phase SelectStarterPhase color:green;
+[01:10:45.063] LOG: [coop-launch] startCoopSelect role=host partnerConnected=true partnerReady=false
+[01:10:55.051] WARN: cry/81 not found
+[01:10:55.703] WARN: cry/37 not found
+[01:10:59.001] WARN: cry/115 not found
+[01:11:02.201] LOG: [coop-runconfig] startRun role=host willBroadcast=true difficulty=elite
+[01:11:02.201] LOG: [coop-runconfig] host broadcast difficulty=elite netcode=authoritative (role=host)
+[01:11:02.201] LOG: [coop-launch] proceedIfReady launched=false localTeam=0 bothReady=false role=host partnerReady=false
+[01:11:02.203] LOG: [coop-launch] local team locked in: 3 mons, role=host
+[01:11:02.205] LOG: [coop-launch] proceedIfReady launched=false localTeam=3 bothReady=false role=host partnerReady=false
+[01:11:02.205] LOG: [coop-launch] proceedIfReady launched=false localTeam=3 bothReady=false role=host partnerReady=false
+[01:11:02.205] LOG: [coop-launch] local ready, partner NOT ready -> waiting screen
+[01:11:05.768] LOG: [coop-launch] proceedIfReady launched=false localTeam=3 bothReady=false role=host partnerReady=false
+[01:11:05.769] LOG: [coop-launch] proceedIfReady launched=false localTeam=3 bothReady=true role=host partnerReady=true
+[01:11:05.770] LOG: [coop-launch] launchCoopMergedParty role=host merged=5 slot=4
+[01:11:05.771] WARN: [coop-launch] host: all 5 save slots full, falling back to current slot 4 (will overwrite)
+[01:11:05.771] LOG: [coop-launch] host: auto-picked slot 4 (no picker), clearing STARTER_SELECT -> MESSAGE
+[01:11:06.978] LOG: Wave Seed: WBCBMGqTu7hNgzk54wST3buU 1
+[01:11:06.981] LOG: %cStart Phase EncounterPhase color:green;
+[01:11:06.990] LOG: Starting species pool tier: COMMON
+[01:11:07.021] LOG: Pokemon: Wild Starly | Species ID: 396 | Level: 2 | Nature: Sassy (+SpDef/-Spd)
+[01:11:07.021] LOG: Stats (IVs): HP: 13 (17), Atk: 7 (19), Def: 6 (16), Spatk: 6 (12), Spdef: 7 (29), Spd: 6 (17)
+[01:11:07.021] LOG: Ability: Intimidate | Passive Ability: Flock 
+[01:11:07.021] LOG: Moveset: ["Uproar (P)","Detect","Peck"]
+[01:11:07.021] LOG: Starting species pool tier: COMMON
+[01:11:07.022] LOG: Replaced SILCOON with WURMPLE
+[01:11:07.037] LOG: Pokemon: Wild Wurmple | Species ID: 265 | Level: 2 | Nature: Naive (+Spd/-SpDef)
+[01:11:07.038] LOG: Stats (IVs): HP: 14 (13), Atk: 6 (0), Def: 6 (17), Spatk: 5 (1), Spdef: 5 (6), Spd: 6 (8)
+[01:11:07.038] LOG: Ability: Shield Dust | Passive Ability: Swarm 
+[01:11:07.038] LOG: Moveset: ["Struggle Bug","Web Shot","Poison Sting","Tackle"]
+[01:11:10.421] DEBUG: Session data saved to slot 4!
+[01:11:17.771] LOG: Wave Seed: WBCBMGqTu7hNgzk54wST3buU 1
+[01:11:18.214] LOG: %cStart Phase SummonPhase color:green;
+[01:11:18.413] WARN: cry/81 not found
+[01:11:18.506] LOG: %cStart Phase ShinySparklePhase color:green;
+[01:11:18.614] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[01:11:18.615] LOG: %cStart Phase SummonPhase color:green;
+[01:11:18.892] LOG: %cStart Phase CheckSwitchPhase color:green;
+[01:11:18.892] LOG: %cStart Phase CheckSwitchPhase color:green;
+[01:11:18.892] LOG: %cStart Phase InitEncounterPhase color:green;
+[01:11:18.899] LOG: %cStart Phase PostSummonPhase color:green;
+[01:11:18.899] LOG: Ran PSP for: Litten
+[01:11:18.903] LOG: %cStart Phase PostSummonPhase color:green;
+[01:11:18.905] LOG: %cStart Phase ShowAbilityPhase color:green;
+[01:11:19.074] LOG: %cStart Phase StatStageChangePhase color:green;
+[01:11:19.265] LOG: %cStart Phase MessagePhase color:green;
+[01:11:19.471] LOG: %cStart Phase StatStageChangePhase color:green;
+[01:11:19.662] LOG: %cStart Phase MessagePhase color:green;
+[01:11:19.890] LOG: %cStart Phase HideAbilityPhase color:green;
+[01:11:19.914] LOG: %cStart Phase PostSummonPhase color:green;
+[01:11:19.914] LOG: Ran PSP for: Magnemite
+[01:11:19.915] LOG: %cStart Phase PostSummonPhase color:green;
+[01:11:19.915] LOG: %cStart Phase PostSummonPhase color:green;
+[01:11:19.916] LOG: %cStart Phase PostSummonPhase color:green;
+[01:11:19.916] LOG: Ran PSP for: Starly
+[01:11:19.917] LOG: %cStart Phase PostSummonPhase color:green;
+[01:11:19.917] LOG: Ran PSP for: Wurmple
+[01:11:19.917] LOG: %cStart Phase PostSummonPhase color:green;
+[01:11:19.918] LOG: %cStart Phase ShowAbilityPhase color:green;
+[01:11:20.080] LOG: %cStart Phase StatStageChangePhase color:green;
+[01:11:20.285] LOG: %cStart Phase MessagePhase color:green;
+[01:11:20.487] LOG: %cStart Phase StatStageChangePhase color:green;
+[01:11:20.687] LOG: %cStart Phase MessagePhase color:green;
+[01:11:20.889] LOG: %cStart Phase HideAbilityPhase color:green;
+[01:11:20.915] LOG: %cStart Phase PostSummonPhase color:green;
+[01:11:20.915] LOG: %cStart Phase PostSummonPhase color:green;
+[01:11:20.915] LOG: %cStart Phase PostSummonPhase color:green;
+[01:11:20.915] LOG: %cStart Phase TurnInitPhase color:green;
+[01:11:20.916] LOG: %cStart Phase CommandPhase color:green;
+[01:11:34.036] LOG: Move: FLAMETHROWER Move targets: {"targets":[2,3,1],"multiple":false} 
+Player Pokemon: Magnemite
+[01:11:34.038] LOG: %cStart Phase SelectTargetPhase color:green;
+[01:11:34.458] LOG: %cStart Phase CommandPhase color:green;
+[01:11:34.461] LOG: Move: FIRE_FANG Move targets: {"targets":[3],"multiple":false} 
+Player Pokemon: Litten
+[01:11:34.461] LOG: %cStart Phase EnemyCommandPhase color:green;
+[01:11:34.462] LOG: Battle Seed: lWXCBO5rBltpyXSK
+[01:11:34.479] LOG: Move Pool: ["Uproar (P)","Detect","Peck"]
+[01:11:34.479] LOG: Move Scores: [27,-20,6.65625]
+[01:11:34.479] LOG: Sorted Move Pool: ["Uproar (P)","Peck","Detect"]
+[01:11:34.479] LOG: Chosen Move: Uproar (P)
+[01:11:34.479] LOG: %cStart Phase EnemyCommandPhase color:green;
+[01:11:34.506] LOG: Move Pool: ["Struggle Bug","Web Shot","Poison Sting","Tackle"]
+[01:11:34.506] LOG: Move Scores: [15.375,10.5,11,8]
+[01:11:34.506] LOG: Sorted Move Pool: ["Struggle Bug","Poison Sting","Web Shot","Tackle"]
+[01:11:34.506] LOG: Chosen Move: Poison Sting
+[01:11:34.506] LOG: %cStart Phase TurnStartPhase color:green;
+[01:11:34.512] LOG: %cStart Phase MovePhase color:green;
+[01:11:34.513] LOG: %cUser: Wurmple
+Move: POISON_STING
+Use Mode: NORMAL color:orchid
+[01:11:34.519] LOG: %cStart Phase MessagePhase color:green;
+[01:11:34.585] LOG: %cStart Phase MoveEffectPhase color:green;
+[01:11:34.847] LOG: crit stage: +0
+[01:11:34.848] LOG: Move: Poison Sting | Base damage: 3.493333333333333 | Power: 40 | Source attack: 6 | Target defense: 9
+[01:11:34.848] LOG: Move: Poison Sting | Attack damage: 3
+[01:11:34.851] LOG: %cStart Phase DamageAnimPhase color:green;
+[01:11:34.865] LOG: %cStart Phase ObtainStatusEffectPhase color:green;
+[01:11:35.054] LOG: %cStart Phase MessagePhase color:green;
+[01:11:35.258] LOG: %cStart Phase MoveEndPhase color:green;
+[01:11:35.259] LOG: %cStart Phase MovePhase color:green;
+[01:11:35.259] LOG: %cUser: Litten
+Move: FIRE_FANG
+Use Mode: NORMAL color:orchid
+[01:11:35.268] LOG: %cStart Phase MessagePhase color:green;
+[01:11:35.378] LOG: %cStart Phase MoveEffectPhase color:green;
+[01:11:35.576] LOG: crit stage: +0
+[01:11:35.577] LOG: Move: Fire Fang | Base damage: 10.533333333333333 | Power: 80 | Source attack: 8 | Target defense: 6
+[01:11:35.578] LOG: Move: Fire Fang | Attack damage: 27
+[01:11:35.579] LOG: %cStart Phase DamageAnimPhase color:green;
+[01:11:35.591] LOG: %cStart Phase MessagePhase color:green;
+[01:11:35.794] LOG: %cStart Phase FaintPhase color:green;
+[01:11:35.859] LOG: %cStart Phase MessagePhase color:green;
+[01:11:36.419] LOG: %cStart Phase VictoryPhase color:green;
+[01:11:36.421] LOG: %cStart Phase ExpPhase color:green;
+[01:11:36.888] LOG: %cStart Phase ExpPhase color:green;
+[01:11:37.114] LOG: %cStart Phase MoveEndPhase color:green;
+[01:11:37.114] LOG: %cStart Phase MovePhase color:green;
+[01:11:37.115] LOG: %cUser: Magnemite
+Move: FLAMETHROWER
+Use Mode: NORMAL color:orchid
+[01:11:37.118] LOG: %cStart Phase MessagePhase color:green;
+[01:11:37.232] LOG: %cStart Phase MoveEffectPhase color:green;
+[01:11:37.441] LOG: crit stage: +0
+[01:11:37.444] LOG: Move: Flamethrower | Base damage: 18.45714285714286 | Power: 90 | Source attack: 16 | Target defense: 7
+[01:11:37.445] LOG: Move: Flamethrower | Attack damage: 15
+[01:11:37.446] LOG: %cStart Phase DamageAnimPhase color:green;
+[01:11:37.462] LOG: %cStart Phase FaintPhase color:green;
+[01:11:37.525] LOG: %cStart Phase MessagePhase color:green;
+[01:11:40.153] LOG: %cStart Phase VictoryPhase color:green;
+[01:11:40.155] LOG: %cStart Phase ExpPhase color:green;
+[01:11:40.352] LOG: %cStart Phase ExpPhase color:green;
+[01:11:40.850] LOG: %cStart Phase MoveEndPhase color:green;
+[01:11:40.850] LOG: %cStart Phase MovePhase color:green;
+[01:11:40.850] LOG: %cStart Phase MoveEndPhase color:green;
+[01:11:40.850] LOG: %cStart Phase CheckInterludePhase color:green;
+[01:11:40.851] LOG: %cStart Phase WeatherEffectPhase color:green;
+[01:11:40.851] LOG: %cStart Phase PositionalTagPhase color:green;
+[01:11:40.851] LOG: %cStart Phase BerryPhase color:green;
+[01:11:40.852] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[01:11:40.853] LOG: %cStart Phase PostTurnStatusEffectPhase color:green;
+[01:11:41.062] LOG: %cStart Phase MessagePhase color:green;
+[01:11:41.274] LOG: %cStart Phase TurnEndPhase color:green;
+[01:11:41.292] LOG: %cStart Phase BattleEndPhase color:green;
+[01:11:41.293] LOG: Battle Score: 22 (1 Turns x1)
+[01:11:41.293] LOG: Total Score: 22
+[01:11:41.306] LOG: %cStart Phase EggLapsePhase color:green;
+[01:11:41.307] LOG: %cStart Phase SelectModifierPhase color:green;
+[01:11:41.308] LOG: Wave Seed: WBCBMGqTu7hNgzk54wST3buU 1
+[01:11:41.319] LOG: 7 5 [2,3,4,5,6]
+[01:11:41.319] LOG: {"id":"TEMP_STAT_STAGE_BOOSTER","localeKey":"","iconImage":"x_speed","soundName":"se/restore","tier":0,"stat":5,"nameKey":"x_speed","quantityKey":"percentage"} 
+[01:11:41.319] LOG: 7 5 [2,3,4,5,6]
+[01:11:41.319] LOG: {"id":"TEMP_STAT_STAGE_BOOSTER","localeKey":"","iconImage":"x_sp_atk","soundName":"se/restore","tier":0,"stat":3,"nameKey":"x_sp_atk","quantityKey":"percentage"} 
+[01:11:41.319] LOG: 7 5 [2,3,4,5,6]
+[01:11:41.319] LOG: {"id":"TEMP_STAT_STAGE_BOOSTER","localeKey":"","iconImage":"x_attack","soundName":"se/restore","tier":0,"stat":1,"nameKey":"x_attack","quantityKey":"percentage"} 
+[01:11:41.319] LOG: 8 5 [2,3,4,5,6]
+[01:11:41.319] LOG: {"id":"BERRY","localeKey":"","iconImage":"ganlon_berry","group":"berry","soundName":"se/restore","tier":0,"berryType":4} 
+[01:11:41.319] LOG: 0 0 [2,3,4,5,6]
+[01:11:41.319] LOG: {"id":"POKEBALL","localeKey":"","iconImage":"pb","group":"pb","soundName":"se/pb_bounce_1","tier":0,"pokeballType":0,"count":5} 
+[01:11:41.320] LOG: [coop-reward] OWNER drives reward screen (start=0 role=host spoof=false wave=1)
+[01:11:49.651] LOG: %cStart Phase NewBattlePhase color:green;
+[01:11:49.651] LOG: Wave Seed: XCDCNHrUv8iOh{l65xTU4cvV 2
+[01:11:49.653] LOG: Applied X Speed 
+[01:11:49.653] LOG: Applied X Speed 
+[01:11:49.654] LOG: %cStart Phase ReturnPhase color:green;
+[01:11:49.655] LOG: [coop-reward] advance interaction (role=host from=0 counter=0)
+[01:11:49.655] LOG: [coop-launch] proceedIfReady launched=true localTeam=3 bothReady=true role=host partnerReady=true
+[01:11:49.673] LOG: [coop-launch] proceedIfReady launched=true localTeam=3 bothReady=true role=host partnerReady=true
+[01:11:49.769] LOG: %cStart Phase ReturnPhase color:green;
+[01:11:49.889] LOG: %cStart Phase ShowTrainerPhase color:green;
+[01:11:49.997] LOG: %cStart Phase NextEncounterPhase color:green;
+[01:11:53.129] DEBUG: Session data saved to slot 4!
+[01:11:53.131] LOG: Wave Seed: XCDCNHrUv8iOh{l65xTU4cvV 2
+[01:11:54.436] LOG: %cStart Phase MysteryEncounterPhase color:green;
+[01:12:20.904] LOG: [coop-launch] proceedIfReady launched=true localTeam=3 bothReady=true role=host partnerReady=true
+[01:12:20.905] LOG: [coop-launch] proceedIfReady launched=true localTeam=3 bothReady=true role=host partnerReady=true
+[01:12:22.793] LOG: %cStart Phase MysteryEncounterRewardsPhase color:green;
+[01:12:22.794] LOG: %cStart Phase EggLapsePhase color:green;
+[01:12:22.794] LOG: %cStart Phase MysteryEncounterOptionSelectedPhase color:green;
+[01:12:23.759] LOG: %cStart Phase PostMysteryEncounterPhase color:green;
+[01:12:23.760] LOG: [coop-launch] proceedIfReady launched=true localTeam=3 bothReady=true role=host partnerReady=true
+[01:12:23.760] LOG: %cStart Phase MysteryEncounterRewardsPhase color:green;
+[01:12:23.760] LOG: %cStart Phase SelectModifierPhase color:green;
+[01:12:23.760] LOG: Wave Seed: XCDCNHrUv8iOh{l65xTU4cvV 2
+[01:12:23.763] LOG: 5 1 [1,11,13,24]
+[01:12:23.763] LOG: {"id":"SPEED_ORDER","localeKey":"","iconImage":"scanner","soundName":"se/restore","tier":2} 
+[01:12:23.763] LOG: 14 3 [1,11,13,24]
+[01:12:23.763] LOG: {"id":"FROSTBITE_ORB","localeKey":"","iconImage":"frostbite_orb","soundName":"se/restore","tier":2} 
+[01:12:23.763] LOG: 15 3 [1,11,13,24]
+[01:12:23.763] LOG: {"id":"MYSTICAL_ROCK","localeKey":"modifierType:ModifierType.MYSTICAL_ROCK","iconImage":"mystical_rock","soundName":"se/restore","tier":2} 
+[01:12:23.764] LOG: 29 4 [1,11,13,24]
+[01:12:23.764] LOG: {"id":"ER_RUSTY_CLAW","localeKey":"","iconImage":"quick_claw","iconTint":10115891,"soundName":"se/restore","tier":2} 
+[01:12:23.764] LOG: 14 3 [1,11,13,24]
+[01:12:23.764] LOG: {"id":"FROSTBITE_ORB","localeKey":"","iconImage":"frostbite_orb","soundName":"se/restore","tier":2} 
+[01:12:23.764] LOG: 18 3 [1,11,13,24]
+[01:12:23.764] LOG: {"id":"ATTACK_TYPE_BOOSTER","localeKey":"","iconImage":"silk_scarf","soundName":"se/restore","tier":2,"moveType":0,"boostPercent":20} 
+[01:12:23.764] LOG: 12 2 [1,11,13,24]
+[01:12:23.764] LOG: {"id":"TOXIC_ORB","localeKey":"modifierType:ModifierType.TOXIC_ORB","iconImage":"toxic_orb","soundName":"se/restore","tier":2} 
+[01:12:23.764] LOG: 10 1 [1,11,13,24]
+[01:12:23.764] LOG: ULTRA 0
+[01:12:23.764] LOG: 10 1 [1,11,13,24]
+[01:12:23.764] LOG: ULTRA 0
+[01:12:23.764] LOG: 0 0 [1,11,13,24]
+[01:12:23.764] LOG: {"id":"ULTRA_BALL","localeKey":"","iconImage":"ub","group":"pb","soundName":"se/pb_bounce_1","tier":2,"pokeballType":2,"count":5} 
+[01:12:23.764] LOG: 10 1 [1,11,13,24]
+[01:12:23.764] LOG: ULTRA 0
+[01:12:23.764] LOG: 15 3 [1,11,13,24]
+[01:12:23.764] LOG: {"id":"MYSTICAL_ROCK","localeKey":"modifierType:ModifierType.MYSTICAL_ROCK","iconImage":"mystical_rock","soundName":"se/restore","tier":2} 
+[01:12:23.764] LOG: 8 1 [1,11,13,24]
+[01:12:23.764] LOG: {"id":"AMULET_COIN","localeKey":"modifierType:ModifierType.AMULET_COIN","iconImage":"amulet_coin","soundName":"se/restore","tier":2} 
+[01:12:23.765] LOG: 23 3 [1,11,13,24]
+[01:12:23.765] LOG: {"id":"EXP_SHARE","localeKey":"modifierType:ModifierType.EXP_SHARE","iconImage":"exp_share","soundName":"se/restore","tier":2} 
+[01:12:23.765] LOG: 15 3 [1,11,13,24]
+[01:12:23.765] LOG: {"id":"MYSTICAL_ROCK","localeKey":"modifierType:ModifierType.MYSTICAL_ROCK","iconImage":"mystical_rock","soundName":"se/restore","tier":2} 
+[01:12:23.765] LOG: 26 4 [1,11,13,24]
+[01:12:23.765] LOG: {"id":"WIDE_LENS","localeKey":"modifierType:ModifierType.WIDE_LENS","iconImage":"wide_lens","soundName":"se/restore","tier":2,"amount":5} 
+[01:12:23.765] LOG: 20 3 [1,11,13,24]
+[01:12:23.765] LOG: {"id":"GOLDEN_PUNCH","localeKey":"modifierType:ModifierType.GOLDEN_PUNCH","iconImage":"golden_punch","soundName":"se/restore","tier":2} 
+[01:12:23.765] LOG: 33 4 [1,11,13,24]
+[01:12:23.765] LOG: {"id":"ER_DEX_NAV","localeKey":"","iconImage":"dex_nav","soundName":"se/restore","tier":2} 
+[01:12:23.765] LOG: 26 4 [1,11,13,24]
+[01:12:23.765] LOG: {"id":"WIDE_LENS","localeKey":"modifierType:ModifierType.WIDE_LENS","iconImage":"wide_lens","soundName":"se/restore","tier":2,"amount":5} 
+[01:12:23.765] LOG: 4 1 [1,11,13,24]
+[01:12:23.765] LOG: {"id":"MINT","localeKey":"","iconImage":"mint_spdef","group":"mint","soundName":"se/restore","tier":2,"nature":20} 
+[01:12:23.766] LOG: [coop-reward] OWNER drives reward screen (start=2 role=host spoof=false wave=2)
