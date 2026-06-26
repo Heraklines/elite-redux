@@ -45,10 +45,11 @@ const PANEL_H = 178;
 const PARCH_BASE = 0xe2d2ab; // aged paper
 const FRAME_DARK = 0x4a3217; // leather map border
 const FRAME_MID = 0x6e4d28; // inner rule + tile frames
-const INK = 0x33240f; // body text (dark sepia)
-const INK_HEAD = 0x7a3410; // section headings (burnt sienna ink)
-const DIM = 0x8a7044; // faint sepia (hints / older-biomes arrow)
-const MAP_RED = 0xb23320; // "you are here" + the route cursor (map ink red)
+const INK = "#33240f"; // body text (dark sepia) - text FILL colour, set directly
+const INK_HEAD = "#7a3410"; // section headings (burnt sienna ink)
+const DIM = "#8a7044"; // faint sepia (hints / older-biomes arrow)
+const MAP_RED = 0xb23320; // current biome + hovered route - tile BORDERS (numeric)
+const MAP_RED_HEX = "#b23320"; // ... and the matching current/hovered NAME colour
 const ROUTE = 0x946127; // traveled path + a base onward path (brown trail)
 /** Onward-route node colours by source (muted so they read as map ink). */
 const GREEN = 0x4a7a2a; // a route a Map Upgrade revealed
@@ -158,6 +159,22 @@ function drawErParchment(g: Phaser.GameObjects.Graphics): void {
   g.strokeRect(FOOTER_PAD + 2, FOOTER_Y + 2, fw - 4, FOOTER_H - 4);
 }
 
+/** Create a parchment text label. The colour is set as the FILL directly (NOT via
+ *  setTint - which also darkens the WINDOW drop-shadow, doubling each glyph on the
+ *  light paper), and the drop-shadow is removed so the ink reads crisp. */
+function erInkText(
+  x: number,
+  y: number,
+  content: string,
+  color: string,
+  fontSize: string,
+  align: "left" | "center" = "left",
+): Phaser.GameObjects.Text {
+  const t = addTextObject(x, y, content, TextStyle.WINDOW, { fontSize, align, color });
+  t.setShadow(0, 0, "rgba(0,0,0,0)", 0, false, false);
+  return t;
+}
+
 export class ErMapUiHandler extends UiHandler {
   private container: Phaser.GameObjects.Container;
   private card: Phaser.GameObjects.Container;
@@ -240,56 +257,38 @@ export class ErMapUiHandler extends UiHandler {
     drawErParchment(this.parchment);
     this.card.add(this.parchment);
 
-    this.headerText = addTextObject(PANEL_W / 2, 6, "World Map", TextStyle.WINDOW, {
-      fontSize: "60px",
-      align: "center",
-    });
+    this.headerText = erInkText(PANEL_W / 2, 6, "World Map", INK_HEAD, "60px", "center");
     this.headerText.setOrigin(0.5, 0);
-    this.headerText.setTint(INK_HEAD);
     this.card.add(this.headerText);
 
-    this.fragmentText = addTextObject(PANEL_W / 2, 18, "", TextStyle.WINDOW, { fontSize: "38px", align: "center" });
+    this.fragmentText = erInkText(PANEL_W / 2, 18, "", INK, "38px", "center");
     this.fragmentText.setOrigin(0.5, 0);
-    this.fragmentText.setTint(INK);
     this.card.add(this.fragmentText);
 
     // Connector graphics sit UNDER the tiles (added before the transient sprites).
     this.graphics = globalScene.add.graphics();
     this.card.add(this.graphics);
 
-    this.journeyLabel = addTextObject(11, 30, "Your journey", TextStyle.WINDOW, { fontSize: "38px" });
+    this.journeyLabel = erInkText(11, 30, "Your journey", INK_HEAD, "38px");
     this.journeyLabel.setOrigin(0, 0);
-    this.journeyLabel.setTint(INK_HEAD);
     this.card.add(this.journeyLabel);
 
-    this.routesLabel = addTextObject(11, 67, "Routes ahead", TextStyle.WINDOW, { fontSize: "38px" });
+    this.routesLabel = erInkText(11, 67, "Routes ahead", INK_HEAD, "38px");
     this.routesLabel.setOrigin(0, 0);
-    this.routesLabel.setTint(INK_HEAD);
     this.card.add(this.routesLabel);
 
     // Conditions cartouche label (the inset box itself is drawn on the parchment).
-    this.footerLabel = addTextObject(FOOTER_PAD + 6, FOOTER_Y + 3, "Conditions", TextStyle.WINDOW, {
-      fontSize: "38px",
-    });
+    this.footerLabel = erInkText(FOOTER_PAD + 6, FOOTER_Y + 3, "Conditions", INK_HEAD, "38px");
     this.footerLabel.setOrigin(0, 0);
-    this.footerLabel.setTint(INK_HEAD);
     this.card.add(this.footerLabel);
 
-    this.emptyText = addTextObject(PANEL_W / 2, ErMapUiHandler.ROUTES_Y, "", TextStyle.WINDOW, {
-      fontSize: "38px",
-      align: "center",
-    });
+    this.emptyText = erInkText(PANEL_W / 2, ErMapUiHandler.ROUTES_Y, "", DIM, "38px", "center");
     this.emptyText.setOrigin(0.5, 0.5);
-    this.emptyText.setTint(DIM);
     this.emptyText.setVisible(false);
     this.card.add(this.emptyText);
 
-    this.hintText = addTextObject(PANEL_W / 2, PANEL_H - 12, "< > Scroll    B: Close", TextStyle.WINDOW, {
-      fontSize: "36px",
-      align: "center",
-    });
+    this.hintText = erInkText(PANEL_W / 2, PANEL_H - 12, "< > Scroll    B: Close", DIM, "36px", "center");
     this.hintText.setOrigin(0.5, 0);
-    this.hintText.setTint(DIM);
     this.card.add(this.hintText);
 
     installErMapHotkey();
@@ -363,12 +362,15 @@ export class ErMapUiHandler extends UiHandler {
     this.card.add(border);
     this.transient.push(border);
 
-    const name = addTextObject(cx, cy + TILE_H / 2 + 1, getBiomeName(biome), TextStyle.WINDOW, {
-      fontSize: "32px",
-      align: "center",
-    });
+    const name = erInkText(
+      cx,
+      cy + TILE_H / 2 + 1,
+      getBiomeName(biome),
+      highlight ? MAP_RED_HEX : INK,
+      "32px",
+      "center",
+    );
     name.setOrigin(0.5, 0);
-    name.setTint(highlight ? MAP_RED : INK);
     this.card.add(name);
     this.transient.push(name);
     // The current biome reads as current from its red frame + red name (and, in pick
@@ -432,9 +434,8 @@ export class ErMapUiHandler extends UiHandler {
     }
     // "older biomes" hint when the window is scrolled off the start.
     if (this.scroll > 0 && count > 0) {
-      const more = addTextObject(4, cy, "<", TextStyle.WINDOW, { fontSize: "44px" });
+      const more = erInkText(4, cy, "<", DIM, "44px");
       more.setOrigin(0, 0.5);
-      more.setTint(DIM);
       this.card.add(more);
       this.transient.push(more);
     }
@@ -481,12 +482,8 @@ export class ErMapUiHandler extends UiHandler {
         border.setStrokeStyle(1, color);
         this.card.add(border);
         this.transient.push(border);
-        const name = addTextObject(cx, oy + TILE_H / 2 + 1, getBiomeName(node.biome), TextStyle.WINDOW, {
-          fontSize: "32px",
-          align: "center",
-        });
+        const name = erInkText(cx, oy + TILE_H / 2 + 1, getBiomeName(node.biome), INK, "32px", "center");
         name.setOrigin(0.5, 0);
-        name.setTint(INK);
         this.card.add(name);
         this.transient.push(name);
         // Track this tile's frame + name + base colour so the pick cursor can redden
@@ -536,21 +533,15 @@ export class ErMapUiHandler extends UiHandler {
 
     const lines = biome === undefined ? [] : getErBiomeEffectLines(biome);
     if (lines.length === 0) {
-      const none = addTextObject(FOOTER_PAD + 6, COND_FIRST_Y, "No special conditions", TextStyle.WINDOW, {
-        fontSize: "34px",
-      });
+      const none = erInkText(FOOTER_PAD + 6, COND_FIRST_Y, "No special conditions", DIM, "34px");
       none.setOrigin(0, 0);
-      none.setTint(DIM);
       this.card.add(none);
       this.condLines.push(none);
       return;
     }
     for (let i = 0; i < lines.length; i++) {
-      const line = addTextObject(FOOTER_PAD + 6, COND_FIRST_Y + i * COND_LINE_H, lines[i], TextStyle.WINDOW, {
-        fontSize: "34px",
-      });
+      const line = erInkText(FOOTER_PAD + 6, COND_FIRST_Y + i * COND_LINE_H, lines[i], INK, "34px");
       line.setOrigin(0, 0);
-      line.setTint(INK);
       this.card.add(line);
       this.condLines.push(line);
     }
@@ -574,7 +565,7 @@ export class ErMapUiHandler extends UiHandler {
     for (let i = 0; i < count; i++) {
       const sel = i === this.pickCursor;
       this.onwardBorders[i].setStrokeStyle(sel ? 2 : 1, sel ? MAP_RED : (this.onwardColors[i] ?? FRAME_MID));
-      this.onwardNames[i]?.setTint(sel ? MAP_RED : INK);
+      this.onwardNames[i]?.setColor(sel ? MAP_RED_HEX : INK);
     }
     // Pick mode (#129): the footer follows the cursor - list the conditions of the
     // onward biome the cursor is over (so the player compares routes by their rules).
