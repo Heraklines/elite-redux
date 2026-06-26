@@ -580,4 +580,97 @@ describe.skipIf(!RUN)("co-op richer battle events + guest animation pump (#633, 
     expect(enemy0.isOnField(), "the poison-KO'd enemy left the field (the faint animated + removed it)").toBe(false);
     expect(field[COOP_HOST_FIELD_INDEX].isOnField(), "the host's mon survives the poison turn").toBe(true);
   });
+
+  // ===========================================================================
+  // (Step 3) LIVE-STREAM: the host streams each event the INSTANT it records it (per-turn
+  // monotonic seq); the guest buffers them by (turn, seq), de-dupes a re-send + tolerates a
+  // gap, and at the turn boundary renders the EXACTLY-ONCE merge of live + batch (seq==index)
+  // BEFORE the deferred checkpoint. The checkpoint can only ever run in the finalize phase, LAST.
+  // ===========================================================================
+
+  it("(Step 3) consumeLiveEvents returns live events sorted by seq + de-dupes a re-sent seq", async () => {
+    await startCoopGuest();
+    const turn = globalScene.currentBattle.turn;
+    const streamer = getCoopRuntime()!.battleStream;
+    const partner = getCoopRuntime()!.partnerTransport!;
+
+    // The host streams three live events OUT OF ORDER (seq 2 then 0 then 1), and RE-SENDS seq 1
+    // (a duplicate the transport can deliver). The guest must return them sorted asc by seq, with the
+    // re-sent seq de-duped (the latest copy for a seq wins, one entry per seq).
+    partner.send({ t: "battleEvent", turn, seq: 2, event: { k: "faint", bi: BattlerIndex.ENEMY } });
+    partner.send({ t: "battleEvent", turn, seq: 0, event: { k: "message", text: "live-0" } });
+    partner.send({ t: "battleEvent", turn, seq: 1, event: { k: "message", text: "live-1-first" } });
+    partner.send({ t: "battleEvent", turn, seq: 1, event: { k: "message", text: "live-1-resent" } });
+    await new Promise(r => setTimeout(r, 0));
+
+    const consumed = streamer.consumeLiveEvents(turn);
+    // Sorted ascending by seq, exactly one entry per seq (the re-send did not add a duplicate).
+    expect(
+      consumed.map(e => e.seq),
+      "live events return sorted asc by seq, de-duped",
+    ).toEqual([0, 1, 2]);
+    // The re-sent seq 1 reflects the LATEST copy (last write for a seq wins).
+    const seq1 = consumed.find(e => e.seq === 1);
+    expect(seq1?.event.k === "message" ? seq1.event.text : "", "the re-sent seq's latest copy wins").toBe(
+      "live-1-resent",
+    );
+    // Consuming a turn CLEARS it (a second consume returns empty - no double-render).
+    expect(streamer.consumeLiveEvents(turn), "consuming a turn clears its live buffer").toEqual([]);
+  });
+
+  it("(Step 3) a batch event already seen LIVE is NOT rendered twice; the checkpoint applies only AFTER the pump", async () => {
+    const field = await startCoopGuest();
+    const turn = globalScene.currentBattle.turn;
+    const enemy0 = globalScene.getEnemyField(false)[0];
+    const koBi = enemy0.getBattlerIndex();
+    const partner = getCoopRuntime()!.partnerTransport!;
+
+    // The host streams the hp drain LIVE first (seq 1), then the turn-end batch carries the SAME ordered
+    // events (message seq0, hp seq1, faint seq2). seq == batch index, so the merge must render the hp
+    // event EXACTLY ONCE (sourced from the live channel for seq 1, filled from the batch for 0 + 2).
+    partner.send({ t: "battleEvent", turn, seq: 1, event: { k: "hp", bi: koBi, hp: 0, maxHp: enemy0.getMaxHp() } });
+    partner.send({
+      t: "turnResolution",
+      turn,
+      events: [
+        { k: "message", text: "The enemy is hurt by poison!" },
+        { k: "hp", bi: koBi, hp: 0, maxHp: enemy0.getMaxHp() },
+        { k: "faint", bi: koBi },
+      ],
+      checkpoint: checkpointKO(koBi),
+      checksum: coopEngine.captureCoopChecksum(),
+    });
+    await new Promise(r => setTimeout(r, 0));
+
+    // Count how many presentation phases of each kind the replay pump unshifts, and capture WHEN the
+    // checkpoint is applied relative to them (applyCoopCheckpoint runs only in CoopFinalizeTurnPhase).
+    const unshiftSpy = vi.spyOn(globalScene.phaseManager, "unshiftNew");
+    let checkpointAppliedAfterUnshifts = -1;
+    const applySpy = vi.spyOn(coopEngine, "applyCoopCheckpoint").mockImplementation(() => {
+      // Record the number of presentation unshifts that had happened by the time the checkpoint applied.
+      checkpointAppliedAfterUnshifts = unshiftSpy.mock.calls.filter(([name]) =>
+        ["CoopHpDrainReplayPhase", "CoopFaintReplayPhase", "CoopMoveAnimReplayPhase"].includes(name as string),
+      ).length;
+    });
+
+    await driveReplayTurn(turn);
+
+    // The hp event (seen live AND in the batch) was rendered EXACTLY ONCE (the merge de-dupes by seq==index).
+    const hpUnshifts = unshiftSpy.mock.calls.filter(([name]) => name === "CoopHpDrainReplayPhase").length;
+    const faintUnshifts = unshiftSpy.mock.calls.filter(([name]) => name === "CoopFaintReplayPhase").length;
+    expect(hpUnshifts, "the hp event seen both live and in the batch is rendered exactly once").toBe(1);
+    expect(faintUnshifts, "the batch faint event is rendered once").toBe(1);
+
+    // The checkpoint applied ONLY AFTER both presentation phases were unshifted (the finalize phase is
+    // last on its tree level). 2 = the hp + faint phases were already queued when applyCoopCheckpoint ran.
+    expect(applySpy, "the checkpoint applied exactly once (in the finalize phase)").toHaveBeenCalledTimes(1);
+    expect(
+      checkpointAppliedAfterUnshifts,
+      "applyCoopCheckpoint ran only AFTER the live pump unshifted its presentation phases",
+    ).toBe(2);
+
+    unshiftSpy.mockRestore();
+    applySpy.mockRestore();
+    expect(field.length, "the guest field is intact").toBe(2);
+  });
 });

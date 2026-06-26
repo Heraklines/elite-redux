@@ -41,6 +41,7 @@ import type {
   CoopWaveOutcome,
 } from "#data/elite-redux/coop/coop-transport";
 import { type CoopTransport, createLoopbackPair, type SerializedCommand } from "#data/elite-redux/coop/coop-transport";
+import { setCoopLiveEmitter } from "#data/elite-redux/coop/coop-turn-recorder";
 import { CoopUiMirror } from "#data/elite-redux/coop/coop-ui-mirror";
 import { setCoopGhostFetchSuppressed, setCoopGhostPool, setGhostPoolPublisher } from "#data/elite-redux/er-ghost-teams";
 import { compressToBase64, decompressFromBase64 } from "lz-string";
@@ -64,6 +65,23 @@ function wireCoopGhostPoolSync(controller: CoopSessionController, battleStream: 
     if (controller.role === "guest") {
       setCoopGhostPool(pool);
     }
+  });
+}
+
+/**
+ * Co-op LIVE battle-event emitter (#633, animation layer): wire the host turn recorder so each visible
+ * event (move / hp / faint / stat) is streamed the INSTANT it is recorded, with a per-turn monotonic
+ * `seq`, instead of only batching at turn-end. The guest buffers them by `(turn, seq)` and replays them
+ * in order (de-duping the turn-end batch) so it watches the fight with minimal lag. Gated on the LIVE
+ * host role in the AUTHORITATIVE netcode at send time (a guest / solo / lockstep client never emits), so
+ * the existing Phase-1 turn-end batch is unaffected for everyone else. Cleared in {@linkcode clearCoopRuntime}.
+ */
+function wireCoopLiveEvents(controller: CoopSessionController, battleStream: CoopBattleStreamer): void {
+  setCoopLiveEmitter((turn, seq, event) => {
+    if (controller.role !== "host" || getCoopNetcodeMode() !== "authoritative") {
+      return;
+    }
+    battleStream.emitEvent(turn, seq, event);
   });
 }
 
@@ -469,6 +487,7 @@ export function startLocalCoopSession(
   wireCoopResyncResponder(controller, battleStream);
   wireCoopWaveResolved(controller, battleStream);
   wireCoopMeChecksumCheck(battleStream);
+  wireCoopLiveEvents(controller, battleStream);
   setCoopRuntime(runtime);
   controller.connect();
   return runtime;
@@ -510,6 +529,7 @@ export function connectCoopSession(
   wireCoopResyncResponder(controller, battleStream);
   wireCoopWaveResolved(controller, battleStream);
   wireCoopMeChecksumCheck(battleStream);
+  wireCoopLiveEvents(controller, battleStream);
   setCoopRuntime(runtime);
   controller.connect();
   return runtime;
@@ -531,6 +551,8 @@ export function clearCoopRuntime(): void {
   // Clear the co-op ghost-pool hooks so a subsequent SOLO run fetches normally (#633).
   setGhostPoolPublisher(null);
   setCoopGhostFetchSuppressed(null);
+  // Clear the live-event emitter so a subsequent solo / lockstep run never streams battle events (#633).
+  setCoopLiveEmitter(null);
   // Reset the authoritative wave-advance state so a subsequent run starts clean (#633).
   pendingWaveAdvance = null;
   lastResolvedWave = -1;

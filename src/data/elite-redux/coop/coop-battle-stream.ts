@@ -67,6 +67,13 @@ export interface CoopBattleStreamerOptions {
 // shop while the other is still choosing). Match the 20min command grace.
 const DEFAULT_TIMEOUT_MS = 1_200_000;
 
+/**
+ * How many past turns of buffered LIVE battle events to retain (#633, animation layer). A handful is
+ * plenty: a turn's events are consumed at that turn's boundary, so retention only needs to cover a
+ * late event for the turn just before the one being rendered. Bounded so a long run never leaks memory.
+ */
+const LIVE_EVENT_TURN_RETENTION = 4;
+
 function defaultSchedule(cb: () => void, ms: number): () => void {
   const id = setTimeout(cb, ms);
   return () => clearTimeout(id);
@@ -92,6 +99,17 @@ export class CoopBattleStreamer {
   private readonly pending = new Map<number, (res: CoopTurnResolution | null) => void>();
   /** turn -> a resolution that arrived before its waiter (race buffer). */
   private readonly inbox = new Map<number, CoopTurnResolution>();
+  /**
+   * GUEST: live battle events buffered by turn, keyed inner by `seq` so a duplicate / out-of-order
+   * `battleEvent` is de-duped + a stutter (a missing seq) is tolerated (#633, animation layer LIVE).
+   * Consumed in seq order by `CoopReplayTurnPhase` at the turn boundary, so the guest never replays a
+   * live event twice (it de-dupes the turn-end batch against these). A bounded number of past turns is
+   * retained ({@linkcode LIVE_EVENT_TURN_RETENTION}) so a late event for a just-finished turn is not
+   * silently dropped while old turns never leak.
+   */
+  private readonly liveEvents = new Map<number, Map<number, CoopBattleEvent>>();
+  /** GUEST: live-event arrival handler (optional; lets a live pump react the instant one lands). */
+  private liveEventHandler: ((turn: number, seq: number, event: CoopBattleEvent) => void) | null = null;
 
   private enemyPartyHandler: ((wave: number, enemies: CoopSerializedEnemy[]) => void) | null = null;
   private checkpointHandler: ((reason: string, checkpoint: CoopBattleCheckpoint) => void) | null = null;
@@ -179,6 +197,17 @@ export class CoopBattleStreamer {
       checksum,
       ...(preimage === undefined ? {} : { preimage }),
     });
+  }
+
+  /**
+   * HOST: emit ONE visible battle event LIVE (#633, animation layer), the instant the host records
+   * it, so the guest can WATCH the fight unfold with minimal lag instead of waiting for the whole
+   * turn to batch at turn-end. `seq` is a per-turn monotonic index the host supplies (so the guest
+   * replays in order + de-dupes against the turn-end batch). PRESENTATION ONLY - the turn-end
+   * checkpoint is still the source of truth, so a dropped / reordered live event only stutters.
+   */
+  emitEvent(turn: number, seq: number, event: CoopBattleEvent): void {
+    this.transport.send({ t: "battleEvent", turn, seq, event });
   }
 
   /**
@@ -364,6 +393,44 @@ export class CoopBattleStreamer {
   }
 
   /**
+   * GUEST: subscribe to LIVE battle events as they arrive (#633, animation layer). The handler fires
+   * the instant a `battleEvent` lands (already de-duped + buffered by `(turn, seq)`), so a live pump
+   * can render it with minimal lag. Optional: with no handler the events are still buffered and
+   * consumed at the turn boundary by {@linkcode consumeLiveEvents}. Returns an unsubscribe function.
+   */
+  onLiveEvent(handler: (turn: number, seq: number, event: CoopBattleEvent) => void): () => void {
+    this.liveEventHandler = handler;
+    return () => {
+      if (this.liveEventHandler === handler) {
+        this.liveEventHandler = null;
+      }
+    };
+  }
+
+  /**
+   * GUEST: take + clear the LIVE battle events buffered for `turn`, in ascending `seq` order (#633,
+   * animation layer). Returns the ordered events the guest already received over the live channel for
+   * this turn (empty when none arrived live - e.g. an older host that never streams them, or all live
+   * events dropped). The caller plays these and DE-DUPES the turn-end `turnResolution` batch against
+   * the seqs returned, so no event is ever rendered twice. Clearing also prunes turns older than the
+   * retention window so a long run never leaks.
+   */
+  consumeLiveEvents(turn: number): { seq: number; event: CoopBattleEvent }[] {
+    const perTurn = this.liveEvents.get(turn);
+    this.liveEvents.delete(turn);
+    // Prune stale turns (anything well before the one being consumed) so the buffer stays bounded.
+    for (const t of [...this.liveEvents.keys()]) {
+      if (t < turn - LIVE_EVENT_TURN_RETENTION) {
+        this.liveEvents.delete(t);
+      }
+    }
+    if (perTurn == null) {
+      return [];
+    }
+    return [...perTurn.entries()].sort((a, b) => a[0] - b[0]).map(([seq, event]) => ({ seq, event }));
+  }
+
+  /**
    * GUEST: await the host's resolution for `turn`. Resolves with the streamed turn,
    * or `null` if it does not arrive within the timeout (the guest then shows a
    * "waiting for host" notice and applies the next checkpoint when it lands). If the
@@ -462,6 +529,8 @@ export class CoopBattleStreamer {
     this.stateSyncWaiters.clear();
     this.stateSyncInbox.clear();
     this.inbox.clear();
+    this.liveEvents.clear();
+    this.liveEventHandler = null;
     this.lastCheckpoint = null;
     this.lastEnemyParty = null;
     this.enemyPartyHandler = null;
@@ -516,6 +585,18 @@ export class CoopBattleStreamer {
           // No waiter yet - buffer (latest per turn wins) for the next awaitTurn.
           this.inbox.set(msg.turn, res);
         }
+        return;
+      }
+      case "battleEvent": {
+        // GUEST: buffer the live event by (turn, seq) - de-duped (a re-sent seq overwrites identically)
+        // and order-tolerant (the seq, not arrival order, drives replay). Then fire any live handler.
+        let perTurn = this.liveEvents.get(msg.turn);
+        if (perTurn == null) {
+          perTurn = new Map<number, CoopBattleEvent>();
+          this.liveEvents.set(msg.turn, perTurn);
+        }
+        perTurn.set(msg.seq, msg.event);
+        this.liveEventHandler?.(msg.turn, msg.seq, msg.event);
         return;
       }
       case "battleCheckpoint":

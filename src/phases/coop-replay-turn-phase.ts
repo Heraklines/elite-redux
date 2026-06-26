@@ -52,13 +52,21 @@ export class CoopReplayTurnPhase extends Phase {
       try {
         if (res != null) {
           // ANIMATE first: unshift a presentation phase per host event against the still-ALIVE
-          // pre-turn field. These land FIFO on the tree level ABOVE this phase.
-          this.renderEvents(res.events);
+          // pre-turn field. These land FIFO on the tree level ABOVE this phase. The events are the
+          // EXACTLY-ONCE merge of the LIVE channel (#633, animation layer) and the turn-end batch:
+          // each was streamed live the instant the host recorded it (buffered by `(turn, seq)`), and
+          // the batch is the same ordered list. seq N == batch index N (the recorder stamps one seq
+          // per recorded event), so we de-dupe by index and render each event once, sourced from the
+          // live channel when it arrived, else filled from the batch (a dropped / late live event
+          // still renders). The checkpoint stays the final correction regardless, so any live gap
+          // only stutters the animation - it can never desync.
+          this.renderEvents(this.mergeLiveAndBatch(streamer.consumeLiveEvents(this.turn), res.events));
           // Then unshift the END-OF-TURN finalize LAST (#633, animation-replay redesign). The
           // phase-tree FIFO guarantees it drains BEHIND every animation phase just unshifted, so
           // `applyCoopCheckpoint` (which leaveField's a host-fainted mon) runs only AFTER the faint
-          // has animated. Never collapse this back to a synchronous applyCoopCheckpoint here - that
-          // is the exact bug (the snap removed the mon before its move/damage/faint could animate).
+          // has animated. THE STRUCTURAL GUARANTEE: applyCoopCheckpoint runs ONLY in
+          // CoopFinalizeTurnPhase, which is LAST on this tree level - it can never leaveField a mon
+          // whose faint has not animated. Never collapse this back to a synchronous applyCoopCheckpoint.
           globalScene.phaseManager.unshiftNew(
             "CoopFinalizeTurnPhase",
             this.turn,
@@ -76,6 +84,38 @@ export class CoopReplayTurnPhase extends Phase {
       // next checkpoint rather than hanging forever.
       this.finishTurnNoStream();
     });
+  }
+
+  /**
+   * EXACTLY-ONCE merge of the LIVE-channel events and the turn-end BATCH (#633, animation layer LIVE).
+   * The host streams each visible event live the instant it records it, stamped with a per-turn
+   * monotonic `seq`; the turn-end `turnResolution` carries the SAME ordered events as a batch, where
+   * INVARIANT seq N == batch index N (the recorder stamps one seq per recorded event). So we render
+   * each event POSITION exactly once, in order, sourced from the live channel when that seq arrived
+   * (already buffered + de-duped + order-tolerant by the streamer) and FILLED from the batch when it
+   * did not (a dropped / late live event still renders). Any extra live seq beyond the batch length
+   * (an out-of-band event the batch somehow lacks) is appended after, so nothing the host sent is lost.
+   * The result is the ordered list the animation pump replays; the checkpoint then corrects all state.
+   */
+  private mergeLiveAndBatch(
+    live: { seq: number; event: CoopBattleEvent }[],
+    batch: CoopBattleEvent[],
+  ): CoopBattleEvent[] {
+    const liveBySeq = new Map<number, CoopBattleEvent>();
+    for (const { seq, event } of live) {
+      liveBySeq.set(seq, event);
+    }
+    const merged: CoopBattleEvent[] = [];
+    // Render every batch POSITION exactly once, preferring the live-channel copy for that seq/index.
+    for (let i = 0; i < batch.length; i++) {
+      merged.push(liveBySeq.get(i) ?? batch[i]);
+      liveBySeq.delete(i);
+    }
+    // Append any live seqs the batch did not cover (defensive: out-of-band events), in seq order.
+    for (const seq of [...liveBySeq.keys()].sort((a, b) => a - b)) {
+      merged.push(liveBySeq.get(seq) as CoopBattleEvent);
+    }
+    return merged;
   }
 
   /**
