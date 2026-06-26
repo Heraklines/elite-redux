@@ -1,0 +1,312 @@
+----- BUG REPORT (in-game) -----
+version:  1.11.19
+url:      https://elite-redux.pages.dev/
+ua:       Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36 Edg/149.0.0.0
+mode:     4  wave:12  difficulty:youngster
+seed:     H2Eu3W6nELrA5EV5G2L7sj0D
+party:    Entei(L9 42/42), Hoppip(L8 26/26), Maractus(L5 23/23), Cherubi(L6 22/22), Zigzagoon(L6 22/22)
+
+----- DESCRIPTION -----
+These guys arent even there
+
+----- CONSOLE -----
+[16:51:18.446] LOG: %cStart Phase CommandPhase color:green;
+[16:51:21.297] LOG: Move: FIRE_FANG Move targets: {"targets":[2,3,1],"multiple":false} 
+Player Pokemon: Entei
+[16:51:21.302] LOG: %cStart Phase SelectTargetPhase color:green;
+[16:51:22.057] LOG: %cStart Phase CommandPhase color:green;
+[16:51:27.768] LOG: Move: MEGA_DRAIN Move targets: {"targets":[2,3,0],"multiple":false} 
+Player Pokemon: Hoppip
+[16:51:27.771] LOG: %cStart Phase SelectTargetPhase color:green;
+[16:51:28.481] LOG: %cStart Phase EnemyCommandPhase color:green;
+[16:51:28.489] LOG: Battle Seed: yOW3CIOAYHZ43fz5
+[16:51:28.489] WARN: BattlerTag IGNORE_GHOST is missing a score!
+[16:51:28.490] WARN: BattlerTag IGNORE_GHOST is missing a score!
+[16:51:28.490] WARN: BattlerTag IGNORE_GHOST is missing a score!
+[16:51:28.493] WARN: BattlerTag IGNORE_GHOST is missing a score!
+[16:51:28.494] LOG: Move Pool: ["Tackle","Howl","Roar","Odor Sleuth"]
+[16:51:28.494] LOG: Move Scores: [12,2,-20,0]
+[16:51:28.494] LOG: Sorted Move Pool: ["Tackle","Howl","Odor Sleuth","Roar"]
+[16:51:28.494] LOG: Chosen Move: Tackle
+[16:51:28.494] LOG: %cStart Phase EnemyCommandPhase color:green;
+[16:51:28.500] WARN: BattlerTag IGNORE_GHOST is missing a score!
+[16:51:28.501] WARN: BattlerTag IGNORE_GHOST is missing a score!
+[16:51:28.501] WARN: BattlerTag IGNORE_GHOST is missing a score!
+[16:51:28.501] WARN: BattlerTag IGNORE_GHOST is missing a score!
+[16:51:28.501] LOG: Move Pool: ["Growl","Odor Sleuth","Howl","Roar"]
+[16:51:28.501] LOG: Move Scores: [2,0,2,-20]
+[16:51:28.502] LOG: Sorted Move Pool: ["Growl","Howl","Odor Sleuth","Roar"]
+[16:51:28.503] LOG: Chosen Move: Growl
+[16:51:28.503] LOG: %cStart Phase TurnStartPhase color:green;
+[16:51:28.520] LOG: %cStart Phase MovePhase color:green;
+[16:51:28.520] LOG: %cUser: Entei
+Move: FIRE_FANG
+Use Mode: NORMAL color:orchid
+[16:51:28.528] LOG: %cStart Phase MessagePhase color:green;
+[16:51:28.642] LOG: %cStart Phase MoveEffectPhase color:green;
+[16:51:28.896] LOG: crit stage: +0
+[16:51:28.897] LOG: Move: Fire Fang | Base damage: 23.366153846153846 | Power: 80 | Source attack: 31 | Target defense: 13
+[16:51:28.898] LOG: Move: Fire Fang | Attack damage: 34
+[16:51:28.900] LOG: %cStart Phase DamageAnimPhase color:green;
+[16:51:28.917] LOG: %cStart Phase FaintPhase color:green;
+[16:51:29.546] LOG: %cStart Phase MessagePhase color:green;
+[16:51:29.751] LOG: %cStart Phase ShowAbilityPhase color:green;
+[16:51:29.983] LOG: %cStart Phase StatStageChangePhase color:green;
+[16:51:30.256] LOG: %cStart Phase MessagePhase color:green;
+[16:51:30.527] LOG: %cStart Phase HideAbilityPhase color:green;
+[16:51:30.559] LOG: %cStart Phase VictoryPhase color:green;
+[16:51:30.560] LOG: %cStart Phase ExpPhase color:green;
+[16:51:30.560] LOG: Applied Super EXP. Charm 
+[16:51:30.560] LOG: Applied EXP. Charm 
+[16:51:31.097] LOG: %cStart Phase ExpPhase color:green;
+[16:51:31.098] LOG: Applied Super EXP. Charm 
+[16:51:31.098] LOG: Applied EXP. Charm 
+[16:51:31.572] LOG: %cStart Phase LevelUpPhase color:green;
+[16:51:32.095] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[16:51:32.095] LOG: Applied Super EXP. Charm 
+[16:51:32.095] LOG: Applied EXP. Charm 
+[16:51:32.096] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[16:51:32.096] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[16:51:32.096] LOG: Applied Super EXP. Charm 
+[16:51:32.096] LOG: Applied EXP. Charm 
+[16:51:32.096] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[16:51:32.096] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[16:51:32.096] LOG: Applied Super EXP. Charm 
+[16:51:32.096] LOG: Applied EXP. Charm 
+[16:51:32.096] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[16:51:32.096] LOG: %cStart Phase MoveEndPhase color:green;
+[16:51:32.100] LOG: %cStart Phase MovePhase color:green;
+[16:51:32.100] LOG: %cUser: Entei
+Move: ERUPTION
+Use Mode: INDIRECT color:orchid
+[16:51:32.104] LOG: %cStart Phase MessagePhase color:green;
+[16:51:32.233] LOG: %cStart Phase MoveEffectPhase color:green;
+[16:51:32.248] LOG: crit stage: +0
+[16:51:32.252] LOG: Move: Eruption | Base damage: 26 | Power: 150 | Source attack: 20 | Target defense: 14
+[16:51:32.254] LOG: Move: Eruption | Attack damage: 72
+[16:51:32.256] LOG: %cStart Phase DamageAnimPhase color:green;
+[16:51:32.266] LOG: %cStart Phase FaintPhase color:green;
+[16:51:32.898] LOG: %cStart Phase MessagePhase color:green;
+[16:51:33.121] LOG: %cStart Phase ShowAbilityPhase color:green;
+[16:51:33.348] LOG: %cStart Phase StatStageChangePhase color:green;
+[16:51:33.610] LOG: %cStart Phase MessagePhase color:green;
+[16:51:33.900] LOG: %cStart Phase HideAbilityPhase color:green;
+[16:51:33.933] LOG: %cStart Phase VictoryPhase color:green;
+[16:51:33.934] LOG: %cStart Phase ExpPhase color:green;
+[16:51:33.935] LOG: Applied Super EXP. Charm 
+[16:51:33.936] LOG: Applied EXP. Charm 
+[16:51:34.433] LOG: %cStart Phase ExpPhase color:green;
+[16:51:34.433] LOG: Applied Super EXP. Charm 
+[16:51:34.433] LOG: Applied EXP. Charm 
+[16:51:34.812] LOG: %cStart Phase LevelUpPhase color:green;
+[16:51:35.379] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[16:51:35.379] LOG: Applied Super EXP. Charm 
+[16:51:35.379] LOG: Applied EXP. Charm 
+[16:51:35.380] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[16:51:35.380] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[16:51:35.380] LOG: Applied Super EXP. Charm 
+[16:51:35.380] LOG: Applied EXP. Charm 
+[16:51:35.380] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[16:51:35.380] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[16:51:35.381] LOG: Applied Super EXP. Charm 
+[16:51:35.381] LOG: Applied EXP. Charm 
+[16:51:35.612] LOG: %cStart Phase LevelUpPhase color:green;
+[16:51:36.129] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[16:51:36.222] LOG: %cStart Phase MoveEndPhase color:green;
+[16:51:36.228] LOG: %cStart Phase MovePhase color:green;
+[16:51:36.228] LOG: %cUser: Hoppip
+Move: MEGA_DRAIN
+Use Mode: NORMAL color:orchid
+[16:51:36.231] LOG: %cStart Phase MessagePhase color:green;
+[16:51:36.372] LOG: %cStart Phase MessagePhase color:green;
+[16:51:36.642] LOG: %cStart Phase MoveEndPhase color:green;
+[16:51:36.643] LOG: %cStart Phase MovePhase color:green;
+[16:51:36.643] LOG: %cStart Phase MoveEndPhase color:green;
+[16:51:36.643] LOG: %cStart Phase MovePhase color:green;
+[16:51:36.643] LOG: %cStart Phase MoveEndPhase color:green;
+[16:51:36.643] LOG: %cStart Phase CheckInterludePhase color:green;
+[16:51:36.643] LOG: %cStart Phase WeatherEffectPhase color:green;
+[16:51:36.643] LOG: %cStart Phase PositionalTagPhase color:green;
+[16:51:36.643] LOG: %cStart Phase BerryPhase color:green;
+[16:51:36.646] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[16:51:36.649] LOG: %cStart Phase TurnEndPhase color:green;
+[16:51:36.651] LOG: [coop:replay] host recorder: end turn=-1 events=0
+[16:51:36.651] LOG: %cStart Phase BattleEndPhase color:green;
+[16:51:36.652] LOG: Battle Score: 52 (1 Turns x1)
+[16:51:36.652] LOG: Total Score: 393
+[16:51:36.673] LOG: %cStart Phase EggLapsePhase color:green;
+[16:51:36.673] LOG: %cStart Phase SelectModifierPhase color:green;
+[16:51:36.673] LOG: Wave Seed: S=P>bAyPW}L@Pa@R=WB~u;O 11
+[16:51:36.681] LOG: 0 0 [2,3,4,5]
+[16:51:36.681] LOG: {"id":"POKEBALL","localeKey":"","iconImage":"pb","group":"pb","soundName":"se/pb_bounce_1","tier":0,"pokeballType":0,"count":5} 
+[16:51:36.681] LOG: 8 4 [2,3,4,5]
+[16:51:36.681] LOG: {"id":"BERRY","localeKey":"","iconImage":"liechi_berry","group":"berry","soundName":"se/restore","tier":0,"berryType":3} 
+[16:51:36.682] LOG: 12 9 [2,3,4,5,6,7,8,9,10,22]
+[16:51:36.682] LOG: {"id":"SUPER_LURE","localeKey":"modifierType:ModifierType.SUPER_LURE","iconImage":"super_lure","group":"lure","soundName":"se/restore","tier":1,"maxBattles":15} 
+[16:51:41.030] LOG: %cStart Phase NewBattlePhase color:green;
+[16:51:41.030] LOG: Wave Seed: T>Q?cBzQX~MAQbAS>XCv<P 12
+[16:51:41.034] LOG: [er-ghost] wave 12: ghost 'Kenny' (run ended at 25)
+[16:51:41.038] LOG: %cStart Phase ReturnPhase color:green;
+[16:51:41.174] LOG: %cStart Phase ReturnPhase color:green;
+[16:51:41.317] LOG: %cStart Phase ShowTrainerPhase color:green;
+[16:51:41.464] LOG: %cStart Phase NextEncounterPhase color:green;
+[16:51:41.505] LOG: Pokemon: Foe Sableye Redux | Species ID: 10736 | Level: 10 | Nature: Hardy (-)
+[16:51:41.505] LOG: Stats (IVs): HP: 34 (0), Atk: 22 (0), Def: 20 (0), Spatk: 20 (0), Spdef: 21 (0), Spd: 18 (0)
+[16:51:41.505] LOG: Ability: Magic Guard | Passive Ability: Subdue 
+[16:51:41.505] LOG: Moveset: ["Astonish","Block","Detect","Fairy Wind"]
+[16:51:41.528] LOG: Pokemon: Foe Corvisquire | Species ID: 822 | Level: 10 | Nature: Serious (-)
+[16:51:41.528] LOG: Stats (IVs): HP: 34 (25), Atk: 14 (17), Def: 17 (3), Spatk: 22 (25), Spdef: 17 (1), Spd: 21 (14)
+[16:51:41.528] LOG: Ability: Intimidate | Passive Ability: Flock 
+[16:51:41.528] LOG: Moveset: ["Gust","Dual Wingbeat","Fury Attack","Air Cutter"]
+[16:51:41.541] LOG: ER #419: elite BST cap (420 @ w12) - replacing Mawile Redux B (480) with Clamperl (345)
+[16:51:41.559] LOG: Pokemon: Foe Clamperl | Species ID: 366 | Level: 10 | Nature: Docile (-)
+[16:51:41.560] LOG: Stats (IVs): HP: 28 (21), Atk: 19 (16), Def: 20 (20), Spatk: 22 (23), Spdef: 16 (23), Spd: 15 (29)
+[16:51:41.560] LOG: Ability: Simple | Passive Ability: Shell Armor 
+[16:51:41.560] LOG: Moveset: ["Astonish","Flamethrower","Bullet Seed","Ice Fang"]
+[16:51:41.578] LOG: Pokemon: Foe Purrloin | Species ID: 509 | Level: 10 | Nature: Hasty (+Spd/-Def)
+[16:51:41.578] LOG: Stats (IVs): HP: 29 (19), Atk: 25 (20), Def: 15 (8), Spatk: 17 (22), Spdef: 12 (3), Spd: 18 (1)
+[16:51:41.578] LOG: Ability: Sniper | Passive Ability: Prankster 
+[16:51:41.578] LOG: Moveset: ["Quick Attack","After You","Hone Claws","Fake Out"]
+[16:51:41.595] LOG: Pokemon: Foe Frogadier | Species ID: 657 | Level: 10 | Nature: Hardy (-)
+[16:51:41.595] LOG: Stats (IVs): HP: 31 (18), Atk: 21 (15), Def: 17 (22), Spatk: 18 (21), Spdef: 19 (15), Spd: 27 (27)
+[16:51:41.596] LOG: Ability: Protean | Passive Ability: Torrent 
+[16:51:41.596] LOG: Moveset: ["Water Pledge","Shell Side Arm (P)","Shadow Sneak","Tackle"]
+[16:51:41.596] LOG: ER #419: elite BST cap (420 @ w12) - replacing Kricketune (434) with Kricketot (194)
+[16:51:41.614] LOG: Pokemon: Foe Kricketot | Species ID: 401 | Level: 10 | Nature: Quirky (-)
+[16:51:41.614] LOG: Stats (IVs): HP: 28 (19), Atk: 11 (17), Def: 17 (25), Spatk: 10 (19), Spdef: 13 (25), Spd: 11 (11)
+[16:51:41.614] LOG: Ability: Perfectionist | Passive Ability: Swarm 
+[16:51:41.614] LOG: Moveset: ["Skitter Smack","Growl","Uproar (P)","Round"]
+[16:51:57.507] WARN: Could not load animation file for move 'astonish' AbortError: signal is aborted without reason
+AbortError: signal is aborted without reason
+    at https://elite-redux.pages.dev/assets/BBCodeText-CwLIbsJg.js:1:88266
+[16:51:57.508] WARN: Could not load animation file for move 'block' AbortError: signal is aborted without reason
+AbortError: signal is aborted without reason
+    at https://elite-redux.pages.dev/assets/BBCodeText-CwLIbsJg.js:1:88266
+[16:51:57.508] WARN: Could not load animation file for move 'fairy-wind' AbortError: signal is aborted without reason
+AbortError: signal is aborted without reason
+    at https://elite-redux.pages.dev/assets/BBCodeText-CwLIbsJg.js:1:88266
+[16:51:57.535] WARN: Could not load animation file for move 'gust' AbortError: signal is aborted without reason
+AbortError: signal is aborted without reason
+    at https://elite-redux.pages.dev/assets/BBCodeText-CwLIbsJg.js:1:88266
+[16:51:57.535] WARN: Could not load animation file for move 'dual-wingbeat' AbortError: signal is aborted without reason
+AbortError: signal is aborted without reason
+    at https://elite-redux.pages.dev/assets/BBCodeText-CwLIbsJg.js:1:88266
+[16:51:57.535] WARN: Could not load animation file for move 'fury-attack' AbortError: signal is aborted without reason
+AbortError: signal is aborted without reason
+    at https://elite-redux.pages.dev/assets/BBCodeText-CwLIbsJg.js:1:88266
+[16:51:57.540] WARN: Could not load animation file for move 'air-cutter' AbortError: signal is aborted without reason
+AbortError: signal is aborted without reason
+    at https://elite-redux.pages.dev/assets/BBCodeText-CwLIbsJg.js:1:88266
+[16:51:57.543] WARN: Could not load animation file for move 'razor-shell' AbortError: signal is aborted without reason
+AbortError: signal is aborted without reason
+    at https://elite-redux.pages.dev/assets/BBCodeText-CwLIbsJg.js:1:88266
+[16:51:57.546] WARN: Could not load animation file for move 'acid-armor' AbortError: signal is aborted without reason
+AbortError: signal is aborted without reason
+    at https://elite-redux.pages.dev/assets/BBCodeText-CwLIbsJg.js:1:88266
+[16:51:57.549] WARN: Could not load animation file for move 'baneful-bunker' AbortError: signal is aborted without reason
+AbortError: signal is aborted without reason
+    at https://elite-redux.pages.dev/assets/BBCodeText-CwLIbsJg.js:1:88266
+[16:51:57.560] WARN: Could not load animation file for move 'flamethrower' AbortError: signal is aborted without reason
+AbortError: signal is aborted without reason
+    at https://elite-redux.pages.dev/assets/BBCodeText-CwLIbsJg.js:1:88266
+[16:51:57.561] WARN: Could not load animation file for move 'ice-fang' AbortError: signal is aborted without reason
+AbortError: signal is aborted without reason
+    at https://elite-redux.pages.dev/assets/BBCodeText-CwLIbsJg.js:1:88266
+[16:51:57.588] WARN: Could not load animation file for move 'quick-attack' AbortError: signal is aborted without reason
+AbortError: signal is aborted without reason
+    at https://elite-redux.pages.dev/assets/BBCodeText-CwLIbsJg.js:1:88266
+[16:51:57.589] WARN: Could not load animation file for move 'after-you' AbortError: signal is aborted without reason
+AbortError: signal is aborted without reason
+    at https://elite-redux.pages.dev/assets/BBCodeText-CwLIbsJg.js:1:88266
+[16:51:57.589] WARN: Could not load animation file for move 'hone-claws' AbortError: signal is aborted without reason
+AbortError: signal is aborted without reason
+    at https://elite-redux.pages.dev/assets/BBCodeText-CwLIbsJg.js:1:88266
+[16:51:57.589] WARN: Could not load animation file for move 'fake-out' AbortError: signal is aborted without reason
+AbortError: signal is aborted without reason
+    at https://elite-redux.pages.dev/assets/BBCodeText-CwLIbsJg.js:1:88266
+[16:51:57.598] WARN: Could not load animation file for move 'water-pledge' AbortError: signal is aborted without reason
+AbortError: signal is aborted without reason
+    at https://elite-redux.pages.dev/assets/BBCodeText-CwLIbsJg.js:1:88266
+[16:51:57.599] WARN: Could not load animation file for move 'shell-side-arm' AbortError: signal is aborted without reason
+AbortError: signal is aborted without reason
+    at https://elite-redux.pages.dev/assets/BBCodeText-CwLIbsJg.js:1:88266
+[16:51:57.600] WARN: Could not load animation file for move 'shadow-sneak' AbortError: signal is aborted without reason
+AbortError: signal is aborted without reason
+    at https://elite-redux.pages.dev/assets/BBCodeText-CwLIbsJg.js:1:88266
+[16:51:57.601] WARN: Could not load animation file for move 'skitter-smack' AbortError: signal is aborted without reason
+AbortError: signal is aborted without reason
+    at https://elite-redux.pages.dev/assets/BBCodeText-CwLIbsJg.js:1:88266
+[16:51:57.617] WARN: Could not load animation file for move 'round' AbortError: signal is aborted without reason
+AbortError: signal is aborted without reason
+    at https://elite-redux.pages.dev/assets/BBCodeText-CwLIbsJg.js:1:88266
+[16:52:01.852] WARN: [er-atlas] load error for pkmn__366; retrying once with cache-buster (poisoned-cache bypass)
+[16:52:01.864] WARN: [er-atlas] load error for pkmn__401; retrying once with cache-buster (poisoned-cache bypass)
+[16:52:01.868] WARN: [er-atlas] load error for pkmn__er__sableye_redux; retrying once with cache-buster (poisoned-cache bypass)
+[16:52:01.904] WARN: [er-atlas] load error for pkmn__female__401; retrying once with cache-buster (poisoned-cache bypass)
+[16:52:01.911] WARN: [er-atlas] load error for pkmn__509; retrying once with cache-buster (poisoned-cache bypass)
+[16:52:01.948] WARN: [er-atlas] load error for pkmn__822; retrying once with cache-buster (poisoned-cache bypass)
+[16:52:01.952] WARN: [er-atlas] load error for pkmn__657; retrying once with cache-buster (poisoned-cache bypass)
+[16:52:02.110] WARN: Missing animation: pkmn__er__sableye_redux
+[16:52:02.110] WARN: Missing animation: pkmn__er__sableye_redux
+[16:52:02.111] WARN: Missing animation: pkmn__822
+[16:52:02.111] WARN: Missing animation: pkmn__822
+[16:52:02.111] WARN: Missing animation: pkmn__366
+[16:52:02.111] WARN: Missing animation: pkmn__366
+[16:52:02.111] WARN: Missing animation: pkmn__366
+[16:52:02.111] WARN: Missing animation: pkmn__366
+[16:52:02.112] WARN: Missing animation: pkmn__509
+[16:52:02.112] WARN: Missing animation: pkmn__509
+[16:52:02.112] WARN: Missing animation: pkmn__657
+[16:52:02.112] WARN: Missing animation: pkmn__657
+[16:52:02.112] WARN: Missing animation: pkmn__401
+[16:52:02.112] WARN: Missing animation: pkmn__401
+[16:52:02.112] WARN: Missing animation: pkmn__401
+[16:52:02.112] WARN: Missing animation: pkmn__401
+[16:52:02.113] LOG: {"id":"BERRY","localeKey":"","iconImage":"lansat_berry","group":"berry","soundName":"se/restore","tier":0,"berryType":8} (enemy)
+[16:52:02.120] LOG: Generated AI funcs
+[16:52:02.239] DEBUG: Session data saved to slot 1!
+[16:52:02.240] LOG: Wave Seed: T>Q?cBzQX~MAQbAS>XCv<P 12
+[16:52:02.266] ERROR: [uncaught] Uncaught Error: Audio key "encounter_backpacker" not found in cache @ https://elite-redux.pages.dev/assets/BBCodeText-CwLIbsJg.js:64:29438
+[16:52:02.529] ERROR: No texture found for 'backpacker_f'!
+[16:52:02.529] LOG: Backpacker Kenny
+[16:52:32.230] LOG: Dialogue saved as seen: dialogue:backpacker.encounter.1
+[16:52:32.283] LOG: Backpacker Kenny
+[16:52:33.176] LOG: %cStart Phase SummonPhase color:green;
+[16:52:33.177] LOG: Kenny
+[16:52:33.404] WARN: Missing animation: pkmn__er__sableye_redux
+[16:52:33.405] WARN: Missing animation: pkmn__er__sableye_redux
+[16:52:33.436] WARN: cry/736 not found
+[16:52:33.580] LOG: %cStart Phase SummonPhase color:green;
+[16:52:33.581] LOG: Kenny
+[16:52:33.775] WARN: Missing animation: pkmn__822
+[16:52:33.775] WARN: Missing animation: pkmn__822
+[16:52:33.813] WARN: cry/822 not found
+[16:52:33.963] LOG: %cStart Phase SummonPhase color:green;
+[16:52:34.139] ERROR: [uncaught] Uncaught Error: Audio key "battle_ghost_piano" not found in cache @ https://elite-redux.pages.dev/assets/BBCodeText-CwLIbsJg.js:64:29438
+[16:52:34.362] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[16:52:34.366] LOG: %cStart Phase SummonPhase color:green;
+[16:52:34.774] LOG: %cStart Phase InitEncounterPhase color:green;
+[16:52:34.780] LOG: %cStart Phase PostSummonPhase color:green;
+[16:52:34.780] LOG: Ran PSP for: Entei
+[16:52:34.791] LOG: %cStart Phase PostSummonPhase color:green;
+[16:52:34.794] LOG: %cStart Phase PostSummonPhase color:green;
+[16:52:34.797] LOG: %cStart Phase PostSummonPhase color:green;
+[16:52:34.798] LOG: Ran PSP for: Corvisquire
+[16:52:34.801] LOG: %cStart Phase PostSummonPhase color:green;
+[16:52:34.802] LOG: %cStart Phase ShowAbilityPhase color:green;
+[16:52:35.038] LOG: %cStart Phase StatStageChangePhase color:green;
+[16:52:35.305] LOG: %cStart Phase MessagePhase color:green;
+[16:52:35.585] LOG: %cStart Phase StatStageChangePhase color:green;
+[16:52:35.854] LOG: %cStart Phase MessagePhase color:green;
+[16:52:36.139] LOG: %cStart Phase HideAbilityPhase color:green;
+[16:52:36.173] LOG: %cStart Phase PostSummonPhase color:green;
+[16:52:36.174] LOG: %cStart Phase PostSummonPhase color:green;
+[16:52:36.174] LOG: Ran PSP for: Hoppip
+[16:52:36.176] LOG: %cStart Phase PostSummonPhase color:green;
+[16:52:36.176] LOG: %cStart Phase PostSummonPhase color:green;
+[16:52:36.177] LOG: %cStart Phase PostSummonPhase color:green;
+[16:52:36.177] LOG: Ran PSP for: Sableye Redux
+[16:52:36.178] LOG: %cStart Phase PostSummonPhase color:green;
+[16:52:36.179] LOG: %cStart Phase PostSummonPhase color:green;
+[16:52:36.179] LOG: %cStart Phase TurnInitPhase color:green;
+[16:52:36.180] LOG: %cStart Phase CommandPhase color:green;
