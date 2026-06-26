@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<!--
+  Elite Redux — Pokédex & Usage.
+  Public, read-only static SPA: a competitive-stats dashboard. Reads a generated
+  dex (stats/data/dex.json), a SAMPLE metrics file (stats/data/stats.sample.json),
+  and the REAL nightly usage-tiers feed from er-assets (preferred when present).
+  Vanilla JS/CSS, no framework, no build step. Host on Cloudflare Pages.
+  See stats/README.md.
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Pokerogue Redux · Pokédex &amp; Usage</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <header>
+      <div class="brand">
+        <span class="logo"><span class="er">Pokerogue Redux</span> · Pokédex &amp; Usage</span>
+        <nav class="topnav">
+          <a href="#moves" title="Browse all moves">Moves</a>
+          <a href="#abilities" title="Browse all abilities">Abilities</a>
+        </nav>
+      </div>
+      <div class="controls">
+        <input id="search" type="search" placeholder="Search a Pokémon…" autocomplete="off" spellcheck="false" />
+        <select id="filter-type" title="Filter by type"><option value="">All types</option></select>
+        <select id="filter-tier" title="Filter by tier">
+          <option value="">All tiers</option>
+          <option value="OU">OU</option>
+          <option value="UU">UU</option>
+          <option value="RU">RU</option>
+          <option value="PU">PU</option>
+          <option value="NU">NU</option>
+        </select>
+        <select id="filter-egg" title="Filter by egg rarity">
+          <option value="">All egg tiers</option>
+          <option value="0">Common</option>
+          <option value="1">Rare</option>
+          <option value="2">Epic</option>
+          <option value="3">Legendary</option>
+        </select>
+        <select id="filter-samples" title="Hide Pokemon with few recorded runs (small samples are noisy)">
+          <option value="0">Any sample</option>
+          <option value="5" selected>5+ runs</option>
+          <option value="10">10+ runs</option>
+          <option value="25">25+ runs</option>
+          <option value="50">50+ runs</option>
+        </select>
+        <div class="seg" id="diffseg" title="Which difficulty's win-rate to show">
+          <button data-diff="all" class="on">All</button>
+          <button data-diff="ace">Ace</button>
+          <button data-diff="elite">Elite</button>
+          <button data-diff="hell">Hell</button>
+        </div>
+        <span id="sample-pill" class="sample-pill" title="What these numbers are">Sample data</span>
+        <label id="owned-wrap" class="owned-wrap" hidden title="Show only Pokemon your account has caught">
+          <input type="checkbox" id="owned-only" /> Owned only
+        </label>
+        <button id="account-btn" class="acct-btn" type="button" title="Log in to filter by what you own">Log in</button>
+      </div>
+      <span class="count" id="count">Loading…</span>
+    </header>
+
+    <div class="filters">
+      <div class="grp">
+        <span class="lab">Type</span>
+        <span id="type-chips"></span>
+      </div>
+      <div class="grp">
+        <span class="lab">Tier</span>
+        <span id="tier-chips"></span>
+      </div>
+    </div>
+
+    <main>
+      <div class="table-wrap">
+        <table class="dex">
+          <thead><tr id="head-row"></tr></thead>
+          <tbody id="rows"></tbody>
+        </table>
+      </div>
+      <div class="cards" id="cards"></div>
+      <div class="empty" id="empty" hidden>No Pokémon match your filters.</div>
+    </main>
+
+    <!-- Quick side panel (row click). "Full details" opens the page below. -->
+    <div class="scrim" id="scrim"></div>
+    <aside class="drawer" id="drawer" aria-hidden="true"></aside>
+
+    <!-- Full per-Pokemon / move / ability "deck" page (route-driven, no tabs). -->
+    <div class="detail" id="detail" hidden aria-hidden="true"></div>
+
+    <!-- Optional login: filters the dex to the Pokemon your account owns. -->
+    <div class="login-scrim" id="login-scrim" hidden></div>
+    <div class="login-modal" id="login-modal" hidden role="dialog" aria-label="Log in">
+      <button class="close" id="login-close" title="Close">×</button>
+      <div class="lm-title">Log in</div>
+      <p class="lm-note">Optional. Logs in with your Elite Redux account to filter the dex to the Pokemon you
+        own. Your username and password are sent only to the game's save server (the same login the game uses)
+        over HTTPS. Your save is decrypted in your browser; only the list of species you own is kept locally for
+        the filter. Your password is never stored.</p>
+      <form id="login-form" autocomplete="on">
+        <input id="login-user" type="text" placeholder="Username" autocomplete="username" autocapitalize="off" spellcheck="false" />
+        <input id="login-pass" type="password" placeholder="Password" autocomplete="current-password" />
+        <div class="lm-err" id="login-err" hidden></div>
+        <button class="lm-submit" id="login-submit" type="submit">Log in</button>
+      </form>
+    </div>
+
+    <!-- crypto-js (jsDelivr CDN, not Cloudflare): decrypts the save in-browser. -->
+    <script src="https://cdn.jsdelivr.net/npm/crypto-js@4.2.0/crypto-js.min.js"></script>
+    <script src="./app.js"></script>
+  </body>
+</html>

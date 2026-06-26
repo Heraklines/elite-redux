@@ -1,0 +1,70 @@
+name: Stats Site Nightly Refresh
+
+# Fully-automatic nightly rebuild + redeploy of the er-stats dashboard
+# (er-stats.pages.dev). Pulls the last 30 days of prod runs from the er-saves D1
+# database, regenerates the bundled fallback stats (data/species-stats.json) and
+# re-tiers it with the same M5cap policy the game uses, then deploys a clean
+# _stats_deploy/ dir to the er-stats Cloudflare Pages project.
+#
+# This mirrors the manual deploy block in stats/README.md, just on a schedule.
+# The raw prod dump (stats/data/_runs.json) has user_ids and is NEVER deployed:
+# the deploy dir ships a placeholder _runs.json + a no-cache _headers (see below).
+#
+# Cron is 04:30 UTC - 30 min after the worker's own usage-tier cron (0 4 * * *)
+# so the upstream usage feed is already fresh when this runs.
+
+on:
+  schedule:
+    - cron: "30 4 * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: stats-nightly
+  cancel-in-progress: true
+
+jobs:
+  refresh:
+    if: github.repository == 'Heraklines/elite-redux'
+    timeout-minutes: 20
+    runs-on: ubuntu-latest
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: ./.github/actions/setup-deps
+
+      - name: Dump last 30 days of prod runs to stats/data/_runs.json
+        run: |
+          # SINCE = 30 days ago in epoch MILLISECONDS (created_at is stored in ms).
+          SINCE=$(( ($(date +%s) - 30 * 24 * 60 * 60) * 1000 ))
+          echo "Dumping prod runs created since ${SINCE} (ms)"
+          npx wrangler d1 execute er-saves --remote --json \
+            --config workers/er-save-api/wrangler.toml \
+            --command "SELECT user_id, starters, challenges, difficulty, wave, outcome FROM runs WHERE created_at >= ${SINCE} AND starters IS NOT NULL" \
+            > stats/data/_runs.json
+          # wrangler --json emits [{ "results": [...] }] which the gen-*.mjs scripts expect.
+          node -e "const r=require('./stats/data/_runs.json'); if(!Array.isArray(r)||!r[0]||!Array.isArray(r[0].results)){console.error('Unexpected dump shape');process.exit(1);} console.log('rows='+r[0].results.length);"
+
+      - name: Regenerate + re-tier the bundled fallback stats
+        run: |
+          node stats/gen-real-stats.mjs
+          node stats/gen-usage-tiers.mjs stats/data/usage-tiers.json
+          node stats/apply-m5cap-tiers.mjs
+
+      - name: Build clean _stats_deploy dir
+        working-directory: stats
+        run: |
+          rm -rf _stats_deploy && mkdir -p _stats_deploy/data
+          cp index.html app.js styles.css _stats_deploy/
+          cp data/dex.json data/species-stats.json data/dex-detail.json data/species-extra.json _stats_deploy/data/
+          # NEVER ship the raw prod dump (it has user_ids); ship a placeholder instead.
+          printf '%s' '{"note":"not public"}' > _stats_deploy/data/_runs.json
+          # No-cache /data/* so a stale dump can never linger in the edge cache.
+          printf '%s\n' '/data/*' '  Cache-Control: public, max-age=0, must-revalidate' > _stats_deploy/_headers
+
+      - name: Deploy to Cloudflare Pages (er-stats production)
+        working-directory: stats
+        run: |
+          npx wrangler pages deploy _stats_deploy --project-name=er-stats --branch=main --commit-dirty=true

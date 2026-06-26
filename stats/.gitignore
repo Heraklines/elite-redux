@@ -1,0 +1,9 @@
+# Generated nightly by .github/workflows/stats-nightly.yml (rebuilt from a prod D1
+# dump) - do NOT track; they churn daily and the workflow regenerates them.
+data/_runs.json
+data/species-stats.json
+data/usage-tiers.json
+
+# Build output + local screenshots
+_stats_deploy/
+_preview-*.png

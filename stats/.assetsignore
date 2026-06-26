@@ -1,0 +1,5 @@
+# Dev-only artifacts that should NOT be served on the public Pages site.
+_*
+*.mjs
+README.md
+.assetsignore
