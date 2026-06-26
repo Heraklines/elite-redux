@@ -7,6 +7,7 @@ import {
   COOP_INTERACTION_REROLL,
   type CoopInteractionChoice,
 } from "#data/elite-redux/coop/coop-interaction-relay";
+import { coopGiveMonToPartner } from "#data/elite-redux/coop/coop-party-ops";
 import { reconstructRewardOptions, serializeRewardOptions } from "#data/elite-redux/coop/coop-reward-options";
 import {
   coopMeInProgress,
@@ -16,6 +17,16 @@ import {
   getCoopRuntime,
   getCoopUiMirror,
 } from "#data/elite-redux/coop/coop-runtime";
+import {
+  COOP_ACT_CHECK,
+  COOP_CHECK_OP_FORM_ITEM,
+  COOP_CHECK_OP_GIVE,
+  COOP_CHECK_OP_RELEASE,
+  COOP_CHECK_OP_RENAME,
+  COOP_CHECK_OP_REORDER,
+  COOP_CHECK_OP_UNPAUSE_EVO,
+  COOP_CHECK_OP_UNSPLICE,
+} from "#data/elite-redux/coop/coop-shop-check-relay";
 import { erBalanceArr, erBalanceNum } from "#data/elite-redux/er-balance-tuning";
 import { getErBiomeRule } from "#data/elite-redux/er-biome-rules";
 import {
@@ -23,14 +34,19 @@ import {
   erMerchantsSealRerollMultiplier,
   erScrapMagnetExtraRewards,
 } from "#data/elite-redux/er-relics";
+import { SpeciesFormChangeItemTrigger } from "#data/form-change-triggers";
 import { BattleType } from "#enums/battle-type";
+import { FormChangeItem } from "#enums/form-change-item";
 import { ModifierPoolType } from "#enums/modifier-pool-type";
 import type { ModifierTier } from "#enums/modifier-tier";
+import { SpeciesId } from "#enums/species-id";
 import { UiMode } from "#enums/ui-mode";
+import type { PlayerPokemon } from "#field/pokemon";
 import type { Modifier } from "#modifiers/modifier";
 import {
   ExtraModifierModifier,
   HealShopCostModifier,
+  PokemonFormChangeItemModifier,
   PokemonHeldItemModifier,
   TempExtraModifierModifier,
 } from "#modifiers/modifier";
@@ -69,6 +85,15 @@ const COOP_ACT_REWARD = 0;
 const COOP_ACT_SHOP = 1;
 const COOP_ACT_TRANSFER = 2;
 const COOP_ACT_LOCK = 3;
+// Co-op (#633 B9b): the "Check Team" party-mutation action code + op codes live in the engine-free
+// coop-shop-check-relay module so the owner relay (here) and the per-mutation source hooks
+// (PartyUiHandler) share them without a phase<->handler import cycle. Why they are load-bearing for
+// the per-turn checksum (coop-battle-checksum.ts): `party` order/length + `speciesId`
+// (REORDER/GIVE/RELEASE), `formIndex` (FORM_ITEM/UNSPLICE), `abilityId` (UNSPLICE), and the
+// persistent `modifiers` multiset (RELEASE strips held items) are ALL hashed, so an unrelayed
+// owner-only mutation flips the hash -> resync storm. The NON-hashed residuals (`coopOwner` from
+// GIVE, `pauseEvolutions`, `nickname`) heal via the ME-terminal `applyCoopMeMonFields` path + the
+// future B4 bench snapshot, but are relayed too so the common path never even diverges.
 /** How long the WATCHER waits for the owner's next reward pick before leaving (never hangs).
  *  20min: "wait for the human" - a slow shopper must never trip the watcher's premature leave
  *  (which would land the watcher in the next wave while the owner is still shopping = desync). */
@@ -240,10 +265,7 @@ export class SelectModifierPhase extends BattlePhase {
               return this.openModifierTransferScreen(modifierSelectCallback);
             // Check the party, pass a callback to restore the modifier select screen.
             case 2:
-              globalScene.ui.setModeWithoutClear(UiMode.PARTY, PartyUiMode.CHECK, -1, () => {
-                this.resetModifierSelect(modifierSelectCallback);
-              });
-              return true;
+              return this.openCheckTeamScreen(modifierSelectCallback);
             case 3:
               return this.toggleRerollLock();
             default:
@@ -413,6 +435,34 @@ export class SelectModifierPhase extends BattlePhase {
     }
     globalScene.playSound("se/buy");
     return true;
+  }
+
+  /**
+   * Open the shop's "Check Team" (PARTY/CHECK) sub-screen. Co-op (#633 B9b): the WATCHER must
+   * NEVER open PARTY - the shop mirror session is bound to MODIFIER_SELECT, so opening PARTY
+   * un-blocks the watcher's local input and would let it mutate the shared party off-script. It
+   * stays on its watch loop and applies the owner's relayed CHECK ops (applyRelayedCheckOp)
+   * instead. `coopWatcher` is true ONLY on the watcher (false in solo / host-owner / lockstep),
+   * so this open is byte-identical to the previous inline `case 2:` everywhere but the watcher.
+   */
+  private openCheckTeamScreen(modifierSelectCallback: ModifierSelectCallback): boolean {
+    if (this.coopWatcher) {
+      return true;
+    }
+    globalScene.ui.setModeWithoutClear(UiMode.PARTY, PartyUiMode.CHECK, -1, () => {
+      this.resetModifierSelect(modifierSelectCallback);
+    });
+    return true;
+  }
+
+  /**
+   * Co-op (#633 B9b): called by PartyUiHandler (via coopReportCheckToPhase) when an OWNER
+   * "Check Team" party mutation resolves, to relay it on this shop's pinned interaction seq.
+   * Hard no-op off the pinned owner / outside co-op (coopRelaySend gates on isLocalOwnerAtCounter).
+   * `op` is a COOP_CHECK_OP_*; `data` is its payload (slots / codepoints / form index).
+   */
+  public coopReportCheckMutation(op: number, data: number[]): void {
+    this.coopRelaySend(0, [COOP_ACT_CHECK, op, ...data], "check");
   }
 
   // Transfer modifiers among party pokemon
@@ -1131,7 +1181,125 @@ export class SelectModifierPhase extends BattlePhase {
       this.selectShopModifierOption(data[1], action.choice, noop);
       return false;
     }
+    if (act === COOP_ACT_CHECK) {
+      // CHECK ops are NON-terminal: the owner is still in the shop. Apply against our identical
+      // party and keep watching for the next relayed pick / op / leave.
+      this.applyRelayedCheckOp(data[1], data.slice(2));
+      return false;
+    }
     coopWarn("reward", `WATCHER ignoring unknown reward action choice=${action.choice} data=${data.join(",")}`);
     return false;
+  }
+
+  /**
+   * WATCHER (#633 B9b): reproduce one OWNER "Check Team" party mutation against this client's
+   * identical party. Each op resolves its target by SLOT INDEX against the pre-op party - which
+   * is guaranteed identical on both sides because every CHECK op is relayed and applied in the
+   * same FIFO order on this seq, so neither side mutates ahead of the other. The effect mirrors
+   * the owner's exact code path (the same wrappers / the same form-change trigger), so the hashed
+   * fields converge.
+   */
+  /**
+   * Co-op (#633 B9b) WATCHER: the SAME ordered + filtered form-change-item modifier list the OWNER's
+   * PartyUiHandler.getFormChangeItemsModifiers(pokemon) produced, so the relayed index resolves to
+   * the SAME modifier. Replicated here (not called on the handler) because the watcher has no
+   * PartyUiHandler open. The base order is acquisition order (findModifiers = a stable .filter over
+   * globalScene.modifiers, kept identical across clients by FIFO-relayed acquisitions); the
+   * Necrozma / active-form filter branches mirror the handler verbatim. Keep in lockstep with
+   * PartyUiHandler.getFormChangeItemsModifiers.
+   */
+  private coopFormChangeItemsModifiers(mon: PlayerPokemon): PokemonFormChangeItemModifier[] {
+    let mods = globalScene.findModifiers(
+      m => m instanceof PokemonFormChangeItemModifier && m.pokemonId === mon.id,
+    ) as PokemonFormChangeItemModifier[];
+    const ultraNecrozmaModifiers = mods.filter(m => m.active && m.formChangeItem === FormChangeItem.ULTRANECROZIUM_Z);
+    if (ultraNecrozmaModifiers.length > 0) {
+      return ultraNecrozmaModifiers;
+    }
+    if (mods.find(m => m.active)) {
+      mods = mods.filter(m => m.active || m.formChangeItem === FormChangeItem.ULTRANECROZIUM_Z);
+    } else if (mon.species.speciesId === SpeciesId.NECROZMA) {
+      mods = mods.filter(m => m.formChangeItem !== FormChangeItem.ULTRANECROZIUM_Z);
+    }
+    return mods;
+  }
+
+  private applyRelayedCheckOp(op: number, rest: number[]): void {
+    const party = globalScene.getPlayerParty();
+    switch (op) {
+      case COOP_CHECK_OP_REORDER: {
+        const [src, dst] = rest;
+        if (src < party.length && dst < party.length) {
+          [party[src], party[dst]] = [party[dst], party[src]];
+        }
+        return;
+      }
+      case COOP_CHECK_OP_GIVE: {
+        // Mirrors the owner's PartyUiHandler GIVE_TO_PARTNER: flip coopOwner + re-interleave the
+        // party so the field leads stay host/guest (coopGiveMonToPartner). Slot resolved pre-op.
+        const mon = party[rest[0]];
+        if (mon != null) {
+          coopGiveMonToPartner(mon);
+        }
+        return;
+      }
+      case COOP_CHECK_OP_RELEASE: {
+        // Reproduce the owner's doRelease effect EXACTLY: strip the released mon's held-item
+        // modifiers AND splice it out, so the hashed `modifiers` multiset + `party` both converge.
+        // (Using a look-alike removal API that skips removePartyMemberModifiers would leave the
+        // released mon's items in our modifier set -> a checksum mismatch -> a resync.)
+        const slot = rest[0];
+        if (party[slot] != null) {
+          void globalScene.removePartyMemberModifiers(slot);
+          const removed = party.splice(slot, 1)[0];
+          removed.destroy();
+        }
+        return;
+      }
+      case COOP_CHECK_OP_UNSPLICE: {
+        const mon = party[rest[0]];
+        if (mon?.isFusion()) {
+          // Async on BOTH sides (the owner's unfuse() is also .then-chained); a brief one-side
+          // window self-heals via the per-turn checksum. Do NOT try to make it synchronous.
+          void mon.unfuse();
+        }
+        return;
+      }
+      case COOP_CHECK_OP_RENAME: {
+        const mon = party[rest[0]];
+        if (mon != null) {
+          mon.nickname = String.fromCodePoint(...rest.slice(1));
+          void mon.updateInfo();
+        }
+        return;
+      }
+      case COOP_CHECK_OP_UNPAUSE_EVO: {
+        const mon = party[rest[0]];
+        if (mon != null) {
+          mon.pauseEvolutions = !mon.pauseEvolutions;
+        }
+        return;
+      }
+      case COOP_CHECK_OP_FORM_ITEM: {
+        // Mirror the owner's PartyUiHandler form-change-item toggle. The owner resolved the
+        // modifier as getFormChangeItemsModifiers(mon)[formItemIndex]; that ordering is the
+        // acquisition order of globalScene.modifiers (findModifiers is a stable .filter), which is
+        // identical across clients because every persistent-modifier acquisition is relayed and
+        // applied in the same FIFO order (PersistentModifier.add is a deterministic append). So
+        // the SAME predicate + index resolves the SAME modifier here. We query the form-change-item
+        // modifiers directly (the watcher has no PartyUiHandler open), toggle .active, and fire the
+        // identical SpeciesFormChangeItemTrigger so formIndex converges.
+        const mon = party[rest[0]] as PlayerPokemon | undefined;
+        if (mon != null) {
+          const formMods = this.coopFormChangeItemsModifiers(mon);
+          const modifier = formMods[rest[1]];
+          if (modifier != null) {
+            modifier.active = !modifier.active;
+            globalScene.triggerPokemonFormChange(mon, SpeciesFormChangeItemTrigger, false, true);
+          }
+        }
+        return;
+      }
+    }
   }
 }

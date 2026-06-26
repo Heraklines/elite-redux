@@ -4,6 +4,15 @@ import { pokemonEvolutions } from "#balance/pokemon-evolutions";
 import { allMoves } from "#data/data-lists";
 import { coopGiveMonToPartner } from "#data/elite-redux/coop/coop-party-ops";
 import { coopGiveToPartner, coopSwitchBlocksMon } from "#data/elite-redux/coop/coop-session";
+import {
+  COOP_CHECK_OP_FORM_ITEM,
+  COOP_CHECK_OP_GIVE,
+  COOP_CHECK_OP_RELEASE,
+  COOP_CHECK_OP_RENAME,
+  COOP_CHECK_OP_REORDER,
+  COOP_CHECK_OP_UNPAUSE_EVO,
+  COOP_CHECK_OP_UNSPLICE,
+} from "#data/elite-redux/coop/coop-shop-check-relay";
 import { isErBlackShiny } from "#data/elite-redux/er-black-shinies";
 import { SpeciesFormChangeItemTrigger } from "#data/form-change-triggers";
 import { Gender, getGenderColor, getGenderSymbol } from "#data/gender";
@@ -458,6 +467,9 @@ export class PartyUiHandler extends MessageUiHandler {
     this.clearOptions();
     ui.playSelect();
     pokemon.pauseEvolutions = !pokemon.pauseEvolutions;
+    // Co-op (#633 B9b): relay the toggle so the watcher mirrors it (pauseEvolutions is not hashed,
+    // but relaying it keeps the common path convergent ahead of the ME-terminal heal).
+    this.coopReportCheckToPhase(COOP_CHECK_OP_UNPAUSE_EVO, [this.cursor]);
     this.showText(
       i18next.t(pokemon.pauseEvolutions ? "partyUiHandler:pausedEvolutions" : "partyUiHandler:unpausedEvolutions", {
         pokemonName: getPokemonNameWithAffix(pokemon, false),
@@ -485,10 +497,14 @@ export class PartyUiHandler extends MessageUiHandler {
           UiMode.CONFIRM,
           () => {
             const fusionName = pokemon.getName();
+            // Co-op (#633 B9b): capture the slot BEFORE unfuse mutates, relay inside the .then so the
+            // watcher's unfuse runs after ours (both async; a brief skew self-heals via the checksum).
+            const unspliceSlot = globalScene.getPlayerParty().indexOf(pokemon);
             pokemon.unfuse().then(() => {
               this.clearPartySlots();
               this.populatePartySlots();
               ui.setMode(UiMode.PARTY);
+              this.coopReportCheckToPhase(COOP_CHECK_OP_UNSPLICE, [unspliceSlot]);
               this.showText(
                 i18next.t("partyUiHandler:wasReverted", {
                   fusionName,
@@ -566,6 +582,13 @@ export class PartyUiHandler extends MessageUiHandler {
             this.clearPartySlots();
             this.populatePartySlots();
             ui.setMode(UiMode.PARTY);
+            // Co-op (#633 B9b): relay the new nickname as codepoints (round-trips non-BMP / emoji
+            // via String.fromCodePoint on the watcher). nickname is not hashed, but relaying it
+            // keeps the common path convergent ahead of the ME-terminal field heal.
+            this.coopReportCheckToPhase(COOP_CHECK_OP_RENAME, [
+              this.cursor,
+              ...[...nickname].map(c => c.codePointAt(0) ?? 0),
+            ]);
           },
           () => {
             ui.setMode(UiMode.PARTY);
@@ -961,6 +984,11 @@ export class PartyUiHandler extends MessageUiHandler {
       const modifier = formChangeItemModifiers[option - PartyOption.FORM_CHANGE_ITEM];
       modifier.active = !modifier.active;
       globalScene.triggerPokemonFormChange(pokemon, SpeciesFormChangeItemTrigger, false, true);
+      // Co-op (#633 B9b): relay the form toggle so the watcher resolves the SAME modifier (same
+      // index into its identical, FIFO-synced form-change-item list) and fires the identical
+      // trigger - keeping the hashed formIndex in sync. The watcher replicates
+      // getFormChangeItemsModifiers' filtered ordering in applyRelayedCheckOp.
+      this.coopReportCheckToPhase(COOP_CHECK_OP_FORM_ITEM, [this.cursor, option - PartyOption.FORM_CHANGE_ITEM]);
     }
 
     // This is processed before the filter result since releasing does not depend on status.
@@ -1024,6 +1052,8 @@ export class PartyUiHandler extends MessageUiHandler {
           this.reconcilePlayerFieldAfterSwap(onFieldBefore, fieldSize);
         }
         this.populatePartySlots(); // re-render the list in the new order
+        // Co-op (#633 B9b): relay the resolved swap so the watcher mirrors it on its identical party.
+        this.coopReportCheckToPhase(COOP_CHECK_OP_REORDER, [src, dst]);
       } else {
         this.startTransfer();
       }
@@ -1037,11 +1067,15 @@ export class PartyUiHandler extends MessageUiHandler {
     // host/guest, then re-renders the list. The new ownership serializes with the
     // session at the next save.
     if (option === PartyOption.GIVE_TO_PARTNER) {
+      // Co-op (#633 B9b): capture the giver's slot BEFORE the give re-interleaves the party, so the
+      // watcher resolves the same mon and reproduces the identical flip + reorder.
+      const givenSlot = this.cursor;
       const given = coopGiveMonToPartner(pokemon);
       this.clearOptions();
       if (given.ok) {
         this.populatePartySlots();
         ui.playSelect();
+        this.coopReportCheckToPhase(COOP_CHECK_OP_GIVE, [givenSlot]);
       } else {
         ui.playError();
       }
@@ -2082,6 +2116,11 @@ export class PartyUiHandler extends MessageUiHandler {
         const releasedPokemon = globalScene.getPlayerParty().splice(slotIndex, 1)[0];
         releasedPokemon.destroy();
         this.populatePartySlots();
+        // Co-op (#633 B9b): relay the release AFTER the splice, capturing the SLOT (the param), so the
+        // watcher strips the same held-item modifiers + splices the same mon (the hashed `modifiers`
+        // multiset + `party` both converge). The CHECK-mode guard in coopReportCheckToPhase makes this
+        // a no-op for PartyUiMode.RELEASE (the in-battle / revival release), which must stay local.
+        this.coopReportCheckToPhase(COOP_CHECK_OP_RELEASE, [slotIndex]);
         if (this.cursor >= globalScene.getPlayerParty().length) {
           this.setCursor(this.cursor - 1);
         }
@@ -2137,6 +2176,30 @@ export class PartyUiHandler extends MessageUiHandler {
     return i18next.t("partyUiHandler:smellYaLater", {
       pokemonName,
     });
+  }
+
+  /**
+   * Co-op (#633 B9b): relay an OWNER "Check Team" party MUTATION (op + payload) to the watcher
+   * through the live SelectModifierPhase, so the watcher mirrors it on its identical party
+   * (party order/length/speciesId/formIndex/abilityId/modifiers are all per-turn-checksum hashed,
+   * so an unrelayed owner-only mutation here would desync). Hard-gated to CO-OP + CHECK mode (so
+   * the in-battle RELEASE / a non-shop party screen never fires), and to the shop phase being live
+   * - SelectModifierPhase.coopReportCheckMutation then no-ops off the pinned owner / outside co-op.
+   * Solo / lockstep: isCoop is false, so this returns immediately and the screen is byte-identical.
+   */
+  private coopReportCheckToPhase(op: number, data: number[]): void {
+    if (!globalScene.gameMode.isCoop || this.partyUiMode !== PartyUiMode.CHECK) {
+      return;
+    }
+    const phase = globalScene.phaseManager.getCurrentPhase();
+    if (phase.is("SelectModifierPhase")) {
+      // Structural reach-through, mirroring this file's existing `as CommandPhase` precedent
+      // (line ~1057, the PASS_BATON/SEND_OUT handleCommand call). No `as any` / `@ts-expect-error`.
+      (phase as unknown as { coopReportCheckMutation(op: number, data: number[]): void }).coopReportCheckMutation(
+        op,
+        data,
+      );
+    }
   }
 
   getFormChangeItemsModifiers(pokemon: Pokemon) {

@@ -9686,4 +9686,133 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
     shopItems: [modifierTypes.ER_ABILITY_CAPSULE],
   },
+  // Co-op - shop "Check Team" party-mutation relay (#633 B9b)
+  {
+    label: "(note) Co-op: shop Check Team mutations sync (2 clients)",
+    description:
+      "#633 co-op SHOP CHECK-TEAM RELAY (B9b) - the LIVE desync. In the co-op reward shop the OWNER\n"
+      + "opens 'Check Team' (the party screen) and reorders / gives to partner / releases / unsplices /\n"
+      + "renames / unpauses-evolution / toggles a form-change item (mega stone) on the SHARED party.\n"
+      + "THE BUG: that mutation applied ONLY on the owner's client. Party order/length/speciesId,\n"
+      + "formIndex, abilityId, and the held-item (persistent-modifier) set are ALL in the per-turn\n"
+      + "checksum, so an owner-only Check-Team change flipped the watcher's checksum -> resync storm,\n"
+      + "and an on-field RELEASE / form toggle visibly diverged the field.\n"
+      + "THE FIX: the OWNER relays each resolved Check-Team mutation on the shop's interaction seq (the\n"
+      + "SAME owner/watcher channel reward picks use, action code COOP_ACT_CHECK). The WATCHER never\n"
+      + "opens the party screen; it applies each relayed op verbatim against its identical party - a\n"
+      + "RELEASE strips the SAME held items + splices the SAME mon (so the modifier multiset converges),\n"
+      + "a form toggle resolves the SAME item index + fires the identical form-change trigger.\n"
+      + "DO (single client, just to reach the screen): KO Magikarp; in the FIRST shop open Check Team and\n"
+      + "try each action - Move (reorder) two mons, Release a benched mon, Rename one, toggle Charizard's\n"
+      + "mega stone (Form-Change Item). EXPECT (single client): every action behaves exactly as in solo\n"
+      + "- the form toggles, the release removes the mon and its items, the reorder sticks.\n"
+      + "DO (needs a REAL 2-client AUTHORITATIVE session on staging): on the OWNER's alternation turn,\n"
+      + "perform each Check-Team action; EXPECT BOTH clients show the SAME party order, the SAME mon\n"
+      + "released (and the same held-items gone), the SAME on-field form, the SAME nickname, with NO\n"
+      + "[coop-desync] lines and no resync storm. VERIFY the post-shop checksum matches on both sides.\n"
+      + "(Regression unit test: test/tests/elite-redux/coop/coop-shop-check-ops.test.ts.)",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 40,
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.MAGIKARP,
+        ENEMY_LEVEL_OVERRIDE: 3,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+      });
+      // A Charizard lead (its mega stone is the Form-Change Item to toggle in Check Team) plus a
+      // bench so reorder / release / rename / give have real targets.
+      return [
+        makeStarter(SpeciesId.CHARIZARD, {
+          moveset: [MoveId.FLAMETHROWER, MoveId.AIR_SLASH, MoveId.DRAGON_PULSE, MoveId.ROOST],
+        }),
+        makeStarter(SpeciesId.SNORLAX, {
+          moveset: [MoveId.BODY_SLAM, MoveId.CRUNCH, MoveId.EARTHQUAKE, MoveId.REST],
+        }),
+        makeStarter(SpeciesId.GYARADOS, {
+          moveset: [MoveId.WATERFALL, MoveId.CRUNCH, MoveId.EARTHQUAKE, MoveId.DRAGON_DANCE],
+        }),
+      ];
+    },
+    onBattleStart: () => {
+      // Flip the live run into co-op so the Check-Team relay gates engage (the relay no-ops outside
+      // co-op). Host = slots 0-2; with a single local client this is the spoof/host-owner path, so the
+      // relay sends are inert here - the 2-client convergence is the (note) part validated on staging.
+      globalScene.gameMode = getGameMode(GameModes.COOP);
+      if (getCoopController() == null) {
+        startLocalCoopSession({ username: loggedInUser?.username });
+      }
+      const party = globalScene.getPlayerParty();
+      party.forEach((mon, i) => {
+        mon.coopOwner = i < 3 ? "host" : "guest";
+      });
+      console.log(
+        "[#633 co-op B9b Check-Team] tags: "
+          + party.map(m => `${m.getNameToRender()}=${m.coopOwner}`).join(", ")
+          + " (open Check Team in the first shop; on 2 clients the owner's mutations should mirror to the watcher)",
+      );
+    },
+    shopItems: [modifierTypes.FORM_CHANGE_ITEM],
+  },
+  // Co-op - shop Check-Team RELEASE strips held items + on-field form toggle (#633 B9b, checksum-critical)
+  {
+    label: "(note) Co-op: Check Team release + on-field form sync (2 clients)",
+    description:
+      "#633 co-op B9b - the two CHECKSUM-CRITICAL Check-Team ops, isolated. A RELEASE in Check Team must\n"
+      + "strip the released mon's HELD ITEMS (persistent modifiers, hashed as a multiset) AND splice it,\n"
+      + "exactly like the owner - a look-alike removal that leaves the items behind would mismatch the\n"
+      + "checksum. A FORM-CHANGE-ITEM toggle on the ON-FIELD lead changes formIndex (hashed), so it must\n"
+      + "be relayed or the field forms diverge.\n"
+      + "DO (single client, to reach the screen): KO Magikarp; in the FIRST shop open Check Team, toggle\n"
+      + "Charizard's mega stone (Form-Change Item) ON (it megas in place), then RELEASE the benched\n"
+      + "Gyarados (which is holding the Leftovers given below). EXPECT (single client): Charizard megas;\n"
+      + "Gyarados and its Leftovers are gone.\n"
+      + "DO (needs a REAL 2-client AUTHORITATIVE session on staging): on the OWNER's alternation turn,\n"
+      + "toggle the on-field mega and release the item-holder. EXPECT BOTH clients show the SAME on-field\n"
+      + "form (mega vs base) AND the SAME held-item set after the release (the released mon's Leftovers\n"
+      + "gone on BOTH), with NO [coop-desync] and a matching post-shop checksum.\n"
+      + "(Regression unit test: test/tests/elite-redux/coop/coop-shop-check-ops.test.ts - the RELEASE\n"
+      + "convergence test asserts the held-item multiset is stripped, catching the look-alike-removal gap.)",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 40,
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.MAGIKARP,
+        ENEMY_LEVEL_OVERRIDE: 3,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+      });
+      return [
+        makeStarter(SpeciesId.CHARIZARD, {
+          moveset: [MoveId.FLAMETHROWER, MoveId.AIR_SLASH, MoveId.DRAGON_PULSE, MoveId.ROOST],
+        }),
+        makeStarter(SpeciesId.GYARADOS, {
+          moveset: [MoveId.WATERFALL, MoveId.CRUNCH, MoveId.EARTHQUAKE, MoveId.DRAGON_DANCE],
+        }),
+      ];
+    },
+    onBattleStart: () => {
+      globalScene.gameMode = getGameMode(GameModes.COOP);
+      if (getCoopController() == null) {
+        startLocalCoopSession({ username: loggedInUser?.username });
+      }
+      const party = globalScene.getPlayerParty();
+      party.forEach((mon, i) => {
+        mon.coopOwner = i < 3 ? "host" : "guest";
+      });
+      // Hand the benched Gyarados a persistent held item so the RELEASE must strip it (the
+      // checksum-multiset convergence the unit test asserts).
+      const holder = party[1];
+      if (holder != null) {
+        const item = modifierTypes.LEFTOVERS().newModifier(holder);
+        if (item != null) {
+          globalScene.addModifier(item, true);
+        }
+      }
+      console.log(
+        "[#633 co-op B9b release+form] tags: "
+          + party.map(m => `${m.getNameToRender()}=${m.coopOwner}`).join(", ")
+          + " (toggle Charizard's mega + release the Leftovers-holding Gyarados in the first shop's Check Team)",
+      );
+    },
+    shopItems: [modifierTypes.FORM_CHANGE_ITEM],
+  },
 ];
