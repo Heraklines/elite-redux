@@ -348,8 +348,15 @@ export class UI extends Phaser.GameObjects.Container {
         if (mirror.isWatcher()) {
           return false; // the partner drives this screen; ignore the watcher's local input
         }
+        // #633 ("cursor slightly off sync"): sample the mode BEFORE the press is processed.
+        // processInputInner -> handler.processInput may setMode/revertMode synchronously, so reading
+        // this.mode AFTER would relay the POST-press mode; on a mode-changing press (confirm reward,
+        // open a sub-menu) the watcher's resync barrier then compares it against its still-pre-press
+        // mode, sees a mismatch, and DROPS the valid button as "cursor drift". relayOwnerButton's 2nd
+        // arg is the watcher's resync barrier and must be the PRE-press mode.
+        const modeBefore = this.mode;
         const result = this.processInputInner(button); // OWNER: drive locally...
-        mirror.relayOwnerButton(button, this.mode); // ...then relay the cursor for the partner
+        mirror.relayOwnerButton(button, modeBefore); // ...then relay the cursor for the partner
         return result;
       }
     }
