@@ -1,0 +1,207 @@
+----- BUG REPORT (in-game) -----
+version:  1.11.19
+url:      https://elite-redux.pages.dev/
+ua:       Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36 Avast/148.0.0.0
+mode:     0  wave:163  difficulty:hell
+seed:     e49fhs02sXG5CgS0I8aTUk6A
+party:    Bewear Angry(L162 479/682), Luxzero(L162 461/461), Furret(L162 497/497), Corviknight(L162 538/538), Zebstrika(L162 497/497), Dewgong(L162 512/512)
+
+----- DESCRIPTION -----
+randomly coming across a pangoro with crazy stats for no reason
+
+----- CONSOLE -----
+[10:57:16.063] LOG: %c %c %c %c %c Phaser v3.90.0 (WebGL | Web Audio) %c https://phaser.io/v390 background: #ff0000 background: #ffff00 background: #00ff00 background: #00ffff color: #ffffff; background: #000000 background: transparent
+[10:57:16.706] LOG: [ER] build mqvqyn32-la45
+[10:57:30.480] DEBUG: Destroying loading scene
+[10:57:30.480] DEBUG: Destroyed loading scene
+[10:57:30.630] LOG: Seed: aLnFvZcsSrtIQGENGLWyI0p9
+[10:57:30.630] LOG: Wave Seed: aLnFvZcsSrtIQGENGLWyI0p9 0
+[10:57:32.613] LOG: %cStart Phase LoginPhase color:green;
+[10:57:32.884] LOG: Client Session: jWD2kw2aapjlLpt36wICFaoIbhRu2BkW
+[10:57:33.187] DEBUG: Using cached system data
+[10:57:33.300] LOG: %cStart Phase TitlePhase color:green;
+[10:57:33.300] LOG: Getting Session Slot id: %d 4
+[10:57:33.316] LOG: use seasonal splash messages true
+[10:57:33.316] LOG: Adding 2 Pride Month splash messages (weight: x15)
+[10:57:34.485] LOG: Getting Session Slot id: %d 4
+[10:57:34.493] LOG: Wave Seed: e49fhs02sXG5CgS0I8aTUk6A 0
+[10:57:34.494] LOG: Seed: e49fhs02sXG5CgS0I8aTUk6A
+[10:57:34.576] LOG: Wave Seed: Ĉ×ÜĉċĖÓÕĖûêØæĊöÓìÛĄ÷øĎÙä 163
+[10:57:34.673] LOG: Applied Protein 
+[10:57:34.673] LOG: Applied Zinc 
+[10:57:34.673] LOG: Applied HP Up 
+[10:57:34.673] LOG: Applied Carbos 
+[10:57:34.673] LOG: Applied Iron 
+[10:57:34.676] LOG: Applied Soul Dew 
+[10:57:34.676] LOG: Applied Soul Dew 
+[10:57:34.676] LOG: Applied Iron 
+[10:57:34.688] LOG: Applied Protein 
+[10:57:34.688] LOG: Applied Zinc 
+[10:57:34.688] LOG: Applied HP Up 
+[10:57:34.688] LOG: Applied Carbos 
+[10:57:34.688] LOG: Applied Iron 
+[10:57:34.688] LOG: Applied Soul Dew 
+[10:57:34.689] LOG: Applied Soul Dew 
+[10:57:34.689] LOG: Applied Iron 
+[10:57:34.695] LOG: Applied Protein 
+[10:57:34.696] LOG: Applied Zinc 
+[10:57:34.696] LOG: Applied HP Up 
+[10:57:34.696] LOG: Applied Carbos 
+[10:57:34.696] LOG: Applied Iron 
+[10:57:34.696] LOG: Applied Soul Dew 
+[10:57:34.697] LOG: Applied Soul Dew 
+[10:57:34.697] LOG: Applied Iron 
+[10:57:34.706] LOG: Applied HP Up (enemy)
+[10:57:34.823] LOG: %cStart Phase EncounterPhase color:green;
+[10:57:34.827] LOG: Pokemon: Foe Pangoro | Species ID: 675 | Level: 162 | Nature: Lax (+Def/-SpDef)
+[10:57:34.827] LOG: Stats (IVs): HP: 2098 (999), Atk: 2025 (999), Def: 2064 (999), Spatk: 1846 (999), Spdef: 1667 (999), Spd: 1811 (999)
+[10:57:34.827] LOG: Ability: Precise Fist | Passive Ability: Scrappy 
+[10:57:34.827] LOG: Moveset: ["Bullet Punch","Meteor Mash","Sky Uppercut","Beatdown","Comet Punch"]
+[10:57:34.827] LOG: Pokemon: Foe Great Tusk | Species ID: 984 | Level: 162 | Nature: Jolly (+Spd/-SpAtk)
+[10:57:34.827] LOG: Stats (IVs): HP: 2162 (999), Atk: 2047 (999), Def: 2047 (999), Spatk: 1615 (999), Spdef: 1795 (999), Spd: 2096 (999)
+[10:57:34.827] LOG: Ability: Battle Armor | Passive Ability: Protosynthesis 
+[10:57:34.827] LOG: Moveset: ["Megahorn","Combat Torque","Blazing Torque","Stomping Tantrum","Horn Drill"]
+[10:57:34.827] LOG: Pokemon: Foe Pawmot | Species ID: 923 | Level: 162 | Nature: Impish (+Def/-SpAtk)
+[10:57:34.827] LOG: Stats (IVs): HP: 445 (29), Atk: 426 (30), Def: 306 (29), Spatk: 221 (9), Spdef: 226 (17), Spd: 460 (31)
+[10:57:34.827] LOG: Ability: Adrenaline Rush | Passive Ability: Volt Absorb 
+[10:57:34.827] LOG: Moveset: ["Close Combat","Seismic Fist","Cutsie Slap","Plasma Fists"]
+[10:57:34.828] LOG: Pokemon: Foe Conkeldurr | Species ID: 534 | Level: 162 | Nature: Gentle (+SpDef/-Def)
+[10:57:34.828] LOG: Stats (IVs): HP: 554 (6), Atk: 505 (29), Def: 323 (29), Spatk: 189 (4), Spdef: 273 (20), Spd: 160 (6)
+[10:57:34.828] LOG: Ability: Sheer Force | Passive Ability: Long Reach 
+[10:57:34.828] LOG: Moveset: ["Drain Punch","Fissure","Body Slam","Meteor Mash"]
+[10:57:34.828] LOG: Pokemon: Foe Mega Sneasler | Species ID: 903 | Level: 162 | Nature: Jolly (+Spd/-SpAtk)
+[10:57:34.828] LOG: Stats (IVs): HP: 453 (14), Atk: 510 (2), Def: 236 (3), Spatk: 209 (11), Spdef: 406 (8), Spd: 435 (1)
+[10:57:34.828] LOG: Ability: Merciless | Passive Ability: Lead Claws | Boss Bars: 2
+[10:57:34.828] LOG: Moveset: ["Close Combat","Aerial Ace","Brick Break","Fury Cutter"]
+[10:57:34.828] LOG: Pokemon: Foe Bewear Angry | Species ID: 10766 | Level: 162 | Nature: Quiet (+SpAtk/-Spd)
+[10:57:34.828] LOG: Stats (IVs): HP: 594 (21), Atk: 465 (14), Def: 361 (20), Spatk: 211 (5), Spdef: 205 (4), Spd: 414 (22)
+[10:57:34.828] LOG: Ability: Blind Rage | Passive Ability: Parental Bond 
+[10:57:34.828] LOG: Moveset: ["Mega Punch","First Impression","Extreme Speed","Axe Kick"]
+[10:57:35.881] LOG: Generated AI funcs
+[10:57:35.882] LOG: Applied HP Up (enemy)
+[10:57:35.882] LOG: Wave Seed: Ĉ×ÜĉċĖÓÕĖûêØæĊöÓìÛĄ÷øĎÙä 163
+[10:57:36.286] LOG: Ace Trainer Mary
+[10:57:42.523] LOG: Dialogue saved as seen: dialogue:aceTrainer.encounter.4
+[10:57:42.576] LOG: Ace Trainer Mary
+[10:57:43.076] LOG: %cStart Phase SummonPhase color:green;
+[10:57:43.077] LOG: Mary
+[10:57:43.307] LOG: Applied HP Up (enemy)
+[10:57:43.556] LOG: %cStart Phase SummonPhase color:green;
+[10:57:43.840] LOG: Applied Protein 
+[10:57:43.840] LOG: Applied Zinc 
+[10:57:43.840] LOG: Applied HP Up 
+[10:57:43.840] LOG: Applied Carbos 
+[10:57:43.840] LOG: Applied Iron 
+[10:57:43.840] LOG: Applied Soul Dew 
+[10:57:43.840] LOG: Applied Soul Dew 
+[10:57:43.840] LOG: Applied Iron 
+[10:57:43.889] WARN: cry/10766 not found
+[10:57:44.089] LOG: %cStart Phase ShinySparklePhase color:green;
+[10:57:44.289] LOG: %cStart Phase InitEncounterPhase color:green;
+[10:57:44.291] LOG: %cStart Phase PostSummonPhase color:green;
+[10:57:44.291] LOG: Ran PSP for: Pangoro
+[10:57:44.293] LOG: %cStart Phase PostSummonPhase color:green;
+[10:57:44.293] LOG: %cStart Phase PostSummonPhase color:green;
+[10:57:44.294] LOG: %cStart Phase PostSummonPhase color:green;
+[10:57:44.294] LOG: Ran PSP for: Bewear Angry
+[10:57:44.294] LOG: %cStart Phase PostSummonPhase color:green;
+[10:57:44.294] LOG: %cStart Phase ShowAbilityPhase color:green;
+[10:57:44.598] LOG: %cStart Phase MessagePhase color:green;
+[10:57:45.019] LOG: %cStart Phase HideAbilityPhase color:green;
+[10:57:45.061] LOG: %cStart Phase PostSummonPhase color:green;
+[10:57:45.062] LOG: %cStart Phase TurnInitPhase color:green;
+[10:57:45.062] LOG: %cStart Phase CommandPhase color:green;
+[10:57:50.364] LOG: Move: AXE_KICK Move targets: {"targets":[2],"multiple":false} 
+Player Pokemon: Bewear Angry
+[10:57:50.365] LOG: %cStart Phase EnemyCommandPhase color:green;
+[10:57:50.383] LOG: Battle Seed: KVx20jaewOkAx8n5
+[10:57:50.394] LOG: Move Pool: ["Bullet Punch","Meteor Mash","Sky Uppercut","Beatdown","Comet Punch"]
+[10:57:50.394] LOG: Move Scores: [-11.939174021341387,-7.012487804332579,17.82622187308681,-14.578470209024658,-13.84533237911262]
+[10:57:50.395] LOG: Sorted Move Pool: ["Sky Uppercut","Meteor Mash","Bullet Punch","Comet Punch","Beatdown"]
+[10:57:50.395] LOG: Chosen Move: Sky Uppercut
+[10:57:50.395] LOG: ER AI: experimental brain (sharpness 1)
+[10:57:50.395] LOG: %cStart Phase TurnStartPhase color:green;
+[10:57:50.396] LOG: %cStart Phase MovePhase color:green;
+[10:57:50.396] LOG: %cUser: Pangoro
+Move: SKY_UPPERCUT
+Use Mode: NORMAL color:orchid
+[10:57:50.399] LOG: %cStart Phase MessagePhase color:green;
+[10:57:50.587] LOG: %cStart Phase MoveEffectPhase color:green;
+[10:57:50.949] LOG: crit stage: +1
+[10:57:50.949] LOG: Move: Sky Uppercut | Base damage: 631.9338235294117 | Power: 95 | Source attack: 2025 | Target defense: 408
+[10:57:50.950] LOG: Move: Sky Uppercut | Attack damage: 909
+[10:57:50.951] LOG: %cStart Phase ShowAbilityPhase color:green;
+[10:57:51.251] LOG: %cStart Phase HideAbilityPhase color:green;
+[10:57:51.298] LOG: %cStart Phase DamageAnimPhase color:green;
+[10:57:51.306] LOG: %cStart Phase MessagePhase color:green;
+[10:57:51.697] LOG: %cStart Phase MessagePhase color:green;
+[10:57:52.060] LOG: %cStart Phase FaintPhase color:green;
+[10:57:52.061] LOG: Applied Reviver Seed 
+[10:57:52.062] LOG: Applied Protein 
+[10:57:52.062] LOG: Applied Zinc 
+[10:57:52.062] LOG: Applied HP Up 
+[10:57:52.062] LOG: Applied Carbos 
+[10:57:52.062] LOG: Applied Iron 
+[10:57:52.062] LOG: Applied Soul Dew 
+[10:57:52.062] LOG: Applied Soul Dew 
+[10:57:52.062] LOG: Applied Iron 
+[10:57:52.069] LOG: %cStart Phase PokemonHealPhase color:green;
+[10:57:52.241] LOG: %cStart Phase MessagePhase color:green;
+[10:57:52.727] LOG: %cStart Phase MoveEndPhase color:green;
+[10:57:52.727] LOG: %cStart Phase MovePhase color:green;
+[10:57:52.727] LOG: %cUser: Bewear Angry
+Move: AXE_KICK
+Use Mode: NORMAL color:orchid
+[10:57:52.728] LOG: %cStart Phase MessagePhase color:green;
+[10:57:52.940] LOG: %cStart Phase MoveEffectPhase color:green;
+[10:57:52.941] LOG: Applied Wide Lens 
+[10:57:53.203] LOG: Applied Scope Lens 
+[10:57:53.203] LOG: crit stage: +1
+[10:57:53.204] LOG: Move: Axe Kick | Base damage: 108.73241860465116 | Power: 156 | Source attack: 1057 | Target defense: 2064
+[10:57:53.204] LOG: Move: Axe Kick | Attack damage: 23
+[10:57:53.205] LOG: Applied Amulet Coin 
+[10:57:53.205] LOG: Applied Golden Punch 
+[10:57:53.206] LOG: %cStart Phase ShowAbilityPhase color:green;
+[10:57:53.504] LOG: %cStart Phase HideAbilityPhase color:green;
+[10:57:53.549] LOG: %cStart Phase DamageAnimPhase color:green;
+[10:57:53.559] LOG: %cStart Phase ShowAbilityPhase color:green;
+[10:57:53.862] LOG: %cStart Phase StatStageChangePhase color:green;
+[10:57:54.214] LOG: %cStart Phase MessagePhase color:green;
+[10:57:54.621] LOG: %cStart Phase HideAbilityPhase color:green;
+[10:57:54.663] LOG: %cStart Phase MoveEffectPhase color:green;
+[10:57:54.664] LOG: Applied Wide Lens 
+[10:57:54.926] LOG: Applied Scope Lens 
+[10:57:54.927] LOG: crit stage: +1
+[10:57:54.927] LOG: Move: Axe Kick | Base damage: 108.73241860465116 | Power: 156 | Source attack: 1057 | Target defense: 2064
+[10:57:54.928] LOG: Move: Axe Kick | Attack damage: 5
+[10:57:54.928] LOG: Applied Amulet Coin 
+[10:57:54.928] LOG: Applied Golden Punch 
+[10:57:54.931] LOG: Applied Shell Bell 
+[10:57:54.931] LOG: %cStart Phase DamageAnimPhase color:green;
+[10:57:54.936] LOG: %cStart Phase MessagePhase color:green;
+[10:57:55.338] LOG: %cStart Phase CommonAnimPhase color:green;
+[10:57:55.589] LOG: %cStart Phase MessagePhase color:green;
+[10:57:56.006] LOG: %cStart Phase ShowAbilityPhase color:green;
+[10:57:56.307] LOG: %cStart Phase StatStageChangePhase color:green;
+[10:57:56.658] LOG: %cStart Phase MessagePhase color:green;
+[10:57:57.065] LOG: %cStart Phase HideAbilityPhase color:green;
+[10:57:57.108] LOG: %cStart Phase MessagePhase color:green;
+[10:57:57.470] LOG: %cStart Phase PokemonHealPhase color:green;
+[10:57:57.638] LOG: %cStart Phase MessagePhase color:green;
+[10:57:58.162] LOG: %cStart Phase MoveEndPhase color:green;
+[10:57:58.163] LOG: %cStart Phase CheckInterludePhase color:green;
+[10:57:58.163] LOG: %cStart Phase WeatherEffectPhase color:green;
+[10:57:58.163] LOG: %cStart Phase PositionalTagPhase color:green;
+[10:57:58.163] LOG: %cStart Phase BerryPhase color:green;
+[10:57:58.164] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[10:57:58.164] LOG: %cStart Phase TurnEndPhase color:green;
+[10:57:58.166] LOG: Applied Leftovers 
+[10:57:58.166] WARN: [coop:turn] host recorder: finalize with NO open recording -> turn=-1 events=0 (caller decides not to emit)
+[10:57:58.166] LOG: %cStart Phase PokemonHealPhase color:green;
+[10:57:58.335] LOG: %cStart Phase MessagePhase color:green;
+[10:57:58.758] LOG: %cStart Phase PokemonHealPhase color:green;
+[10:57:58.931] LOG: %cStart Phase MessagePhase color:green;
+[10:57:59.451] LOG: %cStart Phase PokemonHealPhase color:green;
+[10:57:59.619] LOG: %cStart Phase MessagePhase color:green;
+[10:58:00.047] LOG: %cStart Phase TurnInitPhase color:green;
+[10:58:00.048] LOG: %cStart Phase CommandPhase color:green;
