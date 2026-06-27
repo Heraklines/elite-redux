@@ -68,12 +68,23 @@ export class ErGreaterAbilityRandomizerPhase extends Phase {
     this.coopIsWatcher = coopIsWatcher;
   }
 
+  /** Diagnostic trace (captured in the console ring buffer for Send Logs). The solo
+   *  happy-path is otherwise silent, so a "no picker appeared" report leaves nothing
+   *  to go on; these lines show exactly which step ran or stalled. */
+  private log(msg: string): void {
+    console.info(`[GreaterAbilityRandomizer] ${msg}`);
+  }
+
   start(): void {
     super.start();
     this.baseMode = globalScene.ui.getMode();
     const mon = globalScene.getPlayerParty()[this.partyIndex];
+    this.log(
+      `start slot=${this.partyIndex} mon=${mon?.name ?? "null"} coopSeq=${this.coopSeq} watcher=${this.coopIsWatcher} baseMode=${UiMode[this.baseMode] ?? this.baseMode}`,
+    );
     if (mon == null) {
       // Target vanished - leave the continuation copy so the player returns to the shop.
+      this.log("target vanished -> cancel, item kept");
       this.cancelAndEnd();
       return;
     }
@@ -101,6 +112,7 @@ export class ErGreaterAbilityRandomizerPhase extends Phase {
    * different mon) backs out without consuming the item.
    */
   private openSlotPicker(mon: PlayerPokemon): void {
+    this.log(`openSlotPicker -> setMode(PARTY, ABILITY_MODIFIER) for ${mon.name}`);
     globalScene.ui.setMode(
       UiMode.PARTY,
       PartyUiMode.ABILITY_MODIFIER,
@@ -108,6 +120,7 @@ export class ErGreaterAbilityRandomizerPhase extends Phase {
       (slotIndex: number, option: PartyOption) => {
         const party = globalScene.getPlayerParty();
         const picked = slotIndex >= 0 && slotIndex < party.length ? party[slotIndex] : null;
+        this.log(`slot callback slotIndex=${slotIndex} option=${option} pickedIsMon=${picked === mon}`);
         if (picked !== mon || option < PartyOption.ABILITY_SLOT_0) {
           // Backed out of the slot pick - nothing applied, capsule kept.
           // Co-op (#633 B9c): relay a CANCEL so a parked watcher re-offers in parity.
@@ -128,33 +141,40 @@ export class ErGreaterAbilityRandomizerPhase extends Phase {
    */
   private openAbilityPicker(mon: PlayerPokemon, slot: number): void {
     const choices = rollGreaterRandomizerAbilities(mon);
+    this.log(
+      `openAbilityPicker slot=${slot} rolled=${choices.length} ids=[${choices.map(c => c.abilityId).join(",")}]`,
+    );
     if (choices.length === 0) {
       // No rollable ability (should never happen with the full pool) - back out.
+      this.log("roll returned 0 choices -> bounce back to slot picker");
       this.openSlotPicker(mon);
       return;
     }
 
-    globalScene.ui.setMode(UiMode.ER_BARGAIN, {
-      picker: true,
-      title: i18next.t(`${ns}:erGreaterAbilityRandomizer.name`).toUpperCase(),
-      greeting: i18next.t(`${ns}:erGreaterAbilityRandomizer.pickAbility`),
-      options: choices.map(c => ({ label: c.name, description: c.description })),
-      onPick: (index: number) => {
-        const chosen: BargainAbilityChoice | undefined = choices[index];
-        if (!chosen) {
-          this.restore(() => this.openSlotPicker(mon));
-          return;
-        }
-        this.restore(() => {
-          greaterRandomizerReplaceSlot(mon, slot, chosen.abilityId);
-          // Co-op (#633 B9c): relay the slot + the host's LITERAL rolled abilityId so the watcher
-          // applies the SAME ability WITHOUT re-rolling (mirrors the watcher-doesn't-reroll contract).
-          this.coopOutcome = [COOP_ABILITY_OP.GRAND, slot, chosen.abilityId];
-          this.commitAndEnd();
-        });
-      },
-      onCancel: () => this.restore(() => this.openSlotPicker(mon)),
-    });
+    globalScene.ui
+      .setMode(UiMode.ER_BARGAIN, {
+        picker: true,
+        title: i18next.t(`${ns}:erGreaterAbilityRandomizer.name`).toUpperCase(),
+        greeting: i18next.t(`${ns}:erGreaterAbilityRandomizer.pickAbility`),
+        options: choices.map(c => ({ label: c.name, description: c.description })),
+        onPick: (index: number) => {
+          const chosen: BargainAbilityChoice | undefined = choices[index];
+          this.log(`onPick index=${index} id=${chosen?.abilityId ?? "none"}`);
+          if (!chosen) {
+            this.restore(() => this.openSlotPicker(mon));
+            return;
+          }
+          this.restore(() => {
+            greaterRandomizerReplaceSlot(mon, slot, chosen.abilityId);
+            // Co-op (#633 B9c): relay the slot + the host's LITERAL rolled abilityId so the watcher
+            // applies the SAME ability WITHOUT re-rolling (mirrors the watcher-doesn't-reroll contract).
+            this.coopOutcome = [COOP_ABILITY_OP.GRAND, slot, chosen.abilityId];
+            this.commitAndEnd();
+          });
+        },
+        onCancel: () => this.restore(() => this.openSlotPicker(mon)),
+      })
+      .then(() => this.log("ER_BARGAIN setMode resolved (4-ability picker should now be visible)"));
   }
 
   /**
@@ -162,6 +182,7 @@ export class ErGreaterAbilityRandomizerPhase extends Phase {
    * replacement was committed), then end this phase.
    */
   private commitAndEnd(): void {
+    this.log("commit -> slot replaced, item consumed");
     // Co-op (#633 B9c): OWNER relays the committed outcome (slot + literal abilityId) before
     // consuming the copy, so the watcher replaces the SAME slot with the SAME ability.
     if (!this.coopIsWatcher) {
@@ -174,6 +195,7 @@ export class ErGreaterAbilityRandomizerPhase extends Phase {
   /** Co-op (#633 B9c): every NON-committing owner end-path relays a CANCEL so the watcher never
    *  stalls; leaves the continuation copy so the item is re-offered (back-out safe #25). */
   private cancelAndEnd(): void {
+    this.log("cancel/back-out -> item kept, no change applied");
     this.coopOutcome = [COOP_ABILITY_OP.CANCEL];
     if (!this.coopIsWatcher) {
       this.relayEnd();
