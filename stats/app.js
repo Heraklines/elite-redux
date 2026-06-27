@@ -113,12 +113,14 @@ function tierFor(pct, eggTier) {
 
 // M5cap PERFORMANCE tier (matches src/data/elite-redux/er-usage-tiers.ts + the game):
 // common-egg lines are ranked by the skill-adjusted win + wave lift carried in the live
-// nightly feed, quantile-binned, then usage-capped + raw-win-floored; non-common lines
-// (and an old-format feed lacking the lift signals) keep the legacy usage tier. Rebuilt
-// from the feed each load, so the site's tiers track the nightly cron automatically.
+// feed, quantile-binned, then usage-capped; NU is then restricted to genuine losers
+// (win <= 3% AND >= 10 picks). Non-common lines (and an old-format feed lacking the lift
+// signals) keep the legacy usage tier. Rebuilt from the feed each load, so the site's
+// tiers track the worker's daily feed automatically.
 const M5_CUTS = [0.35, 0.6, 0.8, 0.92];
 const M5_USAGE_CAP = 8;
-const M5_WIN_FLOOR_MULT = 2;
+const M5_NU_MAX_WIN = 3; // a line winning above this % can't be NU
+const M5_NU_MIN_SAMPLE = 10; // fewer picks than this can't be NU (too little evidence -> PU)
 function computeM5capTiers() {
   const map = new Map(); // line id -> tier name
   // Produce tiers ONLY when the feed carries the M5cap perf signals (baseWinPct).
@@ -129,7 +131,6 @@ function computeM5capTiers() {
     return map;
   }
   const lines = usage.lines;
-  const baseWin = usage.baseWinPct;
   const eggById = new Map();
   for (const mon of DEX) {
     eggById.set(mon.id, mon.eggTier ?? 0);
@@ -157,8 +158,8 @@ function computeM5capTiers() {
       if (t >= 3 && (l.usagePct ?? 0) > M5_USAGE_CAP) {
         t = 2; // popular line -> can't be PU/NU
       }
-      if (t === 4 && (l.win ?? 0) >= M5_WIN_FLOOR_MULT * baseWin) {
-        t = 3; // clear winner -> never NU
+      if (t === 4 && ((l.win ?? 0) > M5_NU_MAX_WIN || (l.sample ?? M5_NU_MIN_SAMPLE) < M5_NU_MIN_SAMPLE)) {
+        t = 3; // NU only for genuine losers (win <= 3%) with enough evidence (n >= 10)
       }
       map.set(id, TIERS[t]);
     } else {
