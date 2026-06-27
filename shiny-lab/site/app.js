@@ -132,7 +132,7 @@ async function loadSpecies(id) {
 }
 
 // ---- render a full look (palette + surface + around) onto a padded buffer -----
-function renderLook(slots, buf, ef, dist, t, out, intensity) {
+function renderLook(slots, buf, ef, dist, t, out, amt) {
   const sa = makeSampler(buf);
   const ac = { cx: dist.cx, cy: dist.cy };
   const ctx = {
@@ -189,9 +189,14 @@ function renderLook(slots, buf, ef, dist, t, out, intensity) {
         let col = pal ? PALETTE[pal](r, g, b, ctx) : [r, g, b];
         if (pal) {
           a = a0 * (PALETTE_ALPHA[pal] ?? 1);
+          if (amt.pal < 1) {
+            col = [mix(r, col[0], amt.pal), mix(g, col[1], amt.pal), mix(b, col[2], amt.pal)];
+            a = mix(a0, a, amt.pal);
+          }
         }
         if (surf) {
           const base2 = col;
+          const aPal = a;
           let sc;
           if (surf === "prismatic") {
             const off = 0.012 * (0.6 + 0.4 * Math.sin(t * 2));
@@ -209,18 +214,19 @@ function renderLook(slots, buf, ef, dist, t, out, intensity) {
             sc = [sa(x + dx + 0.01, y)[0] * scan, s2[1] * scan, sa(x + dx - 0.01, y)[2] * scan];
             a = s2[3];
           } else {
-            const res = AURA[surf](col[0], col[1], col[2], x, y, t, ctx);
+            const res = AURA[surf](base2[0], base2[1], base2[2], x, y, t, ctx);
             sc = [res[0], res[1], res[2]];
-            a *= res[3];
+            a = aPal * res[3];
           }
           if (doTint && !NO_TINT.has(surf)) {
             sc = tintTo(sc, tintH, tintS);
           }
-          col = blendCol(base2, sc, SURFACE_BLEND[surf] || "normal");
-        }
-        if (intensity < 1) {
-          col = [mix(r, col[0], intensity), mix(g, col[1], intensity), mix(b, col[2], intensity)];
-          a = mix(a0, a, intensity);
+          let blended = blendCol(base2, sc, SURFACE_BLEND[surf] || "normal");
+          if (amt.surf < 1) {
+            blended = [mix(base2[0], blended[0], amt.surf), mix(base2[1], blended[1], amt.surf), mix(base2[2], blended[2], amt.surf)];
+            a = mix(aPal, a, amt.surf);
+          }
+          col = blended;
         }
         out[k] = col[0] * 255;
         out[k + 1] = col[1] * 255;
@@ -238,7 +244,7 @@ function renderLook(slots, buf, ef, dist, t, out, intensity) {
         out[k] = rc[0] * 255;
         out[k + 1] = rc[1] * 255;
         out[k + 2] = rc[2] * 255;
-        out[k + 3] = res[3] * 255;
+        out[k + 3] = res[3] * amt.aro * 255;
       } else {
         out[k + 3] = 0;
       }
@@ -300,7 +306,9 @@ const heroCtx = heroCv.getContext("2d");
 let heroImg = null;
 const slots = { palette: "glacier", surface: "", around: "auroraveil" };
 let speed = 1;
-let intensity = 1;
+let palIntensity = 1;
+let surfIntensity = 1;
+let aroIntensity = 1;
 let fxSeed = 0;
 let fxScale = 1;
 let fxColorMode = "default"; // default | palette | custom
@@ -339,7 +347,9 @@ function wireControls() {
     });
   }
   document.getElementById("speed").addEventListener("input", e => (speed = +e.target.value));
-  document.getElementById("intensity").addEventListener("input", e => (intensity = +e.target.value));
+  document.getElementById("int_palette").addEventListener("input", e => (palIntensity = +e.target.value));
+  document.getElementById("int_surface").addEventListener("input", e => (surfIntensity = +e.target.value));
+  document.getElementById("int_around").addEventListener("input", e => (aroIntensity = +e.target.value));
   document.getElementById("seed").addEventListener("input", e => (fxSeed = +e.target.value));
   document.getElementById("texscale").addEventListener("input", e => (fxScale = +e.target.value));
   document.getElementById("seedRand").addEventListener("click", () => {
@@ -428,7 +438,7 @@ function loop(now) {
   const cur = frameBuf[ai];
   const ef = edgeFor(ai);
   const dist = distFor(ai);
-  renderLook(slots, cur, ef, dist, t * speed, heroImg.data, intensity);
+  renderLook(slots, cur, ef, dist, t * speed, heroImg.data, { pal: palIntensity, surf: surfIntensity, aro: aroIntensity });
   heroCtx.putImageData(heroImg, 0, 0);
   if (now - lastThumb > 60) {
     lastThumb = now;
@@ -436,7 +446,7 @@ function loop(now) {
     const N = Math.min(vis.length, 16);
     for (let j = 0; j < N; j++) {
       const tl = vis[(rr + j) % vis.length];
-      renderLook(tl.slots, cur, ef, dist, t, tl.img.data, 1);
+      renderLook(tl.slots, cur, ef, dist, t, tl.img.data, { pal: 1, surf: 1, aro: 1 });
       tl.ctx.putImageData(tl.img, 0, 0);
     }
     rr = vis.length > 0 ? (rr + N) % vis.length : 0;

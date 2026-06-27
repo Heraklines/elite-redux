@@ -86,7 +86,9 @@ ${css}
       <div class="row"><label class="ls">Surface FX</label><select id="sel_surface" class="sel"></select></div>
       <div class="row"><label class="la">Around FX</label><select id="sel_around" class="sel"></select></div>
       <div class="row"><label>Speed</label><input id="speed" type="range" min="0.1" max="3" step="0.05" value="1"></div>
-      <div class="row"><label>Intensity</label><input id="intensity" type="range" min="0" max="1" step="0.02" value="1"></div>
+      <div class="row"><label class="lp">Pal amount</label><input id="int_palette" type="range" min="0" max="1" step="0.02" value="1"></div>
+      <div class="row"><label class="ls">Surf amount</label><input id="int_surface" type="range" min="0" max="1" step="0.02" value="1"></div>
+      <div class="row"><label class="la">Aura amount</label><input id="int_around" type="range" min="0" max="1" step="0.02" value="1"></div>
       <div class="row"><label>Seed</label><input id="seed" type="range" min="0" max="256" step="1" value="0"><button id="seedRand" class="mini" title="Randomize seed">&#127922;</button></div>
       <div class="row"><label>Texture</label><input id="texscale" type="range" min="0.4" max="2" step="0.05" value="1"></div>
       <div class="row"><label>FX color</label>
