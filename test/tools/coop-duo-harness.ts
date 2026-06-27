@@ -71,16 +71,27 @@ import type { Phase } from "#app/phase";
 import {
   assembleCoopRuntime,
   type CoopRuntime,
+  getCoopInteractionRelay,
+  getCoopMeBattleInteractionCounter,
   getCoopRuntime,
+  setCoopMeBattleInteractionCounter,
   setCoopRuntime,
 } from "#data/elite-redux/coop/coop-runtime";
 import type { CoopTransport } from "#data/elite-redux/coop/coop-transport";
 import { resetErGhostRunState } from "#data/elite-redux/er-ghost-teams";
+import { BattleType } from "#enums/battle-type";
 import type { MysteryEncounterType } from "#enums/mystery-encounter-type";
 import { TrainerSlot } from "#enums/trainer-slot";
 import { EnemyPokemon, PlayerPokemon, type Pokemon } from "#field/pokemon";
 import type { ModifierOverride } from "#modifiers/modifier-type";
 import { PokemonModifierType } from "#modifiers/modifier-type";
+import { MysteryEncounter } from "#mystery-encounters/mystery-encounter";
+import { getCoopMeHostPresentation, setCoopMeHostPresentation } from "#phases/coop-replay-me-phase";
+import {
+  coopClearMePinForGuest,
+  coopMeInteractionStartValue,
+  coopSetMePinForGuest,
+} from "#phases/mystery-encounter-phases";
 import { PokemonData } from "#system/pokemon-data";
 import type { GameManager } from "#test/framework/game-manager";
 import type { GameWrapper } from "#test/framework/game-wrapper";
@@ -91,7 +102,47 @@ import path from "node:path";
 import Phaser from "phaser";
 
 /**
- * The 4-part PROCESS-GLOBAL context that must be swapped atomically before pumping a
+ * The three PROCESS-GLOBAL mystery-encounter pins that are NOT carried on the `active` runtime and
+ * therefore bleed between the two engines unless swapped per client (the documented ME/ghost-wave
+ * harness gap). They are module lets across three files:
+ *  - `start`        = `coopMeInteractionStart` (mystery-encounter-phases.ts): the pinned ME-entry
+ *                     interaction counter that drives the 8M pick / 9M terminal seq + owner parity.
+ *  - `battleCounter`= `coopMeBattleInteractionCounter` (coop-runtime.ts): keys the ME-battle enemy-
+ *                     party handoff (meBattleHandoffKey). Must equal `start` on the same client.
+ *  - `presentation` = `coopMeHostPresentation` (coop-replay-me-phase.ts): the host-streamed ME
+ *                     presentation the GUEST's MysteryEncounterUiHandler reads; non-null only mid-ME.
+ * `-1` / `null` = idle.
+ */
+interface MePins {
+  start: number;
+  battleCounter: number;
+  presentation: ReturnType<typeof getCoopMeHostPresentation>;
+}
+
+const IDLE_ME_PINS: MePins = { start: -1, battleCounter: -1, presentation: null };
+
+/** Capture the live process-global ME pins (for save-back / restore in the ClientCtx swap). */
+function readMePins(): MePins {
+  return {
+    start: coopMeInteractionStartValue(),
+    battleCounter: getCoopMeBattleInteractionCounter(),
+    presentation: getCoopMeHostPresentation(),
+  };
+}
+
+/** Install `pins` as the live process-global ME pins (the inverse of {@linkcode readMePins}). */
+function writeMePins(pins: MePins): void {
+  if (pins.start >= 0) {
+    coopSetMePinForGuest(pins.start);
+  } else {
+    coopClearMePinForGuest();
+  }
+  setCoopMeBattleInteractionCounter(pins.battleCounter);
+  setCoopMeHostPresentation(pins.presentation);
+}
+
+/**
+ * The PROCESS-GLOBAL context that must be swapped atomically before pumping a
  * given client. Snapshotted per client; {@linkcode withClient} installs one + restores
  * the previous on exit so the two engines never read each other's globals.
  */
@@ -103,6 +154,12 @@ export interface ClientCtx {
   rndState: string;
   /** The er-ghost per-run cache for this client (save/restore around the swap). */
   ghost: ReturnType<typeof snapshotGhostState>;
+  /**
+   * The 3 mystery-encounter pins for THIS client (save/restore around the swap; idle off-ME).
+   * Optional: ctxs that never reach an ME (the wave/shop spike tests) omit it and the swap treats
+   * them as idle; an ME-driving ctx carries the live pins so the host's and guest's never bleed.
+   */
+  mePins?: MePins;
 }
 
 // ---------------------------------------------------------------------------
@@ -125,11 +182,12 @@ function restoreGhostState(_snap: { reset: boolean }): void {
 }
 
 /** Capture the live process-global context (so withClient can restore it). */
-function captureLiveCtx(): { scene: BattleScene; runtime: CoopRuntime | null; rndState: string } {
+function captureLiveCtx(): { scene: BattleScene; runtime: CoopRuntime | null; rndState: string; mePins: MePins } {
   return {
     scene: globalScene,
     runtime: getCoopRuntime(),
     rndState: Phaser.Math.RND.state(),
+    mePins: readMePins(),
   };
 }
 
@@ -158,15 +216,18 @@ export function withClientSync<T>(ctx: ClientCtx, fn: () => T): T {
   setCoopRuntime(ctx.runtime);
   Phaser.Math.RND.state(ctx.rndState);
   restoreGhostState(ctx.ghost);
+  writeMePins(ctx.mePins ?? IDLE_ME_PINS);
   try {
     return fn();
   } finally {
     ctx.rndState = Phaser.Math.RND.state();
+    ctx.mePins = readMePins();
     initGlobalScene(prev.scene);
     if (prev.runtime != null) {
       setCoopRuntime(prev.runtime);
     }
     Phaser.Math.RND.state(prev.rndState);
+    writeMePins(prev.mePins);
     activeClientLabel = prevLabel;
   }
 }
@@ -183,16 +244,20 @@ export async function withClient<T>(ctx: ClientCtx, fn: () => T | Promise<T>): P
   Phaser.Math.RND.state(ctx.rndState);
   // 4. er-ghost per-run cache
   restoreGhostState(ctx.ghost);
+  // 5. mystery-encounter pins (start / battleCounter / presentation)
+  writeMePins(ctx.mePins ?? IDLE_ME_PINS);
   try {
     return await fn();
   } finally {
-    // Persist THIS client's mutated RND cursor back into its ctx, then restore the prev.
+    // Persist THIS client's mutated RND cursor + ME pins back into its ctx, then restore the prev.
     ctx.rndState = Phaser.Math.RND.state();
+    ctx.mePins = readMePins();
     initGlobalScene(prev.scene);
     if (prev.runtime != null) {
       setCoopRuntime(prev.runtime);
     }
     Phaser.Math.RND.state(prev.rndState);
+    writeMePins(prev.mePins);
     activeClientLabel = prevLabel;
   }
 }
@@ -490,6 +555,7 @@ export async function buildDuo(
     runtime: hostRuntime,
     rndState: Phaser.Math.RND.state(),
     ghost: { reset: true },
+    mePins: { ...IDLE_ME_PINS },
   };
 
   // The 2nd real BattleScene (steals globalScene; withClient re-points it per pump).
@@ -500,6 +566,7 @@ export async function buildDuo(
     runtime: guestRuntime,
     rndState: Phaser.Math.RND.state(),
     ghost: { reset: true },
+    mePins: { ...IDLE_ME_PINS },
   };
   await withClient(guestCtx, () => {
     toCoopGameMode(guestScene);
@@ -784,4 +851,303 @@ export function forceNextMysteryEncounter(override: OverrideKnobs, type: Mystery
 /** FORCE the reward shop to offer the given modifier(s) (e.g. a TM Case) on BOTH engines. */
 export function forceItemRewards(override: OverrideKnobs, items: ModifierOverride[]): void {
   override.itemRewards(items);
+}
+
+// =============================================================================
+// MYSTERY-ENCOUNTER EXTENSION (#633, #677/#678). Drive a HOST-OWNED NON-BATTLE ME across BOTH
+// real engines: the HOST (sole authoritative engine) runs the real MysteryEncounterPhase ->
+// coopBeginMePump -> streams an entry checksum + `mePresent` presentation on 8M, then at
+// PostMysteryEncounterPhase streams a comprehensive `meResync` outcome on 8M + the LEAVE terminal
+// on 9M; the GUEST runs its REAL CoopReplayMePhase which consumes those streams and leaves. Unlike a
+// normal wave, an ME wave has NO enemy party + NO SummonPhase, so the battle MIRROR is replaced by a
+// dedicated ME mirror that reconstructs the guest's player party + sets currentBattle.mysteryEncounter
+// to the SAME registry object the host has (so CoopReplayMePhase.adopt-host-tokens reads non-null).
+// =============================================================================
+
+/**
+ * Bring the GUEST scene into the SAME mystery encounter the host is in. Unlike
+ * {@linkcode mirrorHostBattleToGuest} (which clones a NORMAL battle's enemy party + field), an ME wave
+ * has NO enemy party and NO field summon - the guest never runs the engine, it only needs:
+ *  - the co-op game mode,
+ *  - a player party (for `leaveEncounterWithoutBattle` + the comprehensive `meResync` party apply),
+ *  - a `currentBattle` whose `battleType` is MYSTERY_ENCOUNTER and whose `mysteryEncounter` is the
+ *    SAME registry instance the host rolled (so {@linkcode CoopReplayMePhase} reads it non-null when
+ *    adopting the host's streamed dialogue tokens / presentation).
+ *
+ * MUST be called inside `withClient(guestCtx, ...)` so globalScene is the guest scene (the player-party
+ * clone builds under the live globalScene). Mutates the guest scene's party / currentBattle / arena.
+ */
+export function mirrorHostMeToGuest(hostScene: BattleScene, guestScene: BattleScene): void {
+  // Same game mode + arena/biome as the host.
+  guestScene.gameMode = hostScene.gameMode;
+  guestScene.newArena(hostScene.arena.biomeId);
+
+  // `party` is private on BattleScene; the harness writes it through an unknown cast (test-only).
+  const guestSceneInternal = guestScene as unknown as { party: PlayerPokemon[] };
+
+  // Rebuild the player party under the guest scene from the host's PokemonData (same technique the
+  // battle mirror uses: construct the mon DIRECTLY, skip init()'s UI build the headless guest can't back).
+  guestSceneInternal.party = [];
+  for (const hostMon of hostScene.getPlayerParty()) {
+    const data = new PokemonData(hostMon);
+    const mon = new PlayerPokemon(
+      getPokemonSpecies(hostMon.species.speciesId),
+      hostMon.level,
+      hostMon.abilityIndex,
+      hostMon.formIndex,
+      hostMon.gender,
+      hostMon.shiny,
+      hostMon.variant,
+      hostMon.ivs,
+      hostMon.nature,
+      data,
+    );
+    mon.coopOwner = hostMon.coopOwner ?? "host";
+    mon.calculateStats();
+    stubBattleInfo(mon);
+    guestSceneInternal.party.push(mon);
+  }
+
+  // Assemble a matching MYSTERY_ENCOUNTER battle. CRUCIAL: the guest gets its OWN MysteryEncounter
+  // instance (a clone of the host's, exactly as production's getMysteryEncounter does `new
+  // MysteryEncounter(...)`) so CoopReplayMePhase's `globalScene.currentBattle.mysteryEncounter` is
+  // non-null (it adopts the host's streamed dialogue tokens onto IT) WITHOUT sharing the host's object
+  // (a shared ref would let the guest's token mutation bleed back into the host - a harness artifact).
+  // Empty enemy party - an ME wave summons none.
+  const hostBattle = hostScene.currentBattle;
+  guestScene.currentBattle = new Battle(hostScene.gameMode, {
+    waveIndex: hostBattle.waveIndex,
+    battleType: BattleType.MYSTERY_ENCOUNTER,
+    mysteryEncounterType: hostBattle.mysteryEncounterType,
+    double: hostBattle.double,
+  });
+  guestScene.currentBattle.turn = hostBattle.turn;
+  guestScene.currentBattle.mysteryEncounter =
+    hostBattle.mysteryEncounter == null ? undefined : new MysteryEncounter(hostBattle.mysteryEncounter);
+  guestScene.currentBattle.enemyParty = [];
+
+  // Put the player leads on the guest field (isActive() reads field membership). No enemy field on an ME.
+  for (const mon of guestScene.getPlayerField()) {
+    guestScene.field.add(mon);
+  }
+}
+
+/**
+ * Stand up the full two-engine rig over ONE {@linkcode createLoopbackPair} for a MYSTERY ENCOUNTER:
+ * assemble BOTH runtimes (via {@linkcode assembleCoopRuntime}, so neither closes the other's transport),
+ * build the GUEST {@linkcode BattleScene}, MIRROR the host's CURRENT mystery encounter onto it (via
+ * {@linkcode mirrorHostMeToGuest}, NOT the battle mirror), tag co-op field ownership, connect both
+ * controllers, and drain the handshake. After this the host OWNS even interaction counters (the ME at
+ * counter 0) and the guest OWNS odd ones - the production parity rule.
+ *
+ * MUST be called with the HOST GameManager already PARKED on an ME wave (its currentBattle.battleType
+ * is MYSTERY_ENCOUNTER and currentBattle.mysteryEncounter is set - e.g. after `runToSummon` at a valid
+ * ME wave with the ME override). Returns the {@linkcode DuoRig}; the caller drives the host through the
+ * ME, then drives the guest's CoopReplayMePhase.
+ */
+export async function buildDuoForMe(
+  hostGame: GameManager,
+  pair: { host: CoopTransport; guest: CoopTransport },
+  setCoopRuntimeFn: (r: CoopRuntime) => void,
+  toCoopGameMode: (scene: BattleScene) => void,
+): Promise<DuoRig> {
+  const hostScene = hostGame.scene;
+  const hostRuntime = buildRuntime(pair.host, "Host", "authoritative");
+  const guestRuntime = buildRuntime(pair.guest, "Guest", "authoritative");
+  hostRuntime.controller.role = "host";
+  guestRuntime.controller.role = "guest";
+
+  // Flip the host engine into co-op + tag the field leads host/guest.
+  toCoopGameMode(hostScene);
+  const hostField = hostScene.getPlayerField();
+  hostField[0].coopOwner = "host";
+  hostField[1].coopOwner = "guest";
+
+  const hostCtx: ClientCtx = {
+    label: "host",
+    scene: hostScene,
+    runtime: hostRuntime,
+    rndState: Phaser.Math.RND.state(),
+    ghost: { reset: true },
+    mePins: { ...IDLE_ME_PINS },
+  };
+
+  // The 2nd real BattleScene (steals globalScene; withClient re-points it per pump).
+  const guestScene = buildGuestScene(hostGame);
+  const guestCtx: ClientCtx = {
+    label: "guest",
+    scene: guestScene,
+    runtime: guestRuntime,
+    rndState: Phaser.Math.RND.state(),
+    ghost: { reset: true },
+    mePins: { ...IDLE_ME_PINS },
+  };
+  await withClient(guestCtx, () => {
+    toCoopGameMode(guestScene);
+    mirrorHostMeToGuest(hostScene, guestScene);
+    const gf = guestScene.getPlayerField();
+    gf[0].coopOwner = "host";
+    gf[1].coopOwner = "guest";
+  });
+
+  // Connect both controllers over the live loopback (exchange hello / runConfig).
+  setCoopRuntimeFn(hostRuntime);
+  hostRuntime.controller.connect();
+  setCoopRuntimeFn(guestRuntime);
+  guestRuntime.controller.connect();
+  await drainLoopback();
+
+  return { hostScene, guestScene, hostRuntime, guestRuntime, hostCtx, guestCtx, pair };
+}
+
+/** Minimal phase-manager surface the guest ME replay pump needs (the guest scene satisfies it). */
+interface MeReplayPumpScene {
+  phaseManager: {
+    create(n: "MysteryEncounterPhase"): Phase;
+    getCurrentPhase(): Phase | undefined;
+    clearPhaseQueue(leaveUnshifted?: boolean): void;
+    pushPhase(phase: Phase): void;
+    shiftPhase(): void;
+  };
+}
+
+/** The started guest CoopReplayMePhase + the `settled` flag the harness inspects (terminal ran once). */
+export interface GuestMeReplay {
+  phase: Phase;
+  settled: boolean;
+}
+
+/**
+ * Drive the GUEST's REAL authoritative-ME path for a HOST-OWNED non-battle ME, FAITHFULLY: run the
+ * guest's REAL {@linkcode MysteryEncounterPhase}, which (because `isCoopAuthoritativeGuest()` is true)
+ * DIVERTS - it pins the guest's ME interaction counter (`coopSetMePinForGuest`, so `coopMeInProgress()`
+ * is TRUE across the whole guest ME exactly as in production), pushes a {@linkcode CoopReplayMePhase},
+ * and ends. We then start that queued CoopReplayMePhase and drain the loopback so the guest consumes -
+ * in FIFO order on the disjoint channels the host already buffered:
+ *  - 8M (OUTCOME inbox): the `mePresent` presentation (at MysteryEncounterPhase.start) THEN the
+ *    comprehensive `meResync` (at PostMysteryEncounterPhase),
+ *  - 9M (terminal inbox): the LEAVE sentinel (at coopEndMePump).
+ * The phase's start() runs a void async IIFE; each await resolves as the loopback is drained. MUST be
+ * called inside `withClient(guestCtx, ...)` AFTER the host has run fully through PostMysteryEncounterPhase
+ * (so both 8M outcomes + the 9M terminal are already buffered and drain with zero network wait).
+ *
+ * Returns the started CoopReplayMePhase + its `settled` flag. THROWS on a no-progress stall (the guest
+ * never left the encounter) - the hang detection the duo harness exists to surface.
+ *
+ * SCOPE: this drives the guest THROUGH the CoopReplayMePhase leave terminal (the single ME alternation
+ * advance), NOT the embedded post-ME watcher reward shop + the guest's PostMysteryEncounterPhase. So the
+ * guest's ME pin (`coopMeInteractionStart`, set to the ME counter by the divert) is STILL SET when this
+ * returns - in production it is cleared later by PostMysteryEncounterPhase, after the watcher shop drains
+ * (MAJOR-3). The harness's `withClient(guestCtx)` swap-back restores the previous (host idle) pins, so the
+ * leak is bounded to `guestCtx.mePins.start` until the next guest pump; a SINGLE-ME duo test is unaffected.
+ */
+/** True when a phase's private `settled` terminal guard has fired (CoopReplayMePhase left exactly once). */
+function meReplaySettled(p: Phase): boolean {
+  return (p as unknown as { settled: boolean }).settled === true;
+}
+
+/**
+ * START the guest's REAL authoritative-ME divert and return the queued {@linkcode CoopReplayMePhase}
+ * (started, but NOT yet drained to its terminal). Runs the guest's REAL {@linkcode MysteryEncounterPhase},
+ * which (because `isCoopAuthoritativeGuest()` is true) DIVERTS: it pins the guest's ME interaction counter
+ * (`coopSetMePinForGuest`, so `coopMeInProgress()` is TRUE across the whole guest ME exactly as in
+ * production), pushes a CoopReplayMePhase, and ends. We then start that queued CoopReplayMePhase (its
+ * start() awaits the host presentation, resolves ownership, and - if the guest OWNS - opens the selector
+ * and RETURNS without awaiting the terminal; if the HOST owns, it begins the outcome/terminal race).
+ *
+ * MUST be called inside `withClient(guestCtx, ...)`. Use this when you need to interleave the guest's
+ * pick relay with the host BEFORE draining to the terminal (guest-OWNED + battle-handoff); for the
+ * pure host-owned renderer path use {@linkcode driveGuestMeReplay} (start + drain-to-settle in one).
+ */
+export async function startGuestMeReplay(guestScene: MeReplayPumpScene): Promise<Phase> {
+  // Clear the guest's stale queue first (in production the guest's EncounterPhase clears it before
+  // MysteryEncounterPhase runs; the headless guest's queue still holds a leftover TitlePhase). Make the
+  // MysteryEncounterPhase the CURRENT phase (pushPhase onto the cleared queue + shiftPhase to pop it as
+  // current), exactly as production's EncounterPhase.end() -> shiftPhase does. Then mePhase.start()'s
+  // divert (`this.end()` -> shiftPhase) pops the freshly-pushed CoopReplayMePhase as the new current.
+  guestScene.phaseManager.clearPhaseQueue();
+  const mePhase = guestScene.phaseManager.create("MysteryEncounterPhase");
+  guestScene.phaseManager.pushPhase(mePhase);
+  guestScene.phaseManager.shiftPhase();
+  mePhase.start();
+  await drainLoopback();
+  const replay = guestScene.phaseManager.getCurrentPhase();
+  if (replay == null || replay.phaseName !== "CoopReplayMePhase") {
+    throw new Error(
+      `guest ME divert FAILED: expected CoopReplayMePhase current, got ${replay?.phaseName ?? "none"} - see dev-logs/coop-duo/`,
+    );
+  }
+  replay.start();
+  await drainLoopback();
+  return replay;
+}
+
+/**
+ * Relay the GUEST's top-level ME option INDEX when the guest OWNS the ME (#633 BLOCK-3) - the SEND ONLY,
+ * WITHOUT starting the guest's outcome/terminal race. This split is load-bearing for the duo harness's
+ * bidirectional handshake:
+ *  - The index must be SENT in STEP B (guest ctx) so the host's coopHostAwaitGuestIndex await resolves.
+ *  - But the guest's outcome/terminal RACE must be started LATER, in STEP D under the guest ctx, AFTER the
+ *    host has buffered the meResync (8M) + LEAVE (9M) - else the race's awaits, being pending while the
+ *    HOST drives (STEP C), resolve under the HOST globalScene (a cross-ctx continuation: applyCoopMeOutcome
+ *    + leaveEncounterWithoutBattle would run against the HOST scene, and the guest never converges).
+ * So this sends the EXACT wire {@linkcode CoopReplayMePhase.handleGuestOptionSelect} sends (an "me"
+ * interactionChoice on the 8M pick seq), and {@linkcode startGuestMeOutcomeRace} starts the race in STEP D.
+ * MUST be called inside `withClient(guestCtx, ...)`.
+ */
+export function relayGuestMeOptionIndexOnly(replay: Phase, index: number): void {
+  const seq = (replay as unknown as { seq: number }).seq;
+  getCoopInteractionRelay()?.sendInteractionChoice(seq, "me", index);
+}
+
+/**
+ * Start the GUEST's outcome/terminal race for an already-relayed guest-owned ME pick (STEP D). Invokes the
+ * private {@linkcode CoopReplayMePhase.awaitOutcomeThenTerminal} so its awaits BUFFER-HIT the host's
+ * already-streamed meResync (8M) + LEAVE (9M) and resolve UNDER the guest ctx (applyCoopMeOutcome +
+ * leaveEncounterWithoutBattle run against the GUEST scene). MUST be called inside `withClient(guestCtx)`.
+ */
+export function startGuestMeOutcomeRace(replay: Phase): void {
+  const relay = getCoopInteractionRelay();
+  if (relay == null) {
+    throw new Error("startGuestMeOutcomeRace: no live interaction relay (call inside withClient(guestCtx))");
+  }
+  (replay as unknown as { awaitOutcomeThenTerminal(r: NonNullable<typeof relay>): void }).awaitOutcomeThenTerminal(
+    relay,
+  );
+}
+
+/**
+ * Drain the guest's already-started {@linkcode CoopReplayMePhase} to its terminal (the host's buffered
+ * 8M meResync / 9M LEAVE / battle-handoff). Returns once `settled` (the single terminal guard fired) or
+ * THROWS on a no-progress stall - the hang detection the duo harness exists to surface (the #693/#698
+ * softlock class: a guest parked on an 8M outcome the host never sends for a battle-handoff/degrade
+ * terminal). MUST be called inside `withClient(guestCtx, ...)`.
+ */
+export async function drainGuestMeReplayToSettle(replay: Phase): Promise<GuestMeReplay> {
+  for (let i = 0; i < 16; i++) {
+    await drainLoopback();
+    if (meReplaySettled(replay)) {
+      return { phase: replay, settled: true };
+    }
+  }
+  throw new Error("guest ME replay HANG: CoopReplayMePhase never settled after 16 drains - see dev-logs/coop-duo/");
+}
+
+/**
+ * Drive the GUEST's REAL authoritative-ME path for a HOST-OWNED non-battle ME, FAITHFULLY: start the
+ * divert ({@linkcode startGuestMeReplay}) then drain to the terminal ({@linkcode drainGuestMeReplayToSettle}).
+ * The guest is a pure renderer here (the host owns + drives the pick), so no pick relay is needed. MUST
+ * be called inside `withClient(guestCtx, ...)` AFTER the host has run fully through PostMysteryEncounterPhase
+ * (so both 8M outcomes + the 9M terminal are already buffered and drain with zero network wait).
+ *
+ * SCOPE: drives the guest THROUGH the CoopReplayMePhase leave terminal (the single ME alternation advance),
+ * NOT the embedded post-ME watcher reward shop + the guest's PostMysteryEncounterPhase. So the guest's ME
+ * pin (`coopMeInteractionStart`, set by the divert) is STILL SET when this returns - in production it is
+ * cleared later by PostMysteryEncounterPhase after the watcher shop drains (MAJOR-3); the harness's
+ * `withClient(guestCtx)` swap-back restores the previous (host idle) pins, so the leak is bounded to
+ * `guestCtx.mePins.start` until the next guest pump (a SINGLE-ME duo test is unaffected).
+ */
+export async function driveGuestMeReplay(guestScene: MeReplayPumpScene): Promise<GuestMeReplay> {
+  const replay = await startGuestMeReplay(guestScene);
+  return drainGuestMeReplayToSettle(replay);
 }

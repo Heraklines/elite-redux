@@ -721,6 +721,16 @@ export function setCoopMeBattleInteractionCounter(counter: number): void {
 }
 
 /**
+ * Read the ME-battle handoff interaction counter (`-1` when idle). Exists for the two-engine duo test
+ * harness's per-client ME-state save/restore (this is a process-global module let NOT carried on the
+ * `active` runtime, so a two-real-engine harness must capture/restore it per client). Production reads
+ * the boolean {@linkcode coopMeInProgress} / {@linkcode coopMeHandoffActive} instead.
+ */
+export function getCoopMeBattleInteractionCounter(): number {
+  return coopMeBattleInteractionCounter;
+}
+
+/**
  * Co-op (#633): whether a mystery encounter is currently in progress (the STABLE in-ME pin,
  * mirrored here from `mystery-encounter-phases` so `select-modifier-phase` can read it WITHOUT a
  * circular import). `coopMeBattleInteractionCounter` is set/reset on the exact same ME entry/terminal

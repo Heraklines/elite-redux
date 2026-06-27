@@ -47,6 +47,18 @@ export function getCoopMeHostPresentation(): Extract<CoopInteractionOutcome, { k
 }
 
 /**
+ * Set the host-streamed ME presentation. Production sets it inline in {@linkcode CoopReplayMePhase}
+ * (and clears it at the terminal); this exported setter exists ONLY for the two-engine duo test
+ * harness's per-client ME-state save/restore, so the guest's mid-ME presentation never bleeds into the
+ * host's process-global context (and vice-versa) when the scheduler swaps clients.
+ */
+export function setCoopMeHostPresentation(
+  presentation: Extract<CoopInteractionOutcome, { k: "mePresent" }> | null,
+): void {
+  coopMeHostPresentation = presentation;
+}
+
+/**
  * Co-op GUEST mystery-encounter REPLAY (#633, TRACK-2 Phase C, NON-BATTLE ME path). In the
  * AUTHORITATIVE netcode the guest's ME engine/RNG is diverged from the host's, so the guest must
  * NOT run the encounter engine: its {@linkcode MysteryEncounterPhase.start} diverts here INSTEAD of

@@ -404,13 +404,29 @@ flushed even on failure - read these to triage a desync.
 3. Assert convergence (guest enemies fainted / `interactionCounter()` equal on both / resyncs bounded)
    and that BOTH reach the next wave; a no-progress stall THROWS in `driveGuestReplayTurn`.
 
+**Mystery encounters ARE now drivable** (`coop-duo-mystery.test.ts`): the per-client `ClientCtx` swap
+carries the 3 ME pins (`coopMeInteractionStart` / `coopMeBattleInteractionCounter` / `coopMeHostPresentation`)
+in `mePins`, so a real two-engine ME is not a harness artifact. `buildDuoForMe` reaches a real
+`MysteryEncounterPhase` on the host at a legal ME wave (12) via `runToMysteryEncounter`, then flips to
+co-op; `driveGuestMeReplay` runs the guest's REAL `CoopReplayMePhase` (8M present/outcome + 9M terminal,
+stall-throws). The test exercises all three authoritative paths and asserts them CORRECT across two real
+engines: HOST-OWNED non-battle (host drives its own UI), GUEST-OWNED non-battle (host awaits the guest's
+relayed pick index via `coopHostAwaitGuestIndex`), and BATTLE-HANDOFF (the #693 softlock class - a
+battle-spawning option fires the 9M terminal with NO trailing 8M `meResync`; the guest must
+`finishWithoutLeaving` WITHOUT advancing the counter). One real cross-ctx footgun surfaced + was fixed at
+the HARNESS layer (the loopback microtask-flush gotcha #5: send the guest index via `withClientSync` so
+the host's await resolves under the host scene; decouple the guest outcome/terminal race so it buffer-hits
+under the guest scene) - NOT a production bug.
+
 **Bounded scope - what it does NOT yet do (respect or close these before relying on it BEYOND the
-wave-loop / reward-shop-alternation / move-learn classes):**
-- **Mystery encounters + ghost waves are NOT safe yet** - `coopMeBattleInteractionCounter` /
-  `authoritativeLatched` (coop-runtime.ts) and the `er-ghost-teams` cache quartet are module-globals
-  NOT in the 4-part swap (the ghost cache is reset-per-client, not save/restored). Implement true
-  per-client save/restore before any ME-bearing or ghost-wave duo test, or a desync could be a harness
-  artifact. The harness never reaches an ME (waves 1-3), so this is latent.
+wave-loop / reward-shop-alternation / move-learn / non-ghost-ME classes):**
+- **Ghost-bearing MEs + ghost WAVES are still NOT safe** - the `er-ghost-teams` cache quartet is
+  reset-per-client (`snapshotGhostState`/`restoreGhostState` are placeholders), NOT save/restored, and the
+  ghost co-op hooks (`coopGhostFetchSuppressed`/`onGhostPoolPublished`) are last-write-wins process-globals.
+  Implement true per-client ghost-cache save/restore + role-gated hook routing before any ghost-ME
+  (colosseum-gauntlet, graves-of-the-fallen) or ghost-wave duo test, or a desync could be a harness
+  artifact. `authoritativeLatched` (coop-runtime.ts) is also a shared process-global - benign while both
+  clients are authoritative.
 - **The guest battle is MIRRORED, not launched** - `mirrorHostBattleToGuest` clones the host's field
   via a `PokemonData` round-trip instead of the real launch + `adoptCoopHostEnemyParty`, so it skips the
   seed-pin (that is WHY a benign per-wave checksum mismatch appears + heals via resync). A
