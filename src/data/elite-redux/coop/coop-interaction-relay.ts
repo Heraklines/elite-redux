@@ -111,6 +111,15 @@ export class CoopInteractionRelay {
   /** "seq:reroll" -> resolver for the in-flight {@linkcode awaitRewardOptions}. */
   private readonly rewardOptionsPending = new Map<string, (res: CoopSerializedRewardOption[] | null) => void>();
 
+  /**
+   * #698 resync-rescue: seqs that have been STICKY-cancelled by {@linkcode cancelWaiters}. Any await
+   * (choice / outcome / rewardOptions) for one of these resolves `null` IMMEDIATELY - so a watcher that
+   * re-parks on the SAME seq right after a cancel (the reward watch loop re-awaits after a null
+   * rewardOptions) cannot re-block the phase queue ahead of a resync snapshot. Interaction seqs are
+   * monotonic, so a cancelled seq never legitimately recurs (a later interaction has a higher seq).
+   */
+  private readonly cancelledSeqs = new Set<number>();
+
   constructor(transport: CoopTransport, opts: CoopInteractionRelayOptions = {}) {
     this.transport = transport;
     this.timeoutMs = opts.timeoutMs ?? DEFAULT_TIMEOUT_MS;
@@ -121,10 +130,7 @@ export class CoopInteractionRelay {
   /** OWNER: send one pick for interaction `seq` (`kind` is routing/logging only). */
   sendInteractionChoice(seq: number, kind: string, choice: number, data?: number[]): void {
     if (isCoopDebug()) {
-      coopLog(
-        "relay",
-        `SEND interactionChoice seq=${seq} kind=${kind} ${summarizeChoice({ choice, data })}`,
-      );
+      coopLog("relay", `SEND interactionChoice seq=${seq} kind=${kind} ${summarizeChoice({ choice, data })}`);
     }
     this.transport.send({
       t: "interactionChoice",
@@ -141,6 +147,10 @@ export class CoopInteractionRelay {
    * resolves `null` on timeout (the watcher then leaves the screen, never hangs).
    */
   awaitInteractionChoice(seq: number, timeoutMs = this.timeoutMs): Promise<CoopInteractionChoice | null> {
+    if (this.cancelledSeqs.has(seq)) {
+      coopWarn("relay", `AWAIT interactionChoice seq=${seq} -> STICKY-CANCELLED (resync rescue) resolve null`);
+      return Promise.resolve(null);
+    }
     const queue = this.inbox.get(seq);
     if (queue !== undefined && queue.length > 0) {
       const next = queue.shift()!;
@@ -205,6 +215,10 @@ export class CoopInteractionRelay {
    * {@linkcode awaitInteractionChoice} exactly.
    */
   awaitInteractionOutcome(seq: number, timeoutMs = this.timeoutMs): Promise<CoopInteractionOutcome | null> {
+    if (this.cancelledSeqs.has(seq)) {
+      coopWarn("relay", `AWAIT interactionOutcome seq=${seq} -> STICKY-CANCELLED (resync rescue) resolve null`);
+      return Promise.resolve(null);
+    }
     const queue = this.outcomeInbox.get(seq);
     if (queue !== undefined && queue.length > 0) {
       const next = queue.shift()!;
@@ -238,7 +252,10 @@ export class CoopInteractionRelay {
           this.outcomePending.delete(seq);
         }
         if (res === null) {
-          coopWarn("relay", `AWAIT interactionOutcome seq=${seq} RESOLVE null (TIMEOUT or supersede) -> watcher leaves`);
+          coopWarn(
+            "relay",
+            `AWAIT interactionOutcome seq=${seq} RESOLVE null (TIMEOUT or supersede) -> watcher leaves`,
+          );
         } else {
           coopLog("relay", `AWAIT interactionOutcome seq=${seq} RESOLVE ${summarizeOutcome(res)}`);
         }
@@ -271,6 +288,13 @@ export class CoopInteractionRelay {
     reroll: number,
     timeoutMs = this.timeoutMs,
   ): Promise<CoopSerializedRewardOption[] | null> {
+    if (this.cancelledSeqs.has(seq)) {
+      coopWarn(
+        "relay",
+        `AWAIT rewardOptions seq=${seq} reroll=${reroll} -> STICKY-CANCELLED (resync rescue) resolve null`,
+      );
+      return Promise.resolve(null);
+    }
     const key = `${seq}:${reroll}`;
     const buffered = this.rewardOptionsInbox.get(key);
     if (buffered !== undefined) {
@@ -316,6 +340,52 @@ export class CoopInteractionRelay {
     });
   }
 
+  /**
+   * #698 resync-rescue (WATCHER-only safety net): STICKY-cancel every in-flight watcher wait so a guest
+   * parked on an interaction the owner already left (e.g. an orphaned reward shop after a TM/Memory
+   * continuation) can never block the phase queue ahead of a resync snapshot apply. Each parked
+   * choice/outcome/rewardOptions waiter resolves to `null` (every await site treats null as "leave the
+   * screen / keep own roll", never a hang), and the waiter's seq is recorded so a phase that immediately
+   * RE-parks on the same seq also resolves null at once. A no-op when nothing is parked. Unlike
+   * {@linkcode dispose}, the relay stays alive (the transport listener is untouched) - the session
+   * continues after the resync heals the state.
+   */
+  cancelWaiters(): void {
+    const seqs = new Set<number>();
+    for (const seq of this.pending.keys()) {
+      seqs.add(seq);
+    }
+    for (const seq of this.outcomePending.keys()) {
+      seqs.add(seq);
+    }
+    for (const key of this.rewardOptionsPending.keys()) {
+      const seq = Number(key.split(":")[0]);
+      if (!Number.isNaN(seq)) {
+        seqs.add(seq);
+      }
+    }
+    if (seqs.size === 0) {
+      return;
+    }
+    coopWarn(
+      "relay",
+      `cancelWaiters() sticky-cancel seqs=[${[...seqs].join(",")}] (resync rescue) -> all resolve null`,
+    );
+    for (const seq of seqs) {
+      this.cancelledSeqs.add(seq);
+    }
+    // finish() callbacks self-delete from their maps; iterate snapshots so that is safe.
+    for (const finish of [...this.pending.values()]) {
+      finish(null);
+    }
+    for (const finish of [...this.outcomePending.values()]) {
+      finish(null);
+    }
+    for (const finish of [...this.rewardOptionsPending.values()]) {
+      finish(null);
+    }
+  }
+
   /** Stop listening and fail any in-flight waits. */
   dispose(): void {
     const inFlight = this.pending.size + this.outcomePending.size + this.rewardOptionsPending.size;
@@ -343,6 +413,7 @@ export class CoopInteractionRelay {
     this.outcomeInbox.clear();
     this.rewardOptionsPending.clear();
     this.rewardOptionsInbox.clear();
+    this.cancelledSeqs.clear();
   }
 
   private handle(msg: CoopMessage): void {
@@ -350,7 +421,10 @@ export class CoopInteractionRelay {
       const waiter = this.outcomePending.get(msg.seq);
       if (waiter) {
         if (isCoopDebug()) {
-          coopLog("relay", `RECV interactionOutcome seq=${msg.seq} -> deliver-to-waiter ${summarizeOutcome(msg.outcome)}`);
+          coopLog(
+            "relay",
+            `RECV interactionOutcome seq=${msg.seq} -> deliver-to-waiter ${summarizeOutcome(msg.outcome)}`,
+          );
         }
         waiter(msg.outcome);
         return;
@@ -380,7 +454,10 @@ export class CoopInteractionRelay {
       // No waiter yet - buffer (latest wins per key) for the next awaitRewardOptions.
       this.rewardOptionsInbox.set(key, msg.options);
       if (isCoopDebug()) {
-        coopLog("relay", `RECV rewardOptions key=${key} -> BUFFER rewardOptionsInbox (latest-wins) count=${msg.options.length}`);
+        coopLog(
+          "relay",
+          `RECV rewardOptions key=${key} -> BUFFER rewardOptionsInbox (latest-wins) count=${msg.options.length}`,
+        );
       }
       return;
     }

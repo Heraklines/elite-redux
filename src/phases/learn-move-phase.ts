@@ -220,6 +220,21 @@ export class LearnMovePhase extends PlayerPartyMemberPokemonPhase {
   private coopAuthoritativeLearnMove(currentMoveset: ReturnType<Pokemon["getMoveset"]>, move: Move, pokemon: Pokemon) {
     const controller = getCoopController();
     if (controller?.role === "guest") {
+      // #698 stale-shop softlock: a TM Case / Memory-Mushroom (cost=-1) reward queues a back-out
+      // "continuation" SelectModifierPhase copy alongside this LearnMovePhase (see
+      // SelectModifierPhase.applyModifier queuesContinuation). On the HOST the real learnMove() deletes
+      // that copy via tryRemovePhase("SelectModifierPhase"); the guest's no-op branch below never runs
+      // learnMove(), so the copy would orphan -> the watcher re-enters a reward shop the owner already
+      // left and hangs (20-min await), which also blocks the resync that should rescue it. Mirror the
+      // host's exact tryRemovePhase conditions (learn-move-phase learnMove: TM, or MEMORY with cost=-1)
+      // so the guest's phase queue converges. Gated inside the authoritative-guest branch -> solo / host
+      // / lockstep / hotseat are byte-identical (they never enter here).
+      if (
+        this.learnMoveType === LearnMoveType.TM
+        || (this.learnMoveType === LearnMoveType.MEMORY && this.cost === -1)
+      ) {
+        globalScene.phaseManager.tryRemovePhase("SelectModifierPhase");
+      }
       // Pure renderer: the persistent listener's CoopReplayLearnMovePhase is the sole picker renderer.
       // Ending here (no menu) is the double-render guard for the Shroom-queued guest LearnMovePhase.
       coopLog("learnmove", "guest authoritative LearnMovePhase no-op end (single renderer is the listener)", {

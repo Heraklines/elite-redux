@@ -47,6 +47,7 @@ import {
   coopHasPendingWaveAdvance,
   coopWaveAdvanceSignaledFor,
   getCoopBattleStreamer,
+  getCoopInteractionRelay,
   isCoopAuthoritativeGuest,
 } from "#data/elite-redux/coop/coop-runtime";
 import type {
@@ -766,6 +767,13 @@ export class CoopFinalizeTurnPhase extends Phase {
       try {
         const snapshot = JSON.parse(decompressFromBase64(blob)) as CoopFullBattleSnapshot;
         coopLog("resync", `turn=${this.turn} queueing full snapshot apply (blobLen=${blob.length})`);
+        // #698 resync-rescue: STICKY-cancel any parked watcher interaction wait (e.g. an orphaned reward
+        // shop the owner already left) so it resolves null + ends, draining the phase queue down to the
+        // resync apply pushed below. Without this a 20-min reward await can sit at the HEAD of the queue
+        // and the resync never runs (the guest stays stuck on a stale shop). This .then is message-driven
+        // (the host's stateSync reply), so it runs INDEPENDENT of the stuck phase and can actually unblock
+        // it. No-op when nothing is parked; guest-only path.
+        getCoopInteractionRelay()?.cancelWaiters();
         // BLOCKING-1 (#633, async resync race guard): the apply now re-summons field mons, vacates
         // slots, and rebuilds boss bars - running THAT inline here (a detached promise continuation,
         // very likely mid-way through the next turn's animation replay) could teardown a live sprite

@@ -10353,4 +10353,40 @@ export const DEV_SCENARIOS: DevScenario[] = [
       }
     },
   },
+  // Co-op - WATCHER does not hang on a TM/Memory reward shop the host already left (#698)
+  {
+    label: "Co-op: watcher survives a TM-Case reward + continue (#698)",
+    description:
+      "#698 stale-reward-shop softlock. CO-OP ONLY (2 clients, authoritative). When the OWNER takes a\n"
+      + "reward that opens a move-learn (TM Case, Memory Mushroom, Learner's Shroom), the shop queues a\n"
+      + "back-out copy that the host removes inside the move-learn but the guest's no-op move-learn did\n"
+      + "NOT - so the WATCHER re-entered a reward shop the host already left and HUNG on a stale shop (the\n"
+      + "resync that should rescue it was blocked behind that hang).\n"
+      + "DO (2 paired clients, authoritative netcode): win the opening battle. On the OWNER of the reward\n"
+      + "shop, take the TM CASE reward and teach a move (or cancel), then CONTINUE to the next wave.\n"
+      + "EXPECT: the WATCHER advances to the next wave too - it must NOT get stuck on the reward screen.\n"
+      + "The move-learn picker still relays/opens exactly once; both clients reach the next encounter.\n"
+      + "Headless regression: test/tests/elite-redux/coop/coop-shop-continuation-orphan.test.ts.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 30,
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.MAGIKARP,
+        ENEMY_LEVEL_OVERRIDE: 5,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+      });
+      return [
+        makeStarter(SpeciesId.PIKACHU, {
+          moveset: [MoveId.THUNDERBOLT, MoveId.QUICK_ATTACK, MoveId.IRON_TAIL, MoveId.THUNDER_WAVE],
+        }),
+      ];
+    },
+    onBattleStart: () => {
+      globalScene.gameMode = getGameMode(GameModes.COOP);
+      if (getCoopController() == null) {
+        startLocalCoopSession({ username: loggedInUser?.username, netcodeMode: "authoritative" });
+      }
+    },
+    shopItems: [modifierTypes.TM_CASE],
+  },
 ];
