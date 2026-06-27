@@ -38,13 +38,14 @@ describe.skipIf(!RUN)("ER status cure generalization", () => {
     game = new GameManager(phaserGame);
   });
 
-  it("ER_AILMENT_TAGS contains the three ER ailments (and not mechanical riders)", () => {
-    expect([...ER_AILMENT_TAGS].sort()).toEqual(
-      [BattlerTagType.ER_BLEED, BattlerTagType.ER_FROSTBITE, BattlerTagType.ER_FEAR].sort(),
-    );
+  it("ER_AILMENT_TAGS holds frostbite + fear but NOT bleed (heal-move-only) or mechanical riders", () => {
+    // BLEED is deliberately EXCLUDED: per the ER dex it is removed ONLY by a healing
+    // move, never by a cure-all (Lum / Full Heal / Heal Bell / Natural Cure / ...).
+    expect([...ER_AILMENT_TAGS].sort()).toEqual([BattlerTagType.ER_FROSTBITE, BattlerTagType.ER_FEAR].sort());
+    expect(ER_AILMENT_TAGS).not.toContain(BattlerTagType.ER_BLEED);
   });
 
-  it("Heal Bell (cure-ALL move) clears an ER ailment from the team", async () => {
+  it("Heal Bell (cure-ALL move) clears a cure-all ER ailment (frostbite) but NOT bleed", async () => {
     game.override
       .battleStyle("single")
       .ability(AbilityId.BALL_FETCH)
@@ -54,19 +55,22 @@ describe.skipIf(!RUN)("ER status cure generalization", () => {
       .moveset([MoveId.HEAL_BELL])
       .startingLevel(50)
       .enemyLevel(5);
-    await game.classicMode.startBattle([SpeciesId.SNORLAX]);
+    await game.classicMode.startBattle(SpeciesId.SNORLAX);
 
     const mon = game.field.getPlayerPokemon();
+    mon.addTag(BattlerTagType.ER_FROSTBITE, 5, MoveId.NONE, mon.id);
     mon.addTag(BattlerTagType.ER_BLEED, 5, MoveId.NONE, mon.id);
     expect(hasErAilment(mon)).toBe(true);
 
     game.move.select(MoveId.HEAL_BELL);
     await game.toNextTurn();
 
-    // Heal Bell's PartyStatusCureAttr now also clears ER ailment tags.
-    expect(mon.getTag(BattlerTagType.ER_BLEED)).toBeUndefined();
+    // Heal Bell's PartyStatusCureAttr clears the cure-all ER ailments (frostbite/fear)...
+    expect(mon.getTag(BattlerTagType.ER_FROSTBITE)).toBeUndefined();
     expect(hasErAilment(mon)).toBe(false);
-    // The helper leaves an already-clean mon untouched.
+    // The helper leaves an already-clean (no cure-all-ailment) mon untouched.
     expect(clearErAilments(mon)).toBe(false);
+    // ...but ER BLEED is NEVER removed by a cure-all - only a healing move clears it.
+    expect(mon.getTag(BattlerTagType.ER_BLEED)).toBeDefined();
   });
 });

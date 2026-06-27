@@ -35,11 +35,16 @@ import type { Pokemon } from "#field/pokemon";
  * Status-SPECIFIC cures map by analogy (see callers):
  *   - FROSTBITE ⇆ FREEZE (Aspear Berry, Ice Heal, and the FREEZE branch of
  *     `HealStatusEffectAttr`). Frostbite is ER's freeze analogue.
- *   - BLEED / FEAR have no vanilla single-status analogue, so only the
- *     cure-ALL paths above remove them.
+ *   - FEAR has no vanilla single-status analogue, so only the cure-ALL paths
+ *     above remove it.
+ *
+ * BLEED is deliberately EXCLUDED: per the ER dex it is removed ONLY by using a
+ * healing MOVE (Recover/Roost/Rest/...), handled in `PokemonHealPhase` via the
+ * `isHealMove` discriminator. A cure-all (Lum/Full Heal/Heal Bell/Natural
+ * Cure/Shed Skin/Healer) must NOT clear bleed, and switching it out must not
+ * either (bleed persists across switch like a non-volatile status).
  */
 export const ER_AILMENT_TAGS: readonly BattlerTagType[] = [
-  BattlerTagType.ER_BLEED,
   BattlerTagType.ER_FROSTBITE,
   BattlerTagType.ER_FEAR,
 ] as const;

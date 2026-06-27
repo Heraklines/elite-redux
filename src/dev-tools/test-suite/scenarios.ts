@@ -10112,4 +10112,135 @@ export const DEV_SCENARIOS: DevScenario[] = [
       ];
     },
   },
+  // ===========================================================================
+  // Bleed (ER dex spec): non-move heals don't cure it + it survives a switch-out
+  // ===========================================================================
+  {
+    label: "Bleed: persists on switch, cured ONLY by a heal move",
+    description:
+      "Bleed (ER dex) spec, two FIXED behaviors. Your Snorlax has Blood Stain (ABILITY\n"
+      + "override) so it re-bleeds itself every turn-end - a perpetual test subject\n"
+      + "(Normal type, so bleedable). It holds Leftovers; Blissey is benched.\n"
+      + "EXPECT each turn: a ~1/16 max-HP chip ('hurt by its bleeding').\n"
+      + "FIX 1 - non-move heals do NOT cure it: your Leftovers (and any item / terrain /\n"
+      + "ability heal) restores NOTHING while bled and the bleed STAYS. Only a healing\n"
+      + "MOVE removes it - use RECOVER or REST: it heals nothing, prints 'bleeding was\n"
+      + "healed!', and clears the bleed (Blood Stain re-applies it next turn-end - so\n"
+      + "you'll be bled again, that's expected).\n"
+      + "FIX 2 - survives switching: switch Snorlax OUT to Blissey then back IN - the\n"
+      + "bleed is STILL on Snorlax (before the fix, switching wiped it). A different\n"
+      + "status (poison via Blissey's Toxic) also does NOT clear it. Rock/Ghost types\n"
+      + "can never be bled.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_WAVE_OVERRIDE: 145, // past the #419 BST cap so Snorlax stays Snorlax
+        STARTING_LEVEL_OVERRIDE: 50,
+        ABILITY_OVERRIDE: erAbility(ErAbilityId.BLOOD_STAIN),
+        STARTING_HELD_ITEMS_OVERRIDE: [{ name: "LEFTOVERS" }],
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.CHANSEY, // bulky + feeble: lets the bleed tick for many turns
+        ENEMY_LEVEL_OVERRIDE: 50,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.GROWL],
+      });
+      return [
+        makeStarter(SpeciesId.SNORLAX, {
+          moveset: [MoveId.RECOVER, MoveId.REST, MoveId.PROTECT, MoveId.BODY_SLAM],
+        }),
+        makeStarter(SpeciesId.BLISSEY, {
+          moveset: [MoveId.SOFT_BOILED, MoveId.SEISMIC_TOSS, MoveId.PROTECT, MoveId.TOXIC],
+        }),
+      ];
+    },
+  },
+  // ===========================================================================
+  // Double-battle lone survivor recenters (the rival "+32 sprite shift" fix)
+  // ===========================================================================
+  {
+    label: "Double battle: lone surviving foe recenters (no +32 shift)",
+    description:
+      "Rival sprite-shift fix. In a DOUBLE battle, when ONE foe faints and nothing\n"
+      + "switches into its slot, the lone survivor used to STAY shifted to its side\n"
+      + "(+32px right / -32px left) instead of recentering - the 'rival sprite shifted\n"
+      + "entirely to the right' bug (it hit mons that never evolved, so it was NOT an\n"
+      + "evolution issue). Here you face TWO frail foes in a forced double.\n"
+      + "DO: KO exactly ONE of the two foes (your fast L100 lead one-shots; leave the\n"
+      + "other alive - have the second mon PROTECT).\n"
+      + "EXPECT: the surviving foe slides to the CENTER of the field, not stuck off to\n"
+      + "one side. (The player's lone survivor already recentered; this fixes the enemy\n"
+      + "side to match.)",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_WAVE_OVERRIDE: 5,
+        STARTING_LEVEL_OVERRIDE: 100,
+        BATTLE_STYLE_OVERRIDE: "double",
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.MAGIKARP, // frail - a single hit OHKOs one foe
+        ENEMY_LEVEL_OVERRIDE: 5,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.GROWL],
+      });
+      return [
+        makeStarter(SpeciesId.SNORLAX, {
+          moveset: [MoveId.BODY_SLAM, MoveId.PROTECT, MoveId.REST, MoveId.TACKLE],
+        }),
+        makeStarter(SpeciesId.PIKACHU, {
+          moveset: [MoveId.THUNDERBOLT, MoveId.PROTECT, MoveId.NUZZLE, MoveId.SURF],
+        }),
+      ];
+    },
+  },
+  // ===========================================================================
+  // Notes (dex / reward-pool / UI fixes that aren't shown in a single battle)
+  // ===========================================================================
+  {
+    label: "(note) Greater Ability Randomizer rarity (Master Ball tier)",
+    description:
+      "Reward-pool weight fix (not battle-testable). The ER Greater Ability Randomizer\n"
+      + "was weight 8 in the Master Ball reward tier, so it appeared far too often.\n"
+      + "Lowered to weight 2 to match its sibling Greater Ability Capsule.\n"
+      + "CHECK: over many Master Ball-tier reward rolls it now shows up about as often\n"
+      + "as the Greater Ability Capsule, not dominating the tier.",
+    setup: () => {
+      resetDevOverrides();
+      return [
+        makeStarter(SpeciesId.SNORLAX, { moveset: [MoveId.BODY_SLAM, MoveId.REST, MoveId.PROTECT, MoveId.TACKLE] }),
+      ];
+    },
+  },
+  {
+    label: "(note) Starter line shares candy + passive (Pichu/Pikachu/Raichu)",
+    description:
+      "Pokedex candy/passive linking fix (dex/UI, not battle-testable). Candy and\n"
+      + "passive/ability unlocks are stored on the evolution line's ROOT (e.g. Pichu),\n"
+      + "but the Pokedex read them off a per-stage key, so a line member (Raichu) showed\n"
+      + "0 candy / a locked passive even after you paid on another member, and unlocking\n"
+      + "the passive on Raichu did not show on Pichu. The Pokedex now reads the SAME\n"
+      + "root key the storage pools under (getRootStarterSpeciesId).\n"
+      + "CHECK: in the Pokedex, every member of a line (Pichu/Pikachu/Raichu, the Burmy\n"
+      + "line, etc.) shows the SAME candy count and the SAME passive/ability unlock\n"
+      + "state; unlocking a passive on one member shows it unlocked on all.",
+    setup: () => {
+      resetDevOverrides();
+      return [
+        makeStarter(SpeciesId.RAICHU, { moveset: [MoveId.THUNDERBOLT, MoveId.SURF, MoveId.NUZZLE, MoveId.PROTECT] }),
+      ];
+    },
+  },
+  {
+    label: "(note) Giratina Bargain shows the correct ability description",
+    description:
+      "Bargain ability-description fix (UI/data, not battle-testable). The Giratina\n"
+      + "Bargain ability pickers (Curiosity / Greater Ability Randomizer) pulled the ROM\n"
+      + "'Detail' text, a few blocks of which are shifted (e.g. Arctic Fur rendered\n"
+      + "Spectralize's text). It now uses the SAME short ability description the in-game\n"
+      + "summary shows, which is correct.\n"
+      + "CHECK: in a Giratina Bargain ability picker, each ability's description matches\n"
+      + "what the Pokemon summary's Abilities page shows for that ability (e.g. Arctic\n"
+      + "Fur: 'Weakens incoming physical and special moves by 35%').",
+    setup: () => {
+      resetDevOverrides();
+      return [
+        makeStarter(SpeciesId.SNORLAX, { moveset: [MoveId.BODY_SLAM, MoveId.REST, MoveId.PROTECT, MoveId.TACKLE] }),
+      ];
+    },
+  },
 ];

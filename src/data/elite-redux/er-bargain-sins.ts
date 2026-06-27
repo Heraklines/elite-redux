@@ -206,16 +206,19 @@ export interface BargainAbilityChoice {
 }
 
 /**
- * The detailed description shown for a rolled ability, resolved exactly like the
- * in-game ability "Detail" view / abilities menu: the full ER ROM text, then the
- * short ER description, then pokerogue's own description.
+ * The description shown for a rolled ability. Resolved to match the NORMAL in-game
+ * ability text the player already sees - the short ER description used by the summary
+ * Abilities page - then pokerogue's own description. We deliberately do NOT use the
+ * full ER ROM "Detail" text here: a handful of ROM blocks have off-by-one shifted
+ * detail pointers (e.g. Arctic Fur renders Spectralize's text), which made the bargain
+ * show the wrong ability description while the in-game summary stayed correct.
  */
 export function bargainAbilityDescription(abilityId: AbilityId): string {
   const ability = allAbilities[abilityId];
   if (!ability) {
     return "";
   }
-  return getErAbilityRomDescription(ability.name) ?? getErAbilityDescription(abilityId) ?? ability.description ?? "";
+  return getErAbilityDescription(abilityId) ?? ability.description ?? "";
 }
 
 /**

@@ -699,7 +699,9 @@ function initMasterModifierPool() {
     ),
     // ER Greater Ability Randomizer: MASTER (maintainer specified) - pick a slot,
     // choose 1 of 4 random abilities to replace it (Curiosity's reward half, no lock).
-    new WeightedModifierType(modifierTypes.ER_GREATER_ABILITY_RANDOMIZER, 8),
+    // Weight 2 to match its sibling ER_GREATER_ABILITY_CAPSULE (weight 8 made it
+    // appear far too often in the Master Ball tier).
+    new WeightedModifierType(modifierTypes.ER_GREATER_ABILITY_RANDOMIZER, 2),
   ].map(m => {
     m.setTier(ModifierTier.MASTER);
     return m;

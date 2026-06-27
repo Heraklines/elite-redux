@@ -2223,6 +2223,21 @@ export class GameData {
     };
   }
 
+  /**
+   * The canonical starterData KEY for a species: its evolution line's baby ROOT,
+   * after first resolving a custom MEGA form to its base. This is the EXACT same
+   * normalization {@linkcode getStarterDataEntry} pools under, exposed so UI that
+   * needs the id (not the entry) - e.g. the Pokedex candy/passive panels - reads
+   * the line's shared bucket instead of a per-stage stray (Pichu/Pikachu/Raichu
+   * all resolve to Pichu). Pure: unlike getStarterDataEntry it never creates an
+   * entry, so it's safe to call across the whole grid. Falls back to the raw id
+   * for synthetic/custom species not in the species table.
+   */
+  public getRootStarterSpeciesId(speciesId: number): SpeciesId {
+    const baseId = erMegaTargetToBaseSpeciesId(speciesId) ?? speciesId;
+    return getPokemonSpecies(baseId)?.getRootSpeciesId() ?? (baseId as SpeciesId);
+  }
+
   public getStarterDataEntry(speciesId: number): StarterDataEntry {
     // Normalize to the evolution line's ROOT so candy + passive/ability unlocks
     // pool under ONE key and survive evolution. Without this, any line with a
@@ -2234,8 +2249,7 @@ export class GameData {
     // base, not a separate line - resolve it to the base FIRST (before the evo
     // root) so its candy/passive/ability unlocks pool on the base and it never
     // shows a split candy count.
-    const baseId = erMegaTargetToBaseSpeciesId(speciesId) ?? speciesId;
-    const rootId = getPokemonSpecies(baseId)?.getRootSpeciesId() ?? baseId;
+    const rootId = this.getRootStarterSpeciesId(speciesId);
     return (this.starterData[rootId] ??= this.createStarterDataEntry(rootId));
   }
 

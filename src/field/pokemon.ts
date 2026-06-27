@@ -2862,11 +2862,8 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
       basePassive =
         ([0, 1, 2] as const).some(s => isSlotActive(this.innateSlotPassiveAttr(s), s))
         || ((erYoungsterFreeInnateSlots(this.level) > 0 || gameMode.isDaily)
-          && this.getPassiveAbilities().some(a => a != null)) // ER (#381): a TRUANT innate is always live (it is a nerf). // ER Ability Capsule run-unlock (maintainer request): a run-unlocked innate
-        || // makes the mon "have a passive" this run, so the candy-unlock gate at the
-        // top of canApplyAbility (which short-circuits when hasPassive() is false)
-        // lets the run-only innate through. Run-scoped; never a permanent unlock.
-        (this.customPokemonData?.erRunUnlockedAbilitySlots?.length ?? 0) > 0
+          && this.getPassiveAbilities().some(a => a != null)) // ER (#381): a TRUANT innate is always live (it is a nerf). // ER Ability Capsule run-unlock (maintainer request): a run-unlocked innate // makes the mon "have a passive" this run, so the candy-unlock gate at the // top of canApplyAbility (which short-circuits when hasPassive() is false) // lets the run-only innate through. Run-scoped; never a permanent unlock.
+        || (this.customPokemonData?.erRunUnlockedAbilitySlots?.length ?? 0) > 0
         || this.getPassiveAbilities()
           .slice(0, 3)
           .some(a => a?.id === AbilityId.TRUANT);
@@ -3031,12 +3028,8 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
         const freeInnate =
           passiveSlot < erYoungsterFreeInnateSlots(this.level)
           || globalScene.gameMode?.isDaily === true // ER Innate Shrine (#514): a mon attuned at the Temple shrine has all its // innate slots unlocked for the run.
-          || this.customPokemonData?.erInnateShrineUnlocked === true // ER Ability Capsule run-unlock (maintainer request): the INVERSE of the
-          || // Curiosity lock - a slot the player paid a capsule to "unlock an innate for
-          // the run" fires this run without the permanent candy unlock. Stored as the
-          // ER slot index (passiveSlot + 1), serialized run-only on customPokemonData;
-          // never writes starterData.passiveAttr. The Curiosity lock above (which
-          // returns false before reaching here) still wins, so a run-unlocked slot that
+          || this.customPokemonData?.erInnateShrineUnlocked === true // ER Ability Capsule run-unlock (maintainer request): the INVERSE of the // Curiosity lock - a slot the player paid a capsule to "unlock an innate for // the run" fires this run without the permanent candy unlock. Stored as the // ER slot index (passiveSlot + 1), serialized run-only on customPokemonData; // never writes starterData.passiveAttr. The Curiosity lock above (which
+          || // returns false before reaching here) still wins, so a run-unlocked slot that
           // is ALSO Curiosity-locked stays dead.
           this.customPokemonData?.erRunUnlockedAbilitySlots?.includes(passiveSlot + 1) === true
           || ability.id === AbilityId.TRUANT;
@@ -6700,8 +6693,17 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
       this.summonData.speciesForm = null;
       this.updateFusionPalette();
     }
+    // ER BLEED behaves like a non-volatile status: it must SURVIVE a switch-out.
+    // resetSummonData() rebuilds summonData from scratch (clearing all volatile
+    // tags), which would otherwise wipe the bleed - so carry an active bleed onto
+    // the fresh summonData, the way vanilla status (which lives outside summonData)
+    // persists. A fainted mon keeps no status, so only carry it while alive.
+    const bleedTag = this.isFainted() ? undefined : this.getTag(BattlerTagType.ER_BLEED);
     this.summonData = new PokemonSummonData();
     this.tempSummonData = new PokemonTempSummonData();
+    if (bleedTag) {
+      this.summonData.tags.push(bleedTag);
+    }
     this.updateInfo();
   }
 

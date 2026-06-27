@@ -944,7 +944,7 @@ export class PokedexUiHandler extends MessageUiHandler {
    */
   isPassiveAvailable(speciesId: number): boolean {
     // Get this species ID's starter data
-    const starterId = this.getStarterSpeciesId(speciesId);
+    const starterId = this.gameData.getRootStarterSpeciesId(speciesId);
     const starterData = this.gameData.starterData[starterId];
     // ER: custom species without starter data / starter cost can't unlock a passive.
     if (!starterData || speciesStarterCosts[starterId] === undefined) {
@@ -963,7 +963,7 @@ export class PokedexUiHandler extends MessageUiHandler {
    */
   isValueReductionAvailable(speciesId: number): boolean {
     // Get this species ID's starter data
-    const starterId = this.getStarterSpeciesId(speciesId);
+    const starterId = this.gameData.getRootStarterSpeciesId(speciesId);
     const starterData = this.gameData.starterData[starterId];
     // ER: custom species without starter data / starter cost can't reduce value.
     if (!starterData || speciesStarterCosts[starterId] === undefined) {
@@ -983,7 +983,7 @@ export class PokedexUiHandler extends MessageUiHandler {
   isSameSpeciesEggAvailable(speciesId: number): boolean {
     // Get this species ID's starter data
     const { gameData } = this;
-    const starterId = this.getStarterSpeciesId(speciesId);
+    const starterId = this.gameData.getRootStarterSpeciesId(speciesId);
     // ER: custom species without starter/dex entries can't buy a same-species
     // egg — guard the reads (and the missing starter-cost) instead of crashing.
     const candyCount = gameData.starterData[starterId]?.candyCount ?? 0;
@@ -1880,8 +1880,10 @@ export class PokedexUiHandler extends MessageUiHandler {
         case SortCriteria.CANDY: {
           // ER hardening: custom species may lack starter/dex entries; missing
           // data sorts as 0 instead of crashing the whole grid sort.
-          const candyCountA = this.gameData.starterData[this.getStarterSpeciesId(a.species.speciesId)]?.candyCount ?? 0;
-          const candyCountB = this.gameData.starterData[this.getStarterSpeciesId(b.species.speciesId)]?.candyCount ?? 0;
+          const candyCountA =
+            this.gameData.starterData[this.gameData.getRootStarterSpeciesId(a.species.speciesId)]?.candyCount ?? 0;
+          const candyCountB =
+            this.gameData.starterData[this.gameData.getRootStarterSpeciesId(b.species.speciesId)]?.candyCount ?? 0;
           return (candyCountA - candyCountB) * -sort.dir;
         }
         case SortCriteria.IV: {
@@ -2009,7 +2011,7 @@ export class PokedexUiHandler extends MessageUiHandler {
             }
           }
 
-          const cStarterData = this.gameData.starterData[this.getStarterSpeciesId(speciesId)];
+          const cStarterData = this.gameData.starterData[this.gameData.getRootStarterSpeciesId(speciesId)];
           // ER Black Shinies (#349): 4th sparkle — pure black — for t4 unlocks.
           if (container.shinyIcons[3]) {
             const hasBlack = !!cStarterData?.erBlackShiny;
@@ -2224,7 +2226,7 @@ export class PokedexUiHandler extends MessageUiHandler {
   }
 
   getFriendship(speciesId: number) {
-    let currentFriendship = this.gameData.starterData[this.getStarterSpeciesId(speciesId)]?.friendship;
+    let currentFriendship = this.gameData.starterData[this.gameData.getRootStarterSpeciesId(speciesId)]?.friendship;
     if (!currentFriendship || currentFriendship === undefined) {
       currentFriendship = 0;
     }

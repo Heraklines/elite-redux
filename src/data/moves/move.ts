@@ -2614,6 +2614,11 @@ export class HealAttr extends MoveEffectAttr {
       i18next.t("moveTriggers:healHp", { pokemonName: getPokemonNameWithAffix(target) }),
       true,
       !this.showAnim,
+      false, // revive
+      false, // healStatus
+      false, // preventFullHeal
+      false, // fullRestorePP
+      true, // isHealMove: a healing move cures ER bleed (and heals nothing while bled)
     );
   }
 
@@ -2680,7 +2685,19 @@ export class RestAttr extends HealAttr {
   }
 
   override addHealPhase(user: Pokemon): void {
-    globalScene.phaseManager.unshiftNew("PokemonHealPhase", user.getBattlerIndex(), user.getMaxHp(), null);
+    globalScene.phaseManager.unshiftNew(
+      "PokemonHealPhase",
+      user.getBattlerIndex(),
+      user.getMaxHp(),
+      null,
+      true, // showFullHpMessage
+      false, // skipAnim
+      false, // revive
+      false, // healStatus
+      false, // preventFullHeal
+      false, // fullRestorePP
+      true, // isHealMove: Rest cures ER bleed (and heals nothing while bled)
+    );
   }
 
   // TODO: change after HealAttr is changed to fail move

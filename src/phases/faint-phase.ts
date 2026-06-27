@@ -13,6 +13,7 @@ import { BattleType } from "#enums/battle-type";
 import type { BattlerIndex } from "#enums/battler-index";
 import { BattlerTagLapseType } from "#enums/battler-tag-lapse-type";
 import { BattlerTagType } from "#enums/battler-tag-type";
+import { FieldPosition } from "#enums/field-position";
 import { HitResult } from "#enums/hit-result";
 import { SpeciesId } from "#enums/species-id";
 import { StatusEffect } from "#enums/status-effect";
@@ -208,6 +209,7 @@ export class FaintPhase extends PokemonPhase {
       }
     } else {
       globalScene.phaseManager.unshiftNew("VictoryPhase", this.battlerIndex);
+      let willSwitchIn = false;
       if ([BattleType.TRAINER, BattleType.MYSTERY_ENCOUNTER].includes(globalScene.currentBattle.battleType)) {
         const hasReservePartyMember =
           globalScene
@@ -216,7 +218,18 @@ export class FaintPhase extends PokemonPhase {
             .length > 0;
         if (hasReservePartyMember) {
           globalScene.phaseManager.pushNew("SwitchSummonPhase", SwitchType.SWITCH, this.fieldIndex, -1, false, false);
+          willSwitchIn = true;
         }
+      }
+      // ER rival-sprite-shift fix: in a double battle, when a foe faints and
+      // nothing switches into its slot, the lone surviving foe keeps its
+      // double-slot offset (+32 RIGHT / -32 LEFT). The player branch above
+      // recenters its lone survivor via ToggleDoublePositionPhase, but the enemy
+      // branch never did, so the survivor stayed shifted off-center (reported in
+      // DOUBLES_ONLY / co-op rival fights, on mons that never evolved). Recenter it.
+      if (globalScene.currentBattle.double && !willSwitchIn) {
+        const survivor = globalScene.getEnemyField().find(p => p !== pokemon && !p.isFainted());
+        survivor?.setFieldPosition(FieldPosition.CENTER, 500);
       }
     }
 

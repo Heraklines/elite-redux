@@ -24,6 +24,13 @@ export class PokemonHealPhase extends CommonAnimPhase {
   private healStatus: boolean;
   private preventFullHeal: boolean;
   private fullRestorePP: boolean;
+  /**
+   * Whether this heal originates from a true healing MOVE (Recover, Roost, Rest,
+   * Synthesis, ...). ER BLEED is cured ONLY by a healing move; any other heal
+   * source (Leftovers, Wish, terrain, recovery abilities) restores nothing on a
+   * bled mon but must NOT remove the bleed.
+   */
+  private isHealMove: boolean;
 
   constructor(
     battlerIndex: BattlerIndex,
@@ -35,6 +42,7 @@ export class PokemonHealPhase extends CommonAnimPhase {
     healStatus = false,
     preventFullHeal = false,
     fullRestorePP = false,
+    isHealMove = false,
   ) {
     super(battlerIndex, undefined, CommonAnim.HEALTH_UP);
 
@@ -46,6 +54,7 @@ export class PokemonHealPhase extends CommonAnimPhase {
     this.healStatus = healStatus;
     this.preventFullHeal = preventFullHeal;
     this.fullRestorePP = fullRestorePP;
+    this.isHealMove = isHealMove;
   }
 
   start() {
@@ -75,14 +84,17 @@ export class PokemonHealPhase extends CommonAnimPhase {
       return super.end();
     }
 
-    // ER BLEED: healing restores no HP — instead the heal CURES the bleed (ROM:
-    // "prevents healing" + the "bleeding was healed!" message). The HP gain is
-    // consumed to remove the bleed.
+    // ER BLEED: healing restores no HP (ROM "prevents healing"). A true healing
+    // MOVE additionally CURES the bleed ("bleeding was healed!", heals nothing).
+    // Any OTHER heal source (Leftovers, Wish, terrain, recovery abilities) is
+    // still consumed to zero on a bled mon but must NOT remove the bleed.
     if (pokemon.getTag(BattlerTagType.ER_BLEED) && this.hpHealed > 0) {
-      pokemon.removeTag(BattlerTagType.ER_BLEED);
-      globalScene.phaseManager.queueMessage(
-        i18next.t("battlerTags:erBleedHealed", { pokemonNameWithAffix: getPokemonNameWithAffix(pokemon) }),
-      );
+      if (this.isHealMove) {
+        pokemon.removeTag(BattlerTagType.ER_BLEED);
+        globalScene.phaseManager.queueMessage(
+          i18next.t("battlerTags:erBleedHealed", { pokemonNameWithAffix: getPokemonNameWithAffix(pokemon) }),
+        );
+      }
       this.message = null;
       return super.end();
     }
