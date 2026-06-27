@@ -8,13 +8,13 @@ import {
   getCoopNetcodeMode,
   getCoopUiMirror,
 } from "#data/elite-redux/coop/coop-runtime";
-import { coopMeInProgress, coopMeInteractionStartValue } from "#phases/mystery-encounter-phases";
 import type { CoopUiMirrorEngine } from "#data/elite-redux/coop/coop-ui-mirror";
 import type { Button } from "#enums/buttons";
 import { Device } from "#enums/devices";
 import { PlayerGender } from "#enums/player-gender";
 import { TextStyle } from "#enums/text-style";
 import { UiMode } from "#enums/ui-mode";
+import { coopMeInProgress, coopMeInteractionStartValue } from "#phases/mystery-encounter-phases";
 import { AchvBar } from "#ui/achv-bar";
 import { AchvsUiHandler } from "#ui/achvs-ui-handler";
 import { AutoEggRestockUiHandler } from "#ui/auto-egg-restock-ui-handler";
@@ -38,6 +38,7 @@ import { ErBargainUiHandler } from "#ui/er-bargain-ui-handler";
 import { ErMapPickerUiHandler } from "#ui/er-map-picker-ui-handler";
 import { ErMapUiHandler } from "#ui/er-map-ui-handler";
 import { ErQuizUiHandler } from "#ui/er-quiz-ui-handler";
+import { ErShinyLabUiHandler } from "#ui/er-shiny-lab-ui-handler";
 import { EvolutionSceneUiHandler } from "#ui/evolution-scene-ui-handler";
 import { FightUiHandler } from "#ui/fight-ui-handler";
 import { GameStatsUiHandler } from "#ui/game-stats-ui-handler";
@@ -218,6 +219,7 @@ export class UI extends Phaser.GameObjects.Container {
       new ErMapPickerUiHandler(),
       new LearnMoveBatchUiHandler(),
       new ErBargainUiHandler(),
+      new ErShinyLabUiHandler(),
     ];
   }
 
@@ -375,11 +377,10 @@ export class UI extends Phaser.GameObjects.Container {
       phaseName === "MysteryEncounterPhase"
       || phaseName === "MysteryEncounterOptionSelectedPhase"
       || phaseName === "MysteryEncounterRewardsPhase"
-      || phaseName === "PostMysteryEncounterPhase"
-      // ER quiz (#633 Fix #4b): the quiz answer is an interactive choice that must be relayed,
-      // else each client answers independently -> different rewards. Route it through the same
+      || phaseName === "PostMysteryEncounterPhase" // ER quiz (#633 Fix #4b): the quiz answer is an interactive choice that must be relayed,
+      || // else each client answers independently -> different rewards. Route it through the same
       // owner-drives / watcher-mirrors pump as the ME screens.
-      || phaseName === "ErQuizPhase"
+      phaseName === "ErQuizPhase"
     );
   }
 

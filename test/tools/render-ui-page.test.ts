@@ -55,6 +55,7 @@ import {
   repointGlobalScene,
   restoreGlobalScene,
 } from "#test/tools/render-harness";
+import { buildDemoConfig } from "#ui/er-shiny-lab-ui-handler";
 import { PartyUiMode } from "#ui/party-ui-handler";
 import { getModifierType } from "#utils/modifier-utils";
 import { getPokemonSpecies } from "#utils/pokemon-utils";
@@ -254,6 +255,28 @@ const RECIPES: Record<string, Recipe> = {
   "greater-ability-randomizer-picker": {
     mode: UiMode.ER_BARGAIN,
     prepare: () => greaterRandomizerPickerArgs(),
+  },
+  // The ER Shiny Lab designer (the in-game special-form shiny tool). Drives the real
+  // ErShinyLabUiHandler with a self-contained demo config (Articuno, all tiers earned,
+  // a representative owned/locked/buyable mix). The golden render confirms the void/neon
+  // theme, the preview pane, the category tabs, the effect list with rarity/lock/cost
+  // tokens, the detail box and the contextual tuning bar all render legibly.
+  "er-shiny-lab": {
+    mode: UiMode.ER_SHINY_LAB,
+    prepare: () => [buildDemoConfig(SpeciesId.ARTICUNO)],
+    diffTolerance: 40000, // live animated mon sprite in the preview pane
+  },
+  // Directional-key navigation tour: browse, switch category (RIGHT), drop into the
+  // tuning bar (DOWN past the last effect), step across the sliders (RIGHT), into the
+  // presets (RIGHT). Each -stepN.png proves the no-mouse flow + that no press crashes.
+  "er-shiny-lab-nav": {
+    mode: UiMode.ER_SHINY_LAB,
+    prepare: () => [buildDemoConfig(SpeciesId.ARTICUNO)],
+    // RIGHT,RIGHT walk Palette->Surface->Around; STATS jumps to the tuning bar; RIGHT
+    // steps a slider; STATS -> presets; STATS -> back to the list. Each -stepN.png proves
+    // the no-mouse flow across all three zones with no crash.
+    steps: [Button.RIGHT, Button.RIGHT, Button.STATS, Button.RIGHT, Button.STATS, Button.STATS],
+    diffTolerance: 40000,
   },
   "biome-shop": {
     mode: UiMode.BIOME_SHOP,

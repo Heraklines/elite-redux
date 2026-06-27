@@ -64,4 +64,6 @@ export enum UiMode {
   LEARN_MOVE_BATCH,
   /** ER Abyss "The Bargain": Giratina's full-screen deal screen (portrait + bargains). */
   ER_BARGAIN,
+  /** ER Shiny Lab: the in-game special-form shiny designer (preview + effect browser). */
+  ER_SHINY_LAB,
 }

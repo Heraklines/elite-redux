@@ -45,6 +45,24 @@ export class MockRectangle implements MockGameObject {
     return this;
   }
 
+  setX(_x?: number): this {
+    return this;
+  }
+
+  setY(_y?: number): this {
+    return this;
+  }
+
+  setAngle(_degrees?: number): this {
+    // Real Phaser shapes expose this; stubbed so handlers that rotate a shape in
+    // setup() (e.g. a diamond logo) don't crash the headless scene.
+    return this;
+  }
+
+  setRotation(_radians?: number): this {
+    return this;
+  }
+
   setPositionRelative(_source, _x, _y): this {
     /// Sets the position of this Game Object to be a relative position from the source Game Object.
     return this;
