@@ -449,6 +449,57 @@ next file's `beforeEach` captures, so even back-to-back swapping files chain a r
 only bites full-directory ER_SCENARIO runs (CI's default suite skips these), so it slips a single-file
 green - always run the WHOLE `coop/` dir before shipping a new co-op test.
 
+## Record -> Replay - a reported bug ships with a replayable trace (#record-replay)
+
+🔴 **The point: a live bug report carries a deterministic `ReplayTrace`, and the harness re-runs that
+trace to REPRODUCE the bug headlessly + verify the fix.** Before this, a co-op (or single-player) bug
+report had a console ring buffer + a seed but no way to RE-DRIVE the exact run; you triaged from logs.
+Now the run is captured as data and replayed through the real engine. Workflow when a trace-bearing
+report lands: pull the report -> load its `replayTrace` -> replay it in the duo harness -> watch it
+diverge/hang at the same point -> fix -> re-replay until it's green (then it doubles as the regression
+test). A run is fully determined by **seed + roster + the ordered events**, because the co-op run-start
+is deterministic (#658 pins the guest to the host seed) - so replaying those three reproduces it 1:1.
+
+**The three pieces (all general - co-op today, single-player is a thin future add):**
+- **Schema** `src/data/elite-redux/replay-trace.ts` - PURE TYPES, zero runtime (type-only imports).
+  `ReplayTrace = { version, seed, gameModeId, difficulty, challenges, roster: PokemonData[], events:
+  ReplayEvent[], coop?: { runConfig: CoopRunConfig } }`. An event is either a `ReplayCommandEvent`
+  (`{type:"command", wave, turn, slotFieldIndex, command}` where command is move/switch/ball/run) or a
+  `ReplayInteractionEvent` (`{type:"interaction", seq, kind, choice, data?}`). Interaction OWNER is
+  DERIVED from `seq` parity (even=host, odd=guest), never stored. `makeReplayTrace` / `validateReplayTrace`
+  / `isReplayCommandEvent` / `isReplayInteractionEvent` are the builder + guards. The `coop` layer is
+  OPTIONAL - omit it and the same trace describes a single-player run.
+- **Recorder** `src/data/elite-redux/replay-recorder.ts` - the PRODUCTION capture. A PASSIVE,
+  ring-buffered (last `REPLAY_RECORDER_WAVE_WINDOW` = 6 waves) observer. The hot-path gate is a single
+  `header != null` read (`isReplayRecording()`): every `record*` returns immediately when not recording,
+  so a non-recording run is byte-identical and free (no alloc beyond the small event, no await, no
+  network, never touches engine/RNG/command-resolution). `beginReplayRecording(header)` is idempotent
+  for the same seed. The ENABLE decision lives at the CALL SITES, not here (the recorder knows nothing
+  about co-op). Taps: `command-phase.ts` records own/partner slot commands AFTER the existing
+  broadcast/apply (behavior-preserving); `encounter-phase.ts` -> `maybeBeginReplayRecording()` begins it
+  at the first `EncounterPhase` of a CO-OP run on the HOST only (the sole authoritative engine; the guest
+  never records, so its taps are no-ops); `coop-interaction-relay.ts` records owner-sent + received
+  picks after the wire send. **Single-player is a thin add**: call `beginReplayRecording` from the
+  classic launch (same taps already fire) - left OFF for now so single-player is provably free.
+- **Loader** `replayCoopTrace(game, trace, opts)` in `test/tools/coop-duo-harness.ts` - feeds a trace
+  back through the two-engine harness: stands up host+guest from the header (seed/roster/runConfig),
+  then drives the ordered events (commands via `move.select`, interactions via the relay) so the run
+  re-executes deterministically. A future single-engine loader (drive ONE `GameManager` from the same
+  trace, skip the `coop` layer) is the thin add for single-player repros.
+
+**Attach + verify.** `er-bug-report.ts` serializes `getReplayTrace()` onto the report as
+`replayTrace: string | null` (try/catch -> null; absent = the run wasn't recording). The closed-loop
+test in `coop-duo-replay.test.ts` is the proof + the recipe: drive a real run with the recorder enabled
+-> `getReplayTrace()` -> feed it back through `replayCoopTrace` -> assert the same run. Copy that test to
+turn any captured trace into a permanent regression.
+
+**Bounds (respect or close before relying beyond them):** only the last 6 waves are kept (a bug older
+than that is off the ring buffer - widen `REPLAY_RECORDER_WAVE_WINDOW` if needed). Recording is co-op +
+host only right now (single-player taps exist but are not begun). The loader inherits the duo harness's
+bounded scope above (ghost-bearing MEs / ghost waves not yet safe; the guest battle is mirrored not
+launched). The trace captures commands + interactions + seed + roster - NOT mid-run RNG reseeds or
+external save/cloud state, so a bug that depends on those is not fully reproduced by replay alone.
+
 ## The in-game dev test suite
 
 - `src/dev-tools/test-suite/` — **TRACKED**. The shared suite: `scenarios.ts`
