@@ -147,10 +147,12 @@ function renderLook(slots, buf, ef, dist, t, out, intensity) {
   const pal = slots.palette && slots.palette !== "base" ? slots.palette : null;
   const surf = slots.surface || null;
   const aro = slots.around || null;
-  // "Tint FX to palette": pick the palette's most colorful tone as the tint hue.
-  let tintH = 0.09;
-  let tintS = 0.6;
-  if (tintFx) {
+  // FX color: default = each effect's own colors; palette = match the palette's
+  // most colorful tone; custom = a hand-picked color (the aura color picker).
+  const doTint = fxColorMode !== "default";
+  let tintH = fxCustomH;
+  let tintS = fxCustomS;
+  if (fxColorMode === "palette") {
     let best = -1;
     const refs = CL
       ? CL.cent
@@ -211,7 +213,7 @@ function renderLook(slots, buf, ef, dist, t, out, intensity) {
             sc = [res[0], res[1], res[2]];
             a *= res[3];
           }
-          if (tintFx && !NO_TINT.has(surf)) {
+          if (doTint && !NO_TINT.has(surf)) {
             sc = tintTo(sc, tintH, tintS);
           }
           col = blendCol(base2, sc, SURFACE_BLEND[surf] || "normal");
@@ -230,7 +232,7 @@ function renderLook(slots, buf, ef, dist, t, out, intensity) {
         const df = dist.d[py * PW + px];
         const res = AROUND[aro](nx, ny, df, t, ac);
         let rc = [res[0], res[1], res[2]];
-        if (tintFx && !NO_TINT.has(aro)) {
+        if (doTint && !NO_TINT.has(aro)) {
           rc = tintTo(rc, tintH, tintS);
         }
         out[k] = rc[0] * 255;
@@ -301,7 +303,9 @@ let speed = 1;
 let intensity = 1;
 let fxSeed = 0;
 let fxScale = 1;
-let tintFx = false;
+let fxColorMode = "default"; // default | palette | custom
+let fxCustomH = 0.92;
+let fxCustomS = 0.7;
 
 const nameOf = kind => {
   const v = slots[kind];
@@ -342,7 +346,22 @@ function wireControls() {
     fxSeed = Math.floor(Math.random() * 257);
     document.getElementById("seed").value = fxSeed;
   });
-  document.getElementById("tintfx").addEventListener("change", e => (tintFx = e.target.checked));
+  document.querySelectorAll("#tintSeg button").forEach(btn =>
+    btn.addEventListener("click", () => {
+      document.querySelectorAll("#tintSeg button").forEach(x => x.classList.remove("on"));
+      btn.classList.add("on");
+      fxColorMode = btn.dataset.tint;
+      document.getElementById("fxcolor").style.display = fxColorMode === "custom" ? "" : "none";
+    }),
+  );
+  document.getElementById("fxcolor").addEventListener("input", e => {
+    const h = e.target.value, hsv = rgb2hsv(parseInt(h.slice(1, 3), 16) / 255, parseInt(h.slice(3, 5), 16) / 255, parseInt(h.slice(5, 7), 16) / 255);
+    fxCustomH = hsv[0];
+    fxCustomS = Math.max(0.5, hsv[1]);
+    fxColorMode = "custom";
+    document.querySelectorAll("#tintSeg button").forEach(x => x.classList.toggle("on", x.dataset.tint === "custom"));
+    document.getElementById("fxcolor").style.display = "";
+  });
   document.querySelectorAll("#bgSeg button").forEach(b =>
     b.addEventListener("click", () => {
       document.querySelectorAll("#bgSeg button").forEach(x => x.classList.remove("on"));

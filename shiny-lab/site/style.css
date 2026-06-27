@@ -311,6 +311,16 @@ input[type="range"] {
   font-size: 12px;
   font-style: italic;
 }
+.colorin {
+  flex: none;
+  width: 38px;
+  height: 28px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: var(--panel);
+  cursor: pointer;
+  padding: 2px;
+}
 .seg {
   display: flex;
   gap: 6px;

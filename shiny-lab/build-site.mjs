@@ -89,7 +89,10 @@ ${css}
       <div class="row"><label>Intensity</label><input id="intensity" type="range" min="0" max="1" step="0.02" value="1"></div>
       <div class="row"><label>Seed</label><input id="seed" type="range" min="0" max="256" step="1" value="0"><button id="seedRand" class="mini" title="Randomize seed">&#127922;</button></div>
       <div class="row"><label>Texture</label><input id="texscale" type="range" min="0.4" max="2" step="0.05" value="1"></div>
-      <div class="row"><label>Tint to palette</label><input id="tintfx" type="checkbox" class="chk"><span class="hintrow">match Around/Surface FX colors to the palette</span></div>
+      <div class="row"><label>FX color</label>
+        <div class="seg" id="tintSeg"><button class="on" data-tint="default">Default</button><button data-tint="palette">Palette</button><button data-tint="custom">Custom</button></div>
+        <input id="fxcolor" type="color" value="#ff66cc" class="colorin" style="display:none">
+      </div>
       <div class="row"><label>Backdrop</label>
         <div class="seg" id="bgSeg">
           <button class="on" data-bg="void">Void</button><button data-bg="mid">Nebula</button>

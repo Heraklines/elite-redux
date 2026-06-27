@@ -346,6 +346,11 @@ export const SURFACE_BLEND = {
   synthscan: "softlight",
   rimlight: "softlight",
   kaleido: "softlight",
+  stainedglass: "softlight",
+  crystalfacets: "softlight",
+  marble: "softlight",
+  halftone: "hardlight",
+  rainbowedge: "screen",
 };
 
 // "Tint FX to palette": recolor a single-hue effect to the palette's hue while
@@ -369,6 +374,7 @@ export const NO_TINT = new Set([
   "vaporwave",
   "synthscan",
   "sunsetsun",
+  "rainbowedge",
   "stainedglass",
   "auroraveil",
   "cosmos",
@@ -1161,6 +1167,14 @@ AURA.synthscan = (r, g, b, x, y, t) => {
   const scan = 0.78 + 0.22 * Math.sin(y * 110 + t * 2);
   return [...c.map(v => clamp(v * scan)), 1];
 };
+// Rainbow as a SURFACE FX: a bright rainbow glow that cycles around the sprite's
+// own edge (uses the edge field). Reads like the RainbowMetagross outline but on-sprite.
+AURA.rainbowedge = (r, g, b, x, y, t, ctx) => {
+  const e = ctx?.e ?? 0;
+  const rim = smooth(0.15, 0.95, e);
+  const rc = hsv2rgb(fract((x + y) * 0.6 + t * 0.25), 0.95, 1);
+  return [...mix3([r, g, b], rc, rim * 0.92), 1];
+};
 AURA.sunsetsun = (r, g, b, x, y) => {
   const grad = ramp(["ffe85a", "ffaa2a", "ff6a3a", "e0407a", "a02a9a", "4a1a7a"].map(hx), clamp(y * 1.05));
   const gap = 0.1 + 0.55 * y;
@@ -1458,6 +1472,7 @@ export const LABELS = {
   sunsetsun: "Sunset Sun",
   crosshatch: "Crosshatch",
   tron: "Tron Lines",
+  rainbowedge: "Rainbow Edge",
   rainbowglitter: "Rainbow Glitter",
   luminous: "Luminous",
   cursedaura: "Cursed Aura",
