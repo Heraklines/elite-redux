@@ -26,6 +26,7 @@ import type { BattleScene } from "#app/battle-scene";
 import { globalScene, initGlobalScene } from "#app/global-scene";
 import { CoopInteractionRelay } from "#data/elite-redux/coop/coop-interaction-relay";
 import { clearCoopRuntime, getCoopController, startLocalCoopSession } from "#data/elite-redux/coop/coop-runtime";
+import { CoopInteractionTurn } from "#data/elite-redux/coop/coop-session";
 import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
 import { LearnMoveType } from "#enums/learn-move-type";
 import { MoveId } from "#enums/move-id";
@@ -154,5 +155,71 @@ describe("#698 stale-reward-shop softlock - continuation-copy orphan + resync re
     const { guest } = createLoopbackPair();
     const watcher = new CoopInteractionRelay(guest);
     expect(() => watcher.cancelWaiters()).not.toThrow();
+  });
+
+  // --- #633 reward-shop-desync (regression): a benign MID-SHOP battle resync must NOT drop the
+  // watcher off a LIVE reward shop. The resync's cancelWaiters now takes an orphan predicate
+  // (peerAdvancedPast) so it spares a wait the owner is still driving and only cancels a genuinely
+  // stuck one. LIVE-SESSION REPRO: host owns wave-1 shop (counter 0); the guest is the parked
+  // watcher; a turn-1 checksum mismatch heals via a late stateSync whose cancelWaiters fired - and
+  // sticky-cancelled the live wait, so the guest left the shop and advanced while the host stayed on
+  // it (the desync the bug report shows). Gating on peerAdvancedPast fixes it.
+  it("peerAdvancedPast: false while the peer is on the interaction, true once it advances past", () => {
+    const turn = new CoopInteractionTurn(0);
+    expect(turn.peerAdvancedPast(0)).toBe(false); // owner still on interaction 0 (pendingRemote=-1) -> LIVE
+    turn.mergeRemote(1); // owner broadcasts it advanced to interaction 1 (it left the shop)
+    expect(turn.peerAdvancedPast(0)).toBe(true); // now ORPHANED
+  });
+
+  it("cancelWaiters(orphan-predicate) SPARES a LIVE reward wait the owner is still driving", async () => {
+    const { host, guest } = createLoopbackPair();
+    const owner = new CoopInteractionRelay(host);
+    const watcher = new CoopInteractionRelay(guest);
+    const turn = new CoopInteractionTurn(0); // owner is STILL on interaction 0 (the live shop)
+
+    // The watcher parks awaiting the owner's pick for the live reward interaction seq 0.
+    let settled: unknown = "pending";
+    const wait = watcher.awaitInteractionChoice(0).then(r => {
+      settled = r;
+    });
+    await flush();
+    expect(settled).toBe("pending");
+
+    // A benign mid-shop BATTLE resync fires cancelWaiters with the orphan predicate. The owner has
+    // NOT advanced past seq 0, so the live wait is SPARED (pre-fix it sticky-resolved null here).
+    watcher.cancelWaiters(seq => turn.peerAdvancedPast(seq));
+    await flush();
+    expect(settled).toBe("pending"); // still on the shop
+
+    // The owner finishes picking -> the still-live wait resolves with the real relayed choice.
+    owner.sendInteractionChoice(0, "reward", 3);
+    await wait;
+    expect((settled as { choice: number }).choice).toBe(3);
+
+    // seq 0 was NOT sticky-cancelled, so a fresh await on it still delivers normally.
+    owner.sendInteractionChoice(0, "reward", 1);
+    await flush();
+    expect((await watcher.awaitInteractionChoice(0))?.choice).toBe(1);
+  });
+
+  it("cancelWaiters(orphan-predicate) STILL rescues a genuinely ORPHANED wait (owner advanced past)", async () => {
+    const { guest } = createLoopbackPair();
+    const watcher = new CoopInteractionRelay(guest);
+    const turn = new CoopInteractionTurn(0);
+    turn.mergeRemote(9); // the owner already advanced PAST interaction 8 -> orphan
+
+    let settled: unknown = "pending";
+    const wait = watcher.awaitInteractionChoice(8).then(r => {
+      settled = r;
+    });
+    await flush();
+    expect(settled).toBe("pending");
+
+    watcher.cancelWaiters(seq => turn.peerAdvancedPast(seq)); // peerAdvancedPast(8) === true -> cancel
+    await wait;
+    expect(settled).toBeNull(); // rescued: resolves null so the watcher leaves the stale shop
+
+    // STICKY: a re-park on the same orphaned seq also resolves null at once.
+    expect(await watcher.awaitInteractionChoice(8)).toBeNull();
   });
 });

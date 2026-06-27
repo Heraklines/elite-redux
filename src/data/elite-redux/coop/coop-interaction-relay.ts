@@ -359,38 +359,60 @@ export class CoopInteractionRelay {
    * {@linkcode dispose}, the relay stays alive (the transport listener is untouched) - the session
    * continues after the resync heals the state.
    */
-  cancelWaiters(): void {
+  /**
+   * #698 resync-rescue, scoped (#633 reward-shop-desync fix): cancel ONLY the parked waiters that
+   * `shouldCancel(seq)` selects. The resync site passes a predicate that returns true only for a
+   * genuinely-ORPHANED interaction (the owner already advanced past it) - so a benign mid-shop
+   * battle resync no longer sticky-cancels a LIVE reward-shop wait and drops the watcher off the
+   * shop while the owner is still picking. Default (no predicate) cancels everything (the legacy
+   * dispose-like behavior the unit tests assert). Each cancelled seq is recorded so a phase that
+   * immediately re-parks on it also resolves null at once; a SPARED live seq is NOT sticky-marked,
+   * so the owner's pick still resolves it normally.
+   */
+  cancelWaiters(shouldCancel: (seq: number) => boolean = () => true): void {
     const seqs = new Set<number>();
-    for (const seq of this.pending.keys()) {
-      seqs.add(seq);
-    }
-    for (const seq of this.outcomePending.keys()) {
-      seqs.add(seq);
-    }
-    for (const key of this.rewardOptionsPending.keys()) {
-      const seq = Number(key.split(":")[0]);
-      if (!Number.isNaN(seq)) {
+    // Snapshot the SELECTED resolvers per map (finish() self-deletes from its map, so iterating a
+    // snapshot is safe). Each map has its own resolver type, so keep them separate (no variance hack).
+    const choiceFinishers: Array<(res: CoopInteractionChoice | null) => void> = [];
+    const outcomeFinishers: Array<(res: CoopInteractionOutcome | null) => void> = [];
+    const rewardFinishers: Array<(res: CoopSerializedRewardOption[] | null) => void> = [];
+    for (const [seq, finish] of this.pending) {
+      if (shouldCancel(seq)) {
         seqs.add(seq);
+        choiceFinishers.push(finish);
+      }
+    }
+    for (const [seq, finish] of this.outcomePending) {
+      if (shouldCancel(seq)) {
+        seqs.add(seq);
+        outcomeFinishers.push(finish);
+      }
+    }
+    for (const [key, finish] of this.rewardOptionsPending) {
+      const seq = Number(key.split(":")[0]);
+      if (!Number.isNaN(seq) && shouldCancel(seq)) {
+        seqs.add(seq);
+        rewardFinishers.push(finish);
       }
     }
     if (seqs.size === 0) {
+      coopLog("relay", "cancelWaiters() no orphaned waiters selected -> nothing cancelled (live waits spared)");
       return;
     }
     coopWarn(
       "relay",
-      `cancelWaiters() sticky-cancel seqs=[${[...seqs].join(",")}] (resync rescue) -> all resolve null`,
+      `cancelWaiters() sticky-cancel seqs=[${[...seqs].join(",")}] (resync rescue) -> selected resolve null`,
     );
     for (const seq of seqs) {
       this.cancelledSeqs.add(seq);
     }
-    // finish() callbacks self-delete from their maps; iterate snapshots so that is safe.
-    for (const finish of [...this.pending.values()]) {
+    for (const finish of choiceFinishers) {
       finish(null);
     }
-    for (const finish of [...this.outcomePending.values()]) {
+    for (const finish of outcomeFinishers) {
       finish(null);
     }
-    for (const finish of [...this.rewardOptionsPending.values()]) {
+    for (const finish of rewardFinishers) {
       finish(null);
     }
   }

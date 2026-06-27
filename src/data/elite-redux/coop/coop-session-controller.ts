@@ -288,10 +288,7 @@ export class CoopSessionController {
     const counter = this.interactionTurn.toJSON();
     const result = this.interactionTurn.isOwner(this.role);
     if (isCoopDebug()) {
-      coopLog(
-        "owner",
-        `isLocalInteractionTurn() read counter=${counter} role=${this.role} -> ${result}`,
-      );
+      coopLog("owner", `isLocalInteractionTurn() read counter=${counter} role=${this.role} -> ${result}`);
     }
     return result;
   }
@@ -325,6 +322,16 @@ export class CoopSessionController {
       coopLog("interaction", `interactionCounter() read -> ${counter} (role=${this.role})`);
     }
     return counter;
+  }
+
+  /**
+   * Co-op (#633): whether the PEER has advanced the interaction counter PAST `seq` (the watcher's
+   * pinned wait). True only for a genuinely-orphaned interaction (the owner already left); a live
+   * interaction the owner is still driving returns false. The resync safety net uses this to spare
+   * a LIVE reward-shop wait while still cancelling a genuinely stuck one.
+   */
+  peerAdvancedPastInteraction(seq: number): boolean {
+    return this.interactionTurn.peerAdvancedPast(seq);
   }
 
   /**
@@ -476,7 +483,10 @@ export class CoopSessionController {
     coopLog(
       "roster",
       `rosterSync SEND role=${this.role} entries=${this.roster.count(this.role)} ready=${this._localReady} `
-        + `spent=${this.roster.spent(this.role)} species=[${this.roster.entries(this.role).map(e => e.speciesId).join(",")}]`,
+        + `spent=${this.roster.spent(this.role)} species=[${this.roster
+          .entries(this.role)
+          .map(e => e.speciesId)
+          .join(",")}]`,
     );
     this.transport.send({
       t: "rosterSync",
@@ -521,7 +531,10 @@ export class CoopSessionController {
               + `username local=${this.username} peer=${msg.username} -> resolved role ${beforeRole}->${this.role}`,
           );
         } else {
-          coopLog("launch", `hello recv partner=${msg.username} partnerRole=${msg.role} (local role=${this.role}; no conflict)`);
+          coopLog(
+            "launch",
+            `hello recv partner=${msg.username} partnerRole=${msg.role} (local role=${this.role}; no conflict)`,
+          );
         }
         this._partnerConnected = true;
         this._partnerName = msg.username;

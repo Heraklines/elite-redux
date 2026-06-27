@@ -280,6 +280,21 @@ export class CoopInteractionTurn {
   }
 
   /**
+   * Co-op (#633): whether the PEER has broadcast an interaction counter STRICTLY BEYOND `seq` -
+   * i.e. the owner has already advanced PAST the interaction pinned at `seq`. Reads the deferred
+   * {@linkcode pendingRemote} (the peer's last broadcast counter, parked but not yet folded in).
+   *
+   * Used by the resync safety net to tell a genuinely-ORPHANED watcher wait (the owner left this
+   * interaction, so the wait can never resolve) from a LIVE one (the owner is still on this
+   * interaction and the watcher must keep waiting). A live interaction leaves `pendingRemote` at
+   * -1, so this is `false` and the parked wait is spared - the regression where a benign mid-shop
+   * battle resync sticky-cancelled the LIVE reward-shop wait and dropped the watcher off the shop.
+   */
+  peerAdvancedPast(seq: number): boolean {
+    return this.pendingRemote > seq;
+  }
+
+  /**
    * The role that owns the interaction whose counter is `n` (parity rule). Co-op (#633):
    * exposed STATICALLY so a phase can resolve the owner from the counter it PINNED at the
    * interaction's start - never from the live counter, which can be bumped mid-interaction
