@@ -128,7 +128,12 @@ export class ErGreaterAbilityRandomizerPhase extends Phase {
           return;
         }
         const slot = option - PartyOption.ABILITY_SLOT_0;
-        globalScene.ui.setMode(this.baseMode).then(() => this.openAbilityPicker(mon, slot));
+        // Open the 4-ability picker DIRECTLY (one setMode replaces the party slot picker).
+        // Do NOT bounce through baseMode (the reward-shop MODIFIER_SELECT) first: re-showing
+        // the live reward shop here makes its SelectModifierPhase advance and tear the Bargain
+        // picker down the instant it opens (the reported "options flash + vanish" bug). Curiosity
+        // opens its identical picker the same way - a clean handoff, not via the shop.
+        this.openAbilityPicker(mon, slot);
       },
       (p: PlayerPokemon) => (p === mon ? null : i18next.t(`${ns}:erGreaterAbilityRandomizer.chooseSameMon`)),
     );
@@ -161,7 +166,7 @@ export class ErGreaterAbilityRandomizerPhase extends Phase {
           const chosen: BargainAbilityChoice | undefined = choices[index];
           this.log(`onPick index=${index} id=${chosen?.abilityId ?? "none"}`);
           if (!chosen) {
-            this.restore(() => this.openSlotPicker(mon));
+            this.openSlotPicker(mon);
             return;
           }
           this.restore(() => {
@@ -172,7 +177,7 @@ export class ErGreaterAbilityRandomizerPhase extends Phase {
             this.commitAndEnd();
           });
         },
-        onCancel: () => this.restore(() => this.openSlotPicker(mon)),
+        onCancel: () => this.openSlotPicker(mon),
       })
       .then(() => this.log("ER_BARGAIN setMode resolved (4-ability picker should now be visible)"));
   }
