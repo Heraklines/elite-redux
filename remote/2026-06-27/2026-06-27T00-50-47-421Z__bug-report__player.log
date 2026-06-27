@@ -1,0 +1,270 @@
+----- BUG REPORT (in-game) -----
+version:  1.11.19
+url:      https://elite-redux.pages.dev/
+ua:       Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36 OPR/132.0.0.0
+mode:     0  wave:164  difficulty:youngster
+seed:     5hMyGFLxrEjb9rEqhQmSontz
+party:    Inteleon(L162 308/530), Luxzero(L155 470/470), Snorlax(L162 902/902), Kingambit Redux(L156 495/495), Durant(L156 426/426), Raikou(L162 520/520)
+
+----- DESCRIPTION -----
+chandelure took super effective damage from a ice type move
+
+----- CONSOLE -----
+[00:48:10.624] LOG: Applied Protein (enemy)
+[00:48:10.624] LOG: Applied HP Up (enemy)
+[00:48:10.625] LOG: Applied Carbos (enemy)
+[00:48:10.625] LOG: Applied Zinc (enemy)
+[00:48:10.625] LOG: Applied Iron (enemy)
+[00:48:10.625] LOG: Applied Calcium (enemy)
+[00:48:10.625] LOG: Applied Carbos (enemy)
+[00:48:10.625] LOG: Applied Zinc (enemy)
+[00:48:10.625] LOG: Applied Calcium (enemy)
+[00:48:10.625] LOG: Applied Iron (enemy)
+[00:48:10.625] LOG: Applied HP Up (enemy)
+[00:48:10.625] LOG: Applied Protein (enemy)
+[00:48:10.625] LOG: Applied Protein (enemy)
+[00:48:10.625] LOG: Applied Iron (enemy)
+[00:48:10.625] LOG: Applied Zinc (enemy)
+[00:48:10.625] LOG: Applied HP Up (enemy)
+[00:48:10.625] LOG: Applied Carbos (enemy)
+[00:48:10.874] LOG: %cStart Phase PostSummonPhase color:green;
+[00:48:10.874] LOG: Ran PSP for: Malamar
+[00:48:10.874] LOG: %cStart Phase PostSummonPhase color:green;
+[00:48:10.875] LOG: %cStart Phase ShowAbilityPhase color:green;
+[00:48:11.190] LOG: %cStart Phase HideAbilityPhase color:green;
+[00:48:11.257] LOG: %cStart Phase PostSummonPhase color:green;
+[00:48:11.257] LOG: %cStart Phase TurnInitPhase color:green;
+[00:48:11.257] LOG: %cStart Phase CommandPhase color:green;
+[00:48:13.738] LOG: Move: ENERGY_BALL Move targets: {"targets":[2],"multiple":false} 
+Player Pokemon: G-Max Inteleon
+[00:48:13.739] LOG: %cStart Phase EnemyCommandPhase color:green;
+[00:48:13.743] LOG: Battle Seed: tyCAPfV9RN1FKklO
+[00:48:13.746] LOG: Move Pool: ["Topsy-Turvy","Sucker Punch","Psycho Boost","X-Scissor"]
+[00:48:13.746] LOG: Move Scores: [0,21,33,21]
+[00:48:13.746] LOG: Sorted Move Pool: ["Psycho Boost","Sucker Punch","X-Scissor","Topsy-Turvy"]
+[00:48:13.746] LOG: Chosen Move: Sucker Punch
+[00:48:13.746] LOG: %cStart Phase TurnStartPhase color:green;
+[00:48:13.747] LOG: %cStart Phase MovePhase color:green;
+[00:48:13.747] LOG: %cUser: Malamar
+Move: SUCKER_PUNCH
+Use Mode: NORMAL color:orchid
+[00:48:13.748] LOG: %cStart Phase MessagePhase color:green;
+[00:48:13.990] LOG: %cStart Phase MoveEffectPhase color:green;
+[00:48:14.457] LOG: crit stage: +0
+[00:48:14.457] LOG: Move: Sucker Punch | Base damage: 170.83444117647056 | Power: 91 | Source attack: 387 | Target defense: 272
+[00:48:14.458] LOG: Move: Sucker Punch | Attack damage: 222
+[00:48:14.458] LOG: %cStart Phase DamageAnimPhase color:green;
+[00:48:14.490] LOG: %cStart Phase MoveEndPhase color:green;
+[00:48:14.491] LOG: %cStart Phase MovePhase color:green;
+[00:48:14.491] LOG: %cUser: G-Max Inteleon
+Move: ENERGY_BALL
+Use Mode: NORMAL color:orchid
+[00:48:14.491] LOG: %cStart Phase MessagePhase color:green;
+[00:48:14.756] LOG: %cStart Phase MoveEffectPhase color:green;
+[00:48:14.757] LOG: Applied Multi Lens 
+[00:48:14.757] LOG: Applied Wide Lens 
+[00:48:15.273] WARN: Texture "%s" has no frame "%s" PRAS- Energy Ball 11
+[00:48:15.290] WARN: Texture "%s" has no frame "%s" PRAS- Energy Ball 10
+[00:48:15.740] LOG: Applied Scope Lens 
+[00:48:15.740] LOG: crit stage: +1
+[00:48:15.740] LOG: Applied Miracle Seed 
+[00:48:15.741] LOG: Applied X Sp. Atk 
+[00:48:15.741] LOG: Move: Energy Ball | Base damage: 370.3279127272727 | Power: 108 | Source attack: 702 | Target defense: 275
+[00:48:15.741] LOG: Applied Multi Lens 
+[00:48:15.741] LOG: Move: Energy Ball | Attack damage: 261
+[00:48:15.741] LOG: Applied Amulet Coin 
+[00:48:15.742] LOG: Applied Golden Punch 
+[00:48:15.742] LOG: %cStart Phase DamageAnimPhase color:green;
+[00:48:15.774] LOG: %cStart Phase MoveEffectPhase color:green;
+[00:48:15.774] LOG: Applied Wide Lens 
+[00:48:16.307] WARN: Texture "%s" has no frame "%s" PRAS- Energy Ball 11
+[00:48:16.323] WARN: Texture "%s" has no frame "%s" PRAS- Energy Ball 10
+[00:48:16.778] LOG: Applied Scope Lens 
+[00:48:16.778] LOG: crit stage: +1
+[00:48:16.778] LOG: Applied Miracle Seed 
+[00:48:16.779] LOG: Applied X Sp. Atk 
+[00:48:16.779] LOG: Move: Energy Ball | Base damage: 370.3279127272727 | Power: 108 | Source attack: 702 | Target defense: 275
+[00:48:16.779] LOG: Applied Multi Lens 
+[00:48:16.780] LOG: Move: Energy Ball | Attack damage: 177
+[00:48:16.780] LOG: Applied Amulet Coin 
+[00:48:16.780] LOG: Applied Golden Punch 
+[00:48:16.781] LOG: %cStart Phase DamageAnimPhase color:green;
+[00:48:16.811] LOG: %cStart Phase MessagePhase color:green;
+[00:48:17.211] LOG: %cStart Phase MessagePhase color:green;
+[00:48:17.611] LOG: %cStart Phase MoveEndPhase color:green;
+[00:48:17.611] LOG: %cStart Phase CheckInterludePhase color:green;
+[00:48:17.611] LOG: %cStart Phase WeatherEffectPhase color:green;
+[00:48:17.611] LOG: %cStart Phase PositionalTagPhase color:green;
+[00:48:17.611] LOG: %cStart Phase BerryPhase color:green;
+[00:48:17.612] LOG: Applied Lansat Berry (enemy)
+[00:48:17.612] LOG: Applied Sitrus Berry (enemy)
+[00:48:17.612] LOG: Applied Protein (enemy)
+[00:48:17.612] LOG: Applied HP Up (enemy)
+[00:48:17.612] LOG: Applied Protein (enemy)
+[00:48:17.613] LOG: Applied Calcium (enemy)
+[00:48:17.613] LOG: Applied Iron (enemy)
+[00:48:17.613] LOG: Applied Zinc (enemy)
+[00:48:17.613] LOG: Applied Protein (enemy)
+[00:48:17.613] LOG: Applied HP Up (enemy)
+[00:48:17.613] LOG: Applied Carbos (enemy)
+[00:48:17.613] LOG: Applied Zinc (enemy)
+[00:48:17.613] LOG: Applied Iron (enemy)
+[00:48:17.613] LOG: Applied Calcium (enemy)
+[00:48:17.613] LOG: Applied Carbos (enemy)
+[00:48:17.613] LOG: Applied Zinc (enemy)
+[00:48:17.613] LOG: Applied Calcium (enemy)
+[00:48:17.613] LOG: Applied Iron (enemy)
+[00:48:17.613] LOG: Applied HP Up (enemy)
+[00:48:17.613] LOG: Applied Protein (enemy)
+[00:48:17.613] LOG: Applied Protein (enemy)
+[00:48:17.613] LOG: Applied Iron (enemy)
+[00:48:17.613] LOG: Applied Zinc (enemy)
+[00:48:17.613] LOG: Applied HP Up (enemy)
+[00:48:17.613] LOG: Applied Carbos (enemy)
+[00:48:17.614] LOG: %cStart Phase CommonAnimPhase color:green;
+[00:48:17.961] LOG: %cStart Phase MessagePhase color:green;
+[00:48:18.427] LOG: %cStart Phase PokemonHealPhase color:green;
+[00:48:18.662] LOG: %cStart Phase MessagePhase color:green;
+[00:48:19.227] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[00:48:19.228] LOG: %cStart Phase TurnEndPhase color:green;
+[00:48:19.229] LOG: [coop:replay] host recorder: end turn=-1 events=0
+[00:48:19.229] LOG: %cStart Phase TurnInitPhase color:green;
+[00:48:19.230] LOG: %cStart Phase CommandPhase color:green;
+[00:48:20.654] LOG: Move: FROST_BREATH Move targets: {"targets":[2],"multiple":false} 
+Player Pokemon: G-Max Inteleon
+[00:48:20.656] LOG: %cStart Phase EnemyCommandPhase color:green;
+[00:48:20.657] LOG: %cStart Phase TurnStartPhase color:green;
+[00:48:20.657] LOG: %cStart Phase SwitchSummonPhase color:green;
+[00:48:20.658] LOG: Xerosic
+[00:48:21.177] LOG: Xerosic
+[00:48:21.311] LOG: Applied Zinc (enemy)
+[00:48:21.311] LOG: Applied Protein (enemy)
+[00:48:21.311] LOG: Applied HP Up (enemy)
+[00:48:21.311] LOG: Applied Protein (enemy)
+[00:48:21.312] LOG: Applied Calcium (enemy)
+[00:48:21.312] LOG: Applied Iron (enemy)
+[00:48:21.312] LOG: Applied Protein (enemy)
+[00:48:21.312] LOG: Applied HP Up (enemy)
+[00:48:21.312] LOG: Applied Carbos (enemy)
+[00:48:21.312] LOG: Applied Zinc (enemy)
+[00:48:21.312] LOG: Applied Iron (enemy)
+[00:48:21.312] LOG: Applied Calcium (enemy)
+[00:48:21.312] LOG: Applied Carbos (enemy)
+[00:48:21.312] LOG: Applied Zinc (enemy)
+[00:48:21.312] LOG: Applied Calcium (enemy)
+[00:48:21.312] LOG: Applied Iron (enemy)
+[00:48:21.312] LOG: Applied HP Up (enemy)
+[00:48:21.312] LOG: Applied Protein (enemy)
+[00:48:21.312] LOG: Applied Protein (enemy)
+[00:48:21.312] LOG: Applied Iron (enemy)
+[00:48:21.312] LOG: Applied Zinc (enemy)
+[00:48:21.312] LOG: Applied HP Up (enemy)
+[00:48:21.312] LOG: Applied Carbos (enemy)
+[00:48:21.561] LOG: %cStart Phase PostSummonPhase color:green;
+[00:48:21.561] LOG: Ran PSP for: Chandelure
+[00:48:21.561] LOG: %cStart Phase PostSummonPhase color:green;
+[00:48:21.562] LOG: %cStart Phase PostSummonPhase color:green;
+[00:48:21.562] LOG: %cStart Phase MovePhase color:green;
+[00:48:21.562] LOG: %cUser: G-Max Inteleon
+Move: FROST_BREATH
+Use Mode: NORMAL color:orchid
+[00:48:21.562] LOG: %cStart Phase MessagePhase color:green;
+[00:48:21.827] LOG: %cStart Phase MoveEffectPhase color:green;
+[00:48:21.828] LOG: Applied Multi Lens 
+[00:48:21.828] LOG: Applied Wide Lens 
+[00:48:21.828] LOG: Battle Seed: tyCAPfV9RN1FKklO
+[00:48:22.378] LOG: Applied Scope Lens 
+[00:48:22.378] LOG: crit stage: +1
+[00:48:22.379] LOG: Applied X Sp. Atk 
+[00:48:22.379] LOG: Move: Frost Breath | Base damage: 160.51357746478874 | Power: 60 | Source attack: 702 | Target defense: 355
+[00:48:22.379] LOG: Applied Multi Lens 
+[00:48:22.379] LOG: Move: Frost Breath | Attack damage: 487
+[00:48:22.379] LOG: Applied Amulet Coin 
+[00:48:22.380] LOG: Applied Golden Punch 
+[00:48:22.380] LOG: %cStart Phase DamageAnimPhase color:green;
+[00:48:22.412] LOG: %cStart Phase MessagePhase color:green;
+[00:48:22.811] LOG: %cStart Phase MessagePhase color:green;
+[00:48:23.227] LOG: %cStart Phase MessagePhase color:green;
+[00:48:23.627] LOG: %cStart Phase FaintPhase color:green;
+[00:48:26.178] LOG: %cStart Phase MessagePhase color:green;
+[00:49:49.338] LOG: %cStart Phase VictoryPhase color:green;
+[00:49:49.339] LOG: Applied Lucky Egg 
+[00:49:49.339] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[00:49:49.339] LOG: Applied Super EXP. Charm 
+[00:49:49.339] LOG: Applied EXP. Charm 
+[00:49:49.339] LOG: %cStart Phase LevelUpPhase color:green;
+[00:49:50.802] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[00:49:50.802] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[00:49:50.802] LOG: Applied Super EXP. Charm 
+[00:49:50.802] LOG: Applied EXP. Charm 
+[00:49:50.802] LOG: 4397098 4636610 4596964
+[00:49:50.803] LOG: %cStart Phase LevelUpPhase color:green;
+[00:49:50.803] LOG: Applied Iron 
+[00:49:51.778] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[00:49:51.778] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[00:49:51.778] LOG: Applied Super EXP. Charm 
+[00:49:51.778] LOG: Applied EXP. Charm 
+[00:49:51.778] LOG: %cStart Phase LevelUpPhase color:green;
+[00:49:52.834] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[00:49:52.834] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[00:49:52.834] LOG: Applied Super EXP. Charm 
+[00:49:52.834] LOG: Applied EXP. Charm 
+[00:49:52.834] LOG: %cStart Phase LevelUpPhase color:green;
+[00:49:52.835] LOG: Applied Protein 
+[00:49:54.114] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[00:49:54.114] LOG: %cStart Phase MoveEndPhase color:green;
+[00:49:54.114] LOG: %cStart Phase CheckInterludePhase color:green;
+[00:49:54.114] LOG: %cStart Phase WeatherEffectPhase color:green;
+[00:49:54.114] LOG: %cStart Phase PositionalTagPhase color:green;
+[00:49:54.114] LOG: %cStart Phase BerryPhase color:green;
+[00:49:54.114] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[00:49:54.114] LOG: %cStart Phase TurnEndPhase color:green;
+[00:49:54.115] LOG: [coop:replay] host recorder: end turn=-1 events=0
+[00:49:54.115] LOG: %cStart Phase SwitchSummonPhase color:green;
+[00:49:54.562] LOG: Xerosic
+[00:49:54.712] LOG: Applied Carbos (enemy)
+[00:49:54.712] LOG: Applied Zinc (enemy)
+[00:49:54.712] LOG: Applied Calcium (enemy)
+[00:49:54.712] LOG: Applied Iron (enemy)
+[00:49:54.712] LOG: Applied HP Up (enemy)
+[00:49:54.712] LOG: Applied Protein (enemy)
+[00:49:54.713] LOG: Applied Protein (enemy)
+[00:49:54.713] LOG: Applied Calcium (enemy)
+[00:49:54.713] LOG: Applied Iron (enemy)
+[00:49:54.713] LOG: Applied Protein (enemy)
+[00:49:54.713] LOG: Applied HP Up (enemy)
+[00:49:54.713] LOG: Applied Carbos (enemy)
+[00:49:54.713] LOG: Applied Zinc (enemy)
+[00:49:54.713] LOG: Applied Iron (enemy)
+[00:49:54.713] LOG: Applied Calcium (enemy)
+[00:49:54.713] LOG: Applied Zinc (enemy)
+[00:49:54.713] LOG: Applied Protein (enemy)
+[00:49:54.713] LOG: Applied HP Up (enemy)
+[00:49:54.714] LOG: Applied Protein (enemy)
+[00:49:54.714] LOG: Applied Iron (enemy)
+[00:49:54.714] LOG: Applied Zinc (enemy)
+[00:49:54.714] LOG: Applied HP Up (enemy)
+[00:49:54.714] LOG: Applied Carbos (enemy)
+[00:49:54.979] LOG: %cStart Phase PostSummonPhase color:green;
+[00:49:54.979] LOG: Ran PSP for: Crobat
+[00:49:54.979] LOG: %cStart Phase PostSummonPhase color:green;
+[00:49:54.979] LOG: %cStart Phase PostSummonPhase color:green;
+[00:49:54.980] LOG: %cStart Phase ShowAbilityPhase color:green;
+[00:49:55.296] LOG: %cStart Phase StatStageChangePhase color:green;
+[00:49:55.646] LOG: %cStart Phase MessagePhase color:green;
+[00:49:56.112] LOG: %cStart Phase ShowAbilityPhase color:green;
+[00:49:56.112] LOG: %cStart Phase HideAbilityPhase color:green;
+[00:49:56.163] LOG: %cStart Phase ShowAbilityPhase color:green;
+[00:49:56.479] LOG: %cStart Phase StatStageChangePhase color:green;
+[00:49:56.479] LOG: %cStart Phase StatStageChangePhase color:green;
+[00:49:56.846] LOG: %cStart Phase MessagePhase color:green;
+[00:49:57.329] LOG: %cStart Phase StatStageChangePhase color:green;
+[00:49:57.696] LOG: %cStart Phase MessagePhase color:green;
+[00:49:58.195] LOG: %cStart Phase HideAbilityPhase color:green;
+[00:49:58.246] LOG: %cStart Phase HideAbilityPhase color:green;
+[00:49:58.312] LOG: %cStart Phase TurnInitPhase color:green;
+[00:49:58.313] LOG: %cStart Phase CommandPhase color:green;
+[00:50:03.628] WARN: Texture "%s" has no frame "%s" items er_bug_gem
+[00:50:03.628] WARN: Texture "%s" has no frame "%s" items er_rock_gem
+[00:50:03.704] WARN: Texture "%s" has no frame "%s" items er_bug_gem
+[00:50:03.705] WARN: Texture "%s" has no frame "%s" items er_rock_gem
