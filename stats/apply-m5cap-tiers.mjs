@@ -18,8 +18,8 @@ const isCommon = e => eggBand(e) === 4;
 const usageBand = p => (p >= 2.25 ? 0 : p >= 1 ? 1 : p >= 0.5 ? 2 : p >= 0.25 ? 3 : 4);
 const CUTS = [0.35, 0.6, 0.8, 0.92];
 const CAP = 8;
-const FLOOR_MULT = 2;
-const baseWin = ut.baseWinPct ?? 6.3;
+const NU_MAX_WIN = 3;
+const NU_MIN_SAMPLE = 10;
 
 const byId = new Map(dex.filter(m => typeof m.id === "number").map(m => [m.id, m]));
 const rows = [];
@@ -35,6 +35,7 @@ for (const [idStr, l] of Object.entries(ut.lines)) {
     common: isCommon(m.eggTier ?? 0),
     usage: l.usagePct ?? 0,
     win: l.win ?? 0,
+    sample: l.sample ?? NU_MIN_SAMPLE,
     winLift: l.winLift ?? 0,
     waveLift: l.waveLift ?? 0,
   });
@@ -58,8 +59,8 @@ for (const r of rows) {
     if (t >= 3 && r.usage > CAP) {
       t = 2; // usage cap
     }
-    if (t === 4 && r.win >= FLOOR_MULT * baseWin) {
-      t = 3; // raw-win floor
+    if (t === 4 && (r.win > NU_MAX_WIN || r.sample < NU_MIN_SAMPLE)) {
+      t = 3; // NU only for genuine losers (win <= 3%) with enough evidence (n >= 10)
     }
   } else {
     t = Math.min(usageBand(r.usage), eggBand(r.egg)); // legacy usage tier

@@ -98,15 +98,15 @@ for (const r of com) {
   r._p = 0.5 * rW.get(r.id) + 0.5 * rV.get(r.id);
 }
 const perfTier = p => (p >= 0.92 ? 0 : p >= 0.8 ? 1 : p >= 0.6 ? 2 : p >= 0.35 ? 3 : 4);
-const baseWin = (100 * runs.reduce((s, r) => s + r.win, 0)) / runs.length;
-const WIN_FLOOR_MULT = 2;
+const NU_MAX_WIN = 3;
+const NU_MIN_SAMPLE = 10;
 for (const r of com) {
   let t = perfTier(r._p);
   if (t >= 3 && r.usage > CAP) {
     t = 2; // usage cap
   }
-  if (t === 4 && r.win >= WIN_FLOOR_MULT * baseWin) {
-    t = 3; // raw-win floor: a clear winner is never NU
+  if (t === 4 && (r.win > NU_MAX_WIN || r.n < NU_MIN_SAMPLE)) {
+    t = 3; // NU only for genuine losers (win <= 3%) with enough evidence (n >= 10)
   }
   r.tier = TIERS[t];
 }
