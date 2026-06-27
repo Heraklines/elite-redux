@@ -1,0 +1,261 @@
+url:      https://elite-redux-staging.pages.dev/
+build:    mqvoog6w-xsn
+mode:     6  wave:9
+seed:     ZjAZGQC77qVwrNK1Jibz4ZYk
+party:    Litten(L10 30hp f0), Kangaskhan(L10 44hp f0), Chikorita(L6 22hp f0), Vulpix(L6 22hp f0), Magnemite(L6 20hp f0), Wooloo(L6 4hp f0)
+enemy:    Zigzagoon(L7), Taillow(L6)
+
+----- COMMENT -----
+state lapsed
+
+----- CONSOLE -----
+[01:39:40.522] LOG: %cStart Phase CoopReplayTurnPhase color:green;
+[01:39:40.522] LOG: [coop:replay] guest replay turn=1: awaiting host resolution
+[01:39:40.522] LOG: [coop:replay] guest awaitTurn turn=1 START timeout=1200000ms
+[01:39:40.554] LOG: [coop:webrtc] raw rx role=guest t=battleEvent bytes=95 handlers=6
+[01:39:40.554] LOG: [coop:replay] guest RECV live battleEvent turn=1 seq=0 k=moveUsed
+[01:39:40.884] LOG: [coop:webrtc] raw rx role=guest t=battleEvent bytes=80 handlers=6
+[01:39:40.884] LOG: [coop:replay] guest RECV live battleEvent turn=1 seq=1 k=hp
+[01:39:40.884] LOG: [coop:webrtc] raw rx role=guest t=battleEvent bytes=80 handlers=6
+[01:39:40.884] LOG: [coop:replay] guest RECV live battleEvent turn=1 seq=2 k=faint
+[01:39:40.885] LOG: [coop:webrtc] raw rx role=guest t=battleEvent bytes=86 handlers=6
+[01:39:40.885] LOG: [coop:replay] guest RECV live battleEvent turn=1 seq=3 k=message
+[01:39:44.535] LOG: [coop:webrtc] raw rx role=guest t=battleEvent bytes=94 handlers=6
+[01:39:44.535] LOG: [coop:replay] guest RECV live battleEvent turn=1 seq=4 k=moveUsed
+[01:39:44.983] LOG: [coop:webrtc] raw rx role=guest t=battleEvent bytes=81 handlers=6
+[01:39:44.983] LOG: [coop:replay] guest RECV live battleEvent turn=1 seq=5 k=hp
+[01:39:44.984] LOG: [coop:webrtc] raw rx role=guest t=battleEvent bytes=81 handlers=6
+[01:39:44.984] LOG: [coop:replay] guest RECV live battleEvent turn=1 seq=6 k=hp
+[01:39:44.984] LOG: [coop:webrtc] raw rx role=guest t=battleEvent bytes=118 handlers=6
+[01:39:44.984] LOG: [coop:replay] guest RECV live battleEvent turn=1 seq=7 k=message
+[01:39:45.263] LOG: [coop:webrtc] raw rx role=guest t=battleEvent bytes=95 handlers=6
+[01:39:45.263] LOG: [coop:replay] guest RECV live battleEvent turn=1 seq=8 k=moveUsed
+[01:39:45.574] LOG: [coop:webrtc] raw rx role=guest t=battleEvent bytes=80 handlers=6
+[01:39:45.574] LOG: [coop:replay] guest RECV live battleEvent turn=1 seq=9 k=hp
+[01:39:45.574] LOG: [coop:webrtc] raw rx role=guest t=battleEvent bytes=81 handlers=6
+[01:39:45.574] LOG: [coop:replay] guest RECV live battleEvent turn=1 seq=10 k=faint
+[01:39:46.509] LOG: [coop:webrtc] raw rx role=guest t=waveResolved bytes=45 handlers=6
+[01:39:46.509] LOG: [coop:replay] guest RECV waveResolved wave=9 outcome=win
+[01:39:46.509] LOG: [coop:runtime] recv waveResolved wave=9 outcome=win role=guest netcode=authoritative
+[01:39:46.509] LOG: [coop:runtime] pend waveResolved wave=9 outcome=win (prevPending=none)
+[01:39:49.011] LOG: [coop:webrtc] raw rx role=guest t=turnResolution bytes=2240 handlers=6
+[01:39:49.011] LOG: [coop:replay] guest RECV turnResolution turn=1 events=11 checksum=e3d367b119e5797e -> parked waiter
+[01:39:49.011] LOG: [coop:replay] guest awaitTurn turn=1 RESOLVE events=11 checksum=e3d367b119e5797e
+[01:39:49.011] LOG: [coop:replay] guest consume live events turn=1 count=11
+[01:39:49.011] LOG: [coop:replay] guest replay turn=1: RESOLVE live=11 batch=11 merged=11
+[01:39:49.011] LOG: [coop:replay] guest replay turn=1: rendering 11 event(s)
+[01:39:49.011] LOG: [coop:replay] guest replay turn=1: present k=moveUsed
+[01:39:49.011] LOG: [coop:replay] guest replay turn=1: present k=hp
+[01:39:49.011] LOG: [coop:replay] guest replay turn=1: present k=faint
+[01:39:49.011] LOG: [coop:replay] guest replay turn=1: present k=message
+[01:39:49.011] LOG: [coop:replay] guest replay turn=1: present k=moveUsed
+[01:39:49.011] LOG: [coop:replay] guest replay turn=1: present k=hp
+[01:39:49.011] LOG: [coop:replay] guest replay turn=1: present k=hp
+[01:39:49.011] LOG: [coop:replay] guest replay turn=1: present k=message
+[01:39:49.011] LOG: [coop:replay] guest replay turn=1: present k=moveUsed
+[01:39:49.011] LOG: [coop:replay] guest replay turn=1: present k=hp
+[01:39:49.011] LOG: [coop:replay] guest replay turn=1: present k=faint
+[01:39:49.011] LOG: [coop:replay] guest replay turn=1: rendered phases [moveUsed=3 hp=4 faint=2 message=2]
+[01:39:49.011] LOG: [coop:replay] guest replay turn=1: unshift CoopFinalizeTurnPhase (checkpoint apply deferred)
+[01:39:49.011] LOG: %cStart Phase MessagePhase color:green;
+[01:39:49.012] LOG: [coop:webrtc] raw rx role=guest t=expResolved bytes=1224 handlers=6
+[01:39:49.012] LOG: [coop:replay] guest RECV expResolved wave=9 deltas=6
+[01:39:49.012] LOG: [coop:runtime] pend expResolved wave=9 deltas=6
+[01:39:49.034] LOG: [coop:webrtc] raw rx role=guest t=rewardOptions bytes=241 handlers=6
+[01:39:49.035] LOG: [coop:relay] RECV rewardOptions key=8:0 -> BUFFER rewardOptionsInbox (latest-wins) count=3
+[01:39:49.104] LOG: [coop:webrtc] raw rx role=guest t=uiInput bytes=51 handlers=6
+[01:39:49.140] LOG: %cStart Phase CoopMoveAnimReplayPhase color:green;
+[01:39:49.140] LOG: [coop:replay] present move bi=1 moveId=252 targets=1
+[01:39:49.368] LOG: %cStart Phase CoopHpDrainReplayPhase color:green;
+[01:39:49.368] LOG: [coop:replay] present hp bi=2 22->14/22
+[01:39:49.373] LOG: %cStart Phase CoopFaintReplayPhase color:green;
+[01:39:49.374] LOG: [coop:replay] present faint bi=2 narrate=true
+[01:39:49.437] LOG: %cStart Phase MessagePhase color:green;
+[01:39:49.902] LOG: [coop:webrtc] raw rx role=guest t=uiInput bytes=51 handlers=6
+[01:39:50.253] LOG: [coop:webrtc] raw rx role=guest t=uiInput bytes=51 handlers=6
+[01:39:51.333] LOG: [coop:webrtc] raw rx role=guest t=uiInput bytes=51 handlers=6
+[01:39:51.511] LOG: [coop:webrtc] raw rx role=guest t=uiInput bytes=51 handlers=6
+[01:39:51.657] LOG: [coop:webrtc] raw rx role=guest t=uiInput bytes=51 handlers=6
+[01:39:51.807] LOG: [coop:webrtc] raw rx role=guest t=uiInput bytes=51 handlers=6
+[01:39:51.925] LOG: [coop:webrtc] raw rx role=guest t=uiInput bytes=51 handlers=6
+[01:39:52.606] LOG: [coop:webrtc] raw rx role=guest t=interactionChoice bytes=86 handlers=6
+[01:39:52.607] LOG: [coop:relay] RECV interactionChoice seq=8 -> BUFFER inbox depth=1 choice=0 data=[1,2,1,3,19791,1938]
+[01:39:52.956] LOG: [coop:webrtc] raw rx role=guest t=uiInput bytes=51 handlers=6
+[01:39:53.225] LOG: [coop:webrtc] raw rx role=guest t=uiInput bytes=51 handlers=6
+[01:39:53.385] LOG: [coop:webrtc] raw rx role=guest t=uiInput bytes=52 handlers=6
+[01:39:54.130] LOG: [coop:webrtc] raw rx role=guest t=interactionChoice bytes=86 handlers=6
+[01:39:54.130] LOG: [coop:relay] RECV interactionChoice seq=8 -> BUFFER inbox depth=2 choice=0 data=[1,2,1,3,19791,1896]
+[01:39:54.379] LOG: [coop:webrtc] raw rx role=guest t=uiInput bytes=52 handlers=6
+[01:39:54.570] LOG: [coop:webrtc] raw rx role=guest t=uiInput bytes=52 handlers=6
+[01:39:54.859] LOG: [coop:webrtc] raw rx role=guest t=uiInput bytes=52 handlers=6
+[01:39:55.089] LOG: [coop:webrtc] raw rx role=guest t=uiInput bytes=52 handlers=6
+[01:39:55.383] LOG: [coop:webrtc] raw rx role=guest t=interactionChoice bytes=81 handlers=6
+[01:39:55.383] LOG: [coop:relay] RECV interactionChoice seq=8 -> BUFFER inbox depth=3 choice=-2 data=[19791,1646]
+[01:39:55.383] LOG: [coop:webrtc] raw rx role=guest t=uiInput bytes=52 handlers=6
+[01:39:55.389] LOG: [coop:webrtc] raw rx role=guest t=rewardOptions bytes=204 handlers=6
+[01:39:55.389] LOG: [coop:relay] RECV rewardOptions key=8:1 -> BUFFER rewardOptionsInbox (latest-wins) count=3
+[01:39:56.154] LOG: [coop:webrtc] raw rx role=guest t=uiInput bytes=51 handlers=6
+[01:39:56.315] LOG: [coop:webrtc] raw rx role=guest t=uiInput bytes=51 handlers=6
+[01:39:56.613] LOG: [coop:webrtc] raw rx role=guest t=uiInput bytes=51 handlers=6
+[01:39:56.764] LOG: [coop:webrtc] raw rx role=guest t=uiInput bytes=51 handlers=6
+[01:40:00.920] LOG: [coop:webrtc] raw rx role=guest t=interactionChoice bytes=76 handlers=6
+[01:40:00.920] LOG: [coop:relay] RECV interactionChoice seq=8 -> BUFFER inbox depth=4 choice=1 data=[0,0,12]
+[01:40:02.612] LOG: [coop:webrtc] raw rx role=guest t=uiInput bytes=55 handlers=6
+[01:40:02.783] LOG: [coop:webrtc] raw rx role=guest t=uiInput bytes=55 handlers=6
+[01:40:02.952] LOG: [coop:webrtc] raw rx role=guest t=uiInput bytes=55 handlers=6
+[01:40:03.101] LOG: [coop:webrtc] raw rx role=guest t=uiInput bytes=55 handlers=6
+[01:40:03.295] LOG: [coop:webrtc] raw rx role=guest t=interactionChoice bytes=69 handlers=6
+[01:40:03.295] LOG: [coop:relay] RECV interactionChoice seq=9000001 -> BUFFER inbox depth=1 choice=0 data=-
+[01:40:04.647] LOG: [coop:webrtc] raw rx role=guest t=enemyPartySync bytes=581 handlers=6
+[01:40:04.647] LOG: [coop:replay] guest RECV enemyPartySync wave=10 count=2 -> buffered (no waiter)
+[01:40:05.206] LOG: [coop:webrtc] raw rx role=guest t=enemyPartySync bytes=581 handlers=6
+[01:40:05.206] LOG: [coop:replay] guest RECV enemyPartySync wave=10 count=2 -> buffered (no waiter)
+[01:40:05.682] LOG: %cStart Phase MessagePhase color:green;
+[01:40:05.879] LOG: %cStart Phase MessagePhase color:green;
+[01:40:06.011] LOG: %cStart Phase CoopMoveAnimReplayPhase color:green;
+[01:40:06.011] LOG: [coop:replay] present move bi=2 moveId=38 targets=1
+[01:40:06.325] LOG: %cStart Phase CoopHpDrainReplayPhase color:green;
+[01:40:06.325] LOG: [coop:replay] present hp bi=3 22->0/22
+[01:40:06.329] LOG: %cStart Phase CoopHpDrainReplayPhase color:green;
+[01:40:06.329] LOG: [coop:replay] present hp bi=2 14->0/22
+[01:40:06.331] LOG: %cStart Phase MessagePhase color:green;
+[01:40:06.585] LOG: %cStart Phase MessagePhase color:green;
+[01:40:06.694] LOG: %cStart Phase CoopMoveAnimReplayPhase color:green;
+[01:40:06.694] LOG: [coop:replay] present move bi=0 moveId=424 targets=1
+[01:40:06.694] LOG: %cStart Phase CoopHpDrainReplayPhase color:green;
+[01:40:06.694] LOG: [coop:replay] present hp bi=1 32->11/44
+[01:40:06.697] LOG: %cStart Phase CoopFaintReplayPhase color:green;
+[01:40:06.697] LOG: [coop:replay] present faint bi=3 narrate=true
+[01:40:06.759] LOG: %cStart Phase MessagePhase color:green;
+[01:40:06.889] LOG: %cStart Phase CoopFinalizeTurnPhase color:green;
+[01:40:06.889] LOG: [coop:checksum] guest finalize turn=1: apply checkpoint + verify checksum=e3d367b119e5797e
+[01:40:06.889] LOG: [coop:checkpoint] guest apply field=4 weather=0 terrain=0 arenaTags=1
+[01:40:06.891] LOG: [coop:session] isCoopAuthoritativeGuestGated -> true (authoritative GUEST gates a structural mutation)
+[01:40:06.892] LOG: [coop:checksum] capture digest=94acc9b36b3afcb6 field=2 biome=0 seed=ZjAZGQC77qVwrNK1Jibz4ZYk weather=0 terrain=0 money=1980 party=[725,115,152,37,81,831] partyLevels=[9,9,5,5,5,5] arenaTags=1 modifiers=3 heldItemsDigest=2 pokeballs=[0:9,1:0,2:0,3:0,4:0] mons=[bi0:sp725/hp28-28/st0/ab5067/form0/tera0:9/boss0:0 bi1:sp115/hp11-40/st0/ab89/form0/tera0:0/boss0:0]
+[01:40:06.892] WARN: [coop:checksum] turn=1 MISMATCH host=e3d367b119e5797e guest=94acc9b36b3afcb6 -> resync
+[01:40:06.892] WARN: [coop-cs] turn=1 14 differing field(s):
+[01:40:06.892] WARN:   field.bi#0.hp: host=30 guest=28
+[01:40:06.892] WARN:   field.bi#0.maxHp: host=30 guest=28
+[01:40:06.892] WARN:   field.bi#0.moves.2.1: host=14 guest=13
+[01:40:06.892] WARN:   field.bi#1.maxHp: host=44 guest=40
+[01:40:06.892] WARN:   field.bi#1.moves.1.1: host=9 guest=8
+[01:40:06.892] WARN:   modifiers.2.0: host=EXP_SHARE guest=MAP
+[01:40:06.892] WARN:   modifiers.3: host=["MAP",1] guest=<absent>
+[01:40:06.892] WARN:   modifiers.4: host=["SUPER_EXP_CHARM",1] guest=<absent>
+[01:40:06.892] WARN:   partyLevels.0: host=10 guest=9
+[01:40:06.892] WARN:   partyLevels.1: host=10 guest=9
+[01:40:06.892] WARN:   partyLevels.2: host=6 guest=5
+[01:40:06.892] WARN:   partyLevels.3: host=6 guest=5
+[01:40:06.892] WARN:   partyLevels.4: host=6 guest=5
+[01:40:06.892] WARN:   partyLevels.5: host=6 guest=5
+[01:40:06.892] LOG: [coop:resync] guest requestStateSync turn=1 seq=15 START timeout=1200000ms
+[01:40:06.892] LOG: [coop:webrtc] raw tx role=guest t=requestStateSync bytes=42
+[01:40:06.892] WARN: [coop:replay] guest finalize turn=1: suppressing phantom turn after wave-advance signaled wave=9 (terminal final turn, NOT queuing turn-end)
+[01:40:06.892] LOG: [coop:runtime] consume wave-advance wave=9 outcome=win (lastResolved 8 -> 9)
+[01:40:06.892] LOG: [coop:replay] guest wave-advance outcome=win wave=9 battleType=WILD queues=VictoryPhase
+[01:40:06.892] LOG: [coop:replay] guest finalize turn=1: END (checkpoint applied, turn-end queued)
+[01:40:06.892] LOG: %cStart Phase VictoryPhase color:green;
+[01:40:06.892] LOG: [coop:progression] GUEST applyPartyExp SKIP wave=9 koMon=Taillow (awaiting host expResolved)
+[01:40:06.892] LOG: %cStart Phase BattleEndPhase color:green;
+[01:40:06.892] LOG: [coop:progression] expResolved BROADCAST wave=9 (host streams settled deltas)
+[01:40:06.893] LOG: [coop:runtime] consume expResolved wave=9 deltas=6
+[01:40:06.893] LOG: [coop:progression] GUEST applyExpDeltas APPLY wave=9 count=6 slots=[0:lv10:exp857,1:lv10:exp1000,2:lv6:exp223,3:lv6:exp236,4:lv6:exp236,5:lv6:exp236]
+[01:40:06.893] WARN: [coop:progression] expDelta level slot=0 sp=725 host=10 guest=9 -> applied
+[01:40:06.893] LOG: [coop:progression] expDelta exp slot=0 sp=725 host=857 guest=687 -> applied
+[01:40:06.893] WARN: [coop:progression] expDelta level slot=1 sp=115 host=10 guest=9 -> applied
+[01:40:06.893] LOG: [coop:progression] expDelta exp slot=1 sp=115 host=1000 guest=764 -> applied
+[01:40:06.893] WARN: [coop:progression] expDelta level slot=2 sp=152 host=6 guest=5 -> applied
+[01:40:06.893] LOG: [coop:progression] expDelta exp slot=2 sp=152 host=223 guest=128 -> applied
+[01:40:06.894] WARN: [coop:progression] expDelta level slot=3 sp=37 host=6 guest=5 -> applied
+[01:40:06.894] LOG: [coop:progression] expDelta exp slot=3 sp=37 host=236 guest=125 -> applied
+[01:40:06.894] WARN: [coop:progression] expDelta level slot=4 sp=81 host=6 guest=5 -> applied
+[01:40:06.894] LOG: [coop:progression] expDelta exp slot=4 sp=81 host=236 guest=125 -> applied
+[01:40:06.894] WARN: [coop:progression] expDelta level slot=5 sp=831 host=6 guest=5 -> applied
+[01:40:06.894] LOG: [coop:progression] expDelta exp slot=5 sp=831 host=236 guest=125 -> applied
+[01:40:06.895] LOG: Battle Score: 0 (0 Turns x1.15)
+[01:40:06.895] LOG: Total Score: 0
+[01:40:06.905] LOG: %cStart Phase EggLapsePhase color:green;
+[01:40:06.905] LOG: %cStart Phase SelectModifierPhase color:green;
+[01:40:06.905] LOG: [coop:interaction] interactionCounter() read -> 8 (role=guest)
+[01:40:06.905] LOG: [coop:owner] ownerOf(counter=8) parity=0 -> owner=host
+[01:40:06.905] LOG: [coop:owner] isLocalOwnerAtCounter(pinnedCounter=8) parity=0 owner=host role=guest -> false
+[01:40:06.905] LOG: Wave Seed: csJcPZL@@z_{WT:Srk=cbt 9
+[01:40:06.910] LOG: [coop:owner] ownerOf(counter=8) parity=0 -> owner=host
+[01:40:06.910] LOG: [coop:owner] isLocalOwnerAtCounter(pinnedCounter=8) parity=0 owner=host role=guest -> false
+[01:40:06.910] LOG: [coop:interaction] interactionCounter() read -> 8 (role=guest)
+[01:40:06.910] LOG: [coop:reward] owner/watcher decision: pinnedStart=8 liveCounter=8 parity=0 role=guest override=none spoof=false -> WATCHER
+[01:40:06.910] LOG: [coop:reward] WATCHER waits for partner's reward picks (start=8 role=guest wave=9)
+[01:40:06.910] LOG: [coop:reward] WATCHER awaiting owner reward options (start=8 reroll=0 localCount=0)
+[01:40:06.911] LOG: [coop:relay] AWAIT rewardOptions key=8:0 timeoutMs=1200000 -> BUFFER-HIT resolve count=3
+[01:40:06.911] LOG: [coop:shop] reconstructRewardOptions OK count=3 ids=[POKEBALL,TEMP_STAT_STAGE_BOOSTER,POTION]
+[01:40:06.911] LOG: [coop:reward] WATCHER ADOPTED owner reward options (was=0 now=3 ids=[POKEBALL,TEMP_STAT_STAGE_BOOSTER,POTION])
+[01:40:06.936] LOG: [coop:interaction] mirror begin role=watcher mirrorSeq=512 interactionStart=8 reroll=0
+[01:40:06.936] LOG: [coop:interaction] uiMirror beginSession role=watcher mode=6 seq=512 early=24
+[01:40:06.936] LOG: [coop:interaction] uiMirror WATCHER apply n=0 button=5 mode=6
+[01:40:06.936] LOG: [coop:interaction] uiMirror WATCHER apply n=1 button=3 mode=6
+[01:40:06.936] LOG: [coop:interaction] uiMirror WATCHER apply n=2 button=3 mode=6
+[01:40:06.936] LOG: [coop:interaction] uiMirror WATCHER apply n=3 button=0 mode=6
+[01:40:06.936] LOG: [coop:interaction] uiMirror WATCHER apply n=4 button=2 mode=6
+[01:40:06.936] LOG: [coop:interaction] uiMirror WATCHER apply n=5 button=2 mode=6
+[01:40:06.936] LOG: [coop:interaction] uiMirror WATCHER apply n=6 button=2 mode=6
+[01:40:06.936] LOG: [coop:interaction] uiMirror WATCHER apply n=7 button=5 mode=6
+[01:40:06.936] LOG: [coop:interaction] uiMirror WATCHER apply n=8 button=1 mode=6
+[01:40:06.936] LOG: [coop:interaction] uiMirror WATCHER apply n=9 button=0 mode=6
+[01:40:06.936] LOG: [coop:interaction] uiMirror WATCHER apply n=10 button=5 mode=6
+[01:40:06.936] LOG: [coop:interaction] uiMirror WATCHER apply n=11 button=1 mode=6
+[01:40:06.936] LOG: [coop:interaction] uiMirror WATCHER apply n=12 button=3 mode=6
+[01:40:06.936] LOG: [coop:interaction] uiMirror WATCHER apply n=13 button=2 mode=6
+[01:40:06.936] LOG: [coop:interaction] uiMirror WATCHER apply n=14 button=1 mode=6
+[01:40:06.936] LOG: [coop:interaction] uiMirror WATCHER apply n=15 button=5 mode=6
+[01:40:06.936] LOG: [coop:relay] AWAIT interactionChoice seq=8 timeoutMs=1200000 -> BUFFER-HIT resolve choice=0 data=[1,2,1,3,19791,1938]
+[01:40:06.936] LOG: [coop:reward] WATCHER applying relayed action seq=8 act=SHOP choice=0 data=[1,2,1,3,19791,1938]
+[01:40:06.936] LOG: [coop:owner] ownerOf(counter=8) parity=0 -> owner=host
+[01:40:06.937] LOG: [coop:owner] isLocalOwnerAtCounter(pinnedCounter=8) parity=0 owner=host role=guest -> false
+[01:40:06.939] LOG: [coop:relay] AWAIT interactionChoice seq=8 timeoutMs=1200000 -> BUFFER-HIT resolve choice=0 data=[1,2,1,3,19791,1896]
+[01:40:06.939] LOG: [coop:reward] WATCHER applying relayed action seq=8 act=SHOP choice=0 data=[1,2,1,3,19791,1896]
+[01:40:06.939] LOG: [coop:owner] ownerOf(counter=8) parity=0 -> owner=host
+[01:40:06.939] LOG: [coop:owner] isLocalOwnerAtCounter(pinnedCounter=8) parity=0 owner=host role=guest -> false
+[01:40:06.941] LOG: [coop:relay] AWAIT interactionChoice seq=8 timeoutMs=1200000 -> BUFFER-HIT resolve choice=-2 data=[19791,1646]
+[01:40:06.941] LOG: [coop:reward] WATCHER applying relayed action seq=8 act=REROLL choice=-2 data=[19791,1646]
+[01:40:06.942] LOG: [coop:owner] ownerOf(counter=8) parity=0 -> owner=host
+[01:40:06.942] LOG: [coop:owner] isLocalOwnerAtCounter(pinnedCounter=8) parity=0 owner=host role=guest -> false
+[01:40:06.943] LOG: %cStart Phase SelectModifierPhase color:green;
+[01:40:06.943] LOG: [coop:interaction] interactionCounter() read -> 8 (role=guest)
+[01:40:06.943] LOG: [coop:owner] ownerOf(counter=8) parity=0 -> owner=host
+[01:40:06.943] LOG: [coop:owner] isLocalOwnerAtCounter(pinnedCounter=8) parity=0 owner=host role=guest -> false
+[01:40:06.947] LOG: [coop:owner] ownerOf(counter=8) parity=0 -> owner=host
+[01:40:06.947] LOG: [coop:owner] isLocalOwnerAtCounter(pinnedCounter=8) parity=0 owner=host role=guest -> false
+[01:40:06.947] LOG: [coop:interaction] interactionCounter() read -> 8 (role=guest)
+[01:40:06.947] LOG: [coop:reward] owner/watcher decision: pinnedStart=8 liveCounter=8 parity=0 role=guest override=none spoof=false -> WATCHER
+[01:40:06.947] LOG: [coop:reward] WATCHER waits for partner's reward picks (start=8 role=guest wave=9)
+[01:40:06.947] LOG: [coop:reward] WATCHER awaiting owner reward options (start=8 reroll=1 localCount=0)
+[01:40:06.947] LOG: [coop:relay] AWAIT rewardOptions key=8:1 timeoutMs=1200000 -> BUFFER-HIT resolve count=3
+[01:40:06.948] LOG: [coop:shop] reconstructRewardOptions OK count=3 ids=[PP_UP,TM_CASE,ETHER]
+[01:40:06.948] LOG: [coop:reward] WATCHER ADOPTED owner reward options (was=0 now=3 ids=[PP_UP,TM_CASE,ETHER])
+[01:40:06.961] LOG: [coop:interaction] mirror begin role=watcher mirrorSeq=513 interactionStart=8 reroll=1
+[01:40:06.961] LOG: [coop:interaction] uiMirror beginSession role=watcher mode=6 seq=513 early=8
+[01:40:06.961] LOG: [coop:interaction] uiMirror WATCHER apply n=0 button=3 mode=6
+[01:40:06.961] LOG: [coop:interaction] uiMirror WATCHER apply n=1 button=3 mode=6
+[01:40:06.961] LOG: [coop:interaction] uiMirror WATCHER apply n=2 button=2 mode=6
+[01:40:06.961] LOG: [coop:interaction] uiMirror WATCHER apply n=3 button=5 mode=6
+[01:40:06.961] LOG: [coop:relay] AWAIT interactionChoice seq=8 timeoutMs=1200000 -> BUFFER-HIT resolve choice=1 data=[0,0,12]
+[01:40:06.961] LOG: [coop:reward] WATCHER applying relayed action seq=8 act=REWARD choice=1 data=[0,0,12]
+[01:40:06.961] LOG: [coop:owner] ownerOf(counter=8) parity=0 -> owner=host
+[01:40:06.961] LOG: [coop:owner] isLocalOwnerAtCounter(pinnedCounter=8) parity=0 owner=host role=guest -> false
+[01:40:06.965] LOG: %cStart Phase LearnMovePhase color:green;
+[01:40:06.965] LOG: [coop:learnmove] guest authoritative LearnMovePhase no-op end (single renderer is the listener) {"slot":0,"moveId":257}
+[01:40:06.965] LOG: %cStart Phase SelectModifierPhase color:green;
+[01:40:06.965] LOG: [coop:interaction] interactionCounter() read -> 8 (role=guest)
+[01:40:06.965] LOG: [coop:owner] ownerOf(counter=8) parity=0 -> owner=host
+[01:40:06.965] LOG: [coop:owner] isLocalOwnerAtCounter(pinnedCounter=8) parity=0 owner=host role=guest -> false
+[01:40:06.965] LOG: [coop:owner] ownerOf(counter=8) parity=0 -> owner=host
+[01:40:06.965] LOG: [coop:owner] isLocalOwnerAtCounter(pinnedCounter=8) parity=0 owner=host role=guest -> false
+[01:40:06.966] LOG: [coop:interaction] interactionCounter() read -> 8 (role=guest)
+[01:40:06.966] LOG: [coop:reward] owner/watcher decision: pinnedStart=8 liveCounter=8 parity=0 role=guest override=none spoof=false -> WATCHER
+[01:40:06.966] LOG: [coop:reward] WATCHER waits for partner's reward picks (start=8 role=guest wave=9)
+[01:40:06.966] LOG: [coop:reward] WATCHER awaiting owner reward options (start=8 reroll=1 localCount=0)
+[01:40:06.966] LOG: [coop:relay] AWAIT rewardOptions key=8:1 timeoutMs=1200000 -> network-wait
+[01:40:06.968] LOG: [coop:webrtc] raw rx role=guest t=stateSync bytes=7684 handlers=6
+[01:40:06.968] LOG: [coop:resync] guest RECV stateSync seq=15 blobLen=7648 -> parked waiter
+[01:40:06.969] LOG: [coop:resync] guest requestStateSync turn=1 seq=15 RESOLVE blobLen=7648
+[01:40:06.969] LOG: [coop:resync] turn=1 queueing full snapshot apply (blobLen=7648)
