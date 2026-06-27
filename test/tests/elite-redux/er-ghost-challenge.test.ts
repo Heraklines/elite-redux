@@ -179,7 +179,7 @@ describe.skipIf(!RUN)("ER Ghost Trainers challenge (#422)", () => {
 
 // Separate block: NO enemySpecies override (it would force every addEnemyPokemon to
 // Magikarp), so we can assert the ACTUAL species applyErGhostOverride builds.
-describe.skipIf(!RUN)("ER ghost devolve gate past wave 100 (#422 follow-up)", () => {
+describe.skipIf(!RUN)("ER ghost devolve gate past wave 50 (#422 follow-up)", () => {
   let phaserGame: Phaser.Game;
   let game: GameManager;
 
@@ -197,11 +197,11 @@ describe.skipIf(!RUN)("ER ghost devolve gate past wave 100 (#422 follow-up)", ()
     }
   });
 
-  it("a deep team is fielded FULLY EVOLVED past wave 100, but still devolved early", async () => {
-    // The "not-fully-evolved ghosts at wave 137+" bug: a deep (wave-200) team drawn for
-    // a high challenge wave was devolved to base forms. Past wave 100 the player already
-    // faces fully-evolved enemies, so applyErGhostOverride must only re-level it, not
-    // devolve. Below wave 100 the fairness devolve still applies.
+  it("a deep team is fielded FULLY EVOLVED past wave 50, but still devolved very early", async () => {
+    // The "not-fully-evolved / baby ghosts" bug: a deep (wave-200) team drawn for a high
+    // challenge wave was devolved to base forms. From ~wave 50 the player is already
+    // strong, so applyErGhostOverride must only re-level it, not devolve. Below wave 50
+    // (only the challenge reaches such early trainer waves) the fairness devolve applies.
     const deepEvolved: GhostTeamSnapshot = {
       ...SNAPSHOT,
       id: "er-test-evolved",
@@ -229,14 +229,21 @@ describe.skipIf(!RUN)("ER ghost devolve gate past wave 100 (#422 follow-up)", ()
     expect(host).not.toBeNull();
     markTrainerAsGhost(host!, deepEvolved);
 
-    // Wave 137 (>= 100): fully evolved, only re-levelled to the wave.
+    // Wave 137 (>= 50): fully evolved, only re-levelled to the wave.
     game.scene.currentBattle.waveIndex = 137;
     game.scene.currentBattle.enemyLevels = [137];
     expect(applyErGhostOverride(host!, 0)?.species.speciesId).toBe(SpeciesId.GARCHOMP);
 
-    // Wave 80 (< 100): overshoot 200 - (80 + 40) = 80 -> 3 stages -> base form (Gible).
+    // Wave 80 (>= 50): now ALSO fully evolved - the cutoff dropped 100 -> 50, so a deep
+    // ghost at a mid-game wave is no longer a baby team (it was Gible before this change).
     game.scene.currentBattle.waveIndex = 80;
     game.scene.currentBattle.enemyLevels = [80];
+    expect(applyErGhostOverride(host!, 0)?.species.speciesId).toBe(SpeciesId.GARCHOMP);
+
+    // Wave 30 (< 50): overshoot 200 - (30 + 40) = 130 -> 3 stages -> base form (Gible).
+    // The fairness devolve still applies on the early Ghost Trainers challenge waves.
+    game.scene.currentBattle.waveIndex = 30;
+    game.scene.currentBattle.enemyLevels = [30];
     expect(applyErGhostOverride(host!, 0)?.species.speciesId).toBe(SpeciesId.GIBLE);
   });
 });

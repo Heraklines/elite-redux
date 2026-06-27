@@ -116,13 +116,17 @@ const PREFETCH_LEAD_WAVES = 15;
 export const ER_GHOST_WAVE_WINDOW = 40;
 
 /**
- * Past this wave the player already faces fully-evolved enemies (the #419 elite BST
- * cap ladder ends ~here), so a ghost drawn from a deeper run must NOT be devolved -
- * it is only re-levelled down to the wave (see applyErGhostOverride). Below it, the
- * fairness devolve still applies so an endgame roster can't sweep an early ghost wave
- * (hell 63/87). Maintainer rule: "at wave 100 there should be no un-evolved mons."
+ * At/after this wave a ghost drawn from a deeper run must NOT be devolved - it is only
+ * re-levelled down to the wave (see applyErGhostOverride). By ~wave 50 the player is
+ * already strong (level ~50, an evolved roster), so the fairness devolve was
+ * over-correcting and fielding BABY teams where it shouldn't - and every scheduled ghost
+ * wave (hell starts 63, elite 87) is past this, so they all stay fully evolved. Below it,
+ * only the Ghost Trainers CHALLENGE reaches such early trainer waves, where the fairness
+ * devolve still applies so an endgame roster can't sweep a wave-5 lead. Lowered 100 -> 50
+ * (maintainer): un-evolved ghost teams from ~wave 50 on were the "baby Pokemon at high
+ * waves" reports.
  */
-export const ER_GHOST_NO_DEVOLVE_WAVE = 100;
+export const ER_GHOST_NO_DEVOLVE_WAVE = 50;
 
 // -----------------------------------------------------------------------------
 // Pool integrity — hacked/impossible teams must never reach other players.
@@ -1009,10 +1013,10 @@ export function applyErGhostOverride(trainer: Trainer, index: number): EnemyPoke
     // / last resort) gets its members devolved - one stage per overshoot band, two
     // past +20, base form past +60 - so a deep team's fully evolved mons don't sweep
     // an early-game player. Single-stagers stay.
-    // ER (#422 follow-up): ONLY below wave 100 (ER_GHOST_NO_DEVOLVE_WAVE). Past there
-    // the player already faces fully-evolved enemies, so a deep ghost is just
-    // re-levelled down (level cap below), never devolved - that devolve was the cause
-    // of "not-fully-evolved ghost mons at wave 137+" in the Ghost Trainers challenge.
+    // ER (#422 follow-up): ONLY below wave 50 (ER_GHOST_NO_DEVOLVE_WAVE). Past there
+    // the player is already strong (level ~50, evolved roster), so a deep ghost is just
+    // re-levelled down (level cap below), never devolved - that devolve was the cause of
+    // "baby / not-fully-evolved ghost mons" at the scheduled ghost waves (hell 63+).
     const overshoot = Math.max(0, snapshot.waveReached - (currentWave + ER_GHOST_WAVE_WINDOW));
     let devolved = false;
     if (overshoot > 0 && currentWave < ER_GHOST_NO_DEVOLVE_WAVE) {
