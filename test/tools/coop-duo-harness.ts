@@ -89,6 +89,7 @@ import { Command } from "#enums/command";
 import { GameModes } from "#enums/game-modes";
 import type { MysteryEncounterType } from "#enums/mystery-encounter-type";
 import { TrainerSlot } from "#enums/trainer-slot";
+import { UiMode } from "#enums/ui-mode";
 import { EnemyPokemon, PlayerPokemon, type Pokemon } from "#field/pokemon";
 import type { ModifierOverride } from "#modifiers/modifier-type";
 import { PokemonModifierType } from "#modifiers/modifier-type";
@@ -835,6 +836,60 @@ export async function driveGuestTmCaseRegression(
     queuedLearnMove: queued.includes("LearnMovePhase"),
     continuationRemoved: removed.includes("SelectModifierPhase"),
   };
+}
+
+/**
+ * Drive the HOST's REAL owner reward shop for a PARTY-TARGET reward (e.g. RARE_CANDY, a vitamin, a
+ * mint, an ability capsule - anything that opens the party UI to pick WHICH mon receives it). The
+ * headless autopilot has no human to pick a mon, so we intercept the ONE `UiMode.PARTY` open the
+ * owner's {@linkcode openModifierMenu} issues and invoke its `(slotIndex, option)` callback with our
+ * chosen `slot` - which fires the GENUINE owner relay (`coopFlushPending([slot, option])` ->
+ * `coopRelaySend([COOP_ACT_REWARD, slot, option])`) over the real loopback AND applies the modifier
+ * to the host's own `party[slot]`. The watcher ({@linkcode driveGuestRewardWatch}) re-applies the
+ * relayed pick to ITS `party[slot]`, so a test can assert the two engines converge (e.g. equal
+ * `party[slot].level` after RARE_CANDY). A party-target reward is TERMINAL (its applyModifier calls
+ * super.end() + coopAdvanceInteraction), so this advances the counter itself - do NOT also leave.
+ * MUST be called inside withClient(hostCtx). Returns the pinned interaction counter. This is the
+ * party-target sibling of {@linkcode driveHostRewardShopOwner} (which only drives NON-party rewards).
+ */
+export async function driveHostPartyRewardOwner(
+  hostPhase: ShopPhaseSeam,
+  opts: { slot?: number; option?: number } = {},
+): Promise<number> {
+  const slot = opts.slot ?? 0;
+  const option = opts.option ?? 0;
+  hostPhase.start();
+  await drainLoopback();
+  const pinned = hostPhase.coopInteractionStart;
+  // Find the first PARTY-TARGET reward (the inverse of driveHostRewardShopOwner's non-party filter).
+  const idx = (hostPhase.typeOptions as { type?: unknown }[]).findIndex(o => o?.type instanceof PokemonModifierType);
+  if (idx < 0) {
+    throw new Error("driveHostPartyRewardOwner: no party-target reward in the forced shop options");
+  }
+  // The owner's openModifierMenu opens UiMode.PARTY with a (slotIndex, option) callback. Stub the ONE
+  // PARTY open so the headless autopilot "picks" our slot - driving the REAL coopFlushPending relay +
+  // host applyModifier. (The callback also calls ui.setMode(MODIFIER_SELECT).then(...), so we drain.)
+  const ui = globalScene.ui as unknown as { setModeWithoutClear: (...args: unknown[]) => unknown };
+  const realSetModeWithoutClear = ui.setModeWithoutClear.bind(ui);
+  ui.setModeWithoutClear = (...args: unknown[]): unknown => {
+    if (args[0] === UiMode.PARTY) {
+      ui.setModeWithoutClear = realSetModeWithoutClear; // one-shot: restore before invoking the picker
+      (args[3] as (slotIndex: number, option: number) => void)(slot, option);
+      return;
+    }
+    return realSetModeWithoutClear(...args);
+  };
+  try {
+    hostPhase.selectRewardModifierOption(idx, () => false);
+    // The picker callback's setMode(MODIFIER_SELECT).then(...) runs on a microtask; drain repeatedly so
+    // it fires (relay + apply) and the relayed pick reaches the watcher's inbox.
+    for (let i = 0; i < 8; i++) {
+      await drainLoopback();
+    }
+  } finally {
+    ui.setModeWithoutClear = realSetModeWithoutClear; // restore even if the PARTY open never came
+  }
+  return pinned;
 }
 
 // ---------------------------------------------------------------------------

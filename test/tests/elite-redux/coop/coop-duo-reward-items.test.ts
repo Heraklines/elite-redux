@@ -1,0 +1,206 @@
+/*
+ * SPDX-FileCopyrightText: 2024-2026 Pagefault Games
+ * SPDX-License-Identifier: AGPL-3.0-only
+ */
+
+// =============================================================================
+// TWO-ENGINE co-op PARTY-TARGET reward items (#719). The duo harness historically drove only
+// NON-party rewards + leave (a party-target reward opens the party UI to pick WHICH mon receives it,
+// which the headless autopilot could not drive) - so the WHOLE party-target item class (Rare Candy,
+// vitamins, mints, ability capsules, evo/form items, TMs) was UNTESTED across two engines. That is
+// exactly the gap a LIVE report hit: RARE_CANDY did not sync (one player's mon leveled, the other's
+// did not). This file closes the hole with driveHostPartyRewardOwner (it stubs the ONE party-UI open
+// to auto-pick a slot, driving the GENUINE owner relay) and asserts the picked mon's LEVEL converges
+// on BOTH engines, in BOTH ownership directions (host-owned even counter, guest-owned odd counter).
+//
+// HOW TO RUN (gated ER_SCENARIO=1, like every ER engine test):
+//   ER_SCENARIO=1 npx vitest run test/tests/elite-redux/coop/coop-duo-reward-items.test.ts
+// =============================================================================
+
+import type { BattleScene } from "#app/battle-scene";
+import { getGameMode } from "#app/game-mode";
+import { initGlobalScene } from "#app/global-scene";
+import { clearCoopRuntime, setCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
+import { COOP_GUEST_FIELD_INDEX, COOP_HOST_FIELD_INDEX } from "#data/elite-redux/coop/coop-session";
+import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
+import { BattlerIndex } from "#enums/battler-index";
+import { Command } from "#enums/command";
+import { GameModes } from "#enums/game-modes";
+import { MoveId } from "#enums/move-id";
+import { SpeciesId } from "#enums/species-id";
+import { SelectModifierPhase } from "#phases/select-modifier-phase";
+import { GameManager } from "#test/framework/game-manager";
+import {
+  buildDuo,
+  type DuoRig,
+  driveGuestReplayTurn,
+  driveGuestRewardWatch,
+  driveHostPartyRewardOwner,
+  forceItemRewards,
+  installDuoLogCapture,
+  remirrorWave,
+  type ShopPhaseSeam,
+  withClient,
+  withClientSync,
+} from "#test/tools/coop-duo-harness";
+import Phaser from "phaser";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
+
+const RUN = process.env.ER_SCENARIO === "1";
+
+/** Flip a freshly-built scene into the co-op game mode (shared by host + guest). */
+function toCoop(scene: BattleScene): void {
+  scene.gameMode = getGameMode(GameModes.COOP);
+}
+
+describe.skipIf(!RUN)("co-op DUO party-target reward items: apply + sync across two engines (#719)", () => {
+  let phaserGame: Phaser.Game;
+  let game: GameManager;
+  let logs: ReturnType<typeof installDuoLogCapture>;
+
+  beforeAll(() => {
+    phaserGame = new Phaser.Game({ type: Phaser.HEADLESS });
+  });
+
+  beforeEach(() => {
+    game = new GameManager(phaserGame);
+    logs = installDuoLogCapture(`reward-items-${Date.now()}`);
+    game.override
+      .battleStyle("double")
+      .startingWave(1)
+      .enemySpecies(SpeciesId.MAGIKARP)
+      .enemyLevel(1)
+      .enemyMoveset(MoveId.SPLASH)
+      .startingLevel(50)
+      .moveset([MoveId.TACKLE, MoveId.SPLASH])
+      .disableTrainerWaves();
+  });
+
+  afterEach(() => {
+    logs.dispose();
+    clearCoopRuntime();
+    // #710 harness-citizenship: restore the host GameManager scene (buildDuo builds a 2nd BattleScene).
+    initGlobalScene(game.scene);
+  });
+
+  afterAll(() => {
+    // best-effort
+  });
+
+  /** Wire the guest's OWN-slot command answer (the genuine production CoopBattleSync relay). */
+  function wireGuestCommand(rig: DuoRig): void {
+    rig.guestRuntime.battleSync.onCommandRequest(({ moveSlots }) => ({
+      command: Command.FIGHT,
+      cursor: moveSlots.length > 0 ? moveSlots[0] : 0,
+      moveId: MoveId.TACKLE,
+      targets: [BattlerIndex.ENEMY_2],
+    }));
+  }
+
+  /** Drive ONE host wave to a win (both player slots FIGHT the frail enemies) under the host ctx. */
+  async function hostPlayWave(rig: DuoRig): Promise<void> {
+    await withClient(rig.hostCtx, async () => {
+      game.move.select(MoveId.TACKLE, COOP_HOST_FIELD_INDEX, BattlerIndex.ENEMY);
+      game.move.select(MoveId.TACKLE, COOP_GUEST_FIELD_INDEX, BattlerIndex.ENEMY_2);
+      await game.phaseInterceptor.to("TurnEndPhase");
+    });
+  }
+
+  /** Reach + drive ONE alternating reward interaction where the OWNER picks party-target SLOT. Drives
+   *  the owner FIRST (it FIFO-buffers its relayed pick), THEN the watcher (drains + re-applies). Returns
+   *  the engines' BEFORE/AFTER so the caller asserts convergence. No cross-wave (the candy's downstream
+   *  move-learn is a SEPARATE concern - see the test note). */
+  async function driveOneSlotReward(rig: DuoRig, slot: number): Promise<{ counterBefore: number; hostOwns: boolean }> {
+    const counterBefore = rig.hostRuntime.controller.interactionCounter();
+    const hostOwns = counterBefore % 2 === 0;
+    await withClient(rig.hostCtx, async () => {
+      await game.phaseInterceptor.to("SelectModifierPhase", false);
+    });
+    const hostShop = rig.hostScene.phaseManager.getCurrentPhase() as unknown as ShopPhaseSeam;
+    expect(hostShop.phaseName, "host reached SelectModifierPhase").toBe("SelectModifierPhase");
+    const guestShop = withClientSync(rig.guestCtx, () => new SelectModifierPhase()) as unknown as ShopPhaseSeam;
+    // Slot must be the SAME mon on both engines for the convergence assertions to mean anything.
+    expect(
+      rig.guestScene.getPlayerParty()[slot]?.species.speciesId,
+      `guest slot ${slot} is the same species as host`,
+    ).toBe(rig.hostScene.getPlayerParty()[slot]?.species.speciesId);
+    if (hostOwns) {
+      await withClient(rig.hostCtx, () => driveHostPartyRewardOwner(hostShop, { slot }));
+      await withClient(rig.guestCtx, () => driveGuestRewardWatch(guestShop));
+    } else {
+      await withClient(rig.guestCtx, () => driveHostPartyRewardOwner(guestShop, { slot }));
+      await withClient(rig.hostCtx, () => driveGuestRewardWatch(hostShop));
+    }
+    // The alternating-interaction counter advanced exactly once on BOTH engines (lockstep).
+    expect(rig.hostRuntime.controller.interactionCounter(), "host advanced the counter once").toBe(counterBefore + 1);
+    expect(rig.guestRuntime.controller.interactionCounter(), "guest advanced the counter once").toBe(counterBefore + 1);
+    return { counterBefore, hostOwns };
+  }
+
+  it("party-target rewards apply + SYNC on both engines: held item (host-owned) + RARE_CANDY level (guest-owned)", async () => {
+    // Wave 1 forces a LEFTOVERS held item (a PokemonHeldItemModifierType, party-target, NO level change
+    // -> no downstream move-learn, so the wave-cross stays clean). Wave 2 forces a RARE_CANDY (the LIVE
+    // report: a party-target level-up). We DON'T cross after the candy: a candy that crosses a move-learn
+    // threshold queues an interactive LearnMovePhase (its own co-op concern, tracked separately) - here we
+    // verify the LEVEL itself converges, which is the reported desync.
+    const SLOT = 0;
+    forceItemRewards(game.override, [{ name: "LEFTOVERS" }]);
+    await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
+    const pair = createLoopbackPair();
+    const rig = await buildDuo(game, pair, setCoopRuntime, toCoop);
+    wireGuestCommand(rig);
+
+    // ===== WAVE 1 (host-owned, even counter): a party-target HELD ITEM. =====
+    {
+      const turn = rig.hostScene.currentBattle.turn;
+      await hostPlayWave(rig);
+      await withClient(rig.guestCtx, async () => {
+        await driveGuestReplayTurn(rig.guestScene, turn);
+      });
+      const hostModsBefore = rig.hostScene.modifiers.length;
+      const guestModsBefore = rig.guestScene.modifiers.length;
+      const { hostOwns } = await driveOneSlotReward(rig, SLOT);
+      expect(hostOwns, "wave 1 reward is host-owned (even counter)").toBe(true);
+      // The held item was granted on the OWNER's engine AND mirrored on the WATCHER's (the relayed pick
+      // applied against the identical pool) - modifier counts move together, no desync.
+      expect(rig.hostScene.modifiers.length, "wave 1: host granted the held item").toBe(hostModsBefore + 1);
+      expect(rig.guestScene.modifiers.length, "wave 1: guest mirrored the held-item grant (no desync)").toBe(
+        guestModsBefore + 1,
+      );
+    }
+
+    // ===== Cross to wave 2 (LEFTOVERS triggers no level-up -> no LearnMovePhase -> clean cross). =====
+    forceItemRewards(game.override, [{ name: "RARE_CANDY" }]);
+    await withClient(rig.hostCtx, async () => {
+      await game.phaseInterceptor.to("CommandPhase");
+    });
+    expect(rig.hostScene.currentBattle.waveIndex, "host advanced to wave 2").toBe(2);
+    await remirrorWave(rig);
+
+    // ===== WAVE 2 (guest-owned, odd counter): a party-target RARE_CANDY (the live desync). =====
+    {
+      const turn = rig.hostScene.currentBattle.turn;
+      await hostPlayWave(rig);
+      await withClient(rig.guestCtx, async () => {
+        await driveGuestReplayTurn(rig.guestScene, turn);
+      });
+      const hostLvlBefore = rig.hostScene.getPlayerParty()[SLOT].level;
+      const guestLvlBefore = rig.guestScene.getPlayerParty()[SLOT].level;
+      const { hostOwns } = await driveOneSlotReward(rig, SLOT);
+      expect(hostOwns, "wave 2 reward is guest-owned (odd counter)").toBe(false);
+      // The picked mon gained a level on the OWNER (guest) engine AND the WATCHER (host) mirrored the
+      // SAME +1 - both engines agree on the leveled mon (the RARE_CANDY desync the player reported).
+      expect(rig.guestScene.getPlayerParty()[SLOT].level, "wave 2: guest (owner) leveled the picked mon").toBe(
+        guestLvlBefore + 1,
+      );
+      expect(rig.hostScene.getPlayerParty()[SLOT].level, "wave 2: host (watcher) mirrored the SAME level-up").toBe(
+        hostLvlBefore + 1,
+      );
+      expect(
+        rig.hostScene.getPlayerParty()[SLOT].level,
+        "wave 2: both engines agree on the leveled mon (no RARE_CANDY desync)",
+      ).toBe(rig.guestScene.getPlayerParty()[SLOT].level);
+    }
+    logs.flush();
+  }, 300_000);
+});
