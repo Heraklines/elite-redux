@@ -20,7 +20,7 @@ The three effect layers come from the Shiny Lab (`shiny-lab/`, live at shiny-lab
 - **Pure cosmetic** (for now; gameplay tie-ins maybe later).
 
 ## 1. Tier -> category (the slot you earn)
-Proposed binding (confirm the tier<->variant mapping):
+Confirmed binding:
 
 | Tier | Existing shiny | Unlocks (cumulative) |
 |---|---|---|
@@ -58,8 +58,8 @@ The Nth unlock in a category for a species costs `base + (owned_in_category) * s
   (non-achievement) effects per category to a discount (e.g. -40%). It does NOT bypass the
   achievement gate - it only lowers gate-3 (candy) for those few.
 - **Achievement/challenge-unlocked effects** still cost candy per species (so a global
-  unlock doesn't flood everyone), but at a **reduced rate** (proposed: ~50% of ramp price).
-  The achievement makes it *buyable everywhere*; candy makes it *owned per species*.
+  unlock doesn't flood everyone), but at **50% of the ramp price** (half off). The
+  achievement makes it *buyable everywhere*; candy makes it *owned per species*.
 
 ## 4. Persistence (save-efficient - bitsets from day one)
 Per species in `starterData`:
@@ -113,8 +113,9 @@ A stylish in-game menu (NOT the web tool), big animated mon preview:
 ## 9. Name signatures + nameplate FX
 - Specific **palette+aura combos earn a named title / nameplate flair** (the GoldenCharizard
   / GlitterRayquaza style). A small `combo -> name` registry.
-- (Stretch, Phase 4) apply the effect to the battle **nameplate** itself (tint/animate the
-  name window + text), not just the sprite.
+- **Nameplate FX (Phase 4):** apply the effect to the battle **nameplate** itself
+  (tint/animate the name window + text), not just the sprite. Gated at **T3+** and behind
+  its OWN separate unlock (TBD) - not the same unlock as the sprite effect.
 
 ## 10. Achievement / challenge -> reward mapping
 Principle: **reward prestige scales with effort**; effects sit ~T1-2 shiny reward rarity, so
@@ -122,6 +123,7 @@ trivial achievements never grant them. **Most gates require ACE mode or higher**
 Youngster). To avoid clogging the achievement UI, prefer **challenge-completion grants** over
 new achievement entries where possible (the reward hook already fires on challenge complete;
 e.g. color/mono challenges with modifiers -> matching palettes weighted by difficulty).
+Confirmed: this also avoids needing a new achievement icon per unlock.
 
 New achievements (confirmed, with suggested reward):
 
@@ -148,9 +150,9 @@ which unlock which effect (which are achievement-locked vs challenge-grant vs pl
 - **P4** - name signatures + nameplate FX + reroll-seed tokens + (later) T5 / quests /
   seasonal limited-time unlocks.
 
-## Open micro-decisions
-1. Confirm the tier<->variant binding in section 1 (esp. T3=epic, T4=black).
-2. Achievement-unlock candy discount rate (proposed ~50% of ramp).
-3. OK to prefer challenge-completion grants over new achievement entries for the bulk of
-   unlocks (UI-clog mitigation)?
-4. Nameplate FX (section 9) - Phase 4 stretch, or cut?
+## Resolved (2026-06-27)
+1. Tier<->category binding **confirmed**: T1-2 -> palettes, T3 -> +surface, T4/black -> +aura.
+2. Achievement-unlock candy discount **= 50% of the ramp price** (half off).
+3. **Prefer challenge-completion grants** over new achievement entries (avoids a new
+   achievement icon per unlock, and the reward hook already fires on challenge complete).
+4. **Nameplate FX kept** - Phase 4, gated at **T3+** with its own separate (TBD) unlock.
