@@ -133,11 +133,11 @@ async function loadSpecies(id) {
 
 // ---- render a full look (palette + surface + around) onto a padded buffer -----
 function renderLook(slots, buf, ef, dist, t, out, amt) {
-  const sa = makeSampler(buf);
+  const rawSa = makeSampler(buf);
   const ac = { cx: dist.cx, cy: dist.cy };
   const ctx = {
     e: 0,
-    sa,
+    sa: rawSa,
     W: FW,
     H: FH,
     K: CL ? CL.K : 1,
@@ -147,6 +147,18 @@ function renderLook(slots, buf, ef, dist, t, out, amt) {
   const pal = slots.palette && slots.palette !== "base" ? slots.palette : null;
   const surf = slots.surface || null;
   const aro = slots.around || null;
+  // Palette-aware sampler: the distortion FX (Heat Shimmer, Ripple, Wormhole, Shatter,
+  // Kaleidoscope, Pixel Pulse, Prismatic, Glitch) read the sprite through `sa` - sample
+  // the RECOLORED sprite so they take the palette color instead of the original sprite.
+  const sa = pal
+    ? (x, y) => {
+        const s = rawSa(x, y);
+        if (s[3] <= 0.02) return s;
+        const c = PALETTE[pal](s[0], s[1], s[2], ctx);
+        return [c[0], c[1], c[2], s[3]];
+      }
+    : rawSa;
+  ctx.sa = sa;
   // FX color: default = each effect's own colors; palette = match the palette's
   // most colorful tone; custom = a hand-picked color (the aura color picker).
   const doTint = fxColorMode !== "default";
