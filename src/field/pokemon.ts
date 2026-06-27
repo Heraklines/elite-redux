@@ -5337,7 +5337,18 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
     if (isCoopRecording()) {
       recordCoopEvent({ k: "hp", bi: this.getBattlerIndex(), hp: this.hp, maxHp: this.getMaxHp() });
       if (this.isFainted()) {
-        recordCoopEvent({ k: "faint", bi: this.getBattlerIndex() });
+        // #691 (host-language leak): carry `narrate` = whether the host shows an "X fainted!" message for
+        // this KO, so the guest regenerates the faint line in its OWN language IFF true (and narrates
+        // exactly the KOs the host narrated). DEVIATION from the spec's literal `!ignoreFaintPhase`: in
+        // this codebase a DIRECT move-hit KO (the dominant narrated case) reaches `damage()` with
+        // `ignoreFaintPhase=true` and its FaintPhase is DEFERRED to MoveEffectPhase.onFaintTarget
+        // (move-effect-phase.ts), so the message IS shown; `!ignoreFaintPhase` would be FALSE for exactly
+        // those KOs and the guest would never narrate them. Every KO that reaches this universal chokepoint
+        // results in a FaintPhase (here when `!ignoreFaintPhase`, else via the move's deferred
+        // onFaintTarget) and thus a shown message, so `narrate` is TRUE for a recorded faint. The flag is
+        // kept on the wire (not hardcoded on the guest) so the GATING semantics + forward-compat hold (an
+        // event may carry narrate=false and the guest suppresses the line).
+        recordCoopEvent({ k: "faint", bi: this.getBattlerIndex(), narrate: true });
       }
     }
     if (this.isFainted() && !ignoreFaintPhase) {

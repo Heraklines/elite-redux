@@ -29,6 +29,7 @@
 // =============================================================================
 
 import { globalScene } from "#app/global-scene";
+import { getPokemonNameWithAffix } from "#app/messages";
 import { Phase } from "#app/phase";
 import { CommonBattleAnim, MoveAnim } from "#data/battle-anims";
 import { COOP_CHECKSUM_SENTINEL, canonicalize } from "#data/elite-redux/coop/coop-battle-checksum";
@@ -43,20 +44,30 @@ import { logCanonicalDiff } from "#data/elite-redux/coop/coop-data-fingerprint";
 import { coopLog, coopWarn, isCoopDebug } from "#data/elite-redux/coop/coop-debug";
 import {
   consumeCoopPendingWaveAdvance,
+  coopHasPendingWaveAdvance,
   coopWaveAdvanceSignaledFor,
   getCoopBattleStreamer,
   isCoopAuthoritativeGuest,
 } from "#data/elite-redux/coop/coop-runtime";
-import type { CoopBattleCheckpoint, CoopFullBattleSnapshot } from "#data/elite-redux/coop/coop-transport";
+import type {
+  CoopBattleCheckpoint,
+  CoopCapturePresentation,
+  CoopFullBattleSnapshot,
+} from "#data/elite-redux/coop/coop-transport";
+import { doPokeballBounceAnim, getPokeballAtlasKey } from "#data/pokeball";
 import { BattleType } from "#enums/battle-type";
 import { BattlerIndex } from "#enums/battler-index";
 import { HitResult } from "#enums/hit-result";
 import { CommonAnim } from "#enums/move-anims-common";
 import type { MoveId } from "#enums/move-id";
+import type { PokeballType } from "#enums/pokeball";
 import { type BattleStat, Stat } from "#enums/stat";
 import { StatusEffect } from "#enums/status-effect";
+import { PokemonMove } from "#moves/pokemon-move";
 import { PokemonPhase } from "#phases/pokemon-phase";
 import { fixedInt } from "#utils/common";
+import { getPokemonSpecies } from "#utils/pokemon-utils";
+import i18next from "i18next";
 import { decompressFromBase64 } from "lz-string";
 
 /** Generous watchdog: a presentation phase whose anim callback never fires ends after this. */
@@ -74,6 +85,66 @@ function fieldMon(bi: number): ReturnType<typeof globalScene.getField>[number] |
     return globalScene.getField()[bi] ?? null;
   } catch {
     return null;
+  }
+}
+
+/**
+ * GUEST (#691, host-language leak): regenerate the "X used Y!" line in the GUEST'S OWN language from a
+ * structured `moveUsed` event. The host SUPPRESSES streaming its own (host-language) `useMove` message
+ * for this move (move-phase.ts), so this is the SOLE source of the line on the guest - localized here via
+ * the guest's i18next locale (`new PokemonMove(moveId).getName()` re-localizes the move name in the live
+ * locale; `getPokemonNameWithAffix` localizes the user's affix - nicknames are locale-independent raw
+ * strings that render identically on both clients). PRESENTATION ONLY: it only calls `queueMessage` (which
+ * enqueues a self-terminating MessagePhase - no new awaited callback / timer / anim), and the whole body is
+ * in try/catch so a bad moveId / bi degrades to no line and NEVER throws into the replay pump.
+ */
+export function coopNarrateMoveUsed(bi: number, moveId: number): void {
+  try {
+    const user = fieldMon(bi);
+    if (user == null) {
+      return;
+    }
+    const moveName = new PokemonMove(moveId as MoveId).getName();
+    if (!moveName) {
+      return;
+    }
+    globalScene.phaseManager.queueMessage(
+      i18next.t("battle:useMove", {
+        pokemonNameWithAffix: getPokemonNameWithAffix(user),
+        moveName,
+      }),
+      500,
+    );
+  } catch {
+    // A bad moveId / bi must never throw into the replay pump - skip the cosmetic line.
+    coopWarn("replay", `narrate moveUsed bi=${bi} moveId=${moveId} threw (handled, line skipped)`);
+  }
+}
+
+/**
+ * GUEST (#691, host-language leak): regenerate the "X fainted!" line in the GUEST'S OWN language from a
+ * structured `faint` event. Called from {@linkcode CoopFaintReplayPhase} ONLY when the host streamed
+ * `narrate=true` (i.e. a real `FaintPhase` ran on the host), so the guest narrates exactly the KOs the
+ * host narrated. The host SUPPRESSES streaming its own (host-language) `fainted` message (faint-phase.ts),
+ * so this is the SOLE source of the line on the guest. PRESENTATION ONLY: only `queueMessage`; the whole
+ * body is in try/catch so a bad bi degrades to no line and NEVER throws into the replay pump.
+ */
+export function coopNarrateFaint(bi: number): void {
+  try {
+    const mon = fieldMon(bi);
+    if (mon == null) {
+      return;
+    }
+    globalScene.phaseManager.queueMessage(
+      i18next.t("battle:fainted", {
+        pokemonNameWithAffix: getPokemonNameWithAffix(mon),
+      }),
+      null,
+      true,
+    );
+  } catch {
+    // A bad bi must never throw into the replay pump - skip the cosmetic line.
+    coopWarn("replay", `narrate faint bi=${bi} threw (handled, line skipped)`);
   }
 }
 
@@ -391,6 +462,18 @@ export class CoopStatusReplayPhase extends PokemonPhase {
 export class CoopFaintReplayPhase extends PokemonPhase {
   public readonly phaseName = "CoopFaintReplayPhase";
 
+  /**
+   * #691 (host-language leak): whether to regenerate the "X fainted!" line in the GUEST'S language. True
+   * IFF the host streamed `faint.narrate === true` (a real FaintPhase ran on the host). Defaults false so
+   * an older host (no `narrate` field) or an `ignoreFaintPhase` KO produces no extra line.
+   */
+  private readonly narrate: boolean;
+
+  constructor(battlerIndex: number, narrate = false) {
+    super(battlerIndex);
+    this.narrate = narrate;
+  }
+
   public override start(): void {
     super.start();
     let ended = false;
@@ -404,7 +487,7 @@ export class CoopFaintReplayPhase extends PokemonPhase {
       this.end();
     };
     if (isCoopDebug()) {
-      coopLog("replay", `present faint bi=${this.battlerIndex}`);
+      coopLog("replay", `present faint bi=${this.battlerIndex} narrate=${this.narrate}`);
     }
     try {
       const pokemon = fieldMon(this.battlerIndex);
@@ -415,6 +498,12 @@ export class CoopFaintReplayPhase extends PokemonPhase {
         }
         this.end();
         return;
+      }
+      // #691: regenerate the "X fainted!" line in the GUEST'S language while the mon is still on-field
+      // (before the cry / drop), ONLY when the host narrated this KO. queueMessage enqueues a
+      // self-terminating MessagePhase - no new awaited callback, so the no-hang guarantee is preserved.
+      if (this.narrate) {
+        coopNarrateFaint(this.battlerIndex);
       }
       watchdog = globalScene.time.delayedCall(COOP_REPLAY_WATCHDOG_MS, finish);
       pokemon.faintCry(() => {
@@ -439,7 +528,10 @@ export class CoopFaintReplayPhase extends PokemonPhase {
                 pokemon.leaveField(true, true, false);
               } catch {
                 // the removal is best-effort; the checkpoint reconcile still corrects the slot
-                coopWarn("replay", `present faint bi=${this.battlerIndex} removal threw (handled, checkpoint reconciles)`);
+                coopWarn(
+                  "replay",
+                  `present faint bi=${this.battlerIndex} removal threw (handled, checkpoint reconciles)`,
+                );
               }
               finish();
             },
@@ -449,6 +541,134 @@ export class CoopFaintReplayPhase extends PokemonPhase {
         }
       });
     } catch {
+      finish();
+    }
+  }
+}
+
+/**
+ * GUEST: play the cosmetic CAPTURE animation for a host `waveResolved("capture")` (#689). The host
+ * runs `AttemptCapturePhase` (the ball throw + shake + capture stars + "X was caught!" line) which
+ * the pure-renderer guest NEVER runs - so without this the guest's catch is silent. This phase plays
+ * a bounded subset of that presentation: throw the ball in -> open it -> a fixed bounce/shake ->
+ * capture stars + "X was caught!" - then ends. The exact shake count is OUT OF SCOPE (a fixed bounce
+ * is enough for the bounded fix).
+ *
+ * PRESENTATION ONLY (the LOAD-BEARING invariant): this phase NEVER mutates any field / party / arena
+ * state - the checkpoint reconcile in {@linkcode CoopFinalizeTurnPhase} already removed the captured
+ * enemy BEFORE this phase runs and owns ALL hashed state, and `applyCoopCaptureParty` already grew the
+ * party + credited the dex with `showMessage=false`, so this phase is the SOLE source of the "caught!"
+ * line (no duplicate). REVISION #1: it does NOT tint / hide / touch any field mon at
+ * `targetBattlerIndex` - the captured enemy is already gone and a next-wave enemy could occupy that
+ * slot, so tinting it would hide the WRONG live sprite. The ball is animated ALONE; the
+ * `targetBattlerIndex` is only a cosmetic throw-anchor (default enemy position if that slot is empty).
+ * The message is generated LOCALLY from `speciesId` so it is correctly localized in the GUEST's
+ * language (acceptable fidelity gap: this is the base SPECIES name, not a nickname / fusion name).
+ *
+ * Hardened like {@linkcode CoopFaintReplayPhase}: an `ended` flag + a 5s watchdog + an idempotent
+ * `finish()` + the whole body and every tween onComplete in try/catch funnel to `finish()`. A bad
+ * payload (null anchor, unknown pokeballType / speciesId) degrades to "ball thrown + caught message"
+ * or just reaches `finish()` - it can never strand the queue.
+ */
+export class CoopCaptureReplayPhase extends Phase {
+  public readonly phaseName = "CoopCaptureReplayPhase";
+
+  constructor(private readonly presentation: CoopCapturePresentation) {
+    super();
+  }
+
+  public override start(): void {
+    super.start();
+    if (isCoopDebug()) {
+      coopLog(
+        "replay",
+        `present capture sp=${this.presentation?.speciesId} ball=${this.presentation?.pokeballType} target=${this.presentation?.targetBattlerIndex}`,
+      );
+    }
+    let ended = false;
+    let watchdog: Phaser.Time.TimerEvent | undefined;
+    let pokeball: Phaser.GameObjects.Sprite | undefined;
+    const finish = () => {
+      if (ended) {
+        return;
+      }
+      ended = true;
+      watchdog?.remove();
+      try {
+        pokeball?.destroy();
+      } catch {
+        /* sprite teardown best-effort */
+      }
+      this.end();
+    };
+    try {
+      const pokeballType = this.presentation.pokeballType as PokeballType;
+      const pokeballAtlasKey = getPokeballAtlasKey(pokeballType);
+      // The throw ANCHOR only (cosmetic): aim at the live field mon if its slot is still occupied,
+      // else the default enemy position. Never read/mutate any state off this mon (REVISION #1).
+      const anchorMon = fieldMon(this.presentation.targetBattlerIndex);
+      const fpOffset = anchorMon == null ? [0, 0] : anchorMon.getFieldPositionOffset();
+      const targetX = 236 + fpOffset[0];
+      const targetY = 16 + fpOffset[1];
+
+      pokeball = globalScene.addFieldSprite(16, 80, "pb", pokeballAtlasKey);
+      pokeball.setOrigin(0.5, 0.625);
+      globalScene.field.add(pokeball);
+
+      watchdog = globalScene.time.delayedCall(COOP_REPLAY_WATCHDOG_MS, finish);
+      globalScene.playSound("se/pb_throw");
+
+      globalScene.tweens.add({
+        // Throw the ball in (no mon enters - the captured enemy is already gone).
+        targets: pokeball,
+        x: { value: targetX, ease: "Linear" },
+        y: { value: targetY, ease: "Cubic.easeOut" },
+        duration: 500,
+        onComplete: () => {
+          try {
+            const pb = pokeball;
+            if (pb == null) {
+              finish();
+              return;
+            }
+            // Ball opens.
+            pb.setTexture("pb", `${pokeballAtlasKey}_opening`);
+            globalScene.time.delayedCall(17, () => {
+              try {
+                pb.setTexture("pb", `${pokeballAtlasKey}_open`);
+              } catch {
+                /* texture swap best-effort */
+              }
+            });
+            globalScene.playSound("se/pb_rel");
+            globalScene.animations.addPokeballOpenParticles(pb.x, pb.y, pokeballType);
+            // A fixed bounce/shake (the exact shake count is out of scope), then lock + stars + message.
+            doPokeballBounceAnim(pb, 16, 72, 350, () => {
+              try {
+                globalScene.playSound("se/pb_lock");
+                globalScene.animations.addPokeballCaptureStars(pb);
+                const species = getPokemonSpecies(this.presentation.speciesId);
+                globalScene.ui.showText(
+                  i18next.t("battle:pokemonCaught", { pokemonName: species.name }),
+                  null,
+                  finish,
+                  null,
+                  true,
+                );
+              } catch {
+                coopWarn("replay", "present capture lock/stars/message threw -> finish (handled)");
+                finish();
+              }
+            });
+          } catch {
+            coopWarn("replay", "present capture open threw -> finish (handled)");
+            finish();
+          }
+        },
+      });
+    } catch {
+      // A bad payload (unknown ball / species, missing sprite) must never strand the queue.
+      coopWarn("replay", "present capture threw -> finish (handled)");
       finish();
     }
   }
@@ -598,7 +818,14 @@ export class CoopFinalizeTurnPhase extends Phase {
   private finishTurn(): void {
     try {
       const wave = globalScene.currentBattle.waveIndex;
-      const waveEnding = coopWaveAdvanceSignaledFor(wave);
+      // #698 softlock: treat a still-PENDING wave-advance as terminal too, not only an already-signaled
+      // one. When the host wins a wave in a SINGLE turn, the win arrives + is consumed in THIS same
+      // finalize (lastResolvedWave is still behind, so coopWaveAdvanceSignaledFor is false). Without the
+      // pending peek we fall into the turn-advance branch and incrementTurn() starts a phantom next turn
+      // the host already passed -> the guest awaits a turn-N+1 resolution the host (now in the reward
+      // shop) never sends -> softlock right after the battle. Peeking the pending advance routes that
+      // case through the TERMINAL branch (run the victory tail, NO turn advance), like a multi-turn wave.
+      const waveEnding = coopWaveAdvanceSignaledFor(wave) || coopHasPendingWaveAdvance();
       if (waveEnding) {
         // FINAL turn of an already-/about-to-be-resolved wave: be TERMINAL. Run the wave-advance tail
         // (VictoryPhase / BattleEnd / GameOver - exactly once, one-shot + wave-guarded) and DO NOT queue
@@ -631,7 +858,10 @@ export class CoopFinalizeTurnPhase extends Phase {
       }
     } catch {
       // The turn-end queue / wave-advance is best-effort; a failure here must never hang the turn.
-      coopWarn("replay", `guest finalize turn=${this.turn}: finishTurn (queue turn-end / wave-advance) threw (handled)`);
+      coopWarn(
+        "replay",
+        `guest finalize turn=${this.turn}: finishTurn (queue turn-end / wave-advance) threw (handled)`,
+      );
     }
     coopLog("replay", `guest finalize turn=${this.turn}: END (checkpoint applied, turn-end queued)`);
     this.end();
@@ -672,6 +902,13 @@ export class CoopFinalizeTurnPhase extends Phase {
       switch (pending.outcome) {
         case "win":
         case "capture": {
+          // Co-op (#689 capture animation): play the cosmetic ball-throw + "caught!" line FIRST so it
+          // drains AHEAD of the VictoryPhase tail pushed below (FIFO). PRESENTATION ONLY - it touches
+          // no hashed state. Only present when the host carried it (a KEPT catch); absent for a "win"
+          // or a challenge-blocked catch (host-gated).
+          if (pending.capturePresentation != null) {
+            globalScene.phaseManager.pushNew("CoopCaptureReplayPhase", pending.capturePresentation);
+          }
           // Co-op (#633 B1/B2/B3): adopt the host's post-catch party BEFORE the VictoryPhase tail so
           // the caught mon is present (B1), attributed to the host-resolved owner (B2), and credited
           // to the guest's OWN dex (B3). Safe at this boundary: it only reconciles the BENCH (off-field

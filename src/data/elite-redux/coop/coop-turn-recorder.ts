@@ -39,6 +39,34 @@ interface CoopRecording {
 let recording: CoopRecording | null = null;
 
 /**
+ * Co-op host MESSAGE-RECORDING SUPPRESSION (#691, host-language leak). The guest REGENERATES the two
+ * dominant battle lines ("X used Y!" + "X fainted!") in its OWN language from the structured `moveUsed`
+ * / `faint` events; so the host must NOT also stream the host-language `message` line for those, or the
+ * guest would double-render (host-language + guest-language). When this flag is set, `recordCoopMessage`
+ * is a no-op BEFORE building the event (so `recording.seq` is NOT advanced for a suppressed line - the
+ * seq==batch-index invariant the merge in coop-replay-turn-phase.ts relies on is preserved). The host
+ * still SHOWS its own message locally; suppression only stops RECORDING/streaming it. Inert outside a
+ * recording (solo / non-host) and never touches any non-`message` event.
+ */
+let suppressMessageRecording = false;
+
+/**
+ * HOST: run `fn` with `message`-event RECORDING suppressed (the queued/shown message is unaffected; only
+ * the recorder tap is gated). try/finally restores the prior flag even if `fn` throws, so a throwing
+ * narrate can never leave recording permanently suppressed. Reentrant-safe (restores the PREVIOUS value,
+ * not a hardcoded false).
+ */
+export function withCoopMessageRecordingSuppressed<T>(fn: () => T): T {
+  const prev = suppressMessageRecording;
+  suppressMessageRecording = true;
+  try {
+    return fn();
+  } finally {
+    suppressMessageRecording = prev;
+  }
+}
+
+/**
  * HOST live-event emitter (#633, animation layer LIVE): a callback the runtime registers so each event
  * is streamed the INSTANT it is recorded (per-turn monotonic `seq`), not only batched at turn-end. Kept
  * as an injected hook so this recorder stays engine-free (it imports only the transport TYPE); the
@@ -79,8 +107,16 @@ export function isCoopRecording(): boolean {
   return recording != null;
 }
 
-/** HOST: record one narration line as a `message` event (no-op when not recording). */
+/**
+ * HOST: record one narration line as a `message` event (no-op when not recording). When message
+ * recording is SUPPRESSED (#691, inside {@linkcode withCoopMessageRecordingSuppressed}), return BEFORE
+ * building the event so `recording.seq` is not advanced for the skipped line - keeping the seq==batch-index
+ * invariant intact. The guest regenerates that line in its own language from the structured event instead.
+ */
 export function recordCoopMessage(text: string): void {
+  if (suppressMessageRecording) {
+    return;
+  }
   recordCoopEvent({ k: "message", text });
 }
 

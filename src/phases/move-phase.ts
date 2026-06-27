@@ -5,7 +5,11 @@ import { getPokemonNameWithAffix } from "#app/messages";
 import Overrides from "#app/overrides";
 import { PokemonPhase } from "#app/phases/pokemon-phase";
 import { CenterOfAttentionTag, type EncoreTag } from "#data/battler-tags";
-import { isCoopRecording, recordCoopEvent } from "#data/elite-redux/coop/coop-turn-recorder";
+import {
+  isCoopRecording,
+  recordCoopEvent,
+  withCoopMessageRecordingSuppressed,
+} from "#data/elite-redux/coop/coop-turn-recorder";
 import { SpeciesFormChangePreMoveTrigger } from "#data/form-change-triggers";
 import { getStatusEffectActivationText } from "#data/status-effect";
 import { getTerrainBlockMessage } from "#data/terrain";
@@ -695,13 +699,26 @@ export class MovePhase extends PokemonPhase {
     this.moveHistoryEntry.move = moveId;
 
     // TODO: This should be done by the move...
-    globalScene.phaseManager.queueMessage(
-      i18next.t(isReflected(this.useMode) ? "battle:magicCoatActivated" : "battle:useMove", {
-        pokemonNameWithAffix: getPokemonNameWithAffix(pokemon),
-        moveName: pokemonMove.getName(),
-      }),
-      500,
-    );
+    // #691 (host-language leak): the guest REGENERATES "X used Y!" in its OWN language from the
+    // `moveUsed` event, so the host must NOT also stream its (host-language) `useMove` line - suppress
+    // RECORDING it (the message is still SHOWN locally; only the recorder tap is gated). Suppress ONLY
+    // the plain `useMove` variant: the `magicCoatActivated` variant is NOT 1:1 with a moveUsed event, so
+    // it stays verbatim host text (documented partial scope). Gated on `isCoopRecording()` so solo / host
+    // / lockstep call `narrate()` directly with byte-identical args.
+    const reflected = isReflected(this.useMode);
+    const narrate = () =>
+      globalScene.phaseManager.queueMessage(
+        i18next.t(reflected ? "battle:magicCoatActivated" : "battle:useMove", {
+          pokemonNameWithAffix: getPokemonNameWithAffix(pokemon),
+          moveName: pokemonMove.getName(),
+        }),
+        500,
+      );
+    if (isCoopRecording() && !reflected) {
+      withCoopMessageRecordingSuppressed(narrate);
+    } else {
+      narrate();
+    }
 
     // Co-op host turn recorder (#633, TRACK-2 Phase B - animation layer): record the move usage as a
     // structured `moveUsed` event so the AUTHORITATIVE guest can play the RNG-free move animation. The

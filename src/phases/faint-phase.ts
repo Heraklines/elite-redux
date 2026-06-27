@@ -3,6 +3,7 @@ import { globalScene } from "#app/global-scene";
 import { getPokemonNameWithAffix } from "#app/messages";
 import { allMoves } from "#data/data-lists";
 import { classicFinalBossDialogue } from "#data/dialogue";
+import { isCoopRecording, withCoopMessageRecordingSuppressed } from "#data/elite-redux/coop/coop-turn-recorder";
 import { erBalanceNum } from "#data/elite-redux/er-balance-tuning";
 import { getErBiomeRule } from "#data/elite-redux/er-biome-rules";
 import { recordErStreakFaint } from "#data/elite-redux/er-money-streak";
@@ -138,13 +139,23 @@ export class FaintPhase extends PokemonPhase {
       });
     }
 
-    globalScene.phaseManager.queueMessage(
-      i18next.t("battle:fainted", {
-        pokemonNameWithAffix: getPokemonNameWithAffix(pokemon),
-      }),
-      null,
-      true,
-    );
+    // #691 (host-language leak): the guest REGENERATES "X fainted!" in its OWN language from the `faint`
+    // event (narrate=true), so the host must NOT also stream its (host-language) `fainted` line - suppress
+    // RECORDING it (still SHOWN locally; only the recorder tap is gated). Gated on `isCoopRecording()` so
+    // solo / host / lockstep call `narrate()` directly with byte-identical args.
+    const narrate = () =>
+      globalScene.phaseManager.queueMessage(
+        i18next.t("battle:fainted", {
+          pokemonNameWithAffix: getPokemonNameWithAffix(pokemon),
+        }),
+        null,
+        true,
+      );
+    if (isCoopRecording()) {
+      withCoopMessageRecordingSuppressed(narrate);
+    } else {
+      narrate();
+    }
     globalScene.triggerPokemonFormChange(pokemon, SpeciesFormChangeActiveTrigger, true);
 
     pokemon.resetTera();

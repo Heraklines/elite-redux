@@ -396,8 +396,16 @@ export type CoopBattleEvent =
   | { k: "moveUsed"; bi: number; moveId: number; targets: number[] }
   /** Set + tween a mon's hp to this value. */
   | { k: "hp"; bi: number; hp: number; maxHp: number }
-  /** A mon fainted. */
-  | { k: "faint"; bi: number }
+  /**
+   * A mon fainted. `narrate` (#691, additive optional) is true IFF the host shows an "X fainted!" message
+   * for this KO (a FaintPhase runs - either inline at the damage chokepoint or deferred via the move's
+   * MoveEffectPhase.onFaintTarget). The guest regenerates the faint line in its OWN language IFF `narrate
+   * === true`, so it narrates exactly the KOs the host narrated. The host SUPPRESSES streaming its own
+   * host-language `fainted` message for these, so the guest's regenerated line is the sole copy. Absent on
+   * an older host -> the guest treats it as falsy and does not narrate (today's silent behavior); the flag
+   * stays on the wire (not hardcoded on the guest) so the gating + forward-compat semantics hold.
+   */
+  | { k: "faint"; bi: number; narrate?: boolean }
   /** A mon's stat stage changed to this absolute value (`Stat` enum). */
   | { k: "statStage"; bi: number; stat: number; value: number }
   /** A mon's status changed (`StatusEffect` enum, 0 = cured). */
@@ -495,6 +503,25 @@ export type CoopInteractionOutcome =
  *  - `gameOver` the run ended (the host's `GameOverPhase`)
  */
 export type CoopWaveOutcome = "win" | "capture" | "flee" | "gameOver";
+
+/**
+ * Co-op authoritative CAPTURE PRESENTATION (#689): the tiny cosmetic payload the HOST streams
+ * alongside a `waveResolved("capture")` so the GUEST - a pure renderer that never runs the
+ * host-only `AttemptCapturePhase` - can play the ball-throw animation and show a LOCALLY-localized
+ * "X was caught!" line. PRESENTATION ONLY: the authoritative party / dex state still rides
+ * `captureParty` + the checkpoint; this only drives the cosmetic ball animation + message. A
+ * SUCCESSFUL catch is the only thing that ever broadcasts `waveResolved("capture")`, so there is
+ * no "broke free" arm on the wire (a challenge-blocked catch is host-gated to NOT carry this).
+ * All plain JSON (enum VALUES / ids), so the transport stays the lowest layer.
+ */
+export interface CoopCapturePresentation {
+  /** `PokeballType` enum value the ball animation renders. */
+  pokeballType: number;
+  /** `BattlerIndex` the ball was thrown at (a cosmetic throw-anchor only; never mutated). */
+  targetBattlerIndex: number;
+  /** Root `speciesId` for the LOCALLY-localized "X was caught!" line (guest's own language). */
+  speciesId: number;
+}
 
 /**
  * The co-op wire protocol: a discriminated union on `t`. This GROWS per
@@ -750,8 +777,20 @@ export type CoopMessage =
    * guest reconciles its bench to match - adding the caught mon (with the host-resolved `coopOwner`,
    * B2) and crediting the catch to its OWN gameData (B3) - because a pure renderer never runs the
    * `AttemptCapturePhase` that grows the party. Absent for non-capture outcomes (a hard no-op).
+   *
+   * Co-op (#689 capture animation): on a SUCCESSFUL `"capture"` the host ALSO carries a tiny
+   * cosmetic {@linkcode CoopCapturePresentation} so the guest plays the ball-throw animation +
+   * a locally-localized "X was caught!" line (the guest never runs `AttemptCapturePhase`, which
+   * owns that presentation). Host-gated to a KEPT catch only (a challenge-blocked catch omits it,
+   * so the guest never shows a "caught!" line for a mon that was not added). Absent otherwise.
    */
-  | { t: "waveResolved"; wave: number; outcome: CoopWaveOutcome; captureParty?: string[] | undefined }
+  | {
+      t: "waveResolved";
+      wave: number;
+      outcome: CoopWaveOutcome;
+      captureParty?: string[] | undefined;
+      capturePresentation?: CoopCapturePresentation | undefined;
+    }
   /**
    * Host -> guest (#633 B5, authoritative EXP): the host's SETTLED per-slot exp / level / moveset
    * after the wave's whole exp/level/evolution chain drained (emitted from the host's
@@ -833,7 +872,7 @@ function summarizeCoopMessage(msg: CoopMessage): string {
     case "pong":
       return `ts=${msg.ts}`;
     case "waveResolved":
-      return `wave=${msg.wave} outcome=${msg.outcome} captureParty=${msg.captureParty?.length ?? "-"}`;
+      return `wave=${msg.wave} outcome=${msg.outcome} captureParty=${msg.captureParty?.length ?? "-"} cap=${msg.capturePresentation != null ? `sp${msg.capturePresentation.speciesId}` : "-"}`;
     case "expResolved":
       return `wave=${msg.wave} deltas=${msg.deltas.length}`;
     case "dataFingerprint":

@@ -297,7 +297,21 @@ export class AttemptCapturePhase extends PokemonPhase {
           // which clears the wave. Signal the guest renderer so it runs the same post-battle tail
           // (it removes the captured enemy without a FaintPhase, so it never queues that tail
           // itself). Hard no-op for solo / non-host / lockstep; guarded against a double-advance.
-          broadcastCoopWaveResolved("capture");
+          //
+          // Co-op (#689 capture animation): ALSO carry a tiny cosmetic presentation so the guest
+          // plays the ball-throw animation + a locally-localized "X was caught!" line (it never
+          // runs this host-only phase, which owns that presentation). Gate it on the SAME
+          // `addStatus.value` (mon actually KEPT / added to party) that distinguishes a real catch
+          // from a challenge-blocked one - a challenge-blocked catch shows the host
+          // `pokemonCaughtButChallenge` and must NOT show the guest a "caught!" line.
+          const capturePresentation = addStatus.value
+            ? {
+                pokeballType: this.pokeballType,
+                targetBattlerIndex: this.battlerIndex,
+                speciesId: pokemon.species.getRootSpeciesId(true),
+              }
+            : undefined;
+          broadcastCoopWaveResolved("capture", capturePresentation);
           globalScene.phaseManager.unshiftNew("VictoryPhase", this.battlerIndex);
           globalScene.pokemonInfoContainer.hide();
           this.removePb();

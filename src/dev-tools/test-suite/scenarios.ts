@@ -10243,4 +10243,114 @@ export const DEV_SCENARIOS: DevScenario[] = [
       ];
     },
   },
+  // Co-op - GUEST sees the catch animation + "caught!" line (#689)
+  {
+    label: "Co-op: guest catch animation + caught! (#689)",
+    description:
+      "#689 co-op GUEST CATCH PRESENTATION - the HOST runs AttemptCapturePhase (ball throw +\n"
+      + "shake + capture stars + 'X was caught!'); the authoritative GUEST is a pure renderer that\n"
+      + "never runs it, so its catch was SILENT (the mon just appeared in the party). The host now\n"
+      + "streams a tiny cosmetic presentation on waveResolved('capture') and the guest plays the\n"
+      + "ball animation + a LOCALLY-localized 'caught!' line via a hardened CoopCaptureReplayPhase.\n"
+      + "TWO CLIENTS (host + guest): a single wild Pidgey at low HP, your lead holds Poke Balls.\n"
+      + "DO: on the HOST, weaken the wild mon (a soft hit) then throw a Poke Ball and catch it.\n"
+      + "EXPECT (GUEST screen): the GUEST now SEES a ball thrown in, capture stars, and a\n"
+      + "'Pidgey was caught!' line in the GUEST's language - NOT a silent party grow. The mon still\n"
+      + "lands in both parties (the handshake is unchanged), the message shows EXACTLY ONCE (no\n"
+      + "double 'caught!'), and nothing hangs. A CHALLENGE-BLOCKED catch (if a roster challenge is\n"
+      + "active) shows NO guest 'caught!' line (host-gated). Console (host): a single\n"
+      + "[coop:replay] host SEND waveResolved ... cap=sp<id> line.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 50,
+        BATTLE_STYLE_OVERRIDE: "single",
+        // A wild single battle with a frail catchable foe; plenty of Poke Balls to throw.
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.PIDGEY,
+        ENEMY_LEVEL_OVERRIDE: 5,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+      });
+      return [
+        makeStarter(SpeciesId.SNORLAX, {
+          moveset: [MoveId.FALSE_SWIPE, MoveId.TACKLE, MoveId.REST, MoveId.BODY_SLAM],
+        }),
+      ];
+    },
+    onBattleStart: () => {
+      // Flip the live run into authoritative co-op so the host's capture broadcast carries the
+      // new cosmetic presentation. On the HOST client this scenario tags the lead as host-owned;
+      // pair with a real GUEST client to watch CoopCaptureReplayPhase render the catch.
+      globalScene.gameMode = getGameMode(GameModes.COOP);
+      if (getCoopController() == null) {
+        startLocalCoopSession({ username: loggedInUser?.username, netcodeMode: "authoritative" });
+      }
+      const party = globalScene.getPlayerParty();
+      for (const mon of party) {
+        mon.coopOwner = "host";
+      }
+      console.log(
+        "[#689 co-op catch-anim] local role="
+          + getCoopController()?.role
+          + " (HOST: weaken the wild Pidgey then throw a Poke Ball; the GUEST client should SEE the"
+          + " ball + capture stars + a localized 'caught!' line - previously silent)",
+      );
+    },
+  },
+  // Co-op - GUEST regenerates "X used Y!" / "X fainted!" in its OWN language (#691)
+  {
+    label: "Co-op: guest move/faint lines in its own language (#691)",
+    description:
+      "#691 host-language leak. In authoritative co-op all battle narration is recorded AFTER the\n"
+      + "host localizes it, so the guest used to read EVERY line in the HOST's language. This fix has\n"
+      + "the guest REGENERATE the two dominant lines ('X used Y!' and 'X fainted!') in its OWN\n"
+      + "language from the structured moveUsed/faint events, and the host stops streaming its host-\n"
+      + "language duplicate of exactly those two lines.\n"
+      + "SETUP (two clients): Client A = HOST, set Language = Deutsch (German) in Options. Client B =\n"
+      + "GUEST, set Language = English. Pair them into an AUTHORITATIVE co-op session and launch this\n"
+      + "scenario.\n"
+      + "DO: on the HOST, have a player mon use Tackle on the frail Magikarp so it faints. Watch the\n"
+      + "GUEST's battle log.\n"
+      + "EXPECT (GUEST, in ENGLISH): 'Snorlax used Tackle!' then 'The opposing Magikarp fainted!' -\n"
+      + "NOT the German 'setzt Tackle ein!' / 'wurde besiegt!'. The HOST still sees its own German\n"
+      + "lines. KNOWN BOUNDED SCOPE: other lines (stat-stage, status, weather, ability/item, miss/\n"
+      + "crit/super-effective, and a Magic-Coat REFLECTED move) may STILL show in German on the guest\n"
+      + "- only the two highest-volume lines are relocalized.\n"
+      + "ALSO VERIFY (no regression): the battle stays in sync (no resync storm) - the regenerated\n"
+      + "lines are purely cosmetic (NOT in the per-turn checksum); an ignoreFaintPhase KO shows NO\n"
+      + "extra faint line on the guest; a captured (not KO'd) mon shows NO spurious 'fainted!' line.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 50,
+        BATTLE_STYLE_OVERRIDE: "double",
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.MAGIKARP,
+        ENEMY_LEVEL_OVERRIDE: 5,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+      });
+      return [
+        makeStarter(SpeciesId.SNORLAX, {
+          moveset: [MoveId.TACKLE, MoveId.BODY_SLAM, MoveId.REST, MoveId.PROTECT],
+        }),
+        makeStarter(SpeciesId.PIKACHU, {
+          moveset: [MoveId.THUNDERBOLT, MoveId.QUICK_ATTACK, MoveId.IRON_TAIL, MoveId.THUNDER_WAVE],
+        }),
+      ];
+    },
+    onBattleStart: () => {
+      // Flip the live run into authoritative co-op so the host RECORDS its turn with the new move/
+      // faint message suppression. Pair with a real GUEST client (set to a different language) to
+      // confirm the guest regenerates the two dominant lines in ITS locale.
+      globalScene.gameMode = getGameMode(GameModes.COOP);
+      if (getCoopController() == null) {
+        startLocalCoopSession({ username: loggedInUser?.username, netcodeMode: "authoritative" });
+      }
+      const party = globalScene.getPlayerParty();
+      if (party[0]) {
+        party[0].coopOwner = "host";
+      }
+      if (party[1]) {
+        party[1].coopOwner = "guest";
+      }
+    },
+  },
 ];

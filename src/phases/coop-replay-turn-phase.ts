@@ -7,8 +7,13 @@
 import { globalScene } from "#app/global-scene";
 import { Phase } from "#app/phase";
 import { coopLog, coopWarn, isCoopDebug } from "#data/elite-redux/coop/coop-debug";
-import { getCoopBattleStreamer, isCoopAuthoritativeGuest } from "#data/elite-redux/coop/coop-runtime";
+import {
+  coopHasPendingWaveAdvance,
+  getCoopBattleStreamer,
+  isCoopAuthoritativeGuest,
+} from "#data/elite-redux/coop/coop-runtime";
 import type { CoopBattleEvent } from "#data/elite-redux/coop/coop-transport";
+import { coopNarrateMoveUsed } from "#phases/coop-replay-phases";
 
 /**
  * Co-op GUEST turn REPLAY (#633, TRACK-2 Phase B). The guest is a pure renderer: it
@@ -76,7 +81,10 @@ export class CoopReplayTurnPhase extends Phase {
           // has animated. THE STRUCTURAL GUARANTEE: applyCoopCheckpoint runs ONLY in
           // CoopFinalizeTurnPhase, which is LAST on this tree level - it can never leaveField a mon
           // whose faint has not animated. Never collapse this back to a synchronous applyCoopCheckpoint.
-          coopLog("replay", `guest replay turn=${this.turn}: unshift CoopFinalizeTurnPhase (checkpoint apply deferred)`);
+          coopLog(
+            "replay",
+            `guest replay turn=${this.turn}: unshift CoopFinalizeTurnPhase (checkpoint apply deferred)`,
+          );
           globalScene.phaseManager.unshiftNew(
             "CoopFinalizeTurnPhase",
             this.turn,
@@ -93,7 +101,10 @@ export class CoopReplayTurnPhase extends Phase {
       }
       // No resolution arrived (host stall) - end the turn defensively; the guest re-syncs on the
       // next checkpoint rather than hanging forever.
-      coopWarn("replay", `guest replay turn=${this.turn}: ending without applied resolution (stall/payload-error) -> finishTurnNoStream`);
+      coopWarn(
+        "replay",
+        `guest replay turn=${this.turn}: ending without applied resolution (stall/payload-error) -> finishTurnNoStream`,
+      );
       this.finishTurnNoStream();
     });
   }
@@ -173,6 +184,11 @@ export class CoopReplayTurnPhase extends Phase {
             pm.queueMessage(event.text);
             break;
           case "moveUsed":
+            // #691 (host-language leak): regenerate "X used Y!" in the GUEST'S language BEFORE unshifting
+            // the move-anim phase. The host suppressed streaming its own (host-language) useMove message,
+            // so this queueMessage is the sole source of the line. The regenerated line lands at the
+            // moveUsed position (one slot after the original message position - adjacent, cosmetic).
+            coopNarrateMoveUsed(event.bi, event.moveId);
             pm.unshiftNew("CoopMoveAnimReplayPhase", event.bi, event.moveId, [...event.targets]);
             break;
           case "hp": {
@@ -190,7 +206,10 @@ export class CoopReplayTurnPhase extends Phase {
             pm.unshiftNew("CoopStatusReplayPhase", event.bi, event.status);
             break;
           case "faint":
-            pm.unshiftNew("CoopFaintReplayPhase", event.bi);
+            // #691 (host-language leak): pass the `narrate` flag so the faint phase regenerates the
+            // "X fainted!" line in the GUEST'S language ONLY for KOs the host actually narrated (a real
+            // FaintPhase ran, i.e. `!ignoreFaintPhase`). Older host (no `narrate`) -> falsy -> no line.
+            pm.unshiftNew("CoopFaintReplayPhase", event.bi, event.narrate === true);
             break;
           default:
             // weather / terrain / switch ride the authoritative checkpoint, not the animation pump.
@@ -227,8 +246,16 @@ export class CoopReplayTurnPhase extends Phase {
       // the original turn-end run. (CoopReplayTurnPhase is guest-only; the gate is for symmetry and so a
       // future lockstep guest is unaffected.)
       if (isCoopAuthoritativeGuest()) {
-        globalScene.currentBattle.incrementTurn();
-        globalScene.phaseManager.dynamicQueueManager.clearLastTurnOrder();
+        // #698 softlock: do NOT advance the turn when a wave-advance is already PENDING (the host has won
+        // the wave). Incrementing here would start a phantom turn N+1 the host already passed -> the guest
+        // then awaits a turn-N+1 resolution the host (now in the reward shop) never sends -> softlock right
+        // after the battle. This is the same hazard the streamed finishTurn guards via
+        // coopHasPendingWaveAdvance; mirror it here. With an advance pending, end the turn flat - the
+        // host's pending waveResolved drives the post-battle tail on the next finalize / checkpoint resync.
+        if (!coopHasPendingWaveAdvance()) {
+          globalScene.currentBattle.incrementTurn();
+          globalScene.phaseManager.dynamicQueueManager.clearLastTurnOrder();
+        }
       } else {
         globalScene.phaseManager.queueTurnEndPhases();
       }

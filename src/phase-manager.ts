@@ -32,6 +32,7 @@ import { CoopReplayLearnMovePhase } from "#phases/coop-replay-learn-move-phase";
 import { CoopReplayMePhase } from "#phases/coop-replay-me-phase";
 import {
   CoopApplyResyncPhase,
+  CoopCaptureReplayPhase,
   CoopFaintReplayPhase,
   CoopFinalizeTurnPhase,
   CoopHpDrainReplayPhase,
@@ -179,6 +180,7 @@ const PHASES = Object.freeze({
   CoopReplayMePhase,
   CoopReplayLearnMovePhase,
   CoopApplyResyncPhase,
+  CoopCaptureReplayPhase,
   CoopFinalizeTurnPhase,
   CoopFaintReplayPhase,
   CoopHpDrainReplayPhase,

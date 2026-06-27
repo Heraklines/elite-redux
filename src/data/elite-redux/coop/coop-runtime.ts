@@ -39,6 +39,7 @@ import { coopOwnerOfFieldIndex } from "#data/elite-redux/coop/coop-session";
 import { CoopSessionController } from "#data/elite-redux/coop/coop-session-controller";
 import { SpoofGuest } from "#data/elite-redux/coop/coop-spoof-guest";
 import type {
+  CoopCapturePresentation,
   CoopExpDelta,
   CoopFullBattleSnapshot,
   CoopNetcodeMode,
@@ -174,7 +175,12 @@ function wireCoopEnemyPartyResponder(controller: CoopSessionController, battleSt
  * on receipt; {@linkcode consumeCoopPendingWaveAdvance} hands it to the guest's
  * `CoopReplayTurnPhase` at the next SAFE turn boundary (NEVER mid-replay) so it runs the tail.
  */
-let pendingWaveAdvance: { wave: number; outcome: CoopWaveOutcome; captureParty?: string[] | undefined } | null = null;
+let pendingWaveAdvance: {
+  wave: number;
+  outcome: CoopWaveOutcome;
+  captureParty?: string[] | undefined;
+  capturePresentation?: CoopCapturePresentation | undefined;
+} | null = null;
 /** The last wave the guest already ran the victory tail for (guards a duplicate `waveResolved`). */
 let lastResolvedWave = -1;
 
@@ -213,10 +219,22 @@ export function consumeCoopPendingExpDeltas(): CoopExpDelta[] | null {
  * already advanced past. Called by `CoopReplayTurnPhase` at a safe boundary. Bumps the
  * double-advance guard so a duplicate `waveResolved` for the same wave is a no-op.
  */
+/**
+ * PEEK (non-consuming, #698 softlock): whether a wave-advance is pending for a wave the guest has NOT
+ * yet advanced past. The guest's finalize uses this to take the TERMINAL path (run the victory tail,
+ * do NOT advance the turn) even when the win is consumed in the SAME turn it arrives - otherwise the
+ * minimal turn-advance starts a phantom next turn the host already passed (the guest then awaits a
+ * turn-N+1 resolution the host - now in the reward shop - never sends -> softlock after the battle).
+ */
+export function coopHasPendingWaveAdvance(): boolean {
+  return pendingWaveAdvance != null && pendingWaveAdvance.wave > lastResolvedWave;
+}
+
 export function consumeCoopPendingWaveAdvance(): {
   wave: number;
   outcome: CoopWaveOutcome;
   captureParty?: string[] | undefined;
+  capturePresentation?: CoopCapturePresentation | undefined;
 } | null {
   const pending = pendingWaveAdvance;
   pendingWaveAdvance = null;
@@ -268,17 +286,32 @@ export function coopWaveAdvanceSignaledFor(wave: number): boolean {
  * pending unchanged (a stale earlier-wave signal). Pure - exported for unit testing.
  */
 export function mergeCoopPendingWaveAdvance(
-  prev: { wave: number; outcome: CoopWaveOutcome; captureParty?: string[] | undefined } | null,
+  prev: {
+    wave: number;
+    outcome: CoopWaveOutcome;
+    captureParty?: string[] | undefined;
+    capturePresentation?: CoopCapturePresentation | undefined;
+  } | null,
   wave: number,
   outcome: CoopWaveOutcome,
   captureParty: string[] | undefined,
-): { wave: number; outcome: CoopWaveOutcome; captureParty?: string[] | undefined } | null {
+  capturePresentation?: CoopCapturePresentation | undefined,
+): {
+  wave: number;
+  outcome: CoopWaveOutcome;
+  captureParty?: string[] | undefined;
+  capturePresentation?: CoopCapturePresentation | undefined;
+} | null {
   if (prev != null && wave < prev.wave) {
     return null; // a stale earlier-wave signal: keep the existing later-wave pending.
   }
   // Carry forward a captureParty from the same wave's other message (either arrival order).
   const carriedCapture = captureParty ?? (prev != null && prev.wave === wave ? prev.captureParty : undefined);
-  return { wave, outcome, captureParty: carriedCapture };
+  // Carry the cosmetic capturePresentation across a same-wave supersession EXACTLY like captureParty,
+  // so a "win" arriving after the "capture" in a double battle does not drop the ball animation (#689).
+  const carriedPresentation =
+    capturePresentation ?? (prev != null && prev.wave === wave ? prev.capturePresentation : undefined);
+  return { wave, outcome, captureParty: carriedCapture, capturePresentation: carriedPresentation };
 }
 
 /**
@@ -289,7 +322,7 @@ export function mergeCoopPendingWaveAdvance(
  * live GUEST role in the AUTHORITATIVE netcode; a host / solo / lockstep client ignores it.
  */
 function wireCoopWaveResolved(controller: CoopSessionController, battleStream: CoopBattleStreamer): void {
-  battleStream.onWaveResolved((wave, outcome, captureParty) => {
+  battleStream.onWaveResolved((wave, outcome, captureParty, capturePresentation) => {
     coopLog(
       "runtime",
       `recv waveResolved wave=${wave} outcome=${outcome} role=${controller.role} netcode=${getCoopNetcodeMode()}`,
@@ -305,7 +338,7 @@ function wireCoopWaveResolved(controller: CoopSessionController, battleStream: C
     }
     // Latest signal wins (a later wave supersedes an unconsumed earlier one), but a captureParty is
     // PRESERVED across a same-wave supersession (see mergeCoopPendingWaveAdvance).
-    const merged = mergeCoopPendingWaveAdvance(pendingWaveAdvance, wave, outcome, captureParty);
+    const merged = mergeCoopPendingWaveAdvance(pendingWaveAdvance, wave, outcome, captureParty, capturePresentation);
     if (merged == null) {
       coopWarn("runtime", `waveResolved wave=${wave} stale vs pending=${pendingWaveAdvance?.wave} -> kept pending`);
     } else {
@@ -605,7 +638,7 @@ export function broadcastCoopOwnSlotCommand(fieldIndex: number, command: Seriali
  * `currentBattle.waveIndex`. Hard no-op unless we are in a live AUTHORITATIVE co-op run as the
  * HOST, so solo / non-host / lockstep play is byte-for-byte unaffected. Best-effort + guarded.
  */
-export function broadcastCoopWaveResolved(outcome: CoopWaveOutcome): void {
+export function broadcastCoopWaveResolved(outcome: CoopWaveOutcome, presentation?: CoopCapturePresentation): void {
   if (!globalScene.gameMode.isCoop || active == null || getCoopNetcodeMode() !== "authoritative") {
     return;
   }
@@ -620,9 +653,9 @@ export function broadcastCoopWaveResolved(outcome: CoopWaveOutcome): void {
     const captureParty = outcome === "capture" ? captureCoopCaptureParty() : undefined;
     coopLog(
       "runtime",
-      `send waveResolved wave=${wave} outcome=${outcome}${captureParty == null ? "" : ` captureParty=${captureParty.length}`} (host)`,
+      `send waveResolved wave=${wave} outcome=${outcome}${captureParty == null ? "" : ` captureParty=${captureParty.length}`}${presentation == null ? "" : ` cap=sp${presentation.speciesId}`} (host)`,
     );
-    active.battleStream.sendWaveResolved(wave, outcome, captureParty);
+    active.battleStream.sendWaveResolved(wave, outcome, captureParty, presentation);
   } catch (e) {
     /* a wave-resolved send failure must never break the host's post-battle flow */
     coopWarn("runtime", `send waveResolved failed wave=${wave} outcome=${outcome}`, e);

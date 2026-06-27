@@ -26,6 +26,7 @@ import { coopLog, coopWarn, isCoopDebug } from "#data/elite-redux/coop/coop-debu
 import type {
   CoopBattleCheckpoint,
   CoopBattleEvent,
+  CoopCapturePresentation,
   CoopExpDelta,
   CoopMessage,
   CoopSerializedEnemy,
@@ -144,8 +145,14 @@ export class CoopBattleStreamer {
   /** GUEST: handler for the host's ME narration lines (#633, TRACK-2 Phase C, non-battle ME). */
   private meMessageHandler: ((text: string) => void) | null = null;
   /** GUEST: handler for the host's wave-resolved signal (#633, authoritative wave-advance). */
-  private waveResolvedHandler: ((wave: number, outcome: CoopWaveOutcome, captureParty?: string[]) => void) | null =
-    null;
+  private waveResolvedHandler:
+    | ((
+        wave: number,
+        outcome: CoopWaveOutcome,
+        captureParty?: string[],
+        capturePresentation?: CoopCapturePresentation,
+      ) => void)
+    | null = null;
   /** GUEST: handler for the host's settled post-exp per-slot deltas (#633 B5, authoritative EXP). */
   private expResolvedHandler: ((wave: number, deltas: CoopExpDelta[]) => void) | null = null;
 
@@ -252,12 +259,17 @@ export class CoopBattleStreamer {
    * FaintPhase - uses this to run the normal post-battle tail and reach the next wave (it
    * would otherwise loop the won wave forever). `outcome` is WHY the wave ended.
    */
-  sendWaveResolved(wave: number, outcome: CoopWaveOutcome, captureParty?: string[]): void {
+  sendWaveResolved(
+    wave: number,
+    outcome: CoopWaveOutcome,
+    captureParty?: string[],
+    capturePresentation?: CoopCapturePresentation,
+  ): void {
     coopLog(
       "replay",
-      `host SEND waveResolved wave=${wave} outcome=${outcome}${captureParty != null ? ` captureParty=${captureParty.length}` : ""}`,
+      `host SEND waveResolved wave=${wave} outcome=${outcome}${captureParty != null ? ` captureParty=${captureParty.length}` : ""}${capturePresentation != null ? ` cap=sp${capturePresentation.speciesId}` : ""}`,
     );
-    this.transport.send({ t: "waveResolved", wave, outcome, captureParty });
+    this.transport.send({ t: "waveResolved", wave, outcome, captureParty, capturePresentation });
   }
 
   /**
@@ -586,7 +598,14 @@ export class CoopBattleStreamer {
    * The handler runs the guest's normal post-battle tail so it reaches the next wave's
    * encounter (the pure renderer never queues that tail itself).
    */
-  onWaveResolved(handler: (wave: number, outcome: CoopWaveOutcome, captureParty?: string[]) => void): void {
+  onWaveResolved(
+    handler: (
+      wave: number,
+      outcome: CoopWaveOutcome,
+      captureParty?: string[],
+      capturePresentation?: CoopCapturePresentation,
+    ) => void,
+  ): void {
     coopLog("stream", `guest REGISTER onWaveResolved handler (was=${this.waveResolvedHandler != null})`);
     this.waveResolvedHandler = handler;
   }
@@ -923,12 +942,12 @@ export class CoopBattleStreamer {
         // GUEST: the host cleared/ended this wave - run the normal post-battle tail.
         coopLog(
           "replay",
-          `guest RECV waveResolved wave=${msg.wave} outcome=${msg.outcome}${msg.captureParty != null ? ` captureParty=${msg.captureParty.length}` : ""}`,
+          `guest RECV waveResolved wave=${msg.wave} outcome=${msg.outcome}${msg.captureParty != null ? ` captureParty=${msg.captureParty.length}` : ""}${msg.capturePresentation != null ? ` cap=sp${msg.capturePresentation.speciesId}` : ""}`,
         );
         if (this.waveResolvedHandler == null) {
           coopWarn("replay", `guest RECV waveResolved wave=${msg.wave} DROPPED (no handler registered)`);
         }
-        this.waveResolvedHandler?.(msg.wave, msg.outcome, msg.captureParty);
+        this.waveResolvedHandler?.(msg.wave, msg.outcome, msg.captureParty, msg.capturePresentation);
         return;
       case "expResolved":
         // GUEST: the host's settled post-exp per-slot deltas - the guest adopts them in BattleEndPhase.
