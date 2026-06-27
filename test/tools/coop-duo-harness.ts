@@ -66,6 +66,7 @@
 
 import { Battle } from "#app/battle";
 import { BattleScene } from "#app/battle-scene";
+import { getGameMode } from "#app/game-mode";
 import { globalScene, initGlobalScene } from "#app/global-scene";
 import type { Phase } from "#app/phase";
 import {
@@ -77,9 +78,15 @@ import {
   setCoopMeBattleInteractionCounter,
   setCoopRuntime,
 } from "#data/elite-redux/coop/coop-runtime";
-import type { CoopTransport } from "#data/elite-redux/coop/coop-transport";
+import { COOP_GUEST_FIELD_INDEX, COOP_HOST_FIELD_INDEX } from "#data/elite-redux/coop/coop-session";
+import { type CoopTransport, createLoopbackPair, type SerializedCommand } from "#data/elite-redux/coop/coop-transport";
 import { resetErGhostRunState } from "#data/elite-redux/er-ghost-teams";
+import type { ReplayCommandEvent, ReplayTrace } from "#data/elite-redux/replay-trace";
+import { isReplayCommandEvent, isReplayInteractionEvent, validateReplayTrace } from "#data/elite-redux/replay-trace";
 import { BattleType } from "#enums/battle-type";
+import { BattlerIndex } from "#enums/battler-index";
+import { Command } from "#enums/command";
+import { GameModes } from "#enums/game-modes";
 import type { MysteryEncounterType } from "#enums/mystery-encounter-type";
 import { TrainerSlot } from "#enums/trainer-slot";
 import { EnemyPokemon, PlayerPokemon, type Pokemon } from "#field/pokemon";
@@ -1150,4 +1157,284 @@ export async function drainGuestMeReplayToSettle(replay: Phase): Promise<GuestMe
 export async function driveGuestMeReplay(guestScene: MeReplayPumpScene): Promise<GuestMeReplay> {
   const replay = await startGuestMeReplay(guestScene);
   return drainGuestMeReplayToSettle(replay);
+}
+
+// =============================================================================
+// REPLAY-TRACE LOADER (#record-replay, Phase 1). Replays a captured {@linkcode ReplayTrace} across
+// BOTH real engines in the duo harness so a reported co-op bug reproduces headlessly + a fix can be
+// re-verified. It SEEDS the host run from the trace (seed + roster species + the coop runConfig),
+// flips to co-op via {@linkcode buildDuo}, then walks the trace's ordered events wave-by-wave - feeding
+// each battle COMMAND into the host (the host slot via `game.move.select`; the guest slot via the
+// CoopBattleSync responder) and each INTERACTION via the existing owner/watcher reward drivers - while
+// driving the guest's REAL replay each wave ({@linkcode driveGuestReplayTurn}) and asserting convergence.
+// A no-progress stall THROWS (the hang detector). It REUSES the existing drivers (buildDuo /
+// remirrorWave / driveGuestReplayTurn / driveHostRewardShopOwner / driveGuestRewardWatch) - it does NOT
+// rebuild them. The trace SCHEMA is general (single-player reuse is a thin add); THIS loader is the
+// co-op replayer.
+// =============================================================================
+
+/** The minimal GameManager surface the replay loader drives (so the harness need not import GameManager). */
+export interface ReplayGameManager {
+  scene: BattleScene;
+  override: { battleStyle(s: "single" | "double"): unknown; startingLevel(n: number): unknown };
+  classicMode: { startBattle(...species: number[]): Promise<void> };
+  move: { select(move: number, pkmIndex?: number, target?: number | null): void };
+  phaseInterceptor: { to(target: string, runTarget?: boolean): Promise<void> };
+}
+
+/** A divergence the loader observed while replaying (a non-fatal mismatch surfaced for the test). */
+export interface ReplayDivergence {
+  wave: number;
+  detail: string;
+}
+
+/** The outcome of replaying a {@linkcode ReplayTrace} (a test asserts reproduction off this). */
+export interface ReplayResult {
+  /** Number of waves replayed to completion. */
+  wavesReplayed: number;
+  /** Number of battle-command events fed. */
+  commandsFed: number;
+  /** Number of interaction events applied (reward picks / leaves). */
+  interactionsApplied: number;
+  /** Number of guest full-state resyncs requested across the run (a converged run is bounded). */
+  resyncCount: number;
+  /** Non-fatal divergences observed (empty for a clean reproduction). */
+  divergences: ReplayDivergence[];
+  /** The final interaction counter both controllers reached (asserted equal => lockstep). */
+  finalHostCounter: number;
+  finalGuestCounter: number;
+}
+
+/** Flip a scene into the co-op game mode (the loader's internal `toCoop`, so callers need not pass one). */
+function replayToCoop(scene: BattleScene): void {
+  scene.gameMode = getGameMode(GameModes.COOP);
+}
+
+/** Resolve a captured move SLOT to the live mon's `MoveId` at that slot (the loader stays slot-based). */
+function resolveMoveIdForSlot(mon: Pokemon, moveIndex: number): number {
+  const moveset = mon.getMoveset();
+  const pm = moveset[moveIndex];
+  if (pm == null) {
+    throw new Error(
+      `replay: move slot ${moveIndex} out of range for ${mon.name} (moveset has ${moveset.length} moves)`,
+    );
+  }
+  return pm.moveId;
+}
+
+/**
+ * Build the {@linkcode CoopBattleSync} responder for the GUEST slot from this wave's captured guest
+ * command. The host AWAITS the guest slot's command over the relay; here we answer it with the trace's
+ * decision (resolving the captured move slot to the live guest mon's MoveId). A non-move command on the
+ * guest slot is uncommon in the wave loop; we answer FIGHT with the first legal slot as a safe default
+ * (and record a divergence) so the turn never hangs.
+ */
+function guestCommandResponder(
+  rig: DuoRig,
+  cmd: ReplayCommandEvent | undefined,
+  divergences: ReplayDivergence[],
+): SerializedCommand {
+  const guestMon = rig.guestScene.getPlayerField()[COOP_GUEST_FIELD_INDEX];
+  if (cmd != null && cmd.command.kind === "move") {
+    const moveId = resolveMoveIdForSlot(guestMon, cmd.command.moveIndex);
+    return {
+      command: Command.FIGHT,
+      cursor: cmd.command.moveIndex,
+      moveId,
+      targets: [cmd.command.target ?? BattlerIndex.ENEMY_2],
+    };
+  }
+  // No captured move for the guest slot this wave (or a non-move command the wave loop can't drive):
+  // answer FIGHT with the first move so the host's request resolves; record it so a test can see it.
+  divergences.push({
+    wave: rig.hostScene.currentBattle.waveIndex,
+    detail: `guest slot had no replayable move command (kind=${cmd?.command.kind ?? "none"}); used first move`,
+  });
+  const moveset = guestMon.getMoveset();
+  return {
+    command: Command.FIGHT,
+    cursor: 0,
+    moveId: moveset.length > 0 ? moveset[0].moveId : 0,
+    targets: [BattlerIndex.ENEMY_2],
+  };
+}
+
+/**
+ * Feed one field slot's captured FIGHT move into the host (under `withClient(hostCtx)`). Resolves the
+ * captured move SLOT to the live mon's MoveId and selects it at the captured (or default) target. A
+ * missing/non-move command falls back to the slot's first move so the host's double commits both slots
+ * (the wave never hangs); the caller records a divergence for the missing capture.
+ */
+function feedHostFightMove(
+  game: ReplayGameManager,
+  rig: DuoRig,
+  fieldIndex: number,
+  cmd: ReplayCommandEvent | undefined,
+): void {
+  const mon = rig.hostScene.getPlayerField()[fieldIndex];
+  const defaultTarget = fieldIndex === COOP_HOST_FIELD_INDEX ? BattlerIndex.ENEMY : BattlerIndex.ENEMY_2;
+  if (cmd != null && cmd.command.kind === "move") {
+    const moveId = resolveMoveIdForSlot(mon, cmd.command.moveIndex);
+    game.move.select(moveId, fieldIndex, cmd.command.target ?? defaultTarget);
+    return;
+  }
+  const firstMoveId = mon.getMoveset()[0]?.moveId;
+  if (firstMoveId != null) {
+    game.move.select(firstMoveId, fieldIndex, defaultTarget);
+  }
+}
+
+/**
+ * Replay a captured {@linkcode ReplayTrace} across BOTH engines (#record-replay, Phase 1). Seeds the
+ * HOST run, flips to co-op, and walks the trace's events wave-by-wave feeding commands + interactions
+ * and driving the guest replay, asserting convergence (the guest's enemies reach the host-KO'd state +
+ * the interaction counters stay lockstep). THROWS on a no-progress stall (the hang detector) so a
+ * regression fails loudly. Returns a {@linkcode ReplayResult} a test asserts reproduction off.
+ *
+ * SCOPE (Phase 1): the run is reached via `game.classicMode.startBattle` from the roster's SPECIES
+ * (not a full PokemonData rebuild + launch handshake - that is a Phase-2 production-capture concern;
+ * for the synthetic-trace test the species + seed + level + commands fully determine the run). Commands
+ * are the wave-loop FIGHT class (both slots) and interactions are the reward-shop owner/watcher leave +
+ * non-party pick the existing drivers support; richer command/interaction classes extend the same loop.
+ *
+ * `game` is the host {@linkcode GameManager} (already constructed, with overrides stageable). `trace`
+ * is validated first (a malformed trace THROWS with the precise reason). `resyncSpy` is an optional
+ * counter (a vi spy's call count) the caller wires onto `CoopBattleStreamer.requestStateSync` so the
+ * result can report the resync count.
+ */
+export async function replayCoopTrace(
+  game: ReplayGameManager,
+  trace: ReplayTrace,
+  opts: { resyncCount?: () => number } = {},
+): Promise<ReplayResult> {
+  const validation = validateReplayTrace(trace);
+  if (!validation.ok) {
+    throw new Error(`replayCoopTrace: invalid trace - ${validation.errors.join("; ")}`);
+  }
+
+  const divergences: ReplayDivergence[] = [];
+  const commandEvents = trace.events.filter(isReplayCommandEvent);
+  const interactionEvents = trace.events.filter(isReplayInteractionEvent);
+
+  // ===== Seed the HOST run from the trace: double battle (co-op is a double), the roster's species,
+  // the difficulty/level. The seed is pinned by the deterministic run-start; the species + commands
+  // reproduce the run. We derive the species from the roster's serialized PokemonData. =====
+  game.override.battleStyle("double");
+  const rosterSpecies = trace.roster.map(d => d.species).filter((s): s is number => typeof s === "number");
+  if (rosterSpecies.length < 2) {
+    throw new Error(`replayCoopTrace: co-op needs >=2 roster mons, got ${rosterSpecies.length}`);
+  }
+  await game.classicMode.startBattle(...rosterSpecies.slice(0, 2));
+
+  // ===== Flip to co-op + stand up the guest engine over one loopback pair (host owns EVEN interaction
+  // counters, guest owns ODD - the production parity rule buildDuo wires). =====
+  const pair = createLoopbackPair();
+  const rig = await buildDuo(game as unknown as Parameters<typeof buildDuo>[0], pair, setCoopRuntime, replayToCoop);
+
+  // The captured waves, in order (a Set keeps them unique + sorted).
+  const waves = [...new Set(commandEvents.map(c => c.wave))].sort((a, b) => a - b);
+  let commandsFed = 0;
+  let interactionsApplied = 0;
+  let wavesReplayed = 0;
+
+  for (const wave of waves) {
+    // The guest's battle must mirror the host's CURRENT (this-wave) field before the host plays.
+    if (wavesReplayed > 0) {
+      await remirrorWave(rig);
+    }
+
+    const waveCommands = commandEvents.filter(c => c.wave === wave);
+    const hostCmd = waveCommands.find(c => c.slotFieldIndex === COOP_HOST_FIELD_INDEX);
+    const guestCmd = waveCommands.find(c => c.slotFieldIndex === COOP_GUEST_FIELD_INDEX);
+
+    // Wire the GUEST slot's command (answered over the CoopBattleSync relay when the host requests it).
+    rig.guestRuntime.battleSync.onCommandRequest(() => guestCommandResponder(rig, guestCmd, divergences));
+
+    // ===== Host plays this wave: feed BOTH slots' captured FIGHT moves (the host commits both in a
+    // co-op double; the guest slot's command is ALSO answered over the relay by the responder above).
+    // For Phase 1 this is the FIGHT class (the wave-loop drivers); a non-move host command records a
+    // divergence (the existing drivers don't cover switch/ball/run yet). =====
+    const turn = rig.hostScene.currentBattle.turn;
+    await withClient(rig.hostCtx, async () => {
+      if (hostCmd != null && hostCmd.command.kind === "move") {
+        feedHostFightMove(game, rig, COOP_HOST_FIELD_INDEX, hostCmd);
+        feedHostFightMove(game, rig, COOP_GUEST_FIELD_INDEX, guestCmd);
+        commandsFed += waveCommands.length;
+      } else {
+        divergences.push({
+          wave,
+          detail: `host slot command kind=${hostCmd?.command.kind ?? "none"} not replayable by the wave-loop drivers (FIGHT only)`,
+        });
+      }
+      await game.phaseInterceptor.to("TurnEndPhase");
+    });
+
+    // ===== Guest replays the host's turn + applies the checkpoint (renders the host's outcome). =====
+    await withClient(rig.guestCtx, async () => {
+      await driveGuestReplayTurn(rig.guestScene, turn);
+    });
+    const guestEnemiesFainted = rig.guestScene.currentBattle.enemyParty.every(e => e.isFainted());
+    if (!guestEnemiesFainted) {
+      divergences.push({ wave, detail: "guest enemies did NOT converge to the host-KO'd state" });
+    }
+
+    // ===== The reward shop interaction for this wave: the OWNER (by counter parity) drives, the WATCHER
+    // mirrors. Apply the captured interaction for this wave's reward seq (a leave / non-party pick). =====
+    const counterBefore = rig.hostRuntime.controller.interactionCounter();
+    const hostOwns = counterBefore % 2 === 0;
+    const waveInteraction = interactionEvents.find(e => e.seq === counterBefore);
+    const takeReward = waveInteraction != null && waveInteraction.choice >= 0 && waveInteraction.kind === "reward";
+
+    await withClient(rig.hostCtx, async () => {
+      await game.phaseInterceptor.to("SelectModifierPhase", false);
+    });
+    const hostShop = rig.hostScene.phaseManager.getCurrentPhase() as unknown as ShopPhaseSeam;
+    if (hostShop.phaseName === "SelectModifierPhase") {
+      const guestShop = withClientSync(rig.guestCtx, () => buildGuestShopPhase()) as unknown as ShopPhaseSeam;
+      if (hostOwns) {
+        await withClient(rig.hostCtx, () => driveHostRewardShopOwner(hostShop, { takeReward }));
+        await withClient(rig.guestCtx, () => driveGuestRewardWatch(guestShop));
+      } else {
+        await withClient(rig.guestCtx, () => driveHostRewardShopOwner(guestShop, { takeReward }));
+        await withClient(rig.hostCtx, () => driveGuestRewardWatch(hostShop));
+      }
+      if (waveInteraction != null) {
+        interactionsApplied++;
+      }
+      // Lockstep check: both controllers advanced exactly once for this interaction.
+      if (
+        rig.hostRuntime.controller.interactionCounter() !== counterBefore + 1
+        || rig.guestRuntime.controller.interactionCounter() !== counterBefore + 1
+      ) {
+        divergences.push({
+          wave,
+          detail: `interaction counter NOT lockstep after wave ${wave} (host=${rig.hostRuntime.controller.interactionCounter()} guest=${rig.guestRuntime.controller.interactionCounter()})`,
+        });
+      }
+    }
+
+    wavesReplayed++;
+
+    // ===== Host crosses into the next wave's battle (real EncounterPhase rolls wave w+1). =====
+    if (wavesReplayed < waves.length) {
+      await withClient(rig.hostCtx, async () => {
+        await game.phaseInterceptor.to("CommandPhase");
+      });
+    }
+  }
+
+  return {
+    wavesReplayed,
+    commandsFed,
+    interactionsApplied,
+    resyncCount: opts.resyncCount?.() ?? 0,
+    divergences,
+    finalHostCounter: rig.hostRuntime.controller.interactionCounter(),
+    finalGuestCounter: rig.guestRuntime.controller.interactionCounter(),
+  };
+}
+
+/** Build a fresh guest-side SelectModifierPhase for the watcher (under withClientSync, globalScene=guest). */
+function buildGuestShopPhase(): Phase {
+  return globalScene.phaseManager.create("SelectModifierPhase");
 }
