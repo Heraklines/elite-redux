@@ -1,0 +1,276 @@
+----- BUG REPORT (in-game) -----
+version:  1.11.19
+url:      https://elite-redux.pages.dev/
+ua:       Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36 Edg/149.0.0.0
+mode:     4  wave:13  difficulty:youngster
+seed:     JgPo8tVLM8mQVxaCwj9pXrOI
+party:    Emolga(L12 40/40), Squawkabilly(L10 40/40), Volbeat(L6 25/25), Cubchoo(L6 24/24), Spoink(L6 24/24)
+
+----- DESCRIPTION -----
+Squakabily Parroting Bug
+
+----- CONSOLE -----
+[19:09:40.484] LOG: Move Pool: ["Quick Attack","Ice Fang","After You","Thunder Fang"]
+[19:09:40.484] LOG: Move Scores: [12,44,0,17]
+[19:09:40.484] LOG: Sorted Move Pool: ["Ice Fang","Thunder Fang","Quick Attack","After You"]
+[19:09:40.484] LOG: Chosen Move: Ice Fang
+[19:09:40.484] LOG: %cStart Phase TurnStartPhase color:green;
+[19:09:40.488] LOG: %cStart Phase MovePhase color:green;
+[19:09:40.488] LOG: %cUser: Emolga
+Move: FLOATY_FALL
+Use Mode: NORMAL color:orchid
+[19:09:40.492] LOG: %cStart Phase MessagePhase color:green;
+[19:09:40.582] LOG: %cStart Phase MoveEffectPhase color:green;
+[19:09:40.786] LOG: Applied Dire Hit 
+[19:09:40.786] LOG: crit stage: +1
+[19:09:40.787] LOG: Move: Floaty Fall | Base damage: 13.08421052631579 | Power: 117 | Source attack: 15 | Target defense: 19
+[19:09:40.787] LOG: Move: Floaty Fall | Attack damage: 34
+[19:09:40.787] LOG: %cStart Phase DamageAnimPhase color:green;
+[19:09:40.795] LOG: %cStart Phase MessagePhase color:green;
+[19:09:40.998] LOG: %cStart Phase FaintPhase color:green;
+[19:09:41.973] LOG: %cStart Phase MessagePhase color:green;
+[19:09:42.231] LOG: %cStart Phase VictoryPhase color:green;
+[19:09:42.232] LOG: %cStart Phase ExpPhase color:green;
+[19:09:42.232] LOG: Applied Super EXP. Charm 
+[19:09:42.233] LOG: Applied EXP. Charm 
+[19:09:42.492] LOG: %cStart Phase LevelUpPhase color:green;
+[19:09:42.493] LOG: %cStart Phase ExpPhase color:green;
+[19:09:42.493] LOG: Applied Super EXP. Charm 
+[19:09:42.493] LOG: Applied EXP. Charm 
+[19:09:42.717] LOG: %cStart Phase LevelUpPhase color:green;
+[19:09:42.717] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[19:09:42.717] LOG: Applied Super EXP. Charm 
+[19:09:42.718] LOG: Applied EXP. Charm 
+[19:09:42.718] LOG: %cStart Phase LevelUpPhase color:green;
+[19:09:42.718] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[19:09:42.718] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[19:09:42.718] LOG: Applied Super EXP. Charm 
+[19:09:42.718] LOG: Applied EXP. Charm 
+[19:09:42.718] LOG: %cStart Phase LevelUpPhase color:green;
+[19:09:42.718] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[19:09:42.718] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[19:09:42.718] LOG: Applied Super EXP. Charm 
+[19:09:42.718] LOG: Applied EXP. Charm 
+[19:09:42.719] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[19:09:42.719] LOG: %cStart Phase MoveEndPhase color:green;
+[19:09:42.719] LOG: %cStart Phase MovePhase color:green;
+[19:09:42.719] LOG: %cUser: Squawkabilly
+Move: PECK
+Use Mode: NORMAL color:orchid
+[19:09:42.721] LOG: %cStart Phase MessagePhase color:green;
+[19:09:42.825] LOG: %cStart Phase MoveEffectPhase color:green;
+[19:09:42.904] LOG: Applied Dire Hit 
+[19:09:42.904] LOG: crit stage: +1
+[19:09:42.905] LOG: Move: Peck | Base damage: 9.279999999999998 | Power: 39 | Source attack: 15 | Target defense: 9
+[19:09:42.905] LOG: Move: Peck | Attack damage: 13
+[19:09:42.906] LOG: %cStart Phase DamageAnimPhase color:green;
+[19:09:42.913] LOG: %cStart Phase MoveEffectPhase color:green;
+[19:09:42.992] LOG: Applied Dire Hit 
+[19:09:42.992] LOG: crit stage: +1
+[19:09:42.993] LOG: Move: Peck | Base damage: 9.279999999999998 | Power: 39 | Source attack: 15 | Target defense: 9
+[19:09:42.993] LOG: Move: Peck | Attack damage: 13
+[19:09:42.993] LOG: %cStart Phase DamageAnimPhase color:green;
+[19:09:43.000] LOG: %cStart Phase MessagePhase color:green;
+[19:09:43.187] LOG: %cStart Phase FaintPhase color:green;
+[19:09:43.820] LOG: %cStart Phase MessagePhase color:green;
+[19:09:44.007] LOG: %cStart Phase VictoryPhase color:green;
+[19:09:44.008] LOG: %cStart Phase ExpPhase color:green;
+[19:09:44.008] LOG: Applied Super EXP. Charm 
+[19:09:44.008] LOG: Applied EXP. Charm 
+[19:09:44.269] LOG: %cStart Phase ExpPhase color:green;
+[19:09:44.269] LOG: Applied Super EXP. Charm 
+[19:09:44.269] LOG: Applied EXP. Charm 
+[19:09:44.590] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[19:09:44.590] LOG: Applied Super EXP. Charm 
+[19:09:44.590] LOG: Applied EXP. Charm 
+[19:09:44.590] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[19:09:44.590] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[19:09:44.590] LOG: Applied Super EXP. Charm 
+[19:09:44.590] LOG: Applied EXP. Charm 
+[19:09:44.590] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[19:09:44.590] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[19:09:44.590] LOG: Applied Super EXP. Charm 
+[19:09:44.591] LOG: Applied EXP. Charm 
+[19:09:44.591] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[19:09:44.591] LOG: %cStart Phase MoveEndPhase color:green;
+[19:09:44.591] LOG: %cStart Phase MovePhase color:green;
+[19:09:44.591] LOG: %cStart Phase MoveEndPhase color:green;
+[19:09:44.591] LOG: %cStart Phase MovePhase color:green;
+[19:09:44.592] LOG: %cStart Phase MoveEndPhase color:green;
+[19:09:44.592] LOG: %cStart Phase CheckInterludePhase color:green;
+[19:09:44.592] LOG: %cStart Phase WeatherEffectPhase color:green;
+[19:09:44.592] LOG: %cStart Phase PositionalTagPhase color:green;
+[19:09:44.592] LOG: %cStart Phase BerryPhase color:green;
+[19:09:44.592] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[19:09:44.592] LOG: %cStart Phase TurnEndPhase color:green;
+[19:09:44.593] WARN: [coop:turn] host recorder: finalize with NO open recording -> turn=-1 events=0 (caller decides not to emit)
+[19:09:44.593] LOG: %cStart Phase BattleEndPhase color:green;
+[19:09:44.593] LOG: Battle Score: 96 (1 Turns x1)
+[19:09:44.593] LOG: Total Score: 406
+[19:09:44.598] LOG: %cStart Phase EggLapsePhase color:green;
+[19:09:44.599] LOG: %cStart Phase SelectModifierPhase color:green;
+[19:09:44.599] LOG: Wave Seed: Vs\{DbXYDy]bmOvE|d~[U 12
+[19:09:44.601] LOG: 12 9 [2,3,4,5,6,7,8,9,10,22]
+[19:09:44.601] LOG: {"id":"SUPER_LURE","localeKey":"modifierType:ModifierType.SUPER_LURE","iconImage":"super_lure","group":"lure","soundName":"se/restore","tier":1,"maxBattles":15} 
+[19:09:44.601] LOG: 12 9 [2,3,4,5,6,7,8,9,10,22]
+[19:09:44.601] LOG: {"id":"SUPER_LURE","localeKey":"modifierType:ModifierType.SUPER_LURE","iconImage":"super_lure","group":"lure","soundName":"se/restore","tier":1,"maxBattles":15} 
+[19:09:44.601] LOG: 18 9 [2,3,4,5,6,7,8,9,10,22]
+[19:09:44.601] LOG: {"id":"MEMORY_MUSHROOM","localeKey":"modifierType:ModifierType.MEMORY_MUSHROOM","iconImage":"big_mushroom","soundName":"se/restore","tier":1} 
+[19:09:44.601] LOG: 29 3 [10,14,23]
+[19:09:44.601] LOG: {"id":"ER_SPIKED_KNUCKLES","localeKey":"","iconImage":"quick_claw","iconTint":12107976,"soundName":"se/restore","tier":2} 
+[19:09:44.601] LOG: 22 2 [10,14,23]
+[19:09:44.601] LOG: {"id":"EXP_SHARE","localeKey":"modifierType:ModifierType.EXP_SHARE","iconImage":"exp_share","soundName":"se/restore","tier":2} 
+[19:09:44.601] LOG: 6 0 [10,14,23]
+[19:09:44.601] LOG: ULTRA 0
+[19:09:44.601] LOG: 13 1 [10,14,23]
+[19:09:44.601] LOG: {"id":"FROSTBITE_ORB","localeKey":"","iconImage":"frostbite_orb","soundName":"se/restore","tier":2} 
+[19:09:44.602] LOG: 0 0 [10,14,23]
+[19:09:44.602] LOG: {"id":"ULTRA_BALL","localeKey":"","iconImage":"ub","group":"pb","soundName":"se/pb_bounce_1","tier":2,"pokeballType":2,"count":5} 
+[19:09:58.956] LOG: %cStart Phase NewBattlePhase color:green;
+[19:09:58.956] LOG: Wave Seed: Wt]|EcYZEz^cnPwF}e\V 13
+[19:09:58.956] LOG: %cStart Phase NextEncounterPhase color:green;
+[19:09:58.957] LOG: Starting species pool tier: COMMON
+[19:09:58.964] LOG: Pokemon: Wild Houndour | Species ID: 228 | Level: 9 | Nature: Impish (+Def/-SpAtk)
+[19:09:58.964] LOG: Stats (IVs): HP: 27 (2), Atk: 20 (29), Def: 13 (13), Spatk: 18 (28), Spdef: 14 (6), Spd: 19 (7)
+[19:09:58.964] LOG: Ability: Pyromancy | Passive Ability: Nocturnal 
+[19:09:58.965] LOG: Moveset: ["Fire Fang","Poison Gas","Odor Sleuth","Howl"]
+[19:09:58.965] LOG: Starting species pool tier: UNCOMMON
+[19:09:58.975] LOG: Pokemon: Wild Espurr | Species ID: 677 | Level: 8 | Nature: Gentle (+SpDef/-Def)
+[19:09:58.975] LOG: Stats (IVs): HP: 30 (7), Atk: 14 (26), Def: 13 (18), Spatk: 16 (2), Spdef: 18 (27), Spd: 17 (20)
+[19:09:58.975] LOG: Ability: Infiltrator | Passive Ability: Keen Eye 
+[19:09:58.975] LOG: Moveset: ["Confusion","Teleport","Scratch"]
+[19:09:59.237] DEBUG: Session data saved to slot 0!
+[19:09:59.237] LOG: Wave Seed: Wt]|EcYZEz^cnPwF}e\V 13
+[19:09:59.671] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[19:09:59.671] LOG: %cStart Phase CheckSwitchPhase color:green;
+[19:10:00.043] LOG: %cStart Phase CheckSwitchPhase color:green;
+[19:10:00.394] LOG: %cStart Phase InitEncounterPhase color:green;
+[19:10:00.395] LOG: %cStart Phase PostSummonPhase color:green;
+[19:10:00.395] LOG: Ran PSP for: Houndour
+[19:10:00.396] LOG: %cStart Phase PostSummonPhase color:green;
+[19:10:00.396] LOG: %cStart Phase PostSummonPhase color:green;
+[19:10:00.396] LOG: %cStart Phase PostSummonPhase color:green;
+[19:10:00.396] LOG: Ran PSP for: Espurr
+[19:10:00.396] LOG: %cStart Phase PostSummonPhase color:green;
+[19:10:00.396] LOG: %cStart Phase PostSummonPhase color:green;
+[19:10:00.396] LOG: %cStart Phase TurnInitPhase color:green;
+[19:10:00.396] LOG: %cStart Phase CommandPhase color:green;
+[19:10:03.210] LOG: Move: FLOATY_FALL Move targets: {"targets":[2,3,1],"multiple":false} 
+Player Pokemon: Emolga
+[19:10:03.211] LOG: %cStart Phase SelectTargetPhase color:green;
+[19:10:03.562] LOG: %cStart Phase CommandPhase color:green;
+[19:10:04.474] LOG: Move: PECK Move targets: {"targets":[2,3,0],"multiple":false} 
+Player Pokemon: Squawkabilly
+[19:10:04.475] LOG: %cStart Phase SelectTargetPhase color:green;
+[19:10:04.858] LOG: %cStart Phase EnemyCommandPhase color:green;
+[19:10:04.859] LOG: Applied X Defense 
+[19:10:04.860] LOG: Applied X Defense 
+[19:10:04.863] LOG: Battle Seed: 0OkxC2qEAlQramxi
+[19:10:04.863] WARN: BattlerTag IGNORE_GHOST is missing a score!
+[19:10:04.863] WARN: BattlerTag IGNORE_GHOST is missing a score!
+[19:10:04.863] WARN: BattlerTag IGNORE_GHOST is missing a score!
+[19:10:04.864] WARN: BattlerTag IGNORE_GHOST is missing a score!
+[19:10:04.864] LOG: Move Pool: ["Fire Fang","Poison Gas","Odor Sleuth","Howl"]
+[19:10:04.864] LOG: Move Scores: [36,0,0,2]
+[19:10:04.864] LOG: Sorted Move Pool: ["Fire Fang","Howl","Poison Gas","Odor Sleuth"]
+[19:10:04.864] LOG: Chosen Move: Howl
+[19:10:04.864] LOG: %cStart Phase EnemyCommandPhase color:green;
+[19:10:04.866] LOG: Applied X Defense 
+[19:10:04.866] LOG: Applied X Defense 
+[19:10:04.869] LOG: Move Pool: ["Confusion","Teleport","Scratch"]
+[19:10:04.869] LOG: Move Scores: [16.5,-20,8]
+[19:10:04.869] LOG: Sorted Move Pool: ["Confusion","Scratch","Teleport"]
+[19:10:04.869] LOG: Chosen Move: Confusion
+[19:10:04.869] LOG: %cStart Phase TurnStartPhase color:green;
+[19:10:04.873] LOG: %cStart Phase MovePhase color:green;
+[19:10:04.873] LOG: %cUser: Emolga
+Move: FLOATY_FALL
+Use Mode: NORMAL color:orchid
+[19:10:04.876] LOG: %cStart Phase MessagePhase color:green;
+[19:10:04.969] LOG: %cStart Phase MoveEffectPhase color:green;
+[19:10:05.173] LOG: crit stage: +0
+[19:10:05.174] LOG: Move: Floaty Fall | Base damage: 20.432000000000002 | Power: 117 | Source attack: 16 | Target defense: 13
+[19:10:05.174] LOG: Move: Floaty Fall | Attack damage: 26
+[19:10:05.174] LOG: %cStart Phase DamageAnimPhase color:green;
+[19:10:05.182] LOG: %cStart Phase MoveEndPhase color:green;
+[19:10:05.182] LOG: %cStart Phase MovePhase color:green;
+[19:10:05.182] LOG: %cUser: Squawkabilly
+Move: PECK
+Use Mode: NORMAL color:orchid
+[19:10:05.186] LOG: %cStart Phase MessagePhase color:green;
+[19:10:05.289] LOG: %cStart Phase MoveEffectPhase color:green;
+[19:10:05.369] LOG: crit stage: +0
+[19:10:05.369] LOG: Move: Peck | Base damage: 7.039999999999999 | Power: 39 | Source attack: 15 | Target defense: 13
+[19:10:05.370] LOG: Move: Peck | Attack damage: 9
+[19:10:05.370] LOG: %cStart Phase DamageAnimPhase color:green;
+[19:10:05.377] LOG: %cStart Phase MoveEffectPhase color:green;
+[19:10:05.456] LOG: crit stage: +0
+[19:10:05.457] LOG: Move: Peck | Base damage: 7.039999999999999 | Power: 39 | Source attack: 15 | Target defense: 13
+[19:10:05.457] LOG: Move: Peck | Attack damage: 8
+[19:10:05.458] LOG: %cStart Phase DamageAnimPhase color:green;
+[19:10:05.465] LOG: %cStart Phase MoveEffectPhase color:green;
+[19:10:05.543] LOG: crit stage: +0
+[19:10:05.544] LOG: Move: Peck | Base damage: 7.039999999999999 | Power: 39 | Source attack: 15 | Target defense: 13
+[19:10:05.544] LOG: Move: Peck | Attack damage: 9
+[19:10:05.544] LOG: %cStart Phase DamageAnimPhase color:green;
+[19:10:05.552] LOG: %cStart Phase MoveEffectPhase color:green;
+[19:10:05.631] LOG: crit stage: +0
+[19:10:05.631] LOG: Move: Peck | Base damage: 7.039999999999999 | Power: 39 | Source attack: 15 | Target defense: 13
+[19:10:05.631] LOG: Move: Peck | Attack damage: 9
+[19:10:05.632] LOG: %cStart Phase DamageAnimPhase color:green;
+[19:10:05.640] LOG: %cStart Phase MessagePhase color:green;
+[19:10:05.826] LOG: %cStart Phase FaintPhase color:green;
+[19:10:06.231] LOG: %cStart Phase MessagePhase color:green;
+[19:10:06.506] LOG: %cStart Phase VictoryPhase color:green;
+[19:10:06.507] LOG: %cStart Phase ExpPhase color:green;
+[19:10:06.507] LOG: Applied Super EXP. Charm 
+[19:10:06.507] LOG: Applied EXP. Charm 
+[19:10:06.805] LOG: %cStart Phase LevelUpPhase color:green;
+[19:10:06.805] LOG: %cStart Phase ExpPhase color:green;
+[19:10:06.805] LOG: Applied Super EXP. Charm 
+[19:10:06.805] LOG: Applied EXP. Charm 
+[19:10:07.025] LOG: %cStart Phase LevelUpPhase color:green;
+[19:10:07.025] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[19:10:07.026] LOG: Applied Super EXP. Charm 
+[19:10:07.026] LOG: Applied EXP. Charm 
+[19:10:07.026] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[19:10:07.026] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[19:10:07.026] LOG: Applied Super EXP. Charm 
+[19:10:07.026] LOG: Applied EXP. Charm 
+[19:10:07.026] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[19:10:07.026] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[19:10:07.026] LOG: Applied Super EXP. Charm 
+[19:10:07.026] LOG: Applied EXP. Charm 
+[19:10:07.026] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[19:10:07.026] LOG: %cStart Phase MoveEndPhase color:green;
+[19:10:07.027] LOG: %cStart Phase MovePhase color:green;
+[19:10:07.027] LOG: %cUser: Houndour
+Move: HOWL
+Use Mode: NORMAL color:orchid
+[19:10:07.029] LOG: %cStart Phase MessagePhase color:green;
+[19:10:07.133] LOG: %cStart Phase MoveEffectPhase color:green;
+[19:10:07.225] LOG: %cStart Phase StatStageChangePhase color:green;
+[19:10:07.404] LOG: %cStart Phase MessagePhase color:green;
+[19:10:07.620] LOG: %cStart Phase ShowAbilityPhase color:green;
+[19:10:07.779] LOG: %cStart Phase MovePhase color:green;
+[19:10:07.779] LOG: %cUser: Squawkabilly
+Move: HOWL
+Use Mode: INDIRECT color:orchid
+[19:10:07.780] LOG: %cStart Phase MessagePhase color:green;
+[19:10:07.886] LOG: %cStart Phase MoveEffectPhase color:green;
+[19:10:07.999] LOG: %cStart Phase StatStageChangePhase color:green;
+[19:10:08.178] LOG: %cStart Phase MessagePhase color:green;
+[19:10:08.394] LOG: %cStart Phase MoveEndPhase color:green;
+[19:10:08.394] LOG: %cStart Phase HideAbilityPhase color:green;
+[19:10:08.415] LOG: %cStart Phase MoveEndPhase color:green;
+[19:10:08.415] LOG: %cStart Phase MovePhase color:green;
+[19:10:08.415] LOG: %cStart Phase MoveEndPhase color:green;
+[19:10:08.415] LOG: %cStart Phase CheckInterludePhase color:green;
+[19:10:08.415] LOG: %cStart Phase WeatherEffectPhase color:green;
+[19:10:08.415] LOG: %cStart Phase PositionalTagPhase color:green;
+[19:10:08.415] LOG: %cStart Phase BerryPhase color:green;
+[19:10:08.416] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[19:10:08.417] LOG: %cStart Phase TurnEndPhase color:green;
+[19:10:08.417] WARN: [coop:turn] host recorder: finalize with NO open recording -> turn=-1 events=0 (caller decides not to emit)
+[19:10:08.417] LOG: %cStart Phase TurnInitPhase color:green;
+[19:10:08.418] LOG: %cStart Phase CommandPhase color:green;
