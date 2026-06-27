@@ -350,6 +350,89 @@ hit-tests; very deep cross-handler chains may need extra `gs.ui` methods stubbed
 - **Browser/prod-only** - service-worker/CDN cache staleness, cross-user/device sprite
   variance (#335), audio/BGM (#403), and real save/cloud round-trips can't reproduce headlessly.
 
+## Two-engine co-op harness (`test/tools/coop-duo-harness.ts`) - reproduce CO-OP desyncs headlessly
+
+🔴 **STANDING RULE - any CO-OP sync/desync/softlock bug gets reproduced in the TWO-ENGINE harness
+FIRST, then fixed, then kept green.** Co-op bugs are interaction bugs between two REAL clients; a
+single client (or a hand-faked partner) cannot exhibit them - that is exactly how the post-battle
+softlocks and the TM-reward-shop orphan (#698) slipped through. Before fixing a co-op bug: write a
+`coop-duo-*` repro that drives BOTH real engines over the loopback until it hangs/diverges, then make
+that repro green. Do NOT diagnose co-op desyncs from live two-client logs alone when the harness can
+reproduce them - the harness is the fast, deterministic loop. (Pure combat/ability/move behavior still
+goes through the combat scenario runner; this is for the co-op SYNC layer.)
+
+**What it is.** Boots a HOST `BattleScene` (the sole authoritative engine) AND a GUEST `BattleScene`
+(a pure renderer) in ONE vitest process, paired over the in-process `LoopbackTransport`
+(`createLoopbackPair` - the SAME framing the real WebRTC path uses). Every OTHER co-op test is
+single-engine (one `globalScene`; the local client plays the guest; the host is FAKED with
+hand-authored `turnResolution` messages). Here BOTH sides are REAL engines, so a real host-vs-guest
+divergence surfaces ORGANICALLY in the logs (the spike already surfaced a real turn-1 checksum
+mismatch that single-engine tests structurally cannot produce).
+
+**How it works (so you can extend it).** The engine has PROCESS-GLOBAL state that is NOT per-scene, so
+the cooperative scheduler swaps a 4-part `ClientCtx` ATOMICALLY (`withClient` / `withClientSync`)
+before pumping each client: (1) `globalScene` (`initGlobalScene`), (2) the coop `active` runtime
+(`setCoopRuntime` - also installs the authoritative-guest predicate), (3) `Phaser.Math.RND.state()`
+(the process-global seeded RNG cursor, saved back per client so they don't bleed), (4) the
+`er-ghost-teams` per-run cache (`resetErGhostRunState` boundary). Each `CoopRuntime` is assembled ONCE
+(`assembleCoopRuntime` in `coop-runtime.ts` - the additive seam `connectCoopSession` delegates to, so
+two runtimes can stand up over one loopback pair WITHOUT `clearCoopRuntime` closing the transport),
+then the live one is selected with `setCoopRuntime` - never re-wired. The HOST is a real `GameManager`
+(`game.move.select(...)` -> real `MovePhase`/AI/RNG -> `TurnEndPhase.emitCoopTurn`); the GUEST is a
+2nd `BattleScene` built directly (`buildGuestScene`) running its real `CoopReplayTurnPhase` ->
+`CoopFinalizeTurnPhase` -> `applyCoopCheckpoint`. A no-progress stall THROWS (`driveGuestReplayTurn`,
+>16 idle iters) so a regression hangs LOUDLY with both logs already captured.
+
+```
+# the duo tests are gated ER_SCENARIO=1 (like every ER engine test):
+ER_SCENARIO=1 npx vitest run test/tests/elite-redux/coop/coop-duo-engine.test.ts        # spike: 1 battle + reach reward shop
+ER_SCENARIO=1 npx vitest run test/tests/elite-redux/coop/coop-duo-multiwave.test.ts     # >=3-wave run + owner/watcher shop + #698 TM-orphan repro
+# (PowerShell: $env:ER_SCENARIO="1"; npx vitest run <path>)
+```
+Both clients' `coop:*` + phase lines stream to `dev-logs/coop-duo/<run>/{host,guest}.log` (gitignored),
+flushed even on failure - read these to triage a desync.
+
+**Add a new co-op repro (recipe, from the harness header):**
+1. In a fresh `it(...)`, boot the host (`game.classicMode.startBattle(...)`) + `buildDuo(game,
+   createLoopbackPair(), setCoopRuntime, toCoop)` to stand up the guest engine + both runtimes over one
+   loopback pair (host owns EVEN interaction counters, guest owns ODD); stage with
+   `forceItemRewards([...])` / `forceNextMysteryEncounter(type)`.
+2. Per wave: `hostPlayWave` (`move.select` both slots -> `TurnEndPhase`) -> `withClient(guestCtx, () =>
+   driveGuestReplayTurn(...))` -> `driveHostRewardShopOwner` + `driveGuestRewardWatch` (pick
+   owner/watcher by counter parity) -> `phaseInterceptor.to("CommandPhase")` for the host's next wave,
+   calling `remirrorWave(rig)` before each new wave.
+3. Assert convergence (guest enemies fainted / `interactionCounter()` equal on both / resyncs bounded)
+   and that BOTH reach the next wave; a no-progress stall THROWS in `driveGuestReplayTurn`.
+
+**Bounded scope - what it does NOT yet do (respect or close these before relying on it BEYOND the
+wave-loop / reward-shop-alternation / move-learn classes):**
+- **Mystery encounters + ghost waves are NOT safe yet** - `coopMeBattleInteractionCounter` /
+  `authoritativeLatched` (coop-runtime.ts) and the `er-ghost-teams` cache quartet are module-globals
+  NOT in the 4-part swap (the ghost cache is reset-per-client, not save/restored). Implement true
+  per-client save/restore before any ME-bearing or ghost-wave duo test, or a desync could be a harness
+  artifact. The harness never reaches an ME (waves 1-3), so this is latent.
+- **The guest battle is MIRRORED, not launched** - `mirrorHostBattleToGuest` clones the host's field
+  via a `PokemonData` round-trip instead of the real launch + `adoptCoopHostEnemyParty`, so it skips the
+  seed-pin (that is WHY a benign per-wave checksum mismatch appears + heals via resync). A
+  production-grade run should drive the real launch handshake so the guest adopts the host's
+  seed/runConfig - then a residual mismatch is a REAL bug.
+- **Live per-event streaming is OFF** (the `liveEmitter` is role-gated to a no-op here); only the
+  turn-end BATCH path is exercised. Owner reward picks are limited to NON-party items + leave (a
+  party-target reward opens the owner PARTY UI the autopilot doesn't drive); guest mons skip
+  `Pokemon.init()` (no-op `battleInfo`). `driveGuestRewardWatch` returns silently on a stall (caught
+  indirectly by the counter-lockstep assert, not a loud throw).
+
+🔴 **globalScene CITIZENSHIP (vitest runs the ER suite with `isolate: false` - module state, incl.
+`globalScene`, is SHARED across files in run order).** Any co-op test that swaps `globalScene` (the
+duo files build a 2nd `BattleScene`; the engine-free `coop-*` repros install a partial `makeStubScene`)
+MUST restore it in `afterEach`, or the NEXT ER_SCENARIO file's `new GameManager` reuses the leftover
+scene and crashes (`this.scene.reset is not a function` for a stub). The pattern: capture
+`prevGlobalScene = globalScene` in `beforeEach` BEFORE the swap, `initGlobalScene(prevGlobalScene)` in
+`afterEach` (duo files restore the host `game.scene`). It is order-robust: each file restores before the
+next file's `beforeEach` captures, so even back-to-back swapping files chain a real scene through. This
+only bites full-directory ER_SCENARIO runs (CI's default suite skips these), so it slips a single-file
+green - always run the WHOLE `coop/` dir before shipping a new co-op test.
+
 ## The in-game dev test suite
 
 - `src/dev-tools/test-suite/` — **TRACKED**. The shared suite: `scenarios.ts`

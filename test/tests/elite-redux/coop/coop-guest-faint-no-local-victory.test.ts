@@ -29,18 +29,13 @@
 // Phaser / GameManager boot is needed. The non-guest (host) cases drop the role flip so the gate reads
 // false and the original turn-end path is asserted byte-for-byte.
 
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
-
 import type { BattleScene } from "#app/battle-scene";
 import { globalScene, initGlobalScene } from "#app/global-scene";
+import { clearCoopRuntime, getCoopController, startLocalCoopSession } from "#data/elite-redux/coop/coop-runtime";
 import type { CoopBattleCheckpoint } from "#data/elite-redux/coop/coop-transport";
-import {
-  clearCoopRuntime,
-  getCoopController,
-  startLocalCoopSession,
-} from "#data/elite-redux/coop/coop-runtime";
 import { CoopFinalizeTurnPhase } from "#phases/coop-replay-phases";
 import { CoopReplayTurnPhase } from "#phases/coop-replay-turn-phase";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 // --- The recorder behind the injected stub scene: the two end-of-turn levers the fix toggles.
 const rec = {
@@ -121,7 +116,10 @@ function makeFinalizePhase(turn: number): CoopFinalizeTurnPhase {
 }
 
 describe("BUG1 - guest faint must NOT trigger a local victory (premature-victory deadlock)", () => {
+  let prevGlobalScene: BattleScene;
+
   beforeEach(() => {
+    prevGlobalScene = globalScene;
     rec.incrementTurnCalls = 0;
     rec.queueTurnEndCalls = 0;
     rec.clearLastTurnOrderCalls = 0;
@@ -133,6 +131,11 @@ describe("BUG1 - guest faint must NOT trigger a local victory (premature-victory
   afterEach(() => {
     // Tear down any session so the next test (and the rest of the suite) starts solo / off-session.
     clearCoopRuntime();
+    // Citizenship (#710): this engine-free file replaces globalScene with a reset-less stub. Restore
+    // the prior scene so the NEXT ER_SCENARIO file's `new GameManager` reuses a real scene instead of
+    // crashing on `stub.reset is not a function`. Order-robust: each stub file restores before the
+    // next file's beforeEach captures, so even back-to-back stub files chain the real scene through.
+    initGlobalScene(prevGlobalScene);
   });
 
   it("the authoritative-guest gate reads true on the session and the stub scene reaches the phase module (sanity)", () => {

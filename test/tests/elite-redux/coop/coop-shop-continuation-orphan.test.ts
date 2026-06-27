@@ -23,7 +23,7 @@
 // CoopInteractionRelay wait over a LoopbackTransport and asserting cancelWaiters() is sticky-per-seq.
 
 import type { BattleScene } from "#app/battle-scene";
-import { initGlobalScene } from "#app/global-scene";
+import { globalScene, initGlobalScene } from "#app/global-scene";
 import { CoopInteractionRelay } from "#data/elite-redux/coop/coop-interaction-relay";
 import { clearCoopRuntime, getCoopController, startLocalCoopSession } from "#data/elite-redux/coop/coop-runtime";
 import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
@@ -78,13 +78,21 @@ function driveGuestLearnMove(phase: LearnMovePhase): void {
 }
 
 describe("#698 stale-reward-shop softlock - continuation-copy orphan + resync rescue", () => {
+  let prevGlobalScene: BattleScene;
+
   beforeEach(() => {
+    prevGlobalScene = globalScene;
     rec.removed = [];
     initGlobalScene(makeStubScene());
   });
 
   afterEach(() => {
     clearCoopRuntime();
+    // Citizenship (#710): this engine-free file replaces globalScene with a reset-less stub. Restore
+    // the prior scene so the NEXT ER_SCENARIO file's `new GameManager` reuses a real scene instead of
+    // crashing on `stub.reset is not a function`. Order-robust: each stub file restores before the
+    // next file's beforeEach captures, so even back-to-back stub files chain the real scene through.
+    initGlobalScene(prevGlobalScene);
   });
 
   // --- Fix 1: the guest no-op LearnMovePhase removes the continuation shop exactly when the host would.

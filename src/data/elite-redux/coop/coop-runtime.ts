@@ -914,6 +914,32 @@ export function connectCoopSession(
     `connectCoopSession role=${transport.role} state=${transport.state} username=${opts.username ?? "(default)"} netcode=${opts.netcodeMode ?? "lockstep"}`,
   );
   clearCoopRuntime();
+  const runtime = assembleCoopRuntime(transport, opts);
+  setCoopRuntime(runtime);
+  coopLog(
+    "launch",
+    `peer session ready role=${runtime.controller.role} netcode=${runtime.controller.netcodeMode} -> connecting`,
+  );
+  runtime.controller.connect();
+  return runtime;
+}
+
+/**
+ * Assemble + WIRE one co-op runtime over `transport` WITHOUT tearing down any prior session and
+ * WITHOUT registering it as the active runtime or sending `hello`. This is the additive seam
+ * {@linkcode connectCoopSession} delegates to (it adds the clear / setCoopRuntime / connect around
+ * this); it exists separately so a TWO-ENGINE in-process harness can stand up BOTH clients' runtimes
+ * over a single {@linkcode createLoopbackPair} - `connectCoopSession`'s leading `clearCoopRuntime()`
+ * (which CLOSES the live transport) would otherwise disconnect the loopback pair when the second
+ * client is built. The caller selects the live runtime with {@linkcode setCoopRuntime} and drives
+ * {@linkcode CoopSessionController.connect} on each. Production behaviour is unchanged: every prod
+ * caller goes through `connectCoopSession` / `startLocalCoopSession`, which keep the clear+set+connect
+ * wrapper intact.
+ */
+export function assembleCoopRuntime(
+  transport: CoopTransport,
+  opts: { username?: string | undefined; netcodeMode?: CoopNetcodeMode | undefined } = {},
+): CoopRuntime {
   const controller = new CoopSessionController(transport, { username: opts.username });
   // Pin the chosen netcode (#633, selectable A/B). On the HOST this is the source of
   // truth that rides along in broadcastRunConfig; on the GUEST it is only the pre-
@@ -941,9 +967,6 @@ export function connectCoopSession(
   wireCoopMeChecksumCheck(battleStream);
   wireCoopLiveEvents(controller, battleStream);
   wireCoopLearnMoveForward(transport);
-  setCoopRuntime(runtime);
-  coopLog("launch", `peer session ready role=${controller.role} netcode=${controller.netcodeMode} -> connecting`);
-  controller.connect();
   return runtime;
 }
 

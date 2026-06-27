@@ -25,7 +25,7 @@
 // initGlobalScene, so no Phaser / GameManager boot is needed.
 
 import type { BattleScene } from "#app/battle-scene";
-import { initGlobalScene } from "#app/global-scene";
+import { globalScene, initGlobalScene } from "#app/global-scene";
 import {
   type CoopRuntime,
   clearCoopRuntime,
@@ -134,7 +134,10 @@ function makeFinalizePhase(turn: number): CoopFinalizeTurnPhase {
 }
 
 describe("#698 - single-turn-win finalize must not start a phantom next turn", () => {
+  let prevGlobalScene: BattleScene;
+
   beforeEach(() => {
+    prevGlobalScene = globalScene;
     rec.incrementTurnCalls = 0;
     rec.queueTurnEndCalls = 0;
     rec.clearLastTurnOrderCalls = 0;
@@ -145,6 +148,11 @@ describe("#698 - single-turn-win finalize must not start a phantom next turn", (
 
   afterEach(() => {
     clearCoopRuntime();
+    // Citizenship (#710): this engine-free file replaces globalScene with a reset-less stub. Restore
+    // the prior scene so the NEXT ER_SCENARIO file's `new GameManager` reuses a real scene instead of
+    // crashing on `stub.reset is not a function`. Order-robust: each stub file restores before the
+    // next file's beforeEach captures, so even back-to-back stub files chain the real scene through.
+    initGlobalScene(prevGlobalScene);
   });
 
   it("sanity: the host->guest waveResolved sets a PENDING advance for this wave", async () => {
