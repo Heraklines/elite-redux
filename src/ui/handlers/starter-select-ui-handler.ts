@@ -64,6 +64,7 @@ import type { LevelMoves } from "#types/pokemon-level-moves";
 import type { Starter, StarterAttributes, StarterDataEntry, StarterMoveset } from "#types/save-data";
 import type { OptionSelectItem } from "#ui/abstract-option-select-ui-handler";
 import { DropDown, DropDownLabel, DropDownOption, DropDownState, DropDownType, SortCriteria } from "#ui/dropdown";
+import { buildDemoConfig } from "#ui/er-shiny-lab-ui-handler";
 import { FilterBar } from "#ui/filter-bar";
 import { FilterText, FilterTextRow } from "#ui/filter-text";
 import { MessageUiHandler } from "#ui/message-ui-handler";
@@ -3022,6 +3023,27 @@ export class StarterSelectUiHandler extends MessageUiHandler {
               label: i18next.t("starterSelectUiHandler:useCandies"),
               handler: () => {
                 ui.setMode(UiMode.STARTER_SELECT).then(() => showUseCandies());
+                return true;
+              },
+            });
+          }
+          // ER Shiny Lab: open the in-game special-form shiny designer for this species.
+          // Dev/staging-gated for now (the catalog + economy are placeholder demo data
+          // until the P1 save schema lands); mirrors the pokedex option's open-then-return
+          // flow. Hidden in production so players never see the placeholder economy.
+          const shinyLabEnv = import.meta.env as unknown as Record<string, unknown> | undefined;
+          if (shinyLabEnv?.DEV || shinyLabEnv?.VITE_DEV_TOOLS === "1") {
+            options.push({
+              label: "Shiny Lab",
+              handler: () => {
+                const speciesId = this.lastSpecies.speciesId;
+                ui.setMode(UiMode.STARTER_SELECT).then(() => {
+                  const config = buildDemoConfig(speciesId);
+                  config.onExit = () => {
+                    ui.setMode(UiMode.STARTER_SELECT);
+                  };
+                  ui.setModeWithoutClear(UiMode.ER_SHINY_LAB, config);
+                });
                 return true;
               },
             });
