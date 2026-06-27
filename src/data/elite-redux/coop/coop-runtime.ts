@@ -50,6 +50,15 @@ import { type CoopTransport, createLoopbackPair, type SerializedCommand } from "
 import { setCoopLiveEmitter } from "#data/elite-redux/coop/coop-turn-recorder";
 import { CoopUiMirror } from "#data/elite-redux/coop/coop-ui-mirror";
 import { setCoopGhostFetchSuppressed, setCoopGhostPool, setGhostPoolPublisher } from "#data/elite-redux/er-ghost-teams";
+import {
+  beginReplayRecording,
+  clearReplayRecording,
+  isReplayRecording,
+  recordReplayCommand,
+} from "#data/elite-redux/replay-recorder";
+import type { ReplayCommandKind } from "#data/elite-redux/replay-trace";
+import { Command } from "#enums/command";
+import { PokemonData } from "#system/pokemon-data";
 import { compressToBase64, decompressFromBase64 } from "lz-string";
 
 /**
@@ -628,6 +637,95 @@ export function broadcastCoopOwnSlotCommand(fieldIndex: number, command: Seriali
     );
   }
   active.battleSync.broadcastLocalCommand(fieldIndex, globalScene.currentBattle.turn, command);
+  // #record-replay: capture the deferred-target FIGHT own-slot command (no-op unless recording).
+  recordCoopOwnSlotCommand(fieldIndex, command);
+}
+
+// =============================================================================
+// REPLAY RECORDER co-op enable + taps (#record-replay, Phase 2). The recorder is mode-agnostic + a
+// PASSIVE OBSERVER (every record* is no-op unless recording); the ENABLE decision (begin on the
+// authoritative HOST of a co-op run) + the wave/command mapping live HERE in the co-op layer, where
+// globalScene is available. ZERO behavior change: these only read state + push to the recorder's
+// ring buffer, never mutate the engine.
+// =============================================================================
+
+/**
+ * BEGIN replay recording for THIS co-op run if not already recording (#record-replay). Gated to the
+ * authoritative HOST (the sole engine that sees both slots' resolved commands + every committed
+ * interaction). Idempotent (the recorder no-ops a same-seed re-call), so it is safe to call once per
+ * EncounterPhase. Captures the header: seed + gameMode + the serialized merged roster + the CoopRunConfig
+ * + a live-wave provider for interaction pruning. Hard no-op off the live co-op host. Best-effort.
+ */
+export function maybeBeginReplayRecording(): void {
+  if (!globalScene.gameMode.isCoop || active == null || active.controller.role !== "host") {
+    return;
+  }
+  if (isReplayRecording()) {
+    return; // already recording this run (idempotent)
+  }
+  beginReplayRecording({
+    seed: globalScene.seed,
+    gameModeId: globalScene.gameMode.modeId,
+    // The MERGED co-op party as serialized PokemonData (each mon already carries its coopOwner tag).
+    roster: globalScene.getPlayerParty().map(p => new PokemonData(p)),
+    coopRunConfig: active.controller.runConfig() ?? undefined,
+    currentWave: () => globalScene.currentBattle?.waveIndex ?? 0,
+  });
+}
+
+/** Map a {@linkcode SerializedCommand} (the wire command) to a replay {@linkcode ReplayCommandKind}. */
+function serializedCommandToReplayKind(command: SerializedCommand): ReplayCommandKind {
+  switch (command.command) {
+    case Command.BALL:
+      return { kind: "ball", ballIndex: command.cursor };
+    case Command.RUN:
+      return { kind: "run" };
+    case Command.POKEMON:
+      return { kind: "switch", partyIndex: command.cursor };
+    default:
+      // FIGHT / TERA: cursor is the move slot; the first resolved target (if any).
+      return command.targets != null && command.targets.length > 0
+        ? { kind: "move", moveIndex: command.cursor, target: command.targets[0] }
+        : { kind: "move", moveIndex: command.cursor };
+  }
+}
+
+/**
+ * RECORD one OWN-slot resolved command (#record-replay). Called from every own-slot broadcast site (the
+ * one chokepoint set: the FIGHT/no-target + BALL/RUN/POKEMON paths in command-phase, and the deferred-
+ * target FIGHT via {@linkcode broadcastCoopOwnSlotCommand}). No-op unless recording (host only). Reads the
+ * live wave; shallow-copies the kept fields so it never aliases the sent command object.
+ */
+export function recordCoopOwnSlotCommand(fieldIndex: number, command: SerializedCommand): void {
+  if (!isReplayRecording()) {
+    return;
+  }
+  recordReplayCommand({
+    type: "command",
+    wave: globalScene.currentBattle?.waveIndex ?? 0,
+    turn: globalScene.currentBattle?.turn ?? 0,
+    slotFieldIndex: fieldIndex,
+    command: serializedCommandToReplayKind(command),
+  });
+}
+
+/**
+ * RECORD the PARTNER-slot resolved command (#record-replay) - the command the HOST actually committed for
+ * the awaited partner slot, whether RELAYED from the guest or the AI fallback (a null guest reply still
+ * produces a real RNG-derived command that is part of the authoritative run). Read off the resolved
+ * {@linkcode SerializedCommand}; no-op unless recording. Shallow.
+ */
+export function recordCoopPartnerSlotCommand(fieldIndex: number, command: SerializedCommand): void {
+  if (!isReplayRecording()) {
+    return;
+  }
+  recordReplayCommand({
+    type: "command",
+    wave: globalScene.currentBattle?.waveIndex ?? 0,
+    turn: globalScene.currentBattle?.turn ?? 0,
+    slotFieldIndex: fieldIndex,
+    command: serializedCommandToReplayKind(command),
+  });
 }
 
 /**
@@ -1016,5 +1114,7 @@ export function clearCoopRuntime(): void {
   authoritativeLatched = false;
   // Clear the cycle-free authoritative-guest predicate so a subsequent solo / lockstep run reads false.
   setCoopAuthoritativeGuestPredicate(null);
+  // #record-replay: stop + drop the captured trace at run teardown so the next run records fresh.
+  clearReplayRecording();
   active = null;
 }

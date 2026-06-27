@@ -21,6 +21,7 @@
 import { globalScene } from "#app/global-scene";
 import { version } from "#package.json";
 import { getErDifficulty } from "#data/elite-redux/er-run-difficulty";
+import { getReplayTrace } from "#data/elite-redux/replay-recorder";
 import { formatConsoleSnapshot } from "#utils/console-ring-buffer";
 
 interface BugReportState {
@@ -39,6 +40,13 @@ export interface BugReport {
   description: string;
   state: BugReportState;
   logs: string;
+  /**
+   * #record-replay (Phase 2): the captured deterministic replay trace (JSON of a {@linkcode ReplayTrace}),
+   * or `null` when nothing was recorded (single-player with the recorder off, or a menu report). The
+   * recorder ring-buffers to the last few waves, so this stays small + bounded. A reported co-op bug thus
+   * ships with a replayable trace the duo harness can re-run to reproduce + verify a fix.
+   */
+  replayTrace: string | null;
 }
 
 export interface BugReportResult {
@@ -80,12 +88,27 @@ function captureState(): BugReportState {
   };
 }
 
+/**
+ * #record-replay (Phase 2): serialize the captured replay trace for the report, or `null` if nothing was
+ * recorded. Guarded so a serialize failure never breaks the bug-report path (the report still ships
+ * without a trace).
+ */
+function captureReplayTrace(): string | null {
+  try {
+    const trace = getReplayTrace();
+    return trace == null ? null : JSON.stringify(trace);
+  } catch {
+    return null;
+  }
+}
+
 /** Assemble the full bug report payload. */
 export function buildBugReport(description: string): BugReport {
   return {
     description,
     state: captureState(),
     logs: formatConsoleSnapshot(),
+    replayTrace: captureReplayTrace(),
   };
 }
 

@@ -24,26 +24,56 @@
 // reward was applied, resyncs bounded, NO divergences); and a no-progress stall would THROW (hang guard).
 // =============================================================================
 
+import type { BattleScene } from "#app/battle-scene";
+import { getGameMode } from "#app/game-mode";
 import { initGlobalScene } from "#app/global-scene";
 import { CoopBattleStreamer } from "#data/elite-redux/coop/coop-battle-stream";
-import { clearCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
+import { clearCoopRuntime, maybeBeginReplayRecording, setCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
+import { COOP_GUEST_FIELD_INDEX, COOP_HOST_FIELD_INDEX } from "#data/elite-redux/coop/coop-session";
+import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
+import { getReplayTrace, isReplayRecording } from "#data/elite-redux/replay-recorder";
 import {
+  isReplayCommandEvent,
+  isReplayInteractionEvent,
   makeReplayTrace,
   REPLAY_TRACE_VERSION,
   type ReplayEvent,
   type ReplayTrace,
   validateReplayTrace,
 } from "#data/elite-redux/replay-trace";
+import { BattlerIndex } from "#enums/battler-index";
+import { Command } from "#enums/command";
 import { GameModes } from "#enums/game-modes";
 import { MoveId } from "#enums/move-id";
 import { SpeciesId } from "#enums/species-id";
+import { SelectModifierPhase } from "#phases/select-modifier-phase";
 import { PokemonData } from "#system/pokemon-data";
 import { GameManager } from "#test/framework/game-manager";
-import { type ReplayGameManager, replayCoopTrace } from "#test/tools/coop-duo-harness";
+import {
+  buildDuo,
+  type DuoRig,
+  driveGuestReplayTurn,
+  driveGuestRewardWatch,
+  driveHostRewardShopOwner,
+  type ReplayGameManager,
+  remirrorWave,
+  replayCoopTrace,
+  type ShopPhaseSeam,
+  withClient,
+  withClientSync,
+} from "#test/tools/coop-duo-harness";
 import Phaser from "phaser";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 const RUN = process.env.ER_SCENARIO === "1";
+
+/**
+ * The trace CAPTURED by the production taps in the "records" test, replayed by the "reproduces" test
+ * (the two halves of the KILLER round-trip; split across two tests so each uses its OWN clean
+ * GameManager - one test can't safely construct two). Module-scoped so the second test reads the first's
+ * capture; the tests run in declaration order within the describe.
+ */
+let capturedTrace: ReplayTrace | null = null;
 
 /**
  * Build a minimal roster entry as serialized {@linkcode PokemonData} for the synthetic trace. The
@@ -62,6 +92,11 @@ function rosterMon(species: SpeciesId, level: number, coopOwner: "host" | "guest
   });
   data.coopOwner = coopOwner;
   return data;
+}
+
+/** Flip a freshly-built scene into the co-op game mode (shared by host + guest). */
+function toCoop(scene: BattleScene): void {
+  scene.gameMode = getGameMode(GameModes.COOP);
 }
 
 describe.skipIf(!RUN)(
@@ -186,6 +221,141 @@ describe.skipIf(!RUN)(
       ).toBe(true);
       // NO resync storm: a converged run requests at most a handful of resyncs (<= 1 per wave).
       expect(result.resyncCount, `resyncs bounded (got ${result.resyncCount} over 2 waves)`).toBeLessThanOrEqual(2);
+    }, 300_000);
+
+    // =========================================================================================
+    // THE KILLER TEST (closes the record->replay loop), split across TWO tests sharing `capturedTrace`
+    // so each uses its OWN clean GameManager (one test can't safely construct two - the prompt-handler
+    // run interval + shared module state):
+    //   #1 RECORDS a REAL short co-op run through the harness with the PRODUCTION recorder ENABLED (the
+    //      real command + interaction taps fire), then getReplayTrace() reads the CAPTURED trace.
+    //   #2 feeds THAT captured trace back through replayCoopTrace + asserts it REPRODUCES the run (both
+    //      engines converge, counters lockstep, same reward, no hang).
+    // Together they prove CAPTURE -> REPLAY round-trips end-to-end - the load-bearing proof of the feature.
+    // =========================================================================================
+    const RECORD_WAVES = 2;
+
+    it("KILLER #1: a real co-op run is RECORDED by the production command + interaction taps", async () => {
+      // FORCE a deterministic non-party LURE reward so the host owner can take wave 1's reward.
+      game.override.itemRewards([{ name: "LURE" }]);
+
+      await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
+      const pair = createLoopbackPair();
+      const rig: DuoRig = await buildDuo(game, pair, setCoopRuntime, toCoop);
+      // The guest answers its own slot's command over the real CoopBattleSync relay (TACKLE enemy_2).
+      rig.guestRuntime.battleSync.onCommandRequest(({ moveSlots }) => ({
+        command: Command.FIGHT,
+        cursor: moveSlots.length > 0 ? moveSlots[0] : 0,
+        moveId: MoveId.TACKLE,
+        targets: [BattlerIndex.ENEMY_2],
+      }));
+
+      // Establish the host's CoopRunConfig (production does this at run-start via broadcastRunConfig; the
+      // harness's assembleCoopRuntime doesn't, so set it here so the recorder captures the coop layer).
+      await withClient(rig.hostCtx, () => {
+        rig.hostRuntime.controller.broadcastRunConfig({
+          difficulty: "youngster",
+          challenges: [],
+          seed: rig.hostScene.seed,
+          netcodeMode: "authoritative",
+        });
+      });
+
+      // BEGIN recording on the host - exactly what maybeBeginReplayRecording does at the first co-op
+      // EncounterPhase in production (the harness flips to co-op AFTER startBattle, so we call the SAME
+      // production function here to begin from wave 1; the EncounterPhase wiring is verified separately).
+      await withClient(rig.hostCtx, () => {
+        maybeBeginReplayRecording();
+      });
+      expect(isReplayRecording(), "the recorder began on the co-op host").toBe(true);
+
+      for (let w = 1; w <= RECORD_WAVES; w++) {
+        if (w > 1) {
+          await remirrorWave(rig);
+        }
+        const turn = rig.hostScene.currentBattle.turn;
+        // Host plays this wave: BOTH slots TACKLE the frail Magikarps (a guaranteed win). The production
+        // command taps (own-slot broadcast + partner-slot resolve) fire here, recording both commands.
+        await withClient(rig.hostCtx, async () => {
+          game.move.select(MoveId.TACKLE, COOP_HOST_FIELD_INDEX, BattlerIndex.ENEMY);
+          game.move.select(MoveId.TACKLE, COOP_GUEST_FIELD_INDEX, BattlerIndex.ENEMY_2);
+          await game.phaseInterceptor.to("TurnEndPhase");
+        });
+        await withClient(rig.guestCtx, async () => {
+          await driveGuestReplayTurn(rig.guestScene, turn);
+        });
+        // The reward shop: at counter 0 the host owns (take the LURE); the production interaction taps
+        // (sendInteractionChoice / inbound handle) fire here, recording the reward + leave picks.
+        const counterBefore = rig.hostRuntime.controller.interactionCounter();
+        const hostOwns = counterBefore % 2 === 0;
+        await withClient(rig.hostCtx, async () => {
+          await game.phaseInterceptor.to("SelectModifierPhase", false);
+        });
+        const hostShop = rig.hostScene.phaseManager.getCurrentPhase() as unknown as ShopPhaseSeam;
+        const guestShop = withClientSync(rig.guestCtx, () => new SelectModifierPhase()) as unknown as ShopPhaseSeam;
+        const takeReward = w === 1 && hostOwns;
+        if (hostOwns) {
+          await withClient(rig.hostCtx, () => driveHostRewardShopOwner(hostShop, { takeReward }));
+          await withClient(rig.guestCtx, () => driveGuestRewardWatch(guestShop));
+        } else {
+          await withClient(rig.guestCtx, () => driveHostRewardShopOwner(guestShop, { takeReward: false }));
+          await withClient(rig.hostCtx, () => driveGuestRewardWatch(hostShop));
+        }
+        if (w < RECORD_WAVES) {
+          await withClient(rig.hostCtx, async () => {
+            await game.phaseInterceptor.to("CommandPhase");
+          });
+        }
+      }
+
+      // ===== CAPTURE the recorded trace (stash for KILLER #2). =====
+      const captured = getReplayTrace();
+      expect(captured, "a trace was captured during the real run").not.toBeNull();
+      capturedTrace = captured;
+      const trace = captured!;
+      expect(validateReplayTrace(trace).ok, "the captured trace validates").toBe(true);
+      expect(trace.seed.length, "the captured trace pinned the run seed").toBeGreaterThan(0);
+      expect(trace.coop?.runConfig, "the captured trace has the co-op runConfig layer").toBeDefined();
+      expect(trace.roster.length, "the captured trace serialized the merged roster").toBeGreaterThanOrEqual(2);
+      // The production COMMAND taps captured both slots' moves for both waves (4 commands).
+      const commands = trace.events.filter(isReplayCommandEvent);
+      expect(commands.length, "the production command taps recorded both slots x both waves").toBe(RECORD_WAVES * 2);
+      expect(
+        commands.every(c => c.command.kind === "move"),
+        "every recorded command is a FIGHT move",
+      ).toBe(true);
+      // The production INTERACTION taps captured the reward + leave picks (>= one interaction per wave).
+      const interactions = trace.events.filter(isReplayInteractionEvent);
+      expect(interactions.length, "the production interaction taps recorded a pick per wave").toBeGreaterThanOrEqual(
+        RECORD_WAVES,
+      );
+
+      clearCoopRuntime();
+      initGlobalScene(game.scene);
+      expect(isReplayRecording(), "the recorder cleared at run teardown").toBe(false);
+    }, 300_000);
+
+    it("KILLER #2: the CAPTURED trace REPLAYS and reproduces the recorded run (capture->replay round-trip)", async () => {
+      expect(capturedTrace, "KILLER #1 captured a trace to replay").not.toBeNull();
+      const trace = capturedTrace!;
+
+      // FORCE the same deterministic LURE reward so the recorded reward pick reproduces.
+      game.override.itemRewards([{ name: "LURE" }]);
+
+      const result = await replayCoopTrace(game as unknown as ReplayGameManager, trace);
+      // The CAPTURED run reproduced: both waves replayed, both slots' commands fed, lockstep counters.
+      expect(result.wavesReplayed, "the captured run's waves replayed").toBe(RECORD_WAVES);
+      expect(result.commandsFed, "the captured commands were fed").toBe(RECORD_WAVES * 2);
+      expect(
+        result.divergences,
+        `the captured trace reproduced with NO divergence: ${JSON.stringify(result.divergences)}`,
+      ).toEqual([]);
+      expect(result.finalHostCounter, "host counter lockstep after replay").toBe(result.finalGuestCounter);
+      // The recorded reward reproduced: the LURE was granted on the replayed host too.
+      expect(
+        game.scene.modifiers.some(m => m.type.id === "LURE"),
+        "the recorded LURE reward reproduced on replay",
+      ).toBe(true);
     }, 300_000);
   },
 );

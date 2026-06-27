@@ -9,7 +9,12 @@ import { initEncounterAnims, loadEncounterAnimAssets } from "#data/battle-anims"
 import { getCharVariantFromDialogue } from "#data/dialogue";
 import { captureCoopEnemies } from "#data/elite-redux/coop/coop-battle-engine";
 import { buildCoopEnemy } from "#data/elite-redux/coop/coop-enemy-builder";
-import { getCoopBattleStreamer, getCoopController, getCoopNetcodeMode } from "#data/elite-redux/coop/coop-runtime";
+import {
+  getCoopBattleStreamer,
+  getCoopController,
+  getCoopNetcodeMode,
+  maybeBeginReplayRecording,
+} from "#data/elite-redux/coop/coop-runtime";
 import type { CoopSerializedEnemy } from "#data/elite-redux/coop/coop-transport";
 import { erBiomeForcedTerrain, erBiomeForcedWeather } from "#data/elite-redux/er-biome-rules";
 import { getErFinalBossSpecies, isErFinalBossSpecies } from "#data/elite-redux/er-final-boss";
@@ -119,6 +124,11 @@ export class EncounterPhase extends BattlePhase {
   start() {
     super.start();
 
+    // #record-replay (Phase 2): begin recording this co-op run's replay trace on the authoritative
+    // host (idempotent; hard no-op off the live co-op host / when already recording / in single-player).
+    // Placed here because seed + the merged party are both established by the first EncounterPhase.
+    maybeBeginReplayRecording();
+
     // Co-op GUEST (#633, LIVE-D6): adopt the host's authoritative enemy party BEFORE
     // generating our own, so both clients fight byte-identical enemies (species
     // included). The host only knows its enemies after it clears its own save-slot
@@ -191,11 +201,9 @@ export class EncounterPhase extends BattlePhase {
       // `enemyPartySync` (or a host still loading its trainer assets) is recovered on
       // demand instead of silently hard-locking the guest for two minutes. A pre-await
       // or eventual arrival is still consumed via the existing wave-keyed buffer.
-      enemies = await streamer.awaitEnemyPartyWithRetry(
-        battle.waveIndex,
-        wave => streamer.requestEnemyParty(wave),
-        { timeoutMs: COOP_ENEMY_PARTY_WAIT_MS },
-      );
+      enemies = await streamer.awaitEnemyPartyWithRetry(battle.waveIndex, wave => streamer.requestEnemyParty(wave), {
+        timeoutMs: COOP_ENEMY_PARTY_WAIT_MS,
+      });
     } catch {
       enemies = null;
     }

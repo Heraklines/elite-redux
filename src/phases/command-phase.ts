@@ -22,6 +22,8 @@ import {
   getCoopBattleSync,
   getCoopController,
   getCoopNetcodeMode,
+  recordCoopOwnSlotCommand,
+  recordCoopPartnerSlotCommand,
 } from "#data/elite-redux/coop/coop-runtime";
 import { coopOwnerOfFieldIndex } from "#data/elite-redux/coop/coop-session";
 import type { SerializedCommand } from "#data/elite-redux/coop/coop-transport";
@@ -276,9 +278,20 @@ export class CommandPhase extends FieldPhase {
         && (cmd.command === Command.BALL || cmd.command === Command.RUN || cmd.command === Command.POKEMON)
       ) {
         this.applyRelayedActionCommand(cmd);
+        // #record-replay: capture the partner slot's relayed action command (no-op unless recording).
+        recordCoopPartnerSlotCommand(this.fieldIndex, cmd);
         return;
       }
-      apply((cmd && applyWiredPartnerCommand(partner, cmd)) || fallback());
+      // FIGHT: the RELAYED partner command, else the AI fallback (a null guest reply still produces a
+      // real RNG-derived command that is part of the authoritative run - capture what was COMMITTED).
+      const resolved = (cmd && applyWiredPartnerCommand(partner, cmd)) || fallback();
+      apply(resolved);
+      // #record-replay: capture the partner slot's resolved FIGHT command (no-op unless recording).
+      recordCoopPartnerSlotCommand(this.fieldIndex, {
+        command: resolved.command,
+        cursor: resolved.moveIndex,
+        targets: resolved.turnMove.targets,
+      });
     });
     return true;
   }
@@ -602,7 +615,7 @@ export class CommandPhase extends FieldPhase {
     if (sync == null) {
       return;
     }
-    sync.broadcastLocalCommand(this.fieldIndex, globalScene.currentBattle.turn, {
+    const ownFightCommand = {
       command: Command.FIGHT,
       cursor: turnCommand.cursor ?? -1,
       moveId,
@@ -610,7 +623,10 @@ export class CommandPhase extends FieldPhase {
       useMode,
       // #633 Fix #4a: carry the Terastallize flag so the watcher teras the partner's mon.
       ...(tera ? { tera: true } : {}),
-    });
+    };
+    sync.broadcastLocalCommand(this.fieldIndex, globalScene.currentBattle.turn, ownFightCommand);
+    // #record-replay: capture the own-slot FIGHT command (no-op unless recording).
+    recordCoopOwnSlotCommand(this.fieldIndex, ownFightCommand);
   }
 
   /**
@@ -989,12 +1005,15 @@ export class CommandPhase extends FieldPhase {
             .filter(p => p.isActive(true))
             .map(p => p.getBattlerIndex())
         : [];
-    sync.broadcastLocalCommand(this.fieldIndex, globalScene.currentBattle.turn, {
+    const ownActionCommand = {
       command,
       cursor,
       targets,
       ...(command === Command.POKEMON ? { baton } : {}),
-    });
+    };
+    sync.broadcastLocalCommand(this.fieldIndex, globalScene.currentBattle.turn, ownActionCommand);
+    // #record-replay: capture the own-slot BALL/RUN/POKEMON command (no-op unless recording).
+    recordCoopOwnSlotCommand(this.fieldIndex, ownActionCommand);
   }
 
   /**

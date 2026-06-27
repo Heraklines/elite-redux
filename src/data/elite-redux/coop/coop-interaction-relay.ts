@@ -32,6 +32,7 @@ import type {
   CoopSerializedRewardOption,
   CoopTransport,
 } from "#data/elite-redux/coop/coop-transport";
+import { recordReplayInteraction } from "#data/elite-redux/replay-recorder";
 
 /** Sentinel choices shared across interaction screens. */
 export const COOP_INTERACTION_LEAVE = -1;
@@ -138,6 +139,14 @@ export class CoopInteractionRelay {
       kind,
       choice,
       ...(data === undefined ? {} : { data }),
+    });
+    // #record-replay: capture this OWNER-sent interaction pick (no-op unless recording on the host).
+    recordReplayInteraction({
+      type: "interaction",
+      seq,
+      kind,
+      choice,
+      ...(data === undefined ? {} : { data: [...data] }),
     });
   }
 
@@ -465,6 +474,15 @@ export class CoopInteractionRelay {
       return;
     }
     const choice: CoopInteractionChoice = { choice: msg.choice, data: msg.data };
+    // #record-replay: capture this RECEIVED (partner-owned) interaction pick so the host's single trace
+    // captures EVERY committed interaction, not just its own (no-op unless recording on the host).
+    recordReplayInteraction({
+      type: "interaction",
+      seq: msg.seq,
+      kind: msg.kind,
+      choice: msg.choice,
+      ...(msg.data === undefined ? {} : { data: [...msg.data] }),
+    });
     const waiter = this.pending.get(msg.seq);
     if (waiter) {
       if (isCoopDebug()) {
