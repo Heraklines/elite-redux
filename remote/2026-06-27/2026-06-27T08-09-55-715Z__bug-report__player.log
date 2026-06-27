@@ -1,0 +1,273 @@
+----- BUG REPORT (in-game) -----
+version:  1.11.19
+url:      https://elite-redux.pages.dev/
+ua:       Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Mobile Safari/537.36
+mode:     4  wave:1  difficulty:youngster
+seed:     u9dlN8dmydZ4SUuG4643W3GV
+party:    Scatterbug(L5 9/20), Iron Voca(L5 25/25), Whismur(L5 23/23), Marbeep(L5 23/23), Popplio(L5 21/21), Whismur Redux(L5 24/24)
+
+----- DESCRIPTION -----
+ER Sparkling Aria only attacks opponents
+
+----- CONSOLE -----
+[08:01:32.473] LOG: %cStart Phase ReturnPhase color:green;
+[08:01:32.590] LOG: %cStart Phase ReturnPhase color:green;
+[08:01:32.706] LOG: %cStart Phase ShowTrainerPhase color:green;
+[08:01:32.823] LOG: %cStart Phase NextEncounterPhase color:green;
+[08:01:32.850] LOG: Pokemon: Foe Crocalor | Species ID: 910 | Level: 18 | Nature: Adamant (+Atk/-SpAtk)
+[08:01:32.850] LOG: Stats (IVs): HP: 61 (13), Atk: 30 (3), Def: 34 (22), Spatk: 33 (13), Spdef: 30 (8), Spd: 24 (8)
+[08:01:32.850] LOG: Ability: Banshee | Passive Ability: Blaze 
+[08:01:32.850] LOG: Moveset: ["Fire Fang","Hyper Fang","Encore","Leer"]
+[08:01:32.858] LOG: Pokemon: Foe Corvisquire | Species ID: 822 | Level: 17 | Nature: Modest (+SpAtk/-Atk)
+[08:01:32.859] LOG: Stats (IVs): HP: 52 (8), Atk: 17 (14), Def: 25 (23), Spatk: 31 (25), Spdef: 28 (22), Spd: 32 (6)
+[08:01:32.859] LOG: Ability: Intimidate | Passive Ability: Flock 
+[08:01:32.859] LOG: Moveset: ["Razor Wind","Leer","Hone Claws","Scary Face"]
+[08:01:32.866] LOG: Pokemon: Foe Glimmet | Species ID: 969 | Level: 16 | Nature: Docile (-)
+[08:01:32.866] LOG: Stats (IVs): HP: 39 (17), Atk: 15 (6), Def: 20 (19), Spatk: 37 (20), Spdef: 23 (27), Spd: 23 (16)
+[08:01:32.867] LOG: Ability: Loose Quills | Passive Ability: Corrosion 
+[08:01:32.867] LOG: Moveset: ["Acid Spray","Ancient Power","Poison Sting"]
+[08:01:33.829] LOG: {"id":"BERRY","localeKey":"","iconImage":"leppa_berry","group":"berry","soundName":"se/restore","tier":0,"berryType":10} (enemy)
+[08:01:33.830] LOG: Battle Seed: 1UtPlzbhmwIdPDyV
+[08:01:33.831] LOG: Generated AI funcs
+[08:01:33.911] DEBUG: Session data saved to slot 3!
+[08:01:33.912] LOG: Wave Seed: blkNJ_ObbianmqdZpQ 25
+[08:01:34.131] LOG: Rival Ivy
+[08:01:34.132] LOG: Dialogue dialogue:rival2Female.encounter.1 skipped
+[08:01:34.169] LOG: Rival Ivy
+[08:01:34.566] LOG: %cStart Phase SummonPhase color:green;
+[08:01:34.567] LOG: Ivy
+[08:01:34.847] LOG: %cStart Phase SummonPhase color:green;
+[08:01:34.847] LOG: Ivy
+[08:01:35.147] LOG: %cStart Phase SummonPhase color:green;
+[08:01:35.430] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[08:01:35.432] LOG: %cStart Phase SummonPhase color:green;
+[08:01:35.719] LOG: %cStart Phase ShinySparklePhase color:green;
+[08:01:35.827] LOG: %cStart Phase InitEncounterPhase color:green;
+[08:01:35.831] LOG: %cStart Phase PostSummonPhase color:green;
+[08:01:35.831] LOG: Ran PSP for: Vivillon
+[08:01:35.835] LOG: %cStart Phase PostSummonPhase color:green;
+[08:01:35.835] LOG: %cStart Phase MovePhase color:green;
+[08:01:35.835] LOG: %cUser: Vivillon
+Move: TAILWIND
+Use Mode: INDIRECT color:orchid
+[08:01:35.841] LOG: %cStart Phase MessagePhase color:green;
+[08:01:35.964] LOG: %cStart Phase MoveEffectPhase color:green;
+[08:01:36.003] LOG: %cStart Phase MessagePhase color:green;
+[08:01:36.247] LOG: %cStart Phase MoveEndPhase color:green;
+[08:01:36.252] LOG: %cStart Phase PostSummonPhase color:green;
+[08:01:36.253] LOG: %cStart Phase MovePhase color:green;
+[08:01:36.253] LOG: %cUser: Vivillon
+Move: POWDER
+Use Mode: INDIRECT color:orchid
+[08:01:36.261] LOG: %cStart Phase MessagePhase color:green;
+[08:01:36.372] LOG: %cStart Phase MoveEffectPhase color:green;
+[08:01:36.392] LOG: %cStart Phase MessagePhase color:green;
+[08:01:36.630] LOG: %cStart Phase MoveEndPhase color:green;
+[08:01:36.632] LOG: %cStart Phase PostSummonPhase color:green;
+[08:01:36.632] LOG: Ran PSP for: Tapu Lele
+[08:01:36.634] LOG: %cStart Phase PostSummonPhase color:green;
+[08:01:36.634] LOG: %cStart Phase ShowAbilityPhase color:green;
+[08:01:36.799] LOG: %cStart Phase StatStageChangePhase color:green;
+[08:01:36.985] LOG: %cStart Phase MessagePhase color:green;
+[08:01:37.214] LOG: %cStart Phase HideAbilityPhase color:green;
+[08:01:37.242] LOG: %cStart Phase PostSummonPhase color:green;
+[08:01:37.261] LOG: %cStart Phase ShowAbilityPhase color:green;
+[08:01:37.427] LOG: %cStart Phase CommonAnimPhase color:green;
+[08:01:37.930] LOG: %cStart Phase MessagePhase color:green;
+[08:01:38.164] LOG: %cStart Phase HideAbilityPhase color:green;
+[08:01:38.201] LOG: %cStart Phase PostSummonPhase color:green;
+[08:01:38.201] LOG: Ran PSP for: Corvisquire
+[08:01:38.203] LOG: %cStart Phase PostSummonPhase color:green;
+[08:01:38.205] LOG: %cStart Phase ShowAbilityPhase color:green;
+[08:01:38.385] LOG: %cStart Phase StatStageChangePhase color:green;
+[08:01:38.567] LOG: %cStart Phase MessagePhase color:green;
+[08:01:38.780] LOG: %cStart Phase StatStageChangePhase color:green;
+[08:01:38.958] LOG: %cStart Phase MessagePhase color:green;
+[08:01:39.189] LOG: %cStart Phase HideAbilityPhase color:green;
+[08:01:39.217] LOG: %cStart Phase PostSummonPhase color:green;
+[08:01:39.217] LOG: %cStart Phase PostSummonPhase color:green;
+[08:01:39.217] LOG: Ran PSP for: Crocalor
+[08:01:39.217] LOG: %cStart Phase PostSummonPhase color:green;
+[08:01:39.218] LOG: %cStart Phase PostSummonPhase color:green;
+[08:01:39.218] LOG: %cStart Phase TurnInitPhase color:green;
+[08:01:39.218] LOG: %cStart Phase CommandPhase color:green;
+[08:01:51.933] DEBUG: Session data saved to slot 3!
+[08:01:52.952] LOG: Seed: W8fqXEliglc1rq96Tbrug3jx
+[08:01:52.953] LOG: Wave Seed: W8fqXEliglc1rq96Tbrug3jx 0
+[08:01:53.094] WARN: AnimationManager key already exists: prompt
+[08:01:53.094] WARN: AnimationManager key already exists: tera_sparkle
+[08:01:53.094] LOG: Seed: u9dlN8dmydZ4SUuG4643W3GV
+[08:01:53.094] LOG: Wave Seed: u9dlN8dmydZ4SUuG4643W3GV 0
+[08:01:55.079] LOG: %cStart Phase LoginPhase color:green;
+[08:01:55.532] LOG: Client Session: iruvU9M2NWPFThIwrtyOLbiZyWMsqCHx
+[08:01:55.903] LOG: %cStart Phase TitlePhase color:green;
+[08:01:55.903] LOG: Getting Session Slot id: %d 3
+[08:01:55.906] LOG: use seasonal splash messages true
+[08:01:55.911] LOG: Adding 2 Pride Month splash messages (weight: x15)
+[08:02:02.406] LOG: %cStart Phase SelectChallengePhase color:green;
+[08:02:03.553] LOG: %cStart Phase SelectStarterPhase color:green;
+[08:02:06.559] WARN: cry/664 not found
+[08:02:06.564] WARN: cry/10029 not found
+[08:02:06.569] WARN: cry/290 not found
+[08:02:06.573] WARN: cry/13 not found
+[08:02:06.577] WARN: cry/527 not found
+[08:05:29.671] WARN: cry/10047 not found
+[08:06:01.406] WARN: cry/293 not found
+[08:06:04.664] WARN: cry/10047 not found
+[08:06:09.202] WARN: cry/10047 not found
+[08:06:17.958] WARN: cry/728 not found
+[08:06:25.302] WARN: cry/10724 not found
+[08:06:31.575] LOG: %cSaving starter preferences color: blue
+[08:06:54.046] WARN: cry/728 not found
+[08:07:00.470] WARN: cry/728 not found
+[08:07:02.195] LOG: %cSaving starter preferences color: blue
+[08:07:04.180] WARN: cry/728 not found
+[08:07:34.685] LOG: %cSaving starter preferences color: blue
+[08:08:02.686] WARN: cry/10724 not found
+[08:08:05.803] WARN: cry/293 not found
+[08:08:09.800] WARN: cry/293 not found
+[08:08:12.764] WARN: cry/293 not found
+[08:08:15.069] LOG: %cSaving starter preferences color: blue
+[08:08:28.119] LOG: %cSaving starter preferences color: blue
+[08:08:46.097] LOG: Getting Session Slot id: %d 0
+[08:08:46.105] LOG: Getting Session Slot id: %d 1
+[08:08:46.107] LOG: Getting Session Slot id: %d 2
+[08:08:46.109] LOG: Getting Session Slot id: %d 3
+[08:08:46.112] LOG: Getting Session Slot id: %d 4
+[08:08:46.153] LOG: Getting Session Slot id: %d 3
+[08:08:55.477] DEBUG: %cSending a request to delete session in slot %d color: blue 1
+[08:08:57.222] LOG: Wave Seed: v:emO9enze[5TVvH5754X4HW 1
+[08:08:57.224] LOG: %cStart Phase EncounterPhase color:green;
+[08:08:57.230] LOG: Starting species pool tier: RARE
+[08:08:57.240] LOG: Pokemon: Wild Igglybuff | Species ID: 174 | Level: 2 | Nature: Naughty (+Atk/-SpDef)
+[08:08:57.240] LOG: Stats (IVs): HP: 16 (22), Atk: 7 (19), Def: 5 (18), Spatk: 7 (30), Spdef: 5 (19), Spd: 5 (12)
+[08:08:57.241] LOG: Ability: Lullaby | Passive Ability: Cute Charm 
+[08:08:57.241] LOG: Moveset: ["Double Slap","Play Nice","Self-Destruct","Sing"]
+[08:08:57.241] LOG: Starting species pool tier: COMMON
+[08:08:57.246] LOG: Pokemon: Wild Patrat | Species ID: 504 | Level: 2 | Nature: Timid (+Spd/-Atk)
+[08:08:57.247] LOG: Stats (IVs): HP: 13 (6), Atk: 7 (27), Def: 6 (19), Spatk: 6 (14), Spdef: 6 (16), Spd: 9 (18)
+[08:08:57.247] LOG: Ability: Run Away | Passive Ability: Analytic 
+[08:08:57.247] LOG: Moveset: ["Hyper Fang","Focus Energy","Leer","Hypnosis"]
+[08:08:57.740] DEBUG: Session data saved to slot 1!
+[08:08:57.740] LOG: Wave Seed: v:emO9enze[5TVvH5754X4HW 1
+[08:08:57.743] LOG: [er-ghost] challenge prefetch: +20 from 'youngster' pool
+[08:08:58.210] LOG: %cStart Phase SummonPhase color:green;
+[08:08:58.409] WARN: cry/664 not found
+[08:08:58.508] LOG: %cStart Phase ShinySparklePhase color:green;
+[08:08:58.625] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[08:08:58.628] LOG: %cStart Phase SummonPhase color:green;
+[08:08:58.654] LOG: [er-ghost] challenge prefetch: +20 from 'hell' pool
+[08:08:58.655] LOG: [er-ghost] challenge pool ready: 40 team(s) of 40 fetched
+[08:08:58.826] WARN: cry/10029 not found
+[08:08:58.941] LOG: %cStart Phase CheckSwitchPhase color:green;
+[08:08:59.792] LOG: %cStart Phase CheckSwitchPhase color:green;
+[08:09:00.107] LOG: %cStart Phase SwitchPhase color:green;
+[08:09:03.312] LOG: %cStart Phase SwitchSummonPhase color:green;
+[08:09:03.542] WARN: cry/10047 not found
+[08:09:03.650] LOG: %cStart Phase PostSummonPhase color:green;
+[08:09:03.650] LOG: Ran PSP for: Iron Voca
+[08:09:03.651] LOG: %cStart Phase PostSummonPhase color:green;
+[08:09:03.652] LOG: %cStart Phase PostSummonPhase color:green;
+[08:09:03.652] LOG: %cStart Phase InitEncounterPhase color:green;
+[08:09:03.654] LOG: %cStart Phase PostSummonPhase color:green;
+[08:09:03.654] LOG: Ran PSP for: Scatterbug
+[08:09:03.657] LOG: %cStart Phase PostSummonPhase color:green;
+[08:09:03.659] LOG: %cStart Phase PostSummonPhase color:green;
+[08:09:03.660] LOG: %cStart Phase PostSummonPhase color:green;
+[08:09:03.660] LOG: Ran PSP for: Patrat
+[08:09:03.661] LOG: %cStart Phase PostSummonPhase color:green;
+[08:09:03.662] LOG: %cStart Phase PostSummonPhase color:green;
+[08:09:03.662] LOG: %cStart Phase PostSummonPhase color:green;
+[08:09:03.662] LOG: Ran PSP for: Igglybuff
+[08:09:03.662] LOG: %cStart Phase PostSummonPhase color:green;
+[08:09:03.662] LOG: %cStart Phase PostSummonPhase color:green;
+[08:09:03.662] LOG: %cStart Phase TurnInitPhase color:green;
+[08:09:03.662] LOG: %cStart Phase CommandPhase color:green;
+[08:09:05.949] LOG: Move: DECORATE Move targets: {"targets":[2,3],"multiple":false} 
+Player Pokemon: Scatterbug
+[08:09:05.951] LOG: %cStart Phase SelectTargetPhase color:green;
+[08:09:06.199] LOG: %cStart Phase CommandPhase color:green;
+[08:09:08.980] LOG: Move: ROUND Move targets: {"targets":[2,3,0],"multiple":false} 
+Player Pokemon: Iron Voca
+[08:09:08.983] LOG: %cStart Phase SelectTargetPhase color:green;
+[08:09:09.554] LOG: %cStart Phase CommandPhase color:green;
+[08:09:11.689] WARN: cry/10047 not found
+[08:09:16.498] LOG: Move: SPARKLING_ARIA Move targets: {"targets":[2,3,0],"multiple":true} 
+Player Pokemon: Iron Voca
+[08:09:16.501] LOG: %cStart Phase SelectTargetPhase color:green;
+[08:09:21.676] LOG: %cStart Phase EnemyCommandPhase color:green;
+[08:09:21.692] LOG: Battle Seed: qwMWuoS7RkYzQRve
+[08:09:21.704] LOG: Move Pool: ["Double Slap","Play Nice","Self-Destruct","Sing"]
+[08:09:21.704] LOG: Move Scores: [30,2,81,10]
+[08:09:21.704] LOG: Sorted Move Pool: ["Self-Destruct","Double Slap","Sing","Play Nice"]
+[08:09:21.704] LOG: Chosen Move: Double Slap
+[08:09:21.704] LOG: %cStart Phase EnemyCommandPhase color:green;
+[08:09:21.712] LOG: Move Pool: ["Hyper Fang","Focus Energy","Leer","Hypnosis"]
+[08:09:21.712] LOG: Move Scores: [66,5,2,10]
+[08:09:21.712] LOG: Sorted Move Pool: ["Hyper Fang","Hypnosis","Focus Energy","Leer"]
+[08:09:21.712] LOG: Chosen Move: Hyper Fang
+[08:09:21.712] LOG: %cStart Phase TurnStartPhase color:green;
+[08:09:21.720] LOG: %cStart Phase MovePhase color:green;
+[08:09:21.720] LOG: %cUser: Iron Voca
+Move: SPARKLING_ARIA
+Use Mode: NORMAL color:orchid
+[08:09:21.721] LOG: %cStart Phase MessagePhase color:green;
+[08:09:21.833] LOG: %cStart Phase MoveEffectPhase color:green;
+[08:09:22.466] LOG: crit stage: +0
+[08:09:22.468] LOG: Move: Sparkling Aria | Base damage: 19.333333333333332 | Power: 130 | Source attack: 15 | Target defense: 9
+[08:09:22.469] LOG: Move: Sparkling Aria | Attack damage: 11
+[08:09:22.469] LOG: crit stage: +0
+[08:09:22.471] LOG: Move: Sparkling Aria | Base damage: 33.2 | Power: 130 | Source attack: 15 | Target defense: 5
+[08:09:22.471] LOG: Move: Sparkling Aria | Attack damage: 21
+[08:09:22.471] LOG: crit stage: +0
+[08:09:22.473] LOG: Move: Sparkling Aria | Base damage: 28 | Power: 130 | Source attack: 15 | Target defense: 6
+[08:09:22.473] LOG: Move: Sparkling Aria | Attack damage: 20
+[08:09:22.473] LOG: %cStart Phase DamageAnimPhase color:green;
+[08:09:22.503] LOG: %cStart Phase DamageAnimPhase color:green;
+[08:09:22.536] LOG: %cStart Phase DamageAnimPhase color:green;
+[08:09:22.568] LOG: %cStart Phase FaintPhase color:green;
+[08:09:23.437] LOG: %cStart Phase MessagePhase color:green;
+[08:09:23.530] LOG: %cStart Phase VictoryPhase color:green;
+[08:09:23.531] LOG: %cStart Phase ExpPhase color:green;
+[08:09:23.708] LOG: %cStart Phase ExpPhase color:green;
+[08:09:23.926] LOG: %cStart Phase FaintPhase color:green;
+[08:09:24.667] LOG: %cStart Phase MessagePhase color:green;
+[08:09:27.697] LOG: %cStart Phase VictoryPhase color:green;
+[08:09:27.698] LOG: %cStart Phase ExpPhase color:green;
+[08:09:27.992] LOG: %cStart Phase ExpPhase color:green;
+[08:09:28.275] LOG: %cStart Phase MoveEndPhase color:green;
+[08:09:28.277] LOG: %cStart Phase MovePhase color:green;
+[08:09:28.277] LOG: %cUser: Scatterbug
+Move: DECORATE
+Use Mode: NORMAL color:orchid
+[08:09:28.278] LOG: %cStart Phase MessagePhase color:green;
+[08:09:28.416] LOG: %cStart Phase MessagePhase color:green;
+[08:09:28.633] LOG: %cStart Phase MoveEndPhase color:green;
+[08:09:28.635] LOG: %cStart Phase MovePhase color:green;
+[08:09:28.635] LOG: %cStart Phase MoveEndPhase color:green;
+[08:09:28.635] LOG: %cStart Phase MovePhase color:green;
+[08:09:28.635] LOG: %cStart Phase MoveEndPhase color:green;
+[08:09:28.635] LOG: %cStart Phase CheckInterludePhase color:green;
+[08:09:28.635] LOG: %cStart Phase WeatherEffectPhase color:green;
+[08:09:28.635] LOG: %cStart Phase PositionalTagPhase color:green;
+[08:09:28.635] LOG: %cStart Phase BerryPhase color:green;
+[08:09:28.637] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[08:09:28.638] LOG: %cStart Phase TurnEndPhase color:green;
+[08:09:28.646] WARN: [coop:turn] host recorder: finalize with NO open recording -> turn=-1 events=0 (caller decides not to emit)
+[08:09:28.646] LOG: %cStart Phase BattleEndPhase color:green;
+[08:09:28.646] LOG: Battle Score: 20 (1 Turns x1)
+[08:09:28.646] LOG: Total Score: 20
+[08:09:28.662] LOG: %cStart Phase ShowAbilityPhase color:green;
+[08:09:28.662] LOG: %cStart Phase HideAbilityPhase color:green;
+[08:09:28.693] LOG: %cStart Phase MessagePhase color:green;
+[08:09:29.541] LOG: %cStart Phase EggLapsePhase color:green;
+[08:09:29.542] LOG: %cStart Phase SelectModifierPhase color:green;
+[08:09:29.542] LOG: Wave Seed: v:emO9enze[5TVvH5754X4HW 1
+[08:09:29.552] LOG: 0 0 [3,4,5]
+[08:09:29.553] LOG: {"id":"POKEBALL","localeKey":"","iconImage":"pb","group":"pb","soundName":"se/pb_bounce_1","tier":0,"pokeballType":0,"count":5} 
+[08:09:29.553] LOG: 0 0 [3,4,5]
+[08:09:29.553] LOG: {"id":"POKEBALL","localeKey":"","iconImage":"pb","group":"pb","soundName":"se/pb_bounce_1","tier":0,"pokeballType":0,"count":5} 
+[08:09:29.553] LOG: 2 0 [3,4,5]
+[08:09:29.553] LOG: {"id":"POTION","localeKey":"modifierType:ModifierType.POTION","iconImage":"potion","group":"potion","soundName":"se/restore","tier":0,"restorePoints":20,"restorePercent":10,"healStatus":false} 
+[08:09:29.553] LOG: 1 0 [3,4,5]
+[08:09:29.553] LOG: {"id":"RARE_CANDY","localeKey":"modifierType:ModifierType.RARE_CANDY","iconImage":"rare_candy","soundName":"se/restore","tier":0} 
