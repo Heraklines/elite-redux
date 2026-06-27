@@ -10,33 +10,28 @@
 // The in-game counterpart of the web Shiny Lab (shiny-lab.pages.dev). A stylish,
 // fully DIRECTIONAL-KEY navigable (no mouse) full-screen designer reached from
 // Starter Select. The player browses the three effect layers - Palette (T1-2),
-// Surface FX (T3) and Around FX / aura (T4 black shiny) - for one species, sees
-// a live mon preview, equips what they own, spends candy on what they can, and
-// tunes per-layer intensity / texture / seed, saving up to 5 presets.
+// Surface FX (T3) and Aura (T4 black shiny) - for one species, sees a live mon
+// preview, equips what they own, spends candy on what they can, and tunes
+// per-layer intensity / texture / seed, saving up to 5 presets.
 //
 // Theme mirrors the web lab: a dark "void" backdrop with three neon accents -
-// cyan (palette), pink (surface), gold (around) - so the in-game tool reads as
-// the same product the team already uses.
+// cyan (palette), pink (surface), gold (aura).
 //
-// NAVIGATION (directional + Action/Cancel only, no pointer):
-//   The screen has three focus zones, with Cancel as a universal "back up one
-//   level" (sub-zone -> list, list -> exit). Within any zone L/R is the
-//   horizontal action and U/D the vertical one, so the mapping never changes
-//   meaning under the player's thumb:
-//     LIST   - U/D browse effects, L/R switch category, A equip/buy, B exit.
-//              DOWN past the last effect drops into TUNE.
-//     TUNE   - L/R select control (or step out at the ends), U/D adjust value,
-//              A reset the control, B back to LIST.
-//     PRESETS- L/R select slot (or step back to TUNE at the left end), A load
-//              (or save into an empty slot), UP save, B back to LIST.
-//   A context hint line at the very bottom always teaches the active zone.
+// NAVIGATION - four tabs, ONE simple model (no hidden zones):
+//   PALETTE | SURFACE | AURA | TUNE
+//   - In an EFFECT tab (Palette/Surface/Aura): Left/Right switch tab, Up/Down
+//     browse the effect list, A equip/buy, B exit.
+//   - In the TUNE tab: Up/Down pick a control row (the per-layer sliders, texture,
+//     seed, and the load/save-preset rows), Left/Right adjust the selected control,
+//     A does its action (reset a slider / reroll the seed / load or save a preset),
+//     B returns to the effect tabs.
+//   A context hint line at the bottom always teaches the active tab.
 //
 // Modeled on ErBargainUiHandler / BiomeShop: a full-screen container the UI shows
 // on top of the field, placed at y = -h so a child at logical (0,0) lands at the
 // screen top-left. Pure presentation + cursor + callbacks; the caller owns the
-// real save data (this handler is driven by an {@linkcode ErShinyLabConfig}; a
-// self-contained demo config is generated when none is supplied so the screen is
-// renderable on its own).
+// real save data (driven by an {@linkcode ErShinyLabConfig}; a self-contained demo
+// config is generated when none is supplied so the screen is renderable on its own).
 // =============================================================================
 
 import { globalScene } from "#app/global-scene";
@@ -104,33 +99,42 @@ export interface ErShinyLabConfig {
   onChange?: (loadout: ErShinyLabLoadout, params: ErShinyLabParams) => void;
   /** Fired when the player spends candy to buy an effect (caller debits + persists). */
   onBuy?: (category: ErShinyLabCategory, effect: ErShinyLabEffect) => void;
-  /** Fired on exit (Cancel from the list). */
+  /** Fired on exit (Cancel from an effect tab). */
   onExit?: () => void;
 }
 
 /** The resolved gate state of an effect for the current species (the 3-gate resolver, visualized). */
 type EffectState = "equipped" | "owned" | "buyable" | "locked-tier" | "locked-achv" | "locked-candy";
 
-/** Which focus zone owns the directional input right now. */
-type Focus = "list" | "tune" | "presets";
+/** The active tab: one of the three effect layers, or the tuning panel. */
+type Tab = ErShinyLabCategory | "tune";
+
+/** A row in the TUNE panel. */
+type TuneRow = "palAmt" | "surfAmt" | "aroAmt" | "scale" | "seed" | "load" | "save";
 
 const CATEGORIES: ErShinyLabCategory[] = ["palette", "surface", "around"];
-const CATEGORY_LABEL: Record<ErShinyLabCategory, string> = {
+const TABS: Tab[] = ["palette", "surface", "around", "tune"];
+const TAB_LABEL: Record<Tab, string> = {
   palette: "PALETTE",
   surface: "SURFACE",
-  around: "AROUND",
+  around: "AURA",
+  tune: "TUNE",
 };
-/** Neon accent per layer (mirrors the web lab: cyan / pink / gold). */
-const CATEGORY_ACCENT: Record<ErShinyLabCategory, number> = {
+/** Neon accent per tab (mirrors the web lab: cyan / pink / gold; soft white for tune). */
+const TAB_ACCENT: Record<Tab, number> = {
   palette: 0x5ad1ff,
   surface: 0xff7ad9,
   around: 0xffd27a,
+  tune: 0xc9d4e8,
 };
-const CATEGORY_ACCENT_HEX: Record<ErShinyLabCategory, string> = {
+const TAB_ACCENT_HEX: Record<Tab, string> = {
   palette: "#5ad1ff",
   surface: "#ff7ad9",
   around: "#ffd27a",
+  tune: "#c9d4e8",
 };
+/** Short single-letter prefix for the equipped-loadout chips (P / S / A). */
+const CHIP_PREFIX: Record<ErShinyLabCategory, string> = { palette: "P", surface: "S", around: "A" };
 const RARITY_HEX: Record<ErShinyLabRarity, string> = {
   common: "#aab4c6",
   rare: "#5ab6ff",
@@ -146,10 +150,11 @@ const RARITY_COLOR: Record<ErShinyLabRarity, number> = {
 /** Minimum earned tier per layer (the locked decisions: T1-2 palette, T3 surface, T4 aura). */
 const CATEGORY_MIN_TIER: Record<ErShinyLabCategory, number> = { palette: 1, surface: 3, around: 4 };
 
-const VOID_COLOR = 0x080912;
 const INK = "#e8ecf6";
 const DIM = "#8b93a8";
 const GOLD = "#ffd27a";
+const VOID_COLOR = 0x080912;
+const PANEL_TINT = 0x2a3050;
 
 // --- Layout (logical 320x180; container at y=-h so child (0,0) == top-left) ---
 const SCREEN_W = 320;
@@ -165,26 +170,22 @@ const TAB_H = 13;
 const LIST_X = RIGHT_X;
 const LIST_Y = 31;
 const LIST_W = RIGHT_W;
-const LIST_H = 91;
+const LIST_H = 105;
 const ROW_X = LIST_X + 9;
 const ROW_Y0 = LIST_Y + 9;
-const ROW_STEP = 11;
+const ROW_STEP = 13;
 const VISIBLE_ROWS = 7;
 const DETAIL_X = RIGHT_X;
-const DETAIL_Y = 124;
+const DETAIL_Y = 139;
 const DETAIL_W = RIGHT_W;
-const DETAIL_H = 30;
-// The contextual tune/preset bar sits under the detail panel in the RIGHT column only,
-// so the left column stays clear for the preview pane + its equipped-loadout chips.
-const BAR_X = RIGHT_X;
-const BAR_Y = 156;
-const BAR_W = RIGHT_W;
-const BAR_H = 16;
-const HINT_Y = 174;
-/** The 5 tunable controls, in L/R order. */
-const TUNE_KEYS = ["palAmt", "surfAmt", "aroAmt", "scale", "seed"] as const;
-const TUNE_LABEL = ["Pal", "Surf", "Aura", "Tex", "Seed"];
-const PRESET_COUNT = 5;
+const DETAIL_H = 31;
+const HINT_Y = 173;
+// TUNE panel geometry: a label, a segmented bar, and a right-aligned value per row.
+const TUNE_ROWS: TuneRow[] = ["palAmt", "surfAmt", "aroAmt", "scale", "seed", "load", "save"];
+const TUNE_BAR_X = ROW_X + 60;
+const TUNE_BAR_SEGMENTS = 12;
+const TUNE_SEG_W = 6;
+const TUNE_VALUE_X = LIST_X + LIST_W - 9;
 
 export class ErShinyLabUiHandler extends UiHandler {
   private container: Phaser.GameObjects.Container;
@@ -200,11 +201,14 @@ export class ErShinyLabUiHandler extends UiHandler {
   private chipTexts: Phaser.GameObjects.Text[] = [];
   // Header.
   private titleText: Phaser.GameObjects.Text;
+  private candyIcon: Phaser.GameObjects.Sprite;
   private candyText: Phaser.GameObjects.Text;
   // Tabs.
   private tabTexts: Phaser.GameObjects.Text[] = [];
   private tabUnderline: Phaser.GameObjects.Rectangle;
-  // List.
+  private tabHintL: Phaser.GameObjects.Text;
+  private tabHintR: Phaser.GameObjects.Text;
+  // List / panel body.
   private listWindow: Phaser.GameObjects.NineSlice;
   private rowTexts: Phaser.GameObjects.Text[] = [];
   private rowDots: Phaser.GameObjects.Rectangle[] = [];
@@ -212,23 +216,26 @@ export class ErShinyLabUiHandler extends UiHandler {
   private cursorObj: Phaser.GameObjects.Rectangle;
   private scrollUp: Phaser.GameObjects.Text;
   private scrollDown: Phaser.GameObjects.Text;
+  /** Rebuilt container for the TUNE panel rows (labels + bars + values). */
+  private tuneContent: Phaser.GameObjects.Container;
   // Detail.
   private detailWindow: Phaser.GameObjects.NineSlice;
   private detailTitle: Phaser.GameObjects.Text;
   private detailMeta: Phaser.GameObjects.Text;
   private detailStatus: Phaser.GameObjects.Text;
-  // Bottom contextual bar.
-  private barWindow: Phaser.GameObjects.NineSlice;
-  private barContent: Phaser.GameObjects.Container;
+  // Hint.
   private hintText: Phaser.GameObjects.Text;
 
   // State.
   private config: ErShinyLabConfig | null = null;
-  private focus: Focus = "list";
-  private category: ErShinyLabCategory = "palette";
+  private tab: Tab = "palette";
+  // `cursor` (the active effect-list index) is the inherited UiHandler.cursor.
   private scrollTop = 0;
-  private tuneSel = 0;
-  private presetSel = 0;
+  /** Cursor within the TUNE panel rows. */
+  private tuneCursor = 0;
+  /** Which preset the "Load preset" row points at, and which slot "Save" targets. */
+  private loadSel = 0;
+  private saveSel = 0;
   private openedAt = 0;
 
   constructor() {
@@ -243,7 +250,7 @@ export class ErShinyLabUiHandler extends UiHandler {
     this.container.setVisible(false);
     ui.add(this.container);
 
-    // Opaque void backdrop with a faint vignette band at the top for the header.
+    // Opaque void backdrop + a header band.
     this.container.add(globalScene.add.rectangle(0, 0, SCREEN_W, SCREEN_H, VOID_COLOR, 1).setOrigin(0));
     this.container.add(globalScene.add.rectangle(0, 0, SCREEN_W, 15, 0x11131d, 1).setOrigin(0));
 
@@ -255,13 +262,18 @@ export class ErShinyLabUiHandler extends UiHandler {
     this.titleText = addTextObject(20, 2, "SHINY LAB", TextStyle.WINDOW, { fontSize: "56px" });
     this.titleText.setOrigin(0, 0).setColor("#a6e9ff");
     this.container.add(this.titleText);
-    this.candyText = addTextObject(SCREEN_W - 8, 3, "", TextStyle.WINDOW, { fontSize: "44px" });
+    // Candy: the real candy icon (tinted gold) + the count, top-right.
+    this.candyText = addTextObject(SCREEN_W - 6, 3, "", TextStyle.WINDOW, { fontSize: "48px" });
     this.candyText.setOrigin(1, 0).setColor(GOLD);
     this.container.add(this.candyText);
+    this.candyIcon = globalScene.add.sprite(SCREEN_W - 8, 9, "candy");
+    this.candyIcon.setOrigin(1, 0.5).setTint(0xffcf52);
+    this.fitCandyIcon();
+    this.container.add(this.candyIcon);
 
     // --- Preview pane ---
     this.previewWindow = addWindow(PREV_X, PREV_Y, PREV_W, PREV_H);
-    this.previewWindow.setTint(0x2a3050);
+    this.previewWindow.setTint(PANEL_TINT);
     this.container.add(this.previewWindow);
 
     const cx = PREV_X + PREV_W / 2;
@@ -276,8 +288,7 @@ export class ErShinyLabUiHandler extends UiHandler {
     this.container.add(this.auraRing);
 
     this.monSprite = globalScene.add.sprite(cx, cy, "unknown");
-    this.monSprite.setOrigin(0.5, 0.5);
-    this.monSprite.setVisible(false);
+    this.monSprite.setOrigin(0.5, 0.5).setVisible(false);
     this.container.add(this.monSprite);
 
     this.nameText = addTextObject(cx, PREV_Y + 98, "", TextStyle.WINDOW, { fontSize: "52px", align: "center" });
@@ -288,28 +299,29 @@ export class ErShinyLabUiHandler extends UiHandler {
     this.container.add(this.tierText);
 
     // --- Tabs ---
-    const tabW = RIGHT_W / 3;
-    for (let i = 0; i < CATEGORIES.length; i++) {
-      const t = addTextObject(
-        RIGHT_X + tabW * i + tabW / 2,
-        TAB_Y + 1,
-        CATEGORY_LABEL[CATEGORIES[i]],
-        TextStyle.WINDOW,
-        {
-          fontSize: "44px",
-          align: "center",
-        },
-      );
+    const tabW = RIGHT_W / TABS.length;
+    for (let i = 0; i < TABS.length; i++) {
+      const t = addTextObject(RIGHT_X + tabW * i + tabW / 2, TAB_Y + 1, TAB_LABEL[TABS[i]], TextStyle.WINDOW, {
+        fontSize: "38px",
+        align: "center",
+      });
       t.setOrigin(0.5, 0);
       this.container.add(t);
       this.tabTexts.push(t);
     }
     this.tabUnderline = globalScene.add.rectangle(RIGHT_X, TAB_Y + TAB_H - 1, tabW, 2, 0x5ad1ff, 1).setOrigin(0, 0.5);
     this.container.add(this.tabUnderline);
+    // "<" / ">" chevrons flanking the active tab so it reads as Left/Right switchable.
+    this.tabHintL = addTextObject(0, TAB_Y + 2, "<", TextStyle.WINDOW, { fontSize: "38px" });
+    this.tabHintL.setOrigin(0.5, 0).setColor(DIM);
+    this.container.add(this.tabHintL);
+    this.tabHintR = addTextObject(0, TAB_Y + 2, ">", TextStyle.WINDOW, { fontSize: "38px" });
+    this.tabHintR.setOrigin(0.5, 0).setColor(DIM);
+    this.container.add(this.tabHintR);
 
-    // --- List ---
+    // --- List / panel body ---
     this.listWindow = addWindow(LIST_X, LIST_Y, LIST_W, LIST_H);
-    this.listWindow.setTint(0x2a3050);
+    this.listWindow.setTint(PANEL_TINT);
     this.container.add(this.listWindow);
 
     this.cursorObj = globalScene.add.rectangle(0, 0, LIST_W - 12, ROW_STEP, 0xffffff, 0);
@@ -327,11 +339,10 @@ export class ErShinyLabUiHandler extends UiHandler {
 
     for (let i = 0; i < VISIBLE_ROWS; i++) {
       const y = ROW_Y0 + i * ROW_STEP;
-      const dot = globalScene.add.rectangle(ROW_X, y, 4, 4, 0xffffff, 1).setOrigin(0.5, 0.5);
-      dot.setVisible(false);
+      const dot = globalScene.add.rectangle(ROW_X, y, 5, 5, 0xffffff, 1).setOrigin(0.5, 0.5).setVisible(false);
       this.container.add(dot);
       this.rowDots.push(dot);
-      const label = addTextObject(ROW_X + 8, y, "", TextStyle.WINDOW, { fontSize: "48px" });
+      const label = addTextObject(ROW_X + 9, y, "", TextStyle.WINDOW, { fontSize: "48px" });
       label.setOrigin(0, 0.5);
       this.container.add(label);
       this.rowTexts.push(label);
@@ -341,30 +352,27 @@ export class ErShinyLabUiHandler extends UiHandler {
       this.rowTokens.push(token);
     }
 
+    this.tuneContent = globalScene.add.container(0, 0);
+    this.container.add(this.tuneContent);
+
     // --- Detail ---
     this.detailWindow = addWindow(DETAIL_X, DETAIL_Y, DETAIL_W, DETAIL_H);
-    this.detailWindow.setTint(0x2a3050);
+    this.detailWindow.setTint(PANEL_TINT);
     this.container.add(this.detailWindow);
-    this.detailTitle = addTextObject(DETAIL_X + 8, DETAIL_Y + 4, "", TextStyle.WINDOW, { fontSize: "48px" });
+    this.detailTitle = addTextObject(DETAIL_X + 8, DETAIL_Y + 5, "", TextStyle.WINDOW, { fontSize: "48px" });
     this.detailTitle.setOrigin(0, 0);
     this.container.add(this.detailTitle);
-    this.detailMeta = addTextObject(DETAIL_X + DETAIL_W - 8, DETAIL_Y + 5, "", TextStyle.WINDOW, {
+    this.detailMeta = addTextObject(DETAIL_X + DETAIL_W - 8, DETAIL_Y + 6, "", TextStyle.WINDOW, {
       fontSize: "36px",
       align: "right",
     });
     this.detailMeta.setOrigin(1, 0).setColor(DIM);
     this.container.add(this.detailMeta);
-    this.detailStatus = addTextObject(DETAIL_X + 8, DETAIL_Y + 17, "", TextStyle.WINDOW, { fontSize: "38px" });
+    this.detailStatus = addTextObject(DETAIL_X + 8, DETAIL_Y + 18, "", TextStyle.WINDOW, { fontSize: "38px" });
     this.detailStatus.setOrigin(0, 0).setColor(DIM);
     this.container.add(this.detailStatus);
 
-    // --- Bottom contextual bar ---
-    this.barWindow = addWindow(BAR_X, BAR_Y, BAR_W, BAR_H);
-    this.barWindow.setTint(0x2a3050);
-    this.container.add(this.barWindow);
-    this.barContent = globalScene.add.container(0, 0);
-    this.container.add(this.barContent);
-
+    // --- Hint ---
     this.hintText = addTextObject(SCREEN_W / 2, HINT_Y, "", TextStyle.WINDOW, { fontSize: "34px", align: "center" });
     this.hintText.setOrigin(0.5, 0).setColor(DIM);
     this.container.add(this.hintText);
@@ -373,23 +381,18 @@ export class ErShinyLabUiHandler extends UiHandler {
   show(args: any[]): boolean {
     const cfg = args.length > 0 && this.isConfig(args[0]) ? (args[0] as ErShinyLabConfig) : buildDemoConfig(144);
     this.config = cfg;
-    this.focus = "list";
-    this.category = "palette";
+    this.tab = "palette";
     this.cursor = 0;
     this.scrollTop = 0;
-    this.tuneSel = 0;
-    this.presetSel = 0;
+    this.tuneCursor = 0;
+    this.loadSel = 0;
+    this.saveSel = 0;
 
-    this.candyText.setText(`Candy ${cfg.candy}`);
+    this.candyText.setText(String(cfg.candy));
+    this.repositionCandyIcon();
     this.nameText.setText(cfg.speciesName);
     this.refreshTier();
-    this.refreshTabs();
-    this.rebuildRows();
-    this.moveCursorTo(0);
-    this.refreshDetail();
-    this.refreshPreview();
-    this.refreshBar();
-    this.refreshHint();
+    this.render();
 
     this.openedAt = performance.now();
     this.container.setVisible(true);
@@ -410,8 +413,15 @@ export class ErShinyLabUiHandler extends UiHandler {
 
   // ---- Data helpers -------------------------------------------------------
 
+  private effectCategory(): ErShinyLabCategory {
+    return this.tab === "tune" ? "palette" : this.tab;
+  }
+
   private effects(): ErShinyLabEffect[] {
-    return this.config?.effects[this.category] ?? [];
+    if (this.tab === "tune") {
+      return [];
+    }
+    return this.config?.effects[this.tab] ?? [];
   }
 
   private focusedEffect(): ErShinyLabEffect | null {
@@ -438,11 +448,6 @@ export class ErShinyLabUiHandler extends UiHandler {
 
   // ---- Preview sprite -----------------------------------------------------
 
-  /**
-   * Load + show the species' front battle sprite in the preview pane. Synchronous
-   * when cached, on-demand otherwise (the placeholder stays until it lands). Mirrors
-   * the bargain handler's on-demand Giratina load.
-   */
   private loadPreviewSprite(speciesId: number): void {
     const species = getPokemonSpecies(speciesId);
     const key = species.getSpriteKey(false, 0, false, 0);
@@ -474,7 +479,35 @@ export class ErShinyLabUiHandler extends UiHandler {
     this.monSprite.setVisible(true);
   }
 
-  // ---- Render: tier / tabs / rows / detail / preview / bar / hint ----------
+  private fitCandyIcon(): void {
+    this.candyIcon.setScale(1);
+    const sh = this.candyIcon.height || 16;
+    this.candyIcon.setScale(11 / sh);
+  }
+
+  /** Place the candy icon just left of the (right-aligned) candy count. */
+  private repositionCandyIcon(): void {
+    const left = this.candyText.x - this.candyText.displayWidth - 4;
+    this.candyIcon.setX(left);
+  }
+
+  // ---- Render -------------------------------------------------------------
+
+  /** Full refresh for the current tab (tabs, body, detail, preview, cursor, hint). */
+  private render(): void {
+    this.refreshTabs();
+    if (this.tab === "tune") {
+      this.hideEffectRows();
+      this.refreshTune();
+    } else {
+      this.tuneContent.removeAll(true);
+      this.rebuildRows();
+      this.placeEffectCursor();
+      this.refreshEffectDetail();
+    }
+    this.refreshPreview();
+    this.refreshHint();
+  }
 
   private refreshTier(): void {
     const cfg = this.config;
@@ -486,11 +519,16 @@ export class ErShinyLabUiHandler extends UiHandler {
       p.destroy();
     }
     this.tierPips = [];
-    const totalW = 4 * 6 - 2;
-    const x0 = PREV_X + PREV_W / 2 - totalW / 2;
+    const x0 = PREV_X + PREV_W / 2 - (4 * 6 - 2) / 2;
     for (let i = 0; i < 4; i++) {
-      const on = i < cfg.earnedTier;
-      const pip = globalScene.add.rectangle(x0 + i * 6, PREV_Y + 120, 4, 4, on ? 0xffd27a : 0x39405a, 1);
+      const pip = globalScene.add.rectangle(
+        x0 + i * 6,
+        PREV_Y + 120,
+        4,
+        4,
+        i < cfg.earnedTier ? 0xffd27a : 0x39405a,
+        1,
+      );
       pip.setOrigin(0, 0.5);
       this.container.add(pip);
       this.tierPips.push(pip);
@@ -512,9 +550,10 @@ export class ErShinyLabUiHandler extends UiHandler {
     for (const cat of CATEGORIES) {
       const id = cfg.equipped[cat];
       const eff = id ? cfg.effects[cat].find(e => e.id === id) : null;
-      const label = `${CATEGORY_LABEL[cat][0]} ${eff ? eff.label : "-"}`;
-      const chip = addTextObject(PREV_X + 8, y, label, TextStyle.WINDOW, { fontSize: "32px" });
-      chip.setOrigin(0, 0).setColor(eff ? CATEGORY_ACCENT_HEX[cat] : DIM);
+      const chip = addTextObject(PREV_X + 8, y, `${CHIP_PREFIX[cat]} ${eff ? eff.label : "-"}`, TextStyle.WINDOW, {
+        fontSize: "32px",
+      });
+      chip.setOrigin(0, 0).setColor(eff ? TAB_ACCENT_HEX[cat] : DIM);
       this.container.add(chip);
       this.chipTexts.push(chip);
       y += 8;
@@ -522,22 +561,38 @@ export class ErShinyLabUiHandler extends UiHandler {
   }
 
   private refreshTabs(): void {
-    const tabW = RIGHT_W / 3;
-    for (let i = 0; i < CATEGORIES.length; i++) {
-      const cat = CATEGORIES[i];
-      const on = cat === this.category;
-      const reachable = (this.config?.earnedTier ?? 1) >= CATEGORY_MIN_TIER[cat];
-      this.tabTexts[i].setColor(on ? CATEGORY_ACCENT_HEX[cat] : reachable ? DIM : "#5a6072");
+    const tabW = RIGHT_W / TABS.length;
+    for (let i = 0; i < TABS.length; i++) {
+      const tab = TABS[i];
+      const on = tab === this.tab;
+      const reachable = tab === "tune" || (this.config?.earnedTier ?? 1) >= CATEGORY_MIN_TIER[tab];
+      this.tabTexts[i].setColor(on ? TAB_ACCENT_HEX[tab] : reachable ? DIM : "#5a6072");
       this.tabTexts[i].setAlpha(reachable ? 1 : 0.6);
     }
-    const idx = CATEGORIES.indexOf(this.category);
+    const idx = TABS.indexOf(this.tab);
     this.tabUnderline.setX(RIGHT_X + tabW * idx);
-    this.tabUnderline.setFillStyle(CATEGORY_ACCENT[this.category], 1);
+    this.tabUnderline.setFillStyle(TAB_ACCENT[this.tab], 1);
+    // Park the chevrons just outside the active tab label.
+    const t = this.tabTexts[idx];
+    this.tabHintL.setX(RIGHT_X + tabW * idx + tabW / 2 - t.displayWidth / 2 - 6);
+    this.tabHintR.setX(RIGHT_X + tabW * idx + tabW / 2 + t.displayWidth / 2 + 6);
+    this.tabHintL.setVisible(idx > 0);
+    this.tabHintR.setVisible(idx < TABS.length - 1);
+  }
+
+  private hideEffectRows(): void {
+    for (let i = 0; i < VISIBLE_ROWS; i++) {
+      this.rowTexts[i].setText("");
+      this.rowTokens[i].setText("");
+      this.rowDots[i].setVisible(false);
+    }
+    this.scrollUp.setVisible(false);
+    this.scrollDown.setVisible(false);
   }
 
   private rebuildRows(): void {
     const list = this.effects();
-    // Keep the cursor on-screen within the VISIBLE_ROWS window.
+    const cat = this.effectCategory();
     if (this.cursor < this.scrollTop) {
       this.scrollTop = this.cursor;
     } else if (this.cursor >= this.scrollTop + VISIBLE_ROWS) {
@@ -546,8 +601,7 @@ export class ErShinyLabUiHandler extends UiHandler {
     this.scrollTop = Math.max(0, Math.min(this.scrollTop, Math.max(0, list.length - VISIBLE_ROWS)));
 
     for (let i = 0; i < VISIBLE_ROWS; i++) {
-      const idx = this.scrollTop + i;
-      const eff = list[idx];
+      const eff = list[this.scrollTop + i];
       const label = this.rowTexts[i];
       const dot = this.rowDots[i];
       const token = this.rowTokens[i];
@@ -557,20 +611,17 @@ export class ErShinyLabUiHandler extends UiHandler {
         token.setText("");
         continue;
       }
-      const state = this.stateOf(eff, this.category);
+      const state = this.stateOf(eff, cat);
       const locked = state === "locked-tier" || state === "locked-achv" || state === "locked-candy";
       label.setText(eff.label);
-      label.setColor(state === "equipped" ? CATEGORY_ACCENT_HEX[this.category] : locked ? "#6a7188" : INK);
-      dot.setVisible(true);
-      dot.setFillStyle(RARITY_COLOR[eff.rarity], locked ? 0.5 : 1);
-      token.setText(this.tokenFor(eff, state));
-      token.setColor(this.tokenColor(state));
+      label.setColor(state === "equipped" ? TAB_ACCENT_HEX[cat] : locked ? "#6a7188" : INK);
+      dot.setVisible(true).setFillStyle(RARITY_COLOR[eff.rarity], locked ? 0.5 : 1);
+      token.setText(this.tokenFor(eff, state)).setColor(this.tokenColor(state, cat));
     }
     this.scrollUp.setVisible(this.scrollTop > 0);
     this.scrollDown.setVisible(this.scrollTop + VISIBLE_ROWS < list.length);
   }
 
-  /** The compact right-aligned status token on a list row. */
   private tokenFor(eff: ErShinyLabEffect, state: EffectState): string {
     switch (state) {
       case "equipped":
@@ -582,61 +633,58 @@ export class ErShinyLabUiHandler extends UiHandler {
       case "locked-tier":
         return `T${eff.minTier}`;
       case "locked-achv":
-        return "★LOCK";
-      case "locked-candy":
+        return "LOCK";
+      default:
         return `${eff.cost}`;
     }
   }
 
-  private tokenColor(state: EffectState): string {
+  private tokenColor(state: EffectState, cat: ErShinyLabCategory): string {
     switch (state) {
       case "equipped":
-        return CATEGORY_ACCENT_HEX[this.category];
+        return TAB_ACCENT_HEX[cat];
       case "owned":
         return "#9aa3b8";
       case "buyable":
         return GOLD;
-      case "locked-tier":
-        return "#e0707a";
       case "locked-achv":
         return "#c08bff";
-      case "locked-candy":
+      default:
         return "#e0707a";
     }
   }
 
-  private moveCursorTo(index: number): void {
-    const count = this.effects().length;
-    if (count === 0) {
+  private placeCursor(slot: number): void {
+    this.cursorObj.setPosition(LIST_X + 6, ROW_Y0 + slot * ROW_STEP);
+    this.cursorObj.setVisible(true);
+  }
+
+  private placeEffectCursor(): void {
+    if (this.effects().length === 0) {
       this.cursorObj.setVisible(false);
       return;
     }
-    this.cursor = Math.max(0, Math.min(index, count - 1));
-    this.rebuildRows();
-    const slot = this.cursor - this.scrollTop;
-    const y = ROW_Y0 + slot * ROW_STEP;
-    this.cursorObj.setPosition(LIST_X + 6, y);
-    this.cursorObj.setVisible(this.focus === "list");
+    this.placeCursor(this.cursor - this.scrollTop);
   }
 
-  private refreshDetail(): void {
+  private refreshEffectDetail(): void {
     const eff = this.focusedEffect();
+    const cat = this.effectCategory();
     if (!eff) {
       this.detailTitle.setText("");
       this.detailMeta.setText("");
       this.detailStatus.setText("");
       return;
     }
-    const state = this.stateOf(eff, this.category);
-    this.detailTitle.setText(eff.label);
-    this.detailTitle.setColor(RARITY_HEX[eff.rarity]);
+    const state = this.stateOf(eff, cat);
+    this.detailTitle.setText(eff.label).setColor(RARITY_HEX[eff.rarity]);
     this.detailMeta.setText(`${eff.rarity.toUpperCase()}  T${eff.minTier}+`);
     let status: string;
     let color = DIM;
     switch (state) {
       case "equipped":
         status = "Equipped.  A: unequip";
-        color = CATEGORY_ACCENT_HEX[this.category];
+        color = TAB_ACCENT_HEX[cat];
         break;
       case "owned":
         status = "Owned.  A: equip";
@@ -654,131 +702,50 @@ export class ErShinyLabUiHandler extends UiHandler {
         status = `Locked: ${eff.lockHint ?? "complete its challenge"}`;
         color = "#c08bff";
         break;
-      case "locked-candy":
+      default:
         status = `Need ${eff.cost} candy (have ${this.config?.candy ?? 0})`;
         color = "#e0707a";
-        break;
     }
-    this.detailStatus.setText(status);
-    this.detailStatus.setColor(color);
+    this.detailStatus.setText(status).setColor(color);
   }
 
-  /** Update the live preview glow / aura ring from the focused-or-equipped look. */
+  /** Update the live preview glow / aura ring from the focused-or-equipped look + intensities. */
   private refreshPreview(): void {
     const cfg = this.config;
     if (!cfg) {
       return;
     }
-    // Preview the FOCUSED effect of the active category, layered over the equipped
+    // Preview the FOCUSED effect of the active effect tab, layered over the equipped
     // effects of the other two - so browsing a palette recolors the glow live.
-    const palId = this.category === "palette" ? this.focusedEffect()?.id : cfg.equipped.palette;
-    const aroId = this.category === "around" ? this.focusedEffect()?.id : cfg.equipped.around;
+    const palId = this.tab === "palette" ? this.focusedEffect()?.id : cfg.equipped.palette;
+    const aroId = this.tab === "around" ? this.focusedEffect()?.id : cfg.equipped.around;
     const palEff =
       cfg.effects.palette.find(e => e.id === palId) ?? cfg.effects.palette.find(e => e.id === cfg.equipped.palette);
     const aroEff =
       cfg.effects.around.find(e => e.id === aroId) ?? cfg.effects.around.find(e => e.id === cfg.equipped.around);
 
     const glow = palEff ? Phaser.Display.Color.HexStringToColor(palEff.accent).color : 0x5ad1ff;
-    this.glowOuter.setFillStyle(glow, 0.16);
-    this.glowInner.setFillStyle(glow, 0.28);
+    const palA = 0.35 + 0.65 * cfg.params.palAmt;
+    this.glowOuter.setFillStyle(glow, 0.16 * palA);
+    this.glowInner.setFillStyle(glow, 0.28 * palA);
 
     if (aroEff) {
-      this.auraRing.setStrokeStyle(1.5, Phaser.Display.Color.HexStringToColor(aroEff.accent).color, 0.85);
+      const ringCol = Phaser.Display.Color.HexStringToColor(aroEff.accent).color;
+      this.auraRing.setStrokeStyle(1.5, ringCol, 0.4 + 0.6 * cfg.params.aroAmt);
       this.auraRing.setVisible(true);
     } else {
       this.auraRing.setVisible(false);
     }
   }
 
-  /** Rebuild the contextual bottom bar for the active focus zone. */
-  private refreshBar(): void {
-    this.barContent.removeAll(true);
-    const cfg = this.config;
-    if (!cfg) {
-      return;
-    }
-    if (this.focus === "presets") {
-      this.buildPresetBar(cfg);
-    } else {
-      this.buildTuneBar(cfg);
-    }
-  }
+  // ---- TUNE panel ---------------------------------------------------------
 
-  /** The 5 tuning controls as labeled pip bars across the bar (Seed shows its value). */
-  private buildTuneBar(cfg: ErShinyLabConfig): void {
-    const colW = BAR_W / TUNE_KEYS.length;
-    for (let i = 0; i < TUNE_KEYS.length; i++) {
-      const x0 = BAR_X + colW * i + 6;
-      const sel = this.focus === "tune" && this.tuneSel === i;
-      if (sel) {
-        // Faint cyan column behind the selected control so it pops at a glance.
-        const hl = globalScene.add.rectangle(BAR_X + colW * i + 2, BAR_Y + 2, colW - 4, BAR_H - 4, 0x5ad1ff, 0.16);
-        hl.setOrigin(0, 0);
-        this.barContent.add(hl);
-      }
-      const label = addTextObject(x0, BAR_Y + 2, TUNE_LABEL[i], TextStyle.WINDOW, { fontSize: "32px" });
-      label.setOrigin(0, 0).setColor(sel ? "#eef4ff" : DIM);
-      this.barContent.add(label);
-      const key = TUNE_KEYS[i];
-      if (key === "seed") {
-        const v = addTextObject(x0, BAR_Y + 9, String(cfg.params.seed).padStart(3, "0"), TextStyle.WINDOW, {
-          fontSize: "32px",
-        });
-        v.setOrigin(0, 0).setColor(sel ? GOLD : "#9aa3b8");
-        this.barContent.add(v);
-      } else {
-        const filled = Math.round(this.tuneFraction(key) * 5);
-        for (let p = 0; p < 5; p++) {
-          const pip = globalScene.add.rectangle(x0 + p * 6, BAR_Y + 11, 5, 4, p < filled ? 0x5ad1ff : 0x39405a, 1);
-          pip.setOrigin(0, 0.5);
-          if (sel && p < filled) {
-            pip.setFillStyle(0xa6e9ff, 1);
-          }
-          this.barContent.add(pip);
-        }
-      }
-    }
-  }
-
-  /** The 5 preset slots across the bar (filled = a saved loadout). */
-  private buildPresetBar(cfg: ErShinyLabConfig): void {
-    const colW = BAR_W / PRESET_COUNT;
-    for (let i = 0; i < PRESET_COUNT; i++) {
-      const x0 = BAR_X + colW * i + 6;
-      const sel = this.presetSel === i;
-      const preset = cfg.presets[i] ?? null;
-      const filled = !!preset;
-      if (sel) {
-        const hl = globalScene.add.rectangle(BAR_X + colW * i + 2, BAR_Y + 2, colW - 4, BAR_H - 4, 0x5ad1ff, 0.16);
-        hl.setOrigin(0, 0);
-        this.barContent.add(hl);
-      }
-      const t = addTextObject(
-        x0,
-        BAR_Y + 5,
-        `${i + 1}: ${filled ? this.presetLabel(cfg, preset) : "empty"}`,
-        TextStyle.WINDOW,
-        { fontSize: "34px" },
-      );
-      t.setOrigin(0, 0).setColor(sel ? "#eef4ff" : filled ? "#cfd6e6" : DIM);
-      this.barContent.add(t);
-    }
-  }
-
-  private presetLabel(cfg: ErShinyLabConfig, preset: ErShinyLabLoadout | null): string {
-    if (!preset) {
-      return "empty";
-    }
-    const pal = preset.palette ? cfg.effects.palette.find(e => e.id === preset.palette)?.label : null;
-    return pal ?? "set";
-  }
-
-  private tuneFraction(key: (typeof TUNE_KEYS)[number]): number {
+  private tuneFraction(row: TuneRow): number {
     const p = this.config?.params;
     if (!p) {
       return 0;
     }
-    switch (key) {
+    switch (row) {
       case "palAmt":
         return p.palAmt;
       case "surfAmt":
@@ -792,72 +759,170 @@ export class ErShinyLabUiHandler extends UiHandler {
     }
   }
 
-  private refreshHint(): void {
-    let hint: string;
-    switch (this.focus) {
-      case "list":
-        hint = "L/R Category    U/D Browse    A Equip / Unlock    Stats Tune    B Back";
+  private tuneLabel(row: TuneRow): string {
+    switch (row) {
+      case "palAmt":
+        return "Palette";
+      case "surfAmt":
+        return "Surface";
+      case "aroAmt":
+        return "Aura";
+      case "scale":
+        return "Texture";
+      case "seed":
+        return "Seed";
+      case "load":
+        return "Load";
+      case "save":
+        return "Save";
+    }
+  }
+
+  private tuneValueText(row: TuneRow): string {
+    const cfg = this.config;
+    const p = cfg?.params;
+    if (!cfg || !p) {
+      return "";
+    }
+    switch (row) {
+      case "palAmt":
+      case "surfAmt":
+      case "aroAmt":
+        return `${Math.round(this.tuneFraction(row) * 100)}%`;
+      case "scale":
+        return `${p.scale.toFixed(1)}x`;
+      case "seed":
+        return String(p.seed).padStart(3, "0");
+      case "load": {
+        const preset = cfg.presets[this.loadSel] ?? null;
+        return `< ${this.loadSel + 1}: ${preset ? this.presetLabel(cfg, preset) : "empty"} >`;
+      }
+      case "save":
+        return `< slot ${this.saveSel + 1} >`;
+    }
+  }
+
+  private presetLabel(cfg: ErShinyLabConfig, preset: ErShinyLabLoadout): string {
+    const pal = preset.palette ? cfg.effects.palette.find(e => e.id === preset.palette)?.label : null;
+    return pal ?? "set";
+  }
+
+  /** True for rows that draw a segmented intensity bar. */
+  private isSliderRow(row: TuneRow): boolean {
+    return row === "palAmt" || row === "surfAmt" || row === "aroAmt" || row === "scale";
+  }
+
+  private refreshTune(): void {
+    this.tuneContent.removeAll(true);
+    const cfg = this.config;
+    if (!cfg) {
+      return;
+    }
+    for (let i = 0; i < TUNE_ROWS.length; i++) {
+      const row = TUNE_ROWS[i];
+      const y = ROW_Y0 + i * ROW_STEP;
+      const sel = this.tuneCursor === i;
+      const label = addTextObject(ROW_X, y, this.tuneLabel(row), TextStyle.WINDOW, { fontSize: "44px" });
+      label.setOrigin(0, 0.5).setColor(sel ? "#eef4ff" : DIM);
+      this.tuneContent.add(label);
+
+      if (this.isSliderRow(row)) {
+        const filled = Math.round(this.tuneFraction(row) * TUNE_BAR_SEGMENTS);
+        for (let s = 0; s < TUNE_BAR_SEGMENTS; s++) {
+          const on = s < filled;
+          const seg = globalScene.add.rectangle(
+            TUNE_BAR_X + s * TUNE_SEG_W,
+            y,
+            TUNE_SEG_W - 1,
+            5,
+            on ? (sel ? 0xa6e9ff : 0x5ad1ff) : 0x39405a,
+            1,
+          );
+          seg.setOrigin(0, 0.5);
+          this.tuneContent.add(seg);
+        }
+      }
+
+      const value = addTextObject(TUNE_VALUE_X, y, this.tuneValueText(row), TextStyle.WINDOW, {
+        fontSize: "40px",
+        align: "right",
+      });
+      value.setOrigin(1, 0.5).setColor(sel ? GOLD : "#9aa3b8");
+      this.tuneContent.add(value);
+    }
+    this.placeCursor(this.tuneCursor);
+    this.refreshTuneDetail();
+  }
+
+  private refreshTuneDetail(): void {
+    const row = TUNE_ROWS[this.tuneCursor];
+    this.detailTitle.setText(this.tuneLabel(row)).setColor("#c9d4e8");
+    this.detailMeta.setText("");
+    let help: string;
+    switch (row) {
+      case "palAmt":
+      case "surfAmt":
+      case "aroAmt":
+        help = "Layer strength.  Left/Right adjust, A reset";
         break;
-      case "tune":
-        hint = "L/R Select    U/D Adjust    A Reset    Stats Presets    B Back";
+      case "scale":
+        help = "Effect texture scale.  Left/Right adjust, A reset";
         break;
-      case "presets":
-        hint = "L/R Slot    A Load    Up Save    Stats Back    B Back";
+      case "seed":
+        help = "Pattern seed.  Left/Right change, A reroll";
+        break;
+      case "load":
+        help = "Choose a saved preset with Left/Right, A to load";
+        break;
+      case "save":
+        help = "Choose a slot with Left/Right, A to save this look";
         break;
     }
-    this.hintText.setText(hint);
+    this.detailStatus.setText(help).setColor(DIM);
+  }
+
+  private refreshHint(): void {
+    this.hintText.setText(
+      this.tab === "tune"
+        ? "L/R Adjust    U/D Select    A Apply    B Effects"
+        : "L/R Tab    U/D Browse    A Equip / Unlock    B Exit",
+    );
   }
 
   // ---- Input --------------------------------------------------------------
 
   processInput(button: Button): boolean {
-    // Swallow stray input carried over from the opening transition (mirrors bargain).
     if (performance.now() - this.openedAt < 250) {
       return true;
     }
-    if (this.focus === "tune") {
-      return this.inputTune(button);
-    }
-    if (this.focus === "presets") {
-      return this.inputPresets(button);
-    }
-    return this.inputList(button);
+    return this.tab === "tune" ? this.inputTune(button) : this.inputEffect(button);
   }
 
-  private inputList(button: Button): boolean {
+  private inputEffect(button: Button): boolean {
     const count = this.effects().length;
     switch (button) {
       case Button.UP:
         if (this.cursor > 0) {
-          this.moveCursorTo(this.cursor - 1);
-          this.afterListMove();
+          this.cursor--;
+          this.afterEffectMove();
           return true;
         }
         return false;
       case Button.DOWN:
         if (this.cursor < count - 1) {
-          this.moveCursorTo(this.cursor + 1);
-          this.afterListMove();
+          this.cursor++;
+          this.afterEffectMove();
           return true;
         }
-        // Past the last effect: drop into the tuning bar.
-        this.tuneSel = 0;
-        this.enterZone("tune");
-        return true;
+        return false;
       case Button.LEFT:
-        this.switchCategory(-1);
+        this.switchTab(-1);
         return true;
       case Button.RIGHT:
-        this.switchCategory(1);
+        this.switchTab(1);
         return true;
       case Button.ACTION:
         this.activateEffect();
-        return true;
-      // Quick "panel" accelerator: jump straight to the tuning bar (and on round
-      // to presets / back) without walking to the bottom of the list.
-      case Button.STATS:
-        this.tuneSel = 0;
-        this.enterZone("tune");
         return true;
       case Button.CANCEL:
         this.exit();
@@ -867,99 +932,92 @@ export class ErShinyLabUiHandler extends UiHandler {
     }
   }
 
-  private afterListMove(): void {
+  private afterEffectMove(): void {
     globalScene.ui.playSelect();
-    this.refreshDetail();
+    this.rebuildRows();
+    this.placeEffectCursor();
+    this.refreshEffectDetail();
     this.refreshPreview();
   }
 
-  private switchCategory(dir: number): void {
-    const idx = (CATEGORIES.indexOf(this.category) + dir + CATEGORIES.length) % CATEGORIES.length;
-    this.category = CATEGORIES[idx];
+  private switchTab(dir: number): void {
+    const idx = (TABS.indexOf(this.tab) + dir + TABS.length) % TABS.length;
+    this.tab = TABS[idx];
     this.cursor = 0;
     this.scrollTop = 0;
-    this.refreshTabs();
-    this.moveCursorTo(0);
-    this.refreshDetail();
-    this.refreshPreview();
+    this.tuneCursor = 0;
+    this.render();
     globalScene.ui.playSelect();
   }
 
   private activateEffect(): void {
     const cfg = this.config;
     const eff = this.focusedEffect();
+    const cat = this.effectCategory();
     if (!cfg || !eff) {
       return;
     }
-    const state = this.stateOf(eff, this.category);
+    const state = this.stateOf(eff, cat);
     switch (state) {
       case "equipped":
-        cfg.equipped[this.category] = null;
+        cfg.equipped[cat] = null;
         break;
       case "owned":
-        cfg.equipped[this.category] = eff.id;
+        cfg.equipped[cat] = eff.id;
         break;
       case "buyable":
         cfg.candy -= eff.cost;
-        cfg.owned[this.category].add(eff.id);
-        cfg.equipped[this.category] = eff.id;
-        cfg.onBuy?.(this.category, eff);
-        this.candyText.setText(`Candy ${cfg.candy}`);
+        cfg.owned[cat].add(eff.id);
+        cfg.equipped[cat] = eff.id;
+        cfg.onBuy?.(cat, eff);
+        this.candyText.setText(String(cfg.candy));
+        this.repositionCandyIcon();
         break;
       default:
-        // Locked: refuse with the error tone, leave state untouched.
         globalScene.ui.playError();
         return;
     }
     globalScene.ui.playSelect();
     cfg.onChange?.({ ...cfg.equipped }, { ...cfg.params });
     this.rebuildRows();
-    this.moveCursorTo(this.cursor);
-    this.refreshDetail();
+    this.placeEffectCursor();
+    this.refreshEffectDetail();
     this.refreshPreview();
     this.refreshChips();
   }
 
   private inputTune(button: Button): boolean {
-    const cfg = this.config;
-    if (!cfg) {
-      return false;
-    }
     switch (button) {
-      case Button.LEFT:
-        if (this.tuneSel > 0) {
-          this.tuneSel--;
-          this.refreshBar();
-          globalScene.ui.playSelect();
-        } else {
-          this.enterZone("list");
-        }
-        return true;
-      case Button.RIGHT:
-        if (this.tuneSel < TUNE_KEYS.length - 1) {
-          this.tuneSel++;
-          this.refreshBar();
-          globalScene.ui.playSelect();
-        } else {
-          this.presetSel = 0;
-          this.enterZone("presets");
-        }
-        return true;
       case Button.UP:
-        this.adjustTune(1);
+        if (this.tuneCursor > 0) {
+          this.tuneCursor--;
+          this.refreshTune();
+          globalScene.ui.playSelect();
+        }
         return true;
       case Button.DOWN:
+        if (this.tuneCursor < TUNE_ROWS.length - 1) {
+          this.tuneCursor++;
+          this.refreshTune();
+          globalScene.ui.playSelect();
+        }
+        return true;
+      case Button.LEFT:
         this.adjustTune(-1);
         return true;
-      case Button.ACTION:
-        this.resetTune();
+      case Button.RIGHT:
+        this.adjustTune(1);
         return true;
-      case Button.STATS:
-        this.presetSel = 0;
-        this.enterZone("presets");
+      case Button.ACTION:
+        this.tuneAction();
         return true;
       case Button.CANCEL:
-        this.enterZone("list");
+        // Back to the effect tabs (Aura, the tab adjacent to Tune).
+        this.tab = "around";
+        this.cursor = 0;
+        this.scrollTop = 0;
+        this.render();
+        globalScene.ui.playSelect();
         return true;
       default:
         return false;
@@ -967,91 +1025,77 @@ export class ErShinyLabUiHandler extends UiHandler {
   }
 
   private adjustTune(dir: number): void {
-    const p = this.config?.params;
-    if (!p) {
+    const cfg = this.config;
+    const p = cfg?.params;
+    if (!cfg || !p) {
       return;
     }
-    const key = TUNE_KEYS[this.tuneSel];
-    switch (key) {
+    const row = TUNE_ROWS[this.tuneCursor];
+    switch (row) {
       case "palAmt":
       case "surfAmt":
       case "aroAmt":
-        p[key] = clamp(round2(p[key] + dir * 0.1), 0, 1);
+        p[row] = clamp(round2(p[row] + dir * 0.05), 0, 1);
         break;
       case "scale":
-        p.scale = clamp(round2(p.scale + dir * 0.2), 0.4, 2);
+        p.scale = clamp(round2(p.scale + dir * 0.1), 0.4, 2);
         break;
       case "seed":
-        p.seed = (p.seed + dir * 8 + 256) % 256;
+        p.seed = (p.seed + dir + 256) % 256;
+        break;
+      case "load":
+        this.loadSel = (this.loadSel + dir + cfg.presets.length) % cfg.presets.length;
+        break;
+      case "save":
+        this.saveSel = (this.saveSel + dir + cfg.presets.length) % cfg.presets.length;
         break;
     }
     globalScene.ui.playSelect();
-    this.refreshBar();
-    this.config?.onChange?.({ ...this.config.equipped }, { ...p });
+    this.refreshTune();
+    if (this.isSliderRow(row) || row === "seed") {
+      cfg.onChange?.({ ...cfg.equipped }, { ...p });
+      this.refreshPreview();
+    }
   }
 
-  private resetTune(): void {
-    const p = this.config?.params;
-    if (!p) {
+  private tuneAction(): void {
+    const cfg = this.config;
+    const p = cfg?.params;
+    if (!cfg || !p) {
       return;
     }
-    const key = TUNE_KEYS[this.tuneSel];
+    const row = TUNE_ROWS[this.tuneCursor];
     const def: ErShinyLabParams = { palAmt: 1, surfAmt: 1, aroAmt: 1, scale: 1, seed: 0 };
-    p[key] = def[key];
-    globalScene.ui.playSelect();
-    this.refreshBar();
-    this.config?.onChange?.({ ...this.config.equipped }, { ...p });
-  }
-
-  private inputPresets(button: Button): boolean {
-    const cfg = this.config;
-    if (!cfg) {
-      return false;
-    }
-    switch (button) {
-      case Button.LEFT:
-        if (this.presetSel > 0) {
-          this.presetSel--;
-          this.refreshBar();
-          globalScene.ui.playSelect();
-        } else {
-          this.tuneSel = TUNE_KEYS.length - 1;
-          this.enterZone("tune");
-        }
-        return true;
-      case Button.RIGHT:
-        if (this.presetSel < PRESET_COUNT - 1) {
-          this.presetSel++;
-          this.refreshBar();
-          globalScene.ui.playSelect();
-        }
-        return true;
-      case Button.UP:
-        // Save the current loadout into the slot.
-        cfg.presets[this.presetSel] = { ...cfg.equipped };
-        globalScene.ui.playSelect();
-        this.refreshBar();
-        return true;
-      case Button.STATS:
-        this.enterZone("list");
-        return true;
-      case Button.ACTION: {
-        const preset = cfg.presets[this.presetSel];
+    switch (row) {
+      case "palAmt":
+      case "surfAmt":
+      case "aroAmt":
+      case "scale":
+        p[row] = def[row];
+        cfg.onChange?.({ ...cfg.equipped }, { ...p });
+        this.refreshPreview();
+        break;
+      case "seed":
+        p.seed = Math.floor(Math.random() * 256);
+        cfg.onChange?.({ ...cfg.equipped }, { ...p });
+        this.refreshPreview();
+        break;
+      case "load": {
+        const preset = cfg.presets[this.loadSel];
         if (preset) {
           this.applyPreset(preset);
         } else {
-          cfg.presets[this.presetSel] = { ...cfg.equipped };
+          globalScene.ui.playError();
+          return;
         }
-        globalScene.ui.playSelect();
-        this.refreshBar();
-        return true;
+        break;
       }
-      case Button.CANCEL:
-        this.enterZone("list");
-        return true;
-      default:
-        return false;
+      case "save":
+        cfg.presets[this.saveSel] = { ...cfg.equipped };
+        break;
     }
+    globalScene.ui.playSelect();
+    this.refreshTune();
   }
 
   /** Apply a saved loadout, but only the effects this species actually owns. */
@@ -1065,19 +1109,8 @@ export class ErShinyLabUiHandler extends UiHandler {
       cfg.equipped[cat] = id && cfg.owned[cat].has(id) ? id : null;
     }
     cfg.onChange?.({ ...cfg.equipped }, { ...cfg.params });
-    this.rebuildRows();
-    this.moveCursorTo(this.cursor);
-    this.refreshDetail();
-    this.refreshPreview();
     this.refreshChips();
-  }
-
-  private enterZone(focus: Focus): void {
-    this.focus = focus;
-    this.cursorObj.setVisible(focus === "list");
-    this.refreshBar();
-    this.refreshHint();
-    globalScene.ui.playSelect();
+    this.refreshPreview();
   }
 
   private exit(): void {
@@ -1096,7 +1129,7 @@ export class ErShinyLabUiHandler extends UiHandler {
     this.monSprite.stop();
     this.monSprite.setVisible(false);
     this.cursorObj.setVisible(false);
-    this.barContent.removeAll(true);
+    this.tuneContent.removeAll(true);
     this.config = null;
   }
 }
@@ -1112,9 +1145,9 @@ function round2(v: number): number {
 
 // =============================================================================
 // Demo config - a self-contained, representative catalog + player state so the
-// screen renders on its own (the render harness + an in-game smoke). Real save
-// data (per-species owned bitsets, candy, earned tier, the candy ramp) replaces
-// this via show([config]) once the P1 persistence layer lands.
+// screen renders on its own (the render harness + the in-game dev preview). Real
+// save data (per-species owned bitsets, candy, earned tier, the candy ramp)
+// replaces this via show([config]) once the P1 persistence layer lands.
 // =============================================================================
 
 function eff(

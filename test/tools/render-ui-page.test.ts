@@ -272,10 +272,10 @@ const RECIPES: Record<string, Recipe> = {
   "er-shiny-lab-nav": {
     mode: UiMode.ER_SHINY_LAB,
     prepare: () => [buildDemoConfig(SpeciesId.ARTICUNO)],
-    // RIGHT,RIGHT walk Palette->Surface->Around; STATS jumps to the tuning bar; RIGHT
-    // steps a slider; STATS -> presets; STATS -> back to the list. Each -stepN.png proves
-    // the no-mouse flow across all three zones with no crash.
-    steps: [Button.RIGHT, Button.RIGHT, Button.STATS, Button.RIGHT, Button.STATS, Button.STATS],
+    // RIGHT walks the tabs Palette -> Surface -> Aura -> Tune; in the Tune tab DOWN picks
+    // a slider row and RIGHT adjusts it. Each -stepN.png proves the no-mouse 4-tab flow
+    // (tab switching + slider adjust) with no crash.
+    steps: [Button.RIGHT, Button.RIGHT, Button.RIGHT, Button.DOWN, Button.DOWN, Button.RIGHT],
     diffTolerance: 40000,
   },
   "biome-shop": {
