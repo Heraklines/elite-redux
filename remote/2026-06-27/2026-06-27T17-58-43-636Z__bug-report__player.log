@@ -1,0 +1,276 @@
+----- BUG REPORT (in-game) -----
+version:  1.11.19
+url:      https://elite-redux.pages.dev/
+ua:       Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Mobile Safari/537.36
+mode:     4  wave:32  difficulty:hell
+seed:     Sa04qkSPMu7QwrmVY0xm0q7F
+party:    Chi-Yu(L29 38/81), Castform(L29 56/91), Wobbuffet(L27 147/147), Shiinotic(L27 76/76), Zigzagoon(L27 65/65), Gulpin(L27 83/83)
+
+----- DESCRIPTION -----
+fainted pokemon on the battlefield
+
+----- CONSOLE -----
+[17:57:12.927] LOG: %cStart Phase LevelUpPhase color:green;
+[17:57:12.927] LOG: Applied Soul Dew 
+[17:57:12.927] LOG: Applied Soul Dew 
+[17:57:12.928] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[17:57:12.928] LOG: Applied Super EXP. Charm 
+[17:57:12.928] LOG: Applied EXP. Charm 
+[17:57:12.928] LOG: %cStart Phase LevelUpPhase color:green;
+[17:57:12.929] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[17:57:12.929] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[17:57:12.929] LOG: Applied Super EXP. Charm 
+[17:57:12.929] LOG: Applied EXP. Charm 
+[17:57:12.929] LOG: %cStart Phase LevelUpPhase color:green;
+[17:57:12.929] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[17:57:12.929] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[17:57:12.929] LOG: Applied Super EXP. Charm 
+[17:57:12.929] LOG: Applied EXP. Charm 
+[17:57:12.929] LOG: %cStart Phase LevelUpPhase color:green;
+[17:57:12.930] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[17:57:12.930] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[17:57:12.930] LOG: Applied Super EXP. Charm 
+[17:57:12.930] LOG: Applied EXP. Charm 
+[17:57:12.930] LOG: %cStart Phase LevelUpPhase color:green;
+[17:57:12.930] LOG: %cStart Phase EvolutionPhase color:green;
+[17:57:14.036] ERROR: [uncaught] Uncaught SecurityError: Failed to execute 'texImage2D' on 'WebGLRenderingContext': The video element contains cross-origin data, and may not be loaded. @ https://elite-redux.pages.dev/assets/BBCodeText-CwLIbsJg.js:63:2433
+[17:57:16.832] LOG: %cStart Phase EndEvolutionPhase color:green;
+[17:57:16.890] LOG: %cStart Phase EndEvolutionPhase color:green;
+[17:57:16.890] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[17:57:16.891] LOG: %cStart Phase MoveEndPhase color:green;
+[17:57:16.891] LOG: %cStart Phase CheckInterludePhase color:green;
+[17:57:16.891] LOG: %cStart Phase WeatherEffectPhase color:green;
+[17:57:16.950] LOG: %cStart Phase PositionalTagPhase color:green;
+[17:57:16.950] LOG: %cStart Phase BerryPhase color:green;
+[17:57:16.951] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[17:57:16.951] LOG: %cStart Phase TurnEndPhase color:green;
+[17:57:16.952] WARN: [coop:turn] host recorder: finalize with NO open recording -> turn=-1 events=0 (caller decides not to emit)
+[17:57:16.952] LOG: %cStart Phase MessagePhase color:green;
+[17:57:17.196] LOG: %cStart Phase DamageAnimPhase color:green;
+[17:57:17.198] LOG: %cStart Phase MessagePhase color:green;
+[17:57:17.431] LOG: %cStart Phase DamageAnimPhase color:green;
+[17:57:17.436] LOG: %cStart Phase SwitchSummonPhase color:green;
+[17:57:17.671] LOG: EllyKalash
+[17:57:17.755] LOG: Applied HP Up (enemy)
+[17:57:17.755] LOG: Applied Iron (enemy)
+[17:57:17.756] LOG: Applied HP Up (enemy)
+[17:57:17.890] LOG: %cStart Phase PostSummonPhase color:green;
+[17:57:17.890] LOG: Ran PSP for: Dachsbun
+[17:57:17.891] LOG: %cStart Phase PostSummonPhase color:green;
+[17:57:17.891] LOG: %cStart Phase PostSummonPhase color:green;
+[17:57:17.891] LOG: %cStart Phase TurnInitPhase color:green;
+[17:57:17.891] LOG: %cStart Phase CommandPhase color:green;
+[17:58:01.737] LOG: Move: MYSTICAL_FIRE Move targets: {"targets":[2,1],"multiple":false} 
+Player Pokemon: Chi-Yu
+[17:58:01.743] LOG: %cStart Phase SelectTargetPhase color:green;
+[17:58:02.259] LOG: %cStart Phase CommandPhase color:green;
+[17:58:04.947] LOG: Move: DECORATE Move targets: {"targets":[2],"multiple":false} 
+Player Pokemon: Castform
+[17:58:04.949] LOG: %cStart Phase EnemyCommandPhase color:green;
+[17:58:04.980] LOG: Battle Seed: ezDsH9LnwzujkYMF
+[17:58:04.993] LOG: Move Pool: ["Soft-Boiled","Lovely Bite","Sizzly Slide","Fertile Fangs"]
+[17:58:04.994] LOG: Move Scores: [-7,24.67105263157895,8.823529411764707,6.907894736842105]
+[17:58:04.994] LOG: Sorted Move Pool: ["Lovely Bite","Sizzly Slide","Fertile Fangs","Soft-Boiled"]
+[17:58:04.994] LOG: Chosen Move: Lovely Bite
+[17:58:04.994] LOG: ER AI: experimental brain (sharpness 1)
+[17:58:04.994] LOG: %cStart Phase TurnStartPhase color:green;
+[17:58:04.997] LOG: %cStart Phase MovePhase color:green;
+[17:58:04.997] LOG: %cUser: Chi-Yu
+Move: MYSTICAL_FIRE
+Use Mode: NORMAL color:orchid
+[17:58:05.000] LOG: %cStart Phase MessagePhase color:green;
+[17:58:05.074] LOG: %cStart Phase MoveEffectPhase color:green;
+[17:58:05.075] LOG: crit stage: +0
+[17:58:05.076] LOG: Move: Mystical Fire | Base damage: 55.248000000000005 | Power: 80 | Source attack: 91 | Target defense: 35
+[17:58:05.076] LOG: Move: Mystical Fire | Attack damage: 124
+[17:58:05.077] LOG: %cStart Phase DamageAnimPhase color:green;
+[17:58:05.109] LOG: %cStart Phase FaintPhase color:green;
+[17:58:05.176] LOG: %cStart Phase MessagePhase color:green;
+[17:58:05.984] LOG: %cStart Phase VictoryPhase color:green;
+[17:58:05.985] LOG: Applied Soothe Bell 
+[17:58:05.985] LOG: Applied Soothe Bell 
+[17:58:05.986] LOG: %cStart Phase ExpPhase color:green;
+[17:58:05.986] LOG: Applied Super EXP. Charm 
+[17:58:05.986] LOG: Applied EXP. Charm 
+[17:58:06.610] LOG: %cStart Phase LevelUpPhase color:green;
+[17:58:06.610] LOG: Applied Iron 
+[17:58:06.610] LOG: Applied HP Up 
+[17:58:06.611] LOG: %cStart Phase ExpPhase color:green;
+[17:58:06.611] LOG: Applied Super EXP. Charm 
+[17:58:06.611] LOG: Applied EXP. Charm 
+[17:58:07.302] LOG: %cStart Phase LevelUpPhase color:green;
+[17:58:07.303] LOG: Applied Soul Dew 
+[17:58:07.303] LOG: Applied Soul Dew 
+[17:58:07.304] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[17:58:07.304] LOG: Applied Super EXP. Charm 
+[17:58:07.304] LOG: Applied EXP. Charm 
+[17:58:07.304] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[17:58:07.304] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[17:58:07.304] LOG: Applied Super EXP. Charm 
+[17:58:07.304] LOG: Applied EXP. Charm 
+[17:58:07.305] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[17:58:07.305] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[17:58:07.305] LOG: Applied Super EXP. Charm 
+[17:58:07.305] LOG: Applied EXP. Charm 
+[17:58:07.305] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[17:58:07.305] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[17:58:07.305] LOG: Applied Super EXP. Charm 
+[17:58:07.305] LOG: Applied EXP. Charm 
+[17:58:07.306] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[17:58:07.306] LOG: %cStart Phase MoveEndPhase color:green;
+[17:58:07.306] LOG: %cStart Phase MovePhase color:green;
+[17:58:07.306] LOG: %cUser: Castform
+Move: DECORATE
+Use Mode: NORMAL color:orchid
+[17:58:07.308] LOG: %cStart Phase MessagePhase color:green;
+[17:58:07.443] LOG: %cStart Phase MessagePhase color:green;
+[17:58:07.643] LOG: %cStart Phase MoveEndPhase color:green;
+[17:58:07.643] LOG: %cStart Phase MovePhase color:green;
+[17:58:07.644] LOG: %cStart Phase MoveEndPhase color:green;
+[17:58:07.644] LOG: %cStart Phase CheckInterludePhase color:green;
+[17:58:07.644] LOG: %cStart Phase WeatherEffectPhase color:green;
+[17:58:07.711] LOG: %cStart Phase PositionalTagPhase color:green;
+[17:58:07.711] LOG: %cStart Phase BerryPhase color:green;
+[17:58:07.712] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[17:58:07.713] LOG: %cStart Phase TurnEndPhase color:green;
+[17:58:07.715] WARN: [coop:turn] host recorder: finalize with NO open recording -> turn=-1 events=0 (caller decides not to emit)
+[17:58:07.715] LOG: %cStart Phase MessagePhase color:green;
+[17:58:07.943] LOG: %cStart Phase DamageAnimPhase color:green;
+[17:58:07.946] LOG: %cStart Phase MessagePhase color:green;
+[17:58:08.177] LOG: %cStart Phase DamageAnimPhase color:green;
+[17:58:08.180] LOG: %cStart Phase SwitchSummonPhase color:green;
+[17:58:08.411] LOG: EllyKalash
+[17:58:08.495] LOG: Applied HP Up (enemy)
+[17:58:08.496] LOG: Applied HP Up (enemy)
+[17:58:08.496] LOG: Applied Iron (enemy)
+[17:58:08.631] LOG: %cStart Phase PostSummonPhase color:green;
+[17:58:08.631] LOG: Ran PSP for: Watchog
+[17:58:08.631] LOG: %cStart Phase PostSummonPhase color:green;
+[17:58:08.631] LOG: %cStart Phase PostSummonPhase color:green;
+[17:58:08.632] LOG: %cStart Phase TurnInitPhase color:green;
+[17:58:08.632] LOG: %cStart Phase CommandPhase color:green;
+[17:58:11.879] LOG: Move: MYSTICAL_FIRE Move targets: {"targets":[2,1],"multiple":false} 
+Player Pokemon: Chi-Yu
+[17:58:11.881] LOG: %cStart Phase SelectTargetPhase color:green;
+[17:58:12.479] LOG: %cStart Phase CommandPhase color:green;
+[17:58:13.272] LOG: Move: DECORATE Move targets: {"targets":[2],"multiple":false} 
+Player Pokemon: Castform
+[17:58:13.274] LOG: %cStart Phase EnemyCommandPhase color:green;
+[17:58:13.300] LOG: Battle Seed: ezDsH9LnwzujkYMF
+[17:58:13.323] LOG: Move Pool: ["Hyper Fang","Quick Attack","Sucker Punch","Thunder Fang"]
+[17:58:13.323] LOG: Move Scores: [4.985795454545454,17.045454545454543,18.75,3.068181818181818]
+[17:58:13.323] LOG: Sorted Move Pool: ["Sucker Punch","Quick Attack","Hyper Fang","Thunder Fang"]
+[17:58:13.323] LOG: Chosen Move: Sucker Punch
+[17:58:13.323] LOG: ER AI: experimental brain (sharpness 1)
+[17:58:13.323] LOG: %cStart Phase TurnStartPhase color:green;
+[17:58:13.326] LOG: %cStart Phase MovePhase color:green;
+[17:58:13.327] LOG: %cUser: Watchog
+Move: SUCKER_PUNCH
+Use Mode: NORMAL color:orchid
+[17:58:13.329] LOG: %cStart Phase MessagePhase color:green;
+[17:58:13.423] LOG: %cStart Phase MoveEffectPhase color:green;
+[17:58:13.425] LOG: crit stage: +0
+[17:58:13.426] LOG: Move: Sucker Punch | Base damage: 17.39490909090909 | Power: 70 | Source attack: 54 | Target defense: 55
+[17:58:13.427] LOG: Move: Sucker Punch | Attack damage: 15
+[17:58:13.428] LOG: %cStart Phase DamageAnimPhase color:green;
+[17:58:13.458] LOG: %cStart Phase MoveEndPhase color:green;
+[17:58:13.459] LOG: %cStart Phase MovePhase color:green;
+[17:58:13.459] LOG: %cUser: Chi-Yu
+Move: MYSTICAL_FIRE
+Use Mode: NORMAL color:orchid
+[17:58:13.465] LOG: %cStart Phase MessagePhase color:green;
+[17:58:13.590] LOG: %cStart Phase MoveEffectPhase color:green;
+[17:58:13.592] LOG: crit stage: +0
+[17:58:13.594] LOG: Move: Mystical Fire | Base damage: 68.176 | Power: 80 | Source attack: 94 | Target defense: 30
+[17:58:13.594] LOG: Move: Mystical Fire | Attack damage: 131
+[17:58:13.595] LOG: %cStart Phase DamageAnimPhase color:green;
+[17:58:13.625] LOG: %cStart Phase FaintPhase color:green;
+[17:58:13.692] LOG: %cStart Phase MessagePhase color:green;
+[17:58:17.858] LOG: %cStart Phase VictoryPhase color:green;
+[17:58:17.858] LOG: Applied Soothe Bell 
+[17:58:17.858] LOG: Applied Soothe Bell 
+[17:58:17.859] LOG: %cStart Phase ExpPhase color:green;
+[17:58:17.859] LOG: Applied Super EXP. Charm 
+[17:58:17.859] LOG: Applied EXP. Charm 
+[17:58:18.654] LOG: %cStart Phase LevelUpPhase color:green;
+[17:58:18.654] LOG: Applied Iron 
+[17:58:18.654] LOG: Applied HP Up 
+[17:58:18.655] LOG: %cStart Phase ExpPhase color:green;
+[17:58:18.655] LOG: Applied Super EXP. Charm 
+[17:58:18.655] LOG: Applied EXP. Charm 
+[17:58:19.305] LOG: %cStart Phase LevelUpPhase color:green;
+[17:58:19.305] LOG: Applied Soul Dew 
+[17:58:19.305] LOG: Applied Soul Dew 
+[17:58:19.306] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[17:58:19.306] LOG: Applied Super EXP. Charm 
+[17:58:19.306] LOG: Applied EXP. Charm 
+[17:58:19.306] LOG: %cStart Phase LevelUpPhase color:green;
+[17:58:19.306] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[17:58:19.306] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[17:58:19.306] LOG: Applied Super EXP. Charm 
+[17:58:19.306] LOG: Applied EXP. Charm 
+[17:58:19.306] LOG: %cStart Phase LevelUpPhase color:green;
+[17:58:19.307] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[17:58:19.307] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[17:58:19.307] LOG: Applied Super EXP. Charm 
+[17:58:19.307] LOG: Applied EXP. Charm 
+[17:58:19.307] LOG: %cStart Phase LevelUpPhase color:green;
+[17:58:19.307] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[17:58:19.307] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[17:58:19.307] LOG: Applied Super EXP. Charm 
+[17:58:19.307] LOG: Applied EXP. Charm 
+[17:58:19.307] LOG: %cStart Phase LevelUpPhase color:green;
+[17:58:19.308] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[17:58:19.308] LOG: %cStart Phase MoveEndPhase color:green;
+[17:58:19.308] LOG: %cStart Phase MovePhase color:green;
+[17:58:19.308] LOG: %cUser: Castform
+Move: DECORATE
+Use Mode: NORMAL color:orchid
+[17:58:19.309] LOG: %cStart Phase MessagePhase color:green;
+[17:58:19.454] LOG: %cStart Phase MessagePhase color:green;
+[17:58:19.654] LOG: %cStart Phase MoveEndPhase color:green;
+[17:58:19.655] LOG: %cStart Phase CheckInterludePhase color:green;
+[17:58:19.655] LOG: %cStart Phase WeatherEffectPhase color:green;
+[17:58:19.723] LOG: %cStart Phase PositionalTagPhase color:green;
+[17:58:19.723] LOG: %cStart Phase BerryPhase color:green;
+[17:58:19.723] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[17:58:19.724] LOG: %cStart Phase TurnEndPhase color:green;
+[17:58:19.726] WARN: [coop:turn] host recorder: finalize with NO open recording -> turn=-1 events=0 (caller decides not to emit)
+[17:58:19.726] LOG: %cStart Phase MessagePhase color:green;
+[17:58:19.955] LOG: %cStart Phase DamageAnimPhase color:green;
+[17:58:19.958] LOG: %cStart Phase MessagePhase color:green;
+[17:58:20.188] LOG: %cStart Phase DamageAnimPhase color:green;
+[17:58:20.192] LOG: %cStart Phase BattleEndPhase color:green;
+[17:58:20.192] LOG: Battle Score: 408 (4 Turns x0.76)
+[17:58:20.192] LOG: Total Score: 5312
+[17:58:20.198] LOG: Applied Iron 
+[17:58:20.198] LOG: Applied HP Up 
+[17:58:20.199] LOG: Applied Soul Dew 
+[17:58:20.199] LOG: Applied Soul Dew 
+[17:58:20.222] LOG: Applied Iron 
+[17:58:20.222] LOG: Applied HP Up 
+[17:58:20.222] LOG: Applied Soul Dew 
+[17:58:20.222] LOG: Applied Soul Dew 
+[17:58:20.227] LOG: %cStart Phase ShowAbilityPhase color:green;
+[17:58:20.227] LOG: %cStart Phase MessagePhase color:green;
+[17:58:20.439] LOG: %cStart Phase HideAbilityPhase color:green;
+[17:58:20.473] LOG: %cStart Phase TrainerVictoryPhase color:green;
+[17:58:20.479] LOG: Hiker EllyKalash
+[17:58:23.373] LOG: Hiker EllyKalash
+[17:58:23.377] LOG: Dialogue dialogue:hiker.victory.2 skipped
+[17:58:23.377] LOG: %cStart Phase MoneyRewardPhase color:green;
+[17:58:23.377] LOG: Applied Amulet Coin 
+[17:58:24.348] LOG: %cStart Phase ModifierRewardPhase color:green;
+[17:58:25.475] LOG: %cStart Phase ModifierRewardPhase color:green;
+[17:58:25.950] LOG: %cStart Phase ModifierRewardPhase color:green;
+[17:58:26.527] LOG: %cStart Phase EggLapsePhase color:green;
+[17:58:26.527] LOG: %cStart Phase SelectModifierPhase color:green;
+[17:58:26.530] LOG: Wave Seed: sPTspmWqvyPPWf 32
+[17:58:26.539] LOG: 0 0 [2,3,4,5,6,7,8,9,10,22]
+[17:58:26.539] LOG: {"id":"GREAT_BALL","localeKey":"","iconImage":"gb","group":"pb","soundName":"se/pb_bounce_1","tier":1,"pokeballType":1,"count":5} 
+[17:58:26.539] LOG: 19 9 [2,3,4,5,6,7,8,9,10,22]
+[17:58:26.539] LOG: {"id":"ER_ABILITY_CAPSULE","localeKey":"","iconImage":"ability_capsule","soundName":"se/restore","tier":1} 
+[17:58:26.540] LOG: 15 9 [2,3,4,5,6,7,8,9,10,22]
+[17:58:26.540] LOG: GREAT 0
+[17:58:26.540] LOG: 13 9 [2,3,4,5,6,7,8,9,10,22]
+[17:58:26.540] LOG: {"id":"NUGGET","localeKey":"modifierType:ModifierType.NUGGET","iconImage":"nugget","group":"money","soundName":"se/buy","tier":1,"moneyMultiplier":1,"moneyMultiplierDescriptorKey":"modifierType:ModifierType.MoneyRewardModifierType.extra.small"} 
