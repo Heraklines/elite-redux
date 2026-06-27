@@ -1,0 +1,90 @@
+scenario: Greater Ability Randomizer: pick 1 of 4
+url:      https://elite-redux-staging.pages.dev/
+build:    mqwaqdfv-c89q
+mode:     0  wave:1
+seed:     ZzMJYhjn1Yg73jVB0gkr0D0R
+party:    Garchomp(L40 148hp f0)
+enemy:    Magikarp(L3)
+
+----- COMMENT -----
+greater ability randomizer
+
+----- CONSOLE -----
+[12:06:24.464] LOG: %c %c %c %c %c Phaser v3.90.0 (WebGL | Web Audio) %c https://phaser.io/v390 background: #ff0000 background: #ffff00 background: #00ff00 background: #00ffff color: #ffffff; background: #000000 background: transparent
+[12:06:24.828] LOG: [ER] build mqwaqdfv-c89q
+[12:06:25.226] LOG: [dev-tools] loaded — 351 scenarios + Send Logs button
+[12:20:04.712] DEBUG: Destroying loading scene
+[12:20:04.712] DEBUG: Destroyed loading scene
+[12:20:04.773] LOG: Seed: ZzMJYhjn1Yg73jVB0gkr0D0R
+[12:20:04.774] LOG: Wave Seed: ZzMJYhjn1Yg73jVB0gkr0D0R 0
+[12:20:06.844] LOG: %cStart Phase LoginPhase color:green;
+[12:20:07.495] LOG: Client Session: tgxziJ7y7UgMblE3L8ztRVmSfgE5iXmj
+[12:20:07.877] DEBUG: Using cached system data
+[12:20:07.962] LOG: %cStart Phase TitlePhase color:green;
+[12:20:07.963] LOG: Getting Session Slot id: %d 4
+[12:20:07.978] LOG: use seasonal splash messages true
+[12:20:07.978] LOG: Adding 2 Pride Month splash messages (weight: x15)
+[12:23:44.314] LOG: %cStart Phase SelectStarterPhase color:green;
+[12:23:44.874] LOG: Wave Seed: [{NKZiko2Zh84kWC1hls1E1S 1
+[12:23:44.876] LOG: %cStart Phase EncounterPhase color:green;
+[12:23:44.881] LOG: Starting species pool tier: COMMON
+[12:23:44.899] LOG: Pokemon: Wild Magikarp | Species ID: 129 | Level: 3 | Nature: Gentle (+SpDef/-Def)
+[12:23:44.899] LOG: Stats (IVs): HP: 14 (15), Atk: 6 (11), Def: 7 (15), Spatk: 6 (21), Spdef: 8 (28), Spd: 10 (19)
+[12:23:44.899] LOG: Ability: Marvel Scale | Passive Ability: Multiscale 
+[12:23:44.899] LOG: Moveset: ["Splash"]
+[12:23:45.347] DEBUG: Session data saved to slot 4!
+[12:23:46.538] LOG: Wave Seed: [{NKZiko2Zh84kWC1hls1E1S 1
+[12:23:46.961] LOG: %cStart Phase SummonPhase color:green;
+[12:23:47.260] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[12:23:47.261] LOG: %cStart Phase InitEncounterPhase color:green;
+[12:23:47.263] LOG: %cStart Phase PostSummonPhase color:green;
+[12:23:47.263] LOG: Ran PSP for: Garchomp
+[12:23:47.264] LOG: %cStart Phase PostSummonPhase color:green;
+[12:23:47.264] LOG: %cStart Phase PostSummonPhase color:green;
+[12:23:47.264] LOG: %cStart Phase PostSummonPhase color:green;
+[12:23:47.264] LOG: Ran PSP for: Magikarp
+[12:23:47.264] LOG: %cStart Phase PostSummonPhase color:green;
+[12:23:47.264] LOG: %cStart Phase PostSummonPhase color:green;
+[12:23:47.264] LOG: %cStart Phase TurnInitPhase color:green;
+[12:23:47.265] LOG: %cStart Phase CommandPhase color:green;
+[12:23:47.788] LOG: Move: EARTHQUAKE Move targets: {"targets":[2],"multiple":true} 
+Player Pokemon: Garchomp
+[12:23:47.789] LOG: %cStart Phase EnemyCommandPhase color:green;
+[12:23:47.790] LOG: %cStart Phase TurnStartPhase color:green;
+[12:23:47.792] LOG: %cStart Phase MovePhase color:green;
+[12:23:47.792] LOG: %cUser: Garchomp
+Move: EARTHQUAKE
+Use Mode: NORMAL color:orchid
+[12:23:47.794] LOG: %cStart Phase MessagePhase color:green;
+[12:23:47.910] LOG: %cStart Phase MoveEffectPhase color:green;
+[12:23:47.912] LOG: Battle Seed: mqLCFw1UF2rFlJNI
+[12:23:48.911] LOG: crit stage: +0
+[12:23:48.912] LOG: Move: Earthquake | Base damage: 624.2857142857142 | Power: 100 | Source attack: 121 | Target defense: 7
+[12:23:48.913] LOG: Move: Earthquake | Attack damage: 458
+[12:23:48.914] LOG: %cStart Phase DamageAnimPhase color:green;
+[12:23:48.944] LOG: %cStart Phase FaintPhase color:green;
+[12:23:49.028] LOG: %cStart Phase MessagePhase color:green;
+[12:23:49.108] LOG: %cStart Phase ShowAbilityPhase color:green;
+[12:23:49.260] LOG: %cStart Phase StatStageChangePhase color:green;
+[12:23:49.445] LOG: %cStart Phase MessagePhase color:green;
+[12:23:49.676] LOG: %cStart Phase HideAbilityPhase color:green;
+[12:23:49.710] LOG: %cStart Phase VictoryPhase color:green;
+[12:23:49.713] LOG: %cStart Phase MoveEndPhase color:green;
+[12:23:49.713] LOG: %cStart Phase MovePhase color:green;
+[12:23:49.713] LOG: %cStart Phase MoveEndPhase color:green;
+[12:23:49.713] LOG: %cStart Phase CheckInterludePhase color:green;
+[12:23:49.713] LOG: %cStart Phase WeatherEffectPhase color:green;
+[12:23:49.714] LOG: %cStart Phase PositionalTagPhase color:green;
+[12:23:49.714] LOG: %cStart Phase BerryPhase color:green;
+[12:23:49.714] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[12:23:49.714] LOG: %cStart Phase TurnEndPhase color:green;
+[12:23:49.715] WARN: [coop:turn] host recorder: finalize with NO open recording -> turn=-1 events=0 (caller decides not to emit)
+[12:23:49.715] LOG: %cStart Phase BattleEndPhase color:green;
+[12:23:49.715] LOG: Battle Score: 13 (1 Turns x1)
+[12:23:49.715] LOG: Total Score: 13
+[12:23:49.719] LOG: %cStart Phase EggLapsePhase color:green;
+[12:23:49.720] LOG: %cStart Phase SelectModifierPhase color:green;
+[12:23:49.720] LOG: Wave Seed: [{NKZiko2Zh84kWC1hls1E1S 1
+[12:23:49.724] LOG: 9 4 [2,3,4,5]
+[12:23:49.724] LOG: {"id":"TM_CASE","localeKey":"","iconImage":"tm_case","soundName":"se/restore","tier":0} 
+[12:23:51.531] LOG: %cStart Phase ErGreaterAbilityRandomizerPhase color:green;
