@@ -1,0 +1,268 @@
+----- BUG REPORT (in-game) -----
+version:  1.11.19
+url:      https://elite-redux.pages.dev/
+ua:       Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Mobile Safari/537.36
+mode:     4  wave:30  difficulty:hell
+seed:     8JnJMiS2DVN0EwiRiTXfzKS0
+party:    Iron Leaves(L24 84/84), Vivillon(L24 82/82), Zigzagoon(L24 59/59), Fluffbee(L24 82/82), Flygon Redux B(L24 77/83), Charcadet(L24 48/60)
+
+----- DESCRIPTION -----
+morpeko previously fainted but was sent out as Fainted in a later turn
+
+----- CONSOLE -----
+[09:29:33.316] LOG: Applied Multi Lens 
+[09:29:33.317] LOG: Move: Zen Headbutt | Attack damage: 227
+[09:29:33.317] LOG: %cStart Phase DamageAnimPhase color:green;
+[09:29:33.347] LOG: %cStart Phase MessagePhase color:green;
+[09:29:33.553] LOG: %cStart Phase MessagePhase color:green;
+[09:29:33.774] LOG: %cStart Phase FaintPhase color:green;
+[09:29:33.775] WARN: cry/302 not found
+[09:29:33.838] LOG: %cStart Phase MessagePhase color:green;
+[09:29:36.109] LOG: %cStart Phase VictoryPhase color:green;
+[09:29:36.109] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[09:29:36.109] LOG: Applied Super EXP. Charm 
+[09:29:36.109] LOG: Applied EXP. Charm 
+[09:29:36.110] LOG: 13813 15225 13824
+[09:29:36.110] LOG: %cStart Phase LevelUpPhase color:green;
+[09:29:36.110] LOG: %cStart Phase LearnMoveBatchPhase color:green;
+[09:29:39.511] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[09:29:39.511] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[09:29:39.511] LOG: Applied Super EXP. Charm 
+[09:29:39.511] LOG: Applied EXP. Charm 
+[09:29:39.511] LOG: 13813 15225 13824
+[09:29:39.511] LOG: %cStart Phase LevelUpPhase color:green;
+[09:29:39.512] LOG: %cStart Phase LearnMoveBatchPhase color:green;
+[09:29:41.537] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[09:29:41.537] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[09:29:41.538] LOG: Applied Super EXP. Charm 
+[09:29:41.538] LOG: Applied EXP. Charm 
+[09:29:41.538] LOG: 14917 16329 14947
+[09:29:41.538] LOG: %cStart Phase LevelUpPhase color:green;
+[09:29:41.538] LOG: %cStart Phase LearnMoveBatchPhase color:green;
+[09:29:42.735] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[09:29:42.735] LOG: %cStart Phase MoveEndPhase color:green;
+[09:29:42.735] LOG: %cStart Phase CheckInterludePhase color:green;
+[09:29:42.735] LOG: %cStart Phase WeatherEffectPhase color:green;
+[09:29:42.736] LOG: %cStart Phase PositionalTagPhase color:green;
+[09:29:42.736] LOG: %cStart Phase BerryPhase color:green;
+[09:29:42.736] LOG: Applied Lum Berry 
+[09:29:42.737] LOG: Applied Calcium 
+[09:29:42.745] LOG: %cStart Phase CommonAnimPhase color:green;
+[09:29:42.745] LOG: %cStart Phase MessagePhase color:green;
+[09:29:42.970] LOG: %cStart Phase ResetStatusPhase color:green;
+[09:29:42.971] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[09:29:42.971] LOG: %cStart Phase TurnEndPhase color:green;
+[09:29:43.011] WARN: [coop:turn] host recorder: finalize with NO open recording -> turn=-1 events=0 (caller decides not to emit)
+[09:29:43.011] LOG: %cStart Phase BattleEndPhase color:green;
+[09:29:43.011] LOG: Battle Score: 134 (1 Turns x1)
+[09:29:43.011] LOG: Total Score: 4321
+[09:29:43.012] LOG: Applied Amulet Coin 
+[09:29:43.016] LOG: Applied Calcium 
+[09:29:43.017] LOG: %cStart Phase ShowAbilityPhase color:green;
+[09:29:43.017] LOG: %cStart Phase HideAbilityPhase color:green;
+[09:29:43.168] LOG: %cStart Phase MessagePhase color:green;
+[09:29:43.317] LOG: %cStart Phase EggLapsePhase color:green;
+[09:29:43.317] LOG: %cStart Phase SelectModifierPhase color:green;
+[09:29:43.317] LOG: Wave Seed: UggjpOaskMboquhpM 29
+[09:29:43.321] LOG: 9 3 [3,4,5]
+[09:29:43.321] LOG: {"id":"TM_CASE","localeKey":"","iconImage":"tm_case","soundName":"se/restore","tier":0} 
+[09:29:43.321] LOG: 8 0 [10,11,12,14,23]
+[09:29:43.321] LOG: {"id":"EVIOLITE","localeKey":"modifierType:ModifierType.EVIOLITE","iconImage":"eviolite","soundName":"se/restore","tier":2} 
+[09:29:43.321] LOG: 16 4 [10,11,12,14,23]
+[09:29:43.321] LOG: {"id":"CANDY_JAR","localeKey":"modifierType:ModifierType.CANDY_JAR","iconImage":"candy_jar","soundName":"se/restore","tier":2} 
+[09:29:43.321] LOG: 2 0 [10,11,12,14,23]
+[09:29:43.321] LOG: {"id":"BIG_NUGGET","localeKey":"modifierType:ModifierType.BIG_NUGGET","iconImage":"big_nugget","group":"money","soundName":"se/buy","tier":2,"moneyMultiplier":2.5,"moneyMultiplierDescriptorKey":"modifierType:ModifierType.MoneyRewardModifierType.extra.moderate"} 
+[09:29:43.321] LOG: 2 0 [3,4,5]
+[09:29:43.321] LOG: {"id":"POTION","localeKey":"modifierType:ModifierType.POTION","iconImage":"potion","group":"potion","soundName":"se/restore","tier":0,"restorePoints":20,"restorePercent":10,"healStatus":false} 
+[09:29:44.751] LOG: Applied Amulet Coin 
+[09:29:45.575] LOG: Applied Amulet Coin 
+[09:29:46.375] LOG: Applied Amulet Coin 
+[09:29:46.380] LOG: %cStart Phase NewBattlePhase color:green;
+[09:29:46.380] LOG: Wave Seed: VhhkqPbtlNcprviqN 30
+[09:29:46.381] LOG: Starting trainer pool tier: BOSS
+[09:29:46.396] LOG: %cStart Phase MessagePhase color:green;
+[09:29:46.636] LOG: %cStart Phase MessagePhase color:green;
+[09:29:46.920] LOG: %cStart Phase MessagePhase color:green;
+[09:29:47.153] LOG: %cStart Phase ReturnPhase color:green;
+[09:29:47.270] LOG: %cStart Phase ShowTrainerPhase color:green;
+[09:29:47.370] LOG: %cStart Phase NextEncounterPhase color:green;
+[09:29:47.386] LOG: Pokemon: Foe Liepard | Species ID: 510 | Level: 23 | Nature: Bashful (-)
+[09:29:47.386] LOG: Stats (IVs): HP: 65 (17), Atk: 59 (9), Def: 34 (24), Spatk: 45 (21), Spdef: 34 (30), Spd: 57 (3)
+[09:29:47.386] LOG: Ability: On the Prowl | Passive Ability: Super Luck 
+[09:29:47.386] LOG: Moveset: ["Quash","Swagger","After You","Quick Attack"]
+[09:29:47.394] LOG: Pokemon: Foe Morpeko | Species ID: 877 | Level: 23 | Nature: Serious (-)
+[09:29:47.394] LOG: Stats (IVs): HP: 62 (13), Atk: 51 (9), Def: 38 (6), Spatk: 39 (15), Spdef: 32 (17), Spd: 50 (22)
+[09:29:47.394] LOG: Ability: Electric Burst | Passive Ability: Hunger Switch 
+[09:29:47.394] LOG: Moveset: ["Thunder Shock","Stuff Cheeks","Fake Out","Bullet Seed"]
+[09:29:47.400] LOG: Pokemon: Foe Morgrem | Species ID: 860 | Level: 23 | Nature: Naive (+Spd/-SpDef)
+[09:29:47.400] LOG: Stats (IVs): HP: 63 (26), Atk: 46 (17), Def: 30 (18), Spatk: 33 (4), Spdef: 32 (15), Spd: 43 (8)
+[09:29:47.400] LOG: Ability: Pickpocket | Passive Ability: Scare 
+[09:29:47.400] LOG: Moveset: ["False Surrender","Imprison","Fake Out","Parting Shot"]
+[09:29:47.957] LOG: {"id":"BERRY","localeKey":"","iconImage":"sitrus_berry","group":"berry","soundName":"se/restore","tier":0,"berryType":0} (enemy)
+[09:29:47.957] LOG: {"id":"BERRY","localeKey":"","iconImage":"apicot_berry","group":"berry","soundName":"se/restore","tier":0,"berryType":6} (enemy)
+[09:29:47.957] LOG: {"id":"BERRY","localeKey":"","iconImage":"leppa_berry","group":"berry","soundName":"se/restore","tier":0,"berryType":10} (enemy)
+[09:29:47.957] LOG: Battle Seed: iAsRDbabY6391rIm
+[09:29:47.957] LOG: Applied Calcium (enemy)
+[09:29:47.958] LOG: Applied Calcium (enemy)
+[09:29:47.958] LOG: Generated AI funcs
+[09:29:48.021] DEBUG: Session data saved to slot 4!
+[09:29:48.022] LOG: Wave Seed: VhhkqPbtlNcprviqN 30
+[09:29:48.229] LOG: Gym Leader Marnie
+[09:29:48.230] LOG: Dialogue dialogue:marnie.encounter.1 skipped
+[09:29:48.282] LOG: Gym Leader Marnie
+[09:29:48.680] LOG: %cStart Phase SummonPhase color:green;
+[09:29:48.681] LOG: Marnie
+[09:29:48.814] LOG: Applied Calcium (enemy)
+[09:29:48.970] LOG: %cStart Phase SummonPhase color:green;
+[09:29:48.970] LOG: Marnie
+[09:29:49.113] LOG: Applied Calcium (enemy)
+[09:29:49.147] WARN: cry/877 not found
+[09:29:49.253] LOG: %cStart Phase SummonPhase color:green;
+[09:29:49.405] LOG: Applied Calcium 
+[09:29:49.437] WARN: cry/1010 not found
+[09:29:49.536] LOG: %cStart Phase ShinySparklePhase color:green;
+[09:29:49.635] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[09:29:49.636] LOG: %cStart Phase SummonPhase color:green;
+[09:29:49.788] LOG: Applied Calcium 
+[09:29:49.821] WARN: cry/759 not found
+[09:29:49.936] LOG: %cStart Phase ShinySparklePhase color:green;
+[09:29:50.036] LOG: %cStart Phase InitEncounterPhase color:green;
+[09:29:50.038] LOG: %cStart Phase PostSummonPhase color:green;
+[09:29:50.038] LOG: Ran PSP for: Iron Leaves
+[09:29:50.043] LOG: %cStart Phase PostSummonPhase color:green;
+[09:29:50.044] LOG: %cStart Phase PostSummonPhase color:green;
+[09:29:50.044] LOG: Ran PSP for: Flygon Redux B
+[09:29:50.046] LOG: %cStart Phase PostSummonPhase color:green;
+[09:29:50.054] LOG: %cStart Phase ShowAbilityPhase color:green;
+[09:29:50.229] LOG: %cStart Phase CommonAnimPhase color:green;
+[09:29:50.744] LOG: %cStart Phase MessagePhase color:green;
+[09:29:51.011] LOG: %cStart Phase ShowAbilityPhase color:green;
+[09:29:51.012] LOG: %cStart Phase HideAbilityPhase color:green;
+[09:29:51.047] LOG: %cStart Phase ShowAbilityPhase color:green;
+[09:29:51.213] LOG: %cStart Phase MessagePhase color:green;
+[09:29:51.461] LOG: %cStart Phase HideAbilityPhase color:green;
+[09:29:51.496] LOG: %cStart Phase HideAbilityPhase color:green;
+[09:29:51.548] LOG: %cStart Phase PostSummonPhase color:green;
+[09:29:51.549] LOG: %cStart Phase PostSummonPhase color:green;
+[09:29:51.549] LOG: Ran PSP for: Morpeko
+[09:29:51.551] LOG: %cStart Phase PostSummonPhase color:green;
+[09:29:51.552] LOG: %cStart Phase PostSummonPhase color:green;
+[09:29:51.552] LOG: %cStart Phase PostSummonPhase color:green;
+[09:29:51.552] LOG: Ran PSP for: Liepard
+[09:29:51.553] LOG: %cStart Phase PostSummonPhase color:green;
+[09:29:51.554] LOG: %cStart Phase PostSummonPhase color:green;
+[09:29:51.554] LOG: %cStart Phase PostSummonPhase color:green;
+[09:29:51.554] LOG: %cStart Phase TurnInitPhase color:green;
+[09:29:51.554] LOG: %cStart Phase CommandPhase color:green;
+[09:30:01.683] LOG: Move: BITTER_BLADE Move targets: {"targets":[2,3],"multiple":true} 
+Player Pokemon: Iron Leaves
+[09:30:01.686] LOG: %cStart Phase SelectTargetPhase color:green;
+[09:30:02.151] LOG: %cStart Phase CommandPhase color:green;
+[09:30:03.883] LOG: %cStart Phase EnemyCommandPhase color:green;
+[09:30:03.892] LOG: Applied Multi Lens 
+[09:30:03.894] LOG: Applied Multi Lens 
+[09:30:03.898] LOG: Applied Multi Lens 
+[09:30:03.900] LOG: Applied Multi Lens 
+[09:30:03.905] LOG: %cStart Phase EnemyCommandPhase color:green;
+[09:30:03.909] LOG: Applied Multi Lens 
+[09:30:03.911] LOG: Applied Multi Lens 
+[09:30:03.912] LOG: Applied Multi Lens 
+[09:30:03.914] LOG: Applied Multi Lens 
+[09:30:03.934] LOG: Move Pool: ["Thunder Shock"]
+[09:30:03.934] LOG: Move Scores: [1155.421686746988]
+[09:30:03.934] LOG: Sorted Move Pool: ["Thunder Shock"]
+[09:30:03.934] LOG: Chosen Move: Thunder Shock
+[09:30:03.934] LOG: ER AI: experimental brain (sharpness 1)
+[09:30:03.934] LOG: %cStart Phase TurnStartPhase color:green;
+[09:30:03.938] LOG: %cStart Phase SwitchSummonPhase color:green;
+[09:30:04.131] LOG: Applied Calcium 
+[09:30:04.268] LOG: %cStart Phase ShinySparklePhase color:green;
+[09:30:04.362] LOG: %cStart Phase PostSummonPhase color:green;
+[09:30:04.362] LOG: Ran PSP for: Vivillon
+[09:30:04.363] LOG: %cStart Phase PostSummonPhase color:green;
+[09:30:04.365] LOG: %cStart Phase MovePhase color:green;
+[09:30:04.365] LOG: %cUser: Iron Leaves
+Move: BITTER_BLADE
+Use Mode: NORMAL color:orchid
+[09:30:04.372] LOG: %cStart Phase MessagePhase color:green;
+[09:30:04.495] LOG: %cStart Phase MoveEffectPhase color:green;
+[09:30:04.496] LOG: Applied Multi Lens 
+[09:30:05.113] LOG: crit stage: +0
+[09:30:05.114] LOG: Move: Bitter Blade | Base damage: 153.34836363636364 | Power: 117 | Source attack: 184 | Target defense: 33
+[09:30:05.115] LOG: Applied Multi Lens 
+[09:30:05.115] LOG: Move: Bitter Blade | Attack damage: 79
+[09:30:05.115] LOG: crit stage: +0
+[09:30:05.117] LOG: Move: Bitter Blade | Base damage: 153.34836363636364 | Power: 117 | Source attack: 184 | Target defense: 33
+[09:30:05.117] LOG: Applied Multi Lens 
+[09:30:05.117] LOG: Move: Bitter Blade | Attack damage: 101
+[09:30:05.117] LOG: %cStart Phase DamageAnimPhase color:green;
+[09:30:05.147] LOG: %cStart Phase PokemonHealPhase color:green;
+[09:30:05.149] LOG: %cStart Phase MessagePhase color:green;
+[09:30:05.396] LOG: %cStart Phase DamageAnimPhase color:green;
+[09:30:05.431] LOG: %cStart Phase PokemonHealPhase color:green;
+[09:30:05.431] LOG: %cStart Phase MessagePhase color:green;
+[09:30:05.678] LOG: %cStart Phase MessagePhase color:green;
+[09:30:05.895] LOG: %cStart Phase FaintPhase color:green;
+[09:30:07.090] LOG: %cStart Phase MessagePhase color:green;
+[09:30:07.699] LOG: %cStart Phase VictoryPhase color:green;
+[09:30:07.699] LOG: %cStart Phase FaintPhase color:green;
+[09:30:07.701] WARN: cry/877 not found
+[09:30:07.756] LOG: %cStart Phase MessagePhase color:green;
+[09:30:08.008] LOG: %cStart Phase VictoryPhase color:green;
+[09:30:08.009] LOG: %cStart Phase MoveEndPhase color:green;
+[09:30:08.010] LOG: %cStart Phase PostSummonPhase color:green;
+[09:30:08.010] LOG: %cStart Phase SwitchSummonPhase color:green;
+[09:30:08.228] LOG: Marnie
+[09:30:08.304] LOG: Applied Calcium (enemy)
+[09:30:08.421] LOG: %cStart Phase PostSummonPhase color:green;
+[09:30:08.421] LOG: Ran PSP for: Morgrem
+[09:30:08.421] LOG: %cStart Phase PostSummonPhase color:green;
+[09:30:08.422] LOG: %cStart Phase PostSummonPhase color:green;
+[09:30:08.422] LOG: %cStart Phase ShowAbilityPhase color:green;
+[09:30:08.583] LOG: %cStart Phase StatStageChangePhase color:green;
+[09:30:08.742] LOG: %cStart Phase MessagePhase color:green;
+[09:30:08.987] LOG: %cStart Phase StatStageChangePhase color:green;
+[09:30:09.173] LOG: %cStart Phase MessagePhase color:green;
+[09:30:09.403] LOG: %cStart Phase HideAbilityPhase color:green;
+[09:30:09.439] LOG: %cStart Phase ShowAbilityPhase color:green;
+[09:30:09.606] LOG: %cStart Phase StatStageChangePhase color:green;
+[09:30:09.789] LOG: %cStart Phase MessagePhase color:green;
+[09:30:10.003] LOG: %cStart Phase StatStageChangePhase color:green;
+[09:30:10.190] LOG: %cStart Phase MessagePhase color:green;
+[09:30:10.403] LOG: %cStart Phase HideAbilityPhase color:green;
+[09:30:10.440] LOG: %cStart Phase MovePhase color:green;
+[09:30:10.441] LOG: %cUser: Vivillon
+Move: TAILWIND
+Use Mode: INDIRECT color:orchid
+[09:30:10.444] LOG: %cStart Phase MessagePhase color:green;
+[09:30:10.553] LOG: %cStart Phase MoveEffectPhase color:green;
+[09:30:10.593] LOG: %cStart Phase MessagePhase color:green;
+[09:30:10.845] LOG: %cStart Phase MoveEndPhase color:green;
+[09:30:10.845] LOG: %cStart Phase MovePhase color:green;
+[09:30:10.845] LOG: %cStart Phase MoveEndPhase color:green;
+[09:30:10.845] LOG: %cStart Phase CheckInterludePhase color:green;
+[09:30:10.845] LOG: %cStart Phase WeatherEffectPhase color:green;
+[09:30:10.845] LOG: %cStart Phase PositionalTagPhase color:green;
+[09:30:10.846] LOG: %cStart Phase BerryPhase color:green;
+[09:30:10.849] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[09:30:10.851] LOG: %cStart Phase TurnEndPhase color:green;
+[09:30:10.872] WARN: [coop:turn] host recorder: finalize with NO open recording -> turn=-1 events=0 (caller decides not to emit)
+[09:30:10.872] LOG: %cStart Phase SwitchSummonPhase color:green;
+[09:30:10.873] LOG: Marnie
+[09:30:11.136] LOG: Marnie
+[09:30:11.222] LOG: Applied Calcium (enemy)
+[09:30:11.246] WARN: cry/877 not found
+[09:30:11.365] LOG: %cStart Phase PostSummonPhase color:green;
+[09:30:11.365] LOG: Ran PSP for: Morpeko
+[09:30:11.366] LOG: %cStart Phase PostSummonPhase color:green;
+[09:30:11.366] LOG: %cStart Phase PostSummonPhase color:green;
+[09:30:11.366] LOG: %cStart Phase SwitchSummonPhase color:green;
+[09:30:11.438] LOG: %cStart Phase PostSummonPhase color:green;
+[09:30:11.438] LOG: Ran PSP for: Morpeko
+[09:30:11.438] LOG: %cStart Phase PostSummonPhase color:green;
+[09:30:11.438] LOG: %cStart Phase PostSummonPhase color:green;
+[09:30:11.439] LOG: %cStart Phase TurnInitPhase color:green;
+[09:30:11.439] LOG: %cStart Phase CommandPhase color:green;
+[09:30:12.324] LOG: Move: BITTER_BLADE Move targets: {"targets":[3],"multiple":true} 
+Player Pokemon: Iron Leaves
+[09:30:12.326] LOG: %cStart Phase CommandPhase color:green;
