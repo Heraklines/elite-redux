@@ -1,0 +1,24 @@
+----- BUG REPORT (in-game) -----
+version:  1.11.19
+url:      https://elite-redux.pages.dev/
+ua:       Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36 Edg/149.0.0.0
+mode:     0  wave:null  difficulty:ace
+seed:     Eb148Y6IRc9Ct8wsWH7Pq9UU
+party:    
+
+----- DESCRIPTION -----
+Wave 199, Elite Mode, Ghost Trainer. Two of the opposing Pokemon had stats in the 2000 range, both Pokemon also had 5 moveslots (unsure if this has something to do with the bug)
+
+----- CONSOLE -----
+[02:09:21.490] LOG: %c %c %c %c %c Phaser v3.90.0 (WebGL | Web Audio) %c https://phaser.io/v390 background: #ff0000 background: #ffff00 background: #00ff00 background: #00ffff color: #ffffff; background: #000000 background: transparent
+[02:09:27.269] LOG: [ER] build mqvpytls-8ig7
+[02:12:21.875] DEBUG: Destroying loading scene
+[02:12:21.876] DEBUG: Destroyed loading scene
+[02:12:22.824] LOG: Seed: Eb148Y6IRc9Ct8wsWH7Pq9UU
+[02:12:22.825] LOG: Wave Seed: Eb148Y6IRc9Ct8wsWH7Pq9UU 0
+[02:12:40.794] LOG: %cStart Phase LoginPhase color:green;
+[02:12:42.101] LOG: Client Session: xX0Rq38CmgBWpllqFJsepOS87lgH2feF
+[02:12:46.118] LOG: %cStart Phase TitlePhase color:green;
+[02:12:46.132] LOG: Getting Session Slot id: %d 3
+[02:12:46.387] LOG: use seasonal splash messages true
+[02:12:46.388] LOG: Adding 2 Pride Month splash messages (weight: x15)
