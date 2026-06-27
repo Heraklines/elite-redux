@@ -1,0 +1,5 @@
+# build outputs (regenerable)
+dist/
+contact-*.png
+articuno-shiny-lab.html
+_*.js
