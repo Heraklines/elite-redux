@@ -153,7 +153,7 @@ import {
   ER_SHINY_LAB_MINI_ICON_RENDER_PAD,
   erShinyLabSpriteFxStateKey,
   getErShinyLabPokemonIconSource,
-  getErShinyLabSpriteFxLookForSpecies,
+  getErShinyLabSpriteFxLookForPokemon,
   getErShinyLabSpriteFxTime,
   hasErShinyLabAnySpriteFx,
   hasErShinyLabExactSpriteFx,
@@ -1356,7 +1356,7 @@ export class BattleScene extends SceneBase {
       }
     }
 
-    const shinyLabLook = getErShinyLabSpriteFxLookForSpecies(pokemon.species.speciesId, pokemon.shiny);
+    const shinyLabLook = getErShinyLabSpriteFxLookForPokemon(pokemon);
     if (hasErShinyLabAnySpriteFx(shinyLabLook)) {
       const source = getErShinyLabPokemonIconSource(pokemon, ignoreOverride, useIllusion, shinyLabLook);
       const baseState = erShinyLabSpriteFxStateKey(source, shinyLabLook);

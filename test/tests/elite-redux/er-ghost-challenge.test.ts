@@ -15,6 +15,7 @@
 import { allChallenges, GhostTrainersChallenge } from "#data/challenge";
 import {
   applyErGhostOverride,
+  captureGhostTeam,
   type GhostTeamSnapshot,
   hasErGhostOverride,
   markTrainerAsGhost,
@@ -23,10 +24,17 @@ import {
 } from "#data/elite-redux/er-ghost-teams";
 import { isErGhostChallengeActive } from "#data/elite-redux/er-ghost-waves";
 import { getChallengeFavour } from "#data/elite-redux/er-shiny-favour";
+import {
+  ER_SHINY_LAB_EFFECTS_BY_CATEGORY,
+  encodeErShinyLabLoadout,
+  encodeErShinyLabParams,
+  setErShinyLabOwnedBit,
+} from "#data/elite-redux/er-shiny-lab-effects";
 import { AbilityId } from "#enums/ability-id";
 import { Challenges } from "#enums/challenges";
 import { MoveId } from "#enums/move-id";
 import { SpeciesId } from "#enums/species-id";
+import { getErShinyLabSpriteFxLookForPokemon } from "#sprites/er-shiny-lab-sprite-fx";
 import { GameManager } from "#test/framework/game-manager";
 import Phaser from "phaser";
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
@@ -245,5 +253,67 @@ describe.skipIf(!RUN)("ER ghost devolve gate past wave 50 (#422 follow-up)", () 
     game.scene.currentBattle.waveIndex = 30;
     game.scene.currentBattle.enemyLevels = [30];
     expect(applyErGhostOverride(host!, 0)?.species.speciesId).toBe(SpeciesId.GIBLE);
+  });
+
+  it("serializes Shiny Lab looks onto ghost members and clamps malformed payloads to plain", async () => {
+    game.override.shiny(true, 2);
+    game.challengeMode.addChallenge(Challenges.GHOST_TRAINERS, 1, 1);
+    await game.challengeMode.startBattle(SpeciesId.BULBASAUR);
+
+    const palette = ER_SHINY_LAB_EFFECTS_BY_CATEGORY.palette.find(e => e.id === "duoneon")!;
+    const surface = ER_SHINY_LAB_EFFECTS_BY_CATEGORY.surface.find(e => e.id === "starmap")!;
+    const around = ER_SHINY_LAB_EFFECTS_BY_CATEGORY.around.find(e => e.id === "staticfield")!;
+    const starter = game.scene.gameData.getStarterDataEntry(SpeciesId.BULBASAUR);
+    starter.erShinyLab = {};
+    setErShinyLabOwnedBit(starter.erShinyLab, "palette", palette.index);
+    setErShinyLabOwnedBit(starter.erShinyLab, "surface", surface.index);
+    setErShinyLabOwnedBit(starter.erShinyLab, "around", around.index);
+    const savedLoadout = encodeErShinyLabLoadout({
+      palette: "duoneon",
+      surface: "starmap",
+      around: "staticfield",
+    });
+    const savedParams = encodeErShinyLabParams({
+      palAmt: 1,
+      surfAmt: 0.8,
+      aroAmt: 0.6,
+      scale: 1.2,
+      seed: 123,
+      tintMode: 1,
+    });
+    starter.erShinyLab.l = savedLoadout;
+    starter.erShinyLab.q = savedParams;
+    const player = game.scene.getPlayerParty()[0];
+    player.shiny = true;
+    player.variant = 2;
+
+    const snapshot = captureGhostTeam(true);
+    expect(snapshot?.party[0].erShinyLab).toEqual([...savedLoadout, ...savedParams]);
+
+    const host = game.scene.currentBattle.trainer;
+    expect(host).not.toBeNull();
+    markTrainerAsGhost(host!, snapshot!);
+    const enemy = applyErGhostOverride(host!, 0);
+    expect(enemy).not.toBeNull();
+    expect(enemy!.customPokemonData.erShinyLab).toEqual(snapshot!.party[0].erShinyLab);
+    expect(getErShinyLabSpriteFxLookForPokemon(enemy!)?.loadout).toEqual({
+      palette: "duoneon",
+      surface: "starmap",
+      around: "staticfield",
+    });
+
+    const invalidLook: [number, number, number, number, number, number, number, number, number] = [
+      255, 255, 255, 255, 255, 255, 255, 255, 255,
+    ];
+    const malformed: GhostTeamSnapshot = {
+      ...snapshot!,
+      party: [{ ...snapshot!.party[0], erShinyLab: invalidLook }],
+    };
+    markTrainerAsGhost(host!, malformed);
+    const plainEnemy = applyErGhostOverride(host!, 0);
+    expect(plainEnemy).not.toBeNull();
+    expect(plainEnemy!.customPokemonData.erShinyLab).toBeUndefined();
+    expect(plainEnemy!.customPokemonData.erShinyLabSuppressLocal).toBe(true);
+    expect(getErShinyLabSpriteFxLookForPokemon(plainEnemy!)).toBeNull();
   });
 });

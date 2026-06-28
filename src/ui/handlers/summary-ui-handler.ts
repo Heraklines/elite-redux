@@ -43,7 +43,7 @@ import {
   ErShinyLabSpriteFxOverlay,
   type ErShinyLabSpriteSourceRef,
   getErShinyLabPokemonSpriteSource,
-  getErShinyLabSpriteFxLookForSpecies,
+  getErShinyLabSpriteFxLookForPokemon,
   getErShinyLabSpriteFxTime,
   hasErShinyLabAnySpriteFx,
   hasErShinyLabExactSpriteFx,
@@ -498,7 +498,7 @@ export class SummaryUiHandler extends UiHandler {
     this.numberText.setShadowColor(
       getTextColor(this.pokemon.isShiny() ? TextStyle.SUMMARY_GOLD : TextStyle.SUMMARY, true),
     );
-    const shinyLabLook = getErShinyLabSpriteFxLookForSpecies(this.pokemon.species.speciesId, this.pokemon.shiny);
+    const shinyLabLook = getErShinyLabSpriteFxLookForPokemon(this.pokemon);
     const shinyLabSource = hasErShinyLabAnySpriteFx(shinyLabLook)
       ? getErShinyLabPokemonSpriteSource(this.pokemon, true, shinyLabLook)
       : null;
@@ -2122,7 +2122,7 @@ export class SummaryUiHandler extends UiHandler {
     if (!this.pokemon || !this.shinyLabFxOverlay) {
       return;
     }
-    const look = getErShinyLabSpriteFxLookForSpecies(this.pokemon.species.speciesId, this.pokemon.shiny);
+    const look = getErShinyLabSpriteFxLookForPokemon(this.pokemon);
     if (!hasErShinyLabAnySpriteFx(look)) {
       this.shinyLabFxOverlay.hide();
       this.stopShinyLabSummaryFxTimer();

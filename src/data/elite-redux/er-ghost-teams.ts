@@ -32,6 +32,16 @@ import { globalScene } from "#app/global-scene";
 import { bypassLogin } from "#constants/app-constants";
 import { type ErDifficulty, getErDifficulty } from "#data/elite-redux/er-run-difficulty";
 import { ghostWavesForCurrentRun, isErGhostChallengeActive, isErGhostWave } from "#data/elite-redux/er-ghost-waves";
+import {
+  decodeErShinyLabLoadout,
+  decodeErShinyLabParams,
+  encodeErShinyLabPreset,
+  type ErShinyLabCategory,
+  type ErShinyLabSavedLook,
+  getErShinyLabOwnedSet,
+  normalizeErShinyLabSavedLook,
+  sanitizeErShinyLabLoadout,
+} from "#data/elite-redux/er-shiny-lab-effects";
 import { pokemonPrevolutions } from "#balance/pokemon-evolutions";
 import { speciesEggTiers } from "#balance/species-egg-tiers";
 import { TrainerPartyTemplate } from "#data/trainers/trainer-party-template";
@@ -45,6 +55,7 @@ import type { Trainer } from "#field/trainer";
 import { ErSpeciesId } from "#enums/er-species-id";
 import { SpeciesId } from "#enums/species-id";
 import { PokemonMove } from "#moves/pokemon-move";
+import type { Variant } from "#sprites/variant";
 import { sessionIdKey } from "#utils/common";
 import { getCookie } from "#utils/cookies";
 import { loadLastTeam } from "#utils/data";
@@ -70,6 +81,11 @@ export interface GhostMember {
    * snapshots captured before item recording (those fall back to a random
    * Ultra-tier item or berry when a memento is granted). */
   heldItems?: [string, number][] | undefined;
+  /**
+   * ER Shiny Lab: compact equipped look for cross-player ghosts. The viewer
+   * clamps every id before applying so malformed snapshots become plain.
+   */
+  erShinyLab?: ErShinyLabSavedLook | undefined;
 }
 
 export interface GhostTeamSnapshot {
@@ -414,6 +430,7 @@ function serializeMember(p: any, isPlayer = true): GhostMember {
     ? p.moveset.filter(Boolean).map((m: any) => m.moveId ?? m.move ?? 0)
     : [];
   const heldItems = serializeHeldItems(p, isPlayer);
+  const erShinyLab = serializeShinyLabLook(p);
   return {
     speciesId: p?.species?.speciesId ?? 0,
     formIndex: p?.formIndex ?? 0,
@@ -427,7 +444,36 @@ function serializeMember(p: any, isPlayer = true): GhostMember {
     passive: !!p?.passive,
     moves,
     ...(heldItems.length > 0 ? { heldItems } : {}),
+    ...(erShinyLab ? { erShinyLab } : {}),
   };
+}
+
+function serializeShinyLabLook(p: any): ErShinyLabSavedLook | undefined {
+  const carried = normalizeErShinyLabSavedLook(p?.customPokemonData?.erShinyLab);
+  if (carried) {
+    return carried;
+  }
+  if (!p?.shiny) {
+    return undefined;
+  }
+  const speciesId = p?.species?.speciesId;
+  if (typeof speciesId !== "number") {
+    return undefined;
+  }
+  const save = globalScene.gameData?.getStarterDataEntry(speciesId)?.erShinyLab;
+  if (!save) {
+    return undefined;
+  }
+  const owned: Record<ErShinyLabCategory, Set<string>> = {
+    palette: getErShinyLabOwnedSet(save, "palette"),
+    surface: getErShinyLabOwnedSet(save, "surface"),
+    around: getErShinyLabOwnedSet(save, "around"),
+  };
+  const loadout = sanitizeErShinyLabLoadout(decodeErShinyLabLoadout(save.l), owned);
+  if (!loadout.palette && !loadout.surface && !loadout.around) {
+    return undefined;
+  }
+  return normalizeErShinyLabSavedLook(encodeErShinyLabPreset({ loadout, params: decodeErShinyLabParams(save.q) }));
 }
 
 /** Serialise a member's held items as [modifierTypeId, stackCount] pairs, or [] when
@@ -1044,8 +1090,10 @@ export function applyErGhostOverride(trainer: Trainer, index: number): EnemyPoke
     enemy.nature = member.nature as Nature;
     enemy.gender = member.gender;
     enemy.shiny = member.shiny;
-    enemy.variant = member.variant;
+    enemy.variant = member.variant as Variant;
     enemy.passive = member.passive;
+    enemy.customPokemonData.erShinyLabSuppressLocal = true;
+    enemy.customPokemonData.erShinyLab = member.shiny ? normalizeErShinyLabSavedLook(member.erShinyLab) : undefined;
     if (member.moves.length > 0 && !devolved) {
       const moves = member.moves.map(id => new PokemonMove(id));
       enemy.moveset = moves;

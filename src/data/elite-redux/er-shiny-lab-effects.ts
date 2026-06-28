@@ -76,6 +76,7 @@ export type ErShinyLabSavedPreset = [
   number,
   number,
 ];
+export type ErShinyLabSavedLook = ErShinyLabSavedPreset;
 
 export interface ErShinyLabOwnedBitsets {
   p?: number[];
@@ -727,6 +728,32 @@ export function decodeErShinyLabPreset(saved: readonly number[] | null | undefin
     loadout: decodeErShinyLabLoadout(saved.slice(0, 3)),
     params: decodeErShinyLabParams(saved.slice(3, 9)),
   };
+}
+
+export function normalizeErShinyLabSavedLook(
+  saved: readonly number[] | null | undefined,
+): ErShinyLabSavedLook | undefined {
+  if (!saved) {
+    return undefined;
+  }
+  const normalized: ErShinyLabSavedLook = [
+    byte(saved[0] ?? 0),
+    byte(saved[1] ?? 0),
+    byte(saved[2] ?? 0),
+    byte(saved[3] ?? 255),
+    byte(saved[4] ?? 255),
+    byte(saved[5] ?? 255),
+    byte(saved[6] ?? 96),
+    byte(saved[7] ?? 0),
+    byte(saved[8] ?? 0),
+  ];
+  const loadout = decodeErShinyLabLoadout(normalized);
+  return loadout.palette || loadout.surface || loadout.around ? normalized : undefined;
+}
+
+export function decodeErShinyLabSavedLook(saved: readonly number[] | null | undefined): ErShinyLabPreset | null {
+  const normalized = normalizeErShinyLabSavedLook(saved);
+  return normalized ? decodeErShinyLabPreset(normalized) : null;
 }
 
 export function normalizeErShinyLabPresets(

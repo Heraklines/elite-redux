@@ -2,7 +2,9 @@ import { globalScene } from "#app/global-scene";
 import {
   buildErShinyLabVariantPalette,
   decodeErShinyLabLoadout,
+  decodeErShinyLabSavedLook,
   type ErShinyLabSaveData,
+  type ErShinyLabSavedLook,
   getErShinyLabOwnedSet,
 } from "#data/elite-redux/er-shiny-lab-effects";
 import { VariantTier } from "#enums/variant-tier";
@@ -105,7 +107,21 @@ export function getErShinyLabPaletteIdForSpecies(speciesId: number): string | nu
   return getErShinyLabPaletteIdFromSave(save);
 }
 
-export function getErShinyLabPaletteId(pokemon: Pokemon): string | null {
+export function getErShinyLabPaletteId(
+  pokemon: Pokemon & {
+    customPokemonData?: {
+      erShinyLab?: ErShinyLabSavedLook | undefined;
+      erShinyLabSuppressLocal?: boolean | undefined;
+    };
+  },
+): string | null {
+  const carriedLook = decodeErShinyLabSavedLook(pokemon.customPokemonData?.erShinyLab);
+  if (carriedLook?.loadout.palette) {
+    return carriedLook.loadout.palette;
+  }
+  if (pokemon.customPokemonData?.erShinyLabSuppressLocal) {
+    return null;
+  }
   return getErShinyLabPaletteIdForSpecies(pokemon.species.speciesId);
 }
 

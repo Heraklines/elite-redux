@@ -1,5 +1,6 @@
 import type { BattlerTag } from "#data/battler-tags";
 import { loadBattlerTag, SerializableBattlerTag } from "#data/battler-tags";
+import { type ErShinyLabSavedLook, normalizeErShinyLabSavedLook } from "#data/elite-redux/er-shiny-lab-effects";
 import type { Gender } from "#data/gender";
 import { PokemonMove } from "#data/moves/pokemon-move";
 import type { PokemonSpeciesForm } from "#data/pokemon-species";
@@ -73,6 +74,17 @@ export class CustomPokemonData {
   public erGiftAbilities: number[] = [];
   public erGiftIndex = 0;
   /**
+   * ER Shiny Lab: an optional carried cosmetic look for cross-player ghosts.
+   * Permanent starter unlocks still live in starterData; this compact tuple is
+   * copied onto rebuilt ghost Pokemon so viewers see the owner's equipped look.
+   */
+  public erShinyLab?: ErShinyLabSavedLook | undefined;
+  /**
+   * When true, do not fall back to this client's starterData Shiny Lab look.
+   * Ghost Pokemon use this so malformed or absent owner payloads become plain.
+   */
+  public erShinyLabSuppressLocal = false;
+  /**
    * ER Innate Shrine (#514): when `true`, this Pokemon's ER innate slots are all
    * unlocked for the rest of the run (no candy purchase needed), as if it had
    * attuned at the Temple shrine. Run-scoped (serialized with the session), not a
@@ -142,6 +154,8 @@ export class CustomPokemonData {
     this.erBlackShiny = data?.erBlackShiny ?? false;
     this.erGiftAbilities = data?.erGiftAbilities ?? [];
     this.erGiftIndex = data?.erGiftIndex ?? 0;
+    this.erShinyLab = normalizeErShinyLabSavedLook(data?.erShinyLab);
+    this.erShinyLabSuppressLocal = data?.erShinyLabSuppressLocal ?? false;
     this.erInnateShrineUnlocked = data?.erInnateShrineUnlocked ?? false;
     this.erCursedStat = data?.erCursedStat ?? -1;
     this.erLockedAbilitySlots = data?.erLockedAbilitySlots ?? [];

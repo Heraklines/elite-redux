@@ -21,6 +21,7 @@ import {
   getErShinyLabEffectCost,
   getErShinyLabOwnedSet,
   mergeErShinyLabSaveData,
+  normalizeErShinyLabSavedLook,
   resolveErShinyLabEffectState,
   setErShinyLabBit,
   setErShinyLabOwnedBit,
@@ -34,6 +35,7 @@ import {
   erShinyLabSpriteFxStateKey,
   getErShinyLabPokemonBattleSource,
   getErShinyLabSpeciesIconSource,
+  getErShinyLabSpriteFxLookForPokemon,
   hasErShinyLabAnySpriteFx,
   hasErShinyLabExactSpriteFx,
 } from "#sprites/er-shiny-lab-sprite-fx";
@@ -306,5 +308,25 @@ describe("ER Shiny Lab data layer", () => {
 
     const merged = mergeErShinyLabSaveData({}, parsedSave);
     expect(merged).toEqual(parsedSave);
+  });
+
+  it("normalizes carried ghost looks and prefers them over local species data", () => {
+    const look = encodeErShinyLabPreset({
+      loadout: { palette: "duoneon", surface: "starmap", around: "staticfield" },
+      params: { palAmt: 1, surfAmt: 0.8, aroAmt: 0.6, scale: 1.2, seed: 123, tintMode: 1 },
+    });
+    const pokemon = {
+      species: getPokemonSpecies(SpeciesId.BULBASAUR),
+      shiny: true,
+      customPokemonData: { erShinyLab: look },
+    };
+
+    expect(normalizeErShinyLabSavedLook(look)).toEqual(look);
+    expect(normalizeErShinyLabSavedLook([255, 255, 255, 255, 255, 255, 255, 255, 255])).toBeUndefined();
+    expect(getErShinyLabSpriteFxLookForPokemon(pokemon)?.loadout).toEqual({
+      palette: "duoneon",
+      surface: "starmap",
+      around: "staticfield",
+    });
   });
 });

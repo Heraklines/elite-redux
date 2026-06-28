@@ -2,9 +2,11 @@ import { globalScene } from "#app/global-scene";
 import {
   decodeErShinyLabLoadout,
   decodeErShinyLabParams,
+  decodeErShinyLabSavedLook,
   type ErShinyLabCategory,
   type ErShinyLabLoadout,
   type ErShinyLabParams,
+  type ErShinyLabSavedLook,
   getErShinyLabOwnedSet,
   sanitizeErShinyLabLoadout,
 } from "#data/elite-redux/er-shiny-lab-effects";
@@ -33,6 +35,7 @@ type PokemonLike = {
   formIndex: number;
   variant: Variant;
   shiny: boolean;
+  customPokemonData?: { erShinyLab?: ErShinyLabSavedLook | undefined; erShinyLabSuppressLocal?: boolean } | null;
   summonData?: { illusion?: { formIndex?: number; variant?: Variant } | null };
   getBattleSpriteKey(back?: boolean, ignoreOverride?: boolean): string;
   getBattleSpriteAtlasPath(back?: boolean, ignoreOverride?: boolean): string;
@@ -363,6 +366,24 @@ export function getErShinyLabSpriteFxLookForSpecies(speciesId: number, shiny: bo
   return { loadout, params: decodeErShinyLabParams(save.q) };
 }
 
+export function getErShinyLabSpriteFxLookForPokemon(pokemon: {
+  species: { speciesId: number };
+  shiny: boolean;
+  customPokemonData?: { erShinyLab?: ErShinyLabSavedLook | undefined; erShinyLabSuppressLocal?: boolean } | null;
+}): ErShinyLabSpriteFxLook | null {
+  if (!pokemon.shiny) {
+    return null;
+  }
+  const carriedLook = decodeErShinyLabSavedLook(pokemon.customPokemonData?.erShinyLab);
+  if (carriedLook) {
+    return carriedLook;
+  }
+  if (pokemon.customPokemonData?.erShinyLabSuppressLocal) {
+    return null;
+  }
+  return getErShinyLabSpriteFxLookForSpecies(pokemon.species.speciesId, pokemon.shiny);
+}
+
 export function hasErShinyLabAnySpriteFx(
   look: ErShinyLabSpriteFxLook | null | undefined,
 ): look is ErShinyLabSpriteFxLook {
@@ -417,7 +438,7 @@ export function getErShinyLabPokemonBattleSource(
   pokemon: PokemonLike,
   back?: boolean,
   ignoreOverride?: boolean,
-  look = getErShinyLabSpriteFxLookForSpecies(pokemon.species.speciesId, pokemon.shiny),
+  look = getErShinyLabSpriteFxLookForPokemon(pokemon),
 ): ErShinyLabSpriteSourceRef {
   const useBaseSource = !!look?.loadout.palette;
   if (!useBaseSource) {
@@ -440,7 +461,7 @@ export function getErShinyLabPokemonBattleSource(
 export function getErShinyLabPokemonSpriteSource(
   pokemon: PokemonLike,
   ignoreOverride?: boolean,
-  look = getErShinyLabSpriteFxLookForSpecies(pokemon.species.speciesId, pokemon.shiny),
+  look = getErShinyLabSpriteFxLookForPokemon(pokemon),
 ): ErShinyLabSpriteSourceRef {
   if (!look?.loadout.palette) {
     return {
@@ -460,7 +481,7 @@ export function getErShinyLabPokemonIconSource(
   pokemon: PokemonLike,
   ignoreOverride = true,
   useIllusion = false,
-  look = getErShinyLabSpriteFxLookForSpecies(pokemon.species.speciesId, pokemon.shiny),
+  look = getErShinyLabSpriteFxLookForPokemon(pokemon),
 ): ErShinyLabSpriteSourceRef {
   if (!look?.loadout.palette) {
     return {

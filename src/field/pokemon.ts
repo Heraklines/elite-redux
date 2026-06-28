@@ -207,7 +207,7 @@ import { PokemonMove } from "#moves/pokemon-move";
 import {
   ErShinyLabSpriteFxOverlay,
   getErShinyLabPokemonBattleSource,
-  getErShinyLabSpriteFxLookForSpecies,
+  getErShinyLabSpriteFxLookForPokemon,
   getErShinyLabSpriteFxTime,
   hasErShinyLabExactSpriteFx,
 } from "#sprites/er-shiny-lab-sprite-fx";
@@ -939,7 +939,7 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
       }
     }
 
-    const shinyLabLook = getErShinyLabSpriteFxLookForSpecies(this.species.speciesId, this.shiny);
+    const shinyLabLook = getErShinyLabSpriteFxLookForPokemon(this);
     if (shinyLabLook?.loadout.palette) {
       const frontSource = getErShinyLabPokemonBattleSource(this, false, ignoreOverride, shinyLabLook);
       if (frontSource.atlasPath && !globalScene.textures.exists(frontSource.key)) {
@@ -1582,7 +1582,7 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
   }
 
   private refreshErShinyLabBattleFx(): void {
-    const look = getErShinyLabSpriteFxLookForSpecies(this.species.speciesId, this.shiny);
+    const look = getErShinyLabSpriteFxLookForPokemon(this);
     if (!this.erShinyLabFxOverlay || !hasErShinyLabExactSpriteFx(look)) {
       this.restoreErShinyLabTintSprite();
       this.erShinyLabFxOverlay?.hide();
