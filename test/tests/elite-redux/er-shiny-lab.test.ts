@@ -24,7 +24,10 @@ import {
   setErShinyLabBit,
   setErShinyLabOwnedBit,
 } from "#data/elite-redux/er-shiny-lab-effects";
+import { getErShinyLabVariantCacheKey, variantColorCache } from "#sprites/variant";
 import { describe, expect, it } from "vitest";
+
+type VariantPaletteCache = Record<string, Record<number, Record<string, string>>>;
 
 function configFor(
   effect: ErShinyLabEffect,
@@ -128,6 +131,26 @@ describe("ER Shiny Lab data layer", () => {
     expect(variant[0]).toEqual(variant[1]);
     expect(variant[1]).toEqual(variant[2]);
     expect(Object.keys(variant[2])).toEqual(baseHexes);
+  });
+
+  it("stores Shiny Lab palette variants under the raw sprite pipeline cache key", () => {
+    const baseKey = "pkmn__articuno";
+    const cacheKey = getErShinyLabVariantCacheKey(baseKey, "glacier");
+    const cache = variantColorCache as VariantPaletteCache;
+    const baseHexes = ["005273", "94c5ff", "4a84d6", "6badf7", "003152", "007bbd", "5a3a19"];
+
+    try {
+      cache[baseKey] = { 0: Object.fromEntries(baseHexes.map(h => [h, h])) };
+      cache[cacheKey] = buildErShinyLabVariantPalette(cache[baseKey], "glacier", 0);
+
+      expect(cacheKey).toBe("pkmn__articuno-erlab-glacier");
+      expect(cache[cacheKey][0]["005273"]).not.toBe("005273");
+      expect(cache[cacheKey][0]).toEqual(cache[cacheKey][1]);
+      expect(cache[cacheKey][1]).toEqual(cache[cacheKey][2]);
+    } finally {
+      delete cache[baseKey];
+      delete cache[cacheKey];
+    }
   });
 
   it("round-trips compact Shiny Lab save fields through JSON and merge helpers", () => {
