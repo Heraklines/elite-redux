@@ -157,7 +157,13 @@ export class ErShinyLabUiHandler extends UiHandler {
   private glowOuter: Phaser.GameObjects.Ellipse;
   private glowInner: Phaser.GameObjects.Ellipse;
   private auraRing: Phaser.GameObjects.Ellipse;
+  private auraOuterRing: Phaser.GameObjects.Ellipse;
+  private auraSparkles: Phaser.GameObjects.Rectangle[] = [];
   private monSprite: Phaser.GameObjects.Sprite;
+  private surfaceFx: Phaser.GameObjects.Container;
+  private surfaceWash: Phaser.GameObjects.Ellipse;
+  private surfaceLines: Phaser.GameObjects.Rectangle[] = [];
+  private surfaceSparks: Phaser.GameObjects.Rectangle[] = [];
   private nameText: Phaser.GameObjects.Text;
   private tierText: Phaser.GameObjects.Text;
   private tierPips: Phaser.GameObjects.Rectangle[] = [];
@@ -250,6 +256,15 @@ export class ErShinyLabUiHandler extends UiHandler {
     this.auraRing.setStrokeStyle(1.5, 0xffd27a, 0.8).setFillStyle(0, 0);
     this.auraRing.setVisible(false);
     this.container.add(this.auraRing);
+    this.auraOuterRing = globalScene.add.ellipse(cx, cy, 96, 66);
+    this.auraOuterRing.setStrokeStyle(1, 0xffd27a, 0.45).setFillStyle(0xffd27a, 0.04);
+    this.auraOuterRing.setVisible(false);
+    this.container.add(this.auraOuterRing);
+    for (let i = 0; i < 8; i++) {
+      const sparkle = globalScene.add.rectangle(cx, cy, 2, 2, 0xffd27a, 0.85).setAngle(45).setVisible(false);
+      this.container.add(sparkle);
+      this.auraSparkles.push(sparkle);
+    }
 
     this.monSprite = globalScene.add.sprite(cx, cy, "unknown");
     this.monSprite
@@ -260,6 +275,21 @@ export class ErShinyLabUiHandler extends UiHandler {
         ignoreTimeTint: true,
       });
     this.container.add(this.monSprite);
+    this.surfaceFx = globalScene.add.container(cx, cy);
+    this.surfaceFx.setVisible(false);
+    this.container.add(this.surfaceFx);
+    this.surfaceWash = globalScene.add.ellipse(0, 0, 46, 58, 0xff7ad9, 0.16);
+    this.surfaceFx.add(this.surfaceWash);
+    for (let i = 0; i < 4; i++) {
+      const line = globalScene.add.rectangle(0, 0, 48, 2, 0xff7ad9, 0.45);
+      this.surfaceFx.add(line);
+      this.surfaceLines.push(line);
+    }
+    for (let i = 0; i < 5; i++) {
+      const spark = globalScene.add.rectangle(0, 0, 3, 3, 0xff7ad9, 0.55).setAngle(45);
+      this.surfaceFx.add(spark);
+      this.surfaceSparks.push(spark);
+    }
 
     this.nameText = addTextObject(cx, PREV_Y + 98, "", TextStyle.WINDOW, { fontSize: "52px", align: "center" });
     this.nameText.setOrigin(0.5, 0).setColor(INK);
@@ -447,6 +477,7 @@ export class ErShinyLabUiHandler extends UiHandler {
     const sh = this.monSprite.height || 1;
     const maxH = 78;
     this.monSprite.setScale(sh > maxH ? maxH / sh : 1);
+    this.surfaceFx.setScale(this.monSprite.scaleX || 1);
     this.monSprite.setVisible(true);
   }
 
@@ -715,27 +746,95 @@ export class ErShinyLabUiHandler extends UiHandler {
     if (!cfg) {
       return;
     }
-    // Preview the FOCUSED effect of the active effect tab, layered over the equipped
-    // effects of the other two - so browsing a palette recolors the glow live.
+    // Preview the focused effect of the active tab, layered over the equipped effects of the other two.
+    // Palette only swaps sprite colors; the preview backdrop stays neutral for comparison.
     const palId = this.tab === "palette" ? this.focusedEffect()?.id : cfg.equipped.palette;
+    const surfId = this.tab === "surface" ? this.focusedEffect()?.id : cfg.equipped.surface;
     const aroId = this.tab === "around" ? this.focusedEffect()?.id : cfg.equipped.around;
-    const palEff =
-      cfg.effects.palette.find(e => e.id === palId) ?? cfg.effects.palette.find(e => e.id === cfg.equipped.palette);
+    const surfEff =
+      cfg.effects.surface.find(e => e.id === surfId) ?? cfg.effects.surface.find(e => e.id === cfg.equipped.surface);
     const aroEff =
       cfg.effects.around.find(e => e.id === aroId) ?? cfg.effects.around.find(e => e.id === cfg.equipped.around);
 
-    const glow = palEff ? Phaser.Display.Color.HexStringToColor(palEff.accent).color : 0x5ad1ff;
-    const palA = 0.35 + 0.65 * cfg.params.palAmt;
-    this.glowOuter.setFillStyle(glow, 0.16 * palA);
-    this.glowInner.setFillStyle(glow, 0.28 * palA);
+    this.glowOuter.setFillStyle(0x5ad1ff, 0.16);
+    this.glowInner.setFillStyle(0x5ad1ff, 0.28);
     this.refreshPreviewSpritePalette(palId);
+    this.refreshPreviewSurface(surfEff, cfg.params);
+    this.refreshPreviewAura(aroEff, cfg.params);
+  }
 
-    if (aroEff) {
-      const ringCol = Phaser.Display.Color.HexStringToColor(aroEff.accent).color;
-      this.auraRing.setStrokeStyle(1.5, ringCol, 0.4 + 0.6 * cfg.params.aroAmt);
-      this.auraRing.setVisible(true);
-    } else {
+  private refreshPreviewSurface(effect: ErShinyLabEffect | null | undefined, params: ErShinyLabParams): void {
+    if (!effect) {
+      this.surfaceFx.setVisible(false);
+      return;
+    }
+    const color = hexColor(effect.accent, 0xff7ad9);
+    const amount = clamp(0.15 + params.surfAmt * 0.7, 0.12, 0.85);
+    const seed = hashEffectId(effect.id) + params.seed;
+    const mode = seed % 4;
+    const scale = clamp(params.scale, 0.55, 1.45);
+
+    this.surfaceFx.setVisible(true);
+    this.surfaceWash.setFillStyle(color, mode === 0 ? amount * 0.16 : amount * 0.1);
+    this.surfaceWash.setScale(0.9 + scale * 0.12, 0.9 + scale * 0.18);
+    for (let i = 0; i < this.surfaceLines.length; i++) {
+      const line = this.surfaceLines[i];
+      const offset = (i - 1.5) * (mode === 1 ? 9 : 7) * scale;
+      const angle = mode === 2 ? 55 : mode === 3 ? -28 : 14;
+      line
+        .setFillStyle(color, amount * (mode === 2 ? 0.42 : 0.28))
+        .setPosition((mode === 3 ? i - 1.5 : 0) * 6, offset)
+        .setAngle(angle + ((seed + i * 11) % 10) - 5)
+        .setVisible(mode !== 0 || i % 2 === 0);
+    }
+    for (let i = 0; i < this.surfaceSparks.length; i++) {
+      const spark = this.surfaceSparks[i];
+      const angle = ((seed * 17 + i * 71) % 360) * (Math.PI / 180);
+      const radius = (12 + ((seed + i * 13) % 17)) * scale;
+      spark
+        .setFillStyle(color, amount * (mode === 0 ? 0.5 : 0.34))
+        .setPosition(Math.cos(angle) * radius, Math.sin(angle) * radius * 0.8)
+        .setScale(mode === 1 ? 0.85 : 1.05)
+        .setVisible(mode !== 2 || i % 2 === 0);
+    }
+  }
+
+  private refreshPreviewAura(effect: ErShinyLabEffect | null | undefined, params: ErShinyLabParams): void {
+    if (!effect) {
       this.auraRing.setVisible(false);
+      this.auraOuterRing.setVisible(false);
+      for (const sparkle of this.auraSparkles) {
+        sparkle.setVisible(false);
+      }
+      return;
+    }
+    const color = hexColor(effect.accent, 0xffd27a);
+    const amount = clamp(0.25 + params.aroAmt * 0.65, 0.2, 0.9);
+    const seed = hashEffectId(effect.id) + params.seed;
+    const scale = clamp(params.scale, 0.65, 1.45);
+    const cx = PREV_X + PREV_W / 2;
+    const cy = PREV_Y + 56;
+    const orbit = 39 * scale;
+
+    this.auraRing
+      .setStrokeStyle(2, color, amount)
+      .setFillStyle(color, amount * 0.04)
+      .setDisplaySize(78 * scale, 78 * scale)
+      .setVisible(true);
+    this.auraOuterRing
+      .setStrokeStyle(1, color, amount * 0.55)
+      .setFillStyle(color, amount * 0.04)
+      .setDisplaySize(96 * scale, 66 * scale)
+      .setAngle((seed % 18) - 9)
+      .setVisible(true);
+    for (let i = 0; i < this.auraSparkles.length; i++) {
+      const angle = (i / this.auraSparkles.length) * Math.PI * 2 + seed * 0.09;
+      const wobble = 1 + (((seed + i * 19) % 9) - 4) * 0.025;
+      this.auraSparkles[i]
+        .setFillStyle(color, amount * 0.88)
+        .setPosition(cx + Math.cos(angle) * orbit * wobble, cy + Math.sin(angle) * orbit * 0.78 * wobble)
+        .setScale(i % 3 === 0 ? 1.25 : 1)
+        .setVisible(true);
     }
   }
 
@@ -1144,6 +1243,22 @@ function clamp(v: number, lo: number, hi: number): number {
 }
 function round2(v: number): number {
   return Math.round(v * 100) / 100;
+}
+
+function hexColor(value: string, fallback: number): number {
+  try {
+    return Phaser.Display.Color.HexStringToColor(value).color;
+  } catch {
+    return fallback;
+  }
+}
+
+function hashEffectId(id: string): number {
+  let hash = 0;
+  for (let i = 0; i < id.length; i++) {
+    hash = (hash * 31 + id.charCodeAt(i)) % 256;
+  }
+  return hash;
 }
 
 // =============================================================================
