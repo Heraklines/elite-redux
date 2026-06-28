@@ -1,0 +1,279 @@
+----- BUG REPORT (in-game) -----
+version:  1.11.19
+url:      https://elite-redux.pages.dev/
+ua:       Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Mobile Safari/537.36
+mode:     4  wave:5  difficulty:hell
+seed:     yOE9PZDIqdGTifc86EqF8TTd
+party:    Iron Leaves(L7 22/30), Scatterbug(L5 12/19), Voltorb(L7 17/23), Hoothoot(L2 14/14)
+
+----- DESCRIPTION -----
+Lokix at lvl 4 is super early and it used Bleakwind Storm, which it does learn anywhere
+
+----- CONSOLE -----
+[04:10:38.914] LOG: %cStart Phase PostSummonPhase color:green;
+[04:10:38.915] LOG: %cStart Phase PostSummonPhase color:green;
+[04:10:38.915] LOG: %cStart Phase PostSummonPhase color:green;
+[04:10:38.915] LOG: %cStart Phase TurnInitPhase color:green;
+[04:10:38.915] LOG: %cStart Phase CommandPhase color:green;
+[04:10:45.345] LOG: Move: MAGICAL_LEAF Move targets: {"targets":[2,3,1],"multiple":false} 
+Player Pokemon: Iron Leaves
+[04:10:45.349] LOG: %cStart Phase SelectTargetPhase color:green;
+[04:10:45.785] LOG: %cStart Phase CommandPhase color:green;
+[04:10:46.452] LOG: Move: STOMP Move targets: {"targets":[2,3,1],"multiple":false} 
+Player Pokemon: Iron Leaves
+[04:10:46.455] LOG: %cStart Phase SelectTargetPhase color:green;
+[04:10:46.958] LOG: %cStart Phase CommandPhase color:green;
+[04:10:52.275] WARN: cry/664 not found
+[04:10:54.905] LOG: Move: ELECTRIC_TERRAIN Move targets: {"targets":[1,0,2,3],"multiple":true} 
+Player Pokemon: Voltorb
+[04:10:54.908] LOG: %cStart Phase SelectTargetPhase color:green;
+[04:10:55.079] LOG: %cStart Phase EnemyCommandPhase color:green;
+[04:10:55.104] LOG: Move Pool: ["Chatter"]
+[04:10:55.105] LOG: Move Scores: [1128.5714285714284]
+[04:10:55.105] LOG: Sorted Move Pool: ["Chatter"]
+[04:10:55.105] LOG: Chosen Move: Chatter
+[04:10:55.105] LOG: ER AI: experimental brain (sharpness 1)
+[04:10:55.105] LOG: %cStart Phase EnemyCommandPhase color:green;
+[04:10:55.117] LOG: Move Pool: ["Bleakwind Storm"]
+[04:10:55.117] LOG: Move Scores: [954.6428571428571]
+[04:10:55.117] LOG: Sorted Move Pool: ["Bleakwind Storm"]
+[04:10:55.117] LOG: Chosen Move: Bleakwind Storm
+[04:10:55.117] LOG: ER AI: experimental brain (sharpness 1)
+[04:10:55.117] LOG: %cStart Phase TurnStartPhase color:green;
+[04:10:55.126] LOG: %cStart Phase MovePhase color:green;
+[04:10:55.126] LOG: %cUser: Iron Leaves
+Move: STOMP
+Use Mode: NORMAL color:orchid
+[04:10:55.135] LOG: %cStart Phase MessagePhase color:green;
+[04:10:55.213] LOG: %cStart Phase MoveEffectPhase color:green;
+[04:10:55.500] LOG: crit stage: +0
+[04:10:55.504] LOG: Move: Stomp | Base damage: 14.48 | Power: 65 | Source attack: 24 | Target defense: 12
+[04:10:55.505] LOG: Move: Stomp | Attack damage: 14
+[04:10:55.507] LOG: %cStart Phase DamageAnimPhase color:green;
+[04:10:55.532] LOG: %cStart Phase MoveEndPhase color:green;
+[04:10:55.535] LOG: %cStart Phase MovePhase color:green;
+[04:10:55.535] LOG: %cUser: Lokix
+Move: BLEAKWIND_STORM
+Use Mode: NORMAL color:orchid
+[04:10:55.541] LOG: %cStart Phase MessagePhase color:green;
+[04:10:55.663] LOG: %cStart Phase MoveEffectPhase color:green;
+[04:10:56.194] LOG: crit stage: +0
+[04:10:56.198] LOG: Move: Bleakwind Storm | Base damage: 6.8 | Power: 100 | Source attack: 12 | Target defense: 18
+[04:10:56.198] LOG: Move: Bleakwind Storm | Attack damage: 3
+[04:10:56.218] LOG: crit stage: +0
+[04:10:56.220] LOG: Move: Bleakwind Storm | Base damage: 9.854545454545455 | Power: 100 | Source attack: 12 | Target defense: 11
+[04:10:56.223] LOG: Move: Bleakwind Storm | Attack damage: 20
+[04:10:56.223] LOG: %cStart Phase DamageAnimPhase color:green;
+[04:10:56.240] LOG: %cStart Phase MessagePhase color:green;
+[04:10:56.438] LOG: %cStart Phase MessagePhase color:green;
+[04:10:56.672] LOG: %cStart Phase MessagePhase color:green;
+[04:10:56.947] LOG: %cStart Phase ShowAbilityPhase color:green;
+[04:10:57.124] LOG: %cStart Phase HideAbilityPhase color:green;
+[04:10:57.166] LOG: %cStart Phase DamageAnimPhase color:green;
+[04:10:57.200] LOG: %cStart Phase MessagePhase color:green;
+[04:10:57.430] LOG: %cStart Phase MessagePhase color:green;
+[04:10:57.630] LOG: %cStart Phase MessagePhase color:green;
+[04:10:57.846] LOG: %cStart Phase MoveEndPhase color:green;
+[04:10:57.849] LOG: %cStart Phase MovePhase color:green;
+[04:10:57.849] LOG: %cUser: Voltorb
+Move: EXPLOSION
+Use Mode: FOLLOW_UP color:orchid
+[04:10:57.855] LOG: %cStart Phase MessagePhase color:green;
+[04:10:57.971] LOG: %cStart Phase MoveEffectPhase color:green;
+[04:10:57.990] LOG: crit stage: +0
+[04:10:57.993] LOG: Move: Explosion | Base damage: 12.560000000000002 | Power: 100 | Source attack: 18 | Target defense: 15
+[04:10:57.994] LOG: Move: Explosion | Attack damage: 9
+[04:10:57.996] LOG: crit stage: +0
+[04:10:57.998] LOG: Move: Explosion | Base damage: 19.6 | Power: 100 | Source attack: 18 | Target defense: 9
+[04:10:57.999] LOG: Move: Explosion | Attack damage: 14
+[04:10:58.000] LOG: crit stage: +0
+[04:10:58.001] LOG: Move: Explosion | Base damage: 17.840000000000003 | Power: 100 | Source attack: 18 | Target defense: 10
+[04:10:58.002] LOG: Move: Explosion | Attack damage: 11
+[04:10:58.002] LOG: %cStart Phase DamageAnimPhase color:green;
+[04:10:58.023] LOG: %cStart Phase DamageAnimPhase color:green;
+[04:10:58.057] LOG: %cStart Phase DamageAnimPhase color:green;
+[04:10:58.086] LOG: %cStart Phase DamageAnimPhase color:green;
+[04:10:58.090] LOG: %cStart Phase FaintPhase color:green;
+[04:10:59.518] LOG: %cStart Phase MessagePhase color:green;
+[04:10:59.688] LOG: %cStart Phase VictoryPhase color:green;
+[04:10:59.689] LOG: %cStart Phase ExpPhase color:green;
+[04:10:59.915] LOG: %cStart Phase FaintPhase color:green;
+[04:10:59.918] WARN: cry/100 not found
+[04:10:59.990] LOG: %cStart Phase MessagePhase color:green;
+[04:11:00.075] LOG: %cStart Phase MoveEndPhase color:green;
+[04:11:00.076] LOG: %cStart Phase MovePhase color:green;
+[04:11:00.076] LOG: %cUser: Chatot
+Move: CHATTER
+Use Mode: NORMAL color:orchid
+[04:11:00.077] LOG: %cStart Phase MessagePhase color:green;
+[04:11:00.288] LOG: %cStart Phase MoveEndPhase color:green;
+[04:11:00.289] LOG: %cStart Phase MovePhase color:green;
+[04:11:00.289] LOG: %cStart Phase MoveEndPhase color:green;
+[04:11:00.289] LOG: %cStart Phase CheckInterludePhase color:green;
+[04:11:00.290] LOG: %cStart Phase WeatherEffectPhase color:green;
+[04:11:00.290] LOG: %cStart Phase PositionalTagPhase color:green;
+[04:11:00.290] LOG: %cStart Phase BerryPhase color:green;
+[04:11:00.291] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[04:11:00.292] LOG: %cStart Phase TurnEndPhase color:green;
+[04:11:00.304] WARN: [coop:turn] host recorder: finalize with NO open recording -> turn=-1 events=0 (caller decides not to emit)
+[04:11:00.304] LOG: %cStart Phase SwitchPhase color:green;
+[04:11:01.118] LOG: %cStart Phase SwitchSummonPhase color:green;
+[04:11:01.370] LOG: %cStart Phase ShinySparklePhase color:green;
+[04:11:01.464] LOG: %cStart Phase PostSummonPhase color:green;
+[04:11:01.464] LOG: Ran PSP for: Hoothoot
+[04:11:01.466] LOG: %cStart Phase PostSummonPhase color:green;
+[04:11:01.466] LOG: %cStart Phase PostSummonPhase color:green;
+[04:11:01.466] LOG: %cStart Phase TurnInitPhase color:green;
+[04:11:01.467] LOG: %cStart Phase CommandPhase color:green;
+[04:11:11.755] DEBUG: Session data saved to slot 4!
+[04:11:13.178] LOG: Seed: ioARLXaDiqvkuMXSG5dMcm6b
+[04:11:13.178] LOG: Wave Seed: ioARLXaDiqvkuMXSG5dMcm6b 0
+[04:11:13.367] WARN: AnimationManager key already exists: prompt
+[04:11:13.367] WARN: AnimationManager key already exists: tera_sparkle
+[04:11:13.367] LOG: Seed: cY9bDrvdo4fhblSgA1B2wbxK
+[04:11:13.367] LOG: Wave Seed: cY9bDrvdo4fhblSgA1B2wbxK 0
+[04:11:15.492] LOG: %cStart Phase LoginPhase color:green;
+[04:11:15.956] LOG: Client Session: JTN9NcUzbqVa9koKWo4Mo5aR7Wi7wVew
+[04:11:16.332] LOG: %cStart Phase TitlePhase color:green;
+[04:11:16.333] LOG: Getting Session Slot id: %d 4
+[04:11:16.337] LOG: use seasonal splash messages true
+[04:11:16.337] LOG: Adding 2 Pride Month splash messages (weight: x15)
+[04:11:16.948] LOG: Getting Session Slot id: %d 4
+[04:11:16.955] LOG: Wave Seed: yOE9PZDIqdGTifc86EqF8TTd 0
+[04:11:16.955] LOG: Seed: yOE9PZDIqdGTifc86EqF8TTd
+[04:11:16.973] LOG: Wave Seed: ~TJ>U_INviLYnkh=;JvK=YYi 5
+[04:11:17.087] LOG: %cStart Phase EncounterPhase color:green;
+[04:11:17.089] LOG: Pokemon: Foe Chatot | Species ID: 441 | Level: 4 | Nature: Timid (+Spd/-Atk)
+[04:11:17.089] LOG: Stats (IVs): HP: 21 (31), Atk: 9 (31), Def: 9 (31), Spatk: 13 (31), Spdef: 9 (31), Spd: 15 (31)
+[04:11:17.089] LOG: Ability: Prankster | Passive Ability: Adaptability 
+[04:11:17.089] LOG: Moveset: ["Sing","Chatter","Hyper Voice","Parting Shot"]
+[04:11:17.089] LOG: Pokemon: Foe Lokix | Species ID: 920 | Level: 4 | Nature: Modest (+SpAtk/-Atk)
+[04:11:17.089] LOG: Stats (IVs): HP: 20 (31), Atk: 12 (31), Def: 12 (31), Spatk: 11 (31), Spdef: 10 (31), Spd: 13 (31)
+[04:11:17.089] LOG: Ability: Avenger | Passive Ability: Showdown Mode 
+[04:11:17.089] LOG: Moveset: ["Bleakwind Storm","Blizzard","Mystic Dance","Heat Wave"]
+[04:11:17.367] LOG: Generated AI funcs
+[04:11:17.367] LOG: Wave Seed: ~TJ>U_INviLYnkh=;JvK=YYi 5
+[04:11:17.570] LOG: Youngster Wyatt
+[04:11:17.571] LOG: Dialogue dialogue:youngster.encounter.2 skipped
+[04:11:17.613] LOG: Youngster Wyatt
+[04:11:17.972] LOG: %cStart Phase SummonPhase color:green;
+[04:11:17.972] LOG: Wyatt
+[04:11:18.146] WARN: cry/441 not found
+[04:11:18.254] LOG: %cStart Phase SummonPhase color:green;
+[04:11:18.254] LOG: Wyatt
+[04:11:18.520] LOG: %cStart Phase SummonPhase color:green;
+[04:11:18.705] WARN: cry/1010 not found
+[04:11:18.803] LOG: %cStart Phase SummonPhase color:green;
+[04:11:18.987] WARN: cry/100 not found
+[04:11:19.086] LOG: %cStart Phase InitEncounterPhase color:green;
+[04:11:19.090] LOG: %cStart Phase PostSummonPhase color:green;
+[04:11:19.090] LOG: Ran PSP for: Iron Leaves
+[04:11:19.095] LOG: %cStart Phase PostSummonPhase color:green;
+[04:11:19.098] LOG: %cStart Phase PostSummonPhase color:green;
+[04:11:19.098] LOG: Ran PSP for: Lokix
+[04:11:19.101] LOG: %cStart Phase PostSummonPhase color:green;
+[04:11:19.103] LOG: %cStart Phase PostSummonPhase color:green;
+[04:11:19.104] LOG: %cStart Phase PostSummonPhase color:green;
+[04:11:19.104] LOG: Ran PSP for: Voltorb
+[04:11:19.105] LOG: %cStart Phase PostSummonPhase color:green;
+[04:11:19.106] LOG: %cStart Phase ShowAbilityPhase color:green;
+[04:11:19.273] LOG: %cStart Phase StatStageChangePhase color:green;
+[04:11:19.459] LOG: %cStart Phase MessagePhase color:green;
+[04:11:19.670] LOG: %cStart Phase HideAbilityPhase color:green;
+[04:11:19.706] LOG: %cStart Phase PostSummonPhase color:green;
+[04:11:19.707] LOG: %cStart Phase PostSummonPhase color:green;
+[04:11:19.707] LOG: Ran PSP for: Chatot
+[04:11:19.709] LOG: %cStart Phase PostSummonPhase color:green;
+[04:11:19.709] LOG: %cStart Phase PostSummonPhase color:green;
+[04:11:19.709] LOG: %cStart Phase PostSummonPhase color:green;
+[04:11:19.709] LOG: %cStart Phase TurnInitPhase color:green;
+[04:11:19.709] LOG: %cStart Phase CommandPhase color:green;
+[04:11:21.704] LOG: Move: MAGICAL_LEAF Move targets: {"targets":[2,3,1],"multiple":false} 
+Player Pokemon: Iron Leaves
+[04:11:21.708] LOG: %cStart Phase SelectTargetPhase color:green;
+[04:11:22.651] LOG: %cStart Phase CommandPhase color:green;
+[04:11:26.826] LOG: Move: MAGICAL_LEAF Move targets: {"targets":[2,3,1],"multiple":false} 
+Player Pokemon: Iron Leaves
+[04:11:26.829] LOG: %cStart Phase SelectTargetPhase color:green;
+[04:11:27.327] LOG: %cStart Phase CommandPhase color:green;
+[04:11:29.557] LOG: %cStart Phase EnemyCommandPhase color:green;
+[04:11:29.567] LOG: Battle Seed: X38ndcmOHx2Y1FYn
+[04:11:29.571] LOG: Move Pool: ["Chatter"]
+[04:11:29.571] LOG: Move Scores: [1128.5714285714284]
+[04:11:29.571] LOG: Sorted Move Pool: ["Chatter"]
+[04:11:29.571] LOG: Chosen Move: Chatter
+[04:11:29.571] LOG: ER AI: experimental brain (sharpness 1)
+[04:11:29.571] LOG: %cStart Phase EnemyCommandPhase color:green;
+[04:11:29.582] LOG: Move Pool: ["Bleakwind Storm"]
+[04:11:29.582] LOG: Move Scores: [954.6428571428571]
+[04:11:29.582] LOG: Sorted Move Pool: ["Bleakwind Storm"]
+[04:11:29.582] LOG: Chosen Move: Bleakwind Storm
+[04:11:29.582] LOG: ER AI: experimental brain (sharpness 1)
+[04:11:29.582] LOG: %cStart Phase TurnStartPhase color:green;
+[04:11:29.587] LOG: %cStart Phase SwitchSummonPhase color:green;
+[04:11:29.846] WARN: cry/664 not found
+[04:11:29.955] LOG: %cStart Phase PostSummonPhase color:green;
+[04:11:29.956] LOG: Ran PSP for: Scatterbug
+[04:11:29.956] LOG: %cStart Phase PostSummonPhase color:green;
+[04:11:29.956] LOG: %cStart Phase PostSummonPhase color:green;
+[04:11:29.958] LOG: %cStart Phase MovePhase color:green;
+[04:11:29.958] LOG: %cUser: Iron Leaves
+Move: MAGICAL_LEAF
+Use Mode: NORMAL color:orchid
+[04:11:29.969] LOG: %cStart Phase MessagePhase color:green;
+[04:11:30.086] LOG: %cStart Phase MoveEffectPhase color:green;
+[04:11:30.688] LOG: crit stage: +0
+[04:11:30.691] LOG: Move: Magical Leaf | Base damage: 15.44 | Power: 60 | Source attack: 21 | Target defense: 9
+[04:11:30.691] LOG: Move: Magical Leaf | Attack damage: 39
+[04:11:30.692] LOG: %cStart Phase DamageAnimPhase color:green;
+[04:11:30.722] LOG: %cStart Phase MessagePhase color:green;
+[04:11:30.936] LOG: %cStart Phase FaintPhase color:green;
+[04:11:30.941] WARN: cry/441 not found
+[04:11:31.007] LOG: %cStart Phase MessagePhase color:green;
+[04:11:31.131] LOG: %cStart Phase ShowAbilityPhase color:green;
+[04:11:31.305] LOG: %cStart Phase HideAbilityPhase color:green;
+[04:11:31.357] LOG: %cStart Phase VictoryPhase color:green;
+[04:11:31.357] LOG: %cStart Phase ExpPhase color:green;
+[04:11:31.605] LOG: %cStart Phase ExpPhase color:green;
+[04:11:31.872] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[04:11:31.873] LOG: %cStart Phase LevelUpPhase color:green;
+[04:11:31.873] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[04:11:31.873] LOG: %cStart Phase MoveEndPhase color:green;
+[04:11:31.874] LOG: %cStart Phase MovePhase color:green;
+[04:11:31.874] LOG: %cUser: Lokix
+Move: BLEAKWIND_STORM
+Use Mode: NORMAL color:orchid
+[04:11:31.877] LOG: %cStart Phase MessagePhase color:green;
+[04:11:32.011] LOG: %cStart Phase MoveEffectPhase color:green;
+[04:11:32.548] LOG: crit stage: +0
+[04:11:32.552] LOG: Move: Bleakwind Storm | Base damage: 9.2 | Power: 150 | Source attack: 12 | Target defense: 18
+[04:11:32.552] LOG: Move: Bleakwind Storm | Attack damage: 4
+[04:11:32.564] LOG: crit stage: +0
+[04:11:32.565] LOG: Move: Bleakwind Storm | Base damage: 16.4 | Power: 150 | Source attack: 12 | Target defense: 9
+[04:11:32.566] LOG: Move: Bleakwind Storm | Attack damage: 7
+[04:11:32.566] LOG: %cStart Phase ShowAbilityPhase color:green;
+[04:11:32.711] LOG: %cStart Phase HideAbilityPhase color:green;
+[04:11:32.764] LOG: %cStart Phase DamageAnimPhase color:green;
+[04:11:32.797] LOG: %cStart Phase MessagePhase color:green;
+[04:11:32.995] LOG: %cStart Phase MessagePhase color:green;
+[04:11:33.228] LOG: %cStart Phase MessagePhase color:green;
+[04:11:33.494] LOG: %cStart Phase ShowAbilityPhase color:green;
+[04:11:33.647] LOG: %cStart Phase HideAbilityPhase color:green;
+[04:11:33.698] LOG: %cStart Phase DamageAnimPhase color:green;
+[04:11:33.730] LOG: %cStart Phase MessagePhase color:green;
+[04:11:33.928] LOG: %cStart Phase MessagePhase color:green;
+[04:11:34.145] LOG: %cStart Phase MoveEndPhase color:green;
+[04:11:34.146] LOG: %cStart Phase MovePhase color:green;
+[04:11:34.146] LOG: %cStart Phase MoveEndPhase color:green;
+[04:11:34.146] LOG: %cStart Phase CheckInterludePhase color:green;
+[04:11:34.146] LOG: %cStart Phase WeatherEffectPhase color:green;
+[04:11:34.146] LOG: %cStart Phase PositionalTagPhase color:green;
+[04:11:34.146] LOG: %cStart Phase BerryPhase color:green;
+[04:11:34.149] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[04:11:34.152] LOG: %cStart Phase TurnEndPhase color:green;
+[04:11:34.164] WARN: [coop:turn] host recorder: finalize with NO open recording -> turn=-1 events=0 (caller decides not to emit)
+[04:11:34.165] LOG: %cStart Phase ShowAbilityPhase color:green;
+[04:11:34.321] LOG: %cStart Phase HideAbilityPhase color:green;
+[04:11:34.373] LOG: %cStart Phase TurnInitPhase color:green;
+[04:11:34.373] LOG: %cStart Phase CommandPhase color:green;
+[04:11:43.362] WARN: cry/944 not found
