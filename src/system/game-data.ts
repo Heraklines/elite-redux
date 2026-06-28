@@ -26,6 +26,7 @@ import { getErRelicBattleState, restoreErRelicBattleState } from "#data/elite-re
 import { getErResistBerryEntries, restoreErResistBerries } from "#data/elite-redux/er-resist-berries";
 import { getErDifficulty, getErDifficultyCandyMultiplier, setErDifficulty } from "#data/elite-redux/er-run-difficulty";
 import { ER_CANDY_GAIN_MULTIPLIER, getRunCandyMultiplier } from "#data/elite-redux/er-shiny-favour";
+import { mergeErShinyLabSaveData } from "#data/elite-redux/er-shiny-lab-effects";
 import { getErUsedTrainerKeys, restoreErRunTrainerTracking } from "#data/elite-redux/er-trainer-runtime-hook";
 import { getErWardStoneEntries, restoreErWardStones } from "#data/elite-redux/er-ward-stones";
 import { pokemonFormChanges } from "#data/pokemon-forms";
@@ -144,6 +145,8 @@ const systemShortKeys = {
   passiveAttr: "$pa",
   valueReduction: "$vr",
   classicWinCount: "$wc",
+  erShinyLabAvailableEffects: "$esla",
+  erShinyLab: "$esl",
 };
 
 const CLOUD_SYNC_MIN_INTERVAL_MS = 20 * 60 * 1000;
@@ -251,6 +254,8 @@ export class GameData {
   public eggs: Egg[];
   public eggPity: number[];
   public unlockPity: number[];
+  /** ER Shiny Lab: global achievement/challenge availability bitset. */
+  public erShinyLabAvailableEffects: number[] = [];
 
   /**
    * One-time gift flag: set `true` once the player has received the free 2
@@ -299,6 +304,7 @@ export class GameData {
     this.eggs = [];
     this.eggPity = [0, 0, 0, 0];
     this.unlockPity = [0, 0, 0, 0];
+    this.erShinyLabAvailableEffects = [];
     this.autoEggRestock = defaultAutoEggRestockSettings();
     this.llmDirectorState = defaultDirectorState();
     this.initDexData();
@@ -326,6 +332,7 @@ export class GameData {
       autoEggRestock: this.autoEggRestock,
       llmDirectorState: this.llmDirectorState,
       freeLegendaryEggsGranted: this.freeLegendaryEggsGranted,
+      erShinyLabAvailableEffects: this.erShinyLabAvailableEffects.slice(0),
     };
   }
 
@@ -844,6 +851,8 @@ export class GameData {
 
     this.autoEggRestock = mergeAutoEggRestockSettings(systemData.autoEggRestock);
     this.llmDirectorState = mergeDirectorState(systemData.llmDirectorState);
+    this.erShinyLabAvailableEffects =
+      systemData.erShinyLabAvailableEffects?.map(v => Math.max(0, Math.min(255, Math.round(v)))) ?? [];
 
     this.eggPity = systemData.eggPity ? systemData.eggPity.slice(0) : [0, 0, 0, 0];
     this.unlockPity = systemData.unlockPity ? systemData.unlockPity.slice(0) : [0, 0, 0, 0];
@@ -2287,6 +2296,10 @@ export class GameData {
       dst.valueReduction = Math.max(dst.valueReduction ?? 0, src.valueReduction ?? 0);
       dst.classicWinCount = Math.max(dst.classicWinCount ?? 0, src.classicWinCount ?? 0);
       dst.friendship = Math.max(dst.friendship ?? 0, src.friendship ?? 0);
+      const mergedShinyLab = mergeErShinyLabSaveData(dst.erShinyLab, src.erShinyLab);
+      if (mergedShinyLab) {
+        dst.erShinyLab = mergedShinyLab;
+      }
       delete this.starterData[speciesId];
     }
   }

@@ -1,4 +1,9 @@
 import { globalScene } from "#app/global-scene";
+import {
+  buildErShinyLabVariantPalette,
+  decodeErShinyLabLoadout,
+  getErShinyLabOwnedSet,
+} from "#data/elite-redux/er-shiny-lab-effects";
 import { VariantTier } from "#enums/variant-tier";
 import type { Pokemon } from "#field/pokemon";
 import { hasExpSprite } from "#sprites/sprite-utils";
@@ -86,6 +91,41 @@ export async function populateVariantColors(
   const cacheKey = pokemon.getBattleSpriteKey(isBackSprite);
   if (!Object.hasOwn(variantColorCache, cacheKey)) {
     await populateVariantColorCache(cacheKey, useExpSprite, battleSpritePath);
+  }
+}
+
+function getErShinyLabPaletteId(pokemon: Pokemon): string | null {
+  const save = globalScene.gameData?.getStarterDataEntry(pokemon.species.speciesId).erShinyLab;
+  const palette = decodeErShinyLabLoadout(save?.l).palette;
+  return palette && getErShinyLabOwnedSet(save, "palette").has(palette) ? palette : null;
+}
+
+export function getErShinyLabVariantCacheKey(baseKey: string, paletteId: string): string {
+  return `${baseKey}-erlab-${paletteId}`;
+}
+
+export function getErShinyLabPaletteVariantCacheKey(pokemon: Pokemon, baseKey: string): string | null {
+  const paletteId = getErShinyLabPaletteId(pokemon);
+  return paletteId ? getErShinyLabVariantCacheKey(baseKey, paletteId) : null;
+}
+
+export function populateErShinyLabPaletteVariantColors(pokemon: Pokemon, isBackSprite = false): void {
+  const paletteId = getErShinyLabPaletteId(pokemon);
+  if (!paletteId) {
+    return;
+  }
+  const baseKey = pokemon.getBattleSpriteKey(isBackSprite);
+  const cacheKey = getErShinyLabVariantCacheKey(baseKey, paletteId);
+  if (Object.hasOwn(variantColorCache, cacheKey)) {
+    return;
+  }
+  const baseColors = variantColorCache[baseKey] as Record<number, Record<string, string>> | undefined;
+  if (!baseColors) {
+    return;
+  }
+  const palette = buildErShinyLabVariantPalette(baseColors, paletteId, pokemon.variant);
+  if (Object.keys(palette).length > 0) {
+    variantColorCache[cacheKey] = palette;
   }
 }
 

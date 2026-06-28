@@ -3,6 +3,7 @@ import type { Tutorial } from "#app/tutorial";
 import type { ErMapSaveData } from "#data/elite-redux/er-map-nodes";
 import type { ErRelicBattleStateData } from "#data/elite-redux/er-relic-battle-state";
 import type { ErDifficulty } from "#data/elite-redux/er-run-difficulty";
+import type { ErShinyLabSaveData } from "#data/elite-redux/er-shiny-lab-effects";
 import type { BattleType } from "#enums/battle-type";
 import type { GameModes } from "#enums/game-modes";
 import type { MoveId } from "#enums/move-id";
@@ -52,6 +53,8 @@ export interface SystemSaveData {
    * {@linkcode GameData.grantFreeLegendaryEggsOnce}.
    */
   freeLegendaryEggsGranted?: boolean;
+  /** ER Shiny Lab: global achievement/challenge availability bitset. */
+  erShinyLabAvailableEffects?: number[];
 }
 
 export interface SessionSaveData {
@@ -232,6 +235,8 @@ export interface StarterDataEntry {
    * the dex filter. Optional for save compatibility.
    */
   erBlackShiny?: boolean;
+  /** ER Shiny Lab: per-species owned bitsets, equipped loadout, params, and presets. */
+  erShinyLab?: ErShinyLabSaveData;
 }
 
 export interface StarterData {

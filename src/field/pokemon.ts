@@ -206,7 +206,12 @@ import { getMoveTargets } from "#moves/move-utils";
 import { PokemonMove } from "#moves/pokemon-move";
 import { loadMoveAnimations } from "#sprites/pokemon-asset-loader";
 import type { Variant } from "#sprites/variant";
-import { populateVariantColors, variantColorCache, variantData } from "#sprites/variant";
+import {
+  populateErShinyLabPaletteVariantColors,
+  populateVariantColors,
+  variantColorCache,
+  variantData,
+} from "#sprites/variant";
 import { achvs } from "#system/achv";
 import type { PokemonData } from "#system/pokemon-data";
 import { RibbonData } from "#system/ribbons/ribbon-data";
@@ -906,9 +911,17 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
     }
 
     if (this.isShiny(true)) {
-      loadPromises.push(populateVariantColors(this, false, ignoreOverride));
+      loadPromises.push(
+        populateVariantColors(this, false, ignoreOverride).then(() =>
+          populateErShinyLabPaletteVariantColors(this, false),
+        ),
+      );
       if (this.isPlayer()) {
-        loadPromises.push(populateVariantColors(this, true, ignoreOverride));
+        loadPromises.push(
+          populateVariantColors(this, true, ignoreOverride).then(() =>
+            populateErShinyLabPaletteVariantColors(this, true),
+          ),
+        );
       }
     }
 
@@ -3028,10 +3041,8 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
         const freeInnate =
           passiveSlot < erYoungsterFreeInnateSlots(this.level)
           || globalScene.gameMode?.isDaily === true // ER Innate Shrine (#514): a mon attuned at the Temple shrine has all its // innate slots unlocked for the run.
-          || this.customPokemonData?.erInnateShrineUnlocked === true // ER Ability Capsule run-unlock (maintainer request): the INVERSE of the // Curiosity lock - a slot the player paid a capsule to "unlock an innate for // the run" fires this run without the permanent candy unlock. Stored as the // ER slot index (passiveSlot + 1), serialized run-only on customPokemonData; // never writes starterData.passiveAttr. The Curiosity lock above (which
-          || // returns false before reaching here) still wins, so a run-unlocked slot that
-          // is ALSO Curiosity-locked stays dead.
-          this.customPokemonData?.erRunUnlockedAbilitySlots?.includes(passiveSlot + 1) === true
+          || this.customPokemonData?.erInnateShrineUnlocked === true // ER Ability Capsule run-unlock (maintainer request): the INVERSE of the // Curiosity lock - a slot the player paid a capsule to "unlock an innate for // the run" fires this run without the permanent candy unlock. Stored as the // ER slot index (passiveSlot + 1), serialized run-only on customPokemonData; // never writes starterData.passiveAttr. The Curiosity lock above (which // returns false before reaching here) still wins, so a run-unlocked slot that // is ALSO Curiosity-locked stays dead.
+          || this.customPokemonData?.erRunUnlockedAbilitySlots?.includes(passiveSlot + 1) === true
           || ability.id === AbilityId.TRUANT;
         if (!freeInnate && !isSlotActive(passiveAttr, passiveSlot as 0 | 1 | 2)) {
           return false;

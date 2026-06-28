@@ -3,7 +3,7 @@ import { FieldSpritePipeline } from "#app/pipelines/field-sprite";
 import { MysteryEncounterIntroVisuals } from "#field/mystery-encounter-intro";
 import { Pokemon } from "#field/pokemon";
 import { Trainer } from "#field/trainer";
-import { variantColorCache } from "#sprites/variant";
+import { getErShinyLabPaletteVariantCacheKey, variantColorCache } from "#sprites/variant";
 import { rgbHexToRgba } from "#utils/color-utils";
 import spriteFragShader from "./glsl/sprite-frag-shader.frag?raw";
 import spriteVertShader from "./glsl/sprite-shader.vert?raw";
@@ -128,14 +128,14 @@ export class SpritePipeline extends FieldSpritePipeline {
       const flatBaseColors: number[] = [];
       const flatVariantColors: number[] = [];
 
+      const variantCacheKey =
+        sprite.parentContainer instanceof Pokemon
+          ? (getErShinyLabPaletteVariantCacheKey(sprite.parentContainer, sprite.texture.key) ?? sprite.texture.key)
+          : data["spriteKey"];
+
       if (
         (sprite.parentContainer instanceof Pokemon ? sprite.parentContainer.shiny : !!data["shiny"])
-        && (variantColors =
-          variantColorCache[
-            sprite.parentContainer instanceof Pokemon
-              ? sprite.parentContainer.getSprite().texture.key
-              : data["spriteKey"]
-          ])
+        && (variantColors = variantColorCache[variantCacheKey])
         && Object.hasOwn(variantColors, variant)
       ) {
         const baseColors = Object.keys(variantColors[variant]);

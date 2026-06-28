@@ -35,82 +35,45 @@
 // =============================================================================
 
 import { globalScene } from "#app/global-scene";
+import {
+  buildErShinyLabVariantPalette,
+  type ErShinyLabCategory,
+  type ErShinyLabConfig,
+  type ErShinyLabEffect,
+  type ErShinyLabEffectState,
+  type ErShinyLabParams,
+  type ErShinyLabPreset,
+  type ErShinyLabRarity,
+  resolveErShinyLabEffectState,
+} from "#data/elite-redux/er-shiny-lab-effects";
 import { Button } from "#enums/buttons";
 import { TextStyle } from "#enums/text-style";
 import { UiMode } from "#enums/ui-mode";
+import { getErShinyLabVariantCacheKey, variantColorCache } from "#sprites/variant";
 import { addTextObject } from "#ui/text";
 import { UiHandler } from "#ui/ui-handler";
 import { addWindow } from "#ui/ui-theme";
 import { getPokemonSpecies } from "#utils/pokemon-utils";
 
-/** The three effect layers, lowest to highest tier requirement. */
-export type ErShinyLabCategory = "palette" | "surface" | "around";
-/** Wild-rarity label, drives the prestige badge color. */
-export type ErShinyLabRarity = "common" | "rare" | "epic" | "legendary";
-
-/** One designable effect in a category (a palette, a surface FX or an aura). */
-export interface ErShinyLabEffect {
-  id: string;
-  label: string;
-  rarity: ErShinyLabRarity;
-  /** Earned shiny tier this species needs to wear the effect (1 palette, 3 surface, 4 aura). */
-  minTier: number;
-  /** Candy price (post-discount). The Nth-in-category ramp is baked in by the caller. */
-  cost: number;
-  /** Representative #rrggbb accent used for the live preview glow / aura ring. */
-  accent: string;
-  /** When set, the effect is achievement/challenge gated - the hint shown until it's unlocked. */
-  lockHint?: string;
-}
-
-/** A wearable combination - one effect id (or none) per layer. */
-export interface ErShinyLabLoadout {
-  palette: string | null;
-  surface: string | null;
-  around: string | null;
-}
-
-/** Quantized per-layer tuning. Intensities 0..1, scale 0.4..2, seed 0..255. */
-export interface ErShinyLabParams {
-  palAmt: number;
-  surfAmt: number;
-  aroAmt: number;
-  scale: number;
-  seed: number;
-}
-
-/** Everything the handler needs to render + drive the designer for one species. */
-export interface ErShinyLabConfig {
-  speciesId: number;
-  speciesName: string;
-  /** Best earned shiny tier on THIS species (1..4); gates which categories unlock. */
-  earnedTier: number;
-  candy: number;
-  effects: Record<ErShinyLabCategory, ErShinyLabEffect[]>;
-  /** Per-category owned effect ids (bought / caught wild / granted). */
-  owned: Record<ErShinyLabCategory, Set<string>>;
-  /** Effect ids whose achievement/challenge gate is satisfied globally (buyable everywhere). */
-  available: Set<string>;
-  equipped: ErShinyLabLoadout;
-  params: ErShinyLabParams;
-  /** Up to 5 saved loadouts (null = empty slot). */
-  presets: (ErShinyLabLoadout | null)[];
-  /** Fired whenever the equipped loadout or params change (caller persists). */
-  onChange?: (loadout: ErShinyLabLoadout, params: ErShinyLabParams) => void;
-  /** Fired when the player spends candy to buy an effect (caller debits + persists). */
-  onBuy?: (category: ErShinyLabCategory, effect: ErShinyLabEffect) => void;
-  /** Fired on exit (Cancel from an effect tab). */
-  onExit?: () => void;
-}
+export type {
+  ErShinyLabCategory,
+  ErShinyLabConfig,
+  ErShinyLabEffect,
+  ErShinyLabLoadout,
+  ErShinyLabParams,
+  ErShinyLabPreset,
+  ErShinyLabRarity,
+} from "#data/elite-redux/er-shiny-lab-effects";
 
 /** The resolved gate state of an effect for the current species (the 3-gate resolver, visualized). */
-type EffectState = "equipped" | "owned" | "buyable" | "locked-tier" | "locked-achv" | "locked-candy";
+type EffectState = ErShinyLabEffectState;
 
 /** The active tab: one of the three effect layers, or the tuning panel. */
 type Tab = ErShinyLabCategory | "tune";
 
 /** A row in the TUNE panel. */
 type TuneRow = "palAmt" | "surfAmt" | "aroAmt" | "scale" | "seed" | "load" | "save";
+type VariantPaletteMap = Record<number, Record<string, string>>;
 
 const CATEGORIES: ErShinyLabCategory[] = ["palette", "surface", "around"];
 const TABS: Tab[] = ["palette", "surface", "around", "tune"];
@@ -237,6 +200,7 @@ export class ErShinyLabUiHandler extends UiHandler {
   private loadSel = 0;
   private saveSel = 0;
   private openedAt = 0;
+  private previewSpriteKey: string | null = null;
 
   constructor() {
     super(UiMode.ER_SHINY_LAB);
@@ -288,7 +252,13 @@ export class ErShinyLabUiHandler extends UiHandler {
     this.container.add(this.auraRing);
 
     this.monSprite = globalScene.add.sprite(cx, cy, "unknown");
-    this.monSprite.setOrigin(0.5, 0.5).setVisible(false);
+    this.monSprite
+      .setOrigin(0.5, 0.5)
+      .setVisible(false)
+      .setPipeline(globalScene.spritePipeline, {
+        tone: [0.0, 0.0, 0.0, 0.0],
+        ignoreTimeTint: true,
+      });
     this.container.add(this.monSprite);
 
     this.nameText = addTextObject(cx, PREV_Y + 98, "", TextStyle.WINDOW, { fontSize: "52px", align: "center" });
@@ -387,6 +357,7 @@ export class ErShinyLabUiHandler extends UiHandler {
     this.tuneCursor = 0;
     this.loadSel = 0;
     this.saveSel = 0;
+    this.previewSpriteKey = null;
 
     this.candyText.setText(String(cfg.candy));
     this.repositionCandyIcon();
@@ -434,16 +405,15 @@ export class ErShinyLabUiHandler extends UiHandler {
     if (!cfg) {
       return "locked-tier";
     }
-    if (cfg.earnedTier < effect.minTier) {
-      return "locked-tier";
-    }
-    if (cfg.owned[category].has(effect.id)) {
-      return cfg.equipped[category] === effect.id ? "equipped" : "owned";
-    }
-    if (effect.lockHint && !cfg.available.has(effect.id)) {
-      return "locked-achv";
-    }
-    return cfg.candy >= effect.cost ? "buyable" : "locked-candy";
+    return resolveErShinyLabEffectState({
+      effect,
+      category,
+      earnedTier: cfg.earnedTier,
+      candy: cfg.candy,
+      owned: cfg.owned,
+      available: cfg.available,
+      equipped: cfg.equipped,
+    });
   }
 
   // ---- Preview sprite -----------------------------------------------------
@@ -455,15 +425,16 @@ export class ErShinyLabUiHandler extends UiHandler {
       if (!this.active || !globalScene.textures.exists(key)) {
         return;
       }
+      this.previewSpriteKey = key;
       this.monSprite.setTexture(key);
       if (globalScene.anims.exists(key)) {
         this.monSprite.play(key);
       }
+      this.refreshPreviewSpritePalette();
       this.fitSprite();
     };
     if (globalScene.textures.exists(key)) {
       apply();
-      return;
     }
     species
       .loadAssets(false, 0, false, 0, true, false, true)
@@ -477,6 +448,35 @@ export class ErShinyLabUiHandler extends UiHandler {
     const maxH = 78;
     this.monSprite.setScale(sh > maxH ? maxH / sh : 1);
     this.monSprite.setVisible(true);
+  }
+
+  private refreshPreviewSpritePalette(paletteId?: string | null): void {
+    const baseKey = this.previewSpriteKey;
+    if (!baseKey) {
+      return;
+    }
+    const nextPaletteId =
+      paletteId
+      ?? (this.tab === "palette" ? this.focusedEffect()?.id : this.config?.equipped.palette)
+      ?? this.config?.equipped.palette
+      ?? null;
+    let spriteKey = baseKey;
+    if (nextPaletteId) {
+      const cacheKey = getErShinyLabVariantCacheKey(baseKey, nextPaletteId);
+      if (!Object.hasOwn(variantColorCache, cacheKey)) {
+        const baseColors = variantColorCache[baseKey] as VariantPaletteMap | undefined;
+        if (baseColors) {
+          variantColorCache[cacheKey] = buildErShinyLabVariantPalette(baseColors, nextPaletteId, 0);
+        }
+      }
+      if (Object.hasOwn(variantColorCache, cacheKey)) {
+        spriteKey = cacheKey;
+      }
+    }
+    this.monSprite
+      .setPipelineData("shiny", spriteKey !== baseKey)
+      .setPipelineData("variant", 0)
+      .setPipelineData("spriteKey", spriteKey);
   }
 
   private fitCandyIcon(): void {
@@ -728,6 +728,7 @@ export class ErShinyLabUiHandler extends UiHandler {
     const palA = 0.35 + 0.65 * cfg.params.palAmt;
     this.glowOuter.setFillStyle(glow, 0.16 * palA);
     this.glowInner.setFillStyle(glow, 0.28 * palA);
+    this.refreshPreviewSpritePalette(palId);
 
     if (aroEff) {
       const ringCol = Phaser.Display.Color.HexStringToColor(aroEff.accent).color;
@@ -802,8 +803,8 @@ export class ErShinyLabUiHandler extends UiHandler {
     }
   }
 
-  private presetLabel(cfg: ErShinyLabConfig, preset: ErShinyLabLoadout): string {
-    const pal = preset.palette ? cfg.effects.palette.find(e => e.id === preset.palette)?.label : null;
+  private presetLabel(cfg: ErShinyLabConfig, preset: ErShinyLabPreset): string {
+    const pal = preset.loadout.palette ? cfg.effects.palette.find(e => e.id === preset.loadout.palette)?.label : null;
     return pal ?? "set";
   }
 
@@ -1065,7 +1066,7 @@ export class ErShinyLabUiHandler extends UiHandler {
       return;
     }
     const row = TUNE_ROWS[this.tuneCursor];
-    const def: ErShinyLabParams = { palAmt: 1, surfAmt: 1, aroAmt: 1, scale: 1, seed: 0 };
+    const def: ErShinyLabParams = { palAmt: 1, surfAmt: 1, aroAmt: 1, scale: 1, seed: 0, tintMode: 0 };
     switch (row) {
       case "palAmt":
       case "surfAmt":
@@ -1091,7 +1092,8 @@ export class ErShinyLabUiHandler extends UiHandler {
         break;
       }
       case "save":
-        cfg.presets[this.saveSel] = { ...cfg.equipped };
+        cfg.presets[this.saveSel] = { loadout: { ...cfg.equipped }, params: { ...p } };
+        cfg.onChange?.({ ...cfg.equipped }, { ...p });
         break;
     }
     globalScene.ui.playSelect();
@@ -1099,15 +1101,16 @@ export class ErShinyLabUiHandler extends UiHandler {
   }
 
   /** Apply a saved loadout, but only the effects this species actually owns. */
-  private applyPreset(preset: ErShinyLabLoadout): void {
+  private applyPreset(preset: ErShinyLabPreset): void {
     const cfg = this.config;
     if (!cfg) {
       return;
     }
     for (const cat of CATEGORIES) {
-      const id = preset[cat];
+      const id = preset.loadout[cat];
       cfg.equipped[cat] = id && cfg.owned[cat].has(id) ? id : null;
     }
+    cfg.params = { ...preset.params };
     cfg.onChange?.({ ...cfg.equipped }, { ...cfg.params });
     this.refreshChips();
     this.refreshPreview();
@@ -1150,16 +1153,17 @@ function round2(v: number): number {
 // replaces this via show([config]) once the P1 persistence layer lands.
 // =============================================================================
 
-function eff(
+function demoEffect(
   id: string,
   label: string,
+  category: ErShinyLabCategory,
   rarity: ErShinyLabRarity,
   minTier: number,
   cost: number,
   accent: string,
   lockHint?: string,
 ): ErShinyLabEffect {
-  const e: ErShinyLabEffect = { id, label, rarity, minTier, cost, accent };
+  const e: ErShinyLabEffect = { id, label, category, rarity, minTier, cost, accent };
   if (lockHint) {
     e.lockHint = lockHint;
   }
@@ -1176,44 +1180,80 @@ export function buildDemoConfig(speciesId: number): ErShinyLabConfig {
   })();
 
   const palette: ErShinyLabEffect[] = [
-    eff("glacier", "Glacier", "common", 1, 100, "#7fd8ff"),
-    eff("obsidian", "Obsidian", "common", 1, 100, "#2a2a3a"),
-    eff("crimson", "Crimson", "common", 1, 100, "#ff4a5a"),
-    eff("emerald", "Emerald", "common", 1, 140, "#3affa0"),
-    eff("sunset", "Sunset", "rare", 1, 180, "#ff8a3d"),
-    eff("aurora", "Aurora", "rare", 1, 180, "#5affc0"),
-    eff("vaporwave", "Vaporwave", "rare", 1, 220, "#ff77e6"),
-    eff("toxic", "Toxic", "rare", 1, 220, "#9bff4a"),
-    eff("galaxy", "Galaxy", "epic", 1, 320, "#9b6cff"),
-    eff("synthsun", "Synthwave Sun", "epic", 1, 360, "#ff9a3d"),
-    eff("aurum", "Aurum", "epic", 1, 400, "#ffcf52"),
-    eff("prism", "Prism", "legendary", 1, 500, "#a0e0ff", "win with a different type on every team member"),
+    demoEffect("glacier", "Glacier", "palette", "common", 1, 100, "#7fd8ff"),
+    demoEffect("obsidian", "Obsidian", "palette", "common", 1, 100, "#2a2a3a"),
+    demoEffect("crimson", "Crimson", "palette", "common", 1, 100, "#ff4a5a"),
+    demoEffect("emerald", "Emerald", "palette", "common", 1, 140, "#3affa0"),
+    demoEffect("sunset", "Sunset", "palette", "rare", 1, 180, "#ff8a3d"),
+    demoEffect("aurora", "Aurora", "palette", "rare", 1, 180, "#5affc0"),
+    demoEffect("vaporwave", "Vaporwave", "palette", "rare", 1, 220, "#ff77e6"),
+    demoEffect("toxic", "Toxic", "palette", "rare", 1, 220, "#9bff4a"),
+    demoEffect("galaxy", "Galaxy", "palette", "epic", 1, 320, "#9b6cff"),
+    demoEffect("synthsun", "Synthwave Sun", "palette", "epic", 1, 360, "#ff9a3d"),
+    demoEffect("aurum", "Aurum", "palette", "epic", 1, 400, "#ffcf52"),
+    demoEffect(
+      "prism",
+      "Prism",
+      "palette",
+      "legendary",
+      1,
+      500,
+      "#a0e0ff",
+      "win with a different type on every team member",
+    ),
   ];
   const surface: ErShinyLabEffect[] = [
-    eff("scales", "Scales", "common", 3, 500, "#9fd0ff"),
-    eff("marble", "Marble", "common", 3, 500, "#dfe6f2"),
-    eff("holofoil", "Holofoil", "rare", 3, 620, "#7fe0ff"),
-    eff("oilfilm", "Oil Film", "rare", 3, 620, "#b08bff"),
-    eff("electric", "Electric", "rare", 3, 700, "#ffe85a"),
-    eff("tron", "Tron Lines", "rare", 3, 700, "#36e6ff"),
-    eff("crystal", "Crystal Facets", "epic", 3, 900, "#a6f0ff"),
-    eff("plasma", "Plasma", "epic", 3, 900, "#ff6ad9"),
-    eff("stained", "Stained Glass", "epic", 3, 980, "#c08bff"),
-    eff("sunsetsun", "Sunset Sun", "epic", 3, 980, "#ff8a3d"),
-    eff("prismsplit", "Prism Split", "legendary", 3, 1200, "#9ad0ff", "win a Ghost-Trainers run with no faints"),
+    demoEffect("scales", "Scales", "surface", "common", 3, 500, "#9fd0ff"),
+    demoEffect("marble", "Marble", "surface", "common", 3, 500, "#dfe6f2"),
+    demoEffect("holofoil", "Holofoil", "surface", "rare", 3, 620, "#7fe0ff"),
+    demoEffect("oilfilm", "Oil Film", "surface", "rare", 3, 620, "#b08bff"),
+    demoEffect("electric", "Electric", "surface", "rare", 3, 700, "#ffe85a"),
+    demoEffect("tron", "Tron Lines", "surface", "rare", 3, 700, "#36e6ff"),
+    demoEffect("crystal", "Crystal Facets", "surface", "epic", 3, 900, "#a6f0ff"),
+    demoEffect("plasma", "Plasma", "surface", "epic", 3, 900, "#ff6ad9"),
+    demoEffect("stained", "Stained Glass", "surface", "epic", 3, 980, "#c08bff"),
+    demoEffect("sunsetsun", "Sunset Sun", "surface", "epic", 3, 980, "#ff8a3d"),
+    demoEffect(
+      "prismsplit",
+      "Prism Split",
+      "surface",
+      "legendary",
+      3,
+      1200,
+      "#9ad0ff",
+      "win a Ghost-Trainers run with no faints",
+    ),
   ];
   const around: ErShinyLabEffect[] = [
-    eff("softhalo", "Soft Halo", "common", 4, 1000, "#9fd0ff"),
-    eff("petals", "Petals", "common", 4, 1000, "#ff9ad0"),
-    eff("orbiting", "Orbiting Sparks", "rare", 4, 1200, "#7fe0ff"),
-    eff("fireflies", "Fireflies", "rare", 4, 1200, "#ffe07a"),
-    eff("embers", "Embers", "rare", 4, 1300, "#ff7a3a"),
-    eff("frost", "Frost Aura", "rare", 4, 1300, "#a6f0ff"),
-    eff("flame", "Flame Aura", "epic", 4, 1600, "#ff7a3a", "win Classic (Ace+) holding no items"),
-    eff("golden", "Golden Glow", "epic", 4, 1600, "#ffcf52"),
-    eff("shadow", "Shadow Aura", "epic", 4, 1700, "#9b6cff"),
-    eff("cursed", "Cursed Aura", "epic", 4, 1700, "#ff4a6a", "win a Ghost-Trainers run with no faints"),
-    eff("rainbowout", "Rainbow Outline", "legendary", 4, 2200, "#a0e0ff", "reach wave 50 without taking damage"),
+    demoEffect("softhalo", "Soft Halo", "around", "common", 4, 1000, "#9fd0ff"),
+    demoEffect("petals", "Petals", "around", "common", 4, 1000, "#ff9ad0"),
+    demoEffect("orbiting", "Orbiting Sparks", "around", "rare", 4, 1200, "#7fe0ff"),
+    demoEffect("fireflies", "Fireflies", "around", "rare", 4, 1200, "#ffe07a"),
+    demoEffect("embers", "Embers", "around", "rare", 4, 1300, "#ff7a3a"),
+    demoEffect("frost", "Frost Aura", "around", "rare", 4, 1300, "#a6f0ff"),
+    demoEffect("flame", "Flame Aura", "around", "epic", 4, 1600, "#ff7a3a", "win Classic (Ace+) holding no items"),
+    demoEffect("golden", "Golden Glow", "around", "epic", 4, 1600, "#ffcf52"),
+    demoEffect("shadow", "Shadow Aura", "around", "epic", 4, 1700, "#9b6cff"),
+    demoEffect(
+      "cursed",
+      "Cursed Aura",
+      "around",
+      "epic",
+      4,
+      1700,
+      "#ff4a6a",
+      "win a Ghost-Trainers run with no faints",
+    ),
+    demoEffect(
+      "rainbowout",
+      "Rainbow Outline",
+      "around",
+      "legendary",
+      4,
+      2200,
+      "#a0e0ff",
+      "reach wave 50 without taking damage",
+    ),
   ];
 
   const owned: Record<ErShinyLabCategory, Set<string>> = {
@@ -1233,7 +1273,16 @@ export function buildDemoConfig(speciesId: number): ErShinyLabConfig {
     owned,
     available,
     equipped: { palette: "aurora", surface: "holofoil", around: "softhalo" },
-    params: { palAmt: 1, surfAmt: 0.8, aroAmt: 1, scale: 1, seed: 42 },
-    presets: [{ palette: "galaxy", surface: "holofoil", around: "orbiting" }, null, null, null, null],
+    params: { palAmt: 1, surfAmt: 0.8, aroAmt: 1, scale: 1, seed: 42, tintMode: 0 },
+    presets: [
+      {
+        loadout: { palette: "galaxy", surface: "holofoil", around: "orbiting" },
+        params: { palAmt: 1, surfAmt: 0.8, aroAmt: 1, scale: 1, seed: 42, tintMode: 0 },
+      },
+      null,
+      null,
+      null,
+      null,
+    ],
   };
 }
