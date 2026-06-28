@@ -141,14 +141,16 @@ function caughtSpecies(game: GameManager, id: SpeciesId) {
   return getPokemonSpecies(id);
 }
 
-function caughtShinyLabSpecies(game: GameManager, id: SpeciesId, paletteId = "duoneon") {
+function caughtShinyLabSpecies(game: GameManager, id: SpeciesId) {
   const species = caughtSpecies(game, id);
   const shinyAttr = (CAUGHT | DexAttr.SHINY) & ~DexAttr.NON_SHINY;
   const dex = game.scene.gameData.dexData[id];
   const starter = game.scene.gameData.starterData[id];
-  const palette = ER_SHINY_LAB_EFFECTS_BY_CATEGORY.palette.find(e => e.id === paletteId);
-  if (!palette) {
-    throw new Error(`starter-select-shiny-lab recipe: unknown palette ${paletteId}`);
+  const palette = ER_SHINY_LAB_EFFECTS_BY_CATEGORY.palette.find(e => e.id === "duoneon");
+  const surface = ER_SHINY_LAB_EFFECTS_BY_CATEGORY.surface.find(e => e.id === "starmap");
+  const around = ER_SHINY_LAB_EFFECTS_BY_CATEGORY.around.find(e => e.id === "staticfield");
+  if (!palette || !surface || !around) {
+    throw new Error("starter-select-shiny-lab recipe: unknown Shiny Lab effect");
   }
   if (dex) {
     dex.caughtAttr = shinyAttr;
@@ -158,7 +160,9 @@ function caughtShinyLabSpecies(game: GameManager, id: SpeciesId, paletteId = "du
     starter.erShinyLab ??= {};
     const save = starter.erShinyLab;
     setErShinyLabOwnedBit(save, "palette", palette.index);
-    save.l = encodeErShinyLabLoadout({ palette: paletteId, surface: null, around: null });
+    setErShinyLabOwnedBit(save, "surface", surface.index);
+    setErShinyLabOwnedBit(save, "around", around.index);
+    save.l = encodeErShinyLabLoadout({ palette: palette.id, surface: surface.id, around: around.id });
   }
   return species;
 }
@@ -185,6 +189,19 @@ async function startBattleWithBlackShinyLead(game: GameManager) {
   mon.customPokemonData.erBlackShiny = true;
   mon.customPokemonData.erGiftAbilities = [...GIFT_CHOICES];
   mon.customPokemonData.erGiftIndex = 0;
+  return mon;
+}
+
+async function startBattleWithShinyLabLead(game: GameManager, id: SpeciesId = SpeciesId.BULBASAUR) {
+  caughtShinyLabSpecies(game, id);
+  await game.classicMode.startBattle(id);
+  const mon = game.scene.getPlayerPokemon();
+  if (!mon) {
+    throw new Error("shiny lab render recipe: no player pokemon after startBattle");
+  }
+  mon.shiny = true;
+  mon.variant = 0;
+  await mon.loadAssets();
   return mon;
 }
 
@@ -303,7 +320,7 @@ const RECIPES: Record<string, Recipe> = {
     // a slider row and RIGHT adjusts it. Each -stepN.png proves the no-mouse 4-tab flow
     // (tab switching + slider adjust) with no crash.
     steps: [Button.RIGHT, Button.RIGHT, Button.RIGHT, Button.DOWN, Button.DOWN, Button.RIGHT],
-    diffTolerance: 120000,
+    diffTolerance: 180000, // animated exact FX advances during the six-step navigation tour
   },
   "biome-shop": {
     mode: UiMode.BIOME_SHOP,
@@ -365,9 +382,9 @@ const RECIPES: Record<string, Recipe> = {
       return [() => {}];
     },
   },
-  // Regression for Shiny Lab equipped palettes in Starter Select: the selected starter is
-  // shiny, owns/equips a Lab palette, and the preview must still render through the real
-  // StarterSelectUiHandler instead of waiting forever for a missing variant cache.
+  // Regression for Shiny Lab equipped looks in Starter Select: the selected starter is
+  // shiny, owns/equips palette + surface + aura, and the preview must render through the
+  // real StarterSelectUiHandler instead of falling back to palette-only shader rendering.
   "starter-select-shiny-lab": {
     mode: UiMode.STARTER_SELECT,
     prepare: game => {
@@ -377,7 +394,7 @@ const RECIPES: Record<string, Recipe> = {
       caughtShinyLabSpecies(game, SpeciesId.BULBASAUR);
       return [() => {}];
     },
-    diffTolerance: 40000,
+    diffTolerance: 60000, // live exact FX + mini-icon FX animate during frame-capture runs
   },
   // Co-op (#633) starter-select: forces COOP mode so the budget panel reads 0/5
   // (per-player) and the per-player 3-mon cap applies. This is the real screen the
@@ -424,6 +441,27 @@ const RECIPES: Record<string, Recipe> = {
     },
     steps: [Button.CYCLE_SHINY],
     diffTolerance: 40000, // live animated mon sprite in the summary box - see Recipe.diffTolerance
+  },
+  // Regression for Shiny Lab equipped looks in the party SUMMARY view. The lead owns
+  // and equips palette + surface + around FX; the summary mon sprite must use the
+  // exact renderer, not the default shiny palette or palette-only shader path.
+  "summary-shiny-lab": {
+    mode: UiMode.SUMMARY,
+    prepare: async game => {
+      const mon = await startBattleWithShinyLabLead(game);
+      return [mon, undefined /* SummaryUiMode.DEFAULT */, SUMMARY_PAGE_ABILITIES];
+    },
+    diffTolerance: 60000, // live exact FX overlay animates on the summary mon sprite
+  },
+  // Regression for Shiny Lab mini-icons in the in-game party screen. Party slots are
+  // built via BattleScene.addPokemonIcon, so this covers the shared runtime icon path.
+  "party-shiny-lab": {
+    mode: UiMode.PARTY,
+    prepare: async game => {
+      await startBattleWithShinyLabLead(game);
+      return [PartyUiMode.SWITCH, -1, () => {}];
+    },
+    diffTolerance: 40000,
   },
   // Phase-flow bridge demo: drive a real battle (startBattle runs the encounter phases) and
   // render WHATEVER screen the pipeline left active - here the in-battle command menu. Proves

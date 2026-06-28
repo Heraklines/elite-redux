@@ -147,6 +147,16 @@ import { PokemonMove } from "#moves/pokemon-move";
 import { MysteryEncounter } from "#mystery-encounters/mystery-encounter";
 import { MysteryEncounterSaveData } from "#mystery-encounters/mystery-encounter-save-data";
 import { allMysteryEncounters, mysteryEncountersByBiome } from "#mystery-encounters/mystery-encounters";
+import {
+  applyErShinyLabSpriteFxTexture,
+  clearErShinyLabSpriteFxTexture,
+  ER_SHINY_LAB_MINI_ICON_RENDER_PAD,
+  erShinyLabSpriteFxStateKey,
+  getErShinyLabPokemonIconSource,
+  getErShinyLabSpriteFxLookForSpecies,
+  hasErShinyLabAnySpriteFx,
+  hasErShinyLabExactSpriteFx,
+} from "#sprites/er-shiny-lab-sprite-fx";
 import { expSpriteKeys } from "#sprites/sprite-keys";
 import { hasExpSprite } from "#sprites/sprite-utils";
 import type { Variant } from "#sprites/variant";
@@ -1343,6 +1353,43 @@ export class BattleScene extends SceneBase {
       if (originY !== 0) {
         container.y -= icon.height * originY;
       }
+    }
+
+    const shinyLabLook = getErShinyLabSpriteFxLookForSpecies(pokemon.species.speciesId, pokemon.shiny);
+    if (hasErShinyLabAnySpriteFx(shinyLabLook)) {
+      const source = getErShinyLabPokemonIconSource(pokemon, ignoreOverride, useIllusion, shinyLabLook);
+      const baseState = erShinyLabSpriteFxStateKey(source, shinyLabLook);
+      let fxTick = 0;
+      const exactFx = hasErShinyLabExactSpriteFx(shinyLabLook);
+      const refreshIconFx = () =>
+        applyErShinyLabSpriteFxTexture(icon, shinyLabLook, {
+          source,
+          keyPrefix: `pokemon-icon-shiny-lab-fx-${pokemon.id}`,
+          time: fxTick / 10,
+          state: exactFx ? `${baseState}|${fxTick}` : baseState,
+          renderPad: ER_SHINY_LAB_MINI_ICON_RENDER_PAD,
+        });
+      refreshIconFx();
+      let fxTimer: Phaser.Time.TimerEvent | null = null;
+      if (exactFx) {
+        fxTimer = this.time.addEvent({
+          delay: 100,
+          loop: true,
+          callback: () => {
+            if (!container.active || !container.visible) {
+              return;
+            }
+            fxTick = (fxTick + 1) % 60000;
+            refreshIconFx();
+          },
+        });
+      }
+      const destroy = container.destroy.bind(container);
+      container.destroy = ((fromScene?: boolean) => {
+        fxTimer?.remove();
+        clearErShinyLabSpriteFxTexture(icon, false);
+        destroy(fromScene);
+      }) as typeof container.destroy;
     }
 
     // ER (#349): black shinies have no dedicated icon art - the variant sheet

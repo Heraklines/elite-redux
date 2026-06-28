@@ -29,6 +29,19 @@ import { addTreasureFragments, resetErMapNodes } from "#data/elite-redux/er-map-
 import { resetErMoneyStreaks } from "#data/elite-redux/er-money-streak";
 import { type ErDifficulty, setErDifficulty } from "#data/elite-redux/er-run-difficulty";
 import { buildErShinyLabConfig } from "#data/elite-redux/er-shiny-lab-config";
+import {
+  decodeErShinyLabLoadout,
+  decodeErShinyLabParams,
+  type ErShinyLabLoadout,
+  type ErShinyLabParams,
+  getErShinyLabOwnedSet,
+  sanitizeErShinyLabLoadout,
+} from "#data/elite-redux/er-shiny-lab-effects";
+import {
+  type ErShinyLabRenderedPixels,
+  type ErShinyLabSourcePixels,
+  renderErShinyLabLook,
+} from "#data/elite-redux/er-shiny-lab-renderer";
 import { resetErRunTrainerTracking } from "#data/elite-redux/er-trainer-runtime-hook";
 import { GrowthRate, getGrowthRateColor } from "#data/exp";
 import { Gender, getGenderColor, getGenderSymbol } from "#data/gender";
@@ -55,6 +68,16 @@ import { UiMode } from "#enums/ui-mode";
 import { UiTheme } from "#enums/ui-theme";
 import type { CandyUpgradeNotificationChangedEvent } from "#events/battle-scene";
 import { BattleSceneEventType } from "#events/battle-scene";
+import {
+  applyErShinyLabSpriteFxTexture,
+  clearErShinyLabSpriteFxTexture,
+  ER_SHINY_LAB_MINI_ICON_RENDER_PAD,
+  erShinyLabSpriteFxStateKey,
+  getErShinyLabSpeciesIconSource,
+  getErShinyLabSpriteFxLookForSpecies,
+  hasErShinyLabAnySpriteFx,
+  hasErShinyLabExactSpriteFx,
+} from "#sprites/er-shiny-lab-sprite-fx";
 import type { Variant } from "#sprites/variant";
 import {
   ensureErShinyLabPaletteVariantCache,
@@ -441,6 +464,11 @@ export class StarterSelectUiHandler extends MessageUiHandler {
   /** ER 3-passive layout — locked icons for slots 2 and 3. */
   private pokemonPassiveSlotLockedIcons: [Phaser.GameObjects.Sprite, Phaser.GameObjects.Sprite];
   private teraIcon: Phaser.GameObjects.Sprite;
+  private shinyLabFxSprite: Phaser.GameObjects.Sprite;
+  private shinyLabFxKey: string | null = null;
+  private shinyLabFxVersion = 0;
+  private shinyLabFxTick = 0;
+  private shinyLabFxTimer: Phaser.Time.TimerEvent | null = null;
 
   private activeTooltip: "ABILITY" | "PASSIVE" | "CANDY" | undefined;
   private instructionsContainer: Phaser.GameObjects.Container;
@@ -820,6 +848,7 @@ export class StarterSelectUiHandler extends MessageUiHandler {
       tone: [0.0, 0.0, 0.0, 0.0],
       ignoreTimeTint: true,
     });
+    this.shinyLabFxSprite = globalScene.add.sprite(53, 63, "unknown").setOrigin(0.5, 0.5).setVisible(false);
 
     this.pokemonNumberText = addTextObject(17, 1, "0000", TextStyle.SUMMARY_DEX_NUM).setOrigin(0);
 
@@ -1420,6 +1449,7 @@ export class StarterSelectUiHandler extends MessageUiHandler {
       addWindow(teamWindowX, teamWindowY + teamWindowHeight, teamWindowWidth, teamWindowWidth, true),
       starterContainerWindow,
       this.pokemonSprite,
+      this.shinyLabFxSprite,
       this.pokemonNumberText,
       this.pokemonNameText,
       this.pokemonGrowthRateLabelText,
@@ -1515,12 +1545,29 @@ export class StarterSelectUiHandler extends MessageUiHandler {
       }
       this.updateCoopStatus();
       this.spriteLoadAttempts.clear(); // fresh visit: allow previously-failed sprites to retry
+      this.pokemonSprite.setPipelineData("previewStateKey", "");
       // Background grid pre-warmer (idle-gated, single-flight — see prewarmVisibleSprites).
       this.spritePrewarmTimer?.remove();
       this.spritePrewarmTimer = globalScene.time.addEvent({
         delay: 150,
         loop: true,
         callback: () => this.prewarmVisibleSprites(),
+      });
+      this.shinyLabFxTick = 0;
+      this.shinyLabFxTimer?.remove();
+      this.shinyLabFxTimer = globalScene.time.addEvent({
+        delay: 100,
+        loop: true,
+        callback: () => {
+          if (this.statsMode || !this.starterSelectContainer.visible) {
+            return;
+          }
+          this.shinyLabFxTick = (this.shinyLabFxTick + 1) % 60000;
+          if (this.shinyLabFxSprite.visible) {
+            this.refreshAnimatedShinyLabFxPreview();
+          }
+          this.refreshVisibleShinyLabIconFx();
+        },
       });
 
       this.starterPreferences = loadStarterPreferences();
@@ -3460,6 +3507,15 @@ export class StarterSelectUiHandler extends MessageUiHandler {
       props.shiny,
       props.variant,
     );
+    this.refreshShinyLabIconFx(
+      this.starterIcons[this.starterSpecies.length],
+      species,
+      props.female,
+      props.formIndex,
+      props.shiny,
+      props.variant,
+      `starter-party-shiny-lab-icon-${this.starterSpecies.length}-${species.speciesId}`,
+    );
 
     const { dexEntry, starterDataEntry } = this.getSpeciesData(species.speciesId);
 
@@ -3498,6 +3554,15 @@ export class StarterSelectUiHandler extends MessageUiHandler {
     this.starterIcons[index].setTexture(species.getIconAtlasKey(props.formIndex, props.shiny, props.variant));
     this.starterIcons[index].setFrame(species.getIconId(props.female, props.formIndex, props.shiny, props.variant));
     this.checkIconId(this.starterIcons[index], species, props.female, props.formIndex, props.shiny, props.variant);
+    this.refreshShinyLabIconFx(
+      this.starterIcons[index],
+      species,
+      props.female,
+      props.formIndex,
+      props.shiny,
+      props.variant,
+      `starter-party-shiny-lab-icon-${index}-${species.speciesId}`,
+    );
   }
 
   /**
@@ -3958,6 +4023,15 @@ export class StarterSelectUiHandler extends MessageUiHandler {
         currentFilteredContainer.species.getIconId(props.female!, props.formIndex, props.shiny, props.variant),
       );
       currentFilteredContainer.checkIconId(props.female, props.formIndex, props.shiny, props.variant);
+      this.refreshShinyLabIconFx(
+        starterSprite,
+        currentFilteredContainer.species,
+        props.female,
+        props.formIndex,
+        props.shiny,
+        props.variant,
+        `starter-grid-shiny-lab-icon-${currentFilteredContainer.species.speciesId}`,
+      );
     }
 
     // filter
@@ -4488,6 +4562,15 @@ export class StarterSelectUiHandler extends MessageUiHandler {
       const speciesIndex = this.allSpecies.indexOf(this.lastSpecies);
       const lastSpeciesIcon = this.starterContainers[speciesIndex].icon;
       this.checkIconId(lastSpeciesIcon, this.lastSpecies, props.female, props.formIndex, props.shiny, props.variant);
+      this.refreshShinyLabIconFx(
+        lastSpeciesIcon,
+        this.lastSpecies,
+        props.female,
+        props.formIndex,
+        props.shiny,
+        props.variant,
+        `starter-grid-shiny-lab-icon-${this.lastSpecies.speciesId}`,
+      );
       this.iconAnimHandler.addOrUpdate(lastSpeciesIcon, PokemonIconAnimMode.NONE);
 
       // Resume the animation for the previously selected species
@@ -4762,6 +4845,258 @@ export class StarterSelectUiHandler extends MessageUiHandler {
    * uncapped per-selection loads piled up and froze the preview on a previous
    * Pokémon; serialising them keeps every load fast and the preview converging.
    */
+  private refreshShinyLabIconFx(
+    icon: Phaser.GameObjects.Sprite,
+    species: PokemonSpecies,
+    female: boolean,
+    formIndex: number,
+    shiny: boolean,
+    variant: number,
+    keyPrefix: string,
+  ): void {
+    const look = getErShinyLabSpriteFxLookForSpecies(species.speciesId, shiny);
+    if (!hasErShinyLabAnySpriteFx(look)) {
+      clearErShinyLabSpriteFxTexture(icon);
+      return;
+    }
+    const source = getErShinyLabSpeciesIconSource(species, female, formIndex, shiny, variant as Variant, look);
+    const baseState = erShinyLabSpriteFxStateKey(source, look);
+    const exactFx = hasErShinyLabExactSpriteFx(look);
+    applyErShinyLabSpriteFxTexture(icon, look, {
+      source,
+      keyPrefix,
+      time: this.shinyLabFxTick / 10,
+      state: exactFx ? `${baseState}|${this.shinyLabFxTick}` : baseState,
+      renderPad: ER_SHINY_LAB_MINI_ICON_RENDER_PAD,
+    });
+  }
+
+  private refreshVisibleShinyLabIconFx(): void {
+    for (const container of this.filteredStarterContainers) {
+      if (!container.visible) {
+        continue;
+      }
+      const currentDexAttr = this.getCurrentDexProps(container.species.speciesId);
+      const props = globalScene.gameData.getSpeciesDexAttrProps(container.species, currentDexAttr);
+      this.refreshShinyLabIconFx(
+        container.icon,
+        container.species,
+        props.female,
+        props.formIndex,
+        props.shiny,
+        props.variant,
+        `starter-grid-shiny-lab-icon-${container.species.speciesId}`,
+      );
+    }
+    for (let i = 0; i < this.starterSpecies.length; i++) {
+      const species = this.starterSpecies[i];
+      const currentDexAttr = this.getCurrentDexProps(species.speciesId);
+      const props = globalScene.gameData.getSpeciesDexAttrProps(species, currentDexAttr);
+      this.refreshShinyLabIconFx(
+        this.starterIcons[i],
+        species,
+        props.female,
+        props.formIndex,
+        props.shiny,
+        props.variant,
+        `starter-party-shiny-lab-icon-${i}-${species.speciesId}`,
+      );
+    }
+    for (let i = this.starterSpecies.length; i < this.starterIcons.length; i++) {
+      clearErShinyLabSpriteFxTexture(this.starterIcons[i]);
+    }
+  }
+
+  private getStarterShinyLabPreview(
+    speciesId: number,
+  ): { loadout: ErShinyLabLoadout; params: ErShinyLabParams } | null {
+    const save = globalScene.gameData.getStarterDataEntry(speciesId).erShinyLab;
+    if (!save) {
+      return null;
+    }
+    const owned = {
+      palette: getErShinyLabOwnedSet(save, "palette"),
+      surface: getErShinyLabOwnedSet(save, "surface"),
+      around: getErShinyLabOwnedSet(save, "around"),
+    };
+    const loadout = sanitizeErShinyLabLoadout(decodeErShinyLabLoadout(save.l), owned);
+    if (!loadout.palette && !loadout.surface && !loadout.around) {
+      return null;
+    }
+    return { loadout, params: decodeErShinyLabParams(save.q) };
+  }
+
+  private hasExactShinyLabFx(loadout: ErShinyLabLoadout | null | undefined): boolean {
+    return !!(loadout?.surface || loadout?.around);
+  }
+
+  private shinyLabPreviewStateKey(
+    spriteKey: string,
+    loadout: ErShinyLabLoadout | null | undefined,
+    params: ErShinyLabParams | null | undefined,
+  ): string {
+    if (!loadout || !params) {
+      return spriteKey;
+    }
+    return [
+      spriteKey,
+      loadout.palette ?? "",
+      loadout.surface ?? "",
+      loadout.around ?? "",
+      params.palAmt,
+      params.surfAmt,
+      params.aroAmt,
+      params.scale,
+      params.seed,
+      params.tintMode,
+    ].join("|");
+  }
+
+  private readShinyLabSourcePixels(
+    key: string,
+    sourceFrame?: Phaser.Textures.Frame | null,
+  ): ErShinyLabSourcePixels | null {
+    try {
+      if (typeof document === "undefined" || !globalScene.textures.exists(key)) {
+        return null;
+      }
+      const texture = globalScene.textures.get(key) as Phaser.Textures.Texture & {
+        frames?: Record<string, Phaser.Textures.Frame>;
+        getSourceImage?: () => CanvasImageSource | null;
+        source?: { image?: CanvasImageSource } | { image?: CanvasImageSource }[];
+      };
+      const textureSource = texture.source as unknown as
+        | { image?: CanvasImageSource }
+        | { image?: CanvasImageSource }[]
+        | undefined;
+      const source = (texture.getSourceImage?.()
+        ?? (Array.isArray(textureSource) ? textureSource[0]?.image : textureSource?.image)
+        ?? null) as CanvasImageSource & { width?: number; height?: number };
+      if (!source) {
+        return null;
+      }
+      const frameValues = Object.values(texture.frames ?? {});
+      const frame =
+        sourceFrame
+        ?? (texture.firstFrame ? texture.frames?.[texture.firstFrame] : null)
+        ?? texture.frames?.__BASE
+        ?? frameValues[0]
+        ?? null;
+      const width = Math.floor(frame?.cutWidth ?? frame?.width ?? source.width ?? 0);
+      const height = Math.floor(frame?.cutHeight ?? frame?.height ?? source.height ?? 0);
+      if (width <= 0 || height <= 0) {
+        return null;
+      }
+
+      const canvas = document.createElement("canvas");
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext("2d", { willReadFrequently: true });
+      if (!ctx) {
+        return null;
+      }
+      ctx.clearRect(0, 0, width, height);
+      ctx.drawImage(source, frame?.cutX ?? 0, frame?.cutY ?? 0, width, height, 0, 0, width, height);
+      return { width, height, data: ctx.getImageData(0, 0, width, height).data };
+    } catch {
+      return null;
+    }
+  }
+
+  private applyShinyLabFxTexture(rendered: ErShinyLabRenderedPixels): boolean {
+    try {
+      if (typeof document === "undefined") {
+        return false;
+      }
+      const textures = globalScene.textures as Phaser.Textures.TextureManager & {
+        addCanvas?: (key: string, canvas: HTMLCanvasElement) => Phaser.Textures.CanvasTexture | null;
+        remove?: (key: string) => unknown;
+      };
+      if (!textures.addCanvas) {
+        return false;
+      }
+
+      const canvas = document.createElement("canvas");
+      canvas.width = rendered.width;
+      canvas.height = rendered.height;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) {
+        return false;
+      }
+      const image = ctx.createImageData(rendered.width, rendered.height);
+      image.data.set(rendered.data);
+      ctx.putImageData(image, 0, 0);
+
+      const oldKey = this.shinyLabFxKey;
+      let key: string;
+      do {
+        key = `starter-shiny-lab-fx-${++this.shinyLabFxVersion}`;
+      } while (textures.exists(key));
+      const texture = textures.addCanvas(key, canvas);
+      texture?.refresh();
+      this.shinyLabFxKey = key;
+      this.shinyLabFxSprite
+        .setTexture(key)
+        .setPosition(this.pokemonSprite.x, this.pokemonSprite.y)
+        .setScale(this.pokemonSprite.scaleX || 1)
+        .setVisible(!this.statsMode);
+      if (oldKey && oldKey !== key && textures.exists(oldKey)) {
+        textures.remove?.(oldKey);
+      }
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  private hideShinyLabFxPreview(showBase = true): void {
+    this.shinyLabFxSprite?.setVisible(false);
+    if (this.shinyLabFxKey) {
+      try {
+        const textures = globalScene.textures as Phaser.Textures.TextureManager & { remove?: (key: string) => unknown };
+        if (textures.exists(this.shinyLabFxKey)) {
+          textures.remove?.(this.shinyLabFxKey);
+        }
+      } catch {}
+      this.shinyLabFxKey = null;
+    }
+    if (showBase && !this.statsMode) {
+      this.pokemonSprite?.setVisible(true);
+    }
+  }
+
+  private refreshShinyLabFxPreview(spriteKey: string, loadout: ErShinyLabLoadout, params: ErShinyLabParams): boolean {
+    const source = this.readShinyLabSourcePixels(spriteKey, this.pokemonSprite.frame);
+    if (!source) {
+      return false;
+    }
+    const rendered = renderErShinyLabLook(source, loadout, params, this.shinyLabFxTick / 10);
+    if (!rendered) {
+      return false;
+    }
+    return this.applyShinyLabFxTexture(rendered);
+  }
+
+  private refreshAnimatedShinyLabFxPreview(): void {
+    const species = this.lastSpecies;
+    const spriteKey = this.pokemonSprite.pipelineData["textureKey"] as string | undefined;
+    if (!species || !spriteKey || !globalScene.textures.exists(spriteKey)) {
+      this.hideShinyLabFxPreview();
+      return;
+    }
+    const props = globalScene.gameData.getSpeciesDexAttrProps(species, this.getCurrentDexProps(species.speciesId));
+    const labPreview = props.shiny ? this.getStarterShinyLabPreview(species.speciesId) : null;
+    if (!labPreview || !this.hasExactShinyLabFx(labPreview.loadout)) {
+      this.hideShinyLabFxPreview();
+      return;
+    }
+    if (this.refreshShinyLabFxPreview(spriteKey, labPreview.loadout, labPreview.params)) {
+      this.pokemonSprite.setVisible(false);
+    } else {
+      this.hideShinyLabFxPreview();
+    }
+  }
+
   private refreshPreviewSprite(): void {
     const species = this.lastSpecies;
     if (!species || this.statsMode || !this.starterSelectContainer.visible) {
@@ -4773,7 +5108,11 @@ export class StarterSelectUiHandler extends MessageUiHandler {
     }
     const props = globalScene.gameData.getSpeciesDexAttrProps(species, this.getCurrentDexProps(species.speciesId));
     const female = props.female ?? false;
-    const labPaletteId = props.shiny ? getErShinyLabPaletteIdForSpecies(species.speciesId) : null;
+    const labPreview = props.shiny ? this.getStarterShinyLabPreview(species.speciesId) : null;
+    const labPaletteId = props.shiny
+      ? (labPreview?.loadout.palette ?? getErShinyLabPaletteIdForSpecies(species.speciesId))
+      : null;
+    const hasExactLabFx = this.hasExactShinyLabFx(labPreview?.loadout);
     const labPaletteVariant: Variant = 0;
     const textureShiny = labPaletteId ? false : props.shiny;
     const textureVariant = labPaletteId ? labPaletteVariant : props.variant;
@@ -4782,8 +5121,13 @@ export class StarterSelectUiHandler extends MessageUiHandler {
       ? ensureErShinyLabPaletteVariantCache(spriteKey, labPaletteId, labPaletteVariant)
       : null;
     const initialShaderSpriteKey = initialLabCacheKey ?? spriteKey;
-    const initialStateKey = `${spriteKey}|${initialShaderSpriteKey}|${labPaletteId ?? ""}`;
-    if (this.pokemonSprite.pipelineData["previewStateKey"] === initialStateKey) {
+    const initialStateKey = hasExactLabFx
+      ? this.shinyLabPreviewStateKey(spriteKey, labPreview?.loadout, labPreview?.params)
+      : `${spriteKey}|${initialShaderSpriteKey}|${labPaletteId ?? ""}`;
+    if (
+      this.pokemonSprite.pipelineData["previewStateKey"] === initialStateKey
+      && (!hasExactLabFx || this.shinyLabFxSprite.visible)
+    ) {
       return; // already showing the right sprite
     }
     if (globalScene.textures.exists(spriteKey)) {
@@ -4805,8 +5149,17 @@ export class StarterSelectUiHandler extends MessageUiHandler {
           .setPipelineData("variant", labPaletteId ? labPaletteVariant : props.variant)
           .setPipelineData("spriteKey", shaderSpriteKey)
           .setPipelineData("textureKey", spriteKey)
-          .setPipelineData("previewStateKey", `${spriteKey}|${shaderSpriteKey}|${labPaletteId ?? ""}`)
+          .setPipelineData("previewStateKey", initialStateKey)
           .setVisible(!this.statsMode);
+        if (
+          hasExactLabFx
+          && labPreview
+          && this.refreshShinyLabFxPreview(spriteKey, labPreview.loadout, labPreview.params)
+        ) {
+          this.pokemonSprite.setVisible(false);
+        } else {
+          this.hideShinyLabFxPreview(false);
+        }
         return;
       }
     }
@@ -5205,6 +5558,15 @@ export class StarterSelectUiHandler extends MessageUiHandler {
             species.getIconId(female, formIndex, shiny, variant),
           );
           currentFilteredContainer.checkIconId(female, formIndex, shiny, variant);
+          this.refreshShinyLabIconFx(
+            starterSprite,
+            currentFilteredContainer.species,
+            female,
+            formIndex ?? 0,
+            shiny ?? false,
+            variant ?? 0,
+            `starter-grid-shiny-lab-icon-${currentFilteredContainer.species.speciesId}`,
+          );
         }
 
         const isNonShinyCaught = !!(caughtAttr & DexAttr.NON_SHINY);
@@ -5481,6 +5843,15 @@ export class StarterSelectUiHandler extends MessageUiHandler {
         .setTexture(species.getIconAtlasKey(props.formIndex, props.shiny, props.variant))
         .setFrame(species.getIconId(props.female, props.formIndex, props.shiny, props.variant));
       this.checkIconId(this.starterIcons[s], species, props.female, props.formIndex, props.shiny, props.variant);
+      this.refreshShinyLabIconFx(
+        this.starterIcons[s],
+        species,
+        props.female,
+        props.formIndex,
+        props.shiny,
+        props.variant,
+        `starter-party-shiny-lab-icon-${s}-${species.speciesId}`,
+      );
       if (s >= index) {
         this.starterCursorObjs[s]
           .setPosition(this.starterCursorObjs[s + 1].x, this.starterCursorObjs[s + 1].y)
@@ -5488,6 +5859,7 @@ export class StarterSelectUiHandler extends MessageUiHandler {
       }
     }
     this.starterCursorObjs[this.starterSpecies.length].setVisible(false);
+    clearErShinyLabSpriteFxTexture(this.starterIcons[this.starterSpecies.length], false);
     this.starterIcons[this.starterSpecies.length].setTexture("pokemon_icons_0").setFrame("unknown");
 
     if (this.starterIconsCursorObj.visible) {
@@ -6031,6 +6403,7 @@ export class StarterSelectUiHandler extends MessageUiHandler {
       this.showStats();
       this.statsMode = true;
       this.pokemonSprite.setVisible(false);
+      this.shinyLabFxSprite.setVisible(false);
       this.teraIcon.setVisible(false);
       this.canCycleTera = false;
       this.updateInstructions();
@@ -6051,6 +6424,8 @@ export class StarterSelectUiHandler extends MessageUiHandler {
         && getPokemonSpeciesForm(this.lastSpecies.speciesId, formIndex ?? 0).type2 != null
         && !globalScene.gameMode.hasChallenge(Challenges.FRESH_START);
       this.updateInstructions();
+      this.pokemonSprite.setPipelineData("previewStateKey", "");
+      this.refreshPreviewSprite();
     }
   }
 
@@ -6107,6 +6482,9 @@ export class StarterSelectUiHandler extends MessageUiHandler {
     this.blockInput = false;
     this.spritePrewarmTimer?.remove();
     this.spritePrewarmTimer = null;
+    this.shinyLabFxTimer?.remove();
+    this.shinyLabFxTimer = null;
+    this.hideShinyLabFxPreview(false);
 
     while (this.starterSpecies.length > 0) {
       this.popStarter(this.starterSpecies.length - 1);

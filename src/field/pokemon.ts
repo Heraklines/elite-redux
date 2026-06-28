@@ -204,6 +204,12 @@ import { applyMoveAttrs } from "#moves/apply-attrs";
 import type { Move } from "#moves/move";
 import { getMoveTargets } from "#moves/move-utils";
 import { PokemonMove } from "#moves/pokemon-move";
+import {
+  ErShinyLabSpriteFxOverlay,
+  getErShinyLabPokemonBattleSource,
+  getErShinyLabSpriteFxLookForSpecies,
+  hasErShinyLabExactSpriteFx,
+} from "#sprites/er-shiny-lab-sprite-fx";
 import { loadMoveAnimations } from "#sprites/pokemon-asset-loader";
 import type { Variant } from "#sprites/variant";
 import {
@@ -373,6 +379,10 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
 
   public maskEnabled: boolean;
   public maskSprite: Phaser.GameObjects.Sprite | null;
+  private tintSprite: Phaser.GameObjects.Sprite | null = null;
+  private erShinyLabFxOverlay: ErShinyLabSpriteFxOverlay | null = null;
+  private erShinyLabFxTimer: Phaser.Time.TimerEvent | null = null;
+  private erShinyLabFxTick = 0;
 
   /**
    * The set of all TMs that have been used on this Pokémon
@@ -618,9 +628,13 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
     const tintSprite = getSprite();
 
     tintSprite.setVisible(false);
+    this.tintSprite = tintSprite;
 
     this.addAt(sprite, 0);
-    this.addAt(tintSprite, 1);
+    this.erShinyLabFxOverlay?.destroy();
+    this.erShinyLabFxOverlay = new ErShinyLabSpriteFxOverlay(sprite, `battle-shiny-lab-fx-${this.id}`);
+    this.addAt(this.erShinyLabFxOverlay.getSprite(), 1);
+    this.addAt(tintSprite, 2);
 
     if (this.isShiny(true) && !this.shinySparkle) {
       this.initShinySparkle();
@@ -922,6 +936,20 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
             populateErShinyLabPaletteVariantColors(this, true),
           ),
         );
+      }
+    }
+
+    const shinyLabLook = getErShinyLabSpriteFxLookForSpecies(this.species.speciesId, this.shiny);
+    if (shinyLabLook?.loadout.palette) {
+      const frontSource = getErShinyLabPokemonBattleSource(this, false, ignoreOverride, shinyLabLook);
+      if (frontSource.atlasPath && !globalScene.textures.exists(frontSource.key)) {
+        globalScene.loadPokemonAtlas(frontSource.key, frontSource.atlasPath);
+      }
+      if (this.isPlayer()) {
+        const backSource = getErShinyLabPokemonBattleSource(this, true, ignoreOverride, shinyLabLook);
+        if (backSource.atlasPath && !globalScene.textures.exists(backSource.key)) {
+          globalScene.loadPokemonAtlas(backSource.key, backSource.atlasPath);
+        }
       }
     }
 
@@ -1427,7 +1455,7 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
   }
 
   getTintSprite(): Phaser.GameObjects.Sprite | null {
-    return this.maskEnabled ? this.maskSprite : (this.getAt(1) as Phaser.GameObjects.Sprite);
+    return this.maskEnabled ? this.maskSprite : this.tintSprite;
   }
 
   getSpriteScale(): number {
@@ -1524,6 +1552,50 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
 
   playAnim(): void {
     this.tryPlaySprite(this.getSprite(), this.getTintSprite()!, this.getBattleSpriteKey()); // TODO: is the bang correct?
+    this.refreshErShinyLabBattleFx();
+  }
+
+  private startErShinyLabBattleFxTimer(): void {
+    if (this.erShinyLabFxTimer) {
+      return;
+    }
+    this.erShinyLabFxTimer = globalScene.time.addEvent({
+      delay: 100,
+      loop: true,
+      callback: () => {
+        if (!this.active || !this.visible || !this.isOnField()) {
+          return;
+        }
+        this.erShinyLabFxTick = (this.erShinyLabFxTick + 1) % 60000;
+        this.refreshErShinyLabBattleFx();
+      },
+    });
+  }
+
+  private stopErShinyLabBattleFxTimer(): void {
+    this.erShinyLabFxTimer?.remove();
+    this.erShinyLabFxTimer = null;
+  }
+
+  private refreshErShinyLabBattleFx(): void {
+    const look = getErShinyLabSpriteFxLookForSpecies(this.species.speciesId, this.shiny);
+    if (!this.erShinyLabFxOverlay || !hasErShinyLabExactSpriteFx(look)) {
+      this.erShinyLabFxOverlay?.hide();
+      this.stopErShinyLabBattleFxTimer();
+      return;
+    }
+
+    const source = {
+      ...getErShinyLabPokemonBattleSource(this, this.isPlayer(), undefined, look),
+      frame: this.getSprite().frame?.name,
+    };
+    if (this.erShinyLabFxOverlay.refresh(look, source, this.erShinyLabFxTick / 10)) {
+      this.getSprite().setVisible(false);
+      this.startErShinyLabBattleFxTimer();
+    } else {
+      this.erShinyLabFxOverlay.hide();
+      this.stopErShinyLabBattleFxTimer();
+    }
   }
 
   getFieldPositionOffset(): [number, number] {
@@ -7271,6 +7343,9 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
    * {@linkcode battleInfo} and substitute sprite (as applicable).
    */
   destroy(): void {
+    this.stopErShinyLabBattleFxTimer();
+    this.erShinyLabFxOverlay?.destroy();
+    this.erShinyLabFxOverlay = null;
     this.battleInfo?.destroy();
     this.destroySubstitute();
     super.destroy();

@@ -16,6 +16,7 @@ import {
   isErBlackShiny,
   isErGiftCycleAllowed,
 } from "#data/elite-redux/er-black-shinies";
+import { ensureErSpriteAnim } from "#data/elite-redux/er-form-sprite-redirect";
 import { erStreakBonusPercent } from "#data/elite-redux/er-money-streak";
 import { getErMoveDetailPages, type MoveDetailRow } from "#data/elite-redux/er-move-details";
 import { erYoungsterFreeInnateSlots } from "#data/elite-redux/er-run-difficulty";
@@ -38,6 +39,14 @@ import type { PlayerPokemon } from "#field/pokemon";
 import { modifierSortFunc, PokemonHeldItemModifier } from "#modifiers/modifier";
 import type { Move } from "#moves/move";
 import type { PokemonMove } from "#moves/pokemon-move";
+import {
+  ErShinyLabSpriteFxOverlay,
+  type ErShinyLabSpriteSourceRef,
+  getErShinyLabPokemonSpriteSource,
+  getErShinyLabSpriteFxLookForSpecies,
+  hasErShinyLabAnySpriteFx,
+  hasErShinyLabExactSpriteFx,
+} from "#sprites/er-shiny-lab-sprite-fx";
 import type { Variant } from "#sprites/variant";
 import { getVariantTint } from "#sprites/variant";
 import { achvs } from "#system/achv";
@@ -109,6 +118,10 @@ export class SummaryUiHandler extends UiHandler {
   private shinyOverlay: Phaser.GameObjects.Image;
   private numberText: Phaser.GameObjects.Text;
   private pokemonSprite: Phaser.GameObjects.Sprite;
+  private shinyLabFxOverlay: ErShinyLabSpriteFxOverlay | null = null;
+  private shinyLabFxTimer: Phaser.Time.TimerEvent | null = null;
+  private shinyLabFxTick = 0;
+  private shinyLabSummarySpriteLoadKey: string | null = null;
   private nameText: Phaser.GameObjects.Text;
   private splicedIcon: Phaser.GameObjects.Sprite;
   private pokeball: Phaser.GameObjects.Sprite;
@@ -251,6 +264,8 @@ export class SummaryUiHandler extends UiHandler {
       true,
     );
     this.summaryContainer.add(this.pokemonSprite);
+    this.shinyLabFxOverlay = new ErShinyLabSpriteFxOverlay(this.pokemonSprite, "summary-shiny-lab-fx");
+    this.summaryContainer.add(this.shinyLabFxOverlay.getSprite());
 
     this.nameText = addTextObject(6, -54, "", TextStyle.SUMMARY);
     this.nameText.setOrigin(0, 0);
@@ -483,7 +498,14 @@ export class SummaryUiHandler extends UiHandler {
     this.numberText.setShadowColor(
       getTextColor(this.pokemon.isShiny() ? TextStyle.SUMMARY_GOLD : TextStyle.SUMMARY, true),
     );
-    const spriteKey = this.pokemon.getSpriteKey(true);
+    const shinyLabLook = getErShinyLabSpriteFxLookForSpecies(this.pokemon.species.speciesId, this.pokemon.shiny);
+    const shinyLabSource = hasErShinyLabAnySpriteFx(shinyLabLook)
+      ? getErShinyLabPokemonSpriteSource(this.pokemon, true, shinyLabLook)
+      : null;
+    const spriteKey = shinyLabSource?.key ?? this.pokemon.getSpriteKey(true);
+    if (shinyLabSource) {
+      this.ensureShinyLabSummarySpriteLoaded(shinyLabSource);
+    }
     // Pin the texture BEFORE attempting the animation: if `play` fails (anim
     // not built yet), the sprite would otherwise silently keep showing the
     // PREVIOUS mon's texture (e.g. an ally's black-shiny art on Snorlax's
@@ -500,7 +522,7 @@ export class SummaryUiHandler extends UiHandler {
       .setPipelineData("teraColor", getTypeRgb(this.pokemon.getTeraType()))
       .setPipelineData("isTerastallized", this.pokemon.isTerastallized)
       .setPipelineData("ignoreTimeTint", true)
-      .setPipelineData("spriteKey", this.pokemon.getSpriteKey())
+      .setPipelineData("spriteKey", spriteKey)
       .setPipelineData("shiny", this.pokemon.shiny)
       .setPipelineData("variant", this.pokemon.variant);
     ["spriteColors", "fusionSpriteColors"].forEach(k => {
@@ -510,6 +532,8 @@ export class SummaryUiHandler extends UiHandler {
       }
       this.pokemonSprite.pipelineData[k] = this.pokemon?.getSprite().pipelineData[k];
     });
+    this.shinyLabFxTick = 0;
+    this.refreshShinyLabSummaryFx();
     this.pokemon.cry();
 
     this.nameText.setText(this.pokemon.getNameToRender({ useIllusion: false }));
@@ -2018,6 +2042,111 @@ export class SummaryUiHandler extends UiHandler {
     }
   }
 
+  private startShinyLabSummaryFxTimer(): void {
+    if (this.shinyLabFxTimer) {
+      return;
+    }
+    this.shinyLabFxTimer = globalScene.time.addEvent({
+      delay: 100,
+      loop: true,
+      callback: () => {
+        if (!this.summaryContainer.visible || !this.pokemon) {
+          return;
+        }
+        this.shinyLabFxTick = (this.shinyLabFxTick + 1) % 60000;
+        this.refreshShinyLabSummaryFx();
+      },
+    });
+  }
+
+  private stopShinyLabSummaryFxTimer(): void {
+    this.shinyLabFxTimer?.remove();
+    this.shinyLabFxTimer = null;
+  }
+
+  private ensureShinyLabSummarySpriteLoaded(source: ErShinyLabSpriteSourceRef): void {
+    if (globalScene.textures.exists(source.key)) {
+      ensureErSpriteAnim(source.key);
+      return;
+    }
+    if (!source.atlasPath || this.shinyLabSummarySpriteLoadKey === source.key) {
+      return;
+    }
+
+    this.shinyLabSummarySpriteLoadKey = source.key;
+    const completeEvent = `filecomplete-atlasjson-${source.key}`;
+    const cleanup = (): void => {
+      globalScene.load.off(completeEvent, onComplete);
+      globalScene.load.off(Phaser.Loader.Events.FILE_LOAD_ERROR, onError);
+      if (this.shinyLabSummarySpriteLoadKey === source.key) {
+        this.shinyLabSummarySpriteLoadKey = null;
+      }
+    };
+    const refresh = (): void => {
+      if (!this.pokemon || !this.summaryContainer.visible) {
+        return;
+      }
+      ensureErSpriteAnim(source.key);
+      if (globalScene.anims.exists(source.key)) {
+        this.pokemonSprite.play(source.key);
+      } else if (globalScene.textures.exists(source.key)) {
+        this.pokemonSprite.setTexture(source.key);
+      }
+      this.refreshShinyLabSummaryFx();
+    };
+    const onComplete = (): void => {
+      cleanup();
+      refresh();
+    };
+    const onError = (file: Phaser.Loader.File): void => {
+      if (file.key !== source.key) {
+        return;
+      }
+      cleanup();
+    };
+
+    globalScene.load.on(completeEvent, onComplete);
+    globalScene.load.on(Phaser.Loader.Events.FILE_LOAD_ERROR, onError);
+    globalScene.loadPokemonAtlas(source.key, source.atlasPath);
+    if (!globalScene.load.isLoading()) {
+      globalScene.load.start();
+    }
+
+    // The atlas may already have landed via another request between the initial
+    // texture check and listener registration.
+    if (globalScene.textures.exists(source.key)) {
+      cleanup();
+      refresh();
+    }
+  }
+
+  private refreshShinyLabSummaryFx(): void {
+    if (!this.pokemon || !this.shinyLabFxOverlay) {
+      return;
+    }
+    const look = getErShinyLabSpriteFxLookForSpecies(this.pokemon.species.speciesId, this.pokemon.shiny);
+    if (!hasErShinyLabAnySpriteFx(look)) {
+      this.shinyLabFxOverlay.hide();
+      this.stopShinyLabSummaryFxTimer();
+      return;
+    }
+
+    const baseSource = getErShinyLabPokemonSpriteSource(this.pokemon, true, look);
+    const frame = this.pokemonSprite.texture.key === baseSource.key ? this.pokemonSprite.frame?.name : null;
+    const source = frame == null ? baseSource : { ...baseSource, frame };
+    if (this.shinyLabFxOverlay.refresh(look, source, this.shinyLabFxTick / 10)) {
+      this.pokemonSprite.setVisible(false);
+      if (hasErShinyLabExactSpriteFx(look)) {
+        this.startShinyLabSummaryFxTimer();
+      } else {
+        this.stopShinyLabSummaryFxTimer();
+      }
+    } else {
+      this.shinyLabFxOverlay.hide();
+      this.stopShinyLabSummaryFxTimer();
+    }
+  }
+
   /**
    * Advance the ability-cycle on the PROFILE page by one step. Order:
    *   index 0 = ability
@@ -2090,6 +2219,8 @@ export class SummaryUiHandler extends UiHandler {
     this.abilitiesSelectMode = false;
     this.abilitiesCursorObj = null;
     this.abilitiesDetailPrompt = null;
+    this.stopShinyLabSummaryFxTimer();
+    this.shinyLabFxOverlay?.hide(false);
     this.summaryContainer.setVisible(false);
     this.summaryPageContainer.setVisible(false);
   }

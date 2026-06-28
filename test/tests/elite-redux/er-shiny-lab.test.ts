@@ -27,12 +27,24 @@ import {
 } from "#data/elite-redux/er-shiny-lab-effects";
 import { AROUND, AURA, PALETTE } from "#data/elite-redux/er-shiny-lab-fx";
 import { renderErShinyLabLook } from "#data/elite-redux/er-shiny-lab-renderer";
+import { Gender } from "#data/gender";
+import { SpeciesId } from "#enums/species-id";
+import {
+  type ErShinyLabSpriteFxLook,
+  erShinyLabSpriteFxStateKey,
+  getErShinyLabPokemonBattleSource,
+  getErShinyLabSpeciesIconSource,
+  hasErShinyLabAnySpriteFx,
+  hasErShinyLabExactSpriteFx,
+} from "#sprites/er-shiny-lab-sprite-fx";
 import {
   ensureErShinyLabPaletteVariantCache,
   getErShinyLabPaletteIdFromSave,
   getErShinyLabVariantCacheKey,
+  type Variant,
   variantColorCache,
 } from "#sprites/variant";
+import { getPokemonSpecies } from "#utils/pokemon-utils";
 import { describe, expect, it } from "vitest";
 
 type VariantPaletteCache = Record<string, Record<number, Record<string, string>>>;
@@ -90,6 +102,43 @@ describe("ER Shiny Lab data layer", () => {
       expect(rendered, JSON.stringify(loadout)).not.toBeNull();
       expect(rendered!.width * rendered!.height * 4, JSON.stringify(loadout)).toBe(rendered!.data.length);
     }
+  });
+
+  it("tracks exact sprite FX state and source selection for runtime renderers", () => {
+    const look: ErShinyLabSpriteFxLook = {
+      loadout: { palette: "duoneon", surface: "starmap", around: "staticfield" },
+      params: { palAmt: 1, surfAmt: 1, aroAmt: 1, scale: 1, seed: 77, tintMode: 0 },
+    };
+    const species = getPokemonSpecies(SpeciesId.BULBASAUR);
+    const iconSource = getErShinyLabSpeciesIconSource(species, false, 0, true, 2, look);
+    const pokemon = {
+      species,
+      formIndex: 0,
+      variant: 2 as Variant,
+      shiny: true,
+      summonData: {},
+      getBattleSpriteKey: () => "pkmn__default-shiny",
+      getBattleSpriteAtlasPath: () => "default-shiny",
+      getGender: () => Gender.MALE,
+      getIconAtlasKey: () => "icons-default-shiny",
+      getIconId: () => "icon-default-shiny",
+      getSpeciesForm: () => species,
+      getSpriteAtlasPath: () => "default-shiny",
+      getSpriteKey: () => "pkmn__default-shiny",
+    };
+    const backSource = getErShinyLabPokemonBattleSource(pokemon, true, undefined, look);
+
+    expect(hasErShinyLabAnySpriteFx(look)).toBe(true);
+    expect(hasErShinyLabExactSpriteFx(look)).toBe(true);
+    expect(iconSource).toEqual({
+      key: species.getIconAtlasKey(0, false, 0),
+      frame: species.getIconId(false, 0, false, 0),
+    });
+    expect(backSource).toEqual({
+      key: `pkmn__${species.getSpriteId(false, 0, false, 0, true)}`,
+      atlasPath: species.getSpriteAtlasPath(false, 0, false, 0, true),
+    });
+    expect(erShinyLabSpriteFxStateKey(iconSource, look)).toContain("duoneon|starmap|staticfield");
   });
 
   it("resolves the tier, availability, owned, and candy gates in order", () => {

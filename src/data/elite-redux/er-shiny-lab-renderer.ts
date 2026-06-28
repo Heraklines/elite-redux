@@ -21,6 +21,10 @@ import {
 
 export const ER_SHINY_LAB_RENDER_PAD = 22;
 
+interface RenderOptions {
+  pad?: number;
+}
+
 export interface ErShinyLabSourcePixels {
   width: number;
   height: number;
@@ -113,6 +117,7 @@ export function renderErShinyLabLook(
   slots: ErShinyLabLoadout,
   params: ErShinyLabParams,
   time = 0,
+  options?: RenderOptions,
 ): ErShinyLabRenderedPixels | null {
   const fw = Math.floor(source.width);
   const fh = Math.floor(source.height);
@@ -121,7 +126,7 @@ export function renderErShinyLabLook(
     return null;
   }
 
-  const pad = ER_SHINY_LAB_RENDER_PAD;
+  const pad = Math.max(0, Math.floor(options?.pad ?? ER_SHINY_LAB_RENDER_PAD));
   const pw = fw + 2 * pad;
   const ph = fh + 2 * pad;
   const out = new Uint8ClampedArray(pw * ph * 4);

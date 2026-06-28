@@ -36,6 +36,11 @@ import { addTreasureFragments, resetErMapNodes, revealMapNodes } from "#data/eli
 import { advanceErMoneyStreaks } from "#data/elite-redux/er-money-streak";
 import { erResistBerryModifierType } from "#data/elite-redux/er-resist-berries";
 import { setErDifficulty, setErDifficulty as setErDifficultyForScenario } from "#data/elite-redux/er-run-difficulty";
+import {
+  ER_SHINY_LAB_EFFECTS_BY_CATEGORY,
+  encodeErShinyLabLoadout,
+  setErShinyLabOwnedBit,
+} from "#data/elite-redux/er-shiny-lab-effects";
 import { erWardStoneModifierType } from "#data/elite-redux/er-ward-stones";
 import { AbilityId } from "#enums/ability-id";
 import { BattleType } from "#enums/battle-type";
@@ -111,6 +116,25 @@ function makeStarter(speciesId: SpeciesId, opts: StarterOpts = {}): Starter {
   };
 }
 
+function seedShinyLabVisualLook(speciesId: SpeciesId): void {
+  const palette = ER_SHINY_LAB_EFFECTS_BY_CATEGORY.palette.find(e => e.id === "duoneon");
+  const surface = ER_SHINY_LAB_EFFECTS_BY_CATEGORY.surface.find(e => e.id === "starmap");
+  const around = ER_SHINY_LAB_EFFECTS_BY_CATEGORY.around.find(e => e.id === "staticfield");
+  if (!palette || !surface || !around) {
+    return;
+  }
+  const starter = globalScene.gameData.getStarterDataEntry(speciesId);
+  starter.erShinyLab ??= {};
+  setErShinyLabOwnedBit(starter.erShinyLab, "palette", palette.index);
+  setErShinyLabOwnedBit(starter.erShinyLab, "surface", surface.index);
+  setErShinyLabOwnedBit(starter.erShinyLab, "around", around.index);
+  starter.erShinyLab.l = encodeErShinyLabLoadout({
+    palette: palette.id,
+    surface: surface.id,
+    around: around.id,
+  });
+}
+
 /** Resolve the form index whose `formKey` matches (e.g. "redux"); 0 if absent. */
 function formIndexByKey(speciesId: SpeciesId, formKey: string): number {
   const idx = getPokemonSpecies(speciesId).forms.findIndex(f => f.formKey === formKey);
@@ -159,10 +183,14 @@ const DEV_OVERRIDE_DEFAULTS = {
   STARTING_MODIFIER_OVERRIDE: [],
   WEATHER_OVERRIDE: WeatherType.NONE,
   STATUS_OVERRIDE: StatusEffect.NONE,
+  SHINY_OVERRIDE: null,
+  VARIANT_OVERRIDE: null,
   ENEMY_STATUS_OVERRIDE: StatusEffect.NONE,
   ENEMY_SPECIES_OVERRIDE: null,
   ENEMY_LEVEL_OVERRIDE: 0,
   ENEMY_ABILITY_OVERRIDE: AbilityId.NONE,
+  ENEMY_SHINY_OVERRIDE: null,
+  ENEMY_VARIANT_OVERRIDE: null,
   ENEMY_MOVESET_OVERRIDE: [],
   ENEMY_FORM_OVERRIDES: {},
   ER_BLACK_SHINY_PLAYER_OVERRIDE: null,
@@ -9248,6 +9276,40 @@ export const DEV_SCENARIOS: DevScenario[] = [
       return [
         makeStarter(SpeciesId.GARCHOMP, {
           moveset: [MoveId.EARTHQUAKE, MoveId.DRAGON_CLAW, MoveId.SWORDS_DANCE, MoveId.PROTECT],
+        }),
+      ];
+    },
+  },
+  {
+    label: "Shiny Lab FX: combat, party, summary",
+    description:
+      "Shiny Lab visual regression. Bulbasaur and the enemy Vulpix are forced shiny and both\n"
+      + "species are seeded with Duo Neon + Star Map + Static Field in Shiny Lab.\n"
+      + "CHECK 1: in combat, both player backsprite and enemy frontsprite show the equipped\n"
+      + "palette PLUS animated surface/aura FX, not the default shiny palette.\n"
+      + "CHECK 2: open the party screen; the Bulbasaur mini icon shows the Lab look.\n"
+      + "CHECK 3: open Bulbasaur SUMMARY from party; the large summary sprite shows the same\n"
+      + "palette/surface/aura layers and keeps animating.",
+    setup: () => {
+      resetDevOverrides();
+      seedShinyLabVisualLook(SpeciesId.BULBASAUR);
+      seedShinyLabVisualLook(SpeciesId.VULPIX);
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 35,
+        STARTING_WAVE_OVERRIDE: 5,
+        SHINY_OVERRIDE: true,
+        VARIANT_OVERRIDE: 0,
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.VULPIX,
+        ENEMY_LEVEL_OVERRIDE: 30,
+        ENEMY_SHINY_OVERRIDE: true,
+        ENEMY_VARIANT_OVERRIDE: 0,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.QUICK_ATTACK, MoveId.TAIL_WHIP, MoveId.EMBER, MoveId.CONFUSE_RAY],
+      });
+      return [
+        makeStarter(SpeciesId.BULBASAUR, {
+          shiny: true,
+          variant: 0,
+          moveset: [MoveId.VINE_WHIP, MoveId.TACKLE, MoveId.LEECH_SEED, MoveId.SLEEP_POWDER],
         }),
       ];
     },
