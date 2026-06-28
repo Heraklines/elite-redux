@@ -1,0 +1,273 @@
+----- BUG REPORT (in-game) -----
+version:  1.11.19
+url:      https://elite-redux.pages.dev/
+ua:       Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Mobile Safari/537.36
+mode:     4  wave:8  difficulty:youngster
+seed:     YceNXmkrKuoqXLKOQLpqZSBe
+party:    Rayquaza(L8 17/37), Scatterbug(L8 7/26), Marbeep(L5 23/23)
+
+----- DESCRIPTION -----
+Scatterbug was able to hit Sobble thru protect with Decorate after Sobble was moved to the middle in doubles
+
+----- CONSOLE -----
+[18:17:57.781] LOG: Applied X Speed 
+[18:17:57.782] LOG: Applied X Speed 
+[18:17:57.782] LOG: Applied X Speed 
+[18:17:57.782] LOG: %cStart Phase PostSummonPhase color:green;
+[18:17:57.782] LOG: Ran PSP for: Rayquaza
+[18:17:57.782] LOG: Applied X Speed 
+[18:17:57.783] LOG: Applied X Speed 
+[18:17:57.783] LOG: Applied X Speed 
+[18:17:57.784] LOG: Applied X Speed 
+[18:17:57.784] LOG: Applied X Speed 
+[18:17:57.784] LOG: Applied X Speed 
+[18:17:57.784] LOG: %cStart Phase PostSummonPhase color:green;
+[18:17:57.785] LOG: Applied X Speed 
+[18:17:57.785] LOG: Applied X Speed 
+[18:17:57.786] LOG: Applied X Speed 
+[18:17:57.786] LOG: Applied X Speed 
+[18:17:57.786] LOG: %cStart Phase PostSummonPhase color:green;
+[18:17:57.786] LOG: Applied X Speed 
+[18:17:57.787] LOG: Applied X Speed 
+[18:17:57.794] LOG: %cStart Phase ShowAbilityPhase color:green;
+[18:17:57.949] LOG: %cStart Phase MessagePhase color:green;
+[18:17:58.213] LOG: %cStart Phase HideAbilityPhase color:green;
+[18:17:58.249] LOG: %cStart Phase ShowAbilityPhase color:green;
+[18:17:58.416] LOG: %cStart Phase MessagePhase color:green;
+[18:17:58.671] LOG: %cStart Phase HideAbilityPhase color:green;
+[18:17:58.709] LOG: Applied X Speed 
+[18:17:58.710] LOG: %cStart Phase PostSummonPhase color:green;
+[18:17:58.711] LOG: Ran PSP for: Scatterbug
+[18:17:58.711] LOG: Applied X Speed 
+[18:17:58.712] LOG: Applied X Speed 
+[18:17:58.713] LOG: Applied X Speed 
+[18:17:58.714] LOG: %cStart Phase PostSummonPhase color:green;
+[18:17:58.715] LOG: Applied X Speed 
+[18:17:58.716] LOG: %cStart Phase PostSummonPhase color:green;
+[18:17:58.716] LOG: %cStart Phase PostSummonPhase color:green;
+[18:17:58.717] LOG: Ran PSP for: Rookidee
+[18:17:58.718] LOG: %cStart Phase PostSummonPhase color:green;
+[18:17:58.718] LOG: Applied X Speed 
+[18:17:58.719] LOG: Applied X Speed 
+[18:17:58.719] LOG: %cStart Phase ShowAbilityPhase color:green;
+[18:17:58.875] LOG: Applied X Speed 
+[18:17:58.876] LOG: Applied X Speed 
+[18:17:58.876] LOG: %cStart Phase StatStageChangePhase color:green;
+[18:17:59.064] LOG: %cStart Phase MessagePhase color:green;
+[18:17:59.289] LOG: %cStart Phase StatStageChangePhase color:green;
+[18:17:59.476] LOG: %cStart Phase MessagePhase color:green;
+[18:17:59.705] LOG: %cStart Phase HideAbilityPhase color:green;
+[18:17:59.743] LOG: %cStart Phase PostSummonPhase color:green;
+[18:17:59.743] LOG: %cStart Phase PostSummonPhase color:green;
+[18:17:59.743] LOG: Ran PSP for: Sobble
+[18:17:59.744] LOG: %cStart Phase PostSummonPhase color:green;
+[18:17:59.746] LOG: %cStart Phase ShowAbilityPhase color:green;
+[18:17:59.925] LOG: %cStart Phase MessagePhase color:green;
+[18:18:00.155] LOG: %cStart Phase HideAbilityPhase color:green;
+[18:18:00.191] LOG: %cStart Phase PostSummonPhase color:green;
+[18:18:00.191] LOG: %cStart Phase TurnInitPhase color:green;
+[18:18:00.191] LOG: %cStart Phase CommandPhase color:green;
+[18:18:02.953] LOG: Move: ANCIENT_POWER Move targets: {"targets":[2,3,1],"multiple":false} 
+Player Pokemon: Rayquaza
+[18:18:02.956] LOG: %cStart Phase SelectTargetPhase color:green;
+[18:18:03.629] LOG: %cStart Phase CommandPhase color:green;
+[18:18:03.971] LOG: %cStart Phase CommandPhase color:green;
+[18:18:04.894] LOG: Move: DRACONIC_FANGS Move targets: {"targets":[2,3,1],"multiple":false} 
+Player Pokemon: Rayquaza
+[18:18:04.897] LOG: %cStart Phase SelectTargetPhase color:green;
+[18:18:05.337] LOG: %cStart Phase CommandPhase color:green;
+[18:18:07.337] LOG: Move: DECORATE Move targets: {"targets":[2,3],"multiple":false} 
+Player Pokemon: Scatterbug
+[18:18:07.340] LOG: %cStart Phase SelectTargetPhase color:green;
+[18:18:07.753] LOG: %cStart Phase EnemyCommandPhase color:green;
+[18:18:07.754] LOG: Applied X Speed 
+[18:18:07.755] LOG: Applied X Speed 
+[18:18:07.756] LOG: Applied X Speed 
+[18:18:07.756] LOG: Applied X Speed 
+[18:18:07.759] LOG: Applied X Speed 
+[18:18:07.760] LOG: Applied X Speed 
+[18:18:07.763] WARN: BattlerTag ER_FROSTBITE is missing a score!
+[18:18:07.765] WARN: BattlerTag ER_FROSTBITE is missing a score!
+[18:18:07.765] WARN: BattlerTag ER_FROSTBITE is missing a score!
+[18:18:07.765] LOG: Battle Seed: kVsuqxdzkivAUrpL
+[18:18:07.766] WARN: BattlerTag ER_FROSTBITE is missing a score!
+[18:18:07.766] LOG: Move Pool: ["Chilling Water"]
+[18:18:07.766] LOG: Move Scores: [22.5]
+[18:18:07.766] LOG: Sorted Move Pool: ["Chilling Water"]
+[18:18:07.766] LOG: Chosen Move: Chilling Water
+[18:18:07.766] LOG: %cStart Phase EnemyCommandPhase color:green;
+[18:18:07.766] LOG: Applied X Speed 
+[18:18:07.767] LOG: Applied X Speed 
+[18:18:07.767] LOG: Applied X Speed 
+[18:18:07.767] LOG: Applied X Speed 
+[18:18:07.770] LOG: Applied X Speed 
+[18:18:07.770] LOG: Applied X Speed 
+[18:18:07.774] LOG: Move Pool: ["Gust","Hone Claws","Leer","Power Trip"]
+[18:18:07.774] LOG: Move Scores: [5.625,4,2,4]
+[18:18:07.774] LOG: Sorted Move Pool: ["Gust","Hone Claws","Power Trip","Leer"]
+[18:18:07.774] LOG: Chosen Move: Gust
+[18:18:07.774] LOG: %cStart Phase TurnStartPhase color:green;
+[18:18:07.775] LOG: Applied X Speed 
+[18:18:07.775] LOG: Applied X Speed 
+[18:18:07.776] LOG: Applied X Speed 
+[18:18:07.776] LOG: Applied X Speed 
+[18:18:07.776] LOG: Applied X Speed 
+[18:18:07.777] LOG: Applied X Speed 
+[18:18:07.777] LOG: Applied X Speed 
+[18:18:07.778] LOG: Applied X Speed 
+[18:18:07.778] LOG: Applied X Speed 
+[18:18:07.778] LOG: Applied X Speed 
+[18:18:07.779] LOG: Applied X Speed 
+[18:18:07.779] LOG: Applied X Speed 
+[18:18:07.780] LOG: Applied X Speed 
+[18:18:07.780] LOG: Applied X Speed 
+[18:18:07.780] LOG: %cStart Phase MovePhase color:green;
+[18:18:07.780] LOG: %cUser: Rookidee
+Move: GUST
+Use Mode: NORMAL color:orchid
+[18:18:07.781] LOG: Applied X Speed 
+[18:18:07.781] LOG: Applied X Speed 
+[18:18:07.781] LOG: Applied X Speed 
+[18:18:07.782] LOG: Applied X Speed 
+[18:18:07.782] LOG: Applied X Speed 
+[18:18:07.784] LOG: Applied X Speed 
+[18:18:07.784] LOG: Applied X Speed 
+[18:18:07.785] LOG: Applied X Speed 
+[18:18:07.785] LOG: Applied X Speed 
+[18:18:07.785] LOG: Applied X Speed 
+[18:18:07.786] LOG: %cStart Phase MessagePhase color:green;
+[18:18:07.864] LOG: %cStart Phase MoveEffectPhase color:green;
+[18:18:08.415] LOG: crit stage: +0
+[18:18:08.417] LOG: Move: Gust | Base damage: 6.224 | Power: 48 | Source attack: 10 | Target defense: 10
+[18:18:08.418] LOG: Move: Gust | Attack damage: 3
+[18:18:08.418] LOG: %cStart Phase DamageAnimPhase color:green;
+[18:18:08.450] LOG: %cStart Phase MessagePhase color:green;
+[18:18:08.680] LOG: %cStart Phase MoveEndPhase color:green;
+[18:18:08.681] LOG: Applied X Speed 
+[18:18:08.682] LOG: Applied X Speed 
+[18:18:08.682] LOG: Applied X Speed 
+[18:18:08.683] LOG: %cStart Phase MovePhase color:green;
+[18:18:08.683] LOG: %cUser: Rayquaza
+Move: DRACONIC_FANGS
+Use Mode: NORMAL color:orchid
+[18:18:08.683] LOG: Applied X Speed 
+[18:18:08.684] LOG: Applied X Speed 
+[18:18:08.685] LOG: Applied X Speed 
+[18:18:08.685] LOG: Applied X Speed 
+[18:18:08.686] LOG: Applied X Speed 
+[18:18:08.687] LOG: Applied X Speed 
+[18:18:08.689] LOG: Applied X Speed 
+[18:18:08.689] LOG: Applied X Speed 
+[18:18:08.689] LOG: Applied X Speed 
+[18:18:08.690] LOG: Applied X Speed 
+[18:18:08.690] LOG: %cStart Phase MessagePhase color:green;
+[18:18:08.828] LOG: %cStart Phase MoveEffectPhase color:green;
+[18:18:08.830] LOG: Applied X Accuracy 
+[18:18:09.357] LOG: crit stage: +0
+[18:18:09.359] LOG: Applied X Speed 
+[18:18:09.359] LOG: Applied X Speed 
+[18:18:09.359] LOG: Applied Dragon Fang 
+[18:18:09.360] LOG: Move: Draconic Fangs | Base damage: 37.36 | Power: 153 | Source attack: 20 | Target defense: 9
+[18:18:09.360] LOG: Move: Draconic Fangs | Attack damage: 49
+[18:18:09.361] LOG: %cStart Phase DamageAnimPhase color:green;
+[18:18:09.391] LOG: %cStart Phase FaintPhase color:green;
+[18:18:09.392] LOG: Applied X Speed 
+[18:18:09.392] LOG: Applied X Speed 
+[18:18:09.393] LOG: Applied X Speed 
+[18:18:09.394] LOG: Applied X Speed 
+[18:18:09.394] WARN: cry/821 not found
+[18:18:09.465] LOG: Applied X Speed 
+[18:18:09.466] LOG: Applied X Speed 
+[18:18:09.467] LOG: Applied X Speed 
+[18:18:09.468] LOG: Applied X Speed 
+[18:18:09.469] LOG: %cStart Phase MessagePhase color:green;
+[18:18:09.560] LOG: %cStart Phase VictoryPhase color:green;
+[18:18:09.561] LOG: %cStart Phase ExpPhase color:green;
+[18:18:09.807] LOG: %cStart Phase ExpPhase color:green;
+[18:18:10.070] LOG: %cStart Phase LevelUpPhase color:green;
+[18:18:10.071] LOG: %cStart Phase MoveEndPhase color:green;
+[18:18:10.073] LOG: Applied X Speed 
+[18:18:10.073] LOG: %cStart Phase MovePhase color:green;
+[18:18:10.073] LOG: %cUser: Scatterbug
+Move: DECORATE
+Use Mode: NORMAL color:orchid
+[18:18:10.073] LOG: Applied X Speed 
+[18:18:10.074] LOG: Applied X Speed 
+[18:18:10.074] LOG: Applied X Speed 
+[18:18:10.075] LOG: Applied X Speed 
+[18:18:10.076] LOG: Applied X Speed 
+[18:18:10.076] LOG: Applied X Speed 
+[18:18:10.077] LOG: Applied X Speed 
+[18:18:10.077] LOG: Applied X Speed 
+[18:18:10.078] LOG: %cStart Phase MessagePhase color:green;
+[18:18:10.205] LOG: %cStart Phase MoveEffectPhase color:green;
+[18:18:10.207] LOG: Applied X Accuracy 
+[18:18:10.782] LOG: crit stage: +0
+[18:18:10.783] LOG: Applied X Speed 
+[18:18:10.783] LOG: Applied X Speed 
+[18:18:10.784] LOG: Move: Decorate | Base damage: 9.04 | Power: 80 | Source attack: 11 | Target defense: 13
+[18:18:10.785] LOG: Move: Decorate | Attack damage: 8
+[18:18:10.785] LOG: Applied X Speed 
+[18:18:10.786] LOG: Applied X Speed 
+[18:18:10.786] LOG: Applied X Speed 
+[18:18:10.787] LOG: Applied X Speed 
+[18:18:10.787] LOG: %cStart Phase DamageAnimPhase color:green;
+[18:18:10.817] LOG: Applied X Speed 
+[18:18:10.818] LOG: Applied X Speed 
+[18:18:10.818] LOG: %cStart Phase StatStageChangePhase color:green;
+[18:18:10.818] LOG: Applied X Speed 
+[18:18:10.819] LOG: Applied X Speed 
+[18:18:10.819] LOG: %cStart Phase StatStageChangePhase color:green;
+[18:18:10.999] LOG: %cStart Phase MessagePhase color:green;
+[18:18:11.236] LOG: Applied X Speed 
+[18:18:11.238] LOG: Applied X Speed 
+[18:18:11.238] LOG: %cStart Phase StatStageChangePhase color:green;
+[18:18:11.426] LOG: %cStart Phase MessagePhase color:green;
+[18:18:11.672] LOG: %cStart Phase MessagePhase color:green;
+[18:18:11.905] LOG: %cStart Phase StatStageChangePhase color:green;
+[18:18:11.905] LOG: %cStart Phase StatStageChangePhase color:green;
+[18:18:12.101] LOG: %cStart Phase MessagePhase color:green;
+[18:18:12.347] LOG: %cStart Phase StatStageChangePhase color:green;
+[18:18:12.532] LOG: %cStart Phase MessagePhase color:green;
+[18:18:12.780] LOG: %cStart Phase MessagePhase color:green;
+[18:18:13.014] LOG: %cStart Phase MoveEndPhase color:green;
+[18:18:13.014] LOG: %cStart Phase MovePhase color:green;
+[18:18:13.014] LOG: %cUser: Sobble
+Move: CHILLING_WATER
+Use Mode: NORMAL color:orchid
+[18:18:13.015] LOG: Applied X Speed 
+[18:18:13.016] LOG: Applied X Speed 
+[18:18:13.017] LOG: Applied X Speed 
+[18:18:13.018] LOG: Applied X Speed 
+[18:18:13.022] LOG: Applied X Speed 
+[18:18:13.022] LOG: Applied X Speed 
+[18:18:13.023] LOG: Applied X Speed 
+[18:18:13.024] LOG: Applied X Speed 
+[18:18:13.025] LOG: %cStart Phase MessagePhase color:green;
+[18:18:13.155] LOG: %cStart Phase MoveEffectPhase color:green;
+[18:18:13.615] LOG: crit stage: +0
+[18:18:13.618] LOG: Move: Chilling Water | Base damage: 15.352727272727272 | Power: 90 | Source attack: 17 | Target defense: 11
+[18:18:13.619] LOG: Move: Chilling Water | Attack damage: 16
+[18:18:13.620] LOG: %cStart Phase DamageAnimPhase color:green;
+[18:18:13.649] LOG: %cStart Phase MoveEndPhase color:green;
+[18:18:13.649] LOG: %cStart Phase CheckInterludePhase color:green;
+[18:18:13.649] LOG: %cStart Phase WeatherEffectPhase color:green;
+[18:18:13.649] LOG: %cStart Phase PositionalTagPhase color:green;
+[18:18:13.649] LOG: %cStart Phase BerryPhase color:green;
+[18:18:13.650] LOG: Applied X Speed 
+[18:18:13.650] LOG: Applied X Speed 
+[18:18:13.651] LOG: Applied X Speed 
+[18:18:13.652] LOG: Applied X Speed 
+[18:18:13.652] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[18:18:13.653] LOG: Applied X Speed 
+[18:18:13.653] LOG: Applied X Speed 
+[18:18:13.654] LOG: Applied X Speed 
+[18:18:13.655] LOG: Applied X Speed 
+[18:18:13.655] LOG: %cStart Phase TurnEndPhase color:green;
+[18:18:13.665] LOG: Applied X Speed 
+[18:18:13.665] LOG: Applied X Speed 
+[18:18:13.666] LOG: Applied X Speed 
+[18:18:13.666] LOG: Applied X Speed 
+[18:18:13.666] WARN: [coop:turn] host recorder: finalize with NO open recording -> turn=-1 events=0 (caller decides not to emit)
+[18:18:13.666] LOG: %cStart Phase TurnInitPhase color:green;
+[18:18:13.666] LOG: %cStart Phase CommandPhase color:green;
