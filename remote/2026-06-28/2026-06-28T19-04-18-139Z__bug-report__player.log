@@ -1,0 +1,265 @@
+----- BUG REPORT (in-game) -----
+version:  1.11.19
+url:      https://elite-redux.pages.dev/
+ua:       Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36 Edg/149.0.0.0
+mode:     4  wave:188  difficulty:youngster
+seed:     8GA0FbJ3J5yOz8PXLz1rE2uL
+party:    Tyranitar Redux(L190 811/827), Infernape Redux(L188 679/679), Ratiking(L188 716/716), Lucineon(L188 519/519), Dreadnaut(L188 619/619), Mawile Redux(L188 511/511)
+
+----- DESCRIPTION -----
+Mega Tyranitar's Ability evaporate isn't working
+
+----- CONSOLE -----
+[19:03:26.493] LOG: Applied HP Up (enemy)
+[19:03:26.493] LOG: Applied Calcium (enemy)
+[19:03:26.493] LOG: Applied Protein (enemy)
+[19:03:26.494] LOG: Applied Calcium 
+[19:03:26.494] LOG: Applied Protein 
+[19:03:26.494] LOG: Applied Zinc 
+[19:03:26.494] LOG: Applied Carbos 
+[19:03:26.494] LOG: Applied HP Up 
+[19:03:26.494] LOG: Applied Soul Dew 
+[19:03:26.494] LOG: Applied Soul Dew 
+[19:03:26.496] LOG: Applied Mini Black Hole 
+[19:03:26.496] WARN: [coop:turn] host recorder: finalize with NO open recording -> turn=-1 events=0 (caller decides not to emit)
+[19:03:26.496] LOG: %cStart Phase MessagePhase color:green;
+[19:03:26.838] LOG: %cStart Phase TurnInitPhase color:green;
+[19:03:26.839] LOG: %cStart Phase CommandPhase color:green;
+[19:03:28.718] DEBUG: Session data saved to slot 0!
+[19:03:29.766] LOG: Seed: CtvnbwnYqbalf1lxiu3q53EM
+[19:03:29.766] LOG: Wave Seed: CtvnbwnYqbalf1lxiu3q53EM 0
+[19:03:29.926] WARN: AnimationManager key already exists: prompt
+[19:03:29.926] WARN: AnimationManager key already exists: tera_sparkle
+[19:03:29.926] LOG: Seed: 8J1ZHafHZx7fAlJralKAau2t
+[19:03:29.926] LOG: Wave Seed: 8J1ZHafHZx7fAlJralKAau2t 0
+[19:03:31.202] LOG: %cStart Phase LoginPhase color:green;
+[19:03:31.547] LOG: Client Session: hq7M5KXhDrkZo2YDGrJzHILu6OmMkqUq
+[19:03:31.856] LOG: %cStart Phase TitlePhase color:green;
+[19:03:31.856] LOG: Getting Session Slot id: %d 0
+[19:03:31.862] LOG: use seasonal splash messages true
+[19:03:31.862] LOG: Adding 2 Pride Month splash messages (weight: x15)
+[19:03:36.999] LOG: Getting Session Slot id: %d 0
+[19:03:37.004] LOG: Wave Seed: 8GA0FbJ3J5yOz8PXLz1rE2uL 0
+[19:03:37.005] LOG: Seed: 8GA0FbJ3J5yOz8PXLz1rE2uL
+[19:03:37.026] LOG: Wave Seed: ôăýìĂĞĆïĆñĵċĶôČĔĈĶíĮāîıĈ 188
+[19:03:37.060] LOG: Applied Calcium 
+[19:03:37.061] LOG: Applied Protein 
+[19:03:37.061] LOG: Applied Zinc 
+[19:03:37.061] LOG: Applied Carbos 
+[19:03:37.061] LOG: Applied HP Up 
+[19:03:37.061] LOG: Applied Soul Dew 
+[19:03:37.061] LOG: Applied Soul Dew 
+[19:03:37.063] LOG: Applied Calcium 
+[19:03:37.063] LOG: Applied Protein 
+[19:03:37.063] LOG: Applied Zinc 
+[19:03:37.063] LOG: Applied Carbos 
+[19:03:37.063] LOG: Applied HP Up 
+[19:03:37.063] LOG: Applied Soul Dew 
+[19:03:37.063] LOG: Applied Soul Dew 
+[19:03:37.064] LOG: Applied Calcium 
+[19:03:37.065] LOG: Applied Protein 
+[19:03:37.065] LOG: Applied Zinc 
+[19:03:37.065] LOG: Applied Carbos 
+[19:03:37.065] LOG: Applied HP Up 
+[19:03:37.065] LOG: Applied Soul Dew 
+[19:03:37.065] LOG: Applied Soul Dew 
+[19:03:37.066] LOG: Applied Iron (enemy)
+[19:03:37.066] LOG: Applied HP Up (enemy)
+[19:03:37.066] LOG: Applied Calcium (enemy)
+[19:03:37.066] LOG: Applied Protein (enemy)
+[19:03:37.066] LOG: Applied Zinc (enemy)
+[19:03:37.066] LOG: Applied Carbos (enemy)
+[19:03:37.066] LOG: Applied HP Up (enemy)
+[19:03:37.066] LOG: Applied Calcium (enemy)
+[19:03:37.067] LOG: Applied Carbos (enemy)
+[19:03:37.067] LOG: Applied Zinc (enemy)
+[19:03:37.067] LOG: Applied Calcium (enemy)
+[19:03:37.067] LOG: Applied Zinc (enemy)
+[19:03:37.067] LOG: Applied Carbos (enemy)
+[19:03:37.067] LOG: Applied Carbos (enemy)
+[19:03:37.067] LOG: Applied Protein (enemy)
+[19:03:37.067] LOG: Applied HP Up (enemy)
+[19:03:37.067] LOG: Applied HP Up (enemy)
+[19:03:37.067] LOG: Applied Iron (enemy)
+[19:03:37.067] LOG: Applied Calcium (enemy)
+[19:03:37.067] LOG: Applied Carbos (enemy)
+[19:03:37.105] LOG: %cStart Phase EncounterPhase color:green;
+[19:03:37.111] LOG: Pokemon: Foe Flygon | Species ID: 330 | Level: 179 | Nature: Hasty (+Spd/-Def)
+[19:03:37.111] LOG: Stats (IVs): HP: 550 (26), Atk: 434 (20), Def: 329 (26), Spatk: 445 (26), Spdef: 337 (26), Spd: 453 (27)
+[19:03:37.111] LOG: Ability: Amplifier | Passive Ability: Dragonfly 
+[19:03:37.111] LOG: Moveset: ["Struggle Bug","Scorching Sands","Attract","Draco Meteor"]
+[19:03:37.112] LOG: Pokemon: Foe Sandaconda | Species ID: 844 | Level: 182 | Nature: Rash (+SpAtk/-SpDef)
+[19:03:37.112] LOG: Stats (IVs): HP: 519 (22), Atk: 279 (21), Def: 498 (21), Spatk: 517 (22), Spdef: 298 (26), Spd: 392 (29)
+[19:03:37.112] LOG: Ability: Sand Rush | Passive Ability: Sand Spit 
+[19:03:37.112] LOG: Moveset: ["Scatter Blast","Shore Up","Tera Blast","Scary Face"]
+[19:03:37.112] LOG: Pokemon: Foe Goodra | Species ID: 706 | Level: 182 | Nature: Careful (+SpDef/-SpAtk)
+[19:03:37.112] LOG: Stats (IVs): HP: 561 (23), Atk: 419 (28), Def: 359 (25), Spatk: 410 (28), Spdef: 698 (22), Spd: 358 (18)
+[19:03:37.112] LOG: Ability: Gooey | Passive Ability: Adaptability 
+[19:03:37.112] LOG: Moveset: ["Draco Meteor","Water Pledge","Power Whip","Mystic Dance"]
+[19:03:37.112] LOG: Pokemon: Foe Turtonator | Species ID: 776 | Level: 182 | Nature: Quiet (+SpAtk/-Spd)
+[19:03:37.112] LOG: Stats (IVs): HP: 463 (29), Atk: 341 (29), Def: 547 (28), Spatk: 580 (21), Spdef: 394 (28), Spd: 187 (26)
+[19:03:37.112] LOG: Ability: Flame Shield | Passive Ability: Shell Armor 
+[19:03:37.112] LOG: Moveset: ["Scorched Earth","Shell Smash","Dragon Breath","Morning Sun"]
+[19:03:37.112] LOG: Pokemon: Foe Archaludon | Species ID: 1018 | Level: 190 | Nature: Naughty (+Atk/-SpDef)
+[19:03:37.112] LOG: Stats (IVs): HP: 635 (31), Atk: 543 (27), Def: 538 (21), Spatk: 529 (26), Spdef: 257 (18), Spd: 407 (26)
+[19:03:37.112] LOG: Ability: Light Metal | Passive Ability: Steel Barrel | Boss Bars: 2
+[19:03:37.112] LOG: Moveset: ["Rocket Shot","Draco Meteor","Ion Deluge","Autotomize"]
+[19:03:37.112] LOG: Pokemon: Foe Feraligatr Mega X | Species ID: 10504 | Level: 179 | Nature: Jolly (+Spd/-SpAtk)
+[19:03:37.112] LOG: Stats (IVs): HP: 708 (18), Atk: 611 (19), Def: 742 (22), Spatk: 469 (23), Spdef: 386 (27), Spd: 441 (19)
+[19:03:37.112] LOG: Ability: Crushing Jaw | Passive Ability: Riptide 
+[19:03:37.112] LOG: Moveset: ["Deathroll","Draconic Fangs","Dragon Dance","Scary Face"]
+[19:03:37.383] LOG: Generated AI funcs
+[19:03:37.383] LOG: Applied Iron (enemy)
+[19:03:37.383] LOG: Applied HP Up (enemy)
+[19:03:37.383] LOG: Applied Calcium (enemy)
+[19:03:37.383] LOG: Applied Protein (enemy)
+[19:03:37.383] LOG: Applied Zinc (enemy)
+[19:03:37.383] LOG: Applied Carbos (enemy)
+[19:03:37.383] LOG: Applied HP Up (enemy)
+[19:03:37.383] LOG: Applied Calcium (enemy)
+[19:03:37.383] LOG: Applied Carbos (enemy)
+[19:03:37.383] LOG: Applied Zinc (enemy)
+[19:03:37.384] LOG: Applied Calcium (enemy)
+[19:03:37.384] LOG: Applied Zinc (enemy)
+[19:03:37.384] LOG: Applied Carbos (enemy)
+[19:03:37.384] LOG: Applied Carbos (enemy)
+[19:03:37.384] LOG: Applied Protein (enemy)
+[19:03:37.384] LOG: Applied HP Up (enemy)
+[19:03:37.384] LOG: Applied HP Up (enemy)
+[19:03:37.384] LOG: Applied Iron (enemy)
+[19:03:37.384] LOG: Applied Calcium (enemy)
+[19:03:37.384] LOG: Applied Carbos (enemy)
+[19:03:37.384] LOG: Wave Seed: ôăýìĂĞĆïĆñĵċĶôČĔĈĶíĮāîıĈ 188
+[19:03:37.589] LOG: Elite Four Raihan
+[19:03:38.025] LOG: Dialogue saved as seen: dialogue:raihanElite.encounter.2
+[19:03:38.074] LOG: Elite Four Raihan
+[19:03:38.390] LOG: %cStart Phase SummonPhase color:green;
+[19:03:38.391] LOG: Raihan
+[19:03:38.523] LOG: Applied Iron (enemy)
+[19:03:38.523] LOG: Applied HP Up (enemy)
+[19:03:38.523] LOG: Applied Calcium (enemy)
+[19:03:38.523] LOG: Applied Protein (enemy)
+[19:03:38.525] LOG: Applied Zinc (enemy)
+[19:03:38.525] LOG: Applied Carbos (enemy)
+[19:03:38.525] LOG: Applied HP Up (enemy)
+[19:03:38.525] LOG: Applied Calcium (enemy)
+[19:03:38.525] LOG: Applied Carbos (enemy)
+[19:03:38.525] LOG: Applied Zinc (enemy)
+[19:03:38.525] LOG: Applied Calcium (enemy)
+[19:03:38.525] LOG: Applied Zinc (enemy)
+[19:03:38.525] LOG: Applied Carbos (enemy)
+[19:03:38.525] LOG: Applied Carbos (enemy)
+[19:03:38.525] LOG: Applied Protein (enemy)
+[19:03:38.525] LOG: Applied HP Up (enemy)
+[19:03:38.526] LOG: Applied HP Up (enemy)
+[19:03:38.526] LOG: Applied Iron (enemy)
+[19:03:38.526] LOG: Applied Calcium (enemy)
+[19:03:38.526] LOG: Applied Carbos (enemy)
+[19:03:38.655] LOG: %cStart Phase SummonPhase color:green;
+[19:03:38.805] LOG: Applied Calcium 
+[19:03:38.805] LOG: Applied Protein 
+[19:03:38.805] LOG: Applied Zinc 
+[19:03:38.805] LOG: Applied Carbos 
+[19:03:38.805] LOG: Applied HP Up 
+[19:03:38.805] LOG: Applied Soul Dew 
+[19:03:38.806] LOG: Applied Soul Dew 
+[19:03:38.838] WARN: cry/744 not found
+[19:03:38.938] LOG: %cStart Phase InitEncounterPhase color:green;
+[19:03:38.939] LOG: %cStart Phase PostSummonPhase color:green;
+[19:03:38.940] LOG: Ran PSP for: Flygon
+[19:03:38.940] LOG: Battle Seed: qv0PxcWRoj5O1SVw
+[19:03:38.940] LOG: %cStart Phase PostSummonPhase color:green;
+[19:03:38.941] LOG: %cStart Phase PostSummonPhase color:green;
+[19:03:38.942] LOG: %cStart Phase ShowAbilityPhase color:green;
+[19:03:39.122] LOG: %cStart Phase HideAbilityPhase color:green;
+[19:03:39.173] LOG: %cStart Phase PostSummonPhase color:green;
+[19:03:39.173] LOG: Ran PSP for: Mega Tyranitar Redux
+[19:03:39.173] LOG: %cStart Phase PostSummonPhase color:green;
+[19:03:39.174] LOG: %cStart Phase PostSummonPhase color:green;
+[19:03:39.174] LOG: %cStart Phase TurnInitPhase color:green;
+[19:03:39.174] LOG: %cStart Phase CommandPhase color:green;
+[19:03:46.175] LOG: Move: QUIVER_DANCE Move targets: {"targets":[0],"multiple":false} 
+Player Pokemon: Mega Tyranitar Redux
+[19:03:46.178] LOG: %cStart Phase EnemyCommandPhase color:green;
+[19:03:46.182] LOG: %cStart Phase TurnStartPhase color:green;
+[19:03:46.183] LOG: %cStart Phase SwitchSummonPhase color:green;
+[19:03:46.183] LOG: Raihan
+[19:03:46.455] LOG: Raihan
+[19:03:46.524] LOG: Applied HP Up (enemy)
+[19:03:46.524] LOG: Applied Iron (enemy)
+[19:03:46.524] LOG: Applied Calcium (enemy)
+[19:03:46.524] LOG: Applied Carbos (enemy)
+[19:03:46.524] LOG: Applied Zinc (enemy)
+[19:03:46.524] LOG: Applied Carbos (enemy)
+[19:03:46.524] LOG: Applied HP Up (enemy)
+[19:03:46.524] LOG: Applied Calcium (enemy)
+[19:03:46.524] LOG: Applied Carbos (enemy)
+[19:03:46.524] LOG: Applied Zinc (enemy)
+[19:03:46.524] LOG: Applied Calcium (enemy)
+[19:03:46.524] LOG: Applied Zinc (enemy)
+[19:03:46.524] LOG: Applied Carbos (enemy)
+[19:03:46.524] LOG: Applied Carbos (enemy)
+[19:03:46.524] LOG: Applied Protein (enemy)
+[19:03:46.524] LOG: Applied HP Up (enemy)
+[19:03:46.525] LOG: Applied Iron (enemy)
+[19:03:46.525] LOG: Applied HP Up (enemy)
+[19:03:46.525] LOG: Applied Calcium (enemy)
+[19:03:46.525] LOG: Applied Protein (enemy)
+[19:03:46.555] WARN: cry/10504 not found
+[19:03:46.673] LOG: %cStart Phase PostSummonPhase color:green;
+[19:03:46.674] LOG: Ran PSP for: Feraligatr Mega X
+[19:03:46.674] LOG: %cStart Phase PostSummonPhase color:green;
+[19:03:46.674] LOG: %cStart Phase PostSummonPhase color:green;
+[19:03:46.674] LOG: %cStart Phase MovePhase color:green;
+[19:03:46.674] LOG: %cUser: Mega Tyranitar Redux
+Move: QUIVER_DANCE
+Use Mode: NORMAL color:orchid
+[19:03:46.677] LOG: %cStart Phase MessagePhase color:green;
+[19:03:46.821] LOG: %cStart Phase MoveEffectPhase color:green;
+[19:03:47.239] LOG: %cStart Phase StatStageChangePhase color:green;
+[19:03:47.239] LOG: %cStart Phase StatStageChangePhase color:green;
+[19:03:47.424] LOG: %cStart Phase MessagePhase color:green;
+[19:03:47.671] LOG: %cStart Phase StatStageChangePhase color:green;
+[19:03:47.857] LOG: %cStart Phase MessagePhase color:green;
+[19:03:48.104] LOG: %cStart Phase StatStageChangePhase color:green;
+[19:03:48.291] LOG: %cStart Phase MessagePhase color:green;
+[19:03:48.538] LOG: %cStart Phase MoveEndPhase color:green;
+[19:03:48.538] LOG: %cStart Phase CheckInterludePhase color:green;
+[19:03:48.538] LOG: %cStart Phase WeatherEffectPhase color:green;
+[19:03:48.939] LOG: %cStart Phase PositionalTagPhase color:green;
+[19:03:48.939] LOG: %cStart Phase BerryPhase color:green;
+[19:03:48.940] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[19:03:48.940] LOG: %cStart Phase TurnEndPhase color:green;
+[19:03:48.943] LOG: Battle Seed: qv0PxcWRoj5O1SVw
+[19:03:48.943] LOG: Applied HP Up (enemy)
+[19:03:48.943] LOG: Applied Iron (enemy)
+[19:03:48.943] LOG: Applied Calcium (enemy)
+[19:03:48.943] LOG: Applied Carbos (enemy)
+[19:03:48.943] LOG: Applied Zinc (enemy)
+[19:03:48.943] LOG: Applied Carbos (enemy)
+[19:03:48.943] LOG: Applied HP Up (enemy)
+[19:03:48.943] LOG: Applied Calcium (enemy)
+[19:03:48.944] LOG: Applied Carbos (enemy)
+[19:03:48.944] LOG: Applied Zinc (enemy)
+[19:03:48.944] LOG: Applied Calcium (enemy)
+[19:03:48.944] LOG: Applied Zinc (enemy)
+[19:03:48.944] LOG: Applied Carbos (enemy)
+[19:03:48.944] LOG: Applied Carbos (enemy)
+[19:03:48.944] LOG: Applied Protein (enemy)
+[19:03:48.944] LOG: Applied HP Up (enemy)
+[19:03:48.944] LOG: Applied Iron (enemy)
+[19:03:48.944] LOG: Applied HP Up (enemy)
+[19:03:48.944] LOG: Applied Calcium (enemy)
+[19:03:48.944] LOG: Applied Protein (enemy)
+[19:03:48.945] LOG: Applied Calcium 
+[19:03:48.945] LOG: Applied Protein 
+[19:03:48.945] LOG: Applied Zinc 
+[19:03:48.945] LOG: Applied Carbos 
+[19:03:48.945] LOG: Applied HP Up 
+[19:03:48.945] LOG: Applied Soul Dew 
+[19:03:48.945] LOG: Applied Soul Dew 
+[19:03:48.948] LOG: Applied Mini Black Hole 
+[19:03:48.948] WARN: [coop:turn] host recorder: finalize with NO open recording -> turn=-1 events=0 (caller decides not to emit)
+[19:03:48.948] LOG: %cStart Phase MessagePhase color:green;
+[19:03:49.288] LOG: %cStart Phase TurnInitPhase color:green;
+[19:03:49.289] LOG: %cStart Phase CommandPhase color:green;
