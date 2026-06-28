@@ -35,6 +35,7 @@
 // =============================================================================
 
 import { globalScene } from "#app/global-scene";
+import { ensureErSpriteAnim } from "#data/elite-redux/er-form-sprite-redirect";
 import {
   ER_SHINY_LAB_DEFAULT_PARAMS,
   ER_SHINY_LAB_EFFECTS_BY_CATEGORY,
@@ -49,10 +50,15 @@ import {
   type ErShinyLabRarity,
   resolveErShinyLabEffectState,
 } from "#data/elite-redux/er-shiny-lab-effects";
-import { type ErShinyLabRenderedPixels, renderErShinyLabLook } from "#data/elite-redux/er-shiny-lab-renderer";
+import {
+  type ErShinyLabRenderedPixels,
+  type ErShinyLabSourcePixels,
+  renderErShinyLabLook,
+} from "#data/elite-redux/er-shiny-lab-renderer";
 import { Button } from "#enums/buttons";
 import { TextStyle } from "#enums/text-style";
 import { UiMode } from "#enums/ui-mode";
+import { readErShinyLabSpriteSourcePixels } from "#sprites/er-shiny-lab-sprite-fx";
 import { ensureErShinyLabPaletteVariantCache } from "#sprites/variant";
 import { addTextObject } from "#ui/text";
 import { UiHandler } from "#ui/ui-handler";
@@ -77,7 +83,7 @@ type Tab = ErShinyLabCategory | "tune";
 
 /** A row in the TUNE panel. */
 type TuneRow = "palAmt" | "surfAmt" | "aroAmt" | "scale" | "seed" | "load" | "save";
-type PreviewPixels = { width: number; height: number; data: Uint8ClampedArray };
+type PreviewPixels = ErShinyLabSourcePixels;
 
 const CATEGORIES: ErShinyLabCategory[] = ["palette", "surface", "around"];
 const TABS: Tab[] = ["palette", "surface", "around", "tune"];
@@ -477,10 +483,18 @@ export class ErShinyLabUiHandler extends UiHandler {
   private loadPreviewSprite(speciesId: number): void {
     const species = getPokemonSpecies(speciesId);
     const key = species.getSpriteKey(false, 0, false, 0);
+    let retryCount = 0;
     const apply = () => {
-      if (!this.active || !globalScene.textures.exists(key)) {
+      if (!this.active) {
         return;
       }
+      if (!globalScene.textures.exists(key)) {
+        if (retryCount++ < 10) {
+          globalScene.time.delayedCall(50, apply);
+        }
+        return;
+      }
+      ensureErSpriteAnim(key);
       this.previewSpriteKey = key;
       this.monSprite.setTexture(key);
       for (const glow of this.auraGlowSprites) {
@@ -528,47 +542,7 @@ export class ErShinyLabUiHandler extends UiHandler {
   }
 
   private readPreviewSourcePixels(key: string, sourceFrame?: Phaser.Textures.Frame | null): PreviewPixels | null {
-    try {
-      if (typeof document === "undefined" || !globalScene.textures.exists(key)) {
-        return null;
-      }
-      const texture = globalScene.textures.get(key) as Phaser.Textures.Texture & {
-        frames?: Record<string, Phaser.Textures.Frame>;
-      };
-      const textureSource = texture.source as unknown as
-        | { image?: CanvasImageSource }
-        | { image?: CanvasImageSource }[];
-      const source = (texture.getSourceImage?.()
-        ?? (Array.isArray(textureSource) ? textureSource[0]?.image : textureSource.image)
-        ?? null) as CanvasImageSource & { width?: number; height?: number };
-      if (!source) {
-        return null;
-      }
-      const frameValues = Object.values(texture.frames ?? {});
-      const frame =
-        sourceFrame
-        ?? (texture.firstFrame ? texture.frames?.[texture.firstFrame] : null)
-        ?? texture.frames?.__BASE
-        ?? frameValues[0]
-        ?? null;
-      const width = Math.floor(frame?.cutWidth ?? frame?.width ?? source.width ?? 0);
-      const height = Math.floor(frame?.cutHeight ?? frame?.height ?? source.height ?? 0);
-      if (width <= 0 || height <= 0) {
-        return null;
-      }
-
-      const canvas = document.createElement("canvas");
-      canvas.width = width;
-      canvas.height = height;
-      const ctx = canvas.getContext("2d", { willReadFrequently: true });
-      if (!ctx) {
-        return null;
-      }
-      ctx.drawImage(source, frame?.cutX ?? 0, frame?.cutY ?? 0, width, height, 0, 0, width, height);
-      return { width, height, data: ctx.getImageData(0, 0, width, height).data };
-    } catch {
-      return null;
-    }
+    return readErShinyLabSpriteSourcePixels(sourceFrame?.name == null ? { key } : { key, frame: sourceFrame.name });
   }
 
   private refreshExactPreview(loadout: ErShinyLabLoadout, params: ErShinyLabParams): boolean {
@@ -1204,19 +1178,17 @@ export class ErShinyLabUiHandler extends UiHandler {
     const count = this.effects().length;
     switch (button) {
       case Button.UP:
-        if (this.cursor > 0) {
-          this.cursor--;
+        if (count > 0) {
+          this.cursor = this.cursor > 0 ? this.cursor - 1 : count - 1;
           this.afterEffectMove();
-          return true;
         }
-        return false;
+        return true;
       case Button.DOWN:
-        if (this.cursor < count - 1) {
-          this.cursor++;
+        if (count > 0) {
+          this.cursor = this.cursor < count - 1 ? this.cursor + 1 : 0;
           this.afterEffectMove();
-          return true;
         }
-        return false;
+        return true;
       case Button.LEFT:
         this.switchTab(-1);
         return true;

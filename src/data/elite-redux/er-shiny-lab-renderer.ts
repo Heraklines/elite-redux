@@ -44,6 +44,13 @@ interface RenderAmounts {
   aro: number;
 }
 
+interface RenderPrep {
+  buf: Float32Array;
+  ef: Float32Array;
+  dist: ReturnType<typeof computeDist>;
+  clusters: ReturnType<typeof computeClusters>;
+}
+
 type FxContext = {
   e: number;
   sa: (x: number, y: number) => number[];
@@ -67,6 +74,35 @@ function toFloatBuffer(src: ErShinyLabSourcePixels): Float32Array | null {
     out[i + 3] = src.data[i + 3] / 255;
   }
   return out;
+}
+
+const renderPrepCache = new WeakMap<ErShinyLabSourcePixels, Map<number, RenderPrep>>();
+
+function getRenderPrep(source: ErShinyLabSourcePixels, width: number, height: number, pad: number): RenderPrep | null {
+  let byPad = renderPrepCache.get(source);
+  if (!byPad) {
+    byPad = new Map<number, RenderPrep>();
+    renderPrepCache.set(source, byPad);
+  }
+
+  const cached = byPad.get(pad);
+  if (cached) {
+    return cached;
+  }
+
+  const buf = toFloatBuffer({ width, height, data: source.data });
+  if (!buf) {
+    return null;
+  }
+
+  const prep: RenderPrep = {
+    buf,
+    ef: computeEdge(buf, width, height),
+    dist: computeDist(buf, width, height, pad),
+    clusters: computeClusters(buf, width, height, 5),
+  };
+  byPad.set(pad, prep);
+  return prep;
 }
 
 function makeSampler(buf: Float32Array, width: number, height: number): (x: number, y: number) => number[] {
@@ -121,19 +157,17 @@ export function renderErShinyLabLook(
 ): ErShinyLabRenderedPixels | null {
   const fw = Math.floor(source.width);
   const fh = Math.floor(source.height);
-  const buf = toFloatBuffer({ width: fw, height: fh, data: source.data });
-  if (!buf) {
+  const pad = Math.max(0, Math.floor(options?.pad ?? ER_SHINY_LAB_RENDER_PAD));
+  const prep = getRenderPrep(source, fw, fh, pad);
+  if (!prep) {
     return null;
   }
 
-  const pad = Math.max(0, Math.floor(options?.pad ?? ER_SHINY_LAB_RENDER_PAD));
+  const { buf, ef, dist, clusters } = prep;
   const pw = fw + 2 * pad;
   const ph = fh + 2 * pad;
   const out = new Uint8ClampedArray(pw * ph * 4);
   const rawSa = makeSampler(buf, fw, fh);
-  const ef = computeEdge(buf, fw, fh);
-  const dist = computeDist(buf, fw, fh, pad);
-  const clusters = computeClusters(buf, fw, fh, 5);
   const amounts = amountsFromParams(params);
 
   setFxParams(params.seed ?? 0, params.scale ?? 1);

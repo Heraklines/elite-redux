@@ -208,6 +208,7 @@ import {
   ErShinyLabSpriteFxOverlay,
   getErShinyLabPokemonBattleSource,
   getErShinyLabSpriteFxLookForSpecies,
+  getErShinyLabSpriteFxTime,
   hasErShinyLabExactSpriteFx,
 } from "#sprites/er-shiny-lab-sprite-fx";
 import { loadMoveAnimations } from "#sprites/pokemon-asset-loader";
@@ -382,7 +383,6 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
   private tintSprite: Phaser.GameObjects.Sprite | null = null;
   private erShinyLabFxOverlay: ErShinyLabSpriteFxOverlay | null = null;
   private erShinyLabFxTimer: Phaser.Time.TimerEvent | null = null;
-  private erShinyLabFxTick = 0;
 
   /**
    * The set of all TMs that have been used on this Pokémon
@@ -1566,7 +1566,6 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
         if (!this.active || !this.visible || !this.isOnField()) {
           return;
         }
-        this.erShinyLabFxTick = (this.erShinyLabFxTick + 1) % 60000;
         this.refreshErShinyLabBattleFx();
       },
     });
@@ -1577,9 +1576,15 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
     this.erShinyLabFxTimer = null;
   }
 
+  private restoreErShinyLabTintSprite(): void {
+    const sprite = this.getSprite();
+    this.tintSprite?.setTexture(sprite.texture.key, sprite.frame?.name).setOrigin(sprite.originX, sprite.originY);
+  }
+
   private refreshErShinyLabBattleFx(): void {
     const look = getErShinyLabSpriteFxLookForSpecies(this.species.speciesId, this.shiny);
     if (!this.erShinyLabFxOverlay || !hasErShinyLabExactSpriteFx(look)) {
+      this.restoreErShinyLabTintSprite();
       this.erShinyLabFxOverlay?.hide();
       this.stopErShinyLabBattleFxTimer();
       return;
@@ -1589,10 +1594,12 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
       ...getErShinyLabPokemonBattleSource(this, this.isPlayer(), undefined, look),
       frame: this.getSprite().frame?.name,
     };
-    if (this.erShinyLabFxOverlay.refresh(look, source, this.erShinyLabFxTick / 10)) {
+    if (this.erShinyLabFxOverlay.refresh(look, source, getErShinyLabSpriteFxTime())) {
+      this.erShinyLabFxOverlay.copyTextureTo(this.tintSprite);
       this.getSprite().setVisible(false);
       this.startErShinyLabBattleFxTimer();
     } else {
+      this.restoreErShinyLabTintSprite();
       this.erShinyLabFxOverlay.hide();
       this.stopErShinyLabBattleFxTimer();
     }

@@ -9,6 +9,7 @@ import {
   sanitizeErShinyLabLoadout,
 } from "#data/elite-redux/er-shiny-lab-effects";
 import {
+  ER_SHINY_LAB_RENDER_PAD,
   type ErShinyLabRenderedPixels,
   type ErShinyLabSourcePixels,
   renderErShinyLabLook,
@@ -17,7 +18,7 @@ import { Gender } from "#data/gender";
 import type { PokemonSpecies } from "#data/pokemon-species";
 import type { Variant } from "#sprites/variant";
 
-export const ER_SHINY_LAB_MINI_ICON_RENDER_PAD = 8;
+export const ER_SHINY_LAB_MINI_ICON_RENDER_PAD = 6;
 
 interface PokemonSpriteFormLike {
   getIconAtlasKey(formIndex?: number, shiny?: boolean, variant?: number): string;
@@ -77,7 +78,22 @@ interface RenderedTextureApplyOptions {
   sourceHeight: number;
   sourceOriginX: number;
   sourceOriginY: number;
+  cacheKey?: string;
 }
+
+type CachedSourcePixels = ErShinyLabSourcePixels & { frame: Phaser.Textures.Frame };
+
+interface RenderTextureCacheEntry {
+  textureKey: string;
+  lastUsed: number;
+  refCount: number;
+}
+
+const ER_SHINY_LAB_RENDER_TEXTURE_CACHE_MAX = 240;
+const sourcePixelCache = new Map<string, CachedSourcePixels>();
+const renderTextureCache = new Map<string, RenderTextureCacheEntry>();
+const renderTextureKeyToCacheKey = new Map<string, string>();
+let renderTextureCacheClock = 0;
 
 function spriteFxData(sprite: Phaser.GameObjects.Sprite): SpriteFxData {
   const data = sprite.pipelineData as Record<string, unknown>;
@@ -100,7 +116,7 @@ function nextTextureKey(prefix: string): string {
   return key;
 }
 
-function removeTexture(key?: string | null): void {
+function removeTextureNow(key?: string | null): void {
   if (!key) {
     return;
   }
@@ -112,6 +128,43 @@ function removeTexture(key?: string | null): void {
   } catch {
     // Texture cleanup is best-effort; stale generated keys should not break rendering.
   }
+}
+
+function evictRenderTextureCache(): void {
+  if (renderTextureCache.size <= ER_SHINY_LAB_RENDER_TEXTURE_CACHE_MAX) {
+    return;
+  }
+  const evictable = [...renderTextureCache.entries()]
+    .filter(([, entry]) => entry.refCount <= 0)
+    .sort(([, a], [, b]) => a.lastUsed - b.lastUsed);
+  for (const [cacheKey, entry] of evictable) {
+    if (renderTextureCache.size <= ER_SHINY_LAB_RENDER_TEXTURE_CACHE_MAX) {
+      return;
+    }
+    renderTextureCache.delete(cacheKey);
+    renderTextureKeyToCacheKey.delete(entry.textureKey);
+    removeTextureNow(entry.textureKey);
+  }
+}
+
+function releaseGeneratedTexture(key?: string | null): void {
+  if (!key) {
+    return;
+  }
+  const cacheKey = renderTextureKeyToCacheKey.get(key);
+  if (!cacheKey) {
+    removeTextureNow(key);
+    return;
+  }
+  const entry = renderTextureCache.get(cacheKey);
+  if (!entry) {
+    renderTextureKeyToCacheKey.delete(key);
+    removeTextureNow(key);
+    return;
+  }
+  entry.refCount = Math.max(0, entry.refCount - 1);
+  entry.lastUsed = ++renderTextureCacheClock;
+  evictRenderTextureCache();
 }
 
 function spriteSourceRef(key: string, frame?: string | number | null): ErShinyLabSpriteSourceRef {
@@ -148,6 +201,31 @@ function textureSourceImage(texture: Phaser.Textures.Texture): CanvasImageSource
   return sourceImage ?? (Array.isArray(source) ? source[0]?.image : source?.image) ?? null;
 }
 
+function sourcePixelCacheKey(source: ErShinyLabSpriteSourceRef, frame: Phaser.Textures.Frame): string {
+  return [
+    source.key,
+    frame.name,
+    frame.cutX,
+    frame.cutY,
+    frame.cutWidth,
+    frame.cutHeight,
+    frame.width,
+    frame.height,
+    frame.x,
+    frame.y,
+  ].join("|");
+}
+
+function renderTextureCacheKey(
+  source: ErShinyLabSpriteSourceRef,
+  look: ErShinyLabSpriteFxLook,
+  pad: number,
+  time: number,
+): string {
+  const finiteTime = Number.isFinite(time) ? time : 0;
+  return `${erShinyLabSpriteFxStateKey(source, look)}|pad=${pad}|t=${finiteTime.toFixed(2)}`;
+}
+
 export function readErShinyLabSpriteSourcePixels(
   source: ErShinyLabSpriteSourceRef,
 ): (ErShinyLabSourcePixels & { frame: Phaser.Textures.Frame }) | null {
@@ -161,8 +239,18 @@ export function readErShinyLabSpriteSourcePixels(
     if (!frame || !image) {
       return null;
     }
-    const width = Math.floor(frame.cutWidth ?? frame.width ?? image.width ?? 0);
-    const height = Math.floor(frame.cutHeight ?? frame.height ?? image.height ?? 0);
+    const cacheKey = sourcePixelCacheKey(source, frame);
+    const cached = sourcePixelCache.get(cacheKey);
+    if (cached) {
+      return cached;
+    }
+
+    const cutWidth = Math.floor(frame.cutWidth ?? frame.width ?? image.width ?? 0);
+    const cutHeight = Math.floor(frame.cutHeight ?? frame.height ?? image.height ?? 0);
+    const drawX = Math.floor(frame.x ?? 0);
+    const drawY = Math.floor(frame.y ?? 0);
+    const width = Math.max(Math.floor(frame.width ?? cutWidth), drawX + cutWidth, cutWidth);
+    const height = Math.max(Math.floor(frame.height ?? cutHeight), drawY + cutHeight, cutHeight);
     if (width <= 0 || height <= 0) {
       return null;
     }
@@ -175,14 +263,20 @@ export function readErShinyLabSpriteSourcePixels(
       return null;
     }
     ctx.clearRect(0, 0, width, height);
-    ctx.drawImage(image, frame.cutX ?? 0, frame.cutY ?? 0, width, height, 0, 0, width, height);
-    return { width, height, data: ctx.getImageData(0, 0, width, height).data, frame };
+    ctx.drawImage(image, frame.cutX ?? 0, frame.cutY ?? 0, cutWidth, cutHeight, drawX, drawY, cutWidth, cutHeight);
+    const pixels = { width, height, data: ctx.getImageData(0, 0, width, height).data, frame };
+    sourcePixelCache.set(cacheKey, pixels);
+    return pixels;
   } catch {
     return null;
   }
 }
 
-function textureFromRenderedPixels(rendered: ErShinyLabRenderedPixels, keyPrefix: string): string | null {
+function textureFromRenderedPixels(
+  rendered: ErShinyLabRenderedPixels,
+  keyPrefix: string,
+  cacheKey?: string,
+): string | null {
   try {
     if (typeof document === "undefined") {
       return null;
@@ -193,6 +287,20 @@ function textureFromRenderedPixels(rendered: ErShinyLabRenderedPixels, keyPrefix
     if (!textures.addCanvas) {
       return null;
     }
+
+    if (cacheKey) {
+      const cached = renderTextureCache.get(cacheKey);
+      if (cached && textures.exists(cached.textureKey)) {
+        cached.refCount++;
+        cached.lastUsed = ++renderTextureCacheClock;
+        return cached.textureKey;
+      }
+      if (cached) {
+        renderTextureCache.delete(cacheKey);
+        renderTextureKeyToCacheKey.delete(cached.textureKey);
+      }
+    }
+
     const canvas = document.createElement("canvas");
     canvas.width = rendered.width;
     canvas.height = rendered.height;
@@ -203,9 +311,14 @@ function textureFromRenderedPixels(rendered: ErShinyLabRenderedPixels, keyPrefix
     const image = ctx.createImageData(rendered.width, rendered.height);
     image.data.set(rendered.data);
     ctx.putImageData(image, 0, 0);
-    const key = nextTextureKey(keyPrefix);
+    const key = nextTextureKey(cacheKey ? "er-shiny-lab-fx-cache" : keyPrefix);
     const texture = textures.addCanvas(key, canvas);
     texture?.refresh();
+    if (cacheKey) {
+      renderTextureCache.set(cacheKey, { textureKey: key, lastUsed: ++renderTextureCacheClock, refCount: 1 });
+      renderTextureKeyToCacheKey.set(key, cacheKey);
+      evictRenderTextureCache();
+    }
     return key;
   } catch {
     return null;
@@ -217,7 +330,7 @@ function applyRenderedTextureToSprite(
   rendered: ErShinyLabRenderedPixels,
   options: RenderedTextureApplyOptions,
 ): string | null {
-  const key = textureFromRenderedPixels(rendered, options.keyPrefix);
+  const key = textureFromRenderedPixels(rendered, options.keyPrefix, options.cacheKey);
   if (!key) {
     return null;
   }
@@ -283,6 +396,13 @@ export function erShinyLabSpriteFxStateKey(
     params.seed,
     params.tintMode,
   ].join("|");
+}
+
+export function getErShinyLabSpriteFxTime(): number {
+  const now =
+    globalScene.time?.now
+    ?? (typeof performance !== "undefined" && Number.isFinite(performance.now()) ? performance.now() : Date.now());
+  return Math.floor(now / 100) / 10;
 }
 
 function baseVariantForPalette(look: ErShinyLabSpriteFxLook | null | undefined, variant: Variant): Variant {
@@ -385,7 +505,7 @@ export function clearErShinyLabSpriteFxTexture(sprite: Phaser.GameObjects.Sprite
   }
   data.key = null;
   data.state = undefined;
-  removeTexture(oldKey);
+  releaseGeneratedTexture(oldKey);
 }
 
 export function applyErShinyLabSpriteFxTexture(
@@ -422,6 +542,7 @@ export function applyErShinyLabSpriteFxTexture(
   }
 
   const oldKey = data.key;
+  const renderPad = options.renderPad ?? ER_SHINY_LAB_RENDER_PAD;
   const sourceOriginX = data.sourceOriginX ?? sprite.originX;
   const sourceOriginY = data.sourceOriginY ?? sprite.originY;
   const key = applyRenderedTextureToSprite(sprite, rendered, {
@@ -430,6 +551,7 @@ export function applyErShinyLabSpriteFxTexture(
     sourceHeight: sourcePixels.height,
     sourceOriginX,
     sourceOriginY,
+    cacheKey: renderTextureCacheKey(source, look, renderPad, options.time ?? 0),
   });
   if (!key) {
     clearErShinyLabSpriteFxTexture(sprite, true);
@@ -441,7 +563,11 @@ export function applyErShinyLabSpriteFxTexture(
   data.sourceOriginX = sourceOriginX;
   data.sourceOriginY = sourceOriginY;
   data.state = state;
-  removeTexture(oldKey);
+  if (oldKey === key) {
+    releaseGeneratedTexture(key);
+  } else {
+    releaseGeneratedTexture(oldKey);
+  }
   return true;
 }
 
@@ -450,6 +576,7 @@ export class ErShinyLabSpriteFxOverlay {
   private readonly baseSprite: Phaser.GameObjects.Sprite;
   private readonly keyPrefix: string;
   private key: string | null = null;
+  private state: string | null = null;
 
   constructor(baseSprite: Phaser.GameObjects.Sprite, keyPrefix: string) {
     this.baseSprite = baseSprite;
@@ -461,7 +588,34 @@ export class ErShinyLabSpriteFxOverlay {
     return this.sprite;
   }
 
+  isVisible(): boolean {
+    return this.sprite.visible && !!this.key;
+  }
+
+  copyTextureTo(target: Phaser.GameObjects.Sprite | null | undefined): boolean {
+    if (!target || !this.key || !globalScene.textures.exists(this.key)) {
+      return false;
+    }
+    target.setTexture(this.key).setOrigin(this.sprite.originX, this.sprite.originY);
+    return true;
+  }
+
+  private syncFromBase(): void {
+    this.sprite
+      .setPosition(this.baseSprite.x, this.baseSprite.y)
+      .setScale(this.baseSprite.scaleX || 1, this.baseSprite.scaleY || this.baseSprite.scaleX || 1)
+      .setAlpha(this.baseSprite.alpha)
+      .setFlip(this.baseSprite.flipX, this.baseSprite.flipY)
+      .setVisible(true);
+  }
+
   refresh(look: ErShinyLabSpriteFxLook, source: ErShinyLabSpriteSourceRef, time = 0): boolean {
+    const state = renderTextureCacheKey(source, look, ER_SHINY_LAB_RENDER_PAD, time);
+    if (this.state === state && this.key && globalScene.textures.exists(this.key)) {
+      this.syncFromBase();
+      return true;
+    }
+
     const sourcePixels = readErShinyLabSpriteSourcePixels(source);
     if (!sourcePixels) {
       this.hide();
@@ -479,26 +633,28 @@ export class ErShinyLabSpriteFxOverlay {
       sourceHeight: sourcePixels.height,
       sourceOriginX: this.baseSprite.originX,
       sourceOriginY: this.baseSprite.originY,
+      cacheKey: state,
     });
     if (!key) {
       this.hide();
       return false;
     }
     this.key = key;
-    this.sprite
-      .setPosition(this.baseSprite.x, this.baseSprite.y)
-      .setScale(this.baseSprite.scaleX || 1, this.baseSprite.scaleY || this.baseSprite.scaleX || 1)
-      .setAlpha(this.baseSprite.alpha)
-      .setFlip(this.baseSprite.flipX, this.baseSprite.flipY)
-      .setVisible(true);
-    removeTexture(oldKey);
+    this.state = state;
+    this.syncFromBase();
+    if (oldKey === key) {
+      releaseGeneratedTexture(key);
+    } else {
+      releaseGeneratedTexture(oldKey);
+    }
     return true;
   }
 
   hide(showBase = true): void {
     this.sprite.setVisible(false);
-    removeTexture(this.key);
+    releaseGeneratedTexture(this.key);
     this.key = null;
+    this.state = null;
     if (showBase) {
       this.baseSprite.setVisible(true);
     }

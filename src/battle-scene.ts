@@ -154,6 +154,7 @@ import {
   erShinyLabSpriteFxStateKey,
   getErShinyLabPokemonIconSource,
   getErShinyLabSpriteFxLookForSpecies,
+  getErShinyLabSpriteFxTime,
   hasErShinyLabAnySpriteFx,
   hasErShinyLabExactSpriteFx,
 } from "#sprites/er-shiny-lab-sprite-fx";
@@ -1359,16 +1360,17 @@ export class BattleScene extends SceneBase {
     if (hasErShinyLabAnySpriteFx(shinyLabLook)) {
       const source = getErShinyLabPokemonIconSource(pokemon, ignoreOverride, useIllusion, shinyLabLook);
       const baseState = erShinyLabSpriteFxStateKey(source, shinyLabLook);
-      let fxTick = 0;
       const exactFx = hasErShinyLabExactSpriteFx(shinyLabLook);
-      const refreshIconFx = () =>
+      const refreshIconFx = () => {
+        const fxTime = getErShinyLabSpriteFxTime();
         applyErShinyLabSpriteFxTexture(icon, shinyLabLook, {
           source,
           keyPrefix: `pokemon-icon-shiny-lab-fx-${pokemon.id}`,
-          time: fxTick / 10,
-          state: exactFx ? `${baseState}|${fxTick}` : baseState,
+          time: fxTime,
+          state: exactFx ? `${baseState}|${fxTime}` : baseState,
           renderPad: ER_SHINY_LAB_MINI_ICON_RENDER_PAD,
         });
+      };
       refreshIconFx();
       let fxTimer: Phaser.Time.TimerEvent | null = null;
       if (exactFx) {
@@ -1379,7 +1381,6 @@ export class BattleScene extends SceneBase {
             if (!container.active || !container.visible) {
               return;
             }
-            fxTick = (fxTick + 1) % 60000;
             refreshIconFx();
           },
         });

@@ -44,6 +44,7 @@ import {
   type ErShinyLabSpriteSourceRef,
   getErShinyLabPokemonSpriteSource,
   getErShinyLabSpriteFxLookForSpecies,
+  getErShinyLabSpriteFxTime,
   hasErShinyLabAnySpriteFx,
   hasErShinyLabExactSpriteFx,
 } from "#sprites/er-shiny-lab-sprite-fx";
@@ -120,7 +121,6 @@ export class SummaryUiHandler extends UiHandler {
   private pokemonSprite: Phaser.GameObjects.Sprite;
   private shinyLabFxOverlay: ErShinyLabSpriteFxOverlay | null = null;
   private shinyLabFxTimer: Phaser.Time.TimerEvent | null = null;
-  private shinyLabFxTick = 0;
   private shinyLabSummarySpriteLoadKey: string | null = null;
   private nameText: Phaser.GameObjects.Text;
   private splicedIcon: Phaser.GameObjects.Sprite;
@@ -532,7 +532,6 @@ export class SummaryUiHandler extends UiHandler {
       }
       this.pokemonSprite.pipelineData[k] = this.pokemon?.getSprite().pipelineData[k];
     });
-    this.shinyLabFxTick = 0;
     this.refreshShinyLabSummaryFx();
     this.pokemon.cry();
 
@@ -2053,7 +2052,6 @@ export class SummaryUiHandler extends UiHandler {
         if (!this.summaryContainer.visible || !this.pokemon) {
           return;
         }
-        this.shinyLabFxTick = (this.shinyLabFxTick + 1) % 60000;
         this.refreshShinyLabSummaryFx();
       },
     });
@@ -2134,7 +2132,7 @@ export class SummaryUiHandler extends UiHandler {
     const baseSource = getErShinyLabPokemonSpriteSource(this.pokemon, true, look);
     const frame = this.pokemonSprite.texture.key === baseSource.key ? this.pokemonSprite.frame?.name : null;
     const source = frame == null ? baseSource : { ...baseSource, frame };
-    if (this.shinyLabFxOverlay.refresh(look, source, this.shinyLabFxTick / 10)) {
+    if (this.shinyLabFxOverlay.refresh(look, source, getErShinyLabSpriteFxTime())) {
       this.pokemonSprite.setVisible(false);
       if (hasErShinyLabExactSpriteFx(look)) {
         this.startShinyLabSummaryFxTimer();

@@ -77,6 +77,7 @@ import {
   getErShinyLabSpriteFxLookForSpecies,
   hasErShinyLabAnySpriteFx,
   hasErShinyLabExactSpriteFx,
+  readErShinyLabSpriteSourcePixels,
 } from "#sprites/er-shiny-lab-sprite-fx";
 import type { Variant } from "#sprites/variant";
 import {
@@ -3515,6 +3516,7 @@ export class StarterSelectUiHandler extends MessageUiHandler {
       props.shiny,
       props.variant,
       `starter-party-shiny-lab-icon-${this.starterSpecies.length}-${species.speciesId}`,
+      false,
     );
 
     const { dexEntry, starterDataEntry } = this.getSpeciesData(species.speciesId);
@@ -3562,6 +3564,7 @@ export class StarterSelectUiHandler extends MessageUiHandler {
       props.shiny,
       props.variant,
       `starter-party-shiny-lab-icon-${index}-${species.speciesId}`,
+      false,
     );
   }
 
@@ -4031,6 +4034,7 @@ export class StarterSelectUiHandler extends MessageUiHandler {
         props.shiny,
         props.variant,
         `starter-grid-shiny-lab-icon-${currentFilteredContainer.species.speciesId}`,
+        false,
       );
     }
 
@@ -4853,10 +4857,11 @@ export class StarterSelectUiHandler extends MessageUiHandler {
     shiny: boolean,
     variant: number,
     keyPrefix: string,
+    restoreSourceOnClear = true,
   ): void {
     const look = getErShinyLabSpriteFxLookForSpecies(species.speciesId, shiny);
     if (!hasErShinyLabAnySpriteFx(look)) {
-      clearErShinyLabSpriteFxTexture(icon);
+      clearErShinyLabSpriteFxTexture(icon, restoreSourceOnClear);
       return;
     }
     const source = getErShinyLabSpeciesIconSource(species, female, formIndex, shiny, variant as Variant, look);
@@ -4869,6 +4874,12 @@ export class StarterSelectUiHandler extends MessageUiHandler {
       state: exactFx ? `${baseState}|${this.shinyLabFxTick}` : baseState,
       renderPad: ER_SHINY_LAB_MINI_ICON_RENDER_PAD,
     });
+  }
+
+  private resetStarterIconSlot(index: number): void {
+    const icon = this.starterIcons[index];
+    clearErShinyLabSpriteFxTexture(icon, false);
+    icon.setTexture("pokemon_icons_0").setFrame("unknown");
   }
 
   private refreshVisibleShinyLabIconFx(): void {
@@ -4903,7 +4914,7 @@ export class StarterSelectUiHandler extends MessageUiHandler {
       );
     }
     for (let i = this.starterSpecies.length; i < this.starterIcons.length; i++) {
-      clearErShinyLabSpriteFxTexture(this.starterIcons[i]);
+      this.resetStarterIconSlot(i);
     }
   }
 
@@ -4956,51 +4967,7 @@ export class StarterSelectUiHandler extends MessageUiHandler {
     key: string,
     sourceFrame?: Phaser.Textures.Frame | null,
   ): ErShinyLabSourcePixels | null {
-    try {
-      if (typeof document === "undefined" || !globalScene.textures.exists(key)) {
-        return null;
-      }
-      const texture = globalScene.textures.get(key) as Phaser.Textures.Texture & {
-        frames?: Record<string, Phaser.Textures.Frame>;
-        getSourceImage?: () => CanvasImageSource | null;
-        source?: { image?: CanvasImageSource } | { image?: CanvasImageSource }[];
-      };
-      const textureSource = texture.source as unknown as
-        | { image?: CanvasImageSource }
-        | { image?: CanvasImageSource }[]
-        | undefined;
-      const source = (texture.getSourceImage?.()
-        ?? (Array.isArray(textureSource) ? textureSource[0]?.image : textureSource?.image)
-        ?? null) as CanvasImageSource & { width?: number; height?: number };
-      if (!source) {
-        return null;
-      }
-      const frameValues = Object.values(texture.frames ?? {});
-      const frame =
-        sourceFrame
-        ?? (texture.firstFrame ? texture.frames?.[texture.firstFrame] : null)
-        ?? texture.frames?.__BASE
-        ?? frameValues[0]
-        ?? null;
-      const width = Math.floor(frame?.cutWidth ?? frame?.width ?? source.width ?? 0);
-      const height = Math.floor(frame?.cutHeight ?? frame?.height ?? source.height ?? 0);
-      if (width <= 0 || height <= 0) {
-        return null;
-      }
-
-      const canvas = document.createElement("canvas");
-      canvas.width = width;
-      canvas.height = height;
-      const ctx = canvas.getContext("2d", { willReadFrequently: true });
-      if (!ctx) {
-        return null;
-      }
-      ctx.clearRect(0, 0, width, height);
-      ctx.drawImage(source, frame?.cutX ?? 0, frame?.cutY ?? 0, width, height, 0, 0, width, height);
-      return { width, height, data: ctx.getImageData(0, 0, width, height).data };
-    } catch {
-      return null;
-    }
+    return readErShinyLabSpriteSourcePixels(sourceFrame?.name == null ? { key } : { key, frame: sourceFrame.name });
   }
 
   private applyShinyLabFxTexture(rendered: ErShinyLabRenderedPixels): boolean {
@@ -5566,6 +5533,7 @@ export class StarterSelectUiHandler extends MessageUiHandler {
             shiny ?? false,
             variant ?? 0,
             `starter-grid-shiny-lab-icon-${currentFilteredContainer.species.speciesId}`,
+            false,
           );
         }
 
@@ -5851,6 +5819,7 @@ export class StarterSelectUiHandler extends MessageUiHandler {
         props.shiny,
         props.variant,
         `starter-party-shiny-lab-icon-${s}-${species.speciesId}`,
+        false,
       );
       if (s >= index) {
         this.starterCursorObjs[s]
@@ -5859,8 +5828,7 @@ export class StarterSelectUiHandler extends MessageUiHandler {
       }
     }
     this.starterCursorObjs[this.starterSpecies.length].setVisible(false);
-    clearErShinyLabSpriteFxTexture(this.starterIcons[this.starterSpecies.length], false);
-    this.starterIcons[this.starterSpecies.length].setTexture("pokemon_icons_0").setFrame("unknown");
+    this.resetStarterIconSlot(this.starterSpecies.length);
 
     if (this.starterIconsCursorObj.visible) {
       if (this.starterIconsCursorIndex === this.starterSpecies.length) {
