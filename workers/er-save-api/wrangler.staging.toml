@@ -14,8 +14,13 @@ database_id = "7dc09f64-6810-4756-8c0f-e44f7d382eed"
 ALLOWED_ORIGIN = "*"
 MIN_USERNAME_LENGTH = "3"
 MIN_PASSWORD_LENGTH = "6"
+PUBLISH_USAGE_TIERS = "0"
+USAGE_TIER_SOURCE = "staging"
+USAGE_TIER_MIN_PLAYERS = "500"
+USAGE_TIER_MIN_RUNS = "5000"
 
-# ER (#384): nightly usage-tier aggregation - ONE invocation per day.
+# Cron may be present for parity, but PUBLISH_USAGE_TIERS=0 + USAGE_TIER_SOURCE=staging
+# makes staging read-only for the shared er-assets usage-tiers.json feed.
 [triggers]
 crons = ["0 4 * * *"]
 

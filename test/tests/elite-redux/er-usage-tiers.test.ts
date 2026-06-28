@@ -41,10 +41,10 @@ describe("ER usage tiers (M5cap policy)", () => {
     const data = {
       generatedAt: "t",
       windowDays: 30,
-      baseWinPct: 6.3, // raw-win floor = 12.6%
+      baseWinPct: 6.3,
       lines: {
-        [MAGIKARP]: line(-5, -5), // weakest -> NU
-        [SPOINK]: line(-4.5, -4.5, 1, 20), // would be NU, but 20% win >= 2x base -> floored to PU
+        [MAGIKARP]: line(-5, -5, 1, 4), // weakest, but still below average -> NU
+        [SPOINK]: line(-4.5, -4.5, 1, 20), // would be NU, but above-average win -> floored to PU
         [MINCCINO]: line(-4, -4, 12, 1), // would be NU, but 12% usage > 8% cap -> RU
         [GEODUDE]: line(-3, -3), // -> PU
         [TANGELA]: line(-1, -1), // -> RU
@@ -55,7 +55,7 @@ describe("ER usage tiers (M5cap policy)", () => {
     const m = await loadWith(data);
     expect(m.hasErUsageTierData()).toBe(true);
     // tier index 0=OU .. 4=NU
-    expect(m.getErLineTier(MAGIKARP)).toBe(4); // NU
+    expect(m.getErLineTier(MAGIKARP)).toBe(4); // NU; catches the old hardcoded 3% floor regression
     expect(m.getErLineTier(GEODUDE)).toBe(3); // PU
     expect(m.getErLineTier(TANGELA)).toBe(2); // RU
     expect(m.getErLineTier(TOGEPI)).toBe(1); // UU

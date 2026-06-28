@@ -39,6 +39,13 @@ interface Env {
   MIN_PASSWORD_LENGTH?: string;
   /** PAT with push access to Heraklines/er-assets (usage-tiers cron). Set via `wrangler secret put`. */
   ER_ASSETS_TOKEN?: string;
+  /** Explicit prod-only switch for publishing the shared usage-tiers asset. */
+  PUBLISH_USAGE_TIERS?: string;
+  /** Deployment marker used to keep staging/dev from publishing global tier data. */
+  USAGE_TIER_SOURCE?: string;
+  /** Refuse to publish usage tiers from a too-small 30-day sample. */
+  USAGE_TIER_MIN_PLAYERS?: string;
+  USAGE_TIER_MIN_RUNS?: string;
 }
 
 interface UserRow {
@@ -1403,12 +1410,34 @@ async function ensureRunStatColumns(env: Env): Promise<void> {
 // deduped usage %, raw win % + avg wave, and the SKILL-ADJUSTED win/wave lift
 // (each run scored vs the picking player's OWN average, EB-shrunk, to strip the
 // player-skill confound). The CLIENT bins these into OU/UU/RU/PU/NU (rank ->
-// blend -> quantile -> usage-cap -> egg gate). Skips when ER_ASSETS_TOKEN unset.
+// blend -> quantile -> usage-cap -> egg gate). Prod-only: staging workers must
+// never overwrite the shared er-assets feed with their smaller staging D1 sample.
 // =============================================================================
 const USAGE_TIER_CHALLENGE_ID = 12; // Challenges.USAGE_TIER - excluded from usage stats
 
+export function canPublishUsageTiers(
+  env: Pick<Env, "PUBLISH_USAGE_TIERS" | "USAGE_TIER_SOURCE" | "ER_ASSETS_TOKEN">,
+): boolean {
+  return env.PUBLISH_USAGE_TIERS === "1" && env.USAGE_TIER_SOURCE === "prod" && !!env.ER_ASSETS_TOKEN;
+}
+
+const usageTierMin = (value: string | undefined, fallback: number): number => {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+};
+
+export function hasPublishableUsageTierSample(
+  env: Pick<Env, "USAGE_TIER_MIN_PLAYERS" | "USAGE_TIER_MIN_RUNS">,
+  players: number,
+  runs: number,
+): boolean {
+  return (
+    players >= usageTierMin(env.USAGE_TIER_MIN_PLAYERS, 500) && runs >= usageTierMin(env.USAGE_TIER_MIN_RUNS, 5000)
+  );
+}
+
 async function computeAndPublishUsageTiers(env: Env): Promise<void> {
-  if (!env.ER_ASSETS_TOKEN) {
+  if (!canPublishUsageTiers(env)) {
     return;
   }
   await ensureRunStatColumns(env);
@@ -1476,6 +1505,12 @@ async function computeAndPublishUsageTiers(env: Env): Promise<void> {
   }
   if (players.size === 0) {
     return; // No starter-tagged runs yet - keep the seed file as-is.
+  }
+  if (!hasPublishableUsageTierSample(env, players.size, runs.length)) {
+    console.warn(
+      `[usage-tiers] refusing to publish from too-small sample: players=${players.size}, runs=${runs.length}`,
+    );
+    return;
   }
   let gWinSum = 0;
   let gWaveSum = 0;
@@ -1550,6 +1585,10 @@ async function computeAndPublishUsageTiers(env: Env): Promise<void> {
     windowDays: 30,
     players: players.size,
     runs: runs.length,
+    source: {
+      generatedBy: "er-save-api-cron",
+      publisher: env.USAGE_TIER_SOURCE,
+    },
     baseWinPct: r2((100 * gWinSum) / runs.length),
     globalWave: gWaveN ? Math.round((10 * gWaveSum) / gWaveN) / 10 : 0,
     lines,

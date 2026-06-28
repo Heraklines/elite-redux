@@ -53,13 +53,9 @@ const BLEND_WIN = 0.5;
 const TIER_CUTS = [0.35, 0.6, 0.8, 0.92] as const;
 /** A common-egg line picked by MORE than this % of players cannot sit in PU/NU. */
 const USAGE_CAP_PCT = 8;
-/** NU is reserved for mons that genuinely LOSE. A line whose RAW win rate is ABOVE
- *  this percent can't be NU - a 3%+ winner is not "the weakest tier", whatever its
- *  skill-adjusted lift (its pickers just happen to do even better with OTHER mons). */
-const NU_MAX_WIN_PCT = 3;
-/** ...and only when there's enough evidence to trust the low rate: a line picked
- *  FEWER than this many times can't be NU (a 0% win on a handful of picks is noise,
- *  not proof it's bad) - it falls back to PU until the data fills in. */
+/** Baseline win % fallback when the published data omits it (old json / offline). */
+const DEFAULT_BASE_WIN_PCT = 6.3;
+/** Minimum evidence before a low win rate can put a line in NU. */
 const NU_MIN_SAMPLE = 10;
 
 /** Tier index a line can be AT MOST given its egg tier (higher index = lower tier). */
@@ -142,6 +138,11 @@ const eggTierOf = (rootSpeciesId: number): EggTier =>
 
 const isCommonEgg = (rootSpeciesId: number): boolean => eggTierOf(rootSpeciesId) <= EggTier.COMMON;
 
+const pct = (value: number | undefined, fallback = 0): number => {
+  const n = value ?? fallback;
+  return n > 0 && n <= 1 ? n * 100 : n;
+};
+
 /** Legacy usage band (NON-common lines): the strictest tier a usage % qualifies for. */
 function usageBand(usagePct: number): number {
   const gates = erBalanceArr("er.usageTiers.gates");
@@ -170,6 +171,7 @@ function getTierMap(): Map<number, number> {
     tierMap = map;
     return map;
   }
+  const baseWin = pct(data.baseWinPct, DEFAULT_BASE_WIN_PCT);
   // SAFETY: only run the performance model on NEW-FORMAT data (the cron stamps
   // baseWinPct). An OLD or CDN-stale json lacks the lift signals, so every common-egg
   // line would rank identically and collapse into one tier - fall back to the legacy
@@ -204,10 +206,10 @@ function getTierMap(): Map<number, number> {
       if (tier >= 3 && (line.usagePct ?? 0) > USAGE_CAP_PCT) {
         tier = 2; // popular line -> can't sit in PU/NU
       }
-      // NU floor: keep a line NU only if it BOTH wins at/below NU_MAX_WIN_PCT AND has
-      // enough picks to trust that rate. An above-3% winner OR a too-thin sample is
-      // bumped to PU ("weak but not a proven loser").
-      if (tier === 4 && ((line.win ?? 0) > NU_MAX_WIN_PCT || (line.sample ?? NU_MIN_SAMPLE) < NU_MIN_SAMPLE)) {
+      // NU floor: keep a line NU only if it BOTH wins at/below the global average
+      // and has enough picks to trust that rate. Above-average winners or too-thin
+      // samples are bumped to PU ("weak but not a proven loser").
+      if (tier === 4 && (pct(line.win) > baseWin || (line.sample ?? NU_MIN_SAMPLE) < NU_MIN_SAMPLE)) {
         tier = 3;
       }
       map.set(id, tier);

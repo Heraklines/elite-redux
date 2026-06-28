@@ -12,11 +12,16 @@ const eggBandIndex = e => (e === 3 ? 0 : e === 2 ? 1 : e === 1 ? 2 : 4);
 const tierFor = (pct, eggTier) => TIERS[Math.min(usageBandIndex(pct), eggBandIndex(eggTier))];
 const M5_CUTS = [0.35, 0.6, 0.8, 0.92];
 const M5_USAGE_CAP = 8;
-const M5_WIN_FLOOR_MULT = 2;
+const M5_DEFAULT_BASE_WIN = 6.3;
+const M5_NU_MIN_SAMPLE = 10;
+const pct = (value, fallback = 0) => {
+  const n = value ?? fallback;
+  return n > 0 && n <= 1 ? n * 100 : n;
+};
 function computeM5capTiers() {
   const map = new Map();
   const lines = usage.lines;
-  const baseWin = typeof usage.baseWinPct === "number" ? usage.baseWinPct : 6.3;
+  const baseWin = pct(usage.baseWinPct, M5_DEFAULT_BASE_WIN);
   const hasPerf = typeof usage.baseWinPct === "number";
   const eggById = new Map();
   for (const mon of DEX) {
@@ -45,7 +50,7 @@ function computeM5capTiers() {
       if (t >= 3 && (l.usagePct ?? 0) > M5_USAGE_CAP) {
         t = 2;
       }
-      if (t === 4 && (l.win ?? 0) >= M5_WIN_FLOOR_MULT * baseWin) {
+      if (t === 4 && (pct(l.win) > baseWin || (l.sample ?? M5_NU_MIN_SAMPLE) < M5_NU_MIN_SAMPLE)) {
         t = 3;
       }
       map.set(id, TIERS[t]);

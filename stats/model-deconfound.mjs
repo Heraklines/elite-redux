@@ -151,6 +151,9 @@ for (const r of rows) {
   if (r.common && r.usage > CAP && ti(t) >= 3) {
     t = "RU";
   }
+  if (r.common && t === "NU" && (r.win > baseWin || r.n < 10)) {
+    t = "PU";
+  }
   r.m5cap = t;
 }
 

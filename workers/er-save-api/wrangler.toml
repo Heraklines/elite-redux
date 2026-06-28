@@ -26,6 +26,10 @@ ALLOWED_ORIGIN = "*"
 # Minimum lengths enforced server-side at registration.
 MIN_USERNAME_LENGTH = "3"
 MIN_PASSWORD_LENGTH = "6"
+PUBLISH_USAGE_TIERS = "1"
+USAGE_TIER_SOURCE = "prod"
+USAGE_TIER_MIN_PLAYERS = "500"
+USAGE_TIER_MIN_RUNS = "5000"
 
 # ER (#384): nightly usage-tier aggregation - ONE invocation per day.
 [triggers]

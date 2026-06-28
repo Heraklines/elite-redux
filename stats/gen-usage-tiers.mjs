@@ -10,6 +10,8 @@ import fs from "node:fs";
 const OUT = process.argv[2] || "stats/data/usage-tiers.json";
 const USAGE_TIER_CHALLENGE_ID = 12;
 const K = 20;
+const MIN_PLAYERS = Number(process.env.ER_USAGE_TIER_MIN_PLAYERS ?? 500);
+const MIN_RUNS = Number(process.env.ER_USAGE_TIER_MIN_RUNS ?? 5000);
 const runsRaw = JSON.parse(fs.readFileSync(new URL("data/_runs.json", import.meta.url), "utf8"))[0].results;
 
 const runs = [];
@@ -50,6 +52,11 @@ for (const r of runs) {
     p.waveSum += r.wave;
     p.waveN++;
   }
+}
+if (players.size < MIN_PLAYERS || runs.length < MIN_RUNS) {
+  throw new Error(
+    `Refusing to generate usage tiers from too-small sample: players=${players.size}/${MIN_PLAYERS}, runs=${runs.length}/${MIN_RUNS}`,
+  );
 }
 let gWinSum = 0;
 let gWaveSum = 0;
@@ -104,6 +111,10 @@ const payload = {
   windowDays: 30,
   players: players.size,
   runs: runs.length,
+  source: {
+    generatedBy: "stats/gen-usage-tiers.mjs",
+    publisher: "prod-d1-dump",
+  },
   baseWinPct: r2((100 * gWinSum) / runs.length),
   globalWave: gWaveN ? Math.round((10 * gWaveSum) / gWaveN) / 10 : 0,
   lines,
