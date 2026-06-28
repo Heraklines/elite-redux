@@ -41,11 +41,13 @@ import {
   type ErShinyLabConfig,
   type ErShinyLabEffect,
   type ErShinyLabEffectState,
+  type ErShinyLabLoadout,
   type ErShinyLabParams,
   type ErShinyLabPreset,
   type ErShinyLabRarity,
   resolveErShinyLabEffectState,
 } from "#data/elite-redux/er-shiny-lab-effects";
+import { type ErShinyLabRenderedPixels, renderErShinyLabLook } from "#data/elite-redux/er-shiny-lab-renderer";
 import { Button } from "#enums/buttons";
 import { TextStyle } from "#enums/text-style";
 import { UiMode } from "#enums/ui-mode";
@@ -74,6 +76,7 @@ type Tab = ErShinyLabCategory | "tune";
 /** A row in the TUNE panel. */
 type TuneRow = "palAmt" | "surfAmt" | "aroAmt" | "scale" | "seed" | "load" | "save";
 type VariantPaletteMap = Record<number, Record<string, string>>;
+type PreviewPixels = { width: number; height: number; data: Uint8ClampedArray };
 
 const CATEGORIES: ErShinyLabCategory[] = ["palette", "surface", "around"];
 const TABS: Tab[] = ["palette", "surface", "around", "tune"];
@@ -159,8 +162,11 @@ export class ErShinyLabUiHandler extends UiHandler {
   private auraRing: Phaser.GameObjects.Ellipse;
   private auraOuterRing: Phaser.GameObjects.Ellipse;
   private auraSparkles: Phaser.GameObjects.Rectangle[] = [];
+  private auraGlowSprites: Phaser.GameObjects.Sprite[] = [];
   private monSprite: Phaser.GameObjects.Sprite;
+  private fxSprite: Phaser.GameObjects.Sprite;
   private surfaceFx: Phaser.GameObjects.Container;
+  private surfaceMask: Phaser.Display.Masks.BitmapMask | null = null;
   private surfaceWash: Phaser.GameObjects.Ellipse;
   private surfaceLines: Phaser.GameObjects.Rectangle[] = [];
   private surfaceSparks: Phaser.GameObjects.Rectangle[] = [];
@@ -207,6 +213,9 @@ export class ErShinyLabUiHandler extends UiHandler {
   private saveSel = 0;
   private openedAt = 0;
   private previewSpriteKey: string | null = null;
+  private previewSourcePixels: PreviewPixels | null = null;
+  private previewFxKey: string | null = null;
+  private previewFxVersion = 0;
 
   constructor() {
     super(UiMode.ER_SHINY_LAB);
@@ -265,6 +274,11 @@ export class ErShinyLabUiHandler extends UiHandler {
       this.container.add(sparkle);
       this.auraSparkles.push(sparkle);
     }
+    for (let i = 0; i < 2; i++) {
+      const glow = globalScene.add.sprite(cx, cy, "unknown").setOrigin(0.5, 0.5).setVisible(false).setAlpha(0);
+      this.container.add(glow);
+      this.auraGlowSprites.push(glow);
+    }
 
     this.monSprite = globalScene.add.sprite(cx, cy, "unknown");
     this.monSprite
@@ -275,6 +289,9 @@ export class ErShinyLabUiHandler extends UiHandler {
         ignoreTimeTint: true,
       });
     this.container.add(this.monSprite);
+    this.fxSprite = globalScene.add.sprite(cx, cy, "unknown");
+    this.fxSprite.setOrigin(0.5, 0.5).setVisible(false);
+    this.container.add(this.fxSprite);
     this.surfaceFx = globalScene.add.container(cx, cy);
     this.surfaceFx.setVisible(false);
     this.container.add(this.surfaceFx);
@@ -290,6 +307,7 @@ export class ErShinyLabUiHandler extends UiHandler {
       this.surfaceFx.add(spark);
       this.surfaceSparks.push(spark);
     }
+    this.createSurfaceMask();
 
     this.nameText = addTextObject(cx, PREV_Y + 98, "", TextStyle.WINDOW, { fontSize: "52px", align: "center" });
     this.nameText.setOrigin(0.5, 0).setColor(INK);
@@ -388,6 +406,9 @@ export class ErShinyLabUiHandler extends UiHandler {
     this.loadSel = 0;
     this.saveSel = 0;
     this.previewSpriteKey = null;
+    this.previewSourcePixels = null;
+    this.previewFxVersion = 0;
+    this.fxSprite.setVisible(false);
 
     this.candyText.setText(String(cfg.candy));
     this.repositionCandyIcon();
@@ -457,11 +478,18 @@ export class ErShinyLabUiHandler extends UiHandler {
       }
       this.previewSpriteKey = key;
       this.monSprite.setTexture(key);
+      for (const glow of this.auraGlowSprites) {
+        glow.setTexture(key);
+      }
       if (globalScene.anims.exists(key)) {
         this.monSprite.play(key);
+        for (const glow of this.auraGlowSprites) {
+          glow.play(key);
+        }
       }
-      this.refreshPreviewSpritePalette();
       this.fitSprite();
+      this.previewSourcePixels = this.readPreviewSourcePixels(key);
+      this.refreshPreview();
     };
     if (globalScene.textures.exists(key)) {
       apply();
@@ -477,8 +505,140 @@ export class ErShinyLabUiHandler extends UiHandler {
     const sh = this.monSprite.height || 1;
     const maxH = 78;
     this.monSprite.setScale(sh > maxH ? maxH / sh : 1);
-    this.surfaceFx.setScale(this.monSprite.scaleX || 1);
+    const spriteScale = this.monSprite.scaleX || 1;
+    this.surfaceFx.setPosition(this.monSprite.x, this.monSprite.y).setScale(spriteScale);
+    for (const [idx, glow] of this.auraGlowSprites.entries()) {
+      glow.setPosition(this.monSprite.x, this.monSprite.y).setScale(spriteScale * (1.16 + idx * 0.14));
+    }
     this.monSprite.setVisible(true);
+  }
+
+  private createSurfaceMask(): void {
+    try {
+      this.surfaceMask = new Phaser.Display.Masks.BitmapMask(globalScene, this.monSprite);
+      this.surfaceFx.setMask(this.surfaceMask);
+    } catch {
+      this.surfaceMask = null;
+    }
+  }
+
+  private readPreviewSourcePixels(key: string): PreviewPixels | null {
+    try {
+      if (typeof document === "undefined" || !globalScene.textures.exists(key)) {
+        return null;
+      }
+      const texture = globalScene.textures.get(key) as Phaser.Textures.Texture & {
+        frames?: Record<string, Phaser.Textures.Frame>;
+      };
+      const textureSource = texture.source as unknown as
+        | { image?: CanvasImageSource }
+        | { image?: CanvasImageSource }[];
+      const source = (texture.getSourceImage?.()
+        ?? (Array.isArray(textureSource) ? textureSource[0]?.image : textureSource.image)
+        ?? null) as CanvasImageSource & { width?: number; height?: number };
+      if (!source) {
+        return null;
+      }
+      const frameValues = Object.values(texture.frames ?? {});
+      const frame =
+        (texture.firstFrame ? texture.frames?.[texture.firstFrame] : null)
+        ?? texture.frames?.__BASE
+        ?? frameValues[0]
+        ?? null;
+      const width = Math.floor(frame?.cutWidth ?? frame?.width ?? source.width ?? 0);
+      const height = Math.floor(frame?.cutHeight ?? frame?.height ?? source.height ?? 0);
+      if (width <= 0 || height <= 0) {
+        return null;
+      }
+
+      const canvas = document.createElement("canvas");
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext("2d", { willReadFrequently: true });
+      if (!ctx) {
+        return null;
+      }
+      ctx.drawImage(source, frame?.cutX ?? 0, frame?.cutY ?? 0, width, height, 0, 0, width, height);
+      return { width, height, data: ctx.getImageData(0, 0, width, height).data };
+    } catch {
+      return null;
+    }
+  }
+
+  private refreshExactPreview(loadout: ErShinyLabLoadout, params: ErShinyLabParams): boolean {
+    if (!this.previewSourcePixels) {
+      return false;
+    }
+    const rendered = renderErShinyLabLook(this.previewSourcePixels, loadout, params, 0);
+    if (!rendered) {
+      return false;
+    }
+    return this.applyExactPreviewTexture(rendered, this.previewSourcePixels);
+  }
+
+  private applyExactPreviewTexture(rendered: ErShinyLabRenderedPixels, source: PreviewPixels): boolean {
+    try {
+      if (typeof document === "undefined") {
+        return false;
+      }
+      const textures = globalScene.textures as Phaser.Textures.TextureManager & {
+        addCanvas?: (key: string, canvas: HTMLCanvasElement) => Phaser.Textures.CanvasTexture | null;
+        remove?: (key: string) => unknown;
+      };
+      if (!textures.addCanvas) {
+        return false;
+      }
+
+      const canvas = document.createElement("canvas");
+      canvas.width = rendered.width;
+      canvas.height = rendered.height;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) {
+        return false;
+      }
+      const image = ctx.createImageData(rendered.width, rendered.height);
+      image.data.set(rendered.data);
+      ctx.putImageData(image, 0, 0);
+
+      const oldKey = this.previewFxKey;
+      let key: string;
+      do {
+        key = `er-shiny-lab-preview-${this.config?.speciesId ?? "demo"}-${++this.previewFxVersion}`;
+      } while (textures.exists(key));
+      const texture = textures.addCanvas(key, canvas);
+      texture?.refresh();
+      this.previewFxKey = key;
+      this.fxSprite.setTexture(key);
+      this.fitExactPreview(rendered, source);
+      if (oldKey && oldKey !== key && textures.exists(oldKey)) {
+        textures.remove?.(oldKey);
+      }
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  private fitExactPreview(rendered: ErShinyLabRenderedPixels, source: PreviewPixels): void {
+    const cx = PREV_X + PREV_W / 2;
+    const cy = PREV_Y + 54;
+    const coreScale = source.height > 0 ? 78 / source.height : 1;
+    const fitScale = Math.min(104 / rendered.width, 92 / rendered.height);
+    const scale = Math.min(coreScale, fitScale, 1.5);
+    this.fxSprite.setPosition(cx, cy).setScale(scale).setVisible(true);
+  }
+
+  private hideApproxPreview(): void {
+    this.monSprite.setVisible(false);
+    this.surfaceFx.setVisible(false);
+    this.auraRing.setVisible(false);
+    this.auraOuterRing.setVisible(false);
+    for (const glow of this.auraGlowSprites) {
+      glow.setVisible(false);
+    }
+    for (const sparkle of this.auraSparkles) {
+      sparkle.setVisible(false);
+    }
   }
 
   private refreshPreviewSpritePalette(paletteId?: string | null): void {
@@ -756,8 +916,19 @@ export class ErShinyLabUiHandler extends UiHandler {
     const aroEff =
       cfg.effects.around.find(e => e.id === aroId) ?? cfg.effects.around.find(e => e.id === cfg.equipped.around);
 
-    this.glowOuter.setFillStyle(0x5ad1ff, 0.16);
-    this.glowInner.setFillStyle(0x5ad1ff, 0.28);
+    this.glowOuter.setVisible(false);
+    this.glowInner.setVisible(false);
+    const loadout: ErShinyLabLoadout = {
+      palette: palId ?? null,
+      surface: surfEff?.id ?? null,
+      around: aroEff?.id ?? null,
+    };
+    if (this.refreshExactPreview(loadout, cfg.params)) {
+      this.hideApproxPreview();
+      return;
+    }
+    this.fxSprite.setVisible(false);
+    this.monSprite.setVisible(!!this.previewSpriteKey);
     this.refreshPreviewSpritePalette(palId);
     this.refreshPreviewSurface(surfEff, cfg.params);
     this.refreshPreviewAura(aroEff, cfg.params);
@@ -774,7 +945,13 @@ export class ErShinyLabUiHandler extends UiHandler {
     const mode = seed % 4;
     const scale = clamp(params.scale, 0.55, 1.45);
 
-    this.surfaceFx.setVisible(true);
+    if (!this.surfaceMask) {
+      this.createSurfaceMask();
+    }
+    this.surfaceFx
+      .setPosition(this.monSprite.x, this.monSprite.y)
+      .setScale(this.monSprite.scaleX || 1)
+      .setVisible(true);
     this.surfaceWash.setFillStyle(color, mode === 0 ? amount * 0.16 : amount * 0.1);
     this.surfaceWash.setScale(0.9 + scale * 0.12, 0.9 + scale * 0.18);
     for (let i = 0; i < this.surfaceLines.length; i++) {
@@ -803,6 +980,9 @@ export class ErShinyLabUiHandler extends UiHandler {
     if (!effect) {
       this.auraRing.setVisible(false);
       this.auraOuterRing.setVisible(false);
+      for (const glow of this.auraGlowSprites) {
+        glow.setVisible(false);
+      }
       for (const sparkle of this.auraSparkles) {
         sparkle.setVisible(false);
       }
@@ -815,7 +995,16 @@ export class ErShinyLabUiHandler extends UiHandler {
     const cx = PREV_X + PREV_W / 2;
     const cy = PREV_Y + 56;
     const orbit = 39 * scale;
+    const spriteScale = this.monSprite.scaleX || 1;
 
+    for (const [idx, glow] of this.auraGlowSprites.entries()) {
+      glow
+        .setTint(color)
+        .setAlpha(amount * (idx === 0 ? 0.22 : 0.12))
+        .setPosition(this.monSprite.x, this.monSprite.y)
+        .setScale(spriteScale * scale * (1.1 + idx * 0.17))
+        .setVisible(this.monSprite.visible);
+    }
     this.auraRing
       .setStrokeStyle(2, color, amount)
       .setFillStyle(color, amount * 0.04)
@@ -1230,6 +1419,14 @@ export class ErShinyLabUiHandler extends UiHandler {
     this.container.setVisible(false);
     this.monSprite.stop();
     this.monSprite.setVisible(false);
+    this.fxSprite.setVisible(false);
+    if (this.previewFxKey && globalScene.textures.exists(this.previewFxKey)) {
+      (globalScene.textures as Phaser.Textures.TextureManager & { remove?: (key: string) => unknown }).remove?.(
+        this.previewFxKey,
+      );
+    }
+    this.previewFxKey = null;
+    this.previewSourcePixels = null;
     this.cursorObj.setVisible(false);
     this.tuneContent.removeAll(true);
     this.config = null;
