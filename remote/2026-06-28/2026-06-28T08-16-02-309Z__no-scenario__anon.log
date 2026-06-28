@@ -1,0 +1,28 @@
+url:      https://elite-redux-staging.pages.dev/
+build:    mqxbnayl-bcur
+mode:     0  wave:?
+seed:     bybfzo8KHfcwO222I1LhXBgo
+party:    
+enemy:    
+
+----- CONSOLE -----
+[08:14:23.743] LOG: %c %c %c %c %c Phaser v3.90.0 (WebGL | Web Audio) %c https://phaser.io/v390 background: #ff0000 background: #ffff00 background: #00ff00 background: #00ffff color: #ffffff; background: #000000 background: transparent
+[08:14:24.609] LOG: [ER] build mqxbnayl-bcur
+[08:14:24.628] LOG: [dev-tools] loaded — 351 scenarios + Send Logs button
+[08:15:13.071] DEBUG: Destroying loading scene
+[08:15:13.071] DEBUG: Destroyed loading scene
+[08:15:13.153] LOG: Seed: bybfzo8KHfcwO222I1LhXBgo
+[08:15:13.153] LOG: Wave Seed: bybfzo8KHfcwO222I1LhXBgo 0
+[08:15:16.267] LOG: %cStart Phase LoginPhase color:green;
+[08:15:16.658] LOG: Client Session: qhbliBGcyUf3zu6HIp7tQtd9JlVw0Vb5
+[08:15:17.075] DEBUG: Using cached system data
+[08:15:17.235] LOG: %cStart Phase TitlePhase color:green;
+[08:15:17.236] LOG: Getting Session Slot id: %d 2
+[08:15:17.273] LOG: use seasonal splash messages true
+[08:15:17.273] LOG: Adding 2 Pride Month splash messages (weight: x15)
+[08:15:33.832] LOG: Getting Session Slot id: %d 0
+[08:15:33.865] LOG: Getting Session Slot id: %d 1
+[08:15:33.873] LOG: Getting Session Slot id: %d 2
+[08:15:33.882] LOG: Getting Session Slot id: %d 3
+[08:15:33.890] LOG: Getting Session Slot id: %d 4
+[08:15:33.975] LOG: Getting Session Slot id: %d 2
