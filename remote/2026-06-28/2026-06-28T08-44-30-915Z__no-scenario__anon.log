@@ -1,0 +1,266 @@
+url:      https://elite-redux-staging.pages.dev/
+build:    mqxbnayl-bcur
+mode:     4  wave:54
+seed:     zpsrGO9MJF6RtOematsKvIEP
+party:    Basculegion F(L48 129hp f2), Toxtricity Redux Fuzz(L46 131hp f0), Feraligatr(L46 147hp f0), Centiskorch(L46 162hp f0), Nidoqueen(L41 132hp f0), Sylveon(L46 157hp f0)
+enemy:    Pancham(L38), Toxtricity(L37)
+
+----- CONSOLE -----
+[08:43:47.269] LOG: 2 0 [4,5]
+[08:43:47.269] LOG: {"id":"POTION","localeKey":"modifierType:ModifierType.POTION","iconImage":"potion","group":"potion","soundName":"se/restore","tier":0,"restorePoints":20,"restorePercent":10,"healStatus":false} 
+[08:43:47.269] LOG: 2 0 [4,5]
+[08:43:47.269] LOG: {"id":"POTION","localeKey":"modifierType:ModifierType.POTION","iconImage":"potion","group":"potion","soundName":"se/restore","tier":0,"restorePoints":20,"restorePercent":10,"healStatus":false} 
+[08:43:47.270] LOG: 3 0 [4,5]
+[08:43:47.270] LOG: {"id":"SUPER_POTION","localeKey":"modifierType:ModifierType.SUPER_POTION","iconImage":"super_potion","group":"potion","soundName":"se/restore","tier":0,"restorePoints":50,"restorePercent":25,"healStatus":false} 
+[08:43:47.270] LOG: 0 0 [4,5]
+[08:43:47.270] LOG: {"id":"POKEBALL","localeKey":"","iconImage":"pb","group":"pb","soundName":"se/pb_bounce_1","tier":0,"pokeballType":0,"count":5} 
+[08:43:47.270] LOG: 8 2 [4,5]
+[08:43:47.270] LOG: {"id":"BERRY","localeKey":"","iconImage":"petaya_berry","group":"berry","soundName":"se/restore","tier":0,"berryType":5} 
+[08:43:47.271] LOG: 23 11 [3,4,5,6,7,8,9,10,12,16,22]
+[08:43:47.271] LOG: {"id":"VOUCHER","localeKey":"","iconImage":"coupon","group":"voucher","soundName":"se/restore","tier":1,"voucherType":0,"count":1} 
+[08:43:50.928] LOG: Applied Carbos 
+[08:43:50.928] LOG: Applied Calcium 
+[08:43:50.929] LOG: Applied Protein 
+[08:43:50.930] LOG: Applied Carbos 
+[08:43:50.954] LOG: %cStart Phase EggLapsePhase color:green;
+[08:43:50.954] LOG: %cStart Phase PostMysteryEncounterPhase color:green;
+[08:43:50.955] LOG: %cStart Phase NewBattlePhase color:green;
+[08:43:50.955] LOG: Wave Seed: ¯¥¨§|n{k©¢©¨«~z 53
+[08:43:50.956] LOG: Applied Lure 
+[08:43:50.956] LOG: Applied Super Lure 
+[08:43:50.957] LOG: %cStart Phase NextEncounterPhase color:green;
+[08:43:50.959] LOG: Starting species pool tier: COMMON
+[08:43:50.985] LOG: Pokemon: Wild Koffing | Species ID: 109 | Level: 35 | Nature: Bashful (-)
+[08:43:50.985] LOG: Stats (IVs): HP: 77 (13), Atk: 50 (1), Def: 76 (14), Spatk: 57 (11), Spdef: 38 (6), Spd: 40 (30)
+[08:43:50.985] LOG: Ability: Neutralizing Gas | Passive Ability: Levitate 
+[08:43:50.985] LOG: Moveset: ["Sludge Wave","Stockpile","Swallow","Karma"]
+[08:43:50.985] LOG: Starting species pool tier: COMMON
+[08:43:50.986] LOG: Replaced SHUPPET with BANETTE
+[08:43:51.005] LOG: Pokemon: Wild Banette | Species ID: 354 | Level: 36 | Nature: Naive (+Spd/-SpDef)
+[08:43:51.005] LOG: Stats (IVs): HP: 115 (25), Atk: 95 (2), Def: 74 (24), Spatk: 51 (0), Spdef: 61 (9), Spd: 86 (7)
+[08:43:51.005] LOG: Ability: Surprise! | Passive Ability: Scare 
+[08:43:51.005] LOG: Moveset: ["Double-Edge","Fake Tears","Imprison","Feint Attack"]
+[08:43:53.604] LOG: {"id":"BERRY","localeKey":"","iconImage":"salac_berry","group":"berry","soundName":"se/restore","tier":0,"berryType":7} (enemy)
+[08:43:53.726] DEBUG: Session data saved to slot 2!
+[08:43:53.727] LOG: Wave Seed: ¯¥¨§|n{k©¢©¨«~z 53
+[08:43:54.196] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[08:43:54.261] LOG: %cStart Phase SummonPhase color:green;
+[08:43:54.412] LOG: Applied Carbos 
+[08:43:54.415] LOG: Applied Calcium 
+[08:43:54.418] LOG: Applied Protein 
+[08:43:54.418] LOG: Applied Carbos 
+[08:43:54.443] WARN: cry/793 not found
+[08:43:54.540] LOG: %cStart Phase CheckSwitchPhase color:green;
+[08:43:56.000] LOG: %cStart Phase CheckSwitchPhase color:green;
+[08:43:56.286] LOG: %cStart Phase InitEncounterPhase color:green;
+[08:43:56.290] LOG: %cStart Phase PostSummonPhase color:green;
+[08:43:56.303] LOG: %cStart Phase ShowAbilityPhase color:green;
+[08:43:56.459] LOG: %cStart Phase MessagePhase color:green;
+[08:43:56.724] LOG: %cStart Phase HideAbilityPhase color:green;
+[08:43:56.768] LOG: %cStart Phase PostSummonPhase color:green;
+[08:43:56.768] LOG: Ran PSP for: Toxtricity Redux Fuzz
+[08:43:56.774] LOG: %cStart Phase PostSummonPhase color:green;
+[08:43:56.778] LOG: %cStart Phase PostSummonPhase color:green;
+[08:43:56.780] LOG: %cStart Phase PostSummonPhase color:green;
+[08:43:56.780] LOG: Ran PSP for: Banette
+[08:43:56.784] LOG: %cStart Phase PostSummonPhase color:green;
+[08:43:56.787] LOG: %cStart Phase PostSummonPhase color:green;
+[08:43:56.788] LOG: %cStart Phase PostSummonPhase color:green;
+[08:43:56.788] LOG: Ran PSP for: Koffing
+[08:43:56.789] LOG: %cStart Phase PostSummonPhase color:green;
+[08:43:56.790] LOG: %cStart Phase TurnInitPhase color:green;
+[08:43:56.790] LOG: %cStart Phase CommandPhase color:green;
+[08:43:57.652] LOG: Move: SPLISHY_SPLASH Move targets: {"targets":[2,3],"multiple":true} 
+Player Pokemon: Basculegion F
+[08:43:57.657] LOG: %cStart Phase SelectTargetPhase color:green;
+[08:43:57.871] LOG: %cStart Phase CommandPhase color:green;
+[08:43:59.580] LOG: Move: SNARL Move targets: {"targets":[2,3],"multiple":true} 
+Player Pokemon: Toxtricity Redux Fuzz
+[08:43:59.584] LOG: %cStart Phase SelectTargetPhase color:green;
+[08:43:59.771] LOG: %cStart Phase EnemyCommandPhase color:green;
+[08:43:59.782] WARN: BattlerTag STOCKPILING is missing a score!
+[08:43:59.791] WARN: BattlerTag STOCKPILING is missing a score!
+[08:43:59.791] LOG: Battle Seed: M6L17Wls1YTJZTqq
+[08:43:59.791] LOG: Move Pool: ["Sludge Wave","Stockpile","Swallow","Karma"]
+[08:43:59.791] LOG: Move Scores: [30,0,-20,0]
+[08:43:59.791] LOG: Sorted Move Pool: ["Sludge Wave","Stockpile","Karma","Swallow"]
+[08:43:59.791] LOG: Chosen Move: Sludge Wave
+[08:43:59.791] LOG: %cStart Phase EnemyCommandPhase color:green;
+[08:43:59.819] LOG: Move Pool: ["Double-Edge","Fake Tears","Imprison","Feint Attack"]
+[08:43:59.819] LOG: Move Scores: [-20,6,0,5.5]
+[08:43:59.819] LOG: Sorted Move Pool: ["Fake Tears","Feint Attack","Imprison","Double-Edge"]
+[08:43:59.819] LOG: Chosen Move: Feint Attack
+[08:43:59.819] LOG: %cStart Phase TurnStartPhase color:green;
+[08:43:59.836] LOG: %cStart Phase MovePhase color:green;
+[08:43:59.837] LOG: %cUser: Toxtricity Redux Fuzz
+Move: SNARL
+Use Mode: NORMAL color:orchid
+[08:43:59.844] LOG: %cStart Phase MessagePhase color:green;
+[08:43:59.942] LOG: %cStart Phase MoveEffectPhase color:green;
+[08:43:59.949] LOG: crit stage: +0
+[08:43:59.953] LOG: Move: Snarl | Base damage: 79.94947368421053 | Power: 60 | Source attack: 121 | Target defense: 38
+[08:43:59.959] LOG: Move: Snarl | Attack damage: 99
+[08:43:59.961] LOG: crit stage: +0
+[08:43:59.964] LOG: Move: Snarl | Base damage: 50.55868852459016 | Power: 60 | Source attack: 121 | Target defense: 61
+[08:43:59.965] LOG: Move: Snarl | Attack damage: 116
+[08:43:59.965] LOG: %cStart Phase ShowAbilityPhase color:green;
+[08:44:00.128] LOG: %cStart Phase HideAbilityPhase color:green;
+[08:44:00.178] LOG: %cStart Phase DamageAnimPhase color:green;
+[08:44:00.213] LOG: %cStart Phase MessagePhase color:green;
+[08:44:00.441] LOG: %cStart Phase StatStageChangePhase color:green;
+[08:44:00.450] LOG: %cStart Phase MessagePhase color:green;
+[08:44:00.674] LOG: %cStart Phase DamageAnimPhase color:green;
+[08:44:00.712] LOG: %cStart Phase MessagePhase color:green;
+[08:44:00.925] LOG: %cStart Phase FaintPhase color:green;
+[08:44:02.271] LOG: %cStart Phase MessagePhase color:green;
+[08:44:02.586] LOG: %cStart Phase VictoryPhase color:green;
+[08:44:02.587] LOG: Applied Soothe Bell 
+[08:44:02.588] LOG: %cStart Phase ExpPhase color:green;
+[08:44:02.588] LOG: Applied Super EXP. Charm 
+[08:44:02.588] LOG: Applied EXP. Charm 
+[08:44:02.787] LOG: 108085 110915 110592
+[08:44:02.897] LOG: %cStart Phase LevelUpPhase color:green;
+[08:44:02.897] LOG: Applied Carbos 
+[08:44:02.898] LOG: Applied Calcium 
+[08:44:02.899] LOG: %cStart Phase ExpPhase color:green;
+[08:44:02.899] LOG: Applied Super EXP. Charm 
+[08:44:02.899] LOG: Applied EXP. Charm 
+[08:44:03.577] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[08:44:03.577] LOG: Applied Super EXP. Charm 
+[08:44:03.577] LOG: Applied EXP. Charm 
+[08:44:03.578] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[08:44:03.578] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[08:44:03.579] LOG: Applied Super EXP. Charm 
+[08:44:03.579] LOG: Applied EXP. Charm 
+[08:44:03.579] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[08:44:03.579] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[08:44:03.580] LOG: Applied Super EXP. Charm 
+[08:44:03.580] LOG: Applied EXP. Charm 
+[08:44:03.713] LOG: %cStart Phase LevelUpPhase color:green;
+[08:44:03.714] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[08:44:03.797] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[08:44:03.797] LOG: Applied Super EXP. Charm 
+[08:44:03.797] LOG: Applied EXP. Charm 
+[08:44:03.798] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[08:44:03.798] LOG: %cStart Phase MoveEndPhase color:green;
+[08:44:03.803] LOG: %cStart Phase MovePhase color:green;
+[08:44:03.804] LOG: %cUser: Koffing
+Move: EXPLOSION
+Use Mode: FOLLOW_UP color:orchid
+[08:44:03.808] LOG: %cStart Phase MessagePhase color:green;
+[08:44:03.925] LOG: %cStart Phase MoveEffectPhase color:green;
+[08:44:03.931] LOG: crit stage: +0
+[08:44:03.935] LOG: Move: Explosion | Base damage: 14.666666666666668 | Power: 100 | Source attack: 38 | Target defense: 96
+[08:44:03.937] LOG: Move: Explosion | Attack damage: 11
+[08:44:03.942] LOG: %cStart Phase MessagePhase color:green;
+[08:44:04.158] LOG: %cStart Phase DamageAnimPhase color:green;
+[08:44:04.197] LOG: %cStart Phase DamageAnimPhase color:green;
+[08:44:04.202] LOG: %cStart Phase FaintPhase color:green;
+[08:44:05.559] LOG: %cStart Phase MessagePhase color:green;
+[08:44:05.967] LOG: %cStart Phase VictoryPhase color:green;
+[08:44:05.967] LOG: Applied Soothe Bell 
+[08:44:05.969] LOG: %cStart Phase ExpPhase color:green;
+[08:44:05.969] LOG: Applied Super EXP. Charm 
+[08:44:05.969] LOG: Applied EXP. Charm 
+[08:44:06.561] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[08:44:06.561] LOG: Applied Super EXP. Charm 
+[08:44:06.562] LOG: Applied EXP. Charm 
+[08:44:06.562] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[08:44:06.563] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[08:44:06.563] LOG: Applied Super EXP. Charm 
+[08:44:06.563] LOG: Applied EXP. Charm 
+[08:44:06.563] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[08:44:06.564] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[08:44:06.564] LOG: Applied Super EXP. Charm 
+[08:44:06.564] LOG: Applied EXP. Charm 
+[08:44:06.564] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[08:44:06.565] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[08:44:06.565] LOG: Applied Super EXP. Charm 
+[08:44:06.565] LOG: Applied EXP. Charm 
+[08:44:06.565] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[08:44:06.566] LOG: %cStart Phase MessagePhase color:green;
+[08:44:06.827] LOG: %cStart Phase ShowAbilityPhase color:green;
+[08:44:06.996] LOG: %cStart Phase HideAbilityPhase color:green;
+[08:44:07.046] LOG: %cStart Phase MoveEndPhase color:green;
+[08:44:07.051] LOG: %cStart Phase MovePhase color:green;
+[08:44:07.052] LOG: %cStart Phase MoveEndPhase color:green;
+[08:44:07.053] LOG: %cStart Phase MovePhase color:green;
+[08:44:07.054] LOG: %cUser: Basculegion F
+Move: SPLISHY_SPLASH
+Use Mode: NORMAL color:orchid
+[08:44:07.055] LOG: %cStart Phase MessagePhase color:green;
+[08:44:07.192] LOG: %cStart Phase MessagePhase color:green;
+[08:44:07.395] LOG: %cStart Phase MoveEndPhase color:green;
+[08:44:07.396] LOG: %cStart Phase MovePhase color:green;
+[08:44:07.396] LOG: %cStart Phase MoveEndPhase color:green;
+[08:44:07.397] LOG: %cStart Phase CheckInterludePhase color:green;
+[08:44:07.397] LOG: %cStart Phase WeatherEffectPhase color:green;
+[08:44:07.397] LOG: %cStart Phase PositionalTagPhase color:green;
+[08:44:07.397] LOG: %cStart Phase BerryPhase color:green;
+[08:44:07.400] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[08:44:07.403] LOG: %cStart Phase TurnEndPhase color:green;
+[08:44:07.407] WARN: [coop:turn] host recorder: finalize with NO open recording -> turn=-1 events=0 (caller decides not to emit)
+[08:44:07.407] LOG: %cStart Phase BattleEndPhase color:green;
+[08:44:07.407] LOG: Battle Score: 161 (1 Turns x1)
+[08:44:07.407] LOG: Total Score: 7069
+[08:44:07.427] LOG: Applied Carbos 
+[08:44:07.427] LOG: Applied Calcium 
+[08:44:07.428] LOG: Applied Protein 
+[08:44:07.428] LOG: Applied Carbos 
+[08:44:07.438] LOG: %cStart Phase EggLapsePhase color:green;
+[08:44:07.439] LOG: %cStart Phase SelectModifierPhase color:green;
+[08:44:07.439] LOG: Wave Seed: ¯¥¨§|n{k©¢©¨«~z 53
+[08:44:07.451] LOG: Applied Greater Golden Ball 
+[08:44:07.451] LOG: 7 0 []
+[08:44:07.452] LOG: {"id":"TEMP_STAT_STAGE_BOOSTER","localeKey":"","iconImage":"x_sp_def","soundName":"se/restore","tier":0,"stat":4,"nameKey":"x_sp_def","quantityKey":"percentage"} 
+[08:44:07.452] LOG: 7 0 []
+[08:44:07.452] LOG: {"id":"TEMP_STAT_STAGE_BOOSTER","localeKey":"","iconImage":"x_speed","soundName":"se/restore","tier":0,"stat":5,"nameKey":"x_speed","quantityKey":"percentage"} 
+[08:44:07.452] LOG: 9 0 []
+[08:44:07.452] LOG: {"id":"TM_CASE","localeKey":"","iconImage":"tm_case","soundName":"se/restore","tier":0} 
+[08:44:07.452] LOG: 5 0 []
+[08:44:07.452] LOG: {"id":"MAX_ETHER","localeKey":"modifierType:ModifierType.MAX_ETHER","iconImage":"max_ether","group":"ether","soundName":"se/restore","tier":0,"restorePoints":-1} 
+[08:44:07.452] LOG: 7 0 []
+[08:44:07.452] LOG: {"id":"TEMP_STAT_STAGE_BOOSTER","localeKey":"","iconImage":"x_sp_atk","soundName":"se/restore","tier":0,"stat":3,"nameKey":"x_sp_atk","quantityKey":"percentage"} 
+[08:44:07.453] LOG: 5 0 []
+[08:44:07.453] LOG: {"id":"MAX_ETHER","localeKey":"modifierType:ModifierType.MAX_ETHER","iconImage":"max_ether","group":"ether","soundName":"se/restore","tier":0,"restorePoints":-1} 
+[08:44:07.453] LOG: 4 0 []
+[08:44:07.453] LOG: {"id":"ETHER","localeKey":"modifierType:ModifierType.ETHER","iconImage":"ether","group":"ether","soundName":"se/restore","tier":0,"restorePoints":10} 
+[08:44:07.453] LOG: 0 0 []
+[08:44:07.453] LOG: {"id":"POKEBALL","localeKey":"","iconImage":"pb","group":"pb","soundName":"se/pb_bounce_1","tier":0,"pokeballType":0,"count":5} 
+[08:44:07.453] LOG: 11 6 [3,4,5,6,7,8,12,16,22]
+[08:44:07.453] LOG: {"id":"DIRE_HIT","localeKey":"modifierType:ModifierType.DIRE_HIT","iconImage":"dire_hit","soundName":"se/restore","tier":1} 
+[08:44:07.454] LOG: 13 7 [3,4,5,6,7,8,12,16,22]
+[08:44:07.454] LOG: {"id":"NUGGET","localeKey":"modifierType:ModifierType.NUGGET","iconImage":"nugget","group":"money","soundName":"se/buy","tier":1,"moneyMultiplier":1,"moneyMultiplierDescriptorKey":"modifierType:ModifierType.MoneyRewardModifierType.extra.small"} 
+[08:44:07.454] LOG: 1 0 []
+[08:44:07.454] LOG: {"id":"RARE_CANDY","localeKey":"modifierType:ModifierType.RARE_CANDY","iconImage":"rare_candy","soundName":"se/restore","tier":0} 
+[08:44:07.454] LOG: 4 0 []
+[08:44:07.454] LOG: {"id":"ETHER","localeKey":"modifierType:ModifierType.ETHER","iconImage":"ether","group":"ether","soundName":"se/restore","tier":0,"restorePoints":10} 
+[08:44:07.454] LOG: 7 0 []
+[08:44:07.454] LOG: {"id":"TEMP_STAT_STAGE_BOOSTER","localeKey":"","iconImage":"x_speed","soundName":"se/restore","tier":0,"stat":5,"nameKey":"x_speed","quantityKey":"percentage"} 
+[08:44:07.455] LOG: 2 0 []
+[08:44:07.455] LOG: {"id":"POTION","localeKey":"modifierType:ModifierType.POTION","iconImage":"potion","group":"potion","soundName":"se/restore","tier":0,"restorePoints":20,"restorePercent":10,"healStatus":false} 
+[08:44:07.455] LOG: 6 0 []
+[08:44:07.455] LOG: {"id":"LURE","localeKey":"modifierType:ModifierType.LURE","iconImage":"lure","group":"lure","soundName":"se/restore","tier":0,"maxBattles":10} 
+[08:44:09.032] LOG: Applied Amulet Coin 
+[08:44:10.524] LOG: Applied Amulet Coin 
+[08:44:11.510] LOG: Applied Amulet Coin 
+[08:44:14.526] LOG: Applied Carbos 
+[08:44:14.526] LOG: Applied Calcium 
+[08:44:14.528] LOG: Applied Protein 
+[08:44:14.528] LOG: Applied Carbos 
+[08:44:14.548] LOG: %cStart Phase NewBattlePhase color:green;
+[08:44:14.548] LOG: Wave Seed: °¦©¨}o|lª£ª©¬{ 54
+[08:44:14.548] LOG: Applied Lure 
+[08:44:14.548] LOG: Applied Super Lure 
+[08:44:14.549] LOG: %cStart Phase NextEncounterPhase color:green;
+[08:44:14.551] LOG: Starting species pool tier: UNCOMMON
+[08:44:14.572] LOG: Pokemon: Wild Pancham | Species ID: 674 | Level: 38 | Nature: Relaxed (+Def/-Spd)
+[08:44:14.572] LOG: Stats (IVs): HP: 110 (30), Atk: 76 (23), Def: 66 (21), Spatk: 44 (11), Spdef: 49 (20), Spd: 35 (5)
+[08:44:14.572] LOG: Ability: Mold Breaker | Passive Ability: Scrappy 
+[08:44:14.572] LOG: Moveset: ["Brick Break","Swagger","Hammer Arm","Mat Block"]
+[08:44:14.573] LOG: Starting species pool tier: RARE
+[08:44:14.573] LOG: Replaced TOXEL with TOXTRICITY
+[08:44:14.587] LOG: Pokemon: Wild Toxtricity | Species ID: 849 | Level: 37 | Nature: Lonely (+Atk/-Def)
+[08:44:14.587] LOG: Stats (IVs): HP: 107 (13), Atk: 76 (23), Def: 54 (14), Spatk: 98 (24), Spdef: 66 (26), Spd: 87 (27)
+[08:44:14.587] LOG: Ability: Noise Cancel | Passive Ability: Punk Rock 
+[08:44:14.587] LOG: Moveset: ["Overdrive","Noble Roar","Screech","Mud Bomb"]
