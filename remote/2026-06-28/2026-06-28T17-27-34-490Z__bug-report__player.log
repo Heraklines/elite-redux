@@ -1,0 +1,270 @@
+----- BUG REPORT (in-game) -----
+version:  1.11.19
+url:      https://elite-redux.pages.dev/
+ua:       Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36 Avast/148.0.0.0
+mode:     0  wave:null  difficulty:youngster
+seed:     xDbIhxGY3iU7J1IqalM6yNEl
+party:    
+
+----- DESCRIPTION -----
+gear up isnt changed to er version
+
+----- CONSOLE -----
+[12:50:39.929] LOG: %cStart Phase InitEncounterPhase color:green;
+[12:50:39.929] LOG: Applied X Speed 
+[12:50:39.929] LOG: %cStart Phase PostSummonPhase color:green;
+[12:50:39.929] LOG: Ran PSP for: Zekrom
+[12:50:39.929] LOG: Applied X Speed 
+[12:50:39.929] LOG: %cStart Phase PostSummonPhase color:green;
+[12:50:39.930] LOG: Applied X Speed 
+[12:50:39.930] LOG: %cStart Phase PostSummonPhase color:green;
+[12:50:39.930] LOG: %cStart Phase ShowAbilityPhase color:green;
+[12:50:40.232] LOG: %cStart Phase MessagePhase color:green;
+[12:50:40.681] LOG: %cStart Phase HideAbilityPhase color:green;
+[12:50:40.724] LOG: %cStart Phase ShowAbilityPhase color:green;
+[12:50:41.028] LOG: %cStart Phase HideAbilityPhase color:green;
+[12:50:41.075] LOG: %cStart Phase PostSummonPhase color:green;
+[12:50:41.075] LOG: Ran PSP for: Eternatus
+[12:50:41.075] LOG: %cStart Phase PostSummonPhase color:green;
+[12:50:41.075] LOG: %cStart Phase ShowAbilityPhase color:green;
+[12:50:41.379] LOG: %cStart Phase StatStageChangePhase color:green;
+[12:50:41.730] LOG: %cStart Phase MessagePhase color:green;
+[12:50:42.183] LOG: %cStart Phase HideAbilityPhase color:green;
+[12:50:42.225] LOG: %cStart Phase ShowAbilityPhase color:green;
+[12:50:42.530] LOG: %cStart Phase MessagePhase color:green;
+[12:50:42.967] LOG: %cStart Phase HideAbilityPhase color:green;
+[12:50:43.010] LOG: %cStart Phase TurnInitPhase color:green;
+[12:50:43.010] LOG: %cStart Phase CommandPhase color:green;
+[12:50:44.959] LOG: Move: DRAGON_DANCE Move targets: {"targets":[0],"multiple":false} 
+Player Pokemon: Zekrom
+[12:50:44.960] LOG: %cStart Phase EnemyCommandPhase color:green;
+[12:50:44.961] LOG: Applied X Sp. Def 
+[12:50:44.962] LOG: Applied X Sp. Def 
+[12:50:44.963] LOG: Applied X Sp. Def 
+[12:50:44.963] LOG: Battle Seed: IYvgii43hl7GbEAo
+[12:50:44.964] LOG: Move Pool: ["Eternabeam"]
+[12:50:44.964] LOG: Move Scores: [6]
+[12:50:44.964] LOG: Sorted Move Pool: ["Eternabeam"]
+[12:50:44.964] LOG: Chosen Move: Eternabeam
+[12:50:44.964] LOG: %cStart Phase TurnStartPhase color:green;
+[12:50:44.964] LOG: Applied X Speed 
+[12:50:44.964] LOG: Applied X Speed 
+[12:50:44.965] LOG: Applied X Speed 
+[12:50:44.965] LOG: %cStart Phase MovePhase color:green;
+[12:50:44.965] LOG: %cUser: Zekrom
+Move: DRAGON_DANCE
+Use Mode: NORMAL color:orchid
+[12:50:44.965] LOG: Applied X Speed 
+[12:50:44.966] LOG: Applied X Speed 
+[12:50:44.966] LOG: %cStart Phase MessagePhase color:green;
+[12:50:45.161] LOG: %cStart Phase MoveEffectPhase color:green;
+[12:50:45.742] LOG: Applied Shell Bell 
+[12:50:45.742] LOG: %cStart Phase StatStageChangePhase color:green;
+[12:50:45.742] LOG: %cStart Phase StatStageChangePhase color:green;
+[12:50:46.092] LOG: %cStart Phase MessagePhase color:green;
+[12:50:46.484] LOG: %cStart Phase StatStageChangePhase color:green;
+[12:50:46.835] LOG: %cStart Phase MessagePhase color:green;
+[12:50:47.222] LOG: %cStart Phase MoveEndPhase color:green;
+[12:50:47.222] LOG: %cStart Phase MovePhase color:green;
+[12:50:47.222] LOG: %cUser: Eternatus
+Move: ETERNABEAM
+Use Mode: NORMAL color:orchid
+[12:50:47.223] LOG: Applied X Speed 
+[12:50:47.223] LOG: Applied X Speed 
+[12:50:47.223] LOG: %cStart Phase MessagePhase color:green;
+[12:50:47.447] LOG: %cStart Phase MoveEffectPhase color:green;
+[12:50:48.249] LOG: crit stage: +0
+[12:50:48.249] LOG: Applied X Sp. Def 
+[12:50:48.249] LOG: Move: Eternabeam | Base damage: 451.93141289437585 | Power: 160 | Source attack: 1250 | Target defense: 729
+[12:50:48.249] LOG: Move: Eternabeam | Attack damage: 1972
+[12:50:48.249] LOG: Applied Focus Band 
+[12:50:48.250] LOG: %cStart Phase DamageAnimPhase color:green;
+[12:50:48.257] LOG: %cStart Phase MessagePhase color:green;
+[12:50:48.707] LOG: %cStart Phase MessagePhase color:green;
+[12:50:49.074] LOG: %cStart Phase MessagePhase color:green;
+[12:50:49.466] LOG: %cStart Phase MoveEndPhase color:green;
+[12:50:49.466] LOG: %cStart Phase CheckInterludePhase color:green;
+[12:50:49.466] LOG: %cStart Phase WeatherEffectPhase color:green;
+[12:50:49.466] LOG: %cStart Phase PositionalTagPhase color:green;
+[12:50:49.466] LOG: %cStart Phase BerryPhase color:green;
+[12:50:49.467] LOG: Applied X Speed 
+[12:50:49.467] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[12:50:49.467] LOG: Applied X Speed 
+[12:50:49.467] LOG: %cStart Phase TurnEndPhase color:green;
+[12:50:49.467] LOG: Applied X Speed 
+[12:50:49.467] LOG: Applied Leftovers 
+[12:50:49.467] WARN: [coop:turn] host recorder: finalize with NO open recording -> turn=-1 events=0 (caller decides not to emit)
+[12:50:49.467] LOG: %cStart Phase PokemonHealPhase color:green;
+[12:50:49.638] LOG: %cStart Phase MessagePhase color:green;
+[12:50:50.138] LOG: %cStart Phase TurnInitPhase color:green;
+[12:50:50.138] LOG: %cStart Phase CommandPhase color:green;
+[12:50:52.622] LOG: Move: SCALE_SHOT Move targets: {"targets":[2],"multiple":false} 
+Player Pokemon: Zekrom
+[12:50:52.624] LOG: %cStart Phase EnemyCommandPhase color:green;
+[12:50:52.624] LOG: Applied X Sp. Def 
+[12:50:52.625] LOG: Applied X Sp. Def 
+[12:50:52.626] LOG: Applied X Sp. Def 
+[12:50:52.626] LOG: Battle Seed: IYvgii43hl7GbEAo
+[12:50:52.627] LOG: Move Pool: ["Eternabeam","Sludge Bomb"]
+[12:50:52.627] LOG: Move Scores: [6,31.5]
+[12:50:52.627] LOG: Sorted Move Pool: ["Sludge Bomb","Eternabeam"]
+[12:50:52.627] LOG: Chosen Move: Sludge Bomb
+[12:50:52.627] LOG: %cStart Phase TurnStartPhase color:green;
+[12:50:52.628] LOG: Applied X Speed 
+[12:50:52.628] LOG: Applied X Speed 
+[12:50:52.628] LOG: Applied X Speed 
+[12:50:52.628] LOG: %cStart Phase MovePhase color:green;
+[12:50:52.628] LOG: %cUser: Zekrom
+Move: SCALE_SHOT
+Use Mode: NORMAL color:orchid
+[12:50:52.629] LOG: Applied X Speed 
+[12:50:52.629] LOG: Applied X Speed 
+[12:50:52.629] LOG: %cStart Phase MessagePhase color:green;
+[12:50:52.820] LOG: %cStart Phase MoveEffectPhase color:green;
+[12:50:52.820] LOG: Applied Wide Lens 
+[12:50:53.174] LOG: Applied Scope Lens 
+[12:50:53.174] LOG: crit stage: +1
+[12:50:53.175] LOG: Move: Scale Shot | Base damage: 372.46388206388207 | Power: 37.5 | Source attack: 2428 | Target defense: 407
+[12:50:53.175] LOG: Move: Scale Shot | Attack damage: 1061
+[12:50:53.175] LOG: Applied Amulet Coin 
+[12:50:53.176] LOG: Applied Golden Punch 
+[12:50:53.176] LOG: %cStart Phase DamageAnimPhase color:green;
+[12:50:54.848] LOG: Dialogue saved as seen: battleSpecDialogue:firstStageWin
+[12:50:54.849] LOG: %cStart Phase QuietFormChangePhase color:green;
+[12:50:56.195] LOG: %cStart Phase PokemonHealPhase color:green;
+[12:50:56.366] LOG: %cStart Phase MessagePhase color:green;
+[12:50:56.832] LOG: %cStart Phase PostSummonPhase color:green;
+[12:50:56.832] LOG: Ran PSP for: Furret
+[12:50:56.832] LOG: Applied X Speed 
+[12:50:56.833] LOG: Applied X Speed 
+[12:50:56.833] LOG: %cStart Phase PostSummonPhase color:green;
+[12:50:56.833] LOG: %cStart Phase StatStageChangePhase color:green;
+[12:50:57.183] LOG: Applied X Speed 
+[12:50:57.183] LOG: Applied X Speed 
+[12:50:57.183] LOG: %cStart Phase MessagePhase color:green;
+[12:50:57.629] LOG: %cStart Phase StatStageChangePhase color:green;
+[12:50:57.980] LOG: Applied X Speed 
+[12:50:57.980] LOG: Applied X Speed 
+[12:50:57.981] LOG: %cStart Phase MessagePhase color:green;
+[12:50:58.425] LOG: %cStart Phase StatStageChangePhase color:green;
+[12:50:58.776] LOG: Applied X Speed 
+[12:50:58.776] LOG: Applied X Speed 
+[12:50:58.777] LOG: %cStart Phase MessagePhase color:green;
+[12:50:59.255] LOG: %cStart Phase MoveEffectPhase color:green;
+[12:50:59.256] LOG: Applied Wide Lens 
+[12:50:59.610] LOG: Applied Scope Lens 
+[12:50:59.611] LOG: crit stage: +1
+[12:50:59.611] LOG: Applied X Speed 
+[12:50:59.611] LOG: Applied X Speed 
+[12:50:59.612] LOG: Move: Scale Shot | Base damage: 311.60739219712525 | Power: 37.5 | Source attack: 2428 | Target defense: 487
+[12:50:59.612] LOG: Move: Scale Shot | Attack damage: 888
+[12:50:59.612] LOG: Applied Amulet Coin 
+[12:50:59.613] LOG: Applied Golden Punch 
+[12:50:59.613] LOG: %cStart Phase DamageAnimPhase color:green;
+[12:50:59.619] LOG: %cStart Phase StatStageChangePhase color:green;
+[12:50:59.969] LOG: Applied X Speed 
+[12:50:59.970] LOG: Applied X Speed 
+[12:50:59.970] LOG: %cStart Phase MessagePhase color:green;
+[12:51:00.407] LOG: %cStart Phase StatStageChangePhase color:green;
+[12:51:00.757] LOG: Applied X Speed 
+[12:51:00.757] LOG: Applied X Speed 
+[12:51:00.758] LOG: %cStart Phase MessagePhase color:green;
+[12:51:01.199] LOG: %cStart Phase StatStageChangePhase color:green;
+[12:51:01.550] LOG: Applied X Speed 
+[12:51:01.550] LOG: Applied X Speed 
+[12:51:01.551] LOG: %cStart Phase MessagePhase color:green;
+[12:51:02.029] LOG: %cStart Phase MoveEffectPhase color:green;
+[12:51:02.030] LOG: Applied Wide Lens 
+[12:51:02.388] LOG: Applied Scope Lens 
+[12:51:02.388] LOG: crit stage: +1
+[12:51:02.389] LOG: Applied X Speed 
+[12:51:02.389] LOG: Applied X Speed 
+[12:51:02.389] LOG: Move: Scale Shot | Base damage: 311.60739219712525 | Power: 37.5 | Source attack: 2428 | Target defense: 487
+[12:51:02.390] LOG: Move: Scale Shot | Attack damage: 803
+[12:51:02.390] LOG: Applied Amulet Coin 
+[12:51:02.390] LOG: Applied Golden Punch 
+[12:51:02.391] LOG: Applied Shell Bell 
+[12:51:02.391] LOG: %cStart Phase DamageAnimPhase color:green;
+[12:51:02.398] LOG: Applied X Speed 
+[12:51:02.398] LOG: %cStart Phase StatStageChangePhase color:green;
+[12:51:02.398] LOG: %cStart Phase MessagePhase color:green;
+[12:51:02.788] LOG: %cStart Phase StatStageChangePhase color:green;
+[12:51:03.140] LOG: %cStart Phase MessagePhase color:green;
+[12:51:03.527] LOG: %cStart Phase StatStageChangePhase color:green;
+[12:51:03.878] LOG: %cStart Phase MessagePhase color:green;
+[12:51:04.273] LOG: %cStart Phase MessagePhase color:green;
+[12:51:04.636] LOG: %cStart Phase PokemonHealPhase color:green;
+[12:51:04.804] LOG: %cStart Phase MessagePhase color:green;
+[12:51:05.308] LOG: %cStart Phase FaintPhase color:green;
+[12:51:09.399] LOG: Dialogue saved as seen: battleSpecDialogue:secondStageWin
+[12:51:09.400] LOG: Applied X Speed 
+[12:51:09.400] LOG: Applied X Speed 
+[12:51:12.503] LOG: Applied X Speed 
+[12:51:12.503] LOG: Applied X Speed 
+[12:51:12.503] LOG: %cStart Phase MessagePhase color:green;
+[12:51:16.104] LOG: %cStart Phase VictoryPhase color:green;
+[12:51:16.104] LOG: Applied Soothe Bell 
+[12:51:16.105] LOG: %cStart Phase MoveEndPhase color:green;
+[12:51:16.105] LOG: %cStart Phase MovePhase color:green;
+[12:51:16.105] LOG: %cStart Phase MoveEndPhase color:green;
+[12:51:16.105] LOG: %cStart Phase CheckInterludePhase color:green;
+[12:51:16.105] LOG: %cStart Phase PositionalTagPhase color:green;
+[12:51:16.105] LOG: %cStart Phase TurnEndPhase color:green;
+[12:51:16.105] WARN: [coop:turn] host recorder: finalize with NO open recording -> turn=-1 events=0 (caller decides not to emit)
+[12:51:16.105] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[12:51:16.211] LOG: %cStart Phase SummonPhase color:green;
+[12:51:16.495] LOG: Applied HP Up 
+[12:51:16.495] LOG: Applied Protein 
+[12:51:16.495] LOG: Applied Zinc 
+[12:51:16.495] LOG: Applied Iron 
+[12:51:16.495] LOG: Applied Soul Dew 
+[12:51:16.495] LOG: Applied Soul Dew 
+[12:51:16.495] LOG: Applied Iron 
+[12:51:16.496] LOG: Applied Protein 
+[12:51:16.496] LOG: Applied Carbos 
+[12:51:16.744] LOG: %cStart Phase ShinySparklePhase color:green;
+[12:51:16.945] LOG: %cStart Phase PostSummonPhase color:green;
+[12:51:16.945] LOG: %cStart Phase BattleEndPhase color:green;
+[12:51:16.945] LOG: Battle Score: 1291 (2 Turns x0.92)
+[12:51:16.945] LOG: Total Score: 59295
+[12:51:16.948] LOG: Applied HP Up 
+[12:51:16.948] LOG: Applied Protein 
+[12:51:16.948] LOG: Applied Zinc 
+[12:51:16.948] LOG: Applied Iron 
+[12:51:16.948] LOG: Applied Soul Dew 
+[12:51:16.948] LOG: Applied Soul Dew 
+[12:51:16.948] LOG: Applied Iron 
+[12:51:16.948] LOG: Applied Protein 
+[12:51:16.948] LOG: Applied Carbos 
+[12:51:16.953] LOG: %cStart Phase GameOverPhase color:green;
+[12:51:26.303] LOG: Dialogue saved as seen: miscDialogue:ending
+[12:51:26.560] LOG: Getting Session Slot id: %d 3
+[12:51:26.596] LOG: %cStart Phase EndCardPhase color:green;
+[12:51:27.136] LOG: %cStart Phase RibbonModifierRewardPhase color:green;
+[12:51:28.008] LOG: %cStart Phase RibbonModifierRewardPhase color:green;
+[12:51:28.759] LOG: %cStart Phase RibbonModifierRewardPhase color:green;
+[12:51:29.678] LOG: %cStart Phase RibbonModifierRewardPhase color:green;
+[12:51:30.382] LOG: %cStart Phase GameOverModifierRewardPhase color:green;
+[12:51:31.095] LOG: %cStart Phase PostGameOverPhase color:green;
+[12:51:31.274] DEBUG: Session data saved to slot 3!
+[12:51:32.618] LOG: Seed: xDbIhxGY3iU7J1IqalM6yNEl
+[12:51:32.618] LOG: Wave Seed: xDbIhxGY3iU7J1IqalM6yNEl 0
+[12:51:32.620] LOG: %cStart Phase TitlePhase color:green;
+[12:51:32.625] LOG: use seasonal splash messages true
+[12:51:32.626] LOG: Adding 2 Pride Month splash messages (weight: x15)
+[12:52:02.232] LOG: %cStart Phase SelectStarterPhase color:green;
+[12:54:05.420] WARN: cry/403 not found
+[12:54:05.424] WARN: cry/522 not found
+[12:54:40.559] LOG: %cStart Phase TitlePhase color:green;
+[12:54:40.565] LOG: use seasonal splash messages true
+[12:54:40.565] LOG: Adding 2 Pride Month splash messages (weight: x15)
+[12:54:41.543] LOG: %cStart Phase SelectStarterPhase color:green;
+[13:29:07.332] WARN: cry/446 not found
+[13:29:07.796] WARN: cry/447 not found
+[13:29:08.213] WARN: cry/446 not found
+[13:30:53.744] WARN: cry/446 not found
+[13:30:54.243] WARN: cry/446 not found
+[17:24:59.823] WARN: cry/649 not found
+[17:27:08.726] LOG: %cStart Phase TitlePhase color:green;
+[17:27:08.735] LOG: use seasonal splash messages true
+[17:27:08.736] LOG: Adding 2 Pride Month splash messages (weight: x15)
