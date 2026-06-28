@@ -1,0 +1,63 @@
+----- BUG REPORT (in-game) -----
+version:  1.11.19
+url:      https://elite-redux.pages.dev/
+ua:       Mozilla/5.0 (X11; Linux x86_64; rv:152.0) Gecko/20100101 Firefox/152.0
+mode:     0  wave:28  difficulty:ace
+seed:     SvYUhP7txc5VIUq7uMI0lDvM
+party:    Veluza(L22 66/82), Tranquill(L20 26/68), Deerling(L14 0/44), Cetoddle(L14 0/56), Salazzle(L17 36/62), Roggenrola(L17 48/48)
+
+----- DESCRIPTION -----
+Rarer Candy Black Screen
+
+----- CONSOLE -----
+[02:31:02.504] LOG: %c %c %c %c %c Phaser v3.90.0 (WebGL | Web Audio) %c https://phaser.io/v390 background: #ff0000 background: #ffff00 background: #00ff00 background: #00ffff color: #ffffff; background: #000000 background: transparent
+[02:31:03.153] LOG: [ER] build mqvqyn32-la45
+[02:31:38.840] DEBUG: Destroying loading scene
+[02:31:38.840] DEBUG: Destroyed loading scene
+[02:31:38.938] LOG: Seed: oJWZYgu52ENITHtMCLOGyXOy
+[02:31:38.938] LOG: Wave Seed: oJWZYgu52ENITHtMCLOGyXOy 0
+[02:31:41.788] LOG: %cStart Phase LoginPhase color:green;
+[02:31:42.302] LOG: Client Session: 9VuPfDoLQQyIXaQaIxyIpTEdmMdwPbEw
+[02:31:42.937] DEBUG: Using cached system data
+[02:31:43.081] LOG: %cStart Phase TitlePhase color:green;
+[02:31:43.081] LOG: Getting Session Slot id: %d 0
+[02:31:43.099] LOG: use seasonal splash messages true
+[02:31:43.100] LOG: Adding 2 Pride Month splash messages (weight: x15)
+[02:32:07.444] LOG: Getting Session Slot id: %d 0
+[02:32:07.455] LOG: Getting Session Slot id: %d 1
+[02:32:07.456] LOG: Getting Session Slot id: %d 2
+[02:32:07.456] LOG: Getting Session Slot id: %d 3
+[02:32:07.457] LOG: Getting Session Slot id: %d 4
+[02:32:07.774] ERROR: Invalid save data JSON detected! Session not found.
+[02:32:07.809] ERROR: Invalid save data JSON detected! Session not found.
+[02:32:07.809] ERROR: Invalid save data JSON detected! Session not found.
+[02:32:07.809] ERROR: Invalid save data JSON detected! Session not found.
+[02:34:19.768] LOG: Getting Session Slot id: %d 0
+[02:34:19.777] LOG: Wave Seed: SvYUhP7txc5VIUq7uMI0lDvM 0
+[02:34:19.777] LOG: Seed: SvYUhP7txc5VIUq7uMI0lDvM
+[02:34:19.882] LOG: Wave Seed: ouqlSQreqSieL`i 28
+[02:34:19.908] LOG: Applied Protein 
+[02:34:19.908] LOG: Applied Carbos 
+[02:34:19.921] LOG: Applied Protein 
+[02:34:19.921] LOG: Applied Carbos 
+[02:34:19.928] LOG: Applied Protein 
+[02:34:19.929] LOG: Applied Carbos 
+[02:34:20.087] LOG: %cStart Phase EncounterPhase color:green;
+[02:34:20.094] LOG: Pokemon: Wild Kliuncher | Species ID: 599 | Level: 18 | Nature: Hasty (+Spd/-Def)
+[02:34:20.094] LOG: Stats (IVs): HP: 51 (20), Atk: 25 (4), Def: 28 (15), Spatk: 33 (17), Spdef: 31 (16), Spd: 30 (30)
+[02:34:20.096] LOG: Ability: Steelworker | Passive Ability: Multiscale 
+[02:34:20.096] LOG: Moveset: ["Chilling Water","Rising Voltage","Ice Spinner","Zap Cannon"]
+[02:34:22.439] LOG: Failed to create fusion palette
+[02:34:22.443] LOG: Failed to create fusion palette
+[02:34:22.444] LOG: Wave Seed: ouqlSQreqSieL`i 28
+[02:34:23.821] LOG: %cStart Phase SummonPhase color:green;
+[02:34:24.310] LOG: Applied Protein 
+[02:34:24.310] LOG: Applied Carbos 
+[02:34:24.720] LOG: %cStart Phase CheckSwitchPhase color:green;
+[02:34:26.236] LOG: %cStart Phase InitEncounterPhase color:green;
+[02:34:26.237] LOG: %cStart Phase PostSummonPhase color:green;
+[02:34:26.237] LOG: Ran PSP for: Kliuncher
+[02:34:26.238] LOG: %cStart Phase PostSummonPhase color:green;
+[02:34:26.238] LOG: %cStart Phase PostSummonPhase color:green;
+[02:34:26.238] LOG: %cStart Phase TurnInitPhase color:green;
+[02:34:26.239] LOG: %cStart Phase CommandPhase color:green;
