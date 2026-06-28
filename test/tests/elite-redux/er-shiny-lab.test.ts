@@ -24,7 +24,12 @@ import {
   setErShinyLabBit,
   setErShinyLabOwnedBit,
 } from "#data/elite-redux/er-shiny-lab-effects";
-import { getErShinyLabVariantCacheKey, variantColorCache } from "#sprites/variant";
+import {
+  ensureErShinyLabPaletteVariantCache,
+  getErShinyLabPaletteIdFromSave,
+  getErShinyLabVariantCacheKey,
+  variantColorCache,
+} from "#sprites/variant";
 import { describe, expect, it } from "vitest";
 
 type VariantPaletteCache = Record<string, Record<number, Record<string, string>>>;
@@ -141,8 +146,9 @@ describe("ER Shiny Lab data layer", () => {
 
     try {
       cache[baseKey] = { 0: Object.fromEntries(baseHexes.map(h => [h, h])) };
-      cache[cacheKey] = buildErShinyLabVariantPalette(cache[baseKey], "glacier", 0);
+      const resolvedKey = ensureErShinyLabPaletteVariantCache(baseKey, "glacier", 0);
 
+      expect(resolvedKey).toBe(cacheKey);
       expect(cacheKey).toBe("pkmn__articuno-erlab-glacier");
       expect(cache[cacheKey][0]["005273"]).not.toBe("005273");
       expect(cache[cacheKey][0]).toEqual(cache[cacheKey][1]);
@@ -151,6 +157,18 @@ describe("ER Shiny Lab data layer", () => {
       delete cache[baseKey];
       delete cache[cacheKey];
     }
+  });
+
+  it("only resolves an equipped Shiny Lab palette after it is owned", () => {
+    const glacier = ER_SHINY_LAB_EFFECTS_BY_CATEGORY.palette.find(e => e.id === "glacier")!;
+    const save: ErShinyLabSaveData = {
+      l: encodeErShinyLabLoadout({ palette: "glacier", surface: null, around: null }),
+    };
+
+    expect(getErShinyLabPaletteIdFromSave(save)).toBeNull();
+
+    setErShinyLabOwnedBit(save, "palette", glacier.index);
+    expect(getErShinyLabPaletteIdFromSave(save)).toBe("glacier");
   });
 
   it("round-trips compact Shiny Lab save fields through JSON and merge helpers", () => {

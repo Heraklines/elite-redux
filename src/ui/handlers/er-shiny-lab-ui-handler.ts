@@ -216,6 +216,8 @@ export class ErShinyLabUiHandler extends UiHandler {
   private previewSourcePixels: PreviewPixels | null = null;
   private previewFxKey: string | null = null;
   private previewFxVersion = 0;
+  private previewFxTick = 0;
+  private previewAnimTimer: Phaser.Time.TimerEvent | null = null;
 
   constructor() {
     super(UiMode.ER_SHINY_LAB);
@@ -408,6 +410,7 @@ export class ErShinyLabUiHandler extends UiHandler {
     this.previewSpriteKey = null;
     this.previewSourcePixels = null;
     this.previewFxVersion = 0;
+    this.previewFxTick = 0;
     this.fxSprite.setVisible(false);
 
     this.candyText.setText(String(cfg.candy));
@@ -419,6 +422,7 @@ export class ErShinyLabUiHandler extends UiHandler {
     this.openedAt = performance.now();
     this.container.setVisible(true);
     this.active = true;
+    this.startPreviewAnimation();
     // After active=true so the synchronous (cached) path is allowed to reveal the sprite.
     this.loadPreviewSprite(cfg.speciesId);
     return true;
@@ -488,7 +492,7 @@ export class ErShinyLabUiHandler extends UiHandler {
         }
       }
       this.fitSprite();
-      this.previewSourcePixels = this.readPreviewSourcePixels(key);
+      this.previewSourcePixels = this.readPreviewSourcePixels(key, this.monSprite.frame);
       this.refreshPreview();
     };
     if (globalScene.textures.exists(key)) {
@@ -522,7 +526,7 @@ export class ErShinyLabUiHandler extends UiHandler {
     }
   }
 
-  private readPreviewSourcePixels(key: string): PreviewPixels | null {
+  private readPreviewSourcePixels(key: string, sourceFrame?: Phaser.Textures.Frame | null): PreviewPixels | null {
     try {
       if (typeof document === "undefined" || !globalScene.textures.exists(key)) {
         return null;
@@ -541,7 +545,8 @@ export class ErShinyLabUiHandler extends UiHandler {
       }
       const frameValues = Object.values(texture.frames ?? {});
       const frame =
-        (texture.firstFrame ? texture.frames?.[texture.firstFrame] : null)
+        sourceFrame
+        ?? (texture.firstFrame ? texture.frames?.[texture.firstFrame] : null)
         ?? texture.frames?.__BASE
         ?? frameValues[0]
         ?? null;
@@ -566,14 +571,33 @@ export class ErShinyLabUiHandler extends UiHandler {
   }
 
   private refreshExactPreview(loadout: ErShinyLabLoadout, params: ErShinyLabParams): boolean {
-    if (!this.previewSourcePixels) {
+    const source = this.previewSpriteKey
+      ? (this.readPreviewSourcePixels(this.previewSpriteKey, this.monSprite.frame) ?? this.previewSourcePixels)
+      : this.previewSourcePixels;
+    if (!source) {
       return false;
     }
-    const rendered = renderErShinyLabLook(this.previewSourcePixels, loadout, params, 0);
+    this.previewSourcePixels = source;
+    const rendered = renderErShinyLabLook(source, loadout, params, this.previewFxTick / 10);
     if (!rendered) {
       return false;
     }
-    return this.applyExactPreviewTexture(rendered, this.previewSourcePixels);
+    return this.applyExactPreviewTexture(rendered, source);
+  }
+
+  private startPreviewAnimation(): void {
+    this.previewAnimTimer?.remove();
+    this.previewAnimTimer = globalScene.time.addEvent({
+      delay: 100,
+      loop: true,
+      callback: () => {
+        if (!this.active || !this.config || !this.previewSpriteKey) {
+          return;
+        }
+        this.previewFxTick = (this.previewFxTick + 1) % 60000;
+        this.refreshPreview();
+      },
+    });
   }
 
   private applyExactPreviewTexture(rendered: ErShinyLabRenderedPixels, source: PreviewPixels): boolean {
@@ -1416,6 +1440,8 @@ export class ErShinyLabUiHandler extends UiHandler {
 
   clear(): void {
     super.clear();
+    this.previewAnimTimer?.remove();
+    this.previewAnimTimer = null;
     this.container.setVisible(false);
     this.monSprite.stop();
     this.monSprite.setVisible(false);

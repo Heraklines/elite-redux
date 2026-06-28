@@ -56,7 +56,12 @@ import { UiTheme } from "#enums/ui-theme";
 import type { CandyUpgradeNotificationChangedEvent } from "#events/battle-scene";
 import { BattleSceneEventType } from "#events/battle-scene";
 import type { Variant } from "#sprites/variant";
-import { getVariantIcon, getVariantTint } from "#sprites/variant";
+import {
+  ensureErShinyLabPaletteVariantCache,
+  getErShinyLabPaletteIdForSpecies,
+  getVariantIcon,
+  getVariantTint,
+} from "#sprites/variant";
 import { achvs } from "#system/achv";
 import { RibbonData } from "#system/ribbons/ribbon-data";
 import { SettingKeyboard } from "#system/settings-keyboard";
@@ -3039,7 +3044,11 @@ export class StarterSelectUiHandler extends MessageUiHandler {
                 ui.setMode(UiMode.STARTER_SELECT).then(() => {
                   const config = buildErShinyLabConfig(speciesId);
                   config.onExit = () => {
-                    ui.setMode(UiMode.STARTER_SELECT);
+                    ui.setMode(UiMode.STARTER_SELECT).then(() => {
+                      if (this.lastSpecies?.speciesId === speciesId) {
+                        this.setSpecies(this.lastSpecies);
+                      }
+                    });
                   };
                   ui.setModeWithoutClear(UiMode.ER_SHINY_LAB, config);
                 });
@@ -4764,8 +4773,17 @@ export class StarterSelectUiHandler extends MessageUiHandler {
     }
     const props = globalScene.gameData.getSpeciesDexAttrProps(species, this.getCurrentDexProps(species.speciesId));
     const female = props.female ?? false;
-    const spriteKey = species.getSpriteKey(female, props.formIndex, props.shiny, props.variant);
-    if (this.pokemonSprite.pipelineData["spriteKey"] === spriteKey) {
+    const labPaletteId = props.shiny ? getErShinyLabPaletteIdForSpecies(species.speciesId) : null;
+    const labPaletteVariant: Variant = 0;
+    const textureShiny = labPaletteId ? false : props.shiny;
+    const textureVariant = labPaletteId ? labPaletteVariant : props.variant;
+    const spriteKey = species.getSpriteKey(female, props.formIndex, textureShiny, textureVariant);
+    const initialLabCacheKey = labPaletteId
+      ? ensureErShinyLabPaletteVariantCache(spriteKey, labPaletteId, labPaletteVariant)
+      : null;
+    const initialShaderSpriteKey = initialLabCacheKey ?? spriteKey;
+    const initialStateKey = `${spriteKey}|${initialShaderSpriteKey}|${labPaletteId ?? ""}`;
+    if (this.pokemonSprite.pipelineData["previewStateKey"] === initialStateKey) {
       return; // already showing the right sprite
     }
     if (globalScene.textures.exists(spriteKey)) {
@@ -4775,13 +4793,19 @@ export class StarterSelectUiHandler extends MessageUiHandler {
       // shown in the preview. The atlas texture IS present, so gap-fill the anim
       // here (same pattern as the battle-side rebuild in pokemon.ts) then play it.
       ensureErSpriteAnim(spriteKey);
-      if (globalScene.anims.exists(spriteKey)) {
+      const labCacheKey = labPaletteId
+        ? ensureErShinyLabPaletteVariantCache(spriteKey, labPaletteId, labPaletteVariant)
+        : null;
+      if (globalScene.anims.exists(spriteKey) && (!labPaletteId || labCacheKey)) {
+        const shaderSpriteKey = labCacheKey ?? spriteKey;
         this.speciesLoaded.set(species.speciesId, true);
         this.pokemonSprite
           .play(spriteKey)
-          .setPipelineData("shiny", props.shiny)
-          .setPipelineData("variant", props.variant)
-          .setPipelineData("spriteKey", spriteKey)
+          .setPipelineData("shiny", labPaletteId ? true : props.shiny)
+          .setPipelineData("variant", labPaletteId ? labPaletteVariant : props.variant)
+          .setPipelineData("spriteKey", shaderSpriteKey)
+          .setPipelineData("textureKey", spriteKey)
+          .setPipelineData("previewStateKey", `${spriteKey}|${shaderSpriteKey}|${labPaletteId ?? ""}`)
           .setVisible(!this.statsMode);
         return;
       }
@@ -4799,11 +4823,18 @@ export class StarterSelectUiHandler extends MessageUiHandler {
       // the preview — skipping audio is what keeps the loader from piling up.
       // ER-custom species route through ErCustomSpecies.loadAssets here (its
       // `_shiny`/`_shiny2`/`_shiny3` paths), so all custom sprites still load.
-      .loadAssets(female, props.formIndex, props.shiny, props.variant, true, false, true)
+      .loadAssets(female, props.formIndex, textureShiny, textureVariant, true, false, true)
       .catch(() => {})
       .then(() => {
         this.spriteLoadInFlight = false;
-        if (globalScene.textures.exists(spriteKey) && globalScene.anims.exists(spriteKey)) {
+        const labCacheKey = labPaletteId
+          ? ensureErShinyLabPaletteVariantCache(spriteKey, labPaletteId, labPaletteVariant)
+          : null;
+        if (
+          globalScene.textures.exists(spriteKey)
+          && globalScene.anims.exists(spriteKey)
+          && (!labPaletteId || labCacheKey)
+        ) {
           this.spriteLoadAttempts.delete(spriteKey); // landed — clear the counter
         }
         // Re-drive: play this sprite if the cursor is still on it, otherwise kick

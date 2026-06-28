@@ -2,6 +2,7 @@ import { globalScene } from "#app/global-scene";
 import {
   buildErShinyLabVariantPalette,
   decodeErShinyLabLoadout,
+  type ErShinyLabSaveData,
   getErShinyLabOwnedSet,
 } from "#data/elite-redux/er-shiny-lab-effects";
 import { VariantTier } from "#enums/variant-tier";
@@ -94,19 +95,45 @@ export async function populateVariantColors(
   }
 }
 
-function getErShinyLabPaletteId(pokemon: Pokemon): string | null {
-  const save = globalScene.gameData?.getStarterDataEntry(pokemon.species.speciesId).erShinyLab;
+export function getErShinyLabPaletteIdFromSave(save?: ErShinyLabSaveData): string | null {
   const palette = decodeErShinyLabLoadout(save?.l).palette;
   return palette && getErShinyLabOwnedSet(save, "palette").has(palette) ? palette : null;
+}
+
+export function getErShinyLabPaletteIdForSpecies(speciesId: number): string | null {
+  const save = globalScene.gameData?.getStarterDataEntry(speciesId).erShinyLab;
+  return getErShinyLabPaletteIdFromSave(save);
+}
+
+export function getErShinyLabPaletteId(pokemon: Pokemon): string | null {
+  return getErShinyLabPaletteIdForSpecies(pokemon.species.speciesId);
 }
 
 export function getErShinyLabVariantCacheKey(baseKey: string, paletteId: string): string {
   return `${baseKey}-erlab-${paletteId}`;
 }
 
+export function ensureErShinyLabPaletteVariantCache(
+  baseKey: string,
+  paletteId: string | null,
+  variant: Variant = 0,
+): string | null {
+  if (!paletteId) {
+    return null;
+  }
+  const cacheKey = getErShinyLabVariantCacheKey(baseKey, paletteId);
+  if (!Object.hasOwn(variantColorCache, cacheKey)) {
+    const baseColors = variantColorCache[baseKey] as Record<number, Record<string, string>> | undefined;
+    if (baseColors) {
+      variantColorCache[cacheKey] = buildErShinyLabVariantPalette(baseColors, paletteId, variant);
+    }
+  }
+  return Object.hasOwn(variantColorCache, cacheKey) ? cacheKey : null;
+}
+
 export function getErShinyLabPaletteVariantCacheKey(pokemon: Pokemon, baseKey: string): string | null {
   const paletteId = getErShinyLabPaletteId(pokemon);
-  return paletteId ? getErShinyLabVariantCacheKey(baseKey, paletteId) : null;
+  return ensureErShinyLabPaletteVariantCache(baseKey, paletteId, pokemon.variant);
 }
 
 export function populateErShinyLabPaletteVariantColors(pokemon: Pokemon, isBackSprite = false): void {
@@ -115,18 +142,7 @@ export function populateErShinyLabPaletteVariantColors(pokemon: Pokemon, isBackS
     return;
   }
   const baseKey = pokemon.getBattleSpriteKey(isBackSprite);
-  const cacheKey = getErShinyLabVariantCacheKey(baseKey, paletteId);
-  if (Object.hasOwn(variantColorCache, cacheKey)) {
-    return;
-  }
-  const baseColors = variantColorCache[baseKey] as Record<number, Record<string, string>> | undefined;
-  if (!baseColors) {
-    return;
-  }
-  const palette = buildErShinyLabVariantPalette(baseColors, paletteId, pokemon.variant);
-  if (Object.keys(palette).length > 0) {
-    variantColorCache[cacheKey] = palette;
-  }
+  ensureErShinyLabPaletteVariantCache(baseKey, paletteId, pokemon.variant);
 }
 
 /**
