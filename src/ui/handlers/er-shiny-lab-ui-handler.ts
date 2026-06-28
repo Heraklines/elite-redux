@@ -36,10 +36,12 @@
 
 import { globalScene } from "#app/global-scene";
 import {
-  buildErShinyLabVariantPalette,
+  ER_SHINY_LAB_DEFAULT_PARAMS,
+  ER_SHINY_LAB_EFFECTS_BY_CATEGORY,
   type ErShinyLabCategory,
   type ErShinyLabConfig,
   type ErShinyLabEffect,
+  type ErShinyLabEffectDefinition,
   type ErShinyLabEffectState,
   type ErShinyLabLoadout,
   type ErShinyLabParams,
@@ -51,7 +53,7 @@ import { type ErShinyLabRenderedPixels, renderErShinyLabLook } from "#data/elite
 import { Button } from "#enums/buttons";
 import { TextStyle } from "#enums/text-style";
 import { UiMode } from "#enums/ui-mode";
-import { getErShinyLabVariantCacheKey, variantColorCache } from "#sprites/variant";
+import { ensureErShinyLabPaletteVariantCache } from "#sprites/variant";
 import { addTextObject } from "#ui/text";
 import { UiHandler } from "#ui/ui-handler";
 import { addWindow } from "#ui/ui-theme";
@@ -75,7 +77,6 @@ type Tab = ErShinyLabCategory | "tune";
 
 /** A row in the TUNE panel. */
 type TuneRow = "palAmt" | "surfAmt" | "aroAmt" | "scale" | "seed" | "load" | "save";
-type VariantPaletteMap = Record<number, Record<string, string>>;
 type PreviewPixels = { width: number; height: number; data: Uint8ClampedArray };
 
 const CATEGORIES: ErShinyLabCategory[] = ["palette", "surface", "around"];
@@ -675,19 +676,7 @@ export class ErShinyLabUiHandler extends UiHandler {
       ?? (this.tab === "palette" ? this.focusedEffect()?.id : this.config?.equipped.palette)
       ?? this.config?.equipped.palette
       ?? null;
-    let spriteKey = baseKey;
-    if (nextPaletteId) {
-      const cacheKey = getErShinyLabVariantCacheKey(baseKey, nextPaletteId);
-      if (!Object.hasOwn(variantColorCache, cacheKey)) {
-        const baseColors = variantColorCache[baseKey] as VariantPaletteMap | undefined;
-        if (baseColors) {
-          variantColorCache[cacheKey] = buildErShinyLabVariantPalette(baseColors, nextPaletteId, 0);
-        }
-      }
-      if (Object.hasOwn(variantColorCache, cacheKey)) {
-        spriteKey = cacheKey;
-      }
-    }
+    const spriteKey = ensureErShinyLabPaletteVariantCache(baseKey, nextPaletteId, 0) ?? baseKey;
     this.monSprite
       .setPipelineData("shiny", spriteKey !== baseKey)
       .setPipelineData("variant", 0)
@@ -1491,21 +1480,17 @@ function hashEffectId(id: string): number {
 // replaces this via show([config]) once the P1 persistence layer lands.
 // =============================================================================
 
-function demoEffect(
-  id: string,
-  label: string,
-  category: ErShinyLabCategory,
-  rarity: ErShinyLabRarity,
-  minTier: number,
-  cost: number,
-  accent: string,
-  lockHint?: string,
-): ErShinyLabEffect {
-  const e: ErShinyLabEffect = { id, label, category, rarity, minTier, cost, accent };
-  if (lockHint) {
-    e.lockHint = lockHint;
-  }
-  return e;
+function demoEffect(def: ErShinyLabEffectDefinition): ErShinyLabEffect {
+  return {
+    id: def.id,
+    label: def.label,
+    category: def.category,
+    rarity: def.rarity,
+    minTier: def.minTier,
+    cost: def.baseCost,
+    accent: def.accent,
+    ...(def.lockHint ? { lockHint: def.lockHint } : {}),
+  };
 }
 
 export function buildDemoConfig(speciesId: number): ErShinyLabConfig {
@@ -1517,90 +1502,17 @@ export function buildDemoConfig(speciesId: number): ErShinyLabConfig {
     }
   })();
 
-  const palette: ErShinyLabEffect[] = [
-    demoEffect("glacier", "Glacier", "palette", "common", 1, 100, "#7fd8ff"),
-    demoEffect("obsidian", "Obsidian", "palette", "common", 1, 100, "#2a2a3a"),
-    demoEffect("crimson", "Crimson", "palette", "common", 1, 100, "#ff4a5a"),
-    demoEffect("emerald", "Emerald", "palette", "common", 1, 140, "#3affa0"),
-    demoEffect("sunset", "Sunset", "palette", "rare", 1, 180, "#ff8a3d"),
-    demoEffect("aurora", "Aurora", "palette", "rare", 1, 180, "#5affc0"),
-    demoEffect("vaporwave", "Vaporwave", "palette", "rare", 1, 220, "#ff77e6"),
-    demoEffect("toxic", "Toxic", "palette", "rare", 1, 220, "#9bff4a"),
-    demoEffect("galaxy", "Galaxy", "palette", "epic", 1, 320, "#9b6cff"),
-    demoEffect("synthsun", "Synthwave Sun", "palette", "epic", 1, 360, "#ff9a3d"),
-    demoEffect("aurum", "Aurum", "palette", "epic", 1, 400, "#ffcf52"),
-    demoEffect(
-      "prism",
-      "Prism",
-      "palette",
-      "legendary",
-      1,
-      500,
-      "#a0e0ff",
-      "win with a different type on every team member",
-    ),
-  ];
-  const surface: ErShinyLabEffect[] = [
-    demoEffect("scales", "Scales", "surface", "common", 3, 500, "#9fd0ff"),
-    demoEffect("marble", "Marble", "surface", "common", 3, 500, "#dfe6f2"),
-    demoEffect("holofoil", "Holofoil", "surface", "rare", 3, 620, "#7fe0ff"),
-    demoEffect("oilfilm", "Oil Film", "surface", "rare", 3, 620, "#b08bff"),
-    demoEffect("electric", "Electric", "surface", "rare", 3, 700, "#ffe85a"),
-    demoEffect("tron", "Tron Lines", "surface", "rare", 3, 700, "#36e6ff"),
-    demoEffect("crystal", "Crystal Facets", "surface", "epic", 3, 900, "#a6f0ff"),
-    demoEffect("plasma", "Plasma", "surface", "epic", 3, 900, "#ff6ad9"),
-    demoEffect("stained", "Stained Glass", "surface", "epic", 3, 980, "#c08bff"),
-    demoEffect("sunsetsun", "Sunset Sun", "surface", "epic", 3, 980, "#ff8a3d"),
-    demoEffect(
-      "prismsplit",
-      "Prism Split",
-      "surface",
-      "legendary",
-      3,
-      1200,
-      "#9ad0ff",
-      "win a Ghost-Trainers run with no faints",
-    ),
-  ];
-  const around: ErShinyLabEffect[] = [
-    demoEffect("softhalo", "Soft Halo", "around", "common", 4, 1000, "#9fd0ff"),
-    demoEffect("petals", "Petals", "around", "common", 4, 1000, "#ff9ad0"),
-    demoEffect("orbiting", "Orbiting Sparks", "around", "rare", 4, 1200, "#7fe0ff"),
-    demoEffect("fireflies", "Fireflies", "around", "rare", 4, 1200, "#ffe07a"),
-    demoEffect("embers", "Embers", "around", "rare", 4, 1300, "#ff7a3a"),
-    demoEffect("frost", "Frost Aura", "around", "rare", 4, 1300, "#a6f0ff"),
-    demoEffect("flame", "Flame Aura", "around", "epic", 4, 1600, "#ff7a3a", "win Classic (Ace+) holding no items"),
-    demoEffect("golden", "Golden Glow", "around", "epic", 4, 1600, "#ffcf52"),
-    demoEffect("shadow", "Shadow Aura", "around", "epic", 4, 1700, "#9b6cff"),
-    demoEffect(
-      "cursed",
-      "Cursed Aura",
-      "around",
-      "epic",
-      4,
-      1700,
-      "#ff4a6a",
-      "win a Ghost-Trainers run with no faints",
-    ),
-    demoEffect(
-      "rainbowout",
-      "Rainbow Outline",
-      "around",
-      "legendary",
-      4,
-      2200,
-      "#a0e0ff",
-      "reach wave 50 without taking damage",
-    ),
-  ];
+  const palette = ER_SHINY_LAB_EFFECTS_BY_CATEGORY.palette.map(demoEffect);
+  const surface = ER_SHINY_LAB_EFFECTS_BY_CATEGORY.surface.map(demoEffect);
+  const around = ER_SHINY_LAB_EFFECTS_BY_CATEGORY.around.map(demoEffect);
 
   const owned: Record<ErShinyLabCategory, Set<string>> = {
-    palette: new Set(["glacier", "obsidian", "aurora", "galaxy"]),
-    surface: new Set(["scales", "holofoil"]),
-    around: new Set(["softhalo", "orbiting"]),
+    palette: new Set(["glacier", "aurum", "duoneon"]),
+    surface: new Set(["holofoil", "marble", "starmap"]),
+    around: new Set(["halo", "rings", "staticfield"]),
   };
-  // Globally available (achievement/challenge gate satisfied) - prism stays locked.
-  const available = new Set<string>(["prismsplit", "flame", "cursed"]);
+  const available = new Set<string>([...palette, ...surface, ...around].map(e => e.id));
+  const params = { ...ER_SHINY_LAB_DEFAULT_PARAMS, seed: 42 };
 
   return {
     speciesId,
@@ -1610,12 +1522,12 @@ export function buildDemoConfig(speciesId: number): ErShinyLabConfig {
     effects: { palette, surface, around },
     owned,
     available,
-    equipped: { palette: "aurora", surface: "holofoil", around: "softhalo" },
-    params: { palAmt: 1, surfAmt: 0.8, aroAmt: 1, scale: 1, seed: 42, tintMode: 0 },
+    equipped: { palette: "duoneon", surface: "starmap", around: "staticfield" },
+    params,
     presets: [
       {
-        loadout: { palette: "galaxy", surface: "holofoil", around: "orbiting" },
-        params: { palAmt: 1, surfAmt: 0.8, aroAmt: 1, scale: 1, seed: 42, tintMode: 0 },
+        loadout: { palette: "glacier", surface: "marble", around: "rings" },
+        params,
       },
       null,
       null,

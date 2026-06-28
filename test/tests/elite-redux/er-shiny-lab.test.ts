@@ -13,6 +13,7 @@ import {
   ER_SHINY_LAB_EFFECTS_BY_CATEGORY,
   type ErShinyLabConfig,
   type ErShinyLabEffect,
+  type ErShinyLabLoadout,
   type ErShinyLabSaveData,
   encodeErShinyLabLoadout,
   encodeErShinyLabParams,
@@ -24,6 +25,8 @@ import {
   setErShinyLabBit,
   setErShinyLabOwnedBit,
 } from "#data/elite-redux/er-shiny-lab-effects";
+import { AROUND, AURA, PALETTE } from "#data/elite-redux/er-shiny-lab-fx";
+import { renderErShinyLabLook } from "#data/elite-redux/er-shiny-lab-renderer";
 import {
   ensureErShinyLabPaletteVariantCache,
   getErShinyLabPaletteIdFromSave,
@@ -33,6 +36,25 @@ import {
 import { describe, expect, it } from "vitest";
 
 type VariantPaletteCache = Record<string, Record<number, Record<string, string>>>;
+
+function sampleSpritePixels() {
+  const width = 10;
+  const height = 10;
+  const data = new Uint8ClampedArray(width * height * 4);
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const i = (y * width + x) * 4;
+      if (x < 2 || x > 7 || y < 2 || y > 7) {
+        continue;
+      }
+      data[i] = 48 + x * 18;
+      data[i + 1] = 72 + y * 16;
+      data[i + 2] = 180 - x * 8 + y * 3;
+      data[i + 3] = 255;
+    }
+  }
+  return { width, height, data };
+}
 
 function configFor(
   effect: ErShinyLabEffect,
@@ -47,6 +69,29 @@ function configFor(
 }
 
 describe("ER Shiny Lab data layer", () => {
+  it("keeps every game effect category aligned with the website FX registry", () => {
+    expect(ER_SHINY_LAB_EFFECTS_BY_CATEGORY.palette.map(e => e.id)).toEqual(Object.keys(PALETTE));
+    expect(ER_SHINY_LAB_EFFECTS_BY_CATEGORY.surface.map(e => e.id)).toEqual(Object.keys(AURA));
+    expect(ER_SHINY_LAB_EFFECTS_BY_CATEGORY.around.map(e => e.id)).toEqual(Object.keys(AROUND));
+  });
+
+  it("renders every website FX function through the exact in-game renderer", () => {
+    const source = sampleSpritePixels();
+    const params = { palAmt: 1, surfAmt: 1, aroAmt: 1, scale: 1, seed: 42, tintMode: 0 };
+    const loadouts: ErShinyLabLoadout[] = [
+      ...ER_SHINY_LAB_EFFECTS_BY_CATEGORY.palette.map(e => ({ palette: e.id, surface: null, around: null })),
+      ...ER_SHINY_LAB_EFFECTS_BY_CATEGORY.surface.map(e => ({ palette: null, surface: e.id, around: null })),
+      ...ER_SHINY_LAB_EFFECTS_BY_CATEGORY.around.map(e => ({ palette: null, surface: null, around: e.id })),
+    ];
+
+    for (const loadout of loadouts) {
+      const rendered = renderErShinyLabLook(source, loadout, params, 1.7);
+
+      expect(rendered, JSON.stringify(loadout)).not.toBeNull();
+      expect(rendered!.width * rendered!.height * 4, JSON.stringify(loadout)).toBe(rendered!.data.length);
+    }
+  });
+
   it("resolves the tier, availability, owned, and candy gates in order", () => {
     const effect: ErShinyLabEffect = {
       id: "spectrumsplit",

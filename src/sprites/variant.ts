@@ -113,6 +113,66 @@ export function getErShinyLabVariantCacheKey(baseKey: string, paletteId: string)
   return `${baseKey}-erlab-${paletteId}`;
 }
 
+const syntheticErShinyLabVariantCacheKeys = new Set<string>();
+
+function colorToHex(r: number, g: number, b: number): string {
+  return `${r.toString(16).padStart(2, "0")}${g.toString(16).padStart(2, "0")}${b.toString(16).padStart(2, "0")}`;
+}
+
+function buildIdentityVariantPaletteFromTexture(baseKey: string): Record<number, Record<string, string>> | null {
+  try {
+    if (typeof document === "undefined" || !globalScene.textures.exists(baseKey)) {
+      return null;
+    }
+    const texture = globalScene.textures.get(baseKey) as Phaser.Textures.Texture & {
+      getSourceImage?: () => CanvasImageSource | null;
+      source?: { image?: CanvasImageSource } | { image?: CanvasImageSource }[];
+    };
+    const textureSource = texture.source as unknown as
+      | { image?: CanvasImageSource }
+      | { image?: CanvasImageSource }[]
+      | undefined;
+    const source = (texture.getSourceImage?.()
+      ?? (Array.isArray(textureSource) ? textureSource[0]?.image : textureSource?.image)
+      ?? null) as CanvasImageSource & { width?: number; height?: number };
+    const width = Math.floor(source?.width ?? 0);
+    const height = Math.floor(source?.height ?? 0);
+    if (!source || width <= 0 || height <= 0) {
+      return null;
+    }
+
+    const canvas = document.createElement("canvas");
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext("2d", { willReadFrequently: true });
+    if (!ctx) {
+      return null;
+    }
+    ctx.clearRect(0, 0, width, height);
+    ctx.drawImage(source, 0, 0);
+    const pixels = ctx.getImageData(0, 0, width, height).data;
+    const counts = new Map<string, number>();
+    for (let i = 0; i < pixels.length; i += 4) {
+      if (pixels[i + 3] <= 16) {
+        continue;
+      }
+      const hex = colorToHex(pixels[i], pixels[i + 1], pixels[i + 2]);
+      counts.set(hex, (counts.get(hex) ?? 0) + 1);
+    }
+    const colors = [...counts.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 32)
+      .map(([hex]) => hex);
+    if (colors.length === 0) {
+      return null;
+    }
+    const identity = Object.fromEntries(colors.map(hex => [hex, hex]));
+    return { 0: identity, 1: identity, 2: identity };
+  } catch {
+    return null;
+  }
+}
+
 export function ensureErShinyLabPaletteVariantCache(
   baseKey: string,
   paletteId: string | null,
@@ -122,10 +182,28 @@ export function ensureErShinyLabPaletteVariantCache(
     return null;
   }
   const cacheKey = getErShinyLabVariantCacheKey(baseKey, paletteId);
-  if (!Object.hasOwn(variantColorCache, cacheKey)) {
-    const baseColors = variantColorCache[baseKey] as Record<number, Record<string, string>> | undefined;
-    if (baseColors) {
-      variantColorCache[cacheKey] = buildErShinyLabVariantPalette(baseColors, paletteId, variant);
+  const hasRealBaseColors = Object.hasOwn(variantColorCache, baseKey);
+  const shouldBuild =
+    !Object.hasOwn(variantColorCache, cacheKey)
+    || (syntheticErShinyLabVariantCacheKeys.has(cacheKey) && hasRealBaseColors);
+  if (!shouldBuild) {
+    return cacheKey;
+  }
+
+  const baseColors =
+    (variantColorCache[baseKey] as Record<number, Record<string, string>> | undefined)
+    ?? buildIdentityVariantPaletteFromTexture(baseKey);
+  if (!baseColors) {
+    return Object.hasOwn(variantColorCache, cacheKey) ? cacheKey : null;
+  }
+
+  const palette = buildErShinyLabVariantPalette(baseColors, paletteId, variant);
+  if (Object.keys(palette[variant] ?? palette[0] ?? {}).length > 0) {
+    variantColorCache[cacheKey] = palette;
+    if (hasRealBaseColors) {
+      syntheticErShinyLabVariantCacheKeys.delete(cacheKey);
+    } else {
+      syntheticErShinyLabVariantCacheKeys.add(cacheKey);
     }
   }
   return Object.hasOwn(variantColorCache, cacheKey) ? cacheKey : null;

@@ -33,6 +33,11 @@ import { bargainAbilityDescription } from "#data/elite-redux/er-bargain-sins";
 import { applyErBlackShinyKit } from "#data/elite-redux/er-black-shinies";
 import { recordErBiomeVisited } from "#data/elite-redux/er-map-nodes";
 import { STORMGLASS_WEATHER_CHOICES } from "#data/elite-redux/er-relics";
+import {
+  ER_SHINY_LAB_EFFECTS_BY_CATEGORY,
+  encodeErShinyLabLoadout,
+  setErShinyLabOwnedBit,
+} from "#data/elite-redux/er-shiny-lab-effects";
 import { AbilityId } from "#enums/ability-id";
 import { BiomeId } from "#enums/biome-id";
 import { Button } from "#enums/buttons";
@@ -134,6 +139,28 @@ function caughtSpecies(game: GameManager, id: SpeciesId) {
     starter.abilityAttr = 1;
   }
   return getPokemonSpecies(id);
+}
+
+function caughtShinyLabSpecies(game: GameManager, id: SpeciesId, paletteId = "duoneon") {
+  const species = caughtSpecies(game, id);
+  const shinyAttr = (CAUGHT | DexAttr.SHINY) & ~DexAttr.NON_SHINY;
+  const dex = game.scene.gameData.dexData[id];
+  const starter = game.scene.gameData.starterData[id];
+  const palette = ER_SHINY_LAB_EFFECTS_BY_CATEGORY.palette.find(e => e.id === paletteId);
+  if (!palette) {
+    throw new Error(`starter-select-shiny-lab recipe: unknown palette ${paletteId}`);
+  }
+  if (dex) {
+    dex.caughtAttr = shinyAttr;
+    dex.seenAttr = shinyAttr;
+  }
+  if (starter) {
+    starter.erShinyLab ??= {};
+    const save = starter.erShinyLab;
+    setErShinyLabOwnedBit(save, "palette", palette.index);
+    save.l = encodeErShinyLabLoadout({ palette: paletteId, surface: null, around: null });
+  }
+  return species;
 }
 
 /** Page.ABILITIES is module-local (not exported) in summary-ui-handler; its value is 1. */
@@ -264,7 +291,7 @@ const RECIPES: Record<string, Recipe> = {
   "er-shiny-lab": {
     mode: UiMode.ER_SHINY_LAB,
     prepare: () => [buildDemoConfig(SpeciesId.ARTICUNO)],
-    diffTolerance: 40000, // live animated mon sprite in the preview pane
+    diffTolerance: 120000, // live animated exact FX preview in the preview pane
   },
   // Directional-key navigation tour: browse, switch category (RIGHT), drop into the
   // tuning bar (DOWN past the last effect), step across the sliders (RIGHT), into the
@@ -276,7 +303,7 @@ const RECIPES: Record<string, Recipe> = {
     // a slider row and RIGHT adjusts it. Each -stepN.png proves the no-mouse 4-tab flow
     // (tab switching + slider adjust) with no crash.
     steps: [Button.RIGHT, Button.RIGHT, Button.RIGHT, Button.DOWN, Button.DOWN, Button.RIGHT],
-    diffTolerance: 40000,
+    diffTolerance: 120000,
   },
   "biome-shop": {
     mode: UiMode.BIOME_SHOP,
@@ -337,6 +364,20 @@ const RECIPES: Record<string, Recipe> = {
       }
       return [() => {}];
     },
+  },
+  // Regression for Shiny Lab equipped palettes in Starter Select: the selected starter is
+  // shiny, owns/equips a Lab palette, and the preview must still render through the real
+  // StarterSelectUiHandler instead of waiting forever for a missing variant cache.
+  "starter-select-shiny-lab": {
+    mode: UiMode.STARTER_SELECT,
+    prepare: game => {
+      for (let id = 1; id <= 151; id++) {
+        caughtSpecies(game, id as SpeciesId);
+      }
+      caughtShinyLabSpecies(game, SpeciesId.BULBASAUR);
+      return [() => {}];
+    },
+    diffTolerance: 40000,
   },
   // Co-op (#633) starter-select: forces COOP mode so the budget panel reads 0/5
   // (per-player) and the per-player 3-mon cap applies. This is the real screen the
