@@ -33,6 +33,8 @@
 import { globalScene } from "#app/global-scene";
 import { speciesStarterCosts } from "#balance/starters";
 import { Egg } from "#data/egg";
+import { grantErShinyLabEffectAvailability } from "#data/elite-redux/er-shiny-lab-config";
+import { ER_SHINY_LAB_EFFECT_INDEX } from "#data/elite-redux/er-shiny-lab-effects";
 import { getErDifficulty } from "#data/elite-redux/er-run-difficulty";
 import { getPokemonSpecies } from "#utils/pokemon-utils";
 import { DexAttr } from "#enums/dex-attr";
@@ -70,7 +72,9 @@ export type RewardSpec =
   /** The apex-only black shiny (separate ER tier-4 path). */
   | { kind: "blackShiny"; species: SpeciesId | "random" }
   /** A specific Pokemon, caught (normal). */
-  | { kind: "pokemon"; species: SpeciesId };
+  | { kind: "pokemon"; species: SpeciesId }
+  /** Global Shiny Lab availability gates. Species still buy or catch ownership. */
+  | { kind: "shinyLabEffects"; effects: string[] };
 
 /**
  * achv id (the key in `achvs`) -> reward(s). Only ids present here grant anything;
@@ -110,7 +114,11 @@ export const ER_ACHIEVEMENT_REWARDS: Record<string, RewardSpec | RewardSpec[]> =
   MONO_NORMAL: [{ kind: "candyTeam", perMon: 20 }, { kind: "pokemon", species: SpeciesId.SNORLAX }],
   MONO_FIGHTING: [{ kind: "candyTeam", perMon: 20 }, { kind: "pokemon", species: SpeciesId.MACHAMP }],
   MONO_FLYING: [{ kind: "candyTeam", perMon: 20 }, { kind: "pokemon", species: SpeciesId.CORVIKNIGHT }],
-  MONO_POISON: [{ kind: "candyTeam", perMon: 20 }, { kind: "pokemon", species: SpeciesId.NIDOKING }],
+  MONO_POISON: [
+    { kind: "candyTeam", perMon: 20 },
+    { kind: "pokemon", species: SpeciesId.NIDOKING },
+    { kind: "shinyLabEffects", effects: ["toxic", "poison"] },
+  ],
   MONO_GROUND: [{ kind: "candyTeam", perMon: 20 }, { kind: "pokemon", species: SpeciesId.EXCADRILL }],
   MONO_ROCK: [{ kind: "candyTeam", perMon: 20 }, { kind: "pokemon", species: SpeciesId.GIGALITH }],
   MONO_BUG: [{ kind: "candyTeam", perMon: 20 }, { kind: "pokemon", species: SpeciesId.SCIZOR }],
@@ -121,7 +129,11 @@ export const ER_ACHIEVEMENT_REWARDS: Record<string, RewardSpec | RewardSpec[]> =
   MONO_GRASS: [{ kind: "candyTeam", perMon: 20 }, { kind: "pokemon", species: SpeciesId.VENUSAUR }],
   MONO_ELECTRIC: [{ kind: "candyTeam", perMon: 20 }, { kind: "pokemon", species: SpeciesId.JOLTEON }],
   MONO_PSYCHIC: [{ kind: "candyTeam", perMon: 20 }, { kind: "pokemon", species: SpeciesId.ALAKAZAM }],
-  MONO_ICE: [{ kind: "candyTeam", perMon: 20 }, { kind: "pokemon", species: SpeciesId.GLACEON }],
+  MONO_ICE: [
+    { kind: "candyTeam", perMon: 20 },
+    { kind: "pokemon", species: SpeciesId.GLACEON },
+    { kind: "shinyLabEffects", effects: ["frostbite", "frost"] },
+  ],
   MONO_DRAGON: [{ kind: "candyTeam", perMon: 20 }, { kind: "pokemon", species: SpeciesId.HAXORUS }],
   MONO_DARK: [{ kind: "candyTeam", perMon: 20 }, { kind: "pokemon", species: SpeciesId.WEAVILE }],
   MONO_FAIRY: [{ kind: "candyTeam", perMon: 20 }, { kind: "pokemon", species: SpeciesId.SYLVEON }],
@@ -178,7 +190,11 @@ export const ER_ACHIEVEMENT_REWARDS: Record<string, RewardSpec | RewardSpec[]> =
   SHINY_PARTY: { kind: "eggs", tier: EggTier.EPIC, count: 5, shiny: true },
 
   // === Challenge wins =======================================================
-  FRESH_START: [{ kind: "candyTeam", perMon: 20 }, { kind: "eggs", tier: EggTier.RARE, count: 2 }],
+  FRESH_START: [
+    { kind: "candyTeam", perMon: 20 },
+    { kind: "eggs", tier: EggTier.RARE, count: 2 },
+    { kind: "shinyLabEffects", effects: ["aurum", "flame", "goldenglow"] },
+  ],
   INVERSE_BATTLE: { kind: "eggs", tier: EggTier.EPIC, count: 1 },
   FLIP_STATS: { kind: "eggs", tier: EggTier.EPIC, count: 1 },
   FLIP_INVERSE: { kind: "eggs", tier: EggTier.EPIC, count: 1 },
@@ -195,15 +211,22 @@ export const ER_ACHIEVEMENT_REWARDS: Record<string, RewardSpec | RewardSpec[]> =
   // Accepting one of Giratina's Bargain deals.
   DEVILS_BARGAIN: { kind: "eggs", tier: EggTier.EPIC, count: 2 },
   // Defeating a ghost-team trainer (cross-player ghost or Colosseum ghost round).
-  EXORCIST: [{ kind: "candyTeam", perMon: 15 }, { kind: "pokemon", species: SpeciesId.CHANDELURE }],
+  EXORCIST: [
+    { kind: "candyTeam", perMon: 15 },
+    { kind: "pokemon", species: SpeciesId.CHANDELURE },
+    { kind: "shinyLabEffects", effects: ["cosmos", "shadowaura"] },
+  ],
   // Defeating the Primal Cascoon final-boss second stage.
   PRIMAL_CASCOON: { kind: "eggs", tier: EggTier.EPIC, count: 2 },
   // Holding five relics at once in a single run.
   RELIC_HUNTER: { kind: "eggs", tier: EggTier.RARE, count: 2 },
   // Owning a shiny Pokemon of all three variant tiers.
-  ALL_SHINY_TIERS: { kind: "eggs", tier: EggTier.EPIC, count: 1, shiny: true },
+  ALL_SHINY_TIERS: [
+    { kind: "eggs", tier: EggTier.EPIC, count: 1, shiny: true },
+    { kind: "shinyLabEffects", effects: ["rainbowoutline"] },
+  ],
   // Earning all eighteen mono-type ribbons.
-  MASTER_OF_ALL: { kind: "shiny", tier: 2, species: "random" },
+  MASTER_OF_ALL: [{ kind: "shiny", tier: 2, species: "random" }, { kind: "shinyLabEffects", effects: ["spectrumsplit"] }],
 };
 
 /** A short, player-facing summary of one granted reward (+ optional icon mon). */
@@ -284,6 +307,10 @@ function applyRewardSpec(spec: RewardSpec): GrantedReward | null {
     case "pokemon":
       grantPokemon(spec.species);
       return { text: speciesName(spec.species), iconSpecies: spec.species };
+    case "shinyLabEffects": {
+      const labels = spec.effects.filter(effectId => grantErShinyLabEffectAvailability(effectId, false)).map(effectLabel);
+      return labels.length ? { text: `Shiny Lab effects: ${labels.join(", ")}` } : null;
+    }
   }
 }
 
@@ -339,6 +366,10 @@ function rootSpeciesId(species: SpeciesId): SpeciesId {
 
 function speciesName(species: SpeciesId): string {
   return getPokemonSpecies(species).name;
+}
+
+function effectLabel(effectId: string): string {
+  return ER_SHINY_LAB_EFFECT_INDEX.get(effectId)?.label ?? effectId;
 }
 
 /** Resolve a reward species: a fixed id passes through; "random" rolls a starter. */

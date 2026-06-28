@@ -106,6 +106,7 @@ import {
   getErDifficultyShinyMultiplier,
 } from "#data/elite-redux/er-run-difficulty";
 import { getRunShinyMultiplier } from "#data/elite-redux/er-shiny-favour";
+import { getErShinyLabEarnedTierForPokemon, rollErShinyLabWildSavedLook } from "#data/elite-redux/er-shiny-lab-effects";
 import { enforceErEliteBstCurve } from "#data/elite-redux/er-trainer-runtime-hook";
 import {
   applyErWardStoneBlock,
@@ -8253,6 +8254,12 @@ export class EnemyPokemon extends Pokemon {
       // Without this, wild enemies could never naturally roll black.
       resetErBlackShinyState(this);
       maybeUpgradeToErBlackShiny(this);
+      if (this.shiny && !this.hasTrainer() && !this.customPokemonData.erShinyLab) {
+        this.customPokemonData.erShinyLab = rollErShinyLabWildSavedLook(
+          getErShinyLabEarnedTierForPokemon(this),
+          randSeedInt,
+        );
+      }
 
       this.luck = (this.shiny ? this.variant + 1 : 0) + (this.fusionShiny ? this.fusionVariant + 1 : 0);
 

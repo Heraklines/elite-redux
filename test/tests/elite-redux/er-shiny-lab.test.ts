@@ -8,6 +8,7 @@ import {
   bitsetToErShinyLabAvailableSet,
   buildErShinyLabPaletteMap,
   buildErShinyLabVariantPalette,
+  claimErShinyLabCompletionRewards,
   decodeErShinyLabLoadout,
   decodeErShinyLabParams,
   ER_SHINY_LAB_EFFECTS_BY_CATEGORY,
@@ -18,13 +19,20 @@ import {
   encodeErShinyLabLoadout,
   encodeErShinyLabParams,
   encodeErShinyLabPreset,
+  getErShinyLabCompletion,
+  getErShinyLabEarnedTierForPokemon,
   getErShinyLabEffectCost,
+  getErShinyLabNameSignature,
   getErShinyLabOwnedSet,
+  grantErShinyLabSavedLookToSave,
+  grantErShinyLabSeedRerollTokens,
   mergeErShinyLabSaveData,
   normalizeErShinyLabSavedLook,
   resolveErShinyLabEffectState,
+  rollErShinyLabWildSavedLook,
   setErShinyLabBit,
   setErShinyLabOwnedBit,
+  spendErShinyLabSeedRerollToken,
 } from "#data/elite-redux/er-shiny-lab-effects";
 import { AROUND, AURA, PALETTE } from "#data/elite-redux/er-shiny-lab-fx";
 import { renderErShinyLabLook } from "#data/elite-redux/er-shiny-lab-renderer";
@@ -308,6 +316,79 @@ describe("ER Shiny Lab data layer", () => {
 
     const merged = mergeErShinyLabSaveData({}, parsedSave);
     expect(merged).toEqual(parsedSave);
+  });
+
+  it("rolls wild special looks by shiny tier and rarity-weighted category", () => {
+    const noLook = rollErShinyLabWildSavedLook(1, () => 99);
+    expect(noLook).toBeUndefined();
+
+    const paletteLook = rollErShinyLabWildSavedLook(1, max => (max === 100 ? 0 : 0));
+    const paletteLoadout = decodeErShinyLabLoadout(paletteLook);
+    expect(paletteLoadout.palette).toBe(ER_SHINY_LAB_EFFECTS_BY_CATEGORY.palette[0].id);
+    expect(paletteLoadout.surface).toBeNull();
+    expect(paletteLoadout.around).toBeNull();
+
+    const aroundLook = rollErShinyLabWildSavedLook(4, max => (max === 100 ? 0 : 0));
+    const aroundLoadout = decodeErShinyLabLoadout(aroundLook);
+    expect(aroundLoadout.palette).toBeNull();
+    expect(aroundLoadout.surface).toBeNull();
+    expect(aroundLoadout.around).toBe(ER_SHINY_LAB_EFFECTS_BY_CATEGORY.around[0].id);
+  });
+
+  it("grants caught wild looks to a species save without overwriting existing loadouts", () => {
+    const look = encodeErShinyLabPreset({
+      loadout: { palette: "duoneon", surface: "starmap", around: null },
+      params: { palAmt: 1, surfAmt: 0.75, aroAmt: 1, scale: 1, seed: 55, tintMode: 0 },
+    });
+    const save: ErShinyLabSaveData = {};
+
+    expect(grantErShinyLabSavedLookToSave(save, look)).toEqual(["duoneon", "starmap"]);
+    expect(getErShinyLabOwnedSet(save, "palette").has("duoneon")).toBe(true);
+    expect(getErShinyLabOwnedSet(save, "surface").has("starmap")).toBe(true);
+    expect(decodeErShinyLabLoadout(save.l)).toEqual({ palette: "duoneon", surface: "starmap", around: null });
+    expect(decodeErShinyLabParams(save.q).seed).toBe(55);
+
+    const existing = encodeErShinyLabLoadout({ palette: "glacier", surface: null, around: null });
+    save.l = existing;
+    grantErShinyLabSavedLookToSave(
+      save,
+      encodeErShinyLabPreset({
+        loadout: { palette: null, surface: null, around: "halo" },
+        params: { palAmt: 1, surfAmt: 1, aroAmt: 1, scale: 1, seed: 99, tintMode: 0 },
+      }),
+    );
+    expect(save.l).toEqual(existing);
+    expect(getErShinyLabOwnedSet(save, "around").has("halo")).toBe(true);
+  });
+
+  it("tracks Shiny Lab completion rewards and seed reroll tokens compactly", () => {
+    const save: ErShinyLabSaveData = {};
+    for (const def of ER_SHINY_LAB_EFFECTS_BY_CATEGORY.palette) {
+      setErShinyLabOwnedBit(save, "palette", def.index);
+    }
+
+    expect(getErShinyLabCompletion(save, "palette").percent).toBe(100);
+    expect(claimErShinyLabCompletionRewards(save)).toEqual(["palette"]);
+    expect(save.t).toBe(1);
+    expect(claimErShinyLabCompletionRewards(save)).toEqual([]);
+
+    grantErShinyLabSeedRerollTokens(save, 2);
+    expect(save.t).toBe(3);
+    expect(spendErShinyLabSeedRerollToken(save)).toBe(true);
+    expect(save.t).toBe(2);
+  });
+
+  it("derives live Pokemon shiny tiers and name signatures for runtime rendering", () => {
+    expect(getErShinyLabEarnedTierForPokemon({ shiny: false, variant: 2 })).toBe(0);
+    expect(getErShinyLabEarnedTierForPokemon({ shiny: true, variant: 2 })).toBe(3);
+    expect(
+      getErShinyLabEarnedTierForPokemon({ shiny: true, variant: 0, customPokemonData: { erBlackShiny: true } }),
+    ).toBe(4);
+
+    expect(getErShinyLabNameSignature({ palette: "duoneon", surface: "starmap", around: "staticfield" })?.label).toBe(
+      "Neon Field",
+    );
+    expect(getErShinyLabNameSignature({ palette: "glacier", surface: null, around: null })).toBeNull();
   });
 
   it("normalizes carried ghost looks and prefers them over local species data", () => {

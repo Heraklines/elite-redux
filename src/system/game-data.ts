@@ -26,7 +26,7 @@ import { getErRelicBattleState, restoreErRelicBattleState } from "#data/elite-re
 import { getErResistBerryEntries, restoreErResistBerries } from "#data/elite-redux/er-resist-berries";
 import { getErDifficulty, getErDifficultyCandyMultiplier, setErDifficulty } from "#data/elite-redux/er-run-difficulty";
 import { ER_CANDY_GAIN_MULTIPLIER, getRunCandyMultiplier } from "#data/elite-redux/er-shiny-favour";
-import { mergeErShinyLabSaveData } from "#data/elite-redux/er-shiny-lab-effects";
+import { grantErShinyLabSavedLookToSave, mergeErShinyLabSaveData } from "#data/elite-redux/er-shiny-lab-effects";
 import { getErUsedTrainerKeys, restoreErRunTrainerTracking } from "#data/elite-redux/er-trainer-runtime-hook";
 import { getErWardStoneEntries, restoreErWardStones } from "#data/elite-redux/er-ward-stones";
 import { pokemonFormChanges } from "#data/pokemon-forms";
@@ -2387,6 +2387,11 @@ export class GameData {
     // black tier for this line (starter select + dex filter).
     if (pokemon.customPokemonData?.erBlackShiny && this.starterData[speciesRootForm]) {
       this.starterData[speciesRootForm].erBlackShiny = true;
+    }
+    const shinyLabLook = pokemon.customPokemonData?.erShinyLab;
+    const starterEntry = this.starterData[speciesRootForm];
+    if (shinyLabLook && starterEntry) {
+      grantErShinyLabSavedLookToSave((starterEntry.erShinyLab ??= {}), shinyLabLook);
     }
     return this.setPokemonSpeciesCaught(
       pokemon,

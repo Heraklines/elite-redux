@@ -8,6 +8,7 @@ import {
   encodeErShinyLabPreset,
   ER_SHINY_LAB_CATEGORIES,
   ER_SHINY_LAB_EFFECTS_BY_CATEGORY,
+  ER_SHINY_LAB_SEED_REROLL_CANDY_COST,
   erShinyLabAvailableSetToBitset,
   type ErShinyLabCategory,
   type ErShinyLabConfig,
@@ -15,15 +16,19 @@ import {
   type ErShinyLabLoadout,
   type ErShinyLabParams,
   type ErShinyLabSaveData,
+  claimErShinyLabCompletionRewards,
   getErShinyLabDiscountedEffects,
   getErShinyLabEarnedTier,
   getErShinyLabEffectCost,
+  getErShinyLabCompletion,
   getErShinyLabOwnedSet,
   normalizeErShinyLabPresets,
   sanitizeErShinyLabLoadout,
   setErShinyLabOwnedBit,
+  spendErShinyLabSeedRerollToken,
 } from "#data/elite-redux/er-shiny-lab-effects";
 import type { StarterDataEntry } from "#types/save-data";
+import { randSeedInt } from "#utils/common";
 import { getPokemonSpecies } from "#utils/pokemon-utils";
 
 function ensureShinyLabSave(entry: StarterDataEntry): ErShinyLabSaveData {
@@ -42,7 +47,7 @@ function toAvailableSet(): Set<string> {
   return bitsetToErShinyLabAvailableSet(globalScene.gameData.erShinyLabAvailableEffects);
 }
 
-export function grantErShinyLabEffectAvailability(effectId: string): boolean {
+export function grantErShinyLabEffectAvailability(effectId: string, persist = true): boolean {
   const available = toAvailableSet();
   const before = available.size;
   available.add(effectId);
@@ -50,7 +55,9 @@ export function grantErShinyLabEffectAvailability(effectId: string): boolean {
     return false;
   }
   globalScene.gameData.erShinyLabAvailableEffects = erShinyLabAvailableSetToBitset(available);
-  saveSystem();
+  if (persist) {
+    saveSystem();
+  }
   return true;
 }
 
@@ -133,6 +140,9 @@ export function buildErShinyLabConfig(speciesId: number): ErShinyLabConfig {
     equipped,
     params,
     presets: normalizeErShinyLabPresets(save.r),
+    completion: getErShinyLabCompletion(save),
+    seedRerollCost: ER_SHINY_LAB_SEED_REROLL_CANDY_COST,
+    seedRerollTokens: save.t ?? 0,
   };
 
   applyPricedEffects(config);
@@ -144,6 +154,9 @@ export function buildErShinyLabConfig(speciesId: number): ErShinyLabConfig {
     }
     entry.candyCount = Math.max(0, config.candy);
     setErShinyLabOwnedBit(save, category, def.index);
+    claimErShinyLabCompletionRewards(save);
+    config.seedRerollTokens = save.t ?? 0;
+    config.completion = getErShinyLabCompletion(save);
     applyPricedEffects(config);
     persistConfig(entry, config, config.equipped, config.params);
   };
@@ -151,6 +164,20 @@ export function buildErShinyLabConfig(speciesId: number): ErShinyLabConfig {
     config.equipped = sanitizeErShinyLabLoadout(loadout, config.owned);
     config.params = { ...nextParams };
     persistConfig(entry, config, config.equipped, config.params);
+  };
+  config.onRerollSeed = currentParams => {
+    if (!spendErShinyLabSeedRerollToken(save)) {
+      if (entry.candyCount < ER_SHINY_LAB_SEED_REROLL_CANDY_COST) {
+        return null;
+      }
+      entry.candyCount = Math.max(0, entry.candyCount - ER_SHINY_LAB_SEED_REROLL_CANDY_COST);
+    }
+    const nextParams = { ...currentParams, seed: randSeedInt(256) };
+    config.candy = entry.candyCount;
+    config.seedRerollTokens = save.t ?? 0;
+    config.params = nextParams;
+    persistConfig(entry, config, config.equipped, nextParams);
+    return nextParams;
   };
 
   return config;

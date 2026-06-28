@@ -1,5 +1,6 @@
 import { globalScene } from "#app/global-scene";
 import { isErBlackShiny } from "#data/elite-redux/er-black-shinies";
+import { getErShinyLabNameSignature } from "#data/elite-redux/er-shiny-lab-effects";
 import { Gender, getGenderColor, getGenderSymbol } from "#data/gender";
 import { getTypeRgb } from "#data/type";
 import { BattlerTagType } from "#enums/battler-tag-type";
@@ -9,6 +10,7 @@ import { StatusEffect } from "#enums/status-effect";
 import { TextStyle } from "#enums/text-style";
 import { UiTheme } from "#enums/ui-theme";
 import type { Pokemon } from "#field/pokemon";
+import { getErShinyLabSpriteFxLookForPokemon } from "#sprites/er-shiny-lab-sprite-fx";
 import { getVariantTint } from "#sprites/variant";
 import { addTextObject } from "#ui/text";
 import { fixedInt, getLocalizedSpriteKey, getShinyDescriptor } from "#utils/common";
@@ -381,6 +383,7 @@ export abstract class BattleInfo extends Phaser.GameObjects.Container {
 
   initInfo(pokemon: Pokemon) {
     this.updateNameText(pokemon);
+    this.updateShinyLabNameplate(pokemon);
     const nameTextWidth = this.nameText.displayWidth;
 
     this.name = pokemon.getNameToRender({ prependFormName: false });
@@ -518,13 +521,26 @@ export abstract class BattleInfo extends Phaser.GameObjects.Container {
   protected updateName(pokemon: Pokemon): boolean {
     const name = pokemon.getNameToRender({ prependFormName: false });
     if (this.lastName === name) {
+      this.updateShinyLabNameplate(pokemon);
       return false;
     }
 
     this.updateNameText(pokemon);
+    this.updateShinyLabNameplate(pokemon);
     this.genderText.setPositionRelative(this.nameText, this.nameText.displayWidth, 0);
 
     return true;
+  }
+
+  private updateShinyLabNameplate(pokemon: Pokemon): void {
+    const signature = getErShinyLabNameSignature(getErShinyLabSpriteFxLookForPokemon(pokemon)?.loadout);
+    if (!signature) {
+      this.nameText.setColor("#f8f8f8");
+      this.box.clearTint();
+      return;
+    }
+    this.nameText.setColor(signature.color);
+    this.box.setTint(signature.boxTint);
   }
 
   protected updateTeraType(ty: PokemonType): boolean {

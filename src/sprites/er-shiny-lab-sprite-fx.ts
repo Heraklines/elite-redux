@@ -20,7 +20,7 @@ import { Gender } from "#data/gender";
 import type { PokemonSpecies } from "#data/pokemon-species";
 import type { Variant } from "#sprites/variant";
 
-export const ER_SHINY_LAB_MINI_ICON_RENDER_PAD = 6;
+export const ER_SHINY_LAB_MINI_ICON_RENDER_PAD = 4;
 
 interface PokemonSpriteFormLike {
   getIconAtlasKey(formIndex?: number, shiny?: boolean, variant?: number): string;

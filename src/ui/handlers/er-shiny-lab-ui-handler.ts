@@ -692,7 +692,8 @@ export class ErShinyLabUiHandler extends UiHandler {
     if (!cfg) {
       return;
     }
-    this.tierText.setText(`TIER ${cfg.earnedTier}/4`);
+    const pct = cfg.completion ? `  ${cfg.completion.percent}%` : "";
+    this.tierText.setText(`TIER ${cfg.earnedTier}/4${pct}`);
     for (const p of this.tierPips) {
       p.destroy();
     }
@@ -1132,6 +1133,7 @@ export class ErShinyLabUiHandler extends UiHandler {
 
   private refreshTuneDetail(): void {
     const row = TUNE_ROWS[this.tuneCursor];
+    const cfg = this.config;
     this.detailTitle.setText(this.tuneLabel(row)).setColor("#c9d4e8");
     this.detailMeta.setText("");
     let help: string;
@@ -1145,7 +1147,10 @@ export class ErShinyLabUiHandler extends UiHandler {
         help = "Effect texture scale.  Left/Right adjust, A reset";
         break;
       case "seed":
-        help = "Pattern seed.  Left/Right change, A reroll";
+        help =
+          cfg?.seedRerollTokens && cfg.seedRerollTokens > 0
+            ? `Pattern seed.  A uses token (${cfg.seedRerollTokens})`
+            : `Pattern seed.  A reroll costs ${cfg?.seedRerollCost ?? 25}`;
         break;
       case "load":
         help = "Choose a saved preset with Left/Right, A to load";
@@ -1263,18 +1268,14 @@ export class ErShinyLabUiHandler extends UiHandler {
   private inputTune(button: Button): boolean {
     switch (button) {
       case Button.UP:
-        if (this.tuneCursor > 0) {
-          this.tuneCursor--;
-          this.refreshTune();
-          globalScene.ui.playSelect();
-        }
+        this.tuneCursor = (this.tuneCursor - 1 + TUNE_ROWS.length) % TUNE_ROWS.length;
+        this.refreshTune();
+        globalScene.ui.playSelect();
         return true;
       case Button.DOWN:
-        if (this.tuneCursor < TUNE_ROWS.length - 1) {
-          this.tuneCursor++;
-          this.refreshTune();
-          globalScene.ui.playSelect();
-        }
+        this.tuneCursor = (this.tuneCursor + 1) % TUNE_ROWS.length;
+        this.refreshTune();
+        globalScene.ui.playSelect();
         return true;
       case Button.LEFT:
         this.adjustTune(-1);
@@ -1350,8 +1351,20 @@ export class ErShinyLabUiHandler extends UiHandler {
         this.refreshPreview();
         break;
       case "seed":
-        p.seed = Math.floor(Math.random() * 256);
-        cfg.onChange?.({ ...cfg.equipped }, { ...p });
+        if (cfg.onRerollSeed) {
+          const nextParams = cfg.onRerollSeed({ ...p });
+          if (!nextParams) {
+            globalScene.ui.playError();
+            this.refreshTune();
+            return;
+          }
+          Object.assign(p, nextParams);
+          this.candyText.setText(String(cfg.candy));
+          this.repositionCandyIcon();
+        } else {
+          p.seed = (p.seed + 73) % 256;
+          cfg.onChange?.({ ...cfg.equipped }, { ...p });
+        }
         this.refreshPreview();
         break;
       case "load": {
@@ -1485,12 +1498,14 @@ export function buildDemoConfig(speciesId: number): ErShinyLabConfig {
   };
   const available = new Set<string>([...palette, ...surface, ...around].map(e => e.id));
   const params = { ...ER_SHINY_LAB_DEFAULT_PARAMS, seed: 42 };
+  let demoCandy = 1240;
+  let demoTokens = 1;
 
   return {
     speciesId,
     speciesName: name,
     earnedTier: 4,
-    candy: 1240,
+    candy: demoCandy,
     effects: { palette, surface, around },
     owned,
     available,
@@ -1506,5 +1521,20 @@ export function buildDemoConfig(speciesId: number): ErShinyLabConfig {
       null,
       null,
     ],
+    completion: { owned: 9, total: palette.length + surface.length + around.length, percent: 6 },
+    seedRerollCost: 25,
+    seedRerollTokens: demoTokens,
+    onRerollSeed(currentParams) {
+      if (demoTokens > 0) {
+        demoTokens--;
+      } else if (demoCandy >= 25) {
+        demoCandy -= 25;
+        this.candy = demoCandy;
+      } else {
+        return null;
+      }
+      this.seedRerollTokens = demoTokens;
+      return { ...currentParams, seed: (currentParams.seed + 73) % 256 };
+    },
   };
 }

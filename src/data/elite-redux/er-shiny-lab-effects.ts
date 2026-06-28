@@ -47,6 +47,20 @@ export interface ErShinyLabPreset {
   params: ErShinyLabParams;
 }
 
+export interface ErShinyLabCompletion {
+  owned: number;
+  total: number;
+  percent: number;
+  byCategory?: Record<ErShinyLabCategory, Omit<ErShinyLabCompletion, "byCategory">>;
+}
+
+export interface ErShinyLabNameSignature {
+  id: string;
+  label: string;
+  color: string;
+  boxTint: number;
+}
+
 export interface ErShinyLabConfig {
   speciesId: number;
   speciesName: string;
@@ -58,8 +72,12 @@ export interface ErShinyLabConfig {
   equipped: ErShinyLabLoadout;
   params: ErShinyLabParams;
   presets: (ErShinyLabPreset | null)[];
+  completion?: ErShinyLabCompletion;
+  seedRerollCost?: number;
+  seedRerollTokens?: number;
   onChange?: (loadout: ErShinyLabLoadout, params: ErShinyLabParams) => void;
   onBuy?: (category: ErShinyLabCategory, effect: ErShinyLabEffect) => void;
+  onRerollSeed?: (params: ErShinyLabParams) => ErShinyLabParams | null;
   onExit?: () => void;
 }
 
@@ -93,6 +111,10 @@ export interface ErShinyLabSaveData {
   q?: ErShinyLabSavedParams;
   /** Five preset slots: loadout indexes followed by six quantized params. */
   r?: (ErShinyLabSavedPreset | null)[];
+  /** Per-species seed reroll tokens. */
+  t?: number;
+  /** Claimed completion rewards bitfield: palette, surface, around, all. */
+  c?: number;
 }
 
 export const ER_SHINY_LAB_CATEGORIES = ["palette", "surface", "around"] as const;
@@ -122,6 +144,35 @@ export const ER_SHINY_LAB_DEFAULT_PARAMS: ErShinyLabParams = {
   scale: 1,
   seed: 0,
   tintMode: 0,
+};
+
+export const ER_SHINY_LAB_SEED_REROLL_CANDY_COST = 25;
+
+export const ER_SHINY_LAB_WILD_CATEGORY_ROLL_PCT: Record<ErShinyLabCategory, number> = {
+  palette: 40,
+  surface: 14,
+  around: 6,
+};
+
+const ER_SHINY_LAB_WILD_RARITY_WEIGHT: Record<ErShinyLabRarity, number> = {
+  common: 64,
+  rare: 24,
+  epic: 9,
+  legendary: 3,
+};
+
+const COMPLETION_REWARD_TOKENS: Record<ErShinyLabCategory | "all", number> = {
+  palette: 1,
+  surface: 2,
+  around: 3,
+  all: 5,
+};
+
+const COMPLETION_REWARD_BIT: Record<ErShinyLabCategory | "all", number> = {
+  palette: 1,
+  surface: 2,
+  around: 4,
+  all: 8,
 };
 
 const CATEGORY_SAVE_KEY: Record<ErShinyLabCategory, keyof ErShinyLabOwnedBitsets> = {
@@ -546,6 +597,20 @@ export function getErShinyLabEarnedTier(caughtAttr: bigint, hasBlackShiny: boole
   return 1;
 }
 
+export function getErShinyLabEarnedTierForPokemon(pokemon: {
+  shiny?: boolean;
+  variant?: number;
+  customPokemonData?: { erBlackShiny?: boolean | undefined } | null;
+}): number {
+  if (pokemon.customPokemonData?.erBlackShiny) {
+    return 4;
+  }
+  if (!pokemon.shiny) {
+    return 0;
+  }
+  return Math.max(1, Math.min(3, Math.round((pokemon.variant ?? 0) + 1)));
+}
+
 function hashText(seed: number, text: string): number {
   let h = (seed ^ 0x811c9dc5) >>> 0;
   for (let i = 0; i < text.length; i++) {
@@ -585,6 +650,10 @@ export function getErShinyLabEffectCost(args: {
 
 function byte(v: number): number {
   return Math.max(0, Math.min(255, Math.round(v)));
+}
+
+function u16(v: number | undefined): number {
+  return Math.max(0, Math.min(65535, Math.round(v ?? 0)));
 }
 
 export function normalizeErShinyLabBitset(bits: readonly number[] | undefined): number[] {
@@ -756,6 +825,123 @@ export function decodeErShinyLabSavedLook(saved: readonly number[] | null | unde
   return normalized ? decodeErShinyLabPreset(normalized) : null;
 }
 
+function safeRandomInt(nextInt: (exclusive: number) => number, exclusive: number): number {
+  if (exclusive <= 1) {
+    return 0;
+  }
+  return Math.max(0, Math.min(exclusive - 1, Math.floor(nextInt(exclusive))));
+}
+
+function chooseWildCategory(earnedTier: number, nextInt: (exclusive: number) => number): ErShinyLabCategory | null {
+  if (earnedTier >= ER_SHINY_LAB_CATEGORY_MIN_TIER.around) {
+    if (safeRandomInt(nextInt, 100) < ER_SHINY_LAB_WILD_CATEGORY_ROLL_PCT.around) {
+      return "around";
+    }
+  }
+  if (earnedTier >= ER_SHINY_LAB_CATEGORY_MIN_TIER.surface) {
+    if (safeRandomInt(nextInt, 100) < ER_SHINY_LAB_WILD_CATEGORY_ROLL_PCT.surface) {
+      return "surface";
+    }
+  }
+  if (earnedTier >= ER_SHINY_LAB_CATEGORY_MIN_TIER.palette) {
+    if (safeRandomInt(nextInt, 100) < ER_SHINY_LAB_WILD_CATEGORY_ROLL_PCT.palette) {
+      return "palette";
+    }
+  }
+  return null;
+}
+
+function chooseWildEffect(
+  category: ErShinyLabCategory,
+  nextInt: (exclusive: number) => number,
+): ErShinyLabEffectDefinition | null {
+  const candidates = ER_SHINY_LAB_EFFECTS_BY_CATEGORY[category].filter(e => !e.lockHint);
+  const total = candidates.reduce((sum, e) => sum + ER_SHINY_LAB_WILD_RARITY_WEIGHT[e.rarity], 0);
+  if (total <= 0) {
+    return null;
+  }
+  let roll = safeRandomInt(nextInt, total);
+  for (const effect of candidates) {
+    roll -= ER_SHINY_LAB_WILD_RARITY_WEIGHT[effect.rarity];
+    if (roll < 0) {
+      return effect;
+    }
+  }
+  return candidates[0] ?? null;
+}
+
+export function rollErShinyLabWildSavedLook(
+  earnedTier: number,
+  nextInt: (exclusive: number) => number,
+): ErShinyLabSavedLook | undefined {
+  const category = chooseWildCategory(earnedTier, nextInt);
+  if (!category) {
+    return undefined;
+  }
+  const effect = chooseWildEffect(category, nextInt);
+  if (!effect) {
+    return undefined;
+  }
+  const loadout: ErShinyLabLoadout = { palette: null, surface: null, around: null };
+  loadout[category] = effect.id;
+  return encodeErShinyLabPreset({
+    loadout,
+    params: { ...ER_SHINY_LAB_DEFAULT_PARAMS, seed: safeRandomInt(nextInt, 256) },
+  });
+}
+
+export function grantErShinyLabSeedRerollTokens(save: ErShinyLabSaveData, count: number): number {
+  save.t = u16((save.t ?? 0) + Math.max(0, Math.round(count)));
+  return save.t;
+}
+
+export function spendErShinyLabSeedRerollToken(save: ErShinyLabSaveData): boolean {
+  const tokens = u16(save.t);
+  if (tokens <= 0) {
+    return false;
+  }
+  save.t = tokens - 1;
+  return true;
+}
+
+export function grantErShinyLabSavedLookToSave(
+  save: ErShinyLabSaveData,
+  saved: readonly number[] | null | undefined,
+  options: { equipIfEmpty?: boolean; claimCompletionRewards?: boolean } = {},
+): string[] {
+  const preset = decodeErShinyLabSavedLook(saved);
+  if (!preset) {
+    return [];
+  }
+  const granted: string[] = [];
+  for (const category of ER_SHINY_LAB_CATEGORIES) {
+    const id = preset.loadout[category];
+    const def = getErShinyLabDefinition(category, id);
+    if (!def) {
+      continue;
+    }
+    if (!getErShinyLabOwnedSet(save, category).has(def.id)) {
+      granted.push(def.id);
+    }
+    setErShinyLabOwnedBit(save, category, def.index);
+  }
+  const currentLoadout = decodeErShinyLabLoadout(save.l);
+  if (
+    options.equipIfEmpty !== false
+    && !currentLoadout.palette
+    && !currentLoadout.surface
+    && !currentLoadout.around
+    && (preset.loadout.palette || preset.loadout.surface || preset.loadout.around)
+  ) {
+    save.l = encodeErShinyLabLoadout(preset.loadout);
+    save.q = encodeErShinyLabParams(preset.params);
+  }
+  if (options.claimCompletionRewards !== false) {
+    claimErShinyLabCompletionRewards(save);
+  }
+  return granted;
+}
+
 export function normalizeErShinyLabPresets(
   presets: readonly (readonly number[] | null)[] | undefined,
 ): (ErShinyLabPreset | null)[] {
@@ -775,6 +961,61 @@ export function sanitizeErShinyLabLoadout(
     surface: loadout.surface && owned.surface.has(loadout.surface) ? loadout.surface : null,
     around: loadout.around && owned.around.has(loadout.around) ? loadout.around : null,
   };
+}
+
+function completionForCategories(
+  save: ErShinyLabSaveData | undefined,
+  categories: readonly ErShinyLabCategory[],
+): Omit<ErShinyLabCompletion, "byCategory"> {
+  let owned = 0;
+  let total = 0;
+  for (const category of categories) {
+    total += ER_SHINY_LAB_EFFECTS_BY_CATEGORY[category].length;
+    owned += getErShinyLabOwnedSet(save, category).size;
+  }
+  return {
+    owned,
+    total,
+    percent: total > 0 ? Math.floor((owned / total) * 100) : 100,
+  };
+}
+
+export function getErShinyLabCompletion(
+  save: ErShinyLabSaveData | undefined,
+  category?: ErShinyLabCategory,
+): ErShinyLabCompletion {
+  if (category) {
+    return completionForCategories(save, [category]);
+  }
+  const byCategory: Record<ErShinyLabCategory, Omit<ErShinyLabCompletion, "byCategory">> = {
+    palette: completionForCategories(save, ["palette"]),
+    surface: completionForCategories(save, ["surface"]),
+    around: completionForCategories(save, ["around"]),
+  };
+  return {
+    ...completionForCategories(save, ER_SHINY_LAB_CATEGORIES),
+    byCategory,
+  };
+}
+
+export function claimErShinyLabCompletionRewards(save: ErShinyLabSaveData): (ErShinyLabCategory | "all")[] {
+  const claimed: (ErShinyLabCategory | "all")[] = [];
+  const completion = getErShinyLabCompletion(save);
+  for (const category of ER_SHINY_LAB_CATEGORIES) {
+    const categoryCompletion = completion.byCategory?.[category];
+    const bit = COMPLETION_REWARD_BIT[category];
+    if (categoryCompletion?.percent === 100 && ((save.c ?? 0) & bit) === 0) {
+      save.c = byte((save.c ?? 0) | bit);
+      grantErShinyLabSeedRerollTokens(save, COMPLETION_REWARD_TOKENS[category]);
+      claimed.push(category);
+    }
+  }
+  if (completion.percent === 100 && ((save.c ?? 0) & COMPLETION_REWARD_BIT.all) === 0) {
+    save.c = byte((save.c ?? 0) | COMPLETION_REWARD_BIT.all);
+    grantErShinyLabSeedRerollTokens(save, COMPLETION_REWARD_TOKENS.all);
+    claimed.push("all");
+  }
+  return claimed;
 }
 
 function mergeBitsets(a: readonly number[] | undefined, b: readonly number[] | undefined): number[] | undefined {
@@ -818,6 +1059,14 @@ export function mergeErShinyLabSaveData(
   if (!target.q && source.q) {
     target.q = source.q;
   }
+  const tokenCount = Math.max(u16(target.t), u16(source.t));
+  if (tokenCount > 0) {
+    target.t = tokenCount;
+  }
+  const completionClaims = byte((target.c ?? 0) | (source.c ?? 0));
+  if (completionClaims > 0) {
+    target.c = completionClaims;
+  }
   const sourcePresets = source.r ?? [];
   if (sourcePresets.length) {
     target.r ??= [];
@@ -826,6 +1075,83 @@ export function mergeErShinyLabSaveData(
     }
   }
   return target;
+}
+
+const NAME_SIGNATURES: (ErShinyLabNameSignature & { match: Partial<ErShinyLabLoadout> })[] = [
+  {
+    id: "neon-field",
+    label: "Neon Field",
+    color: "#66f5ff",
+    boxTint: 0x243052,
+    match: { palette: "duoneon", surface: "starmap", around: "staticfield" },
+  },
+  {
+    id: "midas",
+    label: "Midas",
+    color: "#ffd45c",
+    boxTint: 0x59401b,
+    match: { palette: "aurum", around: "goldenglow" },
+  },
+  {
+    id: "prism-break",
+    label: "Prism Break",
+    color: "#9ad0ff",
+    boxTint: 0x253a62,
+    match: { surface: "spectrumsplit" },
+  },
+  {
+    id: "eclipse",
+    label: "Eclipse",
+    color: "#caa6ff",
+    boxTint: 0x2e2450,
+    match: { around: "shadowaura" },
+  },
+  {
+    id: "cold-open",
+    label: "Cold Open",
+    color: "#a6f0ff",
+    boxTint: 0x203d52,
+    match: { surface: "frostbite", around: "frost" },
+  },
+  {
+    id: "going-nuclear",
+    label: "Going Nuclear",
+    color: "#b8ff5c",
+    boxTint: 0x33481d,
+    match: { palette: "toxic", surface: "poison" },
+  },
+  {
+    id: "untouchable",
+    label: "Untouchable",
+    color: "#ffd27a",
+    boxTint: 0x4a3958,
+    match: { around: "rainbowoutline" },
+  },
+];
+
+export function getErShinyLabNameSignature(
+  loadout: ErShinyLabLoadout | null | undefined,
+): ErShinyLabNameSignature | null {
+  if (!loadout) {
+    return null;
+  }
+  for (const signature of NAME_SIGNATURES) {
+    const { match, ...display } = signature;
+    const matches =
+      (match.palette == null || loadout.palette === match.palette)
+      && (match.surface == null || loadout.surface === match.surface)
+      && (match.around == null || loadout.around === match.around);
+    if (matches) {
+      return display;
+    }
+  }
+  return null;
+}
+
+export function getErShinyLabNameSignatureFromSavedLook(
+  saved: readonly number[] | null | undefined,
+): ErShinyLabNameSignature | null {
+  return getErShinyLabNameSignature(decodeErShinyLabSavedLook(saved)?.loadout);
 }
 
 type Rgb = [number, number, number];
