@@ -1,0 +1,169 @@
+url:      https://elite-redux-staging.pages.dev/
+build:    mqxbnayl-bcur
+mode:     4  wave:49
+seed:     zpsrGO9MJF6RtOematsKvIEP
+party:    Basculin(L38 112hp f2), Toxtricity Redux Fuzz(L38 70hp f0), Feraligatr(L38 113hp f0), Centiskorch(L38 135hp f0), Nidoqueen(L28 93hp f0), Sylveon(L38 131hp f0)
+enemy:    Linoone(L31), Morpeko(L31)
+
+----- CONSOLE -----
+[08:33:39.119] LOG: %c %c %c %c %c Phaser v3.90.0 (WebGL | Web Audio) %c https://phaser.io/v390 background: #ff0000 background: #ffff00 background: #00ff00 background: #00ffff color: #ffffff; background: #000000 background: transparent
+[08:33:40.156] LOG: [ER] build mqxbnayl-bcur
+[08:33:40.208] LOG: [dev-tools] loaded — 351 scenarios + Send Logs button
+[08:34:29.083] DEBUG: Destroying loading scene
+[08:34:29.083] DEBUG: Destroyed loading scene
+[08:34:29.169] LOG: Seed: SZIfyX5cXOHA5gXws8TGbbdI
+[08:34:29.169] LOG: Wave Seed: SZIfyX5cXOHA5gXws8TGbbdI 0
+[08:34:32.314] LOG: %cStart Phase LoginPhase color:green;
+[08:34:32.742] LOG: Client Session: MCWxiYLtRyMttMpOjQCwsfFe1LVGjUdP
+[08:34:33.162] DEBUG: Using cached system data
+[08:34:33.325] LOG: %cStart Phase TitlePhase color:green;
+[08:34:33.325] LOG: Getting Session Slot id: %d 2
+[08:34:33.357] LOG: use seasonal splash messages true
+[08:34:33.357] LOG: Adding 2 Pride Month splash messages (weight: x15)
+[08:34:36.224] LOG: Getting Session Slot id: %d 0
+[08:34:36.237] LOG: Getting Session Slot id: %d 1
+[08:34:36.245] LOG: Getting Session Slot id: %d 2
+[08:34:36.254] LOG: Getting Session Slot id: %d 3
+[08:34:36.265] LOG: Getting Session Slot id: %d 4
+[08:34:36.383] LOG: Getting Session Slot id: %d 2
+[08:34:38.641] LOG: Getting Session Slot id: %d 2
+[08:34:38.652] LOG: Wave Seed: zpsrGO9MJF6RtOematsKvIEP 0
+[08:34:38.652] LOG: Seed: zpsrGO9MJF6RtOematsKvIEP
+[08:34:38.701] LOG: Wave Seed: «¡¤£xj~{wg¥¥¤|§zv 49
+[08:34:38.724] LOG: Applied Carbos 
+[08:34:38.724] LOG: Applied Calcium 
+[08:34:38.726] LOG: Applied Protein 
+[08:34:38.726] LOG: Applied Carbos 
+[08:34:38.731] LOG: Applied Carbos 
+[08:34:38.731] LOG: Applied Calcium 
+[08:34:38.732] LOG: Applied Protein 
+[08:34:38.732] LOG: Applied Carbos 
+[08:34:38.736] LOG: Applied Carbos 
+[08:34:38.737] LOG: Applied Calcium 
+[08:34:38.737] LOG: Applied Protein 
+[08:34:38.737] LOG: Applied Carbos 
+[08:34:38.793] LOG: %cStart Phase EncounterPhase color:green;
+[08:34:38.799] LOG: Pokemon: Wild Linoone | Species ID: 264 | Level: 31 | Nature: Bashful (-)
+[08:34:38.799] LOG: Stats (IVs): HP: 91 (8), Atk: 73 (22), Def: 43 (2), Spatk: 40 (16), Spdef: 49 (21), Spd: 73 (2)
+[08:34:38.799] LOG: Ability: Gluttony | Passive Ability: Field Explorer 
+[08:34:38.799] LOG: Moveset: ["Double-Edge","Follow Me","Stomping Tantrum","High Horsepower"]
+[08:34:38.799] LOG: Pokemon: Wild Morpeko | Species ID: 877 | Level: 31 | Nature: Rash (+SpAtk/-SpDef)
+[08:34:38.800] LOG: Stats (IVs): HP: 83 (20), Atk: 71 (23), Def: 47 (20), Spatk: 58 (12), Spdef: 42 (20), Spd: 71 (21)
+[08:34:38.800] LOG: Ability: Electric Burst | Passive Ability: Hunger Switch 
+[08:34:38.800] LOG: Moveset: ["Thunder Shock","Thunder Fang","Stuff Cheeks","Swagger"]
+[08:34:40.821] LOG: Wave Seed: «¡¤£xj~{wg¥¥¤|§zv 49
+[08:34:41.294] LOG: %cStart Phase SummonPhase color:green;
+[08:34:41.444] LOG: Applied Carbos 
+[08:34:41.444] LOG: Applied Calcium 
+[08:34:41.447] LOG: Applied Protein 
+[08:34:41.447] LOG: Applied Carbos 
+[08:34:41.580] LOG: %cStart Phase ShinySparklePhase color:green;
+[08:34:41.679] LOG: %cStart Phase SummonPhase color:green;
+[08:34:41.850] LOG: Applied Carbos 
+[08:34:41.850] LOG: Applied Calcium 
+[08:34:41.853] LOG: Applied Protein 
+[08:34:41.853] LOG: Applied Carbos 
+[08:34:41.876] WARN: cry/793 not found
+[08:34:41.973] LOG: %cStart Phase CheckSwitchPhase color:green;
+[08:34:43.040] LOG: %cStart Phase CheckSwitchPhase color:green;
+[08:34:43.320] LOG: %cStart Phase InitEncounterPhase color:green;
+[08:34:43.326] LOG: %cStart Phase PostSummonPhase color:green;
+[08:34:43.327] LOG: Ran PSP for: Linoone
+[08:34:43.332] LOG: %cStart Phase PostSummonPhase color:green;
+[08:34:43.333] LOG: %cStart Phase PostSummonPhase color:green;
+[08:34:43.333] LOG: %cStart Phase PostSummonPhase color:green;
+[08:34:43.333] LOG: Ran PSP for: Morpeko
+[08:34:43.335] LOG: %cStart Phase PostSummonPhase color:green;
+[08:34:43.335] LOG: %cStart Phase PostSummonPhase color:green;
+[08:34:43.336] LOG: %cStart Phase TurnInitPhase color:green;
+[08:34:43.337] LOG: %cStart Phase CommandPhase color:green;
+[08:34:44.219] LOG: Move: SPLISHY_SPLASH Move targets: {"targets":[2,3],"multiple":true} 
+Player Pokemon: Basculin
+[08:34:44.223] LOG: %cStart Phase SelectTargetPhase color:green;
+[08:34:44.435] LOG: %cStart Phase CommandPhase color:green;
+[08:34:45.368] LOG: Move: SNARL Move targets: {"targets":[2,3],"multiple":true} 
+Player Pokemon: Toxtricity Redux Fuzz
+[08:34:45.372] LOG: %cStart Phase SelectTargetPhase color:green;
+[08:34:45.551] LOG: %cStart Phase EnemyCommandPhase color:green;
+[08:34:45.585] LOG: Battle Seed: OFPrTU0FoCnJCnNZ
+[08:34:45.587] LOG: Move Pool: ["High Horsepower"]
+[08:34:45.587] LOG: Move Scores: [46]
+[08:34:45.587] LOG: Sorted Move Pool: ["High Horsepower"]
+[08:34:45.587] LOG: Chosen Move: High Horsepower
+[08:34:45.587] LOG: %cStart Phase EnemyCommandPhase color:green;
+[08:34:45.601] LOG: Applied X Speed 
+[08:34:45.601] LOG: Applied X Speed 
+[08:34:45.606] LOG: Applied X Speed 
+[08:34:45.606] LOG: Applied X Speed 
+[08:34:45.607] LOG: Move Pool: ["Thunder Shock","Thunder Fang","Swagger"]
+[08:34:45.607] LOG: Move Scores: [57,63,1]
+[08:34:45.607] LOG: Sorted Move Pool: ["Thunder Fang","Thunder Shock","Swagger"]
+[08:34:45.607] LOG: Chosen Move: Thunder Fang
+[08:34:45.607] LOG: %cStart Phase TurnStartPhase color:green;
+[08:34:45.608] LOG: Applied X Speed 
+[08:34:45.608] LOG: Applied X Speed 
+[08:34:45.609] LOG: Applied X Speed 
+[08:34:45.609] LOG: Applied X Speed 
+[08:34:45.610] LOG: Applied X Speed 
+[08:34:45.610] LOG: Applied X Speed 
+[08:34:45.611] LOG: Applied X Speed 
+[08:34:45.612] LOG: Applied X Speed 
+[08:34:45.612] LOG: Applied X Speed 
+[08:34:45.613] LOG: Applied X Speed 
+[08:34:45.613] LOG: Applied X Speed 
+[08:34:45.613] LOG: Applied X Speed 
+[08:34:45.614] LOG: Applied X Speed 
+[08:34:45.614] LOG: Applied X Speed 
+[08:34:45.616] LOG: Applied X Speed 
+[08:34:45.616] LOG: Applied X Speed 
+[08:34:45.617] LOG: Applied X Speed 
+[08:34:45.617] LOG: Applied X Speed 
+[08:34:45.617] LOG: Applied X Speed 
+[08:34:45.618] LOG: %cStart Phase MovePhase color:green;
+[08:34:45.618] LOG: %cUser: Basculin
+Move: SPLISHY_SPLASH
+Use Mode: NORMAL color:orchid
+[08:34:45.620] LOG: Applied X Speed 
+[08:34:45.621] LOG: Applied X Speed 
+[08:34:45.621] LOG: Applied X Speed 
+[08:34:45.621] LOG: Applied X Speed 
+[08:34:45.621] LOG: Applied X Speed 
+[08:34:45.622] LOG: Applied X Speed 
+[08:34:45.623] LOG: Applied X Speed 
+[08:34:45.623] LOG: %cStart Phase MessagePhase color:green;
+[08:34:45.709] LOG: %cStart Phase MoveEffectPhase color:green;
+[08:34:45.720] LOG: crit stage: +0
+[08:34:45.721] LOG: Applied X Speed 
+[08:34:45.722] LOG: Applied X Speed 
+[08:34:45.723] LOG: Move: Splishy Splash | Base damage: 64.93093877551021 | Power: 108 | Source attack: 83 | Target defense: 49
+[08:34:45.724] LOG: Move: Splishy Splash | Attack damage: 92
+[08:34:45.725] LOG: Applied Amulet Coin 
+[08:34:45.727] LOG: Applied Golden Punch 
+[08:34:45.729] LOG: crit stage: +0
+[08:34:45.730] LOG: Applied X Speed 
+[08:34:45.730] LOG: Applied X Speed 
+[08:34:45.731] LOG: Move: Splishy Splash | Base damage: 75.41942857142857 | Power: 108 | Source attack: 83 | Target defense: 42
+[08:34:45.731] LOG: Move: Splishy Splash | Attack damage: 137
+[08:34:45.731] LOG: Applied Amulet Coin 
+[08:34:45.732] LOG: Applied Golden Punch 
+[08:34:45.733] LOG: %cStart Phase DamageAnimPhase color:green;
+[08:34:45.763] LOG: %cStart Phase DamageAnimPhase color:green;
+[08:34:45.794] LOG: %cStart Phase FaintPhase color:green;
+[08:34:45.797] LOG: Applied X Speed 
+[08:34:45.797] LOG: Applied X Speed 
+[08:34:47.812] LOG: Applied X Speed 
+[08:34:47.813] LOG: Applied X Speed 
+[08:34:47.815] LOG: %cStart Phase MessagePhase color:green;
+[08:35:21.029] LOG: %cStart Phase VictoryPhase color:green;
+[08:35:21.031] LOG: Applied Soothe Bell 
+[08:35:21.032] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[08:35:21.033] LOG: Applied Super EXP. Charm 
+[08:35:21.033] LOG: Applied EXP. Charm 
+[08:35:21.157] LOG: %cStart Phase LevelUpPhase color:green;
+[08:35:21.160] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[08:35:21.220] LOG: %cStart Phase FaintPhase color:green;
+[08:35:21.224] LOG: Applied X Speed 
+[08:35:21.225] LOG: Applied X Speed 
+[08:35:22.587] LOG: Applied X Speed 
+[08:35:22.587] LOG: Applied X Speed 
+[08:35:22.589] LOG: %cStart Phase MessagePhase color:green;
