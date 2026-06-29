@@ -31,6 +31,7 @@ import { EggHatchData } from "#data/egg-hatch-data";
 import { startLocalCoopSession } from "#data/elite-redux/coop/coop-runtime";
 import { bargainAbilityDescription } from "#data/elite-redux/er-bargain-sins";
 import { applyErBlackShinyKit } from "#data/elite-redux/er-black-shinies";
+import { buildInfernoFeed } from "#data/elite-redux/er-community-challenge-inferno";
 import { buildDemoChallengesConfig } from "#data/elite-redux/er-community-challenges";
 import { recordErBiomeVisited } from "#data/elite-redux/er-map-nodes";
 import { STORMGLASS_WEATHER_CHOICES } from "#data/elite-redux/er-relics";
@@ -347,6 +348,17 @@ const RECIPES: Record<string, Recipe> = {
     prepare: () => [buildDemoChallengesConfig({ populated: true })],
     steps: [Button.RIGHT, Button.RIGHT, Button.DOWN, Button.DOWN],
     diffTolerance: 0,
+  },
+  // The single REAL Inferno card: real achievement-completion data + the LIVE NU
+  // allowed pool (recomputed from the usage-tier feed, which the harness loads
+  // async during boot). The allowed-grid region is therefore non-deterministic
+  // (empty until the feed resolves, then ~10 cells + "+N MORE" whose N tracks the
+  // live tier ranking) - so, like the animated-sprite pages, it uses a coarse
+  // tolerance that covers that one region while still catching gross regressions.
+  "community-challenges-inferno": {
+    mode: UiMode.COMMUNITY_CHALLENGES,
+    prepare: () => [buildInfernoFeed()],
+    diffTolerance: 90_000,
   },
   "biome-shop": {
     mode: UiMode.BIOME_SHOP,

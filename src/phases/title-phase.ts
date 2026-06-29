@@ -12,7 +12,7 @@ import { modifierTypes } from "#data/data-lists";
 import { CoopLobbyController, type LobbyPlayer } from "#data/elite-redux/coop/coop-lobby";
 import { getCoopController, startLocalCoopSession } from "#data/elite-redux/coop/coop-runtime";
 import type { CoopNetcodeMode } from "#data/elite-redux/coop/coop-transport";
-import { buildDemoChallengesConfig } from "#data/elite-redux/er-community-challenges";
+import { buildInfernoFeed } from "#data/elite-redux/er-community-challenge-inferno";
 import { Gender } from "#data/gender";
 import { BattleType } from "#enums/battle-type";
 import { GameModes } from "#enums/game-modes";
@@ -180,12 +180,14 @@ export class TitlePhase extends Phase {
                       {
                         label: "Community Challenges",
                         handler: () => {
-                          // TODO(P1-A): swap the demo feed for fetchCommunityFeed() once the
-                          // /community/* worker routes are deployed. Defer the open the same way.
+                          // For now the feed shows the single REAL Inferno card (live NU
+                          // pool + real achievement-completion count). TODO(P1-A): merge in
+                          // fetchCommunityFeed() player-authored challenges once /community/*
+                          // is deployed. Defer the open the same way (clobber-safe).
                           globalScene.ui.setMode(UiMode.MESSAGE);
                           globalScene.ui.resetModeChain();
                           globalScene.ui.showText("", null, () =>
-                            globalScene.ui.setOverlayMode(UiMode.COMMUNITY_CHALLENGES, buildDemoChallengesConfig()),
+                            globalScene.ui.setOverlayMode(UiMode.COMMUNITY_CHALLENGES, buildInfernoFeed()),
                           );
                           return true;
                         },

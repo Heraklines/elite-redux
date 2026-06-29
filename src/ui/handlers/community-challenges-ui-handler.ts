@@ -228,22 +228,26 @@ export class CommunityChallengesUiHandler extends UiHandler {
 
   // --- Featured row ---
 
-  private featuredCardGeometry(): { x: number; w: number }[] {
+  private featuredCardGeometry(count = 4): { x: number; w: number }[] {
     const totalW = SCREEN_W - CONTENT_X - STATS_W - 6;
-    const w = (totalW - FEAT_GAP * 3) / 4;
-    return [0, 1, 2, 3].map(i => ({ x: CONTENT_X + i * (w + FEAT_GAP), w }));
+    const unit = (totalW - FEAT_GAP * 3) / 4; // one quarter-row card width
+    const slots = Math.min(4, Math.max(1, count));
+    // A lone card (e.g. the single real Inferno feed) reads as a hero plate at
+    // ~2 units, left-aligned; otherwise the cards split the row evenly.
+    const w = slots === 1 ? unit * 2 + FEAT_GAP : (totalW - FEAT_GAP * (slots - 1)) / slots;
+    return Array.from({ length: slots }, (_, i) => ({ x: CONTENT_X + i * (w + FEAT_GAP), w }));
   }
 
   private buildFeaturedRow(featured: CommunityChallengeEntry[]): void {
-    const geom = this.featuredCardGeometry();
+    const geom = this.featuredCardGeometry(featured.length);
     geom.forEach((g, i) => {
       const e = featured[i];
-      const win = addWindow(g.x, FEAT_Y, g.w, FEAT_H);
-      win.setTint(PANEL_TINT);
-      this.dynamic.add(win);
       if (!e) {
         return;
       }
+      const win = addWindow(g.x, FEAT_Y, g.w, FEAT_H);
+      win.setTint(PANEL_TINT);
+      this.dynamic.add(win);
       const selected = i === this.cardCursor;
       // Trial Plate: type-tinted black-silhouette card art fills the card.
       this.dynamic.add(
@@ -506,6 +510,15 @@ export class CommunityChallengesUiHandler extends UiHandler {
   }
 
   private ago(at: number): string {
+    // The demo feed passes a NEGATIVE relative offset ("2h ago"); real entries
+    // (the Inferno card) pass an absolute epoch (ms). Render the latter as a fixed
+    // UTC date so the value doesn't drift with the wall clock (golden-render safe).
+    const EPOCH_FLOOR = 1_000_000_000_000; // ~2001-09; larger magnitudes are absolute epochs
+    if (Math.abs(at) >= EPOCH_FLOOR) {
+      const d = new Date(at);
+      const mon = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"][d.getUTCMonth()];
+      return `${d.getUTCDate()} ${mon}`;
+    }
     const ms = Math.abs(at);
     const h = Math.round(ms / 3600_000);
     return h >= 24 ? `${Math.round(h / 24)}d ago` : `${h}h ago`;
