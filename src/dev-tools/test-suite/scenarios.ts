@@ -182,6 +182,9 @@ const DEV_OVERRIDE_DEFAULTS = {
   STARTING_HELD_ITEMS_OVERRIDE: [],
   STARTING_MODIFIER_OVERRIDE: [],
   WEATHER_OVERRIDE: WeatherType.NONE,
+  // BG-art scenarios force a time of day to show a specific day/dusk/night variant;
+  // reset it so the forced time never leaks into the next scenario or a normal run.
+  TIME_OF_DAY_OVERRIDE: null,
   STATUS_OVERRIDE: StatusEffect.NONE,
   SHINY_OVERRIDE: null,
   VARIANT_OVERRIDE: null,
@@ -343,7 +346,109 @@ function givePlayerCommunityItems(items: [ErCommunityItemKind, number][]): void 
 
 // --- scenarios --------------------------------------------------------------
 
+// --- Battle-background art check (staging) ----------------------------------
+// Hand-painted day/dusk/night backgrounds for volcano / ruins / wasteland /
+// graveyard. Each scenario force-locks the biome + time of day so a tester sees
+// the exact variant instantly; the enemy is a free-win Magikarp and the party is
+// level 100, so you can also blow through waves and confirm the art persists.
+
+/** Strong free-win party so a BG check is a relaxed look-around, not a fight. */
+const bgCheckParty = (): Starter[] => [
+  makeStarter(SpeciesId.RAYQUAZA, {
+    moveset: [MoveId.DRAGON_ASCENT, MoveId.EXTREME_SPEED, MoveId.EARTHQUAKE, MoveId.SURF],
+  }),
+];
+
+function bgCheckScenario(
+  biomeName: string,
+  biomeId: BiomeId,
+  time: Exclude<TimeOfDay, TimeOfDay.ALL>,
+  timeLabel: string,
+  expect: string,
+): DevScenario {
+  return {
+    label: `BG ${biomeName} · ${timeLabel}`,
+    description:
+      `Battle-background art check — ${biomeName} (${timeLabel}).\n`
+      + "DO: just look at the background (free-win Magikarp; advance waves if you like).\n"
+      + `EXPECT: ${expect}\n`
+      + "The art must stay crisp, have NO battle-platform oval painted into the floor,\n"
+      + "and NOT be double-darkened. Day / dusk / night each have their own image.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_BIOME_OVERRIDE: biomeId,
+        STARTING_WAVE_OVERRIDE: 12,
+        TIME_OF_DAY_OVERRIDE: time,
+        STARTING_LEVEL_OVERRIDE: 100,
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.MAGIKARP,
+        ENEMY_LEVEL_OVERRIDE: 5,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+      });
+      return bgCheckParty();
+    },
+  };
+}
+
+const BG_CHECK_SCENARIOS: DevScenario[] = [
+  bgCheckScenario(
+    "Volcano",
+    BiomeId.VOLCANO,
+    TimeOfDay.DAY,
+    "day",
+    "amber daytime sky, erupting volcano, glowing lava rivers.",
+  ),
+  bgCheckScenario("Volcano", BiomeId.VOLCANO, TimeOfDay.DUSK, "dusk", "purple-red dusk sky over the erupting volcano."),
+  bgCheckScenario("Volcano", BiomeId.VOLCANO, TimeOfDay.NIGHT, "night", "dark night sky, the lava and embers glowing."),
+  bgCheckScenario(
+    "Ruins",
+    BiomeId.RUINS,
+    TimeOfDay.DAY,
+    "day",
+    "blue daytime sky over broken stone columns and the arch.",
+  ),
+  bgCheckScenario(
+    "Ruins",
+    BiomeId.RUINS,
+    TimeOfDay.DUSK,
+    "dusk",
+    "warm orange/purple sunset behind the ruined columns.",
+  ),
+  bgCheckScenario(
+    "Ruins",
+    BiomeId.RUINS,
+    TimeOfDay.NIGHT,
+    "night",
+    "deep-blue moonlit ruins, moon above the central arch.",
+  ),
+  bgCheckScenario(
+    "Wasteland",
+    BiomeId.WASTELAND,
+    TimeOfDay.DAY,
+    "day",
+    "blue daytime sky over cracked dry earth and mesas.",
+  ),
+  bgCheckScenario(
+    "Wasteland",
+    BiomeId.WASTELAND,
+    TimeOfDay.DUSK,
+    "dusk",
+    "orange/purple sunset over the cracked wasteland.",
+  ),
+  bgCheckScenario(
+    "Wasteland",
+    BiomeId.WASTELAND,
+    TimeOfDay.NIGHT,
+    "night",
+    "starry night sky over the dark cracked wasteland.",
+  ),
+  bgCheckScenario("Graveyard", BiomeId.GRAVEYARD, TimeOfDay.DAY, "day", "the daytime graveyard art."),
+  bgCheckScenario("Graveyard", BiomeId.GRAVEYARD, TimeOfDay.DUSK, "dusk", "the dusk graveyard art."),
+  bgCheckScenario("Graveyard", BiomeId.GRAVEYARD, TimeOfDay.NIGHT, "night", "the night graveyard art."),
+];
+
 export const DEV_SCENARIOS: DevScenario[] = [
+  ...BG_CHECK_SCENARIOS,
   // ===========================================================================
   // QoL — out-of-battle party reorder
   // ===========================================================================

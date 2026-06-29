@@ -5,7 +5,7 @@ import { isMobile } from "#app/touch-controls";
 import { ER_SPRITE_MANIFEST } from "#data/elite-redux/er-sprite-manifest";
 import { BiomeId } from "#enums/biome-id";
 import { GachaType } from "#enums/gacha-types";
-import { getBiomeHasProps } from "#field/arena";
+import { BG_VARIANT_SUFFIXES, biomeHasBgVariants, getBiomeHasProps } from "#field/arena";
 import { CacheBustedLoaderPlugin } from "#plugins/cache-busted-loader-plugin";
 import { ER_BIOME_SHOP_KEEPERS } from "#ui/biome-shop-ui-handler";
 import { getWindowVariantSuffix, WindowVariant } from "#ui/ui-theme";
@@ -673,6 +673,13 @@ export class LoadingScene extends SceneBase {
       const baseAKey = `${btKey}_a`;
       const baseBKey = `${btKey}_b`;
       this.loadImage(`${btKey}_bg`, "arenas");
+      // Biomes with hand-painted day/dusk/night art (ER staging) preload each
+      // variant; the arena picks the right one by time of day. See arena.ts.
+      if (biomeHasBgVariants(bt)) {
+        for (const suffix of BG_VARIANT_SUFFIXES) {
+          this.loadImage(`${btKey}_bg_${suffix}`, "arenas");
+        }
+      }
       if (isBaseAnimated) {
         this.loadAtlas(baseAKey, "arenas").loadAtlas(baseBKey, "arenas");
       } else {

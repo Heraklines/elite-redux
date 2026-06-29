@@ -113,7 +113,7 @@ import { TrainerVariant } from "#enums/trainer-variant";
 import { UiTheme } from "#enums/ui-theme";
 import { WeatherType } from "#enums/weather-type";
 import { NewArenaEvent } from "#events/battle-scene";
-import { Arena } from "#field/arena";
+import { Arena, biomeHasBgVariants } from "#field/arena";
 import { ArenaBase } from "#field/arena-base";
 import { DamageNumberHandler } from "#field/damage-number-handler";
 import type { Pokemon } from "#field/pokemon";
@@ -2033,6 +2033,11 @@ export class BattleScene extends SceneBase {
     if (!isNewBiome && this.currentBattle.waveIndex % 10 === 5) {
       this.arena.updatePoolsForTimeOfDay();
     }
+    // Swap the background art when the time-of-day bucket changes mid-biome
+    // (variant biomes only; cheap no-op otherwise). New biomes are handled by init().
+    if (!isNewBiome) {
+      this.arena.updateBgForTimeOfDay();
+    }
 
     // use the old value of `double` to ensure both combatants get recalled properly when going from double to single battles
     const playerField = this.getPlayerParty().slice(0, 1 + Number(lastBattle.double));
@@ -2121,6 +2126,9 @@ export class BattleScene extends SceneBase {
 
     this.arenaBg.pipelineData = {
       terrainColorRatio: this.arena.bgTerrainColorRatioForBiome,
+      // Variant biomes ship hand-painted day/dusk/night art, so skip the day/night
+      // shader tint on the background (otherwise the night art is double-darkened).
+      ignoreTimeTint: biomeHasBgVariants(biome),
     };
 
     return this.arena;

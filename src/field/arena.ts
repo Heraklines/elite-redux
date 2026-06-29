@@ -164,6 +164,8 @@ export class Arena {
   public playerFaints: number;
 
   private lastTimeOfDay: TimeOfDay;
+  /** Time of day the background variant was last set for (variant biomes only). */
+  private lastBgTimeOfDay: TimeOfDay;
 
   private pokemonPool: ArenaPokemonPools;
   private readonly trainerPool: TrainerPools;
@@ -218,18 +220,51 @@ export class Arena {
   // #region Misc Public Methods
 
   public init() {
-    const biomeKey = getBiomeKey(this.biomeId);
-
     globalScene.arenaPlayer.setBiome(this.biomeId);
     globalScene.arenaPlayerTransition.setBiome(this.biomeId);
     globalScene.arenaEnemy.setBiome(this.biomeId);
     globalScene.arenaNextEnemy.setBiome(this.biomeId);
-    globalScene.arenaBg.setTexture(`${biomeKey}_bg`);
-    globalScene.arenaBgTransition.setTexture(`${biomeKey}_bg`);
+    const bgKey = this.getBgTextureKey();
+    globalScene.arenaBg.setTexture(bgKey);
+    globalScene.arenaBgTransition.setTexture(bgKey);
+    this.lastBgTimeOfDay = this.getTimeOfDay();
 
     // Redo this on initialize because during save/load the current wave isn't always
     // set correctly during construction
     this.updatePoolsForTimeOfDay();
+  }
+
+  /**
+   * The background texture key for this arena, honoring per-time-of-day variants.
+   * Variant biomes (see {@linkcode BG_VARIANT_BIOMES}) ship hand-painted
+   * `{biome}_bg_{day|dusk|night}` art; every other biome uses the single
+   * `{biome}_bg` (tinted by the day/night shader). DAWN reuses the day art.
+   */
+  public getBgTextureKey(): string {
+    const biomeKey = getBiomeKey(this.biomeId);
+    if (biomeHasBgVariants(this.biomeId)) {
+      return `${biomeKey}_bg_${bgVariantSuffixForTime(this.getTimeOfDay())}`;
+    }
+    return `${biomeKey}_bg`;
+  }
+
+  /**
+   * Swap the arena background to match the current time of day for biomes that
+   * have day/dusk/night variants. Cheap no-op for single-background biomes and
+   * when the time-of-day bucket has not changed. Called once per wave.
+   */
+  public updateBgForTimeOfDay(): void {
+    if (!biomeHasBgVariants(this.biomeId)) {
+      return;
+    }
+    const timeOfDay = this.getTimeOfDay();
+    if (timeOfDay === this.lastBgTimeOfDay) {
+      return;
+    }
+    this.lastBgTimeOfDay = timeOfDay;
+    const bgKey = this.getBgTextureKey();
+    globalScene.arenaBg.setTexture(bgKey);
+    globalScene.arenaBgTransition.setTexture(bgKey);
   }
 
   public setIgnoreAbilities(ignoreAbilities: boolean, ignoringEffectSource: BattlerIndex | null = null): void {
@@ -1195,6 +1230,43 @@ export class Arena {
 
 export function getBiomeKey(biomeId: BiomeId): string {
   return enumValueToKey(BiomeId, biomeId).toLowerCase();
+}
+
+/**
+ * Biomes that ship hand-painted day/dusk/night battle-background art (ER staging).
+ * For these the arena swaps between `{biome}_bg_day` / `_dusk` / `_night` by time
+ * of day instead of tinting a single `{biome}_bg`, and the background opts out of
+ * the day/night shader tint (its lighting is already painted in). Consumed by the
+ * loading-scene variant preload and {@linkcode Arena.getBgTextureKey} /
+ * {@linkcode Arena.updateBgForTimeOfDay}, and the `ignoreTimeTint` flag in
+ * `BattleScene.newArena`.
+ */
+export const BG_VARIANT_BIOMES: ReadonlySet<BiomeId> = new Set<BiomeId>([
+  BiomeId.VOLCANO,
+  BiomeId.RUINS,
+  BiomeId.WASTELAND,
+  BiomeId.GRAVEYARD,
+]);
+
+/** The time-of-day suffixes every variant biome provides (DAWN reuses "day"). */
+export const BG_VARIANT_SUFFIXES = ["day", "dusk", "night"] as const;
+
+/** Whether the biome has per-time-of-day background variants installed. */
+export function biomeHasBgVariants(biomeId: BiomeId): boolean {
+  return BG_VARIANT_BIOMES.has(biomeId);
+}
+
+/** Maps a time of day to the background variant suffix a variant biome provides. */
+export function bgVariantSuffixForTime(timeOfDay: TimeOfDay): (typeof BG_VARIANT_SUFFIXES)[number] {
+  switch (timeOfDay) {
+    case TimeOfDay.NIGHT:
+      return "night";
+    case TimeOfDay.DUSK:
+      return "dusk";
+    default:
+      // DAY and DAWN both use the day-lit art.
+      return "day";
+  }
 }
 
 export function getBiomeHasProps(biomeId: BiomeId): boolean {
