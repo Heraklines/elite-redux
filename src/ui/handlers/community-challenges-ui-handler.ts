@@ -28,6 +28,7 @@ import {
 import { Button } from "#enums/buttons";
 import { TextStyle } from "#enums/text-style";
 import { UiMode } from "#enums/ui-mode";
+import { buildChallengeCardArt, buildChallengeEmblem } from "#ui/community-challenge-card";
 import { addTextObject } from "#ui/text";
 import { UiHandler } from "#ui/ui-handler";
 import { addWindow } from "#ui/ui-theme";
@@ -229,38 +230,48 @@ export class CommunityChallengesUiHandler extends UiHandler {
       const win = addWindow(g.x, FEAT_Y, g.w, FEAT_H);
       win.setTint(PANEL_TINT);
       this.dynamic.add(win);
-      if (i === this.cardCursor) {
-        const sel = globalScene.add.rectangle(g.x, FEAT_Y, g.w, FEAT_H, 0, 0).setOrigin(0);
-        sel.setStrokeStyle(1, 0xffd27a, 0.95);
-        this.dynamic.add(sel);
-      }
       if (!e) {
         return;
       }
-      // Card-art placeholder (the Trial Plates silhouette compositor lands in P1-F).
-      const art = globalScene.add.rectangle(g.x + 2, FEAT_Y + 2, g.w - 4, FEAT_H - 18, 0x141019, 1).setOrigin(0);
-      this.dynamic.add(art);
-      const name = addTextObject(g.x + 4, FEAT_Y + 4, e.config.name.toUpperCase(), TextStyle.WINDOW, {
+      const selected = i === this.cardCursor;
+      // Trial Plate: type-tinted black-silhouette card art fills the card.
+      this.dynamic.add(
+        buildChallengeCardArt(e, g.x + 1, FEAT_Y + 1, g.w - 2, FEAT_H - 2, selected ? 0x3890f8 : 0xa040c0),
+      );
+      // Scrims under the title + foot keep overlaid text readable on the art.
+      this.dynamic.add(globalScene.add.rectangle(g.x + 1, FEAT_Y + 1, g.w - 2, 15, 0x0a0a12, 0.5).setOrigin(0));
+      this.dynamic.add(
+        globalScene.add.rectangle(g.x + 1, FEAT_Y + FEAT_H - 11, g.w - 2, 10, 0x0a0a12, 0.6).setOrigin(0),
+      );
+
+      const name = addTextObject(g.x + 4, FEAT_Y + 3, e.config.name.toUpperCase(), TextStyle.WINDOW, {
         fontSize: "32px",
       });
       name.setOrigin(0, 0).setColor(GOLD);
       this.dynamic.add(name);
-      const sub = addTextObject(g.x + 4, FEAT_Y + 12, e.config.subtitle.toUpperCase(), TextStyle.WINDOW, {
-        fontSize: "24px",
+      const sub = addTextObject(g.x + 4, FEAT_Y + 10, e.config.subtitle.toUpperCase(), TextStyle.WINDOW, {
+        fontSize: "22px",
       });
       sub.setOrigin(0, 0).setColor(GOLD_DIM);
       this.dynamic.add(sub);
-      const rate = addTextObject(g.x + 4, FEAT_Y + FEAT_H - 12, `${this.clearRatePct(e)}%`, TextStyle.WINDOW, {
-        fontSize: "32px",
+      const rate = addTextObject(g.x + 4, FEAT_Y + FEAT_H - 10, `${this.clearRatePct(e)}%`, TextStyle.WINDOW, {
+        fontSize: "30px",
       });
       rate.setOrigin(0, 0).setColor(CYAN);
       this.dynamic.add(rate);
-      const att = addTextObject(g.x + g.w - 4, FEAT_Y + FEAT_H - 12, this.kFmt(e.stats.attempts), TextStyle.WINDOW, {
-        fontSize: "30px",
+      const att = addTextObject(g.x + g.w - 4, FEAT_Y + FEAT_H - 10, this.kFmt(e.stats.attempts), TextStyle.WINDOW, {
+        fontSize: "28px",
         align: "right",
       });
       att.setOrigin(1, 0).setColor(INK);
       this.dynamic.add(att);
+
+      // Selection frame on top.
+      if (selected) {
+        const selFrame = globalScene.add.rectangle(g.x, FEAT_Y, g.w, FEAT_H, 0, 0).setOrigin(0);
+        selFrame.setStrokeStyle(1, 0xffd27a, 0.95);
+        this.dynamic.add(selFrame);
+      }
     });
   }
 
@@ -296,9 +307,8 @@ export class CommunityChallengesUiHandler extends UiHandler {
     win.setTint(PANEL_TINT);
     this.dynamic.add(win);
 
-    // Emblem placeholder (the wax-seal crest lands in P1-F).
-    this.dynamic.add(globalScene.add.circle(CONTENT_X + 15, DETAIL_Y + 14, 11, 0x241a30, 1));
-    this.dynamic.add(globalScene.add.circle(CONTENT_X + 15, DETAIL_Y + 14, 11).setStrokeStyle(1, 0xc8a24a, 0.9));
+    // Wax-seal crest (type-tinted disc + hero silhouette / charge).
+    this.dynamic.add(buildChallengeEmblem(e, CONTENT_X + 15, DETAIL_Y + 15, 12));
 
     const title = addTextObject(
       CONTENT_X + 30,
