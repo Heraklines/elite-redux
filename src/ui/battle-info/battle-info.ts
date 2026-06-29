@@ -1,6 +1,6 @@
 import { globalScene } from "#app/global-scene";
 import { isErBlackShiny } from "#data/elite-redux/er-black-shinies";
-import { getErShinyLabEarnedTierForPokemon, getErShinyLabNameSignature } from "#data/elite-redux/er-shiny-lab-effects";
+import { getErShinyLabEarnedTierForPokemon, getErShinyLabNameStyle } from "#data/elite-redux/er-shiny-lab-effects";
 import { Gender, getGenderColor, getGenderSymbol } from "#data/gender";
 import { getTypeRgb } from "#data/type";
 import { BattlerTagType } from "#enums/battler-tag-type";
@@ -534,17 +534,19 @@ export abstract class BattleInfo extends Phaser.GameObjects.Container {
 
   private updateShinyLabNameplate(pokemon: Pokemon): void {
     const look = getErShinyLabSpriteFxLookForPokemon(pokemon);
-    const signature =
+    // Name FX adopts the equipped PALETTE's color (or a named-combo signature) when the
+    // mon is a T3+ shiny with Name FX unlocked + on. Not just the 7 named combos.
+    const style =
       look?.params.nameFx && getErShinyLabEarnedTierForPokemon(pokemon) >= 3
-        ? getErShinyLabNameSignature(look.loadout)
+        ? getErShinyLabNameStyle(look.loadout)
         : null;
-    if (!signature) {
+    if (!style) {
       this.nameText.setColor("#f8f8f8");
       this.box.clearTint();
       return;
     }
-    this.nameText.setColor(signature.color);
-    this.box.setTint(signature.boxTint);
+    this.nameText.setColor(style.color);
+    this.box.setTint(style.boxTint);
   }
 
   protected updateTeraType(ty: PokemonType): boolean {

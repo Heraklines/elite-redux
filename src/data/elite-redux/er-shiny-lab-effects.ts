@@ -1204,6 +1204,51 @@ export function getErShinyLabNameSignatureFromSavedLook(
   return getErShinyLabNameSignature(decodeErShinyLabSavedLook(saved)?.loadout);
 }
 
+export interface ErShinyLabNameStyle {
+  /** #rrggbb for the name text. */
+  color: string;
+  /** 0xRRGGBB tint for the name box / panel chrome. */
+  boxTint: number;
+}
+
+/** Darken a #rrggbb to a 0xRRGGBB box tint (a dim backdrop for the bright name color). */
+function deriveNameBoxTint(hex: string): number {
+  const n = Number.parseInt(hex.replace("#", ""), 16);
+  if (!Number.isFinite(n)) {
+    return 0x2a3050;
+  }
+  const r = Math.round(((n >> 16) & 0xff) * 0.28);
+  const g = Math.round(((n >> 8) & 0xff) * 0.28);
+  const b = Math.round((n & 0xff) * 0.28);
+  return (r << 16) | (g << 8) | b;
+}
+
+/**
+ * The style the Pokemon NAME should take when Name FX is active: a named-combo
+ * signature if the loadout matches one (prestige), OTHERWISE the equipped PALETTE's
+ * representative accent color - so the name simply "adopts the palette". Returns null
+ * when no palette is equipped (nothing to adopt). Cheap (a lookup + arithmetic), so it
+ * is safe to call on every render; callers gate it on the tier-3 + unlock + `nameFx`
+ * flag. This is the single source of truth shared by every surface that renders the
+ * name (Shiny Lab preview, Starter Select, battle nameplate, Summary, Party).
+ */
+export function getErShinyLabNameStyle(loadout: ErShinyLabLoadout | null | undefined): ErShinyLabNameStyle | null {
+  if (!loadout) {
+    return null;
+  }
+  const signature = getErShinyLabNameSignature(loadout);
+  if (signature) {
+    return { color: signature.color, boxTint: signature.boxTint };
+  }
+  if (loadout.palette) {
+    const def = ER_SHINY_LAB_EFFECTS_BY_CATEGORY.palette.find(e => e.id === loadout.palette);
+    if (def) {
+      return { color: def.accent, boxTint: deriveNameBoxTint(def.accent) };
+    }
+  }
+  return null;
+}
+
 type Rgb = [number, number, number];
 type PaletteContext = {
   K: number;
