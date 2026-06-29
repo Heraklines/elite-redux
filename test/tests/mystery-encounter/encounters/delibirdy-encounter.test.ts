@@ -1,10 +1,12 @@
 import type { BattleScene } from "#app/battle-scene";
 import { modifierTypes } from "#data/data-lists";
+import { ErResistBerryModifier, erResistBerryModifierType } from "#data/elite-redux/er-resist-berries";
 import { BerryType } from "#enums/berry-type";
 import { BiomeId } from "#enums/biome-id";
 import { MysteryEncounterOptionMode } from "#enums/mystery-encounter-option-mode";
 import { MysteryEncounterTier } from "#enums/mystery-encounter-tier";
 import { MysteryEncounterType } from "#enums/mystery-encounter-type";
+import { PokemonType } from "#enums/pokemon-type";
 import { SpeciesId } from "#enums/species-id";
 import {
   BerryModifier,
@@ -205,6 +207,30 @@ describe("Delibird-y - Mystery Encounter", () => {
       const candyJarAfter = scene.findModifier(m => m instanceof LevelIncrementBoosterModifier);
 
       expect(sitrusAfter?.stackCount).toBe(1);
+      expect(candyJarAfter).toBeDefined();
+      expect(candyJarAfter?.stackCount).toBe(1);
+    });
+
+    it("ER: should accept an SE-resist berry as a berry and give a Candy Jar", async () => {
+      // ErResistBerryModifier is NOT the vanilla BerryModifier class, and Delibirdy's
+      // berry checks match by class name - so SE berries were rejected as "not a berry"
+      // (reported in the Delibirdy event). They now count as berries (Candy Jar reward).
+      await game.runToMysteryEncounter(MysteryEncounterType.DELIBIRDY, defaultParty);
+
+      scene.modifiers = [];
+      const chopleMod = erResistBerryModifierType(PokemonType.FIGHTING).newModifier(
+        game.field.getPlayerPokemon(),
+      ) as ErResistBerryModifier;
+      scene.addModifier(chopleMod, true, false, false, true);
+      await scene.updateModifiers(true);
+
+      await runMysteryEncounterToEnd(game, 2, { pokemonNo: 1, optionNo: 1 });
+
+      const berryAfter = scene.findModifier(m => m instanceof ErResistBerryModifier);
+      const candyJarAfter = scene.findModifier(m => m instanceof LevelIncrementBoosterModifier);
+
+      // SE berry consumed (it caps at 1 stack) and a Candy Jar was granted (not a Berry Pouch).
+      expect(berryAfter).toBeUndefined();
       expect(candyJarAfter).toBeDefined();
       expect(candyJarAfter?.stackCount).toBe(1);
     });

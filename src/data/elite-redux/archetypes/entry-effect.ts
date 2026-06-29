@@ -260,7 +260,14 @@ export class EntryEffectAbAttr extends PostSummonAbAttr {
     }
     switch (this.effect.kind) {
       case "set-weather":
-        globalScene.arena.trySetWeather(this.effect.weather, pokemon);
+        // `turns` (when > 0) overrides pokerogue's default 5-turn weather so ER
+        // weathers keep their own duration (e.g. the new FOG's 8 turns). The
+        // Mystical Rock +2/stack extender still applies on top (see arena.trySetWeather).
+        globalScene.arena.trySetWeather(
+          this.effect.weather,
+          pokemon,
+          this.effect.turns > 0 ? this.effect.turns : undefined,
+        );
         return;
       case "set-terrain":
         // `turns` (when > 0) overrides pokerogue's default 5-turn terrain so ER

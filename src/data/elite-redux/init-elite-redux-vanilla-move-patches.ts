@@ -59,6 +59,7 @@ import {
   HighCritAttr,
   HitHealAttr,
   IgnoreOpponentStatStagesAttr,
+  IncrementMovePriorityAttr,
   type Move,
   type MoveAttr,
   type MoveConditionFunc,
@@ -80,6 +81,7 @@ import {
 } from "#data/moves/move";
 import { consecutiveUseRestriction, FirstMoveCondition } from "#data/moves/move-condition";
 import { TerrainType } from "#data/terrain";
+import { ArenaTagSide } from "#enums/arena-tag-side";
 import { ArenaTagType } from "#enums/arena-tag-type";
 import { BattlerTagType } from "#enums/battler-tag-type";
 import { MoveCategory } from "#enums/move-category";
@@ -346,6 +348,20 @@ const MOVE_PATCHERS: ReadonlyMap<MoveId, (move: MutableMove) => void> = new Map(
       // its type-guard per instance; MovePhase then never enters the charging
       // branch. SE-vs-Rock rider comes from ER_ID_SUPER_EFFECTIVE_VS_TYPE.
       Object.defineProperty(move, "isChargingMove", { value: () => false });
+      // ER dex: "+1 priority in tailwind." Same mechanism as Grassy Glide's terrain
+      // priority (IncrementMovePriorityAttr, read in Move.getPriority with target=null,
+      // so the condition only reads `user`). Grant +1 while the user's side has Tailwind.
+      addAttrUnique(
+        move,
+        new IncrementMovePriorityAttr(
+          user =>
+            !!globalScene.arena.getTagOnSide(
+              ArenaTagType.TAILWIND,
+              user.isPlayer() ? ArenaTagSide.PLAYER : ArenaTagSide.ENEMY,
+            ),
+          1,
+        ),
+      );
     },
   ],
   [

@@ -139,8 +139,9 @@ import { type BattleStat, Stat } from "#enums/stat";
 import { StatusEffect } from "#enums/status-effect";
 import { WeatherType } from "#enums/weather-type";
 import type { Pokemon } from "#field/pokemon";
-import { BerryModifier } from "#modifiers/modifier";
+import { BerryModifier, FieldEffectModifier } from "#modifiers/modifier";
 import type { Move } from "#moves/move";
+import { NumberHolder } from "#utils/common";
 import i18next from "i18next";
 
 /**
@@ -1539,6 +1540,19 @@ function patchWeatherSummoner(ability: MutableAbility, weather: WeatherType, tur
  * Carries the new weather type so we can also change SNOW → HAIL for ER's
  * SNOW_WARNING.
  */
+/**
+ * ER's weather/terrain summoners hard-set the duration to a flat ER value, which DISCARDED
+ * the Mystical Rock (FieldEffectModifier, +2 turns/stack) extension that the base
+ * `super.apply()` -> `trySetWeather` had already added. Reported: Drought didn't gain turns
+ * from Mystical Rock. Re-apply the extender on top of ER's base so the bonus is preserved
+ * (mirrors arena.trySetWeather's own FieldEffectModifier hook). No-op without the item.
+ */
+function erFieldTurnsWithItems(pokemon: Pokemon, baseTurns: number): number {
+  const dur = new NumberHolder(baseTurns);
+  globalScene.applyModifier(FieldEffectModifier, pokemon.isPlayer(), pokemon, dur);
+  return dur.value;
+}
+
 class ErWeatherSummonAbAttr extends PostSummonWeatherChangeAbAttr {
   private readonly erTurns: number;
 
@@ -1552,8 +1566,9 @@ class ErWeatherSummonAbAttr extends PostSummonWeatherChangeAbAttr {
     if (!params.simulated) {
       const arenaWeather = globalScene.arena.weather;
       if (arenaWeather && arenaWeather.weatherType === this.weatherType && arenaWeather.turnsLeft > 0) {
-        arenaWeather.turnsLeft = this.erTurns;
-        arenaWeather.maxDuration = this.erTurns;
+        const turns = erFieldTurnsWithItems(params.pokemon, this.erTurns);
+        arenaWeather.turnsLeft = turns;
+        arenaWeather.maxDuration = turns;
       }
     }
   }
@@ -1573,8 +1588,9 @@ class ErBiomeChangeWeatherAbAttr extends PostBiomeChangeWeatherChangeAbAttr {
     if (!params.simulated) {
       const arenaWeather = globalScene.arena.weather;
       if (arenaWeather && arenaWeather.turnsLeft > 0) {
-        arenaWeather.turnsLeft = this.erTurns;
-        arenaWeather.maxDuration = this.erTurns;
+        const turns = erFieldTurnsWithItems(params.pokemon, this.erTurns);
+        arenaWeather.turnsLeft = turns;
+        arenaWeather.maxDuration = turns;
       }
     }
   }
@@ -1611,7 +1627,7 @@ class ErTerrainSummonAbAttr extends PostSummonTerrainChangeAbAttr {
     if (!params.simulated) {
       const arenaTerrain = globalScene.arena.terrain;
       if (arenaTerrain && arenaTerrain.turnsLeft > 0) {
-        arenaTerrain.turnsLeft = this.erTurns;
+        arenaTerrain.turnsLeft = erFieldTurnsWithItems(params.pokemon, this.erTurns);
       }
     }
   }

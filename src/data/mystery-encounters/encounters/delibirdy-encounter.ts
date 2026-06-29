@@ -2,6 +2,7 @@ import { CLASSIC_MODE_MYSTERY_ENCOUNTER_WAVES } from "#app/constants";
 import { timedEventManager } from "#app/global-event-manager";
 import { globalScene } from "#app/global-scene";
 import { modifierTypes } from "#data/data-lists";
+import { ErResistBerryModifier } from "#data/elite-redux/er-resist-berries";
 import { MysteryEncounterOptionMode } from "#enums/mystery-encounter-option-mode";
 import { MysteryEncounterTier } from "#enums/mystery-encounter-tier";
 import { MysteryEncounterType } from "#enums/mystery-encounter-type";
@@ -40,12 +41,19 @@ import i18next from "i18next";
 /** the i18n namespace for this encounter */
 const namespace = "mysteryEncounters/delibirdy";
 
-/** Berries only */
-const OPTION_2_ALLOWED_MODIFIERS = ["BerryModifier", "PokemonInstantReviveModifier"];
+/**
+ * Berries only. ER's super-effective resist berries (Chople, Shuca, …) are a
+ * separate modifier class (`ErResistBerryModifier`, not the vanilla
+ * `BerryModifier`), and these checks match by class-NAME string - so without it
+ * listed here Delibirdy refused to take an SE berry as a berry (reported: "SE
+ * berries aren't berries" in the Delibirdy event).
+ */
+const OPTION_2_ALLOWED_MODIFIERS = ["BerryModifier", "ErResistBerryModifier", "PokemonInstantReviveModifier"];
 
 /** Disallowed items are berries, Reviver Seeds, and Vitamins (form change items and fusion items are not PokemonHeldItemModifiers) */
 const OPTION_3_DISALLOWED_MODIFIERS = [
   "BerryModifier",
+  "ErResistBerryModifier",
   "PokemonInstantReviveModifier",
   "TerastallizeModifier",
   "PokemonBaseStatModifier",
@@ -240,11 +248,13 @@ export const DelibirdyEncounter: MysteryEncounter = MysteryEncounterBuilder.with
       })
       .withOptionPhase(async () => {
         const encounter = globalScene.currentBattle.mysteryEncounter!;
-        const modifier: BerryModifier | PokemonInstantReviveModifier = encounter.misc.chosenModifier;
+        const modifier: BerryModifier | ErResistBerryModifier | PokemonInstantReviveModifier =
+          encounter.misc.chosenModifier;
         const chosenPokemon: PlayerPokemon = encounter.misc.chosenPokemon;
 
-        // Give the player a Candy Jar if they gave a Berry, and a Berry Pouch for Reviver Seed
-        if (modifier instanceof BerryModifier) {
+        // Give the player a Candy Jar if they gave a Berry, and a Berry Pouch for Reviver Seed.
+        // ER SE-resist berries count as berries here too (own modifier class, not BerryModifier).
+        if (modifier instanceof BerryModifier || modifier instanceof ErResistBerryModifier) {
           // Check if the player has max stacks of that Candy Jar already
           const existing = globalScene.findModifier(
             m => m instanceof LevelIncrementBoosterModifier,

@@ -4067,6 +4067,94 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
   },
   {
+    label: "Mystical Rock extends Drought (ability weather)",
+    description:
+      "Mystical Rock (+2 turns/stack to weather) didn't extend ABILITY-set weather - Drought\n"
+      + "was always a flat 8 turns. DO: this Tyranitar has Drought + holds 1 Mystical Rock; send\n"
+      + "it out and read the weather counter (R -> turn info, or just count).  EXPECT: harsh\n"
+      + "sunlight lasts 10 turns (ER base 8 + 2), not 8. Move-set weather already worked.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 50,
+        STARTING_WAVE_OVERRIDE: 5,
+        ABILITY_OVERRIDE: AbilityId.DROUGHT,
+        MOVESET_OVERRIDE: [MoveId.SPLASH],
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.MAGIKARP,
+        ENEMY_LEVEL_OVERRIDE: 50,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+        STARTING_HELD_ITEMS_OVERRIDE: [{ name: "MYSTICAL_ROCK", count: 1 }],
+      });
+      return [
+        makeStarter(SpeciesId.TYRANITAR, {
+          moveset: [MoveId.SPLASH, MoveId.CRUNCH, MoveId.ROCK_SLIDE, MoveId.EARTHQUAKE],
+        }),
+      ];
+    },
+  },
+  {
+    label: "Razor Wind: +1 priority in Tailwind",
+    description:
+      "ER dex: Razor Wind gets +1 priority while Tailwind is active (it was unimplemented).\n"
+      + "DO: turn 1 use Tailwind; turn 2 use Razor Wind against the slower-looking foe.  EXPECT:\n"
+      + "with Tailwind up, Razor Wind moves BEFORE a normal-priority foe move it would otherwise\n"
+      + "lose the speed tie/race to. (Razor Wind also no longer charges - it hits immediately.)",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 50,
+        STARTING_WAVE_OVERRIDE: 5,
+        MOVESET_OVERRIDE: [MoveId.TAILWIND, MoveId.RAZOR_WIND],
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.SNORLAX,
+        ENEMY_LEVEL_OVERRIDE: 50,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.TACKLE],
+      });
+      return [
+        makeStarter(SpeciesId.PIDGEOT, {
+          moveset: [MoveId.TAILWIND, MoveId.RAZOR_WIND, MoveId.SPLASH, MoveId.PROTECT],
+        }),
+      ];
+    },
+  },
+  {
+    label: "(note) Mega/Primal forms can't evolve",
+    description:
+      "DATA fix - verify outside a forced battle: a battle-only resting form (Mega / Primal /\n"
+      + "Gigantamax) must NEVER evolve. ER added level evos to some lines (Scrafty -> Scrafster,\n"
+      + "Scyther -> Scizor/Kleavor, Cascoon -> Dustox) that weren't form-gated, so the MEGA/PRIMAL\n"
+      + "form could still evolve. Now getValidEvolutions() returns nothing for a mega/primal/max\n"
+      + "form; only the BASE form evolves. Check: a Mega Scrafty at L55+ does NOT offer Scrafster;\n"
+      + "a base Scrafty still does. (Unit-tested via getValidEvolutions on a forced Mega form.)",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({ STARTING_WAVE_OVERRIDE: 1, STARTING_LEVEL_OVERRIDE: 60 });
+      return [
+        makeStarter(SpeciesId.SCRAFTY, {
+          moveset: [MoveId.CRUNCH, MoveId.HIGH_JUMP_KICK, MoveId.DRAGON_DANCE, MoveId.BULK_UP],
+        }),
+      ];
+    },
+  },
+  {
+    label: "(note) Delibirdy takes SE-resist berries as berries",
+    description:
+      "DATA fix - verify in a Delibird-y mystery encounter (not a battle): ER's super-effective\n"
+      + "resist berries (Chople, Shuca, Occa, ...) are a separate item class from vanilla berries,\n"
+      + "so Delibirdy refused to take them as a berry (reported: 'SE berries aren't berries').\n"
+      + "Now they count: hold an SE-resist berry, pick 'Give Food' -> the berry IS offered and the\n"
+      + "reward is a Candy Jar (not a Berry Pouch). They're also excluded from the 'give any other\n"
+      + "item' option. (Unit-tested in delibirdy-encounter.test.ts.)",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({ STARTING_WAVE_OVERRIDE: 1 });
+      return [
+        makeStarter(SpeciesId.LUCARIO, {
+          moveset: [MoveId.AURA_SPHERE, MoveId.CLOSE_COMBAT, MoveId.EXTREME_SPEED, MoveId.METEOR_MASH],
+        }),
+      ];
+    },
+  },
+  {
     label: "Mimikyu Apex: Disguise blocks first hit",
     description:
       "Mimikyu Apex's Disguise did NOTHING (the Apex / Rayquaza tiers ship as separate\n"

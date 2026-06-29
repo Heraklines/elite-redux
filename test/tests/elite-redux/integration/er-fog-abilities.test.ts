@@ -118,6 +118,31 @@ describe.skipIf(!RUN_SCENARIOS)("ER fog ecosystem", () => {
     expect(game.scene.arena.weather?.weatherType).toBe(6);
   });
 
+  it("Low Visibility FOG (entry-effect) keeps its 8-turn base AND gains Mystical Rock turns", async () => {
+    // Reported: the new FOG weather didn't honor its configured 8-turn duration and the
+    // Mystical Rock +2/stack extender didn't apply. entry-effect set-weather now forwards
+    // `turns` as turnsOverride and arena.trySetWeather extends it: base 8 + 2 stacks * 2 = 12.
+    const pkrgId = await erId(619);
+    if (pkrgId === undefined) {
+      return;
+    }
+    game.override
+      .battleStyle("single")
+      .ability(pkrgId)
+      .enemyAbility(AbilityId.BALL_FETCH)
+      .enemySpecies(SpeciesId.SNORLAX)
+      .enemyMoveset(MoveId.SPLASH)
+      .startingHeldItems([{ name: "MYSTICAL_ROCK", count: 2 }])
+      .startingLevel(50)
+      .enemyLevel(50)
+      .criticalHits(false);
+    await game.classicMode.startBattle(SpeciesId.GENGAR);
+
+    const weather = game.scene.arena.weather;
+    expect(weather?.weatherType).toBe(WeatherType.FOG);
+    expect(weather!.turnsLeft).toBe(12);
+  });
+
   it("Surprise counters priority after the holder's first turn", async () => {
     const pkrgId = await erId(623);
     if (pkrgId === undefined) {

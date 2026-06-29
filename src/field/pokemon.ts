@@ -3842,6 +3842,15 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
   getValidEvolutions(): SpeciesFormEvolution[] {
     const valid: SpeciesFormEvolution[] = [];
 
+    // ER (megas are permanent resting forms): a battle-only form - Mega / Primal /
+    // Gigantamax / Eternamax - is terminal and must NEVER evolve. Several ER level-evo
+    // edges are NOT form-gated (preFormKey null), so they fired for the mega form too
+    // (reported: Mega Scrafty -> Scrafster; same class for Mega Scyther, Primal Cascoon).
+    // The BASE (non-mega) form still evolves normally.
+    if (this.isMega() || this.isMax()) {
+      return valid;
+    }
+
     if (Object.hasOwn(pokemonEvolutions, this.species.speciesId)) {
       for (const e of pokemonEvolutions[this.species.speciesId]) {
         if (e.validate(this)) {

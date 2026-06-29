@@ -336,9 +336,11 @@ export class Arena {
    * Attempts to set a new weather to the battle
    * @param weather {@linkcode WeatherType} new {@linkcode WeatherType} to set
    * @param user {@linkcode Pokemon} that caused the weather effect
+   * @param turnsOverride base duration to use instead of pokerogue's default 5 (ER weathers
+   *   carry their own, e.g. FOG's 8); the Mystical Rock extender still applies on top
    * @returns true if new weather set, false if no weather provided or attempting to set the same weather as currently in use
    */
-  public trySetWeather(weather: WeatherType, user?: Pokemon): boolean {
+  public trySetWeather(weather: WeatherType, user?: Pokemon, turnsOverride?: number): boolean {
     if (Overrides.WEATHER_OVERRIDE) {
       this.overrideWeather();
       return true;
@@ -363,8 +365,14 @@ export class Arena {
     const weatherDuration = new NumberHolder(0);
 
     if (user != null) {
-      weatherDuration.value = 5;
+      // ER weathers specify their own base duration (e.g. the new FOG's 8 turns); use it
+      // when given, else pokerogue's default 5. Either way the Mystical Rock (FieldEffectModifier)
+      // +2/stack extender applies on top - the item must extend ER weathers too (reported:
+      // it didn't add turns to Drought / FOG).
+      weatherDuration.value = turnsOverride ?? 5;
       globalScene.applyModifier(FieldEffectModifier, user.isPlayer(), user, weatherDuration);
+    } else if (turnsOverride != null) {
+      weatherDuration.value = turnsOverride;
     }
 
     this.weather = weather ? new Weather(weather, weatherDuration.value, weatherDuration.value) : null;
