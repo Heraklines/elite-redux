@@ -120,3 +120,79 @@ CREATE TABLE IF NOT EXISTS notifications (
   created_at INTEGER NOT NULL          -- epoch ms
 );
 CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications (username, created_at);
+
+-- Community challenges (P1). Player-authored run configs that other trainers
+-- browse, play, bookmark, and clear. All three tables are auto-created by the
+-- worker on first /community/* hit (ensureCommunityTables), so an already-deployed
+-- DB needs no migration; they are listed here so a fresh DB matches.
+
+-- The challenge DEFINITION + denormalized counters so browse/donut/clear-rate are
+-- O(1) reads. `config_json` is the run-config source of truth (the config-match
+-- anti-cheat key). A challenge is 'draft' until its founder clear publishes it;
+-- browse/featured only ever read 'active', so a zero-challenge launch returns an
+-- empty feed cleanly with no placeholder rows.
+CREATE TABLE IF NOT EXISTS community_challenges (
+  id               TEXT    PRIMARY KEY,            -- creator/slug-generated
+  title            TEXT    NOT NULL DEFAULT '',
+  subtitle         TEXT    NOT NULL DEFAULT '',
+  description      TEXT    NOT NULL DEFAULT '',
+  config_json      TEXT    NOT NULL,               -- the run-config (verification source of truth)
+  seed             TEXT,                           -- non-null = fixed-seed challenge
+  difficulty       TEXT,                           -- denormalized for filter; ErDifficulty
+  game_mode_id     INTEGER,                        -- GameModes.CHALLENGE / COOP
+  target_wave      INTEGER,                        -- a clear must reach this (<=200)
+  tags             TEXT,                           -- JSON string[] (chips)
+  art_json         TEXT,                           -- deterministic card-art recipe
+  emblem_json      TEXT,                           -- crest/difficulty-emblem recipe
+  created_by       TEXT,                           -- author display name
+  created_by_uid   INTEGER,                        -- author users.id (MY CHALLENGES filter)
+  created_at       INTEGER NOT NULL,
+  published_at     INTEGER,                        -- set when the founder clear publishes it
+  status           TEXT    NOT NULL DEFAULT 'draft', -- 'draft'|'active'|'hidden'|'rejected'
+  founder_clear_id TEXT,                           -- the creator's proving victory
+  featured_rank    INTEGER NOT NULL DEFAULT 0,     -- admin curation; >0 = FEATURED slot order
+  trending_score   REAL    NOT NULL DEFAULT 0,     -- decayed recent-attempt score (nightly cron)
+  attempts_total   INTEGER NOT NULL DEFAULT 0,     -- distinct participants
+  cleared_count    INTEGER NOT NULL DEFAULT 0,
+  failed_count     INTEGER NOT NULL DEFAULT 0,
+  inprogress_count INTEGER NOT NULL DEFAULT 0,
+  best_wave        INTEGER,
+  fastest_clear_ms INTEGER,
+  first_clear_user TEXT,
+  first_clear_at   INTEGER,                         -- "First Clear by ..."
+  updated_at       INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_cc_browse ON community_challenges (status, featured_rank DESC, trending_score DESC);
+CREATE INDEX IF NOT EXISTS idx_cc_newest ON community_challenges (status, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_cc_author ON community_challenges (created_by_uid, created_at DESC);
+
+-- ONE current attempt-record per (challenge,user). Status is a 3-way partition so
+-- the donut sums to 100%. The UPSERT keeps it idempotent + one write/sync;
+-- 'cleared' is sticky (never downgrades).
+CREATE TABLE IF NOT EXISTS community_challenge_attempts (
+  challenge_id  TEXT    NOT NULL,
+  user_id       INTEGER NOT NULL,
+  username      TEXT,
+  status        TEXT    NOT NULL,           -- 'in_progress'|'cleared'|'failed'
+  wave          INTEGER,                    -- best wave reached
+  clear_time_ms INTEGER,                    -- fastest verified clear (for the board)
+  player_team   TEXT,                       -- JSON GhostMember[] (only on a verified clear)
+  challenges    TEXT,                       -- [[id,value,severity]] actually run
+  run_seed      TEXT,                       -- the run's seed (config-match for fixed-seed)
+  verified      INTEGER NOT NULL DEFAULT 0, -- 1 = passed config-match + IV + ban checks (P1-G)
+  replay_trace  TEXT,                       -- OPTIONAL opaque ReplayTrace blob
+  started_at    INTEGER NOT NULL,
+  updated_at    INTEGER NOT NULL,
+  PRIMARY KEY (challenge_id, user_id)
+);
+CREATE INDEX IF NOT EXISTS idx_cca_board  ON community_challenge_attempts (challenge_id, verified, status, wave DESC, clear_time_ms ASC);
+CREATE INDEX IF NOT EXISTS idx_cca_recent ON community_challenge_attempts (challenge_id, status, updated_at DESC);
+CREATE INDEX IF NOT EXISTS idx_cca_user   ON community_challenge_attempts (user_id, updated_at DESC);
+
+CREATE TABLE IF NOT EXISTS community_challenge_bookmarks (
+  user_id      INTEGER NOT NULL,
+  challenge_id TEXT    NOT NULL,
+  created_at   INTEGER NOT NULL,
+  PRIMARY KEY (user_id, challenge_id)
+);
+CREATE INDEX IF NOT EXISTS idx_ccb_user ON community_challenge_bookmarks (user_id, created_at DESC);

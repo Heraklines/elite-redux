@@ -1635,6 +1635,854 @@ async function computeAndPublishUsageTiers(env: Env): Promise<void> {
   });
 }
 
+// #region community challenges (P1)
+// =============================================================================
+// Player-authored "community challenges": a run configuration other trainers
+// browse, play, bookmark, and clear. Three self-creating D1 tables back this
+// (challenge DEFINITION + denormalized counters; one current attempt per
+// (challenge,user); per-user bookmarks) on the SAME `DB` binding, lazily created
+// once per isolate exactly like ensureNotificationsTable / ensureDevTestTable.
+//
+// Routes (wired into the fetch router below):
+//   public : GET  /community/challenges   (browse feed; ALWAYS 200, empty when none)
+//            GET  /community/challenge?id= (full config + stats + recent + board)
+//   authed : POST /community/challenge     (create draft -> {id})
+//            POST /community/attempt        (idempotent run-start record)
+//            POST /community/clear          (verification SEAM - stub, see TODO P1-G)
+//            POST /community/bookmark        (toggle)
+//            GET  /community/bookmarks       (list)
+//
+// Empty-launch is structural, not special-cased: a challenge is `status='draft'`
+// until its founder clear publishes it, and browse only reads `status='active'`,
+// so the feed returns {featured:[], selected:null, totalCount:0} cleanly with no
+// placeholder rows. Counter maintenance is incremental (O(1) read+write per
+// attempt), NOT a recount - deliberately avoiding the full-table-scan trap.
+// =============================================================================
+
+let communityTablesReady = false;
+async function ensureCommunityTables(env: Env): Promise<void> {
+  if (communityTablesReady) {
+    return;
+  }
+  await env.DB.prepare(
+    `CREATE TABLE IF NOT EXISTS community_challenges (
+       id               TEXT    PRIMARY KEY,
+       title            TEXT    NOT NULL DEFAULT '',
+       subtitle         TEXT    NOT NULL DEFAULT '',
+       description      TEXT    NOT NULL DEFAULT '',
+       config_json      TEXT    NOT NULL,
+       seed             TEXT,
+       difficulty       TEXT,
+       game_mode_id     INTEGER,
+       target_wave      INTEGER,
+       tags             TEXT,
+       art_json         TEXT,
+       emblem_json      TEXT,
+       created_by       TEXT,
+       created_by_uid   INTEGER,
+       created_at       INTEGER NOT NULL,
+       published_at     INTEGER,
+       status           TEXT    NOT NULL DEFAULT 'draft',
+       founder_clear_id TEXT,
+       featured_rank    INTEGER NOT NULL DEFAULT 0,
+       trending_score   REAL    NOT NULL DEFAULT 0,
+       attempts_total   INTEGER NOT NULL DEFAULT 0,
+       cleared_count    INTEGER NOT NULL DEFAULT 0,
+       failed_count     INTEGER NOT NULL DEFAULT 0,
+       inprogress_count INTEGER NOT NULL DEFAULT 0,
+       best_wave        INTEGER,
+       fastest_clear_ms INTEGER,
+       first_clear_user TEXT,
+       first_clear_at   INTEGER,
+       updated_at       INTEGER NOT NULL
+     )`,
+  ).run();
+  await env.DB.prepare(
+    "CREATE INDEX IF NOT EXISTS idx_cc_browse ON community_challenges (status, featured_rank DESC, trending_score DESC)",
+  ).run();
+  await env.DB.prepare(
+    "CREATE INDEX IF NOT EXISTS idx_cc_newest ON community_challenges (status, created_at DESC)",
+  ).run();
+  await env.DB.prepare(
+    "CREATE INDEX IF NOT EXISTS idx_cc_author ON community_challenges (created_by_uid, created_at DESC)",
+  ).run();
+  await env.DB.prepare(
+    `CREATE TABLE IF NOT EXISTS community_challenge_attempts (
+       challenge_id  TEXT    NOT NULL,
+       user_id       INTEGER NOT NULL,
+       username      TEXT,
+       status        TEXT    NOT NULL,
+       wave          INTEGER,
+       clear_time_ms INTEGER,
+       player_team   TEXT,
+       challenges    TEXT,
+       run_seed      TEXT,
+       verified      INTEGER NOT NULL DEFAULT 0,
+       replay_trace  TEXT,
+       started_at    INTEGER NOT NULL,
+       updated_at    INTEGER NOT NULL,
+       PRIMARY KEY (challenge_id, user_id)
+     )`,
+  ).run();
+  await env.DB.prepare(
+    "CREATE INDEX IF NOT EXISTS idx_cca_board ON community_challenge_attempts (challenge_id, verified, status, wave DESC, clear_time_ms ASC)",
+  ).run();
+  await env.DB.prepare(
+    "CREATE INDEX IF NOT EXISTS idx_cca_recent ON community_challenge_attempts (challenge_id, status, updated_at DESC)",
+  ).run();
+  await env.DB.prepare(
+    "CREATE INDEX IF NOT EXISTS idx_cca_user ON community_challenge_attempts (user_id, updated_at DESC)",
+  ).run();
+  await env.DB.prepare(
+    `CREATE TABLE IF NOT EXISTS community_challenge_bookmarks (
+       user_id      INTEGER NOT NULL,
+       challenge_id TEXT    NOT NULL,
+       created_at   INTEGER NOT NULL,
+       PRIMARY KEY (user_id, challenge_id)
+     )`,
+  ).run();
+  await env.DB.prepare(
+    "CREATE INDEX IF NOT EXISTS idx_ccb_user ON community_challenge_bookmarks (user_id, created_at DESC)",
+  ).run();
+  communityTablesReady = true;
+}
+
+// ---------------------------------------------------------------------------
+// Shared config validator. This is a VERBATIM copy of the client's
+// `validateChallengeConfig` (src/data/elite-redux/er-community-challenges.ts) -
+// workers can't import from `src/`. A parity vitest asserts the two agree
+// (test/tests/elite-redux/er-community-challenge-validator-parity.test.ts).
+// Keep the bodies byte-identical when either is edited.
+// ---------------------------------------------------------------------------
+
+/** Result of validating an untrusted community-challenge config. */
+export interface ChallengeConfigValidation {
+  ok: boolean;
+  errors: string[];
+}
+
+// The `Challenges` enum (src/enums/challenges.ts) has 15 members (0..14),
+// SINGLE_GENERATION..GHOST_TRAINERS. Hardcoded as a constant so the worker copy
+// and the client copy bind the same range without importing the enum.
+const CC_CHALLENGE_ID_MAX = 14;
+const CC_VALID_DIFFICULTIES = ["youngster", "ace", "elite", "hell"];
+const CC_MAX_NAME = 60;
+const CC_MAX_SUBTITLE = 80;
+const CC_MAX_DESC = 600;
+const CC_MAX_TAGS = 8;
+const CC_MAX_TAG_LEN = 24;
+const CC_MAX_BASE_CHALLENGES = 20;
+const CC_MAX_ALLOWED_SPECIES = 300;
+const CC_MAX_TARGET_WAVE = 200;
+
+export function validateChallengeConfig(config: unknown): ChallengeConfigValidation {
+  const errors: string[] = [];
+  if (!config || typeof config !== "object" || Array.isArray(config)) {
+    return { ok: false, errors: ["config must be an object"] };
+  }
+  const c = config as Record<string, unknown>;
+  if (typeof c.name !== "string" || c.name.trim().length === 0) {
+    errors.push("name is required");
+  } else if (c.name.length > CC_MAX_NAME) {
+    errors.push(`name must be <= ${CC_MAX_NAME} characters`);
+  }
+  if (c.subtitle !== undefined && (typeof c.subtitle !== "string" || c.subtitle.length > CC_MAX_SUBTITLE)) {
+    errors.push(`subtitle must be a string <= ${CC_MAX_SUBTITLE} characters`);
+  }
+  if (c.description !== undefined && (typeof c.description !== "string" || c.description.length > CC_MAX_DESC)) {
+    errors.push(`description must be a string <= ${CC_MAX_DESC} characters`);
+  }
+  if (typeof c.difficulty !== "string" || !CC_VALID_DIFFICULTIES.includes(c.difficulty)) {
+    errors.push("difficulty must be one of youngster|ace|elite|hell");
+  }
+  if (
+    typeof c.difficultyTier !== "number"
+    || !Number.isInteger(c.difficultyTier)
+    || c.difficultyTier < 1
+    || c.difficultyTier > 5
+  ) {
+    errors.push("difficultyTier must be an integer 1..5");
+  }
+  if (typeof c.gameModeId !== "number" || !Number.isFinite(c.gameModeId)) {
+    errors.push("gameModeId must be a number");
+  }
+  if (Array.isArray(c.baseChallenges)) {
+    if (c.baseChallenges.length > CC_MAX_BASE_CHALLENGES) {
+      errors.push(`baseChallenges must have <= ${CC_MAX_BASE_CHALLENGES} entries`);
+    }
+    for (const entry of c.baseChallenges) {
+      if (!Array.isArray(entry) || entry.length < 2) {
+        errors.push("each baseChallenge must be [id, value, severity?]");
+        continue;
+      }
+      const id = entry[0];
+      const value = entry[1];
+      const severity = entry[2];
+      if (typeof id !== "number" || !Number.isInteger(id) || id < 0 || id > CC_CHALLENGE_ID_MAX) {
+        errors.push(`baseChallenge id ${String(id)} is out of range 0..${CC_CHALLENGE_ID_MAX}`);
+      }
+      if (typeof value !== "number" || !Number.isFinite(value)) {
+        errors.push("baseChallenge value must be a number");
+      }
+      if (severity !== undefined && (typeof severity !== "number" || !Number.isFinite(severity))) {
+        errors.push("baseChallenge severity must be a number");
+      }
+    }
+  } else {
+    errors.push("baseChallenges must be an array");
+  }
+  if (c.allowedSpecies !== null && !Array.isArray(c.allowedSpecies)) {
+    errors.push("allowedSpecies must be null or an array");
+  } else if (Array.isArray(c.allowedSpecies)) {
+    if (c.allowedSpecies.length > CC_MAX_ALLOWED_SPECIES) {
+      errors.push(`allowedSpecies must have <= ${CC_MAX_ALLOWED_SPECIES} entries`);
+    }
+    for (const sp of c.allowedSpecies) {
+      if (typeof sp !== "number" || !Number.isInteger(sp) || sp <= 0) {
+        errors.push("allowedSpecies entries must be positive integers");
+        break;
+      }
+    }
+  }
+  if (
+    typeof c.targetWave !== "number"
+    || !Number.isInteger(c.targetWave)
+    || c.targetWave < 1
+    || c.targetWave > CC_MAX_TARGET_WAVE
+  ) {
+    errors.push(`targetWave must be an integer 1..${CC_MAX_TARGET_WAVE}`);
+  }
+  if (Array.isArray(c.tags)) {
+    if (c.tags.length > CC_MAX_TAGS) {
+      errors.push(`tags must have <= ${CC_MAX_TAGS} entries`);
+    }
+    for (const tag of c.tags) {
+      if (typeof tag !== "string" || tag.length === 0 || tag.length > CC_MAX_TAG_LEN) {
+        errors.push(`each tag must be a non-empty string <= ${CC_MAX_TAG_LEN} characters`);
+        break;
+      }
+    }
+  } else {
+    errors.push("tags must be an array");
+  }
+  if (
+    c.restrictions !== undefined
+    && (typeof c.restrictions !== "object" || c.restrictions === null || Array.isArray(c.restrictions))
+  ) {
+    errors.push("restrictions must be an object");
+  }
+  return { ok: errors.length === 0, errors };
+}
+
+// ---------------------------------------------------------------------------
+// Read helpers: row -> CommunityChallengeEntry (the shape the browser binds; see
+// src/data/elite-redux/er-community-challenges.ts).
+// ---------------------------------------------------------------------------
+
+/** Columns of `community_challenges` needed to build a feed entry. */
+const CC_ENTRY_COLS =
+  "id, config_json, status, attempts_total, cleared_count, inprogress_count, failed_count, first_clear_user, created_by, created_by_uid, created_at";
+
+interface CommunityChallengeRow {
+  id: string;
+  config_json: string;
+  status: string;
+  attempts_total: number;
+  cleared_count: number;
+  inprogress_count: number;
+  failed_count: number;
+  first_clear_user: string | null;
+  created_by: string | null;
+  created_by_uid: number | null;
+  created_at: number;
+}
+
+/** Derive the human-readable RULES list from a config's restrictions + meta. */
+function deriveCommunityRules(config: Record<string, unknown>): { icon?: string; text: string }[] {
+  const rules: { icon?: string; text: string }[] = [];
+  const r = (config.restrictions ?? {}) as Record<string, unknown>;
+  if (r.noLegendary) {
+    rules.push({ text: "No Legendary Pokemon" });
+  }
+  if (r.noMythical) {
+    rules.push({ text: "No Mythical Pokemon" });
+  }
+  if (r.noUltraBeasts) {
+    rules.push({ text: "No Ultra Beasts" });
+  }
+  if (r.noRepeats) {
+    rules.push({ text: "No repeats" });
+  }
+  if (r.starterNotGuaranteed) {
+    rules.push({ text: "Starter is not guaranteed" });
+  }
+  if (Array.isArray(config.allowedSpecies)) {
+    rules.push({ text: "Restricted Pokemon pool" });
+  }
+  if (typeof config.targetWave === "number") {
+    rules.push({ text: `Reach wave ${config.targetWave}` });
+  }
+  return rules;
+}
+
+/** Build the CommunityChallengeEntry the browser screen binds, from a DB row. */
+function buildCommunityEntry(
+  row: CommunityChallengeRow,
+  stats: {
+    attempts: number;
+    cleared: number;
+    inProgress: number;
+    failed: number;
+    recent: { user: string; at: number }[];
+  },
+  bookmarked: boolean,
+): unknown {
+  let config: Record<string, unknown>;
+  try {
+    config = JSON.parse(row.config_json) as Record<string, unknown>;
+  } catch {
+    config = {};
+  }
+  const allowed = Array.isArray(config.allowedSpecies) ? (config.allowedSpecies as number[]) : null;
+  return {
+    config,
+    stats: {
+      attempts: stats.attempts,
+      cleared: stats.cleared,
+      inProgress: stats.inProgress,
+      failed: stats.failed,
+      firstClearUser: row.first_clear_user ?? undefined,
+      recent: stats.recent,
+    },
+    rules: deriveCommunityRules(config),
+    allowedPreview: allowed ? allowed.slice(0, 9) : [],
+    allowedCount: allowed ? allowed.length : 0,
+    bookmarked,
+  };
+}
+
+/** Map a `sort` query value to a whitelisted ORDER BY clause (no injection). */
+function communitySortOrder(sort: string): string {
+  switch (sort) {
+    case "newest":
+      return "created_at DESC";
+    case "clearRate":
+      return "(CAST(cleared_count AS REAL) / NULLIF(attempts_total, 0)) DESC, attempts_total DESC";
+    case "attempts":
+      return "attempts_total DESC";
+    case "hardest":
+      return "CASE difficulty WHEN 'hell' THEN 4 WHEN 'elite' THEN 3 WHEN 'ace' THEN 2 WHEN 'youngster' THEN 1 ELSE 0 END DESC, attempts_total DESC";
+    default:
+      // "trending"
+      return "featured_rank DESC, trending_score DESC, created_at DESC";
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Public routes.
+// ---------------------------------------------------------------------------
+
+/**
+ * GET /community/challenges - the browse / featured feed. Filter (difficulty,
+ * tag, q), sort, and page. ALWAYS returns 200 with a CommunityChallengeFeed;
+ * `{featured:[], selected:null, totalCount:0}` when empty (never errors on empty).
+ */
+async function handleCommunityList(url: URL, env: Env, cors: Record<string, string>): Promise<Response> {
+  await ensureCommunityTables(env);
+  const sort = url.searchParams.get("sort") ?? "trending";
+  const difficulty = url.searchParams.get("difficulty") ?? "";
+  const tag = url.searchParams.get("tag") ?? "";
+  const q = (url.searchParams.get("q") ?? "").trim().toLowerCase();
+  const limitParsed = Number.parseInt(url.searchParams.get("limit") ?? "", 10);
+  const limit = Number.isFinite(limitParsed) ? Math.min(Math.max(limitParsed, 1), 30) : 12;
+  const offsetParsed = Number.parseInt(url.searchParams.get("offset") ?? "", 10);
+  const offset = Number.isFinite(offsetParsed) ? Math.max(offsetParsed, 0) : 0;
+
+  const where: string[] = ["status = 'active'"];
+  const binds: unknown[] = [];
+  if (difficulty && CC_VALID_DIFFICULTIES.includes(difficulty)) {
+    where.push("difficulty = ?");
+    binds.push(difficulty);
+  }
+  if (tag) {
+    // tags is a JSON array string e.g. ["NUZLOCKE","HARDCORE"]; match a quoted token.
+    where.push("tags LIKE ?");
+    binds.push(`%${JSON.stringify(tag).slice(1, -1)}%`);
+  }
+  if (q) {
+    where.push("(lower(title) LIKE ? OR lower(description) LIKE ?)");
+    binds.push(`%${q}%`, `%${q}%`);
+  }
+  const whereSql = where.join(" AND ");
+
+  const totalRow = await env.DB.prepare(`SELECT COUNT(*) AS c FROM community_challenges WHERE ${whereSql}`)
+    .bind(...binds)
+    .first<{ c: number }>();
+  const totalCount = totalRow?.c ?? 0;
+
+  const { results } = await env.DB.prepare(
+    `SELECT ${CC_ENTRY_COLS} FROM community_challenges WHERE ${whereSql} ORDER BY ${communitySortOrder(sort)} LIMIT ? OFFSET ?`,
+  )
+    .bind(...binds, limit, offset)
+    .all<CommunityChallengeRow>();
+
+  const featured = (results ?? []).map((row: CommunityChallengeRow) =>
+    buildCommunityEntry(
+      row,
+      {
+        attempts: row.attempts_total,
+        cleared: row.cleared_count,
+        inProgress: row.inprogress_count,
+        failed: row.failed_count,
+        recent: [],
+      },
+      false,
+    ),
+  );
+  return json({ featured, selected: featured[0] ?? null, totalCount }, 200, cors);
+}
+
+/**
+ * GET /community/challenge?id= - full config + stats + recent completions +
+ * leaderboard, in one round-trip. Stats are derived from the attempts table.
+ * 404 when missing or hidden/rejected.
+ */
+async function handleCommunityDetail(url: URL, env: Env, cors: Record<string, string>): Promise<Response> {
+  await ensureCommunityTables(env);
+  const id = url.searchParams.get("id") ?? "";
+  if (!id) {
+    return text("Missing challenge id.", 400, cors);
+  }
+  const row = await env.DB.prepare(`SELECT ${CC_ENTRY_COLS} FROM community_challenges WHERE id = ?`)
+    .bind(id)
+    .first<CommunityChallengeRow>();
+  if (!row || row.status === "hidden" || row.status === "rejected") {
+    return text("Challenge not found.", 404, cors);
+  }
+
+  // Stats derivation (clear rate / attempts / in-progress / failed) straight off
+  // the attempts table - the 3-way status partition sums to the attempt total.
+  const { results: statusRows } = await env.DB.prepare(
+    "SELECT status, COUNT(*) AS c FROM community_challenge_attempts WHERE challenge_id = ? GROUP BY status",
+  )
+    .bind(id)
+    .all<{ status: string; c: number }>();
+  let cleared = 0;
+  let inProgress = 0;
+  let failed = 0;
+  for (const sc of statusRows ?? []) {
+    if (sc.status === "cleared") {
+      cleared = sc.c;
+    } else if (sc.status === "in_progress") {
+      inProgress = sc.c;
+    } else if (sc.status === "failed") {
+      failed = sc.c;
+    }
+  }
+  const attempts = cleared + inProgress + failed;
+
+  const { results: recentRows } = await env.DB.prepare(
+    "SELECT username, updated_at FROM community_challenge_attempts WHERE challenge_id = ? AND status = 'cleared' ORDER BY updated_at DESC LIMIT 5",
+  )
+    .bind(id)
+    .all<{ username: string | null; updated_at: number }>();
+  const recent = (recentRows ?? []).map((r: { username: string | null; updated_at: number }) => ({
+    user: r.username ?? "Trainer",
+    at: r.updated_at,
+  }));
+
+  const { results: boardRows } = await env.DB.prepare(
+    "SELECT username, wave, clear_time_ms, updated_at FROM community_challenge_attempts WHERE challenge_id = ? AND verified = 1 AND status = 'cleared' ORDER BY wave DESC, clear_time_ms ASC LIMIT 10",
+  )
+    .bind(id)
+    .all<{ username: string | null; wave: number | null; clear_time_ms: number | null; updated_at: number }>();
+  const leaderboard = (boardRows ?? []).map(
+    (r: { username: string | null; wave: number | null; clear_time_ms: number | null; updated_at: number }) => ({
+      username: r.username ?? "Trainer",
+      wave: r.wave ?? 0,
+      clearTimeMs: r.clear_time_ms,
+      when: r.updated_at,
+    }),
+  );
+
+  const challenge = buildCommunityEntry(row, { attempts, cleared, inProgress, failed, recent }, false);
+  return json({ challenge, leaderboard }, 200, cors);
+}
+
+// ---------------------------------------------------------------------------
+// Authenticated routes.
+// ---------------------------------------------------------------------------
+
+/**
+ * POST /community/challenge - create a DRAFT challenge. Body is the
+ * CommunityChallengeConfig (or `{ config }`). Validated, then inserted with
+ * `status='draft'`; it stays invisible to browse until its founder clear
+ * publishes it. Returns `{ id }`.
+ */
+async function handleCommunityCreate(
+  request: Request,
+  auth: TokenPayload,
+  env: Env,
+  cors: Record<string, string>,
+): Promise<Response> {
+  await ensureCommunityTables(env);
+  const raw = await readSaveBody(request);
+  if (raw === null) {
+    return text("Challenge data too large.", 413, cors);
+  }
+  let body: unknown;
+  try {
+    body = JSON.parse(raw);
+  } catch {
+    return text("Invalid challenge data.", 400, cors);
+  }
+  const wrapper = body as Record<string, unknown> | null;
+  const config = (wrapper && typeof wrapper === "object" && wrapper.config ? wrapper.config : body) as Record<
+    string,
+    unknown
+  >;
+  const validation = validateChallengeConfig(config);
+  if (!validation.ok) {
+    return json({ error: "invalid config", errors: validation.errors }, 422, cors);
+  }
+  const now = Date.now();
+  const id = `cc-${now.toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+  const asStr = (v: unknown, max: number): string => (typeof v === "string" ? v.slice(0, max) : "");
+  // The server owns id/author/createdAt; persist the canonical config alongside.
+  const stored = {
+    ...config,
+    id,
+    schemaVersion: typeof config.schemaVersion === "number" ? config.schemaVersion : 1,
+    author: auth.u,
+    authorId: auth.uid,
+    createdAt: now,
+  };
+  const tags = Array.isArray(config.tags) ? config.tags : [];
+  await env.DB.prepare(
+    `INSERT INTO community_challenges
+       (id, title, subtitle, description, config_json, seed, difficulty, game_mode_id, target_wave, tags, art_json, emblem_json, created_by, created_by_uid, created_at, status, updated_at)
+     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, 'draft', ?15)`,
+  )
+    .bind(
+      id,
+      asStr(config.name, CC_MAX_NAME),
+      asStr(config.subtitle, CC_MAX_SUBTITLE),
+      asStr(config.description, CC_MAX_DESC),
+      JSON.stringify(stored),
+      typeof config.seed === "string" && config.seed.length > 0 ? config.seed : null,
+      typeof config.difficulty === "string" ? config.difficulty : null,
+      typeof config.gameModeId === "number" ? config.gameModeId : null,
+      typeof config.targetWave === "number" ? config.targetWave : null,
+      JSON.stringify(tags),
+      config.art ? JSON.stringify(config.art) : null,
+      null,
+      auth.u,
+      auth.uid,
+      now,
+    )
+    .run();
+  return json({ id }, 200, cors);
+}
+
+/**
+ * Incremental attempt UPSERT + O(1) counter maintenance. Reads the old status (1
+ * read), computes the (old->new) bucket delta, then batches [attempt upsert,
+ * counter update, optional first-clear stamp]. `cleared` is STICKY (never
+ * downgrades). Returns the effective (post-sticky) status.
+ */
+async function upsertCommunityAttempt(
+  env: Env,
+  p: {
+    challengeId: string;
+    userId: number;
+    username: string;
+    status: "in_progress" | "cleared" | "failed";
+    wave: number | null;
+    clearTimeMs: number | null;
+    verified: number;
+    now: number;
+  },
+): Promise<"in_progress" | "cleared" | "failed"> {
+  const existing = await env.DB.prepare(
+    "SELECT status FROM community_challenge_attempts WHERE challenge_id = ? AND user_id = ?",
+  )
+    .bind(p.challengeId, p.userId)
+    .first<{ status: string }>();
+  const oldStatus = existing?.status ?? null;
+  // Sticky: once cleared, status never downgrades.
+  const effective: "in_progress" | "cleared" | "failed" = oldStatus === "cleared" ? "cleared" : p.status;
+  const isNew = oldStatus === null;
+  const dAttempts = isNew ? 1 : 0;
+  const dInprogress = (effective === "in_progress" ? 1 : 0) - (oldStatus === "in_progress" ? 1 : 0);
+  const dCleared = (effective === "cleared" ? 1 : 0) - (oldStatus === "cleared" ? 1 : 0);
+  const dFailed = (effective === "failed" ? 1 : 0) - (oldStatus === "failed" ? 1 : 0);
+
+  const stmts = [
+    env.DB.prepare(
+      `INSERT INTO community_challenge_attempts
+           (challenge_id, user_id, username, status, wave, clear_time_ms, verified, started_at, updated_at)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?8)
+         ON CONFLICT(challenge_id, user_id) DO UPDATE SET
+           username = ?3,
+           status = ?4,
+           wave = MAX(COALESCE(community_challenge_attempts.wave, 0), COALESCE(?5, 0)),
+           clear_time_ms = CASE
+             WHEN ?6 IS NOT NULL AND (community_challenge_attempts.clear_time_ms IS NULL OR ?6 < community_challenge_attempts.clear_time_ms)
+             THEN ?6 ELSE community_challenge_attempts.clear_time_ms END,
+           verified = MAX(community_challenge_attempts.verified, ?7),
+           updated_at = ?8`,
+    ).bind(p.challengeId, p.userId, p.username, effective, p.wave, p.clearTimeMs, p.verified, p.now),
+    env.DB.prepare(
+      `UPDATE community_challenges SET
+           attempts_total = attempts_total + ?2,
+           inprogress_count = inprogress_count + ?3,
+           cleared_count = cleared_count + ?4,
+           failed_count = failed_count + ?5,
+           best_wave = MAX(COALESCE(best_wave, 0), COALESCE(?6, 0)),
+           fastest_clear_ms = CASE
+             WHEN ?7 = 'cleared' AND ?8 IS NOT NULL AND (fastest_clear_ms IS NULL OR ?8 < fastest_clear_ms)
+             THEN ?8 ELSE fastest_clear_ms END,
+           updated_at = ?9
+         WHERE id = ?1`,
+    ).bind(p.challengeId, dAttempts, dInprogress, dCleared, dFailed, p.wave, effective, p.clearTimeMs, p.now),
+  ];
+  if (effective === "cleared") {
+    stmts.push(
+      env.DB.prepare(
+        "UPDATE community_challenges SET first_clear_user = ?2, first_clear_at = ?3 WHERE id = ?1 AND first_clear_user IS NULL",
+      ).bind(p.challengeId, p.username, p.now),
+    );
+  }
+  await env.DB.batch(stmts);
+  return effective;
+}
+
+/**
+ * POST /community/attempt - record a run START (in-progress) for this player.
+ * Idempotent: keyed (challenge_id, user_id), it no-ops if a row already exists
+ * (so re-entering a challenge never double-counts or downgrades a clear).
+ */
+async function handleCommunityAttempt(
+  request: Request,
+  auth: TokenPayload,
+  env: Env,
+  cors: Record<string, string>,
+): Promise<Response> {
+  await ensureCommunityTables(env);
+  const body = await parseFormBody(request);
+  const challengeId = (body.challengeId ?? "").slice(0, 128);
+  if (!challengeId) {
+    return json({ error: "challengeId required" }, 422, cors);
+  }
+  const exists = await env.DB.prepare("SELECT id FROM community_challenges WHERE id = ?")
+    .bind(challengeId)
+    .first<{ id: string }>();
+  if (!exists) {
+    return text("Challenge not found.", 404, cors);
+  }
+  const waveParsed = Number.parseInt(body.wave ?? "", 10);
+  const wave = Number.isFinite(waveParsed) ? Math.max(0, Math.min(200, waveParsed)) : null;
+  const now = Date.now();
+
+  // Idempotent: only the FIRST attempt for (challenge,user) inserts + bumps. A
+  // pre-existing row (in_progress OR a sticky clear) is left untouched.
+  const existing = await env.DB.prepare(
+    "SELECT status FROM community_challenge_attempts WHERE challenge_id = ? AND user_id = ?",
+  )
+    .bind(challengeId, auth.uid)
+    .first<{ status: string }>();
+  if (existing) {
+    return json({ ok: true, status: existing.status, recorded: false }, 200, cors);
+  }
+  await env.DB.batch([
+    env.DB.prepare(
+      `INSERT INTO community_challenge_attempts
+           (challenge_id, user_id, username, status, wave, verified, started_at, updated_at)
+         VALUES (?1, ?2, ?3, 'in_progress', ?4, 0, ?5, ?5)
+         ON CONFLICT(challenge_id, user_id) DO NOTHING`,
+    ).bind(challengeId, auth.uid, auth.u, wave, now),
+    env.DB.prepare(
+      `UPDATE community_challenges SET
+           attempts_total = attempts_total + 1,
+           inprogress_count = inprogress_count + 1,
+           best_wave = MAX(COALESCE(best_wave, 0), COALESCE(?2, 0)),
+           updated_at = ?3
+         WHERE id = ?1`,
+    ).bind(challengeId, wave, now),
+  ]);
+  return json({ ok: true, status: "in_progress", recorded: true }, 200, cors);
+}
+
+/**
+ * POST /community/clear - the verification SEAM (full anti-cheat is P1-G). Today
+ * it validates the body shape, records the attempt with the claimed outcome, and
+ * lays the founder-publish seam. The config-match + IV-clamp + ban checks that
+ * gate a VERIFIED clear are stubbed - see the TODO(P1-G) below.
+ */
+async function handleCommunityClear(
+  request: Request,
+  auth: TokenPayload,
+  env: Env,
+  cors: Record<string, string>,
+): Promise<Response> {
+  await ensureCommunityTables(env);
+  const raw = await readSaveBody(request);
+  if (raw === null) {
+    return text("Run data too large.", 413, cors);
+  }
+  let body: Record<string, unknown>;
+  try {
+    body = JSON.parse(raw) as Record<string, unknown>;
+  } catch {
+    return text("Invalid run data.", 400, cors);
+  }
+  // Body-shape validation (the seam): a clear claim must name a challenge and
+  // carry a party array, exactly like handleRunCreate requires id + party.
+  const challengeId =
+    typeof body.challengeId === "string" ? body.challengeId : typeof body.id === "string" ? body.id : "";
+  if (!challengeId) {
+    return json({ error: "challengeId required" }, 422, cors);
+  }
+  const party = Array.isArray(body.party) ? body.party : null;
+  if (!party) {
+    return json({ error: "party required" }, 422, cors);
+  }
+  const row = await env.DB.prepare(
+    "SELECT id, status, created_by_uid, target_wave, seed FROM community_challenges WHERE id = ?",
+  )
+    .bind(challengeId)
+    .first<{
+      id: string;
+      status: string;
+      created_by_uid: number | null;
+      target_wave: number | null;
+      seed: string | null;
+    }>();
+  if (!row) {
+    return text("Challenge not found.", 404, cors);
+  }
+  const isCreator = row.created_by_uid === auth.uid;
+  // Only the creator may submit against a not-yet-live challenge (the publish path).
+  if (row.status !== "active" && !isCreator) {
+    return text("Challenge is not available.", 403, cors);
+  }
+  const isVictory = body.outcome === "victory" || body.isVictory === true;
+  const waveParsed = Number.parseInt(String(body.wave ?? body.waveReached ?? ""), 10);
+  const wave = Number.isFinite(waveParsed) ? Math.max(0, Math.min(200, waveParsed)) : null;
+  const clearTimeParsed = Number.parseInt(String(body.clearTimeMs ?? body.clearTime ?? ""), 10);
+  const clearTimeMs = Number.isFinite(clearTimeParsed) ? Math.max(0, clearTimeParsed) : null;
+  const now = Date.now();
+
+  // -------------------------------------------------------------------------
+  // TODO(P1-G): full config-match + anti-cheat verification belongs HERE, before
+  // marking the attempt verified=1 and before publishing. Reuse (do NOT rebuild):
+  //   - the IV-clamp/sanitization loop from handleRunCreate (index.ts ~856): if
+  //     any clamped IV differed from the submitted one, force verified=0.
+  //   - the isErGhostTeamLegal bans (er-ghost-teams.ts:165-240): banned species/
+  //     forms + >=2 legendary-egg lines -> verified=0.
+  //   - the config-match (plan section 4.3): outcome==='victory' AND
+  //     wave>=row.target_wave AND wave<=200; run.difficulty===config.difficulty;
+  //     run.gameModeId===config.gameModeId; submitted `challenges` deep-equal
+  //     config.baseChallenges (order-insensitive by id); every party root species
+  //     in config.allowedSpecies when set; for a fixed-seed challenge
+  //     (row.seed != null) run_seed===row.seed.
+  // Only when ALL pass: verified=1 AND (founder) publish. For now the attempt is
+  // recorded UNVERIFIED so it counts toward stats but never reaches the board.
+  // -------------------------------------------------------------------------
+  const verified: number = 0; // P1-G sets 1 on a passing config-match.
+  const status: "cleared" | "failed" = isVictory ? "cleared" : "failed";
+  const effective = await upsertCommunityAttempt(env, {
+    challengeId,
+    userId: auth.uid,
+    username: auth.u,
+    status,
+    wave,
+    clearTimeMs,
+    verified,
+    now,
+  });
+
+  // Founder-publish seam (plan section 4.3 step 6 - the documented go-live gate):
+  // the creator's first victory flips the draft live. TODO(P1-G): gate this on the
+  // verification above passing (verified===1) before it ships to players.
+  let published = false;
+  if (isCreator && isVictory && row.status === "draft") {
+    await env.DB.prepare(
+      "UPDATE community_challenges SET status = 'active', published_at = ?2, founder_clear_id = ?3, updated_at = ?2 WHERE id = ?1 AND status = 'draft'",
+    )
+      .bind(challengeId, now, typeof body.id === "string" ? body.id : challengeId)
+      .run();
+    published = true;
+  }
+  return json({ ok: true, status: effective, verified: verified === 1, published }, 200, cors);
+}
+
+/** POST /community/bookmark - toggle a bookmark on/off for this player. */
+async function handleCommunityBookmark(
+  request: Request,
+  auth: TokenPayload,
+  env: Env,
+  cors: Record<string, string>,
+): Promise<Response> {
+  await ensureCommunityTables(env);
+  const body = await parseFormBody(request);
+  const challengeId = (body.challengeId ?? "").slice(0, 128);
+  if (!challengeId) {
+    return json({ error: "challengeId required" }, 422, cors);
+  }
+  const on = body.on === undefined ? true : body.on === "true" || body.on === "1";
+  const now = Date.now();
+  if (on) {
+    await env.DB.prepare(
+      "INSERT INTO community_challenge_bookmarks (user_id, challenge_id, created_at) VALUES (?1, ?2, ?3) ON CONFLICT(user_id, challenge_id) DO NOTHING",
+    )
+      .bind(auth.uid, challengeId, now)
+      .run();
+  } else {
+    await env.DB.prepare("DELETE FROM community_challenge_bookmarks WHERE user_id = ?1 AND challenge_id = ?2")
+      .bind(auth.uid, challengeId)
+      .run();
+  }
+  return json({ ok: true, bookmarked: on }, 200, cors);
+}
+
+/** GET /community/bookmarks - this player's bookmarked challenges as entries. */
+async function handleCommunityBookmarks(auth: TokenPayload, env: Env, cors: Record<string, string>): Promise<Response> {
+  await ensureCommunityTables(env);
+  // Qualify every column with `c.` - `created_at` exists in BOTH joined tables.
+  const cols = CC_ENTRY_COLS.split(", ")
+    .map(col => `c.${col}`)
+    .join(", ");
+  const { results } = await env.DB.prepare(
+    `SELECT ${cols}
+       FROM community_challenge_bookmarks b
+       JOIN community_challenges c ON c.id = b.challenge_id
+      WHERE b.user_id = ?
+      ORDER BY b.created_at DESC
+      LIMIT 100`,
+  )
+    .bind(auth.uid)
+    .all<CommunityChallengeRow>();
+  const items = (results ?? [])
+    .filter((row: CommunityChallengeRow) => row.status !== "hidden" && row.status !== "rejected")
+    .map((row: CommunityChallengeRow) =>
+      buildCommunityEntry(
+        row,
+        {
+          attempts: row.attempts_total,
+          cleared: row.cleared_count,
+          inProgress: row.inprogress_count,
+          failed: row.failed_count,
+          recent: [],
+        },
+        true,
+      ),
+    );
+  return json({ items }, 200, cors);
+}
+
+// #endregion
+
 export default {
   async scheduled(_event: ScheduledEvent, env: Env, ctx: ExecutionContext): Promise<void> {
     ctx.waitUntil(computeAndPublishUsageTiers(env));
@@ -1671,6 +2519,14 @@ export default {
       }
       if (pathname === "/devtest/event" && method === "POST") {
         return await handleDevTestEvent(request, env, cors);
+      }
+      // Community challenges - read surface is public (browse feed + detail), like
+      // /devtest/* and /game/titlestats. Always 200 on an empty feed.
+      if (pathname === "/community/challenges" && method === "GET") {
+        return await handleCommunityList(url, env, cors);
+      }
+      if (pathname === "/community/challenge" && method === "GET") {
+        return await handleCommunityDetail(url, env, cors);
       }
       // Logout is harmless without a valid token (tokens are stateless); the
       // client clears its cookie regardless.
@@ -1732,6 +2588,23 @@ export default {
       }
       if (pathname === "/savedata/notifications" && method === "GET") {
         return await handleNotifications(url, auth, env, cors);
+      }
+      // Community challenges - authed write surface (create / attempt / clear /
+      // bookmark) + the player's bookmarks list.
+      if (pathname === "/community/challenge" && method === "POST") {
+        return await handleCommunityCreate(request, auth, env, cors);
+      }
+      if (pathname === "/community/attempt" && method === "POST") {
+        return await handleCommunityAttempt(request, auth, env, cors);
+      }
+      if (pathname === "/community/clear" && method === "POST") {
+        return await handleCommunityClear(request, auth, env, cors);
+      }
+      if (pathname === "/community/bookmark" && method === "POST") {
+        return await handleCommunityBookmark(request, auth, env, cors);
+      }
+      if (pathname === "/community/bookmarks" && method === "GET") {
+        return await handleCommunityBookmarks(auth, env, cors);
       }
 
       return text("Not found.", 404, cors);
