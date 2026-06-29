@@ -126,9 +126,16 @@ function isProtectedPalettePixel(r: number, g: number, b: number, a: number, par
   if (a <= 0.02) {
     return false;
   }
+  const mx = Math.max(r, g, b);
+  const mn = Math.min(r, g, b);
+  // Near-grey (low chroma) so only true black/white OUTLINES + HIGHLIGHTS are spared,
+  // not dark- or bright-COLORED body regions. Thresholds are loosened from "pure"
+  // (0.06 / 0.94) to near-black / near-white because sprite outlines/highlights are
+  // rarely exactly 0 or 1 - the tight band protected almost nothing (no visible effect).
+  const achromatic = mx - mn <= 0.06;
   return (
-    (!!params.protectBlack && Math.max(r, g, b) <= 0.06)
-    || (!!params.protectWhite && Math.min(r, g, b) >= 0.94)
+    (!!params.protectBlack && achromatic && mx <= 0.14)
+    || (!!params.protectWhite && achromatic && mn >= 0.86)
   );
 }
 
