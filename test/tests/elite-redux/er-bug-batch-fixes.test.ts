@@ -28,6 +28,7 @@
 import type { AbAttrBaseParams } from "#abilities/ab-attrs";
 import { modifierTypes } from "#data/data-lists";
 import { CowardOnceProtectAbAttr } from "#data/elite-redux/archetypes/coward-once-protect";
+import { ER_ID_MAP } from "#data/elite-redux/er-id-map";
 import { clearAllErStatuses } from "#data/elite-redux/er-status-cure";
 import { PokemonBattleData } from "#data/pokemon/pokemon-data";
 import { AbilityId } from "#enums/ability-id";
@@ -138,5 +139,42 @@ describe.skipIf(!RUN)("ER bug-batch fixes", () => {
     // The over-broad starter-legality check WOULD wrongly reject it (it is no longer
     // run at catch time - this documents why removing it un-breaks the catch).
     expect(isSpeciesAllowedByActiveChallenges(wild.species)).toBe(false);
+  });
+
+  it("Telekinetic's on-entry Telekinesis is NOT bounced back by a Magic Bounce foe", async () => {
+    // Bug: Telekinetic (5240) casts Telekinesis at the opponent on switch-in, but
+    // the cast was REFLECTABLE - a Magic Bounce foe bounced it back, so the holder
+    // (not the foe) ended up "hurled into the air". The fix strips REFLECTABLE from
+    // the scripted cast, so the foe is the one telekinesed and the holder is clean.
+    // (The combat CLI runner can't assert WHICH side carries a battler tag, so this
+    // is verified here with a direct getTag check.)
+    game.override
+      .enemyAbility(AbilityId.MAGIC_BOUNCE)
+      .enemySpecies(SpeciesId.RATTATA)
+      .ability(ER_ID_MAP.abilities[511]);
+    await game.classicMode.startBattle(SpeciesId.MAGIKARP);
+    const mon = game.field.getPlayerPokemon();
+    const enemy = game.field.getEnemyPokemon();
+
+    expect(mon.getAbility().id).toBe(ER_ID_MAP.abilities[511]);
+    // The foe carries Telekinesis; the Telekinetic holder does NOT (no reflection).
+    expect(enemy.getTag(BattlerTagType.TELEKINESIS)).toBeDefined();
+    expect(mon.getTag(BattlerTagType.TELEKINESIS)).toBeUndefined();
+  });
+
+  it("updateFusionPalette bails (no throw) when a fusion sprite source is unavailable", async () => {
+    // Rare Candy on a FUSED mon black-screened: when the evolved fusion's atlas was
+    // missing (404 for an ER-custom evolved-fusion form), updateFusionPalette read
+    // `frame.width` on an absent frame / drew a null image and THREW deep in the
+    // canvas pipeline. That rejected loadAssets, which the evolution scene awaits with
+    // no catch, so it hung on a black screen. The guard now bails cleanly instead.
+    // Headless stand-in for "source unavailable": the mock texture's getSourceImage()
+    // returns null (the same `!img` condition the guard trips on in the browser).
+    await game.classicMode.startBattle(SpeciesId.MAGIKARP);
+    const mon = game.field.getPlayerPokemon();
+    mon.fusionSpecies = getPokemonSpecies(SpeciesId.GYARADOS);
+    mon.fusionFormIndex = 0;
+
+    expect(() => mon.updateFusionPalette()).not.toThrow();
   });
 });

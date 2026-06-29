@@ -29,6 +29,7 @@
 import { globalScene } from "#app/global-scene";
 import { FirstMoveCondition } from "#data/moves/move-condition";
 import { PokemonMove } from "#data/moves/pokemon-move";
+import { MoveFlags } from "#enums/move-flags";
 import type { MoveId } from "#enums/move-id";
 import type { Pokemon } from "#field/pokemon";
 import { MagnitudePowerAttr, type Move, PreMoveMessageAttr, RechargeAttr } from "#moves/move";
@@ -47,6 +48,15 @@ export interface ScriptedMoveOptions {
    * allowing normal actions next turn"). No-op for moves with no recharge.
    */
   readonly noRecharge?: boolean;
+  /**
+   * Strip {@linkcode MoveFlags.REFLECTABLE} from the scripted cast so it is NOT
+   * bounced back by Magic Bounce / Magic Coat onto the caster. Used by
+   * ability-triggered casts of reflectable status moves at an opponent (e.g.
+   * Telekinetic's on-entry Telekinesis): the ability forces the move ONTO the
+   * opponent, so it must not behave like the holder chose to use a reflectable
+   * move on a Magic-Bounce target. No-op for moves without the flag.
+   */
+  readonly nonReflectable?: boolean;
 }
 
 function getMagnitudeLevel(range: readonly [min: number, max: number]): number {
@@ -84,6 +94,7 @@ class PowerOverriddenPokemonMove extends PokemonMove {
   private readonly bypassFirstMoveCondition: boolean;
   private readonly magnitudeRange: readonly [min: number, max: number] | undefined;
   private readonly noRecharge: boolean;
+  private readonly nonReflectable: boolean;
   private cached: Move | undefined;
 
   constructor(moveId: MoveId, power: number | undefined, opts: ScriptedMoveOptions) {
@@ -93,6 +104,7 @@ class PowerOverriddenPokemonMove extends PokemonMove {
     this.bypassFirstMoveCondition = opts.bypassFirstMoveCondition ?? false;
     this.magnitudeRange = opts.magnitudeRange;
     this.noRecharge = opts.noRecharge ?? false;
+    this.nonReflectable = opts.nonReflectable ?? false;
   }
 
   public override getMove(): Move {
@@ -121,6 +133,14 @@ class PowerOverriddenPokemonMove extends PokemonMove {
         // Drop the recharge so the scripted cast doesn't lock the holder next turn.
         // A NEW array on the clone — the registered move's shared attrs are untouched.
         clone.attrs = clone.attrs.filter(attr => !(attr instanceof RechargeAttr));
+      }
+      if (this.nonReflectable) {
+        // Clear the REFLECTABLE bit on the clone's own `flags` number (copied by
+        // value via Object.assign, so this never mutates the registered move).
+        // An ability forced this move onto the opponent — Magic Bounce must not
+        // bounce it back onto the holder as if the holder chose to use it.
+        const cloneFlags = clone as unknown as { flags: number };
+        cloneFlags.flags &= ~MoveFlags.REFLECTABLE;
       }
       if (this.magnitudeRange !== undefined) {
         const range = this.magnitudeRange;
@@ -156,7 +176,13 @@ export function scriptedPokemonMove(moveId: MoveId, power?: number, opts: Script
   const bypassFirstMoveCondition = opts.bypassFirstMoveCondition ?? false;
   const magnitudeRange = opts.magnitudeRange;
   const noRecharge = opts.noRecharge ?? false;
-  return power === undefined && !alwaysHit && !bypassFirstMoveCondition && magnitudeRange === undefined && !noRecharge
+  const nonReflectable = opts.nonReflectable ?? false;
+  return power === undefined
+    && !alwaysHit
+    && !bypassFirstMoveCondition
+    && magnitudeRange === undefined
+    && !noRecharge
+    && !nonReflectable
     ? new PokemonMove(moveId)
     : new PowerOverriddenPokemonMove(moveId, power, opts);
 }

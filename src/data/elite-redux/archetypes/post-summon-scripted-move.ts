@@ -42,6 +42,15 @@ export interface PostSummonScriptedMoveOptions {
    */
   readonly targetsSelf?: boolean;
   readonly oncePerBattleKey?: string;
+  /**
+   * When `true`, strip {@linkcode MoveFlags.REFLECTABLE} from the scripted cast
+   * so a Magic Bounce / Magic Coat opponent does NOT bounce it back onto the
+   * holder. The ability forced this move onto the opponent — it must not behave
+   * like a holder-chosen reflectable move. Used by Telekinetic (on-entry
+   * Telekinesis): without this, a Magic-Bounce target reflected the real
+   * Telekinesis back, levitating + always-hit-flagging the holder instead.
+   */
+  readonly nonReflectable?: boolean;
 }
 
 export class PostSummonScriptedMoveAbAttr extends PostSummonAbAttr {
@@ -94,7 +103,7 @@ export class PostSummonScriptedMoveAbAttr extends PostSummonAbAttr {
       "MovePhase",
       pokemon,
       [targetIndex],
-      scriptedPokemonMove(this.opts.moveId, this.opts.power),
+      scriptedPokemonMove(this.opts.moveId, this.opts.power, { nonReflectable: this.opts.nonReflectable ?? false }),
       MoveUseMode.INDIRECT,
     );
   }

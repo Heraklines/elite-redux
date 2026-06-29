@@ -1473,18 +1473,20 @@ describe("dispatchArchetype('bespoke', null, erAbilityId): per-id wiring", () =>
     expect(res.attrs.find(a => a.constructor.name === "AttackTypeImmunityAbAttr")).toBeDefined();
   });
 
-  it("er id 422 (Gifted Mind) reduces Dark/Ghost/Bug (×0.5) + status-move always-hit", () => {
-    // Audit-fix: "Nulls Psychic weakness" = reduce the user's Psychic-type
-    // weaknesses (Dark/Ghost/Bug 2x→neutral), not incoming Psychic moves.
+  it("er id 422 (Gifted Mind) grants flat immunity to Dark/Ghost/Bug + status-move always-hit", () => {
+    // 2.65 dex: "grants immunity to Dark, Ghost, and Bug-type moves while making
+    // all status moves used by this Pokemon never miss." Flat x0 immunity to all
+    // three attacking types (regardless of the holder's typing), NOT a Psychic-
+    // weakness patch - so it is wired as three AttackTypeImmunityAbAttr.
     const res = dispatchArchetype("bespoke", null, 422);
     expect(res.skipReason).toBeNull();
-    // "Nulls Psychic weakness" wired via the dedicated DefensiveTypeWeaknessNull
-    // primitive (nulls only the Psychic-type weakness contribution, so a second
-    // type's weakness still applies) + status-move always-hit.
-    expect(res.attrs.find(a => a.constructor.name === "DefensiveTypeWeaknessNullAbAttr")).toBeDefined();
+    const immunities = res.attrs.filter(a => a.constructor.name === "AttackTypeImmunityAbAttr");
+    expect(immunities).toHaveLength(3);
     expect(res.attrs.find(a => a.constructor.name === "ConditionalAlwaysHitAbAttr")).toBeDefined();
-    // The wrong-direction PSYCHIC damage reduction must be gone.
+    // The earlier (wrong) wirings must be gone: no PSYCHIC damage reduction and no
+    // type-chart-neutralize primitive (it is full immunity now).
     expect(res.attrs.find(a => a.constructor.name === "DamageReductionAbAttr")).toBeUndefined();
+    expect(res.attrs.find(a => a.constructor.name === "DefensiveTypeWeaknessNullAbAttr")).toBeUndefined();
   });
 
   it("er id 433 (Dual Wield) wires HitMultiplier + HitMultiplierPower(0.7) on Pulse/Slicing moves", () => {

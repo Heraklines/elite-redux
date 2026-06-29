@@ -3950,12 +3950,14 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
   },
   {
-    label: "Gifted Mind: Psychic",
+    label: "Gifted Mind: Dark/Ghost/Bug immunity",
     description:
-      "#332/#333 Gifted Mind — nulls the holder's Psychic weakness.\n"
-      + "Machamp (Fighting) is normally weak to Psychic.  DO: let Alakazam use Psychic\n"
-      + "on you.  EXPECT: NEUTRAL damage, not super-effective. (Remove the ability\n"
-      + "override in scenarios.ts to see the 2× it would otherwise take.)",
+      "#332/#333 Gifted Mind (2.65 dex) - grants IMMUNITY to Dark, Ghost and Bug-type\n"
+      + "moves (and makes the holder's own status moves never miss). Alakazam (pure\n"
+      + "Psychic) is normally weak (2x) to all three. DO: use Splash and let Tyranitar\n"
+      + "hit you with Crunch (Dark), Shadow Ball (Ghost) and X-Scissor (Bug).  EXPECT:\n"
+      + "every one shows 'it doesn't affect' and deals 0 damage (NOT the 2x it took\n"
+      + "before). The earlier fix only neutralized to 1x; it is full immunity now.",
     setup: () => {
       resetDevOverrides();
       setOverrides({
@@ -3963,11 +3965,34 @@ export const DEV_SCENARIOS: DevScenario[] = [
         STARTING_WAVE_OVERRIDE: 5,
         ABILITY_OVERRIDE: erAbility(ErAbilityId.GIFTED_MIND),
         MOVESET_OVERRIDE: [MoveId.SPLASH],
-        ENEMY_SPECIES_OVERRIDE: SpeciesId.ALAKAZAM,
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.TYRANITAR,
         ENEMY_LEVEL_OVERRIDE: 60,
-        ENEMY_MOVESET_OVERRIDE: [MoveId.PSYCHIC],
+        ENEMY_MOVESET_OVERRIDE: [MoveId.CRUNCH, MoveId.SHADOW_BALL, MoveId.X_SCISSOR],
       });
-      return [makeStarter(SpeciesId.MACHAMP, { moveset: [MoveId.SPLASH] })];
+      return [makeStarter(SpeciesId.ALAKAZAM, { moveset: [MoveId.SPLASH] })];
+    },
+  },
+  {
+    label: "Telekinetic vs Magic Bounce",
+    description:
+      "Telekinetic casts Telekinesis on the OPPONENT on switch-in. Bug: the cast was\n"
+      + "reflectable, so a Magic Bounce foe bounced it back and the HOLDER got hurled\n"
+      + "into the air instead. DO: send out your Telekinetic Gardevoir against a Magic\n"
+      + "Bounce Espeon, then Splash.  EXPECT: 'Foe Espeon was hurled into the air!' on\n"
+      + "entry (the FOE is telekinesed, NOT your Gardevoir) - no Magic Bounce reflection.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 60,
+        STARTING_WAVE_OVERRIDE: 5,
+        ABILITY_OVERRIDE: erAbility(ErAbilityId.TELEKINETIC),
+        MOVESET_OVERRIDE: [MoveId.SPLASH],
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.ESPEON,
+        ENEMY_ABILITY_OVERRIDE: AbilityId.MAGIC_BOUNCE,
+        ENEMY_LEVEL_OVERRIDE: 60,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+      });
+      return [makeStarter(SpeciesId.GARDEVOIR, { moveset: [MoveId.SPLASH] })];
     },
   },
   {
@@ -4167,6 +4192,36 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
     // Two guaranteed candies so the tester can buy both back-to-back (the trigger).
     shopItems: [modifierTypes.RARE_CANDY, modifierTypes.RARE_CANDY],
+  },
+  {
+    label: "Rare Candy evolves a FUSED mon (no black screen)",
+    description:
+      "Using a Rare Candy on a FUSED Pokemon black-screened the game when the evolved\n"
+      + "fusion's sprite was missing/slow: the fusion-palette build threw, that rejected\n"
+      + "the evolved-sprite load, and the evolution scene - which awaits it - hung on a\n"
+      + "black screen forever. DO: this Bulbasaur is fused with Charmander at L15. Win\n"
+      + "the opening battle, then in the shop use the Rare Candy on it (L15 -> L16) so\n"
+      + "the Bulbasaur half evolves to Ivysaur.  EXPECT: the evolution animation plays,\n"
+      + "the evolved FUSED sprite renders, and control returns to the game (NO black\n"
+      + "screen / freeze). The palette degrades gracefully if a sprite is ever absent.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 15, // one Rare Candy -> L16 -> Bulbasaur evolves to Ivysaur
+        STARTING_WAVE_OVERRIDE: 5,
+        STARTER_FUSION_OVERRIDE: true,
+        STARTER_FUSION_SPECIES_OVERRIDE: SpeciesId.CHARMANDER,
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.MAGIKARP,
+        ENEMY_LEVEL_OVERRIDE: 3,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+      });
+      return [
+        makeStarter(SpeciesId.BULBASAUR, {
+          moveset: [MoveId.TACKLE, MoveId.VINE_WHIP, MoveId.GROWL, MoveId.GROWTH],
+        }),
+      ];
+    },
+    shopItems: [modifierTypes.RARE_CANDY],
   },
   {
     // The systematic "Redux X → normal evolved form" repro — BOTH shapes:
@@ -4996,6 +5051,33 @@ export const DEV_SCENARIOS: DevScenario[] = [
       return [
         makeStarter(SpeciesId.LATIOS, {
           moveset: [MoveId.PSYCHIC, MoveId.DRAGON_PULSE, MoveId.CALM_MIND, MoveId.PROTECT],
+        }),
+      ];
+    },
+  },
+  {
+    label: "(note) Ghost trainer movesets + endless contamination",
+    description:
+      "POOL / SERVER fixes - verify by playing the Ghost Trainers challenge (or the\n"
+      + "endgame ghost waves), NOT a single forced battle (the ghost pool is the live\n"
+      + "cross-player run history):\n"
+      + "1) GHOST MOVESETS: a ghost whose stored species gets devolved or BST-swapped on\n"
+      + "spawn (a deep team fielded early, or an over-cap mon capped down to fit the wave)\n"
+      + "now keeps a level-appropriate GENERATED moveset for its FINAL species instead of\n"
+      + "the stored moves of the original species (was 'ghost has wrong/empty moves'). A\n"
+      + "ghost whose species is unchanged still uses its exact stored moveset.\n"
+      + "2) ENDLESS CONTAMINATION: endless / daily runs are no longer captured into the\n"
+      + "ghost pool, and the shared /sample query drops endless-depth rows (wave > 200) +\n"
+      + "any tagged endless run - so a classic ghost is never a 1000-wave endless team.\n"
+      + "Headless coverage: test/tests/elite-redux/er-ghost-challenge.test.ts (moveset\n"
+      + "species-match + the endless capture gate). The worker /sample filter ships in\n"
+      + "workers/er-save-api (deploy gated on the maintainer).",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({ STARTING_WAVE_OVERRIDE: 1 });
+      return [
+        makeStarter(SpeciesId.SNORLAX, {
+          moveset: [MoveId.BODY_SLAM, MoveId.CRUNCH, MoveId.EARTHQUAKE, MoveId.REST],
         }),
       ];
     },

@@ -95,6 +95,13 @@ export interface GhostTeamSnapshot {
   /** Display label for the ghost trainer (the uploader's name, best-effort). */
   trainerName: string;
   difficulty: ErDifficulty;
+  /**
+   * The game mode this run was played in ("classic" / "challenge"; endless/daily are
+   * never captured). Lets the shared pool reject endless contamination - an endless
+   * team can be hundreds of waves deep with absurd kits, which has no business being
+   * fielded as a ghost in a classic run. Optional for back-compat with old snapshots.
+   */
+  mode?: string | undefined;
   waveReached: number;
   isVictory: boolean;
   timestamp: number;
@@ -504,6 +511,14 @@ export function captureGhostTeam(isVictory: boolean): GhostTeamSnapshot | null {
   if (globalScene?.gameMode?.isCoop) {
     return null;
   }
+  // Endless/daily runs must NEVER seed the ghost pool. Endless reaches hundreds of
+  // waves with over-levelled, over-itemed teams; fielding one as a ghost in a classic
+  // run is the "endless contamination" bug. Daily is a separate, throwaway mode. Only
+  // classic / classic-challenge teams are valid ghosts. (The worker /sample query
+  // ALSO filters these, so already-uploaded endless rows are excluded server-side.)
+  if (globalScene?.gameMode?.isEndless || globalScene?.gameMode?.isDaily) {
+    return null;
+  }
   const party = globalScene?.getPlayerParty?.() ?? [];
   if (party.length === 0) {
     return null;
@@ -520,6 +535,8 @@ export function captureGhostTeam(isVictory: boolean): GhostTeamSnapshot | null {
     id: `${globalScene?.seed ?? "seed"}-${Date.now()}`,
     trainerName: loggedInUser?.username ?? "Trainer",
     difficulty: getErDifficulty(),
+    // Only classic / classic-challenge reach here (endless + daily bailed above).
+    mode: globalScene?.gameMode?.isChallenge ? "challenge" : "classic",
     waveReached,
     isVictory,
     timestamp: Date.now(),
@@ -1067,7 +1084,6 @@ export function applyErGhostOverride(trainer: Trainer, index: number): EnemyPoke
     // re-levelled down (level cap below), never devolved - that devolve was the cause of
     // "baby / not-fully-evolved ghost mons" at the scheduled ghost waves (hell 63+).
     const overshoot = Math.max(0, snapshot.waveReached - (currentWave + ER_GHOST_WAVE_WINDOW));
-    let devolved = false;
     if (overshoot > 0 && currentWave < ER_GHOST_NO_DEVOLVE_WAVE) {
       const stages = overshoot > 60 ? 3 : overshoot > 20 ? 2 : 1;
       for (let i = 0; i < stages; i++) {
@@ -1077,16 +1093,26 @@ export function applyErGhostOverride(trainer: Trainer, index: number): EnemyPoke
           break;
         }
         species = prev;
-        devolved = true;
       }
     }
     const level = battle?.enemyLevels?.[index] ?? member.level;
     const trainerSlot = !trainer.isDouble() || !(index % 2) ? TrainerSlot.TRAINER : TrainerSlot.TRAINER_PARTNER;
     const enemy = globalScene.addEnemyPokemon(species, level, trainerSlot);
-    if (member.formIndex >= 0 && !devolved && member.formIndex < (species.forms?.length ?? 0)) {
+    // `addEnemyPokemon` runs enforceErEliteBstCurve, which can devolve/SWAP the species
+    // AGAIN to fit the wave's BST ceiling (e.g. a low-wave Skarmory -> Clamperl) and
+    // then generate a level-appropriate moveset for THAT final species. So restore the
+    // stored loadout (form + ability slot + exact moveset) ONLY when the final species
+    // still matches the stored member - otherwise the stored data belongs to a different
+    // species and the moves are wrong or outright illegal for it (the reported "ghost
+    // trainer has the wrong/empty moves" bug). This also subsumes our fairness devolve
+    // above; when the species differs we keep the moveset addEnemyPokemon generated.
+    const speciesMatchesStored = enemy.species.speciesId === member.speciesId;
+    if (member.formIndex >= 0 && speciesMatchesStored && member.formIndex < (enemy.species.forms?.length ?? 0)) {
       enemy.formIndex = member.formIndex;
     }
-    enemy.abilityIndex = member.abilityIndex;
+    if (speciesMatchesStored) {
+      enemy.abilityIndex = member.abilityIndex;
+    }
     if (member.ivs.length === 6) {
       enemy.ivs = member.ivs.slice();
     }
@@ -1097,14 +1123,13 @@ export function applyErGhostOverride(trainer: Trainer, index: number): EnemyPoke
     enemy.passive = member.passive;
     enemy.customPokemonData.erShinyLabSuppressLocal = true;
     enemy.customPokemonData.erShinyLab = member.shiny ? normalizeErShinyLabSavedLook(member.erShinyLab) : undefined;
-    if (member.moves.length > 0 && !devolved) {
+    if (member.moves.length > 0 && speciesMatchesStored) {
       const moves = member.moves.map(id => new PokemonMove(id));
       enemy.moveset = moves;
       enemy.summonData.moveset = moves;
-    } else if (devolved) {
-      // A devolved stage rolls its own level-appropriate moveset.
-      enemy.generateAndPopulateMoveset();
     }
+    // else: keep the level-appropriate moveset addEnemyPokemon already generated for the
+    // final (devolved or BST-swapped) species.
     enemy.generateName();
     return enemy;
   } catch {

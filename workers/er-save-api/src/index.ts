@@ -1176,6 +1176,15 @@ async function handleRunSample(
   // its point (LIMIT 1) via the PK index, run as one batch. Still ~constant rows read,
   // but a uniform SPREAD across the whole table - diverse uploaders, every wave band
   // reachable. Dedup by id; top up from the table start only if the eligible set is sparse.
+  // Endless contamination guard: a classic/challenge run ends at wave 200 (game-mode.ts
+  // isWaveFinal), while ENDLESS runs go to 250, 500, 1000+ with absurdly over-levelled,
+  // over-itemed teams. Fielding one as a ghost in a classic run is the reported bug.
+  // Exclude them two ways: (a) `mode` (new uploads tag classic/challenge; endless/daily
+  // never upload now) - `mode IS NULL` keeps legacy rows; (b) a hard `wave <= 200` ceiling,
+  // which catches already-stored endless rows that predate the `mode` tag (their depth is
+  // the only signal). No classic run exceeds 200, so this never drops a legitimate team.
+  const MAX_GHOST_SAMPLE_WAVE = 200;
+  const NON_GHOST_MODES = "'endless', 'spliced_endless', 'daily'";
   const cols = "id, username, outcome, difficulty, wave, created_at, player_team, opponent_name, opponent_team";
   const maxRow = await env.DB.prepare("SELECT MAX(rowid) AS m FROM runs").first<{ m: number | null }>();
   const maxRowId = maxRow?.m ?? 0;
@@ -1184,8 +1193,8 @@ async function handleRunSample(
   if (maxRowId > 0) {
     const seekStmt = (start: number) =>
       env.DB.prepare(
-        `SELECT ${cols} FROM runs WHERE rowid >= ?1 AND user_id != ?2 AND wave >= ?3 ORDER BY rowid LIMIT 1`,
-      ).bind(start, auth.uid, minWave);
+        `SELECT ${cols} FROM runs WHERE rowid >= ?1 AND user_id != ?2 AND wave >= ?3 AND wave <= ?4 AND (mode IS NULL OR mode NOT IN (${NON_GHOST_MODES})) ORDER BY rowid LIMIT 1`,
+      ).bind(start, auth.uid, minWave, MAX_GHOST_SAMPLE_WAVE);
     const seeks = Math.min(count * 2, 40);
     const stmts = Array.from({ length: seeks }, () => seekStmt(Math.floor(Math.random() * (maxRowId + 1))));
     const batched = await env.DB.batch<RunSampleRow>(stmts);
@@ -1201,9 +1210,9 @@ async function handleRunSample(
       // Sparse eligible set: some seeks landed past the last eligible row. Top up from
       // the start of the table (a contiguous read of the shallow end) to reach `count`.
       const fill = await env.DB.prepare(
-        `SELECT ${cols} FROM runs WHERE user_id != ?1 AND wave >= ?2 ORDER BY rowid LIMIT ?3`,
+        `SELECT ${cols} FROM runs WHERE user_id != ?1 AND wave >= ?2 AND wave <= ?3 AND (mode IS NULL OR mode NOT IN (${NON_GHOST_MODES})) ORDER BY rowid LIMIT ?4`,
       )
-        .bind(auth.uid, minWave, count * 2)
+        .bind(auth.uid, minWave, MAX_GHOST_SAMPLE_WAVE, count * 2)
         .all<RunSampleRow>();
       for (const row of fill.results ?? []) {
         if (!seen.has(row.id)) {

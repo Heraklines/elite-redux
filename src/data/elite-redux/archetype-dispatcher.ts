@@ -185,10 +185,7 @@ import { MoveFlagInjectionAbAttr } from "#data/elite-redux/archetypes/move-flag-
 import { MovingFirstTrapFlinchAbAttr } from "#data/elite-redux/archetypes/moving-first-trap-flinch";
 import { ErMultiHeadedAbAttr } from "#data/elite-redux/archetypes/multi-headed";
 import { NullifyFirstNHitsAbAttr } from "#data/elite-redux/archetypes/nullify-first-n-hits";
-import {
-  DefensiveTypeWeaknessNullAbAttr,
-  OffensiveTypeChartOverrideAbAttr,
-} from "#data/elite-redux/archetypes/offensive-type-chart-override";
+import { OffensiveTypeChartOverrideAbAttr } from "#data/elite-redux/archetypes/offensive-type-chart-override";
 import { OnCritStatBoostLowestAbAttr } from "#data/elite-redux/archetypes/on-crit-stat-boost-lowest";
 import { OnFaintEffectAbAttr } from "#data/elite-redux/archetypes/on-faint-effect";
 import {
@@ -3499,14 +3496,16 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
       // Flawless Precision — "Fatal + Deadly Precision." Same shape as Deadly.
       return ok([new AlwaysHitAbAttr(), new MoveAbilityBypassAbAttr()]);
     case 422:
-      // Gifted Mind — "Nulls Psychic weakness; status moves always hit." Null the
-      // weaknesses the holder's PSYCHIC type contributes by dividing that type's
-      // super-effective contribution back out (Dark/Ghost/Bug → neutral, no "super
-      // effective" message). Only the Psychic side is nulled, so a second-type
-      // weakness (e.g. Galar Articuno's Flying weaknesses) still applies. Plus the
-      // ER ROM C source (battle_script_commands.c:1936) status-move always-hit half.
+      // Gifted Mind (dex): "grants immunity to Dark, Ghost, and Bug-type moves while
+      // making all status moves used by this Pokemon never miss." i.e. it nulls the
+      // PSYCHIC type's weaknesses by granting flat x0 IMMUNITY to those three attacking
+      // types (regardless of the holder's own typing - the old impl only neutralized,
+      // and only when the holder was Psychic-typed). Type-based, so it ignores Inverse
+      // Room. Plus the status-move always-hit half (ROM battle_script_commands.c:1936).
       return ok([
-        new DefensiveTypeWeaknessNullAbAttr(PokemonType.PSYCHIC),
+        new AttackTypeImmunityAbAttr(PokemonType.DARK),
+        new AttackTypeImmunityAbAttr(PokemonType.GHOST),
+        new AttackTypeImmunityAbAttr(PokemonType.BUG),
         new ConditionalAlwaysHitAbAttr({ categories: [MoveCategory.STATUS] }),
       ]);
     case 955:
@@ -3755,8 +3754,11 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
       // Change of Heart — "Uses Heart Swap on switch-in."
       return ok([new PostSummonScriptedMoveAbAttr({ moveId: MoveId.HEART_SWAP })]);
     case 511:
-      // Telekinetic — "Casts Telekinesis on entry."
-      return ok([new PostSummonScriptedMoveAbAttr({ moveId: MoveId.TELEKINESIS })]);
+      // Telekinetic — "Casts Telekinesis on entry." `nonReflectable` so a Magic
+      // Bounce opponent does NOT reflect the Telekinesis back onto the holder
+      // (the bug: the holder ended up levitating + always-hittable instead of
+      // the opponent). The ability forces the move ONTO the opponent.
+      return ok([new PostSummonScriptedMoveAbAttr({ moveId: MoveId.TELEKINESIS, nonReflectable: true })]);
     case 514:
       // Powder Burst — "Casts Powder on entry."
       return ok([new PostSummonScriptedMoveAbAttr({ moveId: MoveId.POWDER })]);

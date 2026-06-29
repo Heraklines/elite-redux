@@ -7008,6 +7008,23 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
       fusionBackTexture,
     ].map(i => i.getSourceImage() as HTMLImageElement);
 
+    // Defensive: when a (newly evolved) fusion's front/back/fusion atlas has not
+    // finished loading - or 404'd (an ER-custom evolved-fusion form whose sprite is
+    // absent on the CDN) - Phaser hands back the `__MISSING` placeholder whose frame
+    // or source image is missing. Reading `frame.width` below then THROWS; that
+    // rejects `loadAssets`, which the evolution flow awaits with no catch, so the
+    // evolution scene hangs forever on a black screen (the Rare-Candy-on-a-fused-mon
+    // crash). Bail gracefully instead: the sprite keeps its existing colours and the
+    // palette rebuilds on the next refresh once the atlas is present.
+    if (
+      [sourceTexture, sourceBackTexture, fusionTexture, fusionBackTexture].some(t => t.key === "__MISSING")
+      || [sourceFrame, sourceBackFrame, fusionFrame, fusionBackFrame].some(frame => !frame?.width || !frame?.height)
+      || [sourceImage, sourceBackImage, fusionImage, fusionBackImage].some(img => !img)
+    ) {
+      console.warn("updateFusionPalette: a sprite texture/frame is not loaded yet; skipping fusion palette build");
+      return;
+    }
+
     const canvas = document.createElement("canvas");
     const backCanvas = document.createElement("canvas");
     const fusionCanvas = document.createElement("canvas");
@@ -7737,7 +7754,14 @@ export class PlayerPokemon extends Pokemon {
           this,
         );
       }
-      ret.loadAssets().then(() => resolve(ret));
+      // Resolve even if the evolved mon's assets fail to load. Without the catch a
+      // rejected loadAssets (e.g. a missing ER-custom evolved-fusion atlas) leaves
+      // this promise pending forever, and the evolution scene - which awaits it -
+      // hangs on a black screen. Degrade to whatever sprite state `ret` has instead.
+      ret
+        .loadAssets()
+        .catch((err: unknown) => console.error("getPossibleEvolution: failed to load evolved sprite assets", err))
+        .then(() => resolve(ret));
     });
   }
 
@@ -7851,10 +7875,16 @@ export class PlayerPokemon extends Pokemon {
       this.compatibleTms.splice(0, this.compatibleTms.length);
       this.generateCompatibleTms();
       const updateAndResolve = () => {
-        this.loadAssets().then(() => {
-          this.calculateStats();
-          this.updateInfo(true).then(() => resolve());
-        });
+        // Finish the evolution even if the evolved sprite's assets fail to load. The
+        // species is already mutated above; stats + dex info must still update and the
+        // promise must resolve, or the evolution scene hangs on a black screen (the
+        // Rare-Candy-on-a-fused-mon crash, when the evolved-fusion atlas is missing).
+        this.loadAssets()
+          .catch((err: unknown) => console.error("evolve: failed to load evolved sprite assets", err))
+          .then(() => {
+            this.calculateStats();
+            this.updateInfo(true).then(() => resolve());
+          });
       };
       if (preEvolution.speciesId === SpeciesId.GIMMIGHOUL) {
         const evotracker = this.getHeldItems().find(m => m instanceof EvoTrackerModifier) ?? null;

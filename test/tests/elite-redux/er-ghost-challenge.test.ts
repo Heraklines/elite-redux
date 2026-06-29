@@ -256,6 +256,80 @@ describe.skipIf(!RUN)("ER ghost devolve gate past wave 50 (#422 follow-up)", () 
     expect(applyErGhostOverride(host!, 0)?.species.speciesId).toBe(SpeciesId.GIBLE);
   });
 
+  it("restores the stored moveset ONLY when the final species matches (devolve/BST-swap safe)", async () => {
+    // Bug: addEnemyPokemon runs the BST-curve which can devolve/swap the species, then
+    // generates a moveset for THAT final species - but applyErGhostOverride then forced
+    // the STORED moves (of the ORIGINAL species) back on, so a swapped/devolved ghost
+    // carried wrong/illegal moves. Now the stored moveset is only restored on a species
+    // match; otherwise the auto-generated level-appropriate one stands.
+    const deepEvolved: GhostTeamSnapshot = {
+      ...SNAPSHOT,
+      id: "er-test-moveset",
+      waveReached: 200,
+      party: [
+        {
+          speciesId: SpeciesId.GARCHOMP,
+          formIndex: 0,
+          abilityIndex: 0,
+          ivs: [31, 31, 31, 31, 31, 31],
+          nature: 0,
+          level: 100,
+          gender: 0,
+          shiny: false,
+          variant: 0,
+          passive: false,
+          moves: [MoveId.TACKLE], // a single, recognizable stored move
+        },
+      ],
+    };
+    setPrefetchedGhostTeamsForTests([deepEvolved]);
+    game.challengeMode.addChallenge(Challenges.GHOST_TRAINERS, 1, 1);
+    await game.challengeMode.startBattle(SpeciesId.SNORLAX);
+    const host = game.scene.currentBattle.trainer;
+    expect(host).not.toBeNull();
+    markTrainerAsGhost(host!, deepEvolved);
+
+    // Wave 137 (>= 50, past the BST ladder): species stays Garchomp -> stored moveset
+    // restored verbatim.
+    game.scene.currentBattle.waveIndex = 137;
+    game.scene.currentBattle.enemyLevels = [137];
+    const kept = applyErGhostOverride(host!, 0)!;
+    expect(kept.species.speciesId).toBe(SpeciesId.GARCHOMP);
+    expect(kept.getMoveset().map(m => m.moveId)).toEqual([MoveId.TACKLE]);
+
+    // Wave 30 (< 50): devolved to Gible (species != stored) -> the stored Garchomp move
+    // is NOT force-applied; the generated level-appropriate moveset stands instead.
+    game.scene.currentBattle.waveIndex = 30;
+    game.scene.currentBattle.enemyLevels = [30];
+    const swapped = applyErGhostOverride(host!, 0)!;
+    expect(swapped.species.speciesId).toBe(SpeciesId.GIBLE);
+    expect(swapped.getMoveset().map(m => m.moveId)).not.toEqual([MoveId.TACKLE]);
+  });
+
+  it("never captures an ENDLESS run for the ghost pool; classic runs are tagged 'classic'", async () => {
+    // Endless contamination: endless teams (hundreds of waves deep, absurd kits) must
+    // never seed the classic ghost pool. captureGhostTeam bails on endless/daily, and
+    // tags the runs it DOES capture so the shared /sample query can filter them.
+    game.challengeMode.addChallenge(Challenges.GHOST_TRAINERS, 1, 1);
+    await game.challengeMode.startBattle(SpeciesId.SNORLAX);
+
+    // Classic/challenge: captured and tagged with a non-endless mode (this run is a
+    // classic challenge, so "challenge").
+    const captured = captureGhostTeam(true);
+    expect(captured).not.toBeNull();
+    expect(["classic", "challenge"]).toContain(captured?.mode);
+
+    // Pretend the same run is endless -> captureGhostTeam refuses it entirely.
+    game.scene.gameMode.isEndless = true;
+    expect(captureGhostTeam(true)).toBeNull();
+    game.scene.gameMode.isEndless = false;
+
+    // Daily is likewise excluded.
+    game.scene.gameMode.isDaily = true;
+    expect(captureGhostTeam(true)).toBeNull();
+    game.scene.gameMode.isDaily = false;
+  });
+
   it("serializes Shiny Lab looks onto ghost members and clamps malformed payloads to plain", async () => {
     game.override.shiny(true, 2);
     game.challengeMode.addChallenge(Challenges.GHOST_TRAINERS, 1, 1);
