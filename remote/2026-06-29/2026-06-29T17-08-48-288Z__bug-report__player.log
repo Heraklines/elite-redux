@@ -1,0 +1,278 @@
+----- BUG REPORT (in-game) -----
+version:  1.11.19
+url:      https://elite-redux.pages.dev/
+ua:       Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36
+mode:     4  wave:28  difficulty:hell
+seed:     ajV9GR0xeuY2z1YFAcN1q7up
+party:    Kilowattrel(L25 75/77), Gyarados(L24 62/87), Corphish(L24 0/62), Helioptile(L24 62/62), Illumise(L24 79/79), Psyduck Redux(L24 65/65)
+
+----- DESCRIPTION -----
+Rain Flush triggered Rough Skin contact damage
+
+----- CONSOLE -----
+[17:07:28.788] LOG: Sorted Move Pool: ["Draconic Fangs","Excalibur","Bitter Blade","Scorching Sands"]
+[17:07:28.788] LOG: Chosen Move: Draconic Fangs
+[17:07:28.789] LOG: ER AI: experimental brain (sharpness 1)
+[17:07:28.789] LOG: %cStart Phase EnemyCommandPhase color:green;
+[17:07:28.813] LOG: Applied X Sp. Atk 
+[17:07:28.837] LOG: Applied X Sp. Atk 
+[17:07:28.841] LOG: Applied X Sp. Atk 
+[17:07:28.847] LOG: %cStart Phase TurnStartPhase color:green;
+[17:07:28.861] LOG: %cStart Phase SwitchSummonPhase color:green;
+[17:07:28.862] LOG: ShiroOverHeaven
+[17:07:29.137] LOG: ShiroOverHeaven
+[17:07:29.229] LOG: Applied Carbos (enemy)
+[17:07:29.240] LOG: Applied Calcium (enemy)
+[17:07:29.241] LOG: Applied Zinc (enemy)
+[17:07:29.365] LOG: %cStart Phase ShinySparklePhase color:green;
+[17:07:29.453] LOG: %cStart Phase PostSummonPhase color:green;
+[17:07:29.453] LOG: Ran PSP for: Zorua
+[17:07:29.457] LOG: %cStart Phase MessagePhase color:green;
+[17:07:29.703] LOG: %cStart Phase DamageAnimPhase color:green;
+[17:07:29.717] LOG: %cStart Phase PostSummonPhase color:green;
+[17:07:29.717] LOG: %cStart Phase PostSummonPhase color:green;
+[17:07:29.728] LOG: %cStart Phase MovePhase color:green;
+[17:07:29.728] LOG: %cUser: Corphish
+Move: JET_PUNCH
+Use Mode: NORMAL color:orchid
+[17:07:29.749] LOG: %cStart Phase MessagePhase color:green;
+[17:07:29.836] LOG: %cStart Phase MoveEffectPhase color:green;
+[17:07:29.839] LOG: crit stage: +1
+[17:07:29.843] LOG: Move: Jet Punch | Base damage: 28.996363636363636 | Power: 60 | Source attack: 64 | Target defense: 33
+[17:07:29.846] LOG: Move: Jet Punch | Attack damage: 40
+[17:07:29.848] LOG: %cStart Phase DamageAnimPhase color:green;
+[17:07:29.873] LOG: %cStart Phase ShowAbilityPhase color:green;
+[17:07:30.058] LOG: %cStart Phase MessagePhase color:green;
+[17:07:30.321] LOG: %cStart Phase DamageAnimPhase color:green;
+[17:07:30.333] LOG: %cStart Phase HideAbilityPhase color:green;
+[17:07:30.373] LOG: %cStart Phase MoveEndPhase color:green;
+[17:07:30.376] LOG: %cStart Phase MovePhase color:green;
+[17:07:30.377] LOG: %cUser: Gyarados
+Move: DRAGON_ASCENT
+Use Mode: NORMAL color:orchid
+[17:07:30.392] LOG: %cStart Phase MessagePhase color:green;
+[17:07:30.520] LOG: %cStart Phase MoveEffectPhase color:green;
+[17:07:30.523] LOG: crit stage: +0
+[17:07:30.530] LOG: Move: Dragon Ascent | Base damage: 59.476129032258065 | Power: 120 | Source attack: 64 | Target defense: 31
+[17:07:30.532] LOG: Move: Dragon Ascent | Attack damage: 78
+[17:07:30.533] LOG: %cStart Phase DamageAnimPhase color:green;
+[17:07:30.563] LOG: %cStart Phase StatStageChangePhase color:green;
+[17:07:30.563] LOG: %cStart Phase StatStageChangePhase color:green;
+[17:07:30.566] LOG: %cStart Phase MessagePhase color:green;
+[17:07:30.788] LOG: %cStart Phase StatStageChangePhase color:green;
+[17:07:30.798] LOG: %cStart Phase MessagePhase color:green;
+[17:07:31.020] LOG: %cStart Phase FaintPhase color:green;
+[17:07:31.691] LOG: %cStart Phase MessagePhase color:green;
+[17:07:31.926] LOG: %cStart Phase VictoryPhase color:green;
+[17:07:31.928] LOG: %cStart Phase MoveEndPhase color:green;
+[17:07:31.928] LOG: %cStart Phase MovePhase color:green;
+[17:07:31.928] LOG: %cUser: Gible
+Move: DRACONIC_FANGS
+Use Mode: NORMAL color:orchid
+[17:07:31.944] LOG: %cStart Phase MessagePhase color:green;
+[17:07:32.072] LOG: %cStart Phase MoveEffectPhase color:green;
+[17:07:32.075] LOG: crit stage: +0
+[17:07:32.078] LOG: Applied X Defense 
+[17:07:32.079] LOG: Move: Draconic Fangs | Base damage: 19.78666666666667 | Power: 85 | Source attack: 46 | Target defense: 51
+[17:07:32.080] LOG: Move: Draconic Fangs | Attack damage: 20
+[17:07:32.081] LOG: %cStart Phase ShowAbilityPhase color:green;
+[17:07:32.242] LOG: %cStart Phase HideAbilityPhase color:green;
+[17:07:32.282] LOG: %cStart Phase DamageAnimPhase color:green;
+[17:07:32.341] LOG: %cStart Phase MoveEffectPhase color:green;
+[17:07:32.347] LOG: crit stage: +0
+[17:07:32.355] LOG: Applied X Defense 
+[17:07:32.356] LOG: Move: Draconic Fangs | Base damage: 19.78666666666667 | Power: 85 | Source attack: 46 | Target defense: 51
+[17:07:32.358] LOG: Move: Draconic Fangs | Attack damage: 4
+[17:07:32.361] LOG: %cStart Phase DamageAnimPhase color:green;
+[17:07:32.381] LOG: %cStart Phase MessagePhase color:green;
+[17:07:32.599] LOG: %cStart Phase MoveEndPhase color:green;
+[17:07:32.600] LOG: %cStart Phase CheckInterludePhase color:green;
+[17:07:32.600] LOG: %cStart Phase WeatherEffectPhase color:green;
+[17:07:32.700] LOG: %cStart Phase PositionalTagPhase color:green;
+[17:07:32.702] LOG: %cStart Phase MessagePhase color:green;
+[17:07:32.960] LOG: %cStart Phase MoveEffectPhase color:green;
+[17:07:32.966] LOG: crit stage: +0
+[17:07:32.972] LOG: Move: Future Sight | Base damage: 54.8 | Power: 120 | Source attack: 55 | Target defense: 29
+[17:07:32.977] LOG: Move: Future Sight | Attack damage: 59
+[17:07:32.979] LOG: %cStart Phase DamageAnimPhase color:green;
+[17:07:33.011] LOG: %cStart Phase FaintPhase color:green;
+[17:07:33.944] LOG: %cStart Phase MessagePhase color:green;
+[17:07:34.467] LOG: %cStart Phase MessagePhase color:green;
+[17:07:35.100] LOG: %cStart Phase BerryPhase color:green;
+[17:07:35.104] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[17:07:35.106] LOG: %cStart Phase TurnEndPhase color:green;
+[17:07:35.123] WARN: [coop:turn] host recorder: finalize with NO open recording -> turn=-1 events=0 (caller decides not to emit)
+[17:07:35.126] LOG: %cStart Phase SwitchSummonPhase color:green;
+[17:07:35.336] LOG: ShiroOverHeaven
+[17:07:35.421] LOG: Applied Carbos (enemy)
+[17:07:35.422] LOG: Applied Calcium (enemy)
+[17:07:35.422] LOG: Applied Zinc (enemy)
+[17:07:35.578] LOG: %cStart Phase ShinySparklePhase color:green;
+[17:07:35.670] LOG: %cStart Phase PostSummonPhase color:green;
+[17:07:35.670] LOG: Ran PSP for: Prinplup
+[17:07:35.674] LOG: %cStart Phase MessagePhase color:green;
+[17:07:35.938] LOG: %cStart Phase DamageAnimPhase color:green;
+[17:07:35.949] LOG: %cStart Phase PostSummonPhase color:green;
+[17:07:35.951] LOG: %cStart Phase PostSummonPhase color:green;
+[17:07:35.954] LOG: %cStart Phase SwitchPhase color:green;
+[17:07:37.005] LOG: %cStart Phase SwitchSummonPhase color:green;
+[17:07:37.121] LOG: Applied Zinc 
+[17:07:37.124] LOG: Applied Protein 
+[17:07:37.275] LOG: %cStart Phase ShinySparklePhase color:green;
+[17:07:37.353] LOG: %cStart Phase PostSummonPhase color:green;
+[17:07:37.354] LOG: Ran PSP for: Kilowattrel
+[17:07:37.357] LOG: %cStart Phase PostSummonPhase color:green;
+[17:07:37.357] LOG: %cStart Phase MovePhase color:green;
+[17:07:37.357] LOG: %cUser: Kilowattrel
+Move: TAILWIND
+Use Mode: INDIRECT color:orchid
+[17:07:37.368] LOG: %cStart Phase MessagePhase color:green;
+[17:07:37.487] LOG: %cStart Phase MoveEffectPhase color:green;
+[17:07:37.505] LOG: %cStart Phase MessagePhase color:green;
+[17:07:37.737] LOG: %cStart Phase MessagePhase color:green;
+[17:07:38.021] LOG: %cStart Phase MessagePhase color:green;
+[17:07:38.320] LOG: %cStart Phase ShowAbilityPhase color:green;
+[17:07:38.490] LOG: %cStart Phase HideAbilityPhase color:green;
+[17:07:38.541] LOG: %cStart Phase MoveEndPhase color:green;
+[17:07:38.542] LOG: %cStart Phase PostSummonPhase color:green;
+[17:07:38.542] LOG: %cStart Phase TurnInitPhase color:green;
+[17:07:38.542] LOG: %cStart Phase CommandPhase color:green;
+[17:07:41.613] LOG: Move: THUNDER_SHOCK Move targets: {"targets":[2,3,1],"multiple":false} 
+Player Pokemon: Kilowattrel
+[17:07:41.620] LOG: %cStart Phase SelectTargetPhase color:green;
+[17:07:42.266] LOG: %cStart Phase CommandPhase color:green;
+[17:07:45.749] LOG: Move: RAIN_FLUSH Move targets: {"targets":[2,3,0],"multiple":false} 
+Player Pokemon: Gyarados
+[17:07:45.752] LOG: %cStart Phase SelectTargetPhase color:green;
+[17:07:46.521] LOG: %cStart Phase EnemyCommandPhase color:green;
+[17:07:46.538] LOG: Applied X Sp. Atk 
+[17:07:46.543] LOG: Applied X Sp. Atk 
+[17:07:46.559] LOG: Applied X Sp. Atk 
+[17:07:46.565] LOG: Applied X Sp. Atk 
+[17:07:46.573] LOG: Applied X Defense 
+[17:07:46.581] LOG: Applied X Defense 
+[17:07:46.589] LOG: Applied X Defense 
+[17:07:46.593] LOG: Applied X Defense 
+[17:07:46.597] LOG: Applied X Defense 
+[17:07:46.601] LOG: Applied X Defense 
+[17:07:46.605] LOG: Battle Seed: E4jDla8XSBmr4AOT
+[17:07:46.632] LOG: Applied X Sp. Atk 
+[17:07:46.640] LOG: Applied X Sp. Atk 
+[17:07:46.649] LOG: Applied X Sp. Atk 
+[17:07:46.654] LOG: Applied X Sp. Atk 
+[17:07:46.662] LOG: Applied X Defense 
+[17:07:46.666] LOG: Applied X Defense 
+[17:07:46.669] LOG: Applied X Defense 
+[17:07:46.670] LOG: Move Pool: ["Draconic Fangs","Scorching Sands","Bitter Blade","Excalibur"]
+[17:07:46.670] LOG: Move Scores: [1.0344827586206895,-20,0.1293103448275862,0.3506493506493506]
+[17:07:46.670] LOG: Sorted Move Pool: ["Draconic Fangs","Excalibur","Bitter Blade","Scorching Sands"]
+[17:07:46.670] LOG: Chosen Move: Draconic Fangs
+[17:07:46.670] LOG: ER AI: experimental brain (sharpness 1)
+[17:07:46.670] LOG: %cStart Phase EnemyCommandPhase color:green;
+[17:07:46.676] LOG: Applied X Sp. Atk 
+[17:07:46.679] LOG: Applied X Sp. Atk 
+[17:07:46.684] LOG: Applied X Sp. Atk 
+[17:07:46.689] LOG: Applied X Sp. Atk 
+[17:07:46.703] LOG: Applied X Sp. Atk 
+[17:07:46.710] LOG: Applied X Sp. Atk 
+[17:07:46.759] LOG: Applied X Defense 
+[17:07:46.766] LOG: Applied X Defense 
+[17:07:46.788] WARN: BattlerTag KINGS_SHIELD is missing a score!
+[17:07:46.800] WARN: BattlerTag KINGS_SHIELD is missing a score!
+[17:07:46.802] LOG: Applied X Sp. Atk 
+[17:07:46.809] LOG: Applied X Sp. Atk 
+[17:07:46.814] LOG: Applied X Sp. Atk 
+[17:07:46.819] LOG: Applied X Sp. Atk 
+[17:07:46.827] LOG: Applied X Sp. Atk 
+[17:07:46.830] LOG: Applied X Sp. Atk 
+[17:07:46.846] LOG: Applied X Defense 
+[17:07:46.847] LOG: Move Pool: ["Bubble Beam","Tachyon Cutter","Peck","King’s Shield"]
+[17:07:46.847] LOG: Move Scores: [1.6810344827586208,1.0344827586206895,0.5844155844155845,-20]
+[17:07:46.847] LOG: Sorted Move Pool: ["Bubble Beam","Tachyon Cutter","Peck","King’s Shield"]
+[17:07:46.847] LOG: Chosen Move: Bubble Beam
+[17:07:46.847] LOG: ER AI: experimental brain (sharpness 1)
+[17:07:46.848] LOG: %cStart Phase TurnStartPhase color:green;
+[17:07:46.874] LOG: %cStart Phase MovePhase color:green;
+[17:07:46.874] LOG: %cUser: Kilowattrel
+Move: THUNDER_SHOCK
+Use Mode: NORMAL color:orchid
+[17:07:46.897] LOG: %cStart Phase MessagePhase color:green;
+[17:07:47.005] LOG: %cStart Phase MoveEffectPhase color:green;
+[17:07:47.010] LOG: crit stage: +0
+[17:07:47.018] LOG: Applied X Sp. Atk 
+[17:07:47.021] LOG: Move: Thunder Shock | Base damage: 51.92 | Power: 160 | Source attack: 78 | Target defense: 60
+[17:07:47.023] LOG: Move: Thunder Shock | Attack damage: 143
+[17:07:47.024] LOG: %cStart Phase DamageAnimPhase color:green;
+[17:07:47.060] LOG: %cStart Phase MessagePhase color:green;
+[17:07:47.271] LOG: %cStart Phase FaintPhase color:green;
+[17:07:48.527] LOG: %cStart Phase MessagePhase color:green;
+[17:07:48.599] LOG: %cStart Phase VictoryPhase color:green;
+[17:07:48.600] LOG: Applied Soothe Bell 
+[17:07:48.604] LOG: %cStart Phase MoveEndPhase color:green;
+[17:07:48.608] LOG: %cStart Phase MovePhase color:green;
+[17:07:48.608] LOG: %cUser: Gyarados
+Move: RAIN_FLUSH
+Use Mode: NORMAL color:orchid
+[17:07:48.614] LOG: %cStart Phase MessagePhase color:green;
+[17:07:48.738] LOG: %cStart Phase MoveEffectPhase color:green;
+[17:07:48.743] LOG: crit stage: +0
+[17:07:48.750] LOG: Applied X Sp. Atk 
+[17:07:48.751] LOG: Move: Rain Flush | Base damage: 47.472 | Power: 120 | Source attack: 49 | Target defense: 30
+[17:07:48.755] LOG: Move: Rain Flush | Attack damage: 101
+[17:07:48.758] LOG: %cStart Phase DamageAnimPhase color:green;
+[17:07:48.798] LOG: %cStart Phase StatStageChangePhase color:green;
+[17:07:48.798] LOG: %cStart Phase StatStageChangePhase color:green;
+[17:07:48.800] LOG: %cStart Phase MessagePhase color:green;
+[17:07:49.006] LOG: %cStart Phase StatStageChangePhase color:green;
+[17:07:49.013] LOG: %cStart Phase MessagePhase color:green;
+[17:07:49.239] LOG: %cStart Phase ShowAbilityPhase color:green;
+[17:07:49.410] LOG: %cStart Phase MessagePhase color:green;
+[17:07:49.671] LOG: %cStart Phase DamageAnimPhase color:green;
+[17:07:49.682] LOG: %cStart Phase HideAbilityPhase color:green;
+[17:07:49.724] LOG: %cStart Phase FaintPhase color:green;
+[17:07:50.442] LOG: %cStart Phase MessagePhase color:green;
+[17:08:21.970] LOG: %cStart Phase VictoryPhase color:green;
+[17:08:21.970] LOG: Applied Soothe Bell 
+[17:08:21.971] LOG: %cStart Phase MoveEndPhase color:green;
+[17:08:21.976] LOG: %cStart Phase MovePhase color:green;
+[17:08:21.977] LOG: %cStart Phase MoveEndPhase color:green;
+[17:08:21.977] LOG: %cStart Phase MovePhase color:green;
+[17:08:21.978] LOG: %cStart Phase MoveEndPhase color:green;
+[17:08:21.978] LOG: %cStart Phase CheckInterludePhase color:green;
+[17:08:21.978] LOG: %cStart Phase WeatherEffectPhase color:green;
+[17:08:22.026] LOG: %cStart Phase PositionalTagPhase color:green;
+[17:08:22.026] LOG: %cStart Phase BerryPhase color:green;
+[17:08:22.028] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[17:08:22.029] LOG: %cStart Phase TurnEndPhase color:green;
+[17:08:22.047] WARN: [coop:turn] host recorder: finalize with NO open recording -> turn=-1 events=0 (caller decides not to emit)
+[17:08:22.049] LOG: %cStart Phase SwitchSummonPhase color:green;
+[17:08:22.292] LOG: ShiroOverHeaven
+[17:08:22.373] LOG: Applied Calcium (enemy)
+[17:08:22.373] LOG: Applied Zinc (enemy)
+[17:08:22.378] LOG: Applied Carbos (enemy)
+[17:08:22.535] LOG: %cStart Phase ShinySparklePhase color:green;
+[17:08:22.641] LOG: %cStart Phase PostSummonPhase color:green;
+[17:08:22.641] LOG: Ran PSP for: Natu
+[17:08:22.642] LOG: %cStart Phase PostSummonPhase color:green;
+[17:08:22.642] LOG: %cStart Phase PostSummonPhase color:green;
+[17:08:22.643] LOG: %cStart Phase ShowAbilityPhase color:green;
+[17:08:22.811] LOG: %cStart Phase MovePhase color:green;
+[17:08:22.812] LOG: %cUser: Natu
+Move: FUTURE_SIGHT
+Use Mode: INDIRECT color:orchid
+[17:08:22.818] LOG: %cStart Phase MessagePhase color:green;
+[17:08:22.956] LOG: %cStart Phase MoveEffectPhase color:green;
+[17:08:22.958] LOG: %cStart Phase MoveAnimPhase color:green;
+[17:08:22.958] LOG: %cStart Phase MessagePhase color:green;
+[17:08:23.207] LOG: %cStart Phase MoveEndPhase color:green;
+[17:08:23.208] LOG: %cStart Phase HideAbilityPhase color:green;
+[17:08:23.243] LOG: %cStart Phase SwitchSummonPhase color:green;
+[17:08:23.335] LOG: %cStart Phase ShinySparklePhase color:green;
+[17:08:23.441] LOG: %cStart Phase PostSummonPhase color:green;
+[17:08:23.441] LOG: Ran PSP for: Prinplup
+[17:08:23.442] LOG: %cStart Phase MessagePhase color:green;
+[17:08:23.706] LOG: %cStart Phase DamageAnimPhase color:green;
+[17:08:23.712] LOG: %cStart Phase PostSummonPhase color:green;
+[17:08:23.712] LOG: %cStart Phase PostSummonPhase color:green;
+[17:08:23.713] LOG: %cStart Phase TurnInitPhase color:green;
+[17:08:23.713] LOG: %cStart Phase CommandPhase color:green;
