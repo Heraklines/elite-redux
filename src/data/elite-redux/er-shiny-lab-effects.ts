@@ -1212,48 +1212,46 @@ export interface ErShinyLabNameStyle {
 }
 
 /**
- * Ensure an adopted palette accent reads as a CLEAR colour on the name, not ~white.
- * A handful of palette accents (chrome, pearl, negative, mythril, moonstone, sakura) are
- * near-white - on the name they were indistinguishable from the default white text ("Name
- * FX doesn't work on all palettes"). When every channel is light, pull the colour toward
- * its own hue (boost saturation, cap brightness) so it becomes a visible tint. Vivid
- * accents (every other palette) are returned unchanged.
+ * Normalize a palette accent into a CONSISTENT, clearly-readable name colour. Adopting a
+ * raw accent looked inconsistent: vivid accents (Synthwave) read fine, but light/pastel
+ * ones (Iridescent #a0e0ff, Pearl, Chrome) were near-white and "didn't get adopted".
+ * Every accent is now pushed to a rich mid-tone in its OWN hue: saturation floored and
+ * brightness capped, so the name is always saturated + distinct from the default white
+ * text, while still recognizably "the palette's colour". Hue is preserved.
  */
 function vividNameColor(hex: string): string {
   const n = Number.parseInt(hex.replace("#", ""), 16);
   if (!Number.isFinite(n)) {
     return hex;
   }
-  const r = (n >> 16) & 0xff;
-  const g = (n >> 8) & 0xff;
-  const b = n & 0xff;
-  // Already has a dark-enough channel -> distinct from white, leave it.
-  if (Math.min(r, g, b) <= 170) {
-    return hex;
-  }
-  const max = Math.max(r, g, b) / 255;
-  const min = Math.min(r, g, b) / 255;
+  const rn = ((n >> 16) & 0xff) / 255;
+  const gn = ((n >> 8) & 0xff) / 255;
+  const bn = (n & 0xff) / 255;
+  const max = Math.max(rn, gn, bn);
+  const min = Math.min(rn, gn, bn);
   const d = max - min;
-  let h = 0;
-  if (d > 0) {
-    const rn = r / 255;
-    const gn = g / 255;
-    const bn = b / 255;
-    if (max === rn) {
-      h = ((gn - bn) / d) % 6;
-    } else if (max === gn) {
-      h = (bn - rn) / d + 2;
-    } else {
-      h = (rn - gn) / d + 4;
-    }
-    h *= 60;
-    if (h < 0) {
-      h += 360;
-    }
+  // Achromatic accent (no hue to enrich) - just return a readable mid grey.
+  if (d < 0.02) {
+    return "#9aa3b8";
   }
-  // Re-saturate to a clear tint (S=0.55) at a mid brightness (V=0.85).
-  const tv = 0.85;
-  const tc = tv * 0.55;
+  let h = 0;
+  if (max === rn) {
+    h = ((gn - bn) / d) % 6;
+  } else if (max === gn) {
+    h = (bn - rn) / d + 2;
+  } else {
+    h = (rn - gn) / d + 4;
+  }
+  h *= 60;
+  if (h < 0) {
+    h += 360;
+  }
+  // Floor saturation (>=0.62) and cap brightness (<=0.82) so EVERY palette yields a
+  // saturated, readable name in its own hue. min channel ends ~ 0.82*0.38*255 ~ 79, far
+  // from white; max channel ~ 209.
+  const tv = Math.min(Math.max(max, 0.6), 0.82);
+  const ts = Math.max(d / max, 0.62);
+  const tc = tv * ts;
   const tx = tc * (1 - Math.abs(((h / 60) % 2) - 1));
   const tm = tv - tc;
   let rr = 0;

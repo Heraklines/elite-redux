@@ -29,8 +29,9 @@ describe("ER Shiny Lab Name FX - palette adoption (pure)", () => {
     for (const p of ER_SHINY_LAB_EFFECTS_BY_CATEGORY.palette) {
       const style = getErShinyLabNameStyle({ palette: p.id, surface: null, around: null })!;
       const [r, g, b] = channels(style.color);
-      // Near-white = every channel bright (so it looks ~white against the default name).
-      if (Math.min(r, g, b) > 190) {
+      // Light/washed-out = no channel is dark enough to read as a distinct colour against
+      // the default white name (Iridescent #a0e0ff, min 160, was the reported miss).
+      if (Math.min(r, g, b) > 150) {
         offenders.push(`${p.id}=${style.color}`);
       }
     }
