@@ -25,6 +25,16 @@
       5304
     ]
   },
+  "SPECIES_BLOODMOON_URSALUNA": {
+    "ability1": 5266,
+    "ability2": 5067,
+    "hidden": 5264,
+    "innates": [
+      299,
+      5209,
+      142
+    ]
+  },
   "SPECIES_DEERLING": {
     "ability1": 91,
     "ability2": 92,
