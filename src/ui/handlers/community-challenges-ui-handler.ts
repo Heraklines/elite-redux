@@ -28,7 +28,7 @@ import {
 import { Button } from "#enums/buttons";
 import { TextStyle } from "#enums/text-style";
 import { UiMode } from "#enums/ui-mode";
-import { buildChallengeCardArt, buildChallengeEmblem } from "#ui/community-challenge-card";
+import { addPokemonIcon, buildChallengeCardArt, buildChallengeEmblem } from "#ui/community-challenge-card";
 import { addTextObject } from "#ui/text";
 import { UiHandler } from "#ui/ui-handler";
 import { addWindow } from "#ui/ui-theme";
@@ -62,16 +62,18 @@ const HINT_Y = SCREEN_H - 9;
 interface NavItem {
   readonly key: string;
   readonly label: string;
+  /** Frame in the (boot-loaded) `items` atlas; falls back to a drawn rune if absent. */
+  readonly icon: string;
 }
 
 const NAV_ITEMS: NavItem[] = [
-  { key: "community", label: "COMMUNITY" },
-  { key: "featured", label: "FEATURED" },
-  { key: "browse", label: "BROWSE" },
-  { key: "mine", label: "MY" },
-  { key: "create", label: "CREATE" },
-  { key: "bookmarks", label: "SAVED" },
-  { key: "history", label: "HISTORY" },
+  { key: "community", label: "COMMUNITY", icon: "soothe_bell" },
+  { key: "featured", label: "FEATURED", icon: "relic_gold" },
+  { key: "browse", label: "BROWSE", icon: "map" },
+  { key: "mine", label: "MY", icon: "scope_lens" },
+  { key: "create", label: "CREATE", icon: "rare_candy" },
+  { key: "bookmarks", label: "SAVED", icon: "lock_capsule" },
+  { key: "history", label: "HISTORY", icon: "exp_charm" },
 ];
 
 export class CommunityChallengesUiHandler extends UiHandler {
@@ -123,12 +125,7 @@ export class CommunityChallengesUiHandler extends UiHandler {
 
     NAV_ITEMS.forEach((item, i) => {
       const y = 24 + i * 19;
-      // A small drawn glyph (rotated square) stands in for the icon until er_icon__ui_* art lands.
-      const glyph = globalScene.add
-        .rectangle(11, y + 3, 6, 6, 0xc8a24a, 1)
-        .setAngle(45)
-        .setOrigin(0.5);
-      this.container.add(glyph);
+      this.addNavIcon(11, y + 3, item.icon);
       const t = addTextObject(20, y, item.label, TextStyle.WINDOW, { fontSize: "30px" });
       t.setOrigin(0, 0).setColor(i === this.navCursor ? GOLD : DIM);
       this.container.add(t);
@@ -142,6 +139,18 @@ export class CommunityChallengesUiHandler extends UiHandler {
     });
     rival.setOrigin(0.5, 0).setColor(DIM);
     this.container.add(rival);
+  }
+
+  /** A nav glyph: the boot-loaded `items` atlas icon, or a drawn rune if absent. */
+  private addNavIcon(x: number, y: number, frame: string): void {
+    const tex = globalScene.textures.exists("items") ? globalScene.textures.get("items") : null;
+    if (tex && tex.key !== "__MISSING" && tex.has(frame)) {
+      const icon = globalScene.add.sprite(x, y, "items", frame);
+      icon.setOrigin(0.5, 0.5).setScale(0.42);
+      this.container.add(icon);
+      return;
+    }
+    this.container.add(globalScene.add.rectangle(x, y, 6, 6, 0xc8a24a, 1).setAngle(45).setOrigin(0.5));
   }
 
   private buildTopBar(): void {
@@ -210,9 +219,11 @@ export class CommunityChallengesUiHandler extends UiHandler {
       this.buildStatsEmpty();
       return;
     }
+    // Hover updates: the detail + stats follow the focused card.
+    const focused = feed.featured[this.cardCursor] ?? feed.selected ?? feed.featured[0];
     this.buildFeaturedRow(feed.featured);
-    this.buildDetail(feed.selected ?? feed.featured[0]);
-    this.buildStats(feed.selected ?? feed.featured[0]);
+    this.buildDetail(focused);
+    this.buildStats(focused);
   }
 
   // --- Featured row ---
@@ -346,61 +357,38 @@ export class CommunityChallengesUiHandler extends UiHandler {
     desc.setOrigin(0, 0).setColor(INK);
     this.dynamic.add(desc);
 
-    // Tag chips.
-    let tx = CONTENT_X + 6;
-    const ty = DETAIL_Y + 31;
-    for (const tag of e.config.tags) {
-      const cw = 7 + tag.length * 4;
-      const chip = addWindow(tx, ty, cw, 8);
-      chip.setTint(0x2a2238);
-      this.dynamic.add(chip);
-      const ct = addTextObject(tx + cw / 2, ty + 1, tag, TextStyle.WINDOW, { fontSize: "22px", align: "center" });
-      ct.setOrigin(0.5, 0).setColor(CYAN);
-      this.dynamic.add(ct);
-      tx += cw + 3;
-    }
-
-    // Three columns: RULES | ALLOWED | RESTRICTIONS.
-    const colY = DETAIL_Y + 42;
+    // Two columns: RULES (the active base challenges) | ALLOWED POKEMON. Tags +
+    // the RESTRICTIONS column were removed (redundant - restrictions are just more
+    // base-challenge rules), giving the rules + the allowed icon grid more room.
+    const colY = DETAIL_Y + 30;
     this.buildColumnHeader(CONTENT_X + 6, colY, "RULES");
-    e.rules.slice(0, 5).forEach((r, i) => {
+    e.rules.slice(0, 6).forEach((r, i) => {
       const t = addTextObject(CONTENT_X + 6, colY + 8 + i * 7, `- ${r.text}`, TextStyle.WINDOW, { fontSize: "22px" });
       t.setOrigin(0, 0).setColor(INK);
       this.dynamic.add(t);
     });
 
-    const allowX = CONTENT_X + 6 + (w - 12) * 0.37;
+    const allowX = CONTENT_X + 6 + (w - 12) * 0.46;
     this.buildColumnHeader(allowX, colY, "ALLOWED POKEMON");
-    // Icon grid placeholder (real icons land in P1-E/F).
+    // The first ~10 allowed species as real party icons (placeholder squares offline).
     const cols = 5;
-    e.allowedPreview.slice(0, 10).forEach((_sp, i) => {
-      const gx = allowX + (i % cols) * 11;
-      const gy = colY + 8 + Math.floor(i / cols) * 11;
-      this.dynamic.add(globalScene.add.rectangle(gx, gy, 10, 10, 0x1c2236, 1).setOrigin(0));
+    const cell = 14;
+    e.allowedPreview.slice(0, 10).forEach((sp, i) => {
+      const gx = allowX + (i % cols) * cell;
+      const gy = colY + 8 + Math.floor(i / cols) * cell;
+      addPokemonIcon(this.dynamic, sp, gx, gy, cell - 1);
     });
     if (e.allowedCount > e.allowedPreview.length) {
       const more = addTextObject(
         allowX,
-        colY + 31,
+        colY + 8 + 2 * cell + 1,
         `+${e.allowedCount - e.allowedPreview.length} MORE`,
         TextStyle.WINDOW,
-        {
-          fontSize: "22px",
-        },
+        { fontSize: "22px" },
       );
       more.setOrigin(0, 0).setColor(DIM);
       this.dynamic.add(more);
     }
-
-    const restX = CONTENT_X + 6 + (w - 12) * 0.72;
-    this.buildColumnHeader(restX, colY, "RESTRICTIONS");
-    this.restrictionLines(e)
-      .slice(0, 5)
-      .forEach((line, i) => {
-        const t = addTextObject(restX, colY + 8 + i * 7, `x ${line}`, TextStyle.WINDOW, { fontSize: "22px" });
-        t.setOrigin(0, 0).setColor(INK);
-        this.dynamic.add(t);
-      });
   }
 
   private buildColumnHeader(x: number, y: number, label: string): void {
@@ -521,27 +509,6 @@ export class CommunityChallengesUiHandler extends UiHandler {
     const ms = Math.abs(at);
     const h = Math.round(ms / 3600_000);
     return h >= 24 ? `${Math.round(h / 24)}d ago` : `${h}h ago`;
-  }
-
-  private restrictionLines(e: CommunityChallengeEntry): string[] {
-    const r = e.config.restrictions;
-    const out: string[] = [];
-    if (r.noLegendary) {
-      out.push("No Legendary Pokemon");
-    }
-    if (r.noMythical) {
-      out.push("No Mythical Pokemon");
-    }
-    if (r.noUltraBeasts) {
-      out.push("No Ultra Beasts");
-    }
-    if (r.noRepeats) {
-      out.push("No repeats");
-    }
-    if (r.starterNotGuaranteed) {
-      out.push("Starter is not guaranteed");
-    }
-    return out;
   }
 
   // ---- Lifecycle ----------------------------------------------------------

@@ -178,6 +178,35 @@ function tryAddSilhouette(
   return true;
 }
 
+/**
+ * Add a COLOURED Pokemon icon (the real party icon) centered in a `size` cell at
+ * (x, y) into `container`, guarded against a missing texture/frame. Falls back to
+ * a dark placeholder square (the Assets rule) - which is also the harness render,
+ * since the pokemon_icons atlases aren't injected into the offscreen canvas.
+ */
+export function addPokemonIcon(
+  container: Phaser.GameObjects.Container,
+  speciesId: number,
+  x: number,
+  y: number,
+  size: number,
+): void {
+  const species = safeSpecies(speciesId);
+  if (species) {
+    const key = species.getIconAtlasKey(0, false, 0);
+    const frame = String(species.getIconId(false, 0, false, 0));
+    const tex = globalScene.textures.exists(key) ? globalScene.textures.get(key) : null;
+    if (tex && tex.key !== "__MISSING" && tex.has(frame)) {
+      const icon = globalScene.add.sprite(x + size / 2, y + size / 2, key, frame);
+      // The party icon frame is ~40px; fit it to the cell with a touch of bleed.
+      icon.setOrigin(0.5, 0.5).setScale((size / 40) * 1.5);
+      container.add(icon);
+      return;
+    }
+  }
+  container.add(globalScene.add.rectangle(x, y, size, size, 0x1c2236, 1).setOrigin(0).setStrokeStyle(1, 0x2a3450, 0.6));
+}
+
 /** A procedural heraldic charge (diamond + ring) when no icon resolves. */
 function addFallbackCharge(c: Phaser.GameObjects.Container, cx: number, cy: number, h: number, accent: number): void {
   const r = Math.round(h * 0.3);
