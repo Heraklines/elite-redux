@@ -1520,12 +1520,14 @@ describe("dispatchArchetype('bespoke', null, erAbilityId): per-id wiring", () =>
   it("er id 302 (Coil Up) gates the biting +1 priority to the entry turn", () => {
     const res = dispatchArchetype("bespoke", null, 302);
     expect(res.skipReason).toBeNull();
-    // Coil Up's dex: "+1 priority once to the first biting move used." Wired via
-    // the dedicated first-flagged-priority primitive (+ its consume companion),
-    // not the generic PriorityModifier.
+    // Coil Up's dex: "+1 priority once to the first biting move USED." Wired via the
+    // dedicated first-flagged-priority primitive + the on-USE consumer (#632) - the
+    // boost is spent the first time a biting move is used even if it misses/fails, NOT
+    // only on a landed hit (the old ConsumeFirstFlaggedMovePriorityAbAttr, which now
+    // serves only Sidewinder's consume-on-land + regain-on-KO variant).
     const prio = res.attrs.find(a => a.constructor.name === "FirstFlaggedMovePriorityAbAttr");
     expect(prio).toBeDefined();
-    expect(res.attrs.some(a => a.constructor.name === "ConsumeFirstFlaggedMovePriorityAbAttr")).toBe(true);
+    expect(res.attrs.some(a => a.constructor.name === "ConsumeFirstFlaggedMoveOnUseAbAttr")).toBe(true);
   });
 
   it("er id 644 (Ice Cold Hunter) wires hail-gated Ice HitMultiplier + hail immunity", () => {
