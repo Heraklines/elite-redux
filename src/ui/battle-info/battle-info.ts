@@ -1,6 +1,5 @@
 import { globalScene } from "#app/global-scene";
 import { isErBlackShiny } from "#data/elite-redux/er-black-shinies";
-import { getErShinyLabEarnedTierForPokemon, getErShinyLabNameStyle } from "#data/elite-redux/er-shiny-lab-effects";
 import { Gender, getGenderColor, getGenderSymbol } from "#data/gender";
 import { getTypeRgb } from "#data/type";
 import { BattlerTagType } from "#enums/battler-tag-type";
@@ -10,7 +9,7 @@ import { StatusEffect } from "#enums/status-effect";
 import { TextStyle } from "#enums/text-style";
 import { UiTheme } from "#enums/ui-theme";
 import type { Pokemon } from "#field/pokemon";
-import { getErShinyLabSpriteFxLookForPokemon } from "#sprites/er-shiny-lab-sprite-fx";
+import { getErShinyLabNameStyleForPokemon } from "#sprites/er-shiny-lab-sprite-fx";
 import { getVariantTint } from "#sprites/variant";
 import { addTextObject } from "#ui/text";
 import { fixedInt, getLocalizedSpriteKey, getShinyDescriptor } from "#utils/common";
@@ -533,13 +532,11 @@ export abstract class BattleInfo extends Phaser.GameObjects.Container {
   }
 
   private updateShinyLabNameplate(pokemon: Pokemon): void {
-    const look = getErShinyLabSpriteFxLookForPokemon(pokemon);
-    // Name FX adopts the equipped PALETTE's color (or a named-combo signature) when the
-    // mon is a T3+ shiny with Name FX unlocked + on. Not just the 7 named combos.
-    const style =
-      look?.params.nameFx && getErShinyLabEarnedTierForPokemon(pokemon) >= 3
-        ? getErShinyLabNameStyle(look.loadout)
-        : null;
+    // Shared resolver (single source of truth with Starter Select / Summary / Party):
+    // the name adopts the equipped palette's color (or a named-combo signature) for ANY
+    // shiny with Name FX unlocked + on - no earned-tier gate (the old inline `>= 3` here
+    // silently kept ordinary shinies' names white, the "Name FX doesn't appear" report).
+    const style = getErShinyLabNameStyleForPokemon(pokemon);
     // The FX goes on the NAME text itself - NOT the box around it (tinting the box
     // looked like a negative white->black wash). Only recolor the name.
     this.nameText.setColor(style ? style.color : "#f8f8f8");

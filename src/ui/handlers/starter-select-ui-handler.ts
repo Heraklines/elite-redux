@@ -4728,14 +4728,16 @@ export class StarterSelectUiHandler extends MessageUiHandler {
       } else {
         this.pokemonNameText.setText(species.name);
       }
-      // Shiny Lab Name FX: the name adopts the equipped palette's color for a T3+ shiny
-      // with Name FX unlocked + on (only while viewing the shiny form).
-      const nameFxStyle = getErShinyLabNameStyleForSpecies(
-        species.speciesId,
-        !!starterAttributes?.shiny,
-        this.speciesStarterDexEntry?.caughtAttr ?? 0n,
-        !!starterAttributes?.erBlackShiny,
-      );
+      // Shiny Lab Name FX: the name adopts the equipped palette's color when Name FX is
+      // unlocked + on, while viewing the shiny form (any shiny - no tier gate). Use the
+      // SAME resolved display props as the detail sprite/icon - `starterAttributes.shiny`
+      // is the raw pref toggle and is `undefined` for a shiny-only-caught mon that still
+      // RENDERS shiny, which is why the name stayed white while the sprite was shiny.
+      const displayShiny = globalScene.gameData.getSpeciesDexAttrProps(
+        species,
+        this.getCurrentDexProps(species.speciesId),
+      ).shiny;
+      const nameFxStyle = getErShinyLabNameStyleForSpecies(species.speciesId, displayShiny);
       this.pokemonNameText.setColor(nameFxStyle ? nameFxStyle.color : getTextColor(TextStyle.SUMMARY));
       this.truncateName();
 

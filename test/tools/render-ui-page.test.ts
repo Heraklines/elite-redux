@@ -34,9 +34,12 @@ import { applyErBlackShinyKit } from "#data/elite-redux/er-black-shinies";
 import { recordErBiomeVisited } from "#data/elite-redux/er-map-nodes";
 import { STORMGLASS_WEATHER_CHOICES } from "#data/elite-redux/er-relics";
 import {
+  ER_SHINY_LAB_DEFAULT_PARAMS,
   ER_SHINY_LAB_EFFECTS_BY_CATEGORY,
   encodeErShinyLabLoadout,
+  encodeErShinyLabParams,
   setErShinyLabOwnedBit,
+  unlockErShinyLabNameFx,
 } from "#data/elite-redux/er-shiny-lab-effects";
 import { AbilityId } from "#enums/ability-id";
 import { BiomeId } from "#enums/biome-id";
@@ -163,6 +166,10 @@ function caughtShinyLabSpecies(game: GameManager, id: SpeciesId) {
     setErShinyLabOwnedBit(save, "surface", surface.index);
     setErShinyLabOwnedBit(save, "around", around.index);
     save.l = encodeErShinyLabLoadout({ palette: palette.id, surface: surface.id, around: around.id });
+    // Name FX unlocked + on, so the detail-panel NAME renders in the palette's accent
+    // colour (the maintainer "Name FX doesn't appear" repro - any shiny, no tier gate).
+    save.q = encodeErShinyLabParams({ ...ER_SHINY_LAB_DEFAULT_PARAMS, nameFx: true });
+    unlockErShinyLabNameFx(save);
   }
   return species;
 }

@@ -8,8 +8,6 @@ import {
   type ErShinyLabNameStyle,
   type ErShinyLabParams,
   type ErShinyLabSavedLook,
-  getErShinyLabEarnedTier,
-  getErShinyLabEarnedTierForPokemon,
   getErShinyLabNameStyle,
   getErShinyLabOwnedSet,
   isErShinyLabNameFxUnlocked,
@@ -393,9 +391,11 @@ export function getErShinyLabSpriteFxLookForPokemon(pokemon: {
 
 /**
  * The Name FX style for a battle Pokemon: the equipped palette's color (or a named-combo
- * signature) when the mon is a T3+ shiny with Name FX unlocked + enabled; null otherwise.
- * Cheap (a lookup), safe to call per render. Callers apply `.color` to the NAME TEXT only -
- * never a box/panel tint.
+ * signature) whenever the mon is a shiny that has Name FX unlocked + enabled. NO earned-tier
+ * gate - the player explicitly equipped + toggled Name FX, so it must show on the name
+ * regardless of the mon's shiny variant (the prior `< 3` gate silently hid it on ordinary
+ * shinies - the "Name FX doesn't work" report). Cheap (a lookup), safe per render. Callers
+ * apply `.color` to the NAME TEXT only - never a box/panel tint.
  */
 export function getErShinyLabNameStyleForPokemon(pokemon: {
   species: { speciesId: number };
@@ -408,24 +408,20 @@ export function getErShinyLabNameStyleForPokemon(pokemon: {
   } | null;
 }): ErShinyLabNameStyle | null {
   const look = getErShinyLabSpriteFxLookForPokemon(pokemon);
-  if (!look?.params.nameFx || getErShinyLabEarnedTierForPokemon(pokemon) < 3) {
+  if (!look?.params.nameFx) {
     return null;
   }
   return getErShinyLabNameStyle(look.loadout);
 }
 
 /**
- * The Name FX style for a species + its shiny state (Starter Select). `caughtAttr` +
- * `hasBlackShiny` resolve the earned tier (T3+ gate). null when not applicable.
+ * The Name FX style for a species + its shiny view state (Starter Select). Shows whenever the
+ * shiny form has Name FX unlocked + enabled (the unlock is already required for `nameFx` to be
+ * true here, via getErShinyLabSpriteFxLookForSpecies). No earned-tier gate. null otherwise.
  */
-export function getErShinyLabNameStyleForSpecies(
-  speciesId: number,
-  shiny: boolean,
-  caughtAttr: bigint,
-  hasBlackShiny: boolean,
-): ErShinyLabNameStyle | null {
+export function getErShinyLabNameStyleForSpecies(speciesId: number, shiny: boolean): ErShinyLabNameStyle | null {
   const look = getErShinyLabSpriteFxLookForSpecies(speciesId, shiny);
-  if (!look?.params.nameFx || getErShinyLabEarnedTier(caughtAttr, hasBlackShiny) < 3) {
+  if (!look?.params.nameFx) {
     return null;
   }
   return getErShinyLabNameStyle(look.loadout);
