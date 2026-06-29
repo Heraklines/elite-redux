@@ -3996,6 +3996,77 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
   },
   {
+    label: "Gear Up: ER self-buff",
+    description:
+      "Gear Up was still the vanilla Plus/Minus team buff (did nothing useful on a normal\n"
+      + "mon). ER dex: a SELF buff - raises SpAtk and SHARPLY raises Speed. DO: use Gear Up.\n"
+      + "EXPECT: the user's Sp. Atk rises 1 stage and its Speed rises 2 stages (no Plus/Minus\n"
+      + "needed, no ally involvement).",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 50,
+        STARTING_WAVE_OVERRIDE: 5,
+        MOVESET_OVERRIDE: [MoveId.GEAR_UP, MoveId.SPLASH],
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.MAGIKARP,
+        ENEMY_LEVEL_OVERRIDE: 50,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+      });
+      return [
+        makeStarter(SpeciesId.KLINKLANG, { moveset: [MoveId.GEAR_UP, MoveId.SPLASH, MoveId.PROTECT, MoveId.REST] }),
+      ];
+    },
+  },
+  {
+    label: "Decorate is blocked by Protect",
+    description:
+      "ER Decorate became a damaging foe-move but kept the vanilla ally-buff's ignores-Protect\n"
+      + "flag, so it punched through Protect (reported: hit a protected Sobble in doubles). DO:\n"
+      + "use Decorate on the Sobble the turn it uses Protect.  EXPECT: 'Sobble protected itself!'\n"
+      + "and Decorate deals 0 - it does NOT bypass Protect anymore.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 50,
+        STARTING_WAVE_OVERRIDE: 5,
+        MOVESET_OVERRIDE: [MoveId.DECORATE, MoveId.SPLASH],
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.SOBBLE,
+        ENEMY_LEVEL_OVERRIDE: 5,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.PROTECT],
+      });
+      return [
+        makeStarter(SpeciesId.SCATTERBUG, {
+          moveset: [MoveId.DECORATE, MoveId.SPLASH, MoveId.STRING_SHOT, MoveId.TACKLE],
+        }),
+      ];
+    },
+  },
+  {
+    label: "Mega Tyranitar Evaporate: water immunity",
+    description:
+      "Mega Tyranitar's Evaporate ('takes no damage and sets Mist if hit by water') did\n"
+      + "nothing - the immunity attr was never collected by the damage engine. DO: let the\n"
+      + "enemy hit your Evaporate Tyranitar with a Water move (Water Gun).  EXPECT: 'It doesn't\n"
+      + "affect Tyranitar', 0 damage, and 'Your team became shrouded in mist!' (Mist set).",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 50,
+        STARTING_WAVE_OVERRIDE: 5,
+        ABILITY_OVERRIDE: erAbility(ErAbilityId.EVAPORATE),
+        MOVESET_OVERRIDE: [MoveId.SPLASH],
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.MAGIKARP,
+        ENEMY_LEVEL_OVERRIDE: 50,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.WATER_GUN],
+      });
+      return [
+        makeStarter(SpeciesId.TYRANITAR, {
+          moveset: [MoveId.SPLASH, MoveId.CRUNCH, MoveId.ROCK_SLIDE, MoveId.EARTHQUAKE],
+        }),
+      ];
+    },
+  },
+  {
     label: "Mimikyu Apex: Disguise blocks first hit",
     description:
       "Mimikyu Apex's Disguise did NOTHING (the Apex / Rayquaza tiers ship as separate\n"

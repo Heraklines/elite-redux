@@ -306,6 +306,31 @@ describe.skipIf(!RUN)("ER ghost devolve gate past wave 50 (#422 follow-up)", () 
     expect(swapped.getMoveset().map(m => m.moveId)).not.toEqual([MoveId.TACKLE]);
   });
 
+  it("clamps a hacked ghost member's out-of-range IVs to <= 31 (anti 2000-stat ghost)", async () => {
+    // A hacked source save can store IVs of 999 (seen on a wave-199 ghost -> ~2000 stats).
+    // applyErGhostOverride must clamp them to the legal 0..31 so the fielded ghost is not
+    // an unbeatable wall. Legit IVs (<= 31) are untouched.
+    const hacked: GhostTeamSnapshot = {
+      ...SNAPSHOT,
+      id: "er-test-hacked-ivs",
+      waveReached: 200,
+      party: [{ ...SNAPSHOT.party[0], speciesId: SpeciesId.SNORLAX, level: 100, ivs: [999, 999, 999, 999, 999, 999] }],
+    };
+    setPrefetchedGhostTeamsForTests([hacked]);
+    game.challengeMode.addChallenge(Challenges.GHOST_TRAINERS, 1, 1);
+    await game.challengeMode.startBattle(SpeciesId.SNORLAX);
+    const host = game.scene.currentBattle.trainer;
+    expect(host).not.toBeNull();
+    markTrainerAsGhost(host!, hacked);
+    game.scene.currentBattle.waveIndex = 137;
+    game.scene.currentBattle.enemyLevels = [137];
+
+    const enemy = applyErGhostOverride(host!, 0)!;
+    expect(enemy).not.toBeNull();
+    expect(Math.max(...enemy.ivs)).toBeLessThanOrEqual(31);
+    expect(enemy.ivs.every(iv => iv >= 0 && iv <= 31)).toBe(true);
+  });
+
   it("never captures an ENDLESS run for the ghost pool; classic runs are tagged 'classic'", async () => {
     // Endless contamination: endless teams (hundreds of waves deep, absurd kits) must
     // never seed the classic ghost pool. captureGhostTeam bails on endless/daily, and

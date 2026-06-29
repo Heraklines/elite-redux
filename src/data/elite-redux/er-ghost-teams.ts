@@ -1114,7 +1114,11 @@ export function applyErGhostOverride(trainer: Trainer, index: number): EnemyPoke
       enemy.abilityIndex = member.abilityIndex;
     }
     if (member.ivs.length === 6) {
-      enemy.ivs = member.ivs.slice();
+      // Clamp to the legal IV range. A hacked source save can store IVs far above 31
+      // (seen: 999 across all six -> ~2000 stats on a wave-199 ghost), which is restored
+      // verbatim into an unbeatable ghost. Legit IVs never exceed 31, so clamping is a
+      // no-op for honest teams and neutralizes the inflated ones.
+      enemy.ivs = member.ivs.map(iv => Math.max(0, Math.min(31, Math.floor(iv) || 0)));
     }
     enemy.nature = member.nature as Nature;
     enemy.gender = member.gender;

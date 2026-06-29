@@ -293,6 +293,11 @@ const MOVE_PATCHERS: ReadonlyMap<MoveId, (move: MutableMove) => void> = new Map(
       // ally. (Reported: "decorate on my ally damages my ally AND buffs them".)
       move.moveTarget = MoveTarget.NEAR_ENEMY;
       orFlag(move, MoveFlags.MAKES_CONTACT);
+      // Vanilla Decorate was an ally-buff flagged `.ignoresProtect()`. Now that it is a
+      // DAMAGING foe-move, that leftover IGNORE_PROTECT let it punch through the target's
+      // Protect (reported: "Decorate hit Sobble through Protect in doubles"). Clear it so
+      // Protect blocks Decorate like any other attack.
+      clearFlag(move, MoveFlags.IGNORE_PROTECT);
       removeAttrsByName(move, ["StatStageChangeAttr"]);
       // ER Decorate (dex #705): "Damages foes. Raises ALLIES' Attack, Special Attack,
       // and Crit by 2 stages." Apply the +2 Atk/SpAtk + the Focus-Energy CRIT_BOOST to
@@ -600,6 +605,26 @@ const MOVE_PATCHERS: ReadonlyMap<MoveId, (move: MutableMove) => void> = new Map(
       m.conditions.length = 0;
       m.conditionsSeq2.length = 0;
       m.conditionsSeq3.length = 0;
+    },
+  ],
+  // GEAR_UP: ER dex - a SELF buff ("The user rotates its gears, raising its SpAtk and
+  // sharply raising its Speed"), NOT the vanilla Plus/Minus team buff. The port still ran
+  // vanilla (raise Atk/SpAtk of Plus/Minus allies, fail if nobody has Plus/Minus), so on a
+  // normal mon it did nothing useful ("gear up isnt changed to er version"). Strip the
+  // Plus/Minus stat attr + the field-wide Plus/Minus gate, retarget to the user, and apply
+  // SpAtk +1 / Speed +2 to self. Two attrs (different magnitudes) added directly, since
+  // addAttrUnique would dedupe the second StatStageChangeAttr.
+  [
+    MoveId.GEAR_UP,
+    move => {
+      removeAttrsByName(move, ["StatStageChangeAttr"]);
+      const m = move as unknown as { conditions: unknown[]; conditionsSeq2: unknown[]; conditionsSeq3: unknown[] };
+      m.conditions.length = 0;
+      m.conditionsSeq2.length = 0;
+      m.conditionsSeq3.length = 0;
+      move.moveTarget = MoveTarget.USER;
+      move.addAttr(new StatStageChangeAttr([Stat.SPATK], 1, true));
+      move.addAttr(new StatStageChangeAttr([Stat.SPD], 2, true));
     },
   ],
   // PSYBEAM: lowers SpAtk on hit (chance patched separately).
@@ -1130,6 +1155,10 @@ function setCategory(move: MutableMove, category: MoveCategory): void {
 /** OR a {@linkcode MoveFlags} bit into the move's private `flags` bitmask. */
 function orFlag(move: MutableMove, flag: MoveFlags): void {
   move.flags |= flag;
+}
+
+function clearFlag(move: MutableMove, flag: MoveFlags): void {
+  move.flags &= ~flag;
 }
 
 /**
