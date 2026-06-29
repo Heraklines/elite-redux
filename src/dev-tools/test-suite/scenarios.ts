@@ -726,6 +726,43 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
   },
   // ===========================================================================
+  // Combat — Terapagos Terastallizes into its PERMANENT Primal form
+  // ===========================================================================
+  {
+    label: "Terapagos: Terastallize -> permanent Primal",
+    description:
+      "Terapagos 'Primal permanent' model. Terapagos used to do NOTHING on Tera\n"
+      + "(ER replaced its ability kit, so the vanilla Tera Shift -> Terastal/Stellar\n"
+      + "chain was dead). Now Terastallizing it morphs it PERMANENTLY into Terapagos\n"
+      + "PRIMAL, exactly like a mega/primal - it does NOT revert when Tera ends.\n"
+      + "\n"
+      + "DO: your Terapagos starts in its base Normal form. Pick the TERA command\n"
+      + "(the Tera Orb is provided) and attack with any move to Terastallize it.\n"
+      + "EXPECT: it transforms into Terapagos Primal (new sprite + name + stats/\n"
+      + "abilities). Win the battle (or check the next wave): it STAYS Primal - it\n"
+      + "never reverts to Normal. It also can't Tera again (it is now a Primal form).",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 80,
+        // Grant the Tera Orb (TerastallizeAccessModifier) so the TERA command is
+        // available in-battle - that is the player action that triggers the
+        // permanent base "" -> "primal" form change (TeraPhase -> tera trigger).
+        STARTING_MODIFIER_OVERRIDE: [{ name: "TERA_ORB" }],
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.SNORLAX,
+        ENEMY_LEVEL_OVERRIDE: 50,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+      });
+      return [
+        // Spawn in the BASE Normal form (formIndex 0). The Primal form is reached
+        // ONLY by Terastallizing in battle - not at summon (unlike spawn-in megas).
+        makeStarter(SpeciesId.TERAPAGOS, {
+          moveset: [MoveId.TERA_STARSTORM, MoveId.EARTH_POWER, MoveId.TRI_ATTACK, MoveId.CALM_MIND],
+        }),
+      ];
+    },
+  },
+  // ===========================================================================
   // UI — Redux Litwick line renders its own sprite (not Pansear)
   // ===========================================================================
   {

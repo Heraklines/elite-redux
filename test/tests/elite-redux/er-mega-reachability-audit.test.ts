@@ -35,6 +35,18 @@ const RUN = process.env.ER_SCENARIO === "1";
 /** Boss-only targets: deliberately NOT player-reachable (see #351). */
 const BOSS_ONLY = new Set(["primal@Cascoon"]);
 
+/**
+ * TERA-driven resting forms: reached through the Terastallize mechanic, NOT a
+ * held mega stone, so they intentionally have NO item-triggered edge / reward-
+ * pool stone. Their forward change is a `SpeciesFormChangeTeraTrigger` edge in
+ * `pokemon-forms.ts` (fired from `TeraPhase.end`); the generic mega-stone bridge
+ * skips them (see TERA_DRIVEN_FORM_SOURCES in init-elite-redux-form-changes.ts).
+ * Currently only Terapagos (base "" → "primal" on Terastallize, the maintainer's
+ * permanent-Primal model). The form must still EXIST (checked above) — only the
+ * item-edge requirement is waived.
+ */
+const TERA_DRIVEN = new Set(["primal@Terapagos"]);
+
 describe.skipIf(!RUN)("ER mega reachability audit (#359)", () => {
   let phaserGame: Phaser.Game;
   // biome-ignore lint/correctness/noUnusedVariables: side-effectful full init
@@ -75,6 +87,9 @@ describe.skipIf(!RUN)("ER mega reachability audit (#359)", () => {
       }
       if (BOSS_ONLY.has(label)) {
         continue; // deliberately unreachable by players
+      }
+      if (TERA_DRIVEN.has(label)) {
+        continue; // reached via the Tera mechanic, not a held stone (Terapagos → Primal)
       }
 
       // (b) an item-triggered form change is registered
@@ -131,13 +146,15 @@ describe.skipIf(!RUN)("ER mega reachability audit (#359)", () => {
         console.log(`${name}: ${list.join(" | ")}`);
       }
     }
-    // KNOWN EXCEPTIONS (#359 — fixed; floor must stay here):
-    //  - primal@Terapagos: ER's target is SPECIES_TERAPAGOS_STELLAR, which
-    //    vanilla pokerogue already models natively (Terastal/Stellar forms) —
-    //    injecting a duplicate "primal" form would recreate the #296
-    //    duplicate-form problem, so it is intentionally NOT injected.
-    // Everything else: 0 missing edges / 0 stone collisions (was 51 missing).
-    const KNOWN_MISSING_FORM = 1;
+    // KNOWN EXCEPTIONS (#359 — fixed):
+    //  - primal@Terapagos: the "primal" form IS injected (ER target id 1850,
+    //    Stellar-typed), but it is reached by the TERA mechanic, not a held
+    //    stone — so it has no item edge / reward-pool stone by design. It is
+    //    excluded from the item-edge check via TERA_DRIVEN above (the maintainer's
+    //    permanent-Primal model). Its forward edge is the
+    //    SpeciesFormChangeTeraTrigger edge in pokemon-forms.ts.
+    // Everything else: 0 missing forms / 0 missing edges / 0 stone collisions.
+    const KNOWN_MISSING_FORM = 0;
     const KNOWN_MISSING_EDGE = 0;
     expect(missingForm.length).toBeLessThanOrEqual(KNOWN_MISSING_FORM);
     expect(missingEdge.length).toBeLessThanOrEqual(KNOWN_MISSING_EDGE);

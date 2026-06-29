@@ -630,9 +630,24 @@ export const pokemonFormChanges: PokemonFormChanges = {
     new SpeciesFormChange(SpeciesId.OGERPON, "cornerstone-mask-tera", "cornerstone-mask", new SpeciesFormChangeLapseTeraTrigger(), true)
   ],
   [SpeciesId.TERAPAGOS]: [
-    new SpeciesFormChange(SpeciesId.TERAPAGOS, "", "terastal", new SpeciesFormChangeAbilityTrigger(), true),
-    new SpeciesFormChange(SpeciesId.TERAPAGOS, "terastal", "stellar", new SpeciesFormChangeTeraTrigger(), true),
-    new SpeciesFormChange(SpeciesId.TERAPAGOS, "stellar", "terastal", new SpeciesFormChangeLapseTeraTrigger(), true)
+    // Elite Redux "Primal permanent" model. Terapagos spawns in its base ""
+    // Normal form and morphs PERMANENTLY into its "primal" resting form (ER id
+    // 1850, injected by injectAllErMegaForms) the moment the player Terastallizes
+    // it — exactly like an ER mega/primal, it does NOT revert when Tera ends.
+    //
+    // The vanilla Stellar chain is deliberately dropped: its ""→"terastal" edge
+    // was driven by AbilityId.TERA_SHIFT's PostSummon trigger, but ER overwrote
+    // Terapagos's ability kit so Tera Shift is gone and that edge could never
+    // fire — which is why NONE of Terapagos's form changes happened. The
+    // "terastal"→"stellar"/"stellar"→"terastal" edges it fed are likewise dead.
+    //
+    // This single Tera-driven edge (fired from TeraPhase.end via
+    // SpeciesFormChangeTeraTrigger) is the ONE coherent path. There is
+    // deliberately NO lapse edge, so resetTera()'s SpeciesFormChangeLapseTeraTrigger
+    // finds nothing to revert and the Primal form is permanent. The generic ER
+    // mega-stone bridge skips Terapagos (see TERA_DRIVEN_FORM_SOURCES in
+    // init-elite-redux-form-changes.ts) so no dead held-item edge collides here.
+    new SpeciesFormChange(SpeciesId.TERAPAGOS, "", "primal", new SpeciesFormChangeTeraTrigger(), true)
   ],
   [SpeciesId.GALAR_DARMANITAN]: [
     new SpeciesFormChange(SpeciesId.GALAR_DARMANITAN, "", "zen", new SpeciesFormChangeAbilityTrigger(), true),
