@@ -31,6 +31,7 @@ import { EggHatchData } from "#data/egg-hatch-data";
 import { startLocalCoopSession } from "#data/elite-redux/coop/coop-runtime";
 import { bargainAbilityDescription } from "#data/elite-redux/er-bargain-sins";
 import { applyErBlackShinyKit } from "#data/elite-redux/er-black-shinies";
+import { buildDemoChallengesConfig } from "#data/elite-redux/er-community-challenges";
 import { recordErBiomeVisited } from "#data/elite-redux/er-map-nodes";
 import { STORMGLASS_WEATHER_CHOICES } from "#data/elite-redux/er-relics";
 import {
@@ -328,6 +329,24 @@ const RECIPES: Record<string, Recipe> = {
     // (tab switching + slider adjust) with no crash.
     steps: [Button.RIGHT, Button.RIGHT, Button.RIGHT, Button.DOWN, Button.DOWN, Button.RIGHT],
     diffTolerance: 180000, // animated exact FX advances during the six-step navigation tour
+  },
+  // ER Community Challenges (P1): the populated browser, the ZERO-at-launch empty
+  // state ("vacant standards"), and a directional-nav tour. Static (no live anim) -> exact diff.
+  "community-challenges": {
+    mode: UiMode.COMMUNITY_CHALLENGES,
+    prepare: () => [buildDemoChallengesConfig({ populated: true })],
+    diffTolerance: 0,
+  },
+  "community-challenges-empty": {
+    mode: UiMode.COMMUNITY_CHALLENGES,
+    prepare: () => [buildDemoChallengesConfig({ populated: false })],
+    diffTolerance: 0,
+  },
+  "community-challenges-nav": {
+    mode: UiMode.COMMUNITY_CHALLENGES,
+    prepare: () => [buildDemoChallengesConfig({ populated: true })],
+    steps: [Button.RIGHT, Button.RIGHT, Button.DOWN, Button.DOWN],
+    diffTolerance: 0,
   },
   "biome-shop": {
     mode: UiMode.BIOME_SHOP,

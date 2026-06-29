@@ -29,6 +29,8 @@ import { GameChallengesUiHandler } from "#ui/challenges-select-ui-handler";
 import { ChangePasswordFormUiHandler } from "#ui/change-password-form-ui-handler";
 import { ColosseumUiHandler } from "#ui/colosseum-ui-handler";
 import { CommandUiHandler } from "#ui/command-ui-handler";
+import { CommunityChallengeCreateUiHandler } from "#ui/community-challenge-create-ui-handler";
+import { CommunityChallengesUiHandler } from "#ui/community-challenges-ui-handler";
 import { ConfirmUiHandler } from "#ui/confirm-ui-handler";
 import { EggGachaUiHandler } from "#ui/egg-gacha-ui-handler";
 import { EggHatchSceneUiHandler } from "#ui/egg-hatch-scene-ui-handler";
@@ -220,6 +222,8 @@ export class UI extends Phaser.GameObjects.Container {
       new LearnMoveBatchUiHandler(),
       new ErBargainUiHandler(),
       new ErShinyLabUiHandler(),
+      new CommunityChallengesUiHandler(),
+      new CommunityChallengeCreateUiHandler(),
     ];
   }
 
@@ -377,10 +381,8 @@ export class UI extends Phaser.GameObjects.Container {
       phaseName === "MysteryEncounterPhase"
       || phaseName === "MysteryEncounterOptionSelectedPhase"
       || phaseName === "MysteryEncounterRewardsPhase"
-      || phaseName === "PostMysteryEncounterPhase" // ER quiz (#633 Fix #4b): the quiz answer is an interactive choice that must be relayed,
-      || // else each client answers independently -> different rewards. Route it through the same
-      // owner-drives / watcher-mirrors pump as the ME screens.
-      phaseName === "ErQuizPhase"
+      || phaseName === "PostMysteryEncounterPhase" // ER quiz (#633 Fix #4b): the quiz answer is an interactive choice that must be relayed, // else each client answers independently -> different rewards. Route it through the same // owner-drives / watcher-mirrors pump as the ME screens.
+      || phaseName === "ErQuizPhase"
     );
   }
 

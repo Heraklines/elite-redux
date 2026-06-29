@@ -66,4 +66,8 @@ export enum UiMode {
   ER_BARGAIN,
   /** ER Shiny Lab: the in-game special-form shiny designer (preview + effect browser). */
   ER_SHINY_LAB,
+  /** ER Community Challenges: browse/play community-authored challenge runs. */
+  COMMUNITY_CHALLENGES,
+  /** ER Community Challenges: the create-a-challenge designer. */
+  COMMUNITY_CHALLENGE_CREATE,
 }
