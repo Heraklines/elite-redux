@@ -156,7 +156,18 @@ export class TitlePhase extends Phase {
                 // Community is staging/dev-only for now (no backend deployed yet, the
                 // create flow is still being built); the browser degrades gracefully
                 // to an empty feed when the worker is unreachable.
-                if (isDev || isBeta || devToolsEnabled) {
+                if (!(isDev || isBeta || devToolsEnabled)) {
+                  setModeAndEnd(GameModes.CHALLENGE);
+                  return true;
+                }
+                // Opening a NESTED OPTION_SELECT (or any overlay) from inside an
+                // option handler must be DEFERRED: returning true here makes the
+                // current select clear() itself, which would clobber a synchronous
+                // setOverlayMode. setMode(MESSAGE)+resetModeChain()+showText(callback)
+                // is the proven pattern (mirrors the game-mode menu + the co-op lobby).
+                globalScene.ui.setMode(UiMode.MESSAGE);
+                globalScene.ui.resetModeChain();
+                globalScene.ui.showText("Select a challenge type.", null, () =>
                   globalScene.ui.setOverlayMode(UiMode.OPTION_SELECT, {
                     options: [
                       {
@@ -170,16 +181,26 @@ export class TitlePhase extends Phase {
                         label: "Community Challenges",
                         handler: () => {
                           // TODO(P1-A): swap the demo feed for fetchCommunityFeed() once the
-                          // /community/* worker routes are deployed.
-                          globalScene.ui.setOverlayMode(UiMode.COMMUNITY_CHALLENGES, buildDemoChallengesConfig());
+                          // /community/* worker routes are deployed. Defer the open the same way.
+                          globalScene.ui.setMode(UiMode.MESSAGE);
+                          globalScene.ui.resetModeChain();
+                          globalScene.ui.showText("", null, () =>
+                            globalScene.ui.setOverlayMode(UiMode.COMMUNITY_CHALLENGES, buildDemoChallengesConfig()),
+                          );
+                          return true;
+                        },
+                      },
+                      {
+                        label: i18next.t("menu:cancel"),
+                        handler: () => {
+                          globalScene.phaseManager.toTitleScreen();
+                          super.end();
                           return true;
                         },
                       },
                     ],
-                  });
-                } else {
-                  setModeAndEnd(GameModes.CHALLENGE);
-                }
+                  }),
+                );
                 return true;
               },
             });
