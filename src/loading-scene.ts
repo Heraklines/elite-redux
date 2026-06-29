@@ -272,6 +272,25 @@ export class LoadingScene extends SceneBase {
       .bitmapFont("item-count", "fonts/item-count.png", "fonts/item-count.xml")
       .video("evo_bg", "images/effects/evo_bg.mp4", true);
 
+    // ER (#7 "fainted Pokemon on the battlefield"): the Phaser video LOADER has no
+    // per-file crossOrigin argument, so the CDN-served (cross-origin) evo_bg
+    // <video> is tainted. When the evolution scene later uploads a frame as a
+    // WebGL texture, texImage2D throws an UNCAUGHT SecurityError ("the video
+    // element contains cross-origin data"); that aborts Phaser's render loop
+    // mid-frame, so the battlefield is left drawn in its pre-cleanup state - a
+    // just-fainted enemy stays visible while the game logic continues underneath.
+    // Bake crossOrigin "anonymous" into the cached entry once it loads, so every
+    // `add.video(.., "evo_bg")` (EvolutionPhase + the Weird Dream encounter)
+    // builds a CORS-clean element. jsDelivr sends Access-Control-Allow-Origin: *,
+    // so the texture is never tainted. Mirrors the intro video's existing
+    // loadURL(.., "anonymous") fix (see `intro.loadURL` below).
+    this.load.once(`${Phaser.Loader.Events.FILE_KEY_COMPLETE}video-evo_bg`, () => {
+      const evoBg = this.cache.video.get("evo_bg");
+      if (evoBg) {
+        evoBg.crossOrigin = "anonymous";
+      }
+    });
+
     // Get current lang and load the types atlas for it. English will only load types while all other languages will load types and types_<lang>
     const lang = i18next.resolvedLanguage ?? "en";
     const keySuffix = lang !== "en" && hasAllLocalizedSprites(lang) ? `_${lang}` : "";

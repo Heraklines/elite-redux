@@ -4388,6 +4388,71 @@ export const DEV_SCENARIOS: DevScenario[] = [
     shopItems: [modifierTypes.RARE_CANDY],
   },
   {
+    label: "(note) On-entry setup survives an on-entry flinch",
+    description:
+      "COMBAT note (hard to force live - flinch is a 30% roll + needs the flincher to\n"
+      + "move first). A Pokemon that SETS UP on switch-in via an ability - e.g. Air Blower\n"
+      + "casts Tailwind on entry - must NOT have that setup cancelled by an opponent's own\n"
+      + "on-switch-in flinch move (e.g. Jumpscare's Astonish). The self-buff cast used a\n"
+      + "MovePhase that the FLINCHED tag could cancel, so a faster on-entry flincher could\n"
+      + "wipe the Tailwind. Self-targeting on-entry casts now fire flinch-immune (the\n"
+      + "FOLLOW_UP use mode, like a called move); offensive on-entry casts are unchanged.\n"
+      + "Verified by er-entry-setup-flinch.test.ts (self -> FOLLOW_UP, offensive -> INDIRECT).",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({ STARTING_WAVE_OVERRIDE: 1, STARTING_LEVEL_OVERRIDE: 50, ABILITY_OVERRIDE: AbilityId.SAND_RUSH });
+      return [
+        makeStarter(SpeciesId.PELIPPER, {
+          moveset: [MoveId.HURRICANE, MoveId.HYDRO_PUMP, MoveId.ROOST, MoveId.TAILWIND],
+        }),
+      ];
+    },
+  },
+  {
+    label: "Evo bg video: no cross-origin crash (#7)",
+    description:
+      "#7 'fainted Pokemon on the battlefield'. The evolution scene's BACKGROUND is a\n"
+      + "video (evo_bg) served from the CDN. It was loaded WITHOUT crossOrigin, so the\n"
+      + "browser tainted the <video>; when the evolution animation uploaded a frame as a\n"
+      + "WebGL texture, texImage2D threw an UNCAUGHT SecurityError ('the video element\n"
+      + "contains cross-origin data'). That aborts the render loop mid-frame, and in this\n"
+      + "kind of DOUBLES TRAINER fight - where an enemy fainted right as the lead leveled\n"
+      + "up and evolved - the just-KO'd foe was left DRAWN on the field while the game\n"
+      + "logic continued underneath (the reported 'fainted Pokemon on the battlefield').\n"
+      + "Fix: the cached evo_bg now carries crossOrigin 'anonymous' (jsDelivr sends ACAO\n"
+      + "*), so the texture is never tainted.\n"
+      + "DO (must be on STAGING/PROD - it is served from the CDN): win the opening doubles\n"
+      + "trainer battle, then in the shop use the Rare Candy on Charmander (L15 -> L16) so\n"
+      + "it evolves to Charmeleon. WATCH the evolution scene's animated swirling\n"
+      + "BACKGROUND, then check the browser console (or hit Send Logs).\n"
+      + "EXPECT: the evolution plays WITH its animated video background and control\n"
+      + "returns cleanly; the console has NO 'texImage2D ... cross-origin data'\n"
+      + "SecurityError. Before the fix that error appeared and the background did not\n"
+      + "render. NOTE: only reproducible on the CDN build - locally the asset is\n"
+      + "same-origin, so the video was never cross-origin and never crashed; this is also\n"
+      + "why it can't be reproduced in the headless harnesses (WebGL/video/CORS).",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 15, // one Rare Candy -> L16 -> Charmander evolves to Charmeleon
+        STARTING_WAVE_OVERRIDE: 5,
+        BATTLE_TYPE_OVERRIDE: BattleType.TRAINER, // the reported doubles-trainer context
+        BATTLE_STYLE_OVERRIDE: "double",
+      });
+      return [
+        makeStarter(SpeciesId.CHARMANDER, {
+          moveset: [MoveId.EMBER, MoveId.DRAGON_BREATH, MoveId.SCRATCH, MoveId.SMOKESCREEN],
+        }),
+        // Sturdy partner so the doubles fight is winnable; Snorlax does not evolve,
+        // so the Rare Candy unambiguously belongs to Charmander.
+        makeStarter(SpeciesId.SNORLAX, {
+          moveset: [MoveId.BODY_SLAM, MoveId.CRUNCH, MoveId.EARTHQUAKE, MoveId.REST],
+        }),
+      ];
+    },
+    shopItems: [modifierTypes.RARE_CANDY],
+  },
+  {
     // The systematic "Redux X → normal evolved form" repro — BOTH shapes:
     //   • form-carry lines (Drilbur→Excadrill-Redux, Kadabra→Alakazam-Redux)
     //   • the LAST-STAGE / single-evo lines whose Redux evolution is a brand-new

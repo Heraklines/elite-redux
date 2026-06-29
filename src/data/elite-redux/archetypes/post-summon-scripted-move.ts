@@ -99,12 +99,22 @@ export class PostSummonScriptedMoveAbAttr extends PostSummonAbAttr {
     if (this.opts.oncePerBattleKey !== undefined) {
       pokemon.waveData.entryEffectsFired.add(this.opts.oncePerBattleKey);
     }
+    // Self-targeting on-entry SET-UP casts (Air Blower's Tailwind, Let's Roll's
+    // Defense Curl, …) must land regardless of flinch: they are ability-driven
+    // entry effects, not the holder's chosen turn-move, so an opponent's own
+    // on-entry flinch move (e.g. Jumpscare's Astonish, when it goes first) must NOT
+    // be able to cancel them. INDIRECT is NOT ignore-status, so its MovePhase runs
+    // firstFailureCheck()'s FLINCHED cancel; FOLLOW_UP IS ignore-status, skipping
+    // that pre-move cancellation while still applying the move's effect. Offensive
+    // on-entry casts keep INDIRECT (they target the foe; flinch on the holder may
+    // legitimately interrupt an attack).
+    const useMode = this.opts.targetsSelf ? MoveUseMode.FOLLOW_UP : MoveUseMode.INDIRECT;
     globalScene.phaseManager.unshiftNew(
       "MovePhase",
       pokemon,
       [targetIndex],
       scriptedPokemonMove(this.opts.moveId, this.opts.power, { nonReflectable: this.opts.nonReflectable ?? false }),
-      MoveUseMode.INDIRECT,
+      useMode,
     );
   }
 }
