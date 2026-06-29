@@ -43,6 +43,8 @@ const makeSampler = buf => (x, y) => {
   const i = (yi * FW + xi) * 4;
   return [buf[i], buf[i + 1], buf[i + 2], buf[i + 3]];
 };
+const isProtectedPalettePixel = (r, g, b, a) =>
+  a > 0.02 && ((protectBlack && Math.max(r, g, b) <= 0.06) || (protectWhite && Math.min(r, g, b) >= 0.94));
 const parseFrames = a =>
   a.textures ? a.textures[0].frames : Array.isArray(a.frames) ? a.frames : Object.values(a.frames);
 const loadImg = src =>
@@ -154,6 +156,7 @@ function renderLook(slots, buf, ef, dist, t, out, amt) {
     ? (x, y) => {
         const s = rawSa(x, y);
         if (s[3] <= 0.02) return s;
+        if (isProtectedPalettePixel(s[0], s[1], s[2], s[3])) return s;
         const c = PALETTE[pal](s[0], s[1], s[2], ctx);
         return [c[0], c[1], c[2], s[3]];
       }
@@ -198,8 +201,9 @@ function renderLook(slots, buf, ef, dist, t, out, amt) {
         const g = buf[i + 1];
         const b = buf[i + 2];
         let a = a0;
-        let col = pal ? PALETTE[pal](r, g, b, ctx) : [r, g, b];
-        if (pal) {
+        const protectedPal = pal && isProtectedPalettePixel(r, g, b, a0);
+        let col = pal && !protectedPal ? PALETTE[pal](r, g, b, ctx) : [r, g, b];
+        if (pal && !protectedPal) {
           a = a0 * (PALETTE_ALPHA[pal] ?? 1);
           if (amt.pal < 1) {
             col = [mix(r, col[0], amt.pal), mix(g, col[1], amt.pal), mix(b, col[2], amt.pal)];
@@ -323,6 +327,8 @@ let surfIntensity = 1;
 let aroIntensity = 1;
 let fxSeed = 0;
 let fxScale = 1;
+let protectBlack = false;
+let protectWhite = false;
 let fxColorMode = "default"; // default | palette | custom
 let fxCustomH = 0.92;
 let fxCustomS = 0.7;
@@ -364,6 +370,8 @@ function wireControls() {
   document.getElementById("int_around").addEventListener("input", e => (aroIntensity = +e.target.value));
   document.getElementById("seed").addEventListener("input", e => (fxSeed = +e.target.value));
   document.getElementById("texscale").addEventListener("input", e => (fxScale = +e.target.value));
+  document.getElementById("protectBlack").addEventListener("change", e => (protectBlack = e.target.checked));
+  document.getElementById("protectWhite").addEventListener("change", e => (protectWhite = e.target.checked));
   document.getElementById("seedRand").addEventListener("click", () => {
     fxSeed = Math.floor(Math.random() * 257);
     document.getElementById("seed").value = fxSeed;

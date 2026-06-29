@@ -57,6 +57,26 @@ describe.skipIf(!RUN)("ER Prismatic Fur — pre-hit resist swap in a real battle
   let phaserGame: Phaser.Game;
   let game: GameManager;
   const prismaticFurId = ER_ID_MAP.abilities[PRISMATIC_FUR_ER_ID] as AbilityId;
+  const immunityCases: {
+    label: string;
+    move: MoveId;
+    expectedType: PokemonType;
+    enemySpecies?: SpeciesId;
+  }[] = [
+    { label: "Normal -> Ghost", move: MoveId.TACKLE, expectedType: PokemonType.GHOST },
+    { label: "Fighting -> Ghost", move: MoveId.BRICK_BREAK, expectedType: PokemonType.GHOST },
+    { label: "Poison -> Steel", move: MoveId.POISON_JAB, expectedType: PokemonType.STEEL },
+    { label: "Ground -> Flying", move: MoveId.EARTHQUAKE, expectedType: PokemonType.FLYING },
+    { label: "Electric -> Ground", move: MoveId.THUNDERBOLT, expectedType: PokemonType.GROUND },
+    { label: "Psychic -> Dark", move: MoveId.CONFUSION, expectedType: PokemonType.DARK },
+    {
+      label: "Ghost -> Normal",
+      move: MoveId.LICK,
+      expectedType: PokemonType.NORMAL,
+      enemySpecies: SpeciesId.DROWZEE,
+    },
+    { label: "Dragon -> Fairy", move: MoveId.DRAGON_CLAW, expectedType: PokemonType.FAIRY },
+  ];
 
   beforeAll(() => {
     phaserGame = new Phaser.Game({ type: Phaser.HEADLESS });
@@ -69,6 +89,7 @@ describe.skipIf(!RUN)("ER Prismatic Fur — pre-hit resist swap in a real battle
       .enemySpecies(SpeciesId.RATTATA) // pure Normal holder
       .enemyAbility(prismaticFurId)
       .passiveAbility(AbilityId.NONE)
+      .enemyPassiveAbility(AbilityId.NONE)
       .enemyMoveset(MoveId.SPLASH)
       .enemyLevel(100)
       .startingLevel(100);
@@ -88,5 +109,37 @@ describe.skipIf(!RUN)("ER Prismatic Fur — pre-hit resist swap in a real battle
     expect(enemy.hp).toBe(maxHp);
     // And the holder is now (temporarily) the resisting type.
     expect(enemy.getTypes(true, true)).toContain(PokemonType.GHOST);
+  });
+
+  it.each(immunityCases)("chooses the immune type before damage for $label attacks", async ({
+    move,
+    expectedType,
+    enemySpecies,
+  }) => {
+    game.override.enemySpecies(enemySpecies ?? SpeciesId.RATTATA).moveset([move]);
+
+    await game.classicMode.startBattle([SpeciesId.SHUCKLE]);
+    const enemy = game.field.getEnemyPokemon();
+    const hpBefore = enemy.hp;
+
+    game.move.use(move);
+    await game.toEndOfTurn();
+
+    expect(enemy.hp).toBe(hpBefore);
+    expect(enemy.getTypes(true, true)).toContain(expectedType);
+  });
+
+  it("falls back to a resistant type when the incoming move has no immunity target", async () => {
+    game.override.enemyMoveset(MoveId.TAIL_WHIP).moveset([MoveId.FLAMETHROWER]);
+
+    await game.classicMode.startBattle([SpeciesId.SHUCKLE]);
+    const enemy = game.field.getEnemyPokemon();
+    const hpBefore = enemy.hp;
+
+    game.move.use(MoveId.FLAMETHROWER);
+    await game.toEndOfTurn();
+
+    expect(enemy.getTypes(true, true)).toContain(PokemonType.ROCK);
+    expect(enemy.hp).toBeLessThan(hpBefore);
   });
 });

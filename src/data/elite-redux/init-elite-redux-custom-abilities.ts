@@ -32,6 +32,7 @@
 import { type AbAttr, ConditionalCritAbAttr } from "#abilities/ab-attrs";
 import { AbBuilder, type Ability } from "#abilities/ability";
 import { allAbilities } from "#data/data-lists";
+import { ER_SILKEN_DECREE_ABILITY_ID, SilkenDecreeAbAttr } from "#data/elite-redux/abilities/silken-decree";
 import { dispatchArchetype } from "#data/elite-redux/archetype-dispatcher";
 import { ConditionalAlwaysHitAbAttr } from "#data/elite-redux/archetypes/conditional-always-hit";
 import { SpeedBonusToStatAbAttr } from "#data/elite-redux/archetypes/speed-bonus-to-stat";
@@ -190,6 +191,32 @@ export function initEliteReduxCustomAbilities(): InitEliteReduxCustomAbilitiesRe
     }
   }
 
+  const manualDrafts: { draft: ErAbilityDraft; pokerogueId: number }[] = [
+    {
+      draft: {
+        id: ER_SILKEN_DECREE_ABILITY_ID,
+        name: "Silken Decree",
+        description: "At the end of each turn, randomly seals up to two opposing moves for one turn.",
+        archetype: "unknown",
+      },
+      pokerogueId: ER_SILKEN_DECREE_ABILITY_ID,
+    },
+  ];
+  for (const { draft, pokerogueId } of manualDrafts) {
+    if (pokerogueId < VANILLA_ID_CUTOFF || existingIds.has(pokerogueId)) {
+      continue;
+    }
+    try {
+      const ability = buildCustomAbility(draft, pokerogueId, result);
+      (allAbilities as Ability[])[pokerogueId] = ability;
+      existingIds.add(pokerogueId);
+      result.customsAdded++;
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      result.errors.push(`Failed to construct manual ability "${draft.name}" (${pokerogueId}): ${msg}`);
+    }
+  }
+
   return result;
 }
 
@@ -338,6 +365,10 @@ function buildCustomAbility(
     // Speed Force — "Contact moves use 20% of its Speed stat additionally."
     // Adds 20% of the holder's Speed onto its Attack for contact moves.
     builder.attr(SpeedBonusToStatAbAttr, { stat: Stat.ATK, speedFraction: 0.2, filter: { contact: "only" } });
+  }
+
+  if (pokerogueId === ER_SILKEN_DECREE_ABILITY_ID) {
+    builder.attr(SilkenDecreeAbAttr);
   }
 
   const ability = builder.build();

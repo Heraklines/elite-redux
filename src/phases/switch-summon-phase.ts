@@ -3,6 +3,7 @@ import { globalScene } from "#app/global-scene";
 import { getPokemonNameWithAffix } from "#app/messages";
 import { SubstituteTag } from "#data/battler-tags";
 import { allMoves } from "#data/data-lists";
+import { erRecordAchievementSwitchIn } from "#data/elite-redux/er-achievement-tracker";
 import { type ErBondedCharmSnapshot, erBondedCharmApply, erBondedCharmSnapshot } from "#data/elite-redux/er-relics";
 import { SpeciesFormChangeActiveTrigger } from "#data/form-change-triggers";
 import { getPokeballTintColor } from "#data/pokeball";
@@ -135,6 +136,7 @@ export class SwitchSummonPhase extends SummonPhase {
     // prior to switching in a new Pokemon.
     // Force the switch to occur and load the assets for the new pokemon, ignoring override.
     switchedInPokemon.resetSummonData();
+    erRecordAchievementSwitchIn(switchedInPokemon);
     switchedInPokemon.loadAssets(true);
 
     // Even more defensive programming: Some callers will or will not make their users leave the field

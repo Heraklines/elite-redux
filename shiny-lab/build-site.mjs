@@ -90,7 +90,11 @@ ${css}
       <div class="row"><label class="ls">Surf amount</label><input id="int_surface" type="range" min="0" max="1" step="0.02" value="1"></div>
       <div class="row"><label class="la">Aura amount</label><input id="int_around" type="range" min="0" max="1" step="0.02" value="1"></div>
       <div class="row"><label>Seed</label><input id="seed" type="range" min="0" max="256" step="1" value="0"><button id="seedRand" class="mini" title="Randomize seed">&#127922;</button></div>
-      <div class="row"><label>Texture</label><input id="texscale" type="range" min="0.4" max="2" step="0.05" value="1"></div>
+      <div class="row"><label>Texture noise</label><input id="texscale" type="range" min="0.4" max="2" step="0.05" value="1"></div>
+      <div class="row"><label>Protect</label>
+        <label class="check"><input id="protectBlack" class="chk" type="checkbox">Black</label>
+        <label class="check"><input id="protectWhite" class="chk" type="checkbox">White</label>
+      </div>
       <div class="row"><label>FX color</label>
         <div class="seg" id="tintSeg"><button class="on" data-tint="default">Default</button><button data-tint="palette">Palette</button><button data-tint="custom">Custom</button></div>
         <input id="fxcolor" type="color" value="#ff66cc" class="colorin" style="display:none">

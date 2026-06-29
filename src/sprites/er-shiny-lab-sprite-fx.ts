@@ -8,6 +8,7 @@ import {
   type ErShinyLabParams,
   type ErShinyLabSavedLook,
   getErShinyLabOwnedSet,
+  isErShinyLabNameFxUnlocked,
   sanitizeErShinyLabLoadout,
 } from "#data/elite-redux/er-shiny-lab-effects";
 import {
@@ -363,7 +364,9 @@ export function getErShinyLabSpriteFxLookForSpecies(speciesId: number, shiny: bo
   if (!loadout.palette && !loadout.surface && !loadout.around) {
     return null;
   }
-  return { loadout, params: decodeErShinyLabParams(save.q) };
+  const params = decodeErShinyLabParams(save.q);
+  params.nameFx = params.nameFx && isErShinyLabNameFxUnlocked(save);
+  return { loadout, params };
 }
 
 export function getErShinyLabSpriteFxLookForPokemon(pokemon: {
@@ -416,6 +419,8 @@ export function erShinyLabSpriteFxStateKey(
     params.scale,
     params.seed,
     params.tintMode,
+    params.protectBlack ? 1 : 0,
+    params.protectWhite ? 1 : 0,
   ].join("|");
 }
 

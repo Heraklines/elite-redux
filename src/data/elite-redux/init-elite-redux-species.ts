@@ -326,16 +326,7 @@ export function initEliteReduxSpecies(): InitEliteReduxSpeciesResult {
       // form's innates (user report: "the special form for Sinistea doesn't
       // have any innates"). Inherit the base species' ER innates instead.
       let formPassives = rawFormPassives.every(a => a === AbilityId.NONE) ? passives : rawFormPassives;
-      // ER: Primal Cascoon (the Elite/Hell classic final-boss form) ships the plain
-      // Color Change innate, but ER intends the upgraded Prismatic Fur (Color Change
-      // + Protean + Fur Coat + Ice Scales). Swap just that one innate, gated tightly
-      // to Cascoon's "primal" form so no other species/form is touched.
-      if (species.speciesId === SpeciesId.CASCOON && form.formKey === "primal") {
-        const colorChange = mapAbilityId(16);
-        const prismaticFur = mapAbilityId(440);
-        const swap = (a: AbilityId): AbilityId => (a === colorChange ? prismaticFur : a);
-        formPassives = [swap(formPassives[0]), swap(formPassives[1]), swap(formPassives[2])];
-      }
+      formPassives = upgradePrimalCascoonPassives(species.speciesId, form.formKey, formPassives);
       form.setPassives(formPassives);
 
       // Mega forms have their own stat lines and type assignments in ER
@@ -588,11 +579,13 @@ function injectMissingErMegaForms(
     // Wire the 3-passive override (PokemonForm extends PokemonSpeciesForm so
     // setPassives is available). Stats / types are already set via constructor;
     // setActiveAbilities is redundant but harmless if called.
-    form.setPassives([
-      mapAbilityId(formDraft.innates[0]),
-      mapAbilityId(formDraft.innates[1]),
-      mapAbilityId(formDraft.innates[2]),
-    ]);
+    form.setPassives(
+      upgradePrimalCascoonPassives(species.speciesId, form.formKey, [
+        mapAbilityId(formDraft.innates[0]),
+        mapAbilityId(formDraft.innates[1]),
+        mapAbilityId(formDraft.innates[2]),
+      ]),
+    );
     // PokemonForm-private fields (speciesId, formIndex, generation) are
     // assigned by the PokemonSpecies constructor's `forms.forEach` block —
     // since we're pushing after construction, we set them here.
@@ -658,6 +651,24 @@ function mapAbilityId(erAbilityId: number): AbilityId {
     return AbilityId.NONE;
   }
   return mapped as AbilityId;
+}
+
+function upgradePrimalCascoonPassives(
+  speciesId: SpeciesId,
+  formKey: string,
+  passives: readonly [AbilityId, AbilityId, AbilityId],
+): readonly [AbilityId, AbilityId, AbilityId] {
+  // ER: Primal Cascoon (the Elite/Hell classic final-boss form) ships the plain
+  // Color Change innate, but ER intends the upgraded Prismatic Fur (Color Change
+  // + Protean + Fur Coat + Ice Scales). Swap just that one innate, gated tightly
+  // to Cascoon's "primal" form so no other species/form is touched. This helper
+  // is used by both existing-form and injected-form paths.
+  if (speciesId !== SpeciesId.CASCOON || formKey !== "primal") {
+    return passives;
+  }
+  const prismaticFur = mapAbilityId(440);
+  const swap = (abilityId: AbilityId): AbilityId => (abilityId === AbilityId.COLOR_CHANGE ? prismaticFur : abilityId);
+  return [swap(passives[0]), swap(passives[1]), swap(passives[2])];
 }
 
 /**
@@ -804,11 +815,13 @@ export function injectAllErMegaForms(): InjectErMegaFormsResult {
       false, // isStarterSelectable
       false, // isUnobtainable
     );
-    form.setPassives([
-      mapAbilityId(targetDraft.innates[0]),
-      mapAbilityId(targetDraft.innates[1]),
-      mapAbilityId(targetDraft.innates[2]),
-    ]);
+    form.setPassives(
+      upgradePrimalCascoonPassives(species.speciesId, form.formKey, [
+        mapAbilityId(targetDraft.innates[0]),
+        mapAbilityId(targetDraft.innates[1]),
+        mapAbilityId(targetDraft.innates[2]),
+      ]),
+    );
     const formMut = form as unknown as { speciesId: number; formIndex: number; generation: number };
     formMut.speciesId = species.speciesId;
     formMut.formIndex = species.forms.length;

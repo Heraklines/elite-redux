@@ -476,6 +476,83 @@ export class DisabledTag extends MoveRestrictionBattlerTag {
 }
 
 /**
+ * Silken Decree's one-turn random move seal. It intentionally differs from
+ * vanilla Disable: the sealed moves are chosen from the target's current usable
+ * moveset, up to two moves, but never enough to leave the target with no move.
+ */
+export class ErSilkenDecreeTag extends MoveRestrictionBattlerTag {
+  public override readonly tagType = BattlerTagType.ER_SILKEN_DECREE;
+  public readonly moveIds: MoveId[] = [];
+
+  constructor(sourceId: number) {
+    super(
+      BattlerTagType.ER_SILKEN_DECREE,
+      [BattlerTagLapseType.PRE_MOVE, BattlerTagLapseType.TURN_END],
+      1,
+      undefined,
+      sourceId,
+    );
+  }
+
+  override canAdd(pokemon: Pokemon): boolean {
+    return this.getCandidateMoves(pokemon).length > 1;
+  }
+
+  override onAdd(pokemon: Pokemon): void {
+    super.onAdd(pokemon);
+    this.rollSealedMoves(pokemon);
+  }
+
+  override onOverlap(pokemon: Pokemon): void {
+    super.onOverlap(pokemon);
+    this.turnCount = 1;
+    this.rollSealedMoves(pokemon);
+  }
+
+  override isMoveRestricted(move: MoveId): boolean {
+    return this.moveIds.includes(move);
+  }
+
+  override selectionDeniedText(_pokemon: Pokemon, move: MoveId): string {
+    return i18next.t("battle:moveDisabled", { moveName: allMoves[move].name });
+  }
+
+  override interruptedText(pokemon: Pokemon, move: MoveId): string {
+    return i18next.t("battle:disableInterruptedMove", {
+      pokemonNameWithAffix: getPokemonNameWithAffix(pokemon),
+      moveName: allMoves[move].name,
+    });
+  }
+
+  public override loadTag(source: BaseBattlerTag & Pick<ErSilkenDecreeTag, "tagType" | "moveIds">): void {
+    super.loadTag(source);
+    (this as Mutable<this>).moveIds = [...source.moveIds];
+  }
+
+  private getCandidateMoves(pokemon: Pokemon): MoveId[] {
+    return [
+      ...new Set(
+        pokemon
+          .getMoveset()
+          .filter(move => move.moveId !== MoveId.NONE && !move.isOutOfPp())
+          .map(move => move.moveId),
+      ),
+    ];
+  }
+
+  private rollSealedMoves(pokemon: Pokemon): void {
+    const pool = this.getCandidateMoves(pokemon);
+    const sealCount = Math.min(2, Math.max(0, pool.length - 1));
+    const chosen: MoveId[] = [];
+    for (let i = 0; i < sealCount; i++) {
+      const index = pokemon.randBattleSeedInt(pool.length);
+      chosen.push(pool.splice(index, 1)[0]);
+    }
+    (this as Mutable<this>).moveIds = chosen;
+  }
+}
+
+/**
  * Tag used by Gorilla Tactics to restrict the user to using only one move.
  *
  * @sealed
@@ -4252,6 +4329,8 @@ export function getBattlerTag(
       return new ErFearTag();
     case BattlerTagType.ER_ITEM_DISABLED:
       return new ErItemDisabledTag(turnCount || 3);
+    case BattlerTagType.ER_SILKEN_DECREE:
+      return new ErSilkenDecreeTag(sourceId);
     case BattlerTagType.ER_ICE_STATUE:
       return new ErIceStatueTag();
   }
@@ -4392,6 +4471,7 @@ export type BattlerTagTypeMap = {
   [BattlerTagType.ER_FROSTBITE]: ErFrostbiteTag;
   [BattlerTagType.ER_FEAR]: ErFearTag;
   [BattlerTagType.ER_ITEM_DISABLED]: ErItemDisabledTag;
+  [BattlerTagType.ER_SILKEN_DECREE]: ErSilkenDecreeTag;
   [BattlerTagType.ER_ICE_STATUE]: ErIceStatueTag;
 };
 

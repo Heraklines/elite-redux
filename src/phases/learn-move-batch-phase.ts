@@ -1,6 +1,7 @@
 import { globalScene } from "#app/global-scene";
 import { initMoveAnim, loadMoveAnimAssets } from "#data/battle-anims";
 import { allMoves } from "#data/data-lists";
+import { erRecordAchievementLearnMove } from "#data/elite-redux/er-achievement-tracker";
 import { SpeciesFormChangeMoveLearnedTrigger } from "#data/form-change-triggers";
 import { MoveId } from "#enums/move-id";
 import { UiMode } from "#enums/ui-mode";
@@ -110,6 +111,7 @@ export class LearnMoveBatchPhase extends PlayerPartyMemberPokemonPhase {
         // Silent write - no banner, just place the move. Mirrors the data half of
         // LearnMovePhase.learnMove (setMove + load the move's animation assets).
         pokemon.setMove(slotIndex, moveId);
+        erRecordAchievementLearnMove(pokemon, moveId);
         learnedIds.push(moveId);
         initMoveAnim(moveId).then(() => loadMoveAnimAssets([moveId], true));
       },

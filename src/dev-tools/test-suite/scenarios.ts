@@ -3214,7 +3214,8 @@ export const DEV_SCENARIOS: DevScenario[] = [
       + "EXPECT: Cascoon TRANSFORMS into Primal Cascoon with a FRESH full health bar and\n"
       + "keeps fighting (Angel's Wrath kit) - it must NOT just drop to 0 / the victory\n"
       + "screen. Open the boss Summary/Abilities: its innate must read PRISMATIC FUR (not\n"
-      + "Color Change). If phase 2 STILL dies instantly, hit Send Logs - that capture\n"
+      + "Color Change) and it must actually act bulky from Prismatic Fur's pre-hit resist\n"
+      + "swap + damage-halving kit. If phase 2 STILL dies instantly, hit Send Logs - that capture\n"
       + "pins the exact phase ordering so the death can be fixed.",
     setup: () => {
       resetDevOverrides();
@@ -5261,7 +5262,8 @@ export const DEV_SCENARIOS: DevScenario[] = [
       + "BLACK SHINY form (real generated black sprite + smoke, black sparkle).\n"
       + "Wave 200 on HELL with a REAL winning hell team (by 'unstressing',\n"
       + "ghost pool). DO: break stage 1's boss bars.  EXPECT: stage 2 turns\n"
-      + "BLACK, with a gift ability on top of Angel's Wrath. ALSO (#380): open\n"
+      + "BLACK, returns to FULL HP / five boss bars, and has a gift ability on\n"
+      + "top of Angel's Wrath. ALSO (#380): open\n"
       + "Battle Info -> Moves on the boss in BOTH stages - it carries the FULL\n"
       + "7-move Angel's Wrath kit (compressed list), and the AI actually uses\n"
       + "the spread (hazards, omniboost, King's Shield, traps...).",

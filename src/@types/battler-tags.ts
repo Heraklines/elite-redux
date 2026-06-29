@@ -15,6 +15,7 @@ export type MoveRestrictionBattlerTagType =
   | BattlerTagType.HEAL_BLOCK
   | BattlerTagType.ENCORE
   | BattlerTagType.DISABLED
+  | BattlerTagType.ER_SILKEN_DECREE
   | BattlerTagType.GORILLA_TACTICS;
 
 /**

@@ -485,6 +485,28 @@ export function getAchievementDescription(localizationKey: string): string {
       return i18next.t("achv:exorcist.description", { context: genderStr });
     case "primalCascoon":
       return i18next.t("achv:primalCascoon.description", { context: genderStr });
+    case "beamSpam":
+    case "goodChip":
+    case "backInBlood":
+    case "shieldBreak":
+    case "cccCombo":
+    case "gear5":
+    case "metalSlime":
+    case "jurassicEnd":
+    case "heedingTheWarning":
+    case "megaflare":
+    case "yo":
+    case "weaveNationCertified":
+    case "critMattered":
+    case "autoCounter":
+    case "snakesOnAPlane":
+    case "believeIt":
+    case "holdIt":
+    case "chainReaction":
+    case "iJustGotHere":
+    case "sorryForTheWait":
+    case "hollowWickerBasket":
+      return i18next.t(`achv:${localizationKey}.description`, { context: genderStr });
     case "relicHunter":
       return i18next.t("achv:relicHunter.description", { context: genderStr });
     case "allShinyTiers":
@@ -1053,6 +1075,27 @@ export const achvs = {
   DEVILS_BARGAIN: new Achv("devilsBargain", "devilsBargain.description", "soul_dew", 50),
   EXORCIST: new Achv("exorcist", "exorcist.description", "ghost_gem", 75),
   PRIMAL_CASCOON: new Achv("primalCascoon", "primalCascoon.description", "shed_shell", 100),
+  BEAM_SPAM: new Achv("beamSpam", "beamSpam.description", "lucky_punch", 50),
+  GOOD_CHIP: new Achv("goodChip", "goodChip.description", "toxic_orb", 50),
+  BACK_IN_BLOOD: new Achv("backInBlood", "backInBlood.description", "ability_charm", 50),
+  SHIELD_BREAK: new Achv("shieldBreak", "shieldBreak.description", "brick", 50),
+  CCC_COMBO: new Achv("cccCombo", "cccCombo.description", "multi_lens", 50),
+  GEAR_5: new Achv("gear5", "gear5.description", "mega_bracelet", 50),
+  METAL_SLIME: new Achv("metalSlime", "metalSlime.description", "metal_coat", 50),
+  JURASSIC_END: new Achv("jurassicEnd", "jurassicEnd.description", "old_amber", 50),
+  HEEDING_THE_WARNING: new Achv("heedingTheWarning", "heedingTheWarning.description", "pb_gold", 50),
+  MEGAFLARE: new Achv("megaflare", "megaflare.description", "tm_dragon", 50),
+  YO: new Achv("yo", "yo.description", "pb_gold", 50),
+  WEAVE_NATION_CERTIFIED: new Achv("weaveNationCertified", "weaveNationCertified.description", "bright_powder", 50),
+  CRIT_MATTERED: new Achv("critMattered", "critMattered.description", "scope_lens", 50),
+  AUTO_COUNTER: new Achv("autoCounter", "autoCounter.description", "focus_band", 50),
+  SNAKES_ON_A_PLANE: new Achv("snakesOnAPlane", "snakesOnAPlane.description", "ribbon_flying", 75),
+  BELIEVE_IT: new Achv("believeIt", "believeIt.description", "fire_stone", 50),
+  HOLD_IT: new Achv("holdIt", "holdIt.description", "protective_pads", 50),
+  CHAIN_REACTION: new Achv("chainReaction", "chainReaction.description", "linking_cord", 50),
+  I_JUST_GOT_HERE: new Achv("iJustGotHere", "iJustGotHere.description", "eject_button", 50),
+  SORRY_FOR_THE_WAIT: new Achv("sorryForTheWait", "sorryForTheWait.description", "power_herb", 75),
+  HOLLOW_WICKER_BASKET: new Achv("hollowWickerBasket", "hollowWickerBasket.description", "trick_room", 50),
   RELIC_HUNTER: new Achv(
     "relicHunter",
     "relicHunter.description",

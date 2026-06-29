@@ -2,7 +2,12 @@ import { timedEventManager } from "#app/global-event-manager";
 import { globalScene } from "#app/global-scene";
 import { modifierTypes } from "#data/data-lists";
 import { coopLog } from "#data/elite-redux/coop/coop-debug";
-import { broadcastCoopWaveResolved, getCoopController, isCoopAuthoritativeGuest } from "#data/elite-redux/coop/coop-runtime";
+import {
+  broadcastCoopWaveResolved,
+  getCoopController,
+  isCoopAuthoritativeGuest,
+} from "#data/elite-redux/coop/coop-runtime";
+import { erRecordAchievementWaveWon } from "#data/elite-redux/er-achievement-tracker";
 import { erBiomeOverstay } from "#data/elite-redux/er-biome-notoriety";
 import { erBiomeRoutingActive } from "#data/elite-redux/er-biome-routing";
 import { erShouldRaiseCrossroads } from "#data/elite-redux/er-biome-structure";
@@ -54,7 +59,15 @@ export class VictoryPhase extends PokemonPhase {
     // KNOWN RESIDUAL (cosmetic): the guest no longer animates the exp bar / "grew to Lv. N" / level-up
     // move-learn prompt. State is still correct (the deltas carry exp/level/moveset); the host streams
     // narration via the event channel. Consistent with the authoritative renderer model.
-    if (!isCoopAuthoritativeGuest()) {
+    if (isCoopAuthoritativeGuest()) {
+      // Co-op authoritative GUEST: SKIP local exp computation (it would diverge - different
+      // participantIds, one VictoryPhase/wave vs the host's one/faint). The settled per-slot
+      // exp/level/moveset arrives on `expResolved` and is applied in the guest's BattleEndPhase.
+      coopLog(
+        "progression",
+        `GUEST applyPartyExp SKIP wave=${globalScene.currentBattle.waveIndex} koMon=${this.getPokemon().name} (awaiting host expResolved)`,
+      );
+    } else {
       const expValue = this.getPokemon().getExpValue();
       // Co-op authoritative HOST (and solo/lockstep): we COMPUTE exp locally and stream the settled
       // per-slot result. Log on co-op only (solo/lockstep skip silently) so the host's exp computation
@@ -66,14 +79,6 @@ export class VictoryPhase extends PokemonPhase {
         );
       }
       globalScene.applyPartyExp(expValue, true);
-    } else {
-      // Co-op authoritative GUEST: SKIP local exp computation (it would diverge - different
-      // participantIds, one VictoryPhase/wave vs the host's one/faint). The settled per-slot
-      // exp/level/moveset arrives on `expResolved` and is applied in the guest's BattleEndPhase.
-      coopLog(
-        "progression",
-        `GUEST applyPartyExp SKIP wave=${globalScene.currentBattle.waveIndex} koMon=${this.getPokemon().name} (awaiting host expResolved)`,
-      );
     }
 
     if (isMysteryEncounter) {
@@ -93,6 +98,7 @@ export class VictoryPhase extends PokemonPhase {
       // wave forever). Hard no-op for solo / non-host / lockstep. Emitted BEFORE the host queues
       // its own BattleEnd -> rewards -> biome -> NewBattle tail (the order is irrelevant to the
       // guest - it carries the wave number, guarded against a double-advance on the guest side).
+      erRecordAchievementWaveWon();
       broadcastCoopWaveResolved("win");
 
       const isTrainerWin = globalScene.currentBattle.battleType === BattleType.TRAINER;

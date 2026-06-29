@@ -269,6 +269,16 @@ header p {
   flex: none;
   color: var(--ink);
 }
+.row .check {
+  width: auto;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--dim);
+}
+.row .check input {
+  margin: 0;
+}
 input[type="range"] {
   flex: 1;
   accent-color: var(--pal);

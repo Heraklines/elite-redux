@@ -4,6 +4,10 @@ import { getPokemonNameWithAffix } from "#app/messages";
 import { allMoves } from "#data/data-lists";
 import { classicFinalBossDialogue } from "#data/dialogue";
 import { isCoopRecording, withCoopMessageRecordingSuppressed } from "#data/elite-redux/coop/coop-turn-recorder";
+import {
+  erRecordAchievementEnemyFaint,
+  erRecordAchievementPlayerFaint,
+} from "#data/elite-redux/er-achievement-tracker";
 import { erBalanceNum } from "#data/elite-redux/er-balance-tuning";
 import { getErBiomeRule } from "#data/elite-redux/er-biome-rules";
 import { recordErStreakFaint } from "#data/elite-redux/er-money-streak";
@@ -99,6 +103,7 @@ export class FaintPhase extends PokemonPhase {
     // Track total times pokemon have been KO'd for Last Respects/Supreme Overlord
     if (pokemon.isPlayer()) {
       globalScene.arena.playerFaints += 1;
+      erRecordAchievementPlayerFaint();
       // ER Slum (#439 §3): the den - every ALLY that faints in a TRAINER battle
       // costs you a slice of your money (2% of the current purse). Trainer battles
       // only (a wild faint is free); gated on the biome rule so it only bites here.
@@ -130,6 +135,7 @@ export class FaintPhase extends PokemonPhase {
       });
     } else {
       globalScene.currentBattle.enemyFaints += 1;
+      erRecordAchievementEnemyFaint(pokemon);
       // ER relics (#439): Momentum Engine - each enemy KO grants the active player
       // mon +1 Speed stage (resets each battle). No-op unless the relic is held.
       erMomentumEngineOnEnemyKo();

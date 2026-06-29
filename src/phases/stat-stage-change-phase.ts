@@ -5,6 +5,7 @@ import { handleTutorial, Tutorial } from "#app/tutorial";
 import type { ArenaTag } from "#data/arena-tag";
 import { OctolockTag } from "#data/battler-tags";
 import { isCoopRecording, recordCoopEvent } from "#data/elite-redux/coop/coop-turn-recorder";
+import { erRecordAchievementStatStage } from "#data/elite-redux/er-achievement-tracker";
 import { getErBiomeRule } from "#data/elite-redux/er-biome-rules";
 import { ArenaTagSide } from "#enums/arena-tag-side";
 import { ArenaTagType } from "#enums/arena-tag-type";
@@ -236,6 +237,7 @@ export class StatStageChangePhase extends PokemonPhase {
         }
 
         pokemon.setStatStage(s, pokemon.getStatStage(s) + stages.value);
+        erRecordAchievementStatStage(pokemon, s as Stat);
 
         // Co-op host turn recorder (#633, TRACK-2 Phase B - animation layer): record the NEW absolute
         // stage as a structured `statStage` event so the AUTHORITATIVE guest plays the stat tween +

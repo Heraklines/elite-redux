@@ -39,6 +39,7 @@ import {
   type ErShinyLabCategory,
   type ErShinyLabSavedLook,
   getErShinyLabOwnedSet,
+  isErShinyLabNameFxUnlocked,
   normalizeErShinyLabSavedLook,
   sanitizeErShinyLabLoadout,
 } from "#data/elite-redux/er-shiny-lab-effects";
@@ -473,7 +474,9 @@ function serializeShinyLabLook(p: any): ErShinyLabSavedLook | undefined {
   if (!loadout.palette && !loadout.surface && !loadout.around) {
     return undefined;
   }
-  return normalizeErShinyLabSavedLook(encodeErShinyLabPreset({ loadout, params: decodeErShinyLabParams(save.q) }));
+  const params = decodeErShinyLabParams(save.q);
+  params.nameFx = params.nameFx && isErShinyLabNameFxUnlocked(save);
+  return normalizeErShinyLabSavedLook(encodeErShinyLabPreset({ loadout, params }));
 }
 
 /** Serialise a member's held items as [modifierTypeId, stackCount] pairs, or [] when

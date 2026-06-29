@@ -15,12 +15,16 @@
 // Gated behind ER_SCENARIO=1.
 // =============================================================================
 
+import { ER_SILKEN_DECREE_ABILITY_ID } from "#data/elite-redux/abilities/silken-decree";
+import { getErActiveGiftAbilityId } from "#data/elite-redux/er-black-shinies";
 import { getErFinalBossSpecies, isErFinalBossSpecies } from "#data/elite-redux/er-final-boss";
 import { setErDifficulty } from "#data/elite-redux/er-run-difficulty";
 import { pokemonFormChanges } from "#data/pokemon-forms";
 import { SpeciesFormChangeManualTrigger } from "#data/pokemon-forms/form-change-triggers";
 import { AbilityId } from "#enums/ability-id";
+import { ErAbilityId } from "#enums/er-ability-id";
 import { MoveId } from "#enums/move-id";
+import { PokemonType } from "#enums/pokemon-type";
 import { SpeciesFormKey } from "#enums/species-form-key";
 import { SpeciesId } from "#enums/species-id";
 import { GameManager } from "#test/framework/game-manager";
@@ -96,7 +100,7 @@ describe.skipIf(!RUN)("ER final boss: Primal Cascoon survives the stage-2 transf
       .ability(AbilityId.BALL_FETCH)
       .enemyAbility(AbilityId.BALL_FETCH)
       .enemyMoveset(MoveId.SPLASH)
-      .moveset(MoveId.SPLASH);
+      .moveset([MoveId.SPLASH, MoveId.BRICK_BREAK]);
   });
 
   afterEach(() => {
@@ -132,5 +136,84 @@ describe.skipIf(!RUN)("ER final boss: Primal Cascoon survives the stage-2 transf
     // end-of-turn effects; the point is it is nowhere near the death sliver.
     expect(cascoon.formIndex).toBe(1); // primal
     expect(cascoon.hp).toBeGreaterThan(cascoon.getMaxHp() * 0.8);
+  });
+
+  test("Primal Cascoon keeps its ER finale innates active, including Prismatic Fur", async () => {
+    setErDifficulty("elite");
+    await game.classicMode.startBattle(SpeciesId.MAGIKARP);
+    const scene = game.scene;
+    const cascoon = game.field.getEnemyPokemon();
+
+    vi.spyOn(scene.currentBattle, "isClassicFinalBoss", "get").mockReturnValue(true);
+    cascoon.hp = 1;
+    expect(scene.triggerPokemonFormChange(cascoon, SpeciesFormChangeManualTrigger, false)).toBe(true);
+
+    game.move.select(MoveId.SPLASH);
+    await game.phaseInterceptor.to("TurnEndPhase");
+
+    expect(cascoon.formIndex).toBe(1);
+    expect(cascoon.hasPassive()).toBe(true);
+    expect(cascoon.getPassiveAbilities().map(a => a?.name)).toContain("Prismatic Fur");
+    expect(cascoon.hasAbility(ErAbilityId.PRISMATIC_FUR as AbilityId)).toBe(true);
+    expect(cascoon.hasAbilityWithAttr("PreHitResistTypeChangeAbAttr")).toBe(true);
+    expect(cascoon.hasAbilityWithAttr("ReceivedMoveDamageMultiplierAbAttr")).toBe(true);
+
+    const hpBeforeBrickBreak = cascoon.hp;
+    game.move.use(MoveId.BRICK_BREAK);
+    await game.toEndOfTurn();
+
+    expect(cascoon.hp).toBe(hpBeforeBrickBreak);
+    expect(cascoon.getTypes(true, true)).toContain(PokemonType.GHOST);
+  });
+
+  test("boss passive access is not suppressed on non-final boss waves", async () => {
+    setErDifficulty("hell");
+    await game.classicMode.startBattle(SpeciesId.MAGIKARP);
+    const scene = game.scene;
+    const cascoon = game.field.getEnemyPokemon();
+
+    vi.spyOn(scene.currentBattle, "isClassicFinalBoss", "get").mockReturnValue(false);
+    vi.spyOn(scene.gameMode, "isEndlessMinorBoss").mockReturnValue(true);
+    vi.spyOn(scene.gameMode, "isEndlessMajorBoss").mockReturnValue(false);
+    cascoon.formIndex = 1;
+    cascoon.updateScale();
+    cascoon.setBoss();
+
+    expect(cascoon.getPassiveAbilities().map(a => a?.name)).toContain("Prismatic Fur");
+    expect(cascoon.hasPassive()).toBe(true);
+    expect(cascoon.hasAbility(ErAbilityId.PRISMATIC_FUR as AbilityId)).toBe(true);
+  });
+
+  test("Hell Primal Cascoon black-shiny phase two heals to full and activates its gift ability", async () => {
+    setErDifficulty("hell");
+    await game.classicMode.startBattle(SpeciesId.MAGIKARP);
+    const scene = game.scene;
+    const cascoon = game.field.getEnemyPokemon();
+
+    vi.spyOn(scene.currentBattle, "isClassicFinalBoss", "get").mockReturnValue(true);
+    cascoon.formIndex = 1; // Hell finale starts as Primal Cascoon.
+    cascoon.updateScale();
+    cascoon.setBoss();
+    cascoon.hp = 1;
+    cascoon.bossSegments = 5;
+    cascoon.bossSegmentIndex = 0;
+
+    scene.initFinalBossPhaseTwo(cascoon);
+
+    expect(cascoon.customPokemonData.erBlackShiny).toBe(true);
+    expect(cascoon.customPokemonData.erGiftAbilities).toHaveLength(3);
+    const giftAbility = getErActiveGiftAbilityId(cascoon);
+    if (giftAbility == null) {
+      expect.fail("black-shiny Primal Cascoon should have an active gift ability");
+    }
+    expect(giftAbility).toBe(ER_SILKEN_DECREE_ABILITY_ID);
+    expect(cascoon.getPassiveAbilities().some(a => a?.id === giftAbility)).toBe(true);
+    expect(cascoon.hasAbility(giftAbility as AbilityId)).toBe(true);
+
+    await game.phaseInterceptor.to("PokemonHealPhase");
+
+    expect(cascoon.hp).toBe(cascoon.getMaxHp());
+    expect(cascoon.bossSegments).toBe(5);
+    expect(cascoon.bossSegmentIndex).toBe(4);
   });
 });

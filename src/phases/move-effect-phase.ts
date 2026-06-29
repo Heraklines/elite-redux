@@ -13,6 +13,10 @@ import {
   bypassesOpponentMultiHitSuppression,
   suppressesOpponentDamageBoosts,
 } from "#data/elite-redux/archetypes/post-defend-suppress-opponent-damage-boost";
+import {
+  erRecordAchievementMoveDamage,
+  erRecordAchievementMoveResolution,
+} from "#data/elite-redux/er-achievement-tracker";
 import { erApplyCommunityOnHitItems } from "#data/elite-redux/er-community-items";
 import { erApplyReactiveOnHit } from "#data/elite-redux/er-reactive-items";
 import { applyErLifeOrbRecoil, applyErRockyHelmet } from "#data/elite-redux/er-recreated-items";
@@ -217,6 +221,7 @@ export class MoveEffectPhase extends PokemonPhase {
 
     this.firstHit = user.turnData.hitCount === user.turnData.hitsLeft;
     this.lastHit = user.turnData.hitsLeft === 1 || !targets.some(t => t.isActive(true));
+    erRecordAchievementMoveResolution(user, move, targets, this.hitChecks, this.useMode, this.firstHit);
 
     // Play the animation if the move was successful against any of its targets or it has a POST_TARGET effect (like self destruct)
     if (
@@ -740,6 +745,7 @@ export class MoveEffectPhase extends PokemonPhase {
     }
 
     const isOneHitKo = result === HitResult.ONE_HIT_KO;
+    const targetHpBefore = target.hp;
     target.lapseTags(BattlerTagLapseType.HIT);
 
     const substitute = target.getTag(SubstituteTag);
@@ -805,6 +811,8 @@ export class MoveEffectPhase extends PokemonPhase {
     if (user.isPlayer() && target.isEnemy()) {
       globalScene.applyModifiers(DamageMoneyRewardModifier, true, user, new NumberHolder(finalDmg));
     }
+
+    erRecordAchievementMoveDamage(user, target, this.move, this.useMode, finalDmg, isCritical, targetHpBefore);
 
     return [result, finalDmg, isCritical];
   }

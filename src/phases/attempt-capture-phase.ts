@@ -5,6 +5,7 @@ import { IS_TEST, isBeta, isDev } from "#constants/app-constants";
 import { SubstituteTag } from "#data/battler-tags";
 import { broadcastCoopWaveResolved } from "#data/elite-redux/coop/coop-runtime";
 import { coopAttributeNewMon } from "#data/elite-redux/coop/coop-session";
+import { erRecordAchievementCatch } from "#data/elite-redux/er-achievement-tracker";
 import { erCollectorsAlbumRecordCatch } from "#data/elite-redux/er-relics";
 import { Gender } from "#data/gender";
 import {
@@ -249,6 +250,7 @@ export class AttemptCapturePhase extends PokemonPhase {
     // unique-species tally and, on every Nth new species, grant a candy trickle
     // for that species line (no-op unless the relic is held).
     erCollectorsAlbumRecordCatch(pokemon.species.getRootSpeciesId(true));
+    erRecordAchievementCatch(pokemon);
 
     const speciesForm = pokemon.fusionSpecies ? pokemon.getFusionSpeciesForm() : pokemon.getSpeciesForm();
 

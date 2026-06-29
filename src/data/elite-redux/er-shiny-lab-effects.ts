@@ -40,6 +40,9 @@ export interface ErShinyLabParams {
   scale: number;
   seed: number;
   tintMode: number;
+  protectBlack: boolean;
+  protectWhite: boolean;
+  nameFx: boolean;
 }
 
 export interface ErShinyLabPreset {
@@ -73,17 +76,23 @@ export interface ErShinyLabConfig {
   params: ErShinyLabParams;
   presets: (ErShinyLabPreset | null)[];
   completion?: ErShinyLabCompletion;
+  nameFxUnlocked?: boolean;
+  nameFxCost?: number;
   seedRerollCost?: number;
   seedRerollTokens?: number;
   onChange?: (loadout: ErShinyLabLoadout, params: ErShinyLabParams) => void;
   onBuy?: (category: ErShinyLabCategory, effect: ErShinyLabEffect) => void;
+  onBuyNameFx?: () => boolean;
   onRerollSeed?: (params: ErShinyLabParams) => ErShinyLabParams | null;
   onExit?: () => void;
 }
 
 export type ErShinyLabSavedLoadout = [number, number, number];
-export type ErShinyLabSavedParams = [number, number, number, number, number, number];
+export type ErShinyLabSavedParams = [number, number, number, number, number, number, number, number, number];
 export type ErShinyLabSavedPreset = [
+  number,
+  number,
+  number,
   number,
   number,
   number,
@@ -107,14 +116,16 @@ export interface ErShinyLabSaveData {
   o?: ErShinyLabOwnedBitsets;
   /** Equipped effect indexes, 0 means none and N means registry index N - 1. */
   l?: ErShinyLabSavedLoadout;
-  /** Byte-quantized params: pal, surface, aura, scale, seed, tintMode. */
+  /** Byte-quantized params: pal, surface, aura, scale, seed, tintMode, protectBlack, protectWhite, nameFx. */
   q?: ErShinyLabSavedParams;
-  /** Five preset slots: loadout indexes followed by six quantized params. */
+  /** Five preset slots: loadout indexes followed by nine quantized params. */
   r?: (ErShinyLabSavedPreset | null)[];
   /** Per-species seed reroll tokens. */
   t?: number;
   /** Claimed completion rewards bitfield: palette, surface, around, all. */
   c?: number;
+  /** Per-species Shiny Lab feature unlock flags. */
+  f?: number;
 }
 
 export const ER_SHINY_LAB_CATEGORIES = ["palette", "surface", "around"] as const;
@@ -144,9 +155,14 @@ export const ER_SHINY_LAB_DEFAULT_PARAMS: ErShinyLabParams = {
   scale: 1,
   seed: 0,
   tintMode: 0,
+  protectBlack: false,
+  protectWhite: false,
+  nameFx: false,
 };
 
 export const ER_SHINY_LAB_SEED_REROLL_CANDY_COST = 25;
+export const ER_SHINY_LAB_NAME_FX_CANDY_COST = 300;
+const ER_SHINY_LAB_FEATURE_NAME_FX = 1 << 0;
 
 export const ER_SHINY_LAB_WILD_CATEGORY_ROLL_PCT: Record<ErShinyLabCategory, number> = {
   palette: 40,
@@ -708,6 +724,14 @@ export function getErShinyLabOwnedSet(
   return set;
 }
 
+export function isErShinyLabNameFxUnlocked(save: ErShinyLabSaveData | undefined): boolean {
+  return !!((save?.f ?? 0) & ER_SHINY_LAB_FEATURE_NAME_FX);
+}
+
+export function unlockErShinyLabNameFx(save: ErShinyLabSaveData): void {
+  save.f = (save.f ?? 0) | ER_SHINY_LAB_FEATURE_NAME_FX;
+}
+
 export function bitsetToErShinyLabAvailableSet(bits: readonly number[] | undefined): Set<string> {
   const set = new Set<string>();
   const bytes = normalizeErShinyLabBitset(bits);
@@ -766,6 +790,9 @@ export function encodeErShinyLabParams(params: ErShinyLabParams): ErShinyLabSave
     byte(((params.scale - 0.4) / 1.6) * 255),
     byte(params.seed),
     byte(params.tintMode),
+    byte(params.protectBlack ? 1 : 0),
+    byte(params.protectWhite ? 1 : 0),
+    byte(params.nameFx ? 1 : 0),
   ];
 }
 
@@ -780,13 +807,29 @@ export function decodeErShinyLabParams(saved: readonly number[] | undefined): Er
     scale: 0.4 + (byte(saved[3] ?? 96) / 255) * 1.6,
     seed: byte(saved[4] ?? 0),
     tintMode: byte(saved[5] ?? 0),
+    protectBlack: byte(saved[6] ?? 0) > 0,
+    protectWhite: byte(saved[7] ?? 0) > 0,
+    nameFx: byte(saved[8] ?? 0) > 0,
   };
 }
 
 export function encodeErShinyLabPreset(preset: ErShinyLabPreset): ErShinyLabSavedPreset {
   const loadout = encodeErShinyLabLoadout(preset.loadout);
   const params = encodeErShinyLabParams(preset.params);
-  return [loadout[0], loadout[1], loadout[2], params[0], params[1], params[2], params[3], params[4], params[5]];
+  return [
+    loadout[0],
+    loadout[1],
+    loadout[2],
+    params[0],
+    params[1],
+    params[2],
+    params[3],
+    params[4],
+    params[5],
+    params[6],
+    params[7],
+    params[8],
+  ];
 }
 
 export function decodeErShinyLabPreset(saved: readonly number[] | null | undefined): ErShinyLabPreset | null {
@@ -795,7 +838,7 @@ export function decodeErShinyLabPreset(saved: readonly number[] | null | undefin
   }
   return {
     loadout: decodeErShinyLabLoadout(saved.slice(0, 3)),
-    params: decodeErShinyLabParams(saved.slice(3, 9)),
+    params: decodeErShinyLabParams(saved.slice(3, 12)),
   };
 }
 
@@ -815,6 +858,9 @@ export function normalizeErShinyLabSavedLook(
     byte(saved[6] ?? 96),
     byte(saved[7] ?? 0),
     byte(saved[8] ?? 0),
+    byte(saved[9] ?? 0),
+    byte(saved[10] ?? 0),
+    byte(saved[11] ?? 0),
   ];
   const loadout = decodeErShinyLabLoadout(normalized);
   return loadout.palette || loadout.surface || loadout.around ? normalized : undefined;
@@ -1066,6 +1112,10 @@ export function mergeErShinyLabSaveData(
   const completionClaims = byte((target.c ?? 0) | (source.c ?? 0));
   if (completionClaims > 0) {
     target.c = completionClaims;
+  }
+  const featureFlags = byte((target.f ?? 0) | (source.f ?? 0));
+  if (featureFlags > 0) {
+    target.f = featureFlags;
   }
   const sourcePresets = source.r ?? [];
   if (sourcePresets.length) {

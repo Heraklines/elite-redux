@@ -122,6 +122,16 @@ function amountsFromParams(params: ErShinyLabParams): RenderAmounts {
   };
 }
 
+function isProtectedPalettePixel(r: number, g: number, b: number, a: number, params: ErShinyLabParams): boolean {
+  if (a <= 0.02) {
+    return false;
+  }
+  return (
+    (!!params.protectBlack && Math.max(r, g, b) <= 0.06)
+    || (!!params.protectWhite && Math.min(r, g, b) >= 0.94)
+  );
+}
+
 function resolvePaletteTint(
   paletteId: string | null,
   ctx: FxContext,
@@ -190,6 +200,9 @@ export function renderErShinyLabLook(
         if (s[3] <= 0.02) {
           return s;
         }
+        if (isProtectedPalettePixel(s[0], s[1], s[2], s[3], params)) {
+          return s;
+        }
         const c = PALETTE[pal](s[0], s[1], s[2], ctx);
         return [c[0], c[1], c[2], s[3]];
       }
@@ -216,8 +229,9 @@ export function renderErShinyLabLook(
         const g = buf[i + 1];
         const b = buf[i + 2];
         let a = a0;
-        let col = pal ? PALETTE[pal](r, g, b, ctx) : [r, g, b];
-        if (pal) {
+        const protectPalettePixel = pal && isProtectedPalettePixel(r, g, b, a0, params);
+        let col = pal && !protectPalettePixel ? PALETTE[pal](r, g, b, ctx) : [r, g, b];
+        if (pal && !protectPalettePixel) {
           a = a0 * (PALETTE_ALPHA[pal] ?? 1);
           if (amounts.pal < 1) {
             col = [mix(r, col[0], amounts.pal), mix(g, col[1], amounts.pal), mix(b, col[2], amounts.pal)];

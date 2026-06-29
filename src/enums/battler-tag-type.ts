@@ -111,6 +111,12 @@ export enum BattlerTagType {
    */
   ER_ITEM_DISABLED = "ER_ITEM_DISABLED",
   /**
+   * Silken Decree's one-turn random move seal. Unlike vanilla Disable, this can
+   * seal multiple selected moves and expires after the affected Pokemon's next
+   * turn.
+   */
+  ER_SILKEN_DECREE = "ER_SILKEN_DECREE",
+  /**
    * ER Ice Statue (applied by Hollow Ice Zone's Ice-type moves). The holder's
    * typing becomes pure Ice, but — unlike a real Ice-type — it gains NO
    * resistances (any incoming type multiplier below 1 is treated as neutral)

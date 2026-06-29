@@ -8,6 +8,7 @@ import {
   encodeErShinyLabPreset,
   ER_SHINY_LAB_CATEGORIES,
   ER_SHINY_LAB_EFFECTS_BY_CATEGORY,
+  ER_SHINY_LAB_NAME_FX_CANDY_COST,
   ER_SHINY_LAB_SEED_REROLL_CANDY_COST,
   erShinyLabAvailableSetToBitset,
   type ErShinyLabCategory,
@@ -22,10 +23,12 @@ import {
   getErShinyLabEffectCost,
   getErShinyLabCompletion,
   getErShinyLabOwnedSet,
+  isErShinyLabNameFxUnlocked,
   normalizeErShinyLabPresets,
   sanitizeErShinyLabLoadout,
   setErShinyLabOwnedBit,
   spendErShinyLabSeedRerollToken,
+  unlockErShinyLabNameFx,
 } from "#data/elite-redux/er-shiny-lab-effects";
 import type { StarterDataEntry } from "#types/save-data";
 import { randSeedInt } from "#utils/common";
@@ -98,6 +101,15 @@ function applyPricedEffects(config: ErShinyLabConfig): void {
   }
 }
 
+function sanitizeParams(params: ErShinyLabParams, earnedTier: number, nameFxUnlocked: boolean): ErShinyLabParams {
+  return {
+    ...params,
+    protectBlack: !!params.protectBlack,
+    protectWhite: !!params.protectWhite,
+    nameFx: earnedTier >= 3 && nameFxUnlocked && !!params.nameFx,
+  };
+}
+
 function persistConfig(
   entry: StarterDataEntry,
   config: ErShinyLabConfig,
@@ -107,8 +119,17 @@ function persistConfig(
   const save = ensureShinyLabSave(entry);
   const owned = config.owned;
   save.l = encodeErShinyLabLoadout(sanitizeErShinyLabLoadout(loadout, owned));
-  save.q = encodeErShinyLabParams(params);
-  save.r = config.presets.map(p => (p ? encodeErShinyLabPreset(p) : null)).slice(0, 5);
+  save.q = encodeErShinyLabParams(sanitizeParams(params, config.earnedTier, !!config.nameFxUnlocked));
+  save.r = config.presets
+    .map(p =>
+      p
+        ? encodeErShinyLabPreset({
+            ...p,
+            params: sanitizeParams(p.params, config.earnedTier, !!config.nameFxUnlocked),
+          })
+        : null,
+    )
+    .slice(0, 5);
   saveSystem();
 }
 
@@ -128,7 +149,8 @@ export function buildErShinyLabConfig(speciesId: number): ErShinyLabConfig {
   };
 
   const equipped = sanitizeErShinyLabLoadout(decodeErShinyLabLoadout(save.l), owned);
-  const params = decodeErShinyLabParams(save.q);
+  const nameFxUnlocked = isErShinyLabNameFxUnlocked(save);
+  const params = sanitizeParams(decodeErShinyLabParams(save.q), earnedTier, nameFxUnlocked);
   const config: ErShinyLabConfig = {
     speciesId,
     speciesName: species.name,
@@ -141,6 +163,8 @@ export function buildErShinyLabConfig(speciesId: number): ErShinyLabConfig {
     params,
     presets: normalizeErShinyLabPresets(save.r),
     completion: getErShinyLabCompletion(save),
+    nameFxUnlocked,
+    nameFxCost: ER_SHINY_LAB_NAME_FX_CANDY_COST,
     seedRerollCost: ER_SHINY_LAB_SEED_REROLL_CANDY_COST,
     seedRerollTokens: save.t ?? 0,
   };
@@ -162,8 +186,20 @@ export function buildErShinyLabConfig(speciesId: number): ErShinyLabConfig {
   };
   config.onChange = (loadout, nextParams) => {
     config.equipped = sanitizeErShinyLabLoadout(loadout, config.owned);
-    config.params = { ...nextParams };
+    config.params = sanitizeParams(nextParams, config.earnedTier, !!config.nameFxUnlocked);
     persistConfig(entry, config, config.equipped, config.params);
+  };
+  config.onBuyNameFx = () => {
+    if (config.earnedTier < 3 || config.nameFxUnlocked || entry.candyCount < ER_SHINY_LAB_NAME_FX_CANDY_COST) {
+      return false;
+    }
+    entry.candyCount = Math.max(0, entry.candyCount - ER_SHINY_LAB_NAME_FX_CANDY_COST);
+    unlockErShinyLabNameFx(save);
+    config.nameFxUnlocked = true;
+    config.candy = entry.candyCount;
+    config.params = sanitizeParams({ ...config.params, nameFx: true }, config.earnedTier, true);
+    persistConfig(entry, config, config.equipped, config.params);
+    return true;
   };
   config.onRerollSeed = currentParams => {
     if (!spendErShinyLabSeedRerollToken(save)) {
@@ -172,7 +208,11 @@ export function buildErShinyLabConfig(speciesId: number): ErShinyLabConfig {
       }
       entry.candyCount = Math.max(0, entry.candyCount - ER_SHINY_LAB_SEED_REROLL_CANDY_COST);
     }
-    const nextParams = { ...currentParams, seed: randSeedInt(256) };
+    const nextParams = sanitizeParams(
+      { ...currentParams, seed: randSeedInt(256) },
+      config.earnedTier,
+      !!config.nameFxUnlocked,
+    );
     config.candy = entry.candyCount;
     config.seedRerollTokens = save.t ?? 0;
     config.params = nextParams;

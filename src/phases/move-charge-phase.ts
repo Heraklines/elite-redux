@@ -1,5 +1,6 @@
 import { globalScene } from "#app/global-scene";
 import { MoveChargeAnim } from "#data/battle-anims";
+import { erRecordAchievementChargeMove } from "#data/elite-redux/er-achievement-tracker";
 import { erTryConsumePowerHerb } from "#data/elite-redux/er-community-items";
 import type { AbilityId } from "#enums/ability-id";
 import type { BattlerIndex } from "#enums/battler-index";
@@ -86,6 +87,7 @@ export class MoveChargePhase extends PokemonPhase {
     if (!instantCharge.value && user?.hasAbility(ErAbilityId.ACCELERATE as unknown as AbilityId)) {
       instantCharge.value = true;
     }
+    erRecordAchievementChargeMove(user, move.id, instantCharge.value);
 
     // If instantly charging, remove the pending MoveEndPhase and queue a new MovePhase for the "attack" portion of the move.
     // Otherwise, add the attack portion to the user's move queue to execute next turn.

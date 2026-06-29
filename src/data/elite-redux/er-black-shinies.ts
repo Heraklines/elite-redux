@@ -167,6 +167,15 @@ export function getErActiveGiftAbilityId(pokemon: Pokemon): number | null {
   return data.erGiftAbilities[idx] ?? null;
 }
 
+/** Force a black shiny's active gift slot to a specific ability while preserving two backups. */
+export function pinErBlackShinyGiftAbility(pokemon: Pokemon, abilityId: number): void {
+  applyErBlackShinyKit(pokemon);
+  const data = pokemon.customPokemonData;
+  const remaining = (data.erGiftAbilities ?? []).filter(id => id !== abilityId);
+  data.erGiftAbilities = [abilityId, ...remaining].slice(0, 3);
+  data.erGiftIndex = 0;
+}
+
 /** Cycle the gift slot to the next of its 3 choices; returns the new id. */
 export function cycleErGiftAbility(pokemon: Pokemon): number | null {
   const data = pokemon.customPokemonData;

@@ -48,6 +48,7 @@ import {
   type ErShinyLabParams,
   type ErShinyLabPreset,
   type ErShinyLabRarity,
+  getErShinyLabNameSignature,
   resolveErShinyLabEffectState,
 } from "#data/elite-redux/er-shiny-lab-effects";
 import {
@@ -82,7 +83,17 @@ type EffectState = ErShinyLabEffectState;
 type Tab = ErShinyLabCategory | "tune";
 
 /** A row in the TUNE panel. */
-type TuneRow = "palAmt" | "surfAmt" | "aroAmt" | "scale" | "seed" | "load" | "save";
+type TuneRow =
+  | "palAmt"
+  | "surfAmt"
+  | "aroAmt"
+  | "scale"
+  | "protectBlack"
+  | "protectWhite"
+  | "nameFx"
+  | "seed"
+  | "load"
+  | "save";
 type PreviewPixels = ErShinyLabSourcePixels;
 
 const CATEGORIES: ErShinyLabCategory[] = ["palette", "surface", "around"];
@@ -154,7 +165,21 @@ const DETAIL_W = RIGHT_W;
 const DETAIL_H = 31;
 const HINT_Y = 173;
 // TUNE panel geometry: a label, a segmented bar, and a right-aligned value per row.
-const TUNE_ROWS: TuneRow[] = ["palAmt", "surfAmt", "aroAmt", "scale", "seed", "load", "save"];
+const TUNE_ROWS: TuneRow[] = [
+  "palAmt",
+  "surfAmt",
+  "aroAmt",
+  "scale",
+  "protectBlack",
+  "protectWhite",
+  "nameFx",
+  "seed",
+  "load",
+  "save",
+];
+const TUNE_ROW_Y0 = ROW_Y0 + 1;
+const TUNE_ROW_STEP = 10;
+const TUNE_CURSOR_H = 10;
 const TUNE_BAR_X = ROW_X + 60;
 const TUNE_BAR_SEGMENTS = 12;
 const TUNE_SEG_W = 6;
@@ -834,6 +859,7 @@ export class ErShinyLabUiHandler extends UiHandler {
   }
 
   private placeCursor(slot: number): void {
+    this.cursorObj.setDisplaySize(LIST_W - 12, ROW_STEP);
     this.cursorObj.setPosition(LIST_X + 6, ROW_Y0 + slot * ROW_STEP);
     this.cursorObj.setVisible(true);
   }
@@ -844,6 +870,16 @@ export class ErShinyLabUiHandler extends UiHandler {
       return;
     }
     this.placeCursor(this.cursor - this.scrollTop);
+  }
+
+  private tuneRowY(slot: number): number {
+    return TUNE_ROW_Y0 + slot * TUNE_ROW_STEP;
+  }
+
+  private placeTuneCursor(): void {
+    this.cursorObj.setDisplaySize(LIST_W - 12, TUNE_CURSOR_H);
+    this.cursorObj.setPosition(LIST_X + 6, this.tuneRowY(this.tuneCursor));
+    this.cursorObj.setVisible(true);
   }
 
   private refreshEffectDetail(): void {
@@ -911,6 +947,7 @@ export class ErShinyLabUiHandler extends UiHandler {
       surface: surfEff?.id ?? null,
       around: aroEff?.id ?? null,
     };
+    this.refreshNameFxPreview(loadout);
     if (this.refreshExactPreview(loadout, cfg.params)) {
       this.hideApproxPreview();
       return;
@@ -920,6 +957,12 @@ export class ErShinyLabUiHandler extends UiHandler {
     this.refreshPreviewSpritePalette(palId);
     this.refreshPreviewSurface(surfEff, cfg.params);
     this.refreshPreviewAura(aroEff, cfg.params);
+  }
+
+  private refreshNameFxPreview(loadout: ErShinyLabLoadout): void {
+    const cfg = this.config;
+    const signature = cfg && cfg.earnedTier >= 3 && cfg.params.nameFx ? getErShinyLabNameSignature(loadout) : null;
+    this.nameText.setColor(signature?.color ?? INK);
   }
 
   private refreshPreviewSurface(effect: ErShinyLabEffect | null | undefined, params: ErShinyLabParams): void {
@@ -1046,6 +1089,12 @@ export class ErShinyLabUiHandler extends UiHandler {
         return "Aura";
       case "scale":
         return "Texture";
+      case "protectBlack":
+        return "Black";
+      case "protectWhite":
+        return "White";
+      case "nameFx":
+        return "Name FX";
       case "seed":
         return "Seed";
       case "load":
@@ -1068,6 +1117,15 @@ export class ErShinyLabUiHandler extends UiHandler {
         return `${Math.round(this.tuneFraction(row) * 100)}%`;
       case "scale":
         return `${p.scale.toFixed(1)}x`;
+      case "protectBlack":
+        return p.protectBlack ? "ON" : "OFF";
+      case "protectWhite":
+        return p.protectWhite ? "ON" : "OFF";
+      case "nameFx":
+        if (cfg.earnedTier < 3) {
+          return "T3+";
+        }
+        return cfg.nameFxUnlocked ? (p.nameFx ? "ON" : "OFF") : `x${cfg.nameFxCost ?? 300}`;
       case "seed":
         return String(p.seed).padStart(3, "0");
       case "load": {
@@ -1081,7 +1139,7 @@ export class ErShinyLabUiHandler extends UiHandler {
 
   private presetLabel(cfg: ErShinyLabConfig, preset: ErShinyLabPreset): string {
     const pal = preset.loadout.palette ? cfg.effects.palette.find(e => e.id === preset.loadout.palette)?.label : null;
-    return pal ?? "set";
+    return pal && pal.length > 9 ? `${pal.slice(0, 8)}...` : (pal ?? "set");
   }
 
   /** True for rows that draw a segmented intensity bar. */
@@ -1097,9 +1155,9 @@ export class ErShinyLabUiHandler extends UiHandler {
     }
     for (let i = 0; i < TUNE_ROWS.length; i++) {
       const row = TUNE_ROWS[i];
-      const y = ROW_Y0 + i * ROW_STEP;
+      const y = this.tuneRowY(i);
       const sel = this.tuneCursor === i;
-      const label = addTextObject(ROW_X, y, this.tuneLabel(row), TextStyle.WINDOW, { fontSize: "44px" });
+      const label = addTextObject(ROW_X, y, this.tuneLabel(row), TextStyle.WINDOW, { fontSize: "36px" });
       label.setOrigin(0, 0.5).setColor(sel ? "#eef4ff" : DIM);
       this.tuneContent.add(label);
 
@@ -1121,13 +1179,13 @@ export class ErShinyLabUiHandler extends UiHandler {
       }
 
       const value = addTextObject(TUNE_VALUE_X, y, this.tuneValueText(row), TextStyle.WINDOW, {
-        fontSize: "40px",
+        fontSize: row === "load" ? "30px" : "34px",
         align: "right",
       });
       value.setOrigin(1, 0.5).setColor(sel ? GOLD : "#9aa3b8");
       this.tuneContent.add(value);
     }
-    this.placeCursor(this.tuneCursor);
+    this.placeTuneCursor();
     this.refreshTuneDetail();
   }
 
@@ -1144,7 +1202,21 @@ export class ErShinyLabUiHandler extends UiHandler {
         help = "Layer strength.  Left/Right adjust, A reset";
         break;
       case "scale":
-        help = "Effect texture scale.  Left/Right adjust, A reset";
+        help = "Noise scale. Left/Right adjust, A reset";
+        break;
+      case "protectBlack":
+        help = "Keep black outlines. L/R or A toggle";
+        break;
+      case "protectWhite":
+        help = "Keep white highlights. L/R or A toggle";
+        break;
+      case "nameFx":
+        help =
+          cfg && cfg.earnedTier >= 3
+            ? cfg.nameFxUnlocked
+              ? "Battle nameplate FX. L/R or A toggle"
+              : `Unlock battle name FX for x${cfg.nameFxCost ?? 300}.`
+            : "Requires tier 3 shiny.";
         break;
       case "seed":
         help =
@@ -1315,6 +1387,19 @@ export class ErShinyLabUiHandler extends UiHandler {
       case "scale":
         p.scale = clamp(round2(p.scale + dir * 0.1), 0.4, 2);
         break;
+      case "protectBlack":
+        p.protectBlack = !p.protectBlack;
+        break;
+      case "protectWhite":
+        p.protectWhite = !p.protectWhite;
+        break;
+      case "nameFx":
+        if (!this.toggleNameFx()) {
+          return;
+        }
+        globalScene.ui.playSelect();
+        this.refreshTune();
+        return;
       case "seed":
         p.seed = (p.seed + dir + 256) % 256;
         break;
@@ -1327,7 +1412,7 @@ export class ErShinyLabUiHandler extends UiHandler {
     }
     globalScene.ui.playSelect();
     this.refreshTune();
-    if (this.isSliderRow(row) || row === "seed") {
+    if (this.isSliderRow(row) || row === "seed" || row === "protectBlack" || row === "protectWhite") {
       cfg.onChange?.({ ...cfg.equipped }, { ...p });
       this.refreshPreview();
     }
@@ -1340,7 +1425,17 @@ export class ErShinyLabUiHandler extends UiHandler {
       return;
     }
     const row = TUNE_ROWS[this.tuneCursor];
-    const def: ErShinyLabParams = { palAmt: 1, surfAmt: 1, aroAmt: 1, scale: 1, seed: 0, tintMode: 0 };
+    const def: ErShinyLabParams = {
+      palAmt: 1,
+      surfAmt: 1,
+      aroAmt: 1,
+      scale: 1,
+      seed: 0,
+      tintMode: 0,
+      protectBlack: false,
+      protectWhite: false,
+      nameFx: false,
+    };
     switch (row) {
       case "palAmt":
       case "surfAmt":
@@ -1349,6 +1444,21 @@ export class ErShinyLabUiHandler extends UiHandler {
         p[row] = def[row];
         cfg.onChange?.({ ...cfg.equipped }, { ...p });
         this.refreshPreview();
+        break;
+      case "protectBlack":
+        p.protectBlack = !p.protectBlack;
+        cfg.onChange?.({ ...cfg.equipped }, { ...p });
+        this.refreshPreview();
+        break;
+      case "protectWhite":
+        p.protectWhite = !p.protectWhite;
+        cfg.onChange?.({ ...cfg.equipped }, { ...p });
+        this.refreshPreview();
+        break;
+      case "nameFx":
+        if (!this.toggleNameFx()) {
+          return;
+        }
         break;
       case "seed":
         if (cfg.onRerollSeed) {
@@ -1386,6 +1496,34 @@ export class ErShinyLabUiHandler extends UiHandler {
     this.refreshTune();
   }
 
+  private toggleNameFx(): boolean {
+    const cfg = this.config;
+    if (!cfg) {
+      return false;
+    }
+    if (cfg.earnedTier < 3) {
+      globalScene.ui.playError();
+      this.refreshTune();
+      return false;
+    }
+    if (!cfg.nameFxUnlocked) {
+      if (!cfg.onBuyNameFx?.()) {
+        globalScene.ui.playError();
+        this.refreshTune();
+        return false;
+      }
+      this.candyText.setText(String(cfg.candy));
+      this.repositionCandyIcon();
+      globalScene.playSound("se/buy");
+      this.refreshPreview();
+      return true;
+    }
+    cfg.params.nameFx = !cfg.params.nameFx;
+    cfg.onChange?.({ ...cfg.equipped }, { ...cfg.params });
+    this.refreshPreview();
+    return true;
+  }
+
   /** Apply a saved loadout, but only the effects this species actually owns. */
   private applyPreset(preset: ErShinyLabPreset): void {
     const cfg = this.config;
@@ -1396,7 +1534,7 @@ export class ErShinyLabUiHandler extends UiHandler {
       const id = preset.loadout[cat];
       cfg.equipped[cat] = id && cfg.owned[cat].has(id) ? id : null;
     }
-    cfg.params = { ...preset.params };
+    cfg.params = { ...preset.params, nameFx: cfg.earnedTier >= 3 && !!cfg.nameFxUnlocked && !!preset.params.nameFx };
     cfg.onChange?.({ ...cfg.equipped }, { ...cfg.params });
     this.refreshChips();
     this.refreshPreview();
@@ -1497,7 +1635,13 @@ export function buildDemoConfig(speciesId: number): ErShinyLabConfig {
     around: new Set(["halo", "rings", "staticfield"]),
   };
   const available = new Set<string>([...palette, ...surface, ...around].map(e => e.id));
-  const params = { ...ER_SHINY_LAB_DEFAULT_PARAMS, seed: 42 };
+  const params: ErShinyLabParams = {
+    ...ER_SHINY_LAB_DEFAULT_PARAMS,
+    seed: 42,
+    protectBlack: true,
+    protectWhite: true,
+    nameFx: true,
+  };
   let demoCandy = 1240;
   let demoTokens = 1;
 
@@ -1522,6 +1666,8 @@ export function buildDemoConfig(speciesId: number): ErShinyLabConfig {
       null,
     ],
     completion: { owned: 9, total: palette.length + surface.length + around.length, percent: 6 },
+    nameFxUnlocked: true,
+    nameFxCost: 300,
     seedRerollCost: 25,
     seedRerollTokens: demoTokens,
     onRerollSeed(currentParams) {

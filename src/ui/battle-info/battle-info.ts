@@ -1,6 +1,6 @@
 import { globalScene } from "#app/global-scene";
 import { isErBlackShiny } from "#data/elite-redux/er-black-shinies";
-import { getErShinyLabNameSignature } from "#data/elite-redux/er-shiny-lab-effects";
+import { getErShinyLabEarnedTierForPokemon, getErShinyLabNameSignature } from "#data/elite-redux/er-shiny-lab-effects";
 import { Gender, getGenderColor, getGenderSymbol } from "#data/gender";
 import { getTypeRgb } from "#data/type";
 import { BattlerTagType } from "#enums/battler-tag-type";
@@ -533,7 +533,11 @@ export abstract class BattleInfo extends Phaser.GameObjects.Container {
   }
 
   private updateShinyLabNameplate(pokemon: Pokemon): void {
-    const signature = getErShinyLabNameSignature(getErShinyLabSpriteFxLookForPokemon(pokemon)?.loadout);
+    const look = getErShinyLabSpriteFxLookForPokemon(pokemon);
+    const signature =
+      look?.params.nameFx && getErShinyLabEarnedTierForPokemon(pokemon) >= 3
+        ? getErShinyLabNameSignature(look.loadout)
+        : null;
     if (!signature) {
       this.nameText.setColor("#f8f8f8");
       this.box.clearTint();

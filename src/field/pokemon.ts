@@ -61,6 +61,7 @@ import { isCoopAuthoritativeGuestGated } from "#data/elite-redux/coop/coop-autho
 import { coopAttributeNewMon, coopHalfIsFull } from "#data/elite-redux/coop/coop-session";
 import type { CoopRole } from "#data/elite-redux/coop/coop-transport";
 import { isCoopRecording, recordCoopEvent } from "#data/elite-redux/coop/coop-turn-recorder";
+import { erRecordAchievementDamageAndUpdate } from "#data/elite-redux/er-achievement-tracker";
 import { getErBiomeRule } from "#data/elite-redux/er-biome-rules";
 import {
   getErSharedGiftAbilityIdsFor,
@@ -2925,19 +2926,7 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
       return true;
     }
 
-    // Classic Final boss and Endless Minor/Major bosses do not have passive
-    const { currentBattle, gameMode } = globalScene;
-    const waveIndex = currentBattle?.waveIndex;
-    if (
-      this.isEnemy()
-      && !gameMode.hasChallenge(Challenges.PASSIVES)
-      && (currentBattle?.isClassicFinalBoss
-        || gameMode.isEndlessMinorBoss(waveIndex)
-        || gameMode.isEndlessMajorBoss(waveIndex))
-    ) {
-      return false;
-    }
-
+    const { gameMode } = globalScene;
     if (gameMode.isDaily && this.customPokemonData.passive != null && this.customPokemonData.passive !== -1) {
       return true;
     }
@@ -2964,8 +2953,8 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
       // ER: enemies ALWAYS have their innates active (no candy-unlock gate) — unlike
       // the player, whose innate slots are gated by `passiveAttr` above. This only
       // enables the passive at all; the NUMBER of enemy innate slots still ramps
-      // with level via `getEnemyPassiveSlotLimit()`. Final/endless bosses were
-      // already excluded by the earlier guard.
+      // with level via `getEnemyPassiveSlotLimit()`. Bosses are not special-cased:
+      // vanilla's boss-passive suppression is intentionally not used in ER.
       basePassive = this.getPassiveAbilities().some(a => a != null);
     }
     const hasPassive = new BooleanHolder(basePassive);
@@ -5495,6 +5484,7 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
       damage = 0;
     }
     damage = this.damage(damage, ignoreSegments, isIndirectDamage, ignoreFaintPhase);
+    erRecordAchievementDamageAndUpdate(this, damage, source, isIndirectDamage ? "indirect" : "direct");
     // Damage amount may have changed, but needed to be queued before calling damage function
     damagePhase.updateAmount(damage);
     /**

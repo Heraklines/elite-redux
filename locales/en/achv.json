@@ -344,6 +344,111 @@
     "name_female": "Primal Cascoon",
     "description": "Defeat the Primal Cascoon."
   },
+  "beamSpam": {
+    "name": "Beam Spam",
+    "name_female": "Beam Spam",
+    "description": "Win a boss trainer or ghost battle using only Mega Launcher-boosted moves."
+  },
+  "goodChip": {
+    "name": "Good Chip",
+    "name_female": "Good Chip",
+    "description": "With Redux Darumaka or Darmanitan active, faint an opposing Pokemon with indirect damage."
+  },
+  "backInBlood": {
+    "name": "Back in Blood",
+    "name_female": "Back in Blood",
+    "description": "Win a trainer battle using a Pokemon with Predator."
+  },
+  "shieldBreak": {
+    "name": "Shield Break",
+    "name_female": "Shield Break",
+    "description": "Faint a full-health Pokemon while it is protected by a screen."
+  },
+  "cccCombo": {
+    "name": "C-c-c-combo!",
+    "name_female": "C-c-c-combo!",
+    "description": "Faint a Pokemon with the fifth hit of a five-hit move."
+  },
+  "gear5": {
+    "name": "Gear 5",
+    "name_female": "Gear 5",
+    "description": "Mega Evolve a Redux Infernape."
+  },
+  "metalSlime": {
+    "name": "Metal Slime",
+    "name_female": "Metal Slime",
+    "description": "Boost a Redux Munchlax or Snorlax's Defense to +6."
+  },
+  "jurassicEnd": {
+    "name": "Jurassic End",
+    "name_female": "Jurassic End",
+    "description": "Faint a Fossil Pokemon with Meteor Mash."
+  },
+  "heedingTheWarning": {
+    "name": "Heeding the Warning",
+    "name_female": "Heeding the Warning",
+    "description": "Catch a wild Absol and clear the next floor without any Pokemon fainting."
+  },
+  "megaflare": {
+    "name": "Megaflare",
+    "name_female": "Megaflare",
+    "description": "Teach Hyper Beam to a Palkia."
+  },
+  "yo": {
+    "name": "YO!!!!!",
+    "name_female": "YO!!!!!",
+    "description": "Encounter a shiny Pokemon in a run."
+  },
+  "weaveNationCertified": {
+    "name": "Weave Nation Certified",
+    "name_female": "Weave Nation Certified",
+    "description": "Avoid three damaging moves in a row."
+  },
+  "critMattered": {
+    "name": "Crit Mattered",
+    "name_female": "Crit Mattered",
+    "description": "OHKO a Pokemon with a Sniper-boosted critical hit."
+  },
+  "autoCounter": {
+    "name": "Auto Counter",
+    "name_female": "Auto Counter",
+    "description": "Faint a Pokemon with an attack triggered by an ability."
+  },
+  "snakesOnAPlane": {
+    "name": "Snakes on a Plane",
+    "name_female": "Snakes on a Plane",
+    "description": "Defeat Gym Leader Skyla using only snakelike Pokemon."
+  },
+  "believeIt": {
+    "name": "Believe it!",
+    "name_female": "Believe it!",
+    "description": "Defeat Janine, Koga, or Atticus with a Kanto Ninetales on your team."
+  },
+  "holdIt": {
+    "name": "HOLD IT!",
+    "name_female": "HOLD IT!",
+    "description": "Use Protect when an opponent uses a move that always flinches."
+  },
+  "chainReaction": {
+    "name": "Chain Reaction",
+    "name_female": "Chain Reaction",
+    "description": "Deal damage from four separate sources in one turn."
+  },
+  "iJustGotHere": {
+    "name": "I Just Got Here",
+    "name_female": "I Just Got Here",
+    "description": "Send in a Pokemon just before its opponent faints."
+  },
+  "sorryForTheWait": {
+    "name": "Sorry For The Wait",
+    "name_female": "Sorry For The Wait",
+    "description": "KO a boss with a first-turn charge move without skipping the charge turn."
+  },
+  "hollowWickerBasket": {
+    "name": "Hollow Wicker Basket",
+    "name_female": "Hollow Wicker Basket",
+    "description": "Use Quash while Trick Room is active."
+  },
   "relicHunter": {
     "name": "Relic Hunter",
     "name_female": "Relic Hunter",

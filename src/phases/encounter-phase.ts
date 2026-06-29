@@ -16,6 +16,7 @@ import {
   maybeBeginReplayRecording,
 } from "#data/elite-redux/coop/coop-runtime";
 import type { CoopSerializedEnemy } from "#data/elite-redux/coop/coop-transport";
+import { erRecordAchievementShinyEncounter } from "#data/elite-redux/er-achievement-tracker";
 import { erBiomeForcedTerrain, erBiomeForcedWeather } from "#data/elite-redux/er-biome-rules";
 import { getErFinalBossSpecies, isErFinalBossSpecies } from "#data/elite-redux/er-final-boss";
 import { consumeErCarriedWeather } from "#data/elite-redux/er-map-nodes";
@@ -696,6 +697,7 @@ export class EncounterPhase extends BattlePhase {
         enemyPokemon.showInfo();
         if (enemyPokemon.isShiny()) {
           globalScene.validateAchv(achvs.SEE_SHINY);
+          erRecordAchievementShinyEncounter();
         }
       }
       globalScene.updateFieldScale();

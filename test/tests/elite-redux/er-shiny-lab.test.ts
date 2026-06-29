@@ -11,10 +11,12 @@ import {
   claimErShinyLabCompletionRewards,
   decodeErShinyLabLoadout,
   decodeErShinyLabParams,
+  ER_SHINY_LAB_DEFAULT_PARAMS,
   ER_SHINY_LAB_EFFECTS_BY_CATEGORY,
   type ErShinyLabConfig,
   type ErShinyLabEffect,
   type ErShinyLabLoadout,
+  type ErShinyLabParams,
   type ErShinyLabSaveData,
   encodeErShinyLabLoadout,
   encodeErShinyLabParams,
@@ -26,6 +28,7 @@ import {
   getErShinyLabOwnedSet,
   grantErShinyLabSavedLookToSave,
   grantErShinyLabSeedRerollTokens,
+  isErShinyLabNameFxUnlocked,
   mergeErShinyLabSaveData,
   normalizeErShinyLabSavedLook,
   resolveErShinyLabEffectState,
@@ -33,6 +36,7 @@ import {
   setErShinyLabBit,
   setErShinyLabOwnedBit,
   spendErShinyLabSeedRerollToken,
+  unlockErShinyLabNameFx,
 } from "#data/elite-redux/er-shiny-lab-effects";
 import { AROUND, AURA, PALETTE } from "#data/elite-redux/er-shiny-lab-fx";
 import { renderErShinyLabLook } from "#data/elite-redux/er-shiny-lab-renderer";
@@ -78,6 +82,10 @@ function sampleSpritePixels() {
   return { width, height, data };
 }
 
+function labParams(overrides: Partial<ErShinyLabParams> = {}): ErShinyLabParams {
+  return { ...ER_SHINY_LAB_DEFAULT_PARAMS, ...overrides };
+}
+
 function configFor(
   effect: ErShinyLabEffect,
 ): Pick<ErShinyLabConfig, "earnedTier" | "candy" | "owned" | "available" | "equipped"> {
@@ -99,7 +107,7 @@ describe("ER Shiny Lab data layer", () => {
 
   it("renders every website FX function through the exact in-game renderer", () => {
     const source = sampleSpritePixels();
-    const params = { palAmt: 1, surfAmt: 1, aroAmt: 1, scale: 1, seed: 42, tintMode: 0 };
+    const params = labParams({ seed: 42 });
     const loadouts: ErShinyLabLoadout[] = [
       ...ER_SHINY_LAB_EFFECTS_BY_CATEGORY.palette.map(e => ({ palette: e.id, surface: null, around: null })),
       ...ER_SHINY_LAB_EFFECTS_BY_CATEGORY.surface.map(e => ({ palette: null, surface: e.id, around: null })),
@@ -114,10 +122,30 @@ describe("ER Shiny Lab data layer", () => {
     }
   });
 
+  it("can protect pure black outlines and white highlights from palette recolors", () => {
+    const source = {
+      width: 3,
+      height: 1,
+      data: new Uint8ClampedArray([0, 0, 0, 255, 255, 255, 255, 255, 80, 120, 180, 255]),
+    };
+    const rendered = renderErShinyLabLook(
+      source,
+      { palette: "duoneon", surface: null, around: null },
+      labParams({ protectBlack: true, protectWhite: true }),
+      0,
+      { pad: 0 },
+    );
+
+    expect(rendered).not.toBeNull();
+    expect(Array.from(rendered!.data.slice(0, 4))).toEqual([0, 0, 0, 255]);
+    expect(Array.from(rendered!.data.slice(4, 8))).toEqual([255, 255, 255, 255]);
+    expect(Array.from(rendered!.data.slice(8, 11))).not.toEqual([80, 120, 180]);
+  });
+
   it("tracks exact sprite FX state and source selection for runtime renderers", () => {
     const look: ErShinyLabSpriteFxLook = {
       loadout: { palette: "duoneon", surface: "starmap", around: "staticfield" },
-      params: { palAmt: 1, surfAmt: 1, aroAmt: 1, scale: 1, seed: 77, tintMode: 0 },
+      params: labParams({ seed: 77 }),
     };
     const species = getPokemonSpecies(SpeciesId.BULBASAUR);
     const iconSource = getErShinyLabSpeciesIconSource(species, false, 0, true, 2, look);
@@ -282,11 +310,22 @@ describe("ER Shiny Lab data layer", () => {
     setErShinyLabOwnedBit(save, "palette", paletteDef.index);
     setErShinyLabOwnedBit(save, "surface", surfaceDef.index);
     save.l = encodeErShinyLabLoadout({ palette: "glacier", surface: "spectrumsplit", around: null });
-    save.q = encodeErShinyLabParams({ palAmt: 0.75, surfAmt: 0.5, aroAmt: 1, scale: 1.2, seed: 77, tintMode: 1 });
+    save.q = encodeErShinyLabParams(
+      labParams({
+        palAmt: 0.75,
+        surfAmt: 0.5,
+        scale: 1.2,
+        seed: 77,
+        tintMode: 1,
+        protectBlack: true,
+        protectWhite: true,
+        nameFx: true,
+      }),
+    );
     save.r = [
       encodeErShinyLabPreset({
         loadout: { palette: "glacier", surface: null, around: null },
-        params: { palAmt: 1, surfAmt: 1, aroAmt: 1, scale: 1, seed: 9, tintMode: 0 },
+        params: labParams({ seed: 9 }),
       }),
       null,
       null,
@@ -312,10 +351,24 @@ describe("ER Shiny Lab data layer", () => {
       surface: "spectrumsplit",
       around: null,
     });
-    expect(decodeErShinyLabParams(parsedSave.q).seed).toBe(77);
+    expect(decodeErShinyLabParams(parsedSave.q)).toMatchObject({
+      seed: 77,
+      protectBlack: true,
+      protectWhite: true,
+      nameFx: true,
+    });
 
     const merged = mergeErShinyLabSaveData({}, parsedSave);
     expect(merged).toEqual(parsedSave);
+  });
+
+  it("stores nameplate FX as a paid Shiny Lab feature flag", () => {
+    const save: ErShinyLabSaveData = {};
+
+    expect(isErShinyLabNameFxUnlocked(save)).toBe(false);
+    unlockErShinyLabNameFx(save);
+    expect(isErShinyLabNameFxUnlocked(save)).toBe(true);
+    expect(mergeErShinyLabSaveData({}, save)).toMatchObject({ f: save.f });
   });
 
   it("rolls wild special looks by shiny tier and rarity-weighted category", () => {
@@ -338,7 +391,7 @@ describe("ER Shiny Lab data layer", () => {
   it("grants caught wild looks to a species save without overwriting existing loadouts", () => {
     const look = encodeErShinyLabPreset({
       loadout: { palette: "duoneon", surface: "starmap", around: null },
-      params: { palAmt: 1, surfAmt: 0.75, aroAmt: 1, scale: 1, seed: 55, tintMode: 0 },
+      params: labParams({ surfAmt: 0.75, seed: 55 }),
     });
     const save: ErShinyLabSaveData = {};
 
@@ -354,7 +407,7 @@ describe("ER Shiny Lab data layer", () => {
       save,
       encodeErShinyLabPreset({
         loadout: { palette: null, surface: null, around: "halo" },
-        params: { palAmt: 1, surfAmt: 1, aroAmt: 1, scale: 1, seed: 99, tintMode: 0 },
+        params: labParams({ seed: 99 }),
       }),
     );
     expect(save.l).toEqual(existing);
@@ -394,7 +447,7 @@ describe("ER Shiny Lab data layer", () => {
   it("normalizes carried ghost looks and prefers them over local species data", () => {
     const look = encodeErShinyLabPreset({
       loadout: { palette: "duoneon", surface: "starmap", around: "staticfield" },
-      params: { palAmt: 1, surfAmt: 0.8, aroAmt: 0.6, scale: 1.2, seed: 123, tintMode: 1 },
+      params: labParams({ surfAmt: 0.8, aroAmt: 0.6, scale: 1.2, seed: 123, tintMode: 1 }),
     });
     const pokemon = {
       species: getPokemonSpecies(SpeciesId.BULBASAUR),
@@ -403,7 +456,7 @@ describe("ER Shiny Lab data layer", () => {
     };
 
     expect(normalizeErShinyLabSavedLook(look)).toEqual(look);
-    expect(normalizeErShinyLabSavedLook([255, 255, 255, 255, 255, 255, 255, 255, 255])).toBeUndefined();
+    expect(normalizeErShinyLabSavedLook([255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255])).toBeUndefined();
     expect(getErShinyLabSpriteFxLookForPokemon(pokemon)?.loadout).toEqual({
       palette: "duoneon",
       surface: "starmap",

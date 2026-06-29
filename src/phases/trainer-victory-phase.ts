@@ -6,6 +6,7 @@ import {
   coopShouldQueueBossVoucherReward,
   coopVictoryDialogueDecision,
 } from "#data/elite-redux/coop/coop-trainer-victory";
+import { erRecordAchievementTrainerVictory } from "#data/elite-redux/er-achievement-tracker";
 import { hasErGhostOverride } from "#data/elite-redux/er-ghost-teams";
 import { getErDifficulty } from "#data/elite-redux/er-run-difficulty";
 import { BiomeId } from "#enums/biome-id";
@@ -91,6 +92,7 @@ export class TrainerVictoryPhase extends BattlePhase {
     if (trainer && hasErGhostOverride(trainer)) {
       globalScene.validateAchv(achvs.EXORCIST);
     }
+    erRecordAchievementTrainerVictory();
 
     globalScene.ui.showText(
       i18next.t("battle:trainerDefeated", {

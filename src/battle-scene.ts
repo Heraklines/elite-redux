@@ -30,6 +30,7 @@ import { initCommonAnims, initMoveAnim, loadCommonAnimAssets, loadMoveAnimAssets
 import { getDailyMysteryEncounter } from "#data/daily-seed/daily-run";
 import { allMoves, allSpecies, biomeDepths, modifierTypes } from "#data/data-lists";
 import { classicFinalBossDialogue } from "#data/dialogue";
+import { ER_SILKEN_DECREE_ABILITY_ID } from "#data/elite-redux/abilities/silken-decree";
 import { grantErAchievementReward } from "#data/elite-redux/er-achievement-rewards";
 import { erExtraRivalTypeForWave } from "#data/elite-redux/er-battle-frequency";
 import {
@@ -47,7 +48,12 @@ import {
 } from "#data/elite-redux/er-biome-routing";
 import { getErBiomeRule } from "#data/elite-redux/er-biome-rules";
 import { erBiomeJustEnteredAfterWave, erIsBiomeEnd, erRollBiomeLength } from "#data/elite-redux/er-biome-structure";
-import { ER_BLACK_SHINY_TINT, isErBlackShiny, promoteToErBlackShinyInBattle } from "#data/elite-redux/er-black-shinies";
+import {
+  ER_BLACK_SHINY_TINT,
+  isErBlackShiny,
+  pinErBlackShinyGiftAbility,
+  promoteToErBlackShinyInBattle,
+} from "#data/elite-redux/er-black-shinies";
 import { clearErFightTokens } from "#data/elite-redux/er-fight-tokens";
 import { isErFinalBossSpecies } from "#data/elite-redux/er-final-boss";
 import type { GhostTeamSnapshot } from "#data/elite-redux/er-ghost-teams";
@@ -4233,6 +4239,7 @@ export class BattleScene extends SceneBase {
       // still runs.
       if (isErFinalBossSpecies(pokemon.species.speciesId) && getErDifficulty() === "hell") {
         promoteToErBlackShinyInBattle(pokemon);
+        pinErBlackShinyGiftAbility(pokemon, ER_SILKEN_DECREE_ABILITY_ID);
         // ER (#423): the vanilla stage-2 path gets healed/re-shielded by
         // QuietFormChangePhase.end's final-boss block - the Hell promotion
         // path skipped a form change and therefore NEVER got it, so stage 2

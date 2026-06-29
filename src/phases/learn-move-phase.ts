@@ -12,6 +12,7 @@ import {
   getCoopUiMirror,
 } from "#data/elite-redux/coop/coop-runtime";
 import type { CoopRole } from "#data/elite-redux/coop/coop-transport";
+import { erRecordAchievementLearnMove } from "#data/elite-redux/er-achievement-tracker";
 import { SpeciesFormChangeMoveLearnedTrigger } from "#data/form-change-triggers";
 import { LearnMoveType } from "#enums/learn-move-type";
 import { MoveId } from "#enums/move-id";
@@ -463,6 +464,7 @@ export class LearnMovePhase extends PlayerPartyMemberPokemonPhase {
       }
     }
     pokemon.setMove(index, this.moveId);
+    erRecordAchievementLearnMove(pokemon, this.moveId);
     initMoveAnim(this.moveId).then(() => {
       loadMoveAnimAssets([this.moveId], true);
     });

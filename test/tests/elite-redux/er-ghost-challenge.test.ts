@@ -25,6 +25,7 @@ import {
 import { isErGhostChallengeActive } from "#data/elite-redux/er-ghost-waves";
 import { getChallengeFavour } from "#data/elite-redux/er-shiny-favour";
 import {
+  ER_SHINY_LAB_DEFAULT_PARAMS,
   ER_SHINY_LAB_EFFECTS_BY_CATEGORY,
   encodeErShinyLabLoadout,
   encodeErShinyLabParams,
@@ -274,6 +275,7 @@ describe.skipIf(!RUN)("ER ghost devolve gate past wave 50 (#422 follow-up)", () 
       around: "staticfield",
     });
     const savedParams = encodeErShinyLabParams({
+      ...ER_SHINY_LAB_DEFAULT_PARAMS,
       palAmt: 1,
       surfAmt: 0.8,
       aroAmt: 0.6,
@@ -302,9 +304,20 @@ describe.skipIf(!RUN)("ER ghost devolve gate past wave 50 (#422 follow-up)", () 
       around: "staticfield",
     });
 
-    const invalidLook: [number, number, number, number, number, number, number, number, number] = [
-      255, 255, 255, 255, 255, 255, 255, 255, 255,
-    ];
+    const invalidLook: [
+      number,
+      number,
+      number,
+      number,
+      number,
+      number,
+      number,
+      number,
+      number,
+      number,
+      number,
+      number,
+    ] = [255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255];
     const malformed: GhostTeamSnapshot = {
       ...snapshot!,
       party: [{ ...snapshot!.party[0], erShinyLab: invalidLook }],
