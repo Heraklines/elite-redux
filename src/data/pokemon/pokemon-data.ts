@@ -447,6 +447,14 @@ export class PokemonBattleData {
    * Resets with the rest of the per-battle data; transient (not serialized).
    */
   public rudeAwakeningTriggered = false;
+  /**
+   * Whether this Pokémon's ER {@linkcode AbilityId.COWARD} has already set up its
+   * once-per-battle Protect on switch-in. Lives on the per-battle data (cleared by
+   * `resetBattleAndWaveData` each new battle) so Coward re-arms every battle/trainer,
+   * instead of a flag on the persistent instance that would survive the whole run.
+   * Transient (not serialized).
+   */
+  public cowardProtectUsed = false;
 
   constructor(source?: PokemonBattleData | Partial<PokemonBattleData>) {
     if (source != null) {
@@ -455,6 +463,7 @@ export class PokemonBattleData {
       this.berriesEaten = source.berriesEaten ?? [];
       this.anticipationDodgeUsed = source.anticipationDodgeUsed ?? false;
       this.rudeAwakeningTriggered = source.rudeAwakeningTriggered ?? false;
+      this.cowardProtectUsed = source.cowardProtectUsed ?? false;
     }
   }
 }

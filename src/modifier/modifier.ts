@@ -2159,6 +2159,10 @@ export class PokemonHpRestoreModifier extends ConsumablePokemonModifier {
       }
       if (this.fainted || this.healStatus) {
         pokemon.resetStatus(true, true, false, false);
+        // Full Restore clears ER custom ailments (Frostbite / Fear) too; vanilla
+        // resetStatus only touches pokemon.status. (Bleed is deliberately spared per
+        // the dex - only a healing move clears it in battle.)
+        clearErAilments(pokemon);
       }
       pokemon.hp = Math.min(
         pokemon.hp

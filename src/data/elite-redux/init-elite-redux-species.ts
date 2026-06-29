@@ -402,6 +402,36 @@ export function initEliteReduxSpecies(): InitEliteReduxSpeciesResult {
     }
   }
 
+  // Bloodmoon Ursaluna: pokerogue models it as a standalone first-class species
+  // (BLOODMOON_URSALUNA = 8901), but ER's id-map sends the ER draft
+  // (SPECIES_URSALUNA_BLOODMOON) to a custom id >= 10000, so the main loop SKIPS it
+  // (custom-id) and a phantom custom species gets the kit instead. The real 8901 then
+  // falls back to its single vanilla passive (Berserk) -> the reported "only 1 of 3
+  // passives". Give 8901 the same main-loop treatment from its ER draft.
+  const bloodmoonDraft = erDraftByConst.get("SPECIES_URSALUNA_BLOODMOON");
+  const bloodmoon = byId.get(SpeciesId.BLOODMOON_URSALUNA);
+  if (bloodmoonDraft && bloodmoon) {
+    bloodmoon.setPassives([
+      mapAbilityId(bloodmoonDraft.innates[0]),
+      mapAbilityId(bloodmoonDraft.innates[1]),
+      mapAbilityId(bloodmoonDraft.innates[2]),
+    ]);
+    bloodmoon.setBaseStats(bloodmoonDraft.baseStats);
+    const bloodmoonType1 = mapErType(bloodmoonDraft.types[0]);
+    const bloodmoonType2 = mapErType(bloodmoonDraft.types[1]);
+    if (bloodmoonType1 !== null) {
+      bloodmoon.setTypes(bloodmoonType1, bloodmoonType2);
+    }
+    const bloodmoonActives: readonly [AbilityId, AbilityId, AbilityId] = [
+      mapAbilityId(bloodmoonDraft.abilities[0]),
+      mapAbilityId(bloodmoonDraft.abilities[1]),
+      mapAbilityId(bloodmoonDraft.abilities[2]),
+    ];
+    if (bloodmoonActives[0] !== AbilityId.NONE) {
+      bloodmoon.setActiveAbilities(bloodmoonActives);
+    }
+  }
+
   return result;
 }
 

@@ -74,3 +74,21 @@ export function clearErAilments(pokemon: Pokemon): boolean {
   }
   return cleared;
 }
+
+/**
+ * Clear EVERY ER status, INCLUDING Bleed — for the every-10-waves full-team REST
+ * (`PartyHealPhase`), which is a Pokémon-Center-style full restore between waves.
+ * This differs from {@linkcode clearErAilments} (which deliberately spares Bleed for
+ * in-battle cure-alls per the dex): the between-wave rest should leave the party
+ * fully healthy, so Bleed/Frostbite/Fear all clear.
+ *
+ * @returns `true` if at least one ER status tag was removed.
+ */
+export function clearAllErStatuses(pokemon: Pokemon): boolean {
+  let cleared = clearErAilments(pokemon);
+  if (pokemon.getTag(BattlerTagType.ER_BLEED) != null) {
+    pokemon.removeTag(BattlerTagType.ER_BLEED);
+    cleared = true;
+  }
+  return cleared;
+}

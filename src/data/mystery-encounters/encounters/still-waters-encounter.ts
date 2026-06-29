@@ -19,11 +19,13 @@
 
 import { CLASSIC_MODE_MYSTERY_ENCOUNTER_WAVES } from "#app/constants";
 import { globalScene } from "#app/global-scene";
+import { trainerConfigs } from "#data/trainers/trainer-config";
 import { ModifierTier } from "#enums/modifier-tier";
 import { MysteryEncounterOptionMode } from "#enums/mystery-encounter-option-mode";
 import { MysteryEncounterTier } from "#enums/mystery-encounter-tier";
 import { MysteryEncounterType } from "#enums/mystery-encounter-type";
 import { SpeciesId } from "#enums/species-id";
+import { TrainerType } from "#enums/trainer-type";
 import type { PokemonHeldItemModifier } from "#modifiers/modifier";
 import type { EnemyPartyConfig, EnemyPokemonConfig } from "#mystery-encounters/encounter-phase-utils";
 import {
@@ -36,6 +38,7 @@ import type { MysteryEncounter } from "#mystery-encounters/mystery-encounter";
 import { MysteryEncounterBuilder } from "#mystery-encounters/mystery-encounter";
 import { MysteryEncounterOptionBuilder } from "#mystery-encounters/mystery-encounter-option";
 import type { HeldModifierConfig } from "#types/held-modifier-config";
+import i18next from "i18next";
 
 const namespace = "mysteryEncounters/stillWaters";
 
@@ -66,7 +69,14 @@ function buildMirrorBattle(): EnemyPartyConfig {
       modifierConfigs,
     };
   });
-  return { pokemonConfigs: configs, disableSwitch: false };
+  // Run as a TRAINER battle, not WILD. A WILD multi-mon config only fields enemy[0]
+  // and the wild victory check ends the encounter the moment that one clone faints -
+  // so only the FIRST party member was ever fought. A trainer config sends the WHOLE
+  // mirrored team out one-by-one (the reflection of your full squad). The name reads
+  // as the encounter's "Mirror" title; the team is the explicit pokemonConfigs.
+  const trainerConfig = trainerConfigs[TrainerType.ACE_TRAINER].clone();
+  trainerConfig.setName(i18next.t(`${namespace}:title`));
+  return { trainerConfig, pokemonConfigs: configs, disableSwitch: false };
 }
 
 export const StillWatersEncounter: MysteryEncounter = MysteryEncounterBuilder.withEncounterType(

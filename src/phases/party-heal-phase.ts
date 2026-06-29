@@ -1,4 +1,5 @@
 import { globalScene } from "#app/global-scene";
+import { clearAllErStatuses } from "#data/elite-redux/er-status-cure";
 import { ChallengeType } from "#enums/challenge-type";
 import { BattlePhase } from "#phases/battle-phase";
 import { applyChallenges } from "#utils/challenge-utils";
@@ -32,6 +33,9 @@ export class PartyHealPhase extends BattlePhase {
 
         pokemon.hp = pokemon.getMaxHp();
         pokemon.resetStatus(true, false, false, true);
+        // The between-wave rest is a full restore, so it also clears ER custom statuses
+        // (Bleed / Frostbite / Fear) which vanilla resetStatus does not touch.
+        clearAllErStatuses(pokemon);
         for (const move of pokemon.moveset) {
           move.ppUsed = 0;
         }

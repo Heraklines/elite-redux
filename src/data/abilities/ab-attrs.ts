@@ -5034,23 +5034,27 @@ export class PostDancingMoveAbAttr extends PostMoveUsedAbAttr {
 
   override apply({ source, pokemon, move, targets, simulated }: PostMoveUsedAbAttrParams): void {
     if (!simulated) {
-      // If the move is an AttackMove or a StatusMove the Dancer must replicate the move on the source of the Dance
-      if (move.getMove().is("AttackMove") || move.getMove().is("StatusMove")) {
+      // A self/ally-targeting move (Swords Dance, or a sound move like Howl whose
+      // target is USER_AND_ALLIES) must be replicated on the DANCER itself - never the
+      // opponent. Branch on the move's actual target, not its class: Howl is a plain
+      // StatusMove (not a SelfStatusMove), so the old class check routed its copied
+      // +Atk buff through getTarget onto the foe (the Squawkabilly/Parroting bug).
+      if (move.getMove().isAllyTarget()) {
+        globalScene.phaseManager.unshiftNew(
+          "MovePhase",
+          pokemon,
+          [pokemon.getBattlerIndex()],
+          move,
+          MoveUseMode.INDIRECT,
+          MovePhaseTimingModifier.FIRST,
+        );
+      } else if (move.getMove().is("AttackMove") || move.getMove().is("StatusMove")) {
+        // An opponent-targeting attack/status: replicate at the appropriate foe.
         const target = this.getTarget(pokemon, source, targets);
         globalScene.phaseManager.unshiftNew(
           "MovePhase",
           pokemon,
           target,
-          move,
-          MoveUseMode.INDIRECT,
-          MovePhaseTimingModifier.FIRST,
-        );
-      } else if (move.getMove().is("SelfStatusMove")) {
-        // If the move is a SelfStatusMove (ie. Swords Dance) the Dancer should replicate it on itself
-        globalScene.phaseManager.unshiftNew(
-          "MovePhase",
-          pokemon,
-          [pokemon.getBattlerIndex()],
           move,
           MoveUseMode.INDIRECT,
           MovePhaseTimingModifier.FIRST,

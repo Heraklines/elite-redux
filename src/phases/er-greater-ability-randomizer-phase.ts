@@ -55,6 +55,13 @@ export class ErGreaterAbilityRandomizerPhase extends Phase {
   private readonly partyIndex: number;
   /** The UI mode active when this phase started; sub-menus restore to it. */
   private baseMode: UiMode = UiMode.MESSAGE;
+  /**
+   * The 4 rolled abilities, cached on first open and reused for the phase's lifetime.
+   * Without this, backing out of the ability picker (-> slot picker -> re-pick the slot)
+   * re-rolls a fresh set, letting the player reroll indefinitely until they like the
+   * options. The roll is per-mon (slot-independent), so one cache for the phase is correct.
+   */
+  private rolledChoices: BargainAbilityChoice[] | null = null;
 
   // ---- Co-op (#633 B9c): owner-drives / watcher-applies (see ErAbilityCapsulePhase) ----
   private readonly coopSeq: number;
@@ -145,7 +152,9 @@ export class ErGreaterAbilityRandomizerPhase extends Phase {
    * un-consumed).
    */
   private openAbilityPicker(mon: PlayerPokemon, slot: number): void {
-    const choices = rollGreaterRandomizerAbilities(mon);
+    // Roll ONCE and reuse for this phase: re-opening (after a back-out to the slot picker)
+    // must show the SAME set, otherwise the player can reroll freely by cancelling.
+    const choices = (this.rolledChoices ??= rollGreaterRandomizerAbilities(mon));
     this.log(
       `openAbilityPicker slot=${slot} rolled=${choices.length} ids=[${choices.map(c => c.abilityId).join(",")}]`,
     );

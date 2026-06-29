@@ -28,7 +28,7 @@ import { achvs } from "#system/achv";
 import type { PartyOption } from "#ui/party-ui-handler";
 import { PartyUiMode } from "#ui/party-ui-handler";
 import { SummaryUiMode } from "#ui/summary-ui-handler";
-import { applyChallenges, isSpeciesAllowedByActiveChallenges } from "#utils/challenge-utils";
+import { applyChallenges } from "#utils/challenge-utils";
 import { BooleanHolder } from "#utils/common";
 import i18next from "i18next";
 
@@ -279,14 +279,12 @@ export class AttemptCapturePhase extends PokemonPhase {
     globalScene.gameData.updateSpeciesDexIvs(pokemon.species.getRootSpeciesId(true), pokemon.ivs);
 
     const addStatus = new BooleanHolder(true);
+    // POKEMON_ADD_TO_PARTY is the canonical catch-legality gate: every roster challenge
+    // (Mono Type / Generation / Color, Usage Tier, Limited Catch) overrides it. We do NOT
+    // additionally run the starter-select legality here - that would wrongly reject catches
+    // under starter-only challenges like Fresh Start (which only restricts which mons you
+    // START with, not what you can catch mid-run), the reported "Full Reset can't catch" bug.
     applyChallenges(ChallengeType.POKEMON_ADD_TO_PARTY, pokemon, addStatus);
-    // ER (#132): also gate on the unified roster legality - the SAME check starter
-    // select and the party "can't use this mon in this challenge" message use - so EVERY
-    // active challenge blocks an out-of-challenge catch, not only the ones that ship a
-    // bespoke applyPokemonAddToParty override. No-op outside challenges.
-    if (addStatus.value && !isSpeciesAllowedByActiveChallenges(pokemon.species)) {
-      addStatus.value = false;
-    }
 
     globalScene.ui.showText(
       i18next.t(addStatus.value ? "battle:pokemonCaught" : "battle:pokemonCaughtButChallenge", {

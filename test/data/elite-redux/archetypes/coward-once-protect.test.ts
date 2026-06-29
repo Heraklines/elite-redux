@@ -10,8 +10,9 @@
 // The bug we're guarding against: prior implementation used the EntryEffect
 // scripted-move stub, which didn't actually fire Protect AND showed the
 // ability flyout every time (because canApply was unconditionally true).
-// Now: once-per-battle flag via per-Pokemon Symbol; ability fires & shows
-// flyout exactly once.
+// Now: once-per-battle flag stored on `pokemon.battleData.cowardProtectUsed`
+// (cleared by resetBattleAndWaveData each new battle so Coward re-arms per
+// trainer); ability fires & shows the flyout exactly once per battle.
 // =============================================================================
 
 import { CowardOnceProtectAbAttr } from "#data/elite-redux/archetypes/coward-once-protect";
@@ -21,8 +22,10 @@ import { describe, expect, it, vi } from "vitest";
 
 function makePokemon(): Pokemon {
   const addTag = vi.fn();
+  // Fresh per-battle data per holder (the once-flag lives here, like the real engine).
   return {
     addTag,
+    battleData: { cowardProtectUsed: false },
   } as unknown as Pokemon;
 }
 

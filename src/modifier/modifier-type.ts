@@ -20,6 +20,7 @@ import { erMegaStoneIconFrame, isErMegaStone } from "#data/elite-redux/er-mega-s
 import { erReactiveItemType } from "#data/elite-redux/er-reactive-items";
 import { ER_ASSAULT_VEST_TYPE, ER_LIFE_ORB_TYPE, ER_ROCKY_HELMET_TYPE } from "#data/elite-redux/er-recreated-items";
 import { ER_RELIC_CONFIG, type ErRelicKind } from "#data/elite-redux/er-relics";
+import { hasErAilment } from "#data/elite-redux/er-status-cure";
 import { erSeedItemType } from "#data/elite-redux/er-terrain-seeds";
 import { SpeciesFormChangeItemTrigger } from "#data/form-change-triggers";
 import { getNatureName, getNatureStatMultiplier } from "#data/nature";
@@ -525,7 +526,8 @@ export class PokemonHpRestoreModifierType extends PokemonModifierType {
           if (
             !pokemon.hp
             || (pokemon.isFullHp()
-              && (!this.healStatus || (!pokemon.status && !pokemon.getTag(BattlerTagType.CONFUSED))))
+              && (!this.healStatus
+                || (!pokemon.status && !pokemon.getTag(BattlerTagType.CONFUSED) && !hasErAilment(pokemon))))
           ) {
             return PartyUiHandler.NoEffectMessage;
           }
@@ -594,7 +596,7 @@ export class PokemonStatusHealModifierType extends PokemonModifierType {
       iconImage,
       (_type, args) => new PokemonStatusHealModifier(this, (args[0] as PlayerPokemon).id),
       (pokemon: PlayerPokemon) => {
-        if (!pokemon.hp || (!pokemon.status && !pokemon.getTag(BattlerTagType.CONFUSED))) {
+        if (!pokemon.hp || (!pokemon.status && !pokemon.getTag(BattlerTagType.CONFUSED) && !hasErAilment(pokemon))) {
           return PartyUiHandler.NoEffectMessage;
         }
         return null;

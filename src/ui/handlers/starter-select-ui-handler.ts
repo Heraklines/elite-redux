@@ -2776,10 +2776,16 @@ export class StarterSelectUiHandler extends MessageUiHandler {
                 return true;
               },
             });
-            ui.setModeWithoutClear(UiMode.OPTION_SELECT, {
-              options: innateOptions,
-              yOffset: 47,
-            });
+            // Return to STARTER_SELECT FIRST, then open the submenu - the same handoff
+            // manageMoves/manageNature use. Opening a new OPTION_SELECT directly from
+            // inside the action menu's own OPTION_SELECT (without clearing it) leaves the
+            // submenu unable to take input -> softlock (the reported Innates-menu freeze).
+            ui.setMode(UiMode.STARTER_SELECT).then(() =>
+              ui.setModeWithoutClear(UiMode.OPTION_SELECT, {
+                options: innateOptions,
+                yOffset: 47,
+              }),
+            );
           };
           const hasInnateOptions =
             !globalScene.gameMode.hasChallenge(Challenges.FRESH_START)
