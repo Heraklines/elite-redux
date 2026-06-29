@@ -12,6 +12,7 @@ import { modifierTypes } from "#data/data-lists";
 import { CoopLobbyController, type LobbyPlayer } from "#data/elite-redux/coop/coop-lobby";
 import { getCoopController, startLocalCoopSession } from "#data/elite-redux/coop/coop-runtime";
 import type { CoopNetcodeMode } from "#data/elite-redux/coop/coop-transport";
+import { buildDemoChallengesConfig } from "#data/elite-redux/er-community-challenges";
 import { Gender } from "#data/gender";
 import { BattleType } from "#enums/battle-type";
 import { GameModes } from "#enums/game-modes";
@@ -151,7 +152,34 @@ export class TitlePhase extends Phase {
             options.push({
               label: GameMode.getModeName(GameModes.CHALLENGE),
               handler: () => {
-                setModeAndEnd(GameModes.CHALLENGE);
+                // ER Community Challenges: split Challenge into {Custom, Community}.
+                // Community is staging/dev-only for now (no backend deployed yet, the
+                // create flow is still being built); the browser degrades gracefully
+                // to an empty feed when the worker is unreachable.
+                if (isDev || isBeta || devToolsEnabled) {
+                  globalScene.ui.setOverlayMode(UiMode.OPTION_SELECT, {
+                    options: [
+                      {
+                        label: "Custom Challenge",
+                        handler: () => {
+                          setModeAndEnd(GameModes.CHALLENGE);
+                          return true;
+                        },
+                      },
+                      {
+                        label: "Community Challenges",
+                        handler: () => {
+                          // TODO(P1-A): swap the demo feed for fetchCommunityFeed() once the
+                          // /community/* worker routes are deployed.
+                          globalScene.ui.setOverlayMode(UiMode.COMMUNITY_CHALLENGES, buildDemoChallengesConfig());
+                          return true;
+                        },
+                      },
+                    ],
+                  });
+                } else {
+                  setModeAndEnd(GameModes.CHALLENGE);
+                }
                 return true;
               },
             });
