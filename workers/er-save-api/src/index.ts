@@ -850,6 +850,20 @@ async function handleRunCreate(
   if (!id || !party) {
     return text("Run is missing id or party.", 400, cors);
   }
+  // Sanitize IVs on the way in - clamp each member's IVs to the legal 0..31. Legit IVs
+  // never exceed 31, so this is a no-op for honest runs; for a hacked save (IV 999 ->
+  // ~2000-stat ghost) it neutralizes the team WITHOUT rejecting the upload (a hard reject
+  // would just have cheaters' clients retry-spam). The run is still stored for stats; it
+  // just can't be fielded as an unbeatable ghost.
+  for (const member of party) {
+    const ivs = (member as { ivs?: unknown })?.ivs;
+    if (Array.isArray(ivs)) {
+      (member as { ivs: number[] }).ivs = ivs.map(iv => {
+        const n = Math.floor(Number(iv));
+        return Number.isFinite(n) ? Math.max(0, Math.min(31, n)) : 0;
+      });
+    }
+  }
   const outcome =
     run.outcome === "victory" || run.outcome === "defeat" ? run.outcome : run.isVictory ? "victory" : "defeat";
   const wave = Number.parseInt(String(run.wave ?? run.waveReached ?? ""), 10);
