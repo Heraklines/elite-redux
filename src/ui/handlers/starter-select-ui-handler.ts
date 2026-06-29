@@ -2796,7 +2796,7 @@ export class StarterSelectUiHandler extends MessageUiHandler {
                 .some(abilityId => abilityId !== AbilityId.NONE));
           if (hasInnateOptions) {
             options.push({
-              label: "Innates",
+              label: "Unlock Innates",
               handler: () => {
                 showInnateOptions();
                 return true;

@@ -1211,6 +1211,74 @@ export interface ErShinyLabNameStyle {
   boxTint: number;
 }
 
+/**
+ * Ensure an adopted palette accent reads as a CLEAR colour on the name, not ~white.
+ * A handful of palette accents (chrome, pearl, negative, mythril, moonstone, sakura) are
+ * near-white - on the name they were indistinguishable from the default white text ("Name
+ * FX doesn't work on all palettes"). When every channel is light, pull the colour toward
+ * its own hue (boost saturation, cap brightness) so it becomes a visible tint. Vivid
+ * accents (every other palette) are returned unchanged.
+ */
+function vividNameColor(hex: string): string {
+  const n = Number.parseInt(hex.replace("#", ""), 16);
+  if (!Number.isFinite(n)) {
+    return hex;
+  }
+  const r = (n >> 16) & 0xff;
+  const g = (n >> 8) & 0xff;
+  const b = n & 0xff;
+  // Already has a dark-enough channel -> distinct from white, leave it.
+  if (Math.min(r, g, b) <= 170) {
+    return hex;
+  }
+  const max = Math.max(r, g, b) / 255;
+  const min = Math.min(r, g, b) / 255;
+  const d = max - min;
+  let h = 0;
+  if (d > 0) {
+    const rn = r / 255;
+    const gn = g / 255;
+    const bn = b / 255;
+    if (max === rn) {
+      h = ((gn - bn) / d) % 6;
+    } else if (max === gn) {
+      h = (bn - rn) / d + 2;
+    } else {
+      h = (rn - gn) / d + 4;
+    }
+    h *= 60;
+    if (h < 0) {
+      h += 360;
+    }
+  }
+  // Re-saturate to a clear tint (S=0.55) at a mid brightness (V=0.85).
+  const tv = 0.85;
+  const tc = tv * 0.55;
+  const tx = tc * (1 - Math.abs(((h / 60) % 2) - 1));
+  const tm = tv - tc;
+  let rr = 0;
+  let gg = 0;
+  let bb = 0;
+  if (h < 60) {
+    [rr, gg] = [tc, tx];
+  } else if (h < 120) {
+    [rr, gg] = [tx, tc];
+  } else if (h < 180) {
+    [gg, bb] = [tc, tx];
+  } else if (h < 240) {
+    [gg, bb] = [tx, tc];
+  } else if (h < 300) {
+    [rr, bb] = [tx, tc];
+  } else {
+    [rr, bb] = [tc, tx];
+  }
+  const toHex = (v: number): string =>
+    Math.round((v + tm) * 255)
+      .toString(16)
+      .padStart(2, "0");
+  return `#${toHex(rr)}${toHex(gg)}${toHex(bb)}`;
+}
+
 /** Darken a #rrggbb to a 0xRRGGBB box tint (a dim backdrop for the bright name color). */
 function deriveNameBoxTint(hex: string): number {
   const n = Number.parseInt(hex.replace("#", ""), 16);
@@ -1243,7 +1311,8 @@ export function getErShinyLabNameStyle(loadout: ErShinyLabLoadout | null | undef
   if (loadout.palette) {
     const def = ER_SHINY_LAB_EFFECTS_BY_CATEGORY.palette.find(e => e.id === loadout.palette);
     if (def) {
-      return { color: def.accent, boxTint: deriveNameBoxTint(def.accent) };
+      const color = vividNameColor(def.accent);
+      return { color, boxTint: deriveNameBoxTint(color) };
     }
   }
   return null;
