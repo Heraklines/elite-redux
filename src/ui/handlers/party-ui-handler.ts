@@ -33,6 +33,7 @@ import type { PlayerPokemon, Pokemon } from "#field/pokemon";
 import type { PokemonFormChangeItemModifier, PokemonHeldItemModifier } from "#modifiers/modifier";
 import type { PokemonMove } from "#moves/pokemon-move";
 import type { CommandPhase } from "#phases/command-phase";
+import { getErShinyLabNameStyleForPokemon } from "#sprites/er-shiny-lab-sprite-fx";
 import { getVariantTint } from "#sprites/variant";
 import type { TurnMove } from "#types/turn-move";
 import { FusionPreviewPanel } from "#ui/fusion-preview-panel";
@@ -2467,6 +2468,12 @@ class PartySlot extends Phaser.GameObjects.Container {
     this.slotName = addTextObject(0, 0, displayName, TextStyle.PARTY);
     this.slotName.setPositionRelative(this.slotBg, namePosition.x, namePosition.y);
     this.slotName.setOrigin(0);
+    // Shiny Lab Name FX: the slot name adopts the equipped palette's color (the slot is
+    // rebuilt each render, so a freshly-styled PARTY text needs no reset).
+    const nameFxStyle = getErShinyLabNameStyleForPokemon(this.pokemon);
+    if (nameFxStyle) {
+      this.slotName.setColor(nameFxStyle.color);
+    }
 
     const slotLevelLabel = globalScene.add
       .image(0, 0, getLocalizedSpriteKey("party_slot_overlay_lv"))

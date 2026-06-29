@@ -42,6 +42,7 @@ import type { PokemonMove } from "#moves/pokemon-move";
 import {
   ErShinyLabSpriteFxOverlay,
   type ErShinyLabSpriteSourceRef,
+  getErShinyLabNameStyleForPokemon,
   getErShinyLabPokemonSpriteSource,
   getErShinyLabSpriteFxLookForPokemon,
   getErShinyLabSpriteFxTime,
@@ -536,6 +537,9 @@ export class SummaryUiHandler extends UiHandler {
     this.pokemon.cry();
 
     this.nameText.setText(this.pokemon.getNameToRender({ useIllusion: false }));
+    // Shiny Lab Name FX: the name adopts the equipped palette's color (T3+ shiny, unlocked + on).
+    const nameFxStyle = getErShinyLabNameStyleForPokemon(this.pokemon);
+    this.nameText.setColor(nameFxStyle ? nameFxStyle.color : getTextColor(TextStyle.SUMMARY));
 
     const isFusion = this.pokemon.isFusion();
 

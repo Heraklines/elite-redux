@@ -73,6 +73,7 @@ import {
   clearErShinyLabSpriteFxTexture,
   ER_SHINY_LAB_MINI_ICON_RENDER_PAD,
   erShinyLabSpriteFxStateKey,
+  getErShinyLabNameStyleForSpecies,
   getErShinyLabSpeciesIconSource,
   getErShinyLabSpriteFxLookForSpecies,
   hasErShinyLabAnySpriteFx,
@@ -4727,6 +4728,15 @@ export class StarterSelectUiHandler extends MessageUiHandler {
       } else {
         this.pokemonNameText.setText(species.name);
       }
+      // Shiny Lab Name FX: the name adopts the equipped palette's color for a T3+ shiny
+      // with Name FX unlocked + on (only while viewing the shiny form).
+      const nameFxStyle = getErShinyLabNameStyleForSpecies(
+        species.speciesId,
+        !!starterAttributes?.shiny,
+        this.speciesStarterDexEntry?.caughtAttr ?? 0n,
+        !!starterAttributes?.erBlackShiny,
+      );
+      this.pokemonNameText.setColor(nameFxStyle ? nameFxStyle.color : getTextColor(TextStyle.SUMMARY));
       this.truncateName();
 
       if (this.speciesStarterDexEntry?.caughtAttr) {

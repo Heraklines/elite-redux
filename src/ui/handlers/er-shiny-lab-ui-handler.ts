@@ -48,7 +48,7 @@ import {
   type ErShinyLabParams,
   type ErShinyLabPreset,
   type ErShinyLabRarity,
-  getErShinyLabNameSignature,
+  getErShinyLabNameStyle,
   resolveErShinyLabEffectState,
 } from "#data/elite-redux/er-shiny-lab-effects";
 import {
@@ -961,8 +961,10 @@ export class ErShinyLabUiHandler extends UiHandler {
 
   private refreshNameFxPreview(loadout: ErShinyLabLoadout): void {
     const cfg = this.config;
-    const signature = cfg && cfg.earnedTier >= 3 && cfg.params.nameFx ? getErShinyLabNameSignature(loadout) : null;
-    this.nameText.setColor(signature?.color ?? INK);
+    // The name adopts the equipped palette's color (or a named-combo signature) when
+    // Name FX is on for a T3+ shiny. The color goes on the name TEXT, not a box.
+    const style = cfg && cfg.earnedTier >= 3 && cfg.params.nameFx ? getErShinyLabNameStyle(loadout) : null;
+    this.nameText.setColor(style?.color ?? INK);
   }
 
   private refreshPreviewSurface(effect: ErShinyLabEffect | null | undefined, params: ErShinyLabParams): void {

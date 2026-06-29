@@ -540,13 +540,9 @@ export abstract class BattleInfo extends Phaser.GameObjects.Container {
       look?.params.nameFx && getErShinyLabEarnedTierForPokemon(pokemon) >= 3
         ? getErShinyLabNameStyle(look.loadout)
         : null;
-    if (!style) {
-      this.nameText.setColor("#f8f8f8");
-      this.box.clearTint();
-      return;
-    }
-    this.nameText.setColor(style.color);
-    this.box.setTint(style.boxTint);
+    // The FX goes on the NAME text itself - NOT the box around it (tinting the box
+    // looked like a negative white->black wash). Only recolor the name.
+    this.nameText.setColor(style ? style.color : "#f8f8f8");
   }
 
   protected updateTeraType(ty: PokemonType): boolean {

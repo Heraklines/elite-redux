@@ -5,8 +5,12 @@ import {
   decodeErShinyLabSavedLook,
   type ErShinyLabCategory,
   type ErShinyLabLoadout,
+  type ErShinyLabNameStyle,
   type ErShinyLabParams,
   type ErShinyLabSavedLook,
+  getErShinyLabEarnedTier,
+  getErShinyLabEarnedTierForPokemon,
+  getErShinyLabNameStyle,
   getErShinyLabOwnedSet,
   isErShinyLabNameFxUnlocked,
   sanitizeErShinyLabLoadout,
@@ -385,6 +389,46 @@ export function getErShinyLabSpriteFxLookForPokemon(pokemon: {
     return null;
   }
   return getErShinyLabSpriteFxLookForSpecies(pokemon.species.speciesId, pokemon.shiny);
+}
+
+/**
+ * The Name FX style for a battle Pokemon: the equipped palette's color (or a named-combo
+ * signature) when the mon is a T3+ shiny with Name FX unlocked + enabled; null otherwise.
+ * Cheap (a lookup), safe to call per render. Callers apply `.color` to the NAME TEXT only -
+ * never a box/panel tint.
+ */
+export function getErShinyLabNameStyleForPokemon(pokemon: {
+  species: { speciesId: number };
+  shiny: boolean;
+  variant?: number;
+  customPokemonData?: {
+    erShinyLab?: ErShinyLabSavedLook | undefined;
+    erShinyLabSuppressLocal?: boolean;
+    erBlackShiny?: boolean | undefined;
+  } | null;
+}): ErShinyLabNameStyle | null {
+  const look = getErShinyLabSpriteFxLookForPokemon(pokemon);
+  if (!look?.params.nameFx || getErShinyLabEarnedTierForPokemon(pokemon) < 3) {
+    return null;
+  }
+  return getErShinyLabNameStyle(look.loadout);
+}
+
+/**
+ * The Name FX style for a species + its shiny state (Starter Select). `caughtAttr` +
+ * `hasBlackShiny` resolve the earned tier (T3+ gate). null when not applicable.
+ */
+export function getErShinyLabNameStyleForSpecies(
+  speciesId: number,
+  shiny: boolean,
+  caughtAttr: bigint,
+  hasBlackShiny: boolean,
+): ErShinyLabNameStyle | null {
+  const look = getErShinyLabSpriteFxLookForSpecies(speciesId, shiny);
+  if (!look?.params.nameFx || getErShinyLabEarnedTier(caughtAttr, hasBlackShiny) < 3) {
+    return null;
+  }
+  return getErShinyLabNameStyle(look.loadout);
 }
 
 export function hasErShinyLabAnySpriteFx(
