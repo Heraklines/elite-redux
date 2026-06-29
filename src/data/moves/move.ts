@@ -7574,16 +7574,20 @@ export class ErDecorateSideBoostAttr extends MoveEffectAttr {
     if (!super.apply(user, target, move, args)) {
       return false;
     }
-    const side = [user, user.getAlly()].filter((p): p is Pokemon => p != null && !p.isFainted());
-    for (const mon of side) {
+    // Dex (#705): "Damages foes. Raises ALLIES' Attack, Special Attack, and Crit by 2
+    // stages." The boost goes to the user's ALLY only (the partner in doubles), NEVER the
+    // user itself - boosting the whole side (user + ally) was way too strong. In singles
+    // there is no ally, so Decorate is purely a damaging move.
+    const ally = user.getAlly();
+    if (ally != null && !ally.isFainted()) {
       globalScene.phaseManager.unshiftNew(
         "StatStageChangePhase",
-        mon.getBattlerIndex(),
+        ally.getBattlerIndex(),
         true,
         [Stat.ATK, Stat.SPATK],
         2,
       );
-      mon.addTag(BattlerTagType.CRIT_BOOST, 0, move.id);
+      ally.addTag(BattlerTagType.CRIT_BOOST, 0, move.id);
     }
     return true;
   }

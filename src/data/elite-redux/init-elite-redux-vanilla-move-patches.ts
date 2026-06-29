@@ -296,8 +296,8 @@ const MOVE_PATCHERS: ReadonlyMap<MoveId, (move: MutableMove) => void> = new Map(
       removeAttrsByName(move, ["StatStageChangeAttr"]);
       // ER Decorate (dex #705): "Damages foes. Raises ALLIES' Attack, Special Attack,
       // and Crit by 2 stages." Apply the +2 Atk/SpAtk + the Focus-Energy CRIT_BOOST to
-      // the user's WHOLE side (user + ally), not just the user - the old self-targeted
-      // boost missed the partner in doubles (reported on ally Kecleon).
+      // the user's ALLY only (never the user itself - boosting the whole side was way too
+      // strong). In singles, with no ally, Decorate is purely a damaging move.
       addAttrUnique(move, new ErDecorateSideBoostAttr());
     },
   ],
