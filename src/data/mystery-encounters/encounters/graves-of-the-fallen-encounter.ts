@@ -49,7 +49,7 @@ import { MysteryEncounterType } from "#enums/mystery-encounter-type";
 import type { Nature } from "#enums/nature";
 import { PartyMemberStrength } from "#enums/party-member-strength";
 import { TrainerType } from "#enums/trainer-type";
-import type { PokemonHeldItemModifierType } from "#modifiers/modifier-type";
+import type { CustomModifierSettings, PokemonHeldItemModifierType } from "#modifiers/modifier-type";
 import { queueEncounterMessage } from "#mystery-encounters/encounter-dialogue-utils";
 import type { EnemyPartyConfig, EnemyPokemonConfig } from "#mystery-encounters/encounter-phase-utils";
 import {
@@ -59,7 +59,6 @@ import {
   setEncounterRewards,
   transitionMysteryEncounterIntroVisuals,
 } from "#mystery-encounters/encounter-phase-utils";
-import { applyModifierTypeToPlayerPokemon } from "#mystery-encounters/encounter-pokemon-utils";
 import type { MysteryEncounter } from "#mystery-encounters/mystery-encounter";
 import { MysteryEncounterBuilder } from "#mystery-encounters/mystery-encounter";
 import { MysteryEncounterOptionBuilder } from "#mystery-encounters/mystery-encounter-option";
@@ -289,21 +288,20 @@ function fallbackHeldFuncs(): ModifierTypeFunc[] {
 }
 
 /**
- * The {@linkcode DISTURB_REWARD_ITEMS} held-item types a DISTURB win hands over:
- * the fallen team's own held items first, topped up with random solid held items.
- * De-duplicated by name.
+ * The pool of held-item reward FUNCS a DISTURB win offers: the fallen team's own
+ * held items first, then solid fallbacks. De-duplicated by resolved name (so the
+ * same item never appears twice in one selection screen). Returned uncapped - it's
+ * a CHOICE pool, not a fixed grant (the player picks {@linkcode DISTURB_REWARD_ITEMS}
+ * of these across the two selection rounds).
  */
-function disturbMementoTypes(grave: GhostTeamSnapshot): PokemonHeldItemModifierType[] {
-  const out: PokemonHeldItemModifierType[] = [];
+function disturbRewardFuncs(grave: GhostTeamSnapshot): ModifierTypeFunc[] {
+  const out: ModifierTypeFunc[] = [];
   const seen = new Set<string>();
   const tryAdd = (fn: ModifierTypeFunc): void => {
-    if (out.length >= DISTURB_REWARD_ITEMS) {
-      return;
-    }
     const type = generateModifierType(fn) as PokemonHeldItemModifierType | null;
     if (type && !seen.has(type.name)) {
       seen.add(type.name);
-      out.push(type);
+      out.push(fn);
     }
   };
   for (const fn of resolvableHeldItemFuncs(grave)) {
@@ -316,23 +314,29 @@ function disturbMementoTypes(grave: GhostTeamSnapshot): PokemonHeldItemModifierT
 }
 
 /**
- * Grant the DISTURB win reward DIRECTLY: hand the player TWO held items (the
- * fallen team's mementos, topped with solid fallbacks) straight onto the lead, and
- * announce them - no 1-of-N reward screen. Wired as setEncounterRewards' pre-
- * rewards callback so it fires after the win with NO shop opened.
+ * Wire the DISTURB win reward as a SELECTION (reported: the old direct-grant felt
+ * like "no item was chosen"). On victory the player gets {@linkcode DISTURB_REWARD_ITEMS}
+ * reward screens IN A ROW over the memento pool (the fallen team's held items topped
+ * with solid fallbacks) - a normal screen only grants one item, so two screens let
+ * the player choose two. Falls back to a guaranteed Ultra-tier pick if the pool is
+ * somehow empty (it shouldn't be - the fallbacks always resolve).
  */
-function grantDisturbMementos(grave: GhostTeamSnapshot): void {
-  const types = disturbMementoTypes(grave);
-  const lead = globalScene.getPlayerParty()[0];
-  for (const type of types) {
-    if (lead) {
-      applyModifierTypeToPlayerPokemon(lead, type);
-    }
+function setDisturbRewards(grave: GhostTeamSnapshot): void {
+  const funcs = disturbRewardFuncs(grave);
+  if (funcs.length === 0) {
+    setEncounterRewards({ guaranteedModifierTiers: [FALLBACK_TIER, FALLBACK_TIER], fillRemaining: false });
+    return;
   }
-  const encounter = globalScene.currentBattle.mysteryEncounter!;
-  encounter.setDialogueToken("item1", types[0]?.name ?? "a relic");
-  encounter.setDialogueToken("item2", types[1]?.name ?? "a relic");
-  queueEncounterMessage(`${namespace}:disturbReward`);
+  const settings: CustomModifierSettings = { guaranteedModifierTypeFuncs: funcs, fillRemaining: false };
+  // The first screen comes from `customShopRewards`; the pre-rewards callback queues
+  // the SECOND screen. Both run after the MysteryEncounterRewardsPhase, so the player
+  // picks one item from the pool, then a second - DISTURB_REWARD_ITEMS picks total.
+  setEncounterRewards(settings, undefined, () => {
+    for (let i = 1; i < DISTURB_REWARD_ITEMS; i++) {
+      globalScene.phaseManager.unshiftNew("SelectModifierPhase", 0, undefined, settings);
+    }
+    queueEncounterMessage(`${namespace}:disturbReward`);
+  });
 }
 
 /**
@@ -425,10 +429,10 @@ export const GravesOfTheFallenEncounter: MysteryEncounter = MysteryEncounterBuil
       .withOptionPhase(async () => {
         // DISTURB (risk): the fallen team's ghost RISES as a named ghost TRAINER
         // (the source player's account name + ghost BGM), fielding the snapshot's
-        // actual team. Win -> TWO held items are handed over directly (the fallen
-        // team's mementos, topped with solid fallbacks), no 1-of-N reward screen.
+        // actual team. Win -> the player picks TWO items in a row from the memento
+        // pool (the fallen team's held items, topped with solid fallbacks).
         const grave = await resolveGrave();
-        setEncounterRewards(undefined, undefined, () => grantDisturbMementos(grave));
+        setDisturbRewards(grave);
         await transitionMysteryEncounterIntroVisuals(true, false);
         await initBattleWithEnemyConfig(buildGraveBattle(grave));
         // The trainer + its party are now built (party = the grave's mons via

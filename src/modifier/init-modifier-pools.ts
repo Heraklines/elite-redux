@@ -5,6 +5,7 @@ import { modifierTypes } from "#data/data-lists";
 import { MAX_PER_TYPE_POKEBALLS } from "#data/pokeball";
 import { AbilityId } from "#enums/ability-id";
 import { BerryType } from "#enums/berry-type";
+import { Challenges } from "#enums/challenges";
 import { ModifierTier } from "#enums/modifier-tier";
 import { MoveId } from "#enums/move-id";
 import { PokeballType } from "#enums/pokeball";
@@ -894,9 +895,10 @@ function skipInLastClassicWaveOrDefault(defaultWeight: number): WeightedModifier
  */
 function lureWeightFunc(maxBattles: number, weight: number): WeightedModifierTypeWeightFunc {
   return () => {
-    // Co-op (#633): every battle is already a forced double, so a lure (which only
-    // boosts double-battle CHANCE) does nothing - keep it out of the reward pool.
-    if (globalScene.gameMode.isCoop) {
+    // Co-op (#633) AND the Doubles Only challenge (#8): every battle is already a
+    // forced double, so a lure (which only boosts double-battle CHANCE) does nothing
+    // - keep it out of the reward pool (otherwise it's a dead reward slot).
+    if (globalScene.gameMode.isCoop || globalScene.gameMode.hasChallenge(Challenges.DOUBLES_ONLY)) {
       return 0;
     }
     const lures = globalScene.getModifiers(DoubleBattleChanceBoosterModifier);

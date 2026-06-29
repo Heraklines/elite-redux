@@ -1958,18 +1958,16 @@ export class BattleScene extends SceneBase {
       return false;
     }
 
-    // Co-op (#633): every regular battle (wild OR trainer) is a DOUBLE so each of
-    // the two players always has an active Pokemon to control. The finale / endless
-    // boss / ME edges above already returned single. Lures (which only boost the
-    // double-battle CHANCE) are therefore inert in co-op - "deactivated" as designed.
-    if (this.gameMode.isCoop) {
-      return true;
-    }
-
-    // ER (#383): the Doubles Only challenge makes every TRAINER battle a
-    // double battle (before fixed-battle forcing, after the finale/ME edge
-    // cases above - the finale stays single).
-    if (battleType === BattleType.TRAINER && this.gameMode.hasChallenge(Challenges.DOUBLES_ONLY)) {
+    // Co-op (#633) AND the Doubles Only challenge (#8): every regular battle (wild
+    // OR trainer) is a DOUBLE. For co-op so each of the two players always has an
+    // active Pokemon to control; for the challenge so "Doubles" actually means
+    // doubles everywhere (it used to force only TRAINER battles, leaving wild +
+    // event waves single - reported "event won't allow doubles"). The finale /
+    // endless boss / ME edges above already returned single, so those stay single
+    // (matches co-op). Lures (which only boost the double-battle CHANCE) are inert
+    // here, so they're also stripped from the reward pool for both - see
+    // `getErRewardPoolBlocklist` / the lure filter in modifier-type.
+    if (this.gameMode.isCoop || this.gameMode.hasChallenge(Challenges.DOUBLES_ONLY)) {
       return true;
     }
 

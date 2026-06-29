@@ -2342,10 +2342,12 @@ export const DEV_SCENARIOS: DevScenario[] = [
       + "Cynthia) so the epitaph + mementos always render even on an empty pool.\n"
       + "EXPECT: the epitaph shows that NAME / difficulty / wave / killer. PAY\n"
       + "RESPECTS -> a memento (their held item) and leave. DISTURB -> they rise as a\n"
-      + "NAMED GHOST TRAINER (Lance's team, ghost theme); win -> TWO held items are\n"
-      + "handed over DIRECTLY (a notification, NO 1-of-N reward screen). Online, the\n"
-      + "option AWAITS a live ghost sample, so it uses a REAL fallen player's team when\n"
-      + "the pool has one. WALK AWAY -> no cost. Never softlocks.",
+      + "NAMED GHOST TRAINER (Lance's team, ghost theme); win -> the player gets TWO\n"
+      + "reward-selection screens IN A ROW over the memento pool (the fallen team's held\n"
+      + "items + solid fallbacks), so they CHOOSE two items (was a silent direct-grant -\n"
+      + "reported as 'no item selection'). Online, the option AWAITS a live ghost sample,\n"
+      + "so it uses a REAL fallen player's team when the pool has one. WALK AWAY -> no\n"
+      + "cost. Never softlocks.",
     setup: () => {
       resetDevOverrides();
       // Plant a real named grave so the epitaph (name/wave/mode/killer) and the
