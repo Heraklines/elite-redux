@@ -1,0 +1,268 @@
+----- BUG REPORT (in-game) -----
+version:  1.11.19
+url:      https://elite-redux.pages.dev/
+ua:       Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Mobile Safari/537.36
+mode:     4  wave:117  difficulty:hell
+seed:     NrYPxqfY1YvC7xDGcZI8Ho9V
+party:    Darkrai Nightmare(L104 285/285), Moltres Ex(L104 316/316), Nickit(L104 212/212), Slyduck(L104 300/300), Shiftry(L104 320/320), Gengar(L104 277/277)
+
+----- DESCRIPTION -----
+Neutralizing Gas is meant to go before ALL abilities but Fearmonger went first
+
+----- CONSOLE -----
+[22:43:21.182] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[22:43:21.182] LOG: %cStart Phase TurnEndPhase color:green;
+[22:43:21.189] WARN: [coop:turn] host recorder: finalize with NO open recording -> turn=-1 events=0 (caller decides not to emit)
+[22:43:21.189] LOG: %cStart Phase PokemonHealPhase color:green;
+[22:43:21.380] LOG: Applied Healing Charm 
+[22:43:21.384] LOG: %cStart Phase MessagePhase color:green;
+[22:43:21.630] LOG: %cStart Phase SwitchSummonPhase color:green;
+[22:43:21.863] LOG: Debra
+[22:43:21.948] LOG: Applied HP Up (enemy)
+[22:43:21.948] LOG: Applied Protein (enemy)
+[22:43:21.948] LOG: Applied Carbos (enemy)
+[22:43:21.948] LOG: Applied Carbos (enemy)
+[22:43:21.949] LOG: Applied Protein (enemy)
+[22:43:22.091] LOG: %cStart Phase PostSummonPhase color:green;
+[22:43:22.091] LOG: Ran PSP for: Regice
+[22:43:22.092] LOG: %cStart Phase StatStageChangePhase color:green;
+[22:43:22.274] LOG: %cStart Phase MessagePhase color:green;
+[22:43:22.488] LOG: %cStart Phase PostSummonPhase color:green;
+[22:43:22.488] LOG: %cStart Phase PostSummonPhase color:green;
+[22:43:22.489] LOG: %cStart Phase TurnInitPhase color:green;
+[22:43:22.489] LOG: %cStart Phase CommandPhase color:green;
+[22:43:23.483] LOG: Move: FIERY_DANCE Move targets: {"targets":[3,1],"multiple":false} 
+Player Pokemon: Mega Moltres Ex
+[22:43:23.485] LOG: %cStart Phase SelectTargetPhase color:green;
+[22:43:23.731] LOG: %cStart Phase CommandPhase color:green;
+[22:43:24.916] LOG: Move: NASTY_PLOT Move targets: {"targets":[1],"multiple":false} 
+Player Pokemon: Darkrai Nightmare
+[22:43:24.918] LOG: %cStart Phase EnemyCommandPhase color:green;
+[22:43:24.933] LOG: Battle Seed: QnQVfyBvobxVtqke
+[22:43:24.936] LOG: Move Pool: ["Freezy Frost"]
+[22:43:24.936] LOG: Move Scores: [943.5759493670886]
+[22:43:24.936] LOG: Sorted Move Pool: ["Freezy Frost"]
+[22:43:24.936] LOG: Chosen Move: Freezy Frost
+[22:43:24.936] LOG: ER AI: experimental brain (sharpness 1)
+[22:43:24.936] LOG: %cStart Phase TurnStartPhase color:green;
+[22:43:24.939] LOG: %cStart Phase MovePhase color:green;
+[22:43:24.939] LOG: %cUser: Mega Moltres Ex
+Move: FIERY_DANCE
+Use Mode: NORMAL color:orchid
+[22:43:24.942] LOG: %cStart Phase MessagePhase color:green;
+[22:43:25.063] LOG: %cStart Phase MoveEffectPhase color:green;
+[22:43:25.064] LOG: Applied Multi Lens 
+[22:43:25.065] LOG: Applied Wide Lens 
+[22:43:25.597] LOG: crit stage: +0
+[22:43:25.599] LOG: Move: Fiery Dance | Base damage: 153.06966887417218 | Power: 80 | Source attack: 981 | Target defense: 453
+[22:43:25.599] LOG: Applied Multi Lens 
+[22:43:25.599] LOG: Move: Fiery Dance | Attack damage: 439
+[22:43:25.599] LOG: Applied Amulet Coin 
+[22:43:25.600] LOG: Applied Golden Punch 
+[22:43:25.601] LOG: %cStart Phase DamageAnimPhase color:green;
+[22:43:25.632] LOG: %cStart Phase MessagePhase color:green;
+[22:43:25.847] LOG: %cStart Phase ShowAbilityPhase color:green;
+[22:43:26.015] LOG: %cStart Phase HideAbilityPhase color:green;
+[22:43:26.065] LOG: %cStart Phase MessagePhase color:green;
+[22:43:26.263] LOG: %cStart Phase FaintPhase color:green;
+[22:43:28.199] LOG: %cStart Phase MessagePhase color:green;
+[22:43:28.463] LOG: %cStart Phase VictoryPhase color:green;
+[22:43:28.464] LOG: Applied Soothe Bell 
+[22:43:28.464] LOG: Applied Soothe Bell 
+[22:43:28.464] LOG: %cStart Phase MoveEndPhase color:green;
+[22:43:28.465] LOG: %cStart Phase MovePhase color:green;
+[22:43:28.465] LOG: %cUser: Darkrai Nightmare
+Move: NASTY_PLOT
+Use Mode: NORMAL color:orchid
+[22:43:28.467] LOG: %cStart Phase MessagePhase color:green;
+[22:43:28.597] LOG: %cStart Phase MoveEffectPhase color:green;
+[22:43:29.114] LOG: %cStart Phase StatStageChangePhase color:green;
+[22:43:29.299] LOG: %cStart Phase MessagePhase color:green;
+[22:43:29.546] LOG: %cStart Phase MoveEndPhase color:green;
+[22:43:29.547] LOG: %cStart Phase MovePhase color:green;
+[22:43:29.547] LOG: %cStart Phase MoveEndPhase color:green;
+[22:43:29.547] LOG: %cStart Phase CheckInterludePhase color:green;
+[22:43:29.547] LOG: %cStart Phase WeatherEffectPhase color:green;
+[22:43:30.130] LOG: %cStart Phase PositionalTagPhase color:green;
+[22:43:30.130] LOG: %cStart Phase BerryPhase color:green;
+[22:43:30.131] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[22:43:30.132] LOG: %cStart Phase TurnEndPhase color:green;
+[22:43:30.134] WARN: [coop:turn] host recorder: finalize with NO open recording -> turn=-1 events=0 (caller decides not to emit)
+[22:43:30.134] LOG: %cStart Phase PokemonHealPhase color:green;
+[22:43:30.347] LOG: Applied Healing Charm 
+[22:43:30.351] LOG: %cStart Phase MessagePhase color:green;
+[22:43:30.613] LOG: %cStart Phase BattleEndPhase color:green;
+[22:43:30.613] LOG: Battle Score: 3 (6 Turns x0)
+[22:43:30.613] LOG: Total Score: 42366
+[22:43:30.619] LOG: Applied Iron 
+[22:43:30.619] LOG: Applied Iron 
+[22:43:30.619] LOG: Applied HP Up 
+[22:43:30.621] LOG: Applied Protein 
+[22:43:30.621] LOG: Applied Protein 
+[22:43:30.647] LOG: Applied Iron 
+[22:43:30.647] LOG: Applied Iron 
+[22:43:30.647] LOG: Applied HP Up 
+[22:43:30.648] LOG: Applied Protein 
+[22:43:30.648] LOG: Applied Protein 
+[22:43:30.656] LOG: %cStart Phase ShowAbilityPhase color:green;
+[22:43:30.656] LOG: %cStart Phase MessagePhase color:green;
+[22:43:30.863] LOG: %cStart Phase HideAbilityPhase color:green;
+[22:43:30.898] LOG: %cStart Phase TrainerVictoryPhase color:green;
+[22:43:30.901] LOG: Breeders Cory & Debra
+[22:43:31.267] LOG: Breeder Cory
+[22:43:31.268] LOG: Dialogue dialogue:breeder.victory.3 skipped
+[22:43:31.268] LOG: %cStart Phase MoneyRewardPhase color:green;
+[22:43:31.268] LOG: Applied Amulet Coin 
+[22:43:31.268] LOG: Battle Seed: QnQVfyBvobxVtqke
+[22:43:31.520] LOG: %cStart Phase MessagePhase color:green;
+[22:43:31.813] LOG: %cStart Phase ModifierRewardPhase color:green;
+[22:43:32.500] LOG: %cStart Phase ModifierRewardPhase color:green;
+[22:43:32.959] LOG: %cStart Phase ModifierRewardPhase color:green;
+[22:43:33.352] LOG: %cStart Phase EggLapsePhase color:green;
+[22:43:33.352] LOG: %cStart Phase SelectModifierPhase color:green;
+[22:43:33.352] LOG: Wave Seed: ÂæÍÄìåÚÍ¥Íê·«ì¸»×Î½¬¼ã­Ê 116
+[22:43:33.359] LOG: Applied Greater Golden Ball 
+[22:43:33.360] LOG: 2 0 []
+[22:43:33.360] LOG: {"id":"POTION","localeKey":"modifierType:ModifierType.POTION","iconImage":"potion","group":"potion","soundName":"se/restore","tier":0,"restorePoints":20,"restorePercent":10,"healStatus":false} 
+[22:43:33.360] LOG: 6 0 []
+[22:43:33.360] LOG: {"id":"LURE","localeKey":"modifierType:ModifierType.LURE","iconImage":"lure","group":"lure","soundName":"se/restore","tier":0,"maxBattles":10} 
+[22:43:33.360] LOG: 20 6 [2,3,4,5,8,16,22]
+[22:43:33.360] LOG: {"id":"BASE_STAT_BOOSTER","localeKey":"","iconImage":"protein","soundName":"se/restore","tier":1,"stat":1,"key":"protein"} 
+[22:43:33.360] LOG: 4 0 []
+[22:43:33.360] LOG: {"id":"ETHER","localeKey":"modifierType:ModifierType.ETHER","iconImage":"ether","group":"ether","soundName":"se/restore","tier":0,"restorePoints":10} 
+[22:43:33.360] LOG: 8 0 []
+[22:43:33.360] LOG: {"id":"BERRY","localeKey":"","iconImage":"leppa_berry","group":"berry","soundName":"se/restore","tier":0,"berryType":10} 
+[22:43:33.360] LOG: 0 0 []
+[22:43:33.360] LOG: {"id":"POKEBALL","localeKey":"","iconImage":"pb","group":"pb","soundName":"se/pb_bounce_1","tier":0,"pokeballType":0,"count":5} 
+[22:43:37.131] LOG: Applied Healing Charm 
+[22:43:37.131] LOG: Applied Healing Charm 
+[22:43:37.131] LOG: Applied Healing Charm 
+[22:43:37.131] LOG: Applied Healing Charm 
+[22:43:37.131] LOG: Applied Healing Charm 
+[22:43:37.131] LOG: Applied Healing Charm 
+[22:43:40.506] LOG: Applied Healing Charm 
+[22:43:40.506] LOG: Applied Healing Charm 
+[22:43:40.506] LOG: Applied Healing Charm 
+[22:43:40.506] LOG: Applied Healing Charm 
+[22:43:40.506] LOG: Applied Healing Charm 
+[22:43:40.506] LOG: Applied Healing Charm 
+[22:43:42.810] LOG: %cStart Phase SelectModifierPhase color:green;
+[22:43:42.818] LOG: Applied Greater Golden Ball 
+[22:43:42.818] LOG: 8 2 [2,3]
+[22:43:42.818] LOG: {"id":"BERRY","localeKey":"","iconImage":"petaya_berry","group":"berry","soundName":"se/restore","tier":0,"berryType":5} 
+[22:43:42.818] LOG: 0 0 [2,3,4,5,6,7,8,16,22,23]
+[22:43:42.818] LOG: {"id":"GREAT_BALL","localeKey":"","iconImage":"gb","group":"pb","soundName":"se/pb_bounce_1","tier":1,"pokeballType":1,"count":5} 
+[22:43:42.818] LOG: 13 7 [2,3,4,5,6,7,8,16,22,23]
+[22:43:42.818] LOG: {"id":"NUGGET","localeKey":"modifierType:ModifierType.NUGGET","iconImage":"nugget","group":"money","soundName":"se/buy","tier":1,"moneyMultiplier":1,"moneyMultiplierDescriptorKey":"modifierType:ModifierType.MoneyRewardModifierType.extra.small"} 
+[22:43:42.818] LOG: 20 8 [2,3,4,5,6,7,8,16,22,23]
+[22:43:42.818] LOG: {"id":"BASE_STAT_BOOSTER","localeKey":"","iconImage":"zinc","soundName":"se/restore","tier":1,"stat":4,"key":"zinc"} 
+[22:43:42.819] LOG: 4 2 [2,3]
+[22:43:42.819] LOG: {"id":"ETHER","localeKey":"modifierType:ModifierType.ETHER","iconImage":"ether","group":"ether","soundName":"se/restore","tier":0,"restorePoints":10} 
+[22:43:42.819] LOG: 0 0 [2,3]
+[22:43:42.819] LOG: {"id":"POKEBALL","localeKey":"","iconImage":"pb","group":"pb","soundName":"se/pb_bounce_1","tier":0,"pokeballType":0,"count":5} 
+[22:43:42.819] LOG: 4 2 [2,3]
+[22:43:42.819] LOG: {"id":"ETHER","localeKey":"modifierType:ModifierType.ETHER","iconImage":"ether","group":"ether","soundName":"se/restore","tier":0,"restorePoints":10} 
+[22:43:42.819] LOG: 9 2 [2,3]
+[22:43:42.819] LOG: {"id":"TM_CASE","localeKey":"","iconImage":"tm_case","soundName":"se/restore","tier":0} 
+[22:43:42.819] LOG: 1 0 [2,3]
+[22:43:42.819] LOG: {"id":"RARE_CANDY","localeKey":"modifierType:ModifierType.RARE_CANDY","iconImage":"rare_candy","soundName":"se/restore","tier":0} 
+[22:43:42.819] LOG: 4 2 [2,3]
+[22:43:42.819] LOG: {"id":"ETHER","localeKey":"modifierType:ModifierType.ETHER","iconImage":"ether","group":"ether","soundName":"se/restore","tier":0,"restorePoints":10} 
+[22:43:42.819] LOG: 4 2 [2,3]
+[22:43:42.819] LOG: {"id":"ETHER","localeKey":"modifierType:ModifierType.ETHER","iconImage":"ether","group":"ether","soundName":"se/restore","tier":0,"restorePoints":10} 
+[22:43:42.819] LOG: 4 2 [2,3]
+[22:43:42.819] LOG: {"id":"ETHER","localeKey":"modifierType:ModifierType.ETHER","iconImage":"ether","group":"ether","soundName":"se/restore","tier":0,"restorePoints":10} 
+[22:43:42.820] LOG: 4 2 [2,3]
+[22:43:42.820] LOG: {"id":"ETHER","localeKey":"modifierType:ModifierType.ETHER","iconImage":"ether","group":"ether","soundName":"se/restore","tier":0,"restorePoints":10} 
+[22:43:42.820] LOG: 5 2 [2,3]
+[22:43:42.820] LOG: {"id":"MAX_ETHER","localeKey":"modifierType:ModifierType.MAX_ETHER","iconImage":"max_ether","group":"ether","soundName":"se/restore","tier":0,"restorePoints":-1} 
+[22:43:42.820] LOG: 1 0 [2,3]
+[22:43:42.820] LOG: {"id":"RARE_CANDY","localeKey":"modifierType:ModifierType.RARE_CANDY","iconImage":"rare_candy","soundName":"se/restore","tier":0} 
+[22:43:42.820] LOG: 0 0 [2,3]
+[22:43:42.820] LOG: {"id":"POKEBALL","localeKey":"","iconImage":"pb","group":"pb","soundName":"se/pb_bounce_1","tier":0,"pokeballType":0,"count":5} 
+[22:43:42.820] LOG: 6 2 [2,3]
+[22:43:42.820] LOG: {"id":"LURE","localeKey":"modifierType:ModifierType.LURE","iconImage":"lure","group":"lure","soundName":"se/restore","tier":0,"maxBattles":10} 
+[22:43:45.339] LOG: Applied Iron 
+[22:43:45.339] LOG: Applied Zinc 
+[22:43:45.340] LOG: Applied Iron 
+[22:43:45.340] LOG: Applied HP Up 
+[22:43:45.340] LOG: Applied Protein 
+[22:43:45.341] LOG: Applied Protein 
+[22:43:45.353] LOG: %cStart Phase NewBattlePhase color:green;
+[22:43:45.353] LOG: Wave Seed: ÃçÎÅíæÛÎ¦Îë¸¬í¹¼ØÏ¾­½ä®Ë 117
+[22:43:45.355] LOG: %cStart Phase MessagePhase color:green;
+[22:43:45.614] LOG: %cStart Phase ReturnPhase color:green;
+[22:43:45.731] LOG: %cStart Phase MessagePhase color:green;
+[22:43:45.947] LOG: %cStart Phase ReturnPhase color:green;
+[22:43:46.064] LOG: %cStart Phase ShowTrainerPhase color:green;
+[22:43:46.180] LOG: %cStart Phase NextEncounterPhase color:green;
+[22:43:46.189] LOG: Starting species pool tier: BOSS
+[22:43:46.195] LOG: 17 6 [6,8,10,11,12,14,23]
+[22:43:46.196] LOG: {"id":"ATTACK_TYPE_BOOSTER","localeKey":"","iconImage":"black_glasses","soundName":"se/restore","tier":2,"moveType":16,"boostPercent":20} 
+[22:43:46.426] DEBUG: Session data saved to slot 3!
+[22:43:46.428] LOG: Wave Seed: ÃçÎÅíæÛÎ¦Îë¸¬í¹¼ØÏ¾­½ä®Ë 117
+[22:43:47.132] LOG: %cStart Phase MysteryEncounterPhase color:green;
+[22:43:48.864] LOG: %cStart Phase MysteryEncounterOptionSelectedPhase color:green;
+[22:43:48.969] LOG: Pokemon: Wild Musharna | Species ID: 518 | Level: 100 | Nature: Brave (+Atk/-Spd) | Friendship: 50
+[22:43:48.969] LOG: Stats (IVs): HP: 368 (26), Atk: 158 (28), Def: 184 (9), Spatk: 240 (1), Spdef: 207 (12), Spd: 84 (31)
+[22:43:48.969] LOG: Ability: Neutralizing Gas | Passive Ability: Levitate | Boss Bars: 3
+[22:43:48.969] LOG: Moveset: ["Expanding Force","Barrier","Moonlight","Lovely Kiss"]
+[22:43:49.133] LOG: {"id":"BERRY","localeKey":"","iconImage":"lansat_berry","group":"berry","soundName":"se/restore","tier":0,"berryType":8} (enemy)
+[22:43:49.133] LOG: {"id":"ATTACK_TYPE_BOOSTER","localeKey":"","iconImage":"twisted_spoon","soundName":"se/restore","tier":2,"moveType":13,"boostPercent":20} (enemy)
+[22:43:49.133] LOG: {"id":"BERRY","localeKey":"","iconImage":"leppa_berry","group":"berry","soundName":"se/restore","tier":0,"berryType":10} (enemy)
+[22:43:49.133] LOG: {"id":"BASE_STAT_BOOSTER","localeKey":"","iconImage":"carbos","soundName":"se/restore","tier":1,"stat":5,"key":"carbos"} (enemy)
+[22:43:49.133] LOG: {"id":"BERRY","localeKey":"","iconImage":"enigma_berry","group":"berry","soundName":"se/restore","tier":0,"berryType":2} (enemy)
+[22:43:49.133] LOG: {"id":"ATTACK_TYPE_BOOSTER","localeKey":"","iconImage":"twisted_spoon","soundName":"se/restore","tier":2,"moveType":13,"boostPercent":20} (enemy)
+[22:43:49.133] LOG: Battle Seed: rW9A7fMKl6THOxG7
+[22:43:49.134] LOG: Applied Carbos (enemy)
+[22:43:49.134] LOG: %cStart Phase MysteryEncounterBattlePhase color:green;
+[22:43:49.135] LOG: %cStart Phase SummonPhase color:green;
+[22:43:49.135] LOG: Applied Carbos (enemy)
+[22:43:49.256] WARN: cry/518 not found
+[22:43:49.372] LOG: %cStart Phase SummonPhase color:green;
+[22:43:49.523] LOG: Applied Iron 
+[22:43:49.523] LOG: Applied Zinc 
+[22:43:49.524] LOG: Applied Iron 
+[22:43:49.524] LOG: Applied HP Up 
+[22:43:49.526] LOG: Applied Protein 
+[22:43:49.526] LOG: Applied Protein 
+[22:43:49.555] WARN: cry/622 not found
+[22:43:49.672] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[22:43:49.673] LOG: %cStart Phase CheckSwitchPhase color:green;
+[22:43:50.617] LOG: %cStart Phase SwitchPhase color:green;
+[22:43:51.290] LOG: %cStart Phase SwitchSummonPhase color:green;
+[22:43:51.473] LOG: Applied Iron 
+[22:43:51.473] LOG: Applied HP Up 
+[22:43:51.474] LOG: Applied Iron 
+[22:43:51.474] LOG: Applied Zinc 
+[22:43:51.475] LOG: Applied Protein 
+[22:43:51.476] LOG: Applied Protein 
+[22:43:51.507] WARN: cry/10769 not found
+[22:43:51.607] LOG: %cStart Phase PostSummonPhase color:green;
+[22:43:51.607] LOG: Ran PSP for: Darkrai Nightmare
+[22:43:51.607] LOG: %cStart Phase StatStageChangePhase color:green;
+[22:43:51.791] LOG: %cStart Phase MessagePhase color:green;
+[22:43:52.022] LOG: %cStart Phase PostSummonPhase color:green;
+[22:43:52.022] LOG: %cStart Phase PostSummonPhase color:green;
+[22:43:52.022] LOG: %cStart Phase ShowAbilityPhase color:green;
+[22:43:52.190] LOG: %cStart Phase StatStageChangePhase color:green;
+[22:43:52.190] LOG: %cStart Phase StatStageChangePhase color:green;
+[22:43:52.374] LOG: %cStart Phase MessagePhase color:green;
+[22:43:52.622] LOG: %cStart Phase StatStageChangePhase color:green;
+[22:43:52.807] LOG: %cStart Phase MessagePhase color:green;
+[22:43:53.038] LOG: %cStart Phase HideAbilityPhase color:green;
+[22:43:53.073] LOG: %cStart Phase InitEncounterPhase color:green;
+[22:43:53.073] LOG: %cStart Phase PostSummonPhase color:green;
+[22:43:53.081] LOG: %cStart Phase ShowAbilityPhase color:green;
+[22:43:53.240] LOG: %cStart Phase MessagePhase color:green;
+[22:43:53.505] LOG: %cStart Phase HideAbilityPhase color:green;
+[22:43:53.539] LOG: %cStart Phase PostSummonPhase color:green;
+[22:43:53.539] LOG: Ran PSP for: Musharna
+[22:43:53.540] LOG: %cStart Phase MessagePhase color:green;
+[22:43:54.314] LOG: %cStart Phase StatStageChangePhase color:green;
+[22:43:54.467] LOG: %cStart Phase MessagePhase color:green;
+[22:43:54.713] LOG: %cStart Phase PostSummonPhase color:green;
+[22:43:54.714] LOG: %cStart Phase TurnInitPhase color:green;
+[22:43:54.714] LOG: %cStart Phase MysteryEncounterBattleStartCleanupPhase color:green;
+[22:43:54.715] LOG: %cStart Phase CommandPhase color:green;
+[22:44:04.589] WARN: cry/10769 not found
