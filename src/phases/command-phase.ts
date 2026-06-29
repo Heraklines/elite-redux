@@ -1,7 +1,6 @@
 import type { TurnCommand } from "#app/battle";
 import { globalScene } from "#app/global-scene";
 import { getPokemonNameWithAffix } from "#app/messages";
-import { speciesStarterCosts } from "#balance/starters";
 import { TrappedTag } from "#data/battler-tags";
 import { getDailyEventSeedBoss } from "#data/daily-seed/daily-run";
 import { isDailyFinalBoss } from "#data/daily-seed/daily-seed-utils";
@@ -676,8 +675,6 @@ export class CommandPhase extends FieldPhase {
     const someUncaughtSpeciesOnField = globalScene
       .getEnemyField()
       .some(p => p.isActive() && !dexData[p.species.speciesId].caughtAttr);
-    const missingMultipleStarters =
-      gameData.getStarterCount(d => !!d.caughtAttr) < Object.keys(speciesStarterCosts).length - 1;
     const isCatchableDailyBoss = isDailyFinalBoss() && (getDailyEventSeedBoss()?.catchable ?? false);
 
     if (biomeId === BiomeId.END && battleType === BattleType.WILD) {
@@ -689,7 +686,13 @@ export class CommandPhase extends FieldPhase {
         // Uncatchable paradox mons in classic and endless
         this.queueShowText("battle:noPokeballForce");
       } else if (
-        (isClassic && isClassicFinalBoss && missingMultipleStarters)
+        // ER: the classic final boss is the Primal Cascoon - a true BOSS, never a
+        // catch reward. Vanilla only blocked it while you were "missing multiple
+        // starters" (catch Eternatus as a dex-completion prize), so an experienced
+        // ER player with most starters could ball the boss (reported: the Black
+        // Shiny Primal Cascoon was catchable, even with a Master Ball). Always block
+        // the classic final boss here.
+        (isClassic && isClassicFinalBoss)
         || (isFullFreshStart && isClassicFinalBoss)
         || (isEndless && isEndlessMinorBoss)
         || (isDaily && !isCatchableDailyBoss)

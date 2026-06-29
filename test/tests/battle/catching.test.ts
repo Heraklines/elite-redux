@@ -116,16 +116,20 @@ describe("Throwing balls in classic", () => {
     await runPokeballTest(game, PokeballType.MASTER_BALL, "battle:noPokeballForceFinalBoss");
   });
 
-  it("throwing rogue ball at final boss with full dex", async () => {
+  // ER: the classic final boss is the Primal Cascoon, a true boss that is NEVER
+  // catchable - not even with a Master Ball on a full dex (vanilla let you catch
+  // Eternatus as a dex-completion reward; ER does not). So these full-dex cases
+  // hit the hard final-boss block instead of the vanilla "weaken-then-catch" path.
+  it("throwing rogue ball at final boss with full dex (ER: never catchable)", async () => {
     await game.importData("./test/utils/saves/everything.prsv");
     game.override.startingWave(200);
-    await runPokeballTest(game, PokeballType.ROGUE_BALL, "battle:noPokeballForceFinalBossCatchable");
+    await runPokeballTest(game, PokeballType.ROGUE_BALL, "battle:noPokeballForceFinalBoss");
   });
 
-  it("throwing master ball at final boss with full dex", async () => {
+  it("throwing master ball at final boss with full dex (ER: never catchable)", async () => {
     await game.importData("./test/utils/saves/everything.prsv");
     game.override.startingWave(200);
-    await runPokeballTest(game, PokeballType.MASTER_BALL, "success");
+    await runPokeballTest(game, PokeballType.MASTER_BALL, "battle:noPokeballForceFinalBoss");
   });
 });
 
@@ -166,17 +170,19 @@ describe("Throwing balls in fresh start challenge", () => {
     await runPokeballTest(game, PokeballType.MASTER_BALL, "battle:noPokeballForceFinalBoss", "challenge");
   });
 
-  it("throwing rogue ball at final boss with full dex", async () => {
+  // ER: the classic final boss (Primal Cascoon) is never catchable, in plain
+  // classic OR under a challenge - the hard final-boss block applies regardless of
+  // dex completion or ball type.
+  it("throwing rogue ball at final boss with full dex (ER: never catchable)", async () => {
     await game.importData("./test/utils/saves/everything.prsv");
     game.override.startingWave(200);
-    await runPokeballTest(game, PokeballType.ROGUE_BALL, "battle:noPokeballForceFinalBossCatchable", "challenge");
+    await runPokeballTest(game, PokeballType.ROGUE_BALL, "battle:noPokeballForceFinalBoss", "challenge");
   });
 
-  // If a challenge is active, even if the dex is complete we still need to weaken the final boss to master ball it
-  it("throwing ball at final boss with full dex", async () => {
+  it("throwing ball at final boss with full dex (ER: never catchable)", async () => {
     await game.importData("./test/utils/saves/everything.prsv");
     game.override.startingWave(200);
-    await runPokeballTest(game, PokeballType.MASTER_BALL, "battle:noPokeballForceFinalBossCatchable", "challenge");
+    await runPokeballTest(game, PokeballType.MASTER_BALL, "battle:noPokeballForceFinalBoss", "challenge");
   });
 });
 

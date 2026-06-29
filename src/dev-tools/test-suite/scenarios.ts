@@ -3218,7 +3218,10 @@ export const DEV_SCENARIOS: DevScenario[] = [
       + "screen. Open the boss Summary/Abilities: its innate must read PRISMATIC FUR (not\n"
       + "Color Change) and it must actually act bulky from Prismatic Fur's pre-hit resist\n"
       + "swap + damage-halving kit. If phase 2 STILL dies instantly, hit Send Logs - that capture\n"
-      + "pins the exact phase ordering so the death can be fixed.",
+      + "pins the exact phase ordering so the death can be fixed.\n"
+      + "ALSO check (either phase): open the Ball menu and try to throw a ball - even a\n"
+      + "MASTER BALL must be REFUSED ('can't be caught'). The Primal Cascoon final boss is\n"
+      + "NEVER catchable (reported: the Black Shiny Primal Cascoon could be Master-balled).",
     setup: () => {
       resetDevOverrides();
       setErDifficulty("elite");
