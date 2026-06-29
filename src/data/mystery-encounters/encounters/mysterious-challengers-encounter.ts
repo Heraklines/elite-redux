@@ -147,7 +147,10 @@ export const MysteriousChallengersEncounter: MysteryEncounter = MysteryEncounter
       const config: EnemyPartyConfig = encounter.enemyPartyConfigs[0];
 
       setEncounterRewards({
-        guaranteedModifierTypeFuncs: [modifierTypes.TM_COMMON, modifierTypes.TM_GREAT, modifierTypes.MEMORY_MUSHROOM],
+        // ER (#144): individual TMs were replaced by the pick-any TM Case; this reward used
+        // to be two raw TMs + a Memory Mushroom, which showed as "TM <move>" items. Give one
+        // TM Case (worth more than the two fixed TMs) + the Memory Mushroom.
+        guaranteedModifierTypeFuncs: [modifierTypes.TM_CASE, modifierTypes.MEMORY_MUSHROOM],
         fillRemaining: true,
       });
 

@@ -58,21 +58,12 @@ export const DepartmentStoreSaleEncounter: MysteryEncounter = MysteryEncounterBu
       buttonTooltip: `${namespace}:option.1.tooltip`,
     },
     async () => {
-      // Choose TMs
-      const modifiers: ModifierTypeFunc[] = [];
-      let i = 0;
-      while (i < 5) {
-        // 2/2/1 weight on TM rarity
-        const roll = randSeedInt(5);
-        if (roll < 2) {
-          modifiers.push(modifierTypes.TM_COMMON);
-        } else if (roll < 4) {
-          modifiers.push(modifierTypes.TM_GREAT);
-        } else {
-          modifiers.push(modifierTypes.TM_ULTRA);
-        }
-        i++;
-      }
+      // Choose TMs. ER replaced the individual TM_COMMON/GREAT/ULTRA reward items with the
+      // TM Case (#144 - a single item that opens a pick-any-TM list), so the "Department
+      // Store TM sale" must hand out TM Cases too (it was still giving "TM Rain Dance" /
+      // "TM Acrobatics" - the reported inconsistency). Three TM Cases is a fair haul for a
+      // TM-themed encounter (each is worth more than a fixed random TM, so down from 5).
+      const modifiers: ModifierTypeFunc[] = [modifierTypes.TM_CASE, modifierTypes.TM_CASE, modifierTypes.TM_CASE];
 
       setEncounterRewards({
         guaranteedModifierTypeFuncs: modifiers,
