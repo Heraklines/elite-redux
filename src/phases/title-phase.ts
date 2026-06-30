@@ -291,12 +291,13 @@ export class TitlePhase extends Phase {
         },
       },
       {
-        label: i18next.t("menu:runHistory"),
+        // ER Profile hub: replaces the old top-level Run History entry. Run History now
+        // lives as a tab INSIDE the Profile hub (alongside the Ghost Trainer Editor).
+        label: "Profile",
         handler: () => {
-          globalScene.ui.setOverlayMode(UiMode.RUN_HISTORY);
+          this.openProfileHub();
           return true;
         },
-        keepOpen: true,
       },
       {
         label: i18next.t("menu:settings"),
@@ -323,6 +324,25 @@ export class TitlePhase extends Phase {
       yOffset: 47,
     };
     await globalScene.ui.setMode(UiMode.TITLE, config);
+  }
+
+  /**
+   * ER Profile hub: open the side-nav hub screen (UiMode.PROFILE). Its tabs open the
+   * Ghost Trainer Editor and the existing Run History screen; more tabs can be added
+   * later in the hub handler. Opened via the DEFERRED pattern (mirrors the Community
+   * Challenges entry): returning true from an option handler clears the select, which
+   * would clobber a synchronous setOverlayMode, so setMode(MESSAGE)+resetModeChain()+
+   * showText(callback) is mandatory. Because the chain is reset, the hub returns to the
+   * title via `backToTitle` (a fresh TitlePhase) rather than revertMode.
+   */
+  private openProfileHub(): void {
+    const backToTitle = () => {
+      globalScene.phaseManager.toTitleScreen();
+      super.end();
+    };
+    globalScene.ui.setMode(UiMode.MESSAGE);
+    globalScene.ui.resetModeChain();
+    globalScene.ui.showText("", null, () => globalScene.ui.setOverlayMode(UiMode.PROFILE, backToTitle));
   }
 
   /**

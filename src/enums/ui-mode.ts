@@ -72,4 +72,8 @@ export enum UiMode {
   COMMUNITY_CHALLENGE_CREATE,
   /** ER Community Challenges: a single configurable text-input modal (name/subtitle/description). */
   COMMUNITY_CHALLENGE_TEXT,
+  /** ER Profile: the side-nav hub (Ghost Trainer Editor + Run History tabs). */
+  PROFILE,
+  /** ER Ghost Trainer Editor: author how your published ghost (sprite/name/dialogue) looks to others. */
+  GHOST_TRAINER_EDITOR,
 }

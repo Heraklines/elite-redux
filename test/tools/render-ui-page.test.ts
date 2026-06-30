@@ -50,6 +50,7 @@ import { DexAttr } from "#enums/dex-attr";
 import { GameModes } from "#enums/game-modes";
 import { MysteryEncounterType } from "#enums/mystery-encounter-type";
 import { SpeciesId } from "#enums/species-id";
+import { TrainerType } from "#enums/trainer-type";
 import { UiMode } from "#enums/ui-mode";
 import { type ErTmCaseModifierType, getPlayerShopModifierTypeOptionsForWave } from "#modifiers/modifier-type";
 import { allMysteryEncounters } from "#mystery-encounters/mystery-encounters";
@@ -412,6 +413,43 @@ const RECIPES: Record<string, Recipe> = {
     mode: UiMode.COMMUNITY_CHALLENGE_CREATE,
     prepare: () => [null],
     steps: [Button.DOWN, Button.DOWN, Button.DOWN, Button.DOWN, Button.RIGHT],
+    diffTolerance: 0,
+  },
+  // The ER Profile hub (UiMode.PROFILE): the left side-nav dashboard reached from the title.
+  // Static text + panel chrome (no sprites) -> exact diff. The DOWN-step variant proves the
+  // nav re-renders the right-hand description per tab.
+  profile: {
+    mode: UiMode.PROFILE,
+    prepare: () => [() => {}],
+    diffTolerance: 0,
+  },
+  "profile-nav": {
+    mode: UiMode.PROFILE,
+    prepare: () => [() => {}],
+    steps: [Button.DOWN],
+    diffTolerance: 0,
+  },
+  // The ER Ghost Trainer Editor (UiMode.GHOST_TRAINER_EDITOR): the player authors how their
+  // published ghost looks (cosmetic sprite/class, name, title, three dialogue lines) with a live
+  // preview pane (trainer sprite + intro line). Seed an existing profile so the golden exercises
+  // seedFromProfile, a gendered sprite (the FEMALE row appears), and the token-bearing intro. The
+  // ace_trainer_f atlas is injected via the two-pass recorder; static sprite -> exact diff.
+  "ghost-trainer-editor": {
+    mode: UiMode.GHOST_TRAINER_EDITOR,
+    prepare: game => {
+      game.scene.gameData.ghostProfile = {
+        trainerType: TrainerType.ACE_TRAINER,
+        female: true,
+        displayName: "Revenant",
+        title: "Champion",
+        dialogue: {
+          intro: "I have waited a long time for {player}.",
+          defeatPlayer: "Your journey ends where mine did.",
+          defeated: "You are stronger than the legends say.",
+        },
+      };
+      return [() => {}];
+    },
     diffTolerance: 0,
   },
   // The REAL starter-select driven in ER Community Challenge "roster pick" mode (args[1]):

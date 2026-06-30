@@ -46,6 +46,7 @@ import { EvolutionSceneUiHandler } from "#ui/evolution-scene-ui-handler";
 import { FightUiHandler } from "#ui/fight-ui-handler";
 import { GameStatsUiHandler } from "#ui/game-stats-ui-handler";
 import { GamepadBindingUiHandler } from "#ui/gamepad-binding-ui-handler";
+import { GhostTrainerEditorUiHandler } from "#ui/ghost-trainer-editor-ui-handler";
 import { KeyboardBindingUiHandler } from "#ui/keyboard-binding-ui-handler";
 import { LearnMoveBatchUiHandler } from "#ui/learn-move-batch-ui-handler";
 import { LlmDirectorThemePickerUiHandler } from "#ui/llm-director-theme-picker-ui-handler";
@@ -62,6 +63,7 @@ import { PartyUiHandler } from "#ui/party-ui-handler";
 import { PokedexPageUiHandler } from "#ui/pokedex-page-ui-handler";
 import { PokedexScanUiHandler } from "#ui/pokedex-scan-ui-handler";
 import { PokedexUiHandler } from "#ui/pokedex-ui-handler";
+import { ProfileUiHandler } from "#ui/profile-ui-handler";
 import { RegistrationFormUiHandler } from "#ui/registration-form-ui-handler";
 import { RenameFormUiHandler } from "#ui/rename-form-ui-handler";
 import { RunHistoryUiHandler } from "#ui/run-history-ui-handler";
@@ -227,6 +229,8 @@ export class UI extends Phaser.GameObjects.Container {
       new CommunityChallengesUiHandler(),
       new CommunityChallengeCreateUiHandler(),
       new ErChallengeTextInputUiHandler(),
+      new ProfileUiHandler(),
+      new GhostTrainerEditorUiHandler(),
     ];
   }
 
