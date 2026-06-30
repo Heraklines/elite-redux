@@ -1,0 +1,101 @@
+----- BUG REPORT (in-game) -----
+version:  1.11.19
+url:      https://elite-redux-staging.pages.dev/
+ua:       Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36 Edg/149.0.0.0
+mode:     4  wave:129  difficulty:youngster
+seed:     E5m9koHwKJkbBiTod6PypKtM
+party:    Simisear(L110 294/294)
+
+----- DESCRIPTION -----
+Breeder Event Bugged
+
+----- CONSOLE -----
+[22:09:43.669] LOG: %c %c %c %c %c Phaser v3.90.0 (WebGL | Web Audio) %c https://phaser.io/v390 background: #ff0000 background: #ffff00 background: #00ff00 background: #00ffff color: #ffffff; background: #000000 background: transparent
+[22:09:44.097] LOG: [ER] build mr16mhbz-2sj7
+[22:09:44.117] LOG: [dev-tools] loaded — 401 scenarios + Send Logs button
+[22:09:52.306] DEBUG: Destroying loading scene
+[22:09:52.306] DEBUG: Destroyed loading scene
+[22:09:52.383] LOG: Seed: xwB9cpSqb7MKRoVyfvlhUIWX
+[22:09:52.384] LOG: Wave Seed: xwB9cpSqb7MKRoVyfvlhUIWX 0
+[22:09:53.792] LOG: %cStart Phase LoginPhase color:green;
+[22:09:54.047] LOG: Client Session: r0WU2SkvpZverNIoiAC9xi04nHh9H4sS
+[22:09:54.400] DEBUG: Using cached system data
+[22:09:54.472] LOG: %cStart Phase TitlePhase color:green;
+[22:09:54.473] LOG: Getting Session Slot id: %d 1
+[22:09:54.487] LOG: use seasonal splash messages true
+[22:09:54.487] LOG: Adding 2 Pride Month splash messages (weight: x15)
+[22:10:03.435] LOG: Getting Session Slot id: %d 1
+[22:10:03.440] LOG: Wave Seed: E5m9koHwKJkbBiTod6PypKtM 0
+[22:10:03.440] LOG: Seed: E5m9koHwKJkbBiTod6PypKtM
+[22:10:03.487] LOG: Wave Seed: Æ¶îºìðÉøÌËìãÃêÕðå·ÑúñÌõÎ 129
+[22:10:03.491] LOG: Applied Calcium 
+[22:10:03.492] LOG: Applied Carbos 
+[22:10:03.493] LOG: Applied Zinc 
+[22:10:03.493] LOG: Applied Protein 
+[22:10:03.494] LOG: Applied Calcium 
+[22:10:03.499] LOG: Applied Calcium 
+[22:10:03.499] LOG: Applied Carbos 
+[22:10:03.500] LOG: Applied Zinc 
+[22:10:03.500] LOG: Applied Protein 
+[22:10:03.501] LOG: Applied Calcium 
+[22:10:03.504] LOG: Applied Calcium 
+[22:10:03.504] LOG: Applied Carbos 
+[22:10:03.505] LOG: Applied Zinc 
+[22:10:03.505] LOG: Applied Protein 
+[22:10:03.505] LOG: Applied Calcium 
+[22:10:03.532] LOG: %cStart Phase EncounterPhase color:green;
+[22:10:04.149] LOG: Wave Seed: Æ¶îºìðÉøÌËìãÃêÕðå·ÑúñÌõÎ 129
+[22:10:06.185] LOG: %cStart Phase MysteryEncounterPhase color:green;
+[22:10:14.650] LOG: %cStart Phase MysteryEncounterOptionSelectedPhase color:green;
+[22:10:14.730] LOG: %cStart Phase TurnInitPhase color:green;
+[22:10:14.730] LOG: %cStart Phase MysteryEncounterBattleStartCleanupPhase color:green;
+[22:10:14.731] LOG: %cStart Phase CommandPhase color:green;
+[22:10:14.733] ERROR: [unhandledrejection] TypeError: Cannot set property double of #<Battle> which has only a getter
+TypeError: Cannot set property double of #<Battle> which has only a getter
+    at initBattleWithEnemyConfig (https://elite-redux-staging.pages.dev/assets/loading-scene-DDU2v3k1.js:3:98287)
+    at MysteryEncounterOptionSelectedPhase.onOptionSelect (https://elite-redux-staging.pages.dev/assets/loading-scene-DDU2v3k1.js:4:160337)
+    at https://elite-redux-staging.pages.dev/assets/loading-scene-DDU2v3k1.js:3:89081
+    at BattleScene.executeWithSeedOffset (https://elite-redux-staging.pages.dev/assets/battle-scene-fW6IXPOa.js:1048:10175)
+    at https://elite-redux-staging.pages.dev/assets/loading-scene-DDU2v3k1.js:3:89049
+[22:10:16.970] LOG: Move: WILL_O_WISP Move targets: {"targets":[],"multiple":false} 
+Player Pokemon: Simisear
+[22:10:16.971] LOG: %cStart Phase TurnStartPhase color:green;
+[22:10:16.972] LOG: %cStart Phase MovePhase color:green;
+[22:10:16.972] LOG: %cStart Phase MoveEndPhase color:green;
+[22:10:16.972] LOG: %cStart Phase CheckInterludePhase color:green;
+[22:10:16.972] LOG: %cStart Phase WeatherEffectPhase color:green;
+[22:10:16.972] LOG: %cStart Phase PositionalTagPhase color:green;
+[22:10:16.973] LOG: %cStart Phase BerryPhase color:green;
+[22:10:16.973] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[22:10:16.973] LOG: %cStart Phase TurnEndPhase color:green;
+[22:10:16.973] WARN: [coop:turn] host recorder: finalize with NO open recording -> turn=-1 events=0 (caller decides not to emit)
+[22:10:16.973] LOG: %cStart Phase TurnInitPhase color:green;
+[22:10:16.973] LOG: %cStart Phase CommandPhase color:green;
+[22:10:18.298] LOG: Move: INSTRUCT Move targets: {"targets":[],"multiple":false} 
+Player Pokemon: Simisear
+[22:10:18.299] LOG: %cStart Phase TurnStartPhase color:green;
+[22:10:18.300] LOG: %cStart Phase MovePhase color:green;
+[22:10:18.300] LOG: %cStart Phase MoveEndPhase color:green;
+[22:10:18.300] LOG: %cStart Phase CheckInterludePhase color:green;
+[22:10:18.300] LOG: %cStart Phase WeatherEffectPhase color:green;
+[22:10:18.300] LOG: %cStart Phase PositionalTagPhase color:green;
+[22:10:18.300] LOG: %cStart Phase BerryPhase color:green;
+[22:10:18.300] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[22:10:18.300] LOG: %cStart Phase TurnEndPhase color:green;
+[22:10:18.300] WARN: [coop:turn] host recorder: finalize with NO open recording -> turn=-1 events=0 (caller decides not to emit)
+[22:10:18.300] LOG: %cStart Phase TurnInitPhase color:green;
+[22:10:18.300] LOG: %cStart Phase CommandPhase color:green;
+[22:10:27.756] LOG: Move: PYRO_BALL Move targets: {"targets":[],"multiple":false} 
+Player Pokemon: Simisear
+[22:10:27.757] LOG: %cStart Phase TurnStartPhase color:green;
+[22:10:27.757] LOG: %cStart Phase MovePhase color:green;
+[22:10:27.758] LOG: %cStart Phase MoveEndPhase color:green;
+[22:10:27.758] LOG: %cStart Phase CheckInterludePhase color:green;
+[22:10:27.758] LOG: %cStart Phase WeatherEffectPhase color:green;
+[22:10:27.758] LOG: %cStart Phase PositionalTagPhase color:green;
+[22:10:27.758] LOG: %cStart Phase BerryPhase color:green;
+[22:10:27.758] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[22:10:27.758] LOG: %cStart Phase TurnEndPhase color:green;
+[22:10:27.758] WARN: [coop:turn] host recorder: finalize with NO open recording -> turn=-1 events=0 (caller decides not to emit)
+[22:10:27.758] LOG: %cStart Phase TurnInitPhase color:green;
+[22:10:27.758] LOG: %cStart Phase CommandPhase color:green;
