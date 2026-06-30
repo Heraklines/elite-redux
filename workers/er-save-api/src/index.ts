@@ -2382,6 +2382,41 @@ function communityRunMatchesConfig(
   return baseChallengesEqual(config.baseChallenges, body.baseChallenges);
 }
 
+/**
+ * Party-level anti-cheat for a verified clear: reject impossible IVs (a tampered run)
+ * and, when the challenge has a species whitelist, require every party ROOT (the
+ * client-computed `partyRoots`) to be allowed. Whitelist-less challenges skip the roots
+ * check. (Deeper ghost-legal bans need the species graph the worker lacks - a follow-up.)
+ */
+function communityPartyLegal(body: Record<string, unknown>, config: Record<string, unknown>): boolean {
+  const party = Array.isArray(body.party) ? body.party : [];
+  for (const member of party) {
+    const ivs = (member as { ivs?: unknown })?.ivs;
+    if (Array.isArray(ivs)) {
+      for (const iv of ivs) {
+        const n = Number(iv);
+        if (!Number.isFinite(n) || n < 0 || n > 31) {
+          return false; // an out-of-range IV can only come from a tampered client.
+        }
+      }
+    }
+  }
+  const allowed = Array.isArray(config.allowedSpecies) ? (config.allowedSpecies as unknown[]) : null;
+  if (allowed && allowed.length > 0) {
+    const allowedSet = new Set(allowed.map(Number));
+    const roots = Array.isArray(body.partyRoots) ? body.partyRoots : null;
+    if (!roots) {
+      return false; // whitelist challenge but no roots to check -> cannot verify.
+    }
+    for (const r of roots) {
+      if (!allowedSet.has(Number(r))) {
+        return false;
+      }
+    }
+  }
+  return true;
+}
+
 async function handleCommunityClear(
   request: Request,
   auth: TokenPayload,
@@ -2441,11 +2476,12 @@ async function handleCommunityClear(
 
   // -------------------------------------------------------------------------
   // CONFIG-MATCH (anti-cheat "you must PROPERLY win it"). A clear is verified only
-  // when the submitted run matches the stored challenge: a genuine victory at/after
-  // the target wave, with the SAME difficulty / game mode / base challenges / seed.
-  // (Party-level checks - IV-clamp + ghost-legal bans + allowedSpecies membership -
-  // need the species/evolution graph the worker lacks; they stay a follow-up. The
-  // publish below is gated on verified===1, so an unmatched run never goes live.)
+  // when the submitted run matches the stored challenge - a genuine victory at/after
+  // the target wave with the SAME difficulty / game mode / base challenges / seed
+  // (communityRunMatchesConfig) AND a legal party (communityPartyLegal: no impossible
+  // IVs; every party root in the species whitelist). The publish below is gated on
+  // verified===1, so an unmatched / tampered run never goes live. (Deeper ghost-legal
+  // species bans need the evolution graph the worker lacks - a follow-up.)
   // -------------------------------------------------------------------------
   let storedConfig: Record<string, unknown> = {};
   try {
@@ -2453,7 +2489,10 @@ async function handleCommunityClear(
   } catch {
     storedConfig = {};
   }
-  const verified: number = communityRunMatchesConfig(body, row, storedConfig, wave, isVictory) ? 1 : 0;
+  const verified: number =
+    communityRunMatchesConfig(body, row, storedConfig, wave, isVictory) && communityPartyLegal(body, storedConfig)
+      ? 1
+      : 0;
   const status: "cleared" | "failed" = isVictory ? "cleared" : "failed";
   const effective = await upsertCommunityAttempt(env, {
     challengeId,

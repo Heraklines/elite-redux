@@ -28,6 +28,7 @@ import {
   type CommunityChallengeFeed,
   fetchCommunityBookmarks,
   fetchCommunityFeed,
+  flushPendingFounderPublishes,
   recordCommunityAttempt,
 } from "#data/elite-redux/er-community-challenges";
 import { Button } from "#enums/buttons";
@@ -567,6 +568,9 @@ export class CommunityChallengesUiHandler extends UiHandler {
     this.onLaunch = typeof args[1] === "function" ? (args[1] as (config: CommunityChallengeConfig) => void) : null;
     this.onBack = typeof args[2] === "function" ? (args[2] as () => void) : null;
     this.disposed = false;
+    // Retry any founder publish that the win-time POST couldn't land (offline), so
+    // returning here after a victory still publishes the draft - it's never lost.
+    void flushPendingFounderPublishes();
     this.navCursor = 1;
     this.cardCursor = 0;
     this.focus = "cards";

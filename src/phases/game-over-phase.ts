@@ -6,7 +6,7 @@ import { bypassLogin } from "#constants/app-constants";
 import { modifierTypes } from "#data/data-lists";
 import { getCharVariantFromDialogue } from "#data/dialogue";
 import { broadcastCoopWaveResolved } from "#data/elite-redux/coop/coop-runtime";
-import { recordCommunityClear } from "#data/elite-redux/er-community-challenges";
+import { enqueueFounderPublish } from "#data/elite-redux/er-community-challenges";
 import { getFounderRunState, setFounderRunState } from "#data/elite-redux/er-community-run-state";
 import { recordGhostTeamOnGameOver } from "#data/elite-redux/er-ghost-teams";
 import type { PokemonSpecies } from "#data/pokemon-species";
@@ -344,11 +344,20 @@ export class GameOverPhase extends BattlePhase {
       return;
     }
     setFounderRunState(null);
-    const party = globalScene.getPlayerParty().map(p => new PokemonData(p));
-    void recordCommunityClear(founder.draftId, founder.config, {
-      wave: globalScene.currentBattle?.waveIndex ?? founder.config.targetWave,
-      clearTimeMs: Math.round((globalScene.sessionPlayTime ?? 0) * 1000),
-      party,
+    const playerParty = globalScene.getPlayerParty();
+    const party = playerParty.map(p => new PokemonData(p));
+    const partyRoots = [...new Set(playerParty.map(p => p.species.getRootSpeciesId()))];
+    // Enqueue (persisted) + try to publish now. If the POST fails (offline at the win),
+    // it retries when the Community Challenges screen next opens, so it is not lost.
+    enqueueFounderPublish({
+      draftId: founder.draftId,
+      config: founder.config,
+      run: {
+        wave: globalScene.currentBattle?.waveIndex ?? founder.config.targetWave,
+        clearTimeMs: Math.round((globalScene.sessionPlayTime ?? 0) * 1000),
+        party,
+        partyRoots,
+      },
     });
   }
 

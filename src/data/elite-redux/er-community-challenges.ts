@@ -570,15 +570,24 @@ export async function recordCommunityAttempt(challengeId: string, wave?: number)
  * config-match + verify (anti-cheat). Returns whether the call succeeded (false offline
  * / guest / non-victory). `run.party` is the serialized team (PokemonData[]).
  */
+export interface CommunityClearRun {
+  wave: number;
+  clearTimeMs?: number;
+  /** Serialized team (PokemonData[]) - the worker IV-clamps it for tamper detection. */
+  party: unknown[];
+  /** The party's ROOT species ids (client-computed) - the worker checks them vs allowedSpecies. */
+  partyRoots?: number[];
+}
+
 export async function recordCommunityClear(
   draftId: string,
   config: CommunityChallengeConfig,
-  run: { wave: number; clearTimeMs?: number; party: unknown[] },
-): Promise<boolean> {
+  run: CommunityClearRun,
+): Promise<{ published: boolean } | null> {
   const base = serverBase();
   const token = authToken();
   if (!base || !token || typeof fetch !== "function" || !draftId) {
-    return false;
+    return null; // guest / offline - keep queued for a later retry.
   }
   try {
     const res = await fetch(`${base}/community/clear`, {
@@ -590,6 +599,7 @@ export async function recordCommunityClear(
         wave: run.wave,
         clearTimeMs: run.clearTimeMs,
         party: run.party,
+        partyRoots: run.partyRoots,
         // Config-match inputs (the worker compares these to the stored challenge):
         gameModeId: config.gameModeId,
         difficulty: config.difficulty,
@@ -598,10 +608,87 @@ export async function recordCommunityClear(
         seed: config.seed,
       }),
     });
-    return res.ok;
+    if (res.status >= 500) {
+      return null; // transient server error - retry later.
+    }
+    if (!res.ok) {
+      return { published: false }; // 4xx: permanent (not found / forbidden / invalid).
+    }
+    const data = (await res.json()) as { published?: boolean };
+    return { published: data?.published === true };
   } catch {
-    return false;
+    return null; // network failure - retry later.
   }
+}
+
+// ---------------------------------------------------------------------------
+// Founder publish queue: a genuine victory must publish the draft, but the POST
+// can fail (offline at the exact moment of the win). So the clear is persisted in
+// localStorage and retried whenever the Community Challenges screen opens, until
+// the server processes it - the publish is never lost.
+// ---------------------------------------------------------------------------
+const PENDING_FOUNDER_KEY = "er_pending_founder_publishes";
+
+interface PendingFounderPublish {
+  draftId: string;
+  config: CommunityChallengeConfig;
+  run: CommunityClearRun;
+}
+
+function readPendingFounderPublishes(): PendingFounderPublish[] {
+  if (typeof localStorage === "undefined") {
+    return [];
+  }
+  try {
+    const raw = localStorage.getItem(PENDING_FOUNDER_KEY);
+    const arr = raw ? JSON.parse(raw) : [];
+    return Array.isArray(arr) ? (arr as PendingFounderPublish[]) : [];
+  } catch {
+    return []; // corrupt entry - treat as empty.
+  }
+}
+
+function writePendingFounderPublishes(list: PendingFounderPublish[]): void {
+  if (typeof localStorage === "undefined") {
+    return;
+  }
+  try {
+    if (list.length === 0) {
+      localStorage.removeItem(PENDING_FOUNDER_KEY);
+    } else {
+      localStorage.setItem(PENDING_FOUNDER_KEY, JSON.stringify(list));
+    }
+  } catch (e) {
+    console.warn("[community] could not persist pending founder publish", e);
+  }
+}
+
+/** Queue a founder's victory for publish + immediately try it (persisted so it is not lost). */
+export function enqueueFounderPublish(p: PendingFounderPublish): void {
+  const list = readPendingFounderPublishes().filter(e => e.draftId !== p.draftId);
+  list.push(p);
+  writePendingFounderPublishes(list);
+  void flushPendingFounderPublishes();
+}
+
+/**
+ * Retry every queued founder publish; drop each the server PROCESSED (published, or a
+ * permanent 4xx reject - retrying the same payload can't change the verdict), keep only
+ * null (offline / transient) for the next open. Called on the win + on browser open.
+ */
+export async function flushPendingFounderPublishes(): Promise<void> {
+  const list = readPendingFounderPublishes();
+  if (list.length === 0) {
+    return;
+  }
+  const keep: PendingFounderPublish[] = [];
+  for (const p of list) {
+    const result = await recordCommunityClear(p.draftId, p.config, p.run);
+    if (result === null) {
+      keep.push(p);
+    }
+  }
+  writePendingFounderPublishes(keep);
 }
 
 /** Toggle a bookmark on/off for a challenge. Returns the success of the call (no-op false offline). */
