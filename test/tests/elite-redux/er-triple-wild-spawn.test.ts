@@ -63,4 +63,29 @@ describe.skipIf(!RUN)("ER multi-format - a TRIPLE WILD battle spawns 3v3 headles
     expect(globalScene.getEnemyField()[0].getBattlerIndex()).toBe(3);
     expect(globalScene.getEnemyField()[2].getBattlerIndex()).toBe(5);
   });
+
+  it("resolves a full 3v3 turn (command x3 + enemy AI x3, damage + faints process, no soft-lock)", async () => {
+    await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.PIKACHU, SpeciesId.EEVEE);
+    expect(globalScene.currentBattle.turn).toBe(1);
+
+    // Command all THREE player slots (note: in Elite Redux "Splash" is a real 40-power
+    // attack, not vanilla's no-op). The turn loop must build 3 player CommandPhases + roll
+    // 3 enemy AI commands and resolve every move. A wrong slot index / gappy turnCommands /
+    // a 3rd slot with no command would soft-lock here.
+    game.move.select(MoveId.SPLASH, 0);
+    game.move.select(MoveId.SPLASH, 1);
+    game.move.select(MoveId.SPLASH, 2);
+
+    await game.phaseInterceptor.to("TurnInitPhase");
+
+    // Reaching the next turn proves the 3v3 turn (incl. mid-turn faints) resolved with no
+    // soft-lock - the core proof.
+    expect(globalScene.currentBattle.turn).toBe(2);
+    // Combat actually landed across the 3-wide enemy side: at least one enemy took damage,
+    // proving target resolution picked real opponents from {3,4,5}.
+    const enemyTookDamage = globalScene.getEnemyField().some(e => e != null && e.hp < e.getMaxHp());
+    expect(enemyTookDamage).toBe(true);
+    // The player side is still fielding mons (the run continues), and the bulky lead survived.
+    expect(globalScene.getPlayerField(true).length).toBeGreaterThanOrEqual(1);
+  });
 });

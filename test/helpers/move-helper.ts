@@ -61,7 +61,8 @@ export class MoveHelper extends GameManagerHelper {
    */
   public select(
     move: MoveId,
-    pkmIndex: BattlerIndex.PLAYER | BattlerIndex.PLAYER_2 = BattlerIndex.PLAYER,
+    // Widened from PLAYER|PLAYER_2 to support triple+ formats (player slot 2 = flat index 2).
+    pkmIndex: number = BattlerIndex.PLAYER,
     targetIndex?: BattlerIndex | null,
   ) {
     const movePosition = this.getMovePosition(pkmIndex, move);
