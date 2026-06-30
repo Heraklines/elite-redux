@@ -1,4 +1,5 @@
 import { globalScene } from "#app/global-scene";
+import { barSlotOffset } from "#data/battle-format";
 import { isErBlackShiny } from "#data/elite-redux/er-black-shinies";
 import { Gender, getGenderColor, getGenderSymbol } from "#data/gender";
 import { getTypeRgb } from "#data/type";
@@ -68,6 +69,8 @@ export abstract class BattleInfo extends Phaser.GameObjects.Container {
   protected boss: boolean;
   protected bossSegments: number;
   protected offset: boolean;
+  /** Which field SLOT this bar is stacked for (0 = anchor). Drives 3+-bar stacking. */
+  protected slotOffset = 0;
   protected lastName: string | null;
   protected lastTeraType: PokemonType;
   protected lastStatus: StatusEffect;
@@ -460,15 +463,25 @@ export abstract class BattleInfo extends Phaser.GameObjects.Container {
   }
 
   setOffset(offset: boolean): void {
-    if (this.offset === offset) {
+    this.offset = offset;
+    this.setSlotOffset(offset ? 1 : 0);
+  }
+
+  /**
+   * Position this info bar for its field SLOT within its side. Slot 0 is the anchor; each
+   * later slot steps diagonally so three-plus bars stack without overlapping. Binary slot 1
+   * reproduces the legacy single offset exactly. See `barSlotOffset` in `#data/battle-format`.
+   */
+  setSlotOffset(slot: number): void {
+    if (this.slotOffset === slot) {
       return;
     }
-
-    this.offset = offset;
-
-    this.x += 10 * (this.offset === this.player ? 1 : -1);
-    this.y += 27 * (this.offset ? 1 : -1);
+    const [oldDx, oldDy] = barSlotOffset(this.slotOffset, this.player);
+    const [newDx, newDy] = barSlotOffset(slot, this.player);
+    this.x += newDx - oldDx;
+    this.y += newDy - oldDy;
     this.baseY = this.y;
+    this.slotOffset = slot;
   }
 
   //#region Update methods and helpers

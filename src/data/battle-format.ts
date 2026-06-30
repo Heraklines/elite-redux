@@ -243,6 +243,44 @@ export function fieldPositionForSlot(slot: number, capacity: number): FieldPosit
   return FieldPosition.CENTER;
 }
 
+/**
+ * Per-slot SPRITE pixel offset from a side's centre, by {@linkcode FieldPosition} and the
+ * side's capacity. Binary keeps the legacy tight spacing (center 0, wings +/-32). A 3-wide
+ * side spreads the wings out and staggers depth (wings forward+lower, centre back+higher),
+ * so three ~64px sprites read as a triangle instead of stacking on the centre.
+ */
+export function fieldSpriteOffset(position: FieldPosition, capacity: number): [number, number] {
+  if (capacity >= 3) {
+    switch (position) {
+      case FieldPosition.LEFT:
+        return [-58, 10];
+      case FieldPosition.RIGHT:
+        return [58, 10];
+      default:
+        return [0, -8]; // CENTER sits back + up
+    }
+  }
+  switch (position) {
+    case FieldPosition.LEFT:
+      return [-32, -8];
+    case FieldPosition.RIGHT:
+      return [32, 0];
+    default:
+      return [0, 0];
+  }
+}
+
+/**
+ * Per-slot HP/info-BAR pixel shift from the side's slot-0 anchor, so 3 bars stack legibly
+ * instead of overlapping. Slot 0 is the anchor; each later slot steps diagonally. `playerSide`
+ * mirrors the horizontal step (player bars sit bottom-right, enemy top-left). Binary slot 1
+ * reproduces the legacy +/-10 / +27 shift.
+ */
+export function barSlotOffset(slot: number, playerSide: boolean): [number, number] {
+  const dx = 10 * (playerSide ? 1 : -1);
+  return [dx * slot, 27 * slot];
+}
+
 /** Named lookup used by the override / resolver. Unknown id -> null. */
 export function formatById(id: string | null | undefined): BattleFormat | null {
   switch (id) {

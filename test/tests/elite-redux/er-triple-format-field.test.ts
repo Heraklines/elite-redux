@@ -29,7 +29,7 @@ import { MoveId } from "#enums/move-id";
 import { SpeciesId } from "#enums/species-id";
 import { GameManager } from "#test/framework/game-manager";
 import Phaser from "phaser";
-import { afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 const RUN = process.env.ER_SCENARIO === "1";
 
@@ -55,8 +55,9 @@ describe.skipIf(!RUN)("ER multi-format - the live battle responds to TRIPLE_FORM
 
   afterEach(() => {
     // Restore the binary format so the shared module-state scene doesn't leak a
-    // triple field into the next ER file (isolate:false).
+    // triple field into the next ER file (isolate:false), and clear the battleStyle spy.
     globalScene.currentBattle?.setFormat(SINGLE_FORMAT);
+    vi.restoreAllMocks();
   });
 
   it("a battle flipped to TRIPLE reports a 3-wide player side, and triple is not 'double'", async () => {

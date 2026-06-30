@@ -34,6 +34,7 @@ import { tmSpecies } from "#balance/tm-species-map";
 import { reverseCompatibleTms, speciesTmMoves } from "#balance/tms";
 import type { SuppressAbilitiesTag } from "#data/arena-tag";
 import { EntryHazardTag, NoCritTag, WeakenMoveScreenTag } from "#data/arena-tag";
+import { fieldSpriteOffset } from "#data/battle-format";
 import {
   AutotomizedTag,
   BattlerTag,
@@ -61,7 +62,11 @@ import { isCoopAuthoritativeGuestGated } from "#data/elite-redux/coop/coop-autho
 import { coopAttributeNewMon, coopHalfIsFull } from "#data/elite-redux/coop/coop-session";
 import type { CoopRole } from "#data/elite-redux/coop/coop-transport";
 import { isCoopRecording, recordCoopEvent } from "#data/elite-redux/coop/coop-turn-recorder";
-import { erRecordAchievementDamageAndUpdate } from "#data/elite-redux/er-achievement-tracker";
+import {
+  erRecordAchievementDamageAndUpdate,
+  erRecordAchievementFusion,
+  erRecordAchievementStatusSet,
+} from "#data/elite-redux/er-achievement-tracker";
 import { getErBiomeRule } from "#data/elite-redux/er-biome-rules";
 import {
   getErSharedGiftAbilityIdsFor,
@@ -1610,14 +1615,11 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
   }
 
   getFieldPositionOffset(): [number, number] {
-    switch (this.fieldPosition) {
-      case FieldPosition.CENTER:
-        return [0, 0];
-      case FieldPosition.LEFT:
-        return [-32, -8];
-      case FieldPosition.RIGHT:
-        return [32, 0];
-    }
+    // Multi-format: spacing widens with the side's capacity (binary keeps the legacy +/-32;
+    // a 3-wide side spreads + staggers so all three sprites stay separated). See battle-format.
+    const arr = globalScene.currentBattle?.arrangement;
+    const capacity = arr ? (this.isPlayer() ? arr.playerCapacity : arr.enemyCapacity) : 1;
+    return fieldSpriteOffset(this.fieldPosition, capacity);
   }
 
   /**
@@ -1669,8 +1671,13 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
 
       this.fieldPosition = fieldPosition;
 
-      this.battleInfo.setMini(fieldPosition !== FieldPosition.CENTER);
-      this.battleInfo.setOffset(fieldPosition === FieldPosition.RIGHT);
+      // Multi-format: a side with >1 slot uses the compact (mini) bar; the bar stacks by
+      // field slot so 3+ bars stay readable. Binary is identical (in doubles RIGHT == slot 1,
+      // and both slots are non-CENTER -> mini, exactly as before).
+      const arr = globalScene.currentBattle?.arrangement;
+      const sideCapacity = arr ? (this.isPlayer() ? arr.playerCapacity : arr.enemyCapacity) : 1;
+      this.battleInfo.setMini(sideCapacity > 1);
+      this.battleInfo.setSlotOffset(this.getFieldIndex());
 
       const newOffset = this.getFieldPositionOffset();
 
@@ -6691,6 +6698,7 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
     }
 
     this.status = new Status(effect, 0, sleepTurnsRemaining);
+    erRecordAchievementStatusSet(this, effect);
   }
 
   /**
@@ -8139,6 +8147,7 @@ export class PlayerPokemon extends Pokemon {
     }
 
     globalScene.validateAchv(achvs.SPLICE);
+    erRecordAchievementFusion(this.species.speciesId, pokemon.species.speciesId);
     globalScene.gameData.gameStats.pokemonFused++;
 
     // Store the average HP% that each Pokemon has

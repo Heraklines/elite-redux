@@ -19,7 +19,7 @@ import { MoveId } from "#enums/move-id";
 import { SpeciesId } from "#enums/species-id";
 import { GameManager } from "#test/framework/game-manager";
 import Phaser from "phaser";
-import { beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 const RUN = process.env.ER_SCENARIO === "1";
 
@@ -42,6 +42,12 @@ describe.skipIf(!RUN)("ER multi-format - a TRIPLE WILD battle spawns 3v3 headles
       .ability(AbilityId.BALL_FETCH)
       .startingLevel(20)
       .enemyLevel(20);
+  });
+
+  afterEach(() => {
+    // Restore the battleStyle("triple") spy so the "triple" format override doesn't leak
+    // into the next ER file's battles (isolate:false; mocks don't auto-reset).
+    vi.restoreAllMocks();
   });
 
   it("resolves to TRIPLE_FORMAT and fields three active Pokemon on each side", async () => {
