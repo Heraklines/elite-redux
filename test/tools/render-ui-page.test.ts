@@ -360,6 +360,51 @@ const RECIPES: Record<string, Recipe> = {
     prepare: () => [buildInfernoFeed()],
     diffTolerance: 90_000,
   },
+  // Stage B nav sections: DOWN to BROWSE (nav index 2) + ACTION switches the section;
+  // BROWSE has no live backend offline so it settles on the genuine "BE THE FIRST"
+  // empty state (fetchCommunityFeed -> emptyFeed). Static -> exact diff.
+  "community-challenges-section-browse": {
+    mode: UiMode.COMMUNITY_CHALLENGES,
+    prepare: () => [buildDemoChallengesConfig({ populated: true })],
+    steps: [Button.DOWN, Button.ACTION],
+    diffTolerance: 0,
+  },
+  // Stage B "coming soon" copy: DOWN x2 to MY (nav index 3) + ACTION; MY has no client
+  // feed yet, so the empty state renders the "COMING SOON" copy. Static -> exact diff.
+  "community-challenges-section-coming-soon": {
+    mode: UiMode.COMMUNITY_CHALLENGES,
+    prepare: () => [buildDemoChallengesConfig({ populated: true })],
+    steps: [Button.DOWN, Button.DOWN, Button.ACTION],
+    diffTolerance: 0,
+  },
+  // Stage C designer (UiMode.COMMUNITY_CHALLENGE_CREATE): the authoring field list
+  // (NAME / SUBTITLE / DESCRIPTION / DIFFICULTY / the inline RULES rows / ALLOWED
+  // POKEMON / PUBLISH) seeded blank (show([null])). Static text -> exact diff. The
+  // text-entry FORM is a DOM overlay (not rasterized here) - it is verified in the
+  // real browser, not in the golden.
+  "community-challenge-create": {
+    mode: UiMode.COMMUNITY_CHALLENGE_CREATE,
+    prepare: () => [null],
+    diffTolerance: 0,
+  },
+  // DOWN x4 walks the cursor onto the first inline RULE row; RIGHT increases its value
+  // (the copyChallenge row, NOT gameMode.challenges), so the value text flips. Proves the
+  // rules picker adjusts in place. Static -> exact diff.
+  "community-challenge-create-rules": {
+    mode: UiMode.COMMUNITY_CHALLENGE_CREATE,
+    prepare: () => [null],
+    steps: [Button.DOWN, Button.DOWN, Button.DOWN, Button.DOWN, Button.RIGHT],
+    diffTolerance: 0,
+  },
+  // UP x2 wraps the cursor back to ALLOWED POKEMON (second-to-last row), then ACTION drops
+  // into the embedded root-starter grid sub-view (icons fall back to placeholder cells in
+  // the harness, since the pokemon_icons atlases aren't injected). Static -> exact diff.
+  "community-challenge-create-species": {
+    mode: UiMode.COMMUNITY_CHALLENGE_CREATE,
+    prepare: () => [null],
+    steps: [Button.UP, Button.UP, Button.ACTION],
+    diffTolerance: 0,
+  },
   "biome-shop": {
     mode: UiMode.BIOME_SHOP,
     prepare: async game => {

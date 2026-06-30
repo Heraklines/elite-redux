@@ -13,6 +13,13 @@ import { CoopLobbyController, type LobbyPlayer } from "#data/elite-redux/coop/co
 import { getCoopController, startLocalCoopSession } from "#data/elite-redux/coop/coop-runtime";
 import type { CoopNetcodeMode } from "#data/elite-redux/coop/coop-transport";
 import { buildInfernoFeed } from "#data/elite-redux/er-community-challenge-inferno";
+import { applyCommunityChallengeToRun } from "#data/elite-redux/er-community-challenge-launch";
+import {
+  type CommunityChallengeConfig,
+  type CommunityChallengeEntry,
+  recordCommunityAttempt,
+} from "#data/elite-redux/er-community-challenges";
+import { resetCommunityRunState } from "#data/elite-redux/er-community-run-state";
 import { Gender } from "#data/gender";
 import { BattleType } from "#enums/battle-type";
 import { GameModes } from "#enums/game-modes";
@@ -36,9 +43,18 @@ export class TitlePhase extends Phase {
   private loaded = false;
   // TODO: Make `end` take a `GameModes` as a parameter rather than storing it on the class itself
   public gameMode: GameModes;
+  // ER Community Challenge: the config of the community card being played, stashed
+  // by the browser's onPlay closure and consumed in end() (after the CHALLENGE
+  // gameMode is rebuilt). null for every non-community launch.
+  private pendingCommunityConfig: CommunityChallengeConfig | null = null;
 
   async start(): Promise<void> {
     super.start();
+
+    // ER Community Challenge: clear any forced difficulty / species whitelist a
+    // previous community card may have set, so returning to the title never leaks
+    // it into a normal Custom Challenge run.
+    resetCommunityRunState();
 
     globalScene.ui.clearText();
     globalScene.ui.fadeIn(250);
@@ -187,7 +203,32 @@ export class TitlePhase extends Phase {
                           globalScene.ui.setMode(UiMode.MESSAGE);
                           globalScene.ui.resetModeChain();
                           globalScene.ui.showText("", null, () =>
-                            globalScene.ui.setOverlayMode(UiMode.COMMUNITY_CHALLENGES, buildInfernoFeed()),
+                            globalScene.ui.setOverlayMode(
+                              UiMode.COMMUNITY_CHALLENGES,
+                              buildInfernoFeed(),
+                              // onPlay: ACTION on a card stashes its config + records the
+                              // attempt, then tears the browser down into the run. setModeAndEnd
+                              // begins with setMode(MESSAGE) (clears the browser) then end(),
+                              // which rebuilds the CHALLENGE gameMode and applies the config.
+                              (entry: CommunityChallengeEntry) => {
+                                this.pendingCommunityConfig = entry.config;
+                                // Built-in cards (er-inferno) / demo cards have no
+                                // worker row - only record attempts for published ones.
+                                if (!/^(er-|demo-)/.test(entry.config.id)) {
+                                  void recordCommunityAttempt(entry.config.id);
+                                }
+                                // Launch the mode the config declares (CHALLENGE today),
+                                // so the rebuilt gameMode matches the config-match key.
+                                setModeAndEnd(entry.config.gameModeId);
+                              },
+                              // onBack: CANCEL returns to the title. We opened via the
+                              // deferred pattern (resetModeChain), so revertMode alone
+                              // would strand on an empty MESSAGE - reset to a fresh title.
+                              () => {
+                                globalScene.phaseManager.toTitleScreen();
+                                super.end();
+                              },
+                            ),
                           );
                           return true;
                         },
@@ -558,6 +599,13 @@ export class TitlePhase extends Phase {
     if (!this.loaded && !globalScene.gameMode.isDaily) {
       globalScene.loadBgm(globalScene.arena.bgm);
       globalScene.gameMode = getGameMode(this.gameMode);
+      // ER Community Challenge: getGameMode just re-cloned every challenge at value
+      // 0, so apply the community config (baseChallenges + difficulty + seed +
+      // species whitelist) onto the freshly-rebuilt gameMode now, before any phase
+      // reads it. Verbatim with the config (the worker config-match anti-cheat key).
+      if (this.pendingCommunityConfig) {
+        applyCommunityChallengeToRun(this.pendingCommunityConfig);
+      }
       // For LLM Director mode: kick off bible generation in the BACKGROUND
       // before starter select so the LLM call runs in parallel with the
       // player picking starters. The bible is awaited (or no-op if already
@@ -577,7 +625,14 @@ export class TitlePhase extends Phase {
           }`,
         );
       }
-      if ((this.gameMode === GameModes.CHALLENGE || this.gameMode === GameModes.COOP) && !isCoopGuest) {
+      // ER Community Challenge: a community card already carries its full ruleset
+      // (applied above), so skip the challenge-select screen and go straight to
+      // starter-select - just like a coop guest mirroring the host's config.
+      if (
+        (this.gameMode === GameModes.CHALLENGE || this.gameMode === GameModes.COOP)
+        && !isCoopGuest
+        && !this.pendingCommunityConfig
+      ) {
         globalScene.phaseManager.pushNew("SelectChallengePhase");
       } else {
         globalScene.phaseManager.pushNew("SelectStarterPhase");

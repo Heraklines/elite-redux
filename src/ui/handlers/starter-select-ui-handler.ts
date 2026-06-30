@@ -23,6 +23,7 @@ import { getCoopController } from "#data/elite-redux/coop/coop-runtime";
 import { COOP_SLOTS_PER_PLAYER } from "#data/elite-redux/coop/coop-session";
 import { matchesAbilityText } from "#data/elite-redux/er-ability-search";
 import { ER_BLACK_SHINY_TINT } from "#data/elite-redux/er-black-shinies";
+import { clearForcedCommunityDifficulty, getForcedCommunityDifficulty } from "#data/elite-redux/er-community-run-state";
 import { ensureErSpriteAnim } from "#data/elite-redux/er-form-sprite-redirect";
 import { resetErGhostRunState } from "#data/elite-redux/er-ghost-teams";
 import { addTreasureFragments, resetErMapNodes } from "#data/elite-redux/er-map-nodes";
@@ -6339,6 +6340,16 @@ export class StarterSelectUiHandler extends MessageUiHandler {
                 return true;
               },
             });
+            // ER Community Challenge: a launched community card forces its run
+            // difficulty (already applied to the gameMode in TitlePhase.end), so
+            // skip the difficulty chooser and launch directly. Consume the gate so
+            // it can't leak into a later normal run.
+            const forced = getForcedCommunityDifficulty();
+            if (forced) {
+              clearForcedCommunityDifficulty();
+              startRun(forced);
+              return;
+            }
             // Co-op (#633): the GUEST does not choose - it follows the HOST's
             // broadcast difficulty + challenges so the run is coherent. Apply the
             // host's config and launch; if it hasn't arrived yet, wait for it.

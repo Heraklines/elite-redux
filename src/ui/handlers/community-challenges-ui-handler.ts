@@ -20,10 +20,13 @@
 // =============================================================================
 
 import { globalScene } from "#app/global-scene";
+import { buildInfernoFeed, buildMergedCommunityFeed } from "#data/elite-redux/er-community-challenge-inferno";
 import {
   buildDemoChallengesConfig,
   type CommunityChallengeEntry,
   type CommunityChallengeFeed,
+  fetchCommunityBookmarks,
+  fetchCommunityFeed,
 } from "#data/elite-redux/er-community-challenges";
 import { Button } from "#enums/buttons";
 import { TextStyle } from "#enums/text-style";
@@ -88,6 +91,34 @@ export class CommunityChallengesUiHandler extends UiHandler {
   private navCursor = 1; // FEATURED active by default
   private cardCursor = 0;
 
+  // ACTION on a focused card plays it: the launch callback supplied by the
+  // opener (TitlePhase's submenu), or null when the screen is opened standalone.
+  private onPlay: ((e: CommunityChallengeEntry) => void) | null = null;
+  // CANCEL returns here: the opener supplies a back callback (TitlePhase ->
+  // toTitleScreen) because we were opened via the deferred pattern (resetModeChain),
+  // so revertMode() alone would land on an empty MESSAGE box. null = standalone
+  // (render harness), where revertMode() is the correct fallback.
+  private onBack: (() => void) | null = null;
+  // Set true in clear() so an in-flight async section fetch never rebuilds a
+  // torn-down container after the browser is closed (onPlay launch / back-out).
+  private disposed = false;
+  // Which region ACTION acts on: the card row or the sidebar nav.
+  private focus: "nav" | "cards" = "cards";
+
+  // The active sidebar SECTION (NAV_ITEMS[].key). Drives which feed `rebuild()`
+  // renders; switched by ACTION on a nav item (activateNav -> loadSection).
+  private section = "featured";
+  // The merged featured/community feed handed in at open(); reused by the
+  // FEATURED/COMMUNITY sections so switching back is instant + offline-safe.
+  private baseFeed: CommunityChallengeFeed | null = null;
+  // Sections with no client feed yet (MY / HISTORY) render the "coming soon"
+  // empty copy instead of the genuine "be the first" empty state.
+  private comingSoon = false;
+  // Sidebar label Text refs, recolored gold/dim as the nav cursor moves.
+  private navLabels: Phaser.GameObjects.Text[] = [];
+  // The top-bar eyebrow above CHALLENGES; retitled to the active section.
+  private eyebrow!: Phaser.GameObjects.Text;
+
   constructor() {
     super(UiMode.COMMUNITY_CHALLENGES);
   }
@@ -123,12 +154,14 @@ export class CommunityChallengesUiHandler extends UiHandler {
     this.navHighlight.setStrokeStyle(1, ACTIVE_RED, 0.9);
     this.container.add(this.navHighlight);
 
+    this.navLabels = [];
     NAV_ITEMS.forEach((item, i) => {
       const y = 24 + i * 19;
       this.addNavIcon(11, y + 3, item.icon);
       const t = addTextObject(20, y, item.label, TextStyle.WINDOW, { fontSize: "30px" });
       t.setOrigin(0, 0).setColor(i === this.navCursor ? GOLD : DIM);
       this.container.add(t);
+      this.navLabels.push(t);
     });
 
     // Player crest stub (bottom).
@@ -154,9 +187,9 @@ export class CommunityChallengesUiHandler extends UiHandler {
   }
 
   private buildTopBar(): void {
-    const eyebrow = addTextObject(CONTENT_X, TOP_Y, "COMMUNITY", TextStyle.WINDOW, { fontSize: "30px" });
-    eyebrow.setOrigin(0, 0).setColor(GOLD_DIM);
-    this.container.add(eyebrow);
+    this.eyebrow = addTextObject(CONTENT_X, TOP_Y, "COMMUNITY", TextStyle.WINDOW, { fontSize: "30px" });
+    this.eyebrow.setOrigin(0, 0).setColor(GOLD_DIM);
+    this.container.add(this.eyebrow);
 
     const title = addTextObject(CONTENT_X, TOP_Y + 7, "CHALLENGES", TextStyle.WINDOW, { fontSize: "72px" });
     title.setOrigin(0, 0).setColor(GOLD);
@@ -292,18 +325,21 @@ export class CommunityChallengesUiHandler extends UiHandler {
 
   private buildFeaturedEmpty(): void {
     const geom = this.featuredCardGeometry();
+    const lead = this.comingSoon ? "COMING SOON" : "BE THE FIRST";
     geom.forEach((g, i) => {
       const win = addWindow(g.x, FEAT_Y, g.w, FEAT_H);
       win.setTint(0x14121c);
       this.dynamic.add(win);
-      const label = i === 0 ? "BE THE FIRST" : "NO CHALLENGE";
+      const label = i === 0 ? lead : "NO CHALLENGE";
       const t = addTextObject(g.x + g.w / 2, FEAT_Y + FEAT_H / 2 - 8, label, TextStyle.WINDOW, {
         fontSize: "28px",
         align: "center",
       });
       t.setOrigin(0.5, 0).setColor(i === 0 ? GOLD : DIM);
       this.dynamic.add(t);
-      if (i === 0) {
+      // The "+" forge affordance only reads for the genuinely-empty CREATE prompt,
+      // not for a section that simply has no data yet.
+      if (i === 0 && !this.comingSoon) {
         const plus = addTextObject(g.x + g.w / 2, FEAT_Y + 8, "+", TextStyle.WINDOW, {
           fontSize: "60px",
           align: "center",
@@ -410,15 +446,10 @@ export class CommunityChallengesUiHandler extends UiHandler {
     this.dynamic.add(
       globalScene.add.circle(CONTENT_X + 24, DETAIL_Y + DETAIL_H / 2, 18).setStrokeStyle(1, 0x7a6a3a, 0.8),
     );
-    const t = addTextObject(
-      CONTENT_X + 52,
-      DETAIL_Y + DETAIL_H / 2 - 4,
-      "Be the first to forge a community challenge.",
-      TextStyle.WINDOW,
-      {
-        fontSize: "30px",
-      },
-    );
+    const msg = this.comingSoon ? "This section is coming soon." : "Be the first to forge a community challenge.";
+    const t = addTextObject(CONTENT_X + 52, DETAIL_Y + DETAIL_H / 2 - 4, msg, TextStyle.WINDOW, {
+      fontSize: "30px",
+    });
     t.setOrigin(0, 0).setColor(DIM);
     this.dynamic.add(t);
   }
@@ -530,8 +561,17 @@ export class CommunityChallengesUiHandler extends UiHandler {
     super.show(args);
     this.feed =
       args.length > 0 && this.isFeed(args[0]) ? (args[0] as CommunityChallengeFeed) : buildDemoChallengesConfig();
+    this.onPlay = typeof args[1] === "function" ? (args[1] as (e: CommunityChallengeEntry) => void) : null;
+    this.onBack = typeof args[2] === "function" ? (args[2] as () => void) : null;
+    this.disposed = false;
     this.navCursor = 1;
     this.cardCursor = 0;
+    this.focus = "cards";
+    // Open on FEATURED; the merged feed handed in is the featured/community source.
+    this.section = "featured";
+    this.baseFeed = this.feed;
+    this.comingSoon = false;
+    this.updateSectionHeader();
     this.positionNavHighlight();
     this.rebuild();
     this.container.setVisible(true);
@@ -544,16 +584,31 @@ export class CommunityChallengesUiHandler extends UiHandler {
 
   private positionNavHighlight(): void {
     this.navHighlight.setPosition(0, 22 + this.navCursor * 19);
+    this.navLabels.forEach((t, i) => t.setColor(i === this.navCursor ? GOLD : DIM));
+  }
+
+  /** Retitle the top-bar eyebrow to the active section (defaults to its nav label). */
+  private updateSectionHeader(): void {
+    const item = NAV_ITEMS.find(n => n.key === this.section);
+    this.eyebrow.setText(item ? item.label : this.section.toUpperCase());
   }
 
   processInput(button: Button): boolean {
     switch (button) {
       case Button.CANCEL:
         globalScene.ui.playSelect();
-        globalScene.ui.revertMode();
+        // We were opened via the deferred pattern (resetModeChain), so the mode
+        // chain is just [MESSAGE] - revertMode() alone would strand the player on
+        // an empty message box. The opener supplies onBack (-> title screen).
+        if (this.onBack) {
+          this.onBack();
+        } else {
+          globalScene.ui.revertMode();
+        }
         return true;
       case Button.LEFT:
       case Button.RIGHT: {
+        this.focus = "cards";
         const feat = this.feed?.featured ?? [];
         if (feat.length > 0) {
           this.cardCursor = (this.cardCursor + (button === Button.RIGHT ? 1 : feat.length - 1)) % feat.length;
@@ -564,17 +619,117 @@ export class CommunityChallengesUiHandler extends UiHandler {
       }
       case Button.UP:
       case Button.DOWN:
+        this.focus = "nav";
         this.navCursor = (this.navCursor + (button === Button.DOWN ? 1 : NAV_ITEMS.length - 1)) % NAV_ITEMS.length;
         this.positionNavHighlight();
         globalScene.ui.playSelect();
+        return true;
+      case Button.ACTION:
+      case Button.SUBMIT:
+        globalScene.ui.playSelect();
+        if (this.focus === "nav") {
+          this.activateNav(NAV_ITEMS[this.navCursor]);
+        } else {
+          this.playFocusedCard();
+        }
         return true;
       default:
         return false;
     }
   }
 
+  /** Play the currently-focused card via the opener's launch callback (no-op standalone). */
+  private playFocusedCard(): void {
+    const e = this.feed?.featured[this.cardCursor];
+    if (e && this.onPlay) {
+      // Teardown launch (setModeAndEnd clears this handler first); no defer needed.
+      this.onPlay(e);
+    }
+  }
+
+  /** Activate a sidebar nav item: switch the active SECTION (and feed), or open CREATE. */
+  private activateNav(item: NavItem): void {
+    if (item.key === "create") {
+      this.openCreate();
+      return;
+    }
+    this.section = item.key;
+    this.cardCursor = 0; // clamp before rebuild (rebuild reads featured[cardCursor])
+    this.focus = "cards";
+    this.updateSectionHeader();
+    this.loadSection(item.key);
+  }
+
+  /**
+   * Load the feed for a section + rebuild. Sync sections (FEATURED/COMMUNITY) render
+   * immediately; async sections render the empty state first, then fill on resolve
+   * (guarded by `this.section === key` so a fast switch never clobbers a newer one).
+   * MY / HISTORY have no client feed yet -> the "coming soon" empty copy.
+   */
+  private loadSection(key: string): void {
+    this.comingSoon = false;
+    switch (key) {
+      case "featured":
+      case "community":
+        // Render the cached/Inferno-only feed instantly (offline-safe, no loading flash),
+        // then async-upgrade to the merged feed (Inferno pinned first + the backend's
+        // player-authored cards). Guarded by `this.section === key` so a fast nav switch
+        // away never clobbers a newer section; the merged result is cached as `baseFeed`
+        // so switching back is instant.
+        this.feed = this.baseFeed ?? buildInfernoFeed();
+        this.rebuild();
+        void buildMergedCommunityFeed({ sort: "trending" }).then(f => {
+          if (!this.disposed && this.section === key) {
+            this.baseFeed = f;
+            this.feed = f;
+            this.cardCursor = 0;
+            this.rebuild();
+          }
+        });
+        break;
+      case "browse":
+        this.feed = this.emptyFeed();
+        this.rebuild();
+        void fetchCommunityFeed({ sort: "newest" }).then(f => {
+          if (!this.disposed && this.section === key) {
+            this.feed = f;
+            this.cardCursor = 0;
+            this.rebuild();
+          }
+        });
+        break;
+      case "bookmarks":
+        this.feed = this.emptyFeed();
+        this.rebuild();
+        void fetchCommunityBookmarks().then(items => {
+          if (!this.disposed && this.section === key) {
+            this.feed = { featured: items, selected: items[0] ?? null, totalCount: items.length };
+            this.cardCursor = 0;
+            this.rebuild();
+          }
+        });
+        break;
+      default:
+        // "mine" / "history" - no client feed yet.
+        this.feed = this.emptyFeed();
+        this.comingSoon = true;
+        this.rebuild();
+        break;
+    }
+  }
+
+  /** Open the challenge designer over the browser (PATTERN 1: browser stays underneath). */
+  private openCreate(): void {
+    globalScene.ui.setOverlayMode(UiMode.COMMUNITY_CHALLENGE_CREATE, null);
+  }
+
+  private emptyFeed(): CommunityChallengeFeed {
+    return { featured: [], selected: null, totalCount: 0 };
+  }
+
   clear(): void {
     super.clear();
+    this.disposed = true;
     this.container.setVisible(false);
     this.dynamic.removeAll(true);
     this.feed = null;

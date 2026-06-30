@@ -1,6 +1,7 @@
 import type { FixedBattleConfig } from "#app/battle";
 import { globalScene } from "#app/global-scene";
 import { pokemonEvolutions } from "#balance/pokemon-evolutions";
+import { communitySpeciesAllowed } from "#data/elite-redux/er-community-run-state";
 import { pokemonFormChanges } from "#data/pokemon-forms";
 import type { PokemonSpecies } from "#data/pokemon-species";
 import { ChallengeType } from "#enums/challenge-type";
@@ -359,6 +360,12 @@ export function applyChallenges(challengeType: ChallengeType, ...args: any[]): b
  * @returns `true` if the species is considered valid.
  */
 export function checkStarterValidForChallenge(species: PokemonSpecies, props: DexAttrProps, soft: boolean) {
+  // ER Community Challenge: a launched community card may restrict the grid to a
+  // whitelist of root species. `species.speciesId` is already the root (the grid
+  // is built from speciesStarterCosts roots), so it maps 1:1 to the whitelist.
+  if (!communitySpeciesAllowed(species.speciesId)) {
+    return false;
+  }
   if (!soft) {
     const isValidForChallenge = new BooleanHolder(true);
     applyChallenges(ChallengeType.STARTER_CHOICE, species, isValidForChallenge, props);

@@ -33,6 +33,7 @@ import {
   type CommunityChallengeFeed,
   type CommunityChallengeRule,
   type CommunityChallengeStats,
+  fetchCommunityFeed,
 } from "#data/elite-redux/er-community-challenges";
 import { getErLineTier } from "#data/elite-redux/er-usage-tiers";
 import { Challenges } from "#enums/challenges";
@@ -187,4 +188,23 @@ export function buildInfernoEntry(): CommunityChallengeEntry {
 export function buildInfernoFeed(): CommunityChallengeFeed {
   const inferno = buildInfernoEntry();
   return { featured: [inferno], selected: inferno, totalCount: 1 };
+}
+
+/**
+ * The live FEATURED/COMMUNITY feed: the real Inferno card pinned first, followed by
+ * the player-authored challenges from the backend (`fetchCommunityFeed`). Offline /
+ * guest / worker-unreachable degrades to Inferno-only (fetch returns `emptyFeed()`),
+ * so the browser always has at least the apex card and never shows a loading flash.
+ */
+export async function buildMergedCommunityFeed(query?: {
+  sort?: string;
+  filter?: string;
+  page?: number;
+}): Promise<CommunityChallengeFeed> {
+  const inferno = buildInfernoEntry();
+  const fetched = await fetchCommunityFeed(query);
+  // Drop any server copy of Inferno so the pinned card isn't duplicated.
+  const others = fetched.featured.filter(e => e.config.id !== inferno.config.id);
+  const featured = [inferno, ...others];
+  return { featured, selected: inferno, totalCount: featured.length };
 }
