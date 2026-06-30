@@ -86,3 +86,31 @@ if (sha) {
 } else {
   console.log("ER_ASSETS_SHA not set - dist/_redirects keeps the committed er-assets pin.");
 }
+
+// 4b. Optional asset-host override - jsDelivr-outage escape hatch (easily reverted).
+// jsDelivr's GitHub endpoint (cdn.jsdelivr.net/gh/...) can have a wholesale outage
+// ("503 No healthy backends") or flap for a long time after one, taking the game
+// offline/spotty for players regardless of repo or pin (confirmed: an unrelated tiny
+// repo, jquery/jquery, 503s too while jsDelivr's /npm/ stays up). Setting
+// ER_ASSETS_HOST=raw rewrites the redirects to fetch straight from GitHub raw (same
+// bytes, sends Access-Control-Allow-Origin:*). Stopgap only - raw can rate-limit under
+// very heavy load, though at our scale (~100-150 DAU, per-IP limits, Fastly-cached) it
+// is comfortably safe. TO REVERT: redeploy with ER_ASSETS_HOST unset (the default) and
+// the redirects go straight back to jsDelivr. Runs after the SHA re-pin so it inherits
+// whichever sha is active.
+const assetHost = process.env.ER_ASSETS_HOST?.trim();
+if (assetHost === "raw") {
+  const redirectsPath = join(DIST_DIR, "_redirects");
+  const before = await readFile(redirectsPath, "utf8");
+  const after = before.replace(
+    /https:\/\/cdn\.jsdelivr\.net\/gh\/Heraklines\/er-assets@([0-9a-f]{40})\//g,
+    "https://raw.githubusercontent.com/Heraklines/er-assets/$1/",
+  );
+  if (after === before) {
+    throw new Error("ER_ASSETS_HOST=raw set but found no jsDelivr er-assets URLs to rewrite in dist/_redirects");
+  }
+  await writeFile(redirectsPath, after);
+  console.log("ER_ASSETS_HOST=raw: rewrote er-assets redirects jsDelivr -> raw.githubusercontent.com");
+} else if (assetHost) {
+  throw new Error(`ER_ASSETS_HOST="${assetHost}" is not recognized (only "raw" is supported)`);
+}

@@ -10,6 +10,11 @@ name: Deploy Production
 
 on:
   workflow_dispatch:
+    inputs:
+      asset_host:
+        description: "Asset CDN host. Blank = jsDelivr (normal). 'raw' = serve er-assets from raw.githubusercontent.com (jsDelivr-outage stopgap; redeploy blank to revert)."
+        required: false
+        type: string
 
 concurrency:
   group: deploy-prod
@@ -55,6 +60,12 @@ jobs:
             echo "er-assets pin for this deploy: $SHA"
           else
             echo "WARNING: could not resolve er-assets HEAD - keeping the committed pin."
+          fi
+          # Asset CDN host: blank = jsDelivr (normal). 'raw' = serve er-assets from
+          # raw.githubusercontent.com (jsDelivr-outage stopgap). Redeploy blank to revert.
+          if [ "${{ github.event.inputs.asset_host }}" = "raw" ]; then
+            echo "ER_ASSETS_HOST=raw" >> "$GITHUB_ENV"
+            echo "asset host OVERRIDE: raw.githubusercontent.com (jsDelivr bypass)"
           fi
 
       - name: Build standalone bundle
