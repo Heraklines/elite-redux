@@ -221,7 +221,13 @@ export class TurnStartPhase extends FieldPhase {
         this.handleFightCommand(turnCommand, pokemon);
         break;
       case Command.BALL:
-        globalScene.phaseManager.unshiftNew("AttemptCapturePhase", turnCommand.targets![0] % 2, turnCommand.cursor!); //TODO: is the bang correct here?
+        // Multi-format: AttemptCapturePhase takes the target enemy's POSITION within its side
+        // (== flat target - enemyOffset, which is `% 2` only in binary).
+        globalScene.phaseManager.unshiftNew(
+          "AttemptCapturePhase",
+          globalScene.currentBattle.arrangement.locate(turnCommand.targets![0]).position,
+          turnCommand.cursor!,
+        );
         break;
       case Command.POKEMON:
         globalScene.phaseManager.unshiftNew(

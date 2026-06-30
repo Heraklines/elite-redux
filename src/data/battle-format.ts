@@ -78,20 +78,24 @@ export interface BattleArrangement {
   readonly format: BattleFormat;
   /** Canonical base flat-index of `side` (authored). */
   sideOffset(side: number): number;
-  /** Flat {@linkcode BattlerIndex} for a structured id. */
-  indexOf(id: BattlerId): BattlerIndex;
-  /** Structured id for a flat index (inverse of {@linkcode indexOf}). ATTACKER -> {side:-1,position:-1}. */
-  locate(index: BattlerIndex): BattlerId;
+  /**
+   * Flat battler index for a structured id. NB the returned index is a plain integer: in
+   * triple+ formats it can exceed the {@linkcode BattlerIndex} enum (e.g. 4/5), which only
+   * names the binary 0-3 slots.
+   */
+  indexOf(id: BattlerId): number;
+  /** Structured id for a flat index (inverse of {@linkcode indexOf}). ATTACKER/unmapped -> {side:-1,position:-1}. */
+  locate(index: number): BattlerId;
   /** The {@linkcode SideKind} owning a flat index (OTHER for ATTACKER/unmapped). */
-  ownerOf(index: BattlerIndex): SideKind;
+  ownerOf(index: number): SideKind;
   /** Whether two flat indices are on the same team (allies). False if either is ATTACKER. */
-  areAllies(a: BattlerIndex, b: BattlerIndex): boolean;
+  areAllies(a: number, b: number): boolean;
   /** Whether `a` can reach `b` with an adjacent-only move (per the format's topology). */
   isAdjacent(a: BattlerId, b: BattlerId): boolean;
   /** Capacity of a side. */
   capacityOf(side: number): number;
   /** All occupiable flat indices, in canonical (side, position) order. Use for turnCommands keys / RNG-ordered iteration. */
-  activeIndices(): BattlerIndex[];
+  activeIndices(): number[];
   /** Convenience: the local player side's capacity (== the legacy "battler count"). */
   readonly playerCapacity: number;
   /** Convenience: the first opposing (enemy-kind) side's capacity. */
@@ -136,7 +140,7 @@ const teamOf = (sides: BattleSideSpec[], side: number): number => sides[side].te
 export function createArrangement(format: BattleFormat): BattleArrangement {
   const { sides, localPlayerSide, adjacency } = format;
 
-  const locate = (index: BattlerIndex): BattlerId => {
+  const locate = (index: number): BattlerId => {
     if (index < 0) {
       return ATTACKER_ID;
     }
@@ -156,11 +160,11 @@ export function createArrangement(format: BattleFormat): BattleArrangement {
     sideOffset: (side: number) => sides[side].baseIndex,
     indexOf: (id: BattlerId) => sides[id.side].baseIndex + id.position,
     locate,
-    ownerOf: (index: BattlerIndex) => {
+    ownerOf: (index: number) => {
       const id = locate(index);
       return id.side < 0 ? SideKind.OTHER : sides[id.side].kind;
     },
-    areAllies: (a: BattlerIndex, b: BattlerIndex) => {
+    areAllies: (a: number, b: number) => {
       if (a === BattlerIndex.ATTACKER || b === BattlerIndex.ATTACKER) {
         return false;
       }
@@ -174,7 +178,7 @@ export function createArrangement(format: BattleFormat): BattleArrangement {
     isAdjacent: (a: BattlerId, b: BattlerId) => adjacency.reaches(a, b),
     capacityOf: (side: number) => sides[side].capacity,
     activeIndices: () => {
-      const out: BattlerIndex[] = [];
+      const out: number[] = [];
       for (const spec of sides) {
         for (let p = 0; p < spec.capacity; p++) {
           out.push(spec.baseIndex + p);

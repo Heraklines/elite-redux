@@ -41,7 +41,9 @@ export class AttemptCapturePhase extends PokemonPhase {
   private originalY: number;
 
   constructor(targetIndex: number, pokeballType: PokeballType) {
-    super(BattlerIndex.ENEMY + targetIndex);
+    // Multi-format: targetIndex is the caught enemy's position; map it to the flat index via
+    // the enemy side's base offset (== BattlerIndex.ENEMY in binary, shifted in triple).
+    super((globalScene.currentBattle?.arrangement.enemyOffset ?? BattlerIndex.ENEMY) + targetIndex);
 
     this.pokeballType = pokeballType;
   }

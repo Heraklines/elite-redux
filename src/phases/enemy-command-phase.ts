@@ -2,7 +2,6 @@ import { globalScene } from "#app/global-scene";
 import { getCoopController, getCoopNetcodeMode } from "#data/elite-redux/coop/coop-runtime";
 import { ER_DOOMED_SWITCH_THRESHOLD_MULT, erAssessThreat, getErAiProfile } from "#data/elite-redux/er-enemy-ai";
 import { AbilityId } from "#enums/ability-id";
-import { BattlerIndex } from "#enums/battler-index";
 import { BattlerTagType } from "#enums/battler-tag-type";
 import { Command } from "#enums/command";
 import { MoveId } from "#enums/move-id";
@@ -48,7 +47,7 @@ export class EnemyCommandPhase extends FieldPhase {
       && getCoopNetcodeMode() === "authoritative"
       && getCoopController()?.role === "guest"
     ) {
-      globalScene.currentBattle.turnCommands[this.fieldIndex + BattlerIndex.ENEMY] = {
+      globalScene.currentBattle.turnCommands[globalScene.currentBattle.arrangement.enemyOffset + this.fieldIndex] = {
         command: Command.FIGHT,
         move: { move: MoveId.NONE, targets: [], useMode: MoveUseMode.NORMAL },
         skip: true,
@@ -111,7 +110,7 @@ export class EnemyCommandPhase extends FieldPhase {
           if (sortedPartyMemberScores[0][1] * switchMultiplier >= matchupScore * switchThreshold) {
             const index = trainer.getNextSummonIndex(enemyPokemon.trainerSlot, partyMemberScores);
 
-            battle.turnCommands[this.fieldIndex + BattlerIndex.ENEMY] = {
+            battle.turnCommands[globalScene.currentBattle.arrangement.enemyOffset + this.fieldIndex] = {
               command: Command.POKEMON,
               cursor: index,
               args: [false],
@@ -130,10 +129,12 @@ export class EnemyCommandPhase extends FieldPhase {
     const nextMove = enemyPokemon.getNextMove();
 
     if (this.shouldTera(enemyPokemon)) {
-      globalScene.currentBattle.preTurnCommands[this.fieldIndex + BattlerIndex.ENEMY] = { command: Command.TERA };
+      globalScene.currentBattle.preTurnCommands[globalScene.currentBattle.arrangement.enemyOffset + this.fieldIndex] = {
+        command: Command.TERA,
+      };
     }
 
-    globalScene.currentBattle.turnCommands[this.fieldIndex + BattlerIndex.ENEMY] = {
+    globalScene.currentBattle.turnCommands[globalScene.currentBattle.arrangement.enemyOffset + this.fieldIndex] = {
       command: Command.FIGHT,
       move: nextMove,
       skip: this.skipTurn,

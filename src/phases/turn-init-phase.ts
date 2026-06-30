@@ -2,7 +2,6 @@ import { consumePendingDevBattleSetup } from "#app/dev-tools/registry";
 import { globalScene } from "#app/global-scene";
 import { getErBiomeRule } from "#data/elite-redux/er-biome-rules";
 import { BattleType } from "#enums/battle-type";
-import { BattlerIndex } from "#enums/battler-index";
 import { MovePhaseTimingModifier } from "#enums/move-phase-timing-modifier";
 import { MoveUseMode } from "#enums/move-use-mode";
 import { Stat } from "#enums/stat";
@@ -99,7 +98,9 @@ export class TurnInitPhase extends FieldPhase {
         if (pokemon.isPlayer()) {
           globalScene.phaseManager.pushNew("CommandPhase", i);
         } else {
-          globalScene.phaseManager.pushNew("EnemyCommandPhase", i - BattlerIndex.ENEMY);
+          // Multi-format: the enemy's position within its side (== i - enemyOffset, which is
+          // BattlerIndex.ENEMY in binary but shifts in triple). getFieldIndex is self-consistent.
+          globalScene.phaseManager.pushNew("EnemyCommandPhase", pokemon.getFieldIndex());
         }
       }
     });

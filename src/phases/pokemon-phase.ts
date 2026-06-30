@@ -1,4 +1,5 @@
 import { globalScene } from "#app/global-scene";
+import { SideKind } from "#data/battle-format";
 import { BattlerIndex } from "#enums/battler-index";
 import type { Pokemon } from "#field/pokemon";
 import { FieldPhase } from "#phases/field-phase";
@@ -30,13 +31,29 @@ export abstract class PokemonPhase extends FieldPhase {
     }
 
     this.battlerIndex = battlerIndex;
-    this.player = battlerIndex < 2;
-    this.fieldIndex = battlerIndex % 2;
+    // Multi-format: derive side/position from the arrangement so triple enemy slots
+    // (flat indices 4/5) resolve correctly instead of the binary `% 2` / `< 2`. When the
+    // index is not a field slot (a raw pokemon ID, > the format's last slot) fall back to
+    // the legacy arithmetic. Binary battles produce identical player/fieldIndex.
+    const id = globalScene.currentBattle?.arrangement.locate(battlerIndex);
+    if (id && id.side >= 0) {
+      this.player = globalScene.currentBattle!.arrangement.ownerOf(battlerIndex) === SideKind.PLAYER;
+      this.fieldIndex = id.position;
+    } else {
+      this.player = battlerIndex < 2;
+      this.fieldIndex = battlerIndex % 2;
+    }
   }
 
   // TODO: This should have `undefined` in its signature
   getPokemon(): Pokemon {
-    if (this.battlerIndex > BattlerIndex.ENEMY_2) {
+    // Multi-format: a "field slot" is any index the arrangement maps to a real side
+    // (triple includes 4/5). Anything else is a raw pokemon ID. Legacy fallback: > ENEMY_2.
+    const arrangement = globalScene.currentBattle?.arrangement;
+    const isFieldSlot = arrangement
+      ? arrangement.locate(this.battlerIndex).side >= 0
+      : this.battlerIndex <= BattlerIndex.ENEMY_2;
+    if (!isFieldSlot) {
       return globalScene.getPokemonById(this.battlerIndex)!;
     }
     return globalScene.getField()[this.battlerIndex]!;

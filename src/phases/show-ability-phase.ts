@@ -62,10 +62,14 @@ export class ShowAbilityPhase extends PokemonPhase {
     const pokemon = this.getPokemon();
 
     if (pokemon.isPlayer()) {
-      globalScene.currentBattle.lastPlayerInvolved = pokemon.getBattlerIndex() % 2;
+      globalScene.currentBattle.lastPlayerInvolved = globalScene.currentBattle.arrangement.locate(
+        pokemon.getBattlerIndex(),
+      ).position;
     } else {
       /** If its an enemy pokemon, list it as last enemy to use ability or move */
-      globalScene.currentBattle.lastEnemyInvolved = pokemon.getBattlerIndex() % 2;
+      globalScene.currentBattle.lastEnemyInvolved = globalScene.currentBattle.arrangement.locate(
+        pokemon.getBattlerIndex(),
+      ).position;
     }
 
     globalScene.abilityBar.showAbility(this.pokemonName, this.abilityName, this.passive, this.player).then(() => {
