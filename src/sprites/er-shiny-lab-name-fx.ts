@@ -149,6 +149,24 @@ export class ErShinyLabNameFx {
   private stateKey: string | null = null;
   private active = false;
   private savedTextAlpha = 1;
+  /** Current playback speed (the frames are rendered at base speed; speed drives the timer rate). */
+  private speed = 1;
+
+  /** The per-frame timer delay for a given speed (faster speed -> shorter delay -> faster loop). */
+  private static frameDelay(speed: number): number {
+    const s = Math.max(0.25, Math.min(3, speed || 1));
+    return Math.max(16, NAME_FX_FRAME_DELAY / s);
+  }
+
+  /** Recreate the playback timer at the current speed's delay, preserving the frame position. */
+  private restartTimer(): void {
+    this.timer?.remove();
+    this.timer = globalScene.time.addEvent({
+      delay: ErShinyLabNameFx.frameDelay(this.speed),
+      loop: true,
+      callback: () => this.tick(),
+    });
+  }
 
   /**
    * Build or refresh the animated FX for `text` given its resolved `look`. Returns true when the
@@ -165,6 +183,14 @@ export class ErShinyLabNameFx {
 
     const stateKey = erShinyLabNameFxStateKey(text.text, glyphSignature(text), look);
     if (this.active && this.stateKey === stateKey && this.sprite) {
+      // Frames are speed-independent (rendered at base speed for a seamless loop), so a speed-only
+      // change does NOT rebuild - it just re-rates the playback timer. Without this the cached
+      // frames keep playing at the OLD speed (the "speed doesn't affect Name FX" bug).
+      const speed = look.params.speed ?? 1;
+      if (this.speed !== speed) {
+        this.speed = speed;
+        this.restartTimer();
+      }
       this.syncTransform(text); // keep the overlay aligned if the name moved (cheap; no re-render)
       return true;
     }
@@ -218,7 +244,9 @@ export class ErShinyLabNameFx {
     // Auras never apply to text; the renderer recolours the white glyphs itself, so the synthetic
     // white source must NOT be spared by the protect-black/white guards (which target sprite art).
     const loadout = { palette: look.loadout.palette, surface: look.loadout.surface, around: null };
-    const params: ErShinyLabParams = { ...look.params, protectBlack: false, protectWhite: false };
+    // Frames are rendered at BASE speed (speed: 1) so the 24-frame loop wraps seamlessly and is
+    // shared across speeds; the equipped speed only changes the PLAYBACK rate (the timer delay).
+    const params: ErShinyLabParams = { ...look.params, protectBlack: false, protectWhite: false, speed: 1 };
     const periodSeconds = ER_SHINY_LAB_NAME_FX_PERIOD_MS / 1000;
 
     const newKeys: string[] = [];
@@ -255,13 +283,8 @@ export class ErShinyLabNameFx {
     text.setAlpha(0); // hide the flat glyphs; the FX sprite carries the visible name
     this.active = true;
 
-    if (!this.timer) {
-      this.timer = globalScene.time.addEvent({
-        delay: NAME_FX_FRAME_DELAY,
-        loop: true,
-        callback: () => this.tick(),
-      });
-    }
+    this.speed = look.params.speed ?? 1;
+    this.restartTimer();
     return true;
   }
 
