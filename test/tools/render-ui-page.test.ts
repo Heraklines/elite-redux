@@ -388,9 +388,10 @@ const RECIPES: Record<string, Recipe> = {
     steps: [Button.DOWN, Button.ACTION],
     diffTolerance: 0,
   },
-  // Stage B "coming soon" copy: DOWN x2 to MY (nav index 3) + ACTION; MY has no client
-  // feed yet, so the empty state renders the "COMING SOON" copy. Static -> exact diff.
-  "community-challenges-section-coming-soon": {
+  // Stage B MY CHALLENGES: DOWN x2 to MY (nav index 3) + ACTION; MY lists the player's own
+  // local drafts. The harness has no seeded drafts, so it renders the empty MY state (the
+  // generic "BE THE FIRST" empty copy), not "COMING SOON". Static -> exact diff.
+  "community-challenges-section-mine": {
     mode: UiMode.COMMUNITY_CHALLENGES,
     prepare: () => [buildDemoChallengesConfig({ populated: true })],
     steps: [Button.DOWN, Button.DOWN, Button.ACTION],

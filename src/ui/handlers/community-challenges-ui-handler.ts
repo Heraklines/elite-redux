@@ -23,14 +23,18 @@ import { globalScene } from "#app/global-scene";
 import { buildInfernoFeed, buildMergedCommunityFeed } from "#data/elite-redux/er-community-challenge-inferno";
 import {
   buildDemoChallengesConfig,
+  buildMyChallengesFeed,
   type CommunityChallengeConfig,
   type CommunityChallengeEntry,
   type CommunityChallengeFeed,
   fetchCommunityBookmarks,
   fetchCommunityFeed,
+  fetchMyChallenges,
   flushPendingFounderPublishes,
+  getLocalDraft,
   recordCommunityAttempt,
 } from "#data/elite-redux/er-community-challenges";
+import { setFounderRunState } from "#data/elite-redux/er-community-run-state";
 import { Button } from "#enums/buttons";
 import { TextStyle } from "#enums/text-style";
 import { UiMode } from "#enums/ui-mode";
@@ -648,14 +652,26 @@ export class CommunityChallengesUiHandler extends UiHandler {
   /** Play the currently-focused card via the opener's launch callback (no-op standalone). */
   private playFocusedCard(): void {
     const e = this.feed?.featured[this.cardCursor];
-    if (e && this.onLaunch) {
-      // Record a normal attempt for published cards (built-in er-* / demo cards have
-      // no worker row), then teardown-launch the run (setModeAndEnd clears this handler).
-      if (!/^(er-|demo-)/.test(e.config.id)) {
-        void recordCommunityAttempt(e.config.id);
+    if (!e || !this.onLaunch) {
+      return;
+    }
+    if (this.section === "mine") {
+      // MY CHALLENGES: a still-DRAFT challenge is FINALIZED by re-playing the founder
+      // qualifying run from scratch (a win publishes it); a published one just replays.
+      // No /community/attempt - founder runs are recorded via the founder flow on game-over.
+      const draft = getLocalDraft(e.config.id);
+      if (draft?.status === "draft") {
+        setFounderRunState({ draftId: e.config.id, config: e.config });
       }
       this.onLaunch(e.config);
+      return;
     }
+    // Record a normal attempt for published cards (built-in er-* / demo cards have
+    // no worker row), then teardown-launch the run (setModeAndEnd clears this handler).
+    if (!/^(er-|demo-)/.test(e.config.id)) {
+      void recordCommunityAttempt(e.config.id);
+    }
+    this.onLaunch(e.config);
   }
 
   /** Activate a sidebar nav item: switch the active SECTION (and feed), or open CREATE. */
@@ -720,8 +736,29 @@ export class CommunityChallengesUiHandler extends UiHandler {
           }
         });
         break;
+      case "mine": {
+        // THIS player's own challenges. Show local drafts (saved on create, surviving a
+        // loss) INSTANTLY, then merge in the server's /community/mine (cross-device + real
+        // attempt stats) once that route ships - keeping any local-only drafts the server
+        // doesn't know yet. Empty list -> the generic "forge one" empty copy.
+        const local = buildMyChallengesFeed();
+        this.feed = local;
+        this.cardCursor = 0;
+        this.rebuild();
+        void fetchMyChallenges().then(items => {
+          if (!this.disposed && this.section === key && items.length > 0) {
+            const serverIds = new Set(items.map(i => i.config.id));
+            const localOnly = local.featured.filter(e => !serverIds.has(e.config.id));
+            const featured = [...items, ...localOnly];
+            this.feed = { featured, selected: featured[0] ?? null, totalCount: featured.length };
+            this.cardCursor = 0;
+            this.rebuild();
+          }
+        });
+        break;
+      }
       default:
-        // "mine" / "history" - no client feed yet.
+        // "history" - no client feed yet.
         this.feed = this.emptyFeed();
         this.comingSoon = true;
         this.rebuild();

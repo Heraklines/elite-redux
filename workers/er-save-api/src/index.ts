@@ -2604,6 +2604,40 @@ async function handleCommunityBookmarks(auth: TokenPayload, env: Env, cors: Reco
   return json({ items }, 200, cors);
 }
 
+/**
+ * GET /community/mine - this player's OWN challenges (MY CHALLENGES tab). Returns ANY
+ * status EXCEPT hidden/rejected so unpublished DRAFTS show alongside published ones, with
+ * the denormalized attempt counters. Uses idx_cc_author (created_by_uid, created_at DESC).
+ */
+async function handleCommunityMine(auth: TokenPayload, env: Env, cors: Record<string, string>): Promise<Response> {
+  await ensureCommunityTables(env);
+  const { results } = await env.DB.prepare(
+    `SELECT ${CC_ENTRY_COLS}
+       FROM community_challenges
+      WHERE created_by_uid = ?
+      ORDER BY created_at DESC
+      LIMIT 100`,
+  )
+    .bind(auth.uid)
+    .all<CommunityChallengeRow>();
+  const items = (results ?? [])
+    .filter((row: CommunityChallengeRow) => row.status !== "hidden" && row.status !== "rejected")
+    .map((row: CommunityChallengeRow) =>
+      buildCommunityEntry(
+        row,
+        {
+          attempts: row.attempts_total,
+          cleared: row.cleared_count,
+          inProgress: row.inprogress_count,
+          failed: row.failed_count,
+          recent: [],
+        },
+        false,
+      ),
+    );
+  return json({ items }, 200, cors);
+}
+
 // #endregion
 
 export default {
@@ -2728,6 +2762,9 @@ export default {
       }
       if (pathname === "/community/bookmarks" && method === "GET") {
         return await handleCommunityBookmarks(auth, env, cors);
+      }
+      if (pathname === "/community/mine" && method === "GET") {
+        return await handleCommunityMine(auth, env, cors);
       }
 
       return text("Not found.", 404, cors);

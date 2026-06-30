@@ -34,6 +34,7 @@ import {
   COMMUNITY_CHALLENGE_SCHEMA_VERSION,
   type CommunityChallengeConfig,
   createCommunityChallenge,
+  saveLocalDraft,
   validateChallengeConfig,
 } from "#data/elite-redux/er-community-challenges";
 import { setFounderRunState } from "#data/elite-redux/er-community-run-state";
@@ -581,14 +582,19 @@ export class CommunityChallengeCreateUiHandler extends UiHandler {
       return;
     }
     this.errorMsg = null;
-    const id = await createCommunityChallenge(config);
-    if (id && this.onLaunch) {
-      // Saved as a draft (invisible to others until cleared). The FOUNDER must now win
-      // it: tag this as the qualifying run (persisted on the session save so a mid-run
+    const serverId = await createCommunityChallenge(config);
+    if (this.onLaunch) {
+      // Local-first persistence: ALWAYS remember the draft locally (so a loss can't lose
+      // it + it lists in MY CHALLENGES), with the server id when we got one, else a local
+      // id - the draft stays playable + finalizable from MY even before the worker route
+      // ships. Saved as a draft (invisible to others until cleared). The FOUNDER must now
+      // win it: tag this as the qualifying run (persisted on the session save so a mid-run
       // save/reload still auto-publishes), then drop straight into starter-select. A
       // genuine victory flips the draft live (game-over-phase tryPublishFounderClear).
-      const draftConfig = { ...config, id };
-      setFounderRunState({ draftId: id, config: draftConfig });
+      const draftId = serverId ?? `local-${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
+      const draftConfig = { ...config, id: draftId };
+      saveLocalDraft(draftConfig);
+      setFounderRunState({ draftId, config: draftConfig });
       const launch = this.onLaunch;
       // TEAR DOWN BOTH community overlays BEFORE the confirmation, not after. CREATE was
       // opened OVER the browser, so both containers are visible and the browser is high-z.

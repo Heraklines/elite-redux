@@ -6,7 +6,7 @@ import { bypassLogin } from "#constants/app-constants";
 import { modifierTypes } from "#data/data-lists";
 import { getCharVariantFromDialogue } from "#data/dialogue";
 import { broadcastCoopWaveResolved } from "#data/elite-redux/coop/coop-runtime";
-import { enqueueFounderPublish } from "#data/elite-redux/er-community-challenges";
+import { enqueueFounderPublish, recordLocalDraftAttempt } from "#data/elite-redux/er-community-challenges";
 import { getFounderRunState, setFounderRunState } from "#data/elite-redux/er-community-run-state";
 import { recordGhostTeamOnGameOver } from "#data/elite-redux/er-ghost-teams";
 import type { PokemonSpecies } from "#data/pokemon-species";
@@ -249,11 +249,10 @@ export class GameOverPhase extends BattlePhase {
               // ER (#217): snapshot the finished team as a cross-player "ghost"
               // (stored locally + uploaded when an endpoint is configured).
               recordGhostTeamOnGameOver(this.isVictory);
-              // ER Community Challenge: a genuine victory by the FOUNDER of a draft
-              // auto-publishes it (flips draft->active). Only fires on a real win.
-              if (this.isVictory) {
-                this.tryPublishFounderClear();
-              }
+              // ER Community Challenge: record the FOUNDER's qualifying-run outcome. A win
+              // auto-publishes the draft (flips draft->active); a LOSS still records the
+              // attempt locally so the draft is NOT lost and stays in MY CHALLENGES to finalize.
+              this.recordFounderRunOutcome();
               globalScene.phaseManager.pushNew("PostGameOverPhase", globalScene.sessionSlotId, endCardPhase);
               this.end();
             });
@@ -333,17 +332,26 @@ export class GameOverPhase extends BattlePhase {
   }
 
   /**
-   * ER Community Challenge: if THIS run is the founder's qualifying play of a draft
-   * (set at create + persisted on the session save), a genuine victory auto-publishes
-   * it - POST /community/clear flips the draft live. Fire-and-forget; the linkage is
-   * cleared so a second game-over can't re-fire. Called only on `this.isVictory`.
+   * ER Community Challenge: if THIS run is the founder's qualifying play of a draft (set
+   * at create + persisted on the session save), record its outcome. The linkage is cleared
+   * so a second game-over can't re-fire. Called on BOTH win and loss:
+   *  - WIN: auto-publish (POST /community/clear flips the draft live) + mark the local
+   *    draft cleared/published (so MY CHALLENGES shows it as published).
+   *  - LOSS: record a failed attempt LOCALLY so the draft is NOT lost - it stays in MY
+   *    CHALLENGES where the founder can finalize it with another try (replay from scratch).
    */
-  private tryPublishFounderClear(): void {
+  private recordFounderRunOutcome(): void {
     const founder = getFounderRunState();
     if (!founder) {
       return;
     }
     setFounderRunState(null);
+    const wave = globalScene.currentBattle?.waveIndex ?? founder.config.targetWave;
+    if (!this.isVictory) {
+      recordLocalDraftAttempt(founder.draftId, "failed", wave);
+      return;
+    }
+    recordLocalDraftAttempt(founder.draftId, "cleared", wave);
     const playerParty = globalScene.getPlayerParty();
     const party = playerParty.map(p => new PokemonData(p));
     const partyRoots = [...new Set(playerParty.map(p => p.species.getRootSpeciesId()))];
@@ -353,7 +361,7 @@ export class GameOverPhase extends BattlePhase {
       draftId: founder.draftId,
       config: founder.config,
       run: {
-        wave: globalScene.currentBattle?.waveIndex ?? founder.config.targetWave,
+        wave,
         clearTimeMs: Math.round((globalScene.sessionPlayTime ?? 0) * 1000),
         party,
         partyRoots,

@@ -728,3 +728,196 @@ export async function fetchCommunityBookmarks(): Promise<CommunityChallengeEntry
     return [];
   }
 }
+
+// ---------------------------------------------------------------------------
+// Local "My Drafts" store (MY CHALLENGES tab). A draft is also created server-side
+// (status='draft'), but the client must remember it locally so it is NEVER lost -
+// in particular a founder who LOSES their qualifying run can still find + finalize
+// the draft (the server row stays 'draft' but the client otherwise forgot its id).
+// Mirrors the founder-publish queue's localStorage pattern, degrades to a no-op
+// without localStorage, and is merged with GET /community/mine when that route ships.
+// ---------------------------------------------------------------------------
+const MY_DRAFTS_KEY = "er_community_my_drafts";
+
+export type LocalDraftStatus = "draft" | "published";
+
+/** One of the player's own challenges, as remembered locally (id + config + own stats). */
+export interface LocalCommunityDraft {
+  id: string;
+  config: CommunityChallengeConfig;
+  /** 'draft' until the founder clears it once (then 'published', the publish gate). */
+  status: LocalDraftStatus;
+  createdAt: number;
+  updatedAt: number;
+  /** The FOUNDER's own attempts at clearing this draft (local stats, pre-worker). */
+  attempts: number;
+  cleared: number;
+  failed: number;
+  lastWave?: number;
+}
+
+function readMyDrafts(): LocalCommunityDraft[] {
+  if (typeof localStorage === "undefined") {
+    return [];
+  }
+  try {
+    const raw = localStorage.getItem(MY_DRAFTS_KEY);
+    const arr = raw ? JSON.parse(raw) : [];
+    return Array.isArray(arr) ? (arr as LocalCommunityDraft[]) : [];
+  } catch {
+    return []; // corrupt entry - treat as empty.
+  }
+}
+
+function writeMyDrafts(list: LocalCommunityDraft[]): void {
+  if (typeof localStorage === "undefined") {
+    return;
+  }
+  try {
+    if (list.length === 0) {
+      localStorage.removeItem(MY_DRAFTS_KEY);
+    } else {
+      localStorage.setItem(MY_DRAFTS_KEY, JSON.stringify(list));
+    }
+  } catch (e) {
+    console.warn("[community] could not persist local draft", e);
+  }
+}
+
+/**
+ * Persist (upsert) a draft the player just created, keyed by its id, so it survives a
+ * loss and lists in the MY CHALLENGES tab. Call this on create BEFORE launching the
+ * founder run - that is what makes "the draft is not lost when you lose" true.
+ */
+export function saveLocalDraft(config: CommunityChallengeConfig): void {
+  const list = readMyDrafts();
+  const now = Date.now();
+  const existing = list.find(d => d.id === config.id);
+  if (existing) {
+    existing.config = config;
+    existing.updatedAt = now;
+  } else {
+    list.unshift({
+      id: config.id,
+      config,
+      status: "draft",
+      createdAt: config.createdAt ?? now,
+      updatedAt: now,
+      attempts: 0,
+      cleared: 0,
+      failed: 0,
+    });
+  }
+  writeMyDrafts(list);
+}
+
+/** This player's locally-known challenges (drafts + published), newest activity first. */
+export function listLocalDrafts(): LocalCommunityDraft[] {
+  return readMyDrafts().sort((a, b) => b.updatedAt - a.updatedAt);
+}
+
+/** One locally-known draft by id, or null. */
+export function getLocalDraft(id: string): LocalCommunityDraft | null {
+  return readMyDrafts().find(d => d.id === id) ?? null;
+}
+
+/**
+ * Record the FOUNDER's own attempt at clearing their draft (win OR loss). A win also
+ * marks the draft 'published' (the founder cleared it - the publish gate). Keeps the
+ * draft reachable + gives the MY tab real attempt stats even before the worker ships.
+ */
+export function recordLocalDraftAttempt(id: string, outcome: "cleared" | "failed", wave?: number): void {
+  const list = readMyDrafts();
+  const draft = list.find(d => d.id === id);
+  if (!draft) {
+    return;
+  }
+  draft.attempts += 1;
+  draft.updatedAt = Date.now();
+  if (typeof wave === "number") {
+    draft.lastWave = wave;
+  }
+  if (outcome === "cleared") {
+    draft.cleared += 1;
+    draft.status = "published";
+  } else {
+    draft.failed += 1;
+  }
+  writeMyDrafts(list);
+}
+
+/**
+ * Fetch this player's challenges from the server (MY CHALLENGES), any status so drafts
+ * show. Empty on any failure / before the worker route ships - the UI falls back to the
+ * local draft store. Mirrors fetchCommunityBookmarks.
+ */
+export async function fetchMyChallenges(): Promise<CommunityChallengeEntry[]> {
+  const base = serverBase();
+  const token = authToken();
+  if (!base || !token || typeof fetch !== "function") {
+    return [];
+  }
+  try {
+    const res = await fetch(`${base}/community/mine`, { headers: { Authorization: token } });
+    if (!res.ok) {
+      return [];
+    }
+    const data = (await res.json()) as { items?: CommunityChallengeEntry[] };
+    return Array.isArray(data?.items) ? data.items : [];
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * A generic RULES list for the detail panel, derived from difficulty / species cap /
+ * restrictions / tags. Avoids importing the Challenges enum values (er-community-challenge-
+ * inferno.ts has a richer per-challenge deriver for the Inferno card).
+ */
+function deriveGenericRules(config: CommunityChallengeConfig): CommunityChallengeRule[] {
+  const rules: CommunityChallengeRule[] = [
+    { text: `${config.difficulty.charAt(0).toUpperCase()}${config.difficulty.slice(1)} difficulty.` },
+  ];
+  if (config.allowedSpecies && config.allowedSpecies.length > 0) {
+    rules.push({ text: `Only ${config.allowedSpecies.length} eligible Pokemon.` });
+  }
+  const r = config.restrictions ?? {};
+  if (r.noLegendary) {
+    rules.push({ text: "No Legendary Pokemon." });
+  }
+  if (r.noMythical) {
+    rules.push({ text: "No Mythical Pokemon." });
+  }
+  if (r.noUltraBeasts) {
+    rules.push({ text: "No Ultra Beasts." });
+  }
+  if (r.noRepeats) {
+    rules.push({ text: "No repeats." });
+  }
+  for (const tag of config.tags) {
+    rules.push({ text: tag });
+  }
+  return rules;
+}
+
+/**
+ * Build the MY CHALLENGES feed from this player's locally-known drafts/published challenges.
+ * Stats are the founder's own local attempt counts (real cross-player stats arrive via
+ * fetchMyChallenges once the worker /community/mine route ships). Empty feed when none.
+ */
+export function buildMyChallengesFeed(): CommunityChallengeFeed {
+  const featured: CommunityChallengeEntry[] = listLocalDrafts().map(d => ({
+    config: d.config,
+    stats: {
+      attempts: d.attempts,
+      cleared: d.cleared,
+      inProgress: 0,
+      failed: d.failed,
+      recent: [],
+    },
+    rules: deriveGenericRules(d.config),
+    allowedPreview: (d.config.allowedSpecies ?? []).slice(0, 9),
+    allowedCount: d.config.allowedSpecies?.length ?? 0,
+  }));
+  return { featured, selected: featured[0] ?? null, totalCount: featured.length };
+}
