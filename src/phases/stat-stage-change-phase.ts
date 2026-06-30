@@ -188,12 +188,13 @@ export class StatStageChangePhase extends PokemonPhase {
         }
       }
 
-      // Elite Redux: self-inflicted stat-drop immunity (Limber / Lucky Halo).
-      // The `!selfTarget` block above only handles OTHER-source drops (Growl,
-      // Intimidate, Sticky Web); this covers the holder's OWN drops (Overheat,
-      // Close Combat, Draco Meteor, …) — which Clear Body / vanilla ProtectStat
-      // deliberately do NOT block. No vanilla ability wires this attr, so vanilla
-      // behaviour is unchanged.
+      // Elite Redux: self-inflicted stat-drop immunity. The `!selfTarget` block
+      // above only handles OTHER-source drops (Growl, Intimidate, Sticky Web);
+      // this covers the holder's OWN drops (Overheat, Close Combat, Draco Meteor,
+      // …). Per the 2.65 dex this attr is wired onto Limber, Lucky Halo, Clear
+      // Body and Full Metal Body (the latter two also keep ProtectStatAbAttr for
+      // incoming drops). No VANILLA ability wires this attr, so unmodded behaviour
+      // is unchanged - vanilla Clear Body still lets self-drops through.
       if (!cancelled.value && this.selfTarget && stages.value < 0) {
         applyAbAttrs("SelfStatDropImmunityAbAttr", {
           pokemon,

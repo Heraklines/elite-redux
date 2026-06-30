@@ -597,6 +597,41 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
   },
   // ===========================================================================
+  // Ability - Clear Body blocks SELF stat drops (Draco Meteor / Overheat)
+  // ===========================================================================
+  {
+    label: "Ability: Clear Body blocks self stat drops (Draco Meteor)",
+    description:
+      "ER 2.65 dex: Clear Body (and Full Metal Body) give 'immunity to all stat\n"
+      + "reductions from moves and abilities. Includes self stat drops from moves like\n"
+      + "Overheat.' This is an ER divergence from mainline, where Clear Body does NOT\n"
+      + "stop the user's own Draco Meteor / Overheat drop. Reported: a Flygon Redux with\n"
+      + "Clear Body used Draco Meteor and still lost Sp. Atk. This Flygon has Clear Body\n"
+      + "forced as its active ability.\n"
+      + "DO: use Draco Meteor (then Overheat) on the Snorlax (it is bulky and survives).\n"
+      + "EXPECT: Sp. Atk does NOT fall - Clear Body prevents the self-drop (a 'stats were\n"
+      + "not lowered' style message). Open the summary / move again to confirm Sp. Atk is\n"
+      + "still unboosted-but-not-negative. (Before the fix each use dropped Sp. Atk by 2.)\n"
+      + "Incoming drops are unaffected: Clear Body still blocks an enemy Growl/Intimidate.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_WAVE_OVERRIDE: 1,
+        STARTING_LEVEL_OVERRIDE: 100,
+        ABILITY_OVERRIDE: AbilityId.CLEAR_BODY,
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.SNORLAX,
+        ENEMY_LEVEL_OVERRIDE: 100,
+        ENEMY_ABILITY_OVERRIDE: AbilityId.BALL_FETCH,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+      });
+      return [
+        makeStarter(SpeciesId.FLYGON, {
+          moveset: [MoveId.DRACO_METEOR, MoveId.OVERHEAT, MoveId.EARTHQUAKE, MoveId.DRAGON_CLAW],
+        }),
+      ];
+    },
+  },
+  // ===========================================================================
   // QoL — out-of-battle party reorder
   // ===========================================================================
   {

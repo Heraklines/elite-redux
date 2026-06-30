@@ -664,6 +664,15 @@ const ABILITY_PATCHERS: ReadonlyMap<AbilityId, (ability: MutableAbility) => void
   // the ER 7 spec; that rider is removed by overwriting the attrs in
   // patchLimber() rather than appending.
   [AbilityId.LIMBER, ab => patchLimber(ab)],
+  // 29 CLEAR_BODY / 230 FULL_METAL_BODY: ER 2.65 dex - "immunity to all stat
+  // reductions from moves and abilities. Includes self stat drops from moves like
+  // Overheat." The vanilla ProtectStatAbAttr (already wired in init-abilities) only
+  // blocks INCOMING drops; add SelfStatDropImmunityAbAttr so the holder's OWN
+  // Overheat / Draco Meteor / Close Combat drops are negated too (reported: Flygon
+  // Redux + Draco Meteor still lost SpAtk through Clear Body). White Smoke is a
+  // DIFFERENT ability in ER (Smokescreen on entry), so it is deliberately excluded.
+  [AbilityId.CLEAR_BODY, ab => patchSelfStatDropImmunity(ab)],
+  [AbilityId.FULL_METAL_BODY, ab => patchSelfStatDropImmunity(ab)],
   // 39 INNER_FOCUS already handled in MAJOR section above (FEAR immunity extension).
 
   // 161 BIG_PECKS already TOTAL above.
@@ -2217,6 +2226,24 @@ function patchLimber(ability: MutableAbility): void {
     }
     return true;
   });
+}
+
+/**
+ * ER Clear Body / Full Metal Body (2.65 dex): each "gives immunity to all stat
+ * reductions from moves and abilities. Includes self stat drops from moves like
+ * Overheat." Vanilla and the prior port wired only ProtectStatAbAttr, which
+ * blocks INCOMING drops (Growl, Intimidate) but never the holder's OWN drops -
+ * so an Overheat / Draco Meteor / Close Combat user still lost the stat (the
+ * reported Flygon Redux + Draco Meteor dropping SpAtk through Clear Body). Keep
+ * ProtectStatAbAttr and ADD SelfStatDropImmunityAbAttr (which fires in the
+ * stat-change phase's self-target branch), so both incoming AND self drops are
+ * negated. Idempotent. White Smoke is intentionally NOT included: ER reworks it
+ * into a Smokescreen-on-entry evasion ability, not a stat protector.
+ */
+function patchSelfStatDropImmunity(ability: MutableAbility): void {
+  if (!ability.attrs.some(a => a.constructor.name === "SelfStatDropImmunityAbAttr")) {
+    ability.attrs.push(new SelfStatDropImmunityAbAttr());
+  }
 }
 
 function patchLeafGuard(ability: MutableAbility): void {
