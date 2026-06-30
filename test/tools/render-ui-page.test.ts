@@ -53,6 +53,7 @@ import { SpeciesId } from "#enums/species-id";
 import { UiMode } from "#enums/ui-mode";
 import { type ErTmCaseModifierType, getPlayerShopModifierTypeOptionsForWave } from "#modifiers/modifier-type";
 import { allMysteryEncounters } from "#mystery-encounters/mystery-encounters";
+import { achvs } from "#system/achv";
 import type { GameManager } from "#test/framework/game-manager";
 import { GameManager as GameManagerClass } from "#test/framework/game-manager";
 import {
@@ -427,6 +428,43 @@ const RECIPES: Record<string, Recipe> = {
       game.scene.currentBattle.mysteryEncounter = allMysteryEncounters[MysteryEncounterType.FIGHT_OR_FLIGHT];
       return [{}];
     },
+  },
+  // The overhauled achievement screen: left category nav (All + the 6 categories +
+  // Vouchers, with per-category counts), a header with overall completion % + earned/total
+  // achievement points, the category-filtered icon grid, and a detail panel showing the
+  // selected achievement's tier, points, reward summary and description. A deterministic ~1/3
+  // of the registry is unlocked (the first achv, CLASSIC_VICTORY, is kept LOCKED so the
+  // cursor-0 detail shows no locale-dependent unlock date -> exact golden diff).
+  achievements: {
+    mode: UiMode.ACHIEVEMENTS,
+    prepare: game => {
+      const unlockTs = 1_700_000_000_000;
+      Object.keys(achvs).forEach((id, i) => {
+        if (i % 3 === 1) {
+          game.scene.gameData.achvUnlocks[id] = unlockTs;
+        }
+      });
+      return [];
+    },
+    diffTolerance: 0,
+  },
+  // Directional-nav tour of the achievement screen: DOWN twice walks the category rail
+  // (All -> Victory -> Battle) re-filtering the grid + header each step, then RIGHT drops
+  // focus into the grid (cursor highlight appears) and RIGHT steps across the icons. Proves
+  // the no-mouse nav + the live re-filter + that no press crashes.
+  "achievements-nav": {
+    mode: UiMode.ACHIEVEMENTS,
+    prepare: game => {
+      const unlockTs = 1_700_000_000_000;
+      Object.keys(achvs).forEach((id, i) => {
+        if (i % 3 === 1) {
+          game.scene.gameData.achvUnlocks[id] = unlockTs;
+        }
+      });
+      return [];
+    },
+    steps: [Button.DOWN, Button.DOWN, Button.RIGHT, Button.RIGHT],
+    diffTolerance: 0,
   },
   pokedex: {
     mode: UiMode.POKEDEX_PAGE,

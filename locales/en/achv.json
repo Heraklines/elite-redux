@@ -5,6 +5,27 @@
   "locked": {
     "name": "Locked"
   },
+  "category": {
+    "all": "All",
+    "victory": "Victory",
+    "battle": "Battle",
+    "training": "Training",
+    "collection": "Collection",
+    "challenge": "Challenge",
+    "events": "Events"
+  },
+  "tier": {
+    "common": "Common",
+    "great": "Great",
+    "ultra": "Ultra",
+    "rogue": "Rogue",
+    "master": "Master"
+  },
+  "ui": {
+    "points": "pts",
+    "rewards": "Reward",
+    "pointsOnly": "Achievement points"
+  },
   "moneyAchv": {
     "description": "Accumulate a total of ₽{{moneyAmount}}."
   },

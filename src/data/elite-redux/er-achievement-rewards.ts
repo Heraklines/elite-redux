@@ -280,11 +280,63 @@ export function grantErAchievementReward(achvId: string): void {
   }
 }
 
+/** Optional grant-time context that makes a description concrete (party size, rolled species). */
+interface RewardDescribeContext {
+  /** Actual party size at grant time (candyTeam -> "...each of your N team members"). */
+  teamSize?: number;
+  /** Difficulty candy multiplier at grant time (candyTeam -> the real per-mon amount). */
+  candyMult?: number;
+  /** The concrete species a `"random"` roll resolved to (shiny/blackShiny -> name it). */
+  species?: SpeciesId;
+}
+
+/**
+ * A pure, player-facing one-line description of a single reward spec - the single source
+ * of truth for BOTH the grant toast and the achievement-screen reward list. With `ctx`
+ * (the grant path) it reads concretely ("90 candy for each of your 6 team members",
+ * "a shiny Pikachu"); without it (the UI, no active run) it stays generic ("30 candy per
+ * team member", "a random shiny"). No side effects, no global reads.
+ */
+export function describeRewardSpec(spec: RewardSpec, ctx?: RewardDescribeContext): string | null {
+  switch (spec.kind) {
+    case "candy":
+      return `${spec.amount} candy for ${speciesName(spec.species)}`;
+    case "candyTeam": {
+      if (ctx?.teamSize != null && ctx?.candyMult != null) {
+        const amount = Math.round(spec.perMon * ctx.candyMult);
+        return `${amount} candy for each of your ${ctx.teamSize} team members`;
+      }
+      return `${spec.perMon} candy per team member`;
+    }
+    case "eggs": {
+      const label = EGG_TIER_LABEL[spec.tier] ?? "";
+      const shinyPrefix = spec.shiny === true ? "shiny " : "";
+      return `${spec.count} ${shinyPrefix}${label} Egg${spec.count === 1 ? "" : "s"}`;
+    }
+    case "shiny": {
+      if (ctx?.species != null) {
+        return `a shiny ${speciesName(ctx.species)}`;
+      }
+      return spec.species === "random" ? "a random shiny" : `a shiny ${speciesName(spec.species)}`;
+    }
+    case "blackShiny": {
+      if (ctx?.species != null) {
+        return `a BLACK shiny ${speciesName(ctx.species)}`;
+      }
+      return spec.species === "random" ? "a random BLACK shiny" : `a BLACK shiny ${speciesName(spec.species)}`;
+    }
+    case "pokemon":
+      return speciesName(spec.species);
+    case "shinyLabEffects":
+      return spec.effects.length ? `Shiny Lab effects: ${spec.effects.map(effectLabel).join(", ")}` : null;
+  }
+}
+
 function applyRewardSpec(spec: RewardSpec): GrantedReward | null {
   switch (spec.kind) {
     case "candy":
       grantCandy(spec.species, spec.amount);
-      return { text: `${spec.amount} candy for ${speciesName(spec.species)}` };
+      return { text: describeRewardSpec(spec) ?? "" };
     case "candyTeam": {
       const mult = REWARD_DIFFICULTY_CANDY_MULT[getErDifficulty()] ?? 1;
       const amount = Math.round(spec.perMon * mult);
@@ -292,36 +344,54 @@ function applyRewardSpec(spec: RewardSpec): GrantedReward | null {
       for (const mon of party) {
         grantCandy(mon.species.speciesId, amount);
       }
-      return { text: `${amount} candy for each of your ${party.length} team members` };
+      return { text: describeRewardSpec(spec, { teamSize: party.length, candyMult: mult }) ?? "" };
     }
     case "eggs": {
       const isShiny = spec.shiny === true;
       for (let i = 0; i < spec.count; i++) {
         new Egg({ tier: spec.tier, sourceType: EggSourceType.EVENT, isShiny }).addEggToGameData();
       }
-      const label = EGG_TIER_LABEL[spec.tier] ?? "";
-      const shinyPrefix = isShiny ? "shiny " : "";
-      return { text: `${spec.count} ${shinyPrefix}${label} Egg${spec.count === 1 ? "" : "s"}` };
+      return { text: describeRewardSpec(spec) ?? "" };
     }
     case "shiny": {
       const species = resolveSpecies(spec.species);
       grantShiny(species, spec.tier);
-      return { text: `a shiny ${speciesName(species)}`, iconSpecies: species, shiny: true, variant: spec.tier - 1 };
+      return { text: describeRewardSpec(spec, { species }) ?? "", iconSpecies: species, shiny: true, variant: spec.tier - 1 };
     }
     case "blackShiny": {
       const species = resolveSpecies(spec.species);
       grantBlackShiny(species);
       // variant 2 = the epic/black sprite frame (off-by-one vs the VARIANT_3 bit).
-      return { text: `a BLACK shiny ${speciesName(species)}`, iconSpecies: species, shiny: true, variant: 2 };
+      return { text: describeRewardSpec(spec, { species }) ?? "", iconSpecies: species, shiny: true, variant: 2 };
     }
     case "pokemon":
       grantPokemon(spec.species);
-      return { text: speciesName(spec.species), iconSpecies: spec.species };
+      return { text: describeRewardSpec(spec) ?? "", iconSpecies: spec.species };
     case "shinyLabEffects": {
-      const labels = spec.effects.filter(effectId => grantErShinyLabEffectAvailability(effectId, false)).map(effectLabel);
-      return labels.length ? { text: `Shiny Lab effects: ${labels.join(", ")}` } : null;
+      // Grant + announce only the effects NEWLY unlocked here (skip ones already owned).
+      const granted = spec.effects.filter(effectId => grantErShinyLabEffectAvailability(effectId, false));
+      const text = describeRewardSpec({ kind: "shinyLabEffects", effects: granted });
+      return text ? { text } : null;
     }
   }
+}
+
+/**
+ * The player-facing reward lines an achievement grants, for the achievement screen.
+ * Mirrors {@linkcode grantErAchievementReward}'s spec assembly (the inline
+ * `ER_ACHIEVEMENT_REWARDS` entry folded with the effect->achv gate map) so the listed
+ * rewards match what actually unlocks, but is PURE - it describes, never grants. Empty
+ * for achievements with no reward (the great majority, which are points-only).
+ */
+export function getAchvRewardSummary(achvId: string): string[] {
+  const entry = ER_ACHIEVEMENT_REWARDS[achvId];
+  const specs: RewardSpec[] = entry ? (Array.isArray(entry) ? [...entry] : [entry]) : [];
+  const alreadyListed = new Set(specs.flatMap(s => (s.kind === "shinyLabEffects" ? s.effects : [])));
+  const mappedEffects = getErShinyLabEffectsForAchv(achvId).filter(e => !alreadyListed.has(e));
+  if (mappedEffects.length) {
+    specs.push({ kind: "shinyLabEffects", effects: mappedEffects });
+  }
+  return specs.map(spec => describeRewardSpec(spec)).filter((text): text is string => text != null);
 }
 
 // --- grant primitives --------------------------------------------------------

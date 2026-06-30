@@ -1,24 +1,35 @@
 import { globalScene } from "#app/global-scene";
+import { getAchvRewardSummary } from "#data/elite-redux/er-achievement-rewards";
 import { Button } from "#enums/buttons";
 import { PlayerGender } from "#enums/player-gender";
 import { TextStyle } from "#enums/text-style";
 import type { UiMode } from "#enums/ui-mode";
 import type { Achv } from "#system/achv";
 import { achvs, getAchievementDescription } from "#system/achv";
+import {
+  ACHV_CATEGORY_KEY,
+  ACHV_CATEGORY_ORDER,
+  ACHV_TIER_KEY,
+  type AchvCategory,
+  type AchvProgressSummary,
+  computeAchvProgress,
+  getAchvCategory,
+  getAchvDisplayName,
+  getAchvTierTextTint,
+} from "#system/achv-category";
 import type { Voucher } from "#system/voucher";
 import { getVoucherTypeIcon, getVoucherTypeName, vouchers } from "#system/voucher";
-import type { AchvUnlocks, VoucherUnlocks } from "#types/save-data";
 import { MessageUiHandler } from "#ui/message-ui-handler";
 import { ScrollBar } from "#ui/scroll-bar";
 import { addTextObject } from "#ui/text";
-import { addWindow } from "#ui/ui-theme";
 import i18next from "i18next";
 
-const Page = {
-  ACHIEVEMENTS: 0,
-  VOUCHERS: 1,
-} as const;
-type Page = (typeof Page)[keyof typeof Page];
+/**
+ * The left-nav entries. "All" + every {@linkcode AchvCategory} filter the achievement
+ * grid; "Vouchers" swaps the grid to the voucher list (the old ACTION-toggled page,
+ * now folded into the same rail so there is one consistent left nav like the mockup).
+ */
+type NavEntry = { kind: "all" } | { kind: "category"; category: AchvCategory } | { kind: "vouchers" };
 
 interface LanguageSetting {
   TextSize: string;
@@ -28,46 +39,75 @@ const languageSettings: { [key: string]: LanguageSetting } = {
   de: { TextSize: "80px" },
 };
 
+// Dark, mockup-matching palette (the same family the ER community-challenges screen uses):
+// an opaque void backdrop + slightly-raised bands, so light/coloured text stays legible and
+// the look is theme-independent (not the themed `addWindow`, which renders pale + washes out
+// the default-theme white window text).
+const VOID = 0x0b0b16;
+const BAND = 0x17141f;
+const PANEL = 0x0e0c16;
+const SEPARATOR = 0x322b42;
+const HIGHLIGHT = 0x4a5ba8;
+const TEXT_LIGHT = "#e6e6f0";
+const TEXT_DIM = "#8a86a0";
+const TEXT_SELECTED = "#ffffff";
+
 export class AchvsUiHandler extends MessageUiHandler {
-  private readonly ROWS = 4;
-  private readonly COLS = 18;
+  // Grid dimensions are computed from the canvas in setup() (the nav column steals width).
+  private cols = 13;
+  private rows = 4;
+
+  private readonly navWidth = 78;
+  private readonly headerHeight = 24;
+  private readonly detailHeight = 66;
 
   private mainContainer: Phaser.GameObjects.Container;
   private iconsContainer: Phaser.GameObjects.Container;
 
-  private headerBg: Phaser.GameObjects.NineSlice;
   private headerText: Phaser.GameObjects.Text;
-  private headerActionText: Phaser.GameObjects.Text;
-  private headerActionButton: Phaser.GameObjects.Sprite;
-  private headerBgX: number;
-  private iconsBg: Phaser.GameObjects.NineSlice;
+  private headerStatsText: Phaser.GameObjects.Text;
+
+  private navContainer: Phaser.GameObjects.Container;
+  private navRowHeight = 10;
+  private navLabels: Phaser.GameObjects.Text[] = [];
+  private navCounts: Phaser.GameObjects.Text[] = [];
+  private navCursorObj: Phaser.GameObjects.Rectangle | null = null;
+
   private icons: Phaser.GameObjects.Sprite[];
 
-  private titleBg: Phaser.GameObjects.NineSlice;
-  private titleText: Phaser.GameObjects.Text;
-  private scoreContainer: Phaser.GameObjects.Container;
-  private scoreText: Phaser.GameObjects.Text;
-  private unlockText: Phaser.GameObjects.Text;
-
-  private achvsName: string;
-  private achvsTotal: number;
-  private vouchersName: string;
-  private vouchersTotal: number;
-  private currentTotal: number;
+  private detailTitle: Phaser.GameObjects.Text;
+  private detailMeta: Phaser.GameObjects.Text;
+  private detailReward: Phaser.GameObjects.Text;
 
   private scrollBar: ScrollBar;
   private scrollCursor: number;
   private cursorObj: Phaser.GameObjects.NineSlice | null;
-  private currentPage: Page;
+
+  /** The nav rail (All + categories + Vouchers), built once in setup(). */
+  private navEntries: NavEntry[] = [];
+  private navCursor = 0;
+  /** True while focus is on the category nav; false while on the achievement grid. */
+  private navFocus = true;
+
+  /** All achievements grouped by category then registry order, rebuilt per show(). */
+  private achvsByCategory: Map<AchvCategory, Achv[]> = new Map();
+  private orderedAchvs: Achv[] = [];
+  /** The items currently shown in the grid (achievements for a category, or vouchers). */
+  private items: (Achv | Voucher)[] = [];
+  private currentTotal = 0;
+  private progress: AchvProgressSummary | null = null;
 
   constructor(mode: UiMode | null = null) {
     super(mode);
-
-    this.achvsTotal = Object.keys(achvs).length;
-    this.vouchersTotal = Object.keys(vouchers).length;
     this.scrollCursor = 0;
   }
 
+  /** A filled rectangle helper (origin top-left), the building block of every panel/band. */
+  private rect(x: number, y: number, w: number, h: number, color: number, alpha = 1): Phaser.GameObjects.Rectangle {
+    return globalScene.add.rectangle(x, y, w, h, color, alpha).setOrigin(0);
+  }
+
+  // #region Setup
   setup() {
     const ui = this.getUi();
 
@@ -77,458 +117,533 @@ export class AchvsUiHandler extends MessageUiHandler {
     const HEIGHT = globalScene.scaledCanvas.height;
 
     this.mainContainer = globalScene.add.container(1, -HEIGHT + 1);
-
     this.mainContainer.setInteractive(new Phaser.Geom.Rectangle(0, 0, WIDTH, HEIGHT), Phaser.Geom.Rectangle.Contains);
 
-    this.headerBg = addWindow(0, 0, WIDTH - 2, 24);
+    const bodyTop = this.headerHeight;
+    const bodyHeight = HEIGHT - this.headerHeight - this.detailHeight;
+    const gridLeft = this.navWidth + 1;
+    const detailTop = HEIGHT - this.detailHeight;
 
-    this.headerText = addTextObject(0, 0, "", TextStyle.HEADER_LABEL)
-      .setOrigin(0)
-      .setPositionRelative(this.headerBg, 8, 4);
-    this.headerActionButton = new Phaser.GameObjects.Sprite(globalScene, 0, 0, "keyboard", "ACTION.png")
-      .setOrigin(0)
-      .setPositionRelative(this.headerBg, 236, 6);
-    this.headerActionText = addTextObject(0, 0, "", TextStyle.WINDOW, { fontSize: "60px" })
-      .setOrigin(0)
-      .setPositionRelative(this.headerBg, 264, 8);
+    // --- Backdrop + panel bands --------------------------------------------------------
+    const backdrop = this.rect(0, 0, WIDTH, HEIGHT, VOID, 1);
+    const headerBand = this.rect(0, 0, WIDTH, this.headerHeight, BAND, 1);
+    const navBand = this.rect(0, bodyTop, this.navWidth, bodyHeight, BAND, 1);
+    const gridPanel = this.rect(gridLeft, bodyTop, WIDTH - gridLeft, bodyHeight, PANEL, 1);
+    const detailBand = this.rect(0, detailTop, WIDTH, this.detailHeight, BAND, 1);
+    // Thin separators framing the regions.
+    const sepHeader = this.rect(0, this.headerHeight - 1, WIDTH, 1, SEPARATOR, 1);
+    const sepNav = this.rect(this.navWidth, bodyTop, 1, bodyHeight, SEPARATOR, 1);
+    const sepDetail = this.rect(0, detailTop, WIDTH, 1, SEPARATOR, 1);
 
-    // We need to get the player gender from the game data to add the correct prefix to the achievement name
-    const genderIndex = globalScene.gameData.gender ?? PlayerGender.MALE;
-    const genderStr = PlayerGender[genderIndex].toLowerCase();
+    // --- Header: title + aggregate completion / achievement points ---------------------
+    this.headerText = addTextObject(8, 4, "", TextStyle.HEADER_LABEL).setOrigin(0);
+    this.headerStatsText = addTextObject(WIDTH - 8, 8, "", TextStyle.WINDOW, { fontSize: "54px" }).setOrigin(1, 0);
+    this.headerStatsText.setColor(TEXT_LIGHT);
 
-    this.achvsName = i18next.t("achv:achievements.name", { context: genderStr });
-    this.vouchersName = i18next.t("voucher:vouchers");
+    // --- Left category nav -------------------------------------------------------------
+    this.navContainer = globalScene.add.container(0, bodyTop);
+    this.buildNavEntries();
+    this.navRowHeight = Math.max(9, Math.floor((bodyHeight - 8) / this.navEntries.length));
+    this.navLabels = [];
+    this.navCounts = [];
+    this.navCursorObj = this.rect(2, 0, this.navWidth - 4, this.navRowHeight, HIGHLIGHT, 0.32);
+    this.navContainer.add(this.navCursorObj);
+    this.navEntries.forEach((_entry, i) => {
+      const y = 5 + i * this.navRowHeight;
+      const label = addTextObject(5, y, "", TextStyle.WINDOW, { fontSize: "54px" }).setOrigin(0);
+      const count = addTextObject(this.navWidth - 5, y, "", TextStyle.WINDOW, { fontSize: "46px" }).setOrigin(1, 0);
+      this.navLabels.push(label);
+      this.navCounts.push(count);
+      this.navContainer.add([label, count]);
+    });
 
-    this.iconsBg = addWindow(0, this.headerBg.height, WIDTH - 2, HEIGHT - this.headerBg.height - 68).setOrigin(0);
+    // --- Achievement / voucher icon grid ----------------------------------------------
+    this.cols = Math.max(1, Math.floor((WIDTH - gridLeft - 12) / 17));
+    this.rows = Math.max(1, Math.floor((bodyHeight - 10) / 19));
 
     const yOffset = 6;
-    this.scrollBar = new ScrollBar(
-      this.iconsBg.width - 9,
-      this.iconsBg.y + yOffset,
-      4,
-      this.iconsBg.height - yOffset * 2,
-      this.ROWS,
-    );
+    this.scrollBar = new ScrollBar(WIDTH - 9, bodyTop + yOffset, 4, bodyHeight - yOffset * 2, this.rows);
 
-    this.iconsContainer = globalScene.add.container(5, this.headerBg.height + 8);
-
+    this.iconsContainer = globalScene.add.container(gridLeft + 5, bodyTop + 8);
     this.icons = [];
-
-    for (let a = 0; a < this.ROWS * this.COLS; a++) {
-      const x = (a % this.COLS) * 17;
-      const y = Math.floor(a / this.COLS) * 19;
-
+    for (let a = 0; a < this.rows * this.cols; a++) {
+      const x = (a % this.cols) * 17;
+      const y = Math.floor(a / this.cols) * 19;
       const icon = globalScene.add.sprite(x, y, "items", "unknown").setOrigin(0).setScale(0.5);
-
       this.icons.push(icon);
       this.iconsContainer.add(icon);
     }
 
-    const titleBg = addWindow(0, this.headerBg.height + this.iconsBg.height, 174, 24);
-    this.titleBg = titleBg;
-
-    this.titleText = addTextObject(0, 0, "", TextStyle.WINDOW).setOrigin();
-    const textSize = languageSettings[i18next.language]?.TextSize ?? this.titleText.style.fontSize;
-    this.titleText.setFontSize(textSize);
-    const titleBgCenterX = titleBg.x + titleBg.width / 2;
-    const titleBgCenterY = titleBg.y + titleBg.height / 2;
-    this.titleText.setPosition(titleBgCenterX, titleBgCenterY);
-
-    this.scoreContainer = globalScene.add.container(titleBg.x + titleBg.width, titleBg.y);
-    const scoreBg = addWindow(0, 0, 46, 24);
-
-    this.scoreText = addTextObject(scoreBg.width / 2, scoreBg.height / 2, "", TextStyle.WINDOW).setOrigin();
-    this.scoreContainer.add([scoreBg, this.scoreText]);
-
-    const unlockBg = addWindow(this.scoreContainer.x + scoreBg.width, titleBg.y, 98, 24);
-
-    this.unlockText = addTextObject(0, 0, "", TextStyle.WINDOW)
-      .setPositionRelative(unlockBg, unlockBg.width / 2, unlockBg.height / 2)
-      .setOrigin();
-
-    const descriptionBg = addWindow(0, titleBg.y + titleBg.height, WIDTH - 2, 42);
-
-    const descriptionText = addTextObject(0, 0, "", TextStyle.WINDOW, { maxLines: 2 })
-      .setWordWrapWidth(1870)
+    // --- Detail panel: name + tier/points/date + reward + description ------------------
+    this.detailTitle = addTextObject(8, detailTop + 4, "", TextStyle.WINDOW).setOrigin(0);
+    const textSize = languageSettings[i18next.language]?.TextSize ?? this.detailTitle.style.fontSize;
+    this.detailTitle.setFontSize(textSize);
+    this.detailMeta = addTextObject(WIDTH - 8, detailTop + 6, "", TextStyle.WINDOW, { fontSize: "60px" }).setOrigin(
+      1,
+      0,
+    );
+    this.detailReward = addTextObject(8, detailTop + 18, "", TextStyle.WINDOW, { fontSize: "60px" })
       .setOrigin(0)
-      .setPositionRelative(descriptionBg, 8, 4);
+      .setWordWrapWidth((WIDTH - 16) * 6);
+    this.detailReward.setColor(TEXT_LIGHT);
 
+    const descriptionText = addTextObject(8, detailTop + 32, "", TextStyle.WINDOW, { maxLines: 2, fontSize: "60px" })
+      .setOrigin(0)
+      .setWordWrapWidth((WIDTH - 16) * 6);
+    descriptionText.setColor(TEXT_LIGHT);
     this.message = descriptionText;
 
     this.mainContainer.add([
-      this.headerBg,
-      this.headerActionButton,
+      backdrop,
+      headerBand,
+      navBand,
+      gridPanel,
+      detailBand,
+      sepHeader,
+      sepNav,
+      sepDetail,
       this.headerText,
-      this.headerActionText,
-      this.iconsBg,
+      this.headerStatsText,
+      this.navContainer,
       this.scrollBar,
       this.iconsContainer,
-      titleBg,
-      this.titleText,
-      this.scoreContainer,
-      unlockBg,
-      this.unlockText,
-      descriptionBg,
+      this.detailTitle,
+      this.detailMeta,
+      this.detailReward,
       descriptionText,
     ]);
 
     ui.add(this.mainContainer);
-
-    this.currentPage = Page.ACHIEVEMENTS;
-
     this.mainContainer.setVisible(false);
   }
+
+  /** Build the nav rail: All, every category in display order, then Vouchers. */
+  private buildNavEntries(): void {
+    this.navEntries = [
+      { kind: "all" },
+      ...ACHV_CATEGORY_ORDER.map((category): NavEntry => ({ kind: "category", category })),
+      { kind: "vouchers" },
+    ];
+  }
+  // #endregion Setup
 
   show(args: any[]): boolean {
     super.show(args);
 
-    this.headerBgX = this.headerBg.getTopRight().x;
-    this.updateAchvIcons();
+    // Group the registry by category (registry order preserved within each category).
+    this.achvsByCategory = new Map();
+    for (const category of ACHV_CATEGORY_ORDER) {
+      this.achvsByCategory.set(category, []);
+    }
+    for (const achv of Object.values(achvs)) {
+      this.achvsByCategory.get(getAchvCategory(achv))?.push(achv);
+    }
+    this.orderedAchvs = ACHV_CATEGORY_ORDER.flatMap(category => this.achvsByCategory.get(category) ?? []);
+    this.progress = computeAchvProgress(globalScene.gameData.achvUnlocks);
+
+    this.navCursor = 0;
+    this.navFocus = true;
+    this.scrollCursor = 0;
+    this.cursor = 0;
+
+    this.selectNavEntry(0);
 
     this.mainContainer.setVisible(true);
-    this.setCursor(0);
-    this.setScrollCursor(0);
-    this.scrollBar.setTotalRows(Math.ceil(this.currentTotal / this.COLS));
-    this.scrollBar.setScrollCursor(0);
-
-    this.getUi().moveTo(this.mainContainer, this.getUi().length - 1);
-
-    this.getUi().hideTooltip();
-
+    const ui = this.getUi();
+    // Raise the overlay to the top of the UI stack (no-op under the headless render mock,
+    // which has no Container `moveTo`/`length`).
+    ui.moveTo?.(this.mainContainer, (typeof ui.length === "number" ? ui.length : 1) - 1);
+    ui.hideTooltip();
     return true;
   }
 
-  protected showAchv(achv: Achv) {
-    // We need to get the player gender from the game data to add the correct prefix to the achievement name
+  // #region Data
+  private get navEntry(): NavEntry {
+    return this.navEntries[this.navCursor];
+  }
+
+  private get isVouchersView(): boolean {
+    return this.navEntry.kind === "vouchers";
+  }
+
+  /** Resolve the grid item list for the active nav entry. */
+  private computeItems(): (Achv | Voucher)[] {
+    const entry = this.navEntry;
+    if (entry.kind === "vouchers") {
+      return Object.values(vouchers);
+    }
+    if (entry.kind === "category") {
+      return this.achvsByCategory.get(entry.category) ?? [];
+    }
+    return this.orderedAchvs;
+  }
+
+  /** The unlocked/total count for a nav entry, for the nav rail + header. */
+  private navEntryCount(entry: NavEntry): { unlocked: number; total: number } {
+    if (entry.kind === "vouchers") {
+      const total = Object.keys(vouchers).length;
+      const unlocked = Object.keys(globalScene.gameData.voucherUnlocks).filter(id => id in vouchers).length;
+      return { unlocked, total };
+    }
+    if (!this.progress) {
+      return { unlocked: 0, total: 0 };
+    }
+    const p = entry.kind === "category" ? this.progress.byCategory[entry.category] : this.progress.overall;
+    return { unlocked: p.unlocked, total: p.total };
+  }
+
+  private navEntryLabel(entry: NavEntry): string {
+    if (entry.kind === "vouchers") {
+      return i18next.t("voucher:vouchers");
+    }
+    if (entry.kind === "all") {
+      return i18next.t("achv:category.all");
+    }
+    return i18next.t(`achv:category.${ACHV_CATEGORY_KEY[entry.category]}`);
+  }
+  // #endregion Data
+
+  // #region Rendering
+  /** Refresh the header title + the aggregate completion / achievement-point readout. */
+  private refreshHeader(): void {
     const genderIndex = globalScene.gameData.gender ?? PlayerGender.MALE;
     const genderStr = PlayerGender[genderIndex].toLowerCase();
+    this.headerText.setText(i18next.t("achv:achievements.name", { context: genderStr }));
 
-    achv.name = i18next.t(`achv:${achv.localizationKey}.name`, {
-      context: genderStr,
+    if (this.isVouchersView) {
+      const { unlocked, total } = this.navEntryCount(this.navEntry);
+      this.headerStatsText.setText(`${unlocked}/${total}`);
+      return;
+    }
+    const overall = this.progress?.overall;
+    if (!overall) {
+      this.headerStatsText.setText("");
+      return;
+    }
+    const pct = overall.total ? Math.floor((overall.unlocked / overall.total) * 100) : 0;
+    const points = i18next.t("achv:ui.points");
+    this.headerStatsText.setText(
+      `${overall.unlocked}/${overall.total}  ${pct}%   ${overall.earnedScore}/${overall.totalScore} ${points}`,
+    );
+  }
+
+  /** Refresh the nav rail labels, counts, and the selected-row highlight. */
+  private refreshNav(): void {
+    this.navEntries.forEach((entry, i) => {
+      const selected = i === this.navCursor;
+      const { unlocked, total } = this.navEntryCount(entry);
+      this.navLabels[i].setText(this.navEntryLabel(entry));
+      this.navCounts[i].setText(`${unlocked}/${total}`);
+      const color = selected ? TEXT_SELECTED : TEXT_DIM;
+      this.navLabels[i].setColor(color);
+      this.navCounts[i].setColor(color);
     });
+    this.placeNavCursor();
+  }
+
+  private placeNavCursor(): void {
+    if (!this.navCursorObj) {
+      return;
+    }
+    this.navCursorObj.setY(2 + this.navCursor * this.navRowHeight);
+    // The highlight is solid while the nav has focus, faint while the grid is driven.
+    this.navCursorObj.setAlpha(this.navFocus ? 0.42 : 0.16);
+  }
+
+  /** Repopulate the icon grid for the current items + scroll position. */
+  private updateGridIcons(): void {
+    const itemOffset = this.scrollCursor * this.cols;
+    const itemLimit = this.rows * this.cols;
+    const itemRange = this.items.slice(itemOffset, itemOffset + itemLimit);
+    const achvUnlocks = globalScene.gameData.achvUnlocks;
+    const voucherUnlocks = globalScene.gameData.voucherUnlocks;
+    const forVouchers = this.isVouchersView;
+
+    itemRange.forEach((item, i) => {
+      const icon = this.icons[i];
+      icon.setVisible(true);
+      if (forVouchers) {
+        const voucher = item as Voucher;
+        const unlocked = Object.hasOwn(voucherUnlocks, voucher.id);
+        icon.setFrame(getVoucherTypeIcon(voucher.voucherType));
+        if (unlocked) {
+          icon.clearTint();
+        } else {
+          icon.setTintFill(0);
+        }
+        return;
+      }
+      const achv = item as Achv;
+      const unlocked = Object.hasOwn(achvUnlocks, achv.id);
+      const hidden = !unlocked && achv.secret && (!achv.parentId || !Object.hasOwn(achvUnlocks, achv.parentId));
+      icon.setFrame(hidden ? "unknown" : achv.iconImage);
+      if (unlocked) {
+        icon.clearTint();
+      } else {
+        icon.setTintFill(0);
+      }
+    });
+
+    if (itemRange.length < this.icons.length) {
+      this.icons.slice(itemRange.length).forEach(icon => icon.setVisible(false));
+    }
+  }
+
+  /** Render the detail panel for the item under the grid cursor. */
+  private refreshDetail(): void {
+    const index = this.cursor + this.scrollCursor * this.cols;
+    const item = this.items[index];
+    if (!item) {
+      this.detailTitle.setText("");
+      this.detailMeta.setText("");
+      this.detailReward.setText("");
+      this.message.setText("");
+      return;
+    }
+    if (this.isVouchersView) {
+      this.showVoucher(item as Voucher);
+    } else {
+      this.showAchv(item as Achv);
+    }
+  }
+
+  private showAchv(achv: Achv): void {
+    const genderIndex = globalScene.gameData.gender ?? PlayerGender.MALE;
+    achv.name = getAchvDisplayName(achv, genderIndex);
     achv.description = getAchievementDescription(achv.localizationKey);
+
     const achvUnlocks = globalScene.gameData.achvUnlocks;
     const unlocked = Object.hasOwn(achvUnlocks, achv.id);
     const hidden = !unlocked && achv.secret && (!achv.parentId || !Object.hasOwn(achvUnlocks, achv.parentId));
-    this.titleText.setText(unlocked ? achv.name : "???");
-    this.showText(hidden ? "" : achv.description);
-    this.scoreText.setText(`${achv.score}pt`);
-    this.unlockText.setText(
-      unlocked ? new Date(achvUnlocks[achv.id]).toLocaleDateString() : i18next.t("achv:locked.name"),
+
+    const tier = achv.getTier();
+    const tierColor = `#${getAchvTierTextTint(tier).toString(16).padStart(6, "0")}`;
+    this.detailTitle.setText(hidden ? "???" : achv.name);
+    this.detailTitle.setColor(hidden ? TEXT_DIM : tierColor);
+
+    const tierName = i18next.t(`achv:tier.${ACHV_TIER_KEY[tier]}`);
+    const points = i18next.t("achv:ui.points");
+    const status = unlocked ? new Date(achvUnlocks[achv.id]).toLocaleDateString() : i18next.t("achv:locked.name");
+    this.detailMeta.setText(`${tierName}  ${achv.score} ${points}  ${status}`);
+    this.detailMeta.setColor(hidden ? TEXT_DIM : tierColor);
+
+    if (hidden) {
+      this.detailReward.setText("");
+      this.message.setText("");
+      return;
+    }
+    const rewards = getAchvRewardSummary(achv.id);
+    const rewardLabel = i18next.t("achv:ui.rewards");
+    this.detailReward.setText(
+      rewards.length > 0
+        ? `${rewardLabel}: ${rewards.join(", ")}`
+        : `${rewardLabel}: ${i18next.t("achv:ui.pointsOnly")}`,
     );
+    this.message.setText(achv.description);
   }
 
-  protected showVoucher(voucher: Voucher) {
+  private showVoucher(voucher: Voucher): void {
     const voucherUnlocks = globalScene.gameData.voucherUnlocks;
     const unlocked = Object.hasOwn(voucherUnlocks, voucher.id);
-
-    this.titleText.setText(getVoucherTypeName(voucher.voucherType));
-    this.showText(voucher.description);
-    this.unlockText.setText(
+    this.detailTitle.setText(getVoucherTypeName(voucher.voucherType));
+    this.detailTitle.setColor(TEXT_LIGHT);
+    this.detailMeta.setText(
       unlocked ? new Date(voucherUnlocks[voucher.id]).toLocaleDateString() : i18next.t("voucher:locked"),
     );
+    this.detailMeta.setColor(TEXT_LIGHT);
+    this.detailReward.setText("");
+    this.message.setText(voucher.description);
+  }
+  // #endregion Rendering
+
+  // #region Navigation
+  /** Switch the active nav entry: refilter the grid, reset scroll, refresh everything. */
+  private selectNavEntry(index: number): void {
+    this.navCursor = Phaser.Math.Wrap(index, 0, this.navEntries.length);
+    this.items = this.computeItems();
+    this.currentTotal = this.items.length;
+    this.scrollCursor = 0;
+    this.cursor = 0;
+    this.scrollBar.setTotalRows(Math.max(1, Math.ceil(this.currentTotal / this.cols)));
+    this.scrollBar.setScrollCursor(0);
+    this.refreshHeader();
+    this.refreshNav();
+    this.updateGridIcons();
+    this.placeGridCursor();
+    this.refreshDetail();
+    this.updateGridCursorVisible();
   }
 
-  // #region Input Processing
-  /**
-   * Submethod of {@linkcode processInput} that handles the action button input
-   * @returns Whether the success sound should be played
-   */
-  private processActionInput(): true {
-    this.setScrollCursor(0);
-    if (this.currentPage === Page.ACHIEVEMENTS) {
-      this.currentPage = Page.VOUCHERS;
-      this.updateVoucherIcons();
-    } else if (this.currentPage === Page.VOUCHERS) {
-      this.currentPage = Page.ACHIEVEMENTS;
-      this.updateAchvIcons();
+  private enterGrid(): boolean {
+    if (this.currentTotal === 0) {
+      return false;
     }
-    this.setCursor(0, true);
-    this.scrollBar.setTotalRows(Math.ceil(this.currentTotal / this.COLS));
-    this.scrollBar.setScrollCursor(0);
-    this.mainContainer.update();
+    this.navFocus = false;
+    this.placeNavCursor();
+    this.placeGridCursor();
+    this.updateGridCursorVisible();
+    this.refreshDetail();
     return true;
   }
 
-  /**
-   * Submethod of {@linkcode processInput} that handles the up button input
-   * @returns Whether the success sound should be played
-   */
-  private processUpInput(): boolean {
-    if (this.cursor >= this.COLS) {
-      return this.setCursor(this.cursor - this.COLS);
-    }
-    if (this.scrollCursor) {
-      return this.setScrollCursor(this.scrollCursor - 1);
-    }
-
-    // Wrap around to the last row
-    const success = this.setScrollCursor(Math.ceil(this.currentTotal / this.COLS) - this.ROWS);
-    let newCursorIndex = this.cursor + (this.ROWS - 1) * this.COLS;
-    if (newCursorIndex > this.currentTotal - this.scrollCursor * this.COLS - 1) {
-      newCursorIndex -= this.COLS;
-    }
-    return success && this.setCursor(newCursorIndex);
+  private enterNav(): boolean {
+    this.navFocus = true;
+    this.placeNavCursor();
+    this.updateGridCursorVisible();
+    return true;
   }
 
-  /**
-   * Submethod of {@linkcode processInput} that handles the down button input
-   * @returns Whether the success sound should be played
-   */
-  private processDownInput(): boolean {
-    const rowIndex = Math.floor(this.cursor / this.COLS);
-    const itemOffset = this.scrollCursor * this.COLS;
-    const canMoveDown = itemOffset + 1 < this.currentTotal;
-
-    if (rowIndex >= this.ROWS - 1) {
-      if (this.scrollCursor < Math.ceil(this.currentTotal / this.COLS) - this.ROWS && canMoveDown) {
-        // scroll down one row
-        return this.setScrollCursor(this.scrollCursor + 1);
-      }
-      // wrap back to the first row
-      return this.setScrollCursor(0) && this.setCursor(this.cursor % this.COLS);
-    }
-    if (canMoveDown) {
-      return this.setCursor(Math.min(this.cursor + this.COLS, this.currentTotal - itemOffset - 1));
-    }
-    return false;
+  private updateGridCursorVisible(): void {
+    this.cursorObj?.setVisible(!this.navFocus);
   }
 
-  /**
-   * Submethod of {@linkcode processInput} that handles the left button input
-   * @returns Whether the success sound should be played
-   */
-  private processLeftInput(): boolean {
-    const itemOffset = this.scrollCursor * this.COLS;
-    if (this.cursor % this.COLS === 0) {
-      return this.setCursor(Math.min(this.cursor + this.COLS - 1, this.currentTotal - itemOffset - 1));
-    }
-    return this.setCursor(this.cursor - 1);
-  }
-
-  /**
-   * Submethod of {@linkcode processInput} that handles the right button input
-   * @returns Whether the success sound should be played
-   */
-  private processRightInput(): boolean {
-    const itemOffset = this.scrollCursor * this.COLS;
-    if ((this.cursor + 1) % this.COLS === 0 || this.cursor + itemOffset === this.currentTotal - 1) {
-      return this.setCursor(this.cursor - (this.cursor % this.COLS));
-    }
-    return this.setCursor(this.cursor + 1);
-  }
-
-  /**
-   * Process user input to navigate through the achievements and vouchers UI.
-   * @param button - The button that was pressed
-   * @returns Whether an action was successfully processed
-   */
-  processInput(button: Button): boolean {
-    let success = false;
-
-    switch (button) {
-      case Button.ACTION:
-        success = this.processActionInput();
-        break;
-      case Button.CANCEL:
-        success = true;
-        globalScene.ui.revertMode();
-        break;
-      case Button.UP:
-        success = this.processUpInput();
-        break;
-      case Button.DOWN:
-        success = this.processDownInput();
-        break;
-      case Button.LEFT:
-        success = this.processLeftInput();
-        break;
-      case Button.RIGHT:
-        success = this.processRightInput();
-        break;
-    }
-
-    if (success) {
-      this.getUi().playSelect();
-    }
-
-    return success;
-  }
-  // #endregion Input Processing
-
-  setCursor(cursor: number, pageChange?: boolean): boolean {
-    const ret = super.setCursor(cursor);
-
-    let update = ret;
-
+  private placeGridCursor(): void {
     if (!this.cursorObj) {
       this.cursorObj = globalScene.add
         .nineslice(0, 0, "select_cursor_highlight", undefined, 16, 16, 1, 1, 1, 1)
         .setOrigin(0);
       this.iconsContainer.add(this.cursorObj);
-      update = true;
     }
-
+    this.cursorObj.setVisible(!this.navFocus);
     this.cursorObj.setPositionRelative(this.icons[this.cursor], 0, 0);
-    if (!update && !pageChange) {
-      return ret;
-    }
+  }
 
-    switch (this.currentPage) {
-      case Page.ACHIEVEMENTS:
-        if (pageChange) {
-          this.titleBg.width = 174;
-          this.titleText.x = this.titleBg.width / 2;
-          this.scoreContainer.setVisible(true);
-        }
-        this.showAchv(achvs[Object.keys(achvs)[cursor + this.scrollCursor * this.COLS]]);
-        break;
-      case Page.VOUCHERS:
-        if (pageChange) {
-          this.titleBg.width = 220;
-          this.titleText.x = this.titleBg.width / 2;
-          this.scoreContainer.setVisible(false);
-        }
-        this.showVoucher(vouchers[Object.keys(vouchers)[cursor + this.scrollCursor * this.COLS]]);
-        break;
-    }
+  setCursor(cursor: number): boolean {
+    const ret = super.setCursor(cursor);
+    this.placeGridCursor();
+    this.refreshDetail();
     return ret;
   }
 
-  /**
-   * setScrollCursor(scrollCursor: number) : boolean
-   * scrollCursor refers to the page's position within the entire sum of the data, unlike cursor, which refers to a user's position within displayed data
-   * @param scrollCursor takes a value that has been updated based on user behavior
-   * @returns returns a boolean that indicates whether the updated scrollCursor led to an update in the data displayed.
-   */
   setScrollCursor(scrollCursor: number): boolean {
     if (scrollCursor === this.scrollCursor) {
       return false;
     }
-
     this.scrollCursor = scrollCursor;
     this.scrollBar.setScrollCursor(this.scrollCursor);
-
-    // Cursor cannot go farther than the last element in the list
-    const maxCursor = Math.min(this.cursor, this.currentTotal - this.scrollCursor * this.COLS - 1);
+    const maxCursor = Math.min(this.cursor, this.currentTotal - this.scrollCursor * this.cols - 1);
     if (maxCursor !== this.cursor) {
-      this.setCursor(maxCursor);
+      super.setCursor(Math.max(0, maxCursor));
     }
-
-    switch (this.currentPage) {
-      case Page.ACHIEVEMENTS:
-        this.updateAchvIcons();
-        this.showAchv(achvs[Object.keys(achvs)[this.cursor + this.scrollCursor * this.COLS]]);
-        break;
-      case Page.VOUCHERS:
-        this.updateVoucherIcons();
-        this.showVoucher(vouchers[Object.keys(vouchers)[this.cursor + this.scrollCursor * this.COLS]]);
-        break;
-    }
+    this.updateGridIcons();
+    this.placeGridCursor();
+    this.refreshDetail();
     return true;
   }
 
-  /**
-   * Updates the icons displayed on the UI based on the current page and scroll cursor.
-   * @param items - The items to display (achievements or vouchers).
-   * @param unlocks - The unlocks data for the items.
-   * @param getIconFrame - A function to determine the frame for each item.
-   * @param headerText - The text for the header.
-   * @param actionText - The text for the action button.
-   * @param totalItems - The total number of items.
-   * @param forAchievements - `True` when updating icons for the achievements page, `false` for the vouchers page.
-   */
-  private updateIcons<T extends boolean>(
-    items: T extends true ? Achv[] : Voucher[],
-    unlocks: T extends true ? AchvUnlocks : VoucherUnlocks,
-    headerText: string,
-    actionText: string,
-    totalItems: number,
-    forAchievements: T,
-  ): void {
-    // type ItemType = T extends true ? Achv : Voucher;
-    // type RangeType = ItemType[];
-    this.headerText.text = headerText;
-    this.headerActionText.text = actionText;
-    const textPosition = this.headerBgX - this.headerActionText.displayWidth - 8;
-    this.headerActionText.setX(textPosition);
-    this.headerActionButton.setX(textPosition - this.headerActionButton.displayWidth - 4);
+  private processUpInput(): boolean {
+    if (this.cursor >= this.cols) {
+      return this.setCursor(this.cursor - this.cols);
+    }
+    if (this.scrollCursor) {
+      return this.setScrollCursor(this.scrollCursor - 1);
+    }
+    const success = this.setScrollCursor(Math.max(0, Math.ceil(this.currentTotal / this.cols) - this.rows));
+    let newCursorIndex = this.cursor + (this.rows - 1) * this.cols;
+    if (newCursorIndex > this.currentTotal - this.scrollCursor * this.cols - 1) {
+      newCursorIndex -= this.cols;
+    }
+    return success && this.setCursor(Math.max(0, newCursorIndex));
+  }
 
-    const itemOffset = this.scrollCursor * this.COLS;
-    const itemLimit = this.ROWS * this.COLS;
-
-    const itemRange = items.slice(itemOffset, itemLimit + itemOffset);
-
-    itemRange.forEach((item: (typeof itemRange)[0], i: number) => {
-      const icon = this.icons[i];
-      const unlocked = Object.hasOwn(unlocks, item.id);
-      let tinted = !unlocked;
-      if (forAchievements) {
-        // Typescript cannot properly infer the type of `item` here, so we need to cast it
-        const achv = item as Achv;
-        const hidden = !unlocked && achv.secret && (!achv.parentId || !Object.hasOwn(unlocks, achv.parentId));
-        tinted &&= !hidden;
-        icon.setFrame(hidden ? "unknown" : achv.iconImage);
-      } else {
-        icon.setFrame(getVoucherTypeIcon((item as Voucher).voucherType));
+  private processDownInput(): boolean {
+    const rowIndex = Math.floor(this.cursor / this.cols);
+    const itemOffset = this.scrollCursor * this.cols;
+    const canMoveDown = itemOffset + 1 < this.currentTotal;
+    if (rowIndex >= this.rows - 1) {
+      if (this.scrollCursor < Math.ceil(this.currentTotal / this.cols) - this.rows && canMoveDown) {
+        return this.setScrollCursor(this.scrollCursor + 1);
       }
+      return this.setScrollCursor(0) && this.setCursor(this.cursor % this.cols);
+    }
+    if (canMoveDown) {
+      return this.setCursor(Math.min(this.cursor + this.cols, this.currentTotal - itemOffset - 1));
+    }
+    return false;
+  }
 
-      icon.setVisible(true);
-      if (tinted) {
-        icon.setTintFill(0);
-      } else {
-        icon.clearTint();
+  private processLeftInput(): boolean {
+    // At the left edge of the grid, hand focus back to the category nav.
+    if (this.cursor % this.cols === 0) {
+      return this.enterNav();
+    }
+    return this.setCursor(this.cursor - 1);
+  }
+
+  private processRightInput(): boolean {
+    const itemOffset = this.scrollCursor * this.cols;
+    if ((this.cursor + 1) % this.cols === 0 || this.cursor + itemOffset === this.currentTotal - 1) {
+      return this.setCursor(this.cursor - (this.cursor % this.cols));
+    }
+    return this.setCursor(this.cursor + 1);
+  }
+
+  processInput(button: Button): boolean {
+    let success = false;
+    if (this.navFocus) {
+      switch (button) {
+        case Button.UP:
+          this.selectNavEntry(this.navCursor - 1);
+          success = true;
+          break;
+        case Button.DOWN:
+          this.selectNavEntry(this.navCursor + 1);
+          success = true;
+          break;
+        case Button.RIGHT:
+        case Button.ACTION:
+          success = this.enterGrid();
+          break;
+        case Button.CANCEL:
+          success = true;
+          globalScene.ui.revertMode();
+          break;
       }
-    });
-
-    if (itemRange.length < this.icons.length) {
-      this.icons.slice(itemRange.length).forEach(i => i.setVisible(false));
+    } else {
+      switch (button) {
+        case Button.UP:
+          success = this.processUpInput();
+          break;
+        case Button.DOWN:
+          success = this.processDownInput();
+          break;
+        case Button.LEFT:
+          success = this.processLeftInput();
+          break;
+        case Button.RIGHT:
+          success = this.processRightInput();
+          break;
+        case Button.ACTION:
+          success = this.enterNav();
+          break;
+        case Button.CANCEL:
+          success = true;
+          globalScene.ui.revertMode();
+          break;
+      }
     }
 
-    this.currentTotal = totalItems;
+    if (success) {
+      this.getUi().playSelect();
+    }
+    return success;
   }
-
-  /**
-   * Update the achievement icons displayed on the UI based on the current scroll cursor.
-   */
-  updateAchvIcons(): void {
-    this.updateIcons(
-      Object.values(achvs),
-      globalScene.gameData.achvUnlocks,
-      this.achvsName,
-      this.vouchersName,
-      this.achvsTotal,
-      true,
-    );
-  }
-
-  /**
-   * Update the voucher icons displayed on the UI based on the current scroll cursor.
-   */
-  updateVoucherIcons(): void {
-    this.updateIcons(
-      Object.values(vouchers),
-      globalScene.gameData.voucherUnlocks,
-      this.vouchersName,
-      this.achvsName,
-      this.vouchersTotal,
-      false,
-    );
-  }
+  // #endregion Navigation
 
   clear() {
     super.clear();
-    this.currentPage = Page.ACHIEVEMENTS;
     this.mainContainer.setVisible(false);
-    this.setScrollCursor(0);
-    this.setCursor(0, true);
+    this.navFocus = true;
+    this.navCursor = 0;
+    this.scrollCursor = 0;
+    this.cursor = 0;
     this.eraseCursor();
   }
 
   eraseCursor() {
     if (this.cursorObj) {
       this.cursorObj.destroy();
+      this.cursorObj = null;
     }
-    this.cursorObj = null;
   }
 }
