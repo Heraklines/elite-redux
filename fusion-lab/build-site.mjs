@@ -20,16 +20,21 @@ const stratDir = `${DIR}/strategies`;
 const stratFiles = fs.existsSync(stratDir)
   ? fs
       .readdirSync(stratDir)
-      .filter(f => f.endsWith(".mjs") && !f.endsWith(".test.mjs"))
+      .filter(f => f.endsWith(".mjs") && !f.endsWith(".test.mjs") && !f.startsWith("_"))
       .sort()
   : [];
 const strategiesSrc = stratFiles
-  .map(f =>
-    fs
+  .map(f => {
+    const body = fs
       .readFileSync(`${stratDir}/${f}`, "utf8")
       .replace(/^\s*import\b.*\bfrom\b.*;?\s*$/gm, "")
-      .replace(/^export /gm, ""),
-  )
+      .replace(/^export /gm, "");
+    // Wrap each strategy in an IIFE so its file-level helpers (clamp, erode4,
+    // rolesOf, ...) stay file-scoped and can't collide when every strategy is
+    // concatenated into one <script> scope. Only `STRATEGIES.push(...)` needs to
+    // escape, and STRATEGIES is the global registry inlined from fusion.mjs.
+    return `// --- strategies/${f} ---\n(() => {\n${body}\n})();`;
+  })
   .join("\n");
 
 // pin the er-assets sha (jsDelivr serves cold files reliably only when pinned)
