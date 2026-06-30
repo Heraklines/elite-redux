@@ -595,13 +595,17 @@ export class CommunityChallengeCreateUiHandler extends UiHandler {
       globalScene.ui.showText(
         "Draft saved! Now clear it yourself to publish it.",
         null,
-        () => launch(draftConfig),
+        // First revert CREATE -> the browser so the launch tears down from the SAME
+        // single-overlay state the card-play uses (setModeAndEnd clears the active
+        // browser). Launching straight from here would leave the browser visible
+        // underneath, and the run's starter-select (low z) would render behind it.
+        () => globalScene.ui.revertMode().then(() => launch(draftConfig)),
         null,
         true,
       );
       return;
     }
-    // Failure (offline / guest / server reject): surface it, stay where they were.
+    // Failure (offline / guest / server reject): surface it, then back to the browser.
     globalScene.ui.showText(
       "Could not save - check your connection or sign-in.",
       null,
