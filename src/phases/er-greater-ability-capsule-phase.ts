@@ -40,9 +40,9 @@ import {
   GREATER_CAPSULE_RUN_UNLOCK_COUNT,
   greaterCapsuleCanPermanentlyUnlock,
   greaterCapsuleCanRunUnlockTwo,
+  greaterCapsulePermanentlyUnlockableInnateSlots,
   greaterCapsulePermanentlyUnlockInnate,
   greaterCapsuleRunUnlockInnates,
-  greaterCapsuleUnlockableInnateSlots,
 } from "#data/elite-redux/er-greater-ability-capsule";
 import { UiMode } from "#enums/ui-mode";
 import type { PlayerPokemon } from "#field/pokemon";
@@ -149,7 +149,7 @@ export class ErGreaterAbilityCapsulePhase extends Phase {
    * message and reopens the picker. Cancelling returns to the top-level choice.
    */
   private openPermanentPicker(mon: PlayerPokemon): void {
-    const unlockable = greaterCapsuleUnlockableInnateSlots(mon);
+    const unlockable = greaterCapsulePermanentlyUnlockableInnateSlots(mon);
     if (unlockable.length === 0) {
       this.openChoice(mon);
       return;

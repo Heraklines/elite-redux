@@ -51,9 +51,37 @@ export function greaterCapsuleUnlockableInnateSlots(pokemon: PlayerPokemon): ErR
   return erRunUnlockableInnateSlots(pokemon);
 }
 
+/**
+ * The innate slots (ER index 1-3) on `pokemon` that option (A) may PERMANENTLY
+ * unlock: every innate slot whose PERMANENT (candy) `passiveAttr` bit is NOT yet
+ * set, minus Curiosity-hard-locked slots. Crucially this keys off the permanent
+ * unlock state, NOT `canApplyAbility` - so a slot that is merely RUN-unlocked
+ * (the normal capsule's run-unlock) or FREE for the run (e.g. Youngster mode)
+ * but not yet permanently owned is still offered. That is the whole point of the
+ * Greater Capsule: turn a run-only innate into a permanent dex unlock. (Reusing
+ * the run-unlockable set here was the #bug: in Youngster mode every innate reads
+ * usable, so the run set is empty and the item wrongly said "no effect".)
+ */
+export function greaterCapsulePermanentlyUnlockableInnateSlots(pokemon: PlayerPokemon): ErRunUnlockableInnate[] {
+  const locked = pokemon.customPokemonData?.erLockedAbilitySlots ?? [];
+  return pokemon
+    .getAbilitySlots()
+    .filter(({ slot }) => slot >= 1) // innate slots only; slot 0 is the active ability
+    .filter(({ slot }) => !locked.includes(slot)) // never offer a Curiosity-locked slot
+    .filter(({ slot }) => !isInnateSlotPermanentlyUnlocked(pokemon, slot)) // not already permanently owned
+    .map(({ slot, ability }) => ({ slot, ability }));
+}
+
+/** True if innate `slot`'s permanent (candy) unlock bit is already set on its owning species. */
+function isInnateSlotPermanentlyUnlocked(pokemon: PlayerPokemon, slot: number): boolean {
+  const passiveSlot = (slot - 1) as PassiveSlot;
+  const starterData = globalScene.gameData.starterData[permanentUnlockOwnerRootId(pokemon, passiveSlot)];
+  return !!starterData && isSlotUnlocked(starterData.passiveAttr, passiveSlot);
+}
+
 /** Whether option (A) "permanently unlock one innate" is available for `pokemon`. */
 export function greaterCapsuleCanPermanentlyUnlock(pokemon: PlayerPokemon): boolean {
-  return greaterCapsuleUnlockableInnateSlots(pokemon).length >= 1;
+  return greaterCapsulePermanentlyUnlockableInnateSlots(pokemon).length >= 1;
 }
 
 /** Whether option (B) "run-unlock two innates" is available for `pokemon`. */

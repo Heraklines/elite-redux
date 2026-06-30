@@ -25,6 +25,7 @@ import {
   GREATER_CAPSULE_RUN_UNLOCK_COUNT,
   greaterCapsuleCanPermanentlyUnlock,
   greaterCapsuleCanRunUnlockTwo,
+  greaterCapsulePermanentlyUnlockableInnateSlots,
   greaterCapsulePermanentlyUnlockInnate,
   greaterCapsuleRunUnlockInnates,
   greaterCapsuleUnlockableInnateSlots,
@@ -68,6 +69,51 @@ describe.skipIf(!RUN)("ER Greater Ability Capsule - live effects", () => {
     expect(greaterCapsuleUnlockableInnateSlots(mon).map(u => u.slot)).toEqual(
       erRunUnlockableInnateSlots(mon).map(u => u.slot),
     );
+  });
+
+  // ---- BUGFIX: a RUN-unlocked / Youngster-free innate is still PERMANENTLY unlockable ----
+
+  it("still offers the PERMANENT unlock when every innate is only RUN-unlocked (the Youngster/no-effect bug)", async () => {
+    await game.classicMode.startBattle(SpeciesId.GARCHOMP);
+    const mon = game.scene.getPlayerPokemon()!;
+    const root = mon.species.getRootSpeciesId();
+    vi.spyOn(game.scene.gameData, "saveSystem").mockResolvedValue(true);
+
+    // Run-unlock EVERY locked innate. This mirrors "all innates are free for the run"
+    // (a prior Ability Capsule, or Youngster mode making innates free): canApplyAbility
+    // becomes TRUE for them, so the RUN-unlockable set goes empty.
+    const slots = erRunUnlockableInnateSlots(mon).map(u => u.slot);
+    expect(slots.length).toBeGreaterThanOrEqual(1);
+    greaterCapsuleRunUnlockInnates(mon, slots);
+
+    // RUN-aware set (option B) now offers nothing - this is what made the item wrongly
+    // report "no effect on every Pokemon".
+    expect(greaterCapsuleUnlockableInnateSlots(mon)).toHaveLength(0);
+    expect(greaterCapsuleCanRunUnlockTwo(mon)).toBe(false);
+
+    // But NONE are PERMANENTLY unlocked (passiveAttr untouched), so option (A) MUST
+    // still be available - the fix keys off passiveAttr, not canApplyAbility.
+    for (const slot of slots) {
+      expect(isSlotUnlocked(game.scene.gameData.starterData[root].passiveAttr, (slot - 1) as 0 | 1 | 2)).toBe(false);
+    }
+    expect([...greaterCapsulePermanentlyUnlockableInnateSlots(mon).map(u => u.slot)].sort()).toEqual([...slots].sort());
+    expect(greaterCapsuleCanPermanentlyUnlock(mon)).toBe(true);
+
+    // Committing the permanent unlock works, then that slot drops out of the offer set.
+    const target = slots[0];
+    greaterCapsulePermanentlyUnlockInnate(mon, target);
+    expect(isSlotUnlocked(game.scene.gameData.starterData[root].passiveAttr, (target - 1) as 0 | 1 | 2)).toBe(true);
+    expect(greaterCapsulePermanentlyUnlockableInnateSlots(mon).map(u => u.slot)).not.toContain(target);
+  });
+
+  it("an already PERMANENTLY-unlocked innate is correctly excluded (genuine no-op)", async () => {
+    await game.classicMode.startBattle(SpeciesId.GARCHOMP);
+    vi.spyOn(game.scene.gameData, "saveSystem").mockResolvedValue(true);
+    const mon = game.scene.getPlayerPokemon()!;
+    const target = greaterCapsulePermanentlyUnlockableInnateSlots(mon)[0];
+    expect(target).toBeDefined();
+    greaterCapsulePermanentlyUnlockInnate(mon, target.slot);
+    expect(greaterCapsulePermanentlyUnlockableInnateSlots(mon).map(u => u.slot)).not.toContain(target.slot);
   });
 
   // ---- (A) PERMANENT unlock writes starterData and persists ----
