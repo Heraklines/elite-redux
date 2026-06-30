@@ -2616,6 +2616,21 @@ export class ErAbilityCapsuleModifier extends ConsumablePokemonModifier {
     const currentIdx = candidates.indexOf(playerPokemon.getAbility().id);
     const next = candidates[(currentIdx + 1) % candidates.length];
     playerPokemon.setAbilityOverrideForSlot(0, next);
+    // Carry the chosen SLOT into abilityIndex (0=ability1, 1=ability2, 2=hidden), not
+    // just the ability-ID override. On evolution/mega the override can be dropped (#445/
+    // #607) or shadowed by form-derived abilities (#606), at which point getAbility()
+    // falls back to getSpeciesForm().getAbility(abilityIndex). Without this, that fallback
+    // used the STALE generation-time slot, so a capsule-picked hidden (slot 2) reverted to
+    // slot 2's old value (showing ability2 instead of the hidden after evolve/mega).
+    const newSlot =
+      next === form.ability1
+        ? 0
+        : next === form.ability2
+          ? 1
+          : next === form.abilityHidden
+            ? 2
+            : playerPokemon.abilityIndex;
+    playerPokemon.abilityIndex = newSlot;
     if (playerPokemon.usesFormDerivedAbilities()) {
       custom.abilityOverridesForm = true;
     }

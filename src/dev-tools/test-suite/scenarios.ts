@@ -5640,6 +5640,66 @@ export const DEV_SCENARIOS: DevScenario[] = [
     ],
   },
   {
+    label: "Ability Capsule: cycled slot survives mega (#754)",
+    description:
+      "#754 - The Ability Capsule changes a mon's ACTIVE ability SLOT, but the chosen\n"
+      + "slot was lost when the mon mega-evolved: a mon cycled to its 3rd/hidden\n"
+      + "ability would revert to its 2nd-slot ability after mega. Repro mon: Dragapult\n"
+      + "(Clear Body / Speed Boost / Parental Bond), which has a Mega.\n"
+      + "DO: win the opening battle. In the FIRST shop, use the ABILITY CAPSULE on\n"
+      + "Dragapult and cycle its active ability to PARENTAL BOND (the 3rd / hidden\n"
+      + "slot) - the summary should read Parental Bond. Take the FORM CHANGE ITEM\n"
+      + "(a single-mon party makes it Dragapult's mega stone). Next battle, mega-evolve.\n"
+      + "EXPECT: after mega, Dragapult Mega's ACTIVE ability reflects the 3rd / hidden\n"
+      + "SLOT the capsule selected - NOT its 2nd-slot Speed Boost. The slot choice\n"
+      + "carries across the form change (before the fix it fell back a slot).",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 60,
+        STARTING_WAVE_OVERRIDE: 5,
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.RATTATA,
+        ENEMY_LEVEL_OVERRIDE: 5,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+      });
+      return [
+        makeStarter(SpeciesId.DRAGAPULT, {
+          moveset: [MoveId.DRAGON_PULSE, MoveId.SHADOW_BALL, MoveId.U_TURN, MoveId.PROTECT],
+        }),
+      ];
+    },
+    shopItems: [modifierTypes.ER_ABILITY_CAPSULE, modifierTypes.FORM_CHANGE_ITEM],
+  },
+  {
+    label: "Big Leaves: sun-emulation Growth +2 / Solar Beam no charge (#756)",
+    description:
+      "#756 - Big Leaves bundles Chloroplast, so its holder must act AS IF in sun even\n"
+      + "with NO real weather: Growth raises Atk/SpAtk by +2 (not +1), and Solar Beam\n"
+      + "fires the SAME turn it is used (no charge). Brontonana's Big Leaves was only\n"
+      + "giving Growth +1 and Solar Beam was still charging.\n"
+      + "(Big Leaves is normally an INNATE; this scenario forces it ACTIVE so it can be\n"
+      + "tested without the candy unlock.)\n"
+      + "DO: with NO weather set, use GROWTH, then SOLAR BEAM on the Snorlax.\n"
+      + "EXPECT: Growth raises Atk +2 AND SpAtk +2 (two arrows each, check Battle Info);\n"
+      + "Solar Beam deals damage on the turn it is selected - it does NOT spend a charge\n"
+      + "turn. (Verified headless: Growth gave +2/+2 under Big Leaves.)",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 70,
+        ABILITY_OVERRIDE: erAbility(ErAbilityId.BIG_LEAVES),
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.SNORLAX,
+        ENEMY_LEVEL_OVERRIDE: 70,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+      });
+      return [
+        makeStarter(SpeciesId.VENUSAUR, {
+          moveset: [MoveId.GROWTH, MoveId.SOLAR_BEAM, MoveId.SLUDGE_BOMB, MoveId.SYNTHESIS],
+        }),
+      ];
+    },
+  },
+  {
     label: "Learner's Shroom: back-out doesn't consume it (#25)",
     description:
       "#25 - Backing out of the move-learn after picking a Learner's Shroom used to\n"

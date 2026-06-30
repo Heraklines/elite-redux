@@ -355,11 +355,13 @@ export class SummaryUiHandler extends UiHandler {
     this.genderText.setOrigin(0, 1);
     this.summaryContainer.add(this.genderText);
 
-    // ER money streak (#348): small gold ribbon on the name bar — centered in
-    // the free gap between "Lv." and the gender symbol (the ER summary's left
-    // panel is narrow; anything past the gender symbol gets clipped, which is
-    // why the first placement at x=108 was invisible).
-    this.erStreakText = addTextObject(52, -17, "", TextStyle.SUMMARY_GOLD);
+    // ER money streak (#348): small gold ribbon on the name bar — sits in the
+    // free gap between "Lv." and the gender symbol (the ER summary's left panel
+    // is narrow; anything past the gender symbol at x=96 gets clipped, which is
+    // why the first placement at x=108 was invisible). Nudged to x=60 so a
+    // triple-digit level ("Lv.123+", which grows right from x=24 to ~x=54)
+    // no longer overlaps the ribbon.
+    this.erStreakText = addTextObject(60, -17, "", TextStyle.SUMMARY_GOLD);
     this.erStreakText.setOrigin(0, 1);
     this.summaryContainer.add(this.erStreakText);
 

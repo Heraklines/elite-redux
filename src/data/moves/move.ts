@@ -3930,15 +3930,17 @@ export class InstantChargeAttr extends MoveAttr {
  * and the recovery moves act as if used in sun." Returns true when real
  * (un-suppressed) sun is active OR the user holds Chloroplast — letting the
  * sun-gated branches of those moves fire for the holder regardless of weather.
- * Solar Flare (er 366 = Chloroplast + Immolate) FULL: "Additionally activates
- * any Sun related effects for the user's moves" — so it counts too. (Solar Flare
- * is a distinct ability id from Chloroplast, so it must be checked explicitly;
- * the composite's copied attrs do not change which `hasAbility` id matches.)
+ * Solar Flare (er 366 = Chloroplast + Immolate) and Big Leaves (er 374 =
+ * Chloroplast + Chlorophyll + ...) both BUNDLE Chloroplast, but each is a distinct
+ * ability id, and Chloroplast contributes zero attrs (the sun-emulation lives here,
+ * in this id gate), so every Chloroplast-bundling ability must be listed explicitly.
+ * Per ER_COMPOSITE_PARTS these are the only two composites that contain Chloroplast.
  */
 export function userActsInSun(user: Pokemon | null | undefined): boolean {
   if (
     user?.hasAbility(ErAbilityId.CHLOROPLAST as unknown as AbilityId)
     || user?.hasAbility(ErAbilityId.SOLAR_FLARE as unknown as AbilityId)
+    || user?.hasAbility(ErAbilityId.BIG_LEAVES as unknown as AbilityId)
   ) {
     return true;
   }
