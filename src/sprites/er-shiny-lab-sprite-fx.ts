@@ -153,7 +153,7 @@ function evictRenderTextureCache(): void {
   }
 }
 
-function releaseGeneratedTexture(key?: string | null): void {
+export function releaseGeneratedTexture(key?: string | null): void {
   if (!key) {
     return;
   }
@@ -278,7 +278,30 @@ export function readErShinyLabSpriteSourcePixels(
   }
 }
 
-function textureFromRenderedPixels(
+/**
+ * Acquire (refCount++) an already-cached render texture for `cacheKey` WITHOUT rendering.
+ * Returns the live texture key, or null when nothing is cached. Lets a caller that pre-renders
+ * a fixed animation loop (the Name FX frame builder) skip the expensive
+ * {@linkcode renderErShinyLabLook} call entirely when the same (name + look) frames are still
+ * resident - the cross-instance reuse path (e.g. a party slot rebuilt with the same mons). The
+ * returned key MUST be balanced with a {@linkcode releaseGeneratedTexture} on teardown, exactly
+ * like a key returned by {@linkcode textureFromRenderedPixels} with a `cacheKey`.
+ */
+export function acquireErShinyLabCachedTexture(cacheKey: string): string | null {
+  const cached = renderTextureCache.get(cacheKey);
+  if (cached && globalScene.textures.exists(cached.textureKey)) {
+    cached.refCount++;
+    cached.lastUsed = ++renderTextureCacheClock;
+    return cached.textureKey;
+  }
+  if (cached) {
+    renderTextureCache.delete(cacheKey);
+    renderTextureKeyToCacheKey.delete(cached.textureKey);
+  }
+  return null;
+}
+
+export function textureFromRenderedPixels(
   rendered: ErShinyLabRenderedPixels,
   keyPrefix: string,
   cacheKey?: string,

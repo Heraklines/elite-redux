@@ -59,6 +59,7 @@ import {
 import { Button } from "#enums/buttons";
 import { TextStyle } from "#enums/text-style";
 import { UiMode } from "#enums/ui-mode";
+import { ErShinyLabNameFx } from "#sprites/er-shiny-lab-name-fx";
 import { readErShinyLabSpriteSourcePixels } from "#sprites/er-shiny-lab-sprite-fx";
 import { ensureErShinyLabPaletteVariantCache } from "#sprites/variant";
 import { addTextObject } from "#ui/text";
@@ -203,6 +204,7 @@ export class ErShinyLabUiHandler extends UiHandler {
   private surfaceLines: Phaser.GameObjects.Rectangle[] = [];
   private surfaceSparks: Phaser.GameObjects.Rectangle[] = [];
   private nameText: Phaser.GameObjects.Text;
+  private nameFx?: ErShinyLabNameFx | undefined;
   private tierText: Phaser.GameObjects.Text;
   private tierPips: Phaser.GameObjects.Rectangle[] = [];
   private chipTexts: Phaser.GameObjects.Text[] = [];
@@ -965,6 +967,18 @@ export class ErShinyLabUiHandler extends UiHandler {
     // Name FX is on for a T3+ shiny. The color goes on the name TEXT, not a box.
     const style = cfg && cfg.earnedTier >= 3 && cfg.params.nameFx ? getErShinyLabNameStyle(loadout) : null;
     this.nameText.setColor(style?.color ?? INK);
+    // Layer the animated SURFACE FX onto the preview name when a surface is equipped (T3+, Name FX
+    // on). update() internally no-ops to the flat colour above for palette-only / no-FX previews.
+    const look = cfg && cfg.earnedTier >= 3 ? { loadout, params: cfg.params } : null;
+    this.getNameFx().update(this.nameText, look);
+  }
+
+  /** Lazily build the owned animated Name-FX overlay for the preview name. */
+  private getNameFx(): ErShinyLabNameFx {
+    if (!this.nameFx) {
+      this.nameFx = new ErShinyLabNameFx();
+    }
+    return this.nameFx;
   }
 
   private refreshPreviewSurface(effect: ErShinyLabEffect | null | undefined, params: ErShinyLabParams): void {
@@ -1556,6 +1570,8 @@ export class ErShinyLabUiHandler extends UiHandler {
     super.clear();
     this.previewAnimTimer?.remove();
     this.previewAnimTimer = null;
+    this.nameFx?.destroy();
+    this.nameFx = undefined;
     this.container.setVisible(false);
     this.monSprite.stop();
     this.monSprite.setVisible(false);

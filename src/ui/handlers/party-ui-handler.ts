@@ -33,7 +33,8 @@ import type { PlayerPokemon, Pokemon } from "#field/pokemon";
 import type { PokemonFormChangeItemModifier, PokemonHeldItemModifier } from "#modifiers/modifier";
 import type { PokemonMove } from "#moves/pokemon-move";
 import type { CommandPhase } from "#phases/command-phase";
-import { getErShinyLabNameStyleForPokemon } from "#sprites/er-shiny-lab-sprite-fx";
+import { ErShinyLabNameFx } from "#sprites/er-shiny-lab-name-fx";
+import { getErShinyLabNameStyleForPokemon, getErShinyLabSpriteFxLookForPokemon } from "#sprites/er-shiny-lab-sprite-fx";
 import { getVariantTint } from "#sprites/variant";
 import type { TurnMove } from "#types/turn-move";
 import { FusionPreviewPanel } from "#ui/fusion-preview-panel";
@@ -2328,6 +2329,7 @@ class PartySlot extends Phaser.GameObjects.Container {
   private slotBgKey: string;
   private pokemonIcon: Phaser.GameObjects.Container;
   private iconAnimHandler: PokemonIconAnimHelper;
+  private nameFx?: ErShinyLabNameFx | undefined;
 
   constructor(
     slotIndex: number,
@@ -2489,6 +2491,10 @@ class PartySlot extends Phaser.GameObjects.Container {
       .setPositionRelative(slotLevelLabel, levelTextToLevelLabelOffset.x, levelTextToLevelLabelOffset.y)
       .setOrigin(0, 0.25);
     slotInfoContainer.add([this.slotName, slotLevelLabel, slotLevelText]);
+    // Layer the animated SURFACE FX onto the slot name (now that it is parented) when a surface is
+    // equipped + Name FX on; no-ops back to the flat colour above otherwise. Torn down in destroy().
+    this.nameFx = new ErShinyLabNameFx();
+    this.nameFx.update(this.slotName, getErShinyLabSpriteFxLookForPokemon(this.pokemon));
 
     if (genderSymbol) {
       const slotGenderText = addTextObject(0, 0, genderSymbol, TextStyle.PARTY)
@@ -2646,6 +2652,14 @@ class PartySlot extends Phaser.GameObjects.Container {
       this.slotBgKey,
       `${this.slotBgKey}${this.transfer ? "_swap" : this.pokemon.hp ? "" : "_fnt"}${this.selected ? "_sel" : ""}`,
     );
+  }
+
+  destroy(fromScene?: boolean): void {
+    // Release the slot's Name-FX frame textures + timer before the container tears down its
+    // children (slots are rebuilt frequently; cached frames are reused across rebuilds).
+    this.nameFx?.destroy();
+    this.nameFx = undefined;
+    super.destroy(fromScene);
   }
 }
 

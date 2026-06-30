@@ -9,7 +9,8 @@ import { StatusEffect } from "#enums/status-effect";
 import { TextStyle } from "#enums/text-style";
 import { UiTheme } from "#enums/ui-theme";
 import type { Pokemon } from "#field/pokemon";
-import { getErShinyLabNameStyleForPokemon } from "#sprites/er-shiny-lab-sprite-fx";
+import { ErShinyLabNameFx } from "#sprites/er-shiny-lab-name-fx";
+import { getErShinyLabNameStyleForPokemon, getErShinyLabSpriteFxLookForPokemon } from "#sprites/er-shiny-lab-sprite-fx";
 import { getVariantTint } from "#sprites/variant";
 import { addTextObject } from "#ui/text";
 import { fixedInt, getLocalizedSpriteKey, getShinyDescriptor } from "#utils/common";
@@ -83,6 +84,7 @@ export abstract class BattleInfo extends Phaser.GameObjects.Container {
 
   protected box: Phaser.GameObjects.Sprite;
   protected nameText: Phaser.GameObjects.Text;
+  private nameFx?: ErShinyLabNameFx | undefined;
   protected genderText: Phaser.GameObjects.Text;
   protected teraIcon: Phaser.GameObjects.Sprite;
   protected shinyIcon: Phaser.GameObjects.Sprite;
@@ -540,6 +542,23 @@ export abstract class BattleInfo extends Phaser.GameObjects.Container {
     // The FX goes on the NAME text itself - NOT the box around it (tinting the box
     // looked like a negative white->black wash). Only recolor the name.
     this.nameText.setColor(style ? style.color : "#f8f8f8");
+    // Additionally animate the equipped SURFACE on the name glyphs (frame-swap overlay).
+    // No-ops back to the flat colour above for palette-only / no-FX nameplates.
+    this.getNameFx().update(this.nameText, getErShinyLabSpriteFxLookForPokemon(pokemon));
+  }
+
+  /** Lazily build the owned animated Name-FX overlay for this nameplate. */
+  private getNameFx(): ErShinyLabNameFx {
+    if (!this.nameFx) {
+      this.nameFx = new ErShinyLabNameFx();
+    }
+    return this.nameFx;
+  }
+
+  destroy(fromScene?: boolean): void {
+    this.nameFx?.destroy();
+    this.nameFx = undefined;
+    super.destroy(fromScene);
   }
 
   protected updateTeraType(ty: PokemonType): boolean {

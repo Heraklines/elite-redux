@@ -39,6 +39,7 @@ import type { PlayerPokemon } from "#field/pokemon";
 import { modifierSortFunc, PokemonHeldItemModifier } from "#modifiers/modifier";
 import type { Move } from "#moves/move";
 import type { PokemonMove } from "#moves/pokemon-move";
+import { ErShinyLabNameFx } from "#sprites/er-shiny-lab-name-fx";
 import {
   ErShinyLabSpriteFxOverlay,
   type ErShinyLabSpriteSourceRef,
@@ -122,6 +123,7 @@ export class SummaryUiHandler extends UiHandler {
   private pokemonSprite: Phaser.GameObjects.Sprite;
   private shinyLabFxOverlay: ErShinyLabSpriteFxOverlay | null = null;
   private shinyLabFxTimer: Phaser.Time.TimerEvent | null = null;
+  private nameFx?: ErShinyLabNameFx | undefined;
   private shinyLabSummarySpriteLoadKey: string | null = null;
   private nameText: Phaser.GameObjects.Text;
   private splicedIcon: Phaser.GameObjects.Sprite;
@@ -540,6 +542,10 @@ export class SummaryUiHandler extends UiHandler {
     // Shiny Lab Name FX: the name adopts the equipped palette's color (T3+ shiny, unlocked + on).
     const nameFxStyle = getErShinyLabNameStyleForPokemon(this.pokemon);
     this.nameText.setColor(nameFxStyle ? nameFxStyle.color : getTextColor(TextStyle.SUMMARY));
+    // Layer the animated SURFACE FX onto the name glyphs (frame-swap overlay) when a surface is
+    // equipped + Name FX on. Reuses the look already resolved for the sprite FX above; no-ops back
+    // to the flat colour for palette-only / no-FX mons.
+    this.getNameFx().update(this.nameText, shinyLabLook);
 
     const isFusion = this.pokemon.isFusion();
 
@@ -2066,6 +2072,14 @@ export class SummaryUiHandler extends UiHandler {
     this.shinyLabFxTimer = null;
   }
 
+  /** Lazily build the owned animated Name-FX overlay for the summary name. */
+  private getNameFx(): ErShinyLabNameFx {
+    if (!this.nameFx) {
+      this.nameFx = new ErShinyLabNameFx();
+    }
+    return this.nameFx;
+  }
+
   private ensureShinyLabSummarySpriteLoaded(source: ErShinyLabSpriteSourceRef): void {
     if (globalScene.textures.exists(source.key)) {
       ensureErSpriteAnim(source.key);
@@ -2223,6 +2237,8 @@ export class SummaryUiHandler extends UiHandler {
     this.abilitiesDetailPrompt = null;
     this.stopShinyLabSummaryFxTimer();
     this.shinyLabFxOverlay?.hide(false);
+    this.nameFx?.destroy();
+    this.nameFx = undefined;
     this.summaryContainer.setVisible(false);
     this.summaryPageContainer.setVisible(false);
   }

@@ -69,6 +69,7 @@ import { UiMode } from "#enums/ui-mode";
 import { UiTheme } from "#enums/ui-theme";
 import type { CandyUpgradeNotificationChangedEvent } from "#events/battle-scene";
 import { BattleSceneEventType } from "#events/battle-scene";
+import { ErShinyLabNameFx } from "#sprites/er-shiny-lab-name-fx";
 import {
   applyErShinyLabSpriteFxTexture,
   clearErShinyLabSpriteFxTexture,
@@ -434,6 +435,7 @@ export class StarterSelectUiHandler extends MessageUiHandler {
   private pokemonNumberText: Phaser.GameObjects.Text;
   private pokemonSprite: Phaser.GameObjects.Sprite;
   private pokemonNameText: Phaser.GameObjects.Text;
+  private shinyLabNameFx?: ErShinyLabNameFx | undefined;
   private pokemonGrowthRateLabelText: Phaser.GameObjects.Text;
   private pokemonGrowthRateText: Phaser.GameObjects.Text;
   private type1Icon: Phaser.GameObjects.Sprite;
@@ -2965,6 +2967,15 @@ export class StarterSelectUiHandler extends MessageUiHandler {
                         this.pokemonNameText.setText(this.lastSpecies.name);
                       }
                       this.truncateName();
+                      // The name changed: rebuild the animated Name FX so the overlay isn't stale.
+                      const renameDisplayShiny = globalScene.gameData.getSpeciesDexAttrProps(
+                        this.lastSpecies,
+                        this.getCurrentDexProps(this.lastSpecies.speciesId),
+                      ).shiny;
+                      this.getShinyLabNameFx().update(
+                        this.pokemonNameText,
+                        getErShinyLabSpriteFxLookForSpecies(this.lastSpecies.speciesId, renameDisplayShiny),
+                      );
                       ui.setMode(UiMode.STARTER_SELECT);
                     },
                     () => {
@@ -4819,6 +4830,12 @@ export class StarterSelectUiHandler extends MessageUiHandler {
       const nameFxStyle = getErShinyLabNameStyleForSpecies(species.speciesId, displayShiny);
       this.pokemonNameText.setColor(nameFxStyle ? nameFxStyle.color : getTextColor(TextStyle.SUMMARY));
       this.truncateName();
+      // Layer the animated SURFACE FX on the (now-truncated) name glyphs when a surface is
+      // equipped + Name FX is on; the flat setColor above stays as the hidden fallback.
+      this.getShinyLabNameFx().update(
+        this.pokemonNameText,
+        getErShinyLabSpriteFxLookForSpecies(species.speciesId, displayShiny),
+      );
 
       if (this.speciesStarterDexEntry?.caughtAttr) {
         // ER custom species (id >= 10000) aren't pre-populated in starterColors;
@@ -5025,6 +5042,7 @@ export class StarterSelectUiHandler extends MessageUiHandler {
     } else {
       this.pokemonNumberText.setText(padInt(0, 4));
       this.pokemonNameText.setText(species ? "???" : "");
+      this.shinyLabNameFx?.clear();
       this.pokemonGrowthRateText.setText("");
       this.pokemonGrowthRateLabelText.setVisible(false);
       this.type1Icon.setVisible(false);
@@ -6701,6 +6719,8 @@ export class StarterSelectUiHandler extends MessageUiHandler {
     this.spritePrewarmTimer = null;
     this.shinyLabFxTimer?.remove();
     this.shinyLabFxTimer = null;
+    this.shinyLabNameFx?.destroy();
+    this.shinyLabNameFx = undefined;
     this.hideShinyLabFxPreview(false);
 
     while (this.starterSpecies.length > 0) {
@@ -6746,5 +6766,13 @@ export class StarterSelectUiHandler extends MessageUiHandler {
   private truncateName() {
     const name = this.pokemonNameText.text;
     this.pokemonNameText.setText(truncateString(name, 15));
+  }
+
+  /** Lazily build the owned animated Name-FX overlay for the detail-panel name. */
+  private getShinyLabNameFx(): ErShinyLabNameFx {
+    if (!this.shinyLabNameFx) {
+      this.shinyLabNameFx = new ErShinyLabNameFx();
+    }
+    return this.shinyLabNameFx;
   }
 }
