@@ -99,7 +99,7 @@ export abstract class FormModalUiHandler extends ModalUiHandler {
       const isReadOnly = config?.isReadOnly;
       const input = addTextInputObject(4, -2, inputWidth * 5.5, 116, TextStyle.TOOLTIP_CONTENT, {
         type: isPassword ? "password" : "text",
-        maxLength: isPassword ? 64 : 20,
+        maxLength: config?.maxLength ?? (isPassword ? 64 : 20),
         readOnly: isReadOnly ?? false,
       }).setOrigin(0);
 
@@ -222,4 +222,6 @@ export interface InputFieldConfig {
   label: string;
   isPassword?: boolean;
   isReadOnly?: boolean;
+  /** Override the input's max character length (defaults: 64 password, 20 text). */
+  maxLength?: number;
 }

@@ -70,4 +70,6 @@ export enum UiMode {
   COMMUNITY_CHALLENGES,
   /** ER Community Challenges: the create-a-challenge designer. */
   COMMUNITY_CHALLENGE_CREATE,
+  /** ER Community Challenges: a single configurable text-input modal (name/subtitle/description). */
+  COMMUNITY_CHALLENGE_TEXT,
 }

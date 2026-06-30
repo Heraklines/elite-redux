@@ -37,6 +37,7 @@ import { EggHatchSceneUiHandler } from "#ui/egg-hatch-scene-ui-handler";
 import { EggListUiHandler } from "#ui/egg-list-ui-handler";
 import { EggSummaryUiHandler } from "#ui/egg-summary-ui-handler";
 import { ErBargainUiHandler } from "#ui/er-bargain-ui-handler";
+import { ErChallengeTextInputUiHandler } from "#ui/er-challenge-text-input-ui-handler";
 import { ErMapPickerUiHandler } from "#ui/er-map-picker-ui-handler";
 import { ErMapUiHandler } from "#ui/er-map-ui-handler";
 import { ErQuizUiHandler } from "#ui/er-quiz-ui-handler";
@@ -132,6 +133,7 @@ const noTransitionModes = [
   UiMode.RUN_INFO,
   UiMode.CHANGE_PASSWORD_FORM,
   UiMode.BUG_REPORT_FORM,
+  UiMode.COMMUNITY_CHALLENGE_TEXT,
 ];
 
 // biome-ignore lint/style/useNamingConvention: a unique case (only 2 letters)
@@ -224,6 +226,7 @@ export class UI extends Phaser.GameObjects.Container {
       new ErShinyLabUiHandler(),
       new CommunityChallengesUiHandler(),
       new CommunityChallengeCreateUiHandler(),
+      new ErChallengeTextInputUiHandler(),
     ];
   }
 

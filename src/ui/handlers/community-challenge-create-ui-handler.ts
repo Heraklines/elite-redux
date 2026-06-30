@@ -555,25 +555,32 @@ export class CommunityChallengeCreateUiHandler extends UiHandler {
     }
   }
 
-  /** Open BUG_REPORT_FORM for a raw-string field (PATTERN 1: revert on callback). */
+  /** Open the configurable text-input modal for a raw-string field (PATTERN 1: revert on callback). */
   private openTextEntry(field: "name" | "subtitle" | "description"): void {
-    // CREATE paints an opaque full-screen backdrop and is the topmost z handler;
-    // BUG_REPORT_FORM (a modal) does NOT bringToTop, so it would render BEHIND our
-    // backdrop (text entry invisible/unusable). Hide CREATE while the form is up and
-    // restore it on either button.
+    // A modal does NOT bringToTop and CREATE paints an opaque backdrop, so hide CREATE
+    // while the input is up (restore on either button).
     this.container.setVisible(false);
-    globalScene.ui.setOverlayMode(UiMode.BUG_REPORT_FORM, {
-      buttonActions: [
-        (value: string) =>
-          globalScene.ui.revertMode().then(() => {
-            this.container.setVisible(true);
-            this.draft[field] = value;
-            this.errorMsg = null;
-            this.rebuild();
-          }),
-        () => globalScene.ui.revertMode().then(() => this.container.setVisible(true)),
-      ],
-    });
+    const titles: Record<typeof field, string> = {
+      name: "Challenge Name",
+      subtitle: "Subtitle",
+      description: "Description",
+    };
+    globalScene.ui.setOverlayMode(
+      UiMode.COMMUNITY_CHALLENGE_TEXT,
+      {
+        buttonActions: [
+          (value: string) =>
+            globalScene.ui.revertMode().then(() => {
+              this.container.setVisible(true);
+              this.draft[field] = value;
+              this.errorMsg = null;
+              this.rebuild();
+            }),
+          () => globalScene.ui.revertMode().then(() => this.container.setVisible(true)),
+        ],
+      },
+      { title: titles[field], fieldLabel: titles[field], initial: this.draft[field] },
+    );
   }
 
   // ---- Species sub-view input --------------------------------------------
