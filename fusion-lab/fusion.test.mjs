@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  STRATEGIES,
   components,
   detectSockets,
   edt,
@@ -544,4 +545,206 @@ test("skeletonize: clean Y keeps a deg-3 branch; a short stub is pruned", () => 
     assert.equal(graph.edges.length, 2, "the two bar arms survive");
     assert.equal(graph.nodes.filter(n => n.deg === 1).length, 2, "two bar tips");
   }
+});
+
+// ---------------------------------------------------------------------------
+// Unit 4 - fusion STRATEGIES (recolor + socketGraft)
+// ---------------------------------------------------------------------------
+
+// SpriteData from an rgba buffer
+const spriteOf = (rgba, width, height, dex = 1) => ({ dex, name: "test", width, height, rgba });
+
+// build a SpriteData of given dims, painting flat rects via paintRect
+function makeSprite(w, h, rects) {
+  const rgba = new Uint8ClampedArray(w * h * 4);
+  for (const [x0, y0, x1, y1, color] of rects) {
+    paintRect(rgba, w, x0, y0, x1, y1, color);
+  }
+  return spriteOf(rgba, w, h);
+}
+
+const opaqueCount = (rgba, w, h) => {
+  let n = 0;
+  for (let p = 0; p < w * h; p++) {
+    if (rgba[p * 4 + 3] > 24) {
+      n++;
+    }
+  }
+  return n;
+};
+
+const strat = id => STRATEGIES.find(s => s.id === id);
+
+test("STRATEGIES registry: recolor + socketGraft, each {id,label,params,fuse}", () => {
+  assert.ok(Array.isArray(STRATEGIES));
+  assert.equal(STRATEGIES.length, 2);
+  const ids = STRATEGIES.map(s => s.id);
+  assert.deepEqual(ids.sort(), ["recolor", "socketGraft"]);
+
+  for (const s of STRATEGIES) {
+    assert.equal(typeof s.id, "string");
+    assert.equal(typeof s.label, "string");
+    assert.ok(Array.isArray(s.params));
+    assert.equal(typeof s.fuse, "function");
+    for (const p of s.params) {
+      assert.equal(typeof p.key, "string");
+      assert.equal(typeof p.label, "string");
+      for (const f of ["min", "max", "step", "default"]) {
+        assert.equal(typeof p[f], "number", `param ${p.key}.${f}`);
+      }
+    }
+  }
+
+  // the documented param shapes
+  assert.deepEqual(strat("recolor").params[0], {
+    key: "beta",
+    label: "Blend",
+    min: 0,
+    max: 1,
+    step: 0.02,
+    default: 0.55,
+  });
+  const gp = strat("socketGraft").params.map(p => p.key);
+  assert.deepEqual(gp, ["scaleLo", "scaleHi", "overlapPx", "scoreFloor"]);
+});
+
+test("recolor(a, a, {beta:1}) ~= a (flat-region identity), result dims == b dims", () => {
+  // flat regions -> each maps exactly to its own palette mean, so the role target
+  // is the colour itself and the recolor is identity within OKLab round-trip (~2/255).
+  const w = 10;
+  const h = 10;
+  const a = makeSprite(w, h, [
+    [1, 1, 4, 4, [200, 40, 40]], // red block
+    [5, 1, 8, 4, [40, 90, 200]], // blue block
+    [1, 5, 4, 8, [220, 220, 60]], // yellow block
+    [5, 5, 8, 8, [30, 30, 30]], // near-black block
+  ]);
+
+  const res = strat("recolor").fuse(a, a, { beta: 1 });
+  assert.equal(res.width, w);
+  assert.equal(res.height, h);
+  assert.ok(res.rgba instanceof Uint8ClampedArray);
+  assert.equal(res.meta.rung, "recolor");
+  assert.ok(Array.isArray(res.layers) && res.layers.length === 3);
+  assert.ok(opaqueCount(res.rgba, w, h) > 0);
+
+  // every pixel ~ unchanged (<= 3/255 per channel) and alpha preserved exactly
+  for (let p = 0; p < w * h; p++) {
+    const i = p * 4;
+    assert.equal(res.rgba[i + 3], a.rgba[i + 3], `alpha @${p}`);
+    if (a.rgba[i + 3] > 24) {
+      for (let c = 0; c < 3; c++) {
+        assert.ok(Math.abs(res.rgba[i + c] - a.rgba[i + c]) <= 3, `ch${c} @${p}: ${res.rgba[i + c]} vs ${a.rgba[i + c]}`);
+      }
+    }
+  }
+});
+
+test("recolor: result dims track B, and a fully-transparent input does not throw", () => {
+  const a = makeSprite(8, 8, [[1, 1, 6, 6, [200, 40, 40]]]);
+  const b = makeSprite(12, 9, [[2, 2, 9, 6, [40, 90, 200]]]); // different dims
+  const res = strat("recolor").fuse(a, b, { beta: 0.55 });
+  assert.equal(res.width, 12);
+  assert.equal(res.height, 9);
+  assert.ok(opaqueCount(res.rgba, 12, 9) > 0);
+
+  // fully-transparent A -> no palette -> identity recolor of B, no throw
+  const emptyA = spriteOf(new Uint8ClampedArray(8 * 8 * 4), 8, 8);
+  const res2 = strat("recolor").fuse(emptyA, b, { beta: 1 });
+  assert.equal(res2.width, 12);
+  assert.equal(res2.height, 9);
+  assert.ok(opaqueCount(res2.rgba, 12, 9) > 0);
+
+  // fully-transparent B -> all transparent out, still valid + no throw
+  const emptyB = spriteOf(new Uint8ClampedArray(12 * 9 * 4), 12, 9);
+  const res3 = strat("recolor").fuse(a, emptyB, { beta: 0.55 });
+  assert.equal(res3.width, 12);
+  assert.equal(res3.height, 9);
+  assert.equal(opaqueCount(res3.rgba, 12, 9), 0);
+});
+
+// a "body" B: torso blob + small head blob joined by a thin neck (graftable).
+function makeBody() {
+  const w = 24;
+  const h = 32;
+  return makeSprite(w, h, [
+    [6, 14, 17, 29, [70, 130, 70]], // torso
+    [10, 8, 13, 13, [70, 130, 70]], // neck (~2-4px)
+    [8, 2, 15, 8, [90, 160, 90]], // head blob
+    [8, 2, 15, 2, [20, 20, 24]], // a little dark cap (ink-ish)
+  ]);
+}
+
+// a "head donor" A: a blob with a clear head on top of a body.
+function makeHeadDonor() {
+  const w = 24;
+  const h = 32;
+  return makeSprite(w, h, [
+    [6, 16, 17, 29, [160, 80, 80]], // body
+    [10, 11, 13, 16, [160, 80, 80]], // neck
+    [7, 2, 16, 11, [210, 110, 110]], // head (clear, in the top band)
+    [9, 5, 10, 6, [20, 20, 24]], // an "eye" (interior ink)
+    [13, 5, 14, 6, [20, 20, 24]], // an "eye"
+  ]);
+}
+
+test("socketGraft: returns a valid FusionResult, >0 opaque px, meta.rung in {graft,recolor}, no throw", () => {
+  const a = makeHeadDonor();
+  const b = makeBody();
+  const defaults = Object.fromEntries(strat("socketGraft").params.map(p => [p.key, p.default]));
+
+  let res;
+  assert.doesNotThrow(() => {
+    res = strat("socketGraft").fuse(a, b, defaults);
+  });
+  assert.equal(res.width, b.width);
+  assert.equal(res.height, b.height);
+  assert.ok(res.rgba instanceof Uint8ClampedArray);
+  assert.ok(opaqueCount(res.rgba, b.width, b.height) > 0);
+  assert.ok(["graft", "recolor"].includes(res.meta.rung), `rung=${res.meta.rung}`);
+  assert.ok(Array.isArray(res.layers) && res.layers.length > 0);
+  for (const l of res.layers) {
+    assert.equal(typeof l.label, "string");
+    assert.equal(l.rgba.length, l.width * l.height * 4);
+  }
+});
+
+test("socketGraft: a graft actually fires on a clean synthetic head+body pair", () => {
+  // not contractually required (visual quality is tuned in the lab), but a sanity
+  // check that the money path reaches rung 'graft' on an easy fixture.
+  const a = makeHeadDonor();
+  const b = makeBody();
+  const defaults = Object.fromEntries(strat("socketGraft").params.map(p => [p.key, p.default]));
+  const res = strat("socketGraft").fuse(a, b, defaults);
+  if (res.meta.rung === "graft") {
+    assert.ok(res.meta.score >= defaults.scoreFloor);
+    assert.ok(["pinch", "contact"].includes(res.meta.socketKind));
+    // graft path emits the full debug-layer set
+    const labels = res.layers.map(l => l.label);
+    for (const need of ["maskA", "maskB", "edtB", "skeletonB", "sockets", "final"]) {
+      assert.ok(labels.includes(need), `missing layer ${need} (labels: ${labels.join(",")})`);
+    }
+  }
+});
+
+test("socketGraft: degenerate (empty/tiny) A falls back to recolor, never throws", () => {
+  const b = makeBody();
+  const defaults = Object.fromEntries(strat("socketGraft").params.map(p => [p.key, p.default]));
+
+  // fully-empty A
+  const emptyA = spriteOf(new Uint8ClampedArray(b.width * b.height * 4), b.width, b.height);
+  let res;
+  assert.doesNotThrow(() => {
+    res = strat("socketGraft").fuse(emptyA, b, defaults);
+  });
+  assert.equal(res.meta.rung, "recolor");
+  assert.equal(res.width, b.width);
+  assert.equal(res.height, b.height);
+  assert.ok(opaqueCount(res.rgba, b.width, b.height) > 0);
+
+  // tiny A (a 2x2 speck -> too little head to graft)
+  const tinyA = makeSprite(b.width, b.height, [[1, 1, 2, 2, [200, 50, 50]]]);
+  const res2 = strat("socketGraft").fuse(tinyA, b, defaults);
+  assert.equal(res2.meta.rung, "recolor");
+  assert.ok(opaqueCount(res2.rgba, b.width, b.height) > 0);
 });

@@ -1,8 +1,19 @@
 /* Fusion Lab - fusion strategy engine. Each STRATEGIES entry is a pluggable
- * sprite-fusion algorithm: { id, label, params, fuse(a, b, p) -> { image, layers, meta } }
- * where A is the head donor and B is the body donor. Image primitives + the strategy
- * registry live here (kept dependency-free so they unit-test under `node --test`).
- * Stub for now - the algorithm lands in a later unit. */
+ * sprite-fusion algorithm: { id, label, params, fuse(a, b, params) -> FusionResult }
+ * where A is the head donor and B is the body donor (the result silhouette is B's body;
+ * A contributes its head (graft) or its palette (recolor)).
+ *
+ *   SpriteData   = { dex, name, width, height, rgba:Uint8ClampedArray }   (Unit 2 loader)
+ *   FusionResult = { width, height, rgba:Uint8ClampedArray,
+ *                    layers: Array<{ label, width, height, rgba }>, meta: object }
+ *
+ * Strategies operate on / return PLAIN rgba buffers, never `ImageData` - so they unit-test
+ * headlessly under `node --test`. The UI (a later unit) wraps `rgba` into `new ImageData(...)`
+ * for drawing; this file stays DOM-free (no ImageData / canvas / document). Image primitives,
+ * the strategy registry, and the two strategies (recolor + socketGraft) all live here.
+ *
+ * The two strategies are defined + pushed at the BOTTOM of this file (after the primitives
+ * they compose). Math reference: docs/plans/2026-06-30-sprite-fusion-algorithm-design.md. */
 
 export const STRATEGIES = [];
 
@@ -1000,3 +1011,691 @@ export function reconstructFrame(atlasRGBA, atlasW, atlasH, frame, spriteSourceS
   }
   return { width, height, rgba };
 }
+
+/* =========================================================================
+ * Fusion STRATEGIES (Unit 4) - compose the primitives above into fusions.
+ * Pure rgba in/out (SpriteData -> FusionResult), no DOM. Two rungs of the
+ * design's fallback ladder are implemented:
+ *   - recolor      (rung 5, the floor) - always works, never garbage.
+ *   - socketGraft   (rung 2, money path) - H1+H3 socket graft, MVP of Stage 5-12;
+ *                   wrapped in try/catch and falls back to recolor.
+ * ========================================================================= */
+
+const clamp = (v, lo, hi) => (v < lo ? lo : v > hi ? hi : v);
+const DEFAULT_BETA = 0.55;
+
+// ---- tiny rgba canvas helpers (debug-layer painting) ---------------------
+
+const blankRGBA = (w, h) => new Uint8ClampedArray(w * h * 4);
+
+function setPx(out, w, h, x, y, [r, g, b, a]) {
+  x |= 0;
+  y |= 0;
+  if (x < 0 || y < 0 || x >= w || y >= h) {
+    return;
+  }
+  const i = (y * w + x) * 4;
+  out[i] = r;
+  out[i + 1] = g;
+  out[i + 2] = b;
+  out[i + 3] = a;
+}
+
+function fillRect(out, w, x0, y0, rw, rh, [r, g, b, a]) {
+  for (let y = y0; y < y0 + rh; y++) {
+    for (let x = x0; x < x0 + rw; x++) {
+      const i = (y * w + x) * 4;
+      out[i] = r;
+      out[i + 1] = g;
+      out[i + 2] = b;
+      out[i + 3] = a;
+    }
+  }
+}
+
+// dimmed copy of an rgba buffer so overlay markers pop against the source sprite
+function dimCopy(rgba) {
+  const o = Uint8ClampedArray.from(rgba);
+  for (let i = 0; i < o.length; i += 4) {
+    o[i] = (o[i] * 0.38) | 0;
+    o[i + 1] = (o[i + 1] * 0.38) | 0;
+    o[i + 2] = (o[i + 2] * 0.38) | 0;
+  }
+  return o;
+}
+
+function heatColor(t) {
+  t = clamp(t, 0, 1);
+  const r = Math.round(255 * clamp(1.4 * t - 0.2, 0, 1));
+  const g = Math.round(255 * clamp(1 - Math.abs(2 * t - 1), 0, 1));
+  const b = Math.round(255 * clamp(1.2 - 1.4 * t, 0, 1));
+  return [r, g, b];
+}
+
+const countMask = mask => {
+  let n = 0;
+  for (let i = 0; i < mask.length; i++) {
+    n += mask[i];
+  }
+  return n;
+};
+
+// ---- geometry helpers ----------------------------------------------------
+
+function maskBBox(mask, w, h) {
+  let x0 = Infinity;
+  let y0 = Infinity;
+  let x1 = -Infinity;
+  let y1 = -Infinity;
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      if (mask[y * w + x]) {
+        if (x < x0) {
+          x0 = x;
+        }
+        if (x > x1) {
+          x1 = x;
+        }
+        if (y < y0) {
+          y0 = y;
+        }
+        if (y > y1) {
+          y1 = y;
+        }
+      }
+    }
+  }
+  return x1 < 0 ? null : { x0, y0, x1, y1 };
+}
+
+/* topBandRegion - the head-region heuristic Unit 4 feeds detectSockets so H3's
+ * head-disk targets the actual head, not the torso (resolves the Stage-3 TODO).
+ * = foreground bbox intersected with its top `frac` (~45%) of height. */
+function topBandRegion(mask, w, h, frac) {
+  const bb = maskBBox(mask, w, h);
+  if (!bb) {
+    return null;
+  }
+  const y1 = Math.round(bb.y0 + frac * (bb.y1 - bb.y0));
+  return { x0: bb.x0, y0: bb.y0, x1: bb.x1, y1: clamp(y1, bb.y0, bb.y1) };
+}
+
+/* buildAnalysis - assemble the per-sprite analysis bundle detectSockets consumes:
+ * { w, h, mask, edt, skeleton, components, headRegion }. */
+function buildAnalysis(sprite) {
+  const w = sprite.width;
+  const h = sprite.height;
+  const mask = maskOf(sprite.rgba, w, h);
+  const comp = components(mask, w, h);
+  const field = edt(mask, w, h);
+  const skeleton = skeletonize(mask, w, h, field);
+  const headRegion = topBandRegion(mask, w, h, 0.45);
+  return { w, h, mask, edt: field, skeleton, components: comp, headRegion };
+}
+
+/* extractHead - locate A's head "plug": the foreground inside A's head region,
+ * its base (where the head meets the body, used as the graft anchor), and its
+ * attach width (the base-row chord, paired against B's socket width to scale). */
+function extractHead(a, analysis) {
+  const w = a.width;
+  const region = analysis.headRegion;
+  if (!region) {
+    return { count: 0 };
+  }
+  let minx = Infinity;
+  let miny = Infinity;
+  let maxx = -Infinity;
+  let maxy = -Infinity;
+  let sx = 0;
+  let count = 0;
+  for (let y = region.y0; y <= region.y1; y++) {
+    for (let x = region.x0; x <= region.x1; x++) {
+      if (a.rgba[(y * w + x) * 4 + 3] > 24) {
+        if (x < minx) {
+          minx = x;
+        }
+        if (x > maxx) {
+          maxx = x;
+        }
+        if (y < miny) {
+          miny = y;
+        }
+        if (y > maxy) {
+          maxy = y;
+        }
+        sx += x;
+        count++;
+      }
+    }
+  }
+  if (count === 0) {
+    return { count: 0 };
+  }
+  let chord = 0;
+  for (let x = minx; x <= maxx; x++) {
+    if (a.rgba[(maxy * w + x) * 4 + 3] > 24) {
+      chord++;
+    }
+  }
+  const plugWidth = Math.max(2, chord || maxx - minx + 1);
+  return {
+    count,
+    bbox: { x0: minx, y0: miny, x1: maxx, y1: maxy },
+    base: { x: sx / count, y: maxy },
+    plugWidth,
+  };
+}
+
+// ---- candidate render (render-2) -----------------------------------------
+
+/* composeCandidate - place A's head on B's body at one socket. Axis-aligned
+ * clamped scale + translate (MVP of Stage 6/7; no TPS warp / RotSprite yet):
+ *  - scale  = clamp(socket.width / headPlugWidth, scaleLo, scaleHi)
+ *  - bodyDir = direction from the socket into B's body (socket-kind aware; the
+ *    pinch normal points toward the head, the contact normal toward the body)
+ *  - clear B's pixels on the head side of the cut (within the head's span)
+ *  - composite A's head, anchored so its base lands on socket.pos + overlap.
+ * Returns { rgba, headStamp, headArea, kind, scale } - headStamp re-paints the
+ * head interior after the outline pass (anti eyeless-cutout). */
+function composeCandidate(a, head, b, socket, P, kind) {
+  const w = b.width;
+  const h = b.height;
+  const aw = a.width;
+  const out = Uint8ClampedArray.from(b.rgba);
+
+  let bdx = socket.normal.x;
+  let bdy = socket.normal.y;
+  if (kind === "pinch") {
+    bdx = -bdx;
+    bdy = -bdy;
+  }
+  const bl = Math.hypot(bdx, bdy) || 1;
+  bdx /= bl;
+  bdy /= bl;
+
+  const scale = clamp(socket.width / head.plugWidth, P.scaleLo, P.scaleHi);
+  const baseX = socket.pos.x + bdx * P.overlapPx;
+  const baseY = socket.pos.y + bdy * P.overlapPx;
+
+  // clear B's head: pixels on the head side of the socket cut, within the head's span
+  const clearHalf = Math.max(socket.width, head.plugWidth * scale) * 0.6 + 2;
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const along = (x + 0.5 - socket.pos.x) * bdx + (y + 0.5 - socket.pos.y) * bdy;
+      if (along >= 0) {
+        continue; // body side - keep
+      }
+      const perp = (x + 0.5 - socket.pos.x) * -bdy + (y + 0.5 - socket.pos.y) * bdx;
+      if (Math.abs(perp) > clearHalf) {
+        continue; // outside the head column - keep (don't nuke far body parts)
+      }
+      const i = (y * w + x) * 4;
+      out[i] = 0;
+      out[i + 1] = 0;
+      out[i + 2] = 0;
+      out[i + 3] = 0;
+    }
+  }
+
+  // dest bbox = transform of A's head bbox corners
+  const tf = (ax, ay) => [baseX + (ax - head.base.x) * scale, baseY + (ay - head.base.y) * scale];
+  let dminx = Infinity;
+  let dminy = Infinity;
+  let dmaxx = -Infinity;
+  let dmaxy = -Infinity;
+  for (const [cx, cy] of [
+    [head.bbox.x0, head.bbox.y0],
+    [head.bbox.x1, head.bbox.y0],
+    [head.bbox.x0, head.bbox.y1],
+    [head.bbox.x1, head.bbox.y1],
+  ]) {
+    const [px, py] = tf(cx, cy);
+    dminx = Math.min(dminx, px);
+    dminy = Math.min(dminy, py);
+    dmaxx = Math.max(dmaxx, px);
+    dmaxy = Math.max(dmaxy, py);
+  }
+  const x0 = clamp(Math.floor(dminx), 0, w - 1);
+  const x1 = clamp(Math.ceil(dmaxx), 0, w - 1);
+  const y0 = clamp(Math.floor(dminy), 0, h - 1);
+  const y1 = clamp(Math.ceil(dmaxy), 0, h - 1);
+
+  // inverse-map each dest pixel back into A's head and sample (nearest)
+  const headStamp = [];
+  let headArea = 0;
+  for (let dy = y0; dy <= y1; dy++) {
+    for (let dx = x0; dx <= x1; dx++) {
+      const sxp = Math.round(head.base.x + (dx - baseX) / scale);
+      const syp = Math.round(head.base.y + (dy - baseY) / scale);
+      if (sxp < head.bbox.x0 || sxp > head.bbox.x1 || syp < head.bbox.y0 || syp > head.bbox.y1) {
+        continue;
+      }
+      const si = (syp * aw + sxp) * 4;
+      if (a.rgba[si + 3] <= 24) {
+        continue;
+      }
+      const di = (dy * w + dx) * 4;
+      const r = a.rgba[si];
+      const g = a.rgba[si + 1];
+      const bb = a.rgba[si + 2];
+      const al = a.rgba[si + 3];
+      out[di] = r;
+      out[di + 1] = g;
+      out[di + 2] = bb;
+      out[di + 3] = al;
+      headStamp.push([dy * w + dx, r, g, bb, al]);
+      headArea++;
+    }
+  }
+  return { rgba: out, headStamp, headArea, kind, scale };
+}
+
+// ---- finish pass (Stage 12 lite) -----------------------------------------
+
+// 4-neighbour erosion; image-border pixels erode (treated as outside).
+function erode4(mask, w, h) {
+  const out = new Uint8Array(w * h);
+  for (let y = 1; y < h - 1; y++) {
+    for (let x = 1; x < w - 1; x++) {
+      const p = y * w + x;
+      if (mask[p] && mask[p - 1] && mask[p + 1] && mask[p - w] && mask[p + w]) {
+        out[p] = 1;
+      }
+    }
+  }
+  return out;
+}
+
+/* finishCandidate - re-synthesise ONE 1px outline from the merged alpha
+ * (outline = mask AND NOT erode(mask), painted a dark tinted tone) and re-stamp
+ * A's head interior so the face is not an eyeless cutout. */
+function finishCandidate(cand, w, h) {
+  const mask = maskOf(cand.rgba, w, h);
+  const er = erode4(mask, w, h);
+  const out = Uint8ClampedArray.from(cand.rgba);
+  const ink = [26, 22, 34, 255]; // tinted near-black keyline
+  for (let p = 0; p < w * h; p++) {
+    if (mask[p] && !er[p]) {
+      out[p * 4] = ink[0];
+      out[p * 4 + 1] = ink[1];
+      out[p * 4 + 2] = ink[2];
+      out[p * 4 + 3] = ink[3];
+    }
+  }
+  // re-stamp A's head interior (only where eroded, i.e. not on the new outline)
+  for (const [p, r, g, b, a] of cand.headStamp) {
+    if (er[p]) {
+      out[p * 4] = r;
+      out[p * 4 + 1] = g;
+      out[p * 4 + 2] = b;
+      out[p * 4 + 3] = a;
+    }
+  }
+  return out;
+}
+
+// ---- cheap plausibility score (Stage 8 lite) -----------------------------
+
+// triangular score: 1 at `ideal`, falling linearly to 0 at lo/hi, 0 outside.
+function scoreRange(v, lo, hi, ideal) {
+  if (v <= lo || v >= hi) {
+    return 0;
+  }
+  if (v === ideal) {
+    return 1;
+  }
+  return v < ideal ? (v - lo) / (ideal - lo) : (hi - v) / (hi - ideal);
+}
+
+function scoreCandidate(cand, bArea, w, h) {
+  const comp = components(cand.mask, w, h, 1);
+  const largest = comp.areasDesc.length ? comp.areasDesc[0].area : 0;
+  const conn = cand.area > 0 ? largest / cand.area : 0; // outline-closed proxy
+  const areaRatio = bArea > 0 ? cand.area / bArea : 0;
+  const sil = scoreRange(areaRatio, 0.6, 1.6, 1.0);
+  const headRatio = cand.area > 0 ? cand.headArea / cand.area : 0;
+  const headS = scoreRange(headRatio, 0.04, 0.7, 0.3);
+  return 0.4 * sil + 0.25 * headS + 0.35 * conn;
+}
+
+// ---- debug-layer painters ------------------------------------------------
+
+function maskLayerRGBA(mask, w, h, [r, g, b] = [228, 230, 244]) {
+  const out = blankRGBA(w, h);
+  for (let p = 0; p < w * h; p++) {
+    if (mask[p]) {
+      out[p * 4] = r;
+      out[p * 4 + 1] = g;
+      out[p * 4 + 2] = b;
+      out[p * 4 + 3] = 255;
+    }
+  }
+  return out;
+}
+
+function heatLayerRGBA(field, w, h) {
+  let mx = 0;
+  for (let i = 0; i < field.length; i++) {
+    if (field[i] > mx) {
+      mx = field[i];
+    }
+  }
+  const out = blankRGBA(w, h);
+  for (let p = 0; p < w * h; p++) {
+    if (field[p] <= 0) {
+      continue;
+    }
+    const [r, g, b] = heatColor(mx > 0 ? field[p] / mx : 0);
+    out[p * 4] = r;
+    out[p * 4 + 1] = g;
+    out[p * 4 + 2] = b;
+    out[p * 4 + 3] = 255;
+  }
+  return out;
+}
+
+function skeletonLayerRGBA(b, skel) {
+  const w = b.width;
+  const h = b.height;
+  const out = dimCopy(b.rgba);
+  for (const e of skel.graph.edges) {
+    for (const pt of e.points) {
+      setPx(out, w, h, pt.x, pt.y, [92, 232, 142, 255]);
+    }
+  }
+  for (const n of skel.graph.nodes) {
+    setPx(out, w, h, n.x, n.y, [255, 92, 92, 255]);
+  }
+  return out;
+}
+
+function socketLayerRGBA(b, sockets) {
+  const w = b.width;
+  const h = b.height;
+  const out = dimCopy(b.rgba);
+  for (const s of sockets) {
+    const col = s.kind === "pinch" ? [255, 210, 80, 255] : [120, 200, 255, 255];
+    const x = Math.round(s.pos.x);
+    const y = Math.round(s.pos.y);
+    for (let d = -2; d <= 2; d++) {
+      setPx(out, w, h, x + d, y, col);
+      setPx(out, w, h, x, y + d, col);
+    }
+    for (let t = 1; t <= 4; t++) {
+      setPx(out, w, h, Math.round(s.pos.x + s.normal.x * t), Math.round(s.pos.y + s.normal.y * t), [
+        255, 255, 255, 255,
+      ]);
+    }
+  }
+  return out;
+}
+
+function swatchRGBA(palette) {
+  const cell = 8;
+  const n = Math.max(1, palette.length);
+  const width = n * cell;
+  const height = cell;
+  const rgba = blankRGBA(width, height);
+  for (let i = 0; i < palette.length; i++) {
+    const [r, g, b] = oklabToSrgb(palette[i]);
+    fillRect(rgba, width, i * cell, 0, cell, cell, [r, g, b, 255]);
+  }
+  return { width, height, rgba };
+}
+
+function roleMapRGBA(quant, roles, w, h) {
+  const col = {
+    shadow: [60, 60, 92],
+    mid: [140, 140, 162],
+    highlight: [236, 236, 246],
+    ink: [22, 20, 30],
+  };
+  const out = blankRGBA(w, h);
+  for (let p = 0; p < w * h; p++) {
+    const k = quant.indexMap[p];
+    if (k === 255) {
+      continue;
+    }
+    const c = col[roles[k]] || col.mid;
+    out[p * 4] = c[0];
+    out[p * 4 + 1] = c[1];
+    out[p * 4 + 2] = c[2];
+    out[p * 4 + 3] = 255;
+  }
+  return out;
+}
+
+// ---- OKLab role helpers (recolor) ----------------------------------------
+
+const paletteHue = lab => Math.atan2(lab[2], lab[1]);
+const chromaOf = lab => Math.hypot(lab[1], lab[2]);
+function hueDist(h1, h2) {
+  const d = Math.abs(h1 - h2) % (2 * Math.PI);
+  return d > Math.PI ? 2 * Math.PI - d : d;
+}
+
+/* rolesOf - per palette-index role label {shadow|mid|highlight|ink} from the
+ * quantizer's inkIndices + rampRoles (the luminance buckets of Stage 11). */
+function rolesOf(quant) {
+  const roles = new Array(quant.palette.length).fill("mid");
+  for (const k of quant.inkIndices) {
+    roles[k] = "ink";
+  }
+  for (const fam of quant.rampRoles.values()) {
+    if (fam.shadow != null) {
+      roles[fam.shadow] = "shadow";
+    }
+    if (fam.highlight != null) {
+      roles[fam.highlight] = "highlight";
+    }
+  }
+  return roles;
+}
+
+/* buildRecolorTargets - for each B palette index, the A OKLab to steer its
+ * chroma+hue toward: the same-role A entry of nearest hue (chromatic) or nearest
+ * L (ink/neutral). When A === B the nearest match is the entry itself, so the
+ * transfer is identity (the recolor(a,a) ~= a contract). A with no palette ->
+ * target = the B entry (no change). */
+function buildRecolorTargets(aQuant, bQuant) {
+  const aRoles = rolesOf(aQuant);
+  const bRoles = rolesOf(bQuant);
+  const aEntries = aQuant.palette.map((lab, k) => ({
+    lab,
+    role: aRoles[k],
+    hue: paletteHue(lab),
+    chroma: chromaOf(lab),
+    L: lab[0],
+  }));
+  const targets = new Array(bQuant.palette.length);
+  for (let k = 0; k < bQuant.palette.length; k++) {
+    const blab = bQuant.palette[k];
+    const brole = bRoles[k];
+    const bhue = paletteHue(blab);
+    const bchroma = chromaOf(blab);
+    let pool = aEntries.filter(e => e.role === brole);
+    if (pool.length === 0) {
+      pool = aEntries;
+    }
+    if (pool.length === 0) {
+      targets[k] = blab; // A empty -> identity
+      continue;
+    }
+    let best = pool[0];
+    let bestD = Infinity;
+    for (const e of pool) {
+      const chromatic = bchroma > 0.02 && e.chroma > 0.02;
+      const d = chromatic ? hueDist(e.hue, bhue) : Math.abs(e.L - blab[0]);
+      if (d < bestD) {
+        bestD = d;
+        best = e;
+      }
+    }
+    targets[k] = best.lab;
+  }
+  return targets;
+}
+
+// ---- recolor strategy (rung 5, the floor) --------------------------------
+
+/* recolorFuse - B's pixels recoloured toward A's role-matched palette. Each
+ * opaque B pixel keeps its own L (preserves shading + light direction) and moves
+ * its (a,b) chroma toward the target by `beta`; transparent stays transparent.
+ * Used both as the `recolor` strategy and as socketGraft's never-throw fallback. */
+function recolorFuse(a, b, params) {
+  const beta = clamp(params?.beta ?? DEFAULT_BETA, 0, 1);
+  const aQ = quantizeOklab(a.rgba, a.width, a.height);
+  const bQ = quantizeOklab(b.rgba, b.width, b.height);
+  const targets = buildRecolorTargets(aQ, bQ);
+
+  const w = b.width;
+  const h = b.height;
+  const out = Uint8ClampedArray.from(b.rgba);
+  for (let p = 0; p < w * h; p++) {
+    const k = bQ.indexMap[p];
+    if (k === 255) {
+      continue; // transparent / background stays as-is
+    }
+    const i = p * 4;
+    const lab = srgbToOklab([out[i], out[i + 1], out[i + 2]]);
+    const t = targets[k] || lab;
+    const na = lab[1] + beta * (t[1] - lab[1]);
+    const nb = lab[2] + beta * (t[2] - lab[2]);
+    const [r, g, bl] = oklabToSrgb([lab[0], na, nb]);
+    out[i] = r;
+    out[i + 1] = g;
+    out[i + 2] = bl;
+  }
+
+  const aSwatch = swatchRGBA(aQ.palette);
+  const bSwatch = swatchRGBA(bQ.palette);
+  const layers = [
+    { label: "paletteA", width: aSwatch.width, height: aSwatch.height, rgba: aSwatch.rgba },
+    { label: "paletteB", width: bSwatch.width, height: bSwatch.height, rgba: bSwatch.rgba },
+    { label: "roleMapB", width: w, height: h, rgba: roleMapRGBA(bQ, rolesOf(bQ), w, h) },
+  ];
+  return { width: w, height: h, rgba: out, layers, meta: { rung: "recolor" } };
+}
+
+// ---- socketGraft strategy (rung 2, money path) ---------------------------
+
+/* socketGraftFuse - graft A's head onto B's body at the best H1/H3 socket.
+ * Whole body wrapped in try/catch; falls back to recolor on ANY throw, when no
+ * socket/viable candidate is found, or when the best score is below `scoreFloor`.
+ * On success meta = { rung:'graft', score, socketKind }. Emits a debug layer per
+ * stage (maskA, maskB, edtB heat, skeletonB, sockets, the 2 candidates, chosen,
+ * final). MVP of Stage 5-12: clamped scale + translate, no TPS warp / re-shade. */
+function socketGraftFuse(a, b, params) {
+  const P = {
+    scaleLo: params?.scaleLo ?? 0.5,
+    scaleHi: params?.scaleHi ?? 1.8,
+    overlapPx: Math.round(params?.overlapPx ?? 1),
+    scoreFloor: params?.scoreFloor ?? 0.3,
+  };
+  const fallback = reason => {
+    const r = recolorFuse(a, b, { beta: DEFAULT_BETA });
+    r.meta = { ...r.meta, reason };
+    return r;
+  };
+
+  try {
+    const A = buildAnalysis(a);
+    const B = buildAnalysis(b);
+    const head = extractHead(a, A);
+    if (!head.count || head.count < 6) {
+      return fallback("no-head"); // degenerate / empty A
+    }
+
+    const bSockets = detectSockets({ width: b.width, height: b.height, mask: B.mask }, B);
+    if (!bSockets.length) {
+      return fallback("no-socket");
+    }
+
+    // best socket per kind (H1 pinch + H3 contact), highest conf
+    const pickKind = kind =>
+      bSockets.filter(s => s.kind === kind).sort((x, y) => y.conf - x.conf)[0];
+    const chosenSockets = [pickKind("pinch"), pickKind("contact")].filter(Boolean);
+
+    const bArea = countMask(B.mask);
+    const minHead = Math.max(6, 0.02 * bArea);
+    const rasters = []; // every composite (for layers)
+    const cands = []; // viable composites (for scoring)
+    for (const s of chosenSockets) {
+      const c = composeCandidate(a, head, b, s, P, s.kind);
+      c.mask = maskOf(c.rgba, b.width, b.height);
+      c.area = countMask(c.mask);
+      c.viable = c.headArea >= minHead;
+      c.score = c.viable ? scoreCandidate(c, bArea, b.width, b.height) : 0;
+      rasters.push(c);
+      if (c.viable) {
+        cands.push(c);
+      }
+    }
+    if (!cands.length) {
+      return fallback("no-viable-candidate");
+    }
+
+    cands.sort((x, y) => y.score - x.score);
+    const chosen = cands[0];
+    if (chosen.score < P.scoreFloor) {
+      return fallback("below-floor");
+    }
+
+    const finalRgba = finishCandidate(chosen, b.width, b.height);
+
+    const layers = [
+      { label: "maskA", width: a.width, height: a.height, rgba: maskLayerRGBA(A.mask, a.width, a.height) },
+      { label: "maskB", width: b.width, height: b.height, rgba: maskLayerRGBA(B.mask, b.width, b.height) },
+      { label: "edtB", width: b.width, height: b.height, rgba: heatLayerRGBA(B.edt, b.width, b.height) },
+      { label: "skeletonB", width: b.width, height: b.height, rgba: skeletonLayerRGBA(b, B.skeleton) },
+      { label: "sockets", width: b.width, height: b.height, rgba: socketLayerRGBA(b, bSockets) },
+    ];
+    for (const c of rasters) {
+      layers.push({
+        label: `candidate:${c.kind}${c.viable ? "" : " (rejected)"} s=${c.score.toFixed(2)}`,
+        width: b.width,
+        height: b.height,
+        rgba: Uint8ClampedArray.from(c.rgba),
+      });
+    }
+    layers.push({
+      label: "chosen (pre-finish)",
+      width: b.width,
+      height: b.height,
+      rgba: Uint8ClampedArray.from(chosen.rgba),
+    });
+    layers.push({ label: "final", width: b.width, height: b.height, rgba: Uint8ClampedArray.from(finalRgba) });
+
+    return {
+      width: b.width,
+      height: b.height,
+      rgba: finalRgba,
+      layers,
+      meta: { rung: "graft", score: chosen.score, socketKind: chosen.kind },
+    };
+  } catch (err) {
+    return fallback(`exception:${err && err.message ? err.message : err}`);
+  }
+}
+
+// ---- registry ------------------------------------------------------------
+
+STRATEGIES.push(
+  {
+    id: "recolor",
+    label: "Recolor (OKLab role)",
+    params: [{ key: "beta", label: "Blend", min: 0, max: 1, step: 0.02, default: 0.55 }],
+    fuse: recolorFuse,
+  },
+  {
+    id: "socketGraft",
+    label: "Socket Graft (H1+H3)",
+    params: [
+      { key: "scaleLo", label: "Scale min", min: 0.2, max: 1, step: 0.05, default: 0.5 },
+      { key: "scaleHi", label: "Scale max", min: 1, max: 3, step: 0.05, default: 1.8 },
+      { key: "overlapPx", label: "Overlap px", min: 0, max: 4, step: 1, default: 1 },
+      { key: "scoreFloor", label: "Score floor", min: 0, max: 1, step: 0.02, default: 0.3 },
+    ],
+    fuse: socketGraftFuse,
+  },
+);
