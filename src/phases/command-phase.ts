@@ -26,6 +26,7 @@ import {
 } from "#data/elite-redux/coop/coop-runtime";
 import { coopOwnerOfFieldIndex } from "#data/elite-redux/coop/coop-session";
 import type { SerializedCommand } from "#data/elite-redux/coop/coop-transport";
+import { reloadCurrentWave } from "#data/elite-redux/er-reset-wave";
 import { AbilityId } from "#enums/ability-id";
 import { ArenaTagSide } from "#enums/arena-tag-side";
 import { ArenaTagType } from "#enums/arena-tag-type";
@@ -975,6 +976,15 @@ export class CommandPhase extends FieldPhase {
     }
 
     return success;
+  }
+
+  /**
+   * ER dev-tools: reload the current wave from its save snapshot (the same path the
+   * lose-retry uses), then end this phase so the manager advances into the rebuilt
+   * encounter. Triggered by the dev-gated RESET command in {@linkcode CommandUiHandler}.
+   */
+  public resetWave(): void {
+    reloadCurrentWave(() => this.end());
   }
 
   /**

@@ -3,6 +3,7 @@
   "ball": "Ball",
   "pokemon": "Pokémon",
   "run": "Run",
+  "reset": "Reset",
   "actionMessage": "What will\n{{pokemonName}} do?",
   "ballCancel": "Cancel",
   "info": "Info"

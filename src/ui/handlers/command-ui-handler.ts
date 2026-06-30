@@ -1,4 +1,5 @@
 import { MAX_TERAS_PER_ARENA } from "#app/constants";
+import { isDevToolsEnabled } from "#app/dev-tools/registry";
 import { globalScene } from "#app/global-scene";
 import { getTypeRgb } from "#data/type";
 import { Button } from "#enums/buttons";
@@ -31,6 +32,12 @@ export class CommandUiHandler extends UiHandler {
   protected fieldIndex = 0;
   protected cursor2 = 0;
 
+  /**
+   * ER dev-tools: show a 3rd-row "Reset" command that reloads the current wave (the
+   * lose-retry path). Gated to dev/staging - never appears in production.
+   */
+  private readonly resetEnabled = isDevToolsEnabled();
+
   constructor() {
     super(UiMode.COMMAND);
   }
@@ -44,7 +51,9 @@ export class CommandUiHandler extends UiHandler {
       i18next.t("commandUiHandler:run"),
     ];
 
-    this.commandsContainer = globalScene.add.container(217, -38.7);
+    // Dev-tools: lift the grid 16px so the taller command window (resized in show())
+    // has room for a 3rd-row "Reset" command beneath Pokemon/Run.
+    this.commandsContainer = globalScene.add.container(217, this.resetEnabled ? -54.7 : -38.7);
     this.commandsContainer.setName("commands");
     this.commandsContainer.setVisible(false);
     ui.add(this.commandsContainer);
@@ -70,6 +79,13 @@ export class CommandUiHandler extends UiHandler {
       );
       commandText.setName(commands[c]);
       this.commandsContainer.add(commandText);
+    }
+
+    // ER dev-tools: a 3rd-row "Reset" command (reload the current wave). Dev/staging only.
+    if (this.resetEnabled) {
+      const resetText = addTextObject(0, 32, i18next.t("commandUiHandler:reset"), TextStyle.WINDOW_BATTLE_COMMAND);
+      resetText.setName("reset-command");
+      this.commandsContainer.add(resetText);
     }
 
     // ER: "Info" hotkey hint — a key glyph + label above the command grid that
@@ -139,6 +155,11 @@ export class CommandUiHandler extends UiHandler {
     const messageHandler = this.getUi().getMessageHandler();
     messageHandler.bg.setVisible(true);
     messageHandler.commandWindow.setVisible(true);
+    // Dev-tools: extend the command window to fit the 3rd-row Reset command (origin is
+    // bottom-left, so the extra height grows upward). Idempotent; untouched in production.
+    if (this.resetEnabled) {
+      messageHandler.commandWindow.setSize(118, 64);
+    }
     messageHandler.movesWindowContainer.setVisible(false);
     messageHandler.message.setWordWrapWidth(this.canTera() ? 910 : 1110);
     messageHandler.showText(i18next.t("commandUiHandler:actionMessage", { pokemonName }), 0);
@@ -208,6 +229,17 @@ export class CommandUiHandler extends UiHandler {
             );
             success = true;
             break;
+          // ER dev-tools: reload the current wave (lose-retry path). Only reachable when
+          // the dev-gated Reset command is shown.
+          case Command.RESET: {
+            const phase = globalScene.phaseManager.getCurrentPhase();
+            const commandPhase = phase.is("CommandPhase")
+              ? phase
+              : (globalScene.phaseManager.getStandbyPhase() as CommandPhase);
+            commandPhase.resetWave();
+            success = true;
+            break;
+          }
         }
       } else {
         (globalScene.phaseManager.getCurrentPhase() as CommandPhase).cancel();
@@ -217,11 +249,15 @@ export class CommandUiHandler extends UiHandler {
         case Button.UP:
           if (cursor === Command.POKEMON || cursor === Command.RUN) {
             success = this.setCursor(cursor - 2);
+          } else if (cursor === Command.RESET) {
+            success = this.setCursor(Command.POKEMON);
           }
           break;
         case Button.DOWN:
           if (cursor === Command.FIGHT || cursor === Command.BALL) {
             success = this.setCursor(cursor + 2);
+          } else if (this.resetEnabled && (cursor === Command.POKEMON || cursor === Command.RUN)) {
+            success = this.setCursor(Command.RESET);
           }
           break;
         case Button.LEFT:
@@ -290,6 +326,10 @@ export class CommandUiHandler extends UiHandler {
 
     if (cursor === Command.TERA) {
       this.cursorObj.setVisible(false);
+    } else if (cursor === Command.RESET) {
+      // 3rd-row Reset (dev-only): column 0, one row below Pokemon/Run.
+      this.cursorObj.setPosition(-5, 40);
+      this.cursorObj.setVisible(true);
     } else {
       this.cursorObj.setPosition(-5 + (cursor % 2 === 1 ? 56 : 0), 8 + (cursor >= 2 ? 16 : 0));
       this.cursorObj.setVisible(true);

@@ -199,6 +199,16 @@ const localModules = import.meta.glob("./{local,test-suite}/**/index.ts");
 let loadStarted = false;
 
 /**
+ * Whether dev tools are enabled: a local dev server (`import.meta.env.DEV`, i.e.
+ * `npm run start:dev`) or a build with `VITE_DEV_TOOLS=1` (the staging bundle).
+ * False in production. The single source of truth for gating dev-only UI/affordances.
+ */
+export function isDevToolsEnabled(): boolean {
+  const env = import.meta.env as unknown as Record<string, unknown> | undefined;
+  return !!env?.DEV || env?.VITE_DEV_TOOLS === "1";
+}
+
+/**
  * Load local dev modules if dev tools are enabled. Safe to call repeatedly.
  * Gated by env so the tools never activate in a production build even if the
  * (gitignored) files happen to be present in the working tree.
@@ -209,9 +219,7 @@ export async function loadDevTools(): Promise<void> {
   }
   loadStarted = true;
 
-  const env = import.meta.env as unknown as Record<string, unknown> | undefined;
-  const enabled = !!env?.DEV || env?.VITE_DEV_TOOLS === "1";
-  if (!enabled) {
+  if (!isDevToolsEnabled()) {
     return;
   }
 

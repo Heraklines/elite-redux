@@ -523,6 +523,41 @@ export const DEV_SCENARIOS: DevScenario[] = [
   ...BG_CHECK_SCENARIOS,
   ...BG_BIOME_SCENARIOS,
   // ===========================================================================
+  // Dev tool — in-battle "Reset wave" command (dev/staging only)
+  // ===========================================================================
+  {
+    label: "Dev: Reset wave command (reload like a lose-retry)",
+    description:
+      "Dev/staging-only command: the in-battle command box (Fight/Ball/Pokemon/Run)\n"
+      + "now has a 3rd-row RESET that reloads the current wave, exactly like the retry\n"
+      + "you get after a loss.\n"
+      + "DO: in this wave-5 battle, deal some damage to the foe (and let it chip your\n"
+      + "lead) over a turn or two. Then open the command menu, press DOWN past\n"
+      + "Pokemon/Run to highlight RESET, and press the action button.\n"
+      + "EXPECT: the screen fades, the wave reloads from its start - the foe is back at\n"
+      + "FULL HP, your party HP/PP/status are restored to how they were when the wave\n"
+      + "began, and you get a fresh command menu. No softlock, no black screen. The\n"
+      + "RESET row must be reachable with Down/Up and the cursor lands on it cleanly.\n"
+      + "(In production this 3rd row does not exist; the box stays its normal size.)",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_WAVE_OVERRIDE: 5,
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.SNORLAX,
+        ENEMY_LEVEL_OVERRIDE: 30,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.BODY_SLAM],
+      });
+      return [
+        makeStarter(SpeciesId.GENGAR, {
+          moveset: [MoveId.SHADOW_BALL, MoveId.SLUDGE_BOMB, MoveId.THUNDERBOLT, MoveId.DAZZLING_GLEAM],
+        }),
+        makeStarter(SpeciesId.PIKACHU, {
+          moveset: [MoveId.THUNDERBOLT, MoveId.NUZZLE, MoveId.IRON_TAIL, MoveId.SURF],
+        }),
+      ];
+    },
+  },
+  // ===========================================================================
   // QoL — out-of-battle party reorder
   // ===========================================================================
   {
