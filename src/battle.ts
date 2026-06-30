@@ -1,5 +1,12 @@
 import type { GameMode } from "#app/game-mode";
 import { globalScene } from "#app/global-scene";
+import {
+  type BattleArrangement,
+  type BattleFormat,
+  createArrangement,
+  legacyFormat,
+  SINGLE_FORMAT,
+} from "#data/battle-format";
 import { erBalanceNum } from "#data/elite-redux/er-balance-tuning";
 import { erNotorietyOverLevel } from "#data/elite-redux/er-biome-notoriety";
 import { erBiomeRoutingActive } from "#data/elite-redux/er-biome-routing";
@@ -66,7 +73,13 @@ export class Battle {
   public enemyLevels: number[] | undefined;
   public enemyParty: EnemyPokemon[] = [];
   public seenEnemyPartyMemberIds: Set<number> = new Set<number>();
-  public double: boolean;
+  /**
+   * The battle FORMAT (sides x capacity + adjacency). Source of truth for "how many
+   * per side"; the legacy `double` boolean is a derived view. Defaults to single until
+   * the constructor/{@linkcode setFormat} runs. See {@linkcode "#data/battle-format"}.
+   */
+  private _format: BattleFormat = SINGLE_FORMAT;
+  private _arrangement: BattleArrangement = createArrangement(SINGLE_FORMAT);
   public started = false;
   public enemySwitchCounter = 0;
   public turn = 0;
@@ -110,20 +123,22 @@ export class Battle {
 
   constructor(
     gameMode: GameMode,
-    { waveIndex, battleType, trainer, mysteryEncounterType, double = false }: NewBattleResolvedProps,
+    { waveIndex, battleType, trainer, mysteryEncounterType, double = false, format }: NewBattleResolvedProps,
   ) {
     this.gameMode = gameMode;
     this.waveIndex = waveIndex;
     this.battleType = battleType;
     this.trainer = trainer ?? null;
     this.mysteryEncounterType = mysteryEncounterType;
-    this.double = double;
+    // Multi-format: the resolver may hand us an explicit format (e.g. triple); otherwise
+    // fall back to the legacy single/double derived from `double`. Binary is unchanged.
+    this.setFormat(format ?? legacyFormat(double));
 
     this.enemyLevels =
       battleType === BattleType.TRAINER
         ? trainer?.getPartyLevels(this.waveIndex)
         : // TODO: Remove array.fill.map
-          new Array(double ? 2 : 1).fill(null).map(() => this.getLevelForWave());
+          new Array(this._arrangement.enemyCapacity).fill(null).map(() => this.getLevelForWave());
     // ER HELL ONLY: rescale every enemy toward the player's highest party level,
     // eased in by wave (top-2 < w20, top-1 < w40, top after). No-op off Hell.
     this.enemyLevels = applyErHellEnemyLevelScaling(this.enemyLevels, this.waveIndex);
@@ -150,6 +165,37 @@ export class Battle {
 
   public get isClassicFinalBoss(): boolean {
     return this.gameMode.isClassic && this.gameMode.isWaveFinal(this.waveIndex);
+  }
+
+  /** The battle's multi-format descriptor (sides x capacity + adjacency). */
+  public get format(): BattleFormat {
+    return this._format;
+  }
+
+  /** The runtime arrangement: flat-index <-> {side,position} + adjacency/ally queries. */
+  public get arrangement(): BattleArrangement {
+    return this._arrangement;
+  }
+
+  /**
+   * Legacy view: whether the local player side fields exactly two mons. Kept so the many
+   * existing `double` reads stay correct for single/double. NOTE: a TRIPLE is NOT a `double`
+   * (capacity 3) - multi-mon checks that should also fire for triples must migrate to
+   * {@linkcode getBattlerCount} `> 1` instead of reading `double`.
+   */
+  public get double(): boolean {
+    return this._arrangement.playerCapacity === 2;
+  }
+
+  /** Set the battle format and rebuild the arrangement. The single mutation point for "how many per side". */
+  public setFormat(format: BattleFormat): void {
+    this._format = format;
+    this._arrangement = createArrangement(format);
+  }
+
+  /** Legacy helper: set single/double by boolean (rebuilds the arrangement). */
+  public setDouble(double: boolean): void {
+    this.setFormat(legacyFormat(double));
   }
 
   public getLevelForWave(): number {
@@ -190,7 +236,7 @@ export class Battle {
   }
 
   getBattlerCount(): number {
-    return this.double ? 2 : 1;
+    return this._arrangement.playerCapacity;
   }
 
   incrementTurn(): void {

@@ -453,7 +453,7 @@ export function mirrorHostBattleToGuest(hostScene: BattleScene, guestScene: Batt
     enemyParty.push(enemy);
   }
   guestScene.currentBattle.enemyParty = enemyParty;
-  guestScene.currentBattle.double = hostBattle.double;
+  guestScene.currentBattle.setFormat(hostBattle.format);
 
   // 4. Put both leads of each side ON the guest field (isActive() reads field membership via
   //    globalScene.field.getIndex). The Pokemon is itself a Phaser Container, so field.add works.

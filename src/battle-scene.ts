@@ -82,6 +82,7 @@ import type { PokemonSpecies, PokemonSpeciesFilter } from "#data/pokemon-species
 import { getTypeRgb } from "#data/type";
 import { BattleStyle } from "#enums/battle-style";
 import { BattleType } from "#enums/battle-type";
+import { BattlerIndex } from "#enums/battler-index";
 import { BattlerTagType } from "#enums/battler-tag-type";
 import { BiomeId } from "#enums/biome-id";
 import { Challenges } from "#enums/challenges";
@@ -965,7 +966,7 @@ export class BattleScene extends SceneBase {
   public getPlayerField(active = false): PlayerPokemon[] {
     const party = this.getPlayerParty();
     return party
-      .slice(0, Math.min(party.length, this.currentBattle?.double ? 2 : 1))
+      .slice(0, Math.min(party.length, this.currentBattle?.arrangement.playerCapacity ?? 1))
       .filter(p => !active || p.isActive());
   }
 
@@ -992,7 +993,7 @@ export class BattleScene extends SceneBase {
   public getEnemyField(active = false): EnemyPokemon[] {
     const party = this.getEnemyParty();
     return party
-      .slice(0, Math.min(party.length, this.currentBattle?.double ? 2 : 1))
+      .slice(0, Math.min(party.length, this.currentBattle?.arrangement.enemyCapacity ?? 1))
       .filter(p => !active || p.isActive());
   }
 
@@ -1008,11 +1009,16 @@ export class BattleScene extends SceneBase {
    * If speed order matters, use {@linkcode inSpeedOrder}.
    */
   public getField(activeOnly = false): Pokemon[] {
-    const ret: Pokemon[] = new Array(4).fill(null);
     const playerField = this.getPlayerField();
     const enemyField = this.getEnemyField();
+    // Multi-format: place players at 0.. and enemies at the format's enemy base index.
+    // Binary keeps the legacy layout (enemy base 2); triple shifts it to 3 (length 6).
+    const arrangement = this.currentBattle?.arrangement;
+    const enemyOffset = arrangement?.enemyOffset ?? BattlerIndex.ENEMY;
+    const length = arrangement ? enemyOffset + arrangement.enemyCapacity : 4;
+    const ret: Pokemon[] = new Array(length).fill(null);
     ret.splice(0, playerField.length, ...playerField);
-    ret.splice(2, enemyField.length, ...enemyField);
+    ret.splice(enemyOffset, enemyField.length, ...enemyField);
     return activeOnly ? ret.filter(p => p?.isActive()) : ret;
   }
 
@@ -4276,7 +4282,7 @@ export class BattleScene extends SceneBase {
       } else {
         this.triggerPokemonFormChange(pokemon, SpeciesFormChangeManualTrigger, false);
       }
-      this.currentBattle.double = true;
+      this.currentBattle.setDouble(true);
       const availablePartyMembers = this.getPlayerParty().filter(p => p.isAllowedInBattle());
       if (availablePartyMembers.length > 1) {
         this.phaseManager.pushNew("ToggleDoublePositionPhase", true);

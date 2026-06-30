@@ -8,6 +8,7 @@
 
 import type { Battle } from "#app/battle";
 import type { BattleScene } from "#app/battle-scene";
+import type { BattleFormat } from "#data/battle-format";
 import type { BattleType } from "#enums/battle-type";
 import type { MysteryEncounterType } from "#enums/mystery-encounter-type";
 import type { Trainer } from "#field/trainer";
@@ -50,6 +51,12 @@ interface NewBattleBaseProps {
    * and set it to `false`.
    */
   double?: boolean | undefined;
+  /**
+   * The resolved multi-format battle {@linkcode BattleFormat}. When absent, the battle
+   * falls back to the legacy single/double format derived from {@linkcode double}. Only
+   * the format resolver sets a non-legacy (e.g. triple) value, and only when gated on.
+   */
+  format?: BattleFormat | undefined;
 }
 
 /**

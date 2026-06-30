@@ -317,7 +317,7 @@ export class NewBattlePhase extends BattlePhase {
       // keep whatever vanilla set, just truncate to single-battle size.
       const baseLevel = battle.enemyLevels?.[0] ?? Math.max(5, waveIndex);
       battle.enemyLevels = [baseLevel];
-      battle.double = false;
+      battle.setDouble(false);
       console.info(
         `[llm-director] wild-to-trainer conversion wave=${waveIndex} chosenType=${chosenType} (LLM requested type=${requestedType ?? "none"})`,
       );
@@ -485,7 +485,7 @@ export class NewBattlePhase extends BattlePhase {
       }
     }
     battle.enemyLevels = finalLevels;
-    battle.double = battle.enemyParty.length > 1;
+    battle.setDouble(battle.enemyParty.length > 1);
     console.info(
       `[llm-director] wild-encounter-override applied wave=${waveIndex} count=${battle.enemyParty.length} levels=[${finalLevels.join(",")}] boss=${!!spec.isBoss}`,
     );

@@ -96,6 +96,8 @@ export interface BattleArrangement {
   readonly playerCapacity: number;
   /** Convenience: the first opposing (enemy-kind) side's capacity. */
   readonly enemyCapacity: number;
+  /** Convenience: the base flat-index of the first opposing (enemy-kind) side (== legacy `BattlerIndex.ENEMY`). */
+  readonly enemyOffset: number;
 }
 
 const ATTACKER_ID: BattlerId = { side: -1, position: -1 };
@@ -185,6 +187,9 @@ export function createArrangement(format: BattleFormat): BattleArrangement {
     },
     get enemyCapacity() {
       return firstEnemySide >= 0 ? sides[firstEnemySide].capacity : sides[localPlayerSide].capacity;
+    },
+    get enemyOffset() {
+      return firstEnemySide >= 0 ? sides[firstEnemySide].baseIndex : BattlerIndex.ENEMY;
     },
   };
 }

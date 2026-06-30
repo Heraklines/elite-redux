@@ -9179,7 +9179,10 @@ export class EnemyPokemon extends Pokemon {
     if (fieldIndex === -1) {
       return BattlerIndex.ATTACKER;
     }
-    return BattlerIndex.ENEMY + this.getFieldIndex();
+    // Multi-format: the enemy side's base flat-index (legacy == BattlerIndex.ENEMY == 2;
+    // triple shifts it to 3). Falls back to the legacy constant outside a battle.
+    const enemyOffset = globalScene.currentBattle?.arrangement.enemyOffset ?? BattlerIndex.ENEMY;
+    return enemyOffset + fieldIndex;
   }
 
   /**
