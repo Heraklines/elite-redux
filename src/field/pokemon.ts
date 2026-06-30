@@ -4487,8 +4487,22 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
     return this.isPlayer() ? i18next.t("arenaTag:opposingTeam") : i18next.t("arenaTag:yourTeam");
   }
 
+  /**
+   * Every other Pokemon on this one's side, in field-slot order. A single/double battle
+   * yields at most one; a triple center has two. Mirrors the legacy {@linkcode getAlly}
+   * semantics (the raw slot occupants, NOT active-filtered).
+   */
+  getAllies(): Pokemon[] {
+    const field = this.isPlayer() ? globalScene.getPlayerField() : globalScene.getEnemyField();
+    return field.filter(p => p != null && p !== this);
+  }
+
+  /**
+   * The "primary" ally (first by slot order), or `undefined` if alone. Kept for the many
+   * single-ally call sites; multi-ally logic (triples) should use {@linkcode getAllies}.
+   */
   getAlly(): Pokemon | undefined {
-    return (this.isPlayer() ? globalScene.getPlayerField() : globalScene.getEnemyField())[this.getFieldIndex() ? 0 : 1];
+    return this.getAllies()[0];
   }
 
   /**
