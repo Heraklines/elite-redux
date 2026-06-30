@@ -25,11 +25,16 @@ import { addTextObject } from "#ui/text";
 import i18next from "i18next";
 
 /**
- * The left-nav entries. "All" + every {@linkcode AchvCategory} filter the achievement
- * grid; "Vouchers" swaps the grid to the voucher list (the old ACTION-toggled page,
- * now folded into the same rail so there is one consistent left nav like the mockup).
+ * The left-nav entries. "All" lists every achievement (by category); "Recent" lists the
+ * UNLOCKED ones newest-first (so players can triage what they just earned + its rewards);
+ * each {@linkcode AchvCategory} filters the grid; "Vouchers" swaps the grid to the voucher
+ * list (the old ACTION-toggled page, folded into the same rail like the mockup).
  */
-type NavEntry = { kind: "all" } | { kind: "category"; category: AchvCategory } | { kind: "vouchers" };
+type NavEntry =
+  | { kind: "all" }
+  | { kind: "recent" }
+  | { kind: "category"; category: AchvCategory }
+  | { kind: "vouchers" };
 
 interface LanguageSetting {
   TextSize: string;
@@ -217,10 +222,11 @@ export class AchvsUiHandler extends MessageUiHandler {
     this.mainContainer.setVisible(false);
   }
 
-  /** Build the nav rail: All, every category in display order, then Vouchers. */
+  /** Build the nav rail: All, Recent, every category in display order, then Vouchers. */
   private buildNavEntries(): void {
     this.navEntries = [
       { kind: "all" },
+      { kind: "recent" },
       ...ACHV_CATEGORY_ORDER.map((category): NavEntry => ({ kind: "category", category })),
       { kind: "vouchers" },
     ];
@@ -275,6 +281,13 @@ export class AchvsUiHandler extends MessageUiHandler {
     if (entry.kind === "category") {
       return this.achvsByCategory.get(entry.category) ?? [];
     }
+    if (entry.kind === "recent") {
+      // Unlocked achievements only, most-recently-earned first (by unlock timestamp).
+      const unlocks = globalScene.gameData.achvUnlocks;
+      return this.orderedAchvs
+        .filter(achv => Object.hasOwn(unlocks, achv.id))
+        .sort((a, b) => unlocks[b.id] - unlocks[a.id]);
+    }
     return this.orderedAchvs;
   }
 
@@ -293,13 +306,16 @@ export class AchvsUiHandler extends MessageUiHandler {
   }
 
   private navEntryLabel(entry: NavEntry): string {
-    if (entry.kind === "vouchers") {
-      return i18next.t("voucher:vouchers");
+    switch (entry.kind) {
+      case "vouchers":
+        return i18next.t("voucher:vouchers");
+      case "all":
+        return i18next.t("achv:category.all");
+      case "recent":
+        return i18next.t("achv:category.recent");
+      case "category":
+        return i18next.t(`achv:category.${ACHV_CATEGORY_KEY[entry.category]}`);
     }
-    if (entry.kind === "all") {
-      return i18next.t("achv:category.all");
-    }
-    return i18next.t(`achv:category.${ACHV_CATEGORY_KEY[entry.category]}`);
   }
   // #endregion Data
 

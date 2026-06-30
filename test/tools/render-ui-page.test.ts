@@ -293,6 +293,23 @@ function greaterRandomizerPickerArgs(): any[] {
   ];
 }
 
+/**
+ * Seed a deterministic ~1/3 of the achievement registry as unlocked (every 3rd entry, the
+ * first one - CLASSIC_VICTORY - kept LOCKED). With `distinct`, each gets a unique incrementing
+ * timestamp so the "Recent" view's newest-first ordering is reproducible; otherwise a single
+ * fixed timestamp. All timestamps stay within one UTC day so the rendered unlock date is
+ * stable. Returns [] (the achievements handler ignores show() args).
+ */
+function seedAchvUnlocks(game: GameManager, distinct = false): any[] {
+  const base = 1_700_000_000_000;
+  Object.keys(achvs).forEach((id, i) => {
+    if (i % 3 === 1) {
+      game.scene.gameData.achvUnlocks[id] = distinct ? base + i * 1000 : base;
+    }
+  });
+  return [];
+}
+
 const RECIPES: Record<string, Recipe> = {
   bargain: {
     mode: UiMode.ER_BARGAIN,
@@ -429,7 +446,7 @@ const RECIPES: Record<string, Recipe> = {
       return [{}];
     },
   },
-  // The overhauled achievement screen: left category nav (All + the 6 categories +
+  // The overhauled achievement screen: left rail (All + Recent + the 6 categories +
   // Vouchers, with per-category counts), a header with overall completion % + earned/total
   // achievement points, the category-filtered icon grid, and a detail panel showing the
   // selected achievement's tier, points, reward summary and description. A deterministic ~1/3
@@ -437,34 +454,28 @@ const RECIPES: Record<string, Recipe> = {
   // cursor-0 detail shows no locale-dependent unlock date -> exact golden diff).
   achievements: {
     mode: UiMode.ACHIEVEMENTS,
-    prepare: game => {
-      const unlockTs = 1_700_000_000_000;
-      Object.keys(achvs).forEach((id, i) => {
-        if (i % 3 === 1) {
-          game.scene.gameData.achvUnlocks[id] = unlockTs;
-        }
-      });
-      return [];
-    },
+    prepare: game => seedAchvUnlocks(game),
     diffTolerance: 0,
   },
-  // Directional-nav tour of the achievement screen: DOWN twice walks the category rail
-  // (All -> Victory -> Battle) re-filtering the grid + header each step, then RIGHT drops
-  // focus into the grid (cursor highlight appears) and RIGHT steps across the icons. Proves
-  // the no-mouse nav + the live re-filter + that no press crashes.
+  // Directional-nav tour: DOWN x3 walks the rail (All -> Recent -> Victory -> Battle)
+  // re-filtering the grid + header each step, then RIGHT drops focus into the grid (cursor
+  // highlight appears) and RIGHT steps across the icons. Proves the no-mouse nav + live
+  // re-filter + that no press crashes.
   "achievements-nav": {
     mode: UiMode.ACHIEVEMENTS,
-    prepare: game => {
-      const unlockTs = 1_700_000_000_000;
-      Object.keys(achvs).forEach((id, i) => {
-        if (i % 3 === 1) {
-          game.scene.gameData.achvUnlocks[id] = unlockTs;
-        }
-      });
-      return [];
-    },
-    steps: [Button.DOWN, Button.DOWN, Button.RIGHT, Button.RIGHT],
+    prepare: game => seedAchvUnlocks(game),
+    steps: [Button.DOWN, Button.DOWN, Button.DOWN, Button.RIGHT, Button.RIGHT],
     diffTolerance: 0,
+  },
+  // The "Recent" view (triage what you just earned): DOWN once selects the Recent rail entry,
+  // which lists UNLOCKED achievements newest-first by unlock timestamp; the detail shows the
+  // most-recent one + its reward. Distinct (incrementing) unlock timestamps make the order
+  // deterministic; the coarse tolerance absorbs the one locale-dependent unlock-date string.
+  "achievements-recent": {
+    mode: UiMode.ACHIEVEMENTS,
+    prepare: game => seedAchvUnlocks(game, true),
+    steps: [Button.DOWN],
+    diffTolerance: 3000,
   },
   pokedex: {
     mode: UiMode.POKEDEX_PAGE,
