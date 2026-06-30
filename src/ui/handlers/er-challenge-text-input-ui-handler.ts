@@ -13,7 +13,7 @@
 // "Report a Bug" form the first pass shipped.
 // =============================================================================
 
-import { Button } from "#enums/buttons";
+import { globalScene } from "#app/global-scene";
 import type { InputFieldConfig } from "#ui/form-modal-ui-handler";
 import { FormModalUiHandler } from "#ui/form-modal-ui-handler";
 import type { ModalConfig } from "#ui/modal-ui-handler";
@@ -63,6 +63,10 @@ export class ErChallengeTextInputUiHandler extends FormModalUiHandler {
     if (!super.show(args)) {
       return false;
     }
+    // A modal does NOT auto-raise; the opener (CREATE) is registered earlier in the
+    // handler list and paints an opaque backdrop. Raise this modal above it so it
+    // appears OVER the create screen (not floating over the browser underneath).
+    globalScene.ui.bringToTop(this.modalContainer);
     const config = args[0] as ModalConfig;
     // The field label was built once in setup() with the default; retitle it now.
     this.formLabels[0]?.setText(this.fieldLabel);
@@ -74,14 +78,9 @@ export class ErChallengeTextInputUiHandler extends FormModalUiHandler {
     };
     return true;
   }
-
-  override processInput(button: Button): boolean {
-    // B cancels (when the input field is not capturing the key); SUBMIT confirms
-    // via the base. The on-screen Confirm/Cancel buttons (pointer) work regardless.
-    if (button === Button.CANCEL && this.cancelAction) {
-      this.cancelAction();
-      return true;
-    }
-    return super.processInput(button);
-  }
+  // NOTE: deliberately NO processInput override. The CANCEL button is bound to
+  // Backspace, which the player needs to DELETE characters in the text field - a
+  // CANCEL->exit handler here would throw them out of the modal on every Backspace
+  // (and repeated presses pop past the opener). The base FormModalUiHandler handles
+  // only SUBMIT; Cancel is the on-screen button (like every other form modal).
 }

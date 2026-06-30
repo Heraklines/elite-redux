@@ -461,9 +461,8 @@ export class CommunityChallengeCreateUiHandler extends UiHandler {
 
   /** Open the configurable text-input modal for a raw-string field (PATTERN 1: revert on callback). */
   private openTextEntry(field: "name" | "subtitle" | "description"): void {
-    // A modal does NOT bringToTop and CREATE paints an opaque backdrop, so hide CREATE
-    // while the input is up (restore on either button).
-    this.container.setVisible(false);
+    // The modal raises itself above this screen (see ErChallengeTextInputUiHandler.show),
+    // so CREATE stays visible underneath - the input appears OVER the FORGE screen.
     const titles: Record<typeof field, string> = {
       name: "Challenge Name",
       subtitle: "Subtitle",
@@ -475,12 +474,11 @@ export class CommunityChallengeCreateUiHandler extends UiHandler {
         buttonActions: [
           (value: string) =>
             globalScene.ui.revertMode().then(() => {
-              this.container.setVisible(true);
               this.draft[field] = value;
               this.errorMsg = null;
               this.rebuild();
             }),
-          () => globalScene.ui.revertMode().then(() => this.container.setVisible(true)),
+          () => globalScene.ui.revertMode(),
         ],
       },
       { title: titles[field], fieldLabel: titles[field], initial: this.draft[field] },
