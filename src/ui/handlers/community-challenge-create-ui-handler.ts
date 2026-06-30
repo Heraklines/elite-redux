@@ -9,26 +9,26 @@
 //
 // The authoring flow for a player-made challenge run. A vertical field list
 // (NAME / SUBTITLE / DESCRIPTION / DIFFICULTY / the inline RULES rows / ALLOWED
-// POKEMON / PUBLISH) plus an embedded species multi-select sub-view:
-//   - NAME / SUBTITLE / DESCRIPTION  -> reuse UiMode.BUG_REPORT_FORM raw-string
-//     text entry (PATTERN 1 direct overlay, revert on callback - the
-//     menu-ui-handler.ts:519 idiom). No new form UiMode / positional registration.
+// POKEMON / PUBLISH):
+//   - NAME / SUBTITLE / DESCRIPTION  -> the configurable text-input modal
+//     (UiMode.COMMUNITY_CHALLENGE_TEXT) with a per-field title (PATTERN 1 overlay,
+//     revert on callback).
 //   - DIFFICULTY                     -> LEFT/RIGHT cycles youngster|ace|elite|hell.
 //   - RULES                          -> inline `copyChallenge` rows (NOT the real
 //     gameMode.challenges); LEFT/RIGHT adjusts each row's value. Serialized to
 //     baseChallenges on publish.
-//   - ALLOWED POKEMON                -> ACTION drops into an embedded root-starter
-//     grid; toggle membership, B commits the whitelist (null = all species).
+//   - ALLOWED POKEMON                -> ACTION opens the REAL starter-select in
+//     "roster pick" mode (all its filters/search) to toggle the allowed set; the
+//     chosen root ids return via onRosterConfirm (null = all species).
 //   - PUBLISH                        -> CONFIRM -> validateChallengeConfig ->
 //     createCommunityChallenge (a server DRAFT) -> success/failure text.
 //
 // Opened over the browser via PATTERN 1 (setOverlayMode keeps the browser alive
 // underneath); CANCEL reverts straight back to it. Drive it headlessly via the
-// render-harness recipes `community-challenge-create[-rules|-species]`.
+// render-harness recipes `community-challenge-create[-rules]`.
 // =============================================================================
 
 import { globalScene } from "#app/global-scene";
-import { speciesStarterCosts } from "#balance/starters";
 import { allChallenges, type Challenge, copyChallenge } from "#data/challenge";
 import {
   COMMUNITY_CHALLENGE_SCHEMA_VERSION,
@@ -42,10 +42,8 @@ import type { Challenges } from "#enums/challenges";
 import { GameModes } from "#enums/game-modes";
 import { TextStyle } from "#enums/text-style";
 import { UiMode } from "#enums/ui-mode";
-import { addPokemonIcon } from "#ui/community-challenge-card";
 import { addTextObject } from "#ui/text";
 import { UiHandler } from "#ui/ui-handler";
-import { getPokemonSpecies } from "#utils/pokemon-utils";
 
 const SCREEN_W = 320;
 const SCREEN_H = 180;
@@ -78,17 +76,6 @@ const DIFFICULTY_TIERS: Record<ErDifficulty, 1 | 2 | 3 | 4 | 5> = {
   elite: 4,
   hell: 5,
 };
-
-/** Hard cap mirrored from the validator (CC_MAX_ALLOWED_SPECIES). */
-const MAX_ALLOWED_SPECIES = 300;
-
-// --- Species grid geometry ---
-const GRID_X = 8;
-const GRID_Y = 30;
-const GRID_COLS = 14;
-const GRID_ROWS = 7;
-const GRID_CELL = 16;
-const GRID_PAGE = GRID_COLS * GRID_ROWS;
 
 type RowKind = "name" | "subtitle" | "description" | "difficulty" | "rule" | "species" | "publish";
 
@@ -125,14 +112,6 @@ function defaultDraft(): CreateDraft {
   };
 }
 
-function safeSpeciesName(id: number): string {
-  try {
-    return getPokemonSpecies(id)?.name ?? `#${id}`;
-  } catch {
-    return `#${id}`;
-  }
-}
-
 export class CommunityChallengeCreateUiHandler extends UiHandler {
   private container!: Phaser.GameObjects.Container;
   private dynamic!: Phaser.GameObjects.Container;
@@ -140,15 +119,8 @@ export class CommunityChallengeCreateUiHandler extends UiHandler {
   private draft: CreateDraft = defaultDraft();
   /** Standalone copies of every offered challenge (NOT gameMode.challenges). */
   private rules: Challenge[] = [];
-  /** The working allowed-species whitelist while the grid sub-view is open. */
-  private selected = new Set<number>();
-  /** Root starter pool the grid tiles (computed on show). */
-  private roots: number[] = [];
-
-  private view: "form" | "species" = "form";
   private rowCursor = 0;
   private scrollTop = 0;
-  private speciesCursor = 0;
   private errorMsg: string | null = null;
 
   constructor() {
@@ -195,12 +167,8 @@ export class CommunityChallengeCreateUiHandler extends UiHandler {
     super.show(args);
     this.draft = defaultDraft();
     this.rules = allChallenges.map(c => copyChallenge(c));
-    this.selected = new Set<number>();
-    this.roots = Object.keys(speciesStarterCosts).map(Number);
-    this.view = "form";
     this.rowCursor = 0;
     this.scrollTop = 0;
-    this.speciesCursor = 0;
     this.errorMsg = null;
     if (args.length > 0 && this.isConfig(args[0])) {
       this.seedFromConfig(args[0] as CommunityChallengeConfig);
@@ -232,9 +200,6 @@ export class CommunityChallengeCreateUiHandler extends UiHandler {
       rule.value = tuple?.[1] ?? 0;
       rule.severity = tuple?.[2] ?? 0;
     }
-    if (this.draft.allowedSpecies) {
-      this.selected = new Set(this.draft.allowedSpecies);
-    }
   }
 
   clear(): void {
@@ -242,7 +207,6 @@ export class CommunityChallengeCreateUiHandler extends UiHandler {
     this.container.setVisible(false);
     this.dynamic.removeAll(true);
     this.rules = [];
-    this.selected.clear();
   }
 
   // ---- Field list model ---------------------------------------------------
@@ -259,11 +223,7 @@ export class CommunityChallengeCreateUiHandler extends UiHandler {
 
   private rebuild(): void {
     this.dynamic.removeAll(true);
-    if (this.view === "species") {
-      this.buildSpeciesView();
-    } else {
-      this.buildForm();
-    }
+    this.buildForm();
   }
 
   private buildForm(): void {
@@ -416,63 +376,9 @@ export class CommunityChallengeCreateUiHandler extends UiHandler {
     return s.length > max ? `${s.slice(0, max - 1)}…` : s;
   }
 
-  // ---- Species sub-view ---------------------------------------------------
-
-  private buildSpeciesView(): void {
-    const head = addTextObject(GRID_X, 23, "SELECT ALLOWED POKEMON", TextStyle.WINDOW, { fontSize: "30px" });
-    head.setOrigin(0, 0).setColor(GOLD);
-    this.dynamic.add(head);
-
-    const page = Math.floor(this.speciesCursor / GRID_PAGE);
-    const pageStart = page * GRID_PAGE;
-    for (let i = 0; i < GRID_PAGE && pageStart + i < this.roots.length; i++) {
-      const id = this.roots[pageStart + i];
-      const col = i % GRID_COLS;
-      const rowI = Math.floor(i / GRID_COLS);
-      const gx = GRID_X + col * GRID_CELL;
-      const gy = GRID_Y + rowI * GRID_CELL;
-      addPokemonIcon(this.dynamic, id, gx, gy, GRID_CELL - 2);
-      if (this.selected.has(id)) {
-        const sel = globalScene.add.rectangle(gx, gy, GRID_CELL - 1, GRID_CELL - 1, 0, 0).setOrigin(0);
-        sel.setStrokeStyle(1, 0xffd27a, 0.95);
-        this.dynamic.add(sel);
-      }
-    }
-
-    // Cursor highlight.
-    const ci = this.speciesCursor - pageStart;
-    const ccol = ci % GRID_COLS;
-    const crow = Math.floor(ci / GRID_COLS);
-    const cur = globalScene.add
-      .rectangle(GRID_X + ccol * GRID_CELL, GRID_Y + crow * GRID_CELL, GRID_CELL - 1, GRID_CELL - 1, ACTIVE_RED, 0.2)
-      .setOrigin(0);
-    cur.setStrokeStyle(1, ACTIVE_RED, 0.95);
-    this.dynamic.add(cur);
-
-    const focusedId = this.roots[this.speciesCursor];
-    const name = addTextObject(GRID_X, FOOT_Y - 8, focusedId ? safeSpeciesName(focusedId) : "", TextStyle.WINDOW, {
-      fontSize: "28px",
-    });
-    name.setOrigin(0, 0).setColor(INK);
-    this.dynamic.add(name);
-
-    const count = addTextObject(
-      GRID_X,
-      FOOT_Y,
-      `${this.selected.size} selected (max ${MAX_ALLOWED_SPECIES}).  A Toggle    B Done`,
-      TextStyle.WINDOW,
-      { fontSize: "26px" },
-    );
-    count.setOrigin(0, 0).setColor(DIM);
-    this.dynamic.add(count);
-  }
-
   // ---- Input --------------------------------------------------------------
 
   processInput(button: Button): boolean {
-    if (this.view === "species") {
-      return this.processSpeciesInput(button);
-    }
     return this.processFormInput(button);
   }
 
@@ -543,9 +449,7 @@ export class CommunityChallengeCreateUiHandler extends UiHandler {
         this.openTextEntry("description");
         break;
       case "species":
-        this.view = "species";
-        this.speciesCursor = 0;
-        this.rebuild();
+        this.openSpeciesPicker();
         break;
       case "publish":
         this.confirmPublish();
@@ -583,58 +487,26 @@ export class CommunityChallengeCreateUiHandler extends UiHandler {
     );
   }
 
-  // ---- Species sub-view input --------------------------------------------
-
-  private processSpeciesInput(button: Button): boolean {
-    const last = this.roots.length - 1;
-    switch (button) {
-      case Button.CANCEL:
-        globalScene.ui.playSelect();
-        this.draft.allowedSpecies = this.selected.size > 0 ? [...this.selected] : null;
-        this.view = "form";
-        this.rebuild();
-        return true;
-      case Button.LEFT:
-        this.speciesCursor = Math.max(0, this.speciesCursor - 1);
-        globalScene.ui.playSelect();
-        this.rebuild();
-        return true;
-      case Button.RIGHT:
-        this.speciesCursor = Math.min(last, this.speciesCursor + 1);
-        globalScene.ui.playSelect();
-        this.rebuild();
-        return true;
-      case Button.UP:
-        this.speciesCursor = Math.max(0, this.speciesCursor - GRID_COLS);
-        globalScene.ui.playSelect();
-        this.rebuild();
-        return true;
-      case Button.DOWN:
-        this.speciesCursor = Math.min(last, this.speciesCursor + GRID_COLS);
-        globalScene.ui.playSelect();
-        this.rebuild();
-        return true;
-      case Button.ACTION:
-      case Button.SUBMIT:
-        this.toggleFocusedSpecies();
-        return true;
-      default:
-        return false;
-    }
-  }
-
-  private toggleFocusedSpecies(): void {
-    const id = this.roots[this.speciesCursor];
-    if (id === undefined) {
-      return;
-    }
-    if (this.selected.has(id)) {
-      this.selected.delete(id);
-    } else if (this.selected.size < MAX_ALLOWED_SPECIES) {
-      this.selected.add(id);
-    }
-    globalScene.ui.playSelect();
-    this.rebuild();
+  /**
+   * Open the REAL starter-select as a roster picker (all its type/gen/cost/caught/name
+   * filters) to choose the allowed species. PATTERN 1 overlay so the CREATE draft stays
+   * alive underneath; hide CREATE's opaque backdrop while the full-screen picker is up.
+   * An empty selection = no whitelist (all eligible).
+   */
+  private openSpeciesPicker(): void {
+    this.container.setVisible(false);
+    globalScene.ui.setOverlayMode(UiMode.STARTER_SELECT, () => {}, {
+      rosterPickMode: true,
+      initialSelected: this.draft.allowedSpecies ?? [],
+      onRosterConfirm: (ids: number[]) => {
+        globalScene.ui.revertMode().then(() => {
+          this.container.setVisible(true);
+          this.draft.allowedSpecies = ids.length > 0 ? ids : null;
+          this.errorMsg = null;
+          this.rebuild();
+        });
+      },
+    });
   }
 
   // ---- Publish ------------------------------------------------------------

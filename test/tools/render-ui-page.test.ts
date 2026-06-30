@@ -396,14 +396,20 @@ const RECIPES: Record<string, Recipe> = {
     steps: [Button.DOWN, Button.DOWN, Button.DOWN, Button.DOWN, Button.RIGHT],
     diffTolerance: 0,
   },
-  // UP x2 wraps the cursor back to ALLOWED POKEMON (second-to-last row), then ACTION drops
-  // into the embedded root-starter grid sub-view (icons fall back to placeholder cells in
-  // the harness, since the pokemon_icons atlases aren't injected). Static -> exact diff.
-  "community-challenge-create-species": {
-    mode: UiMode.COMMUNITY_CHALLENGE_CREATE,
-    prepare: () => [null],
-    steps: [Button.UP, Button.UP, Button.ACTION],
-    diffTolerance: 0,
+  // The REAL starter-select driven in ER Community Challenge "roster pick" mode (args[1]):
+  // ACTION toggles the focused species into the allowed set (no party/cost/cap), and the
+  // unselected icons dim. RIGHT then ACTION toggles a second. Confirms the reused screen +
+  // its filters work as a multi-select roster picker (live detail sprite -> coarse tolerance).
+  "starter-select-roster": {
+    mode: UiMode.STARTER_SELECT,
+    prepare: game => {
+      for (let id = 1; id <= 151; id++) {
+        caughtSpecies(game, id as SpeciesId);
+      }
+      return [() => {}, { rosterPickMode: true, initialSelected: [], onRosterConfirm: () => {} }];
+    },
+    steps: [Button.ACTION, Button.RIGHT, Button.ACTION],
+    diffTolerance: 40000,
   },
   "biome-shop": {
     mode: UiMode.BIOME_SHOP,

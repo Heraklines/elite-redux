@@ -136,6 +136,20 @@ import type BBCodeText from "phaser3-rex-plugins/plugins/bbcodetext";
 
 export type StarterSelectCallback = (starters: Starter[]) => void;
 
+/**
+ * ER Community Challenge "roster pick" options, passed as `show()`'s SECOND arg. When
+ * `rosterPickMode` is set, the screen toggles a SET of eligible root species (using all
+ * its filters/search) instead of building a 6-slot party, and returns the chosen ids
+ * through `onRosterConfirm`. No normal team-select caller passes a second arg.
+ */
+export interface StarterRosterPickOptions {
+  rosterPickMode: true;
+  /** Root species ids to pre-check. */
+  initialSelected?: number[];
+  /** Called on confirm/done with the chosen root ids ([] = no whitelist / all allowed). */
+  onRosterConfirm: (rootIds: number[]) => void;
+}
+
 interface LanguageSetting {
   starterInfoTextSize: string;
   instructionTextSize: string;
@@ -581,6 +595,14 @@ export class StarterSelectUiHandler extends MessageUiHandler {
   private filterInstructionRowY = 0;
 
   private starterSelectCallback: StarterSelectCallback | null;
+
+  // ER Community Challenge "pick the allowed roster" mode: reuse this whole screen
+  // (grid + all filters + search) to TOGGLE a set of eligible root species instead
+  // of building a 6-slot party. Enabled via show()'s args[1]; never set on the
+  // normal team-select path (no other caller passes args[1]).
+  private rosterPickMode = false;
+  private rosterSelected = new Set<number>();
+  private rosterConfirm: ((rootIds: number[]) => void) | null = null;
 
   private starterPreferences: StarterPreferences;
   private originalStarterPreferences: StarterPreferences;
@@ -1538,6 +1560,12 @@ export class StarterSelectUiHandler extends MessageUiHandler {
       super.show(args);
       this.starterSelectCallback = args[0] as StarterSelectCallback;
 
+      // ER Community Challenge roster-pick mode (args[1]); unset for normal team-select.
+      const rosterOpts = args[1] as StarterRosterPickOptions | undefined;
+      this.rosterPickMode = !!rosterOpts?.rosterPickMode;
+      this.rosterSelected = new Set(rosterOpts?.initialSelected ?? []);
+      this.rosterConfirm = rosterOpts?.onRosterConfirm ?? null;
+
       this.starterSelectContainer.setVisible(true);
       // Co-op (#633): subscribe the partner-status banner to the live session.
       this.coopStatusUnsub?.();
@@ -1626,6 +1654,12 @@ export class StarterSelectUiHandler extends MessageUiHandler {
       this.filterBarCursor = 0;
       this.setCursor(0);
       this.tryUpdateValue(0);
+
+      // Roster-pick mode: hide the party point-budget label and paint the initial marks.
+      this.valueLimitLabel.setVisible(!this.rosterPickMode);
+      if (this.rosterPickMode) {
+        this.refreshRosterMarks();
+      }
 
       handleTutorial(Tutorial.STARTER_SELECT);
 
@@ -2071,6 +2105,11 @@ export class StarterSelectUiHandler extends MessageUiHandler {
       } else if (this.statsMode) {
         this.toggleStatsMode(false);
         success = true;
+      } else if (this.rosterPickMode) {
+        // Roster-pick: B = "Done" (commit the allowed set), mirroring the custom grid
+        // it replaces. The caller reverts this overlay back to the create designer.
+        this.rosterConfirm?.([...this.rosterSelected]);
+        success = true;
       } else if (this.starterSpecies.length > 0) {
         this.popStarter(this.starterSpecies.length - 1);
         success = true;
@@ -2424,6 +2463,19 @@ export class StarterSelectUiHandler extends MessageUiHandler {
       }
 
       if (button === Button.ACTION) {
+        if (this.rosterPickMode) {
+          // Roster-pick: TOGGLE this species in/out of the allowed set. Bypasses the
+          // whole party/cost/cap path (we never build a 6-slot team here).
+          const root = this.lastSpecies.getRootSpeciesId();
+          if (this.rosterSelected.has(root)) {
+            this.rosterSelected.delete(root);
+          } else {
+            this.rosterSelected.add(root);
+          }
+          this.refreshRosterMarks();
+          this.getUi().playSelect();
+          return true;
+        }
         if (!this.speciesStarterDexEntry?.caughtAttr) {
           error = true;
         } else if (this.starterSpecies.length <= 6) {
@@ -3923,6 +3975,11 @@ export class StarterSelectUiHandler extends MessageUiHandler {
   }
 
   getValueLimit(): number {
+    // Roster-pick mode has no point budget (you whitelist any number of species), so
+    // the affordability grey-out leaves cells gated ONLY by challenge legality.
+    if (this.rosterPickMode) {
+      return Number.POSITIVE_INFINITY;
+    }
     // Co-op (#633): each player picks their OWN team on their OWN screen with an
     // independent 5-point budget (two players ~= the solo 10-point pool), not the
     // shared solo limit. Flat for now; co-op challenge interplay lands in P6.
@@ -4555,7 +4612,26 @@ export class StarterSelectUiHandler extends MessageUiHandler {
         container.candyUpgradeOverlayIcon.setVisible(false);
       }
     });
+
+    // Roster-pick: re-apply the selection marks after a re-filter/scroll re-renders.
+    this.refreshRosterMarks();
   };
+
+  /**
+   * ER Community Challenge roster-pick: dim the icons NOT in the chosen allowed set so
+   * the selected species stand out (no-op outside roster mode; an empty set = "all
+   * allowed", shown undimmed). Survives re-filtering via the updateStarters() tail call.
+   */
+  private refreshRosterMarks(): void {
+    if (!this.rosterPickMode) {
+      return;
+    }
+    const anySelected = this.rosterSelected.size > 0;
+    for (const container of this.starterContainers) {
+      const selected = this.rosterSelected.has(container.species.speciesId);
+      container.icon.setAlpha(!anySelected || selected ? 1 : 0.4);
+    }
+  }
 
   setCursor(cursor: number): boolean {
     let changed = false;
@@ -6255,6 +6331,12 @@ export class StarterSelectUiHandler extends MessageUiHandler {
   }
 
   tryStart(manualTrigger = false): boolean {
+    // Roster-pick: SUBMIT/Start = "Done", return the chosen allowed set (empty = all).
+    // Sidesteps the empty-party guard + difficulty/start flow entirely.
+    if (this.rosterPickMode) {
+      this.rosterConfirm?.([...this.rosterSelected]);
+      return true;
+    }
     if (this.starterSpecies.length === 0) {
       return false;
     }
@@ -6600,6 +6682,13 @@ export class StarterSelectUiHandler extends MessageUiHandler {
     this.hideInstructions();
     this.activeTooltip = undefined;
     globalScene.ui.hideTooltip();
+
+    // Reset roster-pick state so a later normal team-select is not poisoned.
+    if (this.rosterPickMode) {
+      this.rosterPickMode = false;
+      this.rosterSelected.clear();
+      this.rosterConfirm = null;
+    }
 
     this.starterSelectContainer.setVisible(false);
     this.coopStatusUnsub?.();
