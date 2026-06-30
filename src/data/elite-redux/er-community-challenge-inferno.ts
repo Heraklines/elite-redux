@@ -146,10 +146,10 @@ export function buildInfernoEntry(): CommunityChallengeEntry {
     name: "Inferno",
     subtitle: "The Apex Trial",
     description:
-      "The hardest stacked challenge in Elite Redux. Conquer Hell difficulty using only the weakest, "
+      "The hardest stacked challenge in Pokerogue Redux. Conquer Hell difficulty using only the weakest, "
       + "lowest-usage Pokemon, in Double Battles, hunted by Ghost trainers at every turn. Survivors are "
       + "crowned with a one-of-a-kind Black Shiny.",
-    author: "Elite Redux",
+    author: "Heraklines",
     gameModeId: GameModes.CHALLENGE,
     difficulty: "hell",
     difficultyTier: 5,
