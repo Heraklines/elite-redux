@@ -31,6 +31,7 @@ import { getCoopController, startLocalCoopSession } from "#data/elite-redux/coop
 import { coopOwnedCount } from "#data/elite-redux/coop/coop-session";
 import { erRunUnlockAbilitySlot, erRunUnlockableInnateSlots } from "#data/elite-redux/er-ability-capsule";
 import type { ErCommunityItemKind } from "#data/elite-redux/er-community-items";
+import { setCommunityAllowedSpecies } from "#data/elite-redux/er-community-run-state";
 import { setErAiExperimentalMode, setErSmartAiTestForced } from "#data/elite-redux/er-enemy-ai";
 import { seedDevGhostGrave } from "#data/elite-redux/er-ghost-teams";
 import { addTreasureFragments, resetErMapNodes, revealMapNodes } from "#data/elite-redux/er-map-nodes";
@@ -555,6 +556,44 @@ export const DEV_SCENARIOS: DevScenario[] = [
           moveset: [MoveId.THUNDERBOLT, MoveId.NUZZLE, MoveId.IRON_TAIL, MoveId.SURF],
         }),
       ];
+    },
+  },
+  // ===========================================================================
+  // Community challenge — allowedSpecies gates mid-run catches (not just starters)
+  // ===========================================================================
+  {
+    label: "Community: off-list catch is blocked from the team",
+    description:
+      "Custom community challenges restrict the run to a whitelist of eligible Pokemon.\n"
+      + "That whitelist must gate not just starter-select but also mid-run CATCHES - an\n"
+      + "off-list mon should be caught (and dex-registered) but NOT added to your team,\n"
+      + "exactly like a usage-tier (NU/PU) run. This scenario arms a whitelist that does\n"
+      + "NOT include the wild Magikarp.\n"
+      + "DO: throw Poke Balls at the wild Magikarp until it is caught (chip it first if a\n"
+      + "ball fails; Magikarp catches easily).\n"
+      + "EXPECT: the message reads 'Magikarp was caught, but was not added to your party\n"
+      + "due to a challenge!' and Magikarp does NOT appear in your party (open Check Team\n"
+      + "to confirm). It still counts in the Pokedex. Catching an ON-list mon would be added\n"
+      + "normally. (Before the fix the off-list mon joined the team.)",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_WAVE_OVERRIDE: 1,
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.MAGIKARP,
+        ENEMY_LEVEL_OVERRIDE: 3,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+      });
+      return [
+        makeStarter(SpeciesId.PIKACHU, {
+          moveset: [MoveId.THUNDERBOLT, MoveId.NUZZLE, MoveId.IRON_TAIL, MoveId.QUICK_ATTACK],
+        }),
+      ];
+    },
+    onBattleStart: () => {
+      // Arm a community whitelist that does NOT include Magikarp (root 129). Off-list
+      // catches must be blocked from the party (caught + dex-registered only). Bulbasaur
+      // stands in for "an eligible species"; the point is simply that Magikarp is absent.
+      setCommunityAllowedSpecies([SpeciesId.BULBASAUR]);
     },
   },
   // ===========================================================================

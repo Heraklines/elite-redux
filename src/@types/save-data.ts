@@ -147,6 +147,11 @@ export interface SessionSaveData {
    * backwards compatibility (older / non-founder saves restore none).
    */
   founderChallenge?: { draftId: string; config: CommunityChallengeConfig };
+  /**
+   * ER Community Challenge: the run's allowed-species whitelist (root species ids), so the
+   * catch gate survives a mid-run save/reload. Optional + absent for non-community runs.
+   */
+  communityAllowedSpecies?: number[];
 }
 
 export interface Unlocks {

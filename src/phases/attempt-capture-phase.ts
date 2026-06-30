@@ -6,6 +6,7 @@ import { SubstituteTag } from "#data/battler-tags";
 import { broadcastCoopWaveResolved } from "#data/elite-redux/coop/coop-runtime";
 import { coopAttributeNewMon } from "#data/elite-redux/coop/coop-session";
 import { erRecordAchievementCatch } from "#data/elite-redux/er-achievement-tracker";
+import { communitySpeciesAllowed } from "#data/elite-redux/er-community-run-state";
 import { erCollectorsAlbumRecordCatch } from "#data/elite-redux/er-relics";
 import { Gender } from "#data/gender";
 import {
@@ -285,6 +286,14 @@ export class AttemptCapturePhase extends PokemonPhase {
     // under starter-only challenges like Fresh Start (which only restricts which mons you
     // START with, not what you can catch mid-run), the reported "Full Reset can't catch" bug.
     applyChallenges(ChallengeType.POKEMON_ADD_TO_PARTY, pokemon, addStatus);
+
+    // ER community challenge: an allowedSpecies whitelist gates mid-run catches the same way
+    // it gates the starter grid - an off-list mon is caught (dex-registered) but NOT added to
+    // the team, mirroring the usage-tier roster gate. The whitelist is per-run state, not a
+    // Challenge object, so it isn't reached by applyChallenges(POKEMON_ADD_TO_PARTY) above.
+    if (addStatus.value && !communitySpeciesAllowed(pokemon.species.getRootSpeciesId(true))) {
+      addStatus.value = false;
+    }
 
     globalScene.ui.showText(
       i18next.t(addStatus.value ? "battle:pokemonCaught" : "battle:pokemonCaughtButChallenge", {

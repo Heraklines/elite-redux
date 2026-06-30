@@ -16,7 +16,12 @@ import { getSerializedDailyRunConfig, parseDailySeed } from "#data/daily-seed/da
 import { allMoves, allSpecies } from "#data/data-lists";
 import { Egg } from "#data/egg";
 import { clearCoopRuntime, startLocalCoopSession } from "#data/elite-redux/coop/coop-runtime";
-import { getFounderRunState, setFounderRunState } from "#data/elite-redux/er-community-run-state";
+import {
+  getCommunityAllowedSpecies,
+  getFounderRunState,
+  setCommunityAllowedSpecies,
+  setFounderRunState,
+} from "#data/elite-redux/er-community-run-state";
 import { migrateErRemovedFormUnlocks } from "#data/elite-redux/er-egg-pool-bans";
 import { erMegaTargetToBaseSpeciesId } from "#data/elite-redux/er-generic-pool-bans";
 import { type GhostTrainerProfile, sanitizeGhostProfile } from "#data/elite-redux/er-ghost-profile";
@@ -1353,6 +1358,9 @@ export class GameData {
       // ER Community Challenge: if this run is a founder's qualifying play of a draft,
       // persist {draftId, config} so a mid-run reload still auto-publishes on the win.
       founderChallenge: getFounderRunState() ?? undefined,
+      // ER Community Challenge: persist the allowed-species whitelist so the catch gate
+      // survives a mid-run reload (it gates the whole run, not just starter-select).
+      communityAllowedSpecies: getCommunityAllowedSpecies() ?? undefined,
     } as SessionSaveData;
   }
 
@@ -1477,6 +1485,9 @@ export class GameData {
     // ER Community Challenge: restore the founder qualifying-run linkage so a reload
     // still auto-publishes the draft on the eventual win (null for non-founder saves).
     setFounderRunState(fromSession.founderChallenge ?? null);
+    // ER Community Challenge: restore the allowed-species whitelist so the catch gate
+    // keeps working after a mid-run reload (null/absent for non-community saves).
+    setCommunityAllowedSpecies(fromSession.communityAllowedSpecies ?? null);
 
     globalScene.setSeed(fromSession.seed || globalScene.game.config.seed[0]);
     globalScene.resetSeed();

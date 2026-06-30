@@ -4,6 +4,7 @@ import { getPokemonNameWithAffix } from "#app/messages";
 import { speciesStarterCosts } from "#balance/starters";
 import { modifierTypes } from "#data/data-lists";
 import { coopAttributeNewMon } from "#data/elite-redux/coop/coop-session";
+import { communitySpeciesAllowed } from "#data/elite-redux/er-community-run-state";
 import { Gender } from "#data/gender";
 import {
   doPokeballBounceAnim,
@@ -674,6 +675,12 @@ export async function catchPokemon(
   return new Promise(resolve => {
     const addStatus = new BooleanHolder(true);
     applyChallenges(ChallengeType.POKEMON_ADD_TO_PARTY, pokemon, addStatus);
+    // ER community challenge: an allowedSpecies whitelist also gates ME catches (caught +
+    // dex-registered, but not added to the team), mirroring the wild-catch gate and the
+    // usage-tier roster gate. The whitelist is per-run state, not a Challenge object.
+    if (addStatus.value && !communitySpeciesAllowed(pokemon.species.getRootSpeciesId(true))) {
+      addStatus.value = false;
+    }
     const doPokemonCatchMenu = () => {
       const end = () => {
         // Ensure the pokemon is in the enemy party in all situations

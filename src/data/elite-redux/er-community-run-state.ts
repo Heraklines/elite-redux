@@ -62,6 +62,16 @@ export function communitySpeciesAllowed(rootSpeciesId: number): boolean {
   return allowedSpecies === null || allowedSpecies.has(rootSpeciesId);
 }
 
+/**
+ * The active whitelist as a plain array (for the SESSION save), or null when none.
+ * UNLIKE the forced difficulty (consumed once at starter-select), the whitelist gates
+ * catches for the WHOLE run, so it must be serialized + re-applied on a mid-run reload -
+ * otherwise the catch gate silently stops after a save/reload.
+ */
+export function getCommunityAllowedSpecies(): number[] | null {
+  return allowedSpecies === null ? null : [...allowedSpecies];
+}
+
 /** Tag the current run as the founder's qualifying run for a draft challenge (null = clear). */
 export function setFounderRunState(state: FounderRunState | null): void {
   founderChallenge = state;
