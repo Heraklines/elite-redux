@@ -51,9 +51,11 @@ export class CommandUiHandler extends UiHandler {
       i18next.t("commandUiHandler:run"),
     ];
 
-    // Dev-tools: lift the grid 16px so the taller command window (resized in show())
-    // has room for a 3rd-row "Reset" command beneath Pokemon/Run.
-    this.commandsContainer = globalScene.add.container(217, this.resetEnabled ? -54.7 : -38.7);
+    // Dev-tools: shift the grid LEFT (not up) so the wider command window (resized in
+    // show()) has room for a 3rd "Reset" column to the right of Ball/Run. The box grows
+    // sideways toward the message panel; its height (and the enemy nameplate above) is
+    // untouched. Production keeps the original x.
+    this.commandsContainer = globalScene.add.container(this.resetEnabled ? 153 : 217, -38.7);
     this.commandsContainer.setName("commands");
     this.commandsContainer.setVisible(false);
     ui.add(this.commandsContainer);
@@ -81,9 +83,10 @@ export class CommandUiHandler extends UiHandler {
       this.commandsContainer.add(commandText);
     }
 
-    // ER dev-tools: a 3rd-row "Reset" command (reload the current wave). Dev/staging only.
+    // ER dev-tools: a 3rd-column "Reset" command (reload the current wave), to the right
+    // of Ball/Run and vertically centered between the two rows. Dev/staging only.
     if (this.resetEnabled) {
-      const resetText = addTextObject(0, 32, i18next.t("commandUiHandler:reset"), TextStyle.WINDOW_BATTLE_COMMAND);
+      const resetText = addTextObject(111.6, 8, i18next.t("commandUiHandler:reset"), TextStyle.WINDOW_BATTLE_COMMAND);
       resetText.setName("reset-command");
       this.commandsContainer.add(resetText);
     }
@@ -155,10 +158,12 @@ export class CommandUiHandler extends UiHandler {
     const messageHandler = this.getUi().getMessageHandler();
     messageHandler.bg.setVisible(true);
     messageHandler.commandWindow.setVisible(true);
-    // Dev-tools: extend the command window to fit the 3rd-row Reset command (origin is
-    // bottom-left, so the extra height grows upward). Idempotent; untouched in production.
+    // Dev-tools: widen the command window to fit the 3rd Reset column. Origin is
+    // bottom-left and the right edge is at the screen edge, so we move it LEFT and grow
+    // the width - the box expands sideways, same height. Idempotent; untouched in production.
     if (this.resetEnabled) {
-      messageHandler.commandWindow.setSize(118, 64);
+      messageHandler.commandWindow.setSize(175, 48);
+      messageHandler.commandWindow.setPosition(145, 0);
     }
     messageHandler.movesWindowContainer.setVisible(false);
     messageHandler.message.setWordWrapWidth(this.canTera() ? 910 : 1110);
@@ -250,19 +255,23 @@ export class CommandUiHandler extends UiHandler {
           if (cursor === Command.POKEMON || cursor === Command.RUN) {
             success = this.setCursor(cursor - 2);
           } else if (cursor === Command.RESET) {
-            success = this.setCursor(Command.POKEMON);
+            // Reset sits in the 3rd column between the rows; Up biases to the top.
+            success = this.setCursor(Command.BALL);
           }
           break;
         case Button.DOWN:
           if (cursor === Command.FIGHT || cursor === Command.BALL) {
             success = this.setCursor(cursor + 2);
-          } else if (this.resetEnabled && (cursor === Command.POKEMON || cursor === Command.RUN)) {
-            success = this.setCursor(Command.RESET);
+          } else if (cursor === Command.RESET) {
+            success = this.setCursor(Command.RUN);
           }
           break;
         case Button.LEFT:
           if (cursor === Command.BALL || cursor === Command.RUN) {
             success = this.setCursor(cursor - 1);
+          } else if (cursor === Command.RESET) {
+            // Leave the dev-only 3rd column back into the 2x2 grid.
+            success = this.setCursor(Command.BALL);
           } else if ((cursor === Command.FIGHT || cursor === Command.POKEMON) && this.canTera()) {
             success = this.setCursor(Command.TERA);
             this.toggleTeraButton();
@@ -274,6 +283,9 @@ export class CommandUiHandler extends UiHandler {
           } else if (cursor === Command.TERA) {
             success = this.setCursor(Command.FIGHT);
             this.toggleTeraButton();
+          } else if (this.resetEnabled && (cursor === Command.BALL || cursor === Command.RUN)) {
+            // Step right from Ball/Run into the dev-only 3rd "Reset" column.
+            success = this.setCursor(Command.RESET);
           }
           break;
       }
@@ -327,8 +339,8 @@ export class CommandUiHandler extends UiHandler {
     if (cursor === Command.TERA) {
       this.cursorObj.setVisible(false);
     } else if (cursor === Command.RESET) {
-      // 3rd-row Reset (dev-only): column 0, one row below Pokemon/Run.
-      this.cursorObj.setPosition(-5, 40);
+      // 3rd-column Reset (dev-only): right of Ball/Run, vertically centered between rows.
+      this.cursorObj.setPosition(106.6, 16);
       this.cursorObj.setVisible(true);
     } else {
       this.cursorObj.setPosition(-5 + (cursor % 2 === 1 ? 56 : 0), 8 + (cursor >= 2 ? 16 : 0));
