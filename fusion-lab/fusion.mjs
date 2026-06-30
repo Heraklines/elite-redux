@@ -193,6 +193,8 @@ function labDist2(a, b) {
  */
 export function quantizeOklab(rgba, w, h, maxColors = 24) {
   const n = w * h;
+  // TODO(tune): 255 transparent-sentinel collides if maxColors > 254 (never
+  // happens for the <=24 default); widen the index buffer if that ceiling rises.
   const indexMap = new Uint8Array(n).fill(255);
 
   const pts = []; // opaque pixels: { p, lab }
@@ -325,10 +327,13 @@ export function quantizeOklab(rgba, w, h, maxColors = 24) {
   }
   const inkIndices = new Set();
   for (let k = 0; k < palette.length; k++) {
-    if (palette[k][0] < inkThresh && total[k] > 0 && inkPix[k] / total[k] > 0.5) {
+    // design: flag entries whose pixels are >70% ink (outline-role)
+    if (palette[k][0] < inkThresh && total[k] > 0 && inkPix[k] / total[k] > 0.7) {
       inkIndices.add(k);
     }
   }
+  // TODO(tune): also emit signatureAccentIndices (high-chroma, small-area,
+  // isolated hue families - flame tips, electric cheeks) for Stage 10/11.
 
   // ramp roles: group non-ink entries by hue family, sort by L into roles
   const hueDeg = c => (Math.atan2(c[2], c[1]) * 180) / Math.PI;
@@ -393,6 +398,9 @@ export function quantizeOklab(rgba, w, h, maxColors = 24) {
  */
 export function edt(mask, w, h) {
   const INF = 1e20;
+  // TODO(tune): a fully-opaque mask (no background seed anywhere) leaves the
+  // sentinel in place -> distances ~sqrt(1e20). Real sprites always have a
+  // transparent border so this degenerate case is not handled specially.
   // seed: foreground = INF (must reach a 0), background = 0
   const g = new Float64Array(w * h);
   for (let i = 0; i < w * h; i++) {
@@ -541,6 +549,7 @@ function zhangSuenThin(mask, w, h) {
  */
 export function skeletonize(mask, w, h, edtField) {
   const S = zhangSuenThin(mask, w, h);
+  const inS = (x, y) => (x < 0 || y < 0 || x >= w || y >= h ? 0 : S[y * w + x]);
   const N8 = [
     [-1, -1],
     [0, -1],
@@ -551,36 +560,80 @@ export function skeletonize(mask, w, h, edtField) {
     [0, 1],
     [1, 1],
   ];
-  const nbrsOf = p => {
+  // Graph adjacency: 8-connected, but a diagonal neighbour is dropped when it is
+  // "redundant" - reachable through a shared orthogonal skeleton pixel. This
+  // collapses the staircase triangles 8-connectivity manufactures at convex
+  // corners, so e.g. a 1px ring resolves to a clean cycle instead of a ring of
+  // false branch nodes + duplicate corner edges.
+  const adj = p => {
     const x = p % w;
     const y = (p - x) / w;
     const out = [];
     for (const [dx, dy] of N8) {
       const nx = x + dx;
       const ny = y + dy;
-      if (nx < 0 || ny < 0 || nx >= w || ny >= h) {
+      if (!inS(nx, ny)) {
         continue;
       }
-      const q = ny * w + nx;
-      if (S[q]) {
-        out.push(q);
+      if (dx !== 0 && dy !== 0 && (inS(x + dx, y) || inS(x, y + dy))) {
+        continue; // redundant diagonal across a corner
       }
+      out.push(ny * w + nx);
     }
     return out;
   };
 
-  // degree of each skeleton pixel; nodes are deg != 2
+  // degree (via corrected adjacency); nodes are deg != 2
   const isNode = new Uint8Array(w * h);
   const degOf = new Map();
+  const adjOf = new Map();
   const skelPixels = [];
   for (let p = 0; p < w * h; p++) {
     if (S[p]) {
-      const deg = nbrsOf(p).length;
-      degOf.set(p, deg);
+      const a = adj(p);
+      adjOf.set(p, a);
+      degOf.set(p, a.length);
       skelPixels.push(p);
-      if (deg !== 2) {
+      if (a.length !== 2) {
         isNode[p] = 1;
       }
+    }
+  }
+
+  // A pure cycle (a connected skeleton loop with no deg!=2 pixel) would emit no
+  // node and therefore no edge, losing the loop entirely. Seed one synthetic node
+  // (lowest-index pixel) per node-less component so the loop survives as a single
+  // self-edge.
+  const seen = new Uint8Array(w * h);
+  for (const start of skelPixels) {
+    if (seen[start]) {
+      continue;
+    }
+    const stack = [start];
+    seen[start] = 1;
+    const comp = [];
+    let hasNode = false;
+    while (stack.length) {
+      const p = stack.pop();
+      comp.push(p);
+      if (isNode[p]) {
+        hasNode = true;
+      }
+      for (const q of adjOf.get(p)) {
+        if (!seen[q]) {
+          seen[q] = 1;
+          stack.push(q);
+        }
+      }
+    }
+    if (!hasNode) {
+      let seed = comp[0];
+      for (const p of comp) {
+        if (p < seed) {
+          seed = p;
+        }
+      }
+      isNode[seed] = 1;
     }
   }
 
@@ -595,7 +648,7 @@ export function skeletonize(mask, w, h, edtField) {
     }
   }
 
-  // trace edges: walk deg-2 chains between nodes
+  // trace edges: walk deg-2 chains between nodes (corrected adjacency)
   const key = (a, b) => `${a}->${b}`;
   const walked = new Set();
   const rawEdges = [];
@@ -607,7 +660,7 @@ export function skeletonize(mask, w, h, edtField) {
     if (!isNode[u]) {
       continue;
     }
-    for (const w0 of nbrsOf(u)) {
+    for (const w0 of adjOf.get(u)) {
       if (walked.has(key(u, w0))) {
         continue;
       }
@@ -622,7 +675,7 @@ export function skeletonize(mask, w, h, edtField) {
         if (isNode[cur]) {
           break;
         }
-        const nexts = nbrsOf(cur).filter(q => q !== prev);
+        const nexts = adjOf.get(cur).filter(q => q !== prev);
         if (nexts.length === 0) {
           break;
         }
@@ -670,19 +723,24 @@ export function skeletonize(mask, w, h, edtField) {
   }
   const prunedRatio = rawEdges.length === 0 ? 0 : prunedCount / rawEdges.length;
 
-  // compact node array to those referenced by surviving edges (+ isolated nodes)
-  const used = new Set();
+  // recompute node degree from the SURVIVING edges (a self-loop counts twice) so
+  // emitted `deg` matches the pruned graph, then compact to referenced nodes
+  // (plus any genuinely isolated deg-0 nodes).
+  const degCount = new Array(allNodes.length).fill(0);
   for (const e of surviving) {
-    used.add(e.a);
-    used.add(e.b);
+    if (e.a === e.b) {
+      degCount[e.a] += 2;
+    } else {
+      degCount[e.a]++;
+      degCount[e.b]++;
+    }
   }
   const remap = new Map();
   const nodes = [];
   for (let i = 0; i < allNodes.length; i++) {
-    if (used.has(i) || allNodes[i].deg === 0) {
+    if (degCount[i] > 0 || allNodes[i].deg === 0) {
       remap.set(i, nodes.length);
-      const { x, y, deg } = allNodes[i];
-      nodes.push({ x, y, deg });
+      nodes.push({ x: allNodes[i].x, y: allNodes[i].y, deg: degCount[i] });
     }
   }
   const edges = surviving.map(e => ({
@@ -712,7 +770,8 @@ const clamp01 = x => (x < 0 ? 0 : x > 1 ? 1 : x);
  *   width = 2*rho_min, normal = edge tangent (unit), conf from flank/min ratio.
  * H3 (contact arc): head-disk center = argmax edt (within headRegion), radius
  *   R = edt there; socket at the disk boundary toward the body along the spine
- *   direction (head-disk center -> mass centroid). ALWAYS returned (conf >= 0.2).
+ *   direction (head-disk center -> mass centroid). Always returned whenever any
+ *   foreground exists (conf lower-bounded at 0.2).
  *
  * @param {{width:number,height:number,mask?:Uint8Array}} spriteData
  * @param {object} analysis
@@ -750,60 +809,77 @@ export function detectSockets(spriteData, analysis) {
     for (let i = 1; i < pts.length; i++) {
       s[i] = s[i - 1] + Math.hypot(pts[i].x - pts[i - 1].x, pts[i].y - pts[i - 1].y);
     }
-    // argmin rho; for a flat min-plateau take its middle index
-    let rhoMin = Infinity;
+    let rhoHeadDisk = 0;
     for (const p of pts) {
-      if (p.rho < rhoMin) {
-        rhoMin = p.rho;
+      if (p.rho > rhoHeadDisk) {
+        rhoHeadDisk = p.rho;
       }
     }
-    const minIdx = [];
+    // Evaluate the prominence test at EVERY local minimum and keep the most
+    // prominent one. Picking the index-median of all min-rho pixels (the prior
+    // approach) drifts off the neck for asymmetric shapes whenever a limb tip or
+    // a thin stretch elsewhere on the edge shares the neck's thickness; scoring
+    // each local min by its flank/min ratio is appendage-immune.
+    let best = null;
     for (let i = 0; i < pts.length; i++) {
-      if (pts[i].rho <= rhoMin + 1e-6) {
-        minIdx.push(i);
+      const r = pts[i].rho;
+      if (r <= 0) {
+        continue;
+      }
+      const lOk = i === 0 || pts[i - 1].rho >= r;
+      const rOk = i === pts.length - 1 || pts[i + 1].rho >= r;
+      if (!lOk || !rOk) {
+        continue; // not a (non-strict) local minimum
+      }
+      let flankL = 0;
+      let flankR = 0;
+      for (let j = 0; j < pts.length; j++) {
+        const ds = s[j] - s[i];
+        if (ds < 0 && ds >= -3) {
+          flankL = Math.max(flankL, pts[j].rho);
+        } else if (ds > 0 && ds <= 3) {
+          flankR = Math.max(flankR, pts[j].rho);
+        }
+      }
+      if (flankL >= 1.3 * r && flankR >= 1.3 * r) {
+        const score = Math.min(flankL, flankR) / r;
+        if (!best || score > best.score) {
+          best = { i, r, flankL, flankR, score };
+        }
       }
     }
-    const iMin = minIdx[(minIdx.length - 1) >> 1];
-
-    // flanks within +-3 arclength
-    let flankL = 0;
-    let flankR = 0;
-    for (let i = 0; i < pts.length; i++) {
-      const ds = s[i] - s[iMin];
-      if (ds < 0 && ds >= -3) {
-        flankL = Math.max(flankL, pts[i].rho);
-      } else if (ds > 0 && ds <= 3) {
-        flankR = Math.max(flankR, pts[i].rho);
-      }
-    }
-    const prominent =
-      rhoMin > 0 && flankL >= 1.3 * rhoMin && flankR >= 1.3 * rhoMin;
-    if (prominent) {
-      const a = pts[Math.max(0, iMin - 1)];
-      const b = pts[Math.min(pts.length - 1, iMin + 1)];
+    if (best) {
+      const i = best.i;
+      const a = pts[Math.max(0, i - 1)];
+      const b = pts[Math.min(pts.length - 1, i + 1)];
       let tx = b.x - a.x;
       let ty = b.y - a.y;
       const tl = Math.hypot(tx, ty) || 1;
       tx /= tl;
       ty /= tl;
-      let rhoHeadDisk = 0;
-      for (const p of pts) {
-        if (p.rho > rhoHeadDisk) {
-          rhoHeadDisk = p.rho;
-        }
+      // Orient the tangent toward the higher-rho (head-disk) end of the edge so
+      // the consumer gets a stable facing, not a trace-direction-dependent,
+      // 180-degree-ambiguous one. The raw tangent (a->b) points toward the edge
+      // END; flip it when the head disk is at the START.
+      if (pts[0].rho > pts[pts.length - 1].rho) {
+        tx = -tx;
+        ty = -ty;
       }
-      const conf = clamp01((Math.min(flankL, flankR) - rhoMin) / Math.max(rhoHeadDisk, 1e-6));
+      const conf = clamp01((Math.min(best.flankL, best.flankR) - best.r) / Math.max(rhoHeadDisk, 1e-6));
       sockets.push({
-        pos: { x: pts[iMin].x, y: pts[iMin].y },
+        pos: { x: pts[i].x, y: pts[i].y },
         normal: { x: tx, y: ty },
-        width: 2 * rhoMin,
+        width: 2 * best.r,
         conf,
         kind: "pinch",
       });
     }
   }
 
-  // ---- H3: head-disk contact arc (always defined) ----------------------
+  // ---- H3: head-disk contact arc (always defined when foreground exists) ----
+  // TODO(tune): without Stage-2 body-plan classification the head region defaults
+  // to the GLOBAL argmax EDT (largest inscribed disk); Unit 4 will pass
+  // analysis.headRegion so this targets the actual head rather than the torso.
   const region = analysis.headRegion ?? { x0: 0, y0: 0, x1: w - 1, y1: h - 1 };
   let hx = -1;
   let hy = -1;

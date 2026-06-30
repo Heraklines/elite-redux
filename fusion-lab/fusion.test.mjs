@@ -446,4 +446,102 @@ test("detectSockets: H3 contact arc is defined even with no detectable pinch", (
   const contact = sockets.find(s => s.kind === "contact");
   assert.ok(contact, "H3 contact socket always defined");
   assert.ok(contact.width > 0);
+  // prominence-rejection path: a solid blob has no pinch
+  assert.ok(
+    !sockets.find(s => s.kind === "pinch"),
+    "no H1 pinch on a neckless round blob",
+  );
+});
+
+test("detectSockets: no foreground -> returns [] without throwing", () => {
+  const w = 6;
+  const h = 6;
+  const rgba = new Uint8ClampedArray(w * h * 4); // fully transparent
+  const mask = maskOf(rgba, w, h);
+  const field = edt(mask, w, h);
+  const skeleton = skeletonize(mask, w, h, field);
+  const sockets = detectSockets(
+    { width: w, height: h, mask },
+    { w, h, mask, edt: field, skeleton },
+  );
+  assert.deepEqual(sockets, []);
+});
+
+// ---------------------------------------------------------------------------
+// EDT fractional answer (review: a broken envelope must not pass)
+// ---------------------------------------------------------------------------
+
+test("edt: a fractional nearest-bg offset (1,2) yields sqrt(5)", () => {
+  // 7x7 fully foreground except a single background hole at (3,5).
+  // (2,3) -> nearest bg (3,5) is offset (1,2) => distance sqrt(5) ~= 2.2360680.
+  const w = 7;
+  const h = 7;
+  const mask = new Uint8Array(w * h).fill(1);
+  mask[5 * w + 3] = 0; // the only background pixel
+  const field = edt(mask, w, h);
+  assert.equal(field[5 * w + 3], 0);
+  assert.ok(Math.abs(field[3 * w + 2] - Math.sqrt(5)) < 1e-4, `got ${field[3 * w + 2]}`);
+});
+
+// ---------------------------------------------------------------------------
+// skeletonize: pure cycle (loop topology) + branch trace + spur prune
+// ---------------------------------------------------------------------------
+
+test("skeletonize: a 1px ring (pure cycle) survives as one node + one self-edge", () => {
+  // 5x5 square annulus inside a 7x7 (no deg!=2 pixel -> needs a synthetic node)
+  const w = 7;
+  const h = 7;
+  const mask = new Uint8Array(w * h);
+  for (let x = 1; x <= 5; x++) {
+    mask[1 * w + x] = 1;
+    mask[5 * w + x] = 1;
+  }
+  for (let y = 1; y <= 5; y++) {
+    mask[y * w + 1] = 1;
+    mask[y * w + 5] = 1;
+  }
+  const field = edt(mask, w, h);
+  const { graph } = skeletonize(mask, w, h, field);
+  // NOT the 8-node/12-edge corner-artifact blowup
+  assert.equal(graph.nodes.length, 1);
+  assert.equal(graph.edges.length, 1);
+  const e = graph.edges[0];
+  assert.equal(e.a, e.b, "the loop is a self-edge");
+  assert.ok(e.points.length > 4, "the edge traces the whole ring");
+});
+
+test("skeletonize: clean Y keeps a deg-3 branch; a short stub is pruned", () => {
+  const w = 17;
+  const rect = (m, x0, y0, x1, y1) => {
+    for (let y = y0; y <= y1; y++) {
+      for (let x = x0; x <= x1; x++) {
+        m[y * w + x] = 1;
+      }
+    }
+  };
+
+  // (A) clean Y/T with a TALL stub -> a real deg-3 branch, nothing pruned
+  {
+    const h = 12;
+    const mask = new Uint8Array(w * h);
+    rect(mask, 2, 7, 14, 9); // bar
+    rect(mask, 7, 1, 9, 8); // tall stub (survives)
+    const { graph, prunedRatio } = skeletonize(mask, w, h, edt(mask, w, h));
+    assert.ok(graph.nodes.some(n => n.deg === 3), "a surviving deg-3 branch");
+    assert.equal(graph.edges.length, 3, "three arms traced");
+    assert.equal(graph.nodes.filter(n => n.deg === 1).length, 3, "three endpoints");
+    assert.equal(prunedRatio, 0);
+  }
+
+  // (B) same bar with a SHORT stub -> the spur is pruned (prunedRatio > 0)
+  {
+    const h = 9;
+    const mask = new Uint8Array(w * h);
+    rect(mask, 2, 4, 14, 6); // bar
+    rect(mask, 7, 1, 9, 5); // short stub (pruned)
+    const { graph, prunedRatio } = skeletonize(mask, w, h, edt(mask, w, h));
+    assert.ok(prunedRatio > 0, `prunedRatio=${prunedRatio}`);
+    assert.equal(graph.edges.length, 2, "the two bar arms survive");
+    assert.equal(graph.nodes.filter(n => n.deg === 1).length, 2, "two bar tips");
+  }
 });
