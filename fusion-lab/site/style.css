@@ -210,6 +210,230 @@ header h1 .ar {
   gap: 14px;
 }
 
+/* ---- params panel + live sliders (4.1) ---- */
+.params-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 14px;
+  flex-wrap: wrap;
+}
+.params-title {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  color: var(--dim);
+}
+.meta-status {
+  font-size: 12px;
+  color: var(--res);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.param-sliders {
+  display: grid;
+  gap: 14px;
+}
+.param-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  color: var(--dim);
+}
+.param-label {
+  width: 84px;
+  flex: none;
+  color: var(--ink);
+}
+.param-row input[type="range"] {
+  flex: 1;
+  accent-color: var(--res);
+}
+.param-val {
+  flex: none;
+  width: 46px;
+  text-align: right;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---- debug-layer grid (4.3) - override the base .debug grid with a flex wrap so
+   each tile can carry its own >=x3 zoom ---- */
+.debug {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  align-items: flex-start;
+}
+.dbg-tile {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 10px;
+}
+.dbg-frame {
+  background: radial-gradient(circle at 50% 44%, #1b2133, #0d1019 75%);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  padding: 6px;
+}
+.dbg-frame canvas {
+  image-rendering: pixelated;
+  display: block;
+}
+.dbg-tile figcaption {
+  font-size: 11.5px;
+  color: var(--dim);
+  max-width: 300px;
+  word-break: break-word;
+  font-family: ui-monospace, "Cascadia Code", monospace;
+}
+
+/* ---- A/B compare (4.4) ---- */
+.compare {
+  background: linear-gradient(180deg, var(--panel2), var(--panel));
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 18px;
+}
+.cmp-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 14px;
+  flex-wrap: wrap;
+}
+.cmp-title {
+  font-size: 14px;
+  font-weight: 600;
+}
+.cmp-lbl {
+  color: var(--dim);
+  font-size: 13px;
+}
+.cmp-sel {
+  background: var(--panel);
+  color: var(--ink);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 7px 10px;
+  font-size: 13.5px;
+  min-width: 180px;
+}
+.cmp-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+.cmp-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-items: center;
+}
+.cmp-frame {
+  width: 100%;
+  background: radial-gradient(circle at 50% 44%, #1b2133, #0d1019 75%);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  display: grid;
+  place-items: center;
+  aspect-ratio: 1 / 1;
+  overflow: hidden;
+}
+.cmp-frame canvas {
+  image-rendering: pixelated;
+  max-width: 100%;
+  height: auto;
+}
+.cmp-cell figcaption {
+  font-size: 12px;
+  color: var(--dim);
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---- batch contact-sheet (4.5) ---- */
+.batch {
+  margin-top: 24px;
+}
+.batch-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+.batch-title {
+  font-size: 15px;
+  font-weight: 600;
+}
+.batch-progress {
+  font-size: 13px;
+  color: var(--dim);
+}
+.batch-sheet {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(132px, 1fr));
+  gap: 14px;
+  max-height: 540px;
+  overflow-y: auto;
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--panel);
+}
+.batch-tile {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.batch-frame {
+  background: radial-gradient(circle at 50% 44%, #1b2133, #0d1019 75%);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  display: grid;
+  place-items: center;
+  aspect-ratio: 1 / 1;
+  overflow: hidden;
+}
+.batch-frame canvas {
+  image-rendering: pixelated;
+  max-width: 100%;
+  height: auto;
+}
+.batch-tile figcaption {
+  display: flex;
+  justify-content: space-between;
+  gap: 6px;
+  font-size: 11.5px;
+}
+.bt-name {
+  color: #cfd6e6;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.bt-rung {
+  color: var(--res);
+  flex: none;
+}
+#downloadBtn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+#downloadBtn:disabled:hover {
+  border-color: var(--line);
+}
+
 footer {
   margin-top: 44px;
   color: var(--dim);

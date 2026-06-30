@@ -1,9 +1,15 @@
-/* Fusion Lab - live A/B preview (Unit 2, Phase 1). Sprites stream from the er-assets
- * CDN (jsDelivr, pinned sha) exactly like the game and the Shiny Lab: fetch the
- * TexturePacker atlas JSON + PNG, draw the sheet to an offscreen canvas, and rebuild
- * frame 0 with the pure `reconstructFrame` (inlined from fusion.mjs in the built page).
- * Two searchable pickers (A = head donor, B = body donor) each drive a native-res canvas
- * upscaled with CSS image-rendering:pixelated. The fusion step lands in a later unit. */
+/* Fusion Lab - interactive UI (Unit 5, Phase 4). Wires the fusion STRATEGIES into a
+ * live page: pick a head donor (A) + body donor (B), pick a strategy, tweak its params
+ * with live sliders, and see the fused result + every pipeline debug layer. A/B-compare a
+ * second strategy and batch-test the current strategy across a stress list of body plans.
+ *
+ * Unit 2 (sprite streaming from the er-assets CDN, searchable A/B pickers) is preserved
+ * below and EXTENDED. The build (build-site.mjs) inlines fusion.mjs (export-stripped) ahead
+ * of this script, so STRATEGIES / quantizeOklab / reconstructFrame / ... are real globals -
+ * no imports. The strategies emit PLAIN rgba buffers; here we wrap them in `new ImageData(...)`
+ * and `putImageData` onto native-res canvases that CSS upscales crisply (image-rendering:
+ * pixelated). fuse() never throws (it falls back to recolor), but the draw path is guarded
+ * anyway so a bad frame can never crash the page. */
 
 const LAB = window.LAB;
 const CDN = LAB.cdn;
@@ -66,7 +72,21 @@ async function loadSpecies(dex) {
   return { dex, name: nameByDex.get(dex) || "No. " + dex, width, height, rgba };
 }
 
-// ---- A/B sides ---------------------------------------------------------------
+// loadSpeciesCached(dex) -> Promise<SpriteData>, memoised by dex (the cache stores the
+// in-flight promise so concurrent requests dedupe; a failed load is evicted so it can retry).
+const spriteCache = new Map();
+function loadSpeciesCached(dex) {
+  if (spriteCache.has(dex)) {
+    return spriteCache.get(dex);
+  }
+  const p = loadSpecies(dex).catch(err => {
+    spriteCache.delete(dex);
+    throw err;
+  });
+  spriteCache.set(dex, p);
+  return p;
+}
+
 // resolve a user-typed string (a species name, or anything containing a dex id) -> dex
 const resolveDex = str => {
   const v = (str || "").trim();
@@ -84,6 +104,48 @@ const resolveDex = str => {
   return null;
 };
 
+// ---- shared drawing helpers --------------------------------------------------
+
+// paint a strategy result (or any { width, height, rgba }) onto a native-res canvas;
+// CSS image-rendering:pixelated upscales it crisply. Guarded: a malformed/empty result
+// blanks the canvas instead of throwing (ImageData() throws on a length mismatch).
+function paintResult(canvas, result) {
+  if (!result || !result.rgba || result.rgba.length !== result.width * result.height * 4) {
+    canvas.width = 1;
+    canvas.height = 1;
+    return;
+  }
+  canvas.width = result.width;
+  canvas.height = result.height;
+  canvas
+    .getContext("2d")
+    .putImageData(new ImageData(new Uint8ClampedArray(result.rgba), result.width, result.height), 0, 0);
+}
+
+const fmtNum = v => (typeof v === "number" ? (Number.isInteger(v) ? v : v.toFixed(3)) : v);
+function fmtMeta(meta) {
+  if (!meta) {
+    return "-";
+  }
+  return Object.entries(meta)
+    .map(([k, v]) => `${k}: ${fmtNum(v)}`)
+    .join("  ·  ");
+}
+const slug = s =>
+  String(s || "A")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "") || "a";
+
+const defaultParams = strategy => {
+  const o = {};
+  for (const p of strategy.params || []) {
+    o[p.key] = p.default;
+  }
+  return o;
+};
+
+// ---- A/B sides ---------------------------------------------------------------
 const sides = {}; // "A" | "B" -> { dex, sprite, ctx, canvas, input, cap, baseCap }
 
 function drawSprite(side, sprite) {
@@ -99,16 +161,19 @@ const setStatus = (side, msg) => {
   }
 };
 
-async function selectSide(key, dex) {
+async function selectSide(key, dex, opts = {}) {
   const side = sides[key];
   setStatus(side, "loading #" + dex + " ...");
   try {
-    const sprite = await loadSpecies(dex);
+    const sprite = await loadSpeciesCached(dex);
     side.dex = dex;
     side.sprite = sprite;
     side.input.value = sprite.name;
     drawSprite(side, sprite);
     setStatus(side, sprite.name);
+    if (opts.fuse !== false) {
+      scheduleFuse();
+    }
   } catch {
     setStatus(side, "#" + dex + " not found");
   }
@@ -151,11 +216,418 @@ function setupSide(key) {
   document.getElementById("monRand" + key).onclick = () => selectSide(key, randomDex());
 }
 
+// randPair: two random DIFFERENT species into A + B, loaded together, then a single fuse.
+async function randomPair() {
+  const a = randomDex();
+  let b = randomDex();
+  let guard = 0;
+  while (b === a && SPECIES.length > 1 && guard++ < 24) {
+    b = randomDex();
+  }
+  await Promise.all([selectSide("A", a, { fuse: false }), selectSide("B", b, { fuse: false })]);
+  doFuse();
+}
+
+// ---- 4.1 strategy select + live params --------------------------------------
+let currentStrategy = null;
+const currentParams = {}; // identity is STABLE (mutated in place) so slider closures stay valid
+let lastResult = null;
+let fuseTimer = 0;
+
+const strategySel = document.getElementById("strategy");
+const paramsHost = document.getElementById("params");
+const resultCanvas = document.getElementById("canvasResult");
+let metaEl = null;
+let paramSlidersEl = null;
+
+function scheduleFuse() {
+  clearTimeout(fuseTimer);
+  fuseTimer = setTimeout(doFuse, 120); // debounce rapid slider drags (~120ms)
+}
+
+function setMeta(text) {
+  if (metaEl) {
+    metaEl.textContent = text;
+  }
+}
+
+// build one labeled range slider per strategy.params[] entry, each with a live readout.
+function buildParamSliders(strategy, paramsObj, host, onInput) {
+  host.innerHTML = "";
+  for (const pdef of strategy.params || []) {
+    const row = document.createElement("div");
+    row.className = "param-row";
+    const lab = document.createElement("label");
+    lab.className = "param-label";
+    lab.textContent = pdef.label;
+    const input = document.createElement("input");
+    input.type = "range";
+    input.min = pdef.min;
+    input.max = pdef.max;
+    input.step = pdef.step;
+    input.value = paramsObj[pdef.key];
+    const val = document.createElement("span");
+    val.className = "param-val";
+    val.textContent = fmtNum(+input.value);
+    input.addEventListener("input", () => {
+      const v = +input.value;
+      paramsObj[pdef.key] = v;
+      val.textContent = fmtNum(v);
+      onInput();
+    });
+    row.append(lab, input, val);
+    host.appendChild(row);
+  }
+}
+
+function setupStrategy() {
+  // scaffold the params panel: a head (title + meta readout) + the sliders host.
+  paramsHost.innerHTML =
+    '<div class="params-head"><span class="params-title">Parameters</span>' +
+    '<span id="metaStatus" class="meta-status">-</span></div>' +
+    '<div id="paramSliders" class="param-sliders"></div>';
+  metaEl = document.getElementById("metaStatus");
+  paramSlidersEl = document.getElementById("paramSliders");
+
+  STRATEGIES.forEach(s => strategySel.appendChild(new Option(s.label, s.id)));
+
+  const applyStrategy = id => {
+    currentStrategy = STRATEGIES.find(s => s.id === id) || STRATEGIES[0];
+    for (const k of Object.keys(currentParams)) {
+      delete currentParams[k];
+    }
+    Object.assign(currentParams, defaultParams(currentStrategy));
+    buildParamSliders(currentStrategy, currentParams, paramSlidersEl, scheduleFuse);
+    doFuse();
+  };
+  strategySel.addEventListener("change", e => applyStrategy(e.target.value));
+
+  // initial (no fuse yet - sprites load during boot, which fires the first fuse)
+  currentStrategy = STRATEGIES[0];
+  strategySel.value = currentStrategy.id;
+  Object.assign(currentParams, defaultParams(currentStrategy));
+  buildParamSliders(currentStrategy, currentParams, paramSlidersEl, scheduleFuse);
+}
+
+// ---- 4.2 render the fusion ---------------------------------------------------
+function doFuse() {
+  const A = sides.A && sides.A.sprite;
+  const B = sides.B && sides.B.sprite;
+  if (!A || !B || !currentStrategy) {
+    return;
+  }
+  let result;
+  try {
+    result = currentStrategy.fuse(A, B, currentParams);
+  } catch (err) {
+    lastResult = null;
+    setMeta("fuse error: " + (err && err.message ? err.message : err));
+    return;
+  }
+  lastResult = result;
+  try {
+    paintResult(resultCanvas, result); // A=head donor, B=body donor -> result
+    setMeta(fmtMeta(result.meta));
+    renderDebug(result.layers || []);
+    renderCompare();
+  } catch (err) {
+    setMeta("draw error: " + (err && err.message ? err.message : err));
+  }
+}
+
+// ---- 4.3 debug-layer grid ----------------------------------------------------
+const debugEl = document.getElementById("debug");
+
+function makeLayerTile(layer) {
+  const fig = document.createElement("figure");
+  fig.className = "dbg-tile";
+  const frame = document.createElement("div");
+  frame.className = "dbg-frame";
+  const cv = document.createElement("canvas");
+  cv.width = layer.width;
+  cv.height = layer.height;
+  if (layer.rgba && layer.rgba.length === layer.width * layer.height * 4) {
+    cv.getContext("2d").putImageData(
+      new ImageData(new Uint8ClampedArray(layer.rgba), layer.width, layer.height),
+      0,
+      0,
+    );
+  }
+  // zoom each tile crisply: >=x3 for sprite-sized layers, capped so wide swatches stay sane.
+  const zoom = 3;
+  const maxW = 300;
+  const dispW = Math.min(layer.width * zoom, maxW);
+  cv.style.width = dispW + "px";
+  cv.style.height = Math.max(1, Math.round((dispW * layer.height) / layer.width)) + "px";
+  frame.appendChild(cv);
+  const cap = document.createElement("figcaption");
+  cap.textContent = layer.label;
+  fig.append(frame, cap);
+  return fig;
+}
+
+function renderDebug(layers) {
+  debugEl.innerHTML = "";
+  for (const layer of layers) {
+    debugEl.appendChild(makeLayerTile(layer));
+  }
+}
+
+// ---- 4.4 A/B compare ---------------------------------------------------------
+const compareEl = document.getElementById("compare");
+let cmpSel = null;
+let cmpCvA = null;
+let cmpCvB = null;
+let cmpMetaA = null;
+let cmpMetaB = null;
+// the right panel only depends on (A, B, compare-strategy) - NOT on the live sliders -
+// so cache it across slider drags.
+let cmpRightCache = { key: null, res: null };
+
+function setupCompare() {
+  compareEl.innerHTML =
+    '<div class="cmp-head"><span class="cmp-title">A/B compare</span>' +
+    '<label class="cmp-lbl">vs</label><select id="cmpStrategy" class="cmp-sel"></select></div>' +
+    '<div class="cmp-grid">' +
+    '<figure class="cmp-cell"><div class="cmp-frame"><canvas id="cmpCvA"></canvas></div>' +
+    '<figcaption id="cmpMetaA"></figcaption></figure>' +
+    '<figure class="cmp-cell"><div class="cmp-frame"><canvas id="cmpCvB"></canvas></div>' +
+    '<figcaption id="cmpMetaB"></figcaption></figure>' +
+    "</div>";
+  cmpSel = document.getElementById("cmpStrategy");
+  cmpCvA = document.getElementById("cmpCvA");
+  cmpCvB = document.getElementById("cmpCvB");
+  cmpMetaA = document.getElementById("cmpMetaA");
+  cmpMetaB = document.getElementById("cmpMetaB");
+  STRATEGIES.forEach(s => cmpSel.appendChild(new Option(s.label, s.id)));
+  // default the compare side to the OTHER strategy (eyeball recolor-vs-graft out of the box)
+  cmpSel.value = (STRATEGIES[1] || STRATEGIES[0]).id;
+  cmpSel.addEventListener("change", () => {
+    cmpRightCache.key = null;
+    renderCompare();
+  });
+}
+
+function renderCompare() {
+  if (!cmpCvA) {
+    return;
+  }
+  const A = sides.A.sprite;
+  const B = sides.B.sprite;
+  if (!A || !B || !currentStrategy) {
+    return;
+  }
+  // left = the current main result (current strategy + live params)
+  paintResult(cmpCvA, lastResult);
+  cmpMetaA.textContent = `${currentStrategy.label}  ·  ${fmtMeta(lastResult && lastResult.meta)}`;
+
+  // right = the compare strategy at its defaults (cached by A/B/strategy)
+  const cmpStrat = STRATEGIES.find(s => s.id === cmpSel.value) || currentStrategy;
+  const key = `${A.dex}|${B.dex}|${cmpStrat.id}`;
+  let right = cmpRightCache.key === key ? cmpRightCache.res : null;
+  if (cmpRightCache.key !== key) {
+    try {
+      right = cmpStrat.fuse(A, B, defaultParams(cmpStrat));
+    } catch (err) {
+      right = null;
+      cmpMetaB.textContent = `${cmpStrat.label}  ·  error: ${err && err.message ? err.message : err}`;
+    }
+    cmpRightCache = { key, res: right };
+  }
+  if (right) {
+    paintResult(cmpCvB, right);
+    cmpMetaB.textContent = `${cmpStrat.label}  ·  ${fmtMeta(right.meta)}`;
+  }
+}
+
+// ---- 4.5 batch contact-sheet -------------------------------------------------
+// stress list: ~12 diverse body plans (Pikachu, Charizard, Gyarados, Snorlax, Onix,
+// Arcanine, Jigglypuff, Magneton, Scyther, Lapras, Gengar, Machamp).
+const STRESS = [25, 6, 130, 143, 95, 59, 39, 82, 123, 131, 94, 68];
+let batchBtn = null;
+let downloadBtn = null;
+let batchSheet = null;
+let batchProgress = null;
+let batchMaster = null; // last composed contact-sheet canvas (for Download PNG)
+let batchRunning = false;
+
+function setupBatch() {
+  const toolbar = document.querySelector(".toolbar");
+  batchBtn = document.createElement("button");
+  batchBtn.id = "batchBtn";
+  batchBtn.textContent = "Batch";
+  downloadBtn = document.createElement("button");
+  downloadBtn.id = "downloadBtn";
+  downloadBtn.textContent = "Download PNG";
+  downloadBtn.disabled = true;
+  toolbar.append(batchBtn, downloadBtn);
+
+  const section = document.createElement("section");
+  section.id = "batch";
+  section.className = "batch";
+  section.innerHTML =
+    '<div class="batch-head"><span class="batch-title">Batch contact sheet</span>' +
+    '<span id="batchProgress" class="batch-progress"></span></div>' +
+    '<div id="batchSheet" class="batch-sheet"></div>';
+  compareEl.insertAdjacentElement("afterend", section);
+  batchSheet = document.getElementById("batchSheet");
+  batchProgress = document.getElementById("batchProgress");
+
+  batchBtn.addEventListener("click", runBatch);
+  downloadBtn.addEventListener("click", downloadBatch);
+}
+
+function makeBatchTile(name, res, isError) {
+  const fig = document.createElement("figure");
+  fig.className = "batch-tile";
+  const frame = document.createElement("div");
+  frame.className = "batch-frame";
+  const cv = document.createElement("canvas");
+  if (res && res.rgba && res.rgba.length === res.width * res.height * 4) {
+    cv.width = res.width;
+    cv.height = res.height;
+    cv.getContext("2d").putImageData(new ImageData(new Uint8ClampedArray(res.rgba), res.width, res.height), 0, 0);
+  } else {
+    cv.width = 1;
+    cv.height = 1;
+  }
+  frame.appendChild(cv);
+  const cap = document.createElement("figcaption");
+  const rung = res && res.meta && res.meta.rung ? res.meta.rung : isError ? "load fail" : "-";
+  const nameEl = document.createElement("span");
+  nameEl.className = "bt-name";
+  nameEl.textContent = name;
+  const rungEl = document.createElement("span");
+  rungEl.className = "bt-rung";
+  rungEl.textContent = rung;
+  cap.append(nameEl, rungEl);
+  fig.append(frame, cap);
+  return fig;
+}
+
+// fix the current A as head donor, vary B across STRESS; render the current strategy across
+// all pairs into the scrollable sheet. Async + yields so sprite loads never block the UI.
+async function runBatch() {
+  if (batchRunning) {
+    return;
+  }
+  const A = sides.A.sprite;
+  if (!A || !currentStrategy) {
+    return;
+  }
+  batchRunning = true;
+  batchBtn.disabled = true;
+  downloadBtn.disabled = true;
+  batchSheet.innerHTML = "";
+  const list = STRESS.filter(d => nameByDex.has(d)); // only species the build actually has
+  const cells = [];
+  let i = 0;
+  for (const dex of list) {
+    i++;
+    batchProgress.textContent = `fusing ${i}/${list.length} ...`;
+    let B = null;
+    try {
+      B = await loadSpeciesCached(dex);
+    } catch {
+      B = null;
+    }
+    let res = null;
+    if (B) {
+      try {
+        res = currentStrategy.fuse(A, B, currentParams);
+      } catch (err) {
+        res = null;
+      }
+    }
+    const name = B ? B.name : nameByDex.get(dex) || "#" + dex;
+    batchSheet.appendChild(makeBatchTile(name, res, !B));
+    cells.push({ name, res });
+    await new Promise(r => setTimeout(r, 0)); // yield to the event loop between sprites
+  }
+  batchProgress.textContent = `done - ${cells.length} fusions`;
+  batchMaster = composeMaster(cells, A);
+  downloadBtn.disabled = cells.length === 0;
+  batchBtn.disabled = false;
+  batchRunning = false;
+}
+
+// compose every batch cell into ONE labeled canvas for Download PNG (imageSmoothing off so
+// the nearest-neighbour upscale stays crisp).
+function composeMaster(cells, A) {
+  const ZOOM = 2;
+  const pad = 8;
+  const labelH = 16;
+  const titleH = 22;
+  let mw = 1;
+  let mh = 1;
+  for (const c of cells) {
+    if (c.res) {
+      mw = Math.max(mw, c.res.width);
+      mh = Math.max(mh, c.res.height);
+    }
+  }
+  const cellW = mw * ZOOM + pad * 2;
+  const cellH = mh * ZOOM + pad + labelH;
+  const cols = Math.min(4, Math.max(1, cells.length));
+  const rows = Math.ceil(cells.length / cols);
+  const cv = document.createElement("canvas");
+  cv.width = cols * cellW;
+  cv.height = titleH + rows * cellH + pad;
+  const ctx = cv.getContext("2d");
+  ctx.imageSmoothingEnabled = false;
+  ctx.fillStyle = "#0b0d16";
+  ctx.fillRect(0, 0, cv.width, cv.height);
+  ctx.fillStyle = "#e8ecf6";
+  ctx.font = "13px Segoe UI, sans-serif";
+  ctx.fillText(`head: ${A.name}  -  ${currentStrategy.label}`, pad, 15);
+  cells.forEach((c, idx) => {
+    const cx = (idx % cols) * cellW;
+    const cy = titleH + Math.floor(idx / cols) * cellH;
+    if (c.res && c.res.rgba && c.res.rgba.length === c.res.width * c.res.height * 4) {
+      const tmp = document.createElement("canvas");
+      tmp.width = c.res.width;
+      tmp.height = c.res.height;
+      tmp
+        .getContext("2d")
+        .putImageData(new ImageData(new Uint8ClampedArray(c.res.rgba), c.res.width, c.res.height), 0, 0);
+      ctx.drawImage(tmp, cx + pad, cy + pad, c.res.width * ZOOM, c.res.height * ZOOM);
+    }
+    ctx.fillStyle = "#9aa3b8";
+    ctx.font = "11px Segoe UI, sans-serif";
+    const rung = c.res && c.res.meta && c.res.meta.rung ? c.res.meta.rung : "-";
+    ctx.fillText(`${c.name} [${rung}]`, cx + pad, cy + cellH - 4, cellW - pad * 2);
+  });
+  return cv;
+}
+
+function downloadBatch() {
+  if (!batchMaster) {
+    return;
+  }
+  batchMaster.toBlob(blob => {
+    if (!blob) {
+      return;
+    }
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `contact-${slug(sides.A.sprite ? sides.A.sprite.name : "A")}.png`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1500);
+  });
+}
+
 // ---- boot --------------------------------------------------------------------
 setupSide("A");
 setupSide("B");
+setupStrategy();
+setupCompare();
+setupBatch();
+document.getElementById("fuseBtn").addEventListener("click", doFuse);
+document.getElementById("randPair").addEventListener("click", randomPair);
 
 const defA = LAB.def;
 const defB = nameByDex.has(130) && defA !== 130 ? 130 : (SPECIES.find(s => s.i !== defA) || SPECIES[0]).i;
-selectSide("A", defA);
-selectSide("B", defB);
+Promise.all([selectSide("A", defA, { fuse: false }), selectSide("B", defB, { fuse: false })]).then(doFuse);
