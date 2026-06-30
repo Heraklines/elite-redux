@@ -1243,9 +1243,12 @@ export function getBiomeKey(biomeId: BiomeId): string {
  */
 export const BG_VARIANT_BIOMES: ReadonlySet<BiomeId> = new Set<BiomeId>([
   BiomeId.VOLCANO,
-  BiomeId.RUINS,
   BiomeId.WASTELAND,
   BiomeId.GRAVEYARD,
+  BiomeId.POWER_PLANT,
+  // Abyss getTimeOfDay() is hardcoded to NIGHT, so it always shows abyss_bg_night
+  // (the dark crystal-cavern slice), untinted.
+  BiomeId.ABYSS,
 ]);
 
 /** The time-of-day suffixes every variant biome provides (DAWN reuses "day"). */
