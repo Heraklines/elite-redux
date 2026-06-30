@@ -30,6 +30,13 @@ Scope for this effort: **wild AND trainer triples**, fully verified **headlessly
 - **Revert recipe:** `git revert` the triple commits (they are self-contained), or
   simply leave the flag off. Nothing else depends on these changes. Base = `ee43a6c65`.
 
+### Commit trail (newest last; `git revert` in reverse to undo)
+1. `2f374bb91` foundation: battle-format arrangement model + 13 unit tests (no wiring).
+2. `6fa6405bc` Battle.double backed by the format arrangement; field accessors +
+   getBattlerIndex route through it (binary byte-identical).
+3. `bd253960b` Pokemon.getAllies(); getAlly() = getAllies()[0] (binary byte-identical).
+   (further commits appended as phases land)
+
 ## Chosen data model (from the architecture consult)
 
 Keep the **flat integer `BattlerIndex` as the canonical wire/save/`turnCommands`/`targets`
