@@ -582,8 +582,6 @@ export class CommunityChallengeCreateUiHandler extends UiHandler {
     }
     this.errorMsg = null;
     const id = await createCommunityChallenge(config);
-    // setMode(MESSAGE) clears CREATE (opaque, topmost z) so the result text is visible.
-    globalScene.ui.setMode(UiMode.MESSAGE);
     if (id && this.onLaunch) {
       // Saved as a draft (invisible to others until cleared). The FOUNDER must now win
       // it: tag this as the qualifying run (persisted on the session save so a mid-run
@@ -592,28 +590,27 @@ export class CommunityChallengeCreateUiHandler extends UiHandler {
       const draftConfig = { ...config, id };
       setFounderRunState({ draftId: id, config: draftConfig });
       const launch = this.onLaunch;
+      // TEAR DOWN BOTH community overlays BEFORE the confirmation, not after. CREATE was
+      // opened OVER the browser, so both containers are visible and the browser is high-z.
+      // If we show the "Draft saved!" text with the browser still up, it renders BEHIND
+      // the featured page - invisible - so the player never sees a prompt to dismiss, the
+      // dismiss callback (which launches the run) never fires, and they sit on the featured
+      // page reading it as a softlock. (Both prior fixes failed for exactly this reason: the
+      // launch lived inside an unreachable callback.) setMode(MESSAGE) clears CREATE; the
+      // direct clear() hides the browser; resetModeChain drops the stack. Now the message
+      // shows on a clean screen and the launch is a plain card-play-style handoff.
+      globalScene.ui.setMode(UiMode.MESSAGE);
+      globalScene.ui.handlers[UiMode.COMMUNITY_CHALLENGES]?.clear();
+      globalScene.ui.resetModeChain();
+      console.log("[community-launch] publish teardown done; awaiting confirm", {
+        mode: UiMode[globalScene.ui.getMode()],
+        chain: globalScene.ui.getModeChain().map(m => UiMode[m]),
+      });
       globalScene.ui.showText(
         "Draft saved! Now clear it yourself to publish it.",
         null,
-        // Launch the founder's qualifying run from the SAME clean single-MESSAGE state
-        // card-play launches from. CREATE was opened OVER the browser, so the browser
-        // container is still visible underneath - the setMode(MESSAGE) above only cleared
-        // CREATE. Hide the browser container directly and drop the mode chain, THEN launch.
-        // We deliberately do NOT revertMode here: reverting MESSAGE->browser fades the
-        // camera, and that fade-in overlaps SelectStarterPhase's STARTER_SELECT fade-out,
-        // stranding the camera mid-transition with the browser ("featured") still on top
-        // while starter-select sits invisibly behind it (the post-publish softlock). With
-        // both community containers hidden and no fade pending, setModeAndEnd's no-op
-        // setMode(MESSAGE) is harmless and this.end() drops cleanly into starter-select.
         () => {
-          globalScene.ui.handlers[UiMode.COMMUNITY_CHALLENGES]?.clear();
-          globalScene.ui.resetModeChain();
-          // Breadcrumb (staging-only flow): if the post-publish launch ever softlocks
-          // again, this pins how far the teardown got before handing off to the run.
-          console.log("[community-launch] publish teardown done; launching run", {
-            mode: UiMode[globalScene.ui.getMode()],
-            chain: globalScene.ui.getModeChain().map(m => UiMode[m]),
-          });
+          console.log("[community-launch] confirm dismissed; launching run");
           launch(draftConfig);
         },
         null,
@@ -621,13 +618,11 @@ export class CommunityChallengeCreateUiHandler extends UiHandler {
       );
       return;
     }
-    // Failure (offline / guest / server reject): surface it, then back to the browser.
-    globalScene.ui.showText(
-      "Could not save - check your connection or sign-in.",
-      null,
-      () => void globalScene.ui.revertMode(),
-      null,
-      true,
-    );
+    // Failure (offline / guest / server reject): show it INLINE on the Create screen the
+    // player is still on. A MESSAGE prompt here would render behind the browser (same
+    // invisible-prompt trap as the success path), so keep them on CREATE and surface the
+    // error in the footer where they can read it and retry.
+    this.errorMsg = "Could not save - check your connection or sign-in.";
+    this.rebuild();
   }
 }
