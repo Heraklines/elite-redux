@@ -10,6 +10,11 @@ name: Deploy Production
 
 on:
   workflow_dispatch:
+    inputs:
+      er_assets_sha:
+        description: "Override er-assets jsDelivr pin (full 40-char SHA). Blank = use main HEAD. Use to pin a known-warm version during a jsDelivr/CDN incident."
+        required: false
+        type: string
 
 concurrency:
   group: deploy-prod
@@ -49,12 +54,18 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          SHA=$(gh api repos/Heraklines/er-assets/commits/main --jq .sha || true)
-          if echo "$SHA" | grep -Eq '^[0-9a-f]{40}$'; then
-            echo "ER_ASSETS_SHA=$SHA" >> "$GITHUB_ENV"
-            echo "er-assets pin for this deploy: $SHA"
+          OVERRIDE="${{ github.event.inputs.er_assets_sha }}"
+          if echo "$OVERRIDE" | grep -Eq '^[0-9a-f]{40}$'; then
+            echo "ER_ASSETS_SHA=$OVERRIDE" >> "$GITHUB_ENV"
+            echo "er-assets pin OVERRIDDEN (CDN incident) to: $OVERRIDE"
           else
-            echo "WARNING: could not resolve er-assets HEAD - keeping the committed pin."
+            SHA=$(gh api repos/Heraklines/er-assets/commits/main --jq .sha || true)
+            if echo "$SHA" | grep -Eq '^[0-9a-f]{40}$'; then
+              echo "ER_ASSETS_SHA=$SHA" >> "$GITHUB_ENV"
+              echo "er-assets pin for this deploy: $SHA"
+            else
+              echo "WARNING: could not resolve er-assets HEAD - keeping the committed pin."
+            fi
           fi
 
       - name: Build standalone bundle
