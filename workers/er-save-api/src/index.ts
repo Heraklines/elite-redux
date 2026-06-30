@@ -837,6 +837,8 @@ async function handleRunCreate(
     killedByGhost?: unknown;
     ghostSourceName?: unknown;
     ghostSourceRunId?: unknown;
+    /** ER Ghost Trainer Editor: the uploader's authored presentation blob (additive/optional). */
+    presentation?: unknown;
     /** ER ghost notifications: every ghost this run fought (additive/optional). */
     ghostsFought?: unknown;
   };
@@ -872,10 +874,17 @@ async function handleRunCreate(
   // requests or writes. Lazy one-time column migration below.
   const starters = Array.isArray(run.starters) ? run.starters.filter(v => typeof v === "number") : null;
   const challenges = Array.isArray(run.challenges) ? run.challenges : null;
+  // ER Ghost Trainer Editor: the uploader's authored presentation blob. Stored
+  // verbatim (opaque) but size-capped so a malicious client can't bloat the row;
+  // store only when it round-trips as valid JSON under the cap (never a truncated
+  // fragment), else null. The encountering client sanitises it before applying.
+  const presentationStr =
+    run.presentation && typeof run.presentation === "object" ? JSON.stringify(run.presentation) : null;
+  const presentationBlob = presentationStr && presentationStr.length <= 4096 ? presentationStr : null;
   await ensureRunStatColumns(env);
   await env.DB.prepare(
-    `INSERT INTO runs (id, user_id, username, outcome, difficulty, mode, wave, created_at, player_team, opponent_name, opponent_team, starters, challenges, killed_by_ghost, ghost_source_name, ghost_source_run_id)
-       VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16)
+    `INSERT INTO runs (id, user_id, username, outcome, difficulty, mode, wave, created_at, player_team, opponent_name, opponent_team, starters, challenges, killed_by_ghost, ghost_source_name, ghost_source_run_id, presentation)
+       VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17)
        ON CONFLICT(id) DO NOTHING`,
   )
     .bind(
@@ -895,6 +904,7 @@ async function handleRunCreate(
       run.killedByGhost === true ? 1 : null,
       typeof run.ghostSourceName === "string" ? run.ghostSourceName : null,
       typeof run.ghostSourceRunId === "string" ? run.ghostSourceRunId : null,
+      presentationBlob,
     )
     .run();
   // ER ghost notifications (ADDITIVE): record every ghost this run fought so the
@@ -1154,6 +1164,7 @@ type RunSampleRow = {
   player_team: string;
   opponent_name: string | null;
   opponent_team: string | null;
+  presentation?: string | null;
 };
 
 /** Sample winning runs (excluding the caller's own) as ghost-team snapshots. */
@@ -1199,7 +1210,8 @@ async function handleRunSample(
   // the only signal). No classic run exceeds 200, so this never drops a legitimate team.
   const MAX_GHOST_SAMPLE_WAVE = 200;
   const NON_GHOST_MODES = "'endless', 'spliced_endless', 'daily'";
-  const cols = "id, username, outcome, difficulty, wave, created_at, player_team, opponent_name, opponent_team";
+  const cols =
+    "id, username, outcome, difficulty, wave, created_at, player_team, opponent_name, opponent_team, presentation";
   const maxRow = await env.DB.prepare("SELECT MAX(rowid) AS m FROM runs").first<{ m: number | null }>();
   const maxRowId = maxRow?.m ?? 0;
   const seen = new Set<string>();
@@ -1250,6 +1262,9 @@ async function handleRunSample(
           party: JSON.parse(row.player_team),
           opponentName: row.opponent_name ?? undefined,
           opponentParty: row.opponent_team ? JSON.parse(row.opponent_team) : undefined,
+          // ER Ghost Trainer Editor: pass the authored presentation through to the
+          // encountering client (which sanitises it before applying). Bad JSON -> omit.
+          presentation: row.presentation ? JSON.parse(row.presentation) : undefined,
         };
       } catch {
         return null;
@@ -1286,7 +1301,7 @@ async function handleRunDeadliest(
   const filterDifficulty = difficulty && difficulty !== "any";
   const { results } = await env.DB.prepare(
     `SELECT r.id, r.username, r.outcome, r.difficulty, r.wave, r.created_at, r.player_team,
-            r.opponent_name, r.opponent_team, COUNT(*) AS kills
+            r.opponent_name, r.opponent_team, r.presentation, COUNT(*) AS kills
        FROM runs k
        JOIN runs r ON r.id = k.ghost_source_run_id
        WHERE k.killed_by_ghost = 1 AND k.ghost_source_run_id IS NOT NULL
@@ -1307,6 +1322,7 @@ async function handleRunDeadliest(
       player_team: string;
       opponent_name: string | null;
       opponent_team: string | null;
+      presentation: string | null;
       kills: number;
     }>();
   const teams = (results ?? [])
@@ -1323,6 +1339,7 @@ async function handleRunDeadliest(
           party: JSON.parse(row.player_team),
           opponentName: row.opponent_name ?? undefined,
           opponentParty: row.opponent_team ? JSON.parse(row.opponent_team) : undefined,
+          presentation: row.presentation ? JSON.parse(row.presentation) : undefined,
         };
       } catch {
         return null;
@@ -1417,6 +1434,10 @@ async function ensureRunStatColumns(env: Env): Promise<void> {
     "killed_by_ghost INTEGER",
     "ghost_source_name TEXT",
     "ghost_source_run_id TEXT",
+    // ER Ghost Trainer Editor: the uploader's authored presentation (sprite/name/
+    // title/dialogue/FX) JSON blob. Additive + nullable; opaque to the worker
+    // (the encountering client sanitises it before applying).
+    "presentation TEXT",
   ]) {
     try {
       await env.DB.prepare(`ALTER TABLE runs ADD COLUMN ${col}`).run();

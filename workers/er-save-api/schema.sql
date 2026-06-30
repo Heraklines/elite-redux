@@ -67,7 +67,11 @@ CREATE TABLE IF NOT EXISTS runs (
   -- that winning run's team. Powers the deadliest-ghost leaderboard.
   killed_by_ghost     INTEGER,
   ghost_source_name   TEXT,
-  ghost_source_run_id TEXT
+  ghost_source_run_id TEXT,
+  -- ER Ghost Trainer Editor: the uploader's authored presentation (sprite/name/
+  -- title/dialogue/FX) JSON blob, applied by the encountering client. Nullable +
+  -- additive (existing DBs get it via the lazy ALTER in ensureRunStatColumns).
+  presentation        TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_runs_sample ON runs (difficulty, outcome, created_at);
 

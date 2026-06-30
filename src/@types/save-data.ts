@@ -1,6 +1,7 @@
 import type { PokeballCounts } from "#app/battle-scene";
 import type { Tutorial } from "#app/tutorial";
 import type { CommunityChallengeConfig } from "#data/elite-redux/er-community-challenges";
+import type { GhostTrainerProfile } from "#data/elite-redux/er-ghost-profile";
 import type { ErMapSaveData } from "#data/elite-redux/er-map-nodes";
 import type { ErRelicBattleStateData } from "#data/elite-redux/er-relic-battle-state";
 import type { ErDifficulty } from "#data/elite-redux/er-run-difficulty";
@@ -56,6 +57,10 @@ export interface SystemSaveData {
   freeLegendaryEggsGranted?: boolean;
   /** ER Shiny Lab: global achievement/challenge availability bitset. */
   erShinyLabAvailableEffects?: number[];
+  /** ER Ghost Trainer Editor: the player's authored ghost presentation profile
+   *  (sprite/name/title/dialogue/FX). null/absent = the default random ghost.
+   *  A snapshot of this rides along on each published ghost (runs.presentation). */
+  ghostProfile?: GhostTrainerProfile | null;
 }
 
 export interface SessionSaveData {

@@ -56,6 +56,7 @@ import {
 } from "#data/elite-redux/er-black-shinies";
 import { clearErFightTokens } from "#data/elite-redux/er-fight-tokens";
 import { isErFinalBossSpecies } from "#data/elite-redux/er-final-boss";
+import { sanitizeGhostProfile } from "#data/elite-redux/er-ghost-profile";
 import type { GhostTeamSnapshot } from "#data/elite-redux/er-ghost-teams";
 import { markTrainerAsGhost, maybePrefetchGhostTeams, takeGhostForWave } from "#data/elite-redux/er-ghost-teams";
 import { recordErBiomeVisited } from "#data/elite-redux/er-map-nodes";
@@ -1899,11 +1900,15 @@ export class BattleScene extends SceneBase {
     for (let i = 0; i < ghost.id.length; i++) {
       idHash = (idHash * 31 + ghost.id.charCodeAt(i)) >>> 0;
     }
-    const ghostType = ghostClasses[idHash % ghostClasses.length];
-    const ghostTrainer = new Trainer(
-      ghostType,
-      trainerConfigs[ghostType].hasGenders && randSeedInt(2) ? TrainerVariant.FEMALE : TrainerVariant.DEFAULT,
-    );
+    // ER Ghost Trainer Editor: if the uploader authored a sprite/class, use it (and
+    // their chosen gender); otherwise fall back to the legacy ghost.id-hashed random
+    // class + random gender. sanitizeGhostProfile rejects an out-of-range trainerType.
+    const pres = sanitizeGhostProfile(ghost.presentation);
+    const authoredType = pres?.trainerType != null && trainerConfigs[pres.trainerType] ? pres.trainerType : null;
+    const ghostType = authoredType ?? ghostClasses[idHash % ghostClasses.length];
+    const hasGenders = !!trainerConfigs[ghostType]?.hasGenders;
+    const female = hasGenders && (authoredType == null ? randSeedInt(2) > 0 : pres?.female === true);
+    const ghostTrainer = new Trainer(ghostType, female ? TrainerVariant.FEMALE : TrainerVariant.DEFAULT);
     markTrainerAsGhost(ghostTrainer, ghost);
     return ghostTrainer;
   }

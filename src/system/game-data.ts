@@ -19,6 +19,7 @@ import { clearCoopRuntime, startLocalCoopSession } from "#data/elite-redux/coop/
 import { getFounderRunState, setFounderRunState } from "#data/elite-redux/er-community-run-state";
 import { migrateErRemovedFormUnlocks } from "#data/elite-redux/er-egg-pool-bans";
 import { erMegaTargetToBaseSpeciesId } from "#data/elite-redux/er-generic-pool-bans";
+import { type GhostTrainerProfile, sanitizeGhostProfile } from "#data/elite-redux/er-ghost-profile";
 import { getErMapSaveData, restoreErMapState } from "#data/elite-redux/er-map-nodes";
 import { getErMoneyStreakEntries, restoreErMoneyStreaks } from "#data/elite-redux/er-money-streak";
 import { resolveErModifierClass } from "#data/elite-redux/er-persistent-modifiers";
@@ -148,6 +149,7 @@ const systemShortKeys = {
   classicWinCount: "$wc",
   erShinyLabAvailableEffects: "$esla",
   erShinyLab: "$esl",
+  ghostProfile: "$gp",
 };
 
 const CLOUD_SYNC_MIN_INTERVAL_MS = 20 * 60 * 1000;
@@ -257,6 +259,8 @@ export class GameData {
   public unlockPity: number[];
   /** ER Shiny Lab: global achievement/challenge availability bitset. */
   public erShinyLabAvailableEffects: number[] = [];
+  /** ER Ghost Trainer Editor: the player's authored ghost presentation profile. */
+  public ghostProfile: GhostTrainerProfile | null = null;
 
   /**
    * One-time gift flag: set `true` once the player has received the free 2
@@ -306,6 +310,7 @@ export class GameData {
     this.eggPity = [0, 0, 0, 0];
     this.unlockPity = [0, 0, 0, 0];
     this.erShinyLabAvailableEffects = [];
+    this.ghostProfile = null;
     this.autoEggRestock = defaultAutoEggRestockSettings();
     this.llmDirectorState = defaultDirectorState();
     this.initDexData();
@@ -334,6 +339,7 @@ export class GameData {
       llmDirectorState: this.llmDirectorState,
       freeLegendaryEggsGranted: this.freeLegendaryEggsGranted,
       erShinyLabAvailableEffects: this.erShinyLabAvailableEffects.slice(0),
+      ghostProfile: this.ghostProfile,
     };
   }
 
@@ -854,6 +860,7 @@ export class GameData {
     this.llmDirectorState = mergeDirectorState(systemData.llmDirectorState);
     this.erShinyLabAvailableEffects =
       systemData.erShinyLabAvailableEffects?.map(v => Math.max(0, Math.min(255, Math.round(v)))) ?? [];
+    this.ghostProfile = sanitizeGhostProfile(systemData.ghostProfile) ?? null;
 
     this.eggPity = systemData.eggPity ? systemData.eggPity.slice(0) : [0, 0, 0, 0];
     this.unlockPity = systemData.unlockPity ? systemData.unlockPity.slice(0) : [0, 0, 0, 0];

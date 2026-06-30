@@ -33,6 +33,12 @@ import { bypassLogin } from "#constants/app-constants";
 import { type ErDifficulty, getErDifficulty } from "#data/elite-redux/er-run-difficulty";
 import { ghostWavesForCurrentRun, isErGhostChallengeActive, isErGhostWave } from "#data/elite-redux/er-ghost-waves";
 import {
+  type GhostDialogueContext,
+  type GhostTrainerProfile,
+  resolveGhostDialogue,
+  sanitizeGhostProfile,
+} from "#data/elite-redux/er-ghost-profile";
+import {
   decodeErShinyLabLoadout,
   decodeErShinyLabParams,
   encodeErShinyLabPreset,
@@ -128,6 +134,13 @@ export interface GhostTeamSnapshot {
   ghostSourceName?: string | undefined;
   /** The killer ghost's source winning-run id (joins back to its exact team). */
   ghostSourceRunId?: string | undefined;
+  /**
+   * ER Ghost Trainer Editor: the uploader's authored presentation (sprite/name/
+   * title/dialogue/FX) at publish time. Absent -> the legacy random-class ghost.
+   * Carried verbatim through the worker `runs.presentation` blob; ALWAYS re-run
+   * through sanitizeGhostProfile before applying (it arrives from an untrusted peer).
+   */
+  presentation?: GhostTrainerProfile | undefined;
 }
 
 const MAX_PARTY = 6;
@@ -577,6 +590,10 @@ export function captureGhostTeam(isVictory: boolean): GhostTeamSnapshot | null {
     killedByGhost: killerGhost != null || undefined,
     ghostSourceName: killerGhost?.trainerName,
     ghostSourceRunId: killerGhost?.id,
+    // ER Ghost Trainer Editor: attach the player's authored presentation so other
+    // players see their chosen sprite/name/dialogue. Sanitised at capture; absent
+    // when the player never opened the editor (legacy random-class ghost).
+    presentation: sanitizeGhostProfile(globalScene?.gameData?.ghostProfile) ?? undefined,
   };
 }
 
@@ -1054,6 +1071,32 @@ export function setPrefetchedGhostTeamsForTests(teams: GhostTeamSnapshot[]): voi
 // -----------------------------------------------------------------------------
 const GHOST_BY_TRAINER = new WeakMap<Trainer, GhostTeamSnapshot>();
 
+/**
+ * Build the placeholder-token context from the ENCOUNTERING player's side, at the
+ * moment a ghost dialogue line is shown. Resolved late so post-battle tokens can use
+ * end-of-battle state. {slayer} (the mon that KO'd the most of the ghost's team) needs
+ * per-faint attribution that isn't tracked yet, so v1 falls back to the lead.
+ */
+function buildGhostDialogueCtx(): GhostDialogueContext {
+  const party = globalScene?.getPlayerParty?.() ?? [];
+  const nameOf = (p: (typeof party)[number]): string | undefined => p?.getNameToRender?.() || p?.name || undefined;
+  const lead = party.length > 0 ? nameOf(party[0]) : undefined;
+  let ace: string | undefined;
+  let bestLevel = -1;
+  for (const p of party) {
+    if ((p?.level ?? 0) > bestLevel) {
+      bestLevel = p.level ?? 0;
+      ace = nameOf(p);
+    }
+  }
+  return {
+    player: loggedInUser?.username || undefined,
+    lead,
+    ace: ace ?? lead,
+    slayer: lead, // TODO(P4): exact kill attribution from the battle faint log.
+  };
+}
+
 /** Flag a freshly-built Trainer as a ghost, and size its party to the snapshot. */
 export function markTrainerAsGhost(trainer: Trainer, snapshot: GhostTeamSnapshot): void {
   GHOST_BY_TRAINER.set(trainer, snapshot);
@@ -1078,6 +1121,38 @@ export function markTrainerAsGhost(trainer: Trainer, snapshot: GhostTeamSnapshot
   // players never heard the theme (#403 report).
   trainer.getBattleBgm = () => "battle_ghost_piano";
   trainer.getMixedBattleBgm = () => "battle_ghost_piano";
+
+  // ER Ghost Trainer Editor: apply the uploader's authored presentation. Sprite/class
+  // + gender are chosen at construction (createGhostTrainer); here we apply the custom
+  // name, title, and battle dialogue. Re-sanitised - it arrives from an untrusted peer.
+  // Dialogue getters resolve placeholder tokens LAZILY (at display time) so post-battle
+  // tokens use end-of-battle state. Mapping: intro -> encounter, defeated -> victory
+  // (player wins), defeatPlayer/afterWin -> defeat (trainer wins).
+  const pres = sanitizeGhostProfile(snapshot.presentation);
+  if (pres) {
+    if (pres.displayName) {
+      trainer.name = pres.displayName;
+    }
+    if (pres.title) {
+      const shownName = trainer.name;
+      const title = pres.title;
+      trainer.getName = (_slot: TrainerSlot = TrainerSlot.NONE, includeTitle = false): string =>
+        includeTitle && shownName ? `${title} ${shownName}`.trim() : shownName;
+    }
+    const d = pres.dialogue;
+    if (d?.intro) {
+      const intro = d.intro;
+      trainer.getEncounterMessages = () => [resolveGhostDialogue(intro, buildGhostDialogueCtx())];
+    }
+    if (d?.defeated) {
+      const defeated = d.defeated;
+      trainer.getVictoryMessages = () => [resolveGhostDialogue(defeated, buildGhostDialogueCtx())];
+    }
+    const lossLines = [d?.defeatPlayer, d?.afterWin].filter((l): l is string => !!l);
+    if (lossLines.length > 0) {
+      trainer.getDefeatMessages = () => lossLines.map(l => resolveGhostDialogue(l, buildGhostDialogueCtx()));
+    }
+  }
 }
 
 /** True if this trainer is an ER ghost battle. */
