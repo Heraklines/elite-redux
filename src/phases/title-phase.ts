@@ -165,13 +165,11 @@ export class TitlePhase extends Phase {
               label: GameMode.getModeName(GameModes.CHALLENGE),
               handler: () => {
                 // ER Community Challenges: split Challenge into {Custom, Community}.
-                // Community is staging/dev-only for now (no backend deployed yet, the
-                // create flow is still being built); the browser degrades gracefully
-                // to an empty feed when the worker is unreachable.
-                if (!(isDev || isBeta || devToolsEnabled)) {
-                  setModeAndEnd(GameModes.CHALLENGE);
-                  return true;
-                }
+                // Enabled in ALL builds now (the worker backend is ready for prod). The
+                // browser shows the live Inferno card today and merges player-authored
+                // challenges once /community/* responds, degrading gracefully to the
+                // built-in card when the worker is unreachable. NOTE: Co-op (above) stays
+                // dev/staging-gated; only this Community split is ungated.
                 // Opening a NESTED OPTION_SELECT (or any overlay) from inside an
                 // option handler must be DEFERRED: returning true here makes the
                 // current select clear() itself, which would clobber a synchronous
