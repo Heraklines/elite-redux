@@ -65,10 +65,19 @@ jobs:
         env:
           NODE_ENV: production
 
-      - name: Assemble dist (Cloudflare config + strip sourcemaps)
+      # build:standalone (scripts/assemble-cloudflare-dist.mjs) already copies the
+      # Cloudflare config, strips sourcemaps, and re-pins dist/_redirects to
+      # $ER_ASSETS_SHA - same as staging. The old manual "Assemble dist" cp step
+      # was a leftover that copied the STALE committed _redirects back over the
+      # freshly re-pinned one, so prod shipped an outdated er-assets pin (custom
+      # backgrounds 404'd / fell back to vanilla). Just verify the assembled dist.
+      - name: Verify assembled dist (built by build:standalone)
         run: |
-          cp deploy/cloudflare/_redirects deploy/cloudflare/_headers deploy/cloudflare/service-worker.js dist/
-          find dist -name '*.map' -delete
+          for f in _redirects _headers service-worker.js; do
+            test -f "dist/$f" || { echo "MISSING dist/$f"; exit 1; }
+          done
+          echo "=== er-assets pins in dist/_redirects ==="
+          grep -o 'er-assets@[0-9a-f]*' dist/_redirects | sort -u
 
       - name: Deploy to Cloudflare Pages (PRODUCTION)
         uses: cloudflare/wrangler-action@v3
