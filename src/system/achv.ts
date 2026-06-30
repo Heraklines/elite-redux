@@ -13,6 +13,7 @@ import { getErDifficulty } from "#data/elite-redux/er-run-difficulty";
 import { Challenges } from "#enums/challenges";
 import { DexAttr } from "#enums/dex-attr";
 import { PlayerGender } from "#enums/player-gender";
+import { PokemonType } from "#enums/pokemon-type";
 import { getShortenedStatKey, Stat } from "#enums/stat";
 import { ErRelicModifier, TurnHeldItemTransferModifier } from "#modifiers/modifier";
 import { RibbonData } from "#system/ribbons/ribbon-data";
@@ -547,6 +548,21 @@ const apexStackActive = () => {
   );
 };
 
+/**
+ * Like {@linkcode apexStackActive} but with a mono-TYPE lock in place of the NU
+ * usage tier: SingleType(type) + Doubles Only + Ghost Trainers all active. A
+ * SingleType challenge stores `type + 1` as its value (see SingleTypeChallenge).
+ * Drives the Elemental Apex achievements (Elite/Hell gated separately).
+ */
+const monoTypeApexActive = (type: PokemonType) => {
+  const ch = globalScene.gameMode.challenges;
+  return (
+    ch.some(c => c.id === Challenges.SINGLE_TYPE && c.value === type + 1)
+    && ch.some(c => c.id === Challenges.DOUBLES_ONLY && c.value > 0)
+    && ch.some(c => c.id === Challenges.GHOST_TRAINERS && c.value > 0)
+  );
+};
+
 /** The eighteen mono-TYPE ribbon flags (one per type), for the Master of All achv. */
 const MONO_TYPE_RIBBONS = [
   RibbonData.MONO_NORMAL,
@@ -1043,6 +1059,37 @@ export const achvs = {
     "pb_black",
     150,
     () => apexStackActive() && getErDifficulty() === "hell",
+  ),
+  // ER "Elemental Apex": a mono-TYPE run with Doubles Only + Ghost Trainers cleared
+  // on Elite or Hell. Same shape as the apex stack, swapping the NU usage tier for a
+  // single-type lock. Each unlocks a matching Shiny Lab aura (er-shiny-lab-effects).
+  SCORCHED_EARTH: new ChallengeAchv(
+    "scorchedEarth",
+    "scorchedEarth.description",
+    "flame_plate",
+    130,
+    () => monoTypeApexActive(PokemonType.FIRE) && (getErDifficulty() === "elite" || getErDifficulty() === "hell"),
+  ),
+  ABSOLUTE_ZERO: new ChallengeAchv(
+    "absoluteZero",
+    "absoluteZero.description",
+    "icicle_plate",
+    130,
+    () => monoTypeApexActive(PokemonType.ICE) && (getErDifficulty() === "elite" || getErDifficulty() === "hell"),
+  ),
+  ENDLESS_NIGHT: new ChallengeAchv(
+    "endlessNight",
+    "endlessNight.description",
+    "dread_plate",
+    130,
+    () => monoTypeApexActive(PokemonType.DARK) && (getErDifficulty() === "elite" || getErDifficulty() === "hell"),
+  ),
+  TEMPEST: new ChallengeAchv(
+    "tempest",
+    "tempest.description",
+    "zap_plate",
+    130,
+    () => monoTypeApexActive(PokemonType.ELECTRIC) && (getErDifficulty() === "elite" || getErDifficulty() === "hell"),
   ),
   // ER difficulty-tiered Nuzlocke (the base NUZLOCKE above still fires on any
   // difficulty; these add the harder Elite/Hell tiers with bigger shiny rewards).

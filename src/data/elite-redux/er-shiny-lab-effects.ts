@@ -438,19 +438,145 @@ const LABELS: Record<string, string> = {
   radiant: "Radiant Burst",
 };
 
-const LOCK_HINTS: Record<string, string> = {
-  aurum: "clear Midas",
-  toxic: "clear Going Nuclear",
-  frostbite: "clear Cold Open",
-  spectrumsplit: "clear Prism Break",
-  poison: "clear Going Nuclear",
-  flame: "clear Midas",
-  frost: "clear Cold Open",
-  cosmos: "clear Eclipse",
-  goldenglow: "clear Midas",
-  shadowaura: "clear Eclipse",
-  rainbowoutline: "clear Untouchable",
+/**
+ * Effect -> achievement gate. The value is the achv OBJECT KEY (achv.id at
+ * runtime / the key in gameData.achvUnlocks), NOT the camelCase localization key.
+ *
+ * A bound effect shows as `locked-achv` until that achievement is earned, then
+ * becomes BUYABLE with the species' candy (model: unlock-to-buy). Availability is
+ * recomputed live from gameData.achvUnlocks at lab-open (see er-shiny-lab-config),
+ * so it is retroactive with no migration. This is ADDITIVE: wild-catch, candy-buy,
+ * and completion-token unlock paths are untouched.
+ *
+ * The six pre-existing reward grants (er-achievement-rewards.ts) are folded in here
+ * as the single source of truth so nothing is erased: toxic/poison = Mono-Poison,
+ * frostbite/frost = Mono-Ice, aurum/flame/goldenglow = Fresh Start,
+ * cosmos/shadowaura = Exorcist, rainbowoutline = All Shiny Tiers,
+ * spectrumsplit = Master of All.
+ */
+export const ER_SHINY_LAB_EFFECT_ACHV: Record<string, string> = {
+  // --- palettes ---------------------------------------------------------------
+  onyxgold: "_10K_MONEY",
+  aurum: "FRESH_START",
+  obsidian: "MONO_DARK",
+  amethyst: "MONO_PSYCHIC",
+  inferno: "MONO_FIRE",
+  toxic: "MONO_POISON",
+  venom: "SNAKES_ON_A_PLANE",
+  acid: "MONO_BUG",
+  verdigris: "MONO_STEEL",
+  duomint: "MONO_GRASS",
+  duoblood: "MONO_FIGHTING",
+  spectral: "MONO_GHOST",
+  bubblegum: "MONO_FAIRY",
+  prismarine: "MONO_WATER",
+  synthwave: "MONO_ELECTRIC",
+  blood: "BACK_IN_BLOOD",
+  shadowflame: "DEVILS_BARGAIN",
+  void: "PERMADEATH",
+  cursed: "PRIMAL_CASCOON",
+  antique: "RELIC_HUNTER",
+  mono: "MASTER_OF_ALL",
+  nebula: "CATCH_LEGENDARY",
+  deepsea: "CATCH_SUB_LEGENDARY",
+  solarflare: "GIGANTAMAX",
+  mythril: "MEGA_EVOLVE",
+  royal: "CLASSIC_VICTORY",
+  sakura: "MAX_FRIENDSHIP",
+  pentajewel: "ALL_SHINY_TIERS",
+  pentacandy: "PASSIVES_CHALLENGE",
+  gameboy: "MONO_GEN_ONE_VICTORY",
+  retro: "MONO_GEN_TWO_VICTORY",
+  // --- surfaces ---------------------------------------------------------------
+  holofoil: "SEE_SHINY",
+  prismatic: "ALL_SHINY_TIERS",
+  frostbite: "MONO_ICE",
+  molten: "MONO_FIRE",
+  electric: "MONO_ELECTRIC",
+  caustics: "MONO_WATER",
+  bioluminescent: "MONO_BUG",
+  aurorawings: "MONO_FLYING",
+  galaxy: "CATCH_LEGENDARY",
+  constellation: "STELLAR_TERASTALLIZE",
+  crystalfacets: "TERASTALLIZE",
+  stainedglass: "TERASTALLIZE",
+  dissolve: "SPLICE",
+  wormhole: "BREEDERS_IN_SPACE",
+  gildededges: "_1M_MONEY",
+  dripgold: "_10M_MONEY",
+  shatter: "SHIELD_BREAK",
+  pixelpulse: "CCC_COMBO",
+  scansweep: "BEAM_SPAM",
+  synthscan: "WEAVE_NATION_CERTIFIED",
+  lightningveins: "SORRY_FOR_THE_WAIT",
+  circuit: "AUTO_COUNTER",
+  poison: "MONO_POISON",
+  spectrumsplit: "MASTER_OF_ALL",
+  // --- auras ------------------------------------------------------------------
+  flame: "FRESH_START",
+  goldenglow: "FRESH_START",
+  cosmos: "EXORCIST",
+  shadowaura: "EXORCIST",
+  rainbowoutline: "ALL_SHINY_TIERS",
+  frost: "MONO_ICE",
+  cursedaura: "INFERNO",
+  underlight: "LIMBO",
+  shadowfire: "ENDLESS_NIGHT",
+  icespikes: "ABSOLUTE_ZERO",
+  sparkstorm: "TEMPEST",
+  wingflame: "SCORCHED_EARTH",
+  efield: "MONO_ELECTRIC",
+  magiccircle: "MONO_PSYCHIC",
+  galaxyspiral: "CATCH_LEGENDARY",
+  prismburst: "STELLAR_TERASTALLIZE",
+  rainbowglitter: "SHINY_PARTY",
+  holyrays: "_10000_HEAL",
+  crown: "CLASSIC_VICTORY",
+  hearts: "MAX_FRIENDSHIP",
+  uprising: "I_JUST_GOT_HERE",
+  topbeam: "BEAM_SPAM",
+  sideaura: "YO",
 };
+
+/** Nicer display hints for achv keys that humanize badly; the rest are derived. */
+const ACHV_HINT_OVERRIDE: Record<string, string> = {
+  _10K_MONEY: "Money Haver",
+  _1M_MONEY: "Millionaire",
+  _10M_MONEY: "One Percenter",
+  _10000_HEAL: "Recovery Master",
+  CCC_COMBO: "C-c-c-combo!",
+  YO: "YO!!!!!",
+  I_JUST_GOT_HERE: "I Just Got Here",
+  ALL_SHINY_TIERS: "All That Glitters",
+  MASTER_OF_ALL: "Master of All",
+  BACK_IN_BLOOD: "Back in Blood",
+  SNAKES_ON_A_PLANE: "Snakes on a Plane",
+  BREEDERS_IN_SPACE: "Breeders in Space",
+  SORRY_FOR_THE_WAIT: "Sorry For The Wait",
+  CATCH_LEGENDARY: "Catch a Legendary",
+  CATCH_SUB_LEGENDARY: "Catch a Sub-Legendary",
+  CLASSIC_VICTORY: "Beat Classic Mode",
+  MONO_GEN_ONE_VICTORY: "Mono-Gen One",
+  MONO_GEN_TWO_VICTORY: "Mono-Gen Two",
+  PASSIVES: "Passive Mastery",
+};
+
+/** A short, player-facing "Locked: <hint>" string for a bound effect. */
+function achvHint(achvId: string): string {
+  if (ACHV_HINT_OVERRIDE[achvId]) {
+    return ACHV_HINT_OVERRIDE[achvId];
+  }
+  return achvId
+    .split("_")
+    .filter(Boolean)
+    .map(w => w.charAt(0) + w.slice(1).toLowerCase())
+    .join(" ");
+}
+
+/** Effects (in registry order) whose gate is the given achievement key. */
+export function getErShinyLabEffectsForAchv(achvId: string): string[] {
+  return ER_SHINY_LAB_EFFECT_DEFS.filter(def => ER_SHINY_LAB_EFFECT_ACHV[def.id] === achvId).map(def => def.id);
+}
 
 const ACCENTS: Record<string, string> = {
   glacier: "#7fd8ff",
@@ -534,7 +660,8 @@ function rarityFor(index: number, count: number, locked: boolean): ErShinyLabRar
 
 function makeDefinitions(ids: readonly string[], category: ErShinyLabCategory): ErShinyLabEffectDefinition[] {
   return ids.map((id, index) => {
-    const lockHint = LOCK_HINTS[id];
+    const achvId = ER_SHINY_LAB_EFFECT_ACHV[id];
+    const lockHint = achvId ? achvHint(achvId) : undefined;
     return {
       id,
       label: labelFor(id),

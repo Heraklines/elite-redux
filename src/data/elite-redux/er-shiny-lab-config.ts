@@ -7,6 +7,7 @@ import {
   encodeErShinyLabParams,
   encodeErShinyLabPreset,
   ER_SHINY_LAB_CATEGORIES,
+  ER_SHINY_LAB_EFFECT_ACHV,
   ER_SHINY_LAB_EFFECTS_BY_CATEGORY,
   ER_SHINY_LAB_NAME_FX_CANDY_COST,
   ER_SHINY_LAB_SEED_REROLL_CANDY_COST,
@@ -142,6 +143,17 @@ export function buildErShinyLabConfig(speciesId: number): ErShinyLabConfig {
   const dexEntry = gameData.dexData[rootId] ?? gameData.dexData[speciesId];
   const earnedTier = getErShinyLabEarnedTier(dexEntry?.caughtAttr ?? 0n, !!entry.erBlackShiny);
   const available = toAvailableSet();
+  // Retroactive + additive: any effect whose gate achievement is already unlocked
+  // becomes BUYABLE on lab-open. Computed live from achvUnlocks, so it needs no
+  // migration and never touches the persisted granted bitset / wild-catch / candy
+  // paths. (Cosmetic-only: this does NOT re-pay the one-time candy/egg/shiny grants
+  // in er-achievement-rewards, which stay event-gated.)
+  const achvUnlocks = gameData.achvUnlocks;
+  for (const effectId in ER_SHINY_LAB_EFFECT_ACHV) {
+    if (achvUnlocks[ER_SHINY_LAB_EFFECT_ACHV[effectId]] != null) {
+      available.add(effectId);
+    }
+  }
   const owned: Record<ErShinyLabCategory, Set<string>> = {
     palette: getErShinyLabOwnedSet(save, "palette"),
     surface: getErShinyLabOwnedSet(save, "surface"),

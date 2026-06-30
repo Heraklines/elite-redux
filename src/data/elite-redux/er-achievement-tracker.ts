@@ -109,6 +109,17 @@ const SNAKELIKE_SPECIES = new Set<number>([
   SpeciesId.DRAGONAIR,
   SpeciesId.RAYQUAZA,
   SpeciesId.ZYGARDE,
+  // Patched in: obvious serpents the original curated list missed, plus the ER
+  // Dunsparce evolutions. hasSpeciesIn() matches on root id, so the whole line
+  // counts (a Gyarados resolves via its own id; Magikarp covers the pre-evo).
+  SpeciesId.DUDUNSPARCE,
+  SpeciesId.MAGIKARP,
+  SpeciesId.GYARADOS,
+  SpeciesId.TYNAMO,
+  SpeciesId.EELEKTRIK,
+  SpeciesId.EELEKTROSS,
+  ErSpeciesId.DUDUDUNSPARCE,
+  ErSpeciesId.DUDUNSPARCE_THREE_SEGMENT,
 ]);
 
 function battleState(): ErAchievementBattleState {

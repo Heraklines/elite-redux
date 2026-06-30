@@ -34,7 +34,7 @@ import { globalScene } from "#app/global-scene";
 import { speciesStarterCosts } from "#balance/starters";
 import { Egg } from "#data/egg";
 import { grantErShinyLabEffectAvailability } from "#data/elite-redux/er-shiny-lab-config";
-import { ER_SHINY_LAB_EFFECT_INDEX } from "#data/elite-redux/er-shiny-lab-effects";
+import { ER_SHINY_LAB_EFFECT_INDEX, getErShinyLabEffectsForAchv } from "#data/elite-redux/er-shiny-lab-effects";
 import { getErDifficulty } from "#data/elite-redux/er-run-difficulty";
 import { getPokemonSpecies } from "#utils/pokemon-utils";
 import { DexAttr } from "#enums/dex-attr";
@@ -246,10 +246,20 @@ interface GrantedReward {
 export function grantErAchievementReward(achvId: string): void {
   try {
     const entry = ER_ACHIEVEMENT_REWARDS[achvId];
-    if (!entry) {
+    const specs: RewardSpec[] = entry ? (Array.isArray(entry) ? [...entry] : [entry]) : [];
+    // Fold the effect->achv gate map (er-shiny-lab-effects) in as the single source
+    // of cosmetic unlocks. Skip any effect an inline shinyLabEffects spec already
+    // lists, so the original reward grants stay intact and nothing double-grants or
+    // double-announces. This is what lets map-only achievements (combat feats, the
+    // new apex combos) grant + announce their effect on first unlock.
+    const alreadyListed = new Set(specs.flatMap(s => (s.kind === "shinyLabEffects" ? s.effects : [])));
+    const mappedEffects = getErShinyLabEffectsForAchv(achvId).filter(e => !alreadyListed.has(e));
+    if (mappedEffects.length) {
+      specs.push({ kind: "shinyLabEffects", effects: mappedEffects });
+    }
+    if (specs.length === 0) {
       return;
     }
-    const specs = Array.isArray(entry) ? entry : [entry];
     const granted: GrantedReward[] = [];
     for (const spec of specs) {
       const g = applyRewardSpec(spec);

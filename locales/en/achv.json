@@ -312,6 +312,22 @@
     "name": "Inferno",
     "description": "Win a Hell classic run with the NU usage tier, Doubles Only, and Ghost Trainers all active."
   },
+  "scorchedEarth": {
+    "name": "Scorched Earth",
+    "description": "Win an Elite or Hell classic run as Mono-Fire with Doubles Only and Ghost Trainers all active."
+  },
+  "absoluteZero": {
+    "name": "Absolute Zero",
+    "description": "Win an Elite or Hell classic run as Mono-Ice with Doubles Only and Ghost Trainers all active."
+  },
+  "endlessNight": {
+    "name": "Endless Night",
+    "description": "Win an Elite or Hell classic run as Mono-Dark with Doubles Only and Ghost Trainers all active."
+  },
+  "tempest": {
+    "name": "Tempest",
+    "description": "Win an Elite or Hell classic run as Mono-Electric with Doubles Only and Ghost Trainers all active."
+  },
   "lastStand": {
     "name": "Last Stand",
     "description": "Complete an Elite Nuzlocke run."
