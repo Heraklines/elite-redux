@@ -1,0 +1,265 @@
+----- BUG REPORT (in-game) -----
+version:  1.11.19
+url:      https://elite-redux.pages.dev/
+ua:       Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Mobile Safari/537.36
+mode:     4  wave:171  difficulty:hell
+seed:     NrYPxqfY1YvC7xDGcZI8Ho9V
+party:    Moltres Ex(L164 523/523), Darkrai Nightmare(L164 444/444), Slyduck(L164 467/467), Shiftry(L164 500/500), Gengar(L164 431/431), Nickit(L164 329/329)
+
+----- DESCRIPTION -----
+IIRC Queens Mourning should raise once per stat lowered on them and their ally, so fearmonger lowered 4 total stats between the two of them, so Vespiquen should have +3 SpA and +4 SpDef
+
+----- CONSOLE -----
+[23:58:22.945] LOG: Applied Iron 
+[23:58:22.945] LOG: Applied HP Up 
+[23:58:22.946] LOG: Applied Protein 
+[23:58:22.946] LOG: Applied Protein 
+[23:58:22.956] LOG: %cStart Phase ShowAbilityPhase color:green;
+[23:58:22.956] LOG: %cStart Phase MessagePhase color:green;
+[23:58:23.153] LOG: %cStart Phase HideAbilityPhase color:green;
+[23:58:23.189] LOG: %cStart Phase EggLapsePhase color:green;
+[23:58:23.189] LOG: %cStart Phase ModifierRewardPhase color:green;
+[23:58:23.190] LOG: Applied Iron 
+[23:58:23.190] LOG: Applied Zinc 
+[23:58:23.190] LOG: Applied Calcium 
+[23:58:23.190] LOG: Applied HP Up 
+[23:58:23.190] LOG: Applied Carbos 
+[23:58:23.191] LOG: Applied Iron 
+[23:58:23.191] LOG: Applied HP Up 
+[23:58:23.193] LOG: Applied Protein 
+[23:58:23.194] LOG: Applied Protein 
+[23:58:23.495] LOG: %cStart Phase SelectModifierPhase color:green;
+[23:58:25.333] LOG: Applied Iron 
+[23:58:25.333] LOG: Applied Zinc 
+[23:58:25.333] LOG: Applied Calcium 
+[23:58:25.333] LOG: Applied HP Up 
+[23:58:25.334] LOG: Applied Carbos 
+[23:58:25.334] LOG: Applied Iron 
+[23:58:25.334] LOG: Applied HP Up 
+[23:58:25.335] LOG: Applied Protein 
+[23:58:25.336] LOG: Applied Protein 
+[23:58:28.834] LOG: Applied Iron 
+[23:58:28.834] LOG: Applied Zinc 
+[23:58:28.834] LOG: Applied Calcium 
+[23:58:28.834] LOG: Applied HP Up 
+[23:58:28.834] LOG: Applied Carbos 
+[23:58:28.835] LOG: Applied Iron 
+[23:58:28.835] LOG: Applied HP Up 
+[23:58:28.836] LOG: Applied Protein 
+[23:58:28.837] LOG: Applied Protein 
+[23:58:31.665] LOG: Applied Iron 
+[23:58:31.665] LOG: Applied Zinc 
+[23:58:31.665] LOG: Applied Calcium 
+[23:58:31.665] LOG: Applied HP Up 
+[23:58:31.665] LOG: Applied Carbos 
+[23:58:31.666] LOG: Applied Iron 
+[23:58:31.666] LOG: Applied HP Up 
+[23:58:31.667] LOG: Applied Protein 
+[23:58:31.667] LOG: Applied Protein 
+[23:58:32.500] LOG: Applied Iron 
+[23:58:32.500] LOG: Applied Zinc 
+[23:58:32.500] LOG: Applied Calcium 
+[23:58:32.500] LOG: Applied HP Up 
+[23:58:32.500] LOG: Applied Carbos 
+[23:58:32.501] LOG: Applied Iron 
+[23:58:32.501] LOG: Applied HP Up 
+[23:58:32.502] LOG: Applied Protein 
+[23:58:32.503] LOG: Applied Protein 
+[23:58:42.127] LOG: Applied Iron 
+[23:58:42.127] LOG: Applied Zinc 
+[23:58:42.127] LOG: Applied Calcium 
+[23:58:42.127] LOG: Applied HP Up 
+[23:58:42.127] LOG: Applied Carbos 
+[23:58:42.128] LOG: Applied Iron 
+[23:58:42.128] LOG: Applied HP Up 
+[23:58:42.129] LOG: Applied Protein 
+[23:58:42.129] LOG: Applied Protein 
+[23:58:44.250] LOG: Applied Iron 
+[23:58:44.250] LOG: Applied Zinc 
+[23:58:44.250] LOG: Applied Calcium 
+[23:58:44.250] LOG: Applied HP Up 
+[23:58:44.250] LOG: Applied Carbos 
+[23:58:44.251] LOG: Applied Iron 
+[23:58:44.251] LOG: Applied HP Up 
+[23:58:44.252] LOG: Applied Protein 
+[23:58:44.252] LOG: Applied Protein 
+[23:58:45.074] LOG: Applied Iron 
+[23:58:45.074] LOG: Applied Zinc 
+[23:58:45.074] LOG: Applied Calcium 
+[23:58:45.074] LOG: Applied HP Up 
+[23:58:45.074] LOG: Applied Carbos 
+[23:58:45.075] LOG: Applied Iron 
+[23:58:45.075] LOG: Applied HP Up 
+[23:58:45.076] LOG: Applied Protein 
+[23:58:45.076] LOG: Applied Protein 
+[23:58:46.166] LOG: Applied Iron 
+[23:58:46.166] LOG: Applied Zinc 
+[23:58:46.166] LOG: Applied Calcium 
+[23:58:46.166] LOG: Applied HP Up 
+[23:58:46.166] LOG: Applied Carbos 
+[23:58:46.167] LOG: Applied Iron 
+[23:58:46.167] LOG: Applied HP Up 
+[23:58:46.168] LOG: Applied Protein 
+[23:58:46.168] LOG: Applied Protein 
+[23:58:50.407] LOG: Applied Soothe Bell 
+[23:58:50.407] LOG: Applied Iron 
+[23:58:50.407] LOG: Applied Zinc 
+[23:58:50.407] LOG: Applied Calcium 
+[23:58:50.407] LOG: Applied HP Up 
+[23:58:50.407] LOG: Applied Carbos 
+[23:58:50.408] LOG: Applied Soothe Bell 
+[23:58:50.408] LOG: Applied Iron 
+[23:58:50.408] LOG: Applied HP Up 
+[23:58:50.410] LOG: Applied Protein 
+[23:58:50.411] LOG: Applied Protein 
+[23:58:50.551] LOG: Applied Soothe Bell 
+[23:58:50.551] LOG: Applied Iron 
+[23:58:50.551] LOG: Applied Zinc 
+[23:58:50.551] LOG: Applied Calcium 
+[23:58:50.551] LOG: Applied HP Up 
+[23:58:50.552] LOG: Applied Carbos 
+[23:58:50.552] LOG: Applied Soothe Bell 
+[23:58:50.553] LOG: Applied Iron 
+[23:58:50.553] LOG: Applied HP Up 
+[23:58:50.553] LOG: Applied Protein 
+[23:58:50.554] LOG: Applied Protein 
+[23:58:52.689] LOG: %cStart Phase LevelUpPhase color:green;
+[23:58:52.693] LOG: %cStart Phase LevelUpPhase color:green;
+[23:58:52.696] LOG: %cStart Phase LevelUpPhase color:green;
+[23:58:52.697] LOG: %cStart Phase LevelUpPhase color:green;
+[23:58:52.698] LOG: %cStart Phase LevelUpPhase color:green;
+[23:58:52.699] LOG: %cStart Phase LevelUpPhase color:green;
+[23:58:52.700] LOG: %cStart Phase LevelUpPhase color:green;
+[23:58:52.701] LOG: %cStart Phase LevelUpPhase color:green;
+[23:58:52.701] LOG: %cStart Phase LevelUpPhase color:green;
+[23:58:52.701] LOG: %cStart Phase LevelUpPhase color:green;
+[23:58:52.701] LOG: %cStart Phase LevelUpPhase color:green;
+[23:58:52.701] LOG: %cStart Phase LevelUpPhase color:green;
+[23:58:52.702] LOG: %cStart Phase SelectBiomePhase color:green;
+[23:58:52.702] LOG: Wave Seed: øĜăúĢěĐăÛăĠíáĢîñčĄóâòęãĀ 170
+[23:59:00.139] LOG: %cStart Phase PartyHealPhase color:green;
+[23:59:02.588] LOG: %cStart Phase ResetStatusPhase color:green;
+[23:59:02.589] LOG: %cStart Phase ResetStatusPhase color:green;
+[23:59:02.590] LOG: %cStart Phase ResetStatusPhase color:green;
+[23:59:02.590] LOG: %cStart Phase ResetStatusPhase color:green;
+[23:59:02.590] LOG: %cStart Phase ResetStatusPhase color:green;
+[23:59:02.591] LOG: %cStart Phase ResetStatusPhase color:green;
+[23:59:02.591] LOG: %cStart Phase SwitchBiomePhase color:green;
+[23:59:03.020] LOG: %cStart Phase NewBattlePhase color:green;
+[23:59:03.021] LOG: Wave Seed: ùĝĄûģĜđĄÜĄġîâģïòĎąôãóĚäā 171
+[23:59:03.021] LOG: Applied Max Lure 
+[23:59:03.021] LOG: Applied Super Lure 
+[23:59:03.024] LOG: %cStart Phase ReturnPhase color:green;
+[23:59:03.137] LOG: %cStart Phase ReturnPhase color:green;
+[23:59:03.253] LOG: %cStart Phase ShowTrainerPhase color:green;
+[23:59:03.370] LOG: %cStart Phase NewBiomeEncounterPhase color:green;
+[23:59:03.375] LOG: Starting species pool tier: COMMON
+[23:59:03.375] LOG: Replaced DEERLING with SAWSBUCK
+[23:59:03.389] LOG: Pokemon: Wild Sawsbuck | Species ID: 586 | Level: 164 | Nature: Hardy (-)
+[23:59:03.389] LOG: Stats (IVs): HP: 439 (2), Atk: 382 (30), Def: 254 (12), Spatk: 229 (17), Spdef: 252 (11), Spd: 321 (3)
+[23:59:03.389] LOG: Ability: Skill Link | Passive Ability: Hardened Sheath 
+[23:59:03.389] LOG: Moveset: ["Hyper Drill","Stomp","High Jump Kick","Double-Edge"]
+[23:59:03.389] LOG: Starting species pool tier: COMMON
+[23:59:03.389] LOG: Replaced COMBEE with VESPIQUEN
+[23:59:03.397] LOG: Pokemon: Wild Vespiquen | Species ID: 416 | Level: 164 | Nature: Sassy (+SpDef/-Spd)
+[23:59:03.397] LOG: Stats (IVs): HP: 444 (25), Atk: 288 (13), Def: 416 (27), Spatk: 283 (10), Spdef: 444 (19), Spd: 127 (4)
+[23:59:03.397] LOG: Ability: Regenerator | Passive Ability: Queen's Mourning 
+[23:59:03.397] LOG: Moveset: ["Defend Order","Struggle Bug","Aromatic Mist","Destiny Bond"]
+[23:59:04.056] LOG: {"id":"LUCKY_EGG","localeKey":"modifierType:ModifierType.LUCKY_EGG","iconImage":"lucky_egg","soundName":"se/restore","tier":3,"boostPercent":40} (enemy)
+[23:59:04.056] LOG: Battle Seed: zQOh4lTy2sLvQECu
+[23:59:04.127] DEBUG: Session data saved to slot 3!
+[23:59:04.128] LOG: Wave Seed: ùĝĄûģĜđĄÜĄġîâģïòĎąôãóĚäā 171
+[23:59:04.578] LOG: %cStart Phase CommonAnimPhase color:green;
+[23:59:04.578] LOG: %cStart Phase MessagePhase color:green;
+[23:59:04.795] LOG: %cStart Phase ShinySparklePhase color:green;
+[23:59:04.904] LOG: %cStart Phase LevelCapPhase color:green;
+[23:59:05.427] LOG: %cStart Phase SummonPhase color:green;
+[23:59:05.562] LOG: Applied Iron 
+[23:59:05.562] LOG: Applied Zinc 
+[23:59:05.563] LOG: Applied Calcium 
+[23:59:05.563] LOG: Applied HP Up 
+[23:59:05.563] LOG: Applied Carbos 
+[23:59:05.564] LOG: Applied Iron 
+[23:59:05.564] LOG: Applied HP Up 
+[23:59:05.566] LOG: Applied Protein 
+[23:59:05.567] LOG: Applied Protein 
+[23:59:05.595] WARN: cry/622 not found
+[23:59:05.711] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[23:59:05.713] LOG: %cStart Phase SummonPhase color:green;
+[23:59:05.863] LOG: Applied Iron 
+[23:59:05.863] LOG: Applied Zinc 
+[23:59:05.863] LOG: Applied Calcium 
+[23:59:05.863] LOG: Applied HP Up 
+[23:59:05.863] LOG: Applied Carbos 
+[23:59:05.864] LOG: Applied Iron 
+[23:59:05.865] LOG: Applied HP Up 
+[23:59:05.866] LOG: Applied Protein 
+[23:59:05.867] LOG: Applied Protein 
+[23:59:05.894] WARN: cry/10769 not found
+[23:59:05.999] LOG: %cStart Phase CheckSwitchPhase color:green;
+[23:59:06.162] LOG: %cStart Phase CheckSwitchPhase color:green;
+[23:59:06.412] LOG: %cStart Phase InitEncounterPhase color:green;
+[23:59:06.417] LOG: %cStart Phase PostSummonPhase color:green;
+[23:59:06.417] LOG: Ran PSP for: Darkrai Nightmare
+[23:59:06.422] LOG: %cStart Phase PostSummonPhase color:green;
+[23:59:06.424] LOG: %cStart Phase PostSummonPhase color:green;
+[23:59:06.425] LOG: %cStart Phase ShowAbilityPhase color:green;
+[23:59:06.589] LOG: %cStart Phase StatStageChangePhase color:green;
+[23:59:06.591] LOG: %cStart Phase StatStageChangePhase color:green;
+[23:59:06.774] LOG: %cStart Phase MessagePhase color:green;
+[23:59:07.021] LOG: %cStart Phase StatStageChangePhase color:green;
+[23:59:07.196] LOG: %cStart Phase MessagePhase color:green;
+[23:59:07.437] LOG: %cStart Phase StatStageChangePhase color:green;
+[23:59:07.437] LOG: %cStart Phase StatStageChangePhase color:green;
+[23:59:07.624] LOG: %cStart Phase MessagePhase color:green;
+[23:59:07.853] LOG: %cStart Phase ShowAbilityPhase color:green;
+[23:59:07.854] LOG: %cStart Phase HideAbilityPhase color:green;
+[23:59:07.889] LOG: %cStart Phase ShowAbilityPhase color:green;
+[23:59:08.056] LOG: %cStart Phase StatStageChangePhase color:green;
+[23:59:08.233] LOG: %cStart Phase MessagePhase color:green;
+[23:59:08.469] LOG: %cStart Phase ShowAbilityPhase color:green;
+[23:59:08.470] LOG: %cStart Phase HideAbilityPhase color:green;
+[23:59:08.505] LOG: %cStart Phase ShowAbilityPhase color:green;
+[23:59:08.689] LOG: %cStart Phase StatStageChangePhase color:green;
+[23:59:08.875] LOG: %cStart Phase MessagePhase color:green;
+[23:59:09.103] LOG: %cStart Phase StatStageChangePhase color:green;
+[23:59:09.289] LOG: %cStart Phase MessagePhase color:green;
+[23:59:09.520] LOG: %cStart Phase HideAbilityPhase color:green;
+[23:59:09.556] LOG: %cStart Phase StatStageChangePhase color:green;
+[23:59:09.741] LOG: %cStart Phase MessagePhase color:green;
+[23:59:09.987] LOG: %cStart Phase HideAbilityPhase color:green;
+[23:59:10.022] LOG: %cStart Phase StatStageChangePhase color:green;
+[23:59:10.209] LOG: %cStart Phase MessagePhase color:green;
+[23:59:10.436] LOG: %cStart Phase HideAbilityPhase color:green;
+[23:59:10.477] LOG: %cStart Phase PostSummonPhase color:green;
+[23:59:10.477] LOG: Ran PSP for: Mega Moltres Ex
+[23:59:10.482] LOG: %cStart Phase PostSummonPhase color:green;
+[23:59:10.491] LOG: %cStart Phase ShowAbilityPhase color:green;
+[23:59:10.655] LOG: %cStart Phase CommonAnimPhase color:green;
+[23:59:11.153] LOG: %cStart Phase MessagePhase color:green;
+[23:59:11.420] LOG: %cStart Phase HideAbilityPhase color:green;
+[23:59:11.456] LOG: %cStart Phase MovePhase color:green;
+[23:59:11.456] LOG: %cUser: Mega Moltres Ex
+Move: TAILWIND
+Use Mode: INDIRECT color:orchid
+[23:59:11.468] LOG: %cStart Phase MessagePhase color:green;
+[23:59:11.586] LOG: %cStart Phase MoveEffectPhase color:green;
+[23:59:11.610] LOG: Applied Shell Bell 
+[23:59:11.610] LOG: %cStart Phase MessagePhase color:green;
+[23:59:11.870] LOG: %cStart Phase MoveEndPhase color:green;
+[23:59:11.874] LOG: %cStart Phase PostSummonPhase color:green;
+[23:59:11.876] LOG: %cStart Phase PostSummonPhase color:green;
+[23:59:11.876] LOG: Ran PSP for: Sawsbuck
+[23:59:11.879] LOG: %cStart Phase PostSummonPhase color:green;
+[23:59:11.880] LOG: %cStart Phase PostSummonPhase color:green;
+[23:59:11.881] LOG: %cStart Phase PostSummonPhase color:green;
+[23:59:11.881] LOG: Ran PSP for: Vespiquen
+[23:59:11.882] LOG: %cStart Phase PostSummonPhase color:green;
+[23:59:11.882] LOG: %cStart Phase PostSummonPhase color:green;
+[23:59:11.882] LOG: %cStart Phase TurnInitPhase color:green;
+[23:59:11.883] LOG: %cStart Phase CommandPhase color:green;
+[23:59:12.977] LOG: Move: FIERY_DANCE Move targets: {"targets":[2,3,1],"multiple":false} 
+Player Pokemon: Mega Moltres Ex
+[23:59:12.979] LOG: %cStart Phase SelectTargetPhase color:green;
+[23:59:13.410] LOG: %cStart Phase CommandPhase color:green;
+[23:59:31.669] LOG: %cStart Phase CommandPhase color:green;
