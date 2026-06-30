@@ -143,32 +143,30 @@ Status key: [x] done, [~] model exists but not wired into gameplay, [ ] not star
 
 - [x] 3 Pokemon per side (spawn + turn loop, headless-verified: er-triple-wild-spawn).
 - [x] Sprite + HP-bar layout for 6 (fieldSpriteOffset / barSlotOffset, rendered).
-- [~] **Positional adjacency targeting** - THE defining triple mechanic. A wing can only hit
-  the directly-opposed foe + the centre, NOT the far diagonal; the centre hits all foes (and is
-  hit by all). MODEL is done + unit-tested (lineAdjacency / arrangement.isAdjacent), but NOT yet
-  wired into `getMoveTargets` - triples currently use the doubles "all foes reachable" rule.
-- [ ] **Spread moves limited by adjacency** (Earthquake from the wing hits front + both centres,
-  not the whole field). Same getMoveTargets adjacency wiring.
-- [ ] **Adjacency EXCEPTIONS** (must bypass the reach restriction, hit anyone):
-  - Flying-type attacks (Hurricane, Air Slash, etc.).
-  - Pulse moves: Dark/Dragon/Water Pulse, Aura Sphere (the `PULSE`/ball-bomb-like flag).
-  These already exist as move flags/types; the adjacency filter must whitelist them.
+- [x] **Positional adjacency targeting** - THE defining triple mechanic. A wing reaches only the
+  opposed foe + the centre, NOT the far diagonal; the centre reaches all. DONE: getMoveTargets
+  filters NEAR_* by arrangement.isAdjacent (er-triple-adjacency.test.ts). Binary byte-identical.
+- [x] **Spread moves limited by adjacency** (Rock Slide from a wing hits centre + opposed, not the
+  far foe) - same filter, verified.
+- [x] **Adjacency EXCEPTIONS** (bypass the reach restriction, hit anyone): FLYING-type attacks and
+  PULSE moves (Dark/Water/Dragon Pulse, Aura Sphere) - whitelisted in getMoveTargets, verified.
 - [x] Field-wide effects ignore adjacency: weather, terrain, Trick Room - already field-wide.
 - [x] Wide Guard / Quick Guard protect the WHOLE side (not just adjacent) - already side-scoped.
-- [~] Helping Hand / ally-target moves (NEAR_ALLY) - needs getAllies (done) + the ally branch in
-  getMoveTargets (P2).
+- [x] Helping Hand / ally-target moves (NEAR_ALLY) - getMoveTargets now builds the ally set from
+  getAllies() (both triple allies) + adjacency-filters NEAR_ALLY.
 - [x] Field-scoped abilities span 2 allies / all foes (Intimidate-all, Power Spot both allies,
   Beads of Ruin, Friend Guard) - flow through getOpponents / getAllies (getAllies now returns 2).
 - [~] Redirection (Follow Me / Rage Powder / Lightning Rod) - works by battler index; should be
   adjacency-gated (only redirect moves that could legally reach the redirector).
 - [x] Fake Out, Faint (breaks Protect/Wide Guard), Imprison - existing move behaviour, format-agnostic.
-- [opt] **Shift command** - a wing may swap with its own centre, consuming the turn (reposition a
-  strong mon into the centre / dodge). Triple-EXCLUSIVE command PokeRogue doesn't have. Nice-to-have,
-  not required for triples to function.
+- [~] **Shift command** - a mon swaps field position with an active ally, consuming the turn
+  (reposition a strong mon into the centre / dodge). Accessed via the PARTY MENU in triples
+  (maintainer's chosen route). IN PROGRESS.
 
-Bottom line: the FOUNDATION + the "free" field/side-wide behaviours are in; the headline gameplay
-gap is wiring positional adjacency (+ the flying/pulse exceptions) into `getMoveTargets` and the
-target-select cursor (P2, #224). Until then triples play like 3-wide doubles (every foe reachable).
+Bottom line: the FOUNDATION + the defining adjacency mechanic (+ flying/pulse exceptions) + the
+field/side-wide behaviours are all DONE and headless-verified. Remaining: the Shift command (in
+progress) and the player-facing 3-wide target-select CURSOR polish (the engine returns the correct
+restricted target set; the manual-targeting cursor nav math still assumes 2 columns - UI polish, #226).
 
 ## Headless verification anchors
 
