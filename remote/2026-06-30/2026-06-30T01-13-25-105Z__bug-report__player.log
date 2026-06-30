@@ -1,0 +1,270 @@
+----- BUG REPORT (in-game) -----
+version:  1.11.19
+url:      https://elite-redux.pages.dev/
+ua:       Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36
+mode:     0  wave:102  difficulty:ace
+seed:     aEfsrhgaVBT0UCrhGM7i0awy
+party:    Zygarde(L86 281/302), Kecleon(L85 222/222), Morpekyll(L85 269/269), Dustox(L85 265/265)
+
+----- DESCRIPTION -----
+Bleed is active permanently
+
+----- CONSOLE -----
+[01:10:29.431] WARN: [coop:turn] host recorder: finalize with NO open recording -> turn=-1 events=0 (caller decides not to emit)
+[01:10:29.431] LOG: %cStart Phase DamageAnimPhase color:green;
+[01:10:29.432] LOG: %cStart Phase TurnInitPhase color:green;
+[01:10:29.432] LOG: %cStart Phase CommandPhase color:green;
+[01:10:29.768] LOG: Move: THOUSAND_ARROWS Move targets: {"targets":[2],"multiple":true} 
+Player Pokemon: Zygarde
+[01:10:29.768] LOG: %cStart Phase EnemyCommandPhase color:green;
+[01:10:29.769] LOG: Battle Seed: 6spAzykwWUmpNeYQ
+[01:10:29.770] LOG: Move Pool: ["Boomburst","Parting Shot","Uproar (P)","Flatter"]
+[01:10:29.770] LOG: Move Scores: [31.5,-16,27,3]
+[01:10:29.770] LOG: Sorted Move Pool: ["Boomburst","Uproar (P)","Flatter","Parting Shot"]
+[01:10:29.770] LOG: Chosen Move: Boomburst
+[01:10:29.770] LOG: %cStart Phase TurnStartPhase color:green;
+[01:10:29.771] LOG: %cStart Phase MovePhase color:green;
+[01:10:29.771] LOG: %cUser: Exploud
+Move: BOOMBURST
+Use Mode: NORMAL color:orchid
+[01:10:29.771] LOG: %cStart Phase MessagePhase color:green;
+[01:10:30.049] LOG: %cStart Phase MoveEffectPhase color:green;
+[01:10:30.486] LOG: crit stage: +0
+[01:10:30.487] LOG: Move: Boomburst | Base damage: 100.19706329113924 | Power: 182 | Source attack: 216 | Target defense: 237
+[01:10:30.487] LOG: Move: Boomburst | Attack damage: 86
+[01:10:30.487] LOG: %cStart Phase DamageAnimPhase color:green;
+[01:10:30.499] LOG: %cStart Phase DamageAnimPhase color:green;
+[01:10:30.500] LOG: %cStart Phase MessagePhase color:green;
+[01:10:31.080] LOG: %cStart Phase MoveEndPhase color:green;
+[01:10:31.080] LOG: %cStart Phase MovePhase color:green;
+[01:10:31.080] LOG: %cUser: Zygarde
+Move: THOUSAND_ARROWS
+Use Mode: NORMAL color:orchid
+[01:10:31.081] LOG: %cStart Phase MessagePhase color:green;
+[01:10:31.361] LOG: %cStart Phase MoveEffectPhase color:green;
+[01:10:31.362] LOG: Applied Wide Lens 
+[01:10:32.555] LOG: crit stage: +0
+[01:10:32.556] LOG: Move: Thousand Arrows | Base damage: 180.0112125984252 | Power: 108 | Source attack: 294 | Target defense: 127
+[01:10:32.556] LOG: Move: Thousand Arrows | Attack damage: 234
+[01:10:32.556] LOG: Applied Shell Bell 
+[01:10:32.556] LOG: %cStart Phase DamageAnimPhase color:green;
+[01:10:32.568] LOG: %cStart Phase PokemonHealPhase color:green;
+[01:10:32.792] LOG: %cStart Phase FaintPhase color:green;
+[01:10:34.693] LOG: %cStart Phase MessagePhase color:green;
+[01:10:34.967] LOG: %cStart Phase VictoryPhase color:green;
+[01:10:34.968] LOG: Applied Soothe Bell 
+[01:10:34.968] LOG: %cStart Phase ExpPhase color:green;
+[01:10:34.968] LOG: Applied Super EXP. Charm 
+[01:10:34.968] LOG: Applied EXP. Charm 
+[01:10:35.599] LOG: %cStart Phase LevelUpPhase color:green;
+[01:10:35.599] LOG: Applied Protein 
+[01:10:35.599] LOG: Applied Zinc 
+[01:10:35.599] LOG: Applied Iron 
+[01:10:36.162] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[01:10:36.162] LOG: Applied Super EXP. Charm 
+[01:10:36.162] LOG: Applied EXP. Charm 
+[01:10:36.480] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[01:10:36.611] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[01:10:36.611] LOG: Applied Super EXP. Charm 
+[01:10:36.611] LOG: Applied EXP. Charm 
+[01:10:36.930] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[01:10:37.061] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[01:10:37.061] LOG: Applied Super EXP. Charm 
+[01:10:37.061] LOG: Applied EXP. Charm 
+[01:10:37.381] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[01:10:37.511] LOG: %cStart Phase MoveEndPhase color:green;
+[01:10:37.511] LOG: %cStart Phase CheckInterludePhase color:green;
+[01:10:37.511] LOG: %cStart Phase WeatherEffectPhase color:green;
+[01:10:37.511] LOG: %cStart Phase PositionalTagPhase color:green;
+[01:10:37.511] LOG: %cStart Phase BerryPhase color:green;
+[01:10:37.512] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[01:10:37.512] LOG: %cStart Phase TurnEndPhase color:green;
+[01:10:37.512] WARN: [coop:turn] host recorder: finalize with NO open recording -> turn=-1 events=0 (caller decides not to emit)
+[01:10:37.512] LOG: %cStart Phase DamageAnimPhase color:green;
+[01:10:37.512] LOG: %cStart Phase BattleEndPhase color:green;
+[01:10:37.512] LOG: Battle Score: 259 (2 Turns x0.88)
+[01:10:37.513] LOG: Total Score: 16243
+[01:10:37.513] LOG: Applied Protein 
+[01:10:37.513] LOG: Applied Zinc 
+[01:10:37.513] LOG: Applied Iron 
+[01:10:37.516] LOG: Applied Protein 
+[01:10:37.516] LOG: Applied Zinc 
+[01:10:37.516] LOG: Applied Iron 
+[01:10:37.517] LOG: %cStart Phase ShowAbilityPhase color:green;
+[01:10:37.517] LOG: %cStart Phase MessagePhase color:green;
+[01:10:38.067] LOG: %cStart Phase HideAbilityPhase color:green;
+[01:10:38.117] LOG: %cStart Phase EggLapsePhase color:green;
+[01:10:38.118] LOG: %cStart Phase SelectModifierPhase color:green;
+[01:10:38.118] LOG: Wave Seed: ÆªËØ×ÍÌÆ»§¹º¨×Í¬²ÎÆÜÞ 101
+[01:10:38.119] LOG: Applied Golden Poké Ball 
+[01:10:38.119] LOG: 5 0 [8,10,11,12,14,23]
+[01:10:38.119] LOG: ULTRA 0
+[01:10:38.119] LOG: 32 6 [8,10,11,12,14,23]
+[01:10:38.119] LOG: {"id":"ER_DEX_NAV","localeKey":"","iconImage":"dex_nav","soundName":"se/restore","tier":2} 
+[01:10:38.119] LOG: 7 2 [4,5]
+[01:10:38.119] LOG: {"id":"TEMP_STAT_STAGE_BOOSTER","localeKey":"","iconImage":"x_sp_def","soundName":"se/restore","tier":0,"stat":4,"nameKey":"x_sp_def","quantityKey":"percentage"} 
+[01:10:38.119] LOG: 2 0 [4,5]
+[01:10:38.119] LOG: {"id":"POTION","localeKey":"modifierType:ModifierType.POTION","iconImage":"potion","group":"potion","soundName":"se/restore","tier":0,"restorePoints":20,"restorePercent":10,"healStatus":false} 
+[01:10:38.119] LOG: 1 0 [4,5]
+[01:10:38.119] LOG: {"id":"RARE_CANDY","localeKey":"modifierType:ModifierType.RARE_CANDY","iconImage":"rare_candy","soundName":"se/restore","tier":0} 
+[01:10:38.119] LOG: 6 2 [4,5]
+[01:10:38.119] LOG: {"id":"LURE","localeKey":"modifierType:ModifierType.LURE","iconImage":"lure","group":"lure","soundName":"se/restore","tier":0,"maxBattles":10} 
+[01:10:38.119] LOG: 2 0 [4,5]
+[01:10:38.119] LOG: {"id":"POTION","localeKey":"modifierType:ModifierType.POTION","iconImage":"potion","group":"potion","soundName":"se/restore","tier":0,"restorePoints":20,"restorePercent":10,"healStatus":false} 
+[01:10:38.119] LOG: 0 0 [4,5]
+[01:10:38.119] LOG: {"id":"POKEBALL","localeKey":"","iconImage":"pb","group":"pb","soundName":"se/pb_bounce_1","tier":0,"pokeballType":0,"count":5} 
+[01:10:38.119] LOG: 1 0 [4,5]
+[01:10:38.119] LOG: {"id":"RARE_CANDY","localeKey":"modifierType:ModifierType.RARE_CANDY","iconImage":"rare_candy","soundName":"se/restore","tier":0} 
+[01:10:38.119] LOG: 9 2 [4,5]
+[01:10:38.119] LOG: {"id":"TM_CASE","localeKey":"","iconImage":"tm_case","soundName":"se/restore","tier":0} 
+[01:10:38.119] LOG: 2 0 [4,5]
+[01:10:38.119] LOG: {"id":"POTION","localeKey":"modifierType:ModifierType.POTION","iconImage":"potion","group":"potion","soundName":"se/restore","tier":0,"restorePoints":20,"restorePercent":10,"healStatus":false} 
+[01:10:38.119] LOG: 7 2 [4,5]
+[01:10:38.119] LOG: {"id":"TEMP_STAT_STAGE_BOOSTER","localeKey":"","iconImage":"x_speed","soundName":"se/restore","tier":0,"stat":5,"nameKey":"x_speed","quantityKey":"percentage"} 
+[01:10:38.119] LOG: 3 0 [4,5]
+[01:10:38.119] LOG: {"id":"SUPER_POTION","localeKey":"modifierType:ModifierType.SUPER_POTION","iconImage":"super_potion","group":"potion","soundName":"se/restore","tier":0,"restorePoints":50,"restorePercent":25,"healStatus":false} 
+[01:10:38.119] LOG: 0 0 [4,5]
+[01:10:38.119] LOG: {"id":"POKEBALL","localeKey":"","iconImage":"pb","group":"pb","soundName":"se/pb_bounce_1","tier":0,"pokeballType":0,"count":5} 
+[01:10:38.119] LOG: 7 2 [4,5]
+[01:10:38.119] LOG: {"id":"TEMP_STAT_STAGE_BOOSTER","localeKey":"","iconImage":"x_attack","soundName":"se/restore","tier":0,"stat":1,"nameKey":"x_attack","quantityKey":"percentage"} 
+[01:10:38.119] LOG: 8 2 [4,5]
+[01:10:38.119] LOG: {"id":"BERRY","localeKey":"","iconImage":"leppa_berry","group":"berry","soundName":"se/restore","tier":0,"berryType":10} 
+[01:10:42.862] LOG: %cStart Phase ErDexNavPhase color:green;
+[01:10:47.145] LOG: %cStart Phase NewBattlePhase color:green;
+[01:10:47.145] LOG: Wave Seed: Ç«ÌÙØÎÍÇ¼¨º»©ØÎ­³ÏÇÝß 102
+[01:10:47.145] LOG: Starting trainer pool tier: COMMON
+[01:10:47.146] LOG: %cStart Phase ReturnPhase color:green;
+[01:10:47.405] LOG: %cStart Phase ShowTrainerPhase color:green;
+[01:10:47.661] LOG: %cStart Phase NextEncounterPhase color:green;
+[01:10:47.661] LOG: COMMON
+[01:10:47.661] LOG: Rexcadrill
+[01:10:47.667] LOG: Pokemon: Foe Rexcadrill | Species ID: 10658 | Level: 81 | Nature: Naughty (+Atk/-SpDef)
+[01:10:47.667] LOG: Stats (IVs): HP: 288 (27), Atk: 259 (31), Def: 167 (11), Spatk: 100 (24), Spdef: 165 (19), Spd: 136 (11)
+[01:10:47.667] LOG: Ability: Tough Claws | Passive Ability: Rock Armor 
+[01:10:47.667] LOG: Moveset: ["Headlong Rush","Dragon Rush","Head Smash","Rock Polish"]
+[01:10:47.672] LOG: Pokemon: Foe Rexcadrill | Species ID: 10658 | Level: 81 | Nature: Docile (-)
+[01:10:47.672] LOG: Stats (IVs): HP: 287 (22), Atk: 227 (30), Def: 143 (29), Spatk: 98 (21), Spdef: 194 (13), Spd: 137 (18)
+[01:10:47.672] LOG: Ability: Hardened Sheath | Passive Ability: Rock Armor 
+[01:10:47.672] LOG: Moveset: ["Seismic Fist","Dragon Claw","Stealth Rock","Head Smash"]
+[01:10:47.672] LOG: UNCOMMON
+[01:10:47.672] LOG: Rhydon
+[01:10:47.676] LOG: Pokemon: Foe Rhydon | Species ID: 112 | Level: 81 | Nature: Mild (+SpAtk/-Def)
+[01:10:47.676] LOG: Stats (IVs): HP: 263 (28), Atk: 218 (15), Def: 191 (17), Spatk: 87 (13), Spdef: 95 (27), Spd: 86 (10)
+[01:10:47.676] LOG: Ability: Lightning Rod | Passive Ability: Solid Rock 
+[01:10:47.676] LOG: Moveset: ["Strength","Headlong Rush","Attract","Megahorn"]
+[01:10:47.741] LOG: {"id":"BASE_STAT_BOOSTER","localeKey":"","iconImage":"iron","soundName":"se/restore","tier":0,"stat":2,"key":"iron"} (enemy)
+[01:10:47.741] LOG: {"id":"BERRY","localeKey":"","iconImage":"enigma_berry","group":"berry","soundName":"se/restore","tier":0,"berryType":2} (enemy)
+[01:10:47.741] LOG: Battle Seed: OV2lF6jWMCSDbDx2
+[01:10:47.741] LOG: Applied Protein (enemy)
+[01:10:47.741] LOG: Applied Calcium (enemy)
+[01:10:47.741] LOG: Applied Zinc (enemy)
+[01:10:47.741] LOG: Applied Protein (enemy)
+[01:10:47.741] LOG: Applied Calcium (enemy)
+[01:10:47.741] LOG: Applied Zinc (enemy)
+[01:10:47.742] LOG: Applied Iron (enemy)
+[01:10:47.742] LOG: Generated AI funcs
+[01:10:47.783] DEBUG: Session data saved to slot 0!
+[01:10:47.783] LOG: Wave Seed: Ç«ÌÙØÎÍÇ¼¨º»©ØÎ­³ÏÇÝß 102
+[01:10:48.286] LOG: Hiker Parry
+[01:10:48.286] LOG: Dialogue dialogue:hiker.encounter.1 skipped
+[01:10:48.361] LOG: Hiker Parry
+[01:10:49.042] LOG: %cStart Phase SummonPhase color:green;
+[01:10:49.042] LOG: Parry
+[01:10:49.342] LOG: Applied Protein (enemy)
+[01:10:49.342] LOG: Applied Calcium (enemy)
+[01:10:49.342] LOG: Applied Zinc (enemy)
+[01:10:49.342] LOG: Applied Iron (enemy)
+[01:10:49.411] WARN: cry/10658 not found
+[01:10:49.667] LOG: %cStart Phase SummonPhase color:green;
+[01:10:50.029] LOG: Applied Protein 
+[01:10:50.030] LOG: Applied Zinc 
+[01:10:50.030] LOG: Applied Iron 
+[01:10:50.342] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[01:10:50.342] LOG: %cStart Phase InitEncounterPhase color:green;
+[01:10:50.343] LOG: %cStart Phase PostSummonPhase color:green;
+[01:10:50.343] LOG: Ran PSP for: Zygarde
+[01:10:50.343] LOG: %cStart Phase PostSummonPhase color:green;
+[01:10:50.343] LOG: %cStart Phase PostSummonPhase color:green;
+[01:10:50.343] LOG: %cStart Phase PostSummonPhase color:green;
+[01:10:50.343] LOG: Ran PSP for: Rexcadrill
+[01:10:50.343] LOG: %cStart Phase PostSummonPhase color:green;
+[01:10:50.343] LOG: %cStart Phase PostSummonPhase color:green;
+[01:10:50.343] LOG: %cStart Phase ShowAbilityPhase color:green;
+[01:10:50.723] LOG: %cStart Phase HideAbilityPhase color:green;
+[01:10:50.780] LOG: %cStart Phase TurnInitPhase color:green;
+[01:10:50.780] LOG: %cStart Phase CommandPhase color:green;
+[01:10:52.904] LOG: Move: THOUSAND_ARROWS Move targets: {"targets":[2],"multiple":true} 
+Player Pokemon: Zygarde
+[01:10:52.905] LOG: %cStart Phase EnemyCommandPhase color:green;
+[01:10:52.907] LOG: Move Pool: ["Dragon Rush"]
+[01:10:52.907] LOG: Move Scores: [54]
+[01:10:52.907] LOG: Sorted Move Pool: ["Dragon Rush"]
+[01:10:52.907] LOG: Chosen Move: Dragon Rush
+[01:10:52.907] LOG: %cStart Phase TurnStartPhase color:green;
+[01:10:52.908] LOG: %cStart Phase MovePhase color:green;
+[01:10:52.908] LOG: %cUser: Zygarde
+Move: THOUSAND_ARROWS
+Use Mode: NORMAL color:orchid
+[01:10:52.908] LOG: %cStart Phase MessagePhase color:green;
+[01:10:53.185] LOG: %cStart Phase MoveEffectPhase color:green;
+[01:10:53.186] LOG: Applied Wide Lens 
+[01:10:54.379] LOG: crit stage: +0
+[01:10:54.380] LOG: Move: Thousand Arrows | Base damage: 154.43019867549668 | Power: 108 | Source attack: 296 | Target defense: 151
+[01:10:54.380] LOG: Move: Thousand Arrows | Attack damage: 412
+[01:10:54.380] LOG: Applied Shell Bell 
+[01:10:54.380] LOG: %cStart Phase DamageAnimPhase color:green;
+[01:10:54.392] LOG: %cStart Phase MessagePhase color:green;
+[01:10:54.885] LOG: %cStart Phase PokemonHealPhase color:green;
+[01:10:55.104] LOG: %cStart Phase FaintPhase color:green;
+[01:10:55.105] WARN: cry/10658 not found
+[01:10:55.229] LOG: %cStart Phase MessagePhase color:green;
+[01:10:55.504] LOG: %cStart Phase VictoryPhase color:green;
+[01:10:55.504] LOG: Applied Soothe Bell 
+[01:10:55.504] LOG: %cStart Phase ExpPhase color:green;
+[01:10:55.504] LOG: Applied Super EXP. Charm 
+[01:10:55.504] LOG: Applied EXP. Charm 
+[01:10:56.392] LOG: %cStart Phase LevelUpPhase color:green;
+[01:10:56.392] LOG: Applied Protein 
+[01:10:56.392] LOG: Applied Zinc 
+[01:10:56.392] LOG: Applied Iron 
+[01:10:56.942] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[01:10:56.942] LOG: Applied Super EXP. Charm 
+[01:10:56.942] LOG: Applied EXP. Charm 
+[01:10:57.268] LOG: %cStart Phase LevelUpPhase color:green;
+[01:10:57.767] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[01:10:57.898] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[01:10:57.898] LOG: Applied Super EXP. Charm 
+[01:10:57.899] LOG: Applied EXP. Charm 
+[01:10:58.229] LOG: %cStart Phase LevelUpPhase color:green;
+[01:10:58.823] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[01:10:58.954] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[01:10:58.954] LOG: Applied Super EXP. Charm 
+[01:10:58.954] LOG: Applied EXP. Charm 
+[01:10:59.279] LOG: %cStart Phase LevelUpPhase color:green;
+[01:10:59.786] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[01:10:59.917] LOG: %cStart Phase MoveEndPhase color:green;
+[01:10:59.917] LOG: %cStart Phase MovePhase color:green;
+[01:10:59.917] LOG: %cStart Phase MoveEndPhase color:green;
+[01:10:59.917] LOG: %cStart Phase CheckInterludePhase color:green;
+[01:10:59.917] LOG: %cStart Phase WeatherEffectPhase color:green;
+[01:10:59.917] LOG: %cStart Phase PositionalTagPhase color:green;
+[01:10:59.917] LOG: %cStart Phase BerryPhase color:green;
+[01:10:59.917] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[01:10:59.917] LOG: %cStart Phase TurnEndPhase color:green;
+[01:10:59.917] WARN: [coop:turn] host recorder: finalize with NO open recording -> turn=-1 events=0 (caller decides not to emit)
+[01:10:59.917] LOG: %cStart Phase DamageAnimPhase color:green;
+[01:10:59.918] LOG: %cStart Phase SwitchSummonPhase color:green;
+[01:11:00.491] LOG: Parry
+[01:11:00.661] LOG: Applied Protein (enemy)
+[01:11:00.661] LOG: Applied Calcium (enemy)
+[01:11:00.661] LOG: Applied Zinc (enemy)
+[01:11:00.661] LOG: Applied Iron (enemy)
+[01:11:00.723] WARN: cry/10658 not found
+[01:11:00.979] LOG: %cStart Phase PostSummonPhase color:green;
+[01:11:00.979] LOG: Ran PSP for: Rexcadrill
+[01:11:00.979] LOG: %cStart Phase PostSummonPhase color:green;
+[01:11:00.979] LOG: %cStart Phase PostSummonPhase color:green;
+[01:11:00.980] LOG: %cStart Phase ShowAbilityPhase color:green;
+[01:11:01.360] LOG: %cStart Phase HideAbilityPhase color:green;
+[01:11:01.417] LOG: %cStart Phase TurnInitPhase color:green;
+[01:11:01.417] LOG: %cStart Phase CommandPhase color:green;
