@@ -1,0 +1,33 @@
+{
+  "screenTitle": "Ghost Trainer Editor",
+  "rowEntrance": "ENTRANCE EFFECT",
+  "rowAura": "AURA EFFECT",
+  "none": "None",
+  "balance": "AP {{amount}}",
+  "lockedValue": "{{name}}  {{cost}} AP",
+  "helpNone": "No {{noun}} effect. Left / Right browses unlockable effects.  You have {{balance}} AP.",
+  "helpLocked": "Locked. Press A to unlock for {{cost}} AP.  You have {{balance}} AP.",
+  "helpEquipped": "Equipped. Press A to remove it.  You have {{balance}} AP.",
+  "helpEquip": "Press A to equip this {{noun}} (free).  You have {{balance}} AP.",
+  "cannotAfford": "Not enough achievement points.",
+  "entranceNoun": "entrance",
+  "auraNoun": "aura",
+  "entrances": {
+    "riseFromGround": "Rise From Ground",
+    "fogMaterialize": "Fog Materialize",
+    "flashIn": "Flash In",
+    "shadowStep": "Shadow Step",
+    "descendFromAbove": "Descend From Above",
+    "reverseDissolve": "Reverse Dissolve"
+  },
+  "auras": {
+    "smoke": "Smoke",
+    "embers": "Embers",
+    "frost": "Frost",
+    "shadowaura": "Shadow Aura",
+    "goldenglow": "Golden Glow",
+    "holyrays": "Holy Rays",
+    "cosmos": "Cosmos",
+    "sparkstorm": "Spark Storm"
+  }
+}

@@ -1152,6 +1152,17 @@ export function markTrainerAsGhost(trainer: Trainer, snapshot: GhostTeamSnapshot
     if (lossLines.length > 0) {
       trainer.getDefeatMessages = () => lossLines.map(l => resolveGhostDialogue(l, buildGhostDialogueCtx()));
     }
+    // ER Ghost Trainer FX: the equipped entrance + aura. Both arrive already
+    // clamped by sanitizeGhostProfile (approach -> known enum, aura -> known
+    // AROUND id), so an untrusted peer can't smuggle an arbitrary effect. The
+    // entrance is consumed by the per-trainer tween in encounter-phase; the aura
+    // overlay is built lazily once the trainer is revealed (applyErGhostAuraFx).
+    if (pres.approach && pres.approach !== "default") {
+      trainer.erGhostApproach = pres.approach;
+    }
+    if (pres.aura && pres.showAuraInBattle) {
+      trainer.erGhostAura = pres.aura;
+    }
   }
 }
 

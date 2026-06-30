@@ -11242,4 +11242,35 @@ export const DEV_SCENARIOS: DevScenario[] = [
       ];
     },
   },
+  {
+    label: "(note) Ghost Trainer FX: entrance + aura (editor)",
+    description:
+      "Ghost Trainer FX - cosmetic ENTRANCE arrival + AURA overlay for YOUR published ghost.\n"
+      + "Not battle-testable in one forced fight: the effects ride on the profile that publishes\n"
+      + "with YOUR runs, and you only SEE them when ANOTHER player encounters your ghost (the\n"
+      + "ghost pool is server-side). So verify it in TWO parts.\n"
+      + "PART 1 - the editor + the AP shop (do this now):\n"
+      + "  Title -> PROFILE -> Ghost Trainer Editor. The header shows your spendable AP (the\n"
+      + "  achievement-point balance). Scroll to ENTRANCE EFFECT and AURA EFFECT. Left / Right\n"
+      + "  browses; a LOCKED effect is greyed and shows its AP cost. Press A on a locked effect to\n"
+      + "  BUY it (AP drops, a buy sound plays, it auto-equips); press A on an owned effect to\n"
+      + "  equip / unequip it (free). The preview pane re-plays the entrance every ~3s and holds\n"
+      + "  the aura around the trainer sprite. PUBLISH PROFILE saves it. EXPECT: you can only buy\n"
+      + "  what you can afford (an error sound otherwise), AP never goes negative, the balance and\n"
+      + "  achievements are never altered (it only spends the SPENDABLE pool), and re-opening the\n"
+      + "  editor re-seeds your equipped picks.\n"
+      + "PART 2 - on a ghost (needs a live ghost pool): start a Ghost Trainers challenge (or reach\n"
+      + "  the endgame ghost waves / the Graveyard 'Unfinished Business' ME). EXPECT a ghost whose\n"
+      + "  uploader equipped FX ARRIVES with its entrance effect (rise / fog / flash / shadow /\n"
+      + "  descend / dissolve - not the plain slide-in) and shows its aura overlay during the\n"
+      + "  encounter. If anything is off, press Send Logs.",
+    setup: () => {
+      resetDevOverrides();
+      return [
+        makeStarter(SpeciesId.GENGAR, {
+          moveset: [MoveId.SHADOW_BALL, MoveId.SLUDGE_BOMB, MoveId.THUNDERBOLT, MoveId.DAZZLING_GLEAM],
+        }),
+      ];
+    },
+  },
 ];

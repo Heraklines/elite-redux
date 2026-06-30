@@ -34,6 +34,7 @@ import { getErResistBerryEntries, restoreErResistBerries } from "#data/elite-red
 import { getErDifficulty, getErDifficultyCandyMultiplier, setErDifficulty } from "#data/elite-redux/er-run-difficulty";
 import { ER_CANDY_GAIN_MULTIPLIER, getRunCandyMultiplier } from "#data/elite-redux/er-shiny-favour";
 import { grantErShinyLabSavedLookToSave, mergeErShinyLabSaveData } from "#data/elite-redux/er-shiny-lab-effects";
+import { sanitizeTrainerFxSaveData, type TrainerFxSaveData } from "#data/elite-redux/er-trainer-fx";
 import { getErUsedTrainerKeys, restoreErRunTrainerTracking } from "#data/elite-redux/er-trainer-runtime-hook";
 import { getErWardStoneEntries, restoreErWardStones } from "#data/elite-redux/er-ward-stones";
 import { pokemonFormChanges } from "#data/pokemon-forms";
@@ -65,6 +66,7 @@ import * as Modifier from "#modifiers/modifier";
 import { MysteryEncounterSaveData } from "#mystery-encounters/mystery-encounter-save-data";
 import type { Variant } from "#sprites/variant";
 import { achvs } from "#system/achv";
+import { computeAchvProgress } from "#system/achv-category";
 import { ArenaData, type SerializedArenaData } from "#system/arena-data";
 import {
   type AutoEggRestockSettings,
@@ -155,6 +157,8 @@ const systemShortKeys = {
   erShinyLabAvailableEffects: "$esla",
   erShinyLab: "$esl",
   ghostProfile: "$gp",
+  spentAchvPoints: "$sap",
+  trainerFx: "$tfx",
 };
 
 const CLOUD_SYNC_MIN_INTERVAL_MS = 20 * 60 * 1000;
@@ -266,6 +270,10 @@ export class GameData {
   public erShinyLabAvailableEffects: number[] = [];
   /** ER Ghost Trainer Editor: the player's authored ghost presentation profile. */
   public ghostProfile: GhostTrainerProfile | null = null;
+  /** ER Ghost Trainer FX: total achievement points already spent unlocking effects. */
+  public spentAchvPoints = 0;
+  /** ER Ghost Trainer FX: owned entrance/aura effect bitsets + equipped picks. */
+  public trainerFx: TrainerFxSaveData = {};
 
   /**
    * One-time gift flag: set `true` once the player has received the free 2
@@ -316,6 +324,8 @@ export class GameData {
     this.unlockPity = [0, 0, 0, 0];
     this.erShinyLabAvailableEffects = [];
     this.ghostProfile = null;
+    this.spentAchvPoints = 0;
+    this.trainerFx = {};
     this.autoEggRestock = defaultAutoEggRestockSettings();
     this.llmDirectorState = defaultDirectorState();
     this.initDexData();
@@ -345,6 +355,8 @@ export class GameData {
       freeLegendaryEggsGranted: this.freeLegendaryEggsGranted,
       erShinyLabAvailableEffects: this.erShinyLabAvailableEffects.slice(0),
       ghostProfile: this.ghostProfile,
+      spentAchvPoints: this.spentAchvPoints,
+      trainerFx: this.trainerFx,
     };
   }
 
@@ -365,6 +377,33 @@ export class GameData {
     }
     this.freeLegendaryEggsGranted = true;
     console.log("[er-gift] granted 2 free Legendary eggs (one-time)");
+  }
+
+  /**
+   * ER Ghost Trainer FX currency: the player's SPENDABLE achievement points.
+   * There is no stored total - it is derived live from `achvUnlocks` (the sum of
+   * `score` over unlocked achievements) MINUS the persisted {@linkcode spentAchvPoints}
+   * counter. This is the game's first AP sink; spending NEVER mutates achvUnlocks.
+   */
+  public getSpendableAchvPoints(): number {
+    const earned = computeAchvProgress(this.achvUnlocks).overall.earnedScore;
+    return Math.max(0, earned - Math.max(0, this.spentAchvPoints || 0));
+  }
+
+  /**
+   * Spend `amount` achievement points. Returns `false` (and changes nothing) when
+   * the player can't afford it; otherwise increments {@linkcode spentAchvPoints},
+   * persists the system save, and returns `true`. Callers should set the relevant
+   * owned bit BEFORE calling so it is captured in the same save.
+   */
+  public spendAchvPoints(amount: number): boolean {
+    const cost = Math.max(0, Math.round(amount));
+    if (cost > this.getSpendableAchvPoints()) {
+      return false;
+    }
+    this.spentAchvPoints = Math.max(0, this.spentAchvPoints || 0) + cost;
+    void this.saveSystem();
+    return true;
   }
 
   /**
@@ -866,6 +905,8 @@ export class GameData {
     this.erShinyLabAvailableEffects =
       systemData.erShinyLabAvailableEffects?.map(v => Math.max(0, Math.min(255, Math.round(v)))) ?? [];
     this.ghostProfile = sanitizeGhostProfile(systemData.ghostProfile) ?? null;
+    this.spentAchvPoints = Math.max(0, Math.round(systemData.spentAchvPoints ?? 0));
+    this.trainerFx = sanitizeTrainerFxSaveData(systemData.trainerFx) ?? {};
 
     this.eggPity = systemData.eggPity ? systemData.eggPity.slice(0) : [0, 0, 0, 0];
     this.unlockPity = systemData.unlockPity ? systemData.unlockPity.slice(0) : [0, 0, 0, 0];

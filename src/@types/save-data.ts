@@ -6,6 +6,7 @@ import type { ErMapSaveData } from "#data/elite-redux/er-map-nodes";
 import type { ErRelicBattleStateData } from "#data/elite-redux/er-relic-battle-state";
 import type { ErDifficulty } from "#data/elite-redux/er-run-difficulty";
 import type { ErShinyLabSaveData } from "#data/elite-redux/er-shiny-lab-effects";
+import type { TrainerFxSaveData } from "#data/elite-redux/er-trainer-fx";
 import type { BattleType } from "#enums/battle-type";
 import type { GameModes } from "#enums/game-modes";
 import type { MoveId } from "#enums/move-id";
@@ -61,6 +62,11 @@ export interface SystemSaveData {
    *  (sprite/name/title/dialogue/FX). null/absent = the default random ghost.
    *  A snapshot of this rides along on each published ghost (runs.presentation). */
   ghostProfile?: GhostTrainerProfile | null;
+  /** ER Ghost Trainer FX: total achievement points SPENT unlocking effects. The
+   *  spendable balance = derived earnedScore - spentAchvPoints. Absent = 0. */
+  spentAchvPoints?: number;
+  /** ER Ghost Trainer FX: owned entrance/aura effect bitsets + equipped picks. */
+  trainerFx?: TrainerFxSaveData;
 }
 
 export interface SessionSaveData {

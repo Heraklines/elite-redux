@@ -36,11 +36,23 @@ import {
   type GhostTrainerProfile,
   sanitizeGhostProfile,
 } from "#data/elite-redux/er-ghost-profile";
+import {
+  buildTrainerEntranceTween,
+  isTrainerAuraOwned,
+  isTrainerEntranceOwned,
+  setEquippedTrainerAura,
+  setEquippedTrainerEntrance,
+  setTrainerAuraOwned,
+  setTrainerEntranceOwned,
+  TRAINER_AURA_EFFECTS,
+  TRAINER_ENTRANCE_EFFECTS,
+} from "#data/elite-redux/er-trainer-fx";
 import { trainerConfigs } from "#data/trainers/trainer-config";
 import { Button } from "#enums/buttons";
 import { TextStyle } from "#enums/text-style";
 import { TrainerType } from "#enums/trainer-type";
 import { UiMode } from "#enums/ui-mode";
+import { ErTrainerAuraFx } from "#sprites/er-trainer-aura-fx";
 import { addTextObject } from "#ui/text";
 import { UiHandler } from "#ui/ui-handler";
 
@@ -57,6 +69,8 @@ const INK = "#d8c9a8";
 const DIM = "#8a8470";
 const ACTIVE_RED = 0xd8542a;
 const ACCENT = 0x5ad1ff;
+/** Text colour for an equipped / spendable-AP value (the cyan accent as a hex string). */
+const ACCENT_TXT = "#7fd6ff";
 
 // --- Field list geometry (left column) ---
 const LIST_X = 6;
@@ -131,13 +145,20 @@ const CANDIDATE_CLASSES: TrainerType[] = [
 ];
 
 type TextField = "displayName" | "title" | "intro" | "defeatPlayer" | "defeated";
-type RowKind = "sprite" | "female" | TextField | "publish";
+/** The two Ghost Trainer FX rows (entrance arrival effect + aura overlay). */
+type FxKind = "entrance" | "aura";
+type RowKind = "sprite" | "female" | TextField | FxKind | "publish";
 
 interface FieldRow {
   readonly kind: RowKind;
 }
 
-/** The mutable working draft (GhostTrainerProfile fields are all optional; this is the editor's scratch). */
+/**
+ * The mutable working draft (GhostTrainerProfile fields are all optional; this is the editor's
+ * scratch). The Ghost Trainer FX picks use the save's 0-based encoding: `equipped*` is 0 for
+ * "none" else the catalog registry index + 1; `*Browse` is the LEFT/RIGHT cursor over the
+ * effect list (0 = the leading "None" entry, k = effect index k - 1).
+ */
 interface EditorDraft {
   spriteIndex: number;
   female: boolean;
@@ -146,6 +167,10 @@ interface EditorDraft {
   intro: string;
   defeatPlayer: string;
   defeated: string;
+  entranceBrowse: number;
+  equippedEntrance: number;
+  auraBrowse: number;
+  equippedAura: number;
 }
 
 /** A blank draft (the chosen sprite defaults to the canonical ghost class, Veteran). */
@@ -159,7 +184,16 @@ function defaultDraft(spriteTypes: TrainerType[]): EditorDraft {
     intro: "",
     defeatPlayer: "",
     defeated: "",
+    entranceBrowse: 0,
+    equippedEntrance: 0,
+    auraBrowse: 0,
+    equippedAura: 0,
   };
+}
+
+/** Clamp a stored equipped-FX index (0 = none, else registry index + 1) to its valid range. */
+function clampEquipIndex(value: number | undefined, count: number): number {
+  return typeof value === "number" && Number.isInteger(value) && value > 0 && value <= count ? value : 0;
 }
 
 /** Humanize a trainer enum name ("ACE_TRAINER" -> "Ace Trainer") for the value/preview label. */
@@ -185,12 +219,25 @@ export class GhostTrainerEditorUiHandler extends UiHandler {
     intro: "",
     defeatPlayer: "",
     defeated: "",
+    entranceBrowse: 0,
+    equippedEntrance: 0,
+    auraBrowse: 0,
+    equippedAura: 0,
   };
   private rowCursor = 0;
   /** Trainer atlases we have already queued a load for (avoids re-queuing / mock re-entrancy). */
   private readonly requestedAtlases = new Set<string>();
   /** Re-entrancy guard: the headless mock loader fires COMPLETE synchronously. */
   private rebuilding = false;
+  // ---- Live FX preview state (rebuilt with the dynamic container; torn down each rebuild) ----
+  /** The current preview trainer sprite (the entrance tween + aura overlay target). */
+  private previewSprite: Phaser.GameObjects.Sprite | null = null;
+  /** The equipped aura overlay held around the preview sprite (null = no aura / failed load). */
+  private previewAura: ErTrainerAuraFx | null = null;
+  /** The ~3s loop that re-plays the equipped entrance tween in the preview. */
+  private previewEntranceTimer: Phaser.Time.TimerEvent | null = null;
+  /** Monotonic counter to keep each preview aura overlay's render-texture key unique. */
+  private previewFxVersion = 0;
   /** Caller's clean-return-to-title callback (TitlePhase.openProfileHub). */
   private onExit: (() => void) | null = null;
 
@@ -250,6 +297,8 @@ export class GhostTrainerEditorUiHandler extends UiHandler {
     this.requestedAtlases.clear();
     // Load the player's current published profile (sanitized) into the draft, else start empty.
     this.seedFromProfile(sanitizeGhostProfile(globalScene.gameData.ghostProfile));
+    // Seed the equipped Ghost Trainer FX from the system save (the canonical owned/equipped store).
+    this.seedFxFromSave();
     this.rebuild();
     this.container.setVisible(true);
     // Opened OVER the Profile hub (another full-screen handler) - raise above it.
@@ -277,8 +326,22 @@ export class GhostTrainerEditorUiHandler extends UiHandler {
     this.draft.defeated = profile.dialogue?.defeated ?? "";
   }
 
+  /**
+   * Seed the equipped entrance + aura from `gameData.trainerFx`. That store is already
+   * sanitized on load (an equipped index only ever points at an OWNED effect), so the
+   * values are trustworthy; the browse cursor starts on the equipped effect.
+   */
+  private seedFxFromSave(): void {
+    const fx = globalScene.gameData.trainerFx;
+    this.draft.equippedEntrance = clampEquipIndex(fx.le, TRAINER_ENTRANCE_EFFECTS.length);
+    this.draft.entranceBrowse = this.draft.equippedEntrance;
+    this.draft.equippedAura = clampEquipIndex(fx.la, TRAINER_AURA_EFFECTS.length);
+    this.draft.auraBrowse = this.draft.equippedAura;
+  }
+
   clear(): void {
     super.clear();
+    this.teardownPreviewFx();
     this.container.setVisible(false);
     this.dynamic.removeAll(true);
   }
@@ -298,7 +361,14 @@ export class GhostTrainerEditorUiHandler extends UiHandler {
     if (this.currentHasGenders()) {
       rows.push({ kind: "female" });
     }
-    rows.push({ kind: "intro" }, { kind: "defeatPlayer" }, { kind: "defeated" }, { kind: "publish" });
+    rows.push(
+      { kind: "intro" },
+      { kind: "defeatPlayer" },
+      { kind: "defeated" },
+      { kind: "entrance" },
+      { kind: "aura" },
+      { kind: "publish" },
+    );
     return rows;
   }
 
@@ -313,12 +383,25 @@ export class GhostTrainerEditorUiHandler extends UiHandler {
       this.rowCursor = this.buildRows().length - 1;
     }
     this.rebuilding = true;
+    // The aura overlay + entrance-replay timer live OUTSIDE the dynamic container (their
+    // Phaser.Time events aren't child game objects), so tear them down explicitly before
+    // removeAll churns the preview sprite they target - otherwise they leak across rebuilds.
+    this.teardownPreviewFx();
     this.dynamic.removeAll(true);
     this.buildForm();
     this.rebuilding = false;
   }
 
   private buildForm(): void {
+    // Spendable AP balance (top-right of the header band). Lives in the dynamic container so it
+    // refreshes after a purchase. This is the game's first achievement-point sink.
+    const ap = addTextObject(SCREEN_W - 6, 3, `AP ${globalScene.gameData.getSpendableAchvPoints()}`, TextStyle.WINDOW, {
+      fontSize: "30px",
+      align: "right",
+    });
+    ap.setOrigin(1, 0).setColor(ACCENT_TXT);
+    this.dynamic.add(ap);
+
     const rows = this.buildRows();
     for (let i = 0; i < rows.length; i++) {
       this.buildRow(rows[i], LIST_Y + i * ROW_H, i === this.rowCursor);
@@ -356,7 +439,7 @@ export class GhostTrainerEditorUiHandler extends UiHandler {
     label.setOrigin(0, 0).setColor(focused ? GOLD : GOLD_DIM);
     this.dynamic.add(label);
 
-    const adjustable = row.kind === "sprite" || row.kind === "female";
+    const adjustable = row.kind === "sprite" || row.kind === "female" || row.kind === "entrance" || row.kind === "aura";
     const value = this.rowValue(row);
     const text = focused && adjustable ? `< ${value} >` : value;
     const v = addTextObject(VALUE_X, y, text, TextStyle.WINDOW, { fontSize: "28px", align: "right" });
@@ -380,6 +463,10 @@ export class GhostTrainerEditorUiHandler extends UiHandler {
         return "DEFEAT LINE";
       case "defeated":
         return "VICTORY LINE";
+      case "entrance":
+        return "ENTRANCE EFFECT";
+      case "aura":
+        return "AURA EFFECT";
       default:
         return "";
     }
@@ -401,6 +488,9 @@ export class GhostTrainerEditorUiHandler extends UiHandler {
         return this.draft.defeatPlayer ? this.truncate(this.draft.defeatPlayer, 16) : "(default)";
       case "defeated":
         return this.draft.defeated ? this.truncate(this.draft.defeated, 16) : "(default)";
+      case "entrance":
+      case "aura":
+        return this.fxRowValue(row.kind);
       default:
         return "";
     }
@@ -422,6 +512,9 @@ export class GhostTrainerEditorUiHandler extends UiHandler {
         return this.draft.defeatPlayer ? INK : DIM;
       case "defeated":
         return this.draft.defeated ? INK : DIM;
+      case "entrance":
+      case "aura":
+        return this.fxRowValueColor(row.kind);
       default:
         return INK;
     }
@@ -444,11 +537,89 @@ export class GhostTrainerEditorUiHandler extends UiHandler {
         return `Press A. Said when the ghost beats you. Tokens: ${tokens}`;
       case "defeated":
         return `Press A. Said when you beat the ghost. Tokens: ${tokens}`;
+      case "entrance":
+      case "aura":
+        return this.fxRowHelp(row.kind);
       case "publish":
         return "Press A to publish this profile to your save.";
       default:
         return "";
     }
+  }
+
+  // ---- Ghost Trainer FX rows ----------------------------------------------
+
+  /** The LEFT/RIGHT browse cursor for an FX row (0 = the "None" entry, k = effect k - 1). */
+  private fxBrowse(kind: FxKind): number {
+    return kind === "entrance" ? this.draft.entranceBrowse : this.draft.auraBrowse;
+  }
+
+  /** The equipped index for an FX row (0 = none, else registry index + 1). */
+  private fxEquipped(kind: FxKind): number {
+    return kind === "entrance" ? this.draft.equippedEntrance : this.draft.equippedAura;
+  }
+
+  /** True if the player owns the catalog effect at 0-based `effectIndex` in `kind`'s list. */
+  private fxOwned(kind: FxKind, effectIndex: number): boolean {
+    const fx = globalScene.gameData.trainerFx;
+    if (kind === "entrance") {
+      const id = TRAINER_ENTRANCE_EFFECTS[effectIndex]?.id;
+      return id != null && isTrainerEntranceOwned(fx, id);
+    }
+    const id = TRAINER_AURA_EFFECTS[effectIndex]?.id;
+    return id != null && isTrainerAuraOwned(fx, id);
+  }
+
+  /** The value text for an FX row: "None", the owned effect name, or "Name  COST AP" when locked. */
+  private fxRowValue(kind: FxKind): string {
+    const browse = this.fxBrowse(kind);
+    if (browse <= 0) {
+      return "None";
+    }
+    const list = kind === "entrance" ? TRAINER_ENTRANCE_EFFECTS : TRAINER_AURA_EFFECTS;
+    const eff = list[browse - 1];
+    if (!eff) {
+      return "None";
+    }
+    if (this.fxOwned(kind, browse - 1)) {
+      return this.truncate(eff.label, 18);
+    }
+    return `${this.truncate(eff.label, 11)}  ${eff.cost} AP`;
+  }
+
+  /** Equipped -> accent, owned -> ink, locked -> dim, none -> ink only when nothing is equipped. */
+  private fxRowValueColor(kind: FxKind): string {
+    const browse = this.fxBrowse(kind);
+    const equipped = this.fxEquipped(kind);
+    if (browse <= 0) {
+      return equipped === 0 ? INK : DIM;
+    }
+    if (equipped === browse) {
+      return ACCENT_TXT;
+    }
+    return this.fxOwned(kind, browse - 1) ? INK : DIM;
+  }
+
+  /** Context-sensitive footer help for an FX row (state + the live AP balance). */
+  private fxRowHelp(kind: FxKind): string {
+    const bal = globalScene.gameData.getSpendableAchvPoints();
+    const noun = kind === "entrance" ? "entrance" : "aura";
+    const browse = this.fxBrowse(kind);
+    if (browse <= 0) {
+      return `No ${noun} effect. Left / Right browses unlockable effects.  You have ${bal} AP.`;
+    }
+    const list = kind === "entrance" ? TRAINER_ENTRANCE_EFFECTS : TRAINER_AURA_EFFECTS;
+    const eff = list[browse - 1];
+    if (!eff) {
+      return `Left / Right browses ${noun} effects.  You have ${bal} AP.`;
+    }
+    if (!this.fxOwned(kind, browse - 1)) {
+      return `Locked. Press A to unlock for ${eff.cost} AP.  You have ${bal} AP.`;
+    }
+    if (this.fxEquipped(kind) === browse) {
+      return `Equipped. Press A to remove it.  You have ${bal} AP.`;
+    }
+    return `Press A to equip this ${noun} (free).  You have ${bal} AP.`;
   }
 
   private truncate(s: string, max: number): string {
@@ -495,6 +666,12 @@ export class GhostTrainerEditorUiHandler extends UiHandler {
     sprite.setScale(PREVIEW_SPRITE_H / fh);
     sprite.setVisible(loaded);
     this.dynamic.add(sprite);
+    this.previewSprite = sprite;
+    // Looping demo: hold the equipped aura around the sprite and re-play the entrance every ~3s.
+    // Only when the texture actually loaded (fail-closed: a missing sprite shows the static panel).
+    if (loaded) {
+      this.attachPreviewFx(sprite);
+    }
 
     // The intro line, the headline a player sees when the ghost appears.
     const intro = this.draft.intro.trim();
@@ -512,6 +689,61 @@ export class GhostTrainerEditorUiHandler extends UiHandler {
     );
     introObj.setOrigin(0, 0).setColor(intro ? INK : DIM);
     this.dynamic.add(introObj);
+  }
+
+  /**
+   * Attach the equipped FX to the just-built preview sprite: the aura overlay (held via the
+   * Shiny Lab pixel pipeline) and a ~3s entrance-replay loop. Both are no-ops unless the
+   * matching effect is equipped, and both fail closed (the bare sprite stays visible).
+   */
+  private attachPreviewFx(sprite: Phaser.GameObjects.Sprite): void {
+    if (this.draft.equippedAura > 0) {
+      const aura = TRAINER_AURA_EFFECTS[this.draft.equippedAura - 1];
+      if (aura) {
+        try {
+          this.previewAura = new ErTrainerAuraFx(
+            this.dynamic,
+            [sprite],
+            aura.id,
+            `er-ghost-editor-aura-${++this.previewFxVersion}`,
+          );
+          this.previewAura.start();
+        } catch {
+          this.previewAura = null;
+        }
+      }
+    }
+    if (this.draft.equippedEntrance > 0) {
+      this.playPreviewEntrance();
+      this.previewEntranceTimer = globalScene.time.addEvent({
+        delay: 3000,
+        loop: true,
+        callback: () => this.playPreviewEntrance(),
+      });
+    }
+  }
+
+  /** Re-play the equipped entrance tween on the current preview sprite (no-op if none / torn down). */
+  private playPreviewEntrance(): void {
+    const sprite = this.previewSprite;
+    if (!sprite || this.draft.equippedEntrance <= 0) {
+      return;
+    }
+    const eff = TRAINER_ENTRANCE_EFFECTS[this.draft.equippedEntrance - 1];
+    if (!eff) {
+      return;
+    }
+    const arrival = { x: PREVIEW_CX, y: PREVIEW_SPRITE_TOP, alpha: 1 };
+    globalScene.tweens.add(buildTrainerEntranceTween(sprite, eff.approach, arrival));
+  }
+
+  /** Tear down the preview aura overlay + entrance timer (idempotent; called each rebuild + on clear). */
+  private teardownPreviewFx(): void {
+    this.previewAura?.destroy();
+    this.previewAura = null;
+    this.previewEntranceTimer?.remove();
+    this.previewEntranceTimer = null;
+    this.previewSprite = null;
   }
 
   private previewSpriteKey(): string {
@@ -590,6 +822,19 @@ export class GhostTrainerEditorUiHandler extends UiHandler {
       this.draft.female = !this.draft.female;
       globalScene.ui.playSelect();
       this.rebuild();
+      return;
+    }
+    if (row.kind === "entrance" || row.kind === "aura") {
+      const list = row.kind === "entrance" ? TRAINER_ENTRANCE_EFFECTS : TRAINER_AURA_EFFECTS;
+      const span = list.length + 1; // +1 for the leading "None" entry.
+      const next = (this.fxBrowse(row.kind) + dir + span) % span;
+      if (row.kind === "entrance") {
+        this.draft.entranceBrowse = next;
+      } else {
+        this.draft.auraBrowse = next;
+      }
+      globalScene.ui.playSelect();
+      this.rebuild();
     }
   }
 
@@ -616,12 +861,78 @@ export class GhostTrainerEditorUiHandler extends UiHandler {
           this.rebuild();
         }
         break;
+      case "entrance":
+      case "aura":
+        this.activateFx(row.kind);
+        break;
       case "publish":
         this.confirmPublish();
         break;
       default:
         break;
     }
+  }
+
+  /** A on an FX row: equip/unequip an owned effect (free), or BUY a locked one with AP. */
+  private activateFx(kind: FxKind): void {
+    const browse = this.fxBrowse(kind);
+    if (browse <= 0) {
+      // The "None" entry: clear the equipped effect.
+      this.setEquippedDraft(kind, 0);
+      globalScene.ui.playSelect();
+      this.rebuild();
+      return;
+    }
+    const effectIndex = browse - 1;
+    if (this.fxOwned(kind, effectIndex)) {
+      // Owned: equip, or unequip if it is already the equipped pick (a free toggle).
+      const next = this.fxEquipped(kind) === browse ? 0 : browse;
+      this.setEquippedDraft(kind, next);
+      globalScene.ui.playSelect();
+      this.rebuild();
+      return;
+    }
+    this.buyFx(kind, effectIndex);
+  }
+
+  private setEquippedDraft(kind: FxKind, value: number): void {
+    if (kind === "entrance") {
+      this.draft.equippedEntrance = value;
+    } else {
+      this.draft.equippedAura = value;
+    }
+  }
+
+  /**
+   * Spend AP to unlock the locked catalog effect at 0-based `effectIndex`. The owned bit is
+   * set BEFORE `spendAchvPoints` (which persists the system save) so it is captured in the same
+   * save; the affordability is checked first so the spend is guaranteed and the bit is never
+   * granted for free. Mirrors the Shiny Lab buy flow (auto-equip + "se/buy").
+   */
+  private buyFx(kind: FxKind, effectIndex: number): void {
+    const list = kind === "entrance" ? TRAINER_ENTRANCE_EFFECTS : TRAINER_AURA_EFFECTS;
+    const eff = list[effectIndex];
+    if (!eff) {
+      return;
+    }
+    const fx = globalScene.gameData.trainerFx;
+    if (globalScene.gameData.getSpendableAchvPoints() < eff.cost) {
+      globalScene.ui.playError();
+      return;
+    }
+    if (kind === "entrance") {
+      setTrainerEntranceOwned(fx, eff.id);
+    } else {
+      setTrainerAuraOwned(fx, eff.id);
+    }
+    if (!globalScene.gameData.spendAchvPoints(eff.cost)) {
+      globalScene.ui.playError();
+      return;
+    }
+    // Auto-equip the freshly unlocked effect.
+    this.setEquippedDraft(kind, effectIndex + 1);
+    globalScene.playSound("se/buy");
+    this.rebuild();
   }
 
   /** Per-field title + cap for the reused configurable text-input modal. */
@@ -670,6 +981,8 @@ export class GhostTrainerEditorUiHandler extends UiHandler {
       || this.draft.defeated.length > 0
       || this.currentType() !== TrainerType.VETERAN
       || this.draft.female
+      || this.draft.equippedEntrance !== 0
+      || this.draft.equippedAura !== 0
     );
   }
 
@@ -706,12 +1019,21 @@ export class GhostTrainerEditorUiHandler extends UiHandler {
     if (this.draft.defeated.trim()) {
       dialogue.defeated = this.draft.defeated.trim();
     }
+    // Ghost Trainer FX: fold the equipped entrance into `approach` and the equipped aura into
+    // `aura` + `showAuraInBattle` so they serialize onto the published ghost and OTHER players
+    // see them on encounter (er-ghost-teams.markTrainerAsGhost). sanitizeGhostProfile re-clamps.
+    const entrance =
+      this.draft.equippedEntrance > 0 ? TRAINER_ENTRANCE_EFFECTS[this.draft.equippedEntrance - 1] : undefined;
+    const aura = this.draft.equippedAura > 0 ? TRAINER_AURA_EFFECTS[this.draft.equippedAura - 1] : undefined;
     const raw: GhostTrainerProfile = {
       trainerType: this.currentType(),
       female: this.draft.female && this.currentHasGenders(),
       displayName: this.draft.displayName.trim() || undefined,
       title: this.draft.title.trim() || undefined,
       dialogue: Object.keys(dialogue).length > 0 ? dialogue : undefined,
+      approach: entrance?.approach,
+      aura: aura?.id,
+      showAuraInBattle: aura ? true : undefined,
     };
     return sanitizeGhostProfile(raw);
   }
@@ -719,6 +1041,14 @@ export class GhostTrainerEditorUiHandler extends UiHandler {
   private async publish(): Promise<void> {
     const profile = this.buildProfile();
     globalScene.gameData.ghostProfile = profile;
+    // Persist the equipped Ghost Trainer FX picks to the system save (owned bits were already set
+    // at purchase time; this records which owned effects are equipped so the editor re-seeds them).
+    const fx = globalScene.gameData.trainerFx;
+    const entranceId =
+      this.draft.equippedEntrance > 0 ? (TRAINER_ENTRANCE_EFFECTS[this.draft.equippedEntrance - 1]?.id ?? null) : null;
+    const auraId = this.draft.equippedAura > 0 ? (TRAINER_AURA_EFFECTS[this.draft.equippedAura - 1]?.id ?? null) : null;
+    setEquippedTrainerEntrance(fx, entranceId);
+    setEquippedTrainerAura(fx, auraId);
     // Tear the editor down BEFORE the confirmation so the message renders on a clean screen
     // (the editor paints an opaque backdrop; a MESSAGE under it would be invisible).
     globalScene.ui.setMode(UiMode.MESSAGE);

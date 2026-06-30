@@ -30,6 +30,7 @@ import {
   hasErRelic,
 } from "#data/elite-redux/er-relics";
 import { getErDifficulty } from "#data/elite-redux/er-run-difficulty";
+import { buildTrainerEntranceTween, TRAINER_ENTRANCE_SLIDE_X } from "#data/elite-redux/er-trainer-fx";
 import { CASCOON_ANGELS_WRATH_MOVES } from "#data/elite-redux/init-elite-redux-movesets";
 import { getNatureName } from "#data/nature";
 import { BattleType } from "#enums/battle-type";
@@ -635,15 +636,12 @@ export class EncounterPhase extends BattlePhase {
     }
 
     const enemyField = globalScene.getEnemyField();
+    // The enemy trainer is split OUT of this shared slide so it can have its own
+    // entrance tween (chosen by the equipped Ghost Trainer FX entrance effect).
+    // The remaining field slides the vanilla +/-300 (enemy side +, player side -).
     globalScene.tweens.add({
-      targets: [
-        globalScene.arenaEnemy,
-        globalScene.currentBattle.trainer,
-        enemyField,
-        globalScene.arenaPlayer,
-        globalScene.trainer,
-      ].flat(),
-      x: (_target, _key, value, fieldIndex: number) => (fieldIndex < 2 + enemyField.length ? value + 300 : value - 300),
+      targets: [globalScene.arenaEnemy, enemyField, globalScene.arenaPlayer, globalScene.trainer].flat(),
+      x: (_target, _key, value, fieldIndex: number) => (fieldIndex < 1 + enemyField.length ? value + 300 : value - 300),
       duration: 2000,
       onComplete: () => {
         if (globalScene.currentBattle.isClassicFinalBoss) {
@@ -653,6 +651,16 @@ export class EncounterPhase extends BattlePhase {
         }
       },
     });
+
+    // Enemy trainer's own entrance. Default (and every non-ghost trainer) keeps
+    // the vanilla +300 slide; a ghost trainer with an equipped entrance effect
+    // arrives differently but always settles at the same final state. Runs as a
+    // parallel fire-and-forget tween (the field tween above drives the reveal).
+    const enemyTrainer = globalScene.currentBattle.trainer;
+    if (enemyTrainer) {
+      const arrival = { x: enemyTrainer.x + TRAINER_ENTRANCE_SLIDE_X, y: enemyTrainer.y, alpha: 1 };
+      globalScene.tweens.add(buildTrainerEntranceTween(enemyTrainer, enemyTrainer.erGhostApproach, arrival));
+    }
 
     const encounterIntroVisuals = globalScene.currentBattle?.mysteryEncounter?.introVisuals;
     if (encounterIntroVisuals) {
@@ -723,6 +731,9 @@ export class EncounterPhase extends BattlePhase {
       const trainer = globalScene.currentBattle.trainer;
       trainer?.untint(100, "Sine.easeOut");
       trainer?.playAnim();
+      // ER Ghost Trainer FX: now that the trainer is revealed, start its equipped
+      // aura overlay (no-op unless the uploader equipped one with showAuraInBattle).
+      trainer?.applyErGhostAuraFx();
 
       const doSummon = () => {
         globalScene.currentBattle.started = true;

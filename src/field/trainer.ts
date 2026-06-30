@@ -3,6 +3,7 @@ import { pokemonPrevolutions } from "#balance/pokemon-evolutions";
 import { signatureSpecies } from "#balance/signature-species";
 import { EntryHazardTag } from "#data/arena-tag";
 import { isErSmartSwitching } from "#data/elite-redux/er-enemy-ai";
+import type { GhostApproachEffect } from "#data/elite-redux/er-ghost-profile";
 import { applyErGhostOverride } from "#data/elite-redux/er-ghost-teams";
 import {
   applyErFactoryOverride,
@@ -21,6 +22,7 @@ import { TrainerType } from "#enums/trainer-type";
 import { TrainerVariant } from "#enums/trainer-variant";
 import type { EnemyPokemon } from "#field/pokemon";
 import type { PersistentModifier } from "#modifiers/modifier";
+import { ErTrainerAuraFx } from "#sprites/er-trainer-aura-fx";
 import type { TrainerConfig } from "#trainers/trainer-config";
 import { trainerConfigs } from "#trainers/trainer-config";
 import { TrainerPartyCompoundTemplate, type TrainerPartyTemplate } from "#trainers/trainer-party-template";
@@ -47,6 +49,25 @@ export class Trainer extends Phaser.GameObjects.Container {
    * `undefined` means "use canonical config dialogue" (vanilla behavior).
    */
   public encounterMessagesOverride?: string[] | undefined;
+
+  /**
+   * ER Ghost Trainer FX: the equipped ENTRANCE effect (the on-field arrival
+   * tween, resolved in encounter-phase). `undefined` = the vanilla slide-in.
+   * Set by `markTrainerAsGhost` from the uploader's published profile.
+   */
+  public erGhostApproach?: GhostApproachEffect | undefined;
+
+  /**
+   * ER Ghost Trainer FX: the equipped AURA effect (an AROUND shader id). Only set
+   * when the uploader equipped an aura AND flagged `showAuraInBattle`. The overlay
+   * is built lazily by {@linkcode applyErGhostAuraFx} once the trainer is revealed.
+   */
+  public erGhostAura?: string | undefined;
+
+  private erAuraFx: ErTrainerAuraFx | null = null;
+  /** Per-instance counter used to namespace generated aura-FX texture keys. */
+  private static erAuraFxSeq = 0;
+  private readonly erAuraFxKey = `trainer-aura-fx-${Trainer.erAuraFxSeq++}`;
 
   /**
    * Create a new Trainer.
@@ -888,5 +909,29 @@ export class Trainer extends Phaser.GameObjects.Container {
       return true;
     }
     return false;
+  }
+
+  /**
+   * ER Ghost Trainer FX: build + start the equipped aura overlay around this
+   * trainer's visible sprite(s). No-op when no aura is equipped or one is already
+   * running. Called once the trainer is revealed on the field (encounter-phase).
+   */
+  applyErGhostAuraFx(): void {
+    if (!this.erGhostAura || this.erAuraFx) {
+      return;
+    }
+    this.erAuraFx = new ErTrainerAuraFx(this, this.getSprites(), this.erGhostAura, this.erAuraFxKey);
+    this.erAuraFx.start();
+  }
+
+  /** ER Ghost Trainer FX: tear down the aura overlay + its refresh timer. */
+  removeErGhostAuraFx(): void {
+    this.erAuraFx?.destroy();
+    this.erAuraFx = null;
+  }
+
+  override destroy(fromScene?: boolean): void {
+    this.removeErGhostAuraFx();
+    super.destroy(fromScene);
   }
 }

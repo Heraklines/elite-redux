@@ -21,6 +21,7 @@
 // shape up front keeps the serialization forward-compatible.
 // =============================================================================
 
+import { isKnownTrainerAuraId } from "#data/elite-redux/er-trainer-fx";
 import type { TrainerType } from "#enums/trainer-type";
 
 /** Field length caps (mirror the editor's on-screen counters). */
@@ -29,10 +30,42 @@ export const GHOST_TITLE_MAX = 32;
 export const GHOST_DIALOGUE_MAX = 80;
 
 /**
- * How the ghost trainer fades/arrives on the field. Reserved for P2 (the
- * encounter-tween hook in encounter-phase.ts). "default" = the vanilla slide-in.
+ * How the ghost trainer arrives on the field at encounter (the per-trainer
+ * entrance tween in encounter-phase.ts). "default" = the vanilla +300 slide-in.
+ * The Ghost Trainer FX catalog (er-trainer-fx.ts) maps each unlockable entrance
+ * effect to one of these values; the legacy `appearsSuddenly`/`wandersIn`/
+ * `blocksPath` members are kept for back-compat (older reserved saves).
  */
-export type GhostApproachEffect = "default" | "fromShadow" | "appearsSuddenly" | "wandersIn" | "blocksPath" | "fromAbove";
+export type GhostApproachEffect =
+  | "default"
+  | "fromShadow"
+  | "appearsSuddenly"
+  | "wandersIn"
+  | "blocksPath"
+  | "fromAbove"
+  | "riseFromGround"
+  | "fogMaterialize"
+  | "flashIn"
+  | "reverseDissolve";
+
+/** Every valid {@linkcode GhostApproachEffect} string (for untrusted-input clamping). */
+const GHOST_APPROACH_VALUES: ReadonlySet<string> = new Set<GhostApproachEffect>([
+  "default",
+  "fromShadow",
+  "appearsSuddenly",
+  "wandersIn",
+  "blocksPath",
+  "fromAbove",
+  "riseFromGround",
+  "fogMaterialize",
+  "flashIn",
+  "reverseDissolve",
+]);
+
+/** True if `value` is a recognised {@linkcode GhostApproachEffect}. */
+export function isGhostApproachEffect(value: unknown): value is GhostApproachEffect {
+  return typeof value === "string" && GHOST_APPROACH_VALUES.has(value);
+}
 
 /**
  * Battle dialogue lines. Mapped onto the engine's three trainer message arrays
@@ -67,14 +100,14 @@ export interface GhostTrainerProfile {
   /** Battle dialogue overrides. */
   dialogue?: GhostDialogue | undefined;
 
-  // ---- Reserved for later phases (P2 appearance FX / P4 encounter options) ----
+  // ---- Ghost Trainer FX (populated by the editor; see er-trainer-fx.ts) ----
   /** P2: appearance tint (Trainer.tint colour). */
   tintColor?: number | undefined;
-  /** P2: aura/effect look, reusing the Shiny Lab compact loadout (serialized form). */
-  aura?: unknown | undefined;
-  /** P2: show the aura during battle (not just the editor preview). */
+  /** Equipped aura effect: an AROUND shader id (one of TRAINER_AURA_IDS). */
+  aura?: string | undefined;
+  /** Show the aura during the encounter (not just the editor preview). */
   showAuraInBattle?: boolean | undefined;
-  /** P2: fade-in / approach style. */
+  /** Equipped entrance effect (the on-field arrival tween). */
   approach?: GhostApproachEffect | undefined;
   /** P4: forced battle music key (absent -> the ghost piano default). */
   music?: string | undefined;
@@ -189,10 +222,13 @@ export function sanitizeGhostProfile(raw: unknown): GhostTrainerProfile | null {
   if (typeof r.showAuraInBattle === "boolean") {
     out.showAuraInBattle = r.showAuraInBattle;
   }
-  if (typeof r.approach === "string") {
-    out.approach = r.approach as GhostApproachEffect;
+  // Approach: clamp to the known enum (default/none if unrecognised) so an
+  // untrusted peer can't smuggle an arbitrary string into the entrance tween.
+  if (isGhostApproachEffect(r.approach) && r.approach !== "default") {
+    out.approach = r.approach;
   }
-  if (r.aura != null) {
+  // Aura: clamp to the known AROUND id whitelist (drop to none if unknown).
+  if (isKnownTrainerAuraId(r.aura)) {
     out.aura = r.aura;
   }
   if (typeof r.music === "string") {
