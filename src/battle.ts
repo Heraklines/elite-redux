@@ -138,6 +138,17 @@ export class Battle {
         ? trainer?.getPartyLevels(this.waveIndex)
         : // TODO: Remove array.fill.map
           new Array(this._arrangement.enemyCapacity).fill(null).map(() => this.getLevelForWave());
+    // Multi-format (triple+): the enemy field must be fillable to the side's capacity. A
+    // trainer whose party template is smaller than the format width (or any path that sized
+    // enemyLevels short) would otherwise field fewer than enemyCapacity foes - the in-game
+    // "3v1". Pad up to capacity. Only fires for >2-wide formats; binary is untouched (single
+    // enemyLevels=1==cap1, double=2==cap2, larger trainer parties already exceed it).
+    if (this.enemyLevels && this.enemyLevels.length < this._arrangement.enemyCapacity) {
+      const fill = this.enemyLevels.at(-1) ?? this.getLevelForWave();
+      while (this.enemyLevels.length < this._arrangement.enemyCapacity) {
+        this.enemyLevels.push(fill);
+      }
+    }
     // ER HELL ONLY: rescale every enemy toward the player's highest party level,
     // eased in by wave (top-2 < w20, top-1 < w40, top after). No-op off Hell.
     this.enemyLevels = applyErHellEnemyLevelScaling(this.enemyLevels, this.waveIndex);
@@ -184,6 +195,15 @@ export class Battle {
    */
   public get double(): boolean {
     return this._arrangement.playerCapacity === 2;
+  }
+
+  /**
+   * Legacy write API: `battle.double = x` still works, delegating to {@linkcode setDouble} so any
+   * remaining single/double assignment site stays byte-identical. New code should call setFormat /
+   * setDouble directly; this exists only to keep the historic mutable-field contract intact.
+   */
+  public set double(value: boolean) {
+    this.setDouble(value);
   }
 
   /** Set the battle format and rebuild the arrangement. The single mutation point for "how many per side". */

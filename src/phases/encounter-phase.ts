@@ -306,6 +306,19 @@ export class EncounterPhase extends BattlePhase {
     // for this wave. Consumed ONCE; null in production builds.
     const devEnemyParty = this.loaded ? null : consumePendingDevEnemyParty();
 
+    // Multi-format (triple+): the enemy-gen loop below is bounded by enemyLevels.length, which
+    // can come up short of the side's capacity (a small trainer party, or new-battle-phase
+    // resizing it for a wild override) - that fielded fewer than 3 foes in-game ("3v1"). Pad
+    // it to enemyCapacity here, AFTER all prior resizes, so the field always fills. Binary
+    // (cap <= 2) is a no-op.
+    const enemyCapacity = battle.arrangement.enemyCapacity;
+    if (!this.loaded && battle.enemyLevels && battle.enemyLevels.length < enemyCapacity) {
+      const fill = battle.enemyLevels.at(-1) ?? battle.enemyLevels[0] ?? 1;
+      while (battle.enemyLevels.length < enemyCapacity) {
+        battle.enemyLevels.push(fill);
+      }
+    }
+
     battle.enemyLevels?.every((level, e) => {
       if (battle.isBattleMysteryEncounter()) {
         // Skip enemy loading for MEs, those are loaded elsewhere

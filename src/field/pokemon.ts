@@ -1662,6 +1662,20 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
    */
   public setFieldPosition(fieldPosition: FieldPosition, duration?: number): Promise<void> {
     return new Promise(resolve => {
+      // Multi-format: apply the bar's mini + per-slot stacking for this mon's CURRENT field
+      // slot BEFORE the position-change early-return. A triple's CENTRE mon keeps the default
+      // CENTER position, so the early-return previously left its bar full-size + overlapping
+      // the others. Binary is unchanged (single -> mini false + slot 0 = no-op; the two double
+      // mons always change position so this ran anyway).
+      const arr = globalScene.currentBattle?.arrangement;
+      const sideCapacity = arr ? (this.isPlayer() ? arr.playerCapacity : arr.enemyCapacity) : 1;
+      // Only a PLAYER's lone single mon uses the big bar; every other case (any multi-mon
+      // side, and all enemy bars) uses the compact mini bar. This matches the legacy result
+      // exactly for single/double (the setMini guard makes the redundant calls no-ops) while
+      // also making a triple's CENTRE mon mini (the bug: its bar was full-size + overlapping).
+      this.battleInfo.setMini(!(this.isPlayer() && sideCapacity === 1));
+      this.battleInfo.setSlotOffset(this.getFieldIndex());
+
       if (fieldPosition === this.fieldPosition) {
         resolve();
         return;
@@ -1670,14 +1684,6 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
       const initialOffset = this.getFieldPositionOffset();
 
       this.fieldPosition = fieldPosition;
-
-      // Multi-format: a side with >1 slot uses the compact (mini) bar; the bar stacks by
-      // field slot so 3+ bars stay readable. Binary is identical (in doubles RIGHT == slot 1,
-      // and both slots are non-CENTER -> mini, exactly as before).
-      const arr = globalScene.currentBattle?.arrangement;
-      const sideCapacity = arr ? (this.isPlayer() ? arr.playerCapacity : arr.enemyCapacity) : 1;
-      this.battleInfo.setMini(sideCapacity > 1);
-      this.battleInfo.setSlotOffset(this.getFieldIndex());
 
       const newOffset = this.getFieldPositionOffset();
 
@@ -4500,7 +4506,7 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
    * semantics (the raw slot occupants, NOT active-filtered).
    */
   getAllies(): Pokemon[] {
-    const field = this.isPlayer() ? globalScene.getPlayerField() : globalScene.getEnemyField();
+    const field: Pokemon[] = this.isPlayer() ? globalScene.getPlayerField() : globalScene.getEnemyField();
     return field.filter(p => p != null && p !== this);
   }
 
