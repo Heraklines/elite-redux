@@ -6,6 +6,8 @@ import { bypassLogin } from "#constants/app-constants";
 import { modifierTypes } from "#data/data-lists";
 import { getCharVariantFromDialogue } from "#data/dialogue";
 import { broadcastCoopWaveResolved } from "#data/elite-redux/coop/coop-runtime";
+import { recordCommunityClear } from "#data/elite-redux/er-community-challenges";
+import { getFounderRunState, setFounderRunState } from "#data/elite-redux/er-community-run-state";
 import { recordGhostTeamOnGameOver } from "#data/elite-redux/er-ghost-teams";
 import type { PokemonSpecies } from "#data/pokemon-species";
 import { BattleType } from "#enums/battle-type";
@@ -247,6 +249,11 @@ export class GameOverPhase extends BattlePhase {
               // ER (#217): snapshot the finished team as a cross-player "ghost"
               // (stored locally + uploaded when an endpoint is configured).
               recordGhostTeamOnGameOver(this.isVictory);
+              // ER Community Challenge: a genuine victory by the FOUNDER of a draft
+              // auto-publishes it (flips draft->active). Only fires on a real win.
+              if (this.isVictory) {
+                this.tryPublishFounderClear();
+              }
               globalScene.phaseManager.pushNew("PostGameOverPhase", globalScene.sessionSlotId, endCardPhase);
               this.end();
             });
@@ -323,6 +330,26 @@ export class GameOverPhase extends BattlePhase {
     } else {
       doGameOver(false);
     }
+  }
+
+  /**
+   * ER Community Challenge: if THIS run is the founder's qualifying play of a draft
+   * (set at create + persisted on the session save), a genuine victory auto-publishes
+   * it - POST /community/clear flips the draft live. Fire-and-forget; the linkage is
+   * cleared so a second game-over can't re-fire. Called only on `this.isVictory`.
+   */
+  private tryPublishFounderClear(): void {
+    const founder = getFounderRunState();
+    if (!founder) {
+      return;
+    }
+    setFounderRunState(null);
+    const party = globalScene.getPlayerParty().map(p => new PokemonData(p));
+    void recordCommunityClear(founder.draftId, founder.config, {
+      wave: globalScene.currentBattle?.waveIndex ?? founder.config.targetWave,
+      clearTimeMs: Math.round((globalScene.sessionPlayTime ?? 0) * 1000),
+      party,
+    });
   }
 
   handleUnlocks(): void {

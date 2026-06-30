@@ -564,6 +564,46 @@ export async function recordCommunityAttempt(challengeId: string, wave?: number)
   }
 }
 
+/**
+ * Record a VICTORY clear of a challenge. For the FOUNDER of a draft this flips it
+ * draft -> active (auto-publish); the run's config fields are sent so the worker can
+ * config-match + verify (anti-cheat). Returns whether the call succeeded (false offline
+ * / guest / non-victory). `run.party` is the serialized team (PokemonData[]).
+ */
+export async function recordCommunityClear(
+  draftId: string,
+  config: CommunityChallengeConfig,
+  run: { wave: number; clearTimeMs?: number; party: unknown[] },
+): Promise<boolean> {
+  const base = serverBase();
+  const token = authToken();
+  if (!base || !token || typeof fetch !== "function" || !draftId) {
+    return false;
+  }
+  try {
+    const res = await fetch(`${base}/community/clear`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: token },
+      body: JSON.stringify({
+        challengeId: draftId,
+        outcome: "victory",
+        wave: run.wave,
+        clearTimeMs: run.clearTimeMs,
+        party: run.party,
+        // Config-match inputs (the worker compares these to the stored challenge):
+        gameModeId: config.gameModeId,
+        difficulty: config.difficulty,
+        baseChallenges: config.baseChallenges,
+        allowedSpecies: config.allowedSpecies,
+        seed: config.seed,
+      }),
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
 /** Toggle a bookmark on/off for a challenge. Returns the success of the call (no-op false offline). */
 export async function setCommunityBookmark(challengeId: string, on: boolean): Promise<boolean> {
   const base = serverBase();

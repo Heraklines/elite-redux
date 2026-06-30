@@ -36,6 +36,7 @@ import {
   createCommunityChallenge,
   validateChallengeConfig,
 } from "#data/elite-redux/er-community-challenges";
+import { setFounderRunState } from "#data/elite-redux/er-community-run-state";
 import type { ErDifficulty } from "#data/elite-redux/er-run-difficulty";
 import { Button } from "#enums/buttons";
 import type { Challenges } from "#enums/challenges";
@@ -122,6 +123,9 @@ export class CommunityChallengeCreateUiHandler extends UiHandler {
   private rowCursor = 0;
   private scrollTop = 0;
   private errorMsg: string | null = null;
+  // The opener's config-based launch callback (browser -> TitlePhase). After publishing
+  // a draft, the founder is dropped straight into their qualifying run via this.
+  private onLaunch: ((config: CommunityChallengeConfig) => void) | null = null;
 
   constructor() {
     super(UiMode.COMMUNITY_CHALLENGE_CREATE);
@@ -170,6 +174,7 @@ export class CommunityChallengeCreateUiHandler extends UiHandler {
     this.rowCursor = 0;
     this.scrollTop = 0;
     this.errorMsg = null;
+    this.onLaunch = typeof args[1] === "function" ? (args[1] as (config: CommunityChallengeConfig) => void) : null;
     if (args.length > 0 && this.isConfig(args[0])) {
       this.seedFromConfig(args[0] as CommunityChallengeConfig);
     }
@@ -577,12 +582,28 @@ export class CommunityChallengeCreateUiHandler extends UiHandler {
     }
     this.errorMsg = null;
     const id = await createCommunityChallenge(config);
-    // CREATE has an opaque backdrop and is the topmost z handler, so showText on the
-    // (lower-z) message handler would render behind it. setMode(MESSAGE) clears CREATE
-    // and makes the message visible; the callback reverts to the browser underneath.
+    // setMode(MESSAGE) clears CREATE (opaque, topmost z) so the result text is visible.
     globalScene.ui.setMode(UiMode.MESSAGE);
+    if (id && this.onLaunch) {
+      // Saved as a draft (invisible to others until cleared). The FOUNDER must now win
+      // it: tag this as the qualifying run (persisted on the session save so a mid-run
+      // save/reload still auto-publishes), then drop straight into starter-select. A
+      // genuine victory flips the draft live (game-over-phase tryPublishFounderClear).
+      const draftConfig = { ...config, id };
+      setFounderRunState({ draftId: id, config: draftConfig });
+      const launch = this.onLaunch;
+      globalScene.ui.showText(
+        "Draft saved! Now clear it yourself to publish it.",
+        null,
+        () => launch(draftConfig),
+        null,
+        true,
+      );
+      return;
+    }
+    // Failure (offline / guest / server reject): surface it, stay where they were.
     globalScene.ui.showText(
-      id ? "Submitted as a draft. Clear it to publish." : "Could not publish - check your connection or sign-in.",
+      "Could not save - check your connection or sign-in.",
       null,
       () => void globalScene.ui.revertMode(),
       null,

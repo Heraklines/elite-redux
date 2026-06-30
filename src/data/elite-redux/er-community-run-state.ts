@@ -20,10 +20,22 @@
 // into a later normal Custom Challenge run).
 // =============================================================================
 
+import type { CommunityChallengeConfig } from "#data/elite-redux/er-community-challenges";
 import type { ErDifficulty } from "#data/elite-redux/er-run-difficulty";
+
+/** The founder's qualifying run for a DRAFT community challenge (draft id + its config). */
+export interface FounderRunState {
+  readonly draftId: string;
+  readonly config: CommunityChallengeConfig;
+}
 
 let forcedDifficulty: ErDifficulty | null = null;
 let allowedSpecies: Set<number> | null = null;
+// The run is the founder's qualifying play of a draft they just created: a legit
+// classic victory auto-publishes the draft. UNLIKE the two gates above this is NOT
+// consumed at launch - it rides the whole run and is serialized with the SESSION save
+// (so a mid-run save + reload still auto-publishes on the eventual win).
+let founderChallenge: FounderRunState | null = null;
 
 /** Force the run difficulty so starter-select skips the chooser and launches directly. */
 export function setForcedCommunityDifficulty(d: ErDifficulty): void {
@@ -50,8 +62,19 @@ export function communitySpeciesAllowed(rootSpeciesId: number): boolean {
   return allowedSpecies === null || allowedSpecies.has(rootSpeciesId);
 }
 
-/** Reset BOTH gates (returning to the title / starting fresh). */
+/** Tag the current run as the founder's qualifying run for a draft challenge (null = clear). */
+export function setFounderRunState(state: FounderRunState | null): void {
+  founderChallenge = state;
+}
+
+/** The founder run-state for the current run, or null. Serialized with the session save. */
+export function getFounderRunState(): FounderRunState | null {
+  return founderChallenge;
+}
+
+/** Reset all gates (returning to the title / starting fresh). */
 export function resetCommunityRunState(): void {
   forcedDifficulty = null;
   allowedSpecies = null;
+  founderChallenge = null;
 }

@@ -1,5 +1,6 @@
 import type { PokeballCounts } from "#app/battle-scene";
 import type { Tutorial } from "#app/tutorial";
+import type { CommunityChallengeConfig } from "#data/elite-redux/er-community-challenges";
 import type { ErMapSaveData } from "#data/elite-redux/er-map-nodes";
 import type { ErRelicBattleStateData } from "#data/elite-redux/er-relic-battle-state";
 import type { ErDifficulty } from "#data/elite-redux/er-run-difficulty";
@@ -134,6 +135,13 @@ export interface SessionSaveData {
    * re-fire the effect. Optional for backwards compatibility (older saves re-arm).
    */
   erRelicBattleState?: ErRelicBattleStateData;
+  /**
+   * ER Community Challenge: when this run is the founder's qualifying play of a draft
+   * they just created, the draft id + its config. A legit classic victory auto-publishes
+   * the draft (it survives a mid-run save/reload so the publish isn't lost). Optional for
+   * backwards compatibility (older / non-founder saves restore none).
+   */
+  founderChallenge?: { draftId: string; config: CommunityChallengeConfig };
 }
 
 export interface Unlocks {

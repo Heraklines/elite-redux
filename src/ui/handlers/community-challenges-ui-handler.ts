@@ -23,10 +23,12 @@ import { globalScene } from "#app/global-scene";
 import { buildInfernoFeed, buildMergedCommunityFeed } from "#data/elite-redux/er-community-challenge-inferno";
 import {
   buildDemoChallengesConfig,
+  type CommunityChallengeConfig,
   type CommunityChallengeEntry,
   type CommunityChallengeFeed,
   fetchCommunityBookmarks,
   fetchCommunityFeed,
+  recordCommunityAttempt,
 } from "#data/elite-redux/er-community-challenges";
 import { Button } from "#enums/buttons";
 import { TextStyle } from "#enums/text-style";
@@ -91,9 +93,10 @@ export class CommunityChallengesUiHandler extends UiHandler {
   private navCursor = 1; // FEATURED active by default
   private cardCursor = 0;
 
-  // ACTION on a focused card plays it: the launch callback supplied by the
-  // opener (TitlePhase's submenu), or null when the screen is opened standalone.
-  private onPlay: ((e: CommunityChallengeEntry) => void) | null = null;
+  // ACTION on a focused card plays it; CREATE's publish reuses this too. The
+  // config-based launch callback supplied by the opener (TitlePhase's submenu),
+  // or null when the screen is opened standalone.
+  private onLaunch: ((config: CommunityChallengeConfig) => void) | null = null;
   // CANCEL returns here: the opener supplies a back callback (TitlePhase ->
   // toTitleScreen) because we were opened via the deferred pattern (resetModeChain),
   // so revertMode() alone would land on an empty MESSAGE box. null = standalone
@@ -561,7 +564,7 @@ export class CommunityChallengesUiHandler extends UiHandler {
     super.show(args);
     this.feed =
       args.length > 0 && this.isFeed(args[0]) ? (args[0] as CommunityChallengeFeed) : buildDemoChallengesConfig();
-    this.onPlay = typeof args[1] === "function" ? (args[1] as (e: CommunityChallengeEntry) => void) : null;
+    this.onLaunch = typeof args[1] === "function" ? (args[1] as (config: CommunityChallengeConfig) => void) : null;
     this.onBack = typeof args[2] === "function" ? (args[2] as () => void) : null;
     this.disposed = false;
     this.navCursor = 1;
@@ -641,9 +644,13 @@ export class CommunityChallengesUiHandler extends UiHandler {
   /** Play the currently-focused card via the opener's launch callback (no-op standalone). */
   private playFocusedCard(): void {
     const e = this.feed?.featured[this.cardCursor];
-    if (e && this.onPlay) {
-      // Teardown launch (setModeAndEnd clears this handler first); no defer needed.
-      this.onPlay(e);
+    if (e && this.onLaunch) {
+      // Record a normal attempt for published cards (built-in er-* / demo cards have
+      // no worker row), then teardown-launch the run (setModeAndEnd clears this handler).
+      if (!/^(er-|demo-)/.test(e.config.id)) {
+        void recordCommunityAttempt(e.config.id);
+      }
+      this.onLaunch(e.config);
     }
   }
 
@@ -718,9 +725,11 @@ export class CommunityChallengesUiHandler extends UiHandler {
     }
   }
 
-  /** Open the challenge designer over the browser (PATTERN 1: browser stays underneath). */
+  /** Open the challenge designer over the browser (PATTERN 1: browser stays underneath).
+   *  Hands the launch callback down so CREATE can drop the founder straight into their
+   *  qualifying run after publishing (args[0]=null = no seed; args[1]=the launch cb). */
   private openCreate(): void {
-    globalScene.ui.setOverlayMode(UiMode.COMMUNITY_CHALLENGE_CREATE, null);
+    globalScene.ui.setOverlayMode(UiMode.COMMUNITY_CHALLENGE_CREATE, null, this.onLaunch);
   }
 
   private emptyFeed(): CommunityChallengeFeed {

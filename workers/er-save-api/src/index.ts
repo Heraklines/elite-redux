@@ -2319,6 +2319,69 @@ async function handleCommunityAttempt(
  * lays the founder-publish seam. The config-match + IV-clamp + ban checks that
  * gate a VERIFIED clear are stubbed - see the TODO(P1-G) below.
  */
+/** Compare two [id, value, severity?] challenge lists order-insensitively (id->value, value!=0). */
+function baseChallengesEqual(a: unknown, b: unknown): boolean {
+  const norm = (x: unknown): Map<number, number> => {
+    const m = new Map<number, number>();
+    if (Array.isArray(x)) {
+      for (const t of x) {
+        if (Array.isArray(t) && typeof t[0] === "number") {
+          const value = typeof t[1] === "number" ? t[1] : 0;
+          if (value !== 0) {
+            m.set(t[0], value);
+          }
+        }
+      }
+    }
+    return m;
+  };
+  const ma = norm(a);
+  const mb = norm(b);
+  if (ma.size !== mb.size) {
+    return false;
+  }
+  for (const [id, value] of ma) {
+    if (mb.get(id) !== value) {
+      return false;
+    }
+  }
+  return true;
+}
+
+/**
+ * Anti-cheat config-match for a community clear. Verified only when the submitted run is
+ * a GENUINE victory at/after the target wave AND its difficulty / game mode / base
+ * challenges / seed match the stored challenge. (Party-level checks need the species
+ * graph the worker lacks; they stay a follow-up.)
+ */
+function communityRunMatchesConfig(
+  body: Record<string, unknown>,
+  row: { target_wave: number | null; seed: string | null; difficulty: string | null; game_mode_id: number | null },
+  config: Record<string, unknown>,
+  wave: number | null,
+  isVictory: boolean,
+): boolean {
+  if (!isVictory) {
+    return false;
+  }
+  const target = typeof row.target_wave === "number" ? row.target_wave : 200;
+  if (wave === null || wave < target || wave > 200) {
+    return false;
+  }
+  const cfgDifficulty = typeof config.difficulty === "string" ? config.difficulty : row.difficulty;
+  if (typeof body.difficulty === "string" && cfgDifficulty != null && body.difficulty !== cfgDifficulty) {
+    return false;
+  }
+  const cfgMode = typeof config.gameModeId === "number" ? config.gameModeId : row.game_mode_id;
+  if (body.gameModeId != null && cfgMode != null && Number(body.gameModeId) !== cfgMode) {
+    return false;
+  }
+  if (row.seed != null && row.seed.length > 0 && body.seed !== row.seed) {
+    return false;
+  }
+  return baseChallengesEqual(config.baseChallenges, body.baseChallenges);
+}
+
 async function handleCommunityClear(
   request: Request,
   auth: TokenPayload,
@@ -2348,7 +2411,7 @@ async function handleCommunityClear(
     return json({ error: "party required" }, 422, cors);
   }
   const row = await env.DB.prepare(
-    "SELECT id, status, created_by_uid, target_wave, seed FROM community_challenges WHERE id = ?",
+    "SELECT id, status, created_by_uid, target_wave, seed, config_json, difficulty, game_mode_id FROM community_challenges WHERE id = ?",
   )
     .bind(challengeId)
     .first<{
@@ -2357,6 +2420,9 @@ async function handleCommunityClear(
       created_by_uid: number | null;
       target_wave: number | null;
       seed: string | null;
+      config_json: string;
+      difficulty: string | null;
+      game_mode_id: number | null;
     }>();
   if (!row) {
     return text("Challenge not found.", 404, cors);
@@ -2374,22 +2440,20 @@ async function handleCommunityClear(
   const now = Date.now();
 
   // -------------------------------------------------------------------------
-  // TODO(P1-G): full config-match + anti-cheat verification belongs HERE, before
-  // marking the attempt verified=1 and before publishing. Reuse (do NOT rebuild):
-  //   - the IV-clamp/sanitization loop from handleRunCreate (index.ts ~856): if
-  //     any clamped IV differed from the submitted one, force verified=0.
-  //   - the isErGhostTeamLegal bans (er-ghost-teams.ts:165-240): banned species/
-  //     forms + >=2 legendary-egg lines -> verified=0.
-  //   - the config-match (plan section 4.3): outcome==='victory' AND
-  //     wave>=row.target_wave AND wave<=200; run.difficulty===config.difficulty;
-  //     run.gameModeId===config.gameModeId; submitted `challenges` deep-equal
-  //     config.baseChallenges (order-insensitive by id); every party root species
-  //     in config.allowedSpecies when set; for a fixed-seed challenge
-  //     (row.seed != null) run_seed===row.seed.
-  // Only when ALL pass: verified=1 AND (founder) publish. For now the attempt is
-  // recorded UNVERIFIED so it counts toward stats but never reaches the board.
+  // CONFIG-MATCH (anti-cheat "you must PROPERLY win it"). A clear is verified only
+  // when the submitted run matches the stored challenge: a genuine victory at/after
+  // the target wave, with the SAME difficulty / game mode / base challenges / seed.
+  // (Party-level checks - IV-clamp + ghost-legal bans + allowedSpecies membership -
+  // need the species/evolution graph the worker lacks; they stay a follow-up. The
+  // publish below is gated on verified===1, so an unmatched run never goes live.)
   // -------------------------------------------------------------------------
-  const verified: number = 0; // P1-G sets 1 on a passing config-match.
+  let storedConfig: Record<string, unknown> = {};
+  try {
+    storedConfig = JSON.parse(row.config_json) as Record<string, unknown>;
+  } catch {
+    storedConfig = {};
+  }
+  const verified: number = communityRunMatchesConfig(body, row, storedConfig, wave, isVictory) ? 1 : 0;
   const status: "cleared" | "failed" = isVictory ? "cleared" : "failed";
   const effective = await upsertCommunityAttempt(env, {
     challengeId,
@@ -2402,11 +2466,10 @@ async function handleCommunityClear(
     now,
   });
 
-  // Founder-publish seam (plan section 4.3 step 6 - the documented go-live gate):
-  // the creator's first victory flips the draft live. TODO(P1-G): gate this on the
-  // verification above passing (verified===1) before it ships to players.
+  // Founder-publish: the creator's first VERIFIED victory flips the draft live.
+  // Gated on verified===1 so a tampered / mismatched run can never publish.
   let published = false;
-  if (isCreator && isVictory && row.status === "draft") {
+  if (isCreator && isVictory && verified === 1 && row.status === "draft") {
     await env.DB.prepare(
       "UPDATE community_challenges SET status = 'active', published_at = ?2, founder_clear_id = ?3, updated_at = ?2 WHERE id = ?1 AND status = 'draft'",
     )

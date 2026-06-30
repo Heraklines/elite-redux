@@ -14,11 +14,7 @@ import { getCoopController, startLocalCoopSession } from "#data/elite-redux/coop
 import type { CoopNetcodeMode } from "#data/elite-redux/coop/coop-transport";
 import { buildInfernoFeed } from "#data/elite-redux/er-community-challenge-inferno";
 import { applyCommunityChallengeToRun } from "#data/elite-redux/er-community-challenge-launch";
-import {
-  type CommunityChallengeConfig,
-  type CommunityChallengeEntry,
-  recordCommunityAttempt,
-} from "#data/elite-redux/er-community-challenges";
+import type { CommunityChallengeConfig } from "#data/elite-redux/er-community-challenges";
 import { resetCommunityRunState } from "#data/elite-redux/er-community-run-state";
 import { Gender } from "#data/gender";
 import { BattleType } from "#enums/battle-type";
@@ -206,20 +202,16 @@ export class TitlePhase extends Phase {
                             globalScene.ui.setOverlayMode(
                               UiMode.COMMUNITY_CHALLENGES,
                               buildInfernoFeed(),
-                              // onPlay: ACTION on a card stashes its config + records the
-                              // attempt, then tears the browser down into the run. setModeAndEnd
-                              // begins with setMode(MESSAGE) (clears the browser) then end(),
-                              // which rebuilds the CHALLENGE gameMode and applies the config.
-                              (entry: CommunityChallengeEntry) => {
-                                this.pendingCommunityConfig = entry.config;
-                                // Built-in cards (er-inferno) / demo cards have no
-                                // worker row - only record attempts for published ones.
-                                if (!/^(er-|demo-)/.test(entry.config.id)) {
-                                  void recordCommunityAttempt(entry.config.id);
-                                }
-                                // Launch the mode the config declares (CHALLENGE today),
-                                // so the rebuilt gameMode matches the config-match key.
-                                setModeAndEnd(entry.config.gameModeId);
+                              // onLaunch: stash a config + tear the browser down into the
+                              // run. setModeAndEnd begins with setMode(MESSAGE) (clears the
+                              // browser) then end(), which rebuilds the CHALLENGE gameMode and
+                              // applies the config. Used for BOTH card-play and the founder's
+                              // post-create qualifying run (the caller does the attempt /
+                              // founder bookkeeping before invoking this). Launch the mode the
+                              // config declares so the rebuilt gameMode matches the config key.
+                              (config: CommunityChallengeConfig) => {
+                                this.pendingCommunityConfig = config;
+                                setModeAndEnd(config.gameModeId);
                               },
                               // onBack: CANCEL returns to the title. We opened via the
                               // deferred pattern (resetModeChain), so revertMode alone

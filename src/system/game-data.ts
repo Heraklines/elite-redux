@@ -16,6 +16,7 @@ import { getSerializedDailyRunConfig, parseDailySeed } from "#data/daily-seed/da
 import { allMoves, allSpecies } from "#data/data-lists";
 import { Egg } from "#data/egg";
 import { clearCoopRuntime, startLocalCoopSession } from "#data/elite-redux/coop/coop-runtime";
+import { getFounderRunState, setFounderRunState } from "#data/elite-redux/er-community-run-state";
 import { migrateErRemovedFormUnlocks } from "#data/elite-redux/er-egg-pool-bans";
 import { erMegaTargetToBaseSpeciesId } from "#data/elite-redux/er-generic-pool-bans";
 import { getErMapSaveData, restoreErMapState } from "#data/elite-redux/er-map-nodes";
@@ -1342,6 +1343,9 @@ export class GameData {
       // per-battle relics), scoped to the current wave so a reload doesn't reset
       // them and re-fire the effect.
       erRelicBattleState: getErRelicBattleState(),
+      // ER Community Challenge: if this run is a founder's qualifying play of a draft,
+      // persist {draftId, config} so a mid-run reload still auto-publishes on the win.
+      founderChallenge: getFounderRunState() ?? undefined,
     } as SessionSaveData;
   }
 
@@ -1462,6 +1466,10 @@ export class GameData {
     // ER (#486): restore the run's Map state (revealed nodes / travel target /
     // fragments). Tolerant of older saves with no field (clean, empty map).
     restoreErMapState(fromSession.erMapState, fromSession.waveIndex);
+
+    // ER Community Challenge: restore the founder qualifying-run linkage so a reload
+    // still auto-publishes the draft on the eventual win (null for non-founder saves).
+    setFounderRunState(fromSession.founderChallenge ?? null);
 
     globalScene.setSeed(fromSession.seed || globalScene.game.config.seed[0]);
     globalScene.resetSeed();
