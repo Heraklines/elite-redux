@@ -37,8 +37,12 @@
 import { globalScene } from "#app/global-scene";
 import { ensureErSpriteAnim } from "#data/elite-redux/er-form-sprite-redirect";
 import {
+  ER_SHINY_LAB_AURA_SIZE_MAX,
+  ER_SHINY_LAB_AURA_SIZE_MIN,
   ER_SHINY_LAB_DEFAULT_PARAMS,
   ER_SHINY_LAB_EFFECTS_BY_CATEGORY,
+  ER_SHINY_LAB_SPEED_MAX,
+  ER_SHINY_LAB_SPEED_MIN,
   type ErShinyLabCategory,
   type ErShinyLabConfig,
   type ErShinyLabEffect,
@@ -50,6 +54,7 @@ import {
   type ErShinyLabRarity,
   getErShinyLabNameStyle,
   resolveErShinyLabEffectState,
+  sanitizeErShinyLabPresetName,
 } from "#data/elite-redux/er-shiny-lab-effects";
 import {
   type ErShinyLabRenderedPixels,
@@ -65,7 +70,7 @@ import { ensureErShinyLabPaletteVariantCache } from "#sprites/variant";
 import { addTextObject } from "#ui/text";
 import { UiHandler } from "#ui/ui-handler";
 import { addWindow } from "#ui/ui-theme";
-import { getPokemonSpecies } from "#utils/pokemon-utils";
+import { decodeNickname, getPokemonSpecies } from "#utils/pokemon-utils";
 
 export type {
   ErShinyLabCategory,
@@ -89,9 +94,13 @@ type TuneRow =
   | "surfAmt"
   | "aroAmt"
   | "scale"
+  | "speed"
+  | "auraSize"
+  | "matchPalette"
   | "protectBlack"
   | "protectWhite"
   | "nameFx"
+  | "name"
   | "seed"
   | "load"
   | "save";
@@ -171,15 +180,21 @@ const TUNE_ROWS: TuneRow[] = [
   "surfAmt",
   "aroAmt",
   "scale",
+  "speed",
+  "auraSize",
+  "matchPalette",
   "protectBlack",
   "protectWhite",
   "nameFx",
+  "name",
   "seed",
   "load",
   "save",
 ];
 const TUNE_ROW_Y0 = ROW_Y0 + 1;
 const TUNE_ROW_STEP = 10;
+/** Rows visible at once in the TUNE panel; the rest scroll (the list grew past the panel height). */
+const VISIBLE_TUNE_ROWS = 9;
 const TUNE_CURSOR_H = 10;
 const TUNE_BAR_X = ROW_X + 60;
 const TUNE_BAR_SEGMENTS = 12;
@@ -242,6 +257,8 @@ export class ErShinyLabUiHandler extends UiHandler {
   private scrollTop = 0;
   /** Cursor within the TUNE panel rows. */
   private tuneCursor = 0;
+  /** Top of the visible TUNE-row window (the panel scrolls when the cursor leaves it). */
+  private tuneScrollTop = 0;
   /** Which preset the "Load preset" row points at, and which slot "Save" targets. */
   private loadSel = 0;
   private saveSel = 0;
@@ -880,8 +897,19 @@ export class ErShinyLabUiHandler extends UiHandler {
 
   private placeTuneCursor(): void {
     this.cursorObj.setDisplaySize(LIST_W - 12, TUNE_CURSOR_H);
-    this.cursorObj.setPosition(LIST_X + 6, this.tuneRowY(this.tuneCursor));
+    this.cursorObj.setPosition(LIST_X + 6, this.tuneRowY(this.tuneCursor - this.tuneScrollTop));
     this.cursorObj.setVisible(true);
+  }
+
+  /** Keep the TUNE cursor inside the visible window, scrolling the panel as needed. */
+  private ensureTuneCursorVisible(): void {
+    const maxTop = Math.max(0, TUNE_ROWS.length - VISIBLE_TUNE_ROWS);
+    if (this.tuneCursor < this.tuneScrollTop) {
+      this.tuneScrollTop = this.tuneCursor;
+    } else if (this.tuneCursor >= this.tuneScrollTop + VISIBLE_TUNE_ROWS) {
+      this.tuneScrollTop = this.tuneCursor - VISIBLE_TUNE_ROWS + 1;
+    }
+    this.tuneScrollTop = Math.max(0, Math.min(maxTop, this.tuneScrollTop));
   }
 
   private refreshEffectDetail(): void {
@@ -1090,6 +1118,10 @@ export class ErShinyLabUiHandler extends UiHandler {
         return p.aroAmt;
       case "scale":
         return (p.scale - 0.4) / 1.6;
+      case "speed":
+        return (p.speed - ER_SHINY_LAB_SPEED_MIN) / (ER_SHINY_LAB_SPEED_MAX - ER_SHINY_LAB_SPEED_MIN);
+      case "auraSize":
+        return (p.auraSize - ER_SHINY_LAB_AURA_SIZE_MIN) / (ER_SHINY_LAB_AURA_SIZE_MAX - ER_SHINY_LAB_AURA_SIZE_MIN);
       default:
         return 0;
     }
@@ -1105,12 +1137,20 @@ export class ErShinyLabUiHandler extends UiHandler {
         return "Aura";
       case "scale":
         return "Texture";
+      case "speed":
+        return "Speed";
+      case "auraSize":
+        return "Aura Size";
+      case "matchPalette":
+        return "Match Pal";
       case "protectBlack":
         return "Black";
       case "protectWhite":
         return "White";
       case "nameFx":
         return "Name FX";
+      case "name":
+        return "Name";
       case "seed":
         return "Seed";
       case "load":
@@ -1133,6 +1173,12 @@ export class ErShinyLabUiHandler extends UiHandler {
         return `${Math.round(this.tuneFraction(row) * 100)}%`;
       case "scale":
         return `${p.scale.toFixed(1)}x`;
+      case "speed":
+        return `${p.speed.toFixed(2)}x`;
+      case "auraSize":
+        return `${p.auraSize.toFixed(2)}x`;
+      case "matchPalette":
+        return p.tintMode === 1 ? "ON" : "OFF";
       case "protectBlack":
         return p.protectBlack ? "ON" : "OFF";
       case "protectWhite":
@@ -1142,6 +1188,10 @@ export class ErShinyLabUiHandler extends UiHandler {
           return "T3+";
         }
         return cfg.nameFxUnlocked ? (p.nameFx ? "ON" : "OFF") : `x${cfg.nameFxCost ?? 300}`;
+      case "name": {
+        const nm = cfg.equippedName ?? "";
+        return nm ? (nm.length > 9 ? `${nm.slice(0, 8)}...` : nm) : "(none)";
+      }
       case "seed":
         return String(p.seed).padStart(3, "0");
       case "load": {
@@ -1154,13 +1204,23 @@ export class ErShinyLabUiHandler extends UiHandler {
   }
 
   private presetLabel(cfg: ErShinyLabConfig, preset: ErShinyLabPreset): string {
+    if (preset.name) {
+      return preset.name.length > 9 ? `${preset.name.slice(0, 8)}...` : preset.name;
+    }
     const pal = preset.loadout.palette ? cfg.effects.palette.find(e => e.id === preset.loadout.palette)?.label : null;
     return pal && pal.length > 9 ? `${pal.slice(0, 8)}...` : (pal ?? "set");
   }
 
   /** True for rows that draw a segmented intensity bar. */
   private isSliderRow(row: TuneRow): boolean {
-    return row === "palAmt" || row === "surfAmt" || row === "aroAmt" || row === "scale";
+    return (
+      row === "palAmt"
+      || row === "surfAmt"
+      || row === "aroAmt"
+      || row === "scale"
+      || row === "speed"
+      || row === "auraSize"
+    );
   }
 
   private refreshTune(): void {
@@ -1169,9 +1229,11 @@ export class ErShinyLabUiHandler extends UiHandler {
     if (!cfg) {
       return;
     }
-    for (let i = 0; i < TUNE_ROWS.length; i++) {
+    this.ensureTuneCursorVisible();
+    const end = Math.min(TUNE_ROWS.length, this.tuneScrollTop + VISIBLE_TUNE_ROWS);
+    for (let i = this.tuneScrollTop; i < end; i++) {
       const row = TUNE_ROWS[i];
-      const y = this.tuneRowY(i);
+      const y = this.tuneRowY(i - this.tuneScrollTop);
       const sel = this.tuneCursor === i;
       const label = addTextObject(ROW_X, y, this.tuneLabel(row), TextStyle.WINDOW, { fontSize: "36px" });
       label.setOrigin(0, 0.5).setColor(sel ? "#eef4ff" : DIM);
@@ -1219,6 +1281,18 @@ export class ErShinyLabUiHandler extends UiHandler {
         break;
       case "scale":
         help = "Noise scale. Left/Right adjust, A reset";
+        break;
+      case "speed":
+        help = "Animation speed. Left/Right adjust, A reset";
+        break;
+      case "auraSize":
+        help = "Aura reach. Left/Right adjust, A reset";
+        break;
+      case "matchPalette":
+        help = "Tint FX to the palette colors. L/R or A toggle";
+        break;
+      case "name":
+        help = "Name this look. A to edit (prefixes the Pokemon name)";
         break;
       case "protectBlack":
         help = "Keep black outlines. L/R or A toggle";
@@ -1403,6 +1477,15 @@ export class ErShinyLabUiHandler extends UiHandler {
       case "scale":
         p.scale = clamp(round2(p.scale + dir * 0.1), 0.4, 2);
         break;
+      case "speed":
+        p.speed = clamp(round2(p.speed + dir * 0.25), ER_SHINY_LAB_SPEED_MIN, ER_SHINY_LAB_SPEED_MAX);
+        break;
+      case "auraSize":
+        p.auraSize = clamp(round2(p.auraSize + dir * 0.1), ER_SHINY_LAB_AURA_SIZE_MIN, ER_SHINY_LAB_AURA_SIZE_MAX);
+        break;
+      case "matchPalette":
+        p.tintMode = p.tintMode === 1 ? 0 : 1;
+        break;
       case "protectBlack":
         p.protectBlack = !p.protectBlack;
         break;
@@ -1416,6 +1499,9 @@ export class ErShinyLabUiHandler extends UiHandler {
         globalScene.ui.playSelect();
         this.refreshTune();
         return;
+      case "name":
+        // No Left/Right adjust; press A to edit the name.
+        return;
       case "seed":
         p.seed = (p.seed + dir + 256) % 256;
         break;
@@ -1428,7 +1514,13 @@ export class ErShinyLabUiHandler extends UiHandler {
     }
     globalScene.ui.playSelect();
     this.refreshTune();
-    if (this.isSliderRow(row) || row === "seed" || row === "protectBlack" || row === "protectWhite") {
+    if (
+      this.isSliderRow(row)
+      || row === "seed"
+      || row === "matchPalette"
+      || row === "protectBlack"
+      || row === "protectWhite"
+    ) {
       cfg.onChange?.({ ...cfg.equipped }, { ...p });
       this.refreshPreview();
     }
@@ -1441,26 +1533,26 @@ export class ErShinyLabUiHandler extends UiHandler {
       return;
     }
     const row = TUNE_ROWS[this.tuneCursor];
-    const def: ErShinyLabParams = {
-      palAmt: 1,
-      surfAmt: 1,
-      aroAmt: 1,
-      scale: 1,
-      seed: 0,
-      tintMode: 0,
-      protectBlack: false,
-      protectWhite: false,
-      nameFx: false,
-    };
+    const def: ErShinyLabParams = { ...ER_SHINY_LAB_DEFAULT_PARAMS };
     switch (row) {
       case "palAmt":
       case "surfAmt":
       case "aroAmt":
       case "scale":
+      case "speed":
+      case "auraSize":
         p[row] = def[row];
         cfg.onChange?.({ ...cfg.equipped }, { ...p });
         this.refreshPreview();
         break;
+      case "matchPalette":
+        p.tintMode = p.tintMode === 1 ? 0 : 1;
+        cfg.onChange?.({ ...cfg.equipped }, { ...p });
+        this.refreshPreview();
+        break;
+      case "name":
+        this.promptEquippedName();
+        return;
       case "protectBlack":
         p.protectBlack = !p.protectBlack;
         cfg.onChange?.({ ...cfg.equipped }, { ...p });
@@ -1504,12 +1596,46 @@ export class ErShinyLabUiHandler extends UiHandler {
         break;
       }
       case "save":
-        cfg.presets[this.saveSel] = { loadout: { ...cfg.equipped }, params: { ...p } };
+        // Save the current look INTO the slot, carrying the current name so a named look
+        // (e.g. "Glittering") survives load/save of presets.
+        cfg.presets[this.saveSel] = {
+          loadout: { ...cfg.equipped },
+          params: { ...p },
+          name: cfg.equippedName ? sanitizeErShinyLabPresetName(cfg.equippedName) : undefined,
+        };
         cfg.onChange?.({ ...cfg.equipped }, { ...p });
         break;
     }
     globalScene.ui.playSelect();
     this.refreshTune();
+  }
+
+  /** Open the text-entry modal to name the equipped look (the Pokemon-name prefix). */
+  private promptEquippedName(): void {
+    const cfg = this.config;
+    if (!cfg) {
+      return;
+    }
+    globalScene.ui.setOverlayMode(
+      UiMode.RENAME_POKEMON,
+      {
+        buttonActions: [
+          (encoded: string) => {
+            globalScene.ui.playSelect();
+            const name = sanitizeErShinyLabPresetName(decodeNickname(encoded, ""));
+            cfg.onSetEquippedName?.(name);
+            cfg.equippedName = name;
+            globalScene.ui.revertMode();
+            this.refreshTune();
+            this.refreshPreview();
+          },
+          () => {
+            globalScene.ui.revertMode();
+          },
+        ],
+      },
+      cfg.equippedName ?? "",
+    );
   }
 
   private toggleNameFx(): boolean {
@@ -1551,6 +1677,9 @@ export class ErShinyLabUiHandler extends UiHandler {
       cfg.equipped[cat] = id && cfg.owned[cat].has(id) ? id : null;
     }
     cfg.params = { ...preset.params, nameFx: cfg.earnedTier >= 3 && !!cfg.nameFxUnlocked && !!preset.params.nameFx };
+    // Loading a named preset adopts its name as the equipped name (the Pokemon-name prefix).
+    cfg.equippedName = sanitizeErShinyLabPresetName(preset.name);
+    cfg.onSetEquippedName?.(cfg.equippedName);
     cfg.onChange?.({ ...cfg.equipped }, { ...cfg.params });
     this.refreshChips();
     this.refreshPreview();

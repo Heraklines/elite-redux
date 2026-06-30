@@ -189,6 +189,11 @@ export function renderErShinyLabLook(
 
   setFxParams(params.seed ?? 0, params.scale ?? 1);
 
+  // Speed scales the animation clock; aura size scales how far the "around" effect reaches
+  // (a smaller effective distance reads as a bigger aura within the fixed render pad).
+  const t = time * clamp(params.speed ?? 1, 0.1, 4);
+  const auraSize = clamp(params.auraSize ?? 1, 0.3, 3);
+
   const ctx: FxContext = {
     e: 0,
     sa: rawSa,
@@ -250,12 +255,12 @@ export function renderErShinyLabLook(
           const aPal = a;
           let sc: number[];
           if (surf === "prismatic") {
-            const off = 0.012 * (0.6 + 0.4 * Math.sin(time * 2));
+            const off = 0.012 * (0.6 + 0.4 * Math.sin(t * 2));
             sc = [sa(x + off, y)[0], col[1], sa(x - off, y)[2]];
           } else if (surf === "glitch") {
             const slice = Math.floor(y * 16);
-            const rnd = vnoise(slice * 3.1 + 0.5, Math.floor(time * 8) * 1.3 + 0.5);
-            const dx = rnd > 0.62 ? (vnoise(slice + 9, Math.floor(time * 8)) - 0.5) * 0.14 : 0;
+            const rnd = vnoise(slice * 3.1 + 0.5, Math.floor(t * 8) * 1.3 + 0.5);
+            const dx = rnd > 0.62 ? (vnoise(slice + 9, Math.floor(t * 8)) - 0.5) * 0.14 : 0;
             const s2 = sa(x + dx, y);
             if (s2[3] <= 0.02) {
               out[k + 3] = 0;
@@ -265,7 +270,7 @@ export function renderErShinyLabLook(
             sc = [sa(x + dx + 0.01, y)[0] * scan, s2[1] * scan, sa(x + dx - 0.01, y)[2] * scan];
             a = s2[3];
           } else {
-            const res = AURA[surf](base2[0], base2[1], base2[2], x, y, time, ctx);
+            const res = AURA[surf](base2[0], base2[1], base2[2], x, y, t, ctx);
             sc = [res[0], res[1], res[2]];
             a = aPal * res[3];
           }
@@ -290,8 +295,8 @@ export function renderErShinyLabLook(
       } else if (aro) {
         const nx = (px + 0.5) / pw;
         const ny = (py + 0.5) / ph;
-        const df = dist.d[py * pw + px];
-        const res = AROUND[aro](nx, ny, df, time, ac);
+        const df = dist.d[py * pw + px] / auraSize;
+        const res = AROUND[aro](nx, ny, df, t, ac);
         let rc = [res[0], res[1], res[2]];
         if (doTint && !NO_TINT.has(aro)) {
           rc = tintTo(rc, tintH, tintS);

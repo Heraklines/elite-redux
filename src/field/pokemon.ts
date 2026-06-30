@@ -208,6 +208,7 @@ import { getMoveTargets } from "#moves/move-utils";
 import { PokemonMove } from "#moves/pokemon-move";
 import {
   ErShinyLabSpriteFxOverlay,
+  getErShinyLabNamePrefixForPokemon,
   getErShinyLabPokemonBattleSource,
   getErShinyLabSpriteFxLookForPokemon,
   getErShinyLabSpriteFxTime,
@@ -575,19 +576,20 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
       return illusion.name;
     }
 
-    if (this.nickname) {
-      return decodeNickname(this.nickname, this.name);
-    }
+    const base = this.nickname
+      ? decodeNickname(this.nickname, this.name)
+      : prependFormName
+        ? this.name
+        : this.isFusion()
+          ? getFusedSpeciesName(this.species.getName(), this.fusionSpecies!.getName())
+          : this.species.getName();
 
-    if (prependFormName) {
-      return this.name;
-    }
-
-    if (this.isFusion()) {
-      return getFusedSpeciesName(this.species.getName(), this.fusionSpecies!.getName());
-    }
-
-    return this.species.getName();
+    // ER Shiny Lab: a player-chosen preset name prefixes the displayed name everywhere
+    // ("Glittering Rayquaza"). Composes over nickname + species name, skipped under an illusion
+    // (disguise), and fail-safe (resolver never throws). Cosmetic only: nothing keys off the
+    // display string (species is resolved by numeric id), so this cannot misresolve a mon.
+    const prefix = getErShinyLabNamePrefixForPokemon(this);
+    return prefix ? `${prefix} ${base}` : base;
   }
 
   /**

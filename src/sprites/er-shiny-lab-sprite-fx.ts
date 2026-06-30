@@ -12,6 +12,7 @@ import {
   getErShinyLabOwnedSet,
   isErShinyLabNameFxUnlocked,
   sanitizeErShinyLabLoadout,
+  sanitizeErShinyLabPresetName,
 } from "#data/elite-redux/er-shiny-lab-effects";
 import {
   ER_SHINY_LAB_RENDER_PAD,
@@ -413,6 +414,47 @@ export function getErShinyLabSpriteFxLookForPokemon(pokemon: {
 }
 
 /**
+ * The player-chosen preset NAME currently equipped for a species' shiny look, or "" when none.
+ * Only returns a name when a look is actually equipped (so a stale name never leaks onto a bare
+ * shiny). This drives the optional name PREFIX ("Glittering Rayquaza") - distinct from the
+ * animated Name FX, and not gated on the Name FX unlock.
+ */
+export function getErShinyLabEquippedNameForSpecies(speciesId: number, shiny: boolean): string {
+  if (!shiny) {
+    return "";
+  }
+  const save = globalScene.gameData?.getStarterDataEntry(speciesId)?.erShinyLab;
+  if (!save?.ln) {
+    return "";
+  }
+  return getErShinyLabSpriteFxLookForSpecies(speciesId, shiny) ? sanitizeErShinyLabPresetName(save.ln) : "";
+}
+
+/**
+ * The name prefix to prepend to a Pokemon's displayed name from its Shiny Lab preset, or "".
+ * Mirrors {@linkcode getErShinyLabSpriteFxLookForPokemon}: a carried name (wild/ghost/co-op
+ * serialized) wins, else the species' live equipped name. Cheap + fail-safe (never throws), so
+ * it is safe to call inside {@linkcode Pokemon.getNameToRender} on every render.
+ */
+export function getErShinyLabNamePrefixForPokemon(pokemon: {
+  species: { speciesId: number };
+  shiny: boolean;
+  customPokemonData?: { erShinyLabName?: string | undefined; erShinyLabSuppressLocal?: boolean } | null;
+}): string {
+  if (!pokemon.shiny) {
+    return "";
+  }
+  const carried = sanitizeErShinyLabPresetName(pokemon.customPokemonData?.erShinyLabName);
+  if (carried) {
+    return carried;
+  }
+  if (pokemon.customPokemonData?.erShinyLabSuppressLocal) {
+    return "";
+  }
+  return getErShinyLabEquippedNameForSpecies(pokemon.species.speciesId, pokemon.shiny);
+}
+
+/**
  * The Name FX style for a battle Pokemon: the equipped palette's color (or a named-combo
  * signature) whenever the mon is a shiny that has Name FX unlocked + enabled. NO earned-tier
  * gate - the player explicitly equipped + toggled Name FX, so it must show on the name
@@ -484,6 +526,8 @@ export function erShinyLabSpriteFxStateKey(
     params.tintMode,
     params.protectBlack ? 1 : 0,
     params.protectWhite ? 1 : 0,
+    params.speed ?? 1,
+    params.auraSize ?? 1,
   ].join("|");
 }
 

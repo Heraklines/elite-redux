@@ -43,11 +43,17 @@ export interface ErShinyLabParams {
   protectBlack: boolean;
   protectWhite: boolean;
   nameFx: boolean;
+  /** Animation speed multiplier for surfaces + auras (1 = default). Scales the render clock. */
+  speed: number;
+  /** Aura extent multiplier (1 = default). Scales how far the "around" effect reaches from the sprite. */
+  auraSize: number;
 }
 
 export interface ErShinyLabPreset {
   loadout: ErShinyLabLoadout;
   params: ErShinyLabParams;
+  /** Optional player-chosen name. When set + equipped, prefixes the Pokemon's displayed name. */
+  name?: string | undefined;
 }
 
 export interface ErShinyLabCompletion {
@@ -74,6 +80,8 @@ export interface ErShinyLabConfig {
   available: Set<string>;
   equipped: ErShinyLabLoadout;
   params: ErShinyLabParams;
+  /** The name carried by the currently-equipped look. Prefixes the Pokemon name when set. */
+  equippedName?: string;
   presets: (ErShinyLabPreset | null)[];
   completion?: ErShinyLabCompletion;
   nameFxUnlocked?: boolean;
@@ -84,12 +92,28 @@ export interface ErShinyLabConfig {
   onBuy?: (category: ErShinyLabCategory, effect: ErShinyLabEffect) => void;
   onBuyNameFx?: () => boolean;
   onRerollSeed?: (params: ErShinyLabParams) => ErShinyLabParams | null;
+  /** Set the equipped look's preset name (the Pokemon-name prefix); "" clears it. */
+  onSetEquippedName?: (name: string) => void;
   onExit?: () => void;
 }
 
 export type ErShinyLabSavedLoadout = [number, number, number];
-export type ErShinyLabSavedParams = [number, number, number, number, number, number, number, number, number];
+export type ErShinyLabSavedParams = [
+  number,
+  number,
+  number,
+  number,
+  number,
+  number,
+  number,
+  number,
+  number,
+  number,
+  number,
+];
 export type ErShinyLabSavedPreset = [
+  number,
+  number,
   number,
   number,
   number,
@@ -116,10 +140,18 @@ export interface ErShinyLabSaveData {
   o?: ErShinyLabOwnedBitsets;
   /** Equipped effect indexes, 0 means none and N means registry index N - 1. */
   l?: ErShinyLabSavedLoadout;
-  /** Byte-quantized params: pal, surface, aura, scale, seed, tintMode, protectBlack, protectWhite, nameFx. */
+  /**
+   * Byte-quantized params: pal, surface, aura, scale, seed, tintMode, protectBlack,
+   * protectWhite, nameFx, speed, auraSize. (Older saves stored the first 9; the new
+   * trailing entries default in via decode, so old saves load unchanged.)
+   */
   q?: ErShinyLabSavedParams;
-  /** Five preset slots: loadout indexes followed by nine quantized params. */
+  /** Five preset slots: loadout indexes followed by the quantized params. */
   r?: (ErShinyLabSavedPreset | null)[];
+  /** Optional player-chosen names for the five preset slots (parallel to `r`). */
+  rn?: (string | null)[];
+  /** Name carried by the currently-equipped look (prefixes the Pokemon name in-run). */
+  ln?: string;
   /** Per-species seed reroll tokens. */
   t?: number;
   /** Claimed completion rewards bitfield: palette, surface, around, all. */
@@ -158,7 +190,34 @@ export const ER_SHINY_LAB_DEFAULT_PARAMS: ErShinyLabParams = {
   protectBlack: false,
   protectWhite: false,
   nameFx: false,
+  speed: 1,
+  auraSize: 1,
 };
+
+/** Animation-speed slider bounds (multiplier applied to the render clock). */
+export const ER_SHINY_LAB_SPEED_MIN = 0.25;
+export const ER_SHINY_LAB_SPEED_MAX = 3;
+/** Aura-size slider bounds (multiplier applied to the "around" effect's reach). */
+export const ER_SHINY_LAB_AURA_SIZE_MIN = 0.5;
+export const ER_SHINY_LAB_AURA_SIZE_MAX = 2;
+/** Max characters for a player-chosen preset name / Pokemon name prefix. */
+export const ER_SHINY_LAB_PRESET_NAME_MAX = 16;
+
+/** Trim + clamp a player-entered preset name (control chars stripped, length capped). */
+export function sanitizeErShinyLabPresetName(name: string | null | undefined): string {
+  if (!name) {
+    return "";
+  }
+  let cleaned = "";
+  for (const ch of name) {
+    const code = ch.charCodeAt(0);
+    // Drop control chars (incl. newlines/tabs) so the prefix renders on a single line.
+    if (code >= 0x20 && code !== 0x7f) {
+      cleaned += ch;
+    }
+  }
+  return cleaned.trim().slice(0, ER_SHINY_LAB_PRESET_NAME_MAX);
+}
 
 export const ER_SHINY_LAB_SEED_REROLL_CANDY_COST = 25;
 export const ER_SHINY_LAB_NAME_FX_CANDY_COST = 300;
@@ -909,6 +968,13 @@ export function decodeErShinyLabLoadout(saved: readonly number[] | undefined): E
   };
 }
 
+// Speed quantizes over [0.25, 3]; aura size over [0.5, 2]. Defaults (1) land at byte 70 / 85,
+// which is also the fallback when an OLDER 9-param save lacks the trailing two entries.
+const SPEED_RANGE = ER_SHINY_LAB_SPEED_MAX - ER_SHINY_LAB_SPEED_MIN;
+const AURA_SIZE_RANGE = ER_SHINY_LAB_AURA_SIZE_MAX - ER_SHINY_LAB_AURA_SIZE_MIN;
+const SPEED_DEFAULT_BYTE = byte(((1 - ER_SHINY_LAB_SPEED_MIN) / SPEED_RANGE) * 255);
+const AURA_SIZE_DEFAULT_BYTE = byte(((1 - ER_SHINY_LAB_AURA_SIZE_MIN) / AURA_SIZE_RANGE) * 255);
+
 export function encodeErShinyLabParams(params: ErShinyLabParams): ErShinyLabSavedParams {
   return [
     byte(params.palAmt * 255),
@@ -920,6 +986,8 @@ export function encodeErShinyLabParams(params: ErShinyLabParams): ErShinyLabSave
     byte(params.protectBlack ? 1 : 0),
     byte(params.protectWhite ? 1 : 0),
     byte(params.nameFx ? 1 : 0),
+    byte((((params.speed ?? 1) - ER_SHINY_LAB_SPEED_MIN) / SPEED_RANGE) * 255),
+    byte((((params.auraSize ?? 1) - ER_SHINY_LAB_AURA_SIZE_MIN) / AURA_SIZE_RANGE) * 255),
   ];
 }
 
@@ -937,6 +1005,8 @@ export function decodeErShinyLabParams(saved: readonly number[] | undefined): Er
     protectBlack: byte(saved[6] ?? 0) > 0,
     protectWhite: byte(saved[7] ?? 0) > 0,
     nameFx: byte(saved[8] ?? 0) > 0,
+    speed: ER_SHINY_LAB_SPEED_MIN + (byte(saved[9] ?? SPEED_DEFAULT_BYTE) / 255) * SPEED_RANGE,
+    auraSize: ER_SHINY_LAB_AURA_SIZE_MIN + (byte(saved[10] ?? AURA_SIZE_DEFAULT_BYTE) / 255) * AURA_SIZE_RANGE,
   };
 }
 
@@ -956,6 +1026,8 @@ export function encodeErShinyLabPreset(preset: ErShinyLabPreset): ErShinyLabSave
     params[6],
     params[7],
     params[8],
+    params[9],
+    params[10],
   ];
 }
 
@@ -965,7 +1037,7 @@ export function decodeErShinyLabPreset(saved: readonly number[] | null | undefin
   }
   return {
     loadout: decodeErShinyLabLoadout(saved.slice(0, 3)),
-    params: decodeErShinyLabParams(saved.slice(3, 12)),
+    params: decodeErShinyLabParams(saved.slice(3, 14)),
   };
 }
 
@@ -988,6 +1060,9 @@ export function normalizeErShinyLabSavedLook(
     byte(saved[9] ?? 0),
     byte(saved[10] ?? 0),
     byte(saved[11] ?? 0),
+    // speed + aura-size: trailing params absent on pre-tuning saves default to 1x.
+    byte(saved[12] ?? SPEED_DEFAULT_BYTE),
+    byte(saved[13] ?? AURA_SIZE_DEFAULT_BYTE),
   ];
   const loadout = decodeErShinyLabLoadout(normalized);
   return loadout.palette || loadout.surface || loadout.around ? normalized : undefined;
@@ -1117,10 +1192,18 @@ export function grantErShinyLabSavedLookToSave(
 
 export function normalizeErShinyLabPresets(
   presets: readonly (readonly number[] | null)[] | undefined,
+  names?: readonly (string | null)[] | undefined,
 ): (ErShinyLabPreset | null)[] {
   const out: (ErShinyLabPreset | null)[] = [];
   for (let i = 0; i < 5; i++) {
-    out.push(decodeErShinyLabPreset(presets?.[i]));
+    const preset = decodeErShinyLabPreset(presets?.[i]);
+    if (preset) {
+      const name = sanitizeErShinyLabPresetName(names?.[i] ?? "");
+      if (name) {
+        preset.name = name;
+      }
+    }
+    out.push(preset);
   }
   return out;
 }

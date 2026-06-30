@@ -1,6 +1,10 @@
 import type { BattlerTag } from "#data/battler-tags";
 import { loadBattlerTag, SerializableBattlerTag } from "#data/battler-tags";
-import { type ErShinyLabSavedLook, normalizeErShinyLabSavedLook } from "#data/elite-redux/er-shiny-lab-effects";
+import {
+  type ErShinyLabSavedLook,
+  normalizeErShinyLabSavedLook,
+  sanitizeErShinyLabPresetName,
+} from "#data/elite-redux/er-shiny-lab-effects";
 import type { Gender } from "#data/gender";
 import { PokemonMove } from "#data/moves/pokemon-move";
 import type { PokemonSpeciesForm } from "#data/pokemon-species";
@@ -80,6 +84,13 @@ export class CustomPokemonData {
    */
   public erShinyLab?: ErShinyLabSavedLook | undefined;
   /**
+   * ER Shiny Lab: the player-chosen PRESET NAME equipped with the carried look. When set, it
+   * prefixes the Pokemon's displayed name everywhere (e.g. "Glittering Rayquaza"). Travels the
+   * same channels as {@linkcode erShinyLab} (save round-trip + ghost/co-op serialization), so a
+   * cross-player ghost shows the original owner's label. Empty/undefined => no prefix.
+   */
+  public erShinyLabName?: string | undefined;
+  /**
    * When true, do not fall back to this client's starterData Shiny Lab look.
    * Ghost Pokemon use this so malformed or absent owner payloads become plain.
    */
@@ -155,6 +166,7 @@ export class CustomPokemonData {
     this.erGiftAbilities = data?.erGiftAbilities ?? [];
     this.erGiftIndex = data?.erGiftIndex ?? 0;
     this.erShinyLab = normalizeErShinyLabSavedLook(data?.erShinyLab);
+    this.erShinyLabName = sanitizeErShinyLabPresetName(data?.erShinyLabName) || undefined;
     this.erShinyLabSuppressLocal = data?.erShinyLabSuppressLocal ?? false;
     this.erInnateShrineUnlocked = data?.erInnateShrineUnlocked ?? false;
     this.erCursedStat = data?.erCursedStat ?? -1;

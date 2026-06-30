@@ -42,6 +42,7 @@ import {
   isErShinyLabNameFxUnlocked,
   normalizeErShinyLabSavedLook,
   sanitizeErShinyLabLoadout,
+  sanitizeErShinyLabPresetName,
 } from "#data/elite-redux/er-shiny-lab-effects";
 import { pokemonPrevolutions } from "#balance/pokemon-evolutions";
 import { speciesEggTiers } from "#balance/species-egg-tiers";
@@ -87,6 +88,11 @@ export interface GhostMember {
    * clamps every id before applying so malformed snapshots become plain.
    */
   erShinyLab?: ErShinyLabSavedLook | undefined;
+  /**
+   * ER Shiny Lab: the owner's equipped preset NAME, shown as a prefix on the ghost's
+   * name for other players (e.g. "Glittering Rayquaza"). Omitted when unnamed.
+   */
+  erShinyLabName?: string | undefined;
 }
 
 export interface GhostTeamSnapshot {
@@ -439,6 +445,7 @@ function serializeMember(p: any, isPlayer = true): GhostMember {
     : [];
   const heldItems = serializeHeldItems(p, isPlayer);
   const erShinyLab = serializeShinyLabLook(p);
+  const erShinyLabName = serializeShinyLabName(p);
   return {
     speciesId: p?.species?.speciesId ?? 0,
     formIndex: p?.formIndex ?? 0,
@@ -453,7 +460,29 @@ function serializeMember(p: any, isPlayer = true): GhostMember {
     moves,
     ...(heldItems.length > 0 ? { heldItems } : {}),
     ...(erShinyLab ? { erShinyLab } : {}),
+    ...(erShinyLabName ? { erShinyLabName } : {}),
   };
+}
+
+/**
+ * The owner's equipped Shiny Lab preset NAME for a member, or undefined. Mirrors
+ * {@linkcode serializeShinyLabLook}: a carried name wins, else the species' equipped name -
+ * but only when a look is actually equipped, so a stale name never travels onto a bare shiny.
+ */
+function serializeShinyLabName(p: any): string | undefined {
+  const carried = sanitizeErShinyLabPresetName(p?.customPokemonData?.erShinyLabName);
+  if (carried) {
+    return carried;
+  }
+  if (!p?.shiny) {
+    return undefined;
+  }
+  const speciesId = p?.species?.speciesId;
+  if (typeof speciesId !== "number") {
+    return undefined;
+  }
+  const name = sanitizeErShinyLabPresetName(globalScene.gameData?.getStarterDataEntry(speciesId)?.erShinyLab?.ln);
+  return name && serializeShinyLabLook(p) ? name : undefined;
 }
 
 function serializeShinyLabLook(p: any): ErShinyLabSavedLook | undefined {
@@ -1127,6 +1156,8 @@ export function applyErGhostOverride(trainer: Trainer, index: number): EnemyPoke
     enemy.passive = member.passive;
     enemy.customPokemonData.erShinyLabSuppressLocal = true;
     enemy.customPokemonData.erShinyLab = member.shiny ? normalizeErShinyLabSavedLook(member.erShinyLab) : undefined;
+    enemy.customPokemonData.erShinyLabName =
+      member.shiny && member.erShinyLab ? sanitizeErShinyLabPresetName(member.erShinyLabName) || undefined : undefined;
     if (member.moves.length > 0 && speciesMatchesStored) {
       const moves = member.moves.map(id => new PokemonMove(id));
       enemy.moveset = moves;

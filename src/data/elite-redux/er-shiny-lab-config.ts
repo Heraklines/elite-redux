@@ -27,6 +27,7 @@ import {
   isErShinyLabNameFxUnlocked,
   normalizeErShinyLabPresets,
   sanitizeErShinyLabLoadout,
+  sanitizeErShinyLabPresetName,
   setErShinyLabOwnedBit,
   spendErShinyLabSeedRerollToken,
   unlockErShinyLabNameFx,
@@ -131,6 +132,18 @@ function persistConfig(
         : null,
     )
     .slice(0, 5);
+  const presetNames = config.presets.map(p => (p?.name ? sanitizeErShinyLabPresetName(p.name) || null : null)).slice(0, 5);
+  if (presetNames.some(Boolean)) {
+    save.rn = presetNames;
+  } else {
+    delete save.rn;
+  }
+  const equippedName = sanitizeErShinyLabPresetName(config.equippedName);
+  if (equippedName) {
+    save.ln = equippedName;
+  } else {
+    delete save.ln;
+  }
   saveSystem();
 }
 
@@ -173,7 +186,8 @@ export function buildErShinyLabConfig(speciesId: number): ErShinyLabConfig {
     available,
     equipped,
     params,
-    presets: normalizeErShinyLabPresets(save.r),
+    equippedName: sanitizeErShinyLabPresetName(save.ln),
+    presets: normalizeErShinyLabPresets(save.r, save.rn),
     completion: getErShinyLabCompletion(save),
     nameFxUnlocked,
     nameFxCost: ER_SHINY_LAB_NAME_FX_CANDY_COST,
@@ -199,6 +213,10 @@ export function buildErShinyLabConfig(speciesId: number): ErShinyLabConfig {
   config.onChange = (loadout, nextParams) => {
     config.equipped = sanitizeErShinyLabLoadout(loadout, config.owned);
     config.params = sanitizeParams(nextParams, config.earnedTier, !!config.nameFxUnlocked);
+    persistConfig(entry, config, config.equipped, config.params);
+  };
+  config.onSetEquippedName = name => {
+    config.equippedName = sanitizeErShinyLabPresetName(name);
     persistConfig(entry, config, config.equipped, config.params);
   };
   config.onBuyNameFx = () => {
