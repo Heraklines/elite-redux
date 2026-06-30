@@ -1658,6 +1658,10 @@ export class StarterSelectUiHandler extends MessageUiHandler {
       // Roster-pick mode: hide the party point-budget label and paint the initial marks.
       this.valueLimitLabel.setVisible(!this.rosterPickMode);
       if (this.rosterPickMode) {
+        // Opened as an OVERLAY over the create designer (a high-z handler); this screen
+        // is registered early (low z), so raise it to the top or it renders BEHIND the
+        // designer/browser and the player just sees the screen they came from.
+        globalScene.ui.bringToTop(this.starterSelectContainer);
         this.refreshRosterMarks();
       }
 

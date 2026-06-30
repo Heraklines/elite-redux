@@ -497,13 +497,13 @@ export class CommunityChallengeCreateUiHandler extends UiHandler {
    * An empty selection = no whitelist (all eligible).
    */
   private openSpeciesPicker(): void {
-    this.container.setVisible(false);
+    // starter-select raises itself to the top in roster mode (it is a low-z handler),
+    // so CREATE can stay where it is - revertMode lands back on it.
     globalScene.ui.setOverlayMode(UiMode.STARTER_SELECT, () => {}, {
       rosterPickMode: true,
       initialSelected: this.draft.allowedSpecies ?? [],
       onRosterConfirm: (ids: number[]) => {
         globalScene.ui.revertMode().then(() => {
-          this.container.setVisible(true);
           this.draft.allowedSpecies = ids.length > 0 ? ids : null;
           this.errorMsg = null;
           this.rebuild();
