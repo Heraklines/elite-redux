@@ -29,6 +29,7 @@ import Overrides from "#app/overrides";
 import { modifierTypes } from "#data/data-lists";
 import { getCoopController, startLocalCoopSession } from "#data/elite-redux/coop/coop-runtime";
 import { coopOwnedCount } from "#data/elite-redux/coop/coop-session";
+import { erRunUnlockAbilitySlot, erRunUnlockableInnateSlots } from "#data/elite-redux/er-ability-capsule";
 import type { ErCommunityItemKind } from "#data/elite-redux/er-community-items";
 import { setErAiExperimentalMode, setErSmartAiTestForced } from "#data/elite-redux/er-enemy-ai";
 import { seedDevGhostGrave } from "#data/elite-redux/er-ghost-teams";
@@ -328,6 +329,22 @@ function boostEnemy(stages: [BattleStat, number][]): void {
 const ALL_MAIN_STATS: BattleStat[] = [Stat.ATK, Stat.DEF, Stat.SPATK, Stat.SPDEF, Stat.SPD];
 const allStages = (n: number): [BattleStat, number][] => ALL_MAIN_STATS.map(s => [s, n]);
 
+/**
+ * Greater-Ability-Capsule repro: RUN-unlock every one of the lead's locked innates,
+ * simulating the state where they are already FREE for the run (Youngster mode, or a
+ * prior Ability Capsule). After this `canApplyAbility` is true for them, so the OLD
+ * Greater Capsule (which keyed off the run-unlockable set) wrongly said "no effect".
+ */
+function runUnlockAllLeadInnates(): void {
+  const p = globalScene.getPlayerPokemon();
+  if (!p) {
+    return;
+  }
+  for (const { slot } of erRunUnlockableInnateSlots(p)) {
+    erRunUnlockAbilitySlot(p, slot);
+  }
+}
+
 /** #387: hand the active player Pokemon community items (kind, stacks). */
 function givePlayerCommunityItems(items: [ErCommunityItemKind, number][]): void {
   const player = globalScene.getPlayerPokemon();
@@ -447,8 +464,62 @@ const BG_CHECK_SCENARIOS: DevScenario[] = [
   bgCheckScenario("Graveyard", BiomeId.GRAVEYARD, TimeOfDay.NIGHT, "night", "the night graveyard art."),
 ];
 
+// --- One best-pick background per biome (staging eval) -----------------------
+// A single hand-picked image now backs each of these biomes ({biome}_bg on
+// er-assets). One scenario each drops you into the biome at daytime (so the art
+// shows untinted) with a free-win Magikarp, just to eyeball how it looks.
+function bgBiomeScenario(biomeName: string, biomeId: BiomeId, expect: string): DevScenario {
+  return {
+    label: `BG ${biomeName}`,
+    description:
+      `New best-pick battle background for ${biomeName}.\n`
+      + "DO: just look at the background (free-win Magikarp; forced to daytime).\n"
+      + `EXPECT: ${expect}`,
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_BIOME_OVERRIDE: biomeId,
+        STARTING_WAVE_OVERRIDE: 12,
+        TIME_OF_DAY_OVERRIDE: TimeOfDay.DAY,
+        STARTING_LEVEL_OVERRIDE: 100,
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.MAGIKARP,
+        ENEMY_LEVEL_OVERRIDE: 5,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+      });
+      return bgCheckParty();
+    },
+  };
+}
+
+const BG_BIOME_SCENARIOS: DevScenario[] = [
+  bgBiomeScenario("Town", BiomeId.TOWN, "lush green field with a big shade tree."),
+  bgBiomeScenario("Plains", BiomeId.PLAINS, "bright open rolling green hills."),
+  bgBiomeScenario("Grass", BiomeId.GRASS, "lush green grass with trees and bushes."),
+  bgBiomeScenario("Tall Grass", BiomeId.TALL_GRASS, "dense tall-grass undergrowth."),
+  bgBiomeScenario("Forest", BiomeId.FOREST, "tree trunks and a leaf-litter forest path."),
+  bgBiomeScenario("Sea", BiomeId.SEA, "bright open blue ocean."),
+  bgBiomeScenario("Beach", BiomeId.BEACH, "sandy shore meeting blue sea under clouds."),
+  bgBiomeScenario("Lake", BiomeId.LAKE, "calm tree-ringed lake with lily pads."),
+  bgBiomeScenario("Mountain", BiomeId.MOUNTAIN, "brown rocky slopes dotted with pines."),
+  bgBiomeScenario("Badlands", BiomeId.BADLANDS, "red rock canyon walls."),
+  bgBiomeScenario("Cave", BiomeId.CAVE, "dark blue cavern with twin tunnels."),
+  bgBiomeScenario("Desert", BiomeId.DESERT, "orange rolling sand dunes."),
+  bgBiomeScenario("Ice Cave", BiomeId.ICE_CAVE, "icy snow-covered cave mouth."),
+  bgBiomeScenario("Meadow", BiomeId.MEADOW, "flowery meadow with a big shade tree."),
+  bgBiomeScenario("Power Plant", BiomeId.POWER_PLANT, "red-alert sci-fi control room."),
+  bgBiomeScenario("Dojo", BiomeId.DOJO, "stone arena floor with red banners."),
+  bgBiomeScenario("Abyss", BiomeId.ABYSS, "dark sci-fi void floor (abyss stays dim by design)."),
+  bgBiomeScenario("Space", BiomeId.SPACE, "sci-fi floor with a starfield window."),
+  bgBiomeScenario("Jungle", BiomeId.JUNGLE, "tropical waterfall over mossy rocks."),
+  bgBiomeScenario("Temple", BiomeId.TEMPLE, "torchlit ancient stone interior."),
+  bgBiomeScenario("Snowy Forest", BiomeId.SNOWY_FOREST, "snow-laden pines on a white slope."),
+  bgBiomeScenario("Island", BiomeId.ISLAND, "sunny sandy shore and sea."),
+  bgBiomeScenario("Laboratory", BiomeId.LABORATORY, "clean blue-accent sci-fi lab floor."),
+];
+
 export const DEV_SCENARIOS: DevScenario[] = [
   ...BG_CHECK_SCENARIOS,
+  ...BG_BIOME_SCENARIOS,
   // ===========================================================================
   // QoL — out-of-battle party reorder
   // ===========================================================================
@@ -10909,5 +10980,37 @@ export const DEV_SCENARIOS: DevScenario[] = [
       }
     },
     shopItems: [modifierTypes.TM_CASE],
+  },
+  // Greater Ability Capsule permanently unlocks an innate even when it is only run-free
+  {
+    label: "Greater Ability Capsule: permanent unlock works on a run-free innate",
+    description:
+      "Greater Ability Capsule wrongly said 'no effect' on every Pokemon when its innates\n"
+      + "were already FREE for the run (Youngster mode, or after a normal Ability Capsule).\n"
+      + "The PERMANENT-unlock option keyed off the run-unlockable set, which is empty once an\n"
+      + "innate is run-free - so it offered nothing even though the innate was never\n"
+      + "PERMANENTLY (candy) unlocked. Fixed: option (A) now keys off the permanent passiveAttr.\n"
+      + "DO: KO the Magikarp. This scenario run-unlocks ALL of Garchomp's innates first turn\n"
+      + "(simulating the Youngster/already-free state). On the reward screen pick the GREATER\n"
+      + "ABILITY CAPSULE (violet) and target Garchomp.\n"
+      + "EXPECT: it does NOT say 'no effect'. You are offered 'Permanently unlock an innate';\n"
+      + "pick a slot and it permanently unlocks (stays unlocked in starter-select + future runs).\n"
+      + "Regression: test/tests/elite-redux/er-greater-ability-capsule.test.ts.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 50,
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.MAGIKARP,
+        ENEMY_LEVEL_OVERRIDE: 3,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+      });
+      return [
+        makeStarter(SpeciesId.GARCHOMP, {
+          moveset: [MoveId.EARTHQUAKE, MoveId.DRAGON_CLAW, MoveId.STONE_EDGE, MoveId.SWORDS_DANCE],
+        }),
+      ];
+    },
+    onBattleStart: () => runUnlockAllLeadInnates(),
+    shopItems: [modifierTypes.ER_GREATER_ABILITY_CAPSULE],
   },
 ];
