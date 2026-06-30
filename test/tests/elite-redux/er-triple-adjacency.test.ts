@@ -1,0 +1,98 @@
+/*
+ * SPDX-FileCopyrightText: 2024-2026 Pagefault Games
+ *
+ * SPDX-License-Identifier: AGPL-3.0-only
+ */
+
+// =============================================================================
+// Multi-format battles - POSITIONAL ADJACENCY in triple move targeting (the
+// defining triple mechanic). In a 3v3, a WING reaches only the foe opposite it +
+// the centre, NOT the far diagonal; the CENTRE reaches every foe. Two bypass
+// classes hit the whole field regardless of position: FLYING-type moves and
+// PULSE moves. Spread NEAR moves are likewise limited to the adjacent foes.
+//
+// Player slots 0(L)/1(C)/2(R) -> flat 0/1/2; enemy 0/1/2 -> flat 3/4/5. By the
+// mirrored line topology, player-left (0) reaches enemy centre(4) + opposed(5)
+// but NOT enemy-left(3). ER_SCENARIO=1.
+// =============================================================================
+
+import { globalScene } from "#app/global-scene";
+import { getMoveTargets } from "#data/moves/move-utils";
+import { AbilityId } from "#enums/ability-id";
+import { MoveId } from "#enums/move-id";
+import { SpeciesId } from "#enums/species-id";
+import { GameManager } from "#test/framework/game-manager";
+import Phaser from "phaser";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+
+const RUN = process.env.ER_SCENARIO === "1";
+
+describe.skipIf(!RUN)("ER triple battles - positional adjacency in move targeting", () => {
+  let phaserGame: Phaser.Game;
+  let game: GameManager;
+
+  beforeAll(() => {
+    phaserGame = new Phaser.Game({ type: Phaser.HEADLESS });
+  });
+
+  beforeEach(() => {
+    game = new GameManager(phaserGame);
+    game.override
+      .battleStyle("triple")
+      .enemySpecies(SpeciesId.MAGIKARP)
+      .enemyAbility(AbilityId.BALL_FETCH)
+      .enemyMoveset(MoveId.SPLASH)
+      .ability(AbilityId.BALL_FETCH)
+      .startingLevel(50)
+      .enemyLevel(50);
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("a wing can't hit the far diagonal; the centre hits all foes; flying/spread obey the rules", async () => {
+    await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.PIKACHU, SpeciesId.EEVEE);
+
+    const players = globalScene.getPlayerField();
+    const wing = players[0]; // flat index 0 (LEFT)
+    const centre = players[1]; // flat index 1 (CENTRE)
+    expect(wing.getBattlerIndex()).toBe(0);
+    expect(centre.getBattlerIndex()).toBe(1);
+
+    // Sanity: the enemy side is flat 3/4/5.
+    const enemies = globalScene.getEnemyField();
+    expect(enemies.map(e => e.getBattlerIndex())).toEqual([3, 4, 5]);
+
+    // (1) Wing single-target (Tackle = NEAR_OTHER, Normal): reaches enemy centre(4) +
+    // opposed(5) but NOT the far enemy-left(3).
+    const wingTackle = getMoveTargets(wing, MoveId.TACKLE).targets;
+    expect(wingTackle).toContain(4);
+    expect(wingTackle).toContain(5);
+    expect(wingTackle).not.toContain(3);
+
+    // (2) Centre single-target: reaches ALL three foes.
+    const centreTackle = getMoveTargets(centre, MoveId.TACKLE).targets;
+    expect(centreTackle).toContain(3);
+    expect(centreTackle).toContain(4);
+    expect(centreTackle).toContain(5);
+
+    // (3) Wing FLYING move (Gust) bypasses adjacency -> the far foe is now reachable.
+    const wingGust = getMoveTargets(wing, MoveId.GUST).targets;
+    expect(wingGust).toContain(3);
+    expect(wingGust).toContain(4);
+    expect(wingGust).toContain(5);
+
+    // (4) Wing SPREAD move (Rock Slide = ALL_NEAR_ENEMIES, Rock) is limited to adjacent
+    // foes - it hits the centre + opposed, NOT the far diagonal.
+    const wingRockSlide = getMoveTargets(wing, MoveId.ROCK_SLIDE);
+    expect(wingRockSlide.multiple).toBe(true);
+    expect(wingRockSlide.targets).toContain(4);
+    expect(wingRockSlide.targets).toContain(5);
+    expect(wingRockSlide.targets).not.toContain(3);
+
+    // (5) Centre SPREAD move hits all three foes.
+    const centreRockSlide = getMoveTargets(centre, MoveId.ROCK_SLIDE).targets;
+    expect(centreRockSlide).toEqual(expect.arrayContaining([3, 4, 5]));
+  });
+});

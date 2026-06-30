@@ -1,7 +1,9 @@
+import { globalScene } from "#app/global-scene";
 import { allMoves } from "#data/data-lists";
 import { BattlerIndex } from "#enums/battler-index";
 import { BattlerTagType } from "#enums/battler-tag-type";
 import { MoveCategory, type MoveDamageCategory } from "#enums/move-category";
+import { MoveFlags } from "#enums/move-flags";
 import type { MoveId } from "#enums/move-id";
 import { MoveTarget } from "#enums/move-target";
 import { PokemonType } from "#enums/pokemon-type";
@@ -87,7 +89,9 @@ export function getMoveTargets(user: Pokemon, move: MoveId, replaceTarget?: Move
 
   let set: Pokemon[] = [];
   let multiple = false;
-  const ally: Pokemon | undefined = user.getAlly();
+  // Multi-format: a side can have more than one ally (triple centre). Binary -> 0/1, so
+  // [user, ...allies] is byte-identical to the legacy [user, ally].
+  const allies: Pokemon[] = user.getAllies();
   switch (moveTarget) {
     case MoveTarget.USER:
     case MoveTarget.PARTY:
@@ -106,7 +110,7 @@ export function getMoveTargets(user: Pokemon, move: MoveId, replaceTarget?: Move
     case MoveTarget.OTHER:
     case MoveTarget.ALL_NEAR_OTHERS:
     case MoveTarget.ALL_OTHERS:
-      set = ally == null ? opponents : opponents.concat([ally]);
+      set = opponents.concat(allies);
       multiple = moveTarget === MoveTarget.ALL_NEAR_OTHERS || moveTarget === MoveTarget.ALL_OTHERS;
       break;
     case MoveTarget.NEAR_ENEMY:
@@ -124,20 +128,22 @@ export function getMoveTargets(user: Pokemon, move: MoveId, replaceTarget?: Move
       return { targets: [BattlerIndex.ATTACKER], multiple: false };
     case MoveTarget.NEAR_ALLY:
     case MoveTarget.ALLY:
-      set = ally == null ? [] : [ally];
+      set = allies;
       break;
     case MoveTarget.USER_OR_NEAR_ALLY:
     case MoveTarget.USER_AND_ALLIES:
     case MoveTarget.USER_SIDE:
-      set = ally == null ? [user] : [user, ally];
+      set = [user, ...allies];
       multiple = moveTarget !== MoveTarget.USER_OR_NEAR_ALLY;
       break;
     case MoveTarget.ALL:
     case MoveTarget.BOTH_SIDES:
-      set = (ally == null ? [user] : [user, ally]).concat(opponents);
+      set = [user, ...allies].concat(opponents);
       multiple = true;
       break;
   }
+
+  set = applyTripleAdjacency(user, allMoves[move], moveTarget, set);
 
   return {
     targets: set
@@ -146,6 +152,42 @@ export function getMoveTargets(user: Pokemon, move: MoveId, replaceTarget?: Move
       .filter(t => t !== undefined),
     multiple,
   };
+}
+
+/**
+ * MoveTargets whose reach is restricted by POSITIONAL ADJACENCY in triples (the "near"
+ * categories). In a triple a wing only reaches the foe opposite it + the centre, NOT the
+ * far diagonal; the centre reaches everything. Non-`NEAR_` categories (ALL_ENEMIES, the
+ * whole-own-side buffs, etc.) ignore adjacency.
+ */
+const NEAR_TARGETS: ReadonlySet<MoveTarget> = new Set([
+  MoveTarget.NEAR_OTHER,
+  MoveTarget.ALL_NEAR_OTHERS,
+  MoveTarget.NEAR_ENEMY,
+  MoveTarget.ALL_NEAR_ENEMIES,
+  MoveTarget.NEAR_ALLY,
+  MoveTarget.USER_OR_NEAR_ALLY,
+]);
+
+/**
+ * Filter a `NEAR_*` move's candidate set down to the battlers the user can actually REACH
+ * given the format's adjacency, unless the move bypasses adjacency. Two bypass classes
+ * (matching the mainline triple rules): FLYING-type attacks and PULSE moves (Dark/Water/
+ * Dragon Pulse, Aura Sphere) can hit anyone on the field. The user itself is always kept.
+ *
+ * Binary battles are unaffected: every pair is mutually adjacent, so nothing is removed.
+ */
+function applyTripleAdjacency(user: Pokemon, move: Move, moveTarget: MoveTarget, set: Pokemon[]): Pokemon[] {
+  const arrangement = globalScene.currentBattle?.arrangement;
+  if (!arrangement || !NEAR_TARGETS.has(moveTarget)) {
+    return set;
+  }
+  // Bypass: flying-type + pulse moves reach the whole field regardless of position.
+  if (move.type === PokemonType.FLYING || move.hasFlag(MoveFlags.PULSE_MOVE)) {
+    return set;
+  }
+  const userId = arrangement.locate(user.getBattlerIndex());
+  return set.filter(p => p === user || arrangement.isAdjacent(userId, arrangement.locate(p.getBattlerIndex())));
 }
 
 export const frenzyMissFunc: UserMoveConditionFunc = (user: Pokemon, move: Move) => {
