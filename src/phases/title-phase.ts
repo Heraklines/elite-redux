@@ -210,6 +210,10 @@ export class TitlePhase extends Phase {
                               // founder bookkeeping before invoking this). Launch the mode the
                               // config declares so the rebuilt gameMode matches the config key.
                               (config: CommunityChallengeConfig) => {
+                                console.log("[community-launch] onLaunch -> setModeAndEnd", {
+                                  gameMode: GameModes[config.gameModeId],
+                                  mode: UiMode[globalScene.ui.getMode()],
+                                });
                                 this.pendingCommunityConfig = config;
                                 setModeAndEnd(config.gameModeId);
                               },
@@ -597,6 +601,9 @@ export class TitlePhase extends Phase {
       // reads it. Verbatim with the config (the worker config-match anti-cheat key).
       if (this.pendingCommunityConfig) {
         applyCommunityChallengeToRun(this.pendingCommunityConfig);
+        console.log("[community-launch] end(): config applied, pushing SelectStarterPhase", {
+          gameMode: GameModes[this.gameMode],
+        });
       }
       // For LLM Director mode: kick off bible generation in the BACKGROUND
       // before starter select so the LLM call runs in parallel with the

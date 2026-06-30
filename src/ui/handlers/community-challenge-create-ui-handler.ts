@@ -595,11 +595,27 @@ export class CommunityChallengeCreateUiHandler extends UiHandler {
       globalScene.ui.showText(
         "Draft saved! Now clear it yourself to publish it.",
         null,
-        // First revert CREATE -> the browser so the launch tears down from the SAME
-        // single-overlay state the card-play uses (setModeAndEnd clears the active
-        // browser). Launching straight from here would leave the browser visible
-        // underneath, and the run's starter-select (low z) would render behind it.
-        () => globalScene.ui.revertMode().then(() => launch(draftConfig)),
+        // Launch the founder's qualifying run from the SAME clean single-MESSAGE state
+        // card-play launches from. CREATE was opened OVER the browser, so the browser
+        // container is still visible underneath - the setMode(MESSAGE) above only cleared
+        // CREATE. Hide the browser container directly and drop the mode chain, THEN launch.
+        // We deliberately do NOT revertMode here: reverting MESSAGE->browser fades the
+        // camera, and that fade-in overlaps SelectStarterPhase's STARTER_SELECT fade-out,
+        // stranding the camera mid-transition with the browser ("featured") still on top
+        // while starter-select sits invisibly behind it (the post-publish softlock). With
+        // both community containers hidden and no fade pending, setModeAndEnd's no-op
+        // setMode(MESSAGE) is harmless and this.end() drops cleanly into starter-select.
+        () => {
+          globalScene.ui.handlers[UiMode.COMMUNITY_CHALLENGES]?.clear();
+          globalScene.ui.resetModeChain();
+          // Breadcrumb (staging-only flow): if the post-publish launch ever softlocks
+          // again, this pins how far the teardown got before handing off to the run.
+          console.log("[community-launch] publish teardown done; launching run", {
+            mode: UiMode[globalScene.ui.getMode()],
+            chain: globalScene.ui.getModeChain().map(m => UiMode[m]),
+          });
+          launch(draftConfig);
+        },
         null,
         true,
       );
