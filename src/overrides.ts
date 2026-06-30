@@ -91,6 +91,9 @@ class DefaultOverrides {
    *
    * If `"odd-doubles"`, follow the `"double"` rule on odd wave numbers,
    * and the `"single"` rule on even wave numbers.
+   *
+   * If `"triple"`, set every battle to a TRIPLE battle (3 per side). This is the gated
+   * multi-format entry point (dev/headless only - production never sets overrides).
    * @defaultValue `null`
    * @privateRemarks
    * Prefer using {@linkcode RANDOM_TRAINER_OVERRIDE} to override trainer battles.
@@ -367,7 +370,7 @@ export default {
   ...overrides,
 } satisfies InstanceType<typeof DefaultOverrides>;
 
-export type BattleStyle = "double" | "single" | "even-doubles" | "odd-doubles";
+export type BattleStyle = "double" | "single" | "even-doubles" | "odd-doubles" | "triple";
 
 export type RandomTrainerOverride = {
   /** The Type of trainer to force */

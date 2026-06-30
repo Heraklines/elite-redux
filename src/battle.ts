@@ -14,7 +14,7 @@ import { getErBiomeRule } from "#data/elite-redux/er-biome-rules";
 import { applyErHellEnemyLevelScaling } from "#data/elite-redux/er-run-difficulty";
 import { ArenaTagType } from "#enums/arena-tag-type";
 import { BattleType } from "#enums/battle-type";
-import { BattlerIndex } from "#enums/battler-index";
+import type { BattlerIndex } from "#enums/battler-index";
 import { BiomeId } from "#enums/biome-id";
 import type { Command } from "#enums/command";
 import { MoveId } from "#enums/move-id";
@@ -43,7 +43,6 @@ import {
   randSeedItem,
   shiftCharCodes,
 } from "#utils/common";
-import { getEnumValues } from "#utils/enums";
 import { randSeedUniqueItem } from "#utils/random";
 import i18next from "i18next";
 
@@ -241,8 +240,11 @@ export class Battle {
 
   incrementTurn(): void {
     this.turn++;
-    this.turnCommands = Object.fromEntries(getEnumValues(BattlerIndex).map(bt => [bt, null]));
-    this.preTurnCommands = Object.fromEntries(getEnumValues(BattlerIndex).map(bt => [bt, null]));
+    // Multi-format: key the command maps off the arrangement's occupiable flat indices
+    // (binary -> the same 0..3 slots; triple -> 0..5) instead of the fixed BattlerIndex enum.
+    const slots = this._arrangement.activeIndices();
+    this.turnCommands = Object.fromEntries(slots.map(bt => [bt, null]));
+    this.preTurnCommands = Object.fromEntries(slots.map(bt => [bt, null]));
     this.battleSeedState = null;
   }
 

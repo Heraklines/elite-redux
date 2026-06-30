@@ -26,6 +26,7 @@
 // =============================================================================
 
 import { BattlerIndex } from "#enums/battler-index";
+import { FieldPosition } from "#enums/field-position";
 
 /** Structured battler identity. Used by topology/adjacency/new code only - NEVER as a map key (the flat BattlerIndex stays the key). */
 export interface BattlerId {
@@ -222,6 +223,24 @@ export const TRIPLE_FORMAT: BattleFormat = makeFormat("triple", 3, 3, BattlerInd
 /** The legacy binary formats, by their `double` boolean. */
 export function legacyFormat(double: boolean): BattleFormat {
   return double ? DOUBLE_FORMAT : SINGLE_FORMAT;
+}
+
+/**
+ * Map a 0-based field slot to a {@linkcode FieldPosition} for a side of `capacity`, for
+ * sprite layout. 1 -> CENTER; 2 -> LEFT/RIGHT (legacy double); 3 -> LEFT/CENTER/RIGHT.
+ * Extra slots clamp to RIGHT for now (the P4 UI pass refines >3-wide spacing).
+ */
+export function fieldPositionForSlot(slot: number, capacity: number): FieldPosition {
+  if (capacity <= 1) {
+    return FieldPosition.CENTER;
+  }
+  if (slot <= 0) {
+    return FieldPosition.LEFT;
+  }
+  if (slot >= capacity - 1) {
+    return FieldPosition.RIGHT;
+  }
+  return FieldPosition.CENTER;
 }
 
 /** Named lookup used by the override / resolver. Unknown id -> null. */

@@ -27,6 +27,7 @@ import { STARTING_WAVE } from "#balance/misc";
 import { pokemonPrevolutions } from "#balance/pokemon-evolutions";
 import { FRIENDSHIP_GAIN_FROM_BATTLE } from "#balance/starters";
 import { initCommonAnims, initMoveAnim, loadCommonAnimAssets, loadMoveAnimAssets } from "#data/battle-anims";
+import { type BattleFormat, legacyFormat, TRIPLE_FORMAT } from "#data/battle-format";
 import { getDailyMysteryEncounter } from "#data/daily-seed/daily-run";
 import { allMoves, allSpecies, biomeDepths, modifierTypes } from "#data/data-lists";
 import { classicFinalBossDialogue } from "#data/dialogue";
@@ -1649,6 +1650,9 @@ export class BattleScene extends SceneBase {
       );
     }
     resolved.double = this.checkIsDouble(resolved as NewBattleConstructedProps);
+    // Multi-format: resolve the full battle format. Gated - only produces a >2-wide
+    // (triple+) format when explicitly requested; otherwise the legacy single/double.
+    resolved.format = this.resolveBattleFormat(resolved.double);
 
     const lastBattle: Battle | null = this.currentBattle;
     const maxExpLevel = this.getMaxExpLevel();
@@ -2017,10 +2021,29 @@ export class BattleScene extends SceneBase {
         return waveIndex % 2 === 0;
       case "odd-doubles":
         return waveIndex % 2 === 1;
+      case "triple":
+        // A triple is NOT a legacy double - the format is resolved separately in
+        // resolveBattleFormat. Report "not double" so binary-only code stays correct.
+        return false;
       default:
         Overrides.BATTLE_STYLE_OVERRIDE satisfies null;
         return;
     }
+  }
+
+  /**
+   * Resolve the full multi-format {@linkcode BattleFormat} for the new battle. This is the
+   * SINGLE gated entry point for >2-wide formats: it only produces a non-binary format
+   * (triple+) when explicitly requested (dev/headless override today; a player-facing
+   * trigger later). Otherwise it returns the legacy single/double derived from `double`,
+   * so production stays provably single/double.
+   * @param double - The already-resolved legacy double flag.
+   */
+  private resolveBattleFormat(double: boolean): BattleFormat {
+    if (Overrides.BATTLE_STYLE_OVERRIDE === "triple") {
+      return TRIPLE_FORMAT;
+    }
+    return legacyFormat(double);
   }
 
   // TODO: Split this up and move it to a "post battle phase"

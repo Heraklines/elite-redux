@@ -6,6 +6,7 @@ import { getPokemonNameWithAffix } from "#app/messages";
 import Overrides from "#app/overrides";
 import { handleTutorial, Tutorial } from "#app/tutorial";
 import { initEncounterAnims, loadEncounterAnimAssets } from "#data/battle-anims";
+import { fieldPositionForSlot } from "#data/battle-format";
 import { getCharVariantFromDialogue } from "#data/dialogue";
 import { captureCoopEnemies } from "#data/elite-redux/coop/coop-battle-engine";
 import { buildCoopEnemy } from "#data/elite-redux/coop/coop-enemy-builder";
@@ -32,9 +33,7 @@ import { getErDifficulty } from "#data/elite-redux/er-run-difficulty";
 import { CASCOON_ANGELS_WRATH_MOVES } from "#data/elite-redux/init-elite-redux-movesets";
 import { getNatureName } from "#data/nature";
 import { BattleType } from "#enums/battle-type";
-import { BattlerIndex } from "#enums/battler-index";
 import { BiomeId } from "#enums/biome-id";
-import { FieldPosition } from "#enums/field-position";
 import { ModifierPoolType } from "#enums/modifier-pool-type";
 import { MysteryEncounterMode } from "#enums/mystery-encounter-mode";
 import { PlayerGender } from "#enums/player-gender";
@@ -356,7 +355,7 @@ export class EncounterPhase extends BattlePhase {
           }
           globalScene
             .getPlayerParty()
-            .slice(0, battle.double ? 2 : 1)
+            .slice(0, battle.arrangement.playerCapacity)
             .reverse()
             .forEach(playerPokemon => {
               applyAbAttrs("SyncEncounterNatureAbAttr", { pokemon: playerPokemon, target: battle.enemyParty[e] });
@@ -364,7 +363,7 @@ export class EncounterPhase extends BattlePhase {
         }
       }
       const enemyPokemon = globalScene.getEnemyParty()[e];
-      if (e < (battle.double ? 2 : 1)) {
+      if (e < battle.arrangement.enemyCapacity) {
         enemyPokemon.setX(-66 + enemyPokemon.getFieldPositionOffset()[0]);
         enemyPokemon.fieldSetup(true);
       }
@@ -492,7 +491,7 @@ export class EncounterPhase extends BattlePhase {
         if (battle.isBattleMysteryEncounter()) {
           return false;
         }
-        if (e < (battle.double ? 2 : 1)) {
+        if (e < battle.arrangement.enemyCapacity) {
           if (battle.battleType === BattleType.WILD) {
             for (const pokemon of globalScene.getField()) {
               applyAbAttrs("PreSummonAbAttr", { pokemon });
@@ -508,8 +507,9 @@ export class EncounterPhase extends BattlePhase {
             enemyPokemon.setVisible(false);
             globalScene.currentBattle.trainer?.tint(0, 0.5);
           }
-          if (battle.double) {
-            enemyPokemon.setFieldPosition(e ? FieldPosition.RIGHT : FieldPosition.LEFT);
+          // Multi-format: position each on-field enemy by slot (LEFT/CENTER/RIGHT for 3).
+          if (battle.arrangement.enemyCapacity > 1) {
+            enemyPokemon.setFieldPosition(fieldPositionForSlot(e, battle.arrangement.enemyCapacity));
           }
         }
         return true;
@@ -823,7 +823,7 @@ export class EncounterPhase extends BattlePhase {
 
     enemyField.forEach((enemyPokemon, e) => {
       if (enemyPokemon.isShiny(true)) {
-        globalScene.phaseManager.unshiftNew("ShinySparklePhase", BattlerIndex.ENEMY + e);
+        globalScene.phaseManager.unshiftNew("ShinySparklePhase", globalScene.currentBattle.arrangement.enemyOffset + e);
       }
       /** This sets Eternatus' held item to be untransferrable, preventing it from being stolen */
       if (
@@ -852,16 +852,23 @@ export class EncounterPhase extends BattlePhase {
 
     if (!this.loaded) {
       const availablePartyMembers = globalScene.getPokemonAllowedInBattle();
+      // Multi-format: the local player side's capacity drives how many leads summon /
+      // get a switch prompt. Binary -> 1 (single) or 2 (double); triple -> 3.
+      const playerCapacity = globalScene.currentBattle.arrangement.playerCapacity;
+      const multiFormat = playerCapacity > 1;
 
       if (!availablePartyMembers[0].isOnField()) {
         globalScene.phaseManager.pushNew("SummonPhase", 0);
       }
 
-      if (globalScene.currentBattle.double) {
+      if (multiFormat) {
         if (availablePartyMembers.length > 1) {
           globalScene.phaseManager.pushNew("ToggleDoublePositionPhase", true);
-          if (!availablePartyMembers[1].isOnField()) {
-            globalScene.phaseManager.pushNew("SummonPhase", 1);
+          // Summon every additional on-field slot the side can hold (2nd, 3rd, ...).
+          for (let i = 1; i < playerCapacity; i++) {
+            if (availablePartyMembers.length > i && !availablePartyMembers[i].isOnField()) {
+              globalScene.phaseManager.pushNew("SummonPhase", i);
+            }
           }
         }
       } else {
@@ -874,13 +881,10 @@ export class EncounterPhase extends BattlePhase {
       if (
         globalScene.currentBattle.battleType !== BattleType.TRAINER
         && (globalScene.currentBattle.waveIndex > 1 || !globalScene.gameMode.isDaily)
+        && availablePartyMembers.length > playerCapacity
       ) {
-        const minPartySize = globalScene.currentBattle.double ? 2 : 1;
-        if (availablePartyMembers.length > minPartySize) {
-          globalScene.phaseManager.pushNew("CheckSwitchPhase", 0, globalScene.currentBattle.double);
-          if (globalScene.currentBattle.double) {
-            globalScene.phaseManager.pushNew("CheckSwitchPhase", 1, globalScene.currentBattle.double);
-          }
+        for (let i = 0; i < playerCapacity; i++) {
+          globalScene.phaseManager.pushNew("CheckSwitchPhase", i, multiFormat);
         }
       }
     }
