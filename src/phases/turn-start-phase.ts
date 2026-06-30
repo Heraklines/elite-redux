@@ -239,6 +239,12 @@ export class TurnStartPhase extends FieldPhase {
           pokemon.isPlayer(),
         );
         break;
+      case Command.SHIFT:
+        // Multi-format (triple+): reposition this mon by swapping field slots with an active
+        // ally. Queued like a switch (unshift -> runs BEFORE the move phases), so the shifter's
+        // turn is consumed. `cursor` carries the ally's field slot. Player-side only.
+        globalScene.phaseManager.unshiftNew("ShiftSummonPhase", pokemon.getFieldIndex(), turnCommand.cursor!);
+        break;
       case Command.RUN:
         globalScene.phaseManager.unshiftNew("AttemptRunPhase");
         break;

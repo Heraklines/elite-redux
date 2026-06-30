@@ -857,6 +857,38 @@ export class CommandPhase extends FieldPhase {
   }
 
   /**
+   * Multi-format (triple+) SHIFT: reposition this mon by swapping field slots with an ACTIVE
+   * ally. Writes a {@linkcode Command.SHIFT} turn command (carrying the ally's field slot) for
+   * THIS slot only - the swapped-with ally is NOT skipped and still acts from its new position.
+   * Resolved during {@linkcode TurnStartPhase} ordered like a switch (before moves), so the
+   * shifter's turn is consumed. Strictly gated to triple+ formats; binary battles never reach here.
+   *
+   * @param targetFieldIndex - The field slot of the active ally to swap positions with.
+   * @returns Whether the shift command was accepted (ending the command phase).
+   */
+  private handleShiftCommand(targetFieldIndex: number): boolean {
+    // Gate every shift branch on triple+ (binary battles are byte-identical: no shift exists).
+    // Co-op is excluded entirely (triples are gated out of co-op); guard the path regardless.
+    if (globalScene.currentBattle.getBattlerCount() < 3 || globalScene.gameMode.isCoop) {
+      return false;
+    }
+    // TODO(triple): restrict to adjacent/center per strict mainline rules
+    if (targetFieldIndex === this.fieldIndex) {
+      return false;
+    }
+    const playerField = globalScene.getPlayerField();
+    if (!playerField[this.fieldIndex]?.isActive(true) || !playerField[targetFieldIndex]?.isActive(true)) {
+      return false;
+    }
+
+    globalScene.currentBattle.turnCommands[this.fieldIndex] = {
+      command: Command.SHIFT,
+      cursor: targetFieldIndex,
+    };
+    return true;
+  }
+
+  /**
    * Helper method for {@linkcode handleCommand} that handles the logic when the selected command is RUN.
    *
    * @remarks
@@ -926,7 +958,7 @@ export class CommandPhase extends FieldPhase {
    */
   handleCommand(command: Command.FIGHT | Command.TERA, cursor: number, useMode?: MoveUseMode, move?: TurnMove): boolean;
   handleCommand(command: Command.POKEMON, cursor: number, useBaton: boolean): boolean;
-  handleCommand(command: Command.BALL | Command.RUN, cursor: number): boolean;
+  handleCommand(command: Command.BALL | Command.RUN | Command.SHIFT, cursor: number): boolean;
   handleCommand(command: Command, cursor: number, useMode?: boolean | MoveUseMode, move?: TurnMove): boolean;
 
   public handleCommand(
@@ -952,6 +984,10 @@ export class CommandPhase extends FieldPhase {
         break;
       case Command.RUN:
         success = this.handleRunCommand();
+        break;
+      case Command.SHIFT:
+        success = this.handleShiftCommand(cursor);
+        break;
     }
 
     if (success) {

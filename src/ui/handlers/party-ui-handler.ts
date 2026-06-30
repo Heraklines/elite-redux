@@ -200,6 +200,9 @@ export enum PartyOption {
   /** Co-op (#633, P3): hand this mon to the partner (re-attributes its `coopOwner`
    * to the other player's half). Co-op runs only, CHECK mode. */
   GIVE_TO_PARTNER,
+  /** Multi-format (triple+): swap this ACTIVE ally's field slot with the commanding mon's
+   * (a reposition that consumes the shifter's turn). SWITCH mode, triple+ only. */
+  SHIFT,
   SCROLL_UP = 1000,
   SCROLL_DOWN = 1001,
   FORM_CHANGE_ITEM = 2000,
@@ -1111,6 +1114,15 @@ export class PartyUiHandler extends MessageUiHandler {
       return true;
     }
 
+    // Multi-format (triple+): the SHIFT option repositions by swapping this active ally's field
+    // slot with the commanding mon's. There is no callback - it writes a SHIFT turn command on the
+    // commanding slot (consuming its turn) and ends the command phase, exactly like a switch.
+    if (option === PartyOption.SHIFT && this.partyUiMode === PartyUiMode.SWITCH) {
+      this.clearOptions();
+      (globalScene.phaseManager.getCurrentPhase() as CommandPhase).handleCommand(Command.SHIFT, this.cursor);
+      return true;
+    }
+
     // This is used when switching out using the Pokemon command (possibly holding a Baton held item). In this case there is no callback.
     if (
       (option === PartyOption.PASS_BATON || option === PartyOption.SEND_OUT)
@@ -1763,6 +1775,16 @@ export class PartyUiHandler extends MessageUiHandler {
           this.options.push(
             isBatonPassMove && !allowBatonModifierSwitch ? PartyOption.PASS_BATON : PartyOption.SEND_OUT,
           );
+        } else if (
+          // Multi-format (triple+): an ACTIVE on-field ally (cursor below battler count, and not
+          // the commanding mon's own slot) is selectable for a SHIFT (swap field positions). Only
+          // in a voluntary command switch; binary battles never reach this branch (battlerCount<3).
+          this.partyUiMode === PartyUiMode.SWITCH
+          && globalScene.currentBattle.getBattlerCount() >= 3
+          && this.cursor !== this.fieldIndex
+          && pokemon.isActive(true)
+        ) {
+          this.options.push(PartyOption.SHIFT);
         }
         this.addCommonOptions(pokemon);
         break;
@@ -1933,6 +1955,9 @@ export class PartyUiHandler extends MessageUiHandler {
             } else if (option === PartyOption.MOVE) {
               // ER party reorder: "Move" picks the source mon, "Swap here" the target.
               optionName = this.transferMode ? "Swap here" : "Move";
+            } else if (option === PartyOption.SHIFT) {
+              // Multi-format (triple+): swap field positions with the commanding mon.
+              optionName = "Shift";
             } else if (option === PartyOption.GIVE_TO_PARTNER) {
               // Co-op (#633, P3): hand this mon to the other player.
               optionName = i18next.t("partyUiHandler:coopGiveToPartner");

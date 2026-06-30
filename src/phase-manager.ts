@@ -121,6 +121,7 @@ import { SelectGenderPhase } from "#phases/select-gender-phase";
 import { SelectModifierPhase } from "#phases/select-modifier-phase";
 import { SelectStarterPhase } from "#phases/select-starter-phase";
 import { SelectTargetPhase } from "#phases/select-target-phase";
+import { ShiftSummonPhase } from "#phases/shift-summon-phase";
 import { ShinySparklePhase } from "#phases/shiny-sparkle-phase";
 import { ShowAbilityPhase } from "#phases/show-ability-phase";
 import { ShowPartyExpBarPhase } from "#phases/show-party-exp-bar-phase";
@@ -258,6 +259,7 @@ const PHASES = Object.freeze({
   SelectModifierPhase,
   SelectStarterPhase,
   SelectTargetPhase,
+  ShiftSummonPhase,
   ShinySparklePhase,
   ShowAbilityPhase,
   ShowPartyExpBarPhase,
