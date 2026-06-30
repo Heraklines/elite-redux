@@ -501,5 +501,70 @@
     "name": "Master of All",
     "name_female": "Master of All",
     "description": "Earn all eighteen mono-type ribbons."
+  },
+  "everyoneGetOut": {
+    "name": "EVERYONE GET OUT!",
+    "name_female": "EVERYONE GET OUT!",
+    "description": "Knock out both opponents and your ally with one Earthquake or Surf."
+  },
+  "mutuallyAssuredDestruction": {
+    "name": "Mutually Assured Destruction",
+    "name_female": "Mutually Assured Destruction",
+    "description": "Win a double battle on a turn that knocks out every Pokémon on the field."
+  },
+  "fullOnMegaPower": {
+    "name": "Full on Mega Power",
+    "name_female": "Full on Mega Power",
+    "description": "Have your entire team Mega Evolved at the same time."
+  },
+  "originalDragonSpirit": {
+    "name": "Original Dragon Spirit",
+    "name_female": "Original Dragon Spirit",
+    "description": "Use DNA Splicers to fuse Reshiram and Zekrom."
+  },
+  "incompatibleHardware": {
+    "name": "Incompatible Hardware",
+    "name_female": "Incompatible Hardware",
+    "description": "Obtain a Porygon-Z."
+  },
+  "dreamcatcher": {
+    "name": "Dreamcatcher",
+    "name_female": "Dreamcatcher",
+    "description": "Catch a wild Cresselia."
+  },
+  "compleatNightmare": {
+    "name": "Compleat Nightmare",
+    "name_female": "Compleat Nightmare",
+    "description": "Have a Darkrai on your team while a Pokémon is asleep."
+  },
+  "pokeHimOn": {
+    "name": "Poke Him On!",
+    "name_female": "Poke Him On!",
+    "description": "Release a Pikachu."
+  },
+  "superArmor": {
+    "name": "Super Armor",
+    "name_female": "Super Armor",
+    "description": "OHKO a Pokémon with Counter, Mirror Coat, Comeuppance, or Metal Burst."
+  },
+  "pkStarstorm": {
+    "name": "PK STARSTORM!!!",
+    "name_female": "PK STARSTORM!!!",
+    "description": "Teach Draco Meteor to a Psychic-type Pokémon."
+  },
+  "realisticFlashIsBoring": {
+    "name": "Realistic Flash is Boring",
+    "name_female": "Realistic Flash is Boring",
+    "description": "Win a battle without an opposing Pokémon ever moving before yours."
+  },
+  "endTheLegend": {
+    "name": "End the Legend",
+    "name_female": "End the Legend",
+    "description": "Using Lucario, defeat a Pokémon that has the Rampage ability."
+  },
+  "squatter": {
+    "name": "Squatter",
+    "name_female": "Squatter",
+    "description": "Stay in a single biome for at least 20 waves."
   }
 }

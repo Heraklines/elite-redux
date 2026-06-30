@@ -1,5 +1,9 @@
 import { globalScene } from "#app/global-scene";
+import { erBiomeRoutingActive } from "#data/elite-redux/er-biome-routing";
+import { wavesSinceEnteredBiome } from "#data/elite-redux/er-biome-structure";
+import { ER_COMPOSITE_PARTS } from "#data/elite-redux/er-composite-parts";
 import { hasErGhostOverride } from "#data/elite-redux/er-ghost-teams";
+import { ER_ID_MAP } from "#data/elite-redux/er-id-map";
 import { ArenaTagSide } from "#enums/arena-tag-side";
 import { ArenaTagType } from "#enums/arena-tag-type";
 import { BattleType } from "#enums/battle-type";
@@ -11,8 +15,10 @@ import { MoveCategory } from "#enums/move-category";
 import { MoveFlags } from "#enums/move-flags";
 import { MoveId } from "#enums/move-id";
 import { MoveUseMode } from "#enums/move-use-mode";
+import { PokemonType } from "#enums/pokemon-type";
 import { SpeciesId } from "#enums/species-id";
 import { Stat } from "#enums/stat";
+import { StatusEffect } from "#enums/status-effect";
 import { TrainerType } from "#enums/trainer-type";
 import type { Pokemon } from "#field/pokemon";
 import type { Move } from "#moves/move";
@@ -29,6 +35,18 @@ interface ErAchievementBattleState {
   turnOneChargedMoves?: Set<string>;
   damageSourceTurn?: number;
   damageSourcesByTarget?: Map<number, Set<string>>;
+  /** The most recent player Earthquake/Surf in a double battle, for EVERYONE GET OUT. */
+  lastSpreadMove?: { moveId: number; userId: number; turn: number };
+  /** The turn the faint ledger below currently reflects (reset when a new turn faints). */
+  faintLedgerTurn?: number;
+  /** Player/enemy field mon ids that fainted on `faintLedgerTurn` (Mutually Assured Destruction). */
+  playerFieldFaints?: Set<number>;
+  enemyFieldFaints?: Set<number>;
+  /** Realistic Flash: per-turn order tracking + whether the enemy ever moved before us. */
+  flashTurn?: number;
+  playerActedThisTurn?: boolean;
+  playerEverActed?: boolean;
+  flashFailed?: boolean;
 }
 
 interface ErAchievementRunState {
@@ -122,6 +140,67 @@ const SNAKELIKE_SPECIES = new Set<number>([
   ErSpeciesId.DUDUNSPARCE_THREE_SEGMENT,
 ]);
 
+/** Counter-class moves whose OHKO unlocks Super Armor. */
+const SUPER_ARMOR_MOVES = new Set<number>([MoveId.COUNTER, MoveId.MIRROR_COAT, MoveId.COMEUPPANCE, MoveId.METAL_BURST]);
+
+/** Self-immune spread moves that can wipe both foes + the ally (EVERYONE GET OUT). */
+const BOARD_WIPE_MOVES = new Set<number>([MoveId.EARTHQUAKE, MoveId.SURF]);
+
+/** Lucario (any form, incl. Mega) for End the Legend - matched on root species id. */
+const LUCARIO_SPECIES = new Set<number>([SpeciesId.LUCARIO]);
+
+/**
+ * Every LIVE ability id that carries Rampage - the pure Rampage ability PLUS every
+ * composite ability that bundles it (e.g. "Berserk + Rampage"). `hasAbility(RAMPAGE)`
+ * alone misses the composites (they are a single distinct ability id), so for "End the
+ * Legend" we precompute the full set once at load: walk ER_COMPOSITE_PARTS for any
+ * composite whose parts include a Rampage draft id (directly or transitively), then map
+ * those draft ids -> live ability ids via ER_ID_MAP. Computed once; just a Set lookup at use.
+ */
+const RAMPAGE_ABILITY_IDS: ReadonlySet<number> = (() => {
+  // Draft ids that map to the live RAMPAGE ability.
+  const rampageDrafts = new Set<number>();
+  for (const [draft, live] of Object.entries(ER_ID_MAP.abilities)) {
+    if (live === ErAbilityId.RAMPAGE) {
+      rampageDrafts.add(Number(draft));
+    }
+  }
+  // Fixpoint: a composite bears Rampage if any ER part is a Rampage-bearing draft.
+  const bearingDrafts = new Set<number>(rampageDrafts);
+  let changed = true;
+  while (changed) {
+    changed = false;
+    for (const entry of Object.values(ER_COMPOSITE_PARTS)) {
+      if (bearingDrafts.has(entry.erAbilityId)) {
+        continue;
+      }
+      if (entry.parts.some(part => part.kind === "er" && bearingDrafts.has(part.erAbilityId))) {
+        bearingDrafts.add(entry.erAbilityId);
+        changed = true;
+      }
+    }
+  }
+  // Map every bearing draft id -> its live ability id (plus pure Rampage itself).
+  const liveIds = new Set<number>([ErAbilityId.RAMPAGE]);
+  for (const draft of bearingDrafts) {
+    const live = ER_ID_MAP.abilities[draft];
+    if (typeof live === "number") {
+      liveIds.add(live);
+    }
+  }
+  return liveIds;
+})();
+
+/** True if the target's ability is Rampage or any composite that bundles it. */
+function targetHasRampage(target: Pokemon): boolean {
+  for (const abilityId of RAMPAGE_ABILITY_IDS) {
+    if (target.hasAbility(abilityId as AbilityId)) {
+      return true;
+    }
+  }
+  return false;
+}
+
 function battleState(): ErAchievementBattleState {
   const battle = globalScene.currentBattle as BattleWithErAchievements;
   if (!battle.erAchievementState || battle.erAchievementState.waveIndex !== battle.waveIndex) {
@@ -132,6 +211,10 @@ function battleState(): ErAchievementBattleState {
       turnOneChargedMoves: new Set<string>(),
       damageSourcesByTarget: new Map<number, Set<string>>(),
       damageSourceTurn: battle.turn,
+      playerFieldFaints: new Set<number>(),
+      enemyFieldFaints: new Set<number>(),
+      flashFailed: false,
+      playerEverActed: false,
     };
   }
   return battle.erAchievementState;
@@ -209,6 +292,96 @@ function recordDamageSource(target: Pokemon, sourceKey: string): void {
   }
 }
 
+/** A mon is "mega" if its active form's key contains "mega" (mega / mega-x / mega-y). */
+function isMegaForm(pokemon: Pokemon): boolean {
+  const formKey = pokemon.species.forms[pokemon.formIndex]?.formKey;
+  return !!formKey && formKey.includes("mega");
+}
+
+/** True when every member of the player party is currently in a Mega form (Full on Mega Power). */
+function playerTeamAllMega(): boolean {
+  const party = globalScene.getPlayerParty();
+  return party.length > 0 && party.every(isMegaForm);
+}
+
+/**
+ * Realistic Flash: track, per turn, whether one of YOUR Pokemon has acted yet. If an
+ * enemy move resolves before you have acted this turn, the run "fails" the achievement.
+ * Called for every move resolution (player + enemy).
+ */
+function recordFlashOrder(user: Pokemon): void {
+  const state = battleState();
+  const turn = globalScene.currentBattle.turn;
+  if (state.flashTurn !== turn) {
+    state.flashTurn = turn;
+    state.playerActedThisTurn = false;
+  }
+  if (user.isPlayer()) {
+    state.playerActedThisTurn = true;
+    state.playerEverActed = true;
+  } else if (!state.playerActedThisTurn) {
+    state.flashFailed = true;
+  }
+}
+
+/** Record a faint into the per-turn ledger (resets when a new turn produces a faint). */
+function recordFaintForLedger(pokemon: Pokemon): void {
+  const state = battleState();
+  const turn = globalScene.currentBattle.turn;
+  if (state.faintLedgerTurn !== turn) {
+    state.faintLedgerTurn = turn;
+    state.playerFieldFaints = new Set<number>();
+    state.enemyFieldFaints = new Set<number>();
+  }
+  (pokemon.isPlayer() ? state.playerFieldFaints : state.enemyFieldFaints)!.add(pokemon.id);
+}
+
+/**
+ * EVERYONE GET OUT: a player Earthquake/Surf this turn knocked out both foes AND the
+ * surviving user's ally. Checked on every faint (the last qualifying faint trips it).
+ */
+function checkEveryoneGetOut(): void {
+  const state = battleState();
+  const spread = state.lastSpreadMove;
+  if (!spread || spread.turn !== globalScene.currentBattle.turn || !globalScene.currentBattle.double) {
+    return;
+  }
+  const playerField = globalScene.getPlayerField();
+  const user = playerField.find(pokemon => pokemon?.id === spread.userId);
+  if (!user || user.isFainted()) {
+    return;
+  }
+  const enemyField = globalScene.getEnemyField();
+  const allyField = playerField.filter(pokemon => pokemon && pokemon.id !== user.id);
+  const enemiesDown = enemyField.length > 0 && enemyField.every(pokemon => pokemon?.isFainted());
+  const allyDown = allyField.length > 0 && allyField.every(pokemon => pokemon?.isFainted());
+  if (enemiesDown && allyDown) {
+    globalScene.validateAchv(achvs.EVERYONE_GET_OUT);
+  }
+}
+
+/**
+ * Mutually Assured Destruction: the deciding turn of a double battle knocked out both of
+ * your field mons AND both of theirs. Checked at the win (the ledger holds the final turn).
+ */
+function checkMutualDestruction(): void {
+  const state = battleState();
+  if (!globalScene.currentBattle.double) {
+    return;
+  }
+  if ((state.playerFieldFaints?.size ?? 0) >= 2 && (state.enemyFieldFaints?.size ?? 0) >= 2) {
+    globalScene.validateAchv(achvs.MUTUALLY_ASSURED_DESTRUCTION);
+  }
+}
+
+/** Realistic Flash: at the win, award if you fought and no enemy ever moved before you. */
+function checkFlash(): void {
+  const state = battleState();
+  if (state.playerEverActed && !state.flashFailed) {
+    globalScene.validateAchv(achvs.REALISTIC_FLASH_IS_BORING);
+  }
+}
+
 export function erRecordAchievementMoveResolution(
   user: Pokemon,
   move: Move,
@@ -222,6 +395,8 @@ export function erRecordAchievementMoveResolution(
   }
 
   const state = battleState();
+  // Realistic Flash: record turn move-order for both sides before branching.
+  recordFlashOrder(user);
   if (user.isPlayer()) {
     if (move.id === MoveId.QUASH && globalScene.arena.hasTag(ArenaTagType.TRICK_ROOM)) {
       globalScene.validateAchv(achvs.HOLLOW_WICKER_BASKET);
@@ -231,6 +406,11 @@ export function erRecordAchievementMoveResolution(
       if (!move.hasFlag(MoveFlags.PULSE_MOVE)) {
         state.beamSpamInvalid = true;
       }
+    }
+    // EVERYONE GET OUT: arm a board-wipe check when a player fires Earthquake/Surf in a
+    // double (it hits both foes + the ally). The faint hooks confirm the wipe.
+    if (BOARD_WIPE_MOVES.has(move.id) && globalScene.currentBattle.double) {
+      state.lastSpreadMove = { moveId: move.id, userId: user.id, turn: globalScene.currentBattle.turn };
     }
     return;
   }
@@ -302,6 +482,15 @@ export function erRecordAchievementMoveDamage(
   if (target.isBoss() && target.isFainted() && battleState().turnOneChargedMoves?.has(`${user.id}:${move.id}`)) {
     globalScene.validateAchv(achvs.SORRY_FOR_THE_WAIT);
   }
+  // Super Armor: OHKO with a counter-class move (Counter / Mirror Coat / Comeuppance / Metal Burst).
+  if (koFromFull && SUPER_ARMOR_MOVES.has(move.id)) {
+    globalScene.validateAchv(achvs.SUPER_ARMOR);
+  }
+  // End the Legend: a player Lucario (any form, incl. Mega) defeats a Rampage-ability mon
+  // (counts composites that bundle Rampage, e.g. "Berserk + Rampage").
+  if (target.isFainted() && hasSpeciesIn(user, LUCARIO_SPECIES) && targetHasRampage(target)) {
+    globalScene.validateAchv(achvs.END_THE_LEGEND);
+  }
 }
 
 export function erRecordAchievementDamageAndUpdate(
@@ -321,6 +510,9 @@ export function erRecordAchievementDamageAndUpdate(
 }
 
 export function erRecordAchievementEnemyFaint(fainted: Pokemon): void {
+  recordFaintForLedger(fainted);
+  checkEveryoneGetOut();
+
   const indirect = fainted.turnData.attacksReceived.length === 0;
   if (!indirect) {
     return;
@@ -336,7 +528,10 @@ export function erRecordAchievementEnemyFaint(fainted: Pokemon): void {
   }
 }
 
-export function erRecordAchievementPlayerFaint(): void {
+export function erRecordAchievementPlayerFaint(fainted: Pokemon): void {
+  recordFaintForLedger(fainted);
+  checkEveryoneGetOut();
+
   const state = runState();
   if (state.absolWarningWave != null && globalScene.currentBattle.waveIndex > state.absolWarningWave) {
     state.absolWarningFailed = true;
@@ -364,6 +559,16 @@ export function erRecordAchievementTrainerVictory(): void {
 }
 
 export function erRecordAchievementWaveWon(): void {
+  // Mutually Assured Destruction + Realistic Flash both resolve at the win.
+  checkMutualDestruction();
+  checkFlash();
+
+  // Squatter: deliberately linger in one biome for >= 20 waves (only meaningful in
+  // ER biome-routing runs, where the per-biome wave counter resets on each entry).
+  if (erBiomeRoutingActive() && wavesSinceEnteredBiome(globalScene.currentBattle.waveIndex) >= 20) {
+    globalScene.validateAchv(achvs.SQUATTER);
+  }
+
   const state = runState();
   if (
     state.absolWarningWave != null
@@ -381,6 +586,14 @@ export function erRecordAchievementCatch(pokemon: Pokemon): void {
     const state = runState();
     state.absolWarningWave = globalScene.currentBattle.waveIndex;
     state.absolWarningFailed = false;
+  }
+  // Dreamcatcher: catch a (wild) Cresselia. Catches only happen in wild encounters.
+  if (pokemon.species.speciesId === SpeciesId.CRESSELIA) {
+    globalScene.validateAchv(achvs.DREAMCATCHER);
+  }
+  // Incompatible Hardware: also covers a wild-caught Porygon-Z (the usual path is evolution).
+  if (pokemon.species.speciesId === SpeciesId.PORYGON_Z) {
+    globalScene.validateAchv(achvs.INCOMPATIBLE_HARDWARE);
   }
 }
 
@@ -404,6 +617,10 @@ export function erRecordAchievementFormChange(pokemon: Pokemon, formKey: string)
   if (formKey.includes("mega") && hasSpeciesIn(pokemon, REDUX_INFERNAPE_LINE)) {
     globalScene.validateAchv(achvs.GEAR_5);
   }
+  // Full on Mega Power: after a Mega change, check the WHOLE party is now Mega.
+  if (formKey.includes("mega") && playerTeamAllMega()) {
+    globalScene.validateAchv(achvs.FULL_ON_MEGA_POWER);
+  }
 }
 
 export function erRecordAchievementStatStage(pokemon: Pokemon, stat: Stat): void {
@@ -415,5 +632,41 @@ export function erRecordAchievementStatStage(pokemon: Pokemon, stat: Stat): void
 export function erRecordAchievementLearnMove(pokemon: Pokemon, moveId: MoveId): void {
   if (pokemon.species.speciesId === SpeciesId.PALKIA && moveId === MoveId.HYPER_BEAM) {
     globalScene.validateAchv(achvs.MEGAFLARE);
+  }
+  // PK STARSTORM: teach Draco Meteor to a Psychic-type Pokemon.
+  if (moveId === MoveId.DRACO_METEOR && pokemon.getTypes().includes(PokemonType.PSYCHIC)) {
+    globalScene.validateAchv(achvs.PK_STARSTORM);
+  }
+}
+
+/** Original Dragon Spirit: a DNA Splicers fusion of Reshiram + Zekrom (in either order). */
+export function erRecordAchievementFusion(speciesA: number, speciesB: number): void {
+  const pair = new Set<number>([speciesA, speciesB]);
+  if (pair.has(SpeciesId.RESHIRAM) && pair.has(SpeciesId.ZEKROM)) {
+    globalScene.validateAchv(achvs.ORIGINAL_DRAGON_SPIRIT);
+  }
+}
+
+/** Incompatible Hardware: obtaining a Porygon-Z (the usual path is an evolution). */
+export function erRecordAchievementEvolution(pokemon: Pokemon): void {
+  if (pokemon.species.speciesId === SpeciesId.PORYGON_Z) {
+    globalScene.validateAchv(achvs.INCOMPATIBLE_HARDWARE);
+  }
+}
+
+/** Compleat Nightmare: a Pokemon falls asleep while you have a Darkrai on your team. */
+export function erRecordAchievementStatusSet(_pokemon: Pokemon, effect: StatusEffect): void {
+  if (
+    effect === StatusEffect.SLEEP
+    && globalScene.getPlayerParty().some(member => member.species.speciesId === SpeciesId.DARKRAI)
+  ) {
+    globalScene.validateAchv(achvs.COMPLEAT_NIGHTMARE);
+  }
+}
+
+/** Poke Him On!: release a Pikachu. */
+export function erRecordAchievementRelease(speciesId: number): void {
+  if (speciesId === SpeciesId.PIKACHU) {
+    globalScene.validateAchv(achvs.POKE_HIM_ON);
   }
 }

@@ -14,6 +14,7 @@ import {
   COOP_CHECK_OP_UNPAUSE_EVO,
   COOP_CHECK_OP_UNSPLICE,
 } from "#data/elite-redux/coop/coop-shop-check-relay";
+import { erRecordAchievementRelease } from "#data/elite-redux/er-achievement-tracker";
 import { isErBlackShiny } from "#data/elite-redux/er-black-shinies";
 import { SpeciesFormChangeItemTrigger } from "#data/form-change-triggers";
 import { Gender, getGenderColor, getGenderSymbol } from "#data/gender";
@@ -2142,6 +2143,8 @@ export class PartyUiHandler extends MessageUiHandler {
         this.clearPartySlots();
         globalScene.removePartyMemberModifiers(slotIndex);
         const releasedPokemon = globalScene.getPlayerParty().splice(slotIndex, 1)[0];
+        // ER achievement (Poke Him On!): releasing a Pikachu.
+        erRecordAchievementRelease(releasedPokemon.species.speciesId);
         releasedPokemon.destroy();
         this.populatePartySlots();
         // Co-op (#633 B9b): relay the release AFTER the splice, capturing the SLOT (the param), so the

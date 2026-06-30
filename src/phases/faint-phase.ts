@@ -103,7 +103,7 @@ export class FaintPhase extends PokemonPhase {
     // Track total times pokemon have been KO'd for Last Respects/Supreme Overlord
     if (pokemon.isPlayer()) {
       globalScene.arena.playerFaints += 1;
-      erRecordAchievementPlayerFaint();
+      erRecordAchievementPlayerFaint(pokemon);
       // ER Slum (#439 §3): the den - every ALLY that faints in a TRAINER battle
       // costs you a slice of your money (2% of the current purse). Trainer battles
       // only (a wild faint is free); gated on the biome rule so it only bites here.

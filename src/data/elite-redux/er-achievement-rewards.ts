@@ -43,6 +43,7 @@ import { EggTier } from "#enums/egg-type";
 import { ErSpeciesId } from "#enums/er-species-id";
 import { SpeciesId } from "#enums/species-id";
 import { type Achv, achvs, RewardAchv } from "#system/achv";
+import { VoucherType } from "#system/voucher";
 import { randSeedItem } from "#utils/common";
 
 /** Per-difficulty multiplier applied to candy-to-team payouts (skill scaling). */
@@ -56,6 +57,14 @@ const REWARD_DIFFICULTY_CANDY_MULT: Record<string, number> = {
 /** Player-facing egg-tier label (no enum SHOUTING in the inbox). */
 const EGG_TIER_LABEL = ["Common", "Rare", "Epic", "Legendary"] as const;
 
+/** Player-facing voucher label per VoucherType (Regular/Plus/Premium/Golden). */
+const VOUCHER_LABEL: Record<VoucherType, string> = {
+  [VoucherType.REGULAR]: "Egg Voucher",
+  [VoucherType.PLUS]: "Egg Voucher Plus",
+  [VoucherType.PREMIUM]: "Egg Voucher Premium",
+  [VoucherType.GOLDEN]: "Golden Egg Voucher",
+};
+
 /**
  * What a single achievement grants. A discriminated union so each kind carries
  * exactly its own fields. `species: "random"` rolls a random obtainable starter.
@@ -65,8 +74,13 @@ export type RewardSpec =
   | { kind: "candy"; species: SpeciesId; amount: number }
   /** Candy to EACH mon on the winning team, scaled by run difficulty. */
   | { kind: "candyTeam"; perMon: number }
-  /** `count` eggs of a fixed tier. `shiny` forces every hatch to be shiny. */
-  | { kind: "eggs"; tier: EggTier; count: number; shiny?: boolean }
+  /**
+   * `count` eggs of a fixed tier. `shiny` forces every hatch to be shiny; `species`
+   * makes them a fixed-species egg (otherwise the tier's species pool rolls).
+   */
+  | { kind: "eggs"; tier: EggTier; count: number; shiny?: boolean; species?: SpeciesId }
+  /** `count` egg-gacha vouchers of a type (Regular/Plus/Premium/Golden = 1/5/10/25 pulls). */
+  | { kind: "voucher"; voucherType: VoucherType; count: number }
   /** A guaranteed shiny at tier 1/2/3 (hard challenges only). */
   | { kind: "shiny"; tier: 1 | 2 | 3; species: SpeciesId | "random" }
   /** The apex-only black shiny (separate ER tier-4 path). */
@@ -165,8 +179,15 @@ export const ER_ACHIEVEMENT_REWARDS: Record<string, RewardSpec | RewardSpec[]> =
   _10_RIBBONS: { kind: "eggs", tier: EggTier.RARE, count: 1 },
   _25_RIBBONS: { kind: "eggs", tier: EggTier.RARE, count: 2 },
   _50_RIBBONS: { kind: "eggs", tier: EggTier.EPIC, count: 1 },
-  _75_RIBBONS: { kind: "eggs", tier: EggTier.EPIC, count: 2 },
-  _100_RIBBONS: { kind: "eggs", tier: EggTier.LEGENDARY, count: 1 },
+  _75_RIBBONS: [
+    { kind: "eggs", tier: EggTier.LEGENDARY, count: 1 },
+    { kind: "voucher", voucherType: VoucherType.PREMIUM, count: 1 },
+  ],
+  // 100 challenge ribbons is an extreme grind - cap the ladder with a guaranteed shiny.
+  _100_RIBBONS: [
+    { kind: "eggs", tier: EggTier.LEGENDARY, count: 1 },
+    { kind: "shiny", tier: 2, species: "random" },
+  ],
 
   // === Grind ladders (team candy, escalating within each ladder) ============
   _10K_MONEY: { kind: "candyTeam", perMon: 10 },
@@ -214,10 +235,14 @@ export const ER_ACHIEVEMENT_REWARDS: Record<string, RewardSpec | RewardSpec[]> =
   EXORCIST: [
     { kind: "candyTeam", perMon: 15 },
     { kind: "pokemon", species: SpeciesId.CHANDELURE },
+    { kind: "voucher", voucherType: VoucherType.PREMIUM, count: 1 },
     { kind: "shinyLabEffects", effects: ["cosmos", "shadowaura"] },
   ],
-  // Defeating the Primal Cascoon final-boss second stage.
-  PRIMAL_CASCOON: { kind: "eggs", tier: EggTier.EPIC, count: 2 },
+  // Defeating the Primal Cascoon final-boss second stage (endgame - guaranteed shiny).
+  PRIMAL_CASCOON: [
+    { kind: "shiny", tier: 2, species: "random" },
+    { kind: "eggs", tier: EggTier.EPIC, count: 1 },
+  ],
   // Holding five relics at once in a single run.
   RELIC_HUNTER: { kind: "eggs", tier: EggTier.RARE, count: 2 },
   // Owning a shiny Pokemon of all three variant tiers.
@@ -225,9 +250,137 @@ export const ER_ACHIEVEMENT_REWARDS: Record<string, RewardSpec | RewardSpec[]> =
     { kind: "eggs", tier: EggTier.EPIC, count: 1, shiny: true },
     { kind: "shinyLabEffects", effects: ["rainbowoutline"] },
   ],
-  // Earning all eighteen mono-type ribbons.
-  MASTER_OF_ALL: [{ kind: "shiny", tier: 2, species: "random" }, { kind: "shinyLabEffects", effects: ["spectrumsplit"] }],
+  // Earning all eighteen mono-type ribbons (= 18 hard run clears; the meta-capstone).
+  MASTER_OF_ALL: [
+    { kind: "shiny", tier: 3, species: "random" },
+    { kind: "voucher", voucherType: VoucherType.PREMIUM, count: 3 },
+    { kind: "shinyLabEffects", effects: ["spectrumsplit"] },
+  ],
+
+  // === New feat batch (#747) + Squatter ====================================
+  // Low: a single egg + a little themed candy. Medium: egg-gacha vouchers.
+  // High: a guaranteed shiny (per the difficulty->reward rule). Run-completion
+  // achievements ALSO get +2 Premium vouchers folded in by RUN_COMPLETION_ACHV_IDS.
+  POKE_HIM_ON: [{ kind: "eggs", tier: EggTier.RARE, count: 1 }, { kind: "candy", species: SpeciesId.PIKACHU, amount: 50 }],
+  REALISTIC_FLASH_IS_BORING: [{ kind: "eggs", tier: EggTier.RARE, count: 1 }, { kind: "candyTeam", perMon: 10 }],
+  PK_STARSTORM: { kind: "eggs", tier: EggTier.EPIC, count: 1 },
+  INCOMPATIBLE_HARDWARE: { kind: "voucher", voucherType: VoucherType.PLUS, count: 1 },
+  SUPER_ARMOR: { kind: "voucher", voucherType: VoucherType.PLUS, count: 1 },
+  END_THE_LEGEND: { kind: "voucher", voucherType: VoucherType.PLUS, count: 1 },
+  // Compleat Nightmare needs a Darkrai; reward its lunar counterpart, Cresselia.
+  COMPLEAT_NIGHTMARE: [
+    { kind: "voucher", voucherType: VoucherType.PREMIUM, count: 1 },
+    { kind: "pokemon", species: SpeciesId.CRESSELIA },
+  ],
+  EVERYONE_GET_OUT: { kind: "voucher", voucherType: VoucherType.PREMIUM, count: 1 },
+  // Dreamcatcher catches Cresselia; reward its counterpart, Darkrai (feeds Compleat Nightmare).
+  DREAMCATCHER: [
+    { kind: "voucher", voucherType: VoucherType.PREMIUM, count: 1 },
+    { kind: "pokemon", species: SpeciesId.DARKRAI },
+  ],
+  MUTUALLY_ASSURED_DESTRUCTION: { kind: "shiny", tier: 1, species: "random" },
+  FULL_ON_MEGA_POWER: { kind: "shiny", tier: 2, species: "random" },
+  // Original Dragon Spirit: Reshiram + Zekrom -> the original dragon, a shiny Kyurem.
+  ORIGINAL_DRAGON_SPIRIT: { kind: "shiny", tier: 2, species: SpeciesId.KYUREM },
+  // Squatter: survive a fully-notorious 20-wave biome overstay -> a random shiny.
+  SQUATTER: { kind: "shiny", tier: 1, species: "random" },
+
+  // === ER combat feats (previously material-rewardless) =====================
+  // Most are score-50 mid feats -> a voucher or egg; the boss/score-75 ones get more.
+  // Several keep a thematic species candy/egg/shiny inspired by the feat itself.
+  BEAM_SPAM: { kind: "voucher", voucherType: VoucherType.PREMIUM, count: 1 },
+  GOOD_CHIP: { kind: "candy", species: ErSpeciesId.DARMANITAN_REDUX as unknown as SpeciesId, amount: 75 },
+  BACK_IN_BLOOD: { kind: "candyTeam", perMon: 20 },
+  SHIELD_BREAK: { kind: "voucher", voucherType: VoucherType.PLUS, count: 1 },
+  CCC_COMBO: { kind: "voucher", voucherType: VoucherType.PLUS, count: 1 },
+  // Mega-evolve the Redux Infernape line -> shiny Redux Chimchar (the pre-evo).
+  GEAR_5: { kind: "shiny", tier: 1, species: ErSpeciesId.CHIMCHAR_REDUX as unknown as SpeciesId },
+  METAL_SLIME: { kind: "candy", species: ErSpeciesId.MUNCHLAX_REDUX as unknown as SpeciesId, amount: 50 },
+  JURASSIC_END: { kind: "eggs", tier: EggTier.EPIC, count: 1 },
+  // Heeding the Warning: act on Absol's omen -> a shiny Absol.
+  HEEDING_THE_WARNING: { kind: "shiny", tier: 1, species: SpeciesId.ABSOL },
+  MEGAFLARE: { kind: "candy", species: SpeciesId.PALKIA, amount: 50 },
+  YO: { kind: "eggs", tier: EggTier.RARE, count: 1 },
+  WEAVE_NATION_CERTIFIED: { kind: "candyTeam", perMon: 25 },
+  CRIT_MATTERED: { kind: "voucher", voucherType: VoucherType.PLUS, count: 1 },
+  AUTO_COUNTER: { kind: "candyTeam", perMon: 15 },
+  SNAKES_ON_A_PLANE: { kind: "voucher", voucherType: VoucherType.PREMIUM, count: 1 },
+  // Believe It: a Kanto Ninetales beats a Poison-master -> a shiny Kanto Ninetales.
+  BELIEVE_IT: { kind: "shiny", tier: 1, species: SpeciesId.NINETALES },
+  HOLD_IT: { kind: "voucher", voucherType: VoucherType.PLUS, count: 1 },
+  CHAIN_REACTION: { kind: "voucher", voucherType: VoucherType.PLUS, count: 1 },
+  I_JUST_GOT_HERE: { kind: "voucher", voucherType: VoucherType.PREMIUM, count: 1 },
+  SORRY_FOR_THE_WAIT: { kind: "voucher", voucherType: VoucherType.PREMIUM, count: 1 },
+  HOLLOW_WICKER_BASKET: [{ kind: "pokemon", species: SpeciesId.QUAGSIRE }, { kind: "eggs", tier: EggTier.RARE, count: 1 }],
+
+  // === Elemental Apex (Elite/Hell mono-type apex; were cosmetic-only) =======
+  // High difficulty -> guaranteed shiny. The +2 Premium run-completion bonus applies.
+  SCORCHED_EARTH: { kind: "shiny", tier: 2, species: "random" },
+  ABSOLUTE_ZERO: { kind: "shiny", tier: 2, species: "random" },
+  ENDLESS_NIGHT: { kind: "shiny", tier: 2, species: "random" },
+  TEMPEST: { kind: "shiny", tier: 2, species: "random" },
 };
+
+/**
+ * Achievements earned by COMPLETING A WHOLE RUN (classic / daily / challenge / apex
+ * / final-boss clears). Each grants +2 Premium egg vouchers ON TOP of its base
+ * reward (maintainer rule: full-run feats were under-paying for the effort). Folded
+ * in by the spec assembly so it applies whether or not the achv has a base entry.
+ */
+const RUN_COMPLETION_ACHV_IDS = new Set<string>([
+  "CLASSIC_VICTORY",
+  "UNEVOLVED_CLASSIC_VICTORY",
+  "DAILY_VICTORY",
+  "FRESH_START",
+  "INVERSE_BATTLE",
+  "FLIP_STATS",
+  "FLIP_INVERSE",
+  "NUZLOCKE",
+  "LAST_STAND",
+  "PERMADEATH",
+  "LIMBO",
+  "PURGATORY",
+  "INFERNO",
+  "SCORCHED_EARTH",
+  "ABSOLUTE_ZERO",
+  "ENDLESS_NIGHT",
+  "TEMPEST",
+  "PRIMAL_CASCOON",
+  "MONO_GEN_ONE_VICTORY",
+  "MONO_GEN_TWO_VICTORY",
+  "MONO_GEN_THREE_VICTORY",
+  "MONO_GEN_FOUR_VICTORY",
+  "MONO_GEN_FIVE_VICTORY",
+  "MONO_GEN_SIX_VICTORY",
+  "MONO_GEN_SEVEN_VICTORY",
+  "MONO_GEN_EIGHT_VICTORY",
+  "MONO_GEN_NINE_VICTORY",
+  "MONO_NORMAL",
+  "MONO_FIGHTING",
+  "MONO_FLYING",
+  "MONO_POISON",
+  "MONO_GROUND",
+  "MONO_ROCK",
+  "MONO_BUG",
+  "MONO_GHOST",
+  "MONO_STEEL",
+  "MONO_FIRE",
+  "MONO_WATER",
+  "MONO_GRASS",
+  "MONO_ELECTRIC",
+  "MONO_PSYCHIC",
+  "MONO_ICE",
+  "MONO_DRAGON",
+  "MONO_DARK",
+  "MONO_FAIRY",
+]);
+
+/** The +2 Premium-voucher bonus a full-run-completion achievement gets, else nothing. */
+function runCompletionBonus(achvId: string): RewardSpec[] {
+  return RUN_COMPLETION_ACHV_IDS.has(achvId)
+    ? [{ kind: "voucher", voucherType: VoucherType.PREMIUM, count: 2 }]
+    : [];
+}
 
 /** A short, player-facing summary of one granted reward (+ optional icon mon). */
 interface GrantedReward {
@@ -257,6 +410,7 @@ export function grantErAchievementReward(achvId: string): void {
     if (mappedEffects.length) {
       specs.push({ kind: "shinyLabEffects", effects: mappedEffects });
     }
+    specs.push(...runCompletionBonus(achvId));
     if (specs.length === 0) {
       return;
     }
@@ -311,7 +465,15 @@ export function describeRewardSpec(spec: RewardSpec, ctx?: RewardDescribeContext
     case "eggs": {
       const label = EGG_TIER_LABEL[spec.tier] ?? "";
       const shinyPrefix = spec.shiny === true ? "shiny " : "";
-      return `${spec.count} ${shinyPrefix}${label} Egg${spec.count === 1 ? "" : "s"}`;
+      const plural = spec.count === 1 ? "" : "s";
+      if (spec.species != null) {
+        return `${spec.count} ${shinyPrefix}${speciesName(spec.species)} Egg${plural}`;
+      }
+      return `${spec.count} ${shinyPrefix}${label} Egg${plural}`;
+    }
+    case "voucher": {
+      const label = VOUCHER_LABEL[spec.voucherType];
+      return `${spec.count} ${label}${spec.count === 1 ? "" : "s"}`;
     }
     case "shiny": {
       if (ctx?.species != null) {
@@ -349,8 +511,17 @@ function applyRewardSpec(spec: RewardSpec): GrantedReward | null {
     case "eggs": {
       const isShiny = spec.shiny === true;
       for (let i = 0; i < spec.count; i++) {
-        new Egg({ tier: spec.tier, sourceType: EggSourceType.EVENT, isShiny }).addEggToGameData();
+        new Egg({
+          tier: spec.tier,
+          sourceType: EggSourceType.EVENT,
+          isShiny,
+          ...(spec.species != null ? { species: spec.species } : {}),
+        }).addEggToGameData();
       }
+      return { text: describeRewardSpec(spec) ?? "" };
+    }
+    case "voucher": {
+      grantVouchers(spec.voucherType, spec.count);
       return { text: describeRewardSpec(spec) ?? "" };
     }
     case "shiny": {
@@ -391,6 +562,7 @@ export function getAchvRewardSummary(achvId: string): string[] {
   if (mappedEffects.length) {
     specs.push({ kind: "shinyLabEffects", effects: mappedEffects });
   }
+  specs.push(...runCompletionBonus(achvId));
   return specs.map(spec => describeRewardSpec(spec)).filter((text): text is string => text != null);
 }
 
@@ -404,6 +576,13 @@ export function getAchvRewardSummary(achvId: string): string[] {
 function grantCandy(species: SpeciesId, amount: number): void {
   if (amount > 0) {
     globalScene.gameData.addStarterCandy(species, amount, true);
+  }
+}
+
+/** Add egg-gacha vouchers (clamped to >= 0; rides the normal save cycle like candy). */
+function grantVouchers(voucherType: VoucherType, count: number): void {
+  if (count > 0) {
+    globalScene.gameData.voucherCounts[voucherType] += count;
   }
 }
 

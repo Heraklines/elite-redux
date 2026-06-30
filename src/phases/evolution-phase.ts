@@ -5,6 +5,7 @@ import { getPokemonNameWithAffix } from "#app/messages";
 import { Phase } from "#app/phase";
 import type { SpeciesFormEvolution } from "#balance/pokemon-evolutions";
 import { FusionSpeciesFormEvolution } from "#balance/pokemon-evolutions";
+import { erRecordAchievementEvolution } from "#data/elite-redux/er-achievement-tracker";
 import { getTypeRgb } from "#data/type";
 import { LearnMoveSituation } from "#enums/learn-move-situation";
 import { UiMode } from "#enums/ui-mode";
@@ -490,6 +491,8 @@ export class EvolutionPhase extends Phase {
    * Fadeout evolution music, play the cry, show the evolution completed text, and end the phase
    */
   private onEvolutionComplete(evolvedPokemon: Pokemon) {
+    // ER achievements: `this.pokemon` is now the evolved species (Incompatible Hardware: Porygon-Z).
+    erRecordAchievementEvolution(this.pokemon);
     if (this.evolutionBgm) {
       SoundFade.fadeOut(globalScene, this.evolutionBgm, 100);
     }

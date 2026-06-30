@@ -5,7 +5,6 @@ import {
   FlipStatChallenge,
   FreshStartChallenge,
   InverseBattleChallenge,
-  PassivesChallenge,
   SingleGenerationChallenge,
   SingleTypeChallenge,
 } from "#data/challenge";
@@ -507,6 +506,19 @@ export function getAchievementDescription(localizationKey: string): string {
     case "iJustGotHere":
     case "sorryForTheWait":
     case "hollowWickerBasket":
+    case "everyoneGetOut":
+    case "mutuallyAssuredDestruction":
+    case "fullOnMegaPower":
+    case "originalDragonSpirit":
+    case "incompatibleHardware":
+    case "dreamcatcher":
+    case "compleatNightmare":
+    case "pokeHimOn":
+    case "superArmor":
+    case "pkStarstorm":
+    case "realisticFlashIsBoring":
+    case "endTheLegend":
+    case "squatter":
       return i18next.t(`achv:${localizationKey}.description`, { context: genderStr });
     case "relicHunter":
       return i18next.t("achv:relicHunter.description", { context: genderStr });
@@ -516,8 +528,6 @@ export function getAchievementDescription(localizationKey: string): string {
       return i18next.t("achv:masterOfAll.description", { context: genderStr });
     case "dailyVictory":
       return i18next.t("achv:dailyVictory.description", { context: genderStr });
-    case "passives":
-      return i18next.t("achv:passives.description", { context: genderStr });
     default:
       return "";
   }
@@ -1011,13 +1021,6 @@ export const achvs = {
       && !inverseAndFlipStatAchievementsBlock()
       && !passivesChallengeAchievementsBlock(),
   ),
-  PASSIVES_CHALLENGE: new ChallengeAchv(
-    "passives",
-    "passives.description",
-    "ability_capsule",
-    100,
-    c => c instanceof PassivesChallenge && c.value > 0 && !inverseAndFlipStatAchievementsBlock(),
-  ),
   UNEVOLVED_CLASSIC_VICTORY: new Achv(
     "unevolvedClassicVictory",
     "unevolvedClassicVictory.description",
@@ -1154,6 +1157,29 @@ export const achvs = {
   MASTER_OF_ALL: new Achv("masterOfAll", "masterOfAll.description", "relic_crown", 150, () =>
     allMonoTypeRibbonsEarned(),
   ),
+  // === ER feat/collection achievements (batch 2) ============================
+  // Event-gated plain Achvs validated from the matching er-achievement-tracker
+  // hook (the same pattern as the BEAM_SPAM..HOLLOW_WICKER_BASKET block above).
+  // Icons are existing item-atlas frames chosen thematically.
+  EVERYONE_GET_OUT: new Achv("everyoneGetOut", "everyoneGetOut.description", "eject_button", 50),
+  MUTUALLY_ASSURED_DESTRUCTION: new Achv(
+    "mutuallyAssuredDestruction",
+    "mutuallyAssuredDestruction.description",
+    "reaper_cloth",
+    50,
+  ),
+  FULL_ON_MEGA_POWER: new Achv("fullOnMegaPower", "fullOnMegaPower.description", "mega_bracelet", 75),
+  ORIGINAL_DRAGON_SPIRIT: new Achv("originalDragonSpirit", "originalDragonSpirit.description", "dna_splicers", 50),
+  INCOMPATIBLE_HARDWARE: new Achv("incompatibleHardware", "incompatibleHardware.description", "dubious_disc", 25),
+  DREAMCATCHER: new Achv("dreamcatcher", "dreamcatcher.description", "moon_stone", 50),
+  COMPLEAT_NIGHTMARE: new Achv("compleatNightmare", "compleatNightmare.description", "dread_plate", 25),
+  POKE_HIM_ON: new Achv("pokeHimOn", "pokeHimOn.description", "zap_plate", 25),
+  SUPER_ARMOR: new Achv("superArmor", "superArmor.description", "metal_coat", 50),
+  PK_STARSTORM: new Achv("pkStarstorm", "pkStarstorm.description", "tm_dragon", 25),
+  REALISTIC_FLASH_IS_BORING: new Achv("realisticFlashIsBoring", "realisticFlashIsBoring.description", "power_herb", 50),
+  END_THE_LEGEND: new Achv("endTheLegend", "endTheLegend.description", "brick", 50),
+  // Stay in one biome for >= 20 waves (deliberate overstay through full notoriety).
+  SQUATTER: new Achv("squatter", "squatter.description", "leftovers", 50),
 };
 
 export function initAchievements() {

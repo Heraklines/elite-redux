@@ -117,8 +117,23 @@ const ACHV_CATEGORY_OVERRIDES: Record<string, AchvCategory> = {
   HIDDEN_ABILITY: AchvCategory.TRAINING,
   PERFECT_IVS: AchvCategory.TRAINING,
 
+  // --- Battle: the new feat batch (#747) ---
+  EVERYONE_GET_OUT: AchvCategory.BATTLE,
+  MUTUALLY_ASSURED_DESTRUCTION: AchvCategory.BATTLE,
+  FULL_ON_MEGA_POWER: AchvCategory.BATTLE,
+  ORIGINAL_DRAGON_SPIRIT: AchvCategory.BATTLE,
+  COMPLEAT_NIGHTMARE: AchvCategory.BATTLE,
+  SUPER_ARMOR: AchvCategory.BATTLE,
+  PK_STARSTORM: AchvCategory.BATTLE,
+  REALISTIC_FLASH_IS_BORING: AchvCategory.BATTLE,
+  END_THE_LEGEND: AchvCategory.BATTLE,
+
   // --- Collection: catch / hatch / shiny ---
   SEE_SHINY: AchvCategory.COLLECTION,
+  // The new obtain/catch/release feats (#747).
+  INCOMPATIBLE_HARDWARE: AchvCategory.COLLECTION,
+  DREAMCATCHER: AchvCategory.COLLECTION,
+  POKE_HIM_ON: AchvCategory.COLLECTION,
   SHINY_PARTY: AchvCategory.COLLECTION,
   ALL_SHINY_TIERS: AchvCategory.COLLECTION,
   CATCH_SUB_LEGENDARY: AchvCategory.COLLECTION,
@@ -131,6 +146,7 @@ const ACHV_CATEGORY_OVERRIDES: Record<string, AchvCategory> = {
   MASTER_OF_ALL: AchvCategory.COLLECTION,
 
   // --- Events: ER event + boss feats ---
+  SQUATTER: AchvCategory.EVENTS,
   BREEDERS_IN_SPACE: AchvCategory.EVENTS,
   DEVILS_BARGAIN: AchvCategory.EVENTS,
   EXORCIST: AchvCategory.EVENTS,

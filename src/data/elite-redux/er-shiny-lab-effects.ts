@@ -543,7 +543,9 @@ export const ER_SHINY_LAB_EFFECT_ACHV: Record<string, string> = {
   royal: "CLASSIC_VICTORY",
   sakura: "MAX_FRIENDSHIP",
   pentajewel: "ALL_SHINY_TIERS",
-  pentacandy: "PASSIVES_CHALLENGE",
+  // Rebound off the removed PASSIVES_CHALLENGE achv onto a new high-effort feat so
+  // the cosmetic stays earnable.
+  pentacandy: "FULL_ON_MEGA_POWER",
   gameboy: "MONO_GEN_ONE_VICTORY",
   retro: "MONO_GEN_TWO_VICTORY",
   // --- surfaces ---------------------------------------------------------------
