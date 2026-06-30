@@ -20,23 +20,39 @@ const present = new Set(
     .map(f => +f.slice(0, -4)),
 );
 
-// dex -> name from the species enum
+// dex -> slug from the species enum. The enum is `BULBASAUR = 1,` then AUTO-INCREMENTS
+// (`IVYSAUR,` `VENUSAUR,` ...), so walk members in order tracking a running `cur`: an
+// explicit `= N` sets it, otherwise it is the previous + 1. Record the FIRST slug seen
+// for each national-dex id so base species win over later form members (Alola/Galar/etc).
 const enumSrc = fs.readFileSync("src/enums/species-id.ts", "utf8");
-const names = {};
-for (const m of enumSrc.matchAll(/^\s*([A-Z0-9_]+)\s*=\s*(\d+),/gm)) {
-  const id = +m[2];
-  if (id <= 1025 && !names[id]) {
-    names[id] = m[1]
-      .toLowerCase()
+const dexToSlug = {};
+let cur = 0;
+for (const m of enumSrc.matchAll(/^\s*([A-Z][A-Z0-9_]*)\s*(?:=\s*(\d+))?\s*,/gm)) {
+  cur = m[2] === undefined ? cur + 1 : +m[2];
+  if (cur <= 1025 && dexToSlug[cur] === undefined) {
+    dexToSlug[cur] = m[1].toLowerCase();
+  }
+}
+
+// dex -> display name: prefer the i18n table, else a title-cased slug, else "No. <dex>"
+const loc = JSON.parse(fs.readFileSync("locales/en/pokemon.json", "utf8"));
+const nameOf = dex => {
+  const slug = dexToSlug[dex];
+  if (slug && loc[slug]) {
+    return loc[slug];
+  }
+  if (slug) {
+    return slug
       .split("_")
       .map(w => (w ? w[0].toUpperCase() + w.slice(1) : w))
       .join(" ");
   }
-}
+  return "No. " + dex;
+};
 const species = [];
 for (let id = 1; id <= 1025; id++) {
   if (present.has(id)) {
-    species.push({ i: id, n: names[id] || "No. " + id });
+    species.push({ i: id, n: nameOf(id) });
   }
 }
 
