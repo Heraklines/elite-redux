@@ -8657,9 +8657,12 @@ export class EnemyPokemon extends Pokemon {
             const activeOpponents = this.getOpponents().filter(o => o.isActive(true));
             // The experimental (Foul-Play-style) brain plays a depth-1 positional
             // game: it scores the board AFTER my move + the opponent's best reply.
-            // It models a 1v1 board, so in doubles (or with no single opponent) it
-            // falls back to the standard greedy transforms below.
-            const useDepth1 = erAi.kind === "experimental" && activeOpponents.length === 1 && !this.getAlly();
+            // It models a 1v1 board (me vs the lone opponent), so it engages whenever
+            // there is exactly ONE active opponent - including a triple/double endgame
+            // where my side still has allies (they aren't modelled in the lookahead, a
+            // conservative under-estimate). With >1 opponent it falls back to greedy.
+            // TODO(triple): a full 3-opponent depth-1 lookahead would model all foes.
+            const useDepth1 = erAi.kind === "experimental" && activeOpponents.length === 1;
 
             if (useDepth1) {
               const oppMon = activeOpponents[0];
@@ -8834,26 +8837,32 @@ export class EnemyPokemon extends Pokemon {
                     });
                     best = Math.max(best, damageToScore(damage, target.getMaxHp(), target.hp, move.accuracy));
                   }
-                  // Slice 4 (doubles): a spread move that also hits our own ally is
-                  // penalized by the damage it would deal them - so the AI won't
-                  // Earthquake its non-immune partner (and never KOs its own ally).
-                  const ally = this.getAlly();
+                  // Slice 4 (doubles/triples): a spread move that also hits our own ally is
+                  // penalized by the damage it would deal them - so the AI won't Earthquake
+                  // its non-immune partner (and never KOs its own ally). In a triple there
+                  // can be TWO allies, so penalise by EACH ally the spread would hit (the old
+                  // single getAlly() under-counted, letting the AI spread into its own team).
                   const hitsAlly =
                     move.moveTarget === MoveTarget.ALL_NEAR_OTHERS
                     || move.moveTarget === MoveTarget.ALL_OTHERS
                     || move.moveTarget === MoveTarget.ALL;
-                  if (best > 0 && hitsAlly && ally && !ally.isFainted()) {
-                    const { damage: allyDamage } = ally.getAttackDamage({
-                      source: this,
-                      move,
-                      ignoreAbility: false,
-                      ignoreSourceAbility: false,
-                      ignoreAllyAbility: false,
-                      ignoreSourceAllyAbility: false,
-                      isCritical: false,
-                      simulated: true,
-                    });
-                    best -= damageToScore(allyDamage, ally.getMaxHp(), ally.hp, 100);
+                  if (best > 0 && hitsAlly) {
+                    for (const ally of this.getAllies()) {
+                      if (ally.isFainted()) {
+                        continue;
+                      }
+                      const { damage: allyDamage } = ally.getAttackDamage({
+                        source: this,
+                        move,
+                        ignoreAbility: false,
+                        ignoreSourceAbility: false,
+                        ignoreAllyAbility: false,
+                        ignoreSourceAllyAbility: false,
+                        isCritical: false,
+                        simulated: true,
+                      });
+                      best -= damageToScore(allyDamage, ally.getMaxHp(), ally.hp, 100);
+                    }
                   }
                   // Phase A: doomed-and-outsped -> a slow move likely won't execute,
                   // so devalue it (a priority move keeps full value and wins).

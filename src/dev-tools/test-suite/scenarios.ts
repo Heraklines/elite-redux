@@ -22,7 +22,7 @@
  */
 
 import { loggedInUser } from "#app/account";
-import { setClearMeOverrideAfterFirst } from "#app/dev-tools/registry";
+import { setClearMeOverrideAfterFirst, setPendingDevEnemyParty } from "#app/dev-tools/registry";
 import { getGameMode } from "#app/game-mode";
 import { globalScene } from "#app/global-scene";
 import Overrides from "#app/overrides";
@@ -11088,5 +11088,63 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
     onBattleStart: () => runUnlockAllLeadInnates(),
     shopItems: [modifierTypes.ER_GREATER_ABILITY_CAPSULE],
+  },
+  // ===========================================================================
+  // Triple battles - positional adjacency, flying/pulse bypass, Wide Guard, Shift
+  // ===========================================================================
+  {
+    label: "TRIPLE battle: competitive 3v3 (adjacency / flying / Wide Guard / Shift)",
+    description:
+      "Triple battle (3 per side) with competitive teams. Exercise the new mechanics:\n"
+      + "- ADJACENCY: command a WING mon (left/right) with a normal move (Earthquake / Stone\n"
+      + "  Edge) - it reaches the foe OPPOSITE you + the CENTRE foe, but NOT the far diagonal.\n"
+      + "  The CENTRE mon reaches ALL three foes.\n"
+      + "- FLYING / PULSE BYPASS: a wing's FLYING move (Talonflame's Brave Bird) or a Pulse move\n"
+      + "  hits ANY foe, ignoring position.\n"
+      + "- SPREAD: Earthquake from a wing hits only the adjacent foes (and your own adjacent\n"
+      + "  ally!); from the centre it hits all three.\n"
+      + "- WIDE GUARD (Hitmontop) shields your WHOLE side from spread moves.\n"
+      + "- SHIFT: open the Pokemon (party) menu and pick an active ALLY to SWAP field positions\n"
+      + "  (consumes the turn) - e.g. move a strong mon to the centre to reach everything.\n"
+      + "Your team: Garchomp / Talonflame / Hitmontop. Enemy: Garchomp / Sylveon / Metagross.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        // Past the #419 BST-cap ladder so the ~600-BST mons spawn at full strength.
+        STARTING_WAVE_OVERRIDE: 145,
+        STARTING_LEVEL_OVERRIDE: 80,
+        BATTLE_STYLE_OVERRIDE: "triple",
+      });
+      // The opposing 3-mon competitive team (distinct mons + movesets). The triple
+      // encounter consumes this staged party for its three on-field foes.
+      setPendingDevEnemyParty([
+        {
+          speciesId: SpeciesId.GARCHOMP,
+          level: 80,
+          moveIds: [MoveId.EARTHQUAKE, MoveId.STONE_EDGE, MoveId.DRAGON_CLAW, MoveId.FIRE_FANG],
+        },
+        {
+          speciesId: SpeciesId.SYLVEON,
+          level: 80,
+          moveIds: [MoveId.HYPER_VOICE, MoveId.HELPING_HAND, MoveId.MYSTICAL_FIRE, MoveId.PROTECT],
+        },
+        {
+          speciesId: SpeciesId.METAGROSS,
+          level: 80,
+          moveIds: [MoveId.METEOR_MASH, MoveId.BULLET_PUNCH, MoveId.EARTHQUAKE, MoveId.ICE_PUNCH],
+        },
+      ]);
+      return [
+        makeStarter(SpeciesId.GARCHOMP, {
+          moveset: [MoveId.EARTHQUAKE, MoveId.STONE_EDGE, MoveId.DRAGON_CLAW, MoveId.SWORDS_DANCE],
+        }),
+        makeStarter(SpeciesId.TALONFLAME, {
+          moveset: [MoveId.BRAVE_BIRD, MoveId.FLARE_BLITZ, MoveId.TAILWIND, MoveId.ROOST],
+        }),
+        makeStarter(SpeciesId.HITMONTOP, {
+          moveset: [MoveId.WIDE_GUARD, MoveId.FAKE_OUT, MoveId.CLOSE_COMBAT, MoveId.SUCKER_PUNCH],
+        }),
+      ];
+    },
   },
 ];
