@@ -43,12 +43,44 @@ import { addTextObject as addTextObjectBase } from "#ui/text";
 import { UiHandler } from "#ui/ui-handler";
 import { addWindow } from "#ui/ui-theme";
 
-// This screen deliberately uses small font sizes (22-30px). At that scale the
-// emerald font renders blurry (it is crisp nearer its native ~48px+ size). Route
-// every text creation through a wrapper that bumps the render resolution, so
-// glyphs are rasterized sharp WITHOUT changing the display size or layout.
+// This screen used very small font sizes (22-30px), which render blurry (the
+// emerald font is crisp nearer ~40px+). Route every text creation through a
+// wrapper that bumps small sizes slightly and raises the render resolution.
+// Overflow from the larger text is contained by fitText() / the description's
+// maxLines below, so growing the font can never spill outside a box.
 const TEXT_RESOLUTION = 4;
-const addTextObject: typeof addTextObjectBase = (...args) => addTextObjectBase(...args).setResolution(TEXT_RESOLUTION);
+const FONT_BUMP = 1.18;
+const addTextObject: typeof addTextObjectBase = (x, y, content, style, extra) => {
+  const opts: Phaser.Types.GameObjects.Text.TextStyle = { ...(extra ?? {}) };
+  const fs = typeof opts.fontSize === "string" ? Number.parseInt(opts.fontSize, 10) : Number.NaN;
+  if (!Number.isNaN(fs) && fs < 40) {
+    opts.fontSize = `${Math.round(fs * FONT_BUMP)}px`;
+  }
+  return addTextObjectBase(x, y, content, style, opts).setResolution(TEXT_RESOLUTION);
+};
+
+/**
+ * Truncate a SINGLE-LINE text with ".." until its rendered width fits `maxW`
+ * (logical px, i.e. the text's already-scaled `displayWidth`). No-op if it fits.
+ */
+function fitText(t: Phaser.GameObjects.Text, maxW: number): void {
+  if (t.displayWidth <= maxW) {
+    return;
+  }
+  const full = t.text;
+  let lo = 0;
+  let hi = full.length;
+  while (lo < hi) {
+    const mid = (lo + hi + 1) >> 1;
+    t.setText(`${full.slice(0, mid).trimEnd()}..`);
+    if (t.displayWidth <= maxW) {
+      lo = mid;
+    } else {
+      hi = mid - 1;
+    }
+  }
+  t.setText(`${full.slice(0, lo).trimEnd()}..`);
+}
 
 const SCREEN_W = 320;
 const SCREEN_H = 180;
@@ -384,12 +416,14 @@ export class CommunityChallengesUiHandler extends UiHandler {
       { fontSize: "36px" },
     );
     title.setOrigin(0, 0).setColor(GOLD);
+    fitText(title, w - 32);
     this.dynamic.add(title);
 
     const by = addTextObject(CONTENT_X + 30, DETAIL_Y + 11, `Created by ${e.config.author}`, TextStyle.WINDOW, {
       fontSize: "22px",
     });
     by.setOrigin(0, 0).setColor(DIM);
+    fitText(by, 53);
     this.dynamic.add(by);
     if (e.stats.firstClearUser) {
       const fc = addTextObject(
@@ -402,14 +436,23 @@ export class CommunityChallengesUiHandler extends UiHandler {
         },
       );
       fc.setOrigin(0, 0).setColor(DIM);
+      fitText(fc, w - 88);
       this.dynamic.add(fc);
     }
 
     const desc = addTextObject(CONTENT_X + 30, DETAIL_Y + 18, e.config.description, TextStyle.WINDOW, {
       fontSize: "22px",
       wordWrap: { width: (w - 36) * 6 },
+      maxLines: 3,
     });
     desc.setOrigin(0, 0).setColor(INK);
+    // If maxLines clipped the description, end the last kept line with "..".
+    const descLines = desc.getWrappedText(e.config.description);
+    if (descLines.length > 3) {
+      const kept = descLines.slice(0, 3);
+      kept[2] = `${kept[2].replace(/\s*\S*$/, "").trimEnd()}..`;
+      desc.setText(kept.join("\n"));
+    }
     this.dynamic.add(desc);
 
     // Two columns: RULES (the active base challenges) | ALLOWED POKEMON. Tags +
@@ -420,6 +463,7 @@ export class CommunityChallengesUiHandler extends UiHandler {
     e.rules.slice(0, 6).forEach((r, i) => {
       const t = addTextObject(CONTENT_X + 6, colY + 8 + i * 7, `- ${r.text}`, TextStyle.WINDOW, { fontSize: "22px" });
       t.setOrigin(0, 0).setColor(INK);
+      fitText(t, (w - 12) * 0.46 - 6);
       this.dynamic.add(t);
     });
 
