@@ -41,8 +41,12 @@ function fieldSpriteOffset(position, capacity) {
   }
   return [0, 0];
 }
-function barSlotOffset(slot, playerSide) {
+function barSlotOffset(slot, playerSide, capacity = 2) {
   const dx = 10 * (playerSide ? 1 : -1);
+  if (capacity >= 3) {
+    // Triple+: player bars stack UP (bottom-anchored), enemy DOWN (top-anchored); tighter step.
+    return [dx * slot, (playerSide ? -22 : 22) * slot];
+  }
   return [dx * slot, 27 * slot];
 }
 function posForSlot(slot, capacity) {
@@ -96,7 +100,7 @@ function drawField(ctx, originX, scale, capacity, label) {
       ctx.font = `${Math.round(9 * scale)}px sans-serif`;
       ctx.fillText(`${player ? "P" : "E"}${slot}`, sx(cx - 6), sy(cy - SPRITE_H / 2));
 
-      const [bx, by] = barSlotOffset(slot, player);
+      const [bx, by] = barSlotOffset(slot, player, capacity);
       const barX = barAnchor.x + bx;
       const barY = barAnchor.y + by;
       ctx.globalAlpha = 0.95;

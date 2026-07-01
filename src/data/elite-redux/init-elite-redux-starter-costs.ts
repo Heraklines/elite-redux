@@ -68,7 +68,7 @@ const COST_OVERRIDES: Readonly<Record<string, number>> = {
   "Calyrex Cloud Rider": 9,
   "Zapdos Ex": 9,
   "Articuno Ex": 9,
-  "Moltres Ex": 9,
+  "Moltres Ex": 12,
   "Zarude Dada": 7,
   // ~600-BST band, pinned explicitly so they don't drift with the BST bands:
   "Ash-Greninja": 8,

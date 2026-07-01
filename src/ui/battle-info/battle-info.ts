@@ -472,12 +472,12 @@ export abstract class BattleInfo extends Phaser.GameObjects.Container {
    * later slot steps diagonally so three-plus bars stack without overlapping. Binary slot 1
    * reproduces the legacy single offset exactly. See `barSlotOffset` in `#data/battle-format`.
    */
-  setSlotOffset(slot: number): void {
+  setSlotOffset(slot: number, capacity = 2): void {
     if (this.slotOffset === slot) {
       return;
     }
-    const [oldDx, oldDy] = barSlotOffset(this.slotOffset, this.player);
-    const [newDx, newDy] = barSlotOffset(slot, this.player);
+    const [oldDx, oldDy] = barSlotOffset(this.slotOffset, this.player, capacity);
+    const [newDx, newDy] = barSlotOffset(slot, this.player, capacity);
     this.x += newDx - oldDx;
     this.y += newDy - oldDy;
     this.baseY = this.y;

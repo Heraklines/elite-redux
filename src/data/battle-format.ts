@@ -276,8 +276,18 @@ export function fieldSpriteOffset(position: FieldPosition, capacity: number): [n
  * mirrors the horizontal step (player bars sit bottom-right, enemy top-left). Binary slot 1
  * reproduces the legacy +/-10 / +27 shift.
  */
-export function barSlotOffset(slot: number, playerSide: boolean): [number, number] {
+export function barSlotOffset(slot: number, playerSide: boolean, capacity = 2): [number, number] {
   const dx = 10 * (playerSide ? 1 : -1);
+  if (capacity >= 3) {
+    // Triple+: a side's info bars stack AWAY from the screen edge they anchor to, so all
+    // three stay on-screen. The PLAYER's bars are anchored at the bottom, so they step UP
+    // (into the field); the ENEMY's are anchored at the top, so they step DOWN. A tighter
+    // vertical step (22 vs the binary 27) keeps three compact bars within the band. Slot 1
+    // no longer matches the binary double offset here, but that only applies at capacity>=3
+    // - single/double are untouched below.
+    return [dx * slot, (playerSide ? -22 : 22) * slot];
+  }
+  // Single/double: the legacy diagonal down-step (byte-identical).
   return [dx * slot, 27 * slot];
 }
 

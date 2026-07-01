@@ -1674,7 +1674,7 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
       // exactly for single/double (the setMini guard makes the redundant calls no-ops) while
       // also making a triple's CENTRE mon mini (the bug: its bar was full-size + overlapping).
       this.battleInfo.setMini(!(this.isPlayer() && sideCapacity === 1));
-      this.battleInfo.setSlotOffset(this.getFieldIndex());
+      this.battleInfo.setSlotOffset(this.getFieldIndex(), sideCapacity);
 
       if (fieldPosition === this.fieldPosition) {
         resolve();
