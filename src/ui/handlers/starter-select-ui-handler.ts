@@ -3247,6 +3247,7 @@ export class StarterSelectUiHandler extends MessageUiHandler {
             ui.setModeWithoutClear(UiMode.OPTION_SELECT, {
               options,
               yOffset: 47,
+              maxOptions: 8,
             });
           };
           options.push({
@@ -3316,6 +3317,7 @@ export class StarterSelectUiHandler extends MessageUiHandler {
           ui.setModeWithoutClear(UiMode.OPTION_SELECT, {
             options,
             yOffset: 47,
+            maxOptions: 8,
           });
           success = true;
         }
