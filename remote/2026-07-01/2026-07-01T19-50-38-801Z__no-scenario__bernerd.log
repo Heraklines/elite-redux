@@ -1,0 +1,279 @@
+url:      https://elite-redux-staging.pages.dev/
+build:    mr2gafdr-8tyo
+mode:     0  wave:22
+seed:     21cncr5QM6Zr8xjHQW48hGVe
+party:    Litwick(L21 46hp f0), Floragato(L17 51hp f0), Nincada(L11 29hp f0), Sobble(L13 37hp f0), Zorua(L13 33hp f0), Vivillon(L14 48hp f12)
+enemy:    Forretress(L13), Butterfree(L15), Gastrodon(L13)
+
+----- COMMENT -----
+Confusion from Butterfree should be a 100% Confusion chance
+
+----- CONSOLE -----
+[19:49:26.327] LOG: %cStart Phase TurnInitPhase color:green;
+[19:49:26.327] LOG: %cStart Phase CommandPhase color:green;
+[19:49:27.224] LOG: Move: SHADOW_BALL Move targets: {"targets":[2],"multiple":false} 
+Player Pokemon: Litwick
+[19:49:27.226] LOG: %cStart Phase EnemyCommandPhase color:green;
+[19:49:27.229] LOG: Battle Seed: u5RJaO9RbtqrNAKJ
+[19:49:27.231] LOG: Move Pool: ["Mud Bomb","Body Slam","Mud Sport","Recover"]
+[19:49:27.231] LOG: Move Scores: [51,-20,0,0]
+[19:49:27.231] LOG: Sorted Move Pool: ["Mud Bomb","Mud Sport","Recover","Body Slam"]
+[19:49:27.231] LOG: Chosen Move: Mud Bomb
+[19:49:27.231] LOG: %cStart Phase TurnStartPhase color:green;
+[19:49:27.232] LOG: %cStart Phase MovePhase color:green;
+[19:49:27.232] LOG: %cUser: Litwick
+Move: SHADOW_BALL
+Use Mode: NORMAL color:orchid
+[19:49:27.233] LOG: %cStart Phase MessagePhase color:green;
+[19:49:27.341] LOG: %cStart Phase MoveEffectPhase color:green;
+[19:49:28.076] LOG: crit stage: +0
+[19:49:28.077] LOG: Move: Shadow Ball | Base damage: 26.99 | Power: 85 | Source attack: 49 | Target defense: 28
+[19:49:28.078] LOG: Move: Shadow Ball | Attack damage: 36
+[19:49:28.079] LOG: Applied Shell Bell 
+[19:49:28.079] LOG: %cStart Phase DamageAnimPhase color:green;
+[19:49:28.110] LOG: %cStart Phase MoveEndPhase color:green;
+[19:49:28.110] LOG: %cStart Phase MovePhase color:green;
+[19:49:28.110] LOG: %cUser: Gastrodon
+Move: MUD_BOMB
+Use Mode: NORMAL color:orchid
+[19:49:28.112] LOG: %cStart Phase MessagePhase color:green;
+[19:49:28.242] LOG: %cStart Phase MoveEffectPhase color:green;
+[19:49:28.659] LOG: crit stage: +0
+[19:49:28.660] LOG: Move: Mud Bomb | Base damage: 13.093333333333332 | Power: 65 | Source attack: 32 | Target defense: 27
+[19:49:28.661] LOG: Move: Mud Bomb | Attack damage: 35
+[19:49:28.662] LOG: %cStart Phase DamageAnimPhase color:green;
+[19:49:28.695] LOG: %cStart Phase MessagePhase color:green;
+[19:49:28.925] LOG: %cStart Phase MoveEndPhase color:green;
+[19:49:28.926] LOG: %cStart Phase CheckInterludePhase color:green;
+[19:49:28.926] LOG: %cStart Phase WeatherEffectPhase color:green;
+[19:49:28.926] LOG: %cStart Phase PositionalTagPhase color:green;
+[19:49:28.926] LOG: %cStart Phase BerryPhase color:green;
+[19:49:28.932] LOG: Applied Lansat Berry 
+[19:49:28.932] LOG: Applied Apicot Berry 
+[19:49:28.933] LOG: Applied Sitrus Berry 
+[19:49:28.942] LOG: %cStart Phase CommonAnimPhase color:green;
+[19:49:29.268] LOG: %cStart Phase MessagePhase color:green;
+[19:49:29.501] LOG: %cStart Phase StatStageChangePhase color:green;
+[19:49:29.686] LOG: %cStart Phase MessagePhase color:green;
+[19:49:29.900] LOG: %cStart Phase PokemonHealPhase color:green;
+[19:49:30.105] LOG: %cStart Phase MessagePhase color:green;
+[19:49:30.383] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[19:49:30.384] LOG: %cStart Phase TurnEndPhase color:green;
+[19:49:30.385] WARN: [coop:turn] host recorder: finalize with NO open recording -> turn=-1 events=0 (caller decides not to emit)
+[19:49:30.385] LOG: %cStart Phase TurnInitPhase color:green;
+[19:49:30.385] LOG: %cStart Phase CommandPhase color:green;
+[19:49:31.000] LOG: Move: TORCH_SONG Move targets: {"targets":[2],"multiple":false} 
+Player Pokemon: Litwick
+[19:49:31.003] LOG: %cStart Phase EnemyCommandPhase color:green;
+[19:49:31.008] LOG: Battle Seed: u5RJaO9RbtqrNAKJ
+[19:49:31.008] LOG: Move Pool: ["Mud Bomb"]
+[19:49:31.008] LOG: Move Scores: [51]
+[19:49:31.008] LOG: Sorted Move Pool: ["Mud Bomb"]
+[19:49:31.008] LOG: Chosen Move: Mud Bomb
+[19:49:31.008] LOG: %cStart Phase TurnStartPhase color:green;
+[19:49:31.010] LOG: %cStart Phase MovePhase color:green;
+[19:49:31.010] LOG: %cUser: Litwick
+Move: TORCH_SONG
+Use Mode: NORMAL color:orchid
+[19:49:31.011] LOG: %cStart Phase MessagePhase color:green;
+[19:49:31.117] LOG: %cStart Phase MoveEffectPhase color:green;
+[19:49:31.484] WARN: cry/607 not found
+[19:49:32.418] LOG: crit stage: +2
+[19:49:32.419] LOG: Move: Torch Song | Base damage: 25.52 | Power: 80 | Source attack: 49 | Target defense: 28
+[19:49:32.420] LOG: Move: Torch Song | Attack damage: 25
+[19:49:32.422] LOG: Applied Shell Bell 
+[19:49:32.422] LOG: %cStart Phase DamageAnimPhase color:green;
+[19:49:32.452] LOG: %cStart Phase MessagePhase color:green;
+[19:49:32.667] LOG: %cStart Phase MessagePhase color:green;
+[19:49:32.884] LOG: %cStart Phase StatStageChangePhase color:green;
+[19:49:33.071] LOG: %cStart Phase MessagePhase color:green;
+[19:49:33.300] LOG: %cStart Phase PokemonHealPhase color:green;
+[19:49:33.497] LOG: %cStart Phase MessagePhase color:green;
+[19:49:33.775] LOG: %cStart Phase FaintPhase color:green;
+[19:49:35.552] LOG: %cStart Phase MessagePhase color:green;
+[19:49:35.622] LOG: %cStart Phase ShowAbilityPhase color:green;
+[19:49:35.784] LOG: %cStart Phase PokemonHealPhase color:green;
+[19:49:36.004] LOG: %cStart Phase MessagePhase color:green;
+[19:49:36.267] LOG: %cStart Phase HideAbilityPhase color:green;
+[19:49:36.293] LOG: %cStart Phase VictoryPhase color:green;
+[19:49:36.293] LOG: Applied Soothe Bell 
+[19:49:36.293] LOG: %cStart Phase ExpPhase color:green;
+[19:49:36.293] LOG: Applied Super EXP. Charm 
+[19:49:36.293] LOG: Applied EXP. Charm 
+[19:49:36.727] LOG: %cStart Phase LevelUpPhase color:green;
+[19:49:36.729] LOG: %cStart Phase LearnMoveBatchPhase color:green;
+[19:49:43.395] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[19:49:43.395] LOG: Applied Super EXP. Charm 
+[19:49:43.395] LOG: Applied EXP. Charm 
+[19:49:43.396] LOG: %cStart Phase LevelUpPhase color:green;
+[19:49:43.396] LOG: %cStart Phase LearnMoveBatchPhase color:green;
+[19:49:49.751] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[19:49:49.751] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[19:49:49.751] LOG: Applied Super EXP. Charm 
+[19:49:49.751] LOG: Applied EXP. Charm 
+[19:49:49.751] LOG: %cStart Phase LevelUpPhase color:green;
+[19:49:49.752] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[19:49:49.752] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[19:49:49.752] LOG: Applied Super EXP. Charm 
+[19:49:49.752] LOG: Applied EXP. Charm 
+[19:49:49.752] LOG: %cStart Phase LevelUpPhase color:green;
+[19:49:49.752] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[19:49:49.752] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[19:49:49.752] LOG: Applied Super EXP. Charm 
+[19:49:49.753] LOG: Applied EXP. Charm 
+[19:49:49.753] LOG: %cStart Phase LevelUpPhase color:green;
+[19:49:49.753] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[19:49:49.753] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[19:49:49.753] LOG: Applied Super EXP. Charm 
+[19:49:49.753] LOG: Applied EXP. Charm 
+[19:49:49.753] LOG: %cStart Phase LevelUpPhase color:green;
+[19:49:49.754] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[19:49:49.754] LOG: %cStart Phase MoveEndPhase color:green;
+[19:49:49.754] LOG: %cStart Phase MovePhase color:green;
+[19:49:49.754] LOG: %cStart Phase MoveEndPhase color:green;
+[19:49:49.754] LOG: %cStart Phase CheckInterludePhase color:green;
+[19:49:49.754] LOG: %cStart Phase WeatherEffectPhase color:green;
+[19:49:49.754] LOG: %cStart Phase PositionalTagPhase color:green;
+[19:49:49.754] LOG: %cStart Phase BerryPhase color:green;
+[19:49:49.754] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[19:49:49.754] LOG: %cStart Phase TurnEndPhase color:green;
+[19:49:49.754] WARN: [coop:turn] host recorder: finalize with NO open recording -> turn=-1 events=0 (caller decides not to emit)
+[19:49:49.754] LOG: %cStart Phase SwitchSummonPhase color:green;
+[19:49:49.984] LOG: Lonnie
+[19:49:50.202] LOG: %cStart Phase PostSummonPhase color:green;
+[19:49:50.203] LOG: Ran PSP for: Butterfree
+[19:49:50.203] LOG: %cStart Phase PostSummonPhase color:green;
+[19:49:50.203] LOG: %cStart Phase PostSummonPhase color:green;
+[19:49:50.204] LOG: %cStart Phase ShowAbilityPhase color:green;
+[19:49:50.369] LOG: %cStart Phase StatStageChangePhase color:green;
+[19:49:50.554] LOG: %cStart Phase MessagePhase color:green;
+[19:49:50.784] LOG: %cStart Phase HideAbilityPhase color:green;
+[19:49:50.819] LOG: %cStart Phase TurnInitPhase color:green;
+[19:49:50.819] LOG: %cStart Phase CommandPhase color:green;
+[19:49:51.691] LOG: Move: TORCH_SONG Move targets: {"targets":[2],"multiple":false} 
+Player Pokemon: Litwick
+[19:49:51.693] LOG: %cStart Phase EnemyCommandPhase color:green;
+[19:49:51.701] LOG: Battle Seed: u5RJaO9RbtqrNAKJ
+[19:49:51.703] LOG: Move Pool: ["Confusion","Skitter Smack","Sleep Powder","Confide"]
+[19:49:51.703] LOG: Move Scores: [16.5,4.40625,10,2]
+[19:49:51.703] LOG: Sorted Move Pool: ["Confusion","Sleep Powder","Skitter Smack","Confide"]
+[19:49:51.703] LOG: Chosen Move: Sleep Powder
+[19:49:51.703] LOG: %cStart Phase TurnStartPhase color:green;
+[19:49:51.705] LOG: %cStart Phase MovePhase color:green;
+[19:49:51.705] LOG: %cUser: Butterfree
+Move: SLEEP_POWDER
+Use Mode: NORMAL color:orchid
+[19:49:51.706] LOG: %cStart Phase MessagePhase color:green;
+[19:49:51.834] LOG: %cStart Phase MoveEffectPhase color:green;
+[19:49:52.385] LOG: %cStart Phase ObtainStatusEffectPhase color:green;
+[19:49:52.692] LOG: %cStart Phase MessagePhase color:green;
+[19:49:52.925] LOG: %cStart Phase MoveEndPhase color:green;
+[19:49:52.926] LOG: %cStart Phase MovePhase color:green;
+[19:49:52.926] LOG: %cUser: Litwick
+Move: TORCH_SONG
+Use Mode: NORMAL color:orchid
+[19:49:52.930] LOG: %cStart Phase MessagePhase color:green;
+[19:49:53.137] LOG: %cStart Phase CommonAnimPhase color:green;
+[19:49:53.409] LOG: %cStart Phase MoveEndPhase color:green;
+[19:49:53.409] LOG: %cStart Phase CheckInterludePhase color:green;
+[19:49:53.409] LOG: %cStart Phase WeatherEffectPhase color:green;
+[19:49:53.409] LOG: %cStart Phase PositionalTagPhase color:green;
+[19:49:53.409] LOG: %cStart Phase BerryPhase color:green;
+[19:49:53.411] LOG: Applied Lum Berry 
+[19:49:53.424] LOG: %cStart Phase CommonAnimPhase color:green;
+[19:49:53.725] LOG: %cStart Phase MessagePhase color:green;
+[19:49:53.942] LOG: %cStart Phase ResetStatusPhase color:green;
+[19:49:53.943] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[19:49:53.945] LOG: %cStart Phase TurnEndPhase color:green;
+[19:49:53.946] WARN: [coop:turn] host recorder: finalize with NO open recording -> turn=-1 events=0 (caller decides not to emit)
+[19:49:53.946] LOG: %cStart Phase TurnInitPhase color:green;
+[19:49:53.946] LOG: %cStart Phase CommandPhase color:green;
+[19:49:54.314] LOG: Move: TORCH_SONG Move targets: {"targets":[2],"multiple":false} 
+Player Pokemon: Litwick
+[19:49:54.316] LOG: %cStart Phase EnemyCommandPhase color:green;
+[19:49:54.322] LOG: Battle Seed: u5RJaO9RbtqrNAKJ
+[19:49:54.324] LOG: Move Pool: ["Confusion","Skitter Smack","Sleep Powder","Confide"]
+[19:49:54.324] LOG: Move Scores: [16.5,4.40625,10,2]
+[19:49:54.324] LOG: Sorted Move Pool: ["Confusion","Sleep Powder","Skitter Smack","Confide"]
+[19:49:54.324] LOG: Chosen Move: Confusion
+[19:49:54.324] LOG: %cStart Phase TurnStartPhase color:green;
+[19:49:54.325] LOG: %cStart Phase MovePhase color:green;
+[19:49:54.325] LOG: %cUser: Butterfree
+Move: CONFUSION
+Use Mode: NORMAL color:orchid
+[19:49:54.327] LOG: %cStart Phase MessagePhase color:green;
+[19:49:54.433] LOG: %cStart Phase MoveEffectPhase color:green;
+[19:49:55.102] LOG: crit stage: +0
+[19:49:55.104] LOG: Move: Confusion | Base damage: 12.666666666666668 | Power: 50 | Source attack: 60 | Target defense: 45
+[19:49:55.106] LOG: Move: Confusion | Attack damage: 17
+[19:49:55.107] LOG: %cStart Phase DamageAnimPhase color:green;
+[19:49:55.135] LOG: %cStart Phase MoveEndPhase color:green;
+[19:49:55.135] LOG: %cStart Phase MovePhase color:green;
+[19:49:55.135] LOG: %cUser: Litwick
+Move: TORCH_SONG
+Use Mode: NORMAL color:orchid
+[19:49:55.137] LOG: %cStart Phase MessagePhase color:green;
+[19:49:55.250] LOG: %cStart Phase MoveEffectPhase color:green;
+[19:49:55.617] WARN: cry/607 not found
+[19:49:56.552] LOG: crit stage: +2
+[19:49:56.553] LOG: Move: Torch Song | Base damage: 33.550270270270275 | Power: 80 | Source attack: 76 | Target defense: 37
+[19:49:56.554] LOG: Move: Torch Song | Attack damage: 90
+[19:49:56.555] LOG: Applied Shell Bell 
+[19:49:56.555] LOG: %cStart Phase DamageAnimPhase color:green;
+[19:49:56.585] LOG: %cStart Phase MessagePhase color:green;
+[19:49:56.801] LOG: %cStart Phase StatStageChangePhase color:green;
+[19:49:56.996] LOG: %cStart Phase MessagePhase color:green;
+[19:49:57.209] LOG: %cStart Phase PokemonHealPhase color:green;
+[19:49:57.412] LOG: %cStart Phase MessagePhase color:green;
+[19:49:57.692] LOG: %cStart Phase FaintPhase color:green;
+[19:49:58.593] LOG: %cStart Phase MessagePhase color:green;
+[19:49:58.832] LOG: %cStart Phase ShowAbilityPhase color:green;
+[19:49:59.002] LOG: %cStart Phase PokemonHealPhase color:green;
+[19:49:59.239] LOG: %cStart Phase MessagePhase color:green;
+[19:49:59.484] LOG: %cStart Phase HideAbilityPhase color:green;
+[19:49:59.518] LOG: %cStart Phase VictoryPhase color:green;
+[19:49:59.519] LOG: Applied Soothe Bell 
+[19:49:59.521] LOG: %cStart Phase ExpPhase color:green;
+[19:49:59.521] LOG: Applied Super EXP. Charm 
+[19:49:59.521] LOG: Applied EXP. Charm 
+[19:50:00.202] LOG: %cStart Phase LevelUpPhase color:green;
+[19:50:00.203] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[19:50:00.204] LOG: Applied Super EXP. Charm 
+[19:50:00.204] LOG: Applied EXP. Charm 
+[19:50:00.204] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[19:50:00.204] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[19:50:00.204] LOG: Applied Super EXP. Charm 
+[19:50:00.204] LOG: Applied EXP. Charm 
+[19:50:00.205] LOG: %cStart Phase LevelUpPhase color:green;
+[19:50:00.206] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[19:50:00.206] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[19:50:00.206] LOG: Applied Super EXP. Charm 
+[19:50:00.206] LOG: Applied EXP. Charm 
+[19:50:00.206] LOG: %cStart Phase LevelUpPhase color:green;
+[19:50:00.207] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[19:50:00.207] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[19:50:00.207] LOG: Applied Super EXP. Charm 
+[19:50:00.207] LOG: Applied EXP. Charm 
+[19:50:00.207] LOG: %cStart Phase LevelUpPhase color:green;
+[19:50:00.208] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[19:50:00.208] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[19:50:00.208] LOG: Applied Super EXP. Charm 
+[19:50:00.208] LOG: Applied EXP. Charm 
+[19:50:00.208] LOG: %cStart Phase LevelUpPhase color:green;
+[19:50:00.209] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[19:50:00.209] LOG: %cStart Phase MoveEndPhase color:green;
+[19:50:00.209] LOG: %cStart Phase CheckInterludePhase color:green;
+[19:50:00.209] LOG: %cStart Phase WeatherEffectPhase color:green;
+[19:50:00.209] LOG: %cStart Phase PositionalTagPhase color:green;
+[19:50:00.209] LOG: %cStart Phase BerryPhase color:green;
+[19:50:00.209] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[19:50:00.209] LOG: %cStart Phase TurnEndPhase color:green;
+[19:50:00.210] WARN: [coop:turn] host recorder: finalize with NO open recording -> turn=-1 events=0 (caller decides not to emit)
+[19:50:00.210] LOG: %cStart Phase SwitchSummonPhase color:green;
+[19:50:00.450] LOG: Lonnie
+[19:50:00.651] LOG: %cStart Phase PostSummonPhase color:green;
+[19:50:00.651] LOG: Ran PSP for: Forretress
+[19:50:00.651] LOG: %cStart Phase PostSummonPhase color:green;
+[19:50:00.651] LOG: %cStart Phase PostSummonPhase color:green;
+[19:50:00.652] LOG: %cStart Phase TurnInitPhase color:green;
+[19:50:00.652] LOG: %cStart Phase CommandPhase color:green;
