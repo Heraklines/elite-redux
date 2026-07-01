@@ -44,7 +44,6 @@ import { ErSpeciesId } from "#enums/er-species-id";
 import { SpeciesId } from "#enums/species-id";
 import { type Achv, achvs, RewardAchv } from "#system/achv";
 import { VoucherType } from "#system/voucher";
-import { randSeedItem } from "#utils/common";
 
 /** Per-difficulty multiplier applied to candy-to-team payouts (skill scaling). */
 const REWARD_DIFFICULTY_CANDY_MULT: Record<string, number> = {
@@ -637,7 +636,12 @@ function resolveSpecies(species: SpeciesId | "random"): SpeciesId {
     return species;
   }
   const pool = Object.keys(speciesStarterCosts).map(Number) as SpeciesId[];
-  return randSeedItem(pool);
+  // Use an UNSEEDED pick, NOT randSeedItem: an achievement unlocks with the battle RNG at a
+  // fixed / reset state that is identical across players, so the seeded pick handed EVERY player
+  // the same species (Scorbunny). A reward roll is cosmetic and needs no reproducibility, so
+  // Math.random gives each unlock a genuinely random black shiny (same idiom as the random-starter
+  // pick in starter-select).
+  return pool[Math.floor(Math.random() * pool.length)];
 }
 
 /**
