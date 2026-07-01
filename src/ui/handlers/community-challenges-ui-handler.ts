@@ -458,7 +458,10 @@ export class CommunityChallengesUiHandler extends UiHandler {
     // Two columns: RULES (the active base challenges) | ALLOWED POKEMON. Tags +
     // the RESTRICTIONS column were removed (redundant - restrictions are just more
     // base-challenge rules), giving the rules + the allowed icon grid more room.
-    const colY = DETAIL_Y + 30;
+    // Start the RULES / ALLOWED POKEMON columns just below the description's
+    // actual rendered height, so a taller (up to 3-line) description never
+    // overlaps them.
+    const colY = Math.ceil(desc.y + desc.displayHeight + 3);
     this.buildColumnHeader(CONTENT_X + 6, colY, "RULES");
     e.rules.slice(0, 6).forEach((r, i) => {
       const t = addTextObject(CONTENT_X + 6, colY + 8 + i * 7, `- ${r.text}`, TextStyle.WINDOW, { fontSize: "22px" });
