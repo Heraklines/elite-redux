@@ -69,6 +69,8 @@ export abstract class BattleInfo extends Phaser.GameObjects.Container {
   protected boss: boolean;
   protected bossSegments: number;
   protected offset: boolean;
+  /** The triple+ base y-shift currently applied (so `applyTripleThin` stays idempotent). */
+  private appliedTripleShift = 0;
   /** Which field SLOT this bar is stacked for (0 = anchor). Drives 3+-bar stacking. */
   protected slotOffset = 0;
   protected lastName: string | null;
@@ -482,6 +484,20 @@ export abstract class BattleInfo extends Phaser.GameObjects.Container {
     this.y += newDy - oldDy;
     this.baseY = this.y;
     this.slotOffset = slot;
+  }
+
+  /**
+   * Triple+ only: thin the stacked bars (a smaller scale) and nudge the side's whole stack
+   * off the sprites - the player's DOWN (it sits over the field), the enemy's UP (toward the
+   * top edge). Idempotent: re-applying with the same capacity is a no-op, and capacity<3
+   * restores full size / zero shift, so single/double are unaffected.
+   */
+  applyTripleThin(capacity: number, isPlayer: boolean): void {
+    const shift = capacity >= 3 ? (isPlayer ? 12 : -6) : 0;
+    this.y += shift - this.appliedTripleShift;
+    this.baseY = this.y;
+    this.appliedTripleShift = shift;
+    this.setScale(capacity >= 3 ? 0.78 : 1);
   }
 
   //#region Update methods and helpers

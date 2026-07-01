@@ -8,9 +8,9 @@
 // in normal CI. Locks the two invariants the whole migration depends on:
 //   (1) single/double reproduce TODAY's exact flat indices (enemy base == 2), and
 //       in binary every pair is mutually adjacent (targeting identical to legacy).
-//   (2) triple positional adjacency is mainline-correct: the center reaches all 3
-//       foes; a wing reaches the opposed foe + center but NOT the far diagonal;
-//       allied wings are not adjacent to each other.
+//   (2) triple positional adjacency is a non-mirrored face-off: the center reaches
+//       all 3 foes; a wing reaches the foe IN FRONT of it + center but NOT the far
+//       diagonal; allied wings are not adjacent to each other.
 
 import {
   createArrangement,
@@ -101,16 +101,16 @@ describe("battle-format: triple positional adjacency (mainline rule)", () => {
     expect(adj(a, 1, 5)).toBe(true);
   });
 
-  it("player-left (0) reaches the opposed foe + center, NOT the far diagonal (enemy-left @3)", () => {
-    expect(adj(a, 0, 3)).toBe(false); // far diagonal - unreachable
+  it("player-left (0) reaches the foe IN FRONT (enemy-left @3) + center, NOT the far diagonal (@5)", () => {
+    expect(adj(a, 0, 3)).toBe(true); // enemy-left - the foe directly in front (non-mirrored face-off)
     expect(adj(a, 0, 4)).toBe(true); // enemy center
-    expect(adj(a, 0, 5)).toBe(true); // directly opposed
+    expect(adj(a, 0, 5)).toBe(false); // far diagonal - unreachable
   });
 
-  it("player-right (2) reaches the opposed foe + center, NOT the far diagonal (enemy-right @5)", () => {
-    expect(adj(a, 2, 5)).toBe(false); // far diagonal - unreachable
+  it("player-right (2) reaches the foe IN FRONT (enemy-right @5) + center, NOT the far diagonal (@3)", () => {
+    expect(adj(a, 2, 5)).toBe(true); // enemy-right - the foe directly in front
     expect(adj(a, 2, 4)).toBe(true);
-    expect(adj(a, 2, 3)).toBe(true);
+    expect(adj(a, 2, 3)).toBe(false); // far diagonal - unreachable
   });
 
   it("enemy center (4) reaches all three player mons", () => {

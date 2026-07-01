@@ -208,7 +208,13 @@ export function createArrangement(format: BattleFormat): BattleArrangement {
 function makeFormat(id: string, playerCap: number, enemyCap: number, enemyBase: number): BattleFormat {
   const sides: BattleSideSpec[] = [
     { kind: SideKind.PLAYER, capacity: playerCap, baseIndex: 0, mirrored: false },
-    { kind: SideKind.ENEMY, capacity: enemyCap, baseIndex: enemyBase, mirrored: true },
+    // Enemy is NON-mirrored so the adjacency matches the (non-mirrored) sprite layout: each
+    // side's LEFT/CENTER/RIGHT line up as a direct face-off. A wing then reaches the foe on
+    // its OWN side (the one "in front") plus the centre, not the far diagonal. (A mirrored
+    // enemy made a wing reach the OPPOSITE wing, which read as targeting the wrong two foes.)
+    // Adjacency only matters at capacity>=3; single/double have everyone mutually adjacent
+    // either way, so this stays byte-identical there.
+    { kind: SideKind.ENEMY, capacity: enemyCap, baseIndex: enemyBase, mirrored: false },
   ];
   return { id, sides, localPlayerSide: 0, adjacency: lineAdjacency(sides) };
 }
@@ -281,11 +287,11 @@ export function barSlotOffset(slot: number, playerSide: boolean, capacity = 2): 
   if (capacity >= 3) {
     // Triple+: a side's info bars stack AWAY from the screen edge they anchor to, so all
     // three stay on-screen. The PLAYER's bars are anchored at the bottom, so they step UP
-    // (into the field); the ENEMY's are anchored at the top, so they step DOWN. A tighter
-    // vertical step (22 vs the binary 27) keeps three compact bars within the band. Slot 1
-    // no longer matches the binary double offset here, but that only applies at capacity>=3
-    // - single/double are untouched below.
-    return [dx * slot, (playerSide ? -22 : 22) * slot];
+    // (into the field); the ENEMY's are anchored at the top, so they step DOWN. A tight
+    // 16px step (paired with the triple thin-scale in BattleInfo) keeps three compact bars
+    // within the band without reaching into the sprites. Slot 1 no longer matches the binary
+    // double offset here, but that only applies at capacity>=3 - single/double are untouched.
+    return [dx * slot, (playerSide ? -16 : 16) * slot];
   }
   // Single/double: the legacy diagonal down-step (byte-identical).
   return [dx * slot, 27 * slot];

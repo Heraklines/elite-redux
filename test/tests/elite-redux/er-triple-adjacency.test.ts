@@ -11,9 +11,9 @@
 // classes hit the whole field regardless of position: FLYING-type moves and
 // PULSE moves. Spread NEAR moves are likewise limited to the adjacent foes.
 //
-// Player slots 0(L)/1(C)/2(R) -> flat 0/1/2; enemy 0/1/2 -> flat 3/4/5. By the
-// mirrored line topology, player-left (0) reaches enemy centre(4) + opposed(5)
-// but NOT enemy-left(3). ER_SCENARIO=1.
+// Player slots 0(L)/1(C)/2(R) -> flat 0/1/2; enemy 0/1/2 -> flat 3/4/5. The rows
+// are a direct (non-mirrored) face-off, so player-left (0) reaches the foe IN FRONT
+// of it, enemy-left(3), + the centre(4), but NOT the far enemy-right(5). ER_SCENARIO=1.
 // =============================================================================
 
 import { globalScene } from "#app/global-scene";
@@ -64,12 +64,12 @@ describe.skipIf(!RUN)("ER triple battles - positional adjacency in move targetin
     const enemies = globalScene.getEnemyField();
     expect(enemies.map(e => e.getBattlerIndex())).toEqual([3, 4, 5]);
 
-    // (1) Wing single-target (Tackle = NEAR_OTHER, Normal): reaches enemy centre(4) +
-    // opposed(5) but NOT the far enemy-left(3).
+    // (1) Wing single-target (Tackle = NEAR_OTHER, Normal): reaches the foe IN FRONT,
+    // enemy-left(3), + centre(4) but NOT the far enemy-right(5).
     const wingTackle = getMoveTargets(wing, MoveId.TACKLE).targets;
+    expect(wingTackle).toContain(3);
     expect(wingTackle).toContain(4);
-    expect(wingTackle).toContain(5);
-    expect(wingTackle).not.toContain(3);
+    expect(wingTackle).not.toContain(5);
 
     // (2) Centre single-target: reaches ALL three foes.
     const centreTackle = getMoveTargets(centre, MoveId.TACKLE).targets;
@@ -84,12 +84,12 @@ describe.skipIf(!RUN)("ER triple battles - positional adjacency in move targetin
     expect(wingGust).toContain(5);
 
     // (4) Wing SPREAD move (Rock Slide = ALL_NEAR_ENEMIES, Rock) is limited to adjacent
-    // foes - it hits the centre + opposed, NOT the far diagonal.
+    // foes - it hits the foe in front(3) + centre(4), NOT the far diagonal(5).
     const wingRockSlide = getMoveTargets(wing, MoveId.ROCK_SLIDE);
     expect(wingRockSlide.multiple).toBe(true);
+    expect(wingRockSlide.targets).toContain(3);
     expect(wingRockSlide.targets).toContain(4);
-    expect(wingRockSlide.targets).toContain(5);
-    expect(wingRockSlide.targets).not.toContain(3);
+    expect(wingRockSlide.targets).not.toContain(5);
 
     // (5) Centre SPREAD move hits all three foes.
     const centreRockSlide = getMoveTargets(centre, MoveId.ROCK_SLIDE).targets;

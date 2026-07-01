@@ -1675,6 +1675,8 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
       // also making a triple's CENTRE mon mini (the bug: its bar was full-size + overlapping).
       this.battleInfo.setMini(!(this.isPlayer() && sideCapacity === 1));
       this.battleInfo.setSlotOffset(this.getFieldIndex(), sideCapacity);
+      // Triple+: thin the stacked bars and shift them off the sprites (player down, enemy up).
+      this.battleInfo.applyTripleThin(sideCapacity, this.isPlayer());
 
       if (fieldPosition === this.fieldPosition) {
         resolve();
