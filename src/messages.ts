@@ -15,7 +15,11 @@ export function getPokemonNameWithAffix(pokemon: Pokemon | undefined, useIllusio
     return "MissingNo.";
   }
 
-  const pokemonName = pokemon.getNameToRender({ useIllusion });
+  // Defensive: a mon whose display name resolves EMPTY (e.g. an ER form / save state whose
+  // `name` never got set) must never render a blank prompt like "Will you switch ?". Fall back
+  // to the species name so a message always shows something. No-op for a normal mon (its name
+  // is its species name), so binary/normal behaviour is unchanged.
+  const pokemonName = pokemon.getNameToRender({ useIllusion }) || pokemon.species.getName();
   if (!pokemon.isEnemy()) {
     return pokemonName;
   }
