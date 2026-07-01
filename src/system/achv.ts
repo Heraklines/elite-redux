@@ -519,6 +519,12 @@ export function getAchievementDescription(localizationKey: string): string {
     case "realisticFlashIsBoring":
     case "endTheLegend":
     case "squatter":
+    // ER Elemental Apex mono-type achievements (their .description keys exist in
+    // achv.json; without a case here they hit the default and render blank).
+    case "scorchedEarth":
+    case "absoluteZero":
+    case "endlessNight":
+    case "tempest":
       return i18next.t(`achv:${localizationKey}.description`, { context: genderStr });
     case "relicHunter":
       return i18next.t("achv:relicHunter.description", { context: genderStr });

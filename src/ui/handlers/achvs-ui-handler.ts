@@ -456,6 +456,7 @@ export class AchvsUiHandler extends MessageUiHandler {
         : `${rewardLabel}: ${i18next.t("achv:ui.pointsOnly")}`,
     );
     this.message.setText(achv.description);
+    this.positionRequirementBelowReward();
   }
 
   private showVoucher(voucher: Voucher): void {
@@ -469,6 +470,18 @@ export class AchvsUiHandler extends MessageUiHandler {
     this.detailMeta.setColor(TEXT_LIGHT);
     this.detailReward.setText("");
     this.message.setText(voucher.description);
+    this.positionRequirementBelowReward();
+  }
+
+  /**
+   * Keep the requirement/description text just below the reward line(s). A long ER
+   * reward can wrap to two lines; pinning the description to a fixed Y let the
+   * second reward line overlap it. `detailReward.y` is the reward's top; 14 is the
+   * original one-line step (detailTop+18 reward -> detailTop+32 description).
+   */
+  private positionRequirementBelowReward(): void {
+    const rewardLines = Math.max(1, this.detailReward.getWrappedText(this.detailReward.text).length);
+    this.message.setY(this.detailReward.y + 14 * rewardLines);
   }
   // #endregion Rendering
 
