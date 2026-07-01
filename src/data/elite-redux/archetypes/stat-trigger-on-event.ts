@@ -61,6 +61,7 @@
 // =============================================================================
 
 import {
+  PostAllyStatStageChangeAbAttr,
   PostDefendAbAttr,
   PostKnockOutAbAttr,
   type PostKnockOutAbAttrParams,
@@ -124,6 +125,20 @@ export interface StatTriggerOnHitPayload extends StatTriggerPayload {
   readonly filter?: OnHitFilter;
 }
 
+/** {@linkcode StatTriggerOnStatLoweredAbAttr} payload — adds the trigger scope. */
+export interface StatTriggerOnStatLoweredPayload extends StatTriggerPayload {
+  /**
+   * `"self"` (default): fire ONCE when the HOLDER's own stat is lowered by a
+   * foreign source — the Defiant / Narcissist shape.
+   *
+   * `"side"`: fire ONCE PER STAT LOWERED, on drops inflicted on the holder AND
+   * on its ally. This is the King's Wrath / Queen's Mourning shape ("Lowering
+   * any stats on its side raises ..."); the ally half is delivered by
+   * {@linkcode StatTriggerOnAllyStatLoweredAbAttr}, wired alongside it.
+   */
+  readonly scope?: "self" | "side";
+}
+
 /** Discriminator enum for the four trigger surfaces this archetype supports. */
 export type StatTriggerEvent = "on-ko" | "on-hit" | "on-entry" | "on-stat-lowered";
 
@@ -150,9 +165,12 @@ function validateStatChanges(label: string, stats: readonly StatChange[]): void 
  * @param params - The standard ability-apply params (we need the subject's
  *   {@linkcode AbAttrBaseParams.pokemon} and {@linkcode AbAttrBaseParams.simulated}).
  * @param stats - The configured stat changes.
+ * @param multiplier - Repeats each configured delta this many times (used by the
+ *   side-scoped stat-lowered trigger to apply the boost ONCE PER STAT LOWERED).
+ *   Defaults to `1` (apply each configured delta once).
  */
-function applyStatChanges(params: AbAttrBaseParams, stats: readonly StatChange[]): void {
-  if (params.simulated) {
+function applyStatChanges(params: AbAttrBaseParams, stats: readonly StatChange[], multiplier = 1): void {
+  if (params.simulated || multiplier <= 0) {
     return;
   }
   for (const change of stats) {
@@ -161,7 +179,7 @@ function applyStatChanges(params: AbAttrBaseParams, stats: readonly StatChange[]
       params.pokemon.getBattlerIndex(),
       true,
       [change.stat],
-      change.stages,
+      change.stages * multiplier,
     );
   }
 }
@@ -349,11 +367,13 @@ export class StatTriggerOnEntryAbAttr extends PostSummonAbAttr implements StatTr
 export class StatTriggerOnStatLoweredAbAttr extends PostStatStageChangeAbAttr implements StatTriggerOnEventAbAttr {
   public readonly event: StatTriggerEvent = "on-stat-lowered";
   private readonly stats: readonly StatChange[];
+  private readonly scope: "self" | "side";
 
-  constructor(payload: StatTriggerPayload) {
+  constructor(payload: StatTriggerOnStatLoweredPayload) {
     super();
     validateStatChanges("StatTriggerOnStatLoweredAbAttr", payload.stats);
     this.stats = payload.stats;
+    this.scope = payload.scope ?? "self";
   }
 
   public getStatChanges(): readonly StatChange[] {
@@ -367,6 +387,48 @@ export class StatTriggerOnStatLoweredAbAttr extends PostStatStageChangeAbAttr im
   }
 
   public override apply(params: PostStatStageChangeAbAttrParams): void {
-    applyStatChanges(params, this.stats);
+    // "side" scope (King's Wrath / Queen's Mourning) raises the holder ONCE PER
+    // STAT LOWERED; "self" scope (Defiant/Narcissist) fires once per event.
+    const multiplier = this.scope === "side" ? params.stats.length : 1;
+    applyStatChanges(params, this.stats, multiplier);
+  }
+}
+
+/**
+ * Ally-side companion to {@linkcode StatTriggerOnStatLoweredAbAttr} for the
+ * `"side"`-scoped abilities (King's Wrath / Queen's Mourning) — fires on the
+ * HOLDER when its ALLY's stat is lowered by a foreign source, raising the
+ * holder ONCE PER STAT LOWERED. `params.pokemon` is the holder (the notified
+ * observer); `params.stats` are the stats lowered on its ally. The self half
+ * (drops on the holder itself) is handled by
+ * {@linkcode StatTriggerOnStatLoweredAbAttr}; wiring both together gives the
+ * full "any stats on its side" behavior with no double counting (the two attrs
+ * react to disjoint dispatch surfaces).
+ */
+export class StatTriggerOnAllyStatLoweredAbAttr
+  extends PostAllyStatStageChangeAbAttr
+  implements StatTriggerOnEventAbAttr
+{
+  public readonly event: StatTriggerEvent = "on-stat-lowered";
+  private readonly stats: readonly StatChange[];
+
+  constructor(payload: StatTriggerPayload) {
+    super();
+    validateStatChanges("StatTriggerOnAllyStatLoweredAbAttr", payload.stats);
+    this.stats = payload.stats;
+  }
+
+  public getStatChanges(): readonly StatChange[] {
+    return this.stats;
+  }
+
+  public override canApply(params: PostStatStageChangeAbAttrParams): boolean {
+    // Fire only when the ally's change was a drop from a foreign source (not the
+    // ally's own self-targeting move — "does not activate from self drops").
+    return params.stages < 0 && !params.selfTarget;
+  }
+
+  public override apply(params: PostStatStageChangeAbAttrParams): void {
+    applyStatChanges(params, this.stats, params.stats.length);
   }
 }

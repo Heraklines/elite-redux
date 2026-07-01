@@ -268,6 +268,22 @@ export class StatStageChangePhase extends PokemonPhase {
         selfTarget: this.selfTarget,
       });
 
+      // ER: side-scoped stat-lowered observers (King's Wrath / Queen's Mourning
+      // — "lowering any stats on its side raises ...") also react to an ALLY's
+      // stat change. `getAllies()` excludes the subject itself (unlike
+      // `getAlliesGenerator()`, which is the whole side), so the subject's own
+      // drop does NOT double-count here. Dispatched via a DISTINCT attr so no
+      // vanilla PostStatStageChange subclass (Defiant/Competitive, etc.) wrongly
+      // fires from a partner's drop — those only implement `PostStatStageChangeAbAttr`.
+      for (const ally of pokemon.getAllies()) {
+        applyAbAttrs("PostAllyStatStageChangeAbAttr", {
+          pokemon: ally,
+          stats: filteredStats,
+          stages: this.stages,
+          selfTarget: this.selfTarget,
+        });
+      }
+
       // Look for any other stat change phases; if this is the last one, do White Herb check
       if (!globalScene.phaseManager.hasPhaseOfType("StatStageChangePhase", p => p.battlerIndex === this.battlerIndex)) {
         // Apply White Herb if needed

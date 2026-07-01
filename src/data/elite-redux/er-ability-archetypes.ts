@@ -211,8 +211,8 @@ export const ER_ABILITY_ARCHETYPES: Readonly<Record<number, ErAbilityArchetypeEn
   406: { erAbilityId: 406, archetype: "bespoke", params: null },
   407: { erAbilityId: 407, archetype: "bespoke", params: null },
   408: { erAbilityId: 408, archetype: "bespoke", params: null }, // Fearmonger: Intimidate+Scare on entry (ATK+SpAtk -1 to foes) AND 10% fear on contact (composite — see dispatchBespoke)
-  409: { erAbilityId: 409, archetype: "stat-trigger-on-event", params: {"trigger":"on-stat-lowered","stats":[{"stat":"ATK","stages":1},{"stat":"DEF","stages":1}]} },
-  410: { erAbilityId: 410, archetype: "stat-trigger-on-event", params: {"trigger":"on-stat-lowered","stats":[{"stat":"SPATK","stages":1},{"stat":"SPDEF","stages":1}]} },
+  409: { erAbilityId: 409, archetype: "stat-trigger-on-event", params: {"trigger":"on-stat-lowered","scope":"side","stats":[{"stat":"ATK","stages":1},{"stat":"DEF","stages":1}]} }, // King's Wrath: "Lowering any stats on its side raises Atk and Def" (holder + ally, once per stat)
+  410: { erAbilityId: 410, archetype: "stat-trigger-on-event", params: {"trigger":"on-stat-lowered","scope":"side","stats":[{"stat":"SPATK","stages":1},{"stat":"SPDEF","stages":1}]} }, // Queen's Mourning: "Lowering any stats on its side raises SpAtk and SpDef" (holder + ally, once per stat)
   411: { erAbilityId: 411, archetype: "bespoke", params: null },
   412: { erAbilityId: 412, archetype: "bespoke", params: null },
   413: { erAbilityId: 413, archetype: "type-conversion", params: {"sourceType":"NORMAL","targetType":"DRAGON","multiplier":1.2} },

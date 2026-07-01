@@ -1344,6 +1344,27 @@ export class PostStatStageChangeAbAttr extends AbAttr {
   override apply(_params: Closed<PostStatStageChangeAbAttrParams>) {}
 }
 
+/**
+ * Fires on a Pokemon whose ALLY had a stat stage changed — the ally-side
+ * companion to {@linkcode PostStatStageChangeAbAttr} (which only ever fires on
+ * the subject of the change itself). `pokemon` here is the OBSERVER being
+ * notified (its ally is the subject); `stats` / `stages` / `selfTarget`
+ * describe the change that happened to that ally.
+ *
+ * Dispatched from `StatStageChangePhase` to each ally of the subject. Only ER
+ * side-scoped stat-lowered abilities (King's Wrath / Queen's Mourning) react to
+ * it; no vanilla ability implements it, so existing behavior is unchanged.
+ */
+export class PostAllyStatStageChangeAbAttr extends AbAttr {
+  private declare readonly _: never;
+
+  override canApply(_params: Closed<PostStatStageChangeAbAttrParams>) {
+    return true;
+  }
+
+  override apply(_params: Closed<PostStatStageChangeAbAttrParams>) {}
+}
+
 export class PostStatStageChangeStatStageChangeAbAttr extends PostStatStageChangeAbAttr {
   private readonly condition: PokemonStatStageChangeCondition;
   private readonly statsToChange: readonly BattleStat[];
@@ -6787,6 +6808,7 @@ export const AbilityAttrs = Object.freeze({
   NoTransformAbilityAbAttr,
   NonSuperEffectiveImmunityAbAttr,
   PokemonTypeChangeAbAttr,
+  PostAllyStatStageChangeAbAttr,
   PostAttackAbAttr,
   PostAttackApplyBattlerTagAbAttr,
   PostAttackApplyStatusEffectAbAttr,

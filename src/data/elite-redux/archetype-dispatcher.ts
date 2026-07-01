@@ -270,6 +270,7 @@ import {
 } from "#data/elite-redux/archetypes/stat-multiplier-per-faint";
 import {
   type StatChange,
+  StatTriggerOnAllyStatLoweredAbAttr,
   StatTriggerOnEntryAbAttr,
   StatTriggerOnHitAbAttr,
   StatTriggerOnKoAbAttr,
@@ -1084,8 +1085,19 @@ function dispatchStatTriggerOnEvent(params: Record<string, unknown>): DispatchRe
       return ok([new StatTriggerOnHitAbAttr({ stats, filter: parseOnHitFilter(params.filter) ?? undefined })]);
     case "on-entry":
       return ok([new StatTriggerOnEntryAbAttr({ stats })]);
-    case "on-stat-lowered":
-      return ok([new StatTriggerOnStatLoweredAbAttr({ stats })]);
+    case "on-stat-lowered": {
+      // `scope: "side"` (King's Wrath 409 / Queen's Mourning 410) fires ONCE
+      // PER STAT LOWERED on the holder AND its ally; the ally half needs the
+      // companion attr. Default `"self"` keeps the Defiant/Narcissist shape.
+      const scope = params.scope === "side" ? "side" : "self";
+      if (scope === "side") {
+        return ok([
+          new StatTriggerOnStatLoweredAbAttr({ stats, scope }),
+          new StatTriggerOnAllyStatLoweredAbAttr({ stats }),
+        ]);
+      }
+      return ok([new StatTriggerOnStatLoweredAbAttr({ stats, scope })]);
+    }
     // The classifier emits `first-turn` for some abilities; the archetype
     // doesn't have a `StatTriggerOnFirstTurnAbAttr` yet. Skip.
     case "first-turn":
