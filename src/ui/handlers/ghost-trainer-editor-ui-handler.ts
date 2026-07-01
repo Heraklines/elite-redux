@@ -150,6 +150,7 @@ const CANDIDATE_CLASSES: TrainerType[] = [
   TrainerType.WAITER,
   TrainerType.WORKER,
   TrainerType.YOUNGSTER,
+  TrainerType.PRIVATE_EYE,
 ];
 
 type TextField = "displayName" | "title" | "intro" | "defeatPlayer" | "defeated";

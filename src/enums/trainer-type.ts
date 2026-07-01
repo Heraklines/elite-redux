@@ -153,6 +153,9 @@ export enum TrainerType {
   EXPERT_POKEMON_BREEDER,
   PLAYER_M_ALTERNATE,
   PLAYER_F_ALTERNATE,
+  // ER Ghost Trainer Editor: cosmetic-only ghost trainer class (sprite atlas key "private_eye").
+  // Appended at the tail of the auto-incremented block so no existing trainer id shifts.
+  PRIVATE_EYE,
   // #endregion
 
   // #region Gym Leaders

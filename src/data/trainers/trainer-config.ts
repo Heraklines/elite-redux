@@ -6785,4 +6785,9 @@ export const trainerConfigs: TrainerConfigs = {
     .setVictoryBgm("mystery_encounter_weird_dream")
     .setLocalizedName("Alternate Player  F")
     .setPartyTemplates(new TrainerPartyTemplate(6, PartyMemberStrength.STRONG)),
+  // ER Ghost Trainer Editor: cosmetic, genderless ghost trainer class. getKey/getSpriteKey
+  // lowercase the enum name, so the sprite resolves to the "private_eye" er-assets atlas.
+  // No party pool - a ghost's team always comes from the uploader's run snapshot; this class
+  // contributes only the sprite + name (default name "Private Eye" via toTitleCase).
+  [TrainerType.PRIVATE_EYE]: new TrainerConfig(++t).setEncounterBgm(TrainerType.ACE_TRAINER),
 };

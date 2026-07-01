@@ -1905,6 +1905,7 @@ export class BattleScene extends SceneBase {
       TrainerType.CYCLIST,
       TrainerType.MUSICIAN,
       TrainerType.BIKER,
+      TrainerType.PRIVATE_EYE,
     ];
     let idHash = 0;
     for (let i = 0; i < ghost.id.length; i++) {
