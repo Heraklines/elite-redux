@@ -1087,14 +1087,27 @@ const ABILITY_PATCHERS: ReadonlyMap<AbilityId, (ability: MutableAbility) => void
 
   // ===== Round 54 — ER deltas vs vanilla pokerogue (audit-found) =====
   // 74 PURE_POWER: vanilla doubles ATK. ER spec says SP.ATK instead.
-  // We strip the vanilla ATK ×2 attr and add SPATK ×2.
+  // We strip the vanilla ATK ×2 attr and add SPATK ×2. The vanilla ability also
+  // carries an AI moveset-gen/scoring hint that doubles a move's effective power
+  // for PHYSICAL moves; since ER's Pure Power now boosts SP.ATK, that hint must
+  // favor SPECIAL moves instead (otherwise the AI still builds/picks physical
+  // movesets for a special-attacking ability). Strip it and re-add for SPECIAL.
   [
     AbilityId.PURE_POWER,
     ab => {
       ab.attrs = ab.attrs.filter(
-        a => !(a instanceof StatMultiplierAbAttr && a.stat === Stat.ATK && a.multiplier === 2),
+        a =>
+          !(a instanceof StatMultiplierAbAttr && a.stat === Stat.ATK && a.multiplier === 2)
+          && !(a instanceof AiMovegenMoveStatsAbAttr),
       );
       ab.attrs.push(new StatMultiplierAbAttr(Stat.SPATK, 2));
+      ab.attrs.push(
+        new AiMovegenMoveStatsAbAttr(({ move, powerMult }) => {
+          if (move.category === MoveCategory.SPECIAL) {
+            powerMult.value *= 2;
+          }
+        }),
+      );
     },
   ],
 

@@ -631,6 +631,37 @@ export const DEV_SCENARIOS: DevScenario[] = [
       ];
     },
   },
+  {
+    label: "(note) Pure Power boosts SP.ATK (special), not ATK",
+    description:
+      "ER 2.65 dex: Pure Power 'Doubles own Sp.Atk stat' (mainline doubles Atk). This\n"
+      + "Medicham has Pure Power forced active + a same-type (Fighting) special and physical\n"
+      + "move of similar power vs a Regigigas with equal Def/Sp.Def (110/110), so damage only\n"
+      + "differs by which offensive stat is doubled.\n"
+      + "DO: hit the Regigigas with AURA SPHERE (special), then BRICK BREAK (physical).\n"
+      + "EXPECT: AURA SPHERE hits clearly HARDER - the boost is on Sp.Atk, not Atk (mainline\n"
+      + "would be the reverse). A Pure Power mon is a SPECIAL attacker in ER.\n"
+      + "AI-side (behind the scenes, not shown in this battle): the AI now builds SPECIAL-\n"
+      + "leaning movesets for Pure Power mons instead of physical. Unit-tested in\n"
+      + "test/tests/elite-redux/er-rebalance-attr-patches.test.ts ('Pure Power doubles SP.ATK').",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_WAVE_OVERRIDE: 1,
+        STARTING_LEVEL_OVERRIDE: 100,
+        ABILITY_OVERRIDE: AbilityId.PURE_POWER,
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.REGIGIGAS,
+        ENEMY_LEVEL_OVERRIDE: 100,
+        ENEMY_ABILITY_OVERRIDE: AbilityId.BALL_FETCH,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+      });
+      return [
+        makeStarter(SpeciesId.MEDICHAM, {
+          moveset: [MoveId.AURA_SPHERE, MoveId.BRICK_BREAK, MoveId.PSYCHIC, MoveId.ZEN_HEADBUTT],
+        }),
+      ];
+    },
+  },
   // ===========================================================================
   // QoL — out-of-battle party reorder
   // ===========================================================================

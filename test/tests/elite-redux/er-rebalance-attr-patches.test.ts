@@ -16,6 +16,8 @@
 // vanilla `AbilityAttrs` registry, which does not include ER archetype classes
 // (e.g. StatTriggerOnStatLoweredAbAttr).
 import {
+  AiMovegenMoveStatsAbAttr,
+  type AiMovegenMoveStatsAbAttrParams,
   BlockCritAbAttr,
   BlockWeatherDamageAttr,
   PokemonTypeChangeAbAttr,
@@ -26,7 +28,9 @@ import { allAbilities } from "#data/data-lists";
 import { StatTriggerOnStatLoweredAbAttr } from "#data/elite-redux/archetypes/stat-trigger-on-event";
 import { ER_ID_MAP } from "#data/elite-redux/er-id-map";
 import { AbilityId } from "#enums/ability-id";
+import { MoveCategory } from "#enums/move-category";
 import { Stat } from "#enums/stat";
+import { NumberHolder } from "#utils/common";
 import { describe, expect, it } from "vitest";
 
 const hasAlwaysHit = (id: number): boolean =>
@@ -136,5 +140,30 @@ describe.skipIf(!RUN)("ER rebalance attr patches (audit chunk 7)", () => {
     expect(trigger).toBeDefined();
     const spd = trigger?.getStatChanges().find(s => s.stat === Stat.SPD);
     expect(spd?.stages).toBe(2);
+  });
+
+  it("Pure Power doubles SP.ATK (not ATK) and its AI moveset hint favors SPECIAL moves", () => {
+    const attrs = allAbilities[AbilityId.PURE_POWER].attrs;
+    // Stat swap: the boost is SPATK ×2, and the vanilla ATK ×2 is gone.
+    const stat = attrs.find((a): a is StatMultiplierAbAttr => a instanceof StatMultiplierAbAttr);
+    expect(stat?.stat).toBe(Stat.SPATK);
+    expect(stat?.multiplier).toBe(2);
+    expect(attrs.some(a => a instanceof StatMultiplierAbAttr && a.stat === Stat.ATK)).toBe(false);
+    // AI moveset-gen hint: doubles effective power for SPECIAL, leaves PHYSICAL alone
+    // (the vanilla hint was the reverse, which mis-tuned the AI after the stat swap).
+    const hint = attrs.find((a): a is AiMovegenMoveStatsAbAttr => a instanceof AiMovegenMoveStatsAbAttr);
+    expect(hint).toBeDefined();
+    const special = new NumberHolder(1);
+    hint?.apply({
+      move: { category: MoveCategory.SPECIAL },
+      powerMult: special,
+    } as unknown as AiMovegenMoveStatsAbAttrParams);
+    expect(special.value).toBe(2);
+    const physical = new NumberHolder(1);
+    hint?.apply({
+      move: { category: MoveCategory.PHYSICAL },
+      powerMult: physical,
+    } as unknown as AiMovegenMoveStatsAbAttrParams);
+    expect(physical.value).toBe(1);
   });
 });
