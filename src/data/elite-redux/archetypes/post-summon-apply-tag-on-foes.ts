@@ -15,7 +15,7 @@
 // =============================================================================
 
 import { type AbAttrBaseParams, PostSummonAbAttr } from "#abilities/ab-attrs";
-import { BattlerTagType } from "#enums/battler-tag-type";
+import type { BattlerTagType } from "#enums/battler-tag-type";
 
 export interface PostSummonApplyTagOnFoesOptions {
   readonly tag: BattlerTagType;
@@ -35,7 +35,8 @@ export class PostSummonApplyTagOnFoesAbAttr extends PostSummonAbAttr {
     if (simulated) {
       return;
     }
-    for (const opp of pokemon.getOpponents()) {
+    // Triple: a placement-dependent foe effect only reaches ADJACENT foes (binary: all foes).
+    for (const opp of pokemon.getAdjacentOpponents()) {
       if (!opp || opp.isFainted()) {
         continue;
       }

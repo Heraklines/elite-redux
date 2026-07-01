@@ -44,7 +44,8 @@ export class PostTurnApplyTagOnFoesAbAttr extends PostTurnAbAttr {
     if (simulated) {
       return;
     }
-    for (const opp of pokemon.getOpponents()) {
+    // Triple: a placement-dependent foe effect only reaches ADJACENT foes (binary: all foes).
+    for (const opp of pokemon.getAdjacentOpponents()) {
       if (!opp || opp.isFainted()) {
         continue;
       }

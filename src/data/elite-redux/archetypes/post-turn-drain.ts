@@ -57,7 +57,8 @@ export class PostTurnDrainAbAttr extends PostTurnAbAttr {
       return;
     }
     let drained = 0;
-    for (const opp of pokemon.getOpponents()) {
+    // Triple: a placement-dependent foe effect only reaches ADJACENT foes (binary: all foes).
+    for (const opp of pokemon.getAdjacentOpponents()) {
       if (!opp || opp.isFainted() || opp.hp <= 0) {
         continue;
       }
