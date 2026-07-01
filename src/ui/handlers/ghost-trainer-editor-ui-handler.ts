@@ -38,14 +38,22 @@ import {
 } from "#data/elite-redux/er-ghost-profile";
 import {
   buildTrainerEntranceTween,
+  clampTrainerFxIntensity,
+  clampTrainerFxSpeed,
+  getTrainerFxIntensity,
+  getTrainerFxSpeed,
   isTrainerAuraOwned,
   isTrainerEntranceOwned,
   setEquippedTrainerAura,
   setEquippedTrainerEntrance,
   setTrainerAuraOwned,
   setTrainerEntranceOwned,
+  setTrainerFxIntensity,
+  setTrainerFxSpeed,
   TRAINER_AURA_EFFECTS,
   TRAINER_ENTRANCE_EFFECTS,
+  TRAINER_FX_DEFAULT_TUNING,
+  TRAINER_FX_TUNING_STEP,
 } from "#data/elite-redux/er-trainer-fx";
 import { trainerConfigs } from "#data/trainers/trainer-config";
 import { Button } from "#enums/buttons";
@@ -76,8 +84,8 @@ const ACCENT_TXT = "#7fd6ff";
 const LIST_X = 6;
 const LABEL_X = LIST_X + 4;
 const VALUE_X = 184;
-const LIST_Y = 28;
-const ROW_H = 12;
+const LIST_Y = 26;
+const ROW_H = 11;
 const FOOT_Y = SCREEN_H - 22;
 const HINT_Y = SCREEN_H - 9;
 
@@ -145,9 +153,11 @@ const CANDIDATE_CLASSES: TrainerType[] = [
 ];
 
 type TextField = "displayName" | "title" | "intro" | "defeatPlayer" | "defeated";
-/** The two Ghost Trainer FX rows (entrance arrival effect + aura overlay). */
+/** The two Ghost Trainer FX effect rows (entrance arrival effect + aura overlay). */
 type FxKind = "entrance" | "aura";
-type RowKind = "sprite" | "female" | TextField | FxKind | "publish";
+/** The two Ghost Trainer FX tuning rows (playback speed + intensity multipliers). */
+type FxTuningKind = "fxSpeed" | "fxIntensity";
+type RowKind = "sprite" | "female" | TextField | FxKind | FxTuningKind | "publish";
 
 interface FieldRow {
   readonly kind: RowKind;
@@ -171,6 +181,10 @@ interface EditorDraft {
   equippedEntrance: number;
   auraBrowse: number;
   equippedAura: number;
+  /** FX playback speed multiplier (0.25-3, default 1). Applies to entrance + aura. */
+  fxSpeed: number;
+  /** FX intensity multiplier (0.5-2, default 1). Applies to entrance + aura. */
+  fxIntensity: number;
 }
 
 /** A blank draft (the chosen sprite defaults to the canonical ghost class, Veteran). */
@@ -188,6 +202,8 @@ function defaultDraft(spriteTypes: TrainerType[]): EditorDraft {
     equippedEntrance: 0,
     auraBrowse: 0,
     equippedAura: 0,
+    fxSpeed: TRAINER_FX_DEFAULT_TUNING,
+    fxIntensity: TRAINER_FX_DEFAULT_TUNING,
   };
 }
 
@@ -223,6 +239,8 @@ export class GhostTrainerEditorUiHandler extends UiHandler {
     equippedEntrance: 0,
     auraBrowse: 0,
     equippedAura: 0,
+    fxSpeed: TRAINER_FX_DEFAULT_TUNING,
+    fxIntensity: TRAINER_FX_DEFAULT_TUNING,
   };
   private rowCursor = 0;
   /** Trainer atlases we have already queued a load for (avoids re-queuing / mock re-entrancy). */
@@ -337,6 +355,8 @@ export class GhostTrainerEditorUiHandler extends UiHandler {
     this.draft.entranceBrowse = this.draft.equippedEntrance;
     this.draft.equippedAura = clampEquipIndex(fx.la, TRAINER_AURA_EFFECTS.length);
     this.draft.auraBrowse = this.draft.equippedAura;
+    this.draft.fxSpeed = clampTrainerFxSpeed(getTrainerFxSpeed(fx));
+    this.draft.fxIntensity = clampTrainerFxIntensity(getTrainerFxIntensity(fx));
   }
 
   clear(): void {
@@ -367,6 +387,8 @@ export class GhostTrainerEditorUiHandler extends UiHandler {
       { kind: "defeated" },
       { kind: "entrance" },
       { kind: "aura" },
+      { kind: "fxSpeed" },
+      { kind: "fxIntensity" },
       { kind: "publish" },
     );
     return rows;
@@ -439,7 +461,13 @@ export class GhostTrainerEditorUiHandler extends UiHandler {
     label.setOrigin(0, 0).setColor(focused ? GOLD : GOLD_DIM);
     this.dynamic.add(label);
 
-    const adjustable = row.kind === "sprite" || row.kind === "female" || row.kind === "entrance" || row.kind === "aura";
+    const adjustable =
+      row.kind === "sprite"
+      || row.kind === "female"
+      || row.kind === "entrance"
+      || row.kind === "aura"
+      || row.kind === "fxSpeed"
+      || row.kind === "fxIntensity";
     const value = this.rowValue(row);
     const text = focused && adjustable ? `< ${value} >` : value;
     const v = addTextObject(VALUE_X, y, text, TextStyle.WINDOW, { fontSize: "28px", align: "right" });
@@ -467,6 +495,10 @@ export class GhostTrainerEditorUiHandler extends UiHandler {
         return "ENTRANCE EFFECT";
       case "aura":
         return "AURA EFFECT";
+      case "fxSpeed":
+        return "FX SPEED";
+      case "fxIntensity":
+        return "FX INTENSITY";
       default:
         return "";
     }
@@ -491,6 +523,10 @@ export class GhostTrainerEditorUiHandler extends UiHandler {
       case "entrance":
       case "aura":
         return this.fxRowValue(row.kind);
+      case "fxSpeed":
+        return this.fxTuningRowValue("fxSpeed");
+      case "fxIntensity":
+        return this.fxTuningRowValue("fxIntensity");
       default:
         return "";
     }
@@ -515,6 +551,10 @@ export class GhostTrainerEditorUiHandler extends UiHandler {
       case "entrance":
       case "aura":
         return this.fxRowValueColor(row.kind);
+      case "fxSpeed":
+        return this.draft.fxSpeed === TRAINER_FX_DEFAULT_TUNING ? DIM : INK;
+      case "fxIntensity":
+        return this.draft.fxIntensity === TRAINER_FX_DEFAULT_TUNING ? DIM : INK;
       default:
         return INK;
     }
@@ -540,6 +580,10 @@ export class GhostTrainerEditorUiHandler extends UiHandler {
       case "entrance":
       case "aura":
         return this.fxRowHelp(row.kind);
+      case "fxSpeed":
+        return "Left / Right sets how fast the entrance + aura play. Press A to reset to 100%.";
+      case "fxIntensity":
+        return "Left / Right sets how strong the entrance + aura look. Press A to reset to 100%.";
       case "publish":
         return "Press A to publish this profile to your save.";
       default:
@@ -622,6 +666,12 @@ export class GhostTrainerEditorUiHandler extends UiHandler {
     return `Press A to equip this ${noun} (free).  You have ${bal} AP.`;
   }
 
+  /** An FX tuning multiplier shown as a percentage (1.0 -> "100%"). */
+  private fxTuningRowValue(kind: FxTuningKind): string {
+    const value = kind === "fxSpeed" ? this.draft.fxSpeed : this.draft.fxIntensity;
+    return `${Math.round(value * 100)}%`;
+  }
+
   private truncate(s: string, max: number): string {
     return s.length > max ? `${s.slice(0, max - 1)}…` : s;
   }
@@ -667,8 +717,9 @@ export class GhostTrainerEditorUiHandler extends UiHandler {
     sprite.setVisible(loaded);
     this.dynamic.add(sprite);
     this.previewSprite = sprite;
-    // Looping demo: hold the equipped aura around the sprite and re-play the entrance every ~3s.
-    // Only when the texture actually loaded (fail-closed: a missing sprite shows the static panel).
+    // Looping demo: hold the BROWSED aura around the sprite and re-play the BROWSED entrance every
+    // ~3s (so a locked effect previews before purchase). Only when the texture actually loaded
+    // (fail-closed: a missing sprite shows the static panel).
     if (loaded) {
       this.attachPreviewFx(sprite);
     }
@@ -692,13 +743,16 @@ export class GhostTrainerEditorUiHandler extends UiHandler {
   }
 
   /**
-   * Attach the equipped FX to the just-built preview sprite: the aura overlay (held via the
-   * Shiny Lab pixel pipeline) and a ~3s entrance-replay loop. Both are no-ops unless the
-   * matching effect is equipped, and both fail closed (the bare sprite stays visible).
+   * Attach the currently-BROWSED FX to the just-built preview sprite: the aura overlay (held
+   * via the Shiny Lab pixel pipeline) and a ~3s entrance-replay loop. Driven by the highlighted
+   * browse cursor (NOT ownership / equipped state), so a player can preview a LOCKED effect
+   * before buying it. Both reflect the live speed + intensity tuning, are no-ops when the browse
+   * cursor is on "None", and fail closed (the bare sprite stays visible on any error).
    */
   private attachPreviewFx(sprite: Phaser.GameObjects.Sprite): void {
-    if (this.draft.equippedAura > 0) {
-      const aura = TRAINER_AURA_EFFECTS[this.draft.equippedAura - 1];
+    const tuning = { speed: this.draft.fxSpeed, intensity: this.draft.fxIntensity };
+    if (this.draft.auraBrowse > 0) {
+      const aura = TRAINER_AURA_EFFECTS[this.draft.auraBrowse - 1];
       if (aura) {
         try {
           this.previewAura = new ErTrainerAuraFx(
@@ -706,6 +760,7 @@ export class GhostTrainerEditorUiHandler extends UiHandler {
             [sprite],
             aura.id,
             `er-ghost-editor-aura-${++this.previewFxVersion}`,
+            tuning,
           );
           this.previewAura.start();
         } catch {
@@ -713,7 +768,7 @@ export class GhostTrainerEditorUiHandler extends UiHandler {
         }
       }
     }
-    if (this.draft.equippedEntrance > 0) {
+    if (this.draft.entranceBrowse > 0) {
       this.playPreviewEntrance();
       this.previewEntranceTimer = globalScene.time.addEvent({
         delay: 3000,
@@ -723,18 +778,27 @@ export class GhostTrainerEditorUiHandler extends UiHandler {
     }
   }
 
-  /** Re-play the equipped entrance tween on the current preview sprite (no-op if none / torn down). */
+  /**
+   * Re-play the currently-BROWSED entrance tween on the preview sprite with the live tuning
+   * (no-op if the browse cursor is on "None" / the sprite was torn down). Browsing a locked
+   * entrance still previews it.
+   */
   private playPreviewEntrance(): void {
     const sprite = this.previewSprite;
-    if (!sprite || this.draft.equippedEntrance <= 0) {
+    if (!sprite || this.draft.entranceBrowse <= 0) {
       return;
     }
-    const eff = TRAINER_ENTRANCE_EFFECTS[this.draft.equippedEntrance - 1];
+    const eff = TRAINER_ENTRANCE_EFFECTS[this.draft.entranceBrowse - 1];
     if (!eff) {
       return;
     }
     const arrival = { x: PREVIEW_CX, y: PREVIEW_SPRITE_TOP, alpha: 1 };
-    globalScene.tweens.add(buildTrainerEntranceTween(sprite, eff.approach, arrival));
+    globalScene.tweens.add(
+      buildTrainerEntranceTween(sprite, eff.approach, arrival, {
+        speed: this.draft.fxSpeed,
+        intensity: this.draft.fxIntensity,
+      }),
+    );
   }
 
   /** Tear down the preview aura overlay + entrance timer (idempotent; called each rebuild + on clear). */
@@ -835,6 +899,18 @@ export class GhostTrainerEditorUiHandler extends UiHandler {
       }
       globalScene.ui.playSelect();
       this.rebuild();
+      return;
+    }
+    if (row.kind === "fxSpeed" || row.kind === "fxIntensity") {
+      // Adjust in small steps, rounded to 2 decimals to avoid float drift, then clamped.
+      const stepped = (current: number): number => Math.round((current + dir * TRAINER_FX_TUNING_STEP) * 100) / 100;
+      if (row.kind === "fxSpeed") {
+        this.draft.fxSpeed = clampTrainerFxSpeed(stepped(this.draft.fxSpeed));
+      } else {
+        this.draft.fxIntensity = clampTrainerFxIntensity(stepped(this.draft.fxIntensity));
+      }
+      globalScene.ui.playSelect();
+      this.rebuild();
     }
   }
 
@@ -864,6 +940,14 @@ export class GhostTrainerEditorUiHandler extends UiHandler {
       case "entrance":
       case "aura":
         this.activateFx(row.kind);
+        break;
+      case "fxSpeed":
+        this.draft.fxSpeed = TRAINER_FX_DEFAULT_TUNING;
+        this.rebuild();
+        break;
+      case "fxIntensity":
+        this.draft.fxIntensity = TRAINER_FX_DEFAULT_TUNING;
+        this.rebuild();
         break;
       case "publish":
         this.confirmPublish();
@@ -983,6 +1067,8 @@ export class GhostTrainerEditorUiHandler extends UiHandler {
       || this.draft.female
       || this.draft.equippedEntrance !== 0
       || this.draft.equippedAura !== 0
+      || this.draft.fxSpeed !== TRAINER_FX_DEFAULT_TUNING
+      || this.draft.fxIntensity !== TRAINER_FX_DEFAULT_TUNING
     );
   }
 
@@ -1025,6 +1111,9 @@ export class GhostTrainerEditorUiHandler extends UiHandler {
     const entrance =
       this.draft.equippedEntrance > 0 ? TRAINER_ENTRANCE_EFFECTS[this.draft.equippedEntrance - 1] : undefined;
     const aura = this.draft.equippedAura > 0 ? TRAINER_AURA_EFFECTS[this.draft.equippedAura - 1] : undefined;
+    // Tuning only affects the entrance + aura, so fold it only when one is equipped
+    // (sanitizeGhostProfile re-clamps; an absent tuning applies the 1x default on encounter).
+    const hasFx = entrance !== undefined || aura !== undefined;
     const raw: GhostTrainerProfile = {
       trainerType: this.currentType(),
       female: this.draft.female && this.currentHasGenders(),
@@ -1034,6 +1123,8 @@ export class GhostTrainerEditorUiHandler extends UiHandler {
       approach: entrance?.approach,
       aura: aura?.id,
       showAuraInBattle: aura ? true : undefined,
+      fxSpeed: hasFx ? this.draft.fxSpeed : undefined,
+      fxIntensity: hasFx ? this.draft.fxIntensity : undefined,
     };
     return sanitizeGhostProfile(raw);
   }
@@ -1049,6 +1140,8 @@ export class GhostTrainerEditorUiHandler extends UiHandler {
     const auraId = this.draft.equippedAura > 0 ? (TRAINER_AURA_EFFECTS[this.draft.equippedAura - 1]?.id ?? null) : null;
     setEquippedTrainerEntrance(fx, entranceId);
     setEquippedTrainerAura(fx, auraId);
+    setTrainerFxSpeed(fx, this.draft.fxSpeed);
+    setTrainerFxIntensity(fx, this.draft.fxIntensity);
     // Tear the editor down BEFORE the confirmation so the message renders on a clean screen
     // (the editor paints an opaque backdrop; a MESSAGE under it would be invisible).
     globalScene.ui.setMode(UiMode.MESSAGE);

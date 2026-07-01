@@ -1163,6 +1163,14 @@ export function markTrainerAsGhost(trainer: Trainer, snapshot: GhostTeamSnapshot
     if (pres.aura && pres.showAuraInBattle) {
       trainer.erGhostAura = pres.aura;
     }
+    // FX tuning (already clamped to their bands by sanitizeGhostProfile): apply the
+    // speed + intensity multipliers to both the entrance tween and the aura overlay.
+    if (pres.fxSpeed !== undefined) {
+      trainer.erGhostFxSpeed = pres.fxSpeed;
+    }
+    if (pres.fxIntensity !== undefined) {
+      trainer.erGhostFxIntensity = pres.fxIntensity;
+    }
   }
 }
 

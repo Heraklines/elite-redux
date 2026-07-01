@@ -31,6 +31,8 @@ import {
 import {
   getEquippedTrainerAura,
   getEquippedTrainerEntrance,
+  getTrainerFxIntensity,
+  getTrainerFxSpeed,
   isTrainerAuraOwned,
   isTrainerEntranceOwned,
   sanitizeTrainerFxSaveData,
@@ -38,8 +40,11 @@ import {
   setEquippedTrainerEntrance,
   setTrainerAuraOwned,
   setTrainerEntranceOwned,
+  setTrainerFxIntensity,
+  setTrainerFxSpeed,
   TRAINER_AURA_EFFECTS,
   TRAINER_ENTRANCE_EFFECTS,
+  TRAINER_FX_DEFAULT_TUNING,
   type TrainerFxSaveData,
 } from "#data/elite-redux/er-trainer-fx";
 import { readFileSync } from "node:fs";
@@ -48,16 +53,25 @@ import { describe, expect, it } from "vitest";
 
 /**
  * Mirror the editor's buildProfile() FX fold: an equipped entrance -> profile.approach,
- * an equipped aura -> profile.aura + showAuraInBattle (er-ghost-profile fields).
+ * an equipped aura -> profile.aura + showAuraInBattle, and the speed + intensity tuning
+ * (folded only when an entrance or aura is equipped, exactly like the editor).
  */
-function foldFx(base: GhostTrainerProfile, entranceId: string | null, auraId: string | null): GhostTrainerProfile {
+function foldFx(
+  base: GhostTrainerProfile,
+  entranceId: string | null,
+  auraId: string | null,
+  tuning?: { fxSpeed?: number; fxIntensity?: number },
+): GhostTrainerProfile {
   const entrance = entranceId ? TRAINER_ENTRANCE_EFFECTS.find(e => e.id === entranceId) : undefined;
   const aura = auraId ? TRAINER_AURA_EFFECTS.find(a => a.id === auraId) : undefined;
+  const hasFx = entrance !== undefined || aura !== undefined;
   return {
     ...base,
     approach: entrance?.approach,
     aura: aura?.id,
     showAuraInBattle: aura ? true : undefined,
+    fxSpeed: hasFx ? (tuning?.fxSpeed ?? TRAINER_FX_DEFAULT_TUNING) : undefined,
+    fxIntensity: hasFx ? (tuning?.fxIntensity ?? TRAINER_FX_DEFAULT_TUNING) : undefined,
   };
 }
 
@@ -75,10 +89,14 @@ function roundTrip(profile: GhostTrainerProfile): GhostTrainerProfile | null {
 function readGhostFx(pres: GhostTrainerProfile | null): {
   erGhostApproach: GhostApproachEffect | undefined;
   erGhostAura: string | undefined;
+  erGhostFxSpeed: number | undefined;
+  erGhostFxIntensity: number | undefined;
 } {
   return {
     erGhostApproach: pres?.approach && pres.approach !== "default" ? pres.approach : undefined,
     erGhostAura: pres?.aura && pres.showAuraInBattle ? pres.aura : undefined,
+    erGhostFxSpeed: pres?.fxSpeed,
+    erGhostFxIntensity: pres?.fxIntensity,
   };
 }
 
@@ -157,6 +175,56 @@ describe("ER Ghost Trainer FX - profile serialization round-trip", () => {
     // ...but markTrainerAsGhost only renders it when the show flag is set.
     expect(readGhostFx(decoded).erGhostAura).toBeUndefined();
   });
+
+  it("carries the FX speed + intensity tuning through publish -> wire -> encounter", () => {
+    // A player picks a non-default speed (1.5x) + intensity (0.75x) on an equipped entrance + aura.
+    const profile = foldFx({ displayName: "Wraith" }, "flashIn", "sparkstorm", { fxSpeed: 1.5, fxIntensity: 0.75 });
+    expect(profile.fxSpeed).toBe(1.5);
+    expect(profile.fxIntensity).toBe(0.75);
+
+    const decoded = roundTrip(profile);
+    expect(decoded).not.toBeNull();
+    // Both tuning values survive the round-trip intact (in-band values pass the clamp).
+    expect(decoded?.fxSpeed).toBe(1.5);
+    expect(decoded?.fxIntensity).toBe(0.75);
+
+    // The encountering client applies them exactly as markTrainerAsGhost does.
+    const applied = readGhostFx(decoded);
+    expect(applied.erGhostFxSpeed).toBe(1.5);
+    expect(applied.erGhostFxIntensity).toBe(0.75);
+    expect(applied.erGhostApproach).toBe("flashIn");
+    expect(applied.erGhostAura).toBe("sparkstorm");
+  });
+
+  it("clamps a garbage / out-of-range FX tuning to the 1.0 default (anti-tamper)", () => {
+    // A hostile peer forges extreme + non-numeric tuning on top of a valid effect.
+    const tampered = {
+      approach: "flashIn",
+      aura: "sparkstorm",
+      showAuraInBattle: true,
+      fxSpeed: 999, // way out of the [0.25, 3] band
+      fxIntensity: "boom", // not even a number
+    } as unknown as GhostTrainerProfile;
+
+    const decoded = roundTrip(tampered);
+    // Both collapse to the neutral 1.0 default (never an extreme value).
+    expect(decoded?.fxSpeed).toBe(TRAINER_FX_DEFAULT_TUNING);
+    expect(decoded?.fxIntensity).toBe(TRAINER_FX_DEFAULT_TUNING);
+
+    const applied = readGhostFx(decoded);
+    expect(applied.erGhostFxSpeed).toBe(1);
+    expect(applied.erGhostFxIntensity).toBe(1);
+  });
+
+  it("omits the FX tuning entirely when no entrance or aura is equipped (old ghosts unaffected)", () => {
+    const decoded = roundTrip(foldFx({ displayName: "Plain" }, null, null));
+    expect(decoded?.fxSpeed).toBeUndefined();
+    expect(decoded?.fxIntensity).toBeUndefined();
+    // The encounter applies the 1.0 default when the fields are absent.
+    const applied = readGhostFx(decoded);
+    expect(applied.erGhostFxSpeed).toBeUndefined();
+    expect(applied.erGhostFxIntensity).toBeUndefined();
+  });
 });
 
 describe("ER Ghost Trainer FX - local save (TrainerFxSaveData) round-trip", () => {
@@ -180,6 +248,27 @@ describe("ER Ghost Trainer FX - local save (TrainerFxSaveData) round-trip", () =
     const clamped = sanitizeTrainerFxSaveData(tampered);
     // The last aura is not owned, so the equip is cleared.
     expect(getEquippedTrainerAura(clamped)).toBeNull();
+  });
+
+  it("byte-round-trips the FX speed + intensity tuning (within quantization tolerance)", () => {
+    const save: TrainerFxSaveData = {};
+    setTrainerFxSpeed(save, 1.5);
+    setTrainerFxIntensity(save, 0.75);
+
+    const restored = sanitizeTrainerFxSaveData(JSON.parse(JSON.stringify(save)));
+    expect(restored).toBeDefined();
+    // Byte-quantized like the Shiny Lab params, so allow a small tolerance.
+    expect(getTrainerFxSpeed(restored)).toBeCloseTo(1.5, 1);
+    expect(getTrainerFxIntensity(restored)).toBeCloseTo(0.75, 1);
+  });
+
+  it("defaults FX tuning to 1.0 when the save has no fs / fi (older save)", () => {
+    // A pre-tuning save with only owned/equipped data and no fs/fi bytes.
+    const save: TrainerFxSaveData = {};
+    setTrainerAuraOwned(save, "embers");
+    const restored = sanitizeTrainerFxSaveData(JSON.parse(JSON.stringify(save)));
+    expect(getTrainerFxSpeed(restored)).toBe(1);
+    expect(getTrainerFxIntensity(restored)).toBe(1);
   });
 });
 

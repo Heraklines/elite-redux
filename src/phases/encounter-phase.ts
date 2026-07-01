@@ -659,7 +659,12 @@ export class EncounterPhase extends BattlePhase {
     const enemyTrainer = globalScene.currentBattle.trainer;
     if (enemyTrainer) {
       const arrival = { x: enemyTrainer.x + TRAINER_ENTRANCE_SLIDE_X, y: enemyTrainer.y, alpha: 1 };
-      globalScene.tweens.add(buildTrainerEntranceTween(enemyTrainer, enemyTrainer.erGhostApproach, arrival));
+      globalScene.tweens.add(
+        buildTrainerEntranceTween(enemyTrainer, enemyTrainer.erGhostApproach, arrival, {
+          speed: enemyTrainer.erGhostFxSpeed,
+          intensity: enemyTrainer.erGhostFxIntensity,
+        }),
+      );
     }
 
     const encounterIntroVisuals = globalScene.currentBattle?.mysteryEncounter?.introVisuals;

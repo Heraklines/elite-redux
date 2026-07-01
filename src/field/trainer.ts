@@ -64,6 +64,14 @@ export class Trainer extends Phaser.GameObjects.Container {
    */
   public erGhostAura?: string | undefined;
 
+  /**
+   * ER Ghost Trainer FX: playback speed + intensity multipliers (default 1x) applied
+   * to BOTH the entrance tween and the aura overlay. Set by `markTrainerAsGhost` from
+   * the uploader's published (and clamped) profile.
+   */
+  public erGhostFxSpeed?: number | undefined;
+  public erGhostFxIntensity?: number | undefined;
+
   private erAuraFx: ErTrainerAuraFx | null = null;
   /** Per-instance counter used to namespace generated aura-FX texture keys. */
   private static erAuraFxSeq = 0;
@@ -920,7 +928,10 @@ export class Trainer extends Phaser.GameObjects.Container {
     if (!this.erGhostAura || this.erAuraFx) {
       return;
     }
-    this.erAuraFx = new ErTrainerAuraFx(this, this.getSprites(), this.erGhostAura, this.erAuraFxKey);
+    this.erAuraFx = new ErTrainerAuraFx(this, this.getSprites(), this.erGhostAura, this.erAuraFxKey, {
+      speed: this.erGhostFxSpeed,
+      intensity: this.erGhostFxIntensity,
+    });
     this.erAuraFx.start();
   }
 

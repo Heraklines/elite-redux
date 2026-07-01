@@ -23,7 +23,8 @@
 // =============================================================================
 
 import { globalScene } from "#app/global-scene";
-import { ER_SHINY_LAB_DEFAULT_PARAMS, type ErShinyLabParams } from "#data/elite-redux/er-shiny-lab-effects";
+import { ER_SHINY_LAB_DEFAULT_PARAMS } from "#data/elite-redux/er-shiny-lab-effects";
+import { clampTrainerFxIntensity, clampTrainerFxSpeed, type TrainerFxTuning } from "#data/elite-redux/er-trainer-fx";
 import {
   type ErShinyLabSpriteFxLook,
   ErShinyLabSpriteFxOverlay,
@@ -41,9 +42,18 @@ interface AuraOverlayEntry {
 }
 
 /**
- * Aura overlay manager for a set of base sprites. The `auraSize` param can be
- * tuned per-call if a trainer's proportions need a wider/narrower reach (a
- * parameter, not a code change).
+ * The bold default aura reach + amount for a trainer sprite (much taller than a 96px
+ * Pokemon battle sprite, so the Pokemon-tuned default reads tiny). The FX intensity
+ * multiplier scales BOTH on top of these (the renderer clamps the extremes).
+ */
+const TRAINER_AURA_BASE_SIZE = 1.85;
+const TRAINER_AURA_BASE_AMOUNT = 1;
+
+/**
+ * Aura overlay manager for a set of base sprites. FX `tuning` maps `speed` onto the
+ * render-clock multiplier (`params.speed`) and `intensity` onto the aura reach +
+ * amount (`params.auraSize` + `params.aroAmt`), each scaling the bold trainer default.
+ * Tuning of 1x (or omitted) reproduces the shipped bold aura EXACTLY.
  */
 export class ErTrainerAuraFx {
   private readonly look: ErShinyLabSpriteFxLook;
@@ -56,15 +66,18 @@ export class ErTrainerAuraFx {
     baseSprites: Phaser.GameObjects.Sprite[],
     auraId: string,
     keyPrefix: string,
-    params?: Partial<ErShinyLabParams>,
+    tuning?: TrainerFxTuning,
   ) {
+    const speed = clampTrainerFxSpeed(tuning?.speed);
+    const intensity = clampTrainerFxIntensity(tuning?.intensity);
     this.look = {
-      // Trainer sprites are much taller than a 96px Pokemon battle sprite, so the
-      // Pokemon-tuned default aura reads tiny on them. Default to a bold, wide
-      // aura (near the auraSize max) so it actually wraps the trainer; a caller
-      // (e.g. the editor's live Intensity slider) can still override via `params`.
       loadout: { palette: null, surface: null, around: auraId },
-      params: { ...ER_SHINY_LAB_DEFAULT_PARAMS, auraSize: 1.85, aroAmt: 1, ...params },
+      params: {
+        ...ER_SHINY_LAB_DEFAULT_PARAMS,
+        auraSize: TRAINER_AURA_BASE_SIZE * intensity,
+        aroAmt: TRAINER_AURA_BASE_AMOUNT * intensity,
+        speed,
+      },
     };
     for (let i = 0; i < baseSprites.length; i++) {
       const base = baseSprites[i];

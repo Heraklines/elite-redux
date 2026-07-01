@@ -21,7 +21,14 @@
 // shape up front keeps the serialization forward-compatible.
 // =============================================================================
 
-import { isKnownTrainerAuraId } from "#data/elite-redux/er-trainer-fx";
+import {
+  isKnownTrainerAuraId,
+  TRAINER_FX_DEFAULT_TUNING,
+  TRAINER_FX_INTENSITY_MAX,
+  TRAINER_FX_INTENSITY_MIN,
+  TRAINER_FX_SPEED_MAX,
+  TRAINER_FX_SPEED_MIN,
+} from "#data/elite-redux/er-trainer-fx";
 import type { TrainerType } from "#enums/trainer-type";
 
 /** Field length caps (mirror the editor's on-screen counters). */
@@ -109,8 +116,24 @@ export interface GhostTrainerProfile {
   showAuraInBattle?: boolean | undefined;
   /** Equipped entrance effect (the on-field arrival tween). */
   approach?: GhostApproachEffect | undefined;
+  /** FX playback speed multiplier for the entrance + aura (0.25-3, default 1). */
+  fxSpeed?: number | undefined;
+  /** FX intensity multiplier for the entrance + aura (0.5-2, default 1). */
+  fxIntensity?: number | undefined;
   /** P4: forced battle music key (absent -> the ghost piano default). */
   music?: string | undefined;
+}
+
+/**
+ * Clamp an untrusted FX tuning multiplier: an in-band number is kept, anything else
+ * (out-of-range, NaN, non-number) collapses to the default 1x. So a tampered peer can
+ * never smuggle an extreme speed / intensity into another player's encounter.
+ */
+function clampGhostFxTuning(value: unknown, min: number, max: number): number {
+  if (typeof value === "number" && Number.isFinite(value) && value >= min && value <= max) {
+    return value;
+  }
+  return TRAINER_FX_DEFAULT_TUNING;
 }
 
 /** Placeholder tokens, resolved on the ENCOUNTERING player's client at display time. */
@@ -230,6 +253,15 @@ export function sanitizeGhostProfile(raw: unknown): GhostTrainerProfile | null {
   // Aura: clamp to the known AROUND id whitelist (drop to none if unknown).
   if (isKnownTrainerAuraId(r.aura)) {
     out.aura = r.aura;
+  }
+  // FX tuning: present-but-untrusted values are clamped to their band (garbage /
+  // out-of-range -> 1x). An absent field stays undefined (old ghosts unaffected;
+  // the encounter applies the 1x default).
+  if (r.fxSpeed !== undefined) {
+    out.fxSpeed = clampGhostFxTuning(r.fxSpeed, TRAINER_FX_SPEED_MIN, TRAINER_FX_SPEED_MAX);
+  }
+  if (r.fxIntensity !== undefined) {
+    out.fxIntensity = clampGhostFxTuning(r.fxIntensity, TRAINER_FX_INTENSITY_MIN, TRAINER_FX_INTENSITY_MAX);
   }
   if (typeof r.music === "string") {
     out.music = clampLine(r.music, 64);
