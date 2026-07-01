@@ -145,11 +145,23 @@ export function getMoveTargets(user: Pokemon, move: MoveId, replaceTarget?: Move
 
   set = applyTripleAdjacency(user, allMoves[move], moveTarget, set);
 
+  let alive = set.filter(p => p?.isActive(true));
+  // Triple: a SINGLE-target "other" move (foe OR ally selectable) must not fall back to an ALLY
+  // when every REACHABLE foe has fainted but the wave continues via a non-adjacent foe. A triple
+  // wing whose two adjacent foes both died would otherwise auto-target the adjacent ally (its only
+  // remaining valid target). With no live foe in reach the move targets foes (all dead) and FAILS,
+  // matching mainline - it never auto-hits your own side. While any reachable foe is alive the ally
+  // stays selectable (the normal manual pick), and a SPREAD ALL_OTHERS move (Earthquake) still hits
+  // allies, so only the single-target NEAR_OTHER/OTHER categories are pruned.
+  if (
+    (moveTarget === MoveTarget.NEAR_OTHER || moveTarget === MoveTarget.OTHER)
+    && !alive.some(p => opponents.includes(p))
+  ) {
+    alive = alive.filter(p => opponents.includes(p));
+  }
+
   return {
-    targets: set
-      .filter(p => p?.isActive(true))
-      .map(p => p.getBattlerIndex())
-      .filter(t => t !== undefined),
+    targets: alive.map(p => p.getBattlerIndex()).filter(t => t !== undefined),
     multiple,
   };
 }

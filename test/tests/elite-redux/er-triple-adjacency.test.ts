@@ -136,4 +136,31 @@ describe.skipIf(!RUN)("ER triple battles - positional adjacency in move targetin
     expect(bi(foes[1].getAdjacentAllies())).toEqual([3, 5]); // enemy centre <-> both enemy wings
     expect(bi(foes[2].getAdjacentAllies())).toEqual([4]); // enemy RIGHT <-> enemy centre
   });
+
+  it("a wing's single-target move fails (never the ally) when every reachable foe is dead", async () => {
+    // Bug: a single-target NEAR_OTHER move (foe OR ally selectable) auto-fell-back to the adjacent
+    // ALLY once the wing's two adjacent foes died while the wave kept going via a non-adjacent foe,
+    // so "attack the dead foe" hit your own teammate. It must fail (no reachable live foe) instead.
+    await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.PIKACHU, SpeciesId.EEVEE);
+    const pLeft = globalScene.getPlayerField()[0];
+    const foes = globalScene.getEnemyField();
+    // Kill the LEFT wing's two adjacent foes (enemy LEFT@3 + CENTRE@4); RIGHT@5 (non-adjacent) lives.
+    foes[0].hp = 0;
+    foes[1].hp = 0;
+
+    const dead = getMoveTargets(pLeft, MoveId.TACKLE).targets;
+    expect(dead).not.toContain(1); // NOT the adjacent ally (the reported bug)
+    expect(dead).toHaveLength(0); // no reachable live foe -> the move fails
+  });
+
+  it("keeps the ally selectable while a reachable foe is still alive", async () => {
+    await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.PIKACHU, SpeciesId.EEVEE);
+    const pLeft = globalScene.getPlayerField()[0];
+    const foes = globalScene.getEnemyField();
+    foes[0].hp = 0; // kill only enemy LEFT@3; enemy CENTRE@4 (adjacent) stays alive
+
+    const withFoe = getMoveTargets(pLeft, MoveId.TACKLE).targets;
+    expect(withFoe).toContain(4); // the alive adjacent foe is a target
+    expect(withFoe).toContain(1); // the ally is STILL offered (a normal manual pick)
+  });
 });
