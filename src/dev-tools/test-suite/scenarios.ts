@@ -3628,6 +3628,65 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
   },
   // ===========================================================================
+  // Final boss — Primal Cascoon (Hell) with a REAL winning mono-Fire team
+  // ===========================================================================
+  {
+    label: "Primal Cascoon (Hell): a real winning Fire team",
+    description:
+      "The Hell classic finale opens straight on the Primal Cascoon - a black-shiny\n"
+      + "two-phase boss (Angel's Wrath kit + Prismatic Fur). This party is a REAL mono-Fire\n"
+      + "team taken verbatim from an actual Hell VICTORY in the ghost pool; Fire is super\n"
+      + "effective on the Bug-based boss, which is how it won.\n"
+      + "DO: fight the Primal Cascoon and clear it. Open with a Fire STAB (Pyro Ball / Heat\n"
+      + "Wave / Fiery Dance), set up on a safe turn (Swords Dance / Nasty Plot / Calm Mind),\n"
+      + "and keep the pressure through BOTH health bars.\n"
+      + "EXPECT: the team can win. NOTES: the original run's held items are NOT carried here\n"
+      + "(play the matchups), each mon here has 4 moves (the winner's 5th came from the in-run\n"
+      + "move expander), and the boss can NEVER be caught (even a Master Ball is refused).",
+    setup: () => {
+      resetDevOverrides();
+      setErDifficulty("hell");
+      setOverrides({
+        STARTING_WAVE_OVERRIDE: 200,
+        STARTING_LEVEL_OVERRIDE: 200,
+      });
+      // Mono-Fire roster from a real Hell victory (D1 runs, outcome=victory difficulty=hell).
+      // Species / form / ability / level are verbatim; movesets are the winner's 4 best (its
+      // 5th slot came from the move expander item, which a starter can't carry). One swap:
+      // Volcanion's stored G-Max Vine Lash -> its Steam Eruption STAB, which functions as a
+      // normal move here.
+      return [
+        makeStarter(SpeciesId.CINDERACE, {
+          formIndex: 2,
+          abilityIndex: 0,
+          moveset: [MoveId.PYRO_BALL, MoveId.SWORDS_DANCE, MoveId.TRIPLE_KICK, MoveId.TRIPLE_AXEL],
+        }),
+        makeStarter(SpeciesId.DELPHOX, {
+          formIndex: 1,
+          abilityIndex: 1,
+          moveset: [MoveId.FIERY_DANCE, MoveId.EXPANDING_FORCE, MoveId.THUNDERBOLT, MoveId.SPARKLY_SWIRL],
+        }),
+        makeStarter(SpeciesId.VOLCANION, {
+          abilityIndex: 1,
+          moveset: [erMove(ErMoveId.SCORCHED_EARTH), MoveId.STEAM_ERUPTION, MoveId.STRANGE_STEAM, MoveId.CALM_MIND],
+        }),
+        makeStarter(SpeciesId.HOUNDOOM, {
+          abilityIndex: 0,
+          moveset: [MoveId.NASTY_PLOT, MoveId.FIRE_FANG, erMove(ErMoveId.RIP_AND_TEAR), MoveId.THUNDER_FANG],
+        }),
+        makeStarter(SpeciesId.NINETALES, {
+          abilityIndex: 1,
+          moveset: [MoveId.HEAT_WAVE, MoveId.DAZZLING_GLEAM, MoveId.SYNCHRONOISE, MoveId.SIMPLE_BEAM],
+        }),
+        makeStarter(SpeciesId.INFERNAPE, {
+          formIndex: 1,
+          abilityIndex: 0,
+          moveset: [MoveId.FIRE_PUNCH, erMove(ErMoveId.ONE_INCH_PUNCH), MoveId.ICE_PUNCH, MoveId.SWORDS_DANCE],
+        }),
+      ];
+    },
+  },
+  // ===========================================================================
   // FIXES — this session
   // ===========================================================================
   {
