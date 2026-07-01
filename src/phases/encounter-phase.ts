@@ -748,9 +748,14 @@ export class EncounterPhase extends BattlePhase {
         const doTrainerSummon = () => {
           this.hideEnemyTrainer();
           const availablePartyMembers = globalScene.getEnemyParty().filter(p => !p.isFainted()).length;
+          // Summon one enemy per on-field slot (1 single / 2 double / 3 triple), so EVERY fielded
+          // trainer mon gets a real SummonPhase - its send-out animation/message + on-summon
+          // abilities (Intimidate etc.) fire. Was `double`-gated, so a triple's 3rd mon filled the
+          // field but never truly summoned. Binary is unchanged (enemyCapacity is 1/2 there).
+          const enemyFieldSlots = globalScene.currentBattle.arrangement?.enemyCapacity ?? 1;
           globalScene.phaseManager.unshiftNew("SummonPhase", 0, false);
-          if (globalScene.currentBattle.double && availablePartyMembers > 1) {
-            globalScene.phaseManager.unshiftNew("SummonPhase", 1, false);
+          for (let i = 1; i < enemyFieldSlots && i < availablePartyMembers; i++) {
+            globalScene.phaseManager.unshiftNew("SummonPhase", i, false);
           }
           this.end();
         };
