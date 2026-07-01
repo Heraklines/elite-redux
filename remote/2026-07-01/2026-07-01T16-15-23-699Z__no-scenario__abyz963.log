@@ -1,0 +1,279 @@
+url:      https://elite-redux-staging.pages.dev/
+build:    mr28wu1g-78vg
+mode:     4  wave:9
+seed:     XkKjyUosIiiE96BcCXJB8k32
+party:    Kyogre(L8 36hp f0), Pumpkaboo(L5 21hp f0), Starly(L8 26hp f0), Mawile(L7 0hp f0), Spinarak(L5 0hp f0), Kricketot(L5 0hp f0)
+enemy:    Taillow(L7), Pidgey(L7), Poochyena(L7)
+
+----- CONSOLE -----
+[16:11:53.826] LOG: %cStart Phase MoveEndPhase color:green;
+[16:11:53.827] LOG: %cStart Phase MovePhase color:green;
+[16:11:53.827] LOG: %cStart Phase MoveEndPhase color:green;
+[16:11:53.827] LOG: %cStart Phase MovePhase color:green;
+[16:11:53.827] LOG: %cStart Phase MoveEndPhase color:green;
+[16:11:53.827] LOG: %cStart Phase MovePhase color:green;
+[16:11:53.827] LOG: %cUser: Chimchar
+Move: FLAME_CHARGE
+Use Mode: NORMAL color:orchid
+[16:11:53.829] LOG: %cStart Phase MessagePhase color:green;
+[16:11:54.026] LOG: %cStart Phase MessagePhase color:green;
+[16:11:54.320] LOG: %cStart Phase MoveEndPhase color:green;
+[16:11:54.320] LOG: %cStart Phase CheckInterludePhase color:green;
+[16:11:54.320] LOG: %cStart Phase WeatherEffectPhase color:green;
+[16:11:55.152] LOG: %cStart Phase PositionalTagPhase color:green;
+[16:11:55.152] LOG: %cStart Phase BerryPhase color:green;
+[16:11:55.153] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[16:11:55.153] LOG: %cStart Phase PostTurnStatusEffectPhase color:green;
+[16:11:55.601] LOG: %cStart Phase MessagePhase color:green;
+[16:11:55.937] LOG: %cStart Phase TurnEndPhase color:green;
+[16:11:55.939] WARN: [coop:turn] host recorder: finalize with NO open recording -> turn=-1 events=0 (caller decides not to emit)
+[16:11:55.939] LOG: %cStart Phase PokemonHealPhase color:green;
+[16:11:55.940] LOG: %cStart Phase MessagePhase color:green;
+[16:11:56.253] LOG: %cStart Phase PokemonHealPhase color:green;
+[16:11:56.519] LOG: %cStart Phase MessagePhase color:green;
+[16:11:56.858] LOG: %cStart Phase SwitchPhase color:green;
+[16:11:58.975] LOG: %cStart Phase SwitchSummonPhase color:green;
+[16:11:59.287] LOG: %cStart Phase ShinySparklePhase color:green;
+[16:11:59.432] LOG: %cStart Phase PostSummonPhase color:green;
+[16:11:59.432] LOG: Ran PSP for: Kricketot
+[16:11:59.433] LOG: %cStart Phase PostSummonPhase color:green;
+[16:11:59.433] LOG: %cStart Phase PostSummonPhase color:green;
+[16:11:59.433] LOG: %cStart Phase TurnInitPhase color:green;
+[16:11:59.433] LOG: %cStart Phase CommandPhase color:green;
+[16:12:01.348] LOG: Move: ELECTRO_SHOT Move targets: {"targets":[1],"multiple":false} 
+Player Pokemon: Kyogre
+[16:12:01.351] LOG: %cStart Phase CommandPhase color:green;
+[16:12:03.090] LOG: Move: ROUND Move targets: {"targets":[5,0],"multiple":false} 
+Player Pokemon: Kricketot
+[16:12:03.092] LOG: %cStart Phase SelectTargetPhase color:green;
+[16:12:03.310] LOG: %cStart Phase CommandPhase color:green;
+[16:12:05.128] LOG: Move: HIGH_JUMP_KICK Move targets: {"targets":[5,1],"multiple":false} 
+Player Pokemon: Starly
+[16:12:05.132] LOG: %cStart Phase SelectTargetPhase color:green;
+[16:12:05.348] LOG: %cStart Phase EnemyCommandPhase color:green;
+[16:12:05.353] LOG: Battle Seed: CqcimJDBRHcSDI6l
+[16:12:05.354] LOG: Move Pool: ["Flame Charge","Leer","Double Kick","Scratch"]
+[16:12:05.354] LOG: Move Scores: [72,2,23,8]
+[16:12:05.354] LOG: Sorted Move Pool: ["Flame Charge","Double Kick","Scratch","Leer"]
+[16:12:05.354] LOG: Chosen Move: Flame Charge
+[16:12:05.354] LOG: %cStart Phase TurnStartPhase color:green;
+[16:12:05.358] LOG: %cStart Phase MovePhase color:green;
+[16:12:05.358] LOG: %cUser: Kyogre
+Move: ELECTRO_SHOT
+Use Mode: NORMAL color:orchid
+[16:12:05.359] LOG: %cStart Phase MessagePhase color:green;
+[16:12:05.535] LOG: %cStart Phase MoveChargePhase color:green;
+[16:12:05.983] LOG: %cStart Phase MessagePhase color:green;
+[16:12:06.327] LOG: %cStart Phase StatStageChangePhase color:green;
+[16:12:06.598] LOG: %cStart Phase MessagePhase color:green;
+[16:12:06.921] LOG: %cStart Phase MovePhase color:green;
+[16:12:06.921] LOG: %cUser: Kyogre
+Move: ELECTRO_SHOT
+Use Mode: IGNORE_PP color:orchid
+[16:12:06.924] LOG: %cStart Phase MessagePhase color:green;
+[16:12:07.106] LOG: %cStart Phase MoveEffectPhase color:green;
+[16:12:08.216] LOG: crit stage: +0
+[16:12:08.217] LOG: Applied X Sp. Atk 
+[16:12:08.217] LOG: Move: Electro Shot | Base damage: 144.27200000000002 | Power: 120 | Source attack: 114 | Target defense: 10
+[16:12:08.217] LOG: Move: Electro Shot | Attack damage: 134
+[16:12:08.218] LOG: %cStart Phase DamageAnimPhase color:green;
+[16:12:08.258] LOG: %cStart Phase FaintPhase color:green;
+[16:12:08.361] LOG: %cStart Phase MessagePhase color:green;
+[16:12:08.657] LOG: %cStart Phase MoveEndPhase color:green;
+[16:12:08.657] LOG: %cStart Phase MovePhase color:green;
+[16:12:08.657] LOG: %cStart Phase MoveEndPhase color:green;
+[16:12:08.658] LOG: %cStart Phase MovePhase color:green;
+[16:12:08.658] LOG: %cUser: Chimchar
+Move: FLAME_CHARGE
+Use Mode: NORMAL color:orchid
+[16:12:08.659] LOG: %cStart Phase MessagePhase color:green;
+[16:12:08.861] LOG: %cStart Phase MessagePhase color:green;
+[16:12:09.154] LOG: %cStart Phase MoveEndPhase color:green;
+[16:12:09.154] LOG: %cStart Phase MovePhase color:green;
+[16:12:09.154] LOG: %cStart Phase MoveEndPhase color:green;
+[16:12:09.154] LOG: %cStart Phase CheckInterludePhase color:green;
+[16:12:09.154] LOG: %cStart Phase WeatherEffectPhase color:green;
+[16:12:09.977] LOG: %cStart Phase PositionalTagPhase color:green;
+[16:12:09.977] LOG: %cStart Phase BerryPhase color:green;
+[16:12:09.978] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[16:12:09.979] LOG: %cStart Phase PostTurnStatusEffectPhase color:green;
+[16:12:10.436] LOG: %cStart Phase MessagePhase color:green;
+[16:12:10.772] LOG: %cStart Phase TurnEndPhase color:green;
+[16:12:10.774] WARN: [coop:turn] host recorder: finalize with NO open recording -> turn=-1 events=0 (caller decides not to emit)
+[16:12:10.774] LOG: %cStart Phase PokemonHealPhase color:green;
+[16:12:10.774] LOG: %cStart Phase MessagePhase color:green;
+[16:12:11.089] LOG: %cStart Phase PokemonHealPhase color:green;
+[16:12:11.355] LOG: %cStart Phase MessagePhase color:green;
+[16:12:11.688] LOG: %cStart Phase SwitchPhase color:green;
+[16:12:15.370] LOG: %cStart Phase SwitchSummonPhase color:green;
+[16:12:15.680] LOG: %cStart Phase ShinySparklePhase color:green;
+[16:12:15.828] LOG: %cStart Phase PostSummonPhase color:green;
+[16:12:15.828] LOG: Ran PSP for: Pumpkaboo
+[16:12:15.829] LOG: %cStart Phase PostSummonPhase color:green;
+[16:12:15.829] LOG: %cStart Phase PostSummonPhase color:green;
+[16:12:15.829] LOG: %cStart Phase ShowAbilityPhase color:green;
+[16:12:16.061] LOG: %cStart Phase StatStageChangePhase color:green;
+[16:12:16.333] LOG: %cStart Phase MessagePhase color:green;
+[16:12:16.649] LOG: %cStart Phase HideAbilityPhase color:green;
+[16:12:16.692] LOG: %cStart Phase ShowAbilityPhase color:green;
+[16:12:16.959] LOG: %cStart Phase HideAbilityPhase color:green;
+[16:12:17.019] LOG: %cStart Phase TurnInitPhase color:green;
+[16:12:17.019] LOG: %cStart Phase CommandPhase color:green;
+[16:12:17.917] LOG: Move: HURRICANE Move targets: {"targets":[5,1],"multiple":false} 
+Player Pokemon: Kyogre
+[16:12:17.919] LOG: %cStart Phase SelectTargetPhase color:green;
+[16:12:18.257] LOG: %cStart Phase CommandPhase color:green;
+[16:12:19.698] LOG: Move: DIRE_CLAW Move targets: {"targets":[5,0],"multiple":false} 
+Player Pokemon: Pumpkaboo
+[16:12:19.700] LOG: %cStart Phase SelectTargetPhase color:green;
+[16:12:20.222] LOG: %cStart Phase CommandPhase color:green;
+[16:12:20.892] LOG: Move: BULK_UP Move targets: {"targets":[],"multiple":false} 
+Player Pokemon: Starly
+[16:12:20.895] LOG: %cStart Phase EnemyCommandPhase color:green;
+[16:12:20.901] LOG: Battle Seed: CqcimJDBRHcSDI6l
+[16:12:20.905] LOG: Move Pool: ["Flame Charge","Leer","Double Kick","Scratch"]
+[16:12:20.905] LOG: Move Scores: [78,2,-20,-20]
+[16:12:20.905] LOG: Sorted Move Pool: ["Flame Charge","Leer","Double Kick","Scratch"]
+[16:12:20.905] LOG: Chosen Move: Flame Charge
+[16:12:20.905] LOG: %cStart Phase TurnStartPhase color:green;
+[16:12:20.910] LOG: %cStart Phase MovePhase color:green;
+[16:12:20.910] LOG: %cUser: Kyogre
+Move: HURRICANE
+Use Mode: NORMAL color:orchid
+[16:12:20.913] LOG: %cStart Phase MessagePhase color:green;
+[16:12:21.049] LOG: %cStart Phase MoveEffectPhase color:green;
+[16:12:22.847] LOG: crit stage: +0
+[16:12:22.848] LOG: Applied X Sp. Atk 
+[16:12:22.848] LOG: Move: Hurricane | Base damage: 120.56 | Power: 110 | Source attack: 114 | Target defense: 11
+[16:12:22.848] LOG: Move: Hurricane | Attack damage: 104
+[16:12:22.848] LOG: %cStart Phase DamageAnimPhase color:green;
+[16:12:22.889] LOG: %cStart Phase FaintPhase color:green;
+[16:12:22.991] LOG: %cStart Phase MessagePhase color:green;
+[16:12:23.228] LOG: %cStart Phase VictoryPhase color:green;
+[16:12:23.228] LOG: %cStart Phase ExpPhase color:green;
+[16:12:23.430] LOG: %cStart Phase ExpPhase color:green;
+[16:12:23.851] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[16:12:24.459] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[16:12:24.542] LOG: %cStart Phase MoveEndPhase color:green;
+[16:12:24.545] LOG: %cStart Phase MovePhase color:green;
+[16:12:24.545] LOG: %cStart Phase MoveEndPhase color:green;
+[16:12:24.545] LOG: %cStart Phase MovePhase color:green;
+[16:12:24.545] LOG: %cStart Phase MoveEndPhase color:green;
+[16:12:24.545] LOG: %cStart Phase MovePhase color:green;
+[16:12:24.546] LOG: %cUser: Pumpkaboo
+Move: DIRE_CLAW
+Use Mode: NORMAL color:orchid
+[16:12:24.547] LOG: %cStart Phase MessagePhase color:green;
+[16:12:24.728] LOG: %cStart Phase MessagePhase color:green;
+[16:12:25.031] LOG: %cStart Phase MoveEndPhase color:green;
+[16:12:25.031] LOG: %cStart Phase CheckInterludePhase color:green;
+[16:12:25.031] LOG: %cStart Phase WeatherEffectPhase color:green;
+[16:12:25.853] LOG: %cStart Phase PositionalTagPhase color:green;
+[16:12:25.853] LOG: %cStart Phase BerryPhase color:green;
+[16:12:25.854] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[16:12:25.855] LOG: %cStart Phase TurnEndPhase color:green;
+[16:12:25.857] WARN: [coop:turn] host recorder: finalize with NO open recording -> turn=-1 events=0 (caller decides not to emit)
+[16:12:25.857] LOG: %cStart Phase PokemonHealPhase color:green;
+[16:12:25.857] LOG: %cStart Phase MessagePhase color:green;
+[16:12:26.148] LOG: %cStart Phase PokemonHealPhase color:green;
+[16:12:26.148] LOG: %cStart Phase MessagePhase color:green;
+[16:12:26.465] LOG: %cStart Phase MessagePhase color:green;
+[16:12:26.928] LOG: %cStart Phase BattleEndPhase color:green;
+[16:12:26.928] LOG: Battle Score: 68 (6 Turns x0.61)
+[16:12:26.928] LOG: Total Score: 475
+[16:12:26.933] LOG: %cStart Phase TrainerVictoryPhase color:green;
+[16:12:26.934] LOG: Rival Ivy
+[16:12:27.406] LOG: Rival Ivy
+[16:12:30.003] LOG: Dialogue saved as seen: dialogue:rivalFemale.victory.1
+[16:12:30.213] LOG: %cStart Phase MoneyRewardPhase color:green;
+[16:12:30.654] LOG: %cStart Phase ModifierRewardPhase color:green;
+[16:12:31.094] LOG: %cStart Phase ModifierRewardPhase color:green;
+[16:12:31.529] LOG: %cStart Phase EggLapsePhase color:green;
+[16:12:31.530] LOG: %cStart Phase SelectModifierPhase color:green;
+[16:12:31.531] LOG: Wave Seed: `sSr]w{QqqMA>JkK`RJ@s;: 8
+[16:12:31.539] LOG: 13 6 [2,6,7,8,9,10,16,22]
+[16:12:31.539] LOG: {"id":"NUGGET","localeKey":"modifierType:ModifierType.NUGGET","iconImage":"nugget","group":"money","soundName":"se/buy","tier":1,"moneyMultiplier":1,"moneyMultiplierDescriptorKey":"modifierType:ModifierType.MoneyRewardModifierType.extra.small"} 
+[16:12:31.539] LOG: 7 4 [2,3,4,5]
+[16:12:31.539] LOG: {"id":"TEMP_STAT_STAGE_BOOSTER","localeKey":"","iconImage":"x_accuracy","soundName":"se/restore","tier":0,"stat":6,"nameKey":"x_accuracy","quantityKey":"stage"} 
+[16:12:31.539] LOG: 3 1 [2,6,7,8,9,10,16,22]
+[16:12:31.539] LOG: {"id":"REVIVE","localeKey":"modifierType:ModifierType.REVIVE","iconImage":"revive","group":"revive","soundName":"se/restore","tier":1,"restorePoints":0,"restorePercent":50,"healStatus":false} 
+[16:12:41.273] WARN: Texture "%s" has no frame "%s" items brick
+[16:12:41.273] WARN: Texture "%s" has no frame "%s" items old_amber
+[16:12:41.273] WARN: Texture "%s" has no frame "%s" items bright_powder
+[16:12:41.273] WARN: Texture "%s" has no frame "%s" items protective_pads
+[16:12:41.273] WARN: Texture "%s" has no frame "%s" items eject_button
+[16:12:41.273] WARN: Texture "%s" has no frame "%s" items trick_room
+[16:12:41.273] WARN: Texture "%s" has no frame "%s" items eject_button
+[16:12:41.273] WARN: Texture "%s" has no frame "%s" items brick
+[16:14:52.212] LOG: %cStart Phase NewBattlePhase color:green;
+[16:14:52.212] LOG: Wave Seed: atTs^x|RrrNB?KlLaSKAt<; 9
+[16:14:52.213] LOG: %cStart Phase NextEncounterPhase color:green;
+[16:14:52.214] LOG: Starting species pool tier: COMMON
+[16:14:52.219] LOG: Pokemon: Wild Taillow | Species ID: 276 | Level: 7 | Nature: Lax (+Def/-SpDef)
+[16:14:52.219] LOG: Stats (IVs): HP: 23 (10), Atk: 12 (1), Def: 13 (31), Spatk: 14 (31), Spdef: 8 (0), Spd: 16 (1)
+[16:14:52.219] LOG: Ability: Air Blower | Passive Ability: Flock 
+[16:14:52.219] LOG: Moveset: ["Double Hit","Quick Attack","Peck","Quick Guard"]
+[16:14:52.219] LOG: Starting species pool tier: COMMON
+[16:14:52.223] LOG: Pokemon: Wild Pidgey | Species ID: 16 | Level: 7 | Nature: Hardy (-)
+[16:14:52.223] LOG: Stats (IVs): HP: 23 (17), Atk: 11 (28), Def: 11 (11), Spatk: 12 (22), Spdef: 11 (27), Spd: 12 (2)
+[16:14:52.223] LOG: Ability: Guts | Passive Ability: Flock 
+[16:14:52.223] LOG: Moveset: ["Air Cutter","Sand Attack","Peck","Steel Wing"]
+[16:14:52.223] LOG: Starting species pool tier: COMMON
+[16:14:52.227] LOG: Pokemon: Wild Poochyena | Species ID: 261 | Level: 7 | Nature: Brave (+Atk/-Spd)
+[16:14:52.227] LOG: Stats (IVs): HP: 22 (3), Atk: 18 (5), Def: 10 (8), Spatk: 9 (10), Spdef: 12 (1), Spd: 15 (21)
+[16:14:52.227] LOG: Ability: Intimidate | Passive Ability: Nocturnal 
+[16:14:52.228] LOG: Moveset: ["Odor Sleuth","Hyper Fang","Howl","Roar"]
+[16:14:52.594] DEBUG: Session data saved to slot 0!
+[16:14:52.595] LOG: Wave Seed: atTs^x|RrrNB?KlLaSKAt<; 9
+[16:14:53.289] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[16:14:53.290] LOG: %cStart Phase SummonPhase color:green;
+[16:14:53.711] LOG: %cStart Phase ShinySparklePhase color:green;
+[16:14:53.860] LOG: %cStart Phase InitEncounterPhase color:green;
+[16:14:53.861] LOG: %cStart Phase PostSummonPhase color:green;
+[16:14:53.862] LOG: Ran PSP for: Starly
+[16:14:53.864] LOG: %cStart Phase PostSummonPhase color:green;
+[16:14:53.865] LOG: %cStart Phase ShowAbilityPhase color:green;
+[16:14:54.105] LOG: %cStart Phase StatStageChangePhase color:green;
+[16:14:54.384] LOG: %cStart Phase MessagePhase color:green;
+[16:14:54.713] LOG: %cStart Phase StatStageChangePhase color:green;
+[16:14:54.975] LOG: %cStart Phase MessagePhase color:green;
+[16:14:55.297] LOG: %cStart Phase HideAbilityPhase color:green;
+[16:14:55.345] LOG: %cStart Phase PostSummonPhase color:green;
+[16:14:55.346] LOG: %cStart Phase PostSummonPhase color:green;
+[16:14:55.346] LOG: Ran PSP for: Taillow
+[16:14:55.349] LOG: %cStart Phase PostSummonPhase color:green;
+[16:14:55.350] LOG: %cStart Phase MovePhase color:green;
+[16:14:55.350] LOG: %cUser: Taillow
+Move: TAILWIND
+Use Mode: FOLLOW_UP color:orchid
+[16:14:55.366] LOG: %cStart Phase MessagePhase color:green;
+[16:14:55.543] LOG: %cStart Phase MoveEffectPhase color:green;
+[16:14:55.568] LOG: %cStart Phase MessagePhase color:green;
+[16:14:55.975] LOG: %cStart Phase MoveEndPhase color:green;
+[16:14:55.976] LOG: %cStart Phase PostSummonPhase color:green;
+[16:14:55.977] LOG: %cStart Phase PostSummonPhase color:green;
+[16:14:55.977] LOG: Ran PSP for: Poochyena
+[16:14:55.979] LOG: %cStart Phase PostSummonPhase color:green;
+[16:14:55.980] LOG: %cStart Phase ShowAbilityPhase color:green;
+[16:14:56.233] LOG: %cStart Phase StatStageChangePhase color:green;
+[16:14:56.515] LOG: %cStart Phase MessagePhase color:green;
+[16:14:56.793] LOG: %cStart Phase ShowAbilityPhase color:green;
+[16:14:56.793] LOG: %cStart Phase HideAbilityPhase color:green;
+[16:14:56.838] LOG: %cStart Phase ShowAbilityPhase color:green;
+[16:14:57.093] LOG: %cStart Phase StatStageChangePhase color:green;
+[16:14:57.378] LOG: %cStart Phase MessagePhase color:green;
+[16:14:57.680] LOG: %cStart Phase HideAbilityPhase color:green;
+[16:14:57.724] LOG: %cStart Phase StatStageChangePhase color:green;
+[16:14:58.004] LOG: %cStart Phase MessagePhase color:green;
+[16:14:58.324] LOG: %cStart Phase HideAbilityPhase color:green;
+[16:14:58.371] LOG: %cStart Phase PostSummonPhase color:green;
+[16:14:58.371] LOG: %cStart Phase PostSummonPhase color:green;
+[16:14:58.371] LOG: Ran PSP for: Pidgey
+[16:14:58.373] LOG: %cStart Phase PostSummonPhase color:green;
+[16:14:58.373] LOG: %cStart Phase PostSummonPhase color:green;
+[16:14:58.373] LOG: %cStart Phase TurnInitPhase color:green;
+[16:14:58.373] LOG: %cStart Phase CommandPhase color:green;
+[16:15:02.041] LOG: Move: AQUA_FANG Move targets: {"targets":[3,4,1],"multiple":false} 
+Player Pokemon: Kyogre
+[16:15:02.044] LOG: %cStart Phase SelectTargetPhase color:green;
+[16:15:02.869] LOG: %cStart Phase CommandPhase color:green;
