@@ -330,13 +330,21 @@ export class TitlePhase extends Phase {
    * later in the hub handler. Opened via the DEFERRED pattern (mirrors the Community
    * Challenges entry): returning true from an option handler clears the select, which
    * would clobber a synchronous setOverlayMode, so setMode(MESSAGE)+resetModeChain()+
-   * showText(callback) is mandatory. Because the chain is reset, the hub returns to the
-   * title via `backToTitle` (a fresh TitlePhase) rather than revertMode.
+   * showText(callback) is mandatory. On exit `backToTitle` revertModes() to unwind the
+   * hub AND any tab overlay stacked on it (running each handler's clear() so no ghost
+   * container is left behind) before starting a fresh TitlePhase.
    */
   private openProfileHub(): void {
     const backToTitle = () => {
-      globalScene.phaseManager.toTitleScreen();
-      super.end();
+      // Unwind the PROFILE hub AND any tab overlay stacked on top of it (e.g. the
+      // Ghost Trainer Editor, which stays on the chain when you PUBLISH) so each
+      // handler's clear() runs and hides its container BEFORE the fresh title shows.
+      // Without this, the overlay containers stay layered over the title / battle /
+      // starter-select screens (a full-screen ghost of the Profile screen).
+      void globalScene.ui.revertModes().then(() => {
+        globalScene.phaseManager.toTitleScreen();
+        super.end();
+      });
     };
     globalScene.ui.setMode(UiMode.MESSAGE);
     globalScene.ui.resetModeChain();
