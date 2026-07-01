@@ -1,6 +1,7 @@
 import { applyAbAttrs } from "#abilities/apply-ab-attrs";
 import { globalScene } from "#app/global-scene";
 import { getPokemonNameWithAffix } from "#app/messages";
+import { fieldPositionForSlot } from "#data/battle-format";
 import { SpeciesFormChangeActiveTrigger } from "#data/form-change-triggers";
 import { getPokeballAtlasKey, getPokeballTintColor } from "#data/pokeball";
 import { BattleType } from "#enums/battle-type";
@@ -132,14 +133,19 @@ export class SummonPhase extends PartyMemberPokemonPhase {
     pokeball.setOrigin(0.5, 0.625);
     globalScene.field.add(pokeball);
 
-    if (this.fieldIndex === 1) {
-      pokemon.setFieldPosition(FieldPosition.RIGHT, 0);
-    } else {
-      const availablePartyMembers = this.getParty().filter(p => p.isAllowedInBattle()).length;
-      pokemon.setFieldPosition(
-        !globalScene.currentBattle.double || availablePartyMembers === 1 ? FieldPosition.CENTER : FieldPosition.LEFT,
-      );
-    }
+    // Multi-format: each mon takes its own field-slot position. fieldPositionForSlot
+    // reproduces the legacy single(CENTER)/double(LEFT,RIGHT) mapping and extends it to
+    // 3-wide (LEFT,CENTRE,RIGHT). The old binary `fieldIndex===1?RIGHT` rule mis-slotted a
+    // triple (flat 1 -> RIGHT, flat 0/2 -> CENTER), so the player sprites no longer lined up
+    // with their battler index - and thus not with the index-based targeting adjacency. A
+    // lone usable mon still centres (a double where only one can battle). Slot 0 animates in;
+    // later slots snap into place (duration 0), matching the previous 2nd-summon behaviour.
+    const availablePartyMembers = this.getParty().filter(p => p.isAllowedInBattle()).length;
+    const capacity =
+      globalScene.currentBattle.arrangement?.playerCapacity ?? (globalScene.currentBattle.double ? 2 : 1);
+    const position =
+      availablePartyMembers === 1 ? FieldPosition.CENTER : fieldPositionForSlot(this.fieldIndex, capacity);
+    pokemon.setFieldPosition(position, this.fieldIndex === 0 ? undefined : 0);
 
     const fpOffset = pokemon.getFieldPositionOffset();
 
@@ -216,14 +222,13 @@ export class SummonPhase extends PartyMemberPokemonPhase {
   summonWild(): void {
     const pokemon = this.getPokemon();
 
-    if (this.fieldIndex === 1) {
-      pokemon.setFieldPosition(FieldPosition.RIGHT, 0);
-    } else {
-      const availablePartyMembers = this.getParty().filter(p => !p.isFainted()).length;
-      pokemon.setFieldPosition(
-        !globalScene.currentBattle.double || availablePartyMembers === 1 ? FieldPosition.CENTER : FieldPosition.LEFT,
-      );
-    }
+    // Same field-slot positioning as the main summon above (triple-aware; see that comment).
+    const availablePartyMembers = this.getParty().filter(p => !p.isFainted()).length;
+    const capacity =
+      globalScene.currentBattle.arrangement?.playerCapacity ?? (globalScene.currentBattle.double ? 2 : 1);
+    const position =
+      availablePartyMembers === 1 ? FieldPosition.CENTER : fieldPositionForSlot(this.fieldIndex, capacity);
+    pokemon.setFieldPosition(position, this.fieldIndex === 0 ? undefined : 0);
 
     globalScene.add.existing(pokemon);
     globalScene.field.add(pokemon);

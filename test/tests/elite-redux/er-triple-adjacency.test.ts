@@ -19,6 +19,7 @@
 import { globalScene } from "#app/global-scene";
 import { getMoveTargets } from "#data/moves/move-utils";
 import { AbilityId } from "#enums/ability-id";
+import { FieldPosition } from "#enums/field-position";
 import { MoveId } from "#enums/move-id";
 import { SpeciesId } from "#enums/species-id";
 import { GameManager } from "#test/framework/game-manager";
@@ -94,5 +95,18 @@ describe.skipIf(!RUN)("ER triple battles - positional adjacency in move targetin
     // (5) Centre SPREAD move hits all three foes.
     const centreRockSlide = getMoveTargets(centre, MoveId.ROCK_SLIDE).targets;
     expect(centreRockSlide).toEqual(expect.arrayContaining([3, 4, 5]));
+  });
+
+  it("the player sprites sit at LEFT/CENTRE/RIGHT matching their battler index", async () => {
+    // Regression: the summon positioned the player mons with a binary `fieldIndex===1?RIGHT`
+    // rule, so a triple mis-slotted them (flat 1 -> RIGHT, flat 0/2 -> CENTRE). The SPRITES
+    // then no longer matched the index-based targeting adjacency, so a spread move looked like
+    // it hit the wrong ally. The three field slots must line up with battler index 0/1/2.
+    await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.PIKACHU, SpeciesId.EEVEE);
+    const players = globalScene.getPlayerField();
+    expect(players.map(p => p.getBattlerIndex())).toEqual([0, 1, 2]);
+    expect(players[0].fieldPosition).toBe(FieldPosition.LEFT);
+    expect(players[1].fieldPosition).toBe(FieldPosition.CENTER);
+    expect(players[2].fieldPosition).toBe(FieldPosition.RIGHT);
   });
 });
