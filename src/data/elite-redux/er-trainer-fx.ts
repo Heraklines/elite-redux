@@ -100,6 +100,14 @@ export const TRAINER_FX_INTENSITY_MAX = 2;
 export const TRAINER_FX_DEFAULT_TUNING = 1;
 /** LEFT/RIGHT adjustment step in the editor (a small 5% increment). */
 export const TRAINER_FX_TUNING_STEP = 0.05;
+/**
+ * Base playback-speed factor applied to EVERY trainer FX (entrance + aura) on top of
+ * the player's speed tuning. 0.4 means the default (100% slider) plays at 40% of the
+ * raw effect speed (2.5x slower) for a calmer default; the slider still scales from
+ * here (up to the 3x cap -> ~1.2x raw). Applied at render time only, so it also
+ * slows already-published ghosts with a default (1x) tuning.
+ */
+export const TRAINER_FX_BASE_SPEED = 0.4;
 
 /** Clamp an FX speed multiplier to its valid band; garbage / non-finite -> default 1. */
 export function clampTrainerFxSpeed(value: number | null | undefined): number {
@@ -323,7 +331,7 @@ export function buildTrainerEntranceTween(
   // ALWAYS settle back to it (the end state stays x/y/alpha/scale = arrival).
   const sx = trainer.scaleX;
   const sy = trainer.scaleY;
-  const speed = clampTrainerFxSpeed(tuning?.speed);
+  const speed = TRAINER_FX_BASE_SPEED * clampTrainerFxSpeed(tuning?.speed);
   const intensity = clampTrainerFxIntensity(tuning?.intensity);
   const base: Phaser.Types.Tweens.TweenBuilderConfig = {
     targets: trainer,

@@ -24,7 +24,12 @@
 
 import { globalScene } from "#app/global-scene";
 import { ER_SHINY_LAB_DEFAULT_PARAMS } from "#data/elite-redux/er-shiny-lab-effects";
-import { clampTrainerFxIntensity, clampTrainerFxSpeed, type TrainerFxTuning } from "#data/elite-redux/er-trainer-fx";
+import {
+  clampTrainerFxIntensity,
+  clampTrainerFxSpeed,
+  TRAINER_FX_BASE_SPEED,
+  type TrainerFxTuning,
+} from "#data/elite-redux/er-trainer-fx";
 import {
   type ErShinyLabSpriteFxLook,
   ErShinyLabSpriteFxOverlay,
@@ -68,7 +73,7 @@ export class ErTrainerAuraFx {
     keyPrefix: string,
     tuning?: TrainerFxTuning,
   ) {
-    const speed = clampTrainerFxSpeed(tuning?.speed);
+    const speed = TRAINER_FX_BASE_SPEED * clampTrainerFxSpeed(tuning?.speed);
     const intensity = clampTrainerFxIntensity(tuning?.intensity);
     this.look = {
       loadout: { palette: null, surface: null, around: auraId },
