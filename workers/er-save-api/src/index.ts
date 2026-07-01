@@ -1678,11 +1678,13 @@ async function computeAndPublishUsageTiers(env: Env): Promise<void> {
 // Routes (wired into the fetch router below):
 //   public : GET  /community/challenges   (browse feed; ALWAYS 200, empty when none)
 //            GET  /community/challenge?id= (full config + stats + recent + board)
+//            GET  /community/achv-tally    (live tracked-achv holder tally; ALWAYS 200)
 //   authed : POST /community/challenge     (create draft -> {id})
 //            POST /community/attempt        (idempotent run-start record)
 //            POST /community/clear          (verification SEAM - stub, see TODO P1-G)
 //            POST /community/bookmark        (toggle)
 //            GET  /community/bookmarks       (list)
+//            POST /community/achv            (report this player's tracked achv unlocks)
 //
 // Empty-launch is structural, not special-cased: a challenge is `status='draft'`
 // until its founder clear publishes it, and browse only reads `status='active'`,
@@ -1776,8 +1778,29 @@ async function ensureCommunityTables(env: Env): Promise<void> {
   await env.DB.prepare(
     "CREATE INDEX IF NOT EXISTS idx_ccb_user ON community_challenge_bookmarks (user_id, created_at DESC)",
   ).run();
+  // Tracked-achievement tally: one row per (user, tracked achv) recording the
+  // player's EARLIEST unlock. Backs the live holder-count / rarity shown on the
+  // featured Inferno card (client-reported since system saves are encrypted).
+  await env.DB.prepare(
+    `CREATE TABLE IF NOT EXISTS achievement_holders (
+       user_id    INTEGER NOT NULL,
+       achv_id    TEXT    NOT NULL,
+       at         INTEGER NOT NULL,
+       updated_at INTEGER NOT NULL,
+       PRIMARY KEY (user_id, achv_id)
+     )`,
+  ).run();
+  await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_ah_achv ON achievement_holders (achv_id)").run();
   communityTablesReady = true;
 }
+
+// ---------------------------------------------------------------------------
+// Tracked-achievement tally. A small server-side ALLOW-LIST of achievement ids
+// whose holder count / rarity is surfaced publicly (currently just the Inferno
+// apex). Anything else the client reports is ignored (anti-abuse). Kept a Set so
+// more featured achievements can be added without touching the route logic.
+// ---------------------------------------------------------------------------
+const TRACKED_ACHV_IDS = new Set(["INFERNO"]);
 
 // ---------------------------------------------------------------------------
 // Shared config validator. This is a VERBATIM copy of the client's
@@ -2649,6 +2672,107 @@ async function handleCommunityMine(auth: TokenPayload, env: Env, cors: Record<st
   return json({ items }, 200, cors);
 }
 
+/**
+ * POST /community/achv - the player REPORTS their tracked achievement unlocks (the
+ * client sends these because system saves are encrypted and the worker can't read
+ * achvUnlocks itself). Body: `{ unlocked: Array<{ id: string; at?: number }> }`.
+ * Only ids in TRACKED_ACHV_IDS are stored (anything else is ignored - anti-abuse).
+ * The UPSERT keeps the EARLIEST unlock time per (user, achv). Always `{ ok: true }`.
+ */
+async function handleCommunityAchvReport(
+  request: Request,
+  auth: TokenPayload,
+  env: Env,
+  cors: Record<string, string>,
+): Promise<Response> {
+  await ensureCommunityTables(env);
+  const raw = await readSaveBody(request);
+  if (raw === null) {
+    return text("Report too large.", 413, cors);
+  }
+  let body: Record<string, unknown>;
+  try {
+    body = JSON.parse(raw) as Record<string, unknown>;
+  } catch {
+    return text("Invalid report data.", 400, cors);
+  }
+  const unlocked = Array.isArray(body.unlocked) ? body.unlocked : [];
+  const now = Date.now();
+  // Cap the number of processed entries to bound work per request. Build the
+  // statement batch functionally (a bare `[]` would infer `never[]`), matching the
+  // other batched community handlers - drop malformed / non-tracked ids (anti-abuse).
+  const stmts = unlocked.slice(0, 32).flatMap((entry: unknown) => {
+    if (!entry || typeof entry !== "object") {
+      return [];
+    }
+    const id = (entry as { id?: unknown }).id;
+    if (typeof id !== "string" || !TRACKED_ACHV_IDS.has(id)) {
+      return [];
+    }
+    const rawAt = Number((entry as { at?: unknown }).at);
+    const at = Number.isFinite(rawAt) && rawAt > 0 ? Math.floor(rawAt) : now;
+    return [
+      env.DB.prepare(
+        `INSERT INTO achievement_holders (user_id, achv_id, at, updated_at)
+           VALUES (?1, ?2, ?3, ?4)
+           ON CONFLICT(user_id, achv_id) DO UPDATE SET
+             at = MIN(achievement_holders.at, excluded.at),
+             updated_at = excluded.updated_at`,
+      ).bind(auth.uid, id, at, now),
+    ];
+  });
+  if (stmts.length > 0) {
+    await env.DB.batch(stmts);
+  }
+  return json({ ok: true }, 200, cors);
+}
+
+/**
+ * GET /community/achv-tally - PUBLIC live holder tally for the tracked achievements.
+ * Optional `?ids=INFERNO,X` (defaults to all TRACKED_ACHV_IDS; non-tracked ids are
+ * dropped). ALWAYS 200 (empty tally when none), like the browse feed. Returns
+ * `{ tally: { <id>: { count, holders: [{ user, at }] } }, totalTrainers }` where
+ * `count` is the distinct holder count, `holders` are the earliest 12 (username via
+ * JOIN users), and `totalTrainers` is COUNT(*) FROM system_saves (rarity denominator).
+ */
+async function handleCommunityAchvTally(url: URL, env: Env, cors: Record<string, string>): Promise<Response> {
+  await ensureCommunityTables(env);
+  const idsParam = (url.searchParams.get("ids") ?? "").trim();
+  const requested = idsParam
+    ? idsParam
+        .split(",")
+        .map(s => s.trim())
+        .filter(id => TRACKED_ACHV_IDS.has(id))
+    : [...TRACKED_ACHV_IDS];
+  const ids = [...new Set(requested)];
+
+  const tally: Record<string, { count: number; holders: { user: string; at: number }[] }> = {};
+  for (const id of ids) {
+    const countRow = await env.DB.prepare("SELECT COUNT(*) AS c FROM achievement_holders WHERE achv_id = ?")
+      .bind(id)
+      .first<{ c: number }>();
+    const { results } = await env.DB.prepare(
+      `SELECT u.username AS username, h.at AS at
+         FROM achievement_holders h
+         LEFT JOIN users u ON u.id = h.user_id
+        WHERE h.achv_id = ?
+        ORDER BY h.at ASC
+        LIMIT 12`,
+    )
+      .bind(id)
+      .all<{ username: string | null; at: number }>();
+    const holders = (results ?? []).map((r: { username: string | null; at: number }) => ({
+      user: r.username ?? "Trainer",
+      at: r.at,
+    }));
+    tally[id] = { count: countRow?.c ?? 0, holders };
+  }
+
+  const totalRow = await env.DB.prepare("SELECT COUNT(*) AS c FROM system_saves").first<{ c: number }>();
+  const totalTrainers = totalRow?.c ?? 0;
+  return json({ tally, totalTrainers }, 200, cors);
+}
+
 // #endregion
 
 export default {
@@ -2695,6 +2819,10 @@ export default {
       }
       if (pathname === "/community/challenge" && method === "GET") {
         return await handleCommunityDetail(url, env, cors);
+      }
+      // Live tracked-achievement holder tally (Inferno rarity). Public, always 200.
+      if (pathname === "/community/achv-tally" && method === "GET") {
+        return await handleCommunityAchvTally(url, env, cors);
       }
       // Logout is harmless without a valid token (tokens are stateless); the
       // client clears its cookie regardless.
@@ -2776,6 +2904,11 @@ export default {
       }
       if (pathname === "/community/mine" && method === "GET") {
         return await handleCommunityMine(auth, env, cors);
+      }
+      // Player reports their tracked achievement unlocks (system saves are encrypted,
+      // so the worker can't read achvUnlocks itself). Only TRACKED_ACHV_IDS are stored.
+      if (pathname === "/community/achv" && method === "POST") {
+        return await handleCommunityAchvReport(request, auth, env, cors);
       }
 
       return text("Not found.", 404, cors);

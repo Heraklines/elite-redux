@@ -33,6 +33,7 @@ import {
   flushPendingFounderPublishes,
   getLocalDraft,
   recordCommunityAttempt,
+  reportTrackedAchievements,
 } from "#data/elite-redux/er-community-challenges";
 import { setFounderRunState } from "#data/elite-redux/er-community-run-state";
 import { Button } from "#enums/buttons";
@@ -629,6 +630,10 @@ export class CommunityChallengesUiHandler extends UiHandler {
     // Retry any founder publish that the win-time POST couldn't land (offline), so
     // returning here after a victory still publishes the draft - it's never lost.
     void flushPendingFounderPublishes();
+    // Report this player's tracked achievement unlocks (Inferno) so the live holder
+    // tally stays current. Best-effort, decoupled from the save-upload path; swallows
+    // errors and never blocks the UI.
+    void reportTrackedAchievements(globalScene.gameData.achvUnlocks);
     this.navCursor = 1;
     this.cardCursor = 0;
     this.focus = "cards";

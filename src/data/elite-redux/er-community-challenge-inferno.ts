@@ -27,12 +27,14 @@
 
 import { speciesStarterCosts } from "#balance/starters";
 import {
+  type AchvTallyResponse,
   COMMUNITY_CHALLENGE_SCHEMA_VERSION,
   type CommunityChallengeConfig,
   type CommunityChallengeEntry,
   type CommunityChallengeFeed,
   type CommunityChallengeRule,
   type CommunityChallengeStats,
+  fetchAchvTally,
   fetchCommunityFeed,
 } from "#data/elite-redux/er-community-challenges";
 import { getErLineTier } from "#data/elite-redux/er-usage-tiers";
@@ -136,8 +138,16 @@ function deriveInfernoRules(config: CommunityChallengeConfig): CommunityChalleng
   return rules;
 }
 
-/** Build the single real Inferno entry (live NU pool + real completion count). */
-export function buildInfernoEntry(): CommunityChallengeEntry {
+/**
+ * Build the single real Inferno entry (live NU pool + completion count).
+ *
+ * `tally` is the live holder tally from the worker (GET /community/achv-tally). When
+ * present, the completion stats are LIVE: `cleared` = the distinct holder count,
+ * `attempts` = the tracked-trainer denominator, and the holder names / first-clear
+ * ordering come from `tally.tally.INFERNO.holders`. When ABSENT (offline / guest /
+ * fetch failed), the stats fall back to the hardcoded INFERNO_* snapshot below.
+ */
+export function buildInfernoEntry(tally?: AchvTallyResponse | null): CommunityChallengeEntry {
   const pool = getInfernoNuPool();
   const hero = strongestRoot(pool) ?? INFERNO_FALLBACK_HERO;
 
@@ -162,13 +172,22 @@ export function buildInfernoEntry(): CommunityChallengeEntry {
     art: { accentType: PokemonType.FIRE, themeSpeciesId: hero },
   };
 
-  const byOldest = [...INFERNO_HOLDERS].sort((a, b) => a.at - b.at);
-  const byNewest = [...INFERNO_HOLDERS].sort((a, b) => b.at - a.at);
+  // Live tally when the worker answered; otherwise the hardcoded snapshot fallback.
+  const live = tally?.tally?.INFERNO;
+  const holders: ReadonlyArray<{ readonly user: string; readonly at: number }> =
+    live && Array.isArray(live.holders) ? live.holders : INFERNO_HOLDERS;
+  const cleared = live && Number.isFinite(live.count) ? live.count : INFERNO_HOLDERS.length;
+  const liveTotal =
+    tally && Number.isFinite(tally.totalTrainers) ? Math.max(0, Math.floor(tally.totalTrainers)) : null;
+  // attempts = the whole tracked population, so the clear rate reads as the real
+  // rarity; never let the denominator dip below the holder count.
+  const attempts = liveTotal !== null ? Math.max(liveTotal, cleared) : INFERNO_TOTAL_TRAINERS;
+
+  const byOldest = [...holders].sort((a, b) => a.at - b.at);
+  const byNewest = [...holders].sort((a, b) => b.at - a.at);
   const stats: CommunityChallengeStats = {
-    // attempts = the whole tracked population, so the clear rate reads as the real
-    // rarity (3 / 963 ~ 0.3%); cleared = the real holder count.
-    attempts: INFERNO_TOTAL_TRAINERS,
-    cleared: INFERNO_HOLDERS.length,
+    attempts,
+    cleared,
     inProgress: 0,
     failed: 0,
     firstClearUser: byOldest[0]?.user,
@@ -201,8 +220,10 @@ export async function buildMergedCommunityFeed(query?: {
   filter?: string;
   page?: number;
 }): Promise<CommunityChallengeFeed> {
-  const inferno = buildInfernoEntry();
-  const fetched = await fetchCommunityFeed(query);
+  // Fetch the live holder tally alongside the community feed; both degrade to
+  // null / empty offline, so the pinned Inferno card falls back to its snapshot.
+  const [tally, fetched] = await Promise.all([fetchAchvTally(), fetchCommunityFeed(query)]);
+  const inferno = buildInfernoEntry(tally);
   // Drop any server copy of Inferno so the pinned card isn't duplicated.
   const others = fetched.featured.filter(e => e.config.id !== inferno.config.id);
   const featured = [inferno, ...others];

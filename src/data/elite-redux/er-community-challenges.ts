@@ -498,6 +498,87 @@ export async function fetchCommunityFeed(query?: {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Tracked-achievement tally (live Inferno rarity). The client REPORTS the
+// player's tracked achievement unlocks (system saves are encrypted, so the
+// worker can't read achvUnlocks itself), and reads back the aggregate holder
+// count / rarity for the featured cards. Kept a list so more featured
+// achievements can be added later without new plumbing. Both calls degrade to a
+// no-op / null offline, exactly like the feed fetch above.
+// ---------------------------------------------------------------------------
+
+/** Achievement ids whose live holder tally the client reports + reads (mirrors the worker allow-list). */
+export const TRACKED_ACHV_IDS: readonly string[] = ["INFERNO"];
+
+/** One holder row in a tally: the trainer name + their (earliest) unlock epoch ms. */
+export interface AchvTallyHolder {
+  readonly user: string;
+  readonly at: number;
+}
+
+/** The live tally for one tracked achievement: distinct holder count + earliest holders. */
+export interface AchvTallyEntry {
+  readonly count: number;
+  readonly holders: AchvTallyHolder[];
+}
+
+/** GET /community/achv-tally response: per-achv tally + the rarity denominator. */
+export interface AchvTallyResponse {
+  readonly tally: Record<string, AchvTallyEntry>;
+  /** Total tracked trainers (system-save rows) - the rarity denominator. */
+  readonly totalTrainers: number;
+}
+
+/**
+ * Report this player's tracked achievement unlocks so the live holder tally stays
+ * current. Best-effort + fire-and-forget: needs the session token, swallows every
+ * error, and never throws (safe to `void` from a UI show()). No-op for a guest /
+ * offline. `achvUnlocks` is the game's `{ ACHV_ID: unlockTimestamp }` map.
+ */
+export async function reportTrackedAchievements(achvUnlocks: Record<string, number>): Promise<void> {
+  const base = serverBase();
+  const token = authToken();
+  if (!base || !token || typeof fetch !== "function") {
+    return;
+  }
+  const unlocked = TRACKED_ACHV_IDS.filter(id => id in achvUnlocks).map(id => ({ id, at: achvUnlocks[id] }));
+  if (unlocked.length === 0) {
+    return; // nothing tracked unlocked yet - don't bother the server.
+  }
+  try {
+    await fetch(`${base}/community/achv`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: token },
+      body: JSON.stringify({ unlocked }),
+    });
+  } catch {
+    // Best-effort telemetry - a failed report is silently ignored.
+  }
+}
+
+/**
+ * Fetch the live tracked-achievement tally (holder counts + rarity denominator).
+ * Public route (no auth needed). Returns null on any failure / offline, so callers
+ * fall back to their hardcoded snapshot. `ids` defaults to all tracked achievements.
+ */
+export async function fetchAchvTally(ids?: readonly string[]): Promise<AchvTallyResponse | null> {
+  const base = serverBase();
+  if (!base || typeof fetch !== "function") {
+    return null;
+  }
+  try {
+    const qs = ids && ids.length > 0 ? `?ids=${encodeURIComponent(ids.join(","))}` : "";
+    const res = await fetch(`${base}/community/achv-tally${qs}`);
+    if (!res.ok) {
+      return null;
+    }
+    const data = (await res.json()) as AchvTallyResponse;
+    return data && typeof data === "object" && data.tally && typeof data.totalTrainers === "number" ? data : null;
+  } catch {
+    return null;
+  }
+}
+
 /** Fetch one challenge's full detail entry (config + stats + recent). Null on any failure. */
 export async function fetchCommunityChallenge(id: string): Promise<CommunityChallengeEntry | null> {
   const base = serverBase();
