@@ -1,6 +1,7 @@
 import { applyAbAttrs } from "#abilities/apply-ab-attrs";
 import { globalScene } from "#app/global-scene";
 import { getPokemonNameWithAffix } from "#app/messages";
+import { fieldPositionForSlot } from "#data/battle-format";
 import { canonicalize } from "#data/elite-redux/coop/coop-battle-checksum";
 import {
   captureCoopCheckpoint,
@@ -151,9 +152,51 @@ export class TurnEndPhase extends FieldPhase {
       globalScene.arena.trySetTerrain(TerrainType.NONE);
     }
 
+    this.erAutoShiftNonAdjacentSurvivors();
+
     this.emitCoopTurn();
 
     this.end();
+  }
+
+  /**
+   * Triple+ end-of-turn rule: when a side has exactly TWO active mons left and they are
+   * NON-adjacent (the two wings, with a fainted centre), they close ranks toward the centre so
+   * they become adjacent again - the mainline "both shift to the centre" behaviour. This is a
+   * pure REPOSITION (swap the party entries + move the sprite); it triggers no switch side-
+   * effects. Binary battles never reach this (a side has no non-adjacent pair), so singles and
+   * doubles are unaffected.
+   */
+  private erAutoShiftNonAdjacentSurvivors(): void {
+    const arrangement = globalScene.currentBattle?.arrangement;
+    if (!arrangement) {
+      return;
+    }
+    for (const isPlayer of [true, false]) {
+      const capacity = isPlayer ? arrangement.playerCapacity : arrangement.enemyCapacity;
+      if (capacity < 3) {
+        continue;
+      }
+      const party = isPlayer ? globalScene.getPlayerParty() : globalScene.getEnemyParty();
+      const active = party
+        .slice(0, capacity)
+        .map((p, i) => ({ p, i }))
+        .filter(x => x.p?.isActive(true));
+      if (active.length !== 2) {
+        continue;
+      }
+      const [lo, hi] = active; // lo.i < hi.i
+      if (
+        arrangement.isAdjacent(arrangement.locate(lo.p.getBattlerIndex()), arrangement.locate(hi.p.getBattlerIndex()))
+      ) {
+        continue; // already adjacent - nothing to do
+      }
+      // Non-adjacent wings (slots 0 and 2). Slide the higher survivor into the empty centre slot
+      // (between them) so the pair is adjacent again; the fainted centre mon takes the vacated slot.
+      const centre = lo.i + 1;
+      [party[centre], party[hi.i]] = [party[hi.i], party[centre]];
+      void hi.p.setFieldPosition(fieldPositionForSlot(centre, capacity), 500);
+    }
   }
 
   /**
