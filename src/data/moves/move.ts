@@ -666,14 +666,19 @@ export abstract class Move implements Localizable {
   /**
    * Sets the flags of the move
    * @param flag {@linkcode MoveFlags}
-   * @param on a boolean, if True, then "ORs" the flag onto existing ones, if False then "XORs" the flag onto existing ones
+   * @param on a boolean: if `true`, "ORs" the flag onto the existing ones (sets it); if
+   * `false`, clears the flag (`AND` with the complement)
    */
   private setFlag(flag: MoveFlags, on: boolean): void {
-    // bitwise OR and bitwise XOR respectively
+    // Set with bitwise OR; clear with bitwise AND-NOT. Clearing must be an
+    // idempotent unset (NOT a toggle): a non-physical move that never had
+    // MAKES_CONTACT would otherwise gain it when `.makesContact(false)` is
+    // called, wrongly triggering contact-punish abilities (e.g. Rain Flush ->
+    // Rough Skin).
     if (on) {
       this.flags |= flag;
     } else {
-      this.flags ^= flag;
+      this.flags &= ~flag;
     }
   }
 
