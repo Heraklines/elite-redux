@@ -563,12 +563,20 @@ export class GameChallengesUiHandler extends UiHandler {
         success = false;
       }
     } else if (this.onHeaderButton) {
-      // ER (#382): DOWN (or UP, wrap-style) leaves the header button back to
-      // the challenge list's top row. LEFT/RIGHT do nothing up here.
-      if (button === Button.DOWN || button === Button.UP) {
+      // ER (#382): DOWN leaves the Last Setup header back to the challenge list's top row.
+      if (button === Button.DOWN) {
         this.setHeaderFocus(false);
         success = true;
+      } else if (button === Button.UP) {
+        // ER QoL: pressing UP again PAST the Last Setup header wraps around to the very
+        // BOTTOM of the challenge list (mirrors DOWN wrapping bottom -> top).
+        this.setHeaderFocus(false);
+        success = this.wrapCursorToBottom();
+        if (success) {
+          this.updateText();
+        }
       }
+      // LEFT/RIGHT do nothing up here.
     } else if (this.startCursor.visible && (button === Button.LEFT || button === Button.RIGHT)) {
       // ER (#382): LEFT/RIGHT on the focused start bar toggles between
       // "begin" and "reuse last setup".
@@ -640,12 +648,14 @@ export class GameChallengesUiHandler extends UiHandler {
         case Button.LEFT:
           success = this.getActiveChallenge().decreaseValue();
           if (success) {
+            this.enforceFormatExclusivity(this.getActiveChallenge());
             this.updateText();
           }
           break;
         case Button.RIGHT:
           success = this.getActiveChallenge().increaseValue();
           if (success) {
+            this.enforceFormatExclusivity(this.getActiveChallenge());
             this.updateText();
           }
           break;
@@ -690,6 +700,40 @@ export class GameChallengesUiHandler extends UiHandler {
 
   private getActiveChallenge(): Challenge {
     return globalScene.gameMode.challenges[this.cursor + this.scrollCursor];
+  }
+
+  /**
+   * ER: Doubles Only and Triples Only are mutually exclusive (a battle can't be both). When one is
+   * turned ON, force the other OFF so a run never carries both format-forcing challenges at once.
+   */
+  private enforceFormatExclusivity(changed: Challenge): void {
+    if (changed.value <= 0) {
+      return;
+    }
+    let conflictId: Challenges | undefined;
+    if (changed.id === Challenges.DOUBLES_ONLY) {
+      conflictId = Challenges.TRIPLES_ONLY;
+    } else if (changed.id === Challenges.TRIPLES_ONLY) {
+      conflictId = Challenges.DOUBLES_ONLY;
+    }
+    if (conflictId === undefined) {
+      return;
+    }
+    const other = globalScene.gameMode.challenges.find(c => c.id === conflictId);
+    if (other && other.value > 0) {
+      other.value = 0;
+    }
+  }
+
+  /** Move the cursor + scroll to the LAST challenge in the list (the UP-wrap-around target). */
+  private wrapCursorToBottom(): boolean {
+    const { challenges } = globalScene.gameMode;
+    if (challenges.length > MAX_ROWS_TO_DISPLAY) {
+      const movedCursor = this.setCursor(MAX_ROWS_TO_DISPLAY - 1);
+      const movedScroll = this.setScrollCursor(challenges.length - MAX_ROWS_TO_DISPLAY);
+      return movedCursor && movedScroll;
+    }
+    return this.setCursor(challenges.length - 1);
   }
 
   public override clear(): void {

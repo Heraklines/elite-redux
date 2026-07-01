@@ -11411,6 +11411,28 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
   },
   {
+    label: "(note) Triples Only challenge (menu-activated)",
+    description:
+      "MENU feature - verify from the Challenges screen, not a forced battle. New challenge\n"
+      + "'Triples Only': turn it ON, start a run, and EVERY regular battle (wild AND trainer)\n"
+      + "should be a 3v3 TRIPLE (finale / endless boss / mystery encounters stay single, like\n"
+      + "Doubles Only). CHECK: (1) trainers send out all 3 mons; (2) Triples Only and Doubles\n"
+      + "Only are MUTUALLY EXCLUSIVE - turning one on flips the other to Off (never both);\n"
+      + "(3) scroll QoL - pressing UP past the 'Last Setup' header wraps to the very BOTTOM of\n"
+      + "the challenge list. It must NOT disturb any Doubles-Only achievements / community\n"
+      + "challenges (it is a separate challenge id). Unit-tested via the challenge -> triple\n"
+      + "arrangement + the mutual-exclusion helper (er-triples-only-challenge.test.ts).",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({ STARTING_WAVE_OVERRIDE: 1, STARTING_LEVEL_OVERRIDE: 50 });
+      return [
+        makeStarter(SpeciesId.SNORLAX, {
+          moveset: [MoveId.BODY_SLAM, MoveId.EARTHQUAKE, MoveId.CRUNCH, MoveId.REST],
+        }),
+      ];
+    },
+  },
+  {
     label: "(note) Ghost Trainer FX: entrance + aura (editor)",
     description:
       "Ghost Trainer FX - cosmetic ENTRANCE arrival + AURA overlay for YOUR published ghost.\n"

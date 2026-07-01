@@ -1324,6 +1324,8 @@ export function copyChallenge(source: Challenge | any): Challenge {
       return PassivesChallenge.loadChallenge(source);
     case Challenges.DOUBLES_ONLY:
       return DoublesOnlyChallenge.loadChallenge(source);
+    case Challenges.TRIPLES_ONLY:
+      return TriplesOnlyChallenge.loadChallenge(source);
     case Challenges.USAGE_TIER:
       return UsageTierChallenge.loadChallenge(source);
     case Challenges.MONO_COLOR:
@@ -1346,6 +1348,27 @@ export class DoublesOnlyChallenge extends Challenge {
 
   static override loadChallenge(source: DoublesOnlyChallenge | any): DoublesOnlyChallenge {
     const newChallenge = new DoublesOnlyChallenge();
+    newChallenge.value = source.value;
+    newChallenge.severity = source.severity;
+    return newChallenge;
+  }
+}
+
+/**
+ * ER (triples): Triples Only - every regular battle (wild OR trainer) is a TRIPLE
+ * battle. The forcing lives in BattleScene.checkIsDouble (reach the force point) +
+ * resolveBattleFormat (upgrade to the triple format), keyed on this challenge.
+ * Kept SEPARATE from Doubles Only (not a shared "format" value) so it never trips the
+ * many DOUBLES_ONLY checks in achievements / community challenges; the two are made
+ * mutually exclusive in the challenge-select UI instead.
+ */
+export class TriplesOnlyChallenge extends Challenge {
+  constructor() {
+    super(Challenges.TRIPLES_ONLY, 1);
+  }
+
+  static override loadChallenge(source: TriplesOnlyChallenge | any): TriplesOnlyChallenge {
+    const newChallenge = new TriplesOnlyChallenge();
     newChallenge.value = source.value;
     newChallenge.severity = source.severity;
     return newChallenge;
@@ -1593,6 +1616,7 @@ export function initChallenges() {
     new InverseBattleChallenge(),
     new FlipStatChallenge(),
     new DoublesOnlyChallenge(),
+    new TriplesOnlyChallenge(),
     new GhostTrainersChallenge(),
     new UsageTierChallenge(),
   );

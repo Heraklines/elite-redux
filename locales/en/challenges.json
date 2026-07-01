@@ -123,6 +123,14 @@
       "1": "On"
     }
   },
+  "triplesOnly": {
+    "name": "Triples Only",
+    "desc": "Every battle is a Triple Battle (3 on 3). Cannot be combined with Doubles Only.",
+    "value": {
+      "0": "Off",
+      "1": "On"
+    }
+  },
   "monoColor": {
     "name": "Mono Color",
     "desc": {

@@ -14,4 +14,7 @@ export enum Challenges {
   USAGE_TIER,
   MONO_COLOR,
   GHOST_TRAINERS,
+  // ER: keep TRIPLES_ONLY LAST - challenge ids are persisted by ordinal, so a new
+  // value must APPEND (never insert) or it shifts every saved challenge config.
+  TRIPLES_ONLY,
 }

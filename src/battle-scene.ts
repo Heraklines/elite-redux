@@ -1983,7 +1983,14 @@ export class BattleScene extends SceneBase {
     // (matches co-op). Lures (which only boost the double-battle CHANCE) are inert
     // here, so they're also stripped from the reward pool for both - see
     // `getErRewardPoolBlocklist` / the lure filter in modifier-type.
-    if (this.gameMode.isCoop || this.gameMode.hasChallenge(Challenges.DOUBLES_ONLY)) {
+    // Triples Only forces every regular battle to reach the force point too; resolveBattleFormat
+    // then UPGRADES that forced-double to the 3-wide triple format (the `double` flag is transient
+    // - Battle derives the real `double` from the arrangement, which is false for a triple).
+    if (
+      this.gameMode.isCoop
+      || this.gameMode.hasChallenge(Challenges.DOUBLES_ONLY)
+      || this.gameMode.hasChallenge(Challenges.TRIPLES_ONLY)
+    ) {
       return true;
     }
 
@@ -2041,7 +2048,13 @@ export class BattleScene extends SceneBase {
    * @param double - The already-resolved legacy double flag.
    */
   private resolveBattleFormat(double: boolean): BattleFormat {
-    if (Overrides.BATTLE_STYLE_OVERRIDE === "triple") {
+    // Triples Only: any battle that reached the force point (double === true, set in checkIsDouble)
+    // becomes a triple. The single edges (finale / endless boss / ME) return double === false there,
+    // so they correctly stay single - never upgraded.
+    if (
+      Overrides.BATTLE_STYLE_OVERRIDE === "triple"
+      || (double && this.gameMode.hasChallenge(Challenges.TRIPLES_ONLY))
+    ) {
       return TRIPLE_FORMAT;
     }
     return legacyFormat(double);
