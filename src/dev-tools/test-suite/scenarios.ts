@@ -11324,10 +11324,16 @@ export const DEV_SCENARIOS: DevScenario[] = [
     setup: () => {
       resetDevOverrides();
       setOverrides({
-        // Past the #419 BST-cap ladder so the ~600-BST mons spawn at full strength.
-        STARTING_WAVE_OVERRIDE: 145,
+        // Past the #419 BST-cap ladder so the ~600-BST mons spawn at full strength, and
+        // NOT a fixed-battle wave. 145 was RIVAL_5 - a SCRIPTED rival TRAINER fight that
+        // BATTLE_TYPE_OVERRIDE can't turn wild, so it ignored the staged party and fielded
+        // one rival ("3v1"). 133 is a normal wave; force it WILD so the staged 3-mon party
+        // fills all three foe slots.
+        STARTING_WAVE_OVERRIDE: 133,
         STARTING_LEVEL_OVERRIDE: 80,
         BATTLE_STYLE_OVERRIDE: "triple",
+        BATTLE_TYPE_OVERRIDE: BattleType.WILD,
+        DISABLE_STANDARD_TRAINERS_OVERRIDE: true,
       });
       // The opposing 3-mon competitive team (distinct mons + movesets). The triple
       // encounter consumes this staged party for its three on-field foes.
