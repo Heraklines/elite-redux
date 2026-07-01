@@ -884,7 +884,26 @@ export class EncounterPhase extends BattlePhase {
       }
     }
 
-    if (!this.loaded) {
+    if (this.loaded) {
+      // RELOAD (loaded): the lead is already restored to the field, but the NON-lead field slots
+      // are not - on a >1-wide format only the leftmost mon reappeared, so a triple came back
+      // "1v3". Place each additional on-field slot DIRECTLY (no re-summon, so on-summon abilities
+      // like Intimidate never re-fire). Starts at slot 1 so binary singles are a no-op, and the
+      // `isOnField` guard keeps it idempotent for any slot already present (e.g. a restored double).
+      const playerCapacity = globalScene.currentBattle.arrangement.playerCapacity;
+      const party = globalScene.getPlayerParty();
+      for (let i = 1; i < playerCapacity && i < party.length; i++) {
+        const pokemon = party[i];
+        if (!pokemon || pokemon.isFainted() || pokemon.isOnField()) {
+          continue;
+        }
+        globalScene.field.add(pokemon);
+        pokemon.fieldSetup();
+        pokemon.setFieldPosition(fieldPositionForSlot(i, playerCapacity));
+        pokemon.setVisible(true);
+        pokemon.showInfo();
+      }
+    } else {
       const availablePartyMembers = globalScene.getPokemonAllowedInBattle();
       // Multi-format: the local player side's capacity drives how many leads summon /
       // get a switch prompt. Binary -> 1 (single) or 2 (double); triple -> 3.
