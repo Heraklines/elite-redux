@@ -528,10 +528,42 @@ export class CommunityChallengesUiHandler extends UiHandler {
     head.setOrigin(0, 0).setColor(GOLD);
     this.dynamic.add(head);
 
-    // Donut placeholder (the arc renderer lands in P1-E).
+    // Proportional donut: a dark base ring, then colored pie slices for the
+    // cleared / in-progress / failed split (each as a fraction of total
+    // attempts), then the inner hole punches through to leave a ring. Any
+    // remainder (attempts not yet cleared/in-progress/failed) stays the dark
+    // base, so a mostly-unattempted challenge reads as a near-empty ring.
     const cx = x + 22;
     const cy = DETAIL_Y + 30;
+    // Base ring + backdrop for the un-attempted remainder.
     this.dynamic.add(globalScene.add.circle(cx, cy, 14, 0x223052, 1));
+    // Colored arcs, matching the legend colors exactly. Start at the top
+    // (-90 degrees) and sweep clockwise: cleared -> in progress -> failed.
+    const attempts = e.stats.attempts;
+    const segments: [number, number][] = [
+      [e.stats.cleared, 0x5fd38a],
+      [e.stats.inProgress, 0x5aa0e8],
+      [e.stats.failed, 0xe06a6a],
+    ];
+    const drawn = segments.filter(([count]) => count > 0);
+    if (attempts > 0 && drawn.length > 0) {
+      const donut = globalScene.add.graphics();
+      let start = -Math.PI / 2;
+      for (const [count, color] of drawn) {
+        donut.fillStyle(color, 1);
+        if (drawn.length === 1 && count >= attempts) {
+          // A single segment that fills the whole ring closes it cleanly.
+          donut.fillCircle(cx, cy, 14);
+        } else {
+          const sweep = (count / attempts) * Math.PI * 2;
+          donut.slice(cx, cy, 14, start, start + sweep);
+          donut.fillPath();
+          start += sweep;
+        }
+      }
+      this.dynamic.add(donut);
+    }
+    // Inner hole -> the donut ring shape; the centered total sits on top.
     this.dynamic.add(globalScene.add.circle(cx, cy, 8, PANEL_TINT, 1));
     const kt = addTextObject(cx, cy - 3, this.kFmt(e.stats.attempts), TextStyle.WINDOW, {
       fontSize: "24px",

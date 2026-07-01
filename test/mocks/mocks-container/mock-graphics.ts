@@ -62,6 +62,11 @@ export class MockGraphics implements MockGameObject {
     return this;
   }
 
+  slice(_x, _y, _radius, _startAngle, _endAngle, _anticlockwise?, _overshoot?): this {
+    // Adds a pie-slice/arc shape to the path, filled when you call fillPath().
+    return this;
+  }
+
   strokeCircle(_x, _y, _radius): this {
     return this;
   }
