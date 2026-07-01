@@ -99,7 +99,15 @@ export class CommandPhase extends FieldPhase {
     // Switch back to the center pokemon. This can happen rarely in double battles with mid turn switching
     // TODO: Prevent this from happening in the first place
     if (globalScene.getPlayerField().filter(p => p.isActive()).length === 1) {
-      this.fieldIndex = FieldPosition.CENTER;
+      // Triple: the lone survivor can sit at ANY slot (0/1/2), so command IT - a hardcoded slot 0
+      // (CENTER) could point at a fainted mon (the doubles assumption that the survivor is always
+      // slot 0). Binary keeps the exact legacy CENTER(=0) behavior.
+      if (globalScene.currentBattle.getBattlerCount() >= 3) {
+        const survivor = globalScene.getPlayerField().find(p => p.isActive());
+        this.fieldIndex = survivor ? globalScene.getPlayerField().indexOf(survivor) : FieldPosition.CENTER;
+      } else {
+        this.fieldIndex = FieldPosition.CENTER;
+      }
       return;
     }
 

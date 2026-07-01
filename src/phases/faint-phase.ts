@@ -208,15 +208,19 @@ export class FaintPhase extends PokemonPhase {
         /** If the player doesn't have any legal Pokemon, end the game */
         globalScene.phaseManager.unshiftNew("GameOverPhase");
       } else if (
-        globalScene.currentBattle.double
-        && legalPlayerPokemon.length === 1
+        legalPlayerPokemon.length === 1
         && legalPlayerPartyPokemon.length === 0
+        && (globalScene.currentBattle.double || globalScene.currentBattle.getBattlerCount() >= 3)
       ) {
         /**
-         * If the player has exactly one Pokemon in total at this point in a double battle, and that Pokemon
-         * is already on the field, unshift a phase that moves that Pokemon to center position.
+         * Exactly one legal Pokemon left and already on the field: recenter it. A double toggles its
+         * +/-32 slot offset; a triple sets the position directly (its lone survivor may be at any slot).
          */
-        globalScene.phaseManager.unshiftNew("ToggleDoublePositionPhase", true);
+        if (globalScene.currentBattle.double) {
+          globalScene.phaseManager.unshiftNew("ToggleDoublePositionPhase", true);
+        } else {
+          legalPlayerPokemon.find(p => p.isActive(true))?.setFieldPosition(FieldPosition.CENTER, 500);
+        }
       } else if (legalPlayerPartyPokemon.length > 0) {
         /**
          * If previous conditions weren't met, and the player has at least 1 legal Pokemon off the field,
@@ -244,9 +248,14 @@ export class FaintPhase extends PokemonPhase {
       // recenters its lone survivor via ToggleDoublePositionPhase, but the enemy
       // branch never did, so the survivor stayed shifted off-center (reported in
       // DOUBLES_ONLY / co-op rival fights, on mons that never evolved). Recenter it.
-      if (globalScene.currentBattle.double && !willSwitchIn) {
-        const survivor = globalScene.getEnemyField().find(p => p !== pokemon && !p.isFainted());
-        survivor?.setFieldPosition(FieldPosition.CENTER, 500);
+      // Recenter a LONE surviving foe (exactly one left on the side) to CENTER. A double always
+      // reaches here with one survivor; a triple only when it has collapsed to one (the
+      // 2-non-adjacent-survivor auto-shift is a separate, not-yet-implemented mechanic).
+      if (!willSwitchIn && (globalScene.currentBattle.double || globalScene.currentBattle.getBattlerCount() >= 3)) {
+        const survivors = globalScene.getEnemyField().filter(p => p !== pokemon && !p.isFainted());
+        if (survivors.length === 1) {
+          survivors[0].setFieldPosition(FieldPosition.CENTER, 500);
+        }
       }
     }
 
