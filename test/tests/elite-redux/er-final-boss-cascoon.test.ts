@@ -21,6 +21,7 @@ import { getErFinalBossSpecies, isErFinalBossSpecies } from "#data/elite-redux/e
 import { setErDifficulty } from "#data/elite-redux/er-run-difficulty";
 import { pokemonFormChanges } from "#data/pokemon-forms";
 import { SpeciesFormChangeManualTrigger } from "#data/pokemon-forms/form-change-triggers";
+import { getTypeDamageMultiplier } from "#data/type";
 import { AbilityId } from "#enums/ability-id";
 import { ErAbilityId } from "#enums/er-ability-id";
 import { MoveId } from "#enums/move-id";
@@ -164,6 +165,37 @@ describe.skipIf(!RUN)("ER final boss: Primal Cascoon survives the stage-2 transf
 
     expect(cascoon.hp).toBe(hpBeforeBrickBreak);
     expect(cascoon.getTypes(true, true)).toContain(PokemonType.GHOST);
+  });
+
+  test("Prismatic Fur FIRES in the boss fight: an incoming hit triggers the pre-hit resist type swap", async () => {
+    // Proves the EFFECT (not just presence) in the real boss context. The boss (much
+    // faster) acts first, then our Flamethrower lands. Prismatic Fur's PRE-hit resist
+    // swap must retype the boss to whatever single type best resists the incoming Fire
+    // BEFORE the hit, so its resulting type resists Fire (multiplier <= 0.5). If the
+    // ability did not fire, the boss would keep its own (Angel's Wrath-driven) typing
+    // and not necessarily resist Fire.
+    setErDifficulty("elite");
+    game.override.moveset([MoveId.SPLASH, MoveId.FLAMETHROWER]).startingLevel(100).enemyLevel(100);
+    await game.classicMode.startBattle(SpeciesId.MAGIKARP);
+    const scene = game.scene;
+    const cascoon = game.field.getEnemyPokemon();
+
+    // Bring the boss to its Primal phase-2 form (the finale state).
+    vi.spyOn(scene.currentBattle, "isClassicFinalBoss", "get").mockReturnValue(true);
+    cascoon.hp = 1;
+    expect(scene.triggerPokemonFormChange(cascoon, SpeciesFormChangeManualTrigger, false)).toBe(true);
+    game.move.use(MoveId.SPLASH);
+    await game.toEndOfTurn();
+    expect(cascoon.formIndex).toBe(1);
+    cascoon.hp = cascoon.getMaxHp(); // survive the hit so we can read the resulting type
+
+    // Flamethrower is 100% accurate (no forceHit needed). After it lands the boss must be
+    // a type that resists Fire - the pre-hit resist swap fired during the boss fight.
+    game.move.use(MoveId.FLAMETHROWER);
+    await game.toEndOfTurn();
+
+    const resistType = cascoon.getTypes(true, true)[0];
+    expect(getTypeDamageMultiplier(PokemonType.FIRE, resistType)).toBeLessThanOrEqual(0.5);
   });
 
   test("boss passive access is not suppressed on non-final boss waves", async () => {
