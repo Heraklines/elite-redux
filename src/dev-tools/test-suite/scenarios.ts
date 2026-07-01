@@ -1138,6 +1138,37 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
   },
   // ===========================================================================
+  // Relic - Stormglass re-applies its weather EVERY battle (not just the first)
+  // ===========================================================================
+  {
+    label: "Relic: Stormglass weather refreshes every battle",
+    description:
+      "Stormglass forces your chosen weather for 5 turns at the START of every battle.\n"
+      + "Reported bug: it only worked the FIRST battle and never again (the weather carried\n"
+      + "over from the prior battle, so the re-apply was a no-op that never refreshed it).\n"
+      + "You are holding Stormglass from the start.\n"
+      + "DO: on the first battle you are prompted to pick a weather - pick one and note it is\n"
+      + "active. One-shot the Magikarp (Earthquake), advance, and start the NEXT battle.\n"
+      + "EXPECT: the SAME weather is active again at the start of battle 2 (and every battle\n"
+      + "after), each time for 5 turns. Before the fix the weather was gone from battle 2 on.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_WAVE_OVERRIDE: 1,
+        STARTING_LEVEL_OVERRIDE: 100,
+        STARTING_MODIFIER_OVERRIDE: [{ name: "ER_RELIC_STORMGLASS" }],
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.MAGIKARP,
+        ENEMY_LEVEL_OVERRIDE: 5,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+      });
+      return [
+        makeStarter(SpeciesId.GARCHOMP, {
+          moveset: [MoveId.EARTHQUAKE, MoveId.DRAGON_CLAW, MoveId.STONE_EDGE, MoveId.SWORDS_DANCE],
+        }),
+      ];
+    },
+  },
+  // ===========================================================================
   // Abilities — Multi-Headed strikes per head on a SINGLE-turn charge move (#617)
   // ===========================================================================
   {

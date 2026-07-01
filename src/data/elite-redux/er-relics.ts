@@ -804,8 +804,19 @@ export function erStormglassApplyChosenWeather(): void {
   if (weather == null || weather === WeatherType.NONE) {
     return;
   }
-  if (!globalScene.arena.trySetWeather(weather)) {
-    return;
+  // `trySetWeather` is a no-op when the arena weather is ALREADY this type
+  // (`canSetWeather` rejects the same type). Weather carries across waves in the
+  // same biome, so from the 2nd battle on the chosen weather is usually already
+  // active - the relic then bailed here and never re-pinned the duration, so the
+  // weather quietly decayed and stopped (reported: "only works the first battle").
+  // Only call trySetWeather when the type actually differs; if the type already
+  // matches, fall through to refresh the duration below. A genuine failure to set
+  // a DIFFERENT weather (e.g. an immutable primal weather we must not override)
+  // still bails.
+  if (globalScene.arena.weather?.weatherType !== weather) {
+    if (!globalScene.arena.trySetWeather(weather)) {
+      return;
+    }
   }
   if (globalScene.arena.weather) {
     globalScene.arena.weather.turnsLeft = STORMGLASS_WEATHER_TURNS;

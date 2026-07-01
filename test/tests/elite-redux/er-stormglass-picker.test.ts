@@ -17,7 +17,7 @@
 
 import { globalScene } from "#app/global-scene";
 import { modifierTypes } from "#data/data-lists";
-import { getStormglassWeather } from "#data/elite-redux/er-relics";
+import { erStormglassApplyChosenWeather, getStormglassWeather } from "#data/elite-redux/er-relics";
 import { Button } from "#enums/buttons";
 import { SpeciesId } from "#enums/species-id";
 import { UiMode } from "#enums/ui-mode";
@@ -136,5 +136,29 @@ describe.skipIf(!RUN)("ER Stormglass picker (#130)", () => {
     await vi.waitFor(() => expect(globalScene.arena.weather?.weatherType).toBe(WeatherType.RAIN));
     expect(globalScene.arena.weather?.turnsLeft).toBe(5);
     expect(getStormglassWeather()).toBe(WeatherType.RAIN);
+  });
+
+  it("later battle: REFRESHES the chosen weather even when it carried over (the 'works once then stops' bug)", async () => {
+    const mod = grantStormglass();
+
+    // First battle: pick Rain, applied for 5 turns.
+    globalScene.arena.trySetWeather(WeatherType.NONE);
+    await runPickerAndChoose(1);
+    await vi.waitFor(() => expect(globalScene.arena.weather?.weatherType).toBe(WeatherType.RAIN));
+    expect(mod.chosenWeather).toBe(WeatherType.RAIN);
+
+    // Turns elapse during battle 1: the Rain is nearly spent but is STILL Rain.
+    globalScene.arena.weather!.turnsLeft = 1;
+
+    // Next battle in the SAME biome: the engine does NOT clear weather between waves,
+    // so the arena is still Rain. The per-battle apply must REFRESH the duration back
+    // to 5. Before the fix, trySetWeather is a no-op for the same weather type, so the
+    // apply bailed and the Rain expired and never came back - the reported "Stormglass
+    // only works the first battle."
+    erStormglassApplyChosenWeather();
+
+    expect(globalScene.arena.weather?.weatherType).toBe(WeatherType.RAIN);
+    expect(globalScene.arena.weather?.turnsLeft).toBe(5);
+    expect(globalScene.arena.weather?.maxDuration).toBe(5);
   });
 });
