@@ -315,6 +315,15 @@ function evolutionLine(start: SpeciesId): SpeciesId[] {
 function partyLineMegaStones(): FormChangeItem[] {
   const items = new Set<FormChangeItem>();
   for (const mon of globalScene.getPlayerParty()) {
+    // A mon ALREADY in its mega/primal resting form can never take another mega
+    // stone (ER megas are permanent), so its own line contributes nothing here.
+    // Skip only THIS mon: a different not-yet-mega'd party member, or a pre-evo
+    // in the same line, still adds the stone on its own iteration - so an
+    // eligible target keeps the offer. Reuses the game's own isMega() detection.
+    // (Reported: a mega-evolved Victreebel was still offered a Victreebelite.)
+    if (mon.isMega()) {
+      continue;
+    }
     for (const sid of evolutionLine(mon.species.speciesId)) {
       for (const fc of pokemonFormChanges[sid] ?? []) {
         if (fc.formKey.indexOf(SpeciesFormKey.MEGA) === -1) {
