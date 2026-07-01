@@ -121,7 +121,7 @@ export class AchvsUiHandler extends MessageUiHandler {
     /** Height of the global canvas / 6 */
     const HEIGHT = globalScene.scaledCanvas.height;
 
-    this.mainContainer = globalScene.add.container(1, -HEIGHT + 1);
+    this.mainContainer = globalScene.add.container(0, -HEIGHT);
     this.mainContainer.setInteractive(new Phaser.Geom.Rectangle(0, 0, WIDTH, HEIGHT), Phaser.Geom.Rectangle.Contains);
 
     const bodyTop = this.headerHeight;
