@@ -1077,7 +1077,7 @@ export class PartyUiHandler extends MessageUiHandler {
         // reward shop, where the active mon's sprite is live). Swapping an on-field
         // slot would otherwise leave the displaced lead's sprite on the field and
         // stack the new lead on top of it.
-        const fieldSize = globalScene.currentBattle?.double ? 2 : 1;
+        const fieldSize = globalScene.currentBattle?.getBattlerCount() ?? 1;
         const onFieldBefore = party.slice(0, fieldSize);
         [party[src], party[dst]] = [party[dst], party[src]];
         if (src < fieldSize || dst < fieldSize) {
@@ -2136,7 +2136,15 @@ export class PartyUiHandler extends MessageUiHandler {
       if (!mon) {
         return;
       }
-      const position = fieldSize > 1 ? (index === 0 ? FieldPosition.LEFT : FieldPosition.RIGHT) : FieldPosition.CENTER;
+      // 1 -> CENTER; 2 -> LEFT/RIGHT; 3+ -> LEFT/CENTER.../RIGHT (triple's middle slot).
+      const position =
+        fieldSize <= 1
+          ? FieldPosition.CENTER
+          : index === 0
+            ? FieldPosition.LEFT
+            : index >= fieldSize - 1
+              ? FieldPosition.RIGHT
+              : FieldPosition.CENTER;
       if (onFieldBefore.includes(mon)) {
         // Already on the field - only its slot changed (doubles slot 0<->1 swap).
         if (mon.fieldPosition !== position) {
@@ -2378,10 +2386,19 @@ class PartySlot extends Phaser.GameObjects.Container {
      */
     const slotPositionX = isBenched ? 143 : 9;
 
+    // Triple+: three (or more) mons are on the field, so the on-field column needs a
+    // tighter step and a higher start than the 1/2-slot single/double layout - otherwise
+    // the 3rd on-field slot is spread off the bottom (the reported "3rd mon missing").
+    const onFieldCount = globalScene.currentBattle.getBattlerCount();
+    const isTripleField = onFieldCount >= 3;
+
     let slotPositionY: number;
     if (isBenched) {
-      slotPositionY = -196 + (isDoubleBattle ? -40 : 0);
-      slotPositionY += (28 + (isDoubleBattle ? 8 : 0)) * slotIndex;
+      slotPositionY = -196 + (isDoubleBattle || isTripleField ? -40 : 0);
+      slotPositionY += (28 + (isDoubleBattle || isTripleField ? 8 : 0)) * slotIndex;
+    } else if (isTripleField) {
+      slotPositionY = -160 + (isItemManageMode ? -12 : 0);
+      slotPositionY += (isItemManageMode ? 38 : 44) * slotIndex;
     } else {
       slotPositionY = -148.5;
       if (isDoubleBattle) {
