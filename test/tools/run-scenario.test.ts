@@ -41,6 +41,7 @@ import { getGameMode } from "#app/game-mode";
 import { TerrainType } from "#data/terrain";
 import { AbilityId } from "#enums/ability-id";
 import { BattlerIndex } from "#enums/battler-index";
+import { BattlerTagType } from "#enums/battler-tag-type";
 import { BiomeId } from "#enums/biome-id";
 import { GameModes } from "#enums/game-modes";
 import { MoveId } from "#enums/move-id";
@@ -101,6 +102,12 @@ interface ExpectSpec {
   maxHits?: HpCheck;
   logIncludes?: string[];
   logExcludes?: string[];
+  /** Battler/ER-status tags that MUST be present on the lead mon (enum names, e.g. "ER_FROSTBITE"). */
+  playerTags?: string[];
+  enemyTags?: string[];
+  /** Battler/ER-status tags that MUST be absent on the lead mon. */
+  playerTagsAbsent?: string[];
+  enemyTagsAbsent?: string[];
 }
 
 // The runner accepts a superset of ScenarioSpec: the extra `script` / `expect`
@@ -452,8 +459,32 @@ function evaluateExpect(
   if (exp.maxHits != null) {
     checkNum("maxHits", ctx.maxHits, exp.maxHits, fails);
   }
+  expectTags("player", ctx.player, exp.playerTags, exp.playerTagsAbsent, fails);
+  expectTags("enemy", ctx.enemy, exp.enemyTags, exp.enemyTagsAbsent, fails);
   expectLog(exp, ctx.log.toLowerCase(), fails);
   return fails;
+}
+
+/** Battler/ER-status tag presence/absence checks (by BattlerTagType enum name). */
+function expectTags(
+  label: string,
+  mon: Pokemon | undefined,
+  present: string[] | undefined,
+  absent: string[] | undefined,
+  fails: string[],
+): void {
+  for (const name of present ?? []) {
+    const tag = (BattlerTagType as Record<string, BattlerTagType>)[name.toUpperCase()];
+    if (tag == null || mon?.getTag(tag) == null) {
+      fails.push(`${label} missing tag ${name}`);
+    }
+  }
+  for (const name of absent ?? []) {
+    const tag = (BattlerTagType as Record<string, BattlerTagType>)[name.toUpperCase()];
+    if (tag != null && mon?.getTag(tag) != null) {
+      fails.push(`${label} unexpectedly has tag ${name}`);
+    }
+  }
 }
 
 /** Field-wide weather / terrain checks. */

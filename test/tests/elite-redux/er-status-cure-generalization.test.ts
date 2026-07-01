@@ -45,7 +45,10 @@ describe.skipIf(!RUN)("ER status cure generalization", () => {
     expect(ER_AILMENT_TAGS).not.toContain(BattlerTagType.ER_BLEED);
   });
 
-  it("Heal Bell (cure-ALL move) clears a cure-all ER ailment (frostbite) but NOT bleed", async () => {
+  // NB: the ER major statuses are mutually exclusive (a mon cannot be both
+  // frostbitten AND bleeding at once), so the "clears frostbite" and "does not
+  // clear bleed" properties are pinned on SEPARATE mons.
+  it("Heal Bell (cure-ALL move) clears a cure-all ER ailment (frostbite)", async () => {
     game.override
       .battleStyle("single")
       .ability(AbilityId.BALL_FETCH)
@@ -59,7 +62,6 @@ describe.skipIf(!RUN)("ER status cure generalization", () => {
 
     const mon = game.field.getPlayerPokemon();
     mon.addTag(BattlerTagType.ER_FROSTBITE, 5, MoveId.NONE, mon.id);
-    mon.addTag(BattlerTagType.ER_BLEED, 5, MoveId.NONE, mon.id);
     expect(hasErAilment(mon)).toBe(true);
 
     game.move.select(MoveId.HEAL_BELL);
@@ -70,7 +72,27 @@ describe.skipIf(!RUN)("ER status cure generalization", () => {
     expect(hasErAilment(mon)).toBe(false);
     // The helper leaves an already-clean (no cure-all-ailment) mon untouched.
     expect(clearErAilments(mon)).toBe(false);
-    // ...but ER BLEED is NEVER removed by a cure-all - only a healing move clears it.
+  });
+
+  it("Heal Bell (cure-ALL move) does NOT clear ER Bleed (heal-move-only)", async () => {
+    game.override
+      .battleStyle("single")
+      .ability(AbilityId.BALL_FETCH)
+      .enemySpecies(SpeciesId.MAGIKARP)
+      .enemyAbility(AbilityId.BALL_FETCH)
+      .enemyMoveset(MoveId.SPLASH)
+      .moveset([MoveId.HEAL_BELL])
+      .startingLevel(50)
+      .enemyLevel(5);
+    await game.classicMode.startBattle(SpeciesId.SNORLAX);
+
+    const mon = game.field.getPlayerPokemon();
+    mon.addTag(BattlerTagType.ER_BLEED, 5, MoveId.NONE, mon.id);
+
+    game.move.select(MoveId.HEAL_BELL);
+    await game.toNextTurn();
+
+    // ER BLEED is NEVER removed by a cure-all - only a healing move clears it.
     expect(mon.getTag(BattlerTagType.ER_BLEED)).toBeDefined();
   });
 });

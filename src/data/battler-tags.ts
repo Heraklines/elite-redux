@@ -56,6 +56,7 @@ import Overrides from "#app/overrides";
 import { CommonBattleAnim, MoveChargeAnim } from "#data/battle-anims";
 import { allAbilities, allMoves } from "#data/data-lists";
 import { getErBiomeRule } from "#data/elite-redux/er-biome-rules";
+import { hasOtherErMajorStatus } from "#data/elite-redux/er-status-cure";
 import { SpeciesFormChangeAbilityTrigger } from "#data/form-change-triggers";
 import { getStatusEffectHealText } from "#data/status-effect";
 import { TerrainType } from "#data/terrain";
@@ -3939,6 +3940,11 @@ export class ErBleedTag extends SerializableBattlerTag {
   }
 
   override canAdd(pokemon: Pokemon): boolean {
+    // ER major statuses are mutually exclusive (like vanilla non-volatile
+    // status): don't overwrite an existing Frostbite/Fear with Bleed.
+    if (hasOtherErMajorStatus(pokemon, BattlerTagType.ER_BLEED)) {
+      return false;
+    }
     // ROM: "Rock and Ghost types are immune to bleeding."
     return !pokemon.isOfType(PokemonType.ROCK) && !pokemon.isOfType(PokemonType.GHOST);
   }
@@ -3972,6 +3978,11 @@ export class ErFrostbiteTag extends SerializableBattlerTag {
   }
 
   override canAdd(pokemon: Pokemon): boolean {
+    // ER major statuses are mutually exclusive (like vanilla non-volatile
+    // status): don't overwrite an existing Bleed/Fear with Frostbite.
+    if (hasOtherErMajorStatus(pokemon, BattlerTagType.ER_FROSTBITE)) {
+      return false;
+    }
     // Ice types are immune to frostbite (Gen 9 mainline behavior) — EXCEPT a
     // target afflicted by ER Ice Statue, which is Ice-type but explicitly loses
     // that immunity.
@@ -4020,6 +4031,12 @@ export class ErFearTag extends SerializableBattlerTag {
   public override readonly tagType = BattlerTagType.ER_FEAR;
   constructor() {
     super(BattlerTagType.ER_FEAR, BattlerTagLapseType.TURN_END, 2);
+  }
+
+  override canAdd(pokemon: Pokemon): boolean {
+    // ER major statuses are mutually exclusive (like vanilla non-volatile
+    // status): don't overwrite an existing Bleed/Frostbite with Fear.
+    return !hasOtherErMajorStatus(pokemon, BattlerTagType.ER_FEAR);
   }
 }
 

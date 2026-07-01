@@ -50,6 +50,31 @@ export const ER_AILMENT_TAGS: readonly BattlerTagType[] = [
 ] as const;
 
 /**
+ * The three ER major statuses (Bleed / Frostbite / Fear). Like vanilla
+ * non-volatile status conditions, these are MUTUALLY EXCLUSIVE: a Pokemon
+ * already afflicted with one must NOT be overwritten by another (you cannot
+ * bleed a frostbitten mon any more than you can burn a poisoned one). The guard
+ * lives in each tag's `canAdd` (see the `Er*Tag` classes in `battler-tags.ts`)
+ * via {@linkcode hasOtherErMajorStatus}. (Frostbite additionally blocks the
+ * vanilla majors it is exclusive with — e.g. Paralysis, #294 — in
+ * `Pokemon.canSetStatus`; that is a separate gate and unaffected here.)
+ */
+export const ER_MAJOR_STATUS_TAGS: readonly BattlerTagType[] = [
+  BattlerTagType.ER_BLEED,
+  BattlerTagType.ER_FROSTBITE,
+  BattlerTagType.ER_FEAR,
+] as const;
+
+/**
+ * @returns `true` if the Pokemon already carries an ER major status tag OTHER
+ * than `excluding`. Used by each ER status tag's `canAdd` so a second ER major
+ * status cannot land on (overwrite) a mon that already has one.
+ */
+export function hasOtherErMajorStatus(pokemon: Pokemon, excluding: BattlerTagType): boolean {
+  return ER_MAJOR_STATUS_TAGS.some(tag => tag !== excluding && pokemon.getTag(tag) != null);
+}
+
+/**
  * @returns `true` if the Pokémon currently carries any ER ailment tag.
  * Used to broaden cure gates that otherwise only fire on `pokemon.status`.
  */
