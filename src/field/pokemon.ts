@@ -5350,10 +5350,15 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
     if (!ignoreAbility && !overruleIgnoresDefAbilities) {
       applyAbAttrs("ReceivedMoveDamageMultiplierAbAttr", abAttrParams);
 
-      const ally = this.getAlly();
-      // Additionally apply friend guard damage reduction if ally has it.
-      if (globalScene.currentBattle.double && ally?.isActive(true)) {
-        applyAbAttrs("AlliedFieldDamageReductionAbAttr", { ...abAttrParams, pokemon: ally });
+      // Friend Guard: EVERY active ally that has it reduces the damage (all allies, not just the
+      // first - a triple centre has two). Multi-battle only; a single has no ally. `getBattlerCount()
+      // > 1` is byte-identical to the old `double` gate for singles/doubles and enables triples.
+      if (globalScene.currentBattle.getBattlerCount() > 1) {
+        for (const ally of this.getAllies()) {
+          if (ally.isActive(true)) {
+            applyAbAttrs("AlliedFieldDamageReductionAbAttr", { ...abAttrParams, pokemon: ally });
+          }
+        }
       }
     }
 

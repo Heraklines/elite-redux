@@ -539,8 +539,10 @@ export function initAbilities() {
     new AbBuilder(AbilityId.PLUS, 3) //
       .conditionalAttr(
         p =>
-          globalScene.currentBattle.double
-          && [AbilityId.PLUS, AbilityId.MINUS].some(a => p.getAlly()?.hasAbility(a) ?? false),
+          // Multi-battle (was `double`, dead in triples): activate if ANY ally has Plus/Minus.
+          // `getBattlerCount() > 1` is byte-identical to `double` for singles/doubles.
+          globalScene.currentBattle.getBattlerCount() > 1
+          && p.getAllies().some(ally => [AbilityId.PLUS, AbilityId.MINUS].some(a => ally.hasAbility(a))),
         StatMultiplierAbAttr,
         Stat.SPATK,
         1.5,
@@ -549,8 +551,10 @@ export function initAbilities() {
     new AbBuilder(AbilityId.MINUS, 3) //
       .conditionalAttr(
         p =>
-          globalScene.currentBattle.double
-          && [AbilityId.PLUS, AbilityId.MINUS].some(a => p.getAlly()?.hasAbility(a) ?? false),
+          // Multi-battle (was `double`, dead in triples): activate if ANY ally has Plus/Minus.
+          // `getBattlerCount() > 1` is byte-identical to `double` for singles/doubles.
+          globalScene.currentBattle.getBattlerCount() > 1
+          && p.getAllies().some(ally => [AbilityId.PLUS, AbilityId.MINUS].some(a => ally.hasAbility(a))),
         StatMultiplierAbAttr,
         Stat.SPATK,
         1.5,

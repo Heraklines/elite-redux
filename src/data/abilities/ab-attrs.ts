@@ -2725,12 +2725,19 @@ export class PostSummonAllyHealAbAttr extends PostSummonAbAttr {
  */
 export class PostSummonClearAllyStatStagesAbAttr extends PostSummonAbAttr {
   override canApply({ pokemon }: AbAttrBaseParams): boolean {
-    return pokemon.getAlly()?.isActive(true) ?? false;
+    return pokemon.getAllies().some(ally => ally.isActive(true));
   }
 
   override apply({ pokemon, simulated }: AbAttrBaseParams): void {
-    const target = pokemon.getAlly();
-    if (!simulated && target != null) {
+    if (simulated) {
+      return;
+    }
+    // Curious Medicine resets the stat stages of ALL allies (a triple centre has two, not just
+    // the first). Binary yields the single ally, so singles/doubles are byte-identical.
+    for (const target of pokemon.getAllies()) {
+      if (!target.isActive(true)) {
+        continue;
+      }
       for (const s of BATTLE_STATS) {
         target.setStatStage(s, 0);
       }
@@ -2991,7 +2998,10 @@ export class PostSummonCopyAllyStatsAbAttr extends PostSummonAbAttr {
   private ally: Pokemon;
 
   override canApply({ pokemon }: AbAttrBaseParams): boolean {
-    if (!globalScene.currentBattle.double) {
+    // Costar copies one ally's stat stages on entry. Multi-battle only - was `double` (dead in
+    // triples); `getBattlerCount() > 1` is byte-identical for singles/doubles. In a triple it
+    // copies the first ally (getAlly), which is fine for a one-ally copy.
+    if (globalScene.currentBattle.getBattlerCount() <= 1) {
       return false;
     }
 
@@ -3161,18 +3171,26 @@ export class CommanderAbAttr extends AbAttr {
     super(true);
   }
 
+  /**
+   * The adjacent ally Commander can jump into: an active, un-commanded Dondozo. In a triple a
+   * wing reaches the centre and the centre reaches both wings; binary yields the single ally.
+   * TODO: Should this work with X + Dondozo fusions?
+   */
+  private findCommandableDondozo(pokemon: Pokemon): Pokemon | undefined {
+    return pokemon
+      .getAdjacentAllies()
+      .find(
+        ally =>
+          ally.isActive(true)
+          && ally.species.speciesId === SpeciesId.DONDOZO
+          && !(ally.isFainted() || ally.getTag(BattlerTagType.COMMANDED)),
+      );
+  }
+
   override canApply({ pokemon }: AbAttrBaseParams): boolean {
-    // If the ally Dondozo is fainted or was previously "commanded" by
-    // another Pokemon, this effect cannot apply.
-    // TODO: Should this work with X + Dondozo fusions?
-    const ally = pokemon.getAlly();
-    return (
-      globalScene.currentBattle?.double
-      && ally != null
-      && ally.isActive(true)
-      && ally.species.speciesId === SpeciesId.DONDOZO
-      && !(ally.isFainted() || ally.getTag(BattlerTagType.COMMANDED))
-    );
+    // Multi-battle only (was `double`, which is dead in triples); byte-identical for
+    // singles/doubles since an adjacent ally there is the single ally.
+    return globalScene.currentBattle.getBattlerCount() > 1 && this.findCommandableDondozo(pokemon) != null;
   }
 
   override apply({ pokemon, simulated }: AbAttrBaseParams): void {
@@ -3182,7 +3200,7 @@ export class CommanderAbAttr extends AbAttr {
       // Play an animation of the source jumping into the ally Dondozo's mouth
       globalScene.triggerPokemonBattleAnim(pokemon, PokemonAnimType.COMMANDER_APPLY);
       // Apply boosts from this effect to the ally Dondozo
-      pokemon.getAlly()?.addTag(BattlerTagType.COMMANDED, 0, MoveId.NONE, pokemon.id);
+      this.findCommandableDondozo(pokemon)?.addTag(BattlerTagType.COMMANDED, 0, MoveId.NONE, pokemon.id);
       // Cancel the source Pokemon's next move (if a move is queued)
       globalScene.phaseManager.tryRemovePhase("MovePhase", phase => phase.pokemon === pokemon);
     }
@@ -4612,7 +4630,12 @@ export class PostTurnResetStatusAbAttr extends PostTurnAbAttr {
 
   override canApply({ pokemon }: AbAttrBaseParams): boolean {
     if (this.allyTarget) {
-      this.target = pokemon.getAlly();
+      // Triple: heal the first ADJACENT ally that actually has a curable status - a wing has
+      // two mons beside it in effect (via the centre), and the old code only ever looked at the
+      // first ally, so it could never cure the other. Binary yields the single ally, unchanged.
+      this.target = pokemon
+        .getAdjacentAllies()
+        .find(ally => (!!ally.status?.effect && ally.status.effect !== StatusEffect.FAINT) || hasErAilment(ally));
     } else {
       this.target = pokemon;
     }

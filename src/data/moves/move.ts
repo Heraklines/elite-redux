@@ -1211,8 +1211,9 @@ export abstract class Move implements Localizable {
 
     if (!ignoreSourceAbility) {
       applyAbAttrs("VariableMovePowerAbAttr", abAttrParams);
-      const ally = source.getAlly();
-      if (ally != null) {
+      // Battery / Power Spot: each ADJACENT ally that has it boosts the user's move (a triple
+      // centre has two adjacent allies). Binary has just the single ally, so this is identical.
+      for (const ally of source.getAdjacentAllies()) {
         applyAbAttrs("AllyMoveCategoryPowerBoostAbAttr", { ...abAttrParams, pokemon: ally });
       }
     }
@@ -1243,7 +1244,10 @@ export abstract class Move implements Localizable {
         aura.apply({ pokemon: source, simulated, opponent: target, move: this, power });
       }
 
-      for (const p of source.getAlliesGenerator()) {
+      // Steely Spirit (a user-field type-power aura): only ADJACENT allies contribute in a
+      // triple - a wing's far ally does not. Binary is byte-identical (the single ally is
+      // always adjacent), so singles/doubles are unaffected.
+      for (const p of source.getAdjacentAllies()) {
         applyAbAttrs("UserFieldMoveTypePowerBoostAbAttr", {
           pokemon: p,
           opponent: target,
