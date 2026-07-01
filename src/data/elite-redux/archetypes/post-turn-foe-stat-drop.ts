@@ -68,7 +68,10 @@ export class PostTurnFoeStatDropAbAttr extends PostTurnAbAttr {
     if (simulated) {
       return;
     }
-    for (const opp of pokemon.getOpponents()) {
+    // Triple: this per-turn foe stat-drop (Serpent Bind / Chokehold / Sap Trap) is ruled like
+    // Intimidate - a wing only drops the ADJACENT trapped foes' stat, never the far foe. Binary
+    // battles have every foe adjacent, so this is unchanged there.
+    for (const opp of pokemon.getAdjacentOpponents()) {
       if (!this.eligible(opp)) {
         continue;
       }
