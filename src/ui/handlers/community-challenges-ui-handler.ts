@@ -39,9 +39,16 @@ import { Button } from "#enums/buttons";
 import { TextStyle } from "#enums/text-style";
 import { UiMode } from "#enums/ui-mode";
 import { addPokemonIcon, buildChallengeCardArt, buildChallengeEmblem } from "#ui/community-challenge-card";
-import { addTextObject } from "#ui/text";
+import { addTextObject as addTextObjectBase } from "#ui/text";
 import { UiHandler } from "#ui/ui-handler";
 import { addWindow } from "#ui/ui-theme";
+
+// This screen deliberately uses small font sizes (22-30px). At that scale the
+// emerald font renders blurry (it is crisp nearer its native ~48px+ size). Route
+// every text creation through a wrapper that bumps the render resolution, so
+// glyphs are rasterized sharp WITHOUT changing the display size or layout.
+const TEXT_RESOLUTION = 4;
+const addTextObject: typeof addTextObjectBase = (...args) => addTextObjectBase(...args).setResolution(TEXT_RESOLUTION);
 
 const SCREEN_W = 320;
 const SCREEN_H = 180;
