@@ -898,6 +898,46 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
   },
   // ===========================================================================
+  // Multi-format — TRIPLE leads keep their slots across a wave (no vanishing lead)
+  // ===========================================================================
+  {
+    label: "(triple) Leads keep their slots after a wave (no vanishing sprite)",
+    description:
+      "Multi-format TRIPLE. Reported: after a battle a lead's sprite briefly vanishes while the\n"
+      + "other two remain, inconsistently. Cause: the wave-start reposition only fixed the LEFT\n"
+      + "slot, so once a lead had fainted the RIGHT lead could stay stuck on CENTER, hidden behind\n"
+      + "the middle mon (read as 'a sprite disappeared'). Now every on-field lead is repositioned\n"
+      + "to its own slot at wave start.\n"
+      + "DO: this is a 3-lead battle. Let ONE lead faint (let it take hits), send in your 4th mon,\n"
+      + "WIN the wave, then continue to the NEXT wave.\n"
+      + "EXPECT: at the next wave all three on-field leads sit on their OWN distinct spots\n"
+      + "(left / center / right) - none stacked on or hidden behind another. (Unit-tested in\n"
+      + "test/tests/elite-redux/er-triple-wave-transition.test.ts.)",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_WAVE_OVERRIDE: 1,
+        STARTING_LEVEL_OVERRIDE: 60,
+        BATTLE_STYLE_OVERRIDE: "triple",
+        ENEMY_LEVEL_OVERRIDE: 5,
+      });
+      return [
+        makeStarter(SpeciesId.SNORLAX, {
+          moveset: [MoveId.BODY_SLAM, MoveId.EARTHQUAKE, MoveId.CRUNCH, MoveId.REST],
+        }),
+        makeStarter(SpeciesId.PIKACHU, {
+          moveset: [MoveId.THUNDERBOLT, MoveId.QUICK_ATTACK, MoveId.SURF, MoveId.IRON_TAIL],
+        }),
+        makeStarter(SpeciesId.GARCHOMP, {
+          moveset: [MoveId.EARTHQUAKE, MoveId.DRAGON_CLAW, MoveId.STONE_EDGE, MoveId.SWORDS_DANCE],
+        }),
+        makeStarter(SpeciesId.GENGAR, {
+          moveset: [MoveId.SHADOW_BALL, MoveId.SLUDGE_BOMB, MoveId.THUNDERBOLT, MoveId.DESTINY_BOND],
+        }),
+      ];
+    },
+  },
+  // ===========================================================================
   // Combat — Cotton Down lowers FOES' Speed only, not the ally (double battle)
   // ===========================================================================
   {
