@@ -11534,4 +11534,145 @@ export const DEV_SCENARIOS: DevScenario[] = [
       ];
     },
   },
+  // ===========================================================================
+  // Status — ER major statuses are mutually exclusive (Frostbite blocks Bleed)
+  // ===========================================================================
+  {
+    label: "Status: ER majors block each other (Frostbite vs Bleed)",
+    description:
+      "ER 2.65: the custom major statuses (Frostbite / Bleed / Fear) are MUTUALLY\n"
+      + "EXCLUSIVE, exactly like vanilla non-volatile status (you cannot burn an already-\n"
+      + "poisoned mon). Reported: 'frostbite being replaced by bleed when it should be\n"
+      + "blocking'. Your Snorlax starts FROSTBITTEN; the foe has Blood Stain, which spreads\n"
+      + "Bleed onto anything that makes contact with it.\n"
+      + "DO: hit the Chansey with a CONTACT move (BODY SLAM). Blood Stain then tries to\n"
+      + "inflict Bleed on your Snorlax.\n"
+      + "EXPECT: Snorlax STAYS Frostbitten (the frostbite status icon is unchanged) - the\n"
+      + "Bleed is BLOCKED, not applied on top of / over the frostbite. Before the fix the\n"
+      + "frostbite was overwritten by bleed.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_WAVE_OVERRIDE: 145,
+        STARTING_LEVEL_OVERRIDE: 50,
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.CHANSEY,
+        ENEMY_LEVEL_OVERRIDE: 100,
+        ENEMY_ABILITY_OVERRIDE: erAbility(ErAbilityId.BLOOD_STAIN),
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+      });
+      return [
+        makeStarter(SpeciesId.SNORLAX, {
+          moveset: [MoveId.BODY_SLAM, MoveId.REST, MoveId.CRUNCH, MoveId.EARTHQUAKE],
+        }),
+      ];
+    },
+    onBattleStart: () => {
+      // Pre-frostbite the lead: the vanilla FREEZE status reroutes to ER Frostbite.
+      globalScene.getPlayerPokemon()?.trySetStatus(StatusEffect.FREEZE);
+    },
+  },
+  // ===========================================================================
+  // Move — Rain Flush is non-contact (must not trigger Rough Skin), #254 class
+  // ===========================================================================
+  {
+    label: "Move: Rain Flush is non-contact (no Rough Skin recoil)",
+    description:
+      "ER 2.65: Rain Flush is a special water blast with NO 'Makes Contact' flag, so it\n"
+      + "must not trigger contact-punish abilities. Reported: it was proc'ing the foe's\n"
+      + "Rough Skin (same class as #254). Your Snorlax has Rain Flush; the Chansey has\n"
+      + "Rough Skin.\n"
+      + "DO: use RAIN FLUSH on the Chansey (bulky, survives).\n"
+      + "EXPECT: NO 'Rough Skin hurt its attacker!' message and your Snorlax takes NO\n"
+      + "recoil from the move. (For contrast, a real contact move like BODY SLAM DOES\n"
+      + "take the Rough Skin chip - try it to compare.)",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_WAVE_OVERRIDE: 145,
+        STARTING_LEVEL_OVERRIDE: 50,
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.CHANSEY,
+        ENEMY_LEVEL_OVERRIDE: 100,
+        ENEMY_ABILITY_OVERRIDE: AbilityId.ROUGH_SKIN,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+      });
+      return [
+        makeStarter(SpeciesId.SNORLAX, {
+          moveset: [erMove(ErMoveId.RAIN_FLUSH), MoveId.BODY_SLAM, MoveId.REST, MoveId.EARTHQUAKE],
+        }),
+      ];
+    },
+  },
+  // ===========================================================================
+  // Ability — Queen's Mourning counts holder + ally stat drops (once per stat)
+  // ===========================================================================
+  {
+    label: "Ability: Queen's Mourning counts holder + ally drops",
+    description:
+      "ER 2.65: Queen's Mourning 'triggers when the user OR THEIR ALLY has their stats\n"
+      + "lowered ... boosting Sp.Atk and Sp.Def by one stage', once PER STAT lowered.\n"
+      + "Reported: it only counted the holder's OWN drops. DOUBLE battle; your Vespiquen\n"
+      + "has Queen's Mourning and the foes have Fearmonger (Intimidate + Scare: ATK &\n"
+      + "Sp.Atk -1 to your whole side on entry).\n"
+      + "DO: nothing - the boost lands on entry. Open Check Team / the summary and read\n"
+      + "Vespiquen's stat-stage arrows.\n"
+      + "EXPECT: Vespiquen's Sp.Def is MAXED (+6) and Sp.Atk strongly boosted - it counts\n"
+      + "the drops on BOTH of your mons, once per stat. Before the fix it was only about\n"
+      + "+2 (its own drops, once per event).",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_WAVE_OVERRIDE: 145,
+        STARTING_LEVEL_OVERRIDE: 55,
+        BATTLE_STYLE_OVERRIDE: "double",
+        ABILITY_OVERRIDE: erAbility(ErAbilityId.QUEEN_S_MOURNING),
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.BLISSEY,
+        ENEMY_LEVEL_OVERRIDE: 60,
+        ENEMY_ABILITY_OVERRIDE: erAbility(ErAbilityId.FEARMONGER),
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+      });
+      return [
+        makeStarter(SpeciesId.VESPIQUEN, {
+          moveset: [MoveId.BUG_BUZZ, MoveId.AIR_SLASH, MoveId.POWER_GEM, MoveId.ROOST],
+        }),
+        makeStarter(SpeciesId.SNORLAX, {
+          moveset: [MoveId.BODY_SLAM, MoveId.CRUNCH, MoveId.EARTHQUAKE, MoveId.REST],
+        }),
+      ];
+    },
+  },
+  // ===========================================================================
+  // Ability — Neutralizing Gas suppresses Fearmonger's entry drop (VERIFIED OK)
+  // ===========================================================================
+  {
+    label: "(note) Neut Gas suppresses Fearmonger's entry drop",
+    description:
+      "VERIFIED CORRECT (no code change needed): with a Neutralizing Gas mon on the\n"
+      + "field, a Fearmonger entry/switch-in's ATK & Sp.Atk drop is SUPPRESSED - at battle\n"
+      + "start AND on a mid-battle switch-in, and whether Fearmonger is the active ability\n"
+      + "or an innate. It is handled by the generic ability-suppression pipeline, exactly\n"
+      + "like the Scare/#375 fix. Regression-checked headlessly.\n"
+      + "DO: this battle has YOUR Gyarados with Fearmonger vs a Weezing with Neutralizing\n"
+      + "Gas. Check the Weezing's stat arrows on entry.\n"
+      + "EXPECT: the Weezing's ATK / Sp.Atk are NOT lowered (0 stages) - Fearmonger is\n"
+      + "gassed. If a tester ever sees the drop LAND under active Neut Gas, Send Logs: it\n"
+      + "would be a summon-ORDER case (Fearmonger entering before the Gas activates), not\n"
+      + "this suppression path.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_WAVE_OVERRIDE: 145,
+        STARTING_LEVEL_OVERRIDE: 50,
+        ABILITY_OVERRIDE: erAbility(ErAbilityId.FEARMONGER),
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.WEEZING,
+        ENEMY_LEVEL_OVERRIDE: 50,
+        ENEMY_ABILITY_OVERRIDE: AbilityId.NEUTRALIZING_GAS,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+      });
+      return [
+        makeStarter(SpeciesId.GYARADOS, {
+          moveset: [MoveId.WATERFALL, MoveId.CRUNCH, MoveId.EARTHQUAKE, MoveId.DRAGON_DANCE],
+        }),
+      ];
+    },
+  },
 ];
