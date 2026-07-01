@@ -119,6 +119,12 @@ export class MockText implements MockGameObject {
     return this;
   }
 
+  setResolution(_resolution): this {
+    // Sets the resolution (render scale) of this text. No-op headless.
+    // return this.phaserText.setResolution(resolution);
+    return this;
+  }
+
   setLineSpacing(_lineSpacing): this {
     // Sets the line spacing value of this Game Object.
     // return this.phaserText.setLineSpacing(lineSpacing);
