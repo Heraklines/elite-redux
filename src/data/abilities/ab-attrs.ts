@@ -5563,6 +5563,22 @@ export abstract class RedirectMoveAbAttr extends AbAttr {
     if (!this.canRedirect(moveId, sourcePokemon)) {
       return false;
     }
+    // Triple: only redirect the move if this mon (the redirector) is ADJACENT to the attacker, so
+    // the move can actually reach it - unless the move bypasses adjacency (Flying/Pulse). Binary
+    // battles have every pair adjacent, so this never blocks a redirect there.
+    const arrangement = globalScene.currentBattle?.arrangement;
+    const move = allMoves[moveId];
+    if (
+      arrangement
+      && move.type !== PokemonType.FLYING
+      && !move.hasFlag(MoveFlags.PULSE_MOVE)
+      && !arrangement.isAdjacent(
+        arrangement.locate(sourcePokemon.getBattlerIndex()),
+        arrangement.locate(pokemon.getBattlerIndex()),
+      )
+    ) {
+      return false;
+    }
     const newTarget = pokemon.getBattlerIndex();
     return targetIndex.value !== newTarget;
   }

@@ -560,6 +560,26 @@ export class MovePhase extends PokemonPhase {
   }
 
   /**
+   * Triple: a redirect (Follow Me / Rage Powder / Spotlight) can only pull the move to a target
+   * the attacker can actually reach - one ADJACENT to the user, or any target if the move bypasses
+   * adjacency (Flying/Pulse). Binary battles have every pair adjacent, so this is always true there.
+   */
+  private canRedirectTo(target: Pokemon): boolean {
+    const arrangement = globalScene.currentBattle?.arrangement;
+    if (!arrangement) {
+      return true;
+    }
+    const move = this.move.getMove();
+    if (move.type === PokemonType.FLYING || move.hasFlag(MoveFlags.PULSE_MOVE)) {
+      return true;
+    }
+    return arrangement.isAdjacent(
+      arrangement.locate(this.pokemon.getBattlerIndex()),
+      arrangement.locate(target.getBattlerIndex()),
+    );
+  }
+
+  /**
    * Modify `this.targets` in place based on move redirection effects.
    */
   protected resolveRedirectTarget(): void {
@@ -597,6 +617,7 @@ export class MovePhase extends PokemonPhase {
         redirectTag
         && (!redirectTag.powder
           || (!this.pokemon.isOfType(PokemonType.GRASS) && !this.pokemon.hasAbility(AbilityId.OVERCOAT)))
+        && this.canRedirectTo(p)
       ) {
         redirectTarget.value = p.getBattlerIndex();
         redirectedByAbility = false;
