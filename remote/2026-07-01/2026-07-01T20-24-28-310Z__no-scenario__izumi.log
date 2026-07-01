@@ -1,0 +1,304 @@
+url:      https://elite-redux-staging.pages.dev/
+build:    mr2gafdr-8tyo
+mode:     4  wave:10
+seed:     PpQazmgIpokVK21dcoas9wQ4
+party:    Taillow(L5 0hp f0), Squirtle(L8 0hp f0), Ponyta(L8 3hp f0), Scyther(L6 0hp f0), Minun(L6 0hp f0), Dratini(L5 0hp f0)
+enemy:    Caterpie(L6), Lillipup(L8), Wooloo(L6)
+
+----- COMMENT -----
+Crash Happens when you throw a pokeball in Triples only mode
+
+----- CONSOLE -----
+[20:24:39.045] LOG: Move: Bubble Beam | Base damage: 5.466666666666667 | Power: 30 | Source attack: 10 | Target defense: 9
+[20:24:39.046] LOG: Move: Bubble Beam | Attack damage: 7
+[20:24:39.047] LOG: %cStart Phase DamageAnimPhase color:green;
+[20:24:39.135] LOG: %cStart Phase MoveEffectPhase color:green;
+[20:24:39.137] LOG: crit stage: +0
+[20:24:39.139] LOG: Move: Bubble Beam | Base damage: 5.466666666666667 | Power: 30 | Source attack: 10 | Target defense: 9
+[20:24:39.140] LOG: Move: Bubble Beam | Attack damage: 7
+[20:24:39.140] LOG: %cStart Phase DamageAnimPhase color:green;
+[20:24:39.227] LOG: %cStart Phase MessagePhase color:green;
+[20:24:39.503] LOG: %cStart Phase MoveEndPhase color:green;
+[20:24:39.503] LOG: %cStart Phase MovePhase color:green;
+[20:24:39.503] LOG: %cUser: Caterpie
+Move: SKITTER_SMACK
+Use Mode: NORMAL color:orchid
+[20:24:39.508] LOG: %cStart Phase MessagePhase color:green;
+[20:24:39.745] LOG: %cStart Phase MoveEffectPhase color:green;
+[20:24:39.746] LOG: crit stage: +0
+[20:24:39.747] LOG: Move: Skitter Smack | Base damage: 7.217882352941177 | Power: 126 | Source attack: 8 | Target defense: 17
+[20:24:39.748] LOG: Move: Skitter Smack | Attack damage: 8
+[20:24:39.748] LOG: %cStart Phase DamageAnimPhase color:green;
+[20:24:39.845] LOG: %cStart Phase StatStageChangePhase color:green;
+[20:24:39.848] LOG: %cStart Phase MessagePhase color:green;
+[20:24:40.128] LOG: %cStart Phase ShowAbilityPhase color:green;
+[20:24:40.366] LOG: %cStart Phase StatStageChangePhase color:green;
+[20:24:40.371] LOG: %cStart Phase MessagePhase color:green;
+[20:24:40.696] LOG: %cStart Phase HideAbilityPhase color:green;
+[20:24:40.746] LOG: %cStart Phase MoveEndPhase color:green;
+[20:24:40.747] LOG: %cStart Phase CheckInterludePhase color:green;
+[20:24:40.747] LOG: %cStart Phase WeatherEffectPhase color:green;
+[20:24:40.747] LOG: %cStart Phase PositionalTagPhase color:green;
+[20:24:40.747] LOG: %cStart Phase BerryPhase color:green;
+[20:24:40.751] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[20:24:40.753] LOG: %cStart Phase TurnEndPhase color:green;
+[20:24:40.755] WARN: [coop:turn] host recorder: finalize with NO open recording -> turn=-1 events=0 (caller decides not to emit)
+[20:24:40.755] LOG: %cStart Phase PokemonHealPhase color:green;
+[20:24:40.781] LOG: %cStart Phase MessagePhase color:green;
+[20:24:41.081] LOG: %cStart Phase TurnInitPhase color:green;
+[20:24:41.082] LOG: %cStart Phase CommandPhase color:green;
+[20:24:41.926] LOG: Move: TAIL_WHIP Move targets: {"targets":[3],"multiple":true} 
+Player Pokemon: Squirtle
+[20:24:41.933] LOG: %cStart Phase CommandPhase color:green;
+[20:24:42.655] LOG: Move: FLAME_WHEEL Move targets: {"targets":[],"multiple":false} 
+Player Pokemon: Ponyta
+[20:24:42.660] LOG: %cStart Phase EnemyCommandPhase color:green;
+[20:24:42.666] LOG: Battle Seed: uyrbF8gsWMbu66Rs
+[20:24:42.669] LOG: Move Pool: ["Skitter Smack","Tackle"]
+[20:24:42.669] LOG: Move Scores: [21,8]
+[20:24:42.669] LOG: Sorted Move Pool: ["Skitter Smack","Tackle"]
+[20:24:42.669] LOG: Chosen Move: Skitter Smack
+[20:24:42.669] LOG: %cStart Phase TurnStartPhase color:green;
+[20:24:42.674] LOG: %cStart Phase MovePhase color:green;
+[20:24:42.674] LOG: %cUser: Ponyta
+Move: FLAME_WHEEL
+Use Mode: NORMAL color:orchid
+[20:24:42.674] WARN: Ponyta is attempting to use a move with no targets
+[20:24:42.674] LOG: %cStart Phase MoveEndPhase color:green;
+[20:24:42.674] LOG: %cStart Phase MovePhase color:green;
+[20:24:42.674] LOG: %cUser: Squirtle
+Move: TAIL_WHIP
+Use Mode: NORMAL color:orchid
+[20:24:42.677] LOG: %cStart Phase MessagePhase color:green;
+[20:24:42.811] LOG: %cStart Phase MoveEffectPhase color:green;
+[20:24:42.812] LOG: %cStart Phase StatStageChangePhase color:green;
+[20:24:42.816] LOG: %cStart Phase MessagePhase color:green;
+[20:24:43.054] LOG: %cStart Phase MoveEndPhase color:green;
+[20:24:43.055] LOG: %cStart Phase MovePhase color:green;
+[20:24:43.055] LOG: %cUser: Caterpie
+Move: SKITTER_SMACK
+Use Mode: NORMAL color:orchid
+[20:24:43.059] LOG: %cStart Phase MessagePhase color:green;
+[20:24:43.294] LOG: %cStart Phase MoveEffectPhase color:green;
+[20:24:43.295] LOG: crit stage: +0
+[20:24:43.296] LOG: Move: Skitter Smack | Base damage: 7.217882352941177 | Power: 126 | Source attack: 8 | Target defense: 17
+[20:24:43.296] LOG: Move: Skitter Smack | Attack damage: 7
+[20:24:43.297] LOG: %cStart Phase DamageAnimPhase color:green;
+[20:24:43.403] LOG: %cStart Phase StatStageChangePhase color:green;
+[20:24:43.407] LOG: %cStart Phase MessagePhase color:green;
+[20:24:43.687] LOG: %cStart Phase ShowAbilityPhase color:green;
+[20:24:43.934] LOG: %cStart Phase StatStageChangePhase color:green;
+[20:24:43.938] LOG: %cStart Phase MessagePhase color:green;
+[20:24:44.234] LOG: %cStart Phase HideAbilityPhase color:green;
+[20:24:44.286] LOG: %cStart Phase MoveEndPhase color:green;
+[20:24:44.287] LOG: %cStart Phase CheckInterludePhase color:green;
+[20:24:44.287] LOG: %cStart Phase WeatherEffectPhase color:green;
+[20:24:44.287] LOG: %cStart Phase PositionalTagPhase color:green;
+[20:24:44.287] LOG: %cStart Phase BerryPhase color:green;
+[20:24:44.291] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[20:24:44.293] LOG: %cStart Phase TurnEndPhase color:green;
+[20:24:44.294] WARN: [coop:turn] host recorder: finalize with NO open recording -> turn=-1 events=0 (caller decides not to emit)
+[20:24:44.294] LOG: %cStart Phase PokemonHealPhase color:green;
+[20:24:44.296] LOG: %cStart Phase MessagePhase color:green;
+[20:24:44.579] LOG: %cStart Phase TurnInitPhase color:green;
+[20:24:44.579] LOG: %cStart Phase CommandPhase color:green;
+[20:24:45.534] LOG: Move: TAIL_WHIP Move targets: {"targets":[3],"multiple":true} 
+Player Pokemon: Squirtle
+[20:24:45.541] LOG: %cStart Phase CommandPhase color:green;
+[20:24:45.934] LOG: Move: FLAME_WHEEL Move targets: {"targets":[],"multiple":false} 
+Player Pokemon: Ponyta
+[20:24:45.938] LOG: %cStart Phase EnemyCommandPhase color:green;
+[20:24:45.945] LOG: Battle Seed: uyrbF8gsWMbu66Rs
+[20:24:45.946] LOG: Move Pool: ["Skitter Smack"]
+[20:24:45.946] LOG: Move Scores: [21]
+[20:24:45.946] LOG: Sorted Move Pool: ["Skitter Smack"]
+[20:24:45.946] LOG: Chosen Move: Skitter Smack
+[20:24:45.946] LOG: %cStart Phase TurnStartPhase color:green;
+[20:24:45.951] LOG: %cStart Phase MovePhase color:green;
+[20:24:45.951] LOG: %cUser: Ponyta
+Move: FLAME_WHEEL
+Use Mode: NORMAL color:orchid
+[20:24:45.951] WARN: Ponyta is attempting to use a move with no targets
+[20:24:45.951] LOG: %cStart Phase MoveEndPhase color:green;
+[20:24:45.951] LOG: %cStart Phase MovePhase color:green;
+[20:24:45.951] LOG: %cUser: Squirtle
+Move: TAIL_WHIP
+Use Mode: NORMAL color:orchid
+[20:24:45.955] LOG: %cStart Phase MessagePhase color:green;
+[20:24:46.091] LOG: %cStart Phase MoveEffectPhase color:green;
+[20:24:46.092] LOG: %cStart Phase StatStageChangePhase color:green;
+[20:24:46.096] LOG: %cStart Phase MessagePhase color:green;
+[20:24:46.382] LOG: %cStart Phase MoveEndPhase color:green;
+[20:24:46.382] LOG: %cStart Phase MovePhase color:green;
+[20:24:46.382] LOG: %cUser: Caterpie
+Move: SKITTER_SMACK
+Use Mode: NORMAL color:orchid
+[20:24:46.386] LOG: %cStart Phase MessagePhase color:green;
+[20:24:46.622] LOG: %cStart Phase MoveEffectPhase color:green;
+[20:24:46.623] LOG: crit stage: +0
+[20:24:46.624] LOG: Move: Skitter Smack | Base damage: 7.217882352941177 | Power: 126 | Source attack: 8 | Target defense: 17
+[20:24:46.624] LOG: Move: Skitter Smack | Attack damage: 7
+[20:24:46.625] LOG: %cStart Phase DamageAnimPhase color:green;
+[20:24:46.719] LOG: %cStart Phase FaintPhase color:green;
+[20:24:46.723] WARN: cry/7 not found
+[20:24:46.858] LOG: %cStart Phase MessagePhase color:green;
+[20:24:47.675] LOG: %cStart Phase MoveEndPhase color:green;
+[20:24:47.675] LOG: %cStart Phase CheckInterludePhase color:green;
+[20:24:47.675] LOG: %cStart Phase WeatherEffectPhase color:green;
+[20:24:47.675] LOG: %cStart Phase PositionalTagPhase color:green;
+[20:24:47.675] LOG: %cStart Phase BerryPhase color:green;
+[20:24:47.676] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[20:24:47.676] LOG: %cStart Phase TurnEndPhase color:green;
+[20:24:47.677] WARN: [coop:turn] host recorder: finalize with NO open recording -> turn=-1 events=0 (caller decides not to emit)
+[20:24:47.677] LOG: %cStart Phase TurnInitPhase color:green;
+[20:24:47.677] LOG: %cStart Phase CommandPhase color:green;
+[20:24:48.734] LOG: Move: FLAME_WHEEL Move targets: {"targets":[],"multiple":false} 
+Player Pokemon: Ponyta
+[20:24:48.739] LOG: %cStart Phase EnemyCommandPhase color:green;
+[20:24:48.740] LOG: Move Pool: ["Skitter Smack","Tackle"]
+[20:24:48.740] LOG: Move Scores: [null,null]
+[20:24:48.740] LOG: Sorted Move Pool: ["Skitter Smack","Tackle"]
+[20:24:48.740] LOG: Chosen Move: Skitter Smack
+[20:24:48.740] LOG: %cStart Phase TurnStartPhase color:green;
+[20:24:48.744] LOG: %cStart Phase MovePhase color:green;
+[20:24:48.744] LOG: %cUser: Ponyta
+Move: FLAME_WHEEL
+Use Mode: NORMAL color:orchid
+[20:24:48.744] WARN: Ponyta is attempting to use a move with no targets
+[20:24:48.744] LOG: %cStart Phase MoveEndPhase color:green;
+[20:24:48.744] LOG: %cStart Phase MovePhase color:green;
+[20:24:48.744] LOG: %cUser: Caterpie
+Move: SKITTER_SMACK
+Use Mode: NORMAL color:orchid
+[20:24:48.744] WARN: Caterpie is attempting to use a move with no targets
+[20:24:48.745] LOG: %cStart Phase MoveEndPhase color:green;
+[20:24:48.745] LOG: %cStart Phase CheckInterludePhase color:green;
+[20:24:48.745] LOG: %cStart Phase WeatherEffectPhase color:green;
+[20:24:48.745] LOG: %cStart Phase PositionalTagPhase color:green;
+[20:24:48.745] LOG: %cStart Phase BerryPhase color:green;
+[20:24:48.745] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[20:24:48.746] LOG: %cStart Phase TurnEndPhase color:green;
+[20:24:48.746] WARN: [coop:turn] host recorder: finalize with NO open recording -> turn=-1 events=0 (caller decides not to emit)
+[20:24:48.746] LOG: %cStart Phase TurnInitPhase color:green;
+[20:24:48.746] LOG: %cStart Phase CommandPhase color:green;
+[20:24:50.004] LOG: Move: FLAME_WHEEL Move targets: {"targets":[],"multiple":false} 
+Player Pokemon: Ponyta
+[20:24:50.008] LOG: %cStart Phase EnemyCommandPhase color:green;
+[20:24:50.010] LOG: Move Pool: ["Skitter Smack","Tackle"]
+[20:24:50.010] LOG: Move Scores: [null,null]
+[20:24:50.010] LOG: Sorted Move Pool: ["Skitter Smack","Tackle"]
+[20:24:50.010] LOG: Chosen Move: Skitter Smack
+[20:24:50.010] LOG: %cStart Phase TurnStartPhase color:green;
+[20:24:50.013] LOG: %cStart Phase MovePhase color:green;
+[20:24:50.013] LOG: %cUser: Ponyta
+Move: FLAME_WHEEL
+Use Mode: NORMAL color:orchid
+[20:24:50.013] WARN: Ponyta is attempting to use a move with no targets
+[20:24:50.013] LOG: %cStart Phase MoveEndPhase color:green;
+[20:24:50.013] LOG: %cStart Phase MovePhase color:green;
+[20:24:50.013] LOG: %cUser: Caterpie
+Move: SKITTER_SMACK
+Use Mode: NORMAL color:orchid
+[20:24:50.013] WARN: Caterpie is attempting to use a move with no targets
+[20:24:50.014] LOG: %cStart Phase MoveEndPhase color:green;
+[20:24:50.014] LOG: %cStart Phase CheckInterludePhase color:green;
+[20:24:50.014] LOG: %cStart Phase WeatherEffectPhase color:green;
+[20:24:50.014] LOG: %cStart Phase PositionalTagPhase color:green;
+[20:24:50.014] LOG: %cStart Phase BerryPhase color:green;
+[20:24:50.015] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[20:24:50.015] LOG: %cStart Phase TurnEndPhase color:green;
+[20:24:50.016] WARN: [coop:turn] host recorder: finalize with NO open recording -> turn=-1 events=0 (caller decides not to emit)
+[20:24:50.016] LOG: %cStart Phase TurnInitPhase color:green;
+[20:24:50.016] LOG: %cStart Phase CommandPhase color:green;
+[20:24:52.296] LOG: Move: HIGH_JUMP_KICK Move targets: {"targets":[],"multiple":false} 
+Player Pokemon: Ponyta
+[20:24:52.300] LOG: %cStart Phase EnemyCommandPhase color:green;
+[20:24:52.301] LOG: Move Pool: ["Skitter Smack","Tackle"]
+[20:24:52.301] LOG: Move Scores: [null,null]
+[20:24:52.301] LOG: Sorted Move Pool: ["Skitter Smack","Tackle"]
+[20:24:52.301] LOG: Chosen Move: Skitter Smack
+[20:24:52.301] LOG: %cStart Phase TurnStartPhase color:green;
+[20:24:52.305] LOG: %cStart Phase MovePhase color:green;
+[20:24:52.305] LOG: %cUser: Ponyta
+Move: HIGH_JUMP_KICK
+Use Mode: NORMAL color:orchid
+[20:24:52.305] WARN: Ponyta is attempting to use a move with no targets
+[20:24:52.306] LOG: %cStart Phase MoveEndPhase color:green;
+[20:24:52.306] LOG: %cStart Phase MovePhase color:green;
+[20:24:52.306] LOG: %cUser: Caterpie
+Move: SKITTER_SMACK
+Use Mode: NORMAL color:orchid
+[20:24:52.306] WARN: Caterpie is attempting to use a move with no targets
+[20:24:52.306] LOG: %cStart Phase MoveEndPhase color:green;
+[20:24:52.306] LOG: %cStart Phase CheckInterludePhase color:green;
+[20:24:52.306] LOG: %cStart Phase WeatherEffectPhase color:green;
+[20:24:52.306] LOG: %cStart Phase PositionalTagPhase color:green;
+[20:24:52.306] LOG: %cStart Phase BerryPhase color:green;
+[20:24:52.307] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[20:24:52.307] LOG: %cStart Phase TurnEndPhase color:green;
+[20:24:52.308] WARN: [coop:turn] host recorder: finalize with NO open recording -> turn=-1 events=0 (caller decides not to emit)
+[20:24:52.308] LOG: %cStart Phase TurnInitPhase color:green;
+[20:24:52.308] LOG: %cStart Phase CommandPhase color:green;
+[20:24:54.264] LOG: Move: PROTECT Move targets: {"targets":[2],"multiple":false} 
+Player Pokemon: Ponyta
+[20:24:54.267] LOG: %cStart Phase EnemyCommandPhase color:green;
+[20:24:54.270] LOG: Move Pool: ["Skitter Smack","Tackle"]
+[20:24:54.270] LOG: Move Scores: [null,null]
+[20:24:54.270] LOG: Sorted Move Pool: ["Skitter Smack","Tackle"]
+[20:24:54.270] LOG: Chosen Move: Skitter Smack
+[20:24:54.270] LOG: %cStart Phase TurnStartPhase color:green;
+[20:24:54.273] LOG: %cStart Phase MovePhase color:green;
+[20:24:54.273] LOG: %cUser: Ponyta
+Move: PROTECT
+Use Mode: NORMAL color:orchid
+[20:24:54.275] LOG: %cStart Phase MessagePhase color:green;
+[20:24:54.403] LOG: %cStart Phase MoveEffectPhase color:green;
+[20:24:54.404] LOG: %cStart Phase MessagePhase color:green;
+[20:24:54.636] LOG: %cStart Phase MoveEndPhase color:green;
+[20:24:54.636] LOG: %cStart Phase MovePhase color:green;
+[20:24:54.636] LOG: %cUser: Caterpie
+Move: SKITTER_SMACK
+Use Mode: NORMAL color:orchid
+[20:24:54.636] WARN: Caterpie is attempting to use a move with no targets
+[20:24:54.637] LOG: %cStart Phase MoveEndPhase color:green;
+[20:24:54.637] LOG: %cStart Phase CheckInterludePhase color:green;
+[20:24:54.637] LOG: %cStart Phase WeatherEffectPhase color:green;
+[20:24:54.637] LOG: %cStart Phase PositionalTagPhase color:green;
+[20:24:54.637] LOG: %cStart Phase BerryPhase color:green;
+[20:24:54.637] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[20:24:54.638] LOG: %cStart Phase TurnEndPhase color:green;
+[20:24:54.638] WARN: [coop:turn] host recorder: finalize with NO open recording -> turn=-1 events=0 (caller decides not to emit)
+[20:24:54.638] LOG: %cStart Phase TurnInitPhase color:green;
+[20:24:54.638] LOG: %cStart Phase CommandPhase color:green;
+[20:24:57.021] LOG: Move: PROTECT Move targets: {"targets":[2],"multiple":false} 
+Player Pokemon: Ponyta
+[20:24:57.024] LOG: %cStart Phase EnemyCommandPhase color:green;
+[20:24:57.026] LOG: Move Pool: ["Skitter Smack","Tackle"]
+[20:24:57.026] LOG: Move Scores: [null,null]
+[20:24:57.026] LOG: Sorted Move Pool: ["Skitter Smack","Tackle"]
+[20:24:57.026] LOG: Chosen Move: Skitter Smack
+[20:24:57.026] LOG: %cStart Phase TurnStartPhase color:green;
+[20:24:57.029] LOG: %cStart Phase MovePhase color:green;
+[20:24:57.029] LOG: %cUser: Ponyta
+Move: PROTECT
+Use Mode: NORMAL color:orchid
+[20:24:57.031] LOG: Battle Seed: uyrbF8gsWMbu66Rs
+[20:24:57.031] LOG: %cStart Phase MessagePhase color:green;
+[20:24:57.160] LOG: %cStart Phase MessagePhase color:green;
+[20:24:57.385] LOG: %cStart Phase MoveEndPhase color:green;
+[20:24:57.385] LOG: %cStart Phase MovePhase color:green;
+[20:24:57.385] LOG: %cUser: Caterpie
+Move: SKITTER_SMACK
+Use Mode: NORMAL color:orchid
+[20:24:57.385] WARN: Caterpie is attempting to use a move with no targets
+[20:24:57.385] LOG: %cStart Phase MoveEndPhase color:green;
+[20:24:57.385] LOG: %cStart Phase CheckInterludePhase color:green;
+[20:24:57.385] LOG: %cStart Phase WeatherEffectPhase color:green;
+[20:24:57.385] LOG: %cStart Phase PositionalTagPhase color:green;
+[20:24:57.385] LOG: %cStart Phase BerryPhase color:green;
+[20:24:57.386] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[20:24:57.386] LOG: %cStart Phase TurnEndPhase color:green;
+[20:24:57.386] WARN: [coop:turn] host recorder: finalize with NO open recording -> turn=-1 events=0 (caller decides not to emit)
+[20:24:57.386] LOG: %cStart Phase TurnInitPhase color:green;
+[20:24:57.387] LOG: %cStart Phase CommandPhase color:green;
+[20:25:03.733] ERROR: [uncaught] Uncaught TypeError: Cannot set properties of null (setting 'skip') @ https://elite-redux-staging.pages.dev/assets/battle-scene-BAdHM9GP.js:20:2764
