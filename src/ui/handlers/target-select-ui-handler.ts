@@ -16,8 +16,9 @@ export class TargetSelectUiHandler extends UiHandler {
   private fieldIndex: number;
   private move: MoveId;
   private targetSelectCallback: TargetSelectCallback;
-  private cursor0: number; // associated with BattlerIndex.PLAYER
-  private cursor1: number; // associated with BattlerIndex.PLAYER_2
+  // Last-chosen target per attacking field slot (index by fieldIndex). Multi-format: a triple
+  // has three attackers, so this is an array rather than the old cursor0/cursor1 pair.
+  private cursors: number[] = [];
 
   private isMultipleTargets = false;
   private targets: BattlerIndex[];
@@ -64,11 +65,9 @@ export class TargetSelectUiHandler extends UiHandler {
       return true;
     }
 
-    if (this.fieldIndex === BattlerIndex.PLAYER) {
-      this.resetCursor(this.cursor0, user);
-    } else if (this.fieldIndex === BattlerIndex.PLAYER_2) {
-      this.resetCursor(this.cursor1, user);
-    }
+    // Binary: PLAYER(0) and PLAYER_2(1) are the only attackers. Triple adds PLAYER_3(2);
+    // indexing cursors by fieldIndex reproduces the old cursor0/cursor1 for slots 0/1.
+    this.resetCursor(this.cursors[this.fieldIndex], user);
     return true;
   }
 
@@ -78,11 +77,10 @@ export class TargetSelectUiHandler extends UiHandler {
    * @param user the Pokemon using the move
    */
   resetCursor(cursorN: number, user: Pokemon): void {
-    if (
-      cursorN != null
-      && ([BattlerIndex.PLAYER, BattlerIndex.PLAYER_2].includes(cursorN) || user.tempSummonData.waveTurnCount === 1)
-    ) {
-      // Reset cursor on the first turn of a fight or if an ally was targeted last turn
+    // Reset the cursor on the first turn of a fight or if an ally was targeted last turn. The
+    // ally check is by side (isPlayer) so it also covers a triple's 3rd slot; for binary it is
+    // exactly the old [PLAYER, PLAYER_2] membership test.
+    if (cursorN != null && (globalScene.getField()[cursorN]?.isPlayer() || user.tempSummonData.waveTurnCount === 1)) {
       cursorN = -1;
     }
     this.setCursor(this.targets.includes(cursorN) ? cursorN : this.targets[0]);
@@ -97,15 +95,15 @@ export class TargetSelectUiHandler extends UiHandler {
       const targetIndexes: BattlerIndex[] = this.isMultipleTargets ? this.targets : [this.cursor];
       this.targetSelectCallback(button === Button.ACTION ? targetIndexes : []);
       success = true;
-      if (this.fieldIndex === BattlerIndex.PLAYER) {
-        if (this.cursor0 == null || this.cursor0 !== this.cursor) {
-          this.cursor0 = this.cursor;
-        }
-      } else if (this.fieldIndex === BattlerIndex.PLAYER_2 && (this.cursor1 == null || this.cursor1 !== this.cursor)) {
-        this.cursor1 = this.cursor;
-      }
+      // Remember this attacker's pick (index by fieldIndex; binary uses slots 0/1 as before).
+      this.cursors[this.fieldIndex] = this.cursor;
     } else if (this.isMultipleTargets) {
       success = false;
+    } else if (this.isTripleField()) {
+      // Triple+: the parity / BattlerIndex.ENEMY model below is a 2-wide battler-index layout
+      // that can't reach a 3rd column (from the front foe RIGHT never fires and LEFT looks at
+      // a player index), so navigate the sorted valid targets on the cursor's side instead.
+      success = this.navigateTripleCursor(button);
     } else {
       switch (button) {
         case Button.UP:
@@ -136,6 +134,50 @@ export class TargetSelectUiHandler extends UiHandler {
     }
 
     return success;
+  }
+
+  /** True only in a triple+ battle (either side has 3 or more field slots). Binary is false. */
+  private isTripleField(): boolean {
+    const arr = globalScene.currentBattle?.arrangement;
+    return (arr?.playerCapacity ?? 0) >= 3 || (arr?.enemyCapacity ?? 0) >= 3;
+  }
+
+  /**
+   * Triple+ cursor navigation over the current valid targets. LEFT/RIGHT step through the
+   * targets on the cursor's OWN side in field order (flat index = screen LEFT->RIGHT); UP jumps
+   * to the enemy row (top), DOWN to the player row (bottom). Only ever lands on a valid target.
+   */
+  private navigateTripleCursor(button: Button): boolean {
+    const field = globalScene.getField();
+    const isFoe = (i: number) => !field[i]?.isPlayer();
+    const sortAsc = (a: number, b: number) => a - b;
+    const cursorIsFoe = isFoe(this.cursor);
+
+    const sameSide = this.targets.filter(t => isFoe(t) === cursorIsFoe).sort(sortAsc);
+    const pos = sameSide.indexOf(this.cursor);
+
+    switch (button) {
+      case Button.LEFT:
+        return pos > 0 ? this.setCursor(sameSide[pos - 1]) : false;
+      case Button.RIGHT:
+        return pos > -1 && pos < sameSide.length - 1 ? this.setCursor(sameSide[pos + 1]) : false;
+      case Button.UP: {
+        if (cursorIsFoe) {
+          return false;
+        }
+        const foes = this.targets.filter(isFoe).sort(sortAsc);
+        return foes.length > 0 ? this.setCursor(foes[0]) : false;
+      }
+      case Button.DOWN: {
+        if (!cursorIsFoe) {
+          return false;
+        }
+        const allies = this.targets.filter(t => !isFoe(t)).sort(sortAsc);
+        return allies.length > 0 ? this.setCursor(allies[0]) : false;
+      }
+      default:
+        return false;
+    }
   }
 
   setCursor(cursor: number): boolean {

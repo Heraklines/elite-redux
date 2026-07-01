@@ -394,8 +394,16 @@ export class BattleInfoOverlay {
     const field = this.onField();
     const n = Math.max(1, field.length);
     const sel = Math.min(this.slotIndex, n - 1);
-    const slotH = n <= 2 ? 44 : 30;
-    const gap = 4;
+    // Triple has 6 on-field mons (3+3): 6 tiles at the binary height overflow the 160px
+    // column, so shrink the tiles (and their icon/label) to fit. Binary (<=4 on-field,
+    // singles/doubles) keeps its exact previous layout.
+    const isTriple = n > 4;
+    const slotH = isTriple ? 22 : n <= 2 ? 44 : 30;
+    const gap = isTriple ? 3 : 4;
+    const iconScale = isTriple ? 0.55 : 0.7;
+    const iconDy = isTriple ? -3 : -4;
+    const tagDy = isTriple ? 7 : 8;
+    const tagFont = isTriple ? "32px" : "38px";
     const total = field.length * slotH + (field.length - 1) * gap;
     let top = Math.max(6, Math.floor((BG_H - total) / 2));
     for (let i = 0; i < field.length; i++) {
@@ -411,12 +419,18 @@ export class BattleInfoOverlay {
         g.strokeRoundedRect(COL_X, top, COL_W, slotH, 6);
       }
       c.add(g);
-      const icon = globalScene.addPokemonIcon(mon, COL_X + COL_W / 2, cy - 4, 0.5, 0.5);
-      icon.setScale(0.7);
+      const icon = globalScene.addPokemonIcon(mon, COL_X + COL_W / 2, cy + iconDy, 0.5, 0.5);
+      icon.setScale(iconScale);
       c.add(icon);
-      const tag = addTextObject(COL_X + COL_W / 2, top + slotH - 8, isEnemy ? "Foe" : "Ally", TextStyle.WINDOW_ALT, {
-        fontSize: "38px",
-      });
+      const tag = addTextObject(
+        COL_X + COL_W / 2,
+        top + slotH - tagDy,
+        isEnemy ? "Foe" : "Ally",
+        TextStyle.WINDOW_ALT,
+        {
+          fontSize: tagFont,
+        },
+      );
       tag.setOrigin(0.5, 0);
       c.add(tag);
       top += slotH + gap;
