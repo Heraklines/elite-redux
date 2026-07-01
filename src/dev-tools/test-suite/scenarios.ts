@@ -11368,6 +11368,49 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
   },
   {
+    label: "TRIPLE: ability adjacency (Intimidate hits ADJACENT foes only)",
+    description:
+      "Triple battle where ALL THREE of your mons have INTIMIDATE (forced). On entry each\n"
+      + "Intimidate lowers the ATTACK only of the foes it is ADJACENT to (the mainline triple\n"
+      + "rule), so:\n"
+      + "- The CENTRE foe is reached by all three of your mons -> Attack -3.\n"
+      + "- Each WING foe (left / right) is reached by only two of your mons -> Attack -2.\n"
+      + "WHAT TO DO: at battle start, open the INFO screen (Stats page) and read each foe's\n"
+      + "Attack stage. EXPECT centre = -3, both wings = -2. If adjacency were broken (the old\n"
+      + "all-foes behaviour) every foe would read -3.\n"
+      + "The same adjacency rule now governs Scare / Terrify / Fearmonger / Cotton Down /\n"
+      + "Download / Trace and the ally auras (Battery / Power Spot / Friend Guard). The foes are\n"
+      + "given Ball Fetch so none are Intimidate-immune.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_WAVE_OVERRIDE: 133,
+        STARTING_LEVEL_OVERRIDE: 50,
+        BATTLE_STYLE_OVERRIDE: "triple",
+        BATTLE_TYPE_OVERRIDE: BattleType.WILD,
+        DISABLE_STANDARD_TRAINERS_OVERRIDE: true,
+        ABILITY_OVERRIDE: AbilityId.INTIMIDATE,
+        ENEMY_ABILITY_OVERRIDE: AbilityId.BALL_FETCH,
+      });
+      setPendingDevEnemyParty([
+        { speciesId: SpeciesId.SNORLAX, level: 50, moveIds: [MoveId.SPLASH] },
+        { speciesId: SpeciesId.SNORLAX, level: 50, moveIds: [MoveId.SPLASH] },
+        { speciesId: SpeciesId.SNORLAX, level: 50, moveIds: [MoveId.SPLASH] },
+      ]);
+      return [
+        makeStarter(SpeciesId.SNORLAX, {
+          moveset: [MoveId.BODY_SLAM, MoveId.EARTHQUAKE, MoveId.CRUNCH, MoveId.REST],
+        }),
+        makeStarter(SpeciesId.PIKACHU, {
+          moveset: [MoveId.THUNDERBOLT, MoveId.VOLT_SWITCH, MoveId.SURF, MoveId.NUZZLE],
+        }),
+        makeStarter(SpeciesId.EEVEE, {
+          moveset: [MoveId.QUICK_ATTACK, MoveId.BITE, MoveId.SWIFT, MoveId.HELPING_HAND],
+        }),
+      ];
+    },
+  },
+  {
     label: "(note) Ghost Trainer FX: entrance + aura (editor)",
     description:
       "Ghost Trainer FX - cosmetic ENTRANCE arrival + AURA overlay for YOUR published ghost.\n"
