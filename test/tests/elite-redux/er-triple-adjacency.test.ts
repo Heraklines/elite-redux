@@ -125,5 +125,15 @@ describe.skipIf(!RUN)("ER triple battles - positional adjacency in move targetin
     expect(bi(players[0].getAdjacentAllies())).toEqual([1]); // LEFT wing <-> centre only
     expect(bi(players[1].getAdjacentAllies())).toEqual([0, 2]); // centre <-> both wings
     expect(bi(players[2].getAdjacentAllies())).toEqual([1]); // RIGHT wing <-> centre only
+
+    // The enemy side mirrors it (both sides use the same arrangement): a foe wing reaches the
+    // player in front + centre and is adjacent only to the centre foe; the centre foe reaches all.
+    const foes = globalScene.getEnemyField();
+    expect(bi(foes[0].getAdjacentOpponents())).toEqual([0, 1]); // enemy LEFT -> player LEFT + centre
+    expect(bi(foes[1].getAdjacentOpponents())).toEqual([0, 1, 2]); // enemy centre -> all players
+    expect(bi(foes[2].getAdjacentOpponents())).toEqual([1, 2]); // enemy RIGHT -> player centre + RIGHT
+    expect(bi(foes[0].getAdjacentAllies())).toEqual([4]); // enemy LEFT <-> enemy centre
+    expect(bi(foes[1].getAdjacentAllies())).toEqual([3, 5]); // enemy centre <-> both enemy wings
+    expect(bi(foes[2].getAdjacentAllies())).toEqual([4]); // enemy RIGHT <-> enemy centre
   });
 });
