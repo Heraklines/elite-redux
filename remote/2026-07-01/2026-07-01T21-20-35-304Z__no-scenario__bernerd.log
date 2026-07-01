@@ -1,0 +1,274 @@
+url:      https://elite-redux-staging.pages.dev/
+build:    mr2gafdr-8tyo
+mode:     0  wave:44
+seed:     21cncr5QM6Zr8xjHQW48hGVe
+party:    Lampent(L36 81hp f0), Floragato(L35 78hp f0), Shedinja(L26 1hp f0), Drizzile(L28 78hp f0), Vivillon(L27 83hp f12), Gabite(L26 73hp f0)
+enemy:    Parasect(L28), Parasect(L28)
+
+----- COMMENT -----
+Ominous Wind should hit both opponents
+
+----- CONSOLE -----
+[21:14:31.312] LOG: %cStart Phase BerryPhase color:green;
+[21:14:31.312] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[21:14:31.312] LOG: %cStart Phase TurnEndPhase color:green;
+[21:14:31.314] WARN: [coop:turn] host recorder: finalize with NO open recording -> turn=-1 events=0 (caller decides not to emit)
+[21:14:31.314] LOG: %cStart Phase BattleEndPhase color:green;
+[21:14:31.314] LOG: Battle Score: 114 (2 Turns x0.84)
+[21:14:31.314] LOG: Total Score: 3750
+[21:14:31.323] LOG: %cStart Phase MysteryEncounterRewardsPhase color:green;
+[21:14:31.323] LOG: %cStart Phase SelectModifierPhase color:green;
+[21:14:31.324] LOG: Wave Seed: \[_{w`b¢r{^bq 42
+[21:14:31.326] LOG: 0 0 [2,3,4,5]
+[21:14:31.326] LOG: {"id":"POKEBALL","localeKey":"","iconImage":"pb","group":"pb","soundName":"se/pb_bounce_1","tier":0,"pokeballType":0,"count":5} 
+[21:14:31.326] LOG: 15 9 [2,3,4,5,6,7,8,9,10,22]
+[21:14:31.326] LOG: GREAT 0
+[21:14:31.326] LOG: 20 9 [2,3,4,5,6,7,8,9,10,22]
+[21:14:31.326] LOG: {"id":"BASE_STAT_BOOSTER","localeKey":"","iconImage":"hp_up","soundName":"se/restore","tier":1,"stat":0,"key":"hp_up"} 
+[21:14:31.327] LOG: 6 4 [2,3,4,5]
+[21:14:31.327] LOG: {"id":"LURE","localeKey":"modifierType:ModifierType.LURE","iconImage":"lure","group":"lure","soundName":"se/restore","tier":0,"maxBattles":10} 
+[21:14:34.205] LOG: Applied HP Up 
+[21:14:34.215] LOG: %cStart Phase EggLapsePhase color:green;
+[21:14:34.215] LOG: %cStart Phase PostMysteryEncounterPhase color:green;
+[21:14:34.215] LOG: %cStart Phase NewBattlePhase color:green;
+[21:14:34.215] LOG: Wave Seed: ]\`|xac£s|_cr 43
+[21:14:34.216] LOG: %cStart Phase NextEncounterPhase color:green;
+[21:14:34.217] LOG: Starting species pool tier: UNCOMMON
+[21:14:34.217] LOG: Replaced NINCADA with NINJASK
+[21:14:34.219] LOG: Applied Shiny Charm 
+[21:14:34.225] LOG: Pokemon: Wild Ninjask | Species ID: 291 | Level: 28 | Nature: Serious (-)
+[21:14:34.225] LOG: Stats (IVs): HP: 76 (16), Atk: 62 (4), Def: 31 (6), Spatk: 36 (13), Spdef: 33 (2), Spd: 96 (7)
+[21:14:34.225] LOG: Ability: Speed Force | Passive Ability: Compound Eyes 
+[21:14:34.225] LOG: Moveset: ["Lunge","Dual Wingbeat","Harden","Mind Reader"]
+[21:14:34.465] LOG: Battle Seed: wXOOUFMV25OCKAfo
+[21:14:34.515] DEBUG: Session data saved to slot 0!
+[21:14:34.515] LOG: Wave Seed: ]\`|xac£s|_cr 43
+[21:14:34.948] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[21:14:34.948] LOG: %cStart Phase CheckSwitchPhase color:green;
+[21:14:52.388] LOG: %cStart Phase InitEncounterPhase color:green;
+[21:14:52.388] LOG: %cStart Phase PostSummonPhase color:green;
+[21:14:52.389] LOG: Ran PSP for: Ninjask
+[21:14:52.389] LOG: %cStart Phase PostSummonPhase color:green;
+[21:14:52.389] LOG: %cStart Phase PostSummonPhase color:green;
+[21:14:52.389] LOG: %cStart Phase TurnInitPhase color:green;
+[21:14:52.389] LOG: %cStart Phase CommandPhase color:green;
+[21:14:53.734] LOG: Move: FLAME_BURST Move targets: {"targets":[2],"multiple":false} 
+Player Pokemon: Lampent
+[21:14:53.735] LOG: %cStart Phase EnemyCommandPhase color:green;
+[21:14:53.741] WARN: BattlerTag MIND_READER is missing a score!
+[21:14:53.742] WARN: BattlerTag MIND_READER is missing a score!
+[21:14:53.742] LOG: Move Pool: ["Lunge","Dual Wingbeat","Harden","Mind Reader"]
+[21:14:53.742] LOG: Move Scores: [5.90625,33,10,-20]
+[21:14:53.742] LOG: Sorted Move Pool: ["Dual Wingbeat","Harden","Lunge","Mind Reader"]
+[21:14:53.742] LOG: Chosen Move: Dual Wingbeat
+[21:14:53.742] LOG: %cStart Phase TurnStartPhase color:green;
+[21:14:53.744] LOG: %cStart Phase MovePhase color:green;
+[21:14:53.744] LOG: %cUser: Lampent
+Move: FLAME_BURST
+Use Mode: NORMAL color:orchid
+[21:14:53.745] LOG: %cStart Phase MessagePhase color:green;
+[21:14:53.854] LOG: %cStart Phase MoveEffectPhase color:green;
+[21:14:54.405] LOG: crit stage: +0
+[21:14:54.406] LOG: Applied Charcoal 
+[21:14:54.406] LOG: Move: Flame Burst | Base damage: 39.70181818181818 | Power: 48 | Source attack: 81 | Target defense: 33
+[21:14:54.407] LOG: Move: Flame Burst | Attack damage: 227
+[21:14:54.408] LOG: Applied Shell Bell 
+[21:14:54.408] LOG: %cStart Phase DamageAnimPhase color:green;
+[21:14:54.440] LOG: %cStart Phase MessagePhase color:green;
+[21:14:54.637] LOG: %cStart Phase MessagePhase color:green;
+[21:14:54.854] LOG: %cStart Phase FaintPhase color:green;
+[21:14:55.780] LOG: %cStart Phase MessagePhase color:green;
+[21:14:55.995] LOG: %cStart Phase VictoryPhase color:green;
+[21:14:55.995] LOG: Applied Soothe Bell 
+[21:14:55.995] LOG: Applied Lucky Egg 
+[21:14:55.996] LOG: %cStart Phase ExpPhase color:green;
+[21:14:55.996] LOG: Applied Super EXP. Charm 
+[21:14:55.996] LOG: Applied EXP. Charm 
+[21:14:56.281] LOG: %cStart Phase LevelUpPhase color:green;
+[21:14:56.281] LOG: Applied HP Up 
+[21:14:56.282] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[21:14:56.282] LOG: Applied Super EXP. Charm 
+[21:14:56.283] LOG: Applied EXP. Charm 
+[21:14:56.284] LOG: %cStart Phase LevelUpPhase color:green;
+[21:14:56.285] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[21:14:56.285] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[21:14:56.285] LOG: Applied Super EXP. Charm 
+[21:14:56.285] LOG: Applied EXP. Charm 
+[21:14:56.286] LOG: %cStart Phase LevelUpPhase color:green;
+[21:14:56.287] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[21:14:56.287] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[21:14:56.287] LOG: Applied Super EXP. Charm 
+[21:14:56.287] LOG: Applied EXP. Charm 
+[21:14:56.288] LOG: %cStart Phase LevelUpPhase color:green;
+[21:14:56.288] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[21:14:56.288] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[21:14:56.288] LOG: Applied Super EXP. Charm 
+[21:14:56.289] LOG: Applied EXP. Charm 
+[21:14:56.290] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[21:14:56.291] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[21:14:56.291] LOG: Applied Super EXP. Charm 
+[21:14:56.291] LOG: Applied EXP. Charm 
+[21:14:56.291] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[21:14:56.291] LOG: %cStart Phase MoveEndPhase color:green;
+[21:14:56.291] LOG: %cStart Phase MovePhase color:green;
+[21:14:56.291] LOG: %cStart Phase MoveEndPhase color:green;
+[21:14:56.292] LOG: %cStart Phase CheckInterludePhase color:green;
+[21:14:56.292] LOG: %cStart Phase WeatherEffectPhase color:green;
+[21:14:56.672] LOG: %cStart Phase PositionalTagPhase color:green;
+[21:14:56.672] LOG: %cStart Phase BerryPhase color:green;
+[21:14:56.672] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[21:14:56.673] LOG: %cStart Phase TurnEndPhase color:green;
+[21:14:56.675] WARN: [coop:turn] host recorder: finalize with NO open recording -> turn=-1 events=0 (caller decides not to emit)
+[21:14:56.675] LOG: %cStart Phase BattleEndPhase color:green;
+[21:14:56.675] LOG: Battle Score: 107 (1 Turns x1)
+[21:14:56.675] LOG: Total Score: 3857
+[21:14:56.684] LOG: Applied HP Up 
+[21:14:56.691] LOG: %cStart Phase EggLapsePhase color:green;
+[21:14:56.691] LOG: %cStart Phase SelectModifierPhase color:green;
+[21:14:56.691] LOG: Wave Seed: ]\`|xac£s|_cr 43
+[21:14:56.695] LOG: 0 0 [2,3,4,5]
+[21:14:56.695] LOG: {"id":"POKEBALL","localeKey":"","iconImage":"pb","group":"pb","soundName":"se/pb_bounce_1","tier":0,"pokeballType":0,"count":5} 
+[21:14:56.695] LOG: 19 9 [2,3,4,5,6,7,8,9,10,22]
+[21:14:56.695] LOG: {"id":"ER_ABILITY_CAPSULE","localeKey":"","iconImage":"ability_capsule","soundName":"se/restore","tier":1} 
+[21:14:56.695] LOG: 0 0 [2,3,4,5]
+[21:14:56.695] LOG: {"id":"POKEBALL","localeKey":"","iconImage":"pb","group":"pb","soundName":"se/pb_bounce_1","tier":0,"pokeballType":0,"count":5} 
+[21:14:56.695] LOG: 6 4 [2,3,4,5]
+[21:14:56.695] LOG: {"id":"LURE","localeKey":"modifierType:ModifierType.LURE","iconImage":"lure","group":"lure","soundName":"se/restore","tier":0,"maxBattles":10} 
+[21:18:54.957] WARN: Texture "%s" has no frame "%s" items er_grass_gem
+[21:18:55.025] WARN: Texture "%s" has no frame "%s" items er_grass_gem
+[21:18:55.326] WARN: Texture "%s" has no frame "%s" items er_grass_gem
+[21:19:54.403] LOG: Applied HP Up 
+[21:19:54.425] LOG: %cStart Phase NewBattlePhase color:green;
+[21:19:54.426] LOG: Wave Seed: ^]a}ybd¤t}`ds 44
+[21:19:54.426] LOG: Applied Lure 
+[21:19:54.426] LOG: %cStart Phase NextEncounterPhase color:green;
+[21:19:54.427] LOG: Starting species pool tier: COMMON
+[21:19:54.428] LOG: Replaced PARAS with PARASECT
+[21:19:54.430] LOG: Applied Shiny Charm 
+[21:19:54.437] LOG: Pokemon: Wild Parasect | Species ID: 47 | Level: 28 | Nature: Naive (+Spd/-SpDef)
+[21:19:54.437] LOG: Stats (IVs): HP: 87 (18), Atk: 64 (13), Def: 64 (23), Spatk: 52 (28), Spdef: 76 (6), Spd: 25 (3)
+[21:19:54.437] LOG: Ability: Self Sufficient | Passive Ability: Parasitic Spores 
+[21:19:54.437] LOG: Moveset: ["Fertile Fangs","Fury Cutter","Phantom Force","Giga Drain"]
+[21:19:54.437] LOG: Starting species pool tier: COMMON
+[21:19:54.437] LOG: Replaced PARAS with PARASECT
+[21:19:54.438] LOG: Applied Shiny Charm 
+[21:19:54.443] LOG: Pokemon: Wild Parasect | Species ID: 47 | Level: 28 | Nature: Sassy (+SpDef/-Spd)
+[21:19:54.443] LOG: Stats (IVs): HP: 88 (22), Atk: 68 (26), Def: 63 (18), Spatk: 51 (26), Spdef: 94 (6), Spd: 21 (8)
+[21:19:54.444] LOG: Ability: Shadow Tag | Passive Ability: Parasitic Spores 
+[21:19:54.444] LOG: Moveset: ["Skitter Smack","Fury Cutter","Giga Drain","Fertile Fangs"]
+[21:19:55.095] LOG: Battle Seed: 44pDZjkJOYPfIFUl
+[21:19:55.159] DEBUG: Session data saved to slot 0!
+[21:19:55.160] LOG: Wave Seed: ^]a}ybd¤t}`ds 44
+[21:19:55.612] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[21:19:55.678] LOG: %cStart Phase SummonPhase color:green;
+[21:19:55.820] LOG: Applied HP Up 
+[21:19:55.959] LOG: %cStart Phase CheckSwitchPhase color:green;
+[21:19:56.448] LOG: %cStart Phase CheckSwitchPhase color:green;
+[21:19:56.450] LOG: %cStart Phase InitEncounterPhase color:green;
+[21:19:56.452] LOG: %cStart Phase PostSummonPhase color:green;
+[21:19:56.452] LOG: Ran PSP for: Floragato
+[21:19:56.454] LOG: %cStart Phase PostSummonPhase color:green;
+[21:19:56.455] LOG: %cStart Phase PostSummonPhase color:green;
+[21:19:56.456] LOG: %cStart Phase PostSummonPhase color:green;
+[21:19:56.456] LOG: Ran PSP for: Parasect
+[21:19:56.457] LOG: %cStart Phase PostSummonPhase color:green;
+[21:19:56.458] LOG: %cStart Phase PostSummonPhase color:green;
+[21:19:56.458] LOG: %cStart Phase ShowAbilityPhase color:green;
+[21:19:56.629] LOG: %cStart Phase HideAbilityPhase color:green;
+[21:19:56.679] LOG: %cStart Phase PostSummonPhase color:green;
+[21:19:56.679] LOG: Ran PSP for: Parasect
+[21:19:56.682] LOG: %cStart Phase PostSummonPhase color:green;
+[21:19:56.682] LOG: %cStart Phase PostSummonPhase color:green;
+[21:19:56.682] LOG: %cStart Phase ShowAbilityPhase color:green;
+[21:19:56.845] LOG: %cStart Phase HideAbilityPhase color:green;
+[21:19:56.886] LOG: %cStart Phase TurnInitPhase color:green;
+[21:19:56.886] LOG: %cStart Phase CommandPhase color:green;
+[21:19:59.678] LOG: Move: OMINOUS_WIND Move targets: {"targets":[2,3,1],"multiple":false} 
+Player Pokemon: Lampent
+[21:19:59.683] LOG: %cStart Phase SelectTargetPhase color:green;
+[21:20:02.431] LOG: %cStart Phase CommandPhase color:green;
+[21:20:04.718] LOG: Move: TRIPLE_AXEL Move targets: {"targets":[2,3,0],"multiple":false} 
+Player Pokemon: Floragato
+[21:20:04.721] LOG: %cStart Phase SelectTargetPhase color:green;
+[21:20:05.177] LOG: %cStart Phase EnemyCommandPhase color:green;
+[21:20:05.201] LOG: Move Pool: ["Fertile Fangs","Fury Cutter","Phantom Force","Giga Drain"]
+[21:20:05.201] LOG: Move Scores: [12.1875,2.7421875,13.5,10.875]
+[21:20:05.201] LOG: Sorted Move Pool: ["Phantom Force","Fertile Fangs","Giga Drain","Fury Cutter"]
+[21:20:05.201] LOG: Chosen Move: Phantom Force
+[21:20:05.201] LOG: %cStart Phase EnemyCommandPhase color:green;
+[21:20:05.214] LOG: Move Pool: ["Skitter Smack","Fury Cutter","Giga Drain","Fertile Fangs"]
+[21:20:05.214] LOG: Move Scores: [4.828125,2.53125,10.875,12]
+[21:20:05.214] LOG: Sorted Move Pool: ["Fertile Fangs","Giga Drain","Skitter Smack","Fury Cutter"]
+[21:20:05.214] LOG: Chosen Move: Giga Drain
+[21:20:05.214] LOG: %cStart Phase TurnStartPhase color:green;
+[21:20:05.221] LOG: %cStart Phase MovePhase color:green;
+[21:20:05.221] LOG: %cUser: Floragato
+Move: TRIPLE_AXEL
+Use Mode: NORMAL color:orchid
+[21:20:05.227] LOG: %cStart Phase MessagePhase color:green;
+[21:20:05.301] LOG: %cStart Phase ShowAbilityPhase color:green;
+[21:20:05.454] LOG: %cStart Phase MessagePhase color:green;
+[21:20:05.702] LOG: %cStart Phase HideAbilityPhase color:green;
+[21:20:05.737] LOG: %cStart Phase MoveEffectPhase color:green;
+[21:20:05.741] LOG: %cStart Phase MessagePhase color:green;
+[21:20:05.985] LOG: %cStart Phase MoveEndPhase color:green;
+[21:20:05.989] LOG: %cStart Phase MovePhase color:green;
+[21:20:05.989] LOG: %cUser: Lampent
+Move: OMINOUS_WIND
+Use Mode: NORMAL color:orchid
+[21:20:06.004] LOG: %cStart Phase MessagePhase color:green;
+[21:20:06.135] LOG: %cStart Phase MoveEffectPhase color:green;
+[21:20:06.787] LOG: crit stage: +0
+[21:20:06.791] LOG: Move: Ominous Wind | Base damage: 23.492631578947368 | Power: 60 | Source attack: 83 | Target defense: 76
+[21:20:06.792] LOG: Move: Ominous Wind | Attack damage: 66
+[21:20:06.793] LOG: Applied Shell Bell 
+[21:20:06.794] LOG: %cStart Phase DamageAnimPhase color:green;
+[21:20:06.820] LOG: %cStart Phase MessagePhase color:green;
+[21:20:07.035] LOG: %cStart Phase MoveEndPhase color:green;
+[21:20:07.037] LOG: %cStart Phase MovePhase color:green;
+[21:20:07.038] LOG: %cUser: Parasect
+Move: PHANTOM_FORCE
+Use Mode: NORMAL color:orchid
+[21:20:07.048] LOG: %cStart Phase MessagePhase color:green;
+[21:20:07.168] LOG: %cStart Phase MoveChargePhase color:green;
+[21:20:07.391] LOG: %cStart Phase MessagePhase color:green;
+[21:20:07.618] LOG: %cStart Phase MoveEndPhase color:green;
+[21:20:07.618] LOG: %cStart Phase MovePhase color:green;
+[21:20:07.618] LOG: %cUser: Parasect
+Move: GIGA_DRAIN
+Use Mode: NORMAL color:orchid
+[21:20:07.633] LOG: %cStart Phase MessagePhase color:green;
+[21:20:07.768] LOG: %cStart Phase MoveEffectPhase color:green;
+[21:20:08.679] LOG: crit stage: +0
+[21:20:08.682] LOG: Move: Giga Drain | Base damage: 21.41923076923077 | Power: 75 | Source attack: 51 | Target defense: 52
+[21:20:08.683] LOG: Move: Giga Drain | Attack damage: 20
+[21:20:08.684] LOG: %cStart Phase DamageAnimPhase color:green;
+[21:20:08.712] LOG: %cStart Phase MessagePhase color:green;
+[21:20:08.927] LOG: %cStart Phase PokemonHealPhase color:green;
+[21:20:08.927] LOG: %cStart Phase MessagePhase color:green;
+[21:20:09.160] LOG: %cStart Phase MoveEndPhase color:green;
+[21:20:09.160] LOG: %cStart Phase CheckInterludePhase color:green;
+[21:20:09.160] LOG: %cStart Phase WeatherEffectPhase color:green;
+[21:20:09.561] LOG: %cStart Phase PositionalTagPhase color:green;
+[21:20:09.562] LOG: %cStart Phase BerryPhase color:green;
+[21:20:09.572] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[21:20:09.578] LOG: %cStart Phase TurnEndPhase color:green;
+[21:20:09.586] WARN: [coop:turn] host recorder: finalize with NO open recording -> turn=-1 events=0 (caller decides not to emit)
+[21:20:09.586] LOG: %cStart Phase PokemonHealPhase color:green;
+[21:20:09.783] LOG: %cStart Phase MessagePhase color:green;
+[21:20:10.010] LOG: %cStart Phase ShowAbilityPhase color:green;
+[21:20:10.195] LOG: %cStart Phase PokemonHealPhase color:green;
+[21:20:10.416] LOG: %cStart Phase MessagePhase color:green;
+[21:20:10.693] LOG: %cStart Phase HideAbilityPhase color:green;
+[21:20:10.728] LOG: %cStart Phase ShowAbilityPhase color:green;
+[21:20:10.912] LOG: %cStart Phase DamageAnimPhase color:green;
+[21:20:10.916] LOG: %cStart Phase MessagePhase color:green;
+[21:20:11.143] LOG: %cStart Phase HideAbilityPhase color:green;
+[21:20:11.179] LOG: %cStart Phase PokemonHealPhase color:green;
+[21:20:11.179] LOG: %cStart Phase MessagePhase color:green;
+[21:20:11.410] LOG: %cStart Phase ShowAbilityPhase color:green;
+[21:20:11.578] LOG: %cStart Phase DamageAnimPhase color:green;
+[21:20:11.582] LOG: %cStart Phase MessagePhase color:green;
+[21:20:11.810] LOG: %cStart Phase HideAbilityPhase color:green;
+[21:20:11.845] LOG: %cStart Phase TurnInitPhase color:green;
+[21:20:11.845] LOG: %cStart Phase CommandPhase color:green;
