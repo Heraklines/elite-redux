@@ -1144,9 +1144,14 @@ export class GhostTrainerEditorUiHandler extends UiHandler {
     setTrainerFxSpeed(fx, this.draft.fxSpeed);
     setTrainerFxIntensity(fx, this.draft.fxIntensity);
     // Tear the editor down BEFORE the confirmation so the message renders on a clean screen
-    // (the editor paints an opaque backdrop; a MESSAGE under it would be invisible).
+    // (the editor paints an opaque backdrop; a MESSAGE under it would be invisible). setMode
+    // clears the editor (the current handler) but does NOT touch the mode chain, so the
+    // Profile hub overlay beneath it stays on the chain. Do NOT resetModeChain() here: that
+    // orphaned the hub (its opaque container stayed visible with no chain entry left to clear
+    // it, ghosting the Profile screen over the title / battle / starter-select). Leaving the
+    // chain intact lets the exit path's ui.revertModes() (in TitlePhase.backToTitle) pop and
+    // clear() the hub too. The message still renders over the hub's opaque backdrop, as before.
     globalScene.ui.setMode(UiMode.MESSAGE);
-    globalScene.ui.resetModeChain();
     const saved = await globalScene.gameData.saveSystem();
     const message = saved
       ? "Ghost profile published. Other trainers will see it on your ghost."
