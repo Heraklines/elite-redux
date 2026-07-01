@@ -839,6 +839,8 @@ async function handleRunCreate(
     ghostSourceRunId?: unknown;
     /** ER Ghost Trainer Editor: the uploader's authored presentation blob (additive/optional). */
     presentation?: unknown;
+    /** ER (relics): the run's active relics at capture, records-only (additive/optional). */
+    relics?: unknown;
     /** ER ghost notifications: every ghost this run fought (additive/optional). */
     ghostsFought?: unknown;
   };
@@ -881,10 +883,15 @@ async function handleRunCreate(
   const presentationStr =
     run.presentation && typeof run.presentation === "object" ? JSON.stringify(run.presentation) : null;
   const presentationBlob = presentationStr && presentationStr.length <= 4096 ? presentationStr : null;
+  // ER (relics): the run's active relics at capture. RECORDS-ONLY - stored verbatim
+  // (opaque JSON, size-capped) for analytics; the encountering client NEVER reads or
+  // applies these to the fielded ghost. Old clients omit `relics` -> stays null.
+  const relicsStr = Array.isArray(run.relics) ? JSON.stringify(run.relics) : null;
+  const relicsBlob = relicsStr && relicsStr.length <= 2048 ? relicsStr : null;
   await ensureRunStatColumns(env);
   await env.DB.prepare(
-    `INSERT INTO runs (id, user_id, username, outcome, difficulty, mode, wave, created_at, player_team, opponent_name, opponent_team, starters, challenges, killed_by_ghost, ghost_source_name, ghost_source_run_id, presentation)
-       VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17)
+    `INSERT INTO runs (id, user_id, username, outcome, difficulty, mode, wave, created_at, player_team, opponent_name, opponent_team, starters, challenges, killed_by_ghost, ghost_source_name, ghost_source_run_id, presentation, relics)
+       VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18)
        ON CONFLICT(id) DO NOTHING`,
   )
     .bind(
@@ -905,6 +912,7 @@ async function handleRunCreate(
       typeof run.ghostSourceName === "string" ? run.ghostSourceName : null,
       typeof run.ghostSourceRunId === "string" ? run.ghostSourceRunId : null,
       presentationBlob,
+      relicsBlob,
     )
     .run();
   // ER ghost notifications (ADDITIVE): record every ghost this run fought so the
@@ -1438,6 +1446,9 @@ async function ensureRunStatColumns(env: Env): Promise<void> {
     // title/dialogue/FX) JSON blob. Additive + nullable; opaque to the worker
     // (the encountering client sanitises it before applying).
     "presentation TEXT",
+    // ER (relics): the run's active relics at capture. RECORDS-ONLY JSON blob
+    // (analytics); never read back / applied to a fielded ghost. Additive + nullable.
+    "relics TEXT",
   ]) {
     try {
       await env.DB.prepare(`ALTER TABLE runs ADD COLUMN ${col}`).run();

@@ -55,7 +55,7 @@ import { speciesEggTiers } from "#balance/species-egg-tiers";
 import { TrainerPartyTemplate } from "#data/trainers/trainer-party-template";
 import { EggTier } from "#enums/egg-type";
 import type { Nature } from "#enums/nature";
-import { PokemonHeldItemModifier } from "#modifiers/modifier";
+import { ErRelicModifier, PokemonHeldItemModifier } from "#modifiers/modifier";
 import { PartyMemberStrength } from "#enums/party-member-strength";
 import { TrainerSlot } from "#enums/trainer-slot";
 import type { EnemyPokemon } from "#field/pokemon";
@@ -127,6 +127,12 @@ export interface GhostTeamSnapshot {
   starters?: number[] | undefined;
   /** ER (#384): active challenges at run end, as [id, value] pairs. */
   challenges?: [number, number][] | undefined;
+  /**
+   * ER (relics): the run's active ER relics at capture, as [kind, stackCount, chosenWeather]
+   * snapshots. RECORDS-ONLY - persisted to the `runs.relics` blob for analytics. Relics are
+   * the uploader's own run buffs and are NEVER reconstructed or applied to the fielded ghost.
+   */
+  relics?: [string, number, number | null][] | undefined;
   /** ER (Colosseum): true when a GHOST trainer dealt the run-ending defeat -
    * the deadliest-ghost leaderboard counts these. Only set on a loss. */
   killedByGhost?: boolean | undefined;
@@ -545,6 +551,22 @@ function serializeHeldItems(p: any, isPlayer: boolean): [string, number][] {
   }
 }
 
+/** Serialise the run's active ER relics as [kind, stackCount, chosenWeather] snapshots.
+ * RECORDS-ONLY: persisted for analytics; NEVER reconstructed or applied to a fielded ghost
+ * (markTrainerAsGhost ignores this field entirely). Best-effort and never throws. */
+function serializeRelics(): [string, number, number | null][] {
+  try {
+    return globalScene
+      .findModifiers(m => m instanceof ErRelicModifier)
+      .map(m => {
+        const r = m as ErRelicModifier;
+        return [String(r.kind), r.getStackCount(), r.chosenWeather ?? null] as [string, number, number | null];
+      });
+  } catch {
+    return [];
+  }
+}
+
 /** Snapshot the current player party into a ghost team, or `null` if empty. */
 export function captureGhostTeam(isVictory: boolean): GhostTeamSnapshot | null {
   // Co-op (#633, P6): a co-op run's party is a MERGED two-player team (each player
@@ -587,6 +609,9 @@ export function captureGhostTeam(isVictory: boolean): GhostTeamSnapshot | null {
     opponentParty,
     starters: captureRunStarterLines(),
     challenges: captureRunChallenges(),
+    // ER (relics): records-only snapshot of the run's relics; persisted to runs.relics
+    // for analytics. NEVER applied to the fielded ghost (markTrainerAsGhost ignores it).
+    relics: serializeRelics(),
     killedByGhost: killerGhost != null || undefined,
     ghostSourceName: killerGhost?.trainerName,
     ghostSourceRunId: killerGhost?.id,
