@@ -253,7 +253,9 @@ export async function initBattleWithEnemyConfig(partyConfig: EnemyPartyConfig): 
     enemyPokemon.leaveField(true, true, true);
   });
   battle.enemyParty = [];
-  battle.double = doubleBattle;
+  // `Battle.double` is a read-only derived view of the format arrangement; write the battle mode
+  // through the supported `setDouble` API (rebuilds the arrangement) instead of assigning the getter.
+  battle.setDouble(doubleBattle);
 
   // ME levels are modified by an additive value that scales with wave index
   // Base scaling: Every 10 waves, modifier gets +1 level

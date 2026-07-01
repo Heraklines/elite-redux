@@ -8,6 +8,7 @@ import { MysteryEncounterTier } from "#enums/mystery-encounter-tier";
 import { MysteryEncounterType } from "#enums/mystery-encounter-type";
 import { SpeciesId } from "#enums/species-id";
 import { TrainerType } from "#enums/trainer-type";
+import { initBattleWithEnemyConfig } from "#mystery-encounters/encounter-phase-utils";
 import { MysteryEncounter } from "#mystery-encounters/mystery-encounter";
 import * as MysteryEncounters from "#mystery-encounters/mystery-encounters";
 import { HUMAN_TRANSITABLE_BIOMES } from "#mystery-encounters/mystery-encounters";
@@ -238,6 +239,41 @@ describe("The Expert Pokémon Breeder - Mystery Encounter", () => {
       expect(scene.currentBattle.trainer).toBeDefined();
       expect(scene.currentBattle.mysteryEncounter?.encounterMode).toBe(MysteryEncounterMode.TRAINER_BATTLE);
       expect(scene.getPlayerParty().length).toBe(1);
+    });
+
+    // Regression: `Battle.double` is a read-only derived view of the format arrangement. The battle
+    // start path (initBattleWithEnemyConfig) used to assign it directly (`battle.double = x`), which
+    // threw "Cannot set property double ... which has only a getter" and crashed
+    // MysteryEncounterOptionSelectedPhase.onOptionSelect. The fix writes the mode through setDouble.
+    it("battle-start (initBattleWithEnemyConfig) does not write the read-only Battle.double getter", async () => {
+      await game.runToMysteryEncounter(MysteryEncounterType.THE_EXPERT_POKEMON_BREEDER, defaultParty);
+
+      const encounter = scene.currentBattle.mysteryEncounter!;
+      const battle = scene.currentBattle;
+
+      // Reproduce the format-refactor condition on this Battle instance: `double` as an own accessor
+      // with a getter and NO setter (shadowing the prototype accessor), exactly as a getter-only
+      // Battle behaves. A direct assignment now throws, matching the captured staging error.
+      Object.defineProperty(battle, "double", {
+        configurable: true,
+        get() {
+          return battle.getBattlerCount() === 2;
+        },
+      });
+      // Guard: prove the getter-only condition truly rejects the old direct-assignment pattern.
+      expect(() => {
+        battle.double = false;
+      }).toThrow();
+
+      // The offending handler is the shared battle-start util the breeder option calls. Awaiting it
+      // directly means a getter-only `battle.double = x` write rejects this promise (the crash);
+      // routing through setDouble resolves it cleanly.
+      await expect(initBattleWithEnemyConfig(encounter.enemyPartyConfigs[0])).resolves.toBeUndefined();
+
+      expect(scene.currentBattle.mysteryEncounter?.encounterMode).toBe(MysteryEncounterMode.TRAINER_BATTLE);
+      // Breeder is a single trainer battle, so setDouble(false) must have applied without throwing.
+      expect(scene.currentBattle.double).toBe(false);
+      expect(scene.currentBattle.getBattlerCount()).toBe(1);
     });
 
     it("Should reward the player with friendship and eggs based on pokemon selected", async () => {
