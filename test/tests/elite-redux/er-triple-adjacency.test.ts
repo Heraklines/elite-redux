@@ -109,4 +109,21 @@ describe.skipIf(!RUN)("ER triple battles - positional adjacency in move targetin
     expect(players[1].fieldPosition).toBe(FieldPosition.CENTER);
     expect(players[2].fieldPosition).toBe(FieldPosition.RIGHT);
   });
+
+  it("getAdjacentOpponents / getAdjacentAllies respect triple placement (the ability-fix foundation)", async () => {
+    // These helpers back every placement-dependent ability fix (Intimidate-family, Cotton Down,
+    // Download, Trace, Battery/Power Spot, ...). A wing reaches the foe in front + centre, not
+    // the far foe; the centre reaches all. Ally-side: a wing is adjacent to the centre only.
+    await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.PIKACHU, SpeciesId.EEVEE);
+    const players = globalScene.getPlayerField();
+    const bi = (arr: { getBattlerIndex: () => number }[]) => arr.map(p => p.getBattlerIndex()).sort((a, b) => a - b);
+
+    expect(bi(players[0].getAdjacentOpponents())).toEqual([3, 4]); // LEFT wing -> front + centre
+    expect(bi(players[1].getAdjacentOpponents())).toEqual([3, 4, 5]); // centre -> all foes
+    expect(bi(players[2].getAdjacentOpponents())).toEqual([4, 5]); // RIGHT wing -> centre + front
+
+    expect(bi(players[0].getAdjacentAllies())).toEqual([1]); // LEFT wing <-> centre only
+    expect(bi(players[1].getAdjacentAllies())).toEqual([0, 2]); // centre <-> both wings
+    expect(bi(players[2].getAdjacentAllies())).toEqual([1]); // RIGHT wing <-> centre only
+  });
 });

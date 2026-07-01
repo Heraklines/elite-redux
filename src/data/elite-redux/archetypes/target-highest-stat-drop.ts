@@ -52,7 +52,9 @@ export class TargetHighestStatDropAbAttr extends PostSummonAbAttr {
     if (simulated) {
       return;
     }
-    const opponents = pokemon.getOpponents();
+    // Triple: Malicious is an on-entry foe stat-drop (Intimidate-family), so it only reaches
+    // ADJACENT foes - a wing never touches the far foe. Binary: every foe is adjacent.
+    const opponents = pokemon.getAdjacentOpponents();
     for (const opp of opponents) {
       if (!opp || opp.isFainted()) {
         continue;

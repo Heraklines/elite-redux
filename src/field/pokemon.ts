@@ -4503,6 +4503,23 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
     return inSpeedOrder(this.isPlayer() ? ArenaTagSide.ENEMY : ArenaTagSide.PLAYER);
   }
 
+  /**
+   * Foes this mon can REACH given the format's positional adjacency - the placement-dependent
+   * subset of {@linkcode getOpponents}. In a triple a wing reaches only the foe opposite it +
+   * the centre; the centre reaches all. Binary battles are unaffected (every pair is mutually
+   * adjacent), so this equals {@linkcode getOpponents} there. Use for placement-dependent foe
+   * effects (Intimidate, Download, Trace, Cotton Down, ...) so a wing never touches the far foe.
+   */
+  getAdjacentOpponents(onField = true): Pokemon[] {
+    const arrangement = globalScene.currentBattle?.arrangement;
+    const opponents = this.getOpponents(onField);
+    if (!arrangement) {
+      return opponents;
+    }
+    const selfId = arrangement.locate(this.getBattlerIndex());
+    return opponents.filter(p => arrangement.isAdjacent(selfId, arrangement.locate(p.getBattlerIndex())));
+  }
+
   getOpponentDescriptor(): string {
     return this.isPlayer() ? i18next.t("arenaTag:opposingTeam") : i18next.t("arenaTag:yourTeam");
   }
@@ -4515,6 +4532,22 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
   getAllies(): Pokemon[] {
     const field: Pokemon[] = this.isPlayer() ? globalScene.getPlayerField() : globalScene.getEnemyField();
     return field.filter(p => p != null && p !== this);
+  }
+
+  /**
+   * Allies this mon is ADJACENT to - the placement-dependent subset of {@linkcode getAllies}.
+   * Binary: the single ally, if any. Triple: a wing has one adjacent ally (the centre); the
+   * centre has two. Binary is byte-identical to {@linkcode getAllies}. Use for adjacency-limited
+   * ally auras (Battery, Power Spot, Steely Spirit, Healer, ...).
+   */
+  getAdjacentAllies(): Pokemon[] {
+    const arrangement = globalScene.currentBattle?.arrangement;
+    const allies = this.getAllies();
+    if (!arrangement) {
+      return allies;
+    }
+    const selfId = arrangement.locate(this.getBattlerIndex());
+    return allies.filter(p => arrangement.isAdjacent(selfId, arrangement.locate(p.getBattlerIndex())));
   }
 
   /**

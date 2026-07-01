@@ -797,11 +797,13 @@ export class PostDefendStatStageChangeAbAttr extends PostDefendAbAttr {
     }
 
     if (this.allOthers || this.opponentsOnly) {
-      const opponents = pokemon.getOpponents();
-      // `opponentsOnly` (ER Cotton Down: "all foes") excludes the ally; the
-      // vanilla `allOthers` path includes it.
-      const ally = this.opponentsOnly ? null : pokemon.getAlly();
-      const otherPokemon = ally == null ? opponents : opponents.concat([ally]);
+      // Triple: placement-dependent - a wing's on-hit stat drop only reaches ADJACENT mons.
+      // `opponentsOnly` (ER Cotton Down) hits adjacent FOES only - its Speed drop is ruled like
+      // Intimidate; the vanilla `allOthers` path also includes adjacent allies. Binary battles
+      // have every foe/ally adjacent, so this is byte-identical there.
+      const opponents = pokemon.getAdjacentOpponents();
+      const allies = this.opponentsOnly ? [] : pokemon.getAdjacentAllies();
+      const otherPokemon = [...opponents, ...allies];
       for (const other of otherPokemon) {
         globalScene.phaseManager.unshiftNew(
           "StatStageChangePhase",
@@ -2647,7 +2649,20 @@ export class PostSummonStatStageChangeAbAttr extends PostSummonAbAttr {
       return;
     }
 
+    // Triple: an on-summon foe stat drop (Intimidate, Supersweet Syrup, and the ER bespoke
+    // Intimidate-family) is placement-dependent - a wing only affects the ADJACENT foe(s), not
+    // the far one. Binary battles have every foe adjacent, so this skips nothing there.
+    const arrangement = globalScene.currentBattle?.arrangement;
     for (const opponent of pokemon.getOpponentsGenerator()) {
+      if (
+        arrangement
+        && !arrangement.isAdjacent(
+          arrangement.locate(pokemon.getBattlerIndex()),
+          arrangement.locate(opponent.getBattlerIndex()),
+        )
+      ) {
+        continue;
+      }
       const cancelled = new BooleanHolder(false);
       if (this.intimidate) {
         const params: AbAttrParamsWithCancel = { pokemon: opponent, cancelled, simulated };
@@ -2744,7 +2759,9 @@ export class DownloadAbAttr extends PostSummonAbAttr {
     this.enemySpDef = 0;
     this.enemyCountTally = 0;
 
-    for (const opponent of pokemon.getOpponents()) {
+    // Triple: Download reads only the ADJACENT foes' bulk to choose its boost (a wing can't
+    // see the far foe). Binary battles have every foe adjacent, so this is unchanged there.
+    for (const opponent of pokemon.getAdjacentOpponents()) {
       // A field slot can be empty/unresolved at switch-in (e.g. this mon post-
       // summons before an opponent is on the field), so skip null entries rather
       // than crash on null.getEffectiveStat (the daily-run PostSummon crash).
@@ -2893,7 +2910,8 @@ export class PostSummonCopyAbilityAbAttr extends PostSummonAbAttr {
 
   override canApply({ pokemon, simulated }: AbAttrBaseParams): boolean {
     const targets = pokemon
-      .getOpponents()
+      // Triple: Trace can only copy an ADJACENT foe's ability (binary: all foes adjacent).
+      .getAdjacentOpponents()
       .filter(t => t.getAbility().copiable || t.getAbility().id === AbilityId.WONDER_GUARD);
     if (targets.length === 0) {
       return false;
