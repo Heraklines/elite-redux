@@ -25,4 +25,4 @@ export const bypassLogin = import.meta.env.VITE_BYPASS_LOGIN === "1";
  * PokeRogue `package.json` version. Bump this with each player-facing patch
  * (keep it in sync with the matching `docs/patch-notes/<version>.md`).
  */
-export const ER_VERSION = "0.0.5.5";
+export const ER_VERSION = "0.0.5.6";
