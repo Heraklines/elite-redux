@@ -1,0 +1,279 @@
+----- BUG REPORT (in-game) -----
+version:  1.11.19
+url:      https://elite-redux.pages.dev/
+ua:       Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36 Edg/149.0.0.0
+mode:     4  wave:190  difficulty:youngster
+seed:     Ywpqinoa8e658f6ImEGYlcsL
+party:    Rapidash(L188 634/634), Orbeetle(L188 0/472), Malamar(L188 551/551), Metagross(L188 0/551), Starmie(L188 481/481), Lilligant(L188 534/534)
+
+----- DESCRIPTION -----
+Horn Drill randomly turned into it's old OHKO move variant when I used it against Hydrapple, kept saying "but it failed" or something like that
+
+----- CONSOLE -----
+[16:00:35.910] LOG: Chosen Move: Tera Starstorm (P)
+[16:00:35.910] LOG: %cStart Phase TurnStartPhase color:green;
+[16:00:35.911] LOG: %cStart Phase MovePhase color:green;
+[16:00:35.911] LOG: %cUser: Mega Orbeetle
+Move: EXPANDING_FORCE
+Use Mode: NORMAL color:orchid
+[16:00:35.911] LOG: %cStart Phase MessagePhase color:green;
+[16:00:36.054] LOG: %cStart Phase MoveEffectPhase color:green;
+[16:00:36.838] LOG: crit stage: +0
+[16:00:36.839] LOG: Move: Expanding Force | Base damage: 143.3321832884097 | Power: 120 | Source attack: 566 | Target defense: 742
+[16:00:36.840] LOG: Move: Expanding Force | Attack damage: 265
+[16:00:36.841] LOG: %cStart Phase DamageAnimPhase color:green;
+[16:00:36.872] LOG: %cStart Phase MoveEndPhase color:green;
+[16:00:36.872] LOG: %cStart Phase MovePhase color:green;
+[16:00:36.872] LOG: %cUser: Terapagos
+Move: TERA_STARSTORM
+Use Mode: NORMAL color:orchid
+[16:00:36.873] LOG: %cStart Phase MessagePhase color:green;
+[16:00:37.038] LOG: %cStart Phase MoveEffectPhase color:green;
+[16:00:37.055] LOG: crit stage: +0
+[16:00:37.056] LOG: Applied Silk Scarf (enemy)
+[16:00:37.056] LOG: Move: Tera Starstorm (P) | Base damage: 248.1642105263158 | Power: 168 | Source attack: 580 | Target defense: 627
+[16:00:37.057] LOG: Move: Tera Starstorm (P) | Attack damage: 421
+[16:00:37.057] LOG: %cStart Phase DamageAnimPhase color:green;
+[16:00:37.089] LOG: %cStart Phase MoveEndPhase color:green;
+[16:00:37.089] LOG: %cStart Phase CheckInterludePhase color:green;
+[16:00:37.089] LOG: %cStart Phase WeatherEffectPhase color:green;
+[16:00:37.089] LOG: %cStart Phase PositionalTagPhase color:green;
+[16:00:37.089] LOG: %cStart Phase BerryPhase color:green;
+[16:00:37.090] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[16:00:37.090] LOG: %cStart Phase TurnEndPhase color:green;
+[16:00:37.091] WARN: [coop:turn] host recorder: finalize with NO open recording -> turn=-1 events=0 (caller decides not to emit)
+[16:00:37.091] LOG: %cStart Phase TurnInitPhase color:green;
+[16:00:37.091] LOG: %cStart Phase CommandPhase color:green;
+[16:00:37.824] LOG: Move: EXPANDING_FORCE Move targets: {"targets":[2],"multiple":true} 
+Player Pokemon: Mega Orbeetle
+[16:00:37.825] LOG: %cStart Phase EnemyCommandPhase color:green;
+[16:00:37.827] LOG: Applied Silk Scarf (enemy)
+[16:00:37.829] LOG: Battle Seed: BafpBNOmp8ZG9X74
+[16:00:37.829] LOG: Move Pool: ["Tera Starstorm (P)","Gem Missile"]
+[16:00:37.829] LOG: Move Scores: [36,24]
+[16:00:37.829] LOG: Sorted Move Pool: ["Tera Starstorm (P)","Gem Missile"]
+[16:00:37.829] LOG: Chosen Move: Gem Missile
+[16:00:37.829] LOG: %cStart Phase TurnStartPhase color:green;
+[16:00:37.830] LOG: %cStart Phase MovePhase color:green;
+[16:00:37.830] LOG: %cUser: Terapagos
+Move: GEM_MISSILE
+Use Mode: NORMAL color:orchid
+[16:00:37.831] LOG: %cStart Phase MessagePhase color:green;
+[16:00:37.954] LOG: %cStart Phase MessagePhase color:green;
+[16:00:38.221] LOG: %cStart Phase MoveEndPhase color:green;
+[16:00:38.221] LOG: %cStart Phase MovePhase color:green;
+[16:00:38.221] LOG: %cUser: Mega Orbeetle
+Move: EXPANDING_FORCE
+Use Mode: NORMAL color:orchid
+[16:00:38.223] LOG: %cStart Phase MessagePhase color:green;
+[16:00:38.371] LOG: %cStart Phase MoveEffectPhase color:green;
+[16:00:39.154] LOG: crit stage: +0
+[16:00:39.155] LOG: Move: Expanding Force | Base damage: 143.3321832884097 | Power: 120 | Source attack: 566 | Target defense: 742
+[16:00:39.157] LOG: Move: Expanding Force | Attack damage: 268
+[16:00:39.157] LOG: %cStart Phase DamageAnimPhase color:green;
+[16:00:39.189] LOG: %cStart Phase MoveEndPhase color:green;
+[16:00:39.189] LOG: %cStart Phase CheckInterludePhase color:green;
+[16:00:39.189] LOG: %cStart Phase WeatherEffectPhase color:green;
+[16:00:39.189] LOG: %cStart Phase PositionalTagPhase color:green;
+[16:00:39.189] LOG: %cStart Phase BerryPhase color:green;
+[16:00:39.189] LOG: Applied Sitrus Berry (enemy)
+[16:00:39.190] LOG: Applied Zinc (enemy)
+[16:00:39.190] LOG: Applied HP Up (enemy)
+[16:00:39.190] LOG: Applied Calcium (enemy)
+[16:00:39.190] LOG: Applied Carbos (enemy)
+[16:00:39.190] LOG: Applied HP Up (enemy)
+[16:00:39.190] LOG: Applied Protein (enemy)
+[16:00:39.190] LOG: Applied Zinc (enemy)
+[16:00:39.190] LOG: Applied Carbos (enemy)
+[16:00:39.190] LOG: Applied Zinc (enemy)
+[16:00:39.190] LOG: Applied Protein (enemy)
+[16:00:39.190] LOG: Applied Calcium (enemy)
+[16:00:39.191] LOG: Applied Zinc (enemy)
+[16:00:39.191] LOG: Applied Iron (enemy)
+[16:00:39.191] LOG: Applied Calcium (enemy)
+[16:00:39.191] LOG: Applied HP Up (enemy)
+[16:00:39.191] LOG: Applied Zinc (enemy)
+[16:00:39.193] LOG: %cStart Phase CommonAnimPhase color:green;
+[16:00:39.538] LOG: %cStart Phase PokemonHealPhase color:green;
+[16:00:39.739] LOG: %cStart Phase MessagePhase color:green;
+[16:00:40.021] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[16:00:40.021] LOG: %cStart Phase TurnEndPhase color:green;
+[16:00:40.023] WARN: [coop:turn] host recorder: finalize with NO open recording -> turn=-1 events=0 (caller decides not to emit)
+[16:00:40.023] LOG: %cStart Phase TurnInitPhase color:green;
+[16:00:40.023] LOG: %cStart Phase CommandPhase color:green;
+[16:00:40.481] LOG: Move: EXPANDING_FORCE Move targets: {"targets":[2],"multiple":true} 
+Player Pokemon: Mega Orbeetle
+[16:00:40.482] LOG: %cStart Phase EnemyCommandPhase color:green;
+[16:00:40.484] LOG: Applied Silk Scarf (enemy)
+[16:00:40.485] LOG: Battle Seed: BafpBNOmp8ZG9X74
+[16:00:40.487] LOG: Move Pool: ["Tera Starstorm (P)","Gem Missile"]
+[16:00:40.487] LOG: Move Scores: [36,24]
+[16:00:40.487] LOG: Sorted Move Pool: ["Tera Starstorm (P)","Gem Missile"]
+[16:00:40.487] LOG: Chosen Move: Tera Starstorm (P)
+[16:00:40.487] LOG: %cStart Phase TurnStartPhase color:green;
+[16:00:40.488] LOG: %cStart Phase MovePhase color:green;
+[16:00:40.488] LOG: %cUser: Mega Orbeetle
+Move: EXPANDING_FORCE
+Use Mode: NORMAL color:orchid
+[16:00:40.489] LOG: %cStart Phase MessagePhase color:green;
+[16:00:40.637] LOG: %cStart Phase MoveEffectPhase color:green;
+[16:00:41.421] LOG: crit stage: +0
+[16:00:41.422] LOG: Move: Expanding Force | Base damage: 143.3321832884097 | Power: 120 | Source attack: 566 | Target defense: 742
+[16:00:41.423] LOG: Move: Expanding Force | Attack damage: 245
+[16:00:41.424] LOG: %cStart Phase DamageAnimPhase color:green;
+[16:00:41.456] LOG: %cStart Phase ObtainStatusEffectPhase color:green;
+[16:00:41.620] LOG: %cStart Phase MessagePhase color:green;
+[16:00:41.854] LOG: %cStart Phase MoveEndPhase color:green;
+[16:00:41.855] LOG: %cStart Phase MovePhase color:green;
+[16:00:41.855] LOG: %cUser: Terapagos
+Move: TERA_STARSTORM
+Use Mode: NORMAL color:orchid
+[16:00:41.857] LOG: %cStart Phase MessagePhase color:green;
+[16:00:42.020] LOG: %cStart Phase MoveEffectPhase color:green;
+[16:00:42.038] LOG: crit stage: +0
+[16:00:42.038] LOG: Applied Silk Scarf (enemy)
+[16:00:42.038] LOG: Move: Tera Starstorm (P) | Base damage: 248.1642105263158 | Power: 168 | Source attack: 580 | Target defense: 627
+[16:00:42.039] LOG: Move: Tera Starstorm (P) | Attack damage: 461
+[16:00:42.039] LOG: %cStart Phase DamageAnimPhase color:green;
+[16:00:42.072] LOG: %cStart Phase FaintPhase color:green;
+[16:00:42.073] WARN: cry/826-mega not found
+[16:00:42.139] LOG: %cStart Phase MessagePhase color:green;
+[16:00:42.624] LOG: %cStart Phase MoveEndPhase color:green;
+[16:00:42.624] LOG: %cStart Phase CheckInterludePhase color:green;
+[16:00:42.624] LOG: %cStart Phase WeatherEffectPhase color:green;
+[16:00:42.624] LOG: %cStart Phase PositionalTagPhase color:green;
+[16:00:42.624] LOG: %cStart Phase BerryPhase color:green;
+[16:00:42.624] LOG: Applied Salac Berry (enemy)
+[16:00:42.625] LOG: Applied Petaya Berry (enemy)
+[16:00:42.625] LOG: Applied Starf Berry (enemy)
+[16:00:42.625] LOG: Applied Zinc (enemy)
+[16:00:42.625] LOG: Applied HP Up (enemy)
+[16:00:42.625] LOG: Applied Calcium (enemy)
+[16:00:42.627] LOG: Applied Carbos (enemy)
+[16:00:42.627] LOG: Applied HP Up (enemy)
+[16:00:42.627] LOG: Applied Protein (enemy)
+[16:00:42.627] LOG: Applied Zinc (enemy)
+[16:00:42.627] LOG: Applied Carbos (enemy)
+[16:00:42.627] LOG: Applied Zinc (enemy)
+[16:00:42.627] LOG: Applied Protein (enemy)
+[16:00:42.627] LOG: Applied Calcium (enemy)
+[16:00:42.627] LOG: Applied Zinc (enemy)
+[16:00:42.627] LOG: Applied Iron (enemy)
+[16:00:42.627] LOG: Applied Calcium (enemy)
+[16:00:42.628] LOG: Applied HP Up (enemy)
+[16:00:42.628] LOG: Applied Zinc (enemy)
+[16:00:42.628] LOG: %cStart Phase CommonAnimPhase color:green;
+[16:00:42.971] LOG: %cStart Phase StatStageChangePhase color:green;
+[16:00:43.155] LOG: %cStart Phase MessagePhase color:green;
+[16:00:43.388] LOG: %cStart Phase StatStageChangePhase color:green;
+[16:00:43.572] LOG: %cStart Phase MessagePhase color:green;
+[16:00:43.805] LOG: %cStart Phase StatStageChangePhase color:green;
+[16:00:43.989] LOG: %cStart Phase MessagePhase color:green;
+[16:00:44.254] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[16:00:44.254] LOG: %cStart Phase PostTurnStatusEffectPhase color:green;
+[16:00:44.404] LOG: %cStart Phase MessagePhase color:green;
+[16:00:44.671] LOG: %cStart Phase TurnEndPhase color:green;
+[16:00:44.673] WARN: [coop:turn] host recorder: finalize with NO open recording -> turn=-1 events=0 (caller decides not to emit)
+[16:00:44.673] LOG: %cStart Phase SwitchPhase color:green;
+[16:00:45.775] LOG: %cStart Phase SwitchSummonPhase color:green;
+[16:00:45.871] LOG: Applied Carbos 
+[16:00:45.871] LOG: Applied Calcium 
+[16:00:45.871] LOG: Applied Zinc 
+[16:00:45.871] LOG: Applied Iron 
+[16:00:45.871] LOG: Applied HP Up 
+[16:00:45.872] LOG: Applied Protein 
+[16:00:45.904] WARN: cry/78 not found
+[16:00:46.006] LOG: %cStart Phase PostSummonPhase color:green;
+[16:00:46.006] LOG: Ran PSP for: Rapidash
+[16:00:46.006] LOG: %cStart Phase PostSummonPhase color:green;
+[16:00:46.006] LOG: %cStart Phase PostSummonPhase color:green;
+[16:00:46.006] LOG: %cStart Phase TurnInitPhase color:green;
+[16:00:46.006] LOG: %cStart Phase CommandPhase color:green;
+[16:00:47.290] LOG: Move: HORN_DRILL Move targets: {"targets":[2],"multiple":false} 
+Player Pokemon: Rapidash
+[16:00:47.291] LOG: %cStart Phase EnemyCommandPhase color:green;
+[16:00:47.293] LOG: %cStart Phase TurnStartPhase color:green;
+[16:00:47.294] LOG: Battle Seed: BafpBNOmp8ZG9X74
+[16:00:47.294] LOG: Applied Quick Claw 
+[16:00:47.294] LOG: %cStart Phase MessagePhase color:green;
+[16:00:47.587] LOG: %cStart Phase SwitchSummonPhase color:green;
+[16:00:47.588] LOG: Kieran
+[16:00:47.854] LOG: Kieran
+[16:00:47.938] LOG: Applied HP Up (enemy)
+[16:00:47.938] LOG: Applied Protein (enemy)
+[16:00:47.938] LOG: Applied Zinc (enemy)
+[16:00:47.938] LOG: Applied Carbos (enemy)
+[16:00:47.938] LOG: Applied Carbos (enemy)
+[16:00:47.939] LOG: Applied Zinc (enemy)
+[16:00:47.939] LOG: Applied HP Up (enemy)
+[16:00:47.939] LOG: Applied Calcium (enemy)
+[16:00:47.939] LOG: Applied Zinc (enemy)
+[16:00:47.939] LOG: Applied Protein (enemy)
+[16:00:47.939] LOG: Applied Calcium (enemy)
+[16:00:47.939] LOG: Applied Zinc (enemy)
+[16:00:47.939] LOG: Applied Iron (enemy)
+[16:00:47.939] LOG: Applied Calcium (enemy)
+[16:00:47.939] LOG: Applied HP Up (enemy)
+[16:00:47.939] LOG: Applied Zinc (enemy)
+[16:00:48.072] LOG: %cStart Phase ResetStatusPhase color:green;
+[16:00:48.073] LOG: %cStart Phase PostSummonPhase color:green;
+[16:00:48.073] LOG: Ran PSP for: Dragonite
+[16:00:48.073] LOG: %cStart Phase PostSummonPhase color:green;
+[16:00:48.073] LOG: %cStart Phase PostSummonPhase color:green;
+[16:00:48.073] LOG: %cStart Phase MovePhase color:green;
+[16:00:48.073] LOG: %cUser: Rapidash
+Move: HORN_DRILL
+Use Mode: NORMAL color:orchid
+[16:00:48.074] LOG: %cStart Phase MessagePhase color:green;
+[16:00:48.187] LOG: %cStart Phase MoveEffectPhase color:green;
+[16:00:48.188] LOG: Applied Multi Lens 
+[16:00:48.189] LOG: Applied Wide Lens 
+[16:00:49.355] LOG: Applied Scope Lens 
+[16:00:49.355] LOG: crit stage: +2
+[16:00:49.356] LOG: Applied Fairy Feather 
+[16:00:49.356] LOG: Move: Horn Drill | Base damage: 912.2854368932038 | Power: 350 | Source attack: 694 | Target defense: 412
+[16:00:49.356] LOG: Applied Multi Lens 
+[16:00:49.357] LOG: Move: Horn Drill | Attack damage: 1806
+[16:00:49.357] LOG: Applied Amulet Coin 
+[16:00:49.358] LOG: Applied Golden Punch 
+[16:00:49.359] LOG: Applied King’s Rock 
+[16:00:49.359] LOG: %cStart Phase DamageAnimPhase color:green;
+[16:00:49.389] LOG: %cStart Phase MessagePhase color:green;
+[16:00:49.587] LOG: %cStart Phase MessagePhase color:green;
+[16:00:49.804] LOG: %cStart Phase MessagePhase color:green;
+[16:00:50.004] LOG: %cStart Phase FaintPhase color:green;
+[16:00:51.405] LOG: %cStart Phase MessagePhase color:green;
+[16:00:51.867] LOG: %cStart Phase VictoryPhase color:green;
+[16:00:51.867] LOG: Applied Soothe Bell 
+[16:00:51.867] LOG: %cStart Phase MoveEndPhase color:green;
+[16:00:51.867] LOG: %cStart Phase CheckInterludePhase color:green;
+[16:00:51.867] LOG: %cStart Phase WeatherEffectPhase color:green;
+[16:00:51.867] LOG: %cStart Phase PositionalTagPhase color:green;
+[16:00:51.867] LOG: %cStart Phase BerryPhase color:green;
+[16:00:51.867] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[16:00:51.867] LOG: %cStart Phase TurnEndPhase color:green;
+[16:00:51.868] WARN: [coop:turn] host recorder: finalize with NO open recording -> turn=-1 events=0 (caller decides not to emit)
+[16:00:51.868] LOG: %cStart Phase SwitchSummonPhase color:green;
+[16:00:52.103] LOG: Kieran
+[16:00:52.188] LOG: Applied Iron (enemy)
+[16:00:52.188] LOG: Applied Calcium (enemy)
+[16:00:52.188] LOG: Applied HP Up (enemy)
+[16:00:52.188] LOG: Applied Zinc (enemy)
+[16:00:52.188] LOG: Applied Carbos (enemy)
+[16:00:52.189] LOG: Applied Zinc (enemy)
+[16:00:52.189] LOG: Applied HP Up (enemy)
+[16:00:52.189] LOG: Applied Calcium (enemy)
+[16:00:52.189] LOG: Applied Zinc (enemy)
+[16:00:52.189] LOG: Applied Protein (enemy)
+[16:00:52.189] LOG: Applied Calcium (enemy)
+[16:00:52.189] LOG: Applied Zinc (enemy)
+[16:00:52.189] LOG: Applied HP Up (enemy)
+[16:00:52.189] LOG: Applied Protein (enemy)
+[16:00:52.189] LOG: Applied Zinc (enemy)
+[16:00:52.189] LOG: Applied Carbos (enemy)
+[16:00:52.321] LOG: %cStart Phase PostSummonPhase color:green;
+[16:00:52.321] LOG: Ran PSP for: Hydrapple
+[16:00:52.321] LOG: %cStart Phase PostSummonPhase color:green;
+[16:00:52.321] LOG: %cStart Phase PostSummonPhase color:green;
+[16:00:52.321] LOG: %cStart Phase TurnInitPhase color:green;
+[16:00:52.321] LOG: %cStart Phase CommandPhase color:green;
