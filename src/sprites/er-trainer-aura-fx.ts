@@ -59,8 +59,12 @@ export class ErTrainerAuraFx {
     params?: Partial<ErShinyLabParams>,
   ) {
     this.look = {
+      // Trainer sprites are much taller than a 96px Pokemon battle sprite, so the
+      // Pokemon-tuned default aura reads tiny on them. Default to a bold, wide
+      // aura (near the auraSize max) so it actually wraps the trainer; a caller
+      // (e.g. the editor's live Intensity slider) can still override via `params`.
       loadout: { palette: null, surface: null, around: auraId },
-      params: { ...ER_SHINY_LAB_DEFAULT_PARAMS, ...params },
+      params: { ...ER_SHINY_LAB_DEFAULT_PARAMS, auraSize: 1.85, aroAmt: 1, ...params },
     };
     for (let i = 0; i < baseSprites.length; i++) {
       const base = baseSprites[i];

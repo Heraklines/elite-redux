@@ -2008,7 +2008,12 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
       if (s === Stat.HP) {
         statHolder.value = statHolder.value + this.level + 10;
         globalScene.applyModifier(PokemonIncrementingStatModifier, this.isPlayer(), this, s, statHolder);
-        if (this.hasAbility(AbilityId.WONDER_GUARD, false, true)) {
+        // Shedinja - any form, including ER's Mega Shedinja - always has exactly 1 HP,
+        // its whole identity. Base Shedinja gets this via Wonder Guard, but Mega
+        // Shedinja's kit (Cheating Death / Magic Guard) replaces Wonder Guard, so it
+        // fell through to the normal formula (base HP 1 -> ~95 at high level). Key the
+        // 1-HP rule on the species line too (its mega baseStats HP is already 1).
+        if (this.hasAbility(AbilityId.WONDER_GUARD, false, true) || this.hasSpecies(SpeciesId.SHEDINJA)) {
           statHolder.value = 1;
         }
         if (this.hp > statHolder.value || this.hp === undefined) {

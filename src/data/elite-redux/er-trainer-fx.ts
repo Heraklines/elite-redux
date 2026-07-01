@@ -211,45 +211,66 @@ export function buildTrainerEntranceTween(
   approach: GhostApproachEffect | undefined,
   arrival: EntranceArrival,
 ): Phaser.Types.Tweens.TweenBuilderConfig {
+  // Capture the trainer's natural scale so every entrance can squash/pop and
+  // ALWAYS settle back to it (the end state stays x/y/alpha/scale = arrival).
+  const sx = trainer.scaleX;
+  const sy = trainer.scaleY;
   const base: Phaser.Types.Tweens.TweenBuilderConfig = {
     targets: trainer,
     x: arrival.x,
     y: arrival.y,
     alpha: arrival.alpha,
+    scaleX: sx,
+    scaleY: sy,
     duration: 2000,
   };
   switch (approach) {
+    case "riseFromGround":
+      // Burst up from well below the field, squashed flat, overshooting as it
+      // stretches to full height on the way out of the ground.
+      trainer.x = arrival.x;
+      trainer.y = arrival.y + 190;
+      trainer.setScale(sx * 1.12, sy * 0.4);
+      trainer.setAlpha(0);
+      return { ...base, duration: 1150, ease: "Back.easeOut" };
     case "fromAbove":
-    case "riseFromGround": {
-      // Descend from above / rise from below: no horizontal slide, settle vertically.
-      const dy = approach === "fromAbove" ? -120 : 90;
+      // Plummet from high above and BOUNCE on landing.
       trainer.x = arrival.x;
-      trainer.y = arrival.y + dy;
-      trainer.setAlpha(0);
-      return { ...base, duration: 1300, ease: approach === "fromAbove" ? "Bounce.easeOut" : "Back.easeOut" };
-    }
+      trainer.y = arrival.y - 280;
+      trainer.setScale(sx, sy);
+      trainer.setAlpha(1);
+      return { ...base, duration: 1250, ease: "Bounce.easeOut" };
     case "flashIn":
-      // Snap into place, then a quick alpha pop.
+      // Pop into existence oversized + invisible, snapping down hard and fast.
       trainer.x = arrival.x;
       trainer.y = arrival.y;
+      trainer.setScale(sx * 1.7, sy * 1.7);
       trainer.setAlpha(0);
-      return { ...base, duration: 350, ease: "Cubic.easeIn" };
+      return { ...base, duration: 240, ease: "Back.easeOut" };
     case "fogMaterialize":
-    case "reverseDissolve":
-      // Materialize in place (alpha fade), no slide.
+      // Swell in from a small, low, drifting haze.
       trainer.x = arrival.x;
-      trainer.y = arrival.y;
+      trainer.y = arrival.y + 26;
+      trainer.setScale(sx * 0.8, sy * 0.8);
       trainer.setAlpha(0);
-      return { ...base, duration: approach === "fogMaterialize" ? 1800 : 1500, ease: "Sine.easeInOut" };
-    case "fromShadow":
-      // Emerge from a shadow: in place, faint -> full.
+      return { ...base, duration: 1700, ease: "Sine.easeOut" };
+    case "reverseDissolve":
+      // Shimmer up from a slightly oversized, transparent ghost.
       trainer.x = arrival.x;
       trainer.y = arrival.y;
-      trainer.setAlpha(0.12);
-      return { ...base, duration: 1600, ease: "Sine.easeOut" };
+      trainer.setScale(sx * 1.14, sy * 1.14);
+      trainer.setAlpha(0);
+      return { ...base, duration: 1300, ease: "Cubic.easeInOut" };
+    case "fromShadow":
+      // Slink up out of a flattened shadow puddle (very squashed + faint -> full).
+      trainer.x = arrival.x;
+      trainer.y = arrival.y + 34;
+      trainer.setScale(sx * 1.18, sy * 0.28);
+      trainer.setAlpha(0.18);
+      return { ...base, duration: 1400, ease: "Back.easeOut" };
     default:
       // Vanilla slide-in: the trainer keeps its current (pre-slide) x and slides
-      // the +300 to its arrival x. y / alpha are already at the arrival values.
+      // the +300 to its arrival x. y / alpha / scale are already at arrival.
       return base;
   }
 }

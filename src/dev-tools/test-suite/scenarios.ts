@@ -1138,6 +1138,35 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
   },
   // ===========================================================================
+  // Pokemon - Mega Shedinja always has exactly 1 HP (its whole identity)
+  // ===========================================================================
+  {
+    label: "Mega Shedinja has 1 HP (not 95)",
+    description:
+      "Shedinja (every form, including Mega Shedinja) always has exactly 1 HP - that is\n"
+      + "its whole identity. Reported bug: a Mega Shedinja had 95 HP at level 64. Its kit\n"
+      + "(Cheating Death / Magic Guard) replaces Wonder Guard, so the 1-HP rule was skipped.\n"
+      + "This party is a level-64 Mega Shedinja.\n"
+      + "DO: look at your Mega Shedinja's HP bar, or open Check Team / the summary.\n"
+      + "EXPECT: its max HP is 1 (a single sliver). Before the fix it read ~95.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_WAVE_OVERRIDE: 1,
+        STARTING_LEVEL_OVERRIDE: 64,
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.MAGIKARP,
+        ENEMY_LEVEL_OVERRIDE: 5,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+      });
+      return [
+        makeStarter(SpeciesId.SHEDINJA, {
+          formIndex: formIndexContaining(SpeciesId.SHEDINJA, "mega"),
+          moveset: [MoveId.SHADOW_SNEAK, MoveId.X_SCISSOR, MoveId.SWORDS_DANCE, MoveId.PROTECT],
+        }),
+      ];
+    },
+  },
+  // ===========================================================================
   // Relic - Stormglass re-applies its weather EVERY battle (not just the first)
   // ===========================================================================
   {
