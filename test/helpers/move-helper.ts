@@ -149,7 +149,7 @@ export class MoveHelper extends GameManagerHelper {
   }
 
   /** Helper function to get the index of the selected move in the selected party member's moveset. */
-  private getMovePosition(pokemonIndex: BattlerIndex.PLAYER | BattlerIndex.PLAYER_2, move: MoveId): number {
+  private getMovePosition(pokemonIndex: number, move: MoveId): number {
     const playerPokemon = this.game.scene.getPlayerField()[pokemonIndex];
     const moveset = playerPokemon.getMoveset();
     const index = moveset.findIndex(m => m.moveId === move && m.ppUsed < m.getMovePp());
@@ -173,7 +173,8 @@ export class MoveHelper extends GameManagerHelper {
    */
   public use(
     moveId: MoveId,
-    pkmIndex: BattlerIndex.PLAYER | BattlerIndex.PLAYER_2 = BattlerIndex.PLAYER,
+    // Widened from PLAYER|PLAYER_2 to support triple+ formats (player slot 2 = flat index 2).
+    pkmIndex: number = BattlerIndex.PLAYER,
     targetIndex?: BattlerIndex,
     useTera = false,
   ): void {

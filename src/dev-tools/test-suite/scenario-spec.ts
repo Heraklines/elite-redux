@@ -108,6 +108,8 @@ export interface ScenarioSpec {
         level?: number | undefined;
         money?: number | undefined;
         double?: boolean | undefined;
+        /** Triple battle (3v3). Takes precedence over `double`; fill `party` + enemy party with 3. */
+        triple?: boolean | undefined;
         /** Pin the run seed for a fully deterministic repro. */
         seed?: string | undefined;
         difficulty?: "youngster" | "ace" | "elite" | "hell" | undefined;
@@ -145,13 +147,20 @@ export interface ScenarioSpec {
         enemyHpPct?: number | undefined;
         playerStatus?: number | undefined;
         enemyStatus?: number | undefined;
-        /** Same mid-battle state for the SECOND mon on each side (doubles only). */
+        /** Same mid-battle state for the SECOND mon on each side (doubles + triples). */
         player2Stages?: number[] | undefined;
         enemy2Stages?: number[] | undefined;
         player2HpPct?: number | undefined;
         enemy2HpPct?: number | undefined;
         player2Status?: number | undefined;
         enemy2Status?: number | undefined;
+        /** Same mid-battle state for the THIRD mon on each side (triples only). */
+        player3Stages?: number[] | undefined;
+        enemy3Stages?: number[] | undefined;
+        player3HpPct?: number | undefined;
+        enemy3HpPct?: number | undefined;
+        player3Status?: number | undefined;
+        enemy3Status?: number | undefined;
       }
     | undefined;
 }
@@ -347,7 +356,9 @@ export function buildDevScenario(spec: ScenarioSpec): { scenario: DevScenario; p
     if (run.level && run.level >= 1) {
       O.STARTING_LEVEL_OVERRIDE = Math.min(100, run.level);
     }
-    if (run.double) {
+    if (run.triple) {
+      O.BATTLE_STYLE_OVERRIDE = "triple";
+    } else if (run.double) {
       O.BATTLE_STYLE_OVERRIDE = "double";
     }
     setErDifficulty(run.difficulty ?? "ace");
@@ -421,7 +432,8 @@ export function buildDevScenario(spec: ScenarioSpec): { scenario: DevScenario; p
         return m;
       });
       setPendingDevEnemyParty(devParty);
-      if (devParty.length >= 2) {
+      // Don't downgrade a triple to a double: a triple keeps its 3-wide style set above.
+      if (devParty.length >= 2 && !run.triple) {
         O.BATTLE_STYLE_OVERRIDE = "double";
       }
       // Arbitrary ability / passive / held items for the enemy side (the global
@@ -448,19 +460,25 @@ export function buildDevScenario(spec: ScenarioSpec): { scenario: DevScenario; p
 
   const onBattleStartFn = (): void => {
     const start = spec.start ?? {};
-    // Lead (slot 0), then the 2nd mon on each side (slot 1) for doubles.
+    // Lead (slot 0), then the 2nd (slot 1, doubles+triples) and 3rd (slot 2, triples) mons.
     applyStages("player", 0, start.playerStages);
     applyStages("enemy", 0, start.enemyStages);
     applyStages("player", 1, start.player2Stages);
     applyStages("enemy", 1, start.enemy2Stages);
+    applyStages("player", 2, start.player3Stages);
+    applyStages("enemy", 2, start.enemy3Stages);
     applyHpPct("player", 0, start.playerHpPct);
     applyHpPct("enemy", 0, start.enemyHpPct);
     applyHpPct("player", 1, start.player2HpPct);
     applyHpPct("enemy", 1, start.enemy2HpPct);
+    applyHpPct("player", 2, start.player3HpPct);
+    applyHpPct("enemy", 2, start.enemy3HpPct);
     applyStatus("player", 0, start.playerStatus);
     applyStatus("enemy", 0, start.enemyStatus);
     applyStatus("player", 1, start.player2Status);
     applyStatus("enemy", 1, start.enemy2Status);
+    applyStatus("player", 2, start.player3Status);
+    applyStatus("enemy", 2, start.enemy3Status);
     // Wild ability slot: applied live (simplest reliable path).
     const wildSlot = spec.enemy?.kind === "wild" ? spec.enemy.wild?.abilitySlot : undefined;
     if (wildSlot !== undefined) {

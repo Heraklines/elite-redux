@@ -68,6 +68,9 @@ interface TurnAction {
   target?: number;
   move2?: number | string;
   target2?: number;
+  /** Triple: the 3rd (RIGHT) player mon's move + target. */
+  move3?: number | string;
+  target3?: number;
 }
 
 // A declarative self-check block. Every field is optional; each that's set is
@@ -88,6 +91,11 @@ interface ExpectSpec {
   enemyHp?: HpCheck;
   playerStage?: { stat: string; value: number };
   enemyStage?: { stat: string; value: number };
+  /** Triple: stat-stage checks on the 2nd/3rd mon of each side, by field slot (LEFT/CENTRE/RIGHT). */
+  player2Stage?: { stat: string; value: number };
+  player3Stage?: { stat: string; value: number };
+  enemy2Stage?: { stat: string; value: number };
+  enemy3Stage?: { stat: string; value: number };
   weather?: string;
   terrain?: string;
   maxHits?: HpCheck;
@@ -289,7 +297,7 @@ function snapshot(game: GameManager) {
 function applyAction(
   game: GameManager,
   mon: Pokemon,
-  idx: BattlerIndex.PLAYER | BattlerIndex.PLAYER_2,
+  idx: BattlerIndex,
   move?: number | string,
   target?: number,
 ): void {
@@ -305,12 +313,16 @@ function applyAction(
   game.move.use(moveId, idx, target == null ? undefined : (target as BattlerIndex));
 }
 
-/** Command every active player mon for the turn (lead + the 2nd in doubles). */
+/** Command every active player mon for the turn (lead + 2nd in doubles + 3rd in triples). */
 function doPlayerActions(game: GameManager, action: TurnAction | undefined): void {
   const field = game.scene.getPlayerField();
   applyAction(game, field[0], BattlerIndex.PLAYER, action?.move, action?.target);
   if (field.length > 1 && field[1]) {
     applyAction(game, field[1], BattlerIndex.PLAYER_2, action?.move2, action?.target2);
+  }
+  // Triple: the 3rd (RIGHT) player mon commands from field slot 2 (no BattlerIndex.PLAYER_3 enum).
+  if (field.length > 2 && field[2]) {
+    applyAction(game, field[2], 2 as BattlerIndex, action?.move3, action?.target3);
   }
 }
 
@@ -379,6 +391,23 @@ function expectSide(label: string, mon: Pokemon | undefined, c: SideCheck, fails
   expectSideStats(label, mon, c, fails);
 }
 
+/** A single mon's stat-stage check by field slot (used for the triple 2nd/3rd position asserts). */
+function checkMonStage(
+  label: string,
+  mon: Pokemon | undefined,
+  spec: { stat: string; value: number } | undefined,
+  fails: string[],
+): void {
+  if (!spec) {
+    return;
+  }
+  const st = STAT_BY_NAME[spec.stat.toUpperCase()];
+  const v = st == null ? Number.NaN : (mon?.getStatStage(st) ?? 0);
+  if (v !== spec.value) {
+    fails.push(`${label} ${spec.stat} stage ${v} != ${spec.value}`);
+  }
+}
+
 /** Evaluate the optional `expect` block; returns a list of human-readable mismatches. */
 function evaluateExpect(
   exp: ExpectSpec,
@@ -412,6 +441,13 @@ function evaluateExpect(
     },
     fails,
   );
+  // Triple: per-position stat-stage checks on the 2nd/3rd mon of each side (by field slot).
+  const pf = ctx.game.scene.getPlayerField();
+  const ef = ctx.game.scene.getEnemyField();
+  checkMonStage("player2", pf[1], exp.player2Stage, fails);
+  checkMonStage("player3", pf[2], exp.player3Stage, fails);
+  checkMonStage("enemy2", ef[1], exp.enemy2Stage, fails);
+  checkMonStage("enemy3", ef[2], exp.enemy3Stage, fails);
   expectArena(exp, ctx.game, fails);
   if (exp.maxHits != null) {
     checkNum("maxHits", ctx.maxHits, exp.maxHits, fails);
@@ -465,7 +501,7 @@ async function launchScenario(phaserGame: Phaser.Game, spec: ScenarioSpec): Prom
   const { scenario, postLaunch } = buildDevScenario(spec);
   await game.runToTitle();
   const starters = scenario.setup();
-  game.override.battleStyle(spec.run?.double ? "double" : "single");
+  game.override.battleStyle(spec.run?.triple ? "triple" : spec.run?.double ? "double" : "single");
   game.onNextPrompt("TitlePhase", UiMode.TITLE, () => {
     game.scene.gameMode = getGameMode(GameModes.CLASSIC);
     const ssp = new SelectStarterPhase();
