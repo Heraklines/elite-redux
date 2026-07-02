@@ -36,8 +36,23 @@ import type { CoopRunConfig } from "#data/elite-redux/coop/coop-session-controll
 import type { GameModes } from "#enums/game-modes";
 import type { PokemonData } from "#system/pokemon-data";
 
-/** Bump when the wire shape changes incompatibly so a loader can reject an unreadable trace. */
-export const REPLAY_TRACE_VERSION = 1;
+/**
+ * Bump when the wire shape changes incompatibly so a loader can reject an unreadable trace.
+ *
+ * v1 -> v2 (#record-replay, single-player): ADDITIVE growth only - a new OPTIONAL {@linkcode
+ * ReplayTrace.endState} summary (captured by the single-player recorder for the loader's deterministic
+ * end-state assert) plus new single-player interaction `kind`s ("biome" / "crossroads" / "me" / ...).
+ * Nothing removed or reshaped, so v1 traces stay readable: {@linkcode validateReplayTrace} accepts every
+ * version in {@linkcode SUPPORTED_REPLAY_TRACE_VERSIONS} (a stored v1 co-op trace still validates).
+ */
+export const REPLAY_TRACE_VERSION = 2;
+
+/**
+ * Every trace-schema version a loader can still read. v2 only GREW the schema additively over v1 (an
+ * optional end-state + new interaction kinds), so both validate - a v1 co-op trace captured before the
+ * single-player add is still replayable. New captures stamp {@linkcode REPLAY_TRACE_VERSION}.
+ */
+export const SUPPORTED_REPLAY_TRACE_VERSIONS: readonly number[] = [1, 2];
 
 /**
  * One serialized player COMMAND (a battle decision), mode-agnostic. Mirrors the engine's command
@@ -82,9 +97,21 @@ export interface ReplayCommandEvent {
  * (`seq`, `kind`, `choice`, optional `data`) so the co-op loader can relay it verbatim, and a
  * single-player loader can apply it as the local choice. `seq` is the interaction counter at
  * screen-open; the OWNER is derivable from its parity (see the module + `coop` docs) so no owner
- * field is needed. `kind` is the routing tag ("reward" / "me" / "meSub" / "skip" / ...); `choice` is
- * the index or sentinel (e.g. `COOP_INTERACTION_LEAVE` = -1, an ME option index, a reward row);
- * `data` carries the extra payload some picks need (e.g. a reward's resolved party slot + sub-index).
+ * field is needed. `kind` is the routing tag; `choice` is the index or sentinel (e.g.
+ * `COOP_INTERACTION_LEAVE` = -1, an ME option index, a reward row); `data` carries the extra payload
+ * some picks need (e.g. a reward's resolved party slot + sub-index).
+ *
+ * Known `kind`s (co-op today + single-player, additive - a loader ignores an unknown kind loudly):
+ *  - "reward"     reward-shop pick (`choice` = the option row index)
+ *  - "skip"       left the reward shop without picking (`choice` = -1)
+ *  - "reroll" / "transfer" / "lock" / "check"   reward-shop sub-actions (co-op relay + single-player tap)
+ *  - "learnMove"  a level-up move-learn RESULT (`choice` = the forgotten moveset slot, or the mon's
+ *                 move cap = "declined / did not learn")
+ *  - "biome"      a World-Map / biome pick (`choice` = the chosen `BiomeId`)
+ *  - "crossroads" the ER every-5-waves Stay/Leave choice (`choice` = 0 stay / 1 leave)
+ *  - "me" / "meSub"   a mystery-encounter option / sub-option index
+ * For single-player the `seq` is a monotonic per-recording counter (owner parity is irrelevant), so the
+ * loader consumes interactions in the trace's event ORDER (not by parity) - see the single-player loader.
  */
 export interface ReplayInteractionEvent {
   type: "interaction";
@@ -111,6 +138,32 @@ export type ReplayEvent = ReplayCommandEvent | ReplayInteractionEvent;
  */
 export interface ReplayCoopLayer {
   runConfig: CoopRunConfig;
+}
+
+/** One party mon in a {@linkcode ReplayEndState} summary (the minimal state a replay asserts on). */
+export interface ReplayEndPartyMon {
+  /** The {@linkcode SpeciesId} value (a number so it round-trips through JSON). */
+  species: number;
+  level: number;
+  hp: number;
+  maxHp: number;
+}
+
+/**
+ * An optional END-STATE summary of the recorded run (v2+, #record-replay single-player). Captured by the
+ * single-player recorder at trace-emit time (via an injected provider, so the recorder stays
+ * globalScene-free) so the single-engine loader can assert the replay reproduced the run 1:1 (same final
+ * `waveIndex` / `money` / party species+level+hp). Absent for a co-op trace (the duo harness asserts
+ * convergence differently) and for a v1 trace - a loader treats a missing `endState` as "derive from the
+ * last events / do not assert".
+ */
+export interface ReplayEndState {
+  /** The run's final `currentBattle.waveIndex` at capture time. */
+  waveIndex: number;
+  /** The player's money at capture time. */
+  money: number;
+  /** The player party's species/level/hp at capture time (the deterministic reproduction target). */
+  party: ReplayEndPartyMon[];
 }
 
 /**
@@ -145,6 +198,11 @@ export interface ReplayTrace {
   events: ReplayEvent[];
   /** Optional co-op layer (the host `CoopRunConfig`); absent for single-player. */
   coop?: ReplayCoopLayer;
+  /**
+   * Optional end-state summary (v2+): the recorded run's final `waveIndex` / `money` / party, so a
+   * single-engine loader can assert it reproduced the run deterministically. Absent for co-op / v1 traces.
+   */
+  endState?: ReplayEndState;
 }
 
 /** Narrowing guard: is this event a battle command? */
@@ -171,8 +229,10 @@ export interface ReplayTraceValidation {
  */
 export function validateReplayTrace(trace: ReplayTrace): ReplayTraceValidation {
   const errors: string[] = [];
-  if (trace.version !== REPLAY_TRACE_VERSION) {
-    errors.push(`unsupported trace version ${trace.version} (loader supports ${REPLAY_TRACE_VERSION})`);
+  if (!SUPPORTED_REPLAY_TRACE_VERSIONS.includes(trace.version)) {
+    errors.push(
+      `unsupported trace version ${trace.version} (loader supports ${SUPPORTED_REPLAY_TRACE_VERSIONS.join("/")})`,
+    );
   }
   if (typeof trace.seed !== "string" || trace.seed.length === 0) {
     errors.push("missing run seed (a replay needs the seed to pin RNG)");
@@ -234,6 +294,8 @@ export function makeReplayTrace(args: {
   coopRunConfig?: CoopRunConfig;
   difficulty?: string;
   challenges?: CoopRunConfig["challenges"];
+  /** Optional v2+ end-state summary (single-player); omitted for a co-op trace. */
+  endState?: ReplayEndState;
 }): ReplayTrace {
   const difficulty = args.difficulty ?? args.coopRunConfig?.difficulty ?? "youngster";
   const challenges = args.challenges ?? args.coopRunConfig?.challenges ?? [];
@@ -246,5 +308,6 @@ export function makeReplayTrace(args: {
     roster: args.roster,
     events: args.events,
     ...(args.coopRunConfig == null ? {} : { coop: { runConfig: args.coopRunConfig } }),
+    ...(args.endState == null ? {} : { endState: args.endState }),
   };
 }

@@ -232,11 +232,20 @@ export class FaintPhase extends PokemonPhase {
       globalScene.phaseManager.unshiftNew("VictoryPhase", this.battlerIndex);
       let willSwitchIn = false;
       if ([BattleType.TRAINER, BattleType.MYSTERY_ENCOUNTER].includes(globalScene.currentBattle.battleType)) {
+        // Slot-gate the replacement only in DOUBLES (each partner refills its own slot).
+        // In a single battle ANY reserve must come in: mixed trainerSlot values (e.g. a
+        // double-variant trainer config rolled into a single format) otherwise soft-lock
+        // the fight - the fainted mon stays on an empty field and the battle can't end
+        // (found by the headless full-run harness at a seeded wave-22 trainer).
         const hasReservePartyMember =
           globalScene
             .getEnemyParty()
-            .filter(p => p.isActive() && !p.isOnField() && p.trainerSlot === (pokemon as EnemyPokemon).trainerSlot)
-            .length > 0;
+            .filter(
+              p =>
+                p.isActive()
+                && !p.isOnField()
+                && (!globalScene.currentBattle.double || p.trainerSlot === (pokemon as EnemyPokemon).trainerSlot),
+            ).length > 0;
         if (hasReservePartyMember) {
           globalScene.phaseManager.pushNew("SwitchSummonPhase", SwitchType.SWITCH, this.fieldIndex, -1, false, false);
           willSwitchIn = true;

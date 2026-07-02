@@ -83,29 +83,43 @@ export class PhaseInterceptor {
     // NB: This has to use an interval to wait for UI prompts to activate
     // since our UI code effectively stalls when waiting for input.
     // This entire function can likely be made synchronous once UI code is moved to a separate scene.
-    await vi.waitUntil(
-      async () => {
-        // If we were interrupted by a UI prompt, we assume that the calling code will queue inputs to
-        // end the current phase manually, so we just wait for the phase to end from the caller.
-        if (this.state === "interrupted") {
-          if (!didLog) {
-            this.doLog("PhaseInterceptor.to: Waiting for phase to end after being interrupted!");
-            didLog = true;
+    try {
+      await vi.waitUntil(
+        async () => {
+          // If we were interrupted by a UI prompt, we assume that the calling code will queue inputs to
+          // end the current phase manually, so we just wait for the phase to end from the caller.
+          if (this.state === "interrupted") {
+            if (!didLog) {
+              this.doLog("PhaseInterceptor.to: Waiting for phase to end after being interrupted!");
+              didLog = true;
+            }
+            return false;
           }
+
+          currentPhase = pm.getCurrentPhase();
+          if (currentPhase.is(this.target)) {
+            return true;
+          }
+
+          // Current phase is different; run and wait for it to finish.
+          await this.run(currentPhase);
           return false;
-        }
-
-        currentPhase = pm.getCurrentPhase();
-        if (currentPhase.is(this.target)) {
-          return true;
-        }
-
-        // Current phase is different; run and wait for it to finish.
-        await this.run(currentPhase);
-        return false;
-      },
-      { interval: 0, timeout: TEST_TIMEOUT },
-    );
+        },
+        { interval: 0, timeout: TEST_TIMEOUT },
+      );
+    } catch (err) {
+      // A timeout here is a soft-lock / freeze: the target phase was never reached
+      // because something is waiting on input that never came. Surface the CURRENT
+      // phase + active UI mode + interceptor state so the hang is diagnosable
+      // instead of a bare "Timed out in waitUntil".
+      const stuckPhase = pm.getCurrentPhase()?.phaseName ?? "(none)";
+      const uiMode = getEnumStr(UiMode, this.scene.ui.getMode());
+      throw new Error(
+        `PhaseInterceptor.to("${this.target}") did not reach its target (soft-lock / freeze?): `
+          + `stuck at phase "${stuckPhase}", UI mode ${uiMode}, interceptor state "${this.state}".`
+          + `\nOriginal: ${err instanceof Error ? err.message : inspect(err)}`,
+      );
+    }
 
     // We hit the target; run as applicable and wrap up.
     if (!runTarget) {

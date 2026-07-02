@@ -15,7 +15,7 @@ import { EntryHazardTag } from "#data/arena-tag";
 import { getSerializedDailyRunConfig, parseDailySeed } from "#data/daily-seed/daily-seed-utils";
 import { allMoves, allSpecies } from "#data/data-lists";
 import { Egg } from "#data/egg";
-import { clearCoopRuntime, startLocalCoopSession } from "#data/elite-redux/coop/coop-runtime";
+import { clearCoopRuntime, getCoopRuntime, startLocalCoopSession } from "#data/elite-redux/coop/coop-runtime";
 import {
   getCommunityAllowedSpecies,
   getFounderRunState,
@@ -1492,6 +1492,27 @@ export class GameData {
     return true;
   }
 
+  /**
+   * Co-op GUEST (#633 M4 push-snapshot launch): BOOT the local session from the host's authoritative
+   * launch snapshot (`sessionJson` = the host's `getSessionSaveData()` over the wire), instead of the
+   * guest rolling its own enemy / arena / party. Rehydrates via the SAME {@linkcode parseSessionData}
+   * cloud-save + resume use, then applies via the production-hardened {@linkcode initSessionFromData}
+   * (which the guard above keeps from clobbering the live co-op runtime). AWAITED (unlike loadSession's
+   * fire-and-forget) so the party/enemy assets are loaded before the caller queues EncounterPhase(true).
+   * Returns false if the snapshot is unparseable (the caller then falls back to its own launch).
+   */
+  public async applyCoopLaunchSession(sessionJson: string): Promise<boolean> {
+    let sessionData: SessionSaveData;
+    try {
+      sessionData = this.parseSessionData(sessionJson);
+    } catch (err) {
+      console.warn("[coop-launch] applyCoopLaunchSession: unparseable snapshot, falling back", err);
+      return false;
+    }
+    await this.initSessionFromData(sessionData);
+    return true;
+  }
+
   // TODO: This needs a giant refactor and overhaul
   private async initSessionFromData(fromSession: SessionSaveData): Promise<void> {
     if (isBeta || isDev) {
@@ -1558,8 +1579,16 @@ export class GameData {
     // tags were restored from the save above (PokemonData). For any non-co-op load,
     // tear down a stale co-op session left over from a prior run. (P6's real
     // transport reconnects the actual partner at this seam instead of a spoof.)
+    //
+    // #633 M4: guard the spoof-establish so it NEVER clobbers a LIVE runtime. A co-op GUEST
+    // booting from the host's launch snapshot (applyCoopLaunchSession) already has a real
+    // transport-connected runtime; startLocalCoopSession would clearCoopRuntime + spoof a
+    // partner, severing the live peer. Only (re)establish when there is no active session
+    // (the from-title resume path); the live launch keeps its real runtime untouched.
     if (globalScene.gameMode.isCoop) {
-      startLocalCoopSession();
+      if (getCoopRuntime() == null) {
+        startLocalCoopSession();
+      }
     } else {
       clearCoopRuntime();
     }
@@ -2709,7 +2738,13 @@ export class GameData {
       count = Math.max(1, Math.round(count * ER_CANDY_GAIN_MULTIPLIER * favourMultiplier * difficultyMultiplier));
     }
 
-    globalScene.candyBar.showStarterSpeciesCandy(speciesId, count);
+    // The ROOT id, not speciesId: the candy bar does a raw starterData[id] read, and
+    // getStarterDataEntry only guarantees (and increments) the evolution-line ROOT
+    // bucket - e.g. candy granted to SNORLAX lives under MUNCHLAX. Passing the raw id
+    // crashes the bar (`candyCount` of undefined) whenever that id has no bucket of
+    // its own - the wave-won achievement candy-grant black-screen class - and would
+    // display the wrong count even when it doesn't crash.
+    globalScene.candyBar.showStarterSpeciesCandy(this.getRootStarterSpeciesId(baseId), count);
     starterEntry.candyCount = Math.min(candyCount + count, MAX_STARTER_CANDY_COUNT);
 
     return true;

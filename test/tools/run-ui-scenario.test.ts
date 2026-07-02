@@ -97,6 +97,55 @@ const DEMO_SPECIES = DEMO_BY_SURFACE[SURFACE] ?? DEMO_BY_SURFACE["starter-select
 const STRICT = process.env.ER_UI_STRICT === "1";
 const RUN = process.env.ER_SCENARIO === "1";
 
+// ER_UI_ME=all sweeps EVERY registered ER MysteryEncounterType through the option-panel render
+// path (the default demo token list is only 3). The token list is read from the LIVE
+// allMysteryEncounters registry at runtime (never hardcoded) so a newly-added ER encounter is
+// swept automatically. Only meaningful for the `mystery-encounter` surface.
+const ME_ALL = process.env.ER_UI_ME === "all";
+
+/**
+ * MEs that legitimately CANNOT render through the direct `handler.show([{}])` option-panel path,
+ * so they are SKIPPED from the sweep (never attempted) with a reason. These are structural, not
+ * failures: a phase-driven screen (its choices are not the ME option panel) or a synthetic type
+ * that is never in the registry.
+ */
+const ME_SWEEP_SKIP = new Map<string, string>([
+  [
+    "ER_THE_BARGAIN",
+    "phase-driven: TheBargainPhase drives ErBargainUiHandler (Seven Sins), not the ME option panel; not registered in allMysteryEncounters",
+  ],
+  [
+    "LLM_DIRECTED",
+    "synthetic LLM Director type; the instance is pre-set on currentBattle, never in allMysteryEncounters",
+  ],
+]);
+
+/**
+ * MEs that ARE swept but are KNOWN to fail this direct-render path. They stay in the run as
+ * signal (a regression on any OTHER ME still fails the sweep) but are reported as EXPECTED
+ * failures rather than hard errors. Each entry carries the observed reason. Populated from the
+ * sweep's own verdicts - a failure NOT listed here fails the run (that is the point). The full
+ * ER sweep currently renders 59/59 ok, so this is empty.
+ */
+const ME_SWEEP_EXPECTED_FAIL = new Map<string, string>([
+  // (none - every registered ER ME currently renders its option panel; see the report table)
+]);
+
+/**
+ * The ER MysteryEncounterType NAMES to sweep: every ER_* entry plus COLOSSEUM that is actually
+ * registered in allMysteryEncounters, minus the structural skip-list. Read from the live registry.
+ */
+function erMysteryEncounterTokens(): string[] {
+  const enumMap = MysteryEncounterType as unknown as Record<number, string>;
+  return Object.keys(allMysteryEncounters)
+    .map(Number)
+    .filter(t => Number.isInteger(t))
+    .map(t => enumMap[t])
+    .filter((name): name is string => typeof name === "string" && (name.startsWith("ER_") || name === "COLOSSEUM"))
+    .filter(name => !ME_SWEEP_SKIP.has(name))
+    .sort();
+}
+
 /** Resolve a token (numeric id, SpeciesId name, or ErSpeciesId name) to a numeric species id. */
 function resolveSpecies(token: string): number | undefined {
   const t = token.trim();
@@ -630,35 +679,89 @@ describe.skipIf(!RUN)("headless UI runner", () => {
     "mystery-encounter: renders each ME's option panel",
     async () => {
       console.log("\n===== UI SURFACE: mystery-encounter =====");
-      console.log(`encounters: ${TARGET_TOKENS.length}`);
+      // ER_UI_ME=all: sweep EVERY registered ER ME (read from the live registry). Otherwise the
+      // caller's ER_UI_SPECIES list, or the built-in 3-ME demo set.
+      const tokens = ME_ALL ? erMysteryEncounterTokens() : TARGET_TOKENS;
+      console.log(`encounters: ${tokens.length}${ME_ALL ? " (ER_UI_ME=all sweep)" : ""}`);
+      if (ME_ALL) {
+        for (const [name, reason] of ME_SWEEP_SKIP) {
+          console.log(`  (skip) ${name} — ${reason}`);
+        }
+      }
 
       // ONE battle (so currentBattle exists); each ME just swaps currentBattle.mysteryEncounter
       // and re-renders. Reusing the GameManager avoids the per-test prompt-interval static.
       const game = new GameManager(phaserGame);
       await game.classicMode.startBattle(SpeciesId.RATTATA);
 
+      // Per-ME verdict, for the report table. status: ok | threw | not-shown | zero-options | error.
+      const verdicts: { token: string; status: string; detail: string; optionCount: number }[] = [];
+      // Hard errors fail the run; expectedFails are KNOWN, listed failures (kept in the run as signal).
       const errors: string[] = [];
-      for (const token of TARGET_TOKENS) {
+      const expectedFails: string[] = [];
+
+      for (const token of tokens) {
         const snap = snapEncounter(game, token);
         if ("error" in snap) {
           console.log(`\n=== ${token} ===\nERROR ${snap.error}`);
-          errors.push(snap.error);
+          verdicts.push({ token, status: "error", detail: snap.error, optionCount: 0 });
+          const expected = ME_SWEEP_EXPECTED_FAIL.get(token);
+          (expected ? expectedFails : errors).push(
+            `${token}: ${snap.error}${expected ? ` [expected: ${expected}]` : ""}`,
+          );
           continue;
         }
         console.log(`\n=== ${token} (#${snap.type}) ===`);
         console.log("STATE", JSON.stringify(snap));
-        // Crash class: the option panel threw, returned false, or rendered no options.
+        // Per-ME assertions: no throw, shown, optionCount > 0.
+        let status = "ok";
+        let detail = "";
         if (snap.threw) {
-          errors.push(`${token}: ME show() threw — ${snap.threw}`);
+          status = "threw";
+          detail = snap.threw;
         } else if (!snap.shown) {
-          errors.push(`${token}: ME show() returned false`);
+          status = "not-shown";
+          detail = "show() returned false";
         } else if (snap.optionCount === 0) {
-          errors.push(`${token}: ME rendered with ZERO options`);
+          status = "zero-options";
+          detail = "rendered with ZERO options";
+        }
+        verdicts.push({ token, status, detail, optionCount: snap.optionCount });
+        if (status !== "ok") {
+          const expected = ME_SWEEP_EXPECTED_FAIL.get(token);
+          const msg = `${token}: ME ${status}${detail ? ` — ${detail}` : ""}${expected ? ` [expected: ${expected}]` : ""}`;
+          (expected ? expectedFails : errors).push(msg);
         }
       }
-      console.log("\nRESULT", JSON.stringify({ surface: "mystery-encounter", count: TARGET_TOKENS.length, errors }));
+
+      // Verdict table (the report evidence): one aligned row per swept ME.
+      if (ME_ALL) {
+        const pad = Math.max(...verdicts.map(v => v.token.length), 4);
+        console.log("\n===== ME SWEEP VERDICT TABLE =====");
+        console.log(`${"ME".padEnd(pad)}  status        opts`);
+        for (const v of verdicts) {
+          const mark =
+            v.status === "ok" ? "ok" : ME_SWEEP_EXPECTED_FAIL.has(v.token) ? `${v.status} (expected)` : v.status;
+          console.log(`${v.token.padEnd(pad)}  ${mark.padEnd(13)} ${v.optionCount}`);
+        }
+        const okCount = verdicts.filter(v => v.status === "ok").length;
+        console.log(
+          `\nSWEPT ${verdicts.length}  ok ${okCount}  expected-fail ${expectedFails.length}  UNEXPECTED-FAIL ${errors.length}  skipped ${ME_SWEEP_SKIP.size}`,
+        );
+      }
+
+      if (expectedFails.length > 0) {
+        console.log(`\n${expectedFails.length} EXPECTED FAILURE(S) (kept in the run as signal):`);
+        for (const e of expectedFails) {
+          console.log(`  ~ ${e}`);
+        }
+      }
+      console.log(
+        "\nRESULT",
+        JSON.stringify({ surface: "mystery-encounter", count: tokens.length, errors, expectedFails }),
+      );
       expect(errors, errors.join("\n")).toEqual([]);
     },
-    180000,
+    300000,
   );
 });

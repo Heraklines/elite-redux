@@ -661,7 +661,12 @@ export class Trainer extends Phaser.GameObjects.Container {
     forSwitch = false,
     useBestMove = false,
   ): [number, number][] {
-    if (trainerSlot && !this.isDouble()) {
+    // Slot-gating is only meaningful when the BATTLE is a partnered double. A
+    // double-VARIANT trainer rolled into a SINGLE battle assigns alternating
+    // trainerSlots at party gen (see the ctor), so gating by variant alone left
+    // its slot-2 reserves unsendable - the fainted lead sat on an empty field
+    // and the fight soft-locked (found by the headless full-run harness).
+    if (trainerSlot && !(this.isDouble() && globalScene.currentBattle?.double)) {
       trainerSlot = TrainerSlot.NONE;
     }
 
@@ -717,7 +722,10 @@ export class Trainer extends Phaser.GameObjects.Container {
       isErSmartSwitching(),
     ),
   ): number {
-    if (trainerSlot && !this.isDouble()) {
+    // Same battle-format guard as getPartyMemberMatchupScores: variant-double
+    // trainers in a SINGLE battle must ignore trainerSlot or their slot-2
+    // reserves can never be summoned.
+    if (trainerSlot && !(this.isDouble() && globalScene.currentBattle?.double)) {
       trainerSlot = TrainerSlot.NONE;
     }
 

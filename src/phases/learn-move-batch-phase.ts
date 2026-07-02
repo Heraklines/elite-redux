@@ -2,6 +2,7 @@ import { globalScene } from "#app/global-scene";
 import { initMoveAnim, loadMoveAnimAssets } from "#data/battle-anims";
 import { allMoves } from "#data/data-lists";
 import { erRecordAchievementLearnMove } from "#data/elite-redux/er-achievement-tracker";
+import { recordSinglePlayerInteraction } from "#data/elite-redux/replay-single-recording";
 import { SpeciesFormChangeMoveLearnedTrigger } from "#data/form-change-triggers";
 import { MoveId } from "#enums/move-id";
 import { UiMode } from "#enums/ui-mode";
@@ -97,6 +98,9 @@ export class LearnMoveBatchPhase extends PlayerPartyMemberPokemonPhase {
     const returnMode =
       globalScene.ui.getHandler() instanceof EvolutionSceneUiHandler ? UiMode.EVOLUTION_SCENE : UiMode.MESSAGE;
     const learnedIds: MoveId[] = [];
+    // #record-replay (single-player): the overwritten slot for each learned move (parallel to learnedIds),
+    // so the batch learn is captured with enough detail for the single-engine loader to reproduce it.
+    const learnedSlots: number[] = [];
     let finished = false;
     // Snapshot the pre-panel moveset so the panel's "undo" exit can restore it
     // EXACTLY. setMove() replaces a slot with a NEW PokemonMove, so these held refs
@@ -113,6 +117,7 @@ export class LearnMoveBatchPhase extends PlayerPartyMemberPokemonPhase {
         pokemon.setMove(slotIndex, moveId);
         erRecordAchievementLearnMove(pokemon, moveId);
         learnedIds.push(moveId);
+        learnedSlots.push(slotIndex);
         initMoveAnim(moveId).then(() => loadMoveAnimAssets([moveId], true));
       },
       revert: () => {
@@ -123,6 +128,7 @@ export class LearnMoveBatchPhase extends PlayerPartyMemberPokemonPhase {
           pokemon.summonData.moveset.splice(0, pokemon.summonData.moveset.length, ...snapshotSummonMoveset);
         }
         learnedIds.length = 0;
+        learnedSlots.length = 0;
       },
       done: () => {
         if (finished) {
@@ -132,6 +138,17 @@ export class LearnMoveBatchPhase extends PlayerPartyMemberPokemonPhase {
         // Fire any move-learned form change ONCE after the panel closes (not mid-panel).
         if (learnedIds.length > 0) {
           globalScene.triggerPokemonFormChange(pokemon, SpeciesFormChangeMoveLearnedTrigger, true);
+        }
+        // #record-replay (single-player): capture the batch level-up learn RESULT so the single-engine
+        // loader reproduces it. One "learnMove" per learned move (choice = the overwritten slot, data =
+        // [moveId]), or a single DECLINE (choice = the move cap, matching the per-move LearnMovePhase
+        // sentinel) when nothing was learned. No-op unless recording; hard no-op in co-op (the co-op branch
+        // above already routed level-up learns through the relayed per-move LearnMovePhase, so this never
+        // double-records). Fires AFTER the moves are applied (behavior-preserving) + is fully guarded.
+        if (learnedIds.length === 0) {
+          recordSinglePlayerInteraction("learnMove", pokemon.getMaxMoveCount());
+        } else {
+          learnedIds.forEach((id, i) => recordSinglePlayerInteraction("learnMove", learnedSlots[i] ?? 0, [id]));
         }
         globalScene.ui.setMode(returnMode).then(() => this.end());
       },

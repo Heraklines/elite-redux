@@ -4,144 +4,85 @@
  */
 
 // =============================================================================
-// Co-op MYSTERY-ENCOUNTER input pump (#633) - engine-free unit tests over a
-// LoopbackTransport. Proves the authoritative button stream is FIFO + lossless (never
-// drops, unlike the cosmetic mirror), readiness-gated (waits out the watcher's text
-// scroll before applying), idempotent across nested option-selects (no double loop),
-// and degrades to a safe skip on timeout. The LoopbackTransport delivers via
-// queueMicrotask, so each batch of sends is followed by `await settle()`.
+// Co-op MYSTERY-ENCOUNTER owner relay (#633, authoritative-only after M6) - engine-free
+// unit tests over a LoopbackTransport. The pump is now the OWNER half only: it relays the
+// owner's meaningful buttons on the 8M pick seq and its TERMINALS (LEAVE / battle-handoff)
+// on the dedicated 9M terminal seq. The PEER side is a plain CoopInteractionRelay await -
+// exactly what the production authoritative guest's `CoopReplayMePhase` does - so these
+// tests pin the real consumer contract. The old lockstep WATCHER loop (injected engine
+// replaying raw buttons) was retired in M3 and physically deleted in M6b; its tests went
+// with it. The LoopbackTransport delivers via queueMicrotask, so each batch of sends is
+// followed by `await settle()`.
 // =============================================================================
 
 import { COOP_INTERACTION_LEAVE, CoopInteractionRelay } from "#data/elite-redux/coop/coop-interaction-relay";
-import { COOP_ME_BATTLE_HANDOFF, CoopMePump, type CoopMePumpEngine } from "#data/elite-redux/coop/coop-me-pump";
+import { COOP_ME_BATTLE_HANDOFF, CoopMePump } from "#data/elite-redux/coop/coop-me-pump";
 import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
 import { describe, expect, it } from "vitest";
 
-/** Let the loopback microtasks + the pump's await/readiness chain drain before asserting. */
+/** Let the loopback microtasks drain before asserting. */
 const settle = async () => {
   for (let i = 0; i < 4; i++) {
     await new Promise<void>(resolve => setTimeout(resolve, 0));
   }
 };
 
-/** A recording engine with a settable ready flag. */
-function makeEngine(ready = true): CoopMePumpEngine & { applied: number[]; ready: boolean } {
-  const e = {
-    applied: [] as number[],
-    ready,
-    isReady() {
-      return e.ready;
-    },
-    applyButton(button: number) {
-      e.applied.push(button);
-    },
-  };
-  return e;
-}
-
 const SEQ = 8_000_042;
-/** Macrotask tick so the readiness poll advances at a realistic (testable) pace, not instantly
- *  draining its best-effort guard. When the handler is READY the poll exits before ticking. */
-const fastTick = () => new Promise<void>(resolve => setTimeout(resolve, 0));
 
-describe("co-op mystery-encounter input pump (#633)", () => {
-  it("replays the owner's buttons on the watcher IN ORDER (lossless FIFO)", async () => {
+describe("co-op mystery-encounter owner relay (#633)", () => {
+  it("relays the owner's buttons to the peer IN ORDER on the pick seq (lossless FIFO)", async () => {
     const { host, guest } = createLoopbackPair();
-    const owner = new CoopMePump(new CoopInteractionRelay(host), { tick: fastTick });
-    const wRelay = new CoopInteractionRelay(guest);
-    const watcher = new CoopMePump(wRelay, { tick: fastTick });
-    const eng = makeEngine();
-    watcher.attach(eng);
+    const owner = new CoopMePump(new CoopInteractionRelay(host));
+    const peerRelay = new CoopInteractionRelay(guest);
 
     owner.beginOwner(SEQ);
-    watcher.beginWatcher(SEQ, () => {});
+    expect(owner.isSessionActive()).toBe(true);
     owner.relayOwnerButton(10);
     owner.relayOwnerButton(11);
     owner.relayOwnerButton(12);
     await settle();
 
-    expect(eng.applied).toEqual([10, 11, 12]);
-    expect(watcher.isWatcher()).toBe(true);
-    expect(watcher.isSessionActive()).toBe(true);
-
-    owner.endOwner();
-    await settle();
-    expect(watcher.isSessionActive()).toBe(false); // leave sentinel ended the loop
-
-    owner.endSession();
-    watcher.endSession();
-  });
-
-  it("is readiness-gated: holds a relayed button until the watcher's handler is READY", async () => {
-    const { host, guest } = createLoopbackPair();
-    const owner = new CoopMePump(new CoopInteractionRelay(host), { tick: fastTick });
-    const watcher = new CoopMePump(new CoopInteractionRelay(guest), { tick: fastTick });
-    const eng = makeEngine(false); // handler busy (text scrolling)
-    watcher.attach(eng);
-
-    owner.beginOwner(SEQ);
-    watcher.beginWatcher(SEQ, () => {});
-    owner.relayOwnerButton(20);
-    await settle();
-    expect(eng.applied).toEqual([]); // not applied while the handler is not ready
-
-    eng.ready = true; // text finished, prompt up
-    await settle();
-    expect(eng.applied).toEqual([20]); // now it lands - never lost
-
-    owner.endOwner();
-    watcher.endSession();
-  });
-
-  it("beginWatcher is idempotent on the same seq (nested option-select spawns no 2nd loop)", async () => {
-    const { host, guest } = createLoopbackPair();
-    const owner = new CoopMePump(new CoopInteractionRelay(host), { tick: fastTick });
-    const watcher = new CoopMePump(new CoopInteractionRelay(guest), { tick: fastTick });
-    const eng = makeEngine();
-    watcher.attach(eng);
-
-    owner.beginOwner(SEQ);
-    watcher.beginWatcher(SEQ, () => {});
-    watcher.beginWatcher(SEQ, () => {}); // re-enter (nested) - must not start a 2nd loop
-    watcher.beginWatcher(SEQ, () => {});
-
-    owner.relayOwnerButton(30);
-    owner.relayOwnerButton(31);
-    await settle();
-
-    // A second loop would double-consume / double-apply; lossless single-apply proves one loop.
-    expect(eng.applied).toEqual([30, 31]);
-
-    owner.endOwner();
-    watcher.endSession();
-  });
-
-  it("degrades to a safe skip when the owner's next button never arrives (timeout)", async () => {
-    const { host, guest } = createLoopbackPair();
-    const owner = new CoopMePump(new CoopInteractionRelay(host), { tick: fastTick });
-    // Short watcher wait so the timeout fires fast under test.
-    const watcher = new CoopMePump(new CoopInteractionRelay(guest, { timeoutMs: 10 }), {
-      tick: fastTick,
-      waitMs: 10,
-    });
-    const eng = makeEngine();
-    watcher.attach(eng);
-
-    let degraded = false;
-    owner.beginOwner(SEQ);
-    watcher.beginWatcher(SEQ, () => {
-      degraded = true;
-    });
-    owner.relayOwnerButton(40);
-    await settle(); // first button applies
-    expect(eng.applied).toEqual([40]);
-
-    // No further buttons: the watcher's await times out -> onDegrade fires, session ends.
-    await new Promise<void>(resolve => setTimeout(resolve, 40));
-    expect(degraded).toBe(true);
-    expect(watcher.isSessionActive()).toBe(false);
+    // The peer (production: CoopReplayMePhase) drains the FIFO in relay order, losslessly.
+    const seen: number[] = [];
+    for (let i = 0; i < 3; i++) {
+      const action = await peerRelay.awaitInteractionChoice(SEQ, 10);
+      expect(action, `button ${i} arrived`).not.toBeNull();
+      seen.push(action!.choice);
+    }
+    expect(seen).toEqual([10, 11, 12]);
 
     owner.endSession();
+  });
+
+  it("relayOwnerButton is a no-op with NO active session (nothing leaks onto the wire)", async () => {
+    const { host, guest } = createLoopbackPair();
+    const owner = new CoopMePump(new CoopInteractionRelay(host));
+    const peerRelay = new CoopInteractionRelay(guest);
+
+    owner.relayOwnerButton(99); // never began
+    owner.beginOwner(SEQ);
+    owner.endSession();
+    owner.relayOwnerButton(98); // session already ended
+    await settle();
+
+    expect(await peerRelay.awaitInteractionChoice(SEQ, 10)).toBeNull();
+  });
+
+  it("beginOwner is idempotent on the same seq and REFRESHES termSeq on a nested re-entry", async () => {
+    const { host, guest } = createLoopbackPair();
+    const owner = new CoopMePump(new CoopInteractionRelay(host));
+    const peerRelay = new CoopInteractionRelay(guest);
+
+    const SEQ_TERM = 9_000_042;
+    owner.beginOwner(SEQ, SEQ_TERM);
+    // A nested option-select re-enters beginOwner with the same seq: the session stays open
+    // (no reset) and the terminal seq is refreshed, so the terminal still lands on 9M.
+    owner.beginOwner(SEQ, SEQ_TERM);
+    expect(owner.isSessionActive()).toBe(true);
+
+    owner.endOwner();
+    await settle();
+    expect((await peerRelay.awaitInteractionChoice(SEQ_TERM, 10))?.choice).toBe(COOP_INTERACTION_LEAVE);
   });
 
   it("AUTHORITATIVE (#633 B-1): the owner sends its TERMINAL on termSeq, NOT on the 8M pick seq", async () => {
@@ -151,7 +92,7 @@ describe("co-op mystery-encounter input pump (#633)", () => {
     // disconnect timeout - every authoritative non-battle ME hung the guest. This proves the
     // terminal actually lands on termSeq, and that an 8M-only listener never drains it.
     const { host, guest } = createLoopbackPair();
-    const owner = new CoopMePump(new CoopInteractionRelay(host), { tick: fastTick });
+    const owner = new CoopMePump(new CoopInteractionRelay(host));
     const guestRelay = new CoopInteractionRelay(guest);
 
     const SEQ_ME = 8_000_007; // guest -> host picks (P1/P1b)
@@ -179,7 +120,7 @@ describe("co-op mystery-encounter input pump (#633)", () => {
 
   it("AUTHORITATIVE (#633 B-1): the BATTLE-HANDOFF sentinel also rides termSeq, not the 8M pick seq", async () => {
     const { host, guest } = createLoopbackPair();
-    const owner = new CoopMePump(new CoopInteractionRelay(host), { tick: fastTick });
+    const owner = new CoopMePump(new CoopInteractionRelay(host));
     const guestRelay = new CoopInteractionRelay(guest);
 
     const SEQ_ME = 8_000_009;
@@ -194,43 +135,33 @@ describe("co-op mystery-encounter input pump (#633)", () => {
     owner.endSession();
   });
 
-  it("LOCKSTEP (#633): with no termSeq the terminal stays on seq - the watcher loop catches it (byte-identical)", async () => {
-    // Default termSeq == seq: the lockstep watcher loop awaits buttons AND the terminal on the SAME
-    // seq, so omitting termSeq must keep the LEAVE on `seq` and end the loop, exactly as before.
+  it("with no termSeq the terminal defaults onto seq (a caller with no split stays coherent)", async () => {
     const { host, guest } = createLoopbackPair();
-    const owner = new CoopMePump(new CoopInteractionRelay(host), { tick: fastTick });
-    const watcher = new CoopMePump(new CoopInteractionRelay(guest), { tick: fastTick });
-    watcher.attach(makeEngine());
+    const owner = new CoopMePump(new CoopInteractionRelay(host));
+    const peerRelay = new CoopInteractionRelay(guest);
 
-    owner.beginOwner(SEQ); // no termSeq
-    let left = false;
-    watcher.beginWatcher(SEQ, () => {
-      left = true;
-    });
+    owner.beginOwner(SEQ); // no termSeq -> terminal rides `seq`
     owner.endOwner();
     await settle();
-    expect(left, "the LEAVE on `seq` reached the same-seq watcher loop").toBe(true);
-    expect(watcher.isSessionActive()).toBe(false);
 
-    watcher.endSession();
+    expect((await peerRelay.awaitInteractionChoice(SEQ, 10))?.choice).toBe(COOP_INTERACTION_LEAVE);
+    expect(owner.isSessionActive()).toBe(false);
   });
 
-  it("the OWNER never applies into its own engine (it only relays)", async () => {
+  it("both terminals close the session EXACTLY ONCE (no duplicate sentinel after end)", async () => {
     const { host, guest } = createLoopbackPair();
-    const ownerEng = makeEngine();
-    const owner = new CoopMePump(new CoopInteractionRelay(host), { tick: fastTick });
-    owner.attach(ownerEng);
-    const watcher = new CoopMePump(new CoopInteractionRelay(guest), { tick: fastTick });
-    watcher.attach(makeEngine());
+    const owner = new CoopMePump(new CoopInteractionRelay(host));
+    const peerRelay = new CoopInteractionRelay(guest);
 
-    owner.beginOwner(SEQ);
-    watcher.beginWatcher(SEQ, () => {});
-    owner.relayOwnerButton(50);
+    const SEQ_TERM = 9_000_011;
+    owner.beginOwner(SEQ, SEQ_TERM);
+    owner.relayMeBattleHandoff(); // terminal 1: sends the sentinel + ends the session
+    owner.endOwner(); // terminal 2 AFTER end: must send NOTHING (session already closed)
     await settle();
 
-    expect(ownerEng.applied).toEqual([]); // owner drives its real handler directly, not via the pump
-
-    owner.endOwner();
-    watcher.endSession();
+    expect((await peerRelay.awaitInteractionChoice(SEQ_TERM, 10))?.choice).toBe(COOP_ME_BATTLE_HANDOFF);
+    // No second sentinel behind it - endOwner after the handoff was a no-op.
+    expect(await peerRelay.awaitInteractionChoice(SEQ_TERM, 10)).toBeNull();
+    expect(owner.isSessionActive()).toBe(false);
   });
 });

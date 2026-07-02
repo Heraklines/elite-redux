@@ -634,6 +634,17 @@ export type CoopMessage =
    */
   | { t: "requestEnemyParty"; wave: number }
   /**
+   * Host -> guest (#633, M4 push-snapshot launch): the AUTHORITATIVE full session snapshot at
+   * the launch (and every hard-transition) boundary. `session` is a JSON-serialized
+   * {@linkcode SessionSaveData} (the host's `getSessionSaveData()` - the SAME complete serializer
+   * cloud-save + resume ride on), keyed by `wave` so a stale wave's snapshot is never adopted.
+   * The guest does NOT roll its own enemy / arena / party at launch: it BOOTS from this snapshot
+   * via the heavy session-restore apply (`applyCoopLaunchSession`) and lands already synced - so it
+   * computes NOTHING that could diverge (§3.6). Pushed the instant the host's session is coherent
+   * (its EncounterPhase), replacing the narrow `enemyPartySync` + the `requestEnemyParty` poll.
+   */
+  | { t: "launchSnapshot"; wave: number; session: string }
+  /**
    * Host -> guest (#633, authoritative ME battle handoff): the EXACT enemy party the host
    * generated for a mystery-encounter-SPAWNED battle. Unlike `enemyPartySync` (keyed by the
    * wave's starting encounter), an ME battle spawns MID-wave from an option pick, so it is
@@ -687,6 +698,12 @@ export type CoopMessage =
       checkpoint: CoopBattleCheckpoint;
       checksum: string;
       preimage?: string;
+      /**
+       * The host's COMPLETE per-mon on-field snapshot (#633 M2): heals the on-field state the numeric
+       * `checkpoint` omits (moveset+PP / tera / boss / held items / ability / form) IN-LINE each turn.
+       * Optional + additive - an older host omits it and the guest keeps its checksum-detect + resync heal.
+       */
+      fullField?: CoopFullMonSnapshot[];
     }
   /**
    * Host -> guest (#633, LIVE-D): an out-of-turn authoritative checkpoint (after a
@@ -842,6 +859,8 @@ function summarizeCoopMessage(msg: CoopMessage): string {
       return `wave=${msg.wave} enemies=${msg.enemies.length}`;
     case "requestEnemyParty":
       return `wave=${msg.wave}`;
+    case "launchSnapshot":
+      return `wave=${msg.wave} session=${msg.session.length}b`;
     case "meBattleEnemyPartySync":
       return `key=${msg.key} enemies=${msg.enemies.length}`;
     case "ghostPool":
@@ -872,7 +891,7 @@ function summarizeCoopMessage(msg: CoopMessage): string {
     case "pong":
       return `ts=${msg.ts}`;
     case "waveResolved":
-      return `wave=${msg.wave} outcome=${msg.outcome} captureParty=${msg.captureParty?.length ?? "-"} cap=${msg.capturePresentation != null ? `sp${msg.capturePresentation.speciesId}` : "-"}`;
+      return `wave=${msg.wave} outcome=${msg.outcome} captureParty=${msg.captureParty?.length ?? "-"} cap=${msg.capturePresentation == null ? "-" : `sp${msg.capturePresentation.speciesId}`}`;
     case "expResolved":
       return `wave=${msg.wave} deltas=${msg.deltas.length}`;
     case "dataFingerprint":

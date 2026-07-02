@@ -3,8 +3,11 @@ import type { TurnCommand } from "#app/battle";
 import { globalScene } from "#app/global-scene";
 import { summonCoopPlayerField } from "#data/elite-redux/coop/coop-battle-engine";
 import { coopLog } from "#data/elite-redux/coop/coop-debug";
-import { getCoopController, getCoopNetcodeMode } from "#data/elite-redux/coop/coop-runtime";
-import { COOP_GUEST_FIELD_INDEX } from "#data/elite-redux/coop/coop-session";
+import {
+  coopLocalOwnedPlayerFieldSlot,
+  getCoopController,
+  getCoopNetcodeMode,
+} from "#data/elite-redux/coop/coop-runtime";
 import { beginCoopRecording } from "#data/elite-redux/coop/coop-turn-recorder";
 import { ArenaTagSide } from "#enums/arena-tag-side";
 import type { BattlerIndex } from "#enums/battler-index";
@@ -179,9 +182,10 @@ export class TurnStartPhase extends FieldPhase {
 
   /**
    * GUEST (authoritative, #633): mirror the guest's OWN voluntary switch BEFORE diverting the turn to
-   * CoopReplayTurnPhase. The guest owns exactly one player field slot ({@linkcode COOP_GUEST_FIELD_INDEX});
-   * its queued `turnCommands[slot]` carries the switch (`command === Command.POKEMON`, `cursor` = the target
-   * party slot) written by command-phase `tryLeaveField`. Perform the SAME side-effect-free
+   * CoopReplayTurnPhase. The guest owns exactly one player field slot (resolved N-ready via
+   * {@linkcode coopLocalOwnedPlayerFieldSlot} - the mon's `coopOwner` tag, falling back to the fixed
+   * 2-player slot map); its queued `turnCommands[slot]` carries the switch (`command === Command.POKEMON`,
+   * `cursor` = the target party slot) written by command-phase `tryLeaveField`. Perform the SAME side-effect-free
    * `party[fieldIndex] <-> party[cursor]` swap + visual summon the host's SwitchSummonPhase does via
    * {@linkcode summonCoopPlayerField} (NO resolution pipeline / NO fresh RNG), so the guest's positional
    * field serialization realigns with the host's. ONLY the guest's own slot + ONLY a POKEMON command is
@@ -190,7 +194,7 @@ export class TurnStartPhase extends FieldPhase {
    */
   private mirrorGuestOwnSwitch(): void {
     try {
-      const guestSlot = COOP_GUEST_FIELD_INDEX;
+      const guestSlot = coopLocalOwnedPlayerFieldSlot();
       const turnCommand = globalScene.currentBattle.turnCommands[guestSlot];
       // A voluntary switch carries the target party slot in `cursor`. Anything else (FIGHT/BALL/RUN,
       // a skipped command, or no cursor) is not a self-switch and rides the host's authoritative outcome.

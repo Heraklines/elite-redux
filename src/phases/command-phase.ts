@@ -4,19 +4,14 @@ import { getPokemonNameWithAffix } from "#app/messages";
 import { TrappedTag } from "#data/battler-tags";
 import { getDailyEventSeedBoss } from "#data/daily-seed/daily-run";
 import { isDailyFinalBoss } from "#data/daily-seed/daily-seed-utils";
-import {
-  applyCoopCheckpoint,
-  applyCoopEnemies,
-  captureCoopCheckpoint,
-  captureCoopChecksum,
-  captureCoopEnemies,
-} from "#data/elite-redux/coop/coop-battle-engine";
+import { applyCoopEnemies, captureCoopEnemies } from "#data/elite-redux/coop/coop-battle-engine";
 import {
   applyWiredPartnerCommand,
   type ResolvedPartnerCommand,
   resolvePartnerCommand,
 } from "#data/elite-redux/coop/coop-partner-ai";
 import {
+  coopOwnerOfPlayerFieldSlot,
   getCoopBattleStreamer,
   getCoopBattleSync,
   getCoopController,
@@ -24,9 +19,9 @@ import {
   recordCoopOwnSlotCommand,
   recordCoopPartnerSlotCommand,
 } from "#data/elite-redux/coop/coop-runtime";
-import { coopOwnerOfFieldIndex } from "#data/elite-redux/coop/coop-session";
 import type { SerializedCommand } from "#data/elite-redux/coop/coop-transport";
 import { reloadCurrentWave } from "#data/elite-redux/er-reset-wave";
+import { recordSinglePlayerCommand } from "#data/elite-redux/replay-single-recording";
 import { AbilityId } from "#enums/ability-id";
 import { ArenaTagSide } from "#enums/arena-tag-side";
 import { ArenaTagType } from "#enums/arena-tag-type";
@@ -111,10 +106,21 @@ export class CommandPhase extends FieldPhase {
       return;
     }
 
-    const allyCommand = globalScene.currentBattle.turnCommands[this.fieldIndex - 1];
-    if (allyCommand?.command === Command.BALL || allyCommand?.command === Command.RUN) {
+    // Scan ALL earlier slots (not just fieldIndex-1): in a TRIPLE, a fainted/empty middle
+    // slot has a null command, which broke the skip chain - slot 2 would still be prompted
+    // after slot 0 threw a ball / fled. NB turnCommands is a KEYED OBJECT (Object.fromEntries
+    // in battle.ts), not an array - index it, never .slice it (that threw in every double).
+    let allyCommand: TurnCommand | null = null;
+    for (let i = 0; i < this.fieldIndex; i++) {
+      const c = globalScene.currentBattle.turnCommands[i];
+      if (c?.command === Command.BALL || c?.command === Command.RUN) {
+        allyCommand = c;
+        break;
+      }
+    }
+    if (allyCommand) {
       globalScene.currentBattle.turnCommands[this.fieldIndex] = {
-        command: allyCommand?.command,
+        command: allyCommand.command,
         skip: true,
       };
     }
@@ -221,7 +227,7 @@ export class CommandPhase extends FieldPhase {
       return false;
     }
     // Only auto-resolve the PARTNER's slot; the local player commands their own.
-    if (coopOwnerOfFieldIndex(this.fieldIndex) === controller.role) {
+    if (coopOwnerOfPlayerFieldSlot(this.fieldIndex) === controller.role) {
       return false;
     }
 
@@ -323,47 +329,10 @@ export class CommandPhase extends FieldPhase {
       return;
     }
     const { turn, waveIndex } = globalScene.currentBattle;
-    // LOCKSTEP netcode (#633): heal state exactly as 778b192dd did - the HOST broadcasts
-    // the authoritative post-previous-turn checkpoint once per turn (slot 0, turn 2+), and
-    // the GUEST snaps to the latest such checkpoint at this safe boundary, so both screens
-    // converge on the same hp / status / stages / weather every turn. (In AUTHORITATIVE the
-    // per-turn checkpoint + checksum verification is owned by CoopReplayTurnPhase / emitTurn,
-    // so it is NOT re-sent here - the Track-2 path below.)
-    if (getCoopNetcodeMode() === "lockstep") {
-      if (controller.role === "host") {
-        // Turn 1 of each wave (first command phase): broadcast the authoritative enemy
-        // party so the guest's enemies match exactly (ability/moveset/IVs/nature).
-        if (this.fieldIndex === 0 && turn === 1) {
-          streamer.sendEnemyParty(waveIndex, captureCoopEnemies());
-        }
-        // Once per turn after turn 1: snapshot + broadcast the post-turn state. The
-        // streamer API now also carries the host's full-state checksum (#633, TRACK-2);
-        // passing it keeps lockstep on the current API while the BEHAVIOR (per-turn
-        // checkpoint broadcast/adopt) matches 778b192dd exactly.
-        if (this.fieldIndex === 0 && turn > 1) {
-          const checkpoint = captureCoopCheckpoint();
-          if (checkpoint != null) {
-            streamer.sendCheckpoint("turn", checkpoint, captureCoopChecksum());
-          }
-        }
-      } else {
-        // Guest: at the wave's first turn, adopt the host's exact enemy party.
-        if (turn === 1) {
-          const enemies = streamer.consumeEnemyParty(waveIndex);
-          if (enemies != null) {
-            applyCoopEnemies(enemies);
-          }
-        }
-        // Apply the host's latest authoritative checkpoint at this safe boundary. The
-        // current streamer returns an envelope (checkpoint + checksum); lockstep applies
-        // the checkpoint exactly as 778b192dd did.
-        const envelope = streamer.consumeCheckpoint();
-        if (envelope != null) {
-          applyCoopCheckpoint(envelope.checkpoint);
-        }
-      }
-      return;
-    }
+    // M6c (#633): the LOCKSTEP per-turn checkpoint broadcast/adopt that used to live here was
+    // dead (a live co-op session is ALWAYS authoritative since M3) and is deleted. The per-turn
+    // authoritative state (checkpoint + checksum) streams via emitTurn at TurnEnd (TRACK-2
+    // Phase B) / CoopReplayTurnPhase; only the wave-start enemy-party belt-and-suspenders stays.
     if (controller.role === "host") {
       // Turn 1 of each wave (first command phase): broadcast the authoritative enemy
       // party so the guest's enemies match exactly (ability/moveset/IVs/nature). The
@@ -534,7 +503,8 @@ export class CommandPhase extends FieldPhase {
     // was stuck choosing Charmander's move" bug). Solo / own-slot / queued-move paths
     // are unaffected: `coopController` is null outside a live co-op run.
     const coopController = move !== undefined && globalScene.gameMode.isCoop ? getCoopController() : null;
-    const isCoopPartnerApply = coopController != null && coopOwnerOfFieldIndex(this.fieldIndex) !== coopController.role;
+    const isCoopPartnerApply =
+      coopController != null && coopOwnerOfPlayerFieldSlot(this.fieldIndex) !== coopController.role;
 
     // Whether an interactive SelectTargetPhase was queued for THIS (own) command, so
     // the co-op broadcast of our own pick is DEFERRED until SelectTargetPhase resolves
@@ -616,7 +586,7 @@ export class CommandPhase extends FieldPhase {
       return;
     }
     // Only broadcast OUR OWN slot; the partner slot is awaited, not broadcast.
-    if (coopOwnerOfFieldIndex(this.fieldIndex) !== controller.role) {
+    if (coopOwnerOfPlayerFieldSlot(this.fieldIndex) !== controller.role) {
       return;
     }
     const sync = getCoopBattleSync();
@@ -776,8 +746,15 @@ export class CommandPhase extends FieldPhase {
         cursor,
       };
       globalScene.currentBattle.turnCommands[this.fieldIndex]!.targets = targets;
-      if (this.fieldIndex) {
-        globalScene.currentBattle.turnCommands[this.fieldIndex - 1]!.skip = true;
+      // The throw consumes the whole side's turn: skip every EARLIER slot's committed
+      // command. Null-safe + all slots, not just [fieldIndex-1] - in a TRIPLE the
+      // previous slot's command can be null (fainted/empty slot), which crashed with
+      // "Cannot set properties of null (setting 'skip')" (tester izumi, 2026-07-01).
+      for (let i = 0; i < this.fieldIndex; i++) {
+        const cmd = globalScene.currentBattle.turnCommands[i];
+        if (cmd) {
+          cmd.skip = true;
+        }
       }
       return true;
     }
@@ -856,7 +833,15 @@ export class CommandPhase extends FieldPhase {
             command: Command.RUN,
           };
       if (!this.isSwitch && this.fieldIndex) {
-        currentBattle.turnCommands[this.fieldIndex - 1]!.skip = true;
+        // Fleeing consumes the side's turn: skip every earlier slot's committed command,
+        // null-safe (a fainted/empty TRIPLE slot has a null command - same crash class
+        // as the triple ball throw).
+        for (let i = 0; i < this.fieldIndex; i++) {
+          const cmd = currentBattle.turnCommands[i];
+          if (cmd) {
+            cmd.skip = true;
+          }
+        }
       }
       return true;
     }
@@ -1016,6 +1001,10 @@ export class CommandPhase extends FieldPhase {
         // (the merged party is identical on both clients), and the Baton flag rides along.
         this.broadcastLocalCoopActionCommand(command, cursor, typeof useMode === "boolean" ? useMode : false);
       }
+      // #record-replay (single-player): capture this committed player command (move/switch/ball/run).
+      // Fires AFTER the co-op broadcast above (behavior-preserving) and is a hard no-op in co-op (the
+      // co-op relay taps own that path) + when not recording - so solo / co-op are both unaffected.
+      recordSinglePlayerCommand(this.fieldIndex, command, cursor);
       this.end();
     }
 
@@ -1048,7 +1037,7 @@ export class CommandPhase extends FieldPhase {
       return;
     }
     const controller = getCoopController();
-    if (controller == null || coopOwnerOfFieldIndex(this.fieldIndex) !== controller.role) {
+    if (controller == null || coopOwnerOfPlayerFieldSlot(this.fieldIndex) !== controller.role) {
       return;
     }
     const sync = getCoopBattleSync();

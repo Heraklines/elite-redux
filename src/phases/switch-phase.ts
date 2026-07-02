@@ -1,6 +1,11 @@
 import { globalScene } from "#app/global-scene";
-import { getCoopController, getCoopInteractionRelay, getCoopNetcodeMode } from "#data/elite-redux/coop/coop-runtime";
-import { coopOwnerOfFieldIndex, coopSwitchBlocksMon } from "#data/elite-redux/coop/coop-session";
+import {
+  coopOwnerOfPlayerFieldSlot,
+  getCoopController,
+  getCoopInteractionRelay,
+  getCoopNetcodeMode,
+} from "#data/elite-redux/coop/coop-runtime";
+import { coopSwitchBlocksMonForOwner } from "#data/elite-redux/coop/coop-session";
 import { SwitchType } from "#enums/switch-type";
 import { UiMode } from "#enums/ui-mode";
 import { BattlePhase } from "#phases/battle-phase";
@@ -80,7 +85,7 @@ export class SwitchPhase extends BattlePhase {
     const coopRelay = coopController == null ? null : getCoopInteractionRelay();
     if (coopController != null && coopRelay != null) {
       const seq = (globalScene.currentBattle.turn ?? 0) * 4 + this.fieldIndex;
-      if (coopOwnerOfFieldIndex(this.fieldIndex) !== coopController.role) {
+      if (coopOwnerOfPlayerFieldSlot(this.fieldIndex) !== coopController.role) {
         // AUTHORITATIVE netcode (#633 partner-death sync, HALF B): the WATCHER here is the HOST
         // simulating the whole turn, and the slot's OWNER is the GUEST - but the authoritative guest
         // is a pure renderer in CoopReplayTurnPhase and NEVER reaches its own SwitchPhase, so it can
@@ -155,19 +160,22 @@ export class SwitchPhase extends BattlePhase {
    * fainted field slot whose OWNER is the partner the host can't await. Mirrors exactly the choices
    * the owner's interactive picker would allow: the FIRST party member that is a BENCH slot (index
    * `>= getBattlerCount()`, i.e. not already on-field), is allowed in battle (non-fainted, same as
-   * the picker's `FilterNonFainted`), and belongs to the slot's OWNER half (same `coopSwitchBlocksMon`
-   * gate the picker enforces, so the host never pulls the host's own bench into the guest's slot).
-   * Returns the chosen party slot, or -1 when the owner has no legal bench replacement (the caller
-   * then leaves the slot empty exactly as a no-reply relay would). No await, no menu, no RNG.
+   * the picker's `FilterNonFainted`), and belongs to the slot's OWNER half (same
+   * `coopSwitchBlocksMonForOwner` gate the picker enforces, so the host never pulls the host's own
+   * bench into the guest's slot). Returns the chosen party slot, or -1 when the owner has no legal
+   * bench replacement (the caller then leaves the slot empty exactly as a no-reply relay would).
+   * No await, no menu, no RNG.
    */
   private coopAutoPickReplacement(): number {
     const battlerCount = globalScene.currentBattle.getBattlerCount();
     const party = globalScene.getPlayerParty();
     // Ownership is keyed off the ORIGINAL slot (this.fieldIndex), matching the watcher gate above -
     // the override-to-0 `fieldIndex` only affects where the summon lands, not whose half is legal.
+    // M5 (#633): the slot's owner is resolved from the mon's tag (N-ready), hoisted out of the scan.
+    const slotOwner = coopOwnerOfPlayerFieldSlot(this.fieldIndex);
     return party.findIndex(
       (mon, i) =>
-        i >= battlerCount && i < 6 && mon.isAllowedInBattle() && !coopSwitchBlocksMon(this.fieldIndex, mon.coopOwner),
+        i >= battlerCount && i < 6 && mon.isAllowedInBattle() && !coopSwitchBlocksMonForOwner(slotOwner, mon.coopOwner),
     );
   }
 }

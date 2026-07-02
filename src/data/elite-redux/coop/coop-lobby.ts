@@ -87,18 +87,72 @@ export async function announceToLobby(
   return { id: String(body.id), pairing: asPairing(body.pairing) };
 }
 
+/** An incoming join request (lobby v2): who is asking to play with me. */
+export interface LobbyRequest {
+  id: string;
+  name: string;
+}
+
+/** One full lobby poll result (lobby v2 adds `request` + the one-shot `declined`). */
+export interface LobbySnapshot {
+  players: LobbyPlayer[];
+  pairing: LobbyPairing | null;
+  /** Someone is asking to join ME (answer via {@linkcode respondToRequest}). */
+  request: LobbyRequest | null;
+  /** One-shot: the named player DECLINED my request (already cleared server-side). */
+  declined: string | null;
+}
+
 /**
  * Poll the lobby: returns OTHER waiting players + my pairing if the worker matched
- * me. Doubles as a presence heartbeat (the worker refreshes my seen_at).
+ * me, plus any incoming join request / decline notice (lobby v2). Doubles as a
+ * presence heartbeat (the worker refreshes my seen_at). Tolerant of an OLD worker
+ * that omits the v2 fields (they parse to null).
  */
-export async function fetchLobby(self: string): Promise<{ players: LobbyPlayer[]; pairing: LobbyPairing | null }> {
+export async function fetchLobby(self: string): Promise<LobbySnapshot> {
   const res = await fetch(`${coopServerBase()}/coop/lobby?self=${encodeURIComponent(self)}`);
   const text = await res.text();
   if (!res.ok) {
     throw lobbyError("/coop/lobby", res.status, text);
   }
-  const body = JSON.parse(text) as { players?: LobbyPlayer[]; pairing?: unknown };
-  return { players: Array.isArray(body.players) ? body.players : [], pairing: asPairing(body.pairing) };
+  const body = JSON.parse(text) as {
+    players?: LobbyPlayer[];
+    pairing?: unknown;
+    request?: unknown;
+    declined?: unknown;
+  };
+  let request: LobbyRequest | null = null;
+  if (body.request && typeof body.request === "object") {
+    const r = body.request as Record<string, unknown>;
+    if (typeof r.id === "string" && typeof r.name === "string") {
+      request = { id: r.id, name: r.name };
+    }
+  }
+  return {
+    players: Array.isArray(body.players) ? body.players : [],
+    pairing: asPairing(body.pairing),
+    request,
+    declined: typeof body.declined === "string" ? body.declined : null,
+  };
+}
+
+/**
+ * Lobby v2: ASK a player to co-op (they must ACCEPT before anything connects).
+ * Resolves when the request is parked on their row; the answer arrives via polling
+ * (a pairing on accept, a `declined` notice on decline). Throws "not found" against
+ * an OLD worker - the caller falls back to the instant {@linkcode pickPlayer}.
+ */
+export async function requestPlayer(self: string, target: string): Promise<void> {
+  await lobbyPost("/coop/lobby/request", { self, target });
+}
+
+/**
+ * Lobby v2: ANSWER the join request parked on my row. Accepting returns MY pairing
+ * (I host; the requester reads its pairing on its next poll); declining resolves null.
+ */
+export async function respondToRequest(self: string, from: string, accept: boolean): Promise<LobbyPairing | null> {
+  const body = await lobbyPost("/coop/lobby/respond", { self, from, accept });
+  return accept ? asPairing(body) : null;
 }
 
 /**
@@ -134,6 +188,14 @@ export interface CoopLobbyCallbacks {
   onConnected: (runtime: CoopRuntime) => void;
   /** A fatal error (announce/connect failed). */
   onError: (message: string) => void;
+  /** Lobby v2: someone is asking to join ME - show Accept / Decline. */
+  onRequest?: (from: LobbyRequest) => void;
+  /** Lobby v2: the incoming request evaporated (requester left / was matched). */
+  onRequestGone?: () => void;
+  /** Lobby v2: the named player DECLINED my outgoing request. */
+  onDeclined?: (name: string) => void;
+  /** Lobby v2: my outgoing request is parked - waiting on their answer. */
+  onRequestPending?: (targetName: string) => void;
 }
 
 /** The WebRTC connect signature - injectable so tests can stub the browser leg. */
@@ -163,6 +225,10 @@ export class CoopLobbyController {
   private stopped = false;
   private connecting = false;
   private readonly connectFn: CoopConnectFn;
+  /** Lobby v2: the presence id of the player currently asking to join ME (dedupe onRequest). */
+  private incomingRequestId: string | null = null;
+  /** Lobby v2: whether MY outgoing request is parked awaiting the other player's answer. */
+  private outgoingPending = false;
 
   constructor(
     private readonly name: string,
@@ -217,6 +283,61 @@ export class CoopLobbyController {
     }
   }
 
+  /**
+   * Lobby v2: ASK `targetId` to co-op (they must ACCEPT before anything connects).
+   * Falls back to the instant {@linkcode pick} when the worker predates the
+   * request/respond endpoints (a "not found" answer), so an un-deployed worker
+   * never bricks the lobby - it just behaves like the old consentless flow.
+   */
+  async request(targetId: string, targetName: string): Promise<void> {
+    if (!this.id || this.connecting || this.stopped) {
+      return;
+    }
+    coopLog("lobby", `request target=${targetId} (self=${this.id})`);
+    try {
+      await requestPlayer(this.id, targetId);
+      this.outgoingPending = true;
+      this.callbacks.onRequestPending?.(targetName);
+      this.scheduleNextPoll(0);
+    } catch (e) {
+      const msg = message(e);
+      if (/not found/i.test(msg)) {
+        // OLD worker (no request/respond endpoints): degrade to the instant pick.
+        coopWarn("lobby", "request unsupported by worker -> falling back to instant pick");
+        await this.pick(targetId);
+        return;
+      }
+      coopWarn("lobby", `request failed (transient): ${msg} -> keep browsing`);
+      this.callbacks.onError(msg);
+      this.scheduleNextPoll(POLL_INTERVAL_MS);
+    }
+  }
+
+  /**
+   * Lobby v2: ANSWER the incoming join request. Accepting pairs us (I host) and
+   * connects immediately; declining clears it and keeps browsing.
+   */
+  async respond(accept: boolean): Promise<void> {
+    if (!this.id || this.connecting || this.stopped || this.incomingRequestId == null) {
+      return;
+    }
+    const from = this.incomingRequestId;
+    this.incomingRequestId = null;
+    coopLog("lobby", `respond accept=${accept} from=${from} (self=${this.id})`);
+    try {
+      const pairing = await respondToRequest(this.id, from, accept);
+      if (pairing) {
+        await this.connect(pairing);
+        return;
+      }
+    } catch (e) {
+      // The requester left / was matched while we decided: keep browsing.
+      coopWarn("lobby", `respond failed (transient): ${message(e)} -> keep browsing`);
+      this.callbacks.onError(message(e));
+    }
+    this.scheduleNextPoll(POLL_INTERVAL_MS);
+  }
+
   /** Back out: stop polling and drop my presence row. */
   cancel(): void {
     coopLog("lobby", `cancel (id=${this.id ?? "none"} connecting=${this.connecting})`);
@@ -247,7 +368,7 @@ export class CoopLobbyController {
       return;
     }
     try {
-      const { players, pairing } = await fetchLobby(this.id);
+      const { players, pairing, request, declined } = await fetchLobby(this.id);
       if (this.stopped || this.connecting) {
         return;
       }
@@ -256,12 +377,33 @@ export class CoopLobbyController {
         await this.connect(pairing);
         return;
       }
+      // Lobby v2: my outgoing request was DECLINED (one-shot notice) - resume browsing.
+      if (declined) {
+        coopLog("lobby", `poll: request declined by ${declined}`);
+        this.outgoingPending = false;
+        this.callbacks.onDeclined?.(declined);
+      }
+      // Lobby v2: an INCOMING join request appeared / evaporated - surface the change once.
+      if (request && request.id !== this.incomingRequestId) {
+        coopLog("lobby", `poll: incoming request from=${request.id} name=${request.name}`);
+        this.incomingRequestId = request.id;
+        this.callbacks.onRequest?.(request);
+      } else if (!request && this.incomingRequestId != null) {
+        coopLog("lobby", "poll: incoming request gone (requester left / matched)");
+        this.incomingRequestId = null;
+        this.callbacks.onRequestGone?.();
+      }
       coopLog("lobby", `poll players=${players.length}`);
       this.callbacks.onPlayers(players);
     } catch {
       // transient network blip; keep polling
     }
     this.scheduleNextPoll(POLL_INTERVAL_MS);
+  }
+
+  /** Lobby v2: whether MY outgoing request is still awaiting the other player's answer. */
+  isRequestPending(): boolean {
+    return this.outgoingPending;
   }
 
   private async connect(pairing: LobbyPairing): Promise<void> {

@@ -29,7 +29,7 @@ import {
 } from "#data/elite-redux/coop/coop-data-fingerprint";
 import { coopLog, coopWarn, isCoopDebug } from "#data/elite-redux/coop/coop-debug";
 import { CoopRoster, type CoopRosterEntry } from "#data/elite-redux/coop/coop-roster";
-import { CoopInteractionTurn } from "#data/elite-redux/coop/coop-session";
+import { CoopInteractionTurn, type CoopPlayerId, coopSeatOfRole } from "#data/elite-redux/coop/coop-session";
 import type { CoopMessage, CoopNetcodeMode, CoopRole, CoopTransport } from "#data/elite-redux/coop/coop-transport";
 
 /** Reserved {@linkcode CoopMessage} `screen` tag carrying the interaction-turn
@@ -121,6 +121,16 @@ export class CoopSessionController {
   // state is unaffected.
   role: CoopRole;
   partnerRoleId: CoopRole;
+
+  /**
+   * This client's SEAT / PlayerId (#633, M5): host = seat 0 = the authority, guest = seat 1.
+   * Derived from the (reconcilable) live {@linkcode role}, so a hello-handshake role
+   * reconciliation moves the seat with it. The N-player generalization keys authority and
+   * ownership rules off seats; the binary role stays the 2-player wire representation.
+   */
+  get seat(): CoopPlayerId {
+    return coopSeatOfRole(this.role);
+  }
   /** Per-client random nonce broadcast in `hello` to break a role tie deterministically. */
   private readonly tiebreak: number;
   private readonly transport: CoopTransport;
@@ -134,12 +144,13 @@ export class CoopSessionController {
   /** The host-authoritative run config once received/known (#633, LIVE-C). */
   private _runConfig: CoopRunConfig | null = null;
   /**
-   * The active co-op netcode (#633, selectable A/B). Defaults to `"lockstep"` (the
-   * safe live default that keeps the visible move synced). The HOST sets it at
-   * session start via {@linkcode setNetcodeMode}; the GUEST adopts the host's value
-   * off the `runConfig`. Every co-op gate reads this single source of truth.
+   * The active co-op netcode (#633 M3): co-op is now AUTHORITATIVE-ONLY (the host is the
+   * sole engine, the guest is a pure renderer that runs no combat + no ME engine), so this
+   * defaults to `"authoritative"` and the old "lockstep" dual-engine mode is retired. The
+   * HOST pins it at session start via {@linkcode setNetcodeMode}; the GUEST adopts the host's
+   * value off the `runConfig`. Every co-op gate reads this single source of truth.
    */
-  private _netcodeMode: CoopNetcodeMode = "lockstep";
+  private _netcodeMode: CoopNetcodeMode = "authoritative";
   private _localReady = false;
   private _partnerReady = false;
   private _partnerConnected = false;
@@ -594,9 +605,9 @@ export class CoopSessionController {
         // so the run is coherent and both engines stay in lockstep (#633, LIVE-A/C).
         // Only honour it FROM the host.
         if (this.role === "guest") {
-          // The guest adopts the host's chosen netcode (#633, selectable A/B); an
-          // absent value (an in-flight save from before this field) means "lockstep".
-          const netcodeMode = msg.netcodeMode ?? "lockstep";
+          // The guest adopts the host's chosen netcode (#633 M3: authoritative-only); an
+          // absent value (an in-flight save from before this field) means "authoritative".
+          const netcodeMode = msg.netcodeMode ?? "authoritative";
           coopLog("runtime", `guest received difficulty=${msg.difficulty} netcode=${netcodeMode}`);
           this._netcodeMode = netcodeMode;
           this._runConfig = { difficulty: msg.difficulty, challenges: msg.challenges, seed: msg.seed, netcodeMode };

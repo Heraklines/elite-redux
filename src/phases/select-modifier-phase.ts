@@ -34,6 +34,7 @@ import {
   erMerchantsSealRerollMultiplier,
   erScrapMagnetExtraRewards,
 } from "#data/elite-redux/er-relics";
+import { recordSinglePlayerInteraction } from "#data/elite-redux/replay-single-recording";
 import { SpeciesFormChangeItemTrigger } from "#data/form-change-triggers";
 import { BattleType } from "#enums/battle-type";
 import { FormChangeItem } from "#enums/form-change-item";
@@ -283,6 +284,8 @@ export class SelectModifierPhase extends BattlePhase {
               // Co-op (#633): relay the skip to the watcher, then advance the turn.
               this.coopEndMirror();
               this.coopRelaySend(COOP_INTERACTION_LEAVE, undefined, "skip");
+              // #record-replay (single-player): capture the reward-shop LEAVE (no-op unless recording / in co-op).
+              recordSinglePlayerInteraction("skip", COOP_INTERACTION_LEAVE);
               super.end();
               this.coopAdvanceInteraction();
             },
@@ -373,6 +376,8 @@ export class SelectModifierPhase extends BattlePhase {
       // Co-op (#633): no reward to pick is the same as leaving - relay + advance.
       this.coopEndMirror();
       this.coopRelaySend(COOP_INTERACTION_LEAVE, undefined, "skip");
+      // #record-replay (single-player): no reward to pick is a LEAVE (no-op unless recording / in co-op).
+      recordSinglePlayerInteraction("skip", COOP_INTERACTION_LEAVE);
       super.end();
       this.coopAdvanceInteraction();
       return true;
@@ -381,6 +386,10 @@ export class SelectModifierPhase extends BattlePhase {
     // Co-op (#633): capture the free-reward pick so it is relayed to the watcher once
     // any party target / sub-option is resolved (or immediately for a non-party item).
     this.coopBeginPending("reward", cursor, 1);
+    // #record-replay (single-player): capture the reward pick (the chosen option row). Recorded at the
+    // decision point (behavior-preserving passive push); a hard no-op unless recording / in co-op. A
+    // party-target reward's resolved slot is a DOCUMENTED replay-gap (the loader picks a non-party reward).
+    recordSinglePlayerInteraction("reward", cursor);
     return this.applyChosenModifier(modifierType, -1, modifierSelectCallback);
   }
 
@@ -478,6 +487,9 @@ export class SelectModifierPhase extends BattlePhase {
     // interaction owner). coopOwnerPostMoney is read + reset inside coopRelaySend.
     this.coopOwnerPostMoney = Overrides.WAIVE_ROLL_FEE_OVERRIDE ? -1 : Math.trunc(globalScene.money);
     this.coopRelaySend(COOP_INTERACTION_REROLL, undefined, "reroll");
+    // #record-replay (single-player): capture the reroll (a fresh SelectModifierPhase follows with its
+    // own reward/skip interaction). No-op unless recording / in co-op.
+    recordSinglePlayerInteraction("reroll", COOP_INTERACTION_REROLL);
     globalScene.playSound("se/buy");
     return true;
   }
@@ -582,6 +594,9 @@ export class SelectModifierPhase extends BattlePhase {
     globalScene.lockModifierTiers = !globalScene.lockModifierTiers;
     // Co-op (#633): relay the lock toggle (engine state the next pool generation reads).
     this.coopRelaySend(0, [COOP_ACT_LOCK], "lock");
+    // #record-replay (single-player): capture the reroll-lock toggle (engine state the next reward-pool
+    // roll reads, so a faithful replay must reproduce it). No-op unless recording / in co-op.
+    recordSinglePlayerInteraction("lock", 0, [COOP_ACT_LOCK]);
     // The WATCHER has no MODIFIER_SELECT handler open - mutate the flag only, skip UI.
     if (!this.coopWatcher) {
       const uiHandler = globalScene.ui.getHandler() as ModifierSelectUiHandler;
@@ -1244,8 +1259,8 @@ export class SelectModifierPhase extends BattlePhase {
     // rerollModifiers / applyModifier set-verbatim; reset to -1 at every return so it can't bleed.
     let relayedMoney = -1;
     let data = action.data ?? [];
-    if (data.length >= 2 && data[data.length - 2] === COOP_MONEY_TAG) {
-      relayedMoney = data[data.length - 1];
+    if (data.length >= 2 && data.at(-2) === COOP_MONEY_TAG) {
+      relayedMoney = data.at(-1) ?? -1;
       data = data.slice(0, -2);
     }
     this.coopRelayedMoney = relayedMoney;

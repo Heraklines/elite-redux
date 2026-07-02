@@ -12,6 +12,10 @@ import { DynamicQueueManager } from "#app/dynamic-queue-manager";
 import { globalScene } from "#app/global-scene";
 import type { Phase } from "#app/phase";
 import { PhaseTree } from "#app/phase-tree";
+import {
+  isCoopRendererNeutralizedPhase,
+  recordCoopRendererNeutralized,
+} from "#data/elite-redux/coop/coop-renderer-gate";
 import { isCoopRecording, recordCoopMessage } from "#data/elite-redux/coop/coop-turn-recorder";
 import { MovePhaseTimingModifier } from "#enums/move-phase-timing-modifier";
 import type { Pokemon } from "#field/pokemon";
@@ -28,6 +32,7 @@ import { CheckSwitchPhase } from "#phases/check-switch-phase";
 import { ColosseumChoicePhase } from "#phases/colosseum-choice-phase";
 import { CommandPhase } from "#phases/command-phase";
 import { CommonAnimPhase } from "#phases/common-anim-phase";
+import { CoopInertPhase } from "#phases/coop-inert-phase";
 import { CoopReplayLearnMovePhase } from "#phases/coop-replay-learn-move-phase";
 import { CoopReplayMePhase } from "#phases/coop-replay-me-phase";
 import {
@@ -180,6 +185,7 @@ const PHASES = Object.freeze({
   CoopReplayTurnPhase,
   CoopReplayMePhase,
   CoopReplayLearnMovePhase,
+  CoopInertPhase,
   CoopApplyResyncPhase,
   CoopCaptureReplayPhase,
   CoopFinalizeTurnPhase,
@@ -570,6 +576,23 @@ export class PhaseManager {
 
     if (!PhaseClass) {
       throw new Error(`Phase ${phase} does not exist in PhaseMap.`);
+    }
+
+    // Co-op RENDERER default-deny (#633, M1 - authoritative session replication redesign). The
+    // authoritative co-op GUEST is a pure renderer that resolves nothing: it renders the host's
+    // streamed outcome via the CoopReplay* phases and applies the host's authoritative checkpoint.
+    // A host-authoritative battle-RESOLUTION phase reaching this factory on a renderer is a LEAK, so
+    // substitute an inert no-op that occupies the queue slot and advances immediately - it can never
+    // roll RNG, apply damage, or read per-account state. The renderer's OWN input + render phases are
+    // NOT denied, so its flow is untouched. Hard-gated on the live authoritative GUEST, so solo /
+    // host / lockstep are byte-for-byte unaffected (the predicate is false and this branch never runs).
+    // See docs/plans/2026-07-02-coop-authoritative-replication-redesign.md.
+    if (isCoopRendererNeutralizedPhase(phase)) {
+      recordCoopRendererNeutralized(phase);
+      // The inert phase legitimately substitutes for ANY denied resolution phase; every consumer of
+      // create() only ENQUEUES the result as a base `Phase` (verified: no caller reads a denied phase's
+      // methods), so this is a sound deliberate substitution, not an error suppression.
+      return new CoopInertPhase(phase) as unknown as PhaseMap[T];
     }
 
     // @ts-expect-error: Typescript does not support narrowing the type of operands in generic methods (see https://stackoverflow.com/a/72891234)

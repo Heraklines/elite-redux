@@ -34,6 +34,8 @@ import { Stat } from "#enums/stat";
 import type { StatusEffect } from "#enums/status-effect";
 import type { TrainerType } from "#enums/trainer-type";
 import { WeatherType } from "#enums/weather-type";
+import type { Pokemon } from "#field/pokemon";
+import { overrideHeldItems } from "#modifiers/modifier";
 import type { ModifierOverride } from "#modifiers/modifier-type";
 import type { ModifierTypeFunc } from "#types/modifier-types";
 import type { Starter, StarterMoveset } from "#types/save-data";
@@ -92,6 +94,41 @@ export interface SpecItemRow {
   type?: number | undefined;
 }
 
+// --- Headless full-run knobs (runner-only; all optional, ignored in-game) -------
+// Every field below is consumed ONLY by the headless scenario runner
+// (test/tools/run-scenario.test.ts) while it plays an entire classic run. They are
+// additive/optional so old ERS1 share codes still decode and the in-game launch
+// path (buildDevScenario) ignores them entirely.
+
+/** A biome-market visit script: at the (optional) global wave, buy these `modifierTypes` keys. */
+export interface BiomeShopVisit {
+  /** Only apply on this global wave (e.g. 10, 20). Absent = every biome-shop visit. */
+  wave?: number | undefined;
+  /** `modifierTypes` keys to buy, in order. */
+  buys: string[];
+}
+
+/** Pin a specific MysteryEncounter to a wave. `type` is a MysteryEncounterType enum NAME. */
+export interface ForcedMysteryEncounter {
+  wave: number;
+  type: string;
+}
+
+/** A between-wave party-management action, applied after `afterWave` is cleared. */
+export interface BetweenWaveAction {
+  /** The global wave after which to apply these (e.g. 3 = after wave 3's reward). */
+  afterWave: number;
+  /** Reorder the party: the new order as a list of current party indexes (drives PartyUiMode.SWITCH). */
+  reorder?: number[] | undefined;
+  /** Move a held item from one party slot to another (drives PartyUiMode.MODIFIER_TRANSFER). */
+  transferItem?: { from: number; to: number; itemName: string } | undefined;
+  /** Teach a TM to a party slot (drives the ER TM-case party flow). `move` optionally forces which move slot to overwrite. */
+  tmTeach?: { slot: number; move?: number | string | undefined } | undefined;
+}
+
+/** Party-full catch policy: keep (add, replacing slot 0), release (decline), or replace a chosen slot. */
+export type OnCatchFull = "keep" | "release" | { replaceSlot: number };
+
 export interface ScenarioSpec {
   /** Spec format version - bump on breaking changes. */
   v: 1;
@@ -107,6 +144,18 @@ export interface ScenarioSpec {
         /** Party-wide player level. */
         level?: number | undefined;
         money?: number | undefined;
+        /**
+         * Headless runner only: play this many consecutive waves (drive the reward
+         * shop between them). Ignored by the in-game launch path (the human plays).
+         * Additive/optional so old share codes still decode.
+         */
+        waves?: number | undefined;
+        /**
+         * Headless runner only: allow mystery encounters to spawn during the run
+         * (un-does the test framework's `mysteryEncounterChance(0)`). Off by default
+         * so a run is deterministic unless a scenario opts in. Ignored in-game.
+         */
+        allowMysteryEncounters?: boolean | undefined;
         double?: boolean | undefined;
         /** Triple battle (3v3). Takes precedence over `double`; fill `party` + enemy party with 3. */
         triple?: boolean | undefined;
@@ -135,6 +184,12 @@ export interface ScenarioSpec {
         modifiers?: SpecItemRow[] | undefined;
         /** Guaranteed reward options in the first shop (modifierTypes keys). */
         shop?: string[] | undefined;
+        /**
+         * Headless runner only: seed the pokeball inventory ({POKEBALL name: count}).
+         * The runner also auto-seeds a default stock when any `script` entry throws a
+         * `ball`, so an unowned-ball throw never hangs the BALL submenu. Ignored in-game.
+         */
+        pokeballs?: Record<string, number> | undefined;
       }
     | undefined;
   start?:
@@ -163,6 +218,51 @@ export interface ScenarioSpec {
         enemy3Status?: number | undefined;
       }
     | undefined;
+  /**
+   * Headless runner only (multi-wave): the reward to take after each wave, one
+   * entry per wave. Each entry is a `modifierTypes` key (pick that reward),
+   * `"FIRST"` (the first option), or `"SKIP"` (skip the reward). Ignored by the
+   * in-game launch path. Additive/optional so old share codes still decode.
+   */
+  rewards?: string[] | undefined;
+  /**
+   * Headless runner only: the biome-market policy on every-10-wave shop visits.
+   * `"SKIP"` (default) leaves each market immediately; an array of {@link BiomeShopVisit}
+   * buys the listed items (optionally gated per wave). Ignored in-game.
+   */
+  biomeShops?: "SKIP" | BiomeShopVisit[] | undefined;
+  /**
+   * Headless runner only: the biome to pick at each World-Map boundary, consumed in
+   * order (BiomeId enum NAMES). When exhausted / absent, the runner picks the first
+   * (leftmost) node deterministically. Ignored in-game.
+   */
+  biomePicks?: string[] | undefined;
+  /**
+   * Headless runner only: the option index to choose at each ER Crossroads
+   * (`0` = Stay, `1` = Leave), consumed in order; default `0`. Ignored in-game.
+   */
+  crossroads?: number[] | undefined;
+  /** Headless runner only: pin specific MysteryEncounters to waves. Ignored in-game. */
+  forceMysteryEncounters?: ForcedMysteryEncounter[] | undefined;
+  /**
+   * Headless runner only: the option-index path to take for each ME encountered, in
+   * order (`[topOption, ...subOptions]`); default `[0]`. Ignored in-game.
+   */
+  meOptions?: number[][] | undefined;
+  /**
+   * Headless runner only: what to do when the party is full on a catch. `"release"`
+   * (default) declines so the loop never stalls; `"keep"` adds the caught mon
+   * (replacing slot 0); `{replaceSlot}` releases a chosen slot. Ignored in-game.
+   */
+  onCatchFull?: OnCatchFull | undefined;
+  /**
+   * Headless runner only: how to handle the between-wave egg lapse. `"skip"`
+   * (default) declines the hatch prompt; `"hatch"` drives the hatch + summary.
+   * Ignored in-game.
+   */
+  eggs?: "skip" | "hatch" | undefined;
+  /** Headless runner only: between-wave party management actions. Ignored in-game. */
+  betweenWaves?: BetweenWaveAction[] | undefined;
 }
 
 // --- Share codes ---------------------------------------------------------------
@@ -265,6 +365,27 @@ function applyStatus(side: "player" | "enemy", idx: number, status: number | und
     return;
   }
   fieldMon(side, idx)?.trySetStatus(status as StatusEffect);
+}
+
+/**
+ * Apply a specific set of held-item rows to ONE already-spawned enemy mon (not
+ * the whole side). Reuses the engine's own {@linkcode overrideHeldItems} builder
+ * (handles ModifierTypeGenerator / pregen args) by temporarily pointing the
+ * side-wide enemy override at this mon's rows, then restoring it. Synchronous, so
+ * the swap is invisible to anything else.
+ */
+function applyEnemyHeldItemsToMon(mon: Pokemon, rows: SpecItemRow[] | undefined): void {
+  const overrides = toModifierOverrides(rows);
+  if (overrides.length === 0) {
+    return;
+  }
+  const prev = O.ENEMY_HELD_ITEMS_OVERRIDE;
+  O.ENEMY_HELD_ITEMS_OVERRIDE = overrides;
+  try {
+    overrideHeldItems(mon, false);
+  } finally {
+    O.ENEMY_HELD_ITEMS_OVERRIDE = prev;
+  }
 }
 
 /** One-line human summary for the banner / log header. */
@@ -436,8 +557,10 @@ export function buildDevScenario(spec: ScenarioSpec): { scenario: DevScenario; p
       if (devParty.length >= 2 && !run.triple) {
         O.BATTLE_STYLE_OVERRIDE = "double";
       }
-      // Arbitrary ability / passive / held items for the enemy side (the global
-      // enemy overrides hit every enemy, so they read off the first custom mon).
+      // Ability / passive are SIDE-WIDE overrides (they hit every enemy), so they
+      // read off the first custom mon. Per-mon `status` / `bossSegments` /
+      // `heldItems` can't ride a uniform override - they're applied post-spawn on
+      // the actual mons in onBattleStartFn below.
       const e0 = enemy.party[0];
       if (e0?.ability) {
         O.ENEMY_ABILITY_OVERRIDE = e0.ability as AbilityId;
@@ -445,9 +568,6 @@ export function buildDevScenario(spec: ScenarioSpec): { scenario: DevScenario; p
       if (e0?.passiveAbility) {
         O.ENEMY_PASSIVE_ABILITY_OVERRIDE = e0.passiveAbility as AbilityId;
         O.ENEMY_HAS_PASSIVE_ABILITY_OVERRIDE = true;
-      }
-      if (e0?.heldItems && e0.heldItems.length > 0) {
-        O.ENEMY_HELD_ITEMS_OVERRIDE = toModifierOverrides(e0.heldItems);
       }
     }
 
@@ -487,12 +607,35 @@ export function buildDevScenario(spec: ScenarioSpec): { scenario: DevScenario; p
         e.abilityIndex = Math.max(0, Math.min(2, wildSlot));
       }
     }
+    // Custom enemy party: per-mon status / boss segments / held items, applied on
+    // the actual spawned mons (indexed by party slot so benched mons get them too)
+    // - the uniform ENEMY_*_OVERRIDEs can only express a single side-wide value.
+    if (spec.enemy?.kind === "party" && spec.enemy.party) {
+      const enemyParty = globalScene.getEnemyParty();
+      spec.enemy.party.slice(0, 6).forEach((p, i) => {
+        const mon = enemyParty[i];
+        if (!mon) {
+          return;
+        }
+        if (p.status) {
+          mon.trySetStatus(p.status as StatusEffect);
+        }
+        if (p.bossSegments && p.bossSegments >= 1) {
+          mon.setBoss(true, Math.min(10, p.bossSegments));
+          mon.initBattleInfo();
+        }
+        applyEnemyHeldItemsToMon(mon, p.heldItems);
+      });
+    }
   };
 
   // Build incrementally so optional fields are never set to `undefined`
   // (the shared DevScenario type runs under exactOptionalPropertyTypes).
+  const hasPerMonEnemyFields =
+    spec.enemy?.kind === "party"
+    && (spec.enemy.party ?? []).some(p => p.status || p.bossSegments || (p.heldItems?.length ?? 0) > 0);
   const scenario: DevScenario = { label, description, setup: setupFn };
-  if (spec.start || spec.enemy?.kind === "wild") {
+  if (spec.start || spec.enemy?.kind === "wild" || hasPerMonEnemyFields) {
     scenario.onBattleStart = onBattleStartFn;
   }
   const shopFuncs = (spec.items?.shop ?? [])

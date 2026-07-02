@@ -479,4 +479,71 @@ describe("co-op host-authoritative battle stream (#633, LIVE-D)", () => {
       expect(round.heldItems[1].typePregenArgs).toEqual([4]);
     });
   });
+
+  // #633 M4 push-snapshot launch: the host PUSHES the full session snapshot at launch and the guest
+  // BOOTS from it, and the `requestEnemyParty` POLL is DELETED (the guest awaits the host's one-shot
+  // push event-driven over the ordered/reliable channel). These engine-free tests pin the wire half:
+  // the launchSnapshot round-trip (parked-waiter + race-buffer + timeout) and that awaitEnemyParty
+  // emits ZERO re-request messages. (The full two-engine convergence proof is coop-duo-launch-snapshot.)
+  describe("launch snapshot + poll deletion (#633 M4)", () => {
+    const SESSION_JSON = JSON.stringify({ seed: "abc", waveIndex: 1, party: [], enemyParty: [] });
+
+    it("the guest awaits the host's launchSnapshot PUSH when parked first (no poll)", async () => {
+      const { host, guest } = createLoopbackPair();
+      const hostStream = new CoopBattleStreamer(host);
+      const guestStream = new CoopBattleStreamer(guest);
+
+      // Guest reaches launch and parks BEFORE the host has generated (the realistic order).
+      const awaited = guestStream.awaitLaunchSnapshot(1);
+      hostStream.sendLaunchSnapshot(1, SESSION_JSON);
+
+      expect(await awaited).toBe(SESSION_JSON);
+    });
+
+    it("the guest consumes a launchSnapshot that arrived BEFORE its await (race buffer)", async () => {
+      const { host, guest } = createLoopbackPair();
+      const hostStream = new CoopBattleStreamer(host);
+      const guestStream = new CoopBattleStreamer(guest);
+
+      hostStream.sendLaunchSnapshot(1, SESSION_JSON);
+      await new Promise(r => setTimeout(r, 0)); // let it land in the guest buffer
+
+      expect(await guestStream.awaitLaunchSnapshot(1)).toBe(SESSION_JSON);
+    });
+
+    it("awaitLaunchSnapshot resolves null on timeout (guest then builds its own launch - never hangs)", async () => {
+      const { guest } = createLoopbackPair();
+      const timer: { fire?: () => void } = {};
+      const guestStream = new CoopBattleStreamer(guest, {
+        schedule: cb => {
+          timer.fire = cb;
+          return () => {};
+        },
+      });
+      const awaited = guestStream.awaitLaunchSnapshot(1, 5_000);
+      timer.fire?.(); // fire the timeout
+      expect(await awaited).toBeNull();
+    });
+
+    it("THE POLL IS GONE: awaitEnemyParty sends ZERO requestEnemyParty messages on the wire", async () => {
+      const { host, guest } = createLoopbackPair();
+      // Tap everything the GUEST endpoint sends toward the host (host receives it here).
+      const hostSeen: string[] = [];
+      host.onMessage(msg => hostSeen.push(msg.t));
+      const hostStream = new CoopBattleStreamer(host);
+      const guestStream = new CoopBattleStreamer(guest);
+
+      // The M4 production path awaits event-driven (awaitEnemyParty), NOT the retry poll. Even with
+      // a wait window elapsing before the host answers, the guest must NEVER re-request.
+      const awaited = guestStream.awaitEnemyParty(3, 5_000);
+      await new Promise(r => setTimeout(r, 0));
+      hostStream.sendEnemyParty(3, [{ fieldIndex: 2, data: { speciesId: 1 } }]);
+      const res = await awaited;
+
+      expect(res?.[0]?.data.speciesId).toBe(1);
+      expect(hostSeen, "the guest emitted NO requestEnemyParty (the poll is deleted)").not.toContain(
+        "requestEnemyParty",
+      );
+    });
+  });
 });

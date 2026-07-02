@@ -81,7 +81,13 @@ export class SelectTargetPhase extends PokemonPhase {
           }
         }
         if (turnCommand.command === Command.BALL && this.fieldIndex) {
-          globalScene.currentBattle.turnCommands[this.fieldIndex - 1]!.skip = true;
+          // Null-safe + ALL earlier slots (triple ball-throw crash class - see command-phase).
+          for (let i = 0; i < this.fieldIndex; i++) {
+            const cmd = globalScene.currentBattle.turnCommands[i];
+            if (cmd) {
+              cmd.skip = true;
+            }
+          }
         }
         this.end();
       },

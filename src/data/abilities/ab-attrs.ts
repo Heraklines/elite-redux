@@ -5544,7 +5544,9 @@ export class PostFaintContactDamageAbAttr extends PostFaintAbAttr {
 export class PostFaintHPDamageAbAttr extends PostFaintAbAttr {
   override apply({ simulated, pokemon, move, attacker }: PostFaintAbAttrParams): void {
     // return early if the user died to indirect damage, target has magic guard or was KO'd by an ally
-    if (!move || !attacker || simulated || attacker.getAlly() === pokemon) {
+    // (getAllies().includes, not getAlly() ===: in a TRIPLE the identity check only matched the
+    // attacker's first ally, so an ally-KO from the second ally wrongly triggered Aftermath.)
+    if (!move || !attacker || simulated || attacker.getAllies().includes(pokemon)) {
       return;
     }
 

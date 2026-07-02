@@ -27,6 +27,7 @@ import type { Modifier } from "#modifiers/modifier";
 import { getDailyRunStarterModifiers, regenerateModifierPoolThresholds } from "#modifiers/modifier-type";
 import { vouchers } from "#system/voucher";
 import type { OptionSelectConfig, OptionSelectItem } from "#ui/abstract-option-select-ui-handler";
+import { CoopLobbyStage } from "#ui/coop-lobby-stage";
 import { SaveSlotUiMode } from "#ui/save-slot-select-ui-handler";
 import { isLocalServerConnected } from "#utils/common";
 import { getPokemonSpecies } from "#utils/pokemon-utils";
@@ -134,19 +135,13 @@ export class TitlePhase extends Phase {
           const devToolsEnabled =
             (import.meta.env as unknown as Record<string, string | undefined>).VITE_DEV_TOOLS === "1";
           if (isDev || isBeta || devToolsEnabled) {
-            // Two SELECTABLE co-op netcodes (#633, A/B): "lockstep" (default - both
-            // engines resolve, the visible move stays synced) and "authoritative"
-            // (the guest is a pure renderer of the host's streamed turn). Same
-            // dev/beta/devTools gate; the host's pick is adopted by the guest.
+            // Co-op is AUTHORITATIVE-ONLY (#633 M3): the HOST is the sole engine and the
+            // guest is a pure renderer (it runs no combat + no mystery-encounter engine, so
+            // it can never desync by construction). The old "lockstep" dual-engine mode + its
+            // A/B toggle are retired - authoritative is the one and only co-op netcode. Same
+            // dev/beta/devTools gate.
             options.push({
               label: GameMode.getModeName(GameModes.COOP),
-              handler: () => {
-                this.openCoopLobby(setModeAndEnd, "lockstep");
-                return true;
-              },
-            });
-            options.push({
-              label: `${GameMode.getModeName(GameModes.COOP)} (Authoritative)`,
               handler: () => {
                 this.openCoopLobby(setModeAndEnd, "authoritative");
                 return true;
@@ -366,75 +361,146 @@ export class TitlePhase extends Phase {
     const username = loggedInUser?.username ?? "Player";
     let listSig: string | null = null;
     let controller: CoopLobbyController | null = null;
+    let lastPlayers: LobbyPlayer[] = [];
+    /** The incoming join request currently on screen (Accept/Decline panel showing). */
+    let incoming: { id: string; name: string } | null = null;
+    // The aesthetic stage (backdrop + two seat cards + status strip); the option
+    // panel below is the INPUT. Torn down on every exit path.
+    const stage = new CoopLobbyStage(username);
 
     const backToTitle = () => {
+      stage.destroy();
       controller?.cancel();
       globalScene.phaseManager.toTitleScreen();
       super.end();
     };
 
-    // Render (or re-render) the waiting-player list as a blue OPTION_SELECT panel.
+    // Render (or re-render) the current INPUT panel as a blue OPTION_SELECT.
     // resetModeChain() clears the previous overlay first, so re-rendering on a
-    // list change REPLACES the panel rather than stacking a new one.
-    const renderList = (players: LobbyPlayer[]) => {
-      const opts: OptionSelectItem[] = players.map(p => ({
-        label: `${p.name}  (${Math.round(p.age / 1000)}s)`,
-        handler: () => {
-          void controller?.pick(p.id);
-          return true;
-        },
-      }));
-      opts.push(
-        {
+    // state change REPLACES the panel rather than stacking a new one. An incoming
+    // join request takes over the panel (Accept / Decline) until it is answered.
+    const renderPanel = () => {
+      const opts: OptionSelectItem[] = [];
+      if (incoming) {
+        const from = incoming;
+        opts.push(
+          {
+            label: `✔ Accept ${from.name}`,
+            handler: () => {
+              incoming = null;
+              void controller?.respond(true);
+              return true;
+            },
+          },
+          {
+            label: "✘ Decline",
+            handler: () => {
+              incoming = null;
+              stage.setSeat(1, { name: null, detail: "Searching...", dot: "amber" });
+              stage.setStatus("Looking for other players...");
+              void controller?.respond(false);
+              renderPanel();
+              return true;
+            },
+          },
+        );
+      } else {
+        for (const p of lastPlayers) {
+          opts.push({
+            label: `Ask ${p.name} to play`,
+            handler: () => {
+              void controller?.request(p.id, p.name);
+              return true;
+            },
+          });
+        }
+        opts.push({
           label: "▶ Play vs CPU",
           handler: () => {
+            stage.destroy();
             controller?.cancel();
             startLocalCoopSession({ username, netcodeMode });
             setModeAndEnd(GameModes.COOP);
             return true;
           },
+        });
+      }
+      opts.push({
+        label: i18next.t("menu:cancel"),
+        handler: () => {
+          backToTitle();
+          return true;
         },
-        {
-          label: i18next.t("menu:cancel"),
-          handler: () => {
-            backToTitle();
-            return true;
-          },
-        },
-      );
-      const header = players.length > 0 ? "Co-op: pick a player to connect." : "Co-op: waiting for another player...";
+      });
       globalScene.ui.setMode(UiMode.MESSAGE);
       globalScene.ui.resetModeChain();
-      globalScene.ui.showText(header, null, () =>
-        globalScene.ui.setOverlayMode(UiMode.OPTION_SELECT, { options: opts }),
-      );
+      globalScene.ui.showText("", null, () => globalScene.ui.setOverlayMode(UiMode.OPTION_SELECT, { options: opts }));
     };
 
     controller = new CoopLobbyController(username, {
       onPlayers: players => {
-        const sig = players.map(p => p.id).join(",");
+        lastPlayers = players;
+        stage.setStatus(
+          incoming
+            ? `${incoming.name} wants to join your run!`
+            : controller?.isRequestPending()
+              ? "Waiting for their answer..."
+              : players.length > 0
+                ? "Pick a player below to send a request."
+                : "Looking for other players...",
+        );
+        const sig = players.map(p => p.id).join(",") + (incoming ? `|req:${incoming.id}` : "");
         if (sig !== listSig) {
           listSig = sig;
-          renderList(players);
+          if (!incoming) {
+            renderPanel();
+          }
         }
       },
+      // Lobby v2: someone asked to join US - take over the panel with Accept/Decline.
+      onRequest: from => {
+        incoming = { id: from.id, name: from.name };
+        stage.setSeat(1, { name: from.name, detail: "Wants to join!", dot: "red" });
+        stage.setStatus(`${from.name} wants to join your run!`);
+        renderPanel();
+      },
+      onRequestGone: () => {
+        incoming = null;
+        stage.setSeat(1, { name: null, detail: "Searching...", dot: "amber" });
+        stage.setStatus("They withdrew. Looking for other players...");
+        renderPanel();
+      },
+      onRequestPending: targetName => {
+        stage.setSeat(1, { name: targetName, detail: "Asked to join", dot: "amber" });
+        stage.setStatus(`Request sent to ${targetName}. Waiting for their answer...`);
+      },
+      onDeclined: name => {
+        stage.setSeat(1, { name: null, detail: "Searching...", dot: "amber" });
+        stage.setStatus(`${name} declined. Pick another player.`);
+      },
       onConnecting: () => {
+        stage.setSeat(1, { name: null, detail: "Connecting...", dot: "amber" });
+        stage.setStatus("Connecting to your partner...");
         globalScene.ui.setMode(UiMode.MESSAGE);
         globalScene.ui.resetModeChain();
         globalScene.ui.showText("Connecting to your partner...", null);
       },
       onConnected: runtime => {
-        // The lobby just built the live CoopRuntime. If THIS client is the host, pin
-        // the chosen netcode (#633, selectable A/B) onto its controller now, before it
-        // broadcasts the runConfig - the guest adopts the host's value off that config,
-        // so the guest never needs to set it here. Default lockstep on a missing pick.
+        // Co-op is authoritative-only (#633 M6c); pinning the mode here is a no-op
+        // kept for the wire config's back-compat field.
         if (runtime.controller.role === "host") {
           runtime.controller.setNetcodeMode(netcodeMode);
         }
+        const partner = runtime.controller.partnerName ?? "Partner";
+        stage.setSeat(1, { name: partner, detail: "Connected", dot: "green" });
+        stage.setStatus("Connected! Starting co-op...");
         globalScene.ui.showText(
           "Connected to your partner!\nPress to start co-op.",
           null,
-          () => setModeAndEnd(GameModes.COOP),
+          () => {
+            stage.destroy();
+            setModeAndEnd(GameModes.COOP);
+          },
           null,
           true,
         );
@@ -444,7 +510,7 @@ export class TitlePhase extends Phase {
       },
     });
 
-    // Enter the lobby: clear the mode menu and show progress while we announce.
+    // Enter the lobby: clear the mode menu and show the stage while we announce.
     globalScene.ui.setMode(UiMode.MESSAGE);
     globalScene.ui.resetModeChain();
     globalScene.ui.showText("Finding co-op players...", null);

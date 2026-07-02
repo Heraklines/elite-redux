@@ -9,6 +9,7 @@ import type { IEggOptions } from "#data/egg";
 import { Egg } from "#data/egg";
 import { coopLog, coopWarn } from "#data/elite-redux/coop/coop-debug";
 import { buildCoopEnemy } from "#data/elite-redux/coop/coop-enemy-builder";
+import { coopMeInProgress, coopMeInteractionStartValue } from "#data/elite-redux/coop/coop-me-pin-state";
 import {
   coopGuestAwaitMeBattleParty,
   coopGuestShouldAdoptMeBattleParty,
@@ -52,7 +53,6 @@ import {
 import { PokemonMove } from "#moves/pokemon-move";
 import { showEncounterText } from "#mystery-encounters/encounter-dialogue-utils";
 import type { MysteryEncounter } from "#mystery-encounters/mystery-encounter";
-import { coopMeInProgress, coopMeInteractionStartValue } from "#phases/mystery-encounter-phases";
 import type { MysteryEncounterOption } from "#mystery-encounters/mystery-encounter-option";
 import type { Variant } from "#sprites/variant";
 import type { PokemonData } from "#system/pokemon-data";

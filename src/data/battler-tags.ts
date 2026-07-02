@@ -1034,8 +1034,10 @@ export class DestinyBondTag extends SerializableBattlerTag {
       return true;
     }
 
-    // Don't kill allies or opposing bosses.
-    if (source.getAlly() === pokemon) {
+    // Don't kill allies or opposing bosses. (getAllies().includes, not getAlly() ===:
+    // in a TRIPLE the source has two allies - the identity check only spared the first,
+    // so Destiny Bond could kill the second ally.)
+    if (source.getAllies().includes(pokemon)) {
       return false;
     }
 

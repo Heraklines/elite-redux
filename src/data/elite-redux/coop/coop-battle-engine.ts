@@ -697,10 +697,7 @@ export function reconcileArenaTags(hostTags: CoopSerializedArenaTag[] | undefine
     for (const tag of [...arena.tags]) {
       const k = keyOf(tag.tagType as unknown as string, tag.side as unknown as number);
       if (!wanted.has(k)) {
-        coopWarn(
-          "heal",
-          `arenaTag REMOVE tagType=${tag.tagType} side=${tag.side} (host lacks it) -> removed`,
-        );
+        coopWarn("heal", `arenaTag REMOVE tagType=${tag.tagType} side=${tag.side} (host lacks it) -> removed`);
         try {
           arena.removeTagOnSide(tag.tagType, tag.side, true);
         } catch {
@@ -825,12 +822,10 @@ export function applyCoopCheckpoint(checkpoint: CoopBattleCheckpoint): void {
     // of the wave after a shop spend snaps it). GATED to the authoritative GUEST so solo / host / lockstep
     // never touch money here (the host owns + computes its own money; only the renderer adopts it). Additive:
     // an older host omits `money` (undefined) and the guest leaves its money alone (no regression).
-    if (checkpoint.money !== undefined && isCoopAuthoritativeGuestGated()) {
-      if (globalScene.money !== checkpoint.money) {
-        coopWarn("checkpoint", `money host=${checkpoint.money} guest=${globalScene.money} -> applied`);
-        globalScene.money = checkpoint.money;
-        globalScene.updateMoneyText();
-      }
+    if (checkpoint.money !== undefined && isCoopAuthoritativeGuestGated() && globalScene.money !== checkpoint.money) {
+      coopWarn("checkpoint", `money host=${checkpoint.money} guest=${globalScene.money} -> applied`);
+      globalScene.money = checkpoint.money;
+      globalScene.updateMoneyText();
     }
   } catch {
     // A malformed checkpoint must never crash the guest's battle.
@@ -1222,7 +1217,7 @@ function readModifiers(): [string, number][] {
  * `field[].heldItems`); `PokemonFormChangeItemModifier`s are EXCLUDED too (healed via snap.formIndex).
  * Mirrors the held-item / enemy ModifierData serialization (`new ModifierData(m, false)`). Fully guarded.
  */
-function captureCoopPlayerModifiers(): Record<string, unknown>[] {
+export function captureCoopPlayerModifiers(): Record<string, unknown>[] {
   try {
     return globalScene.modifiers
       .filter(
@@ -1765,7 +1760,10 @@ export function reconcileCoopModifierStacks(hostModifiers: [string, number][] | 
         continue;
       }
       if (modifier.stackCount !== want) {
-        coopWarn("heal", `modifier stack typeId=${modifier.type.id} host=${want} guest=${modifier.stackCount} -> applied`);
+        coopWarn(
+          "heal",
+          `modifier stack typeId=${modifier.type.id} host=${want} guest=${modifier.stackCount} -> applied`,
+        );
         modifier.stackCount = want;
         changed = true;
       }
@@ -2104,9 +2102,69 @@ export function applyCoopFullSnapshot(
       );
       applyCoopCaptureParty(snapshot.benchParty);
     }
-    coopLog("resync", `guest applyFullSnapshot DONE authoritativeGuest=${authoritativeGuest} suppressResummon=${suppressResummon}`);
+    coopLog(
+      "resync",
+      `guest applyFullSnapshot DONE authoritativeGuest=${authoritativeGuest} suppressResummon=${suppressResummon}`,
+    );
   } catch {
     // A malformed snapshot must never crash the guest's battle.
+  }
+}
+
+/**
+ * HOST (#633 M2): capture ONLY the on-field mons' COMPLETE per-mon snapshot (the same `readFullMon`
+ * view the resync uses), so the per-turn stream can heal the on-field state the numeric checkpoint
+ * OMITS - moveset+PP / tera / boss segments / held items / non-ER tags / ability / form - IN-LINE every
+ * turn, instead of only via a checksum-mismatch resync round-trip. FIELD-ONLY (no bench / player-modifier
+ * / arena payload: those do not change within a battle turn and stay on the resync). Sorted by `bi` for a
+ * stable wire order. Returns `null` on an empty field or a read failure (never breaks the host's turn).
+ */
+export function captureCoopFieldSnapshot(): CoopFullMonSnapshot[] | null {
+  try {
+    const field = getCoopSerializableField()
+      .map(readFullMon)
+      .sort((a, b) => a.bi - b.bi);
+    return field.length === 0 ? null : field;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * GUEST (#633 M2): apply the host's COMPLETE per-mon field snapshot at the turn boundary, healing each
+ * on-field mon's ability / form / tera / moveset+PP / tags / held items IN-LINE (the numeric checkpoint
+ * carries only hp / status / stages, so those otherwise wait for a checksum-mismatch resync). Reuses the
+ * proven {@linkcode applyFullMon} per mon, matched by battler index. The field-COMPOSITION reconcile (drop
+ * a fainted mon / mirror a switch) is already done by the per-turn checkpoint apply, so it is intentionally
+ * NOT repeated here. Gated authoritative-guest BY THE CALLER (solo / host / lockstep pass `false` and this
+ * is a no-op via the loop's applyFullMon gates); the held-item bar is refreshed ONCE after the loop
+ * (mirrors applyCoopFullSnapshot's deferral). Fully guarded - a malformed field can never break the turn.
+ */
+export function applyCoopFieldSnapshot(field: CoopFullMonSnapshot[] | undefined, authoritativeGuest: boolean): void {
+  if (!Array.isArray(field) || field.length === 0) {
+    return;
+  }
+  try {
+    const byIndex = new Map(
+      globalScene
+        .getField(true)
+        .filter((m): m is Pokemon => m != null)
+        .map(m => [m.getBattlerIndex(), m]),
+    );
+    for (const snap of field) {
+      const mon = byIndex.get(snap.bi);
+      if (mon != null) {
+        applyFullMon(mon, snap, authoritativeGuest);
+      }
+    }
+    // Deferred single bar refresh (mirrors applyCoopFullSnapshot C4): applyFullMon healed held items
+    // with ignoreUpdate; refresh both modifier bars ONCE here when the gated held-item heal could run.
+    if (authoritativeGuest && field.some(s => s.heldItems !== undefined)) {
+      globalScene.updateModifiers(true);
+      globalScene.updateModifiers(false);
+    }
+  } catch {
+    /* a malformed field snapshot must never crash the guest's turn */
   }
 }
 
@@ -2172,13 +2230,19 @@ export function applyCoopExpDeltas(deltas: CoopExpDelta[] | undefined): void {
       }
       if (typeof d.level === "number" && d.level > 0) {
         if (mon.level !== d.level) {
-          coopWarn("progression", `expDelta level slot=${d.slot} sp=${d.speciesId} host=${d.level} guest=${mon.level} -> applied`);
+          coopWarn(
+            "progression",
+            `expDelta level slot=${d.slot} sp=${d.speciesId} host=${d.level} guest=${mon.level} -> applied`,
+          );
         }
         mon.level = d.level;
       }
       if (typeof d.exp === "number") {
         if (mon.exp !== d.exp) {
-          coopLog("progression", `expDelta exp slot=${d.slot} sp=${d.speciesId} host=${d.exp} guest=${mon.exp} -> applied`);
+          coopLog(
+            "progression",
+            `expDelta exp slot=${d.slot} sp=${d.speciesId} host=${d.exp} guest=${mon.exp} -> applied`,
+          );
         }
         mon.exp = d.exp;
       }
@@ -2364,7 +2428,7 @@ export function applyCoopMePartyFromData(serializedParty: string[]): void {
     // Remove from the tail inward so each splice keeps the lower indices stable.
     while (globalScene.getPlayerParty().length > targetLen) {
       const live = globalScene.getPlayerParty();
-      const surplus = live[live.length - 1];
+      const surplus = live.at(-1);
       if (surplus == null) {
         break;
       }
@@ -2532,7 +2596,10 @@ export function applyCoopCaptureParty(serializedParty: string[]): void {
         result.push(m); // safety: a live on-field mon is never torn down here.
         keptOnFieldSafety++;
       } else {
-        coopLog("party", `captureParty RELEASE bench sp=${m.species?.speciesId ?? 0} owner=${m.coopOwner} (host dropped it)`);
+        coopLog(
+          "party",
+          `captureParty RELEASE bench sp=${m.species?.speciesId ?? 0} owner=${m.coopOwner} (host dropped it)`,
+        );
         globalScene.removePokemonFromPlayerParty(m, true);
         releasedCount++;
       }

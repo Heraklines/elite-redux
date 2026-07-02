@@ -69,18 +69,26 @@ import { BattleScene } from "#app/battle-scene";
 import { getGameMode } from "#app/game-mode";
 import { globalScene, initGlobalScene } from "#app/global-scene";
 import type { Phase } from "#app/phase";
+import { captureCoopPlayerModifiers, reconcileCoopPlayerModifiers } from "#data/elite-redux/coop/coop-battle-engine";
 import {
   assembleCoopRuntime,
   type CoopRuntime,
   getCoopInteractionRelay,
   getCoopMeBattleInteractionCounter,
   getCoopRuntime,
+  installCoopRuntimeGhostHooks,
+  installCoopRuntimeLiveEmitter,
   setCoopMeBattleInteractionCounter,
   setCoopRuntime,
 } from "#data/elite-redux/coop/coop-runtime";
 import { COOP_GUEST_FIELD_INDEX, COOP_HOST_FIELD_INDEX } from "#data/elite-redux/coop/coop-session";
 import { type CoopTransport, createLoopbackPair, type SerializedCommand } from "#data/elite-redux/coop/coop-transport";
-import { resetErGhostRunState } from "#data/elite-redux/er-ghost-teams";
+import {
+  type ErGhostRunStateSnapshot,
+  emptyErGhostRunStateSnapshot,
+  restoreErGhostRunState,
+  snapshotErGhostRunState,
+} from "#data/elite-redux/er-ghost-teams";
 import type { ReplayCommandEvent, ReplayTrace } from "#data/elite-redux/replay-trace";
 import { isReplayCommandEvent, isReplayInteractionEvent, validateReplayTrace } from "#data/elite-redux/replay-trace";
 import { BattleType } from "#enums/battle-type";
@@ -171,30 +179,70 @@ export interface ClientCtx {
 }
 
 // ---------------------------------------------------------------------------
-// er-ghost per-run cache save/restore. clearCoopRuntime does NOT reset this; the only
-// reset is resetErGhostRunState (which wipes it). We can't read the module lets directly
-// (they aren't exported), so we partition by RESETTING to a clean slate per client - in
-// the spike the opening wave is a wild battle that takes no ghost, so an empty cache for
-// both clients is correct + benign. The snapshot type is a placeholder for the real
-// save/restore the production harness would need at ghost waves.
+// er-ghost per-run cache save/restore (#633 bounded-scope: ghost-bearing MEs + ghost WAVES).
+// The er-ghost cache quartet (prefetched pool + prefetchStarted + usedGhostIds + ghostByWave, plus the
+// lastGhostUploader picker cursor) is a PROCESS-GLOBAL owned by er-ghost-teams, NOT carried on the `active`
+// runtime and NOT reset by clearCoopRuntime. Previously the harness PLACEHOLDER just RESET it per client
+// (benign only when no ghost is taken); now we SAVE+RESTORE it per client via the additive
+// snapshotErGhostRunState / restoreErGhostRunState seam, so a ghost-bearing ME (colosseum-gauntlet,
+// graves-of-the-fallen) or a ghost WAVE can be duo-tested without one engine inheriting the other's ghost
+// picks. ClientCtx.ghost holds THIS client's saved cache; withClient restores it on swap-in and saves the
+// mutated cache back on swap-out (exactly like rndState + mePins). The ghost-pool SYNC hooks
+// (coopGhostFetchSuppressed / onGhostPoolPublished) are ROLE-GATED per client by installCoopRuntimeGhostHooks
+// in the swap (they are last-write-wins process-globals the guest would otherwise own for BOTH engines).
 // ---------------------------------------------------------------------------
-function snapshotGhostState(): { reset: boolean } {
-  // Reset to a clean per-client slate. Benign for the opening wild wave (no ghost taken).
-  resetErGhostRunState();
-  return { reset: true };
+function snapshotGhostState(): ErGhostRunStateSnapshot {
+  return snapshotErGhostRunState();
 }
 
-function restoreGhostState(_snap: { reset: boolean }): void {
-  // Symmetric placeholder: re-clean so neither client inherits the other's ghost picks.
-  resetErGhostRunState();
+function restoreGhostState(snap: ErGhostRunStateSnapshot): void {
+  restoreErGhostRunState(snap);
+}
+
+/** A CLEAN per-client ghost cache (the starting slate for a fresh ClientCtx). */
+export function emptyGhostSnapshot(): ErGhostRunStateSnapshot {
+  return emptyErGhostRunStateSnapshot();
+}
+
+/**
+ * Whether the LIVE per-event stream (#633 bounded-scope #3) is enabled for the duo swap. OFF by default so
+ * the existing wave-loop / reward-shop tests keep the Phase-1 turn-end BATCH path (byte-identical to
+ * before); a test that exercises the live path calls {@linkcode setCoopHarnessLiveEvents}(true) to install
+ * the ACTIVE client's role-gated live emitter on each swap (the host's during host pumps -> the stream
+ * turns on; the guest's is a self-gated no-op).
+ */
+let coopHarnessLiveEvents = false;
+
+/** Enable/disable the LIVE per-event stream for the duo swap (#633 bounded-scope #3). Default OFF. */
+export function setCoopHarnessLiveEvents(on: boolean): void {
+  coopHarnessLiveEvents = on;
+}
+
+/**
+ * Install the swapped-in runtime's ROLE-GATED process hooks: the GHOST-pool publisher/suppression ALWAYS
+ * (a correctness fix - the guest must own suppression, the host the publisher), and the LIVE-event emitter
+ * ONLY when the harness has opted in ({@linkcode setCoopHarnessLiveEvents}). See those functions for why.
+ */
+function installCoopHooksForActive(runtime: CoopRuntime): void {
+  installCoopRuntimeGhostHooks(runtime);
+  if (coopHarnessLiveEvents) {
+    installCoopRuntimeLiveEmitter(runtime);
+  }
 }
 
 /** Capture the live process-global context (so withClient can restore it). */
-function captureLiveCtx(): { scene: BattleScene; runtime: CoopRuntime | null; rndState: string; mePins: MePins } {
+function captureLiveCtx(): {
+  scene: BattleScene;
+  runtime: CoopRuntime | null;
+  rndState: string;
+  ghost: ErGhostRunStateSnapshot;
+  mePins: MePins;
+} {
   return {
     scene: globalScene,
     runtime: getCoopRuntime(),
     rndState: Phaser.Math.RND.state(),
+    ghost: snapshotGhostState(),
     mePins: readMePins(),
   };
 }
@@ -222,6 +270,7 @@ export function withClientSync<T>(ctx: ClientCtx, fn: () => T): T {
   activeClientLabel = ctx.label;
   initGlobalScene(ctx.scene);
   setCoopRuntime(ctx.runtime);
+  installCoopHooksForActive(ctx.runtime);
   Phaser.Math.RND.state(ctx.rndState);
   restoreGhostState(ctx.ghost);
   writeMePins(ctx.mePins ?? IDLE_ME_PINS);
@@ -229,12 +278,15 @@ export function withClientSync<T>(ctx: ClientCtx, fn: () => T): T {
     return fn();
   } finally {
     ctx.rndState = Phaser.Math.RND.state();
+    ctx.ghost = snapshotGhostState();
     ctx.mePins = readMePins();
     initGlobalScene(prev.scene);
     if (prev.runtime != null) {
       setCoopRuntime(prev.runtime);
+      installCoopHooksForActive(prev.runtime);
     }
     Phaser.Math.RND.state(prev.rndState);
+    restoreGhostState(prev.ghost);
     writeMePins(prev.mePins);
     activeClientLabel = prevLabel;
   }
@@ -248,6 +300,11 @@ export async function withClient<T>(ctx: ClientCtx, fn: () => T | Promise<T>): P
   initGlobalScene(ctx.scene);
   // 2. coop active runtime (also installs the authoritative-guest predicate)
   setCoopRuntime(ctx.runtime);
+  // 2b. per-client ROLE-GATED process hooks (ghost-pool publisher/suppression always; live-event emitter
+  //     when opted in): re-point the last-write-wins process-globals at THIS runtime's role-gated closures
+  //     (#633 bounded-scope), so a host pump owns the host publisher and a guest pump owns the guest
+  //     suppression/adopt - not whichever runtime happened to wire last.
+  installCoopHooksForActive(ctx.runtime);
   // 3. process-global RND cursor
   Phaser.Math.RND.state(ctx.rndState);
   // 4. er-ghost per-run cache
@@ -257,14 +314,17 @@ export async function withClient<T>(ctx: ClientCtx, fn: () => T | Promise<T>): P
   try {
     return await fn();
   } finally {
-    // Persist THIS client's mutated RND cursor + ME pins back into its ctx, then restore the prev.
+    // Persist THIS client's mutated RND cursor + ghost cache + ME pins back into its ctx, then restore prev.
     ctx.rndState = Phaser.Math.RND.state();
+    ctx.ghost = snapshotGhostState();
     ctx.mePins = readMePins();
     initGlobalScene(prev.scene);
     if (prev.runtime != null) {
       setCoopRuntime(prev.runtime);
+      installCoopHooksForActive(prev.runtime);
     }
     Phaser.Math.RND.state(prev.rndState);
+    restoreGhostState(prev.ghost);
     writeMePins(prev.mePins);
     activeClientLabel = prevLabel;
   }
@@ -374,6 +434,7 @@ export function buildGuestScene(hostGame: GameManager): BattleScene {
   // Give the guest scene a TextInterceptor (sets scene.messageWrapper) so the replayed turn's
   // MessagePhase / showText path does not crash the headless guest.
   new TextInterceptor(guestScene);
+  neutralizeCoopCandyBar(guestScene);
   // Restore the RND cursor the ctor/injection may have touched.
   Phaser.Math.RND.state(savedRnd);
   // Make the guest scene's phase pump MANUAL (the cooperative scheduler drives it). Without
@@ -385,17 +446,65 @@ export function buildGuestScene(hostGame: GameManager): BattleScene {
 }
 
 /**
+ * REAL LAUNCH-HANDSHAKE step (#658 seed-pin): make the guest scene adopt the HOST's authoritative
+ * run-config-derived scene state so the guest's post-checkpoint {@linkcode captureCoopChecksumState} matches
+ * the host's WITHOUT a resync. The per-wave checksum hashes NON-field state the turn CHECKPOINT does not
+ * reconcile - the run `seed` (the master determinism input), `money`, the `pokeballCounts` inventory, and
+ * the player-wide persistent `modifiers`. In production the guest pins all of these at LAUNCH: it adopts the
+ * host's seed off the broadcast `runConfig` (#658, `setSeed`), and money/balls/modifiers ride the
+ * host-authoritative relays + the resync reconcile. The plain mirror skipped this - so the guest kept its
+ * OWN fresh-scene seed/money/balls and lacked the host's starting modifiers, and the checksum diverged every
+ * wave then self-healed via a benign `requestStateSync`. This closes that gap so a residual mismatch after
+ * mirroring is a REAL host-vs-guest divergence, not a harness artifact.
+ *
+ * `setSeed` only writes `seed` + the derived wave-cycle/offset-gym flags (no RNG re-sow, so the per-client
+ * swapped RND cursor is untouched). Money + ball inventory are host-authoritative snapshots (a REAL capture
+ * that later decrements the host's balls host-only is still detected + healed by the checksum's
+ * `pokeballCounts` field exactly as in production). The player-wide modifiers are adopted via the SAME
+ * production heal the resync uses ({@linkcode reconcileCoopPlayerModifiers}, reconstructing the ones the
+ * guest lacks); per-mon HELD items ride the mirrored field. The brief globalScene point at the host is the
+ * only way {@linkcode captureCoopPlayerModifiers} (a globalScene reader) can see the host's list from inside
+ * the guest-ctx mirror; it is restored before returning.
+ */
+function adoptCoopHostRunConfig(hostScene: BattleScene, guestScene: BattleScene): void {
+  // Seed: the #658 launch pin. setSeed writes seed + waveCycleOffset + offsetGym; it does NOT re-sow RND.
+  guestScene.setSeed(hostScene.seed);
+  // Money: host-authoritative; the guest mirrors it (relayed in production). Checksum-hashed.
+  guestScene.money = hostScene.money;
+  // Ball inventory: host-authoritative starting counts; a real capture-driven drift stays checksum-detectable.
+  guestScene.pokeballCounts = { ...hostScene.pokeballCounts };
+  // Player-wide PERSISTENT modifiers (checksum-hashed `modifiers`): a launched host run carries starting /
+  // accumulated player-wide modifiers (lures, EXP charms, relics, the run's own starting items) the bare
+  // `new BattleScene()` guest never inherited. Adopt them via the SAME production heal the resync uses:
+  // serialize the host's owned (non-held, non-form) persistent modifiers under the host scene, then
+  // RECONSTRUCT the ones the guest lacks on the guest scene. Per-mon HELD items ride the mirrored field.
+  const prevScene = globalScene;
+  initGlobalScene(hostScene);
+  const hostModifierBlobs = captureCoopPlayerModifiers();
+  initGlobalScene(guestScene);
+  reconcileCoopPlayerModifiers(hostModifierBlobs);
+  initGlobalScene(prevScene);
+}
+
+/**
  * Bring the GUEST scene into the SAME live battle the host is in, by reconstructing the host's
  * field under the guest scene (PokemonData round-trip) + assembling a matching {@linkcode Battle}.
  * In production the guest reaches its battle through the full launch + `enemyPartySync` adopt; for
  * the spike we mirror the host's resolved field directly so the guest's REAL phase pipeline
  * (TurnStartPhase -> CoopReplayTurnPhase -> CoopFinalizeTurnPhase -> applyCoopCheckpoint) can run
- * against the host's streamed turns. MUST be called inside `withClient(guestCtx, ...)` so globalScene
- * is the guest scene (PokemonData.toPokemon / addPlayerPokemon build under the live globalScene).
+ * against the host's streamed turns. The {@linkcode adoptCoopHostRunConfig} step pins the host's
+ * seed/money/ball inventory/modifiers (#658) so the per-wave checksum MATCHES with no resync. MUST be
+ * called inside `withClient(guestCtx, ...)` so globalScene is the guest scene (PokemonData.toPokemon /
+ * addPlayerPokemon build under the live globalScene).
  *
  * Returns nothing; mutates the guest scene's party / currentBattle / arena / field.
  */
 export function mirrorHostBattleToGuest(hostScene: BattleScene, guestScene: BattleScene): void {
+  // 0. Adopt the host's SEED + run-config-derived scene state (#658 seed-pin). See adoptCoopHostRunConfig:
+  //    this is the launch-handshake step the plain mirror skipped, and WHY a benign per-wave checksum
+  //    mismatch appeared + self-healed via a resync. After it the guest's wave-start checksum MATCHES the
+  //    host's, so a residual mismatch is a REAL divergence.
+  adoptCoopHostRunConfig(hostScene, guestScene);
   // 1. Same game mode + arena/biome as the host.
   guestScene.gameMode = hostScene.gameMode;
   guestScene.newArena(hostScene.arena.biomeId);
@@ -471,7 +580,40 @@ export function mirrorHostBattleToGuest(hostScene: BattleScene, guestScene: Batt
   // (and applyCoopFullSnapshot's updateModifiers UI work would crash the stubbed headless guest mons).
 }
 
-/** Minimal no-op battleInfo so the headless guest mon's updateInfo/initBattleInfo calls don't crash. */
+/**
+ * Neutralize a scene's CandyBar UI for the headless duo harness. When a wave is WON, the (host's, and the
+ * guest's authoritative-tail) `VictoryPhase` fires `erRecordAchievementWaveWon`; unlocking an achievement
+ * (e.g. REALISTIC_FLASH_IS_BORING) grants team candy, whose `CandyBar.showStarterSpeciesCandy` reads
+ * `gameData.starterData[speciesId].candyCount`. For an EVOLVED starter (e.g. GENGAR #94) that read uses the
+ * un-root-normalized species id, so the bucket `getStarterDataEntry` created under the ROOT (Gastly #92) is
+ * NOT the one read -> `starterData[94]` is undefined -> the read throws INSIDE the CandyBar Promise executor
+ * -> an UNHANDLED REJECTION that fails the test. This is best-effort achievement UI, entirely orthogonal to
+ * the co-op SYNC layer the duo harness tests, so we replace ONLY the UI call with a resolved no-op (the
+ * achievement's own starterData bookkeeping still runs). Idempotent + guarded; a no-op if candyBar is absent.
+ */
+function neutralizeCoopCandyBar(scene: BattleScene): void {
+  const candyBar = (
+    scene as unknown as { candyBar?: { showStarterSpeciesCandy?: (id: number, count: number) => Promise<void> } }
+  ).candyBar;
+  if (candyBar != null) {
+    candyBar.showStarterSpeciesCandy = () => Promise.resolve();
+  }
+}
+
+/**
+ * Minimal no-op battleInfo so the headless guest mon's updateInfo/initBattleInfo calls don't crash.
+ *
+ * DOCUMENTED RESIDUAL (#633 bounded-scope, "guest mons skip Pokemon.init()"): the guest mons are built by
+ * ctor + calculateStats() but NEVER run the full {@linkcode Pokemon.init} - which builds the real
+ * PlayerBattleInfo/EnemyBattleInfo container, the mon sprite, and registers the field icon. Running the real
+ * init() headless is DISPROPORTIONATE: it constructs Phaser UI/sprite objects the mock texture manager does
+ * not back (the full-page render harness exists precisely because the GameManager scene rasterizes nothing),
+ * so it would crash or need a second wave of UI stubs for zero fidelity gain - the co-op SYNC layer the duo
+ * harness tests never reads the battle-info UI, only the checkpoint/checksum LOGICAL state (hp/status/moves/
+ * stat-stages), which the ctor already builds faithfully. So we keep the tiny proxy stub and leave the real
+ * init() out by design. (If a future co-op UI-mirror test needs real HP bars, wire it via the render harness's
+ * repointGlobalScene, not by running init() here.)
+ */
 function stubBattleInfo(mon: Pokemon): void {
   // The real PlayerBattleInfo/EnemyBattleInfo was never built (we skipped init()); a tiny async-resolving
   // stub satisfies updateInfo / setHpNumbers / initInfo / setMini etc. on the headless render path.
@@ -546,6 +688,9 @@ export async function buildDuo(
   toCoopGameMode: (scene: BattleScene) => void,
 ): Promise<DuoRig> {
   const hostScene = hostGame.scene;
+  // Headless best-effort UI: neutralize the host's achievement candy-bar UI (see neutralizeCoopCandyBar)
+  // so a won wave's REALISTIC_FLASH candy grant on an evolved starter can't throw an unhandled rejection.
+  neutralizeCoopCandyBar(hostScene);
   const hostRuntime = buildRuntime(pair.host, "Host", "authoritative");
   const guestRuntime = buildRuntime(pair.guest, "Guest", "authoritative");
   hostRuntime.controller.role = "host";
@@ -562,7 +707,7 @@ export async function buildDuo(
     scene: hostScene,
     runtime: hostRuntime,
     rndState: Phaser.Math.RND.state(),
-    ghost: { reset: true },
+    ghost: snapshotGhostState(),
     mePins: { ...IDLE_ME_PINS },
   };
 
@@ -573,7 +718,7 @@ export async function buildDuo(
     scene: guestScene,
     runtime: guestRuntime,
     rndState: Phaser.Math.RND.state(),
-    ghost: { reset: true },
+    ghost: emptyGhostSnapshot(),
     mePins: { ...IDLE_ME_PINS },
   };
   await withClient(guestCtx, () => {
@@ -746,21 +891,38 @@ export async function driveHostRewardShopOwner(
  * MUST be called inside withClient(guestCtx). Throws on a no-progress stall (the watcher should
  * always converge + leave once the owner's terminal arrives). Returns when the watcher has left.
  */
+const REWARD_WATCH_MAX_IDLE = 32;
+
 export async function driveGuestRewardWatch(guestPhase: ShopPhaseSeam): Promise<void> {
   // start() (watcher branch) is async-ish: it awaits the owner's options, opens the cosmetic screen,
   // then loops on awaitInteractionChoice. We kick it off, then drain the loopback repeatedly so each
-  // buffered/relayed owner pick is delivered + applied until the LEAVE terminal ends the phase.
+  // buffered/relayed owner pick is delivered + applied until the LEAVE/terminal ADVANCES the interaction.
   guestPhase.start();
-  for (let i = 0; i < 32; i++) {
+  // The interaction counter the watcher pinned to at start() - it ADVANCES past this exactly once when the
+  // owner's terminal (LEAVE or a terminal reward) is mirrored, which is the authoritative "this interaction
+  // completed" signal (the phase's own `coopWatcher` flag can lag past that advance, so it alone is not a
+  // reliable "left" signal). Read via the LIVE guest controller (we run inside withClient(guestCtx)).
+  const pinned = guestPhase.coopInteractionStart;
+  const advancedPastPinned = (): boolean => {
+    const counter = getCoopRuntime()?.controller.interactionCounter();
+    return counter != null && pinned >= 0 && counter > pinned;
+  };
+  for (let i = 0; i < REWARD_WATCH_MAX_IDLE; i++) {
     await drainLoopback();
-    // The watcher leaves by calling end() -> the harness's inert startCurrentPhase keeps the queue
-    // put; we detect "left" by the phase no longer being the current phase. The relay loop resolves
-    // its awaits as the owner's choices + terminal arrive over the drained loopback.
-    if (!(guestPhase as unknown as { coopWatcher: boolean }).coopWatcher) {
-      // start() short-circuited (no controller/relay) - it already left.
+    // Completed when EITHER the watcher left (coopWatcher cleared - e.g. a no-relay short-circuit) OR the
+    // interaction counter advanced past the pinned one (the owner's terminal was mirrored + applied).
+    if (!(guestPhase as unknown as { coopWatcher: boolean }).coopWatcher || advancedPastPinned()) {
       return;
     }
   }
+  // NO-PROGRESS STALL: after REWARD_WATCH_MAX_IDLE drains the watcher neither left NOR advanced the
+  // interaction - the owner's terminal never arrived (a relay drop / owner hang / counter-parity mismatch).
+  // THROW loudly (the harness's design language, mirroring driveGuestReplayTurn) so a regression surfaces
+  // here with both clients' logs already captured, instead of returning silently + being caught only much
+  // later by a downstream lockstep assert.
+  throw new Error(
+    `guest reward WATCH HANG: watcher neither left nor advanced past interaction ${pinned} after ${REWARD_WATCH_MAX_IDLE} drains (owner terminal never arrived) - see dev-logs/coop-duo/`,
+  );
 }
 
 /**
@@ -940,6 +1102,8 @@ export function forceItemRewards(override: OverrideKnobs, items: ModifierOverrid
  * clone builds under the live globalScene). Mutates the guest scene's party / currentBattle / arena.
  */
 export function mirrorHostMeToGuest(hostScene: BattleScene, guestScene: BattleScene): void {
+  // Adopt the host's seed + run-config-derived scene state (#658 seed-pin) - see adoptCoopHostRunConfig.
+  adoptCoopHostRunConfig(hostScene, guestScene);
   // Same game mode + arena/biome as the host.
   guestScene.gameMode = hostScene.gameMode;
   guestScene.newArena(hostScene.arena.biomeId);
@@ -1014,6 +1178,9 @@ export async function buildDuoForMe(
   toCoopGameMode: (scene: BattleScene) => void,
 ): Promise<DuoRig> {
   const hostScene = hostGame.scene;
+  // Headless best-effort UI: neutralize the host's achievement candy-bar UI (see neutralizeCoopCandyBar)
+  // so a won wave's REALISTIC_FLASH candy grant on an evolved starter can't throw an unhandled rejection.
+  neutralizeCoopCandyBar(hostScene);
   const hostRuntime = buildRuntime(pair.host, "Host", "authoritative");
   const guestRuntime = buildRuntime(pair.guest, "Guest", "authoritative");
   hostRuntime.controller.role = "host";
@@ -1030,7 +1197,7 @@ export async function buildDuoForMe(
     scene: hostScene,
     runtime: hostRuntime,
     rndState: Phaser.Math.RND.state(),
-    ghost: { reset: true },
+    ghost: snapshotGhostState(),
     mePins: { ...IDLE_ME_PINS },
   };
 
@@ -1041,7 +1208,7 @@ export async function buildDuoForMe(
     scene: guestScene,
     runtime: guestRuntime,
     rndState: Phaser.Math.RND.state(),
-    ghost: { reset: true },
+    ghost: emptyGhostSnapshot(),
     mePins: { ...IDLE_ME_PINS },
   };
   await withClient(guestCtx, () => {

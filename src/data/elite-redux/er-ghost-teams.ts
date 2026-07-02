@@ -1083,6 +1083,62 @@ export function resetErGhostRunState(): void {
 }
 
 /**
+ * A frozen capture of the per-run ghost cache quartet (+ the last-uploader picker cursor). These are the
+ * ONLY per-run mutable state this module owns; capturing them fully save/restores a client's ghost cache.
+ * Arrays/maps are shallow-COPIED so a later mutation of the live cache cannot bleed into a held snapshot
+ * (and vice-versa); the {@linkcode GhostTeamSnapshot} elements are treated as immutable.
+ */
+export interface ErGhostRunStateSnapshot {
+  prefetched: GhostTeamSnapshot[] | null;
+  prefetchStarted: boolean;
+  usedGhostIds: string[];
+  ghostByWave: [number, GhostTeamSnapshot][];
+  lastGhostUploader: string | null;
+}
+
+/**
+ * TWO-ENGINE co-op harness (#633 bounded-scope): capture this client's live per-run ghost cache so the
+ * cooperative scheduler can SAVE it before swapping to the other engine and RESTORE it on swap-back. Unlike
+ * {@linkcode resetErGhostRunState} (which WIPES the cache), this preserves it, so a ghost-bearing ME
+ * (colosseum-gauntlet, graves-of-the-fallen) or a ghost WAVE can be duo-tested without one engine inheriting
+ * the other's ghost picks. Pure read + shallow copy; never mutates the live cache. Production never calls
+ * this (solo/real-peer runs own a single ghost cache); it is the additive seam the harness needs.
+ */
+export function snapshotErGhostRunState(): ErGhostRunStateSnapshot {
+  return {
+    prefetched: prefetched == null ? null : [...prefetched],
+    prefetchStarted,
+    usedGhostIds: [...usedGhostIds],
+    ghostByWave: [...ghostByWave.entries()],
+    lastGhostUploader,
+  };
+}
+
+/**
+ * TWO-ENGINE co-op harness (#633 bounded-scope): install a previously-{@linkcode snapshotErGhostRunState}d
+ * ghost cache as the live per-run state (the inverse of the snapshot). Restores the whole quartet + picker
+ * cursor, re-copying so the live cache never aliases the held snapshot. Production never calls this.
+ */
+export function restoreErGhostRunState(snap: ErGhostRunStateSnapshot): void {
+  prefetched = snap.prefetched == null ? null : [...snap.prefetched];
+  prefetchStarted = snap.prefetchStarted;
+  usedGhostIds.clear();
+  for (const id of snap.usedGhostIds) {
+    usedGhostIds.add(id);
+  }
+  ghostByWave.clear();
+  for (const [wave, team] of snap.ghostByWave) {
+    ghostByWave.set(wave, team);
+  }
+  lastGhostUploader = snap.lastGhostUploader;
+}
+
+/** A CLEAN (empty) ghost-cache snapshot: the per-client starting slate for the duo harness swap. */
+export function emptyErGhostRunStateSnapshot(): ErGhostRunStateSnapshot {
+  return { prefetched: null, prefetchStarted: false, usedGhostIds: [], ghostByWave: [], lastGhostUploader: null };
+}
+
+/**
  * TEST HOOK (#350): inject a ready-made ghost pool so the full-run audit can
  * exercise the ghost-wave spawn path deterministically (no network/local pool).
  */

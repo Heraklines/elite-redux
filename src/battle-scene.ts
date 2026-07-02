@@ -2087,8 +2087,14 @@ export class BattleScene extends SceneBase {
       this.arena.updateBgForTimeOfDay();
     }
 
-    // use the old value of `double` to ensure both combatants get recalled properly when going from double to single battles
-    const playerField = this.getPlayerParty().slice(0, 1 + Number(lastBattle.double));
+    // Recall EVERY combatant the PREVIOUS battle had on the field - its full player-side
+    // capacity - so a wider format collapsing to a narrower one recalls all leads. The old
+    // `1 + Number(lastBattle.double)` was doubles-era arithmetic: a TRIPLE carries
+    // `double === false`, so it yielded 1 and left the triple's slots 1 and 2 on the field,
+    // their back sprites + info bars lingering into the next battle's intro (report #2 -
+    // "after trainer battles the sprites don't move away"). `getBattlerCount()` is the old
+    // arrangement's player capacity (1 / 2 / 3), so single/double stay byte-identical.
+    const playerField = this.getPlayerParty().slice(0, lastBattle.getBattlerCount());
     if (resetArenaState) {
       this.arena.resetArenaEffects();
 

@@ -32,6 +32,7 @@ import {
 import { getErDifficulty } from "#data/elite-redux/er-run-difficulty";
 import { buildTrainerEntranceTween, TRAINER_ENTRANCE_SLIDE_X } from "#data/elite-redux/er-trainer-fx";
 import { CASCOON_ANGELS_WRATH_MOVES } from "#data/elite-redux/init-elite-redux-movesets";
+import { maybeBeginSinglePlayerReplayRecording } from "#data/elite-redux/replay-single-recording";
 import { getNatureName } from "#data/nature";
 import { BattleType } from "#enums/battle-type";
 import { BiomeId } from "#enums/biome-id";
@@ -125,10 +126,14 @@ export class EncounterPhase extends BattlePhase {
   start() {
     super.start();
 
-    // #record-replay (Phase 2): begin recording this co-op run's replay trace on the authoritative
-    // host (idempotent; hard no-op off the live co-op host / when already recording / in single-player).
-    // Placed here because seed + the merged party are both established by the first EncounterPhase.
+    // #record-replay (Phase 2): begin recording this run's replay trace at the first EncounterPhase
+    // (seed + the starting party are both established here). Two mutually-exclusive, idempotent enables:
+    //  - CO-OP: begin on the authoritative host (hard no-op off the live co-op host / already recording).
+    //  - SINGLE-PLAYER: begin for a classic SOLO run (hard no-op in co-op / non-classic / already recording).
+    // Exactly one fires per run (gated by mode), so the same passive command + interaction taps feed
+    // whichever recording is live. Both are behavior-preserving passive observers.
     maybeBeginReplayRecording();
+    maybeBeginSinglePlayerReplayRecording();
 
     // Co-op GUEST (#633, LIVE-D6): adopt the host's authoritative enemy party BEFORE
     // generating our own, so both clients fight byte-identical enemies (species
@@ -197,14 +202,14 @@ export class EncounterPhase extends BattlePhase {
     }
     let enemies: CoopSerializedEnemy[] | null = null;
     try {
-      // #633/#698 handoff robustness: await the host's party for the FULL 120s ceiling
-      // (the backstop), but re-request it on a short interval so a single LOST
-      // `enemyPartySync` (or a host still loading its trainer assets) is recovered on
-      // demand instead of silently hard-locking the guest for two minutes. A pre-await
-      // or eventual arrival is still consumed via the existing wave-keyed buffer.
-      enemies = await streamer.awaitEnemyPartyWithRetry(battle.waveIndex, wave => streamer.requestEnemyParty(wave), {
-        timeoutMs: COOP_ENEMY_PARTY_WAIT_MS,
-      });
+      // #633 M4: DELETE THE POLL. The guest awaits the host's one-shot `enemyPartySync` PUSH
+      // event-driven - NO `requestEnemyParty` re-request. The co-op data channel is ordered +
+      // reliable ({ ordered: true }, no maxRetransmits), so the host's push is guaranteed
+      // delivered in order; a pre-await or eventual arrival is consumed via the wave-keyed buffer /
+      // parked waiter. The 120s ceiling remains as a last-resort backstop (then the guest
+      // self-generates - divergent but never a hang). The launch (first EncounterPhase) does not
+      // reach here at all: the guest boots from the full launch snapshot (tryCoopGuestSnapshotBoot).
+      enemies = await streamer.awaitEnemyParty(battle.waveIndex, COOP_ENEMY_PARTY_WAIT_MS);
     } catch {
       enemies = null;
     }
@@ -251,6 +256,36 @@ export class EncounterPhase extends BattlePhase {
       streamer.sendEnemyParty(globalScene.currentBattle.waveIndex, captureCoopEnemies());
     } catch {
       /* a serialize/send failure must never break the host's encounter */
+    }
+  }
+
+  /**
+   * Co-op HOST (#633 M4 push-snapshot launch): the instant the host's session is COHERENT at a
+   * launch encounter (enemy party + arena + weather/terrain all set), serialize the FULL session
+   * (`getSessionSaveData()` - the same complete serializer cloud-save + resume ride on) and PUSH it
+   * to the guest, which BOOTS from it rolling nothing of its own (§3.6). This is the "launch = the
+   * first snapshot" mechanism: it replaces the guest re-deriving its enemy/arena from the seed (a
+   * latent desync surface) with adopting the host's authoritative bytes. Launch-only for now
+   * (`this.phaseName === "EncounterPhase"`); NextEncounter/NewBiome waves keep the per-wave
+   * enemy-adopt. No-op for solo / guest / loaded. Best-effort + guarded - never breaks the host.
+   */
+  private broadcastCoopLaunchSnapshot(): void {
+    if (!globalScene.gameMode.isCoop || this.phaseName !== "EncounterPhase") {
+      return;
+    }
+    const controller = getCoopController();
+    const streamer = getCoopBattleStreamer();
+    if (controller == null || streamer == null || controller.role !== "host") {
+      return;
+    }
+    try {
+      const session = globalScene.gameData.getSessionSaveData();
+      // bigint-safe (mirrors game-data.ts initSessionFromData's debug serialize); parseSessionData
+      // rehydrates every class instance (PokemonData / ArenaData / modifiers / challenges) on the guest.
+      const json = JSON.stringify(session, (_k, v: unknown) => (typeof v === "bigint" ? v.toString() : v));
+      streamer.sendLaunchSnapshot(globalScene.currentBattle.waveIndex, json);
+    } catch {
+      /* a serialize/send failure must never break the host's encounter (the guest falls back) */
     }
   }
 
@@ -595,6 +630,10 @@ export class EncounterPhase extends BattlePhase {
           } else {
             erStormglassApplyChosenWeather();
           }
+          // Co-op HOST (#633 M4): the session is now fully coherent (party + enemy + arena +
+          // weather/terrain), so PUSH the launch snapshot for the guest to boot from. Placed after
+          // the weather/terrain set so the snapshot carries them; before saveAll (same coherent point).
+          this.broadcastCoopLaunchSnapshot();
           globalScene.gameData
             .saveAll(true, battle.waveIndex % 20 === 1 || (globalScene.lastSavePlayTime ?? 0) >= 1200)
             .then(success => {
@@ -914,6 +953,22 @@ export class EncounterPhase extends BattlePhase {
         globalScene.phaseManager.pushNew("SummonPhase", 0);
       }
 
+      // Multi-format transition: a mon still on the field from a WIDER previous format (a triple
+      // collapsing to a single/double on this wave) sits on a slot the new format cannot hold -
+      // recall EACH such orphaned slot, or its back sprite + info bar linger into this intro
+      // (report #2: player slots 1-2 "don't move away" after a triple). This generalizes the old
+      // hardcoded `ReturnPhase(1)` (which only ever recalled the doubles-era 2nd slot).
+      // `getPlayerField()`/`getFieldIndex()` are sized by the NEW (narrower) capacity, so the
+      // orphans are invisible to them - enumerate the PARTY by index. `ReturnPhase` is
+      // party-indexed (PartyMemberPokemonPhase.getPokemon -> party[i]), so it recalls the correct
+      // mon regardless of the new arrangement.
+      const party = globalScene.getPlayerParty();
+      for (let i = playerCapacity; i < party.length; i++) {
+        if (party[i]?.isOnField()) {
+          globalScene.phaseManager.pushNew("ReturnPhase", i);
+        }
+      }
+
       if (multiFormat) {
         if (availablePartyMembers.length > 1) {
           globalScene.phaseManager.pushNew("ToggleDoublePositionPhase", true);
@@ -925,9 +980,6 @@ export class EncounterPhase extends BattlePhase {
           }
         }
       } else {
-        if (availablePartyMembers.length > 1 && availablePartyMembers[1].isOnField()) {
-          globalScene.phaseManager.pushNew("ReturnPhase", 1);
-        }
         globalScene.phaseManager.pushNew("ToggleDoublePositionPhase", false);
       }
 

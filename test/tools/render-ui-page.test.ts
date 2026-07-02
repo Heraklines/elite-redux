@@ -43,32 +43,44 @@ import {
   setErShinyLabOwnedBit,
   unlockErShinyLabNameFx,
 } from "#data/elite-redux/er-shiny-lab-effects";
+import { trainerConfigs } from "#data/trainers/trainer-config";
 import { AbilityId } from "#enums/ability-id";
+import { BattleType } from "#enums/battle-type";
 import { BiomeId } from "#enums/biome-id";
 import { Button } from "#enums/buttons";
 import { DexAttr } from "#enums/dex-attr";
+import { EggTier } from "#enums/egg-type";
 import { GameModes } from "#enums/game-modes";
+import { MoveId } from "#enums/move-id";
 import { MysteryEncounterType } from "#enums/mystery-encounter-type";
 import { SpeciesId } from "#enums/species-id";
 import { TrainerType } from "#enums/trainer-type";
 import { UiMode } from "#enums/ui-mode";
-import { type ErTmCaseModifierType, getPlayerShopModifierTypeOptionsForWave } from "#modifiers/modifier-type";
+import {
+  type ErTmCaseModifierType,
+  getPlayerShopModifierTypeOptionsForWave,
+  ModifierTypeOption,
+} from "#modifiers/modifier-type";
 import { allMysteryEncounters } from "#mystery-encounters/mystery-encounters";
 import { achvs } from "#system/achv";
+import { VoucherType } from "#system/voucher";
 import type { GameManager } from "#test/framework/game-manager";
 import { GameManager as GameManagerClass } from "#test/framework/game-manager";
 import {
   createRenderScene,
+  findSuspectSprites,
   freezeAnimations,
   injectMissing,
   pixelDiff,
   type RenderContext,
+  renderBattlefield,
   renderTwoPass,
   repointGlobalScene,
   restoreGlobalScene,
 } from "#test/tools/render-harness";
 import { buildDemoConfig } from "#ui/er-shiny-lab-ui-handler";
 import { PartyUiMode } from "#ui/party-ui-handler";
+import { SaveSlotUiMode } from "#ui/save-slot-select-ui-handler";
 import { getModifierType } from "#utils/modifier-utils";
 import { getPokemonSpecies } from "#utils/pokemon-utils";
 import { copyFileSync, existsSync, mkdirSync, writeFileSync } from "node:fs";
@@ -100,10 +112,17 @@ interface Recipe {
    * phase pipeline transitioned to last. The harness wraps `ui.setMode` during `prepare` to
    * capture the final `(mode, args)`, then renders that handler. Lets you snapshot mid-run
    * screens (the in-battle command menu, post-battle reward, etc.) without hand-building args.
-   * NOTE: the battle FIELD (sprites/HP bars) is scene-level, not a UiHandler, so only the
-   * active handler's own container renders - the menu chrome, not the battlefield backdrop.
+   * NOTE: pair with `field: true` to also draw the battlefield beneath the handler.
    */
   captureActive?: boolean;
+  /**
+   * Render the BATTLEFIELD beneath the page: arena bg + platforms, on-field pokemon
+   * sprites, trainer, and fresh BattleInfo HP bars, rebuilt from live game state
+   * (see renderBattlefield in render-harness). Pair with `captureActive` + a
+   * `prepare` that drives a battle to the state you want to see. Visibility mirrors
+   * the live scene graph, so lingering/fainted-but-shown field objects reproduce.
+   */
+  field?: boolean;
   /** Fully custom page: build + show the UI directly into the render scene. */
   render?: (game: GameManager, ctx: RenderContext) => void | Promise<void>;
   /**
@@ -309,6 +328,84 @@ function seedAchvUnlocks(game: GameManager, distinct = false): any[] {
     }
   });
   return [];
+}
+
+/**
+ * A realistic Colosseum standings board (#439): a 15-entrant gauntlet mid-run (4 rounds
+ * cleared). Mirrors what ColosseumChoicePhase builds - each row's spriteKey is the trainer
+ * class atlas key (`trainerConfigs[t].getSpriteKey`, so the two-pass injector resolves the
+ * class portrait), tier drives the tag, and only cleared + next-up rows are revealed (the
+ * rest render as dark silhouettes). Champion is the final, gold-trophy row. Args match the
+ * handler's `show([data, onChoice])`.
+ */
+function colosseumDemoArgs(): any[] {
+  const roster: [TrainerType, string][] = [
+    [TrainerType.YOUNGSTER, "normal"],
+    [TrainerType.SWIMMER, "normal"],
+    [TrainerType.SCHOOL_KID, "normal"],
+    [TrainerType.CYCLIST, "normal"],
+    [TrainerType.BLACK_BELT, "ghost"],
+    [TrainerType.ACE_TRAINER, "ghost"],
+    [TrainerType.VETERAN, "gym"],
+    [TrainerType.HIKER, "gym"],
+    [TrainerType.BEAUTY, "normal"],
+    [TrainerType.RICH_KID, "normal"],
+    [TrainerType.PSYCHIC, "boss"],
+    [TrainerType.SCIENTIST, "boss"],
+    [TrainerType.BREEDER, "gym"],
+    [TrainerType.PARASOL_LADY, "ghost"],
+    [TrainerType.CYNTHIA, "champion"],
+  ];
+  const tierTag: Record<string, string> = {
+    normal: "Normal",
+    ghost: "Ghost",
+    boss: "Boss",
+    gym: "Gym",
+    champion: "Champion",
+  };
+  const wins = 4; // 4 rounds cleared -> rows 0..4 revealed, the rest silhouettes.
+  const challengers = roster.map(([type, tier], i) => ({
+    name: trainerConfigs[type]?.name || TrainerType[type],
+    spriteKey: trainerConfigs[type]?.getSpriteKey(false, false) ?? "veteran_m",
+    tier: tierTag[tier],
+    revealed: i <= wins,
+  }));
+  const data = {
+    round: wins,
+    totalRounds: roster.length,
+    tierLabel: "B",
+    nextTierLabel: "B+",
+    challengers,
+  };
+  return [data, () => {}];
+}
+
+/**
+ * Build + show a registered handler exactly the way the it()-body mode path does (fresh
+ * instance against the re-pointed scene), but first add no-op shims for the few
+ * Container-backed UI-surface methods the render mock omits (`moveTo` / `length`, which the
+ * real `ui` inherits from Phaser.Container). Handlers that reorder their own container on
+ * show() (GAME_STATS / CHALLENGE_SELECT / MENU) call these and otherwise crash. `moveTo`
+ * returns the ui so handlers that CHAIN off it (GAME_STATS does `.moveTo(...).hideTooltip()`)
+ * don't crash on an undefined return. We only touch the live mock ui object - never the harness.
+ */
+function shimUiAndShow(game: GameManager, mode: UiMode, args: any[]): any {
+  const ui: any = game.scene.ui;
+  ui.moveTo ??= () => ui;
+  if (typeof ui.length !== "number") {
+    ui.length = 0;
+  }
+  const registered: any = ui.handlers[mode];
+  let handler: any = registered;
+  try {
+    handler = new registered.constructor();
+  } catch {
+    handler = registered;
+  }
+  handler.setup();
+  handler.show(args);
+  ui.setActiveHandler?.(handler);
+  return handler;
 }
 
 const RECIPES: Record<string, Recipe> = {
@@ -641,14 +738,78 @@ const RECIPES: Record<string, Recipe> = {
     diffTolerance: 40000,
   },
   // Phase-flow bridge demo: drive a real battle (startBattle runs the encounter phases) and
-  // render WHATEVER screen the pipeline left active - here the in-battle command menu. Proves
-  // mid-run screens reached through the phase system are renderable. (The battlefield sprites
-  // are scene-level, not a handler, so only the command-menu chrome renders.)
+  // render WHATEVER screen the pipeline left active - here the in-battle command menu -
+  // WITH the battlefield beneath it (arena, both pokemon, HP bars) via `field: true`.
+  // This is the full mid-battle screen, headless.
   "battle-command": {
     captureActive: true,
+    field: true,
     prepare: async game => {
       await game.classicMode.startBattle(SpeciesId.RATTATA);
       return []; // captureActive ignores this; satisfies the prepare return type
+    },
+  },
+  // Battlefield in a DOUBLE battle: two mons + stacked HP bars per side. Exercises the
+  // slot-offset layout (fieldSpriteOffset / barSlotOffset) of the field renderer.
+  "battle-field-doubles": {
+    captureActive: true,
+    field: true,
+    prepare: async game => {
+      game.override.battleStyle("double");
+      await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
+      return [];
+    },
+  },
+  // Battlefield in a TRIPLE battle: three mons + three stacked HP bars per side. Verifies
+  // the triple slot-offset layout (fieldSpriteOffset/barSlotOffset at capacity 3) AND the
+  // "backsprites not showing" report (#4) - the PNG must show THREE player BACK sprites.
+  // (If the backs render here, the browser report is the async atlas-load race, headless-
+  // invisible - classify it browser-tier.)
+  "battle-field-triples": {
+    captureActive: true,
+    field: true,
+    prepare: async game => {
+      game.override.battleStyle("triple");
+      await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR, SpeciesId.CHARIZARD);
+      return [];
+    },
+  },
+  // Report #2 visual: the state AFTER winning a triple TRAINER battle and advancing to a
+  // NARROWER (single) next wave. The bug left the player's 2nd + 3rd back sprites AND their
+  // info bars on screen through the next intro ("the UI doesn't change, doesn't move away").
+  // The field renderer mirrors the LIVE scene graph, so post-fix this PNG shows exactly ONE
+  // player back sprite (the single lead) + one player bar; pre-fix it showed three.
+  "battle-field-triples-postwin": {
+    captureActive: true,
+    field: true,
+    prepare: async game => {
+      game.override
+        .battleType(BattleType.TRAINER)
+        .randomTrainer({ trainerType: TrainerType.ACE_TRAINER })
+        .battleStyle("triple")
+        .criticalHits(false)
+        .startingLevel(200) // OHKO every foe -> win in one turn
+        .enemyLevel(20)
+        .enemyMoveset(MoveId.HARDEN)
+        .moveset([MoveId.TACKLE])
+        .ability(AbilityId.BALL_FETCH)
+        .enemyAbility(AbilityId.BALL_FETCH);
+      await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.SNORLAX, SpeciesId.SNORLAX);
+      const battle = game.scene.currentBattle;
+      battle.enemyParty.length = 3; // exactly three foes, no reserves -> KO all three = victory
+      const foes = game.scene.getEnemyField();
+      const idx = foes.map(e => e.getBattlerIndex());
+      for (const e of foes) {
+        e.hp = 1;
+      }
+      game.move.select(MoveId.TACKLE, 0, idx[0]);
+      game.move.select(MoveId.TACKLE, 1, idx[1]);
+      game.move.select(MoveId.TACKLE, 2, idx[2]);
+      // Narrow the next wave to a SINGLE (read fresh at newBattle time) so the transition
+      // must recall the leftover triple slots 1-2. Post-fix: only slot 0 remains on-field.
+      game.override.battleStyle("single");
+      await game.toNextWave();
+      return [];
     },
   },
   // The Stormglass relic (#130) weather PICKER - the one-time OPTION_SELECT the
@@ -760,6 +921,258 @@ const RECIPES: Record<string, Recipe> = {
     // ACTION selects the lead mon, opening its TM move list (the pick screen).
     steps: [Button.ACTION],
   },
+  // The post-battle REWARD shop (UiMode.MODIFIER_SELECT) - the single highest-value uncovered
+  // screen. `mode` triggers `prepare` (a started battle, PRE-repoint, so the handler has its
+  // currentBattle for money / wave / shop-status), and a custom `render` builds the REAL
+  // ModifierSelectUiHandler with real reward TYPES. It then calls each tile's `revealInstant()`
+  // (the same shortcut the Biome Market uses) INSTEAD of the staggered pokeball-bounce /
+  // upgrade-reveal tween sequence - the harness force-completes tweens to onComplete but never
+  // steps that per-reward stagger, so without this the tiles stay stuck off-screen at their
+  // pre-animation position. setCursor(0) then shows option 0's cursor + description
+  // deterministically (a nav STEP navigated unpredictably across the batch). Fixed reward TYPES
+  // keep the golden stable.
+  "modifier-select": {
+    mode: UiMode.MODIFIER_SELECT,
+    // In-game the reward shop overlays the battlefield - render it too (field: true),
+    // not reward tiles floating on black.
+    field: true,
+    prepare: async game => {
+      await game.classicMode.startBattle(SpeciesId.PIKACHU);
+      return []; // render (below) builds the handler; this just gives it a currentBattle
+    },
+    render: game => {
+      const ui: any = game.scene.ui;
+      const registered: any = ui.handlers[UiMode.MODIFIER_SELECT];
+      let handler: any = registered;
+      try {
+        handler = new registered.constructor();
+      } catch {
+        handler = registered;
+      }
+      handler.setup();
+      const options = [
+        new ModifierTypeOption(modifierTypes.POTION(), 0),
+        new ModifierTypeOption(modifierTypes.SUPER_POTION(), 0),
+        new ModifierTypeOption(modifierTypes.ETHER(), 0),
+        new ModifierTypeOption(modifierTypes.REVIVE(), 0),
+      ];
+      handler.show([true, options, () => {}, 0]);
+      for (const opt of handler.options ?? []) {
+        opt.revealInstant?.();
+      }
+      // NB: no setCursor here - the reward reticle ("cursor" image) rasterizes as a big
+      // magenta placeholder box in the harness (same as the accepted stormglass-picker
+      // golden) whose presence/position varies with the shared texture cache across the
+      // batch. Leaving it at its default keeps the 4 revealed tiles clean + deterministic.
+      ui.setActiveHandler?.(handler);
+    },
+    diffTolerance: 2000,
+  },
+  // The in-battle FIGHT move-select (UiMode.FIGHT): the 4 moves + PP + type/effectiveness bar,
+  // OVER the live battlefield (field: true draws the arena + mon sprites + HP bars beneath the
+  // menu). The mode path builds the real FightUiHandler and calls show([fieldIndex]) while the
+  // pipeline sits on the CommandPhase (so getPokemon resolves); enemy + moveset are pinned so the
+  // move list + field are fixed (coarse tolerance for the live battle sprites). NOTE: these battle
+  // menus deliberately do NOT drive the real ui.setMode(FIGHT/BALL/TARGET) in prepare - that leaves
+  // the shared globalScene UI stuck in a battle sub-mode and breaks the NEXT recipe's startBattle;
+  // the mode path is side-effect-free (pipeline left on the safe COMMAND mode).
+  "fight-menu": {
+    mode: UiMode.FIGHT,
+    field: true,
+    prepare: async game => {
+      game.override
+        .enemySpecies(SpeciesId.MAGIKARP)
+        .moveset([MoveId.TACKLE, MoveId.TAIL_WHIP, MoveId.QUICK_ATTACK, MoveId.HYPER_FANG]);
+      await game.classicMode.startBattle(SpeciesId.RATTATA);
+      return [0]; // fieldIndex 0; fromCommand defaults to Command.FIGHT
+    },
+    diffTolerance: 60000, // live battle sprites on the field (see Recipe.diffTolerance)
+  },
+  // The in-battle BALL menu (UiMode.BALL) in a wild battle: the pokeball type list + counts, over
+  // the live battlefield. Mode path (side-effect-free, see fight-menu note); enemy pinned; coarse
+  // tolerance for the battle sprites.
+  "ball-menu": {
+    mode: UiMode.BALL,
+    field: true,
+    prepare: async game => {
+      game.override.enemySpecies(SpeciesId.MAGIKARP);
+      await game.classicMode.startBattle(SpeciesId.RATTATA);
+      return [];
+    },
+    diffTolerance: 60000, // live battle sprites on the field (see Recipe.diffTolerance)
+  },
+  // TARGET_SELECT in a DOUBLE battle (UiMode.TARGET_SELECT): the target cursor over the two foes
+  // when a single-target move (Tackle) is chosen (getMoveTargets yields both foe slots), over the
+  // double battlefield. TARGET_SELECT is a pure OVERLAY with no chrome of its own, so it NEEDS
+  // field: true to be meaningful (without the battlefield beneath, it renders a blank frame). Mode
+  // path builds the real handler; enemy pinned; coarse tolerance for the battle sprites.
+  "target-select": {
+    mode: UiMode.TARGET_SELECT,
+    field: true,
+    prepare: async game => {
+      game.override.battleStyle("double").enemySpecies(SpeciesId.MAGIKARP);
+      await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
+      return [0, MoveId.TACKLE, () => {}];
+    },
+    diffTolerance: 60000, // live battle sprites on the field (see Recipe.diffTolerance)
+  },
+  // The Egg Gacha machines (UiMode.EGG_GACHA): the three gacha handles + the voucher tallies.
+  // Seed a spread of vouchers across tiers so the pull-count displays populate. The legendary
+  // gacha panel shows a rotating legendary + a live countdown (wall-clock), so a coarse
+  // tolerance covers that one changing region while still catching gross breakage.
+  "egg-gacha": {
+    mode: UiMode.EGG_GACHA,
+    prepare: game => {
+      game.scene.gameData.voucherCounts[VoucherType.REGULAR] = 12;
+      game.scene.gameData.voucherCounts[VoucherType.PLUS] = 5;
+      game.scene.gameData.voucherCounts[VoucherType.PREMIUM] = 2;
+      game.scene.gameData.voucherCounts[VoucherType.GOLDEN] = 1;
+      return [];
+    },
+    // The legendary-gacha panel shows a DAILY-rotating featured legendary + a live countdown,
+    // so both the sprite and the timer change with the wall-clock date - a coarse tolerance
+    // covers that whole panel while the gate still catches gross breakage of the machines/tallies.
+    diffTolerance: 80000,
+  },
+  // The Egg List (UiMode.EGG_LIST): the grid of held eggs + the selected egg's detail panel.
+  // Seed three eggs of different tiers (fixed id AND timestamp so both the per-egg roll and the
+  // "obtained on" date are deterministic; not shiny so no run-varying sparkle). Static -> exact.
+  "egg-list": {
+    mode: UiMode.EGG_LIST,
+    prepare: game => {
+      const ts = 1_600_000_000_000;
+      game.scene.gameData.eggs = [
+        new Egg({ scene: game.scene, id: 1001, tier: EggTier.COMMON, isShiny: false, timestamp: ts }),
+        new Egg({ scene: game.scene, id: 1002, tier: EggTier.RARE, isShiny: false, timestamp: ts }),
+        new Egg({ scene: game.scene, id: 1003, tier: EggTier.EPIC, isShiny: false, timestamp: ts }),
+      ];
+      return [];
+    },
+    diffTolerance: 0,
+  },
+  // The Save Slot select (UiMode.SAVE_SLOT) in LOAD mode: the 5 session slots (all Empty on a
+  // fresh save) + slot chrome. Args are [SaveSlotUiMode, callback]. Static -> exact diff.
+  "save-slot": {
+    mode: UiMode.SAVE_SLOT,
+    prepare: () => [SaveSlotUiMode.LOAD, () => {}],
+    diffTolerance: 0,
+  },
+  // The Game Stats screen (UiMode.GAME_STATS): the paged stat grid, read from the live gameData
+  // (ER init pre-seeds the starter/seen counts, else zeros). Custom render (the handler chains
+  // ui.moveTo(...).hideTooltip(), which the mock shims). Coarse tolerance: a prior page in a batch
+  // may have caught extra species, nudging the seen/caught stat text.
+  "game-stats": {
+    render: game => shimUiAndShow(game, UiMode.GAME_STATS, []),
+    diffTolerance: 8000,
+  },
+  // The Run History screen (UiMode.RUN_HISTORY): the saved-run list. No runs are seeded (a real
+  // run-history entry needs a full SessionSaveData round-trip, not cheap), so this renders the
+  // genuine EMPTY-list state + chrome. Static -> exact diff.
+  "run-history": {
+    mode: UiMode.RUN_HISTORY,
+    prepare: () => [],
+    diffTolerance: 0,
+  },
+  // The Challenge select (UiMode.CHALLENGE_SELECT): the challenge toggle list. Force CHALLENGE
+  // mode so gameMode.challenges is populated (classic's is empty) and every challenge row renders
+  // with its value stepper. Custom render (the handler reorders its container via ui.moveTo/length,
+  // shimmed). Static -> exact diff.
+  "challenge-select": {
+    render: game => {
+      game.scene.gameMode = getGameMode(GameModes.CHALLENGE);
+      shimUiAndShow(game, UiMode.CHALLENGE_SELECT, []);
+    },
+    diffTolerance: 0,
+  },
+  // The in-run pause MENU (UiMode.MENU): the top-level menu option list. Custom render (the handler
+  // reorders its container via ui.moveTo/length, shimmed). Static -> exact diff.
+  menu: {
+    render: game => shimUiAndShow(game, UiMode.MENU, []),
+    diffTolerance: 0,
+  },
+  // The ER Colosseum standings board (UiMode.COLOSSEUM) [ER, #439] - ZERO prior coverage anywhere.
+  // A 15-entrant press-your-luck gauntlet mid-run: the BW2 PWT board, the two-column roster
+  // (cleared/next-up revealed, the rest dark silhouettes), the banked-grade panel, and the
+  // CONTINUE / CASH OUT buttons. RIGHT toggles the two buttons. NOTE: the deep-navy PWT chrome +
+  // class portraits are CDN-only assets that stay behind a `textures.exists` gate the two-pass
+  // injector can't pre-satisfy, so the board falls back to the light engine window (text renders
+  // low-contrast) - the structure/layout/cursor still render + regress-guard. Static -> exact.
+  colosseum: {
+    mode: UiMode.COLOSSEUM,
+    prepare: () => colosseumDemoArgs(),
+    steps: [Button.RIGHT],
+    diffTolerance: 0,
+  },
+  // The ER Quiz/Minigame panel (UiMode.ER_QUIZ) [ER, #439] - ZERO prior coverage. The compact
+  // dex-blurb question card: header + wrapped Pokedex blurb + four answer buttons. DOWN walks the
+  // answer cursor. NOTE: the card is a dark-themed window; the harness renders windows in their
+  // light base colour, so the light card text is low-contrast here (the card + 4 buttons + cursor
+  // structure render + regress-guard). Static -> exact diff.
+  "er-quiz": {
+    mode: UiMode.ER_QUIZ,
+    prepare: () => [
+      {
+        header: "Who's that Pokémon?  (1/5)",
+        prompt:
+          "A legendary bird Pokémon. It is said that one appears when a doomed ship is about to sink, and guides it to safety.",
+        options: ["Articuno", "Lugia", "Ho-Oh", "Zapdos"],
+      },
+      () => {},
+    ],
+    steps: [Button.DOWN],
+    diffTolerance: 0,
+  },
+  // The ER World Map node PICKER (UiMode.ER_MAP_PICKER) [ER, #486] - the branching route chooser
+  // shown when leaving a biome. Mirrors the er-map recipe's node-building: three revealed onward
+  // biomes across the base/upgrade/event colour-key sources. DOWN walks the cursor down the route
+  // list. (The route graph + nodes render; the picker's dark-theme biome-name labels are
+  // low-contrast, same harness limitation as noted above.) Static -> exact diff.
+  "er-map-picker": {
+    mode: UiMode.ER_MAP_PICKER,
+    prepare: () => {
+      const nodes = [
+        { biome: BiomeId.VOLCANO, revealed: true, source: "base" as const },
+        { biome: BiomeId.GRASS, revealed: true, source: "upgrade" as const },
+        { biome: BiomeId.ICE_CAVE, revealed: true, source: "event" as const },
+      ];
+      return [{ nodes, origin: BiomeId.PLAINS, onSelect: () => {} }];
+    },
+    steps: [Button.DOWN, Button.DOWN],
+    diffTolerance: 0,
+  },
+  // The level-up Move Learn panel (UiMode.LEARN_MOVE_BATCH) [ER QoL]: LEARNABLE | CURRENT columns +
+  // the mon's icon/base-stat side panel + the move-info overlay. Drives the real handler with a
+  // live player mon (fixed 2-move set so CURRENT is deterministic) and four offerable moves.
+  // Static -> exact diff.
+  "learn-move-batch": {
+    mode: UiMode.LEARN_MOVE_BATCH,
+    prepare: async game => {
+      game.override.moveset([MoveId.TACKLE, MoveId.REST]); // pin CURRENT for a stable golden
+      await game.classicMode.startBattle(SpeciesId.SNORLAX);
+      const pokemon = game.scene.getPlayerPokemon();
+      if (!pokemon) {
+        throw new Error("learn-move-batch recipe: no player pokemon after startBattle");
+      }
+      return [
+        {
+          pokemon,
+          learnableIds: [MoveId.BODY_SLAM, MoveId.EARTHQUAKE, MoveId.CRUNCH, MoveId.FIRE_PUNCH],
+          assign: () => {},
+          revert: () => {},
+          done: () => {},
+          fallback: () => {},
+        },
+      ];
+    },
+    diffTolerance: 0,
+  },
+  // NOTE: TITLE (UiMode.TITLE) is intentionally NOT a recipe - it is animation-tier. Its
+  // titleContainer starts at alpha 0 and fades in via an alpha tween; the harness force-completes
+  // tweens to onComplete WITHOUT applying the tweened alpha, so the container stays invisible (a
+  // blank frame, nonBlankPx 0). On top of that the splash line + backdrop Pokemon are picked at
+  // RANDOM each show(), so even forcing the alpha would leave the golden non-deterministic.
+  // (Verified: renders blank.) Likewise EVOLUTION_SCENE / EGG_HATCH_SCENE are animation-driven
+  // cutscenes (a static show() renders only the pre-animation frame) and are left out.
 };
 
 const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
@@ -841,9 +1254,23 @@ describe.skipIf(!RUN)("render-ui-page", () => {
     let renderError: unknown = null;
     const run = async () => {
       try {
+        if (recipe.field) {
+          await renderBattlefield(game.scene, ctx);
+          // The in-battle bottom band is the MESSAGE handler's window (the command menu
+          // renders ON it in-game). Build it fresh beneath the active handler; a failure
+          // here only costs the bar, not the page.
+          try {
+            const msgReg: any = (game.scene as any).ui.handlers[UiMode.MESSAGE];
+            const msgHandler: any = new msgReg.constructor();
+            msgHandler.setup();
+            msgHandler.show([]);
+          } catch {
+            /* no message bar - battlefield + handler still render */
+          }
+        }
         if (recipe.render) {
           await recipe.render(game, ctx);
-        } else {
+        } else if (HandlerClass || registered) {
           let handler = registered;
           try {
             handler = new HandlerClass();
@@ -894,6 +1321,7 @@ describe.skipIf(!RUN)("render-ui-page", () => {
         await sleep(10);
       }
       freezeAnimations(ctx.uiInner);
+      freezeAnimations(ctx.fieldRoot);
       ctx.step();
       ctx.snapshot(join("dev-logs", "ui-pages", `${PAGE}-step${i}.png`));
     }
@@ -908,9 +1336,14 @@ describe.skipIf(!RUN)("render-ui-page", () => {
 
     // Pin animated sprites to frame 0 so the snapshot is byte-deterministic (golden diff).
     freezeAnimations(ctx.uiInner);
+    freezeAnimations(ctx.fieldRoot);
     ctx.step();
     const out = join("dev-logs", "ui-pages", `${PAGE}${SIMULATE_MISSING ? "-missing" : ""}.png`);
     const { nonBlankPx } = ctx.snapshot(out);
+    for (const s of findSuspectSprites(ctx)) {
+      // biome-ignore lint/suspicious/noConsole: harness diagnostics
+      console.log(`[suspect] ${PAGE}: ${s}`);
+    }
     // biome-ignore lint/suspicious/noConsole: harness diagnostics
     console.log(
       "WROTE",

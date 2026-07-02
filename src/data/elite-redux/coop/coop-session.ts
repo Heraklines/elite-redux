@@ -152,6 +152,78 @@ export function coopOwnerOfFieldIndex(fieldIndex: number): CoopRole {
   return fieldIndex === COOP_GUEST_FIELD_INDEX ? "guest" : "host";
 }
 
+// =============================================================================
+// Seat / PlayerId model (#633, M5: generalize role/ownership to N players).
+//
+// The binary host/guest role maps BIJECTIVELY onto 0-based SEAT indices: host =
+// seat 0 = the AUTHORITY, guest = seat 1. Every ownership / turn / authority rule
+// below is expressed as a SEAT rule, so raising the player count is a DATA change
+// (playerCount, seatOf(mon)) rather than a control-flow rewrite. These helpers are
+// ADDITIVE - the binary API above is unchanged - so the 2-player path stays
+// byte-identical while the model becomes N-ready. All pure / engine-free.
+// =============================================================================
+
+/** A co-op player's stable 0-based seat index. Seat {@linkcode COOP_AUTHORITY_ID} is the
+ *  authority (the host, in the 2-player model). */
+export type CoopPlayerId = number;
+
+/** The authoritative seat: the persistence + battle authority. Seat 0 by convention. */
+export const COOP_AUTHORITY_ID: CoopPlayerId = 0;
+
+/** The player count of the current co-op model. The rest of co-op is 2-player today;
+ *  N-ready helpers take an explicit `playerCount` and default to this. */
+export const COOP_PLAYER_COUNT = 2;
+
+/** Map the binary role to its seat index (host = 0 = authority, guest = 1). */
+export function coopSeatOfRole(role: CoopRole): CoopPlayerId {
+  return role === "host" ? COOP_AUTHORITY_ID : 1;
+}
+
+/** Map a seat index back to the binary role (seat 0 = host, any other seat = guest).
+ *  Bijective for the 2-player model; seats > 1 collapse to "guest" until N distinct
+ *  roles land (the binary role type only encodes authority-vs-not today). */
+export function coopRoleOfSeat(seat: CoopPlayerId): CoopRole {
+  return seat === COOP_AUTHORITY_ID ? "host" : "guest";
+}
+
+/** Whether `seat` is the authoritative seat (seat 0). */
+export function coopSeatIsAuthority(seat: CoopPlayerId): boolean {
+  return seat === COOP_AUTHORITY_ID;
+}
+
+/**
+ * N-ready field-slot ownership (#633, M5): resolve the OWNER of battle field slot `slot`
+ * from the persistent `coopOwner` tag of the mon ACTUALLY in that slot - not a hardcoded
+ * guest slot. `field[slot]` is the active mon at that field index (`undefined` if empty).
+ *
+ * Falls back to the fixed 2-player slot map ({@linkcode coopOwnerOfFieldIndex}) when the
+ * slot is empty or its mon is untagged, so the binary launch order (slot 0 = host, slot 1
+ * = guest) is preserved bit-for-bit. But once slots reorder (a switch / give-to-partner),
+ * this reads the TRUE owner off the mon rather than assuming the launch layout - the
+ * correctness the design (§3.4) keys command / switch routing off. Pure over the
+ * `coopOwner` tag so the routing gate and its unit test share one source of truth.
+ */
+export function coopOwnerOfFieldSlot(field: readonly (CoopOwnedMon | undefined)[], slot: number): CoopRole {
+  const mon = field[slot];
+  if (mon?.coopOwner !== undefined) {
+    return mon.coopOwner;
+  }
+  return coopOwnerOfFieldIndex(slot);
+}
+
+/**
+ * The SEAT that owns the interaction whose counter is `n`, round-robin over `playerCount`
+ * players (#633, M5). The 2-player parity rule (even counter -> seat 0 -> host, odd -> seat
+ * 1 -> guest) is exactly the `playerCount === 2` case, so {@linkcode CoopInteractionTurn.ownerOf}
+ * delegates here and stays bit-for-bit identical while alternation becomes N-ready. The modulo
+ * is written to be safe for negative / non-integer counters (clamped like the old parity math).
+ */
+export function coopInteractionOwnerSeat(counter: number, playerCount: number = COOP_PLAYER_COUNT): CoopPlayerId {
+  const n = Math.max(1, Math.trunc(playerCount));
+  const c = Math.trunc(counter);
+  return ((c % n) + n) % n;
+}
+
 /** The field slot a given player commands. */
 export function coopFieldIndexOf(role: CoopRole): number {
   return role === "guest" ? COOP_GUEST_FIELD_INDEX : COOP_HOST_FIELD_INDEX;
@@ -170,10 +242,20 @@ export function coopFieldIndexOf(role: CoopRole): number {
  * fails open rather than locking the player out of every replacement.
  */
 export function coopSwitchBlocksMon(fieldIndex: number, monOwner: CoopRole | undefined): boolean {
+  return coopSwitchBlocksMonForOwner(coopOwnerOfFieldIndex(fieldIndex), monOwner);
+}
+
+/**
+ * N-ready switch gate (#633, M5): same rule as {@linkcode coopSwitchBlocksMon} but keyed on the
+ * slot's RESOLVED owner (from {@linkcode coopOwnerOfFieldSlot} / the mon's `coopOwner` tag) instead
+ * of the fixed 2-player slot map. A candidate is BLOCKED when it belongs to a different owner than
+ * the slot being switched; an untagged candidate fails open (never lock the player out).
+ */
+export function coopSwitchBlocksMonForOwner(slotOwner: CoopRole, monOwner: CoopRole | undefined): boolean {
   if (monOwner === undefined) {
     return false;
   }
-  return monOwner !== coopOwnerOfFieldIndex(fieldIndex);
+  return monOwner !== slotOwner;
 }
 
 /**
@@ -302,12 +384,15 @@ export class CoopInteractionTurn {
    * STABLE for the whole interaction, or the watcher follows the wrong seq).
    */
   static ownerOf(counter: number): CoopRole {
-    const parity = ((counter % 2) + 2) % 2;
-    const owner: CoopRole = counter % 2 === 0 ? "host" : "guest";
+    // N-ready (#633, M5): resolve the owning SEAT round-robin, then map back to the binary
+    // role. For the 2-player model this is exactly the old parity rule (even -> seat 0 ->
+    // host, odd -> seat 1 -> guest), so the alternation is unchanged bit-for-bit.
+    const seat = coopInteractionOwnerSeat(counter);
+    const owner = coopRoleOfSeat(seat);
     if (isCoopDebug()) {
-      coopLog("owner", `ownerOf(counter=${counter}) parity=${parity} -> owner=${owner}`);
+      coopLog("owner", `ownerOf(counter=${counter}) seat=${seat} -> owner=${owner}`);
     }
-    return counter % 2 === 0 ? "host" : "guest";
+    return owner;
   }
 
   /**

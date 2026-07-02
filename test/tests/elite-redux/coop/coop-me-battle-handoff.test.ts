@@ -19,46 +19,31 @@
 // Deadlock. (See the first test - it reproduces exactly that stall against the pump.)
 //
 // THE FIX (proven here at the protocol level): at the encounter -> battle boundary the
-// owner relays a BATTLE-HANDOFF sentinel (distinct from LEAVE) so the watcher ENDS the
-// pump WITHOUT leaving the encounter; and the HOST streams the ME battle's enemy party
-// keyed by the ME INTERACTION (not just waveIndex, since the battle spawns mid-wave),
-// which the GUEST adopts verbatim. Both then fall into the existing host-drives /
-// guest-replays battle path, so the boss is identical + host-authoritative regardless
-// of who OWNED the encounter (BOTH owner cases covered below).
+// owner relays a BATTLE-HANDOFF sentinel (distinct from LEAVE) on the dedicated 9M
+// TERMINAL seq the peer's `CoopReplayMePhase.awaitHostTerminal` listens on; and the HOST
+// streams the ME battle's enemy party keyed by the ME INTERACTION (not just waveIndex,
+// since the battle spawns mid-wave), which the GUEST adopts verbatim. Both then fall
+// into the existing host-drives / guest-replays battle path, so the boss is identical +
+// host-authoritative regardless of who OWNED the encounter (BOTH owner cases covered
+// below). The peer side here is a plain relay await - the M6 authoritative model; the
+// old lockstep watcher pump was deleted with M6b.
 // =============================================================================
 
 import { CoopBattleStreamer } from "#data/elite-redux/coop/coop-battle-stream";
-import { CoopInteractionRelay } from "#data/elite-redux/coop/coop-interaction-relay";
+import { COOP_INTERACTION_LEAVE, CoopInteractionRelay } from "#data/elite-redux/coop/coop-interaction-relay";
 import { meBattleHandoffKey } from "#data/elite-redux/coop/coop-me-battle-handoff";
-import { CoopMePump, type CoopMePumpEngine } from "#data/elite-redux/coop/coop-me-pump";
+import { COOP_ME_BATTLE_HANDOFF, CoopMePump } from "#data/elite-redux/coop/coop-me-pump";
 import { type CoopSerializedEnemy, createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
 import { describe, expect, it } from "vitest";
 
 /** Flush the loopback (delivers on a macrotask via setTimeout(0), like the live transport). */
 const flush = () => new Promise<void>(resolve => setTimeout(resolve, 0));
-/** Let the pump's await/readiness chain drain across several macrotasks before asserting. */
+/** Let the relay await chain drain across several macrotasks before asserting. */
 const settle = async () => {
   for (let i = 0; i < 6; i++) {
     await flush();
   }
 };
-
-/** A recording pump engine with a settable ready flag (mirrors the ui.ts surface). */
-function makeEngine(ready = true): CoopMePumpEngine & { applied: number[]; ready: boolean } {
-  const e = {
-    applied: [] as number[],
-    ready,
-    isReady() {
-      return e.ready;
-    },
-    applyButton(button: number) {
-      e.applied.push(button);
-    },
-  };
-  return e;
-}
-
-const fastTick = () => new Promise<void>(resolve => setTimeout(resolve, 0));
 
 /** A one-mon boss party the host "generated" for the ME battle. */
 const BOSS_PARTY: CoopSerializedEnemy[] = [
@@ -77,135 +62,77 @@ const BOSS_PARTY: CoopSerializedEnemy[] = [
 ];
 
 describe("co-op authoritative ME battle handoff (#633)", () => {
-  it("REPRO: the watcher's button stream dries up at the encounter -> battle boundary (the old hang)", async () => {
-    // Guest owns the ME (the failing case). The watcher (host) replays the owner's buttons.
+  it("REPRO: with NO handoff sentinel the peer's terminal await starves at the ME -> battle boundary", async () => {
+    // Guest owns the ME (the failing case). The peer (host) awaits the terminal on the 9M seq,
+    // exactly as CoopReplayMePhase.awaitHostTerminal does.
     const { host, guest } = createLoopbackPair();
-    const ownerPump = new CoopMePump(new CoopInteractionRelay(guest), { tick: fastTick });
-    const watcherPump = new CoopMePump(new CoopInteractionRelay(host), { tick: fastTick });
-    const watcherEng = makeEngine();
-    watcherPump.attach(watcherEng);
+    const ownerPump = new CoopMePump(new CoopInteractionRelay(guest));
+    const peerRelay = new CoopInteractionRelay(host);
 
-    const SEQ = 8_000_001;
-    let left = false;
-    let handedOff = false;
-    ownerPump.beginOwner(SEQ);
-    watcherPump.beginWatcher(SEQ, {
-      onLeave: () => {
-        left = true;
-      },
-      onBattleHandoff: () => {
-        handedOff = true;
-      },
-    });
+    const SEQ_ME = 8_000_001;
+    const SEQ_TERM = 9_000_001;
+    ownerPump.beginOwner(SEQ_ME, SEQ_TERM);
 
-    // The owner presses the option-commit, which the watcher replays.
-    ownerPump.relayOwnerButton(0); // cursor stays on option 0
-    ownerPump.relayOwnerButton(99); // ACTION = commit the option
-    await settle();
-    expect(watcherEng.applied).toEqual([0, 99]);
-
-    // Now the owner FORKS into the spawned battle (initBattleWithEnemyConfig) and would park in
-    // CoopReplayTurnPhase - WITHOUT the handoff sentinel it sends NO MORE buttons, so the watcher
-    // is stuck in awaitInteractionChoice: it neither advances to the battle nor degrades = HANG.
-    await settle();
-    expect(left, "old behavior without the sentinel: watcher does not leave...").toBe(false);
-    expect(handedOff, "...and does not hand off...").toBe(false);
-    expect(watcherPump.isSessionActive(), "...it is STILL parked = the deadlock").toBe(true);
-
-    ownerPump.endSession();
-    watcherPump.endSession();
-  });
-
-  it("FIX: the owner relays a BATTLE-HANDOFF sentinel; the watcher ends the pump WITHOUT leaving the encounter", async () => {
-    const { host, guest } = createLoopbackPair();
-    const ownerPump = new CoopMePump(new CoopInteractionRelay(guest), { tick: fastTick });
-    const watcherPump = new CoopMePump(new CoopInteractionRelay(host), { tick: fastTick });
-    const watcherEng = makeEngine();
-    watcherPump.attach(watcherEng);
-
-    const SEQ = 8_000_001;
-    let left = false;
-    let handedOff = false;
-    ownerPump.beginOwner(SEQ);
-    watcherPump.beginWatcher(SEQ, {
-      onLeave: () => {
-        left = true;
-      },
-      onBattleHandoff: () => {
-        handedOff = true;
-      },
-    });
-
+    // The owner commits its option picks (they ride the 8M pick seq)...
     ownerPump.relayOwnerButton(0);
     ownerPump.relayOwnerButton(99);
     await settle();
-    expect(watcherEng.applied).toEqual([0, 99]);
+
+    // ...then FORKS into the spawned battle (initBattleWithEnemyConfig) and parks in
+    // CoopReplayTurnPhase. WITHOUT the handoff sentinel it sends NOTHING on the terminal seq,
+    // so the peer's terminal await starves - it can only ever time out = the old hang.
+    const terminal = await peerRelay.awaitInteractionChoice(SEQ_TERM, 15);
+    expect(terminal, "no sentinel -> the terminal await times out to null (the deadlock)").toBeNull();
+
+    ownerPump.endSession();
+  });
+
+  it("FIX: the owner relays a BATTLE-HANDOFF sentinel; the peer's terminal await resolves WITHOUT a leave", async () => {
+    const { host, guest } = createLoopbackPair();
+    const ownerPump = new CoopMePump(new CoopInteractionRelay(guest));
+    const peerRelay = new CoopInteractionRelay(host);
+
+    const SEQ_ME = 8_000_001;
+    const SEQ_TERM = 9_000_001;
+    ownerPump.beginOwner(SEQ_ME, SEQ_TERM);
+    ownerPump.relayOwnerButton(0);
+    ownerPump.relayOwnerButton(99);
+    await settle();
 
     // The owner spawns the battle: it relays the BATTLE-HANDOFF sentinel instead of pressing on.
     ownerPump.relayMeBattleHandoff();
     await settle();
 
-    expect(handedOff, "watcher ran the battle-handoff callback").toBe(true);
-    expect(left, "watcher did NOT leaveEncounterWithoutBattle (the battle must run)").toBe(false);
-    expect(watcherPump.isSessionActive(), "the pump ended cleanly at the handoff (no hang)").toBe(false);
-    expect(ownerPump.isSessionActive(), "the owner's pump also ended at the handoff").toBe(false);
+    const terminal = await peerRelay.awaitInteractionChoice(SEQ_TERM, 15);
+    expect(terminal?.choice, "the peer's terminal await resolved with the HANDOFF sentinel").toBe(
+      COOP_ME_BATTLE_HANDOFF,
+    );
+    expect(terminal?.choice, "the sentinel is NOT the LEAVE (the battle must run, no encounter skip)").not.toBe(
+      COOP_INTERACTION_LEAVE,
+    );
+    expect(ownerPump.isSessionActive(), "the owner's pump ended at the handoff").toBe(false);
 
     ownerPump.endSession();
-    watcherPump.endSession();
   });
 
-  it("FIX: the LEAVE sentinel still skips a NON-battle ME (no handoff) - lockstep behavior preserved", async () => {
+  it("FIX: the LEAVE sentinel still ends a NON-battle ME (distinct terminal, no handoff)", async () => {
     const { host, guest } = createLoopbackPair();
-    const ownerPump = new CoopMePump(new CoopInteractionRelay(guest), { tick: fastTick });
-    const watcherPump = new CoopMePump(new CoopInteractionRelay(host), { tick: fastTick });
-    watcherPump.attach(makeEngine());
+    const ownerPump = new CoopMePump(new CoopInteractionRelay(guest));
+    const peerRelay = new CoopInteractionRelay(host);
 
-    const SEQ = 8_000_003;
-    let left = false;
-    let handedOff = false;
-    ownerPump.beginOwner(SEQ);
-    watcherPump.beginWatcher(SEQ, {
-      onLeave: () => {
-        left = true;
-      },
-      onBattleHandoff: () => {
-        handedOff = true;
-      },
-    });
-
+    const SEQ_ME = 8_000_003;
+    const SEQ_TERM = 9_000_003;
+    ownerPump.beginOwner(SEQ_ME, SEQ_TERM);
     ownerPump.relayOwnerButton(5);
     await settle();
     // A pure-dialogue ME ends with the normal LEAVE sentinel (no battle).
     ownerPump.endOwner();
     await settle();
 
-    expect(left, "LEAVE still fast-forwards a non-battle ME").toBe(true);
-    expect(handedOff, "no battle handoff for a non-battle ME").toBe(false);
-    expect(watcherPump.isSessionActive()).toBe(false);
-
-    watcherPump.endSession();
-  });
-
-  it("FIX: a bare-function watcher callback is still accepted as legacy onLeave (backward compat)", async () => {
-    const { host, guest } = createLoopbackPair();
-    const ownerPump = new CoopMePump(new CoopInteractionRelay(guest), { tick: fastTick });
-    const watcherPump = new CoopMePump(new CoopInteractionRelay(host), { tick: fastTick });
-    watcherPump.attach(makeEngine());
-
-    const SEQ = 8_000_004;
-    let left = false;
-    ownerPump.beginOwner(SEQ);
-    // Legacy callers (and the existing unit tests) pass a bare function = onLeave only.
-    watcherPump.beginWatcher(SEQ, () => {
-      left = true;
-    });
-    ownerPump.relayOwnerButton(7);
-    await settle();
-    ownerPump.endOwner();
-    await settle();
-    expect(left, "the bare function still fires on LEAVE").toBe(true);
-
-    watcherPump.endSession();
+    const terminal = await peerRelay.awaitInteractionChoice(SEQ_TERM, 15);
+    expect(terminal?.choice, "LEAVE still ends a non-battle ME on the terminal channel").toBe(COOP_INTERACTION_LEAVE);
+    expect(terminal?.choice, "and it is NOT the battle handoff").not.toBe(COOP_ME_BATTLE_HANDOFF);
+    expect(ownerPump.isSessionActive()).toBe(false);
   });
 
   // ===========================================================================

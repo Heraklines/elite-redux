@@ -2252,10 +2252,17 @@ export class CounterRedirectAttr extends MoveAttr {
   override apply(user: Pokemon, _target: Pokemon | null, _move: Move, args: [NumberHolder, ...any[]]): boolean {
     const desiredTarget = getCounterAttackTarget(user, this.moveFilter);
     if (desiredTarget !== null && desiredTarget !== BattlerIndex.ATTACKER) {
-      // check if the target is still alive
-      if (globalScene.currentBattle.double && !globalScene.getField()[desiredTarget]?.isActive(true)) {
+      // check if the target is still alive (any multi-mon format, not just doubles)
+      if (globalScene.currentBattle.getBattlerCount() > 1 && !globalScene.getField()[desiredTarget]?.isActive(true)) {
+        // Side resolution via the arrangement, NOT `>= BattlerIndex.ENEMY`: a TRIPLE's
+        // enemies start at flat index 3, so index 2 is the player's OWN third mon and
+        // the constant-2 boundary picked the wrong side's field.
+        const arrangement = globalScene.currentBattle.arrangement;
+        const onEnemySide = arrangement
+          ? arrangement.ownerOf(desiredTarget) !== arrangement.ownerOf(user.getBattlerIndex())
+          : desiredTarget >= BattlerIndex.ENEMY;
         const targetField =
-          desiredTarget >= BattlerIndex.ENEMY ? globalScene.getEnemyField() : globalScene.getPlayerField();
+          onEnemySide === user.isPlayer() ? globalScene.getEnemyField() : globalScene.getPlayerField();
         args[0].value = targetField.find(p => p.hp > 0)?.getBattlerIndex() ?? BattlerIndex.ATTACKER;
       } else {
         args[0].value = desiredTarget;
@@ -5897,7 +5904,10 @@ export class StatusCategoryOnAllyAttr extends VariableMoveCategoryAttr {
   apply(user: Pokemon, target: Pokemon, _move: Move, args: any[]): boolean {
     const category = args[0] as NumberHolder;
 
-    if (user.getAlly() === target) {
+    // getAllies().includes, not getAlly() ===: a triple has TWO allies - the identity
+    // check only matched the first, so targeting the second ally DAMAGED it instead
+    // of switching to the status (heal) branch.
+    if (user.getAllies().includes(target)) {
       category.value = MoveCategory.STATUS;
       return true;
     }

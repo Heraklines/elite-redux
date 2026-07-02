@@ -4,7 +4,11 @@ import { pokemonEvolutions } from "#balance/pokemon-evolutions";
 import { allMoves } from "#data/data-lists";
 import { coopLog } from "#data/elite-redux/coop/coop-debug";
 import { coopGiveMonToPartner } from "#data/elite-redux/coop/coop-party-ops";
-import { coopGiveToPartner, coopSwitchBlocksMon } from "#data/elite-redux/coop/coop-session";
+import {
+  coopGiveToPartner,
+  coopOwnerOfFieldSlot,
+  coopSwitchBlocksMonForOwner,
+} from "#data/elite-redux/coop/coop-session";
 import {
   COOP_CHECK_OP_FORM_ITEM,
   COOP_CHECK_OP_GIVE,
@@ -933,7 +937,13 @@ export class PartyUiHandler extends MessageUiHandler {
     if (!globalScene.gameMode.isCoop || this.fieldIndex < 0) {
       return null;
     }
-    if (!coopSwitchBlocksMon(this.fieldIndex, pokemon.coopOwner)) {
+    // M5 (#633): the slot's owner is resolved from the mon actually IN the slot (N-ready tag-based
+    // resolver), not the fixed 2-player slot map - correct even after a slot reorder. Uses the PURE
+    // coop-session resolver directly (NOT the coop-runtime adapter): importing coop-runtime here
+    // closes a module-init cycle (ui -> runtime -> battle-engine -> pokemon -> abilities -> ui)
+    // that leaves AbAttr undefined at class-extends time.
+    const slotOwner = coopOwnerOfFieldSlot(globalScene.getPlayerField(), this.fieldIndex);
+    if (!coopSwitchBlocksMonForOwner(slotOwner, pokemon.coopOwner)) {
       return null;
     }
     return i18next.t("partyUiHandler:coopPartnerMon", {

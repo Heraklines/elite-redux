@@ -91,6 +91,7 @@ export class CoopReplayTurnPhase extends Phase {
             res.checkpoint,
             res.checksum,
             res.preimage,
+            res.fullField,
           );
           this.end();
           return;

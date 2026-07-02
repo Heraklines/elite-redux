@@ -28,6 +28,7 @@ import { Phase } from "#app/phase";
 import { getCoopController } from "#data/elite-redux/coop/coop-runtime";
 import { erHasNotoriety } from "#data/elite-redux/er-biome-notoriety";
 import { erMarkBiomeStay, setErLeaveBiomeNow } from "#data/elite-redux/er-biome-structure";
+import { recordSinglePlayerInteraction } from "#data/elite-redux/replay-single-recording";
 import { UiMode } from "#enums/ui-mode";
 import type { OptionSelectItem } from "#ui/abstract-option-select-ui-handler";
 import { getBiomeName } from "#utils/common";
@@ -89,6 +90,9 @@ export class ErCrossroadsPhase extends Phase {
       return;
     }
     this.resolving = true;
+    // #record-replay (single-player): capture the crossroads Stay(0)/Leave(1) choice. No-op unless
+    // recording / in co-op (co-op auto-resolves this deterministically, so it never records here).
+    recordSinglePlayerInteraction("crossroads", moveOn ? 1 : 0);
     globalScene.ui.setMode(UiMode.MESSAGE);
 
     if (moveOn) {

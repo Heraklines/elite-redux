@@ -938,6 +938,49 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
   },
   // ===========================================================================
+  // Multi-format — a TRIPLE collapsing to a narrower next wave recalls ALL leads
+  // ===========================================================================
+  {
+    label: "(note) Triple -> narrower next wave recalls the 2nd + 3rd leads",
+    description:
+      "Multi-format cleanup - verify in a TRIPLES-ONLY RUN, not this forced scenario (the 'triple'\n"
+      + "override forces EVERY wave to a triple, so it can't show the transition itself; this just\n"
+      + "drops you into a triple to inspect the layout). Reported: after a TRIPLE trainer battle,\n"
+      + "when the NEXT wave is a narrower format (a single/double edge - finale, endless boss, or a\n"
+      + "mystery-encounter battle), the player's 2nd and 3rd back sprites AND their HP bars stayed on\n"
+      + "screen, overlapping the next intro ('the UI doesn't change, doesn't move away'). Cause: the\n"
+      + "between-wave recall counted `1 + double` (= 1 for a triple, which carries double=false), so\n"
+      + "only the LEFT lead was recalled. Now every lead the previous wave had on the field is\n"
+      + "recalled, and any leftover on-field slot the new (narrower) format can't hold is returned at\n"
+      + "the new wave's start.\n"
+      + "DO: in a TRIPLES-ONLY run, WIN a TRIPLE trainer battle, then reach a SINGLE-format wave (a\n"
+      + "boss / finale / mystery-encounter battle) immediately after.\n"
+      + "EXPECT: the next battle shows ONLY the leads the new format holds (one back sprite + one HP\n"
+      + "bar for a single) - no leftover 2nd/3rd player sprites or bars overlapping the intro.\n"
+      + "(Unit-tested in test/tools/repro-triple-battle-bugs.test.ts '#2 player' cases; the render is\n"
+      + "test/tools/render-ui-page.test.ts 'battle-field-triples-postwin'.)",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_WAVE_OVERRIDE: 1,
+        STARTING_LEVEL_OVERRIDE: 60,
+        BATTLE_STYLE_OVERRIDE: "triple",
+        ENEMY_LEVEL_OVERRIDE: 20,
+      });
+      return [
+        makeStarter(SpeciesId.SNORLAX, {
+          moveset: [MoveId.BODY_SLAM, MoveId.EARTHQUAKE, MoveId.CRUNCH, MoveId.REST],
+        }),
+        makeStarter(SpeciesId.PIKACHU, {
+          moveset: [MoveId.THUNDERBOLT, MoveId.QUICK_ATTACK, MoveId.SURF, MoveId.IRON_TAIL],
+        }),
+        makeStarter(SpeciesId.GARCHOMP, {
+          moveset: [MoveId.EARTHQUAKE, MoveId.DRAGON_CLAW, MoveId.STONE_EDGE, MoveId.SWORDS_DANCE],
+        }),
+      ];
+    },
+  },
+  // ===========================================================================
   // Combat — Cotton Down lowers FOES' Speed only, not the ally (double battle)
   // ===========================================================================
   {

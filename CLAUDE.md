@@ -80,7 +80,7 @@ the game's own `console.*` output is captured to stdout. ~30-50s cold (one-time 
 init) then ~1-2s per scenario - batch scenarios in one run to amortize.
 
 ```
-node scripts/run-scenario.mjs <ERS1-code | @spec.json | demo> [--turns N] [--move MOVE]
+node scripts/run-scenario.mjs <ERS1-code | @spec.json | demo> [--turns N] [--move MOVE] [--waves N] [--no-miss] [--no-crit] [--real-rng]
 ```
 
 - `demo` runs a built-in smoke battle. An `ERS1.` share code (from the in-game
@@ -90,17 +90,64 @@ node scripts/run-scenario.mjs <ERS1-code | @spec.json | demo> [--turns N] [--mov
   (`species:"GRENINJA"`, `ability:"HIGH_TIDE"`, `moves:["SURF"]`, `weather:"RAIN"`).
   Force an arbitrary ability/innate (incl. ER ids) per mon with `ability` /
   `passiveAbility` (player lead + enemy); give the enemy items with `heldItems:
-  [{name:"LEFTOVERS"}]`. Script the player's turns with `script:[{move,target,
-  move2,target2}]` (target is a BattlerIndex: 2/3 = enemies). Self-verify with an
-  `expect` block: `playerAbility`/`enemyAbility`, `player/enemyStatus`,
-  `player/enemyHp` ({min,max,equals}), `player/enemyStage` ({stat,value}),
-  `player/enemyFainted`, `weather`, `terrain`, `maxHits`, `outcome`, and
+  [{name:"LEFTOVERS"}]` (for `kind:"party"` custom enemies, `status`/`bossSegments`/
+  `heldItems` are applied PER MON by party slot; `ability`/`passiveAbility` stay
+  side-wide from `party[0]` - an Overrides limit).
+- **Scripting the player's turns** with `script:[{...}]`, one entry per turn, per-slot
+  suffixes `2`/`3` for doubles/triples (target is a BattlerIndex: 2/3 = enemies).
+  Every in-battle interaction is scriptable per slot: `move`/`target` (+ `tera:true`
+  to terastallize), `switch:<partyIndex>` (voluntary switch via the real Command
+  path), `ball:"<POKEBALL name>"` (capture attempt), `run:true` (flee attempt), and
+  ENEMY forcing `enemyMove`/`enemyTarget` (+`enemyMove2/3`) so "the foe used X into Y"
+  situations reproduce exactly. Scripted moves that are IN the mon's real moveset go
+  through non-destructive `select` (PP depletes, moveset intact - Encore/Choice/PP-out
+  interplay is faithful); a move NOT in the moveset falls back to the old
+  moveset-replacing `use` (flagged in the turn log). A player faint with a living
+  bench auto-sends the first legal bench mon (or the next scripted `switch`) - no
+  more 20s timeout hang.
+- **Multi-wave runs:** `run.waves: N` (CLI `--waves N`) keeps playing past victory:
+  the reward shop is driven headlessly (`rewards: ["<modifierTypes key>"|"FIRST"|"SKIP"]`,
+  one per wave; party-target rewards drive the party UI too), level-up move-learn
+  prompts default to decline (script `learnMove:{slot}` to accept), evolutions run.
+  `items.shop` staging works headlessly now. This unlocks the shop-cancel /
+  Rarer-Candy / evolution / switch-timing bug classes.
+- Self-verify with an `expect` block: `playerAbility`/`enemyAbility`,
+  `player/enemyStatus`, `player/enemyHp` ({min,max,equals}), `player/enemyStage`
+  ({stat,value}), `player/enemyFainted`, per-slot `player2/player3/enemy2/enemy3`
+  variants of Hp/Status/Fainted/Stage, `enemyUsedMoves` (ordered subsequence of the
+  enemy's actual moves), `weather`, `terrain`, `maxHits`, `outcome`, and
   `logIncludes` / `logExcludes` (substring match on the battle message log, the
   catch-all). A failed `expect` exits nonzero with the exact mismatches.
 - More knobs: `run.terrain` (NONE/MISTY/ELECTRIC/GRASSY/PSYCHIC/TOXIC); in
   doubles, `start.player2Stages`/`player2HpPct`/`player2Status` (+ `enemy2*`) set
   the 2nd mon on each side. Flags `--no-miss` (force every move to hit) and
   `--no-crit` (no crits) make damage / stat-stage assertions reproducible.
+- **RNG fidelity:** by default the test framework clamps every battle roll to its
+  MAX (deterministic, but damage is always max and sub-100% procs never fire; the
+  seed does NOT govern battle rolls). `--real-rng` (`ER_RUN_REAL_RNG=1`) restores
+  the real seeded `randBattleSeedInt` for probabilistic proc/variance repros.
+- Trainer/boss intro dialogue is auto-skipped (no more `kind:"trainer"` hangs), and
+  a phase-advance timeout now names the STUCK phase + active UI mode.
+- **FULL-RUN AUTOPILOT (entire game via CLI, no browser):** `--to-end` plays wave 1 →
+  victory / game-over; every between-wave menu is driven: biome shop (`biomeShops:
+  "SKIP" | [{buys}]`), biome pick (`biomePicks: ["VOLCANO",...]`, default first node),
+  crossroads (`crossroads: [optionIdx]`), mystery encounters (`run.
+  allowMysteryEncounters`, `forceMysteryEncounters: [{wave,type}]`, `meOptions`),
+  catch policy (`onCatchFull: "keep"|"release"|{replaceSlot}` + `items.pokeballs`),
+  eggs (`eggs: "skip"|"hatch"`), between-wave party management (`betweenWaves`), and
+  scripted rewards. `--policy @file.json` merges any of these over the spec;
+  `--json-out` writes the machine-readable result (per-wave summaries + timings);
+  `--quiet` for speed. **Future-proofing:** any UNKNOWN interactive menu fails
+  loudly by name, or `--auto-first` presses through deterministically logging
+  `[auto-first] <mode>` - new content can never silently hang a run. A wave that
+  can't be won prints a STUCK diagnostic block (enemy party/field/reserves + the
+  autopilot's next action) - read it before suspecting the harness. A mid-turn run
+  END (wipe → GameOver → Title, or the final-boss credits) is classified as
+  `player-wiped`/`victory`, never a stall. Measured: ~1-1.3s/wave after a one-time
+  ~30-50s boot (a 94-wave run plays in ~2 min).
+- The runner's capability self-check suite (21 cases incl. a 25-wave
+  biome+shop+ME+catch+egg integration run) lives in the same file - run it after
+  touching the runner: `ER_SCENARIO=1 npx vitest run test/tools/run-scenario.test.ts`.
 - Output: a `=== TURN n ===` block per turn with a `STATE {…}` snapshot (each
   side's hp / status / stat stages / ability + weather), interleaved game logs,
   and a final `RESULT {…}`. A thrown error or phase-advance timeout (soft-lock /
@@ -199,7 +246,11 @@ node scripts/run-ui-scenario.mjs [species,species,...] [--surface S] [--strict]
     shown / optionCount / options[] / title; `errors[]` = threw, show() false, or ZERO options.
     NB: assigns the encounter directly because ER gates ME *spawns* by biome/wave (the override
     won't force an ER ME onto an arbitrary wave); ONE GameManager is reused across MEs because
-    the prompt-handler interval is a per-test static.
+    the prompt-handler interval is a per-test static. **`ER_UI_ME=all` sweeps EVERY registered
+    ER MysteryEncounterType** (read live from `allMysteryEncounters` - nothing hardcoded) and
+    asserts per ME: no throw, shown, optionCount>0, printing a verdict table. Baseline: 59/59
+    ok (skip-list with reasons in-code: ER_THE_BARGAIN is phase-driven, LLM_DIRECTED is
+    synthetic). Run it after adding/changing any ER ME.
 - Files: `test/tools/run-ui-scenario.test.ts` + `scripts/run-ui-scenario.mjs`. Sets
   `ER_SCENARIO=1` for you. Add a surface by adding a `snap*` + an `it.skipIf(SURFACE
   !== "…")` block (drive the handler, snapshot its computed state + resolved keys).
@@ -274,13 +325,36 @@ tolerance since that sprite is non-deterministic here). On an INTENDED visual ch
 with `ER_UPDATE_BASELINE=1` and commit the updated baseline PNGs. A failing diff writes
 `dev-logs/ui-pages/<page>-diff.png` (red = changed pixels).
 
-Out: `dev-logs/ui-pages/<page>[-missing].png` (gitignored). All six wired pages
-(`PAGE_RECIPES`) render faithfully: `bargain`, `biome-shop`, `mystery-encounter`, `pokedex`,
-`egg-hatch` (real `EggSummaryUiHandler` - hatch-info card + IV hexagon + candy/egg-moves +
-the icon grid), and `starter-select` (real `show([cb])` - the species grid, filter bar,
-per-species detail panel with ER ability/passives/nature, party slots). Remaining green
-`__MISSING` boxes are genuinely-absent ER-custom icon keys (e.g. `er_icon__*` redux forms),
-not harness defects.
+Out: `dev-logs/ui-pages/<page>[-missing].png` (gitignored). ~35 wired pages (see
+`RECIPES`) render faithfully, incl. `bargain`, `biome-shop`, `mystery-encounter`, `pokedex`,
+`egg-hatch`, `starter-select` (+roster/shiny-lab/coop/nav), `summary`, `party`,
+`achievements`, community-challenges (6), `profile`, `ghost-trainer-editor`, `er-map`,
+`er-map-picker`, `stormglass-picker`, the ability capsules, `tm-case-party`,
+`modifier-select` (the post-battle reward shop), `egg-gacha`, `egg-list`, `save-slot`,
+`game-stats`, `run-history`, `challenge-select`, `menu`, `learn-move-batch`, `colosseum`,
+`er-quiz`, and the BATTLE screens below. Remaining green `__MISSING` boxes are
+genuinely-absent ER-custom icon keys (e.g. `er_icon__*` redux forms), not harness defects.
+
+**BATTLEFIELD RENDERING (`field: true`)**: a recipe flag that draws the full battle FIELD
+beneath the page - arena bg + platforms (biome-derived), every on-field pokemon sprite
+(real `getBattleSpriteKey`/atlas resolution: forms/shinies/ER customs), trainer sprites,
+fresh `PlayerBattleInfo`/`EnemyBattleInfo` HP/EXP bars with real double/triple slot
+stacking, and the bottom message bar. Pair with `captureActive` + a `prepare` that drives
+a battle to the state you want. Visibility mirrors the LIVE scene graph (a lingering
+trainer sprite or a fainted-but-still-shown mon reproduces); positions are the canonical
+layout constants + the real slot-offset code (live x/y is untrustworthy headlessly - the
+framework tween mock fires onComplete without applying values). Reference recipes:
+`battle-command` (full single-battle screen), `battle-field-doubles`, `fight-menu`,
+`ball-menu`, `target-select`. Core: `renderBattlefield` in `render-harness.ts`.
+
+**Diagnostics**: every page run prints `[suspect]` lines for VISIBLE sprites drawing wrong
+pixels - texture `__MISSING` (a key requested through an unwrapped path) or a whole-sheet
+`__BASE` render of a multi-frame atlas (a failed `setFrame`). `ER_RENDER_DUMP=1` dumps
+every textured node with its world position to hunt one down. The two-pass injector
+handles BOTH TexturePacker JSON shapes (array + hash) with trim data, prioritizes
+`images/ui` in the basename index (so e.g. dexnav's `cursor.png` can't shadow the real ui
+cursor), and also records keys from post-creation `setTexture` swaps (e.g. `setMini`'s
+`pbinfo_*_mini`).
 
 How it works (so you can extend it):
 - Boots a normal headless `GameManager` for full DATA + every registered handler, then
@@ -337,16 +411,19 @@ hit-tests; very deep cross-handler chains may need extra `gs.ui` methods stubbed
   no-op, so the GOLDEN snapshot is a still, not a film. Partial repro: set `frames: N` on a
   recipe (or `ER_FRAMES=N`) to capture N successive LIVE frames as `<page>-frameNN.png` after
   the page is built + input fired - a flip-book for sprite-anim / rapid-cycle-race bugs
-  (#140/#144). Tween-driven mid-animation states (fades) are still not stepped. 
-- **Multi-screen / phase flow & combat** - combat BEHAVIOR still goes through the **combat
-  scenario runner** + in-game test-suite (standing rules above). But a recipe CAN now render a
-  mid-run screen the phase pipeline reaches: set `captureActive: true` and DRIVE the game in
-  `prepare(game)` (e.g. `await game.classicMode.startBattle(...)`); the harness records the
-  last `ui.setMode(mode, args)` and renders that handler (see the `battle-command` demo).
-  Caveat: the battle FIELD (sprites, HP bars) is scene-level, not a UiHandler, so only the
-  active handler's own container renders - the menu/panel chrome, not the battlefield.
+  (#140/#144). Tween-driven mid-animation states (fades) are still not stepped, and
+  tween-FINAL positions never apply headlessly (the framework tween mock only fires
+  onComplete) - positional-drift bugs are invisible; the field renderer uses canonical
+  layout constants instead. TITLE / EVOLUTION_SCENE / EGG_HATCH_SCENE are animation-tier
+  (a static render is blank/meaningless).
+- **Combat BEHAVIOR** still goes through the **combat scenario runner** + in-game test-suite
+  (standing rules above). But the mid-battle SCREEN renders fully now: `captureActive: true`
+  + `field: true` gives the battlefield + active handler (see the battle recipes above) -
+  the old "menu chrome only" limitation is CLOSED.
 - **WebGL-exact pixels** - it rasterizes with 2D `@napi-rs` canvas, not WebGL; shader/pipeline
   output, variant **palette-swap colours**, masks, and glow/particle FX are approximated.
+  Field-render residuals: fusion second-sprite, weather/fog overlays, substitute doll, and
+  the dynamic >2-mon field scale are not drawn.
 - **Browser/prod-only** - service-worker/CDN cache staleness, cross-user/device sprite
   variance (#335), audio/BGM (#403), and real save/cloud round-trips can't reproduce headlessly.
 
@@ -418,25 +495,48 @@ the HARNESS layer (the loopback microtask-flush gotcha #5: send the guest index 
 the host's await resolves under the host scene; decouple the guest outcome/terminal race so it buffer-hits
 under the guest scene) - NOT a production bug.
 
-**Bounded scope - what it does NOT yet do (respect or close these before relying on it BEYOND the
-wave-loop / reward-shop-alternation / move-learn / non-ghost-ME classes):**
-- **Ghost-bearing MEs + ghost WAVES are still NOT safe** - the `er-ghost-teams` cache quartet is
-  reset-per-client (`snapshotGhostState`/`restoreGhostState` are placeholders), NOT save/restored, and the
-  ghost co-op hooks (`coopGhostFetchSuppressed`/`onGhostPoolPublished`) are last-write-wins process-globals.
-  Implement true per-client ghost-cache save/restore + role-gated hook routing before any ghost-ME
-  (colosseum-gauntlet, graves-of-the-fallen) or ghost-wave duo test, or a desync could be a harness
-  artifact. `authoritativeLatched` (coop-runtime.ts) is also a shared process-global - benign while both
-  clients are authoritative.
-- **The guest battle is MIRRORED, not launched** - `mirrorHostBattleToGuest` clones the host's field
-  via a `PokemonData` round-trip instead of the real launch + `adoptCoopHostEnemyParty`, so it skips the
-  seed-pin (that is WHY a benign per-wave checksum mismatch appears + heals via resync). A
-  production-grade run should drive the real launch handshake so the guest adopts the host's
-  seed/runConfig - then a residual mismatch is a REAL bug.
-- **Live per-event streaming is OFF** (the `liveEmitter` is role-gated to a no-op here); only the
-  turn-end BATCH path is exercised. Owner reward picks are limited to NON-party items + leave (a
-  party-target reward opens the owner PARTY UI the autopilot doesn't drive); guest mons skip
-  `Pokemon.init()` (no-op `battleInfo`). `driveGuestRewardWatch` returns silently on a stall (caught
-  indirectly by the counter-lockstep assert, not a loud throw).
+**Bounded scope - closed vs residual (updated 2026-07-02):**
+- **CLOSED - per-client ghost state**: the `er-ghost-teams` cache quartet is now truly
+  save/restored per client in the ClientCtx swap (`snapshotErGhostRunState`/
+  `restoreErGhostRunState`), and the ghost hooks (`coopGhostFetchSuppressed`/
+  `onGhostPoolPublished`) are role-gate-routed per active runtime
+  (`installCoopRuntimeGhostHooks`). Ghost-bearing MEs / ghost waves are duo-testable;
+  see `coop-duo-ghost-sync.test.ts`.
+- **CLOSED - seed-pin launch adoption**: `mirrorHostBattleToGuest` now runs
+  `adoptCoopHostRunConfig` (host seed per #658 + money + ball inventory + player-wide
+  modifiers), so the wave-start checksum matches EXACTLY with zero resyncs
+  (`coop-duo-launch-sync.test.ts`). A wave-start mismatch is now a REAL bug, not a
+  harness artifact. (The full SelectStarter->launch handshake is still not driven -
+  see the rewrite note below.)
+- **CLOSED - live per-event streaming**: `setCoopHarnessLiveEvents(true)` installs the
+  real role-gated live emitter over the loopback; `coop-duo-live-events.test.ts` proves
+  host-emitted mid-turn events reach + apply on the guest.
+- **CLOSED - reward drive**: party-target rewards drive the owner PARTY UI
+  (`driveHostPartyRewardOwner`), and `driveGuestRewardWatch` now THROWS on a true
+  no-progress stall (like `driveGuestReplayTurn`).
+- **KNOWN REAL DESYNC (found by the harness, deliberately NOT papered over): move PP.**
+  The per-turn checkpoint reconciles hp/status/stages/tags/weather/terrain/money but NOT
+  moveset `ppUsed`; the pure-renderer guest never decrements PP, the checksum hashes PP,
+  so every turn a move is used forces a full resync. Repro isolated in
+  `coop-duo-launch-sync.test.ts` (strip `moves` from both checksum states -> byte-equal).
+  Fix path: carry `[moveId, ppUsed]` in the checkpoint like `money` - OR see below.
+- Residual: guest mons skip `Pokemon.init()` (headless `battleInfo` stub - documented in
+  the harness header; irrelevant to the sync layer).
+
+**🔴 CO-OP REWRITE NOTE (the netcode is being collapsed to host-authoritative +
+session-save snapshot + live cue stream).** The harness is layered to survive that
+rewrite - keep the layers separate when extending it:
+- Layer A (netcode-blind, KEEP): the two-engine substrate - dual BattleScene boot, the
+  atomic ClientCtx swap (globalScene/RNG/ghost caches), `LoopbackTransport` pair,
+  per-client logs, stall-throws. Add transport fault-injection (drop/reorder/delay)
+  here to prove cue-loss can't desync.
+- Layer B (thin protocol drivers, REPLACED by the rewrite): mirror/adopt launch,
+  `driveGuestReplayTurn`, reward-alternation drivers. Keep tests calling drivers, not
+  netcode seams, so swapping the driver implementation ports every test.
+- Layer C (invariants, KEEP): convergence assertions. Prefer a normalized
+  `getSessionSaveData()` diff as the comparator - that is the rewrite's own definition
+  of correctness (and it makes the PP desync above impossible by construction, since
+  `ppUsed` is already in the save).
 
 🔴 **globalScene CITIZENSHIP (vitest runs the ER suite with `isolate: false` - module state, incl.
 `globalScene`, is SHARED across files in run order).** Any co-op test that swaps `globalScene` (the
@@ -493,12 +593,25 @@ test in `coop-duo-replay.test.ts` is the proof + the recipe: drive a real run wi
 -> `getReplayTrace()` -> feed it back through `replayCoopTrace` -> assert the same run. Copy that test to
 turn any captured trace into a permanent regression.
 
+**SINGLE-PLAYER record→replay is LIVE (2026-07-02).** Recording begins at the first
+EncounterPhase of a classic solo run too (not just co-op host). Tapped decisions beyond
+commands: reward-shop pick/skip, learn-move — incl. ER's batch level-up panel
+(`learn-move-batch-phase.ts`, the REAL solo path; the per-move LearnMovePhase tap alone
+never fired), crossroads pick, biome pick, catch decisions. Player bug reports carry the
+trace (`er-bug-report.ts` serializes it after the `DEVLOG_REPLAY_TRACE_MARKER` line).
+- **Loader**: `replaySingleTrace` in `test/tools/replay-single.test.ts` — rebuilds the run
+  from the header (seed + roster) and re-drives every event through the real input paths;
+  divergences fail loudly by event index. Closed-loop proof in the same file (record a real
+  7-wave run crossing a crossroads → replay 1:1).
+- **CLI**: `node scripts/replay-run.mjs <trace.json | bug-report.log>` — extracts the trace
+  from a tester's log capture and re-drives the exact run headlessly ("REPLAYED 1:1" or the
+  precise divergence).
+
 **Bounds (respect or close before relying beyond them):** only the last 6 waves are kept (a bug older
-than that is off the ring buffer - widen `REPLAY_RECORDER_WAVE_WINDOW` if needed). Recording is co-op +
-host only right now (single-player taps exist but are not begun). The loader inherits the duo harness's
-bounded scope above (ghost-bearing MEs / ghost waves not yet safe; the guest battle is mirrored not
-launched). The trace captures commands + interactions + seed + roster - NOT mid-run RNG reseeds or
-external save/cloud state, so a bug that depends on those is not fully reproduced by replay alone.
+than that is off the ring buffer - widen `REPLAY_RECORDER_WAVE_WINDOW` if needed). The co-op loader
+inherits the duo harness's bounded scope above. The trace captures commands + interactions + seed +
+roster - NOT mid-run RNG reseeds or external save/cloud state, so a bug that depends on those is not
+fully reproduced by replay alone.
 
 ## The in-game dev test suite
 
@@ -680,8 +793,27 @@ Cloudflare Pages production alias, not a git branch we maintain).
 - You are free to push + staging-deploy after making changes.
 
 ## Build / checks
-- `npx tsc --noEmit` baseline is **267 errors** (pre-existing). A correct change
-  keeps it at 267 — more = you introduced an error.
+- `npx tsc --noEmit` baseline is **277 errors** (pre-existing; re-measured 2026-07-02 -
+  the old "267" note was stale). A correct change keeps it at 277 — more = you
+  introduced an error.
+- ⚠️ Do NOT run bare `pnpm biome` for a scoped change: `--changed` diffs against `main`
+  (thousands of commits behind) and reformats ~700 files repo-wide. Use
+  `npx biome check --write <your files>`.
+- Known red (pre-existing, fails on clean HEAD): the `summary gift-cycle (R) ... (#349)`
+  case in `test/tools/render-ui-page.test.ts` - the gift ability id no longer advances
+  on R. Possible real regression of the #349 fix; triage separately.
+- Two REAL bugs found + FIXED by the full-run harness (2026-07-02, each still owes its
+  in-game dev scenario + dedicated vitest per the standing rule):
+  1. `game-data.ts addStarterCandy` handed the candy bar the raw speciesId while only
+     the evolution-line ROOT bucket is guaranteed (SNORLAX candy lives under MUNCHLAX)
+     -> `candyCount` of undefined TypeError on wave-won achievement grants (live
+     black-screen class). Fixed: pass `getRootStarterSpeciesId(baseId)`.
+  2. Variant-DOUBLE trainer rolled into a SINGLE battle: party gen assigns alternating
+     `trainerSlot`s, and FaintPhase + `getPartyMemberMatchupScores`/`getNextSummonIndex`
+     slot-gated by the trainer VARIANT, so slot-2 reserves could never be summoned ->
+     the fainted lead sat on an empty field, battle unwinnable (the "enemies aren't
+     even there" tester class). Fixed: slot-gate only when the BATTLE is a double
+     (faint-phase.ts, trainer.ts x2).
 - CI gates on **biome** + **vitest** (not tsc). Pre-commit runs biome:staged +
   ls-lint.
 - Tests: `npx vitest run <path>`. ER tests live in `test/tests/elite-redux/`.

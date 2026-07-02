@@ -8635,11 +8635,17 @@ export class EnemyPokemon extends Pokemon {
               /**
                * The "target score" of a move is given by the move's user benefit score + the move's target benefit score.
                * If the target is an ally, the target benefit score is multiplied by -1.
+               * Side membership via the arrangement, NOT `mt < BattlerIndex.ENEMY`: a TRIPLE's
+               * enemies start at flat index 3, so the constant-2 boundary made the AI score the
+               * player's THIRD mon as its own ally (avoiding damage onto it, favoring buffs).
                */
+              const arrangement = globalScene.currentBattle.arrangement;
+              const targetIsAllied = arrangement
+                ? arrangement.areAllies(mt, this.getBattlerIndex())
+                : mt < BattlerIndex.ENEMY === this.isPlayer();
               let targetScore =
                 move.getUserBenefitScore(this, target, move)
-                + move.getTargetBenefitScore(this, target, move)
-                  * (mt < BattlerIndex.ENEMY === this.isPlayer() ? 1 : -1);
+                + move.getTargetBenefitScore(this, target, move) * (targetIsAllied ? 1 : -1);
               if (Number.isNaN(targetScore)) {
                 console.error(`Move ${move.name} returned score of NaN`);
                 targetScore = 0;

@@ -7,6 +7,7 @@ import {
   captureCoopCheckpoint,
   captureCoopChecksum,
   captureCoopChecksumState,
+  captureCoopFieldSnapshot,
 } from "#data/elite-redux/coop/coop-battle-engine";
 import { getCoopBattleStreamer, getCoopController, getCoopNetcodeMode } from "#data/elite-redux/coop/coop-runtime";
 import { endCoopRecording } from "#data/elite-redux/coop/coop-turn-recorder";
@@ -227,7 +228,12 @@ export class TurnEndPhase extends FieldPhase {
         // guest deep-diffs it against its own on a mismatch to pinpoint the divergent field.
         // Small payload on the already-gated authoritative path, so always include it.
         const preimage = canonicalize(captureCoopChecksumState());
-        streamer.emitTurn(recording.turn, recording.events, checkpoint, captureCoopChecksum(), preimage);
+        // Complete on-field per-mon snapshot (#633 M2): heals the on-field state the numeric checkpoint
+        // omits (moveset+PP / tera / boss / held items / ability / form) IN-LINE on the guest this turn,
+        // instead of only via a checksum-mismatch resync round-trip. `?? undefined` keeps the wire field
+        // ABSENT (never explicit null) when the capture returned nothing (empty field / read failure).
+        const fullField = captureCoopFieldSnapshot() ?? undefined;
+        streamer.emitTurn(recording.turn, recording.events, checkpoint, captureCoopChecksum(), preimage, fullField);
       }
     } catch {
       /* a stream/capture failure must never break the host's turn */

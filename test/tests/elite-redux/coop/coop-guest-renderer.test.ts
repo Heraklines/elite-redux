@@ -159,20 +159,26 @@ describe.skipIf(!RUN)("co-op GUEST = pure renderer - real engine (#633, TRACK-2 
     }
   };
 
-  it("the guest's EnemyCommandPhase rolls NO AI (no getNextMove / RNG), writes an inert command", async () => {
+  it("the guest's EnemyCommandPhase is DENIED to an inert phase (M1 default-deny) - no enemy AI", async () => {
     await startCoopGuest();
     globalScene.currentBattle.turnCommands = {};
     const getNextMoveSpy = vi.spyOn(EnemyPokemon.prototype, "getNextMove");
 
+    // #633 M1 default-deny: the authoritative guest's EnemyCommandPhase is NEUTRALIZED at the phase
+    // factory - create() returns an inert no-op, never the real resolution phase. So the guest builds
+    // no enemy AI, rolls no battle RNG, and writes no command (it renders the host's turn instead).
+    // This SUPERSEDES the old M2/M3 "run EnemyCommandPhase but write a skipped command" muzzle.
     const enemyPhase = game.scene.phaseManager.create("EnemyCommandPhase", 0);
+    expect(enemyPhase.is("EnemyCommandPhase"), "EnemyCommandPhase is denied (inert) on the guest").toBe(false);
     enemyPhase.start();
 
-    // The guest must NOT roll enemy AI (that draws battle RNG -> desync).
+    // The guest must NOT roll enemy AI (that draws battle RNG -> desync)...
     expect(getNextMoveSpy, "guest rolls no enemy AI").not.toHaveBeenCalled();
-    // It wrote an inert, skipped command so the phase queue stays well-formed.
-    const cmd = globalScene.currentBattle.turnCommands[BattlerIndex.ENEMY];
-    expect(cmd?.skip).toBe(true);
-    expect(cmd?.move?.move).toBe(MoveId.NONE);
+    // ...and the inert phase rolls no command at all (nothing to keep well-formed - the turn diverts).
+    expect(
+      globalScene.currentBattle.turnCommands[BattlerIndex.ENEMY],
+      "the denied inert phase rolls no enemy command",
+    ).toBeUndefined();
   });
 
   it("the guest's host-slot CommandPhase auto-resolves to an inert command (no menu, no await)", async () => {
@@ -245,9 +251,13 @@ describe.skipIf(!RUN)("co-op GUEST = pure renderer - real engine (#633, TRACK-2 
     for (const mon of field) {
       expect(mon.hp, "guest field snaps to the host's streamed checkpoint hp").toBe(7);
     }
-    // The finalize phase queued the guest's OWN turn-end phases so the run loops (no hang).
+    // BUG1 (deadlock fix): the authoritative-guest finalize does NOT run the real (damaging) turn-end
+    // phases - those let the guest locally chip a host-surviving mon to a premature faint/victory. It
+    // advances the turn MINIMALLY (incrementTurn), so the drained queue auto-runs the next turn's
+    // replay. The run LOOPS (no hang) via the turn advance, NOT a queued TurnEndPhase.
+    expect(globalScene.currentBattle.turn, "the finalize advances the guest's turn minimally (no hang)").toBe(turn + 1);
     const queuedTurnEnd = pushNewSpy.mock.calls.some(([name]) => name === "TurnEndPhase");
-    expect(queuedTurnEnd, "the finalize phase queues the guest's turn-end (run loops)").toBe(true);
+    expect(queuedTurnEnd, "the guest queues NO damaging TurnEndPhase (BUG1 deadlock fix)").toBe(false);
   });
 
   it("ENEMY-FIELD RECONCILE (#633): a host-KOd enemy the guest still has ALIVE is removed + the checksum converges", async () => {
@@ -559,8 +569,11 @@ describe.skipIf(!RUN)("co-op GUEST = pure renderer - real engine (#633, TRACK-2 
     // The finalize phase queued its turn-end (run loops) AND the VictoryPhase tail (wave advances).
     const victoryPushes = pushNewSpy.mock.calls.filter(([name]) => name === "VictoryPhase");
     expect(victoryPushes.length, "the guest queues the VictoryPhase tail to advance the wave").toBe(1);
+    // #698 softlock fix: on a resolved wave the finalize is TERMINAL - it runs the VictoryPhase tail
+    // (which advances the wave) and queues NO turn-end, so it cannot loop into a phantom next turn the
+    // host already passed. The wave advances via the tail above, not a queued TurnEndPhase.
     const queuedTurnEnd = pushNewSpy.mock.calls.some(([name]) => name === "TurnEndPhase");
-    expect(queuedTurnEnd, "the in-flight turn still ends (no hang)").toBe(true);
+    expect(queuedTurnEnd, "no phantom turn-end on a resolved wave (#698 terminal finalize)").toBe(false);
 
     // IDEMPOTENT: a DUPLICATE waveResolved for the same wave must NOT queue a second VictoryPhase.
     partner.send({ t: "waveResolved", wave: globalScene.currentBattle.waveIndex, outcome: "win" });
@@ -825,11 +838,12 @@ describe.skipIf(!RUN)("co-op GUEST = pure renderer - real engine (#633, TRACK-2 
     expect(pushedBattleEnd, "the guest queues BattleEndPhase for the flee").toBe(true);
     expect(pushedNewBattle, "the guest queues NewBattlePhase to advance past the fled wave").toBe(true);
     expect(pushedVictory, "a flee grants NO VictoryPhase (no exp / rewards)").toBe(false);
-    // The in-flight turn still ended (no hang).
+    // #698 terminal finalize: the flee tail (BattleEnd -> NewBattle) advances the run; the finalize
+    // queues NO turn-end (a phantom next turn the host already passed would deadlock the guest).
     expect(
       pushNewSpy.mock.calls.some(([name]) => name === "TurnEndPhase"),
-      "the turn still ends",
-    ).toBe(true);
+      "no phantom turn-end on a fled wave (#698 terminal finalize)",
+    ).toBe(false);
   });
 
   // (E) GAME-OVER RENDER (#633 GAP 6): the host's run ended; the guest renderer must show the
@@ -1198,9 +1212,10 @@ describe.skipIf(!RUN)("co-op GUEST = pure renderer - real engine (#633, TRACK-2 
     const rebuiltBoss = buildCoopEnemy(bossBlob, hostBoss.level, TrainerSlot.TRAINER);
     expect(rebuiltBoss, "the boss reconstructed (species resolved)").not.toBeNull();
     expect(rebuiltBoss!.isBoss(), "the reconstructed guest enemy is a boss (bars + segment split restored)").toBe(true);
-    expect(rebuiltBoss!.bossSegments, "the reconstructed boss has the host's EXACT segment count (no RNG re-roll)").toBe(
-      4,
-    );
+    expect(
+      rebuiltBoss!.bossSegments,
+      "the reconstructed boss has the host's EXACT segment count (no RNG re-roll)",
+    ).toBe(4);
     expect(rebuiltBoss!.bossSegmentIndex, "the reconstructed boss has the host's decremented index").toBe(1);
 
     // --- RECONSTRUCT a NON-boss (additive path): the rebuilt normal enemy stays a normal mon - the

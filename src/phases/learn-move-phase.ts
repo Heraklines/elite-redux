@@ -13,6 +13,7 @@ import {
 } from "#data/elite-redux/coop/coop-runtime";
 import type { CoopRole } from "#data/elite-redux/coop/coop-transport";
 import { erRecordAchievementLearnMove } from "#data/elite-redux/er-achievement-tracker";
+import { recordSinglePlayerInteraction } from "#data/elite-redux/replay-single-recording";
 import { SpeciesFormChangeMoveLearnedTrigger } from "#data/form-change-triggers";
 import { LearnMoveType } from "#enums/learn-move-type";
 import { MoveId } from "#enums/move-id";
@@ -383,6 +384,9 @@ export class LearnMovePhase extends PlayerPartyMemberPokemonPhase {
         );
         // Co-op (#633): relay the owner's chosen forget-slot so the partner mirrors it.
         this.coopRelayLearnResult(moveIndex);
+        // #record-replay (single-player): capture the learn-move RESULT (the forgotten moveset slot).
+        // No-op unless recording / in co-op (the co-op relay above owns that path).
+        recordSinglePlayerInteraction("learnMove", moveIndex);
         globalScene.ui.setMode(this.messageMode).then(() => this.learnMove(moveIndex, move, pokemon, fullText));
       },
     );
@@ -411,6 +415,9 @@ export class LearnMovePhase extends PlayerPartyMemberPokemonPhase {
         // Co-op (#633): relay "did not learn" (sentinel = the move cap) so the partner
         // mirrors the no-op and both leave the screen together.
         this.coopRelayLearnResult(pokemon.getMaxMoveCount());
+        // #record-replay (single-player): capture the learn-move DECLINE (sentinel = the move cap).
+        // No-op unless recording / in co-op (the co-op relay above owns that path).
+        recordSinglePlayerInteraction("learnMove", pokemon.getMaxMoveCount());
         globalScene.ui
           .showTextPromise(
             i18next.t("battle:learnMoveNotLearned", {

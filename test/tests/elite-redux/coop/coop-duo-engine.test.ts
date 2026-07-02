@@ -35,6 +35,7 @@ import {
   buildRuntime,
   type ClientCtx,
   drainLoopback,
+  emptyGhostSnapshot,
   installDuoLogCapture,
   mirrorHostBattleToGuest,
   withClient,
@@ -164,7 +165,7 @@ describe.skipIf(!RUN)("co-op DUO: two real engines over loopback (#633 feasibili
       scene: hostScene,
       runtime: hostRuntime,
       rndState: Phaser.Math.RND.state(),
-      ghost: { reset: true },
+      ghost: emptyGhostSnapshot(),
     };
 
     // ===== GUEST engine (a 2nd real BattleScene) =====
@@ -174,7 +175,7 @@ describe.skipIf(!RUN)("co-op DUO: two real engines over loopback (#633 feasibili
       scene: guestScene,
       runtime: guestRuntime,
       rndState: Phaser.Math.RND.state(),
-      ghost: { reset: true },
+      ghost: emptyGhostSnapshot(),
     };
     await withClient(guestCtx, () => {
       mirrorHostBattleToGuest(hostScene, guestScene);

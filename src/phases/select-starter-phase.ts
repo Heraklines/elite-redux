@@ -10,8 +10,20 @@ import { PokemonMove } from "#moves/pokemon-move";
 /** Throwaway save slot used by dev test-scenarios so they don't clobber slot 0. */
 const DEV_SCENARIO_SLOT = 4;
 
+/**
+ * The wave a co-op run launches into (#633 M4). A fresh co-op run always starts at wave 1, so the
+ * guest awaits the host's launch snapshot keyed by this wave (the host pushes it from its first
+ * EncounterPhase at `currentBattle.waveIndex === 1`). Mid-run resume is a separate flow (loadSession).
+ */
+const COOP_LAUNCH_WAVE = 1;
+
 import type { CoopRosterEntry } from "#data/elite-redux/coop/coop-roster";
-import { getCoopController, getCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
+import {
+  getCoopBattleStreamer,
+  getCoopController,
+  getCoopNetcodeMode,
+  getCoopRuntime,
+} from "#data/elite-redux/coop/coop-runtime";
 import { coopGuestSessionSlot, coopHostSessionSlot } from "#data/elite-redux/coop/coop-session";
 import type { CoopRole, CoopSerializedStarter } from "#data/elite-redux/coop/coop-transport";
 import { SpeciesFormChangeMoveLearnedTrigger } from "#data/form-change-triggers";
@@ -207,8 +219,17 @@ export class SelectStarterPhase extends Phase {
       // STARTER_SELECT here, the starter-select handler stays active and re-fires its
       // "Begin with these Pokemon?" confirm in a loop (#633 guest launch-loop). Move
       // to MESSAGE first (as the SAVE_SLOT flow ultimately does), THEN launch.
-      console.log("[coop-launch] guest: clearing STARTER_SELECT -> MESSAGE, then initBattle");
-      void globalScene.ui.setMode(UiMode.MESSAGE).then(() => this.initBattle(merged, true, owners));
+      console.log("[coop-launch] guest: clearing STARTER_SELECT -> MESSAGE, then launch");
+      void globalScene.ui.setMode(UiMode.MESSAGE).then(async () => {
+        // #633 M4 push-snapshot launch: the AUTHORITATIVE guest BOOTS from the host's full
+        // session snapshot - it rolls no enemy / arena / party of its own, so it can never
+        // diverge at launch (the whole point of M4). On timeout / parse failure / legacy
+        // lockstep it falls back to building its own launch below, so it can never hang.
+        if (getCoopNetcodeMode() === "authoritative" && (await this.tryCoopGuestSnapshotBoot())) {
+          return;
+        }
+        this.initBattle(merged, true, owners);
+      });
       return;
     }
     // HOST: auto-pick the first EMPTY slot (never overwrite an existing run); fall back
@@ -225,6 +246,37 @@ export class SelectStarterPhase extends Phase {
     globalScene.sessionSlotId = slot;
     console.log(`[coop-launch] host: auto-picked slot ${slot} (no picker), clearing STARTER_SELECT -> MESSAGE`);
     void globalScene.ui.setMode(UiMode.MESSAGE).then(() => this.initBattle(merged, true, owners));
+  }
+
+  /**
+   * Co-op GUEST (#633 M4 push-snapshot launch): boot the battle from the host's AUTHORITATIVE launch
+   * snapshot instead of rolling our own enemy / arena / party. Awaits the host's push event-driven
+   * (NO `requestEnemyParty` poll - the ordered/reliable channel guarantees delivery), applies it via
+   * the production-hardened resume machinery ({@linkcode GameData.applyCoopLaunchSession}), then queues
+   * the LOADED {@linkcode EncounterPhase} (which renders the applied session and GENERATES NOTHING - its
+   * `shouldAdoptCoopEnemyParty` returns false for a loaded phase). Returns false on no-streamer /
+   * timeout / unparseable snapshot so the caller falls back to building its own launch (never hangs).
+   * This is the whole point of M4: the guest computes NOTHING at launch, so it cannot desync.
+   */
+  private async tryCoopGuestSnapshotBoot(): Promise<boolean> {
+    const streamer = getCoopBattleStreamer();
+    if (streamer == null) {
+      return false;
+    }
+    console.log("[coop-launch] guest: awaiting host launch snapshot (push-snapshot boot, no poll)");
+    const json = await streamer.awaitLaunchSnapshot(COOP_LAUNCH_WAVE);
+    if (json == null) {
+      console.warn("[coop-launch] guest: no launch snapshot (timeout), falling back to own launch");
+      return false;
+    }
+    const booted = await globalScene.gameData.applyCoopLaunchSession(json);
+    if (!booted) {
+      return false;
+    }
+    console.log("[coop-launch] guest: booted from host snapshot -> LOADED EncounterPhase (no generation)");
+    globalScene.phaseManager.pushNew("EncounterPhase", true);
+    this.end();
+    return true;
   }
 
   /**

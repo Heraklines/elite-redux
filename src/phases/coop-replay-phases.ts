@@ -36,6 +36,7 @@ import { COOP_CHECKSUM_SENTINEL, canonicalize } from "#data/elite-redux/coop/coo
 import {
   applyCoopCaptureParty,
   applyCoopCheckpoint,
+  applyCoopFieldSnapshot,
   applyCoopFullSnapshot,
   captureCoopChecksum,
   captureCoopChecksumState,
@@ -55,6 +56,7 @@ import type {
   CoopBattleCheckpoint,
   CoopCapturePresentation,
   CoopFullBattleSnapshot,
+  CoopFullMonSnapshot,
 } from "#data/elite-redux/coop/coop-transport";
 import { doPokeballBounceAnim, getPokeballAtlasKey } from "#data/pokeball";
 import { BattleType } from "#enums/battle-type";
@@ -705,6 +707,7 @@ export class CoopFinalizeTurnPhase extends Phase {
     private readonly checkpoint: CoopBattleCheckpoint,
     private readonly checksum: string,
     private readonly preimage?: string,
+    private readonly fullField?: CoopFullMonSnapshot[],
   ) {
     super();
     this.turn = turn;
@@ -718,6 +721,11 @@ export class CoopFinalizeTurnPhase extends Phase {
       // old synchronous path did, only now it runs AFTER the animation phases drained - so a faint that
       // already animated is reconciled as a no-op (the leaveField guards are idempotent on a removed mon).
       applyCoopCheckpoint(this.checkpoint);
+      // Heal the COMPLETE on-field per-mon state the numeric checkpoint OMITS (#633 M2): moveset+PP /
+      // tera / boss / held items / ability / form, applied IN-LINE this turn via the proven applyFullMon
+      // (gated authoritative-guest). Runs AFTER the checkpoint so it is the authoritative final word on the
+      // on-field mons; ABSENT (older host) -> no-op, and the checksum-detect + resync heal still covers it.
+      applyCoopFieldSnapshot(this.fullField, isCoopAuthoritativeGuest());
       this.verifyChecksum(this.checksum, this.preimage);
     } catch {
       // A bad stream payload must never hang the guest's turn.

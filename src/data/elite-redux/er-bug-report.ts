@@ -195,6 +195,13 @@ async function postReport(report: BugReport): Promise<boolean> {
  */
 const DEVLOG_SINK_URL = "https://er-editor-api.heraklines.workers.dev/devlog";
 
+/**
+ * The delimiter that fences the serialized {@linkcode ReplayTrace} JSON in the devlog capture text, so a
+ * headless replay tool (`scripts/replay-run.mjs`) can EXTRACT the trace back out of a plain `.log` and
+ * re-drive the run. Exported so the extractor keys off the exact same marker. (#record-replay)
+ */
+export const DEVLOG_REPLAY_TRACE_MARKER = "----- REPLAY TRACE (JSON) -----";
+
 /** Render the report as the plain-text capture format the /devlog sink stores. */
 function buildDevLogText(report: BugReport): string {
   const s = report.state;
@@ -213,6 +220,11 @@ function buildDevLogText(report: BugReport): string {
     "",
     "----- CONSOLE -----",
     report.logs,
+    "",
+    // #record-replay: embed the deterministic replay trace (one line of JSON, or "(none)") so the .log
+    // capture on the dev-logs branch is self-contained + replayable by scripts/replay-run.mjs.
+    DEVLOG_REPLAY_TRACE_MARKER,
+    report.replayTrace ?? "(none)",
     "",
   ].join("\n");
 }

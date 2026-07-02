@@ -31,7 +31,7 @@ import { CoopBattleStreamer } from "#data/elite-redux/coop/coop-battle-stream";
 import { clearCoopRuntime, maybeBeginReplayRecording, setCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
 import { COOP_GUEST_FIELD_INDEX, COOP_HOST_FIELD_INDEX } from "#data/elite-redux/coop/coop-session";
 import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
-import { getReplayTrace, isReplayRecording } from "#data/elite-redux/replay-recorder";
+import { clearReplayRecording, getReplayTrace, isReplayRecording } from "#data/elite-redux/replay-recorder";
 import {
   isReplayCommandEvent,
   isReplayInteractionEvent,
@@ -264,6 +264,11 @@ describe.skipIf(!RUN)(
       // BEGIN recording on the host - exactly what maybeBeginReplayRecording does at the first co-op
       // EncounterPhase in production (the harness flips to co-op AFTER startBattle, so we call the SAME
       // production function here to begin from wave 1; the EncounterPhase wiring is verified separately).
+      // #record-replay single-player: the classic `startBattle` above ran a solo EncounterPhase, so the
+      // SINGLE-PLAYER enable already began a (solo) recording. That is a TEST artifact of the harness's
+      // classic-launch shortcut (production co-op is co-op at its first EncounterPhase, so the solo enable
+      // never fires there). Clear it so the co-op begin below records a fresh CO-OP trace, not the solo one.
+      clearReplayRecording();
       await withClient(rig.hostCtx, () => {
         maybeBeginReplayRecording();
       });

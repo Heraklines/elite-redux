@@ -4,6 +4,11 @@ import { Phase } from "#app/phase";
 import { getCharVariantFromDialogue } from "#data/dialogue";
 import { captureCoopChecksum, captureCoopMeOutcome } from "#data/elite-redux/coop/coop-battle-engine";
 import { coopLog, coopWarn } from "#data/elite-redux/coop/coop-debug";
+import {
+  coopMeInProgress,
+  coopMeInteractionStartValue,
+  setCoopMeInteractionStart,
+} from "#data/elite-redux/coop/coop-me-pin-state";
 import { COOP_ME_TERM_SEQ_BASE } from "#data/elite-redux/coop/coop-me-pump";
 import {
   getCoopBattleStreamer,
@@ -16,6 +21,7 @@ import {
   setCoopMeBattleInteractionCounter,
 } from "#data/elite-redux/coop/coop-runtime";
 import type { CoopInteractionOutcome } from "#data/elite-redux/coop/coop-transport";
+import { recordSinglePlayerInteraction } from "#data/elite-redux/replay-single-recording";
 import { ArenaTagSide } from "#enums/arena-tag-side";
 import { BattlerTagLapseType } from "#enums/battler-tag-lapse-type";
 import { BattlerTagType } from "#enums/battler-tag-type";
@@ -54,43 +60,14 @@ const COOP_ME_PUMP_SEQ_BASE = 8_000_000;
  *  state resolves on the relayed message; this only fires for a genuinely disconnected partner. */
 const COOP_ME_REPLAY_WAIT_MS = 1_200_000;
 
-/** Co-op (#633): the alternation counter this ME opened on. Both clients advance the
- *  turn LOCALLY + idempotently at the ME terminal (keyed to this value), so the ME's
- *  single advance can never double-count regardless of whether the owner's terminal or
- *  the watcher's fast-forward fires first. -1 = not in an ME. */
-let coopMeInteractionStart = -1;
-
-/** Co-op (#633): whether the CURRENT phase is a mystery-encounter INTERACTIVE phase (NOT the
- *  embedded battle / reward shop). Used to guard the watcher's fast-forward so it never fires
- *  once the encounter has already been left. */
-function coopInMeInteractivePhase(): boolean {
-  const pn = globalScene.phaseManager.getCurrentPhase()?.phaseName;
-  return (
-    pn === "MysteryEncounterPhase"
-    || pn === "MysteryEncounterOptionSelectedPhase"
-    || pn === "MysteryEncounterRewardsPhase"
-    || pn === "PostMysteryEncounterPhase"
-  );
-}
-
-/** Co-op (#633): the interaction counter the in-progress ME opened on, or -1 when not in an
- *  ME. The single STABLE in-ME signal (phase-ordering-independent, unlike
- *  `currentBattle.mysteryEncounter`): the embedded end-of-ME reward shop reads it to suppress
- *  its own alternation advance, so the ME's single advance stays owned by PostMysteryEncounterPhase. */
-export function coopMeInProgress(): boolean {
-  return coopMeInteractionStart >= 0;
-}
-
-/**
- * Co-op authoritative non-battle ME (#633, ADD-2): the interaction counter the in-progress ME
- * pinned on (== `seq - COOP_ME_PUMP_SEQ_BASE`), or -1 when not in an ME. The host's await-and-apply
- * path + the engine sub-prompt relays (encounter-phase-utils) and the host input block (ui.ts) read
- * it to key their seq channels onto the SAME pinned counter the pump opened on, never the live
- * counter (an inbound reconcile broadcast can bump the live counter mid-ME).
- */
-export function coopMeInteractionStartValue(): number {
-  return coopMeInteractionStart;
-}
+// Co-op (#633): the alternation counter this ME opened on. Both clients advance the
+// turn LOCALLY + idempotently at the ME terminal (keyed to this value), so the ME's
+// single advance can never double-count regardless of whether the owner's terminal or
+// the watcher's fast-forward fires first. -1 = not in an ME. The pin STATE lives in the
+// cycle-free leaf module `coop-me-pin-state` (encounter-phase-utils + ui.ts read it there
+// without importing this phase module, which itself imports encounter-phase-utils);
+// re-exported here so existing consumers keep their import path.
+export { coopMeInProgress, coopMeInteractionStartValue };
 
 /**
  * Co-op authoritative GUEST (#633, CHANGE-3): pin the ME interaction counter at the guest's ME
@@ -102,16 +79,16 @@ export function coopMeInteractionStartValue(): number {
  * guest guard), NOT at leaveDefensive (MAJOR-3).
  */
 export function coopSetMePinForGuest(counter: number): void {
-  coopLog("me", "coopSetMePinForGuest", { before: coopMeInteractionStart, after: counter });
-  coopMeInteractionStart = counter;
+  coopLog("me", "coopSetMePinForGuest", { before: coopMeInteractionStartValue(), after: counter });
+  setCoopMeInteractionStart(counter);
   setCoopMeBattleInteractionCounter(counter);
 }
 
 /** Co-op authoritative GUEST (#633, CHANGE-3): clear the guest's ME pin at the true post-ME
  *  boundary (after the embedded watcher reward shop has drained). */
 export function coopClearMePinForGuest(): void {
-  coopLog("me", "coopClearMePinForGuest", { before: coopMeInteractionStart, after: -1 });
-  coopMeInteractionStart = -1;
+  coopLog("me", "coopClearMePinForGuest", { before: coopMeInteractionStartValue(), after: -1 });
+  setCoopMeInteractionStart(-1);
   setCoopMeBattleInteractionCounter(-1);
 }
 
@@ -131,13 +108,14 @@ function coopBeginMePump(): void {
   }
   // Capture the alternation counter at the ME's start (== seq - BASE). The ME terminal
   // advances the turn ONCE per client, idempotently keyed to this value (#633).
-  coopMeInteractionStart = controller.interactionCounter();
+  const meStart = controller.interactionCounter();
+  setCoopMeInteractionStart(meStart);
   // Pin the same counter for the ME BATTLE HANDOFF key (#633): if this ME's option spawns a
   // battle, the host streams the boss party keyed by (waveIndex, this counter) and the guest
   // adopts it, so the spawned boss is identical + host-authoritative on both clients. Reset at
   // the ME terminal (coopEndMePump).
-  setCoopMeBattleInteractionCounter(coopMeInteractionStart);
-  const seq = COOP_ME_PUMP_SEQ_BASE + coopMeInteractionStart;
+  setCoopMeBattleInteractionCounter(meStart);
+  const seq = COOP_ME_PUMP_SEQ_BASE + meStart;
   const spoofed = getCoopRuntime()?.spoof != null;
   // Co-op AUTHORITATIVE netcode (#633, ADD-2): the HOST is the SOLE ME engine for EVERY non-battle
   // ME - host- AND guest-owned alike (the guest's diverged RNG must never run encounter logic). So
@@ -146,71 +124,32 @@ function coopBeginMePump(): void {
   // host-await block below in MysteryEncounterPhase.start). The guest already diverted to
   // CoopReplayMePhase at :202, so only the HOST ever reaches coopBeginMePump in authoritative mode.
   // In LOCKSTEP (either client) the owner/watcher split stands byte-identical (both run the engine).
-  const authoritative = getCoopNetcodeMode() === "authoritative";
-  const hostDrives = authoritative
-    ? controller.role === "host"
-    : spoofed || controller.isLocalOwnerAtCounter(coopMeInteractionStart);
-  coopLog("me", "coopBeginMePump owner resolution", {
-    counter: coopMeInteractionStart,
+  // Co-op is AUTHORITATIVE-ONLY (#633 M3/M6): the HOST is the SOLE ME engine for EVERY non-battle
+  // ME (host- AND guest-owned alike); the guest already diverted to CoopReplayMePhase at :202 and
+  // NEVER reaches here. So whoever reaches coopBeginMePump is the owner (the host, or the local
+  // human in the dev/spoof path) and always drives the engine (beginOwner) + awaits the guest's
+  // relayed option index (the host-await block in MysteryEncounterPhase.start). The old LOCKSTEP
+  // watcher branch (both clients ran the engine; the non-owner replayed the owner's button stream
+  // via CoopMePump.beginWatcher) is RETIRED - lockstep is gone, so that path was dead.
+  const hostDrives = controller.role === "host";
+  coopLog("me", "coopBeginMePump owner resolution (authoritative-only)", {
+    counter: meStart,
     seq,
     role: controller.role,
-    netcode: authoritative ? "authoritative" : "lockstep",
     spoofed,
     hostDrives,
-    branch: spoofed || hostDrives ? "beginOwner" : "beginWatcher",
   });
-  // Resolve the ME owner from the PINNED start counter (#633), not the live counter - an
-  // inbound reconcile broadcast can bump the live counter mid-encounter, which would flip
-  // the owner/seq calc and desync the pump (the same drift that broke the cursor mirror).
-  if (spoofed || hostDrives) {
-    // #633 MAJOR-1 / B-1: in AUTHORITATIVE mode the host sends its TERMINAL sentinels (LEAVE /
-    // battle-handoff) on the DEDICATED 9M terminal seq, where the authoritative guest's
-    // CoopReplayMePhase.awaitHostTerminal listens (disjoint from the 8M guest->host pick relay).
-    // In LOCKSTEP the terminal stays on `seq` (8M) so the watcher loop catches it byte-identically.
-    const termSeq = authoritative ? COOP_ME_TERM_SEQ_BASE + coopMeInteractionStart : seq;
-    pump.beginOwner(seq, termSeq);
-    if (authoritative) {
-      coopLog("me", "ME owner streamed entry checksum", { seq });
-    }
-    // Co-op AUTHORITATIVE netcode only (#633, TRACK-2 Phase C): stamp the owner's
-    // authoritative full-state checksum at ME entry so the watcher can verify its ME state
-    // is identical BEFORE the pump replays the button stream into it (the pump's one
-    // load-bearing assumption, now self-checking). The watcher's verify+heal handler is
-    // wired once in the runtime. In LOCKSTEP both clients run the full engine on the shared
-    // seed, so the ME state already matches and no checksum stamp is sent (778b192dd path).
-    if (authoritative) {
-      getCoopBattleStreamer()?.sendMeChecksum(seq, captureCoopChecksum());
-    }
-  } else {
-    // LOCKSTEP non-owner only (#633, ADD-2): in authoritative mode the guest diverted at :202 and
-    // never reaches here, so this watcher path is lockstep-only and stays byte-identical.
-    // On the leave sentinel / timeout / partner-gone, fast-forward to the next wave IF still in
-    // the encounter (the rewards were already applied by the relayed picks; only the final outro
-    // is skipped). Both clients advance the alternation turn LOCALLY + idempotently (keyed to the
-    // ME's start counter), so whichever terminal fires first (this fast-forward or the owner's
-    // coopEndMePump) advances exactly once and the other no-ops.
-    //
-    // On a BATTLE HANDOFF (#633): the owner's option spawned a battle. Do NOT leave the encounter
-    // and do NOT advance the interaction counter - the spawned battle (+ its reward shop) still
-    // runs, and the SINGLE ME advance happens at the true ME terminal (coopEndMePump) after it.
-    // The watcher's input gate auto-suspends for the battle phase, so the battle command relay
-    // takes over and the host drives the battle host-authoritatively.
-    pump.beginWatcher(seq, {
-      onLeave: () => {
-        if (!coopInMeInteractivePhase()) {
-          coopLog("me", "lockstep watcher onLeave no-op (already past encounter)", { counter: coopMeInteractionStart });
-          return; // already auto-completed past the encounter; its terminal already advanced
-        }
-        coopLog("me", "lockstep watcher onLeave: leave + advance alternation", { counter: coopMeInteractionStart });
-        leaveEncounterWithoutBattle();
-        controller.advanceInteraction(coopMeInteractionStart);
-      },
-      onBattleHandoff: () => {
-        // No-op beyond ending the pump: the spawned battle runs via the existing host-drives /
-        // guest-replays path; the counter advance is deferred to the true ME terminal.
-      },
-    });
-  }
+  // Resolve the ME owner from the PINNED start counter (#633), not the live counter - an inbound
+  // reconcile broadcast can bump the live counter mid-encounter, which would flip the owner/seq calc.
+  // The host sends its TERMINAL sentinels (LEAVE / battle-handoff) on the DEDICATED 9M terminal seq,
+  // where the guest's CoopReplayMePhase.awaitHostTerminal listens (disjoint from the 8M pick relay).
+  const termSeq = COOP_ME_TERM_SEQ_BASE + meStart;
+  pump.beginOwner(seq, termSeq);
+  coopLog("me", "ME owner streamed entry checksum", { seq });
+  // TRACK-2 Phase C: stamp the owner's authoritative full-state checksum at ME entry so the guest's
+  // CoopReplayMePhase can verify its render state matches before applying the streamed outcome. The
+  // guest's verify+heal handler is wired once in the runtime.
+  getCoopBattleStreamer()?.sendMeChecksum(seq, captureCoopChecksum());
 }
 
 /**
@@ -228,13 +167,13 @@ function coopEndMePump(): void {
   if (controller == null || pump == null) {
     return;
   }
-  coopLog("me", "coopEndMePump: close pump + advance alternation", { counter: coopMeInteractionStart });
+  coopLog("me", "coopEndMePump: close pump + advance alternation", { counter: coopMeInteractionStartValue() });
   pump.endOwner();
   // Both clients advance LOCALLY + idempotently (keyed to the ME's start counter), so the
   // whole ME (encounter + its embedded reward shop, which suppresses its own advance) counts
   // as exactly ONE alternation step on each client - no host-broadcast race (#633).
-  controller.advanceInteraction(coopMeInteractionStart);
-  coopMeInteractionStart = -1;
+  controller.advanceInteraction(coopMeInteractionStartValue());
+  setCoopMeInteractionStart(-1);
   // Clear the ME battle handoff key now the encounter is fully over (#633).
   setCoopMeBattleInteractionCounter(-1);
 }
@@ -455,6 +394,10 @@ export class MysteryEncounterPhase extends Phase {
     // Set option selected flag
     globalScene.currentBattle.mysteryEncounter!.selectedOption = option;
 
+    // #record-replay (single-player): capture the ME option pick (top-level "me" vs a followup "meSub").
+    // No-op unless recording / in co-op (co-op drives the ME via its pump, which owns that path).
+    recordSinglePlayerInteraction(this.optionSelectSettings ? "meSub" : "me", index);
+
     if (!this.optionSelectSettings) {
       // Saves the selected option in the ME save data, only if this is not a followup option select phase
       // Can be used for analytics purposes to track what options are popular on certain encounters
@@ -569,7 +512,7 @@ export class MysteryEncounterOptionSelectedPhase extends Phase {
     // is the guest's sole ME driver. Solo / lockstep / host unaffected.
     if (isCoopAuthoritativeGuest()) {
       coopLog("me", "authoritative guest: ending MysteryEncounterOptionSelectedPhase (no engine)", {
-        counter: coopMeInteractionStart,
+        counter: coopMeInteractionStartValue(),
       });
       this.end();
       return;
@@ -914,7 +857,7 @@ export class MysteryEncounterRewardsPhase extends Phase {
     if (isCoopAuthoritativeGuest()) {
       const guestEncounter = globalScene.currentBattle.mysteryEncounter!;
       coopLog("me", "reward-owner override: guest runs reward shop as WATCHER (host=owner)", {
-        counter: coopMeInteractionStart,
+        counter: coopMeInteractionStartValue(),
         hasDoEncounterRewards: !!guestEncounter.doEncounterRewards,
         addHealPhase: this.addHealPhase,
       });
@@ -1005,7 +948,7 @@ export class PostMysteryEncounterPhase extends Phase {
     // the double-advance window. Solo / lockstep / host unaffected.
     if (isCoopAuthoritativeGuest()) {
       coopLog("me", "authoritative guest: PostMysteryEncounterPhase terminal (clearing pin)", {
-        counter: coopMeInteractionStart,
+        counter: coopMeInteractionStartValue(),
       });
       coopClearMePinForGuest();
       this.end();

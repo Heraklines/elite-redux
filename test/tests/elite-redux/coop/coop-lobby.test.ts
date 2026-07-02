@@ -167,3 +167,161 @@ describe("CoopLobbyController state machine (#633)", () => {
     c.cancel();
   });
 });
+
+describe("co-op lobby v2: join-with-confirmation (#633)", () => {
+  it("requestPlayer posts self+target; respondToRequest accept returns the HOST pairing", async () => {
+    responder = call => {
+      if (call.url.includes("/coop/lobby/request")) {
+        return { body: { ok: true, pending: true } };
+      }
+      if (call.url.includes("/coop/lobby/respond")) {
+        return { body: { code: "HOSTME", role: "host" } };
+      }
+      return { body: {} };
+    };
+    const { requestPlayer, respondToRequest } = await import("#data/elite-redux/coop/coop-lobby");
+    await requestPlayer("me", "them");
+    expect(calls[0].url).toContain("/coop/lobby/request");
+    expect(calls[0].body).toEqual({ self: "me", target: "them" });
+
+    const pairing = await respondToRequest("me", "them", true);
+    expect(calls[1].body).toEqual({ self: "me", from: "them", accept: true });
+    expect(pairing).toEqual({ code: "HOSTME", role: "host" });
+  });
+
+  it("fetchLobby parses the v2 request + declined fields (and tolerates their absence)", async () => {
+    responder = () => ({
+      body: { players: [], pairing: null, request: { id: "r1", name: "Ash" }, declined: "Misty" },
+    });
+    const snap = await fetchLobby("me");
+    expect(snap.request).toEqual({ id: "r1", name: "Ash" });
+    expect(snap.declined).toBe("Misty");
+
+    // OLD worker: v2 fields absent -> they parse to null (never undefined crashes).
+    responder = () => ({ body: { players: [], pairing: null } });
+    const legacy = await fetchLobby("me");
+    expect(legacy.request).toBeNull();
+    expect(legacy.declined).toBeNull();
+  });
+
+  it("controller: an INCOMING request fires onRequest ONCE, and respond(true) connects as HOST", async () => {
+    vi.useFakeTimers();
+    let respondCalls = 0;
+    responder = call => {
+      if (call.url.includes("/announce")) {
+        return { body: { id: "me", pairing: null } };
+      }
+      if (call.url.includes("/coop/lobby?self")) {
+        return { body: { players: [], pairing: null, request: { id: "asker", name: "Ash" }, declined: null } };
+      }
+      if (call.url.includes("/respond")) {
+        respondCalls++;
+        return { body: { code: "ACCEPT", role: "host" } };
+      }
+      if (call.url.includes("/leave")) {
+        return { body: { ok: true } };
+      }
+      return { body: {} };
+    };
+    connectMock.mockResolvedValue({ runtime: true });
+
+    const onRequest = vi.fn();
+    const onConnected = vi.fn();
+    const c = new CoopLobbyController(
+      "Brock",
+      { onPlayers: vi.fn(), onConnecting: vi.fn(), onConnected, onError: vi.fn(), onRequest },
+      { connect: connectMock },
+    );
+    await c.start();
+    await vi.advanceTimersByTimeAsync(1); // first poll -> incoming request surfaces
+    await vi.advanceTimersByTimeAsync(1600); // second poll: SAME request -> no duplicate callback
+    expect(onRequest).toHaveBeenCalledTimes(1);
+    expect(onRequest.mock.calls[0][0]).toEqual({ id: "asker", name: "Ash" });
+
+    await c.respond(true); // accept -> pairs as HOST -> connects
+    expect(respondCalls).toBe(1);
+    expect(connectMock).toHaveBeenCalledWith("ACCEPT", "host", { username: "Brock" });
+    expect(onConnected).toHaveBeenCalledTimes(1);
+    c.cancel();
+  });
+
+  it("controller: request() parks pending; a DECLINE notice fires onDeclined and resumes browsing", async () => {
+    vi.useFakeTimers();
+    let polls = 0;
+    responder = call => {
+      if (call.url.includes("/announce")) {
+        return { body: { id: "me", pairing: null } };
+      }
+      if (call.url.includes("/coop/lobby/request")) {
+        return { body: { ok: true, pending: true } };
+      }
+      if (call.url.includes("/coop/lobby?self")) {
+        polls++;
+        // First poll: Bob is available. After the request: Bob declined (one-shot).
+        return polls < 3
+          ? { body: { players: [{ id: "bob", name: "Bob", age: 100 }], pairing: null, request: null, declined: null } }
+          : { body: { players: [], pairing: null, request: null, declined: "Bob" } };
+      }
+      if (call.url.includes("/leave")) {
+        return { body: { ok: true } };
+      }
+      return { body: {} };
+    };
+    const onDeclined = vi.fn();
+    const onRequestPending = vi.fn();
+    const c = new CoopLobbyController(
+      "May",
+      {
+        onPlayers: vi.fn(),
+        onConnecting: vi.fn(),
+        onConnected: vi.fn(),
+        onError: vi.fn(),
+        onDeclined,
+        onRequestPending,
+      },
+      { connect: connectMock },
+    );
+    await c.start();
+    await vi.advanceTimersByTimeAsync(1); // poll 1: Bob listed
+    await c.request("bob", "Bob");
+    expect(onRequestPending).toHaveBeenCalledWith("Bob");
+    expect(c.isRequestPending()).toBe(true);
+
+    await vi.advanceTimersByTimeAsync(1); // poll 2 (rescheduled at 0 by request)
+    await vi.advanceTimersByTimeAsync(1600); // poll 3: the decline notice arrives
+    expect(onDeclined).toHaveBeenCalledWith("Bob");
+    expect(c.isRequestPending()).toBe(false);
+    c.cancel();
+  });
+
+  it("controller: request() FALLS BACK to the instant pick against an OLD worker (404)", async () => {
+    vi.useFakeTimers();
+    responder = call => {
+      if (call.url.includes("/announce")) {
+        return { body: { id: "me", pairing: null } };
+      }
+      if (call.url.includes("/coop/lobby/request")) {
+        return { status: 404, body: { error: "not found" } };
+      }
+      if (call.url.includes("/coop/lobby/pick")) {
+        return { body: { code: "LEGACY", role: "guest" } };
+      }
+      if (call.url.includes("/leave")) {
+        return { body: { ok: true } };
+      }
+      return { body: { players: [], pairing: null } };
+    };
+    connectMock.mockResolvedValue({ runtime: true });
+    const onConnected = vi.fn();
+    const c = new CoopLobbyController(
+      "Dawn",
+      { onPlayers: vi.fn(), onConnecting: vi.fn(), onConnected, onError: vi.fn() },
+      { connect: connectMock },
+    );
+    await c.start();
+    await c.request("bob", "Bob"); // 404 -> falls back to pick -> pairs as guest -> connects
+    expect(connectMock).toHaveBeenCalledWith("LEGACY", "guest", { username: "Dawn" });
+    expect(onConnected).toHaveBeenCalledTimes(1);
+    c.cancel();
+  });
+});

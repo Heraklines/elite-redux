@@ -8,6 +8,7 @@ import {
   rollErNextBiomeNodes,
 } from "#data/elite-redux/er-biome-routing";
 import { consumeMapTravelTarget } from "#data/elite-redux/er-map-nodes";
+import { recordSinglePlayerInteraction } from "#data/elite-redux/replay-single-recording";
 import { BiomeId } from "#enums/biome-id";
 import { ChallengeType } from "#enums/challenge-type";
 import { UiMode } from "#enums/ui-mode";
@@ -81,7 +82,11 @@ export class SelectBiomePhase extends BattlePhase {
         globalScene.ui.setMode(UiMode.ER_MAP, {
           nodes: revealed,
           origin: currentBiome,
-          onSelect: (biome: BiomeId) => this.setNextBiomeAndEnd(biome),
+          onSelect: (biome: BiomeId) => {
+            // #record-replay (single-player): capture the World-Map biome pick (no-op unless recording / co-op).
+            recordSinglePlayerInteraction("biome", biome);
+            this.setNextBiomeAndEnd(biome);
+          },
         });
       } else {
         this.setNextBiomeAndEnd(revealed[0].biome);
@@ -106,6 +111,8 @@ export class SelectBiomePhase extends BattlePhase {
             label: getBiomeName(b),
             handler: () => {
               globalScene.ui.setMode(UiMode.MESSAGE);
+              // #record-replay (single-player): capture the biome-link pick (no-op unless recording / co-op).
+              recordSinglePlayerInteraction("biome", b);
               this.setNextBiomeAndEnd(b);
               return true;
             },

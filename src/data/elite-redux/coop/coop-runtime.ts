@@ -35,7 +35,7 @@ import { coopLog, coopWarn, isCoopDebug } from "#data/elite-redux/coop/coop-debu
 import { CoopInteractionRelay } from "#data/elite-redux/coop/coop-interaction-relay";
 import { meBattleHandoffKey } from "#data/elite-redux/coop/coop-me-battle-handoff";
 import { CoopMePump } from "#data/elite-redux/coop/coop-me-pump";
-import { coopOwnerOfFieldIndex } from "#data/elite-redux/coop/coop-session";
+import { coopFieldIndexOf, coopOwnerOfFieldSlot } from "#data/elite-redux/coop/coop-session";
 import { CoopSessionController } from "#data/elite-redux/coop/coop-session-controller";
 import { SpoofGuest } from "#data/elite-redux/coop/coop-spoof-guest";
 import type {
@@ -43,6 +43,7 @@ import type {
   CoopExpDelta,
   CoopFullBattleSnapshot,
   CoopNetcodeMode,
+  CoopRole,
   CoopSerializedEnemy,
   CoopWaveOutcome,
 } from "#data/elite-redux/coop/coop-transport";
@@ -505,17 +506,6 @@ export interface CoopRuntime {
 
 let active: CoopRuntime | null = null;
 
-/**
- * Authoritative LATCH (#633 trainer-victory deadlock): once an active co-op session has been
- * observed in "authoritative" netcode, an active session STAYS authoritative for the rest of
- * the run. Guards the guest from silently falling back to "lockstep" mid-run (e.g. a transient
- * read where the controller's `_netcodeMode` had not yet adopted the host's runConfig, or a
- * controller re-read race) - which would make TurnStartPhase NOT divert to CoopReplayTurnPhase
- * and the guest run its OWN engine + the waveResolved tail (a double-advance / desync). Reset in
- * {@linkcode clearCoopRuntime} so a subsequent run (incl. a solo / lockstep one) starts clean.
- */
-let authoritativeLatched = false;
-
 /** Register the live co-op session (called when a co-op run is being set up). */
 export function setCoopRuntime(runtime: CoopRuntime): void {
   active = runtime;
@@ -535,37 +525,16 @@ export function getCoopController(): CoopSessionController | null {
 }
 
 /**
- * The active co-op netcode (#633, selectable A/B), or `"lockstep"` when there is no
- * live session. This is the SINGLE read point every co-op gate uses to decide
- * between the lockstep (both engines resolve) and authoritative (guest renders)
- * implementations. Deliberately does NOT touch globalScene - it is a pure controller
- * read so the engine-free unit tests can call it.
+ * The active co-op netcode (#633, M6c: authoritative-ONLY), or `"lockstep"` when there is no
+ * live session. Co-op has exactly one netcode since M3: a LIVE session is ALWAYS authoritative
+ * (the guest renders, the host resolves), unconditionally - the old selectable toggle, the
+ * controller's netcodeMode consultation, and the transient-read LATCH are all retired. The
+ * "lockstep" return survives ONLY as the no-session sentinel every solo gate keys off
+ * (`=== "authoritative"` is false -> solo is byte-for-byte unaffected). Deliberately does NOT
+ * touch globalScene - it is a pure runtime read so the engine-free unit tests can call it.
  */
 export function getCoopNetcodeMode(): CoopNetcodeMode {
-  // No live session -> lockstep (solo / non-coop / lockstep run, byte-for-byte unchanged).
-  if (active == null) {
-    return "lockstep";
-  }
-  const mode = active.controller.netcodeMode;
-  // Latch authoritative (#633 trainer-victory deadlock): once an active session is authoritative,
-  // keep returning it for the rest of the run so a transient controller read (pre-runConfig, a
-  // re-read race) can NEVER flip the guest back to "lockstep" and make it run its own engine.
-  if (mode === "authoritative") {
-    if (!authoritativeLatched) {
-      // State CHANGE: log the one-time latch flip (NOT on every hot read).
-      coopLog("runtime", `netcode LATCH authoritative role=${active.controller.role} (was unlatched)`);
-    }
-    authoritativeLatched = true;
-    return "authoritative";
-  }
-  if (authoritativeLatched && isCoopDebug()) {
-    // Controller momentarily reads lockstep but the latch holds authoritative (re-read race / pre-runConfig).
-    coopWarn(
-      "runtime",
-      `netcode read=${mode} but latched authoritative role=${active.controller.role} -> authoritative`,
-    );
-  }
-  return authoritativeLatched ? "authoritative" : mode;
+  return active == null ? "lockstep" : "authoritative";
 }
 
 /**
@@ -609,6 +578,35 @@ export function isCoopRuntimeActive(): boolean {
 }
 
 /**
+ * N-ready field-slot ownership, engine adapter (#633, M5): resolve the owner of PLAYER field
+ * slot `fieldIndex` from the mon actually in it ({@linkcode coopOwnerOfFieldSlot} reads the
+ * persistent `coopOwner` tag; empty / untagged slots fall back to the fixed 2-player slot map).
+ * `getPlayerField()` is index-aligned with field slots (the party's first `playerCapacity`
+ * entries, unfiltered), so this is the single place engine code turns a slot into its owner -
+ * every command / switch routing gate keys off it instead of assuming the launch layout.
+ */
+export function coopOwnerOfPlayerFieldSlot(fieldIndex: number): CoopRole {
+  return coopOwnerOfFieldSlot(globalScene.getPlayerField(), fieldIndex);
+}
+
+/**
+ * The PLAYER field slot the LOCAL client owns (#633, M5): the first slot whose resolved owner is
+ * the local role. Falls back to the fixed 2-player slot map ({@linkcode coopFieldIndexOf}) when no
+ * tagged slot matches (empty field / launch edge), so 2-player behavior is unchanged. In the
+ * 2-player double each player owns exactly one slot, so "first" is exact.
+ */
+export function coopLocalOwnedPlayerFieldSlot(): number {
+  const role = active?.controller.role ?? "guest";
+  const field = globalScene.getPlayerField();
+  for (let i = 0; i < field.length; i++) {
+    if (field[i]?.coopOwner === role) {
+      return i;
+    }
+  }
+  return coopFieldIndexOf(role);
+}
+
+/**
  * Broadcast the LOCAL human's RESOLVED own-slot FIGHT command to the partner (#633).
  * Shared by {@linkcode CommandPhase} (moves with no target prompt) and
  * {@linkcode SelectTargetPhase} (the deferred broadcast once the human has actually
@@ -623,7 +621,7 @@ export function broadcastCoopOwnSlotCommand(fieldIndex: number, command: Seriali
   if (!globalScene.gameMode.isCoop || active == null) {
     return;
   }
-  const owner = coopOwnerOfFieldIndex(fieldIndex);
+  const owner = coopOwnerOfPlayerFieldSlot(fieldIndex);
   if (owner !== active.controller.role) {
     if (isCoopDebug()) {
       coopLog("owner", `broadcast SKIP fi=${fieldIndex} owner=${owner} != role=${active.controller.role} (await slot)`);
@@ -940,9 +938,10 @@ export function coopMeOwnerRelayBattleHandoff(): void {
     return;
   }
   const pump = active.mePump;
-  // Only the OWNER of an active pump session relays the sentinel; the watcher receives it.
-  if (!pump.isSessionActive() || pump.isWatcher()) {
-    coopLog("me", `owner-relay battle-handoff SKIP (active=${pump.isSessionActive()} watcher=${pump.isWatcher()})`);
+  // Only an active pump session relays the sentinel. Co-op is authoritative-only (#633 M6): the
+  // pump is always OWNER-side (the host); the retired watcher never held a session.
+  if (!pump.isSessionActive()) {
+    coopLog("me", `owner-relay battle-handoff SKIP (active=${pump.isSessionActive()})`);
     return;
   }
   try {
@@ -966,14 +965,14 @@ export function startLocalCoopSession(
 ): CoopRuntime {
   coopLog(
     "launch",
-    `startLocalCoopSession username=${opts.username ?? "(default)"} netcode=${opts.netcodeMode ?? "lockstep"}`,
+    `startLocalCoopSession username=${opts.username ?? "(default)"} netcode=${opts.netcodeMode ?? "authoritative"}`,
   );
   clearCoopRuntime();
   const { host, guest } = createLoopbackPair();
   const controller = new CoopSessionController(host, { username: opts.username });
   // This client is the HOST here; pin the chosen netcode (#633, selectable A/B) so
   // it rides along in broadcastRunConfig and the guest adopts it. Default lockstep.
-  controller.setNetcodeMode(opts.netcodeMode ?? "lockstep");
+  controller.setNetcodeMode(opts.netcodeMode ?? "authoritative");
   const battleSync = new CoopBattleSync(host);
   const battleStream = new CoopBattleStreamer(host);
   const interactionRelay = new CoopInteractionRelay(host);
@@ -1019,7 +1018,7 @@ export function connectCoopSession(
 ): CoopRuntime {
   coopLog(
     "launch",
-    `connectCoopSession role=${transport.role} state=${transport.state} username=${opts.username ?? "(default)"} netcode=${opts.netcodeMode ?? "lockstep"}`,
+    `connectCoopSession role=${transport.role} state=${transport.state} username=${opts.username ?? "(default)"} netcode=${opts.netcodeMode ?? "authoritative"}`,
   );
   clearCoopRuntime();
   const runtime = assembleCoopRuntime(transport, opts);
@@ -1052,7 +1051,7 @@ export function assembleCoopRuntime(
   // Pin the chosen netcode (#633, selectable A/B). On the HOST this is the source of
   // truth that rides along in broadcastRunConfig; on the GUEST it is only the pre-
   // runConfig default (the host's value overwrites it on receipt). Default lockstep.
-  controller.setNetcodeMode(opts.netcodeMode ?? "lockstep");
+  controller.setNetcodeMode(opts.netcodeMode ?? "authoritative");
   const battleSync = new CoopBattleSync(transport);
   const battleStream = new CoopBattleStreamer(transport);
   const interactionRelay = new CoopInteractionRelay(transport);
@@ -1076,6 +1075,45 @@ export function assembleCoopRuntime(
   wireCoopLiveEvents(controller, battleStream);
   wireCoopLearnMoveForward(transport);
   return runtime;
+}
+
+/**
+ * Re-install the LAST-WRITE-WINS process-global co-op hooks for `runtime` (#633 bounded-scope: two-engine
+ * harness). Three of the co-op hooks are NOT per-runtime state - they are module-level process-globals that
+ * whichever runtime wired LAST owns: the er-ghost-teams ghost-pool PUBLISHER + guest FETCH-SUPPRESSION
+ * predicate ({@linkcode wireCoopGhostPoolSync}) and the host live-battle-event EMITTER
+ * ({@linkcode wireCoopLiveEvents}). In production there is exactly ONE runtime, so last-write-wins is
+ * correct and this is never called. In the TWO-ENGINE harness both a host and a guest runtime coexist, so
+ * the hook the guest wired last would answer for BOTH engines (wrong role gate). The cooperative scheduler
+ * calls this after {@linkcode setCoopRuntime} on every client swap so the ACTIVE runtime owns its role-gated
+ * hooks. Additive + idempotent; unused in production; the real two-client WebRTC path is untouched.
+ */
+export function installCoopRuntimeProcessHooks(runtime: CoopRuntime): void {
+  installCoopRuntimeGhostHooks(runtime);
+  installCoopRuntimeLiveEmitter(runtime);
+}
+
+/**
+ * Re-point ONLY the er-ghost-teams ghost-pool PUBLISHER + guest FETCH-SUPPRESSION process-globals at
+ * `runtime`'s role-gated closures ({@linkcode wireCoopGhostPoolSync}). Split out from
+ * {@linkcode installCoopRuntimeProcessHooks} so the two-engine harness can route the GHOST hooks per
+ * client on EVERY swap (a correctness fix - the guest must own suppression, the host the publisher) while
+ * installing the live-event emitter ONLY for the tests that exercise it. Additive + idempotent; unused in
+ * production.
+ */
+export function installCoopRuntimeGhostHooks(runtime: CoopRuntime): void {
+  wireCoopGhostPoolSync(runtime.controller, runtime.battleStream);
+}
+
+/**
+ * Re-point ONLY the host live-battle-event EMITTER process-global at `runtime`'s role-gated closure
+ * ({@linkcode wireCoopLiveEvents}). Split out so the two-engine harness enables the LIVE per-event stream
+ * (host emits, guest applies) only for the tests that assert it - the emitter self-gates to a no-op on a
+ * guest/solo runtime, so installing the host runtime's emitter during host pumps is what turns the stream
+ * ON. Additive + idempotent; unused in production (production wires it once at assembly).
+ */
+export function installCoopRuntimeLiveEmitter(runtime: CoopRuntime): void {
+  wireCoopLiveEvents(runtime.controller, runtime.battleStream);
 }
 
 /** Tear down and forget the live co-op session (closing its transport). */
@@ -1110,8 +1148,6 @@ export function clearCoopRuntime(): void {
   lastExpResolvedWave = -1;
   // Reset the ME battle handoff counter so a subsequent run starts clean (#633).
   coopMeBattleInteractionCounter = -1;
-  // Drop the authoritative latch so a subsequent solo / lockstep run is not forced authoritative.
-  authoritativeLatched = false;
   // Clear the cycle-free authoritative-guest predicate so a subsequent solo / lockstep run reads false.
   setCoopAuthoritativeGuestPredicate(null);
   // #record-replay: stop + drop the captured trace at run teardown so the next run records fresh.

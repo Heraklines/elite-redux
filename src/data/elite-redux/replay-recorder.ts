@@ -32,14 +32,24 @@ import type { CoopRunConfig } from "#data/elite-redux/coop/coop-session-controll
 import {
   makeReplayTrace,
   type ReplayCommandEvent,
+  type ReplayEndState,
   type ReplayInteractionEvent,
   type ReplayTrace,
 } from "#data/elite-redux/replay-trace";
 import type { GameModes } from "#enums/game-modes";
 import type { PokemonData } from "#system/pokemon-data";
 
-/** Keep events from at most the last N waves so a captured trace stays small (the bug-report bound). */
-export const REPLAY_RECORDER_WAVE_WINDOW = 6;
+/**
+ * Keep events from at most the last N waves so a captured trace stays small (the bug-report bound).
+ *
+ * Widened 6 -> 10 for the single-player add: a single-player bug report is usually filed a few waves
+ * AFTER the wave that went wrong (the player finishes the wave, then reports), so a slightly deeper
+ * window makes the offending wave much more likely to still be on the ring buffer + replayable. Memory
+ * cost is trivial: each buffered event is a tiny shallow object (a command is ~4 numbers; an interaction
+ * ~4 fields), so ~10 waves x a handful of decisions/wave is well under a kilobyte - the header's seed +
+ * serialized roster dwarf it. Raise further only if reports routinely reference a wave older than this.
+ */
+export const REPLAY_RECORDER_WAVE_WINDOW = 10;
 
 /** The run header captured once at run-start (seed + roster + mode + the optional co-op layer). */
 export interface ReplayRecorderHeader {
@@ -55,6 +65,14 @@ export interface ReplayRecorderHeader {
    * pruning. Commands carry their own wave already, so they don't need it.
    */
   currentWave: () => number;
+  /**
+   * OPTIONAL end-state provider (#record-replay single-player). Injected by the single-player enable so the
+   * recorder can stamp a {@linkcode ReplayEndState} summary onto the emitted trace WITHOUT importing
+   * globalScene: {@linkcode getReplayTrace} calls this closure (which reads globalScene at the call site) to
+   * snapshot the run's CURRENT `waveIndex` / `money` / party, giving the single-engine loader a deterministic
+   * end-state to assert reproduction against. Omitted for co-op (the duo harness asserts convergence instead).
+   */
+  endState?: () => ReplayEndState;
 }
 
 /** A buffered event tagged with the live wave (for ring-buffer pruning; the wave is dropped on emit). */
@@ -149,11 +167,22 @@ export function getReplayTrace(): ReplayTrace | null {
   if (header == null) {
     return null;
   }
+  // Stamp the OPTIONAL end-state summary from the injected provider (single-player), guarded so a provider
+  // failure never breaks the trace emit (the report still ships, just without an end-state to assert on).
+  let endState: ReplayEndState | undefined;
+  if (header.endState != null) {
+    try {
+      endState = header.endState();
+    } catch {
+      endState = undefined;
+    }
+  }
   return makeReplayTrace({
     seed: header.seed,
     gameModeId: header.gameModeId,
     roster: header.roster,
     events: buffer.map(b => b.event),
     ...(header.coopRunConfig == null ? {} : { coopRunConfig: header.coopRunConfig }),
+    ...(endState == null ? {} : { endState }),
   });
 }

@@ -1,6 +1,6 @@
 import { globalScene } from "#app/global-scene";
 import { coopLog, isCoopDebug } from "#data/elite-redux/coop/coop-debug";
-import type { CoopMePumpEngine } from "#data/elite-redux/coop/coop-me-pump";
+import { coopMeInProgress, coopMeInteractionStartValue } from "#data/elite-redux/coop/coop-me-pin-state";
 import {
   coopHostStreamMeMessage,
   getCoopController,
@@ -14,7 +14,6 @@ import { Device } from "#enums/devices";
 import { PlayerGender } from "#enums/player-gender";
 import { TextStyle } from "#enums/text-style";
 import { UiMode } from "#enums/ui-mode";
-import { coopMeInProgress, coopMeInteractionStartValue } from "#phases/mystery-encounter-phases";
 import { AchvBar } from "#ui/achv-bar";
 import { AchvsUiHandler } from "#ui/achvs-ui-handler";
 import { AutoEggRestockUiHandler } from "#ui/auto-egg-restock-ui-handler";
@@ -157,8 +156,6 @@ export class UI extends Phaser.GameObjects.Container {
 
   /** Co-op (#633): cached engine surface for the live-cursor UI mirror (lazily built). */
   private _coopMirrorEngine: CoopUiMirrorEngine | null = null;
-  /** Co-op (#633): cached engine surface for the mystery-encounter input pump (lazily built). */
-  private _coopMePumpEngine: CoopMePumpEngine | null = null;
 
   constructor() {
     super(globalScene, 0, globalScene.scaledCanvas.height);
@@ -338,12 +335,6 @@ export class UI extends Phaser.GameObjects.Container {
           }
           return false; // the guest owns this ME; the host applies the relayed index programmatically
         }
-        if (mePump.isWatcher()) {
-          if (isCoopDebug()) {
-            coopLog("me", "ui: watcher local press blocked (partner drives ME)", { button });
-          }
-          return false; // the partner drives the encounter; ignore the watcher's local input
-        }
         const wasReady = this.coopMeReady(); // only relay presses the handler will ACT on
         const result = this.processInputInner(button);
         if (wasReady) {
@@ -431,17 +422,6 @@ export class UI extends Phaser.GameObjects.Container {
       };
     }
     return this._coopMirrorEngine;
-  }
-
-  /** Stable engine surface handed to the co-op ME input pump (created once, reused) (#633). */
-  private coopMePumpEngine(): CoopMePumpEngine {
-    if (this._coopMePumpEngine == null) {
-      this._coopMePumpEngine = {
-        applyButton: (b: Button) => this.processInputInner(b),
-        isReady: () => this.coopMeReady(),
-      };
-    }
-    return this._coopMePumpEngine;
   }
 
   showTextPromise(text: string, callbackDelay = 0, prompt = true, promptDelay?: number | null): Promise<void> {
@@ -728,7 +708,6 @@ export class UI extends Phaser.GameObjects.Container {
     // opens via setMode, not via local input). Cheap + idempotent; hard no-op in solo.
     if (globalScene.gameMode.isCoop) {
       getCoopUiMirror()?.attach(this.coopMirrorEngine());
-      getCoopMePump()?.attach(this.coopMePumpEngine());
     }
     return new Promise(resolve => {
       if (this.mode === mode && !forceTransition) {

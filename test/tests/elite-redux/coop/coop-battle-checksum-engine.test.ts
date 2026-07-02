@@ -288,7 +288,9 @@ describe.skipIf(!RUN)("co-op battle checksum + resync - real engine (#633, TRACK
     try {
       applyCoopFullSnapshot(snap);
       // Capture the assertion BEFORE restoring the spy (mockRestore clears mock.calls).
-      sawMaxHpWarn = warnSpy.mock.calls.some(args => typeof args[0] === "string" && args[0].includes("[coop-maxhp]"));
+      // The maxHp-divergence warn was refactored from a `[coop-maxhp]` prefix to the standard
+      // coopWarn("resync", "maxhp divergence ...") channel; match the message, not the old prefix.
+      sawMaxHpWarn = warnSpy.mock.calls.some(args => args.join(" ").toLowerCase().includes("maxhp divergence"));
     } finally {
       warnSpy.mockRestore();
     }

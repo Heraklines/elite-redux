@@ -477,10 +477,14 @@ describe.skipIf(!RUN)("co-op richer battle events + guest animation pump (#633, 
     replay.start();
     await new Promise(r => setTimeout(r, 0));
     // Drain the unshifted phases (MoveAnim -> HpDrain -> Faint -> Finalize) deterministically.
-    for (let i = 0; i < 8 && game.scene.phaseManager.getCurrentPhase() != null; i++) {
+    // MessagePhase is included: the moveUsed event now queues a guest-language narration line
+    // (#691 coopNarrateMoveUsed), so a MessagePhase sits amongst the presentation phases - drain
+    // past it (like coop-guest-renderer's REPLAY_DRAIN_PHASES) so the loop reaches the Faint phase.
+    for (let i = 0; i < 12 && game.scene.phaseManager.getCurrentPhase() != null; i++) {
       const cur = game.scene.phaseManager.getCurrentPhase();
       if (
-        cur.is("CoopMoveAnimReplayPhase")
+        cur.is("MessagePhase")
+        || cur.is("CoopMoveAnimReplayPhase")
         || cur.is("CoopHpDrainReplayPhase")
         || cur.is("CoopFaintReplayPhase")
         || cur.is("CoopFinalizeTurnPhase")

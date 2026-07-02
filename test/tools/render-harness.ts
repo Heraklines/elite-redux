@@ -267,7 +267,7 @@ function patchTweensAndShapes(): void {
 // textured via `.play()` (animations) renders blank (e.g. every pokemon_icons grid icon, the
 // starter grid, shiny stars). Restore the genuine Phaser implementations from the component
 // mixins (which the mock never touched). Must run AFTER boot, BEFORE rendering; idempotent.
-function restoreSpriteTextureMethods(): void {
+function restoreSpriteTextureMethods(missing?: Set<string>): void {
   const components: any = (Phaser.GameObjects as any).Components;
   const proto: any = (Phaser.GameObjects as any).Sprite?.prototype;
   if (!components || !proto) {
@@ -275,6 +275,18 @@ function restoreSpriteTextureMethods(): void {
   }
   if (typeof components.TextureCrop?.setTexture === "function") {
     proto.setTexture = components.TextureCrop.setTexture;
+    // Post-creation setTexture(key) is an UNWRAPPED path the two-pass injector cannot
+    // see through the add.* factory wrappers (e.g. BattleInfo.setMini swaps the box to
+    // `pbinfo_*_mini` after construction). Record the miss so pass 2 injects it.
+    if (missing) {
+      const real = proto.setTexture;
+      proto.setTexture = function (key: any, ...rest: any[]) {
+        if (typeof key === "string" && key && this.scene?.textures && !this.scene.textures.exists(key)) {
+          missing.add(key);
+        }
+        return real.call(this, key, ...rest);
+      };
+    }
   }
   if (typeof components.TextureCrop?.setFrame === "function") {
     proto.setFrame = components.TextureCrop.setFrame;
@@ -355,6 +367,10 @@ function buildAssetIndex(): Map<string, string> {
     }
   };
   for (const root of ASSET_ROOTS) {
+    // images/ui FIRST so ui chrome keys resolve to the real ui asset even when an
+    // unrelated screen ships a same-named file (e.g. elite-redux/dexnav/cursor.png
+    // must not shadow ui/cursor.png - the game's loadImage defaults to the ui dir).
+    walk(join(root, "images", "ui"));
     walk(join(root, "images"));
   }
   assetIndex = index;
@@ -381,6 +397,36 @@ function resolveTextureFile(key: string): string | null {
   return buildAssetIndex().get(key) ?? null;
 }
 
+/**
+ * Register a parsed atlas JSON's frames on a texture. Handles BOTH TexturePacker output
+ * shapes the assets use: the ARRAY form (`{textures:[{frames:[{filename,frame,...}]}]}`
+ * or `{frames:[...]}` - pokemon battle atlases) and the HASH form
+ * (`{frames:{"C.png":{frame,...}}}` - ui atlases like keyboard/button_tera/types).
+ * Applies trim data so trimmed frames draw at their in-game offsets.
+ */
+function addAtlasFrames(tex: Phaser.Textures.Texture, atlas: any): void {
+  const framesNode = atlas?.textures?.[0]?.frames ?? atlas?.frames;
+  if (!framesNode) {
+    return;
+  }
+  const entries: [string, any][] = Array.isArray(framesNode)
+    ? framesNode.filter((f: any) => f?.filename && f?.frame).map((f: any) => [f.filename, f])
+    : Object.entries(framesNode).filter(([, f]: [string, any]) => f?.frame);
+  for (const [name, f] of entries) {
+    const fr = tex.add(name, 0, f.frame.x, f.frame.y, f.frame.w, f.frame.h);
+    if (fr && f.trimmed && f.sourceSize && f.spriteSourceSize) {
+      fr.setTrim(
+        f.sourceSize.w,
+        f.sourceSize.h,
+        f.spriteSourceSize.x,
+        f.spriteSourceSize.y,
+        f.spriteSourceSize.w,
+        f.spriteSourceSize.h,
+      );
+    }
+  }
+}
+
 /** Inject `key`'s PNG (+ sibling .json atlas frames, if present) into the live TextureManager. */
 async function injectTextureByKey(scene: Phaser.Scene, key: string): Promise<boolean> {
   if (scene.textures.exists(key)) {
@@ -398,14 +444,7 @@ async function injectTextureByKey(scene: Phaser.Scene, key: string): Promise<boo
   const jsonPath = `${png.slice(0, -4)}.json`;
   if (existsSync(jsonPath)) {
     try {
-      const atlas = JSON.parse(readFileSync(jsonPath, "utf8"));
-      const frames = atlas.textures?.[0]?.frames ?? atlas.frames ?? [];
-      const list = Array.isArray(frames) ? frames : Object.values(frames);
-      for (const f of list as any[]) {
-        if (f?.filename && f?.frame) {
-          tex.add(f.filename, 0, f.frame.x, f.frame.y, f.frame.w, f.frame.h);
-        }
-      }
+      addAtlasFrames(tex, JSON.parse(readFileSync(jsonPath, "utf8")));
     } catch {
       /* leave as a single __BASE-frame texture */
     }
@@ -424,6 +463,12 @@ export interface RenderContext {
   missing: Set<string>;
   /** UI nesting target the handler container is parented into. */
   uiInner: Phaser.GameObjects.Container;
+  /**
+   * Scene-root layer the BATTLEFIELD renders into (arena bg + bases, pokemon sprites,
+   * trainer, HP bars). Sits BELOW the ui layer, mirroring the game's field(0)/fieldUI(1)/
+   * ui(2) depth order. Populated by `renderBattlefield`; cleared each two-pass run.
+   */
+  fieldRoot: Phaser.GameObjects.Container;
   snapshot(outPath: string): { nonBlankPx: number };
   step(): void;
 }
@@ -471,6 +516,10 @@ export function createRenderScene(): Promise<RenderContext> {
             return doneTween;
           };
 
+          // Battlefield layer FIRST so it draws beneath the ui layer (game depth
+          // order: field(0) / fieldUI(1) / ui(2)). renderBattlefield fills it.
+          const fieldRoot = this.add.container(0, 0);
+
           // x6 logical->screen nesting: uiLayer(scale 6) -> uiInner(0,180) so a
           // handler container at (0,-180) maps child (0,0) to screen (0,0).
           const uiLayer = this.add.container(0, 0).setScale(6);
@@ -511,7 +560,7 @@ export function createRenderScene(): Promise<RenderContext> {
             writeFileSync(outPath, canvas.toBuffer("image/png"));
             return { nonBlankPx: nonBlank };
           };
-          resolve({ game, scene: this, missing, uiInner, snapshot, step });
+          resolve({ game, scene: this, missing, uiInner, fieldRoot, snapshot, step });
         },
       },
     });
@@ -639,7 +688,7 @@ function makeUiSurface(ctx: RenderContext, originalUi: any): any {
 /** Re-point `globalScene` (the GameManager mock BattleScene) render members at the CANVAS scene. */
 export function repointGlobalScene(gs: any, ctx: RenderContext): void {
   // Undo the MockSprite prototype clobbering now that boot is done and we render for real.
-  restoreSpriteTextureMethods();
+  restoreSpriteTextureMethods(ctx.missing);
   // Stash the REAL render members once, so a batch run can restore them before constructing
   // the NEXT page's GameManager (which re-instruments the real UI, e.g. spies setModeInternal -
   // that fails against our mock `ui`). See `restoreGlobalScene`.
@@ -714,10 +763,7 @@ async function injectAtlasByPath(scene: Phaser.Scene, key: string, atlasPath: st
     const jsonPath = `${png.slice(0, -4)}.json`;
     if (existsSync(jsonPath)) {
       try {
-        const atlas = JSON.parse(readFileSync(jsonPath, "utf8"));
-        for (const f of atlas.textures?.[0]?.frames ?? []) {
-          tex.add(f.filename, 0, f.frame.x, f.frame.y, f.frame.w, f.frame.h);
-        }
+        addAtlasFrames(tex, JSON.parse(readFileSync(jsonPath, "utf8")));
       } catch {
         /* single frame */
       }
@@ -836,6 +882,267 @@ export async function pixelDiff(
   return { changed, total, dimsMatch: true };
 }
 
+// ---------------------------------------------------------------------------
+// Battlefield rendering (the combat gap)
+// ---------------------------------------------------------------------------
+//
+// The battle FIELD is scene-level, not a UiHandler: `field` container (arena bases,
+// pokemon sprites, trainer) + `fieldUI` (BattleInfo HP bars) + the scene-level
+// `arenaBg`. In a headless GameManager all of it exists but was built with MOCK
+// factories, so it rasterizes nothing. This rebuilds it on the render scene from
+// LIVE game state:
+//   - visibility/existence mirror the live scene graph (a lingering trainer sprite
+//     or a still-visible fainted mon reproduces faithfully),
+//   - texture keys are RE-DERIVED via the real game code paths
+//     (getBattleSpriteKey/AtlasPath, arena.getBgTextureKey, getBiomeKey()_a/_b,
+//     trainer.getKey) because the mocks no-op setTexture()/play(),
+//   - layout positions are the real constants + the real offset code
+//     (fieldSpriteOffset via getFieldPositionOffset, barSlotOffset via
+//     setSlotOffset/applyTripleThin) because the framework's tween mock only fires
+//     onComplete and never applies tweened values, so live x/y hold base coords.
+// Known residuals (documented in CLAUDE.md): no fusion second-sprite, no
+// weather/fog overlays, field scale fixed at x6, tween-final positions lost.
+
+/** One rebuilt battlefield element, for diagnostics. */
+interface FieldElement {
+  kind: string;
+  key?: string;
+  error?: string;
+}
+
+/** Read live transform state off a real GO or a MockSprite (inner phaserSprite). */
+function liveState(node: any): { x: number; y: number; visible: boolean; alpha: number } {
+  const inner = node?.phaserSprite ?? node;
+  return {
+    x: Number(inner?.x ?? 0),
+    y: Number(inner?.y ?? 0),
+    visible: inner?.visible !== false,
+    alpha: typeof inner?.alpha === "number" ? inner.alpha : 1,
+  };
+}
+
+/** Pin a freshly-created atlas sprite to its first real frame (not the __BASE sheet). */
+function setFirstAtlasFrame(scene: Phaser.Scene, spr: any, key: string): void {
+  try {
+    if (!scene.textures.exists(key)) {
+      return;
+    }
+    const names: string[] = scene.textures.get(key).getFrameNames?.() ?? [];
+    if (names.length > 0) {
+      spr.setFrame([...names].sort()[0]);
+    }
+  } catch {
+    /* single-frame texture - fine as-is */
+  }
+}
+
+/**
+ * Rebuild the battlefield from live game state into `ctx.fieldRoot`. Call inside the
+ * `run()` of `renderTwoPass` (AFTER `repointGlobalScene`), before the page handler is
+ * built, so the two-pass injector resolves the chrome textures (pbinfo_*, overlay_*,
+ * numbers, {biome}_a/_b/_bg) and the pokemon atlases inject inline here.
+ */
+export async function renderBattlefield(gs: any, ctx: RenderContext): Promise<FieldElement[]> {
+  const scene: any = ctx.scene;
+  const built: FieldElement[] = [];
+  const simulateMissing = process.env.ER_SIMULATE_MISSING === "1";
+  // Dynamic import: keeps render-harness loadable without dragging the arena module
+  // graph in at module-init time (it is only needed for field renders).
+  const { getBiomeHasProps, getBiomeKey } = await import("#field/arena");
+  const biomeId = gs.arena?.biomeId;
+  const biomeKey = biomeId == null ? "plains" : getBiomeKey(biomeId);
+
+  const addSprite = (parent: any, x: number, y: number, key: string, ox = 0.5, oy = 1) => {
+    const spr = scene.add.sprite(x, y, key); // wrapped factory records missing keys
+    spr.setOrigin(ox, oy);
+    setFirstAtlasFrame(scene, spr, key);
+    parent.add(spr);
+    return spr;
+  };
+
+  // --- 1. Arena background (scene-level in the game: origin 0, scale 6).
+  const bgState = liveState(gs.arenaBg);
+  if (gs.arenaBg && bgState.visible) {
+    const bgKey = gs.arena?.getBgTextureKey?.() ?? `${biomeKey}_bg`;
+    addSprite(ctx.fieldRoot, 0, 0, bgKey, 0, 0).setScale(6).setAlpha(bgState.alpha);
+    built.push({ kind: "arena-bg", key: bgKey });
+  }
+
+  // --- 2. The `field` container (x6): arena bases, trainers, pokemon.
+  const fieldC = scene.add.container(0, 0).setScale(6);
+  ctx.fieldRoot.add(fieldC);
+
+  // Arena bases: player platform ({biome}_a at (300,0)) + enemy platform ({biome}_b at
+  // (-280,0), plus seeded props). ArenaBase is a REAL container headlessly, so its
+  // x/y/visible/propValue are live; only its mock sprite children lost their textures.
+  for (const [baseObj, isPlayerBase] of [
+    [gs.arenaPlayer, true],
+    [gs.arenaEnemy, false],
+  ] as const) {
+    if (!baseObj || baseObj.visible === false) {
+      continue;
+    }
+    const baseKey = `${biomeKey}_${isPlayerBase ? "a" : "b"}`;
+    const cont = scene.add.container(baseObj.x ?? 0, baseObj.y ?? 0);
+    fieldC.add(cont);
+    addSprite(cont, 0, 0, baseKey, 0, 0);
+    built.push({ kind: isPlayerBase ? "arena-player" : "arena-enemy", key: baseKey });
+    if (!isPlayerBase && biomeId != null && getBiomeHasProps(biomeId)) {
+      const propValue = Number(baseObj.propValue ?? 0);
+      for (let p = 0; p < 3; p++) {
+        if (propValue & (1 << p)) {
+          addSprite(cont, 0, 0, `${biomeKey}_b_${p + 1}`, 0, 0);
+          built.push({ kind: "arena-prop", key: `${biomeKey}_b_${p + 1}` });
+        }
+      }
+    }
+  }
+
+  // Player trainer back sprite (MockSprite: transforms live on the inner phaserSprite;
+  // texture key frozen at construction - which is also what the game would show).
+  const trainerState = liveState(gs.trainer);
+  if (gs.trainer && trainerState.visible) {
+    const key = gs.trainer.texture?.key || "trainer_m_back";
+    addSprite(fieldC, trainerState.x, trainerState.y, key, 0.5, 1).setAlpha(trainerState.alpha);
+    built.push({ kind: "trainer-player", key });
+  }
+
+  // Enemy trainer (a REAL container with mock sprite children): rebuild via getKey().
+  const enemyTrainer = gs.currentBattle?.trainer;
+  if (enemyTrainer && enemyTrainer.visible !== false && typeof enemyTrainer.getKey === "function") {
+    try {
+      const cont = scene.add.container(enemyTrainer.x ?? 0, enemyTrainer.y ?? 0);
+      cont.setScale(enemyTrainer.scaleX ?? 1, enemyTrainer.scaleY ?? 1);
+      fieldC.add(cont);
+      const isDouble = !!enemyTrainer.isDouble?.() && !enemyTrainer.config?.doubleOnly;
+      addSprite(cont, isDouble ? -4 : 0, 0, enemyTrainer.getKey(), 0.5, 1);
+      built.push({ kind: "trainer-enemy", key: enemyTrainer.getKey() });
+      if (isDouble) {
+        addSprite(cont, 28, 0, enemyTrainer.getKey(true), 0.5, 1);
+        built.push({ kind: "trainer-enemy-partner", key: enemyTrainer.getKey(true) });
+      }
+    } catch (e) {
+      built.push({ kind: "trainer-enemy", error: String(e) });
+    }
+  }
+
+  // Pokemon: walk the LIVE field container children in order (so an object that
+  // should have left the field but did not still shows up - that IS the bug class).
+  // Positions are the CANONICAL side bases + the real slot-offset code, NOT live x/y:
+  // the framework's tween mock only fires onComplete and never applies tweened values,
+  // so live coords hold whatever pre-animation offset the intro slide left behind.
+  const fieldChildren: any[] = gs.field?.list ?? [];
+  for (const mon of fieldChildren) {
+    if (typeof mon?.getBattleSpriteKey !== "function" || mon.visible === false) {
+      continue;
+    }
+    try {
+      const key = mon.getBattleSpriteKey();
+      const atlasPath = mon.getBattleSpriteAtlasPath();
+      if (!simulateMissing) {
+        await injectAtlasByPath(scene, key, atlasPath);
+      }
+      const isPlayerMon = !!mon.isPlayer?.();
+      const [baseX, baseY] = isPlayerMon ? [106, 148] : [236, 84];
+      const off: [number, number] = mon.getFieldPositionOffset?.() ?? [0, 0];
+      const cont = scene.add.container(baseX + off[0], baseY + off[1]);
+      cont.setScale(mon.getSpriteScale?.() ?? 1);
+      cont.setAlpha(typeof mon.alpha === "number" ? mon.alpha : 1);
+      fieldC.add(cont);
+      addSprite(cont, 0, 0, key, 0.5, 1);
+      built.push({ kind: isPlayerMon ? "pokemon-player" : "pokemon-enemy", key });
+    } catch (e) {
+      built.push({ kind: "pokemon", error: String(e) });
+    }
+  }
+
+  // --- 3. `fieldUI` (x6, anchored at the canvas bottom): fresh BattleInfo per live one.
+  // The live instances hold live DATA but mock children; a fresh instance built against
+  // the re-pointed factories renders real pixels, and the real slot-offset methods
+  // reproduce double/triple bar stacking (they are direct sets, not tweens).
+  const fieldUiC = scene.add.container(0, Number(scene.game.config.height)).setScale(6);
+  ctx.fieldRoot.add(fieldUiC);
+  const arrangement = gs.currentBattle?.arrangement;
+  for (const mon of fieldChildren) {
+    if (typeof mon?.getBattleSpriteKey !== "function") {
+      continue;
+    }
+    const liveInfo = mon.battleInfo;
+    if (!liveInfo || liveInfo.visible === false) {
+      continue;
+    }
+    try {
+      const Ctor: any = liveInfo.constructor;
+      const fresh: any = new Ctor();
+      fresh.initInfo(mon);
+      if (typeof fresh.updateBossSegments === "function" && mon.isBoss?.()) {
+        fresh.updateBossSegments(mon);
+      }
+      const isPlayerMon = !!mon.isPlayer?.();
+      const capacity = arrangement ? (isPlayerMon ? arrangement.playerCapacity : arrangement.enemyCapacity) : 1;
+      if (capacity > 1) {
+        const slot = Math.max(0, Number(mon.getFieldIndex?.() ?? 0));
+        fresh.setMini?.(true);
+        fresh.setSlotOffset?.(slot, capacity);
+        fresh.applyTripleThin?.(capacity, isPlayerMon);
+      }
+      fresh.setVisible(true);
+      fieldUiC.add(fresh);
+      built.push({ kind: isPlayerMon ? "battle-info-player" : "battle-info-enemy" });
+    } catch (e) {
+      built.push({ kind: "battle-info", error: String(e) });
+    }
+  }
+
+  for (const el of built) {
+    if (el.error) {
+      // biome-ignore lint/suspicious/noConsole: harness diagnostics
+      console.log(`[render-harness] battlefield element ${el.kind} failed: ${el.error}`);
+    }
+  }
+  return built;
+}
+
+/**
+ * Diagnostic: walk the render scene's display tree and report sprites that would draw
+ * wrong pixels - texture "__MISSING" (created through an unwrapped path, e.g. make.* or
+ * a post-creation setTexture, so the two-pass injector never saw the key) and sprites
+ * stuck on the __BASE frame of a MULTI-frame atlas (a setFrame(name) that failed, which
+ * renders the whole spritesheet). Returns human-readable lines; log them per page.
+ */
+export function findSuspectSprites(ctx: RenderContext): string[] {
+  const suspects: string[] = [];
+  const dumpAll = process.env.ER_RENDER_DUMP === "1";
+  const walk = (node: any, path: string, depth: number): void => {
+    // Invisible subtrees draw nothing - a hidden __MISSING is noise, not a defect.
+    if (!node || depth > 14 || node.visible === false) {
+      return;
+    }
+    const tex = node.texture;
+    if (dumpAll && tex && node.visible !== false) {
+      const m = node.getWorldTransformMatrix?.();
+      const wx = m ? Math.round(m.getX(0, 0)) : Math.round(node.x);
+      const wy = m ? Math.round(m.getY(0, 0)) : Math.round(node.y);
+      // biome-ignore lint/suspicious/noConsole: harness diagnostics (env-gated)
+      console.log(`[dump] ${path} tex="${tex.key}" frame="${node.frame?.name}" world=(${wx},${wy})`);
+    }
+    if (tex?.key === "__MISSING") {
+      suspects.push(`__MISSING texture: ${path} at (${Math.round(node.x)},${Math.round(node.y)})`);
+    } else if (tex && tex.frameTotal > 1 && node.frame?.name === "__BASE") {
+      suspects.push(
+        `whole-sheet render (__BASE of ${tex.frameTotal - 1}-frame atlas "${tex.key}"): ${path} at (${Math.round(node.x)},${Math.round(node.y)})`,
+      );
+    }
+    const children: any[] = node.list ?? [];
+    for (let i = 0; i < children.length; i++) {
+      const c = children[i];
+      walk(c, `${path}/${c?.name || c?.texture?.key || c?.type || i}`, depth + 1);
+    }
+  };
+  walk({ list: (ctx.scene as any).children?.list ?? [] }, "scene", 0);
+  return suspects;
+}
+
 /**
  * Render a handler page in two passes: pass 1 records the texture keys it asks
  * for, we inject them, pass 2 renders for real. `run` should (re)build the page:
@@ -847,6 +1154,7 @@ export async function renderTwoPass(
 ): Promise<{ injected: string[]; unresolved: string[] }> {
   // Pass 1: collect requested texture keys.
   ctx.uiInner.removeAll(true);
+  ctx.fieldRoot.removeAll(true);
   ctx.missing.clear();
   await run();
   ctx.step();
@@ -855,6 +1163,7 @@ export async function renderTwoPass(
   const { injected, unresolved } = await injectMissing(ctx);
   // Pass 2: rebuild now that textures exist (clear pass-1 objects first), then settle.
   ctx.uiInner.removeAll(true);
+  ctx.fieldRoot.removeAll(true);
   ctx.missing.clear();
   await run();
   for (let i = 0; i < 4; i++) {
