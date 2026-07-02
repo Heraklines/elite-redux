@@ -617,11 +617,21 @@ export async function createCommunityChallenge(config: CommunityChallengeConfig)
       body: JSON.stringify(config),
     });
     if (!res.ok) {
+      // A null here makes the create handler mint a LOCAL draft id; the eventual founder
+      // clear then 404s server-side (unknown id) and can never publish. Log loudly so the
+      // bug-report console buffer shows exactly why a draft went local-only.
+      const body = await res.text().catch(() => "");
+      console.error(`[community] challenge create REJECTED (${res.status}): ${body.slice(0, 200)} - draft saved LOCALLY only`);
       return null;
     }
     const data = (await res.json()) as { id?: string };
-    return typeof data?.id === "string" ? data.id : null;
-  } catch {
+    if (typeof data?.id !== "string") {
+      console.error("[community] challenge create returned no id - draft saved LOCALLY only");
+      return null;
+    }
+    return data.id;
+  } catch (e) {
+    console.error("[community] challenge create failed (network) - draft saved LOCALLY only", e);
     return null;
   }
 }
@@ -690,14 +700,31 @@ export async function recordCommunityClear(
       }),
     });
     if (res.status >= 500) {
+      console.warn(`[community] founder publish for ${draftId}: server error ${res.status} - will retry`);
       return null; // transient server error - retry later.
     }
+    if (res.status === 401) {
+      // The login token can expire during a long founder run. Auth recovers after a
+      // re-login, so KEEP the clear queued (it retries on the next Community open) -
+      // dropping it here silently ate real founder clears (the scoom report).
+      console.error(`[community] founder publish for ${draftId}: auth rejected (401) - kept queued, re-login and reopen Community Challenges to retry`);
+      return null;
+    }
     if (!res.ok) {
-      return { published: false }; // 4xx: permanent (not found / forbidden / invalid).
+      // Permanent reject (404 unknown id / 403 not the creator / 422 bad payload).
+      // Log LOUDLY - this lands in the bug-report console ring buffer, so a player's
+      // "it didn't publish" report shows exactly what the server said.
+      const body = await res.text().catch(() => "");
+      console.error(`[community] founder publish for ${draftId} REJECTED (${res.status}): ${body.slice(0, 200)}`);
+      return { published: false };
     }
     const data = (await res.json()) as { published?: boolean };
+    if (data?.published !== true) {
+      console.warn(`[community] founder clear for ${draftId} recorded but NOT published (already active, or the run failed verification)`);
+    }
     return { published: data?.published === true };
-  } catch {
+  } catch (e) {
+    console.warn(`[community] founder publish for ${draftId}: network failure - will retry`, e);
     return null; // network failure - retry later.
   }
 }
