@@ -1,0 +1,274 @@
+----- BUG REPORT (in-game) -----
+version:  1.11.19
+url:      https://elite-redux.pages.dev/
+ua:       Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36 OPR/132.0.0.0
+mode:     4  wave:110  difficulty:youngster
+seed:     Db0oJ2BSnchvd6iN4ZVX3bTK
+party:    Inteleon(L94 311/311), Kyurem(L94 194/368), Mawile(L94 264/264), Durant(L94 0/260)
+
+----- DESCRIPTION -----
+Eldegoss took not very effective damage from aeroblast
+
+----- CONSOLE -----
+[21:01:11.868] LOG: Applied X Speed 
+[21:01:11.868] LOG: Applied X Speed 
+[21:01:11.869] LOG: Applied X Speed 
+[21:01:11.869] LOG: Applied X Speed 
+[21:01:11.870] LOG: %cStart Phase ShinySparklePhase color:green;
+[21:01:12.083] LOG: %cStart Phase PostSummonPhase color:green;
+[21:01:12.083] LOG: Ran PSP for: G-Max Inteleon
+[21:01:12.084] LOG: Applied X Speed 
+[21:01:12.084] LOG: Applied X Speed 
+[21:01:12.084] LOG: %cStart Phase PostSummonPhase color:green;
+[21:01:12.084] LOG: %cStart Phase PostSummonPhase color:green;
+[21:01:12.084] LOG: %cStart Phase ShowAbilityPhase color:green;
+[21:01:12.411] LOG: %cStart Phase HideAbilityPhase color:green;
+[21:01:12.467] LOG: %cStart Phase TurnInitPhase color:green;
+[21:01:12.467] LOG: %cStart Phase CommandPhase color:green;
+[21:01:14.411] LOG: Move: AEROBLAST Move targets: {"targets":[2,3,1],"multiple":false} 
+Player Pokemon: G-Max Inteleon
+[21:01:14.411] LOG: %cStart Phase SelectTargetPhase color:green;
+[21:01:15.061] LOG: %cStart Phase CommandPhase color:green;
+[21:01:19.325] LOG: Move: GLACIAL_LANCE Move targets: {"targets":[2,3],"multiple":true} 
+Player Pokemon: Kyurem
+[21:01:19.326] LOG: %cStart Phase SelectTargetPhase color:green;
+[21:01:19.973] LOG: %cStart Phase EnemyCommandPhase color:green;
+[21:01:19.973] LOG: Applied X Speed 
+[21:01:19.974] LOG: Applied X Speed 
+[21:01:19.974] LOG: Applied X Speed 
+[21:01:19.974] LOG: Applied X Speed 
+[21:01:19.975] LOG: Applied X Speed 
+[21:01:19.976] LOG: Applied X Speed 
+[21:01:19.977] LOG: Applied X Speed 
+[21:01:19.977] LOG: Applied X Speed 
+[21:01:19.978] LOG: Applied X Speed 
+[21:01:19.978] LOG: Applied X Speed 
+[21:01:19.979] LOG: Applied X Speed 
+[21:01:19.980] LOG: Applied X Speed 
+[21:01:19.981] LOG: Applied X Speed 
+[21:01:19.981] LOG: Applied X Speed 
+[21:01:19.983] LOG: Battle Seed: DHvME4A7rIWxac3K
+[21:01:19.983] LOG: Applied X Speed 
+[21:01:19.983] LOG: Applied X Speed 
+[21:01:19.984] LOG: Applied X Speed 
+[21:01:19.984] LOG: Applied X Speed 
+[21:01:19.987] LOG: Applied X Speed 
+[21:01:19.987] LOG: Applied X Speed 
+[21:01:19.987] LOG: Applied X Speed 
+[21:01:19.987] LOG: Applied X Speed 
+[21:01:19.988] LOG: Applied X Speed 
+[21:01:19.988] LOG: Applied X Speed 
+[21:01:19.989] LOG: Applied X Speed 
+[21:01:19.989] LOG: Applied X Speed 
+[21:01:19.989] LOG: Move Pool: ["Echoed Voice","Spore","Giga Drain","Pollen Puff"]
+[21:01:19.989] LOG: Move Scores: [9,10,10.5,13]
+[21:01:19.989] LOG: Sorted Move Pool: ["Pollen Puff","Giga Drain","Spore","Echoed Voice"]
+[21:01:19.989] LOG: Chosen Move: Pollen Puff
+[21:01:19.989] LOG: %cStart Phase EnemyCommandPhase color:green;
+[21:01:19.989] LOG: Applied X Speed 
+[21:01:19.989] LOG: Applied X Speed 
+[21:01:19.989] LOG: Applied X Speed 
+[21:01:19.990] LOG: Applied X Speed 
+[21:01:19.991] LOG: Applied X Speed 
+[21:01:19.991] LOG: Applied X Speed 
+[21:01:19.992] LOG: Applied X Speed 
+[21:01:19.992] LOG: Applied X Speed 
+[21:01:19.993] LOG: Applied X Speed 
+[21:01:19.994] LOG: Applied X Speed 
+[21:01:19.995] LOG: Applied X Speed 
+[21:01:19.995] LOG: Applied X Speed 
+[21:01:19.996] LOG: Applied X Speed 
+[21:01:19.996] LOG: Applied X Speed 
+[21:01:19.998] LOG: Applied X Speed 
+[21:01:19.999] LOG: Applied X Speed 
+[21:01:19.999] LOG: Move Pool: ["Double-Edge"]
+[21:01:19.999] LOG: Move Scores: [28.5]
+[21:01:19.999] LOG: Sorted Move Pool: ["Double-Edge"]
+[21:01:19.999] LOG: Chosen Move: Double-Edge
+[21:01:19.999] LOG: %cStart Phase TurnStartPhase color:green;
+[21:01:19.999] LOG: Applied X Speed 
+[21:01:19.999] LOG: Applied X Speed 
+[21:01:20.000] LOG: Applied X Speed 
+[21:01:20.000] LOG: Applied X Speed 
+[21:01:20.000] LOG: Applied X Speed 
+[21:01:20.000] LOG: Applied X Speed 
+[21:01:20.001] LOG: Applied X Speed 
+[21:01:20.001] LOG: Applied X Speed 
+[21:01:20.002] LOG: Applied X Speed 
+[21:01:20.002] LOG: Applied X Speed 
+[21:01:20.002] LOG: Applied X Speed 
+[21:01:20.002] LOG: Applied X Speed 
+[21:01:20.003] LOG: Applied X Speed 
+[21:01:20.003] LOG: Applied X Speed 
+[21:01:20.004] LOG: Applied X Speed 
+[21:01:20.004] LOG: Applied X Speed 
+[21:01:20.005] LOG: Applied X Speed 
+[21:01:20.005] LOG: Applied X Speed 
+[21:01:20.005] LOG: Applied X Speed 
+[21:01:20.005] LOG: %cStart Phase MovePhase color:green;
+[21:01:20.005] LOG: %cUser: G-Max Inteleon
+Move: AEROBLAST
+Use Mode: NORMAL color:orchid
+[21:01:20.006] LOG: Applied X Speed 
+[21:01:20.006] LOG: Applied X Speed 
+[21:01:20.006] LOG: Applied X Speed 
+[21:01:20.006] LOG: Applied X Speed 
+[21:01:20.007] LOG: Applied X Speed 
+[21:01:20.007] LOG: Applied X Speed 
+[21:01:20.008] LOG: Applied X Speed 
+[21:01:20.008] LOG: Applied X Speed 
+[21:01:20.009] LOG: Applied X Speed 
+[21:01:20.009] LOG: Applied X Speed 
+[21:01:20.009] LOG: Applied X Speed 
+[21:01:20.009] LOG: Applied X Speed 
+[21:01:20.010] LOG: Applied X Speed 
+[21:01:20.010] LOG: Applied X Speed 
+[21:01:20.011] LOG: %cStart Phase MessagePhase color:green;
+[21:01:20.216] LOG: %cStart Phase MoveEffectPhase color:green;
+[21:01:22.150] LOG: crit stage: +1
+[21:01:22.151] LOG: Applied X Speed 
+[21:01:22.151] LOG: Applied X Speed 
+[21:01:22.151] LOG: Move: Aeroblast | Base damage: 86.48932038834954 | Power: 100 | Source attack: 333 | Target defense: 309
+[21:01:22.152] LOG: Move: Aeroblast | Attack damage: 29
+[21:01:22.152] LOG: Applied Shell Bell 
+[21:01:22.152] LOG: %cStart Phase DamageAnimPhase color:green;
+[21:01:22.184] LOG: %cStart Phase MessagePhase color:green;
+[21:01:22.616] LOG: %cStart Phase MoveEndPhase color:green;
+[21:01:22.617] LOG: Applied X Speed 
+[21:01:22.617] LOG: Applied X Speed 
+[21:01:22.618] LOG: %cStart Phase MovePhase color:green;
+[21:01:22.618] LOG: %cUser: Kyurem
+Move: GLACIAL_LANCE
+Use Mode: NORMAL color:orchid
+[21:01:22.618] LOG: Applied X Speed 
+[21:01:22.618] LOG: Applied X Speed 
+[21:01:22.619] LOG: Applied X Speed 
+[21:01:22.619] LOG: Applied X Speed 
+[21:01:22.619] LOG: Applied X Speed 
+[21:01:22.619] LOG: Applied X Speed 
+[21:01:22.620] LOG: Applied X Speed 
+[21:01:22.620] LOG: %cStart Phase MessagePhase color:green;
+[21:01:22.866] LOG: %cStart Phase MoveEffectPhase color:green;
+[21:01:23.310] LOG: crit stage: +0
+[21:01:23.311] LOG: Applied X Speed 
+[21:01:23.311] LOG: Applied X Speed 
+[21:01:23.311] LOG: Move: Glacial Lance | Base damage: 141.6238048780488 | Power: 130 | Source attack: 278 | Target defense: 205
+[21:01:23.312] LOG: Move: Glacial Lance | Attack damage: 99
+[21:01:23.312] LOG: crit stage: +0
+[21:01:23.312] LOG: Applied X Speed 
+[21:01:23.312] LOG: Applied X Speed 
+[21:01:23.313] LOG: Move: Glacial Lance | Base damage: 102.43115789473684 | Power: 130 | Source attack: 278 | Target defense: 285
+[21:01:23.313] LOG: Move: Glacial Lance | Attack damage: 122
+[21:01:23.313] LOG: %cStart Phase DamageAnimPhase color:green;
+[21:01:23.334] LOG: %cStart Phase MessagePhase color:green;
+[21:01:23.766] LOG: %cStart Phase DamageAnimPhase color:green;
+[21:01:23.809] LOG: %cStart Phase MoveEndPhase color:green;
+[21:01:23.810] LOG: Applied X Speed 
+[21:01:23.810] LOG: %cStart Phase MovePhase color:green;
+[21:01:23.810] LOG: %cUser: Kyurem
+Move: BLIZZARD
+Use Mode: INDIRECT color:orchid
+[21:01:23.811] LOG: %cStart Phase MessagePhase color:green;
+[21:01:24.033] LOG: %cStart Phase MoveEffectPhase color:green;
+[21:01:24.050] LOG: crit stage: +0
+[21:01:24.050] LOG: Applied X Speed 
+[21:01:24.051] LOG: Applied X Speed 
+[21:01:24.051] LOG: Move: Blizzard | Base damage: 85.81359223300971 | Power: 50 | Source attack: 654 | Target defense: 309
+[21:01:24.051] LOG: Move: Blizzard | Attack damage: 50
+[21:01:24.052] LOG: crit stage: +0
+[21:01:24.052] LOG: Applied X Speed 
+[21:01:24.052] LOG: Applied X Speed 
+[21:01:24.053] LOG: Move: Blizzard | Base damage: 91.61384083044983 | Power: 50 | Source attack: 654 | Target defense: 289
+[21:01:24.053] LOG: Move: Blizzard | Attack damage: 92
+[21:01:24.053] LOG: %cStart Phase DamageAnimPhase color:green;
+[21:01:24.084] LOG: %cStart Phase MessagePhase color:green;
+[21:01:24.516] LOG: %cStart Phase DamageAnimPhase color:green;
+[21:01:24.551] LOG: %cStart Phase FaintPhase color:green;
+[21:01:24.552] LOG: Applied X Speed 
+[21:01:24.552] LOG: Applied X Speed 
+[21:01:24.552] LOG: Applied X Speed 
+[21:01:24.552] LOG: Applied X Speed 
+[21:01:24.553] LOG: Applied X Speed 
+[21:01:24.553] WARN: cry/143-primal not found
+[21:01:24.667] LOG: Applied X Speed 
+[21:01:24.667] LOG: Applied X Speed 
+[21:01:24.667] LOG: Applied X Speed 
+[21:01:24.667] LOG: Applied X Speed 
+[21:01:24.667] LOG: Applied X Speed 
+[21:01:24.668] LOG: %cStart Phase MessagePhase color:green;
+[21:01:25.773] LOG: %cStart Phase ShowAbilityPhase color:green;
+[21:01:26.083] LOG: %cStart Phase StatStageChangePhase color:green;
+[21:01:26.451] LOG: %cStart Phase MessagePhase color:green;
+[21:01:26.866] LOG: %cStart Phase HideAbilityPhase color:green;
+[21:01:26.910] LOG: %cStart Phase VictoryPhase color:green;
+[21:01:26.910] LOG: %cStart Phase ExpPhase color:green;
+[21:01:26.910] LOG: Applied Super EXP. Charm 
+[21:01:26.910] LOG: Applied EXP. Charm 
+[21:01:27.293] LOG: 822162 866804 844505
+[21:01:27.433] LOG: %cStart Phase LevelUpPhase color:green;
+[21:01:27.434] LOG: Applied Calcium 
+[21:01:28.573] LOG: %cStart Phase MoveEndPhase color:green;
+[21:01:28.573] LOG: Applied X Speed 
+[21:01:28.574] LOG: Applied X Speed 
+[21:01:28.574] LOG: %cStart Phase MovePhase color:green;
+[21:01:28.574] LOG: %cUser: Kyurem
+Move: BLIZZARD
+Use Mode: INDIRECT color:orchid
+[21:01:28.574] LOG: %cStart Phase MessagePhase color:green;
+[21:01:28.783] LOG: %cStart Phase MoveEffectPhase color:green;
+[21:01:28.784] LOG: %cStart Phase MessagePhase color:green;
+[21:01:29.233] LOG: %cStart Phase MoveEndPhase color:green;
+[21:01:29.233] LOG: %cStart Phase MovePhase color:green;
+[21:01:29.233] LOG: %cUser: Eldegoss
+Move: POLLEN_PUFF
+Use Mode: NORMAL color:orchid
+[21:01:29.234] LOG: Applied X Speed 
+[21:01:29.234] LOG: Applied X Speed 
+[21:01:29.234] LOG: Applied X Speed 
+[21:01:29.234] LOG: Applied X Speed 
+[21:01:29.234] LOG: Applied X Speed 
+[21:01:29.235] LOG: Applied X Speed 
+[21:01:29.235] LOG: Applied X Speed 
+[21:01:29.236] LOG: Applied X Speed 
+[21:01:29.236] LOG: Applied X Speed 
+[21:01:29.236] LOG: Applied X Speed 
+[21:01:29.236] LOG: %cStart Phase MessagePhase color:green;
+[21:01:29.483] LOG: %cStart Phase MoveEffectPhase color:green;
+[21:01:30.066] LOG: crit stage: +0
+[21:01:30.067] LOG: Move: Pollen Puff | Base damage: 66.19704433497537 | Power: 90 | Source attack: 181 | Target defense: 203
+[21:01:30.067] LOG: Move: Pollen Puff | Attack damage: 33
+[21:01:30.068] LOG: %cStart Phase DamageAnimPhase color:green;
+[21:01:30.110] LOG: %cStart Phase MoveEndPhase color:green;
+[21:01:30.110] LOG: %cStart Phase MovePhase color:green;
+[21:01:30.110] LOG: %cStart Phase MoveEndPhase color:green;
+[21:01:30.110] LOG: %cStart Phase CheckInterludePhase color:green;
+[21:01:30.110] LOG: %cStart Phase WeatherEffectPhase color:green;
+[21:01:30.110] LOG: %cStart Phase PositionalTagPhase color:green;
+[21:01:30.110] LOG: %cStart Phase BerryPhase color:green;
+[21:01:30.110] LOG: Applied X Speed 
+[21:01:30.110] LOG: Applied X Speed 
+[21:01:30.110] LOG: Applied X Speed 
+[21:01:30.111] LOG: Applied X Speed 
+[21:01:30.111] LOG: Applied X Speed 
+[21:01:30.111] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[21:01:30.111] LOG: Applied X Speed 
+[21:01:30.111] LOG: Applied X Speed 
+[21:01:30.111] LOG: Applied X Speed 
+[21:01:30.112] LOG: Applied X Speed 
+[21:01:30.112] LOG: Applied X Speed 
+[21:01:30.112] LOG: %cStart Phase TurnEndPhase color:green;
+[21:01:30.113] LOG: Applied X Speed 
+[21:01:30.113] LOG: Applied X Speed 
+[21:01:30.113] LOG: Applied X Speed 
+[21:01:30.113] LOG: Applied X Speed 
+[21:01:30.113] LOG: Applied X Speed 
+[21:01:30.114] WARN: [coop:turn] host recorder: finalize with NO open recording -> turn=-1 events=0 (caller decides not to emit)
+[21:01:30.114] LOG: %cStart Phase PokemonHealPhase color:green;
+[21:01:30.114] LOG: %cStart Phase MessagePhase color:green;
+[21:01:30.549] LOG: %cStart Phase PokemonHealPhase color:green;
+[21:01:30.783] LOG: Applied Healing Charm 
+[21:01:30.784] LOG: %cStart Phase MessagePhase color:green;
+[21:01:31.233] LOG: %cStart Phase PokemonHealPhase color:green;
+[21:01:31.483] LOG: %cStart Phase MessagePhase color:green;
+[21:01:31.933] LOG: %cStart Phase TurnInitPhase color:green;
+[21:01:31.933] LOG: %cStart Phase CommandPhase color:green;
