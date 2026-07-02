@@ -45,6 +45,8 @@ export interface CoopFieldMonView {
   abilityId?: number;
   /** ER bleed/frost/fear BattlerTags on this mon (#633 Fix #4h): `{ type, turns }` each. */
   erTags?: { type: string; turns: number }[];
+  /** Move PP usage per moveset slot (#798): `{ id, ppUsed }` in slot order. */
+  moves?: { id: number; ppUsed: number }[];
 }
 
 /** A readable snapshot of the arena's weather + terrain (+ tags, #633 GAP 1). */
@@ -98,6 +100,14 @@ export function serializeMonState(mon: CoopFieldMonView): CoopSerializedMonState
   if (mon.abilityId !== undefined) {
     state.abilityId = mon.abilityId;
   }
+  if (mon.moves !== undefined) {
+    // Sanitize per slot: non-negative integers only; slot order preserved (the checksum
+    // hashes moves in slot order, so the wire shape must mirror the live moveset exactly).
+    state.moves = mon.moves.map(m => ({
+      id: Math.max(0, Math.trunc(m.id)),
+      ppUsed: Math.max(0, Math.trunc(m.ppUsed)),
+    }));
+  }
   // ER bleed/frost/fear tags (#633 Fix #4h): carry them through, sanitized (string type +
   // non-negative integer turns). Omitted when empty so a tagless mon's wire shape is unchanged.
   if (mon.erTags !== undefined && mon.erTags.length > 0) {
@@ -116,11 +126,7 @@ export function serializeMonState(mon: CoopFieldMonView): CoopSerializedMonState
  * an undefined value (an older caller / a context with no money) omits the field, and the guest then
  * leaves its money alone (no regression). Non-finite / negative values are dropped (treated as absent).
  */
-export function buildCheckpoint(
-  mons: CoopFieldMonView[],
-  arena: CoopArenaView,
-  money?: number,
-): CoopBattleCheckpoint {
+export function buildCheckpoint(mons: CoopFieldMonView[], arena: CoopArenaView, money?: number): CoopBattleCheckpoint {
   const checkpoint: CoopBattleCheckpoint = {
     field: mons.map(serializeMonState),
     weather: Math.max(0, Math.trunc(arena.weather)),

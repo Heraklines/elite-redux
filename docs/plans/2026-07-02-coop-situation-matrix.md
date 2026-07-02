@@ -29,7 +29,7 @@ TEST: file names are under test/tests/elite-redux/coop/ unless noted.
 | Mega evolve / tera mid-battle | PARTIAL | host resolves; guest renders via checkpoint form fields. OPEN: probe asserting guest form/type convergence |
 | Charge moves / semi-invulnerable (Fly/Dig) across turns | LIVE-OK | turn resolution replays; no dedicated probe |
 | Weather/terrain/hazards set + expire | DONE | reconcileArenaTags + checkpoint weather/terrain; duo asserts checksum |
-| PP desync (guest never decrements) | PARTIAL | KNOWN: checksum-forced resync each move turn heals it; fix path = [moveId, ppUsed] in checkpoint (harness doc) |
+| PP desync (guest never decrements) | DONE | #798: checkpoint carries [moveId, ppUsed]; multiwave pins ZERO forced resyncs (was 1/turn) |
 | Disconnect mid-battle + rejoin | PARTIAL | #652 lifecycle grace; OPEN: duo probe simulating transport death + resume |
 | Checksum mismatch -> auto-resync heals | DONE | organic in every duo run; #718 spares live waits (market variant probe parked) |
 

@@ -228,13 +228,15 @@ describe.skipIf(!RUN)("co-op DUO multi-wave: two real engines, real reward shop 
       applyCheckpointSpy.mock.calls.length,
       "the guest applied a host checkpoint each wave",
     ).toBeGreaterThanOrEqual(WAVES);
-    // NO RESYNC STORM: a converged run requests at most a handful of full-state resyncs across the
-    // whole run (the organic per-wave seed/ability divergence self-heals via the per-turn checkpoint),
-    // never an unbounded per-iteration storm. Bound generously at <= 1 per wave.
+    // ZERO FORCED RESYNCS (#798): the old "<= 1 per wave" budget existed because the per-turn
+    // checkpoint did not carry move PP - the checksum mismatched EVERY move turn and the resync
+    // healed it (a constant false alarm that blinded the desync detector). The checkpoint now
+    // carries [moveId, ppUsed], so a fully-converged run requests NO resync at all; any count
+    // above zero is a REAL divergence regression, not tolerated noise.
     expect(
       resyncSpy.mock.calls.length,
-      `the guest did not resync-storm (resyncs=${resyncSpy.mock.calls.length} over ${WAVES} waves)`,
-    ).toBeLessThanOrEqual(WAVES);
+      `a converged run forces ZERO resyncs (got ${resyncSpy.mock.calls.length} over ${WAVES} waves)`,
+    ).toBe(0);
     logs.flush();
   }, 300_000);
 

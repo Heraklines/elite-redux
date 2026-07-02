@@ -232,6 +232,13 @@ export interface CoopSerializedMonState {
   speciesId: number;
   hp: number;
   maxHp: number;
+  /**
+   * Move PP usage per moveset slot (#798): `{ id: MoveId, ppUsed }` in slot order. The pure-renderer
+   * guest never decrements PP, and the checksum hashes `[moveId, ppUsed]` - without this every turn
+   * with a move use forced a FULL resync (a constant false alarm that blinded the desync detector).
+   * Optional/additive: an older host omits it and the guest leaves PP alone (resync still heals).
+   */
+  moves?: { id: number; ppUsed: number }[];
   /** `StatusEffect` enum value (0 = none). */
   status: number;
   /** The 7 stat stages (ATK..ACC/EVA), absolute values. */

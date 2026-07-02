@@ -150,6 +150,9 @@ function readMonView(mon: ReturnType<typeof globalScene.getField>[number]): Coop
     statStages: [...mon.getStatStages()],
     fainted: mon.isFainted(),
     ...(erTags.length > 0 ? { erTags } : {}),
+    // #798 PP sync: carry each slot's [moveId, ppUsed] so the guest's PP converges via the
+    // checkpoint (it never runs MovePhase) instead of via a forced FULL resync every turn.
+    moves: (mon.moveset ?? []).map(m => ({ id: m?.moveId ?? 0, ppUsed: m?.ppUsed ?? 0 })),
   };
 }
 
@@ -814,6 +817,17 @@ export function applyCoopCheckpoint(checkpoint: CoopBattleCheckpoint): void {
             stages[i] = state.statStages[i];
           }
           repairErTags(mon, state.erTags);
+          // #798 PP sync: adopt the host's ppUsed PER MATCHING MOVE ID. Deliberately
+          // conservative - never adds/removes/reorders moves (learn-move has its own relay);
+          // an id mismatch skips that slot and the resync backstop still heals it.
+          if (state.moves !== undefined && Array.isArray(mon.moveset)) {
+            for (const wire of state.moves) {
+              const slot = mon.moveset.find(m => m?.moveId === wire.id);
+              if (slot != null && slot.ppUsed !== wire.ppUsed) {
+                slot.ppUsed = Math.max(0, Math.trunc(wire.ppUsed));
+              }
+            }
+          }
           void mon.updateInfo();
         }
       } catch {
