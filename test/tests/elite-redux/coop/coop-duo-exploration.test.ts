@@ -495,6 +495,99 @@ describe.skipIf(!RUN)("co-op DUO exploration sweep (maintainer directive)", () =
     logs.flush();
   }, 240_000);
 
+  it("PROBE #795: Giratina's Bargain alternates - owner leaves, watcher adopts the outcome blob, counters lockstep", async () => {
+    // The Bargain is the 4th owner/watcher surface: at most ONE deal per visit, so the whole
+    // relay is a single comprehensive outcome blob (the proven ME-terminal resync) + a uniform
+    // terminal. This probe drives the LEAVE path end-to-end across two engines; the deal-commit
+    // path reuses applyCoopMeOutcome verbatim (already proven by the duo ME tests).
+    await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
+    const pair = createLoopbackPair();
+    const rig = await buildDuo(game, pair, setCoopRuntime, toCoop);
+    wireGuestCommand(rig);
+    const turn = rig.hostScene.currentBattle.turn;
+    await hostPlayWave(rig);
+    await withClient(rig.guestCtx, async () => {
+      await driveGuestReplayTurn(rig.guestScene, turn);
+    });
+    const { TheBargainPhase } = await import("#phases/the-bargain-phase");
+    const counterBefore = rig.hostRuntime.controller.interactionCounter();
+
+    // OWNER (host, even counter): play the real phase; the stub screen immediately leaves.
+    // Drain until the phase's async leave() chain fully ENDS - exiting with the chain
+    // mid-flight leaks its continuations into the NEXT test's boot (cross-ctx bleed).
+    let ownerDone = false;
+    await withClient(rig.hostCtx, async () => {
+      const phase = new TheBargainPhase();
+      const seamO = phase as unknown as { end: () => void };
+      const realEndO = seamO.end.bind(phase);
+      seamO.end = () => {
+        ownerDone = true;
+        realEndO();
+      };
+      const ui = globalScene.ui as unknown as {
+        setMode: (...args: unknown[]) => unknown;
+        showDialogue: (...args: unknown[]) => unknown;
+        showText: (...args: unknown[]) => unknown;
+      };
+      const savedSetMode = ui.setMode.bind(globalScene.ui);
+      const savedShowDialogue = ui.showDialogue?.bind(globalScene.ui);
+      const savedShowText = ui.showText.bind(globalScene.ui);
+      try {
+        ui.setMode = (...args: unknown[]): unknown => {
+          if (args[0] === UiMode.ER_BARGAIN) {
+            const onLeave = args[6] as () => void;
+            queueMicrotask(() => onLeave());
+          }
+          return Promise.resolve(true);
+        };
+        ui.showDialogue = (...args: unknown[]): unknown => {
+          (args[3] as (() => void) | undefined)?.();
+          return;
+        };
+        ui.showText = (...args: unknown[]): unknown => {
+          (args[2] as (() => void) | undefined)?.();
+          return;
+        };
+        haltQueueAfterCurrent();
+        phase.start();
+        for (let i = 0; i < 20 && !ownerDone; i++) {
+          await drainLoopback();
+        }
+      } finally {
+        ui.setMode = savedSetMode;
+        ui.showDialogue = savedShowDialogue as typeof ui.showDialogue;
+        ui.showText = savedShowText;
+      }
+    });
+    expect(ownerDone, "HARNESS: the owner bargain chain fully completed before exit").toBe(true);
+    expect(rig.hostRuntime.controller.interactionCounter(), "owner advanced the bargain interaction").toBe(
+      counterBefore + 1,
+    );
+
+    // WATCHER (guest): never opens the screen; buffer-hits the outcome blob + advances.
+    let watchDone = false;
+    await withClient(rig.guestCtx, async () => {
+      const phase = new TheBargainPhase();
+      haltQueueAfterCurrent();
+      const seam = phase as unknown as { end: () => void };
+      const realEnd = seam.end.bind(phase);
+      seam.end = () => {
+        watchDone = true;
+        realEnd();
+      };
+      phase.start();
+      for (let i = 0; i < 12 && !watchDone; i++) {
+        await drainLoopback();
+      }
+    });
+    expect(watchDone, "watcher converged and ended").toBe(true);
+    expect(rig.guestRuntime.controller.interactionCounter(), "guest advanced the bargain interaction").toBe(
+      counterBefore + 1,
+    );
+    expect(rig.guestScene.money, "money converged via the outcome blob").toBe(rig.hostScene.money);
+    logs.flush();
+  }, 240_000);
+
   it("PROBE #794: a host-side catch streams dex credit to the partner's account immediately", async () => {
     // Shared acquisition: setPokemonCaught is the universal chokepoint (wild catch, DexNav,
     // ME grants). The HOST's write must reach the GUEST's gameData without waiting for an

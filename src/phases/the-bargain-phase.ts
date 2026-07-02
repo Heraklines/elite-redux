@@ -20,6 +20,15 @@ import { globalScene } from "#app/global-scene";
 import { Phase } from "#app/phase";
 import { modifierTypes } from "#data/data-lists";
 import { Egg } from "#data/egg";
+import { applyCoopMeOutcome, captureCoopMeOutcome } from "#data/elite-redux/coop/coop-battle-engine";
+import { coopLog, coopWarn } from "#data/elite-redux/coop/coop-debug";
+import { COOP_BARGAIN_SEQ_BASE, COOP_BIOME_WAIT_MS } from "#data/elite-redux/coop/coop-interaction-relay";
+import {
+  advanceCoopInteractionForContinuation,
+  getCoopController,
+  getCoopInteractionRelay,
+  getCoopRuntime,
+} from "#data/elite-redux/coop/coop-runtime";
 import {
   BARGAIN_RELIC_CHOICES,
   BARGAIN_SIN_ORDER,
@@ -59,15 +68,99 @@ export class TheBargainPhase extends Phase {
   /** Guards against a double input resolving the event twice. */
   private resolving = false;
 
+  /** Co-op (#795): interaction counter pinned at open (-1 = solo / not pinned). */
+  private coopBargainStart = -1;
+  /** Co-op (#795): this client drives the real bargain screen. */
+  private coopBargainOwner = false;
+  /** Co-op (#795): the owner terminal fired (idempotence guard). */
+  private coopBargainDone = false;
+
   start(): void {
     super.start();
+    // Co-op (#795): the Bargain ALTERNATES like the market. The OWNER plays the real
+    // screen; whatever the deal did reaches the WATCHER as ONE comprehensive outcome
+    // blob (the proven ME-terminal resync: party / money / modifiers / dex / seeds),
+    // so no per-Sin serialization exists to get wrong. Solo / non-coop untouched.
+    const coopController = globalScene.gameMode.isCoop ? getCoopController() : null;
+    if (coopController != null) {
+      if (this.coopBargainStart < 0) {
+        this.coopBargainStart = coopController.interactionCounter();
+      }
+      const spoofed = getCoopRuntime()?.spoof != null;
+      const owns = spoofed || coopController.isLocalOwnerAtCounter(this.coopBargainStart);
+      coopLog(
+        "reward",
+        `bargain owner/watcher decision: pinnedStart=${this.coopBargainStart} role=${coopController.role} spoof=${spoofed} -> ${owns ? "OWNER" : "WATCHER"}`,
+      );
+      if (!owns) {
+        void this.coopBargainWatch();
+        return;
+      }
+      this.coopBargainOwner = true;
+    }
     this.run();
+  }
+
+  /**
+   * Co-op OWNER terminal (#795): fires on EVERY exit path (deal committed, leave,
+   * no available Sins) BEFORE UI teardown. Uniform protocol: always ONE outcome blob
+   * (on a leave the state is unchanged - the apply is a harmless convergence no-op),
+   * so the watcher awaits exactly one message and can never strand on a missing one.
+   */
+  private coopBargainTerminal(): void {
+    if (!this.coopBargainOwner || this.coopBargainDone) {
+      return;
+    }
+    this.coopBargainDone = true;
+    try {
+      getCoopInteractionRelay()?.sendInteractionOutcome(
+        COOP_BARGAIN_SEQ_BASE + this.coopBargainStart,
+        "bargain",
+        captureCoopMeOutcome(),
+      );
+      coopLog("reward", `bargain OWNER terminal: outcome blob sent (pinnedStart=${this.coopBargainStart})`);
+    } catch {
+      coopWarn("reward", "bargain OWNER terminal send threw (handled - watcher heals on timeout)");
+    }
+    advanceCoopInteractionForContinuation(this.coopBargainStart);
+  }
+
+  /** Co-op WATCHER (#795): never opens the bargain; adopts the owner's outcome verbatim. */
+  private async coopBargainWatch(): Promise<void> {
+    try {
+      globalScene.ui.showText("Your partner is bargaining with Giratina...");
+    } catch {
+      /* cosmetic */
+    }
+    const relay = getCoopInteractionRelay();
+    const outcome =
+      relay == null
+        ? null
+        : await relay.awaitInteractionOutcome(COOP_BARGAIN_SEQ_BASE + this.coopBargainStart, COOP_BIOME_WAIT_MS);
+    if (outcome?.k === "meResync") {
+      coopLog("reward", "bargain WATCHER: outcome blob received -> converging");
+      try {
+        applyCoopMeOutcome(outcome);
+      } catch {
+        coopWarn("reward", "bargain WATCHER apply threw (handled - checksum resync heals residuals)");
+      }
+    } else {
+      coopWarn("reward", `bargain WATCHER: ${outcome == null ? "TIMEOUT" : "unexpected outcome kind"} -> move on`);
+    }
+    advanceCoopInteractionForContinuation(this.coopBargainStart);
+    try {
+      globalScene.ui.clearText();
+    } catch {
+      /* cosmetic */
+    }
+    void globalScene.ui.setMode(UiMode.MESSAGE).then(() => this.end());
   }
 
   private run(): void {
     const available = BARGAIN_SIN_ORDER.filter(k => !DISABLED_BARGAIN_SINS.has(k) && bargainSinAvailable(k));
     const sins = pickBargainSins(available, Math.min(3, available.length));
     if (sins.length === 0) {
+      this.coopBargainTerminal();
       this.end();
       return;
     }
@@ -122,6 +215,7 @@ export class TheBargainPhase extends Phase {
     if (committed) {
       // The player accepted (and the deal was applied) one of Giratina's bargains.
       globalScene.validateAchv(achvs.DEVILS_BARGAIN);
+      this.coopBargainTerminal();
       this.end();
       return;
     }
@@ -136,6 +230,7 @@ export class TheBargainPhase extends Phase {
       return;
     }
     this.resolving = true;
+    this.coopBargainTerminal();
     await globalScene.ui.setMode(UiMode.MESSAGE);
     await this.giratina(`${ns}:option.leave.line1`);
     await this.narrate(`${ns}:option.leave.line2`);

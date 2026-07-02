@@ -47,6 +47,9 @@ export const COOP_BIOME_SHOP_SEQ_BASE = 7_000_000;
 
 /** #794 shared acquisition: the fixed disjoint seq for host->guest dex/starter sync broadcasts. */
 export const COOP_DEX_SYNC_SEQ = 9_200_000;
+
+/** #795 Giratina's Bargain: disjoint seq band (+ pinned interaction counter) for the deal outcome. */
+export const COOP_BARGAIN_SEQ_BASE = 7_500_000;
 export function coopBiomeShopSeq(pinnedStart: number): number {
   return COOP_BIOME_SHOP_SEQ_BASE + Math.max(0, pinnedStart);
 }

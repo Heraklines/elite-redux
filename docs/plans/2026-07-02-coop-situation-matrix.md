@@ -47,7 +47,7 @@ TEST: file names are under test/tests/elite-redux/coop/ unless noted.
 | Transfer / lock / check-team ops mid-shop | LIVE-OK | COOP_ACT_* relays; OPEN: probe |
 | Biome market every 10 waves | DONE | #673 ENABLED; PROBE #673 (stock stream + verbatim buys + money + counters) |
 | ME shops (Exotic Trader / Black Market) | PARTIAL | inherit market alternation; OPEN: probe vs the ME owner override |
-| Giratina's Bargain (Abyss x0) | OPEN | #795: routed to market for now; design written |
+| Giratina's Bargain (Abyss x0) | DONE | #795 ENABLED: owner plays, single comprehensive outcome blob (ME-resync reuse), PROBE #795 green |
 | Item registry round-trip (all items, relics) | DONE | registry-sweep probe: 169 ids clean, 17 generators healthy |
 | Resync fires during a LIVE shop wait | PARTIAL | #718 orphan-selector spares it; probe parked (cross-ctx fix needed) |
 | Both clients disagree who owns (parity drift) | DONE | from-pinned advances + owner resolved from pinned counter |
