@@ -1473,6 +1473,12 @@ export function initEliteReduxVanillaMovePatches(): VanillaMovePatchResult {
     const mutable = move as unknown as MutableMove;
     const had = mutable.attrs.some(a => a.constructor === ErSuperEffectiveVsTypeAttr);
     addAttrUnique(mutable, new ErSuperEffectiveVsTypeAttr(targetType));
+    // Pin the ER dex description too (e.g. Brine "Deals Super Effective damage vs
+    // Water") - this loop is separate from MOVE_PATCHERS, so without this the mechanic
+    // applied but the in-game text stayed vanilla (community report 2026-07-02:
+    // "Brine doesn't say it's super effective vs Water"). Idempotent: no-op if a
+    // bespoke override already pinned it.
+    applyErMoveDescription(mutable, pokerogueId);
     if (!had) {
       result.moveDeltas++;
     }

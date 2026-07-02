@@ -8,6 +8,7 @@ import { AbilityId } from "#enums/ability-id";
 import { ArenaTagSide } from "#enums/arena-tag-side";
 import { ArenaTagType } from "#enums/arena-tag-type";
 import { Command } from "#enums/command";
+import { ErAbilityId } from "#enums/er-ability-id";
 import { MoveCategory, type MoveDamageCategory } from "#enums/move-category";
 import type { MoveId } from "#enums/move-id";
 import { isVirtual } from "#enums/move-use-mode";
@@ -215,6 +216,32 @@ export const failIfDampCondition = new MoveCondition((user, _target, move) => {
     );
   }
   return !cancelled.value;
+});
+
+/**
+ * ER Radiance (2.65 dex: "+20% accuracy; Dark moves fail when user is present."): the
+ * dark-fail half. Attached dynamically to every DARK move by the ER custom-abilities
+ * init; fails the move while ANY active on-field Pokemon has Radiance (mirrors the
+ * Damp/Explosion field-wide condition above). The +20% accuracy half is wired in the
+ * archetype dispatcher (case 437).
+ */
+// ER custom ability ids live in the ErAbilityId numeric space; the established cast
+// pattern for engine APIs typed on AbilityId (see er-damage-preview.ts).
+const ER_RADIANCE_ABILITY_ID = ErAbilityId.RADIANCE as unknown as AbilityId;
+
+export const failIfRadianceOnFieldCondition = new MoveCondition((user, _target, move) => {
+  const simulated = globalScene.phaseManager.getCurrentPhase()?.is("EnemyCommandPhase");
+  for (const p of inSpeedOrder(ArenaTagSide.BOTH)) {
+    if (p.isActive(true) && p.hasAbility(ER_RADIANCE_ABILITY_ID)) {
+      if (!simulated) {
+        globalScene.phaseManager.queueMessage(
+          i18next.t("moveTriggers:cannotUseMove", { pokemonName: getPokemonNameWithAffix(user), moveName: move.name }),
+        );
+      }
+      return false;
+    }
+  }
+  return true;
 });
 
 /**

@@ -258,7 +258,11 @@ const C_SOURCE_OVERRIDES: ReadonlyMap<
   ["MOVE_BULLET_SEED", { pp: 30 }],
   ["MOVE_ICICLE_SPEAR", { pp: 30 }],
   ["MOVE_HOWL", { pp: 40 }],
-  ["MOVE_DRAGON_CLAW", { power: 80, chance: 0 }],
+  // MANUAL Nextdex override (do NOT regenerate away) - community report 2026-07-02:
+  // the v2.65.3b C source had Dragon Claw at 80 BP, but the live 2.65 dex
+  // (er-moves.ts id, longDescription "Keen Edge boost") shows 90. The dex is the
+  // canonical balance source per CLAUDE.md, so pin to it (keep chance:0).
+  ["MOVE_DRAGON_CLAW", { power: 90, chance: 0 }],
   ["MOVE_FRENZY_PLANT", { power: 150, accuracy: 90 }],
   ["MOVE_BOUNCE", { power: 85, accuracy: 90, pp: 5 }],
   ["MOVE_POISON_TAIL", { power: 80, pp: 25, chance: 30 }],

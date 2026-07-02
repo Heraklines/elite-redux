@@ -31,7 +31,7 @@
 
 import { type AbAttr, ConditionalCritAbAttr } from "#abilities/ab-attrs";
 import { AbBuilder, type Ability } from "#abilities/ability";
-import { allAbilities } from "#data/data-lists";
+import { allAbilities, allMoves } from "#data/data-lists";
 import { ER_SILKEN_DECREE_ABILITY_ID, SilkenDecreeAbAttr } from "#data/elite-redux/abilities/silken-decree";
 import { dispatchArchetype } from "#data/elite-redux/archetype-dispatcher";
 import { ConditionalAlwaysHitAbAttr } from "#data/elite-redux/archetypes/conditional-always-hit";
@@ -40,7 +40,9 @@ import { ER_ABILITIES, type ErAbilityDraft } from "#data/elite-redux/er-abilitie
 import { ER_ABILITY_ARCHETYPES, type ErArchetypeKind } from "#data/elite-redux/er-ability-archetypes";
 import { ER_ID_MAP } from "#data/elite-redux/er-id-map";
 import { AbilityId } from "#enums/ability-id";
+import { PokemonType } from "#enums/pokemon-type";
 import { Stat } from "#enums/stat";
+import { failIfRadianceOnFieldCondition } from "#moves/move-condition";
 
 /**
  * Numeric cutoff for "vanilla pokerogue" ability ids. ER-custom abilities are
@@ -217,7 +219,28 @@ export function initEliteReduxCustomAbilities(): InitEliteReduxCustomAbilitiesRe
     }
   }
 
+  patchDarkMovesForRadiance();
+
   return result;
+}
+
+/**
+ * ER Radiance (2.65 dex): "Dark moves fail when user is present." Attach the
+ * field-wide fail condition to EVERY Dark-type move dynamically (so future Dark
+ * moves are covered without per-move wiring). Idempotent across the re-runs this
+ * init sees in tests. The +20% accuracy half lives in the archetype dispatcher.
+ */
+let radianceDarkMovesPatched = false;
+function patchDarkMovesForRadiance(): void {
+  if (radianceDarkMovesPatched) {
+    return;
+  }
+  radianceDarkMovesPatched = true;
+  for (const move of allMoves) {
+    if (move?.type === PokemonType.DARK) {
+      move.condition(failIfRadianceOnFieldCondition, 3);
+    }
+  }
 }
 
 /** Aggregated result of a single `refreshEliteReduxComposites()` run. */

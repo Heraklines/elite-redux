@@ -506,14 +506,35 @@ function initUltraModifierPool() {
     new WeightedModifierType(
       modifierTypes.FROSTBITE_ORB,
       (party: Pokemon[]) => {
-        // ER Frostbite Orb (#387): same shelf as Toxic/Flame Orb. Offer it when
-        // someone could actually use a self-status orb (not already holding one
-        // and not frostbite-immune Ice-type).
+        // ER Frostbite Orb (#387): same shelf as Toxic/Flame Orb, and the SAME
+        // beneficiary gate they use. Previously it offered for ANY non-Ice mon (no
+        // ability/move requirement), so it appeared for nearly every team while
+        // Flame/Toxic almost never did (community report 2026-07-02: "only ever see
+        // Frostbite Orb, never Flame or Toxic"). Frostbite (ER's special-side burn,
+        // cuts Sp. Atk) rewards the same status-payoff kit; Ice-types are immune.
         return party.some(p => {
           const isHoldingOrb = p
             .getHeldItems()
             .some(i => i.type.id === "FLAME_ORB" || i.type.id === "TOXIC_ORB" || i.type.id === "FROSTBITE_ORB");
-          return !isHoldingOrb && !p.isOfType(PokemonType.ICE);
+
+          if (!isHoldingOrb && !p.isOfType(PokemonType.ICE)) {
+            const moveset = p
+              .getMoveset(true)
+              .filter(m => m != null)
+              .map(m => m.moveId);
+            // Moves that take advantage of being statused (Facade) or passing it on.
+            const hasStatusMoves = [MoveId.FACADE, MoveId.PSYCHO_SHIFT].some(m => moveset.includes(m));
+            // General "I want to be statused" abilities (mirror Flame/Toxic Orb).
+            const hasGeneralAbility = [
+              AbilityId.QUICK_FEET,
+              AbilityId.GUTS,
+              AbilityId.MARVEL_SCALE,
+              AbilityId.MAGIC_GUARD,
+            ].some(a => p.hasUnlockedAbility(a));
+            return hasGeneralAbility || hasStatusMoves;
+          }
+
+          return false;
         })
           ? 10
           : 0;

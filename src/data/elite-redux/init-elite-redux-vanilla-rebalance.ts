@@ -648,11 +648,15 @@ const ABILITY_PATCHERS: ReadonlyMap<AbilityId, (ability: MutableAbility) => void
   // ===== Round 3: more MINOR / MAJOR patches from the audit =====
   // 178 MEGA_LAUNCHER: pulse moves 1.5x → 1.3x (audit MINOR retune).
   [AbilityId.MEGA_LAUNCHER, ab => mutateMovePowerBoost(ab, 1.3)],
-  // 6 STURDY: ER ROM description — "When at full HP, survive any single attack
-  // with at least 1 HP remaining. Functions like a Focus Sash; does not protect
-  // against multihit or follow-up attacks." This is IDENTICAL to vanilla pokerogue
-  // STURDY (SturdyAbAttr / PreventBerryUseAbAttr-style full-HP survival). No rider
-  // needed — earlier audit note about a "SE + full-HP damage cut" was incorrect.
+  // 6 STURDY: ER 2.65 dex — "At full HP, cannot be KO in one hit, stays at 1 HP
+  // instead." The survive-at-1-HP clause is vanilla pokerogue Sturdy's
+  // PreDefendFullHpEndureAbAttr (already wired), so no rider is needed. The other
+  // vanilla-Sturdy clause (BlockOneHitKOAbAttr, which makes OHKO moves FAIL) is
+  // DEAD in ER: all four OHKO moves (Guillotine/Horn Drill/Fissure/Sheer Cold) are
+  // converted to regular damaging moves in init-elite-redux-vanilla-move-patches.ts
+  // (OneHitKOAttr stripped), so nothing ever triggers the block. The community
+  // "Guillotine fails on Sturdy" report is STALE - it predates that OHKO->regular
+  // conversion; ER Guillotine is now a 120-BP Bug move with no Sturdy interaction.
 
   // 7 LIMBER: ER spec is "Para immune, takes half recoil, immune to self
   // stat drops." Vanilla pokerogue Limber covers paralysis immunity; ER
