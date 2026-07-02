@@ -146,6 +146,17 @@ export class CoopBattleStreamer {
     return this.finalizedMark != null && this.finalizedMark.wave === wave && turn <= this.finalizedMark.turn;
   }
 
+  /**
+   * #790 REGRESSION FIX (live "after even normal combat we are stuck"): the guest's
+   * currentBattle.waveIndex may not have ticked yet when the NEXT wave's first replay phase
+   * starts, so a mark from the finished wave (same waveIndex, turn 1) wrongly killed the new
+   * wave's turn 1 in a loop. Clear the mark the moment the guest processes a wave advance -
+   * the mark only ever exists to kill duplicates WITHIN the wave it was set in.
+   */
+  clearFinalizedMark(): void {
+    this.finalizedMark = null;
+  }
+
   private enemyPartyHandler: ((wave: number, enemies: CoopSerializedEnemy[]) => void) | null = null;
   private checkpointHandler: ((reason: string, checkpoint: CoopBattleCheckpoint) => void) | null = null;
   /** wave -> resolver for an in-flight {@linkcode awaitEnemyParty}. */

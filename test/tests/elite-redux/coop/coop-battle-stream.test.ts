@@ -547,3 +547,23 @@ describe("co-op host-authoritative battle stream (#633, LIVE-D)", () => {
     });
   });
 });
+
+describe("stale-turn finalize mark (#790 + regression fix)", () => {
+  it("marks kill same-wave duplicates but NEVER survive the wave boundary (the live 'stuck after normal combat' regression)", () => {
+    const { host } = createLoopbackPair();
+    const stream = new CoopBattleStreamer(host);
+    // Within a wave: once turn N finalized, N and below are stale, N+1 is live.
+    stream.markTurnFinalized(1, 2);
+    expect(stream.isTurnFinalized(1, 1), "earlier turn same wave is stale").toBe(true);
+    expect(stream.isTurnFinalized(1, 2), "the finalized turn itself is stale").toBe(true);
+    expect(stream.isTurnFinalized(1, 3), "the NEXT turn is live").toBe(false);
+    // A different waveIndex never matches (the guard is wave-scoped).
+    expect(stream.isTurnFinalized(2, 1), "another wave's turn 1 is live").toBe(false);
+    // THE REGRESSION: the guest's waveIndex may not tick before the next wave's turn 1 replay
+    // starts, so the wave boundary MUST clear the mark - otherwise (same stale waveIndex, turn 1)
+    // reads as a duplicate and the new wave's first turn is killed in a loop.
+    stream.clearFinalizedMark();
+    expect(stream.isTurnFinalized(1, 1), "after the wave-boundary clear NOTHING is stale").toBe(false);
+    expect(stream.isTurnFinalized(1, 2), "after the wave-boundary clear NOTHING is stale (finalized turn)").toBe(false);
+  });
+});

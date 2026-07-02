@@ -914,6 +914,10 @@ export class CoopFinalizeTurnPhase extends Phase {
           "replay",
           `guest finalize turn=${this.turn}: suppressing phantom turn after wave-advance signaled wave=${wave} (terminal final turn, NOT queuing turn-end)`,
         );
+        // #790 regression fix: the stale-duplicate mark is scoped to the wave it was set in.
+        // waveIndex may not tick before the next wave's first replay phase starts, so clear the
+        // mark NOW (the wave boundary) or the new wave's turn 1 is killed as a "stale duplicate".
+        getCoopBattleStreamer()?.clearFinalizedMark();
         this.maybeRunCoopWaveAdvance();
       } else {
         // BUG1 (faint auto-switch premature-victory deadlock): the authoritative guest is a PURE
@@ -970,6 +974,9 @@ export class CoopFinalizeTurnPhase extends Phase {
     if (pending == null) {
       return;
     }
+    // #790 regression fix (both entry points): a consumed wave advance is THE wave boundary -
+    // clear the stale-duplicate mark here too so no path can carry it into the next wave.
+    getCoopBattleStreamer()?.clearFinalizedMark();
     // DIAGNOSTIC (#633 trainer-victory deadlock): log the outcome + the guest's battleType so a live
     // capture confirms the guest queues the right tail. For a "win" on a TRAINER wave the VictoryPhase
     // it queues MUST go on to push TrainerVictoryPhase + SelectModifierPhase (the guest becomes the
