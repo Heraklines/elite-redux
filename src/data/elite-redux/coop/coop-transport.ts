@@ -411,7 +411,7 @@ export type CoopBattleEvent =
   /** A mon used a move (cue the "X used Y!" + move animation). */
   | { k: "moveUsed"; bi: number; moveId: number; targets: number[] }
   /** Set + tween a mon's hp to this value. */
-  | { k: "hp"; bi: number; hp: number; maxHp: number }
+  | { k: "hp"; bi: number; hp: number; maxHp: number; sp?: number }
   /**
    * A mon fainted. `narrate` (#691, additive optional) is true IFF the host shows an "X fainted!" message
    * for this KO (a FaintPhase runs - either inline at the damage chokepoint or deferred via the move's
@@ -421,7 +421,7 @@ export type CoopBattleEvent =
    * an older host -> the guest treats it as falsy and does not narrate (today's silent behavior); the flag
    * stays on the wire (not hardcoded on the guest) so the gating + forward-compat semantics hold.
    */
-  | { k: "faint"; bi: number; narrate?: boolean }
+  | { k: "faint"; bi: number; narrate?: boolean; sp?: number }
   /** A mon's stat stage changed to this absolute value (`Stat` enum). */
   | { k: "statStage"; bi: number; stat: number; value: number }
   /** A mon's status changed (`StatusEffect` enum, 0 = cured). */
@@ -573,7 +573,7 @@ export type CoopMessage =
    */
   | { t: "commandRequest"; fieldIndex: number; turn: number; moveSlots: number[] }
   /** A player's battle command for their own field slot (phase P2 / LIVE-C reply). */
-  | { t: "command"; fieldIndex: number; turn: number; command: SerializedCommand }
+  | { t: "command"; fieldIndex: number; turn: number; command: SerializedCommand; decline?: boolean }
   /** A forced/voluntary switch replacement: bring in party `partySlot` to `fieldIndex` (P2). */
   | { t: "switchChoice"; fieldIndex: number; partySlot: number }
   /**

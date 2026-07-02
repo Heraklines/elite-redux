@@ -229,6 +229,7 @@ export class CoopHpDrainReplayPhase extends PokemonPhase {
     private readonly fromHp: number,
     private readonly toHp: number,
     private readonly maxHp: number,
+    private readonly sp?: number,
   ) {
     super(battlerIndex);
   }
@@ -242,7 +243,9 @@ export class CoopHpDrainReplayPhase extends PokemonPhase {
       );
     }
     try {
-      const mon = fieldMon(this.battlerIndex);
+      // #796 ("pokemon not doing damage at all"): resolve by IDENTITY - never drain the wrong
+      // mon's bar around a mid-turn switch-in; an unmaterialized actor defers to the checkpoint.
+      const mon = fieldMonByIdentity(this.battlerIndex, this.sp);
       if (mon == null) {
         // The checkpoint already removed this mon - nothing to drain; end.
         if (isCoopDebug()) {
@@ -466,6 +469,44 @@ export class CoopStatusReplayPhase extends PokemonPhase {
  * checkpoint somehow already removed (or an absent slot) is a no-op here too. Hardened to always reach
  * `end()` (faintCry can swallow its own callback when audio is muted, so a watchdog backs it).
  */
+/**
+ * #796 (live: lingering sprites, "no damage", entry-KO desyncs): live events target a FIELD
+ * SLOT, but around mid-turn switch-ins / entry-ability KOs the guest's slot may hold a
+ * DIFFERENT mon than the host acted on. Resolve the actor by IDENTITY first: if the slot mon's
+ * species matches `sp` use it; otherwise scan the same side's field for the species. Returns
+ * null when the actor is not materialized on this renderer yet (callers no-op or defer to the
+ * checkpoint, NEVER apply to the wrong mon).
+ */
+function fieldMonByIdentity(bi: number, sp: number | undefined): ReturnType<typeof fieldMon> {
+  const slotMon = fieldMon(bi);
+  if (sp == null || sp === 0) {
+    return slotMon; // legacy event (older host build): slot semantics
+  }
+  if (slotMon != null && slotMon.species?.speciesId === sp) {
+    return slotMon;
+  }
+  const field = globalScene.getField();
+  const isEnemySide = bi >= 2;
+  for (let i = 0; i < field.length; i++) {
+    const mon = field[i];
+    if (mon == null || i === bi || i >= 2 !== isEnemySide) {
+      continue;
+    }
+    if (mon.species?.speciesId === sp && mon.isOnField()) {
+      coopWarn("replay", `event actor resolved by IDENTITY sp=${sp} bi=${bi} -> field slot ${i} (slot drift, #796)`);
+      return mon;
+    }
+  }
+  if (slotMon != null) {
+    coopWarn(
+      "replay",
+      `event actor sp=${sp} NOT on field (slot ${bi} holds sp=${slotMon.species?.speciesId}) -> SKIP apply, checkpoint reconciles (#796)`,
+    );
+    return null;
+  }
+  return null;
+}
+
 export class CoopFaintReplayPhase extends PokemonPhase {
   /**
    * #786: when the presented faint removed a GUEST-OWNED player-field mon and the guest still has a
@@ -538,22 +579,38 @@ export class CoopFaintReplayPhase extends PokemonPhase {
    * an older host (no `narrate` field) or an `ignoreFaintPhase` KO produces no extra line.
    */
   private readonly narrate: boolean;
+  private readonly sp: number | undefined;
 
-  constructor(battlerIndex: number, narrate = false) {
+  constructor(battlerIndex: number, narrate = false, sp?: number) {
     super(battlerIndex);
     this.narrate = narrate;
+    this.sp = sp;
   }
 
   public override start(): void {
     super.start();
     let ended = false;
     let watchdog: Phaser.Time.TimerEvent | undefined;
+    const victim = fieldMonByIdentity(this.battlerIndex, this.sp);
     const finish = () => {
       if (ended) {
         return;
       }
       ended = true;
       watchdog?.remove();
+      // #796 GUARANTEED removal ("sprite doesn't vanish", Low Blow entry-KO class): whatever the
+      // animation path did (cry threw mid-summon, tween failed, watchdog fired), the fainted mon
+      // must never remain standing. Idempotent: a completed animation already removed it.
+      try {
+        if (victim != null && victim.isOnField()) {
+          victim.hp = 0;
+          victim.doSetStatus(StatusEffect.FAINT);
+          victim.leaveField(true, true, false);
+          victim.hideInfo();
+        }
+      } catch {
+        coopWarn("replay", `present faint bi=${this.battlerIndex} finish-removal threw (checkpoint reconciles)`);
+      }
       // #786: OUR mon just fainted with a legal bench - open OUR replacement picker (relay-only;
       // the host's out-of-band replacement checkpoint materializes the pick on this renderer).
       this.maybeOpenOwnReplacementPicker();
@@ -563,7 +620,7 @@ export class CoopFaintReplayPhase extends PokemonPhase {
       coopLog("replay", `present faint bi=${this.battlerIndex} narrate=${this.narrate}`);
     }
     try {
-      const pokemon = fieldMon(this.battlerIndex);
+      const pokemon = victim;
       // Already removed (defensive: a duplicate faint, or a mon off-field) - nothing to animate.
       if (pokemon == null || !pokemon.isOnField()) {
         if (isCoopDebug()) {

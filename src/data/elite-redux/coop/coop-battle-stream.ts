@@ -467,6 +467,17 @@ export class CoopBattleStreamer {
   consumeEnemyParty(wave: number): CoopSerializedEnemy[] | null {
     const buffered = this.lastEnemyParty;
     if (buffered == null || buffered.wave !== wave) {
+      // #693 ME battle desync: the ME handoff streams enemies keyed `me:<wave>:<counter>`;
+      // the guest's encounter build consumes by WAVE and missed them (live: "consumeEnemyParty
+      // wave=3 -> null" while `me:3:2` sat buffered -> guest generated DIFFERENT enemies).
+      // Fall back to a buffered ME party for THIS wave.
+      for (const [key, enemies] of this.meBattlePartyInbox) {
+        if (key.startsWith(`me:${wave}:`)) {
+          this.meBattlePartyInbox.delete(key);
+          coopLog("stream", `guest consumeEnemyParty wave=${wave} -> ${enemies.length} enemies (ME buffer ${key})`);
+          return enemies;
+        }
+      }
       if (isCoopDebug()) {
         coopLog(
           "stream",

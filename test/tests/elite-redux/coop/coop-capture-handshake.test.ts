@@ -14,7 +14,11 @@
 
 import { getGameMode } from "#app/game-mode";
 import { applyCoopCaptureParty } from "#data/elite-redux/coop/coop-battle-engine";
-import { clearCoopRuntime, mergeCoopPendingWaveAdvance, startLocalCoopSession } from "#data/elite-redux/coop/coop-runtime";
+import {
+  clearCoopRuntime,
+  mergeCoopPendingWaveAdvance,
+  startLocalCoopSession,
+} from "#data/elite-redux/coop/coop-runtime";
 import type { CoopMessage } from "#data/elite-redux/coop/coop-transport";
 import { GameModes } from "#enums/game-modes";
 import { SpeciesId } from "#enums/species-id";
@@ -93,7 +97,7 @@ describe.skipIf(!RUN)("co-op capture handshake (#633 B1/B2/B3) - live reconcile"
     clearCoopRuntime();
   });
 
-  it("B1/B2/B3: a caught mon is appended to the guest party with the host owner + own-dex credit", async () => {
+  it("B1/B2/B3(#801): own (guest-owned) catch credits the local dex; PARTNER-owned constructs do NOT", async () => {
     await game.classicMode.startBattle(SpeciesId.SNORLAX);
     startLocalCoopSession({ username: "Host" });
     game.scene.gameMode = getGameMode(GameModes.COOP);
@@ -122,7 +126,25 @@ describe.skipIf(!RUN)("co-op capture handshake (#633 B1/B2/B3) - live reconcile"
     expect(party[1].species.speciesId).toBe(SpeciesId.PIKACHU);
     expect(party[1].coopOwner).toBe("guest"); // B2: the host-resolved owner was mirrored, not re-derived
     expect(party[0]).toBe(lead); // the on-field lead object is preserved untouched
-    expect(scene.gameData.dexData[SpeciesId.PIKACHU].caughtAttr).not.toBe(0n); // B3: credited to OWN dex
+    // This apply runs on the authoritative-GUEST renderer, so a GUEST-owned constructed mon is
+    // the LOCAL player's own catch - it credits the local dex (B3 unchanged).
+    expect(scene.gameData.dexData[SpeciesId.PIKACHU].caughtAttr).not.toBe(0n);
+
+    // #801 (live account overwrite): a PARTNER-owned (host) constructed mon must NOT credit the
+    // local dex - that crediting is exactly the leak that copied partners' starters onto each
+    // other's accounts on every adopt. The partner's catch reaches this account only through the
+    // run-scoped dexSync stream.
+    const partnerCaught = scene.addPlayerPokemon(getPokemonSpecies(SpeciesId.EEVEE), 12);
+    partnerCaught.coopOwner = "host";
+    const eeveeDex = scene.gameData.dexData[SpeciesId.EEVEE];
+    eeveeDex.caughtAttr = 0n;
+    eeveeDex.seenAttr = 0n;
+    const target2 = [lead, party[1], partnerCaught].map(p => JSON.stringify(new PokemonData(p)));
+    applyCoopCaptureParty(JSON.parse(JSON.stringify(target2)));
+    await new Promise(resolve => setTimeout(resolve, 50));
+    expect(scene.gameData.dexData[SpeciesId.EEVEE].caughtAttr, "partner-owned construct never credits local dex").toBe(
+      0n,
+    );
   });
 
   it("B9a: a party-full release (host dropped a bench mon, added the caught one) reconciles by composition", async () => {

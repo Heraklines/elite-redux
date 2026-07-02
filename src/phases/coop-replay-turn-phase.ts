@@ -283,7 +283,7 @@ export class CoopReplayTurnPhase extends Phase {
               ? (fromHpByBi.get(event.bi) ?? event.hp)
               : (globalScene.getField()[event.bi]?.hp ?? event.hp);
             fromHpByBi.set(event.bi, event.hp);
-            pm.unshiftNew("CoopHpDrainReplayPhase", event.bi, seeded, event.hp, event.maxHp);
+            pm.unshiftNew("CoopHpDrainReplayPhase", event.bi, seeded, event.hp, event.maxHp, event.sp);
             break;
           }
           case "statStage":
@@ -296,7 +296,7 @@ export class CoopReplayTurnPhase extends Phase {
             // #691 (host-language leak): pass the `narrate` flag so the faint phase regenerates the
             // "X fainted!" line in the GUEST'S language ONLY for KOs the host actually narrated (a real
             // FaintPhase ran, i.e. `!ignoreFaintPhase`). Older host (no `narrate`) -> falsy -> no line.
-            pm.unshiftNew("CoopFaintReplayPhase", event.bi, event.narrate === true);
+            pm.unshiftNew("CoopFaintReplayPhase", event.bi, event.narrate === true, event.sp);
             break;
           default:
             // weather / terrain / switch ride the authoritative checkpoint, not the animation pump.

@@ -5498,7 +5498,13 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
     // excluded. Inert unless a recording is open (only the host, mid-turn, in a live co-op run) - solo
     // / non-host is byte-for-byte unaffected.
     if (isCoopRecording()) {
-      recordCoopEvent({ k: "hp", bi: this.getBattlerIndex(), hp: this.hp, maxHp: this.getMaxHp() });
+      recordCoopEvent({
+        k: "hp",
+        bi: this.getBattlerIndex(),
+        hp: this.hp,
+        maxHp: this.getMaxHp(),
+        sp: this.species?.speciesId ?? 0,
+      });
       if (this.isFainted()) {
         // #691 (host-language leak): carry `narrate` = whether the host shows an "X fainted!" message for
         // this KO, so the guest regenerates the faint line in its OWN language IFF true (and narrates
@@ -5511,7 +5517,7 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
         // onFaintTarget) and thus a shown message, so `narrate` is TRUE for a recorded faint. The flag is
         // kept on the wire (not hardcoded on the guest) so the GATING semantics + forward-compat hold (an
         // event may carry narrate=false and the guest suppresses the line).
-        recordCoopEvent({ k: "faint", bi: this.getBattlerIndex(), narrate: true });
+        recordCoopEvent({ k: "faint", bi: this.getBattlerIndex(), narrate: true, sp: this.species?.speciesId ?? 0 });
       }
     }
     if (this.isFainted() && !ignoreFaintPhase) {

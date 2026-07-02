@@ -221,12 +221,22 @@ export class CoopBattleSync {
     if (msg.t === "commandRequest") {
       const responder = this.responder;
       if (responder == null) {
-        if (isCoopDebug()) {
-          coopWarn(
-            "relay",
-            `peer recv commandRequest fieldIndex=${msg.fieldIndex} turn=${msg.turn} but NO responder installed -> dropped`,
-          );
-        }
+        // #693 live deadlock ("unable to continue"): dropping the request left the host
+        // awaiting forever ("Your partner is choosing a move..."). ANSWER with a DECLINE so
+        // the host's await resolves null and its AI fallback commands the slot immediately.
+        // Hit when slot-ownership tags diverge (both clients think the slot is the other's,
+        // seen in the ME single-format battle) or the guest has no picker for this turn.
+        coopWarn(
+          "relay",
+          `peer recv commandRequest fieldIndex=${msg.fieldIndex} turn=${msg.turn} but NO responder installed -> DECLINE reply (host AI-falls-back)`,
+        );
+        this.transport.send({
+          t: "command",
+          fieldIndex: msg.fieldIndex,
+          turn: msg.turn,
+          command: { command: 0, cursor: -1 } as SerializedCommand,
+          decline: true,
+        });
         return;
       }
       const command = responder({ fieldIndex: msg.fieldIndex, turn: msg.turn, moveSlots: msg.moveSlots });
@@ -243,6 +253,14 @@ export class CoopBattleSync {
     if (msg.t === "command") {
       const key = commandKey(msg.fieldIndex, msg.turn);
       const resolver = this.pending.get(key);
+      // #693: an explicit DECLINE resolves the awaiter with null -> the caller's AI
+      // fallback commands the slot. Never treated as a real command.
+      if (msg.decline && resolver != null) {
+        this.pending.delete(key);
+        coopLog("relay", `recv command DECLINE fieldIndex=${msg.fieldIndex} turn=${msg.turn} -> AI fallback`);
+        resolver(null);
+        return;
+      }
       if (resolver) {
         if (isCoopDebug()) {
           coopLog(

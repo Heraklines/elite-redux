@@ -43,6 +43,7 @@ import type {
   CoopFullBattleSnapshot,
   CoopFullMonSnapshot,
   CoopInteractionOutcome,
+  CoopRole,
   CoopSerializedArenaTag,
   CoopSerializedEnemy,
 } from "#data/elite-redux/coop/coop-transport";
@@ -2762,8 +2763,23 @@ export function applyCoopCaptureParty(serializedParty: string[]): void {
     // candy-reward + candy-bar UI, side-effects that don't belong on a silent wave-advance reconcile
     // (and the species registration above is what B3 needs; the per-species best-IV record is a
     // non-synced cosmetic dex detail).
+    // #801 ROOT (live 'starters still being given to me'): this crediting predates the scoped
+    // #794 share and ran for EVERY reconstructed mon - including the PARTNER'S OWN starters and
+    // bench whenever the matcher rebuilt them (launch, wave adopts, resyncs) - silently
+    // registering the partner's account species onto ours on every session. Credit ONLY mons WE
+    // own; a partner's genuine catch reaches this account through the run-scoped dexSync stream.
+    // This apply runs ONLY on the authoritative-guest renderer (cycle-free role derivation:
+    // importing the controller from coop-runtime here would create an import cycle).
+    const localRole: CoopRole = "guest";
     for (const mon of constructed) {
-      void globalScene.gameData.setPokemonCaught(mon, true, false, false).catch(() => {});
+      if ((mon as { coopOwner?: CoopRole }).coopOwner === localRole) {
+        void globalScene.gameData.setPokemonCaught(mon, true, false, false).catch(() => {});
+      } else {
+        coopLog(
+          "party",
+          `adopt SKIP account credit for partner-owned constructed mon sp=${mon.species?.speciesId} (#801)`,
+        );
+      }
     }
     coopLog(
       "party",
