@@ -1,0 +1,156 @@
+----- BUG REPORT (in-game) -----
+version:  1.11.19
+url:      https://elite-redux.pages.dev/
+ua:       Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36
+mode:     0  wave:25  difficulty:hell
+seed:     RQFEnxX7B0UqGGmvvvb4DgOR
+party:    Flaaffy(L24 49/81), Ponyta(L24 0/65), Zapdos(L24 3/83), Cottonee(L22 0/54), Sawsbuck(L24 77/77), Weepinbell(L24 42/84)
+
+----- DESCRIPTION -----
+A pokemon with Coward switching in might get hit before Coward sets Protect
+
+----- CONSOLE -----
+[12:20:43.451] LOG: %c %c %c %c %c Phaser v3.90.0 (WebGL | Web Audio) %c https://phaser.io/v390 background: #ff0000 background: #ffff00 background: #00ff00 background: #00ffff color: #ffffff; background: #000000 background: transparent
+[12:20:43.842] LOG: [ER] build mr1lenh7-fth8
+[12:20:49.767] DEBUG: Destroying loading scene
+[12:20:49.767] DEBUG: Destroyed loading scene
+[12:20:49.837] LOG: Seed: yz38yfnlg4VYGdHF87GFr7bD
+[12:20:49.837] LOG: Wave Seed: yz38yfnlg4VYGdHF87GFr7bD 0
+[12:20:52.456] LOG: %cStart Phase LoginPhase color:green;
+[12:20:52.649] LOG: Client Session: DEk7Xf6ju6fyIogaYFYDzjXZdfhvlc5O
+[12:20:52.797] DEBUG: Using cached system data
+[12:20:52.906] LOG: %cStart Phase TitlePhase color:green;
+[12:20:52.906] LOG: Getting Session Slot id: %d 0
+[12:20:52.920] LOG: use seasonal splash messages true
+[12:20:53.958] LOG: Getting Session Slot id: %d 0
+[12:20:53.966] LOG: Wave Seed: RQFEnxX7B0UqGGmvvvb4DgOR 0
+[12:20:53.966] LOG: Seed: RQFEnxX7B0UqGGmvvvb4DgOR
+[12:20:54.020] LOG: Wave Seed: kj_^qP[In``{M]hk 25
+[12:20:54.068] LOG: Applied Zinc 
+[12:20:54.072] LOG: Applied Zinc 
+[12:20:54.075] LOG: Applied Zinc 
+[12:20:54.250] LOG: %cStart Phase EncounterPhase color:green;
+[12:20:54.254] LOG: Pokemon: Foe Swellow | Species ID: 277 | Level: 28 | Nature: Timid (+Spd/-Atk)
+[12:20:54.254] LOG: Stats (IVs): HP: 80 (31), Atk: 54 (31), Def: 47 (31), Spatk: 61 (31), Spdef: 41 (31), Spd: 92 (31)
+[12:20:54.255] LOG: Ability: Determination | Passive Ability: Flock 
+[12:20:54.255] LOG: Moveset: ["Boomburst","Protect","Heat Wave","Hurricane"]
+[12:20:54.255] LOG: Pokemon: Foe Starmie | Species ID: 121 | Level: 28 | Nature: Timid (+Spd/-Atk)
+[12:20:54.256] LOG: Stats (IVs): HP: 80 (31), Atk: 49 (31), Def: 61 (31), Spatk: 72 (31), Spdef: 61 (31), Spd: 86 (31)
+[12:20:54.256] LOG: Ability: Storm Drain | Passive Ability: Natural Cure 
+[12:20:54.256] LOG: Moveset: ["Water Shuriken","Ice Beam","Diamond Storm","Psychic"]
+[12:20:54.256] LOG: Pokemon: Foe Combusken | Species ID: 256 | Level: 28 | Nature: Jolly (+Spd/-SpAtk)
+[12:20:54.256] LOG: Stats (IVs): HP: 83 (31), Atk: 61 (31), Def: 47 (31), Spatk: 54 (31), Spdef: 47 (31), Spd: 56 (31)
+[12:20:54.257] LOG: Ability: Speed Boost | Passive Ability: Blaze 
+[12:20:54.257] LOG: Moveset: ["Crush Claw","Agility","Blaze Kick","Double Kick"]
+[12:20:54.925] LOG: Generated AI funcs
+[12:20:54.926] LOG: Wave Seed: kj_^qP[In``{M]hk 25
+[12:20:55.437] LOG: Rival Ivy
+[12:20:55.438] LOG: Dialogue dialogue:rival2Female.encounter.1 skipped
+[12:20:55.516] LOG: Rival Ivy
+[12:20:56.114] LOG: %cStart Phase SummonPhase color:green;
+[12:20:56.114] LOG: Ivy
+[12:20:56.779] LOG: %cStart Phase SummonPhase color:green;
+[12:20:57.187] LOG: Applied Zinc 
+[12:20:57.512] LOG: %cStart Phase InitEncounterPhase color:green;
+[12:20:57.513] LOG: %cStart Phase PostSummonPhase color:green;
+[12:20:57.513] LOG: Ran PSP for: Swellow
+[12:20:57.513] LOG: %cStart Phase PostSummonPhase color:green;
+[12:20:57.514] LOG: %cStart Phase PostSummonPhase color:green;
+[12:20:57.514] LOG: %cStart Phase PostSummonPhase color:green;
+[12:20:57.514] LOG: Ran PSP for: Zapdos
+[12:20:57.514] LOG: %cStart Phase PostSummonPhase color:green;
+[12:20:57.514] LOG: %cStart Phase PostSummonPhase color:green;
+[12:20:57.514] LOG: %cStart Phase TurnInitPhase color:green;
+[12:20:57.514] LOG: %cStart Phase CommandPhase color:green;
+[12:20:59.403] LOG: %cStart Phase EnemyCommandPhase color:green;
+[12:20:59.410] LOG: Battle Seed: 7Vqm5Y3lwD1N9g0p
+[12:20:59.413] LOG: Move Pool: ["Boomburst","Heat Wave","Hurricane"]
+[12:20:59.413] LOG: Move Scores: [25,25,25]
+[12:20:59.413] LOG: Sorted Move Pool: ["Boomburst","Heat Wave","Hurricane"]
+[12:20:59.413] LOG: Chosen Move: Boomburst
+[12:20:59.413] LOG: ER AI: experimental brain (sharpness 1)
+[12:20:59.413] LOG: %cStart Phase TurnStartPhase color:green;
+[12:20:59.414] LOG: %cStart Phase SwitchSummonPhase color:green;
+[12:20:59.880] LOG: Applied Zinc 
+[12:21:00.163] LOG: %cStart Phase PostSummonPhase color:green;
+[12:21:00.163] LOG: Ran PSP for: Ponyta
+[12:21:00.163] LOG: %cStart Phase PostSummonPhase color:green;
+[12:21:00.163] LOG: %cStart Phase ShowAbilityPhase color:green;
+[12:21:00.614] LOG: %cStart Phase MovePhase color:green;
+[12:21:00.614] LOG: %cUser: Swellow
+Move: BOOMBURST
+Use Mode: NORMAL color:orchid
+[12:21:00.617] LOG: %cStart Phase MessagePhase color:green;
+[12:21:00.912] LOG: %cStart Phase MoveEffectPhase color:green;
+[12:21:01.597] LOG: crit stage: +0
+[12:21:01.599] LOG: Move: Boomburst | Base damage: 66.416 | Power: 140 | Source attack: 61 | Target defense: 35
+[12:21:01.600] LOG: Move: Boomburst | Attack damage: 88
+[12:21:01.601] LOG: %cStart Phase DamageAnimPhase color:green;
+[12:21:01.641] LOG: %cStart Phase DamageAnimPhase color:green;
+[12:21:01.642] LOG: %cStart Phase MessagePhase color:green;
+[12:21:02.278] LOG: %cStart Phase FaintPhase color:green;
+[12:21:04.281] LOG: %cStart Phase MessagePhase color:green;
+[12:21:04.540] LOG: %cStart Phase MoveEndPhase color:green;
+[12:21:04.540] LOG: %cStart Phase HideAbilityPhase color:green;
+[12:21:04.642] LOG: %cStart Phase PostSummonPhase color:green;
+[12:21:04.642] LOG: %cStart Phase MovePhase color:green;
+[12:21:04.642] LOG: %cStart Phase MoveEndPhase color:green;
+[12:21:04.642] LOG: %cStart Phase CheckInterludePhase color:green;
+[12:21:04.642] LOG: %cStart Phase WeatherEffectPhase color:green;
+[12:21:04.642] LOG: %cStart Phase PositionalTagPhase color:green;
+[12:21:04.642] LOG: %cStart Phase BerryPhase color:green;
+[12:21:04.643] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[12:21:04.643] LOG: %cStart Phase TurnEndPhase color:green;
+[12:21:04.643] WARN: [coop:turn] host recorder: finalize with NO open recording -> turn=-1 events=0 (caller decides not to emit)
+[12:21:04.643] LOG: %cStart Phase SwitchPhase color:green;
+[12:21:06.998] LOG: %cStart Phase SwitchSummonPhase color:green;
+[12:21:07.207] LOG: Applied Zinc 
+[12:21:07.575] LOG: %cStart Phase PostSummonPhase color:green;
+[12:21:07.575] LOG: Ran PSP for: Flaaffy
+[12:21:07.575] LOG: %cStart Phase PostSummonPhase color:green;
+[12:21:07.575] LOG: %cStart Phase PostSummonPhase color:green;
+[12:21:07.575] LOG: %cStart Phase TurnInitPhase color:green;
+[12:21:07.575] LOG: %cStart Phase CommandPhase color:green;
+[12:21:08.463] LOG: Move: THUNDERCLAP Move targets: {"targets":[2],"multiple":false} 
+Player Pokemon: Flaaffy
+[12:21:08.464] LOG: %cStart Phase EnemyCommandPhase color:green;
+[12:21:08.472] LOG: Move Pool: ["Boomburst"]
+[12:21:08.472] LOG: Move Scores: [60]
+[12:21:08.472] LOG: Sorted Move Pool: ["Boomburst"]
+[12:21:08.472] LOG: Chosen Move: Boomburst
+[12:21:08.472] LOG: ER AI: experimental brain (sharpness 1)
+[12:21:08.472] LOG: %cStart Phase TurnStartPhase color:green;
+[12:21:08.473] LOG: %cStart Phase MovePhase color:green;
+[12:21:08.473] LOG: %cUser: Flaaffy
+Move: THUNDERCLAP
+Use Mode: NORMAL color:orchid
+[12:21:08.473] LOG: %cStart Phase MessagePhase color:green;
+[12:21:08.769] LOG: %cStart Phase MoveEffectPhase color:green;
+[12:21:08.770] LOG: Battle Seed: 7Vqm5Y3lwD1N9g0p
+[12:21:09.612] LOG: crit stage: +0
+[12:21:09.614] LOG: Move: Thunderclap | Base damage: 21.40878048780488 | Power: 70 | Source attack: 49 | Target defense: 41
+[12:21:09.615] LOG: Move: Thunderclap | Attack damage: 58
+[12:21:09.616] LOG: %cStart Phase DamageAnimPhase color:green;
+[12:21:09.637] LOG: %cStart Phase MessagePhase color:green;
+[12:21:10.144] LOG: %cStart Phase FaintPhase color:green;
+[12:21:10.992] LOG: %cStart Phase MessagePhase color:green;
+[12:21:11.146] LOG: %cStart Phase VictoryPhase color:green;
+[12:21:11.147] LOG: Applied Soothe Bell 
+[12:21:11.147] LOG: %cStart Phase MoveEndPhase color:green;
+[12:21:11.147] LOG: %cStart Phase MovePhase color:green;
+[12:21:11.147] LOG: %cStart Phase MoveEndPhase color:green;
+[12:21:11.147] LOG: %cStart Phase CheckInterludePhase color:green;
+[12:21:11.147] LOG: %cStart Phase WeatherEffectPhase color:green;
+[12:21:11.147] LOG: %cStart Phase PositionalTagPhase color:green;
+[12:21:11.147] LOG: %cStart Phase BerryPhase color:green;
+[12:21:11.147] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[12:21:11.147] LOG: %cStart Phase TurnEndPhase color:green;
+[12:21:11.147] WARN: [coop:turn] host recorder: finalize with NO open recording -> turn=-1 events=0 (caller decides not to emit)
+[12:21:11.147] LOG: %cStart Phase SwitchSummonPhase color:green;
+[12:21:11.678] LOG: Ivy
+[12:21:12.207] LOG: %cStart Phase PostSummonPhase color:green;
+[12:21:12.208] LOG: Ran PSP for: Combusken
+[12:21:12.208] LOG: %cStart Phase PostSummonPhase color:green;
+[12:21:12.208] LOG: %cStart Phase PostSummonPhase color:green;
+[12:21:12.208] LOG: %cStart Phase TurnInitPhase color:green;
+[12:21:12.209] LOG: %cStart Phase CommandPhase color:green;
