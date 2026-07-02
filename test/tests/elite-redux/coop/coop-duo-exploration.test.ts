@@ -495,6 +495,41 @@ describe.skipIf(!RUN)("co-op DUO exploration sweep (maintainer directive)", () =
     logs.flush();
   }, 240_000);
 
+  it("PROBE disconnect: partner channel death cancels a parked 20-minute wait IMMEDIATELY (#799)", async () => {
+    // The transport detects channel death but nothing reacted: a dead partner left the survivor
+    // parked in a live shop/picker wait for the FULL default timeout (20 min) with no feedback.
+    // The new disconnect reaction cancels this runtime's relay waits the moment the channel dies.
+    await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
+    const pair = createLoopbackPair();
+    const rig = await buildDuo(game, pair, setCoopRuntime, toCoop);
+    wireGuestCommand(rig);
+    let resolvedWith: unknown = "unresolved";
+    await withClient(rig.guestCtx, async () => {
+      const relay = getCoopInteractionRelay();
+      expect(relay, "HARNESS: guest relay present").not.toBeNull();
+      // Park on a wait with the PRODUCTION default timeout (20 minutes) - nothing will answer it.
+      const parked = relay?.awaitInteractionChoice(123_456).then(v => {
+        resolvedWith = v;
+      });
+      for (let i = 0; i < 4; i++) {
+        await drainLoopback();
+      }
+      expect(resolvedWith, "the wait is genuinely PARKED before the channel dies").toBe("unresolved");
+      // THE FAULT: the partner's side of the channel dies (marks this side "disconnected").
+      pair.host.close();
+      const outcome = await Promise.race([
+        (parked as Promise<void>).then(() => "cancelled" as const),
+        new Promise<"still-parked">(r => setTimeout(() => r("still-parked"), 3000)),
+      ]);
+      expect(outcome, "the parked wait resolved IMMEDIATELY on channel death (not after 20 min)").toBe("cancelled");
+      expect(
+        resolvedWith,
+        "cancelled waits resolve null (the timeout path - shop leaves, picker auto-resolves)",
+      ).toBeNull();
+    });
+    logs.flush();
+  }, 240_000);
+
   it("PROBE double-KO: BOTH player mons faint in one turn - both pickers resolve, both replacements land on both engines", async () => {
     // Matrix battle-flow row "Double KO same turn". Deterministic double faint: both leads at
     // 1 HP, the host's Blissey EXPLODES (user-faint + the blast kills the 1-HP Normal ally;

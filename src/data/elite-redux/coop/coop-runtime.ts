@@ -557,6 +557,38 @@ export function coopBroadcastDexSync(): void {
 }
 
 let offDexSync: (() => void) | null = null;
+let offDisconnectReaction: (() => void) | null = null;
+
+/**
+ * Partner-disconnect reaction (#799): the transport DETECTS channel death (onStateChange fires
+ * "disconnected") but nothing reacted - a dead partner left the survivor parked in a live shop /
+ * picker / lockstep wait for the FULL default timeout (20 minutes) with zero feedback. On channel
+ * death: cancel THIS runtime's pending relay waits (every wait takes its timeout path IMMEDIATELY -
+ * shop watchers leave, faint pickers auto-resolve, the lockstep gate proceeds) and tell the player.
+ * The waits themselves stay long for LIVE partners (a human slowly browsing a market is legitimate);
+ * only a genuinely dead channel short-circuits them. The resync/backstop layers are untouched.
+ */
+function wireCoopDisconnectReaction(transport: CoopTransport, relay: CoopInteractionRelay, runtime: CoopRuntime): void {
+  offDisconnectReaction = transport.onStateChange(state => {
+    if (state !== "disconnected" && state !== "closed") {
+      return;
+    }
+    coopWarn("runtime", `partner channel ${state} -> cancelling pending co-op waits (no 20-minute strand)`);
+    try {
+      relay.cancelWaiters(() => true);
+    } catch {
+      /* cancel failure must not cascade */
+    }
+    // Only the ACTIVE runtime owns the screen (the duo harness assembles two in one process).
+    if (getCoopRuntime() === runtime) {
+      try {
+        globalScene.ui.showText("Your partner disconnected. Continuing without waiting...", null, undefined, 3000);
+      } catch {
+        /* cosmetic */
+      }
+    }
+  });
+}
 function wireCoopDexSync(transport: CoopTransport): void {
   offDexSync = transport.onMessage(msg => {
     if (msg.t !== "interactionOutcome" || msg.outcome.k !== "dexSync") {
@@ -1130,6 +1162,7 @@ export function startLocalCoopSession(
   wireCoopLiveEvents(controller, battleStream);
   wireCoopLearnMoveForward(host);
   wireCoopDexSync(host);
+  wireCoopDisconnectReaction(host, interactionRelay, runtime);
   setCoopRuntime(runtime);
   coopLog("launch", `local session ready role=${controller.role} netcode=${controller.netcodeMode} -> connecting`);
   controller.connect();
@@ -1207,6 +1240,7 @@ export function assembleCoopRuntime(
   wireCoopLiveEvents(controller, battleStream);
   wireCoopLearnMoveForward(transport);
   wireCoopDexSync(transport);
+  wireCoopDisconnectReaction(transport, interactionRelay, runtime);
   return runtime;
 }
 
@@ -1268,6 +1302,8 @@ export function clearCoopRuntime(): void {
   offLearnMoveForward = null;
   offDexSync?.();
   offDexSync = null;
+  offDisconnectReaction?.();
+  offDisconnectReaction = null;
   learnMoveForwardInFlight.clear();
   active.localTransport.close();
   // Clear the co-op ghost-pool hooks so a subsequent SOLO run fetches normally (#633).

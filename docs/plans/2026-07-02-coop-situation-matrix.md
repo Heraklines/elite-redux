@@ -30,7 +30,7 @@ TEST: file names are under test/tests/elite-redux/coop/ unless noted.
 | Charge moves / semi-invulnerable (Fly/Dig) across turns | LIVE-OK | turn resolution replays; no dedicated probe |
 | Weather/terrain/hazards set + expire | DONE | reconcileArenaTags + checkpoint weather/terrain; duo asserts checksum |
 | PP desync (guest never decrements) | DONE | #798: checkpoint carries [moveId, ppUsed]; multiwave pins ZERO forced resyncs (was 1/turn) |
-| Disconnect mid-battle + rejoin | PARTIAL | #652 lifecycle grace; OPEN: duo probe simulating transport death + resume |
+| Disconnect mid-battle + rejoin | PARTIAL | #799: channel death now CANCELS all parked waits instantly + notifies (PROBE disconnect green); hot-REJOIN still open |
 | Checksum mismatch -> auto-resync heals | DONE | organic in every duo run; #718 spares live waits (market variant probe parked) |
 
 ## 2. Alternating interactions (shops, pickers)
@@ -92,12 +92,12 @@ TEST: file names are under test/tests/elite-redux/coop/ unless noted.
 
 | Situation | Status | Coverage / Test |
 |---|---|---|
-| Transport drop / reorder / delay | OPEN | harness Layer A fault injection (designed, not built) |
+| Transport drop / reorder / delay | DONE (reframed) | WebRTC DataChannel is reliable+ordered: drop/reorder impossible while alive; delay covered by loopback queueing; the REAL fault is channel death -> #799 probe |
 | Duplicate phases racing resyncs | DONE | #790 guard + regression test |
 | Non-converging heal loops | DONE (bounded) | #793 reclassified; watch for repeated identical heal WARNs in live logs |
 | Both clients act simultaneously on the same seq | PARTIAL | from-pinned idempotence; OPEN: dedicated interleave probe |
 | OOM / runaway allocation in guest phases | DONE (harness) | haltQueueAfterCurrent + stubBattleInfo re-stub |
-| 20-min waits as freeze masks | PARTIAL | all waits injectable + sentinel fixes; audit remaining COOP_*_WAIT_MS sites for missing fast-fail sentinels |
+| 20-min waits as freeze masks | DONE | #799: long waits are for LIVE humans; a dead channel cancels them all instantly (relay-wide) + player notice |
 
 ## How to add coverage (the recipe)
 
