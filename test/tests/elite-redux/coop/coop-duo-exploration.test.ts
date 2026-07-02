@@ -495,6 +495,121 @@ describe.skipIf(!RUN)("co-op DUO exploration sweep (maintainer directive)", () =
     logs.flush();
   }, 240_000);
 
+  it("PROBE double-KO: BOTH player mons faint in one turn - both pickers resolve, both replacements land on both engines", async () => {
+    // Matrix battle-flow row "Double KO same turn". Deterministic double faint: both leads at
+    // 1 HP, the host's Blissey EXPLODES (user-faint + the blast kills the 1-HP Normal ally;
+    // Blissey's floor-tier Attack cannot KO the level-100 foes). The host's own picker AND the
+    // guest's relayed picker must BOTH resolve, and both replacements must materialize on both
+    // engines - the class where one empty slot masks the other.
+    game.override
+      .moveset([MoveId.EXPLOSION, MoveId.SPLASH])
+      .enemySpecies(SpeciesId.MAGIKARP)
+      .enemyLevel(100)
+      .enemyMoveset(MoveId.GROWL)
+      .startingLevel(50);
+    await game.classicMode.startBattle(SpeciesId.BLISSEY, SpeciesId.SNORLAX, SpeciesId.LAPRAS, SpeciesId.CHARIZARD);
+    const pair = createLoopbackPair();
+    const rig = await buildDuo(game, pair, setCoopRuntime, toCoop);
+    wireGuestCommand(rig);
+    const { setCoopFaintSwitchWaitMs } = await import("#data/elite-redux/coop/coop-interaction-relay");
+    setCoopFaintSwitchWaitMs(4000);
+    try {
+      // Bench ownership: LAPRAS stays host-owned (buildDuo default), CHARIZARD is the guest's.
+      for (const scene of [rig.hostScene, rig.guestScene]) {
+        scene.getPlayerParty()[3].coopOwner = "guest";
+      }
+      rig.hostScene.getPlayerField()[0].hp = 1;
+      rig.hostScene.getPlayerField()[1].hp = 1;
+      withClientSync(rig.guestCtx, () => {
+        rig.guestScene.getPlayerField()[0].hp = 1;
+        rig.guestScene.getPlayerField()[1].hp = 1;
+      });
+      const turn = rig.hostScene.currentBattle.turn;
+
+      // TURN 1 on the HOST: Blissey explodes - Blissey user-faints, 1-HP Snorlax dies to the
+      // blast. The host's OWN picker (slot 0) opens on the post-turn SwitchPhase, which runs
+      // during the SECOND host drive - keep the one-shot PARTY stub (pick LAPRAS, slot 2)
+      // armed across BOTH host drives.
+      const hostUi = rig.hostScene.ui as unknown as { setMode: (...args: unknown[]) => unknown };
+      const realHostSetMode = hostUi.setMode.bind(rig.hostScene.ui);
+      hostUi.setMode = (...args: unknown[]): unknown => {
+        if (args[0] === UiMode.PARTY) {
+          hostUi.setMode = realHostSetMode; // one-shot
+          (args[3] as (slotIndex: number, option: number) => void)(2, 0);
+          return;
+        }
+        return realHostSetMode(...args);
+      };
+      await withClient(rig.hostCtx, async () => {
+        game.move.select(MoveId.EXPLOSION, 0);
+        game.move.select(MoveId.SPLASH, 1);
+        await game.phaseInterceptor.to("TurnEndPhase");
+      });
+      const f0 = rig.hostScene.getPlayerField()[0];
+      const f1 = rig.hostScene.getPlayerField()[1];
+      expect(
+        (f0 == null || f0.isFainted() || f0.species.speciesId === SpeciesId.LAPRAS) && (f1 == null || f1.isFainted()),
+        "both player slots were vacated (or already refilled) by the double KO on the host",
+      ).toBe(true);
+
+      // GUEST renders turn 1: presents BOTH faints; ONLY its own slot's picker opens (the
+      // host-owned faint is not its pick). One-shot PARTY stub picks CHARIZARD (slot 3).
+      await withClient(rig.guestCtx, async () => {
+        const ui = rig.guestScene.ui as unknown as { setMode: (...args: unknown[]) => unknown };
+        const realSetMode = ui.setMode.bind(ui);
+        ui.setMode = (...args: unknown[]): unknown => {
+          if (args[0] === UiMode.PARTY) {
+            ui.setMode = realSetMode; // one-shot
+            (args[3] as (slotIndex: number, option: number) => void)(3, 0);
+            return;
+          }
+          if (args[0] === UiMode.MESSAGE) {
+            return;
+          }
+          return realSetMode(...args);
+        };
+        try {
+          await driveGuestReplayTurn(rig.guestScene, turn);
+        } finally {
+          ui.setMode = realSetMode;
+        }
+      });
+
+      // HOST: both SwitchPhases resolve (own pick already stubbed; the guest's pick is
+      // buffered on the relay) -> both replacements summoned + OOB checkpoints pushed.
+      try {
+        await withClient(rig.hostCtx, async () => {
+          await game.phaseInterceptor.to("CommandPhase", false);
+        });
+      } finally {
+        hostUi.setMode = realHostSetMode;
+      }
+      const hostSlot0 = rig.hostScene.getPlayerField()[0];
+      const hostSlot1 = rig.hostScene.getPlayerField()[1];
+      expect(hostSlot0?.species.speciesId, "host slot 0 refilled with the HOST's pick").toBe(SpeciesId.LAPRAS);
+      expect(hostSlot1?.species.speciesId, "host slot 1 refilled with the GUEST's pick").toBe(SpeciesId.CHARIZARD);
+      expect(hostSlot0?.isFainted(), "host slot 0 battle-ready").toBe(false);
+      expect(hostSlot1?.isFainted(), "host slot 1 battle-ready").toBe(false);
+
+      // GUEST: the next pump consumes BOTH out-of-band replacement checkpoints - both
+      // replacements materialize (the second empty slot must not deadlock behind the first).
+      await withClient(rig.guestCtx, async () => {
+        await driveGuestReplayTurn(rig.guestScene, turn + 1);
+      });
+      withClientSync(rig.guestCtx, () => {
+        const g0 = rig.guestScene.getPlayerField()[0];
+        const g1 = rig.guestScene.getPlayerField()[1];
+        expect(g0?.species.speciesId, "guest materialized slot 0 (LAPRAS)").toBe(SpeciesId.LAPRAS);
+        expect(g1?.species.speciesId, "guest materialized slot 1 (CHARIZARD)").toBe(SpeciesId.CHARIZARD);
+        expect(g0?.isFainted(), "guest slot 0 battle-ready").toBe(false);
+        expect(g1?.isFainted(), "guest slot 1 battle-ready").toBe(false);
+      });
+    } finally {
+      setCoopFaintSwitchWaitMs(60_000);
+    }
+    logs.flush();
+  }, 240_000);
+
   it("PROBE #795: Giratina's Bargain alternates - owner leaves, watcher adopts the outcome blob, counters lockstep", async () => {
     // The Bargain is the 4th owner/watcher surface: at most ONE deal per visit, so the whole
     // relay is a single comprehensive outcome blob (the proven ME-terminal resync) + a uniform

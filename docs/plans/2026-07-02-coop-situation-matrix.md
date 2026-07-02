@@ -21,7 +21,7 @@ TEST: file names are under test/tests/elite-redux/coop/ unless noted.
 | Guest has NO legal replacement (last mon down) | DONE | instant no-pick sentinel (#18:30 fix); host auto-pick / lone survivor |
 | Partner mon REVIVED mid-combat (Revival Blessing) | PARTIAL | code-audited: refill via SwitchSummonPhase + checkpoint; no-bench state never latched. OPEN: duo probe; owner should pick the revive target for their own cast (#794 note) |
 | Partner mons restored at wave heal / biome rest | LIVE-OK | wave-start summons by ownership; needs one live confirm |
-| Double KO same turn (both player mons) | OPEN | probe: EARTHQUAKE double ally-kill, both pickers, both summons |
+| Double KO same turn (both player mons) | DONE | PROBE double-KO (Blissey EXPLOSION): both pickers resolve, both replacements land on both engines - zero production fixes needed |
 | Enemy trainer mid-battle switch | DONE | #790 field reconcile + stale-turn guard; live log verified heal |
 | Both sides wipe (game over) | LIVE-OK | #309/#344 lost-run rails; needs a duo probe for the coop game-over tail |
 | Catch attempt (ball throw) | DONE | #689 both-account credit + anim sync |
