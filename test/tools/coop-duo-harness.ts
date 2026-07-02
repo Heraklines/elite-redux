@@ -785,6 +785,9 @@ export async function remirrorWave(rig: DuoRig): Promise<void> {
 /** The presentation phases CoopReplayTurnPhase unshifts + the deferred finalize, drained each turn. */
 const REPLAY_DRAIN_PHASES = new Set([
   "MessagePhase",
+  // #788 v2: the lockstep gate self-ends when the partner's advance broadcast is already seen
+  // (or after the injectable barrier) - drive it like any replay phase or wave-2 never replays.
+  "CoopPartnerSyncPhase",
   "CoopMoveAnimReplayPhase",
   "CoopHpDrainReplayPhase",
   "CoopStatStageReplayPhase",

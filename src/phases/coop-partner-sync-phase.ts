@@ -8,7 +8,7 @@ import { globalScene } from "#app/global-scene";
 import { Phase } from "#app/phase";
 import { coopLog, coopWarn } from "#data/elite-redux/coop/coop-debug";
 import { getCoopWaveBarrierMs } from "#data/elite-redux/coop/coop-interaction-relay";
-import { getCoopController } from "#data/elite-redux/coop/coop-runtime";
+import { getCoopController, getCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
 
 /**
  * Co-op LOCKSTEP GATE (#788 v2): BLOCKS this client's phase queue after it finishes an
@@ -23,10 +23,21 @@ import { getCoopController } from "#data/elite-redux/coop/coop-runtime";
 export class CoopPartnerSyncPhase extends Phase {
   public readonly phaseName = "CoopPartnerSyncPhase";
 
+  /** Re-entrant guard: harness drives re-call start() on unfinished phases. */
+  private waiting = false;
+
   public override start(): void {
     super.start();
+    if (this.waiting) {
+      return;
+    }
     const controller = getCoopController();
     if (controller == null || !globalScene.gameMode.isCoop) {
+      this.end();
+      return;
+    }
+    // Hotseat / SpoofGuest: no real partner to wait for - the gate is meaningless, skip.
+    if (getCoopRuntime()?.spoof != null) {
       this.end();
       return;
     }
@@ -35,6 +46,7 @@ export class CoopPartnerSyncPhase extends Phase {
       this.end();
       return;
     }
+    this.waiting = true;
     coopLog("interaction", `partner-sync gate: waiting for partner to reach counter=${target}`);
     try {
       globalScene.ui.showText(`Waiting for ${controller.partnerName ?? "your partner"}...`);
