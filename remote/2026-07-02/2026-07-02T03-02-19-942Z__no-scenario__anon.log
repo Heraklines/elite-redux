@@ -1,0 +1,24 @@
+url:      https://elite-redux-staging.pages.dev/
+build:    mr2gafdr-8tyo
+mode:     4  wave:?
+seed:     BsepnFHEHXcmSd0jOwVMFP2m
+party:    
+enemy:    
+
+----- CONSOLE -----
+[01:33:10.857] LOG: %c %c %c %c %c Phaser v3.90.0 (WebGL | Web Audio) %c https://phaser.io/v390 background: #ff0000 background: #ffff00 background: #00ff00 background: #00ffff color: #ffffff; background: #000000 background: transparent
+[01:33:11.221] LOG: [ER] build mr2gafdr-8tyo
+[01:33:11.251] LOG: [dev-tools] loaded — 417 scenarios + Send Logs button
+[01:33:20.380] DEBUG: Destroying loading scene
+[01:33:20.380] DEBUG: Destroyed loading scene
+[01:33:20.510] LOG: Seed: BsepnFHEHXcmSd0jOwVMFP2m
+[01:33:20.510] LOG: Wave Seed: BsepnFHEHXcmSd0jOwVMFP2m 0
+[01:33:24.404] LOG: %cStart Phase LoginPhase color:green;
+[01:33:24.720] LOG: Client Session: 1ezPINZiftrVUTlVLk4IY5pbcAvKzLqv
+[01:33:25.200] DEBUG: Using cached system data
+[01:33:25.379] LOG: %cStart Phase TitlePhase color:green;
+[01:33:25.380] LOG: Getting Session Slot id: %d 1
+[01:33:25.416] LOG: use seasonal splash messages true
+[01:53:58.134] LOG: %cStart Phase SelectChallengePhase color:green;
+[03:01:05.992] LOG: %cStart Phase SelectStarterPhase color:green;
+[03:01:19.646] WARN: cry/10733 not found
