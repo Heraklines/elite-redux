@@ -335,6 +335,53 @@ export function coopGiveToPartner(party: readonly CoopOwnedMon[], monOwner: Coop
  * correct order.
  */
 export class CoopInteractionTurn {
+  /**
+   * The highest interaction counter the PARTNER has broadcast (#788 wave-start barrier).
+   * Independent of the local live counter: the local side may defer folding a remote value
+   * in, but the BARRIER only needs to know "has my partner finished interaction N too?".
+   */
+  private remoteSeen = 0;
+  /** One-shot waiters keyed by the remote counter value they need (#788). */
+  private remoteWaiters: { need: number; resolve: () => void }[] = [];
+
+  /** Highest partner-broadcast counter observed this session (#788). */
+  remoteCounterSeen(): number {
+    return this.remoteSeen;
+  }
+
+  /**
+   * Resolves once the PARTNER'S broadcast counter reaches `need` (immediately when it already
+   * has), or after `timeoutMs` - the barrier degrades to "proceed anyway" (resync heals) so a
+   * disconnected partner can never freeze the waiter.
+   */
+  awaitRemoteCounter(need: number, timeoutMs: number): Promise<boolean> {
+    if (this.remoteSeen >= need) {
+      return Promise.resolve(true);
+    }
+    return new Promise(resolve => {
+      const entry = { need, resolve: () => resolve(true) };
+      this.remoteWaiters.push(entry);
+      setTimeout(() => {
+        const i = this.remoteWaiters.indexOf(entry);
+        if (i >= 0) {
+          this.remoteWaiters.splice(i, 1);
+          resolve(false);
+        }
+      }, timeoutMs);
+    });
+  }
+
+  private noteRemote(counter: number): void {
+    if (counter > this.remoteSeen) {
+      this.remoteSeen = counter;
+    }
+    const ready = this.remoteWaiters.filter(w => this.remoteSeen >= w.need);
+    this.remoteWaiters = this.remoteWaiters.filter(w => this.remoteSeen < w.need);
+    for (const w of ready) {
+      w.resolve();
+    }
+  }
+
   constructor(private counter = 0) {}
 
   /**
@@ -450,6 +497,7 @@ export class CoopInteractionTurn {
    * late / stale / duplicated message can never rewind anything (monotonic on both ends).
    */
   mergeRemote(remote: number): void {
+    this.noteRemote(remote);
     const before = this.counter;
     const valid = Number.isInteger(remote);
     if (valid && remote > this.pendingRemote) {

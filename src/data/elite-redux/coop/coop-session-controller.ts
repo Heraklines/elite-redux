@@ -248,6 +248,26 @@ export class CoopSessionController {
     return this._partnerConnected;
   }
 
+  /** The local player's display name (#788/#789: barrier logs + controller tag). */
+  localName(): string {
+    return this.username;
+  }
+
+  /**
+   * Highest interaction counter the PARTNER has broadcast (#788 wave-start barrier).
+   */
+  partnerInteractionCounterSeen(): number {
+    return this.interactionTurn.remoteCounterSeen();
+  }
+
+  /**
+   * #788: resolves once the partner's broadcast interaction counter catches up to OURS
+   * (immediately when it already has), or after `timeoutMs` (degrade to proceed; resync heals).
+   */
+  awaitPartnerInteraction(timeoutMs: number): Promise<boolean> {
+    return this.interactionTurn.awaitRemoteCounter(this.interactionTurn.toJSON(), timeoutMs);
+  }
+
   get partnerName(): string | null {
     return this._partnerName;
   }

@@ -7598,11 +7598,15 @@ export class ErDecorateSideBoostAttr extends MoveEffectAttr {
       return false;
     }
     // Dex (#705): "Damages foes. Raises ALLIES' Attack, Special Attack, and Crit by 2
-    // stages." The boost goes to the user's ALLY only (the partner in doubles), NEVER the
-    // user itself - boosting the whole side (user + ally) was way too strong. In singles
+    // stages." The boost goes to the user's ALLIES (plural), NEVER the user itself -
+    // boosting the whole side (user + allies) was too strong. getAllies(), not getAlly():
+    // in a TRIPLE the user has two allies, and the single-ally version only buffed the
+    // first (reported: "Decorate only affects the first ally in a triple"). In singles
     // there is no ally, so Decorate is purely a damaging move.
-    const ally = user.getAlly();
-    if (ally != null && !ally.isFainted()) {
+    for (const ally of user.getAllies()) {
+      if (ally.isFainted()) {
+        continue;
+      }
       globalScene.phaseManager.unshiftNew(
         "StatStageChangePhase",
         ally.getBattlerIndex(),

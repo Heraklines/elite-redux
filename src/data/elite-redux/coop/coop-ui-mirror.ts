@@ -57,6 +57,19 @@ const EARLY_BUFFER_CAP = 512;
  * closes it with {@linkcode endSession}; the UI layer calls {@linkcode relayOwnerButton}
  * (owner) and feeds replays via the injected engine (watcher).
  */
+/**
+ * #789: session lifecycle hook for the CONTROLLER NAME TAG. Injected by the UI layer
+ * (src/ui/coop-controller-tag.ts) so this engine-free module never imports UI code.
+ * `role` is the LOCAL player's role in the mirrored screen ("owner" = we control it).
+ * N-way ready: the tag derives the controlling player's NAME from the session controller,
+ * so 3/6-player seats work unchanged once the controller maps seats to names.
+ */
+let uiMirrorSessionHook: ((active: boolean, role: MirrorRole) => void) | null = null;
+
+export function setCoopUiMirrorSessionHook(hook: (active: boolean, role: MirrorRole) => void): void {
+  uiMirrorSessionHook = hook;
+}
+
 export class CoopUiMirror {
   private readonly transport: CoopTransport;
   private engine: CoopUiMirrorEngine | null = null;
@@ -79,6 +92,11 @@ export class CoopUiMirror {
 
   /** Open a shared-screen mirror session. `mode` binds it; `seq` ids it on the wire. */
   beginSession(role: MirrorRole, mode: number, seq: number): void {
+    try {
+      uiMirrorSessionHook?.(true, role);
+    } catch {
+      /* the tag is cosmetic - never break a session over it */
+    }
     coopLog("interaction", `uiMirror beginSession role=${role} mode=${mode} seq=${seq} early=${this.early.length}`);
     this.session = { role, mode, seq, n: 0 };
     this.inbox.clear();
@@ -96,6 +114,11 @@ export class CoopUiMirror {
 
   /** Close the active session (selection committed / screen left / disconnect). */
   endSession(): void {
+    try {
+      uiMirrorSessionHook?.(false, "owner");
+    } catch {
+      /* cosmetic */
+    }
     this.session = null;
     this.inbox.clear();
   }

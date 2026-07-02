@@ -107,6 +107,17 @@ let coopFaintSwitchWaitMs = 60_000;
  */
 export const COOP_FAINT_SWITCH_SEQ_BASE = 90_000;
 
+/** #788: how long the HOST defers the next wave's party sync waiting for the partner's menu-done broadcast. */
+let coopWaveBarrierMs = 60_000;
+
+export function getCoopWaveBarrierMs(): number {
+  return coopWaveBarrierMs;
+}
+
+export function setCoopWaveBarrierMs(ms: number): void {
+  coopWaveBarrierMs = ms;
+}
+
 export function getCoopFaintSwitchWaitMs(): number {
   return coopFaintSwitchWaitMs;
 }

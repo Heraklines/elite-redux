@@ -9,7 +9,9 @@ import { initEncounterAnims, loadEncounterAnimAssets } from "#data/battle-anims"
 import { fieldPositionForSlot } from "#data/battle-format";
 import { getCharVariantFromDialogue } from "#data/dialogue";
 import { captureCoopEnemies } from "#data/elite-redux/coop/coop-battle-engine";
+import { coopWarn } from "#data/elite-redux/coop/coop-debug";
 import { buildCoopEnemy } from "#data/elite-redux/coop/coop-enemy-builder";
+import { getCoopWaveBarrierMs } from "#data/elite-redux/coop/coop-interaction-relay";
 import {
   getCoopBattleStreamer,
   getCoopController,
@@ -253,7 +255,21 @@ export class EncounterPhase extends BattlePhase {
       return;
     }
     try {
-      streamer.sendEnemyParty(globalScene.currentBattle.waveIndex, captureCoopEnemies());
+      const wave = globalScene.currentBattle.waveIndex;
+      const enemies = captureCoopEnemies();
+      // #788 (live "I could pick a reward and continue without my partner"): the HOST reaches
+      // the next wave SECONDS before the guest finishes replaying the between-wave menu, and
+      // handing the guest the NEXT wave's party mid-menu is the desync window. BARRIER: defer
+      // the party sync until the partner's broadcast interaction counter catches up to ours
+      // (its menu watcher advanced = menu done). The host itself keeps playing - its first
+      // turn cannot resolve without the guest's command anyway, so nothing user-visible waits.
+      // Bounded (60s -> send anyway; resync heals) so a disconnected partner never freezes it.
+      void controller.awaitPartnerInteraction(getCoopWaveBarrierMs()).then(caughtUp => {
+        if (!caughtUp) {
+          coopWarn("replay", `wave-start barrier wave=${wave} timed out -> sending party anyway (resync heals)`);
+        }
+        streamer.sendEnemyParty(wave, enemies);
+      });
     } catch {
       /* a serialize/send failure must never break the host's encounter */
     }

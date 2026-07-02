@@ -1,4 +1,6 @@
 import { globalScene } from "#app/global-scene";
+// #789: registers the co-op controller name tag with the ui-mirror session hook (side effect).
+import "#ui/coop-controller-tag";
 import { coopLog, isCoopDebug } from "#data/elite-redux/coop/coop-debug";
 import { coopMeInProgress, coopMeInteractionStartValue } from "#data/elite-redux/coop/coop-me-pin-state";
 import {
