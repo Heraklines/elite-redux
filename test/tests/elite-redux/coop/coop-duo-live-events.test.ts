@@ -147,16 +147,23 @@ describe.skipIf(!RUN)("co-op DUO live events: host emits per-event, guest applie
     expect(seqsForTurn.length, "the guest buffered live events for this turn").toBeGreaterThan(0);
     expect(Math.min(...seqsForTurn), "live seqs start at 0 (per-turn monotonic)").toBe(0);
 
-    // (3) GUEST APPLIED the live stream: its CoopReplayTurnPhase consumed the buffered live events for the
-    // turn (merged with + de-duped against the turn-end batch), then applied the checkpoint.
+    // (3) GUEST APPLIED the live stream: its CoopReplayTurnPhase consumed the buffered live events for
+    // the turn. Since the #782 INSTANT-STREAMING pump, the primary consumption path is the INCREMENTAL
+    // `consumeLiveEventsFrom` (events present the moment they arrive, BEFORE the resolution); the
+    // turn-boundary `consumeLiveEvents` only mops up whatever the increments had not drained. Count
+    // consumption through EITHER path - what matters is the stream was applied, not just the batch.
+    const consumeFromSpy = vi.spyOn(CoopBattleStreamer.prototype, "consumeLiveEventsFrom");
     await withClient(rig.guestCtx, async () => {
       await driveGuestReplayTurn(rig.guestScene, turn);
     });
-    const consumedForTurn = consumeSpy.mock.results
+    const consumedBatched = consumeSpy.mock.results
       .map(r => (r.type === "return" ? (r.value as { seq: number }[]) : []))
       .filter(list => list.length > 0);
+    const consumedLive = consumeFromSpy.mock.results
+      .map(r => (r.type === "return" ? (r.value as unknown[]) : []))
+      .filter(list => list.length > 0);
     expect(
-      consumedForTurn.length,
+      consumedBatched.length + consumedLive.length,
       "the guest's replay consumed the buffered live events (applied the stream, not just the batch)",
     ).toBeGreaterThan(0);
 

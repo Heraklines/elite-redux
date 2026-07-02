@@ -1090,6 +1090,22 @@ const RECIPES: Record<string, Recipe> = {
     render: game => shimUiAndShow(game, UiMode.MENU, []),
     diffTolerance: 0,
   },
+  // The co-op LOBBY STAGE (#633 lobby v2, #781): the dimmed backdrop + CO-OP LOBBY header +
+  // two seat cards + context strip the title-phase lobby renders behind its option panel.
+  // Custom render (a bare presentation container, not a UiHandler). This page CAUGHT the
+  // live "lobby invisible" bug: the ui container is BOTTOM-anchored, so the original
+  // (0,0)-anchored root rendered a full screen below the canvas (0 non-blank px). NB the
+  // card texts render light-on-light here (the harness light-window fallback, same as
+  // colosseum) - in-game windows are dark, contrast is fine. Static -> exact diff.
+  "coop-lobby": {
+    render: async () => {
+      const { CoopLobbyStage } = await import("#ui/coop-lobby-stage");
+      const stage = new CoopLobbyStage("Heraklines");
+      stage.setSeat(1, { name: "Scooom", detail: "Wants to join!", dot: "red" });
+      stage.setStatus("Scooom wants to join your run!");
+    },
+    diffTolerance: 0,
+  },
   // The ER Colosseum standings board (UiMode.COLOSSEUM) [ER, #439] - ZERO prior coverage anywhere.
   // A 15-entrant press-your-luck gauntlet mid-run: the BW2 PWT board, the two-column roster
   // (cleared/next-up revealed, the rest dark silhouettes), the banked-grade panel, and the

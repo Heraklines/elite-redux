@@ -120,6 +120,8 @@ export class CoopBattleStreamer {
   private readonly liveEvents = new Map<number, Map<number, CoopBattleEvent>>();
   /** GUEST: live-event arrival handler (optional; lets a live pump react the instant one lands). */
   private liveEventHandler: ((turn: number, seq: number, event: CoopBattleEvent) => void) | null = null;
+  /** GUEST: one-shot live-arrival waiter for the pump race ({@linkcode awaitTurnOrLiveEvent}). */
+  private liveWaiter: ((turn: number, seq: number) => void) | null = null;
 
   private enemyPartyHandler: ((wave: number, enemies: CoopSerializedEnemy[]) => void) | null = null;
   private checkpointHandler: ((reason: string, checkpoint: CoopBattleCheckpoint) => void) | null = null;
@@ -750,6 +752,89 @@ export class CoopBattleStreamer {
   }
 
   /**
+   * GUEST live pump (#782, instant streaming): take + clear the CONTIGUOUS run of live events for
+   * `turn` starting exactly at `fromSeq` (fromSeq, fromSeq+1, ... until the first gap). Ordering is
+   * sacred - an event can only present after every earlier seq has - so a gap (a still-in-flight
+   * earlier event) stops the drain; the gapped events stay buffered for a later call or the final
+   * turn-end merge. Returns the ordered contiguous events (empty when seq `fromSeq` has not arrived).
+   */
+  consumeLiveEventsFrom(turn: number, fromSeq: number): CoopBattleEvent[] {
+    const perTurn = this.liveEvents.get(turn);
+    if (perTurn == null) {
+      return [];
+    }
+    const run: CoopBattleEvent[] = [];
+    for (let seq = fromSeq; ; seq++) {
+      const event = perTurn.get(seq);
+      if (event === undefined) {
+        break;
+      }
+      run.push(event);
+      perTurn.delete(seq);
+    }
+    if (run.length > 0 && isCoopDebug()) {
+      coopLog("replay", `guest live-pump drain turn=${turn} seq=${fromSeq}..${fromSeq + run.length - 1}`);
+    }
+    return run;
+  }
+
+  /**
+   * GUEST live pump (#782, instant streaming): await EITHER the host's `turnResolution` for `turn`
+   * OR the next live `battleEvent` for it landing at-or-beyond `fromSeq` - whichever first. This is
+   * what lets {@linkcode CoopReplayTurnPhase} present the host's events the moment they arrive
+   * instead of batching the whole turn ("animations only after the host clicked through everything").
+   *
+   * Resolution semantics: `{kind:"live"}` = one or more new live events are buffered (drain them via
+   * {@linkcode consumeLiveEventsFrom}); `{kind:"turn", res}` = the resolution arrived (res null on a
+   * genuine host stall). CRITICAL rebuffer rule: when the LIVE leg wins the race and the resolution
+   * lands on the now-stale turn waiter afterwards, it is put BACK into the inbox so the pump's next
+   * race finds it - a raced-out resolution is never lost (that would stall the guest a full timeout).
+   */
+  awaitTurnOrLiveEvent(
+    turn: number,
+    fromSeq: number,
+  ): Promise<{ kind: "turn"; res: CoopTurnResolution | null } | { kind: "live" }> {
+    // Fast paths: anything already buffered resolves without parking waiters.
+    if (this.inbox.has(turn)) {
+      return this.awaitTurn(turn).then(res => ({ kind: "turn" as const, res }));
+    }
+    const perTurn = this.liveEvents.get(turn);
+    if (perTurn != null && perTurn.has(fromSeq)) {
+      return Promise.resolve({ kind: "live" as const });
+    }
+    return new Promise(resolve => {
+      let settled = false;
+      const settleLive = (liveTurn: number, seq: number) => {
+        if (settled || liveTurn !== turn || seq < fromSeq) {
+          return;
+        }
+        settled = true;
+        if (this.liveWaiter === settleLive) {
+          this.liveWaiter = null;
+        }
+        resolve({ kind: "live" });
+      };
+      this.liveWaiter = settleLive;
+      void this.awaitTurn(turn).then(res => {
+        if (!settled) {
+          settled = true;
+          if (this.liveWaiter === settleLive) {
+            this.liveWaiter = null;
+          }
+          resolve({ kind: "turn", res });
+          return;
+        }
+        // The live leg already won this race; a resolution landing on the stale waiter must be
+        // REBUFFERED so the pump's next race consumes it (never lost).
+        if (res != null) {
+          coopLog("replay", `guest live-pump rebuffer turnResolution turn=${turn} (live leg won the race)`);
+          this.inbox.set(turn, res);
+        }
+      });
+    });
+  }
+
+  /**
    * GUEST: await the host's resolution for `turn`. Resolves with the streamed turn,
    * or `null` if it does not arrive within the timeout (the guest then shows a
    * "waiting for host" notice and applies the next checkpoint when it lands). If the
@@ -883,6 +968,7 @@ export class CoopBattleStreamer {
     this.inbox.clear();
     this.liveEvents.clear();
     this.liveEventHandler = null;
+    this.liveWaiter = null;
     this.lastCheckpoint = null;
     this.lastEnemyParty = null;
     this.enemyPartyHandler = null;
@@ -991,6 +1077,7 @@ export class CoopBattleStreamer {
         }
         perTurn.set(msg.seq, msg.event);
         this.liveEventHandler?.(msg.turn, msg.seq, msg.event);
+        this.liveWaiter?.(msg.turn, msg.seq);
         return;
       }
       case "battleCheckpoint":

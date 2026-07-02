@@ -54,10 +54,18 @@ export class CoopLobbyStage {
   private destroyed = false;
 
   constructor(localName: string) {
-    const width = globalScene.game.canvas.width / 6;
-    const height = globalScene.game.canvas.height / 6;
-    this.root = globalScene.add.container(0, 0);
-    this.root.setDepth(1000);
+    // The game's LOGICAL resolution is a fixed 320x180 (1920x1080 canvas at the x6 ui
+    // scale; FIT scaling never changes the internal canvas). Fixed constants, NOT
+    // `game.canvas.width / 6`: headless environments carry a differently-sized mock
+    // canvas, which skewed the whole layout in the render harness.
+    const width = 320;
+    const height = 180;
+    // The UI container is BOTTOM-anchored (`super(scene, 0, scaledCanvas.height)` in ui.ts),
+    // so a child at (0,0) renders one full screen BELOW the canvas - the live "lobby is
+    // invisible" bug (#781, proven by the render harness world-position dump: every node at
+    // world y = local + 1080). Anchor the root a full screen up so children keep clean
+    // top-left 0..height coords.
+    this.root = globalScene.add.container(0, -height);
     globalScene.ui.add(this.root);
 
     // Dimmed backdrop so the lobby floats over the title screen.

@@ -40,10 +40,16 @@ export class CoopReplayTurnPhase extends Phase {
   public readonly phaseName = "CoopReplayTurnPhase";
 
   private readonly turn: number;
+  /** #782 live pump: how many event POSITIONS (seq 0..rendered-1) this turn has already presented. */
+  private readonly rendered: number;
+  /** #782 live pump: the per-mon hp chain carried ACROSS pump continuations (multi-hit drains). */
+  private readonly fromHpByBi: Map<number, number>;
 
-  constructor(turn: number) {
+  constructor(turn: number, rendered = 0, hpChain?: [number, number][]) {
     super();
     this.turn = turn;
+    this.rendered = rendered;
+    this.fromHpByBi = new Map(hpChain ?? []);
   }
 
   public override start(): void {
@@ -55,59 +61,88 @@ export class CoopReplayTurnPhase extends Phase {
       this.finishTurnNoStream();
       return;
     }
-    coopLog("replay", `guest replay turn=${this.turn}: awaiting host resolution`);
-    void streamer.awaitTurn(this.turn).then(res => {
-      try {
-        if (res != null) {
-          // ANIMATE first: unshift a presentation phase per host event against the still-ALIVE
-          // pre-turn field. These land FIFO on the tree level ABOVE this phase. The events are the
-          // EXACTLY-ONCE merge of the LIVE channel (#633, animation layer) and the turn-end batch:
-          // each was streamed live the instant the host recorded it (buffered by `(turn, seq)`), and
-          // the batch is the same ordered list. seq N == batch index N (the recorder stamps one seq
-          // per recorded event), so we de-dupe by index and render each event once, sourced from the
-          // live channel when it arrived, else filled from the batch (a dropped / late live event
-          // still renders). The checkpoint stays the final correction regardless, so any live gap
-          // only stutters the animation - it can never desync.
-          const liveEvents = streamer.consumeLiveEvents(this.turn);
-          const merged = this.mergeLiveAndBatch(liveEvents, res.events);
+    if (this.rendered === 0) {
+      coopLog("replay", `guest replay turn=${this.turn}: live pump start (awaiting host events/resolution)`);
+    }
+    void this.pump(streamer);
+  }
+
+  /**
+   * #782 INSTANT STREAMING: present the host's events THE MOMENT they arrive instead of batching the
+   * whole turn ("i only get animations after the host clicked through everything"). The host already
+   * emits every event live (`battleEvent`, buffered by `(turn, seq)`); this pump drains the buffered
+   * CONTIGUOUS run from the current watermark, unshifts the presentation phases + a CONTINUATION pump
+   * (same phase, watermark advanced) and ends - phase-tree FIFO plays the animations, then re-enters
+   * the pump for the next increment. When the turn RESOLUTION arrives, the remaining un-presented
+   * positions render (live-sourced where buffered, batch-filled otherwise - the same exactly-once
+   * merge as before, from the watermark) and the finalize phase is unshifted LAST, preserving the
+   * structural guarantee that the checkpoint applies only after every animation drained.
+   */
+  private async pump(streamer: NonNullable<ReturnType<typeof getCoopBattleStreamer>>): Promise<void> {
+    try {
+      for (;;) {
+        // 1) Present any contiguous live events buffered right now, then continue via a
+        //    continuation phase so the presentations actually play before the next drain.
+        const increment = streamer.consumeLiveEventsFrom(this.turn, this.rendered);
+        if (increment.length > 0) {
           coopLog(
             "replay",
-            `guest replay turn=${this.turn}: RESOLVE live=${liveEvents.length} batch=${res.events.length} merged=${merged.length}`,
+            `guest replay turn=${this.turn}: live increment seq=${this.rendered}..${this.rendered + increment.length - 1}`,
           );
-          this.renderEvents(merged);
-          // Then unshift the END-OF-TURN finalize LAST (#633, animation-replay redesign). The
-          // phase-tree FIFO guarantees it drains BEHIND every animation phase just unshifted, so
-          // `applyCoopCheckpoint` (which leaveField's a host-fainted mon) runs only AFTER the faint
-          // has animated. THE STRUCTURAL GUARANTEE: applyCoopCheckpoint runs ONLY in
-          // CoopFinalizeTurnPhase, which is LAST on this tree level - it can never leaveField a mon
-          // whose faint has not animated. Never collapse this back to a synchronous applyCoopCheckpoint.
-          coopLog(
-            "replay",
-            `guest replay turn=${this.turn}: unshift CoopFinalizeTurnPhase (checkpoint apply deferred)`,
-          );
-          globalScene.phaseManager.unshiftNew(
-            "CoopFinalizeTurnPhase",
-            this.turn,
-            res.checkpoint,
-            res.checksum,
-            res.preimage,
-            res.fullField,
-          );
+          this.renderEvents(increment);
+          globalScene.phaseManager.unshiftNew("CoopReplayTurnPhase", this.turn, this.rendered + increment.length, [
+            ...this.fromHpByBi.entries(),
+          ]);
           this.end();
           return;
         }
-      } catch {
-        // A bad stream payload must never hang the guest's turn.
-        coopWarn("replay", `guest replay turn=${this.turn}: payload error -> finishTurnNoStream`);
+        // 2) Nothing buffered: race the host's resolution against the next live arrival.
+        const raced = await streamer.awaitTurnOrLiveEvent(this.turn, this.rendered);
+        if (raced.kind === "live") {
+          continue; // drain the fresh arrival(s) on the next loop iteration
+        }
+        if (raced.res == null) {
+          // No resolution arrived (host stall) - end the turn defensively; the guest re-syncs on
+          // the next checkpoint rather than hanging forever.
+          coopWarn(
+            "replay",
+            `guest replay turn=${this.turn}: ending without applied resolution (stall) -> finishTurnNoStream`,
+          );
+          this.finishTurnNoStream();
+          return;
+        }
+        // 3) Resolution: render the REMAINING positions (exactly-once merge from the watermark -
+        // live-sourced where buffered, batch-filled for anything the live channel dropped), then
+        // unshift the END-OF-TURN finalize LAST (#633, animation-replay redesign). The phase-tree
+        // FIFO guarantees it drains BEHIND every presentation phase just unshifted, so
+        // `applyCoopCheckpoint` (which leaveField's a host-fainted mon) runs only AFTER the faint
+        // has animated. THE STRUCTURAL GUARANTEE: applyCoopCheckpoint runs ONLY in
+        // CoopFinalizeTurnPhase, LAST on this tree level. Never collapse this back to a
+        // synchronous applyCoopCheckpoint.
+        const live = streamer.consumeLiveEvents(this.turn);
+        const remaining = this.mergeLiveAndBatch(live, raced.res.events, this.rendered);
+        coopLog(
+          "replay",
+          `guest replay turn=${this.turn}: RESOLVE renderedLive=${this.rendered} remaining=${remaining.length} batch=${raced.res.events.length}`,
+        );
+        this.renderEvents(remaining);
+        coopLog("replay", `guest replay turn=${this.turn}: unshift CoopFinalizeTurnPhase (checkpoint apply deferred)`);
+        globalScene.phaseManager.unshiftNew(
+          "CoopFinalizeTurnPhase",
+          this.turn,
+          raced.res.checkpoint,
+          raced.res.checksum,
+          raced.res.preimage,
+          raced.res.fullField,
+        );
+        this.end();
+        return;
       }
-      // No resolution arrived (host stall) - end the turn defensively; the guest re-syncs on the
-      // next checkpoint rather than hanging forever.
-      coopWarn(
-        "replay",
-        `guest replay turn=${this.turn}: ending without applied resolution (stall/payload-error) -> finishTurnNoStream`,
-      );
+    } catch {
+      // A bad stream payload must never hang the guest's turn.
+      coopWarn("replay", `guest replay turn=${this.turn}: payload error -> finishTurnNoStream`);
       this.finishTurnNoStream();
-    });
+    }
   }
 
   /**
@@ -124,14 +159,16 @@ export class CoopReplayTurnPhase extends Phase {
   private mergeLiveAndBatch(
     live: { seq: number; event: CoopBattleEvent }[],
     batch: CoopBattleEvent[],
+    fromIndex = 0,
   ): CoopBattleEvent[] {
     const liveBySeq = new Map<number, CoopBattleEvent>();
     for (const { seq, event } of live) {
       liveBySeq.set(seq, event);
     }
     const merged: CoopBattleEvent[] = [];
-    // Render every batch POSITION exactly once, preferring the live-channel copy for that seq/index.
-    for (let i = 0; i < batch.length; i++) {
+    // Render every REMAINING batch POSITION exactly once, preferring the live-channel copy for that
+    // seq/index. Positions < fromIndex were already presented live by the pump (#782) - skip them.
+    for (let i = fromIndex; i < batch.length; i++) {
       merged.push(liveBySeq.get(i) ?? batch[i]);
       liveBySeq.delete(i);
     }
@@ -167,8 +204,10 @@ export class CoopReplayTurnPhase extends Phase {
   private renderEvents(events: CoopBattleEvent[]): void {
     coopLog("replay", `guest replay turn=${this.turn}: rendering ${events.length} event(s)`);
     // Running per-mon hp so multi-hit drains chain (hit1: cur->hp1, hit2: hp1->hp2, ...). Seeded
-    // lazily from the live (pre-checkpoint) hp the first time a mon is seen.
-    const fromHpByBi = new Map<number, number>();
+    // lazily from the live (pre-checkpoint) hp the first time a mon is seen. INSTANCE state (#782):
+    // the chain is carried across live-pump continuations via the ctor, so an increment boundary
+    // mid-multi-hit never re-seeds from the (not-yet-checkpointed) live hp and jumps the bar.
+    const fromHpByBi = this.fromHpByBi;
     const pm = globalScene.phaseManager;
     // Per-turn tally of the presentation phases unshifted, so the guest's log shows the exact
     // replay-phase sequence it ran for this turn (move/hp/stat/status/faint/message counts).
