@@ -1,0 +1,286 @@
+url:      https://elite-redux-staging.pages.dev/
+build:    mr36ffcp-kyid
+mode:     4  wave:90
+seed:     PsrHvtfDsNwWT6iFHvMcMKTi
+party:    Reuniclus Redux(L74 200hp f0), Feraligatr(L72 225hp f0), Phione(L75 0hp f0), Torrentula(L74 0hp f0), Altaria Redux(L72 0hp f0)
+enemy:    Mismagius(L74), Magnezone(L69), Bellibolt(L71), Kilowattrel(L69), Electrode(L69)
+
+----- COMMENT -----
+Reuniclus Redux (Named Firedrop) Is not attacking. Its turn is being skipped for some reason. This seems to happen when one of my mons faints
+
+----- CONSOLE -----
+[09:00:36.095] LOG: Applied Calcium (enemy)
+[09:00:36.095] LOG: Applied Zinc (enemy)
+[09:00:36.095] LOG: Applied Protein (enemy)
+[09:00:36.095] LOG: Applied Carbos (enemy)
+[09:00:36.095] LOG: Applied HP Up (enemy)
+[09:00:36.096] LOG: Applied Iron 
+[09:00:36.096] LOG: Applied Carbos 
+[09:00:36.097] LOG: Applied Soul Dew 
+[09:00:36.097] LOG: Applied Soul Dew 
+[09:00:36.099] LOG: Applied Mini Black Hole 
+[09:00:36.100] WARN: [coop:turn] host recorder: finalize with NO open recording -> turn=-1 events=0 (caller decides not to emit)
+[09:00:36.100] LOG: %cStart Phase MessagePhase color:green;
+[09:00:36.324] LOG: %cStart Phase DamageAnimPhase color:green;
+[09:00:36.326] LOG: %cStart Phase MessagePhase color:green;
+[09:00:36.627] LOG: %cStart Phase MessagePhase color:green;
+[09:00:36.876] LOG: %cStart Phase DamageAnimPhase color:green;
+[09:00:36.878] LOG: %cStart Phase MessagePhase color:green;
+[09:00:37.112] LOG: %cStart Phase DamageAnimPhase color:green;
+[09:00:37.114] LOG: %cStart Phase MessagePhase color:green;
+[09:00:37.336] LOG: %cStart Phase DamageAnimPhase color:green;
+[09:00:37.338] LOG: %cStart Phase TurnInitPhase color:green;
+[09:00:37.338] LOG: %cStart Phase CommandPhase color:green;
+[09:00:39.040] LOG: Move: EARTH_POWER Move targets: {"targets":[],"multiple":false} 
+Player Pokemon: Firedrop
+[09:00:39.041] LOG: %cStart Phase CommandPhase color:green;
+[09:00:40.676] LOG: Move: SURF Move targets: {"targets":[5,0,2],"multiple":true} 
+Player Pokemon: Raindrop
+[09:00:40.678] LOG: %cStart Phase SelectTargetPhase color:green;
+[09:00:41.082] LOG: %cStart Phase CommandPhase color:green;
+[09:00:42.373] LOG: Move: LEECH_LIFE Move targets: {"targets":[5,1],"multiple":false} 
+Player Pokemon: Dewdrop
+[09:00:42.374] LOG: %cStart Phase SelectTargetPhase color:green;
+[09:00:42.791] LOG: %cStart Phase EnemyCommandPhase color:green;
+[09:00:42.797] LOG: Move Pool: ["Parabolic Charge"]
+[09:00:42.797] LOG: Move Scores: [72]
+[09:00:42.797] LOG: Sorted Move Pool: ["Parabolic Charge"]
+[09:00:42.797] LOG: Chosen Move: Parabolic Charge
+[09:00:42.797] LOG: %cStart Phase TurnStartPhase color:green;
+[09:00:42.802] LOG: %cStart Phase MovePhase color:green;
+[09:00:42.802] LOG: %cUser: Phione
+Move: SURF
+Use Mode: NORMAL color:orchid
+[09:00:42.804] LOG: %cStart Phase MessagePhase color:green;
+[09:00:42.888] LOG: %cStart Phase MoveEffectPhase color:green;
+[09:00:42.888] LOG: Applied Multi Lens 
+[09:00:42.889] LOG: %cStart Phase ShowAbilityPhase color:green;
+[09:00:43.046] LOG: %cStart Phase PokemonHealPhase color:green;
+[09:00:43.154] LOG: %cStart Phase MessagePhase color:green;
+[09:00:43.409] LOG: %cStart Phase HideAbilityPhase color:green;
+[09:00:43.434] LOG: %cStart Phase ShowAbilityPhase color:green;
+[09:00:43.597] LOG: %cStart Phase StatStageChangePhase color:green;
+[09:00:43.775] LOG: %cStart Phase MessagePhase color:green;
+[09:00:43.966] LOG: %cStart Phase HideAbilityPhase color:green;
+[09:00:43.991] LOG: %cStart Phase ShowAbilityPhase color:green;
+[09:00:44.155] LOG: %cStart Phase PokemonHealPhase color:green;
+[09:00:44.259] LOG: %cStart Phase MessagePhase color:green;
+[09:00:44.518] LOG: %cStart Phase HideAbilityPhase color:green;
+[09:00:44.543] LOG: %cStart Phase MoveEndPhase color:green;
+[09:00:44.543] LOG: %cStart Phase MovePhase color:green;
+[09:00:44.543] LOG: %cUser: Bellibolt
+Move: PARABOLIC_CHARGE
+Use Mode: NORMAL color:orchid
+[09:00:44.545] LOG: %cStart Phase MessagePhase color:green;
+[09:00:44.675] LOG: %cStart Phase MoveEffectPhase color:green;
+[09:00:44.676] LOG: Battle Seed: 33bCRYt5DG8qzUWt
+[09:00:44.888] LOG: crit stage: +0
+[09:00:44.888] LOG: Move: Parabolic Charge | Base damage: 116.59011764705883 | Power: 180 | Source attack: 178 | Target defense: 170
+[09:00:44.888] LOG: Move: Parabolic Charge | Attack damage: 225
+[09:00:44.889] LOG: crit stage: +0
+[09:00:44.889] LOG: Move: Parabolic Charge | Base damage: 40.96064 | Power: 90 | Source attack: 178 | Target defense: 250
+[09:00:44.889] LOG: Move: Parabolic Charge | Attack damage: 119
+[09:00:44.890] LOG: %cStart Phase DamageAnimPhase color:green;
+[09:00:44.901] LOG: %cStart Phase MessagePhase color:green;
+[09:00:45.099] LOG: %cStart Phase PokemonHealPhase color:green;
+[09:00:45.101] LOG: %cStart Phase MessagePhase color:green;
+[09:00:45.318] LOG: %cStart Phase DamageAnimPhase color:green;
+[09:00:45.331] LOG: %cStart Phase MessagePhase color:green;
+[09:00:45.530] LOG: %cStart Phase PokemonHealPhase color:green;
+[09:00:45.530] LOG: %cStart Phase MessagePhase color:green;
+[09:00:45.748] LOG: %cStart Phase FaintPhase color:green;
+[09:00:45.803] LOG: %cStart Phase MessagePhase color:green;
+[09:00:46.209] LOG: %cStart Phase MoveEndPhase color:green;
+[09:00:46.209] LOG: %cStart Phase MovePhase color:green;
+[09:00:46.209] LOG: %cUser: Reuniclus Redux
+Move: EARTH_POWER
+Use Mode: NORMAL color:orchid
+[09:00:46.209] WARN: Reuniclus Redux is attempting to use a move with no targets
+[09:00:46.209] LOG: %cStart Phase MoveEndPhase color:green;
+[09:00:46.209] LOG: %cStart Phase MovePhase color:green;
+[09:00:46.209] LOG: %cUser: Torrentula
+Move: LEECH_LIFE
+Use Mode: NORMAL color:orchid
+[09:00:46.211] LOG: %cStart Phase MessagePhase color:green;
+[09:00:46.305] LOG: %cStart Phase MoveEffectPhase color:green;
+[09:00:46.469] LOG: crit stage: +0
+[09:00:46.470] LOG: Applied Silver Powder 
+[09:00:46.470] LOG: Move: Leech Life | Base damage: 125.83736986301372 | Power: 96 | Source attack: 298 | Target defense: 146
+[09:00:46.470] LOG: Move: Leech Life | Attack damage: 115
+[09:00:46.471] LOG: %cStart Phase DamageAnimPhase color:green;
+[09:00:46.482] LOG: %cStart Phase PokemonHealPhase color:green;
+[09:00:46.483] LOG: %cStart Phase MessagePhase color:green;
+[09:00:46.675] LOG: %cStart Phase ShowAbilityPhase color:green;
+[09:00:46.833] LOG: %cStart Phase MessagePhase color:green;
+[09:00:47.099] LOG: %cStart Phase MessagePhase color:green;
+[09:00:47.372] LOG: %cStart Phase HideAbilityPhase color:green;
+[09:00:47.397] LOG: %cStart Phase MoveEndPhase color:green;
+[09:00:47.397] LOG: %cStart Phase CheckInterludePhase color:green;
+[09:00:47.397] LOG: %cStart Phase WeatherEffectPhase color:green;
+[09:00:47.760] LOG: %cStart Phase ShowAbilityPhase color:green;
+[09:00:47.918] LOG: %cStart Phase PokemonHealPhase color:green;
+[09:00:48.023] LOG: %cStart Phase MessagePhase color:green;
+[09:00:48.281] LOG: %cStart Phase HideAbilityPhase color:green;
+[09:00:48.306] LOG: %cStart Phase PositionalTagPhase color:green;
+[09:00:48.306] LOG: %cStart Phase BerryPhase color:green;
+[09:00:48.307] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[09:00:48.308] LOG: %cStart Phase TurnEndPhase color:green;
+[09:00:48.309] WARN: [coop:turn] host recorder: finalize with NO open recording -> turn=-1 events=0 (caller decides not to emit)
+[09:00:48.310] LOG: %cStart Phase MessagePhase color:green;
+[09:00:48.554] LOG: %cStart Phase DamageAnimPhase color:green;
+[09:00:48.555] LOG: %cStart Phase MessagePhase color:green;
+[09:00:48.790] LOG: %cStart Phase DamageAnimPhase color:green;
+[09:00:48.792] LOG: %cStart Phase MessagePhase color:green;
+[09:00:49.026] LOG: %cStart Phase DamageAnimPhase color:green;
+[09:00:49.028] LOG: %cStart Phase SwitchPhase color:green;
+[09:00:49.029] LOG: %cStart Phase TurnInitPhase color:green;
+[09:00:49.029] LOG: %cStart Phase CommandPhase color:green;
+[09:00:51.597] LOG: Move: EARTH_POWER Move targets: {"targets":[],"multiple":false} 
+Player Pokemon: Firedrop
+[09:00:51.599] LOG: %cStart Phase CommandPhase color:green;
+[09:00:52.748] LOG: Move: LEECH_LIFE Move targets: {"targets":[5,0],"multiple":false} 
+Player Pokemon: Dewdrop
+[09:00:52.750] LOG: %cStart Phase SelectTargetPhase color:green;
+[09:00:52.961] LOG: %cStart Phase EnemyCommandPhase color:green;
+[09:00:52.963] LOG: Move Pool: ["Parabolic Charge"]
+[09:00:52.963] LOG: Move Scores: [69]
+[09:00:52.963] LOG: Sorted Move Pool: ["Parabolic Charge"]
+[09:00:52.963] LOG: Chosen Move: Parabolic Charge
+[09:00:52.963] LOG: %cStart Phase TurnStartPhase color:green;
+[09:00:52.966] LOG: %cStart Phase MovePhase color:green;
+[09:00:52.966] LOG: %cUser: Bellibolt
+Move: PARABOLIC_CHARGE
+Use Mode: NORMAL color:orchid
+[09:00:52.968] LOG: %cStart Phase MessagePhase color:green;
+[09:00:53.093] LOG: %cStart Phase MoveEffectPhase color:green;
+[09:00:53.094] LOG: Battle Seed: 33bCRYt5DG8qzUWt
+[09:00:53.306] LOG: crit stage: +0
+[09:00:53.306] LOG: Move: Parabolic Charge | Base damage: 79.92128 | Power: 180 | Source attack: 178 | Target defense: 250
+[09:00:53.306] LOG: Move: Parabolic Charge | Attack damage: 208
+[09:00:53.307] LOG: %cStart Phase DamageAnimPhase color:green;
+[09:00:53.320] LOG: %cStart Phase MessagePhase color:green;
+[09:00:53.517] LOG: %cStart Phase PokemonHealPhase color:green;
+[09:00:53.519] LOG: %cStart Phase MessagePhase color:green;
+[09:00:53.736] LOG: %cStart Phase FaintPhase color:green;
+[09:00:53.737] WARN: cry/10081 not found
+[09:00:53.791] LOG: %cStart Phase MessagePhase color:green;
+[09:00:54.069] LOG: %cStart Phase MoveEndPhase color:green;
+[09:00:54.070] LOG: %cStart Phase MovePhase color:green;
+[09:00:54.070] LOG: %cStart Phase MoveEndPhase color:green;
+[09:00:54.070] LOG: %cStart Phase MovePhase color:green;
+[09:00:54.070] LOG: %cUser: Reuniclus Redux
+Move: EARTH_POWER
+Use Mode: NORMAL color:orchid
+[09:00:54.070] WARN: Reuniclus Redux is attempting to use a move with no targets
+[09:00:54.070] LOG: %cStart Phase MoveEndPhase color:green;
+[09:00:54.070] LOG: %cStart Phase CheckInterludePhase color:green;
+[09:00:54.070] LOG: %cStart Phase WeatherEffectPhase color:green;
+[09:00:54.433] LOG: %cStart Phase ShowAbilityPhase color:green;
+[09:00:54.591] LOG: %cStart Phase PokemonHealPhase color:green;
+[09:00:54.695] LOG: %cStart Phase MessagePhase color:green;
+[09:00:54.954] LOG: %cStart Phase HideAbilityPhase color:green;
+[09:00:54.979] LOG: %cStart Phase PositionalTagPhase color:green;
+[09:00:54.979] LOG: %cStart Phase BerryPhase color:green;
+[09:00:54.980] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[09:00:54.980] LOG: %cStart Phase TurnEndPhase color:green;
+[09:00:54.981] WARN: [coop:turn] host recorder: finalize with NO open recording -> turn=-1 events=0 (caller decides not to emit)
+[09:00:54.981] LOG: %cStart Phase MessagePhase color:green;
+[09:00:55.227] LOG: %cStart Phase DamageAnimPhase color:green;
+[09:00:55.228] LOG: %cStart Phase MessagePhase color:green;
+[09:00:55.463] LOG: %cStart Phase DamageAnimPhase color:green;
+[09:00:55.465] LOG: %cStart Phase SwitchPhase color:green;
+[09:00:56.570] LOG: %cStart Phase SwitchSummonPhase color:green;
+[09:00:56.645] LOG: Applied Iron 
+[09:00:56.645] LOG: Applied Carbos 
+[09:00:56.646] LOG: Applied Soul Dew 
+[09:00:56.646] LOG: Applied Soul Dew 
+[09:00:56.669] WARN: cry/678 not found
+[09:00:56.773] LOG: %cStart Phase ShinySparklePhase color:green;
+[09:00:56.875] LOG: %cStart Phase PostSummonPhase color:green;
+[09:00:56.875] LOG: Ran PSP for: Altaria Redux
+[09:00:56.875] LOG: %cStart Phase PostSummonPhase color:green;
+[09:00:56.875] LOG: %cStart Phase PostSummonPhase color:green;
+[09:00:56.876] LOG: %cStart Phase ShowAbilityPhase color:green;
+[09:00:57.033] LOG: %cStart Phase MessagePhase color:green;
+[09:00:57.293] LOG: %cStart Phase HideAbilityPhase color:green;
+[09:00:57.318] LOG: %cStart Phase TurnInitPhase color:green;
+[09:00:57.318] LOG: %cStart Phase CommandPhase color:green;
+[09:00:58.166] LOG: Move: EARTH_POWER Move targets: {"targets":[],"multiple":false} 
+Player Pokemon: Firedrop
+[09:00:58.167] LOG: %cStart Phase CommandPhase color:green;
+[09:00:58.960] LOG: Move: BOILING_FLAME Move targets: {"targets":[5,0],"multiple":false} 
+Player Pokemon: Altaria Redux
+[09:00:58.962] LOG: %cStart Phase SelectTargetPhase color:green;
+[09:00:59.142] LOG: %cStart Phase EnemyCommandPhase color:green;
+[09:00:59.144] LOG: Move Pool: ["Parabolic Charge"]
+[09:00:59.144] LOG: Move Scores: [66]
+[09:00:59.144] LOG: Sorted Move Pool: ["Parabolic Charge"]
+[09:00:59.144] LOG: Chosen Move: Parabolic Charge
+[09:00:59.144] LOG: %cStart Phase TurnStartPhase color:green;
+[09:00:59.146] LOG: %cStart Phase MovePhase color:green;
+[09:00:59.146] LOG: %cUser: Altaria Redux
+Move: BOILING_FLAME
+Use Mode: NORMAL color:orchid
+[09:00:59.148] LOG: %cStart Phase MessagePhase color:green;
+[09:00:59.269] LOG: %cStart Phase MoveEffectPhase color:green;
+[09:00:59.269] LOG: Battle Seed: 33bCRYt5DG8qzUWt
+[09:00:59.432] LOG: crit stage: +0
+[09:00:59.433] LOG: Move: Boiling Flame | Base damage: 212.01976470588232 | Power: 360 | Source attack: 161 | Target defense: 170
+[09:00:59.433] LOG: Move: Boiling Flame | Attack damage: 192
+[09:00:59.434] LOG: %cStart Phase DamageAnimPhase color:green;
+[09:00:59.445] LOG: %cStart Phase ShowAbilityPhase color:green;
+[09:00:59.609] LOG: %cStart Phase MessagePhase color:green;
+[09:00:59.874] LOG: %cStart Phase MessagePhase color:green;
+[09:01:00.153] LOG: %cStart Phase HideAbilityPhase color:green;
+[09:01:00.179] LOG: %cStart Phase MoveEndPhase color:green;
+[09:01:00.179] LOG: %cStart Phase MovePhase color:green;
+[09:01:00.179] LOG: %cUser: Bellibolt
+Move: PARABOLIC_CHARGE
+Use Mode: NORMAL color:orchid
+[09:01:00.181] LOG: %cStart Phase MessagePhase color:green;
+[09:01:00.311] LOG: %cStart Phase MoveEffectPhase color:green;
+[09:01:00.523] LOG: crit stage: +0
+[09:01:00.524] LOG: Move: Parabolic Charge | Base damage: 103.46 | Power: 180 | Source attack: 178 | Target defense: 192
+[09:01:00.524] LOG: Move: Parabolic Charge | Attack damage: 228
+[09:01:00.525] LOG: %cStart Phase DamageAnimPhase color:green;
+[09:01:00.536] LOG: %cStart Phase MessagePhase color:green;
+[09:01:00.735] LOG: %cStart Phase PokemonHealPhase color:green;
+[09:01:00.737] LOG: %cStart Phase MessagePhase color:green;
+[09:01:00.953] LOG: %cStart Phase FaintPhase color:green;
+[09:01:00.954] WARN: cry/10678 not found
+[09:01:01.009] LOG: %cStart Phase MessagePhase color:green;
+[09:01:01.299] LOG: %cStart Phase MoveEndPhase color:green;
+[09:01:01.299] LOG: %cStart Phase MovePhase color:green;
+[09:01:01.299] LOG: %cUser: Reuniclus Redux
+Move: EARTH_POWER
+Use Mode: NORMAL color:orchid
+[09:01:01.299] WARN: Reuniclus Redux is attempting to use a move with no targets
+[09:01:01.299] LOG: %cStart Phase MoveEndPhase color:green;
+[09:01:01.299] LOG: %cStart Phase CheckInterludePhase color:green;
+[09:01:01.299] LOG: %cStart Phase WeatherEffectPhase color:green;
+[09:01:01.663] LOG: %cStart Phase ShowAbilityPhase color:green;
+[09:01:01.821] LOG: %cStart Phase PokemonHealPhase color:green;
+[09:01:01.925] LOG: %cStart Phase MessagePhase color:green;
+[09:01:02.183] LOG: %cStart Phase HideAbilityPhase color:green;
+[09:01:02.209] LOG: %cStart Phase PositionalTagPhase color:green;
+[09:01:02.209] LOG: %cStart Phase BerryPhase color:green;
+[09:01:02.209] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[09:01:02.209] LOG: %cStart Phase TurnEndPhase color:green;
+[09:01:02.210] WARN: [coop:turn] host recorder: finalize with NO open recording -> turn=-1 events=0 (caller decides not to emit)
+[09:01:02.210] LOG: %cStart Phase MessagePhase color:green;
+[09:01:02.456] LOG: %cStart Phase DamageAnimPhase color:green;
+[09:01:02.458] LOG: %cStart Phase MessagePhase color:green;
+[09:01:02.693] LOG: %cStart Phase DamageAnimPhase color:green;
+[09:01:02.694] LOG: %cStart Phase SwitchPhase color:green;
+[09:01:04.405] LOG: %cStart Phase SwitchSummonPhase color:green;
+[09:01:04.487] LOG: Applied Iron 
+[09:01:04.487] LOG: Applied Carbos 
+[09:01:04.487] LOG: Applied Soul Dew 
+[09:01:04.487] LOG: Applied Soul Dew 
+[09:01:04.615] LOG: %cStart Phase ShinySparklePhase color:green;
+[09:01:04.717] LOG: %cStart Phase PostSummonPhase color:green;
+[09:01:04.717] LOG: Ran PSP for: Feraligatr
+[09:01:04.717] LOG: %cStart Phase PostSummonPhase color:green;
+[09:01:04.717] LOG: %cStart Phase PostSummonPhase color:green;
+[09:01:04.718] LOG: %cStart Phase TurnInitPhase color:green;
+[09:01:04.718] LOG: %cStart Phase CommandPhase color:green;
