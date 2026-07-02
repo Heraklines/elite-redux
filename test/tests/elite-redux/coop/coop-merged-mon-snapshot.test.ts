@@ -12,10 +12,12 @@
 // live co-op battle getLuck + innateSlotPassiveAttr read the snapshot, not local account data.
 
 import { getGameMode } from "#app/game-mode";
+import { clearCoopRuntime, startLocalCoopSession } from "#data/elite-redux/coop/coop-runtime";
+import { ER_SHINY_LAB_DEFAULT_PARAMS, encodeErShinyLabPreset } from "#data/elite-redux/er-shiny-lab-effects";
 import { CustomPokemonData } from "#data/pokemon/pokemon-data";
 import { GameModes } from "#enums/game-modes";
 import { SpeciesId } from "#enums/species-id";
-import { startLocalCoopSession, clearCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
+import { getErShinyLabSpriteFxLookForPokemon } from "#sprites/er-shiny-lab-sprite-fx";
 import { GameManager } from "#test/framework/game-manager";
 import Phaser from "phaser";
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
@@ -85,5 +87,51 @@ describe.skipIf(!RUN)("co-op merged-mon owner snapshot (#633 Fix #3) - live gate
     expect(mon.innateSlotPassiveAttr(0)).toBe(5);
     expect(mon.innateSlotPassiveAttr(1)).toBe(2);
     expect(mon.innateSlotPassiveAttr(2)).toBe(1);
+  });
+});
+
+// =============================================================================
+// Co-op Shiny Lab look sync (#785): each pick carries its OWNER'S equipped look in
+// `customPokemonData.erShinyLab` (stamped from the roster starter blob at merge), so the
+// partner's client renders the custom shiny effects instead of the default shiny. These pin
+// the two substrate guarantees the sync rides on: the look survives the (de)serialize
+// round-trip, and the FX lookup PREFERS a carried look / honors the suppress flag.
+// =============================================================================
+describe("co-op Shiny Lab look sync (#785) - carry + precedence", () => {
+  const carriedLook = encodeErShinyLabPreset({
+    loadout: { palette: "duoneon", surface: "starmap", around: null },
+    params: { ...ER_SHINY_LAB_DEFAULT_PARAMS },
+  });
+
+  it("CustomPokemonData carries erShinyLab + name + suppressLocal through a (de)serialize round-trip", () => {
+    const original = new CustomPokemonData();
+    original.erShinyLab = carriedLook;
+    original.erShinyLabName = "Glittering";
+    original.erShinyLabSuppressLocal = true;
+
+    const round = new CustomPokemonData(JSON.parse(JSON.stringify(original)));
+    expect(round.erShinyLab, "the carried look survives the save/wire round-trip").toEqual(carriedLook);
+    expect(round.erShinyLabName).toBe("Glittering");
+    expect(round.erShinyLabSuppressLocal).toBe(true);
+  });
+
+  it("the FX lookup PREFERS a carried look (the partner's mon renders ITS owner's effects)", () => {
+    const look = getErShinyLabSpriteFxLookForPokemon({
+      species: { speciesId: 1 },
+      shiny: true,
+      customPokemonData: { erShinyLab: carriedLook },
+    });
+    expect(look, "a carried look resolves without any local starter-data").not.toBeNull();
+    expect(look?.loadout.palette).toBe("duoneon");
+    expect(look?.loadout.surface).toBe("starmap");
+  });
+
+  it("suppressLocal blocks the LOCAL per-species lookup on a partner's bare shiny", () => {
+    const look = getErShinyLabSpriteFxLookForPokemon({
+      species: { speciesId: 1 },
+      shiny: true,
+      customPokemonData: { erShinyLabSuppressLocal: true },
+    });
+    expect(look, "no carried look + suppressLocal -> default shiny (never this client's preset)").toBeNull();
   });
 });

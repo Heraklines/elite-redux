@@ -32,6 +32,7 @@ import { ChallengeType } from "#enums/challenge-type";
 import { Nature } from "#enums/nature";
 import { UiMode } from "#enums/ui-mode";
 import { overrideHeldItems, overrideModifiers } from "#modifiers/modifier";
+import { getErShinyLabEquippedNameForSpecies, getErShinyLabSavedLookForSpecies } from "#sprites/er-shiny-lab-sprite-fx";
 import type { Starter } from "#types/save-data";
 import { SaveSlotUiMode } from "#ui/handlers/save-slot-select-ui-handler";
 import { applyChallenges } from "#utils/challenge-utils";
@@ -380,6 +381,18 @@ export class SelectStarterPhase extends Phase {
         if (starter.coopLuck !== undefined) {
           starterPokemon.customPokemonData.coopLuck = starter.coopLuck;
         }
+        // Co-op (#785): carry the OWNER'S Shiny Lab look onto the mon (customPokemonData
+        // round-trips through serialization, and the FX lookup prefers a carried look). A
+        // SHINY mon whose owner carried NO look suppresses the LOCAL per-species lookup, so
+        // this client's own preset for the species never leaks onto the partner's plain shiny.
+        if (starter.erShinyLab !== undefined) {
+          starterPokemon.customPokemonData.erShinyLab = starter.erShinyLab;
+          if (starter.erShinyLabName) {
+            starterPokemon.customPokemonData.erShinyLabName = starter.erShinyLabName;
+          }
+        } else if (starterPokemon.shiny) {
+          starterPokemon.customPokemonData.erShinyLabSuppressLocal = true;
+        }
       }
       const chalApplied = applyChallenges(ChallengeType.STARTER_MODIFY, starterPokemon);
       party.push(starterPokemon);
@@ -450,6 +463,10 @@ function serializeCoopStarter(s: Starter): CoopSerializedStarter {
     erBlackShiny: s.erBlackShiny,
     coopPassiveAttr: snap.coopPassiveAttr,
     coopLuck: snap.coopLuck,
+    // Co-op (#785): carry the OWNER'S locally-equipped Shiny Lab look (+ preset name) so the
+    // partner's client renders this mon's custom shiny effects instead of the default shiny.
+    erShinyLab: getErShinyLabSavedLookForSpecies(s.speciesId, s.shiny),
+    erShinyLabName: getErShinyLabEquippedNameForSpecies(s.speciesId, s.shiny) || undefined,
   };
 }
 
@@ -480,6 +497,9 @@ function rebuildCoopStarter(blob: CoopSerializedStarter): Starter {
     // partner mon is gated by its owner's state (threaded into customPokemonData in initBattle).
     coopPassiveAttr: blob.coopPassiveAttr ? [...blob.coopPassiveAttr] : undefined,
     coopLuck: blob.coopLuck,
+    // Co-op (#785): the owner's carried Shiny Lab look (threaded into customPokemonData below).
+    erShinyLab: blob.erShinyLab,
+    erShinyLabName: blob.erShinyLabName,
   };
 }
 

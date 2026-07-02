@@ -24,10 +24,11 @@
 // plain-JSON `ErDataFingerprint` (#633 diagnostics), so the transport stays the lowest layer.
 import type { ErDataFingerprint } from "#data/elite-redux/coop/coop-data-fingerprint";
 import { coopLog, isCoopDebug } from "#data/elite-redux/coop/coop-debug";
+import type { GhostTeamSnapshot } from "#data/elite-redux/er-ghost-teams";
 // TYPE-ONLY import (fully erased at runtime by `import type`, so this file stays the
 // zero-runtime-import lowest layer): the ghost-pool message carries plain-JSON
 // `GhostTeamSnapshot`s, which already live in er-ghost-teams (#633 ghost-pool sync).
-import type { GhostTeamSnapshot } from "#data/elite-redux/er-ghost-teams";
+import type { ErShinyLabSavedLook } from "#data/elite-redux/er-shiny-lab-effects";
 
 /** Which side of a co-op session a client is. Auto-assigned at pairing time (the
  *  player never chooses); the run is host-authoritative, so `host` is the engine
@@ -108,6 +109,14 @@ export interface CoopSerializedStarter {
   coopPassiveAttr?: number[] | undefined;
   /** Co-op (#633 Fix #3): the picking player's canonical luck for this mon (owner-authoritative). */
   coopLuck?: number | undefined;
+  /**
+   * Co-op (#785): the OWNER'S equipped Shiny Lab look for this mon (the encoded SavedLook that
+   * rides `customPokemonData.erShinyLab`). Presets live in the owner's LOCAL save, so without
+   * carrying them the partner's client rendered default shinies. Type-only import (erased).
+   */
+  erShinyLab?: ErShinyLabSavedLook | undefined;
+  /** Co-op (#785): the equipped preset NAME (the "Glittering Rayquaza" prefix), when a look is carried. */
+  erShinyLabName?: string | undefined;
 }
 
 // =============================================================================

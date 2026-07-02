@@ -8,9 +8,11 @@ import {
   type ErShinyLabNameStyle,
   type ErShinyLabParams,
   type ErShinyLabSavedLook,
+  encodeErShinyLabPreset,
   getErShinyLabNameStyle,
   getErShinyLabOwnedSet,
   isErShinyLabNameFxUnlocked,
+  normalizeErShinyLabSavedLook,
   sanitizeErShinyLabLoadout,
   sanitizeErShinyLabPresetName,
 } from "#data/elite-redux/er-shiny-lab-effects";
@@ -393,6 +395,20 @@ export function getErShinyLabSpriteFxLookForSpecies(speciesId: number, shiny: bo
   const params = decodeErShinyLabParams(save.q);
   params.nameFx = params.nameFx && isErShinyLabNameFxUnlocked(save);
   return { loadout, params };
+}
+
+/**
+ * The ENCODED SavedLook for a species' locally-equipped Shiny Lab look, or undefined when none
+ * is equipped (#785 co-op sync). This is the wire/carry shape (`customPokemonData.erShinyLab`);
+ * the decoded render shape is {@linkcode getErShinyLabSpriteFxLookForSpecies}. Ownership and
+ * name-FX unlocks are already sanitized by the underlying lookup.
+ */
+export function getErShinyLabSavedLookForSpecies(speciesId: number, shiny: boolean): ErShinyLabSavedLook | undefined {
+  const look = getErShinyLabSpriteFxLookForSpecies(speciesId, shiny);
+  if (!look) {
+    return;
+  }
+  return normalizeErShinyLabSavedLook(encodeErShinyLabPreset(look)) ?? undefined;
 }
 
 export function getErShinyLabSpriteFxLookForPokemon(pokemon: {

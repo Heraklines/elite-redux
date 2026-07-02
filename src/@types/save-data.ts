@@ -230,6 +230,10 @@ export interface Starter {
    * local client's. `undefined` for every solo / non-co-op starter (all other modes untouched).
    */
   coopPassiveAttr?: number[] | undefined;
+  /** Co-op (#785): the OWNER'S carried Shiny Lab look (encoded SavedLook) for this pick. */
+  erShinyLab?: import("#data/elite-redux/er-shiny-lab-effects").ErShinyLabSavedLook | undefined;
+  /** Co-op (#785): the equipped preset name carried with the look. */
+  erShinyLabName?: string | undefined;
   /** Co-op (#633 Fix #3): the owning player's canonical luck for this mon. */
   coopLuck?: number | undefined;
 }
