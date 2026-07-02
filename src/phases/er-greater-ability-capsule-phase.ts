@@ -34,7 +34,7 @@ import {
   coopAbilityPickerSeq,
 } from "#data/elite-redux/coop/coop-ability-picker-relay";
 import { coopLog } from "#data/elite-redux/coop/coop-debug";
-import { getCoopInteractionRelay } from "#data/elite-redux/coop/coop-runtime";
+import { advanceCoopInteractionForContinuation, getCoopInteractionRelay } from "#data/elite-redux/coop/coop-runtime";
 import { erRunUnlockableInnateSlots } from "#data/elite-redux/er-ability-capsule";
 import {
   GREATER_CAPSULE_RUN_UNLOCK_COUNT,
@@ -262,6 +262,9 @@ export class ErGreaterAbilityCapsulePhase extends Phase {
       this.relayEnd();
     }
     globalScene.phaseManager.tryRemovePhase("SelectModifierPhase");
+    // #789 (same hole as the regular capsule, probe-verified there): a committed capsule ends
+    // the whole alternating interaction, but nothing advanced the counter - rotation stalled.
+    advanceCoopInteractionForContinuation(this.coopSeq);
     this.end();
   }
 
@@ -313,6 +316,8 @@ export class ErGreaterAbilityCapsulePhase extends Phase {
         greaterCapsuleRunUnlockInnates(mon, [data[1], data[2]]);
       }
       globalScene.phaseManager.tryRemovePhase("SelectModifierPhase");
+      // #789: the watcher's committed capsule advances too (from-pinned; lockstep with the owner).
+      advanceCoopInteractionForContinuation(this.coopSeq);
     }
     this.end();
   }

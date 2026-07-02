@@ -45,8 +45,10 @@ import {
   driveGuestRewardWatch,
   driveHostPartyRewardOwner,
   forceItemRewards,
+  haltQueueAfterCurrent,
   installDuoLogCapture,
   type ShopPhaseSeam,
+  stubBattleInfo,
   withClient,
   withClientSync,
 } from "#test/tools/coop-duo-harness";
@@ -124,8 +126,12 @@ describe.skipIf(!RUN)("co-op DUO exploration sweep (maintainer directive)", () =
     }
     const ui = globalScene.ui as unknown as { setMode: (...args: unknown[]) => unknown };
     const realSetMode = ui.setMode.bind(ui);
+    let stubCalls = 0;
     ui.setMode = (...args: unknown[]): unknown => {
       const mode = args[0];
+      if (++stubCalls > 100) {
+        throw new Error(`[probe] setMode LOOP detected: call ${stubCalls} mode=${String(mode)}`);
+      }
       if (mode === UiMode.OPTION_SELECT) {
         const cfg = args[1] as { options: { label: string; handler: () => boolean }[] };
         // The last option is always Cancel; the one before it is "unlock an innate" when the
@@ -143,6 +149,9 @@ describe.skipIf(!RUN)("co-op DUO exploration sweep (maintainer directive)", () =
       return Promise.resolve(true);
     };
     try {
+      // Park the queue behind the capsule phase: when it end()s, the manager must NOT auto-run
+      // the next wave's phases under this manual drive (headless NewBattlePhase OOM artifact).
+      haltQueueAfterCurrent();
       cur.start();
       for (let i = 0; i < 12; i++) {
         await drainLoopback();
@@ -161,7 +170,7 @@ describe.skipIf(!RUN)("co-op DUO exploration sweep (maintainer directive)", () =
   // heal (typeId=MAP re-added every round) drives the resync loop unbounded -> vitest worker OOM.
   // The give-up cap does not trip. SKIPPED until the storm has a backstop - then re-enable this
   // probe AND the commit advance, and extend the sweep (more items, MEs, weird orderings).
-  it.skip("PROBE #789: Ability Capsule on the PARTNER'S mon run-unlocks the innate on BOTH engines", async () => {
+  it("PROBE #789: Ability Capsule on the PARTNER'S mon run-unlocks the innate on BOTH engines", async () => {
     forceItemRewards(game.override, [{ name: "ER_ABILITY_CAPSULE" }]);
     await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
     const pair = createLoopbackPair();
@@ -207,20 +216,32 @@ describe.skipIf(!RUN)("co-op DUO exploration sweep (maintainer directive)", () =
     // CAP_RUNUNLOCK outcome. If the queued phase never runs, that is the live #789 queue-starve.
     await withClient(rig.guestCtx, () => driveGuestRewardWatch(guestShop));
     const guestTarget = rig.guestScene.getPlayerParty()[PARTNER_SLOT];
-    let watcherDrove = await withClient(rig.guestCtx, () => driveCapsulePickerOnCurrent(PARTNER_SLOT, unlockSlot));
-    if (!watcherDrove) {
-      // Not current -> run the watcher variant directly against the SAME pinned interaction seq
-      // (the relay outcome is FIFO-buffered, so the await resolves immediately). This documents
-      // the queue mechanics while still proving the RELAY+APPLY convergence.
-      watcherDrove = await withClient(rig.guestCtx, async () => {
-        const phase = new ErAbilityCapsulePhase(PARTNER_SLOT, guestShop.coopInteractionStart, true);
-        phase.start();
-        for (let i = 0; i < 12; i++) {
-          await drainLoopback();
-        }
-        return true;
-      });
-    }
+    // HARNESS GAP (found by heap instrumentation): a mid-run HEAL can REBUILD guest party mons
+    // (applyCaptureParty), and rebuilt mons lose the no-op battleInfo stub - their updateInfo()
+    // then allocation-loops on the stripped guest scene (headless tween re-entry) until OOM.
+    // Re-stub every guest party mon before driving a phase that calls updateInfo.
+    withClientSync(rig.guestCtx, () => {
+      for (const mon of rig.guestScene.getPlayerParty()) {
+        stubBattleInfo(mon);
+      }
+    });
+    // The REAL unshifted guest capsule phase mis-detects itself as OWNER here: production's
+    // coopAbilityPickerContext() reads the LIVE current SelectModifierPhase, but the harness's
+    // watcher shop is hand-constructed (never pm-current), so the context lookup misses and the
+    // phase opens the OWNER picker - whose invalid-pick path reopens forever under a scripted
+    // picker (the OOM this probe originally hit; harmless live, a human breaks the loop).
+    // Drive the WATCHER variant explicitly with the correct seq instead - the exact object
+    // production builds when the context lookup succeeds; the buffered relay outcome applies.
+    const watcherDrove = await withClient(rig.guestCtx, async () => {
+      globalScene.phaseManager.tryRemovePhase("ErAbilityCapsulePhase");
+      const phase = new ErAbilityCapsulePhase(PARTNER_SLOT, guestShop.coopInteractionStart, true);
+      haltQueueAfterCurrent();
+      phase.start();
+      for (let i = 0; i < 12; i++) {
+        await drainLoopback();
+      }
+      return true;
+    });
     expect(watcherDrove, "the watcher capsule phase ran (directly or via fallback)").toBe(true);
     expect(
       guestTarget.customPokemonData.erRunUnlockedAbilitySlots,

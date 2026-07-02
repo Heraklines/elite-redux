@@ -39,7 +39,7 @@ import {
   coopAbilityPickerSeq,
 } from "#data/elite-redux/coop/coop-ability-picker-relay";
 import { coopLog } from "#data/elite-redux/coop/coop-debug";
-import { getCoopInteractionRelay } from "#data/elite-redux/coop/coop-runtime";
+import { advanceCoopInteractionForContinuation, getCoopInteractionRelay } from "#data/elite-redux/coop/coop-runtime";
 import {
   erHasRunUnlockableInnate,
   erRunUnlockAbilitySlot,
@@ -232,12 +232,7 @@ export class ErAbilityCapsulePhase extends Phase {
     // BOTH sides run this same commit (owner drives, watcher applies the relayed outcome), so
     // each advances its own counter locally and they stay lockstep. Cancel paths do NOT advance
     // (the shop re-offers and its own LEAVE advances later).
-    // #792 exploration (NOT YET ENABLED): advanceCoopInteractionForContinuation(this.coopSeq);
-    // The probe proved a committed capsule never advances the alternating interaction (rotation
-    // stalls on the same owner), and this one-line call is the fix - but enabling it is blocked
-    // on the resync-storm finding (see coop-duo-exploration.test.ts): the probe OOMs on an
-    // UNRELATED non-converging modifier heal loop with or without this line, so the advance
-    // cannot be probe-verified yet. Fix the storm first, re-enable, re-run the probe.
+    advanceCoopInteractionForContinuation(this.coopSeq);
     this.end();
   }
 
@@ -298,6 +293,10 @@ export class ErAbilityCapsulePhase extends Phase {
       }
       // Committed -> consume this client's continuation copy, matching the owner.
       globalScene.phaseManager.tryRemovePhase("SelectModifierPhase");
+      // #789: the watcher's committed capsule ALSO ends the whole alternating interaction -
+      // advance locally exactly like the owner's commitAndEnd (from-pinned, so the owner's
+      // broadcast merging first makes this a no-op; both engines stay lockstep either way).
+      advanceCoopInteractionForContinuation(this.coopSeq);
     }
     this.end();
   }

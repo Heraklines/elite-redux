@@ -467,6 +467,10 @@ const learnMoveForwardInFlight = new Set<number>();
 export function advanceCoopInteractionForContinuation(fromSeq: number): void {
   try {
     if (!globalScene.gameMode?.isCoop || fromSeq < 0 || coopMeInProgress()) {
+      coopLog(
+        "reward",
+        `advanceCoopInteractionForContinuation SKIP (isCoop=${globalScene.gameMode?.isCoop === true} fromSeq=${fromSeq} meInProgress=${coopMeInProgress()})`,
+      );
       return;
     }
     const controller = getCoopController();
@@ -479,8 +483,9 @@ export function advanceCoopInteractionForContinuation(fromSeq: number): void {
       "reward",
       `advance interaction from CONTINUATION commit (role=${controller.role} from=${fromSeq} counter ${before} -> ${controller.interactionCounter()})`,
     );
-  } catch {
+  } catch (e) {
     /* the advance must never break the item flow */
+    coopWarn("reward", "advanceCoopInteractionForContinuation threw (handled)", e);
   }
 }
 

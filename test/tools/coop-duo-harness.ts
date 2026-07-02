@@ -68,7 +68,7 @@ import { Battle } from "#app/battle";
 import { BattleScene } from "#app/battle-scene";
 import { getGameMode } from "#app/game-mode";
 import { globalScene, initGlobalScene } from "#app/global-scene";
-import type { Phase } from "#app/phase";
+import { Phase } from "#app/phase";
 import { captureCoopPlayerModifiers, reconcileCoopPlayerModifiers } from "#data/elite-redux/coop/coop-battle-engine";
 import {
   assembleCoopRuntime,
@@ -614,7 +614,7 @@ function neutralizeCoopCandyBar(scene: BattleScene): void {
  * init() out by design. (If a future co-op UI-mirror test needs real HP bars, wire it via the render harness's
  * repointGlobalScene, not by running init() here.)
  */
-function stubBattleInfo(mon: Pokemon): void {
+export function stubBattleInfo(mon: Pokemon): void {
   // The real PlayerBattleInfo/EnemyBattleInfo was never built (we skipped init()); a tiny async-resolving
   // stub satisfies updateInfo / setHpNumbers / initInfo / setMini etc. on the headless render path.
   const noop = () => Promise.resolve();
@@ -642,6 +642,24 @@ export function buildRuntime(endpoint: CoopTransport, username: string, netcodeM
 // ---------------------------------------------------------------------------
 
 /** Drain the loopback microtask queue (LoopbackTransport delivers on queueMicrotask). */
+/**
+ * #792 exploration: HALT the active client's phase queue after the phase-under-test ends. A manual
+ * drive starts ONE phase; when it end()s, the phase manager auto-starts whatever is next - on the
+ * guest that can be NewBattlePhase (next-wave generation), which allocation-loops under the
+ * harness's headless stubs (tween onComplete re-entry) until the vitest worker OOMs. Unshifting
+ * this inert phase parks the queue at a safe boundary instead: its start() never end()s, so
+ * nothing downstream auto-runs. Call INSIDE withClient(ctx) right before driving the phase.
+ */
+export function haltQueueAfterCurrent(): void {
+  class HarnessHaltPhase extends Phase {
+    public readonly phaseName = "HarnessHaltPhase" as never;
+    public override start(): void {
+      // Deliberately never end(): the queue parks here.
+    }
+  }
+  globalScene.phaseManager.unshiftPhase(new HarnessHaltPhase() as unknown as Phase);
+}
+
 export async function drainLoopback(): Promise<void> {
   // A few macrotask hops flush nested microtask -> microtask deliveries deterministically.
   for (let i = 0; i < 4; i++) {

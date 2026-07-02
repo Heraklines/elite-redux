@@ -608,7 +608,9 @@ export function erRecordAchievementSwitchIn(pokemon: Pokemon): void {
 }
 
 export function erRecordAchievementChargeMove(user: Pokemon, moveId: MoveId, instantCharge: boolean): void {
-  if (!instantCharge && user.isPlayer() && globalScene.currentBattle.turn === 0) {
+  // battle.turn is 1-based during play (already incremented when MoveChargePhase runs),
+  // so the old `=== 0` gate could never pass - SORRY_FOR_THE_WAIT was unobtainable.
+  if (!instantCharge && user.isPlayer() && globalScene.currentBattle.turn === 1) {
     battleState().turnOneChargedMoves?.add(`${user.id}:${moveId}`);
   }
 }
