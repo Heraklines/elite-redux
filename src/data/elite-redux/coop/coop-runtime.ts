@@ -454,6 +454,36 @@ const learnMoveForwardInFlight = new Set<number>();
  * indirection. When set, `learnMoveForward` opens the picker INLINE over the current screen -
  * a phase queued behind a parked watcher phase can never run (the live TM Case circular stall).
  */
+/**
+ * #789 (found by the duo exploration probe): advance the alternating interaction from OUTSIDE the
+ * reward shop. A CONTINUATION-class reward (Ability Capsule, TM, Learner's Shroom) deliberately
+ * skips the shop's own advance (the item's picker phase owns the rest of the interaction) - but the
+ * COMMIT paths never advanced at all, so the rotation stalled on the same owner every wave. Each
+ * side calls this locally when ITS copy of the item flow commits (owner + watcher run the same
+ * flow), so the counters stay lockstep with no extra wire traffic. Mirrors the shop's own guards:
+ * no-op outside co-op, inside a mystery encounter (the ME owns the single advance), or with no
+ * controller. Safe to call more than once per seq: advanceInteraction(from) is from-pinned.
+ */
+export function advanceCoopInteractionForContinuation(fromSeq: number): void {
+  try {
+    if (!globalScene.gameMode?.isCoop || fromSeq < 0 || coopMeInProgress()) {
+      return;
+    }
+    const controller = getCoopController();
+    if (controller == null) {
+      return;
+    }
+    const before = controller.interactionCounter();
+    controller.advanceInteraction(fromSeq);
+    coopLog(
+      "reward",
+      `advance interaction from CONTINUATION commit (role=${controller.role} from=${fromSeq} counter ${before} -> ${controller.interactionCounter()})`,
+    );
+  } catch {
+    /* the advance must never break the item flow */
+  }
+}
+
 let learnMovePickerOpener: ((partySlot: number, moveId: number, maxMoveCount: number) => void) | null = null;
 
 export function setCoopLearnMovePickerOpener(

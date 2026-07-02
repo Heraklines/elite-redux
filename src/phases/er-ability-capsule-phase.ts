@@ -99,10 +99,7 @@ export class ErAbilityCapsulePhase extends Phase {
       return;
     }
     if (this.coopSeq >= 0) {
-      coopLog(
-        "ability",
-        `capsule OWNER-DRIVES-PICKER seq=${this.coopSeq} slot=${this.partyIndex} mon=${mon.name}`,
-      );
+      coopLog("ability", `capsule OWNER-DRIVES-PICKER seq=${this.coopSeq} slot=${this.partyIndex} mon=${mon.name}`);
     }
     this.openChoice(mon);
   }
@@ -229,6 +226,18 @@ export class ErAbilityCapsulePhase extends Phase {
       this.relayEnd();
     }
     globalScene.phaseManager.tryRemovePhase("SelectModifierPhase");
+    // Co-op (#789, found by the duo exploration probe): a committed capsule ENDS the whole
+    // alternating interaction, but the shop deliberately skipped its advance (queuesContinuation)
+    // and nothing here advanced either - so the rotation stalled on the same owner every wave.
+    // BOTH sides run this same commit (owner drives, watcher applies the relayed outcome), so
+    // each advances its own counter locally and they stay lockstep. Cancel paths do NOT advance
+    // (the shop re-offers and its own LEAVE advances later).
+    // #792 exploration (NOT YET ENABLED): advanceCoopInteractionForContinuation(this.coopSeq);
+    // The probe proved a committed capsule never advances the alternating interaction (rotation
+    // stalls on the same owner), and this one-line call is the fix - but enabling it is blocked
+    // on the resync-storm finding (see coop-duo-exploration.test.ts): the probe OOMs on an
+    // UNRELATED non-converging modifier heal loop with or without this line, so the advance
+    // cannot be probe-verified yet. Fix the storm first, re-enable, re-run the probe.
     this.end();
   }
 

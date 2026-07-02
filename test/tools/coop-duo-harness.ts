@@ -898,6 +898,21 @@ export async function driveGuestRewardWatch(guestPhase: ShopPhaseSeam): Promise<
   // start() (watcher branch) is async-ish: it awaits the owner's options, opens the cosmetic screen,
   // then loops on awaitInteractionChoice. We kick it off, then drain the loopback repeatedly so each
   // buffered/relayed owner pick is delivered + applied until the LEAVE/terminal ADVANCES the interaction.
+  // A CONTINUATION-class reward (TM / TM Case / Learner's Shroom / Ability Capsule) is TERMINAL for
+  // the watcher (applyRelayedRewardAction returns true and the shop super.end()s) WITHOUT advancing
+  // the interaction counter (the item's own picker phase owns the rest of the interaction) - so track
+  // the phase's end() directly as a third completion signal (found by the #789 exploration probe:
+  // the old leave-or-advance detector misread this legitimate terminal as a WATCH HANG).
+  let terminalApplied = false;
+  const seamApply = guestPhase as unknown as { applyRelayedRewardAction?: (a: unknown) => boolean };
+  const realApply = seamApply.applyRelayedRewardAction?.bind(guestPhase);
+  if (realApply) {
+    seamApply.applyRelayedRewardAction = (a: unknown): boolean => {
+      const terminal = realApply(a);
+      terminalApplied ||= terminal;
+      return terminal;
+    };
+  }
   guestPhase.start();
   // The interaction counter the watcher pinned to at start() - it ADVANCES past this exactly once when the
   // owner's terminal (LEAVE or a terminal reward) is mirrored, which is the authoritative "this interaction
@@ -912,7 +927,7 @@ export async function driveGuestRewardWatch(guestPhase: ShopPhaseSeam): Promise<
     await drainLoopback();
     // Completed when EITHER the watcher left (coopWatcher cleared - e.g. a no-relay short-circuit) OR the
     // interaction counter advanced past the pinned one (the owner's terminal was mirrored + applied).
-    if (!(guestPhase as unknown as { coopWatcher: boolean }).coopWatcher || advancedPastPinned()) {
+    if (!(guestPhase as unknown as { coopWatcher: boolean }).coopWatcher || advancedPastPinned() || terminalApplied) {
       return;
     }
   }
