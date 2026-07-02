@@ -1,0 +1,303 @@
+url:      https://elite-redux-staging.pages.dev/
+build:    mr2gafdr-8tyo
+mode:     4  wave:20
+seed:     qDvLGpSp59RKskuVRgWw8PMa
+party:    Scyther Redux(L16 51hp f0), Pawniard Redux(L15 0hp f0), Honedge Redux(L10 0hp f0), Machop Redux(L9 0hp f0), Totodile(L15 0hp f0)
+enemy:    Medicham(L15), Onix(L15), Voltorb(L15)
+
+----- COMMENT -----
+Game just fully broke. Using moves goes through turns as seen by the Speed boost ability triggering but nothing happens
+
+----- CONSOLE -----
+[04:08:31.984] LOG: Applied Super EXP. Charm 
+[04:08:31.984] LOG: Applied EXP. Charm 
+[04:08:32.226] LOG: 3867 4144 4096
+[04:08:32.293] LOG: %cStart Phase LevelUpPhase color:green;
+[04:08:32.293] LOG: %cStart Phase MoveEndPhase color:green;
+[04:08:32.294] LOG: %cStart Phase MovePhase color:green;
+[04:08:32.294] LOG: %cUser: Voltorb
+Move: ELECTRO_BALL
+Use Mode: NORMAL color:orchid
+[04:08:32.294] WARN: Voltorb is attempting to use a move with no targets
+[04:08:32.294] LOG: %cStart Phase MoveEndPhase color:green;
+[04:08:32.294] LOG: %cStart Phase MovePhase color:green;
+[04:08:32.294] LOG: %cStart Phase MoveEndPhase color:green;
+[04:08:32.294] LOG: %cStart Phase MovePhase color:green;
+[04:08:32.294] LOG: %cStart Phase MoveEndPhase color:green;
+[04:08:32.294] LOG: %cStart Phase CheckInterludePhase color:green;
+[04:08:32.294] LOG: %cStart Phase WeatherEffectPhase color:green;
+[04:08:32.294] LOG: %cStart Phase PositionalTagPhase color:green;
+[04:08:32.294] LOG: %cStart Phase BerryPhase color:green;
+[04:08:32.294] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[04:08:32.294] LOG: %cStart Phase TurnEndPhase color:green;
+[04:08:32.294] WARN: [coop:turn] host recorder: finalize with NO open recording -> turn=-1 events=0 (caller decides not to emit)
+[04:08:32.294] LOG: %cStart Phase ShowAbilityPhase color:green;
+[04:08:32.456] LOG: %cStart Phase StatStageChangePhase color:green;
+[04:08:32.457] LOG: %cStart Phase MessagePhase color:green;
+[04:08:32.668] LOG: %cStart Phase HideAbilityPhase color:green;
+[04:08:32.693] LOG: %cStart Phase TurnInitPhase color:green;
+[04:08:32.693] LOG: %cStart Phase CommandPhase color:green;
+[04:08:33.529] LOG: Move: POISON_GAS Move targets: {"targets":[],"multiple":true} 
+Player Pokemon: Scyther Redux
+[04:08:33.530] LOG: %cStart Phase EnemyCommandPhase color:green;
+[04:08:33.530] LOG: Move Pool: ["Electro Ball","Eerie Impulse","Screech","Rollout (P)"]
+[04:08:33.530] LOG: Move Scores: [null,null,null,null]
+[04:08:33.530] LOG: Sorted Move Pool: ["Electro Ball","Eerie Impulse","Screech","Rollout (P)"]
+[04:08:33.530] LOG: Chosen Move: Electro Ball
+[04:08:33.530] LOG: %cStart Phase TurnStartPhase color:green;
+[04:08:33.531] LOG: %cStart Phase MovePhase color:green;
+[04:08:33.531] LOG: %cUser: Scyther Redux
+Move: POISON_GAS
+Use Mode: NORMAL color:orchid
+[04:08:33.531] WARN: Scyther Redux is attempting to use a move with no targets
+[04:08:33.531] LOG: %cStart Phase MoveEndPhase color:green;
+[04:08:33.531] LOG: %cStart Phase MovePhase color:green;
+[04:08:33.531] LOG: %cUser: Voltorb
+Move: ELECTRO_BALL
+Use Mode: NORMAL color:orchid
+[04:08:33.531] WARN: Voltorb is attempting to use a move with no targets
+[04:08:33.531] LOG: %cStart Phase MoveEndPhase color:green;
+[04:08:33.531] LOG: %cStart Phase CheckInterludePhase color:green;
+[04:08:33.531] LOG: %cStart Phase WeatherEffectPhase color:green;
+[04:08:33.531] LOG: %cStart Phase PositionalTagPhase color:green;
+[04:08:33.531] LOG: %cStart Phase BerryPhase color:green;
+[04:08:33.531] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[04:08:33.531] LOG: %cStart Phase TurnEndPhase color:green;
+[04:08:33.532] WARN: [coop:turn] host recorder: finalize with NO open recording -> turn=-1 events=0 (caller decides not to emit)
+[04:08:33.532] LOG: %cStart Phase ShowAbilityPhase color:green;
+[04:08:33.693] LOG: %cStart Phase StatStageChangePhase color:green;
+[04:08:33.694] LOG: %cStart Phase MessagePhase color:green;
+[04:08:33.904] LOG: %cStart Phase HideAbilityPhase color:green;
+[04:08:33.929] LOG: %cStart Phase TurnInitPhase color:green;
+[04:08:33.929] LOG: %cStart Phase CommandPhase color:green;
+[04:08:34.177] LOG: Move: POISON_GAS Move targets: {"targets":[],"multiple":true} 
+Player Pokemon: Scyther Redux
+[04:08:34.179] LOG: %cStart Phase EnemyCommandPhase color:green;
+[04:08:34.179] LOG: Move Pool: ["Electro Ball","Eerie Impulse","Screech","Rollout (P)"]
+[04:08:34.179] LOG: Move Scores: [null,null,null,null]
+[04:08:34.179] LOG: Sorted Move Pool: ["Electro Ball","Eerie Impulse","Screech","Rollout (P)"]
+[04:08:34.179] LOG: Chosen Move: Electro Ball
+[04:08:34.179] LOG: %cStart Phase TurnStartPhase color:green;
+[04:08:34.179] LOG: %cStart Phase MovePhase color:green;
+[04:08:34.179] LOG: %cUser: Scyther Redux
+Move: POISON_GAS
+Use Mode: NORMAL color:orchid
+[04:08:34.179] WARN: Scyther Redux is attempting to use a move with no targets
+[04:08:34.179] LOG: %cStart Phase MoveEndPhase color:green;
+[04:08:34.179] LOG: %cStart Phase MovePhase color:green;
+[04:08:34.179] LOG: %cUser: Voltorb
+Move: ELECTRO_BALL
+Use Mode: NORMAL color:orchid
+[04:08:34.179] WARN: Voltorb is attempting to use a move with no targets
+[04:08:34.179] LOG: %cStart Phase MoveEndPhase color:green;
+[04:08:34.179] LOG: %cStart Phase CheckInterludePhase color:green;
+[04:08:34.179] LOG: %cStart Phase WeatherEffectPhase color:green;
+[04:08:34.179] LOG: %cStart Phase PositionalTagPhase color:green;
+[04:08:34.179] LOG: %cStart Phase BerryPhase color:green;
+[04:08:34.180] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[04:08:34.180] LOG: %cStart Phase TurnEndPhase color:green;
+[04:08:34.180] WARN: [coop:turn] host recorder: finalize with NO open recording -> turn=-1 events=0 (caller decides not to emit)
+[04:08:34.180] LOG: %cStart Phase ShowAbilityPhase color:green;
+[04:08:34.341] LOG: %cStart Phase StatStageChangePhase color:green;
+[04:08:34.342] LOG: %cStart Phase MessagePhase color:green;
+[04:08:34.553] LOG: %cStart Phase HideAbilityPhase color:green;
+[04:08:34.578] LOG: %cStart Phase TurnInitPhase color:green;
+[04:08:34.578] LOG: %cStart Phase CommandPhase color:green;
+[04:08:35.286] LOG: Move: POISON_GAS Move targets: {"targets":[],"multiple":true} 
+Player Pokemon: Scyther Redux
+[04:08:35.287] LOG: %cStart Phase EnemyCommandPhase color:green;
+[04:08:35.288] LOG: Move Pool: ["Electro Ball","Eerie Impulse","Screech","Rollout (P)"]
+[04:08:35.288] LOG: Move Scores: [null,null,null,null]
+[04:08:35.288] LOG: Sorted Move Pool: ["Electro Ball","Eerie Impulse","Screech","Rollout (P)"]
+[04:08:35.288] LOG: Chosen Move: Electro Ball
+[04:08:35.288] LOG: %cStart Phase TurnStartPhase color:green;
+[04:08:35.288] LOG: %cStart Phase MovePhase color:green;
+[04:08:35.288] LOG: %cUser: Scyther Redux
+Move: POISON_GAS
+Use Mode: NORMAL color:orchid
+[04:08:35.288] WARN: Scyther Redux is attempting to use a move with no targets
+[04:08:35.288] LOG: %cStart Phase MoveEndPhase color:green;
+[04:08:35.288] LOG: %cStart Phase MovePhase color:green;
+[04:08:35.288] LOG: %cUser: Voltorb
+Move: ELECTRO_BALL
+Use Mode: NORMAL color:orchid
+[04:08:35.288] WARN: Voltorb is attempting to use a move with no targets
+[04:08:35.288] LOG: %cStart Phase MoveEndPhase color:green;
+[04:08:35.288] LOG: %cStart Phase CheckInterludePhase color:green;
+[04:08:35.288] LOG: %cStart Phase WeatherEffectPhase color:green;
+[04:08:35.288] LOG: %cStart Phase PositionalTagPhase color:green;
+[04:08:35.288] LOG: %cStart Phase BerryPhase color:green;
+[04:08:35.289] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[04:08:35.289] LOG: %cStart Phase TurnEndPhase color:green;
+[04:08:35.289] WARN: [coop:turn] host recorder: finalize with NO open recording -> turn=-1 events=0 (caller decides not to emit)
+[04:08:35.289] LOG: %cStart Phase ShowAbilityPhase color:green;
+[04:08:35.450] LOG: %cStart Phase StatStageChangePhase color:green;
+[04:08:35.451] LOG: %cStart Phase MessagePhase color:green;
+[04:08:35.662] LOG: %cStart Phase HideAbilityPhase color:green;
+[04:08:35.687] LOG: %cStart Phase TurnInitPhase color:green;
+[04:08:35.687] LOG: %cStart Phase CommandPhase color:green;
+[04:08:37.613] LOG: Move: SCRATCH Move targets: {"targets":[],"multiple":false} 
+Player Pokemon: Scyther Redux
+[04:08:37.615] LOG: %cStart Phase EnemyCommandPhase color:green;
+[04:08:37.615] LOG: Move Pool: ["Electro Ball","Eerie Impulse","Screech","Rollout (P)"]
+[04:08:37.615] LOG: Move Scores: [null,null,null,null]
+[04:08:37.615] LOG: Sorted Move Pool: ["Electro Ball","Eerie Impulse","Screech","Rollout (P)"]
+[04:08:37.615] LOG: Chosen Move: Electro Ball
+[04:08:37.615] LOG: %cStart Phase TurnStartPhase color:green;
+[04:08:37.615] LOG: %cStart Phase MovePhase color:green;
+[04:08:37.615] LOG: %cUser: Scyther Redux
+Move: SCRATCH
+Use Mode: NORMAL color:orchid
+[04:08:37.615] WARN: Scyther Redux is attempting to use a move with no targets
+[04:08:37.615] LOG: %cStart Phase MoveEndPhase color:green;
+[04:08:37.616] LOG: %cStart Phase MovePhase color:green;
+[04:08:37.616] LOG: %cUser: Voltorb
+Move: ELECTRO_BALL
+Use Mode: NORMAL color:orchid
+[04:08:37.616] WARN: Voltorb is attempting to use a move with no targets
+[04:08:37.616] LOG: %cStart Phase MoveEndPhase color:green;
+[04:08:37.616] LOG: %cStart Phase CheckInterludePhase color:green;
+[04:08:37.616] LOG: %cStart Phase WeatherEffectPhase color:green;
+[04:08:37.616] LOG: %cStart Phase PositionalTagPhase color:green;
+[04:08:37.616] LOG: %cStart Phase BerryPhase color:green;
+[04:08:37.616] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[04:08:37.616] LOG: %cStart Phase TurnEndPhase color:green;
+[04:08:37.616] WARN: [coop:turn] host recorder: finalize with NO open recording -> turn=-1 events=0 (caller decides not to emit)
+[04:08:37.616] LOG: %cStart Phase ShowAbilityPhase color:green;
+[04:08:37.778] LOG: %cStart Phase StatStageChangePhase color:green;
+[04:08:37.778] LOG: %cStart Phase MessagePhase color:green;
+[04:08:38.019] LOG: %cStart Phase HideAbilityPhase color:green;
+[04:08:38.044] LOG: %cStart Phase TurnInitPhase color:green;
+[04:08:38.044] LOG: %cStart Phase CommandPhase color:green;
+[04:08:39.262] LOG: Move: SCRATCH Move targets: {"targets":[],"multiple":false} 
+Player Pokemon: Scyther Redux
+[04:08:39.263] LOG: %cStart Phase EnemyCommandPhase color:green;
+[04:08:39.263] LOG: Move Pool: ["Electro Ball","Eerie Impulse","Screech","Rollout (P)"]
+[04:08:39.264] LOG: Move Scores: [null,null,null,null]
+[04:08:39.264] LOG: Sorted Move Pool: ["Electro Ball","Eerie Impulse","Screech","Rollout (P)"]
+[04:08:39.264] LOG: Chosen Move: Electro Ball
+[04:08:39.264] LOG: %cStart Phase TurnStartPhase color:green;
+[04:08:39.264] LOG: %cStart Phase MovePhase color:green;
+[04:08:39.264] LOG: %cUser: Scyther Redux
+Move: SCRATCH
+Use Mode: NORMAL color:orchid
+[04:08:39.264] WARN: Scyther Redux is attempting to use a move with no targets
+[04:08:39.264] LOG: %cStart Phase MoveEndPhase color:green;
+[04:08:39.264] LOG: %cStart Phase MovePhase color:green;
+[04:08:39.264] LOG: %cUser: Voltorb
+Move: ELECTRO_BALL
+Use Mode: NORMAL color:orchid
+[04:08:39.264] WARN: Voltorb is attempting to use a move with no targets
+[04:08:39.264] LOG: %cStart Phase MoveEndPhase color:green;
+[04:08:39.264] LOG: %cStart Phase CheckInterludePhase color:green;
+[04:08:39.264] LOG: %cStart Phase WeatherEffectPhase color:green;
+[04:08:39.264] LOG: %cStart Phase PositionalTagPhase color:green;
+[04:08:39.264] LOG: %cStart Phase BerryPhase color:green;
+[04:08:39.264] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[04:08:39.264] LOG: %cStart Phase TurnEndPhase color:green;
+[04:08:39.265] WARN: [coop:turn] host recorder: finalize with NO open recording -> turn=-1 events=0 (caller decides not to emit)
+[04:08:39.265] LOG: %cStart Phase ShowAbilityPhase color:green;
+[04:08:39.426] LOG: %cStart Phase StatStageChangePhase color:green;
+[04:08:39.426] LOG: %cStart Phase MessagePhase color:green;
+[04:08:39.667] LOG: %cStart Phase HideAbilityPhase color:green;
+[04:08:39.693] LOG: %cStart Phase TurnInitPhase color:green;
+[04:08:39.693] LOG: %cStart Phase CommandPhase color:green;
+[04:08:39.935] LOG: Move: SCRATCH Move targets: {"targets":[],"multiple":false} 
+Player Pokemon: Scyther Redux
+[04:08:39.936] LOG: %cStart Phase EnemyCommandPhase color:green;
+[04:08:39.936] LOG: Move Pool: ["Electro Ball","Eerie Impulse","Screech","Rollout (P)"]
+[04:08:39.936] LOG: Move Scores: [null,null,null,null]
+[04:08:39.936] LOG: Sorted Move Pool: ["Electro Ball","Eerie Impulse","Screech","Rollout (P)"]
+[04:08:39.936] LOG: Chosen Move: Electro Ball
+[04:08:39.936] LOG: %cStart Phase TurnStartPhase color:green;
+[04:08:39.937] LOG: %cStart Phase MovePhase color:green;
+[04:08:39.937] LOG: %cUser: Scyther Redux
+Move: SCRATCH
+Use Mode: NORMAL color:orchid
+[04:08:39.937] WARN: Scyther Redux is attempting to use a move with no targets
+[04:08:39.937] LOG: %cStart Phase MoveEndPhase color:green;
+[04:08:39.937] LOG: %cStart Phase MovePhase color:green;
+[04:08:39.937] LOG: %cUser: Voltorb
+Move: ELECTRO_BALL
+Use Mode: NORMAL color:orchid
+[04:08:39.937] WARN: Voltorb is attempting to use a move with no targets
+[04:08:39.937] LOG: %cStart Phase MoveEndPhase color:green;
+[04:08:39.937] LOG: %cStart Phase CheckInterludePhase color:green;
+[04:08:39.937] LOG: %cStart Phase WeatherEffectPhase color:green;
+[04:08:39.937] LOG: %cStart Phase PositionalTagPhase color:green;
+[04:08:39.937] LOG: %cStart Phase BerryPhase color:green;
+[04:08:39.937] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[04:08:39.937] LOG: %cStart Phase TurnEndPhase color:green;
+[04:08:39.937] WARN: [coop:turn] host recorder: finalize with NO open recording -> turn=-1 events=0 (caller decides not to emit)
+[04:08:39.937] LOG: %cStart Phase ShowAbilityPhase color:green;
+[04:08:40.099] LOG: %cStart Phase StatStageChangePhase color:green;
+[04:08:40.099] LOG: %cStart Phase MessagePhase color:green;
+[04:08:40.340] LOG: %cStart Phase HideAbilityPhase color:green;
+[04:08:40.365] LOG: %cStart Phase TurnInitPhase color:green;
+[04:08:40.365] LOG: %cStart Phase CommandPhase color:green;
+[04:08:41.856] LOG: Move: BREAKING_SWIPE Move targets: {"targets":[],"multiple":true} 
+Player Pokemon: Scyther Redux
+[04:08:41.857] LOG: %cStart Phase EnemyCommandPhase color:green;
+[04:08:41.857] LOG: Move Pool: ["Electro Ball","Eerie Impulse","Screech","Rollout (P)"]
+[04:08:41.857] LOG: Move Scores: [null,null,null,null]
+[04:08:41.857] LOG: Sorted Move Pool: ["Electro Ball","Eerie Impulse","Screech","Rollout (P)"]
+[04:08:41.857] LOG: Chosen Move: Electro Ball
+[04:08:41.857] LOG: %cStart Phase TurnStartPhase color:green;
+[04:08:41.858] LOG: %cStart Phase MovePhase color:green;
+[04:08:41.858] LOG: %cUser: Scyther Redux
+Move: BREAKING_SWIPE
+Use Mode: NORMAL color:orchid
+[04:08:41.858] WARN: Scyther Redux is attempting to use a move with no targets
+[04:08:41.858] LOG: %cStart Phase MoveEndPhase color:green;
+[04:08:41.858] LOG: %cStart Phase MovePhase color:green;
+[04:08:41.858] LOG: %cUser: Voltorb
+Move: ELECTRO_BALL
+Use Mode: NORMAL color:orchid
+[04:08:41.858] WARN: Voltorb is attempting to use a move with no targets
+[04:08:41.858] LOG: %cStart Phase MoveEndPhase color:green;
+[04:08:41.858] LOG: %cStart Phase CheckInterludePhase color:green;
+[04:08:41.858] LOG: %cStart Phase WeatherEffectPhase color:green;
+[04:08:41.858] LOG: %cStart Phase PositionalTagPhase color:green;
+[04:08:41.858] LOG: %cStart Phase BerryPhase color:green;
+[04:08:41.858] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[04:08:41.858] LOG: %cStart Phase TurnEndPhase color:green;
+[04:08:41.858] WARN: [coop:turn] host recorder: finalize with NO open recording -> turn=-1 events=0 (caller decides not to emit)
+[04:08:41.858] LOG: %cStart Phase ShowAbilityPhase color:green;
+[04:08:42.020] LOG: %cStart Phase StatStageChangePhase color:green;
+[04:08:42.021] LOG: %cStart Phase MessagePhase color:green;
+[04:08:42.261] LOG: %cStart Phase HideAbilityPhase color:green;
+[04:08:42.286] LOG: %cStart Phase TurnInitPhase color:green;
+[04:08:42.287] LOG: %cStart Phase CommandPhase color:green;
+[04:08:46.474] LOG: Move: BREAKING_SWIPE Move targets: {"targets":[],"multiple":true} 
+Player Pokemon: Scyther Redux
+[04:08:46.475] LOG: %cStart Phase EnemyCommandPhase color:green;
+[04:08:46.475] LOG: Move Pool: ["Electro Ball","Eerie Impulse","Screech","Rollout (P)"]
+[04:08:46.475] LOG: Move Scores: [null,null,null,null]
+[04:08:46.475] LOG: Sorted Move Pool: ["Electro Ball","Eerie Impulse","Screech","Rollout (P)"]
+[04:08:46.475] LOG: Chosen Move: Electro Ball
+[04:08:46.475] LOG: %cStart Phase TurnStartPhase color:green;
+[04:08:46.476] LOG: %cStart Phase MovePhase color:green;
+[04:08:46.476] LOG: %cUser: Scyther Redux
+Move: BREAKING_SWIPE
+Use Mode: NORMAL color:orchid
+[04:08:46.476] WARN: Scyther Redux is attempting to use a move with no targets
+[04:08:46.476] LOG: %cStart Phase MoveEndPhase color:green;
+[04:08:46.476] LOG: %cStart Phase MovePhase color:green;
+[04:08:46.476] LOG: %cUser: Voltorb
+Move: ELECTRO_BALL
+Use Mode: NORMAL color:orchid
+[04:08:46.476] WARN: Voltorb is attempting to use a move with no targets
+[04:08:46.476] LOG: %cStart Phase MoveEndPhase color:green;
+[04:08:46.476] LOG: %cStart Phase CheckInterludePhase color:green;
+[04:08:46.476] LOG: %cStart Phase WeatherEffectPhase color:green;
+[04:08:46.476] LOG: %cStart Phase PositionalTagPhase color:green;
+[04:08:46.476] LOG: %cStart Phase BerryPhase color:green;
+[04:08:46.476] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[04:08:46.476] LOG: %cStart Phase TurnEndPhase color:green;
+[04:08:46.476] WARN: [coop:turn] host recorder: finalize with NO open recording -> turn=-1 events=0 (caller decides not to emit)
+[04:08:46.476] LOG: %cStart Phase ShowAbilityPhase color:green;
+[04:08:46.638] LOG: %cStart Phase StatStageChangePhase color:green;
+[04:08:46.638] LOG: %cStart Phase MessagePhase color:green;
+[04:08:46.879] LOG: %cStart Phase HideAbilityPhase color:green;
+[04:08:46.904] LOG: %cStart Phase TurnInitPhase color:green;
+[04:08:46.904] LOG: %cStart Phase CommandPhase color:green;
