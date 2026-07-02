@@ -56,6 +56,7 @@ import type { ArenaTagType } from "#enums/arena-tag-type";
 import { BattlerIndex } from "#enums/battler-index";
 import { BattlerTagType } from "#enums/battler-tag-type";
 import type { BiomeId } from "#enums/biome-id";
+import { FieldPosition } from "#enums/field-position";
 import type { MoveId } from "#enums/move-id";
 import type { Nature } from "#enums/nature";
 import { Stat } from "#enums/stat";
@@ -645,11 +646,29 @@ export function summonCoopPlayerField(fieldIndex: number, partySlot: number): vo
     // field-setup (clears switchOutStatus so it reads as ON-FIELD). No moveBelow - the player mon
     // renders on top.
     incoming.resetSummonData();
-    // Re-seat at the vacated slot's exact position + field-position (setFieldPosition is RELATIVE and
-    // no-ops when the position already matches, so set the public field directly + place the container)
-    // - without this the sprite keeps its stale x and lands shifted-right, superimposed on the old mon.
+    // #791 (live "the UI is placed on top of the other"): the OUTGOING capture is unreliable
+    // after a FAINT - the drop animation tweened that container low, so seating the incoming at
+    // outgoing.x/y parked the new sprite over the bottom UI. Derive the side's CANONICAL base
+    // from a LIVE ally when one exists (its x/y minus its own slot offset); fall back to the
+    // outgoing capture minus the slot's offset otherwise. Then seat via the REAL
+    // setFieldPosition (duration 0): it applies the slot offset AND the battle-info seating
+    // (setMini + setSlotOffset) that the old direct fieldPosition write bypassed - which is why
+    // the new mon's HP bar rendered full-size ON TOP of the ally's bar.
     incoming.fieldPosition = slotFieldPosition;
-    incoming.setPosition(slotX, slotY);
+    const slotOffset = incoming.getFieldPositionOffset();
+    let baseX = slotX - slotOffset[0];
+    let baseY = slotY - slotOffset[1];
+    const liveAlly = globalScene
+      .getPlayerField(true)
+      .find(p => p != null && p !== incoming && p !== outgoing && p.isActive() && p.isOnField());
+    if (liveAlly != null) {
+      const allyOffset = liveAlly.getFieldPositionOffset();
+      baseX = liveAlly.x - allyOffset[0];
+      baseY = liveAlly.y - allyOffset[1];
+    }
+    incoming.fieldPosition = FieldPosition.CENTER;
+    incoming.setPosition(baseX, baseY);
+    void incoming.setFieldPosition(slotFieldPosition, 0);
     void incoming.loadAssets(true);
     globalScene.field.add(incoming);
     incoming.showInfo();
