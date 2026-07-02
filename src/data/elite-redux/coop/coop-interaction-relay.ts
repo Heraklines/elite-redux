@@ -36,6 +36,20 @@ import { recordReplayInteraction } from "#data/elite-redux/replay-recorder";
 
 /** Sentinel choices shared across interaction screens. */
 export const COOP_INTERACTION_LEAVE = -1;
+
+/**
+ * #673 co-op biome market: DEDICATED derived seq namespace for the market's buy/leave relay
+ * (clear of the shop cursor seqs, the faint-switch 90k band, and the ability picker 6M band),
+ * and the rewardOptions reroll-namespace the owner streams the 16-slot stock under (the reward
+ * shop's real reroll counts stay single digits, so 777 can never collide).
+ */
+export const COOP_BIOME_SHOP_SEQ_BASE = 7_000_000;
+export function coopBiomeShopSeq(pinnedStart: number): number {
+  return COOP_BIOME_SHOP_SEQ_BASE + Math.max(0, pinnedStart);
+}
+export const COOP_BIOME_STOCK_REROLL = 777;
+/** Watcher-side wait for the owner's market activity (long, like the reward shop's). */
+export const COOP_BIOME_WAIT_MS = 1_200_000;
 export const COOP_INTERACTION_REROLL = -2;
 
 /** One relayed owner choice the watcher applies to its identical pool. */

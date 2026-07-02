@@ -14,6 +14,7 @@ import { UiMode } from "#enums/ui-mode";
 import type { EnemyPokemon, PlayerPokemon } from "#field/pokemon";
 import { Trainer } from "#field/trainer";
 import { ModifierTypeOption } from "#modifiers/modifier-type";
+import { setCoopBiomeMarketTestSkip } from "#phases/biome-shop-phase";
 import { CommandPhase } from "#phases/command-phase";
 import { EncounterPhase } from "#phases/encounter-phase";
 import { SelectStarterPhase } from "#phases/select-starter-phase";
@@ -79,6 +80,9 @@ export class GameManager {
    */
   constructor(phaserGame: Phaser.Game, bypassLogin = true) {
     localStorage.clear();
+    // #673: the co-op biome market is now a REAL alternating screen; legacy co-op tests advance
+    // x0 waves without driving it, so default it skipped in tests. Market probes re-enable.
+    setCoopBiomeMarketTestSkip(true);
     // Simulate max rolls on RNG functions
     // TODO: Create helpers for disabling/enabling battle RNG
     BattleScene.prototype.randBattleSeedInt = (range, min = 0) => min + range - 1;

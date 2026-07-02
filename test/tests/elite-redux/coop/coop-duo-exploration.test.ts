@@ -24,6 +24,7 @@
 import type { BattleScene } from "#app/battle-scene";
 import { getGameMode } from "#app/game-mode";
 import { globalScene, initGlobalScene } from "#app/global-scene";
+import Overrides from "#app/overrides";
 import { clearCoopRuntime, setCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
 import { COOP_GUEST_FIELD_INDEX, COOP_HOST_FIELD_INDEX } from "#data/elite-redux/coop/coop-session";
 import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
@@ -34,6 +35,7 @@ import { GameModes } from "#enums/game-modes";
 import { MoveId } from "#enums/move-id";
 import { SpeciesId } from "#enums/species-id";
 import { UiMode } from "#enums/ui-mode";
+import { BiomeShopPhase, setCoopBiomeMarketTestSkip } from "#phases/biome-shop-phase";
 import { ErAbilityCapsulePhase } from "#phases/er-ability-capsule-phase";
 import { SelectModifierPhase } from "#phases/select-modifier-phase";
 import { GameManager } from "#test/framework/game-manager";
@@ -89,6 +91,7 @@ describe.skipIf(!RUN)("co-op DUO exploration sweep (maintainer directive)", () =
   });
 
   afterEach(() => {
+    setCoopBiomeMarketTestSkip(true);
     logs.dispose();
     clearCoopRuntime();
     initGlobalScene(game.scene);
@@ -251,6 +254,145 @@ describe.skipIf(!RUN)("co-op DUO exploration sweep (maintainer directive)", () =
     // Lockstep: exactly one alternating interaction consumed on both engines.
     expect(rig.hostRuntime.controller.interactionCounter(), "host counter advanced once").toBe(counterBefore + 1);
     expect(rig.guestRuntime.controller.interactionCounter(), "guest counter advanced once").toBe(counterBefore + 1);
+
+    logs.flush();
+  }, 240_000);
+
+  it("PROBE #673: the biome market alternates - owner buys relay, watcher applies verbatim, counters advance", async () => {
+    setCoopBiomeMarketTestSkip(false); // this probe drives the REAL co-op market
+    await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
+    const pair = createLoopbackPair();
+    const rig = await buildDuo(game, pair, setCoopRuntime, toCoop);
+    wireGuestCommand(rig);
+
+    const turn = rig.hostScene.currentBattle.turn;
+    await hostPlayWave(rig);
+    await withClient(rig.guestCtx, async () => {
+      await driveGuestReplayTurn(rig.guestScene, turn);
+    });
+
+    const counterBefore = rig.hostRuntime.controller.interactionCounter();
+    const hostModsBefore = rig.hostScene.modifiers.length;
+    const guestModsBefore = rig.guestScene.modifiers.length;
+    const waiveBefore = Overrides.WAIVE_ROLL_FEE_OVERRIDE;
+    Overrides.WAIVE_ROLL_FEE_OVERRIDE = true; // wave-1 money cannot afford market goods
+
+    // OWNER (host, counter parity 0): drive the REAL market - buy ONE non-party item, then leave.
+    let boughtTypeId = "";
+    try {
+      await withClient(rig.hostCtx, async () => {
+        const phase = new BiomeShopPhase();
+        // The leave-confirm path first hides the shop backdrop via real UI handler calls the
+        // headless mock cannot service - neutralize it (purely cosmetic; the flow continues).
+        (phase as unknown as { hideShopForOverlay: () => void }).hideShopForOverlay = () => {};
+        // The post-buy repaint calls getHandler().updateCostText() - real handlers have it, the
+        // headless mock does not; inject a noop so the buy's tail (the coop relay) can run.
+        const uiAny = globalScene.ui as unknown as { getHandler: () => Record<string, unknown> };
+        const realGetHandler = uiAny.getHandler.bind(globalScene.ui);
+        uiAny.getHandler = () => {
+          const h = realGetHandler() as Record<string, unknown>;
+          if (h != null && typeof h.updateCostText !== "function") {
+            h.updateCostText = () => {};
+          }
+          return h;
+        };
+        const ui = globalScene.ui as unknown as {
+          setMode: (...args: unknown[]) => unknown;
+          setModeWithoutClear: (...args: unknown[]) => unknown;
+          setOverlayMode: (...args: unknown[]) => unknown;
+          showText: (...args: unknown[]) => unknown;
+        };
+        const realSetMode = ui.setMode.bind(ui);
+        const realSetModeWC = ui.setModeWithoutClear.bind(ui);
+        const realSetOverlay = ui.setOverlayMode.bind(ui);
+        const realShowText = ui.showText.bind(ui);
+        // Party-target market goods open the party menu via setModeWithoutClear - auto-pick slot 0.
+        ui.setModeWithoutClear = (...args: unknown[]): unknown => {
+          if (args[0] === UiMode.PARTY) {
+            (args[3] as (slotIndex: number, option: number) => void)(0, 0);
+            return Promise.resolve(true);
+          }
+          return Promise.resolve(true);
+        };
+        ui.setMode = (...args: unknown[]): unknown => {
+          if (args[0] === UiMode.BIOME_SHOP) {
+            const options = args[1] as { type?: { id?: string } }[];
+            // Signature: (BIOME_SHOP, shopOptions, biomeId, onSelect, qtys) - the callback is [3].
+            const cb = args[3] as (index: number) => boolean;
+            // Buy a KNOWN NON-party item (balls/lures apply directly, no party sub-menu) so the
+            // probe stays deterministic; the relay path is identical for party-target goods.
+            // LURE: non-party AND lands in scene.modifiers (balls only bump the ball inventory,
+            // which this probe does not observe). The harness seed makes the stock deterministic.
+            let idx = options.findIndex(o => (o?.type?.id ?? "").includes("LURE"));
+            if (idx < 0) {
+              idx = options.findIndex(o => o?.type != null);
+            }
+            boughtTypeId = options[idx]?.type?.id ?? "";
+            queueMicrotask(() => {
+              cb(idx);
+              queueMicrotask(() => cb(-1)); // leave after the buy resolves
+            });
+            return Promise.resolve(true);
+          }
+          if (args[0] === UiMode.PARTY) {
+            const cb = args[3] as (slotIndex: number, option: number) => void;
+            cb(0, 0);
+            return Promise.resolve(true);
+          }
+          return Promise.resolve(true);
+        };
+        ui.showText = (...args: unknown[]): unknown => {
+          const cb = args[2] as (() => void) | undefined;
+          cb?.();
+          return realShowText === null ? undefined : undefined;
+        };
+        ui.setOverlayMode = (...args: unknown[]): unknown => {
+          if (args[0] === UiMode.CONFIRM) {
+            (args[1] as () => void)(); // YES: leave the market
+            return Promise.resolve(true);
+          }
+          return realSetOverlay(...args);
+        };
+        try {
+          haltQueueAfterCurrent();
+          phase.start();
+          for (let i = 0; i < 16; i++) {
+            await drainLoopback();
+          }
+        } finally {
+          ui.setMode = realSetMode;
+          ui.setModeWithoutClear = realSetModeWC;
+          ui.setOverlayMode = realSetOverlay;
+          ui.showText = realShowText;
+        }
+      });
+    } finally {
+      Overrides.WAIVE_ROLL_FEE_OVERRIDE = waiveBefore;
+    }
+    expect(rig.hostScene.modifiers.length, "OWNER bought exactly one market item").toBe(hostModsBefore + 1);
+    expect(rig.hostRuntime.controller.interactionCounter(), "host advanced the market interaction").toBe(
+      counterBefore + 1,
+    );
+
+    // WATCHER (guest): its market phase adopts the streamed stock + applies the buffered buy + leave.
+    await withClient(rig.guestCtx, async () => {
+      const phase = new BiomeShopPhase();
+      haltQueueAfterCurrent();
+      phase.start();
+      for (let i = 0; i < 16; i++) {
+        await drainLoopback();
+      }
+    });
+    expect(rig.guestScene.modifiers.length, "WATCHER applied the same buy (one new modifier)").toBe(
+      guestModsBefore + 1,
+    );
+    expect(rig.guestScene.modifiers.at(-1)?.type?.id, "WATCHER applied the SAME item the owner bought").toBe(
+      boughtTypeId,
+    );
+    expect(rig.guestScene.money, "money converged verbatim").toBe(rig.hostScene.money);
+    expect(rig.guestRuntime.controller.interactionCounter(), "guest advanced the market interaction").toBe(
+      counterBefore + 1,
+    );
 
     logs.flush();
   }, 240_000);

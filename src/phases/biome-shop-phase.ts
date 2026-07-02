@@ -22,7 +22,20 @@
 
 import { globalScene } from "#app/global-scene";
 import Overrides from "#app/overrides";
-import { getCoopController } from "#data/elite-redux/coop/coop-runtime";
+import { coopLog, coopWarn } from "#data/elite-redux/coop/coop-debug";
+import {
+  COOP_BIOME_STOCK_REROLL,
+  COOP_BIOME_WAIT_MS,
+  COOP_INTERACTION_LEAVE,
+  coopBiomeShopSeq,
+} from "#data/elite-redux/coop/coop-interaction-relay";
+import { reconstructRewardOptions, serializeRewardOptions } from "#data/elite-redux/coop/coop-reward-options";
+import {
+  advanceCoopInteractionForContinuation,
+  getCoopController,
+  getCoopInteractionRelay,
+  getCoopRuntime,
+} from "#data/elite-redux/coop/coop-runtime";
 import { erBiomeStockCount } from "#data/elite-redux/er-biome-economy";
 import { ModifierTier } from "#enums/modifier-tier";
 import { UiMode } from "#enums/ui-mode";
@@ -35,6 +48,17 @@ import { SelectModifierPhase } from "#phases/select-modifier-phase";
 import { NumberHolder } from "#utils/common";
 import i18next from "i18next";
 
+/**
+ * #673 TEST KNOB: legacy co-op tests advance x0 waves without driving the (now enabled) co-op
+ * market - the GameManager test framework turns this on by default so those runs keep their old
+ * "market skipped in co-op" behavior, and market-specific probes turn it back off. Production
+ * never touches it (defaults false).
+ */
+let coopBiomeMarketTestSkip = false;
+export function setCoopBiomeMarketTestSkip(on: boolean): void {
+  coopBiomeMarketTestSkip = on;
+}
+
 export class BiomeShopPhase extends SelectModifierPhase {
   /** The shop stock. `protected` so event-specific shops (e.g. ExoticShopPhase)
    * can override buildStock() to supply their own curated goods. */
@@ -43,6 +67,11 @@ export class BiomeShopPhase extends SelectModifierPhase {
   protected qtys: number[] = [];
   /** Slot index awaiting a purchase result, so applyModifier can decrement it. */
   private pendingIndex = -1;
+
+  /** Co-op (#673): the alternation counter pinned when this market opened (-1 = solo). */
+  private coopBiomeStart = -1;
+  /** Co-op (#673): true when THIS client drives the market (relays each buy + the leave). */
+  private coopBiomeOwner = false;
 
   /** The biome market re-appears (not the vanilla reward screen) after the
    * party-target menu closes on a held-item / TM purchase. */
@@ -58,17 +87,45 @@ export class BiomeShopPhase extends SelectModifierPhase {
       return false;
     }
 
-    // Co-op (#633): the biome shop is an interactive, shared-economy screen that
-    // would open INDEPENDENTLY on each client (two players buying from one money
-    // pool -> desync). Until it is driven host-authoritatively, skip it in co-op so
-    // both clients deterministically move on together. Solo / non-coop unaffected.
-    if (globalScene.gameMode.isCoop && getCoopController() != null) {
+    // Co-op (#673, replaces the old self-skip): the market ALTERNATES like the reward shop.
+    // The interaction OWNER (counter parity, pinned at open) drives the real screen; every
+    // committed buy relays SELF-DESCRIBING data (slot into the owner-streamed stock + target
+    // party slot + resulting money) so the WATCHER applies it verbatim - no stock-determinism
+    // assumption, no independent screens, one shared money pool. Solo / non-coop untouched.
+    const coopController = globalScene.gameMode.isCoop ? getCoopController() : null;
+    if (coopController != null && coopBiomeMarketTestSkip) {
       this.end();
       return;
     }
+    if (coopController != null) {
+      if (this.coopBiomeStart < 0) {
+        this.coopBiomeStart = coopController.interactionCounter();
+      }
+      const spoofed = getCoopRuntime()?.spoof != null;
+      const owns = spoofed || coopController.isLocalOwnerAtCounter(this.coopBiomeStart);
+      coopLog(
+        "reward",
+        `biome market owner/watcher decision: pinnedStart=${this.coopBiomeStart} role=${coopController.role} spoof=${spoofed} -> ${owns ? "OWNER" : "WATCHER"}`,
+      );
+      if (!owns) {
+        void this.coopBiomeWatch();
+        return;
+      }
+      this.coopBiomeOwner = true;
+    }
 
     this.buildStock();
+    // Co-op OWNER: stream the exact rolled stock BEFORE the empty check, so the watcher's
+    // stock await resolves even when the market is empty (it then just consumes the LEAVE).
+    if (this.coopBiomeOwner && getCoopRuntime()?.spoof == null) {
+      getCoopInteractionRelay()?.sendRewardOptions(
+        this.coopBiomeStart,
+        COOP_BIOME_STOCK_REROLL,
+        serializeRewardOptions(this.shopOptions),
+      );
+    }
     if (this.shopOptions.length === 0) {
+      this.coopBiomeTerminal();
       this.end();
       return;
     }
@@ -147,6 +204,9 @@ export class BiomeShopPhase extends SelectModifierPhase {
         UiMode.CONFIRM,
         () => {
           // YES: pop the confirm, drop the prompt, hand off to the next phase.
+          // Co-op (#673): fire the terminal FIRST - a UI teardown hiccup must never
+          // eat the relayed LEAVE + the alternation advance (the watcher would strand).
+          this.coopBiomeTerminal();
           globalScene.ui.revertMode();
           globalScene.ui.clearText();
           globalScene.ui.setMode(UiMode.MESSAGE).then(() => this.end());
@@ -166,8 +226,102 @@ export class BiomeShopPhase extends SelectModifierPhase {
    * refresh the grid. The party-CANCEL path goes through resetModifierSelect
    * (no applyModifier), so cancelling never consumes stock.
    */
+  /**
+   * Co-op (#673): terminal for this market interaction. The OWNER relays the LEAVE so the
+   * parked watcher exits its watch loop; BOTH sides then advance the alternation locally
+   * (from-pinned, so the partner's broadcast merging first makes it a no-op).
+   */
+  private coopBiomeTerminal(): void {
+    if (this.coopBiomeStart < 0) {
+      return;
+    }
+    if (this.coopBiomeOwner) {
+      getCoopInteractionRelay()?.sendInteractionChoice(
+        coopBiomeShopSeq(this.coopBiomeStart),
+        "biomeShop",
+        COOP_INTERACTION_LEAVE,
+      );
+    }
+    advanceCoopInteractionForContinuation(this.coopBiomeStart);
+  }
+
+  /**
+   * Co-op (#673) WATCHER: never opens the market UI. Adopts the owner's streamed stock, then
+   * applies each relayed buy VERBATIM (slot into that stock + target party slot + the owner's
+   * post-buy money) until the LEAVE terminal. A timeout resolves like a LEAVE (never hangs);
+   * the auto-resync heals any residue.
+   */
+  private async coopBiomeWatch(): Promise<void> {
+    const relay = getCoopInteractionRelay();
+    if (relay == null) {
+      this.end();
+      return;
+    }
+    globalScene.ui.showText("Your partner is browsing the market...", null, undefined, null, true);
+    const streamed = await relay.awaitRewardOptions(this.coopBiomeStart, COOP_BIOME_STOCK_REROLL, COOP_BIOME_WAIT_MS);
+    const rebuilt = streamed == null ? null : reconstructRewardOptions(streamed, globalScene.getPlayerParty());
+    if (rebuilt == null) {
+      coopWarn("reward", "biome market watcher: stock stream timed out -> local roll fallback");
+      this.buildStock();
+    } else {
+      this.shopOptions = rebuilt;
+      this.qtys = this.shopOptions.map(() => 99);
+    }
+    const seq = coopBiomeShopSeq(this.coopBiomeStart);
+    for (;;) {
+      const action = await relay.awaitInteractionChoice(seq, COOP_BIOME_WAIT_MS);
+      if (action == null || action.choice === COOP_INTERACTION_LEAVE) {
+        break;
+      }
+      const slot = action.choice;
+      const data = action.data ?? [];
+      const partySlot = data[0] ?? -1;
+      const money = data[1] ?? -1;
+      const opt = this.shopOptions[slot];
+      coopLog(
+        "reward",
+        `biome market watcher applies buy slot=${slot} id=${opt?.type?.id ?? "?"} partySlot=${partySlot} money=${money}`,
+      );
+      try {
+        if (opt?.type != null) {
+          const party = globalScene.getPlayerParty();
+          const mon = partySlot >= 0 ? party[partySlot] : undefined;
+          const modifier = mon == null ? opt.type.newModifier() : opt.type.newModifier(mon);
+          if (modifier != null) {
+            this.pendingIndex = slot;
+            // Free apply (cost -1): the money is set VERBATIM from the owner below, never re-deducted.
+            this.applyModifier(modifier, -1, false);
+          }
+        }
+      } catch {
+        /* one bad relayed buy must never strand the watcher */
+      }
+      if (money >= 0) {
+        globalScene.money = money;
+        globalScene.updateMoneyText();
+      }
+    }
+    advanceCoopInteractionForContinuation(this.coopBiomeStart);
+    globalScene.ui.clearText();
+    globalScene.ui.setMode(UiMode.MESSAGE).then(() => this.end());
+  }
+
   protected override applyModifier(modifier: Modifier, cost = -1, playSound = false): void {
+    // Co-op (#673) OWNER: capture the buy BEFORE the stock decrement resets pendingIndex,
+    // then relay it self-describing: [slotIntoStreamedStock] + data [targetPartySlot, moneyAfter].
+    const coopBoughtSlot = this.coopBiomeOwner && cost !== -1 ? this.pendingIndex : -1;
     super.applyModifier(modifier, cost, playSound);
+    if (coopBoughtSlot >= 0) {
+      const party = globalScene.getPlayerParty();
+      const pokemonId = (modifier as unknown as { pokemonId?: number }).pokemonId;
+      const partySlot = typeof pokemonId === "number" ? party.findIndex(p => p?.id === pokemonId) : -1;
+      getCoopInteractionRelay()?.sendInteractionChoice(
+        coopBiomeShopSeq(this.coopBiomeStart),
+        "biomeShop",
+        coopBoughtSlot,
+        [partySlot, globalScene.money],
+      );
+    }
     if (cost !== -1 && this.pendingIndex >= 0 && this.pendingIndex < this.qtys.length) {
       this.qtys[this.pendingIndex] = Math.max(0, this.qtys[this.pendingIndex] - 1);
       const handler = globalScene.ui.getHandler() as { setStock?: (index: number, remaining: number) => void };
