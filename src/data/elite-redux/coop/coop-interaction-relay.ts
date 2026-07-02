@@ -92,6 +92,29 @@ function summarizeOutcome(o: CoopInteractionOutcome): string {
  * the WATCHER `await`s {@linkcode awaitInteractionChoice} in a loop until a leave
  * sentinel.
  */
+/**
+ * How long the HOST waits for the guest's own-replacement pick (#786) before auto-picking.
+ * Injectable so tests never sit through the live-generous default.
+ */
+let coopFaintSwitchWaitMs = 60_000;
+
+/**
+ * Seq namespace for guest-owned faint-replacement picks (#786): `BASE + fieldIndex`, shared
+ * verbatim by the guest picker and the host's awaiting SwitchPhase. Deliberately NOT keyed by
+ * turn - the host's SwitchPhase can run after TurnInit already advanced its counter while the
+ * guest keys by the replayed turn (the live seq-9-vs-5 mismatch), and only one replacement per
+ * slot can be outstanding at a time so the slot alone identifies the exchange.
+ */
+export const COOP_FAINT_SWITCH_SEQ_BASE = 90_000;
+
+export function getCoopFaintSwitchWaitMs(): number {
+  return coopFaintSwitchWaitMs;
+}
+
+export function setCoopFaintSwitchWaitMs(ms: number): void {
+  coopFaintSwitchWaitMs = ms;
+}
+
 export class CoopInteractionRelay {
   private readonly transport: CoopTransport;
   private readonly timeoutMs: number;

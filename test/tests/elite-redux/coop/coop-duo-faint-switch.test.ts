@@ -1,0 +1,193 @@
+/*
+ * SPDX-FileCopyrightText: 2024-2026 Pagefault Games
+ * SPDX-License-Identifier: AGPL-3.0-only
+ */
+
+// =============================================================================
+// TWO-ENGINE guest-owned faint replacement (#786, the live "the host just sent out a pokemon
+// without the guest choosing and now we were stuck" deadlock). The full production path across
+// two REAL engines over the loopback:
+//   1. The GUEST'S field mon faints (the host's ally-targeted TACKLE - deterministic, no AI).
+//   2. The guest's faint presentation opens the guest's OWN replacement picker
+//      (CoopGuestFaintSwitchPhase) and relays the pick (party slot 3 = CHARIZARD - deliberately
+//      NOT the auto-pick's first-legal choice, LAPRAS, so the assertion distinguishes them).
+//   3. The host's SwitchPhase (partner-owned slot, HALF B) AWAITS that relayed pick and summons
+//      THE GUEST'S CHOICE, then pushes the out-of-band replacement checkpoint.
+//   4. The guest's next-turn live pump consumes that checkpoint mid-park: the replacement
+//      materializes on the guest and its own CommandPhase opens for the refilled slot - the
+//      deadlock class (host waiting on a command for a mon the guest cannot see) is impossible.
+//
+// HOW TO RUN (gated ER_SCENARIO=1, like every ER engine test):
+//   ER_SCENARIO=1 npx vitest run test/tests/elite-redux/coop/coop-duo-faint-switch.test.ts
+// =============================================================================
+
+import type { BattleScene } from "#app/battle-scene";
+import { getGameMode } from "#app/game-mode";
+import { initGlobalScene } from "#app/global-scene";
+import { setCoopFaintSwitchWaitMs } from "#data/elite-redux/coop/coop-interaction-relay";
+import { clearCoopRuntime, setCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
+import { COOP_GUEST_FIELD_INDEX, COOP_HOST_FIELD_INDEX } from "#data/elite-redux/coop/coop-session";
+import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
+import { BattlerIndex } from "#enums/battler-index";
+import { Command } from "#enums/command";
+import { GameModes } from "#enums/game-modes";
+import { MoveId } from "#enums/move-id";
+import { SpeciesId } from "#enums/species-id";
+import { UiMode } from "#enums/ui-mode";
+import { GameManager } from "#test/framework/game-manager";
+import {
+  buildDuo,
+  type DuoRig,
+  driveGuestReplayTurn,
+  installDuoLogCapture,
+  withClient,
+  withClientSync,
+} from "#test/tools/coop-duo-harness";
+import Phaser from "phaser";
+import { afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
+
+const RUN = process.env.ER_SCENARIO === "1";
+
+/** The guest picks party slot 3 (CHARIZARD). The auto-pick fallback would take slot 2 (LAPRAS). */
+const GUEST_PICK_SLOT = 3;
+
+function toCoop(scene: BattleScene): void {
+  scene.gameMode = getGameMode(GameModes.COOP);
+}
+
+describe.skipIf(!RUN)("co-op DUO guest-owned faint: the guest chooses its OWN replacement (#786)", () => {
+  let phaserGame: Phaser.Game;
+  let game: GameManager;
+  let logs: ReturnType<typeof installDuoLogCapture>;
+
+  beforeAll(() => {
+    phaserGame = new Phaser.Game({ type: Phaser.HEADLESS });
+  });
+
+  beforeEach(() => {
+    game = new GameManager(phaserGame);
+    logs = installDuoLogCapture(`faint-switch-${Date.now()}`);
+    // Bounded host wait: the guest's pick lands well within it; a regression that stops the
+    // pick from arriving fails FAST (auto-pick -> the LAPRAS assertion below trips) instead
+    // of sitting through the 60s live default.
+    setCoopFaintSwitchWaitMs(4000);
+    game.override
+      .battleStyle("double")
+      .startingWave(1)
+      .enemySpecies(SpeciesId.MAGIKARP)
+      .enemyLevel(100)
+      .enemyMoveset(MoveId.GROWL)
+      .startingLevel(50)
+      .moveset([MoveId.EARTHQUAKE, MoveId.SPLASH])
+      .disableTrainerWaves();
+  });
+
+  afterEach(() => {
+    setCoopFaintSwitchWaitMs(60_000);
+    logs.dispose();
+    clearCoopRuntime();
+    initGlobalScene(game.scene);
+  });
+
+  /** The guest's own-slot command answer (the genuine production CoopBattleSync relay). */
+  function wireGuestCommand(rig: DuoRig): void {
+    rig.guestRuntime.battleSync.onCommandRequest(({ moveSlots }) => ({
+      command: Command.FIGHT,
+      cursor: moveSlots.length > 0 ? moveSlots[0] : 0,
+      moveId: MoveId.SPLASH,
+      targets: [BattlerIndex.ENEMY],
+    }));
+  }
+
+  it("guest picks CHARIZARD; the host summons THE GUEST'S pick; the guest materializes + can command it", async () => {
+    await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR, SpeciesId.LAPRAS, SpeciesId.CHARIZARD);
+    const pair = createLoopbackPair();
+    const rig = await buildDuo(game, pair, setCoopRuntime, toCoop);
+    wireGuestCommand(rig);
+
+    // The guest's lead (field slot 1, GENGAR) at 1 HP on BOTH engines so the host's own
+    // ally-splashing EARTHQUAKE faints it deterministically. The BENCH (LAPRAS + CHARIZARD)
+    // is tagged GUEST-owned on both engines - buildDuo tags everything beyond slot 1 as the
+    // host's, which would leave the guest zero legal replacements (production gives the guest
+    // its own bench via the per-player 3-cap). Both guest-owned keeps the pick distinguishable:
+    // auto-pick takes the FIRST legal (LAPRAS), the guest deliberately picks CHARIZARD.
+    for (const scene of [rig.hostScene, rig.guestScene]) {
+      scene.getPlayerParty()[2].coopOwner = "guest";
+      scene.getPlayerParty()[3].coopOwner = "guest";
+    }
+    rig.hostScene.getPlayerField()[COOP_GUEST_FIELD_INDEX].hp = 1;
+    withClientSync(rig.guestCtx, () => {
+      rig.guestScene.getPlayerField()[COOP_GUEST_FIELD_INDEX].hp = 1;
+    });
+
+    const turn = rig.hostScene.currentBattle.turn;
+
+    // TURN 1 on the HOST: Snorlax's EARTHQUAKE is a spread move that hits its ALLY too - the
+    // 1-HP Gengar faints deterministically (no enemy AI, no target rolls). The LEVEL-100 foes
+    // shrug the EQ off (nothing can end the wave early - ER's rebalanced Splash even KILLED
+    // level-1 foes in an earlier draft of this repro) and their GROWL is harmless.
+    await withClient(rig.hostCtx, async () => {
+      game.move.select(MoveId.EARTHQUAKE, COOP_HOST_FIELD_INDEX);
+      game.move.select(MoveId.SPLASH, COOP_GUEST_FIELD_INDEX);
+      await game.phaseInterceptor.to("TurnEndPhase");
+    });
+    const hostSlotAfterFaint = rig.hostScene.getPlayerField()[COOP_GUEST_FIELD_INDEX];
+    expect(
+      hostSlotAfterFaint == null || hostSlotAfterFaint.isFainted(),
+      "the guest-owned field slot was vacated by the faint on the host",
+    ).toBe(true);
+
+    // GUEST renders turn 1: the faint presentation opens the guest's OWN picker
+    // (CoopGuestFaintSwitchPhase). The headless guest has no human, so stub the ONE
+    // PARTY open to pick CHARIZARD - the RELAY send + seq keying stay fully real.
+    await withClient(rig.guestCtx, async () => {
+      const ui = rig.guestScene.ui as unknown as { setMode: (...args: unknown[]) => unknown };
+      const realSetMode = ui.setMode.bind(ui);
+      ui.setMode = (...args: unknown[]): unknown => {
+        if (args[0] === UiMode.PARTY) {
+          ui.setMode = realSetMode; // one-shot
+          (args[3] as (slotIndex: number, option: number) => void)(GUEST_PICK_SLOT, 0);
+          return;
+        }
+        if (args[0] === UiMode.MESSAGE) {
+          return; // the picker's close transition - a no-op headlessly
+        }
+        return realSetMode(...args);
+      };
+      try {
+        await driveGuestReplayTurn(rig.guestScene, turn);
+      } finally {
+        ui.setMode = realSetMode;
+      }
+    });
+
+    // HOST: drive past its SwitchPhase - it AWAITS the guest's relayed pick (already buffered
+    // over the loopback) and summons it, then pushes the out-of-band replacement checkpoint.
+    await withClient(rig.hostCtx, async () => {
+      await game.phaseInterceptor.to("CommandPhase", false);
+    });
+    const hostReplacement = rig.hostScene.getPlayerField()[COOP_GUEST_FIELD_INDEX];
+    expect(
+      hostReplacement?.species.speciesId,
+      "the HOST summoned THE GUEST'S pick (CHARIZARD), not the auto-pick (LAPRAS)",
+    ).toBe(SpeciesId.CHARIZARD);
+    expect(hostReplacement?.isFainted(), "the replacement is battle-ready on the host").toBe(false);
+
+    // GUEST turn 2 pump: consumes the out-of-band replacement checkpoint mid-park - the
+    // replacement MATERIALIZES on the guest and its own CommandPhase opens for the refilled
+    // slot (the drive returns at the CommandPhase boundary; the apply already happened).
+    await withClient(rig.guestCtx, async () => {
+      await driveGuestReplayTurn(rig.guestScene, turn + 1);
+    });
+    withClientSync(rig.guestCtx, () => {
+      const guestReplacement = rig.guestScene.getPlayerField()[COOP_GUEST_FIELD_INDEX];
+      expect(
+        guestReplacement?.species.speciesId,
+        "the GUEST materialized the replacement from the out-of-band checkpoint (no deadlock)",
+      ).toBe(SpeciesId.CHARIZARD);
+      expect(guestReplacement?.isFainted(), "the replacement is battle-ready on the guest").toBe(false);
+    });
+
+    logs.flush();
+  }, 240_000);
+});

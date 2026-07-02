@@ -772,6 +772,7 @@ const REPLAY_DRAIN_PHASES = new Set([
   "CoopStatStageReplayPhase",
   "CoopStatusReplayPhase",
   "CoopFaintReplayPhase",
+  "CoopGuestFaintSwitchPhase",
   "CoopFinalizeTurnPhase",
 ]);
 

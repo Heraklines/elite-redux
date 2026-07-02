@@ -46,12 +46,14 @@ import { coopLog, coopWarn, isCoopDebug } from "#data/elite-redux/coop/coop-debu
 import {
   consumeCoopPendingWaveAdvance,
   coopHasPendingWaveAdvance,
+  coopOwnerOfPlayerFieldSlot,
   coopWaveAdvanceSignaledFor,
   getCoopBattleStreamer,
   getCoopController,
   getCoopInteractionRelay,
   isCoopAuthoritativeGuest,
 } from "#data/elite-redux/coop/coop-runtime";
+import { coopSwitchBlocksMonForOwner } from "#data/elite-redux/coop/coop-session";
 import type {
   CoopBattleCheckpoint,
   CoopCapturePresentation,
@@ -464,6 +466,58 @@ export class CoopStatusReplayPhase extends PokemonPhase {
  * `end()` (faintCry can swallow its own callback when audio is muted, so a watchdog backs it).
  */
 export class CoopFaintReplayPhase extends PokemonPhase {
+  /**
+   * #786: when the presented faint removed a GUEST-OWNED player-field mon and the guest still has a
+   * legal bench mon, unshift {@linkcode CoopGuestFaintSwitchPhase} so THIS player chooses the
+   * replacement (relayed to the awaiting host) instead of the host auto-picking. Child-level
+   * unshift: the picker runs right after this faint phase, pausing the rest of the replay until
+   * the player answers (or the host's wait elapses and auto-picks - the run never stalls).
+   */
+  private maybeOpenOwnReplacementPicker(): void {
+    try {
+      const controller = getCoopController();
+      if (controller == null) {
+        coopLog("replay", `own-faint picker gate bi=${this.battlerIndex}: no controller -> skip`);
+        return;
+      }
+      const battlerCount = globalScene.currentBattle?.getBattlerCount() ?? 0;
+      if (this.battlerIndex >= battlerCount) {
+        return; // enemy-side faint
+      }
+      const slotOwner = coopOwnerOfPlayerFieldSlot(this.battlerIndex);
+      if (slotOwner !== controller.role) {
+        coopLog(
+          "replay",
+          `own-faint picker gate bi=${this.battlerIndex}: owner=${slotOwner} != ${controller.role} -> skip`,
+        );
+        return; // the partner's mon - the partner (or the host fallback) picks
+      }
+      const party = globalScene.getPlayerParty();
+      // NOT isAllowedInBattle(): the renderer's mirrored bench can miss full init state, and
+      // LEGALITY is the host's call anyway (it re-validates the pick, auto-picking on illegal).
+      // This gate only decides whether a picker is worth SHOWING.
+      const hasBench = party.some(
+        (mon, i) =>
+          i >= battlerCount
+          && i < 6
+          && !mon.isFainted()
+          && !coopSwitchBlocksMonForOwner(controller.role, mon.coopOwner),
+      );
+      if (!hasBench) {
+        coopLog(
+          "replay",
+          `own-faint picker gate bi=${this.battlerIndex}: no legal bench -> skip (bc=${battlerCount} party=[${party
+            .map((m, i) => `${i}:sp${m?.species?.speciesId}/fnt${m?.isFainted() ? 1 : 0}/own${m?.coopOwner ?? "-"}`)
+            .join(" ")}])`,
+        );
+        return; // nothing to send out - the host's flow decides (wipe / lone survivor)
+      }
+      globalScene.phaseManager.unshiftNew("CoopGuestFaintSwitchPhase", this.battlerIndex);
+    } catch {
+      coopWarn("replay", `own-faint picker gate bi=${this.battlerIndex} threw (handled, host auto-picks)`);
+    }
+  }
+
   public readonly phaseName = "CoopFaintReplayPhase";
 
   /**
@@ -488,6 +542,9 @@ export class CoopFaintReplayPhase extends PokemonPhase {
       }
       ended = true;
       watchdog?.remove();
+      // #786: OUR mon just fainted with a legal bench - open OUR replacement picker (relay-only;
+      // the host's out-of-band replacement checkpoint materializes the pick on this renderer).
+      this.maybeOpenOwnReplacementPicker();
       this.end();
     };
     if (isCoopDebug()) {

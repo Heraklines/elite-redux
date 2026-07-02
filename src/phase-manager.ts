@@ -32,6 +32,7 @@ import { CheckSwitchPhase } from "#phases/check-switch-phase";
 import { ColosseumChoicePhase } from "#phases/colosseum-choice-phase";
 import { CommandPhase } from "#phases/command-phase";
 import { CommonAnimPhase } from "#phases/common-anim-phase";
+import { CoopGuestFaintSwitchPhase } from "#phases/coop-guest-faint-switch-phase";
 import { CoopInertPhase } from "#phases/coop-inert-phase";
 import { CoopPushReplacementCheckpointPhase } from "#phases/coop-push-replacement-checkpoint-phase";
 import { CoopReplayLearnMovePhase } from "#phases/coop-replay-learn-move-phase";
@@ -186,6 +187,7 @@ const PHASES = Object.freeze({
   CoopReplayTurnPhase,
   CoopReplayMePhase,
   CoopReplayLearnMovePhase,
+  CoopGuestFaintSwitchPhase,
   CoopInertPhase,
   CoopPushReplacementCheckpointPhase,
   CoopApplyResyncPhase,

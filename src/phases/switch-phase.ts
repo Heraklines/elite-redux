@@ -1,4 +1,6 @@
 import { globalScene } from "#app/global-scene";
+import { coopLog } from "#data/elite-redux/coop/coop-debug";
+import { COOP_FAINT_SWITCH_SEQ_BASE, getCoopFaintSwitchWaitMs } from "#data/elite-redux/coop/coop-interaction-relay";
 import {
   coopOwnerOfPlayerFieldSlot,
   getCoopController,
@@ -95,21 +97,45 @@ export class SwitchPhase extends BattlePhase {
         // the new mon at this slot - which HALF A's reconcileCoopPlayerField then renders on the guest.
         // (LOCKSTEP is unchanged: both clients run the real SwitchPhase and fall through to the relay.)
         if (getCoopNetcodeMode() === "authoritative") {
-          const slotIndex = this.coopAutoPickReplacement();
-          if (slotIndex >= globalScene.currentBattle.getBattlerCount() && slotIndex < 6) {
-            globalScene.phaseManager.unshiftNew(
-              "SwitchSummonPhase",
-              this.switchType,
-              fieldIndex,
-              slotIndex,
-              this.doReturn,
-            );
-            // #633 guest-faint deadlock: push an OUT-OF-BAND checkpoint AFTER the summon
-            // (FIFO on this level) so the guest materializes the replacement NOW and can
-            // command it - the next turn resolution can never arrive without that command.
-            globalScene.phaseManager.unshiftNew("CoopPushReplacementCheckpointPhase");
-          }
-          return super.end();
+          // #786: the slot's OWNER (the guest) chooses its OWN replacement. Its renderer opens
+          // a party picker off the faint presentation (CoopGuestFaintSwitchPhase) and relays the
+          // pick under this same turn+slot seq; await it here, falling back to the old auto-pick
+          // when no (or an illegal) pick arrives in time - the run never stalls on a
+          // disconnected or idle partner.
+          globalScene.ui.showText("Waiting for your partner to choose their next Pokemon...");
+          const faintSeq = COOP_FAINT_SWITCH_SEQ_BASE + this.fieldIndex;
+          void coopRelay.awaitInteractionChoice(faintSeq, getCoopFaintSwitchWaitMs()).then(res => {
+            const battlerCount = globalScene.currentBattle.getBattlerCount();
+            let slotIndex = res?.choice ?? -1;
+            const picked = globalScene.getPlayerParty()[slotIndex];
+            const legal =
+              slotIndex >= battlerCount
+              && slotIndex < 6
+              && picked?.isAllowedInBattle() === true
+              && !coopSwitchBlocksMonForOwner(coopOwnerOfPlayerFieldSlot(this.fieldIndex), picked.coopOwner);
+            if (!legal) {
+              coopLog(
+                "replay",
+                `partner replacement pick seq=${faintSeq} ${res == null ? "TIMED OUT" : `illegal (${slotIndex})`} -> auto-pick`,
+              );
+              slotIndex = this.coopAutoPickReplacement();
+            }
+            if (slotIndex >= battlerCount && slotIndex < 6) {
+              globalScene.phaseManager.unshiftNew(
+                "SwitchSummonPhase",
+                this.switchType,
+                fieldIndex,
+                slotIndex,
+                this.doReturn,
+              );
+              // #633 guest-faint deadlock: push an OUT-OF-BAND checkpoint AFTER the summon
+              // (FIFO on this level) so the guest materializes the replacement NOW and can
+              // command it - the next turn resolution can never arrive without that command.
+              globalScene.phaseManager.unshiftNew("CoopPushReplacementCheckpointPhase");
+            }
+            void Promise.resolve(globalScene.ui.setMode(UiMode.MESSAGE)).then(() => super.end());
+          });
+          return;
         }
         // LOCKSTEP WATCHER: do not open the picker; apply the owner's relayed replacement.
         void coopRelay.awaitInteractionChoice(seq, COOP_SWITCH_WAIT_MS).then(res => {

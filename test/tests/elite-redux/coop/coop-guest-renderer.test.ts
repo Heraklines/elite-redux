@@ -26,7 +26,7 @@ import { globalScene } from "#app/global-scene";
 import { modifierTypes } from "#data/data-lists";
 import * as coopEngine from "#data/elite-redux/coop/coop-battle-engine";
 import { buildCoopEnemy } from "#data/elite-redux/coop/coop-enemy-builder";
-import { CoopInteractionRelay } from "#data/elite-redux/coop/coop-interaction-relay";
+import { CoopInteractionRelay, setCoopFaintSwitchWaitMs } from "#data/elite-redux/coop/coop-interaction-relay";
 import {
   clearCoopRuntime,
   getCoopController,
@@ -419,14 +419,13 @@ describe.skipIf(!RUN)("co-op GUEST = pure renderer - real engine (#633, TRACK-2 
     ).toEqual([BattlerIndex.ENEMY, BattlerIndex.ENEMY_2]);
   });
 
-  // (B) PLAYER REPLACEMENT auto-pick (#633 partner-death sync, HALF B): when the GUEST's mon (bi1)
-  // faints, the host's FaintPhase queues a SwitchPhase(SWITCH, 1, ...). The host is the WATCHER for
-  // that guest-owned slot, but the authoritative guest is a pure renderer in CoopReplayTurnPhase and
-  // NEVER reaches SwitchPhase to relay a choice. In LOCKSTEP the host would await 300s then apply
-  // nothing (a stall + desync). HALF B makes the host AUTO-PICK a replacement from the OWNER's (guest's)
-  // bench and apply it locally - no await. This asserts the SwitchPhase unshifts a SwitchSummonPhase for
-  // the guest's bench mon WITHOUT calling awaitInteractionChoice.
-  it("PLAYER REPLACEMENT (#633, HALF B): the host auto-picks a guest bench replacement WITHOUT awaiting", async () => {
+  // (B) PLAYER REPLACEMENT (#633 partner-death sync, HALF B; reworked by #786): when the GUEST's
+  // mon (bi1) faints, the host's SwitchPhase for that guest-owned slot now AWAITS the guest's OWN
+  // relayed replacement pick (its renderer opens a picker off the faint presentation - proven
+  // end-to-end in coop-duo-faint-switch.test.ts) and falls back to the AUTO-PICK when no pick
+  // arrives in time. This asserts the fallback: await fired, then a SwitchSummonPhase for the
+  // guest's bench mon.
+  it("PLAYER REPLACEMENT (#786): the host awaits the guest's pick, then auto-picks a guest bench replacement on timeout", async () => {
     const field = await startCoopGuest();
     // This is the HOST simulating the turn (the watcher of the guest-owned slot 1). Flip local role.
     getCoopController()!.role = "host";
@@ -449,25 +448,32 @@ describe.skipIf(!RUN)("co-op GUEST = pure renderer - real engine (#633, TRACK-2 
     // proceeds to choose a replacement for the empty slot.
     field[COOP_GUEST_FIELD_INDEX].hp = 0;
 
-    // Spy: the host must NOT await the guest's relayed choice in authoritative mode (the 300s stall).
+    // Spy: the host AWAITS the guest's relayed pick (bounded), then falls back to the auto-pick.
     const awaitSpy = vi.spyOn(CoopInteractionRelay.prototype, "awaitInteractionChoice");
     const relay = getCoopInteractionRelay();
     expect(relay, "a live interaction relay exists").not.toBeNull();
     const unshiftSpy = vi.spyOn(globalScene.phaseManager, "unshiftNew");
 
     // Drive the host's SwitchPhase for the guest-owned slot 1 (exactly what FaintPhase queues).
-    const switchPhase = game.scene.phaseManager.create(
-      "SwitchPhase",
-      SwitchType.SWITCH,
-      COOP_GUEST_FIELD_INDEX,
-      true,
-      false,
-    );
-    switchPhase.start();
+    // Tiny wait so the no-pick fallback fires fast (the live default is 60s).
+    setCoopFaintSwitchWaitMs(30);
+    try {
+      const switchPhase = game.scene.phaseManager.create(
+        "SwitchPhase",
+        SwitchType.SWITCH,
+        COOP_GUEST_FIELD_INDEX,
+        true,
+        false,
+      );
+      switchPhase.start();
+      await new Promise(r => setTimeout(r, 120));
+    } finally {
+      setCoopFaintSwitchWaitMs(60_000);
+    }
 
-    // The host did NOT await the guest's relayed choice (no 300s stall) ...
-    expect(awaitSpy, "authoritative host does not await the guest's relayed switch choice").not.toHaveBeenCalled();
-    // ... and it auto-unshifted a SwitchSummonPhase for the guest's bench mon at the correct slot.
+    // The host DID await the guest's pick first (#786) ...
+    expect(awaitSpy, "the host awaits the guest's relayed replacement pick").toHaveBeenCalled();
+    // ... then (no pick arrived) auto-unshifted a SwitchSummonPhase for the guest's bench mon.
     const switchSummon = unshiftSpy.mock.calls.find(([name]) => name === "SwitchSummonPhase");
     expect(switchSummon, "the host auto-picked a replacement (queued a SwitchSummonPhase)").toBeDefined();
     // SwitchSummonPhase args: (switchType, fieldIndex, slotIndex, doReturn). The slotIndex is the
@@ -490,19 +496,23 @@ describe.skipIf(!RUN)("co-op GUEST = pure renderer - real engine (#633, TRACK-2 
 
     field[COOP_GUEST_FIELD_INDEX].hp = 0;
     const unshiftSpy = vi.spyOn(globalScene.phaseManager, "unshiftNew");
-    const awaitSpy = vi.spyOn(CoopInteractionRelay.prototype, "awaitInteractionChoice");
 
-    const switchPhase = game.scene.phaseManager.create(
-      "SwitchPhase",
-      SwitchType.SWITCH,
-      COOP_GUEST_FIELD_INDEX,
-      true,
-      false,
-    );
-    switchPhase.start();
+    setCoopFaintSwitchWaitMs(30);
+    try {
+      const switchPhase = game.scene.phaseManager.create(
+        "SwitchPhase",
+        SwitchType.SWITCH,
+        COOP_GUEST_FIELD_INDEX,
+        true,
+        false,
+      );
+      switchPhase.start();
+      await new Promise(r => setTimeout(r, 120));
+    } finally {
+      setCoopFaintSwitchWaitMs(60_000);
+    }
 
-    // No await (still authoritative), and NO SwitchSummonPhase (the host has no legal guest bench mon).
-    expect(awaitSpy, "still no await in authoritative mode").not.toHaveBeenCalled();
+    // After the pick wait lapsed: NO SwitchSummonPhase (the host has no legal guest bench mon).
     const switchSummon = unshiftSpy.mock.calls.find(([name]) => name === "SwitchSummonPhase");
     expect(switchSummon, "no replacement queued when the only bench is the wrong owner's half").toBeUndefined();
   });
