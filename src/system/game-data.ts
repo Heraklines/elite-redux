@@ -15,7 +15,12 @@ import { EntryHazardTag } from "#data/arena-tag";
 import { getSerializedDailyRunConfig, parseDailySeed } from "#data/daily-seed/daily-seed-utils";
 import { allMoves, allSpecies } from "#data/data-lists";
 import { Egg } from "#data/egg";
-import { clearCoopRuntime, getCoopRuntime, startLocalCoopSession } from "#data/elite-redux/coop/coop-runtime";
+import {
+  clearCoopRuntime,
+  coopBroadcastDexSync,
+  getCoopRuntime,
+  startLocalCoopSession,
+} from "#data/elite-redux/coop/coop-runtime";
 import {
   getCommunityAllowedSpecies,
   getFounderRunState,
@@ -2489,6 +2494,14 @@ export class GameData {
     if (shinyLabLook && starterEntry) {
       grantErShinyLabSavedLookToSave((starterEntry.erShinyLab ??= {}), shinyLabLook);
     }
+    // Co-op shared acquisition (#794): this is THE universal acquisition chokepoint (wild
+    // catch, DexNav grant, ME-granted mon, Picnic join, ...). After the dex write lands,
+    // the HOST streams its dex/starter blob so the partner's account is credited NOW - not
+    // only at the next ME terminal. No-op outside an active co-op run (guarded inside).
+    const coopShareAcquisition = <T>(v: T): T => {
+      coopBroadcastDexSync();
+      return v;
+    };
     return this.setPokemonSpeciesCaught(
       pokemon,
       dexSpecies,
@@ -2498,7 +2511,7 @@ export class GameData {
       // The redux formIndex bit means nothing on the single-form counterpart:
       // register its DEFAULT form alongside the mon's gender/shiny/variant bits.
       reduxCounterpartId === undefined ? undefined : (pokemon.getDexAttr() & 127n) | DexAttr.DEFAULT_FORM,
-    );
+    ).then(coopShareAcquisition);
   }
 
   /**

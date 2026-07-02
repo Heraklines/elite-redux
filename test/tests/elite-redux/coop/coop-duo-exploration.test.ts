@@ -495,6 +495,45 @@ describe.skipIf(!RUN)("co-op DUO exploration sweep (maintainer directive)", () =
     logs.flush();
   }, 240_000);
 
+  it("PROBE #794: a host-side catch streams dex credit to the partner's account immediately", async () => {
+    // Shared acquisition: setPokemonCaught is the universal chokepoint (wild catch, DexNav,
+    // ME grants). The HOST's write must reach the GUEST's gameData without waiting for an
+    // ME terminal. Uses the real relay end-to-end (hook -> throttle -> wire -> merge apply).
+    await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
+    const pair = createLoopbackPair();
+    const rig = await buildDuo(game, pair, setCoopRuntime, toCoop);
+    wireGuestCommand(rig);
+    const { setCoopDexSyncDelayMs } = await import("#data/elite-redux/coop/coop-runtime");
+    try {
+      setCoopDexSyncDelayMs(0);
+      const caughtMon = rig.hostScene.getEnemyParty()[0];
+      const rootId = caughtMon.species.getRootSpeciesId();
+      const guestBefore = rig.guestScene.gameData.dexData[rootId]?.caughtAttr ?? 0n;
+      expect(guestBefore, "HARNESS: guest starts WITHOUT this species caught").toBe(0n);
+      await withClient(rig.hostCtx, async () => {
+        // Binds the HOST blob + relay at write time; the trailing send timer fires LATER.
+        await globalScene.gameData.setPokemonCaught(caughtMon, true, false, false);
+      });
+      // Let the trailing send fire while the GUEST ctx is active: the loopback delivers
+      // synchronously at send time, so this way the apply runs under the guest scene
+      // (gotcha #5). Live clients are separate processes - this is harness-only care.
+      await withClient(rig.guestCtx, async () => {
+        await new Promise(resolve => setTimeout(resolve, 10));
+        for (let i = 0; i < 10; i++) {
+          await drainLoopback();
+        }
+      });
+      const guestAfter = rig.guestScene.gameData.dexData[rootId]?.caughtAttr ?? 0n;
+      const hostAfter = rig.hostScene.gameData.dexData[rootId]?.caughtAttr ?? 0n;
+      expect(hostAfter > 0n, "host account credited (sanity)").toBe(true);
+      expect(guestAfter > 0n, "PARTNER account credited by the dexSync stream").toBe(true);
+      expect(rig.guestScene.gameData.dexData[rootId].caughtCount, "partner caughtCount merged").toBeGreaterThan(0);
+    } finally {
+      setCoopDexSyncDelayMs(500);
+    }
+    logs.flush();
+  }, 240_000);
+
   it("PROBE registry-sweep: EVERY modifier registry id round-trips through the watcher rebuild (relics included)", async () => {
     // The watcher rebuilds ALL streamed items (reward shop, biome market, relic rewards) via
     // the registry round-trip; any id that fails falls back to a DIVERGENT local roll live.

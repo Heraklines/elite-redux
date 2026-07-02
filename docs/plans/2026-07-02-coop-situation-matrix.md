@@ -68,9 +68,9 @@ TEST: file names are under test/tests/elite-redux/coop/ unless noted.
 
 | Situation | Status | Coverage / Test |
 |---|---|---|
-| Wild catch -> dex + starter unlock BOTH accounts | DONE | #689; OPEN: re-verify under authoritative-only via probe (#794) |
-| Dex Nav grants | OPEN | #794 |
-| Shiny-palette / effect availability unlocks on catch/appear | OPEN | #794 (needs unlock-event relay - guest is a renderer) |
+| Wild catch -> dex + starter unlock BOTH accounts | DONE | #794 dexSync chokepoint hook; PROBE #794 (host catch -> guest account credited end-to-end) |
+| Dex Nav grants | DONE | #794: every grant funnels through setPokemonCaught -> the same dexSync stream |
+| Shiny-palette / effect availability unlocks on catch/appear | DONE | #794: blob carries starterData wholesale (erBlackShiny + erShinyLab looks written before the hook) |
 | Shiny Lab looks synced both directions | DONE | #785 v3 own-mon stamp; lock-in diagnostics |
 | Egg vouchers / achievements from shared play | PARTIAL | trackers fire on the computing engine only; fold into #794 relay |
 | Give mon to partner (ownership transfer) | DONE | #649 |

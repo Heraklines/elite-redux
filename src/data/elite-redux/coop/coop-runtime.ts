@@ -22,9 +22,11 @@ import { globalScene } from "#app/global-scene";
 import { setCoopAuthoritativeGuestPredicate } from "#data/elite-redux/coop/coop-authoritative-gate";
 import { COOP_CHECKSUM_SENTINEL } from "#data/elite-redux/coop/coop-battle-checksum";
 import {
+  applyCoopDexDelta,
   applyCoopFullSnapshot,
   captureCoopCaptureParty,
   captureCoopChecksum,
+  captureCoopDexDelta,
   captureCoopEnemies,
   captureCoopExpDeltas,
   captureCoopFullSnapshot,
@@ -32,7 +34,7 @@ import {
 import { CoopBattleStreamer } from "#data/elite-redux/coop/coop-battle-stream";
 import { CoopBattleSync } from "#data/elite-redux/coop/coop-battle-sync";
 import { coopLog, coopWarn, isCoopDebug } from "#data/elite-redux/coop/coop-debug";
-import { CoopInteractionRelay } from "#data/elite-redux/coop/coop-interaction-relay";
+import { COOP_DEX_SYNC_SEQ, CoopInteractionRelay } from "#data/elite-redux/coop/coop-interaction-relay";
 import { meBattleHandoffKey } from "#data/elite-redux/coop/coop-me-battle-handoff";
 import { CoopMePump } from "#data/elite-redux/coop/coop-me-pump";
 import { coopFieldIndexOf, coopOwnerOfFieldSlot } from "#data/elite-redux/coop/coop-session";
@@ -495,6 +497,77 @@ export function setCoopLearnMovePickerOpener(
   opener: (partySlot: number, moveId: number, maxMoveCount: number) => void,
 ): void {
   learnMovePickerOpener = opener;
+}
+
+// =============================================================================
+// #794 shared acquisition: the HOST (sole engine) streams its dex / starter blob right after
+// any acquisition event (wild catch, DexNav grant, ME-granted mon, shiny-variant unlock bits
+// ride caughtAttr) so the partner's ACCOUNT is credited immediately - previously the blob only
+// flowed at ME terminals, so a run without MEs never shared catches. Throttled (bursts like
+// mid-run egg hatches coalesce into one trailing send); the apply side is merge-only (union),
+// so the partner can only GAIN entries - a stale blob can never remove anything.
+// =============================================================================
+
+let dexSyncPending: { relay: CoopInteractionRelay; blob: string } | null = null;
+let dexSyncTimerArmed = false;
+/** Injectable for tests: 0 = flush on the next macrotask. */
+let dexSyncDelayMs = 500;
+export function setCoopDexSyncDelayMs(ms: number): void {
+  dexSyncDelayMs = ms;
+}
+
+/**
+ * Call after ANY acquisition write (chokepoint: gameData.setPokemonCaught). Safe anywhere.
+ * The blob AND the sending relay are bound AT CALL TIME (the timer callback runs under
+ * whatever client context is active - binding late would capture/send via the wrong client
+ * in multi-client processes like the duo harness). A burst overwrites the pending blob
+ * (capture-after-write means the latest capture reflects every write), one trailing send.
+ */
+export function coopBroadcastDexSync(): void {
+  try {
+    if (getCoopRuntime() == null || !globalScene.gameMode?.isCoop || isCoopAuthoritativeGuest()) {
+      return;
+    }
+    const relay = getCoopInteractionRelay();
+    if (relay == null) {
+      return;
+    }
+    dexSyncPending = { relay, blob: captureCoopDexDelta() };
+    if (dexSyncTimerArmed) {
+      return;
+    }
+    dexSyncTimerArmed = true;
+    setTimeout(() => {
+      dexSyncTimerArmed = false;
+      const pending = dexSyncPending;
+      dexSyncPending = null;
+      if (pending == null) {
+        return;
+      }
+      try {
+        pending.relay.sendInteractionOutcome(COOP_DEX_SYNC_SEQ, "dexSync", { k: "dexSync", dex: pending.blob });
+        coopLog("runtime", "dexSync broadcast (acquisition -> partner account credited)");
+      } catch {
+        coopWarn("runtime", "dexSync broadcast threw (handled - next ME terminal still converges)");
+      }
+    }, dexSyncDelayMs);
+  } catch {
+    /* an acquisition write must never fail because of the sync hook */
+  }
+}
+
+let offDexSync: (() => void) | null = null;
+function wireCoopDexSync(transport: CoopTransport): void {
+  offDexSync = transport.onMessage(msg => {
+    if (msg.t !== "interactionOutcome" || msg.outcome.k !== "dexSync") {
+      return;
+    }
+    if (!isCoopAuthoritativeGuest()) {
+      return;
+    }
+    coopLog("runtime", "recv dexSync -> merging partner acquisition credit onto local account");
+    applyCoopDexDelta(msg.outcome.dex);
+  });
 }
 
 function wireCoopLearnMoveForward(transport: CoopTransport): void {
@@ -1056,6 +1129,7 @@ export function startLocalCoopSession(
   wireCoopMeChecksumCheck(battleStream);
   wireCoopLiveEvents(controller, battleStream);
   wireCoopLearnMoveForward(host);
+  wireCoopDexSync(host);
   setCoopRuntime(runtime);
   coopLog("launch", `local session ready role=${controller.role} netcode=${controller.netcodeMode} -> connecting`);
   controller.connect();
@@ -1132,6 +1206,7 @@ export function assembleCoopRuntime(
   wireCoopMeChecksumCheck(battleStream);
   wireCoopLiveEvents(controller, battleStream);
   wireCoopLearnMoveForward(transport);
+  wireCoopDexSync(transport);
   return runtime;
 }
 
@@ -1191,6 +1266,8 @@ export function clearCoopRuntime(): void {
   // subsequent solo / lockstep run has no listener and spawns no CoopReplayLearnMovePhase.
   offLearnMoveForward?.();
   offLearnMoveForward = null;
+  offDexSync?.();
+  offDexSync = null;
   learnMoveForwardInFlight.clear();
   active.localTransport.close();
   // Clear the co-op ghost-pool hooks so a subsequent SOLO run fetches normally (#633).

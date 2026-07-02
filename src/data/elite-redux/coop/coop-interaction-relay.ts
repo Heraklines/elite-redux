@@ -44,6 +44,9 @@ export const COOP_INTERACTION_LEAVE = -1;
  * shop's real reroll counts stay single digits, so 777 can never collide).
  */
 export const COOP_BIOME_SHOP_SEQ_BASE = 7_000_000;
+
+/** #794 shared acquisition: the fixed disjoint seq for host->guest dex/starter sync broadcasts. */
+export const COOP_DEX_SYNC_SEQ = 9_200_000;
 export function coopBiomeShopSeq(pinnedStart: number): number {
   return COOP_BIOME_SHOP_SEQ_BASE + Math.max(0, pinnedStart);
 }

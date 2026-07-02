@@ -500,7 +500,14 @@ export type CoopInteractionOutcome =
    *  - `moveId`       the move id being learned (cosmetic on the guest; the host applies it).
    *  - `maxMoveCount` the mon's move-slot cap == the "did not learn" sentinel index.
    */
-  | { k: "learnMoveForward"; partySlot: number; moveId: number; maxMoveCount: number };
+  | { k: "learnMoveForward"; partySlot: number; moveId: number; maxMoveCount: number }
+  /**
+   * Co-op shared acquisition (#794): the HOST (sole engine) streams its dex / starter blob
+   * ({@linkcode captureCoopDexDelta}) right after ANY acquisition event (wild catch, DexNav
+   * grant, ME-granted mon) so the partner's ACCOUNT gets the same dex credit + shiny-variant
+   * unlocks immediately - not only at the next ME terminal. Throttled sender; merge-only apply.
+   */
+  | { k: "dexSync"; dex: string };
 
 /**
  * How a wave's battle ended (#633, authoritative wave-advance handshake). The host
