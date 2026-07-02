@@ -796,12 +796,18 @@ export class CoopBattleStreamer {
     turn: number,
     fromSeq: number,
   ): Promise<{ kind: "turn"; res: CoopTurnResolution | null } | { kind: "live" } | { kind: "checkpoint" }> {
-    // Fast paths: anything already buffered resolves without parking waiters.
-    if (this.inbox.has(turn)) {
-      return this.awaitTurn(turn).then(res => ({ kind: "turn" as const, res }));
-    }
+    // Fast paths: anything already buffered resolves without parking waiters. The OUT-OF-BAND
+    // checkpoint is checked FIRST (#788): it is always NEWER state than a buffered turn
+    // resolution (e.g. the post-faint replacement summon captured AFTER the turn ended), and
+    // its slot entries are ALIVE - applying it triggers the visual summon reposition the
+    // turn-end checkpoint (slot still fainted) skips. Live failure this fixes: the resolution
+    // beat the replacement snapshot into the buffer and the chooser never saw their mon
+    // come out on screen.
     if (this.lastCheckpoint != null) {
       return Promise.resolve({ kind: "checkpoint" as const });
+    }
+    if (this.inbox.has(turn)) {
+      return this.awaitTurn(turn).then(res => ({ kind: "turn" as const, res }));
     }
     const perTurn = this.liveEvents.get(turn);
     if (perTurn != null && perTurn.has(fromSeq)) {
