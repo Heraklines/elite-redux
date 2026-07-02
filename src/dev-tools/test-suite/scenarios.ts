@@ -11718,4 +11718,37 @@ export const DEV_SCENARIOS: DevScenario[] = [
       ];
     },
   },
+  // ===========================================================================
+  // Achievement — Sorry For The Wait (first-turn charge move boss KO)
+  // ===========================================================================
+  {
+    label: "Achv: Sorry For The Wait (turn-1 charge KO)",
+    description:
+      "Reported: a genuine charge-turn Meteor Beam boss OHKO never granted 'Sorry For\n"
+      + "The Wait'. Root cause: the tracker recorded the charge only on an impossible\n"
+      + "turn value, so the achievement was UNOBTAINABLE for everyone. Your Probopass\n"
+      + "has Meteor Beam (NO Power Herb - skipping the charge is excluded by design);\n"
+      + "the foe is a frail boss.\n"
+      + "DO: on TURN 1 use METEOR BEAM (it charges), let the beam land on turn 2 and\n"
+      + "KO the boss.\n"
+      + "EXPECT: the 'Sorry For The Wait' achievement pops on the KO (re-unlock is\n"
+      + "forced in this scenario, so it pops even if you already own it).",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_WAVE_OVERRIDE: 145,
+        STARTING_LEVEL_OVERRIDE: 100,
+        ACHIEVEMENTS_REUNLOCK_OVERRIDE: true,
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.MAGIKARP,
+        ENEMY_LEVEL_OVERRIDE: 5,
+        ENEMY_HEALTH_SEGMENTS_OVERRIDE: 2,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+      });
+      return [
+        makeStarter(SpeciesId.PROBOPASS, {
+          moveset: [MoveId.METEOR_BEAM, MoveId.POWER_GEM, MoveId.FLASH_CANNON, MoveId.EARTH_POWER],
+        }),
+      ];
+    },
+  },
 ];

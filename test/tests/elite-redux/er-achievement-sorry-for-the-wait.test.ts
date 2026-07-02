@@ -71,15 +71,15 @@ describe.skipIf(!RUN)("ER achievement: Sorry For The Wait (first-turn charge mov
   it("does NOT grant it when the charge starts after turn 1", async () => {
     await game.classicMode.startBattle(SpeciesId.PROBOPASS);
     const boss = game.field.getEnemyPokemon();
-
-    game.move.select(MoveId.SPLASH);
-    await game.phaseInterceptor.to("TurnEndPhase"); // turn 1: not charging
+    // Same flow as the positive case, but the battle is no longer on its first turn
+    // (as if two Splash turns already passed) - the charge must NOT be recorded.
+    game.scene.currentBattle.turn = 3;
 
     game.move.select(MoveId.METEOR_BEAM);
-    await game.phaseInterceptor.to("TurnEndPhase"); // turn 2: charge
-    await game.phaseInterceptor.to("FaintPhase"); // turn 3: beam lands + KO (wave ends, no TurnEndPhase)
+    await game.phaseInterceptor.to("TurnEndPhase"); // charge turn (turn 3)
+    await game.phaseInterceptor.to("TurnEndPhase"); // the beam lands
 
-    expect(boss.isFainted(), "boss dies to the turn-3 beam").toBe(true);
+    expect(boss.isFainted(), "boss dies to the beam").toBe(true);
     expect(game.scene.gameData.achvUnlocks, "no unlock for a later-turn charge").not.toHaveProperty(
       achvs.SORRY_FOR_THE_WAIT.id,
     );
