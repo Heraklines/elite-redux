@@ -17,6 +17,7 @@ const DEV_SCENARIO_SLOT = 4;
  */
 const COOP_LAUNCH_WAVE = 1;
 
+import { coopLog } from "#data/elite-redux/coop/coop-debug";
 import type { CoopRosterEntry } from "#data/elite-redux/coop/coop-roster";
 import {
   getCoopBattleStreamer,
@@ -470,9 +471,15 @@ function serializeCoopStarter(s: Starter): CoopSerializedStarter {
     coopLuck: snap.coopLuck,
     // Co-op (#785): carry the OWNER'S locally-equipped Shiny Lab look (+ preset name) so the
     // partner's client renders this mon's custom shiny effects instead of the default shiny.
-    erShinyLab: getErShinyLabSavedLookForSpecies(s.speciesId, s.shiny),
+    erShinyLab: coopLogShinyLabCarry(s.speciesId, getErShinyLabSavedLookForSpecies(s.speciesId, s.shiny)),
     erShinyLabName: getErShinyLabEquippedNameForSpecies(s.speciesId, s.shiny) || undefined,
   };
+}
+
+/** #785 diagnostics: prove in the session log whether a pick's look attached at lock-in. */
+function coopLogShinyLabCarry<T>(speciesId: number, look: T): T {
+  coopLog("session", `roster carry shinyLab speciesId=${speciesId} -> ${look === undefined ? "none" : "ATTACHED"}`);
+  return look;
 }
 
 /**

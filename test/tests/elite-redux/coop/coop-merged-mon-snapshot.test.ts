@@ -135,3 +135,39 @@ describe("co-op Shiny Lab look sync (#785) - carry + precedence", () => {
     expect(look, "no carried look + suppressLocal -> default shiny (never this client's preset)").toBeNull();
   });
 });
+
+describe.skipIf(!RUN)("co-op Shiny Lab look sync (#785) - serialize-side lookup (live gate)", () => {
+  let phaserGame: Phaser.Game;
+  let game: GameManager;
+
+  beforeAll(() => {
+    phaserGame = new Phaser.Game({ type: Phaser.HEADLESS });
+  });
+
+  beforeEach(() => {
+    game = new GameManager(phaserGame);
+  });
+
+  afterEach(() => {
+    // no per-test teardown needed (shared GameManager pattern in this file's live gate)
+  });
+
+  it("getErShinyLabSavedLookForSpecies returns the equipped look from starterData (the roster-carry source)", async () => {
+    await game.classicMode.startBattle(SpeciesId.SNORLAX);
+    const { getErShinyLabSavedLookForSpecies } = await import("#sprites/er-shiny-lab-sprite-fx");
+    const { grantErShinyLabSavedLookToSave, encodeErShinyLabLoadout } = await import(
+      "#data/elite-redux/er-shiny-lab-effects"
+    );
+    const carried = encodeErShinyLabPreset({
+      loadout: { palette: "duoneon", surface: "starmap", around: null },
+      params: { ...ER_SHINY_LAB_DEFAULT_PARAMS },
+    });
+    const entry = game.scene.gameData.getStarterDataEntry(SpeciesId.SNORLAX);
+    entry.erShinyLab = {};
+    grantErShinyLabSavedLookToSave(entry.erShinyLab, carried);
+    entry.erShinyLab.l = encodeErShinyLabLoadout({ palette: "duoneon", surface: "starmap", around: null });
+
+    const look = getErShinyLabSavedLookForSpecies(SpeciesId.SNORLAX, true);
+    expect(look, "the serialize-side lookup finds the equipped look (roster carry has a source)").toBeDefined();
+  });
+});
