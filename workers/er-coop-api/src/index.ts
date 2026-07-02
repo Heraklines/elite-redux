@@ -37,6 +37,9 @@ interface Env {
   RUN_TTL_MS?: string;
   /** Cloudflare Realtime TURN key id (optional). Set via `wrangler secret put CF_TURN_KEY_ID`. */
   CF_TURN_KEY_ID?: string;
+  TURN_URLS?: string;
+  TURN_USERNAME?: string;
+  TURN_CREDENTIAL?: string;
   /** Cloudflare Realtime TURN API token (optional). Set via `wrangler secret put CF_TURN_API_TOKEN`. */
   CF_TURN_API_TOKEN?: string;
   /** TURN credential lifetime in seconds (default 86400). */
@@ -587,6 +590,25 @@ async function handleIce(env: Env): Promise<Response> {
   const keyId = env.CF_TURN_KEY_ID;
   const apiToken = env.CF_TURN_API_TOKEN;
   if (!keyId || !apiToken) {
+    // STATIC TURN fallback (#797): no Cloudflare Realtime key provisioned, but a static
+    // relay is configured (e.g. the free Open Relay). Two peers behind incompatible NATs
+    // CANNOT connect with STUN alone - live sessions were stuck at "connecting" forever.
+    if (env.TURN_URLS) {
+      const turn: { urls: string[]; username?: string; credential?: string } = {
+        urls: env.TURN_URLS.split(",")
+          .map(u => u.trim())
+          .filter(u => u.length > 0),
+      };
+      if (env.TURN_USERNAME) {
+        turn.username = env.TURN_USERNAME;
+      }
+      if (env.TURN_CREDENTIAL) {
+        turn.credential = env.TURN_CREDENTIAL;
+      }
+      return json(env, {
+        iceServers: [{ urls: ["stun:stun.cloudflare.com:3478", "stun:stun.l.google.com:19302"] }, turn],
+      });
+    }
     return stunOnlyIce(env);
   }
   const ttl = Number(env.TURN_TTL_SECONDS);
