@@ -385,7 +385,7 @@ export class TitlePhase extends Phase {
         const from = incoming;
         opts.push(
           {
-            label: `✔ Accept ${from.name}`,
+            label: `Accept ${from.name}`,
             handler: () => {
               incoming = null;
               void controller?.respond(true);
@@ -393,7 +393,7 @@ export class TitlePhase extends Phase {
             },
           },
           {
-            label: "✘ Decline",
+            label: "Decline",
             handler: () => {
               incoming = null;
               stage.setSeat(1, { name: null, detail: "Searching...", dot: "amber" });
@@ -415,7 +415,7 @@ export class TitlePhase extends Phase {
           });
         }
         opts.push({
-          label: "▶ Play vs CPU",
+          label: "Play vs CPU",
           handler: () => {
             stage.destroy();
             controller?.cancel();
@@ -434,7 +434,13 @@ export class TitlePhase extends Phase {
       });
       globalScene.ui.setMode(UiMode.MESSAGE);
       globalScene.ui.resetModeChain();
-      globalScene.ui.showText("", null, () => globalScene.ui.setOverlayMode(UiMode.OPTION_SELECT, { options: opts }));
+      // The panel is right-edge anchored and grows up-left; yOffset 40 drops its bottom to
+      // 8px above the screen edge so it sits INSIDE the stage's ACTIONS dock (no overlap
+      // with the seat cards), xOffset 2 gives it a right margin, maxOptions bounds a busy
+      // lobby to a scrolling list instead of a screen-tall tower.
+      globalScene.ui.showText("", null, () =>
+        globalScene.ui.setOverlayMode(UiMode.OPTION_SELECT, { options: opts, maxOptions: 6, xOffset: 2, yOffset: 40 }),
+      );
     };
 
     controller = new CoopLobbyController(username, {

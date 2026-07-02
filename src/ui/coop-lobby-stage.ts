@@ -28,10 +28,15 @@ export interface SeatState {
   dot: "green" | "amber" | "red";
 }
 
-const CARD_W = 108;
-const CARD_H = 64;
-const CARD_GAP = 12;
-const CARD_Y = 34;
+// LEFT-COLUMN layout (v2): the input OPTION_SELECT panel is right-edge anchored (it grows
+// up-left from the bottom-right), so the stage keeps ALL its content in the left column and
+// dresses the right side as an "ACTIONS" dock the panel visually docks into - no overlap.
+const DOCK_X = 202;
+const LEFT_CENTER = DOCK_X / 2;
+const CARD_X = 8;
+const CARD_W = DOCK_X - 16;
+const CARD_H = 56;
+const CARD_YS = [30, 92] as const;
 
 const DOT_COLORS: Record<SeatState["dot"], number> = {
   green: 0x78c850,
@@ -72,51 +77,64 @@ export class CoopLobbyStage {
     const dim = globalScene.add.rectangle(0, 0, width, height, 0x000000, 0.65).setOrigin(0);
     this.root.add(dim);
 
-    // Header: title + accent underline.
-    const title = addTextObject(width / 2, 8, "CO-OP LOBBY", TextStyle.SETTINGS_LABEL, { fontSize: "112px" });
+    // RIGHT: the "ACTIONS" dock - a darker band with a cyan divider the option panel
+    // (right-edge anchored by design) visually docks into.
+    const dock = globalScene.add.rectangle(DOCK_X, 0, width - DOCK_X, height, 0x000000, 0.35).setOrigin(0);
+    this.root.add(dock);
+    const divider = globalScene.add.rectangle(DOCK_X, 0, 1, height, 0x78c8f0, 0.7).setOrigin(0);
+    this.root.add(divider);
+    const dockLabel = addTextObject(DOCK_X + (width - DOCK_X) / 2, 5, "ACTIONS", TextStyle.TOOLTIP_CONTENT, {
+      fontSize: "48px",
+    });
+    dockLabel.setOrigin(0.5, 0);
+    dockLabel.setAlpha(0.7);
+    this.root.add(dockLabel);
+
+    // LEFT: header (title + accent underline) centered over the left column.
+    const title = addTextObject(LEFT_CENTER, 6, "CO-OP LOBBY", TextStyle.SETTINGS_LABEL, { fontSize: "112px" });
     title.setOrigin(0.5, 0);
     this.root.add(title);
-    const underline = globalScene.add.rectangle(width / 2, 24, 132, 1.5, 0x78c8f0, 0.9).setOrigin(0.5, 0);
+    const underline = globalScene.add.rectangle(LEFT_CENTER, 22, 132, 1.5, 0x78c8f0, 0.9).setOrigin(0.5, 0);
     this.root.add(underline);
 
-    // Seat cards, centered as a row.
-    const rowW = CARD_W * 2 + CARD_GAP;
-    const startX = (width - rowW) / 2;
+    // Seat cards, stacked in the left column - roomier than the old side-by-side pair.
     for (let seat = 0; seat < 2; seat++) {
-      const x = startX + seat * (CARD_W + CARD_GAP);
-      const win = addWindow(x, CARD_Y, CARD_W, CARD_H);
+      const y = CARD_YS[seat];
+      const win = addWindow(CARD_X, y, CARD_W, CARD_H);
       this.root.add(win);
 
       const seatLabel = addTextObject(
-        x + CARD_W / 2,
-        CARD_Y + 5,
+        CARD_X + 7,
+        y + 5,
         seat === 0 ? "PLAYER 1 - HOST" : "PLAYER 2",
         TextStyle.TOOLTIP_CONTENT,
         { fontSize: "48px" },
       );
-      seatLabel.setOrigin(0.5, 0);
+      seatLabel.setOrigin(0, 0);
       seatLabel.setAlpha(0.85);
       this.root.add(seatLabel);
 
-      const name = addTextObject(x + CARD_W / 2, CARD_Y + 21, "", TextStyle.WINDOW, { fontSize: "72px" });
-      name.setOrigin(0.5, 0);
+      const name = addTextObject(CARD_X + 7, y + 16, "", TextStyle.WINDOW, { fontSize: "84px" });
+      name.setOrigin(0, 0);
       this.root.add(name);
 
-      const dot = globalScene.add.circle(x + CARD_W / 2 - 26, CARD_Y + CARD_H - 14, 2.5, DOT_COLORS.amber);
+      const dot = globalScene.add.circle(CARD_X + 11, y + CARD_H - 12, 2.5, DOT_COLORS.amber);
       this.root.add(dot);
-      const detail = addTextObject(x + CARD_W / 2 + 3, CARD_Y + CARD_H - 18, "", TextStyle.TOOLTIP_CONTENT, {
+      const detail = addTextObject(CARD_X + 18, y + CARD_H - 16, "", TextStyle.TOOLTIP_CONTENT, {
         fontSize: "48px",
       });
-      detail.setOrigin(0.5, 0);
+      detail.setOrigin(0, 0);
       this.root.add(detail);
 
       this.seatTexts.push({ name, detail });
       this.seatDots.push(dot);
     }
 
-    // Context strip between the cards and the input panel.
-    this.statusText = addTextObject(width / 2, CARD_Y + CARD_H + 8, "", TextStyle.TOOLTIP_CONTENT, {
+    // Context strip at the bottom of the left column.
+    this.statusText = addTextObject(LEFT_CENTER, height - 26, "", TextStyle.TOOLTIP_CONTENT, {
       fontSize: "56px",
+      wordWrap: { width: (DOCK_X - 12) * 6, useAdvancedWrap: true },
+      align: "center",
     });
     this.statusText.setOrigin(0.5, 0);
     this.root.add(this.statusText);

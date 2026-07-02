@@ -122,6 +122,8 @@ export class CoopBattleStreamer {
   private liveEventHandler: ((turn: number, seq: number, event: CoopBattleEvent) => void) | null = null;
   /** GUEST: one-shot live-arrival waiter for the pump race ({@linkcode awaitTurnOrLiveEvent}). */
   private liveWaiter: ((turn: number, seq: number) => void) | null = null;
+  /** GUEST: one-shot OUT-OF-BAND-checkpoint waiter for the pump race (#633 guest-faint deadlock). */
+  private checkpointWaiter: (() => void) | null = null;
 
   private enemyPartyHandler: ((wave: number, enemies: CoopSerializedEnemy[]) => void) | null = null;
   private checkpointHandler: ((reason: string, checkpoint: CoopBattleCheckpoint) => void) | null = null;
@@ -793,10 +795,13 @@ export class CoopBattleStreamer {
   awaitTurnOrLiveEvent(
     turn: number,
     fromSeq: number,
-  ): Promise<{ kind: "turn"; res: CoopTurnResolution | null } | { kind: "live" }> {
+  ): Promise<{ kind: "turn"; res: CoopTurnResolution | null } | { kind: "live" } | { kind: "checkpoint" }> {
     // Fast paths: anything already buffered resolves without parking waiters.
     if (this.inbox.has(turn)) {
       return this.awaitTurn(turn).then(res => ({ kind: "turn" as const, res }));
+    }
+    if (this.lastCheckpoint != null) {
+      return Promise.resolve({ kind: "checkpoint" as const });
     }
     const perTurn = this.liveEvents.get(turn);
     if (perTurn != null && perTurn.has(fromSeq)) {
@@ -804,30 +809,47 @@ export class CoopBattleStreamer {
     }
     return new Promise(resolve => {
       let settled = false;
+      const cleanup = () => {
+        if (this.liveWaiter === settleLive) {
+          this.liveWaiter = null;
+          this.checkpointWaiter = null;
+        }
+        if (this.checkpointWaiter === settleCheckpoint) {
+          this.checkpointWaiter = null;
+        }
+      };
       const settleLive = (liveTurn: number, seq: number) => {
         if (settled || liveTurn !== turn || seq < fromSeq) {
           return;
         }
         settled = true;
-        if (this.liveWaiter === settleLive) {
-          this.liveWaiter = null;
-        }
+        cleanup();
         resolve({ kind: "live" });
       };
+      // #633 guest-faint deadlock: an OUT-OF-BAND checkpoint (the host auto-summoned a
+      // replacement into the guest-owned slot) must WAKE the parked pump - it carries the
+      // mon the guest has to command before the turn resolution can ever arrive.
+      const settleCheckpoint = () => {
+        if (settled) {
+          return;
+        }
+        settled = true;
+        cleanup();
+        resolve({ kind: "checkpoint" });
+      };
       this.liveWaiter = settleLive;
+      this.checkpointWaiter = settleCheckpoint;
       void this.awaitTurn(turn).then(res => {
         if (!settled) {
           settled = true;
-          if (this.liveWaiter === settleLive) {
-            this.liveWaiter = null;
-          }
+          cleanup();
           resolve({ kind: "turn", res });
           return;
         }
-        // The live leg already won this race; a resolution landing on the stale waiter must be
-        // REBUFFERED so the pump's next race consumes it (never lost).
+        // The live/checkpoint leg already won this race; a resolution landing on the stale
+        // waiter must be REBUFFERED so the pump's next race consumes it (never lost).
         if (res != null) {
-          coopLog("replay", `guest live-pump rebuffer turnResolution turn=${turn} (live leg won the race)`);
+          coopLog("replay", `guest live-pump rebuffer turnResolution turn=${turn} (raced out)`);
           this.inbox.set(turn, res);
         }
       });
@@ -1085,6 +1107,7 @@ export class CoopBattleStreamer {
         // carrying the host's checksum so the guest can verify convergence after applying.
         coopLog("checksum", `guest RECV battleCheckpoint reason=${msg.reason} checksum=${msg.checksum}`);
         this.lastCheckpoint = { reason: msg.reason, checkpoint: msg.checkpoint, checksum: msg.checksum };
+        this.checkpointWaiter?.();
         this.checkpointHandler?.(msg.reason, msg.checkpoint);
         return;
       case "requestEnemyParty":

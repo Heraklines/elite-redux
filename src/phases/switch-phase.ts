@@ -104,6 +104,10 @@ export class SwitchPhase extends BattlePhase {
               slotIndex,
               this.doReturn,
             );
+            // #633 guest-faint deadlock: push an OUT-OF-BAND checkpoint AFTER the summon
+            // (FIFO on this level) so the guest materializes the replacement NOW and can
+            // command it - the next turn resolution can never arrive without that command.
+            globalScene.phaseManager.unshiftNew("CoopPushReplacementCheckpointPhase");
           }
           return super.end();
         }

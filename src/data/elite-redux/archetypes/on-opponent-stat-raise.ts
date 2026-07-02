@@ -83,6 +83,13 @@ export class OnOpponentStatRaiseAbAttr extends StatStageChangeCopyAbAttr {
         true,
         [change.stat],
         change.stages,
+        true,
+        false,
+        // canBeCopied=false, like vanilla Opportunist's copy: a reactive boost must
+        // never itself count as a copyable raise, or two reactive holders (Egoist vs
+        // an Opportunist/Egoist foe) ping-pong boosts forever - the live "Egoist kept
+        // chaining forever" freeze after a Dragon Dance.
+        false,
       );
     }
   }

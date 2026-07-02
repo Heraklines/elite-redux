@@ -6,9 +6,11 @@
 
 import { globalScene } from "#app/global-scene";
 import { Phase } from "#app/phase";
+import { applyCoopCheckpoint } from "#data/elite-redux/coop/coop-battle-engine";
 import { coopLog, coopWarn, isCoopDebug } from "#data/elite-redux/coop/coop-debug";
 import {
   coopHasPendingWaveAdvance,
+  coopLocalOwnedPlayerFieldSlot,
   getCoopBattleStreamer,
   isCoopAuthoritativeGuest,
 } from "#data/elite-redux/coop/coop-runtime";
@@ -100,6 +102,41 @@ export class CoopReplayTurnPhase extends Phase {
         const raced = await streamer.awaitTurnOrLiveEvent(this.turn, this.rendered);
         if (raced.kind === "live") {
           continue; // drain the fresh arrival(s) on the next loop iteration
+        }
+        if (raced.kind === "checkpoint") {
+          // #633 guest-faint deadlock: the host auto-summoned a replacement into a fainted
+          // player slot and pushed this OUT-OF-BAND checkpoint. Apply it NOW (parked = idle,
+          // no animation in flight - a safe boundary) so the replacement materializes on the
+          // guest; then, if the refilled slot is OURS and it has no command yet this turn,
+          // open our own CommandPhase for it - the host's turn resolution cannot arrive
+          // until we send that command.
+          const envelope = streamer.consumeCheckpoint();
+          if (envelope != null) {
+            coopLog(
+              "checkpoint",
+              `guest apply OUT-OF-BAND checkpoint mid-park reason=${envelope.reason} turn=${this.turn}`,
+            );
+            applyCoopCheckpoint(envelope.checkpoint);
+            const ownSlot = coopLocalOwnedPlayerFieldSlot();
+            const ownMon = ownSlot == null ? undefined : globalScene.getPlayerField()[ownSlot];
+            if (
+              ownSlot != null
+              && ownMon?.isActive() === true
+              && globalScene.currentBattle.turnCommands[ownSlot] == null
+            ) {
+              coopLog(
+                "replay",
+                `guest replay turn=${this.turn}: replacement filled OUR slot ${ownSlot} -> opening own CommandPhase`,
+              );
+              globalScene.phaseManager.unshiftNew("CommandPhase", ownSlot);
+              globalScene.phaseManager.unshiftNew("CoopReplayTurnPhase", this.turn, this.rendered, [
+                ...this.fromHpByBi.entries(),
+              ]);
+              this.end();
+              return;
+            }
+          }
+          continue;
         }
         if (raced.res == null) {
           // No resolution arrived (host stall) - end the turn defensively; the guest re-syncs on

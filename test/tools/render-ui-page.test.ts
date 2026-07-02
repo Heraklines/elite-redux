@@ -1098,11 +1098,27 @@ const RECIPES: Record<string, Recipe> = {
   // card texts render light-on-light here (the harness light-window fallback, same as
   // colosseum) - in-game windows are dark, contrast is fine. Static -> exact diff.
   "coop-lobby": {
-    render: async () => {
+    render: async game => {
       const { CoopLobbyStage } = await import("#ui/coop-lobby-stage");
       const stage = new CoopLobbyStage("Heraklines");
       stage.setSeat(1, { name: "Scooom", detail: "Wants to join!", dot: "red" });
       stage.setStatus("Scooom wants to join your run!");
+      // Compose the INPUT panel exactly as title-phase renderPanel shows it (right-edge
+      // anchored, docked into the stage's ACTIONS band) so the golden image guards the
+      // COMBINED screen - the "panel overlaps the cards" class is a pixel diff here.
+      shimUiAndShow(game, UiMode.OPTION_SELECT, [
+        {
+          options: [
+            { label: "Accept Scooom", handler: () => true },
+            { label: "Decline", handler: () => true },
+            { label: "Play vs CPU", handler: () => true },
+            { label: "Cancel", handler: () => true },
+          ],
+          maxOptions: 6,
+          xOffset: 2,
+          yOffset: 40,
+        },
+      ]);
     },
     diffTolerance: 0,
   },
