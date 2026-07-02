@@ -7582,40 +7582,36 @@ export class ErSuperEffectiveVsTypeAttr extends MoveTypeChartOverrideAttr {
 }
 
 /**
- * ER Decorate (dex #705): "Damages foes. Raises ALLIES' Attack, Special Attack,
- * and Crit by 2 stages." The move damages a foe, so the buff can't ride the move's
- * target - it is applied to the user AND its ally (the user's whole side). The old
- * patch used a self-targeted StatStageChange, so in doubles only the user got the
- * boost and the partner (the reported "ally Kecleon") was missed.
+ * ER Decorate (dex #705): "Damages foes. Raises allies' Attack, Special Attack, and
+ * Crit by 2 stages." A SINGLE-TARGET move - the boost goes to the CHOSEN target when
+ * (and only when) that target is an ally. On a foe it does nothing here (the move's
+ * damage handles that; StatusCategoryOnAllyAttr flips it to a no-damage STATUS move on
+ * an ally so it only buffs). The old patch always boosted `user.getAlly()` (the first
+ * ally) regardless of the selected target, so in a triple it buffed the wrong ally and
+ * couldn't be aimed at all (reported 2026-07-02).
  */
 export class ErDecorateSideBoostAttr extends MoveEffectAttr {
   constructor() {
-    super(true);
+    super(false); // effect on the TARGET, not the user
   }
 
   override apply(user: Pokemon, target: Pokemon, move: Move, args: any[]): boolean {
     if (!super.apply(user, target, move, args)) {
       return false;
     }
-    // Dex (#705): "Damages foes. Raises ALLIES' Attack, Special Attack, and Crit by 2
-    // stages." The boost goes to the user's ALLIES (plural), NEVER the user itself -
-    // boosting the whole side (user + allies) was too strong. getAllies(), not getAlly():
-    // in a TRIPLE the user has two allies, and the single-ally version only buffed the
-    // first (reported: "Decorate only affects the first ally in a triple"). In singles
-    // there is no ally, so Decorate is purely a damaging move.
-    for (const ally of user.getAllies()) {
-      if (ally.isFainted()) {
-        continue;
-      }
-      globalScene.phaseManager.unshiftNew(
-        "StatStageChangePhase",
-        ally.getBattlerIndex(),
-        true,
-        [Stat.ATK, Stat.SPATK],
-        2,
-      );
-      ally.addTag(BattlerTagType.CRIT_BOOST, 0, move.id);
+    // Only an ALLY target gets buffed (getAllies().includes handles a triple's two
+    // allies); a foe target just takes the damage.
+    if (target.isFainted() || !user.getAllies().includes(target)) {
+      return false;
     }
+    globalScene.phaseManager.unshiftNew(
+      "StatStageChangePhase",
+      target.getBattlerIndex(),
+      true,
+      [Stat.ATK, Stat.SPATK],
+      2,
+    );
+    target.addTag(BattlerTagType.CRIT_BOOST, 0, move.id);
     return true;
   }
 }

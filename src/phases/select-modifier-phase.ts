@@ -1116,6 +1116,12 @@ export class SelectModifierPhase extends BattlePhase {
       "reward",
       `advance interaction (role=${controller.role} from=${this.coopInteractionStart} counter ${before} -> ${controller.interactionCounter()})`,
     );
+    // #788 v2 (NOT YET ENABLED): unshifting CoopPartnerSyncPhase here makes whoever finishes
+    // this menu first WAIT ON SCREEN for the partner's advance broadcast - the full lockstep
+    // gate the live sessions need. It breaks the duo harness's manually-driven shop ordering
+    // (4 proof files fail at wave-2 convergence), so the harness drives must be reconciled
+    // (drive the gate phase like the replay drains) BEFORE flipping this on. The v1 barrier
+    // (EncounterPhase defers the next wave's party sync until the partner catches up) is live.
   }
 
   /** OWNER: stash the current reward/shop selection so it is relayed once the party

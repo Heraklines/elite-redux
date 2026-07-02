@@ -36,6 +36,7 @@ import type { BattleScene } from "#app/battle-scene";
 import { getGameMode } from "#app/game-mode";
 import { initGlobalScene } from "#app/global-scene";
 import { captureCoopChecksum, captureCoopChecksumState } from "#data/elite-redux/coop/coop-battle-engine";
+import { setCoopWaveBarrierMs } from "#data/elite-redux/coop/coop-interaction-relay";
 import { clearCoopRuntime, setCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
 import { COOP_GUEST_FIELD_INDEX, COOP_HOST_FIELD_INDEX } from "#data/elite-redux/coop/coop-session";
 import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
@@ -91,6 +92,10 @@ describe.skipIf(!RUN)("co-op DUO launch-sync: seed-pinned mirror => wave-start p
   });
 
   beforeEach(() => {
+    // #788 v2 partner-sync gate: tiny wait so the harness's manually-driven shop flows
+    // (spoof / out-of-order duo drives never broadcast in time) proceed fast via the
+    // gate's own timeout fallback instead of sitting through the 60s live default.
+    setCoopWaveBarrierMs(50);
     game = new GameManager(phaserGame);
     logs = installDuoLogCapture(`launch-sync-${Date.now()}`);
     game.override
@@ -105,6 +110,7 @@ describe.skipIf(!RUN)("co-op DUO launch-sync: seed-pinned mirror => wave-start p
   });
 
   afterEach(() => {
+    setCoopWaveBarrierMs(60_000);
     logs.dispose();
     clearCoopRuntime();
     // #710 harness-citizenship: restore the host GameManager scene (buildDuo builds a 2nd BattleScene).

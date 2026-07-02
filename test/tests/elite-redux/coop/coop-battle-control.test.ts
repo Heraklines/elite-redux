@@ -24,6 +24,7 @@
 
 import { getGameMode } from "#app/game-mode";
 import { globalScene } from "#app/global-scene";
+import { setCoopWaveBarrierMs } from "#data/elite-redux/coop/coop-interaction-relay";
 import { resolvePartnerCommand } from "#data/elite-redux/coop/coop-partner-ai";
 import { coopGiveMonToPartner, coopReorderParty } from "#data/elite-redux/coop/coop-party-ops";
 import {
@@ -86,6 +87,10 @@ describe.skipIf(!RUN)("co-op battle control (#633, P2) - real engine (double bat
   });
 
   beforeEach(() => {
+    // #788 v2 partner-sync gate: tiny wait so the harness's manually-driven shop flows
+    // (spoof / out-of-order duo drives never broadcast in time) proceed fast via the
+    // gate's own timeout fallback instead of sitting through the 60s live default.
+    setCoopWaveBarrierMs(50);
     game = new GameManager(phaserGame);
     game.override
       .battleStyle("double")
@@ -95,6 +100,7 @@ describe.skipIf(!RUN)("co-op battle control (#633, P2) - real engine (double bat
   });
 
   afterEach(() => {
+    setCoopWaveBarrierMs(60_000);
     clearCoopRuntime();
   });
 

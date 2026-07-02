@@ -74,6 +74,7 @@ import {
   SetBasePowerAttr,
   SheerColdAccuracyAttr,
   StatStageChangeAttr,
+  StatusCategoryOnAllyAttr,
   StatusEffectAttr,
   TerrainChangeAttr,
   VariableMoveTypeAttr,
@@ -278,33 +279,30 @@ const MOVE_PATCHERS: ReadonlyMap<MoveId, (move: MutableMove) => void> = new Map(
     },
   ],
   // DECORATE: vanilla status (ally Atk/SpAtk +2, ally-targeted, no power) → ER
-  // Special Fairy DAMAGING move (80 BP) that also raises the USER's Atk/SpAtk.
-  // The old patch only flipped the category, leaving power = -1, the
-  // `targetsAllyDefault` target, and the ally-targeted StatStageChange — so it
-  // chip-damaged your OWN ally and buffed the wrong side. Aim it at the foe and
-  // redirect the +2 boost to self.
+  // Special Fairy move (dex #705: "Damages foes. Raises allies' Attack, Special
+  // Attack, and Crit by 2 stages."). It is a SINGLE-TARGET move you aim at ONE mon:
+  //   - a FOE  -> deals 80-BP special damage (no boost),
+  //   - an ALLY -> boosts THAT ally +2 Atk/SpAtk + Crit (no damage).
+  // Mechanism = the Pollen Puff pattern: NEAR_OTHER target (pick ally OR foe) +
+  // StatusCategoryOnAllyAttr (become a no-damage STATUS move when the target is an
+  // ally) + a target-aware boost attr. The prior patch locked it to NEAR_ENEMY and
+  // ALWAYS boosted the first ally (getAlly), so it couldn't be aimed at an ally and
+  // in a triple it buffed the wrong ally (reported 2026-07-02).
   [
     MoveId.DECORATE,
     move => {
       setCategory(move, MoveCategory.SPECIAL);
       move.power = 80;
       move.accuracy = 100;
-      // NEAR_ENEMY (a single adjacent FOE), NOT NEAR_OTHER — NEAR_OTHER also lets
-      // you pick your own ally, so in doubles Decorate could be aimed at (and
-      // damage) your partner. The dex move "Damages foes"; it must never target an
-      // ally. (Reported: "decorate on my ally damages my ally AND buffs them".)
-      move.moveTarget = MoveTarget.NEAR_ENEMY;
+      move.moveTarget = MoveTarget.NEAR_OTHER;
       orFlag(move, MoveFlags.MAKES_CONTACT);
-      // Vanilla Decorate was an ally-buff flagged `.ignoresProtect()`. Now that it is a
-      // DAMAGING foe-move, that leftover IGNORE_PROTECT let it punch through the target's
-      // Protect (reported: "Decorate hit Sobble through Protect in doubles"). Clear it so
-      // Protect blocks Decorate like any other attack.
+      // Protect must block the damaging (foe) use like any attack; clear the
+      // vanilla ally-buff IGNORE_PROTECT leftover.
       clearFlag(move, MoveFlags.IGNORE_PROTECT);
       removeAttrsByName(move, ["StatStageChangeAttr"]);
-      // ER Decorate (dex #705): "Damages foes. Raises ALLIES' Attack, Special Attack,
-      // and Crit by 2 stages." Apply the +2 Atk/SpAtk + the Focus-Energy CRIT_BOOST to
-      // the user's ALLY only (never the user itself - boosting the whole side was way too
-      // strong). In singles, with no ally, Decorate is purely a damaging move.
+      // No damage when the target is an ally (Pollen Puff category flip).
+      addAttrUnique(move, new StatusCategoryOnAllyAttr());
+      // Boost ONLY when the target is an ally, and only THAT target.
       addAttrUnique(move, new ErDecorateSideBoostAttr());
     },
   ],

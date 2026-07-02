@@ -28,6 +28,7 @@ import type { BattleScene } from "#app/battle-scene";
 import { getGameMode } from "#app/game-mode";
 import { initGlobalScene } from "#app/global-scene";
 import { CoopBattleStreamer } from "#data/elite-redux/coop/coop-battle-stream";
+import { setCoopWaveBarrierMs } from "#data/elite-redux/coop/coop-interaction-relay";
 import { clearCoopRuntime, maybeBeginReplayRecording, setCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
 import { COOP_GUEST_FIELD_INDEX, COOP_HOST_FIELD_INDEX } from "#data/elite-redux/coop/coop-session";
 import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
@@ -110,6 +111,10 @@ describe.skipIf(!RUN)(
     });
 
     beforeEach(() => {
+      // #788 v2 partner-sync gate: tiny wait so the harness's manually-driven shop flows
+      // (spoof / out-of-order duo drives never broadcast in time) proceed fast via the
+      // gate's own timeout fallback instead of sitting through the 60s live default.
+      setCoopWaveBarrierMs(50);
       game = new GameManager(phaserGame);
       game.override
         .battleStyle("double")
@@ -123,6 +128,7 @@ describe.skipIf(!RUN)(
     });
 
     afterEach(() => {
+      setCoopWaveBarrierMs(60_000);
       clearCoopRuntime();
       // #710 harness-citizenship: replayCoopTrace -> buildDuo -> buildGuestScene constructs a 2nd
       // BattleScene whose ctor steals globalScene. Restore the host scene so the NEXT ER_SCENARIO file's
