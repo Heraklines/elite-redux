@@ -1,0 +1,258 @@
+url:      https://elite-redux-staging.pages.dev/
+build:    mr30ig9s-3dkx
+mode:     4  wave:28
+seed:     qDvLGpSp59RKskuVRgWw8PMa
+party:    Croconaw(L24 42hp f0), Scyther Redux(L24 0hp f0), Pawniard Redux(L24 0hp f0), Machop Redux(L21 58hp f0), Honedge Redux(L21 55hp f0)
+enemy:    Poltchageist(L17), Mudbray(L19), Drilbur(L19)
+
+----- CONSOLE -----
+[04:51:57.366] LOG: %cStart Phase MessagePhase color:green;
+[04:51:57.594] LOG: %cStart Phase HideAbilityPhase color:green;
+[04:51:57.619] LOG: %cStart Phase VictoryPhase color:green;
+[04:51:57.619] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[04:51:57.619] LOG: Applied Super EXP. Charm 
+[04:51:57.619] LOG: Applied EXP. Charm 
+[04:51:57.737] LOG: %cStart Phase LevelUpPhase color:green;
+[04:51:57.738] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[04:51:57.795] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[04:51:57.795] LOG: Applied Super EXP. Charm 
+[04:51:57.795] LOG: Applied EXP. Charm 
+[04:51:57.795] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[04:51:57.795] LOG: %cStart Phase MoveEndPhase color:green;
+[04:51:57.795] LOG: %cStart Phase CheckInterludePhase color:green;
+[04:51:57.795] LOG: %cStart Phase WeatherEffectPhase color:green;
+[04:51:57.843] LOG: %cStart Phase MessagePhase color:green;
+[04:51:58.079] LOG: %cStart Phase DamageAnimPhase color:green;
+[04:51:58.081] LOG: %cStart Phase PositionalTagPhase color:green;
+[04:51:58.081] LOG: %cStart Phase BerryPhase color:green;
+[04:51:58.081] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[04:51:58.081] LOG: %cStart Phase TurnEndPhase color:green;
+[04:51:58.081] WARN: [coop:turn] host recorder: finalize with NO open recording -> turn=-1 events=0 (caller decides not to emit)
+[04:51:58.081] LOG: %cStart Phase BattleEndPhase color:green;
+[04:51:58.081] LOG: Battle Score: 564 (9 Turns x0.64)
+[04:51:58.081] LOG: Total Score: 3016
+[04:51:58.092] LOG: Applied Protein 
+[04:51:58.094] LOG: %cStart Phase TrainerVictoryPhase color:green;
+[04:51:58.095] LOG: Gym Leader Clay
+[04:51:58.177] LOG: Gym Leader Clay
+[04:51:58.674] LOG: Dialogue saved as seen: dialogue:clay.victory.1
+[04:51:58.674] LOG: %cStart Phase MoneyRewardPhase color:green;
+[04:51:59.019] LOG: %cStart Phase ModifierRewardPhase color:green;
+[04:51:59.377] LOG: %cStart Phase MysteryEncounterRewardsPhase color:green;
+[04:51:59.377] LOG: %cStart Phase SelectModifierPhase color:green;
+[04:51:59.377] LOG: Wave Seed: _gbnPTmfqmrSkh| 27
+[04:51:59.378] LOG: 10 1 [9,17]
+[04:51:59.378] LOG: {"id":"ABILITY_CHARM","localeKey":"modifierType:ModifierType.ABILITY_CHARM","iconImage":"ability_charm","soundName":"se/restore","tier":3} 
+[04:51:59.378] LOG: 4 0 []
+[04:51:59.378] LOG: {"id":"VOUCHER_PREMIUM","localeKey":"","iconImage":"mystic_ticket","group":"voucher","soundName":"se/restore","tier":4,"voucherType":2,"count":1} 
+[04:51:59.378] LOG: 17 2 [10,14,23]
+[04:51:59.378] LOG: {"id":"ATTACK_TYPE_BOOSTER","localeKey":"","iconImage":"dragon_fang","soundName":"se/restore","tier":2,"moveType":15,"boostPercent":20} 
+[04:51:59.379] LOG: 12 1 [10,14,23]
+[04:51:59.379] LOG: {"id":"FLAME_ORB","localeKey":"modifierType:ModifierType.FLAME_ORB","iconImage":"flame_orb","soundName":"se/restore","tier":2} 
+[04:51:59.379] LOG: 6 0 [10,14,23]
+[04:51:59.379] LOG: ULTRA 0
+[04:51:59.379] LOG: 13 1 [10,14,23]
+[04:51:59.379] LOG: {"id":"FROSTBITE_ORB","localeKey":"","iconImage":"frostbite_orb","soundName":"se/restore","tier":2} 
+[04:51:59.379] LOG: 25 3 [10,14,23]
+[04:51:59.379] LOG: {"id":"WIDE_LENS","localeKey":"modifierType:ModifierType.WIDE_LENS","iconImage":"wide_lens","soundName":"se/restore","tier":2,"amount":5} 
+[04:51:59.379] LOG: 33 3 [10,14,23]
+[04:51:59.379] LOG: {"id":"ER_POWER_HERB","localeKey":"","iconImage":"power_herb","iconTint":16777215,"soundName":"se/restore","tier":2} 
+[04:51:59.379] LOG: 8 0 [10,14,23]
+[04:51:59.379] LOG: {"id":"EVIOLITE","localeKey":"modifierType:ModifierType.EVIOLITE","iconImage":"eviolite","soundName":"se/restore","tier":2} 
+[04:51:59.379] LOG: 18 2 [10,14,23]
+[04:51:59.379] LOG: {"id":"RARER_CANDY","localeKey":"modifierType:ModifierType.RARER_CANDY","iconImage":"rarer_candy","soundName":"se/restore","tier":2} 
+[04:51:59.379] LOG: 0 0 [10,14,23]
+[04:51:59.379] LOG: {"id":"ULTRA_BALL","localeKey":"","iconImage":"ub","group":"pb","soundName":"se/pb_bounce_1","tier":2,"pokeballType":2,"count":5} 
+[04:51:59.379] LOG: 12 7 [2,5,6,7,8,9,10,22]
+[04:51:59.379] LOG: {"id":"SUPER_LURE","localeKey":"modifierType:ModifierType.SUPER_LURE","iconImage":"super_lure","group":"lure","soundName":"se/restore","tier":1,"maxBattles":15} 
+[04:52:04.849] LOG: Applied Protein 
+[04:52:04.854] LOG: %cStart Phase EggLapsePhase color:green;
+[04:52:04.855] LOG: %cStart Phase PostMysteryEncounterPhase color:green;
+[04:52:06.097] LOG: %cStart Phase NewBattlePhase color:green;
+[04:52:06.097] LOG: Wave Seed: `hcoQUngrnsTli} 28
+[04:52:06.098] LOG: %cStart Phase NextEncounterPhase color:green;
+[04:52:06.098] LOG: Starting species pool tier: RARE
+[04:52:06.098] LOG: Applied Ability Charm 
+[04:52:06.105] LOG: Pokemon: Wild Poltchageist | Species ID: 1012 | Level: 17 | Nature: Modest (+SpAtk/-Atk)
+[04:52:06.105] LOG: Stats (IVs): HP: 41 (8), Atk: 20 (19), Def: 23 (20), Spatk: 38 (28), Spdef: 27 (24), Spd: 24 (12)
+[04:52:06.105] LOG: Ability: Self Sufficient | Passive Ability: Heatproof 
+[04:52:06.105] LOG: Moveset: ["Mega Drain","Ominous Wind","Leafage"]
+[04:52:06.105] LOG: Starting species pool tier: COMMON
+[04:52:06.105] LOG: Applied Ability Charm 
+[04:52:06.111] LOG: Pokemon: Wild Mudbray | Species ID: 749 | Level: 19 | Nature: Impish (+Def/-SpAtk)
+[04:52:06.111] LOG: Stats (IVs): HP: 59 (19), Atk: 47 (23), Def: 39 (20), Spatk: 21 (15), Spdef: 30 (25), Spd: 23 (6)
+[04:52:06.111] LOG: Ability: Unaware | Passive Ability: Own Tempo 
+[04:52:06.111] LOG: Moveset: ["Stomping Tantrum","Mega Kick","Stomp","Rock Blast"]
+[04:52:06.111] LOG: Starting species pool tier: COMMON
+[04:52:06.111] LOG: Applied Ability Charm 
+[04:52:06.116] LOG: Pokemon: Wild Drilbur | Species ID: 529 | Level: 19 | Nature: Adamant (+Atk/-SpAtk)
+[04:52:06.116] LOG: Stats (IVs): HP: 54 (16), Atk: 47 (28), Def: 24 (23), Spatk: 18 (20), Spdef: 27 (28), Spd: 35 (26)
+[04:52:06.116] LOG: Ability: Mold Breaker | Passive Ability: Sand Rush 
+[04:52:06.116] LOG: Moveset: ["Mud Sport","Hone Claws","Rock Smash","Fury Swipes"]
+[04:52:10.465] LOG: Battle Seed: 7HO2BnyiN7KSgtTF
+[04:52:10.517] DEBUG: Session data saved to slot 0!
+[04:52:10.518] LOG: Wave Seed: `hcoQUngrnsTli} 28
+[04:52:10.964] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[04:52:11.025] LOG: %cStart Phase SummonPhase color:green;
+[04:52:11.025] WARN: The Pokemon about to be sent out is fainted or illegal under a challenge. Attempting to resolve...
+[04:52:11.025] WARN: Swapped %s %O with %s %O Scyther Redux {"name":"Scyther Redux","type":"Container","x":80,"y":174,"depth":0,"scale":{"x":1,"y":1},"origin":{"x":0.5,"y":0.5},"rotation":0,"alpha":1,"visible":false,"blendMode":-1,"textureKey":"","frameKey":"","data":{}} Croconaw {"name":"Croconaw","type":"Container","x":74,"y":184,"depth":0,"scale":{"x":1,"y":1},"origin":{"x":0.5,"y":0.5},"rotation":0,"alpha":1,"visible":true,"blendMode":-1,"textureKey":"","frameKey":"","data":{}}
+[04:52:11.177] LOG: Applied Protein 
+[04:52:11.200] WARN: cry/10715 not found
+[04:52:11.303] LOG: %cStart Phase ShinySparklePhase color:green;
+[04:52:11.406] LOG: %cStart Phase SummonPhase color:green;
+[04:52:11.406] WARN: The Pokemon about to be sent out is fainted or illegal under a challenge. Attempting to resolve...
+[04:52:11.406] WARN: Swapped %s %O with %s %O Pawniard Redux {"name":"Pawniard Redux","type":"Container","x":106,"y":148,"depth":0,"scale":{"x":1,"y":1},"origin":{"x":0.5,"y":0.5},"rotation":0,"alpha":1,"visible":false,"blendMode":-1,"textureKey":"","frameKey":"","data":{}} Croconaw {"name":"Croconaw","type":"Container","x":74,"y":184,"depth":0,"scale":{"x":1,"y":1},"origin":{"x":0.5,"y":0.5},"rotation":0,"alpha":1,"visible":true,"blendMode":-1,"textureKey":"","frameKey":"","data":{}}
+[04:52:11.558] LOG: Applied Protein 
+[04:52:11.588] WARN: cry/10690 not found
+[04:52:11.691] LOG: %cStart Phase InitEncounterPhase color:green;
+[04:52:11.694] LOG: %cStart Phase PostSummonPhase color:green;
+[04:52:11.694] LOG: Ran PSP for: Drilbur
+[04:52:11.698] LOG: %cStart Phase PostSummonPhase color:green;
+[04:52:11.698] LOG: %cStart Phase ShowAbilityPhase color:green;
+[04:52:11.855] LOG: %cStart Phase MessagePhase color:green;
+[04:52:12.072] LOG: %cStart Phase HideAbilityPhase color:green;
+[04:52:12.100] LOG: %cStart Phase PostSummonPhase color:green;
+[04:52:12.101] LOG: %cStart Phase PostSummonPhase color:green;
+[04:52:12.101] LOG: Ran PSP for: Machop Redux
+[04:52:12.103] LOG: %cStart Phase PostSummonPhase color:green;
+[04:52:12.105] LOG: %cStart Phase PostSummonPhase color:green;
+[04:52:12.106] LOG: %cStart Phase PostSummonPhase color:green;
+[04:52:12.106] LOG: Ran PSP for: Poltchageist
+[04:52:12.107] LOG: %cStart Phase PostSummonPhase color:green;
+[04:52:12.108] LOG: %cStart Phase PostSummonPhase color:green;
+[04:52:12.108] LOG: %cStart Phase PostSummonPhase color:green;
+[04:52:12.108] LOG: Ran PSP for: Honedge Redux
+[04:52:12.110] LOG: %cStart Phase PostSummonPhase color:green;
+[04:52:12.110] LOG: %cStart Phase PostSummonPhase color:green;
+[04:52:12.110] LOG: %cStart Phase PostSummonPhase color:green;
+[04:52:12.110] LOG: Ran PSP for: Mudbray
+[04:52:12.111] LOG: %cStart Phase PostSummonPhase color:green;
+[04:52:12.111] LOG: %cStart Phase PostSummonPhase color:green;
+[04:52:12.111] LOG: %cStart Phase TurnInitPhase color:green;
+[04:52:12.111] LOG: %cStart Phase CommandPhase color:green;
+[04:52:17.228] LOG: Seed: aqz8CgrFFRLeU8dfjNvSSfDo
+[04:52:17.228] LOG: Wave Seed: aqz8CgrFFRLeU8dfjNvSSfDo 0
+[04:52:17.230] LOG: Getting Session Slot id: %d 0
+[04:52:17.233] LOG: Wave Seed: qDvLGpSp59RKskuVRgWw8PMa 0
+[04:52:17.233] LOG: Seed: qDvLGpSp59RKskuVRgWw8PMa
+[04:52:17.250] LOG: Wave Seed: `hcoQUngrnsTli} 28
+[04:52:17.265] LOG: Applied Protein 
+[04:52:17.267] LOG: Applied Protein 
+[04:52:17.269] LOG: Applied Protein 
+[04:52:17.272] LOG: %cStart Phase EncounterPhase color:green;
+[04:52:17.273] LOG: Pokemon: Wild Poltchageist | Species ID: 1012 | Level: 17 | Nature: Modest (+SpAtk/-Atk)
+[04:52:17.273] LOG: Stats (IVs): HP: 41 (8), Atk: 20 (19), Def: 23 (20), Spatk: 38 (28), Spdef: 27 (24), Spd: 24 (12)
+[04:52:17.273] LOG: Ability: Self Sufficient | Passive Ability: Heatproof 
+[04:52:17.273] LOG: Moveset: ["Mega Drain","Ominous Wind","Leafage"]
+[04:52:17.274] LOG: Pokemon: Wild Mudbray | Species ID: 749 | Level: 19 | Nature: Impish (+Def/-SpAtk)
+[04:52:17.274] LOG: Stats (IVs): HP: 59 (19), Atk: 47 (23), Def: 39 (20), Spatk: 21 (15), Spdef: 30 (25), Spd: 23 (6)
+[04:52:17.274] LOG: Ability: Unaware | Passive Ability: Own Tempo 
+[04:52:17.274] LOG: Moveset: ["Stomping Tantrum","Mega Kick","Stomp","Rock Blast"]
+[04:52:17.274] LOG: Pokemon: Wild Drilbur | Species ID: 529 | Level: 19 | Nature: Adamant (+Atk/-SpAtk)
+[04:52:17.274] LOG: Stats (IVs): HP: 54 (16), Atk: 47 (28), Def: 24 (23), Spatk: 18 (20), Spdef: 27 (28), Spd: 35 (26)
+[04:52:17.274] LOG: Ability: Mold Breaker | Passive Ability: Sand Rush 
+[04:52:17.274] LOG: Moveset: ["Mud Sport","Hone Claws","Rock Smash","Fury Swipes"]
+[04:52:17.276] LOG: Wave Seed: `hcoQUngrnsTli} 28
+[04:52:17.722] LOG: %cStart Phase SummonPhase color:green;
+[04:52:17.873] LOG: Applied Protein 
+[04:52:18.006] LOG: %cStart Phase ShinySparklePhase color:green;
+[04:52:18.109] LOG: %cStart Phase CheckSwitchPhase color:green;
+[04:52:19.341] LOG: %cStart Phase InitEncounterPhase color:green;
+[04:52:19.341] LOG: %cStart Phase PostSummonPhase color:green;
+[04:52:19.341] LOG: Ran PSP for: Drilbur
+[04:52:19.343] LOG: %cStart Phase PostSummonPhase color:green;
+[04:52:19.343] LOG: %cStart Phase ShowAbilityPhase color:green;
+[04:52:19.503] LOG: %cStart Phase MessagePhase color:green;
+[04:52:19.721] LOG: %cStart Phase HideAbilityPhase color:green;
+[04:52:19.747] LOG: %cStart Phase PostSummonPhase color:green;
+[04:52:19.747] LOG: %cStart Phase PostSummonPhase color:green;
+[04:52:19.747] LOG: Ran PSP for: Poltchageist
+[04:52:19.748] LOG: %cStart Phase PostSummonPhase color:green;
+[04:52:19.748] LOG: %cStart Phase PostSummonPhase color:green;
+[04:52:19.748] LOG: %cStart Phase PostSummonPhase color:green;
+[04:52:19.748] LOG: Ran PSP for: Mudbray
+[04:52:19.749] LOG: %cStart Phase PostSummonPhase color:green;
+[04:52:19.749] LOG: %cStart Phase PostSummonPhase color:green;
+[04:52:19.749] LOG: %cStart Phase TurnInitPhase color:green;
+[04:52:19.750] LOG: %cStart Phase CommandPhase color:green;
+[04:52:22.353] LOG: Seed: o0EnkdsInLH3nlDnZV73WLca
+[04:52:22.353] LOG: Wave Seed: o0EnkdsInLH3nlDnZV73WLca 0
+[04:52:22.354] LOG: Getting Session Slot id: %d 0
+[04:52:22.357] LOG: Wave Seed: qDvLGpSp59RKskuVRgWw8PMa 0
+[04:52:22.357] LOG: Seed: qDvLGpSp59RKskuVRgWw8PMa
+[04:52:22.378] LOG: Wave Seed: `hcoQUngrnsTli} 28
+[04:52:22.392] LOG: Applied Protein 
+[04:52:22.395] LOG: Applied Protein 
+[04:52:22.397] LOG: Applied Protein 
+[04:52:22.400] LOG: %cStart Phase EncounterPhase color:green;
+[04:52:22.400] LOG: Pokemon: Wild Poltchageist | Species ID: 1012 | Level: 17 | Nature: Modest (+SpAtk/-Atk)
+[04:52:22.401] LOG: Stats (IVs): HP: 41 (8), Atk: 20 (19), Def: 23 (20), Spatk: 38 (28), Spdef: 27 (24), Spd: 24 (12)
+[04:52:22.401] LOG: Ability: Self Sufficient | Passive Ability: Heatproof 
+[04:52:22.401] LOG: Moveset: ["Mega Drain","Ominous Wind","Leafage"]
+[04:52:22.401] LOG: Pokemon: Wild Mudbray | Species ID: 749 | Level: 19 | Nature: Impish (+Def/-SpAtk)
+[04:52:22.401] LOG: Stats (IVs): HP: 59 (19), Atk: 47 (23), Def: 39 (20), Spatk: 21 (15), Spdef: 30 (25), Spd: 23 (6)
+[04:52:22.401] LOG: Ability: Unaware | Passive Ability: Own Tempo 
+[04:52:22.401] LOG: Moveset: ["Stomping Tantrum","Mega Kick","Stomp","Rock Blast"]
+[04:52:22.401] LOG: Pokemon: Wild Drilbur | Species ID: 529 | Level: 19 | Nature: Adamant (+Atk/-SpAtk)
+[04:52:22.401] LOG: Stats (IVs): HP: 54 (16), Atk: 47 (28), Def: 24 (23), Spatk: 18 (20), Spdef: 27 (28), Spd: 35 (26)
+[04:52:22.401] LOG: Ability: Mold Breaker | Passive Ability: Sand Rush 
+[04:52:22.401] LOG: Moveset: ["Mud Sport","Hone Claws","Rock Smash","Fury Swipes"]
+[04:52:22.402] LOG: Wave Seed: `hcoQUngrnsTli} 28
+[04:52:22.855] LOG: %cStart Phase SummonPhase color:green;
+[04:52:23.000] LOG: Applied Protein 
+[04:52:23.133] LOG: %cStart Phase ShinySparklePhase color:green;
+[04:52:23.236] LOG: %cStart Phase CheckSwitchPhase color:green;
+[04:52:24.557] LOG: %cStart Phase SwitchPhase color:green;
+[04:52:28.397] LOG: %cStart Phase SwitchSummonPhase color:green;
+[04:52:28.588] LOG: Applied Protein 
+[04:52:28.618] WARN: cry/10715 not found
+[04:52:28.723] LOG: %cStart Phase ShinySparklePhase color:green;
+[04:52:28.823] LOG: %cStart Phase PostSummonPhase color:green;
+[04:52:28.823] LOG: Ran PSP for: Machop Redux
+[04:52:28.824] LOG: %cStart Phase PostSummonPhase color:green;
+[04:52:28.824] LOG: %cStart Phase PostSummonPhase color:green;
+[04:52:28.824] LOG: %cStart Phase InitEncounterPhase color:green;
+[04:52:28.824] LOG: %cStart Phase PostSummonPhase color:green;
+[04:52:28.824] LOG: Ran PSP for: Drilbur
+[04:52:28.826] LOG: %cStart Phase PostSummonPhase color:green;
+[04:52:28.826] LOG: %cStart Phase ShowAbilityPhase color:green;
+[04:52:28.982] LOG: %cStart Phase MessagePhase color:green;
+[04:52:29.199] LOG: %cStart Phase HideAbilityPhase color:green;
+[04:52:29.225] LOG: %cStart Phase PostSummonPhase color:green;
+[04:52:29.225] LOG: %cStart Phase PostSummonPhase color:green;
+[04:52:29.225] LOG: Ran PSP for: Poltchageist
+[04:52:29.226] LOG: %cStart Phase PostSummonPhase color:green;
+[04:52:29.226] LOG: %cStart Phase PostSummonPhase color:green;
+[04:52:29.226] LOG: %cStart Phase PostSummonPhase color:green;
+[04:52:29.226] LOG: Ran PSP for: Mudbray
+[04:52:29.227] LOG: %cStart Phase PostSummonPhase color:green;
+[04:52:29.227] LOG: %cStart Phase PostSummonPhase color:green;
+[04:52:29.227] LOG: %cStart Phase TurnInitPhase color:green;
+[04:52:29.227] LOG: %cStart Phase CommandPhase color:green;
+[04:52:33.559] LOG: Seed: WsGzgcuNagFoK0gTbHGuPCBh
+[04:52:33.559] LOG: Wave Seed: WsGzgcuNagFoK0gTbHGuPCBh 0
+[04:52:33.560] LOG: Getting Session Slot id: %d 0
+[04:52:33.563] LOG: Wave Seed: qDvLGpSp59RKskuVRgWw8PMa 0
+[04:52:33.563] LOG: Seed: qDvLGpSp59RKskuVRgWw8PMa
+[04:52:33.578] LOG: Wave Seed: `hcoQUngrnsTli} 28
+[04:52:33.590] LOG: Applied Protein 
+[04:52:33.591] LOG: Applied Protein 
+[04:52:33.593] LOG: Applied Protein 
+[04:52:33.596] LOG: %cStart Phase EncounterPhase color:green;
+[04:52:33.597] LOG: Pokemon: Wild Poltchageist | Species ID: 1012 | Level: 17 | Nature: Modest (+SpAtk/-Atk)
+[04:52:33.597] LOG: Stats (IVs): HP: 41 (8), Atk: 20 (19), Def: 23 (20), Spatk: 38 (28), Spdef: 27 (24), Spd: 24 (12)
+[04:52:33.597] LOG: Ability: Self Sufficient | Passive Ability: Heatproof 
+[04:52:33.597] LOG: Moveset: ["Mega Drain","Ominous Wind","Leafage"]
+[04:52:33.597] LOG: Pokemon: Wild Mudbray | Species ID: 749 | Level: 19 | Nature: Impish (+Def/-SpAtk)
+[04:52:33.597] LOG: Stats (IVs): HP: 59 (19), Atk: 47 (23), Def: 39 (20), Spatk: 21 (15), Spdef: 30 (25), Spd: 23 (6)
+[04:52:33.597] LOG: Ability: Unaware | Passive Ability: Own Tempo 
+[04:52:33.597] LOG: Moveset: ["Stomping Tantrum","Mega Kick","Stomp","Rock Blast"]
+[04:52:33.597] LOG: Pokemon: Wild Drilbur | Species ID: 529 | Level: 19 | Nature: Adamant (+Atk/-SpAtk)
+[04:52:33.597] LOG: Stats (IVs): HP: 54 (16), Atk: 47 (28), Def: 24 (23), Spatk: 18 (20), Spdef: 27 (28), Spd: 35 (26)
+[04:52:33.597] LOG: Ability: Mold Breaker | Passive Ability: Sand Rush 
+[04:52:33.597] LOG: Moveset: ["Mud Sport","Hone Claws","Rock Smash","Fury Swipes"]
+[04:52:33.599] LOG: Wave Seed: `hcoQUngrnsTli} 28
+[04:52:34.042] LOG: %cStart Phase SummonPhase color:green;
+[04:52:34.194] LOG: Applied Protein 
+[04:52:34.326] LOG: %cStart Phase ShinySparklePhase color:green;
+[04:52:34.429] LOG: %cStart Phase CheckSwitchPhase color:green;
