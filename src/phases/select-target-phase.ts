@@ -28,13 +28,14 @@ export class SelectTargetPhase extends PokemonPhase {
     const fieldSide = globalScene.getField();
 
     const user = fieldSide[this.fieldIndex];
-    const ally = user.getAlly();
+    // Any multi format + any LIVING ally (was `double` + getAlly(): the ally-default
+    // cursor was dead in TRIPLES and only ever considered the first ally).
+    const ally = user.getAllies().find(a => !a.isFainted());
     const shouldDefaultToAlly =
-      globalScene.currentBattle.double // formatting
+      globalScene.currentBattle.getBattlerCount() > 1 // formatting
       && move.allyTargetDefault
-      && ally != null
-      && !ally.isFainted();
-    const defaultTargets = shouldDefaultToAlly ? [ally.getBattlerIndex()] : undefined;
+      && ally != null;
+    const defaultTargets = shouldDefaultToAlly && ally != null ? [ally.getBattlerIndex()] : undefined;
 
     globalScene.ui.setMode(
       UiMode.TARGET_SELECT,

@@ -390,7 +390,12 @@ export class SelectStarterPhase extends Phase {
           if (starter.erShinyLabName) {
             starterPokemon.customPokemonData.erShinyLabName = starter.erShinyLabName;
           }
-        } else if (starterPokemon.shiny) {
+        } else if (starterPokemon.shiny && coopOwners[i] !== getCoopController()?.role) {
+          // Suppress the LOCAL per-species lookup ONLY for the PARTNER'S bare shiny (their look
+          // decision is authoritative; absence = default shiny). NEVER for OUR OWN mons: the
+          // local Starter never went through the wire rebuild, so its erShinyLab field is
+          // legitimately undefined here - suppressing killed the owner's own effects (live
+          // "all the shiny lab effects are gone, even from the host screen" regression).
           starterPokemon.customPokemonData.erShinyLabSuppressLocal = true;
         }
       }
