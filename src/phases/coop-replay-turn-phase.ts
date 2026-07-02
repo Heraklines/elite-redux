@@ -63,6 +63,15 @@ export class CoopReplayTurnPhase extends Phase {
       this.finishTurnNoStream();
       return;
     }
+    // #790 (live post-resync strand): a DUPLICATE replay phase for an already-finalized turn
+    // (a leftover pump continuation that a resync raced past) must never park - the host will
+    // never resend that turn's resolution, and the legit instance already advanced the run.
+    const wave = globalScene.currentBattle?.waveIndex ?? 0;
+    if (streamer.isTurnFinalized(wave, this.turn)) {
+      coopWarn("replay", `guest replay turn=${this.turn}: STALE duplicate (already finalized this wave) -> end`);
+      this.end();
+      return;
+    }
     if (this.rendered === 0) {
       coopLog("replay", `guest replay turn=${this.turn}: live pump start (awaiting host events/resolution)`);
     }
@@ -163,6 +172,7 @@ export class CoopReplayTurnPhase extends Phase {
           `guest replay turn=${this.turn}: RESOLVE renderedLive=${this.rendered} remaining=${remaining.length} batch=${raced.res.events.length}`,
         );
         this.renderEvents(remaining);
+        streamer.markTurnFinalized(globalScene.currentBattle?.waveIndex ?? 0, this.turn);
         coopLog("replay", `guest replay turn=${this.turn}: unshift CoopFinalizeTurnPhase (checkpoint apply deferred)`);
         globalScene.phaseManager.unshiftNew(
           "CoopFinalizeTurnPhase",

@@ -391,7 +391,21 @@ export class SelectStarterPhase extends Phase {
           if (starter.erShinyLabName) {
             starterPokemon.customPokemonData.erShinyLabName = starter.erShinyLabName;
           }
-        } else if (starterPokemon.shiny && coopOwners[i] !== getCoopController()?.role) {
+        } else if (coopOwners[i] === getCoopController()?.role) {
+          // #785 v3 (live "partner never sees MY effects"): OUR OWN picks never cross the wire
+          // on this client, so their Starter carries no blob look - stamp OUR locally-equipped
+          // look straight from the save onto customPokemonData, which rides the launch snapshot
+          // to the partner. Without this, only wire-rebuilt (partner) mons ever carried looks
+          // and each side saw the other's mons as default shinies.
+          const ownLook = getErShinyLabSavedLookForSpecies(starterPokemon.species.speciesId, starterPokemon.shiny);
+          if (ownLook !== undefined) {
+            starterPokemon.customPokemonData.erShinyLab = ownLook;
+            const ownName = getErShinyLabEquippedNameForSpecies(starterPokemon.species.speciesId, starterPokemon.shiny);
+            if (ownName) {
+              starterPokemon.customPokemonData.erShinyLabName = ownName;
+            }
+          }
+        } else if (starterPokemon.shiny) {
           // Suppress the LOCAL per-species lookup ONLY for the PARTNER'S bare shiny (their look
           // decision is authoritative; absence = default shiny). NEVER for OUR OWN mons: the
           // local Starter never went through the wire rebuild, so its erShinyLab field is

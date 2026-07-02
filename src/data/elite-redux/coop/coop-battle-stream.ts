@@ -124,6 +124,27 @@ export class CoopBattleStreamer {
   private liveWaiter: ((turn: number, seq: number) => void) | null = null;
   /** GUEST: one-shot OUT-OF-BAND-checkpoint waiter for the pump race (#633 guest-faint deadlock). */
   private checkpointWaiter: (() => void) | null = null;
+  /**
+   * GUEST (#790, the post-resync strand): the last (wave, turn) whose resolution was HANDED TO A
+   * FINALIZE. A duplicate CoopReplayTurnPhase for an already-finalized turn (leftover pump
+   * continuation racing a resync) must END instead of parking 20 minutes on a resolution the
+   * host will never resend. Per-session by construction (a new session builds a new streamer).
+   */
+  private finalizedMark: { wave: number; turn: number } | null = null;
+
+  markTurnFinalized(wave: number, turn: number): void {
+    if (
+      this.finalizedMark == null
+      || wave > this.finalizedMark.wave
+      || (wave === this.finalizedMark.wave && turn > this.finalizedMark.turn)
+    ) {
+      this.finalizedMark = { wave, turn };
+    }
+  }
+
+  isTurnFinalized(wave: number, turn: number): boolean {
+    return this.finalizedMark != null && this.finalizedMark.wave === wave && turn <= this.finalizedMark.turn;
+  }
 
   private enemyPartyHandler: ((wave: number, enemies: CoopSerializedEnemy[]) => void) | null = null;
   private checkpointHandler: ((reason: string, checkpoint: CoopBattleCheckpoint) => void) | null = null;
