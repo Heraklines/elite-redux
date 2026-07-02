@@ -117,17 +117,20 @@ export class GameOverPhase extends BattlePhase {
 
                 const availablePartyMembers = globalScene.getPokemonAllowedInBattle().length;
 
-                globalScene.phaseManager.pushNew("SummonPhase", 0, true, true);
-                if (globalScene.currentBattle.double && availablePartyMembers > 1) {
-                  globalScene.phaseManager.pushNew("SummonPhase", 1, true, true);
+                // Format-capacity, not hardcoded doubles slots 0/1 (a retried TRIPLE
+                // summoned/prompted only two of three slots). Slots >= 1 of a loaded
+                // multi format are also restored by the encounter-phase reload block;
+                // SummonPhase's isOnField-guarded path keeps this idempotent.
+                const battlerCount = globalScene.currentBattle.getBattlerCount();
+                for (let i = 0; i < battlerCount && (i === 0 || availablePartyMembers > i); i++) {
+                  globalScene.phaseManager.pushNew("SummonPhase", i, true, true);
                 }
                 if (
                   globalScene.currentBattle.waveIndex > 1
                   && globalScene.currentBattle.battleType !== BattleType.TRAINER
                 ) {
-                  globalScene.phaseManager.pushNew("CheckSwitchPhase", 0, globalScene.currentBattle.double);
-                  if (globalScene.currentBattle.double && availablePartyMembers > 1) {
-                    globalScene.phaseManager.pushNew("CheckSwitchPhase", 1, globalScene.currentBattle.double);
+                  for (let i = 0; i < battlerCount && (i === 0 || availablePartyMembers > i); i++) {
+                    globalScene.phaseManager.pushNew("CheckSwitchPhase", i, battlerCount > 1);
                   }
                 }
 

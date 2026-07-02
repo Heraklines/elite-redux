@@ -753,30 +753,44 @@ export class MysteryEncounterBattlePhase extends Phase {
       globalScene.phaseManager.pushNew("SummonPhase", 0);
     }
 
-    if (globalScene.currentBattle.double) {
-      if (availablePartyMembers.length > 1) {
-        globalScene.phaseManager.pushNew("ToggleDoublePositionPhase", true);
-        if (!availablePartyMembers[1].isOnField()) {
-          globalScene.phaseManager.pushNew("SummonPhase", 1);
+    // Format-capacity generalization (was hardcoded doubles slots 0/1): summon up to the
+    // ME battle's capacity, and recall every ORPHANED wider-format slot (a previous TRIPLE
+    // collapsing into this ME left slots >= capacity on the field - the lingering
+    // back-sprite/info-bar class; same fix as encounter-phase). ReturnPhase is
+    // party-indexed, so orphans recall correctly regardless of the new arrangement.
+    const battlerCount = globalScene.currentBattle.getBattlerCount();
+    const multiFormat = battlerCount > 1;
+    if (multiFormat && availablePartyMembers.length > 1) {
+      globalScene.phaseManager.pushNew("ToggleDoublePositionPhase", true);
+      for (let i = 1; i < battlerCount; i++) {
+        if (availablePartyMembers.length > i && !availablePartyMembers[i].isOnField()) {
+          globalScene.phaseManager.pushNew("SummonPhase", i);
         }
       }
-    } else {
-      if (availablePartyMembers.length > 1 && availablePartyMembers[1].isOnField()) {
-        for (const pokemon of inSpeedOrder(ArenaTagSide.PLAYER)) {
-          pokemon.lapseTag(BattlerTagType.COMMANDED);
-        }
-        globalScene.phaseManager.pushNew("ReturnPhase", 1);
+    }
+    const party = globalScene.getPlayerParty();
+    const hasOrphans = party.some((p, i) => i >= battlerCount && p?.isOnField());
+    if (hasOrphans) {
+      for (const pokemon of inSpeedOrder(ArenaTagSide.PLAYER)) {
+        pokemon.lapseTag(BattlerTagType.COMMANDED);
       }
+      for (let i = battlerCount; i < party.length; i++) {
+        if (party[i]?.isOnField()) {
+          globalScene.phaseManager.pushNew("ReturnPhase", i);
+        }
+      }
+    }
+    if (!multiFormat) {
       globalScene.phaseManager.pushNew("ToggleDoublePositionPhase", false);
     }
 
-    if (encounterMode !== MysteryEncounterMode.TRAINER_BATTLE && !this.disableSwitch) {
-      const minPartySize = globalScene.currentBattle.double ? 2 : 1;
-      if (availablePartyMembers.length > minPartySize) {
-        globalScene.phaseManager.pushNew("CheckSwitchPhase", 0, globalScene.currentBattle.double);
-        if (globalScene.currentBattle.double) {
-          globalScene.phaseManager.pushNew("CheckSwitchPhase", 1, globalScene.currentBattle.double);
-        }
+    if (
+      encounterMode !== MysteryEncounterMode.TRAINER_BATTLE
+      && !this.disableSwitch
+      && availablePartyMembers.length > battlerCount
+    ) {
+      for (let i = 0; i < battlerCount; i++) {
+        globalScene.phaseManager.pushNew("CheckSwitchPhase", i, multiFormat);
       }
     }
 

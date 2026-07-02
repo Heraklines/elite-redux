@@ -2719,12 +2719,18 @@ export class PostSummonAllyHealAbAttr extends PostSummonAbAttr {
   }
 
   override canApply({ pokemon }: AbAttrBaseParams): boolean {
-    return pokemon.getAlly()?.isActive(true) ?? false;
+    // ANY active adjacent ally, not just getAlly() (the first): in a TRIPLE the old
+    // check was dead whenever allies[0] was inactive, and the second ally could never
+    // be healed at all.
+    return pokemon.getAdjacentAllies().some(ally => ally.isActive(true));
   }
 
   override apply({ pokemon, simulated }: AbAttrBaseParams): void {
-    const target = pokemon.getAlly();
-    if (!simulated && target != null) {
+    if (simulated) {
+      return;
+    }
+    // Heal EACH active adjacent ally (binary formats: exactly the single ally, unchanged).
+    for (const target of pokemon.getAdjacentAllies().filter(ally => ally.isActive(true))) {
       globalScene.phaseManager.unshiftNew(
         "PokemonHealPhase",
         target.getBattlerIndex(),

@@ -94,6 +94,22 @@ export class CommandPhase extends FieldPhase {
     // Switch back to the center pokemon. This can happen rarely in double battles with mid turn switching
     // TODO: Prevent this from happening in the first place
     if (globalScene.getPlayerField().filter(p => p.isActive()).length === 1) {
+      // Co-op (#783, the live faint deadlock): redirect to the SURVIVOR'S ACTUAL slot, never
+      // blindly to CENTER. With one player mon fainted (not yet replaced - in co-op the
+      // replacement rides the relayed switch / next checkpoint, so the fainted mon can still
+      // occupy its slot), the legacy CENTER redirect could move this CommandPhase onto the
+      // FAINTED, partner-owned slot; the ownership gate then skipped it silently - the guest
+      // never prompted or broadcast its command, the host waited on the guest's move, and both
+      // clients deadlocked ("partner moved forward and I was stuck"). Pointing at the survivor
+      // keeps the downstream ownership gates correct on BOTH clients (own slot -> prompt,
+      // partner slot -> request/await).
+      if (getCoopController() != null) {
+        const coopSurvivor = globalScene.getPlayerField().find(p => p.isActive());
+        if (coopSurvivor) {
+          this.fieldIndex = globalScene.getPlayerField().indexOf(coopSurvivor);
+        }
+        return;
+      }
       // Triple: the lone survivor can sit at ANY slot (0/1/2), so command IT - a hardcoded slot 0
       // (CENTER) could point at a fainted mon (the doubles assumption that the survivor is always
       // slot 0). Binary keeps the exact legacy CENTER(=0) behavior.
@@ -131,10 +147,13 @@ export class CommandPhase extends FieldPhase {
    * is commanding its ally via {@linkcode AbilityId.COMMANDER}.
    */
   private checkCommander(): void {
-    // If the Pokemon has applied Commander's effects to its ally, skip this command
+    // If the Pokemon has applied Commander's effects to an ally, skip this command.
+    // Any multi format + ANY ally (was `double` + first-ally-only, so a triple's
+    // hidden Tatsugiri still got prompted for a command).
+    const pokemon = this.getPokemon();
     if (
-      globalScene.currentBattle?.double
-      && this.getPokemon().getAlly()?.getTag(BattlerTagType.COMMANDED)?.getSourcePokemon() === this.getPokemon()
+      (globalScene.currentBattle?.getBattlerCount() ?? 0) > 1
+      && pokemon.getAllies().some(ally => ally.getTag(BattlerTagType.COMMANDED)?.getSourcePokemon() === pokemon)
     ) {
       globalScene.currentBattle.turnCommands[this.fieldIndex] = {
         command: Command.FIGHT,

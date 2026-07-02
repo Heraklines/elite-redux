@@ -60,7 +60,8 @@ export class FightUiHandler extends UiHandler implements InfoToggle {
 
   protected fieldIndex = 0;
   protected fromCommand: Command = Command.FIGHT;
-  protected cursor2 = 0;
+  /** Remembered cursor per NON-lead field slot (index 1..2; a triple has two - a single shared `cursor2` made slots 2 and 3 clobber each other's memory). Slot 0 keeps the base-class `cursor`. */
+  protected cursorsBySlot: number[] = [];
 
   constructor() {
     super(UiMode.FIGHT);
@@ -192,7 +193,7 @@ export class FightUiHandler extends UiHandler implements InfoToggle {
     if (pokemon.tempSummonData.turnCount <= 1) {
       this.setCursor(0);
     } else {
-      this.setCursor(this.fieldIndex ? this.cursor2 : this.cursor);
+      this.setCursor(this.fieldIndex ? (this.cursorsBySlot[this.fieldIndex] ?? 0) : this.cursor);
     }
     this.displayMoves();
     // ER double-battle fix: clearMoves() (run when the fight menu closes for the
@@ -323,7 +324,7 @@ export class FightUiHandler extends UiHandler implements InfoToggle {
   }
 
   getCursor(): number {
-    return this.fieldIndex ? this.cursor2 : this.cursor;
+    return this.fieldIndex ? (this.cursorsBySlot[this.fieldIndex] ?? 0) : this.cursor;
   }
 
   /**
@@ -494,7 +495,7 @@ export class FightUiHandler extends UiHandler implements InfoToggle {
     const changed = this.getCursor() !== cursor;
     if (changed) {
       if (this.fieldIndex) {
-        this.cursor2 = cursor;
+        this.cursorsBySlot[this.fieldIndex] = cursor;
       } else {
         this.cursor = cursor;
       }

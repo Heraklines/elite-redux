@@ -30,7 +30,8 @@ export class CommandUiHandler extends UiHandler {
   private infoHintLabel: Phaser.GameObjects.Text;
 
   protected fieldIndex = 0;
-  protected cursor2 = 0;
+  /** Remembered cursor per NON-lead field slot (index 1..2; a triple has two - a single shared `cursor2` made slots 2 and 3 clobber each other's memory). Slot 0 keeps the base-class `cursor`. */
+  protected cursorsBySlot: number[] = [];
 
   /**
    * ER dev-tools: show a 3rd-row "Reset" command that reloads the current wave (the
@@ -318,14 +319,14 @@ export class CommandUiHandler extends UiHandler {
   }
 
   getCursor(): number {
-    return this.fieldIndex ? this.cursor2 : this.cursor;
+    return this.fieldIndex ? (this.cursorsBySlot[this.fieldIndex] ?? 0) : this.cursor;
   }
 
   setCursor(cursor: number): boolean {
     const changed = this.getCursor() !== cursor;
     if (changed) {
       if (this.fieldIndex) {
-        this.cursor2 = cursor;
+        this.cursorsBySlot[this.fieldIndex] = cursor;
       } else {
         this.cursor = cursor;
       }

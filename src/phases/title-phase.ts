@@ -764,11 +764,12 @@ export class TitlePhase extends Phase {
         globalScene.currentBattle.battleType !== BattleType.TRAINER
         && (globalScene.currentBattle.waveIndex > 1 || !globalScene.gameMode.isDaily)
       ) {
-        const minPartySize = globalScene.currentBattle.double ? 2 : 1;
-        if (availablePartyMembers > minPartySize) {
-          globalScene.phaseManager.pushNew("CheckSwitchPhase", 0, globalScene.currentBattle.double);
-          if (globalScene.currentBattle.double) {
-            globalScene.phaseManager.pushNew("CheckSwitchPhase", 1, globalScene.currentBattle.double);
+        // Format-capacity, not `double ? 2 : 1` (a loaded TRIPLE got one prompt max):
+        // a switch prompt per field slot whenever a benched spare exists.
+        const battlerCount = globalScene.currentBattle.getBattlerCount();
+        if (availablePartyMembers > battlerCount) {
+          for (let i = 0; i < battlerCount; i++) {
+            globalScene.phaseManager.pushNew("CheckSwitchPhase", i, battlerCount > 1);
           }
         }
       }

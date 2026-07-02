@@ -1095,7 +1095,9 @@ export abstract class Move implements Localizable {
   getTargetBenefitScore(user: Pokemon, target: Pokemon, move: Move): number {
     let score = 0;
 
-    if (target.getAlly()?.getTag(BattlerTagType.COMMANDED)?.getSourcePokemon() === target) {
+    // ANY ally, not just the first (triples): the target is untargetable while hiding
+    // in an ally Dondozo, wherever that Dondozo stands.
+    if (target.getAllies().some(ally => ally.getTag(BattlerTagType.COMMANDED)?.getSourcePokemon() === target)) {
       return 20 * (target.isPlayer() === user.isPlayer() ? -1 : 1); // always -20 with how the AI handles this score
     }
 

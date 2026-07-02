@@ -37,14 +37,17 @@ export function reloadCurrentWave(onComplete?: () => void): void {
 
       const availablePartyMembers = globalScene.getPokemonAllowedInBattle().length;
 
-      globalScene.phaseManager.pushNew("SummonPhase", 0, true, true);
-      if (globalScene.currentBattle.double && availablePartyMembers > 1) {
-        globalScene.phaseManager.pushNew("SummonPhase", 1, true, true);
+      // Format-capacity, not hardcoded doubles slots 0/1: a reset TRIPLE re-summoned only
+      // ONE mon (`double` is false there) - the live "after a freeze+reset it won't send
+      // out more than one mon" report. SummonPhase's isOnField guard keeps this idempotent
+      // with the encounter-phase reload-restore of slots >= 1.
+      const battlerCount = globalScene.currentBattle.getBattlerCount();
+      for (let i = 0; i < battlerCount && (i === 0 || availablePartyMembers > i); i++) {
+        globalScene.phaseManager.pushNew("SummonPhase", i, true, true);
       }
       if (globalScene.currentBattle.waveIndex > 1 && globalScene.currentBattle.battleType !== BattleType.TRAINER) {
-        globalScene.phaseManager.pushNew("CheckSwitchPhase", 0, globalScene.currentBattle.double);
-        if (globalScene.currentBattle.double && availablePartyMembers > 1) {
-          globalScene.phaseManager.pushNew("CheckSwitchPhase", 1, globalScene.currentBattle.double);
+        for (let i = 0; i < battlerCount && (i === 0 || availablePartyMembers > i); i++) {
+          globalScene.phaseManager.pushNew("CheckSwitchPhase", i, battlerCount > 1);
         }
       }
 

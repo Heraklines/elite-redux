@@ -72,6 +72,15 @@ export abstract class BattleInfo extends Phaser.GameObjects.Container {
   /** The triple+ base shift currently applied (so `applyTripleThin` stays idempotent). */
   private appliedTripleShiftX = 0;
   private appliedTripleShiftY = 0;
+  /**
+   * The slot-stacking [dx, dy] currently APPLIED to x/y. Tracked explicitly because the
+   * un-apply must subtract what was actually added: recomputing it from (slotOffset,
+   * capacity) breaks the moment capacity CHANGES between calls (triple stacking != double
+   * stacking), leaving a residue on every format transition - the live "HP bar keeps
+   * climbing each send-out after a single-format event battle" bug.
+   */
+  private appliedSlotDx = 0;
+  private appliedSlotDy = 0;
   /** Which field SLOT this bar is stacked for (0 = anchor). Drives 3+-bar stacking. */
   protected slotOffset = 0;
   protected lastName: string | null;
@@ -476,15 +485,20 @@ export abstract class BattleInfo extends Phaser.GameObjects.Container {
    * reproduces the legacy single offset exactly. See `barSlotOffset` in `#data/battle-format`.
    */
   setSlotOffset(slot: number, capacity = 2): void {
-    if (this.slotOffset === slot) {
+    const [newDx, newDy] = barSlotOffset(slot, this.player, capacity);
+    this.slotOffset = slot;
+    // Idempotence on the APPLIED delta, not on (slot == slot): the same slot under a NEW
+    // capacity must still re-position, and un-applying must subtract exactly what was
+    // added (see appliedSlotDx docs - recomputing from the current capacity left a
+    // residue on every triple<->single/double transition, creeping the bar upward).
+    if (newDx === this.appliedSlotDx && newDy === this.appliedSlotDy) {
       return;
     }
-    const [oldDx, oldDy] = barSlotOffset(this.slotOffset, this.player, capacity);
-    const [newDx, newDy] = barSlotOffset(slot, this.player, capacity);
-    this.x += newDx - oldDx;
-    this.y += newDy - oldDy;
+    this.x += newDx - this.appliedSlotDx;
+    this.y += newDy - this.appliedSlotDy;
     this.baseY = this.y;
-    this.slotOffset = slot;
+    this.appliedSlotDx = newDx;
+    this.appliedSlotDy = newDy;
   }
 
   /**

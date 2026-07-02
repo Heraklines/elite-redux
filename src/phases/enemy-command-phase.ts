@@ -61,10 +61,15 @@ export class EnemyCommandPhase extends FieldPhase {
 
     const trainer = battle.trainer;
 
+    // Any multi format + ANY ally (a triple has two; was `double` + first-ally-only, so
+    // Commander never skipped the hidden mon's turn in triples): the acting mon is hiding
+    // in an ally Dondozo iff some ally carries a COMMANDED tag SOURCED by it.
     if (
-      battle.double
+      battle.getBattlerCount() > 1
       && enemyPokemon.hasAbility(AbilityId.COMMANDER)
-      && enemyPokemon.getAlly()?.getTag(BattlerTagType.COMMANDED)
+      && enemyPokemon
+        .getAllies()
+        .some(ally => ally.getTag(BattlerTagType.COMMANDED)?.getSourcePokemon() === enemyPokemon)
     ) {
       this.skipTurn = true;
     }

@@ -47,14 +47,19 @@ export class SwitchSummonPhase extends SummonPhase {
 
   preSummon(): void {
     if (!this.player) {
+      // Partner attribution only applies in a partnered DOUBLE: in a TRIPLE vs one
+      // trainer, `fieldIndex ? PARTNER : TRAINER` mislabeled slots 1-2 as the partner's
+      // (wrong summon pool arg + wrong trainer sprite/name shown). getNextSummonIndex
+      // also normalizes slot to NONE outside partnered doubles, so this keeps the two
+      // in agreement.
+      const partnered = globalScene.currentBattle.double && !!globalScene.currentBattle.trainer?.isDouble();
+      const trainerSlot = partnered && this.fieldIndex ? TrainerSlot.TRAINER_PARTNER : TrainerSlot.TRAINER;
       if (this.slotIndex === -1) {
         //@ts-expect-error
-        this.slotIndex = globalScene.currentBattle.trainer?.getNextSummonIndex(
-          this.fieldIndex ? TrainerSlot.TRAINER_PARTNER : TrainerSlot.TRAINER,
-        ); // TODO: what would be the default trainer-slot fallback?
+        this.slotIndex = globalScene.currentBattle.trainer?.getNextSummonIndex(trainerSlot); // TODO: what would be the default trainer-slot fallback?
       }
       if (this.slotIndex > -1) {
-        this.showEnemyTrainer(this.fieldIndex % 2 ? TrainerSlot.TRAINER_PARTNER : TrainerSlot.TRAINER);
+        this.showEnemyTrainer(trainerSlot);
         globalScene.pbTrayEnemy.showPbTray(globalScene.getEnemyParty());
       }
     }

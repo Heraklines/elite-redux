@@ -411,11 +411,12 @@ export class MoveEffectPhase extends PokemonPhase {
       return [HitCheckResult.TARGET_NOT_ON_FIELD, 0];
     }
 
-    // Commander causes moves used against the target to miss
+    // Commander causes moves used against the target to miss (any multi format + ANY
+    // ally - was `double` + first-ally-only, so a hidden Tatsugiri was hittable in triples)
     if (
       !fieldTargeted
-      && globalScene.currentBattle.double
-      && target.getAlly()?.getTag(BattlerTagType.COMMANDED)?.getSourcePokemon() === target
+      && globalScene.currentBattle.getBattlerCount() > 1
+      && target.getAllies().some(ally => ally.getTag(BattlerTagType.COMMANDED)?.getSourcePokemon() === target)
     ) {
       return [HitCheckResult.MISS, 0];
     }
