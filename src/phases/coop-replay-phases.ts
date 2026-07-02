@@ -43,6 +43,7 @@ import {
 } from "#data/elite-redux/coop/coop-battle-engine";
 import { logCanonicalDiff } from "#data/elite-redux/coop/coop-data-fingerprint";
 import { coopLog, coopWarn, isCoopDebug } from "#data/elite-redux/coop/coop-debug";
+import { COOP_FAINT_SWITCH_SEQ_BASE } from "#data/elite-redux/coop/coop-interaction-relay";
 import {
   consumeCoopPendingWaveAdvance,
   coopHasPendingWaveAdvance,
@@ -509,6 +510,17 @@ export class CoopFaintReplayPhase extends PokemonPhase {
           `own-faint picker gate bi=${this.battlerIndex}: no legal bench -> skip (bc=${battlerCount} party=[${party
             .map((m, i) => `${i}:sp${m?.species?.speciesId}/fnt${m?.isFainted() ? 1 : 0}/own${m?.coopOwner ?? "-"}`)
             .join(" ")}])`,
+        );
+        // LIVE 18:30 report ("when your partner runs out of pokemon the game waits forever"):
+        // the silent skip left the HOST parked through the FULL faint-switch wait before its
+        // auto-pick fallback. Relay an immediate NO-PICK sentinel (-1) on the same seq - the
+        // host's legality check rejects it instantly and runs auto-pick (which, with this side
+        // truly empty, cleanly skips the summon: the lone-survivor flow). Zero wait either way.
+        getCoopInteractionRelay()?.sendInteractionChoice(
+          COOP_FAINT_SWITCH_SEQ_BASE + this.battlerIndex,
+          "switch",
+          -1,
+          [0],
         );
         return; // nothing to send out - the host's flow decides (wipe / lone survivor)
       }
