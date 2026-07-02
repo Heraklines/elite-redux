@@ -12,6 +12,7 @@ import {
   clearCoopLearnMoveForwardInFlight,
   getCoopInteractionRelay,
   getCoopUiMirror,
+  setCoopLearnMovePickerOpener,
 } from "#data/elite-redux/coop/coop-runtime";
 import { UiMode } from "#enums/ui-mode";
 import { COOP_LEARN_MOVE_FWD_SEQ_BASE, COOP_LEARN_MOVE_SEQ } from "#phases/learn-move-phase";
@@ -19,6 +20,50 @@ import { SummaryUiMode } from "#ui/summary-ui-handler";
 
 /** Routing tag for the guest->host relayed move-forget pick (distinguishes it on the wire / in logs). */
 const LEARN_MOVE_CHOICE_KIND = "learnMove";
+
+/**
+ * INLINE move-forget picker (#787, the live TM Case stall): opens the picker OVER the current
+ * screen the moment `learnMoveForward` arrives, with NO phase queued. The old phase spawn sat
+ * BEHIND the guest's parked reward-shop WATCHER phase, which cannot end until the host finishes
+ * the shop, which was itself awaiting this very pick - a circular wait broken only by the host's
+ * 20-minute fallback ("it worked after a while"). `setModeWithoutClear` overlays the picker and
+ * `revertMode` restores whatever screen was up (the parked shop) once the pick relays.
+ */
+export function openCoopLearnMovePickerInline(partySlot: number, moveId: number, maxMoveCount: number): void {
+  const relay = getCoopInteractionRelay();
+  const pokemon = globalScene.getPlayerParty()[partySlot];
+  const seq = COOP_LEARN_MOVE_FWD_SEQ_BASE + partySlot;
+  if (relay == null || pokemon == null) {
+    coopWarn("learnmove", "inline picker: no relay / mon; skipping (host await falls back)", {
+      partySlot,
+      hasRelay: relay != null,
+    });
+    clearCoopLearnMoveForwardInFlight(partySlot);
+    return;
+  }
+  coopLog("learnmove", "guest inline move-forget picker OPEN", { partySlot, moveId, maxMoveCount, seq });
+  const move = allMoves[moveId];
+  let settled = false;
+  const finish = (moveIndex: number) => {
+    if (settled) {
+      return;
+    }
+    settled = true;
+    getCoopUiMirror()?.endSession();
+    clearCoopLearnMoveForwardInFlight(partySlot);
+    coopLog("learnmove", "guest relays move-forget pick (inline)", { seq, kind: LEARN_MOVE_CHOICE_KIND, moveIndex });
+    getCoopInteractionRelay()?.sendInteractionChoice(seq, LEARN_MOVE_CHOICE_KIND, moveIndex);
+    // Restore whatever screen the picker overlaid (e.g. the parked shop watcher) - no phase to end.
+    void Promise.resolve(globalScene.ui.revertMode()).catch(() => globalScene.ui.setMode(UiMode.MESSAGE));
+  };
+  void globalScene.ui.setModeWithoutClear(UiMode.SUMMARY, pokemon, SummaryUiMode.LEARN_MOVE, move, finish).then(() => {
+    getCoopUiMirror()?.beginSession("owner", UiMode.SUMMARY, COOP_LEARN_MOVE_SEQ);
+  });
+}
+
+// Register with the session runtime (loaded at boot via the phase registry) so the
+// learnMoveForward listener opens the picker INLINE instead of queueing a phase.
+setCoopLearnMovePickerOpener(openCoopLearnMovePickerInline);
 
 /**
  * Co-op AUTHORITATIVE move-learn REPLAY (#633 BUG3+5). The HOST is the sole battle engine, so for a

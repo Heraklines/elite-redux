@@ -448,6 +448,20 @@ const learnMoveForwardInFlight = new Set<number>();
  * dead no-op outside an authoritative-guest run. An in-flight slot guard ignores a duplicate message
  * for a slot whose picker is still open. Cleared in {@linkcode clearCoopRuntime}.
  */
+/**
+ * #787: the learn-move picker opener, INJECTED by coop-replay-learn-move-phase at module load
+ * (the phase registry imports it at boot). Runtime -> phase would be an import cycle, hence the
+ * indirection. When set, `learnMoveForward` opens the picker INLINE over the current screen -
+ * a phase queued behind a parked watcher phase can never run (the live TM Case circular stall).
+ */
+let learnMovePickerOpener: ((partySlot: number, moveId: number, maxMoveCount: number) => void) | null = null;
+
+export function setCoopLearnMovePickerOpener(
+  opener: (partySlot: number, moveId: number, maxMoveCount: number) => void,
+): void {
+  learnMovePickerOpener = opener;
+}
+
 function wireCoopLearnMoveForward(transport: CoopTransport): void {
   offLearnMoveForward = transport.onMessage(msg => {
     if (msg.t !== "interactionOutcome" || msg.outcome.k !== "learnMoveForward") {
@@ -463,16 +477,25 @@ function wireCoopLearnMoveForward(transport: CoopTransport): void {
     }
     coopLog(
       "learnmove",
-      `recv learnMoveForward slot=${partySlot} moveId=${moveId} maxMoveCount=${maxMoveCount} -> spawn CoopReplayLearnMovePhase`,
+      `recv learnMoveForward slot=${partySlot} moveId=${moveId} maxMoveCount=${maxMoveCount} -> open picker ${
+        learnMovePickerOpener == null ? "via CoopReplayLearnMovePhase" : "INLINE"
+      }`,
     );
     learnMoveForwardInFlight.add(partySlot);
     try {
-      globalScene.phaseManager.unshiftNew("CoopReplayLearnMovePhase", partySlot, moveId, maxMoveCount);
+      if (learnMovePickerOpener == null) {
+        globalScene.phaseManager.unshiftNew("CoopReplayLearnMovePhase", partySlot, moveId, maxMoveCount);
+      } else {
+        // #787: INLINE over the current screen - immune to a parked phase queue (the TM Case
+        // circular stall: the queued phase sat behind the shop watcher the host could not end
+        // while awaiting this very pick).
+        learnMovePickerOpener(partySlot, moveId, maxMoveCount);
+      }
     } catch (e) {
       // A spawn failure must never hang the run: the host's own await times out to "keep current
       // moves". Drop the in-flight mark so a retry/resend can re-spawn.
       learnMoveForwardInFlight.delete(partySlot);
-      coopWarn("learnmove", `spawn CoopReplayLearnMovePhase failed slot=${partySlot} (host await falls back)`, e);
+      coopWarn("learnmove", `learn-move picker open failed slot=${partySlot} (host await falls back)`, e);
     }
   });
 }
