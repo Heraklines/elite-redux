@@ -4,7 +4,8 @@ import { globalScene } from "#app/global-scene";
 import { IS_TEST, isBeta, isDev } from "#constants/app-constants";
 import { SubstituteTag } from "#data/battler-tags";
 import { broadcastCoopWaveResolved } from "#data/elite-redux/coop/coop-runtime";
-import { coopAttributeNewMon } from "#data/elite-redux/coop/coop-session";
+import { coopAttributeNewMon, setCoopCatchThrowerHint } from "#data/elite-redux/coop/coop-session";
+import type { CoopRole } from "#data/elite-redux/coop/coop-transport";
 import { erRecordAchievementCatch } from "#data/elite-redux/er-achievement-tracker";
 import { communitySpeciesAllowed } from "#data/elite-redux/er-community-run-state";
 import { erCollectorsAlbumRecordCatch } from "#data/elite-redux/er-relics";
@@ -40,15 +41,28 @@ export class AttemptCapturePhase extends PokemonPhase {
   private pokeball: Phaser.GameObjects.Sprite;
   private originalY: number;
 
-  constructor(targetIndex: number, pokeballType: PokeballType) {
+  /** Co-op (#800): the BALL-THROWER's role, pinned for attribution while this capture resolves. */
+  private throwerRole: CoopRole | undefined;
+
+  constructor(targetIndex: number, pokeballType: PokeballType, throwerRole?: CoopRole) {
     // Multi-format: targetIndex is the caught enemy's position; map it to the flat index via
     // the enemy side's base offset (== BattlerIndex.ENEMY in binary, shifted in triple).
     super((globalScene.currentBattle?.arrangement.enemyOffset ?? BattlerIndex.ENEMY) + targetIndex);
 
     this.pokeballType = pokeballType;
+    this.throwerRole = throwerRole;
+  }
+
+  public override end(): void {
+    // The hint only means anything while THIS capture resolves.
+    setCoopCatchThrowerHint(null);
+    super.end();
   }
 
   start() {
+    // Co-op (#800): attribute the catch to the ACTUAL thrower (when their half has room)
+    // instead of pure half-balancing - "I caught it" must mean "it is mine".
+    setCoopCatchThrowerHint(this.throwerRole ?? null);
     super.start();
 
     const pokemon = this.getPokemon() as EnemyPokemon;

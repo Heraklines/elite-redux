@@ -27,6 +27,7 @@ import {
   coopHalfIsFull,
   coopInterleaveOrder,
   coopOwnedCount,
+  setCoopCatchThrowerHint,
 } from "#data/elite-redux/coop/coop-session";
 import { GameModes } from "#enums/game-modes";
 import { PokeballType } from "#enums/pokeball";
@@ -74,6 +75,24 @@ describe("co-op per-player party cap (#633, P1g) - pure predicate", () => {
   it("attribution returns null only when BOTH halves are full (the hard block)", () => {
     const full: CoopOwnedMon[] = [host(), host(), host(), guest(), guest(), guest()];
     expect(coopAttributeNewMon(full)).toBeNull();
+  });
+
+  it("attribution: the BALL-THROWER hint wins while their half has room (#800 'my Dracovish counted as the host's')", () => {
+    try {
+      // Balance alone would give this catch to the emptier HOST half - but the GUEST threw the ball.
+      setCoopCatchThrowerHint("guest");
+      expect(coopAttributeNewMon([host(), guest()])).toBe("guest");
+      expect(coopAttributeNewMon([])).toBe("guest");
+      // The thrower's half being FULL falls back to the balance rule (host has room).
+      expect(coopAttributeNewMon([guest(), guest(), guest()])).toBe("host");
+      // Both full still hard-blocks.
+      expect(coopAttributeNewMon([host(), host(), host(), guest(), guest(), guest()])).toBeNull();
+      // Hint cleared -> pure balance again.
+      setCoopCatchThrowerHint(null);
+      expect(coopAttributeNewMon([host(), guest()])).toBe("host");
+    } finally {
+      setCoopCatchThrowerHint(null);
+    }
   });
 });
 

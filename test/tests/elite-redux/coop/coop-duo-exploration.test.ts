@@ -645,6 +645,82 @@ describe.skipIf(!RUN)("co-op DUO exploration sweep (maintainer directive)", () =
     logs.flush();
   }, 240_000);
 
+  it("PROBE #800: a GUEST-owned mon's full-moveset learn (TM Case path) FORWARDS the forget-pick to the guest", async () => {
+    // The TM Case constructs the SAME LearnMovePhase as plain TMs, so this proves the whole
+    // class: host runs the phase on a guest-owned mon with 4 moves -> the forget prompt must
+    // FORWARD to the guest (never open host-side), and the host must apply the guest's pick.
+    await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
+    const pair = createLoopbackPair();
+    const rig = await buildDuo(game, pair, setCoopRuntime, toCoop);
+    wireGuestCommand(rig);
+    const { LearnMovePhase, COOP_LEARN_MOVE_FWD_SEQ_BASE } = await import("#phases/learn-move-phase");
+    const { PokemonMove } = await import("#moves/pokemon-move");
+    const PARTY_SLOT = 1; // GENGAR - the guest-owned lead
+    const FULL_MOVESET = [MoveId.SHADOW_BALL, MoveId.SLUDGE_BOMB, MoveId.HYPNOSIS, MoveId.PROTECT];
+    const NEW_MOVE = MoveId.SWORDS_DANCE;
+    const gengar = rig.hostScene.getPlayerParty()[PARTY_SLOT];
+    expect((gengar as unknown as { coopOwner?: string }).coopOwner, "HARNESS: slot 1 is guest-owned").toBe("guest");
+    gengar.moveset = FULL_MOVESET.map(m => new PokemonMove(m));
+
+    // The GUEST's pick (forget slot 0) is PRE-BUFFERED - the host's forward await buffer-hits.
+    withClientSync(rig.guestCtx, () => {
+      getCoopInteractionRelay()?.sendInteractionChoice(COOP_LEARN_MOVE_FWD_SEQ_BASE + PARTY_SLOT, "learnMoveFwd", 0);
+    });
+
+    // HOST: spy the wire for the forward emission, stub the read-only UI, run the phase.
+    let forwardEmitted = false;
+    const offSpy = pair.host.onMessage(() => {});
+    const realSend = pair.host.send.bind(pair.host);
+    (pair.host as { send: (m: unknown) => void }).send = (m: unknown) => {
+      const msg = m as { t?: string; outcome?: { k?: string } };
+      if (msg.t === "interactionOutcome" && msg.outcome?.k === "learnMoveForward") {
+        forwardEmitted = true;
+      }
+      realSend(m as never);
+    };
+    let phaseDone = false;
+    await withClient(rig.hostCtx, async () => {
+      const phase = new LearnMovePhase(PARTY_SLOT, NEW_MOVE);
+      const seam = phase as unknown as { end: () => void };
+      const realEnd = seam.end.bind(phase);
+      seam.end = () => {
+        phaseDone = true;
+        realEnd();
+      };
+      const ui = rig.hostScene.ui as unknown as {
+        setModeWithoutClear: (...args: unknown[]) => unknown;
+        showTextPromise: (...args: unknown[]) => unknown;
+        setMode: (...args: unknown[]) => unknown;
+      };
+      const saved = {
+        smwc: ui.setModeWithoutClear?.bind(rig.hostScene.ui),
+        stp: ui.showTextPromise?.bind(rig.hostScene.ui),
+        sm: ui.setMode.bind(rig.hostScene.ui),
+      };
+      try {
+        ui.setModeWithoutClear = () => Promise.resolve(true);
+        ui.showTextPromise = () => Promise.resolve();
+        ui.setMode = () => Promise.resolve(true);
+        haltQueueAfterCurrent();
+        phase.start();
+        for (let i = 0; i < 30 && !phaseDone; i++) {
+          await drainLoopback();
+        }
+      } finally {
+        ui.setModeWithoutClear = saved.smwc as typeof ui.setModeWithoutClear;
+        ui.showTextPromise = saved.stp as typeof ui.showTextPromise;
+        ui.setMode = saved.sm;
+      }
+    });
+    offSpy();
+    expect(forwardEmitted, "the forget prompt was FORWARDED to the guest (never host-side)").toBe(true);
+    expect(phaseDone, "the host learn phase completed on the guest's buffered pick").toBe(true);
+    const movesAfter = gengar.moveset.map(m => m?.moveId);
+    expect(movesAfter, "the guest's pick applied: slot 0 forgotten, the new move learned").toContain(NEW_MOVE);
+    expect(movesAfter, "the forgotten move is gone").not.toContain(MoveId.SHADOW_BALL);
+    logs.flush();
+  }, 240_000);
+
   it("PROBE #795: Giratina's Bargain alternates - owner leaves, watcher adopts the outcome blob, counters lockstep", async () => {
     // The Bargain is the 4th owner/watcher surface: at most ONE deal per visit, so the whole
     // relay is a single comprehensive outcome blob (the proven ME-terminal resync) + a uniform

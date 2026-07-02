@@ -231,6 +231,9 @@ export class TurnStartPhase extends FieldPhase {
           "AttemptCapturePhase",
           globalScene.currentBattle.arrangement.locate(turnCommand.targets![0]).position,
           turnCommand.cursor!,
+          // Co-op (#800): the commanding mon's owner IS the ball-thrower - the catch is
+          // attributed to them (their half permitting) instead of pure half-balancing.
+          (pokemon as { coopOwner?: "host" | "guest" }).coopOwner,
         );
         break;
       case Command.POKEMON:

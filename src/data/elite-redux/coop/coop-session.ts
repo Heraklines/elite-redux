@@ -122,9 +122,27 @@ export function coopHalfIsFull(party: readonly CoopOwnedMon[], owner: CoopRole):
  * blocked by the caller). Exposed as a small helper so P2 can swap it for
  * "attribute to the actual thrower".
  */
+/**
+ * #800 follow-up ("my Dracovish counted as the host's"): while a capture resolves, the
+ * ACTUAL BALL-THROWER's role is pinned here (set by AttemptCapturePhase, cleared when it
+ * ends). {@linkcode coopAttributeNewMon} prefers it whenever that half has room, so a mon
+ * you caught is YOURS - the emptier-half balancing only decides when the thrower is full
+ * or unknown (ME grants / gifts have no thrower and keep the balance rule).
+ */
+let coopCatchThrowerHint: CoopRole | null = null;
+export function setCoopCatchThrowerHint(role: CoopRole | null): void {
+  coopCatchThrowerHint = role;
+}
+
 export function coopAttributeNewMon(party: readonly CoopOwnedMon[]): CoopRole | null {
   const hostCount = coopOwnedCount(party, "host");
   const guestCount = coopOwnedCount(party, "guest");
+  if (coopCatchThrowerHint != null) {
+    const throwerCount = coopCatchThrowerHint === "host" ? hostCount : guestCount;
+    if (throwerCount < COOP_SLOTS_PER_PLAYER) {
+      return coopCatchThrowerHint;
+    }
+  }
   const hostFull = hostCount >= COOP_SLOTS_PER_PLAYER;
   const guestFull = guestCount >= COOP_SLOTS_PER_PLAYER;
   if (hostFull && guestFull) {
