@@ -754,6 +754,11 @@ describe.skipIf(!RUN)("co-op DUO exploration sweep (maintainer directive)", () =
       const guestBefore = rig.guestScene.gameData.dexData[rootId]?.caughtAttr ?? 0n;
       expect(guestBefore, "HARNESS: guest starts WITHOUT this species caught").toBe(0n);
       await withClient(rig.hostCtx, async () => {
+        // #801: the shared blob is RUN-SCOPED - capture the run-start baseline first (the game
+        // does this at the co-op run's first encounter), then catch. The delta then carries
+        // ONLY this catch, never the host's whole account dex.
+        const { captureCoopDexBaseline } = await import("#data/elite-redux/coop/coop-battle-engine");
+        captureCoopDexBaseline();
         // Binds the HOST blob + relay at write time; the trailing send timer fires LATER.
         await globalScene.gameData.setPokemonCaught(caughtMon, true, false, false);
       });

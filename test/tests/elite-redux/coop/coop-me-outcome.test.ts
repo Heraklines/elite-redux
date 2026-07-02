@@ -15,6 +15,7 @@ import { getGameMode } from "#app/game-mode";
 import {
   applyCoopDexDelta,
   applyCoopMeOutcome,
+  captureCoopDexBaseline,
   captureCoopDexDelta,
   captureCoopMeOutcome,
 } from "#data/elite-redux/coop/coop-battle-engine";
@@ -110,6 +111,9 @@ describe.skipIf(!RUN)("co-op ME outcome resync (#633, CHANGE-4 / P4) - live capt
     scene.waveSeed = "HOSTWAVESEED0987654321";
 
     // A bigint dex field (the exact JSON-hostile shape the serializer must string-encode).
+    // #801: deltas are RUN-SCOPED - capture the baseline BEFORE the mutation below, exactly
+    // like the game does at the co-op run's first encounter; the delta then carries the change.
+    captureCoopDexBaseline();
     const dexEntry = scene.gameData.dexData[speciesId];
     expect(dexEntry).not.toBeUndefined();
     const wantSeenAttr = (dexEntry.seenAttr | 1n) + (1n << 40n); // forces a >2^53 bigint
@@ -201,6 +205,7 @@ describe.skipIf(!RUN)("co-op ME outcome resync (#633, CHANGE-4 / P4) - live capt
     await game.classicMode.startBattle(SpeciesId.PIKACHU);
     const scene = game.scene;
     const speciesId = scene.getPlayerParty()[0].species.speciesId;
+    captureCoopDexBaseline(); // #801 run-scoped: baseline first, then mutate, then delta
     const entry = scene.gameData.dexData[speciesId];
 
     const wantSeen = (1n << 60n) | 7n;

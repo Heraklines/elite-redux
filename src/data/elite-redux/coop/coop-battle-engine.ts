@@ -1940,36 +1940,62 @@ export function adoptCoopHostPlayerPartyOrder(hostParty: number[] | undefined): 
   }
   try {
     const party = globalScene.getPlayerParty() as Pokemon[];
-    // Number of on-field leads (a single in singles, two in a double): never reordered here.
-    const onFieldCount = globalScene.getPlayerField(false).length;
-    if (party.length <= onFieldCount + 1) {
-      return false; // 0 or 1 bench mon -> nothing to reorder.
+    if (party.length <= 1) {
+      return false;
     }
-    // Build the desired BENCH order from the host's speciesId sequence at slots >= onFieldCount,
-    // matching each against the guest's actual bench mons by speciesId (first-available wins).
-    const bench = party.slice(onFieldCount);
-    const remaining = [...bench];
-    const desired: Pokemon[] = [];
-    for (let i = onFieldCount; i < hostParty.length; i++) {
+    // #799 (live Wingull/Chinchou transposition): the old guard skipped ALL slots below the
+    // on-field count, so in a co-op DOUBLE array slot 1 was permanently untouchable - a
+    // transposition involving a lead ARRAY slot could NEVER heal (the field reconcile fixes
+    // sprites/field state, not an array slot whose occupant is not even on the field, e.g. at
+    // a wave boundary). New rule: pin ONLY mons that are genuinely ON FIELD right now (moving
+    // those is the field reconcile's job); every other slot - including a lead-index slot whose
+    // occupant is benched - is reorderable by identity to the host's exact sequence.
+    const pinned = new Set<number>();
+    for (let i = 0; i < party.length; i++) {
+      const mon = party[i];
+      if (mon != null && mon.isOnField() && mon.isActive()) {
+        pinned.add(i);
+      }
+    }
+    // Pool = every non-pinned mon; assign each non-pinned slot the host's species at that index.
+    const remaining: Pokemon[] = [];
+    for (let i = 0; i < party.length; i++) {
+      if (!pinned.has(i) && party[i] != null) {
+        remaining.push(party[i]);
+      }
+    }
+    const desired: (Pokemon | null)[] = Array.from({ length: party.length }, () => null);
+    for (let i = 0; i < party.length && i < hostParty.length; i++) {
+      if (pinned.has(i)) {
+        continue;
+      }
       const wantSpecies = hostParty[i];
       const idx = remaining.findIndex(p => (p.species?.speciesId ?? -1) === wantSpecies);
       if (idx >= 0) {
-        desired.push(remaining[idx]);
+        desired[i] = remaining[idx];
         remaining.splice(idx, 1);
       }
     }
-    // Append any guest bench mons the host order didn't account for (defensive; keeps every mon).
-    desired.push(...remaining);
-    // No change? (already aligned) -> done.
-    const changed = desired.some((p, i) => p !== bench[i]);
-    if (!changed) {
-      return false;
+    // Any unmatched pool mons fill the remaining non-pinned holes in order (defensive; keeps all).
+    for (let i = 0; i < party.length; i++) {
+      if (!pinned.has(i) && desired[i] == null && remaining.length > 0) {
+        desired[i] = remaining.shift() ?? null;
+      }
     }
-    // Write the reordered bench back in place (on-field leads untouched at the head).
-    for (let i = 0; i < desired.length; i++) {
-      party[onFieldCount + i] = desired[i];
+    let changed = false;
+    for (let i = 0; i < party.length; i++) {
+      if (!pinned.has(i) && desired[i] != null && party[i] !== desired[i]) {
+        party[i] = desired[i] as Pokemon;
+        changed = true;
+      }
     }
-    return true;
+    if (changed) {
+      coopLog(
+        "resync",
+        `adoptCoopHostPlayerPartyOrder reordered to host sequence (pinnedOnField=[${[...pinned].join(",")}])`,
+      );
+    }
+    return changed;
   } catch {
     // A malformed party order must never crash the guest's run.
     return false;
@@ -2315,8 +2341,62 @@ export function applyCoopExpDeltas(deltas: CoopExpDelta[] | undefined): void {
  * dex is serialized (a per-species "touched" diff is a future optimization; a full blob is correct
  * and small after lz-string). `starterData` is plain scalars / arrays, carried as-is. Fully guarded.
  */
+/**
+ * #801 run-scoped acquisition sharing: per-species dex fingerprints + the starterData JSON
+ * captured at the CO-OP RUN START. The delta blob only carries entries that CHANGED since -
+ * run catches, shiny unlocks, grants - never the host's whole account (live report: "they get
+ * all of my pokemon instead of theirs" - the un-scoped blob union-merged the host's entire
+ * dex onto the guest's account). No baseline captured -> EMPTY blob (share nothing, never
+ * overshare); the next run start re-arms it.
+ */
+let coopDexBaseline: Map<number, string> | null = null;
+let coopStarterBaseline: Map<number, string> | null = null;
+
+/** Fingerprint one dex entry (cheap string compare basis). */
+function dexEntryFingerprint(e: {
+  seenAttr: bigint;
+  caughtAttr: bigint;
+  natureAttr: number;
+  seenCount: number;
+  caughtCount: number;
+  hatchedCount: number;
+}): string {
+  return `${e.seenAttr}|${e.caughtAttr}|${e.natureAttr}|${e.seenCount}|${e.caughtCount}|${e.hatchedCount}`;
+}
+
+/** Capture the run-start acquisition baseline (call at the co-op run's first encounter). */
+export function captureCoopDexBaseline(): void {
+  try {
+    const dex = new Map<number, string>();
+    for (const [id, e] of Object.entries(globalScene.gameData.dexData)) {
+      dex.set(Number(id), dexEntryFingerprint(e));
+    }
+    const starter = new Map<number, string>();
+    for (const [id, e] of Object.entries(globalScene.gameData.starterData)) {
+      starter.set(Number(id), JSON.stringify(e));
+    }
+    coopDexBaseline = dex;
+    coopStarterBaseline = starter;
+    coopLog("shop", `dex baseline captured (species=${dex.size} starters=${starter.size}) - deltas are run-scoped`);
+  } catch {
+    coopDexBaseline = null;
+    coopStarterBaseline = null;
+  }
+}
+
+/** Test/teardown hook: drop the baseline (a delta request then shares NOTHING). */
+export function clearCoopDexBaseline(): void {
+  coopDexBaseline = null;
+  coopStarterBaseline = null;
+}
+
 export function captureCoopDexDelta(): string {
   try {
+    // #801: without a run-start baseline, share NOTHING (an un-scoped blob would clone the
+    // host's whole account dex onto the partner - the live "all of my pokemon" report).
+    if (coopDexBaseline == null || coopStarterBaseline == null) {
+      return "";
+    }
     const dex: Record<
       number,
       {
@@ -2330,6 +2410,9 @@ export function captureCoopDexDelta(): string {
       }
     > = {};
     for (const [id, e] of Object.entries(globalScene.gameData.dexData)) {
+      if (coopDexBaseline.get(Number(id)) === dexEntryFingerprint(e)) {
+        continue; // unchanged since run start - not a run acquisition, never shared
+      }
       dex[Number(id)] = {
         seenAttr: e.seenAttr.toString(),
         caughtAttr: e.caughtAttr.toString(),
@@ -2340,7 +2423,15 @@ export function captureCoopDexDelta(): string {
         ivs: [...e.ivs],
       };
     }
-    return compressToBase64(JSON.stringify({ dex, starter: globalScene.gameData.starterData }));
+    // #801: starterData is scoped identically - only entries that changed since run start
+    // (run shiny/black unlocks, candy from run catches), never the whole account table.
+    const starter: Record<number, unknown> = {};
+    for (const [id, e] of Object.entries(globalScene.gameData.starterData)) {
+      if (coopStarterBaseline.get(Number(id)) !== JSON.stringify(e)) {
+        starter[Number(id)] = e;
+      }
+    }
+    return compressToBase64(JSON.stringify({ dex, starter }));
   } catch {
     // A dex read failure must never break the outcome send; an empty blob is a no-op on apply.
     return "";
@@ -2377,30 +2468,51 @@ export function applyCoopDexDelta(blob: string): void {
       >;
       starter?: Record<string, StarterDataEntry>;
     };
+    // #801 CRITICAL ("i overwrote all my guest's pokemon... it seems permanent"): the old apply
+    // wholesale-SET each dex field and spread-OVERWROTE starter entries with the host's values -
+    // the partner's own attrs, candy counts, and unlocks were REPLACED (destroyed) by whatever
+    // the host had. The apply is now a strict GAIN-ONLY UNION: bitmasks OR, counts max, objects
+    // gain new keys only. The receiving account can never lose anything from a co-op session.
     const dexData = globalScene.gameData.dexData;
     for (const [id, e] of Object.entries(parsed.dex ?? {})) {
       const entry = dexData[Number(id)];
       if (entry == null) {
         continue;
       }
-      entry.seenAttr = BigInt(e.seenAttr);
-      entry.caughtAttr = BigInt(e.caughtAttr);
-      entry.natureAttr = e.natureAttr;
-      entry.seenCount = e.seenCount;
-      entry.caughtCount = e.caughtCount;
-      entry.hatchedCount = e.hatchedCount;
-      if (Array.isArray(e.ivs)) {
-        entry.ivs = [...e.ivs];
+      entry.seenAttr |= BigInt(e.seenAttr);
+      entry.caughtAttr |= BigInt(e.caughtAttr);
+      entry.natureAttr |= e.natureAttr;
+      entry.seenCount = Math.max(entry.seenCount, e.seenCount);
+      entry.caughtCount = Math.max(entry.caughtCount, e.caughtCount);
+      entry.hatchedCount = Math.max(entry.hatchedCount, e.hatchedCount);
+      if (Array.isArray(e.ivs) && Array.isArray(entry.ivs)) {
+        for (let i = 0; i < entry.ivs.length && i < e.ivs.length; i++) {
+          entry.ivs[i] = Math.max(entry.ivs[i], e.ivs[i]);
+        }
       }
     }
-    // Merge starter entries field-by-field onto the live starterData (candy / friendship / egg
-    // moves / ability+passive unlocks an ME can grant), leaving any local-only entry alone.
+    const BITMASK_STARTER_FIELDS = new Set(["eggMoves", "abilityAttr", "passiveAttr"]);
     const starterData = globalScene.gameData.starterData;
-    for (const [id, s] of Object.entries(parsed.starter ?? {})) {
-      if (s != null && typeof s === "object") {
-        const key = Number(id);
-        starterData[key] = { ...(starterData[key] ?? {}), ...s };
+    for (const [id, sIn] of Object.entries(parsed.starter ?? {})) {
+      if (sIn == null || typeof sIn !== "object") {
+        continue;
       }
+      const key = Number(id);
+      const local = (starterData[key] ?? {}) as unknown as Record<string, unknown>;
+      for (const [field, incoming] of Object.entries(sIn as unknown as Record<string, unknown>)) {
+        const cur = local[field];
+        if (typeof incoming === "number" && typeof cur === "number") {
+          local[field] = BITMASK_STARTER_FIELDS.has(field) ? cur | incoming : Math.max(cur, incoming);
+        } else if (typeof incoming === "boolean") {
+          local[field] = cur === true || incoming;
+        } else if (incoming != null && typeof incoming === "object" && !Array.isArray(incoming)) {
+          // Objects (e.g. erShinyLab saved looks): gain NEW keys, local values win on conflict.
+          local[field] = { ...(incoming as Record<string, unknown>), ...((cur as Record<string, unknown>) ?? {}) };
+        } else if (cur === undefined) {
+          local[field] = incoming;
+        }
+      }
+      starterData[key] = local as unknown as (typeof starterData)[number];
     }
   } catch {
     // A malformed dex blob must never crash the guest; the checksum / next ME terminal re-sync.

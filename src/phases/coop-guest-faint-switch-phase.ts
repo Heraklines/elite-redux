@@ -60,7 +60,11 @@ export class CoopGuestFaintSwitchPhase extends Phase {
           const battlerCount = globalScene.currentBattle?.getBattlerCount() ?? 0;
           if (slotIndex >= battlerCount && slotIndex < 6) {
             coopLog("replay", `guest own-faint picker PICK slot=${this.fieldIndex} -> party[${slotIndex}] seq=${seq}`);
-            relay.sendInteractionChoice(seq, "switch", slotIndex, [0]);
+            // #799 (Wingull/Chinchou wrong-mon summon): carry the picked mon's SPECIES so the
+            // host can resolve the pick by IDENTITY when the two clients' party orders have
+            // diverged (a blind slot index summons a DIFFERENT mon on the other engine).
+            const pickedSpecies = globalScene.getPlayerParty()[slotIndex]?.species?.speciesId ?? 0;
+            relay.sendInteractionChoice(seq, "switch", slotIndex, [0, pickedSpecies]);
           }
           void Promise.resolve(globalScene.ui.setMode(UiMode.MESSAGE)).then(() => this.end());
         },

@@ -188,6 +188,13 @@ describe.skipIf(!RUN)("co-op DUO guest-owned faint: the guest chooses its OWN re
       expect(guestReplacement?.isFainted(), "the replacement is battle-ready on the guest").toBe(false);
     });
 
+    // #799 (live Wingull/Chinchou transposition): after the replacement flow the two engines'
+    // party ARRAYS must be permutation-identical INCLUDING ORDER - a transposition here is the
+    // root of wrong-mon summons and slot-targeted item cross-application.
+    const hostOrder = rig.hostScene.getPlayerParty().map(p => p?.species?.speciesId ?? 0);
+    const guestOrder = rig.guestScene.getPlayerParty().map(p => p?.species?.speciesId ?? 0);
+    expect(guestOrder, "guest party ARRAY ORDER matches the host after the replacement").toEqual(hostOrder);
+
     logs.flush();
   }, 240_000);
 });

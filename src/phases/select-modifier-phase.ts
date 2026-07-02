@@ -360,6 +360,18 @@ export class SelectModifierPhase extends BattlePhase {
           "reward",
           `WATCHER waits for partner's reward picks (start=${this.coopInteractionStart} role=${coopController.role} wave=${globalScene.currentBattle?.waveIndex})`,
         );
+        // #800 (live "it's not letting me pick anything"): the mirrored screen looks EXACTLY like
+        // the watcher's own, so blocked input reads as a bug. Say whose turn it is, plainly.
+        try {
+          globalScene.ui.showText(
+            `${coopController.partnerName ?? "Your partner"}'s turn: they are picking the rewards. Your picks come next screen.`,
+            null,
+            undefined,
+            4000,
+          );
+        } catch {
+          /* cosmetic */
+        }
         void this.startCoopWatch();
       }
       return;

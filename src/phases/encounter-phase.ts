@@ -8,7 +8,7 @@ import { handleTutorial, Tutorial } from "#app/tutorial";
 import { initEncounterAnims, loadEncounterAnimAssets } from "#data/battle-anims";
 import { fieldPositionForSlot } from "#data/battle-format";
 import { getCharVariantFromDialogue } from "#data/dialogue";
-import { captureCoopEnemies } from "#data/elite-redux/coop/coop-battle-engine";
+import { captureCoopDexBaseline, captureCoopEnemies } from "#data/elite-redux/coop/coop-battle-engine";
 import { coopWarn } from "#data/elite-redux/coop/coop-debug";
 import { buildCoopEnemy } from "#data/elite-redux/coop/coop-enemy-builder";
 import { getCoopWaveBarrierMs } from "#data/elite-redux/coop/coop-interaction-relay";
@@ -136,6 +136,13 @@ export class EncounterPhase extends BattlePhase {
     // whichever recording is live. Both are behavior-preserving passive observers.
     maybeBeginReplayRecording();
     maybeBeginSinglePlayerReplayRecording();
+    // #801 run-scoped acquisition sharing: snapshot the dex/starter baseline at the CO-OP run's
+    // first encounter so the shared blob only ever carries RUN acquisitions (catches, unlocks) -
+    // never the host's whole account dex ("they get all of my pokemon" live report). Idempotent
+    // per wave-1; harmless in solo (the blob is only sent in co-op).
+    if (globalScene.gameMode.isCoop && globalScene.currentBattle?.waveIndex === 1) {
+      captureCoopDexBaseline();
+    }
 
     // Co-op GUEST (#633, LIVE-D6): adopt the host's authoritative enemy party BEFORE
     // generating our own, so both clients fight byte-identical enemies (species

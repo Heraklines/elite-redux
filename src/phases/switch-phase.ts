@@ -1,5 +1,5 @@
 import { globalScene } from "#app/global-scene";
-import { coopLog } from "#data/elite-redux/coop/coop-debug";
+import { coopLog, coopWarn } from "#data/elite-redux/coop/coop-debug";
 import { COOP_FAINT_SWITCH_SEQ_BASE, getCoopFaintSwitchWaitMs } from "#data/elite-redux/coop/coop-interaction-relay";
 import {
   coopOwnerOfPlayerFieldSlot,
@@ -107,6 +107,25 @@ export class SwitchPhase extends BattlePhase {
           void coopRelay.awaitInteractionChoice(faintSeq, getCoopFaintSwitchWaitMs()).then(res => {
             const battlerCount = globalScene.currentBattle.getBattlerCount();
             let slotIndex = res?.choice ?? -1;
+            // #799 (live Wingull/Chinchou wrong-mon summon): the pick carries the chosen mon's
+            // SPECIES (data[1]). If the two clients' party orders diverged, the blind slot index
+            // points at a DIFFERENT mon here - resolve by IDENTITY instead and log the drift.
+            const pickedSpecies = res?.data?.[1] ?? 0;
+            if (pickedSpecies > 0 && slotIndex >= 0) {
+              const atSlot = globalScene.getPlayerParty()[slotIndex];
+              if (atSlot?.species?.speciesId !== pickedSpecies) {
+                const bySpecies = globalScene
+                  .getPlayerParty()
+                  .findIndex((p, i) => i >= battlerCount && i < 6 && p?.species?.speciesId === pickedSpecies);
+                if (bySpecies >= 0) {
+                  coopWarn(
+                    "replay",
+                    `partner pick slot=${slotIndex} holds sp${atSlot?.species?.speciesId ?? 0} but partner picked sp${pickedSpecies} -> resolved by identity to slot=${bySpecies} (party-order drift)`,
+                  );
+                  slotIndex = bySpecies;
+                }
+              }
+            }
             const picked = globalScene.getPlayerParty()[slotIndex];
             const legal =
               slotIndex >= battlerCount
