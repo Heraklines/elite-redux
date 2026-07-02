@@ -1,0 +1,283 @@
+url:      https://elite-redux-staging.pages.dev/
+build:    mr331o1a-5o09
+mode:     4  wave:14
+seed:     PsrHvtfDsNwWT6iFHvMcMKTi
+party:    Dewpider(L11 18hp f0), Phione(L11 45hp f0), Solosis Redux(L10 32hp f0), Swablu Redux(L7 25hp f0), Totodile(L7 26hp f0)
+enemy:    Budew(L10), Cottonee(L10), Litleo(L10)
+
+----- COMMENT -----
+Helping hand is bugged
+
+----- CONSOLE -----
+[06:16:19.626] LOG: %cStart Phase SelectTargetPhase color:green;
+[06:16:19.860] LOG: %cStart Phase CommandPhase color:green;
+[06:16:21.381] LOG: Move: FREEZE_DRY Move targets: {"targets":[3,0,2],"multiple":false} 
+Player Pokemon: Phione
+[06:16:21.383] LOG: %cStart Phase SelectTargetPhase color:green;
+[06:16:21.618] LOG: %cStart Phase CommandPhase color:green;
+[06:16:22.728] LOG: Move: HELPING_HAND Move targets: {"targets":[1],"multiple":false} 
+Player Pokemon: Solosis Redux
+[06:16:22.729] LOG: %cStart Phase EnemyCommandPhase color:green;
+[06:16:22.734] LOG: Battle Seed: hBUgwbwdyZl9lg2b
+[06:16:22.734] LOG: Move Pool: ["Struggle Bug","Synthesis","Camouflage"]
+[06:16:22.734] LOG: Move Scores: [31.5,-7,0]
+[06:16:22.734] LOG: Sorted Move Pool: ["Struggle Bug","Camouflage","Synthesis"]
+[06:16:22.734] LOG: Chosen Move: Synthesis
+[06:16:22.734] LOG: %cStart Phase TurnStartPhase color:green;
+[06:16:22.739] LOG: %cStart Phase MovePhase color:green;
+[06:16:22.739] LOG: %cUser: Solosis Redux
+Move: HELPING_HAND
+Use Mode: NORMAL color:orchid
+[06:16:22.740] LOG: %cStart Phase MessagePhase color:green;
+[06:16:22.823] LOG: %cStart Phase MessagePhase color:green;
+[06:16:23.011] LOG: %cStart Phase MoveEndPhase color:green;
+[06:16:23.012] LOG: %cStart Phase MovePhase color:green;
+[06:16:23.012] LOG: %cUser: Phione
+Move: FREEZE_DRY
+Use Mode: NORMAL color:orchid
+[06:16:23.014] LOG: %cStart Phase MessagePhase color:green;
+[06:16:23.120] LOG: %cStart Phase MoveEffectPhase color:green;
+[06:16:23.121] LOG: crit stage: +0
+[06:16:23.121] LOG: Move: Freeze-Dry | Base damage: 14.6 | Power: 70 | Source attack: 27 | Target defense: 18
+[06:16:23.121] LOG: Move: Freeze-Dry | Attack damage: 28
+[06:16:23.122] LOG: %cStart Phase DamageAnimPhase color:green;
+[06:16:23.133] LOG: %cStart Phase MessagePhase color:green;
+[06:16:23.332] LOG: %cStart Phase FaintPhase color:green;
+[06:16:23.388] LOG: %cStart Phase MessagePhase color:green;
+[06:16:23.884] LOG: %cStart Phase VictoryPhase color:green;
+[06:16:23.884] LOG: %cStart Phase ExpPhase color:green;
+[06:16:23.884] LOG: Applied Super EXP. Charm 
+[06:16:23.884] LOG: Applied EXP. Charm 
+[06:16:24.206] LOG: %cStart Phase LevelUpPhase color:green;
+[06:16:24.206] LOG: %cStart Phase ExpPhase color:green;
+[06:16:24.206] LOG: Applied Super EXP. Charm 
+[06:16:24.206] LOG: Applied EXP. Charm 
+[06:16:24.430] LOG: %cStart Phase LevelUpPhase color:green;
+[06:16:24.430] LOG: %cStart Phase ExpPhase color:green;
+[06:16:24.430] LOG: Applied Super EXP. Charm 
+[06:16:24.430] LOG: Applied EXP. Charm 
+[06:16:24.642] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[06:16:24.642] LOG: Applied Super EXP. Charm 
+[06:16:24.642] LOG: Applied EXP. Charm 
+[06:16:24.643] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[06:16:24.643] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[06:16:24.643] LOG: Applied Super EXP. Charm 
+[06:16:24.643] LOG: Applied EXP. Charm 
+[06:16:24.643] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[06:16:24.643] LOG: %cStart Phase MoveEndPhase color:green;
+[06:16:24.643] LOG: %cStart Phase MovePhase color:green;
+[06:16:24.643] LOG: %cUser: Dewpider
+Move: SIGNAL_BEAM
+Use Mode: NORMAL color:orchid
+[06:16:24.644] LOG: %cStart Phase MessagePhase color:green;
+[06:16:24.756] LOG: %cStart Phase MessagePhase color:green;
+[06:16:24.944] LOG: %cStart Phase MoveEndPhase color:green;
+[06:16:24.944] LOG: %cStart Phase MovePhase color:green;
+[06:16:24.944] LOG: %cStart Phase MoveEndPhase color:green;
+[06:16:24.944] LOG: %cStart Phase CheckInterludePhase color:green;
+[06:16:24.944] LOG: %cStart Phase WeatherEffectPhase color:green;
+[06:16:24.944] LOG: %cStart Phase PositionalTagPhase color:green;
+[06:16:24.944] LOG: %cStart Phase BerryPhase color:green;
+[06:16:24.945] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[06:16:24.946] LOG: %cStart Phase TurnEndPhase color:green;
+[06:16:24.947] WARN: [coop:turn] host recorder: finalize with NO open recording -> turn=-1 events=0 (caller decides not to emit)
+[06:16:24.947] LOG: %cStart Phase PokemonHealPhase color:green;
+[06:16:24.949] LOG: %cStart Phase MessagePhase color:green;
+[06:16:25.169] LOG: %cStart Phase PokemonHealPhase color:green;
+[06:16:25.169] LOG: %cStart Phase MessagePhase color:green;
+[06:16:25.368] LOG: %cStart Phase PokemonHealPhase color:green;
+[06:16:25.370] LOG: %cStart Phase MessagePhase color:green;
+[06:16:25.593] LOG: %cStart Phase PokemonHealPhase color:green;
+[06:16:25.595] LOG: %cStart Phase MessagePhase color:green;
+[06:16:25.805] LOG: %cStart Phase PokemonHealPhase color:green;
+[06:16:25.806] LOG: %cStart Phase MessagePhase color:green;
+[06:16:25.993] LOG: %cStart Phase BattleEndPhase color:green;
+[06:16:25.993] LOG: Battle Score: 120 (2 Turns x0.92)
+[06:16:25.993] LOG: Total Score: 941
+[06:16:25.999] LOG: %cStart Phase EggLapsePhase color:green;
+[06:16:26.017] LOG: %cStart Phase MessagePhase color:green;
+[06:16:26.163] LOG: %cStart Phase EggSummaryPhase color:green;
+[06:16:32.485] LOG: %cStart Phase SelectModifierPhase color:green;
+[06:16:32.485] LOG: Wave Seed: ]UsQ[daCvSUZpZXav 13
+[06:16:32.490] LOG: 13 9 [2,3,4,5,6,7,8,9,10,22]
+[06:16:32.490] LOG: {"id":"NUGGET","localeKey":"modifierType:ModifierType.NUGGET","iconImage":"nugget","group":"money","soundName":"se/buy","tier":1,"moneyMultiplier":1,"moneyMultiplierDescriptorKey":"modifierType:ModifierType.MoneyRewardModifierType.extra.small"} 
+[06:16:32.490] LOG: 1 0 [2,3,4,5]
+[06:16:32.490] LOG: {"id":"RARE_CANDY","localeKey":"modifierType:ModifierType.RARE_CANDY","iconImage":"rare_candy","soundName":"se/restore","tier":0} 
+[06:16:32.490] LOG: 7 4 [2,3,4,5]
+[06:16:32.490] LOG: {"id":"TEMP_STAT_STAGE_BOOSTER","localeKey":"","iconImage":"x_accuracy","soundName":"se/restore","tier":0,"stat":6,"nameKey":"x_accuracy","quantityKey":"stage"} 
+[06:16:32.490] LOG: 1 0 [2,3,4,5]
+[06:16:32.490] LOG: {"id":"RARE_CANDY","localeKey":"modifierType:ModifierType.RARE_CANDY","iconImage":"rare_candy","soundName":"se/restore","tier":0} 
+[06:16:32.491] LOG: 0 0 [2,3,4,5]
+[06:16:32.491] LOG: {"id":"POKEBALL","localeKey":"","iconImage":"pb","group":"pb","soundName":"se/pb_bounce_1","tier":0,"pokeballType":0,"count":5} 
+[06:16:38.122] LOG: %cStart Phase NewBattlePhase color:green;
+[06:16:38.122] LOG: Wave Seed: ^VtR\ebDwTV[q[Ybw 14
+[06:16:38.122] LOG: Starting trainer pool tier: COMMON
+[06:16:38.124] LOG: %cStart Phase MessagePhase color:green;
+[06:16:38.932] LOG: %cStart Phase ReturnPhase color:green;
+[06:16:39.272] LOG: %cStart Phase ReturnPhase color:green;
+[06:16:39.611] LOG: %cStart Phase ReturnPhase color:green;
+[06:16:39.950] LOG: %cStart Phase ShowTrainerPhase color:green;
+[06:16:40.289] LOG: %cStart Phase NextEncounterPhase color:green;
+[06:16:40.290] LOG: COMMON
+[06:16:40.290] LOG: Budew
+[06:16:40.296] LOG: Pokemon: Foe Budew | Species ID: 406 | Level: 10 | Nature: Lonely (+Atk/-Def)
+[06:16:40.296] LOG: Stats (IVs): HP: 28 (14), Atk: 13 (15), Def: 12 (10), Spatk: 15 (7), Spdef: 19 (27), Spd: 16 (12)
+[06:16:40.296] LOG: Ability: Pastel Veil | Passive Ability: Poison Point 
+[06:16:40.296] LOG: Moveset: ["Poison Sting","Grass Knot","Stun Spore","Sweet Scent"]
+[06:16:40.296] LOG: UNCOMMON
+[06:16:40.296] LOG: Cottonee
+[06:16:40.301] LOG: Pokemon: Foe Cottonee | Species ID: 546 | Level: 10 | Nature: Bashful (-)
+[06:16:40.301] LOG: Stats (IVs): HP: 28 (26), Atk: 10 (27), Def: 19 (23), Spatk: 13 (6), Spdef: 16 (1), Spd: 20 (22)
+[06:16:40.301] LOG: Ability: Guilt Trip | Passive Ability: Infiltrator 
+[06:16:40.301] LOG: Moveset: ["Fairy Wind","Mega Drain","Stun Spore","Tickle"]
+[06:16:40.301] LOG: COMMON
+[06:16:40.301] LOG: Litleo
+[06:16:40.306] LOG: Pokemon: Foe Litleo | Species ID: 667 | Level: 10 | Nature: Impish (+Def/-SpAtk)
+[06:16:40.306] LOG: Stats (IVs): HP: 34 (20), Atk: 15 (2), Def: 19 (23), Spatk: 20 (18), Spdef: 18 (31), Spd: 20 (12)
+[06:16:40.306] LOG: Ability: Competitive | Passive Ability: Pretentious 
+[06:16:40.306] LOG: Moveset: ["Growl","Roar"]
+[06:16:41.478] LOG: Generated AI funcs
+[06:16:41.529] DEBUG: Session data saved to slot 4!
+[06:16:41.529] LOG: Wave Seed: ^VtR\ebDwTV[q[Ybw 14
+[06:16:42.199] LOG: Colleagues Ivan & Kristen
+[06:17:13.355] LOG: Dialogue saved as seen: dialogue:clerk.encounter.1
+[06:17:13.447] LOG: Colleagues Ivan & Kristen
+[06:17:14.458] LOG: %cStart Phase SummonPhase color:green;
+[06:17:14.458] LOG: Ivan
+[06:17:15.257] LOG: %cStart Phase SummonPhase color:green;
+[06:17:15.257] LOG: Kristen
+[06:17:16.100] LOG: %cStart Phase SummonPhase color:green;
+[06:17:16.100] LOG: Ivan
+[06:17:16.906] LOG: %cStart Phase SummonPhase color:green;
+[06:17:17.470] WARN: cry/751 not found
+[06:17:17.809] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[06:17:17.810] LOG: %cStart Phase SummonPhase color:green;
+[06:17:18.373] WARN: cry/489 not found
+[06:17:18.712] LOG: %cStart Phase SummonPhase color:green;
+[06:17:19.276] WARN: cry/10718 not found
+[06:17:19.615] LOG: %cStart Phase InitEncounterPhase color:green;
+[06:17:19.616] LOG: %cStart Phase PostSummonPhase color:green;
+[06:17:19.616] LOG: Ran PSP for: Phione
+[06:17:19.618] LOG: %cStart Phase PostSummonPhase color:green;
+[06:17:19.621] LOG: %cStart Phase PostSummonPhase color:green;
+[06:17:19.621] LOG: %cStart Phase ShowAbilityPhase color:green;
+[06:17:20.125] LOG: %cStart Phase MovePhase color:green;
+[06:17:20.125] LOG: %cUser: Phione
+Move: AQUA_RING
+Use Mode: INDIRECT color:orchid
+[06:17:20.128] LOG: %cStart Phase MessagePhase color:green;
+[06:17:20.457] LOG: %cStart Phase MoveEffectPhase color:green;
+[06:17:20.458] LOG: %cStart Phase MessagePhase color:green;
+[06:17:21.294] LOG: %cStart Phase MoveEndPhase color:green;
+[06:17:21.294] LOG: %cStart Phase HideAbilityPhase color:green;
+[06:17:21.368] LOG: %cStart Phase PostSummonPhase color:green;
+[06:17:21.368] LOG: Ran PSP for: Cottonee
+[06:17:21.371] LOG: %cStart Phase PostSummonPhase color:green;
+[06:17:21.371] LOG: Ran PSP for: Litleo
+[06:17:21.373] LOG: %cStart Phase PostSummonPhase color:green;
+[06:17:21.374] LOG: %cStart Phase PostSummonPhase color:green;
+[06:17:21.375] LOG: %cStart Phase PostSummonPhase color:green;
+[06:17:21.376] LOG: %cStart Phase PostSummonPhase color:green;
+[06:17:21.377] LOG: %cStart Phase PostSummonPhase color:green;
+[06:17:21.377] LOG: Ran PSP for: Budew
+[06:17:21.377] LOG: %cStart Phase PostSummonPhase color:green;
+[06:17:21.378] LOG: %cStart Phase ShowAbilityPhase color:green;
+[06:17:21.888] LOG: %cStart Phase MovePhase color:green;
+[06:17:21.888] LOG: %cUser: Budew
+Move: SAFEGUARD
+Use Mode: INDIRECT color:orchid
+[06:17:21.892] LOG: %cStart Phase MessagePhase color:green;
+[06:17:22.245] LOG: %cStart Phase MoveEffectPhase color:green;
+[06:17:22.247] LOG: %cStart Phase MessagePhase color:green;
+[06:17:23.123] LOG: %cStart Phase MoveEndPhase color:green;
+[06:17:23.124] LOG: %cStart Phase HideAbilityPhase color:green;
+[06:17:23.197] LOG: %cStart Phase PostSummonPhase color:green;
+[06:17:23.198] LOG: %cStart Phase PostSummonPhase color:green;
+[06:17:23.198] LOG: Ran PSP for: Dewpider
+[06:17:23.198] LOG: %cStart Phase PostSummonPhase color:green;
+[06:17:23.199] LOG: %cStart Phase ShowAbilityPhase color:green;
+[06:17:23.712] LOG: %cStart Phase MovePhase color:green;
+[06:17:23.712] LOG: %cUser: Dewpider
+Move: AQUA_RING
+Use Mode: INDIRECT color:orchid
+[06:17:23.717] LOG: %cStart Phase MessagePhase color:green;
+[06:17:24.057] LOG: %cStart Phase MoveEffectPhase color:green;
+[06:17:24.058] LOG: %cStart Phase MessagePhase color:green;
+[06:17:24.905] LOG: %cStart Phase MoveEndPhase color:green;
+[06:17:24.905] LOG: %cStart Phase HideAbilityPhase color:green;
+[06:17:24.975] LOG: %cStart Phase PostSummonPhase color:green;
+[06:17:24.976] LOG: %cStart Phase PostSummonPhase color:green;
+[06:17:24.976] LOG: Ran PSP for: Solosis Redux
+[06:17:24.977] LOG: %cStart Phase PostSummonPhase color:green;
+[06:17:24.977] LOG: %cStart Phase PostSummonPhase color:green;
+[06:17:24.978] LOG: %cStart Phase TurnInitPhase color:green;
+[06:17:24.978] LOG: %cStart Phase CommandPhase color:green;
+[06:17:31.026] LOG: Move: AQUA_STEP Move targets: {"targets":[3,4,1],"multiple":false} 
+Player Pokemon: Dewpider
+[06:17:31.028] LOG: %cStart Phase SelectTargetPhase color:green;
+[06:17:33.590] LOG: %cStart Phase CommandPhase color:green;
+[06:17:34.415] LOG: %cStart Phase CommandPhase color:green;
+[06:17:41.451] LOG: Move: AQUA_STEP Move targets: {"targets":[3,4,1],"multiple":false} 
+Player Pokemon: Dewpider
+[06:17:41.452] LOG: %cStart Phase SelectTargetPhase color:green;
+[06:17:41.820] LOG: %cStart Phase CommandPhase color:green;
+[06:17:43.414] LOG: Move: SURF Move targets: {"targets":[3,4,5,0,2],"multiple":true} 
+Player Pokemon: Phione
+[06:17:43.416] LOG: %cStart Phase SelectTargetPhase color:green;
+[06:17:43.820] LOG: %cStart Phase CommandPhase color:green;
+[06:17:45.153] LOG: Move: HELPING_HAND Move targets: {"targets":[1],"multiple":false} 
+Player Pokemon: Solosis Redux
+[06:17:45.154] LOG: %cStart Phase EnemyCommandPhase color:green;
+[06:17:45.162] LOG: Battle Seed: RHcqWqzhSb6wjAop
+[06:17:45.167] LOG: Move Pool: ["Poison Sting","Grass Knot","Stun Spore","Sweet Scent"]
+[06:17:45.167] LOG: Move Scores: [16.5,18,10,6]
+[06:17:45.167] LOG: Sorted Move Pool: ["Grass Knot","Poison Sting","Stun Spore","Sweet Scent"]
+[06:17:45.167] LOG: Chosen Move: Grass Knot
+[06:17:45.167] LOG: %cStart Phase EnemyCommandPhase color:green;
+[06:17:45.178] LOG: Move Pool: ["Fairy Wind","Mega Drain","Stun Spore","Tickle"]
+[06:17:45.178] LOG: Move Scores: [5.625,15,10,2]
+[06:17:45.178] LOG: Sorted Move Pool: ["Mega Drain","Stun Spore","Fairy Wind","Tickle"]
+[06:17:45.178] LOG: Chosen Move: Mega Drain
+[06:17:45.178] LOG: %cStart Phase EnemyCommandPhase color:green;
+[06:17:45.179] LOG: Move Pool: ["Growl","Roar"]
+[06:17:45.179] LOG: Move Scores: [2,-20]
+[06:17:45.179] LOG: Sorted Move Pool: ["Growl","Roar"]
+[06:17:45.179] LOG: Chosen Move: Growl
+[06:17:45.180] LOG: %cStart Phase TurnStartPhase color:green;
+[06:17:45.187] LOG: %cStart Phase MovePhase color:green;
+[06:17:45.187] LOG: %cUser: Solosis Redux
+Move: HELPING_HAND
+Use Mode: NORMAL color:orchid
+[06:17:45.190] LOG: %cStart Phase MessagePhase color:green;
+[06:17:45.474] LOG: %cStart Phase MessagePhase color:green;
+[06:17:46.086] LOG: %cStart Phase MoveEndPhase color:green;
+[06:17:46.088] LOG: %cStart Phase MovePhase color:green;
+[06:17:46.088] LOG: %cUser: Phione
+Move: SURF
+Use Mode: NORMAL color:orchid
+[06:17:46.092] LOG: %cStart Phase MessagePhase color:green;
+[06:17:46.383] LOG: %cStart Phase MoveEffectPhase color:green;
+[06:17:46.384] LOG: crit stage: +0
+[06:17:46.385] LOG: Move: Surf | Base damage: 23.78782608695652 | Power: 135 | Source attack: 29 | Target defense: 23
+[06:17:46.385] LOG: Move: Surf | Attack damage: 8
+[06:17:46.385] LOG: crit stage: +0
+[06:17:46.385] LOG: Move: Surf | Base damage: 25.86285714285714 | Power: 135 | Source attack: 29 | Target defense: 21
+[06:17:46.386] LOG: Move: Surf | Attack damage: 12
+[06:17:46.386] LOG: crit stage: +0
+[06:17:46.386] LOG: Move: Surf | Base damage: 35.408 | Power: 135 | Source attack: 29 | Target defense: 15
+[06:17:46.386] LOG: Move: Surf | Attack damage: 18
+[06:17:46.386] LOG: crit stage: +0
+[06:17:46.387] LOG: Move: Surf | Base damage: 29.84 | Power: 135 | Source attack: 29 | Target defense: 18
+[06:17:46.387] LOG: Move: Surf | Attack damage: 64
+[06:17:46.387] LOG: %cStart Phase ShowAbilityPhase color:green;
+[06:17:46.893] LOG: %cStart Phase HideAbilityPhase color:green;
+[06:17:46.966] LOG: %cStart Phase ShowAbilityPhase color:green;
+[06:17:47.475] LOG: %cStart Phase HideAbilityPhase color:green;
+[06:17:47.548] LOG: %cStart Phase DamageAnimPhase color:green;
+[06:17:47.560] LOG: %cStart Phase MessagePhase color:green;
+[06:17:48.177] LOG: %cStart Phase MessagePhase color:green;
+[06:17:48.855] LOG: %cStart Phase MessagePhase color:green;
+[06:17:49.510] LOG: %cStart Phase DamageAnimPhase color:green;
+[06:17:49.524] LOG: %cStart Phase MessagePhase color:green;
+[06:17:50.201] LOG: %cStart Phase DamageAnimPhase color:green;
+[06:17:50.214] LOG: %cStart Phase MessagePhase color:green;
