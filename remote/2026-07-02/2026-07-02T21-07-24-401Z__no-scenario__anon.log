@@ -1,0 +1,87 @@
+url:      https://elite-redux-staging.pages.dev/
+build:    mr3zr6c8-bvg2
+mode:     0  wave:?
+seed:     twVLEtwlaoMfSZD9DcF5zNoT
+party:    
+enemy:    
+
+----- COMMENT -----
+Co-Op log
+
+----- CONSOLE -----
+[21:05:20.275] LOG: %c %c %c %c %c Phaser v3.90.0 (WebGL | Web Audio) %c https://phaser.io/v390 background: #ff0000 background: #ffff00 background: #00ff00 background: #00ffff color: #ffffff; background: #000000 background: transparent
+[21:05:20.640] LOG: [ER] build mr3zr6c8-bvg2
+[21:05:21.006] LOG: [dev-tools] loaded — 419 scenarios + Send Logs button
+[21:05:28.001] DEBUG: Destroying loading scene
+[21:05:28.001] DEBUG: Destroyed loading scene
+[21:05:28.128] LOG: Seed: twVLEtwlaoMfSZD9DcF5zNoT
+[21:05:28.128] LOG: Wave Seed: twVLEtwlaoMfSZD9DcF5zNoT 0
+[21:05:31.688] LOG: %cStart Phase LoginPhase color:green;
+[21:05:32.013] LOG: Client Session: K6s7yyZuavxt9MCsC5yi0KhwkCLRM0vR
+[21:05:32.364] DEBUG: Using cached system data
+[21:05:32.615] LOG: %cStart Phase TitlePhase color:green;
+[21:05:32.616] LOG: Getting Session Slot id: %d 0
+[21:05:32.660] LOG: use seasonal splash messages true
+[21:06:23.479] LOG: [coop:lobby] start announce name=Arctic Flame
+[21:06:24.722] LOG: [coop:lobby] announced id=0ca79925-e792-475f-85d3-e239ec0ebb28 -> begin polling
+[21:06:25.901] LOG: [coop:lobby] poll players=1
+[21:06:27.567] LOG: [coop:lobby] request target=de8cf2b8-b63b-40aa-8f9e-d5326bbe46e4 (self=0ca79925-e792-475f-85d3-e239ec0ebb28)
+[21:06:28.678] LOG: [coop:lobby] poll players=1
+[21:06:30.113] LOG: [coop:lobby] poll: incoming request from=de8cf2b8-b63b-40aa-8f9e-d5326bbe46e4 name=Heraklines1
+[21:06:30.114] LOG: [coop:lobby] poll players=1
+[21:06:31.888] LOG: [coop:lobby] respond accept=true from=de8cf2b8-b63b-40aa-8f9e-d5326bbe46e4 (self=0ca79925-e792-475f-85d3-e239ec0ebb28)
+[21:06:33.044] LOG: [coop:lobby] poll matched code=R6JP7P role=guest -> connect
+[21:06:33.044] LOG: [coop:launch] lobby connect code=R6JP7P role=guest name=Arctic Flame
+[21:06:33.046] LOG: [coop:launch] connectCoopWithCode code=R6JP7P role=guest username=Arctic Flame
+[21:06:33.046] LOG: [coop:launch] exchange SDP start code=R6JP7P role=guest (ice=fetched)
+[21:06:33.195] WARN: [coop:lobby] respond failed (transient): that player is no longer available -> keep browsing
+[21:06:33.902] LOG: [coop:launch] ICE from worker /coop/ice servers=1
+[21:06:33.952] LOG: [coop:launch] await peer signal start code=R6JP7P role=guest timeout=60000ms
+[21:06:34.544] LOG: [coop:lobby] cancel (id=0ca79925-e792-475f-85d3-e239ec0ebb28 connecting=true)
+[21:06:34.544] LOG: %cStart Phase TitlePhase color:green;
+[21:06:34.545] LOG: Getting Session Slot id: %d 0
+[21:06:34.555] LOG: use seasonal splash messages true
+[21:06:35.028] LOG: [coop:launch] await peer signal resolve code=R6JP7P role=guest (1577b)
+[21:06:35.028] LOG: [coop:launch] guest received offer code=R6JP7P -> answering
+[21:06:35.054] LOG: [coop:launch] iceConnectionState=checking code=R6JP7P role=guest
+[21:06:35.055] LOG: [coop:launch] pcConnectionState=connecting code=R6JP7P role=guest
+[21:06:35.259] LOG: [coop:launch] guest pushing answer code=R6JP7P (ICE gathered)
+[21:06:35.259] LOG: [coop:launch] pushSignal code=R6JP7P role=guest sdpBytes=1974
+[21:06:37.538] LOG: [coop:launch] iceConnectionState=connected code=R6JP7P role=guest
+[21:06:37.764] LOG: [coop:launch] pcConnectionState=connected code=R6JP7P role=guest
+[21:06:38.118] LOG: [coop:launch] guest datachannel event label=coop state=open code=R6JP7P
+[21:06:38.118] LOG: [coop:launch] data channel already open
+[21:06:38.119] LOG: [coop:webrtc] ctor role=guest readyState=open state=connected
+[21:06:38.119] LOG: [coop:launch] connectCoopSession role=guest state=connected username=Arctic Flame netcode=authoritative
+[21:06:38.120] LOG: [coop:stream] streamer CONSTRUCT timeout=1200000ms onMessage registered
+[21:06:38.120] LOG: [coop:stream] guest REGISTER onGhostPool handler (bufferedEarly=false)
+[21:06:38.120] LOG: [coop:stream] host REGISTER onStateSyncRequest handler (was=false)
+[21:06:38.120] LOG: [coop:stream] host REGISTER onEnemyPartyRequest handler (was=false)
+[21:06:38.120] LOG: [coop:stream] guest REGISTER onWaveResolved handler (was=false)
+[21:06:38.120] LOG: [coop:stream] guest REGISTER onExpResolved handler (was=false)
+[21:06:38.120] LOG: [coop:stream] watcher REGISTER onMeChecksum handler (was=false)
+[21:06:38.121] LOG: [coop:turn] host recorder: REGISTER live emitter (was=false)
+[21:06:38.121] LOG: [coop:session] coopAuthoritativeGuestPredicate INSTALLED
+[21:06:38.121] LOG: [coop:launch] peer session ready role=guest netcode=authoritative -> connecting
+[21:06:38.121] LOG: [coop:launch] session connect role=guest partnerRole=host netcode=authoritative username=Arctic Flame version=1 tiebreak=0.059127505787617385
+[21:06:38.121] LOG: [coop:webrtc] raw tx role=guest t=hello bytes=100
+[21:06:38.216] LOG: [coop:checksum] dataFingerprint compute moveMap=e9b828360aafb9e2(1032) movesData=fd4644aafd23b546(1107) movesName=fad7fe8932ec09a1(1107) movesets=64b54a1afcca3c5d(1908) abilitiesData=3088ac8089021d9e(1047) abilitiesName=7c302bdd9cc50a0b(1047)
+[21:06:38.222] LOG: [coop:webrtc] raw tx role=guest t=dataFingerprint bytes=329
+[21:06:38.222] LOG: [coop:launch] lobby connect: runtime ready but stopped -> discard code=R6JP7P
+[21:06:38.222] LOG: [coop:webrtc] channel OPEN role=guest
+[21:06:38.223] LOG: [coop:webrtc] raw rx role=guest t=hello bytes=96 handlers=7
+[21:06:38.224] LOG: [coop:launch] hello recv partner=Heraklines1 partnerRole=host (local role=guest; no conflict)
+[21:06:38.224] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[21:06:38.224] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[21:06:38.225] LOG: [coop:webrtc] raw rx role=guest t=dataFingerprint bytes=329 handlers=7
+[21:06:38.225] LOG: [coop:checksum] MATCH - data tables identical across clients
+[21:06:53.838] LOG: [coop:lobby] start announce name=Arctic Flame
+[21:06:54.897] LOG: [coop:lobby] announced id=f904860e-6160-4a51-b981-f225116c5bb4 -> begin polling
+[21:06:56.122] LOG: [coop:lobby] poll players=0
+[21:06:58.888] LOG: [coop:lobby] poll players=0
+[21:07:01.657] LOG: [coop:lobby] poll players=0
+[21:07:05.143] LOG: [coop:lobby] poll players=0
+[21:07:08.165] LOG: [coop:lobby] poll players=0
+[21:07:11.174] LOG: [coop:lobby] poll players=0
+[21:07:14.143] LOG: [coop:lobby] poll players=0
+[21:07:17.075] LOG: [coop:lobby] poll players=0
