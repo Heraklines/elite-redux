@@ -5,6 +5,7 @@ import { initMoveAnim, loadMoveAnimAssets } from "#data/battle-anims";
 import { allMoves } from "#data/data-lists";
 import { coopLog, coopWarn } from "#data/elite-redux/coop/coop-debug";
 import {
+  advanceCoopInteractionForContinuation,
   getCoopController,
   getCoopInteractionRelay,
   getCoopNetcodeMode,
@@ -231,11 +232,15 @@ export class LearnMovePhase extends PlayerPartyMemberPokemonPhase {
       // host's exact tryRemovePhase conditions (learn-move-phase learnMove: TM, or MEMORY with cost=-1)
       // so the guest's phase queue converges. Gated inside the authoritative-guest branch -> solo / host
       // / lockstep / hotseat are byte-identical (they never enter here).
+      // #789-class (probe-verified for capsules): removing the continuation copy IS the commit
+      // signal for a continuation-class reward - the shop deliberately skipped its advance, so
+      // advance HERE or the alternation rotation stalls on the same owner. From-pinned to the
+      // live counter, so a double-fire (or the partner's broadcast landing first) is a no-op.
       if (
-        this.learnMoveType === LearnMoveType.TM
-        || (this.learnMoveType === LearnMoveType.MEMORY && this.cost === -1)
+        (this.learnMoveType === LearnMoveType.TM || (this.learnMoveType === LearnMoveType.MEMORY && this.cost === -1))
+        && globalScene.phaseManager.tryRemovePhase("SelectModifierPhase")
       ) {
-        globalScene.phaseManager.tryRemovePhase("SelectModifierPhase");
+        advanceCoopInteractionForContinuation(controller.interactionCounter());
       }
       // Pure renderer: the persistent listener's CoopReplayLearnMovePhase is the sole picker renderer.
       // Ending here (no menu) is the double-render guard for the Shroom-queued guest LearnMovePhase.
@@ -457,11 +462,15 @@ export class LearnMovePhase extends PlayerPartyMemberPokemonPhase {
         pokemon.usedTMs = [];
       }
       pokemon.usedTMs.push(this.moveId);
-      globalScene.phaseManager.tryRemovePhase("SelectModifierPhase");
+      // #789-class: the continuation-copy removal is the interaction commit (see the guest mirror
+      // branch above) - advance the alternation or the rotation stalls after a committed TM.
+      if (globalScene.phaseManager.tryRemovePhase("SelectModifierPhase")) {
+        advanceCoopInteractionForContinuation(getCoopController()?.interactionCounter() ?? -1);
+      }
     } else if (this.learnMoveType === LearnMoveType.MEMORY) {
-      if (this.cost === -1) {
-        globalScene.phaseManager.tryRemovePhase("SelectModifierPhase");
-      } else {
+      if (this.cost === -1 && globalScene.phaseManager.tryRemovePhase("SelectModifierPhase")) {
+        advanceCoopInteractionForContinuation(getCoopController()?.interactionCounter() ?? -1);
+      } else if (this.cost !== -1) {
         if (!Overrides.WAIVE_ROLL_FEE_OVERRIDE) {
           globalScene.money -= this.cost;
           globalScene.updateMoneyText();
