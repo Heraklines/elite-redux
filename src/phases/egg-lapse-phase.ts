@@ -48,6 +48,15 @@ export class EggLapsePhase extends Phase {
 
   start() {
     super.start();
+    // CO-OP (#633, live egg freeze 00:53): egg hatching is a SOLO input-driven flow that can
+    // fire on ONE machine at any wave boundary - live it opened the guest's hatch screen while
+    // watcher-mode input suppression had their controls locked (frozen guest) and the host
+    // parked forever at the next lockstep gate. In co-op, eggs stay warm: hatch-wave countdown
+    // is PAUSED (no decrement) and nothing hatches; the backlog hatches on the next solo wave.
+    if (globalScene.gameMode?.isCoop) {
+      this.end();
+      return;
+    }
     // ER relic (#439): Warm Incubator gives every egg extra hatch-wave progress
     // this wave, on top of the normal -1 (0 when the relic isn't held).
     const warmBonus = erWarmIncubatorBonus();

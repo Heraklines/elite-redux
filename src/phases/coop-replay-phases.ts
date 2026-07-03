@@ -1173,6 +1173,18 @@ export class CoopApplyResyncPhase extends Phase {
   public override start(): void {
     super.start();
     try {
+      // #790-class STALE GUARD for resyncs (live faint softlock, 00:47 logs): a resync REQUESTED
+      // at turn N can be answered + queued while turn N+1 already finalized. Applying that OLD
+      // snapshot then REGRESSES fresh state (the party.1/party.5 transposition warnings) and -
+      // fatally - derails whatever the queue was mid-way through (the guest's replacement picker
+      // vanished; host waited on a pick that could never come). A resync older than the CURRENT
+      // battle turn is dead on arrival: the per-turn checkpoint already healed anything it knew.
+      const liveTurn = globalScene.currentBattle?.turn ?? 0;
+      if (this.turn > 0 && liveTurn > this.turn) {
+        coopWarn("resync", `turn=${this.turn} STALE (live turn=${liveTurn}) -> DROPPED (checkpoint supersedes)`);
+        this.end();
+        return;
+      }
       // MINOR-1: if we've already failed to heal THIS divergence twice in a row, skip the heavy
       // field/boss re-summon (it isn't closing the gap and a per-turn rebuild is a flicker storm) -
       // keep only the cheap scalar writes so we don't regress hp/status/stages.
