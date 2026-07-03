@@ -161,3 +161,51 @@ describe("co-op session controller over WebRtcTransport (#633, P6) - transport-a
     expect(g.bothReady()).toBe(true);
   });
 });
+
+describe("hot rejoin (#805): replaceChannel swaps a fresh wire into the LIVE transport", () => {
+  function pairedWires(): [MockWire, MockWire] {
+    const a = new MockWire();
+    const b = new MockWire();
+    a.peer = b;
+    b.peer = a;
+    return [a, b];
+  }
+
+  it("channel death -> disconnected; replaceChannel -> connected; messages flow over the NEW wire; stale wire events are inert", () => {
+    const [hostWireA, guestWireA] = pairedWires();
+    const host = new WebRtcTransport("host", hostWireA);
+    const guest = new WebRtcTransport("guest", guestWireA);
+    expect(host.state).toBe("connected");
+
+    const guestGot: string[] = [];
+    guest.onMessage(msg => guestGot.push(msg.t));
+    const hostStates: string[] = [];
+    host.onStateChange(st => hostStates.push(st));
+
+    // The live channel dies (network blip): both transports report disconnected.
+    hostWireA.close();
+    expect(host.state).toBe("disconnected");
+    expect(guest.state).toBe("disconnected");
+    expect(hostStates).toContain("disconnected");
+
+    // Re-dial: a fresh wire pair is swapped into BOTH live transports in place.
+    const [hostWireB, guestWireB] = pairedWires();
+    host.replaceChannel(hostWireB);
+    guest.replaceChannel(guestWireB);
+    expect(host.state).toBe("connected");
+    expect(guest.state).toBe("connected");
+    expect(hostStates).toContain("connected");
+
+    // The SAME transport objects carry messages over the new wire - the session stack
+    // above (controller/relays/streamers) never noticed the swap.
+    host.send({ t: "waveResolved", wave: 5, outcome: "win" });
+    expect(guestGot).toContain("waveResolved");
+
+    // Stale events from the DEAD wire are inert (generation guard): a late frame or
+    // close on wire A must not corrupt the reconnected transport.
+    guestWireA.injectRaw(JSON.stringify({ t: "waveResolved", wave: 99, outcome: "win" }));
+    expect(guestGot.filter(t => t === "waveResolved").length).toBe(1);
+    hostWireA.close();
+    expect(host.state).toBe("connected");
+  });
+});

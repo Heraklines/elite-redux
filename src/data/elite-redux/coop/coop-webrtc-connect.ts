@@ -28,7 +28,11 @@
 import { coopLog, coopWarn } from "#data/elite-redux/coop/coop-debug";
 import type { CoopRuntime } from "#data/elite-redux/coop/coop-runtime";
 import { connectCoopSession } from "#data/elite-redux/coop/coop-runtime";
-import { webRtcTransportFromChannel } from "#data/elite-redux/coop/coop-webrtc-transport";
+import {
+  type WebRtcTransport,
+  webRtcTransportFromChannel,
+  wireFromRtcChannel,
+} from "#data/elite-redux/coop/coop-webrtc-transport";
 
 /**
  * Free public STUN (no account, no cost, no relay - just IP reflection so the two
@@ -244,7 +248,10 @@ async function exchangeAndOpenChannel(code: string, role: CoopRole, ice?: CoopIc
 
   const channelPromise = new Promise<RTCDataChannel>(resolve => {
     pc.addEventListener("datachannel", ev => {
-      coopLog("launch", `guest datachannel event label=${ev.channel.label} state=${ev.channel.readyState} code=${code}`);
+      coopLog(
+        "launch",
+        `guest datachannel event label=${ev.channel.label} state=${ev.channel.readyState} code=${code}`,
+      );
       resolve(ev.channel);
     });
   });
@@ -265,6 +272,41 @@ async function exchangeAndOpenChannel(code: string, role: CoopRole, ice?: CoopIc
  * this skips create/join and goes straight to the SDP exchange. This is the entry
  * the lobby uses - players never see host/guest; the worker decides.
  */
+/**
+ * #805 HOT REJOIN driver: re-runs the SDP exchange with the SAME code/role (the worker's
+ * poll-then-clear signal slots tolerate a fresh exchange) and swaps the new channel into the
+ * LIVE transport - the whole co-op session survives in place. Retries within the 2-minute
+ * grace window; both peers must re-enter (the exchange is symmetric), which is exactly the
+ * grace semantics. Resolves true on reconnect, false when the window expires.
+ */
+const COOP_REJOIN_GRACE_MS = 120_000;
+function makeCoopRejoinDriver(
+  code: string,
+  role: CoopRole,
+  transport: WebRtcTransport,
+  ice?: CoopIceConfig,
+): () => Promise<boolean> {
+  return async () => {
+    const startedAt = Date.now();
+    let attempt = 0;
+    while (Date.now() - startedAt < COOP_REJOIN_GRACE_MS) {
+      attempt++;
+      coopLog("launch", `rejoin attempt ${attempt} code=${code} role=${role} elapsed=${Date.now() - startedAt}ms`);
+      try {
+        const channel = await exchangeAndOpenChannel(code, role, ice);
+        transport.replaceChannel(wireFromRtcChannel(role, channel));
+        coopLog("launch", `rejoin SUCCESS attempt=${attempt} code=${code} role=${role}`);
+        return true;
+      } catch (e) {
+        coopWarn("launch", `rejoin attempt ${attempt} failed (${(e as Error)?.message ?? "?"}); retrying in 5s`);
+        await new Promise(resolve => setTimeout(resolve, 5_000));
+      }
+    }
+    coopWarn("launch", `rejoin grace EXPIRED code=${code} role=${role} after ${attempt} attempts`);
+    return false;
+  };
+}
+
 export async function connectCoopWithCode(
   code: string,
   role: CoopRole,
@@ -276,7 +318,10 @@ export async function connectCoopWithCode(
   }
   coopLog("launch", `connectCoopWithCode code=${code} role=${role} username=${opts.username ?? "(default)"}`);
   const channel = await exchangeAndOpenChannel(code, role, opts.ice);
-  return connectCoopSession(webRtcTransportFromChannel(role, channel), { username: opts.username });
+  const transport = webRtcTransportFromChannel(role, channel);
+  const runtime = connectCoopSession(transport, { username: opts.username });
+  runtime.rejoinDriver = makeCoopRejoinDriver(code, role, transport, opts.ice);
+  return runtime;
 }
 
 /**
@@ -301,7 +346,9 @@ export async function connectCoopAsHost(
   opts.onCode?.(code);
 
   const channel = await exchangeAndOpenChannel(code, "host", opts.ice);
-  const runtime = connectCoopSession(webRtcTransportFromChannel("host", channel), { username: opts.username });
+  const transport = webRtcTransportFromChannel("host", channel);
+  const runtime = connectCoopSession(transport, { username: opts.username });
+  runtime.rejoinDriver = makeCoopRejoinDriver(code, "host", transport, opts.ice);
   coopLog("launch", `host session live code=${code}`);
   return { code, runtime };
 }
@@ -319,5 +366,8 @@ export async function connectCoopAsGuest(code: string, opts: CoopConnectOptions 
   coopLog("launch", `connectCoopAsGuest code=${code} username=${opts.username ?? "(default)"}`);
   await postJson("/coop/join", { code, guest: opts.username ?? "Player 2" });
   const channel = await exchangeAndOpenChannel(code, "guest", opts.ice);
-  return connectCoopSession(webRtcTransportFromChannel("guest", channel), { username: opts.username });
+  const transport = webRtcTransportFromChannel("guest", channel);
+  const runtime = connectCoopSession(transport, { username: opts.username });
+  runtime.rejoinDriver = makeCoopRejoinDriver(code, "guest", transport, opts.ice);
+  return runtime;
 }

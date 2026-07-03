@@ -569,6 +569,7 @@ let offDisconnectReaction: (() => void) | null = null;
  * only a genuinely dead channel short-circuits them. The resync/backstop layers are untouched.
  */
 function wireCoopDisconnectReaction(transport: CoopTransport, relay: CoopInteractionRelay, runtime: CoopRuntime): void {
+  let rejoining = false;
   offDisconnectReaction = transport.onStateChange(state => {
     if (state !== "disconnected" && state !== "closed") {
       return;
@@ -580,7 +581,73 @@ function wireCoopDisconnectReaction(transport: CoopTransport, relay: CoopInterac
       /* cancel failure must not cascade */
     }
     // Only the ACTIVE runtime owns the screen (the duo harness assembles two in one process).
-    if (getCoopRuntime() === runtime) {
+    const isActiveRuntime = getCoopRuntime() === runtime;
+    // #805 HOT REJOIN: re-dial the same pairing code within the grace window and swap the fresh
+    // channel into the live transport - the whole session survives in place. One loop at a time.
+    if (runtime.rejoinDriver != null && !rejoining) {
+      rejoining = true;
+      if (isActiveRuntime) {
+        try {
+          globalScene.ui.showText("Connection lost. Trying to reconnect (up to 2 minutes)...", null, undefined, 4000);
+        } catch {
+          /* cosmetic */
+        }
+      }
+      void runtime
+        .rejoinDriver()
+        .then(ok => {
+          rejoining = false;
+          if (!ok) {
+            coopWarn("runtime", "rejoin FAILED (grace expired) -> continuing without the partner");
+            if (isActiveRuntime) {
+              try {
+                globalScene.ui.showText(
+                  "Your partner didn't reconnect. Continuing without waiting...",
+                  null,
+                  undefined,
+                  4000,
+                );
+              } catch {
+                /* cosmetic */
+              }
+            }
+            return;
+          }
+          coopLog("runtime", "rejoin SUCCESS -> channel re-established in place");
+          if (isActiveRuntime) {
+            try {
+              globalScene.ui.showText("Partner reconnected!", null, undefined, 3000);
+            } catch {
+              /* cosmetic */
+            }
+          }
+          // The GUEST missed events while dark: pull the host's full authoritative snapshot.
+          if (isCoopAuthoritativeGuest()) {
+            const seq = COOP_REJOIN_SYNC_SEQ_BASE + (Date.now() % 100_000);
+            coopLog("resync", `post-rejoin full resync request seq=${seq}`);
+            void runtime.battleStream.requestStateSync(seq).then(blob => {
+              if (blob == null) {
+                coopWarn("resync", `post-rejoin stateSync TIMEOUT/null seq=${seq} (checksum backstop heals next turn)`);
+                return;
+              }
+              try {
+                applyCoopFullSnapshot(
+                  JSON.parse(decompressFromBase64(blob)) as CoopFullBattleSnapshot,
+                  isCoopAuthoritativeGuest(),
+                );
+                coopLog("resync", `post-rejoin snapshot applied seq=${seq} blob=${blob.length}b`);
+              } catch {
+                coopWarn("resync", `post-rejoin snapshot apply FAILED seq=${seq} (checksum backstop heals next turn)`);
+              }
+            });
+          }
+        })
+        .catch(() => {
+          rejoining = false;
+        });
+      return;
+    }
+    if (isActiveRuntime) {
       try {
         globalScene.ui.showText("Your partner disconnected. Continuing without waiting...", null, undefined, 3000);
       } catch {
@@ -589,6 +656,9 @@ function wireCoopDisconnectReaction(transport: CoopTransport, relay: CoopInterac
     }
   });
 }
+
+/** #805: seq band for post-rejoin full resyncs (disjoint from turn + ME channels). */
+const COOP_REJOIN_SYNC_SEQ_BASE = 9_300_000;
 function wireCoopDexSync(transport: CoopTransport): void {
   offDexSync = transport.onMessage(msg => {
     if (msg.t !== "interactionOutcome" || msg.outcome.k !== "dexSync") {
@@ -665,6 +735,12 @@ export interface CoopRuntime {
   partnerTransport?: CoopTransport;
   /** The stand-in player 2 (local dev only). */
   spoof?: SpoofGuest;
+  /**
+   * #805 hot rejoin: re-dials the SAME pairing code/role and swaps the fresh channel into the
+   * LIVE transport (set by the real-peer connect entrypoints; absent over loopback/spoof).
+   * Resolves true when the channel is re-established within the grace window.
+   */
+  rejoinDriver?: () => Promise<boolean>;
 }
 
 let active: CoopRuntime | null = null;

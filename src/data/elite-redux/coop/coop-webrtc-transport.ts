@@ -54,7 +54,9 @@ export interface CoopWireChannel {
 export class WebRtcTransport implements CoopTransport {
   readonly role: CoopRole;
   private _state: CoopConnectionState;
-  private readonly wire: CoopWireChannel;
+  private wire: CoopWireChannel;
+  /** #805 hot rejoin: increments per {@linkcode replaceChannel}; stale channel events are ignored. */
+  private wireGeneration = 0;
   private readonly msgHandlers = new Set<(msg: CoopMessage) => void>();
   private readonly stateHandlers = new Set<(state: CoopConnectionState) => void>();
 
@@ -63,15 +65,53 @@ export class WebRtcTransport implements CoopTransport {
     this.wire = wire;
     this._state = wire.readyState === "open" ? "connected" : "connecting";
     coopLog("webrtc", `ctor role=${role} readyState=${wire.readyState} state=${this._state}`);
+    this.attach(wire);
+  }
+
+  /** Bind channel events for the CURRENT generation; a replaced channel's events are inert. */
+  private attach(wire: CoopWireChannel): void {
+    const gen = this.wireGeneration;
     wire.onOpen(() => {
-      coopLog("webrtc", `channel OPEN role=${this.role}`);
+      if (gen !== this.wireGeneration) {
+        return;
+      }
+      coopLog("webrtc", `channel OPEN role=${this.role} gen=${gen}`);
       this.setState("connected");
     });
     wire.onClose(() => {
-      coopLog("webrtc", `channel CLOSE role=${this.role} state=${this._state}`);
+      if (gen !== this.wireGeneration) {
+        return;
+      }
+      coopLog("webrtc", `channel CLOSE role=${this.role} state=${this._state} gen=${gen}`);
       this.setState("disconnected");
     });
-    wire.onMessage(data => this.receive(data));
+    wire.onMessage(data => {
+      if (gen !== this.wireGeneration) {
+        return;
+      }
+      this.receive(data);
+    });
+  }
+
+  /**
+   * #805 HOT REJOIN: swap a freshly-dialed channel into this live transport. Everything above
+   * (controller, relays, streamers, the run itself) holds THIS object - swapping the wire
+   * reconnects the whole co-op session in place, no teardown. The old channel is closed
+   * best-effort and its events go inert via the generation counter.
+   */
+  replaceChannel(wire: CoopWireChannel): void {
+    this.wireGeneration++;
+    coopLog("webrtc", `replaceChannel role=${this.role} gen=${this.wireGeneration} readyState=${wire.readyState}`);
+    try {
+      this.wire.close();
+    } catch {
+      /* the dead channel may already be closed */
+    }
+    this.wire = wire;
+    this.attach(wire);
+    if (wire.readyState === "open") {
+      this.setState("connected");
+    }
   }
 
   get state(): CoopConnectionState {
@@ -162,6 +202,15 @@ export class WebRtcTransport implements CoopTransport {
  * this once the signaling handshake has produced an open (or opening) data channel.
  */
 export function webRtcTransportFromChannel(role: CoopRole, channel: RTCDataChannel): WebRtcTransport {
+  return new WebRtcTransport(role, wireFromRtcChannel(role, channel));
+}
+
+/**
+ * Adapt a raw RTCDataChannel to the {@linkcode CoopWireChannel} surface. Factored out of
+ * {@linkcode webRtcTransportFromChannel} so hot rejoin (#805) can wrap a freshly re-dialed
+ * channel and {@linkcode WebRtcTransport.replaceChannel} it into the LIVE transport.
+ */
+export function wireFromRtcChannel(role: CoopRole, channel: RTCDataChannel): CoopWireChannel {
   // Log-only: surface the raw channel error event (NOT wired into message flow / state), so a live
   // DataChannel error is visible in the captured log instead of being silently swallowed.
   channel.addEventListener("error", ev => {
@@ -184,5 +233,5 @@ export function webRtcTransportFromChannel(role: CoopRole, channel: RTCDataChann
       channel.addEventListener("close", () => handler());
     },
   };
-  return new WebRtcTransport(role, wire);
+  return wire;
 }
