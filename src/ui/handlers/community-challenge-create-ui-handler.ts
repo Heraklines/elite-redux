@@ -77,6 +77,7 @@ const DIFFICULTY_TIERS: Record<ErDifficulty, 1 | 2 | 3 | 4 | 5> = {
   ace: 2,
   elite: 4,
   hell: 5,
+  mystery: 5,
 };
 
 type RowKind = "name" | "subtitle" | "description" | "difficulty" | "rule" | "species" | "publish";

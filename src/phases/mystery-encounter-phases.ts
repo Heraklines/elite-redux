@@ -225,6 +225,24 @@ export class MysteryEncounterPhase extends Phase {
       // TRUE across the embedded watcher reward shop too). Cleared at the PostMysteryEncounterPhase
       // guest guard, AFTER the shop drains (MAJOR-3), never at leaveDefensive.
       coopSetMePinForGuest(interactionCounter);
+      // #813 (live 'the other person threw out a pokemon'): the guest's LOCAL wave setup may
+      // have rolled a normal battle before adopting the host's ME snapshot, leaving a stale
+      // summon chain in the queue. This is an ME wave - nothing summons - so PURGE it, or the
+      // watcher's screen throws a mon out over the encounter instead of rendering it.
+      let purged = 0;
+      for (const stale of [
+        "SummonPhase",
+        "PostSummonPhase",
+        "ToggleDoublePositionPhase",
+        "CheckSwitchPhase",
+      ] as const) {
+        while (globalScene.phaseManager.tryRemovePhase(stale)) {
+          purged++;
+        }
+      }
+      if (purged > 0) {
+        coopLog("me", `purged ${purged} stale summon-chain phases at ME divert (#813)`);
+      }
       globalScene.phaseManager.pushNew("CoopReplayMePhase", interactionCounter);
       this.end();
       return;

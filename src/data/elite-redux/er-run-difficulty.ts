@@ -26,7 +26,8 @@ import { globalScene } from "#app/global-scene";
 import { erBalanceNum } from "#data/elite-redux/er-balance-tuning";
 import type { ErRosterTier } from "#data/elite-redux/er-trainer-overlay";
 
-export type ErDifficulty = "youngster" | "ace" | "elite" | "hell";
+/** "mystery" is the DEV-GATED testing gauntlet (#814): rosters behave like hell. */
+export type ErDifficulty = "youngster" | "ace" | "elite" | "hell" | "mystery";
 
 /** Default difficulty when the player hasn't chosen (or after a reload). */
 const DEFAULT_DIFFICULTY: ErDifficulty = "ace";

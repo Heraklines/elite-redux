@@ -32,6 +32,7 @@ const GHOST_WAVES: Readonly<Record<ErDifficulty, readonly number[]>> = {
   ace: [],
   elite: [87, 137, 163, 192, 196, 199],
   hell: [63, 87, 113, 137, 163, 176, 178, 192, 193, 194, 196, 197, 199],
+  mystery: [63, 87, 113, 137, 163, 176, 178, 192, 193, 194, 196, 197, 199],
 };
 
 /** The ordered ghost waves for the current run's difficulty. */

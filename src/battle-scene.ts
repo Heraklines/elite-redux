@@ -62,6 +62,7 @@ import type { GhostTeamSnapshot } from "#data/elite-redux/er-ghost-teams";
 import { markTrainerAsGhost, maybePrefetchGhostTeams, takeGhostForWave } from "#data/elite-redux/er-ghost-teams";
 import { recordErBiomeVisited } from "#data/elite-redux/er-map-nodes";
 import { erTeamMoneyBonusPercent } from "#data/elite-redux/er-money-streak";
+import { erGauntletActive, erGauntletPickMeType, erGauntletWaveKind } from "#data/elite-redux/er-mystery-gauntlet";
 import { resetErRelicBattleState } from "#data/elite-redux/er-relic-battle-state";
 import {
   erCoinPurseBonusPercent,
@@ -1859,6 +1860,20 @@ export class BattleScene extends SceneBase {
       this.field.add(ghostTrainer);
       resolved.trainer = ghostTrainer;
       return;
+    }
+
+    // MYSTERY GAUNTLET (#814, dev-gated testing difficulty): the wave kind is SCRIPTED.
+    // ME/bargain waves force a mystery encounter (type picked in getMysteryEncounter);
+    // ghost/boss waves fall through to their normal machinery (the ghost branch above
+    // already ran for ghost-eligible waves; boss flags are forced at the boss gate).
+    if (erGauntletActive() && !Overrides.BATTLE_TYPE_OVERRIDE) {
+      const kind = erGauntletWaveKind(waveIndex);
+      if (kind === "me" || kind === "bargain") {
+        resolved.battleType = BattleType.MYSTERY_ENCOUNTER;
+        this.mysteryEncounterSaveData.encounterSpawnChance = BASE_MYSTERY_ENCOUNTER_SPAWN_WEIGHT;
+        console.log(`[er-gauntlet] wave=${waveIndex} kind=${kind} -> MYSTERY_ENCOUNTER`);
+        return;
+      }
     }
 
     // Check for mystery encounter
@@ -4561,6 +4576,14 @@ export class BattleScene extends SceneBase {
     } else if (canBypass) {
       encounter = allMysteryEncounters[encounterType ?? -1];
       return encounter;
+    } else if (erGauntletActive()) {
+      // MYSTERY GAUNTLET (#814): the schedule picks the type (non-repeating registry walk).
+      const forced = erGauntletPickMeType(
+        this.currentBattle.waveIndex,
+        (this.mysteryEncounterSaveData?.encounteredEvents ?? []).map(e => e.type),
+      );
+      console.log(`[er-gauntlet] wave=${this.currentBattle.waveIndex} ME type -> ${MysteryEncounterType[forced]}`);
+      encounter = allMysteryEncounters[forced] ?? null;
     } else if (getDailyMysteryEncounter(this.currentBattle.waveIndex) == null) {
       encounter = encounterType == null ? null : allMysteryEncounters[encounterType];
     } else {

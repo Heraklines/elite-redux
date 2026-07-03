@@ -27,6 +27,7 @@
 //   - GameOverPhase.handleGameOver      → recordGhostTeamOnGameOver (capture/upload)
 // =============================================================================
 
+import { erGauntletActive, erGauntletWaveKind } from "#data/elite-redux/er-mystery-gauntlet";
 import { loggedInUser } from "#app/account";
 import { globalScene } from "#app/global-scene";
 import { bypassLogin } from "#constants/app-constants";
@@ -995,7 +996,10 @@ function pickGhost(candidates: GhostTeamSnapshot[], waveIndex: number): GhostTea
 export function takeGhostForWave(waveIndex: number, trainerWave = false): GhostTeamSnapshot | null {
   // ER (#422): with the Ghost Trainers challenge active, EVERY trainer wave
   // is a ghost wave (the caller says whether this wave fields a trainer).
-  if (!isErGhostWave(waveIndex) && !(trainerWave && isErGhostChallengeActive())) {
+  // MYSTERY GAUNTLET (#814): the scripted ghost wave always fields a ghost when one
+  // is available, regardless of the endgame wave table or the challenge.
+  const gauntletGhost = erGauntletActive() && erGauntletWaveKind(waveIndex) === "ghost";
+  if (!gauntletGhost && !isErGhostWave(waveIndex) && !(trainerWave && isErGhostChallengeActive())) {
     if (trainerWave && ghostByWave.size > 0) {
       // Tripwire for the live "silent wave miss" reports: a ghost was already
       // fielded THIS RUN (so it must be a challenge run), yet the challenge

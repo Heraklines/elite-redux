@@ -11,6 +11,7 @@ import { erBalanceNum } from "#data/elite-redux/er-balance-tuning";
 import { erNotorietyOverLevel } from "#data/elite-redux/er-biome-notoriety";
 import { erBiomeRoutingActive } from "#data/elite-redux/er-biome-routing";
 import { getErBiomeRule } from "#data/elite-redux/er-biome-rules";
+import { erGauntletActive, erGauntletWaveKind } from "#data/elite-redux/er-mystery-gauntlet";
 import { applyErHellEnemyLevelScaling } from "#data/elite-redux/er-run-difficulty";
 import { ArenaTagType } from "#enums/arena-tag-type";
 import { BattleType } from "#enums/battle-type";
@@ -226,7 +227,7 @@ export class Battle {
       + Math.pow(levelWaveIndex / erBalanceNum("vanilla.level.quadDivisor"), 2);
     const bossMultiplier = erBalanceNum("vanilla.level.bossMult");
 
-    if (this.gameMode.isBoss(this.waveIndex)) {
+    if (this.gameMode.isBoss(this.waveIndex) || (erGauntletActive() && erGauntletWaveKind(this.waveIndex) === "boss")) {
       const ret = Math.floor(baseLevel * bossMultiplier);
       if (this.isClassicFinalBoss || !(this.waveIndex % 250)) {
         return Math.ceil(ret / 25) * 25;
