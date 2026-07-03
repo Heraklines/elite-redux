@@ -40,6 +40,7 @@ import {
 } from "#mystery-encounters/encounter-phase-utils";
 import type { MysteryEncounterOption, OptionPhaseCallback } from "#mystery-encounters/mystery-encounter-option";
 import { SeenEncounterData } from "#mystery-encounters/mystery-encounter-save-data";
+import { hideCoopControllerTag, showCoopControllerTagFor } from "#ui/coop-controller-tag";
 import { randSeedItem } from "#utils/common";
 import { inSpeedOrder } from "#utils/speed-order-generator";
 import i18next from "i18next";
@@ -89,6 +90,7 @@ export function coopSetMePinForGuest(counter: number): void {
 export function coopClearMePinForGuest(): void {
   coopLog("me", "coopClearMePinForGuest", { before: coopMeInteractionStartValue(), after: -1 });
   setCoopMeInteractionStart(-1);
+  hideCoopControllerTag(); // #817: never outlive the encounter
   setCoopMeBattleInteractionCounter(-1);
 }
 
@@ -144,6 +146,11 @@ function coopBeginMePump(): void {
   // The host sends its TERMINAL sentinels (LEAVE / battle-handoff) on the DEDICATED 9M terminal seq,
   // where the guest's CoopReplayMePhase.awaitHostTerminal listens (disjoint from the 8M pick relay).
   const termSeq = COOP_ME_TERM_SEQ_BASE + meStart;
+  // #817: the shop-style tag on the HOST too - green when this ME is the host's own to drive
+  // (the amber awaiting-partner tag is shown at the guest-await site in MysteryEncounterPhase).
+  if (controller.isLocalOwnerAtCounter(meStart)) {
+    showCoopControllerTagFor(true);
+  }
   pump.beginOwner(seq, termSeq);
   coopLog("me", "ME owner streamed entry checksum", { seq });
   // TRACK-2 Phase C: stamp the owner's authoritative full-state checksum at ME entry so the guest's
@@ -174,6 +181,7 @@ function coopEndMePump(): void {
   // as exactly ONE alternation step on each client - no host-broadcast race (#633).
   controller.advanceInteraction(coopMeInteractionStartValue());
   setCoopMeInteractionStart(-1);
+  hideCoopControllerTag(); // #817: never outlive the encounter
   // Clear the ME battle handoff key now the encounter is fully over (#633).
   setCoopMeBattleInteractionCounter(-1);
 }
@@ -352,13 +360,9 @@ export class MysteryEncounterPhase extends Phase {
     }
     const seqMe = COOP_ME_PUMP_SEQ_BASE + coopMeInteractionStartValue();
     coopLog("me", "host awaits guest ME option index", { seq: seqMe, timeoutMs: COOP_ME_REPLAY_WAIT_MS });
-    // #815 visibility: the shop-style banner while the PARTNER decides this encounter.
-    try {
-      const partnerName = getCoopController()?.partnerName ?? "Your partner";
-      globalScene.ui.showText(`${partnerName} is choosing...`, null);
-    } catch {
-      /* cosmetic */
-    }
+    // #817 visibility: the shop's controller tag (top of screen, named, amber) while the
+    // PARTNER decides - never drawn into the message box, so nothing layers over the options.
+    showCoopControllerTagFor(false);
     void relay.awaitInteractionChoice(seqMe, COOP_ME_REPLAY_WAIT_MS).then(choice => {
       if (choice == null || choice.choice < 0) {
         // D1 null-end: a disconnected guest must never hang the host's engine - safe-leave + close.
@@ -403,13 +407,7 @@ export class MysteryEncounterPhase extends Phase {
         index: choice.choice,
         encounter: MysteryEncounterType[encounter.encounterType],
       });
-      // #815 visibility: announce the partner's pick on THIS screen (the pick echo).
-      try {
-        const partnerName = getCoopController()?.partnerName ?? "Your partner";
-        globalScene.ui.showText(`${partnerName} chose option ${choice.choice + 1}.`, null);
-      } catch {
-        /* cosmetic */
-      }
+      hideCoopControllerTag(); // #817: the pick landed - the tag comes down before the engine runs it
       // Input-free option apply (the same path the local handler uses): drives onPre / onOption /
       // onPost; the engine sub-prompts (party target / secondary menu) await the guest's relayed
       // sub-picks at their own sites (encounter-phase-utils ADD-2b).

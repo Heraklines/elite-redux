@@ -29,6 +29,7 @@
 
 import { coopLog, isCoopDebug } from "#data/elite-redux/coop/coop-debug";
 import { COOP_INTERACTION_LEAVE, type CoopInteractionRelay } from "#data/elite-redux/coop/coop-interaction-relay";
+import { setCoopMeHandoffBattleStarted } from "#data/elite-redux/coop/coop-me-pin-state";
 
 /** Routing tag for relayed ME buttons (distinguishes them on the wire / in logs). */
 const ME_PUMP_KIND = "meBtn";
@@ -131,6 +132,7 @@ export class CoopMePump {
   relayMeBattleHandoff(): void {
     if (this.isSessionActive()) {
       coopLog("pump", "relay BATTLE-HANDOFF sentinel", { termSeq: this.termSeq, sentinel: COOP_ME_BATTLE_HANDOFF });
+      setCoopMeHandoffBattleStarted(); // #817: gates stand down - the spawned battle runs the normal sync
       // Terminal sentinel rides `termSeq` (#633 MAJOR-1 / B-1): the dedicated 9M terminal seq
       // the authoritative guest awaits (CoopReplayMePhase.awaitHostTerminal).
       this.relay.sendInteractionChoice(this.termSeq, ME_PUMP_KIND, COOP_ME_BATTLE_HANDOFF);

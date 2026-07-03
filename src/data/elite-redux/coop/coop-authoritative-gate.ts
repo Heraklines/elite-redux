@@ -29,7 +29,10 @@ let predicate: (() => boolean) | null = null;
 export function setCoopAuthoritativeGuestPredicate(fn: (() => boolean) | null): void {
   // One-shot (session register / teardown) - log install vs clear so a stale-gate bug (a predicate
   // surviving into a later solo / lockstep run) is visible in the captured log.
-  coopLog("session", `coopAuthoritativeGuestPredicate ${fn == null ? "CLEARED (-> solo/host/lockstep reads false)" : "INSTALLED"}`);
+  coopLog(
+    "session",
+    `coopAuthoritativeGuestPredicate ${fn == null ? "CLEARED (-> solo/host/lockstep reads false)" : "INSTALLED"}`,
+  );
   predicate = fn;
 }
 

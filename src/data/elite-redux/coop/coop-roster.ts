@@ -197,7 +197,10 @@ export class CoopRoster {
       "roster",
       `toMergedParty build hostCount=${this.count("host")} guestCount=${this.count("guest")} bothReady=${this.bothReady()} `
         + `slots=[${party
-          .map((e, i) => `${i}:${e === null ? "empty" : `sp${e.speciesId}/${i < COOP_SLOTS_PER_PLAYER ? "host" : "guest"}`}`)
+          .map(
+            (e, i) =>
+              `${i}:${e === null ? "empty" : `sp${e.speciesId}/${i < COOP_SLOTS_PER_PLAYER ? "host" : "guest"}`}`,
+          )
           .join(" ")}]`,
     );
     return party;

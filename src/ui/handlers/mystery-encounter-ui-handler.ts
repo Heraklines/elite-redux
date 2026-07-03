@@ -1,4 +1,6 @@
 import { globalScene } from "#app/global-scene";
+import { coopMeInProgress, coopMeInteractionStartValue } from "#data/elite-redux/coop/coop-me-pin-state";
+import { getCoopController } from "#data/elite-redux/coop/coop-runtime";
 import { getPokeballAtlasKey } from "#data/pokeball";
 import { Button } from "#enums/buttons";
 import { MysteryEncounterOptionMode } from "#enums/mystery-encounter-option-mode";
@@ -337,6 +339,19 @@ export class MysteryEncounterUiHandler extends UiHandler {
     const changed = prevCursor !== cursor;
     if (changed) {
       this.cursor = cursor;
+      // #817 co-op cursor mirror: the ME OWNER's cursor is streamed so the watcher's
+      // read-only selector highlights the same option live (like the shop). Cosmetic.
+      try {
+        if (
+          globalScene.gameMode?.isCoop
+          && coopMeInProgress()
+          && (getCoopController()?.isLocalOwnerAtCounter(coopMeInteractionStartValue()) ?? false)
+        ) {
+          getCoopController()?.sendMeCursor(cursor);
+        }
+      } catch {
+        /* cosmetic */
+      }
     }
 
     this.viewPartyIndex = this.optionsContainer.getAll()?.length - 1;

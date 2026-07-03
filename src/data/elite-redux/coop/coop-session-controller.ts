@@ -191,6 +191,18 @@ export class CoopSessionController {
     return this.partnerVersionValue ?? "?";
   }
 
+  /** #817: watcher-side hook - the partner's ME option cursor moved. */
+  public onMeCursor: ((index: number) => void) | null = null;
+
+  /** #817: owner-side send - mirror the local ME option cursor to the watcher. */
+  public sendMeCursor(index: number): void {
+    try {
+      this.transport.send({ t: "meCursor", index });
+    } catch {
+      /* cosmetic channel - a lost cursor move is fine */
+    }
+  }
+
   /**
    * #810 GUEST: arm the resume-offer handler. If the host's offer already arrived
    * (the wire beat the UI), it fires immediately from the buffer.
@@ -595,6 +607,16 @@ export class CoopSessionController {
 
   private handleMessage(msg: CoopMessage): void {
     switch (msg.t) {
+      case "meCursor": {
+        // #817 cosmetic cursor mirror: the ME owner's option cursor, applied to the
+        // watcher's read-only selector. Best-effort; a dropped move can never desync.
+        try {
+          this.onMeCursor?.(msg.index);
+        } catch {
+          /* cosmetic */
+        }
+        break;
+      }
       case "resumeOffer": {
         // #810: buffer if the UI has not armed its handler yet (offer can beat the arm).
         coopLog("launch", `RECV resumeOffer wave=${msg.wave} (#810)`);

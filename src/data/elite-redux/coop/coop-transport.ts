@@ -40,7 +40,7 @@ export type CoopRole = "host" | "guest";
  * changes shape. Carried in the hello; a mismatch means one player runs a stale cached bundle -
  * the top source of unreproducible ghost bugs - and both get told to hard-refresh.
  */
-export const COOP_PROTOCOL_VERSION = "er-coop-9";
+export const COOP_PROTOCOL_VERSION = "er-coop-10";
 
 /**
  * Which co-op netcode the run uses (#633, selectable A/B). Two complete
@@ -594,6 +594,7 @@ export type CoopMessage =
   /** #809: host asks the partner to pick a Revival Blessing target for its own mon. */
   | { t: "revivalPrompt"; fieldIndex: number }
   /** #810 resume flow: host offers to resume the saved run with this partner at `wave`. */
+  | { t: "meCursor"; index: number }
   | { t: "resumeOffer"; wave: number }
   /** #810 resume flow: guest's answer to the offer. */
   | { t: "resumeReply"; accept: boolean }

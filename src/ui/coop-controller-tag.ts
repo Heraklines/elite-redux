@@ -76,6 +76,19 @@ setCoopUiMirrorSessionHook((active, role) => {
   }
 });
 
+/**
+ * #817: explicit tag control for the co-op ME paths (they never open a ui-mirror
+ * session, so the hook above cannot drive them). Same look as the shop tag.
+ */
+export function showCoopControllerTagFor(localOwns: boolean): void {
+  showTag(localOwns);
+}
+
+/** #817: hide the tag when the ME choice resolves / hands off to a battle. */
+export function hideCoopControllerTag(): void {
+  hideTag();
+}
+
 /** Test/diagnostic surface: whether the tag is currently shown. */
 export function coopControllerTagVisible(): boolean {
   return container != null;

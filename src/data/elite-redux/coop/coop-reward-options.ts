@@ -63,7 +63,7 @@ function readPregenArgs(type: ModifierType): number[] | undefined {
     const nums = args.filter((a): a is number => typeof a === "number");
     return nums.length > 0 ? nums : undefined;
   }
-  return undefined;
+  return;
 }
 
 /**
@@ -81,12 +81,18 @@ export function reconstructRewardOptions(
     const func = modifierTypes[s.id];
     if (func == null) {
       // Unknown registry id => the WATCHER falls back to its OWN roll (DIVERGENT pool). Surface it.
-      coopWarn("shop", `reconstructRewardOptions FAIL id=${s.id} (unknown registry key) -> watcher falls back to own roll`);
+      coopWarn(
+        "shop",
+        `reconstructRewardOptions FAIL id=${s.id} (unknown registry key) -> watcher falls back to own roll`,
+      );
       return null;
     }
     let type: ModifierType | null = func();
     if (type == null) {
-      coopWarn("shop", `reconstructRewardOptions FAIL id=${s.id} (factory returned null) -> watcher falls back to own roll`);
+      coopWarn(
+        "shop",
+        `reconstructRewardOptions FAIL id=${s.id} (factory returned null) -> watcher falls back to own roll`,
+      );
       return null;
     }
     type.id = s.id;

@@ -78,7 +78,10 @@ let liveEmitter: CoopLiveEmitter | null = null;
 
 /** HOST: register (or clear with null) the live-event emitter the runtime wires to the battle stream. */
 export function setCoopLiveEmitter(emitter: CoopLiveEmitter | null): void {
-  coopLog("turn", `host recorder: ${emitter != null ? "REGISTER" : "CLEAR (null-out)"} live emitter (was=${liveEmitter != null})`);
+  coopLog(
+    "turn",
+    `host recorder: ${emitter == null ? "CLEAR (null-out)" : "REGISTER"} live emitter (was=${liveEmitter != null})`,
+  );
   liveEmitter = emitter;
 }
 
@@ -89,15 +92,15 @@ export function setCoopLiveEmitter(emitter: CoopLiveEmitter | null): void {
  * `seq` resets to 0 so each turn's events number from the start.
  */
 export function beginCoopRecording(turn: number): void {
-  if (recording != null) {
+  if (recording == null) {
+    coopLog("turn", `host recorder: begin turn=${turn} (no prior open recording)`);
+  } else {
     // A turn should never overlap another; an open recording at begin means the prior turn never
     // finalized (endCoopRecording was missed) - its buffered events are discarded by the replace.
     coopWarn(
       "turn",
       `host recorder: begin turn=${turn} REPLACES open recording turn=${recording.turn} events=${recording.events.length} (prior turn never finalized)`,
     );
-  } else {
-    coopLog("turn", `host recorder: begin turn=${turn} (no prior open recording)`);
   }
   recording = { turn, events: [], seq: 0 };
 }
@@ -146,7 +149,10 @@ export function recordCoopEvent(event: CoopBattleEvent): void {
       liveEmitter(recording.turn, seq, event);
     } catch {
       // a live-emit failure must never break the host's turn - the turn-end batch + checkpoint still go
-      coopWarn("turn", `host recorder: live emit threw turn=${recording.turn} seq=${seq} k=${event.k} (handled, batch still sent)`);
+      coopWarn(
+        "turn",
+        `host recorder: live emit threw turn=${recording.turn} seq=${seq} k=${event.k} (handled, batch still sent)`,
+      );
     }
   }
 }

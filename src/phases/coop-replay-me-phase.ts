@@ -9,11 +9,13 @@ import { Phase } from "#app/phase";
 import { applyCoopMeOutcome } from "#data/elite-redux/coop/coop-battle-engine";
 import { coopLog, coopWarn } from "#data/elite-redux/coop/coop-debug";
 import type { CoopInteractionChoice } from "#data/elite-redux/coop/coop-interaction-relay";
+import { setCoopMeHandoffBattleStarted } from "#data/elite-redux/coop/coop-me-pin-state";
 import { COOP_ME_BATTLE_HANDOFF, COOP_ME_TERM_SEQ_BASE } from "#data/elite-redux/coop/coop-me-pump";
 import { getCoopBattleStreamer, getCoopController, getCoopInteractionRelay } from "#data/elite-redux/coop/coop-runtime";
 import type { CoopInteractionOutcome } from "#data/elite-redux/coop/coop-transport";
 import { UiMode } from "#enums/ui-mode";
 import { leaveEncounterWithoutBattle } from "#mystery-encounters/encounter-phase-utils";
+import { hideCoopControllerTag, showCoopControllerTagFor } from "#ui/coop-controller-tag";
 import type { OptionSelectConfig } from "#ui/handlers/abstract-option-select-ui-handler";
 import { PartyUiMode } from "#ui/party-ui-handler";
 import i18next from "i18next";
@@ -131,6 +133,8 @@ export class CoopReplayMePhase extends Phase {
         try {
           // #816: render DIRECTLY - queued messages never display while this phase is
           // parked awaiting the host, which is exactly when narration arrives.
+          // #817: the ME selector handler HAS a message area (showText routes into it),
+          // so narration renders inside the encounter window instead of overdrawing it.
           globalScene.ui.showText(text, null, undefined, null, true);
         } catch {
           /* a narration render failure must never hang the guest's encounter */
@@ -180,17 +184,15 @@ export class CoopReplayMePhase extends Phase {
       if (ownsMe) {
         // Same setMode call MysteryEncounterPhase.start uses; the handler renders off the streamed
         // presentation (getCoopMeHostPresentation) and captures the human's cursor.
+        showCoopControllerTagFor(true); // #817: the shop-style top banner, green = you drive
         void globalScene.ui.setMode(UiMode.MYSTERY_ENCOUNTER, undefined);
         return;
       }
-      // #815 visibility: tell the watcher WHO is driving (the shop-style banner the
-      // maintainer asked for), so a quiet encounter never reads as a freeze.
-      try {
-        const partner = getCoopController()?.partnerName ?? "Your partner";
-        globalScene.ui.showText(`${partner} is choosing...`, null);
-      } catch {
-        /* cosmetic */
-      }
+      // #817 visibility: the watcher sees the SAME screen as the owner - the real option
+      // selector (input is blocked for non-owners by the ui.ts gate; the owner's cursor is
+      // mirrored via meCursor) - plus the shop-style named tag saying who is driving.
+      showCoopControllerTagFor(false);
+      void globalScene.ui.setMode(UiMode.MYSTERY_ENCOUNTER, undefined);
       this.awaitOutcomeThenTerminal(relay);
     })();
   }
@@ -471,6 +473,8 @@ export class CoopReplayMePhase extends Phase {
     coopLog("me", "ME terminal: battle-handoff, ending phase WITHOUT leaving encounter", {
       counter: this.interactionCounter,
     });
+    setCoopMeHandoffBattleStarted(); // #817: ME gates stand down - the battle runs the normal sync
+    hideCoopControllerTag();
     this.settled = true;
     coopMeHostPresentation = null;
     this.offMeMessage?.();
@@ -494,6 +498,7 @@ export class CoopReplayMePhase extends Phase {
     coopLog("me", "ME terminal: leaving encounter locally + advancing alternation", {
       counter: this.interactionCounter,
     });
+    hideCoopControllerTag();
     this.settled = true;
     coopMeHostPresentation = null;
     this.offMeMessage?.();

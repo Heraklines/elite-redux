@@ -35,4 +35,24 @@ export function coopMeInteractionStartValue(): number {
 /** Write the ME pin (mystery-encounter-phases owns every call site). */
 export function setCoopMeInteractionStart(counter: number): void {
   coopMeInteractionStart = counter;
+  if (counter < 0) {
+    coopMeHandoffBattle = false; // the ME ended - the handoff exemption ends with it
+  }
+}
+
+// #817 (live BOTH-frozen at the ME battle): once an ME option SPAWNS A BATTLE, the ME pin
+// stays set through the fight (the post-battle rewards/terminal still key off it), but the
+// ui.ts input/stream gates MUST stand down - they are selector-era gates, and leaving them
+// up froze the battle's command UI on both clients while its messages streamed down the
+// (already-closed) ME narration channel. This flag marks "the handoff battle has started".
+let coopMeHandoffBattle = false;
+
+/** Whether the in-progress ME has handed off to its spawned battle (#817). */
+export function coopMeHandoffBattleStarted(): boolean {
+  return coopMeHandoffBattle;
+}
+
+/** Mark the ME battle handoff as started (host pump end + guest terminal set this). */
+export function setCoopMeHandoffBattleStarted(): void {
+  coopMeHandoffBattle = true;
 }

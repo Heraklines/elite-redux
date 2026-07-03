@@ -37,6 +37,7 @@ import { CoopBattleSync } from "#data/elite-redux/coop/coop-battle-sync";
 import { coopLog, coopWarn, isCoopDebug } from "#data/elite-redux/coop/coop-debug";
 import { COOP_DEX_SYNC_SEQ, CoopInteractionRelay } from "#data/elite-redux/coop/coop-interaction-relay";
 import { meBattleHandoffKey } from "#data/elite-redux/coop/coop-me-battle-handoff";
+import { coopMeInteractionStartValue } from "#data/elite-redux/coop/coop-me-pin-state";
 import { CoopMePump } from "#data/elite-redux/coop/coop-me-pump";
 import { coopFieldIndexOf, coopOwnerOfFieldSlot } from "#data/elite-redux/coop/coop-session";
 import { CoopSessionController } from "#data/elite-redux/coop/coop-session-controller";
@@ -67,6 +68,7 @@ import {
 } from "#data/elite-redux/replay-recorder";
 import type { ReplayCommandKind } from "#data/elite-redux/replay-trace";
 import { Command } from "#enums/command";
+import { UiMode } from "#enums/ui-mode";
 import { PokemonData } from "#system/pokemon-data";
 import { compressToBase64, decompressFromBase64 } from "lz-string";
 
@@ -1386,6 +1388,21 @@ export function startLocalCoopSession(
   wireCoopDisconnectReaction(host, interactionRelay, runtime);
   wireCoopStallWatchdog(host, interactionRelay, battleStream, runtime);
   // #812: ownership probe for pre-responder commandRequests (buffer own-slot, decline foreign).
+  // #817 cosmetic cursor mirror: the ME owner's option cursor lands on the WATCHER's
+  // read-only selector (only when that selector is actually open; never on the owner).
+  controller.onMeCursor = index => {
+    try {
+      if (controller.isLocalOwnerAtCounter(coopMeInteractionStartValue())) {
+        return; // we drive this ME - our own cursor rules
+      }
+      const handler = globalScene.ui?.getHandler();
+      if (globalScene.ui?.getMode() === UiMode.MYSTERY_ENCOUNTER && typeof handler?.setCursor === "function") {
+        handler.setCursor(index);
+      }
+    } catch {
+      /* cosmetic */
+    }
+  };
   battleSync.setSlotOwnershipProbe(fieldIndex => {
     try {
       return coopOwnerOfPlayerFieldSlot(fieldIndex) === controller.role;
