@@ -1,0 +1,271 @@
+url:      https://elite-redux-staging.pages.dev/
+build:    mr47cifw-3jkx
+mode:     6  wave:8
+seed:     X7QnnhaT6mrWog2GvjXKi77W
+party:    Aron(L7 17hp f0), Unown(L7 0hp f28), Basculin(L5 23hp f0), Wurmple(L6 23hp f0), Snorunt Redux(L5 23hp f0), Goldeen(L5 0hp f0)
+enemy:    Froakie(L7), Pikipek(L6)
+
+----- COMMENT -----
+game freeze co-op
+
+----- CONSOLE -----
+[00:47:18.984] LOG: Move: Bubble Beam | Attack damage: 3
+[00:47:18.984] LOG: [coop:turn] host recorder: append turn=1 seq=6 k=hp total=7 live=true
+[00:47:18.984] LOG: [coop:runtime] ME-stream live-event host turn=1 seq=6 k=hp
+[00:47:18.984] LOG: [coop:replay] host EMIT live battleEvent turn=1 seq=6 k=hp
+[00:47:18.984] LOG: [coop:webrtc] raw tx role=host t=battleEvent bytes=89
+[00:47:18.984] LOG: %cStart Phase DamageAnimPhase color:green;
+[00:47:18.991] LOG: %cStart Phase MoveEffectPhase color:green;
+[00:47:18.992] LOG: crit stage: +0
+[00:47:18.992] LOG: Move: Bubble Beam | Base damage: 5.665454545454546 | Power: 30 | Source attack: 14 | Target defense: 11
+[00:47:18.992] LOG: Move: Bubble Beam | Attack damage: 3
+[00:47:18.992] LOG: [coop:turn] host recorder: append turn=1 seq=7 k=hp total=8 live=true
+[00:47:18.992] LOG: [coop:runtime] ME-stream live-event host turn=1 seq=7 k=hp
+[00:47:18.992] LOG: [coop:replay] host EMIT live battleEvent turn=1 seq=7 k=hp
+[00:47:18.992] LOG: [coop:webrtc] raw tx role=host t=battleEvent bytes=89
+[00:47:18.992] LOG: [coop:turn] host recorder: append turn=1 seq=8 k=faint total=9 live=true
+[00:47:18.992] LOG: [coop:runtime] ME-stream live-event host turn=1 seq=8 k=faint
+[00:47:18.993] LOG: [coop:replay] host EMIT live battleEvent turn=1 seq=8 k=faint
+[00:47:18.993] LOG: [coop:webrtc] raw tx role=host t=battleEvent bytes=89
+[00:47:18.993] LOG: [coop:turn] host recorder: append turn=1 seq=9 k=message total=10 live=true
+[00:47:18.993] LOG: [coop:runtime] ME-stream live-event host turn=1 seq=9 k=message
+[00:47:18.993] LOG: [coop:replay] host EMIT live battleEvent turn=1 seq=9 k=message
+[00:47:18.993] LOG: [coop:webrtc] raw tx role=host t=battleEvent bytes=94
+[00:47:18.993] LOG: [coop:turn] host recorder: append turn=1 seq=10 k=message total=11 live=true
+[00:47:18.993] LOG: [coop:runtime] ME-stream live-event host turn=1 seq=10 k=message
+[00:47:18.993] LOG: [coop:replay] host EMIT live battleEvent turn=1 seq=10 k=message
+[00:47:18.993] LOG: [coop:webrtc] raw tx role=host t=battleEvent bytes=85
+[00:47:18.993] LOG: %cStart Phase DamageAnimPhase color:green;
+[00:47:19.000] LOG: %cStart Phase MessagePhase color:green;
+[00:47:19.207] LOG: %cStart Phase MessagePhase color:green;
+[00:47:19.469] LOG: %cStart Phase FaintPhase color:green;
+[00:47:20.370] LOG: %cStart Phase MessagePhase color:green;
+[00:47:20.498] LOG: %cStart Phase MoveEndPhase color:green;
+[00:47:20.499] LOG: %cStart Phase MovePhase color:green;
+[00:47:20.499] LOG: %cStart Phase MoveEndPhase color:green;
+[00:47:20.499] LOG: %cStart Phase MovePhase color:green;
+[00:47:20.499] LOG: %cUser: Aron
+Move: BODY_PRESS
+Use Mode: NORMAL color:orchid
+[00:47:20.499] LOG: [coop:turn] host recorder: append turn=1 seq=11 k=moveUsed total=12 live=true
+[00:47:20.500] LOG: [coop:runtime] ME-stream live-event host turn=1 seq=11 k=moveUsed
+[00:47:20.500] LOG: [coop:replay] host EMIT live battleEvent turn=1 seq=11 k=moveUsed
+[00:47:20.500] LOG: [coop:webrtc] raw tx role=host t=battleEvent bytes=96
+[00:47:20.500] LOG: %cStart Phase MessagePhase color:green;
+[00:47:20.601] LOG: %cStart Phase MoveEffectPhase color:green;
+[00:47:20.602] LOG: crit stage: +0
+[00:47:20.602] LOG: Move: Body Press | Base damage: 17.36 | Power: 80 | Source attack: 18 | Target defense: 9
+[00:47:20.603] LOG: Move: Body Press | Attack damage: 17
+[00:47:20.603] LOG: [coop:turn] host recorder: append turn=1 seq=12 k=hp total=13 live=true
+[00:47:20.603] LOG: [coop:runtime] ME-stream live-event host turn=1 seq=12 k=hp
+[00:47:20.603] LOG: [coop:replay] host EMIT live battleEvent turn=1 seq=12 k=hp
+[00:47:20.603] LOG: [coop:webrtc] raw tx role=host t=battleEvent bytes=90
+[00:47:20.603] LOG: %cStart Phase DamageAnimPhase color:green;
+[00:47:20.610] LOG: %cStart Phase MoveEndPhase color:green;
+[00:47:20.610] LOG: %cStart Phase CheckInterludePhase color:green;
+[00:47:20.610] LOG: %cStart Phase WeatherEffectPhase color:green;
+[00:47:20.610] LOG: %cStart Phase PositionalTagPhase color:green;
+[00:47:20.610] LOG: %cStart Phase BerryPhase color:green;
+[00:47:20.611] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[00:47:20.611] LOG: %cStart Phase TurnEndPhase color:green;
+[00:47:20.612] LOG: [coop:turn] host recorder: finalize turn=1 events=13 seq=13
+[00:47:20.612] LOG: [coop:checkpoint] build field=4 weather=0/0 terrain=0/0 arenaTags=0 money=1228 mons=[bi0:sp304/hp17-25/st0/fnt0 bi1:sp118/hp0-21/st7/fnt1 bi2:sp656/hp24-24/st0/fnt0 bi3:sp731/hp4-21/st0/fnt0]
+[00:47:20.612] LOG: [coop:checkpoint] host capture field=4 weather=0 terrain=0 money=1228 arenaTags=0 mons=[bi0:sp304/hp17-25/st0/fnt0 bi1:sp118/hp0-21/st7/fnt1 bi2:sp656/hp24-24/st0/fnt0 bi3:sp731/hp4-21/st0/fnt0]
+[00:47:20.613] LOG: [coop:checksum] capture digest=72271c929f976546 field=3 biome=0 seed=X7QnnhaT6mrWog2GvjXKi77W weather=0 terrain=0 money=1228 party=[304,118,550,265,10807,201] partyLevels=[7,5,5,6,5,7] arenaTags=0 modifiers=2 heldItemsDigest=1 pokeballs=[0:5,1:0,2:0,3:0,4:0] mons=[bi0:sp304/hp17-25/st0/ab69/form0/tera0:8/boss0:0 bi2:sp656/hp24-24/st0/ab5210/form0/tera0:10/boss0:0 bi3:sp731/hp4-21/st0/ab125/form0/tera0:2/boss0:0]
+[00:47:20.613] LOG: [coop:replay] host SEND turnResolution turn=1 events=13 checksum=72271c929f976546 preimage=true fullField=4
+[00:47:20.613] LOG: [coop:webrtc] raw tx role=host t=turnResolution bytes=4245
+[00:47:20.613] LOG: %cStart Phase SwitchPhase color:green;
+[00:47:20.613] LOG: [coop:relay] AWAIT interactionChoice seq=90001 timeoutMs=60000 -> network-wait
+[00:47:21.551] LOG: [coop:webrtc] raw rx role=host t=command bytes=113 handlers=7
+[00:47:21.551] LOG: [coop:relay] recv command fieldIndex=1 turn=1 command=0 -> BUFFERED (no awaiter yet)
+[00:47:23.791] LOG: [coop:webrtc] raw rx role=host t=interactionChoice bytes=79 handlers=7
+[00:47:23.791] LOG: [coop:relay] RECV interactionChoice seq=90001 -> deliver-to-waiter choice=5 data=[0,201]
+[00:47:23.791] LOG: [coop:relay] AWAIT interactionChoice seq=90001 RESOLVE choice=5 data=[0,201]
+[00:47:23.791] LOG: %cStart Phase SwitchSummonPhase color:green;
+[00:47:23.991] LOG: %cStart Phase ShinySparklePhase color:green;
+[00:47:24.093] LOG: %cStart Phase PostSummonPhase color:green;
+[00:47:24.093] LOG: Ran PSP for: Unown
+[00:47:24.093] LOG: %cStart Phase PostSummonPhase color:green;
+[00:47:24.094] LOG: %cStart Phase PostSummonPhase color:green;
+[00:47:24.094] LOG: %cStart Phase CoopPushReplacementCheckpointPhase color:green;
+[00:47:24.094] LOG: [coop:checkpoint] build field=4 weather=0/0 terrain=0/0 arenaTags=0 money=1228 mons=[bi0:sp304/hp17-25/st0/fnt0 bi1:sp201/hp27-27/st0/fnt0 bi2:sp656/hp24-24/st0/fnt0 bi3:sp731/hp4-21/st0/fnt0]
+[00:47:24.094] LOG: [coop:checkpoint] host capture field=4 weather=0 terrain=0 money=1228 arenaTags=0 mons=[bi0:sp304/hp17-25/st0/fnt0 bi1:sp201/hp27-27/st0/fnt0 bi2:sp656/hp24-24/st0/fnt0 bi3:sp731/hp4-21/st0/fnt0]
+[00:47:24.094] LOG: [coop:checkpoint] host push OUT-OF-BAND replacement checkpoint (partner-slot auto-summon)
+[00:47:24.094] LOG: [coop:checksum] capture digest=29f64027d584bb5d field=4 biome=0 seed=X7QnnhaT6mrWog2GvjXKi77W weather=0 terrain=0 money=1228 party=[304,201,550,265,10807,118] partyLevels=[7,7,5,6,5,5] arenaTags=0 modifiers=2 heldItemsDigest=2 pokeballs=[0:5,1:0,2:0,3:0,4:0] mons=[bi0:sp304/hp17-25/st0/ab69/form0/tera0:8/boss0:0 bi1:sp201/hp27-27/st0/ab107/form28/tera0:13/boss0:0 bi2:sp656/hp24-24/st0/ab5210/form0/tera0:10/boss0:0 bi3:sp731/hp4-21/st0/ab125/form0/tera0:2/boss0:0]
+[00:47:24.094] LOG: [coop:checksum] host SEND battleCheckpoint reason=replacement checksum=29f64027d584bb5d
+[00:47:24.094] LOG: [coop:webrtc] raw tx role=host t=battleCheckpoint bytes=1059
+[00:47:24.094] LOG: %cStart Phase TurnInitPhase color:green;
+[00:47:24.094] LOG: %cStart Phase CommandPhase color:green;
+[00:47:24.382] LOG: [coop:webrtc] raw rx role=host t=requestStateSync bytes=41 handlers=7
+[00:47:24.382] LOG: [coop:resync] host RECV requestStateSync turn=1 seq=2
+[00:47:24.382] LOG: [coop:resync] recv requestStateSync turn=1 seq=2 role=host
+[00:47:24.386] LOG: [coop:resync] send stateSync seq=2 blob=7676b
+[00:47:24.386] LOG: [coop:resync] host SEND stateSync seq=2 blobLen=7676
+[00:47:24.386] LOG: [coop:webrtc] raw tx role=host t=stateSync bytes=7711
+[00:47:25.698] LOG: Move: BODY_PRESS Move targets: {"targets":[2,3,1],"multiple":false} 
+Player Pokemon: Aron
+[00:47:25.699] LOG: %cStart Phase SelectTargetPhase color:green;
+[00:47:26.674] LOG: [coop:owner] broadcast own-slot fi=0 turn=2 role=host cmd=0
+[00:47:26.674] LOG: [coop:relay] broadcastLocalCommand SEND fieldIndex=0 turn=2 command=0 cursor=1 moveId=776 targets=[3]
+[00:47:26.674] LOG: [coop:webrtc] raw tx role=host t=command bytes=113
+[00:47:26.674] LOG: %cStart Phase CommandPhase color:green;
+[00:47:26.675] LOG: [coop:relay] host requestPartnerCommand SEND fieldIndex=1 turn=2 moveSlots=[0,1,2,3] (awaiting peer)
+[00:47:26.675] LOG: [coop:webrtc] raw tx role=host t=commandRequest bytes=68
+[00:47:27.570] LOG: [coop:webrtc] raw rx role=host t=command bytes=90 handlers=7
+[00:47:27.570] LOG: [coop:relay] recv command DECLINE fieldIndex=1 turn=2 -> AI fallback
+[00:47:27.570] LOG: Battle Seed: mMfqncpJm9SiNRiU
+[00:47:27.570] LOG: [coop:ai] resolvePartnerCommand partner=201 usable=4 encored=false -> moveId=246 moveIndex=1 targets=[2]
+[00:47:27.570] LOG: Move: ANCIENT_POWER Move targets: {"targets":[2],"multiple":false} 
+Player Pokemon: Unown
+[00:47:27.570] LOG: %cStart Phase EnemyCommandPhase color:green;
+[00:47:27.574] LOG: Move Pool: ["Bubble Beam","Mud Sport","Tackle","Leer"]
+[00:47:27.574] LOG: Move Scores: [30,0,8,2]
+[00:47:27.574] LOG: Sorted Move Pool: ["Bubble Beam","Tackle","Leer","Mud Sport"]
+[00:47:27.574] LOG: Chosen Move: Bubble Beam
+[00:47:27.575] LOG: %cStart Phase EnemyCommandPhase color:green;
+[00:47:27.578] LOG: Move Pool: ["Fury Attack","Peck","Growl"]
+[00:47:27.578] LOG: Move Scores: [34.5,6.65625,2]
+[00:47:27.578] LOG: Sorted Move Pool: ["Fury Attack","Peck","Growl"]
+[00:47:27.578] LOG: Chosen Move: Fury Attack
+[00:47:27.579] LOG: %cStart Phase TurnStartPhase color:green;
+[00:47:27.579] LOG: [coop:turn] host recorder: begin turn=2 (no prior open recording)
+[00:47:27.583] LOG: %cStart Phase MovePhase color:green;
+[00:47:27.583] LOG: %cUser: Froakie
+Move: BUBBLE_BEAM
+Use Mode: NORMAL color:orchid
+[00:47:27.585] LOG: [coop:turn] host recorder: append turn=2 seq=0 k=moveUsed total=1 live=true
+[00:47:27.585] LOG: [coop:runtime] ME-stream live-event host turn=2 seq=0 k=moveUsed
+[00:47:27.585] LOG: [coop:replay] host EMIT live battleEvent turn=2 seq=0 k=moveUsed
+[00:47:27.585] LOG: [coop:webrtc] raw tx role=host t=battleEvent bytes=94
+[00:47:27.587] LOG: %cStart Phase MessagePhase color:green;
+[00:47:27.684] LOG: %cStart Phase MoveEffectPhase color:green;
+[00:47:27.685] LOG: crit stage: +0
+[00:47:27.685] LOG: Move: Bubble Beam | Base damage: 3.6128 | Power: 30 | Source attack: 14 | Target defense: 25
+[00:47:27.686] LOG: Move: Bubble Beam | Attack damage: 5
+[00:47:27.686] LOG: [coop:turn] host recorder: append turn=2 seq=1 k=hp total=2 live=true
+[00:47:27.686] LOG: [coop:runtime] ME-stream live-event host turn=2 seq=1 k=hp
+[00:47:27.686] LOG: [coop:replay] host EMIT live battleEvent turn=2 seq=1 k=hp
+[00:47:27.686] LOG: [coop:webrtc] raw tx role=host t=battleEvent bytes=90
+[00:47:27.686] LOG: %cStart Phase DamageAnimPhase color:green;
+[00:47:27.694] LOG: %cStart Phase MoveEffectPhase color:green;
+[00:47:27.694] LOG: crit stage: +0
+[00:47:27.695] LOG: Move: Bubble Beam | Base damage: 3.6128 | Power: 30 | Source attack: 14 | Target defense: 25
+[00:47:27.696] LOG: Move: Bubble Beam | Attack damage: 4
+[00:47:27.696] LOG: [coop:turn] host recorder: append turn=2 seq=2 k=hp total=3 live=true
+[00:47:27.696] LOG: [coop:runtime] ME-stream live-event host turn=2 seq=2 k=hp
+[00:47:27.696] LOG: [coop:replay] host EMIT live battleEvent turn=2 seq=2 k=hp
+[00:47:27.696] LOG: [coop:webrtc] raw tx role=host t=battleEvent bytes=90
+[00:47:27.696] LOG: [coop:turn] host recorder: append turn=2 seq=3 k=message total=4 live=true
+[00:47:27.696] LOG: [coop:runtime] ME-stream live-event host turn=2 seq=3 k=message
+[00:47:27.696] LOG: [coop:replay] host EMIT live battleEvent turn=2 seq=3 k=message
+[00:47:27.696] LOG: [coop:webrtc] raw tx role=host t=battleEvent bytes=84
+[00:47:27.696] LOG: %cStart Phase DamageAnimPhase color:green;
+[00:47:27.701] LOG: %cStart Phase MessagePhase color:green;
+[00:47:27.888] LOG: %cStart Phase MoveEndPhase color:green;
+[00:47:27.889] LOG: %cStart Phase MovePhase color:green;
+[00:47:27.889] LOG: %cUser: Pikipek
+Move: FURY_ATTACK
+Use Mode: NORMAL color:orchid
+[00:47:27.892] LOG: [coop:turn] host recorder: append turn=2 seq=4 k=moveUsed total=5 live=true
+[00:47:27.892] LOG: [coop:runtime] ME-stream live-event host turn=2 seq=4 k=moveUsed
+[00:47:27.892] LOG: [coop:replay] host EMIT live battleEvent turn=2 seq=4 k=moveUsed
+[00:47:27.892] LOG: [coop:webrtc] raw tx role=host t=battleEvent bytes=94
+[00:47:27.894] LOG: %cStart Phase MessagePhase color:green;
+[00:47:28.004] LOG: %cStart Phase MoveEffectPhase color:green;
+[00:47:28.005] LOG: crit stage: +1
+[00:47:28.006] LOG: Move: Fury Attack | Base damage: 3.3200000000000003 | Power: 25 | Source attack: 15 | Target defense: 25
+[00:47:28.006] LOG: Move: Fury Attack | Attack damage: 4
+[00:47:28.006] LOG: [coop:turn] host recorder: append turn=2 seq=5 k=hp total=6 live=true
+[00:47:28.006] LOG: [coop:runtime] ME-stream live-event host turn=2 seq=5 k=hp
+[00:47:28.006] LOG: [coop:replay] host EMIT live battleEvent turn=2 seq=5 k=hp
+[00:47:28.006] LOG: [coop:webrtc] raw tx role=host t=battleEvent bytes=90
+[00:47:28.007] LOG: %cStart Phase DamageAnimPhase color:green;
+[00:47:28.014] LOG: %cStart Phase MoveEffectPhase color:green;
+[00:47:28.014] LOG: crit stage: +1
+[00:47:28.014] LOG: Move: Fury Attack | Base damage: 3.3200000000000003 | Power: 25 | Source attack: 15 | Target defense: 25
+[00:47:28.015] LOG: Move: Fury Attack | Attack damage: 4
+[00:47:28.015] LOG: [coop:turn] host recorder: append turn=2 seq=6 k=hp total=7 live=true
+[00:47:28.015] LOG: [coop:runtime] ME-stream live-event host turn=2 seq=6 k=hp
+[00:47:28.015] LOG: [coop:replay] host EMIT live battleEvent turn=2 seq=6 k=hp
+[00:47:28.015] LOG: [coop:webrtc] raw tx role=host t=battleEvent bytes=90
+[00:47:28.015] LOG: %cStart Phase DamageAnimPhase color:green;
+[00:47:28.022] LOG: %cStart Phase MoveEffectPhase color:green;
+[00:47:28.022] LOG: crit stage: +1
+[00:47:28.023] LOG: Move: Fury Attack | Base damage: 3.3200000000000003 | Power: 25 | Source attack: 15 | Target defense: 25
+[00:47:28.023] LOG: Move: Fury Attack | Attack damage: 6
+[00:47:28.023] LOG: [coop:turn] host recorder: append turn=2 seq=7 k=hp total=8 live=true
+[00:47:28.023] LOG: [coop:runtime] ME-stream live-event host turn=2 seq=7 k=hp
+[00:47:28.023] LOG: [coop:replay] host EMIT live battleEvent turn=2 seq=7 k=hp
+[00:47:28.023] LOG: [coop:webrtc] raw tx role=host t=battleEvent bytes=89
+[00:47:28.024] LOG: [coop:turn] host recorder: append turn=2 seq=8 k=message total=9 live=true
+[00:47:28.024] LOG: [coop:runtime] ME-stream live-event host turn=2 seq=8 k=message
+[00:47:28.024] LOG: [coop:replay] host EMIT live battleEvent turn=2 seq=8 k=message
+[00:47:28.024] LOG: [coop:webrtc] raw tx role=host t=battleEvent bytes=85
+[00:47:28.024] LOG: %cStart Phase DamageAnimPhase color:green;
+[00:47:28.030] LOG: %cStart Phase MessagePhase color:green;
+[00:47:28.221] LOG: %cStart Phase MoveEffectPhase color:green;
+[00:47:28.221] LOG: crit stage: +1
+[00:47:28.222] LOG: Move: Fury Attack | Base damage: 3.3200000000000003 | Power: 25 | Source attack: 15 | Target defense: 25
+[00:47:28.223] LOG: Move: Fury Attack | Attack damage: 4
+[00:47:28.223] LOG: [coop:turn] host recorder: append turn=2 seq=9 k=hp total=10 live=true
+[00:47:28.223] LOG: [coop:runtime] ME-stream live-event host turn=2 seq=9 k=hp
+[00:47:28.223] LOG: [coop:replay] host EMIT live battleEvent turn=2 seq=9 k=hp
+[00:47:28.223] LOG: [coop:webrtc] raw tx role=host t=battleEvent bytes=89
+[00:47:28.223] LOG: [coop:turn] host recorder: append turn=2 seq=10 k=faint total=11 live=true
+[00:47:28.223] LOG: [coop:runtime] ME-stream live-event host turn=2 seq=10 k=faint
+[00:47:28.223] LOG: [coop:replay] host EMIT live battleEvent turn=2 seq=10 k=faint
+[00:47:28.223] LOG: [coop:webrtc] raw tx role=host t=battleEvent bytes=90
+[00:47:28.223] LOG: [coop:turn] host recorder: append turn=2 seq=11 k=message total=12 live=true
+[00:47:28.223] LOG: [coop:runtime] ME-stream live-event host turn=2 seq=11 k=message
+[00:47:28.223] LOG: [coop:replay] host EMIT live battleEvent turn=2 seq=11 k=message
+[00:47:28.223] LOG: [coop:webrtc] raw tx role=host t=battleEvent bytes=85
+[00:47:28.223] LOG: %cStart Phase DamageAnimPhase color:green;
+[00:47:28.230] LOG: %cStart Phase MessagePhase color:green;
+[00:47:28.416] LOG: %cStart Phase FaintPhase color:green;
+[00:47:29.321] LOG: %cStart Phase MessagePhase color:green;
+[00:47:29.411] LOG: %cStart Phase MoveEndPhase color:green;
+[00:47:29.411] LOG: %cStart Phase MovePhase color:green;
+[00:47:29.411] LOG: %cStart Phase MoveEndPhase color:green;
+[00:47:29.411] LOG: %cStart Phase MovePhase color:green;
+[00:47:29.411] LOG: %cUser: Aron
+Move: BODY_PRESS
+Use Mode: NORMAL color:orchid
+[00:47:29.412] LOG: [coop:turn] host recorder: append turn=2 seq=12 k=moveUsed total=13 live=true
+[00:47:29.412] LOG: [coop:runtime] ME-stream live-event host turn=2 seq=12 k=moveUsed
+[00:47:29.412] LOG: [coop:replay] host EMIT live battleEvent turn=2 seq=12 k=moveUsed
+[00:47:29.412] LOG: [coop:webrtc] raw tx role=host t=battleEvent bytes=96
+[00:47:29.413] LOG: %cStart Phase MessagePhase color:green;
+[00:47:29.511] LOG: %cStart Phase MoveEffectPhase color:green;
+[00:47:29.512] LOG: crit stage: +0
+[00:47:29.512] LOG: Move: Body Press | Base damage: 17.36 | Power: 80 | Source attack: 18 | Target defense: 9
+[00:47:29.513] LOG: Move: Body Press | Attack damage: 16
+[00:47:29.513] LOG: [coop:turn] host recorder: append turn=2 seq=13 k=hp total=14 live=true
+[00:47:29.513] LOG: [coop:runtime] ME-stream live-event host turn=2 seq=13 k=hp
+[00:47:29.513] LOG: [coop:replay] host EMIT live battleEvent turn=2 seq=13 k=hp
+[00:47:29.513] LOG: [coop:webrtc] raw tx role=host t=battleEvent bytes=90
+[00:47:29.513] LOG: [coop:turn] host recorder: append turn=2 seq=14 k=faint total=15 live=true
+[00:47:29.513] LOG: [coop:runtime] ME-stream live-event host turn=2 seq=14 k=faint
+[00:47:29.513] LOG: [coop:replay] host EMIT live battleEvent turn=2 seq=14 k=faint
+[00:47:29.513] LOG: [coop:webrtc] raw tx role=host t=battleEvent bytes=90
+[00:47:29.513] LOG: %cStart Phase DamageAnimPhase color:green;
+[00:47:29.520] LOG: %cStart Phase FaintPhase color:green;
+[00:47:29.520] WARN: cry/731 not found
+[00:47:29.574] LOG: %cStart Phase MessagePhase color:green;
+[00:47:29.683] LOG: %cStart Phase VictoryPhase color:green;
+[00:47:29.683] LOG: [coop:progression] HOST applyPartyExp COMPUTE wave=8 expValue=64.6 koMon=Pikipek
+[00:47:29.683] LOG: %cStart Phase ExpPhase color:green;
+[00:47:30.107] LOG: %cStart Phase MoveEndPhase color:green;
+[00:47:30.107] LOG: %cStart Phase CheckInterludePhase color:green;
+[00:47:30.107] LOG: %cStart Phase WeatherEffectPhase color:green;
+[00:47:30.107] LOG: %cStart Phase PositionalTagPhase color:green;
+[00:47:30.107] LOG: %cStart Phase BerryPhase color:green;
+[00:47:30.107] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[00:47:30.107] LOG: %cStart Phase TurnEndPhase color:green;
+[00:47:30.108] LOG: [coop:turn] host recorder: finalize turn=2 events=15 seq=15
+[00:47:30.108] LOG: [coop:checkpoint] build field=4 weather=0/0 terrain=0/0 arenaTags=0 money=1228 mons=[bi0:sp304/hp17-25/st0/fnt0 bi1:sp201/hp0-27/st7/fnt1 bi2:sp656/hp24-24/st0/fnt0 bi3:sp731/hp0-21/st7/fnt1]
+[00:47:30.108] LOG: [coop:checkpoint] host capture field=4 weather=0 terrain=0 money=1228 arenaTags=0 mons=[bi0:sp304/hp17-25/st0/fnt0 bi1:sp201/hp0-27/st7/fnt1 bi2:sp656/hp24-24/st0/fnt0 bi3:sp731/hp0-21/st7/fnt1]
+[00:47:30.108] LOG: [coop:checksum] capture digest=f6d9dca771d6540a field=2 biome=0 seed=X7QnnhaT6mrWog2GvjXKi77W weather=0 terrain=0 money=1228 party=[304,201,550,265,10807,118] partyLevels=[7,7,5,6,5,5] arenaTags=0 modifiers=2 heldItemsDigest=0 pokeballs=[0:5,1:0,2:0,3:0,4:0] mons=[bi0:sp304/hp17-25/st0/ab69/form0/tera0:8/boss0:0 bi2:sp656/hp24-24/st0/ab5210/form0/tera0:10/boss0:0]
+[00:47:30.108] LOG: [coop:replay] host SEND turnResolution turn=2 events=15 checksum=f6d9dca771d6540a preimage=true fullField=4
+[00:47:30.108] LOG: [coop:webrtc] raw tx role=host t=turnResolution bytes=4115
+[00:47:30.108] LOG: %cStart Phase SwitchPhase color:green;
+[00:47:30.109] LOG: [coop:relay] AWAIT interactionChoice seq=90001 timeoutMs=60000 -> network-wait
