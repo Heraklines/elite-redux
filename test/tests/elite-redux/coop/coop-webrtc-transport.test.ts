@@ -11,6 +11,7 @@
 import { CoopInteractionRelay } from "#data/elite-redux/coop/coop-interaction-relay";
 import { CoopSessionController } from "#data/elite-redux/coop/coop-session-controller";
 import type { CoopConnectionState, CoopMessage } from "#data/elite-redux/coop/coop-transport";
+import { COOP_PROTOCOL_VERSION } from "#data/elite-redux/coop/coop-transport";
 import { type CoopWireChannel, WebRtcTransport } from "#data/elite-redux/coop/coop-webrtc-transport";
 import { describe, expect, it } from "vitest";
 
@@ -246,7 +247,7 @@ describe("#807 C: protocol version negotiation", () => {
     b.peer = a;
     const host = new WebRtcTransport("host", a);
     const guest = new WebRtcTransport("guest", b);
-    const hostCtl = new CoopSessionController(host, { username: "H", version: "er-coop-7" });
+    const hostCtl = new CoopSessionController(host, { username: "H", version: COOP_PROTOCOL_VERSION });
     const guestCtl = new CoopSessionController(guest, { username: "G", version: "er-coop-STALE" });
     hostCtl.connect();
     guestCtl.connect();
@@ -259,8 +260,14 @@ describe("#807 C: protocol version negotiation", () => {
     const d = new MockWire();
     c.peer = d;
     d.peer = c;
-    const h2 = new CoopSessionController(new WebRtcTransport("host", c), { username: "H", version: "er-coop-7" });
-    const g2 = new CoopSessionController(new WebRtcTransport("guest", d), { username: "G", version: "er-coop-7" });
+    const h2 = new CoopSessionController(new WebRtcTransport("host", c), {
+      username: "H",
+      version: COOP_PROTOCOL_VERSION,
+    });
+    const g2 = new CoopSessionController(new WebRtcTransport("guest", d), {
+      username: "G",
+      version: COOP_PROTOCOL_VERSION,
+    });
     h2.connect();
     g2.connect();
     expect(h2.versionMismatch).toBe(false);
