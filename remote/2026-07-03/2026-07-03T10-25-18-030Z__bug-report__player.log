@@ -1,0 +1,281 @@
+----- BUG REPORT (in-game) -----
+version:  1.11.19
+url:      https://elite-redux.pages.dev/
+ua:       Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Mobile Safari/537.36
+mode:     4  wave:21  difficulty:youngster
+seed:     8rYVf2WPt7CQb0KTMjwwtdq2
+party:    Charcadet(L16 30/43), Iron Thorns(L16 62/62), Spewpa(L9 29/29), Kecleon(L10 35/35), Mew(L10 42/42)
+
+----- DESCRIPTION -----
+Dragon Breath should have a 100% paralyze chance
+
+----- CONSOLE -----
+[10:22:56.139] LOG: %cStart Phase HideAbilityPhase color:green;
+[10:22:56.165] LOG: %cStart Phase MoveEndPhase color:green;
+[10:22:56.166] LOG: %cStart Phase MovePhase color:green;
+[10:22:56.166] LOG: %cUser: Iron Thorns
+Move: SHIFT_GEAR
+Use Mode: NORMAL color:orchid
+[10:22:56.170] LOG: %cStart Phase MessagePhase color:green;
+[10:22:56.306] LOG: %cStart Phase MoveEffectPhase color:green;
+[10:22:56.840] LOG: %cStart Phase StatStageChangePhase color:green;
+[10:22:57.025] LOG: %cStart Phase MessagePhase color:green;
+[10:22:57.256] LOG: %cStart Phase StatStageChangePhase color:green;
+[10:22:57.441] LOG: %cStart Phase MessagePhase color:green;
+[10:22:57.689] LOG: %cStart Phase MoveEndPhase color:green;
+[10:22:57.689] LOG: %cStart Phase CheckInterludePhase color:green;
+[10:22:57.689] LOG: %cStart Phase WeatherEffectPhase color:green;
+[10:22:58.264] LOG: %cStart Phase PositionalTagPhase color:green;
+[10:22:58.264] LOG: %cStart Phase BerryPhase color:green;
+[10:22:58.267] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[10:22:58.270] LOG: %cStart Phase TurnEndPhase color:green;
+[10:22:58.278] WARN: [coop:turn] host recorder: finalize with NO open recording -> turn=-1 events=0 (caller decides not to emit)
+[10:22:58.278] LOG: %cStart Phase TurnInitPhase color:green;
+[10:22:58.278] LOG: %cStart Phase CommandPhase color:green;
+[10:22:58.653] LOG: Move: FIRE_PLEDGE Move targets: {"targets":[2,1],"multiple":false} 
+Player Pokemon: Charcadet
+[10:22:58.655] LOG: %cStart Phase SelectTargetPhase color:green;
+[10:22:58.878] LOG: %cStart Phase CommandPhase color:green;
+[10:22:59.586] LOG: Move: SHIFT_GEAR Move targets: {"targets":[1],"multiple":false} 
+Player Pokemon: Iron Thorns
+[10:22:59.588] LOG: %cStart Phase EnemyCommandPhase color:green;
+[10:22:59.598] LOG: Battle Seed: gjpGyzGN2pRQEOQB
+[10:22:59.599] LOG: Move Pool: ["Scratch"]
+[10:22:59.599] LOG: Move Scores: [5.25]
+[10:22:59.599] LOG: Sorted Move Pool: ["Scratch"]
+[10:22:59.599] LOG: Chosen Move: Scratch
+[10:22:59.599] LOG: %cStart Phase TurnStartPhase color:green;
+[10:22:59.602] LOG: %cStart Phase MovePhase color:green;
+[10:22:59.602] LOG: %cUser: Charcadet
+Move: FIRE_PLEDGE
+Use Mode: NORMAL color:orchid
+[10:22:59.605] LOG: %cStart Phase MessagePhase color:green;
+[10:22:59.714] LOG: %cStart Phase MoveEffectPhase color:green;
+[10:23:00.074] LOG: crit stage: +0
+[10:23:00.076] LOG: Move: Fire Pledge | Base damage: 22.64 | Power: 90 | Source attack: 43 | Target defense: 30
+[10:23:00.076] LOG: Move: Fire Pledge | Attack damage: 14
+[10:23:00.077] LOG: %cStart Phase DamageAnimPhase color:green;
+[10:23:00.103] LOG: %cStart Phase FaintPhase color:green;
+[10:23:00.699] LOG: %cStart Phase MessagePhase color:green;
+[10:23:01.346] LOG: %cStart Phase VictoryPhase color:green;
+[10:23:01.346] LOG: Applied Soothe Bell 
+[10:23:01.347] LOG: %cStart Phase ExpPhase color:green;
+[10:23:01.347] LOG: Applied Super EXP. Charm 
+[10:23:01.347] LOG: Applied EXP. Charm 
+[10:23:01.595] LOG: 3858 4642 4428
+[10:23:01.707] LOG: %cStart Phase LevelUpPhase color:green;
+[10:23:01.707] LOG: Applied Zinc 
+[10:23:01.707] LOG: Applied Calcium 
+[10:23:01.708] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[10:23:01.708] LOG: Applied Super EXP. Charm 
+[10:23:01.708] LOG: Applied EXP. Charm 
+[10:23:01.709] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[10:23:01.709] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[10:23:01.709] LOG: Applied Super EXP. Charm 
+[10:23:01.709] LOG: Applied EXP. Charm 
+[10:23:01.709] LOG: %cStart Phase LevelUpPhase color:green;
+[10:23:01.709] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[10:23:01.710] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[10:23:01.710] LOG: Applied Super EXP. Charm 
+[10:23:01.710] LOG: Applied EXP. Charm 
+[10:23:01.710] LOG: %cStart Phase LevelUpPhase color:green;
+[10:23:01.710] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[10:23:01.710] LOG: %cStart Phase MoveEndPhase color:green;
+[10:23:01.711] LOG: %cStart Phase MovePhase color:green;
+[10:23:01.711] LOG: %cUser: Iron Thorns
+Move: SHIFT_GEAR
+Use Mode: NORMAL color:orchid
+[10:23:01.713] LOG: %cStart Phase MessagePhase color:green;
+[10:23:01.847] LOG: %cStart Phase MoveEffectPhase color:green;
+[10:23:02.391] LOG: %cStart Phase StatStageChangePhase color:green;
+[10:23:02.575] LOG: %cStart Phase MessagePhase color:green;
+[10:23:02.822] LOG: %cStart Phase StatStageChangePhase color:green;
+[10:23:03.008] LOG: %cStart Phase MessagePhase color:green;
+[10:23:03.256] LOG: %cStart Phase MoveEndPhase color:green;
+[10:23:03.256] LOG: %cStart Phase MovePhase color:green;
+[10:23:03.256] LOG: %cStart Phase MoveEndPhase color:green;
+[10:23:03.256] LOG: %cStart Phase CheckInterludePhase color:green;
+[10:23:03.256] LOG: %cStart Phase PositionalTagPhase color:green;
+[10:23:03.256] LOG: %cStart Phase TurnEndPhase color:green;
+[10:23:03.259] WARN: [coop:turn] host recorder: finalize with NO open recording -> turn=-1 events=0 (caller decides not to emit)
+[10:23:03.259] LOG: %cStart Phase BattleEndPhase color:green;
+[10:23:03.260] LOG: Battle Score: 173 (3 Turns x0.69)
+[10:23:03.260] LOG: Total Score: 1342
+[10:23:03.265] LOG: Applied Zinc 
+[10:23:03.265] LOG: Applied Calcium 
+[10:23:03.267] LOG: %cStart Phase TrainerVictoryPhase color:green;
+[10:23:03.268] LOG: Pokémon Ranger Cappuccino
+[10:23:21.346] LOG: Pokémon Ranger Cappuccino
+[10:23:21.347] LOG: Dialogue dialogue:ranger.victory.1 skipped
+[10:23:21.347] LOG: %cStart Phase MoneyRewardPhase color:green;
+[10:23:21.348] LOG: Applied Amulet Coin 
+[10:23:21.653] LOG: %cStart Phase EggLapsePhase color:green;
+[10:23:21.653] LOG: %cStart Phase ModifierRewardPhase color:green;
+[10:23:21.654] LOG: Applied Zinc 
+[10:23:21.654] LOG: Applied Calcium 
+[10:23:21.954] LOG: %cStart Phase SelectModifierPhase color:green;
+[10:23:26.623] WARN: cry/995 not found
+[10:23:28.723] WARN: cry/995 not found
+[10:23:30.420] WARN: cry/995 not found
+[10:23:31.298] LOG: Applied Zinc 
+[10:23:31.298] LOG: Applied Calcium 
+[10:23:33.565] LOG: Applied Zinc 
+[10:23:33.565] LOG: Applied Calcium 
+[10:23:34.422] LOG: Applied Zinc 
+[10:23:34.423] LOG: Applied Calcium 
+[10:23:34.993] LOG: %cStart Phase PartyHealPhase color:green;
+[10:23:37.424] LOG: %cStart Phase ResetStatusPhase color:green;
+[10:23:37.425] LOG: %cStart Phase ResetStatusPhase color:green;
+[10:23:37.425] LOG: %cStart Phase ResetStatusPhase color:green;
+[10:23:37.426] LOG: %cStart Phase ResetStatusPhase color:green;
+[10:23:37.426] LOG: %cStart Phase ResetStatusPhase color:green;
+[10:23:37.426] LOG: %cStart Phase ErCrossroadsPhase color:green;
+[10:23:39.506] LOG: %cStart Phase SelectBiomePhase color:green;
+[10:23:39.506] LOG: Wave Seed: LmjzFkdKWevD_ha~xF 20
+[10:23:40.940] LOG: %cStart Phase PartyHealPhase color:green;
+[10:23:43.416] LOG: %cStart Phase ResetStatusPhase color:green;
+[10:23:43.416] LOG: %cStart Phase ResetStatusPhase color:green;
+[10:23:43.417] LOG: %cStart Phase ResetStatusPhase color:green;
+[10:23:43.417] LOG: %cStart Phase ResetStatusPhase color:green;
+[10:23:43.417] LOG: %cStart Phase ResetStatusPhase color:green;
+[10:23:43.418] LOG: %cStart Phase SwitchBiomePhase color:green;
+[10:23:43.832] LOG: %cStart Phase NewBattlePhase color:green;
+[10:23:43.832] LOG: Wave Seed: Mnk{GleLXfwE`ibyG 21
+[10:23:43.834] LOG: %cStart Phase ReturnPhase color:green;
+[10:23:43.948] LOG: %cStart Phase ReturnPhase color:green;
+[10:23:44.065] LOG: %cStart Phase ShowTrainerPhase color:green;
+[10:23:44.181] LOG: %cStart Phase NewBiomeEncounterPhase color:green;
+[10:23:44.184] LOG: Starting species pool tier: UNCOMMON
+[10:23:44.195] LOG: Pokemon: Wild Mareep | Species ID: 179 | Level: 14 | Nature: Mild (+SpAtk/-Def)
+[10:23:44.195] LOG: Stats (IVs): HP: 47 (30), Atk: 20 (31), Def: 16 (15), Spatk: 29 (22), Spdef: 18 (6), Spd: 19 (30)
+[10:23:44.195] LOG: Ability: Short Circuit | Passive Ability: Static 
+[10:23:44.195] LOG: Moveset: ["Thunder Shock","Defense Curl","Charge","Eerie Impulse"]
+[10:23:44.195] LOG: Starting species pool tier: RARE
+[10:23:44.202] LOG: Pokemon: Wild Applin | Species ID: 840 | Level: 14 | Nature: Sassy (+SpDef/-Spd)
+[10:23:44.202] LOG: Stats (IVs): HP: 42 (24), Atk: 21 (6), Def: 29 (16), Spatk: 21 (9), Spdef: 26 (22), Spd: 12 (0)
+[10:23:44.202] LOG: Ability: Thick Fat | Passive Ability: Overgrow 
+[10:23:44.202] LOG: Moveset: ["Dragon Breath","Concoction","Growth","U-turn"]
+[10:23:44.891] LOG: Battle Seed: oGijzAbpOQUNBRPZ
+[10:23:44.959] DEBUG: Session data saved to slot 4!
+[10:23:44.959] LOG: Wave Seed: Mnk{GleLXfwE`ibyG 21
+[10:23:45.424] LOG: %cStart Phase CommonAnimPhase color:green;
+[10:23:45.424] LOG: %cStart Phase MessagePhase color:green;
+[10:23:45.656] LOG: %cStart Phase LevelCapPhase color:green;
+[10:24:11.995] LOG: %cStart Phase SummonPhase color:green;
+[10:24:12.123] LOG: Applied Zinc 
+[10:24:12.123] LOG: Applied Calcium 
+[10:24:12.273] LOG: %cStart Phase ShinySparklePhase color:green;
+[10:24:12.372] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[10:24:12.374] LOG: %cStart Phase SummonPhase color:green;
+[10:24:12.523] LOG: Applied Zinc 
+[10:24:12.523] LOG: Applied Calcium 
+[10:24:12.556] WARN: cry/995 not found
+[10:24:12.656] LOG: %cStart Phase ShinySparklePhase color:green;
+[10:24:12.755] LOG: %cStart Phase CheckSwitchPhase color:green;
+[10:24:15.072] LOG: %cStart Phase CheckSwitchPhase color:green;
+[10:24:15.531] LOG: %cStart Phase InitEncounterPhase color:green;
+[10:24:15.534] LOG: %cStart Phase PostSummonPhase color:green;
+[10:24:15.534] LOG: Ran PSP for: Iron Thorns
+[10:24:15.537] LOG: %cStart Phase PostSummonPhase color:green;
+[10:24:15.540] LOG: %cStart Phase PostSummonPhase color:green;
+[10:24:15.540] LOG: Ran PSP for: Mareep
+[10:24:15.542] LOG: %cStart Phase PostSummonPhase color:green;
+[10:24:15.544] LOG: %cStart Phase PostSummonPhase color:green;
+[10:24:15.544] LOG: %cStart Phase PostSummonPhase color:green;
+[10:24:15.544] LOG: Ran PSP for: Charcadet
+[10:24:15.546] LOG: %cStart Phase PostSummonPhase color:green;
+[10:24:15.546] LOG: %cStart Phase PostSummonPhase color:green;
+[10:24:15.547] LOG: %cStart Phase PostSummonPhase color:green;
+[10:24:15.547] LOG: Ran PSP for: Applin
+[10:24:15.547] LOG: %cStart Phase PostSummonPhase color:green;
+[10:24:15.548] LOG: %cStart Phase PostSummonPhase color:green;
+[10:24:15.548] LOG: %cStart Phase PostSummonPhase color:green;
+[10:24:15.548] LOG: %cStart Phase TurnInitPhase color:green;
+[10:24:15.548] LOG: %cStart Phase CommandPhase color:green;
+[10:24:30.260] LOG: Move: NO_RETREAT Move targets: {"targets":[0],"multiple":false} 
+Player Pokemon: Charcadet
+[10:24:30.262] LOG: %cStart Phase CommandPhase color:green;
+[10:24:33.062] LOG: Move: SHIFT_GEAR Move targets: {"targets":[1],"multiple":false} 
+Player Pokemon: Iron Thorns
+[10:24:33.063] LOG: %cStart Phase EnemyCommandPhase color:green;
+[10:24:33.069] WARN: BattlerTag CHARGED is missing a score!
+[10:24:33.070] WARN: BattlerTag CHARGED is missing a score!
+[10:24:33.070] LOG: Move Pool: ["Thunder Shock","Defense Curl","Charge","Eerie Impulse"]
+[10:24:33.070] LOG: Move Scores: [25.5,2,2,6]
+[10:24:33.070] LOG: Sorted Move Pool: ["Thunder Shock","Eerie Impulse","Defense Curl","Charge"]
+[10:24:33.070] LOG: Chosen Move: Thunder Shock
+[10:24:33.070] LOG: %cStart Phase EnemyCommandPhase color:green;
+[10:24:33.084] LOG: Move Pool: ["Dragon Breath","Concoction","Growth","U-turn"]
+[10:24:33.084] LOG: Move Scores: [25.5,4.125,12,-3.25]
+[10:24:33.084] LOG: Sorted Move Pool: ["Dragon Breath","Growth","Concoction","U-turn"]
+[10:24:33.084] LOG: Chosen Move: Dragon Breath
+[10:24:33.084] LOG: %cStart Phase TurnStartPhase color:green;
+[10:24:33.092] LOG: %cStart Phase MovePhase color:green;
+[10:24:33.093] LOG: %cUser: Iron Thorns
+Move: SHIFT_GEAR
+Use Mode: NORMAL color:orchid
+[10:24:33.098] LOG: %cStart Phase MessagePhase color:green;
+[10:24:33.193] LOG: %cStart Phase MoveEffectPhase color:green;
+[10:24:33.749] LOG: %cStart Phase StatStageChangePhase color:green;
+[10:24:33.935] LOG: %cStart Phase MessagePhase color:green;
+[10:24:34.181] LOG: %cStart Phase StatStageChangePhase color:green;
+[10:24:34.368] LOG: %cStart Phase MessagePhase color:green;
+[10:24:34.597] LOG: %cStart Phase MoveEndPhase color:green;
+[10:24:34.601] LOG: %cStart Phase MovePhase color:green;
+[10:24:34.601] LOG: %cUser: Mareep
+Move: THUNDER_SHOCK
+Use Mode: NORMAL color:orchid
+[10:24:34.614] LOG: %cStart Phase MessagePhase color:green;
+[10:24:34.747] LOG: %cStart Phase MoveEffectPhase color:green;
+[10:24:35.165] LOG: crit stage: +0
+[10:24:35.168] LOG: Move: Thunder Shock | Base damage: 19.631999999999998 | Power: 96 | Source attack: 29 | Target defense: 24
+[10:24:35.169] LOG: Move: Thunder Shock | Attack damage: 10
+[10:24:35.169] LOG: %cStart Phase ShowAbilityPhase color:green;
+[10:24:35.316] LOG: %cStart Phase HideAbilityPhase color:green;
+[10:24:35.365] LOG: %cStart Phase DamageAnimPhase color:green;
+[10:24:35.400] LOG: %cStart Phase MoveEndPhase color:green;
+[10:24:35.402] LOG: %cStart Phase MovePhase color:green;
+[10:24:35.402] LOG: %cUser: Charcadet
+Move: NO_RETREAT
+Use Mode: NORMAL color:orchid
+[10:24:35.414] LOG: %cStart Phase MessagePhase color:green;
+[10:24:35.530] LOG: %cStart Phase MoveEffectPhase color:green;
+[10:24:35.966] LOG: %cStart Phase StatStageChangePhase color:green;
+[10:24:35.966] LOG: %cStart Phase StatStageChangePhase color:green;
+[10:24:36.151] LOG: %cStart Phase MessagePhase color:green;
+[10:24:36.380] LOG: %cStart Phase StatStageChangePhase color:green;
+[10:24:36.568] LOG: %cStart Phase MessagePhase color:green;
+[10:24:36.797] LOG: %cStart Phase StatStageChangePhase color:green;
+[10:24:36.984] LOG: %cStart Phase MessagePhase color:green;
+[10:24:37.214] LOG: %cStart Phase StatStageChangePhase color:green;
+[10:24:37.401] LOG: %cStart Phase MessagePhase color:green;
+[10:24:37.631] LOG: %cStart Phase StatStageChangePhase color:green;
+[10:24:37.826] LOG: %cStart Phase MessagePhase color:green;
+[10:24:38.064] LOG: %cStart Phase MessagePhase color:green;
+[10:24:38.305] LOG: %cStart Phase MoveEndPhase color:green;
+[10:24:38.306] LOG: %cStart Phase MovePhase color:green;
+[10:24:38.306] LOG: %cUser: Applin
+Move: DRAGON_BREATH
+Use Mode: NORMAL color:orchid
+[10:24:38.319] LOG: %cStart Phase MessagePhase color:green;
+[10:24:38.456] LOG: %cStart Phase MoveEffectPhase color:green;
+[10:24:38.756] LOG: crit stage: +0
+[10:24:38.759] LOG: Move: Dragon Breath | Base damage: 6.655 | Power: 70 | Source attack: 21 | Target defense: 48
+[10:24:38.760] LOG: Move: Dragon Breath | Attack damage: 3
+[10:24:38.761] LOG: %cStart Phase ShowAbilityPhase color:green;
+[10:24:38.908] LOG: %cStart Phase HideAbilityPhase color:green;
+[10:24:38.957] LOG: %cStart Phase DamageAnimPhase color:green;
+[10:24:38.992] LOG: %cStart Phase MoveEndPhase color:green;
+[10:24:38.992] LOG: %cStart Phase CheckInterludePhase color:green;
+[10:24:38.992] LOG: %cStart Phase WeatherEffectPhase color:green;
+[10:24:39.390] LOG: %cStart Phase PositionalTagPhase color:green;
+[10:24:39.390] LOG: %cStart Phase BerryPhase color:green;
+[10:24:39.397] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[10:24:39.402] LOG: %cStart Phase TurnEndPhase color:green;
+[10:24:39.408] WARN: [coop:turn] host recorder: finalize with NO open recording -> turn=-1 events=0 (caller decides not to emit)
+[10:24:39.408] LOG: %cStart Phase TurnInitPhase color:green;
+[10:24:39.408] LOG: %cStart Phase CommandPhase color:green;
+[10:24:41.328] LOG: Move: PHOTON_GEYSER Move targets: {"targets":[2,3,1],"multiple":false} 
+Player Pokemon: Charcadet
+[10:24:41.330] LOG: %cStart Phase SelectTargetPhase color:green;
+[10:24:41.886] LOG: %cStart Phase CommandPhase color:green;
