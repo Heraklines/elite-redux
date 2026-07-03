@@ -4581,6 +4581,7 @@ export class BattleScene extends SceneBase {
       const forced = erGauntletPickMeType(
         this.currentBattle.waveIndex,
         (this.mysteryEncounterSaveData?.encounteredEvents ?? []).map(e => e.type),
+        this.seed ?? "",
       );
       console.log(`[er-gauntlet] wave=${this.currentBattle.waveIndex} ME type -> ${MysteryEncounterType[forced]}`);
       encounter = allMysteryEncounters[forced] ?? null;

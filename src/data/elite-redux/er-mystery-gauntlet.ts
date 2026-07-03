@@ -59,6 +59,7 @@ const GAUNTLET_EXCLUDED = new Set<MysteryEncounterType>([MysteryEncounterType.LL
 export function erGauntletPickMeType(
   waveIndex: number,
   encountered: readonly MysteryEncounterType[],
+  runSeed = "",
 ): MysteryEncounterType {
   if (erGauntletWaveKind(waveIndex) === "bargain") {
     return MysteryEncounterType.ER_THE_BARGAIN;
@@ -69,6 +70,11 @@ export function erGauntletPickMeType(
   const seen = new Set(encountered);
   const fresh = all.filter(t => !seen.has(t));
   const pool = fresh.length > 0 ? fresh : all; // pool exhausted -> start repeating
-  // Deterministic walk keyed by wave so both a replay and the co-op guest's logs agree.
-  return pool[waveIndex % pool.length];
+  // Deterministic walk keyed by wave + RUN SEED: replays and the co-op guest agree,
+  // but different runs see different encounters at the same wave (live 'same ME again').
+  let seedHash = 0;
+  for (let i = 0; i < runSeed.length; i++) {
+    seedHash = (seedHash * 31 + runSeed.charCodeAt(i)) >>> 0;
+  }
+  return pool[(waveIndex + seedHash) % pool.length];
 }

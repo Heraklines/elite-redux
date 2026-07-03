@@ -332,6 +332,15 @@ export class UI extends Phaser.GameObjects.Container {
           && coopMeInProgress()
           && !(getCoopController()?.isLocalOwnerAtCounter(coopMeInteractionStartValue()) ?? true)
         ) {
+          // #816 (live BOTH-frozen): the engine's own dialogue ("that Unown will do
+          // nicely!") runs on the HOST and needs a press to advance - blocking it parked
+          // the encounter forever (no terminal -> the owner waited forever). MESSAGE mode
+          // is pure text-advance with no choice semantics, so let it through; every
+          // CHOICE screen (options / party / secondary) stays blocked.
+          if (this.getMode() === UiMode.MESSAGE) {
+            coopLog("me", "ui: host ADVANCES engine dialogue on guest-owned ME (#816)", { button });
+            return this.processInputInner(button);
+          }
           if (isCoopDebug()) {
             coopLog("me", "ui: host blocks local press on guest-owned ME (applies relayed index)", { button });
           }

@@ -129,7 +129,9 @@ export class CoopReplayMePhase extends Phase {
     this.offMeMessage =
       getCoopBattleStreamer()?.onMeMessage(text => {
         try {
-          globalScene.phaseManager.queueMessage(text);
+          // #816: render DIRECTLY - queued messages never display while this phase is
+          // parked awaiting the host, which is exactly when narration arrives.
+          globalScene.ui.showText(text, null, undefined, null, true);
         } catch {
           /* a narration render failure must never hang the guest's encounter */
         }
@@ -185,7 +187,7 @@ export class CoopReplayMePhase extends Phase {
       // maintainer asked for), so a quiet encounter never reads as a freeze.
       try {
         const partner = getCoopController()?.partnerName ?? "Your partner";
-        globalScene.phaseManager.queueMessage(`${partner} is choosing...`, 0, true);
+        globalScene.ui.showText(`${partner} is choosing...`, null);
       } catch {
         /* cosmetic */
       }

@@ -355,7 +355,7 @@ export class MysteryEncounterPhase extends Phase {
     // #815 visibility: the shop-style banner while the PARTNER decides this encounter.
     try {
       const partnerName = getCoopController()?.partnerName ?? "Your partner";
-      globalScene.phaseManager.queueMessage(`${partnerName} is choosing...`, 0, true);
+      globalScene.ui.showText(`${partnerName} is choosing...`, null);
     } catch {
       /* cosmetic */
     }
@@ -406,7 +406,7 @@ export class MysteryEncounterPhase extends Phase {
       // #815 visibility: announce the partner's pick on THIS screen (the pick echo).
       try {
         const partnerName = getCoopController()?.partnerName ?? "Your partner";
-        globalScene.phaseManager.queueMessage(`${partnerName} chose option ${choice.choice + 1}.`, 0, true);
+        globalScene.ui.showText(`${partnerName} chose option ${choice.choice + 1}.`, null);
       } catch {
         /* cosmetic */
       }

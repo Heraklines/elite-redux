@@ -6523,7 +6523,7 @@ export class StarterSelectUiHandler extends MessageUiHandler {
                 // MYSTERY GAUNTLET (#814): the dev/staging-only ME testing schedule.
                 ...(import.meta.env.DEV
                 || (import.meta.env as unknown as Record<string, string | undefined>).VITE_DEV_TOOLS === "1"
-                  ? [difficultyOption("mystery", "Mystery (test)")]
+                  ? [difficultyOption("mystery", "Mystery")]
                   : []),
               ],
             });
