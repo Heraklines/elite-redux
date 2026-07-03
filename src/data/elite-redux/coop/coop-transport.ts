@@ -239,6 +239,8 @@ export interface CoopSerializedMonState {
    * Optional/additive: an older host omits it and the guest leaves PP alone (resync still heals).
    */
   moves?: { id: number; ppUsed: number }[];
+  /** #804: host-authoritative owner tag for player-side mons (heals cross-client tag drift). */
+  coopOwner?: "host" | "guest";
   /** `StatusEffect` enum value (0 = none). */
   status: number;
   /** The 7 stat stages (ATK..ACC/EVA), absolute values. */

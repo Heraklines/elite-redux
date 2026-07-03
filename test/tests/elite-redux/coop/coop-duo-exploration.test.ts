@@ -645,6 +645,32 @@ describe.skipIf(!RUN)("co-op DUO exploration sweep (maintainer directive)", () =
     logs.flush();
   }, 240_000);
 
+  it("PROBE #804: a flipped coopOwner tag on the guest's field mon is HEALED by the per-turn checkpoint", async () => {
+    // Live evidence (ME battle deadlock): the tags diverged between clients, so BOTH resolved the
+    // same slot as the partner's - the host requested a command nobody could answer. The checkpoint
+    // now carries the host-authoritative tag; a drifted guest tag must heal on apply.
+    await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
+    const pair = createLoopbackPair();
+    const rig = await buildDuo(game, pair, setCoopRuntime, toCoop);
+    wireGuestCommand(rig);
+    const { captureCoopCheckpoint, applyCoopCheckpoint } = await import("#data/elite-redux/coop/coop-battle-engine");
+
+    // HOST truth: slot 0 = SNORLAX owned by "host".
+    const hostLead = rig.hostScene.getPlayerParty()[0] as unknown as { coopOwner?: string };
+    expect(hostLead.coopOwner, "HARNESS: host lead is host-owned").toBe("host");
+    const checkpoint = withClientSync(rig.hostCtx, () => captureCoopCheckpoint());
+    expect(checkpoint, "host captured a checkpoint").not.toBeNull();
+    const lead = checkpoint?.field?.find(m => m?.bi === 0);
+    expect(lead?.coopOwner, "the checkpoint CARRIES the owner tag").toBe("host");
+
+    // GUEST drift: flip the tag (the divergence class), then apply the host's checkpoint.
+    const guestLead = rig.guestScene.getPlayerParty()[0] as unknown as { coopOwner?: string };
+    guestLead.coopOwner = "guest";
+    withClientSync(rig.guestCtx, () => applyCoopCheckpoint(checkpoint!));
+    expect(guestLead.coopOwner, "the drifted tag HEALED to the host's resolution").toBe("host");
+    logs.flush();
+  }, 240_000);
+
   it("PROBE #800: a GUEST-owned mon's full-moveset learn (TM Case path) FORWARDS the forget-pick to the guest", async () => {
     // The TM Case constructs the SAME LearnMovePhase as plain TMs, so this proves the whole
     // class: host runs the phase on a guest-owned mon with 4 moves -> the forget prompt must

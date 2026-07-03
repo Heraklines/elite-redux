@@ -47,6 +47,13 @@ export interface CoopFieldMonView {
   erTags?: { type: string; turns: number }[];
   /** Move PP usage per moveset slot (#798): `{ id, ppUsed }` in slot order. */
   moves?: { id: number; ppUsed: number }[];
+  /**
+   * #804 slot-ownership heal: the host-authoritative owner tag for PLAYER-side mons. Live
+   * evidence (ME battle deadlock): the tags diverged between clients (a host-only summon-safety
+   * swap), so BOTH resolved the same slot as the partner's. Carrying the tag per turn heals
+   * drift at every checkpoint instead of only on full snapshots.
+   */
+  coopOwner?: "host" | "guest";
 }
 
 /** A readable snapshot of the arena's weather + terrain (+ tags, #633 GAP 1). */
@@ -107,6 +114,10 @@ export function serializeMonState(mon: CoopFieldMonView): CoopSerializedMonState
       id: Math.max(0, Math.trunc(m.id)),
       ppUsed: Math.max(0, Math.trunc(m.ppUsed)),
     }));
+  }
+  // #804: pass the owner tag through, value-checked (only ever "host"/"guest" on the wire).
+  if (mon.coopOwner === "host" || mon.coopOwner === "guest") {
+    state.coopOwner = mon.coopOwner;
   }
   // ER bleed/frost/fear tags (#633 Fix #4h): carry them through, sanitized (string type +
   // non-negative integer turns). Omitted when empty so a tagless mon's wire shape is unchanged.
@@ -188,5 +199,8 @@ export function normalizeMonState(state: CoopSerializedMonState): CoopSerialized
     ...(state.formIndex === undefined ? {} : { formIndex: state.formIndex }),
     ...(state.abilityId === undefined ? {} : { abilityId: state.abilityId }),
     ...(state.erTags === undefined ? {} : { erTags: state.erTags }),
+    ...(state.moves === undefined ? {} : { moves: state.moves }),
+    // #804: the owner tag must survive normalization or the drift heal never fires.
+    ...(state.coopOwner === undefined ? {} : { coopOwner: state.coopOwner }),
   });
 }

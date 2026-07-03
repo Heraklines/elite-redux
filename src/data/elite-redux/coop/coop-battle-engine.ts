@@ -154,6 +154,10 @@ function readMonView(mon: ReturnType<typeof globalScene.getField>[number]): Coop
     // #798 PP sync: carry each slot's [moveId, ppUsed] so the guest's PP converges via the
     // checkpoint (it never runs MovePhase) instead of via a forced FULL resync every turn.
     moves: (mon.moveset ?? []).map(m => ({ id: m?.moveId ?? 0, ppUsed: m?.ppUsed ?? 0 })),
+    // #804: the authoritative owner tag (player-side mons only; enemies have none).
+    ...((mon as { coopOwner?: CoopRole }).coopOwner === undefined
+      ? {}
+      : { coopOwner: (mon as { coopOwner?: CoopRole }).coopOwner }),
   };
 }
 
@@ -821,6 +825,20 @@ export function applyCoopCheckpoint(checkpoint: CoopBattleCheckpoint): void {
           // #798 PP sync: adopt the host's ppUsed PER MATCHING MOVE ID. Deliberately
           // conservative - never adds/removes/reorders moves (learn-move has its own relay);
           // an id mismatch skips that slot and the resync backstop still heals it.
+          // #804 slot-ownership heal: adopt the host-resolved owner tag on PLAYER mons,
+          // GUARDED (never clear on undefined - same rule as applyFullMon). Divergent tags
+          // made both clients resolve a slot as the partner's (the ME battle deadlock);
+          // per-turn adoption keeps command routing agreed on both engines.
+          if (state.coopOwner !== undefined && mon.isPlayer()) {
+            const cur = (mon as { coopOwner?: "host" | "guest" }).coopOwner;
+            if (cur !== state.coopOwner) {
+              coopWarn(
+                "checkpoint",
+                `mon bi=${mon.getBattlerIndex()} coopOwner host=${state.coopOwner} guest=${cur ?? "-"} -> adopted (#804)`,
+              );
+              (mon as { coopOwner?: "host" | "guest" }).coopOwner = state.coopOwner;
+            }
+          }
           if (state.moves !== undefined && Array.isArray(mon.moveset)) {
             for (const wire of state.moves) {
               const slot = mon.moveset.find(m => m?.moveId === wire.id);
