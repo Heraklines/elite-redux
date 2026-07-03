@@ -267,3 +267,52 @@ describe("#807 C: protocol version negotiation", () => {
     expect(g2.versionMismatch).toBe(false);
   });
 });
+
+describe("#810: resume offer/reply protocol + marker", () => {
+  it("offer -> guest handler fires (buffered if armed late) -> reply resolves the host promise", async () => {
+    const a = new MockWire();
+    const b = new MockWire();
+    a.peer = b;
+    b.peer = a;
+    const host = new CoopSessionController(new WebRtcTransport("host", a), { username: "H" });
+    const guest = new CoopSessionController(new WebRtcTransport("guest", b), { username: "G" });
+    host.connect();
+    guest.connect();
+
+    // Host offers BEFORE the guest arms its handler: the offer must buffer, not vanish.
+    const replyPromise = host.offerResume(42);
+    let offeredWave = -1;
+    guest.armResumeOfferHandler(wave => {
+      offeredWave = wave;
+    });
+    expect(offeredWave, "buffered offer fired on arm").toBe(42);
+
+    // Guest accepts: the host's promise resolves true.
+    guest.replyResume(true);
+    await expect(replyPromise).resolves.toBe(true);
+
+    // Second round, armed-first + decline path.
+    let secondWave = -1;
+    guest.armResumeOfferHandler(wave => {
+      secondWave = wave;
+    });
+    const decline = host.offerResume(77);
+    expect(secondWave).toBe(77);
+    guest.replyResume(false);
+    await expect(decline).resolves.toBe(false);
+  });
+
+  it("resume marker: records, matches the partner case-insensitively, rejects others, clears", async () => {
+    const { recordCoopResumeMarker, readCoopResumeMarker, clearCoopResumeMarker } = await import(
+      "#data/elite-redux/coop/coop-resume-marker"
+    );
+    clearCoopResumeMarker();
+    expect(readCoopResumeMarker("Alice")).toBeNull();
+    recordCoopResumeMarker(3, "Alice", 27);
+    expect(readCoopResumeMarker("alice")?.slot, "case-insensitive partner match").toBe(3);
+    expect(readCoopResumeMarker("alice")?.wave).toBe(27);
+    expect(readCoopResumeMarker("Bob"), "different partner does not match").toBeNull();
+    clearCoopResumeMarker();
+    expect(readCoopResumeMarker("Alice"), "cleared").toBeNull();
+  });
+});

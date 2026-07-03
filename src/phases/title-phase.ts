@@ -10,7 +10,8 @@ import { bypassLogin, isBeta, isDev } from "#constants/app-constants";
 import { getDailyRunStarters, startDailyEventChallenges } from "#data/daily-seed/daily-run";
 import { modifierTypes } from "#data/data-lists";
 import { CoopLobbyController, type LobbyPlayer } from "#data/elite-redux/coop/coop-lobby";
-import { getCoopController, startLocalCoopSession } from "#data/elite-redux/coop/coop-runtime";
+import { readCoopResumeMarker } from "#data/elite-redux/coop/coop-resume-marker";
+import { getCoopBattleStreamer, getCoopController, startLocalCoopSession } from "#data/elite-redux/coop/coop-runtime";
 import type { CoopNetcodeMode } from "#data/elite-redux/coop/coop-transport";
 import { buildInfernoFeed } from "#data/elite-redux/er-community-challenge-inferno";
 import { applyCommunityChallengeToRun } from "#data/elite-redux/er-community-challenge-launch";
@@ -500,16 +501,72 @@ export class TitlePhase extends Phase {
         const partner = runtime.controller.partnerName ?? "Partner";
         stage.setSeat(1, { name: partner, detail: "Connected", dot: "green" });
         stage.setStatus("Connected! Starting co-op...");
-        globalScene.ui.showText(
-          "Connected to your partner!\nPress to start co-op.",
-          null,
-          () => {
-            stage.destroy();
-            setModeAndEnd(GameModes.COOP);
-          },
-          null,
-          true,
-        );
+        const startNewRun = () => {
+          stage.destroy();
+          setModeAndEnd(GameModes.COOP);
+        };
+        // #810 RESUME FLOW: the lobby remembers a saved run with THIS partner.
+        // GUEST: arm the offer handler first (the host's offer can arrive any moment).
+        if (runtime.controller.role === "guest") {
+          runtime.controller.armResumeOfferHandler(wave => {
+            globalScene.ui.showText(
+              `${partner} wants to resume your saved co-op run (wave ${wave}). Accept?`,
+              null,
+              () => {
+                globalScene.ui.setMode(
+                  UiMode.CONFIRM,
+                  () => {
+                    runtime.controller.replyResume(true);
+                    stage.destroy();
+                    void this.coopGuestResumeBoot(wave);
+                  },
+                  () => {
+                    runtime.controller.replyResume(false);
+                    startNewRun();
+                  },
+                );
+              },
+              null,
+              true,
+            );
+          });
+        }
+        // HOST: if a saved run with this partner exists, offer to resume it.
+        const marker = runtime.controller.role === "host" ? readCoopResumeMarker(partner) : null;
+        if (marker != null) {
+          globalScene.ui.showText(
+            `Found a saved co-op run with ${partner} (wave ${marker.wave}). Resume it?`,
+            null,
+            () => {
+              globalScene.ui.setMode(
+                UiMode.CONFIRM,
+                () => {
+                  globalScene.ui.setMode(UiMode.MESSAGE);
+                  globalScene.ui.showText(`Waiting for ${partner} to accept...`, null);
+                  void runtime.controller.offerResume(marker.wave).then(accepted => {
+                    if (accepted) {
+                      stage.destroy();
+                      void this.loadSaveSlot(marker.slot);
+                    } else {
+                      globalScene.ui.showText(
+                        `${partner} declined. Starting a new run.`,
+                        null,
+                        startNewRun,
+                        null,
+                        true,
+                      );
+                    }
+                  });
+                },
+                startNewRun,
+              );
+            },
+            null,
+            true,
+          );
+          return;
+        }
+        globalScene.ui.showText("Connected to your partner!\nPress to start co-op.", null, startNewRun, null, true);
       },
       onError: e => {
         globalScene.ui.showText(`Co-op error:\n${e}`, null, backToTitle, null, true);
@@ -521,6 +578,30 @@ export class TitlePhase extends Phase {
     globalScene.ui.resetModeChain();
     globalScene.ui.showText("Finding co-op players...", null);
     void controller.start();
+  }
+
+  /**
+   * #810 GUEST resume boot: the host is loading its save and its EncounterPhase pushes the
+   * full session snapshot for the resumed wave (the same machinery as every co-op hard
+   * transition). Await it, apply it, and enter the run as a LOADED encounter - the guest
+   * computes nothing, so a resumed run cannot diverge at boot.
+   */
+  private async coopGuestResumeBoot(wave: number): Promise<void> {
+    globalScene.ui.setMode(UiMode.MESSAGE);
+    globalScene.ui.resetModeChain();
+    globalScene.ui.showText("Resuming co-op run...", null);
+    this.gameMode = GameModes.COOP;
+    globalScene.gameMode = getGameMode(GameModes.COOP);
+    const streamer = getCoopBattleStreamer();
+    const json = streamer == null ? null : await streamer.awaitLaunchSnapshot(wave);
+    if (json == null || !(await globalScene.gameData.applyCoopLaunchSession(json))) {
+      console.warn(`[coop-resume] guest: no/unusable resume snapshot for wave=${wave} -> new run instead`);
+      globalScene.ui.showText("Could not resume the run. Starting a new one.", null, () => this.end(), null, true);
+      return;
+    }
+    console.log(`[coop-resume] guest: booted from resume snapshot wave=${wave} -> LOADED EncounterPhase`);
+    this.loaded = true;
+    this.end();
   }
 
   // TODO: Make callers actually wait for the save slot to load

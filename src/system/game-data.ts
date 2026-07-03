@@ -17,6 +17,7 @@ import { allMoves, allSpecies } from "#data/data-lists";
 import { Egg } from "#data/egg";
 import { coopGateAccountWrite } from "#data/elite-redux/coop/coop-account-gate";
 import { coopWarn } from "#data/elite-redux/coop/coop-debug";
+import { recordCoopResumeMarker } from "#data/elite-redux/coop/coop-resume-marker";
 import {
   clearCoopRuntime,
   coopBroadcastDexSync,
@@ -1978,6 +1979,20 @@ export class GameData {
       sessionSlotId: globalScene.sessionSlotId,
       clientSessionId,
     };
+
+    // #810: the lobby's resume memory. Whenever the HOST saves a co-op session into a
+    // slot, remember WHICH partner + slot + wave, so the next lobby connect with the
+    // same partner can offer Resume instead of always starting a new game.
+    if (globalScene.gameMode?.isCoop === true && globalScene.sessionSlotId >= 0) {
+      const controller = getCoopRuntime()?.controller;
+      if (controller?.role === "host" && controller.partnerName) {
+        recordCoopResumeMarker(
+          globalScene.sessionSlotId,
+          controller.partnerName,
+          globalScene.currentBattle?.waveIndex ?? 0,
+        );
+      }
+    }
 
     const systemSaved = trySetLocalStorageItem(
       `data_${loggedInUser?.username}`,
