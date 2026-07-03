@@ -138,6 +138,10 @@ export class CoopSessionController {
   private readonly version: string;
   /** #807 C: the partner's hello version (undefined until the handshake). */
   private partnerVersionValue: string | undefined;
+  /** #810 resume flow: guest-side offer handler + buffered offer, host-side reply waiter. */
+  private resumeOfferHandler: ((wave: number) => void) | null = null;
+  private pendingResumeOfferWave: number | null = null;
+  private resumeReplyWaiter: ((accept: boolean) => void) | null = null;
 
   /** Both halves of the shared roster; local edits its own, partner's is mirrored. */
   private readonly roster = new CoopRoster();
@@ -185,6 +189,50 @@ export class CoopSessionController {
   /** #807 C: the partner's reported version ("?" before the handshake). */
   get partnerVersion(): string {
     return this.partnerVersionValue ?? "?";
+  }
+
+  /**
+   * #810 GUEST: arm the resume-offer handler. If the host's offer already arrived
+   * (the wire beat the UI), it fires immediately from the buffer.
+   */
+  armResumeOfferHandler(handler: (wave: number) => void): void {
+    this.resumeOfferHandler = handler;
+    if (this.pendingResumeOfferWave != null) {
+      const wave = this.pendingResumeOfferWave;
+      this.pendingResumeOfferWave = null;
+      handler(wave);
+    }
+  }
+
+  /**
+   * #810 HOST: offer to resume the saved run at `wave`; resolves with the guest's
+   * answer (false on a 60s no-reply timeout so the lobby can never hang on it).
+   */
+  offerResume(wave: number): Promise<boolean> {
+    coopLog("launch", `SEND resumeOffer wave=${wave} (#810)`);
+    this.transport.send({ t: "resumeOffer", wave });
+    return new Promise<boolean>(resolve => {
+      const finish = (accept: boolean) => {
+        if (this.resumeReplyWaiter === finish) {
+          this.resumeReplyWaiter = null;
+        }
+        resolve(accept);
+      };
+      this.resumeReplyWaiter = finish;
+      setTimeout(() => {
+        if (this.resumeReplyWaiter === finish) {
+          this.resumeReplyWaiter = null;
+          coopWarn("launch", "resumeOffer TIMEOUT (no reply in 60s) -> treated as declined (#810)");
+          resolve(false);
+        }
+      }, 60_000);
+    });
+  }
+
+  /** #810 GUEST: answer the host's resume offer. */
+  replyResume(accept: boolean): void {
+    coopLog("launch", `SEND resumeReply accept=${accept} (#810)`);
+    this.transport.send({ t: "resumeReply", accept });
   }
 
   /** Announce ourselves to the partner. Call once the transport is connected. */
@@ -547,6 +595,23 @@ export class CoopSessionController {
 
   private handleMessage(msg: CoopMessage): void {
     switch (msg.t) {
+      case "resumeOffer": {
+        // #810: buffer if the UI has not armed its handler yet (offer can beat the arm).
+        coopLog("launch", `RECV resumeOffer wave=${msg.wave} (#810)`);
+        if (this.resumeOfferHandler == null) {
+          this.pendingResumeOfferWave = msg.wave;
+        } else {
+          this.resumeOfferHandler(msg.wave);
+        }
+        break;
+      }
+      case "resumeReply": {
+        coopLog("launch", `RECV resumeReply accept=${msg.accept} (#810)`);
+        const waiter = this.resumeReplyWaiter;
+        this.resumeReplyWaiter = null;
+        waiter?.(msg.accept);
+        break;
+      }
       case "hello": {
         // #807 C (version negotiation): a protocol mismatch means someone runs a stale cached
         // bundle. Record + warn loudly; the runtime shows both players the hard-refresh banner.

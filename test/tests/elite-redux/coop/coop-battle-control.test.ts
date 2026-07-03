@@ -349,6 +349,45 @@ describe.skipIf(!RUN)("co-op battle control (#633, P2) - real engine (double bat
     expect(mode.hasChallenge(Challenges.SINGLE_GENERATION)).toBe(true);
   });
 
+  it("#811: a forced switch (Roar) summons from the roared player's OWN bench (no spectator)", async () => {
+    const field = await startCoopDouble();
+    // Bench: one mon per player, so both a same-owner and a partner-owned candidate exist.
+    const hostBench = game.scene.addPlayerPokemon(getPokemonSpecies(SpeciesId.PIKACHU), 5);
+    hostBench.coopOwner = "host";
+    const guestBench = game.scene.addPlayerPokemon(getPokemonSpecies(SpeciesId.EEVEE), 5);
+    guestBench.coopOwner = "guest";
+    globalScene.getPlayerParty().push(hostBench, guestBench);
+
+    // Assert the SELECTION itself: spy the deferred SwitchSummonPhase queue and check the
+    // chosen replacement's owner matches the roared mon's owner, for BOTH field slots,
+    // across repeated rolls (the same-owner pool makes it deterministic here).
+    const { allMoves } = await import("#data/data-lists");
+    const roar = allMoves[MoveId.ROAR];
+    const attr = roar.attrs.find(a => a.constructor.name === "ForceSwitchOutAttr")!;
+    const enemy = game.scene.getEnemyField()[0];
+    const picks: { victimOwner: string | undefined; pickedOwner: string | undefined }[] = [];
+    const spy = vi.spyOn(globalScene.phaseManager, "queueDeferred").mockImplementation(((
+      _phase: string,
+      _switchType: unknown,
+      _fieldIndex: number,
+      slotIndex: number,
+    ) => {
+      picks.push({
+        victimOwner: picks.length % 2 === 0 ? field[0].coopOwner : field[1].coopOwner,
+        pickedOwner: globalScene.getPlayerParty()[slotIndex]?.coopOwner,
+      });
+    }) as never);
+    for (let round = 0; round < 5; round++) {
+      await attr.apply(enemy, field[0], roar);
+      await attr.apply(enemy, field[1], roar);
+    }
+    spy.mockRestore();
+    expect(picks.length, "every roar produced a forced-switch pick").toBe(10);
+    for (const pick of picks) {
+      expect(pick.pickedOwner, "replacement comes from the roared player's OWN bench").toBe(pick.victimOwner);
+    }
+  });
+
   it("P5 resume (#807 contract): a co-op save loads while CONNECTED and is REFUSED solo", async () => {
     await startCoopDouble();
 

@@ -7853,9 +7853,22 @@ export class ForceSwitchOutAttr extends MoveEffectAttr {
         return false;
       }
 
+      // Co-op (#811): a forced switch must keep each player on the field. Roar dragging in
+      // the PARTNER's bench mon leaves one player owning BOTH slots (the other becomes a
+      // spectator), so restrict the roll to the roared player's OWN bench when possible.
+      // Runs on the host (sole engine); the outcome streams to the guest like any switch.
+      let forcedPool = eligibleNewIndices;
+      if (globalScene.gameMode?.isCoop && switchOutTarget.isPlayer() && switchOutTarget.coopOwner != null) {
+        const party = globalScene.getPlayerParty();
+        const sameOwner = eligibleNewIndices.filter(i => party[i].coopOwner === switchOutTarget.coopOwner);
+        if (sameOwner.length > 0) {
+          forcedPool = sameOwner;
+        }
+      }
+
       if (switchOutTarget.hp > 0) {
         if (this.switchType === SwitchType.FORCE_SWITCH) {
-          const slotIndex = eligibleNewIndices[user.randBattleSeedInt(eligibleNewIndices.length)];
+          const slotIndex = forcedPool[user.randBattleSeedInt(forcedPool.length)];
           globalScene.phaseManager.queueDeferred(
             "SwitchSummonPhase",
             this.switchType,

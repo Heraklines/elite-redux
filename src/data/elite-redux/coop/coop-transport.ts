@@ -591,6 +591,10 @@ export type CoopMessage =
   /** A player's battle command for their own field slot (phase P2 / LIVE-C reply). */
   | { t: "command"; fieldIndex: number; turn: number; command: SerializedCommand; decline?: boolean }
   | { t: "stallBeat"; waitingMs: number }
+  /** #810 resume flow: host offers to resume the saved run with this partner at `wave`. */
+  | { t: "resumeOffer"; wave: number }
+  /** #810 resume flow: guest's answer to the offer. */
+  | { t: "resumeReply"; accept: boolean }
   /** A forced/voluntary switch replacement: bring in party `partySlot` to `fieldIndex` (P2). */
   | { t: "switchChoice"; fieldIndex: number; partySlot: number }
   /**
