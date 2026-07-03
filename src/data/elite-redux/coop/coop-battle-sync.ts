@@ -192,6 +192,11 @@ export class CoopBattleSync {
   private slotOwnershipProbe: ((fieldIndex: number) => boolean) | null = null;
 
   /** #812: install the slot-ownership probe used to buffer-vs-decline pre-responder requests. */
+  /** #820 wiring-completeness surface: whether the factory installed the probe. */
+  hasSlotOwnershipProbe(): boolean {
+    return this.slotOwnershipProbe != null;
+  }
+
   setSlotOwnershipProbe(probe: (fieldIndex: number) => boolean): void {
     this.slotOwnershipProbe = probe;
   }
