@@ -1,0 +1,269 @@
+url:      https://elite-redux-staging.pages.dev/
+build:    mr4ebzls-50sp
+mode:     6  wave:1
+seed:     YAGsiXaASk9TJgAmTxlrL7F2
+party:    Flamiau(L5 20hp f0), Icognito(L5 18hp f28), Endivie(L5 20hp f0), Waumpel(L5 21hp f0), Goldini(L5 21hp f0)
+enemy:    Wiesor(L2), Waumpel(L2)
+
+----- COMMENT -----
+my pokemon used the wrong move, and didnt wait for the partner to choose a move. in one screen it was using mystic power and the other ancient power.
+
+----- CONSOLE -----
+[14:05:23.689] LOG: [coop:stream] host REGISTER onStateSyncRequest handler (was=false)
+[14:05:23.689] LOG: [coop:stream] host REGISTER onEnemyPartyRequest handler (was=false)
+[14:05:23.690] LOG: [coop:stream] guest REGISTER onWaveResolved handler (was=false)
+[14:05:23.690] LOG: [coop:stream] guest REGISTER onExpResolved handler (was=false)
+[14:05:23.690] LOG: [coop:stream] watcher REGISTER onMeChecksum handler (was=false)
+[14:05:23.690] LOG: [coop:turn] host recorder: REGISTER live emitter (was=false)
+[14:05:23.691] LOG: [coop:session] coopAuthoritativeGuestPredicate INSTALLED
+[14:05:23.691] LOG: [coop:launch] peer session ready role=host netcode=authoritative -> connecting
+[14:05:23.691] LOG: [coop:launch] session connect role=host partnerRole=guest netcode=authoritative username=test4 version=er-coop-8 tiebreak=0.13984552137587136
+[14:05:23.691] LOG: [coop:webrtc] raw tx role=host t=hello bytes=99
+[14:05:23.758] LOG: [coop:checksum] dataFingerprint compute moveMap=e9b828360aafb9e2(1032) movesData=fd4644aafd23b546(1107) movesName=30e2bf626b99790e(1107) movesets=64b54a1afcca3c5d(1908) abilitiesData=3088ac8089021d9e(1047) abilitiesName=fe1b451b3ba80b76(1047)
+[14:05:23.763] LOG: [coop:webrtc] raw tx role=host t=dataFingerprint bytes=329
+[14:05:23.763] LOG: [coop:launch] lobby connected code=CZAHP4 role=host -> onConnected
+[14:05:23.766] LOG: [coop:webrtc] raw rx role=host t=hello bytes=106 handlers=7
+[14:05:23.767] LOG: [coop:launch] hello recv partner=Heraklines1 partnerRole=guest (local role=host; no conflict)
+[14:05:23.767] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[14:05:23.767] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[14:05:23.770] LOG: [coop:webrtc] raw rx role=host t=dataFingerprint bytes=329 handlers=7
+[14:05:23.770] WARN: [coop:checksum] MISMATCH sections=movesName,abilitiesName - movesName local=30e2bf626b99790e(1107) peer=fad7fe8932ec09a1(1107) abilitiesName local=fe1b451b3ba80b76(1047) peer=7c302bdd9cc50a0b(1047)
+[14:05:24.108] LOG: [coop-launch] title challenge-gate: role=host isCoopGuest=false -> SelectChallengePhase
+[14:05:24.110] LOG: %cStart Phase SelectChallengePhase color:green;
+[14:05:29.990] LOG: %cStart Phase SelectStarterPhase color:green;
+[14:05:29.990] LOG: [coop-launch] startCoopSelect role=host partnerConnected=true partnerReady=false
+[14:05:30.056] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[14:05:30.056] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[14:05:41.403] LOG: [coop:webrtc] raw rx role=host t=requestRunConfig bytes=24 handlers=7
+[14:05:43.563] LOG: [coop:webrtc] raw rx role=host t=requestRunConfig bytes=24 handlers=7
+[14:05:44.296] WARN: cry/725 not found
+[14:05:45.306] WARN: cry/152 not found
+[14:05:45.777] LOG: [coop:webrtc] raw rx role=host t=requestRunConfig bytes=24 handlers=7
+[14:05:47.646] LOG: [coop:webrtc] raw rx role=host t=requestRunConfig bytes=24 handlers=7
+[14:05:48.486] LOG: [coop-runconfig] startRun role=host willBroadcast=true difficulty=elite
+[14:05:48.487] LOG: [coop:runtime] host broadcast difficulty=elite netcode=authoritative (role=host)
+[14:05:48.487] LOG: [coop:webrtc] raw tx role=host t=runConfig bytes=571
+[14:05:48.487] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[14:05:48.487] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[14:05:48.487] LOG: [coop-launch] proceedIfReady launched=false localTeam=0 bothReady=false role=host partnerReady=false
+[14:05:48.487] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[14:05:48.487] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[14:05:48.488] LOG: [coop-launch] local team locked in: 2 mons, role=host
+[14:05:48.488] LOG: [coop:session] roster carry shinyLab speciesId=725 -> none
+[14:05:48.489] LOG: [coop:session] roster carry shinyLab speciesId=152 -> none
+[14:05:48.489] LOG: [coop:roster] add ACCEPT role=host speciesId=725 cost=3 hasStarter=true -> count=1 spent=3 remaining=2
+[14:05:48.489] LOG: [coop:roster] add ACCEPT role=host speciesId=152 cost=2 hasStarter=true -> count=2 spent=5 remaining=0
+[14:05:48.489] LOG: [coop:roster] replace role=host requested=2 accepted=2 spent=5 species=[725,152]
+[14:05:48.489] LOG: [coop:roster] rosterSync SEND role=host entries=2 ready=false spent=5 species=[725,152]
+[14:05:48.489] LOG: [coop:webrtc] raw tx role=host t=rosterSync bytes=649
+[14:05:48.489] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[14:05:48.489] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[14:05:48.489] LOG: [coop-launch] proceedIfReady launched=false localTeam=2 bothReady=false role=host partnerReady=false
+[14:05:48.489] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[14:05:48.489] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[14:05:48.489] LOG: [coop:roster] setLocalReady role=host localReady=true localCount=2 partnerReady=false -> bothReady=false
+[14:05:48.489] LOG: [coop:roster] rosterSync SEND role=host entries=2 ready=true spent=5 species=[725,152]
+[14:05:48.489] LOG: [coop:webrtc] raw tx role=host t=rosterSync bytes=648
+[14:05:48.489] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[14:05:48.490] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[14:05:48.490] LOG: [coop-launch] proceedIfReady launched=false localTeam=2 bothReady=false role=host partnerReady=false
+[14:05:48.490] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[14:05:48.490] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[14:05:48.490] LOG: [coop-launch] local ready, partner NOT ready -> waiting screen
+[14:05:48.571] LOG: [coop:webrtc] raw rx role=host t=rosterSync bytes=1125 handlers=7
+[14:05:48.571] LOG: [coop:roster] add ACCEPT role=guest speciesId=201 cost=1 hasStarter=true -> count=1 spent=1 remaining=4
+[14:05:48.571] LOG: [coop:roster] add ACCEPT role=guest speciesId=265 cost=0.25 hasStarter=true -> count=2 spent=1.25 remaining=3.75
+[14:05:48.571] LOG: [coop:roster] add ACCEPT role=guest speciesId=118 cost=0.5 hasStarter=true -> count=3 spent=1.75 remaining=3.25
+[14:05:48.571] LOG: [coop:roster] replace role=guest requested=3 accepted=3 spent=1.75 species=[201,265,118]
+[14:05:48.571] LOG: [coop:roster] rosterSync RECV partner=guest entries=3 partnerReady=false partnerCount=3 -> bothReady=false (local role=host)
+[14:05:48.571] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[14:05:48.571] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[14:05:48.571] LOG: [coop-launch] proceedIfReady launched=false localTeam=2 bothReady=false role=host partnerReady=false
+[14:05:48.571] LOG: [coop:webrtc] raw rx role=host t=rosterSync bytes=1124 handlers=7
+[14:05:48.572] LOG: [coop:roster] add ACCEPT role=guest speciesId=201 cost=1 hasStarter=true -> count=1 spent=1 remaining=4
+[14:05:48.572] LOG: [coop:roster] add ACCEPT role=guest speciesId=265 cost=0.25 hasStarter=true -> count=2 spent=1.25 remaining=3.75
+[14:05:48.572] LOG: [coop:roster] add ACCEPT role=guest speciesId=118 cost=0.5 hasStarter=true -> count=3 spent=1.75 remaining=3.25
+[14:05:48.572] LOG: [coop:roster] replace role=guest requested=3 accepted=3 spent=1.75 species=[201,265,118]
+[14:05:48.572] LOG: [coop:roster] rosterSync RECV partner=guest entries=3 partnerReady=true partnerCount=3 -> bothReady=true (local role=host)
+[14:05:48.572] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[14:05:48.572] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[14:05:48.572] LOG: [coop-launch] proceedIfReady launched=false localTeam=2 bothReady=true role=host partnerReady=true
+[14:05:48.572] LOG: [coop-launch] launchCoopMergedParty role=host merged=5 slot=1
+[14:05:48.572] LOG: [coop-launch] host: auto-picked slot 0 (no picker), clearing STARTER_SELECT -> MESSAGE
+[14:05:49.587] LOG: Wave Seed: ZBHtjYbBTl:UKhBnUymsM8G3 1
+[14:05:49.590] LOG: %cStart Phase EncounterPhase color:green;
+[14:05:49.594] LOG: [coop:shop] dex baseline captured (species=1908 starters=912) - deltas are run-scoped
+[14:05:49.600] LOG: Starting species pool tier: COMMON
+[14:05:49.625] LOG: Pokemon: Wiesor (wild) | Species ID: 161 | Level: 2 | Nature: Solo (+Ang/-Vert)
+[14:05:49.625] LOG: Stats (IVs): HP: 13 (29), Atk: 8 (9), Def: 5 (0), Spatk: 6 (2), Spdef: 7 (6), Spd: 8 (29)
+[14:05:49.625] LOG: Ability: Angsthase | Passive Ability: Schnüffler 
+[14:05:49.625] LOG: Moveset: ["Kratzer","Einigler","Kratzfurie"]
+[14:05:49.625] LOG: Starting species pool tier: COMMON
+[14:05:49.626] LOG: Replaced SILCOON with WURMPLE
+[14:05:49.644] LOG: Pokemon: Waumpel (wild) | Species ID: 265 | Level: 2 | Nature: Scheu (+Init/-Ang)
+[14:05:49.644] LOG: Stats (IVs): HP: 14 (19), Atk: 6 (19), Def: 6 (2), Spatk: 5 (0), Spdef: 6 (3), Spd: 7 (10)
+[14:05:49.644] LOG: Ability: Puderabwehr | Passive Ability: Hexaplaga 
+[14:05:49.644] LOG: Moveset: ["Käfertrutz","Web Shot","Tackle","Giftstachel"]
+[14:05:51.027] LOG: [coop:replay] host SEND enemyPartySync wave=1 count=2
+[14:05:51.027] LOG: [coop:webrtc] raw tx role=host t=enemyPartySync bytes=499
+[14:05:51.030] LOG: [coop:replay] host SEND launchSnapshot wave=1 sessionLen=15159
+[14:05:51.030] LOG: [coop:webrtc] raw tx role=host t=launchSnapshot bytes=16921
+[14:05:51.032] LOG: [coop:launch] resume marker recorded slot=0 partner=Heraklines1 wave=1 (#810)
+[14:05:51.190] DEBUG: Session data saved to slot 0!
+[14:05:52.743] LOG: Wave Seed: ZBHtjYbBTl:UKhBnUymsM8G3 1
+[14:05:53.248] LOG: %cStart Phase SummonPhase color:green;
+[14:05:54.193] WARN: cry/725 not found
+[14:05:54.291] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[14:05:54.294] LOG: %cStart Phase SummonPhase color:green;
+[14:05:54.672] LOG: %cStart Phase ShinySparklePhase color:green;
+[14:05:54.759] LOG: %cStart Phase CheckSwitchPhase color:green;
+[14:05:54.759] LOG: %cStart Phase CheckSwitchPhase color:green;
+[14:05:54.759] LOG: %cStart Phase InitEncounterPhase color:green;
+[14:05:54.766] LOG: %cStart Phase PostSummonPhase color:green;
+[14:05:54.766] LOG: Ran PSP for: Flamiau
+[14:05:54.771] LOG: %cStart Phase PostSummonPhase color:green;
+[14:05:54.772] LOG: %cStart Phase ShowAbilityPhase color:green;
+[14:05:54.943] LOG: %cStart Phase StatStageChangePhase color:green;
+[14:05:55.166] LOG: %cStart Phase MessagePhase color:green;
+[14:05:55.422] LOG: %cStart Phase ShowAbilityPhase color:green;
+[14:05:55.422] LOG: %cStart Phase HideAbilityPhase color:green;
+[14:05:55.520] LOG: %cStart Phase ShowAbilityPhase color:green;
+[14:05:55.702] LOG: %cStart Phase StatStageChangePhase color:green;
+[14:05:55.919] LOG: %cStart Phase MessagePhase color:green;
+[14:05:56.141] LOG: %cStart Phase HideAbilityPhase color:green;
+[14:05:56.193] LOG: %cStart Phase StatStageChangePhase color:green;
+[14:05:56.345] LOG: %cStart Phase MessagePhase color:green;
+[14:05:56.606] LOG: %cStart Phase HideAbilityPhase color:green;
+[14:05:56.685] LOG: %cStart Phase PostSummonPhase color:green;
+[14:05:56.685] LOG: Ran PSP for: Wiesor
+[14:05:56.687] LOG: %cStart Phase PostSummonPhase color:green;
+[14:05:56.687] LOG: %cStart Phase PostSummonPhase color:green;
+[14:05:56.691] LOG: %cStart Phase ShowAbilityPhase color:green;
+[14:05:56.889] LOG: %cStart Phase HideAbilityPhase color:green;
+[14:05:56.943] LOG: %cStart Phase PostSummonPhase color:green;
+[14:05:56.943] LOG: Ran PSP for: Icognito
+[14:05:56.945] LOG: %cStart Phase PostSummonPhase color:green;
+[14:05:56.947] LOG: %cStart Phase PostSummonPhase color:green;
+[14:05:56.948] LOG: %cStart Phase ShowAbilityPhase color:green;
+[14:05:57.160] LOG: %cStart Phase QuietFormChangePhase color:green;
+[14:05:57.346] WARN: [coop:account] BLOCKED un-allowlisted account write (setPokemonCaught sp=201) during co-op - default-deny gate (#807). Wrap the legitimate call site in coopAllowAccountWrite().
+[14:05:58.198] LOG: %cStart Phase ShowAbilityPhase color:green;
+[14:05:58.198] LOG: %cStart Phase HideAbilityPhase color:green;
+[14:05:58.225] LOG: %cStart Phase ShowAbilityPhase color:green;
+[14:05:58.410] LOG: %cStart Phase MessagePhase color:green;
+[14:05:58.624] LOG: %cStart Phase HideAbilityPhase color:green;
+[14:05:58.659] LOG: %cStart Phase HideAbilityPhase color:green;
+[14:05:58.730] LOG: %cStart Phase PostSummonPhase color:green;
+[14:05:58.731] LOG: Ran PSP for: Waumpel
+[14:05:58.732] LOG: %cStart Phase PostSummonPhase color:green;
+[14:05:58.732] LOG: %cStart Phase PostSummonPhase color:green;
+[14:05:58.732] LOG: %cStart Phase TurnInitPhase color:green;
+[14:05:58.733] LOG: %cStart Phase CommandPhase color:green;
+[14:05:58.733] LOG: [coop:replay] host SEND enemyPartySync wave=1 count=2
+[14:05:58.733] LOG: [coop:webrtc] raw tx role=host t=enemyPartySync bytes=499
+[14:06:00.733] LOG: Move: FIRE_FANG Move targets: {"targets":[2,3,1],"multiple":false} 
+Player Pokemon: Flamiau
+[14:06:00.735] LOG: %cStart Phase SelectTargetPhase color:green;
+[14:06:01.450] LOG: [coop:owner] broadcast own-slot fi=0 turn=1 role=host cmd=0
+[14:06:01.450] LOG: [coop:relay] broadcastLocalCommand SEND fieldIndex=0 turn=1 command=0 cursor=2 moveId=424 targets=[3]
+[14:06:01.450] LOG: [coop:webrtc] raw tx role=host t=command bytes=113
+[14:06:01.450] LOG: %cStart Phase CommandPhase color:green;
+[14:06:01.452] LOG: [coop:relay] host requestPartnerCommand SEND fieldIndex=1 turn=1 moveSlots=[0,1,2,3] (awaiting peer)
+[14:06:01.452] LOG: [coop:webrtc] raw tx role=host t=commandRequest bytes=68
+[14:06:01.462] LOG: [coop:webrtc] raw rx role=host t=command bytes=90 handlers=7
+[14:06:01.462] LOG: [coop:relay] recv command DECLINE fieldIndex=1 turn=1 -> AI fallback
+[14:06:01.463] LOG: Battle Seed: Vvu7hKSLonDVkdMg
+[14:06:01.463] LOG: [coop:ai] resolvePartnerCommand partner=201 usable=4 encored=false -> moveId=246 moveIndex=1 targets=[2]
+[14:06:01.464] LOG: Move: ANCIENT_POWER Move targets: {"targets":[2],"multiple":false} 
+Player Pokemon: Icognito
+[14:06:01.464] LOG: %cStart Phase EnemyCommandPhase color:green;
+[14:06:01.486] LOG: Move Pool: ["Kratzer","Einigler","Kratzfurie"]
+[14:06:01.486] LOG: Move Scores: [12,2,34.5]
+[14:06:01.486] LOG: Sorted Move Pool: ["Kratzfurie","Kratzer","Einigler"]
+[14:06:01.486] LOG: Chosen Move: Kratzer
+[14:06:01.487] LOG: %cStart Phase EnemyCommandPhase color:green;
+[14:06:01.511] LOG: Move Pool: ["Käfertrutz","Web Shot","Tackle","Giftstachel"]
+[14:06:01.511] LOG: Move Scores: [15.375,10.5,8,11]
+[14:06:01.511] LOG: Sorted Move Pool: ["Käfertrutz","Giftstachel","Web Shot","Tackle"]
+[14:06:01.511] LOG: Chosen Move: Käfertrutz
+[14:06:01.511] LOG: %cStart Phase TurnStartPhase color:green;
+[14:06:01.512] LOG: [coop:turn] host recorder: begin turn=1 (no prior open recording)
+[14:06:01.520] LOG: %cStart Phase MovePhase color:green;
+[14:06:01.520] LOG: %cUser: Wiesor
+Move: SCRATCH
+Use Mode: NORMAL color:orchid
+[14:06:01.526] LOG: [coop:turn] host recorder: append turn=1 seq=0 k=moveUsed total=1 live=true
+[14:06:01.526] LOG: [coop:runtime] ME-stream live-event host turn=1 seq=0 k=moveUsed
+[14:06:01.526] LOG: [coop:replay] host EMIT live battleEvent turn=1 seq=0 k=moveUsed
+[14:06:01.526] LOG: [coop:webrtc] raw tx role=host t=battleEvent bytes=94
+[14:06:01.530] LOG: %cStart Phase MessagePhase color:green;
+[14:06:01.624] LOG: %cStart Phase MoveEffectPhase color:green;
+[14:06:01.860] LOG: crit stage: +0
+[14:06:01.861] LOG: Move: Kratzer | Base damage: 2.943157894736842 | Power: 40 | Source attack: 8 | Target defense: 19
+[14:06:01.863] LOG: Move: Kratzer | Attack damage: 4
+[14:06:01.863] LOG: [coop:turn] host recorder: append turn=1 seq=1 k=hp total=2 live=true
+[14:06:01.863] LOG: [coop:runtime] ME-stream live-event host turn=1 seq=1 k=hp
+[14:06:01.863] LOG: [coop:replay] host EMIT live battleEvent turn=1 seq=1 k=hp
+[14:06:01.863] LOG: [coop:webrtc] raw tx role=host t=battleEvent bytes=90
+[14:06:01.865] LOG: %cStart Phase DamageAnimPhase color:green;
+[14:06:01.928] LOG: %cStart Phase MoveEndPhase color:green;
+[14:06:01.929] LOG: %cStart Phase MovePhase color:green;
+[14:06:01.929] LOG: %cUser: Flamiau
+Move: FIRE_FANG
+Use Mode: NORMAL color:orchid
+[14:06:01.932] LOG: [coop:turn] host recorder: append turn=1 seq=2 k=moveUsed total=3 live=true
+[14:06:01.932] LOG: [coop:runtime] ME-stream live-event host turn=1 seq=2 k=moveUsed
+[14:06:01.932] LOG: [coop:replay] host EMIT live battleEvent turn=1 seq=2 k=moveUsed
+[14:06:01.932] LOG: [coop:webrtc] raw tx role=host t=battleEvent bytes=95
+[14:06:01.936] LOG: %cStart Phase MessagePhase color:green;
+[14:06:02.140] LOG: %cStart Phase MoveEffectPhase color:green;
+[14:06:02.607] LOG: crit stage: +0
+[14:06:02.608] LOG: Move: Feuerzahn | Base damage: 14.8 | Power: 80 | Source attack: 12 | Target defense: 6
+[14:06:02.609] LOG: Move: Feuerzahn | Attack damage: 40
+[14:06:02.609] LOG: [coop:turn] host recorder: append turn=1 seq=3 k=hp total=4 live=true
+[14:06:02.609] LOG: [coop:runtime] ME-stream live-event host turn=1 seq=3 k=hp
+[14:06:02.609] LOG: [coop:replay] host EMIT live battleEvent turn=1 seq=3 k=hp
+[14:06:02.609] LOG: [coop:webrtc] raw tx role=host t=battleEvent bytes=89
+[14:06:02.609] LOG: [coop:turn] host recorder: append turn=1 seq=4 k=faint total=5 live=true
+[14:06:02.609] LOG: [coop:runtime] ME-stream live-event host turn=1 seq=4 k=faint
+[14:06:02.609] LOG: [coop:replay] host EMIT live battleEvent turn=1 seq=4 k=faint
+[14:06:02.609] LOG: [coop:webrtc] raw tx role=host t=battleEvent bytes=89
+[14:06:02.610] LOG: [coop:turn] host recorder: append turn=1 seq=5 k=message total=6 live=true
+[14:06:02.610] LOG: [coop:runtime] ME-stream live-event host turn=1 seq=5 k=message
+[14:06:02.610] LOG: [coop:replay] host EMIT live battleEvent turn=1 seq=5 k=message
+[14:06:02.610] LOG: [coop:webrtc] raw tx role=host t=battleEvent bytes=92
+[14:06:02.611] LOG: %cStart Phase DamageAnimPhase color:green;
+[14:06:02.627] LOG: %cStart Phase MessagePhase color:green;
+[14:06:02.924] LOG: %cStart Phase FaintPhase color:green;
+[14:06:03.717] LOG: %cStart Phase MessagePhase color:green;
+[14:06:06.207] LOG: [coop:webrtc] raw rx role=host t=command bytes=113 handlers=7
+[14:06:06.208] LOG: [coop:relay] recv command fieldIndex=1 turn=1 command=0 -> BUFFERED (no awaiter yet)
+[14:06:09.707] LOG: %cStart Phase VictoryPhase color:green;
+[14:06:09.708] LOG: [coop:progression] HOST applyPartyExp COMPUTE wave=1 expValue=23.4 koMon=Waumpel
+[14:06:09.708] LOG: %cStart Phase ExpPhase color:green;
+[14:06:09.942] LOG: %cStart Phase ExpPhase color:green;
+[14:06:10.142] LOG: %cStart Phase MoveEndPhase color:green;
+[14:06:10.143] LOG: %cStart Phase MovePhase color:green;
+[14:06:10.143] LOG: %cUser: Icognito
+Move: ANCIENT_POWER
+Use Mode: NORMAL color:orchid
+[14:06:10.145] LOG: [coop:turn] host recorder: append turn=1 seq=6 k=moveUsed total=7 live=true
+[14:06:10.145] LOG: [coop:runtime] ME-stream live-event host turn=1 seq=6 k=moveUsed
+[14:06:10.145] LOG: [coop:replay] host EMIT live battleEvent turn=1 seq=6 k=moveUsed
+[14:06:10.145] LOG: [coop:webrtc] raw tx role=host t=battleEvent bytes=95
+[14:06:10.149] LOG: %cStart Phase MessagePhase color:green;
+[14:06:10.333] LOG: %cStart Phase MoveEffectPhase color:green;
+[14:06:11.319] LOG: crit stage: +0
+[14:06:11.321] LOG: Move: Antik-Kraft | Base damage: 24.628571428571426 | Power: 90 | Source attack: 22 | Target defense: 7
+[14:06:11.322] LOG: Move: Antik-Kraft | Attack damage: 24
+[14:06:11.322] LOG: [coop:turn] host recorder: append turn=1 seq=7 k=hp total=8 live=true
+[14:06:11.322] LOG: [coop:runtime] ME-stream live-event host turn=1 seq=7 k=hp
+[14:06:11.322] LOG: [coop:replay] host EMIT live battleEvent turn=1 seq=7 k=hp
+[14:06:11.322] LOG: [coop:webrtc] raw tx role=host t=battleEvent bytes=89
+[14:06:11.322] LOG: [coop:turn] host recorder: append turn=1 seq=8 k=faint total=9 live=true
+[14:06:11.322] LOG: [coop:runtime] ME-stream live-event host turn=1 seq=8 k=faint
+[14:06:11.322] LOG: [coop:replay] host EMIT live battleEvent turn=1 seq=8 k=faint
+[14:06:11.322] LOG: [coop:webrtc] raw tx role=host t=battleEvent bytes=89
+[14:06:11.324] LOG: %cStart Phase DamageAnimPhase color:green;
+[14:06:11.342] LOG: %cStart Phase FaintPhase color:green;
+[14:06:11.912] LOG: %cStart Phase MessagePhase color:green;
