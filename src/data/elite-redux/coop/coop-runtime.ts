@@ -30,6 +30,7 @@ import {
   captureCoopEnemies,
   captureCoopExpDeltas,
   captureCoopFullSnapshot,
+  resetCoopStateTicks,
 } from "#data/elite-redux/coop/coop-battle-engine";
 import { CoopBattleStreamer } from "#data/elite-redux/coop/coop-battle-stream";
 import { CoopBattleSync } from "#data/elite-redux/coop/coop-battle-sync";
@@ -49,7 +50,12 @@ import type {
   CoopSerializedEnemy,
   CoopWaveOutcome,
 } from "#data/elite-redux/coop/coop-transport";
-import { type CoopTransport, createLoopbackPair, type SerializedCommand } from "#data/elite-redux/coop/coop-transport";
+import {
+  COOP_PROTOCOL_VERSION,
+  type CoopTransport,
+  createLoopbackPair,
+  type SerializedCommand,
+} from "#data/elite-redux/coop/coop-transport";
 import { setCoopLiveEmitter } from "#data/elite-redux/coop/coop-turn-recorder";
 import { CoopUiMirror } from "#data/elite-redux/coop/coop-ui-mirror";
 import { setCoopGhostFetchSuppressed, setCoopGhostPool, setGhostPoolPublisher } from "#data/elite-redux/er-ghost-teams";
@@ -593,6 +599,7 @@ function wireCoopStallWatchdog(
 ): void {
   let peerBeat: { ms: number; at: number } | null = null;
   let lastRecoveryAt = 0;
+  let versionWarned = false;
   const offMsg = transport.onMessage(msg => {
     if (msg.t === "stallBeat") {
       peerBeat = { ms: msg.waitingMs, at: Date.now() };
@@ -600,6 +607,21 @@ function wireCoopStallWatchdog(
   });
   const timer = setInterval(() => {
     try {
+      // #807 C one-shot: a protocol-version mismatch means a stale cached bundle - tell BOTH
+      // players plainly (the top source of unreproducible ghost bugs in live sessions).
+      if (!versionWarned && runtime.controller.versionMismatch && getCoopRuntime() === runtime) {
+        versionWarned = true;
+        try {
+          globalScene.ui.showText(
+            "Version mismatch with your partner. Both players should hard refresh (Ctrl+F5) and reconnect.",
+            null,
+            undefined,
+            6000,
+          );
+        } catch {
+          /* cosmetic */
+        }
+      }
       const localMs = Math.max(relay.oldestNetworkWaitMs(), battleStream.oldestNetworkWaitMs());
       if (localMs >= COOP_STALL_REPORT_MS) {
         transport.send({ t: "stallBeat", waitingMs: localMs });
@@ -837,6 +859,8 @@ let active: CoopRuntime | null = null;
 /** Register the live co-op session (called when a co-op run is being set up). */
 export function setCoopRuntime(runtime: CoopRuntime): void {
   active = runtime;
+  // #807: a fresh session starts a fresh tick line on both sides.
+  resetCoopStateTicks();
   // Install the cycle-free authoritative-guest predicate (#633 B6) so `field/pokemon.ts` can gate the
   // Shedinja party-add without importing this module (which would close a value-level import cycle).
   setCoopAuthoritativeGuestPredicate(isCoopAuthoritativeGuest);
@@ -1297,7 +1321,7 @@ export function startLocalCoopSession(
   );
   clearCoopRuntime();
   const { host, guest } = createLoopbackPair();
-  const controller = new CoopSessionController(host, { username: opts.username });
+  const controller = new CoopSessionController(host, { username: opts.username, version: COOP_PROTOCOL_VERSION });
   // This client is the HOST here; pin the chosen netcode (#633, selectable A/B) so
   // it rides along in broadcastRunConfig and the guest adopts it. Default lockstep.
   controller.setNetcodeMode(opts.netcodeMode ?? "authoritative");
@@ -1378,7 +1402,7 @@ export function assembleCoopRuntime(
   transport: CoopTransport,
   opts: { username?: string | undefined; netcodeMode?: CoopNetcodeMode | undefined } = {},
 ): CoopRuntime {
-  const controller = new CoopSessionController(transport, { username: opts.username });
+  const controller = new CoopSessionController(transport, { username: opts.username, version: COOP_PROTOCOL_VERSION });
   // Pin the chosen netcode (#633, selectable A/B). On the HOST this is the source of
   // truth that rides along in broadcastRunConfig; on the GUEST it is only the pre-
   // runConfig default (the host's value overwrites it on receipt). Default lockstep.

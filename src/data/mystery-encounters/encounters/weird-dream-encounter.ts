@@ -1,5 +1,6 @@
 import { globalScene } from "#app/global-scene";
 import { allSpecies, modifierTypes } from "#data/data-lists";
+import { coopAllowAccountWrite } from "#data/elite-redux/coop/coop-account-gate";
 import { isErGenericPoolBanned } from "#data/elite-redux/er-generic-pool-bans";
 import { getLevelTotalExp } from "#data/exp";
 import type { PokemonSpecies } from "#data/pokemon-species";
@@ -568,7 +569,9 @@ async function postProcessTransformedPokemon(
     }
 
     globalScene.gameData.updateSpeciesDexIvs(newPokemon.species.getRootSpeciesId(true), newPokemon.ivs);
-    const newStarterUnlocked = await globalScene.gameData.setPokemonCaught(newPokemon, true, false, false);
+    const newStarterUnlocked = await coopAllowAccountWrite("me-own-mon", () =>
+      globalScene.gameData.setPokemonCaught(newPokemon, true, false, false),
+    );
     if (newStarterUnlocked) {
       isNewStarter = true;
       await showEncounterText(
@@ -667,9 +670,8 @@ export function getTransformedSpecies(
         bstInRange
         && validBst
         && !EXCLUDED_TRANSFORMATION_SPECIES.includes(s.speciesId)
-        && !isErGenericPoolBanned(s.speciesId, s.name) // ER (#126): in a roster challenge run, only transform party mons INTO
-        && // challenge-legal species (cheapest term, so it short-circuits last).
-        isSpeciesAllowedByActiveChallenges(s)
+        && !isErGenericPoolBanned(s.speciesId, s.name) // ER (#126): in a roster challenge run, only transform party mons INTO // challenge-legal species (cheapest term, so it short-circuits last).
+        && isSpeciesAllowedByActiveChallenges(s)
       );
     });
 

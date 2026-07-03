@@ -237,3 +237,33 @@ describe("stall watchdog sensor (#806): oldestNetworkWaitMs tracks parked networ
     expect(relay.oldestNetworkWaitMs()).toBe(-1);
   });
 });
+
+describe("#807 C: protocol version negotiation", () => {
+  it("a partner hello with a DIFFERENT version flips versionMismatch (stale-bundle detection)", () => {
+    const a = new MockWire();
+    const b = new MockWire();
+    a.peer = b;
+    b.peer = a;
+    const host = new WebRtcTransport("host", a);
+    const guest = new WebRtcTransport("guest", b);
+    const hostCtl = new CoopSessionController(host, { username: "H", version: "er-coop-7" });
+    const guestCtl = new CoopSessionController(guest, { username: "G", version: "er-coop-STALE" });
+    hostCtl.connect();
+    guestCtl.connect();
+    expect(hostCtl.versionMismatch).toBe(true);
+    expect(hostCtl.partnerVersion).toBe("er-coop-STALE");
+    expect(guestCtl.versionMismatch).toBe(true);
+
+    // Same version on both sides: no mismatch.
+    const c = new MockWire();
+    const d = new MockWire();
+    c.peer = d;
+    d.peer = c;
+    const h2 = new CoopSessionController(new WebRtcTransport("host", c), { username: "H", version: "er-coop-7" });
+    const g2 = new CoopSessionController(new WebRtcTransport("guest", d), { username: "G", version: "er-coop-7" });
+    h2.connect();
+    g2.connect();
+    expect(h2.versionMismatch).toBe(false);
+    expect(g2.versionMismatch).toBe(false);
+  });
+});

@@ -860,9 +860,13 @@ describe.skipIf(!RUN)("co-op DUO exploration sweep (maintainer directive)", () =
         // does this at the co-op run's first encounter), then catch. The delta then carries
         // ONLY this catch, never the host's whole account dex.
         const { captureCoopDexBaseline } = await import("#data/elite-redux/coop/coop-battle-engine");
+        const { coopAllowAccountWrite } = await import("#data/elite-redux/coop/coop-account-gate");
         captureCoopDexBaseline();
         // Binds the HOST blob + relay at write time; the trailing send timer fires LATER.
-        await globalScene.gameData.setPokemonCaught(caughtMon, true, false, false);
+        // #807 B: a catch is an allowlisted account write (production wraps the capture path).
+        await coopAllowAccountWrite("own-catch", () =>
+          globalScene.gameData.setPokemonCaught(caughtMon, true, false, false),
+        );
       });
       // Let the trailing send fire while the GUEST ctx is active: the loopback delivers
       // synchronously at send time, so this way the apply runs under the guest scene

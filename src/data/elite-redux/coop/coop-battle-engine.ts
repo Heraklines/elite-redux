@@ -22,6 +22,7 @@
 
 import { globalScene } from "#app/global-scene";
 import { EntryHazardTag } from "#data/arena-tag";
+import { coopAllowAccountWrite } from "#data/elite-redux/coop/coop-account-gate";
 import { isCoopAuthoritativeGuestGated } from "#data/elite-redux/coop/coop-authoritative-gate";
 import {
   buildCheckpoint,
@@ -230,6 +231,43 @@ function readArenaTagViews(): CoopSerializedArenaTag[] {
  * HOST: snapshot the current (post-turn) authoritative battle state. Returns null if
  * there is no live battle field to read (defensive).
  */
+/**
+ * #807 MONOTONIC STATE TICK (standard snapshot sequencing, Source/Quake style): the HOST stamps
+ * every state-bearing capture (per-turn checkpoint, full snapshot, ME outcome) with a session-
+ * monotonic tick; every GUEST applier rejects anything not NEWER than the last applied tick.
+ * This retires the whole out-of-order/stale-apply bug class (the live stale-resync softlock was
+ * one instance) instead of guarding each path by hand. Legacy peers (no tick) are accepted.
+ */
+let coopStateTickCounter = 0;
+let coopLastAppliedStateTick = -1;
+
+/** HOST: next monotonic tick for a state capture. */
+export function coopNextStateTick(): number {
+  return ++coopStateTickCounter;
+}
+
+/**
+ * GUEST: accept-or-reject a state payload by tick. Advances the high-water mark on accept.
+ * `undefined` (legacy sender) is always accepted and does not advance the mark.
+ */
+export function coopAcceptStateTick(tick: number | undefined, label: string): boolean {
+  if (tick === undefined) {
+    return true;
+  }
+  if (tick <= coopLastAppliedStateTick) {
+    coopWarn("resync", `${label} tick=${tick} STALE (lastApplied=${coopLastAppliedStateTick}) -> REJECTED (#807)`);
+    return false;
+  }
+  coopLastAppliedStateTick = tick;
+  return true;
+}
+
+/** Session reset (new run / new rig): both sides start from a clean tick line. */
+export function resetCoopStateTicks(): void {
+  coopStateTickCounter = 0;
+  coopLastAppliedStateTick = -1;
+}
+
 export function captureCoopCheckpoint(): CoopBattleCheckpoint | null {
   try {
     // Serialize player ACTIVE mons + enemy SLOT-PRESENT mons (incl. just-fainted ones) so a
@@ -253,6 +291,7 @@ export function captureCoopCheckpoint(): CoopBattleCheckpoint | null {
       money = undefined;
     }
     const checkpoint = buildCheckpoint(mons, readArenaView(), money);
+    checkpoint.tick = coopNextStateTick(); // #807 monotonic sequencing
     // Per-turn-HOT: build the summary only when debug is on. Reads the just-built checkpoint, never mutates.
     if (isCoopDebug()) {
       coopLog(
@@ -774,6 +813,10 @@ export function reconcileArenaTags(hostTags: CoopSerializedArenaTag[] | undefine
  */
 export function applyCoopCheckpoint(checkpoint: CoopBattleCheckpoint): void {
   try {
+    // #807: reject out-of-order/stale state (standard snapshot sequencing).
+    if (!coopAcceptStateTick(checkpoint.tick, "checkpoint")) {
+      return;
+    }
     coopLog(
       "checkpoint",
       `guest apply field=${checkpoint.field?.length ?? 0} weather=${checkpoint.weather} terrain=${checkpoint.terrain} arenaTags=${checkpoint.arenaTags?.length ?? 0}`,
@@ -1513,6 +1556,7 @@ export function captureCoopFullSnapshot(): CoopFullBattleSnapshot | null {
       return null;
     }
     return {
+      tick: coopNextStateTick(), // #807 monotonic sequencing
       field,
       weather: arena.weather?.weatherType ?? 0,
       weatherTurnsLeft: arena.weather?.turnsLeft ?? 0,
@@ -2043,6 +2087,10 @@ export function applyCoopFullSnapshot(
   authoritativeGuest = false,
   suppressResummon = false,
 ): void {
+  // #807: reject out-of-order/stale state (standard snapshot sequencing).
+  if (!coopAcceptStateTick(snapshot.tick, "fullSnapshot")) {
+    return;
+  }
   try {
     coopLog(
       "resync",
@@ -2791,7 +2839,10 @@ export function applyCoopCaptureParty(serializedParty: string[]): void {
     const localRole: CoopRole = "guest";
     for (const mon of constructed) {
       if ((mon as { coopOwner?: CoopRole }).coopOwner === localRole) {
-        void globalScene.gameData.setPokemonCaught(mon, true, false, false).catch(() => {});
+        // #807 B: crediting our OWN constructed mon is an allowlisted account write.
+        void coopAllowAccountWrite("own-adopt-credit", () =>
+          globalScene.gameData.setPokemonCaught(mon, true, false, false),
+        ).catch(() => {});
       } else {
         coopLog(
           "party",

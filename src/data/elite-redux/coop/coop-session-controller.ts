@@ -136,6 +136,8 @@ export class CoopSessionController {
   private readonly transport: CoopTransport;
   private readonly username: string;
   private readonly version: string;
+  /** #807 C: the partner's hello version (undefined until the handshake). */
+  private partnerVersionValue: string | undefined;
 
   /** Both halves of the shared roster; local edits its own, partner's is mirrored. */
   private readonly roster = new CoopRoster();
@@ -173,6 +175,16 @@ export class CoopSessionController {
     this.username = opts.username ?? (transport.role === "host" ? "Player 1" : "Player 2");
     this.version = opts.version ?? "1";
     this.offMessage = transport.onMessage(msg => this.handleMessage(msg));
+  }
+
+  /** #807 C: true when the partner's hello carried a DIFFERENT protocol version. */
+  get versionMismatch(): boolean {
+    return this.partnerVersionValue !== undefined && this.partnerVersionValue !== this.version;
+  }
+
+  /** #807 C: the partner's reported version ("?" before the handshake). */
+  get partnerVersion(): string {
+    return this.partnerVersionValue ?? "?";
   }
 
   /** Announce ourselves to the partner. Call once the transport is connected. */
@@ -536,6 +548,15 @@ export class CoopSessionController {
   private handleMessage(msg: CoopMessage): void {
     switch (msg.t) {
       case "hello": {
+        // #807 C (version negotiation): a protocol mismatch means someone runs a stale cached
+        // bundle. Record + warn loudly; the runtime shows both players the hard-refresh banner.
+        this.partnerVersionValue = msg.version;
+        if (msg.version !== this.version) {
+          coopWarn(
+            "launch",
+            `PROTOCOL VERSION MISMATCH: ours=${this.version} partner=${msg.version} - one client is on a stale build`,
+          );
+        }
         // Deterministic role reconciliation (#633): if the peer claims the SAME role
         // as us (the lobby race assigned both clients the same role - the live "both
         // wait, nobody commands the 2nd slot, 30s stall" bug), break the tie IDENTICALLY

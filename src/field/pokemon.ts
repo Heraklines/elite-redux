@@ -58,6 +58,7 @@ import { isDailyEventSeed, isDailyFinalBoss } from "#data/daily-seed/daily-seed-
 import { allAbilities, allMoves } from "#data/data-lists";
 import { PersistentFieldAuraAbAttr } from "#data/elite-redux/archetypes/persistent-field-aura";
 import { suppressesOpponentDamageBoosts } from "#data/elite-redux/archetypes/post-defend-suppress-opponent-damage-boost";
+import { coopAllowAccountWrite } from "#data/elite-redux/coop/coop-account-gate";
 import { isCoopAuthoritativeGuestGated } from "#data/elite-redux/coop/coop-authoritative-gate";
 import { coopAttributeNewMon, coopHalfIsFull } from "#data/elite-redux/coop/coop-session";
 import type { CoopRole } from "#data/elite-redux/coop/coop-transport";
@@ -7985,7 +7986,9 @@ export class PlayerPokemon extends Pokemon {
       if (!globalScene.gameMode.isDaily || this.metBiome > -1) {
         globalScene.gameData.updateSpeciesDexIvs(this.species.speciesId, this.ivs);
         globalScene.gameData.setPokemonSeen(this, false);
-        globalScene.gameData.setPokemonCaught(this, false).then(() => updateAndResolve());
+        coopAllowAccountWrite("own-evolution", () => globalScene.gameData.setPokemonCaught(this, false)).then(() =>
+          updateAndResolve(),
+        );
       } else {
         updateAndResolve();
       }

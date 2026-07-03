@@ -3,6 +3,7 @@ import { CLASSIC_MODE_MYSTERY_ENCOUNTER_WAVES } from "#app/constants";
 import { globalScene } from "#app/global-scene";
 import { speciesStarterCosts } from "#balance/starters";
 import { allAbilities } from "#data/data-lists";
+import { coopAllowAccountWrite } from "#data/elite-redux/coop/coop-account-gate";
 import { getNatureName } from "#data/nature";
 import { AbilityAttr } from "#enums/ability-attr";
 import { BattlerTagType } from "#enums/battler-tag-type";
@@ -149,7 +150,7 @@ export const TrainingSessionEncounter: MysteryEncounter = MysteryEncounterBuilde
           if (improvedCount > 0) {
             playerPokemon.calculateStats();
             globalScene.gameData.updateSpeciesDexIvs(playerPokemon.species.getRootSpeciesId(true), playerPokemon.ivs);
-            globalScene.gameData.setPokemonCaught(playerPokemon, false);
+            coopAllowAccountWrite("me-own-mon", () => globalScene.gameData.setPokemonCaught(playerPokemon, false));
           }
 
           // Add pokemon and mods back
@@ -338,7 +339,7 @@ export const TrainingSessionEncounter: MysteryEncounter = MysteryEncounterBuilde
           }
 
           playerPokemon.calculateStats();
-          globalScene.gameData.setPokemonCaught(playerPokemon, false);
+          coopAllowAccountWrite("me-own-mon", () => globalScene.gameData.setPokemonCaught(playerPokemon, false));
 
           // Add pokemon and mods back
           globalScene.getPlayerParty().push(playerPokemon);

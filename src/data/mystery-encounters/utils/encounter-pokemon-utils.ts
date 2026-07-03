@@ -3,6 +3,7 @@ import { globalScene } from "#app/global-scene";
 import { getPokemonNameWithAffix } from "#app/messages";
 import { speciesStarterCosts } from "#balance/starters";
 import { modifierTypes } from "#data/data-lists";
+import { coopAllowAccountWrite } from "#data/elite-redux/coop/coop-account-gate";
 import { coopAttributeNewMon } from "#data/elite-redux/coop/coop-session";
 import { communitySpeciesAllowed } from "#data/elite-redux/er-community-run-state";
 import { Gender } from "#data/gender";
@@ -715,7 +716,11 @@ export async function catchPokemon(
           }
         });
       };
-      Promise.all([pokemon.hideInfo(), globalScene.gameData.setPokemonCaught(pokemon)]).then(() => {
+      Promise.all([
+        pokemon.hideInfo(),
+        // #807 B: an ME catch on THIS client is an allowlisted account write.
+        coopAllowAccountWrite("me-catch", () => globalScene.gameData.setPokemonCaught(pokemon)),
+      ]).then(() => {
         if (!(isObtain || addStatus.value)) {
           removePokemon();
           end();
@@ -1019,7 +1024,8 @@ export async function addPokemonDataToDexAndValidateAchievements(pokemon: Player
   }
 
   globalScene.gameData.updateSpeciesDexIvs(pokemon.species.getRootSpeciesId(true), pokemon.ivs);
-  return globalScene.gameData.setPokemonCaught(pokemon, true, false, false);
+  // #807 B: an ME-granted mon on THIS client is an allowlisted account write.
+  return coopAllowAccountWrite("me-grant", () => globalScene.gameData.setPokemonCaught(pokemon, true, false, false));
 }
 
 /**

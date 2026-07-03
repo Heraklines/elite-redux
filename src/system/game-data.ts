@@ -15,6 +15,7 @@ import { EntryHazardTag } from "#data/arena-tag";
 import { getSerializedDailyRunConfig, parseDailySeed } from "#data/daily-seed/daily-seed-utils";
 import { allMoves, allSpecies } from "#data/data-lists";
 import { Egg } from "#data/egg";
+import { coopGateAccountWrite } from "#data/elite-redux/coop/coop-account-gate";
 import {
   clearCoopRuntime,
   coopBroadcastDexSync,
@@ -2471,6 +2472,14 @@ export class GameData {
     fromEgg = false,
     showMessage = true,
   ): Promise<boolean> {
+    // #807 B (default-deny account writes): during a CO-OP session, caught-registration only
+    // proceeds from explicitly allowlisted scopes (own catch, scoped share apply, own adopt
+    // credit). Anything else is a leak path by definition - blocked + loudly logged.
+    if (
+      !coopGateAccountWrite(globalScene.gameMode?.isCoop === true, `setPokemonCaught sp=${pokemon.species?.speciesId}`)
+    ) {
+      return false;
+    }
     // ER (#410): a vanilla mon wearing the REDUX form registers its RDX custom
     // species (the entry eggs hatch and the RDX tab lists) instead of stamping
     // the vanilla species' slot - the reported "Spearow Redux replaced gen 1

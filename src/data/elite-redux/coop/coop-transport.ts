@@ -36,6 +36,13 @@ import type { ErShinyLabSavedLook } from "#data/elite-redux/er-shiny-lab-effects
 export type CoopRole = "host" | "guest";
 
 /**
+ * #807 C: co-op PROTOCOL version (standard version negotiation). Bump when the wire protocol
+ * changes shape. Carried in the hello; a mismatch means one player runs a stale cached bundle -
+ * the top source of unreproducible ghost bugs - and both get told to hard-refresh.
+ */
+export const COOP_PROTOCOL_VERSION = "er-coop-7";
+
+/**
  * Which co-op netcode the run uses (#633, selectable A/B). Two complete
  * implementations live side by side:
  *  - `"lockstep"` (DEFAULT): both clients run the FULL battle engine on the host's
@@ -261,6 +268,8 @@ export interface CoopSerializedMonState {
 
 /** Authoritative post-turn snapshot: enough to set the guest's field state exactly. */
 export interface CoopBattleCheckpoint {
+  /** #807 monotonic state tick (Source-style snapshot sequencing); absent on legacy senders. */
+  tick?: number;
   /** Every occupied field mon's mutable state. */
   field: CoopSerializedMonState[];
   /** `WeatherType` enum value (0 = none) + turns remaining. */
@@ -348,6 +357,8 @@ export interface CoopFullMonSnapshot {
 
 /** The full authoritative battle state the host sends to heal a desync. */
 export interface CoopFullBattleSnapshot {
+  /** #807 monotonic state tick (Source-style snapshot sequencing); absent on legacy senders. */
+  tick?: number;
   /** Every occupied field mon's full state, by battler index. */
   field: CoopFullMonSnapshot[];
   /** `WeatherType` enum value (0 = none) + turns remaining. */

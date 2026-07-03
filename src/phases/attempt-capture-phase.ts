@@ -3,6 +3,7 @@ import { timedEventManager } from "#app/global-event-manager";
 import { globalScene } from "#app/global-scene";
 import { IS_TEST, isBeta, isDev } from "#constants/app-constants";
 import { SubstituteTag } from "#data/battler-tags";
+import { coopAllowAccountWrite } from "#data/elite-redux/coop/coop-account-gate";
 import { broadcastCoopWaveResolved } from "#data/elite-redux/coop/coop-runtime";
 import { coopAttributeNewMon, setCoopCatchThrowerHint } from "#data/elite-redux/coop/coop-session";
 import type { CoopRole } from "#data/elite-redux/coop/coop-transport";
@@ -366,7 +367,11 @@ export class AttemptCapturePhase extends PokemonPhase {
             }
           });
         };
-        Promise.all([pokemon.hideInfo(), globalScene.gameData.setPokemonCaught(pokemon)]).then(() => {
+        Promise.all([
+          pokemon.hideInfo(),
+          // #807 B: the local player's OWN catch is an allowlisted account write.
+          coopAllowAccountWrite("own-catch", () => globalScene.gameData.setPokemonCaught(pokemon)),
+        ]).then(() => {
           if (!addStatus.value) {
             removePokemon();
             end();

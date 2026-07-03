@@ -1,4 +1,5 @@
 import { globalScene } from "#app/global-scene";
+import { coopAllowAccountWrite } from "#data/elite-redux/coop/coop-account-gate";
 import type { PlayerPokemon } from "#field/pokemon";
 import type { DexEntry } from "#types/dex-data";
 import type { StarterDataEntry } from "#types/save-data";
@@ -87,7 +88,9 @@ export class EggHatchData {
    */
   updatePokemon(showMessage = false) {
     return new Promise<void>(resolve => {
-      globalScene.gameData.setPokemonCaught(this.pokemon, true, true, showMessage).then(() => {
+      coopAllowAccountWrite("egg-hatch", () =>
+        globalScene.gameData.setPokemonCaught(this.pokemon, true, true, showMessage),
+      ).then(() => {
         globalScene.gameData.updateSpeciesDexIvs(this.pokemon.species.speciesId, this.pokemon.ivs);
         globalScene.gameData.setEggMoveUnlocked(this.pokemon.species, this.eggMoveIndex, showMessage).then(value => {
           this.setEggMoveUnlocked(value);
