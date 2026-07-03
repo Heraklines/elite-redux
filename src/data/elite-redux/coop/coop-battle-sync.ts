@@ -177,9 +177,43 @@ export class CoopBattleSync {
     });
   }
 
+  /** #812: requests that arrived before the responder installed (guest mid-replay). */
+  private readonly bufferedRequests: { fieldIndex: number; turn: number; moveSlots: number[] }[] = [];
+  /** #812: injected by the runtime (cycle-free); true = this client owns the field slot. */
+  private slotOwnershipProbe: ((fieldIndex: number) => boolean) | null = null;
+
+  /** #812: install the slot-ownership probe used to buffer-vs-decline pre-responder requests. */
+  setSlotOwnershipProbe(probe: (fieldIndex: number) => boolean): void {
+    this.slotOwnershipProbe = probe;
+  }
+
+  /** Run one inbound request through the installed responder and reply. */
+  private answerRequest(req: { fieldIndex: number; turn: number; moveSlots: number[] }): void {
+    const responder = this.responder;
+    if (responder == null) {
+      return;
+    }
+    const command = responder({ fieldIndex: req.fieldIndex, turn: req.turn, moveSlots: req.moveSlots });
+    if (isCoopDebug()) {
+      coopLog(
+        "relay",
+        `peer recv commandRequest fieldIndex=${req.fieldIndex} turn=${req.turn} moveSlots=[${req.moveSlots.join(",")}] -> reply command=${command.command} cursor=${command.cursor} moveId=${command.moveId ?? "-"}`,
+      );
+    }
+    // Echo the request's turn so the awaiter matches by (fieldIndex, turn) (#633).
+    this.transport.send({ t: "command", fieldIndex: req.fieldIndex, turn: req.turn, command });
+  }
+
   /** PEER (guest / spoof): install the responder that answers inbound requests. */
   onCommandRequest(responder: CoopCommandResponder): void {
     this.responder = responder;
+    // #812: drain requests that arrived while the responder was not yet installed (the
+    // guest was still replaying the previous turn). Stale turns are ignored host-side.
+    const buffered = this.bufferedRequests.splice(0);
+    for (const req of buffered) {
+      coopLog("relay", `answering BUFFERED commandRequest fieldIndex=${req.fieldIndex} turn=${req.turn} (#812)`);
+      this.answerRequest(req);
+    }
   }
 
   /**
@@ -215,20 +249,32 @@ export class CoopBattleSync {
     this.pending.clear();
     this.inbox.clear();
     this.responder = null;
+    this.bufferedRequests.length = 0;
   }
 
   private handle(msg: CoopMessage): void {
     if (msg.t === "commandRequest") {
-      const responder = this.responder;
-      if (responder == null) {
-        // #693 live deadlock ("unable to continue"): dropping the request left the host
-        // awaiting forever ("Your partner is choosing a move..."). ANSWER with a DECLINE so
-        // the host's await resolves null and its AI fallback commands the slot immediately.
-        // Hit when slot-ownership tags diverge (both clients think the slot is the other's,
-        // seen in the ME single-format battle) or the guest has no picker for this turn.
+      if (this.responder == null) {
+        // #812 (live "wrong move / didn't wait" regression of the #693 decline): a missing
+        // responder is TRANSIENT whenever this client is still replaying the previous turn
+        // when the host already asks for the next command. Deciding by OWNERSHIP:
+        //  - the slot IS ours (or ownership unknown): the responder is coming - BUFFER the
+        //    request and answer it the moment the responder installs. The host's own
+        //    timeout+AI fallback still bounds the worst case, so this can never hang.
+        //  - the slot is provably NOT ours (#693's mutual-misresolve deadlock): DECLINE so
+        //    the host's await resolves null and its AI fallback breaks the deadlock.
+        const ours = this.slotOwnershipProbe?.(msg.fieldIndex) ?? true;
+        if (ours) {
+          coopLog(
+            "relay",
+            `peer recv commandRequest fieldIndex=${msg.fieldIndex} turn=${msg.turn} before responder install -> BUFFERED (own slot, #812)`,
+          );
+          this.bufferedRequests.push({ fieldIndex: msg.fieldIndex, turn: msg.turn, moveSlots: msg.moveSlots });
+          return;
+        }
         coopWarn(
           "relay",
-          `peer recv commandRequest fieldIndex=${msg.fieldIndex} turn=${msg.turn} but NO responder installed -> DECLINE reply (host AI-falls-back)`,
+          `peer recv commandRequest fieldIndex=${msg.fieldIndex} turn=${msg.turn} for a slot that is NOT ours -> DECLINE reply (host AI-falls-back, #693)`,
         );
         this.transport.send({
           t: "command",
@@ -239,15 +285,7 @@ export class CoopBattleSync {
         });
         return;
       }
-      const command = responder({ fieldIndex: msg.fieldIndex, turn: msg.turn, moveSlots: msg.moveSlots });
-      if (isCoopDebug()) {
-        coopLog(
-          "relay",
-          `peer recv commandRequest fieldIndex=${msg.fieldIndex} turn=${msg.turn} moveSlots=[${msg.moveSlots.join(",")}] -> reply command=${command.command} cursor=${command.cursor} moveId=${command.moveId ?? "-"}`,
-        );
-      }
-      // Echo the request's turn so the awaiter matches by (fieldIndex, turn) (#633).
-      this.transport.send({ t: "command", fieldIndex: msg.fieldIndex, turn: msg.turn, command });
+      this.answerRequest({ fieldIndex: msg.fieldIndex, turn: msg.turn, moveSlots: msg.moveSlots });
       return;
     }
     if (msg.t === "command") {

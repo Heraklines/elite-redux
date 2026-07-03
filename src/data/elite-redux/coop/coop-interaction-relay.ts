@@ -126,6 +126,8 @@ let coopFaintSwitchWaitMs = 60_000;
  * slot can be outstanding at a time so the slot alone identifies the exchange.
  */
 export const COOP_FAINT_SWITCH_SEQ_BASE = 90_000;
+/** #809 revival owner-pick: `seq = BASE + fieldIndex` (same shape as the faint-switch band). */
+export const COOP_REVIVAL_SEQ_BASE = 95_000;
 
 /** #788: how long the HOST defers the next wave's party sync waiting for the partner's menu-done broadcast. */
 let coopWaveBarrierMs = 60_000;
@@ -182,6 +184,12 @@ export class CoopInteractionRelay {
     this.timeoutMs = opts.timeoutMs ?? DEFAULT_TIMEOUT_MS;
     this.schedule = opts.schedule ?? defaultSchedule;
     this.offMessage = transport.onMessage(msg => this.handle(msg));
+  }
+
+  /** #809: ask the partner to open its Revival Blessing picker for `fieldIndex`. */
+  promptRevival(fieldIndex: number): void {
+    coopLog("relay", `SEND revivalPrompt fieldIndex=${fieldIndex} (#809)`);
+    this.transport.send({ t: "revivalPrompt", fieldIndex });
   }
 
   /** OWNER: send one pick for interaction `seq` (`kind` is routing/logging only). */
@@ -523,7 +531,18 @@ export class CoopInteractionRelay {
     this.cancelledSeqs.clear();
   }
 
+  /**
+   * #809: fired when the partner asks THIS client to pick a Revival Blessing target for its
+   * own mon. Wired by the runtime (queues CoopGuestRevivalPhase); null in engine-free tests.
+   */
+  onRevivalPrompt: ((fieldIndex: number) => void) | null = null;
+
   private handle(msg: CoopMessage): void {
+    if (msg.t === "revivalPrompt") {
+      coopLog("relay", `RECV revivalPrompt fieldIndex=${msg.fieldIndex} (#809)`);
+      this.onRevivalPrompt?.(msg.fieldIndex);
+      return;
+    }
     if (msg.t === "interactionOutcome") {
       const waiter = this.outcomePending.get(msg.seq);
       if (waiter) {

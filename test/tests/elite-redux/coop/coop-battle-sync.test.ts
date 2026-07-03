@@ -157,3 +157,36 @@ describe("co-op battle command relay (#633, LIVE-C)", () => {
     expect(secondCmd?.command).toBe(Command.FIGHT);
   });
 });
+
+describe("#812: pre-responder commandRequest buffering (the 'wrong move / didn't wait' live fix)", () => {
+  it("an OWN-slot request arriving before the responder installs is BUFFERED and answered on install", async () => {
+    const { host, guest } = createLoopbackPair();
+    const hostSync = new CoopBattleSync(host);
+    const guestSync = new CoopBattleSync(guest);
+    guestSync.setSlotOwnershipProbe(() => true); // the slot is ours - responder is coming
+
+    // Host asks while the guest has NO responder yet (mid-replay in production).
+    const reply = hostSync.requestPartnerCommand(1, 3, [1, 2, 3, 4], 5_000);
+    await new Promise(r => setTimeout(r, 10));
+
+    // The responder installs late (replay finished) - the buffered request must be answered.
+    guestSync.onCommandRequest(() => ({ command: 1, cursor: 2, moveId: 55 }) as never);
+    const res = await reply;
+    expect(res, "the REAL pick answered the buffered request (no decline, no AI)").not.toBeNull();
+    expect((res as { moveId?: number }).moveId).toBe(55);
+    hostSync.dispose();
+    guestSync.dispose();
+  });
+
+  it("a FOREIGN-slot request (the true #693 mutual-misresolve deadlock) still declines immediately", async () => {
+    const { host, guest } = createLoopbackPair();
+    const hostSync = new CoopBattleSync(host);
+    const guestSync = new CoopBattleSync(guest);
+    guestSync.setSlotOwnershipProbe(() => false); // both clients think the slot is the other's
+
+    const res = await hostSync.requestPartnerCommand(0, 1, [1], 5_000);
+    expect(res, "declined -> null -> host AI fallback (deadlock broken)").toBeNull();
+    hostSync.dispose();
+    guestSync.dispose();
+  });
+});

@@ -1385,6 +1385,26 @@ export function startLocalCoopSession(
   wireCoopDexSync(host);
   wireCoopDisconnectReaction(host, interactionRelay, runtime);
   wireCoopStallWatchdog(host, interactionRelay, battleStream, runtime);
+  // #812: ownership probe for pre-responder commandRequests (buffer own-slot, decline foreign).
+  battleSync.setSlotOwnershipProbe(fieldIndex => {
+    try {
+      return coopOwnerOfPlayerFieldSlot(fieldIndex) === controller.role;
+    } catch {
+      return true; // unknown -> buffer (never wrongly decline a real player's slot)
+    }
+  });
+  // #809: the partner asked THIS client to pick a Revival Blessing target for its own mon -
+  // open the real picker via a queued phase (the pick relays back; the host engine applies it).
+  interactionRelay.onRevivalPrompt = fieldIndex => {
+    if (getCoopRuntime() !== runtime || runtime.controller.role === "host") {
+      return;
+    }
+    try {
+      globalScene.phaseManager.unshiftNew("CoopGuestRevivalPhase", fieldIndex);
+    } catch (e) {
+      coopWarn("replay", `revivalPrompt fieldIndex=${fieldIndex} could not queue the picker (${e}) - host auto-picks`);
+    }
+  };
   // #807: a fresh SESSION starts a fresh tick line (assembly-scoped, NOT setCoopRuntime -
   // the duo harness re-registers runtimes per context swap and must not reset mid-session).
   resetCoopStateTicks();

@@ -349,6 +349,46 @@ describe.skipIf(!RUN)("co-op battle control (#633, P2) - real engine (double bat
     expect(mode.hasChallenge(Challenges.SINGLE_GENERATION)).toBe(true);
   });
 
+  it("#809 revival owner-pick: a PARTNER-owned Revival Blessing prompts the partner, never the host's screen", async () => {
+    const field = await startCoopDouble();
+    const guestMon = field[COOP_GUEST_FIELD_INDEX]; // partner-owned user
+    // A fainted guest-owned bench mon to revive.
+    const fainted = game.scene.addPlayerPokemon(getPokemonSpecies(SpeciesId.EEVEE), 5);
+    fainted.coopOwner = "guest";
+    fainted.hp = 0;
+    globalScene.getPlayerParty().push(fainted);
+    const faintedSlot = globalScene.getPlayerParty().indexOf(fainted);
+
+    const { getCoopInteractionRelay } = await import("#data/elite-redux/coop/coop-runtime");
+    const relay = getCoopInteractionRelay()!;
+    const promptSpy = vi.spyOn(relay, "promptRevival");
+    const pickSpy = vi
+      .spyOn(relay, "awaitInteractionChoice")
+      .mockResolvedValue({ choice: faintedSlot, data: [0, fainted.species.speciesId] } as never);
+    const uiSpy = vi.spyOn(globalScene.ui, "setMode");
+
+    const { RevivalBlessingPhase } = await import("#phases/revival-blessing-phase");
+    const phase = new RevivalBlessingPhase(guestMon as never);
+    let ended = false;
+    (phase as unknown as { end: () => void }).end = () => {
+      ended = true;
+    };
+    phase.start();
+    await new Promise(r => setTimeout(r, 25));
+
+    expect(promptSpy, "the PARTNER was prompted").toHaveBeenCalledWith(guestMon.getFieldIndex());
+    expect(
+      uiSpy.mock.calls.some(c => c[0] === UiMode.PARTY),
+      "the HOST's party screen never opened for the partner's move",
+    ).toBe(false);
+    expect(fainted.isFainted(), "the picked mon was revived from the relayed pick").toBe(false);
+    expect(fainted.hp, "revived at half HP").toBeGreaterThan(0);
+    expect(ended, "phase completed").toBe(true);
+    pickSpy.mockRestore();
+    promptSpy.mockRestore();
+    uiSpy.mockRestore();
+  });
+
   it("#811: a forced switch (Roar) summons from the roared player's OWN bench (no spectator)", async () => {
     const field = await startCoopDouble();
     // Bench: one mon per player, so both a same-owner and a partner-owned candidate exist.
