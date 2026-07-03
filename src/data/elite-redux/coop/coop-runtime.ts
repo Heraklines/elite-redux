@@ -1355,88 +1355,19 @@ export function startLocalCoopSession(
   );
   clearCoopRuntime();
   const { host, guest } = createLoopbackPair();
-  const controller = new CoopSessionController(host, { username: opts.username, version: COOP_PROTOCOL_VERSION });
-  // This client is the HOST here; pin the chosen netcode (#633, selectable A/B) so
-  // it rides along in broadcastRunConfig and the guest adopts it. Default lockstep.
-  controller.setNetcodeMode(opts.netcodeMode ?? "authoritative");
-  const battleSync = new CoopBattleSync(host);
-  const battleStream = new CoopBattleStreamer(host);
-  const interactionRelay = new CoopInteractionRelay(host);
-  const uiMirror = new CoopUiMirror(host);
-  const mePump = new CoopMePump(interactionRelay);
-  const spoof = new SpoofGuest(guest);
-  const runtime: CoopRuntime = {
-    controller,
-    battleSync,
-    battleStream,
-    interactionRelay,
-    uiMirror,
-    mePump,
-    localTransport: host,
-    partnerTransport: guest,
-    spoof,
-  };
-  wireCoopGhostPoolSync(controller, battleStream);
-  wireCoopResyncResponder(controller, battleStream);
-  wireCoopEnemyPartyResponder(controller, battleStream);
-  wireCoopWaveResolved(controller, battleStream);
-  wireCoopExpResolved(controller, battleStream);
-  wireCoopMeChecksumCheck(battleStream);
-  wireCoopLiveEvents(controller, battleStream);
-  wireCoopLearnMoveForward(host);
-  wireCoopDexSync(host);
-  wireCoopDisconnectReaction(host, interactionRelay, runtime);
-  wireCoopStallWatchdog(host, interactionRelay, battleStream, runtime);
-  // #812: ownership probe for pre-responder commandRequests (buffer own-slot, decline foreign).
-  // #817 cosmetic cursor mirror: the ME owner's option cursor lands on the WATCHER's
-  // read-only selector (only when that selector is actually open; never on the owner).
-  controller.onMeCursor = index => {
-    try {
-      if (controller.isLocalOwnerAtCounter(coopMeInteractionStartValue())) {
-        return; // we drive this ME - our own cursor rules
-      }
-      const mode = globalScene.ui?.getMode();
-      const handler = globalScene.ui?.getHandler();
-      // #819 diagnostics: the 16:38 session proved the wire flows but the cursor never moved -
-      // log the apply/skip verdict so the next capture pins the receiver-side failure exactly.
-      if (mode === UiMode.MYSTERY_ENCOUNTER && typeof handler?.setCursor === "function") {
-        handler.setCursor(index);
-        coopLog("me", `meCursor APPLIED index=${index}`);
-      } else {
-        coopLog(
-          "me",
-          `meCursor SKIPPED index=${index} mode=${mode} hasSetCursor=${typeof handler?.setCursor === "function"}`,
-        );
-      }
-    } catch (e) {
-      coopWarn("me", "meCursor apply threw", e);
-    }
-  };
-  battleSync.setSlotOwnershipProbe(fieldIndex => {
-    try {
-      return coopOwnerOfPlayerFieldSlot(fieldIndex) === controller.role;
-    } catch {
-      return true; // unknown -> buffer (never wrongly decline a real player's slot)
-    }
-  });
-  // #809: the partner asked THIS client to pick a Revival Blessing target for its own mon -
-  // open the real picker via a queued phase (the pick relays back; the host engine applies it).
-  interactionRelay.onRevivalPrompt = fieldIndex => {
-    if (getCoopRuntime() !== runtime || runtime.controller.role === "host") {
-      return;
-    }
-    try {
-      globalScene.phaseManager.unshiftNew("CoopGuestRevivalPhase", fieldIndex);
-    } catch (e) {
-      coopWarn("replay", `revivalPrompt fieldIndex=${fieldIndex} could not queue the picker (${e}) - host auto-picks`);
-    }
-  };
-  // #807: a fresh SESSION starts a fresh tick line (assembly-scoped, NOT setCoopRuntime -
-  // the duo harness re-registers runtimes per context swap and must not reset mid-session).
-  resetCoopStateTicks();
+  // #820 ONE FACTORY: the full runtime (objects + EVERY hook) comes from assembleCoopRuntime -
+  // the same factory the live peer path and the duo harness use. Only the spoof partner and
+  // the host-side netcode pin are dev-path extras.
+  const runtime = assembleCoopRuntime(host, opts);
+  runtime.controller.setNetcodeMode(opts.netcodeMode ?? "authoritative");
+  runtime.partnerTransport = guest;
+  runtime.spoof = new SpoofGuest(guest);
   setCoopRuntime(runtime);
-  coopLog("launch", `local session ready role=${controller.role} netcode=${controller.netcodeMode} -> connecting`);
-  controller.connect();
+  coopLog(
+    "launch",
+    `local session ready role=${runtime.controller.role} netcode=${runtime.controller.netcodeMode} -> connecting`,
+  );
+  runtime.controller.connect();
   return runtime;
 }
 
@@ -1512,6 +1443,53 @@ export function assembleCoopRuntime(
   wireCoopLearnMoveForward(transport);
   wireCoopDexSync(transport);
   wireCoopDisconnectReaction(transport, interactionRelay, runtime);
+  wireCoopStallWatchdog(transport, interactionRelay, battleStream, runtime);
+  // #812: ownership probe for pre-responder commandRequests (buffer own-slot, decline foreign).
+  battleSync.setSlotOwnershipProbe(fieldIndex => {
+    try {
+      return coopOwnerOfPlayerFieldSlot(fieldIndex) === controller.role;
+    } catch {
+      return true; // unknown -> buffer (never wrongly decline a real player's slot)
+    }
+  });
+  // #817/#820 cosmetic cursor mirror: the ME owner's option cursor lands on the WATCHER's
+  // read-only selector. #820: this (plus the probe/watchdog/revival hooks) used to be wired
+  // ONLY in startLocalCoopSession - the DEV factory - so the LIVE path silently lacked them
+  // (the 16:38 capture: 13 meCursor rx, zero applies). ONE factory now wires everything.
+  controller.onMeCursor = index => {
+    try {
+      if (controller.isLocalOwnerAtCounter(coopMeInteractionStartValue())) {
+        return; // we drive this ME - our own cursor rules
+      }
+      const mode = globalScene.ui?.getMode();
+      const handler = globalScene.ui?.getHandler();
+      if (mode === UiMode.MYSTERY_ENCOUNTER && typeof handler?.setCursor === "function") {
+        handler.setCursor(index);
+        coopLog("me", `meCursor APPLIED index=${index}`);
+      } else {
+        coopLog(
+          "me",
+          `meCursor SKIPPED index=${index} mode=${mode} hasSetCursor=${typeof handler?.setCursor === "function"}`,
+        );
+      }
+    } catch (e) {
+      coopWarn("me", "meCursor apply threw", e);
+    }
+  };
+  // #809: the partner asked THIS client to pick a Revival Blessing target for its own mon.
+  interactionRelay.onRevivalPrompt = fieldIndex => {
+    if (getCoopRuntime() !== runtime || runtime.controller.role === "host") {
+      return;
+    }
+    try {
+      globalScene.phaseManager.unshiftNew("CoopGuestRevivalPhase", fieldIndex);
+    } catch (e) {
+      coopWarn("replay", `revivalPrompt fieldIndex=${fieldIndex} could not queue the picker (${e}) - host auto-picks`);
+    }
+  };
+  // #807: a fresh SESSION starts a fresh tick line (assembly-scoped, NOT setCoopRuntime -
+  // the duo harness re-registers runtimes per context swap and must not reset mid-session).
+  resetCoopStateTicks();
   return runtime;
 }
 

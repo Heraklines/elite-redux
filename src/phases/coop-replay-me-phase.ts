@@ -15,6 +15,7 @@ import { setCoopMeHandoffBattleStarted } from "#data/elite-redux/coop/coop-me-pi
 import { COOP_ME_BATTLE_HANDOFF, COOP_ME_TERM_SEQ_BASE } from "#data/elite-redux/coop/coop-me-pump";
 import { getCoopBattleStreamer, getCoopController, getCoopInteractionRelay } from "#data/elite-redux/coop/coop-runtime";
 import type { CoopInteractionOutcome } from "#data/elite-redux/coop/coop-transport";
+import { MysteryEncounterMode } from "#enums/mystery-encounter-mode";
 import { UiMode } from "#enums/ui-mode";
 import { leaveEncounterWithoutBattle } from "#mystery-encounters/encounter-phase-utils";
 import { hideCoopControllerTag, showCoopControllerTagFor } from "#ui/coop-controller-tag";
@@ -493,6 +494,16 @@ export class CoopReplayMePhase extends Phase {
         ?? getCoopBattleStreamer()?.consumeEnemyParty(globalScene.currentBattle.waveIndex);
       if (enemies != null && enemies.length > 0) {
         adoptCoopEnemiesStructural(enemies);
+      }
+      // #820: encounterMode is a HOST-engine write (initBattleWithEnemyConfig) - stale on the
+      // guest, so MysteryEncounterBattlePhase matches NO branch and hangs (17:17 capture:
+      // phase started, zero summons, 50s silence). Derive it from the adopted party: any
+      // multi-bar mon -> BOSS_BATTLE, else WILD_BATTLE (they differ only in bgm).
+      const meRef = globalScene.currentBattle.mysteryEncounter;
+      if (meRef != null && meRef.encounterMode !== MysteryEncounterMode.TRAINER_BATTLE) {
+        const anyBoss = globalScene.getEnemyParty().some(e => e.isBoss());
+        meRef.encounterMode = anyBoss ? MysteryEncounterMode.BOSS_BATTLE : MysteryEncounterMode.WILD_BATTLE;
+        coopLog("me", `guest ME battle boot: encounterMode -> ${anyBoss ? "BOSS" : "WILD"}_BATTLE (#820)`);
       }
       globalScene.phaseManager.unshiftNew("MysteryEncounterBattlePhase", false);
       coopLog("me", "guest queued its OWN ME battle boot (adopt + MysteryEncounterBattlePhase) (#819)", {
