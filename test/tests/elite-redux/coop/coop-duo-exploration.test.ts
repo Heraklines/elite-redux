@@ -645,6 +645,64 @@ describe.skipIf(!RUN)("co-op DUO exploration sweep (maintainer directive)", () =
     logs.flush();
   }, 240_000);
 
+  it("PROBE #809: mid-battle FORM + TERA changes converge to the guest via the per-turn checkpoint", async () => {
+    await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
+    const pair = createLoopbackPair();
+    const rig = await buildDuo(game, pair, setCoopRuntime, toCoop);
+    wireGuestCommand(rig);
+    const { captureCoopCheckpoint, applyCoopCheckpoint } = await import("#data/elite-redux/coop/coop-battle-engine");
+
+    // The HOST's lead changes form + terastallizes mid-battle (mega/tera class).
+    const hostLead = rig.hostScene.getPlayerParty()[0];
+    hostLead.formIndex = 1;
+    hostLead.isTerastallized = true;
+    hostLead.teraType = 5;
+    const cp = withClientSync(rig.hostCtx, () => captureCoopCheckpoint());
+    expect(cp, "checkpoint captured").not.toBeNull();
+
+    // The GUEST's copy converges: form + tera state adopt via the checkpoint.
+    const guestLead = rig.guestScene.getPlayerParty()[0];
+    expect(guestLead.formIndex, "HARNESS: guest starts at base form").toBe(0);
+    withClientSync(rig.guestCtx, () => applyCoopCheckpoint(cp!));
+    expect(guestLead.formIndex, "guest adopted the host's FORM").toBe(1);
+    expect(guestLead.isTerastallized, "guest adopted the host's TERA state").toBe(true);
+    expect(guestLead.teraType, "guest adopted the host's TERA type").toBe(5);
+    logs.flush();
+  }, 240_000);
+
+  it("PROBE #807: co-op session save round-trips; solo load is REFUSED, connected load proceeds", async () => {
+    await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
+    const pair = createLoopbackPair();
+    const rig = await buildDuo(game, pair, setCoopRuntime, toCoop);
+    wireGuestCommand(rig);
+    const { getCoopRuntime, clearCoopRuntime } = await import("#data/elite-redux/coop/coop-runtime");
+    const SLOT = 4;
+
+    // 1. Save the live co-op session into a slot (the host's auto-save path in production).
+    const saved = await withClient(rig.hostCtx, async () => {
+      const data = rig.hostScene.gameData.getSessionSaveData();
+      expect(data.gameMode as number, "session save carries the CO-OP mode").toBe(rig.hostScene.gameMode.modeId);
+      return rig.hostScene.gameData.saveAll(true, true, false, false).then(() => data);
+    });
+    expect(saved, "session serialized").toBeTruthy();
+
+    // 2. CONNECTED load: with the runtime live, loading the co-op slot proceeds
+    // (round-trips through initSessionFromData without throwing).
+    const loadedConnected = await withClient(rig.hostCtx, () => rig.hostScene.gameData.loadSession(SLOT));
+    expect(typeof loadedConnected, "connected load returns a boolean (no crash)").toBe("boolean");
+
+    // 3. SOLO load: tear the session down - the SAME slot must now be REFUSED
+    // (resume-requires-both, finally enforced at the loadSession chokepoint).
+    expect(getCoopRuntime(), "runtime live before teardown").not.toBeNull();
+    clearCoopRuntime();
+    expect(getCoopRuntime(), "runtime gone").toBeNull();
+    if (loadedConnected === true) {
+      const soloLoad = await rig.hostScene.gameData.loadSession(SLOT);
+      expect(soloLoad, "SOLO load of a co-op save is REFUSED (#807 gate)").toBe(false);
+    }
+    logs.flush();
+  }, 240_000);
+
   it("PROBE #808: SIMULTANEOUS same-seq choices from both clients resolve deterministically (no cross-consumption)", async () => {
     // The matrix's last untested adversarial row: both clients fire an interactionChoice on the
     // SAME seq at the same instant (a lag burst / double-driver bug shape). Contract: each side

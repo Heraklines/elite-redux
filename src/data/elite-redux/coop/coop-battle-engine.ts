@@ -155,6 +155,10 @@ function readMonView(mon: ReturnType<typeof globalScene.getField>[number]): Coop
     // #798 PP sync: carry each slot's [moveId, ppUsed] so the guest's PP converges via the
     // checkpoint (it never runs MovePhase) instead of via a forced FULL resync every turn.
     moves: (mon.moveset ?? []).map(m => ({ id: m?.moveId ?? 0, ppUsed: m?.ppUsed ?? 0 })),
+    // #809: form + tera converge per turn (a mega/tera no longer costs a forced full resync).
+    formIndex: mon.formIndex,
+    isTerastallized: mon.isTerastallized === true,
+    teraType: (mon as { teraType?: number }).teraType ?? 0,
     // #804: the authoritative owner tag (player-side mons only; enemies have none).
     ...((mon as { coopOwner?: CoopRole }).coopOwner === undefined
       ? {}
@@ -868,6 +872,26 @@ export function applyCoopCheckpoint(checkpoint: CoopBattleCheckpoint): void {
           // #798 PP sync: adopt the host's ppUsed PER MATCHING MOVE ID. Deliberately
           // conservative - never adds/removes/reorders moves (learn-move has its own relay);
           // an id mismatch skips that slot and the resync backstop still heals it.
+          // #809: adopt FORM + TERA (the checksum hashes both, so carrying them here keeps
+          // checksums matched through megas/teras instead of triggering a forced resync).
+          if (state.formIndex !== undefined && mon.formIndex !== state.formIndex) {
+            coopLog(
+              "checkpoint",
+              `mon bi=${mon.getBattlerIndex()} formIndex ${mon.formIndex} -> ${state.formIndex} (#809)`,
+            );
+            mon.formIndex = state.formIndex;
+            try {
+              void mon.loadAssets(false);
+            } catch {
+              /* sprite refresh is cosmetic; state is what must converge */
+            }
+          }
+          if (state.isTerastallized !== undefined) {
+            mon.isTerastallized = state.isTerastallized;
+          }
+          if (state.teraType !== undefined) {
+            (mon as { teraType?: number }).teraType = state.teraType;
+          }
           // #804 slot-ownership heal: adopt the host-resolved owner tag on PLAYER mons,
           // GUARDED (never clear on undefined - same rule as applyFullMon). Divergent tags
           // made both clients resolve a slot as the partner's (the ME battle deadlock);

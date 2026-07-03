@@ -16,6 +16,7 @@ import { getSerializedDailyRunConfig, parseDailySeed } from "#data/daily-seed/da
 import { allMoves, allSpecies } from "#data/data-lists";
 import { Egg } from "#data/egg";
 import { coopGateAccountWrite } from "#data/elite-redux/coop/coop-account-gate";
+import { coopWarn } from "#data/elite-redux/coop/coop-debug";
 import {
   clearCoopRuntime,
   coopBroadcastDexSync,
@@ -1492,6 +1493,24 @@ export class GameData {
   public async loadSession(slotIndex: number): Promise<boolean> {
     const sessionData = await this.getSession(slotIndex);
     if (!sessionData) {
+      return false;
+    }
+    // #807 RESUME-REQUIRES-BOTH (finally enforced at the chokepoint): a co-op session save
+    // may only load while a live co-op connection exists - a solo client cannot simulate a
+    // merged-party run (the guest half was never an engine) and loading one solo corrupts the
+    // run and confuses accounts. Connect through the Co-op lobby first, then resume.
+    if ((sessionData.gameMode as number) === GameModes.COOP && getCoopRuntime() == null) {
+      coopWarn("launch", `loadSession slot=${slotIndex} REFUSED: co-op save without a live partner connection (#807)`);
+      try {
+        globalScene.ui.showText(
+          "This is a co-op save. Connect with your partner in the Co-op lobby to resume it.",
+          null,
+          undefined,
+          4000,
+        );
+      } catch {
+        /* cosmetic */
+      }
       return false;
     }
     this.initSessionFromData(sessionData);

@@ -47,6 +47,9 @@ export interface CoopFieldMonView {
   erTags?: { type: string; turns: number }[];
   /** Move PP usage per moveset slot (#798): `{ id, ppUsed }` in slot order. */
   moves?: { id: number; ppUsed: number }[];
+  /** #809: tera state so mega/tera converge per turn (formIndex is the existing field above). */
+  isTerastallized?: boolean;
+  teraType?: number;
   /**
    * #804 slot-ownership heal: the host-authoritative owner tag for PLAYER-side mons. Live
    * evidence (ME battle deadlock): the tags diverged between clients (a host-only summon-safety
@@ -114,6 +117,13 @@ export function serializeMonState(mon: CoopFieldMonView): CoopSerializedMonState
       id: Math.max(0, Math.trunc(m.id)),
       ppUsed: Math.max(0, Math.trunc(m.ppUsed)),
     }));
+  }
+  // #809: tera state passthrough (formIndex already carried below when present).
+  if (typeof mon.isTerastallized === "boolean") {
+    state.isTerastallized = mon.isTerastallized;
+  }
+  if (typeof mon.teraType === "number") {
+    state.teraType = Math.trunc(mon.teraType);
   }
   // #804: pass the owner tag through, value-checked (only ever "host"/"guest" on the wire).
   if (mon.coopOwner === "host" || mon.coopOwner === "guest") {
@@ -200,6 +210,8 @@ export function normalizeMonState(state: CoopSerializedMonState): CoopSerialized
     ...(state.abilityId === undefined ? {} : { abilityId: state.abilityId }),
     ...(state.erTags === undefined ? {} : { erTags: state.erTags }),
     ...(state.moves === undefined ? {} : { moves: state.moves }),
+    ...(state.isTerastallized === undefined ? {} : { isTerastallized: state.isTerastallized }),
+    ...(state.teraType === undefined ? {} : { teraType: state.teraType }),
     // #804: the owner tag must survive normalization or the drift heal never fires.
     ...(state.coopOwner === undefined ? {} : { coopOwner: state.coopOwner }),
   });

@@ -246,6 +246,9 @@ export interface CoopSerializedMonState {
    * Optional/additive: an older host omits it and the guest leaves PP alone (resync still heals).
    */
   moves?: { id: number; ppUsed: number }[];
+  /** #809: tera state so mega/tera converge via the checkpoint instead of a forced resync. */
+  isTerastallized?: boolean;
+  teraType?: number;
   /** #804: host-authoritative owner tag for player-side mons (heals cross-client tag drift). */
   coopOwner?: "host" | "guest";
   /** `StatusEffect` enum value (0 = none). */

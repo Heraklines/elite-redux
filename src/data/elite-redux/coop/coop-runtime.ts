@@ -605,6 +605,7 @@ export function wireCoopStallWatchdog(
   let peerBeat: { ms: number; at: number } | null = null;
   let lastRecoveryAt = 0;
   let versionWarned = false;
+  let lastHealthAt = 0;
   const offMsg = transport.onMessage(msg => {
     if (msg.t === "stallBeat") {
       peerBeat = { ms: msg.waitingMs, at: Date.now() };
@@ -628,6 +629,15 @@ export function wireCoopStallWatchdog(
         }
       }
       const localMs = Math.max(relay.oldestNetworkWaitMs(), battleStream.oldestNetworkWaitMs());
+      // #808 HEALTH LINE: one compact self-describing line every ~30s so every log capture
+      // carries a session-health timeline for free (zero extra timers).
+      if (Date.now() - lastHealthAt >= 30_000) {
+        lastHealthAt = Date.now();
+        coopLog(
+          "health",
+          `tick=${coopSessionGeneration()}g turn=${globalScene.currentBattle?.turn ?? "-"} wave=${globalScene.currentBattle?.waveIndex ?? "-"} counter=${runtime.controller.interactionCounter?.() ?? "-"} wait=${localMs}ms peerBeat=${peerBeat ? `${Math.round((Date.now() - peerBeat.at) / 1000)}s` : "-"} transport=${transport.state}`,
+        );
+      }
       if (localMs >= COOP_STALL_REPORT_MS) {
         transport.send({ t: "stallBeat", waitingMs: localMs });
       }
