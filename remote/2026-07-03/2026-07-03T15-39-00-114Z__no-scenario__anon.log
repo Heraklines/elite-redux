@@ -1,0 +1,267 @@
+url:      https://elite-redux-staging.pages.dev/
+build:    mr53elnx-aiky
+mode:     6  wave:2
+seed:     e1hulBDIWDsRPoNSUrYn8KOH
+party:    Unown(L5 15hp f28), Litten(L5 20hp f0), Wurmple(L5 21hp f0), Chikorita(L5 20hp f0), Goldeen(L5 21hp f0)
+enemy:    Cherubi(L3)
+
+----- COMMENT -----
+me issues
+
+----- CONSOLE -----
+[15:36:30.279] LOG: [coop:runtime] ME-stream live-event host turn=2 seq=2 k=faint
+[15:36:30.279] LOG: [coop:replay] host EMIT live battleEvent turn=2 seq=2 k=faint
+[15:36:30.279] LOG: [coop:webrtc] raw tx role=host t=battleEvent bytes=89
+[15:36:30.279] LOG: %cStart Phase DamageAnimPhase color:green;
+[15:36:30.293] LOG: %cStart Phase FaintPhase color:green;
+[15:36:30.374] LOG: %cStart Phase MessagePhase color:green;
+[15:36:30.746] LOG: %cStart Phase VictoryPhase color:green;
+[15:36:30.746] LOG: [coop:progression] HOST applyPartyExp COMPUTE wave=1 expValue=21.4 koMon=Lechonk
+[15:36:30.748] LOG: [coop:runtime] send waveResolved wave=1 outcome=win (host)
+[15:36:30.748] LOG: [coop:replay] host SEND waveResolved wave=1 outcome=win
+[15:36:30.749] LOG: [coop:webrtc] raw tx role=host t=waveResolved bytes=45
+[15:36:30.750] LOG: %cStart Phase ExpPhase color:green;
+[15:36:30.940] LOG: %cStart Phase ExpPhase color:green;
+[15:36:31.105] LOG: %cStart Phase MoveEndPhase color:green;
+[15:36:31.106] LOG: %cStart Phase MovePhase color:green;
+[15:36:31.107] LOG: %cUser: Unown
+Move: MYSTICAL_POWER
+Use Mode: NORMAL color:orchid
+[15:36:31.108] LOG: [coop:turn] host recorder: append turn=2 seq=3 k=moveUsed total=4 live=true
+[15:36:31.108] LOG: [coop:runtime] ME-stream live-event host turn=2 seq=3 k=moveUsed
+[15:36:31.108] LOG: [coop:replay] host EMIT live battleEvent turn=2 seq=3 k=moveUsed
+[15:36:31.108] LOG: [coop:webrtc] raw tx role=host t=battleEvent bytes=95
+[15:36:31.108] LOG: [coop:turn] host recorder: append turn=2 seq=4 k=message total=5 live=true
+[15:36:31.108] LOG: [coop:runtime] ME-stream live-event host turn=2 seq=4 k=message
+[15:36:31.108] LOG: [coop:replay] host EMIT live battleEvent turn=2 seq=4 k=message
+[15:36:31.108] LOG: [coop:webrtc] raw tx role=host t=battleEvent bytes=84
+[15:36:31.108] LOG: %cStart Phase MessagePhase color:green;
+[15:36:31.229] LOG: %cStart Phase MessagePhase color:green;
+[15:36:31.423] LOG: %cStart Phase MoveEndPhase color:green;
+[15:36:31.424] LOG: %cStart Phase MovePhase color:green;
+[15:36:31.424] LOG: %cStart Phase MoveEndPhase color:green;
+[15:36:31.424] LOG: %cStart Phase CheckInterludePhase color:green;
+[15:36:31.424] LOG: %cStart Phase WeatherEffectPhase color:green;
+[15:36:31.424] LOG: %cStart Phase PositionalTagPhase color:green;
+[15:36:31.424] LOG: %cStart Phase BerryPhase color:green;
+[15:36:31.425] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[15:36:31.426] LOG: %cStart Phase TurnEndPhase color:green;
+[15:36:31.426] LOG: [coop:turn] host recorder: finalize turn=2 events=5 seq=5
+[15:36:31.426] LOG: [coop:checkpoint] build field=4 weather=0/0 terrain=0/0 arenaTags=0 money=1000 mons=[bi0:sp201/hp15-22/st0/fnt0 bi1:sp725/hp20-20/st0/fnt0 bi2:sp915/hp0-14/st7/fnt1 bi3:sp263/hp0-13/st7/fnt1]
+[15:36:31.426] LOG: [coop:checkpoint] host capture field=4 weather=0 terrain=0 money=1000 arenaTags=0 mons=[bi0:sp201/hp15-22/st0/fnt0 bi1:sp725/hp20-20/st0/fnt0 bi2:sp915/hp0-14/st7/fnt1 bi3:sp263/hp0-13/st7/fnt1]
+[15:36:31.427] LOG: [coop:checksum] capture digest=f38a5962debcb697 field=2 biome=0 seed=e1hulBDIWDsRPoNSUrYn8KOH weather=0 terrain=0 money=1000 party=[201,725,265,152,118] partyLevels=[5,5,5,5,5] arenaTags=0 modifiers=1 heldItemsDigest=0 pokeballs=[0:5,1:0,2:0,3:0,4:0] mons=[bi0:sp201/hp15-22/st0/ab107/form28/tera0:13/boss0:0 bi1:sp725/hp20-20/st0/ab268/form0/tera0:9/boss0:0]
+[15:36:31.427] LOG: [coop:replay] host SEND turnResolution turn=2 events=5 checksum=f38a5962debcb697 preimage=true fullField=4
+[15:36:31.427] LOG: [coop:webrtc] raw tx role=host t=turnResolution bytes=3651
+[15:36:31.427] LOG: %cStart Phase BattleEndPhase color:green;
+[15:36:31.427] LOG: [coop:progression] expResolved BROADCAST wave=1 (host streams settled deltas)
+[15:36:31.428] LOG: [coop:runtime] send expResolved wave=1 deltas=5 (host)
+[15:36:31.428] LOG: [coop:replay] host SEND expResolved wave=1 deltas=5
+[15:36:31.428] LOG: [coop:webrtc] raw tx role=host t=expResolved bytes=1029
+[15:36:31.428] LOG: Battle Score: 20 (2 Turns x0.84)
+[15:36:31.428] LOG: Total Score: 20
+[15:36:31.439] LOG: %cStart Phase EggLapsePhase color:green;
+[15:36:31.440] LOG: %cStart Phase SelectModifierPhase color:green;
+[15:36:31.440] LOG: [coop:interaction] interactionCounter() read -> 0 (role=host)
+[15:36:31.440] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[15:36:31.440] LOG: [coop:owner] isLocalOwnerAtCounter(pinnedCounter=0) parity=0 owner=host role=host -> true
+[15:36:31.440] LOG: Wave Seed: f2ivmCEJXEtSQpOTVsZo9LPI 1
+[15:36:31.448] LOG: 9 5 [2,3,4,5,6]
+[15:36:31.448] LOG: {"id":"TM_CASE","localeKey":"","iconImage":"tm_case","soundName":"se/restore","tier":0} 
+[15:36:31.448] LOG: 31 7 [1,10,11,12,13,14,23]
+[15:36:31.448] LOG: {"id":"ER_LUCKY_HEART","localeKey":"","iconImage":"healing_charm","iconTint":16744362,"soundName":"se/restore","tier":2} 
+[15:36:31.448] LOG: 2 1 [1,10,11,12,13,14,23]
+[15:36:31.448] LOG: {"id":"BIG_NUGGET","localeKey":"modifierType:ModifierType.BIG_NUGGET","iconImage":"big_nugget","group":"money","soundName":"se/buy","tier":2,"moneyMultiplier":2.5,"moneyMultiplierDescriptorKey":"modifierType:ModifierType.MoneyRewardModifierType.extra.moderate"} 
+[15:36:31.448] LOG: 9 5 [2,3,4,5,6]
+[15:36:31.448] LOG: {"id":"TM_CASE","localeKey":"","iconImage":"tm_case","soundName":"se/restore","tier":0} 
+[15:36:31.448] LOG: 7 5 [2,3,4,5,6]
+[15:36:31.448] LOG: {"id":"TEMP_STAT_STAGE_BOOSTER","localeKey":"","iconImage":"x_defense","soundName":"se/restore","tier":0,"stat":2,"nameKey":"x_defense","quantityKey":"percentage"} 
+[15:36:31.448] LOG: 0 0 [2,3,4,5,6]
+[15:36:31.448] LOG: {"id":"POKEBALL","localeKey":"","iconImage":"pb","group":"pb","soundName":"se/pb_bounce_1","tier":0,"pokeballType":0,"count":5} 
+[15:36:31.448] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[15:36:31.448] LOG: [coop:owner] isLocalOwnerAtCounter(pinnedCounter=0) parity=0 owner=host role=host -> true
+[15:36:31.448] LOG: [coop:interaction] interactionCounter() read -> 0 (role=host)
+[15:36:31.448] LOG: [coop:reward] owner/watcher decision: pinnedStart=0 liveCounter=0 parity=0 role=host override=none spoof=false -> OWNER
+[15:36:31.448] LOG: [coop:reward] OWNER drives reward screen (start=0 role=host spoof=false wave=1)
+[15:36:31.448] LOG: [coop:shop] serializeRewardOptions count=3 ids=[TM_CASE,BIG_NUGGET,POKEBALL] tiers=[0,2,0]
+[15:36:31.448] LOG: [coop:reward] OWNER streams reward options (start=0 reroll=0 count=3 ids=[TM_CASE,BIG_NUGGET,POKEBALL])
+[15:36:31.448] LOG: [coop:relay] SEND rewardOptions seq=0 reroll=0 count=3 ids=[TM_CASE,BIG_NUGGET,POKEBALL]
+[15:36:31.448] LOG: [coop:webrtc] raw tx role=host t=rewardOptions bytes=212
+[15:36:31.472] LOG: [coop:interaction] mirror begin role=owner mirrorSeq=0 interactionStart=0 reroll=0
+[15:36:31.473] LOG: [coop:interaction] uiMirror beginSession role=owner mode=6 seq=0 early=0
+[15:36:31.475] LOG: [coop:interaction] uiMirror OWNER send seq=0 n=0 button=5 modeBefore=6
+[15:36:31.475] LOG: [coop:webrtc] raw tx role=host t=uiInput bytes=49
+[15:36:35.265] LOG: [coop:interaction] uiMirror OWNER send seq=0 n=1 button=3 modeBefore=6
+[15:36:35.265] LOG: [coop:webrtc] raw tx role=host t=uiInput bytes=49
+[15:36:35.529] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[15:36:35.529] LOG: [coop:owner] isLocalOwnerAtCounter(pinnedCounter=0) parity=0 owner=host role=host -> true
+[15:36:35.530] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[15:36:35.530] LOG: [coop:owner] isLocalOwnerAtCounter(pinnedCounter=0) parity=0 owner=host role=host -> true
+[15:36:35.530] LOG: [coop:relay] OWNER send seq=0 kind=reward choice=1 data=[0] role=host
+[15:36:35.530] LOG: [coop:relay] SEND interactionChoice seq=0 kind=reward choice=1 data=[0]
+[15:36:35.530] LOG: [coop:webrtc] raw tx role=host t=interactionChoice bytes=71
+[15:36:35.533] LOG: %cStart Phase NewBattlePhase color:green;
+[15:36:35.533] LOG: Wave Seed: g3jwnDFKYFuTRqPUWt[p:MQJ 2
+[15:36:35.534] LOG: [er-gauntlet] wave=2 kind=me -> MYSTERY_ENCOUNTER
+[15:36:35.536] LOG: %cStart Phase ReturnPhase color:green;
+[15:36:35.537] LOG: [coop:interaction] interactionCounter() read -> 0 (role=host)
+[15:36:35.537] LOG: [coop:interaction] CoopInteractionTurn.advance INCREMENT (fromCounter=0) counter 0 -> 1
+[15:36:35.537] LOG: [coop:interaction] advanceInteraction ADVANCED+BROADCAST (fromCounter=0) counter 0 -> 1 role=host; send interaction screen=__turn__ choice=1
+[15:36:35.537] LOG: [coop:webrtc] raw tx role=host t=interaction bytes=50
+[15:36:35.537] LOG: [coop:owner] ownerOf(counter=1) seat=1 -> owner=guest
+[15:36:35.537] LOG: [coop:owner] ownerOf(counter=1) seat=1 -> owner=guest
+[15:36:35.537] LOG: [coop-launch] proceedIfReady launched=true localTeam=3 bothReady=true role=host partnerReady=true
+[15:36:35.537] LOG: [coop:interaction] interactionCounter() read -> 1 (role=host)
+[15:36:35.537] LOG: [coop:reward] advance interaction (role=host from=0 counter 0 -> 1)
+[15:36:35.545] LOG: [coop:webrtc] raw rx role=host t=interaction bytes=50 handlers=7
+[15:36:35.545] LOG: [coop:interaction] RECV interaction broadcast (deferred catch-up net) received=1 localBefore=1 role=host -> no defer (local >= received)
+[15:36:35.545] WARN: [coop:interaction] CoopInteractionTurn.mergeRemote DEFER (remote=1, counter=1, pendingRemote=1) live counter UNCHANGED (folds in at next advance if still ahead)
+[15:36:35.545] LOG: [coop:owner] ownerOf(counter=1) seat=1 -> owner=guest
+[15:36:35.545] LOG: [coop:owner] ownerOf(counter=1) seat=1 -> owner=guest
+[15:36:35.545] LOG: [coop-launch] proceedIfReady launched=true localTeam=3 bothReady=true role=host partnerReady=true
+[15:36:35.660] LOG: %cStart Phase CoopPartnerSyncPhase color:green;
+[15:36:35.660] LOG: [coop:interaction] interactionCounter() read -> 1 (role=host)
+[15:36:35.660] LOG: %cStart Phase ReturnPhase color:green;
+[15:36:35.764] LOG: %cStart Phase ShowTrainerPhase color:green;
+[15:36:35.868] LOG: %cStart Phase NextEncounterPhase color:green;
+[15:36:35.871] LOG: [er-gauntlet] wave=2 ME type -> UNCOMMON_BREED
+[15:36:35.872] LOG: Starting species pool tier: UNCOMMON
+[15:36:36.642] LOG: [coop:replay] host SEND enemyPartySync wave=2 count=0
+[15:36:36.642] LOG: [coop:webrtc] raw tx role=host t=enemyPartySync bytes=44
+[15:36:36.642] LOG: [coop:launch] resume marker recorded slot=4 partner=test4 wave=2 (#810)
+[15:36:36.769] DEBUG: Session data saved to slot 4!
+[15:36:36.770] LOG: Wave Seed: g3jwnDFKYFuTRqPUWt[p:MQJ 2
+[15:36:38.698] LOG: %cStart Phase MysteryEncounterPhase color:green;
+[15:36:38.726] LOG: [coop:interaction] interactionCounter() read -> 1 (role=host)
+[15:36:38.726] LOG: [coop:me] interaction-counter -1 -> 1 (ME begin)
+[15:36:38.726] LOG: [coop:me] coopBeginMePump owner resolution (authoritative-only) {"counter":1,"seq":8000001,"role":"host","spoofed":false,"hostDrives":true}
+[15:36:38.726] LOG: [coop:pump] begin OWNER session {"seq":8000001,"termSeq":9000001}
+[15:36:38.726] LOG: [coop:me] ME owner streamed entry checksum {"seq":8000001}
+[15:36:38.726] LOG: [coop:checksum] capture digest=32f03c1b2f6bed27 field=1 biome=0 seed=e1hulBDIWDsRPoNSUrYn8KOH weather=0 terrain=0 money=1460 party=[201,725,265,152,118] partyLevels=[5,5,5,5,5] arenaTags=0 modifiers=1 heldItemsDigest=0 pokeballs=[0:5,1:0,2:0,3:0,4:0] mons=[bi0:sp201/hp15-22/st0/ab107/form28/tera0:13/boss0:0]
+[15:36:38.726] LOG: [coop:checksum] owner SEND meChecksum seq=8000001 checksum=32f03c1b2f6bed27
+[15:36:38.726] LOG: [coop:webrtc] raw tx role=host t=meChecksum bytes=62
+[15:36:38.727] LOG: [coop:me] host streams ME presentation (mePresent) {"seq":8000001,"opts":3,"labels":3,"tokens":6}
+[15:36:38.727] LOG: [coop:relay] SEND interactionOutcome seq=8000001 kind=mePresent k=mePresent opts=3
+[15:36:38.727] LOG: [coop:webrtc] raw tx role=host t=interactionOutcome bytes=358
+[15:36:38.727] LOG: [coop:owner] ownerOf(counter=1) seat=1 -> owner=guest
+[15:36:38.727] LOG: [coop:owner] isLocalOwnerAtCounter(pinnedCounter=1) parity=1 owner=guest role=host -> false
+[15:36:38.727] LOG: [coop:me] host awaits guest ME option index {"seq":8000001,"timeoutMs":1200000}
+[15:36:38.727] LOG: [coop:me] ui: host streams ME narration (showText) {"len":20,"preview":"test4 is choosing..."}
+[15:36:38.728] LOG: [coop:me] host stream ME-message len=20
+[15:36:38.728] LOG: [coop:replay] host SEND meMessage len=20
+[15:36:38.728] LOG: [coop:webrtc] raw tx role=host t=meMessage bytes=47
+[15:36:38.728] LOG: [coop:relay] AWAIT interactionChoice seq=8000001 timeoutMs=1200000 -> network-wait
+[15:37:17.786] LOG: [coop:webrtc] raw rx role=host t=interactionChoice bytes=62 handlers=7
+[15:37:17.786] LOG: [coop:relay] RECV interactionChoice seq=8000001 -> deliver-to-waiter choice=0 data=-
+[15:37:17.786] LOG: [coop:relay] AWAIT interactionChoice seq=8000001 RESOLVE choice=0 data=-
+[15:37:17.786] LOG: [coop:me] host received guest ME option index {"seq":8000001,"index":0}
+[15:37:17.786] LOG: [coop:me] host applies relayed guest option programmatically {"seq":8000001,"index":0,"encounter":"UNCOMMON_BREED"}
+[15:37:17.786] LOG: [coop:me] ui: host streams ME narration (showText) {"len":21,"preview":"test4 chose option 1."}
+[15:37:17.786] LOG: [coop:me] host stream ME-message len=21
+[15:37:17.786] LOG: [coop:replay] host SEND meMessage len=21
+[15:37:17.786] LOG: [coop:webrtc] raw tx role=host t=meMessage bytes=48
+[15:37:17.790] LOG: [coop:me] ui: host streams ME narration (showText) {"len":38,"preview":"You approach the\nCherubi without fear."}
+[15:37:17.790] LOG: [coop:me] host stream ME-message len=38
+[15:37:17.790] LOG: [coop:replay] host SEND meMessage len=38
+[15:37:17.791] LOG: [coop:webrtc] raw tx role=host t=meMessage bytes=66
+[15:37:31.088] LOG: [coop:owner] ownerOf(counter=1) seat=1 -> owner=guest
+[15:37:31.088] LOG: [coop:owner] isLocalOwnerAtCounter(pinnedCounter=1) parity=1 owner=guest role=host -> false
+[15:37:31.088] LOG: [coop:me] ui: host ADVANCES engine dialogue on guest-owned ME (#816) {"button":5}
+[15:37:31.123] LOG: %cStart Phase MysteryEncounterOptionSelectedPhase color:green;
+[15:37:31.233] LOG: Pokemon: Wild Cherubi | Species ID: 420 | Level: 3 | Nature: Timid (+Spd/-Atk) | Friendship: 50
+[15:37:31.233] LOG: Stats (IVs): HP: 16 (17), Atk: 7 (3), Def: 7 (3), Spatk: 9 (13), Spdef: 8 (19), Spd: 10 (27)
+[15:37:31.233] LOG: Ability: Pastel Veil | Passive Ability: Overgrow 
+[15:37:31.233] LOG: Moveset: ["Sleep Powder","Lucky Chant","Growth","Bullet Seed"]
+[15:37:31.233] LOG: [coop:me] meBattleHandoffKey wave=2 meCounter=1 -> key=me:2:1
+[15:37:31.233] LOG: [coop:me] host stream ME-battle party key=me:2:1 enemies=1
+[15:37:31.234] LOG: [coop:replay] host SEND meBattleEnemyPartySync key=me:2:1 count=1
+[15:37:31.234] LOG: [coop:webrtc] raw tx role=host t=meBattleEnemyPartySync bytes=288
+[15:37:31.234] LOG: [coop:me] owner-relay battle-handoff sentinel (end pump, run spawned battle)
+[15:37:31.234] LOG: [coop:pump] relay BATTLE-HANDOFF sentinel {"termSeq":9000001,"sentinel":-1000}
+[15:37:31.234] LOG: [coop:relay] SEND interactionChoice seq=9000001 kind=meBtn choice=-1000 data=-
+[15:37:31.234] LOG: [coop:webrtc] raw tx role=host t=interactionChoice bytes=69
+[15:37:31.234] LOG: [coop:pump] end session {"wasOwner":true,"seq":8000001,"termSeq":9000001}
+[15:37:33.268] LOG: %cStart Phase MysteryEncounterBattlePhase color:green;
+[15:37:33.269] LOG: %cStart Phase SummonPhase color:green;
+[15:37:33.377] WARN: cry/420 not found
+[15:37:33.477] LOG: %cStart Phase SummonPhase color:green;
+[15:37:33.478] LOG: [coop:me] ui: host streams ME narration (showText) {"len":10,"preview":"Go! Unown!"}
+[15:37:33.478] LOG: [coop:me] host stream ME-message len=10
+[15:37:33.478] LOG: [coop:replay] host SEND meMessage len=10
+[15:37:33.478] LOG: [coop:webrtc] raw tx role=host t=meMessage bytes=37
+[15:37:33.778] LOG: %cStart Phase ShinySparklePhase color:green;
+[15:37:33.879] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[15:37:33.880] LOG: %cStart Phase CheckSwitchPhase color:green;
+[15:37:33.880] LOG: %cStart Phase InitEncounterPhase color:green;
+[15:37:33.880] LOG: %cStart Phase PostSummonPhase color:green;
+[15:37:33.880] LOG: Ran PSP for: Cherubi
+[15:37:33.881] LOG: %cStart Phase MessagePhase color:green;
+[15:37:33.881] LOG: [coop:me] ui: host streams ME narration (showText) {"len":51,"preview":"The Cherubi’s heightened abilities boost"}
+[15:37:33.881] LOG: [coop:me] host stream ME-message len=51
+[15:37:33.881] LOG: [coop:replay] host SEND meMessage len=51
+[15:37:33.881] LOG: [coop:webrtc] raw tx role=host t=meMessage bytes=78
+[15:37:36.255] LOG: %cStart Phase StatStageChangePhase color:green;
+[15:37:36.255] LOG: %cStart Phase StatStageChangePhase color:green;
+[15:37:36.444] LOG: %cStart Phase MessagePhase color:green;
+[15:37:36.444] LOG: [coop:me] ui: host streams ME narration (showText) {"len":28,"preview":"Wild Cherubi’s Defense rose!"}
+[15:37:36.444] LOG: [coop:me] host stream ME-message len=28
+[15:37:36.444] LOG: [coop:replay] host SEND meMessage len=28
+[15:37:36.444] LOG: [coop:webrtc] raw tx role=host t=meMessage bytes=55
+[15:37:36.677] LOG: %cStart Phase StatStageChangePhase color:green;
+[15:37:36.869] LOG: %cStart Phase MessagePhase color:green;
+[15:37:36.869] LOG: [coop:me] ui: host streams ME narration (showText) {"len":28,"preview":"Wild Cherubi’s Sp. Def rose!"}
+[15:37:36.869] LOG: [coop:me] host stream ME-message len=28
+[15:37:36.869] LOG: [coop:replay] host SEND meMessage len=28
+[15:37:36.869] LOG: [coop:webrtc] raw tx role=host t=meMessage bytes=55
+[15:37:37.094] LOG: %cStart Phase StatStageChangePhase color:green;
+[15:37:37.283] LOG: %cStart Phase MessagePhase color:green;
+[15:37:37.283] LOG: [coop:me] ui: host streams ME narration (showText) {"len":26,"preview":"Wild Cherubi’s Speed rose!"}
+[15:37:37.283] LOG: [coop:me] host stream ME-message len=26
+[15:37:37.283] LOG: [coop:replay] host SEND meMessage len=26
+[15:37:37.283] LOG: [coop:webrtc] raw tx role=host t=meMessage bytes=53
+[15:37:37.497] LOG: %cStart Phase PostSummonPhase color:green;
+[15:37:37.498] LOG: %cStart Phase ShowAbilityPhase color:green;
+[15:37:37.659] LOG: %cStart Phase MovePhase color:green;
+[15:37:37.659] LOG: %cUser: Cherubi
+Move: SAFEGUARD
+Use Mode: INDIRECT color:orchid
+[15:37:37.660] LOG: %cStart Phase MessagePhase color:green;
+[15:37:37.660] LOG: [coop:me] ui: host streams ME narration (showText) {"len":28,"preview":"Wild Cherubi used\nSafeguard!"}
+[15:37:37.660] LOG: [coop:me] host stream ME-message len=28
+[15:37:37.660] LOG: [coop:replay] host SEND meMessage len=28
+[15:37:37.660] LOG: [coop:webrtc] raw tx role=host t=meMessage bytes=56
+[15:37:37.775] LOG: %cStart Phase MoveEffectPhase color:green;
+[15:37:37.785] LOG: %cStart Phase MessagePhase color:green;
+[15:37:37.785] LOG: [coop:me] ui: host streams ME narration (showText) {"len":52,"preview":"The opposing team cloaked itself in a my"}
+[15:37:37.785] LOG: [coop:me] host stream ME-message len=52
+[15:37:37.785] LOG: [coop:replay] host SEND meMessage len=52
+[15:37:37.785] LOG: [coop:webrtc] raw tx role=host t=meMessage bytes=79
+[15:37:38.052] LOG: %cStart Phase MoveEndPhase color:green;
+[15:37:38.053] LOG: %cStart Phase HideAbilityPhase color:green;
+[15:37:38.074] LOG: %cStart Phase PostSummonPhase color:green;
+[15:37:38.075] LOG: %cStart Phase PostSummonPhase color:green;
+[15:37:38.075] LOG: Ran PSP for: Unown
+[15:37:38.075] LOG: %cStart Phase PostSummonPhase color:green;
+[15:37:38.075] LOG: %cStart Phase PostSummonPhase color:green;
+[15:37:38.075] LOG: %cStart Phase TurnInitPhase color:green;
+[15:37:38.075] LOG: %cStart Phase MovePhase color:green;
+[15:37:38.075] LOG: %cUser: Cherubi
+Move: SLEEP_POWDER
+Use Mode: IGNORE_PP color:orchid
+[15:37:38.076] LOG: %cStart Phase MessagePhase color:green;
+[15:37:38.076] LOG: [coop:me] ui: host streams ME narration (showText) {"len":31,"preview":"Wild Cherubi used\nSleep Powder!"}
+[15:37:38.076] LOG: [coop:me] host stream ME-message len=31
+[15:37:38.076] LOG: [coop:replay] host SEND meMessage len=31
+[15:37:38.076] LOG: [coop:webrtc] raw tx role=host t=meMessage bytes=59
+[15:37:38.200] LOG: %cStart Phase MoveEffectPhase color:green;
+[15:37:38.201] LOG: Battle Seed: hnTtGr5pzUyhtcYm
+[15:37:38.517] LOG: %cStart Phase ObtainStatusEffectPhase color:green;
+[15:37:38.694] LOG: %cStart Phase MessagePhase color:green;
+[15:37:38.694] LOG: [coop:me] ui: host streams ME narration (showText) {"len":18,"preview":"Unown\nfell asleep!"}
+[15:37:38.694] LOG: [coop:me] host stream ME-message len=18
+[15:37:38.694] LOG: [coop:replay] host SEND meMessage len=18
+[15:37:38.694] LOG: [coop:webrtc] raw tx role=host t=meMessage bytes=46
+[15:37:38.889] LOG: %cStart Phase MoveEndPhase color:green;
+[15:37:38.889] LOG: %cStart Phase MysteryEncounterBattleStartCleanupPhase color:green;
+[15:37:38.890] LOG: %cStart Phase CommandPhase color:green;
+[15:37:38.890] LOG: [coop:replay] host SEND enemyPartySync wave=2 count=1
+[15:37:38.890] LOG: [coop:webrtc] raw tx role=host t=enemyPartySync bytes=274
