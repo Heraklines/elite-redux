@@ -8,7 +8,9 @@ import { globalScene } from "#app/global-scene";
 import { Phase } from "#app/phase";
 import { applyCoopMeOutcome } from "#data/elite-redux/coop/coop-battle-engine";
 import { coopLog, coopWarn } from "#data/elite-redux/coop/coop-debug";
+import { adoptCoopEnemiesStructural } from "#data/elite-redux/coop/coop-enemy-builder";
 import type { CoopInteractionChoice } from "#data/elite-redux/coop/coop-interaction-relay";
+import { meBattleHandoffKey } from "#data/elite-redux/coop/coop-me-battle-handoff";
 import { setCoopMeHandoffBattleStarted } from "#data/elite-redux/coop/coop-me-pin-state";
 import { COOP_ME_BATTLE_HANDOFF, COOP_ME_TERM_SEQ_BASE } from "#data/elite-redux/coop/coop-me-pump";
 import { getCoopBattleStreamer, getCoopController, getCoopInteractionRelay } from "#data/elite-redux/coop/coop-runtime";
@@ -214,6 +216,9 @@ export class CoopReplayMePhase extends Phase {
       return;
     }
     this.pickSent = true;
+    // #819 ('the selection screen doesn't disappear'): the pick is committed - dismiss the
+    // option UI so narration renders in a clean message box, mirroring the engine side.
+    void globalScene.ui.setMode(UiMode.MESSAGE);
     const relay = getCoopInteractionRelay();
     if (relay == null) {
       coopWarn("me", "no relay on guest option select; defensive leave", { counter: this.interactionCounter, index });
@@ -475,6 +480,27 @@ export class CoopReplayMePhase extends Phase {
     });
     setCoopMeHandoffBattleStarted(); // #817: ME gates stand down - the battle runs the normal sync
     hideCoopControllerTag();
+    // #819 (live BOTH-stuck at the ME battle): the guest's field is EMPTY here - its own
+    // wave roll's summon chain was purged at the divert (#813) and the host's ME-battle
+    // summons run in a phase only the host executes. Adopt the host's streamed battle party
+    // (buffered by now - it is sent just before the terminal) and queue the guest's OWN
+    // MysteryEncounterBattlePhase so both sides summon: with a fielded party the guest's
+    // CommandPhase opens its real fight UI and answers the host's command request.
+    try {
+      const key = meBattleHandoffKey(globalScene.currentBattle.waveIndex, this.interactionCounter);
+      const enemies =
+        getCoopBattleStreamer()?.consumeMeBattleEnemyParty?.(key)
+        ?? getCoopBattleStreamer()?.consumeEnemyParty(globalScene.currentBattle.waveIndex);
+      if (enemies != null && enemies.length > 0) {
+        adoptCoopEnemiesStructural(enemies);
+      }
+      globalScene.phaseManager.unshiftNew("MysteryEncounterBattlePhase", false);
+      coopLog("me", "guest queued its OWN ME battle boot (adopt + MysteryEncounterBattlePhase) (#819)", {
+        adopted: enemies?.length ?? 0,
+      });
+    } catch (e) {
+      coopWarn("me", "guest ME battle boot failed (falling through to the old flow)", e);
+    }
     this.settled = true;
     coopMeHostPresentation = null;
     this.offMeMessage?.();

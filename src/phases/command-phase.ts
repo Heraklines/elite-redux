@@ -5,6 +5,7 @@ import { TrappedTag } from "#data/battler-tags";
 import { getDailyEventSeedBoss } from "#data/daily-seed/daily-run";
 import { isDailyFinalBoss } from "#data/daily-seed/daily-seed-utils";
 import { captureCoopEnemies } from "#data/elite-redux/coop/coop-battle-engine";
+import { coopLog } from "#data/elite-redux/coop/coop-debug";
 import { adoptCoopEnemiesStructural } from "#data/elite-redux/coop/coop-enemy-builder";
 import {
   applyWiredPartnerCommand,
@@ -247,7 +248,14 @@ export class CommandPhase extends FieldPhase {
       return false;
     }
     // Only auto-resolve the PARTNER's slot; the local player commands their own.
-    if (coopOwnerOfPlayerFieldSlot(this.fieldIndex) === controller.role) {
+    const slotOwner = coopOwnerOfPlayerFieldSlot(this.fieldIndex);
+    // #819 diagnostics: ownership decides who prompts/relays this slot - a misresolve here IS
+    // the spectator/deadlock class, so make the verdict visible in every capture.
+    coopLog(
+      "battle",
+      `CommandPhase slot=${this.fieldIndex} turn=${globalScene.currentBattle.turn} owner=${slotOwner} role=${controller.role} -> ${slotOwner === controller.role ? "LOCAL UI" : "partner path"}`,
+    );
+    if (slotOwner === controller.role) {
       return false;
     }
 

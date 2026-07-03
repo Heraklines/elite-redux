@@ -482,6 +482,17 @@ export class CoopBattleStreamer {
     return oldest;
   }
 
+  /** #819: consume a buffered ME-spawned-battle party by its exact handoff key. */
+  consumeMeBattleEnemyParty(key: string): CoopSerializedEnemy[] | null {
+    const enemies = this.meBattlePartyInbox.get(key);
+    if (enemies == null) {
+      return null;
+    }
+    this.meBattlePartyInbox.delete(key);
+    coopLog("stream", `guest consumeMeBattleEnemyParty ${key} -> ${enemies.length} enemies`);
+    return enemies;
+  }
+
   consumeEnemyParty(wave: number): CoopSerializedEnemy[] | null {
     const buffered = this.lastEnemyParty;
     if (buffered == null || buffered.wave !== wave) {

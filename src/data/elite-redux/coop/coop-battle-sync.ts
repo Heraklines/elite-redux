@@ -25,6 +25,7 @@
 // protocol then runs unchanged over the real WebRTC transport.
 // =============================================================================
 
+import { globalScene } from "#app/global-scene";
 import { coopLog, coopWarn, isCoopDebug } from "#data/elite-redux/coop/coop-debug";
 import type { CoopMessage, CoopTransport, SerializedCommand } from "#data/elite-redux/coop/coop-transport";
 
@@ -65,7 +66,15 @@ function defaultSchedule(cb: () => void, ms: number): () => void {
 
 /** Inbox / pending key: a command is matched by BOTH slot AND turn (#633 desync fix). */
 function commandKey(fieldIndex: number, turn: number): string {
-  return `${fieldIndex}:${turn}`;
+  // #819: scope by WAVE too - an ME-spawned battle resets `turn` to 1 within the run, so a
+  // stale wave-N buffered command must never satisfy wave-M's request for the same slot+turn.
+  let wave = 0;
+  try {
+    wave = globalScene.currentBattle?.waveIndex ?? 0;
+  } catch {
+    /* engine-free tests have no scene - 0 scopes them all to one battle, the old behavior */
+  }
+  return `${wave}:${fieldIndex}:${turn}`;
 }
 
 /**
@@ -114,7 +123,7 @@ export class CoopBattleSync {
    */
   requestPartnerCommand(fieldIndex: number, turn: number, moveSlots: number[]): Promise<SerializedCommand | null> {
     const key = commandKey(fieldIndex, turn);
-    const slotPrefix = `${fieldIndex}:`;
+    const slotPrefix = key.slice(0, key.lastIndexOf(":") + 1); // `wave:fieldIndex:` (#819)
     // Supersede any stale in-flight request on this SLOT (the turn has moved on, so an
     // older-turn await is moot) and prune any stale older-turn buffered command for it,
     // so a request for turn N can never resolve with a turn != N command (#633 desync fix).

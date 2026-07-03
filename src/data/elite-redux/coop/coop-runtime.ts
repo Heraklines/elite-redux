@@ -1395,12 +1395,21 @@ export function startLocalCoopSession(
       if (controller.isLocalOwnerAtCounter(coopMeInteractionStartValue())) {
         return; // we drive this ME - our own cursor rules
       }
+      const mode = globalScene.ui?.getMode();
       const handler = globalScene.ui?.getHandler();
-      if (globalScene.ui?.getMode() === UiMode.MYSTERY_ENCOUNTER && typeof handler?.setCursor === "function") {
+      // #819 diagnostics: the 16:38 session proved the wire flows but the cursor never moved -
+      // log the apply/skip verdict so the next capture pins the receiver-side failure exactly.
+      if (mode === UiMode.MYSTERY_ENCOUNTER && typeof handler?.setCursor === "function") {
         handler.setCursor(index);
+        coopLog("me", `meCursor APPLIED index=${index}`);
+      } else {
+        coopLog(
+          "me",
+          `meCursor SKIPPED index=${index} mode=${mode} hasSetCursor=${typeof handler?.setCursor === "function"}`,
+        );
       }
-    } catch {
-      /* cosmetic */
+    } catch (e) {
+      coopWarn("me", "meCursor apply threw", e);
     }
   };
   battleSync.setSlotOwnershipProbe(fieldIndex => {
