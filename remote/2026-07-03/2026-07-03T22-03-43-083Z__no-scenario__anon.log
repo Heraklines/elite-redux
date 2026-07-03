@@ -1,0 +1,27 @@
+url:      https://elite-redux-staging.pages.dev/
+build:    mr5f51y8-fjag
+mode:     0  wave:?
+seed:     RtOMAHVmpZj2GdIdAGJu7FXv
+party:    
+enemy:    
+
+----- CONSOLE -----
+[21:57:52.310] LOG: %c %c %c %c %c Phaser v3.90.0 (WebGL | Web Audio) %c https://phaser.io/v390 background: #ff0000 background: #ffff00 background: #00ff00 background: #00ffff color: #ffffff; background: #000000 background: transparent
+[21:57:56.419] LOG: [ER] build mr5f51y8-fjag
+[21:57:56.960] LOG: [dev-tools] loaded — 419 scenarios + Send Logs button
+[22:00:34.357] DEBUG: Destroying loading scene
+[22:00:34.357] DEBUG: Destroyed loading scene
+[22:00:38.690] LOG: Seed: RtOMAHVmpZj2GdIdAGJu7FXv
+[22:00:38.691] LOG: Wave Seed: RtOMAHVmpZj2GdIdAGJu7FXv 0
+[22:00:58.295] LOG: %cStart Phase LoginPhase color:green;
+[22:02:23.004] WARN: Login failed! 401 
+[22:02:28.548] WARN: Login failed! 401 
+[22:02:41.768] WARN: Login failed! 401 
+[22:02:57.933] WARN: Login failed! 401 
+[22:02:59.332] LOG: %cStart Phase LoginPhase color:green;
+[22:03:26.808] LOG: Client Session: zivilayOJc622yezVvkayaExgQU1sBdo
+[22:03:26.956] WARN: Could not get system savedata! 404 Save data not found.
+[22:03:26.959] LOG: %cStart Phase MessagePhase color:green;
+[22:03:29.583] LOG: %cStart Phase SelectGenderPhase color:green;
+[22:03:30.172] LOG: [er-gift] granted 2 free Legendary eggs (one-time)
+[22:03:32.714] LOG: %cStart Phase SelectGenderPhase color:green;
