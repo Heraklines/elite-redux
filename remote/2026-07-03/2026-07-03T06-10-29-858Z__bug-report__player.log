@@ -1,0 +1,67 @@
+----- BUG REPORT (in-game) -----
+version:  1.11.19
+url:      https://elite-redux.pages.dev/
+ua:       Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36
+mode:     0  wave:36  difficulty:youngster
+seed:     HvrVVB3QfS3cMZsLImX0XZ1w
+party:    Charmeleon(L32 87/87), Arbok(L26 90/90), Yanma(L26 72/72), Gimmighoul(L26 75/75), Raticate(L28 76/76), Azelf Redux(L29 74/84)
+
+----- DESCRIPTION -----
+Hatched a shiny Azelf Redux form but the base colours are not selectable. (First time adding this pokemon to my roster)
+
+----- CONSOLE -----
+[06:08:01.734] LOG: %c %c %c %c %c Phaser v3.90.0 (WebGL | Web Audio) %c https://phaser.io/v390 background: #ff0000 background: #ffff00 background: #00ff00 background: #00ffff color: #ffffff; background: #000000 background: transparent
+[06:08:02.531] LOG: [ER] build mr1lenh7-fth8
+[06:08:26.091] DEBUG: Destroying loading scene
+[06:08:26.091] DEBUG: Destroyed loading scene
+[06:08:26.315] LOG: Seed: oyWJmnXaQztoBBKsRCqHD9Zh
+[06:08:26.315] LOG: Wave Seed: oyWJmnXaQztoBBKsRCqHD9Zh 0
+[06:08:27.640] LOG: %cStart Phase LoginPhase color:green;
+[06:08:28.077] LOG: Client Session: tev4zYhxaCOjN0qAuMXeqnn7Ghiz08e0
+[06:08:28.384] DEBUG: Using cached system data
+[06:08:28.451] LOG: %cStart Phase TitlePhase color:green;
+[06:08:28.451] LOG: Getting Session Slot id: %d 0
+[06:08:28.464] LOG: use seasonal splash messages true
+[06:08:45.163] LOG: Getting Session Slot id: %d 0
+[06:08:45.172] LOG: Getting Session Slot id: %d 1
+[06:08:45.172] LOG: Getting Session Slot id: %d 2
+[06:08:45.173] LOG: Getting Session Slot id: %d 3
+[06:08:45.173] LOG: Getting Session Slot id: %d 4
+[06:08:45.174] LOG: Getting Session Slot id: %d 0
+[06:08:45.373] ERROR: Invalid save data JSON detected! Session not found.
+[06:08:45.378] ERROR: Invalid save data JSON detected! Session not found.
+[06:08:45.379] ERROR: Invalid save data JSON detected! Session not found.
+[06:08:45.379] ERROR: Invalid save data JSON detected! Session not found.
+[06:08:45.822] ERROR: TypeError: undefined is not a constructor
+TypeError: undefined is not a constructor
+    at ModifierData.toModifier (https://elite-redux.pages.dev/assets/er-map-nodes-DWNswsmu.js:6:494605)
+    at SessionSlot.setupWithData (https://elite-redux.pages.dev/assets/battle-scene-DxOmxB2p.js:1044:3574)
+[06:08:48.399] LOG: Getting Session Slot id: %d 0
+[06:08:48.404] LOG: Wave Seed: HvrVVB3QfS3cMZsLImX0XZ1w 0
+[06:08:48.404] LOG: Seed: HvrVVB3QfS3cMZsLImX0XZ1w
+[06:08:48.422] LOG: Wave Seed: lzzfWuwWq~pm|T|~U 36
+[06:08:48.431] LOG: Applied Carbos 
+[06:08:48.433] LOG: Applied Protein 
+[06:08:48.434] LOG: Applied Carbos 
+[06:08:48.435] LOG: Applied Protein 
+[06:08:48.436] LOG: Applied Carbos 
+[06:08:48.436] LOG: Applied Protein 
+[06:08:48.692] LOG: %cStart Phase EncounterPhase color:green;
+[06:08:48.694] LOG: Pokemon: Wild Vulpix | Species ID: 37 | Level: 24 | Nature: Sassy (+SpDef/-Spd)
+[06:08:48.694] LOG: Stats (IVs): HP: 57 (20), Atk: 25 (2), Def: 24 (0), Spatk: 34 (3), Spdef: 41 (4), Spd: 36 (22)
+[06:08:48.694] LOG: Ability: Pyromancy | Passive Ability: Quick Feet 
+[06:08:48.694] LOG: Moveset: ["Mystical Fire","Roar","Captivate","Incinerate"]
+[06:08:49.060] LOG: Wave Seed: lzzfWuwWq~pm|T|~U 36
+[06:08:51.060] LOG: %cStart Phase SummonPhase color:green;
+[06:08:51.761] LOG: Applied Carbos 
+[06:08:51.762] LOG: Applied Protein 
+[06:08:52.386] LOG: %cStart Phase CheckSwitchPhase color:green;
+[06:08:53.310] LOG: %cStart Phase SwitchPhase color:green;
+[06:08:56.895] WARN: cry/10712 not found
+[06:09:49.984] LOG: %cStart Phase InitEncounterPhase color:green;
+[06:09:49.985] LOG: %cStart Phase PostSummonPhase color:green;
+[06:09:49.985] LOG: Ran PSP for: Vulpix
+[06:09:49.985] LOG: %cStart Phase PostSummonPhase color:green;
+[06:09:49.985] LOG: %cStart Phase PostSummonPhase color:green;
+[06:09:49.985] LOG: %cStart Phase TurnInitPhase color:green;
+[06:09:49.985] LOG: %cStart Phase CommandPhase color:green;
