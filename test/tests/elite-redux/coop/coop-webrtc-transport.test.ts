@@ -8,6 +8,7 @@
 // verified headlessly against a mock data channel (no live ICE). Also proves the
 // CoopSessionController runs unchanged over WebRtcTransport (transport-agnostic).
 
+import { CoopInteractionRelay } from "#data/elite-redux/coop/coop-interaction-relay";
 import { CoopSessionController } from "#data/elite-redux/coop/coop-session-controller";
 import type { CoopConnectionState, CoopMessage } from "#data/elite-redux/coop/coop-transport";
 import { type CoopWireChannel, WebRtcTransport } from "#data/elite-redux/coop/coop-webrtc-transport";
@@ -207,5 +208,32 @@ describe("hot rejoin (#805): replaceChannel swaps a fresh wire into the LIVE tra
     expect(guestGot.filter(t => t === "waveResolved").length).toBe(1);
     hostWireA.close();
     expect(host.state).toBe("connected");
+  });
+});
+
+describe("stall watchdog sensor (#806): oldestNetworkWaitMs tracks parked network waits", () => {
+  it("is -1 with no waits, grows while parked, -1 again after resolution", async () => {
+    const [a, b] = (() => {
+      const x = new MockWire();
+      const y = new MockWire();
+      x.peer = y;
+      y.peer = x;
+      return [x, y];
+    })();
+    const host = new WebRtcTransport("host", a);
+    const guest = new WebRtcTransport("guest", b);
+    const relay = new CoopInteractionRelay(host);
+    const guestRelay = new CoopInteractionRelay(guest);
+    expect(relay.oldestNetworkWaitMs()).toBe(-1);
+
+    // Park a network wait (no buffered choice): the sensor must report a non-negative age.
+    const wait = relay.awaitInteractionChoice(4242, 5_000);
+    expect(relay.oldestNetworkWaitMs()).toBeGreaterThanOrEqual(0);
+
+    // The peer answers: the wait resolves and the sensor returns to idle.
+    guestRelay.sendInteractionChoice(4242, "test", 1);
+    const res = await wait;
+    expect(res?.choice).toBe(1);
+    expect(relay.oldestNetworkWaitMs()).toBe(-1);
   });
 });

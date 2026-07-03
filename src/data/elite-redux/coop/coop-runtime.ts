@@ -568,6 +568,95 @@ let offDisconnectReaction: (() => void) | null = null;
  * The waits themselves stay long for LIVE partners (a human slowly browsing a market is legitimate);
  * only a genuinely dead channel short-circuits them. The resync/backstop layers are untouched.
  */
+/** #806 keepalive/deadlock-detection thresholds (standard netcode watchdog numbers). */
+const COOP_STALL_TICK_MS = 5_000;
+const COOP_STALL_REPORT_MS = 10_000;
+const COOP_STALL_TRIGGER_MS = 20_000;
+const COOP_STALL_RECOVERY_COOLDOWN_MS = 30_000;
+let offStallWatchdog: (() => void) | null = null;
+
+/**
+ * #806 STALL WATCHDOG (standard technique: keepalive heartbeat + wait-for-cycle deadlock
+ * detection). Each client that has been parked in a NETWORK wait for 10s+ tells its peer via a
+ * tiny `stallBeat`. When BOTH sides report 20s+ simultaneously, neither can produce the other's
+ * awaited message - a proven two-node wait cycle. Recovery: cancel the local parked waits (all
+ * existing timeout/AI fallbacks fire immediately) and, on the authoritative guest, pull a fresh
+ * full snapshot. A human browsing a shop never triggers this: the browsing side is in UI, not a
+ * network wait. Converts every current AND FUTURE mutual-wait bug from a softlock into a
+ * seconds-long self-healed hiccup with a loud log marker.
+ */
+function wireCoopStallWatchdog(
+  transport: CoopTransport,
+  relay: CoopInteractionRelay,
+  battleStream: CoopBattleStreamer,
+  runtime: CoopRuntime,
+): void {
+  let peerBeat: { ms: number; at: number } | null = null;
+  let lastRecoveryAt = 0;
+  const offMsg = transport.onMessage(msg => {
+    if (msg.t === "stallBeat") {
+      peerBeat = { ms: msg.waitingMs, at: Date.now() };
+    }
+  });
+  const timer = setInterval(() => {
+    try {
+      const localMs = Math.max(relay.oldestNetworkWaitMs(), battleStream.oldestNetworkWaitMs());
+      if (localMs >= COOP_STALL_REPORT_MS) {
+        transport.send({ t: "stallBeat", waitingMs: localMs });
+      }
+      const peerFresh = peerBeat != null && Date.now() - peerBeat.at < COOP_STALL_TICK_MS * 2.5;
+      if (
+        localMs >= COOP_STALL_TRIGGER_MS
+        && peerFresh
+        && (peerBeat?.ms ?? 0) >= COOP_STALL_TRIGGER_MS
+        && Date.now() - lastRecoveryAt > COOP_STALL_RECOVERY_COOLDOWN_MS
+      ) {
+        lastRecoveryAt = Date.now();
+        coopWarn(
+          "runtime",
+          `STALL WATCHDOG: mutual network wait (local=${Math.round(localMs / 1000)}s peer=${Math.round((peerBeat?.ms ?? 0) / 1000)}s) -> recovering (cancel waits${isCoopAuthoritativeGuest() ? " + full resync" : ""})`,
+        );
+        if (getCoopRuntime() === runtime) {
+          try {
+            globalScene.ui.showText("Connection stall detected. Resynchronizing...", null, undefined, 3000);
+          } catch {
+            /* cosmetic */
+          }
+        }
+        try {
+          relay.cancelWaiters(() => true);
+        } catch {
+          /* recovery must never throw */
+        }
+        if (isCoopAuthoritativeGuest()) {
+          const seq = COOP_REJOIN_SYNC_SEQ_BASE + (Date.now() % 100_000);
+          void battleStream.requestStateSync(seq).then(blob => {
+            if (blob == null) {
+              coopWarn("resync", `stall-recovery stateSync TIMEOUT/null seq=${seq}`);
+              return;
+            }
+            try {
+              applyCoopFullSnapshot(
+                JSON.parse(decompressFromBase64(blob)) as CoopFullBattleSnapshot,
+                isCoopAuthoritativeGuest(),
+              );
+              coopLog("resync", `stall-recovery snapshot applied seq=${seq} blob=${blob.length}b`);
+            } catch {
+              coopWarn("resync", `stall-recovery snapshot apply FAILED seq=${seq}`);
+            }
+          });
+        }
+      }
+    } catch {
+      /* the watchdog itself must never crash the game loop */
+    }
+  }, COOP_STALL_TICK_MS);
+  offStallWatchdog = () => {
+    clearInterval(timer);
+    offMsg();
+  };
+}
+
 function wireCoopDisconnectReaction(transport: CoopTransport, relay: CoopInteractionRelay, runtime: CoopRuntime): void {
   let rejoining = false;
   offDisconnectReaction = transport.onStateChange(state => {
@@ -1239,6 +1328,7 @@ export function startLocalCoopSession(
   wireCoopLearnMoveForward(host);
   wireCoopDexSync(host);
   wireCoopDisconnectReaction(host, interactionRelay, runtime);
+  wireCoopStallWatchdog(host, interactionRelay, battleStream, runtime);
   setCoopRuntime(runtime);
   coopLog("launch", `local session ready role=${controller.role} netcode=${controller.netcodeMode} -> connecting`);
   controller.connect();
@@ -1380,6 +1470,8 @@ export function clearCoopRuntime(): void {
   offDexSync = null;
   offDisconnectReaction?.();
   offDisconnectReaction = null;
+  offStallWatchdog?.();
+  offStallWatchdog = null;
   learnMoveForwardInFlight.clear();
   active.localTransport.close();
   // Clear the co-op ghost-pool hooks so a subsequent SOLO run fetches normally (#633).

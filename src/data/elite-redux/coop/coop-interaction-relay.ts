@@ -156,6 +156,8 @@ export class CoopInteractionRelay {
   private readonly inbox = new Map<number, CoopInteractionChoice[]>();
   /** seq -> resolver for the in-flight {@linkcode awaitInteractionChoice} (one at a time). */
   private readonly pending = new Map<number, (res: CoopInteractionChoice | null) => void>();
+  /** #806 stall watchdog: when each parked network wait began (same keys as `pending`). */
+  private readonly pendingSince = new Map<number, number>();
   /** seq -> FIFO queue of OUTCOMES that arrived before their waiter (#633, TRACK-2 Phase C). */
   private readonly outcomeInbox = new Map<number, CoopInteractionOutcome[]>();
   /** seq -> resolver for the in-flight {@linkcode awaitInteractionOutcome} (one at a time). */
@@ -229,6 +231,7 @@ export class CoopInteractionRelay {
       return Promise.resolve(next);
     }
     coopLog("relay", `AWAIT interactionChoice seq=${seq} timeoutMs=${timeoutMs} -> network-wait`);
+    this.pendingSince.set(seq, Date.now());
     // Supersede any stale waiter parked on this seq.
     if (this.pending.has(seq)) {
       coopWarn("relay", `AWAIT interactionChoice seq=${seq} SUPERSEDE stale waiter -> resolved null`);
@@ -244,6 +247,7 @@ export class CoopInteractionRelay {
         settled = true;
         cancelTimer();
         if (this.pending.get(seq) === finish) {
+          this.pendingSince.delete(seq);
           this.pending.delete(seq);
         }
         if (res === null) {
@@ -423,6 +427,23 @@ export class CoopInteractionRelay {
    * immediately re-parks on it also resolves null at once; a SPARED live seq is NOT sticky-marked,
    * so the owner's pick still resolves it normally.
    */
+  /**
+   * #806 stall watchdog: age (ms) of the OLDEST parked network wait, or -1 when none.
+   * A client with a positive value cannot produce the next message for that seq itself -
+   * two clients both reporting 20s+ is a proven mutual-wait deadlock.
+   */
+  oldestNetworkWaitMs(): number {
+    let oldest = -1;
+    const now = Date.now();
+    for (const since of this.pendingSince.values()) {
+      const age = now - since;
+      if (age > oldest) {
+        oldest = age;
+      }
+    }
+    return oldest;
+  }
+
   cancelWaiters(shouldCancel: (seq: number) => boolean = () => true): void {
     const seqs = new Set<number>();
     // Snapshot the SELECTED resolvers per map (finish() self-deletes from its map, so iterating a
@@ -493,6 +514,7 @@ export class CoopInteractionRelay {
       finish(null);
     }
     this.pending.clear();
+    this.pendingSince.clear();
     this.inbox.clear();
     this.outcomePending.clear();
     this.outcomeInbox.clear();

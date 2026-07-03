@@ -107,6 +107,8 @@ export class CoopBattleStreamer {
 
   /** turn -> resolver for an in-flight {@linkcode awaitTurn}. */
   private readonly pending = new Map<number, (res: CoopTurnResolution | null) => void>();
+  /** #806 stall watchdog: when each parked turn wait began (same keys as `pending`). */
+  private readonly pendingSince = new Map<number, number>();
   /** turn -> a resolution that arrived before its waiter (race buffer). */
   private readonly inbox = new Map<number, CoopTurnResolution>();
   /**
@@ -464,6 +466,22 @@ export class CoopBattleStreamer {
    * Returns null when none is buffered or it is for a different wave (so the guest
    * never adopts a stale wave's enemies). Applied at the wave's first turn boundary.
    */
+  /**
+   * #806 stall watchdog (standard keepalive/deadlock-detection support): age (ms) of the OLDEST
+   * parked turn wait, or -1 when none. Mirrors the relay's reader; the watchdog reports the max.
+   */
+  oldestNetworkWaitMs(): number {
+    let oldest = -1;
+    const now = Date.now();
+    for (const since of this.pendingSince.values()) {
+      const age = now - since;
+      if (age > oldest) {
+        oldest = age;
+      }
+    }
+    return oldest;
+  }
+
   consumeEnemyParty(wave: number): CoopSerializedEnemy[] | null {
     const buffered = this.lastEnemyParty;
     if (buffered == null || buffered.wave !== wave) {
@@ -925,6 +943,7 @@ export class CoopBattleStreamer {
       return Promise.resolve(buffered);
     }
     coopLog("replay", `guest awaitTurn turn=${turn} START timeout=${this.timeoutMs}ms`);
+    this.pendingSince.set(turn, Date.now());
     return new Promise<CoopTurnResolution | null>(resolve => {
       let settled = false;
       let cancelTimer: () => void = () => {};
@@ -936,6 +955,7 @@ export class CoopBattleStreamer {
         cancelTimer();
         if (this.pending.get(turn) === finish) {
           this.pending.delete(turn);
+          this.pendingSince.delete(turn);
         }
         if (res == null) {
           coopWarn("replay", `guest awaitTurn turn=${turn} STALL -> null (timeout/superseded)`);
