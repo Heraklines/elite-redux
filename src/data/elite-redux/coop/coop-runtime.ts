@@ -591,7 +591,7 @@ let offStallWatchdog: (() => void) | null = null;
  * network wait. Converts every current AND FUTURE mutual-wait bug from a softlock into a
  * seconds-long self-healed hiccup with a loud log marker.
  */
-function wireCoopStallWatchdog(
+export function wireCoopStallWatchdog(
   transport: CoopTransport,
   relay: CoopInteractionRelay,
   battleStream: CoopBattleStreamer,
@@ -859,8 +859,6 @@ let active: CoopRuntime | null = null;
 /** Register the live co-op session (called when a co-op run is being set up). */
 export function setCoopRuntime(runtime: CoopRuntime): void {
   active = runtime;
-  // #807: a fresh session starts a fresh tick line on both sides.
-  resetCoopStateTicks();
   // Install the cycle-free authoritative-guest predicate (#633 B6) so `field/pokemon.ts` can gate the
   // Shedinja party-add without importing this module (which would close a value-level import cycle).
   setCoopAuthoritativeGuestPredicate(isCoopAuthoritativeGuest);
@@ -1353,6 +1351,9 @@ export function startLocalCoopSession(
   wireCoopDexSync(host);
   wireCoopDisconnectReaction(host, interactionRelay, runtime);
   wireCoopStallWatchdog(host, interactionRelay, battleStream, runtime);
+  // #807: a fresh SESSION starts a fresh tick line (assembly-scoped, NOT setCoopRuntime -
+  // the duo harness re-registers runtimes per context swap and must not reset mid-session).
+  resetCoopStateTicks();
   setCoopRuntime(runtime);
   coopLog("launch", `local session ready role=${controller.role} netcode=${controller.netcodeMode} -> connecting`);
   controller.connect();

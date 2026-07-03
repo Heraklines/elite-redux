@@ -645,6 +645,65 @@ describe.skipIf(!RUN)("co-op DUO exploration sweep (maintainer directive)", () =
     logs.flush();
   }, 240_000);
 
+  it("PROBE #807-A: a STALE checkpoint fired into a live duo is REJECTED (state intact, tick sequencing)", async () => {
+    await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
+    const pair = createLoopbackPair();
+    const rig = await buildDuo(game, pair, setCoopRuntime, toCoop);
+    wireGuestCommand(rig);
+    const { captureCoopCheckpoint, applyCoopCheckpoint } = await import("#data/elite-redux/coop/coop-battle-engine");
+
+    // Two checkpoints in order: T1 (old truth) then T2 (current truth).
+    const hostLead = rig.hostScene.getPlayerParty()[0];
+    const oldHp = hostLead.hp;
+    const cp1 = withClientSync(rig.hostCtx, () => captureCoopCheckpoint());
+    hostLead.hp = Math.max(1, oldHp - 5); // the world moved on
+    const cp2 = withClientSync(rig.hostCtx, () => captureCoopCheckpoint());
+    expect(cp1?.tick, "checkpoints are tick-stamped").toBeGreaterThan(0);
+    expect(cp2!.tick!, "ticks are monotonic").toBeGreaterThan(cp1!.tick!);
+
+    // Guest applies them IN ORDER: converges to the newer truth.
+    const guestLead = rig.guestScene.getPlayerParty()[0];
+    withClientSync(rig.guestCtx, () => applyCoopCheckpoint(cp1!));
+    withClientSync(rig.guestCtx, () => applyCoopCheckpoint(cp2!));
+    const currentHp = guestLead.hp;
+    expect(currentHp, "guest converged to the newer state").toBe(Math.max(1, oldHp - 5));
+
+    // The STALE checkpoint arrives late (the live stale-resync class): it must be DROPPED,
+    // never regress the guest to yesterday's hp.
+    withClientSync(rig.guestCtx, () => applyCoopCheckpoint(cp1!));
+    expect(guestLead.hp, "stale apply REJECTED - state did not regress").toBe(currentHp);
+    logs.flush();
+  }, 240_000);
+
+  it("PROBE #807-B: an un-allowlisted account write during a live duo is BLOCKED (default-deny gate)", async () => {
+    await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
+    const pair = createLoopbackPair();
+    const rig = await buildDuo(game, pair, setCoopRuntime, toCoop);
+    wireGuestCommand(rig);
+    const { coopAllowAccountWrite } = await import("#data/elite-redux/coop/coop-account-gate");
+    const { getPokemonSpecies } = await import("#utils/pokemon-utils");
+
+    // A mon the guest account does NOT own; wipe its dex for a clean assertion.
+    const sneaky = rig.guestScene.addPlayerPokemon(getPokemonSpecies(SpeciesId.MEWTWO), 70);
+    const dex = rig.guestScene.gameData.dexData[SpeciesId.MEWTWO];
+    dex.caughtAttr = 0n;
+    dex.seenAttr = 0n;
+
+    // A future leak path (no allowlisted scope) tries to register it during co-op: BLOCKED.
+    const blocked = await withClient(rig.guestCtx, () =>
+      rig.guestScene.gameData.setPokemonCaught(sneaky, true, false, false),
+    );
+    expect(blocked, "un-allowlisted write returned false").toBe(false);
+    expect(rig.guestScene.gameData.dexData[SpeciesId.MEWTWO].caughtAttr, "dex NOT contaminated").toBe(0n);
+
+    // The same write inside an allowlisted scope proceeds (own catch path).
+    await withClient(rig.guestCtx, () =>
+      coopAllowAccountWrite("own-catch", () => rig.guestScene.gameData.setPokemonCaught(sneaky, true, false, false)),
+    );
+    expect(rig.guestScene.gameData.dexData[SpeciesId.MEWTWO].caughtAttr, "allowlisted write credited").not.toBe(0n);
+    logs.flush();
+  }, 240_000);
+
   it("PROBE #804: a flipped coopOwner tag on the guest's field mon is HEALED by the per-turn checkpoint", async () => {
     // Live evidence (ME battle deadlock): the tags diverged between clients, so BOTH resolved the
     // same slot as the partner's - the host requested a command nobody could answer. The checkpoint
