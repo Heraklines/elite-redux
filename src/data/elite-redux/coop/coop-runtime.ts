@@ -410,7 +410,12 @@ function wireCoopMeChecksumCheck(battleStream: CoopBattleStreamer): void {
     }
     coopWarn("checksum", `me-entry MISMATCH seq=${seq} owner=${ownerChecksum} watcher=${ours} -> requesting stateSync`);
     coopLog("resync", `await stateSync start seq=${seq}`);
+    const gen = coopSessionGeneration(); // #808: die if the session ends before the reply
     void battleStream.requestStateSync(seq).then(blob => {
+      if (gen !== coopSessionGeneration()) {
+        coopWarn("resync", `stateSync reply seq=${seq} arrived AFTER session teardown -> dropped (#808)`);
+        return;
+      }
       if (blob == null) {
         coopWarn("resync", `await stateSync TIMEOUT/null seq=${seq}`);
         return;
@@ -652,7 +657,11 @@ export function wireCoopStallWatchdog(
         }
         if (isCoopAuthoritativeGuest()) {
           const seq = COOP_REJOIN_SYNC_SEQ_BASE + (Date.now() % 100_000);
+          const gen = coopSessionGeneration(); // #808
           void battleStream.requestStateSync(seq).then(blob => {
+            if (gen !== coopSessionGeneration()) {
+              return;
+            }
             if (blob == null) {
               coopWarn("resync", `stall-recovery stateSync TIMEOUT/null seq=${seq}`);
               return;
@@ -736,7 +745,11 @@ function wireCoopDisconnectReaction(transport: CoopTransport, relay: CoopInterac
           if (isCoopAuthoritativeGuest()) {
             const seq = COOP_REJOIN_SYNC_SEQ_BASE + (Date.now() % 100_000);
             coopLog("resync", `post-rejoin full resync request seq=${seq}`);
+            const gen = coopSessionGeneration(); // #808
             void runtime.battleStream.requestStateSync(seq).then(blob => {
+              if (gen !== coopSessionGeneration()) {
+                return;
+              }
               if (blob == null) {
                 coopWarn("resync", `post-rejoin stateSync TIMEOUT/null seq=${seq} (checksum backstop heals next turn)`);
                 return;
@@ -855,6 +868,17 @@ export interface CoopRuntime {
 }
 
 let active: CoopRuntime | null = null;
+
+/**
+ * #808 SESSION GENERATION (same pattern as the transport's wire generation): bumped when a
+ * session is TORN DOWN. Async continuations capture it at scheduling and no-op if it moved -
+ * a late resync/share/rejoin continuation can never mutate a scene the session left behind.
+ * Deliberately NOT bumped by setCoopRuntime (the duo harness re-registers per context swap).
+ */
+let sessionGeneration = 0;
+export function coopSessionGeneration(): number {
+  return sessionGeneration;
+}
 
 /** Register the live co-op session (called when a co-op run is being set up). */
 export function setCoopRuntime(runtime: CoopRuntime): void {
@@ -1479,7 +1503,12 @@ export function clearCoopRuntime(): void {
   if (active == null) {
     return;
   }
-  coopLog("launch", `clearCoopRuntime role=${active.controller.role} netcode=${active.controller.netcodeMode}`);
+  // #808: invalidate every in-flight async continuation scheduled under this session.
+  sessionGeneration++;
+  coopLog(
+    "launch",
+    `clearCoopRuntime role=${active.controller.role} netcode=${active.controller.netcodeMode} gen->${sessionGeneration}`,
+  );
   active.controller.dispose();
   active.battleSync.dispose();
   active.battleStream.dispose();

@@ -645,6 +645,51 @@ describe.skipIf(!RUN)("co-op DUO exploration sweep (maintainer directive)", () =
     logs.flush();
   }, 240_000);
 
+  it("PROBE #808: SIMULTANEOUS same-seq choices from both clients resolve deterministically (no cross-consumption)", async () => {
+    // The matrix's last untested adversarial row: both clients fire an interactionChoice on the
+    // SAME seq at the same instant (a lag burst / double-driver bug shape). Contract: each side
+    // deterministically receives exactly the PEER's message, exactly once - no self-echo, no
+    // duplicate consumption, no corruption of a subsequent await on the same seq.
+    await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
+    const pair = createLoopbackPair();
+    const rig = await buildDuo(game, pair, setCoopRuntime, toCoop);
+    wireGuestCommand(rig);
+    const SEQ = 4_040_404;
+
+    // Both send "simultaneously" (loopback delivers synchronously; order host-then-guest).
+    withClientSync(rig.hostCtx, () => {
+      getCoopInteractionRelay()?.sendInteractionChoice(SEQ, "interleave", 1, [11]);
+    });
+    withClientSync(rig.guestCtx, () => {
+      getCoopInteractionRelay()?.sendInteractionChoice(SEQ, "interleave", 2, [22]);
+    });
+
+    // Each side awaits the seq: buffered peer message resolves instantly and deterministically.
+    const hostGot = await withClient(rig.hostCtx, () => getCoopInteractionRelay()!.awaitInteractionChoice(SEQ, 5_000));
+    const guestGot = await withClient(rig.guestCtx, () =>
+      getCoopInteractionRelay()!.awaitInteractionChoice(SEQ, 5_000),
+    );
+    expect(hostGot?.choice, "host received the GUEST's choice (never its own echo)").toBe(2);
+    expect(guestGot?.choice, "guest received the HOST's choice (never its own echo)").toBe(1);
+
+    // Idempotence: the buffered messages were consumed EXACTLY once - a second await on the
+    // same seq parks (no stale duplicate) and resolves only when a fresh message arrives.
+    let second: unknown = "unresolved";
+    const secondWait = withClient(rig.hostCtx, () =>
+      getCoopInteractionRelay()!.awaitInteractionChoice(SEQ, 3_000),
+    ).then(r => {
+      second = r;
+      return r;
+    });
+    expect(second, "no duplicate delivery from the consumed buffer").toBe("unresolved");
+    withClientSync(rig.guestCtx, () => {
+      getCoopInteractionRelay()?.sendInteractionChoice(SEQ, "interleave", 3, [33]);
+    });
+    const fresh = await secondWait;
+    expect((fresh as { choice?: number })?.choice, "a FRESH message resolves the new await").toBe(3);
+    logs.flush();
+  }, 240_000);
+
   it("PROBE #807-A: a STALE checkpoint fired into a live duo is REJECTED (state intact, tick sequencing)", async () => {
     await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
     const pair = createLoopbackPair();

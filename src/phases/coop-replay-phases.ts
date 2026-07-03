@@ -48,6 +48,7 @@ import {
   consumeCoopPendingWaveAdvance,
   coopHasPendingWaveAdvance,
   coopOwnerOfPlayerFieldSlot,
+  coopSessionGeneration,
   coopWaveAdvanceSignaledFor,
   getCoopBattleStreamer,
   getCoopController,
@@ -891,6 +892,7 @@ export class CoopFinalizeTurnPhase extends Phase {
       const guestObj = this.parseCanonical(canonicalize(captureCoopChecksumState()));
       logCanonicalDiff(`[coop-cs] turn=${this.turn}`, hostObj, guestObj);
     }
+    const resyncGen = coopSessionGeneration(); // #808
     void streamer.requestStateSync(this.turn).then(blob => {
       if (blob == null) {
         coopWarn(
@@ -900,6 +902,12 @@ export class CoopFinalizeTurnPhase extends Phase {
         return;
       }
       try {
+        // #808: a reply landing after session teardown must never queue a phase into the
+        // NEXT session's queue (the generation moved on teardown).
+        if (resyncGen !== coopSessionGeneration()) {
+          coopWarn("resync", `turn=${this.turn} stateSync reply arrived AFTER session teardown -> dropped (#808)`);
+          return;
+        }
         const snapshot = JSON.parse(decompressFromBase64(blob)) as CoopFullBattleSnapshot;
         coopLog("resync", `turn=${this.turn} queueing full snapshot apply (blobLen=${blob.length})`);
         // #698 resync-rescue, SCOPED (#633 reward-shop-desync fix): sticky-cancel a parked watcher
