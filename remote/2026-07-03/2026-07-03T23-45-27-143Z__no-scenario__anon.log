@@ -1,0 +1,188 @@
+url:      https://elite-redux-staging.pages.dev/
+build:    mr5j3ned-20tz
+mode:     4  wave:1
+seed:     34dPliRlm1YiPpArQVEcPTcn
+party:    Solosis Redux(L5 0hp f0), Phione(L5 26hp f0), Swablu Redux(L5 21hp f0), Volcanion(L5 24hp f0)
+enemy:    Skwovet(L2), Taillow(L2), Starly(L2)
+
+----- CONSOLE -----
+[23:43:35.333] LOG: %c %c %c %c %c Phaser v3.90.0 (WebGL | Web Audio) %c https://phaser.io/v390 background: #ff0000 background: #ffff00 background: #00ff00 background: #00ffff color: #ffffff; background: #000000 background: transparent
+[23:43:36.334] LOG: [ER] build mr5j3ned-20tz
+[23:43:36.351] LOG: [dev-tools] loaded — 419 scenarios + Send Logs button
+[23:43:55.282] DEBUG: Destroying loading scene
+[23:43:55.282] DEBUG: Destroyed loading scene
+[23:43:55.375] LOG: Seed: xoOz3yPVKploHWyc7vDniaPe
+[23:43:55.375] LOG: Wave Seed: xoOz3yPVKploHWyc7vDniaPe 0
+[23:43:59.108] LOG: %cStart Phase LoginPhase color:green;
+[23:43:59.447] LOG: Client Session: SzYhb49NjO4zqPlejV3xjCSLtUWBGzf4
+[23:43:59.778] DEBUG: Using cached system data
+[23:43:59.972] LOG: %cStart Phase TitlePhase color:green;
+[23:43:59.973] LOG: Getting Session Slot id: %d 2
+[23:44:00.012] LOG: use seasonal splash messages true
+[23:44:04.369] LOG: %cStart Phase TitlePhase color:green;
+[23:44:04.369] LOG: Getting Session Slot id: %d 2
+[23:44:04.395] LOG: use seasonal splash messages true
+[23:44:05.066] LOG: Getting Session Slot id: %d 0
+[23:44:05.075] LOG: Getting Session Slot id: %d 1
+[23:44:05.080] LOG: Getting Session Slot id: %d 2
+[23:44:05.086] LOG: Getting Session Slot id: %d 3
+[23:44:05.091] LOG: Getting Session Slot id: %d 4
+[23:44:05.267] LOG: Getting Session Slot id: %d 1
+[23:44:07.090] LOG: Getting Session Slot id: %d 1
+[23:44:07.105] LOG: Wave Seed: 34dPliRlm1YiPpArQVEcPTcn 0
+[23:44:07.105] LOG: Seed: 34dPliRlm1YiPpArQVEcPTcn
+[23:44:07.153] LOG: Wave Seed: 45eQmjSmn2ZjQqBsRWFdQUdo 1
+[23:44:07.235] LOG: %cStart Phase EncounterPhase color:green;
+[23:44:07.240] LOG: Pokemon: Wild Skwovet | Species ID: 819 | Level: 2 | Nature: Docile (-)
+[23:44:07.240] LOG: Stats (IVs): HP: 15 (24), Atk: 7 (19), Def: 7 (17), Spatk: 6 (20), Spdef: 6 (26), Spd: 6 (9)
+[23:44:07.240] LOG: Ability: Frisk | Passive Ability: Gluttony 
+[23:44:07.240] LOG: Moveset: ["Tackle","Berry Smash","Defense Curl","Stuff Cheeks"]
+[23:44:07.241] LOG: Pokemon: Wild Taillow | Species ID: 276 | Level: 2 | Nature: Hasty (+Spd/-Def)
+[23:44:07.241] LOG: Stats (IVs): HP: 13 (9), Atk: 7 (15), Def: 5 (8), Spatk: 7 (2), Spdef: 6 (17), Spd: 9 (27)
+[23:44:07.241] LOG: Ability: Air Blower | Passive Ability: Flock 
+[23:44:07.241] LOG: Moveset: ["Peck","Quick Attack","Focus Energy","Double Hit"]
+[23:44:07.242] LOG: Pokemon: Wild Starly | Species ID: 396 | Level: 2 | Nature: Hasty (+Spd/-Def)
+[23:44:07.242] LOG: Stats (IVs): HP: 13 (6), Atk: 7 (14), Def: 5 (23), Spatk: 6 (27), Spdef: 6 (23), Spd: 8 (0)
+[23:44:07.242] LOG: Ability: Intimidate | Passive Ability: Flock 
+[23:44:07.242] LOG: Moveset: ["Peck","Uproar (P)","Detect"]
+[23:44:08.970] LOG: Wave Seed: 45eQmjSmn2ZjQqBsRWFdQUdo 1
+[23:44:09.454] LOG: %cStart Phase SummonPhase color:green;
+[23:44:09.717] LOG: %cStart Phase CheckSwitchPhase color:green;
+[23:44:11.267] LOG: %cStart Phase CheckSwitchPhase color:green;
+[23:44:11.584] LOG: %cStart Phase CheckSwitchPhase color:green;
+[23:44:11.927] LOG: %cStart Phase InitEncounterPhase color:green;
+[23:44:11.936] LOG: %cStart Phase PostSummonPhase color:green;
+[23:44:11.937] LOG: Ran PSP for: Volcanion
+[23:44:11.946] LOG: %cStart Phase PostSummonPhase color:green;
+[23:44:11.967] LOG: %cStart Phase ShowAbilityPhase color:green;
+[23:44:12.156] LOG: %cStart Phase CommonAnimPhase color:green;
+[23:44:12.158] LOG: %cStart Phase MessagePhase color:green;
+[23:44:12.367] LOG: %cStart Phase HideAbilityPhase color:green;
+[23:44:12.410] LOG: %cStart Phase PostSummonPhase color:green;
+[23:44:12.412] LOG: %cStart Phase PostSummonPhase color:green;
+[23:44:12.412] LOG: Ran PSP for: Taillow
+[23:44:12.419] LOG: %cStart Phase PostSummonPhase color:green;
+[23:44:12.420] LOG: %cStart Phase MovePhase color:green;
+[23:44:12.420] LOG: %cUser: Taillow
+Move: TAILWIND
+Use Mode: FOLLOW_UP color:orchid
+[23:44:12.454] LOG: %cStart Phase MessagePhase color:green;
+[23:44:12.551] LOG: %cStart Phase MoveEffectPhase color:green;
+[23:44:12.567] LOG: %cStart Phase MessagePhase color:green;
+[23:44:12.817] LOG: %cStart Phase MoveEndPhase color:green;
+[23:44:12.822] LOG: %cStart Phase PostSummonPhase color:green;
+[23:44:12.823] LOG: %cStart Phase PostSummonPhase color:green;
+[23:44:12.823] LOG: Ran PSP for: Starly
+[23:44:12.827] LOG: %cStart Phase PostSummonPhase color:green;
+[23:44:12.832] LOG: %cStart Phase ShowAbilityPhase color:green;
+[23:44:13.025] LOG: %cStart Phase StatStageChangePhase color:green;
+[23:44:13.031] LOG: %cStart Phase MessagePhase color:green;
+[23:44:13.235] LOG: %cStart Phase StatStageChangePhase color:green;
+[23:44:13.242] LOG: %cStart Phase MessagePhase color:green;
+[23:44:13.433] LOG: %cStart Phase HideAbilityPhase color:green;
+[23:44:13.475] LOG: %cStart Phase PostSummonPhase color:green;
+[23:44:13.475] LOG: %cStart Phase PostSummonPhase color:green;
+[23:44:13.476] LOG: Ran PSP for: Skwovet
+[23:44:13.481] LOG: %cStart Phase PostSummonPhase color:green;
+[23:44:13.494] LOG: %cStart Phase ShowAbilityPhase color:green;
+[23:44:13.673] LOG: %cStart Phase HideAbilityPhase color:green;
+[23:44:13.721] LOG: %cStart Phase PostSummonPhase color:green;
+[23:44:13.721] LOG: %cStart Phase TurnInitPhase color:green;
+[23:44:13.723] LOG: %cStart Phase CommandPhase color:green;
+[23:44:24.304] LOG: Move: BUBBLE_BEAM Move targets: {"targets":[3,4,5,1,2],"multiple":false} 
+Player Pokemon: Volcanion
+[23:44:24.310] LOG: %cStart Phase SelectTargetPhase color:green;
+[23:44:26.145] LOG: %cStart Phase CommandPhase color:green;
+[23:45:08.775] LOG: %cStart Phase CommandPhase color:green;
+[23:45:10.531] LOG: Move: SURF Move targets: {"targets":[3,4,5,0,2],"multiple":true} 
+Player Pokemon: Phione
+[23:45:10.535] LOG: %cStart Phase SelectTargetPhase color:green;
+[23:45:10.732] LOG: %cStart Phase CommandPhase color:green;
+[23:45:12.147] LOG: Move: ICE_BEAM Move targets: {"targets":[3,4,5,0,1],"multiple":false} 
+Player Pokemon: Swablu Redux
+[23:45:12.151] LOG: %cStart Phase SelectTargetPhase color:green;
+[23:45:13.127] LOG: %cStart Phase EnemyCommandPhase color:green;
+[23:45:13.159] LOG: Battle Seed: o10b9iswmbVX7tFW
+[23:45:13.164] LOG: Move Pool: ["Tackle","Berry Smash","Defense Curl"]
+[23:45:13.164] LOG: Move Scores: [12,34,2]
+[23:45:13.164] LOG: Sorted Move Pool: ["Berry Smash","Tackle","Defense Curl"]
+[23:45:13.164] LOG: Chosen Move: Tackle
+[23:45:13.164] LOG: %cStart Phase EnemyCommandPhase color:green;
+[23:45:13.195] LOG: Move Pool: ["Peck","Quick Attack","Focus Energy","Double Hit"]
+[23:45:13.195] LOG: Move Scores: [30,12,5,33]
+[23:45:13.195] LOG: Sorted Move Pool: ["Double Hit","Peck","Quick Attack","Focus Energy"]
+[23:45:13.195] LOG: Chosen Move: Double Hit
+[23:45:13.195] LOG: %cStart Phase EnemyCommandPhase color:green;
+[23:45:13.203] LOG: Move Pool: ["Peck","Uproar (P)","Detect"]
+[23:45:13.203] LOG: Move Scores: [30,27,-20]
+[23:45:13.203] LOG: Sorted Move Pool: ["Peck","Uproar (P)","Detect"]
+[23:45:13.203] LOG: Chosen Move: Uproar (P)
+[23:45:13.203] LOG: %cStart Phase TurnStartPhase color:green;
+[23:45:13.220] LOG: %cStart Phase SwitchSummonPhase color:green;
+[23:45:13.435] WARN: cry/10718 not found
+[23:45:13.578] LOG: %cStart Phase PostSummonPhase color:green;
+[23:45:13.580] LOG: Ran PSP for: Solosis Redux
+[23:45:13.587] LOG: %cStart Phase PostSummonPhase color:green;
+[23:45:13.587] LOG: %cStart Phase PostSummonPhase color:green;
+[23:45:13.594] LOG: %cStart Phase MovePhase color:green;
+[23:45:13.594] LOG: %cUser: Phione
+Move: SURF
+Use Mode: NORMAL color:orchid
+[23:45:13.609] LOG: %cStart Phase MessagePhase color:green;
+[23:45:13.698] LOG: %cStart Phase MoveEffectPhase color:green;
+[23:45:13.707] LOG: crit stage: +0
+[23:45:13.710] LOG: Move: Surf | Base damage: 21.2 | Power: 135 | Source attack: 16 | Target defense: 9
+[23:45:13.712] LOG: Move: Surf | Attack damage: 24
+[23:45:13.715] LOG: crit stage: +0
+[23:45:13.717] LOG: Move: Surf | Base damage: 30.8 | Power: 135 | Source attack: 16 | Target defense: 6
+[23:45:13.718] LOG: Move: Surf | Attack damage: 45
+[23:45:13.719] LOG: crit stage: +0
+[23:45:13.720] LOG: Move: Surf | Base damage: 30.8 | Power: 135 | Source attack: 16 | Target defense: 6
+[23:45:13.721] LOG: Move: Surf | Attack damage: 51
+[23:45:13.722] LOG: crit stage: +0
+[23:45:13.722] LOG: Move: Surf | Base damage: 30.8 | Power: 135 | Source attack: 16 | Target defense: 6
+[23:45:13.723] LOG: Move: Surf | Attack damage: 44
+[23:45:13.723] LOG: %cStart Phase ShowAbilityPhase color:green;
+[23:45:13.901] LOG: %cStart Phase HideAbilityPhase color:green;
+[23:45:13.952] LOG: %cStart Phase DamageAnimPhase color:green;
+[23:45:13.986] LOG: %cStart Phase MessagePhase color:green;
+[23:45:14.198] LOG: %cStart Phase DamageAnimPhase color:green;
+[23:45:14.236] LOG: %cStart Phase DamageAnimPhase color:green;
+[23:45:14.268] LOG: %cStart Phase DamageAnimPhase color:green;
+[23:45:14.310] LOG: %cStart Phase FaintPhase color:green;
+[23:45:14.316] WARN: cry/10718 not found
+[23:45:14.387] LOG: %cStart Phase MessagePhase color:green;
+[23:45:14.706] LOG: %cStart Phase ShowAbilityPhase color:green;
+[23:45:14.869] LOG: %cStart Phase StatStageChangePhase color:green;
+[23:45:14.871] LOG: %cStart Phase MessagePhase color:green;
+[23:45:15.081] LOG: %cStart Phase HideAbilityPhase color:green;
+[23:45:15.117] LOG: %cStart Phase FaintPhase color:green;
+[23:45:15.186] LOG: %cStart Phase MessagePhase color:green;
+[23:45:15.319] LOG: %cStart Phase ShowAbilityPhase color:green;
+[23:45:15.502] LOG: %cStart Phase StatStageChangePhase color:green;
+[23:45:15.504] LOG: %cStart Phase MessagePhase color:green;
+[23:45:15.715] LOG: %cStart Phase HideAbilityPhase color:green;
+[23:45:15.752] LOG: %cStart Phase VictoryPhase color:green;
+[23:45:15.756] LOG: %cStart Phase ExpPhase color:green;
+[23:45:16.418] LOG: %cStart Phase ExpPhase color:green;
+[23:45:16.616] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[23:45:16.618] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[23:45:16.618] LOG: %cStart Phase FaintPhase color:green;
+[23:45:16.684] LOG: %cStart Phase MessagePhase color:green;
+[23:45:16.783] LOG: %cStart Phase ShowAbilityPhase color:green;
+[23:45:16.953] LOG: %cStart Phase StatStageChangePhase color:green;
+[23:45:16.955] LOG: %cStart Phase MessagePhase color:green;
+[23:45:17.168] LOG: %cStart Phase HideAbilityPhase color:green;
+[23:45:17.199] LOG: %cStart Phase VictoryPhase color:green;
+[23:45:17.200] LOG: %cStart Phase ExpPhase color:green;
+[23:45:17.374] LOG: %cStart Phase ExpPhase color:green;
+[23:45:17.570] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[23:45:17.571] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[23:45:17.571] LOG: %cStart Phase FaintPhase color:green;
+[23:45:17.635] LOG: %cStart Phase MessagePhase color:green;
+[23:45:17.734] LOG: %cStart Phase ShowAbilityPhase color:green;
+[23:45:17.936] LOG: %cStart Phase StatStageChangePhase color:green;
+[23:45:17.940] LOG: %cStart Phase MessagePhase color:green;
+[23:45:18.150] LOG: %cStart Phase HideAbilityPhase color:green;
+[23:45:18.185] LOG: %cStart Phase VictoryPhase color:green;
+[23:45:18.187] LOG: %cStart Phase ExpPhase color:green;
