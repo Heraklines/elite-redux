@@ -3,6 +3,7 @@ import { globalScene } from "#app/global-scene";
 import "#ui/coop-controller-tag";
 import { coopLog, isCoopDebug } from "#data/elite-redux/coop/coop-debug";
 import {
+  coopMeBespokeHostDrives,
   coopMeHandoffBattleStarted,
   coopMeInProgress,
   coopMeInteractionStartValue,
@@ -334,6 +335,7 @@ export class UI extends Phaser.GameObjects.Container {
           getCoopNetcodeMode() === "authoritative"
           && coopMeInProgress()
           && !coopMeHandoffBattleStarted() // #817: the spawned battle uses the NORMAL battle input path
+          && !coopMeBespokeHostDrives() // #823: the host must be able to play the bespoke mini-game
           && !(getCoopController()?.isLocalOwnerAtCounter(coopMeInteractionStartValue()) ?? true)
         ) {
           // #816 (live BOTH-frozen): the engine's own dialogue ("that Unown will do

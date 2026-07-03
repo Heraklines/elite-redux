@@ -37,6 +37,7 @@ export function setCoopMeInteractionStart(counter: number): void {
   coopMeInteractionStart = counter;
   if (counter < 0) {
     coopMeHandoffBattle = false; // the ME ended - the handoff exemption ends with it
+    coopMeBespokeHost = false; // #823: ditto for the bespoke host-drive window
   }
 }
 
@@ -50,6 +51,22 @@ let coopMeHandoffBattle = false;
 /** Whether the in-progress ME has handed off to its spawned battle (#817). */
 export function coopMeHandoffBattleStarted(): boolean {
   return coopMeHandoffBattle;
+}
+
+// #823: a BESPOKE mini-game ME (quiz/braille/footprints...) is running on the HOST while the
+// GUEST owns the encounter. The old 'safe-degrade' DISCARDED the pick and force-left (the
+// Dormant Guardian strand); until the mirroring epic lands, the host drives the mini-game
+// for real - this flag stands the host input gate down so it actually can.
+let coopMeBespokeHost = false;
+
+/** Whether a bespoke ME mini-game is being driven by the host right now (#823). */
+export function coopMeBespokeHostDrives(): boolean {
+  return coopMeBespokeHost;
+}
+
+/** Mark/clear the bespoke host-drive window (#823). */
+export function setCoopMeBespokeHostDrives(on: boolean): void {
+  coopMeBespokeHost = on;
 }
 
 /** Mark the ME battle handoff as started (host pump end + guest terminal set this). */

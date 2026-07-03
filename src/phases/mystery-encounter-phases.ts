@@ -9,6 +9,7 @@ import {
   coopMeHandoffBattleStarted,
   coopMeInProgress,
   coopMeInteractionStartValue,
+  setCoopMeBespokeHostDrives,
   setCoopMeInteractionStart,
 } from "#data/elite-redux/coop/coop-me-pin-state";
 import { COOP_ME_TERM_SEQ_BASE } from "#data/elite-redux/coop/coop-me-pump";
@@ -405,14 +406,18 @@ export class MysteryEncounterPhase extends Phase {
       // guest-owned ME would HANG the host on an un-relayed sub-screen. SAFE-DEGRADE instead: leave
       // the encounter at its default branch + close the pump, logged. Gated + closed-list; never a hang.
       if (COOP_AUTHORITATIVE_BESPOKE_SUB_ME.has(encounter.encounterType)) {
+        // #823 (live Dormant Guardian strand): the old 'safe-degrade' DISCARDED the guest's pick
+        // and force-left - the guest advanced alone while the host stranded on its intro screen.
+        // Until the bespoke mini-games are fully MIRRORED (the byte-identical epic), the HOST
+        // drives the mini-game FOR REAL: the option applies through the normal engine path, the
+        // input gate stands down for the sub-screens (flag below), the narration mirror keeps
+        // the owner informed, and the normal terminal advances BOTH clients together.
         coopWarn(
           "me",
-          `bespoke sub-UI on guest-owned ME ${MysteryEncounterType[encounter.encounterType]}; safe-degraded`,
+          `bespoke sub-UI on guest-owned ME ${MysteryEncounterType[encounter.encounterType]}: HOST drives the mini-game (#823 interim; mirroring epic pending)`,
           { seq: seqMe, index: choice.choice },
         );
-        leaveEncounterWithoutBattle();
-        coopEndMePump();
-        return;
+        setCoopMeBespokeHostDrives(true);
       }
       coopLog("me", "host applies relayed guest option programmatically", {
         seq: seqMe,
