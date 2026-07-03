@@ -1,0 +1,261 @@
+url:      https://elite-redux-staging.pages.dev/
+build:    mr57mdfj-759k
+mode:     6  wave:2
+seed:     94On5WUUuLd3SfhemZLrkkBt
+party:    Icognito(L5 16hp f28), Flamiau(L5 20hp f0), Waumpel(L5 21hp f0), Endivie(L5 20hp f0), Goldini(L5 21hp f0)
+enemy:    
+
+----- COMMENT -----
+after the me, the reward shop doesnt load for the other player. and if the other player takes a reward, it continue for the other to the next me but the other one is also stuck, there was one more dialogueline after taking the reward shop but it doesnt continue after that.
+
+----- CONSOLE -----
+[17:35:50.658] LOG: [coop:session] isCoopAuthoritativeGuestGated -> true (authoritative GUEST gates a structural mutation)
+[17:35:50.660] LOG: [coop:webrtc] raw rx role=guest t=interaction bytes=50 handlers=8
+[17:35:50.660] LOG: [coop:interaction] RECV interaction broadcast (deferred catch-up net) received=1 localBefore=1 role=guest -> no defer (local >= received)
+[17:35:50.660] WARN: [coop:interaction] CoopInteractionTurn.mergeRemote DEFER (remote=1, counter=1, pendingRemote=1) live counter UNCHANGED (folds in at next advance if still ahead)
+[17:35:50.660] LOG: [coop:owner] ownerOf(counter=1) seat=1 -> owner=guest
+[17:35:50.660] LOG: [coop:owner] ownerOf(counter=1) seat=1 -> owner=guest
+[17:35:50.660] LOG: [coop-launch] proceedIfReady launched=true localTeam=2 bothReady=true role=guest partnerReady=true
+[17:35:50.776] LOG: %cStart Phase CoopPartnerSyncPhase color:green;
+[17:35:50.776] LOG: [coop:interaction] interactionCounter() read -> 1 (role=guest)
+[17:35:50.776] LOG: %cStart Phase ReturnPhase color:green;
+[17:35:50.886] LOG: %cStart Phase ShowTrainerPhase color:green;
+[17:35:50.989] LOG: %cStart Phase NextEncounterPhase color:green;
+[17:35:50.989] LOG: [coop:stream] guest consumeEnemyParty wave=2 -> null (buffered=none)
+[17:35:50.990] LOG: [coop:stream] guest awaitEnemyParty wave=2 START timeout=120000ms
+[17:35:52.859] LOG: [coop:webrtc] raw rx role=guest t=enemyPartySync bytes=44 handlers=8
+[17:35:52.859] LOG: [coop:replay] guest RECV enemyPartySync wave=2 count=0 -> parked waiter
+[17:35:52.859] LOG: [coop:stream] guest awaitEnemyParty wave=2 RESOLVE count=0
+[17:35:52.862] LOG: [er-gauntlet] wave=2 ME type -> PART_TIMER
+[17:35:53.246] DEBUG: Session data saved to slot 2!
+[17:35:53.247] LOG: Wave Seed: ;6Qp7YWWwNf5Uhjgo\NtmmDv 2
+[17:35:56.009] LOG: [coop:session] isCoopAuthoritativeGuestGated -> true (authoritative GUEST gates a structural mutation)
+[17:35:56.010] LOG: [coop:session] isCoopAuthoritativeGuestGated -> true (authoritative GUEST gates a structural mutation)
+[17:35:56.010] LOG: [coop:session] isCoopAuthoritativeGuestGated -> true (authoritative GUEST gates a structural mutation)
+[17:35:56.010] LOG: [coop:session] isCoopAuthoritativeGuestGated -> true (authoritative GUEST gates a structural mutation)
+[17:35:56.010] LOG: [coop:session] isCoopAuthoritativeGuestGated -> true (authoritative GUEST gates a structural mutation)
+[17:35:56.010] LOG: %cStart Phase MysteryEncounterPhase color:green;
+[17:35:56.011] LOG: [coop:interaction] interactionCounter() read -> 1 (role=guest)
+[17:35:56.011] LOG: [coop:me] authoritative guest: diverting MysteryEncounterPhase -> CoopReplayMePhase {"counter":1,"wave":2}
+[17:35:56.012] LOG: [coop:me] coopSetMePinForGuest {"before":-1,"after":1}
+[17:35:56.012] LOG: [coop:me] interaction-counter -1 -> 1 (ME begin)
+[17:35:56.012] LOG: [coop:me] purged 3 stale summon-chain phases at ME divert (#813)
+[17:35:56.012] LOG: [coop:session] isCoopAuthoritativeGuestGated -> true (authoritative GUEST gates a structural mutation)
+[17:35:56.012] LOG: %cStart Phase InitEncounterPhase color:green;
+[17:35:56.012] LOG: %cStart Phase CoopReplayMePhase color:green;
+[17:35:56.012] LOG: [coop:me] guest diverted into CoopReplayMePhase {"counter":1,"seqMe":8000001,"seqTerm":9000001,"wave":2}
+[17:35:56.012] LOG: [coop:stream] guest REGISTER onMeMessage handler (was=false)
+[17:35:56.012] LOG: [coop:me] await host presentation (mePresent) {"seq":8000001,"timeoutMs":1200000}
+[17:35:56.012] LOG: [coop:relay] AWAIT interactionOutcome seq=8000001 timeoutMs=1200000 -> network-wait
+[17:35:58.403] LOG: [coop:webrtc] raw rx role=guest t=meChecksum bytes=62 handlers=8
+[17:35:58.403] LOG: [coop:checksum] watcher RECV meChecksum seq=8000001 checksum=4d10173c3e1353c8
+[17:35:58.403] LOG: [coop:checksum] capture digest=4d10173c3e1353c8 field=1 biome=0 seed=94On5WUUuLd3SfhemZLrkkBt weather=0 terrain=0 money=1000 party=[201,725,265,152,118] partyLevels=[5,5,5,5,5] arenaTags=0 modifiers=2 heldItemsDigest=1 pokeballs=[0:5,1:0,2:0,3:0,4:0] mons=[bi0:sp201/hp16-22/st0/ab107/form28/tera0:13/boss0:0]
+[17:35:58.403] LOG: [coop:checksum] recv meChecksum seq=8000001 MATCH owner=4d10173c3e1353c8 watcher=4d10173c3e1353c8
+[17:35:58.403] LOG: [coop:webrtc] raw rx role=guest t=interactionOutcome bytes=297 handlers=8
+[17:35:58.403] LOG: [coop:relay] RECV interactionOutcome seq=8000001 -> deliver-to-waiter k=mePresent opts=3
+[17:35:58.403] LOG: [coop:relay] AWAIT interactionOutcome seq=8000001 RESOLVE k=mePresent opts=3
+[17:35:58.403] LOG: [coop:me] adopted host presentation {"seq":8000001,"opts":3,"labels":3,"tokens":4}
+[17:35:58.403] LOG: [coop:owner] ownerOf(counter=1) seat=1 -> owner=guest
+[17:35:58.403] LOG: [coop:owner] isLocalOwnerAtCounter(pinnedCounter=1) parity=1 owner=guest role=guest -> true
+[17:35:58.403] LOG: [coop:me] ME ownership resolved {"counter":1,"ownsMe":true,"branch":"guest renders selector + relays picks"}
+[17:36:00.840] LOG: [coop:owner] ownerOf(counter=1) seat=1 -> owner=guest
+[17:36:00.840] LOG: [coop:owner] isLocalOwnerAtCounter(pinnedCounter=1) parity=1 owner=guest role=guest -> true
+[17:36:00.841] LOG: [coop:webrtc] raw tx role=guest t=meCursor bytes=26
+[17:36:01.275] LOG: [coop:owner] ownerOf(counter=1) seat=1 -> owner=guest
+[17:36:01.275] LOG: [coop:owner] isLocalOwnerAtCounter(pinnedCounter=1) parity=1 owner=guest role=guest -> true
+[17:36:01.275] LOG: [coop:webrtc] raw tx role=guest t=meCursor bytes=26
+[17:36:01.536] LOG: [coop:owner] ownerOf(counter=1) seat=1 -> owner=guest
+[17:36:01.536] LOG: [coop:owner] isLocalOwnerAtCounter(pinnedCounter=1) parity=1 owner=guest role=guest -> true
+[17:36:01.536] LOG: [coop:webrtc] raw tx role=guest t=meCursor bytes=26
+[17:36:01.876] LOG: [coop:owner] ownerOf(counter=1) seat=1 -> owner=guest
+[17:36:01.876] LOG: [coop:owner] isLocalOwnerAtCounter(pinnedCounter=1) parity=1 owner=guest role=guest -> true
+[17:36:01.876] LOG: [coop:webrtc] raw tx role=guest t=meCursor bytes=26
+[17:36:02.103] LOG: [coop:owner] ownerOf(counter=1) seat=1 -> owner=guest
+[17:36:02.103] LOG: [coop:owner] isLocalOwnerAtCounter(pinnedCounter=1) parity=1 owner=guest role=guest -> true
+[17:36:02.103] LOG: [coop:webrtc] raw tx role=guest t=meCursor bytes=26
+[17:36:02.381] LOG: [coop:owner] ownerOf(counter=1) seat=1 -> owner=guest
+[17:36:02.381] LOG: [coop:owner] isLocalOwnerAtCounter(pinnedCounter=1) parity=1 owner=guest role=guest -> true
+[17:36:02.381] LOG: [coop:webrtc] raw tx role=guest t=meCursor bytes=26
+[17:36:03.510] LOG: [coop:owner] ownerOf(counter=1) seat=1 -> owner=guest
+[17:36:03.510] LOG: [coop:owner] isLocalOwnerAtCounter(pinnedCounter=1) parity=1 owner=guest role=guest -> true
+[17:36:03.510] LOG: [coop:webrtc] raw tx role=guest t=meCursor bytes=26
+[17:36:03.751] LOG: [coop:owner] ownerOf(counter=1) seat=1 -> owner=guest
+[17:36:03.751] LOG: [coop:owner] isLocalOwnerAtCounter(pinnedCounter=1) parity=1 owner=guest role=guest -> true
+[17:36:03.751] LOG: [coop:webrtc] raw tx role=guest t=meCursor bytes=26
+[17:36:03.811] LOG: [coop:owner] ownerOf(counter=1) seat=1 -> owner=guest
+[17:36:03.811] LOG: [coop:owner] isLocalOwnerAtCounter(pinnedCounter=1) parity=1 owner=guest role=guest -> true
+[17:36:03.811] LOG: [coop:webrtc] raw tx role=guest t=meCursor bytes=26
+[17:36:04.278] LOG: [coop:owner] ownerOf(counter=1) seat=1 -> owner=guest
+[17:36:04.278] LOG: [coop:owner] isLocalOwnerAtCounter(pinnedCounter=1) parity=1 owner=guest role=guest -> true
+[17:36:04.278] LOG: [coop:webrtc] raw tx role=guest t=meCursor bytes=26
+[17:36:04.514] LOG: [coop:owner] ownerOf(counter=1) seat=1 -> owner=guest
+[17:36:04.514] LOG: [coop:owner] isLocalOwnerAtCounter(pinnedCounter=1) parity=1 owner=guest role=guest -> true
+[17:36:04.514] LOG: [coop:webrtc] raw tx role=guest t=meCursor bytes=26
+[17:36:05.143] LOG: [coop:owner] ownerOf(counter=1) seat=1 -> owner=guest
+[17:36:05.143] LOG: [coop:owner] isLocalOwnerAtCounter(pinnedCounter=1) parity=1 owner=guest role=guest -> true
+[17:36:05.143] LOG: [coop:webrtc] raw tx role=guest t=meCursor bytes=26
+[17:36:05.402] LOG: [coop:owner] ownerOf(counter=1) seat=1 -> owner=guest
+[17:36:05.402] LOG: [coop:owner] isLocalOwnerAtCounter(pinnedCounter=1) parity=1 owner=guest role=guest -> true
+[17:36:05.402] LOG: [coop:webrtc] raw tx role=guest t=meCursor bytes=26
+[17:36:05.814] LOG: [coop:me] guest relays top-level ME pick {"seq":8000001,"kind":"me","index":2}
+[17:36:05.814] LOG: [coop:relay] SEND interactionChoice seq=8000001 kind=me choice=2 data=-
+[17:36:05.815] LOG: [coop:webrtc] raw tx role=guest t=interactionChoice bytes=62
+[17:36:05.815] LOG: [coop:me] await host outcome (mePresent subPrompt / meResync) racing terminal {"seq":8000001,"seqTerm":9000001,"timeoutMs":1200000}
+[17:36:05.815] LOG: [coop:relay] AWAIT interactionOutcome seq=8000001 timeoutMs=1200000 -> network-wait
+[17:36:05.815] LOG: [coop:relay] AWAIT interactionChoice seq=9000001 timeoutMs=1200000 -> network-wait
+[17:36:05.820] LOG: [coop:webrtc] raw rx role=guest t=meMessage bytes=109 handlers=8
+[17:36:05.820] LOG: [coop:stream] guest RECV meMessage len=82 -> handler
+[17:36:05.820] LOG: [coop:me] ui: host streams ME narration (showText) {"len":82,"preview":"Your Chikorita spends the day using Swee"}
+[17:36:08.424] LOG: [coop:interaction] interactionCounter() read -> 1 (role=guest)
+[17:36:08.424] LOG: [coop:health] tick=0g turn=1 wave=2 counter=1 wait=2608ms peerBeat=- transport=connected
+[17:36:08.449] LOG: [coop:webrtc] raw rx role=guest t=meMessage bytes=93 handlers=8
+[17:36:08.449] LOG: [coop:stream] guest RECV meMessage len=65 -> handler
+[17:36:08.449] LOG: [coop:me] ui: host streams ME narration (showText) {"len":65,"preview":"Thanks for the assistance!\nYour Chikorit"}
+[17:36:10.730] LOG: [coop:webrtc] raw rx role=guest t=meMessage bytes=57 handlers=8
+[17:36:10.730] LOG: [coop:stream] guest RECV meMessage len=30 -> handler
+[17:36:10.730] LOG: [coop:me] ui: host streams ME narration (showText) {"len":30,"preview":"Here’s your check for the day."}
+[17:36:11.175] LOG: [coop:webrtc] raw rx role=guest t=meMessage bytes=45 handlers=8
+[17:36:11.175] LOG: [coop:stream] guest RECV meMessage len=18 -> handler
+[17:36:11.175] LOG: [coop:me] ui: host streams ME narration (showText) {"len":18,"preview":"You received ₽480!"}
+[17:36:12.411] LOG: [coop:webrtc] raw rx role=guest t=meMessage bytes=97 handlers=8
+[17:36:12.411] LOG: [coop:stream] guest RECV meMessage len=69 -> handler
+[17:36:12.411] LOG: [coop:me] ui: host streams ME narration (showText) {"len":69,"preview":"Your Chikorita is worn out!\nThe PP of al"}
+[17:36:12.622] LOG: [coop:webrtc] raw rx role=guest t=rewardOptions bytes=253 handlers=8
+[17:36:12.623] LOG: [coop:relay] RECV rewardOptions key=1:0 -> BUFFER rewardOptionsInbox (latest-wins) count=3
+[17:36:13.201] LOG: [coop:webrtc] raw rx role=guest t=meMessage bytes=27 handlers=8
+[17:36:13.201] LOG: [coop:stream] guest RECV meMessage len=0 -> handler
+[17:36:13.201] LOG: [coop:me] ui: host streams ME narration (showText) {"len":0,"preview":""}
+[17:36:13.202] LOG: [coop:webrtc] raw rx role=guest t=meMessage bytes=27 handlers=8
+[17:36:13.202] LOG: [coop:stream] guest RECV meMessage len=0 -> handler
+[17:36:13.202] LOG: [coop:me] ui: host streams ME narration (showText) {"len":0,"preview":""}
+[17:36:18.424] LOG: [coop:webrtc] raw tx role=guest t=stallBeat bytes=35
+[17:36:36.323] LOG: [coop:webrtc] raw tx role=guest t=stallBeat bytes=35
+[17:36:37.949] LOG: [coop:webrtc] raw rx role=guest t=meMessage bytes=27 handlers=8
+[17:36:37.949] LOG: [coop:stream] guest RECV meMessage len=0 -> handler
+[17:36:37.949] LOG: [coop:me] ui: host streams ME narration (showText) {"len":0,"preview":""}
+[17:36:37.951] LOG: [coop:webrtc] raw rx role=guest t=uiInput bytes=50 handlers=8
+[17:36:38.118] LOG: [coop:webrtc] raw rx role=guest t=meMessage bytes=27 handlers=8
+[17:36:38.118] LOG: [coop:stream] guest RECV meMessage len=0 -> handler
+[17:36:38.121] LOG: [coop:me] ui: host streams ME narration (showText) {"len":0,"preview":""}
+[17:36:38.123] LOG: [coop:webrtc] raw rx role=guest t=uiInput bytes=50 handlers=8
+[17:36:38.424] LOG: [coop:interaction] interactionCounter() read -> 1 (role=guest)
+[17:36:38.424] LOG: [coop:health] tick=0g turn=1 wave=2 counter=1 wait=32608ms peerBeat=- transport=connected
+[17:36:38.424] LOG: [coop:webrtc] raw tx role=guest t=stallBeat bytes=35
+[17:36:38.498] LOG: [coop:webrtc] raw rx role=guest t=meMessage bytes=27 handlers=8
+[17:36:38.498] LOG: [coop:stream] guest RECV meMessage len=0 -> handler
+[17:36:38.498] LOG: [coop:me] ui: host streams ME narration (showText) {"len":0,"preview":""}
+[17:36:38.499] LOG: [coop:webrtc] raw rx role=guest t=uiInput bytes=50 handlers=8
+[17:36:38.687] LOG: [coop:webrtc] raw rx role=guest t=meMessage bytes=27 handlers=8
+[17:36:38.687] LOG: [coop:stream] guest RECV meMessage len=0 -> handler
+[17:36:38.687] LOG: [coop:me] ui: host streams ME narration (showText) {"len":0,"preview":""}
+[17:36:38.687] LOG: [coop:webrtc] raw rx role=guest t=uiInput bytes=50 handlers=8
+[17:36:39.052] LOG: [coop:webrtc] raw rx role=guest t=meMessage bytes=27 handlers=8
+[17:36:39.052] LOG: [coop:stream] guest RECV meMessage len=0 -> handler
+[17:36:39.052] LOG: [coop:me] ui: host streams ME narration (showText) {"len":0,"preview":""}
+[17:36:39.054] LOG: [coop:webrtc] raw rx role=guest t=uiInput bytes=50 handlers=8
+[17:36:39.236] LOG: [coop:webrtc] raw rx role=guest t=meMessage bytes=27 handlers=8
+[17:36:39.236] LOG: [coop:stream] guest RECV meMessage len=0 -> handler
+[17:36:39.236] LOG: [coop:me] ui: host streams ME narration (showText) {"len":0,"preview":""}
+[17:36:39.237] LOG: [coop:webrtc] raw rx role=guest t=uiInput bytes=50 handlers=8
+[17:36:39.522] LOG: [coop:webrtc] raw rx role=guest t=meMessage bytes=27 handlers=8
+[17:36:39.522] LOG: [coop:stream] guest RECV meMessage len=0 -> handler
+[17:36:39.523] LOG: [coop:me] ui: host streams ME narration (showText) {"len":0,"preview":""}
+[17:36:39.523] LOG: [coop:webrtc] raw rx role=guest t=uiInput bytes=50 handlers=8
+[17:36:39.680] LOG: [coop:webrtc] raw rx role=guest t=meMessage bytes=27 handlers=8
+[17:36:39.680] LOG: [coop:stream] guest RECV meMessage len=0 -> handler
+[17:36:39.680] LOG: [coop:me] ui: host streams ME narration (showText) {"len":0,"preview":""}
+[17:36:39.680] LOG: [coop:webrtc] raw rx role=guest t=uiInput bytes=50 handlers=8
+[17:36:40.134] LOG: [coop:webrtc] raw rx role=guest t=meMessage bytes=27 handlers=8
+[17:36:40.134] LOG: [coop:stream] guest RECV meMessage len=0 -> handler
+[17:36:40.134] LOG: [coop:me] ui: host streams ME narration (showText) {"len":0,"preview":""}
+[17:36:40.135] LOG: [coop:webrtc] raw rx role=guest t=uiInput bytes=50 handlers=8
+[17:36:40.303] LOG: [coop:webrtc] raw rx role=guest t=meMessage bytes=27 handlers=8
+[17:36:40.304] LOG: [coop:stream] guest RECV meMessage len=0 -> handler
+[17:36:40.304] LOG: [coop:me] ui: host streams ME narration (showText) {"len":0,"preview":""}
+[17:36:40.304] LOG: [coop:webrtc] raw rx role=guest t=uiInput bytes=50 handlers=8
+[17:36:40.578] LOG: [coop:webrtc] raw rx role=guest t=meMessage bytes=27 handlers=8
+[17:36:40.578] LOG: [coop:stream] guest RECV meMessage len=0 -> handler
+[17:36:40.578] LOG: [coop:me] ui: host streams ME narration (showText) {"len":0,"preview":""}
+[17:36:40.579] LOG: [coop:webrtc] raw rx role=guest t=uiInput bytes=51 handlers=8
+[17:36:40.733] LOG: [coop:webrtc] raw rx role=guest t=meMessage bytes=27 handlers=8
+[17:36:40.733] LOG: [coop:stream] guest RECV meMessage len=0 -> handler
+[17:36:40.733] LOG: [coop:me] ui: host streams ME narration (showText) {"len":0,"preview":""}
+[17:36:40.734] LOG: [coop:webrtc] raw rx role=guest t=uiInput bytes=51 handlers=8
+[17:36:41.182] LOG: [coop:webrtc] raw rx role=guest t=uiInput bytes=51 handlers=8
+[17:36:42.526] LOG: [coop:webrtc] raw rx role=guest t=meMessage bytes=65 handlers=8
+[17:36:42.527] LOG: [coop:stream] guest RECV meMessage len=38 -> handler
+[17:36:42.527] LOG: [coop:me] ui: host streams ME narration (showText) {"len":38,"preview":"Come back and help out again sometime!"}
+[17:36:43.424] LOG: [coop:webrtc] raw tx role=guest t=stallBeat bytes=35
+[17:36:46.195] LOG: [coop:webrtc] raw rx role=guest t=interactionOutcome bytes=24067 handlers=8
+[17:36:46.195] LOG: [coop:relay] RECV interactionOutcome seq=8000001 -> deliver-to-waiter k=meResync
+[17:36:46.195] LOG: [coop:relay] AWAIT interactionOutcome seq=8000001 RESOLVE k=meResync
+[17:36:46.196] LOG: [coop:me] host sent comprehensive outcome (meResync); applying {"seq":8000001}
+[17:36:46.196] LOG: [coop:resync] guest applyFullSnapshot field=1 weather=0 terrain=0 arenaTags=0 modifiers=3 party=5 money=1480 suppressResummon=false
+[17:36:46.198] WARN: [coop:heal] money host=1480 guest=1000 -> applied
+[17:36:46.199] LOG: [coop:resync] guest applyFullSnapshot DONE authoritativeGuest=false suppressResummon=false
+[17:36:46.208] LOG: [coop:webrtc] raw rx role=guest t=interactionChoice bytes=66 handlers=8
+[17:36:46.208] LOG: [coop:relay] RECV interactionChoice seq=9000001 -> deliver-to-waiter choice=-1 data=-
+[17:36:46.208] LOG: [coop:relay] AWAIT interactionChoice seq=9000001 RESOLVE choice=-1 data=-
+[17:36:46.209] LOG: [coop:me] host terminal resolved {"seqTerm":9000001,"action":-1,"isHandoff":false}
+[17:36:46.209] LOG: [coop:me] ME terminal: leaving encounter locally + advancing alternation {"counter":1}
+[17:36:46.209] LOG: [coop:stream] guest UNREGISTER onMeMessage handler (null-out)
+[17:36:46.210] LOG: [coop:session] isCoopAuthoritativeGuestGated -> true (authoritative GUEST gates a structural mutation)
+[17:36:46.210] LOG: [coop:session] isCoopAuthoritativeGuestGated -> true (authoritative GUEST gates a structural mutation)
+[17:36:46.210] LOG: [coop:interaction] CoopInteractionTurn.advance INCREMENT (fromCounter=1) counter 1 -> 2
+[17:36:46.210] LOG: [coop:interaction] advanceInteraction ADVANCED+BROADCAST (fromCounter=1) counter 1 -> 2 role=guest; send interaction screen=__turn__ choice=2
+[17:36:46.210] LOG: [coop:webrtc] raw tx role=guest t=interaction bytes=50
+[17:36:46.211] LOG: [coop:owner] ownerOf(counter=2) seat=0 -> owner=host
+[17:36:46.211] LOG: [coop:owner] ownerOf(counter=2) seat=0 -> owner=host
+[17:36:46.211] LOG: [coop-launch] proceedIfReady launched=true localTeam=2 bothReady=true role=guest partnerReady=true
+[17:36:46.212] LOG: %cStart Phase MysteryEncounterRewardsPhase color:green;
+[17:36:46.212] LOG: [coop:me] reward-owner override: guest runs reward shop as WATCHER (host=owner) {"counter":1,"hasDoEncounterRewards":false,"addHealPhase":false}
+[17:36:46.212] LOG: [coop:session] isCoopAuthoritativeGuestGated -> true (authoritative GUEST gates a structural mutation)
+[17:36:46.212] LOG: %cStart Phase EggLapsePhase color:green;
+[17:36:46.212] LOG: %cStart Phase PostMysteryEncounterPhase color:green;
+[17:36:46.212] LOG: [coop:me] authoritative guest: PostMysteryEncounterPhase terminal (clearing pin) {"counter":1}
+[17:36:46.212] LOG: [coop:me] coopClearMePinForGuest {"before":1,"after":-1}
+[17:36:46.212] LOG: [coop:me] interaction-counter 1 -> -1 (ME end)
+[17:36:46.212] LOG: %cStart Phase TurnInitPhase color:green;
+[17:36:46.213] LOG: [coop:session] isCoopAuthoritativeGuestGated -> true (authoritative GUEST gates a structural mutation)
+[17:36:46.213] LOG: [coop:session] isCoopAuthoritativeGuestGated -> true (authoritative GUEST gates a structural mutation)
+[17:36:46.213] LOG: %cStart Phase CommandPhase color:green;
+[17:36:46.213] LOG: [coop:stream] guest consumeEnemyParty wave=2 -> null (buffered=none)
+[17:36:46.214] LOG: [coop:battle] CommandPhase slot=0 turn=1 owner=host role=guest -> partner path
+[17:36:46.214] LOG: %cStart Phase TurnStartPhase color:green;
+[17:36:46.215] LOG: [coop:session] isCoopAuthoritativeGuestGated -> true (authoritative GUEST gates a structural mutation)
+[17:36:46.215] LOG: %cStart Phase CoopReplayTurnPhase color:green;
+[17:36:46.215] LOG: [coop:replay] guest replay turn=1: live pump start (awaiting host events/resolution)
+[17:36:46.215] LOG: [coop:replay] guest awaitTurn turn=1 START timeout=1200000ms
+[17:36:46.215] LOG: [coop:webrtc] raw rx role=guest t=interaction bytes=50 handlers=8
+[17:36:46.215] LOG: [coop:interaction] RECV interaction broadcast (deferred catch-up net) received=2 localBefore=2 role=guest -> no defer (local >= received)
+[17:36:46.215] WARN: [coop:interaction] CoopInteractionTurn.mergeRemote DEFER (remote=2, counter=2, pendingRemote=2) live counter UNCHANGED (folds in at next advance if still ahead)
+[17:36:46.216] LOG: [coop:owner] ownerOf(counter=2) seat=0 -> owner=host
+[17:36:46.216] LOG: [coop:owner] ownerOf(counter=2) seat=0 -> owner=host
+[17:36:46.216] LOG: [coop-launch] proceedIfReady launched=true localTeam=2 bothReady=true role=guest partnerReady=true
+[17:36:48.021] LOG: [coop:webrtc] raw rx role=guest t=enemyPartySync bytes=44 handlers=8
+[17:36:48.021] LOG: [coop:replay] guest RECV enemyPartySync wave=3 count=0 -> buffered (no waiter)
+[17:36:52.378] LOG: [coop:webrtc] raw rx role=guest t=meChecksum bytes=62 handlers=8
+[17:36:52.378] LOG: [coop:checksum] watcher RECV meChecksum seq=8000002 checksum=f5e845f20d842e20
+[17:36:52.379] LOG: [coop:checksum] capture digest=eaebccb192330974 field=1 biome=0 seed=94On5WUUuLd3SfhemZLrkkBt weather=0 terrain=0 money=1480 party=[201,725,265,152,118] partyLevels=[5,5,5,5,5] arenaTags=0 modifiers=2 heldItemsDigest=1 pokeballs=[0:5,1:0,2:0,3:0,4:0] mons=[bi0:sp201/hp16-22/st0/ab107/form28/tera0:13/boss0:0]
+[17:36:52.379] WARN: [coop:checksum] me-entry MISMATCH seq=8000002 owner=f5e845f20d842e20 watcher=eaebccb192330974 -> requesting stateSync
+[17:36:52.379] LOG: [coop:resync] await stateSync start seq=8000002
+[17:36:52.379] LOG: [coop:resync] guest requestStateSync turn=8000002 seq=1 START timeout=1200000ms
+[17:36:52.379] LOG: [coop:webrtc] raw tx role=guest t=requestStateSync bytes=47
+[17:36:52.379] LOG: [coop:webrtc] raw rx role=guest t=interactionOutcome bytes=227 handlers=8
+[17:36:52.379] LOG: [coop:relay] RECV interactionOutcome seq=8000002 -> BUFFER outcomeInbox depth=1 k=mePresent opts=3
+[17:36:52.383] LOG: [coop:webrtc] raw rx role=guest t=stateSync bytes=6355 handlers=8
+[17:36:52.383] LOG: [coop:resync] guest RECV stateSync seq=1 blobLen=6320 -> parked waiter
+[17:36:52.383] LOG: [coop:resync] guest requestStateSync turn=8000002 seq=1 RESOLVE blobLen=6320
+[17:36:52.383] LOG: [coop:resync] await stateSync resolve seq=8000002 blob=6320b -> applying
+[17:36:52.386] LOG: [coop:resync] guest applyFullSnapshot field=1 weather=0 terrain=0 arenaTags=0 modifiers=3 party=5 money=1480 suppressResummon=false
+[17:36:52.386] WARN: [coop:heal] heldItems monId=1614291244 bi=0 removed=[BERRY] added=[BERRY,BASE_STAT_BOOSTER] -> applied
+[17:36:52.386] WARN: [coop:heal] heldItems bi=0 host=[BERRY,BASE_STAT_BOOSTER] -> applied (rewrote to host set)
+[17:36:52.386] LOG: Applied Kalzium 
+[17:36:52.387] LOG: Applied Kalzium 
+[17:36:52.388] WARN: [coop:heal] waveSeed host=<7Rq8ZXXxOg6Vikhp]OunnEw guest=;6Qp7YWWwNf5Uhjgo\NtmmDv -> applied
+[17:36:52.388] LOG: [coop:heal] benchParty reconcile host=5 mons guest=5 -> applyCaptureParty
+[17:36:52.389] LOG: [coop:party] guest applied capture party: 5 mons (kept=5 added=0 released=0 onFieldSafety=0, host target=5)
+[17:36:52.389] LOG: [coop:resync] guest applyFullSnapshot DONE authoritativeGuest=true suppressResummon=false
+[17:36:52.389] LOG: [coop:checksum] capture digest=f5e845f20d842e20 field=1 biome=0 seed=94On5WUUuLd3SfhemZLrkkBt weather=0 terrain=0 money=1480 party=[201,725,265,152,118] partyLevels=[5,5,5,5,5] arenaTags=0 modifiers=3 heldItemsDigest=2 pokeballs=[0:5,1:0,2:0,3:0,4:0] mons=[bi0:sp201/hp16-22/st0/ab107/form28/tera0:13/boss0:0]
+[17:36:52.389] LOG: [coop:resync] me-entry seq=8000002 ok (healed=f5e845f20d842e20)
+[17:36:58.424] LOG: [coop:webrtc] raw tx role=guest t=stallBeat bytes=35
