@@ -1419,6 +1419,82 @@ export async function driveGuestMeReplay(guestScene: MeReplayPumpScene): Promise
   return drainGuestMeReplayToSettle(replay);
 }
 
+/** The private CoopReplayMePhase seam the repeated-round harness inspects (#831, established cast form). */
+interface GuestMeRoundSeam {
+  /** How many REPEATED option-select rounds (bare re-fired mePresents) the phase re-rendered. */
+  newRoundsRendered: number;
+  /** Whether the single terminal guard has fired (the phase left/ended exactly once). */
+  settled: boolean;
+}
+
+/**
+ * #831 (audit P0#1, GROUP REPEAT): drain a guest {@linkcode CoopReplayMePhase} that is consuming a
+ * REPEATED option-select ME (a press-your-luck delve / Safari) until it has re-rendered `expected` new
+ * rounds - the bare re-fired `mePresent`s the host streamed for each "descend again? / dig again?" round.
+ * The guest must render each round and PARK (NOT settle) because the host's terminal (meResync + LEAVE) is
+ * only sent AFTER the last round (STEP C in the duo recipe). Returns the observed count so the caller can
+ * assert lockstep with the host's stream. Bails early (returns the count) if the phase settles - so a
+ * REGRESSION (the old stray -> terminal fall-through, which settles after ZERO new rounds) is caught by the
+ * caller's `expect(newRounds).toBe(expected)` rather than hanging here. MUST be called inside
+ * withClient(guestCtx, ...) AFTER the host has streamed the round presentations (they drain with zero wait).
+ */
+export async function drainGuestMeReplayNewRounds(replay: Phase, expected: number): Promise<number> {
+  const seam = replay as unknown as GuestMeRoundSeam;
+  for (let i = 0; i < 24; i++) {
+    await drainLoopback();
+    if (seam.newRoundsRendered >= expected || seam.settled) {
+      break;
+    }
+  }
+  return seam.newRoundsRendered;
+}
+
+// ---------------------------------------------------------------------------
+// #828 GUEST-OWNED ME embedded reward shop (the reward-pick OWNER flips to the GUEST). On a guest-owned
+// ME the reward shop's two authorities SPLIT: the HOST is the OPTION owner (the sole ME engine rolls +
+// STREAMS the pool) but the reward-pick WATCHER, while the GUEST (the ME owner) ADOPTS the streamed
+// options and OWNS the interactive pick, relaying it for the host to apply. These helpers drive that
+// split across the two engines with the same cross-ctx discipline as the top-level ME pick handshake
+// (owner send under withClientSync, watcher apply under a later drain in the owner's ctx).
+// ---------------------------------------------------------------------------
+
+/**
+ * Build the GUEST's OWN embedded reward-shop {@linkcode SelectModifierPhase} and START it as the reward
+ * pick OWNER (#828). Because the shop pins the (odd) ME interaction counter, its start() resolves the pick
+ * to the ME owner (the guest) and, since the HOST is the reward OPTION owner, ADOPTS the host's streamed
+ * option list (buffer-hit) before opening the interactive owner screen. Drains under the guest ctx until
+ * the adopt lands (typeOptions filled). Returns the shop seam so the caller can assert `coopWatcher ===
+ * false` (the guest DRIVES) and relay the leave/pick. MUST be called inside withClient(guestCtx) AFTER the
+ * host's embedded shop has started + streamed its options (so the adopt buffer-hits). Does NOT end the
+ * detached phase: the guest's live CoopReplayMePhase owns the ME terminal (leave + advance), so ending
+ * this detached artifact would shiftPhase() that live phase off the queue.
+ */
+export async function startGuestMeShopOwner(guestScene: BattleScene): Promise<ShopPhaseSeam> {
+  const shop = guestScene.phaseManager.create("SelectModifierPhase") as unknown as ShopPhaseSeam;
+  shop.start();
+  // The owner path is async (adopt the host's streamed options -> open the screen); drain until it lands.
+  for (let i = 0; i < 8; i++) {
+    await drainLoopback();
+    if ((shop.typeOptions as unknown[]).length > 0) {
+      break;
+    }
+  }
+  return shop;
+}
+
+/**
+ * Relay the GUEST reward-shop OWNER's LEAVE synchronously (#828) - the SEND ONLY, without flushing the
+ * loopback, so the HOST's reward pick-WATCHER await resolves UNDER the host ctx on the next drain (the
+ * cross-ctx footgun the top-level pick handshake also dodges). Mirrors the leave path of
+ * {@linkcode driveHostRewardShopOwner} (coopEndMirror + coopRelaySend(LEAVE)) but deliberately does NOT
+ * end() the detached guest shop (see {@linkcode startGuestMeShopOwner}) nor advance the counter (the ME
+ * owns the single advance - MAJOR-3 no-ops it anyway). MUST be called inside withClientSync(guestCtx).
+ */
+export function relayGuestMeShopLeaveSync(guestShop: ShopPhaseSeam): void {
+  guestShop.coopEndMirror();
+  guestShop.coopRelaySend(/* COOP_INTERACTION_LEAVE */ -1, undefined, "skip");
+}
+
 // ---------------------------------------------------------------------------
 // #818 co-op QUIZ MIRRORING (guest FOLLOW side). An embedded-quiz ME (Sealed Door / Guessing
 // Booth / Scrambled Pokedex / footprint hunt / cipher / braille / Salvage Yard) hands off to a

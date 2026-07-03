@@ -590,13 +590,6 @@ export class CoopInteractionRelay {
       if (waiter) {
         if (isCoopDebug()) {
           coopLog("relay", `RECV rewardOptions key=${key} -> deliver-to-waiter count=${msg.options.length}`);
-          // #821: notify a live listener (the guest's CoopReplayMePhase) that an embedded
-          // ME reward shop just opened on the owner's engine - the watcher must open its own.
-          try {
-            this.onRewardOptionsBuffered?.(key);
-          } catch {
-            /* cosmetic notification - never break the buffer path */
-          }
         }
         waiter(msg.options);
         return;
@@ -608,6 +601,16 @@ export class CoopInteractionRelay {
           "relay",
           `RECV rewardOptions key=${key} -> BUFFER rewardOptionsInbox (latest-wins) count=${msg.options.length}`,
         );
+      }
+      // #821/#830 (audit P0#3): notify the live listener (the guest's CoopReplayMePhase) that an
+      // embedded ME reward shop opened on the owner's engine with NO local consumer - the shop
+      // handoff. This fires UNCONDITIONALLY on the buffer branch: the old placement (inside the
+      // waiter branch, behind isCoopDebug) contradicted its own doc and only ever worked because
+      // COOP_DEBUG_DEFAULT is true - a latent strand for any production build that flips it.
+      try {
+        this.onRewardOptionsBuffered?.(key);
+      } catch {
+        /* the notification must never break the buffer path */
       }
       return;
     }

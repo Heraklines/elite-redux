@@ -131,18 +131,31 @@ function coopCheckOpName(op: number): string {
 const COOP_REWARD_WAIT_MS = 1_200_000;
 
 /**
- * Co-op (#633 BLOCK-1 / CHANGE-2): inside an AUTHORITATIVE mystery encounter the HOST is the SOLE
- * engine and granted the actual rewards, so the HOST must OWN the embedded ME reward shop and the
- * GUEST must WATCH it - regardless of whose ALTERNATING turn the ME itself is. Without this override
- * a guest-owned ME would make the GUEST the reward owner: it would roll a luck/party-divergent pool
- * and stream it to the host, granting items the host never rolled. Outside an ME (the normal wave
- * shop) this returns null and the existing {@linkcode isLocalOwnerAtCounter} alternation stands
- * BYTE-IDENTICAL. The spoof/hotseat path (local human owns everything) is also left unchanged.
+ * Co-op (#633 / #828): inside an AUTHORITATIVE mystery encounter the embedded reward shop's two
+ * authorities SPLIT (they coincide for every normal wave shop, so this is null outside an ME):
+ *  - OPTION authority (roll the pool + STREAM it, vs adopt the streamed list): ALWAYS the HOST. The
+ *    host is the SOLE ME engine; the guest diverted into CoopReplayMePhase never ran the encounter, so
+ *    a guest-rolled pool would diverge (party luck + a diverged shared RNG cursor) from the rewards the
+ *    host actually grants. So the HOST rolls + streams and the GUEST adopts the list, regardless of who
+ *    OWNS the ME. THIS is the only thing the override controls.
+ *  - PICK authority (drive the interactive pick + relay it, vs apply the relayed pick) is resolved
+ *    SEPARATELY by the existing {@linkcode isLocalOwnerAtCounter} alternation on the shop's PINNED
+ *    counter - which inside an ME EQUALS the ME's pinned counter, so it already resolves to the ME
+ *    OWNER. So the pick needs NO override: the ME owner drives + relays, the other side applies.
  *
- * Returns: `true` => this client is the forced reward OWNER; `false` => forced WATCHER; `null` => no
- * override (outside an authoritative ME / solo / lockstep / hotseat).
+ * The #828 fix: the maintainer OWNED a guest-side ME but the relic/reward pick behaved as the host's,
+ * because the OLD override forced BOTH authorities to the host. Splitting them keeps the correct (host)
+ * option source AND hands the interactive pick to the ME owner, reusing the wave-shop owner/watcher
+ * machinery: the option owner (host) streams; the pick owner (ME owner) drives + relays; the pick
+ * watcher (the other side) applies. On a guest-owned ME the HOST is the option OWNER but the pick
+ * WATCHER, and the GUEST is the option WATCHER (adopts) but the pick OWNER (drives) - the two axes
+ * genuinely split, and the phase handles both combinations below.
+ *
+ * Returns the OPTION authority: `true` => THIS client rolls + streams the pool; `false` => THIS client
+ * adopts the streamed list; `null` => no override (normal wave shop: the counter-parity owner rolls its
+ * own pool, byte-identical to before). The spoof/hotseat path (local human owns everything) is null too.
  */
-function coopMeRewardOwnerOverride(): boolean | null {
+function coopMeRewardOptionOwnerOverride(): boolean | null {
   if (!globalScene.gameMode.isCoop || getCoopNetcodeMode() !== "authoritative") {
     return null;
   }
@@ -167,6 +180,15 @@ export class SelectModifierPhase extends BattlePhase {
   // ---- Co-op alternating reward shop (#633) ----
   /** True only on the WATCHER's phase: it replays the owner's relayed picks with NO interactive UI. */
   private coopWatcher = false;
+  /**
+   * Co-op (#828) OPTION axis (distinct from the pick axis {@linkcode coopWatcher}): true => this client
+   * ADOPTS the owner's streamed reward-option list; false => it ROLLED its own + streams it. For a
+   * normal wave shop the option axis == the pick axis; inside a guest-owned ME they SPLIT (the HOST
+   * rolls+streams even though it WATCHES the pick, and the GUEST adopts even though it OWNS the pick).
+   * Set in {@linkcode start}; read by {@linkcode startCoopWatch} to skip the adopt when this client is
+   * the option owner (the host on a guest-owned ME keeps its own rolled+streamed list).
+   */
+  private coopAdoptsOptions = false;
   /** Owner-side: the selection captured at row/cursor time, relayed once the party target resolves. */
   private coopPendingKind: "reward" | "shop" | null = null;
   private coopPendingCursor = 0;
@@ -219,22 +241,30 @@ export class SelectModifierPhase extends BattlePhase {
       this.coopInteractionStart = coopController.interactionCounter();
     }
 
-    // Co-op (#633 BLOCK-1 / CHANGE-2): inside an authoritative ME the HOST is the forced reward
-    // OWNER and the GUEST the forced WATCHER (it streams the items the host actually rolled).
-    // Outside an ME this is null and the existing alternation stands byte-identical. Hoisted so the
-    // owner-resolution branch below (:239) shares the same decision.
-    const rewardOverride = coopMeRewardOwnerOverride();
+    // Co-op (#633 / #828): the OPTION authority (roll+stream vs adopt). Inside an authoritative ME this
+    // is forced to the HOST (the sole engine); outside an ME it is null and the counter-parity owner
+    // rolls. The PICK authority (drive vs watch) is resolved SEPARATELY below from the pinned counter -
+    // inside an ME that pinned counter IS the ME counter, so the pick naturally goes to the ME OWNER.
+    // Hoisted so the pick-resolution branch below shares the same option decision.
+    const optionOwnerOverride = coopMeRewardOptionOwnerOverride();
 
-    // Co-op (#633 Fix #2): is THIS client the WATCHER of this reward interaction? The watcher
-    // must NOT roll its own option pool - party luck changes the number of seeded upgrade
-    // draws getNewModifierTypeOption consumes, so a local roll would (a) diverge from the
-    // owner's pool and (b) shift the shared RNG cursor differently. The watcher instead
-    // adopts the owner's streamed list (coopAdoptOwnerRewardOptions). The spoof/hotseat path
-    // has no real peer, so the local human always OWNS (never a watcher).
+    // Co-op (#633 Fix #2 / #828): is THIS client the OPTION WATCHER of this reward interaction (it
+    // ADOPTS the streamed list instead of rolling)? A local roll would (a) diverge from the owner's
+    // pool (party luck changes the number of seeded upgrade draws getNewModifierTypeOption consumes)
+    // and (b) shift the shared RNG cursor differently, so the option watcher adopts the owner's streamed
+    // list (coopAdoptOwnerRewardOptions). For a normal wave shop this is the pick watcher; inside a
+    // guest-owned ME it is the HOST (option owner) that ROLLS and the GUEST (option watcher) that adopts,
+    // even though the GUEST OWNS the pick. The spoof/hotseat path has no real peer, so the local human
+    // always rolls (never an option watcher).
     const coopIsWatcher =
       coopController != null
       && getCoopRuntime()?.spoof == null
-      && (rewardOverride == null ? !coopController.isLocalOwnerAtCounter(this.coopInteractionStart) : !rewardOverride); // authoritative ME: forced owner=host => the guest watches
+      && (optionOwnerOverride == null
+        ? !coopController.isLocalOwnerAtCounter(this.coopInteractionStart)
+        : !optionOwnerOverride); // authoritative ME: forced option owner=host => the guest adopts
+    // Remember the option axis for startCoopWatch (the host on a guest-owned ME watches the pick but is
+    // the option OWNER, so it must NOT adopt - it keeps its own rolled+streamed list).
+    this.coopAdoptsOptions = coopIsWatcher;
 
     // Dev test-suite "start in the store" scenarios stage guaranteed reward
     // options (e.g. a Rare Candy, or a Form-Change Item that resolves to a
@@ -329,28 +359,39 @@ export class SelectModifierPhase extends BattlePhase {
       // interaction, so the local human (host) OWNS every reward screen. Only a REAL peer
       // alternates control. The counter still advances so persistence stays coherent.
       const spoofed = getCoopRuntime()?.spoof != null;
-      // Co-op (#633): the OWNER is resolved from the counter PINNED when this shop opened
-      // (coopInteractionStart), NOT the live counter - an inbound reconcile broadcast can
-      // bump the live counter mid-interaction, which would flip the owner/seq calc and make
-      // the watcher follow a seq the owner stopped sending on ("cursor at the wrong spots").
-      // CHANGE-2: inside an authoritative ME, rewardOverride forces host=owner / guest=watcher.
-      const ownsThisShop =
-        rewardOverride == null ? coopController.isLocalOwnerAtCounter(this.coopInteractionStart) : rewardOverride;
+      // Co-op (#633): the PICK OWNER is resolved from the counter PINNED when this shop opened
+      // (coopInteractionStart), NOT the live counter - an inbound reconcile broadcast can bump the
+      // live counter mid-interaction, which would flip the owner/seq calc and make the watcher follow
+      // a seq the owner stopped sending on ("cursor at the wrong spots"). #828: this is the natural
+      // alternation with NO override - inside an ME the pinned counter IS the ME counter, so it already
+      // resolves to the ME OWNER (the old override forcing host=owner is gone; only the OPTION axis is
+      // forced to the host now, via coopIsWatcher above).
+      const ownsThisShop = coopController.isLocalOwnerAtCounter(this.coopInteractionStart);
       const parity = ((this.coopInteractionStart % 2) + 2) % 2;
       coopLog(
         "reward",
-        `owner/watcher decision: pinnedStart=${this.coopInteractionStart} liveCounter=${coopController.interactionCounter()} parity=${parity} role=${coopController.role} override=${rewardOverride ?? "none"} spoof=${spoofed} -> ${spoofed || ownsThisShop ? "OWNER" : "WATCHER"}`,
+        `owner/watcher decision: pinnedStart=${this.coopInteractionStart} liveCounter=${coopController.interactionCounter()} parity=${parity} role=${coopController.role} pick=${spoofed || ownsThisShop ? "OWNER" : "WATCHER"} option=${coopIsWatcher ? "ADOPT" : "ROLL"} spoof=${spoofed}`,
       );
+      // Co-op (#633 Fix #2 / #828): the OPTION OWNER streams its rolled list so the option WATCHER
+      // adopts it instead of re-rolling (party luck / a diverged ME engine would diverge the pool + the
+      // shared RNG cursor). For a normal wave shop the option owner == the pick owner; inside a
+      // guest-owned ME the HOST is the option owner but the pick WATCHER, so stream here - BEFORE the
+      // pick branch - whenever we rolled (!coopIsWatcher), regardless of the pick role. Not sent in the
+      // spoof/hotseat path (no real peer watcher).
+      if (!coopIsWatcher && !spoofed) {
+        this.coopSendRewardOptions();
+      }
       if (spoofed || ownsThisShop) {
         coopLog(
           "reward",
-          `OWNER drives reward screen (start=${this.coopInteractionStart} role=${coopController.role} spoof=${spoofed} wave=${globalScene.currentBattle?.waveIndex})`,
+          `OWNER drives reward screen (start=${this.coopInteractionStart} role=${coopController.role} spoof=${spoofed} adoptsOptions=${coopIsWatcher} wave=${globalScene.currentBattle?.waveIndex})`,
         );
-        // Co-op (#633 Fix #2): stream the EXACT option list we rolled so the watcher rebuilds
-        // it instead of re-rolling (party luck would otherwise diverge the pools + the shared
-        // RNG cursor). Not sent in the spoof/hotseat path (no real peer watcher).
-        if (!spoofed) {
-          this.coopSendRewardOptions();
+        if (coopIsWatcher) {
+          // #828 guest pick-owner on a guest-owned ME: it does NOT roll (the HOST is the sole ME
+          // engine + streamed the pool), so ADOPT the host's streamed options first, THEN open the
+          // interactive owner screen + relay the pick exactly like a normal owner.
+          void this.startCoopOwnerAdoptOptions(modifierSelectCallback);
+          return;
         }
         this.resetModifierSelect(modifierSelectCallback);
         // Co-op (#633): relay our cursor so the partner's screen mirrors it live.
@@ -483,9 +524,12 @@ export class SelectModifierPhase extends BattlePhase {
     globalScene.ui.clearText();
     globalScene.ui.setMode(UiMode.MESSAGE).then(() => super.end());
     if (!Overrides.WAIVE_ROLL_FEE_OVERRIDE) {
-      if (this.coopWatcher && this.coopRelayedMoney >= 0) {
-        // Co-op (#698): host is authoritative - SET the streamed post-reroll money instead of
+      if (this.coopWatcher && this.coopAdoptsOptions && this.coopRelayedMoney >= 0) {
+        // Co-op (#698): the OWNER is authoritative - SET the streamed post-reroll money instead of
         // recomputing/subtracting (avoids per-client cost divergence + double-deduct after a resync).
+        // #828: only a TRUE watcher (it also ADOPTS the owner's options) adopts the relayed money; the
+        // HOST as a guest-owned-ME reward pick WATCHER is the option OWNER + the authoritative engine, so
+        // it deducts its OWN money (a mid-ME host money change the stale guest never saw is not lost).
         globalScene.money = this.coopRelayedMoney;
       } else {
         globalScene.money -= rerollCost;
@@ -652,9 +696,12 @@ export class SelectModifierPhase extends BattlePhase {
     if (cost !== -1 && !(modifier.type instanceof RememberMoveModifierType)) {
       if (result) {
         if (!Overrides.WAIVE_ROLL_FEE_OVERRIDE) {
-          if (this.coopWatcher && this.coopRelayedMoney >= 0) {
-            // Co-op (#698): host is authoritative - SET the streamed post-buy money instead of
+          if (this.coopWatcher && this.coopAdoptsOptions && this.coopRelayedMoney >= 0) {
+            // Co-op (#698): the OWNER is authoritative - SET the streamed post-buy money instead of
             // recomputing/subtracting (avoids per-client cost divergence + double-deduct after a resync).
+            // #828: only a TRUE watcher (it also ADOPTS the owner's options) adopts the relayed money; the
+            // HOST as a guest-owned-ME reward pick WATCHER is the option OWNER + the authoritative engine,
+            // so it deducts its OWN money (a mid-ME host money change the stale guest never saw is not lost).
             globalScene.money = this.coopRelayedMoney;
           } else {
             globalScene.money -= cost;
@@ -1213,6 +1260,21 @@ export class SelectModifierPhase extends BattlePhase {
     }
   }
 
+  /**
+   * Co-op (#828) GUEST pick-owner on a guest-owned ME: the HOST is the sole ME engine, so it rolled +
+   * streamed the reward pool. ADOPT that exact list (never re-roll - the guest never ran the ME engine,
+   * so its pool + the shared RNG cursor would diverge), THEN open the interactive owner screen + relay
+   * the pick exactly like a normal owner (this.coopWatcher stays false - it DRIVES). Only reached when
+   * this client OWNS the ME reward PICK but ADOPTS the options (the split axes); the normal owner rolls
+   * + drives synchronously in start() and never lands here.
+   */
+  private async startCoopOwnerAdoptOptions(modifierSelectCallback: ModifierSelectCallback): Promise<void> {
+    await this.coopAdoptOwnerRewardOptions();
+    this.resetModifierSelect(modifierSelectCallback);
+    // Co-op (#633): relay our cursor so the partner (the pick watcher) mirrors it live.
+    this.coopBeginMirror("owner");
+  }
+
   /** WATCHER: open the SAME reward screen the owner drives (read-only, cursor-mirrored) and
    *  apply the owner's relayed picks against this client's identical pool until they leave. */
   private async startCoopWatch(): Promise<void> {
@@ -1225,11 +1287,16 @@ export class SelectModifierPhase extends BattlePhase {
       super.end();
       return;
     }
-    // Co-op (#633 Fix #2): adopt the owner's EXACT rolled option list instead of the one we
-    // rolled in start() - party luck changes the number of seeded upgrade draws, so our local
-    // pool (and the shared RNG cursor) could diverge from the owner's. We wait briefly for the
-    // owner's streamed list; on timeout / unknown id we keep our own (divergent but no hang).
-    await this.coopAdoptOwnerRewardOptions();
+    // Co-op (#633 Fix #2 / #828): adopt the owner's EXACT rolled option list instead of the one we
+    // rolled in start() - party luck changes the number of seeded upgrade draws, so our local pool (and
+    // the shared RNG cursor) could diverge from the owner's. We wait briefly for the owner's streamed
+    // list; on timeout / unknown id we keep our own (divergent but no hang). SKIPPED when we are the
+    // option OWNER (the HOST on a guest-owned ME, #828): it ROLLED + STREAMED its own authoritative list
+    // and only WATCHES the guest's pick, so it keeps that list rather than adopting (there is no other
+    // streamer - it IS the streamer).
+    if (this.coopAdoptsOptions) {
+      await this.coopAdoptOwnerRewardOptions();
+    }
     // Open the SAME reward screen the owner drives (identical options/prices/money - now
     // guaranteed identical by the adopted list), with a NO-OP callback: the watcher's local
     // input is blocked at the UI layer, replayed owner buttons only move the cursor, and the

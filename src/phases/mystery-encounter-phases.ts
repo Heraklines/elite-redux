@@ -9,7 +9,6 @@ import {
   coopMeHandoffBattleStarted,
   coopMeInProgress,
   coopMeInteractionStartValue,
-  setCoopMeBespokeHostDrives,
   setCoopMeInteractionStart,
 } from "#data/elite-redux/coop/coop-me-pin-state";
 import { COOP_ME_TERM_SEQ_BASE } from "#data/elite-redux/coop/coop-me-pump";
@@ -322,11 +321,17 @@ export class MysteryEncounterPhase extends Phase {
       const enc = globalScene.currentBattle.mysteryEncounter!;
       // Ensure tokens + per-option meetsReqs are computed off the host party before snapshotting.
       enc.populateDialogueTokensFromRequirements();
+      // #831 (audit P0#1, GROUP REPEAT): a re-fired ROUND (press-your-luck delve / Safari Zone) carries its
+      // NEW options in optionSelectSettings.overrideOptions - the SAME set coopHostAwaitGuestIndex applies the
+      // relayed index against, and the SAME set the host's own MysteryEncounterUiHandler renders. Stream THOSE
+      // labels/enablement (not the stale base enc.options) so the guest re-renders the round's real "descend
+      // again? / dig again?" prompt byte-identically. Falls back to enc.options for the top-level round.
+      const options = this.optionSelectSettings?.overrideOptions ?? enc.options;
       const present: CoopInteractionOutcome = {
         k: "mePresent",
         tokens: { ...enc.dialogueTokens },
-        meetsReqs: enc.options.map(o => o.meetsRequirements()),
-        labels: enc.options.map(o => {
+        meetsReqs: options.map(o => o.meetsRequirements()),
+        labels: options.map(o => {
           const d = o.dialogue;
           if (d == null) {
             return "";
@@ -401,34 +406,24 @@ export class MysteryEncounterPhase extends Phase {
         coopEndMePump();
         return;
       }
-      // ADD-2c (BLOCK-3 residual): an ME whose option chain pushes a BESPOKE interactive sub-UI
-      // (ErQuizPhase / a custom OPTION_SELECT) has no generic host relay site, so resolving it on a
-      // guest-owned ME would HANG the host on an un-relayed sub-screen. SAFE-DEGRADE instead: leave
-      // the encounter at its default branch + close the pump, logged. Gated + closed-list; never a hang.
+      // ADD-2c (BLOCK-3 residual): an ME whose option chain pushes a BESPOKE interactive sub-PHASE
+      // (ErQuizPhase) has no generic party/secondary host relay site. It is NOT safe-degraded: #818 co-op
+      // quiz MIRRORING - the 8 quiz MEs are MIRRORED, the host streams the question session and BOTH clients
+      // run ErQuizPhase off it, with the GUEST owner driving its OWN answers over the quiz relay. So the host
+      // input gate must STAY UP (standing it down would let the HOST player hijack and answer the guest's
+      // quiz), and every case falls through unchanged to the programmatic option apply below
+      // (ErQuizPhase.start streams the session there).
+      // #827: CLOWNING_AROUND (a bespoke yes/no OPTION_SELECT) is no longer in this set - it now relays its
+      // yes/no as a `{ kind: "secondary" }` sub-prompt (coopHostStreamSecondaryAwaitIndex) exactly like the
+      // party->secondary path, so it needs no bespoke branch and reaches this apply like any relayed ME. The
+      // #823 host-drives set is therefore EMPTY (setCoopMeBespokeHostDrives is never set true anymore; the
+      // ui.ts gate reader stays as a harmless always-false guard, kept for a future bespoke host-drive ME).
       if (COOP_AUTHORITATIVE_BESPOKE_SUB_ME.has(encounter.encounterType)) {
-        // #823 (live Dormant Guardian strand): the old 'safe-degrade' DISCARDED the guest's pick
-        // and force-left - the guest advanced alone while the host stranded on its intro screen.
-        // #818 co-op quiz MIRRORING: the 8 quiz MEs (ErQuizPhase) are now MIRRORED - the host streams
-        // the question session and BOTH clients run ErQuizPhase off it, with the GUEST owner driving its
-        // OWN answers over the quiz relay. So for those the host input gate must STAY UP: standing it
-        // down (setCoopMeBespokeHostDrives) would let the HOST player hijack and answer the guest's quiz.
-        // Only CLOWNING_AROUND is a non-quiz bespoke sub-UI (a yes/no OPTION_SELECT) with no mirror path,
-        // so it alone still needs the host to drive it locally. Every case falls through unchanged to the
-        // programmatic option apply below (for the quiz MEs, ErQuizPhase.start streams the session there).
-        if (encounter.encounterType === MysteryEncounterType.CLOWNING_AROUND) {
-          coopWarn(
-            "me",
-            `bespoke sub-UI on guest-owned ME ${MysteryEncounterType[encounter.encounterType]}: HOST drives it locally (#823; only CLOWNING_AROUND host-drives, quiz MEs mirror)`,
-            { seq: seqMe, index: choice.choice },
-          );
-          setCoopMeBespokeHostDrives(true);
-        } else {
-          coopLog(
-            "me",
-            `quiz ME on guest-owned encounter ${MysteryEncounterType[encounter.encounterType]}: MIRRORED (host gate stays up; guest owner drives the quiz) (#818)`,
-            { seq: seqMe, index: choice.choice },
-          );
-        }
+        coopLog(
+          "me",
+          `quiz ME on guest-owned encounter ${MysteryEncounterType[encounter.encounterType]}: MIRRORED (host gate stays up; guest owner drives the quiz) (#818)`,
+          { seq: seqMe, index: choice.choice },
+        );
       }
       coopLog("me", "host applies relayed guest option programmatically", {
         seq: seqMe,

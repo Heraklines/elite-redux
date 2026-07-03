@@ -2,6 +2,7 @@ import { CLASSIC_MODE_MYSTERY_ENCOUNTER_WAVES } from "#app/constants";
 import { globalScene } from "#app/global-scene";
 import { EncounterBattleAnim } from "#data/battle-anims";
 import { allAbilities, modifierTypes } from "#data/data-lists";
+import { coopLog, coopWarn } from "#data/elite-redux/coop/coop-debug";
 import { CustomPokemonData } from "#data/pokemon-data";
 import { AbilityId } from "#enums/ability-id";
 import { BattlerIndex } from "#enums/battler-index";
@@ -28,6 +29,8 @@ import { PokemonMove } from "#moves/pokemon-move";
 import { showEncounterDialogue, showEncounterText } from "#mystery-encounters/encounter-dialogue-utils";
 import type { EnemyPartyConfig } from "#mystery-encounters/encounter-phase-utils";
 import {
+  coopHostAwaitsGuestSubPick,
+  coopHostStreamSecondaryAwaitIndex,
   generateModifierType,
   initBattleWithEnemyConfig,
   leaveEncounterWithoutBattle,
@@ -467,6 +470,36 @@ function displayYesNoOptions(resolve) {
     maxOptions: 7,
     yOffset: 0,
   };
+
+  // Co-op authoritative host on a GUEST-OWNED ME (#827): this bespoke yes/no OPTION_SELECT is a pick the
+  // GUEST owns, so the host must NOT open its own confirm screen - it relays the choice to the guest,
+  // mirroring the party->secondary sub-prompt exactly. Stream a `{ kind: "secondary", labels: [Yes, No] }`
+  // sub-prompt on seq_me + await the guest's relayed index (same sender/awaiter/ceiling as
+  // selectPokemonForOption), then invoke the SAME handler the local UI would. The guest's CoopReplayMePhase
+  // opens a REAL local yes/no OPTION_SELECT off the streamed labels. Solo / host-owned skip this entirely
+  // (the predicate is false), so the local screen below opens byte-identically.
+  if (coopHostAwaitsGuestSubPick()) {
+    void coopHostStreamSecondaryAwaitIndex(fullOptions.map(o => o.label)).then(index => {
+      if (index == null) {
+        // Guest disconnected / the disconnect-ceiling await elapsed: RESCUE the run by opening the LOCAL
+        // yes/no so the host can answer and the encounter still reaches a terminal (never a host hang).
+        coopWarn("me", "#827 guest yes/no relay disconnected/timed out; host RESCUES with local UI");
+        globalScene.ui.setModeWithoutClear(UiMode.OPTION_SELECT, config, null, true);
+        return;
+      }
+      if (index < 0 || index >= fullOptions.length) {
+        // The guest's appended cancel / an out-of-range index: a pure yes/no has no cancel, so re-prompt
+        // (identical to the encounter's own not-selected loop) until the guest picks Yes or No.
+        coopLog("me", "#827 guest cancelled the yes/no; re-prompting the owner", { index });
+        displayYesNoOptions(resolve);
+        return;
+      }
+      coopLog("me", "#827 host applies the guest's yes/no pick", { index });
+      fullOptions[index].handler();
+    });
+    return;
+  }
+
   globalScene.ui.setModeWithoutClear(UiMode.OPTION_SELECT, config, null, true);
 }
 

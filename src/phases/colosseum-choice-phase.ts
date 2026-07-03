@@ -19,6 +19,7 @@
 
 import { globalScene } from "#app/global-scene";
 import { Phase } from "#app/phase";
+import { coopColosseumSendDecision, coopColosseumStreamBoard } from "#data/elite-redux/coop/coop-colosseum";
 import { trainerConfigs } from "#data/trainers/trainer-config";
 import { TrainerVariant } from "#enums/trainer-variant";
 import { UiMode } from "#enums/ui-mode";
@@ -82,6 +83,12 @@ export class ColosseumChoicePhase extends Phase {
       nextTierLabel: TIER_LADDER[Math.min(this.wins, MAX_ROUNDS - 1)],
       challengers,
     };
+    // Co-op (#829): stream the board's two decision labels so the partner client can render the SAME
+    // CONTINUE / CASH-OUT choice (the guest's own encounter.misc.gauntlet is empty - it never ran the
+    // engine). Index 0 == COLOSSEUM_CONTINUE, index 1 == COLOSSEUM_CASH_OUT, aligned with onChoice.
+    // FIRE-AND-FORGET + hard no-op off the authoritative host / in solo, so solo is byte-identical and
+    // the host never blocks on the partner. No em dashes in the labels (project rule).
+    coopColosseumStreamBoard([`CONTINUE (risk for ${data.nextTierLabel})`, `CASH OUT (claim ${data.tierLabel})`]);
     globalScene.ui.setMode(UiMode.COLOSSEUM, data, (choice: number) => this.onChoice(choice));
   }
 
@@ -90,6 +97,11 @@ export class ColosseumChoicePhase extends Phase {
       return;
     }
     this.resolving = true;
+
+    // Co-op (#829): relay the resolved board decision on the dedicated board seq so the partner
+    // adopts the SAME branch. On a HOST-owned board the host's pick is the authoritative decision the
+    // guest watcher adopts. FIRE-AND-FORGET + hard no-op off the authoritative host / in solo.
+    coopColosseumSendDecision(choice);
 
     // Hand the UI back to MESSAGE FIRST. endColosseum/startNextColosseumBattle
     // run dialogue + reward flow (showEncounterText, leaveEncounterWithoutBattle)

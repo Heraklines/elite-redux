@@ -81,15 +81,19 @@ const COOP_ME_PUMP_SEQ_BASE = 8_000_000;
 /** Disconnect ceiling for every host<->guest ME await; steady state resolves on the relayed pick. */
 const COOP_ME_REPLAY_WAIT_MS = 1_200_000;
 /**
- * Co-op authoritative non-battle ME (#633, ADD-2c): MEs whose selected-option chain pushes a BESPOKE
- * interactive sub-phase / sub-UI that does NOT route through the generic `selectPokemonForOption`
- * party screen + secondary menu (the two sites ADD-2b relays). On a GUEST-OWNED ME of one of these
- * the host has no generic relay site, so rather than HANG it SAFE-DEGRADES (runs the option's
- * not-selected / default branch + the terminal, logged). Enumerated from grepping the encounters:
- *  - ErQuizPhase sub-phase (8): TRACKS_IN_THE_SNOW / GUESSING_BOOTH / SCRAMBLED_POKEDEX / SEALED_DOOR
- *    / SALVAGE_YARD / LAKE_SPIRIT / FROZEN_SHAPES / DORMANT_GUARDIAN.
- *  - Bespoke OPTION_SELECT yes/no prompt (1): CLOWNING_AROUND (displayYesNoOptions).
- * NOT an open deferral - a closed list; the host always reaches a terminal.
+ * Co-op authoritative non-battle ME (#633, ADD-2c; #818/#827 mirrored): MEs whose selected-option chain
+ * pushes a BESPOKE interactive sub-PHASE (ErQuizPhase) that does NOT route through the generic
+ * `selectPokemonForOption` party screen + secondary menu (the two sites ADD-2b relays). On a GUEST-OWNED
+ * ME of one of these the host has no PARTY/SECONDARY relay site, but it does NOT safe-degrade: #818 co-op
+ * quiz MIRRORING streams the whole ErQuizPhase session so BOTH clients run it (the guest owner drives its
+ * own answers over the quiz relay), so the host input gate must STAY UP. Enumerated from grepping the
+ * encounters - the 8 ErQuizPhase MEs:
+ *    TRACKS_IN_THE_SNOW / GUESSING_BOOTH / SCRAMBLED_POKEDEX / SEALED_DOOR / SALVAGE_YARD / LAKE_SPIRIT
+ *    / FROZEN_SHAPES / DORMANT_GUARDIAN.
+ * #827: CLOWNING_AROUND (a bespoke yes/no OPTION_SELECT via displayYesNoOptions) LEFT this set - it now
+ * relays its yes/no as a `{ kind: "secondary" }` sub-prompt through {@linkcode coopHostStreamSecondaryAwaitIndex}
+ * exactly like the party->secondary path, so it needs no bespoke handling and falls through to the normal
+ * relayed option apply. NOT an open deferral - a closed list; the host always reaches a terminal.
  */
 export const COOP_AUTHORITATIVE_BESPOKE_SUB_ME: ReadonlySet<MysteryEncounterType> = new Set([
   MysteryEncounterType.ER_TRACKS_IN_THE_SNOW,
@@ -100,16 +104,18 @@ export const COOP_AUTHORITATIVE_BESPOKE_SUB_ME: ReadonlySet<MysteryEncounterType
   MysteryEncounterType.ER_LAKE_SPIRIT,
   MysteryEncounterType.ER_FROZEN_SHAPES,
   MysteryEncounterType.ER_DORMANT_GUARDIAN,
-  MysteryEncounterType.CLOWNING_AROUND,
 ]);
 
 /**
- * Co-op authoritative non-battle ME (#633, ADD-2b): is THIS client the HOST running the sole engine
- * on a GUEST-OWNED ME? Then a `selectPokemonForOption` sub-prompt must await the guest's relayed pick
- * (not open a local host party screen). Hard `false` off the live authoritative host, when the host
+ * Co-op authoritative non-battle ME (#633, ADD-2b; #827): is THIS client the HOST running the sole engine
+ * on a GUEST-OWNED ME? Then a `selectPokemonForOption` sub-prompt (party target / secondary menu) - and the
+ * bespoke yes/no sub-prompt (#827, {@linkcode coopHostStreamSecondaryAwaitIndex}) - must await the guest's
+ * relayed pick (not open a local host screen). Hard `false` off the live authoritative host, when the host
  * OWNS this ME (it drives off local input), and in solo / lockstep - so those paths are byte-identical.
+ * Exported so the bespoke yes/no wrapper (clowning-around-encounter) reuses the EXACT predicate rather than
+ * re-deriving it.
  */
-function coopHostAwaitsGuestSubPick(): boolean {
+export function coopHostAwaitsGuestSubPick(): boolean {
   return (
     globalScene.gameMode.isCoop
     && getCoopNetcodeMode() === "authoritative"
@@ -117,6 +123,46 @@ function coopHostAwaitsGuestSubPick(): boolean {
     && coopMeInProgress()
     && !(getCoopController()?.isLocalOwnerAtCounter(coopMeInteractionStartValue()) ?? true)
   );
+}
+
+/**
+ * Co-op authoritative non-battle ME (#827): stream a bespoke yes/no (or any small labelled choice) as a
+ * `{ kind: "secondary", labels }` sub-prompt on `seq_me` and await the guest owner's relayed index -
+ * REUSING the EXACT sender + awaiter + disconnect ceiling the party->secondary sub-prompt path
+ * ({@linkcode selectPokemonForOption}) already uses. The guest's `CoopReplayMePhase.openSubPickCapture`
+ * opens a REAL local OPTION_SELECT with these labels, relays the chosen index, and the caller maps it back
+ * onto its handlers. Resolves to:
+ *  - the guest's 0-based index over `labels` on a live pick (`labels.length` == the guest's appended cancel
+ *    / an out-of-range "not selected" sentinel), or
+ *  - `null` when the guest disconnected / the await hit its ceiling (the caller RESCUES with the local UI).
+ * The caller MUST have gated on {@linkcode coopHostAwaitsGuestSubPick} first - this opens no local UI and is
+ * a bare relay off the awaiting host, so solo / host-owned never reach it and stay byte-identical.
+ */
+export function coopHostStreamSecondaryAwaitIndex(labels: string[]): Promise<number | null> {
+  const seqMe = COOP_ME_PUMP_SEQ_BASE + coopMeInteractionStartValue();
+  const relay = getCoopInteractionRelay();
+  const prompt: CoopInteractionOutcome = {
+    k: "mePresent",
+    tokens: {},
+    meetsReqs: [],
+    labels: [],
+    subPrompt: { kind: "secondary", labels },
+  };
+  coopLog("me", "host streams bespoke yes/no secondary sub-prompt + awaits guest index (#827)", {
+    seq: seqMe,
+    labels: labels.length,
+  });
+  relay?.sendInteractionOutcome(seqMe, "mePresent", prompt);
+  const awaited = relay?.awaitInteractionChoice(seqMe, COOP_ME_REPLAY_WAIT_MS) ?? Promise.resolve(null);
+  return awaited.then(pick => {
+    const idx = pick?.choice ?? null;
+    coopLog("me", "host received guest bespoke yes/no sub-pick (#827)", {
+      seq: seqMe,
+      idx,
+      fromNull: pick == null,
+    });
+    return idx;
+  });
 }
 
 /**

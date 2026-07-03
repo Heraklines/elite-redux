@@ -49,6 +49,7 @@ import { MysteryEncounterPhase } from "#phases/mystery-encounter-phases";
 import { GameManager } from "#test/framework/game-manager";
 import {
   buildDuoForMe,
+  drainGuestMeReplayNewRounds,
   drainGuestMeReplayToSettle,
   drainLoopback,
   driveGuestMeReplay,
@@ -57,13 +58,17 @@ import {
   type ErQuizPhaseSeam,
   installDuoLogCapture,
   relayGuestMeOptionIndexOnly,
+  relayGuestMeShopLeaveSync,
   type ShopPhaseSeam,
   startGuestMeOutcomeRace,
   startGuestMeReplay,
+  startGuestMeShopOwner,
   withClient,
   withClientSync,
 } from "#test/tools/coop-duo-harness";
 import { runMysteryEncounterToEnd, runSelectMysteryEncounterOption } from "#test/utils/encounter-test-utils";
+// #831: force the press-your-luck bust roll to SURVIVE (deterministic 2+ round delve) - see IT #5.
+import * as Common from "#utils/common";
 import Phaser from "phaser";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -75,6 +80,27 @@ const ME_WAVE = 12;
 /** Flip a freshly-built scene into the co-op game mode (shared by host + guest). */
 function toCoop(scene: BattleScene): void {
   scene.gameMode = getGameMode(GameModes.COOP);
+}
+
+/**
+ * #831 (IT #5 helper): pump the HOST to its next real {@linkcode MysteryEncounterPhase} (option-select
+ * screen) and pick an option via the REAL {@linkcode MysteryEncounterUiHandler}. `cursorMoves` navigates
+ * from the default cursor 0 (e.g. `[Button.RIGHT]` selects the 2nd option). MUST be called inside
+ * withClient(rig.hostCtx). The caller installs a scoped `ui.showText` auto-advance so the intervening
+ * ME narration / round-prompt messages resolve without the FIFO prompt handler (a delve queues a variable
+ * number of them per round), leaving only the option pick + the one "appeared" showDialogue to the handler.
+ * A drainLoopback after the phase runs flushes the round's freshly-streamed `mePresent` onto the guest
+ * relay's 8M buffer.
+ */
+async function pickHostMeOption(game: GameManager, hostScene: BattleScene, cursorMoves: Button[]): Promise<void> {
+  await game.phaseInterceptor.to("MysteryEncounterPhase"); // start() ran: present streamed, ME UI mode, interrupted
+  await drainLoopback(); // flush the round's streamed mePresent onto the guest relay's 8M outcome inbox
+  const uiHandler = hostScene.ui.getHandler() as unknown as { unblockInput(): void; processInput(b: number): boolean };
+  uiHandler.unblockInput(); // ME handler blocks input for 1s on show; tests clear it
+  for (const move of cursorMoves) {
+    uiHandler.processInput(move);
+  }
+  uiHandler.processInput(Button.ACTION);
 }
 
 describe.skipIf(!RUN)(
@@ -228,15 +254,23 @@ describe.skipIf(!RUN)(
     }, 300_000);
 
     // ===========================================================================================
-    // IT #2 - GUEST-OWNED non-battle ME (counter 1, odd). DISTINCT code path from the host-owned case:
-    // the host CANNOT take the human pick, so MysteryEncounterPhase.coopHostAwaitGuestIndex() AWAITS the
-    // guest's relayed option INDEX on 8M and applies it PROGRAMMATICALLY via handleOptionSelect; the
-    // guest renders the selector off the host presentation and relays its cursor via
-    // CoopReplayMePhase.handleGuestOptionSelect -> relay.sendInteractionChoice(8M,"me",index). This is the
-    // bidirectional pick->await->outcome handshake, so it interleaves host/guest in explicit phases with
-    // drainLoopback between (strict per-ctx; no cross-ctx await continuation under the wrong globalScene).
+    // IT #2 - GUEST-OWNED non-battle ME (counter 1, odd). DISTINCT code path from the host-owned case,
+    // and the #828 REWARD-OWNERSHIP fix's home test. TWO relayed picks, both owned by the GUEST:
+    //   (a) TOP-LEVEL option: the host CANNOT take the human pick, so MysteryEncounterPhase
+    //       .coopHostAwaitGuestIndex() AWAITS the guest's relayed option INDEX on 8M and applies it
+    //       PROGRAMMATICALLY via handleOptionSelect; the guest renders the selector + relays its cursor.
+    //   (b) #828 EMBEDDED REWARD SHOP: the shop's authorities SPLIT. The HOST stays the OPTION owner (the
+    //       sole ME engine rolls + STREAMS the pool - the guest's diverged RNG can't roll it) but becomes
+    //       the reward-pick WATCHER; the GUEST (the ME owner) ADOPTS the streamed options and OWNS the
+    //       interactive PICK, relaying it for the host to apply. Pre-#828 the host was FORCED to own the
+    //       pick even on a guest-owned ME (the maintainer's live bug: they owned the event but the relic
+    //       pick behaved as the host's). Asserted here: hostShop.coopWatcher === true, guestShop.coopWatcher
+    //       === false, both counters advance exactly once in lockstep.
+    // Both are the bidirectional pick->await->outcome handshake, so they interleave host/guest in explicit
+    // phases with drainLoopback between (strict per-ctx; no cross-ctx await continuation under the wrong
+    // globalScene - the owner sends under withClientSync, the watcher applies under a later drain in its ctx).
     // ===========================================================================================
-    it("DUO ME: a GUEST-OWNED DEPARTMENT_STORE_SALE - guest relays the pick, host applies it programmatically, lockstep", async () => {
+    it("DUO ME: a GUEST-OWNED DEPARTMENT_STORE_SALE - guest owns BOTH the top-level pick AND the embedded reward shop (#828); host applies both; lockstep", async () => {
       await game.runToMysteryEncounter(MysteryEncounterType.DEPARTMENT_STORE_SALE, [
         SpeciesId.SNORLAX,
         SpeciesId.GENGAR,
@@ -295,20 +329,31 @@ describe.skipIf(!RUN)(
 
       // ===== STEP C (host): the relayed index's deliver-microtask is queued but UNFIRED. Pump the host
       // UNDER hostCtx: the first drainLoopback flushes it, the coopHostAwaitGuestIndex await resolves (its
-      // .then() runs under the HOST scene), applies handleOptionSelect(option 0) PROGRAMMATICALLY, runs the
-      // option chain through the embedded reward shop to PostMysteryEncounterPhase (streams meResync on 8M +
-      // LEAVE on 9M into the GUEST's relay inbox - BUFFERED, since the guest has no pending waiter yet -
-      // and advances the counter once). =====
+      // .then() runs under the HOST scene), applies handleOptionSelect(option 0) PROGRAMMATICALLY, and runs
+      // the option chain to the embedded end-of-ME reward shop. #828: on a GUEST-OWNED ME the reward shop's
+      // OPTION owner is the HOST (the sole ME engine rolls + STREAMS the pool) but the reward-pick WATCHER
+      // (the GUEST owns the pick). So we START the host shop (it rolls + streams its options + parks its
+      // watcher loop awaiting the guest's relayed pick) and drain to flush the option stream to the guest -
+      // the host shop does NOT complete here (it awaits the guest owner's pick, applied in STEP C3). =====
+      let hostShop!: ShopPhaseSeam;
       await withClient(rig.hostCtx, async () => {
         await drainLoopback(); // flush the index deliver-microtask -> host await resolves under the HOST scene
         await game.phaseInterceptor.to("SelectModifierPhase", false);
-        const hostShop = hostScene.phaseManager.getCurrentPhase() as unknown as ShopPhaseSeam;
+        hostShop = hostScene.phaseManager.getCurrentPhase() as unknown as ShopPhaseSeam;
         expect(hostShop.phaseName, "host reached the embedded end-of-ME reward shop").toBe("SelectModifierPhase");
-        await driveHostRewardShopOwner(hostShop, { takeReward: false });
-        await game.phaseInterceptor.to("PostMysteryEncounterPhase");
+        hostShop.start(); // #828 pick WATCHER on a guest-owned ME: rolls + STREAMS options, parks awaiting the guest pick
+        await drainLoopback(); // flush the option stream to the guest relay buffer
+        // start() pins the shop to the LIVE counter, which mid-ME is the (odd) ME counter -> guest owns it.
+        expect(hostShop.coopInteractionStart, "host shop pinned to the ME counter (odd -> guest owns)").toBe(
+          counterBefore,
+        );
+        expect(
+          hostShop.coopWatcher,
+          "#828: host's embedded shop is the reward pick WATCHER on a guest-owned ME (host stays the option owner)",
+        ).toBe(true);
       });
 
-      // The host APPLIED the guest's relayed pick programmatically (the load-bearing guest-owned proof).
+      // The host APPLIED the guest's relayed TOP-LEVEL pick programmatically (the load-bearing guest-owned proof).
       expect(
         handleOptionSelectSpy,
         "host applied the guest's relayed option via handleOptionSelect",
@@ -318,6 +363,46 @@ describe.skipIf(!RUN)(
         handleOptionSelectSpy.mock.calls.some(c => c[1] === 0),
         "host applied option INDEX 0 (the guest's pick)",
       ).toBe(true);
+      // MAJOR-3: the embedded ME reward shop suppresses its own advance mid-ME - still counter 1.
+      expect(
+        rig.hostRuntime.controller.interactionCounter(),
+        "embedded ME reward shop suppressed its own advance (MAJOR-3, still mid-ME at the guest-owned counter)",
+      ).toBe(counterBefore);
+
+      // ===== STEP C2 (guest): the guest OWNS the ME, so it OWNS the reward PICK (#828 - the maintainer's
+      // fix). Open its OWN embedded shop as the reward pick OWNER: because the shop pins the (odd) ME
+      // counter it resolves the pick to the guest, ADOPTS the host's streamed options (buffer-hit), and
+      // opens the interactive owner screen. Then relay the owner's LEAVE SYNCHRONOUSLY (withClientSync) so
+      // the host's pick-watcher await resolves UNDER the host ctx in STEP C3 (the cross-ctx footgun the
+      // top-level pick handshake also dodges). =====
+      const guestShop = await withClient(rig.guestCtx, () => startGuestMeShopOwner(rig.guestScene));
+      expect(
+        guestShop.coopWatcher,
+        "#828: guest's embedded shop DRIVES the reward pick (OWNER) on a guest-owned ME - the maintainer's fix",
+      ).toBe(false);
+      expect(guestShop.coopInteractionStart, "guest shop pinned to the SAME ME counter as the host").toBe(
+        counterBefore,
+      );
+      expect(
+        (guestShop.typeOptions as unknown[]).length,
+        "guest ADOPTED the host's streamed reward options (never re-rolled its diverged ME pool)",
+      ).toBeGreaterThan(0);
+      withClientSync(rig.guestCtx, () => relayGuestMeShopLeaveSync(guestShop));
+
+      // ===== STEP C3 (host): drain so the guest owner's LEAVE deliver-microtask flushes UNDER hostCtx ->
+      // the host watcher loop applies it, the host shop ends, and the option chain runs to
+      // PostMysteryEncounterPhase (streams meResync on 8M + LEAVE on 9M into the GUEST's relay inbox -
+      // BUFFERED, since the guest's outcome race is deferred to STEP D - and advances the counter once). =====
+      await withClient(rig.hostCtx, async () => {
+        for (let i = 0; i < 16; i++) {
+          await drainLoopback();
+          if (hostScene.phaseManager.getCurrentPhase()?.phaseName !== "SelectModifierPhase") {
+            break;
+          }
+        }
+        await game.phaseInterceptor.to("PostMysteryEncounterPhase");
+      });
+
       // The host advanced the alternation counter exactly once for the whole ME.
       expect(rig.hostRuntime.controller.interactionCounter(), "host advanced the counter once for the ME").toBe(
         counterBefore + 1,
@@ -719,6 +804,212 @@ describe.skipIf(!RUN)(
       expect(
         rig.guestRuntime.controller.interactionCounter(),
         "guest counter is 1 after the quiz ME (lockstep with host, single advance)",
+      ).toBe(counterBefore + 1);
+
+      logs.flush();
+    }, 300_000);
+
+    // ===========================================================================================
+    // IT #5 - #831 REPEATED OPTION-SELECT ROUNDS (audit P0#1, GROUP REPEAT). The 8 press-your-luck delves
+    // + Safari Zone re-fire MysteryEncounterPhase(optionSelectSettings) each round ("descend again? / dig
+    // again?"). On the host each re-fire re-streams a FRESH top-level `mePresent` (no subPrompt) on 8M via
+    // coopHostStreamPresentation. PRE-FIX the guest handled exactly ONE top-level present: a re-fired bare
+    // mePresent fell to the "stray outcome" branch (coop-replay-me-phase.ts) and resolved toward the
+    // terminal, so a HOST-OWNED delve froze the guest on round 1 (it never re-rendered rounds 2+ and dropped
+    // the terminal meResync); a GUEST-OWNED delve softlocked (the host's coopHostAwaitGuestIndex blocked for
+    // the 20-min ceiling). POST-FIX awaitOutcomeThenTerminal treats a bare mePresent on a live unsettled
+    // phase as a NEW ROUND (beginNewRound): re-render the selector off the fresh presentation + re-arm the
+    // race, inheriting the ONE live 9M terminal arm (#818) so a fast host's already-buffered LEAVE is never
+    // lost. This drives a REAL 2-round ER_INTO_THE_CALDERA delve (DIVE -> PUSH[survive] -> BANK) on a
+    // HOST-OWNED encounter (counter 0) and asserts: the host re-streamed a fresh present per round, the guest
+    // re-rendered BOTH new rounds (two adopted presentations), the terminal still settled ONCE (single
+    // meResync apply + leave), and both counters advanced exactly once in lockstep - no hang.
+    //
+    // A press-your-luck round is deterministic here by forcing randSeedInt to its MAX (the bust roll
+    // `randSeedInt(10000) < chance*10000` can never fire, so every PUSH SURVIVES) and driving the host's real
+    // UI. Interleaved like IT #4 (host parks BEFORE its terminal so the guest runs its rounds while 9M is
+    // empty, then the host fires the terminal) - the #818 latent race would otherwise let the FIRST race's
+    // terminalArm buffer-consume a fast host's LEAVE and strand the re-armed rounds.
+    // ===========================================================================================
+    it("DUO ME: a HOST-OWNED 2-round press-your-luck delve (ER_INTO_THE_CALDERA) - guest re-renders BOTH rounds, terminal settles once, lockstep, no hang (#831)", async () => {
+      /** DIVE (option 0) starts the delve; RISE (option 1) leaves. */
+      const DIVE_OPTION_CURSOR: Button[] = [];
+      /** Each press-your-luck round: PUSH = cursor 0, BANK = cursor 1 (Button.RIGHT). */
+      const PUSH_CURSOR: Button[] = [];
+      const BANK_CURSOR: Button[] = [Button.RIGHT];
+      /** DIVE + PUSH(survive) + BANK => the guest sees TWO repeated-select rounds after the initial present. */
+      const EXPECTED_NEW_ROUNDS = 2;
+
+      // ===== REACH: park the HOST on a real ER_INTO_THE_CALDERA ME wave, then stand up the two-engine rig
+      // (host owns the ME at counter 0 - even). Identical structure to IT #1 / IT #4. =====
+      await game.runToMysteryEncounter(MysteryEncounterType.ER_INTO_THE_CALDERA, [SpeciesId.SNORLAX, SpeciesId.GENGAR]);
+      const hostScene = game.scene;
+      expect(hostScene.currentBattle.battleType, "host reached a MYSTERY_ENCOUNTER wave").toBe(
+        BattleType.MYSTERY_ENCOUNTER,
+      );
+      expect(hostScene.currentBattle.mysteryEncounter?.encounterType, "the forced ME is ER_INTO_THE_CALDERA").toBe(
+        MysteryEncounterType.ER_INTO_THE_CALDERA,
+      );
+
+      const pair = createLoopbackPair();
+      const rig = await buildDuoForMe(game, pair, setCoopRuntime, toCoop);
+
+      const counterBefore = rig.hostRuntime.controller.interactionCounter();
+      expect(counterBefore, "the delve opens on interaction counter 0 (host owns even)").toBe(0);
+      expect(rig.guestRuntime.controller.interactionCounter(), "guest also at counter 0").toBe(0);
+
+      // Spy the guest's sole convergence mechanism (fires EXACTLY once at the host's terminal meResync).
+      const applyMeOutcomeSpy = vi.spyOn(coopEngine, "applyCoopMeOutcome");
+      // Tap the HOST relay's outcome sends: a FRESH `mePresent` (no subPrompt) must be streamed PER round.
+      const sendOutcomeSpy = vi.spyOn(rig.hostRuntime.interactionRelay, "sendInteractionOutcome");
+
+      // ===== STEP A (host): drive the REAL delve DIVE -> PUSH(survives) -> BANK, then the embedded reward
+      // shop, and PARK at PostMysteryEncounterPhase WITHOUT running it - so the 3 round presents are streamed
+      // + buffered on the guest's 8M inbox, but the terminal meResync (8M) + LEAVE (9M) are NOT sent yet
+      // (they fire only in PostMysteryEncounterPhase.start, STEP C). =====
+      await withClient(rig.hostCtx, async () => {
+        // Drive the delve deterministically: force randSeedInt to its MAX so the bust roll never fires
+        // (every PUSH survives), and auto-advance ME narration / round-prompt messages (a delve queues a
+        // variable count per round) via a scoped ui.showText that invokes its callback immediately.
+        const randSpy = vi
+          .spyOn(Common, "randSeedInt")
+          .mockImplementation((range: number, min = 0) => min + Math.max(0, range - 1));
+        const showTextSpy = vi.spyOn(hostScene.ui, "showText").mockImplementation((_text, _delay, callback) => {
+          if (typeof callback === "function") {
+            callback();
+          }
+        });
+        // The only showDialogue in the reach path is "A mysterious encounter appeared!" (EncounterPhase,
+        // speaker "???"); auto-advance it via the prompt handler (showText auto-advance can't see it).
+        game.onNextPrompt(
+          "EncounterPhase",
+          UiMode.MESSAGE,
+          () =>
+            (hostScene.ui.getHandler() as unknown as { processInput(b: number): boolean }).processInput(Button.ACTION),
+          () => game.isCurrentPhase("MysteryEncounterPhase"),
+          true,
+        );
+        try {
+          // Round 0: pick DIVE (starts the press-your-luck loop -> re-fires round 1).
+          await pickHostMeOption(game, hostScene, DIVE_OPTION_CURSOR);
+          // Round 1: pick PUSH -> survives (randSeedInt mocked to max) -> re-fires round 2.
+          await pickHostMeOption(game, hostScene, PUSH_CURSOR);
+          // Round 2: pick BANK -> ends the delve (sets rewards + leaves) -> embedded reward shop.
+          await pickHostMeOption(game, hostScene, BANK_CURSOR);
+          // Drive the embedded end-of-ME reward shop (owner leave). MAJOR-3: it suppresses its own advance
+          // mid-ME, so the counter stays at 0 here.
+          await game.phaseInterceptor.to("SelectModifierPhase", false);
+          const hostShop = hostScene.phaseManager.getCurrentPhase() as unknown as ShopPhaseSeam;
+          expect(hostShop.phaseName, "host reached the embedded end-of-delve reward shop").toBe("SelectModifierPhase");
+          await driveHostRewardShopOwner(hostShop, { takeReward: false });
+          expect(
+            rig.hostRuntime.controller.interactionCounter(),
+            "embedded ME reward shop suppressed its own advance (MAJOR-3, still counter 0 mid-ME)",
+          ).toBe(counterBefore);
+          // PARK before the true terminal (do NOT run it): the meResync + LEAVE are streamed only inside
+          // PostMysteryEncounterPhase.start (STEP C), so the guest's 9M inbox stays empty through STEP B.
+          await game.phaseInterceptor.to("PostMysteryEncounterPhase", false);
+        } finally {
+          showTextSpy.mockRestore();
+          randSpy.mockRestore();
+          // Clear any leftover prompts so nothing fires against the host scene during the guest pumps.
+          (game.promptHandler as unknown as { prompts: unknown[] }).prompts.length = 0;
+        }
+      });
+
+      // The host has NOT advanced yet (its terminal is parked, not run).
+      expect(
+        rig.hostRuntime.controller.interactionCounter(),
+        "host has NOT advanced yet (terminal parked before PostMysteryEncounterPhase.start)",
+      ).toBe(counterBefore);
+
+      // ===== HOST DRIVE-SIDE PROOF: the host re-streamed a FRESH top-level `mePresent` (no subPrompt) PER
+      // round - the initial DIVE/RISE present + one per re-fired round (PUSH/BANK x2) = 3. =====
+      const presentSends = sendOutcomeSpy.mock.calls
+        .map(c => c[2] as CoopInteractionOutcome)
+        .filter(
+          (o): o is Extract<CoopInteractionOutcome, { k: "mePresent" }> => o.k === "mePresent" && o.subPrompt == null,
+        );
+      expect(
+        presentSends.length,
+        "host streamed a FRESH bare mePresent per round (initial DIVE/RISE + 2 re-fired press-your-luck rounds)",
+      ).toBe(EXPECTED_NEW_ROUNDS + 1);
+      // #831 host label fix: the re-fired rounds stream the ROUND's overrideOptions (PUSH/BANK), NOT the
+      // stale base DIVE/RISE options - so the guest renders the round's real prompt. Round labels differ
+      // from the initial present's labels; PRE-FIX they were identical (base options re-streamed).
+      expect(
+        JSON.stringify(presentSends[1].labels),
+        "re-fired round 1 streamed the ROUND's option labels, not the stale base DIVE/RISE labels (#831 host fix)",
+      ).not.toBe(JSON.stringify(presentSends[0].labels));
+
+      // ===== STEP B (guest): run the guest's REAL CoopReplayMePhase. It consumes the 3 buffered presents
+      // FIFO on 8M: present#0 at start() (watcher render), then present#1 + present#2 each as a NEW ROUND
+      // (beginNewRound re-renders + re-arms, inheriting the live 9M arm). The 9M terminal inbox is still
+      // empty, so the phase PARKS (does NOT settle) after the 2 new rounds. A no-progress stall would leave
+      // newRoundsRendered < 2 and fail the assert below (loud, not a hang). =====
+      const replay = await withClient(rig.guestCtx, () => startGuestMeReplay(rig.guestScene));
+      const newRounds = await withClient(rig.guestCtx, () => drainGuestMeReplayNewRounds(replay, EXPECTED_NEW_ROUNDS));
+
+      // The load-bearing #831 assertion: the guest re-rendered BOTH repeated-select rounds (pre-fix it
+      // rendered ZERO - the re-fired presents fell to the stray branch and it headed for the terminal).
+      expect(newRounds, "guest re-rendered BOTH repeated option-select rounds (two adopted presentations) (#831)").toBe(
+        EXPECTED_NEW_ROUNDS,
+      );
+      // The phase is PARKED, not settled (the host has not sent its terminal yet) - no premature leave.
+      expect(
+        (replay as unknown as { settled: boolean }).settled,
+        "guest CoopReplayMePhase is PARKED mid-delve (NOT settled before the host terminal)",
+      ).toBe(false);
+      // The guest has not converged / advanced yet (no terminal meResync).
+      expect(applyMeOutcomeSpy.mock.calls.length, "guest applied NO meResync yet (host terminal still parked)").toBe(0);
+      expect(
+        rig.guestRuntime.controller.interactionCounter(),
+        "guest has NOT advanced yet (host terminal still parked)",
+      ).toBe(counterBefore);
+
+      // ===== STEP C (host, SYNCHRONOUS): fire PostMysteryEncounterPhase.start() - for a no-outro non-battle
+      // ME it runs synchronously: streams the comprehensive meResync (8M) + the LEAVE terminal (9M) +
+      // advances the host counter. withClientSync restores the ctx before any loopback deliver-microtask
+      // flushes, so they flush under the GUEST ctx in STEP D (the cross-ctx footgun IT #2 / IT #4 also dodge). =====
+      withClientSync(rig.hostCtx, () => {
+        rig.hostScene.phaseManager.getCurrentPhase()!.start();
+      });
+      expect(
+        rig.hostRuntime.controller.interactionCounter(),
+        "host advanced the interaction counter once for the whole delve (single advance)",
+      ).toBe(counterBefore + 1);
+
+      const hostSeed = hostScene.seed;
+      const hostEncounteredEvents = JSON.stringify(hostScene.mysteryEncounterSaveData.encounteredEvents);
+
+      // ===== STEP D (guest): drain so the host's now-buffered meResync (8M) + LEAVE (9M) deliver to the
+      // guest's PARKED re-armed race UNDER the guest ctx: applyCoopMeOutcome converges the guest, then the
+      // LEAVE runs leaveEncounterWithoutBattle + advanceInteraction (the single terminal). =====
+      const guestReplay = await withClient(rig.guestCtx, () => drainGuestMeReplayToSettle(replay));
+
+      // The terminal STILL settles exactly once after the multi-round loop (all existing terminal machinery
+      // unchanged): the guest left once, applied the host's meResync once.
+      expect(guestReplay.settled, "guest CoopReplayMePhase settled (left once) at the delve terminal").toBe(true);
+      expect(
+        applyMeOutcomeSpy.mock.calls.length,
+        "guest applied the host's comprehensive meResync exactly once (its sole convergence path)",
+      ).toBe(1);
+      // CONVERGENCE: the guest's RNG seed + ME-save converged to the host's authoritative post-delve values.
+      expect(rig.guestScene.seed, "guest RNG seed converged to the host's via meResync").toBe(hostSeed);
+      expect(
+        JSON.stringify(rig.guestScene.mysteryEncounterSaveData.encounteredEvents),
+        "guest ME-save (encounteredEvents) converged to the host's via meResync",
+      ).toBe(hostEncounteredEvents);
+
+      // ===== INTERACTION-COUNTER LOCKSTEP: both controllers advanced EXACTLY ONCE for the whole multi-round
+      // delve (the repeated rounds are ONE alternation step - no per-round double-advance). =====
+      expect(
+        rig.hostRuntime.controller.interactionCounter(),
+        "host counter is 1 after the delve (single advance)",
+      ).toBe(counterBefore + 1);
+      expect(
+        rig.guestRuntime.controller.interactionCounter(),
+        "guest counter is 1 after the delve (lockstep with host, single advance)",
       ).toBe(counterBefore + 1);
 
       logs.flush();

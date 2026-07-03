@@ -167,28 +167,46 @@ export class CoopReplayMePhase extends Phase {
       }) ?? null;
 
     // #821 SHOP HANDOFF (live 'the reward shop doesn't load for the other player'): a
-    // non-battle ME's embedded reward shop runs on the OWNER's engine only; its streamed
-    // rewardOptions used to buffer with no waiter while this phase parked in the ME await -
-    // the watcher never saw a shop AND its wave-end chain (driven by its own shop phase)
-    // never ran, stranding it after the ME. When the options arrive (or already sit
-    // buffered), settle this phase and run the guest's OWN SelectModifierPhase - the
-    // existing ME-watcher override takes it from there; a DETACHED terminal listener
-    // handles the eventual ME end (leave + advance), exactly like the :46 flow did.
+    // non-battle ME's embedded reward shop's OPTION list is always rolled + streamed by the
+    // HOST engine; its streamed rewardOptions used to buffer with no waiter while this phase
+    // parked in the ME await - the guest never saw a shop AND its wave-end chain (driven by
+    // its own shop phase) never ran, stranding it after the ME. When the options arrive (or
+    // already sit buffered), settle this phase and run the guest's OWN SelectModifierPhase.
+    // #828: that phase resolves its role from the ME OWNER - on a HOST-owned ME the guest
+    // WATCHES the host's picks; on a GUEST-owned ME the guest DRIVES the pick as OWNER
+    // (adopting the host's streamed options) and relays it, the host applies. Either way a
+    // DETACHED terminal listener handles the eventual ME end (leave + advance), as the :46 flow did.
     const shopKeyPrefix = `${this.interactionCounter}:`;
+    // #830: capture the registering client's scene. In the two-engine duo harness a loopback
+    // delivery microtask can flush while globalScene points at the OTHER client; opening this
+    // guest's shop against the wrong scene would corrupt the host's phase queue. In production
+    // each client is its own realm, so the guard never fires; in the harness the buffered options
+    // stay in the inbox and the fast-path check on the next same-scene entry picks them up.
+    const registeringScene = globalScene;
     relay.onRewardOptionsBuffered = key => {
       if (!String(key).startsWith(shopKeyPrefix)) {
         return;
       }
+      if (globalScene !== registeringScene) {
+        coopLog("me", "shop-handoff notification under a foreign scene (harness ctx); deferring", { key });
+        return;
+      }
       // #818: a reward shop can FOLLOW a quiz handoff (Dormant Guardian's relic screen after
       // the braille trial). Once the QUIZ already settled this phase DETACHED, settleForWatcherShop's
-      // `settled` guard would no-op, so open the watcher shop DIRECTLY here - exactly once
-      // (shopHandedOff). The detached race the quiz re-armed still runs the ME-end leave/advance.
+      // `settled` guard would no-op, so open the guest shop DIRECTLY here - exactly once
+      // (shopHandedOff). #828: the SelectModifierPhase resolves its role from the ME OWNER (watcher on
+      // a host-owned ME, pick owner on a guest-owned one). The detached race the quiz re-armed still
+      // runs the ME-end leave/advance.
       if (this.settledDetached) {
         if (!this.shopHandedOff) {
           this.shopHandedOff = true;
-          coopLog("me", "reward shop FOLLOWS the quiz handoff - opening watcher shop directly (#818)", {
-            counter: this.interactionCounter,
-          });
+          coopLog(
+            "me",
+            "reward shop FOLLOWS the quiz handoff - opening guest ME-owner-role shop directly (#818/#828)",
+            {
+              counter: this.interactionCounter,
+            },
+          );
           globalScene.phaseManager.unshiftNew("SelectModifierPhase");
         }
         return;
@@ -290,6 +308,22 @@ export class CoopReplayMePhase extends Phase {
   /** #821: whether awaitOutcomeThenTerminal has been armed at least once. */
   private raceArmed = false;
 
+  /**
+   * #831 (audit P0#1): the SINGLE live 9M terminal arm, INHERITED by every re-arm (a repeated-option-select
+   * round re-render OR the quiz handoff) instead of re-awaited on the 9M inbox. A LEAVE the ORIGINAL arm
+   * already buffer-consumed (fast host, lagging guest) would be lost to a fresh await on the emptied inbox
+   * and the guest would never leave/advance (the #818 latent race, generalized to N re-arms).
+   */
+  private liveTerminalArm: MeTerminalArm | undefined;
+
+  /**
+   * #831 (audit P0#1, GROUP REPEAT): how many REPEATED option-select rounds (each a bare re-fired mePresent
+   * with NO subPrompt) this phase re-rendered AFTER the initial presentation. 0 for a single-round ME; N for
+   * an (N+1)-round press-your-luck delve / Safari loop. A duo-harness test seam (read via the established
+   * `as unknown as {...}` cast, like `settled`).
+   */
+  private newRoundsRendered = 0;
+
   public handleGuestOptionSelect(index: number): void {
     if (this.pickSent) {
       coopWarn("me", "DUPLICATE guest option select IGNORED (#815 re-entry guard)", {
@@ -310,6 +344,9 @@ export class CoopReplayMePhase extends Phase {
     }
     coopLog("me", "guest relays top-level ME pick", { seq: this.seq, kind: ME_CHOICE_KIND, index });
     relay.sendInteractionChoice(this.seq, ME_CHOICE_KIND, index); // P1 on seq_me
+    // #831: for a REPEATED option-select round (delve / Safari) beginNewRound reset pickSent so THIS pick is
+    // allowed, and this re-armed race INHERITS the live 9M terminal arm (awaitOutcomeThenTerminal reads
+    // this.liveTerminalArm) rather than re-awaiting the inbox - a fast host's buffered LEAVE is never lost.
     this.awaitOutcomeThenTerminal(relay);
   }
 
@@ -368,15 +405,21 @@ export class CoopReplayMePhase extends Phase {
     const outcomeArm = relay
       .awaitInteractionOutcome(this.seq, COOP_ME_REPLAY_WAIT_MS)
       .then(outcome => ({ tag: "outcome" as const, outcome }));
-    // #818 latent-race fix: a re-arm (quiz handoff) INHERITS the original race's terminal arm.
-    // The original arm may have ALREADY buffer-hit the host's LEAVE (fast host, lagging guest);
-    // re-awaiting the emptied 9M inbox would hang forever and the guest would never leave/advance.
+    // #818/#831 latent-race fix: a re-arm (quiz handoff OR a repeated-option-select ROUND) INHERITS the ONE
+    // live 9M terminal arm rather than re-awaiting the inbox. The original arm may have ALREADY buffer-hit
+    // the host's LEAVE (fast host, lagging guest); re-awaiting the emptied 9M inbox would hang forever and
+    // the guest would never leave/advance. Priority: an explicitly-passed arm (the quiz handoff threads it),
+    // else the stored live arm (new-round re-renders + the owner's per-round pick relay reuse it), else a
+    // fresh await (the FIRST race of the ME). Stored back so handleGuestOptionSelect and beginNewRound both
+    // reuse the identical promise across every round.
     const terminalArm: MeTerminalArm =
       inheritedTerminalArm
+      ?? this.liveTerminalArm
       ?? relay.awaitInteractionChoice(this.seqTerm, COOP_ME_REPLAY_WAIT_MS).then(action => ({
         tag: "terminal" as const,
         action,
       }));
+    this.liveTerminalArm = terminalArm;
     void Promise.race([outcomeArm, terminalArm]).then(winner => {
       if (raceDone) {
         return;
@@ -398,6 +441,16 @@ export class CoopReplayMePhase extends Phase {
         return;
       }
       const outcome = winner.outcome;
+      // #831 (audit P0#1, GROUP REPEAT): a re-fired TOP-LEVEL mePresent (k==="mePresent", subPrompt==null)
+      // arriving on a live UNSETTLED phase is the NEXT press-your-luck / Safari ROUND (the host re-fired
+      // MysteryEncounterPhase with the round's options: "descend again? / dig again?"), NOT the stray it used
+      // to fall through to (:463 warn -> terminal), which softlocked the delves. Re-render exactly as start()
+      // did off the fresh presentation and re-arm. Placed BEFORE the subPrompt branch (disjoint: subPrompt==null
+      // vs !=null) and gated on !settled so a detached shop/quiz settle never re-opens a round.
+      if (outcome != null && outcome.k === "mePresent" && outcome.subPrompt == null && !this.settled) {
+        this.beginNewRound(relay, outcome, terminalArm);
+        return;
+      }
       if (outcome != null && outcome.k === "mePresent" && outcome.subPrompt != null) {
         // #818: the host opened its embedded QUIZ minigame (Guessing Booth / Scrambled Pokedex /
         // footprint hunt / Unown cipher / braille seal / Salvage Yard). Unlike the party/secondary
@@ -455,6 +508,57 @@ export class CoopReplayMePhase extends Phase {
         }
       });
     });
+  }
+
+  /**
+   * #831 (audit P0#1, GROUP REPEAT): render a REPEATED option-select ROUND. The 8 press-your-luck delves
+   * (Into the Caldera, Abyssal Vent, Tide Pools, Buried City, Glittering Vein, Overcharge Core, Overgrown
+   * Temple, Woodland Forager) + Safari Zone re-fire MysteryEncounterPhase each round via
+   * initSubsequentOptionSelect, so the HOST engine streams a FRESH top-level `mePresent` (no subPrompt) per
+   * round through the same 8M sender. This mirrors {@linkcode start}'s presentation-adopt + ownership branch
+   * for the NEW round: the OWNER re-opens the REAL selector + re-arms its pick relay (one pick PER ROUND);
+   * the WATCHER adopts the presentation for display + re-arms the outcome/terminal race and keeps waiting.
+   * The round loop ends when the host reaches its NORMAL terminal (meResync + LEAVE, or a battle handoff on a
+   * bust) - all the existing terminal machinery (leaveDefensive / the meResync branch / handleTerminalAction)
+   * runs UNCHANGED. Every re-arm INHERITS the live terminalArm (#818): a fast host's already-buffered LEAVE is
+   * never lost to a fresh await on 9M. No-op on solo / non-delve co-op MEs (they never re-fire a bare mePresent
+   * on a live phase), so those paths stay byte-identical.
+   */
+  private beginNewRound(
+    relay: NonNullable<ReturnType<typeof getCoopInteractionRelay>>,
+    present: Extract<CoopInteractionOutcome, { k: "mePresent" }>,
+    terminalArm: MeTerminalArm,
+  ): void {
+    this.newRoundsRendered += 1;
+    coopLog("me", "REPEATED option-select ROUND (bare mePresent, no subPrompt) - re-rendering (#831)", {
+      seq: this.seq,
+      round: this.newRoundsRendered,
+      opts: present.meetsReqs.length,
+      labels: present.labels.length,
+    });
+    // Adopt the fresh presentation exactly as start() does (host tokens win; the UI handler reads the round's
+    // meetsReqs / labels off coopMeHostPresentation, so the watcher renders the round's real button labels).
+    const enc = globalScene.currentBattle.mysteryEncounter;
+    if (enc != null) {
+      enc.dialogueTokens = { ...enc.dialogueTokens, ...present.tokens };
+      coopMeHostPresentation = present;
+    }
+    const ownsMe = getCoopController()?.isLocalOwnerAtCounter(this.interactionCounter) ?? false;
+    if (ownsMe) {
+      // One pick PER ROUND: re-open the pick relay (the #815 single-pick guard is per-round for a repeated
+      // select, not per-ME). The UI handler forwards the human's next pick to handleGuestOptionSelect, which
+      // re-arms the race INHERITING this.liveTerminalArm - so we must NOT arm a race here (a second live race
+      // would double-consume the host's next round outcome).
+      this.pickSent = false;
+      showCoopControllerTagFor(true); // #817: green = you drive this round
+      void globalScene.ui.setMode(UiMode.MYSTERY_ENCOUNTER, undefined);
+      return;
+    }
+    // Watcher: adopt the presentation for display (the real selector, input-blocked for non-owners) + re-arm
+    // the outcome/terminal race INHERITING the live terminalArm, and keep waiting for the next round / terminal.
+    showCoopControllerTagFor(false); // #817: amber = partner drives this round
+    void globalScene.ui.setMode(UiMode.MYSTERY_ENCOUNTER, undefined);
+    this.awaitOutcomeThenTerminal(relay, terminalArm);
   }
 
   /**
@@ -667,19 +771,26 @@ export class CoopReplayMePhase extends Phase {
   }
 
   /**
-   * #821 SHOP HANDOFF: the owner's engine opened the ME's embedded reward shop. Settle this
-   * phase (WITHOUT leaving the encounter, WITHOUT advancing - the ME is still live) and run
-   * the guest's OWN SelectModifierPhase: the ME-watcher override inside it consumes the
-   * buffered rewardOptions and mirrors the owner's shop. A DETACHED listener on the terminal
-   * seq performs the eventual leave + advance (the duties leaveDefensive would have run).
+   * #821 SHOP HANDOFF: the HOST engine opened (streamed the options for) the ME's embedded reward shop.
+   * Settle this phase (WITHOUT leaving the encounter, WITHOUT advancing - the ME is still live) and run
+   * the guest's OWN SelectModifierPhase. #828: that phase resolves its role from the ME OWNER, NOT a
+   * forced watcher - on a HOST-owned ME the guest WATCHES (consumes the host's streamed options + mirrors
+   * the host's picks); on a GUEST-owned ME the guest is the reward pick OWNER (adopts the host's streamed
+   * options, DRIVES the interactive pick, and relays it for the host to apply). Either way a DETACHED
+   * listener on the terminal seq performs the eventual leave + advance (the duties leaveDefensive runs).
    */
   private settleForWatcherShop(relay: NonNullable<ReturnType<typeof getCoopInteractionRelay>>): void {
     if (this.settled) {
       return;
     }
-    coopLog("me", "SHOP HANDOFF: owner opened the embedded ME reward shop - running watcher shop (#821)", {
-      counter: this.interactionCounter,
-    });
+    coopLog(
+      "me",
+      "SHOP HANDOFF: host opened the embedded ME reward shop - running guest shop as ME-owner role (#821/#828)",
+      {
+        counter: this.interactionCounter,
+        ownsMe: getCoopController()?.isLocalOwnerAtCounter(this.interactionCounter) ?? false,
+      },
+    );
     hideCoopControllerTag();
     relay.onRewardOptionsBuffered = null;
     // The phase's ALREADY-ARMED outcome/terminal race keeps running detached (promises
