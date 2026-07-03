@@ -58,7 +58,7 @@ const GAUNTLET_EXCLUDED = new Set<MysteryEncounterType>([MysteryEncounterType.LL
  */
 export function erGauntletPickMeType(
   waveIndex: number,
-  encountered: readonly MysteryEncounterType[],
+  _encountered: readonly MysteryEncounterType[],
   runSeed = "",
 ): MysteryEncounterType {
   if (erGauntletWaveKind(waveIndex) === "bargain") {
@@ -67,14 +67,26 @@ export function erGauntletPickMeType(
   const all = Object.values(MysteryEncounterType).filter(
     (v): v is MysteryEncounterType => typeof v === "number" && !GAUNTLET_EXCLUDED.has(v),
   );
-  const seen = new Set(encountered);
-  const fresh = all.filter(t => !seen.has(t));
-  const pool = fresh.length > 0 ? fresh : all; // pool exhausted -> start repeating
-  // Deterministic walk keyed by wave + RUN SEED: replays and the co-op guest agree,
-  // but different runs see different encounters at the same wave (live 'same ME again').
   let seedHash = 0;
   for (let i = 0; i < runSeed.length; i++) {
     seedHash = (seedHash * 31 + runSeed.charCodeAt(i)) >>> 0;
   }
-  return pool[(waveIndex + seedHash) % pool.length];
+  // #825 (live co-op 'different events at the same wave'): the non-repeat exclusion used the
+  // SAVE-TRACKED encounteredEvents list, which differs per client (each registers only what
+  // its own engine ran) - so host and guest walked DIFFERENT pools and picked different MEs
+  // at the same wave. Derive the seen-set BY CONSTRUCTION instead: recompute what every
+  // earlier gauntlet me-wave must have picked from (wave, seed) alone. Pure + identical on
+  // every client and across reloads, no save-state dependency at all.
+  const seen = new Set<MysteryEncounterType>();
+  const pickAt = (wave: number): MysteryEncounterType => {
+    const fresh = all.filter(t => !seen.has(t));
+    const pool = fresh.length > 0 ? fresh : all; // pool exhausted -> start repeating
+    return pool[(wave + seedHash) % pool.length];
+  };
+  for (let w = 2; w < waveIndex; w++) {
+    if (erGauntletWaveKind(w) === "me") {
+      seen.add(pickAt(w));
+    }
+  }
+  return pickAt(waveIndex);
 }

@@ -205,6 +205,14 @@ export class CoopBattleStreamer {
   /** GUEST: handler for the host's settled post-exp per-slot deltas (#633 B5, authoritative EXP). */
   private expResolvedHandler: ((wave: number, deltas: CoopExpDelta[]) => void) | null = null;
 
+  /** GUEST (#825): the host's rolled ME type per wave (from enemyPartySync). */
+  private readonly meTypeByWave = new Map<number, number>();
+
+  /** GUEST (#825): the host's ME type for `wave`, if its wave-start sync arrived. */
+  meTypeForWave(wave: number): number | undefined {
+    return this.meTypeByWave.get(wave);
+  }
+
   constructor(transport: CoopTransport, opts: CoopBattleStreamerOptions = {}) {
     this.transport = transport;
     this.timeoutMs = opts.timeoutMs ?? DEFAULT_TIMEOUT_MS;
@@ -216,9 +224,9 @@ export class CoopBattleStreamer {
   // --- HOST side --------------------------------------------------------------
 
   /** HOST: send the exact enemy party the guest must adopt verbatim for `wave`. */
-  sendEnemyParty(wave: number, enemies: CoopSerializedEnemy[]): void {
-    coopLog("replay", `host SEND enemyPartySync wave=${wave} count=${enemies.length}`);
-    this.transport.send({ t: "enemyPartySync", wave, enemies });
+  sendEnemyParty(wave: number, enemies: CoopSerializedEnemy[], meType?: number): void {
+    coopLog("replay", `host SEND enemyPartySync wave=${wave} count=${enemies.length} meType=${meType ?? "-"}`);
+    this.transport.send({ t: "enemyPartySync", wave, enemies, ...(meType === undefined ? {} : { meType }) });
   }
 
   /**
@@ -1088,6 +1096,11 @@ export class CoopBattleStreamer {
   private handle(msg: CoopMessage): void {
     switch (msg.t) {
       case "enemyPartySync": {
+        // #825: remember the host's rolled ME type for this wave so a guest that
+        // generates its encounter AFTER the sync arrives adopts the host's roll.
+        if (msg.meType !== undefined) {
+          this.meTypeByWave.set(msg.wave, msg.meType);
+        }
         // Hand it straight to a parked awaitEnemyParty (consumed), else buffer for the
         // next consume/await. Either way fire any live handler.
         const waiter = this.enemyPartyWaiters.get(msg.wave);

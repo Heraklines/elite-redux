@@ -32,6 +32,7 @@ import { getDailyMysteryEncounter } from "#data/daily-seed/daily-run";
 import { allMoves, allSpecies, biomeDepths, modifierTypes } from "#data/data-lists";
 import { classicFinalBossDialogue } from "#data/dialogue";
 import { ER_SILKEN_DECREE_ABILITY_ID } from "#data/elite-redux/abilities/silken-decree";
+import { getCoopBattleStreamer, getCoopController } from "#data/elite-redux/coop/coop-runtime";
 import { grantErAchievementReward } from "#data/elite-redux/er-achievement-rewards";
 import { erExtraRivalTypeForWave } from "#data/elite-redux/er-battle-frequency";
 import {
@@ -4576,8 +4577,21 @@ export class BattleScene extends SceneBase {
     } else if (canBypass) {
       encounter = allMysteryEncounters[encounterType ?? -1];
       return encounter;
+    } else if (
+      this.gameMode.isCoop
+      && getCoopController()?.role === "guest"
+      && getCoopBattleStreamer()?.meTypeForWave(this.currentBattle.waveIndex) !== undefined
+    ) {
+      // #825: the host's wave-start sync already told us its rolled ME type - adopt it
+      // verbatim so both screens run the SAME encounter (live 'different events').
+      const adopted = getCoopBattleStreamer()!.meTypeForWave(this.currentBattle.waveIndex)!;
+      console.log(
+        `[coop:me] wave=${this.currentBattle.waveIndex} ME type ADOPTED from host -> ${MysteryEncounterType[adopted]}`,
+      );
+      encounter = allMysteryEncounters[adopted] ?? null;
     } else if (erGauntletActive()) {
-      // MYSTERY GAUNTLET (#814): the schedule picks the type (non-repeating registry walk).
+      // MYSTERY GAUNTLET (#814): the schedule picks the type. #825: the pick is now
+      // deterministic from (wave, seed) ALONE - identical on host + guest by construction.
       const forced = erGauntletPickMeType(
         this.currentBattle.waveIndex,
         (this.mysteryEncounterSaveData?.encounteredEvents ?? []).map(e => e.type),

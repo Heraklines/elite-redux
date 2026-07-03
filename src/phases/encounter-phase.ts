@@ -275,7 +275,7 @@ export class EncounterPhase extends BattlePhase {
         if (!caughtUp) {
           coopWarn("replay", `wave-start barrier wave=${wave} timed out -> sending party anyway (resync heals)`);
         }
-        streamer.sendEnemyParty(wave, enemies);
+        streamer.sendEnemyParty(wave, enemies, globalScene.currentBattle?.mysteryEncounter?.encounterType);
       });
     } catch {
       /* a serialize/send failure must never break the host's encounter */
