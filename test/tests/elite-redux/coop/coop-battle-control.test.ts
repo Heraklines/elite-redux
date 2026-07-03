@@ -349,6 +349,25 @@ describe.skipIf(!RUN)("co-op battle control (#633, P2) - real engine (double bat
     expect(mode.hasChallenge(Challenges.SINGLE_GENERATION)).toBe(true);
   });
 
+  it("#815: a double-fired ME option select relays exactly ONE pick (re-entry guard)", async () => {
+    await startCoopDouble();
+    const { getCoopInteractionRelay } = await import("#data/elite-redux/coop/coop-runtime");
+    const { CoopReplayMePhase } = await import("#phases/coop-replay-me-phase");
+    const relay = getCoopInteractionRelay()!;
+    const sendSpy = vi.spyOn(relay, "sendInteractionChoice");
+    const phase = new CoopReplayMePhase(1);
+    // The live softlock: the option UI fired twice; the second call re-armed the outcome
+    // await on the SAME seq, nulling the first waiter -> misread as host stall -> premature
+    // leave + counter divergence. The guard must swallow the duplicate entirely.
+    phase.handleGuestOptionSelect(0);
+    phase.handleGuestOptionSelect(0);
+    phase.handleGuestOptionSelect(1);
+    const mePicks = sendSpy.mock.calls.filter(c => c[1] === "me");
+    expect(mePicks.length, "exactly one top-level pick relayed").toBe(1);
+    expect(mePicks[0][2], "the FIRST pick wins").toBe(0);
+    sendSpy.mockRestore();
+  });
+
   it("#809 revival owner-pick: a PARTNER-owned Revival Blessing prompts the partner, never the host's screen", async () => {
     const field = await startCoopDouble();
     const guestMon = field[COOP_GUEST_FIELD_INDEX]; // partner-owned user

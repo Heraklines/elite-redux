@@ -352,6 +352,13 @@ export class MysteryEncounterPhase extends Phase {
     }
     const seqMe = COOP_ME_PUMP_SEQ_BASE + coopMeInteractionStartValue();
     coopLog("me", "host awaits guest ME option index", { seq: seqMe, timeoutMs: COOP_ME_REPLAY_WAIT_MS });
+    // #815 visibility: the shop-style banner while the PARTNER decides this encounter.
+    try {
+      const partnerName = getCoopController()?.partnerName ?? "Your partner";
+      globalScene.phaseManager.queueMessage(`${partnerName} is choosing...`, 0, true);
+    } catch {
+      /* cosmetic */
+    }
     void relay.awaitInteractionChoice(seqMe, COOP_ME_REPLAY_WAIT_MS).then(choice => {
       if (choice == null || choice.choice < 0) {
         // D1 null-end: a disconnected guest must never hang the host's engine - safe-leave + close.
@@ -396,6 +403,13 @@ export class MysteryEncounterPhase extends Phase {
         index: choice.choice,
         encounter: MysteryEncounterType[encounter.encounterType],
       });
+      // #815 visibility: announce the partner's pick on THIS screen (the pick echo).
+      try {
+        const partnerName = getCoopController()?.partnerName ?? "Your partner";
+        globalScene.phaseManager.queueMessage(`${partnerName} chose option ${choice.choice + 1}.`, 0, true);
+      } catch {
+        /* cosmetic */
+      }
       // Input-free option apply (the same path the local handler uses): drives onPre / onOption /
       // onPost; the engine sub-prompts (party target / secondary menu) await the guest's relayed
       // sub-picks at their own sites (encounter-phase-utils ADD-2b).

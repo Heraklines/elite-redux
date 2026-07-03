@@ -181,6 +181,14 @@ export class CoopReplayMePhase extends Phase {
         void globalScene.ui.setMode(UiMode.MYSTERY_ENCOUNTER, undefined);
         return;
       }
+      // #815 visibility: tell the watcher WHO is driving (the shop-style banner the
+      // maintainer asked for), so a quiet encounter never reads as a freeze.
+      try {
+        const partner = getCoopController()?.partnerName ?? "Your partner";
+        globalScene.phaseManager.queueMessage(`${partner} is choosing...`, 0, true);
+      } catch {
+        /* cosmetic */
+      }
       this.awaitOutcomeThenTerminal(relay);
     })();
   }
@@ -190,7 +198,18 @@ export class CoopReplayMePhase extends Phase {
    * engine), then drive the sub-pick loop + await the host's authoritative outcome + leave terminal.
    * View-party (cursor === viewPartyIndex) is handled locally in the UI handler and never reaches here.
    */
+  /** #815: one top-level pick per ME - a double-fired select must not re-arm the awaits. */
+  private pickSent = false;
+
   public handleGuestOptionSelect(index: number): void {
+    if (this.pickSent) {
+      coopWarn("me", "DUPLICATE guest option select IGNORED (#815 re-entry guard)", {
+        counter: this.interactionCounter,
+        index,
+      });
+      return;
+    }
+    this.pickSent = true;
     const relay = getCoopInteractionRelay();
     if (relay == null) {
       coopWarn("me", "no relay on guest option select; defensive leave", { counter: this.interactionCounter, index });
