@@ -1012,6 +1012,30 @@ export class PostMysteryEncounterPhase extends Phase {
         counter: coopMeInteractionStartValue(),
       });
       coopClearMePinForGuest();
+      // #824 (THE recurring 'after the ME it doesn't continue' strand - 18:41 session and
+      // every look-alike before it): this early-return skips the wave-advance the host's
+      // PostME performs below, leaving the guest to whatever STALE battle-loop phases sat
+      // in its queue (18:41: it resumed a phantom wave-2 battle and parked awaiting turn 4
+      // forever while the host reached wave 3). Mirror the host DETERMINISTICALLY: purge
+      // the stale battle loop and push exactly one NewBattlePhase - the guest's post-ME
+      // boundary must never depend on leftover queue contents.
+      let purged = 0;
+      for (const stale of [
+        "TurnInitPhase",
+        "CommandPhase",
+        "TurnStartPhase",
+        "TurnEndPhase",
+        "CoopReplayTurnPhase",
+        "CoopInertPhase",
+        "BattleEndPhase",
+        "NewBattlePhase",
+      ] as const) {
+        while (globalScene.phaseManager.tryRemovePhase(stale)) {
+          purged++;
+        }
+      }
+      coopLog("me", `guest post-ME wave advance: purged ${purged} stale phases -> NewBattlePhase (#824)`);
+      globalScene.phaseManager.pushNew("NewBattlePhase");
       this.end();
       return;
     }
