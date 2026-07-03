@@ -1,0 +1,270 @@
+----- BUG REPORT (in-game) -----
+version:  1.11.19
+url:      https://elite-redux.pages.dev/
+ua:       Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Mobile Safari/537.36
+mode:     4  wave:195  difficulty:youngster
+seed:     IP3g2nTZA4ZKu5MFl8hnM4Ex
+party:    Yveltal(L200 872/872), Thievul(L200 552/552), Sharpedo(L181 500/500), Sableye(L179 495/495), Dodrio Redux(L174 551/551)
+
+----- DESCRIPTION -----
+Aurora Veil and Reflect are not supposed to be stackable
+
+----- CONSOLE -----
+[02:43:31.594] LOG: %cStart Phase TurnEndPhase color:green;
+[02:43:31.597] WARN: [coop:turn] host recorder: finalize with NO open recording -> turn=-1 events=0 (caller decides not to emit)
+[02:43:31.598] LOG: %cStart Phase SwitchSummonPhase color:green;
+[02:43:31.828] LOG: Ivy
+[02:43:31.896] LOG: Applied HP Up (enemy)
+[02:43:31.896] LOG: Applied Calcium (enemy)
+[02:43:31.896] LOG: Applied Zinc (enemy)
+[02:43:31.896] LOG: Applied Iron (enemy)
+[02:43:31.897] LOG: Applied Calcium (enemy)
+[02:43:31.897] LOG: Applied Zinc (enemy)
+[02:43:31.897] LOG: Applied Carbos (enemy)
+[02:43:31.897] LOG: Applied Iron (enemy)
+[02:43:31.897] LOG: Applied HP Up (enemy)
+[02:43:31.897] LOG: Applied Zinc (enemy)
+[02:43:31.897] LOG: Applied Carbos (enemy)
+[02:43:31.898] LOG: Applied Carbos (enemy)
+[02:43:31.898] LOG: Applied Calcium (enemy)
+[02:43:31.898] LOG: Applied HP Up (enemy)
+[02:43:31.898] LOG: Applied Iron (enemy)
+[02:43:31.898] LOG: Applied Calcium (enemy)
+[02:43:31.898] LOG: Applied Protein (enemy)
+[02:43:31.898] LOG: Applied HP Up (enemy)
+[02:43:31.899] LOG: Applied Zinc (enemy)
+[02:43:31.899] LOG: Applied Zinc (enemy)
+[02:43:31.899] LOG: Applied Protein (enemy)
+[02:43:31.899] LOG: Applied HP Up (enemy)
+[02:43:31.899] LOG: Applied Iron (enemy)
+[02:43:31.899] LOG: Applied Calcium (enemy)
+[02:43:32.050] LOG: %cStart Phase PostSummonPhase color:green;
+[02:43:32.050] LOG: Ran PSP for: Hydreigon
+[02:43:32.050] LOG: %cStart Phase PostSummonPhase color:green;
+[02:43:32.051] LOG: %cStart Phase PostSummonPhase color:green;
+[02:43:32.051] LOG: %cStart Phase SwitchSummonPhase color:green;
+[02:43:32.277] LOG: Ivy
+[02:43:32.364] LOG: Applied HP Up (enemy)
+[02:43:32.364] LOG: Applied Calcium (enemy)
+[02:43:32.364] LOG: Applied Zinc (enemy)
+[02:43:32.364] LOG: Applied Iron (enemy)
+[02:43:32.364] LOG: Applied Zinc (enemy)
+[02:43:32.364] LOG: Applied Protein (enemy)
+[02:43:32.364] LOG: Applied HP Up (enemy)
+[02:43:32.364] LOG: Applied Iron (enemy)
+[02:43:32.365] LOG: Applied Calcium (enemy)
+[02:43:32.365] LOG: Applied HP Up (enemy)
+[02:43:32.365] LOG: Applied Zinc (enemy)
+[02:43:32.365] LOG: Applied Carbos (enemy)
+[02:43:32.365] LOG: Applied Carbos (enemy)
+[02:43:32.365] LOG: Applied Calcium (enemy)
+[02:43:32.365] LOG: Applied HP Up (enemy)
+[02:43:32.365] LOG: Applied Iron (enemy)
+[02:43:32.365] LOG: Applied Calcium (enemy)
+[02:43:32.365] LOG: Applied Protein (enemy)
+[02:43:32.365] LOG: Applied HP Up (enemy)
+[02:43:32.365] LOG: Applied Zinc (enemy)
+[02:43:32.366] LOG: Applied Calcium (enemy)
+[02:43:32.366] LOG: Applied Zinc (enemy)
+[02:43:32.366] LOG: Applied Carbos (enemy)
+[02:43:32.366] LOG: Applied Iron (enemy)
+[02:43:32.395] WARN: cry/384-mega not found
+[02:43:32.505] LOG: %cStart Phase ShinySparklePhase color:green;
+[02:43:32.611] LOG: %cStart Phase PostSummonPhase color:green;
+[02:43:32.611] LOG: Ran PSP for: Mega Rayquaza
+[02:43:32.613] LOG: %cStart Phase PostSummonPhase color:green;
+[02:43:32.614] LOG: %cStart Phase PostSummonPhase color:green;
+[02:43:32.628] LOG: %cStart Phase ShowAbilityPhase color:green;
+[02:43:32.796] LOG: %cStart Phase CommonAnimPhase color:green;
+[02:43:33.311] LOG: %cStart Phase MessagePhase color:green;
+[02:43:33.611] LOG: %cStart Phase HideAbilityPhase color:green;
+[02:43:33.645] LOG: %cStart Phase TurnInitPhase color:green;
+[02:43:33.646] LOG: %cStart Phase CommandPhase color:green;
+[02:43:42.992] LOG: Move: BLEAKWIND_STORM Move targets: {"targets":[2,3],"multiple":true} 
+Player Pokemon: Yveltal
+[02:43:42.994] LOG: %cStart Phase SelectTargetPhase color:green;
+[02:43:44.044] LOG: %cStart Phase CommandPhase color:green;
+[02:43:46.321] LOG: Move: BADDY_BAD Move targets: {"targets":[2,3,0],"multiple":false} 
+Player Pokemon: Thievul
+[02:43:46.323] LOG: %cStart Phase SelectTargetPhase color:green;
+[02:43:47.159] LOG: %cStart Phase EnemyCommandPhase color:green;
+[02:43:47.169] LOG: Applied Dragon Fang (enemy)
+[02:43:47.171] LOG: Applied Dragon Fang (enemy)
+[02:43:47.177] WARN: BattlerTag THROAT_CHOPPED is missing a score!
+[02:43:47.178] WARN: BattlerTag THROAT_CHOPPED is missing a score!
+[02:43:47.178] WARN: BattlerTag THROAT_CHOPPED is missing a score!
+[02:43:47.179] LOG: Battle Seed: Hm3qrdRqefNH8X4g
+[02:43:47.181] WARN: BattlerTag THROAT_CHOPPED is missing a score!
+[02:43:47.182] LOG: Move Pool: ["Draco Missile","Throat Chop","Dragon Dance","Protect"]
+[02:43:47.182] LOG: Move Scores: [27,11.625,4,-20]
+[02:43:47.182] LOG: Sorted Move Pool: ["Draco Missile","Throat Chop","Dragon Dance","Protect"]
+[02:43:47.182] LOG: Chosen Move: Draco Missile
+[02:43:47.182] LOG: %cStart Phase EnemyCommandPhase color:green;
+[02:43:47.197] LOG: Move Pool: ["Draconic Fangs","Dragon Ascent"]
+[02:43:47.197] LOG: Move Scores: [27,30]
+[02:43:47.197] LOG: Sorted Move Pool: ["Dragon Ascent","Draconic Fangs"]
+[02:43:47.197] LOG: Chosen Move: Dragon Ascent
+[02:43:47.197] LOG: %cStart Phase TurnStartPhase color:green;
+[02:43:47.204] LOG: %cStart Phase MovePhase color:green;
+[02:43:47.204] LOG: %cUser: Thievul
+Move: BADDY_BAD
+Use Mode: NORMAL color:orchid
+[02:43:47.210] LOG: %cStart Phase MessagePhase color:green;
+[02:43:47.269] LOG: %cStart Phase MoveEffectPhase color:green;
+[02:43:47.269] LOG: Applied Multi Lens 
+[02:43:48.155] LOG: Applied Scope Lens 
+[02:43:48.155] LOG: Applied Dire Hit 
+[02:43:48.156] LOG: crit stage: +2
+[02:43:48.159] LOG: Move: Baddy Bad | Base damage: 94.77157733537518 | Power: 80 | Source attack: 464 | Target defense: 653
+[02:43:48.160] LOG: Applied Multi Lens 
+[02:43:48.161] LOG: Move: Baddy Bad | Attack damage: 98
+[02:43:48.168] LOG: %cStart Phase DamageAnimPhase color:green;
+[02:43:48.187] LOG: %cStart Phase MessagePhase color:green;
+[02:43:48.386] LOG: %cStart Phase MessagePhase color:green;
+[02:43:48.686] LOG: %cStart Phase StatStageChangePhase color:green;
+[02:43:48.874] LOG: %cStart Phase MessagePhase color:green;
+[02:43:49.119] LOG: %cStart Phase MoveEffectPhase color:green;
+[02:43:50.004] LOG: Applied Scope Lens 
+[02:43:50.004] LOG: Applied Dire Hit 
+[02:43:50.005] LOG: crit stage: +2
+[02:43:50.008] LOG: Move: Baddy Bad | Base damage: 38.988667687595715 | Power: 80 | Source attack: 185 | Target defense: 653
+[02:43:50.008] LOG: Applied Multi Lens 
+[02:43:50.009] LOG: Move: Baddy Bad | Attack damage: 13
+[02:43:50.010] LOG: %cStart Phase DamageAnimPhase color:green;
+[02:43:50.037] LOG: %cStart Phase StatStageChangePhase color:green;
+[02:43:50.224] LOG: %cStart Phase MessagePhase color:green;
+[02:43:50.453] LOG: %cStart Phase MoveEffectPhase color:green;
+[02:43:51.337] LOG: Applied Scope Lens 
+[02:43:51.338] LOG: Applied Dire Hit 
+[02:43:51.338] LOG: crit stage: +2
+[02:43:51.343] LOG: Move: Baddy Bad | Base damage: 94.77157733537518 | Power: 80 | Source attack: 464 | Target defense: 653
+[02:43:51.343] LOG: Applied Multi Lens 
+[02:43:51.344] LOG: Move: Baddy Bad | Attack damage: 45
+[02:43:51.345] LOG: %cStart Phase DamageAnimPhase color:green;
+[02:43:51.374] LOG: %cStart Phase MessagePhase color:green;
+[02:43:51.570] LOG: %cStart Phase StatStageChangePhase color:green;
+[02:43:51.758] LOG: %cStart Phase MessagePhase color:green;
+[02:43:51.986] LOG: %cStart Phase MessagePhase color:green;
+[02:43:52.186] LOG: %cStart Phase MoveEndPhase color:green;
+[02:43:52.191] LOG: %cStart Phase MovePhase color:green;
+[02:43:52.191] LOG: %cUser: Yveltal
+Move: BLEAKWIND_STORM
+Use Mode: NORMAL color:orchid
+[02:43:52.202] LOG: %cStart Phase MessagePhase color:green;
+[02:43:52.336] LOG: %cStart Phase MoveEffectPhase color:green;
+[02:43:52.337] LOG: Applied Multi Lens 
+[02:43:52.339] LOG: Applied Wide Lens 
+[02:43:52.906] LOG: Applied Scope Lens 
+[02:43:52.906] LOG: Applied Dire Hit 
+[02:43:52.906] LOG: crit stage: +2
+[02:43:52.910] LOG: Applied Sharp Beak 
+[02:43:52.911] LOG: Move: Bleakwind Storm | Base damage: 1326.7424460431655 | Power: 140 | Source attack: 2406 | Target defense: 417
+[02:43:52.912] LOG: Applied Multi Lens 
+[02:43:52.912] LOG: Move: Bleakwind Storm | Attack damage: 1097
+[02:43:52.914] LOG: %cStart Phase ShowAbilityPhase color:green;
+[02:43:53.056] LOG: %cStart Phase MessagePhase color:green;
+[02:43:53.302] LOG: %cStart Phase StatStageChangePhase color:green;
+[02:43:53.492] LOG: %cStart Phase MessagePhase color:green;
+[02:43:53.719] LOG: %cStart Phase HideAbilityPhase color:green;
+[02:43:53.756] LOG: %cStart Phase DamageAnimPhase color:green;
+[02:43:53.789] LOG: %cStart Phase MessagePhase color:green;
+[02:43:54.003] LOG: %cStart Phase MoveEffectPhase color:green;
+[02:43:54.006] LOG: %cStart Phase ShowAbilityPhase color:green;
+[02:43:54.188] LOG: %cStart Phase MessagePhase color:green;
+[02:43:54.436] LOG: %cStart Phase StatStageChangePhase color:green;
+[02:43:54.625] LOG: %cStart Phase MessagePhase color:green;
+[02:43:54.852] LOG: %cStart Phase HideAbilityPhase color:green;
+[02:43:54.889] LOG: %cStart Phase FaintPhase color:green;
+[02:43:57.313] LOG: %cStart Phase MessagePhase color:green;
+[02:43:57.516] LOG: %cStart Phase ShowAbilityPhase color:green;
+[02:43:57.687] LOG: %cStart Phase StatStageChangePhase color:green;
+[02:43:57.862] LOG: %cStart Phase MessagePhase color:green;
+[02:43:58.093] LOG: %cStart Phase HideAbilityPhase color:green;
+[02:43:58.128] LOG: %cStart Phase VictoryPhase color:green;
+[02:43:58.128] LOG: Applied Soothe Bell 
+[02:43:58.128] LOG: %cStart Phase ExpPhase color:green;
+[02:43:58.128] LOG: Applied Super EXP. Charm 
+[02:43:58.128] LOG: Applied EXP. Charm 
+[02:43:59.490] LOG: 7424778 7623795 7480000
+[02:43:59.582] LOG: %cStart Phase LevelUpPhase color:green;
+[02:43:59.583] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[02:43:59.583] LOG: Applied Super EXP. Charm 
+[02:43:59.583] LOG: Applied EXP. Charm 
+[02:43:59.583] LOG: %cStart Phase LevelUpPhase color:green;
+[02:43:59.583] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[02:43:59.583] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[02:43:59.583] LOG: Applied Super EXP. Charm 
+[02:43:59.583] LOG: Applied EXP. Charm 
+[02:43:59.584] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[02:43:59.584] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[02:43:59.584] LOG: Applied Super EXP. Charm 
+[02:43:59.584] LOG: Applied EXP. Charm 
+[02:43:59.584] LOG: %cStart Phase LevelUpPhase color:green;
+[02:43:59.584] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[02:43:59.584] LOG: %cStart Phase MoveEndPhase color:green;
+[02:43:59.586] LOG: %cStart Phase MovePhase color:green;
+[02:43:59.586] LOG: %cUser: Mega Rayquaza
+Move: DRAGON_ASCENT
+Use Mode: NORMAL color:orchid
+[02:43:59.591] LOG: %cStart Phase MessagePhase color:green;
+[02:43:59.732] LOG: %cStart Phase MoveEffectPhase color:green;
+[02:44:00.111] WARN: Texture "%s" has no frame "%s" PRAS- Dragon Ascent 1
+[02:44:00.119] WARN: Texture "%s" has no frame "%s" PRAS- Dragon Ascent 1
+[02:44:00.127] WARN: Texture "%s" has no frame "%s" PRAS- Dragon Ascent 1
+[02:44:00.344] WARN: Texture "%s" has no frame "%s" PRAS- Dragon Ascent 1
+[02:44:00.662] LOG: crit stage: +0
+[02:44:00.663] LOG: Move: Dragon Ascent | Base damage: 182.26712153518125 | Power: 144 | Source attack: 358 | Target defense: 469
+[02:44:00.664] LOG: Move: Dragon Ascent | Attack damage: 162
+[02:44:00.665] LOG: %cStart Phase DamageAnimPhase color:green;
+[02:44:00.696] LOG: %cStart Phase StatStageChangePhase color:green;
+[02:44:00.696] LOG: %cStart Phase StatStageChangePhase color:green;
+[02:44:00.882] LOG: %cStart Phase MessagePhase color:green;
+[02:44:01.127] LOG: %cStart Phase StatStageChangePhase color:green;
+[02:44:01.314] LOG: %cStart Phase MessagePhase color:green;
+[02:44:01.545] LOG: %cStart Phase MoveEndPhase color:green;
+[02:44:01.545] LOG: %cStart Phase MovePhase color:green;
+[02:44:01.545] LOG: %cStart Phase MoveEndPhase color:green;
+[02:44:01.546] LOG: %cStart Phase CheckInterludePhase color:green;
+[02:44:01.546] LOG: %cStart Phase WeatherEffectPhase color:green;
+[02:44:02.127] LOG: %cStart Phase PositionalTagPhase color:green;
+[02:44:02.127] LOG: %cStart Phase BerryPhase color:green;
+[02:44:02.133] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[02:44:02.136] LOG: %cStart Phase TurnEndPhase color:green;
+[02:44:02.144] LOG: Applied Leftovers 
+[02:44:02.145] LOG: Battle Seed: Hm3qrdRqefNH8X4g
+[02:44:02.145] WARN: [coop:turn] host recorder: finalize with NO open recording -> turn=-1 events=0 (caller decides not to emit)
+[02:44:02.145] LOG: %cStart Phase PokemonHealPhase color:green;
+[02:44:02.346] LOG: Applied Healing Charm 
+[02:44:02.352] LOG: %cStart Phase MessagePhase color:green;
+[02:44:02.628] LOG: %cStart Phase SwitchSummonPhase color:green;
+[02:44:02.861] LOG: Ivy
+[02:44:02.945] LOG: Applied HP Up (enemy)
+[02:44:02.946] LOG: Applied Zinc (enemy)
+[02:44:02.946] LOG: Applied Carbos (enemy)
+[02:44:02.946] LOG: Applied Zinc (enemy)
+[02:44:02.946] LOG: Applied Protein (enemy)
+[02:44:02.947] LOG: Applied HP Up (enemy)
+[02:44:02.947] LOG: Applied Iron (enemy)
+[02:44:02.947] LOG: Applied Calcium (enemy)
+[02:44:02.947] LOG: Applied HP Up (enemy)
+[02:44:02.947] LOG: Applied Calcium (enemy)
+[02:44:02.947] LOG: Applied Zinc (enemy)
+[02:44:02.947] LOG: Applied Iron (enemy)
+[02:44:02.947] LOG: Applied Carbos (enemy)
+[02:44:02.948] LOG: Applied Calcium (enemy)
+[02:44:02.948] LOG: Applied HP Up (enemy)
+[02:44:02.948] LOG: Applied Iron (enemy)
+[02:44:02.948] LOG: Applied Calcium (enemy)
+[02:44:02.948] LOG: Applied Protein (enemy)
+[02:44:02.948] LOG: Applied HP Up (enemy)
+[02:44:02.948] LOG: Applied Zinc (enemy)
+[02:44:02.948] LOG: Applied Calcium (enemy)
+[02:44:02.948] LOG: Applied Zinc (enemy)
+[02:44:02.948] LOG: Applied Carbos (enemy)
+[02:44:02.948] LOG: Applied Iron (enemy)
+[02:44:03.098] LOG: %cStart Phase PostSummonPhase color:green;
+[02:44:03.098] LOG: Ran PSP for: Cofagrigus
+[02:44:03.099] LOG: %cStart Phase PostSummonPhase color:green;
+[02:44:03.099] LOG: %cStart Phase PostSummonPhase color:green;
+[02:44:03.099] LOG: %cStart Phase TurnInitPhase color:green;
+[02:44:03.099] LOG: %cStart Phase CommandPhase color:green;
