@@ -1,0 +1,274 @@
+----- BUG REPORT (in-game) -----
+version:  1.11.19
+url:      https://elite-redux.pages.dev/
+ua:       Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Mobile Safari/537.36
+mode:     4  wave:30  difficulty:youngster
+seed:     8rYVf2WPt7CQb0KTMjwwtdq2
+party:    Charcadet(L24 60/60), Iron Thorns(L24 84/89), Vivillon(L16 58/58), Kecleon(L16 50/50), Mew(L16 62/62)
+
+----- DESCRIPTION -----
+Diamond Storm is not adjusting to the highest attacking stat
+
+----- CONSOLE -----
+[10:38:26.704] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[10:38:26.704] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[10:38:26.704] LOG: Applied Super EXP. Charm 
+[10:38:26.704] LOG: Applied EXP. Charm 
+[10:38:26.704] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[10:38:26.704] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[10:38:26.704] LOG: Applied Super EXP. Charm 
+[10:38:26.704] LOG: Applied EXP. Charm 
+[10:38:26.704] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[10:38:26.704] LOG: %cStart Phase MoveEndPhase color:green;
+[10:38:26.704] LOG: %cStart Phase CheckInterludePhase color:green;
+[10:38:26.704] LOG: %cStart Phase WeatherEffectPhase color:green;
+[10:38:27.049] LOG: %cStart Phase PositionalTagPhase color:green;
+[10:38:27.049] LOG: %cStart Phase BerryPhase color:green;
+[10:38:27.050] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[10:38:27.051] LOG: %cStart Phase TurnEndPhase color:green;
+[10:38:27.058] WARN: [coop:turn] host recorder: finalize with NO open recording -> turn=-1 events=0 (caller decides not to emit)
+[10:38:27.058] LOG: %cStart Phase ShowAbilityPhase color:green;
+[10:38:27.208] LOG: %cStart Phase PokemonHealPhase color:green;
+[10:38:27.444] LOG: %cStart Phase MessagePhase color:green;
+[10:38:27.722] LOG: %cStart Phase HideAbilityPhase color:green;
+[10:38:27.757] LOG: %cStart Phase BattleEndPhase color:green;
+[10:38:27.758] LOG: Battle Score: 68 (2 Turns x0.84)
+[10:38:27.758] LOG: Total Score: 2404
+[10:38:27.768] LOG: Applied Zinc 
+[10:38:27.768] LOG: Applied Calcium 
+[10:38:27.771] LOG: %cStart Phase EggLapsePhase color:green;
+[10:38:27.771] LOG: %cStart Phase SelectModifierPhase color:green;
+[10:38:27.771] LOG: Wave Seed: UvsOtmT`nMhqjO 29
+[10:38:27.775] LOG: 0 0 [2,3,6]
+[10:38:27.776] LOG: {"id":"POKEBALL","localeKey":"","iconImage":"pb","group":"pb","soundName":"se/pb_bounce_1","tier":0,"pokeballType":0,"count":5} 
+[10:38:27.776] LOG: 0 0 [2,3,4,5,6,7,8,12,22]
+[10:38:27.776] LOG: {"id":"GREAT_BALL","localeKey":"","iconImage":"gb","group":"pb","soundName":"se/pb_bounce_1","tier":1,"pokeballType":1,"count":5} 
+[10:38:27.776] LOG: 1 0 [2,3,4,5,6,7,8,12,22]
+[10:38:27.776] LOG: {"id":"PP_UP","localeKey":"modifierType:ModifierType.PP_UP","iconImage":"pp_up","group":"ppUp","soundName":"se/restore","tier":1,"upPoints":1} 
+[10:38:27.776] LOG: 0 0 [2,3,6]
+[10:38:27.776] LOG: {"id":"POKEBALL","localeKey":"","iconImage":"pb","group":"pb","soundName":"se/pb_bounce_1","tier":0,"pokeballType":0,"count":5} 
+[10:38:27.776] LOG: 0 0 [2,3,6]
+[10:38:27.776] LOG: {"id":"POKEBALL","localeKey":"","iconImage":"pb","group":"pb","soundName":"se/pb_bounce_1","tier":0,"pokeballType":0,"count":5} 
+[10:38:27.776] LOG: 9 3 [2,3,6]
+[10:38:27.776] LOG: {"id":"TM_CASE","localeKey":"","iconImage":"tm_case","soundName":"se/restore","tier":0} 
+[10:38:51.852] LOG: %cStart Phase LearnMovePhase color:green;
+[10:38:52.807] WARN: cry/995 not found
+[10:38:55.953] LOG: %cStart Phase NewBattlePhase color:green;
+[10:38:55.953] LOG: Wave Seed: VwtPunUaoNirkP 30
+[10:38:55.953] LOG: %cStart Phase NextEncounterPhase color:green;
+[10:38:55.959] LOG: Starting species pool tier: BOSS
+[10:38:55.960] LOG: Replaced DUBWOOL with WOOLOO
+[10:38:55.972] LOG: Pokemon: Wild Wooloo | Species ID: 831 | Level: 22 | Nature: Hasty (+Spd/-Def)
+[10:38:55.972] LOG: Stats (IVs): HP: 55 (20), Atk: 30 (5), Def: 30 (21), Spatk: 33 (16), Spdef: 30 (24), Spd: 38 (17)
+[10:38:55.973] LOG: Ability: Sap Sipper | Passive Ability: Let's Roll | Boss Bars: 2
+[10:38:55.973] LOG: Moveset: ["Body Slam","Defense Curl","Guard Swap","Growl"]
+[10:38:55.973] LOG: Starting species pool tier: BOSS_RARE
+[10:38:55.973] LOG: Replaced FLAPPLE with APPLIN
+[10:38:55.979] LOG: Pokemon: Wild Applin | Species ID: 840 | Level: 18 | Nature: Calm (+SpDef/-Atk)
+[10:38:55.979] LOG: Stats (IVs): HP: 49 (11), Atk: 23 (23), Def: 33 (5), Spatk: 29 (23), Spdef: 28 (19), Spd: 20 (20)
+[10:38:55.979] LOG: Ability: Hustle | Passive Ability: Overgrow | Boss Bars: 2
+[10:38:55.979] LOG: Moveset: ["Dragon Breath","U-turn","Bullet Seed","Astonish"]
+[10:38:55.980] LOG: {"id":"BERRY","localeKey":"","iconImage":"salac_berry","group":"berry","soundName":"se/restore","tier":0,"berryType":7} (enemy)
+[10:38:55.980] LOG: {"id":"BASE_STAT_BOOSTER","localeKey":"","iconImage":"zinc","soundName":"se/restore","tier":1,"stat":4,"key":"zinc"} (enemy)
+[10:38:55.980] LOG: Battle Seed: 5PJ8MUKwTQJhBFsL
+[10:38:55.981] LOG: Applied Zinc (enemy)
+[10:38:56.050] DEBUG: Session data saved to slot 4!
+[10:38:56.053] LOG: Wave Seed: VwtPunUaoNirkP 30
+[10:38:56.265] WARN: cry/831 not found
+[10:38:56.265] WARN: cry/840 not found
+[10:38:56.516] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[10:38:56.516] LOG: %cStart Phase CheckSwitchPhase color:green;
+[10:38:56.518] LOG: %cStart Phase CheckSwitchPhase color:green;
+[10:38:57.157] LOG: %cStart Phase InitEncounterPhase color:green;
+[10:38:57.158] LOG: %cStart Phase PostSummonPhase color:green;
+[10:38:57.158] LOG: Ran PSP for: Wooloo
+[10:38:57.159] LOG: %cStart Phase PostSummonPhase color:green;
+[10:38:57.160] LOG: %cStart Phase PostSummonPhase color:green;
+[10:38:57.166] LOG: %cStart Phase MovePhase color:green;
+[10:38:57.166] LOG: %cUser: Wooloo
+Move: DEFENSE_CURL
+Use Mode: FOLLOW_UP color:orchid
+[10:38:57.176] LOG: %cStart Phase MessagePhase color:green;
+[10:38:57.272] LOG: %cStart Phase MoveEffectPhase color:green;
+[10:38:57.540] LOG: %cStart Phase StatStageChangePhase color:green;
+[10:38:57.729] LOG: %cStart Phase MessagePhase color:green;
+[10:38:57.956] LOG: %cStart Phase MoveEndPhase color:green;
+[10:38:57.956] LOG: %cStart Phase PostSummonPhase color:green;
+[10:38:57.956] LOG: Ran PSP for: Applin
+[10:38:57.957] LOG: %cStart Phase PostSummonPhase color:green;
+[10:38:57.958] LOG: %cStart Phase PostSummonPhase color:green;
+[10:38:57.958] LOG: %cStart Phase TurnInitPhase color:green;
+[10:38:57.958] LOG: %cStart Phase CommandPhase color:green;
+[10:38:58.303] LOG: Move: NO_RETREAT Move targets: {"targets":[0],"multiple":false} 
+Player Pokemon: Charcadet
+[10:38:58.304] LOG: %cStart Phase CommandPhase color:green;
+[10:38:58.868] LOG: Applied Multi Lens 
+[10:38:58.870] LOG: Applied Multi Lens 
+[10:38:58.877] LOG: Applied Multi Lens 
+[10:38:58.880] LOG: Applied Multi Lens 
+[10:39:00.500] LOG: Applied Multi Lens 
+[10:39:00.502] LOG: Applied Multi Lens 
+[10:39:02.375] LOG: Applied Multi Lens 
+[10:39:02.377] LOG: Applied Multi Lens 
+[10:39:06.611] LOG: Applied Multi Lens 
+[10:39:06.613] LOG: Applied Multi Lens 
+[10:39:07.092] LOG: Applied Multi Lens 
+[10:39:07.095] LOG: Applied Multi Lens 
+[10:39:08.527] LOG: Applied Multi Lens 
+[10:39:08.531] LOG: Applied Multi Lens 
+[10:39:09.513] LOG: Move: PLASMA_FISTS Move targets: {"targets":[2,3,0],"multiple":false} 
+Player Pokemon: Iron Thorns
+[10:39:09.515] LOG: %cStart Phase SelectTargetPhase color:green;
+[10:39:10.704] LOG: %cStart Phase CommandPhase color:green;
+[10:39:11.567] LOG: Applied Multi Lens 
+[10:39:11.570] LOG: Applied Multi Lens 
+[10:39:11.576] LOG: Applied Multi Lens 
+[10:39:11.579] LOG: Applied Multi Lens 
+[10:39:12.727] LOG: Applied Multi Lens 
+[10:39:12.730] LOG: Applied Multi Lens 
+[10:39:13.251] LOG: Applied Multi Lens 
+[10:39:13.254] LOG: Applied Multi Lens 
+[10:39:18.184] LOG: Move: PLASMA_FISTS Move targets: {"targets":[2,3,0],"multiple":false} 
+Player Pokemon: Iron Thorns
+[10:39:18.186] LOG: %cStart Phase SelectTargetPhase color:green;
+[10:39:18.621] LOG: %cStart Phase EnemyCommandPhase color:green;
+[10:39:18.634] LOG: Move Pool: ["Body Slam","Defense Curl","Guard Swap","Growl"]
+[10:39:18.634] LOG: Move Scores: [30,2,0,2]
+[10:39:18.634] LOG: Sorted Move Pool: ["Body Slam","Defense Curl","Growl","Guard Swap"]
+[10:39:18.634] LOG: Chosen Move: Body Slam
+[10:39:18.634] LOG: %cStart Phase EnemyCommandPhase color:green;
+[10:39:18.654] LOG: Move Pool: ["Dragon Breath","U-turn","Bullet Seed","Astonish"]
+[10:39:18.654] LOG: Move Scores: [21,-6,66,13]
+[10:39:18.654] LOG: Sorted Move Pool: ["Bullet Seed","Dragon Breath","Astonish","U-turn"]
+[10:39:18.654] LOG: Chosen Move: Bullet Seed
+[10:39:18.654] LOG: %cStart Phase TurnStartPhase color:green;
+[10:39:18.661] LOG: %cStart Phase MovePhase color:green;
+[10:39:18.661] LOG: %cUser: Iron Thorns
+Move: PLASMA_FISTS
+Use Mode: NORMAL color:orchid
+[10:39:18.665] LOG: %cStart Phase MessagePhase color:green;
+[10:39:18.755] LOG: %cStart Phase MoveEffectPhase color:green;
+[10:39:18.756] LOG: Applied Multi Lens 
+[10:39:19.691] LOG: crit stage: +0
+[10:39:19.694] LOG: Move: Plasma Fists | Base damage: 92.64186046511628 | Power: 100 | Source attack: 168 | Target defense: 43
+[10:39:19.695] LOG: Applied Multi Lens 
+[10:39:19.695] LOG: Move: Plasma Fists | Attack damage: 50
+[10:39:19.712] LOG: %cStart Phase DamageAnimPhase color:green;
+[10:39:19.734] LOG: %cStart Phase MessagePhase color:green;
+[10:39:19.997] LOG: %cStart Phase MoveEffectPhase color:green;
+[10:39:20.883] LOG: crit stage: +0
+[10:39:20.886] LOG: Move: Plasma Fists | Base damage: 92.64186046511628 | Power: 100 | Source attack: 168 | Target defense: 43
+[10:39:20.887] LOG: Applied Multi Lens 
+[10:39:20.888] LOG: Move: Plasma Fists | Attack damage: 15
+[10:39:20.888] LOG: %cStart Phase DamageAnimPhase color:green;
+[10:39:20.915] LOG: %cStart Phase MessagePhase color:green;
+[10:39:21.114] LOG: %cStart Phase FaintPhase color:green;
+[10:39:21.119] WARN: cry/831 not found
+[10:39:21.186] LOG: %cStart Phase MessagePhase color:green;
+[10:39:21.345] LOG: %cStart Phase VictoryPhase color:green;
+[10:39:21.345] LOG: Applied Soothe Bell 
+[10:39:21.346] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[10:39:21.346] LOG: Applied Super EXP. Charm 
+[10:39:21.346] LOG: Applied EXP. Charm 
+[10:39:21.347] LOG: %cStart Phase LevelUpPhase color:green;
+[10:39:21.347] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[10:39:21.348] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[10:39:21.348] LOG: Applied Super EXP. Charm 
+[10:39:21.348] LOG: Applied EXP. Charm 
+[10:39:21.348] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[10:39:21.348] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[10:39:21.348] LOG: Applied Super EXP. Charm 
+[10:39:21.348] LOG: Applied EXP. Charm 
+[10:39:21.349] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[10:39:21.349] LOG: %cStart Phase MoveEndPhase color:green;
+[10:39:21.351] LOG: %cStart Phase MovePhase color:green;
+[10:39:21.351] LOG: %cUser: Charcadet
+Move: NO_RETREAT
+Use Mode: NORMAL color:orchid
+[10:39:21.354] LOG: %cStart Phase MessagePhase color:green;
+[10:39:21.472] LOG: %cStart Phase MessagePhase color:green;
+[10:39:21.676] LOG: %cStart Phase MoveEndPhase color:green;
+[10:39:21.677] LOG: %cStart Phase MovePhase color:green;
+[10:39:21.677] LOG: %cStart Phase MoveEndPhase color:green;
+[10:39:21.677] LOG: %cStart Phase MovePhase color:green;
+[10:39:21.677] LOG: %cUser: Applin
+Move: BULLET_SEED
+Use Mode: NORMAL color:orchid
+[10:39:21.686] LOG: %cStart Phase MessagePhase color:green;
+[10:39:21.814] LOG: %cStart Phase MoveEffectPhase color:green;
+[10:39:22.098] LOG: crit stage: +0
+[10:39:22.100] LOG: Move: Bullet Seed | Base damage: 2.7546875 | Power: 42 | Source attack: 25 | Target defense: 256
+[10:39:22.103] LOG: Move: Bullet Seed | Attack damage: 2
+[10:39:22.104] LOG: %cStart Phase ShowAbilityPhase color:green;
+[10:39:22.258] LOG: %cStart Phase HideAbilityPhase color:green;
+[10:39:22.307] LOG: %cStart Phase DamageAnimPhase color:green;
+[10:39:22.342] LOG: %cStart Phase MoveEffectPhase color:green;
+[10:39:22.631] LOG: crit stage: +0
+[10:39:22.632] LOG: Move: Bullet Seed | Base damage: 2.7546875 | Power: 42 | Source attack: 25 | Target defense: 256
+[10:39:22.634] LOG: Move: Bullet Seed | Attack damage: 2
+[10:39:22.634] LOG: %cStart Phase ShowAbilityPhase color:green;
+[10:39:22.790] LOG: %cStart Phase HideAbilityPhase color:green;
+[10:39:22.841] LOG: %cStart Phase DamageAnimPhase color:green;
+[10:39:22.866] LOG: %cStart Phase MoveEffectPhase color:green;
+[10:39:23.166] LOG: crit stage: +0
+[10:39:23.168] LOG: Move: Bullet Seed | Base damage: 2.7546875 | Power: 42 | Source attack: 25 | Target defense: 256
+[10:39:23.170] LOG: Move: Bullet Seed | Attack damage: 2
+[10:39:23.170] LOG: %cStart Phase ShowAbilityPhase color:green;
+[10:39:23.320] LOG: %cStart Phase HideAbilityPhase color:green;
+[10:39:23.366] LOG: %cStart Phase DamageAnimPhase color:green;
+[10:39:23.400] LOG: %cStart Phase MessagePhase color:green;
+[10:39:23.606] LOG: %cStart Phase MessagePhase color:green;
+[10:39:23.814] LOG: %cStart Phase MoveEndPhase color:green;
+[10:39:23.814] LOG: %cStart Phase CheckInterludePhase color:green;
+[10:39:23.814] LOG: %cStart Phase WeatherEffectPhase color:green;
+[10:39:24.205] LOG: %cStart Phase PositionalTagPhase color:green;
+[10:39:24.205] LOG: %cStart Phase BerryPhase color:green;
+[10:39:24.208] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[10:39:24.211] LOG: %cStart Phase TurnEndPhase color:green;
+[10:39:24.222] WARN: [coop:turn] host recorder: finalize with NO open recording -> turn=-1 events=0 (caller decides not to emit)
+[10:39:24.222] LOG: %cStart Phase ShowAbilityPhase color:green;
+[10:39:24.375] LOG: %cStart Phase PokemonHealPhase color:green;
+[10:39:24.585] LOG: %cStart Phase MessagePhase color:green;
+[10:39:24.864] LOG: %cStart Phase HideAbilityPhase color:green;
+[10:39:24.895] LOG: %cStart Phase TurnInitPhase color:green;
+[10:39:24.896] LOG: %cStart Phase CommandPhase color:green;
+[10:39:26.052] LOG: Move: FIRE_PLEDGE Move targets: {"targets":[3,1],"multiple":false} 
+Player Pokemon: Charcadet
+[10:39:26.054] LOG: %cStart Phase SelectTargetPhase color:green;
+[10:39:26.269] LOG: %cStart Phase CommandPhase color:green;
+[10:39:26.560] LOG: Applied Multi Lens 
+[10:39:26.563] LOG: Applied Multi Lens 
+[10:39:26.569] LOG: Applied Multi Lens 
+[10:39:26.571] LOG: Applied Multi Lens 
+[10:39:27.084] LOG: Applied Multi Lens 
+[10:39:27.087] LOG: Applied Multi Lens 
+[10:39:27.743] LOG: Applied Multi Lens 
+[10:39:27.746] LOG: Applied Multi Lens 
+[10:39:28.367] LOG: Applied Multi Lens 
+[10:39:28.370] LOG: Applied Multi Lens 
+[10:39:29.216] LOG: Applied Multi Lens 
+[10:39:29.218] LOG: Applied Multi Lens 
+[10:39:32.336] LOG: Applied Multi Lens 
+[10:39:32.338] LOG: Applied Multi Lens 
+[10:39:32.750] LOG: Applied Multi Lens 
+[10:39:32.753] LOG: Applied Multi Lens 
+[10:39:34.916] LOG: Applied Multi Lens 
+[10:39:34.920] LOG: Applied Multi Lens 
+[10:39:38.251] LOG: Applied Multi Lens 
+[10:39:38.253] LOG: Applied Multi Lens 
+[10:39:38.691] LOG: Applied Multi Lens 
+[10:39:38.695] LOG: Applied Multi Lens 
+[10:39:39.166] LOG: Applied Multi Lens 
+[10:39:39.169] LOG: Applied Multi Lens 
+[10:39:39.717] LOG: Applied Multi Lens 
+[10:39:39.720] LOG: Applied Multi Lens 
+[10:39:40.934] LOG: Applied Multi Lens 
+[10:39:40.936] LOG: Applied Multi Lens 
+[10:39:41.607] LOG: Applied Multi Lens 
+[10:39:41.611] LOG: Applied Multi Lens 
+[10:39:42.550] LOG: Applied Multi Lens 
+[10:39:42.553] LOG: Applied Multi Lens 
+[10:39:43.968] LOG: Applied Multi Lens 
+[10:39:43.971] LOG: Applied Multi Lens 
+[10:39:44.617] LOG: Applied Multi Lens 
+[10:39:44.620] LOG: Applied Multi Lens 
