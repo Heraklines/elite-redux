@@ -144,6 +144,20 @@ export class CoopReplayMePhase extends Phase {
         }
       }) ?? null;
 
+    // #821 SHOP HANDOFF (live 'the reward shop doesn't load for the other player'): a
+    // non-battle ME's embedded reward shop runs on the OWNER's engine only; its streamed
+    // rewardOptions used to buffer with no waiter while this phase parked in the ME await -
+    // the watcher never saw a shop AND its wave-end chain (driven by its own shop phase)
+    // never ran, stranding it after the ME. When the options arrive (or already sit
+    // buffered), settle this phase and run the guest's OWN SelectModifierPhase - the
+    // existing ME-watcher override takes it from there; a DETACHED terminal listener
+    // handles the eventual ME end (leave + advance), exactly like the :46 flow did.
+    const shopKeyPrefix = `${this.interactionCounter}:`;
+    relay.onRewardOptionsBuffered = key => {
+      if (String(key).startsWith(shopKeyPrefix)) {
+        this.settleForWatcherShop(relay);
+      }
+    };
     // The post-subscription work is async (it awaits the host's presentation), but the phase
     // contract is sync-void: wrap it in a void-ed IIFE, mirroring CoopReplayTurnPhase's `.then`
     // pattern. Every await inside has a defensive null-end, so the IIFE can never hang the run.
@@ -171,6 +185,18 @@ export class CoopReplayMePhase extends Phase {
           seq: this.seq,
           got: present == null ? "null" : present.k,
         });
+      }
+
+      // #821: the SHOP HANDOFF settled this phase while we awaited the presentation. The
+      // race was deliberately NOT armed inside the handoff (it would have consumed the
+      // buffered mePresent as an outcome); arm it here, detached - shop-aware guards let
+      // the later meResync apply and the ME-end terminal run the leave duties.
+      if (this.settled && this.settledForShop && !this.raceArmed) {
+        this.awaitOutcomeThenTerminal(relay);
+        return;
+      }
+      if (this.settled) {
+        return; // settled some other way mid-await (defensive)
       }
 
       // Ownership is resolved from the PINNED start counter (stable for the whole ME), never the live
@@ -207,6 +233,12 @@ export class CoopReplayMePhase extends Phase {
    */
   /** #815: one top-level pick per ME - a double-fired select must not re-arm the awaits. */
   private pickSent = false;
+
+  /** #821: settled via the SHOP HANDOFF - the terminal must still run the leave duties. */
+  private settledForShop = false;
+
+  /** #821: whether awaitOutcomeThenTerminal has been armed at least once. */
+  private raceArmed = false;
 
   public handleGuestOptionSelect(index: number): void {
     if (this.pickSent) {
@@ -262,6 +294,7 @@ export class CoopReplayMePhase extends Phase {
    * The single `settled` guard fires the terminal exactly once; whichever arm loses is ignored.
    */
   private awaitOutcomeThenTerminal(relay: NonNullable<ReturnType<typeof getCoopInteractionRelay>>): void {
+    this.raceArmed = true;
     coopLog("me", "await host outcome (mePresent subPrompt / meResync) racing terminal", {
       seq: this.seq,
       seqTerm: this.seqTerm,
@@ -290,7 +323,7 @@ export class CoopReplayMePhase extends Phase {
         return;
       }
       raceDone = true;
-      if (this.settled) {
+      if (this.settled && !this.settledForShop) {
         coopLog("me", "outcome/terminal race resolved after settled; ignoring", { seq: this.seq });
         return;
       }
@@ -329,7 +362,7 @@ export class CoopReplayMePhase extends Phase {
         // SAME terminalArm (its terminal, if any, is already drained into it) so we never re-await an
         // emptied 9M inbox and hang. A still-pending terminalArm resolves on the real terminal / null.
         void terminalArm.then(t => {
-          if (!this.settled) {
+          if (!this.settled || this.settledForShop) {
             this.handleTerminalAction(t.action);
           }
         });
@@ -343,7 +376,7 @@ export class CoopReplayMePhase extends Phase {
         got: outcome == null ? "null" : outcome.k,
       });
       void terminalArm.then(t => {
-        if (!this.settled) {
+        if (!this.settled || this.settledForShop) {
           this.handleTerminalAction(t.action);
         }
       });
@@ -516,6 +549,42 @@ export class CoopReplayMePhase extends Phase {
     coopMeHostPresentation = null;
     this.offMeMessage?.();
     this.offMeMessage = null;
+    try {
+      getCoopInteractionRelay()?.onRewardOptionsBuffered != null
+        && (getCoopInteractionRelay()!.onRewardOptionsBuffered = null); // #821 listener teardown
+    } catch {
+      /* teardown is best-effort */
+    }
+    this.end();
+  }
+
+  /**
+   * #821 SHOP HANDOFF: the owner's engine opened the ME's embedded reward shop. Settle this
+   * phase (WITHOUT leaving the encounter, WITHOUT advancing - the ME is still live) and run
+   * the guest's OWN SelectModifierPhase: the ME-watcher override inside it consumes the
+   * buffered rewardOptions and mirrors the owner's shop. A DETACHED listener on the terminal
+   * seq performs the eventual leave + advance (the duties leaveDefensive would have run).
+   */
+  private settleForWatcherShop(relay: NonNullable<ReturnType<typeof getCoopInteractionRelay>>): void {
+    if (this.settled) {
+      return;
+    }
+    coopLog("me", "SHOP HANDOFF: owner opened the embedded ME reward shop - running watcher shop (#821)", {
+      counter: this.interactionCounter,
+    });
+    hideCoopControllerTag();
+    relay.onRewardOptionsBuffered = null;
+    // The phase's ALREADY-ARMED outcome/terminal race keeps running detached (promises
+    // outlive end()): a later meResync still applies through the normal race handler, and
+    // the eventual ME-end terminal runs leaveDefensive's duties via the settledForShop
+    // branch below. If the handoff fired BEFORE the race was armed (fast-owner path), arm it
+    // now so those channels are never orphaned.
+    this.settledForShop = true;
+    globalScene.phaseManager.unshiftNew("SelectModifierPhase");
+    this.settled = true;
+    coopMeHostPresentation = null;
+    this.offMeMessage?.();
+    this.offMeMessage = null;
     this.end();
   }
 
@@ -529,6 +598,29 @@ export class CoopReplayMePhase extends Phase {
    */
   private leaveDefensive(): void {
     if (this.settled) {
+      if (this.settledForShop) {
+        // #821: settled by the SHOP HANDOFF - the phase ended but the encounter is only now
+        // over (the ME-end terminal just fired). Run the leave duties detachedly, ONCE.
+        this.settledForShop = false;
+        coopLog("me", "detached ME terminal after watcher shop: leaving + advancing (#821)", {
+          counter: this.interactionCounter,
+        });
+        try {
+          leaveEncounterWithoutBattle();
+        } catch {
+          coopWarn("me", "leaveEncounterWithoutBattle threw at detached ME terminal (handled)", {
+            counter: this.interactionCounter,
+          });
+        }
+        try {
+          getCoopController()?.advanceInteraction(this.interactionCounter);
+        } catch {
+          coopWarn("me", "advanceInteraction threw at detached ME terminal (handled, idempotent)", {
+            counter: this.interactionCounter,
+          });
+        }
+        return;
+      }
       coopLog("me", "leaveDefensive no-op (already settled)", { counter: this.interactionCounter });
       return;
     }
@@ -540,6 +632,12 @@ export class CoopReplayMePhase extends Phase {
     coopMeHostPresentation = null;
     this.offMeMessage?.();
     this.offMeMessage = null;
+    try {
+      getCoopInteractionRelay()?.onRewardOptionsBuffered != null
+        && (getCoopInteractionRelay()!.onRewardOptionsBuffered = null); // #821 listener teardown
+    } catch {
+      /* teardown is best-effort */
+    }
     const controller = getCoopController();
     try {
       // leaveEncounterWithoutBattle clears the phase queue + queues the post-ME wave-advance phases

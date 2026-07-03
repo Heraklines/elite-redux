@@ -452,6 +452,23 @@ export class CoopInteractionRelay {
     return oldest;
   }
 
+  /**
+   * #821: fired when rewardOptions are BUFFERED with no waiter (the ME embedded-shop case:
+   * the owner's engine opened its shop while the watcher is parked in the ME await).
+   * Phase-scoped - CoopReplayMePhase assigns it on entry and clears it on settle.
+   */
+  public onRewardOptionsBuffered: ((key: string) => void) | null = null;
+
+  /** #821: whether buffered rewardOptions exist for a key prefix (already-arrived race). */
+  hasBufferedRewardOptionsFor(prefix: string): boolean {
+    for (const k of this.rewardOptionsInbox.keys()) {
+      if (String(k).startsWith(prefix)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   cancelWaiters(shouldCancel: (seq: number) => boolean = () => true): void {
     const seqs = new Set<number>();
     // Snapshot the SELECTED resolvers per map (finish() self-deletes from its map, so iterating a
@@ -573,6 +590,13 @@ export class CoopInteractionRelay {
       if (waiter) {
         if (isCoopDebug()) {
           coopLog("relay", `RECV rewardOptions key=${key} -> deliver-to-waiter count=${msg.options.length}`);
+          // #821: notify a live listener (the guest's CoopReplayMePhase) that an embedded
+          // ME reward shop just opened on the owner's engine - the watcher must open its own.
+          try {
+            this.onRewardOptionsBuffered?.(key);
+          } catch {
+            /* cosmetic notification - never break the buffer path */
+          }
         }
         waiter(msg.options);
         return;
