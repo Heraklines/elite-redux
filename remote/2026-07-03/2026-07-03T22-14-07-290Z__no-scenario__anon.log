@@ -1,0 +1,11 @@
+url:      https://elite-redux-staging.pages.dev/
+build:    mr5f51y8-fjag
+mode:     ?  wave:?
+seed:     ?
+party:    
+enemy:    
+
+----- CONSOLE -----
+[22:13:50.669] LOG: %c %c %c %c %c Phaser v3.90.0 (WebGL | Web Audio) %c https://phaser.io/v390 background: #ff0000 background: #ffff00 background: #00ff00 background: #00ffff color: #ffffff; background: #000000 background: transparent
+[22:13:51.584] LOG: [ER] build mr5f51y8-fjag
+[22:13:51.648] LOG: [dev-tools] loaded — 419 scenarios + Send Logs button
