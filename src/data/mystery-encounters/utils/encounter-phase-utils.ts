@@ -219,7 +219,14 @@ export async function initBattleWithEnemyConfig(partyConfig: EnemyPartyConfig): 
 
     trainerConfig = partyTrainerConfig ? partyTrainerConfig : trainerConfigs[trainerType!];
 
-    const doubleTrainer = trainerConfig.doubleOnly || (trainerConfig.hasDouble && !!partyConfig.doubleBattle);
+    let doubleTrainer = trainerConfig.doubleOnly || (trainerConfig.hasDouble && !!partyConfig.doubleBattle);
+    // Co-op (#818): every fight fields BOTH players, so ME trainer battles are DOUBLE.
+    // A party config with fewer than 2 scripted mons is fine - the generation loop fills
+    // the extra slot from the trainer's own party template (genPartyMember), per the
+    // maintainer's spec ("for trainer battles we can just send out another mon").
+    if (globalScene.gameMode?.isCoop === true) {
+      doubleTrainer = true;
+    }
     doubleBattle = doubleTrainer;
     const trainerFemale = partyConfig.female == null ? !!randSeedInt(2) : partyConfig.female;
     const newTrainer = new Trainer(
@@ -240,6 +247,19 @@ export async function initBattleWithEnemyConfig(partyConfig: EnemyPartyConfig): 
   } else {
     // Wild
     globalScene.currentBattle.mysteryEncounter!.encounterMode = MysteryEncounterMode.WILD_BATTLE;
+    // Co-op (#818): every fight fields BOTH players. Scripted 1v1 encounters conflict with
+    // that, so per the maintainer's spec the single scripted mon is DUPLICATED into a true
+    // 2v2 (same species/level/boss flags; dataSource stripped so the copy rolls its own
+    // identity/IVs - two mons must never share a pokemon id). No configs = two random wilds,
+    // exactly like a normal co-op double. Runs on the HOST only (the guest adopts the party
+    // verbatim via the ME battle handoff stream, which now carries both mons).
+    if (globalScene.gameMode?.isCoop === true) {
+      doubleBattle = true;
+      if (partyConfig?.pokemonConfigs?.length === 1) {
+        const { dataSource: _omitted, ...copy } = partyConfig.pokemonConfigs[0];
+        partyConfig.pokemonConfigs.push(copy);
+      }
+    }
     const numEnemies =
       partyConfig?.pokemonConfigs && partyConfig.pokemonConfigs.length > 0
         ? partyConfig?.pokemonConfigs?.length
@@ -495,6 +515,14 @@ export async function initBattleWithEnemyConfig(partyConfig: EnemyPartyConfig): 
   // encounter; the GUEST discards its own locally-rolled party and adopts the host's verbatim, so
   // the boss is identical on both clients. Hard no-op in solo / lockstep / non-coop. Done BEFORE the
   // battle phase is pushed so the adopted mons' assets load below.
+  // Co-op (#818) safety net: if the forced double still yielded ONE enemy (e.g. a 1-mon
+  // trainer template that genPartyMember could not extend), degrade back to the classic
+  // single shape - a playable 1v1 beats the #385-class 2v1 freeze. Streamed AFTER, so the
+  // guest adopts whatever shape actually stands.
+  if (globalScene.gameMode?.isCoop === true && battle.double && battle.enemyParty.length < 2) {
+    console.warn(`[er-coop] ME battle: forced double degraded to single (party=${battle.enemyParty.length})`);
+    battle.setDouble(false);
+  }
   coopHostStreamMeBattleParty();
   coopMeOwnerRelayBattleHandoff();
   if (coopGuestShouldAdoptMeBattleParty()) {

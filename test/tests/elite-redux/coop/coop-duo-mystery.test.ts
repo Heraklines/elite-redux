@@ -422,6 +422,16 @@ describe.skipIf(!RUN)(
         rig.guestScene.currentBattle.mysteryEncounter,
         "guest did NOT leave the encounter at the battle-handoff (the battle runs next)",
       ).toBeDefined();
+      // (4) #818: in co-op a scripted 1v1 ME battle is a TRUE 2v2 - the host DUPLICATED the
+      // single scripted mon (FIGHT_OR_FLIGHT spawns one boss) and forced the double flag, so
+      // both players field a mon. Both copies are the same species; the copy has its own id.
+      const hostEnemies = hostScene.currentBattle.enemyParty;
+      expect(hostEnemies.length, "host ME battle fields TWO enemies (scripted 1v1 duplicated, #818)").toBe(2);
+      expect(hostScene.currentBattle.double, "host ME battle is a DOUBLE (#818)").toBe(true);
+      expect(hostEnemies[1].species.speciesId, "the duplicate is the SAME species as the scripted mon").toBe(
+        hostEnemies[0].species.speciesId,
+      );
+      expect(hostEnemies[1].id, "the duplicate has its OWN pokemon id").not.toBe(hostEnemies[0].id);
 
       // ===== LOCKSTEP at the handoff boundary: BOTH controllers are still at counterBefore (the single ME
       // advance is deferred to the TRUE terminal after the spawned battle + its shop). NO double-advance,

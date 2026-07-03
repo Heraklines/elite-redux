@@ -17,10 +17,11 @@
 // =============================================================================
 
 import { globalScene } from "#app/global-scene";
-import { applyCoopEnemyHeldItems } from "#data/elite-redux/coop/coop-battle-engine";
+import { applyCoopEnemies, applyCoopEnemyHeldItems } from "#data/elite-redux/coop/coop-battle-engine";
 import { coopLog, coopWarn } from "#data/elite-redux/coop/coop-debug";
-import type { CoopSerializedPokemon } from "#data/elite-redux/coop/coop-transport";
+import type { CoopSerializedEnemy, CoopSerializedPokemon } from "#data/elite-redux/coop/coop-transport";
 import type { Gender } from "#data/gender";
+import { BattleType } from "#enums/battle-type";
 import type { Nature } from "#enums/nature";
 import { TrainerSlot } from "#enums/trainer-slot";
 import type { EnemyPokemon } from "#field/pokemon";
@@ -144,4 +145,73 @@ export function buildCoopEnemy(
     `buildCoopEnemy ADOPT bi=${trainerSlot} species=${speciesId} form=${enemy.formIndex} lv=${enemy.level} abilityIdx=${enemy.abilityIndex} nature=${enemy.nature} gender=${enemy.gender} shiny=${enemy.shiny} hp=${enemy.hp}/${enemy.getMaxHp()} moves=${enemy.moveset.length} heldItems=${Array.isArray(data.heldItems) ? data.heldItems.length : 0}`,
   );
   return enemy;
+}
+
+/**
+ * Co-op GUEST (#818): STRUCTURAL enemy-party adopt. `applyCoopEnemies` below is a
+ * field-CORRECTOR - it fixes stats on a same-species mon and SKIPS a slot that is empty
+ * or holds a different species. That skip was the seam for mid-wave ME-SPAWNED battles
+ * (the encounter engine rolls the party on the HOST only; the guest's local slot is its
+ * own unrelated wave roll or empty), so the guest silently fought DIFFERENT mons. This
+ * function guarantees the guest's party IS the streamed party: mismatched/missing slots
+ * are REBUILT verbatim via buildCoopEnemy, extra local slots are dropped, and (for WILD
+ * battles) the double flag follows the authoritative count - the guest derives its battle
+ * SHAPE from the stream, never from its own assumptions. Ends with the field-corrector
+ * pass so matching slots converge exactly.
+ */
+export function adoptCoopEnemiesStructural(enemies: CoopSerializedEnemy[]): void {
+  try {
+    const battle = globalScene.currentBattle;
+    if (battle == null || enemies.length === 0) {
+      return;
+    }
+    const isTrainer = battle.battleType === BattleType.TRAINER;
+    const trainerSlot = isTrainer ? TrainerSlot.TRAINER : TrainerSlot.NONE;
+    let rebuilt = 0;
+    for (const entry of enemies) {
+      const existing = battle.enemyParty[entry.fieldIndex];
+      const wantSpecies = coopNum(entry.data, "speciesId");
+      if (existing != null && (wantSpecies === undefined || existing.species.speciesId === wantSpecies)) {
+        continue; // same mon - the corrector pass below converges its state
+      }
+      const level = coopNum(entry.data, "level") ?? existing?.level ?? battle.enemyLevels?.[entry.fieldIndex] ?? 1;
+      const built = buildCoopEnemy(entry.data, level, trainerSlot);
+      if (built == null) {
+        continue; // unresolvable blob - leave the local mon (corrector will warn on mismatch)
+      }
+      try {
+        existing?.leaveField(true, true, true);
+      } catch {
+        /* stale sprite teardown must not block the adopt */
+      }
+      battle.enemyParty[entry.fieldIndex] = built;
+      rebuilt++;
+    }
+    if (!isTrainer) {
+      // Drop local extras beyond the authoritative count (a leftover local wild roll).
+      while (battle.enemyParty.length > enemies.length) {
+        const extra = battle.enemyParty.pop();
+        try {
+          extra?.leaveField(true, true, true);
+        } catch {
+          /* ditto */
+        }
+        rebuilt++;
+      }
+      // WILD battle shape follows the authoritative party (trainer field size is variant-
+      // driven and its sync carries the FULL bench, so count>=2 must not force double there).
+      const wantDouble = enemies.length >= 2;
+      if (battle.double !== wantDouble) {
+        coopLog("enemy", `structural adopt: shape align double ${battle.double} -> ${wantDouble} (#818)`);
+        battle.setDouble(wantDouble);
+      }
+    }
+    if (rebuilt > 0) {
+      coopLog("enemy", `structural adopt: REBUILT ${rebuilt} enemy slot(s) from the host stream (#818)`);
+    }
+    applyCoopEnemies(enemies);
+  } catch (e) {
+    coopWarn("enemy", "structural enemy adopt failed (falling back to corrector)", e);
+    applyCoopEnemies(enemies);
+  }
 }

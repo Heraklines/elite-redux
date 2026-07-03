@@ -4,7 +4,8 @@ import { getPokemonNameWithAffix } from "#app/messages";
 import { TrappedTag } from "#data/battler-tags";
 import { getDailyEventSeedBoss } from "#data/daily-seed/daily-run";
 import { isDailyFinalBoss } from "#data/daily-seed/daily-seed-utils";
-import { applyCoopEnemies, captureCoopEnemies } from "#data/elite-redux/coop/coop-battle-engine";
+import { captureCoopEnemies } from "#data/elite-redux/coop/coop-battle-engine";
+import { adoptCoopEnemiesStructural } from "#data/elite-redux/coop/coop-enemy-builder";
 import {
   applyWiredPartnerCommand,
   type ResolvedPartnerCommand,
@@ -366,7 +367,9 @@ export class CommandPhase extends FieldPhase {
       // checksum verification is owned by CoopReplayTurnPhase now (Phase B), not here.
       const enemies = streamer.consumeEnemyParty(waveIndex);
       if (enemies != null) {
-        applyCoopEnemies(enemies);
+        // #818: STRUCTURAL adopt - an ME-spawned battle's party exists only on the host,
+        // so the guest must be able to BUILD it (species/count/shape), not just correct it.
+        adoptCoopEnemiesStructural(enemies);
       }
     }
   }
