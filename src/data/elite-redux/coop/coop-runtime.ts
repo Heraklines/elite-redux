@@ -1463,9 +1463,14 @@ export function assembleCoopRuntime(
       }
       const mode = globalScene.ui?.getMode();
       const handler = globalScene.ui?.getHandler();
-      if (mode === UiMode.MYSTERY_ENCOUNTER && typeof handler?.setCursor === "function") {
+      // #818: the cursor mirror now covers the ER mini-game (quiz/braille/footprints)
+      // screen too - it renders on BOTH clients under UiMode.ER_QUIZ, so the owner's
+      // option cursor lands on the watcher's read-only quiz exactly as it does for a ME.
+      // The er-quiz handler's setCursor clamps a stale index, so it can never crash here.
+      const mirrorable = mode === UiMode.MYSTERY_ENCOUNTER || mode === UiMode.ER_QUIZ;
+      if (mirrorable && typeof handler?.setCursor === "function") {
         handler.setCursor(index);
-        coopLog("me", `meCursor APPLIED index=${index}`);
+        coopLog("me", `meCursor APPLIED index=${index} mode=${mode}`);
       } else {
         coopLog(
           "me",

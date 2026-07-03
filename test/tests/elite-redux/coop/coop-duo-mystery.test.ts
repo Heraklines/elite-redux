@@ -34,13 +34,17 @@
 import type { BattleScene } from "#app/battle-scene";
 import { getGameMode } from "#app/game-mode";
 import { initGlobalScene } from "#app/global-scene";
+import type { Phase } from "#app/phase";
 import * as coopEngine from "#data/elite-redux/coop/coop-battle-engine";
 import { clearCoopRuntime, setCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
+import type { CoopInteractionOutcome } from "#data/elite-redux/coop/coop-transport";
 import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
 import { BattleType } from "#enums/battle-type";
+import { Button } from "#enums/buttons";
 import { GameModes } from "#enums/game-modes";
 import { MysteryEncounterType } from "#enums/mystery-encounter-type";
 import { SpeciesId } from "#enums/species-id";
+import { UiMode } from "#enums/ui-mode";
 import { MysteryEncounterPhase } from "#phases/mystery-encounter-phases";
 import { GameManager } from "#test/framework/game-manager";
 import {
@@ -48,7 +52,9 @@ import {
   drainGuestMeReplayToSettle,
   drainLoopback,
   driveGuestMeReplay,
+  driveGuestMirrorQuiz,
   driveHostRewardShopOwner,
+  type ErQuizPhaseSeam,
   installDuoLogCapture,
   relayGuestMeOptionIndexOnly,
   type ShopPhaseSeam,
@@ -443,6 +449,277 @@ describe.skipIf(!RUN)(
         rig.guestRuntime.controller.interactionCounter(),
         "guest counter unchanged at the handoff (lockstep)",
       ).toBe(counterBefore);
+
+      logs.flush();
+    }, 300_000);
+
+    // ===========================================================================================
+    // IT #4 - #818 CO-OP QUIZ MIRRORING (the leaf-glue PROOF). A quiz-bearing ME (ER_SEALED_DOOR, the
+    // Unown CIPHER) runs its embedded ErQuizPhase on BOTH real engines. This is a DISTINCT authoritative
+    // path from IT #1: the option chain unshifts an ErQuizPhase, and the mini-game is a whole multi-
+    // question sub-phase whose ENGINE outcome only the HOST owns. So:
+    //   - HOST (drive side, counter 0): ErQuizPhase.start streams the whole SESSION to the guest as a
+    //     `mePresent` subPrompt { kind:"quiz" } on the 8M pump seq, then each committed answer relays out
+    //     as a bare "quizAns" integer on the disjoint 8_500_000 family (coopQuizAnswerSeq).
+    //   - GUEST (follow side): its CoopReplayMePhase RACES the 8M outcome, sees the quiz subPrompt, and
+    //     settleForWatcherQuiz DETACHES + unshifts a mirror ErQuizPhase off the identical streamed
+    //     questions. That mirror FOLLOWS - each question arms coopQuizAwaitRemoteAnswer, buffer-hits the
+    //     owner's relayed integer, and self-feeds onAnswer with ZERO local input - landing the identical
+    //     answers. The re-armed outcome/terminal race then applies the post-quiz meResync + runs the true
+    //     LEAVE terminal (leave + advance ONCE) via the settledDetached duty branch.
+    // ER_SEALED_DOOR chosen because "cipher" needs NO per-question sprite atlas loads (Unown icons are
+    // boot-loaded) and it is NON-battle; the answer index is a fixed 0 per question, so both engines
+    // commit the identical choices. The option opens an embedded reward/heal shop after the quiz (like
+    // IT #1's DEPARTMENT_STORE_SALE), driven exactly as IT #1 drives it.
+    // ===========================================================================================
+    it("DUO ME: #818 quiz mirroring - host drives an ER_SEALED_DOOR cipher quiz + streams it; guest mirror quiz FOLLOWs the relayed answers, meResync + leave in lockstep", async () => {
+      /** The Sealed Door decodes GLYPH_COUNT (3) Unown cipher words on the shared ErQuiz engine. */
+      const QUIZ_QUESTIONS = 3;
+      /** Option 1 is the cipher-quiz option (option 2 leaves the door sealed). */
+      const QUIZ_OPTION = 1;
+      /** The DRIVE side commits a fixed answer index per question; both engines apply the identical choice. */
+      const HOST_ANSWER = 0;
+      /** #818: the per-question owner->follower answer relay lives on the 8_500_000 family (coopQuizAnswerSeq). */
+      const QUIZ_ANSWER_SEQ_BASE = 8_500_000;
+
+      // ===== REACH: park the HOST on a real ER_SEALED_DOOR ME wave, then stand up the two-engine rig
+      // (host owns the ME at counter 0). Identical structure to IT #1. =====
+      await game.runToMysteryEncounter(MysteryEncounterType.ER_SEALED_DOOR, [SpeciesId.SNORLAX, SpeciesId.GENGAR]);
+      const hostScene = game.scene;
+      expect(hostScene.currentBattle.battleType, "host reached a MYSTERY_ENCOUNTER wave").toBe(
+        BattleType.MYSTERY_ENCOUNTER,
+      );
+      expect(hostScene.currentBattle.mysteryEncounter?.encounterType, "the forced ME is ER_SEALED_DOOR").toBe(
+        MysteryEncounterType.ER_SEALED_DOOR,
+      );
+
+      const pair = createLoopbackPair();
+      const rig = await buildDuoForMe(game, pair, setCoopRuntime, toCoop);
+
+      const counterBefore = rig.hostRuntime.controller.interactionCounter();
+      expect(counterBefore, "the quiz ME opens on interaction counter 0 (host owns even)").toBe(0);
+      expect(rig.guestRuntime.controller.interactionCounter(), "guest also at counter 0").toBe(0);
+
+      // Spy the guest's sole convergence mechanism (fires EXACTLY once at the host's terminal meResync).
+      const applyMeOutcomeSpy = vi.spyOn(coopEngine, "applyCoopMeOutcome");
+      // Tap the HOST relay: sendInteractionOutcome carries the streamed quiz SESSION (mePresent subPrompt
+      // kind "quiz"); sendInteractionChoice carries each committed answer as a "quizAns" (the DRIVE proof).
+      const sendOutcomeSpy = vi.spyOn(rig.hostRuntime.interactionRelay, "sendInteractionOutcome");
+      const sendChoiceSpy = vi.spyOn(rig.hostRuntime.interactionRelay, "sendInteractionChoice");
+
+      // A mirror-quiz handoff must be INTERLEAVED (the IT #2 split), NOT driven host-fully-first. On the
+      // quiz's `mePresent subPrompt {kind:"quiz"}`, the guest's CoopReplayMePhase.start races the 8M outcome
+      // against the 9M terminal, then settleForWatcherQuiz RE-ARMS that race. If the host had already
+      // buffered the 9M LEAVE (the host-fully-first ordering IT #1 uses), the FIRST race's terminalArm
+      // buffer-HITS + consumes it, and the re-armed terminalArm finds an empty 9M inbox and never resolves -
+      // so the guest converges (meResync) but never runs the leave + advance. So we park the host BEFORE its
+      // terminal (STEP A), run the guest's quiz handoff + mirror quiz while the 9M inbox is still empty
+      // (STEP B, first terminalArm network-waits), then fire the host's terminal (STEP C) so the guest's
+      // ALREADY-ARMED re-armed race consumes the meResync + LEAVE (STEP D). STEP C uses withClientSync so
+      // the loopback deliver-microtasks flush UNDER the GUEST ctx in STEP D (the cross-ctx footgun the IT #2
+      // guest-owned handshake also dodges), keeping applyCoopMeOutcome + leaveEncounterWithoutBattle +
+      // advanceInteraction all against the GUEST scene/controller.
+
+      // ===== STEP A (host): select the quiz option, run its embedded ErQuizPhase headlessly (answer every
+      // question via the ER_QUIZ handler's stored callback), drive the post-quiz embedded shop, and PARK at
+      // PostMysteryEncounterPhase WITHOUT running it - so the session + quizAns are buffered but the terminal
+      // meResync (8M) + LEAVE (9M) are NOT sent yet (they only fire in PostMysteryEncounterPhase.start). =====
+      await withClient(rig.hostCtx, async () => {
+        // Cross the intro dialogue into MysteryEncounterPhase (coopBeginMePump pins the ME counter +
+        // streams the presentation, so coopQuizSide() resolves "drive") and pick the cipher-quiz option.
+        await runSelectMysteryEncounterOption(game, QUIZ_OPTION);
+
+        // runSelectMysteryEncounterOption leaves stale prompts whose expire conditions (MessagePhase /
+        // MysteryEncounterPhase, expiring on OptionSelected/Command/TurnInit) never recur once we cross into
+        // ErQuizPhase - left in the single-file FIFO prompt queue they park at prompts[0] and starve the quiz
+        // prompts. Drop them; the quiz drive below owns the prompt queue from here.
+        (game.promptHandler as unknown as { prompts: unknown[] }).prompts.length = 0;
+
+        // Advance the option's "selected" dialogue so its option phase runs (transition + unshift ErQuizPhase).
+        game.onNextPrompt(
+          "MysteryEncounterOptionSelectedPhase",
+          UiMode.MESSAGE,
+          () => game.scene.ui.getHandler().processInput(Button.ACTION),
+          () => game.isCurrentPhase("ErQuizPhase"),
+        );
+
+        // Register the quiz drive prompts: per question, invoke the ER_QUIZ handler's stored answer callback
+        // with the fixed index (the DRIVE side relays it as a "quizAns"). The ErQuizUiHandler stores the
+        // phase's `(choice) => void this.onAnswer(choice)` as its private `onChoice` field when show() runs -
+        // the ShopPhaseSeam-style cast reaches it. The verdict message then AUTO-advances (the headless
+        // message handler completes its own prompt), so only the choice prompts are needed. Prompts fire FIFO
+        // via the prompt interval while phaseInterceptor.run(ErQuizPhase) waits for the async quiz to end.
+        for (let q = 0; q < QUIZ_QUESTIONS; q++) {
+          game.onNextPrompt(
+            "ErQuizPhase",
+            UiMode.ER_QUIZ,
+            () => {
+              const handler = game.scene.ui.getHandler() as unknown as { onChoice: ((i: number) => void) | null };
+              handler.onChoice?.(HOST_ANSWER);
+            },
+            () => game.isCurrentPhase("PostMysteryEncounterPhase"),
+          );
+        }
+
+        // Pump through the quiz to the embedded post-quiz reward/heal shop (the encounter opens one on every
+        // path: a reward shop when >=1 glyph is decoded, else a heal shop). The quiz prompts fire during the
+        // ErQuizPhase run.
+        await game.phaseInterceptor.to("SelectModifierPhase", false);
+        const hostShop = hostScene.phaseManager.getCurrentPhase() as unknown as ShopPhaseSeam;
+        expect(hostShop.phaseName, "host reached the embedded post-quiz reward shop").toBe("SelectModifierPhase");
+        await driveHostRewardShopOwner(hostShop, { takeReward: false });
+        // MAJOR-3: the embedded ME shop suppresses its own advance mid-ME - still counter 0.
+        expect(
+          rig.hostRuntime.controller.interactionCounter(),
+          "embedded post-quiz ME shop suppressed its own advance (MAJOR-3, still counter 0 mid-ME)",
+        ).toBe(counterBefore);
+        // PARK before the true terminal (do NOT run it): the meResync + LEAVE are streamed only inside
+        // PostMysteryEncounterPhase.start (STEP C), so the guest's 9M inbox stays empty through STEP B.
+        await game.phaseInterceptor.to("PostMysteryEncounterPhase", false);
+      });
+
+      // The host has NOT advanced yet (its terminal is parked, not run).
+      expect(
+        rig.hostRuntime.controller.interactionCounter(),
+        "host has NOT advanced yet (terminal parked before PostMysteryEncounterPhase.start)",
+      ).toBe(counterBefore);
+
+      // ===== DRIVE-SIDE PROOF (host): it streamed the quiz SESSION and published one "quizAns" per question.
+      const quizSessionSends = sendOutcomeSpy.mock.calls.filter(c => {
+        const outcome = c[2] as CoopInteractionOutcome;
+        return outcome.k === "mePresent" && outcome.subPrompt?.kind === "quiz";
+      });
+      expect(
+        quizSessionSends.length,
+        "host streamed the quiz SESSION as a mePresent subPrompt { kind:'quiz' } (#818)",
+      ).toBe(1);
+      const streamedSession = quizSessionSends[0][2] as Extract<CoopInteractionOutcome, { k: "mePresent" }>;
+      expect(
+        streamedSession.subPrompt?.kind === "quiz" ? streamedSession.subPrompt.questions.length : -1,
+        "the streamed session carries all GLYPH_COUNT questions",
+      ).toBe(QUIZ_QUESTIONS);
+
+      const quizAnsSends = sendChoiceSpy.mock.calls.filter(c => c[1] === "quizAns");
+      expect(quizAnsSends.length, "host published one 'quizAns' per question (the DRIVE-side relay proof, #818)").toBe(
+        QUIZ_QUESTIONS,
+      );
+      // Each answer sits on its OWN per-question seq (coopQuizAnswerSeq(counter=0, index) = 8_500_000 + index)
+      // and carries the fixed committed choice.
+      expect(
+        quizAnsSends.map(c => c[0]),
+        "quizAns answers relayed on the per-question 8_500_000 seqs (order-proof, collision-free)",
+      ).toEqual([QUIZ_ANSWER_SEQ_BASE, QUIZ_ANSWER_SEQ_BASE + 1, QUIZ_ANSWER_SEQ_BASE + 2]);
+      expect(
+        quizAnsSends.every(c => c[2] === HOST_ANSWER),
+        "every relayed quizAns is the fixed committed answer index",
+      ).toBe(true);
+
+      // ===== STEP B (guest): start the divert, drain to the quiz handoff (the first outcome/terminal race
+      // sees the buffered quiz session but an EMPTY 9M inbox, so its terminalArm network-waits WITHOUT
+      // consuming a terminal), and run the mirror ErQuizPhase - the FOLLOW side, buffer-hitting every
+      // owner-relayed quizAns with zero local input. The re-armed race is left PARKED (its outcomeArm2 +
+      // terminalArm2 pending) so STEP D can resolve it under the guest ctx. =====
+      let guestMePhase: Phase | undefined;
+      await withClient(rig.guestCtx, async () => {
+        guestMePhase = await startGuestMeReplay(rig.guestScene);
+
+        let quizPhase: ErQuizPhaseSeam | undefined;
+        for (let i = 0; i < 16; i++) {
+          await drainLoopback();
+          const cur = rig.guestScene.phaseManager.getCurrentPhase();
+          if (cur?.phaseName === "ErQuizPhase") {
+            quizPhase = cur as unknown as ErQuizPhaseSeam;
+            break;
+          }
+        }
+        expect(
+          quizPhase,
+          "guest QUEUED its mirror ErQuizPhase after the quiz handoff (#818 settleForWatcherQuiz)",
+        ).toBeDefined();
+        expect(quizPhase!.questions.length, "guest mirror quiz renders the host's identical streamed questions").toBe(
+          QUIZ_QUESTIONS,
+        );
+
+        const answered = await driveGuestMirrorQuiz(rig.guestScene, quizPhase!, QUIZ_QUESTIONS);
+        expect(
+          answered,
+          "guest mirror quiz consumed every owner-relayed answer with zero local input (FOLLOW side, #818)",
+        ).toBe(QUIZ_QUESTIONS);
+      });
+      // The guest has NOT converged / advanced yet (the host has not sent its terminal meResync + LEAVE).
+      expect(
+        applyMeOutcomeSpy.mock.calls.length,
+        "guest has NOT applied a meResync yet (host terminal still parked)",
+      ).toBe(0);
+      expect(
+        rig.guestRuntime.controller.interactionCounter(),
+        "guest has NOT advanced yet (host terminal still parked)",
+      ).toBe(counterBefore);
+
+      // ===== STEP C (host, SYNCHRONOUS): fire PostMysteryEncounterPhase.start() - for a no-outro non-battle
+      // ME it runs fully synchronously: it streams the comprehensive meResync (8M) + the LEAVE terminal (9M)
+      // + advances the host counter, all in one stack. withClientSync installs the host ctx, runs it, and
+      // RESTORES the ctx before any microtask flushes - so the loopback deliver-microtasks it scheduled are
+      // still pending and will flush under the GUEST ctx in STEP D. =====
+      withClientSync(rig.hostCtx, () => {
+        rig.hostScene.phaseManager.getCurrentPhase()!.start();
+      });
+      // The host advanced the alternation counter exactly once for the whole quiz ME.
+      expect(
+        rig.hostRuntime.controller.interactionCounter(),
+        "host advanced the interaction counter once for the whole quiz ME",
+      ).toBe(counterBefore + 1);
+
+      // Capture the host's authoritative post-ME state for the guest-convergence assert (as in IT #1); the
+      // meResync captured the host's state at STEP C, so the guest converges to exactly these values.
+      const hostSeed = hostScene.seed;
+      const hostEncounteredEvents = JSON.stringify(hostScene.mysteryEncounterSaveData.encounteredEvents);
+      expect(
+        hostScene.mysteryEncounterSaveData.encounteredEvents.length,
+        "host recorded the quiz ME in its ME-save (a non-trivial value the guest must converge to)",
+      ).toBeGreaterThan(0);
+
+      // ===== STEP D (guest): drain so the host's now-buffered meResync (8M) + LEAVE (9M) deliver to the
+      // guest's PARKED re-armed race UNDER the guest ctx - applyCoopMeOutcome converges the guest, then the
+      // LEAVE runs leaveEncounterWithoutBattle + advanceInteraction via the settledDetached duty branch. =====
+      await withClient(rig.guestCtx, async () => {
+        for (let i = 0; i < 24; i++) {
+          await drainLoopback();
+          if (
+            applyMeOutcomeSpy.mock.calls.length > 0
+            && rig.guestRuntime.controller.interactionCounter() > counterBefore
+          ) {
+            break;
+          }
+        }
+      });
+
+      // The guest's CoopReplayMePhase settled (via the quiz handoff, then the detached leave terminal).
+      expect(
+        (guestMePhase as unknown as { settled: boolean }).settled,
+        "guest CoopReplayMePhase settled (quiz handoff + detached leave)",
+      ).toBe(true);
+      // The guest applied the host's comprehensive meResync exactly once (its sole convergence path).
+      expect(
+        applyMeOutcomeSpy.mock.calls.length,
+        "guest applied the host's comprehensive meResync exactly once (after the mirror quiz)",
+      ).toBe(1);
+      // CONVERGENCE: the guest's RNG seed + ME-save converged to the host's authoritative values.
+      expect(rig.guestScene.seed, "guest RNG seed converged to the host's via meResync").toBe(hostSeed);
+      expect(
+        JSON.stringify(rig.guestScene.mysteryEncounterSaveData.encounteredEvents),
+        "guest ME-save (encounteredEvents) converged to the host's via meResync",
+      ).toBe(hostEncounteredEvents);
+
+      // ===== INTERACTION-COUNTER LOCKSTEP: both controllers advanced exactly once for the whole quiz ME. =====
+      expect(
+        rig.hostRuntime.controller.interactionCounter(),
+        "host counter is 1 after the quiz ME (single advance)",
+      ).toBe(counterBefore + 1);
+      expect(
+        rig.guestRuntime.controller.interactionCounter(),
+        "guest counter is 1 after the quiz ME (lockstep with host, single advance)",
+      ).toBe(counterBefore + 1);
 
       logs.flush();
     }, 300_000);

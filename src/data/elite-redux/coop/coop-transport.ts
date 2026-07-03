@@ -461,6 +461,27 @@ export type CoopBattleEvent =
 // (de)serialization lives in the reward/ME phases.
 // =============================================================================
 
+/**
+ * #818 co-op quiz mirroring: a structural, fully-serializable copy of ErQuizQuestion's fields. The
+ * host streams a whole quiz session (see the `mePresent` `subPrompt` `quiz` variant below) so BOTH
+ * clients render the SAME quiz off it. This mirrors ErQuizQuestion field-for-field but is kept INLINE
+ * here (NOT imported from er-quiz.ts) so the transport stays engine-free - the lowest layer never pulls
+ * in the quiz engine / species / modifier registries. `kind` is a bare string (not the ErQuizKind
+ * union) for the same reason. If ErQuizQuestion grows a field this mirror follows it.
+ */
+export interface CoopQuizWireQuestion {
+  kind: string;
+  answerId: number;
+  options: number[];
+  prompt: string;
+  cipherWord?: string;
+  cipherOptions?: string[];
+  itemIconFrame?: string;
+  itemName?: string;
+  itemId?: string;
+  itemOptions?: string[];
+}
+
 /** The authoritative outcome of one owner interaction pick, adopted by the watcher. */
 export type CoopInteractionOutcome =
   /**
@@ -481,14 +502,19 @@ export type CoopInteractionOutcome =
    * `meetsReqs[i]` / `labels[i]` are the host-resolved per-option enablement + button label.
    * The optional `subPrompt` is streamed as a FOLLOW-UP `mePresent` right before the host opens
    * an engine sub-prompt (party target / secondary menu), telling the guest which local capture
-   * screen to open. Plain JSON only (strings / booleans), no engine types.
+   * screen to open. The `quiz` variant (#818) instead streams a WHOLE ErQuizPhase session (its
+   * questions + stopOnWrong) so both clients run the identical quiz. Plain JSON only (strings /
+   * booleans / the inline `CoopQuizWireQuestion`), no engine types.
    */
   | {
       k: "mePresent";
       tokens: Record<string, string>;
       meetsReqs: boolean[];
       labels: string[];
-      subPrompt?: { kind: "party" } | { kind: "secondary"; labels: string[] };
+      subPrompt?:
+        | { kind: "party" }
+        | { kind: "secondary"; labels: string[] }
+        | { kind: "quiz"; questions: CoopQuizWireQuestion[]; stopOnWrong: boolean };
     }
   /**
    * Co-op authoritative non-battle ME (#633 B2 / MAJOR-2 / P4): the comprehensive ME-terminal

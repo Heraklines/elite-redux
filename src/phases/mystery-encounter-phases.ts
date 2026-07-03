@@ -408,16 +408,27 @@ export class MysteryEncounterPhase extends Phase {
       if (COOP_AUTHORITATIVE_BESPOKE_SUB_ME.has(encounter.encounterType)) {
         // #823 (live Dormant Guardian strand): the old 'safe-degrade' DISCARDED the guest's pick
         // and force-left - the guest advanced alone while the host stranded on its intro screen.
-        // Until the bespoke mini-games are fully MIRRORED (the byte-identical epic), the HOST
-        // drives the mini-game FOR REAL: the option applies through the normal engine path, the
-        // input gate stands down for the sub-screens (flag below), the narration mirror keeps
-        // the owner informed, and the normal terminal advances BOTH clients together.
-        coopWarn(
-          "me",
-          `bespoke sub-UI on guest-owned ME ${MysteryEncounterType[encounter.encounterType]}: HOST drives the mini-game (#823 interim; mirroring epic pending)`,
-          { seq: seqMe, index: choice.choice },
-        );
-        setCoopMeBespokeHostDrives(true);
+        // #818 co-op quiz MIRRORING: the 8 quiz MEs (ErQuizPhase) are now MIRRORED - the host streams
+        // the question session and BOTH clients run ErQuizPhase off it, with the GUEST owner driving its
+        // OWN answers over the quiz relay. So for those the host input gate must STAY UP: standing it
+        // down (setCoopMeBespokeHostDrives) would let the HOST player hijack and answer the guest's quiz.
+        // Only CLOWNING_AROUND is a non-quiz bespoke sub-UI (a yes/no OPTION_SELECT) with no mirror path,
+        // so it alone still needs the host to drive it locally. Every case falls through unchanged to the
+        // programmatic option apply below (for the quiz MEs, ErQuizPhase.start streams the session there).
+        if (encounter.encounterType === MysteryEncounterType.CLOWNING_AROUND) {
+          coopWarn(
+            "me",
+            `bespoke sub-UI on guest-owned ME ${MysteryEncounterType[encounter.encounterType]}: HOST drives it locally (#823; only CLOWNING_AROUND host-drives, quiz MEs mirror)`,
+            { seq: seqMe, index: choice.choice },
+          );
+          setCoopMeBespokeHostDrives(true);
+        } else {
+          coopLog(
+            "me",
+            `quiz ME on guest-owned encounter ${MysteryEncounterType[encounter.encounterType]}: MIRRORED (host gate stays up; guest owner drives the quiz) (#818)`,
+            { seq: seqMe, index: choice.choice },
+          );
+        }
       }
       coopLog("me", "host applies relayed guest option programmatically", {
         seq: seqMe,

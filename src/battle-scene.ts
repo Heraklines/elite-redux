@@ -2973,9 +2973,13 @@ export class BattleScene extends SceneBase {
 
     if (this.bgm && bgmName === this.bgm.key) {
       if (!this.bgm.isPlaying) {
-        this.bgm.play({
-          volume: this.masterVolume * this.bgmVolume,
-        });
+        try {
+          this.bgm.play({
+            volume: this.masterVolume * this.bgmVolume,
+          });
+        } catch (e) {
+          console.warn(`[bgm] resume failed for "${bgmName}" (handled, music continues silently):`, e);
+        }
       }
       return;
     }
@@ -2988,22 +2992,35 @@ export class BattleScene extends SceneBase {
     loopPoint = bgmName === this.arena.bgm ? this.arena.bgmLoopPoint : this.getBgmLoopPoint(bgmName);
     let loaded = false;
     const playNewBgm = () => {
-      this.ui.bgmBar.setBgmToBgmBar(bgmName);
-      if (bgmName === null && this.bgm && !this.bgm.pendingRemove) {
+      // #826 (live co-op ME-battle crash, ER_INNATE_SHRINE): a missing/unloaded audio asset must
+      // NEVER throw out of a phase. sound.add on an uncached key builds a WebAudioSound with a null
+      // buffer; its play() throws "Cannot set properties of null (setting 'seek')" as an UNHANDLED
+      // REJECTION that killed the host's phase chain mid-encounter (both players stranded). Keep the
+      // current track and log instead - music is never worth a dead engine.
+      try {
+        this.ui.bgmBar.setBgmToBgmBar(bgmName);
+        if (bgmName === null && this.bgm && !this.bgm.pendingRemove) {
+          this.bgm.play({
+            volume: this.masterVolume * this.bgmVolume,
+          });
+          return;
+        }
+        if (bgmName && !this.cache.audio.exists(bgmName)) {
+          console.warn(`[bgm] audio missing from cache for key "${bgmName}"; keeping the current track (#826)`);
+          return;
+        }
+        if (this.bgm && !this.bgm.pendingRemove && this.bgm.isPlaying) {
+          this.bgm.stop();
+        }
+        this.bgm = this.sound.add(bgmName, { loop: true });
         this.bgm.play({
           volume: this.masterVolume * this.bgmVolume,
         });
-        return;
-      }
-      if (this.bgm && !this.bgm.pendingRemove && this.bgm.isPlaying) {
-        this.bgm.stop();
-      }
-      this.bgm = this.sound.add(bgmName, { loop: true });
-      this.bgm.play({
-        volume: this.masterVolume * this.bgmVolume,
-      });
-      if (loopPoint) {
-        this.bgm.on("looped", () => this.bgm.play({ seek: loopPoint }));
+        if (loopPoint) {
+          this.bgm.on("looped", () => this.bgm.play({ seek: loopPoint }));
+        }
+      } catch (e) {
+        console.warn(`[bgm] play failed for "${bgmName}" (handled, music continues with the prior track):`, e);
       }
     };
     this.load.once(Phaser.Loader.Events.COMPLETE, () => {

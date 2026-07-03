@@ -15,9 +15,11 @@ import { coopMeInteractionStartValue, setCoopMeHandoffBattleStarted } from "#dat
 import { COOP_ME_BATTLE_HANDOFF, COOP_ME_TERM_SEQ_BASE } from "#data/elite-redux/coop/coop-me-pump";
 import { getCoopBattleStreamer, getCoopController, getCoopInteractionRelay } from "#data/elite-redux/coop/coop-runtime";
 import type { CoopInteractionOutcome } from "#data/elite-redux/coop/coop-transport";
+import type { ErQuizQuestion } from "#data/elite-redux/er-quiz";
 import { MysteryEncounterMode } from "#enums/mystery-encounter-mode";
 import { UiMode } from "#enums/ui-mode";
 import { leaveEncounterWithoutBattle } from "#mystery-encounters/encounter-phase-utils";
+import type { ErQuizResult } from "#phases/er-quiz-phase";
 import { hideCoopControllerTag, showCoopControllerTagFor } from "#ui/coop-controller-tag";
 import type { OptionSelectConfig } from "#ui/handlers/abstract-option-select-ui-handler";
 import { PartyUiMode } from "#ui/party-ui-handler";
@@ -64,6 +66,18 @@ export function setCoopMeHostPresentation(
 }
 
 /**
+ * #818: the QUIZ variant of the host-streamed `mePresent` sub-prompt (the embedded Guessing Booth /
+ * Scrambled Pokedex / footprint hunt / Unown cipher / braille seal / Salvage Yard). Derived from the
+ * FROZEN wire union so it tracks {@linkcode CoopInteractionOutcome} without re-declaring the shape;
+ * its `questions` are structurally the {@linkcode ErQuizQuestion}s the guest feeds its mirror
+ * ErQuizPhase. Resolves to `never` until the transport union gains the `{ kind: "quiz"; ... }` variant.
+ */
+type CoopMeQuizSubPrompt = Extract<
+  NonNullable<Extract<CoopInteractionOutcome, { k: "mePresent" }>["subPrompt"]>,
+  { kind: "quiz" }
+>;
+
+/**
  * Co-op GUEST mystery-encounter REPLAY (#633, TRACK-2 Phase C, NON-BATTLE ME path). In the
  * AUTHORITATIVE netcode the guest's ME engine/RNG is diverged from the host's, so the guest must
  * NOT run the encounter engine: its {@linkcode MysteryEncounterPhase.start} diverts here INSTEAD of
@@ -93,6 +107,14 @@ export function setCoopMeHostPresentation(
  *    CHOICE inbox; host->guest presentation (P0) + comprehensive outcome (P4) on the OUTCOME inbox.
  *  - `seq_term = 9_000_000 + interactionCounter`: host->guest LEAVE / battle-handoff terminal (P5/P6).
  */
+/** #818 latent-race fix: the 9M terminal arm a re-armed race INHERITS instead of re-awaiting.
+ * A buffered LEAVE consumed by the ORIGINAL race's arm would otherwise be gone forever - the
+ * re-armed await would park on an emptied inbox and the guest would never leave/advance. */
+type MeTerminalArm = Promise<{
+  tag: "terminal";
+  action: Awaited<ReturnType<NonNullable<ReturnType<typeof getCoopInteractionRelay>>["awaitInteractionChoice"]>>;
+}>;
+
 export class CoopReplayMePhase extends Phase {
   public readonly phaseName = "CoopReplayMePhase";
 
@@ -154,9 +176,24 @@ export class CoopReplayMePhase extends Phase {
     // handles the eventual ME end (leave + advance), exactly like the :46 flow did.
     const shopKeyPrefix = `${this.interactionCounter}:`;
     relay.onRewardOptionsBuffered = key => {
-      if (String(key).startsWith(shopKeyPrefix)) {
-        this.settleForWatcherShop(relay);
+      if (!String(key).startsWith(shopKeyPrefix)) {
+        return;
       }
+      // #818: a reward shop can FOLLOW a quiz handoff (Dormant Guardian's relic screen after
+      // the braille trial). Once the QUIZ already settled this phase DETACHED, settleForWatcherShop's
+      // `settled` guard would no-op, so open the watcher shop DIRECTLY here - exactly once
+      // (shopHandedOff). The detached race the quiz re-armed still runs the ME-end leave/advance.
+      if (this.settledDetached) {
+        if (!this.shopHandedOff) {
+          this.shopHandedOff = true;
+          coopLog("me", "reward shop FOLLOWS the quiz handoff - opening watcher shop directly (#818)", {
+            counter: this.interactionCounter,
+          });
+          globalScene.phaseManager.unshiftNew("SelectModifierPhase");
+        }
+        return;
+      }
+      this.settleForWatcherShop(relay);
     };
     // The post-subscription work is async (it awaits the host's presentation), but the phase
     // contract is sync-void: wrap it in a void-ed IIFE, mirroring CoopReplayTurnPhase's `.then`
@@ -189,9 +226,11 @@ export class CoopReplayMePhase extends Phase {
 
       // #821: the SHOP HANDOFF settled this phase while we awaited the presentation. The
       // race was deliberately NOT armed inside the handoff (it would have consumed the
-      // buffered mePresent as an outcome); arm it here, detached - shop-aware guards let
-      // the later meResync apply and the ME-end terminal run the leave duties.
-      if (this.settled && this.settledForShop && !this.raceArmed) {
+      // buffered mePresent as an outcome); arm it here, detached - the detached-settle guards
+      // let the later meResync apply and the ME-end terminal run the leave duties. (Only the
+      // shop reaches here: a quiz always settles from INSIDE the race, so raceArmed is already
+      // true by then - it re-arms its own detached race in settleForWatcherQuiz.)
+      if (this.settled && this.settledDetached && !this.raceArmed) {
         this.awaitOutcomeThenTerminal(relay);
         return;
       }
@@ -234,8 +273,19 @@ export class CoopReplayMePhase extends Phase {
   /** #815: one top-level pick per ME - a double-fired select must not re-arm the awaits. */
   private pickSent = false;
 
-  /** #821: settled via the SHOP HANDOFF - the terminal must still run the leave duties. */
-  private settledForShop = false;
+  /**
+   * #821/#818: settled via a DETACHED handoff (the embedded reward SHOP or the embedded QUIZ) - the
+   * phase ended but the ME is still live on the owner, so the terminal must still run the leave +
+   * advance duties. Generalizes the former `settledForShop`: the three shop-aware race guards + the
+   * leaveDefensive duty branch key off THIS for BOTH handoffs.
+   */
+  private settledDetached = false;
+
+  /**
+   * #818: the watcher reward shop is opened at most ONCE - by settleForWatcherShop (the shop-only
+   * handoff), or (when a reward shop FOLLOWS a quiz handoff) directly by the rewardOptions hook.
+   */
+  private shopHandedOff = false;
 
   /** #821: whether awaitOutcomeThenTerminal has been armed at least once. */
   private raceArmed = false;
@@ -293,7 +343,10 @@ export class CoopReplayMePhase extends Phase {
    *    exactly as the prior null-host-stall fall-through already did).
    * The single `settled` guard fires the terminal exactly once; whichever arm loses is ignored.
    */
-  private awaitOutcomeThenTerminal(relay: NonNullable<ReturnType<typeof getCoopInteractionRelay>>): void {
+  private awaitOutcomeThenTerminal(
+    relay: NonNullable<ReturnType<typeof getCoopInteractionRelay>>,
+    inheritedTerminalArm?: MeTerminalArm,
+  ): void {
     this.raceArmed = true;
     coopLog("me", "await host outcome (mePresent subPrompt / meResync) racing terminal", {
       seq: this.seq,
@@ -315,15 +368,21 @@ export class CoopReplayMePhase extends Phase {
     const outcomeArm = relay
       .awaitInteractionOutcome(this.seq, COOP_ME_REPLAY_WAIT_MS)
       .then(outcome => ({ tag: "outcome" as const, outcome }));
-    const terminalArm = relay
-      .awaitInteractionChoice(this.seqTerm, COOP_ME_REPLAY_WAIT_MS)
-      .then(action => ({ tag: "terminal" as const, action }));
+    // #818 latent-race fix: a re-arm (quiz handoff) INHERITS the original race's terminal arm.
+    // The original arm may have ALREADY buffer-hit the host's LEAVE (fast host, lagging guest);
+    // re-awaiting the emptied 9M inbox would hang forever and the guest would never leave/advance.
+    const terminalArm: MeTerminalArm =
+      inheritedTerminalArm
+      ?? relay.awaitInteractionChoice(this.seqTerm, COOP_ME_REPLAY_WAIT_MS).then(action => ({
+        tag: "terminal" as const,
+        action,
+      }));
     void Promise.race([outcomeArm, terminalArm]).then(winner => {
       if (raceDone) {
         return;
       }
       raceDone = true;
-      if (this.settled && !this.settledForShop) {
+      if (this.settled && !this.settledDetached) {
         coopLog("me", "outcome/terminal race resolved after settled; ignoring", { seq: this.seq });
         return;
       }
@@ -340,6 +399,21 @@ export class CoopReplayMePhase extends Phase {
       }
       const outcome = winner.outcome;
       if (outcome != null && outcome.k === "mePresent" && outcome.subPrompt != null) {
+        // #818: the host opened its embedded QUIZ minigame (Guessing Booth / Scrambled Pokedex /
+        // footprint hunt / Unown cipher / braille seal / Salvage Yard). Unlike the party/secondary
+        // sub-prompts (a single slot/index capture), the quiz is a whole multi-question sub-phase
+        // whose engine outcome the HOST owns. Settle DETACHED + run the guest's OWN mirror ErQuizPhase
+        // (which self-relays its answers), exactly as the reward shop hands off to a watcher
+        // SelectModifierPhase (#821). Handled BEFORE openSubPickCapture, which stays party/secondary-only.
+        if (outcome.subPrompt.kind === "quiz") {
+          coopLog("me", "host opened embedded ME quiz sub-prompt; handing off to mirror ErQuizPhase (#818)", {
+            seq: this.seq,
+            questions: outcome.subPrompt.questions.length,
+            stopOnWrong: outcome.subPrompt.stopOnWrong,
+          });
+          this.settleForWatcherQuiz(relay, outcome.subPrompt, terminalArm);
+          return;
+        }
         // ADD-1c: the host opened an engine sub-prompt. Open the matching local capture screen, relay
         // the human's pick, and loop for the next sub-prompt / the terminal resync. (The pending
         // terminalArm is superseded by the next loop's race - harmless.)
@@ -362,7 +436,7 @@ export class CoopReplayMePhase extends Phase {
         // SAME terminalArm (its terminal, if any, is already drained into it) so we never re-await an
         // emptied 9M inbox and hang. A still-pending terminalArm resolves on the real terminal / null.
         void terminalArm.then(t => {
-          if (!this.settled || this.settledForShop) {
+          if (!this.settled || this.settledDetached) {
             this.handleTerminalAction(t.action);
           }
         });
@@ -376,7 +450,7 @@ export class CoopReplayMePhase extends Phase {
         got: outcome == null ? "null" : outcome.k,
       });
       void terminalArm.then(t => {
-        if (!this.settled || this.settledForShop) {
+        if (!this.settled || this.settledDetached) {
           this.handleTerminalAction(t.action);
         }
       });
@@ -610,11 +684,76 @@ export class CoopReplayMePhase extends Phase {
     relay.onRewardOptionsBuffered = null;
     // The phase's ALREADY-ARMED outcome/terminal race keeps running detached (promises
     // outlive end()): a later meResync still applies through the normal race handler, and
-    // the eventual ME-end terminal runs leaveDefensive's duties via the settledForShop
+    // the eventual ME-end terminal runs leaveDefensive's duties via the settledDetached
     // branch below. If the handoff fired BEFORE the race was armed (fast-owner path), arm it
     // now so those channels are never orphaned.
-    this.settledForShop = true;
+    // #818: settledDetached generalizes the former settledForShop (a quiz handoff sets it too);
+    // shopHandedOff marks the shop opened so the quiz-then-shop hook path never double-opens it.
+    this.settledDetached = true;
+    this.shopHandedOff = true;
     globalScene.phaseManager.unshiftNew("SelectModifierPhase");
+    this.settled = true;
+    coopMeHostPresentation = null;
+    this.offMeMessage?.();
+    this.offMeMessage = null;
+    this.end();
+  }
+
+  /**
+   * #818 QUIZ HANDOFF: the owner's engine opened the ME's embedded QUIZ minigame (the Guessing
+   * Booth / Scrambled Pokedex / Snowy footprint hunt / Unown cipher / braille seal / Salvage Yard).
+   * Like the reward shop (#821), the quiz runs on the OWNER's engine only, so its streamed sub-prompt
+   * had no watcher-side handler and the guest sat parked in the ME await while the owner played a whole
+   * multi-question sub-phase. Settle this phase DETACHED (WITHOUT leaving / advancing - the ME is still
+   * live) and run the guest's OWN mirror ErQuizPhase, which self-relays its answers (drive publishes;
+   * follow awaits the remote pick + self-feeds). The re-armed outcome/terminal race applies the post-quiz
+   * meResync and runs the leave + advance duties at the true terminal, exactly like the shop handoff.
+   * The rewardOptions hook stays LIVE: a reward shop can FOLLOW the quiz (Dormant Guardian's relic
+   * screen after the braille trial), and the hook opens that watcher shop directly once settledDetached.
+   */
+  private settleForWatcherQuiz(
+    relay: NonNullable<ReturnType<typeof getCoopInteractionRelay>>,
+    sub: CoopMeQuizSubPrompt,
+    terminalArm: MeTerminalArm,
+  ): void {
+    if (this.settled) {
+      coopLog("me", "quiz handoff no-op (already settled)", { counter: this.interactionCounter });
+      return;
+    }
+    coopLog("me", "QUIZ HANDOFF: owner opened the embedded ME quiz - running mirror ErQuizPhase (#818)", {
+      counter: this.interactionCounter,
+      questions: sub.questions.length,
+      stopOnWrong: sub.stopOnWrong,
+    });
+    hideCoopControllerTag();
+    // #818: settledDetached (the generalized settledForShop) drives the shop-aware race guards + the
+    // leaveDefensive leave/advance duty. Do NOT null relay.onRewardOptionsBuffered here: a reward shop
+    // can FOLLOW the quiz (the relic screen after Dormant Guardian's braille trial), and the hook opens
+    // that watcher shop directly once this phase is settledDetached (once-only via shopHandedOff).
+    this.settledDetached = true;
+    // Queue the guest's mirror quiz. It renders the SAME questions the host streamed and handles its OWN
+    // answer relay internally (drive publishes each pick; follow awaits the remote pick + self-feeds it),
+    // so we only construct + queue it and take NO engine action here - the authoritative quiz outcome
+    // rides the host's comprehensive meResync at the ME terminal. Structural cast: the wire questions are
+    // ErQuizQuestion-shaped (frozen contract).
+    globalScene.phaseManager.unshiftNew("ErQuizPhase", {
+      questions: sub.questions as ErQuizQuestion[],
+      stopOnWrong: sub.stopOnWrong,
+      onComplete: (result: ErQuizResult) =>
+        coopLog("me", "guest mirror quiz complete (engine outcome comes from the host)", {
+          correct: result.correct,
+          answered: result.answered,
+        }),
+    });
+    // The outcome/terminal race that DELIVERED this quiz subPrompt has already resolved (its raceDone is
+    // set). Re-arm the race DETACHED (promises outlive end()) so the host's post-quiz meResync applies
+    // through the normal race handler and the eventual ME-end terminal runs leaveDefensive's leave +
+    // advance duties via the settledDetached branch. CRITICAL (#818 latent race): the re-arm INHERITS the
+    // delivering race's terminalArm instead of re-awaiting 9M - if a fast host already buffered its LEAVE
+    // before the guest reached this handoff, the original arm consumed it (buffer-hit) and a fresh await
+    // on the emptied inbox would park forever: state would converge but the guest would never leave or
+    // advance (a permanent counter desync - the probe agent's live-timing finding).
+    this.awaitOutcomeThenTerminal(relay, terminalArm);
     this.settled = true;
     coopMeHostPresentation = null;
     this.offMeMessage?.();
@@ -632,11 +771,12 @@ export class CoopReplayMePhase extends Phase {
    */
   private leaveDefensive(): void {
     if (this.settled) {
-      if (this.settledForShop) {
-        // #821: settled by the SHOP HANDOFF - the phase ended but the encounter is only now
-        // over (the ME-end terminal just fired). Run the leave duties detachedly, ONCE.
-        this.settledForShop = false;
-        coopLog("me", "detached ME terminal after watcher shop: leaving + advancing (#821)", {
+      if (this.settledDetached) {
+        // #821/#818: settled by a DETACHED handoff (watcher SHOP or mirror QUIZ) - the phase ended
+        // but the encounter is only now over (the ME-end terminal just fired). Run the leave duties
+        // detachedly, ONCE (the flag flip guarantees the once-only for a detached-settled phase).
+        this.settledDetached = false;
+        coopLog("me", "detached ME terminal after watcher shop/quiz: leaving + advancing (#821/#818)", {
           counter: this.interactionCounter,
         });
         try {

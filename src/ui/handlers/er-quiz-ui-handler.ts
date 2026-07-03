@@ -17,6 +17,8 @@
 // =============================================================================
 
 import { globalScene } from "#app/global-scene";
+import { coopMeInProgress, coopMeInteractionStartValue } from "#data/elite-redux/coop/coop-me-pin-state";
+import { getCoopController } from "#data/elite-redux/coop/coop-runtime";
 import { getErBrailleLegendText } from "#data/elite-redux/er-quiz";
 import { Button } from "#enums/buttons";
 import { TextStyle } from "#enums/text-style";
@@ -297,8 +299,29 @@ export class ErQuizUiHandler extends UiHandler {
   }
 
   override setCursor(cursor: number): boolean {
-    const changed = super.setCursor(cursor);
+    // #818 co-op mini-game cursor mirror: the quiz renders on BOTH clients under
+    // UiMode.ER_QUIZ, so a stale index streamed from the other screen (a different
+    // handler / a smaller option count) must never index past our option buttons.
+    // Clamp into [0, optionCount-1] before we move so the receiver can never crash us.
+    const clamped = Math.max(0, Math.min(cursor, this.optionCount - 1));
+    const changed = super.setCursor(clamped);
     this.moveCursorTo(this.cursor);
+    if (changed) {
+      // #818 co-op cursor mirror: the mini-game OWNER's cursor is streamed so the
+      // watcher's read-only quiz highlights the same option live (like the shop / ME).
+      // Cosmetic - same gating predicate as the mystery-encounter handler.
+      try {
+        if (
+          globalScene.gameMode?.isCoop
+          && coopMeInProgress()
+          && (getCoopController()?.isLocalOwnerAtCounter(coopMeInteractionStartValue()) ?? false)
+        ) {
+          getCoopController()?.sendMeCursor(this.cursor);
+        }
+      } catch {
+        /* cosmetic */
+      }
+    }
     return changed;
   }
 

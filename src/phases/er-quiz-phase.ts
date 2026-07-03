@@ -18,6 +18,11 @@
 
 import { globalScene } from "#app/global-scene";
 import { Phase } from "#app/phase";
+import {
+  coopQuizAwaitRemoteAnswer,
+  coopQuizHostStreamSession,
+  coopQuizPublishAnswer,
+} from "#data/elite-redux/coop/coop-quiz-mirror";
 import type { ErQuizQuestion } from "#data/elite-redux/er-quiz";
 import { erQuizOptionName, getErFootprintAsset } from "#data/elite-redux/er-quiz";
 import { SpeciesId } from "#enums/species-id";
@@ -64,6 +69,9 @@ export class ErQuizPhase extends Phase {
   private forfeited = false;
   /** modifierTypes keys of the "item"-kind questions answered correctly. */
   private readonly correctItemIds: string[] = [];
+  /** #818 co-op quiz mirroring: question indices whose remote (owner-relayed) answer has already
+   *  been applied, so a stale / late remote resolution can never answer a LATER question. */
+  private readonly resolvedRemote = new Set<number>();
 
   constructor(config: ErQuizSessionConfig) {
     super();
@@ -74,6 +82,10 @@ export class ErQuizPhase extends Phase {
 
   start(): void {
     super.start();
+    // #818 co-op quiz mirroring: the HOST (sole engine) streams the whole question session so BOTH
+    // clients render the SAME quiz off it. The function gates itself on host role + a live mirrored ME,
+    // so this is a no-op in solo play and safe to call unconditionally.
+    coopQuizHostStreamSession(this.questions, this.stopOnWrong);
     void this.run();
   }
 
@@ -175,6 +187,7 @@ export class ErQuizPhase extends Phase {
         options: q.cipherOptions ?? [],
       };
       globalScene.ui.setMode(UiMode.ER_QUIZ, cipherView, (choice: number) => void this.onAnswer(choice));
+      this.armRemoteAnswer();
       return;
     }
 
@@ -190,6 +203,7 @@ export class ErQuizPhase extends Phase {
         options: q.cipherOptions ?? [],
       };
       globalScene.ui.setMode(UiMode.ER_QUIZ, brailleView, (choice: number) => void this.onAnswer(choice));
+      this.armRemoteAnswer();
       return;
     }
 
@@ -204,6 +218,7 @@ export class ErQuizPhase extends Phase {
         options: q.itemOptions ?? [],
       };
       globalScene.ui.setMode(UiMode.ER_QUIZ, itemView, (choice: number) => void this.onAnswer(choice));
+      this.armRemoteAnswer();
       return;
     }
 
@@ -253,9 +268,36 @@ export class ErQuizPhase extends Phase {
     };
 
     globalScene.ui.setMode(UiMode.ER_QUIZ, view, (choice: number) => void this.onAnswer(choice));
+    this.armRemoteAnswer();
+  }
+
+  /**
+   * #818 co-op quiz mirroring (FOLLOW side): if the PARTNER owns this ME, arm a one-shot wait for
+   * their relayed answer to the CURRENT question and feed it into our own onAnswer, so the follower
+   * lands the identical result without taking local input. A no-op on the drive / solo side
+   * (coopQuizAwaitRemoteAnswer returns null). The `forIndex` capture + the `resolvedRemote` guard are
+   * MANDATORY: the wait can resolve LATE (after the human on the drive side finally answers), by which
+   * point `this.index` may already point at a later question - applying it there would answer the wrong
+   * one. So we apply only when the index has not advanced AND this index was not already answered
+   * remotely (a duplicate resolution is dropped).
+   */
+  private armRemoteAnswer(): void {
+    const remote = coopQuizAwaitRemoteAnswer(this.index);
+    if (remote) {
+      const forIndex = this.index;
+      void remote.then(c => {
+        if (this.index === forIndex && !this.resolvedRemote.has(forIndex)) {
+          this.resolvedRemote.add(forIndex);
+          void this.onAnswer(c);
+        }
+      });
+    }
   }
 
   private async onAnswer(choice: number): Promise<void> {
+    // #818 co-op quiz mirroring (DRIVE side): relay this answer to the follower BEFORE we consume it,
+    // so both clients apply the identical choice. Gates itself on the drive side (a no-op otherwise).
+    coopQuizPublishAnswer(this.index, choice);
     // Hand the UI back to MESSAGE before showing the verdict text.
     await globalScene.ui.setMode(UiMode.MESSAGE);
 

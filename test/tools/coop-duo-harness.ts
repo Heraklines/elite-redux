@@ -93,6 +93,7 @@ import type { ReplayCommandEvent, ReplayTrace } from "#data/elite-redux/replay-t
 import { isReplayCommandEvent, isReplayInteractionEvent, validateReplayTrace } from "#data/elite-redux/replay-trace";
 import { BattleType } from "#enums/battle-type";
 import { BattlerIndex } from "#enums/battler-index";
+import { Button } from "#enums/buttons";
 import { Command } from "#enums/command";
 import { GameModes } from "#enums/game-modes";
 import type { MysteryEncounterType } from "#enums/mystery-encounter-type";
@@ -1416,6 +1417,80 @@ export async function drainGuestMeReplayToSettle(replay: Phase): Promise<GuestMe
 export async function driveGuestMeReplay(guestScene: MeReplayPumpScene): Promise<GuestMeReplay> {
   const replay = await startGuestMeReplay(guestScene);
   return drainGuestMeReplayToSettle(replay);
+}
+
+// ---------------------------------------------------------------------------
+// #818 co-op QUIZ MIRRORING (guest FOLLOW side). An embedded-quiz ME (Sealed Door / Guessing
+// Booth / Scrambled Pokedex / footprint hunt / cipher / braille / Salvage Yard) hands off to a
+// mirror ErQuizPhase on the GUEST when its CoopReplayMePhase races the host's `mePresent` subPrompt
+// { kind:"quiz" } and calls settleForWatcherQuiz (unshifting the mirror phase off the host-streamed
+// session). The guest pump is MANUAL, so the harness starts that queued phase and, per question,
+// drains the loopback (so the phase's armRemoteAnswer BUFFER-HITS the owner's relayed "quizAns" and
+// self-feeds onAnswer with ZERO local input) then advances the verdict message so it asks the next.
+// `answered === total` on return proves the follower landed every owner-relayed answer.
+// ---------------------------------------------------------------------------
+
+/** #818 seam: the ErQuizPhase private tally fields the harness inspects (mirrors ShopPhaseSeam's shape). */
+export interface ErQuizPhaseSeam {
+  phaseName: string;
+  /** The host-streamed questions the mirror renders (structurally ErQuizQuestion[]). */
+  questions: unknown[];
+  /** Current question index (0-based). */
+  index: number;
+  /** Questions answered so far (=== total when every relayed answer was consumed). */
+  answered: number;
+  /** Questions answered correctly (matches the owner's tally, since the answers are identical). */
+  correct: number;
+  start(): void;
+}
+
+/** Advance the guest's message handler ONE step iff it is parked awaiting input (a quiz verdict). */
+function advanceGuestVerdict(guestScene: BattleScene): void {
+  if (guestScene.ui.getMode() !== UiMode.MESSAGE) {
+    return;
+  }
+  const handler = guestScene.ui.getHandler() as unknown as {
+    awaitingActionInput?: boolean;
+    processInput?: (b: number) => boolean;
+  };
+  if (handler.awaitingActionInput) {
+    handler.processInput?.(Button.ACTION);
+  }
+}
+
+/**
+ * Drive the GUEST's mirror {@linkcode ErQuizPhase} (the #818 FOLLOW side) to completion: start it, then
+ * per question drain the loopback so its armRemoteAnswer BUFFER-HITS the owner's relayed "quizAns" and
+ * self-feeds onAnswer, and advance the verdict message so the phase asks the next question. The follower
+ * takes NO local input - every answer comes from the owner's relay - so `answered === total` on return
+ * proves the mirror consumed every relayed answer. MUST be called inside withClient(guestCtx). THROWS on
+ * a no-progress stall (the hang detection the duo harness exists to surface).
+ */
+export async function driveGuestMirrorQuiz(
+  guestScene: BattleScene,
+  quizPhase: ErQuizPhaseSeam,
+  total: number,
+): Promise<number> {
+  quizPhase.start();
+  for (let i = 0; i < 600; i++) {
+    await drainLoopback();
+    advanceGuestVerdict(guestScene);
+    if (quizPhase.answered >= total) {
+      break;
+    }
+  }
+  if (quizPhase.answered < total) {
+    throw new Error(
+      `guest mirror quiz HANG: consumed ${quizPhase.answered}/${total} owner-relayed answers - see dev-logs/coop-duo/`,
+    );
+  }
+  // Advance the FINAL verdict so finish() runs (onComplete + end) - not load-bearing for the tally, but
+  // leaves the mirror phase cleanly ended rather than parked on its last message.
+  for (let i = 0; i < 8; i++) {
+    await drainLoopback();
+    advanceGuestVerdict(guestScene);
+  }
+  return quizPhase.answered;
 }
 
 // =============================================================================
