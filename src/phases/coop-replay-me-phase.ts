@@ -11,7 +11,7 @@ import { coopLog, coopWarn } from "#data/elite-redux/coop/coop-debug";
 import { adoptCoopEnemiesStructural } from "#data/elite-redux/coop/coop-enemy-builder";
 import type { CoopInteractionChoice } from "#data/elite-redux/coop/coop-interaction-relay";
 import { meBattleHandoffKey } from "#data/elite-redux/coop/coop-me-battle-handoff";
-import { setCoopMeHandoffBattleStarted } from "#data/elite-redux/coop/coop-me-pin-state";
+import { coopMeInteractionStartValue, setCoopMeHandoffBattleStarted } from "#data/elite-redux/coop/coop-me-pin-state";
 import { COOP_ME_BATTLE_HANDOFF, COOP_ME_TERM_SEQ_BASE } from "#data/elite-redux/coop/coop-me-pump";
 import { getCoopBattleStreamer, getCoopController, getCoopInteractionRelay } from "#data/elite-redux/coop/coop-runtime";
 import type { CoopInteractionOutcome } from "#data/elite-redux/coop/coop-transport";
@@ -484,8 +484,9 @@ export class CoopReplayMePhase extends Phase {
       if (action != null && action.choice === COOP_ME_BATTLE_HANDOFF) {
         coopLog("me", "battle-handoff sentinel on seq_term; finishing without leaving", {
           seqTerm: this.seqTerm,
+          hostTurn: action.data?.[0],
         });
-        this.finishWithoutLeaving();
+        this.finishWithoutLeaving(action.data?.[0]);
         return;
       }
     } catch {
@@ -504,10 +505,43 @@ export class CoopReplayMePhase extends Phase {
    * the host's boss via the battle relay). The single ME alternation advance happens at the TRUE ME
    * terminal after the spawned battle, so we must NOT advance here.
    */
-  private finishWithoutLeaving(): void {
+  private finishWithoutLeaving(hostTurn?: number): void {
     if (this.settled) {
       coopLog("me", "finishWithoutLeaving no-op (already settled)", { counter: this.interactionCounter });
       return;
+    }
+    // #822 TURN-SPACE ALIGNMENT: the host numbers its ME-battle turns CONTINUING the wave's
+    // count; a guest booting at its own (stale) turn awaits resolutions keyed to numbers the
+    // host never emits (the 18:05 strand). Adopt the host's turn before the battle boot.
+    if (hostTurn !== undefined && globalScene.currentBattle != null) {
+      coopLog("me", "guest ME battle boot: turn aligned to host (#822)", {
+        guestTurn: globalScene.currentBattle.turn,
+        hostTurn,
+      });
+      globalScene.currentBattle.turn = hostTurn;
+    }
+    // #822 DETACHED ME-END: the TRUE leave terminal arrives on the SAME 9M seq after the
+    // spawned battle + rewards finish on the host. Arm it now so the guest ALWAYS leaves +
+    // advances even if its battle replay stalled; guarded on the pin so a healthy guest that
+    // already left naturally only re-runs the idempotent advance.
+    {
+      const counter = this.interactionCounter;
+      const relayRef = getCoopInteractionRelay();
+      void relayRef?.awaitInteractionChoice(this.seqTerm, COOP_ME_REPLAY_WAIT_MS).then(() => {
+        if (coopMeInteractionStartValue() === counter) {
+          coopLog("me", "detached ME end after battle handoff: leaving + advancing (#822)", { counter });
+          try {
+            leaveEncounterWithoutBattle();
+          } catch {
+            coopWarn("me", "leaveEncounterWithoutBattle threw at detached handoff end (handled)", { counter });
+          }
+        }
+        try {
+          getCoopController()?.advanceInteraction(counter);
+        } catch {
+          coopWarn("me", "advanceInteraction threw at detached handoff end (handled, idempotent)", { counter });
+        }
+      });
     }
     coopLog("me", "ME terminal: battle-handoff, ending phase WITHOUT leaving encounter", {
       counter: this.interactionCounter,

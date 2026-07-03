@@ -1332,7 +1332,7 @@ export function coopMeOwnerRelayBattleHandoff(): void {
   }
   try {
     coopLog("me", "owner-relay battle-handoff sentinel (end pump, run spawned battle)");
-    pump.relayMeBattleHandoff();
+    pump.relayMeBattleHandoff(globalScene.currentBattle?.turn);
   } catch (e) {
     /* a relay failure must never break the owner's ME battle setup */
     coopWarn("me", "owner-relay battle-handoff failed", e);

@@ -129,13 +129,24 @@ export class CoopMePump {
    * path). Unlike {@linkcode endOwner}, this does NOT mean the ME is over - the battle + its
    * reward shop still run; the interaction-counter advance happens at the TRUE ME terminal.
    */
-  relayMeBattleHandoff(): void {
+  relayMeBattleHandoff(hostTurn?: number): void {
     if (this.isSessionActive()) {
-      coopLog("pump", "relay BATTLE-HANDOFF sentinel", { termSeq: this.termSeq, sentinel: COOP_ME_BATTLE_HANDOFF });
+      coopLog("pump", "relay BATTLE-HANDOFF sentinel", {
+        termSeq: this.termSeq,
+        sentinel: COOP_ME_BATTLE_HANDOFF,
+        hostTurn,
+      });
       setCoopMeHandoffBattleStarted(); // #817: gates stand down - the spawned battle runs the normal sync
-      // Terminal sentinel rides `termSeq` (#633 MAJOR-1 / B-1): the dedicated 9M terminal seq
-      // the authoritative guest awaits (CoopReplayMePhase.awaitHostTerminal).
-      this.relay.sendInteractionChoice(this.termSeq, ME_PUMP_KIND, COOP_ME_BATTLE_HANDOFF);
+      // Terminal sentinel rides `termSeq` (#633 MAJOR-1 / B-1). #822: it CARRIES the host's
+      // current battle turn so the guest's ME-battle boot aligns its turn space (the host
+      // numbers ME-battle turns continuing the wave's count; a guest booting at turn 1 awaits
+      // resolutions the host will never emit under that number - the 18:05 strand).
+      this.relay.sendInteractionChoice(
+        this.termSeq,
+        ME_PUMP_KIND,
+        COOP_ME_BATTLE_HANDOFF,
+        hostTurn === undefined ? undefined : [hostTurn],
+      );
     }
     this.endSession();
   }

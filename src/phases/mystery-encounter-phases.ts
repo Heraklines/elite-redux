@@ -4,7 +4,9 @@ import { Phase } from "#app/phase";
 import { getCharVariantFromDialogue } from "#data/dialogue";
 import { captureCoopChecksum, captureCoopMeOutcome } from "#data/elite-redux/coop/coop-battle-engine";
 import { coopLog, coopWarn } from "#data/elite-redux/coop/coop-debug";
+import { COOP_INTERACTION_LEAVE } from "#data/elite-redux/coop/coop-interaction-relay";
 import {
+  coopMeHandoffBattleStarted,
   coopMeInProgress,
   coopMeInteractionStartValue,
   setCoopMeInteractionStart,
@@ -175,6 +177,16 @@ function coopEndMePump(): void {
     return;
   }
   coopLog("me", "coopEndMePump: close pump + advance alternation", { counter: coopMeInteractionStartValue() });
+  // #822 (live 'after the ME it doesn't continue for one player'): for a BATTLE-handoff ME the
+  // pump session already ended at the battle spawn, so endOwner() below sends NO leave sentinel -
+  // the guest never learns the encounter is over. Send the TRUE ME-end LEAVE explicitly; the
+  // guest's detached post-handoff listener leaves + advances on it (idempotent if it already did).
+  if (coopMeHandoffBattleStarted() && controller.role === "host") {
+    const relay = getCoopInteractionRelay();
+    const termSeq = COOP_ME_TERM_SEQ_BASE + coopMeInteractionStartValue();
+    coopLog("me", "post-handoff ME END: sending TRUE leave terminal (#822)", { termSeq });
+    relay?.sendInteractionChoice(termSeq, "meBtn", COOP_INTERACTION_LEAVE);
+  }
   pump.endOwner();
   // Both clients advance LOCALLY + idempotently (keyed to the ME's start counter), so the
   // whole ME (encounter + its embedded reward shop, which suppresses its own advance) counts
