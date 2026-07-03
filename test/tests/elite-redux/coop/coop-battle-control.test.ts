@@ -349,27 +349,35 @@ describe.skipIf(!RUN)("co-op battle control (#633, P2) - real engine (double bat
     expect(mode.hasChallenge(Challenges.SINGLE_GENERATION)).toBe(true);
   });
 
-  it("P5 resume: a saved co-op run re-establishes the local session on reload", async () => {
+  it("P5 resume (#807 contract): a co-op save loads while CONNECTED and is REFUSED solo", async () => {
     await startCoopDouble();
 
-    // Win the wave and advance (the next-wave setup saves; the reload helper
-    // captures the co-op session on that saveAll).
+    // Win the wave and advance, then place the session into a slot through the
+    // game's own key + encrypt path (the headless auto-save skips slot storage).
     game.move.select(MoveId.TACKLE, COOP_HOST_FIELD_INDEX);
     await game.doKillOpponents();
     await game.toNextWave();
+    const slot = 3;
+    const { getSessionDataLocalStorageKey } = await import("#app/account");
+    const { encrypt } = await import("#utils/data");
+    localStorage.setItem(
+      getSessionDataLocalStorageKey(slot),
+      encrypt(JSON.stringify(globalScene.gameData.getSessionSaveData()), true),
+    );
 
-    // Simulate the runtime co-op session being wiped by a page reload: the saved
-    // gameMode (COOP) + per-mon coopOwner tags persist, but the controller is gone.
+    // CONNECTED: with the live session up, the co-op save loads (resume path).
+    const connectedLoad = await globalScene.gameData.loadSession(slot);
+    expect(connectedLoad, "connected load proceeds").toBe(true);
+    expect(globalScene.gameMode.isCoop).toBe(true);
+
+    // SOLO: wipe the runtime (page reload without re-pairing). The OLD behavior
+    // re-established a local spoof session from the save - the corruption source.
+    // The #807 gate now REFUSES: connect with your partner in the lobby first.
     clearCoopRuntime();
     expect(getCoopController()).toBeNull();
-
-    // Reload from the save - initSessionFromData re-establishes the co-op session,
-    // and the run reaches a fresh CommandPhase (the guest slot auto-resolves again,
-    // so the reloaded co-op double is healthy, not stuck).
-    await game.reload.reloadSession();
-    expect(globalScene.gameMode.isCoop).toBe(true);
-    expect(getCoopController()).not.toBeNull();
-    expect(getCoopController()?.role).toBe("host");
+    const soloLoad = await globalScene.gameData.loadSession(slot);
+    expect(soloLoad, "SOLO load of a co-op save is REFUSED (#807)").toBe(false);
+    expect(getCoopController(), "no session conjured from a solo load").toBeNull();
   });
 
   it("P2-fix: a host-first party re-orders so field slot 0 is host-owned and slot 1 is guest-owned", async () => {
