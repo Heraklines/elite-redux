@@ -431,20 +431,28 @@ function tagCoopPartyOwnership(rig: DuoRig): void {
   });
 }
 
-/** First legal (non-fainted, benched) party slot the given owner may send in, or -1 if none. */
-function firstLegalBenchSlot(scene: BattleScene, owner: "host" | "guest"): number {
+/**
+ * First legal (non-fainted, benched) SAME-OWNER party slot the given owner may send in, or -1 if none.
+ *
+ * 🔴 #848 STRICT SAME-OWNER (no cross-owner fallback). In 2-player co-op each player owns exactly one FIELD
+ * slot (host slot 0, guest slot 1) and may ONLY switch/replace from their OWN party half - field-slot
+ * OWNERSHIP is load-bearing (both engines resolve a slot's owner from the occupant's coopOwner tag), NOT
+ * "a nicety". The OLD fallback returned ANY legal bench mon, so when a side had exhausted its own bench a
+ * voluntary switch or faint replacement seated the PARTNER's mon into that side's field slot - corrupting
+ * the seating so the two engines DISAGREED which slot the guest controls (seed 20260704 wave 62: the guest
+ * voluntary-switched slot 1 to a HOST-owned party[2], and separately a host switch seated a guest-owned
+ * GARCHOMP into slot 0). The host then resolved slot 0 as guest-owned, requested the partner command for
+ * it, and both engines spun. Returning -1 when no same-owner bench exists is CORRECT: a voluntary switch
+ * then declines (falls through to a move), a guest faint replacement defers to production's own strict
+ * auto-pick ({@linkcode coopAutoPickReplacement}, which leaves the slot empty), and a host faint with no
+ * host bench is a host-half-exhaustion terminal ({@linkcode hostRunEndReason}), never a seating swap.
+ */
+export function firstLegalBenchSlot(scene: BattleScene, owner: "host" | "guest"): number {
   const party = scene.getPlayerParty();
   const battlerCount = scene.currentBattle?.getBattlerCount() ?? 2;
   for (let i = battlerCount; i < party.length; i++) {
     const mon = party[i];
     if (mon != null && !mon.isFainted() && mon.isAllowedInBattle() && mon.coopOwner === owner) {
-      return i;
-    }
-  }
-  // Fall back to ANY legal bench mon (ownership is a nicety; a legal replacement must always be sent).
-  for (let i = battlerCount; i < party.length; i++) {
-    const mon = party[i];
-    if (mon != null && !mon.isFainted() && mon.isAllowedInBattle()) {
       return i;
     }
   }
@@ -488,6 +496,15 @@ export function hostRunEndReason(rig: DuoRig): string | null {
   const party = rig.hostScene.getPlayerParty();
   if (party.length > 0 && party.every(m => m.isFainted())) {
     return "host player party WIPED (all mons fainted)";
+  }
+  // #848 HOST-HALF EXHAUSTION: a HOST-owned field slot is fainted but the host has NO legal same-owner
+  // bench to replace it (strict firstLegalBenchSlot). The host cannot continue its half; the driver seats
+  // NO cross-owner mon (that was the seating-desync bug), so the OWNER-path replacement SwitchPhase has no
+  // driveable pick. Classify it as a LOUD terminal run-end (the host is effectively out) rather than a
+  // NO-PARK strand at the un-driveable SwitchPhase. (The full party is not yet all-fainted because the
+  // GUEST half may still be alive.)
+  if (hostOwnedFaintPending(rig) && firstLegalBenchSlot(rig.hostScene, "host") < 0) {
+    return "host HALF exhausted (a host-owned field slot fainted with no legal host-owned replacement)";
   }
   return null;
 }
