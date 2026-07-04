@@ -1,0 +1,155 @@
+name: Nightly Co-op Soak
+
+# Runs the seeded two-engine CO-OP SOAK (#841): a long randomized host+guest run that
+# finds desyncs / strands / leaks BY MACHINE (the DIGEST / LOCKSTEP / NO-PARK / TEARDOWN
+# invariants) instead of by live players. Nightly at ~03:00 UTC with SOAK_WAVES=150, and
+# manually dispatchable on demand with a custom wave count / seed:
+#
+#   gh workflow run nightly-coop-soak.yml --ref feat/elite-redux-port \
+#       -R Heraklines/elite-redux -f soak_waves=200
+#   gh workflow run nightly-coop-soak.yml --ref feat/elite-redux-port \
+#       -R Heraklines/elite-redux -f soak_waves=50 -f soak_seed=12345
+#
+# Results are PULLABLE like the dev Send-Logs captures: after the soak (pass OR fail) a
+# compact bundle is committed to the `dev-logs` branch under remote/<date>/ as .log files,
+# so scripts/pull-dev-logs.mjs picks them up with ZERO changes. The dev-logs/coop-soak
+# directory is ALSO uploaded as a workflow artifact (belt and braces), on success and
+# failure, with a 7-day retention.
+
+on:
+  schedule:
+    # ~03:00 UTC nightly.
+    - cron: "0 3 * * *"
+  workflow_dispatch:
+    inputs:
+      soak_waves:
+        description: "Number of waves to soak (nightly default 150)"
+        type: string
+        default: "150"
+      soak_seed:
+        description: "Optional fixed SOAK_SEED to replay a run (empty = date-derived)"
+        type: string
+        default: ""
+
+concurrency:
+  group: nightly-coop-soak
+  cancel-in-progress: false
+
+# Same-repo write so the results bundle can be committed to the dev-logs branch with the
+# workflow's own GITHUB_TOKEN (no PAT needed).
+permissions:
+  contents: write
+
+jobs:
+  soak:
+    if: github.repository == 'Heraklines/elite-redux'
+    timeout-minutes: 90
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          # The cron fires from the DEFAULT branch (main), which holds only this workflow file -
+          # the game + the soak test live on feat/elite-redux-port, so a scheduled run must check
+          # THAT out. A manual dispatch keeps its explicitly-passed --ref.
+          ref: ${{ github.event_name == 'schedule' && 'feat/elite-redux-port' || github.ref }}
+
+      - uses: ./.github/actions/setup-deps
+
+      - name: Run the co-op soak
+        id: soak
+        continue-on-error: true
+        env:
+          ER_SCENARIO: "1"
+          SOAK_WAVES: ${{ github.event.inputs.soak_waves || '150' }}
+          # Empty for a scheduled run / when not supplied -> the driver derives the seed from the date.
+          SOAK_SEED: ${{ github.event.inputs.soak_seed }}
+          NODE_OPTIONS: "--max-old-space-size=8192"
+        run: |
+          set -o pipefail
+          mkdir -p dev-logs/coop-soak
+          # Tee the run output so the results bundle can carry the seed / verdict / skip counters even
+          # on a green run (the driver prints the seed FIRST THING + a DONE line with the skip counters).
+          npx vitest run test/tests/elite-redux/coop/coop-soak.test.ts --reporter=dot 2>&1 \
+            | tee dev-logs/coop-soak/soak-output.txt
+          echo "exit=${PIPESTATUS[0]}" >> "$GITHUB_OUTPUT"
+
+      - name: Bundle + commit soak results to the dev-logs branch (pullable like Send Logs)
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SOAK_EXIT: ${{ steps.soak.outputs.exit }}
+        run: |
+          set -euo pipefail
+          DATE=$(date -u +%Y-%m-%d)
+          TS=$(date -u +%Y-%m-%dT%H-%M-%SZ)
+          if [ "${SOAK_EXIT:-1}" = "0" ]; then VERDICT="PASS"; else VERDICT="FAIL"; fi
+
+          # Build the summary .log the maintainer reads first (seed / waves / verdict / skips / invariant).
+          SUMMARY=$(mktemp)
+          {
+            echo "===== COOP SOAK RESULT ====="
+            echo "verdict: ${VERDICT}"
+            echo "waves_requested: ${SOAK_WAVES:-150}"
+            echo "run: ${GITHUB_RUN_ID} (${GITHUB_REF_NAME})"
+            echo "timestamp: ${TS}"
+            echo
+            echo "----- driver lines -----"
+            grep -E '^\[coop-soak\]' dev-logs/coop-soak/soak-output.txt || echo "(no [coop-soak] lines captured)"
+            echo
+            echo "----- vitest result tail -----"
+            tail -n 40 dev-logs/coop-soak/soak-output.txt || true
+          } > "$SUMMARY"
+
+          # Prepare a shallow clone of the dev-logs branch (orphan-init it if it does not exist yet), so the
+          # results land at exactly remote/<date>/*.log - the path + extension scripts/pull-dev-logs.mjs reads.
+          TMP=$(mktemp -d)
+          REPO_URL="https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          if git clone --depth 1 --branch dev-logs "$REPO_URL" "$TMP" 2>/dev/null; then
+            echo "cloned existing dev-logs branch"
+          else
+            echo "dev-logs branch absent - creating it orphan"
+            git clone --depth 1 "$REPO_URL" "$TMP"
+            git -C "$TMP" checkout --orphan dev-logs
+            git -C "$TMP" rm -rf . >/dev/null 2>&1 || true
+          fi
+
+          DEST="$TMP/remote/$DATE"
+          mkdir -p "$DEST"
+          cp "$SUMMARY" "$DEST/${TS}__coop-soak__ci.log"
+
+          # On FAILURE, also carry the replay script + both clients' captured logs (size-capped ~1MB each)
+          # so the desync is triageable straight from the pulled bundle. The driver writes these into a
+          # timestamped dev-logs/coop-soak/<...>/ dir on any invariant breach.
+          if [ "$VERDICT" = "FAIL" ]; then
+            ART=$(ls -1dt dev-logs/coop-soak/*/ 2>/dev/null | head -n1 || true)
+            if [ -n "$ART" ] && [ -d "$ART" ]; then
+              [ -f "${ART}failure.json" ] && cp "${ART}failure.json" "$DEST/${TS}__coop-soak-failure__ci.log"
+              [ -f "${ART}host.log" ]  && head -c 1000000 "${ART}host.log"  > "$DEST/${TS}__coop-soak-host__ci.log"
+              [ -f "${ART}guest.log" ] && head -c 1000000 "${ART}guest.log" > "$DEST/${TS}__coop-soak-guest__ci.log"
+            fi
+          fi
+
+          git -C "$TMP" add -A
+          if git -C "$TMP" diff --cached --quiet; then
+            echo "no results to commit"
+          else
+            git -C "$TMP" -c user.email="actions@github.com" -c user.name="nightly-coop-soak" \
+              commit -m "coop-soak ${VERDICT} ${TS} (run ${GITHUB_RUN_ID})"
+            git -C "$TMP" push "$REPO_URL" HEAD:dev-logs
+            echo "pushed soak results to dev-logs/remote/$DATE/"
+          fi
+
+      - name: Upload dev-logs/coop-soak artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coop-soak-logs-${{ github.run_id }}
+          path: dev-logs/coop-soak
+          retention-days: 7
+          if-no-files-found: warn
+
+      - name: Fail the job if the soak failed
+        if: steps.soak.outputs.exit != '0'
+        run: |
+          echo "Co-op soak FAILED - see the dev-logs branch (remote/) and the uploaded artifact."
+          exit 1
