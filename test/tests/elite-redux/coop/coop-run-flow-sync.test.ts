@@ -66,6 +66,8 @@ const mon = (over: Partial<CoopChecksumMon> = {}): CoopChecksumMon => ({
     [22, 1],
   ],
   tags: [],
+  transformSpeciesId: 0,
+  transformFormIndex: 0,
   ...over,
 });
 
@@ -85,6 +87,7 @@ const state = (over: Partial<CoopChecksumState> = {}): CoopChecksumState => ({
   ],
   biomeId: 0,
   seed: "SEED",
+  saveDataDigest: "0000000000000000",
   ...over,
 });
 
@@ -121,6 +124,7 @@ describe("co-op run-flow sync pure core (#698, B7 + B8)", () => {
         [0, 5],
         [1, 2],
       ],
+      saveDataDigest: "0000000000000000",
     };
     const b: CoopChecksumState = {
       field: [mon()],
@@ -130,6 +134,7 @@ describe("co-op run-flow sync pure core (#698, B7 + B8)", () => {
       party: [1, 4],
       partyLevels: [50, 48],
       modifiers: [["EXP_CHARM", 1]],
+      saveDataDigest: "0000000000000000",
       pokeballCounts: [
         [0, 5],
         [1, 2],

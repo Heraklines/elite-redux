@@ -31,6 +31,7 @@ import {
 } from "#data/battler-tags";
 import { getBerryEffectFunc } from "#data/berry";
 import { allAbilities, allMoves } from "#data/data-lists";
+import { broadcastCoopWaveResolved } from "#data/elite-redux/coop/coop-runtime";
 import { getErBiomeRule } from "#data/elite-redux/er-biome-rules";
 import {
   erHasUsablePowerHerb,
@@ -7926,6 +7927,13 @@ export class ForceSwitchOutAttr extends MoveEffectAttr {
       globalScene.clearEnemyHeldItemModifiers(switchOutTarget);
 
       if (!allyPokemon?.isActive(true) && switchOutTarget.hp) {
+        // #838 VERIFY-1 (co-op wild-flee wave-advance): a forced WILD flee ends the battle here via
+        // BattleEndPhase + NewBattlePhase DIRECTLY, bypassing AttemptRunPhase (the only other place that
+        // broadcasts "flee"). Without this the co-op guest - a pure renderer that advances the wave only
+        // on a host waveResolved - would STRAND awaiting a resolution the host never sends. Mirror
+        // AttemptRunPhase's broadcast at this shared chokepoint. Hard no-op unless we are the authoritative
+        // co-op HOST (guest / solo / lockstep unaffected), so the vanilla flee flow is byte-for-byte intact.
+        broadcastCoopWaveResolved("flee");
         globalScene.phaseManager.pushNew("BattleEndPhase", false);
 
         if (globalScene.gameMode.hasRandomBiomes || globalScene.isNewBiome()) {

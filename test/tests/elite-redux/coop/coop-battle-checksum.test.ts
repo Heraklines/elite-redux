@@ -38,6 +38,8 @@ const mon = (over: Partial<CoopChecksumMon> = {}): CoopChecksumMon => ({
     [22, 1],
   ],
   tags: [],
+  transformSpeciesId: 0,
+  transformFormIndex: 0,
   ...over,
 });
 
@@ -57,6 +59,7 @@ const state = (over: Partial<CoopChecksumState> = {}): CoopChecksumState => ({
   ],
   biomeId: 0,
   seed: "SEED",
+  saveDataDigest: "0000000000000000",
   ...over,
 });
 
@@ -118,6 +121,7 @@ describe("co-op battle checksum pure core (#633, TRACK-2)", () => {
         ],
         seed: "SEED",
         biomeId: 0,
+        saveDataDigest: "0000000000000000",
       };
       const b: CoopChecksumState = {
         field: [mon()],
@@ -125,6 +129,7 @@ describe("co-op battle checksum pure core (#633, TRACK-2)", () => {
         weather: 0,
         arenaTags: [],
         biomeId: 0,
+        saveDataDigest: "0000000000000000",
         party: [1, 4],
         partyLevels: [50, 48],
         modifiers: [["EXP_CHARM", 1]],
@@ -230,6 +235,21 @@ describe("co-op battle checksum pure core (#633, TRACK-2)", () => {
           }),
         ),
       ).not.toBe(base);
+    });
+    it("a changed full session save-data digest (#837 - the systemic blind-spot closer)", () => {
+      // The saveDataDigest folds money-streak / ward-stone charges / relic-battle-state / biome overstay
+      // anchor / modifier-internal args into the per-turn checksum, so a drift in ANY of them now moves
+      // the field checksum -> a resync heal. This locks in that the digest is part of the hashed state.
+      expect(checksumState(state({ saveDataDigest: "deadbeefdeadbeef" }))).not.toBe(base);
+    });
+    it("a changed transform species id (#836/#837 - a host Ditto/Imposter transform is now detectable)", () => {
+      // A Transform copies the target's identity into summonData while `species` (speciesId) stays the
+      // original, so without this a host transform is invisible to the checksum. Hashing it makes a
+      // host-transformed-but-guest-not divergence detectable + re-convergeable.
+      expect(checksumState(state({ field: [mon({ transformSpeciesId: 132 })] }))).not.toBe(base);
+    });
+    it("a changed transform form index (#836/#837)", () => {
+      expect(checksumState(state({ field: [mon({ transformSpeciesId: 132, transformFormIndex: 1 })] }))).not.toBe(base);
     });
   });
 

@@ -6,11 +6,13 @@ import { allMoves } from "#data/data-lists";
 import { coopLog, coopWarn } from "#data/elite-redux/coop/coop-debug";
 import {
   advanceCoopInteractionForContinuation,
+  clearCoopLearnMoveForwardInFlight,
   getCoopController,
   getCoopInteractionRelay,
   getCoopNetcodeMode,
   getCoopRuntime,
   getCoopUiMirror,
+  markCoopLearnMoveForwardInFlight,
 } from "#data/elite-redux/coop/coop-runtime";
 import type { CoopRole } from "#data/elite-redux/coop/coop-transport";
 import { erRecordAchievementLearnMove } from "#data/elite-redux/er-achievement-tracker";
@@ -223,6 +225,25 @@ export class LearnMovePhase extends PlayerPartyMemberPokemonPhase {
   private coopAuthoritativeLearnMove(currentMoveset: ReturnType<Pokemon["getMoveset"]>, move: Move, pokemon: Pokemon) {
     const controller = getCoopController();
     if (controller?.role === "guest") {
+      // #835 cross-ownership softlock: when a shop-continuation reward (TM Case / Learner's Shroom /
+      // Memory Mushroom) is bought - by EITHER player - for a GUEST-owned mon whose moveset is FULL, the
+      // "which move to forget" pick belongs to the GUEST (the mon's owner). The guest ALSO has this real
+      // LearnMovePhase (queued by the reward apply on the owner/watcher shop axis, which applies on BOTH
+      // clients). Pre-#835 the guest branch immediately removed the continuation copy + advanced the
+      // counter + ended, and the guest's picker came only from a DETACHED overlay (#787
+      // openCoopLearnMovePickerInline via wireCoopLearnMoveForward) that no phase kept alive - so a
+      // following setMode tore it off screen before the human picked, the guest never relayed a
+      // forget-index, and the host's forwarded await (coopHostForwardLearnMove) stranded on the read-only
+      // picker for the full 20-min fallback (the reported "the other person stays in the selection
+      // screen"). Fix: render the picker HERE, from this queue-protected phase, and DEFER the copy-removal
+      // + advance until the pick settles - symmetric to the host's coopHostForwardLearnMove.
+      const monOwner = (pokemon as { coopOwner?: CoopRole }).coopOwner ?? "host";
+      const movesetFull =
+        typeof pokemon?.getMaxMoveCount === "function" && currentMoveset.length >= pokemon.getMaxMoveCount();
+      if (monOwner === "guest" && movesetFull) {
+        this.coopGuestForwardOwnedLearnMove(move, pokemon);
+        return;
+      }
       // #698 stale-shop softlock: a TM Case / Memory-Mushroom (cost=-1) reward queues a back-out
       // "continuation" SelectModifierPhase copy alongside this LearnMovePhase (see
       // SelectModifierPhase.applyModifier queuesContinuation). On the HOST the real learnMove() deletes
@@ -231,7 +252,9 @@ export class LearnMovePhase extends PlayerPartyMemberPokemonPhase {
       // left and hangs (20-min await), which also blocks the resync that should rescue it. Mirror the
       // host's exact tryRemovePhase conditions (learn-move-phase learnMove: TM, or MEMORY with cost=-1)
       // so the guest's phase queue converges. Gated inside the authoritative-guest branch -> solo / host
-      // / lockstep / hotseat are byte-identical (they never enter here).
+      // / lockstep / hotseat are byte-identical (they never enter here). This path is the EMPTY-slot
+      // auto-learn (no picker) or a HOST-owned mon (the host drives its own picker via replaceMoveCheck),
+      // so the guest takes no interactive action and the immediate cleanup is correct.
       // #789-class (probe-verified for capsules): removing the continuation copy IS the commit
       // signal for a continuation-class reward - the shop deliberately skipped its advance, so
       // advance HERE or the alternation rotation stalls on the same owner. From-pinned to the
@@ -242,7 +265,8 @@ export class LearnMovePhase extends PlayerPartyMemberPokemonPhase {
       ) {
         advanceCoopInteractionForContinuation(controller.interactionCounter());
       }
-      // Pure renderer: the persistent listener's CoopReplayLearnMovePhase is the sole picker renderer.
+      // Pure renderer: for the EMPTY-slot / host-owned-mon case the persistent listener's
+      // CoopReplayLearnMovePhase (level-up path) or the host's own picker is the sole renderer.
       // Ending here (no menu) is the double-render guard for the Shroom-queued guest LearnMovePhase.
       coopLog("learnmove", "guest authoritative LearnMovePhase no-op end (single renderer is the listener)", {
         slot: this.partyMemberIndex,
@@ -310,6 +334,75 @@ export class LearnMovePhase extends PlayerPartyMemberPokemonPhase {
     }
     // null -> getMaxMoveCount() sentinel -> applyForgetResult keeps current moves + ends (no hang).
     await this.applyForgetResult(res?.choice ?? maxMoveCount, move, pokemon);
+  }
+
+  /**
+   * Co-op AUTHORITATIVE GUEST (#835): the guest OWNS this full-moveset mon, so the "which move to forget"
+   * pick is the GUEST's - but the actual forget is applied HOST-authoritatively. This runs when a
+   * shop-continuation reward (TM Case / Learner's Shroom / free Memory Mushroom) queued a real guest
+   * {@linkcode LearnMovePhase} on a guest-owned mon (the reward apply runs on BOTH clients). It renders
+   * the interactive forget-picker from THIS queue-protected phase (not the detached #787 overlay, which
+   * a following setMode could tear off), relays the human's chosen slot to the host on the disjoint
+   * `9_100_000 + partySlot` channel (the SAME channel the host's {@linkcode coopHostForwardLearnMove}
+   * awaits), and only THEN performs the deferred continuation cleanup (remove the back-out copy + advance
+   * the alternation). So the host's forwarded await resolves the instant the guest picks and BOTH screens
+   * dismiss together - no orphaned overlay, no 20-min strand.
+   *
+   * It is the SOLE renderer for this learn: the in-flight mark (set synchronously, before the host's
+   * ordered `learnMoveForward` for this slot is processed) makes {@linkcode wireCoopLearnMoveForward}
+   * short-circuit its duplicate listener open. The picker resolves on LOCAL human input / B-cancel, so it
+   * can never hang; if the relay is missing it degrades to the immediate cleanup below (still no hang).
+   */
+  private coopGuestForwardOwnedLearnMove(move: Move, pokemon: Pokemon): void {
+    const slot = this.partyMemberIndex;
+    // Claim the slot BEFORE any await so the ordered `learnMoveForward` the host is about to send finds
+    // the guard SET and does not also open the detached overlay (double-render guard).
+    markCoopLearnMoveForwardInFlight(slot);
+    const seq = COOP_LEARN_MOVE_FWD_SEQ_BASE + slot;
+    const relay = getCoopInteractionRelay();
+    const mirror = getCoopUiMirror();
+    coopLog("learnmove", "guest OWNS this full-moveset mon -> renders the forget-picker itself (#835)", {
+      slot,
+      moveId: this.moveId,
+      seq,
+    });
+    let settled = false;
+    const finish = (moveIndex: number): void => {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      mirror?.endSession();
+      clearCoopLearnMoveForwardInFlight(slot);
+      // Relay the human's forget-slot to the host (the sole engine); it applies the forget + learns.
+      coopLog("learnmove", "guest relays owned-mon forget-pick (#835)", { seq, moveIndex });
+      getCoopInteractionRelay()?.sendInteractionChoice(seq, "learnMove", moveIndex);
+      // DEFERRED continuation cleanup: now that the pick is committed, remove the back-out SelectModifier
+      // copy + advance the alternation (the same commit the immediate no-op path does, but AFTER the pick
+      // instead of before it - so the picker overlay lived long enough for the human to use it).
+      if (
+        (this.learnMoveType === LearnMoveType.TM || (this.learnMoveType === LearnMoveType.MEMORY && this.cost === -1))
+        && globalScene.phaseManager.tryRemovePhase("SelectModifierPhase")
+      ) {
+        advanceCoopInteractionForContinuation(getCoopController()?.interactionCounter() ?? -1);
+      }
+      void globalScene.ui.setMode(this.messageMode).then(() => this.end());
+    };
+    if (relay == null) {
+      // Degraded but safe: no live relay -> keep current moves (sentinel) + run the deferred cleanup.
+      coopWarn("learnmove", "no relay for guest-owned forget-picker; keeping current moves (#835)", { slot });
+      finish(pokemon.getMaxMoveCount());
+      return;
+    }
+    // Render the REAL interactive move-forget picker (the shared #563 screen). beginSession("owner", ...)
+    // so the HOST's read-only mirror follows this client's live cursor (cosmetic).
+    void globalScene.ui
+      .setModeWithoutClear(UiMode.SUMMARY, pokemon, SummaryUiMode.LEARN_MOVE, move, (moveIndex: number) =>
+        finish(moveIndex),
+      )
+      .then(() => {
+        mirror?.beginSession("owner", UiMode.SUMMARY, COOP_LEARN_MOVE_SEQ);
+      });
   }
 
   /**

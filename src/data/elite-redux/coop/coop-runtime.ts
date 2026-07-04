@@ -851,6 +851,24 @@ export function clearCoopLearnMoveForwardInFlight(partySlot: number): void {
   learnMoveForwardInFlight.delete(partySlot);
 }
 
+/**
+ * Co-op (#835): mark a slot's move-forget picker as already in-flight from the GUEST side BEFORE the
+ * host's `learnMoveForward` for that slot is processed, so {@linkcode wireCoopLearnMoveForward} sees the
+ * guard SET and short-circuits its duplicate listener open. Used when the guest's OWN authoritative
+ * {@linkcode LearnMovePhase} (queued by a shop-continuation TM / Shroom on a guest-owned FULL-moveset
+ * mon) renders the picker itself as a queue-protected phase - it is the sole renderer, so the detached
+ * listener overlay must NOT also open. The wire is ORDERED (the reward-pick relay that queues + runs the
+ * guest LMP arrives before the host's `learnMoveForward`), so this mark is set synchronously first.
+ * Returns whether the slot was newly marked (false = a picker for this slot was already in-flight).
+ */
+export function markCoopLearnMoveForwardInFlight(partySlot: number): boolean {
+  if (learnMoveForwardInFlight.has(partySlot)) {
+    return false;
+  }
+  learnMoveForwardInFlight.add(partySlot);
+  return true;
+}
+
 /** Everything tied to one live co-op session. */
 export interface CoopRuntime {
   /** The local player's session brain (host authority in the spoof/dev path). */

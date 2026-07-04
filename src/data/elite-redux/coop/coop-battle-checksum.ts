@@ -83,6 +83,17 @@ export interface CoopChecksumMon {
   moves: [number, number][];
   /** Sorted ascending list of the battler-tag TYPE ids present (identity only, no counters). */
   tags: number[];
+  /**
+   * TRANSFORM / Imposter copied species id (#836/#837); 0 when NOT transformed. Hashing it is INTENDED:
+   * a Transform / Imposter copies the target's identity into `summonData` while `species` (hashed by
+   * {@linkcode speciesId} above) stays the ORIGINAL, so without this a host Ditto's transform is
+   * INVISIBLE to the checksum and never triggers a heal on the pure-renderer guest (live #836). The
+   * per-turn field snapshot applies the copied identity on the guest BEFORE this is recomputed, so a
+   * healthy transformed pair matches; a divergence is now detectable + re-convergeable.
+   */
+  transformSpeciesId: number;
+  /** TRANSFORM / Imposter copied form index (#836/#837); 0 when not transformed. Carried alongside {@linkcode transformSpeciesId}. */
+  transformFormIndex: number;
 }
 
 /**
@@ -139,6 +150,20 @@ export interface CoopChecksumState {
    * no-ME run segment would otherwise leave permanent + silent.
    */
   seed: string;
+  /**
+   * FULL SESSION SAVE-DATA digest (#837): a 64-bit hash of the NORMALIZED `getSessionSaveData()` view,
+   * built by the engine adapter ({@linkcode captureCoopSaveDataDigest} in `coop-battle-engine.ts`).
+   * This is the systemic desync closer: the session save already serializes EVERY run-state substrate
+   * (money-streak, ward stones, relic-battle-state, biome overstay anchor, and all modifiers as full
+   * `ModifierData` blobs incl. their `getArgs` internals), so hashing that canonical form makes the
+   * whole "modifier internal state / module-let substrate" blind-spot class DETECTABLE - a Stormglass
+   * `chosenWeather` change, a money-streak counter drift, or a relic-list divergence now moves this
+   * digest and trips the same resync heal the field checksum does. DERIVED from the serializer (not a
+   * hand-maintained list) so a NEW substrate added to `SessionSaveData` is covered automatically; the
+   * engine strips the fields that legitimately differ per client / per moment (each exclusion is
+   * commented at the capture site). The pure core just carries + hashes the opaque digest string.
+   */
+  saveDataDigest: string;
 }
 
 /** A read-failure sentinel digest. Both sides agree to SKIP the comparison on it. */

@@ -429,3 +429,185 @@ correctness definition the co-op rewrite is already moving toward (CLAUDE.md
 harness Layer C). It is a bigger change than the P1 quick wins, so ship fix P1-1
 (the `clearCoopRuntime` pin reset) first as an immediate, isolated cross-run-desync
 close, then pursue the save-data-based checksum as the systemic follow-up.
+
+---
+
+## Part 8 - The switch sync matrix (task #838)
+
+Switching is the codebase's historically richest desync source, and the ten known
+fixes below already closed the P0/P1 classes. This part enumerates EVERY switch
+pathway, traces it per side (host-owned player mon / guest-owned player mon / enemy
+mon) on BOTH clients (host = engine, guest = renderer), and gives a STATE verdict and
+a VISUAL sub-verdict per cell. It was produced by a static trace of the engine plus
+the coop stream/replay/checkpoint layer; every claim cites the file it was read from.
+
+### 8a. The single convergence mechanism (why most cells are OK by construction)
+
+The netcode is host-authoritative. The HOST is the sole resolution engine: it draws
+ALL battle RNG for every incoming pick (forced-switch roll `move.ts:7871`/`:7958`,
+enemy `getNextSummonIndex` tie-break `trainer.ts:750`, enemy Revival Blessing target
+`move.ts:7747`, flee `attempt-run-phase.ts:24`). The GUEST is a pure renderer that
+diverts its whole turn to `CoopReplayTurnPhase` and draws NO RNG and runs NO
+resolution phase, so it can NEVER pick an incoming mon locally. It converges the field
+composition after every turn through the per-turn CHECKPOINT:
+
+- `reconcileCoopEnemyField` (`coop-battle-engine.ts:363`) and
+  `reconcileCoopPlayerField` (`:543`): a SPECIES-keyed reconcile. PASS 1 removes any
+  on-field guest mon the host reports NOT present-and-alive (a KO or a switch-out);
+  PASS 2 summons/repositions the host's reported species onto each slot via
+  `summonCoopEnemyField` (`:455`) / `summonCoopPlayerField` (`:665`); a post-PASS-2
+  orphan sweep clears any stale sprite. Both are side-effect-free (no FaintPhase /
+  SwitchPhase, so the resolution engine is never re-entered) and IDEMPOTENT (re-apply
+  safe), which is why the checkpoint can carry any switch without a fresh divergence.
+- A per-mon NUMERIC apply (`applyCoopCheckpoint:852-899`) then writes the host's hp /
+  status / STAT STAGES / erTags / PP / form / tera onto the mon now at each bi.
+- The end-of-turn `fullField` snapshot (`applyCoopFieldSnapshot:2680`) heals the
+  richer per-mon state the numeric apply omits (moveset structure, held items,
+  ability, boss, transform, and general battler `tags` via `reconcileTags:1842`).
+- The per-turn CHECKSUM (`readChecksumMon:1466`) hashes species / hp / status /
+  statStages / abilityId / form / tera / boss / moves / tags, so any residual switch
+  drift is DETECTED and a full resync `applyCoopFullSnapshot` HEALS it.
+
+Consequences that hold for EVERY cell below: (1) the guest never rolls RNG for an
+incoming pick, so a forced-switch or enemy-AI-switch cannot desync from a divergent
+roll; (2) the incoming mon's stat stages, tags, ability, form, and tera all ride the
+checkpoint + fullField, so Baton Pass state carry and the Roar of Time slow-start
+rider converge; (3) the `coopOwner` tag is carried per mon in the checkpoint
+(`serializeMonState:128-131`) and re-asserted, so ownership follows a swapped slot.
+
+The one structural VISUAL limitation: the `switch` `CoopBattleEvent` kind
+(`coop-transport.ts:496`) is DECLARED but NEVER emitted (no `recordCoopEvent({k:
+"switch"})` call site exists) and NEVER rendered (`coop-replay-turn-phase.ts:301` routes
+it to the checkpoint). So a MID-TURN switch (pivot / forced / item / ability / baton)
+is not animated on the guest as a recall + ball-throw; the outgoing mon's move plays,
+then the incoming mon appears as a CLEAN re-seated summon at the turn-end checkpoint
+(no pop-in: `summonCoopPlayerField` re-seats via the real `setFieldPosition` per #791,
+and `fieldMonByIdentity` per #796 prevents wrong-mon damage in the interim). This is a
+deliberate tradeoff: the checkpoint reconcile is SPECIES-keyed (robust to party-order
+drift), whereas an animated mid-turn switch event would have to be `partySlot`-keyed
+(fragile), so riding switches on the checkpoint is MORE correct than eventing them.
+
+### 8b. The matrix
+
+Verdict key: OK = covered by a cited mechanism; FRAGILE = correct only via the
+every-turn checkpoint / resync heal (note the symptom between heals); BROKEN = a real
+desync (severity P0-P2). VISUAL sub-verdict is separate from STATE.
+
+| # | Pathway | Side | STATE | VISUAL | Covering mechanism / note |
+|---|---------|------|-------|--------|---------------------------|
+| 1 | Voluntary pre-turn switch (command POKEMON) | host-owned player | OK | OK | host runs real SwitchSummonPhase; guest converges via checkpoint PASS 2 (`reconcileCoopPlayerField:584`). Guest does not eagerly mirror the HOST's switch. |
+| 1 | Voluntary pre-turn switch | guest-owned player | OK | OK | guest eagerly mirrors its OWN switch side-effect-free + RNG-free (`mirrorGuestOwnSwitch`, `turn-start-phase.ts:195`), #695; host runs the real switch from the relayed command; checkpoint reconciles. |
+| 1 | Voluntary pre-turn switch | enemy | n/a | n/a | enemies never voluntarily pre-turn switch (see row 9 for AI switch). |
+| 2 | Faint replacement (owner pick) | host-owned player | OK | OK | host FaintPhase -> owner-gated SwitchPhase pick (`switch-phase.ts:173`), real summon path #791; guest animates the faint (`CoopFaintReplayPhase`) then materializes the replacement via the out-of-band replacement checkpoint (#788). |
+| 2 | Faint replacement | guest-owned player | OK | OK | guest opens its OWN picker (`CoopGuestFaintSwitchPhase`) and relays the pick #786; host awaits + summons the guest's choice #786; species-resolved on party-order drift #799. Integration-tested: `coop-duo-faint-switch.test.ts`. |
+| 2 | Both players' mons faint same turn | both player slots | OK | OK | two FaintPhases -> two owner-gated SwitchPhases; guest opens the picker only for its own slot (`maybeOpenOwnReplacementPicker`, `coop-replay-phases.ts:519`); lone-survivor recenter (`faint-phase.ts:210`), #614 refuted. |
+| 3 | Pivot moves (U-turn / Volt Switch / Flip Turn / Parting Shot / Teleport) | host/guest player | OK | FRAGILE | player self-switch = owner-pick SwitchPhase (no RNG); guest plays the move on the outgoing mon then snaps the incoming at the checkpoint. `fieldMonByIdentity` (`coop-replay-phases.ts:481`) skips the incoming mon's hazard/ability damage until it materializes (#796), so no wrong-mon drain. Visual: instant swap at checkpoint, no recall/throw anim, on-entry hazard damage not animated. |
+| 3 | Pivot moves | enemy | OK | FRAGILE | enemy self-switch uses `getNextSummonIndex` (seeded RNG, host only); guest converges by species. |
+| 4 | Baton Pass (stat-stage / substitute / tag transfer) | host/guest player | OK | FRAGILE | `transferSummon` (`pokemon.ts:5947`) moves stat stages + baton-passable tags on the host. Stat stages ride the checkpoint (`applyCoopCheckpoint:878`); tags (incl. Substitute) ride the fullField `reconcileTags`. Now tested: `coop-switch-sync-matrix.test.ts`. Visual: Substitute doll transfer not animated (instant). |
+| 5 | Forced by opponent (Roar / Whirlwind / Dragon Tail / Circle Throw) | host/guest player | OK | FRAGILE | host rolls `randBattleSeedInt` (`move.ts:7871`); #811 narrows the pool to the roared player's OWN bench so the partner's mon is never dragged; guest never rolls, converges by species. Against the PARTNER's slot: #811 holds (`move.ts:7856-7867`). Now tested: `coop-switch-sync-matrix.test.ts`. |
+| 5 | Forced (enemy target) | enemy | OK | FRAGILE | host rolls `move.ts:7958`; guest converges by species. Wild target flees the battle instead of switching (`move.ts:7910`) - see the wild-flee note in 8c. |
+| 6 | Item-triggered (Eject Button / Eject Pack / Red Card) | all | n/a | n/a | NOT IMPLEMENTED in this fork (no item / modifier for these exists; the only switch-effect held item is Baton). No coverage needed; noted so a future port of these items knows it must ride the checkpoint like every other switch. |
+| 7 | Ability-triggered (Emergency Exit / Wimp Out) | host/guest player | OK | OK | `PostDamageForceSwitchAbAttr` -> owner-pick SwitchPhase (player holder, no RNG), host-resolved; guest converges by species. |
+| 7 | Ability-triggered | enemy | OK | OK | enemy holder -> `getNextSummonIndex` (host RNG); guest converges by species. |
+| 8 | ER Roar of Time / Temporal Rupture (#604 force-switch + slow-start rider) | host/guest/enemy | OK | FRAGILE | `RoarOfTimeForceSwitchOutAttr` (`move.ts:8106`) force-switches (host RNG); Temporal Rupture suppresses it (`move.ts:8107`); the SLOW_START rider sets the incoming mon's active ability, which rides the checkpoint / fullField `abilityId` (`readChecksumMon:1480`), so the rider CONVERGES. |
+| 8 | ER No Turning Back (#604) | host/guest player | OK | OK | a self-TRAP + stat boost, NOT a switch (the inverse); stat stages ride the checkpoint, the NO_RETREAT trap tag rides the fullField `tags`. |
+| 8 | Other ER self-switch abilities (Restraining Order / Strikeout / Tactical Retreat / Hollow Ice Zone) | all | OK | FRAGILE | all `ForceSwitchOutHelper` (host-resolved); guest converges by species; same mid-turn visual note as row 3. |
+| 9 | Enemy AI mid-battle switch | enemy | OK | FRAGILE | `enemy-command-phase.ts:86` + `getNextSummonIndex` (host RNG, seeded offset `turn << 2`); guest converges via `reconcileCoopEnemyField` PASS 2. |
+| 9 | Enemy trainer double-switch | enemy | OK | FRAGILE | #790 (stale replay phase parked on a consumed turn) guarded by `isTurnFinalized` + `clearFinalizedMark` (`coop-battle-stream.ts:137-160`); guest converges both slots by species. |
+| 9 | Enemy sent out after KO (next trainer mon) | enemy | OK | FRAGILE | host FaintPhase -> SwitchSummonPhase (`faint-phase.ts:250`), `getNextSummonIndex`; guest removes the KOd foe (PASS 1) then summons the replacement (PASS 2). |
+| 9 | Wild flee / switch | enemy | FRAGILE | OK | a forced wild flee ends the battle via `BattleEndPhase` + `NewBattlePhase` directly (`move.ts:7929-7935`), NOT `AttemptRunPhase`; see 8c for the wave-advance broadcast verification item. |
+| 10 | Revival Blessing / revival item to field | host/guest player | OK / FRAGILE | OK | player revival = owner-pick relay (`revival-blessing-phase.ts:24`), #809 verified; the revived mon reappears via the checkpoint species reconcile. The BENCH mon's un-faint rides `benchParty` on a RESYNC, not the per-turn checkpoint, so between heals the guest's bench copy can lag (FRAGILE, self-heals at the next checksum mismatch). |
+| 10 | Revival Blessing (enemy) | enemy | OK | OK | host rolls the revived target (`move.ts:7747`); guest converges by species. |
+
+### 8c. The ten known fixes - re-verified on the current tree
+
+Each was traced and still holds; no fix here weakens any of them (their tests stay
+green).
+
+- #695 guest mirrors its OWN voluntary switch: `mirrorGuestOwnSwitch`
+  (`turn-start-phase.ts:195-220`), side-effect-free `summonCoopPlayerField`, no RNG.
+- #699 faint auto-switch premature-victory deadlock: the authoritative guest advances
+  the turn MINIMALLY instead of running the real damaging turn-end phases
+  (`coop-replay-phases.ts:1010`, `coop-replay-turn-phase.ts:335`).
+- #786 guest-owned faint replacement owner-pick: `CoopGuestFaintSwitchPhase` relays the
+  pick; the host's `SwitchPhase` awaits it (`switch-phase.ts:99-157`).
+- #788 replacement summons on the chooser's screen: the out-of-band replacement
+  checkpoint (`CoopPushReplacementCheckpointPhase` unshifted at `switch-phase.ts:153`)
+  is consumed mid-park and materializes the mon on the guest
+  (`coop-replay-turn-phase.ts:115-147`).
+- #790 enemy double-switch + stale replay phase parked on a consumed turn:
+  `isTurnFinalized` / `markTurnFinalized` / `clearFinalizedMark`
+  (`coop-battle-stream.ts:137-160`, `coop-replay-turn-phase.ts:70`).
+- #791 switch-in seating via the real summon path (no sprite stacking):
+  `summonCoopPlayerField` re-seats via `setFieldPosition(...,0)`
+  (`coop-battle-engine.ts:711-733`).
+- #796 presentation order (came-out-fainted): `fieldMonByIdentity`
+  (`coop-replay-phases.ts:481`) resolves the actor by species and defers an
+  unmaterialized actor to the checkpoint; guaranteed removal at `:602`.
+- #799 party-order transposition + bench reconcile: species + `partyIndex`
+  disambiguation in `reconcileCoopPlayerField` (`:598-618`) and the identity resolve in
+  `switch-phase.ts:113-127`.
+- #811 Roar must not drag the PARTNER's bench mon: pool narrowing to the roared
+  player's own `coopOwner` bench (`move.ts:7856-7867`).
+- #604 Roar of Time / Temporal Rupture force-switch + slow-start rider:
+  `RoarOfTimeForceSwitchOutAttr` (`move.ts:8106`), suppression at `:8107`, rider ability
+  carried by the checkpoint `abilityId`.
+
+### 8d. Verdicts that are NOT plainly OK, and their fix or spec
+
+No cell in this matrix is BROKEN at the STATE layer within this task's file scope: the
+checkpoint species-reconcile + numeric apply + fullField + checksum + resync cover all
+ten rows, and the guest draws no RNG. The residuals are VISUAL (engine-owned) plus one
+wave-advance verification item.
+
+FIXED / TESTED in scope:
+- Baton Pass state carry (row 4) and forced-switch RNG-free convergence (row 5), the
+  two riskiest OK-but-untested cells, now have engine-free wire-contract tests
+  (`test/tests/elite-redux/coop/coop-switch-sync-matrix.test.ts`): the incoming mon's
+  transferred stat stages round-trip through `serializeMonState` + `normalizeMonState`
+  (clamped, length 7, identity preserved), a forced switch is detectable as a
+  different `speciesId` at a fixed `bi`, duplicate species are disambiguated by
+  `partyIndex` (#799), and the `coopOwner` tag follows the swapped slot.
+
+SPEC handed to the checksum agent (coop-battle-engine.ts, out of this task's edit
+scope):
+
+- SPEC-1 (P2, enemy-side #791 seating parity). `summonCoopEnemyField`
+  (`coop-battle-engine.ts:499-503`) still seats the incoming enemy with a RAW
+  `fieldPosition` write + `setPosition`, the exact pattern #791 replaced on the PLAYER
+  side with the real `setFieldPosition(slotFieldPosition, 0)` (which also applies the
+  `setMini` / `setSlotOffset` battle-info seating). In an enemy DOUBLE switch the
+  incoming foe's HP-bar can render at the wrong slot offset / size (the #791 class,
+  enemy side). Fix: mirror `summonCoopPlayerField:719-733` on the enemy path (derive
+  the canonical base from a live enemy ally, then seat via `setFieldPosition(...,0)`).
+
+- SPEC-2 (P3, one-frame stale info panel). `summonCoopEnemyField` and
+  `summonCoopPlayerField` call `showInfo()` but not `updateInfo()` /
+  `updateBossSegments(this)` after the swap, so a freshly-summoned boss or statused mon
+  shows a stale bar for one frame until the per-turn numeric apply redraws it. Fix: add
+  a `void mon.updateInfo()` (and `battleInfo.updateBossSegments(mon)` for an
+  `EnemyPokemon`) at the tail of both summon helpers.
+
+VERIFY (borderline, wave-advance not switch-state):
+
+- VERIFY-1 (row 9 wild flee). A Roar / pivot that makes a WILD foe flee ends the battle
+  through `BattleEndPhase(false)` + `NewBattlePhase` directly (`move.ts:7929-7935`),
+  bypassing `AttemptRunPhase`. Confirm the host still broadcasts a `waveResolved`
+  ("flee") for this path so the guest runs its post-battle tail
+  (`maybeRunCoopWaveAdvance`); if `broadcastCoopWaveResolved` is only wired to
+  `AttemptRunPhase` / `VictoryPhase`, a Roar-induced wild flee could strand the guest
+  on the resolved wave (P1). This is a battle-end concern, not switch-state, but it is
+  reachable only through the forced-switch pathway so it is flagged here.
+
+The maintainer's visual-parity checklist maps onto the above as: item 1/7 (animated
+recall vs clean summon) = the accepted checkpoint-reconcile tradeoff in 8a; item 2/3
+(no stacking, info-panel swap) = #791 on the player side, SPEC-1/SPEC-2 on the enemy
+side; item 4 (substitute-doll placeholder) = #836 `loadAssets` in
+`adoptCoopEnemiesStructural` plus the `loadAssets(true)` in both summon helpers, no
+switch pathway leaves a placeholder; item 5 (shiny / name-FX re-apply) = `playAnim`
+after the summon helpers' `loadAssets(true)` refreshes `refreshErShinyLabBattleFx`
+(`pokemon.ts:1563`); item 6 (fainted pose) = #796 identity resolve + guaranteed
+removal, and the bench replacement is never fainted; item 8 (controller banner) = the
+`CoopControllerTag` is only shown on the ME / colosseum / shop paths, never during a
+battle faint replacement (which uses a plain `ui.showText` waiting line,
+`switch-phase.ts:105`), so it can never overlay the party-pick screen.

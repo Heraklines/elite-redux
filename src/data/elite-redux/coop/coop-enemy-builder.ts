@@ -185,6 +185,19 @@ export function adoptCoopEnemiesStructural(enemies: CoopSerializedEnemy[]): void
         /* stale sprite teardown must not block the adopt */
       }
       battle.enemyParty[entry.fieldIndex] = built;
+      // #836 SPRITE: a REBUILT slot is a brand-new EnemyPokemon that never went through the
+      // encounter-phase asset load (buildCoopEnemy deliberately leaves loadAssets to "the
+      // encounter loop", but the structural adopt paths - the ME-battle boot in
+      // CoopReplayMePhase.finishWithoutLeaving + the colosseum round boot - drive their summon
+      // through MysteryEncounterBattlePhase's SummonPhase, which does NOT load assets). Without
+      // this its real sprite atlas is never requested, so it renders the substitute-doll
+      // placeholder for the whole fight (the live "I just saw two SUBSTITUTES" report). Kick the
+      // real load now (fire-and-forget, mirroring applyCoopEnemies + adoptCoopMeBattleParty): the
+      // #205 placeholder swaps to the real sprite when loadAssets completes, even after the mon is
+      // already fielded. loadAssets internally queues its atlas + waits its own COMPLETE, so a
+      // per-mon call is the same shape the encounter-phase enemy load uses (#154/#140 loader
+      // pattern); the guest draws no RNG here (loadAssets is pure asset I/O).
+      void built.loadAssets();
       rebuilt++;
     }
     if (!isTrainer) {

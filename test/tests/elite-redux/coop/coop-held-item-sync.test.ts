@@ -37,13 +37,13 @@ import {
 import { clearCoopRuntime, startLocalCoopSession } from "#data/elite-redux/coop/coop-runtime";
 import { COOP_GUEST_FIELD_INDEX, COOP_HOST_FIELD_INDEX } from "#data/elite-redux/coop/coop-session";
 import type { CoopFullBattleSnapshot, CoopFullMonSnapshot } from "#data/elite-redux/coop/coop-transport";
+import { BerryType } from "#enums/berry-type";
 import { GameModes } from "#enums/game-modes";
 import { MoveId } from "#enums/move-id";
 import { SpeciesId } from "#enums/species-id";
 import type { Pokemon } from "#field/pokemon";
-import { BerryType } from "#enums/berry-type";
-import { BerryModifierType } from "#modifiers/modifier-type";
 import { BerryModifier, PokemonHeldItemModifier } from "#modifiers/modifier";
+import { BerryModifierType } from "#modifiers/modifier-type";
 import { GameManager } from "#test/framework/game-manager";
 import type { ModifierTypeFunc } from "#types/modifier-types";
 import Phaser from "phaser";
@@ -72,6 +72,8 @@ const checksumMon = () => ({
   bossSegmentIndex: 0,
   moves: [[33, 0]] as [number, number][],
   tags: [] as number[],
+  transformSpeciesId: 0,
+  transformFormIndex: 0,
 });
 
 const state = (over: Partial<CoopChecksumState> = {}): CoopChecksumState => ({
@@ -90,6 +92,7 @@ const state = (over: Partial<CoopChecksumState> = {}): CoopChecksumState => ({
   ],
   biomeId: 0,
   seed: "SEED",
+  saveDataDigest: "0000000000000000",
   ...over,
 });
 

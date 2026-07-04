@@ -25,6 +25,7 @@
 import type { ErDataFingerprint } from "#data/elite-redux/coop/coop-data-fingerprint";
 import { coopLog, isCoopDebug } from "#data/elite-redux/coop/coop-debug";
 import type { GhostTeamSnapshot } from "#data/elite-redux/er-ghost-teams";
+import type { ErRelicBattleStateData } from "#data/elite-redux/er-relic-battle-state";
 // TYPE-ONLY import (fully erased at runtime by `import type`, so this file stays the
 // zero-runtime-import lowest layer): the ghost-pool message carries plain-JSON
 // `GhostTeamSnapshot`s, which already live in er-ghost-teams (#633 ghost-pool sync).
@@ -309,6 +310,31 @@ export interface CoopBattleCheckpoint {
 // checksum re-converges. All plain JSON so it compresses + crosses the real transport.
 // =============================================================================
 
+/**
+ * TRANSFORM / Imposter copied identity (#836/#837). When a mon Transforms (move) or Imposter-copies, the
+ * copied identity lives in `summonData` (speciesForm / moveset / types / ability / gender / stats) while
+ * `species` stays the ORIGINAL - so it is invisible to the `speciesId` + `formIndex` fields and never
+ * converges on the pure-renderer guest (live #836: a host Ditto's damage synced but it never visibly
+ * transformed on the watcher's screen; PostSummonTransformAbAttr also draws RNG, so a guest-side pick
+ * would be unhealable without this). Carried so the guest re-applies exactly what the host wrote.
+ */
+export interface CoopMonTransform {
+  /** Copied species id (`summonData.speciesForm.speciesId`). */
+  speciesId: number;
+  /** Copied form index (`summonData.speciesForm.formIndex`). */
+  formIndex: number;
+  /** Copied moveset as `[moveId, ppUsed]` (the transform gives each move min(pp,5)). */
+  moves: [number, number][];
+  /** Copied types (`PokemonType` enum ids). */
+  types: number[];
+  /** Copied active ability id (`AbilityId`); 0 when unreadable. */
+  ability: number;
+  /** Copied gender (`Gender` enum); -1 when unset. */
+  gender: number;
+  /** Copied battle stats (`summonData.stats`, indexed by `Stat`: HP,ATK,DEF,SPATK,SPDEF,SPD). */
+  stats: number[];
+}
+
 /** One field mon's FULL authoritative state for a resync (superset of the checkpoint). */
 export interface CoopFullMonSnapshot {
   /** Battler index (0 host lead, 1 guest lead, 2/3 enemies). */
@@ -356,6 +382,13 @@ export interface CoopFullMonSnapshot {
    * additive: an older host omits it and the guest leaves the mon's items alone.
    */
   heldItems?: Record<string, unknown>[] | undefined;
+  /**
+   * TRANSFORM / Imposter copied identity (#836/#837): the summonData a host Transform wrote, so the
+   * guest's sprite/species/moveset/types/ability/stats converge. `null` = the host mon is NOT
+   * transformed (the guest CLEARS any stale transform). Optional + additive: an older host omits it and
+   * the guest leaves its transform state alone; applied gated authoritative (per-turn field snapshot + resync).
+   */
+  transform?: CoopMonTransform | null | undefined;
 }
 
 /** The full authoritative battle state the host sends to heal a desync. */
@@ -414,6 +447,19 @@ export interface CoopFullBattleSnapshot {
   seed?: string;
   /** Derived wave seed (B8); re-sown alongside `seed` so the guest's RNG cursor matches the host. */
   waveSeed?: string;
+  /**
+   * ER MODULE-LET SUBSTRATES (#837): the run-state substrates the session save serializes but that no
+   * per-turn/resync heal carried, so the {@linkcode CoopChecksumState.saveDataDigest} could now DETECT a
+   * drift the resync could not HEAL. Carried here (reusing the substrates' OWN save-data serializers) so
+   * the gated guest heal restores them through their own restore functions. All optional + additive: an
+   * older host omits them and the guest leaves that substrate alone.
+   */
+  /** #348 per-mon faint-free money-streak counters `[pokemonId, waves]` (audit Part 1 #1). */
+  erMoneyStreaks?: [number, number][] | undefined;
+  /** #504 the wave the player armed biome overstay, or null if never (audit Part 1 #2). */
+  biomeOverstayAnchor?: number | null | undefined;
+  /** ER per-battle relic counters (Cursed Idol / Pharaoh's Ankh), wave-scoped (audit Part 1 #3). */
+  erRelicBattleState?: ErRelicBattleStateData | undefined;
 }
 
 /**

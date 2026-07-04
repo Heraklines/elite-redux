@@ -35,7 +35,9 @@ import {
   COOP_CHECKSUM_SENTINEL,
   type CoopChecksumMon,
   type CoopChecksumState,
+  canonicalize,
   checksumState,
+  fnv1a64,
 } from "#data/elite-redux/coop/coop-battle-checksum";
 import { coopLog, coopWarn, isCoopDebug } from "#data/elite-redux/coop/coop-debug";
 import type {
@@ -44,11 +46,19 @@ import type {
   CoopFullBattleSnapshot,
   CoopFullMonSnapshot,
   CoopInteractionOutcome,
+  CoopMonTransform,
   CoopRole,
   CoopSerializedArenaTag,
   CoopSerializedEnemy,
 } from "#data/elite-redux/coop/coop-transport";
+import { erBiomeOverstayAnchor, setErBiomeOverstayAnchor } from "#data/elite-redux/er-biome-structure";
+import { getErMoneyStreakEntries, restoreErMoneyStreaks } from "#data/elite-redux/er-money-streak";
 import { resolveErModifierClass } from "#data/elite-redux/er-persistent-modifiers";
+import {
+  type ErRelicBattleStateData,
+  getErRelicBattleState,
+  restoreErRelicBattleState,
+} from "#data/elite-redux/er-relic-battle-state";
 import type { Gender } from "#data/gender";
 import { Status } from "#data/status-effect";
 import type { TerrainType } from "#data/terrain";
@@ -72,6 +82,8 @@ import { PokemonMove } from "#moves/pokemon-move";
 import { ModifierData } from "#system/modifier-data";
 import { PokemonData } from "#system/pokemon-data";
 import type { StarterDataEntry } from "#types/save-data";
+import { EnemyBattleInfo } from "#ui/enemy-battle-info";
+import { getPokemonSpeciesForm } from "#utils/pokemon-utils";
 import { compressToBase64, decompressFromBase64 } from "lz-string";
 
 /**
@@ -485,11 +497,28 @@ export function summonCoopEnemyField(fieldIndex: number, partySlot: number): voi
     // the field below the player's mon, show its info + sprite, then field-setup (clears
     // switchOutStatus so it reads as ON-FIELD). Mirrors the summonWild placement subset.
     incoming.resetSummonData();
-    // Re-seat at the vacated slot's exact position + field-position (setFieldPosition is RELATIVE and
-    // no-ops when the position already matches, so set the public field directly + place the container)
-    // - without this the sprite keeps its stale x and lands shifted-right, superimposed on the old mon.
+    // #838 SPEC-1 (enemy-side #791 seating parity): seat via the REAL setFieldPosition (duration 0),
+    // which applies the slot offset AND the battle-info seating (setMini + setSlotOffset) that the old
+    // RAW fieldPosition write bypassed - without it an enemy DOUBLE switch-in renders its HP bar at the
+    // wrong slot offset / full size on top of the ally's bar (the #791 class, enemy side). Derive the
+    // side's CANONICAL base from a LIVE enemy ally when one exists (its x/y minus its own slot offset;
+    // the vacated-slot capture is unreliable after a KO drop-tween), else fall back to the outgoing
+    // capture minus the slot offset. Mirrors summonCoopPlayerField exactly.
     incoming.fieldPosition = slotFieldPosition;
-    incoming.setPosition(slotX, slotY);
+    const slotOffset = incoming.getFieldPositionOffset();
+    let baseX = slotX - slotOffset[0];
+    let baseY = slotY - slotOffset[1];
+    const liveAlly = globalScene
+      .getEnemyField(true)
+      .find(p => p != null && p !== incoming && p !== outgoing && p.isActive() && p.isOnField());
+    if (liveAlly != null) {
+      const allyOffset = liveAlly.getFieldPositionOffset();
+      baseX = liveAlly.x - allyOffset[0];
+      baseY = liveAlly.y - allyOffset[1];
+    }
+    incoming.fieldPosition = FieldPosition.CENTER;
+    incoming.setPosition(baseX, baseY);
+    void incoming.setFieldPosition(slotFieldPosition, 0);
     void incoming.loadAssets(true);
     globalScene.field.add(incoming);
     // Cast to the common base so `moveBelow<T>` (which constrains both args to one T) accepts an
@@ -503,6 +532,14 @@ export function summonCoopEnemyField(fieldIndex: number, partySlot: number): voi
     incoming.getSprite()?.setVisible(true);
     incoming.fieldSetup(true);
     globalScene.updateFieldScale();
+    // #838 SPEC-2 (one-frame stale info panel): showInfo() only makes the bar visible; a freshly
+    // summoned boss/statused mon shows a STALE bar until the per-turn numeric apply redraws it next
+    // turn. Refresh the hp/status panel + the boss shield dividers NOW.
+    void incoming.updateInfo();
+    const info = incoming.getBattleInfo();
+    if (info instanceof EnemyBattleInfo) {
+      info.updateBossSegments(incoming);
+    }
   } catch {
     // A malformed switch mirror must never crash the guest's battle.
   }
@@ -727,6 +764,9 @@ export function summonCoopPlayerField(fieldIndex: number, partySlot: number): vo
     incoming.getSprite()?.setVisible(true);
     incoming.fieldSetup(true);
     globalScene.updateFieldScale();
+    // #838 SPEC-2 (one-frame stale info panel): refresh the hp/status panel now so a freshly summoned
+    // statused replacement doesn't flash a stale bar until the per-turn numeric apply redraws it.
+    void incoming.updateInfo();
   } catch {
     // A malformed replacement mirror must never crash the guest's battle.
   }
@@ -1296,6 +1336,33 @@ function readMoves(mon: Pokemon): [number, number][] {
   }
 }
 
+/**
+ * Read a live mon's TRANSFORM / Imposter copied identity (#836/#837), or null when not transformed. The
+ * copied identity lives entirely in `summonData` (see {@linkcode CoopMonTransform}), so this reads it
+ * from there verbatim - speciesForm id/form, the copied moveset+PP, types, active ability, gender, and
+ * the copied battle stats - so the guest can re-apply exactly what the host's PokemonTransformPhase wrote.
+ */
+function readTransform(mon: Pokemon): CoopMonTransform | null {
+  try {
+    const sd = mon.summonData;
+    const sf = sd?.speciesForm;
+    if (sf == null) {
+      return null;
+    }
+    return {
+      speciesId: sf.speciesId,
+      formIndex: sf.formIndex,
+      moves: (sd.moveset ?? []).map(m => [m?.moveId ?? 0, m?.ppUsed ?? 0] as [number, number]),
+      types: [...(sd.types ?? [])].map(t => t as unknown as number),
+      ability: (sd.ability as unknown as number) ?? 0,
+      gender: sd.gender === undefined ? -1 : (sd.gender as unknown as number),
+      stats: [...(sd.stats ?? [])],
+    };
+  } catch {
+    return null;
+  }
+}
+
 /** Read a live mon's battler-tag TYPE ids, sorted ascending (identity only, no counters). */
 function readTagTypes(mon: Pokemon): number[] {
   try {
@@ -1428,6 +1495,8 @@ function readTeraState(mon: Pokemon): { isTerastallized: boolean; teraType: numb
 function readChecksumMon(mon: Pokemon): CoopChecksumMon {
   const tera = readTeraState(mon);
   const boss = readBossState(mon);
+  // Transform / Imposter copied identity (#836/#837): 0/0 when not transformed (readTransform -> null).
+  const transform = readTransform(mon) ?? { speciesId: 0, formIndex: 0 };
   return {
     bi: mon.getBattlerIndex(),
     partyIndex: readPartyIndex(mon),
@@ -1447,7 +1516,171 @@ function readChecksumMon(mon: Pokemon): CoopChecksumMon {
     bossSegmentIndex: boss.bossSegmentIndex,
     moves: readMoves(mon),
     tags: readTagTypes(mon),
+    // Transform / Imposter copied identity (#836/#837): a host Transform stays invisible to speciesId
+    // (species stays the original); hashing the copied speciesForm makes it detectable + healable.
+    transformSpeciesId: transform.speciesId,
+    transformFormIndex: transform.formIndex,
   };
+}
+
+// =============================================================================
+// FULL SESSION SAVE-DATA digest (#837). The systemic desync closer: hash a NORMALIZED projection of
+// `getSessionSaveData()` alongside the field checksum, so every substrate the session save serializes
+// (money-streak, ward-stone charges, relic-battle-state, biome overstay anchor, and all modifiers as
+// full ModifierData blobs incl. their getArgs internals) becomes desync-DETECTABLE by construction -
+// closing the "modifier internal state / module-let substrate" blind-spot class the [typeId,stackCount]
+// modifier digest is blind to (audit Part 1 #1/#2/#3/#6). DERIVED from the serializer (not a hand list)
+// so a NEW substrate added to SessionSaveData is covered automatically; only the keys below are stripped.
+// =============================================================================
+
+/**
+ * SessionSaveData keys EXCLUDED from the co-op save-data digest (#837). Each is a field that
+ * legitimately differs between two healthy clients or per moment, so hashing it would manufacture a
+ * FALSE desync. Everything NOT listed here is hashed, so a new substrate is covered automatically.
+ * (The guard test asserts this set is the ONLY divergence between two engines sharing state.)
+ */
+const COOP_SAVEDATA_DIGEST_EXCLUDED_KEYS: ReadonlySet<string> = new Set<string>([
+  // Per-client wall-clock accumulator: advances independently on each client every frame.
+  "playTime",
+  // `Date.now()` stamped at serialize time: two serializations are never equal.
+  "timestamp",
+  // Player-chosen run name: cosmetic; the guest may not carry it and it is never a sync concern.
+  "name",
+  // Arena weather/terrain TURN COUNTERS (`turnsLeft`) decrement per tick and legitimately differ by
+  // one between two correct engines - the base field checksum EXCLUDES them for exactly this reason.
+  // Arena IDENTITY (weather/terrain type, tags, biome) is already hashed by the base checksum, so
+  // dropping the whole ArenaData here loses no coverage while avoiding that false-desync class.
+  "arena",
+  // Full per-mon PokemonData for the WHOLE party/enemy is large and carries volatile per-client battle
+  // scratch (summon data, per-frame tweened fields, battle-scoped counters). On-field mon state + party
+  // species + LEVELS are already in the base checksum; bench charge state rides the erWardStones /
+  // modifiers side channels (kept below). Enemy mons are host-built and never id-aligned with the guest.
+  "party",
+  "enemyParty",
+  "enemyModifiers",
+  // The guest is a pure renderer and never RUNS a mystery encounter, so its queued-prophecy /
+  // spawn-chance ME bookkeeping legitimately lags the host's (audit Part 1 #9); the ME OUTCOME is
+  // host-authoritative and already synced through the ME terminal path.
+  "mysteryEncounterSaveData",
+  "mysteryEncounterType",
+  // Host-authoritative TrainerData for a trainer wave: mirrored to the guest via the enemy builder, but
+  // its full serialized form (party template index / gen seed) can differ benignly; the on-field enemy
+  // species the checksum already hashes is the sync-relevant part.
+  "trainer",
+  // Host-authoritative score / arena faint tally / trainer-no-repeat set: accumulated on the host's
+  // authoritative pipeline, which the pure-renderer guest does not reproduce turn-for-turn.
+  "score",
+  "playerFaints",
+  "erUsedTrainerKeys",
+]);
+
+/**
+ * Normalize the session save's `erMapState` (#837) to ONLY the biome-STRUCTURE trio that drives the
+ * host-authoritative encounter generator (`biomeOverstayAnchor` is the confirmed blind spot, audit
+ * Part 1 #2; biome length/start-wave are its inputs). The rest of `erMapState` - revealed nodes, the
+ * pending travel target, Treasure-Map fragments, Fairy's-Boon luck, the journey history - is guest
+ * RENDERER state the pure-renderer guest never rolls, so it legitimately diverges and must stay out of
+ * the digest. Tolerant of an absent/malformed field (older save / no map yet).
+ */
+function normalizeCoopErMapState(value: unknown): Record<string, unknown> {
+  if (value == null || typeof value !== "object") {
+    return {};
+  }
+  const map = value as Record<string, unknown>;
+  return {
+    biomeOverstayAnchor: typeof map.biomeOverstayAnchor === "number" ? map.biomeOverstayAnchor : null,
+    biomeLength: typeof map.biomeLength === "number" ? map.biomeLength : null,
+    biomeStartWave: typeof map.biomeStartWave === "number" ? map.biomeStartWave : null,
+  };
+}
+
+/**
+ * Normalize the session save's `modifiers` list (#837) to the PLAYER-WIDE persistent modifiers with
+ * their full `args`, sorted deterministically. This is the Stormglass-`chosenWeather` / temp-booster
+ * internal-state coverage: the base checksum hashes `[typeId, stackCount]` only, so an arg-only change
+ * (chosenWeather, charges) is invisible - carrying the full args here makes it a hashed divergence the
+ * resync's {@linkcode reconcileCoopPlayerModifiers} can heal. Held items are EXCLUDED (they carry a
+ * per-mon `pokemonId` in args + charge state that heals per-turn via the field snapshot; the resync's
+ * bench heal cannot carry a bench charge, so hashing them here would detect-but-never-heal). Sorting is
+ * by typeId then a canonical of the args, so array iteration order can never manufacture a divergence.
+ */
+function normalizeCoopModifierBlobs(list: unknown): Record<string, unknown>[] {
+  if (!Array.isArray(list)) {
+    return [];
+  }
+  const heldClassNames = new Set(["PokemonHeldItemModifier", "PokemonFormChangeItemModifier"]);
+  const blobs: Record<string, unknown>[] = [];
+  for (const raw of list as unknown[]) {
+    if (raw == null || typeof raw !== "object") {
+      continue;
+    }
+    const data = raw as Record<string, unknown>;
+    const className = typeof data.className === "string" ? data.className : "";
+    // Held items ride the per-mon field snapshot; skip them (their pokemonId arg is per-client and their
+    // charge heal is per-turn field-based, not resync-based). Everything else is a player-wide modifier.
+    if (heldClassNames.has(className)) {
+      continue;
+    }
+    blobs.push({
+      typeId: typeof data.typeId === "string" ? data.typeId : "",
+      className,
+      args: data.args ?? [],
+      stackCount: typeof data.stackCount === "number" ? data.stackCount : 0,
+      ...(data.typePregenArgs === undefined ? {} : { typePregenArgs: data.typePregenArgs }),
+    });
+  }
+  return blobs.sort((a, b) => {
+    const ta = a.typeId as string;
+    const tb = b.typeId as string;
+    if (ta !== tb) {
+      return ta < tb ? -1 : 1;
+    }
+    const aa = canonicalize(a.args);
+    const ba = canonicalize(b.args);
+    return aa < ba ? -1 : aa > ba ? 1 : 0;
+  });
+}
+
+/**
+ * Build the NORMALIZED co-op save-data view (#837): the projection of `getSessionSaveData()` two
+ * healthy clients agree on. DERIVED from the serializer so a new substrate is auto-covered; the
+ * {@linkcode COOP_SAVEDATA_DIGEST_EXCLUDED_KEYS} denylist (each entry commented) strips the fields that
+ * legitimately diverge, and `modifiers` / `erMapState` are normalized to their sync-relevant subset.
+ * Returns a plain object (used both by the digest hash and the deep-diff diagnostics).
+ */
+export function captureCoopSaveDataNormalized(): Record<string, unknown> {
+  const session = globalScene.gameData.getSessionSaveData() as unknown as Record<string, unknown>;
+  const out: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(session)) {
+    if (COOP_SAVEDATA_DIGEST_EXCLUDED_KEYS.has(key)) {
+      continue;
+    }
+    if (key === "modifiers") {
+      out[key] = normalizeCoopModifierBlobs(value);
+      continue;
+    }
+    if (key === "erMapState") {
+      out[key] = normalizeCoopErMapState(value);
+      continue;
+    }
+    out[key] = value;
+  }
+  return out;
+}
+
+/**
+ * The 64-bit digest of the normalized session save-data view (#837). Both clients compute it at the
+ * same turn boundary; a divergence in ANY save-data substrate (money-streak, ward-stone charges, relic
+ * state, overstay anchor, Stormglass weather / booster args) moves the digest -> a checksum mismatch ->
+ * the existing full-snapshot resync heals it. Returns the read-failure sentinel on any error so the
+ * comparison is skipped (never a resync on a transient read failure), mirroring {@linkcode captureCoopChecksum}.
+ */
+export function captureCoopSaveDataDigest(): string {
+  try {
+    return fnv1a64(canonicalize(captureCoopSaveDataNormalized()));
+  } catch {
+    return COOP_CHECKSUM_SENTINEL;
+  }
 }
 
 /**
@@ -1487,6 +1720,13 @@ export function captureCoopChecksumState(): CoopChecksumState {
     // Run seed (B8): the master determinism input. runConfig-pinned identical across healthy clients;
     // only setSeed mutates it (never mid-turn), so it differs ONLY on a real seed split.
     seed: globalScene.seed ?? "",
+    // Full session save-data digest (#837): the systemic blind-spot closer. Hashes the normalized
+    // getSessionSaveData() view so money-streak / ward-stone charges / relic-battle-state / biome
+    // overstay anchor / modifier-internal args (Stormglass chosenWeather) are all desync-detectable -
+    // a class the [typeId, stackCount] `modifiers` digest above cannot see. Wave-boundary substrates,
+    // so a mid-wave recompute yields the SAME value (constant within a wave); measured cheap enough to
+    // recompute every turn (see #837 report), so no per-wave cache is needed.
+    saveDataDigest: captureCoopSaveDataDigest(),
   };
 }
 
@@ -1558,6 +1798,9 @@ function readFullMon(mon: Pokemon): CoopFullMonSnapshot {
     // On-field held items (#633 RISKY #1/#2/#3): the heavy ModifierData blobs the compact checksum
     // digest can't carry; the gated guest heal sets the live mon's items to this exact set.
     heldItems: captureCoopHeldItems(mon),
+    // Transform / Imposter copied identity (#836/#837): the summonData a host Transform wrote, so the
+    // guest converges its sprite/species/moveset/types/ability/stats. null = not transformed (guest clears).
+    transform: readTransform(mon),
   };
 }
 
@@ -1612,6 +1855,12 @@ export function captureCoopFullSnapshot(): CoopFullBattleSnapshot | null {
       biomeId: arena.biomeId ?? 0,
       seed: globalScene.seed ?? "",
       waveSeed: globalScene.waveSeed ?? "",
+      // ER module-let substrates (#837): carried using each substrate's OWN save-data serializer so the
+      // gated guest heal restores them through their own restore functions - closing the drift class the
+      // saveDataDigest now DETECTS. Captured unconditionally (additive); only READ in the gated heal.
+      erMoneyStreaks: getErMoneyStreakEntries(),
+      biomeOverstayAnchor: erBiomeOverstayAnchor(),
+      erRelicBattleState: getErRelicBattleState(),
     };
   } catch {
     return null;
@@ -1668,6 +1917,88 @@ function rebuildMovesetIfStructurallyDiverged(mon: Pokemon, snapMoves: [number, 
     return true;
   } catch {
     return false;
+  }
+}
+
+/**
+ * GUEST (#836/#837): apply the host's TRANSFORM / Imposter copied identity onto a live mon so the
+ * pure-renderer guest converges its sprite/species/moveset/types/ability/stats. Mirrors exactly what
+ * the host's {@linkcode PokemonTransformPhase} writes into `summonData` (speciesForm / moveset / types
+ * / ability / gender / stats). `null` = the host mon is NOT transformed: CLEAR a stale guest transform.
+ * `undefined` = older host omitted the field: leave the guest's transform state alone. Only re-loads the
+ * sprite (async, best-effort) when the transform identity actually CHANGED, so a steady transform is a
+ * cheap no-op each turn. Fully guarded so a bad payload never breaks the guest's turn.
+ */
+function applyMonTransform(mon: Pokemon, transform: CoopMonTransform | null | undefined): void {
+  if (transform === undefined) {
+    return;
+  }
+  try {
+    const sd = mon.summonData;
+    if (sd == null) {
+      return;
+    }
+    if (transform === null) {
+      if (sd.speciesForm != null) {
+        coopWarn("heal", `transform bi=${mon.getBattlerIndex()} host=none guest=transformed -> cleared (#836)`);
+        sd.speciesForm = null;
+        sd.moveset = null;
+        sd.types = [];
+        sd.stats = [0, 0, 0, 0, 0, 0];
+        void mon
+          .loadAssets(false)
+          .then(() => mon.updateInfo())
+          .catch(() => {});
+      }
+      return;
+    }
+    const already =
+      sd.speciesForm != null
+      && sd.speciesForm.speciesId === transform.speciesId
+      && sd.speciesForm.formIndex === transform.formIndex;
+    sd.speciesForm = getPokemonSpeciesForm(
+      transform.speciesId as unknown as Parameters<typeof getPokemonSpeciesForm>[0],
+      transform.formIndex,
+    );
+    sd.moveset = transform.moves
+      .filter(([id]) => typeof id === "number" && id > 0)
+      .map(([id, ppUsed]) => {
+        const pm = new PokemonMove(id as unknown as MoveId);
+        pm.ppUsed = Math.max(0, Math.trunc(ppUsed ?? 0));
+        return pm;
+      });
+    sd.types = transform.types.map(t => t as unknown as (typeof sd.types)[number]);
+    if (transform.ability) {
+      sd.ability = transform.ability as unknown as AbilityId;
+    }
+    if (transform.gender >= 0) {
+      sd.gender = transform.gender as unknown as Gender;
+    }
+    for (let i = 0; i < transform.stats.length && i < sd.stats.length; i++) {
+      if (typeof transform.stats[i] === "number") {
+        sd.stats[i] = transform.stats[i];
+      }
+    }
+    if (!already) {
+      coopWarn(
+        "heal",
+        `transform bi=${mon.getBattlerIndex()} host=sp${transform.speciesId}/form${transform.formIndex} -> applied (#836)`,
+      );
+      void mon
+        .loadAssets(false)
+        .then(() => {
+          // Guarded: a headless/torn-down sprite (no anim target) must not reject the fire-and-forget heal.
+          try {
+            mon.playAnim();
+          } catch {
+            /* sprite anim unavailable (headless / mid-teardown) - the data model is already correct */
+          }
+          mon.updateInfo();
+        })
+        .catch(() => {});
+    }
+  } catch {
+    // A malformed transform payload must never crash the guest's battle.
   }
 }
 
@@ -1729,6 +2060,14 @@ function applyFullMon(
         coopWarn("heal", `teraType bi=${snap.bi} host=${snap.teraType} guest=${mon.teraType} -> applied`);
       }
       mon.teraType = snap.teraType as unknown as Pokemon["teraType"];
+    }
+    // Transform / Imposter (#836/#837): apply the host's copied summonData identity BEFORE the moveset
+    // heal below (a transformed mon's getMoveset() returns summonData.moveset, which this sets, so the
+    // moveset heal then only aligns PP on the transformed set). Gated authoritative: the pure-renderer
+    // guest converges the copied sprite/species/types/ability/stats; solo/host/lockstep compute it
+    // themselves and skip. undefined (older host) is a no-op.
+    if (authoritativeGuest) {
+      applyMonTransform(mon, snap.transform);
     }
     // Moveset: REBUILD from the host's move IDs when they structurally differ (#633 GAP 7); else
     // only align ppUsed per slot (the lockstep-identical common case).
@@ -1915,6 +2254,48 @@ export function reconcileCoopModifierStacks(hostModifiers: [string, number][] | 
  * here so a guest-only one is never removed by this path. Gated authoritative by the caller. Returns true
  * if it changed anything (so the caller refreshes the bar once). Fully guarded.
  */
+/**
+ * GUEST (#837): heal a player-wide modifier's INTERNAL args (Stormglass `chosenWeather`, a temp
+ * booster's stat) by REPLACING the live modifier from the host's full `ModifierData` blob when the args
+ * diverge. The `[typeId, stackCount]` path is blind to arg-only drift; the `saveDataDigest` now DETECTS
+ * it (it hashes the full modifier blobs), so restore it through the SAME proven `ModifierData.toModifier`
+ * reconstruct-and-swap the ADD branch uses (not an in-place arg poke). Returns true iff it replaced.
+ * A no-op (returns false) when the live args already match or the reconstruct fails/yields a non-owned
+ * modifier. Fully guarded.
+ */
+function reconcilePlayerModifierArgs(live: PersistentModifier, blob: Record<string, unknown>): boolean {
+  try {
+    const liveArgs = canonicalize(live.getArgs());
+    const wantArgs = canonicalize(blob.args ?? []);
+    if (liveArgs === wantArgs) {
+      return false;
+    }
+    const data = new ModifierData(blob, false);
+    const rebuilt = data.toModifier(
+      Modifier[data.className as keyof typeof Modifier] ?? resolveErModifierClass(data.className),
+    );
+    if (
+      !(rebuilt instanceof PersistentModifier)
+      || rebuilt instanceof PokemonHeldItemModifier
+      || rebuilt instanceof Modifier.PokemonFormChangeItemModifier
+    ) {
+      return false;
+    }
+    if (typeof data.stackCount === "number") {
+      rebuilt.stackCount = data.stackCount;
+    }
+    coopWarn(
+      "heal",
+      `playerModifier ARGS typeId=${live.type.id} host=${wantArgs} guest=${liveArgs} -> reconstructed (#837)`,
+    );
+    globalScene.removeModifier(live);
+    globalScene.addModifier(rebuilt, true, false, false);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export function reconcileCoopPlayerModifiers(hostBlobs: Record<string, unknown>[] | undefined): boolean {
   if (!Array.isArray(hostBlobs)) {
     return false;
@@ -1926,18 +2307,20 @@ export function reconcileCoopPlayerModifiers(hostBlobs: Record<string, unknown>[
       m instanceof PersistentModifier
       && !(m instanceof PokemonHeldItemModifier)
       && !(m instanceof Modifier.PokemonFormChangeItemModifier);
-    // Host wanted stack per typeId (the host pre-filtered to owned modifiers).
+    // Host wanted stack + full blob per typeId (the host pre-filtered to owned modifiers).
     const wantStackByType = new Map<string, number>();
+    const wantBlobByType = new Map<string, Record<string, unknown>>();
     for (const raw of hostBlobs) {
       if (raw != null && typeof raw === "object") {
         const typeId = (raw as Record<string, unknown>).typeId;
         const stack = (raw as Record<string, unknown>).stackCount;
         if (typeof typeId === "string") {
           wantStackByType.set(typeId, typeof stack === "number" ? Math.max(0, Math.trunc(stack)) : 1);
+          wantBlobByType.set(typeId, raw as Record<string, unknown>);
         }
       }
     }
-    // 1) REMOVE / STACK: iterate a snapshot of the guest's owned player-wide modifiers.
+    // 1) REMOVE / ARGS / STACK: iterate a snapshot of the guest's owned player-wide modifiers.
     const haveTypeIds = new Set<string>();
     for (const modifier of [...globalScene.modifiers]) {
       if (!isOwned(modifier)) {
@@ -1955,6 +2338,14 @@ export function reconcileCoopPlayerModifiers(hostBlobs: Record<string, unknown>[
         continue;
       }
       haveTypeIds.add(modifier.type.id);
+      // ARGS heal (#837): if the modifier's INTERNAL args diverged (Stormglass chosenWeather, ...),
+      // REPLACE it from the host's full blob - this reconstructs with the host's stackCount too, so
+      // skip the stack-only branch below on a successful swap.
+      const wantBlob = wantBlobByType.get(modifier.type.id);
+      if (wantBlob !== undefined && reconcilePlayerModifierArgs(modifier, wantBlob)) {
+        changed = true;
+        continue;
+      }
       if (modifier.stackCount !== want) {
         coopWarn(
           "heal",
@@ -2086,6 +2477,37 @@ export function adoptCoopHostPlayerPartyOrder(hostParty: number[] | undefined): 
   } catch {
     // A malformed party order must never crash the guest's run.
     return false;
+  }
+}
+
+/**
+ * GUEST (authoritative resync, #837): restore the ER MODULE-LET substrates the {@linkcode
+ * CoopChecksumState.saveDataDigest} now detects as diverged but that no per-turn/resync heal carried:
+ * the money-streak map (#348), the biome overstay anchor (#504), and the per-battle relic state
+ * (Cursed Idol / Pharaoh's Ankh). Each goes through the substrate's OWN save-data restore function
+ * (never a hand-rolled write), so the wire form is exactly the session-save form. Every field is
+ * additive: an older host omits it (undefined) and that substrate is left untouched. Fully guarded so a
+ * malformed substrate can never crash the guest's battle.
+ */
+function restoreCoopModuleLetSubstrates(snapshot: CoopFullBattleSnapshot): void {
+  try {
+    if (Array.isArray(snapshot.erMoneyStreaks)) {
+      coopLog("heal", `erMoneyStreaks host entries=${snapshot.erMoneyStreaks.length} -> restored (#837/#348)`);
+      restoreErMoneyStreaks(snapshot.erMoneyStreaks);
+    }
+    if (snapshot.biomeOverstayAnchor !== undefined) {
+      coopLog("heal", `biomeOverstayAnchor host=${snapshot.biomeOverstayAnchor} -> restored (#837/#504)`);
+      setErBiomeOverstayAnchor(snapshot.biomeOverstayAnchor);
+    }
+    if (snapshot.erRelicBattleState !== undefined) {
+      coopLog(
+        "heal",
+        `erRelicBattleState host wave=${(snapshot.erRelicBattleState as ErRelicBattleStateData).wave} -> restored (#837)`,
+      );
+      restoreErRelicBattleState(snapshot.erRelicBattleState);
+    }
+  } catch {
+    // A malformed module-let substrate must never crash the guest's battle.
   }
 }
 
@@ -2251,6 +2673,14 @@ export function applyCoopFullSnapshot(
         `benchParty reconcile host=${snapshot.benchParty.length} mons guest=${globalScene.getPlayerParty().length} -> applyCaptureParty`,
       );
       applyCoopCaptureParty(snapshot.benchParty);
+    }
+    // ER module-let substrate heal (#837): restore the money-streak map, biome overstay anchor, and
+    // per-battle relic state the saveDataDigest now DETECTS as diverged - each through the substrate's
+    // OWN restore function (no hand-rolled second write). GUEST-ONLY (gated authoritative; host / solo /
+    // lockstep skip it - lockstep both advance these deterministically). Each field is additive: an
+    // older host omits it and that substrate is left alone (undefined skip in the helper).
+    if (authoritativeGuest) {
+      restoreCoopModuleLetSubstrates(snapshot);
     }
     coopLog(
       "resync",

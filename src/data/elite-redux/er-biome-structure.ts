@@ -167,6 +167,17 @@ export function erBiomeOverstayAnchor(): number | null {
   return overstayAnchorWave;
 }
 
+/**
+ * Co-op (#837): force the overstay anchor to the host's authoritative value WITHOUT touching the
+ * biome length / start wave (unlike {@linkcode restoreErBiomeStructure}, which is the full save/resume
+ * path). Used by the gated guest resync heal so a diverged overstay anchor - the ONE biome-structure
+ * blind spot the checksum now detects (audit Part 1 #2) - converges through the substrate's own setter,
+ * not a hand-rolled write. Additive: an older host omits the field and this is never called.
+ */
+export function setErBiomeOverstayAnchor(anchor: number | null | undefined): void {
+  overstayAnchorWave = typeof anchor === "number" && anchor > 0 ? Math.floor(anchor) : null;
+}
+
 /** The current biome's rolled length, or null if it is on the vanilla cadence. */
 export function getErBiomeLength(): number | null {
   return currentLength;

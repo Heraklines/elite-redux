@@ -25,7 +25,7 @@ import { getGameMode } from "#app/game-mode";
 import { globalScene } from "#app/global-scene";
 import { modifierTypes } from "#data/data-lists";
 import * as coopEngine from "#data/elite-redux/coop/coop-battle-engine";
-import { buildCoopEnemy } from "#data/elite-redux/coop/coop-enemy-builder";
+import { adoptCoopEnemiesStructural, buildCoopEnemy } from "#data/elite-redux/coop/coop-enemy-builder";
 import { CoopInteractionRelay, setCoopFaintSwitchWaitMs } from "#data/elite-redux/coop/coop-interaction-relay";
 import {
   clearCoopRuntime,
@@ -258,6 +258,46 @@ describe.skipIf(!RUN)("co-op GUEST = pure renderer - real engine (#633, TRACK-2 
     expect(globalScene.currentBattle.turn, "the finalize advances the guest's turn minimally (no hang)").toBe(turn + 1);
     const queuedTurnEnd = pushNewSpy.mock.calls.some(([name]) => name === "TurnEndPhase");
     expect(queuedTurnEnd, "the guest queues NO damaging TurnEndPhase (BUG1 deadlock fix)").toBe(false);
+  });
+
+  // #836 SPRITE FIDELITY: a STRUCTURALLY REBUILT adopted enemy (the ME-battle boot in
+  // CoopReplayMePhase.finishWithoutLeaving, a colosseum round boot, or a wave-start species
+  // mismatch) is a brand-new EnemyPokemon that never went through the encounter phase's asset load,
+  // and its summon (MysteryEncounterBattlePhase -> SummonPhase) does NOT load assets. Without kicking
+  // loadAssets on the rebuilt slot it renders the substitute-doll placeholder for the whole fight
+  // (the live "I just saw two SUBSTITUTES" report). adoptCoopEnemiesStructural now requests the real
+  // assets for every rebuilt slot; the #205 placeholder swaps to the real sprite on loadAssets complete.
+  it("SPRITE FIDELITY (#836): a structurally REBUILT adopted enemy requests its real sprite assets", async () => {
+    await startCoopGuest();
+    const battle = globalScene.currentBattle;
+    // The guest's current wild double is two MAGIKARP (the test override). Clear the enemy-species
+    // override so buildCoopEnemy's addEnemyPokemon honours the host's streamed species instead of
+    // being forced back to MAGIKARP by Overrides.ENEMY_SPECIES_OVERRIDE.
+    expect(battle.enemyParty[0].species.speciesId, "guest starts on its own MAGIKARP roll").toBe(SpeciesId.MAGIKARP);
+    game.override.enemySpecies(null);
+    const originalSlot0 = battle.enemyParty[0];
+
+    // Spy + neutralize the real asset I/O (headless has no atlas); we only assert the load was REQUESTED.
+    const loadAssetsSpy = vi.spyOn(EnemyPokemon.prototype, "loadAssets").mockResolvedValue(undefined);
+
+    // Model the host streaming a DIFFERENT species at enemy slot 0 (a mid-wave ME-spawned party the
+    // guest never rolled) so the structural adopt REBUILDS that slot via buildCoopEnemy - exactly the
+    // placeholder-doll path.
+    adoptCoopEnemiesStructural([
+      { fieldIndex: 0, data: { speciesId: SpeciesId.PIKACHU, level: 5 } },
+      { fieldIndex: 1, data: { speciesId: SpeciesId.MAGIKARP, level: 5 } },
+    ]);
+
+    // Slot 0 was rebuilt to the host's species (a brand-new EnemyPokemon, not the guest's local roll)...
+    const rebuilt = battle.enemyParty[0];
+    expect(rebuilt, "the mismatched slot was replaced by a freshly built mon").not.toBe(originalSlot0);
+    expect(rebuilt.species.speciesId, "the mismatched slot was rebuilt to the host's species").toBe(SpeciesId.PIKACHU);
+    // ...and its REAL sprite assets were requested on THIS rebuilt mon (the placeholder-doll swap is
+    // wired), so it can never sit on the substitute placeholder for the whole fight.
+    expect(
+      loadAssetsSpy.mock.instances.includes(rebuilt),
+      "the rebuilt enemy requested its real sprite assets (no permanent substitute doll)",
+    ).toBe(true);
   });
 
   it("ENEMY-FIELD RECONCILE (#633): a host-KOd enemy the guest still has ALIVE is removed + the checksum converges", async () => {

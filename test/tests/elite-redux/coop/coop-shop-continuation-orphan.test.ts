@@ -25,18 +25,28 @@
 import type { BattleScene } from "#app/battle-scene";
 import { globalScene, initGlobalScene } from "#app/global-scene";
 import { CoopInteractionRelay } from "#data/elite-redux/coop/coop-interaction-relay";
-import { clearCoopRuntime, getCoopController, startLocalCoopSession } from "#data/elite-redux/coop/coop-runtime";
+import {
+  clearCoopLearnMoveForwardInFlight,
+  clearCoopRuntime,
+  getCoopController,
+  getCoopInteractionRelay,
+  markCoopLearnMoveForwardInFlight,
+  startLocalCoopSession,
+} from "#data/elite-redux/coop/coop-runtime";
 import { CoopInteractionTurn } from "#data/elite-redux/coop/coop-session";
 import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
 import { LearnMoveType } from "#enums/learn-move-type";
 import { MoveId } from "#enums/move-id";
+import { UiMode } from "#enums/ui-mode";
 import { LearnMovePhase } from "#phases/learn-move-phase";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const flush = () => new Promise<void>(r => setTimeout(r, 0));
 
 // --- Fix 1 harness: a stub scene that records tryRemovePhase calls. --------------------------------
 const rec = { removed: [] as string[] };
+// #835 harness: capture the move-forget picker open + its finish callback (the human's forget-slot).
+const uiRec = { summaryOpened: 0, finish: null as ((moveIndex: number) => void) | null };
 
 function makeStubScene(): BattleScene {
   return {
@@ -52,6 +62,21 @@ function makeStubScene(): BattleScene {
         return true;
       },
       shiftPhase() {},
+    },
+    // #835: the guest-owned forget-picker renders via ui.setModeWithoutClear(SUMMARY, mon, LEARN_MOVE,
+    // move, finish). Capture that finish callback so the test can drive the human pick + assert the
+    // DEFERRED cleanup fires only then. setMode is a no-op thenable (the finish() end path).
+    ui: {
+      setModeWithoutClear(mode: UiMode, ..._rest: unknown[]): Promise<boolean> {
+        if (mode === UiMode.SUMMARY) {
+          uiRec.summaryOpened++;
+          uiRec.finish = _rest[3] as (moveIndex: number) => void; // [pokemon, summaryMode, move, finish]
+        }
+        return Promise.resolve(true);
+      },
+      setMode(): Promise<boolean> {
+        return Promise.resolve(true);
+      },
     },
   } as unknown as BattleScene;
 }
@@ -221,5 +246,126 @@ describe("#698 stale-reward-shop softlock - continuation-copy orphan + resync re
 
     // STICKY: a re-park on the same orphaned seq also resolves null at once.
     expect(await watcher.awaitInteractionChoice(8)).toBeNull();
+  });
+});
+
+// =====================================================================================================
+// #835 CROSS-OWNERSHIP TM-learn softlock: the reward-shop PICK owner (who buys the TM) is NOT the mon's
+// owner (who chooses which move to forget). The shop applies the reward on BOTH clients, so the GUEST
+// gets a REAL LearnMovePhase for a guest-owned FULL-moveset mon. Pre-#835 the guest branch immediately
+// removed the continuation copy + advanced the counter + ended, and its forget-picker came ONLY from a
+// DETACHED overlay (#787) that no phase kept alive -> a following setMode tore it off, the guest never
+// relayed a forget-index, and the host's forwarded await stranded (the "other person stays in the
+// selection screen" report). Fix: the guest renders the picker from THIS queue-protected phase and
+// DEFERS the copy-removal + advance until the pick settles. These engine-free tests drive the guest
+// branch directly over a real authoritative-guest relay and assert: (1) the guest OWNER of the mon
+// renders the picker (single renderer, listener suppressed), the cleanup is DEFERRED to the pick, and
+// the forget-index is relayed on the disjoint 9_100_000+slot channel; (2) a HOST-owned mon still takes
+// the immediate no-op cleanup (the guest drives NO picker - the host does).
+// =====================================================================================================
+
+const COOP_LEARN_MOVE_FWD_SEQ_BASE = 9_100_000; // mirrors src/phases/learn-move-phase.ts (kept local)
+
+/** Build a slot-N LearnMovePhase; track whether end() ran (the finish path calls it last). */
+function makeSlotLearnMovePhase(
+  slot: number,
+  learnMoveType: LearnMoveType,
+  cost: number,
+): { phase: LearnMovePhase; ended: () => boolean } {
+  const phase = new LearnMovePhase(slot, MoveId.SWORDS_DANCE, learnMoveType, cost);
+  let ended = false;
+  (phase as unknown as Record<string, () => void>).end = () => {
+    ended = true;
+  };
+  return { phase, ended: () => ended };
+}
+
+/** Drive the private guest dispatch with a FULL-moveset mon of the given coopOwner. */
+function driveGuestFullLearnMove(phase: LearnMovePhase, owner: "host" | "guest"): void {
+  const pokemon = {
+    coopOwner: owner,
+    getMaxMoveCount: () => 4,
+    moveset: [{}, {}, {}, {}],
+  };
+  const move = { id: MoveId.SWORDS_DANCE, name: "Swords Dance" };
+  const fn = (phase as unknown as Record<string, (...args: unknown[]) => void>).coopAuthoritativeLearnMove;
+  fn.call(phase, pokemon.moveset, move, pokemon);
+}
+
+describe("#835 cross-ownership TM-learn softlock - guest-owned mon renders + defers, host-owned defers to host", () => {
+  let prevGlobalScene: BattleScene;
+
+  beforeEach(() => {
+    prevGlobalScene = globalScene;
+    rec.removed = [];
+    uiRec.summaryOpened = 0;
+    uiRec.finish = null;
+    initGlobalScene(makeStubScene());
+  });
+
+  afterEach(() => {
+    clearCoopRuntime();
+    initGlobalScene(prevGlobalScene);
+  });
+
+  it("GUEST-owned full-moveset mon: the guest RENDERS the forget-picker, DEFERS cleanup, relays the pick on 9_100_000+slot", async () => {
+    startAuthoritativeGuestSession();
+    const relay = getCoopInteractionRelay();
+    if (relay == null) {
+      throw new Error("expected a live interaction relay");
+    }
+    const sendSpy = vi.spyOn(relay, "sendInteractionChoice");
+    const SLOT = 1;
+    const { phase, ended } = makeSlotLearnMovePhase(SLOT, LearnMoveType.TM, -1);
+
+    driveGuestFullLearnMove(phase, "guest");
+
+    // The picker OPENED once (this queue-protected phase is the sole renderer, not a detached overlay).
+    expect(uiRec.summaryOpened, "the guest opened the move-forget picker exactly once").toBe(1);
+    expect(uiRec.finish, "the picker exposed a finish callback").not.toBeNull();
+    // The listener is SUPPRESSED: the slot is already in-flight (a duplicate learnMoveForward short-circuits).
+    expect(markCoopLearnMoveForwardInFlight(SLOT), "the slot is already marked in-flight (single renderer)").toBe(
+      false,
+    );
+    // DEFERRED: nothing committed yet - the continuation copy is still queued + no pick relayed + not ended.
+    expect(rec.removed, "the continuation copy is NOT removed before the pick").not.toContain("SelectModifierPhase");
+    expect(sendSpy, "no forget-index relayed before the human picks").not.toHaveBeenCalled();
+    expect(ended(), "the phase stays alive (queue-protected) until the pick").toBe(false);
+
+    // The human picks forget-slot 0 -> the deferred commit fires.
+    uiRec.finish?.(0);
+    await flush();
+
+    // The forget-index is relayed to the host on the disjoint per-slot channel (the host's forwarded await).
+    expect(sendSpy, "the guest relayed the forget-pick to the host").toHaveBeenCalledWith(
+      COOP_LEARN_MOVE_FWD_SEQ_BASE + SLOT,
+      "learnMove",
+      0,
+    );
+    // AND only now is the continuation copy removed (commit) + the phase ended.
+    expect(rec.removed, "the continuation copy is removed AFTER the pick (deferred commit)").toContain(
+      "SelectModifierPhase",
+    );
+    expect(ended(), "the phase ends after the pick settles").toBe(true);
+    sendSpy.mockRestore();
+  });
+
+  it("HOST-owned full-moveset mon: the guest opens NO picker + takes the immediate no-op cleanup (the host drives)", () => {
+    startAuthoritativeGuestSession();
+    const SLOT = 0;
+    const { phase, ended } = makeSlotLearnMovePhase(SLOT, LearnMoveType.TM, -1);
+
+    driveGuestFullLearnMove(phase, "host");
+
+    // The guest does NOT drive a picker for a host-owned mon (the host's own LearnMovePhase does).
+    expect(uiRec.summaryOpened, "no guest picker for a host-owned mon").toBe(0);
+    // Immediate cleanup path (unchanged #698 behavior): continuation copy removed + phase ended now.
+    expect(rec.removed, "host-owned mon still removes the continuation copy immediately").toContain(
+      "SelectModifierPhase",
+    );
+    expect(ended(), "the guest no-op phase ends immediately for a host-owned mon").toBe(true);
+    // The slot is NOT claimed in-flight (the guest is not the renderer here).
+    expect(markCoopLearnMoveForwardInFlight(SLOT), "host-owned: guest did not claim the slot").toBe(true);
+    clearCoopLearnMoveForwardInFlight(SLOT);
   });
 });

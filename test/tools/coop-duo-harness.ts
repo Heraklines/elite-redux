@@ -83,12 +83,19 @@ import {
 } from "#data/elite-redux/coop/coop-runtime";
 import { COOP_GUEST_FIELD_INDEX, COOP_HOST_FIELD_INDEX } from "#data/elite-redux/coop/coop-session";
 import { type CoopTransport, createLoopbackPair, type SerializedCommand } from "#data/elite-redux/coop/coop-transport";
+import { erBiomeOverstayAnchor, setErBiomeOverstayAnchor } from "#data/elite-redux/er-biome-structure";
 import {
   type ErGhostRunStateSnapshot,
   emptyErGhostRunStateSnapshot,
   restoreErGhostRunState,
   snapshotErGhostRunState,
 } from "#data/elite-redux/er-ghost-teams";
+import { getErMoneyStreakEntries, restoreErMoneyStreaks } from "#data/elite-redux/er-money-streak";
+import {
+  type ErRelicBattleStateData,
+  getErRelicBattleState,
+  restoreErRelicBattleState,
+} from "#data/elite-redux/er-relic-battle-state";
 import type { ReplayCommandEvent, ReplayTrace } from "#data/elite-redux/replay-trace";
 import { isReplayCommandEvent, isReplayInteractionEvent, validateReplayTrace } from "#data/elite-redux/replay-trace";
 import { BattleType } from "#enums/battle-type";
@@ -172,6 +179,14 @@ export interface ClientCtx {
   /** The er-ghost per-run cache for this client (save/restore around the swap). */
   ghost: ReturnType<typeof snapshotGhostState>;
   /**
+   * The ER module-let substrates for THIS client (#837): money-streak map / overstay anchor / relic
+   * lists. Save/restore around the swap exactly like `ghost` + `rndState`, so each engine keeps its own
+   * (production has one process per client) and a genuine module-let divergence is reproducible + healable.
+   * Optional (like `mePins`): only READ when {@linkcode setCoopHarnessModuleLetIsolation} is enabled, and
+   * seeded lazily on the first isolated swap, so ctxs built as bare literals need not provide it.
+   */
+  moduleLets?: CoopModuleLetSnapshot;
+  /**
    * The 3 mystery-encounter pins for THIS client (save/restore around the swap; idle off-ME).
    * Optional: ctxs that never reach an ME (the wave/shop spike tests) omit it and the swap treats
    * them as idle; an ME-driving ctx carries the live pins so the host's and guest's never bleed.
@@ -192,6 +207,34 @@ export interface ClientCtx {
 // (coopGhostFetchSuppressed / onGhostPoolPublished) are ROLE-GATED per client by installCoopRuntimeGhostHooks
 // in the swap (they are last-write-wins process-globals the guest would otherwise own for BOTH engines).
 // ---------------------------------------------------------------------------
+/**
+ * The ER MODULE-LET substrates (#837) that are PROCESS-GLOBAL (money-streak `STREAKS`, biome overstay
+ * anchor, per-battle relic lists) and therefore SHARED between the two engines in one process unless
+ * swapped per client - the same class as the ME pins / ghost cache. Carrying them in the ClientCtx makes
+ * the harness FAITHFUL for the substrates the #837 saveDataDigest now detects: each engine advances its
+ * OWN streak map (real production has one process per client), so a genuine host-vs-guest module-let
+ * divergence can be reproduced + healed here instead of collapsing onto a shared map.
+ */
+interface CoopModuleLetSnapshot {
+  moneyStreaks: [number, number][];
+  overstayAnchor: number | null;
+  relic: ErRelicBattleStateData;
+}
+
+function snapshotModuleLets(): CoopModuleLetSnapshot {
+  return {
+    moneyStreaks: getErMoneyStreakEntries(),
+    overstayAnchor: erBiomeOverstayAnchor(),
+    relic: getErRelicBattleState(),
+  };
+}
+
+function restoreModuleLets(s: CoopModuleLetSnapshot): void {
+  restoreErMoneyStreaks(s.moneyStreaks);
+  setErBiomeOverstayAnchor(s.overstayAnchor);
+  restoreErRelicBattleState(s.relic);
+}
+
 function snapshotGhostState(): ErGhostRunStateSnapshot {
   return snapshotErGhostRunState();
 }
@@ -220,6 +263,23 @@ export function setCoopHarnessLiveEvents(on: boolean): void {
 }
 
 /**
+ * Whether the ER MODULE-LET substrates (money-streak / overstay anchor / relic lists) are ISOLATED
+ * per client in the swap (#837). OFF by default: those process-globals stay SHARED between the two
+ * engines (the pre-#837 behavior), so the existing wave-loop / reward-shop / mystery tests are
+ * byte-identical - crucially the harness guest's replay drive does NOT run BattleEndPhase's
+ * advanceErMoneyStreaks, so with isolation ON the guest streak would trail the host and manufacture a
+ * digest divergence those tests don't expect. A #837 divergence-and-heal test that manually drives two
+ * DIFFERENT module-let states calls {@linkcode setCoopHarnessModuleLetIsolation}(true) to get faithful
+ * per-client isolation (production has one process per client).
+ */
+let coopHarnessModuleLetIsolation = false;
+
+/** Enable/disable per-client ER module-let isolation for the duo swap (#837). Default OFF (shared). */
+export function setCoopHarnessModuleLetIsolation(on: boolean): void {
+  coopHarnessModuleLetIsolation = on;
+}
+
+/**
  * Install the swapped-in runtime's ROLE-GATED process hooks: the GHOST-pool publisher/suppression ALWAYS
  * (a correctness fix - the guest must own suppression, the host the publisher), and the LIVE-event emitter
  * ONLY when the harness has opted in ({@linkcode setCoopHarnessLiveEvents}). See those functions for why.
@@ -237,6 +297,7 @@ function captureLiveCtx(): {
   runtime: CoopRuntime | null;
   rndState: string;
   ghost: ErGhostRunStateSnapshot;
+  moduleLets: CoopModuleLetSnapshot;
   mePins: MePins;
 } {
   return {
@@ -244,6 +305,8 @@ function captureLiveCtx(): {
     runtime: getCoopRuntime(),
     rndState: Phaser.Math.RND.state(),
     ghost: snapshotGhostState(),
+    // Snapshot the module-lets so the prev-restore is faithful when isolation is ON; harmless when OFF.
+    moduleLets: snapshotModuleLets(),
     mePins: readMePins(),
   };
 }
@@ -274,13 +337,18 @@ export function withClientSync<T>(ctx: ClientCtx, fn: () => T): T {
   installCoopHooksForActive(ctx.runtime);
   Phaser.Math.RND.state(ctx.rndState);
   restoreGhostState(ctx.ghost);
+  if (coopHarnessModuleLetIsolation && ctx.moduleLets !== undefined) {
+    restoreModuleLets(ctx.moduleLets);
+  }
   writeMePins(ctx.mePins ?? IDLE_ME_PINS);
   try {
     return fn();
   } finally {
     ctx.rndState = Phaser.Math.RND.state();
     ctx.ghost = snapshotGhostState();
-    ctx.mePins = readMePins();
+    if (coopHarnessModuleLetIsolation) {
+      ctx.moduleLets = snapshotModuleLets();
+    }
     initGlobalScene(prev.scene);
     if (prev.runtime != null) {
       setCoopRuntime(prev.runtime);
@@ -288,6 +356,9 @@ export function withClientSync<T>(ctx: ClientCtx, fn: () => T): T {
     }
     Phaser.Math.RND.state(prev.rndState);
     restoreGhostState(prev.ghost);
+    if (coopHarnessModuleLetIsolation) {
+      restoreModuleLets(prev.moduleLets);
+    }
     writeMePins(prev.mePins);
     activeClientLabel = prevLabel;
   }
@@ -310,14 +381,22 @@ export async function withClient<T>(ctx: ClientCtx, fn: () => T | Promise<T>): P
   Phaser.Math.RND.state(ctx.rndState);
   // 4. er-ghost per-run cache
   restoreGhostState(ctx.ghost);
+  // 4b. ER module-let substrates (#837): money-streak / overstay anchor / relic lists. Gated on the
+  //     opt-in isolation flag (default OFF = shared, pre-#837 behavior); ON = faithful per-client state.
+  if (coopHarnessModuleLetIsolation && ctx.moduleLets !== undefined) {
+    restoreModuleLets(ctx.moduleLets);
+  }
   // 5. mystery-encounter pins (start / battleCounter / presentation)
   writeMePins(ctx.mePins ?? IDLE_ME_PINS);
   try {
     return await fn();
   } finally {
-    // Persist THIS client's mutated RND cursor + ghost cache + ME pins back into its ctx, then restore prev.
+    // Persist THIS client's mutated RND cursor + ghost cache + module-lets + ME pins into its ctx, restore prev.
     ctx.rndState = Phaser.Math.RND.state();
     ctx.ghost = snapshotGhostState();
+    if (coopHarnessModuleLetIsolation) {
+      ctx.moduleLets = snapshotModuleLets();
+    }
     ctx.mePins = readMePins();
     initGlobalScene(prev.scene);
     if (prev.runtime != null) {
@@ -326,6 +405,9 @@ export async function withClient<T>(ctx: ClientCtx, fn: () => T | Promise<T>): P
     }
     Phaser.Math.RND.state(prev.rndState);
     restoreGhostState(prev.ghost);
+    if (coopHarnessModuleLetIsolation) {
+      restoreModuleLets(prev.moduleLets);
+    }
     writeMePins(prev.mePins);
     activeClientLabel = prevLabel;
   }
@@ -727,6 +809,9 @@ export async function buildDuo(
     runtime: hostRuntime,
     rndState: Phaser.Math.RND.state(),
     ghost: snapshotGhostState(),
+    // #837: seed both ctxs from the host's current module-let state (the launch mirror), so each engine
+    // starts identical and thereafter keeps its OWN money-streak / overstay / relic state.
+    moduleLets: snapshotModuleLets(),
     mePins: { ...IDLE_ME_PINS },
   };
 
@@ -738,6 +823,7 @@ export async function buildDuo(
     runtime: guestRuntime,
     rndState: Phaser.Math.RND.state(),
     ghost: emptyGhostSnapshot(),
+    moduleLets: snapshotModuleLets(),
     mePins: { ...IDLE_ME_PINS },
   };
   await withClient(guestCtx, () => {
@@ -1236,6 +1322,9 @@ export async function buildDuoForMe(
     runtime: hostRuntime,
     rndState: Phaser.Math.RND.state(),
     ghost: snapshotGhostState(),
+    // #837: seed both ctxs from the host's current module-let state (the launch mirror), so each engine
+    // starts identical and thereafter keeps its OWN money-streak / overstay / relic state.
+    moduleLets: snapshotModuleLets(),
     mePins: { ...IDLE_ME_PINS },
   };
 
@@ -1247,6 +1336,7 @@ export async function buildDuoForMe(
     runtime: guestRuntime,
     rndState: Phaser.Math.RND.state(),
     ghost: emptyGhostSnapshot(),
+    moduleLets: snapshotModuleLets(),
     mePins: { ...IDLE_ME_PINS },
   };
   await withClient(guestCtx, () => {
