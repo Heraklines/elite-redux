@@ -110,7 +110,6 @@ import { Button } from "#enums/buttons";
 import { Command } from "#enums/command";
 import { GameModes } from "#enums/game-modes";
 import type { MysteryEncounterType } from "#enums/mystery-encounter-type";
-import { TrainerSlot } from "#enums/trainer-slot";
 import { UiMode } from "#enums/ui-mode";
 import { WeatherType } from "#enums/weather-type";
 import { EnemyPokemon, PlayerPokemon, type Pokemon } from "#field/pokemon";
@@ -587,6 +586,15 @@ function adoptCoopHostRunConfig(hostScene: BattleScene, guestScene: BattleScene)
  * called inside `withClient(guestCtx, ...)` so globalScene is the guest scene (PokemonData.toPokemon /
  * addPlayerPokemon build under the live globalScene).
  *
+ * TRAINER-AWARE (#846): the assembled {@linkcode Battle} carries the host's `battleType` + `trainer`
+ * (so a FIXED rival/evil-team or a RANDOM trainer wave rebuilds with the host's trainer identity /
+ * variant), and every enemy is rebuilt from the FULL host enemy party (`getEnemyParty()` - on-field
+ * leads AND off-field bench) keyed to the host's authoritative `trainerSlot`. This parallels
+ * production's own reconstruction (`adoptCoopEnemiesStructural` in coop-enemy-builder.ts, which rebuilds
+ * the streamed party verbatim under `TrainerSlot.TRAINER`), so harness trainer-wave fidelity equals the
+ * live `enemyPartySync` adopt: the guest is checksum-identical on the on-field enemies AND holds the same
+ * benched reserve pool, so the trainer's post-KO send-out reconstructs the SAME next mon on both engines.
+ *
  * Returns nothing; mutates the guest scene's party / currentBattle / arena / field.
  */
 export function mirrorHostBattleToGuest(hostScene: BattleScene, guestScene: BattleScene): void {
@@ -669,7 +677,16 @@ export function mirrorHostBattleToGuest(hostScene: BattleScene, guestScene: Batt
     const enemy = new EnemyPokemon(
       getPokemonSpecies(hostEnemy.species.speciesId),
       hostEnemy.level,
-      TrainerSlot.NONE,
+      // TRAINER-AWARE mirror: carry the host enemy's AUTHORITATIVE trainerSlot verbatim (was hardcoded
+      // TrainerSlot.NONE, a wild-only mirror). On a TRAINER wave the host's party-gen keys each mon to
+      // TrainerSlot.TRAINER / TRAINER_PARTNER (trainer.ts genPartyMember, alternating for a variant
+      // double); a wild wave is TrainerSlot.NONE on every slot. Copying the host's value (never
+      // recomputing from the guest's diverged RNG) makes the guest enemy byte-identical in that field and
+      // gives the variant-double SLOT GATING (getPartyMemberMatchupScores / getNextSummonIndex filter
+      // benched reserves by trainerSlot) the same reserve pool the host has, so the enemy-switch machinery
+      // (a trainer sending its next mon after a KO) reconstructs the RIGHT bench mon on-field, which the
+      // per-turn checkpoint then reconciles into the guest's on-field checksum.
+      hostEnemy.trainerSlot,
       false,
       false,
       data,

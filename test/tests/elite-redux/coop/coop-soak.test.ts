@@ -85,14 +85,15 @@ describe.skipIf(!RUN)("NIGHTLY co-op SOAK: seeded randomized two-engine run (#84
       // LOUD, skip-counted limitation (the driver records a `mysteryEncounterDisabledV1` skip), NOT a
       // silent omission; the follow-up plan to drive MEs randomly is in the report. Do NOT treat this as
       // adequate - it is the single biggest coverage gap.
-      .mysteryEncounterChance(0)
-      // 🔴 V1 COVERAGE GAP #2 (see the driver's `trainerWavesDisabledV1` skip + the report): TRAINER waves
-      // are OFF. mirrorHostBattleToGuest rebuilds a WILD enemy party (TrainerSlot.NONE, no trainer object /
-      // variant-driven bench / enemy switch machinery), so a mid-soak trainer wave would mirror a
-      // structurally wrong battle onto the guest. This is a LOUD, skip-counted, documented gap (NOT a
-      // silent override); the follow-up plan (a trainer-aware mirror carrying the trainer + full bench) is
-      // in the report. Enabling it needs the harness mirror to gain trainer-battle rebuild first.
-      .disableTrainerWaves();
+      .mysteryEncounterChance(0);
+    // TRAINER WAVES ARE ON (#846). The harness mirror (mirrorHostBattleToGuest) is now TRAINER-AWARE: it
+    // rebuilds the guest battle with the host's trainer identity + the FULL enemy party (bench included)
+    // keyed to the host's authoritative trainerSlot, so a RANDOM (rolled) trainer wave mirrors faithfully
+    // and is surveyed under the full DIGEST / LOCKSTEP / NO-PARK / TEARDOWN invariants exactly like a wild
+    // wave. `.disableTrainerWaves()` (which set DISABLE_STANDARD_TRAINERS_OVERRIDE) is REMOVED, so random
+    // trainer waves roll on the usual cadence alongside the fixed rival / evil-team battles that already
+    // ran. The driver's `trainerWavesDisabledV1` skip counter is gone with it. MEs stay OFF (GAP #1 above,
+    // a separate follow-up); trainer waves are no longer an excluded class.
   });
 
   afterEach(() => {
@@ -136,6 +137,7 @@ describe.skipIf(!RUN)("NIGHTLY co-op SOAK: seeded randomized two-engine run (#84
     console.log(
       `[coop-soak] DONE seed=${seed} waves=${result.wavesCompleted}/${result.wavesRequested} `
         + `resyncHeals=${result.resyncHeals} findings=${result.findings.length} `
+        + `trainerWaves=${result.trainerWaves.total} (fixed=${result.trainerWaves.fixed} random=${result.trainerWaves.random}) `
         + `skips=${JSON.stringify(result.skips)} elapsedMs=${elapsedMs}`,
     );
     for (const f of result.findings) {
@@ -145,8 +147,36 @@ describe.skipIf(!RUN)("NIGHTLY co-op SOAK: seeded randomized two-engine run (#84
       );
     }
 
-    // The run surveyed every requested wave (no hard strand short-circuited it).
-    expect(result.wavesCompleted, "soak surveyed every requested wave").toBe(waves);
+    // #846 TERMINAL run-end: the host run can END mid-soak (a party WIPE on the evil-team fixed-trainer
+    // gauntlet -> GameOver -> Title). The driver detects it and stops the survey LOUDLY (a counted terminal
+    // outcome), NEVER a NO-PARK strand. A run-end is honest + acceptable (the survey covered every wave up
+    // to it under all four invariants); it is reported here so a coordinator can decide whether the wipe is
+    // a content-reality note (real-run heals fire but the level edge still loses to the gauntlet) or a
+    // fidelity gap. The PRIMARY DIGEST gate below still applies to the surveyed waves.
+    if (result.runEnded == null) {
+      // No terminal: the run surveyed every requested wave (no hard strand short-circuited it).
+      expect(result.wavesCompleted, "soak surveyed every requested wave").toBe(waves);
+    } else {
+      // eslint-disable-next-line no-console
+      console.log(
+        `[coop-soak] RUN ENDED at wave ${result.runEnded.wave} (seed ${seed}): ${result.runEnded.reason}. `
+          + `Surveyed ${result.wavesCompleted}/${waves} waves under all invariants before the terminal.`,
+      );
+      // The survey ended EARLY at a real terminal - it must have stopped before the last wave.
+      expect(result.wavesCompleted, "run-end stopped before the full requested count").toBeLessThan(waves);
+      // COVERAGE FLOOR (anti-narrowing): a run-end is only an acceptable terminal if the run got DEEP
+      // enough that the wipe is plausibly the level-85 ceiling losing to the late gauntlet - NOT a
+      // regression that weakened the party into an early wipe. A run-end below the proven-survivable
+      // baseline (SOAK_WAVES=30 completes clean at level 85 on multiple seeds) is a RED, not a silent
+      // green with reduced coverage. Floor = min(requested, 30) so a deliberately tiny run isn't false-red.
+      const coverageFloor = Math.min(waves, 30);
+      expect(
+        result.wavesCompleted,
+        `run-end at wave ${result.runEnded.wave} surveyed only ${result.wavesCompleted} waves - below the `
+          + `proven-survivable floor of ${coverageFloor} (a party this weak this early is a regression, `
+          + `not the late-game level ceiling; replay SOAK_SEED=${seed})`,
+      ).toBeGreaterThanOrEqual(coverageFloor);
+    }
     // THE PRIMARY GATE: the soak found NO unhealed host-vs-guest DIGEST desync. A finding here is the
     // machine doing its job - a REAL co-op divergence the resync did not converge; it is surfaced above +
     // written to dev-logs/coop-soak/<...>/ with a replayable seed. This assertion is a FAITHFUL red on a

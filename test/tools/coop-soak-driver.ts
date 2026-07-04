@@ -56,6 +56,7 @@
 import type { BattleScene } from "#app/battle-scene";
 import { getGameMode } from "#app/game-mode";
 import {
+  adoptCoopHostPlayerPartyOrder,
   applyCoopFieldSnapshot,
   captureCoopChecksum,
   captureCoopChecksumState,
@@ -220,6 +221,20 @@ export interface SoakResult {
   boundaryDigests: SoakBoundaryDigest[];
   /** REAL host-vs-guest desyncs the one-heal resync did not converge (the soak's findings; empty = clean). */
   findings: SoakFinding[];
+  /**
+   * TERMINAL run-end (#846): set when the HOST run ENDED mid-soak (a party WIPE -> GameOverPhase ->
+   * TitlePhase) instead of surveying every requested wave. A wipe is a LOUD, COUNTED terminal outcome (the
+   * survey ends honestly at `wave`), NEVER a NO-PARK strand - the driver detects the host's game-over/Title
+   * transition and stops instead of hanging a phaseInterceptor.to() against a run that is over. Undefined =
+   * the run surveyed every requested wave.
+   */
+  runEnded?: { wave: number; reason: string } | undefined;
+  /**
+   * How many surveyed waves were TRAINER battles (#846) - fixed rival/evil-team AND random rolled trainers.
+   * Reported so a run's trainer coverage is visible (a seed that rolls zero random trainers still logs the
+   * fixed rival waves it crossed). Split into fixed vs random by whether the wave is a gameMode fixed battle.
+   */
+  trainerWaves: { total: number; fixed: number; random: number };
 }
 
 /** Options for a single soak run. */
@@ -447,6 +462,36 @@ export function hostOwnedFaintPending(rig: DuoRig): boolean {
   return rig.hostScene.getPlayerField().some(m => m.isFainted() && m.coopOwner === "host");
 }
 
+/** Terminal host phases: the run has ENDED (a wipe -> GameOver -> Title), so no battle can be driven. */
+const HOST_RUN_END_PHASES = new Set(["GameOverPhase", "TitlePhase"]);
+
+/**
+ * DETECT a mid-soak host RUN-END (#846): the host party WIPED (all mons fainted), or the host has
+ * transitioned to a terminal phase (GameOverPhase -> TitlePhase), or its currentBattle is gone. When true
+ * the soak must STOP surveying and record a terminal outcome - never drive another phaseInterceptor.to()
+ * (which would hang against a run that is over and mis-surface as a NO-PARK strand). Reads rig.hostScene
+ * directly, so it is owner-ctx-independent. Returns a reason string (for the terminal outcome) or null.
+ *
+ * The evil-team fixed-trainer gauntlet (waves 62/64/66) at the soak's level edge with NO shop healing was
+ * the concrete wipe class this closes (CI run 28710818213, seed 20260704, wave 66). A wipe is EXPECTED to
+ * be rare (the soak's premise is a winnable level edge + the real every-10-wave PartyHealPhase firing on
+ * the host's wave crossings); when it happens it is reported LOUDLY with the wave, not hidden as a strand.
+ */
+export function hostRunEndReason(rig: DuoRig): string | null {
+  const phaseName = rig.hostScene.phaseManager.getCurrentPhase()?.phaseName ?? "";
+  if (HOST_RUN_END_PHASES.has(phaseName)) {
+    return `host at terminal phase ${phaseName}`;
+  }
+  if (rig.hostScene.currentBattle == null) {
+    return "host currentBattle is null (run torn down)";
+  }
+  const party = rig.hostScene.getPlayerParty();
+  if (party.length > 0 && party.every(m => m.isFainted())) {
+    return "host player party WIPED (all mons fainted)";
+  }
+  return null;
+}
+
 /**
  * Register a one-shot HOST faint auto-picker for the imminent turn: when a HOST-owned mon faints and the
  * host's real SwitchPhase opens the PARTY picker, send out the first legal host-owned bench mon. (A
@@ -596,6 +641,7 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
   const findings: SoakFinding[] = [];
   let resyncHeals = 0;
   let wavesCompleted = 0;
+  const trainerWaves = { total: 0, fixed: 0, random: 0 };
 
   const bumpSkip = (kind: string): void => {
     skips[kind] = (skips[kind] ?? 0) + 1;
@@ -613,18 +659,24 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
     game.scene.setSeed(opts.pinSeed);
   }
 
-  // 🔴 V1 COVERAGE NOTE #2 (loud + counted): the caller sets .disableTrainerWaves(), which ONLY suppresses
-  // RANDOM (rolled) trainer waves - it sets DISABLE_STANDARD_TRAINERS_OVERRIDE, which gates only
-  // handleNonFixedBattle. FIXED battles - the rival waves (8/25/55/95/145/195) and the evil-team
-  // grunts/admins/bosses + E4/champion (35/62/64/66/...) - are resolved by BattleScene.newBattle BEFORE and
-  // INDEPENDENT of that override (handleFixedBattle, battle-scene.ts), so they STILL run mid-soak and ARE
-  // surveyed here: the harness mirror rebuilds the guest enemy from the host enemyParty snapshot, which holds
-  // up (fixed trainer waves cross green with byte-equal digests in local runs). Those tougher fixed waves are
-  // exactly where a HOST-owned mon actually faints, which is what exposed the #845 host-faint drive strand.
-  // What is NOT yet driven is a FAITHFUL trainer-aware mirror (the trainer object, the full off-field bench,
-  // trainerSlot keying, the enemy-switch machinery). See the report's TRAINER-AWARE-MIRROR HANDOFF. Counted
-  // so the report is honest that RANDOM trainer waves are the only class actually excluded.
-  bumpSkip("trainerWavesDisabledV1");
+  // TRAINER WAVES ARE SURVEYED (#846). Both FIXED trainer battles (rivals 8/25/55/95/145/195, evil-team
+  // grunts/admins/bosses + E4/champion) AND RANDOM (rolled) trainer waves now run: the caller NO LONGER sets
+  // .disableTrainerWaves(), and the harness mirror (mirrorHostBattleToGuest) is TRAINER-AWARE - it rebuilds
+  // the guest with the host trainer identity + the FULL enemy party (bench included) keyed to the host's
+  // authoritative trainerSlot, so a trainer wave mirrors faithfully and the enemy-switch machinery (the
+  // trainer sending its next mon after a KO) reconstructs the SAME bench mon on-field, reconciled by the
+  // per-turn checkpoint. The trainer VICTORY reward tail's interaction-counter semantics SPLIT by wave (the
+  // #846 directive's question): a NON-milestone trainer wave queues a normal owner/watcher SelectModifierPhase
+  // (+1 counter, driven by processNormalWave, money host-authoritative + guest lags benignly), but a %10
+  // MILESTONE trainer wave AUTO-GRANTS via MoneyRewardPhase + ModifierRewardPhase with queuesSelectModifier
+  // =false (counter +0, EXACTLY like a boss) - so the wave loop routes ALL %10 waves through processBossWave
+  // (see the bossWave detection below), never asserting a +1 shop advance a milestone trainer never makes.
+  // Trainer intro dialogue is auto-skipped by the framework (coopVictoryDialogueDecision force-skips it in
+  // co-op; the headless host never opens it).
+  // GHOST trainer waves (er-ghost-waves: elite 87+, hell/mystery 63+) need the network ghost-pool prefetch,
+  // which the harness SUPPRESSES - with an empty pool applyErGhostOverride returns null so the wave degrades
+  // to a normal trainer (no fetch, no hang); a ghost-flagged team is never fielded here. That is the only
+  // trainer sub-class not exercised, and it degrades safely rather than being a silent gap.
 
   // Stand up the two-engine rig over one loopback pair (host owns EVEN interaction counters, guest ODD).
   const pair = createLoopbackPair();
@@ -647,9 +699,18 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
     // #843 coverage #4: occasionally issue a VOLUNTARY SWITCH for the guest slot instead of a move, through
     // the REAL relay Command path (Command.POKEMON + party-slot cursor); the host summons the guest's pick
     // and the switch rides the per-turn checkpoint onto the guest's replay. Only when a legal guest-owned
-    // bench mon exists; else fall through to a move.
+    // bench mon exists AND the mon is NOT TRAPPED (#846: a trainer enemy's Shadow Tag / Arena Trap / trapping
+    // move / Fairy Lock / ER FEAR makes the switch ILLEGAL - the real command menu greys out the POKEMON
+    // option, so issuing Command.POKEMON for a trapped mon soft-locks the command resolution; isTrapped is
+    // the exact gate the menu uses). Else fall through to a move.
+    const guestSwitchMon = rig.hostScene.getPlayerField()[COOP_GUEST_FIELD_INDEX];
     const benchSlot = firstLegalBenchSlot(rig.hostScene, "guest");
-    if (switchesThisTurn(seed, wave, turn, GUEST_SWITCH_SALT) && benchSlot >= 0) {
+    if (
+      switchesThisTurn(seed, wave, turn, GUEST_SWITCH_SALT)
+      && benchSlot >= 0
+      && guestSwitchMon != null
+      && !guestSwitchMon.isTrapped()
+    ) {
       actionScript.push(`wave ${wave} turn ${turn}: guest SWITCH -> party[${benchSlot}]`);
       return { command: Command.POKEMON, cursor: benchSlot };
     }
@@ -831,13 +892,24 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
    * wave (applying the per-turn checkpoint), its full state must EQUAL the host's WITHOUT a re-mirror (a
    * re-mirror would mask a replay desync by resetting the guest to the host). This is where a checkpoint /
    * replay divergence surfaces (the class that surfaced the historical move-PP desync). The one-heal is the
-   * production per-turn full-field resync ({@linkcode applyCoopFieldSnapshot}); a still-diverged state is a
-   * REAL desync the per-turn resync did not converge -> recorded as a finding.
+   * production resync analogue: the per-turn full-field snapshot ({@linkcode applyCoopFieldSnapshot}) PLUS the
+   * bench party-ORDER adopt ({@linkcode adoptCoopHostPlayerPartyOrder}). #846: the field snapshot alone heals
+   * only ON-FIELD mons, so a BENCH transposition (host and guest promoted faint-replacements from the bench in
+   * a different order on a faint-heavy trainer gauntlet - seed 20260704 wave 66) stayed diverged and mis-read
+   * as a REAL finding; production's actual resync (applyCoopFullSnapshot) ALSO runs adoptCoopHostPlayerPartyOrder
+   * (coop-battle-engine.ts), which reorders ONLY the off-field bench to the host's speciesId sequence (on-field
+   * leads pinned). Running the SAME production heal here makes the one-heal a faithful resync analogue - NOT
+   * content narrowing (it is a real production heal mechanism) - so only a divergence production's resync ALSO
+   * cannot converge is recorded as a finding. A still-diverged state after this is a REAL desync -> a finding.
    */
   const assertPostTurnConverged = async (wave: number): Promise<void> => {
     await checkDigest(wave, "post-turn", async () => {
       const snap = await withClient(rig.hostCtx, () => captureCoopFieldSnapshot());
-      await withClient(rig.guestCtx, () => applyCoopFieldSnapshot(snap ?? undefined, true));
+      const hostParty = rig.hostScene.getPlayerParty().map(p => p.species.speciesId);
+      await withClient(rig.guestCtx, () => {
+        applyCoopFieldSnapshot(snap ?? undefined, true);
+        adoptCoopHostPlayerPartyOrder(hostParty);
+      });
     });
   };
 
@@ -888,8 +960,13 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
             // #843 coverage #4: occasionally issue a VOLUNTARY SWITCH for the host's own slot through the
             // REAL Command path (game.doSwitchPokemon drives the POKEMON command + party pick), instead of a
             // move. The switch broadcasts to the guest and rides the per-turn checkpoint onto its replay.
+            // #846: skip the voluntary switch when the mon is TRAPPED (a trainer enemy's Shadow Tag / Arena
+            // Trap / trapping move / Fairy Lock / ER FEAR). The real command menu greys out POKEMON when
+            // trapped; game.doSwitchPokemon blindly drives the POKEMON command, which the menu then REJECTS,
+            // leaving CommandPhase open forever (the NO-PARK strand seen at seed 20260704 wave 43). isTrapped
+            // is the exact switch-legality gate the command menu uses.
             const benchSlot = firstLegalBenchSlot(rig.hostScene, "host");
-            if (switchesThisTurn(seed, wave, turn, HOST_SWITCH_SALT) && benchSlot >= 0) {
+            if (switchesThisTurn(seed, wave, turn, HOST_SWITCH_SALT) && benchSlot >= 0 && !mon.isTrapped()) {
               game.doSwitchPokemon(benchSlot);
               if (isHostSlot) {
                 actionScript.push(`wave ${wave} turn ${turn}: host SWITCH -> party[${benchSlot}]`);
@@ -1071,6 +1148,10 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
     return false;
   };
 
+  // TERMINAL run-end (#846): set the FIRST time the host run ends (a wipe / GameOver / Title). Recorded +
+  // reported LOUDLY; the survey ends honestly at that wave (never a NO-PARK strand). See hostRunEndReason.
+  let runEnded: { wave: number; reason: string } | undefined;
+
   // ===== The wave loop. =====
   for (let wave = 1; wave <= waves; wave++) {
     if (crossedUndrivableWave(wave)) {
@@ -1083,15 +1164,48 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
       await healGuestFromHost(rig);
     }
 
-    const bossWave = rig.hostScene.getEnemyField().some(e => e.isBoss());
+    // Trainer-wave coverage tally (#846): count TRAINER waves (fixed rival/evil-team vs random rolled) so a
+    // run's actual trainer coverage is reportable. gameMode.isFixedBattle keys the fixed/random split.
+    if (rig.hostScene.currentBattle.battleType === BattleType.TRAINER) {
+      trainerWaves.total++;
+      if (rig.hostScene.gameMode.isFixedBattle(wave)) {
+        trainerWaves.fixed++;
+      } else {
+        trainerWaves.random++;
+      }
+      actionScript.push(`wave ${wave}: TRAINER (${rig.hostScene.gameMode.isFixedBattle(wave) ? "fixed" : "random"})`);
+    }
+
+    // BOSS-LIKE (auto-grant reward tail, interaction counter +0). Two classes:
+    //   - a real BOSS (isBoss on an on-field enemy): its VictoryPhase auto-grants via ModifierRewardPhase.
+    //   - a %10 MILESTONE wave (#846): the milestone reward tail ALSO auto-grants (MoneyRewardPhase +
+    //     ModifierRewardPhase, queuesSelectModifier=false) with NO owner/watcher SelectModifierPhase - even
+    //     when the %10 wave rolled a TRAINER instead of a wild boss (the trainer's mons are not isBoss, so
+    //     the isBoss check alone misses it and processNormalWave would wrongly assert a +1 shop advance).
+    //     Both are handled by processBossWave (drive any queued host shop SOLO, reconcile the guest counter,
+    //     counter +0), matching the trainer-victory reward-tail semantics the #846 directive called out.
+    const bossWave = rig.hostScene.getEnemyField().some(e => e.isBoss()) || wave % 10 === 0;
     try {
       await (bossWave ? processBossWave(wave) : processNormalWave(wave));
     } catch (e) {
       if (e instanceof SoakInvariantError) {
         throw e;
       }
-      // A driver stall (driveGuestReplayTurn / driveGuestRewardWatch / phaseInterceptor timeout) throws a
-      // plain Error - convert it into a NO-PARK artifact with the phase dump so the strand is replayable.
+      // #846 RUN-END vs STRAND: a caught driver error is a NO-PARK strand ONLY if the host is still in a
+      // live battle. If the host RUN ENDED (a party wipe on the evil-team gauntlet -> GameOverPhase ->
+      // TitlePhase), the phaseInterceptor.to() that threw was waiting on a battle phase a game-over run will
+      // never reach - that is a TERMINAL outcome, not a strand. Detect it and END the survey LOUDLY at this
+      // wave (counted, reported), instead of writing a misleading no-park artifact.
+      const endReason = hostRunEndReason(rig);
+      if (endReason != null) {
+        runEnded = { wave, reason: endReason };
+        // eslint-disable-next-line no-console
+        console.log(`[coop-soak] RUN ENDED at wave ${wave} (seed ${seed}): ${endReason}. Survey stops here.`);
+        actionScript.push(`RUN-END wave ${wave}: ${endReason}`);
+        break;
+      }
+      // A genuine driver stall (driveGuestReplayTurn / driveGuestRewardWatch / phaseInterceptor timeout in a
+      // LIVE battle) - convert it into a NO-PARK artifact with the phase dump so the strand is replayable.
       fail("no-park", wave, `wave driving threw (strand/stall): ${e instanceof Error ? e.message : String(e)}`);
     }
 
@@ -1100,13 +1214,51 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
     // pending by a boss killing-turn (whose reward tail auto-grants with no shop to drive it through) still
     // opens its PARTY picker on this crossing - re-arm the auto-picker (guarded) so it is driven, not parked.
     if (wave < waves) {
-      await withClient(rig.hostCtx, async () => {
-        armHostFaintAutoPick();
-        await game.phaseInterceptor.to("CommandPhase");
-      });
+      try {
+        await withClient(rig.hostCtx, async () => {
+          armHostFaintAutoPick();
+          await game.phaseInterceptor.to("CommandPhase");
+        });
+      } catch (e) {
+        // #846: the crossing itself can hit a run-end (a killing turn that also wiped the host, or a
+        // between-wave game-over). Same rule: a terminal host state is a counted run-end, not a strand.
+        const endReason = hostRunEndReason(rig);
+        if (endReason == null) {
+          throw e;
+        }
+        runEnded = { wave: wave + 1, reason: endReason };
+        // eslint-disable-next-line no-console
+        console.log(
+          `[coop-soak] RUN ENDED crossing into wave ${wave + 1} (seed ${seed}): ${endReason}. Survey stops here.`,
+        );
+        actionScript.push(`RUN-END crossing wave ${wave + 1}: ${endReason}`);
+        break;
+      }
+      // A clean crossing can still land on a terminal host state without throwing (defensive): stop LOUDLY.
+      const endReason = hostRunEndReason(rig);
+      if (endReason != null) {
+        runEnded = { wave: wave + 1, reason: endReason };
+        // eslint-disable-next-line no-console
+        console.log(
+          `[coop-soak] RUN ENDED after crossing into wave ${wave + 1} (seed ${seed}): ${endReason}. Survey stops.`,
+        );
+        actionScript.push(`RUN-END post-crossing wave ${wave + 1}: ${endReason}`);
+        break;
+      }
     }
   }
 
   assertTeardown();
-  return { seed, wavesRequested: waves, wavesCompleted, skips, resyncHeals, actionScript, boundaryDigests, findings };
+  return {
+    seed,
+    wavesRequested: waves,
+    wavesCompleted,
+    skips,
+    resyncHeals,
+    actionScript,
+    boundaryDigests,
+    findings,
+    runEnded,
+    trainerWaves,
+  };
 }
