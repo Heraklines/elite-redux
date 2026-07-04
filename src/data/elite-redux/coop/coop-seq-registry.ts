@@ -66,6 +66,13 @@ export const COOP_ME_TERM_SEQ_BASE = 9_000_000;
  * ME terminal (9M) and pump (8M) channels so a buffered forward never FIFO-collides.
  */
 export const COOP_LEARN_MOVE_FWD_SEQ_BASE = 9_100_000;
+/**
+ * Host<->partner per-slot BATCH move-learn channel: `BASE + partySlot` (#848). Carries the host's
+ * `learnMoveBatchForward` present (outcome) AND the owner's `learnMoveBatch` terminal (choice) for the
+ * shared level-up Move Learn panel. Disjoint from the per-move forward (9_100_000) and dex-sync (9_200_000)
+ * channels so a buffered batch present/terminal never FIFO-collides.
+ */
+export const COOP_LEARN_MOVE_BATCH_FWD_SEQ_BASE = 9_150_000;
 /** Host->guest dex/starter sync broadcasts: a fixed disjoint seq (#794). */
 export const COOP_DEX_SYNC_SEQ = 9_200_000;
 /** Rejoin full-resync request: `BASE + (Date.now() % 100_000)`. */
@@ -196,6 +203,13 @@ export const COOP_SEQ_BANDS: readonly CoopSeqBand[] = [
     owner: "learn-move-phase.ts",
   },
   {
+    key: "learnMoveBatchFwd",
+    base: COOP_LEARN_MOVE_BATCH_FWD_SEQ_BASE,
+    maxOffset: 5,
+    offset: "+ partySlot (0..5)",
+    owner: "learn-move-batch-phase.ts",
+  },
+  {
     key: "dexSync",
     base: COOP_DEX_SYNC_SEQ,
     maxOffset: 0,
@@ -293,6 +307,19 @@ export const COOP_RELAY_KINDS: readonly CoopRelayKind[] = [
     sender: "learn-move-phase.ts / coop-replay-learn-move-phase.ts",
   },
   { kind: "learnMoveForward", transport: "outcome", band: "learnMoveFwd", sender: "learn-move-phase.ts" },
+  // Batch level-up move-learn (the shared co-op panel: present + owner-relayed terminal).
+  {
+    kind: "learnMoveBatchForward",
+    transport: "outcome",
+    band: "learnMoveBatchFwd",
+    sender: "learn-move-batch-phase.ts",
+  },
+  {
+    kind: "learnMoveBatch",
+    transport: "choice",
+    band: "learnMoveBatchFwd",
+    sender: "learn-move-batch-phase.ts / coop-replay-learn-move-batch.ts",
+  },
   // Dex sync.
   { kind: "dexSync", transport: "outcome", band: "dexSync", sender: "coop-runtime.ts" },
 ];

@@ -597,6 +597,19 @@ export type CoopInteractionOutcome =
    */
   | { k: "learnMoveForward"; partySlot: number; moveId: number; maxMoveCount: number }
   /**
+   * Co-op AUTHORITATIVE batch level-up Move Learn present (#848): the HOST is the sole engine, but the
+   * ER batch Move Learn panel is now the SHARED co-op level-up path (owner drives, watcher mirrors) instead
+   * of the per-move LearnMovePhase bypass. When the host's {@linkcode LearnMoveBatchPhase} opens the panel
+   * it streams this present so the PARTNER opens the SAME panel (on the disjoint 9_150_000 + partySlot
+   * channel). The mon's OWNER drives it; the other client renders it as a read-only watcher and both close
+   * together on the relayed terminal ({@linkcode CoopInteractionChoice} kind `learnMoveBatch`). All scalars /
+   * flat arrays, no engine types - additive, so an older client harmlessly ignores an unknown `k`.
+   *  - `partySlot`    the learning mon's party slot (the partner resolves the SAME Pokemon).
+   *  - `learnableIds` the offerable new-move ids for this level-up (already de-duped / known-filtered).
+   *  - `ownerIsGuest` whether the mon's owner is the GUEST (so the guest drives + relays; else it watches).
+   */
+  | { k: "learnMoveBatchForward"; partySlot: number; learnableIds: number[]; ownerIsGuest: boolean }
+  /**
    * Co-op shared acquisition (#794): the HOST (sole engine) streams its dex / starter blob
    * ({@linkcode captureCoopDexDelta}) right after ANY acquisition event (wild catch, DexNav
    * grant, ME-granted mon) so the partner's ACCOUNT gets the same dex credit + shiny-variant

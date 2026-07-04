@@ -92,6 +92,14 @@ export const COOP_UI_REGISTRY: Record<UiMode, CoopUiClass> = {
   // the outcome blob (the-bargain-phase.ts, #795).
   [UiMode.ER_BARGAIN]: "mirrored",
 
+  // The ER batch level-up Move Learn panel is now the SHARED co-op level-up path (#848): the mon's OWNER
+  // drives the real panel and the WATCHER opens the same panel + mirrors the owner's live cursor, both
+  // closing together on the relayed terminal. Host streams `learnMoveBatchForward` (present) and the owner
+  // relays the final assignment set as a `learnMoveBatch` choice on COOP_LEARN_MOVE_BATCH_FWD_SEQ_BASE +
+  // partySlot (learn-move-batch-phase.ts, coop-replay-learn-move-batch.ts). Any panel error still falls
+  // back to the relayed per-move LearnMovePhase, so it can never softlock.
+  [UiMode.LEARN_MOVE_BATCH]: "mirrored",
+
   // ---- LOCAL-ONLY: legitimately per-client ----
 
   // Ubiquitous chrome / message boxes (exempt from the tripwire, see COOP_UI_TRIPWIRE_EXEMPT).
@@ -181,12 +189,6 @@ export const COOP_UI_REGISTRY: Record<UiMode, CoopUiClass> = {
   // REVIEW: renaming a pokemon in a MERGED co-op party. Confirm each client renames only its own mon
   // (a shared-mon nickname write would be a latent divergence; cosmetic, not run-affecting).
   [UiMode.RENAME_POKEMON]: "local-only",
-
-  // The ER batch level-up Move Learn panel. In co-op it is DELIBERATELY BYPASSED: LearnMoveBatchPhase
-  // redirects each learn to the relayed per-move LearnMovePhase when isCoop (learn-move-batch-phase.ts).
-  // So this mode must NEVER open in a live co-op session; the tripwire firing on it is a real
-  // regression signal (the redirect broke).
-  [UiMode.LEARN_MOVE_BATCH]: "local-only",
 };
 
 /**

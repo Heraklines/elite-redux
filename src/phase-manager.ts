@@ -38,6 +38,9 @@ import { CoopInertPhase } from "#phases/coop-inert-phase";
 import { CoopPartnerSyncPhase } from "#phases/coop-partner-sync-phase";
 import { CoopPushReplacementCheckpointPhase } from "#phases/coop-push-replacement-checkpoint-phase";
 import { CoopReplayLearnMovePhase } from "#phases/coop-replay-learn-move-phase";
+// #848: side-effect import so the guest's INLINE batch Move Learn panel opener registers with the coop
+// runtime at boot (the shared co-op level-up path). It exports no phase, so it needs an explicit import.
+import "#phases/coop-replay-learn-move-batch";
 import { CoopReplayMePhase } from "#phases/coop-replay-me-phase";
 import {
   CoopApplyResyncPhase,

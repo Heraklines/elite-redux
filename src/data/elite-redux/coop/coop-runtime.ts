@@ -462,6 +462,9 @@ function wireCoopMeChecksumCheck(battleStream: CoopBattleStreamer): void {
 let offLearnMoveForward: (() => void) | null = null;
 /** Slots with a learn-move picker already spawned this session (prevents a duplicate-message re-open). */
 const learnMoveForwardInFlight = new Set<number>();
+/** #848: the BATCH move-learn forward listener teardown + its in-flight slot set (mirrors the per-move pair). */
+let offLearnMoveBatchForward: (() => void) | null = null;
+const learnMoveBatchForwardInFlight = new Set<number>();
 
 /**
  * Install the persistent AUTHORITATIVE-GUEST move-learn forward listener (#633 BUG3+5). Covers the
@@ -522,6 +525,27 @@ export function setCoopLearnMovePickerOpener(
   opener: (partySlot: number, moveId: number, maxMoveCount: number) => void,
 ): void {
   learnMovePickerOpener = opener;
+}
+
+/**
+ * #848: the BATCH move-learn panel opener, injected by coop-replay-learn-move-batch at module load
+ * (the phase registry imports it at boot). Runtime -> phase would be an import cycle, hence the
+ * indirection. When the guest receives a `learnMoveBatchForward` present it opens the shared batch
+ * Move Learn panel INLINE over the current screen (owner-drives if the guest owns the mon, else a
+ * read-only watcher that mirrors the host's cursor + closes on the relayed terminal).
+ */
+let learnMoveBatchPickerOpener: ((partySlot: number, learnableIds: number[], ownerIsGuest: boolean) => void) | null =
+  null;
+
+export function setCoopLearnMoveBatchPickerOpener(
+  opener: (partySlot: number, learnableIds: number[], ownerIsGuest: boolean) => void,
+): void {
+  learnMoveBatchPickerOpener = opener;
+}
+
+/** Co-op (#848): clear a slot's in-flight batch Move Learn panel mark once its panel closes. */
+export function clearCoopLearnMoveBatchInFlight(partySlot: number): void {
+  learnMoveBatchForwardInFlight.delete(partySlot);
 }
 
 // =============================================================================
@@ -863,6 +887,50 @@ export function clearCoopLearnMoveForwardInFlight(partySlot: number): void {
 }
 
 /**
+ * Install the persistent AUTHORITATIVE-GUEST BATCH move-learn forward listener (#848). The ER batch
+ * Move Learn panel is now the SHARED co-op level-up path: when the host's {@linkcode LearnMoveBatchPhase}
+ * opens the panel it streams a `learnMoveBatchForward` present so the guest opens the SAME panel INLINE
+ * (owner-drives if the guest owns the mon, else a read-only watcher). Gated hard on
+ * {@linkcode isCoopAuthoritativeGuest} (a dead no-op for solo / host / lockstep). An in-flight slot guard
+ * ignores a duplicate present for a slot whose panel is still open. Cleared in {@linkcode clearCoopRuntime}.
+ */
+function wireCoopLearnMoveBatchForward(transport: CoopTransport): void {
+  offLearnMoveBatchForward = transport.onMessage(msg => {
+    if (msg.t !== "interactionOutcome" || msg.outcome.k !== "learnMoveBatchForward") {
+      return;
+    }
+    if (!isCoopAuthoritativeGuest()) {
+      return;
+    }
+    const { partySlot, learnableIds, ownerIsGuest } = msg.outcome;
+    if (learnMoveBatchForwardInFlight.has(partySlot)) {
+      coopLog("learnmove", `recv learnMoveBatchForward slot=${partySlot} IGNORE (panel already in-flight)`);
+      return;
+    }
+    if (learnMoveBatchPickerOpener == null) {
+      coopWarn(
+        "learnmove",
+        `recv learnMoveBatchForward slot=${partySlot} but no batch opener injected; host await falls back`,
+      );
+      return;
+    }
+    coopLog(
+      "learnmove",
+      `recv learnMoveBatchForward slot=${partySlot} learnable=${learnableIds.length} ownerIsGuest=${ownerIsGuest} -> open batch panel INLINE`,
+    );
+    learnMoveBatchForwardInFlight.add(partySlot);
+    try {
+      learnMoveBatchPickerOpener(partySlot, learnableIds, ownerIsGuest);
+    } catch (e) {
+      // A panel-open failure must never hang the run: the host's own await times out to "keep current
+      // moves". Drop the in-flight mark so a retry/resend can re-open.
+      learnMoveBatchForwardInFlight.delete(partySlot);
+      coopWarn("learnmove", `batch panel open failed slot=${partySlot} (host await falls back)`, e);
+    }
+  });
+}
+
+/**
  * Co-op (#843 soak TEARDOWN probe): whether the AUTHORITATIVE-guest learn-move-forward in-flight slot set
  * is EMPTY. It is a process-global {@linkcode learnMoveForwardInFlight} with no other read point, so the
  * soak's teardown invariant could not verify {@linkcode clearCoopRuntime} drained it (it calls
@@ -871,7 +939,7 @@ export function clearCoopLearnMoveForwardInFlight(partySlot: number): void {
  * of silently surviving into the next run. Pure read, no mutation.
  */
 export function isCoopLearnMoveForwardInFlightEmpty(): boolean {
-  return learnMoveForwardInFlight.size === 0;
+  return learnMoveForwardInFlight.size === 0 && learnMoveBatchForwardInFlight.size === 0;
 }
 
 /**
@@ -1482,6 +1550,7 @@ export function assembleCoopRuntime(
   wireCoopMeChecksumCheck(battleStream);
   wireCoopLiveEvents(controller, battleStream);
   wireCoopLearnMoveForward(transport);
+  wireCoopLearnMoveBatchForward(transport);
   wireCoopDexSync(transport);
   wireCoopDisconnectReaction(transport, interactionRelay, runtime);
   wireCoopStallWatchdog(transport, interactionRelay, battleStream, runtime);
@@ -1600,6 +1669,8 @@ export function clearCoopRuntime(): void {
   // subsequent solo / lockstep run has no listener and spawns no CoopReplayLearnMovePhase.
   offLearnMoveForward?.();
   offLearnMoveForward = null;
+  offLearnMoveBatchForward?.();
+  offLearnMoveBatchForward = null;
   offDexSync?.();
   offDexSync = null;
   offDisconnectReaction?.();
@@ -1607,6 +1678,7 @@ export function clearCoopRuntime(): void {
   offStallWatchdog?.();
   offStallWatchdog = null;
   learnMoveForwardInFlight.clear();
+  learnMoveBatchForwardInFlight.clear();
   active.localTransport.close();
   // Clear the co-op ghost-pool hooks so a subsequent SOLO run fetches normally (#633).
   setGhostPoolPublisher(null);

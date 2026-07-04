@@ -62,6 +62,7 @@ describe("#840 co-op UI classification registry (unmirrored-screen tripwire)", (
       "ER_BARGAIN",
       "ER_QUIZ",
       "FIGHT",
+      "LEARN_MOVE_BATCH",
       "MODIFIER_SELECT",
       "MYSTERY_ENCOUNTER",
       "PARTY",
@@ -103,9 +104,11 @@ describe("#840 co-op UI classification registry (unmirrored-screen tripwire)", (
       expect(reason).toContain("POKEDEX");
     });
 
-    it("WARNS if LEARN_MOVE_BATCH ever opens in co-op (it must be redirected to the relayed LearnMovePhase)", () => {
-      // co-op redirects the batch panel to the per-move relayed flow; its appearance is a regression.
-      expect(coopUnmirroredTripwireReason(UiMode.LEARN_MOVE_BATCH, true)).not.toBeNull();
+    it("is SILENT for LEARN_MOVE_BATCH (it is now the mirrored shared co-op level-up panel, #848)", () => {
+      // #848: the batch Move Learn panel is the SHARED co-op level-up path (owner drives / watcher
+      // mirrors, both close on the relayed terminal), so it is classified "mirrored" and the tripwire
+      // no longer flags it - it legitimately opens on both clients during the move-learn interaction.
+      expect(coopUnmirroredTripwireReason(UiMode.LEARN_MOVE_BATCH, true)).toBeNull();
     });
   });
 });

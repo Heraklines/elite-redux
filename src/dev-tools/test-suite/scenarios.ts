@@ -1765,6 +1765,30 @@ export const DEV_SCENARIOS: DevScenario[] = [
     shopItems: [modifierTypes.RARER_CANDY, modifierTypes.RARER_CANDY],
   },
   {
+    label: "(note) Co-op: level-up Move Learn panel is the SHARED synced path (#848)",
+    description:
+      "CO-OP fix - verify with TWO clients (not a solo battle): a level-up move-learn on a FULL\n"
+      + "moveset used to route each learn through the per-move screen, and the OWNER's picker could\n"
+      + "get STUCK (the partner saw the 'unlearning' but the owner's screen never closed - the live\n"
+      + "wave-6 P0). #848 makes the ER batch Move Learn panel the SHARED co-op level-up path instead:\n"
+      + "the mon's OWNER drives the real panel, the WATCHER opens the SAME panel and mirrors the live\n"
+      + "cursor, and BOTH close together on the relayed final selection (the host applies it\n"
+      + "authoritatively). DO (2 clients): level a FULL-moveset mon owned by EITHER player past a\n"
+      + "level-up-move (e.g. KO wave enemies for EXP). EXPECT: one Move Learn panel opens on BOTH\n"
+      + "screens; only the OWNER can move the cursor / pick; the WATCHER sees it move live; when the\n"
+      + "owner finishes (pick a slot to overwrite, or Cancel), BOTH screens close together and the\n"
+      + "moveset is IDENTICAL on both clients. The owner's screen must NEVER hang. Any panel error\n"
+      + "falls back to the per-move flow (still no softlock). Duo-tested headlessly in\n"
+      + "test/tests/elite-redux/coop/coop-duo-learn-move.test.ts.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({ STARTING_WAVE_OVERRIDE: 1, STARTING_LEVEL_OVERRIDE: 50 });
+      return [
+        makeStarter(SpeciesId.SNORLAX, { moveset: [MoveId.TACKLE, MoveId.BODY_SLAM, MoveId.REST, MoveId.SNORE] }),
+      ];
+    },
+  },
+  {
     label: "QoL: reward-shop long-desc auto-scroll (#557)",
     description:
       "#557 - long ER item descriptions auto-scroll in the REWARD screen instead of\n"

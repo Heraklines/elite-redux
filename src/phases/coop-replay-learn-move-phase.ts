@@ -53,8 +53,18 @@ export function openCoopLearnMovePickerInline(partySlot: number, moveId: number,
     clearCoopLearnMoveForwardInFlight(partySlot);
     coopLog("learnmove", "guest relays move-forget pick (inline)", { seq, kind: LEARN_MOVE_CHOICE_KIND, moveIndex });
     getCoopInteractionRelay()?.sendInteractionChoice(seq, LEARN_MOVE_CHOICE_KIND, moveIndex);
-    // Restore whatever screen the picker overlaid (e.g. the parked shop watcher) - no phase to end.
-    void Promise.resolve(globalScene.ui.revertMode()).catch(() => globalScene.ui.setMode(UiMode.MESSAGE));
+    // Restore whatever screen the picker overlaid (e.g. the parked shop watcher). #848: the picker is opened
+    // with setModeWithoutClear WITHOUT chaining, so revertMode ONLY closes it when there IS a chained mode to
+    // pop (the TM-Case parked shop). In a LEVEL-UP context (the batch-panel fallback) the modeChain is empty
+    // -> revertMode resolves FALSE and does NOT close the picker (a strand). Force MESSAGE in that case so the
+    // owner's forwarded picker can NEVER stay stuck.
+    void Promise.resolve(globalScene.ui.revertMode())
+      .then(reverted => {
+        if (!reverted) {
+          void globalScene.ui.setMode(UiMode.MESSAGE);
+        }
+      })
+      .catch(() => globalScene.ui.setMode(UiMode.MESSAGE));
   };
   void globalScene.ui.setModeWithoutClear(UiMode.SUMMARY, pokemon, SummaryUiMode.LEARN_MOVE, move, finish).then(() => {
     getCoopUiMirror()?.beginSession("owner", UiMode.SUMMARY, COOP_LEARN_MOVE_SEQ);
