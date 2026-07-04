@@ -1,0 +1,58 @@
+===== COOP SOAK RESULT =====
+verdict: FAIL
+waves_requested: 150
+run: 28710818213 (feat/elite-redux-port)
+timestamp: 2026-07-04T15-30-10Z
+
+----- driver lines -----
+[22m[39m[coop-soak] SEED=20260704 WAVES=150 - replay this run with:  SOAK_SEED=20260704 SOAK_WAVES=150 ER_SCENARIO=1 npx vitest run test/tests/elite-redux/coop/coop-soak.test.ts
+[22m[39m[coop-soak] scalar-lag wave 5 @post-shop: guest trails host (expected renderer lag, converges at re-mirror) - money host=590 guest=480
+[22m[39m[coop-soak] scalar-lag wave 8 @post-shop: guest trails host (expected renderer lag, converges at re-mirror) - money host=870 guest=590
+[22m[39m[coop-soak] scalar-lag wave 25 @post-shop: guest trails host (expected renderer lag, converges at re-mirror) - money host=2360 guest=1530
+[22m[39m[coop-soak] scalar-lag wave 35 @post-shop: guest trails host (expected renderer lag, converges at re-mirror) - money host=3280 guest=2360
+[22m[39m[coop-soak] scalar-lag wave 55 @post-shop: guest trails host (expected renderer lag, converges at re-mirror) - money host=8740 guest=6690
+[22m[39m[coop-soak] scalar-lag wave 62 @post-shop: guest trails host (expected renderer lag, converges at re-mirror) - money host=9745 guest=8395
+[22m[39m[coop-soak] scalar-lag wave 64 @post-shop: guest trails host (expected renderer lag, converges at re-mirror) - money host=10935 guest=9745
+[31m[1mSoakInvariantError[22m: [coop-soak] NO-PARK invariant breached at wave 66 (seed 20260704): wave driving threw (strand/stall): PhaseInterceptor.to("TurnEndPhase") did not reach its target (soft-lock / freeze?): stuck at phase "TitlePhase", UI mode TITLE (=1), interceptor state "running".
+
+----- vitest result tail -----
+This might cause false positive tests. Resolve unhandled errors to make sure your tests are not affected.[22m[39m
+
+[31m⎯⎯⎯⎯[39m[1m[41m Unhandled Rejection [49m[22m[31m⎯⎯⎯⎯⎯[39m
+[31m[1mTypeError[22m: Cannot read properties of null (reading 'waveIndex')[39m
+[36m [2m❯[22m SelectModifierPhase.getRerollCost src/phases/select-modifier-phase.ts:[2m943:43[22m[39m
+    [90m941|[39m
+    [90m942|[39m     [35mconst[39m baseMultiplier [33m=[39m [33mMath[39m[33m.[39m[34mmin[39m(
+    [90m943|[39m       Math.ceil(globalScene.currentBattle.waveIndex / 10) * baseValue …
+    [90m   |[39m                                           [31m^[39m
+    [90m944|[39m       [33mNumber[39m[33m.[39m[33mMAX_SAFE_INTEGER[39m[33m,[39m
+    [90m945|[39m     )[33m;[39m
+[90m [2m❯[22m SelectModifierPhase.startCoopWatch src/phases/select-modifier-phase.ts:[2m1311:12[22m[39m
+[90m [2m❯[22m runNextTicks node:internal/process/task_queues:[2m65:5[22m[39m
+[90m [2m❯[22m processTimers node:internal/timers:[2m540:9[22m[39m
+
+[31mThis error originated in "[1mtest/tests/elite-redux/coop/coop-soak.test.ts[22m" test file. It doesn't mean the error was thrown inside the file itself, but while it was running.[39m
+
+[31m⎯⎯⎯⎯[39m[1m[41m Unhandled Rejection [49m[22m[31m⎯⎯⎯⎯⎯[39m
+[31m[1mTypeError[22m: Cannot read properties of null (reading 'waveIndex')[39m
+[36m [2m❯[22m SelectModifierPhase.getRerollCost src/phases/select-modifier-phase.ts:[2m943:43[22m[39m
+    [90m941|[39m
+    [90m942|[39m     [35mconst[39m baseMultiplier [33m=[39m [33mMath[39m[33m.[39m[34mmin[39m(
+    [90m943|[39m       Math.ceil(globalScene.currentBattle.waveIndex / 10) * baseValue …
+    [90m   |[39m                                           [31m^[39m
+    [90m944|[39m       [33mNumber[39m[33m.[39m[33mMAX_SAFE_INTEGER[39m[33m,[39m
+    [90m945|[39m     )[33m;[39m
+[90m [2m❯[22m SelectModifierPhase.startCoopWatch src/phases/select-modifier-phase.ts:[2m1311:12[22m[39m
+[90m [2m❯[22m runNextTicks node:internal/process/task_queues:[2m65:5[22m[39m
+[90m [2m❯[22m processTimers node:internal/timers:[2m540:9[22m[39m
+
+[31mThis error originated in "[1mtest/tests/elite-redux/coop/coop-soak.test.ts[22m" test file. It doesn't mean the error was thrown inside the file itself, but while it was running.[39m
+[31m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[39m
+
+
+[2m Test Files [22m [1m[31m1 failed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[31m1 failed[39m[22m[90m (1)[39m
+[2m     Errors [22m [1m[31m2 errors[39m[22m
+[2m   Start at [22m 15:27:50
+[2m   Duration [22m 139.50s[2m (transform 17.73s, setup 21.94s, import 85ms, tests 116.50s, environment 801ms)[22m
+
