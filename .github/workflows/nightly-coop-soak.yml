@@ -65,13 +65,20 @@ jobs:
           SOAK_SEED: ${{ github.event.inputs.soak_seed }}
           NODE_OPTIONS: "--max-old-space-size=8192"
         run: |
-          set -o pipefail
           mkdir -p dev-logs/coop-soak
           # Tee the run output so the results bundle can carry the seed / verdict / skip counters even
           # on a green run (the driver prints the seed FIRST THING + a DONE line with the skip counters).
+          # GitHub runs this step under `bash -e`: without the set +e window a FAILING vitest aborts the
+          # step BEFORE the exit code is written, and the empty output then loosely-compares EQUAL to '0'
+          # in the final gate (run 28708860699 concluded success on a wave-27 NO-PARK strand). Capture the
+          # pipeline's real exit code explicitly and ALWAYS write it.
+          set +e
           npx vitest run test/tests/elite-redux/coop/coop-soak.test.ts --reporter=dot 2>&1 \
             | tee dev-logs/coop-soak/soak-output.txt
-          echo "exit=${PIPESTATUS[0]}" >> "$GITHUB_OUTPUT"
+          soak_exit=${PIPESTATUS[0]}
+          set -e
+          echo "soak vitest exit code: ${soak_exit}"
+          echo "exit=${soak_exit}" >> "$GITHUB_OUTPUT"
 
       - name: Bundle + commit soak results to the dev-logs branch (pullable like Send Logs)
         if: always()
@@ -129,7 +136,11 @@ jobs:
             fi
           fi
 
-          git -C "$TMP" add -A
+          # -f: the dev-logs branch carries the repo's .gitignore, whose `*.log` rule silently
+          # excludes every results file from a plain add (run 28708860699 committed NOTHING while
+          # printing "no results to commit"). The tester-log worker writes via the GitHub contents
+          # API, which bypasses .gitignore - a real git add must force it.
+          git -C "$TMP" add -A -f remote/
           if git -C "$TMP" diff --cached --quiet; then
             echo "no results to commit"
           else
@@ -149,7 +160,10 @@ jobs:
           if-no-files-found: warn
 
       - name: Fail the job if the soak failed
-        if: steps.soak.outputs.exit != '0'
+        # The empty-check is load-bearing: GitHub's loose comparison coerces a MISSING output ('')
+        # to the number 0, so `'' != '0'` alone evaluates FALSE and a crashed soak step would slip
+        # through as success (exactly how run 28708860699 went green on a real NO-PARK strand).
+        if: steps.soak.outputs.exit == '' || steps.soak.outputs.exit != '0'
         run: |
           echo "Co-op soak FAILED - see the dev-logs branch (remote/) and the uploaded artifact."
           exit 1
