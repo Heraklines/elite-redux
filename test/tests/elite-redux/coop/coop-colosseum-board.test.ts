@@ -24,17 +24,26 @@
 
 import {
   COOP_COLOSSEUM_SEQ_BASE,
+  type CoopColosseumRoundOps,
   coopColosseumAwaitDecision,
   coopColosseumBoardOwnedLocally,
   coopColosseumSendDecision,
   coopColosseumSeq,
   coopColosseumStreamBoard,
+  runColosseumGuestRoundLoop,
 } from "#data/elite-redux/coop/coop-colosseum";
-import { CoopInteractionRelay } from "#data/elite-redux/coop/coop-interaction-relay";
+import { COOP_INTERACTION_LEAVE, CoopInteractionRelay } from "#data/elite-redux/coop/coop-interaction-relay";
 import { setCoopMeInteractionStart } from "#data/elite-redux/coop/coop-me-pin-state";
-import { assembleCoopRuntime, clearCoopRuntime, setCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
-import type { CoopInteractionOutcome, CoopMessage } from "#data/elite-redux/coop/coop-transport";
+import { COOP_ME_TERM_SEQ_BASE } from "#data/elite-redux/coop/coop-me-pump";
+import {
+  assembleCoopRuntime,
+  clearCoopRuntime,
+  getCoopInteractionRelay,
+  setCoopRuntime,
+} from "#data/elite-redux/coop/coop-runtime";
+import type { CoopInteractionOutcome, CoopMessage, CoopSerializedEnemy } from "#data/elite-redux/coop/coop-transport";
 import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
+import { COLOSSEUM_CASH_OUT, COLOSSEUM_CONTINUE } from "#ui/colosseum-ui-handler";
 import { afterEach, describe, expect, it } from "vitest";
 
 /** The board's two decision labels (index 0 == CONTINUE, index 1 == CASH OUT); asserted verbatim on the wire. */
@@ -119,5 +128,173 @@ describe("co-op Colosseum between-rounds board relay (#829)", () => {
       outcome: present,
     };
     expect(JSON.parse(JSON.stringify(msg))).toEqual(msg);
+  });
+});
+
+// =============================================================================
+// #829 PART 2: the GUEST between-rounds ROUND LOOP (runColosseumGuestRoundLoop). Proven over a REAL
+// relay pair with FAKE engine ops (the same headless "spoof the engine" path the wire tests use), so the
+// round STATE MACHINE - watch/drive the board, boot each CONTINUE round, defer the leave to the true
+// ME-end LEAVE, never strand - is exercised end-to-end without a GameManager / Phaser boot. The host end
+// STREAMS the per-round board (coopColosseumStreamBoard) + its pick (coopColosseumSendDecision) + the true
+// 9M LEAVE exactly as ColosseumChoicePhase / coopEndMePump do in production; the loop consumes them off
+// the guest relay. The engine touches (adopt boss / boot ME battle / capture UI / leave+advance) are the
+// injected CoopColosseumRoundOps, so what is asserted is the loop's decisions, not the engine.
+// =============================================================================
+describe("co-op Colosseum guest between-rounds ROUND LOOP (#829)", () => {
+  afterEach(() => {
+    clearCoopRuntime();
+    setCoopMeInteractionStart(-1);
+  });
+
+  /**
+   * Stand up an authoritative HOST runtime (its interactionRelay is the "host" end the board helpers
+   * send on) + pin the ME on `start`, and pair a bare GUEST relay on the other loopback end - the end
+   * the guest round loop reads. Identical to the wire suite's rig above.
+   */
+  const rig = (start: number) => {
+    const { host, guest } = createLoopbackPair();
+    const runtime = assembleCoopRuntime(host, { username: "Host", netcodeMode: "authoritative" });
+    setCoopRuntime(runtime);
+    setCoopMeInteractionStart(start);
+    return { seq: coopColosseumSeq(start), guestRelay: new CoopInteractionRelay(guest) };
+  };
+
+  /** One macrotask tick: drains ALL pending microtasks (loopback deliveries + the loop's await chain). */
+  const tick = (): Promise<void> => new Promise<void>(resolve => setTimeout(resolve, 0));
+
+  /** A minimal serialized boss the fake awaitBoss hands the loop (the loop only forwards it to bootRoundBattle). */
+  const FAKE_BOSS: CoopSerializedEnemy[] = [{ fieldIndex: 0, data: { speciesId: 1, level: 50 } }];
+
+  /** Recording fake ops: the round loop's engine seam, so the test asserts the loop's DECISIONS. */
+  interface FakeOpsState {
+    boots: CoopSerializedEnemy[][];
+    driveCalls: string[][];
+    leaves: number;
+  }
+  const makeFakeOps = (opts: {
+    owned: boolean;
+    boss: CoopSerializedEnemy[] | null;
+    driveReturns?: number[];
+  }): { ops: CoopColosseumRoundOps; state: FakeOpsState } => {
+    const state: FakeOpsState = { boots: [], driveCalls: [], leaves: 0 };
+    let driveIdx = 0;
+    const ops: CoopColosseumRoundOps = {
+      boardOwnedLocally: () => opts.owned,
+      driveBoard: async (labels: string[]) => {
+        state.driveCalls.push([...labels]);
+        const ret = opts.driveReturns?.[driveIdx] ?? COLOSSEUM_CASH_OUT;
+        driveIdx++;
+        return ret;
+      },
+      awaitBoss: async () => opts.boss,
+      bootRoundBattle: (enemies: CoopSerializedEnemy[]) => {
+        state.boots.push(enemies);
+      },
+      leaveAndAdvance: () => {
+        state.leaves++;
+      },
+      showTag: () => {},
+      hideTag: () => {},
+    };
+    return { ops, state };
+  };
+
+  it("WATCHER: watches CONTINUE (boots the next round) then CASH OUT (defers the leave to the true 9M LEAVE)", async () => {
+    // Host-owned board: the guest WATCHES the host's relayed pick. Round 1 -> CONTINUE -> boot round 2;
+    // round 2 -> CASH OUT -> the loop must WAIT for the host's true ME-end LEAVE before leaving (so it
+    // advances IN STEP with the host's reward flow, never early).
+    const { guestRelay } = rig(4);
+    const seqTerm = COOP_ME_TERM_SEQ_BASE + 4;
+    const { ops, state } = makeFakeOps({ owned: false, boss: FAKE_BOSS });
+    const loop = runColosseumGuestRoundLoop(4, seqTerm, guestRelay, ops);
+
+    // Round 1: host streams the board present + its CONTINUE pick.
+    coopColosseumStreamBoard(["CONTINUE (risk for S+)", "CASH OUT (claim S)"]);
+    coopColosseumSendDecision(COLOSSEUM_CONTINUE);
+    await tick();
+    expect(state.boots.length, "watcher booted the next round after CONTINUE").toBe(1);
+    expect(state.boots[0], "booted with the host's re-streamed boss (adopted verbatim)").toEqual(FAKE_BOSS);
+    expect(state.driveCalls.length, "a WATCHER never drives its own board").toBe(0);
+    expect(state.leaves, "no leave mid-gauntlet").toBe(0);
+
+    // Round 2: host streams the board present + its CASH OUT pick.
+    coopColosseumStreamBoard(["CONTINUE (risk for SS)", "CASH OUT (claim S+)"]);
+    coopColosseumSendDecision(COLOSSEUM_CASH_OUT);
+    await tick();
+    expect(state.leaves, "CASH OUT does NOT leave until the host's true ME-end LEAVE arrives").toBe(0);
+    expect(state.boots.length, "no further round booted on CASH OUT").toBe(1);
+
+    // The host runs its reward flow, then coopEndMePump sends the true 9M LEAVE.
+    getCoopInteractionRelay()?.sendInteractionChoice(seqTerm, "meBtn", COOP_INTERACTION_LEAVE);
+    await loop;
+    expect(state.leaves, "left + advanced EXACTLY once at the true ME-end LEAVE").toBe(1);
+    guestRelay.dispose();
+  });
+
+  it("OWNER: DRIVES the CONTINUE / CASH-OUT board off its own capture UI (never watches)", async () => {
+    // Guest-owned board (odd counter in production): the guest DRIVES its local capture UI via ops.driveBoard
+    // and relays the pick. Round 1 -> CONTINUE -> boot round 2; round 2 -> CASH OUT -> await the true LEAVE.
+    const { guestRelay } = rig(5);
+    const seqTerm = COOP_ME_TERM_SEQ_BASE + 5;
+    const { ops, state } = makeFakeOps({
+      owned: true,
+      boss: FAKE_BOSS,
+      driveReturns: [COLOSSEUM_CONTINUE, COLOSSEUM_CASH_OUT],
+    });
+    const loop = runColosseumGuestRoundLoop(5, seqTerm, guestRelay, ops);
+
+    // Round 1: only the board present is streamed (the OWNER makes the decision locally, not off the wire).
+    coopColosseumStreamBoard(["CONTINUE (risk for A)", "CASH OUT (claim B+)"]);
+    await tick();
+    expect(state.driveCalls.length, "owner drove its own board on round 1").toBe(1);
+    expect(state.driveCalls[0], "driveBoard received the HOST-streamed labels (guest gauntlet is empty)").toEqual([
+      "CONTINUE (risk for A)",
+      "CASH OUT (claim B+)",
+    ]);
+    expect(state.boots.length, "booted round 2 after the owner's CONTINUE").toBe(1);
+
+    // Round 2: owner drives again -> CASH OUT.
+    coopColosseumStreamBoard(["CONTINUE (risk for A+)", "CASH OUT (claim A)"]);
+    await tick();
+    expect(state.driveCalls.length, "owner drove its own board on round 2").toBe(2);
+    expect(state.leaves, "no leave until the true ME-end LEAVE").toBe(0);
+
+    getCoopInteractionRelay()?.sendInteractionChoice(seqTerm, "meBtn", COOP_INTERACTION_LEAVE);
+    await loop;
+    expect(state.leaves, "left once at the true ME-end LEAVE").toBe(1);
+    guestRelay.dispose();
+  });
+
+  it("FINAL ROUND: the true ME-end LEAVE (no board streamed) leaves + advances once, boots no extra round", async () => {
+    // The final round auto-awards EX and goes STRAIGHT to endColosseum -> leave, so NO board is streamed -
+    // only the true 9M LEAVE. The loop's race must resolve the terminal and leave without driving a round.
+    const { guestRelay } = rig(6);
+    const seqTerm = COOP_ME_TERM_SEQ_BASE + 6;
+    const { ops, state } = makeFakeOps({ owned: false, boss: null });
+    const loop = runColosseumGuestRoundLoop(6, seqTerm, guestRelay, ops);
+
+    getCoopInteractionRelay()?.sendInteractionChoice(seqTerm, "meBtn", COOP_INTERACTION_LEAVE);
+    await loop;
+    expect(state.leaves, "left + advanced once on the final-round LEAVE").toBe(1);
+    expect(state.boots.length, "no extra round booted (final round)").toBe(0);
+    expect(state.driveCalls.length, "no board driven (none was streamed)").toBe(0);
+    guestRelay.dispose();
+  });
+
+  it("DEFENSIVE: a malformed board present (no secondary sub-prompt) leaves once - never strands", async () => {
+    // A board present the loop cannot read (a host stall / malformed frame: no secondary sub-prompt) must
+    // defensively leave + advance rather than park forever waiting for a decision it can never render.
+    const { seq, guestRelay } = rig(8);
+    const seqTerm = COOP_ME_TERM_SEQ_BASE + 8;
+    const { ops, state } = makeFakeOps({ owned: false, boss: null });
+    const loop = runColosseumGuestRoundLoop(8, seqTerm, guestRelay, ops);
+
+    const malformed: CoopInteractionOutcome = { k: "mePresent", tokens: {}, meetsReqs: [], labels: [] };
+    getCoopInteractionRelay()?.sendInteractionOutcome(seq, "coloBoard", malformed);
+    await loop;
+    expect(state.leaves, "defensively left + advanced once on a malformed board").toBe(1);
+    expect(state.boots.length, "booted no round").toBe(0);
+    guestRelay.dispose();
   });
 });

@@ -19,7 +19,13 @@
 
 import { globalScene } from "#app/global-scene";
 import { Phase } from "#app/phase";
-import { coopColosseumSendDecision, coopColosseumStreamBoard } from "#data/elite-redux/coop/coop-colosseum";
+import {
+  coopColosseumAwaitDecision,
+  coopColosseumBoardIsCoop,
+  coopColosseumBoardOwnedLocally,
+  coopColosseumSendDecision,
+  coopColosseumStreamBoard,
+} from "#data/elite-redux/coop/coop-colosseum";
 import { trainerConfigs } from "#data/trainers/trainer-config";
 import { TrainerVariant } from "#enums/trainer-variant";
 import { UiMode } from "#enums/ui-mode";
@@ -30,7 +36,13 @@ import {
   TIER_LADDER,
 } from "#mystery-encounters/colosseum-encounter";
 import type { ColosseumChallenger } from "#mystery-encounters/colosseum-gauntlet";
-import { COLOSSEUM_CONTINUE, type ColosseumChallengerView, type ColosseumViewData } from "#ui/colosseum-ui-handler";
+import {
+  COLOSSEUM_CASH_OUT,
+  COLOSSEUM_CONTINUE,
+  type ColosseumChallengerView,
+  type ColosseumViewData,
+} from "#ui/colosseum-ui-handler";
+import { hideCoopControllerTag, showCoopControllerTagFor } from "#ui/coop-controller-tag";
 
 const TIER_TAG: Record<ColosseumChallenger["tier"], string> = {
   normal: "Normal",
@@ -89,6 +101,18 @@ export class ColosseumChoicePhase extends Phase {
     // FIRE-AND-FORGET + hard no-op off the authoritative host / in solo, so solo is byte-identical and
     // the host never blocks on the partner. No em dashes in the labels (project rule).
     coopColosseumStreamBoard([`CONTINUE (risk for ${data.nextTierLabel})`, `CASH OUT (claim ${data.tierLabel})`]);
+    // Co-op (#829): on a GUEST-OWNED board the partner (guest) drives the CONTINUE / CASH-OUT decision on
+    // its own capture UI + relays it; the host (sole engine) AWAITS the relayed index and applies it, taking
+    // NO local input (mirrors coopHostAwaitGuestIndex for the top-level ME pick). A null resolution (a
+    // disconnected partner) defaults to CASH OUT so the host never hangs. Host-owned board / solo drive off
+    // local input below - coopColosseumBoardIsCoop() is false in solo, so solo is byte-identical.
+    if (coopColosseumBoardIsCoop() && !coopColosseumBoardOwnedLocally()) {
+      showCoopControllerTagFor(false); // amber: the partner is deciding
+      const idx = await coopColosseumAwaitDecision();
+      hideCoopControllerTag();
+      void this.onChoice(idx ?? COLOSSEUM_CASH_OUT);
+      return;
+    }
     globalScene.ui.setMode(UiMode.COLOSSEUM, data, (choice: number) => this.onChoice(choice));
   }
 
@@ -98,10 +122,13 @@ export class ColosseumChoicePhase extends Phase {
     }
     this.resolving = true;
 
-    // Co-op (#829): relay the resolved board decision on the dedicated board seq so the partner
-    // adopts the SAME branch. On a HOST-owned board the host's pick is the authoritative decision the
-    // guest watcher adopts. FIRE-AND-FORGET + hard no-op off the authoritative host / in solo.
-    coopColosseumSendDecision(choice);
+    // Co-op (#829): relay the resolved board decision on the dedicated board seq so the partner adopts the
+    // SAME branch - but ONLY when the LOCAL client owns the board (host-owned, or solo where the send is a
+    // hard no-op anyway). On a GUEST-owned board the guest already relayed its pick and the host is APPLYING
+    // it here (open() awaited it), so re-sending would echo a second pick onto the board seq. FIRE-AND-FORGET.
+    if (!coopColosseumBoardIsCoop() || coopColosseumBoardOwnedLocally()) {
+      coopColosseumSendDecision(choice);
+    }
 
     // Hand the UI back to MESSAGE FIRST. endColosseum/startNextColosseumBattle
     // run dialogue + reward flow (showEncounterText, leaveEncounterWithoutBattle)

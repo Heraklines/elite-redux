@@ -60,6 +60,13 @@ export const BlackMarketEncounter: MysteryEncounter = MysteryEncounterBuilder.wi
         // Open the real bargain SHOP screen (BlackMarketShopPhase: cheap, mixed-
         // tier used goods). Launched via the doEncounterRewards hook so it runs
         // as a real phase before the post-encounter continuation. Not a reward screen.
+        //
+        // Co-op (#832, audit P1#5): HOST-ONLY (the authoritative guest diverts into
+        // CoopReplayMePhase and never runs this callback), intentionally - the guest opens
+        // its OWN BlackMarketShopPhase-flavored BiomeShopPhase watcher off the host's streamed
+        // stock (reroll 777) via the #821 handoff routed through openGuestMeEmbeddedShop
+        // (coop-biome-shop.ts), so it keys off the host ACTUALLY opening the shop (option 1),
+        // never this per-option assignment. See exotic-trader-encounter.ts for the full note.
         globalScene.currentBattle.mysteryEncounter!.doEncounterRewards = () => {
           globalScene.phaseManager.unshiftNew("BlackMarketShopPhase");
           return true;

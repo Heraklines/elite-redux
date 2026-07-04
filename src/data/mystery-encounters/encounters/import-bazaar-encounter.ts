@@ -57,6 +57,12 @@ export const ImportBazaarEncounter: MysteryEncounter = MysteryEncounterBuilder.w
         // items + supplies at fair prices). Launched via the doEncounterRewards
         // hook so it runs as a real phase BEFORE the post-encounter continuation -
         // a full browse-and-buy market, not a free reward screen.
+        //
+        // Co-op (#832, audit P1#5): HOST-ONLY (the authoritative guest diverts into
+        // CoopReplayMePhase and never runs this callback), intentionally - the guest opens
+        // its OWN BiomeShopPhase watcher off the host's streamed stock (reroll 777) via the
+        // #821 handoff routed through openGuestMeEmbeddedShop (coop-biome-shop.ts), keying off
+        // the host ACTUALLY opening the shop. See exotic-trader-encounter.ts for the full note.
         globalScene.currentBattle.mysteryEncounter!.doEncounterRewards = () => {
           globalScene.phaseManager.unshiftNew("ImportBazaarShopPhase");
           return true;

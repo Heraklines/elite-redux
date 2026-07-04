@@ -7,6 +7,7 @@
 import { globalScene } from "#app/global-scene";
 import { Phase } from "#app/phase";
 import { applyCoopMeOutcome } from "#data/elite-redux/coop/coop-battle-engine";
+import { openGuestMeEmbeddedShop } from "#data/elite-redux/coop/coop-biome-shop";
 import { coopLog, coopWarn } from "#data/elite-redux/coop/coop-debug";
 import { adoptCoopEnemiesStructural } from "#data/elite-redux/coop/coop-enemy-builder";
 import type { CoopInteractionChoice } from "#data/elite-redux/coop/coop-interaction-relay";
@@ -63,6 +64,42 @@ export function setCoopMeHostPresentation(
   presentation: Extract<CoopInteractionOutcome, { k: "mePresent" }> | null,
 ): void {
   coopMeHostPresentation = presentation;
+}
+
+/**
+ * #829 co-op COLOSSEUM between-rounds seam (GENERIC - this phase never learns about the Colosseum).
+ * The Colosseum (#439) is a MULTI-battle press-your-luck gauntlet ME: after each won round a
+ * CONTINUE / CASH-OUT board opens and (on CONTINUE) the NEXT round's battle spawns - each round is a
+ * host-authoritative ME-battle handoff. The guest boots round 1 exactly like any battle-handoff ME
+ * ({@linkcode CoopReplayMePhase.finishWithoutLeaving} below), but the TRUE ME-end LEAVE only fires
+ * when the WHOLE gauntlet ends, so mid-gauntlet the guest's detached 9M-await never resolves and the
+ * guest strands after round 1 (the completed round-1 battle). This delegate lets a colosseum-aware
+ * driver (registered from `coop-colosseum.ts`) claim the terminal at the round-1 handoff and drive the
+ * whole between-rounds loop + the eventual leave/advance itself: a `true` return means "the delegate
+ * owns the terminal now" and this phase SKIPS its default detached leave+advance arm. `ctx.relay` is
+ * the (non-null) live interaction relay; `ctx.seqTerm` is the 9M terminal seq the delegate races the
+ * per-round board against; `ctx.interactionCounter` is the pinned ME counter. Every non-colosseum ME
+ * returns `false` (the delegate self-gates on its own encounter type), so the arm below stays
+ * byte-identical.
+ */
+export type CoopMeBattleEndDelegate = (ctx: {
+  interactionCounter: number;
+  seqTerm: number;
+  relay: NonNullable<ReturnType<typeof getCoopInteractionRelay>>;
+}) => boolean;
+
+/**
+ * #829: the between-rounds battle-end delegate, or null (the default). Set by `coop-colosseum.ts`;
+ * consulted in {@linkcode CoopReplayMePhase.finishWithoutLeaving}'s detached-terminal block. When null
+ * (solo + every non-colosseum ME) the hook is BYTE-IDENTICAL to the pre-#829 code. Kept module-scoped
+ * + self-gated inside the delegate on the colosseum encounter type, so it can never engage for any
+ * other ME even while registered (the "never leaks into other MEs" guarantee).
+ */
+let coopMeBattleEndDelegate: CoopMeBattleEndDelegate | null = null;
+
+/** #829: register (d) or clear (null) the between-rounds battle-end delegate. */
+export function setCoopMeBattleEndDelegate(d: CoopMeBattleEndDelegate | null): void {
+  coopMeBattleEndDelegate = d;
 }
 
 /**
@@ -207,7 +244,7 @@ export class CoopReplayMePhase extends Phase {
               counter: this.interactionCounter,
             },
           );
-          globalScene.phaseManager.unshiftNew("SelectModifierPhase");
+          openGuestMeEmbeddedShop(this.interactionCounter); // #832: BiomeShopPhase for trader/market MEs, SelectModifierPhase otherwise
         }
         return;
       }
@@ -705,21 +742,33 @@ export class CoopReplayMePhase extends Phase {
     {
       const counter = this.interactionCounter;
       const relayRef = getCoopInteractionRelay();
-      void relayRef?.awaitInteractionChoice(this.seqTerm, COOP_ME_REPLAY_WAIT_MS).then(() => {
-        if (coopMeInteractionStartValue() === counter) {
-          coopLog("me", "detached ME end after battle handoff: leaving + advancing (#822)", { counter });
-          try {
-            leaveEncounterWithoutBattle();
-          } catch {
-            coopWarn("me", "leaveEncounterWithoutBattle threw at detached handoff end (handled)", { counter });
+      // #829 co-op COLOSSEUM: before arming the default detached 9M-await, offer the terminal to a
+      // registered between-rounds delegate (the Colosseum gauntlet loop, from coop-colosseum.ts). If it
+      // CLAIMS the terminal (returns true) it drives every SUBSEQUENT round + the eventual leave/advance
+      // itself, so the default arm here would double-drive it - SKIP it. The delegate self-gates on its
+      // own ME type, so a null delegate / a false return (solo + every non-colosseum ME) leaves the arm
+      // below byte-identical (the existing #822 detached-terminal behaviour).
+      const delegateOwnsTerminal =
+        coopMeBattleEndDelegate != null
+        && relayRef != null
+        && coopMeBattleEndDelegate({ interactionCounter: counter, seqTerm: this.seqTerm, relay: relayRef });
+      if (!delegateOwnsTerminal) {
+        void relayRef?.awaitInteractionChoice(this.seqTerm, COOP_ME_REPLAY_WAIT_MS).then(() => {
+          if (coopMeInteractionStartValue() === counter) {
+            coopLog("me", "detached ME end after battle handoff: leaving + advancing (#822)", { counter });
+            try {
+              leaveEncounterWithoutBattle();
+            } catch {
+              coopWarn("me", "leaveEncounterWithoutBattle threw at detached handoff end (handled)", { counter });
+            }
           }
-        }
-        try {
-          getCoopController()?.advanceInteraction(counter);
-        } catch {
-          coopWarn("me", "advanceInteraction threw at detached handoff end (handled, idempotent)", { counter });
-        }
-      });
+          try {
+            getCoopController()?.advanceInteraction(counter);
+          } catch {
+            coopWarn("me", "advanceInteraction threw at detached handoff end (handled, idempotent)", { counter });
+          }
+        });
+      }
     }
     coopLog("me", "ME terminal: battle-handoff, ending phase WITHOUT leaving encounter", {
       counter: this.interactionCounter,
@@ -802,7 +851,7 @@ export class CoopReplayMePhase extends Phase {
     // shopHandedOff marks the shop opened so the quiz-then-shop hook path never double-opens it.
     this.settledDetached = true;
     this.shopHandedOff = true;
-    globalScene.phaseManager.unshiftNew("SelectModifierPhase");
+    openGuestMeEmbeddedShop(this.interactionCounter); // #832: BiomeShopPhase for trader/market MEs, SelectModifierPhase otherwise
     this.settled = true;
     coopMeHostPresentation = null;
     this.offMeMessage?.();

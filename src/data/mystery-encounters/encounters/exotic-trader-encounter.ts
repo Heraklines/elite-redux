@@ -73,6 +73,15 @@ export const ExoticTraderEncounter: MysteryEncounter = MysteryEncounterBuilder.w
         // Launched via the doEncounterRewards hook so it runs as a real phase
         // BEFORE the post-encounter continuation - a full browse-and-buy market,
         // not a reward screen.
+        //
+        // Co-op (#832, audit P1#5): this assignment is HOST-ONLY (the authoritative guest
+        // diverts the whole ME into CoopReplayMePhase and never runs this option callback),
+        // and that is intentional - the guest opening its OWN market must key off the host
+        // ACTUALLY opening the shop, not this unconditional-per-option assignment (option 2
+        // must NOT open a shop). The host's ExoticShopPhase (a BiomeShopPhase) streams its
+        // stock under reroll 777; the guest, parked in CoopReplayMePhase, opens a matching
+        // BiomeShopPhase watcher via the #821 handoff routed through openGuestMeEmbeddedShop
+        // (coop-biome-shop.ts). So the guest sees the shop via the STREAM, not doEncounterRewards.
         updatePlayerMoney(-boardingFee(), true, false);
         globalScene.currentBattle.mysteryEncounter!.doEncounterRewards = () => {
           globalScene.phaseManager.unshiftNew("ExoticShopPhase");

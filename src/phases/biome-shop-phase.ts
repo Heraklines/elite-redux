@@ -29,6 +29,7 @@ import {
   COOP_INTERACTION_LEAVE,
   coopBiomeShopSeq,
 } from "#data/elite-redux/coop/coop-interaction-relay";
+import { coopMeInProgress, coopMeInteractionStartValue } from "#data/elite-redux/coop/coop-me-pin-state";
 import { reconstructRewardOptions, serializeRewardOptions } from "#data/elite-redux/coop/coop-reward-options";
 import {
   advanceCoopInteractionForContinuation,
@@ -70,8 +71,17 @@ export class BiomeShopPhase extends SelectModifierPhase {
 
   /** Co-op (#673): the alternation counter pinned when this market opened (-1 = solo). */
   private coopBiomeStart = -1;
-  /** Co-op (#673): true when THIS client drives the market (relays each buy + the leave). */
+  /** Co-op (#673): true when THIS client drives the market (relays each buy + the leave) - the PICK axis. */
   private coopBiomeOwner = false;
+  /**
+   * Co-op (#832, audit P1#5): the OPTION axis, distinct from the PICK axis {@linkcode coopBiomeOwner}.
+   * True when THIS client rolls the stock + streams it; false when it ADOPTS the streamed stock. For a
+   * wave market the option axis == the pick axis (the counter-parity owner rolls). Inside an authoritative
+   * mystery encounter it SPLITS: the HOST is always the option owner (only it runs the real curated
+   * Exotic / Black-Market / Import subclass; the guest opens a plain BiomeShopPhase that cannot rebuild that
+   * stock), even when the GUEST owns the ME pick - mirrors SelectModifierPhase's #828 option/pick split.
+   */
+  private coopBiomeOptionOwner = false;
 
   /** The biome market re-appears (not the vanilla reward screen) after the
    * party-target menu closes on a held-item / TM purchase. */
@@ -99,25 +109,51 @@ export class BiomeShopPhase extends SelectModifierPhase {
     }
     if (coopController != null) {
       if (this.coopBiomeStart < 0) {
-        this.coopBiomeStart = coopController.interactionCounter();
+        // #832 (audit P1#5, defect b): inside a live mystery encounter, pin to the ME's interaction
+        // counter (coopMeInteractionStartValue) - the SAME counter the host's ExoticShopPhase streams
+        // under and the guest's shop-open (coop-biome-shop) awaits - NOT the live counter, which an
+        // inbound reconcile broadcast can bump mid-encounter (drifting the owner/watcher + seq calc off
+        // the host). Outside an ME (the every-10-wave market) the live counter is correct + byte-identical.
+        this.coopBiomeStart = coopMeInProgress() ? coopMeInteractionStartValue() : coopController.interactionCounter();
       }
       const spoofed = getCoopRuntime()?.spoof != null;
-      const owns = spoofed || coopController.isLocalOwnerAtCounter(this.coopBiomeStart);
+      const inMe = coopMeInProgress();
+      // PICK axis (#832): the ME owner (or the counter-parity owner for a wave market) DRIVES the real
+      // screen + relays each buy. Resolved from the PINNED counter, stable for the whole interaction.
+      const pickOwner = spoofed || coopController.isLocalOwnerAtCounter(this.coopBiomeStart);
+      // OPTION axis (#832, audit P1#5): who rolls + streams the stock. Inside an authoritative ME the HOST
+      // is the sole engine and the only client running the real curated subclass (Exotic / Black-Market /
+      // Import), so it is ALWAYS the option owner - the guest opens a plain BiomeShopPhase and ADOPTS the
+      // stream. Outside an ME the option owner == the pick owner (wave market, byte-identical to before).
+      const optionOwner = spoofed || (inMe ? coopController.role === "host" : pickOwner);
+      this.coopBiomeOwner = pickOwner;
+      this.coopBiomeOptionOwner = optionOwner;
       coopLog(
         "reward",
-        `biome market owner/watcher decision: pinnedStart=${this.coopBiomeStart} role=${coopController.role} spoof=${spoofed} -> ${owns ? "OWNER" : "WATCHER"}`,
+        `biome market roles: pinnedStart=${this.coopBiomeStart} inMe=${inMe} role=${coopController.role} spoof=${spoofed} pick=${pickOwner ? "OWNER" : "WATCHER"} option=${optionOwner ? "ROLL+STREAM" : "ADOPT"}`,
       );
-      if (!owns) {
+      if (!pickOwner) {
+        // PICK WATCHER: never opens the interactive market. coopBiomeWatch adopts the streamed stock
+        // (option watcher) OR rolls + streams its own (the host on a GUEST-owned ME: option owner, pick
+        // watcher), then applies each relayed buy verbatim until the LEAVE.
         void this.coopBiomeWatch();
         return;
       }
-      this.coopBiomeOwner = true;
+      if (!optionOwner) {
+        // PICK OWNER but OPTION WATCHER (the guest on a GUEST-owned ME): the guest cannot rebuild the
+        // curated subclass stock, so ADOPT the host's streamed stock first, THEN open + drive the market.
+        void this.coopBiomeDriveAdoptOptions();
+        return;
+      }
+      // else: pick owner AND option owner -> the normal roll + stream + drive owner path below.
     }
 
     this.buildStock();
-    // Co-op OWNER: stream the exact rolled stock BEFORE the empty check, so the watcher's
-    // stock await resolves even when the market is empty (it then just consumes the LEAVE).
-    if (this.coopBiomeOwner && getCoopRuntime()?.spoof == null) {
+    // Co-op OPTION OWNER: stream the exact rolled stock BEFORE the empty check, so the watcher's stock
+    // await resolves even when the market is empty (it then just consumes the LEAVE). #832: gated on the
+    // OPTION axis (not the pick axis) so the host on a guest-owned ME - option owner, pick watcher - streams
+    // from coopBiomeWatch instead, and a guest pick-owner does NOT double-stream an adopted list.
+    if (this.coopBiomeOptionOwner && getCoopRuntime()?.spoof == null) {
       getCoopInteractionRelay()?.sendRewardOptions(
         this.coopBiomeStart,
         COOP_BIOME_STOCK_REROLL,
@@ -242,14 +278,57 @@ export class BiomeShopPhase extends SelectModifierPhase {
         COOP_INTERACTION_LEAVE,
       );
     }
+    // #832 (audit P1#5, defect c): advanceCoopInteractionForContinuation SUPPRESSES its own advance while
+    // an ME is in progress (its coopMeInProgress guard) - the whole ME counts as ONE alternation step,
+    // advanced once at the true ME terminal (PostMysteryEncounterPhase on the host, CoopReplayMePhase's
+    // leaveDefensive on the guest), exactly like the embedded SelectModifierPhase (coopAdvanceInteraction's
+    // matching coopMeInProgress guard). Outside an ME (the wave market) it advances normally. So the owner
+    // terminal here AND the watcher terminal in coopBiomeWatch are both no-ops inside an ME - no host-only
+    // extra advance, no counter desync.
     advanceCoopInteractionForContinuation(this.coopBiomeStart);
+  }
+
+  /**
+   * Co-op (#832, audit P1#5) PICK OWNER + OPTION WATCHER: the GUEST on a GUEST-owned biome ME. The guest
+   * opens a plain BiomeShopPhase and cannot rebuild the host's curated subclass stock, so ADOPT the host's
+   * streamed stock (recomputing per-slot quantities from each option's tier - erBiomeStockCount is pure, so
+   * they match the host's buildStock exactly), THEN open + DRIVE the real market like a normal owner (each
+   * buy relays via applyModifier's coopBiomeOwner gate). Mirrors SelectModifierPhase.startCoopOwnerAdoptOptions
+   * (#828). A stream timeout falls back to a local roll (divergent but never a hang, like the watcher path).
+   */
+  private async coopBiomeDriveAdoptOptions(): Promise<void> {
+    const relay = getCoopInteractionRelay();
+    if (relay == null) {
+      // No live session (defensive): roll locally so the market still opens, never hangs.
+      this.buildStock();
+      this.openBiomeShop();
+      return;
+    }
+    const streamed = await relay.awaitRewardOptions(this.coopBiomeStart, COOP_BIOME_STOCK_REROLL, COOP_BIOME_WAIT_MS);
+    const rebuilt = streamed == null ? null : reconstructRewardOptions(streamed, globalScene.getPlayerParty());
+    if (rebuilt == null) {
+      coopWarn("reward", "biome market guest owner: stock stream timed out -> local roll fallback");
+      this.buildStock();
+    } else {
+      this.shopOptions = rebuilt;
+      // Per-slot stock counts are NOT streamed (only the options are); recompute them from each option's
+      // resolved tier - erBiomeStockCount is pure, so this matches the host's buildStock quantities exactly.
+      this.qtys = this.shopOptions.map(o => erBiomeStockCount(o.type.getOrInferTier() ?? ModifierTier.GREAT));
+    }
+    if (this.shopOptions.length === 0) {
+      this.coopBiomeTerminal();
+      this.end();
+      return;
+    }
+    this.openBiomeShop();
   }
 
   /**
    * Co-op (#673) WATCHER: never opens the market UI. Adopts the owner's streamed stock, then
    * applies each relayed buy VERBATIM (slot into that stock + target party slot + the owner's
    * post-buy money) until the LEAVE terminal. A timeout resolves like a LEAVE (never hangs);
-   * the auto-resync heals any residue.
+   * the auto-resync heals any residue. #832: the host on a GUEST-owned ME (option owner, pick watcher)
+   * ROLLS + STREAMS its own stock here instead of adopting - see the coopBiomeOptionOwner branch.
    */
   private async coopBiomeWatch(): Promise<void> {
     const relay = getCoopInteractionRelay();
@@ -258,14 +337,26 @@ export class BiomeShopPhase extends SelectModifierPhase {
       return;
     }
     globalScene.ui.showText("Your partner is browsing the market...", null, undefined, null, true);
-    const streamed = await relay.awaitRewardOptions(this.coopBiomeStart, COOP_BIOME_STOCK_REROLL, COOP_BIOME_WAIT_MS);
-    const rebuilt = streamed == null ? null : reconstructRewardOptions(streamed, globalScene.getPlayerParty());
-    if (rebuilt == null) {
-      coopWarn("reward", "biome market watcher: stock stream timed out -> local roll fallback");
+    if (this.coopBiomeOptionOwner) {
+      // #832 (audit P1#5): the HOST on a GUEST-owned biome ME is the OPTION owner but the PICK watcher. It
+      // runs the real curated subclass, so it ROLLS + STREAMS its own authoritative stock (the guest, a
+      // plain BiomeShopPhase, adopts it) and does NOT adopt - there is no other streamer. It then falls
+      // through to the buy-apply loop and applies the guest's relayed buys verbatim, exactly like a normal
+      // watcher (SelectModifierPhase's #828 host-option-owner-but-pick-watcher case).
       this.buildStock();
+      if (getCoopRuntime()?.spoof == null) {
+        relay.sendRewardOptions(this.coopBiomeStart, COOP_BIOME_STOCK_REROLL, serializeRewardOptions(this.shopOptions));
+      }
     } else {
-      this.shopOptions = rebuilt;
-      this.qtys = this.shopOptions.map(() => 99);
+      const streamed = await relay.awaitRewardOptions(this.coopBiomeStart, COOP_BIOME_STOCK_REROLL, COOP_BIOME_WAIT_MS);
+      const rebuilt = streamed == null ? null : reconstructRewardOptions(streamed, globalScene.getPlayerParty());
+      if (rebuilt == null) {
+        coopWarn("reward", "biome market watcher: stock stream timed out -> local roll fallback");
+        this.buildStock();
+      } else {
+        this.shopOptions = rebuilt;
+        this.qtys = this.shopOptions.map(() => 99);
+      }
     }
     const seq = coopBiomeShopSeq(this.coopBiomeStart);
     for (;;) {
