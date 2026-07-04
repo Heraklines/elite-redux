@@ -511,24 +511,40 @@ export function registerHostFaintAutoPick(game: GameManager, rig: DuoRig): void 
     "SwitchPhase",
     UiMode.PARTY,
     () => {
-      const slot = firstLegalBenchSlot(rig.hostScene, "host");
-      if (slot < 0) {
-        return;
+      // A SwitchPhase that reached UiMode.PARTY on the host is - by switch-phase.ts construction - a
+      // HOST-owned faint's OWNER picker (a GUEST-owned faint takes the watcher/relay path: it shows
+      // MESSAGE and awaits the guest's relayed pick, NEVER opening PARTY on the host). Defensively gate by
+      // the SwitchPhase's own `fieldIndex` so a host bench mon can never be sent into a guest-owned slot.
+      const phase = rig.hostScene.phaseManager.getCurrentPhase() as unknown as { fieldIndex?: number } | undefined;
+      const fieldIndex = phase?.fieldIndex;
+      const drivesHostSlot = typeof fieldIndex !== "number" || coopOwnerForPartySlot(fieldIndex) === "host";
+      const benchSlot = firstLegalBenchSlot(rig.hostScene, "host");
+      if (drivesHostSlot && benchSlot >= 0) {
+        const handler = rig.hostScene.ui.getHandler() as PartyUiHandler;
+        handler.setCursor(benchSlot);
+        handler.processInput(Button.ACTION); // select the bench mon
+        handler.processInput(Button.ACTION); // send it out
       }
-      const handler = rig.hostScene.ui.getHandler() as PartyUiHandler;
-      handler.setCursor(slot);
-      handler.processInput(Button.ACTION); // select the bench mon
-      handler.processInput(Button.ACTION); // send it out
+      // 🔴 #847 DOUBLE / INTERLEAVED FAINT: one turn can KO BOTH field slots, opening TWO replacement
+      // SwitchPhases in a single crossing - the GUEST-owned one (watcher/relay) and this HOST-owned one -
+      // in either order, with intervening SwitchSummon / PostSummon / out-of-band-checkpoint phases (and, on
+      // a tough trainer wave, the trainer's own enemy send-outs) between them. A ONE-SHOT prompt could be
+      // consumed or expired before the host-owned SwitchPhase opened, leaving it with NO picker and
+      // STRANDING the to("CommandPhase") crossing forever (seed 20260704 wave 66, a fixed evil-team trainer
+      // wave). RE-ARM while a host-owned faint is STILL pending (the summon this pick queued has not fielded
+      // yet, so the slot still reads fainted here) and a legal host bench remains - so the picker DRAINS
+      // EVERY host-owned SwitchPhase in the crossing. The bench guard stops a no-replacement host PARTY (the
+      // run is wiping) from re-arming into an infinite loop; hostRunEndReason then classifies that terminal.
+      if (hostOwnedFaintPending(rig) && firstLegalBenchSlot(rig.hostScene, "host") >= 0) {
+        registerHostFaintAutoPick(game, rig);
+      }
     },
-    () =>
-      game.isCurrentPhase(
-        "CommandPhase",
-        "TurnInitPhase",
-        "VictoryPhase",
-        "BattleEndPhase",
-        "NewBattlePhase",
-        "SelectModifierPhase",
-      ),
+    // Expire ONLY when no host-owned faint remains to drive. The old phase-list expireFn (CommandPhase /
+    // TurnInitPhase / ...) could drop the picker on a phase that runs BETWEEN two faint replacements,
+    // stranding the second (host-owned) SwitchPhase - the #847 failure mode. Gating on the faint state
+    // instead can never expire mid-crossing while a host-owned faint is still open, and a faint-free arm
+    // still never lingers because every arming site gates on hostOwnedFaintPending.
+    () => !hostOwnedFaintPending(rig),
   );
 }
 
