@@ -1,0 +1,283 @@
+url:      https://elite-redux-staging.pages.dev/
+build:    mr5n8px7-2um
+mode:     4  wave:2
+seed:     Pzf1L9GCSJq9fus4FOpPlmeX
+party:    Iron Valiant(L5 23hp f0), Kecleon(L5 22hp f0), Gimmighoul(L5 23hp f0), Marbeep(L5 23hp f0), Zigzagoon(L5 20hp f0), Snorunt Redux(L5 22hp f0)
+enemy:    Lotad(L3), Skwovet(L2), Sunkern(L3)
+
+----- CONSOLE -----
+[01:09:47.609] LOG: %cStart Phase MessagePhase color:green;
+[01:09:47.738] LOG: %cStart Phase MoveEffectPhase color:green;
+[01:09:48.128] LOG: %cStart Phase MessagePhase color:green;
+[01:09:48.389] LOG: %cStart Phase MoveEndPhase color:green;
+[01:09:48.390] LOG: %cStart Phase MovePhase color:green;
+[01:09:48.390] LOG: %cUser: Bidoof
+Move: STRENGTH
+Use Mode: NORMAL color:orchid
+[01:09:48.410] LOG: %cStart Phase MessagePhase color:green;
+[01:09:48.530] LOG: %cStart Phase MoveEffectPhase color:green;
+[01:09:48.533] LOG: %cStart Phase MessagePhase color:green;
+[01:09:48.763] LOG: %cStart Phase MoveEndPhase color:green;
+[01:09:48.764] LOG: %cStart Phase CheckInterludePhase color:green;
+[01:09:48.764] LOG: %cStart Phase WeatherEffectPhase color:green;
+[01:09:48.765] LOG: %cStart Phase PositionalTagPhase color:green;
+[01:09:48.765] LOG: %cStart Phase BerryPhase color:green;
+[01:09:48.772] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[01:09:48.777] LOG: %cStart Phase TurnEndPhase color:green;
+[01:09:48.785] WARN: [coop:turn] host recorder: finalize with NO open recording -> turn=-1 events=0 (caller decides not to emit)
+[01:09:48.785] LOG: %cStart Phase TurnInitPhase color:green;
+[01:09:48.786] LOG: %cStart Phase CommandPhase color:green;
+[01:09:51.662] LOG: Move: PLAY_ROUGH Move targets: {"targets":[],"multiple":false} 
+Player Pokemon: Iron Valiant
+[01:09:51.665] LOG: %cStart Phase CommandPhase color:green;
+[01:09:52.407] LOG: Move: HAPPY_HOUR Move targets: {"targets":[1,0,2],"multiple":true} 
+Player Pokemon: Gimmighoul
+[01:09:52.409] LOG: %cStart Phase SelectTargetPhase color:green;
+[01:09:52.912] LOG: %cStart Phase CommandPhase color:green;
+[01:09:54.855] LOG: Move: SHADOW_SNEAK Move targets: {"targets":[5,0,2],"multiple":false} 
+Player Pokemon: Gimmighoul
+[01:09:54.859] LOG: %cStart Phase SelectTargetPhase color:green;
+[01:09:55.029] LOG: %cStart Phase CommandPhase color:green;
+[01:09:56.361] LOG: Move: ZIPPY_ZAP Move targets: {"targets":[5,1],"multiple":false} 
+Player Pokemon: Kecleon
+[01:09:56.363] LOG: %cStart Phase SelectTargetPhase color:green;
+[01:09:56.545] LOG: %cStart Phase EnemyCommandPhase color:green;
+[01:09:56.558] LOG: Battle Seed: VOwMtRBwElHMPG4F
+[01:09:56.562] LOG: Move Pool: ["Hyper Fang","Strength","Defense Curl","Mud Sport"]
+[01:09:56.562] LOG: Move Scores: [28.5,18,2,0]
+[01:09:56.562] LOG: Sorted Move Pool: ["Hyper Fang","Strength","Defense Curl","Mud Sport"]
+[01:09:56.563] LOG: Chosen Move: Hyper Fang
+[01:09:56.563] LOG: %cStart Phase TurnStartPhase color:green;
+[01:09:56.573] LOG: %cStart Phase MovePhase color:green;
+[01:09:56.573] LOG: %cUser: Kecleon
+Move: ZIPPY_ZAP
+Use Mode: NORMAL color:orchid
+[01:09:56.582] LOG: %cStart Phase MessagePhase color:green;
+[01:09:56.655] LOG: %cStart Phase ShowAbilityPhase color:green;
+[01:09:56.823] LOG: %cStart Phase MessagePhase color:green;
+[01:09:57.088] LOG: %cStart Phase HideAbilityPhase color:green;
+[01:09:57.124] LOG: %cStart Phase MoveEffectPhase color:green;
+[01:09:57.907] LOG: crit stage: +0
+[01:09:57.910] LOG: Move: Zippy Zap | Base damage: 11.714285714285715 | Power: 50 | Source attack: 17 | Target defense: 7
+[01:09:57.912] LOG: Move: Zippy Zap | Attack damage: 26
+[01:09:57.912] LOG: %cStart Phase DamageAnimPhase color:green;
+[01:09:57.940] LOG: %cStart Phase MessagePhase color:green;
+[01:09:58.138] LOG: %cStart Phase FaintPhase color:green;
+[01:09:59.345] LOG: %cStart Phase MessagePhase color:green;
+[01:10:00.719] LOG: %cStart Phase VictoryPhase color:green;
+[01:10:00.720] LOG: %cStart Phase ExpPhase color:green;
+[01:10:01.490] LOG: %cStart Phase ExpPhase color:green;
+[01:10:01.689] LOG: %cStart Phase ExpPhase color:green;
+[01:10:01.906] LOG: %cStart Phase MoveEndPhase color:green;
+[01:10:01.908] LOG: %cStart Phase MovePhase color:green;
+[01:10:01.908] LOG: %cUser: Gimmighoul
+Move: SHADOW_SNEAK
+Use Mode: NORMAL color:orchid
+[01:10:01.912] LOG: %cStart Phase MessagePhase color:green;
+[01:10:02.046] LOG: %cStart Phase MessagePhase color:green;
+[01:10:02.261] LOG: %cStart Phase MoveEndPhase color:green;
+[01:10:02.262] LOG: %cStart Phase MovePhase color:green;
+[01:10:02.262] LOG: %cUser: Iron Valiant
+Move: PLAY_ROUGH
+Use Mode: NORMAL color:orchid
+[01:10:02.263] WARN: Iron Valiant is attempting to use a move with no targets
+[01:10:02.263] LOG: %cStart Phase MoveEndPhase color:green;
+[01:10:02.263] LOG: %cStart Phase MovePhase color:green;
+[01:10:02.263] LOG: %cStart Phase MoveEndPhase color:green;
+[01:10:02.263] LOG: %cStart Phase CheckInterludePhase color:green;
+[01:10:02.263] LOG: %cStart Phase WeatherEffectPhase color:green;
+[01:10:02.263] LOG: %cStart Phase PositionalTagPhase color:green;
+[01:10:02.263] LOG: %cStart Phase BerryPhase color:green;
+[01:10:02.266] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[01:10:02.269] LOG: %cStart Phase TurnEndPhase color:green;
+[01:10:02.274] WARN: [coop:turn] host recorder: finalize with NO open recording -> turn=-1 events=0 (caller decides not to emit)
+[01:10:02.274] LOG: %cStart Phase BattleEndPhase color:green;
+[01:10:02.274] LOG: Battle Score: 28 (2 Turns x0.92)
+[01:10:02.274] LOG: Total Score: 28
+[01:10:02.286] LOG: %cStart Phase ShowAbilityPhase color:green;
+[01:10:02.287] LOG: %cStart Phase HideAbilityPhase color:green;
+[01:10:02.318] LOG: %cStart Phase MessagePhase color:green;
+[01:10:02.673] LOG: %cStart Phase EggLapsePhase color:green;
+[01:10:02.674] LOG: %cStart Phase SelectModifierPhase color:green;
+[01:10:02.675] LOG: Wave Seed: Q{g2M:HDTKr:gvt5GPqQmnfY 1
+[01:10:02.696] LOG: 14 9 [2,3,4,5,6,7,8,9,10,22]
+[01:10:02.697] LOG: GREAT 0
+[01:10:02.697] LOG: 13 9 [2,3,4,5,6,7,8,9,10,22]
+[01:10:02.697] LOG: {"id":"NUGGET","localeKey":"modifierType:ModifierType.NUGGET","iconImage":"nugget","group":"money","soundName":"se/buy","tier":1,"moneyMultiplier":1,"moneyMultiplierDescriptorKey":"modifierType:ModifierType.MoneyRewardModifierType.extra.small"} 
+[01:10:02.697] LOG: 6 4 [2,3,4,5]
+[01:10:02.697] LOG: {"id":"LURE","localeKey":"modifierType:ModifierType.LURE","iconImage":"lure","group":"lure","soundName":"se/restore","tier":0,"maxBattles":10} 
+[01:10:02.697] LOG: 9 4 [2,3,4,5]
+[01:10:02.697] LOG: {"id":"TM_CASE","localeKey":"","iconImage":"tm_case","soundName":"se/restore","tier":0} 
+[01:10:08.694] LOG: %cStart Phase LearnMovePhase color:green;
+[01:10:09.798] WARN: cry/1006 not found
+[01:10:11.476] LOG: [coop:reward] advanceCoopInteractionForContinuation SKIP (isCoop=false fromSeq=-1 meInProgress=false)
+[01:10:12.178] LOG: %cStart Phase NewBattlePhase color:green;
+[01:10:12.179] LOG: Wave Seed: R|h3N;IEULs;hwu6HQrRnogZ 2
+[01:10:12.181] LOG: %cStart Phase NextEncounterPhase color:green;
+[01:10:12.184] LOG: Starting species pool tier: UNCOMMON
+[01:10:12.195] LOG: Pokemon: Wild Lotad | Species ID: 270 | Level: 3 | Nature: Modest (+SpAtk/-Atk)
+[01:10:12.195] LOG: Stats (IVs): HP: 15 (18), Atk: 5 (0), Def: 7 (18), Spatk: 9 (5), Spdef: 8 (17), Spd: 8 (26)
+[01:10:12.195] LOG: Ability: Chlorophyll | Passive Ability: Seaweed 
+[01:10:12.195] LOG: Moveset: ["Bubble Beam","Growl","Mega Drain","Astonish"]
+[01:10:12.195] LOG: Starting species pool tier: COMMON
+[01:10:12.203] LOG: Pokemon: Wild Skwovet | Species ID: 819 | Level: 2 | Nature: Bold (+Def/-Atk)
+[01:10:12.203] LOG: Stats (IVs): HP: 15 (31), Atk: 6 (28), Def: 8 (17), Spatk: 6 (6), Spdef: 6 (24), Spd: 6 (21)
+[01:10:12.203] LOG: Ability: Frisk | Passive Ability: Gluttony 
+[01:10:12.203] LOG: Moveset: ["Tackle","Stuff Cheeks","Defense Curl","Berry Smash"]
+[01:10:12.204] LOG: Starting species pool tier: COMMON
+[01:10:12.213] LOG: Pokemon: Wild Sunkern | Species ID: 191 | Level: 3 | Nature: Jolly (+Spd/-SpAtk)
+[01:10:12.213] LOG: Stats (IVs): HP: 16 (13), Atk: 8 (1), Def: 8 (19), Spatk: 7 (8), Spdef: 8 (4), Spd: 8 (12)
+[01:10:12.213] LOG: Ability: Grassy Surge | Passive Ability: Guilt Trip 
+[01:10:12.213] LOG: Moveset: ["Mega Drain","Encore","Flower Shield","Growth"]
+[01:10:14.206] DEBUG: Session data saved to slot 2!
+[01:10:14.206] LOG: Wave Seed: R|h3N;IEULs;hwu6HQrRnogZ 2
+[01:10:14.675] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[01:10:14.675] LOG: %cStart Phase CheckSwitchPhase color:green;
+[01:10:15.099] LOG: %cStart Phase CheckSwitchPhase color:green;
+[01:10:15.362] LOG: %cStart Phase SwitchPhase color:green;
+[01:10:23.139] LOG: %cStart Phase SwitchSummonPhase color:green;
+[01:10:23.389] WARN: cry/10029 not found
+[01:10:23.512] LOG: %cStart Phase PostSummonPhase color:green;
+[01:10:23.512] LOG: Ran PSP for: Marbeep
+[01:10:23.515] LOG: %cStart Phase PostSummonPhase color:green;
+[01:10:23.515] LOG: %cStart Phase PostSummonPhase color:green;
+[01:10:23.515] LOG: %cStart Phase CheckSwitchPhase color:green;
+[01:10:23.988] LOG: %cStart Phase SwitchPhase color:green;
+[01:10:25.515] LOG: %cStart Phase SwitchSummonPhase color:green;
+[01:10:25.748] WARN: cry/999 not found
+[01:10:25.887] LOG: %cStart Phase PostSummonPhase color:green;
+[01:10:25.887] LOG: Ran PSP for: Gimmighoul
+[01:10:25.889] LOG: %cStart Phase PostSummonPhase color:green;
+[01:10:25.889] LOG: %cStart Phase PostSummonPhase color:green;
+[01:10:25.890] LOG: %cStart Phase InitEncounterPhase color:green;
+[01:10:25.891] LOG: %cStart Phase PostSummonPhase color:green;
+[01:10:25.891] LOG: Ran PSP for: Sunkern
+[01:10:25.894] LOG: %cStart Phase PostSummonPhase color:green;
+[01:10:25.894] LOG: Ran PSP for: Lotad
+[01:10:25.897] LOG: %cStart Phase PostSummonPhase color:green;
+[01:10:25.910] LOG: %cStart Phase ShowAbilityPhase color:green;
+[01:10:26.075] LOG: %cStart Phase CommonAnimPhase color:green;
+[01:10:26.588] LOG: %cStart Phase MessagePhase color:green;
+[01:10:26.855] LOG: %cStart Phase HideAbilityPhase color:green;
+[01:10:26.895] LOG: %cStart Phase PostSummonPhase color:green;
+[01:10:26.898] LOG: %cStart Phase PostSummonPhase color:green;
+[01:10:26.899] LOG: %cStart Phase PostSummonPhase color:green;
+[01:10:26.899] LOG: %cStart Phase PostSummonPhase color:green;
+[01:10:26.899] LOG: Ran PSP for: Skwovet
+[01:10:26.903] LOG: %cStart Phase PostSummonPhase color:green;
+[01:10:26.914] LOG: %cStart Phase ShowAbilityPhase color:green;
+[01:10:27.083] LOG: %cStart Phase HideAbilityPhase color:green;
+[01:10:27.132] LOG: %cStart Phase PostSummonPhase color:green;
+[01:10:27.132] LOG: %cStart Phase TurnInitPhase color:green;
+[01:10:27.132] LOG: %cStart Phase CommandPhase color:green;
+[01:10:31.520] LOG: Move: SWORDS_DANCE Move targets: {"targets":[0],"multiple":false} 
+Player Pokemon: Iron Valiant
+[01:10:31.522] LOG: %cStart Phase CommandPhase color:green;
+[01:10:33.945] LOG: %cStart Phase CommandPhase color:green;
+[01:10:36.895] LOG: Move: ASTRAL_BARRAGE Move targets: {"targets":[4,5],"multiple":true} 
+Player Pokemon: Gimmighoul
+[01:10:36.897] LOG: %cStart Phase SelectTargetPhase color:green;
+[01:10:37.203] LOG: %cStart Phase EnemyCommandPhase color:green;
+[01:10:37.218] LOG: Battle Seed: Rtpvcpp9eSvvOxo9
+[01:10:37.224] LOG: Move Pool: ["Bubble Beam","Growl","Mega Drain","Astonish"]
+[01:10:37.224] LOG: Move Scores: [30,2,6.75,13]
+[01:10:37.224] LOG: Sorted Move Pool: ["Bubble Beam","Astonish","Mega Drain","Growl"]
+[01:10:37.224] LOG: Chosen Move: Astonish
+[01:10:37.224] LOG: %cStart Phase EnemyCommandPhase color:green;
+[01:10:37.233] LOG: Move Pool: ["Tackle","Defense Curl","Berry Smash"]
+[01:10:37.233] LOG: Move Scores: [12,2,6.75]
+[01:10:37.233] LOG: Sorted Move Pool: ["Tackle","Berry Smash","Defense Curl"]
+[01:10:37.233] LOG: Chosen Move: Tackle
+[01:10:37.233] LOG: %cStart Phase EnemyCommandPhase color:green;
+[01:10:37.238] LOG: Move Pool: ["Mega Drain","Encore","Flower Shield","Growth"]
+[01:10:37.238] LOG: Move Scores: [7.125,-20,0,0]
+[01:10:37.238] LOG: Sorted Move Pool: ["Mega Drain","Flower Shield","Growth","Encore"]
+[01:10:37.238] LOG: Chosen Move: Mega Drain
+[01:10:37.238] LOG: %cStart Phase TurnStartPhase color:green;
+[01:10:37.252] LOG: %cStart Phase SwitchSummonPhase color:green;
+[01:10:37.584] LOG: %cStart Phase ShinySparklePhase color:green;
+[01:10:37.671] LOG: %cStart Phase PostSummonPhase color:green;
+[01:10:37.672] LOG: Ran PSP for: Kecleon
+[01:10:37.678] LOG: %cStart Phase PostSummonPhase color:green;
+[01:10:37.678] LOG: %cStart Phase PostSummonPhase color:green;
+[01:10:37.686] LOG: %cStart Phase MovePhase color:green;
+[01:10:37.687] LOG: %cUser: Lotad
+Move: ASTONISH
+Use Mode: NORMAL color:orchid
+[01:10:37.714] LOG: %cStart Phase MessagePhase color:green;
+[01:10:37.813] LOG: %cStart Phase MoveEffectPhase color:green;
+[01:10:38.049] LOG: crit stage: +0
+[01:10:38.051] LOG: Move: Astonish | Base damage: 2.8533333333333335 | Power: 40 | Source attack: 5 | Target defense: 15
+[01:10:38.053] LOG: Move: Astonish | Attack damage: 0
+[01:10:38.059] LOG: %cStart Phase MoveEndPhase color:green;
+[01:10:38.067] LOG: %cStart Phase MovePhase color:green;
+[01:10:38.067] LOG: %cUser: Iron Valiant
+Move: SWORDS_DANCE
+Use Mode: NORMAL color:orchid
+[01:10:38.067] LOG: %cStart Phase MessagePhase color:green;
+[01:10:38.263] LOG: %cStart Phase MoveEndPhase color:green;
+[01:10:38.268] LOG: %cStart Phase MovePhase color:green;
+[01:10:38.268] LOG: %cUser: Kecleon
+Move: SCRATCH
+Use Mode: INDIRECT color:orchid
+[01:10:38.283] LOG: %cStart Phase MessagePhase color:green;
+[01:10:38.397] LOG: %cStart Phase MoveEffectPhase color:green;
+[01:10:38.414] LOG: crit stage: +0
+[01:10:38.416] LOG: Move: Scratch | Base damage: 9.771428571428572 | Power: 40 | Source attack: 17 | Target defense: 7
+[01:10:38.417] LOG: Move: Scratch | Attack damage: 14
+[01:10:38.418] LOG: %cStart Phase DamageAnimPhase color:green;
+[01:10:38.448] LOG: %cStart Phase MoveEndPhase color:green;
+[01:10:38.451] LOG: %cStart Phase MovePhase color:green;
+[01:10:38.451] LOG: %cUser: Gimmighoul
+Move: ASTRAL_BARRAGE
+Use Mode: NORMAL color:orchid
+[01:10:38.468] LOG: %cStart Phase MessagePhase color:green;
+[01:10:38.571] LOG: %cStart Phase MoveEffectPhase color:green;
+[01:10:39.214] LOG: crit stage: +0
+[01:10:39.216] LOG: Move: Astral Barrage | Base damage: 17.6 | Power: 120 | Source attack: 13 | Target defense: 8
+[01:10:39.217] LOG: Move: Astral Barrage | Attack damage: 17
+[01:10:39.217] LOG: %cStart Phase MessagePhase color:green;
+[01:10:39.455] LOG: %cStart Phase DamageAnimPhase color:green;
+[01:10:39.492] LOG: %cStart Phase FaintPhase color:green;
+[01:10:40.247] LOG: %cStart Phase MessagePhase color:green;
+[01:10:40.451] LOG: %cStart Phase VictoryPhase color:green;
+[01:10:40.452] LOG: %cStart Phase ExpPhase color:green;
+[01:10:40.688] LOG: %cStart Phase ExpPhase color:green;
+[01:10:40.856] LOG: %cStart Phase ExpPhase color:green;
+[01:10:41.039] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[01:10:41.040] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[01:10:41.041] LOG: %cStart Phase MoveEndPhase color:green;
+[01:10:41.042] LOG: %cStart Phase MovePhase color:green;
+[01:10:41.042] LOG: %cStart Phase MoveEndPhase color:green;
+[01:10:41.042] LOG: %cStart Phase MovePhase color:green;
+[01:10:41.042] LOG: %cUser: Skwovet
+Move: TACKLE
+Use Mode: NORMAL color:orchid
+[01:10:41.060] LOG: %cStart Phase MessagePhase color:green;
+[01:10:41.180] LOG: %cStart Phase MoveEffectPhase color:green;
+[01:10:41.183] LOG: %cStart Phase ShowAbilityPhase color:green;
+[01:10:41.348] LOG: %cStart Phase HideAbilityPhase color:green;
+[01:10:41.397] LOG: %cStart Phase MessagePhase color:green;
+[01:10:41.630] LOG: %cStart Phase MoveEndPhase color:green;
+[01:10:41.630] LOG: %cStart Phase CheckInterludePhase color:green;
+[01:10:41.630] LOG: %cStart Phase WeatherEffectPhase color:green;
+[01:10:41.631] LOG: %cStart Phase PositionalTagPhase color:green;
+[01:10:41.631] LOG: %cStart Phase BerryPhase color:green;
+[01:10:41.647] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[01:10:41.657] LOG: %cStart Phase TurnEndPhase color:green;
+[01:10:41.665] WARN: [coop:turn] host recorder: finalize with NO open recording -> turn=-1 events=0 (caller decides not to emit)
+[01:10:41.665] LOG: %cStart Phase PokemonHealPhase color:green;
+[01:10:41.666] LOG: %cStart Phase MessagePhase color:green;
+[01:10:41.854] LOG: %cStart Phase PokemonHealPhase color:green;
+[01:10:41.855] LOG: %cStart Phase MessagePhase color:green;
+[01:10:42.080] LOG: %cStart Phase PokemonHealPhase color:green;
+[01:10:42.302] LOG: %cStart Phase MessagePhase color:green;
+[01:10:42.529] LOG: %cStart Phase PokemonHealPhase color:green;
+[01:10:42.530] LOG: %cStart Phase MessagePhase color:green;
+[01:10:42.746] LOG: %cStart Phase PokemonHealPhase color:green;
+[01:10:42.747] LOG: %cStart Phase MessagePhase color:green;
+[01:10:42.998] LOG: %cStart Phase TurnInitPhase color:green;
+[01:10:42.999] LOG: %cStart Phase CommandPhase color:green;
+[01:10:43.928] LOG: Move: SWORDS_DANCE Move targets: {"targets":[0],"multiple":false} 
+Player Pokemon: Iron Valiant
+[01:10:43.930] LOG: %cStart Phase CommandPhase color:green;
