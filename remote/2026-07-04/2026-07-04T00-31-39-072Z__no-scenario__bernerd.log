@@ -1,0 +1,279 @@
+url:      https://elite-redux-staging.pages.dev/
+build:    mr5lus5o-iigh
+mode:     4  wave:5
+seed:     uAjZOFh3I2y67rmygSeRY64B
+party:    Clauncher(L6 26hp f0), Kecleon(L6 25hp f0), Yveltal(L6 22hp f0), Zigzagoon(L5 20hp f0), Scatterbug(L5 20hp f0), Marbeep(L5 23hp f0)
+enemy:    Machoke(L4), Zigzagoon(L4), Mawile(L4)
+
+----- COMMENT -----
+Upon selecting all 3 moves but backing out of Yveltal, its move was canceled entirely and only the partner Kecleon and Clauncher's moves went through
+
+----- CONSOLE -----
+[00:29:45.946] WARN: [coop:turn] host recorder: finalize with NO open recording -> turn=-1 events=0 (caller decides not to emit)
+[00:29:45.946] LOG: %cStart Phase BattleEndPhase color:green;
+[00:29:45.946] LOG: Battle Score: 48 (2 Turns x0.92)
+[00:29:45.946] LOG: Total Score: 140
+[00:29:45.959] LOG: %cStart Phase ShowAbilityPhase color:green;
+[00:29:45.959] LOG: %cStart Phase MessagePhase color:green;
+[00:29:46.172] LOG: %cStart Phase HideAbilityPhase color:green;
+[00:29:46.198] LOG: %cStart Phase ShowAbilityPhase color:green;
+[00:29:46.198] LOG: %cStart Phase HideAbilityPhase color:green;
+[00:29:46.248] LOG: %cStart Phase MessagePhase color:green;
+[00:29:46.545] LOG: %cStart Phase TrainerVictoryPhase color:green;
+[00:29:46.549] LOG: Beginners Easton & Evelyn
+[00:29:46.930] LOG: Youngster Easton
+[00:29:47.239] LOG: Dialogue saved as seen: dialogue:youngster.victory.9
+[00:29:47.239] LOG: %cStart Phase MoneyRewardPhase color:green;
+[00:29:47.604] LOG: %cStart Phase ModifierRewardPhase color:green;
+[00:29:47.953] LOG: %cStart Phase ModifierRewardPhase color:green;
+[00:29:48.253] LOG: %cStart Phase EggLapsePhase color:green;
+[00:29:48.254] LOG: %cStart Phase SelectModifierPhase color:green;
+[00:29:48.254] LOG: Wave Seed: yEn^SJl7M6}:;vq}kWiV]:8F 4
+[00:29:48.277] LOG: 0 0 [3,4,5]
+[00:29:48.277] LOG: {"id":"POKEBALL","localeKey":"","iconImage":"pb","group":"pb","soundName":"se/pb_bounce_1","tier":0,"pokeballType":0,"count":5} 
+[00:29:48.277] LOG: 24 6 [10,11,12,13,14,23]
+[00:29:48.277] LOG: {"id":"QUICK_CLAW","localeKey":"modifierType:ModifierType.QUICK_CLAW","iconImage":"quick_claw","soundName":"se/restore","tier":2} 
+[00:29:48.277] LOG: 17 5 [10,11,12,13,14,23]
+[00:29:48.277] LOG: {"id":"ATTACK_TYPE_BOOSTER","localeKey":"","iconImage":"miracle_seed","soundName":"se/restore","tier":2,"moveType":11,"boostPercent":20} 
+[00:29:48.278] LOG: 30 6 [10,11,12,13,14,23]
+[00:29:48.278] LOG: {"id":"ER_LOADED_DICE","localeKey":"","iconImage":"wide_lens","iconTint":15255626,"soundName":"se/restore","tier":2} 
+[00:29:48.278] LOG: 31 6 [10,11,12,13,14,23]
+[00:29:48.278] LOG: {"id":"ER_LUCKY_HEART","localeKey":"","iconImage":"healing_charm","iconTint":16744362,"soundName":"se/restore","tier":2} 
+[00:29:48.278] LOG: 7 0 [10,11,12,13,14,23]
+[00:29:48.278] LOG: {"id":"AMULET_COIN","localeKey":"modifierType:ModifierType.AMULET_COIN","iconImage":"amulet_coin","soundName":"se/restore","tier":2} 
+[00:29:48.278] LOG: 34 6 [10,11,12,13,14,23]
+[00:29:48.278] LOG: {"id":"ER_LEARNERS_SHROOM","localeKey":"","iconImage":"learners_shroom","soundName":"se/restore","tier":2} 
+[00:29:48.278] LOG: 6 0 [10,11,12,13,14,23]
+[00:29:48.278] LOG: ULTRA 1
+[00:29:48.278] LOG: 4 0 [10,11,12,13,14,23]
+[00:29:48.278] LOG: {"id":"MINT","localeKey":"","iconImage":"mint_spd","group":"mint","soundName":"se/restore","tier":2,"nature":14} 
+[00:29:52.331] WARN: cry/692 not found
+[00:29:52.520] WARN: cry/352 not found
+[00:29:52.854] WARN: cry/717 not found
+[00:29:53.161] WARN: cry/263 not found
+[00:29:53.456] WARN: cry/664 not found
+[00:29:53.736] WARN: cry/10029 not found
+[00:29:58.755] LOG: %cStart Phase NewBattlePhase color:green;
+[00:29:58.755] LOG: Wave Seed: zFo_TKm8N7~;<wr~lXjW^;9G 5
+[00:29:58.758] LOG: %cStart Phase MessagePhase color:green;
+[00:29:58.999] LOG: %cStart Phase ReturnPhase color:green;
+[00:29:59.115] LOG: %cStart Phase ReturnPhase color:green;
+[00:29:59.230] LOG: %cStart Phase ReturnPhase color:green;
+[00:29:59.347] LOG: %cStart Phase ShowTrainerPhase color:green;
+[00:29:59.455] LOG: %cStart Phase NextEncounterPhase color:green;
+[00:29:59.473] LOG: ER #419: elite BST cap (420 @ w5) - replacing Machamp (505) with Machoke (405)
+[00:29:59.487] LOG: Pokemon: Foe Machoke | Species ID: 67 | Level: 4 | Nature: Adamant (+Atk/-SpAtk)
+[00:29:59.487] LOG: Stats (IVs): HP: 21 (31), Atk: 11 (31), Def: 11 (31), Spatk: 10 (31), Spdef: 11 (31), Spd: 9 (31)
+[00:29:59.487] LOG: Ability: Sheer Force | Passive Ability: No Guard 
+[00:29:59.487] LOG: Moveset: ["Dynamic Punch","Stone Edge","Knock Off","Mach Punch"]
+[00:29:59.497] LOG: ER #419: elite BST cap (420 @ w5) - replacing Basculin (480) with Mawile (410)
+[00:29:59.504] LOG: Pokemon: Foe Mawile | Species ID: 303 | Level: 4 | Nature: Jolly (+Spd/-SpAtk)
+[00:29:59.504] LOG: Stats (IVs): HP: 20 (31), Atk: 9 (31), Def: 14 (31), Spatk: 10 (31), Spdef: 11 (31), Spd: 9 (31)
+[00:29:59.504] LOG: Ability: Intimidate | Passive Ability: Multi-Headed 
+[00:29:59.504] LOG: Moveset: ["Aqua Fang","Crunch","Ice Fang","Psychic Fangs"]
+[00:29:59.504] LOG: COMMON
+[00:29:59.504] LOG: Zigzagoon
+[00:29:59.509] LOG: Pokemon: Foe Zigzagoon | Species ID: 263 | Level: 4 | Nature: Lax (+Def/-SpDef)
+[00:29:59.509] LOG: Stats (IVs): HP: 17 (13), Atk: 10 (23), Def: 9 (9), Spatk: 8 (5), Spdef: 8 (22), Spd: 10 (1)
+[00:29:59.509] LOG: Ability: Momentum | Passive Ability: Pickup 
+[00:29:59.509] LOG: Moveset: ["Double-Edge","Stomping Tantrum","Odor Sleuth","Mud Sport"]
+[00:30:02.653] LOG: Battle Seed: g5OWHaX8q1oegqVI
+[00:30:02.655] LOG: Generated AI funcs
+[00:30:02.734] DEBUG: Session data saved to slot 1!
+[00:30:02.734] LOG: Wave Seed: zFo_TKm8N7~;<wr~lXjW^;9G 5
+[00:30:02.940] LOG: Youngster Hernan
+[00:30:03.239] LOG: Dialogue saved as seen: dialogue:youngster.encounter.3
+[00:30:03.285] LOG: Youngster Hernan
+[00:30:03.623] LOG: %cStart Phase SummonPhase color:green;
+[00:30:03.624] LOG: Hernan
+[00:30:03.922] LOG: %cStart Phase SummonPhase color:green;
+[00:30:03.922] LOG: Hernan
+[00:30:04.205] LOG: %cStart Phase SummonPhase color:green;
+[00:30:04.206] LOG: Hernan
+[00:30:04.405] WARN: cry/263 not found
+[00:30:04.521] LOG: %cStart Phase SummonPhase color:green;
+[00:30:04.707] WARN: cry/692 not found
+[00:30:04.822] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[00:30:04.825] LOG: %cStart Phase SummonPhase color:green;
+[00:30:05.006] WARN: cry/352 not found
+[00:30:05.122] LOG: %cStart Phase ShinySparklePhase color:green;
+[00:30:05.221] LOG: %cStart Phase SummonPhase color:green;
+[00:30:05.406] WARN: cry/717 not found
+[00:30:05.505] LOG: %cStart Phase ShinySparklePhase color:green;
+[00:30:05.605] LOG: %cStart Phase InitEncounterPhase color:green;
+[00:30:05.619] LOG: %cStart Phase PostSummonPhase color:green;
+[00:30:05.619] LOG: Ran PSP for: Yveltal
+[00:30:05.628] LOG: %cStart Phase PostSummonPhase color:green;
+[00:30:05.633] LOG: %cStart Phase PostSummonPhase color:green;
+[00:30:05.634] LOG: %cStart Phase ShowAbilityPhase color:green;
+[00:30:05.790] LOG: %cStart Phase MessagePhase color:green;
+[00:30:06.038] LOG: %cStart Phase HideAbilityPhase color:green;
+[00:30:06.074] LOG: %cStart Phase MovePhase color:green;
+[00:30:06.075] LOG: %cUser: Yveltal
+Move: TAILWIND
+Use Mode: FOLLOW_UP color:orchid
+[00:30:06.107] LOG: %cStart Phase MessagePhase color:green;
+[00:30:06.188] LOG: %cStart Phase MoveEffectPhase color:green;
+[00:30:06.213] LOG: %cStart Phase MessagePhase color:green;
+[00:30:06.455] LOG: %cStart Phase MoveEndPhase color:green;
+[00:30:06.466] LOG: %cStart Phase PostSummonPhase color:green;
+[00:30:06.466] LOG: Ran PSP for: Clauncher
+[00:30:06.474] LOG: %cStart Phase PostSummonPhase color:green;
+[00:30:06.478] LOG: %cStart Phase PostSummonPhase color:green;
+[00:30:06.481] LOG: %cStart Phase PostSummonPhase color:green;
+[00:30:06.481] LOG: Ran PSP for: Kecleon
+[00:30:06.484] LOG: %cStart Phase PostSummonPhase color:green;
+[00:30:06.486] LOG: %cStart Phase PostSummonPhase color:green;
+[00:30:06.486] LOG: %cStart Phase MovePhase color:green;
+[00:30:06.486] LOG: %cUser: Kecleon
+Move: SCRATCH
+Use Mode: INDIRECT color:orchid
+[00:30:06.499] LOG: %cStart Phase MessagePhase color:green;
+[00:30:06.596] LOG: %cStart Phase MoveEffectPhase color:green;
+[00:30:06.615] LOG: crit stage: +0
+[00:30:06.618] LOG: Move: Scratch | Base damage: 8.08 | Power: 40 | Source attack: 19 | Target defense: 11
+[00:30:06.620] LOG: Move: Scratch | Attack damage: 10
+[00:30:06.621] LOG: %cStart Phase DamageAnimPhase color:green;
+[00:30:06.649] LOG: %cStart Phase ShowAbilityPhase color:green;
+[00:30:06.816] LOG: %cStart Phase PokemonHealPhase color:green;
+[00:30:06.817] LOG: %cStart Phase MessagePhase color:green;
+[00:30:07.047] LOG: %cStart Phase HideAbilityPhase color:green;
+[00:30:07.082] LOG: %cStart Phase MoveEndPhase color:green;
+[00:30:07.087] LOG: %cStart Phase PostSummonPhase color:green;
+[00:30:07.087] LOG: Ran PSP for: Mawile
+[00:30:07.093] LOG: %cStart Phase PostSummonPhase color:green;
+[00:30:07.096] LOG: %cStart Phase ShowAbilityPhase color:green;
+[00:30:07.267] LOG: %cStart Phase StatStageChangePhase color:green;
+[00:30:07.449] LOG: %cStart Phase MessagePhase color:green;
+[00:30:07.648] LOG: %cStart Phase StatStageChangePhase color:green;
+[00:30:07.834] LOG: %cStart Phase MessagePhase color:green;
+[00:30:08.046] LOG: %cStart Phase StatStageChangePhase color:green;
+[00:30:08.236] LOG: %cStart Phase MessagePhase color:green;
+[00:30:08.463] LOG: %cStart Phase HideAbilityPhase color:green;
+[00:30:08.502] LOG: %cStart Phase PostSummonPhase color:green;
+[00:30:08.504] LOG: %cStart Phase PostSummonPhase color:green;
+[00:30:08.504] LOG: Ran PSP for: Zigzagoon
+[00:30:08.508] LOG: %cStart Phase PostSummonPhase color:green;
+[00:30:08.509] LOG: %cStart Phase PostSummonPhase color:green;
+[00:30:08.509] LOG: %cStart Phase PostSummonPhase color:green;
+[00:30:08.509] LOG: Ran PSP for: Machoke
+[00:30:08.512] LOG: %cStart Phase PostSummonPhase color:green;
+[00:30:08.512] LOG: %cStart Phase PostSummonPhase color:green;
+[00:30:08.512] LOG: %cStart Phase TurnInitPhase color:green;
+[00:30:08.512] LOG: %cStart Phase CommandPhase color:green;
+[00:30:11.177] LOG: Move: BUBBLE_BEAM Move targets: {"targets":[3,4,5,1,2],"multiple":false} 
+Player Pokemon: Clauncher
+[00:30:11.179] LOG: %cStart Phase SelectTargetPhase color:green;
+[00:30:12.045] LOG: %cStart Phase CommandPhase color:green;
+[00:30:13.502] LOG: Move: FAKE_OUT Move targets: {"targets":[3,4,5,0,2],"multiple":false} 
+Player Pokemon: Kecleon
+[00:30:13.504] LOG: %cStart Phase SelectTargetPhase color:green;
+[00:30:13.862] LOG: %cStart Phase CommandPhase color:green;
+[00:30:15.621] LOG: Move: FIERY_WRATH Move targets: {"targets":[4,5],"multiple":true} 
+Player Pokemon: Yveltal
+[00:30:15.623] LOG: %cStart Phase SelectTargetPhase color:green;
+[00:30:17.814] LOG: %cStart Phase CommandPhase color:green;
+[00:30:17.995] LOG: %cStart Phase CommandPhase color:green;
+[00:30:19.678] LOG: Move: BUBBLE_BEAM Move targets: {"targets":[3,4,5,1,2],"multiple":false} 
+Player Pokemon: Clauncher
+[00:30:19.681] LOG: %cStart Phase SelectTargetPhase color:green;
+[00:30:20.369] LOG: %cStart Phase CommandPhase color:green;
+[00:30:21.194] LOG: Move: ARMOR_CANNON Move targets: {"targets":[3,4,5,1,2],"multiple":false} 
+Player Pokemon: Clauncher
+[00:30:21.196] LOG: %cStart Phase SelectTargetPhase color:green;
+[00:30:21.844] LOG: %cStart Phase CommandPhase color:green;
+[00:30:22.977] LOG: Move: FAKE_OUT Move targets: {"targets":[3,4,5,0,2],"multiple":false} 
+Player Pokemon: Kecleon
+[00:30:22.978] LOG: %cStart Phase SelectTargetPhase color:green;
+[00:30:23.953] LOG: %cStart Phase EnemyCommandPhase color:green;
+[00:30:23.990] LOG: Move Pool: ["Dynamic Punch"]
+[00:30:23.991] LOG: Move Scores: [552.5]
+[00:30:23.991] LOG: Sorted Move Pool: ["Dynamic Punch"]
+[00:30:23.991] LOG: Chosen Move: Dynamic Punch
+[00:30:23.991] LOG: ER AI: standard brain (sharpness 0.85)
+[00:30:23.991] LOG: %cStart Phase EnemyCommandPhase color:green;
+[00:30:24.035] LOG: Move Pool: ["Aqua Fang","Crunch","Ice Fang","Psychic Fangs"]
+[00:30:24.035] LOG: Move Scores: [0.44999999999999996,0.3515625,0.703125,-20]
+[00:30:24.035] LOG: Sorted Move Pool: ["Ice Fang","Aqua Fang","Crunch","Psychic Fangs"]
+[00:30:24.035] LOG: Chosen Move: Aqua Fang
+[00:30:24.035] LOG: ER AI: standard brain (sharpness 0.85)
+[00:30:24.035] LOG: %cStart Phase EnemyCommandPhase color:green;
+[00:30:24.038] WARN: BattlerTag IGNORE_GHOST is missing a score!
+[00:30:24.038] WARN: BattlerTag IGNORE_GHOST is missing a score!
+[00:30:24.038] WARN: BattlerTag IGNORE_GHOST is missing a score!
+[00:30:24.040] WARN: BattlerTag IGNORE_GHOST is missing a score!
+[00:30:24.048] LOG: Move Pool: ["Double-Edge","Stomping Tantrum","Odor Sleuth","Mud Sport"]
+[00:30:24.048] LOG: Move Scores: [3.515625,2.25,0,0]
+[00:30:24.048] LOG: Sorted Move Pool: ["Double-Edge","Stomping Tantrum","Odor Sleuth","Mud Sport"]
+[00:30:24.048] LOG: Chosen Move: Double-Edge
+[00:30:24.048] LOG: ER AI: standard brain (sharpness 0.85)
+[00:30:24.048] LOG: %cStart Phase TurnStartPhase color:green;
+[00:30:24.055] LOG: %cStart Phase MovePhase color:green;
+[00:30:24.055] LOG: %cUser: Kecleon
+Move: FAKE_OUT
+Use Mode: NORMAL color:orchid
+[00:30:24.062] LOG: %cStart Phase MessagePhase color:green;
+[00:30:24.146] LOG: %cStart Phase MoveEffectPhase color:green;
+[00:30:24.497] LOG: crit stage: +0
+[00:30:24.497] LOG: Move: Fake Out | Base damage: 6.693333333333333 | Power: 40 | Source attack: 12 | Target defense: 9
+[00:30:24.498] LOG: Move: Fake Out | Attack damage: 9
+[00:30:24.500] LOG: %cStart Phase DamageAnimPhase color:green;
+[00:30:24.531] LOG: %cStart Phase ShowAbilityPhase color:green;
+[00:30:24.699] LOG: %cStart Phase PokemonHealPhase color:green;
+[00:30:24.700] LOG: %cStart Phase MessagePhase color:green;
+[00:30:24.913] LOG: %cStart Phase HideAbilityPhase color:green;
+[00:30:24.948] LOG: %cStart Phase MoveEndPhase color:green;
+[00:30:24.952] LOG: %cStart Phase MovePhase color:green;
+[00:30:24.952] LOG: %cUser: Clauncher
+Move: ARMOR_CANNON
+Use Mode: NORMAL color:orchid
+[00:30:24.977] LOG: %cStart Phase MessagePhase color:green;
+[00:30:25.079] LOG: %cStart Phase MoveEffectPhase color:green;
+[00:30:25.539] LOG: crit stage: +0
+[00:30:25.541] LOG: Move: Armor Cannon | Base damage: 18.72 | Power: 120 | Source attack: 19 | Target defense: 12
+[00:30:25.541] LOG: Move: Armor Cannon | Attack damage: 34
+[00:30:25.542] LOG: %cStart Phase DamageAnimPhase color:green;
+[00:30:25.574] LOG: %cStart Phase MessagePhase color:green;
+[00:30:25.788] LOG: %cStart Phase StatStageChangePhase color:green;
+[00:30:25.789] LOG: %cStart Phase StatStageChangePhase color:green;
+[00:30:25.977] LOG: %cStart Phase MessagePhase color:green;
+[00:30:26.213] LOG: %cStart Phase StatStageChangePhase color:green;
+[00:30:26.401] LOG: %cStart Phase MessagePhase color:green;
+[00:30:26.630] LOG: %cStart Phase ShowAbilityPhase color:green;
+[00:30:26.798] LOG: %cStart Phase PokemonHealPhase color:green;
+[00:30:26.798] LOG: %cStart Phase MessagePhase color:green;
+[00:30:27.013] LOG: %cStart Phase HideAbilityPhase color:green;
+[00:30:27.049] LOG: %cStart Phase FaintPhase color:green;
+[00:30:28.019] LOG: %cStart Phase MessagePhase color:green;
+[00:30:28.286] LOG: %cStart Phase VictoryPhase color:green;
+[00:30:28.287] LOG: %cStart Phase ExpPhase color:green;
+[00:30:28.515] LOG: %cStart Phase ExpPhase color:green;
+[00:30:28.730] LOG: %cStart Phase ExpPhase color:green;
+[00:30:28.966] LOG: %cStart Phase MoveEndPhase color:green;
+[00:30:28.969] LOG: %cStart Phase MovePhase color:green;
+[00:30:28.970] LOG: %cStart Phase MoveEndPhase color:green;
+[00:30:28.971] LOG: %cStart Phase MovePhase color:green;
+[00:30:28.971] LOG: %cUser: Zigzagoon
+Move: DOUBLE_EDGE
+Use Mode: NORMAL color:orchid
+[00:30:28.971] LOG: %cStart Phase MessagePhase color:green;
+[00:30:29.188] LOG: %cStart Phase MoveEndPhase color:green;
+[00:30:29.189] LOG: %cStart Phase MovePhase color:green;
+[00:30:29.189] LOG: %cUser: Machoke
+Move: DYNAMIC_PUNCH
+Use Mode: NORMAL color:orchid
+[00:30:29.212] LOG: %cStart Phase MessagePhase color:green;
+[00:30:29.330] LOG: %cStart Phase MoveEffectPhase color:green;
+[00:30:29.333] LOG: %cStart Phase ShowAbilityPhase color:green;
+[00:30:29.498] LOG: %cStart Phase HideAbilityPhase color:green;
+[00:30:29.548] LOG: %cStart Phase MessagePhase color:green;
+[00:30:29.780] LOG: %cStart Phase MoveEndPhase color:green;
+[00:30:29.780] LOG: %cStart Phase CheckInterludePhase color:green;
+[00:30:29.780] LOG: %cStart Phase WeatherEffectPhase color:green;
+[00:30:29.780] LOG: %cStart Phase PositionalTagPhase color:green;
+[00:30:29.780] LOG: %cStart Phase BerryPhase color:green;
+[00:30:29.794] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[00:30:29.803] LOG: %cStart Phase TurnEndPhase color:green;
+[00:30:29.811] WARN: [coop:turn] host recorder: finalize with NO open recording -> turn=-1 events=0 (caller decides not to emit)
+[00:30:29.811] LOG: %cStart Phase TurnInitPhase color:green;
+[00:30:29.811] LOG: %cStart Phase CommandPhase color:green;
