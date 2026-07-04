@@ -26,11 +26,12 @@ import { setCoopFaintSwitchWaitMs, setCoopWaveBarrierMs } from "#data/elite-redu
 import { clearCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
 import { MoveId } from "#enums/move-id";
 import { SpeciesId } from "#enums/species-id";
+import { Move } from "#moves/move";
 import { GameManager } from "#test/framework/game-manager";
 import { installDuoLogCapture } from "#test/tools/coop-duo-harness";
 import { announceSoakSeed, resolveSoakSeed, resolveSoakWaves, runCoopSoak } from "#test/tools/coop-soak-driver";
 import Phaser from "phaser";
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, type MockInstance, vi } from "vitest";
 
 const RUN = process.env.ER_SCENARIO === "1";
 
@@ -38,12 +39,23 @@ describe.skipIf(!RUN)("NIGHTLY co-op SOAK: seeded randomized two-engine run (#84
   let phaserGame: Phaser.Game;
   let game: GameManager;
   let logs: ReturnType<typeof installDuoLogCapture>;
+  let accuracySpy: MockInstance | undefined;
 
   beforeAll(() => {
     phaserGame = new Phaser.Game({ type: Phaser.HEADLESS });
   });
 
   beforeEach(() => {
+    // 🔴 FORCE-HIT (a determinism knob, NOT content narrowing). The test framework clamps every battle
+    // roll to its MAX value; for the ACCURACY roll that is the WORST case, so ANY sub-100 effective accuracy
+    // becomes a GUARANTEED miss. Against a real EVASION enemy (e.g. a Snow Cloak Froslass, seen at seed
+    // 20260704 wave 27) EVERY level-85 move then "avoids" - the wave can NEVER be won and NO-PARK strands
+    // at the 60-turn budget, even though the soak's whole premise is "winnable via the LEVEL EDGE". This
+    // makes accuracy consistent with the clamp's already-maxed DAMAGE (both player-favourable) so the level
+    // edge actually connects; it does NOT weaken the DIGEST invariant (both engines still replay the SAME
+    // forced-hit events byte-for-byte) and it changes no enemy content. Mirrors run-scenario.ts's --no-miss
+    // (ER_RUN_NO_MISS). Restored in afterEach so it never leaks into other coop-suite files (isolate:false).
+    accuracySpy = vi.spyOn(Move.prototype, "calculateBattleAccuracy").mockReturnValue(-1);
     // #788 v2 partner-sync gate: tiny wait so the harness's manually-driven shop flows proceed fast via
     // the gate's own timeout fallback instead of sitting through the 60s live default.
     setCoopWaveBarrierMs(50);
@@ -86,6 +98,8 @@ describe.skipIf(!RUN)("NIGHTLY co-op SOAK: seeded randomized two-engine run (#84
   afterEach(() => {
     setCoopWaveBarrierMs(60_000);
     setCoopFaintSwitchWaitMs(60_000);
+    accuracySpy?.mockRestore();
+    accuracySpy = undefined;
     logs.dispose();
     clearCoopRuntime();
     // #710 harness-citizenship: restore the host GameManager scene (buildDuo builds a 2nd BattleScene).

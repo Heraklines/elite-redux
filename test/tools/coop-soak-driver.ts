@@ -437,13 +437,31 @@ function firstLegalBenchSlot(scene: BattleScene, owner: "host" | "guest"): numbe
 }
 
 /**
+ * True if a HOST-owned field slot is currently FAINTED - i.e. the host's real SwitchPhase (the OWNER-path
+ * PARTY picker) is about to open at turn end and needs driving. Reads rig.hostScene directly, so it is
+ * owner-ctx-independent. Used to arm {@linkcode registerHostFaintAutoPick} POST-HOC (only when a send-out
+ * is genuinely pending), so the one-shot picker is never registered - and left lingering at the prompt
+ * queue head - on a faint-free turn.
+ */
+export function hostOwnedFaintPending(rig: DuoRig): boolean {
+  return rig.hostScene.getPlayerField().some(m => m.isFainted() && m.coopOwner === "host");
+}
+
+/**
  * Register a one-shot HOST faint auto-picker for the imminent turn: when a HOST-owned mon faints and the
  * host's real SwitchPhase opens the PARTY picker, send out the first legal host-owned bench mon. (A
  * GUEST-owned faint does NOT open a host PARTY picker - the host's SwitchPhase awaits the guest's relayed
  * pick - so this only fires for host-owned faints.) Expires at the next turn / post-battle boundary so it
  * never lingers at the queue head. Mirrors run-scenario.ts's registerFaintSwitch.
+ *
+ * 🔴 #845: this MUST be armed POST-HOC - only AFTER the turn has played (the host sitting at TurnEndPhase),
+ * right before the crossing that opens the picker - NOT preemptively at the turn's own CommandPhase. The
+ * expireFn below drops the prompt the instant a prompt tick sees CommandPhase; registering it while the
+ * host still sits at CommandPhase (the old bug) expired it on the very first tick, before the turn even
+ * resolved, so the faint's SwitchPhase (which opens at TURN END, after TurnEndPhase) had no picker driving
+ * it and parked forever. See the call sites (all gated by {@linkcode hostOwnedFaintPending}).
  */
-function registerHostFaintAutoPick(game: GameManager, rig: DuoRig): void {
+export function registerHostFaintAutoPick(game: GameManager, rig: DuoRig): void {
   game.onNextPrompt(
     "SwitchPhase",
     UiMode.PARTY,
@@ -595,11 +613,17 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
     game.scene.setSeed(opts.pinSeed);
   }
 
-  // 🔴 V1 COVERAGE GAP #2 (loud + skip-counted): the continuous soak does not yet drive TRAINER waves
-  // (the caller sets disableTrainerWaves). mirrorHostBattleToGuest rebuilds a WILD party (TrainerSlot.NONE,
-  // no trainer object / variant bench / enemy-switch machinery), so a mid-soak trainer wave would mirror a
-  // structurally wrong battle onto the guest. Recorded here so it shows in the run's skip counters + report;
-  // see the report's COVERAGE DECISIONS for the concrete follow-up (a trainer-aware harness mirror).
+  // 🔴 V1 COVERAGE NOTE #2 (loud + counted): the caller sets .disableTrainerWaves(), which ONLY suppresses
+  // RANDOM (rolled) trainer waves - it sets DISABLE_STANDARD_TRAINERS_OVERRIDE, which gates only
+  // handleNonFixedBattle. FIXED battles - the rival waves (8/25/55/95/145/195) and the evil-team
+  // grunts/admins/bosses + E4/champion (35/62/64/66/...) - are resolved by BattleScene.newBattle BEFORE and
+  // INDEPENDENT of that override (handleFixedBattle, battle-scene.ts), so they STILL run mid-soak and ARE
+  // surveyed here: the harness mirror rebuilds the guest enemy from the host enemyParty snapshot, which holds
+  // up (fixed trainer waves cross green with byte-equal digests in local runs). Those tougher fixed waves are
+  // exactly where a HOST-owned mon actually faints, which is what exposed the #845 host-faint drive strand.
+  // What is NOT yet driven is a FAITHFUL trainer-aware mirror (the trainer object, the full off-field bench,
+  // trainerSlot keying, the enemy-switch machinery). See the report's TRAINER-AWARE-MIRROR HANDOFF. Counted
+  // so the report is honest that RANDOM trainer waves are the only class actually excluded.
   bumpSkip("trainerWavesDisabledV1");
 
   // Stand up the two-engine rig over one loopback pair (host owns EVEN interaction counters, guest ODD).
@@ -817,13 +841,24 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
     });
   };
 
+  /**
+   * Arm the host faint auto-picker POST-HOC iff a HOST-owned faint is pending (a no-op otherwise). Call
+   * right before ANY host phaseInterceptor.to(...) that crosses the turn / reward-shop / wave boundary where
+   * the host's own replacement SwitchPhase (OWNER-path PARTY picker) can open: the inter-turn crossing, a
+   * killing-turn faint's post-victory reward crossing, or the wave crossing. MUST be called under host ctx.
+   * Guarded so a faint-free crossing never pushes a one-shot picker that would linger at the queue head.
+   */
+  const armHostFaintAutoPick = (): void => {
+    if (hostOwnedFaintPending(rig)) {
+      registerHostFaintAutoPick(game, rig);
+    }
+  };
+
   /** Play ONE host wave to a win (bounded by the NO-PARK turn budget); the guest replays each turn. */
   const playWave = async (wave: number): Promise<void> => {
     for (let t = 0; t < MAX_TURNS_PER_WAVE; t++) {
       const turn = rig.hostScene.currentBattle.turn;
       await withClient(rig.hostCtx, async () => {
-        // #843 REAL combat can faint a player mon mid-wave: auto-pick the host's own-slot replacement.
-        registerHostFaintAutoPick(game, rig);
         const field = rig.hostScene.getPlayerField();
         // The host LOCALLY commands ONLY the slots it OWNS (coopOwner==="host"); a PARTNER (guest-owned)
         // slot rides the relay (the guest's onCommandRequest answers it) and MUST NOT be game.move.select'd
@@ -868,6 +903,15 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
           actionScript.push(`wave ${wave}: host slot move=${hostMoveId} guest slot move=${guestMoveId}`);
         }
         await game.phaseInterceptor.to("TurnEndPhase");
+        // #845 host-owned FAINT drive (the NO-PARK strand this run fixed). A HOST-owned mon that fainted
+        // THIS turn opens its replacement SwitchPhase - the OWNER-path PARTY picker - at TURN END: AFTER this
+        // TurnEndPhase, during the NEXT host crossing (the inter-turn to("CommandPhase") below, or - on a
+        // winning-turn faint - the reward-shop crossing). Arm the auto-picker POST-HOC HERE, while the host
+        // sits at TurnEndPhase, so it survives to catch that picker. Arming it preemptively at the turn's own
+        // CommandPhase (the old bug) self-expired it before the picker ever opened, so once a real host faint
+        // finally happened - a leaked FIXED trainer wave (rival / evil-grunt bypass .disableTrainerWaves(),
+        // are far tougher, and DO KO the host) - the SwitchPhase parked forever.
+        armHostFaintAutoPick();
       });
       await withClient(rig.guestCtx, () => driveGuestReplayTurnWithFaint(rig, turn));
 
@@ -906,7 +950,12 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
     const counterBefore = rig.hostRuntime.controller.interactionCounter();
     const hostOwns = counterBefore % 2 === 0;
 
-    await withClient(rig.hostCtx, () => game.phaseInterceptor.to("SelectModifierPhase", false));
+    await withClient(rig.hostCtx, async () => {
+      // #845: a KILLING-TURN host faint (fainted the same turn the wave was won) opens its PARTY picker on
+      // this post-victory crossing to the shop - drive it (guarded; no-op when no host faint is pending).
+      armHostFaintAutoPick();
+      await game.phaseInterceptor.to("SelectModifierPhase", false);
+    });
     const hostShop = rig.hostScene.phaseManager.getCurrentPhase() as unknown as ShopPhaseSeam;
     if (hostShop.phaseName !== "SelectModifierPhase") {
       bumpSkip("rewardShopUnavailable");
@@ -954,6 +1003,7 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
     withClientSync(rig.guestCtx, () => rig.guestScene.phaseManager.clearPhaseQueue());
     if (rig.hostScene.phaseManager.hasPhaseOfType("SelectModifierPhase")) {
       await withClient(rig.hostCtx, async () => {
+        armHostFaintAutoPick(); // #845: drive a boss killing-turn host faint's PARTY picker on this crossing
         await game.phaseInterceptor.to("SelectModifierPhase", false);
         const shop = rig.hostScene.phaseManager.getCurrentPhase() as unknown as ShopPhaseSeam;
         if (shop.phaseName === "SelectModifierPhase") {
@@ -1046,9 +1096,14 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
     }
 
     wavesCompleted++;
-    // Cross into the next wave's battle (real EncounterPhase rolls wave w+1).
+    // Cross into the next wave's battle (real EncounterPhase rolls wave w+1). #845: a host faint left
+    // pending by a boss killing-turn (whose reward tail auto-grants with no shop to drive it through) still
+    // opens its PARTY picker on this crossing - re-arm the auto-picker (guarded) so it is driven, not parked.
     if (wave < waves) {
-      await withClient(rig.hostCtx, () => game.phaseInterceptor.to("CommandPhase"));
+      await withClient(rig.hostCtx, async () => {
+        armHostFaintAutoPick();
+        await game.phaseInterceptor.to("CommandPhase");
+      });
     }
   }
 
