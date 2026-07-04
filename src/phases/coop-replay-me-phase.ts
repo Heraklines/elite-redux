@@ -12,7 +12,11 @@ import { coopLog, coopWarn } from "#data/elite-redux/coop/coop-debug";
 import { adoptCoopEnemiesStructural } from "#data/elite-redux/coop/coop-enemy-builder";
 import type { CoopInteractionChoice } from "#data/elite-redux/coop/coop-interaction-relay";
 import { meBattleHandoffKey } from "#data/elite-redux/coop/coop-me-battle-handoff";
-import { coopMeInteractionStartValue, setCoopMeHandoffBattleStarted } from "#data/elite-redux/coop/coop-me-pin-state";
+import {
+  coopMeInteractionStartValue,
+  setCoopMeHandoffBattleStarted,
+  setOnMePinCleared,
+} from "#data/elite-redux/coop/coop-me-pin-state";
 import { COOP_ME_BATTLE_HANDOFF, COOP_ME_TERM_SEQ_BASE } from "#data/elite-redux/coop/coop-me-pump";
 import { getCoopBattleStreamer, getCoopController, getCoopInteractionRelay } from "#data/elite-redux/coop/coop-runtime";
 import type { CoopInteractionOutcome } from "#data/elite-redux/coop/coop-transport";
@@ -44,6 +48,13 @@ const ME_SUBPICK_KIND = "meSub";
  * {@linkcode CoopReplayMePhase}; null everywhere else, so solo / host / lockstep render byte-identical.
  */
 let coopMeHostPresentation: Extract<CoopInteractionOutcome, { k: "mePresent" }> | null = null;
+
+// #834 (structural audit P1-1): drop the adopted presentation whenever the ME pin clears -
+// including clearCoopRuntime after a mid-ME GameOver, where no ME terminal ever ran. Without
+// this, a stale presentation could leak into the NEXT run's first encounter selector.
+setOnMePinCleared(() => {
+  coopMeHostPresentation = null;
+});
 
 /**
  * Accessor for the host-streamed ME presentation (#633 BLOCK-2 / P0). Returns the stored blob while

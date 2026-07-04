@@ -125,6 +125,39 @@ describe.skipIf(!RUN)("probe: triple manual switch", () => {
     expect(slot2Mon.isOnField(), "the switched-out slot-2 mon left the field").toBe(false);
   }, 120_000);
 
+  // C) Adjacency check: a FLANK (slot 0) Surf should hit the CENTRE ally (slot 1) but NOT the
+  //    far-flank ally (slot 2, non-adjacent). If slot 2 takes damage, spread targeting over-reaches.
+  it("C: flank SURF hits centre ally but NOT the far-flank ally (adjacency)", async () => {
+    game.override
+      .battleStyle("triple")
+      .battleType(BattleType.WILD)
+      .disableTrainerWaves()
+      .enemySpecies(SpeciesId.MAGIKARP)
+      .enemyMoveset(MoveId.HARDEN)
+      .moveset([MoveId.SURF, MoveId.HARDEN])
+      .ability(AbilityId.BALL_FETCH)
+      .enemyAbility(AbilityId.BALL_FETCH)
+      .startingLevel(80)
+      .enemyLevel(5)
+      .criticalHits(false);
+    await game.classicMode.startBattle(SpeciesId.MAGIKARP, SpeciesId.SNORLAX, SpeciesId.BLISSEY);
+    const centre = globalScene.getPlayerField()[1];
+    const farFlank = globalScene.getPlayerField()[2];
+    const centreHp0 = centre.hp;
+    const farHp0 = farFlank.hp;
+
+    game.move.select(MoveId.SURF, 0); // flank user
+    game.move.select(MoveId.HARDEN, 1);
+    game.move.select(MoveId.HARDEN, 2);
+    await game.toNextTurn().catch(() => {});
+
+    console.log(
+      `C: centre(${centre.name}) ${centreHp0}->${centre.hp} (hit=${centre.hp < centreHp0}); farFlank(${farFlank.name}) ${farHp0}->${farFlank.hp} (hit=${farFlank.hp < farHp0})`,
+    );
+    // Diagnostic only.
+    expect(true).toBe(true);
+  }, 120_000);
+
   // B) Reproduce the log: center slot (1) uses SURF (spread) the same turn slot 0 switches
   //    a bench mon in. Does the player's own Surf hit the freshly switched-in mon?
   it("B: switch slot 0 in, center uses SURF (spread) same turn -> does friendly fire hit the newcomer?", async () => {

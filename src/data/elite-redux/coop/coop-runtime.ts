@@ -37,7 +37,7 @@ import { CoopBattleSync } from "#data/elite-redux/coop/coop-battle-sync";
 import { coopLog, coopWarn, isCoopDebug } from "#data/elite-redux/coop/coop-debug";
 import { COOP_DEX_SYNC_SEQ, CoopInteractionRelay } from "#data/elite-redux/coop/coop-interaction-relay";
 import { meBattleHandoffKey } from "#data/elite-redux/coop/coop-me-battle-handoff";
-import { coopMeInteractionStartValue } from "#data/elite-redux/coop/coop-me-pin-state";
+import { coopMeInteractionStartValue, setCoopMeInteractionStart } from "#data/elite-redux/coop/coop-me-pin-state";
 import { CoopMePump } from "#data/elite-redux/coop/coop-me-pump";
 import { coopFieldIndexOf, coopOwnerOfFieldSlot } from "#data/elite-redux/coop/coop-session";
 import { CoopSessionController } from "#data/elite-redux/coop/coop-session-controller";
@@ -1572,6 +1572,12 @@ export function clearCoopRuntime(): void {
   setCoopGhostFetchSuppressed(null);
   // Clear the live-event emitter so a subsequent solo / lockstep run never streams battle events (#633).
   setCoopLiveEmitter(null);
+  // #834 (structural audit P1-1): a mid-ME GameOver reaches here with the ME pins still SET
+  // (only the ME terminal cleared them). Stale pins mis-arm the pin-guarded detached listeners
+  // and the ME gates at the NEXT run's first encounter - a cross-run desync. Reset the full pin
+  // family (setCoopMeInteractionStart(-1) also auto-clears the handoff + bespoke flags) and the
+  // adopted host presentation alongside the battle-counter reset that already lived here.
+  setCoopMeInteractionStart(-1);
   // Reset the authoritative wave-advance state so a subsequent run starts clean (#633).
   pendingWaveAdvance = null;
   lastResolvedWave = -1;

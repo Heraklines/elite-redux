@@ -38,6 +38,14 @@ export function setCoopMeInteractionStart(counter: number): void {
   if (counter < 0) {
     coopMeHandoffBattle = false; // the ME ended - the handoff exemption ends with it
     coopMeBespokeHost = false; // #823: ditto for the bespoke host-drive window
+    // #834: let the phase module drop its adopted host presentation with the pin (a mid-ME
+    // GameOver reaches clearCoopRuntime without an ME terminal; a stale presentation must not
+    // leak into the next run's first encounter). Registered by coop-replay-me-phase at load.
+    try {
+      onMePinCleared?.();
+    } catch {
+      /* a cleanup hook must never break the pin state */
+    }
   }
 }
 
@@ -67,6 +75,15 @@ export function coopMeBespokeHostDrives(): boolean {
 /** Mark/clear the bespoke host-drive window (#823). */
 export function setCoopMeBespokeHostDrives(on: boolean): void {
   coopMeBespokeHost = on;
+}
+
+// #834: cleanup hook invoked whenever the ME pin clears (counter -> -1). Lets higher modules
+// (the replay phase's adopted presentation) reset alongside the pin without an import cycle.
+let onMePinCleared: (() => void) | null = null;
+
+/** Register the pin-cleared cleanup hook (#834). Last registration wins. */
+export function setOnMePinCleared(fn: (() => void) | null): void {
+  onMePinCleared = fn;
 }
 
 /** Mark the ME battle handoff as started (host pump end + guest terminal set this). */
