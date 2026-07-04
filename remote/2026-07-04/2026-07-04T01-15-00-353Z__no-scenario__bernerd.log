@@ -1,0 +1,273 @@
+url:      https://elite-redux-staging.pages.dev/
+build:    mr5n8px7-2um
+mode:     4  wave:3
+seed:     Pzf1L9GCSJq9fus4FOpPlmeX
+party:    Kecleon(L5 20hp f0), Iron Valiant(L5 23hp f0), Gimmighoul(L5 15hp f0), Marbeep(L5 23hp f0), Zigzagoon(L5 20hp f0), Snorunt Redux(L5 22hp f0)
+enemy:    Happiny(L3), Wurmple(L3), Zigzagoon(L3)
+
+----- COMMENT -----
+Whenever a T4 Shiny is sharing its gift, it appears to benefit all 3 partners when in the 1st Slot, only benefit the 1st Slot when Kecleon is in the 2nd Slot, and benefits no partners when in the 3rd Slot
+
+----- CONSOLE -----
+[01:11:39.056] LOG: %cStart Phase WeatherEffectPhase color:green;
+[01:11:39.056] LOG: %cStart Phase PositionalTagPhase color:green;
+[01:11:39.056] LOG: %cStart Phase BerryPhase color:green;
+[01:11:39.061] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[01:11:39.065] LOG: %cStart Phase TurnEndPhase color:green;
+[01:11:39.072] WARN: [coop:turn] host recorder: finalize with NO open recording -> turn=-1 events=0 (caller decides not to emit)
+[01:11:39.072] LOG: %cStart Phase PokemonHealPhase color:green;
+[01:11:39.072] LOG: %cStart Phase MessagePhase color:green;
+[01:11:39.287] LOG: %cStart Phase PokemonHealPhase color:green;
+[01:11:39.288] LOG: %cStart Phase MessagePhase color:green;
+[01:11:39.504] LOG: %cStart Phase PokemonHealPhase color:green;
+[01:11:39.505] LOG: %cStart Phase MessagePhase color:green;
+[01:11:39.703] LOG: %cStart Phase BattleEndPhase color:green;
+[01:11:39.704] LOG: Battle Score: 30 (3 Turns x0.84)
+[01:11:39.704] LOG: Total Score: 58
+[01:11:39.719] LOG: %cStart Phase ShowAbilityPhase color:green;
+[01:11:39.719] LOG: %cStart Phase HideAbilityPhase color:green;
+[01:11:39.755] LOG: %cStart Phase MessagePhase color:green;
+[01:11:40.063] LOG: %cStart Phase EggLapsePhase color:green;
+[01:11:40.063] LOG: %cStart Phase SelectModifierPhase color:green;
+[01:11:40.063] LOG: Wave Seed: R|h3N;IEULs;hwu6HQrRnogZ 2
+[01:11:40.086] LOG: 0 0 [2,3,4,5]
+[01:11:40.086] LOG: {"id":"POKEBALL","localeKey":"","iconImage":"pb","group":"pb","soundName":"se/pb_bounce_1","tier":0,"pokeballType":0,"count":5} 
+[01:11:40.086] LOG: 0 0 [2,3,4,5]
+[01:11:40.086] LOG: {"id":"POKEBALL","localeKey":"","iconImage":"pb","group":"pb","soundName":"se/pb_bounce_1","tier":0,"pokeballType":0,"count":5} 
+[01:11:40.087] LOG: 9 4 [2,3,4,5]
+[01:11:40.087] LOG: {"id":"TM_CASE","localeKey":"","iconImage":"tm_case","soundName":"se/restore","tier":0} 
+[01:11:40.087] LOG: 0 0 [2,3,4,5]
+[01:11:40.087] LOG: {"id":"POKEBALL","localeKey":"","iconImage":"pb","group":"pb","soundName":"se/pb_bounce_1","tier":0,"pokeballType":0,"count":5} 
+[01:11:40.087] LOG: 9 4 [2,3,4,5]
+[01:11:40.087] LOG: {"id":"TM_CASE","localeKey":"","iconImage":"tm_case","soundName":"se/restore","tier":0} 
+[01:11:40.087] LOG: 0 0 [2,3,4,5]
+[01:11:40.087] LOG: {"id":"POKEBALL","localeKey":"","iconImage":"pb","group":"pb","soundName":"se/pb_bounce_1","tier":0,"pokeballType":0,"count":5} 
+[01:11:40.087] LOG: 0 0 [2,3,4,5]
+[01:11:40.087] LOG: {"id":"POKEBALL","localeKey":"","iconImage":"pb","group":"pb","soundName":"se/pb_bounce_1","tier":0,"pokeballType":0,"count":5} 
+[01:11:40.087] LOG: 0 0 [2,3,4,5]
+[01:11:40.087] LOG: {"id":"POKEBALL","localeKey":"","iconImage":"pb","group":"pb","soundName":"se/pb_bounce_1","tier":0,"pokeballType":0,"count":5} 
+[01:11:40.087] LOG: 9 4 [2,3,4,5]
+[01:11:40.087] LOG: {"id":"TM_CASE","localeKey":"","iconImage":"tm_case","soundName":"se/restore","tier":0} 
+[01:11:40.087] LOG: 8 4 [2,3,4,5]
+[01:11:40.087] LOG: {"id":"BERRY","localeKey":"","iconImage":"sitrus_berry","group":"berry","soundName":"se/restore","tier":0,"berryType":0} 
+[01:12:05.656] LOG: %cStart Phase LearnMovePhase color:green;
+[01:12:06.580] WARN: cry/999 not found
+[01:12:07.953] LOG: %cStart Phase SelectModifierPhase color:green;
+[01:12:25.012] LOG: %cStart Phase LearnMovePhase color:green;
+[01:12:25.821] WARN: cry/1006 not found
+[01:12:27.057] LOG: [coop:reward] advanceCoopInteractionForContinuation SKIP (isCoop=false fromSeq=-1 meInProgress=false)
+[01:12:28.293] LOG: %cStart Phase NewBattlePhase color:green;
+[01:12:28.293] LOG: Wave Seed: S}i4O<JFVMt<ixv7IRsSoph[ 3
+[01:12:28.294] LOG: %cStart Phase NextEncounterPhase color:green;
+[01:12:28.296] LOG: Starting species pool tier: RARE
+[01:12:28.305] LOG: Pokemon: Wild Happiny | Species ID: 440 | Level: 3 | Nature: Mild (+SpAtk/-Def)
+[01:12:28.305] LOG: Stats (IVs): HP: 19 (6), Atk: 5 (7), Def: 4 (10), Spatk: 7 (22), Spdef: 9 (19), Spd: 7 (16)
+[01:12:28.305] LOG: Ability: Regenerator | Passive Ability: Cute Charm 
+[01:12:28.305] LOG: Moveset: ["Double Slap","Growl","Tail Whip","Defense Curl"]
+[01:12:28.305] LOG: Starting species pool tier: COMMON
+[01:12:28.306] LOG: Replaced SILCOON with WURMPLE
+[01:12:28.312] LOG: Pokemon: Wild Wurmple | Species ID: 265 | Level: 3 | Nature: Modest (+SpAtk/-Atk)
+[01:12:28.312] LOG: Stats (IVs): HP: 16 (14), Atk: 7 (17), Def: 8 (30), Spatk: 7 (7), Spdef: 7 (23), Spd: 7 (29)
+[01:12:28.312] LOG: Ability: Shield Dust | Passive Ability: Swarm 
+[01:12:28.313] LOG: Moveset: ["Struggle Bug","Web Shot","Poison Sting","Tackle"]
+[01:12:28.313] LOG: Starting species pool tier: COMMON
+[01:12:28.318] LOG: Pokemon: Wild Zigzagoon | Species ID: 263 | Level: 3 | Nature: Calm (+SpDef/-Atk)
+[01:12:28.318] LOG: Stats (IVs): HP: 16 (29), Atk: 7 (1), Def: 8 (23), Spatk: 7 (8), Spdef: 9 (31), Spd: 9 (14)
+[01:12:28.318] LOG: Ability: Scrappy | Passive Ability: Pickup 
+[01:12:28.318] LOG: Moveset: ["Double-Edge","Stomping Tantrum","Odor Sleuth","Mud Sport"]
+[01:12:29.526] DEBUG: Session data saved to slot 2!
+[01:12:29.526] LOG: Wave Seed: S}i4O<JFVMt<ixv7IRsSoph[ 3
+[01:12:29.981] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[01:12:29.981] LOG: %cStart Phase CheckSwitchPhase color:green;
+[01:12:31.182] LOG: %cStart Phase CheckSwitchPhase color:green;
+[01:12:31.387] LOG: %cStart Phase CheckSwitchPhase color:green;
+[01:12:34.039] LOG: %cStart Phase InitEncounterPhase color:green;
+[01:12:34.041] LOG: %cStart Phase PostSummonPhase color:green;
+[01:12:34.041] LOG: Ran PSP for: Zigzagoon
+[01:12:34.043] LOG: %cStart Phase PostSummonPhase color:green;
+[01:12:34.044] LOG: %cStart Phase PostSummonPhase color:green;
+[01:12:34.045] LOG: %cStart Phase PostSummonPhase color:green;
+[01:12:34.045] LOG: Ran PSP for: Wurmple
+[01:12:34.047] LOG: %cStart Phase PostSummonPhase color:green;
+[01:12:34.047] LOG: Ran PSP for: Happiny
+[01:12:34.048] LOG: %cStart Phase PostSummonPhase color:green;
+[01:12:34.049] LOG: %cStart Phase PostSummonPhase color:green;
+[01:12:34.049] LOG: %cStart Phase PostSummonPhase color:green;
+[01:12:34.049] LOG: %cStart Phase PostSummonPhase color:green;
+[01:12:34.049] LOG: %cStart Phase TurnInitPhase color:green;
+[01:12:34.049] LOG: %cStart Phase CommandPhase color:green;
+[01:12:35.468] LOG: Seed: sEb97J13MC3rdQEp2TDVKm7r
+[01:12:35.468] LOG: Wave Seed: sEb97J13MC3rdQEp2TDVKm7r 0
+[01:12:35.470] LOG: Getting Session Slot id: %d 2
+[01:12:35.480] LOG: Wave Seed: Pzf1L9GCSJq9fus4FOpPlmeX 0
+[01:12:35.480] LOG: Seed: Pzf1L9GCSJq9fus4FOpPlmeX
+[01:12:35.497] LOG: Wave Seed: S}i4O<JFVMt<ixv7IRsSoph[ 3
+[01:12:35.514] LOG: %cStart Phase EncounterPhase color:green;
+[01:12:35.515] LOG: Pokemon: Wild Happiny | Species ID: 440 | Level: 3 | Nature: Mild (+SpAtk/-Def)
+[01:12:35.515] LOG: Stats (IVs): HP: 19 (6), Atk: 5 (7), Def: 4 (10), Spatk: 7 (22), Spdef: 9 (19), Spd: 7 (16)
+[01:12:35.515] LOG: Ability: Regenerator | Passive Ability: Cute Charm 
+[01:12:35.515] LOG: Moveset: ["Double Slap","Growl","Tail Whip","Defense Curl"]
+[01:12:35.515] LOG: Pokemon: Wild Wurmple | Species ID: 265 | Level: 3 | Nature: Modest (+SpAtk/-Atk)
+[01:12:35.515] LOG: Stats (IVs): HP: 16 (14), Atk: 7 (17), Def: 8 (30), Spatk: 7 (7), Spdef: 7 (23), Spd: 7 (29)
+[01:12:35.515] LOG: Ability: Shield Dust | Passive Ability: Swarm 
+[01:12:35.515] LOG: Moveset: ["Struggle Bug","Web Shot","Poison Sting","Tackle"]
+[01:12:35.515] LOG: Pokemon: Wild Zigzagoon | Species ID: 263 | Level: 3 | Nature: Calm (+SpDef/-Atk)
+[01:12:35.515] LOG: Stats (IVs): HP: 16 (29), Atk: 7 (1), Def: 8 (23), Spatk: 7 (8), Spdef: 9 (31), Spd: 9 (14)
+[01:12:35.515] LOG: Ability: Scrappy | Passive Ability: Pickup 
+[01:12:35.515] LOG: Moveset: ["Double-Edge","Stomping Tantrum","Odor Sleuth","Mud Sport"]
+[01:12:35.517] LOG: Wave Seed: S}i4O<JFVMt<ixv7IRsSoph[ 3
+[01:12:35.923] LOG: %cStart Phase SummonPhase color:green;
+[01:12:36.095] WARN: cry/1006 not found
+[01:12:36.203] LOG: %cStart Phase SummonPhase color:green;
+[01:12:36.478] LOG: %cStart Phase ShinySparklePhase color:green;
+[01:12:36.595] LOG: %cStart Phase SummonPhase color:green;
+[01:12:36.779] WARN: cry/999 not found
+[01:12:36.886] LOG: %cStart Phase CheckSwitchPhase color:green;
+[01:12:37.088] LOG: %cStart Phase SwitchPhase color:green;
+[01:12:39.506] LOG: %cStart Phase SwitchSummonPhase color:green;
+[01:12:39.863] LOG: %cStart Phase ShinySparklePhase color:green;
+[01:12:39.954] LOG: %cStart Phase PostSummonPhase color:green;
+[01:12:39.954] LOG: Ran PSP for: Zigzagoon
+[01:12:39.958] LOG: %cStart Phase PostSummonPhase color:green;
+[01:12:39.958] LOG: %cStart Phase PostSummonPhase color:green;
+[01:12:39.958] LOG: %cStart Phase CheckSwitchPhase color:green;
+[01:12:40.130] LOG: %cStart Phase SwitchPhase color:green;
+[01:12:41.322] LOG: %cStart Phase SwitchSummonPhase color:green;
+[01:12:41.579] WARN: cry/1006 not found
+[01:12:41.706] LOG: %cStart Phase PostSummonPhase color:green;
+[01:12:41.706] LOG: Ran PSP for: Iron Valiant
+[01:12:41.709] LOG: %cStart Phase PostSummonPhase color:green;
+[01:12:41.709] LOG: %cStart Phase PostSummonPhase color:green;
+[01:12:41.709] LOG: %cStart Phase CheckSwitchPhase color:green;
+[01:12:42.830] LOG: %cStart Phase InitEncounterPhase color:green;
+[01:12:42.833] LOG: %cStart Phase PostSummonPhase color:green;
+[01:12:42.833] LOG: Ran PSP for: Zigzagoon
+[01:12:42.836] LOG: %cStart Phase PostSummonPhase color:green;
+[01:12:42.838] LOG: %cStart Phase PostSummonPhase color:green;
+[01:12:42.839] LOG: %cStart Phase PostSummonPhase color:green;
+[01:12:42.839] LOG: Ran PSP for: Wurmple
+[01:12:42.841] LOG: %cStart Phase PostSummonPhase color:green;
+[01:12:42.841] LOG: Ran PSP for: Happiny
+[01:12:42.844] LOG: %cStart Phase PostSummonPhase color:green;
+[01:12:42.844] LOG: %cStart Phase PostSummonPhase color:green;
+[01:12:42.845] LOG: %cStart Phase PostSummonPhase color:green;
+[01:12:42.845] LOG: %cStart Phase PostSummonPhase color:green;
+[01:12:42.845] LOG: %cStart Phase TurnInitPhase color:green;
+[01:12:42.845] LOG: %cStart Phase CommandPhase color:green;
+[01:12:45.016] LOG: %cStart Phase CommandPhase color:green;
+[01:12:47.126] LOG: Move: SWORDS_DANCE Move targets: {"targets":[1],"multiple":false} 
+Player Pokemon: Iron Valiant
+[01:12:47.129] LOG: %cStart Phase CommandPhase color:green;
+[01:12:49.345] LOG: Move: HAPPY_HOUR Move targets: {"targets":[2,0,1],"multiple":true} 
+Player Pokemon: Gimmighoul
+[01:12:49.347] LOG: %cStart Phase SelectTargetPhase color:green;
+[01:12:49.704] LOG: %cStart Phase EnemyCommandPhase color:green;
+[01:12:49.713] LOG: Battle Seed: 2BIK1nfLjPraAmHP
+[01:12:49.713] LOG: Move Pool: ["Double Slap","Growl","Tail Whip","Defense Curl"]
+[01:12:49.713] LOG: Move Scores: [30,2,2,2]
+[01:12:49.713] LOG: Sorted Move Pool: ["Double Slap","Growl","Tail Whip","Defense Curl"]
+[01:12:49.714] LOG: Chosen Move: Growl
+[01:12:49.714] LOG: %cStart Phase EnemyCommandPhase color:green;
+[01:12:49.742] LOG: Move Pool: ["Struggle Bug","Web Shot","Poison Sting","Tackle"]
+[01:12:49.742] LOG: Move Scores: [31.5,22.5,11,8]
+[01:12:49.742] LOG: Sorted Move Pool: ["Struggle Bug","Web Shot","Poison Sting","Tackle"]
+[01:12:49.742] LOG: Chosen Move: Web Shot
+[01:12:49.742] LOG: %cStart Phase EnemyCommandPhase color:green;
+[01:12:49.746] WARN: BattlerTag IGNORE_GHOST is missing a score!
+[01:12:49.746] WARN: BattlerTag IGNORE_GHOST is missing a score!
+[01:12:49.746] WARN: BattlerTag IGNORE_GHOST is missing a score!
+[01:12:49.746] WARN: BattlerTag IGNORE_GHOST is missing a score!
+[01:12:49.746] LOG: Move Pool: ["Double-Edge","Stomping Tantrum","Odor Sleuth","Mud Sport"]
+[01:12:49.746] LOG: Move Scores: [28.5,15,0,0]
+[01:12:49.746] LOG: Sorted Move Pool: ["Double-Edge","Stomping Tantrum","Odor Sleuth","Mud Sport"]
+[01:12:49.747] LOG: Chosen Move: Double-Edge
+[01:12:49.747] LOG: %cStart Phase TurnStartPhase color:green;
+[01:12:49.760] LOG: %cStart Phase SwitchSummonPhase color:green;
+[01:12:50.118] LOG: %cStart Phase ShinySparklePhase color:green;
+[01:12:50.203] LOG: %cStart Phase PostSummonPhase color:green;
+[01:12:50.203] LOG: Ran PSP for: Kecleon
+[01:12:50.208] LOG: %cStart Phase PostSummonPhase color:green;
+[01:12:50.208] LOG: %cStart Phase PostSummonPhase color:green;
+[01:12:50.219] LOG: %cStart Phase MovePhase color:green;
+[01:12:50.219] LOG: %cUser: Iron Valiant
+Move: SWORDS_DANCE
+Use Mode: NORMAL color:orchid
+[01:12:50.245] LOG: %cStart Phase MessagePhase color:green;
+[01:12:50.353] LOG: %cStart Phase MoveEffectPhase color:green;
+[01:12:50.788] LOG: %cStart Phase StatStageChangePhase color:green;
+[01:12:50.976] LOG: %cStart Phase MessagePhase color:green;
+[01:12:51.220] LOG: %cStart Phase MoveEndPhase color:green;
+[01:12:51.228] LOG: %cStart Phase MovePhase color:green;
+[01:12:51.228] LOG: %cUser: Kecleon
+Move: SCRATCH
+Use Mode: INDIRECT color:orchid
+[01:12:51.246] LOG: %cStart Phase MessagePhase color:green;
+[01:12:51.345] LOG: %cStart Phase MoveEffectPhase color:green;
+[01:12:51.362] LOG: crit stage: +0
+[01:12:51.364] LOG: Move: Scratch | Base damage: 15.6 | Power: 40 | Source attack: 17 | Target defense: 4
+[01:12:51.365] LOG: Move: Scratch | Attack damage: 20
+[01:12:51.366] LOG: %cStart Phase DamageAnimPhase color:green;
+[01:12:51.398] LOG: %cStart Phase FaintPhase color:green;
+[01:12:52.229] LOG: %cStart Phase MessagePhase color:green;
+[01:12:52.427] LOG: %cStart Phase VictoryPhase color:green;
+[01:12:52.429] LOG: %cStart Phase ExpPhase color:green;
+[01:12:52.638] LOG: %cStart Phase ExpPhase color:green;
+[01:12:52.921] LOG: %cStart Phase ExpPhase color:green;
+[01:12:53.104] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[01:12:53.105] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[01:12:53.105] LOG: %cStart Phase MoveEndPhase color:green;
+[01:12:53.107] LOG: %cStart Phase MovePhase color:green;
+[01:12:53.107] LOG: %cUser: Zigzagoon
+Move: DOUBLE_EDGE
+Use Mode: NORMAL color:orchid
+[01:12:53.120] LOG: %cStart Phase MessagePhase color:green;
+[01:12:53.261] LOG: %cStart Phase MoveEffectPhase color:green;
+[01:12:53.814] LOG: crit stage: +0
+[01:12:53.816] LOG: Move: Double-Edge | Base damage: 6.48 | Power: 130 | Source attack: 7 | Target defense: 13
+[01:12:53.817] LOG: Move: Double-Edge | Attack damage: 9
+[01:12:53.818] LOG: %cStart Phase DamageAnimPhase color:green;
+[01:12:53.846] LOG: %cStart Phase DamageAnimPhase color:green;
+[01:12:53.848] LOG: %cStart Phase MessagePhase color:green;
+[01:12:54.112] LOG: %cStart Phase MoveEndPhase color:green;
+[01:12:54.115] LOG: %cStart Phase MovePhase color:green;
+[01:12:54.115] LOG: %cUser: Gimmighoul
+Move: HAPPY_HOUR
+Use Mode: NORMAL color:orchid
+[01:12:54.117] LOG: %cStart Phase MessagePhase color:green;
+[01:12:54.245] LOG: %cStart Phase MessagePhase color:green;
+[01:12:54.445] LOG: %cStart Phase MoveEndPhase color:green;
+[01:12:54.447] LOG: %cStart Phase MovePhase color:green;
+[01:12:54.448] LOG: %cStart Phase MoveEndPhase color:green;
+[01:12:54.448] LOG: %cStart Phase MovePhase color:green;
+[01:12:54.448] LOG: %cUser: Wurmple
+Move: WEB_SHOT
+Use Mode: NORMAL color:orchid
+[01:12:54.470] LOG: %cStart Phase MessagePhase color:green;
+[01:12:54.587] LOG: %cStart Phase MoveEffectPhase color:green;
+[01:12:55.172] LOG: crit stage: +0
+[01:12:55.174] LOG: Move: Web Shot | Base damage: 5.101538461538461 | Power: 90 | Source attack: 7 | Target defense: 13
+[01:12:55.175] LOG: Move: Web Shot | Attack damage: 3
+[01:12:55.177] LOG: %cStart Phase ShowAbilityPhase color:green;
+[01:12:55.323] LOG: %cStart Phase HideAbilityPhase color:green;
+[01:12:55.372] LOG: %cStart Phase DamageAnimPhase color:green;
+[01:12:55.406] LOG: %cStart Phase MessagePhase color:green;
+[01:12:55.637] LOG: %cStart Phase MoveEndPhase color:green;
+[01:12:55.637] LOG: %cStart Phase CheckInterludePhase color:green;
+[01:12:55.638] LOG: %cStart Phase WeatherEffectPhase color:green;
+[01:12:55.638] LOG: %cStart Phase PositionalTagPhase color:green;
+[01:12:55.638] LOG: %cStart Phase BerryPhase color:green;
+[01:12:55.652] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[01:12:55.661] LOG: %cStart Phase TurnEndPhase color:green;
+[01:12:55.669] WARN: [coop:turn] host recorder: finalize with NO open recording -> turn=-1 events=0 (caller decides not to emit)
+[01:12:55.669] LOG: %cStart Phase PokemonHealPhase color:green;
+[01:12:55.669] LOG: %cStart Phase MessagePhase color:green;
+[01:12:55.869] LOG: %cStart Phase PokemonHealPhase color:green;
+[01:12:56.075] LOG: %cStart Phase MessagePhase color:green;
+[01:12:56.319] LOG: %cStart Phase PokemonHealPhase color:green;
+[01:12:56.539] LOG: %cStart Phase MessagePhase color:green;
+[01:12:56.770] LOG: %cStart Phase PokemonHealPhase color:green;
+[01:12:56.993] LOG: %cStart Phase MessagePhase color:green;
+[01:12:57.203] LOG: %cStart Phase PokemonHealPhase color:green;
+[01:12:57.204] LOG: %cStart Phase MessagePhase color:green;
+[01:12:57.437] LOG: %cStart Phase TurnInitPhase color:green;
+[01:12:57.437] LOG: %cStart Phase CommandPhase color:green;
