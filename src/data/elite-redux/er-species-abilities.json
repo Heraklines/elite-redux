@@ -84,6 +84,22 @@
       5563
     ]
   },
+  "SPECIES_FLYGON_REDUX_B": {
+    "hidden": 26,
+    "innates": [
+      5402,
+      206,
+      29
+    ]
+  },
+  "SPECIES_FLYGON_REDUX_B_MEGA": {
+    "hidden": 26,
+    "innates": [
+      5402,
+      206,
+      29
+    ]
+  },
   "SPECIES_GRANBULL_MEGA": {
     "ability2": 62
   },
