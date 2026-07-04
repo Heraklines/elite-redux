@@ -1,0 +1,21 @@
+url:      https://elite-redux-staging.pages.dev/
+build:    mr5qkls2-3q4l
+mode:     0  wave:?
+seed:     2xnWkOXgla5KodiiwqrvSslQ
+party:    
+enemy:    
+
+----- CONSOLE -----
+[08:13:49.257] LOG: %c %c %c %c %c Phaser v3.90.0 (WebGL | Web Audio) %c https://phaser.io/v390 background: #ff0000 background: #ffff00 background: #00ff00 background: #00ffff color: #ffffff; background: #000000 background: transparent
+[08:13:50.220] LOG: [ER] build mr5qkls2-3q4l
+[08:13:50.252] LOG: [dev-tools] loaded — 419 scenarios + Send Logs button
+[08:14:26.181] DEBUG: Destroying loading scene
+[08:14:26.181] DEBUG: Destroyed loading scene
+[08:14:26.287] LOG: Seed: 2xnWkOXgla5KodiiwqrvSslQ
+[08:14:26.287] LOG: Wave Seed: 2xnWkOXgla5KodiiwqrvSslQ 0
+[08:14:30.956] LOG: %cStart Phase LoginPhase color:green;
+[08:14:31.361] LOG: Client Session: vbjfVchl3EcexgKSNl1sGVTO0AuFI9Xc
+[08:14:31.816] DEBUG: Using cached system data
+[08:14:32.054] LOG: %cStart Phase TitlePhase color:green;
+[08:14:32.056] LOG: Getting Session Slot id: %d 1
+[08:14:32.097] LOG: use seasonal splash messages true
