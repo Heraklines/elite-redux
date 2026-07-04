@@ -73,6 +73,8 @@ import {
   ConditionalUserFieldProtectStatAbAttr,
   ConditionalUserFieldStatusEffectImmunityAbAttr,
   CritUseLowerDefensiveStatAbAttr,
+  DoubleSelfInflictedDamageAbAttr,
+  DrenchImmunityAbAttr,
   EnemyMinDamageRollAbAttr,
   FieldMoveTypePowerBoostAbAttr,
   FieldPriorityMoveImmunityAbAttr,
@@ -80,6 +82,7 @@ import {
   ForceSwitchOutImmunityAbAttr,
   GorillaTacticsAbAttr,
   getWeatherCondition,
+  IgnoreGenderInfatuationAbAttr,
   IgnoreMoveEffectsAbAttr,
   IgnoreOpponentStatStagesAbAttr,
   IgnoreProtectByFlagAbAttr,
@@ -89,6 +92,7 @@ import {
   MoveAbilityBypassAbAttr,
   MoveImmunityAbAttr,
   MovePowerBoostAbAttr,
+  MoveTypeChangeAbAttr,
   MoveTypePowerBoostAbAttr,
   OverruleCritAbAttr,
   PokemonTypeChangeAbAttr,
@@ -103,10 +107,14 @@ import {
   PostReceiveCritStatStageChangeAbAttr,
   PostStatStageChangeStatStageChangeAbAttr,
   PostSummonAddBattlerTagAbAttr,
+  PostSummonClearAllyStatStagesAbAttr,
+  PostSummonRemoveArenaTagAbAttr,
   PostSummonStatStageChangeAbAttr,
+  PostTurnRandomBerryEffectAbAttr,
   PostTurnResetStatusAbAttr,
-  PostTurnRestoreBerryAbAttr,
   PreHitResistTypeChangeAbAttr,
+  PreserveBaseStatAbilitiesAbAttr,
+  PreventItemUseAbAttr,
   ProtectStatAbAttr,
   ReceivedMoveDamageMultiplierAbAttr,
   ReceivedTypeDamageMultiplierAbAttr,
@@ -116,6 +124,8 @@ import {
   SetMoveAccuracyAbAttr,
   SpreadTargetByFlagAbAttr,
   StatMultiplierAbAttr,
+  StealthRockImmunityAbAttr,
+  SuppressFieldEffectsAbAttr,
   SuppressWeatherEffectAbAttr,
   UserFieldMoveTypePowerBoostAbAttr,
 } from "#abilities/ab-attrs";
@@ -167,6 +177,10 @@ import { type EntryEffect, EntryEffectAbAttr } from "#data/elite-redux/archetype
 import { FieldCritBoostAbAttr } from "#data/elite-redux/archetypes/field-crit-boost";
 import { FieldStatShareAbAttr } from "#data/elite-redux/archetypes/field-stat-share";
 import {
+  FireHitFormChangeAbAttr,
+  FireUseFormChangeAbAttr,
+} from "#data/elite-redux/archetypes/fire-interaction-form-change";
+import {
   ConsumeFirstFlaggedMoveOnUseAbAttr,
   ConsumeFirstFlaggedMovePriorityAbAttr,
   FirstFlaggedMovePriorityAbAttr,
@@ -177,8 +191,13 @@ import { FlagDamageBoostAbAttr } from "#data/elite-redux/archetypes/flag-damage-
 import { FoeStrongestStatSelfBoostAbAttr } from "#data/elite-redux/archetypes/foe-strongest-stat-self-boost";
 import { ForceFoeOutOnInactivityAbAttr } from "#data/elite-redux/archetypes/force-foe-out-on-inactivity";
 import { HitMultiplierAbAttr, HitMultiplierPowerAbAttr } from "#data/elite-redux/archetypes/hit-multiplier";
+import { HpScalingStatMultiplierAbAttr } from "#data/elite-redux/archetypes/hp-scaling-stat-multiplier";
 import { HpThresholdFormChangeAbAttr } from "#data/elite-redux/archetypes/hp-threshold-form-change";
-import { TypeAbsorbHealAbAttr, TypeAbsorbStatBoostAbAttr } from "#data/elite-redux/archetypes/immunity-with-absorb";
+import {
+  TypeAbsorbHealAbAttr,
+  TypeAbsorbHighestAttackStatBoostAbAttr,
+  TypeAbsorbStatBoostAbAttr,
+} from "#data/elite-redux/archetypes/immunity-with-absorb";
 import { IncomingAccuracyMultiplierAbAttr } from "#data/elite-redux/archetypes/incoming-accuracy-multiplier";
 import { LifestealOnHitAbAttr, LifestealOnKoAbAttr, ScavengerLootAbAttr } from "#data/elite-redux/archetypes/lifesteal";
 import { MoveFlagInjectionAbAttr } from "#data/elite-redux/archetypes/move-flag-injection";
@@ -797,6 +816,20 @@ function lookupChanceStatusFilter(value: unknown): ChanceStatusFilter | null | u
     const t = lookupPokemonType(value.type);
     return t === null ? null : { type: t };
   }
+  if (typeof value.category === "string") {
+    // Gate the proc on the incoming move's category (e.g. Voodoo Power: bleed
+    // only when hit by a SPECIAL attack).
+    if (value.category === "PHYSICAL") {
+      return { category: MoveCategory.PHYSICAL };
+    }
+    if (value.category === "SPECIAL") {
+      return { category: MoveCategory.SPECIAL };
+    }
+    if (value.category === "STATUS") {
+      return { category: MoveCategory.STATUS };
+    }
+    return null;
+  }
   return null;
 }
 
@@ -1128,7 +1161,14 @@ function dispatchTypeConversion(params: Record<string, unknown>): DispatchResult
   const attrs: AbAttr[] = [new TypeConversionAbAttr({ source, newType: targetType })];
   const multiplier = params.multiplier;
   if (typeof multiplier === "number" && multiplier !== 1) {
-    attrs.push(new TypeConversionPowerBoostAbAttr({ source, multiplier }));
+    // The power boost is BROADER than the type rewrite for the flag-keyed
+    // "X Song" family: the dex boosts ALL flagged (sound) moves by the
+    // multiplier, while the type conversion only rewrites the requireType-gated
+    // (Normal) subset. Drop `requireType` from the boost source so every sound
+    // move gets the 1.2x (Snow Song, Sand Song, Banshee, Power Metal). Type-
+    // keyed conversions (no flag) keep their single source.
+    const boostSource = flag === null ? source : { kind: "flag" as const, flag };
+    attrs.push(new TypeConversionPowerBoostAbAttr({ source: boostSource, multiplier }));
   }
   return ok(attrs);
 }
@@ -1172,11 +1212,19 @@ function buildTypeAbsorbAttrs(types: readonly PokemonType[], effect: Record<stri
   }
   const statBoost = effect.statBoost;
   if (isObject(statBoost)) {
-    const stat = lookupBattleStat(statBoost.stat);
     const stages = statBoost.stages;
-    if (stat !== null && typeof stages === "number" && Number.isInteger(stages) && stages !== 0) {
-      attrs.push(...types.map(type => new TypeAbsorbStatBoostAbAttr({ type, stat, stages })));
-      return attrs;
+    if (typeof stages === "number" && Number.isInteger(stages) && stages !== 0) {
+      // Heat Sink: "Fire-type moves boost the highest attacking stat by 1."
+      // The `highestAttack` marker resolves ATK vs SPATK at proc time.
+      if (statBoost.highestAttack === true) {
+        attrs.push(...types.map(type => new TypeAbsorbHighestAttackStatBoostAbAttr({ type, stages })));
+        return attrs;
+      }
+      const stat = lookupBattleStat(statBoost.stat);
+      if (stat !== null) {
+        attrs.push(...types.map(type => new TypeAbsorbStatBoostAbAttr({ type, stat, stages })));
+        return attrs;
+      }
     }
     return attrs;
   }
@@ -1457,6 +1505,7 @@ const DAMAGE_CONDITION_TRANSLATORS: Record<string, (cond: Record<string, unknown
   },
   "target-confused": () => ({ kind: "target-confused" }),
   "target-has-lowered-stat": () => ({ kind: "target-has-lowered-stat" }),
+  "any-active-asleep": () => ({ kind: "any-active-asleep" }),
 };
 
 /**
@@ -1570,6 +1619,18 @@ function resolveCompositePartAttrs(
  */
 function compositeRiderAttrs(erAbilityId: number): AbAttr[] {
   switch (erAbilityId) {
+    case 416: {
+      // Atomic Burst — composite (Galvanize + Electromorphosis) PLUS the missing
+      // rider: "If they are Electric-type their Electric moves have a 10%
+      // paralysis chance." Gated on the holder actually being Electric-type.
+      const par = new ChanceStatusOnAttackAbAttr({
+        chance: 10,
+        effects: [StatusEffect.PARALYSIS],
+        filter: { type: PokemonType.ELECTRIC },
+      });
+      par.addCondition(holder => holder.isOfType(PokemonType.ELECTRIC));
+      return [par];
+    }
     case 706: // Shocking Maw: "Bite moves have 50% paralysis chance"
       return [
         new ChanceStatusOnAttackAbAttr({
@@ -1604,7 +1665,13 @@ function compositeRiderAttrs(erAbilityId: number): AbAttr[] {
     // "X STAB" riders — the holder gets STAB (1.5x) on moves of the named type
     // even when it isn't that type. StabAddAbAttr already guards against
     // double-STAB on real-STAB moves.
-    case 620: // Old Mariner: "Water STAB"
+    case 620:
+      // Old Mariner: "Water STAB" + "immunity to being drenched". The Seaweed
+      // (Grass-gated Fire interaction) piece is the auto-resolved composite part;
+      // this rider adds Water STAB plus the drench-immunity marker (DRENCH itself
+      // is not yet implemented engine-wide — the marker makes the immunity
+      // correct-by-construction; see DrenchImmunityAbAttr).
+      return [new StabAddAbAttr({ targetType: PokemonType.WATER }), new DrenchImmunityAbAttr()];
     case 969: // Hand Barnacles: "Water STAB"
       return [new StabAddAbAttr({ targetType: PokemonType.WATER })];
     case 760: // Acidic Slime: "Poison STAB"
@@ -1661,10 +1728,10 @@ function compositeRiderAttrs(erAbilityId: number): AbAttr[] {
           return user?.getMoveType(move) === PokemonType.WATER;
         }, 2.0),
       ];
-    case 870: // Molten Core: "Absorbs Rock-moves/Stealth Rocks" — Rock-move absorb
-      // (immune + heal 1/4, like Water Absorb). The Stealth Rock immunity is a
-      // separate hazard mechanic — partial wire of the main absorb effect.
-      return [new TypeAbsorbHealAbAttr({ type: PokemonType.ROCK })];
+    case 870: // Molten Core: "Absorbs Rock-moves/Stealth Rocks" — Rock-move
+      // absorb (immune + heal 1/4, like Water Absorb) PLUS Stealth Rock immunity
+      // (no switch-in damage, heal 1/4 instead) via the hazard-immunity marker.
+      return [new TypeAbsorbHealAbAttr({ type: PokemonType.ROCK }), new StealthRockImmunityAbAttr()];
     case 848: // Superheavy: "blocks phasing moves" — immune to forced switch-out
       // (Roar/Whirlwind/Dragon Tail), exactly Suction Cups' effect.
       return [new ForceSwitchOutImmunityAbAttr()];
@@ -1687,9 +1754,12 @@ function compositeRiderAttrs(erAbilityId: number): AbAttr[] {
       ];
     case 759: // Faraday Cage: "Shell Armor + 50BP Thunder Cage when hit by
       // contact" — retaliate with Thunder Cage when struck by a contact move
-      // (Shell Armor is the auto-resolved part). The counter casts the real
-      // Thunder Cage move at the attacker.
-      return [new CounterAttackOnHitAbAttr({ moveId: MoveId.THUNDER_CAGE, filter: { contactRequired: true } })];
+      // (Shell Armor is the auto-resolved part). The ROM dex specifies the
+      // counter is cast at 50 BP (Thunder Cage's natural power is 80), so the
+      // power override is required to match the dex.
+      return [
+        new CounterAttackOnHitAbAttr({ moveId: MoveId.THUNDER_CAGE, power: 50, filter: { contactRequired: true } }),
+      ];
     case 1019: // Wind Chimes: "Amplifier + attacks with 30 BP Hyper Voice when
       // hit" — retaliate with a 30BP Hyper Voice on any hit (power overridden
       // from its natural 90BP). Amplifier is the auto-resolved part.
@@ -1734,11 +1804,10 @@ function compositeRiderAttrs(erAbilityId: number): AbAttr[] {
         }),
       ];
     case 959: // Chestnut Axe: "Keen edge + Grass moves become Keen Edge boosted"
-      // — Grass moves gain the Keen Edge / Sharpness 1.5x slicing boost (wired as
-      // the OUTCOME: a Grass-type 1.5x power boost, since pokerogue has no
-      // per-holder move-flag grant). The Keen Edge part (slicing 1.5x) is the
-      // auto-resolved part; this adds the same multiplier for Grass moves.
-      return [new MoveTypePowerBoostAbAttr(PokemonType.GRASS, 1.5)];
+      // — Grass moves gain the ER Keen Edge boost (1.3x, matching case 271's
+      // SLICING 1.3x), wired as the OUTCOME: a Grass-type 1.3x power boost, since
+      // pokerogue has no per-holder move-flag grant.
+      return [new MoveTypePowerBoostAbAttr(PokemonType.GRASS, 1.3)];
     default:
       return [];
   }
@@ -2010,19 +2079,11 @@ function dispatchComposite(erAbilityId: number, visited: Set<number>): DispatchR
     );
   }
   // Brute Force 758 (Rock Head + Reckless) — "increases recoil-move damage by
-  // 20%. While enraged, this boost applies to ALL moves." In ER, "enraged" is the
-  // vanilla TAUNT tag. The Reckless part already gives recoil moves +20%, so the
-  // enraged-all-moves boost only needs to cover NON-recoil moves (avoids stacking
-  // on recoil moves) — net effect: while TAUNT, every move gets the uniform +20%.
-  if (erAbilityId === 758) {
-    out.push(
-      new MovePowerBoostAbAttr(
-        (user, _target, move) =>
-          user != null && user.getTag(BattlerTagType.TAUNT) != null && !move.hasFlag(MoveFlags.RECKLESS_MOVE),
-        1.2,
-      ),
-    );
-  }
+  // 20%. While enraged, this boost applies to ALL moves." The enraged-all-moves
+  // boost is now handled by the GLOBAL ER_ENRAGE Reckless boost in
+  // Move.calculateBattlePower (any enraged mon's non-recoil moves get +20%, with
+  // recoil moves left to the real Reckless part), so no Brute-Force-specific
+  // rider is needed here — its Rock Head recoil immunity also covers enrage recoil.
   // Relentless 772 (Exploit Weakness + Merciless) — Exploit Weakness here is the
   // 1.25×-damage variant ("deals 1.25x damage AND targets their lower defensive
   // stat"); the shared DefenseStatSwap part only does the stat redirect, so add
@@ -2257,6 +2318,18 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
   }
 
   switch (erAbilityId) {
+    case 266:
+    case 267: {
+      // As One (Calyrex Ice Rider 266 / Shadow Rider 267) — "Prevents all
+      // opposing Pokemon from consuming HELD ITEMS. Raise [Attack|Sp.Atk] by one
+      // stage on a KO." Copy vanilla Unnerve (127, PreventBerryUse) + the KO
+      // boost (Chilling Neigh 264 = +Atk / Grim Neigh 265 = +SpAtk) and append
+      // the PreventItemUse marker so the block covers NON-berry consumables too
+      // (ER reactive items) — not just berries.
+      const unnerve = allAbilities[127]?.attrs ?? [];
+      const neigh = allAbilities[erAbilityId === 266 ? 264 : 265]?.attrs ?? [];
+      return ok([...unnerve, ...neigh, new PreventItemUseAbAttr()]);
+    }
     case 289:
       // Growing Tooth — Atk +1 after a biting move resolves.
       return ok([
@@ -2265,6 +2338,31 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
           stat: Stat.ATK,
           stages: 1,
         }),
+      ]);
+    case 315:
+      // Hydrate — "Changes the user's Normal-type moves to Water-type. If the
+      // user is Water-type its Water-type moves have a 10% chance to drench,
+      // otherwise it gains Water STAB." (Was classified type-conversion with a
+      // flat 1.2x boost — an approximation that dropped the conditional STAB /
+      // drench; hand-wired here to the dex.)
+      return ok([
+        // Normal moves become Water.
+        new MoveTypeChangeAbAttr(PokemonType.WATER, (_u, _t, move) => !!move && move.type === PokemonType.NORMAL),
+        // Non-Water user gains Water STAB. StabAddAbAttr self-gates: it only
+        // boosts a Water move that is NOT already one of the user's types, so a
+        // Water-type user (which already has natural Water STAB) gets nothing
+        // here — exactly the dex's "otherwise" branch.
+        new StabAddAbAttr({ targetType: PokemonType.WATER }),
+        // Water-type user: its Water moves (including the Normal->Water converted
+        // ones) get a 10% chance to drench the target. Gated to a Water-type user
+        // so the two branches are mutually exclusive per the dex; ER_DRENCHED's
+        // own canAdd enforces the Water-type/water-immune target immunity.
+        new PostAttackApplyBattlerTagAbAttr(
+          false,
+          (user, _t, move) =>
+            user.isOfType(PokemonType.WATER) && user.getMoveType(move) === PokemonType.WATER ? 10 : 0,
+          BattlerTagType.ER_DRENCHED,
+        ),
       ]);
     case 333:
       // Sweet Dreams — heals 1/8 max HP each turn while asleep AND grants
@@ -2378,14 +2476,23 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
         }),
       ]);
     case 609:
-      // Parasitic Spores — non-Ghost foes take 1/8 dmg every turn. The
-      // "spreads on contact" piece (the secondary contact-status proc) is
-      // deferred — needs a "infect on contact" primitive composing with this
-      // base proc. Partial wire.
+      // Parasitic Spores — "Gain parasitic spores on entry. Each turn, affected
+      // Pokemon lose 1/8 max HP (Ghost types immune). When using contact moves,
+      // spread spores to the target. Spores persist until switch-out."
+      //   - The per-turn 1/8 non-Ghost field aura is the PostTurnHurtNonTyped proc.
+      //   - The contact-spread is a 100% ChanceBattlerTagOnAttack that plants the
+      //     persistent ER_PARASITIC_SPORES tag on the target (Ghost-immune via the
+      //     tag's canAdd; the tag keeps chipping the target 1/8 each turn and
+      //     persists until IT switches out, even after Parasect leaves).
       return ok([
         new PostTurnHurtNonTypedAbAttr({
           safeTypes: [PokemonType.GHOST],
           damageFraction: 1 / 8,
+        }),
+        new ChanceBattlerTagOnAttackAbAttr({
+          chance: 100,
+          tags: [BattlerTagType.ER_PARASITIC_SPORES],
+          contactRequired: true,
         }),
       ]);
     case 643:
@@ -2485,12 +2592,12 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
       // Drop Blocks — set Spikes on attacker side when hit.
       return ok([new SetArenaTagOnHitAbAttr({ tagType: ArenaTagType.SPIKES, side: "attacker" })]);
     case 909:
-      // Loose Thorns — Creeping Thorns when hit by contact. ER's Creeping
-      // Thorns isn't in vanilla `ArenaTagType`; we deploy Spikes as a
-      // stand-in so the proc is at least observable in test runs.
+      // Loose Thorns — "Sets Creeping Thorns when hit by contact." Deploys the
+      // real ER Creeping Thorns hazard (Spikes-style switch-in damage PLUS
+      // ER_BLEED) on the attacker's side.
       return ok([
         new SetArenaTagOnHitAbAttr({
-          tagType: ArenaTagType.SPIKES,
+          tagType: ArenaTagType.CREEPING_THORNS,
           side: "attacker",
           contactRequired: true,
         }),
@@ -2951,11 +3058,10 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
       return ok([new StabAddAbAttr({ targetType: PokemonType.ICE })]);
     case 297:
       // Amphibious — "Water moves gain STAB. Can't become drenched."
-      // Wire the Water STAB add via StabAdd(WATER). The "can't become
-      // drenched" piece is an ER-specific tag-immunity (DRENCHED battler
-      // tag) that the status-immunity primitive doesn't model yet —
-      // deferred. Partial wire.
-      return ok([new StabAddAbAttr({ targetType: PokemonType.WATER })]);
+      // Water STAB add via StabAdd(WATER), plus the drench-immunity marker
+      // (DrenchImmunityAbAttr) so the "can't become drenched" clause is
+      // correct-by-construction once DRENCH lands engine-wide.
+      return ok([new StabAddAbAttr({ targetType: PokemonType.WATER }), new DrenchImmunityAbAttr()]);
     case 365:
       // Lunar Eclipse — "Fairy & Dark gains STAB. Improves Hypnosis accuracy to
       // 90%." Two StabAdd instances (FAIRY, DARK; single-type-per-move means
@@ -3284,21 +3390,24 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
           candidates: [Stat.ATK, Stat.SPATK],
           stages: 2,
         }),
-        // ER "enrage" === the vanilla TAUNT tag (per ER's TM12/Taunt text:
-        // "Enrages the foe so it can only use attack moves"). Berserk DNA
-        // enrages ITSELF on entry — apply TAUNT to the holder. (Previously
-        // mis-modeled as flat self-damage-on-attack.)
-        new PostSummonAddBattlerTagAbAttr(BattlerTagType.TAUNT, 4),
+        // Berserk DNA enrages ITSELF on entry (dex: "adding 33% recoil to all
+        // attacks"). Enrage is the ER_ENRAGE status (33% recoil + Reckless until
+        // switch), NOT vanilla Taunt — apply it to the holder. (The old wiring
+        // reused TAUNT, which wrongly barred the holder from status moves.)
+        new PostSummonAddBattlerTagAbAttr(BattlerTagType.ER_ENRAGE, 1),
       ]);
     case 534:
-      // Cosmic Daze — "Deals 2x damage vs confused and enraged foes." In ER,
-      // "enraged" is the vanilla TAUNT tag, so the boost fires when the target
-      // carries CONFUSED or TAUNT.
+      // Cosmic Daze — "Attacks against confused and enraged targets deal double
+      // damage. Additionally, confused and enraged enemies take twice as much
+      // damage when they hurt themselves from those statuses." The 2x-vs-target
+      // boost (CONFUSED / ER_ENRAGE) plus the self-hurt-doubling marker (read at
+      // the confusion self-hit and enrage-recoil sites).
       return ok([
         new ConditionalDamageAbAttr({
-          condition: { kind: "target-has-any-tag", tags: [BattlerTagType.CONFUSED, BattlerTagType.TAUNT] },
+          condition: { kind: "target-has-any-tag", tags: [BattlerTagType.CONFUSED, BattlerTagType.ER_ENRAGE] },
           multiplier: 2,
         }),
+        new DoubleSelfInflictedDamageAbAttr(),
       ]);
     case 868:
       // Lightning Aspect — "Absorbs Electric moves for immunity and boosts the
@@ -3316,9 +3425,10 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
         }),
       ]);
     case 261:
-      // CuriusMedicn — "Resets its ally's stat changes on entry."
-      // No direct primitive — closest: Haze on all field. Partial wire.
-      return ok([new PostSummonScriptedMoveAbAttr({ moveId: MoveId.HAZE })]);
+      // Curious Medicine — "Resets its ally's stat changes on entry." Use the
+      // dedicated ally-only reset (the vanilla Curious Medicine attr) instead of
+      // field-wide Haze, which wrongly also reset the foes' stages.
+      return ok([new PostSummonClearAllyStatStagesAbAttr()]);
     case 989:
       // Storm Cloud — "Summon rain on entry for 8 turns. Gain Electric-type STAB."
       // Use EntryEffect set-weather + add-self-type for Electric (so STAB applies).
@@ -3329,10 +3439,12 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
     case 604:
       // Desert Spirit — "Summons sand on entry. Ground moves hit airborne in
       // sand." Sand-on-entry + a sand-gated Ground type-chart override that
-      // rewrites Ground-vs-Flying immunity (0x) to neutral (1x).
+      // rewrites Ground-vs-Flying immunity (0x) to neutral (1x) + self-immunity
+      // to the sandstorm chip damage.
       return ok([
         new EntryEffectAbAttr({ kind: "set-weather", weather: WeatherType.SANDSTORM, turns: 8 }),
         new WeatherGroundAirborneAbAttr([WeatherType.SANDSTORM]),
+        new BlockWeatherDamageAttr(WeatherType.SANDSTORM),
       ]);
     case 893:
       // Deep Fried — "Summons a sea of fire on entry." Drops the Fire+Grass
@@ -3388,12 +3500,13 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
       ]);
     case 616:
       // Demolitionist — "Readied Action + Ignores Protect + screens break on
-      // readied turn." Wire ATK × 2.0 on first turn + ignore-Protect on contact
-      // moves (Unseen Fist's IgnoreProtectOnContactAbAttr). The screen-break
-      // half is still an engine-level move-effect — deferred (partial wire).
+      // the readied turn." ATK x2 on the first turn + ignore-Protect on contact
+      // (Unseen Fist) + break the foe's screens on entry (the readied-turn
+      // screen break; Reflect / Light Screen / Aurora Veil).
       return ok([
         new FirstTurnStatMultiplierAbAttr({ stat: Stat.ATK, multiplier: 2.0 }),
         new IgnoreProtectOnContactAbAttr(),
+        new PostSummonRemoveArenaTagAbAttr([ArenaTagType.REFLECT, ArenaTagType.LIGHT_SCREEN, ArenaTagType.AURORA_VEIL]),
       ]);
     case 619:
       // Low Visibility — "Summons Eerie Fog on entry."
@@ -3505,8 +3618,16 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
       // ER C source doesn't implement this ability either (not in abilities.h).
       return ok([new AlwaysHitAbAttr(), new MoveAbilityBypassAbAttr()]);
     case 921:
-      // Flawless Precision — "Fatal + Deadly Precision." Same shape as Deadly.
-      return ok([new AlwaysHitAbAttr(), new MoveAbilityBypassAbAttr()]);
+      // Flawless Precision — "Fatal + Deadly Precision." Deadly Precision = never
+      // miss + bypass the target's ability; Fatal adds "super-effective moves
+      // always land critical hits" (was missing — same shape as Deadly only).
+      return ok([
+        new AlwaysHitAbAttr(),
+        new MoveAbilityBypassAbAttr(),
+        new ConditionalCritAbAttr(
+          (user, target, move) => target != null && user != null && target.getMoveEffectiveness(user, move) > 1,
+        ),
+      ]);
     case 422:
       // Gifted Mind (dex): "grants immunity to Dark, Ghost, and Bug-type moves while
       // making all status moves used by this Pokemon never miss." i.e. it nulls the
@@ -3585,24 +3706,31 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
       return ok([new FirstTurnPriorityClampAbAttr()]);
     case 669:
       // Flammable Coat — "Transforms Lumbering Sloth into its Engulfed form when
-      // hit by/using Fire moves. Cannot be copied or suppressed." The
-      // "cannot be copied or suppressed" clause is implemented faithfully via
-      // the uncopiable/unsuppressable/unreplaceable builder flags (see
-      // init-elite-redux-custom-abilities.ts). The form change itself is ENGINE-
-      // BLOCKED: ER's Engulfed is a SEPARATE species (SPECIES_LUMBERING_SLOTH_
-      // ENGULFED, id 1847), not a form of Lumbering Sloth, and PokeRogue has no
-      // mid-battle species-swap mechanic (only intra-species form changes). The
-      // in-battle Fire interaction is kept as halved Fire damage taken.
-      return ok([
-        new DamageReductionAbAttr({
-          reduction: 0.5,
-          filter: { kind: "move-type", type: PokemonType.FIRE },
-        }),
-      ]);
+      // hit by Fire-type moves or when using Fire-type moves. Cannot be copied or
+      // suppressed." The "cannot be copied or suppressed" clause is implemented
+      // faithfully via the uncopiable/unsuppressable/unreplaceable builder flags
+      // (see init-elite-redux-custom-abilities.ts).
+      //
+      // The Engulfed form is a SEPARATE ER dump species
+      // (SPECIES_LUMBERING_SLOTH_ENGULFED, ER 1847 → pkrg 10439) injected AS the
+      // "engulfed" form onto base Lumbering Sloth (ER 1049 → pkrg 10023) by
+      // init-elite-redux-er-custom-form-changes.ts (one-way "manual-oneway"
+      // edge). The two AbAttrs below fire that manual form change on either fire
+      // interaction (using a Fire move / being hit by one).
+      return ok([new FireUseFormChangeAbAttr("engulfed"), new FireHitFormChangeAbAttr("engulfed")]);
     case 676:
       return ok([
         new FirstFlaggedMovePriorityAbAttr(MoveFlags.BITING_MOVE),
         new ConsumeFirstFlaggedMovePriorityAbAttr(MoveFlags.BITING_MOVE, true),
+      ]);
+    case 882:
+      // Edgelord — "First Keen Edge move each entry gets +1 priority. Resets on
+      // KO." The exact slicing-move twin of Sidewinder (676); was approximated by
+      // the generic priority-modifier (every slicing move on the switch-in turn,
+      // no once-per-entry charge, no KO reset).
+      return ok([
+        new FirstFlaggedMovePriorityAbAttr(MoveFlags.SLICING_MOVE),
+        new ConsumeFirstFlaggedMovePriorityAbAttr(MoveFlags.SLICING_MOVE, true),
       ]);
     case 791:
       // DNA Scramble — "Changes forms based on the move used." Implemented
@@ -3644,13 +3772,14 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
       // Same shape as Scare but -2 stages.
       return ok([new PostSummonStatStageChangeAbAttr([Stat.SPATK], -2, false, true)]);
     case 283:
-      // Christmas Spirit — "Takes 50% less damage if hail is active."
-      // Uses WeatherDamageReductionAbAttr gated to HAIL/SNOW.
+      // Christmas Spirit — "Takes 50% less damage in hail AND is immune to hail
+      // chip damage." The move-damage reduction PLUS the hail/snow chip immunity.
       return ok([
         new WeatherDamageReductionAbAttr({
           weathers: [WeatherType.HAIL, WeatherType.SNOW],
           multiplier: 0.5,
         }),
+        new BlockWeatherDamageAttr(WeatherType.HAIL, WeatherType.SNOW),
       ]);
     case 382:
       // Volcano Rage — "Triggers 50 BP Eruption after using a Fire-type move."
@@ -4405,12 +4534,13 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
         }),
       ]);
     case 426:
-      // Clueless — "Negates Weather, Rooms and Terrains." Cloud Nine continuously
-      // suppresses weather effects; terrain is cleared on entry. (Room tags —
-      // Trick/Magic/Wonder Room, Gravity — would need a continuous field-effect
-      // suppression hook pokerogue lacks; weather suppression + on-entry terrain
-      // clear cover the common cases.)
-      return ok([new SuppressWeatherEffectAbAttr(), new PostSummonClearTerrainAbAttr()]);
+      // Clueless — "Negates Weather, Rooms and Terrains." Weather is suppressed
+      // continuously by SuppressWeatherEffectAbAttr (Cloud Nine); Terrain and the
+      // Room field effects (Trick Room / Inverse Room) and Gravity are negated
+      // continuously via SuppressFieldEffectsAbAttr (Arena.isFieldEffectSuppressed
+      // gates the terrain getter, the Room apply/read sites, and hasActiveGravity).
+      // All effects merely stop applying while Clueless is out and resume after.
+      return ok([new SuppressWeatherEffectAbAttr(), new SuppressFieldEffectsAbAttr()]);
     // -------------------------------------------------------------------------
     // Round 30 — PostStatStageChange + stat-trigger-on-stat-lowered wires
     // -------------------------------------------------------------------------
@@ -4502,10 +4632,14 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
     // Round 33 — more wires + StabAdd / TypeDamageBoost compositions
     // -------------------------------------------------------------------------
     case 423:
-      // Hydro Circuit — "Electric moves +50%; Water moves siphon 25% damage."
-      // Wire the 1.5x Electric type boost. Water-drain piece needs a drain
-      // modifier primitive (deferred).
-      return ok([new TypeDamageBoostAbAttr({ type: PokemonType.ELECTRIC, multiplier: 1.5 })]);
+      // Hydro Circuit — "Electric moves +50%; Water moves heal the user for 25%
+      // of the damage dealt." Both halves now wired: the 1.5x Electric type boost
+      // and the Water-move per-hit lifesteal (the lifesteal primitive documents
+      // exactly this shape).
+      return ok([
+        new TypeDamageBoostAbAttr({ type: PokemonType.ELECTRIC, multiplier: 1.5 }),
+        new LifestealOnHitAbAttr({ healFraction: 0.25, filter: { type: PokemonType.WATER } }),
+      ]);
     case 700:
       // Color Spectrum — handled in dispatchBespokeR48 (consulted first; uses
       // MovePowerBoost-on-STAB + the per-turn random-type rotation). This
@@ -4807,15 +4941,18 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
       // Per-move-count tracker primitive missing. Defer.
       return SKIP_BESPOKE;
     case 381: {
-      // Pollinate — "Normal moves become Bug + gain STAB. Immune to powder if
-      // Bug-type." Reuse the type-conversion archetype (Normal→Bug, 1.2× STAB)
-      // and append the Bug-powder-immunity marker (was missing). Cascades to
-      // 701 Steel Beetle (which composites Pollinate).
-      const base = dispatchTypeConversion({ sourceType: "NORMAL", targetType: "BUG", multiplier: 1.2 });
+      // Pollinate — "Normal moves become Bug and gain STAB. Immune to powder if
+      // Bug-type." The dex says the converted moves GAIN STAB (a real +0.5 →
+      // 1.5×), not a flat 1.2× -ate boost. Wire the Normal→Bug conversion (no
+      // multiplier) + StabAddAbAttr (1.5×, self-guards against double-STAB when
+      // the user is already Bug) + the Bug-powder-immunity marker. Cascades to
+      // 701 Steel Beetle (which composites Pollinate; user is Ghost/Rock, so it
+      // has no natural Bug STAB and the 1.5× applies).
+      const base = dispatchTypeConversion({ sourceType: "NORMAL", targetType: "BUG" });
       if (base.skipReason !== null) {
         return base;
       }
-      return ok([...base.attrs, new BugPowderImmunityAbAttr()]);
+      return ok([...base.attrs, new StabAddAbAttr({ targetType: PokemonType.BUG }), new BugPowderImmunityAbAttr()]);
     }
     case 704:
       // Hot Coals — handled in dispatchBespokeR48 (consulted first; lays the
@@ -4902,10 +5039,10 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
       // defense." Terrain-consume needs new primitive. Defer.
       return SKIP_BESPOKE;
     case 890:
-      // Craving — "Eat a random berry at the end of the turn." Wire
-      // vanilla PostTurnRestoreBerry (Harvest) with 100% chance — restores
-      // any berries that have been eaten this battle.
-      return ok([new PostTurnRestoreBerryAbAttr(() => 1.0)]);
+      // Craving — "Triggers a random berry effect at the end of every turn."
+      // Fires a random berry's effect unconditionally (was Harvest, which only
+      // restored a berry already eaten this battle — the wrong mechanic).
+      return ok([new PostTurnRandomBerryEffectAbAttr()]);
     case 899:
       // Backup Power — "Revives at 25% HP once after fainting in Electric
       // Terrain." Terrain-gated revive. Defer.
@@ -5488,6 +5625,21 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
         new ChanceBattlerTagOnHitAbAttr({ chance: 30, tags: [BattlerTagType.CONFUSED], contactRequired: true }),
         new ChanceBattlerTagOnAttackAbAttr({ chance: 30, tags: [BattlerTagType.CONFUSED], contactRequired: true }),
       ]);
+    case 622:
+      // Beautiful Music — "Sound moves gain 50% chance to infatuate targets on
+      // hit (cuts their Attack and Special Attack in half), IGNORING gender."
+      // The Atk/SpAtk halving is ER's baseline infatuation effect (applied in
+      // Pokemon.getEffectiveStat). The gender-ignore is granted by the marker
+      // (consulted in InfatuatedTag.canAdd). The vanilla archetype wire could
+      // never infatuate same/genderless targets — the marker fixes that.
+      return ok([
+        new ChanceBattlerTagOnAttackAbAttr({
+          chance: 50,
+          tags: [BattlerTagType.INFATUATED],
+          filter: { flag: MoveFlags.SOUND_BASED },
+        }),
+        new IgnoreGenderInfatuationAbAttr(),
+      ]);
     case 642: {
       // Jackhammer — "Hammer moves hit twice, each hit 70% damage." The prior
       // multi-hit-override wire matched ALL moves at full power; gate to
@@ -5567,13 +5719,13 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
         new PostDefendHpGatedSelfTagAbAttr(0.5, BattlerTagType.NO_RETREAT),
       ]);
     case 634: {
-      // Last Stand — "Def and SpDef increase as HP drops. Max 1.6x."
-      // Approximate as a single tier: 1.6x DEF and SPDEF below 50% HP.
-      // Multi-tier gradient (1.2/1.4/1.6) is a future refinement.
-      const halfHpGate = (pokemon: { hp: number; getMaxHp(): number }) => pokemon.hp / pokemon.getMaxHp() <= 0.5;
+      // Last Stand — "Defense and Special Defense increase LINEARLY as HP
+      // decreases. Multiplier scales from 1.0x at full HP to 1.6x at 0% HP (1.3x
+      // at 50%, 1.45x at 25%)." Wire the true linear gradient rather than the
+      // old single 1.6x-below-50% tier.
       return ok([
-        new StatMultiplierAbAttr(Stat.DEF, 1.6, halfHpGate),
-        new StatMultiplierAbAttr(Stat.SPDEF, 1.6, halfHpGate),
+        new HpScalingStatMultiplierAbAttr({ stat: Stat.DEF, minMultiplier: 1.0, maxMultiplier: 1.6 }),
+        new HpScalingStatMultiplierAbAttr({ stat: Stat.SPDEF, minMultiplier: 1.0, maxMultiplier: 1.6 }),
       ]);
     }
     case 703: {
@@ -5756,20 +5908,19 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
     case 800: {
       // Deviate — "Normal-type moves become Dark-type. If the user is Dark-type
       // its Dark-type moves have a 10% enrage chance, otherwise it gains Dark
-      // STAB." Normal→Dark conversion (+1.2 ER-STAB) plus the missing rider: a
-      // 10% enrage (= vanilla TAUNT) on the holder's Dark moves, gated on the
-      // holder actually being Dark-type.
-      const base = dispatchTypeConversion({ sourceType: "NORMAL", targetType: "DARK", multiplier: 1.2 });
-      if (base.skipReason !== null) {
-        return base;
-      }
-      const enrageRider = new ChanceBattlerTagOnAttackAbAttr({
-        chance: 10,
-        tags: [BattlerTagType.TAUNT],
-        filter: { type: PokemonType.DARK },
-      });
-      enrageRider.addCondition(holder => holder.isOfType(PokemonType.DARK));
-      return ok([...base.attrs, enrageRider]);
+      // STAB." The exact Dark analog of Hydrate (315): Normal->Dark conversion +
+      // conditional Dark STAB (non-Dark user, StabAddAbAttr self-gates) + a 10%
+      // ER_ENRAGE on the holder's Dark moves when it IS Dark-type. (Was a
+      // type-conversion approximation with a flat 1.2x + the TAUNT enrage proxy.)
+      return ok([
+        new MoveTypeChangeAbAttr(PokemonType.DARK, (_u, _t, move) => !!move && move.type === PokemonType.NORMAL),
+        new StabAddAbAttr({ targetType: PokemonType.DARK }),
+        new PostAttackApplyBattlerTagAbAttr(
+          false,
+          (user, _t, move) => (user.isOfType(PokemonType.DARK) && user.getMoveType(move) === PokemonType.DARK ? 10 : 0),
+          BattlerTagType.ER_ENRAGE,
+        ),
+      ]);
     }
     case 814: {
       // Strategic Pause — "When the user moves after the target, boosts critical
@@ -5780,9 +5931,9 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
         !globalScene.phaseManager.hasPhaseOfType("MovePhase", phase => phase.pokemon.id !== user.id);
       const critBonus = new CritStageBonusAbAttr({ bonus: 2 });
       critBonus.addCondition(movedLast);
-      // The power boost is explicitly "Analytic", which ER rebalances to 1.5×
-      // (not vanilla's 1.3× — see init-elite-redux-vanilla-rebalance ANALYTIC).
-      return ok([critBonus, new MovePowerBoostAbAttr(user => user != null && movedLast(user), 1.5)]);
+      // The ROM dex specifies "+30% attack power when moving last" — a flat 1.3×
+      // (NOT the ER Analytic 1.5×). Match the dex text verbatim.
+      return ok([critBonus, new MovePowerBoostAbAttr(user => user != null && movedLast(user), 1.3)]);
     }
     case 815:
       // Overrule — "when this Pokémon's moves land critical hits, they ignore
@@ -5796,6 +5947,18 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
       // dispatchBespokeR48 (consulted first; SuppressAttackerAbilityAbAttr with
       // contactOnly). This main-switch entry is dead.
       return SKIP_BESPOKE;
+    case 694: {
+      // Blind Rage — "Scrappy + Mold Breaker" BUT the dex adds: "Does not bypass
+      // abilities that modify base stats such as Grass Pelt." Copy the vanilla
+      // Scrappy (113: ignore Ghost immunity for Normal/Fighting + Intimidate
+      // immunity) and Mold Breaker (104: ability-ignore + summon message) attrs,
+      // then append the PreserveBaseStatAbilities marker so getEffectiveStat
+      // keeps the defender's StatMultiplier abilities (Grass Pelt / Fur Coat)
+      // active even under the ability-ignore.
+      const scrappy = allAbilities[113]?.attrs ?? [];
+      const moldBreaker = allAbilities[104]?.attrs ?? [];
+      return ok([...scrappy, ...moldBreaker, new PreserveBaseStatAbilitiesAbAttr()]);
+    }
     case 690:
       // Restraining Order — "Forces the attacker out when hit, once each
       // switch-in." Must force the ATTACKER out, not the holder. The prior wire
@@ -6564,6 +6727,23 @@ function dispatchBespokeR48(erAbilityId: number): DispatchResult | null {
     case 523:
       // Grappler — "Trapping moves last 6 turns. Trapping deals 1/6 HP."
       return ok([new TrapDurationModifierAbAttr({ turns: 6, damageFraction: 1 / 6 })]);
+    case 818:
+      // Tentalock — "Grappler + Serpent Bind" but the ROM dex tightens the
+      // trap-proc: "Gives attacks a 50% chance to trap the target for 6 turns"
+      // (Serpent Bind alone is 4-5). The composite resolver would reuse Serpent
+      // Bind's 4-5/8 proc, so wire Tentalock's own 6-turn / 1/6-HP proc here.
+      // Grappler still extends real trapping MOVES; this proc is Tentalock's.
+      return ok([
+        new TrapDurationModifierAbAttr({ turns: 6, damageFraction: 1 / 6 }),
+        new ChanceBattlerTagOnAttackAbAttr({
+          chance: 50,
+          tags: [BattlerTagType.WRAP],
+          contactRequired: false,
+          turnRange: [6, 6],
+          damageDenominator: 6,
+        }),
+        new PostTurnFoeStatDropAbAttr({ stat: Stat.SPD, stages: -1, onlyIfTrapped: true }),
+      ]);
     case 556:
       // Subdue — "Doubles stat drop effects used by this pokemon."
       return ok([new OutgoingStatDropMultiplierAbAttr({ factor: 2 })]);
@@ -6681,26 +6861,25 @@ function dispatchBespokeR48(erAbilityId: number): DispatchResult | null {
       ]);
     case 816: {
       // Mental Pollution — "Suppresses others' abilities when it becomes
-      // enraged." In ER, "enraged" is the vanilla TAUNT tag (per ER's TM12/Taunt
-      // text). While the holder is enraged, any attacking foe has its ability
-      // suppressed. (Previously modeled via a FOG-weather proxy.)
+      // enraged." Enraged is the ER_ENRAGE status. While the holder is enraged,
+      // any attacking foe has its ability suppressed.
       const suppress = new SuppressAttackerAbilityAbAttr();
-      suppress.addCondition(holder => holder.getTag(BattlerTagType.TAUNT) != null);
+      suppress.addCondition(holder => holder.getTag(BattlerTagType.ER_ENRAGE) != null);
       return ok([suppress]);
     }
     case 817:
-      // Madness Enhancement — "Enrages in fog, halves damage when enraged." In
-      // ER, "enraged" is the vanilla TAUNT tag. The holder enrages ITSELF while
-      // fog is active (apply TAUNT on entry-in-fog), and halves incoming damage
-      // whenever it is enraged (TAUNT) OR fog is active (the fog auto-enrage,
-      // which also covers fog rolling in mid-battle).
+      // Madness Enhancement — "Enrages in fog, halves damage when enraged." The
+      // holder enrages ITSELF (ER_ENRAGE) while fog is active, and halves incoming
+      // damage whenever it is enraged OR fog is active (the fog auto-enrage, which
+      // also covers fog rolling in mid-battle).
       return ok([
         new ReceivedMoveDamageMultiplierAbAttr(
           target =>
-            target.getTag(BattlerTagType.TAUNT) != null || globalScene.arena.weather?.weatherType === WeatherType.FOG,
+            target.getTag(BattlerTagType.ER_ENRAGE) != null
+            || globalScene.arena.weather?.weatherType === WeatherType.FOG,
           0.5,
         ),
-        new PostSummonAddBattlerTagAbAttr(BattlerTagType.TAUNT, 4).addCondition(
+        new PostSummonAddBattlerTagAbAttr(BattlerTagType.ER_ENRAGE, 1).addCondition(
           () => globalScene.arena.weather?.weatherType === WeatherType.FOG,
         ),
       ]);

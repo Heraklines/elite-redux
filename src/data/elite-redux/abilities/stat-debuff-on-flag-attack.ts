@@ -31,17 +31,18 @@
 //   - 945 Chainsaw — `{ flag: SLICING_MOVE, stat: DEF, stages: -1 }`.
 //
 // Trigger semantics:
-//   - Fires on POST-ATTACK (after the move resolves). The damage outcome
-//     doesn't matter — even if the move misses or is fully resisted, the
-//     stat drop still queues. (Matches `StatBoostOnFlagAttackAbAttr`.)
-//   - Stacks against the same target — no once-per-turn lock. Pokerogue's
-//     stat-stage cap (-6) handles the runaway.
+//   - Fires on POST-ATTACK only when the move actually HITS (dex: Denting
+//     Blows "lowers Defense when hitting", "the Defense drop occurs after
+//     damage"). A miss or an immune target does NOT drop the stat.
+//   - Once per attack per target: a multi-hit flag move drops the stat only on
+//     the FIRST strike (dex: "each target can only be affected once per turn").
 //   - The drop applies to the opponent's stat (selfTarget = false in the
-//     queued `StatStageChangePhase`).
+//     queued `StatStageChangePhase`). Pokerogue's stat-stage cap (-6) applies.
 // =============================================================================
 
 import { PostAttackAbAttr, type PostMoveInteractionAbAttrParams } from "#abilities/ab-attrs";
 import { globalScene } from "#app/global-scene";
+import { HitResult } from "#enums/hit-result";
 import type { MoveFlags } from "#enums/move-flags";
 import type { BattleStat } from "#enums/stat";
 
@@ -126,7 +127,18 @@ export class StatDebuffOnFlagAttackAbAttr extends PostAttackAbAttr {
     if (!super.canApply(params)) {
       return false;
     }
-    const { pokemon, opponent, move } = params;
+    const { pokemon, opponent, move, hitResult } = params;
+    // The drop occurs only when the move actually HITS (dex: "when hitting" /
+    // "after damage"). Misses (MISS) and immune targets (NO_EFFECT) never drop.
+    if (hitResult >= HitResult.NO_EFFECT) {
+      return false;
+    }
+    // "Each target can only be affected once per turn." A multi-hit flag move
+    // must drop the stat only ONCE — gate to the first strike (hitsLeft still
+    // equals the total hitCount on the opening hit).
+    if (pokemon.turnData.hitCount !== pokemon.turnData.hitsLeft) {
+      return false;
+    }
     if (!move.doesFlagEffectApply({ flag: this.flag, user: pokemon, target: opponent })) {
       return false;
     }

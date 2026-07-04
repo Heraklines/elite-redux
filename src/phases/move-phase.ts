@@ -16,7 +16,6 @@ import { getTerrainBlockMessage } from "#data/terrain";
 import { getWeatherBlockMessage } from "#data/weather";
 import { AbilityId } from "#enums/ability-id";
 import { ArenaTagSide } from "#enums/arena-tag-side";
-import { ArenaTagType } from "#enums/arena-tag-type";
 import { BattlerIndex } from "#enums/battler-index";
 import { BattlerTagLapseType } from "#enums/battler-tag-lapse-type";
 import { BattlerTagType } from "#enums/battler-tag-type";
@@ -502,7 +501,7 @@ export class MovePhase extends PokemonPhase {
    */
   private checkGravity(): boolean {
     const move = this.move.getMove();
-    if (!globalScene.arena.hasTag(ArenaTagType.GRAVITY) || !move.hasFlag(MoveFlags.GRAVITY)) {
+    if (!globalScene.arena.hasActiveGravity() || !move.hasFlag(MoveFlags.GRAVITY)) {
       return false;
     }
 

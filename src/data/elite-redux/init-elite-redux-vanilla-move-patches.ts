@@ -52,6 +52,7 @@ import {
   DefDefAttr,
   ErCritBelowHalfHpAttr,
   ErDecorateSideBoostAttr,
+  ErDrenchAttr,
   ErSuperEffectiveVsTypeAttr,
   FlinchAttr,
   HealStatusEffectAttr,
@@ -1065,18 +1066,13 @@ const MOVE_PATCHERS: ReadonlyMap<MoveId, (move: MutableMove) => void> = new Map(
   // SPLASH: in Elite Redux, Splash is NOT the vanilla "nothing happens" status
   // move — it's a WATER-type PHYSICAL attack whose power scales with how much
   // the user outweighs the foe (Heavy-Slam curve), 100% accuracy, targeting the
-  // opponent. (ER move id 150: type Water, split physical, "Does more damage if
-  // the user outweighs the foe.") Convert the SelfStatusMove in-place:
+  // opponent. (ER move id 150: type Water, split physical, "The user slams the
+  // foe. 20% drench chance. Heavier users are stronger.") Convert in-place:
   //  - retype Normal → Water, category Status → Physical
   //  - retarget USER → the opposing Pokémon, set 100% accuracy
   //  - strip the do-nothing "But nothing happened!" MessageAttr
   //  - add the weight-ratio power attr (base power -1 is computed by it)
-  // NOTE: ER also gives Splash a 20% "drench" chance, but DRENCH is an
-  // ER-specific status that isn't yet implemented anywhere in this fork
-  // (resolveStatusName returns null for it, so every DRENCH move currently
-  // skips that piece). The drench rider is intentionally omitted until the
-  // status exists; the move's core identity (Water physical weight attack) is
-  // faithful.
+  //  - add the 20% ER_DRENCHED rider (DRENCH is now implemented as ER_DRENCHED)
   [
     MoveId.SPLASH,
     move => {
@@ -1086,6 +1082,64 @@ const MOVE_PATCHERS: ReadonlyMap<MoveId, (move: MutableMove) => void> = new Map(
       move.accuracy = 100;
       removeAttrsByName(move, ["MessageAttr"]);
       addAttrUnique(move, new CompareWeightPowerAttr());
+      addAttrUnique(move, new ErDrenchAttr(20));
+    },
+  ],
+  // ---- ER Water-move drench riders (2.65 dex). DRENCH = ER_DRENCHED (holder
+  // moves last in its bracket for 2 turns). ErDrenchAttr carries a fixed
+  // per-move chance so it never clobbers the move's own `chance` field. ----
+  [
+    // Water Gun — "A quick squirt of water. 10% drench chance. +1 priority. Mega Launcher boost."
+    MoveId.WATER_GUN,
+    move => addAttrUnique(move, new ErDrenchAttr(10)),
+  ],
+  [
+    // Hydro Pump — "Blasts with a massive amount of water. 30% drench chance. Mega Launcher boost."
+    MoveId.HYDRO_PUMP,
+    move => addAttrUnique(move, new ErDrenchAttr(30)),
+  ],
+  [
+    // Surf — "A big wave crashes down on the foe. 20% drench chance. Field-based."
+    MoveId.SURF,
+    move => addAttrUnique(move, new ErDrenchAttr(20)),
+  ],
+  [
+    // Whirlpool — "The foe is trapped for four or five turns. 30% drench chance. Field-based."
+    MoveId.WHIRLPOOL,
+    move => addAttrUnique(move, new ErDrenchAttr(30)),
+  ],
+  [
+    // Dive — "The user dives underwater and hits next turn. 10% drench chance. Field-based."
+    MoveId.DIVE,
+    move => addAttrUnique(move, new ErDrenchAttr(10)),
+  ],
+  [
+    // Water Spout — "Does more damage at high HP. 10% drench chance. Mega Launcher boost."
+    MoveId.WATER_SPOUT,
+    move => addAttrUnique(move, new ErDrenchAttr(10)),
+  ],
+  [
+    // Wave Crash — "Slams into the target on a giant wave. 10% drench chance. 33% recoil."
+    MoveId.WAVE_CRASH,
+    move => addAttrUnique(move, new ErDrenchAttr(10)),
+  ],
+  // ---- ER Enrage sources (2.65). In ER, Swagger/Flatter ENRAGE the target
+  // instead of confusing it (Enrage = 33% recoil on the target's moves +
+  // Reckless, until it switches out). The stat raise is unchanged. ----
+  [
+    // Swagger — "Enrages the foe, but also sharply raises Attack." (+2 Atk kept.)
+    MoveId.SWAGGER,
+    move => {
+      removeAttrsByCtor(move, [ConfuseAttr]);
+      addAttrUnique(move, new AddBattlerTagAttr(BattlerTagType.ER_ENRAGE, false));
+    },
+  ],
+  [
+    // Flatter — "Enrages the foe, but raises its Sp. Atk." (+1 Sp. Atk kept.)
+    MoveId.FLATTER,
+    move => {
+      removeAttrsByCtor(move, [ConfuseAttr]);
+      addAttrUnique(move, new AddBattlerTagAttr(BattlerTagType.ER_ENRAGE, false));
     },
   ],
 ]);

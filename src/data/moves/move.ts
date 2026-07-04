@@ -49,6 +49,7 @@ import { ArenaTagType } from "#enums/arena-tag-type";
 import { BattleType } from "#enums/battle-type";
 import { BattlerIndex } from "#enums/battler-index";
 import { BattlerTagType } from "#enums/battler-tag-type";
+import { BerryType } from "#enums/berry-type";
 import { BiomeId } from "#enums/biome-id";
 import { ChallengeType } from "#enums/challenge-type";
 import { Command } from "#enums/command";
@@ -84,6 +85,7 @@ import {
   PokemonMultiHitModifier,
   PreserveBerryModifier,
 } from "#modifiers/modifier";
+import { BerryModifierType } from "#modifiers/modifier-type";
 import { applyMoveAttrs } from "#moves/apply-attrs";
 import {
   invalidAssistMoves,
@@ -1154,7 +1156,7 @@ export abstract class Move implements Localizable {
     // removed). ER fog instead reduces Ghost-type damage + strips a stat-buff
     // stage from non-Ghost/Psychic mons (handled in the weather lapse logic).
 
-    if (!isOhko && globalScene.arena.getTag(ArenaTagType.GRAVITY)) {
+    if (!isOhko && globalScene.arena.hasActiveGravity()) {
       moveAccuracy.value = Math.floor(moveAccuracy.value * 1.67);
     }
 
@@ -1282,6 +1284,14 @@ export abstract class Move implements Localizable {
       power.value *= 1.5;
     }
 
+    // ER Enrage: while enraged, the bearer's moves count as recoil moves, so they
+    // are "affected by Reckless" — a 1.2x power boost that offsets the 33% enrage
+    // recoil (applied by ErEnrageTag). Skips moves already Reckless-flagged so a
+    // real Reckless ability on a real recoil move isn't double-counted.
+    if (source.getTag(BattlerTagType.ER_ENRAGE) && !this.hasFlag(MoveFlags.RECKLESS_MOVE)) {
+      power.value *= 1.2;
+    }
+
     if (!ignoreSourceAbility) {
       power.value *=
         (source.getTag(BattlerTagType.SUPREME_OVERLORD) as SupremeOverlordTag | undefined)?.getBoost() ?? 1;
@@ -1309,7 +1319,14 @@ export abstract class Move implements Localizable {
       move: this,
       priority: modifierHolder,
     });
-    return modifierHolder.value as MovePriorityInBracket;
+    const resolved = modifierHolder.value as MovePriorityInBracket;
+    // ER Drenched: the holder moves LAST within its priority bracket while
+    // drenched (Lagging-Tail-style, respecting priority brackets). Loses to an
+    // ability that already forces FIRST in-bracket.
+    if (resolved !== MovePriorityInBracket.FIRST && user.getTag(BattlerTagType.ER_DRENCHED)) {
+      return MovePriorityInBracket.LAST;
+    }
+    return resolved;
   }
 
   /**
@@ -3026,6 +3043,40 @@ export class HealOnAllyAttr extends HealAttr {
 }
 
 /**
+ * ER (Party Favors): heals the USER and its ally by a fraction of their max HP as a
+ * side effect of a FOE-damaging move. Unlike {@linkcode HealOnAllyAttr}, it does not
+ * require the move to target an ally — it always heals the user's own side after the
+ * hit connects. Each side member is healed independently (skipping full-HP/fainted mons).
+ */
+export class HealUserAndAllyAttr extends HealAttr {
+  private readonly sideHealRatio: number;
+
+  constructor(healRatio: number, showAnim = false) {
+    super(healRatio, showAnim, true);
+    this.sideHealRatio = healRatio;
+  }
+
+  override apply(user: Pokemon, _target: Pokemon, _move: Move, _args: any[]): boolean {
+    let healed = false;
+    if (!user.isFullHp()) {
+      this.addHealPhase(user, this.sideHealRatio);
+      healed = true;
+    }
+    const ally = user.getAlly();
+    if (ally && !ally.isFainted() && !ally.isFullHp()) {
+      this.addHealPhase(ally, this.sideHealRatio);
+      healed = true;
+    }
+    return healed;
+  }
+
+  // Never blocks the (damaging) move; the per-target full-HP gating lives in apply.
+  override canApply(_user: Pokemon, _target: Pokemon, _move: Move, _args?: any[]): boolean {
+    return true;
+  }
+}
+
+/**
  * Heals user as a side effect of a move that hits a target.
  * Healing is based on {@linkcode healRatio} * the amount of damage dealt or a stat of the target.
  */
@@ -3336,6 +3387,35 @@ export class StatusEffectAttr extends MoveEffectAttr {
     const pokemon = this.selfTarget ? user : target;
 
     return pokemon.canSetStatus(this.effect, true, false, user) ? score : 0;
+  }
+}
+
+/**
+ * Elite Redux status attr that bypasses TYPE-based status immunity for the move
+ * it is attached to (and ONLY that move). Used by Spectral Flame (er move 966):
+ * "Burns the target, including Fire types." Every other burn source keeps the
+ * vanilla Fire immunity — the bypass is threaded through
+ * `Pokemon.trySetStatus`/`canSetStatus`'s `ignoreTypeImmunity` flag.
+ */
+export class ErStatusEffectIgnoreImmunityAttr extends StatusEffectAttr {
+  override apply(user: Pokemon, target: Pokemon, move: Move, _args: any[]): boolean {
+    const moveChance = this.getMoveChance(user, target, move, this.selfTarget, true);
+    const statusCheck = moveChance < 0 || moveChance === 100 || user.randBattleSeedInt(100) < moveChance;
+    if (!statusCheck) {
+      return false;
+    }
+
+    const quiet = move.category !== MoveCategory.STATUS;
+
+    return target.trySetStatus(this.effect, user, undefined, null, false, quiet, undefined, true);
+  }
+
+  override getTargetBenefitScore(user: Pokemon, target: Pokemon, move: Move): number {
+    const moveChance = this.getMoveChance(user, target, move, this.selfTarget, false);
+    const score = moveChance < 0 ? -10 : Math.floor(moveChance * -0.1);
+    const pokemon = this.selfTarget ? user : target;
+
+    return pokemon.canSetStatus(this.effect, true, false, user, false, true) ? score : 0;
   }
 }
 
@@ -3656,6 +3736,93 @@ export class EatBerryAttr extends MoveEffectAttr {
     applyAbAttrs("PostItemLostAbAttr", { pokemon: berryOwner });
     applyAbAttrs("HealFromBerryUseAbAttr", { pokemon: consumer });
     consumer.recordEatenBerry(this.chosenBerry.berryType, updateHarvest);
+  }
+}
+
+/**
+ * Elite Redux Concoction (er move 1022): "Attacks and uses a random berry
+ * effect." Applies a RANDOM berry's effect to the user, unconditionally — no
+ * held berry is required and nothing is consumed (distinct from
+ * {@linkcode EatBerryAttr}, which eats the user's own held berry and no-ops with
+ * none). Some berries only act under a condition (Sitrus at low HP, Lum with a
+ * status, …); the chosen berry's effect function self-gates in that case.
+ */
+export class ErRandomBerryEffectAttr extends MoveEffectAttr {
+  private static readonly BERRY_COUNT = Object.values(BerryType).filter(v => typeof v === "number").length;
+
+  constructor() {
+    super(true); // selfTarget: the user "uses" the berry effect
+  }
+
+  override apply(user: Pokemon, target: Pokemon, move: Move, args: any[]): boolean {
+    if (!super.apply(user, target, move, args)) {
+      return false;
+    }
+    const berry = user.randBattleSeedInt(ErRandomBerryEffectAttr.BERRY_COUNT) as BerryType;
+    getBerryEffectFunc(berry)(user);
+    return true;
+  }
+}
+
+/**
+ * Elite Redux Fetch (er move 969): "The user retrieves its lost item and
+ * switches to an ally." ER's in-battle item model only tracks CONSUMED BERRIES
+ * (`battleData.berriesEaten`, the same store Harvest restores from) — those are
+ * the only held items that get used up / "lost" mid-battle. This attr restores
+ * the user's MOST RECENTLY consumed berry as a held-item {@linkcode BerryModifier}
+ * (the faithful "retrieves its lost item"), then the self-switch runs.
+ *
+ * RESIDUAL (documented, not silently pretended): non-berry held items (gems,
+ * Power Herb, etc.) are consumed via ad-hoc modifier removal and are NOT recorded
+ * in any "lost item" ledger in this engine, so only the berry case is
+ * retrievable without building a general consumed-item ledger. If Fetch is used
+ * with no berry consumed this battle, nothing is retrieved (the switch still
+ * happens).
+ */
+export class ErRetrieveConsumedItemAttr extends MoveEffectAttr {
+  constructor() {
+    super(true); // selfTarget
+  }
+
+  override apply(user: Pokemon, target: Pokemon, move: Move, args: any[]): boolean {
+    if (!super.apply(user, target, move, args)) {
+      return false;
+    }
+
+    const eaten = user.battleData.berriesEaten;
+    if (eaten.length === 0) {
+      return false;
+    }
+
+    // Retrieve the most recently consumed berry (the last recorded one). Guarded non-empty above.
+    const chosenBerryType = eaten.at(-1)!;
+    eaten.splice(eaten.length - 1, 1);
+    const chosenBerry = new BerryModifierType(chosenBerryType);
+
+    const existing = globalScene.findModifier(
+      m => m instanceof BerryModifier && m.berryType === chosenBerryType && m.pokemonId === user.id,
+      user.isPlayer(),
+    ) as BerryModifier | undefined;
+
+    if (existing) {
+      existing.stackCount++;
+    } else {
+      const newBerry = new BerryModifier(chosenBerry, user.id, chosenBerryType, 1);
+      if (user.isPlayer()) {
+        globalScene.addModifier(newBerry);
+      } else {
+        globalScene.addEnemyModifier(newBerry);
+      }
+    }
+
+    globalScene.updateModifiers(user.isPlayer());
+    globalScene.phaseManager.queueMessage(
+      i18next.t("abilityTriggers:postTurnLootCreateEatenBerry", {
+        pokemonNameWithAffix: getPokemonNameWithAffix(user),
+        berryName: chosenBerry.name,
+      }),
+    );
+    return true;
   }
 }
 
@@ -6885,6 +7052,8 @@ export class AddBattlerTagAttr extends MoveEffectAttr {
       case BattlerTagType.INFESTATION:
         return -3;
       case BattlerTagType.ENCORE:
+      // ER Drenched: forces the target to move last in its bracket for 2 turns.
+      case BattlerTagType.ER_DRENCHED:
         return -2;
       case BattlerTagType.MINIMIZED:
       case BattlerTagType.ALWAYS_GET_HIT:
@@ -6911,6 +7080,35 @@ export class AddBattlerTagAttr extends MoveEffectAttr {
       moveChance = 100;
     }
     return Math.floor(this.getTagTargetBenefitScore() * (moveChance / 100));
+  }
+}
+
+/**
+ * ER Drenched applier: adds {@linkcode BattlerTagType.ER_DRENCHED} (2 turns) to
+ * the target at a FIXED per-move chance, independent of the parent move's
+ * `chance` field. This lets a drench rider sit on a Water move that already has
+ * its own secondary chance (or none) without clobbering it. Drench immunity
+ * (Amphibious / Old Mariner) is enforced by {@linkcode ErDrenchedTag.canAdd}.
+ *
+ * `rainChance` (optional) overrides the chance while rain is up — Waterlog is
+ * "20% drench chance, 50% in rain".
+ */
+export class ErDrenchAttr extends AddBattlerTagAttr {
+  private readonly drenchChance: number;
+  private readonly rainChance: number;
+
+  constructor(drenchChance: number, rainChance?: number) {
+    super(BattlerTagType.ER_DRENCHED, false, false, 2, 2);
+    this.drenchChance = drenchChance;
+    this.rainChance = rainChance ?? drenchChance;
+  }
+
+  public override get effectChanceOverride(): number {
+    const weather = globalScene?.arena?.weather?.weatherType;
+    if (weather === WeatherType.RAIN || weather === WeatherType.HEAVY_RAIN) {
+      return this.rainChance;
+    }
+    return this.drenchChance;
   }
 }
 
@@ -9217,6 +9415,36 @@ export class SuppressAbilitiesAttr extends MoveEffectAttr {
     return (_user, target, _move) =>
       !target.summonData.abilitySuppressed
       && (target.getAbility().suppressable || (target.hasPassive() && target.getPassiveAbility().suppressable));
+  }
+}
+
+/**
+ * Elite Redux Spectral Flame (er move 966) secondary: "Suppresses abilities in
+ * fog." Suppresses the target's ability ONLY when the active weather is
+ * {@linkcode WeatherType.FOG}. Unlike {@linkcode SuppressAbilitiesAttr}, this
+ * contributes NO move-level condition, so the move (its burn body) still lands
+ * outside fog — the suppression simply no-ops.
+ */
+export class ErSuppressAbilitiesInFogAttr extends SuppressAbilitiesAttr {
+  override apply(user: Pokemon, target: Pokemon, move: Move, args: any[]): boolean {
+    if (globalScene.arena.weather?.weatherType !== WeatherType.FOG) {
+      return false;
+    }
+    // Mirror the base getCondition guard: only suppress a suppressable ability.
+    const suppressable =
+      !target.summonData.abilitySuppressed
+      && (target.getAbility().suppressable || (target.hasPassive() && target.getPassiveAbility().suppressable));
+    if (!suppressable) {
+      return false;
+    }
+    return super.apply(user, target, move, args);
+  }
+
+  // Do NOT gate the move on fog — the burn body must land regardless of weather.
+  // Override the base "ability must be suppressable" condition with a no-op so
+  // Spectral Flame never fails outside fog.
+  override getCondition(): MoveConditionFunc {
+    return () => true;
   }
 }
 
@@ -12690,9 +12918,7 @@ export function initMoves() {
       .attr(StatStageChangeAttr, [Stat.SPDEF], -1),
     new AttackMove(MoveId.GRAV_APPLE, PokemonType.GRASS, MoveCategory.PHYSICAL, 80, 100, 10, 100, 0, 8)
       .attr(StatStageChangeAttr, [Stat.DEF], -1)
-      .attr(MovePowerMultiplierAttr, (_user, _target, _move) =>
-        globalScene.arena.getTag(ArenaTagType.GRAVITY) ? 1.5 : 1,
-      )
+      .attr(MovePowerMultiplierAttr, (_user, _target, _move) => (globalScene.arena.hasActiveGravity() ? 1.5 : 1))
       .makesContact(false),
     new AttackMove(MoveId.SPIRIT_BREAK, PokemonType.FAIRY, MoveCategory.PHYSICAL, 75, 100, 15, 100, 0, 8) //
       .attr(StatStageChangeAttr, [Stat.SPATK], -1),

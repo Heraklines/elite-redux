@@ -1903,7 +1903,13 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
       }
     }
 
-    if (!ignoreAbility) {
+    // Elite Redux — Blind Rage's Mold Breaker must NOT bypass abilities that
+    // modify base stats (Grass Pelt, Fur Coat). When the attacker carries the
+    // `PreserveBaseStatAbilitiesAbAttr` marker, apply the defender's
+    // StatMultiplier abilities even though ability-ignore is otherwise active.
+    const preserveBaseStatAbilities =
+      ignoreAbility && (opponent?.hasAbilityWithAttr("PreserveBaseStatAbilitiesAbAttr") ?? false);
+    if (!ignoreAbility || preserveBaseStatAbilities) {
       applyAbAttrs("StatMultiplierAbAttr", {
         pokemon: this,
         stat,
@@ -3586,7 +3592,7 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
     if (
       moveType === PokemonType.GROUND
       && types.includes(PokemonType.FLYING)
-      && (this.isGrounded() || arena.hasTag(ArenaTagType.GRAVITY))
+      && (this.isGrounded() || arena.hasActiveGravity())
     ) {
       types.splice(types.indexOf(PokemonType.FLYING), 1);
     }
@@ -6461,6 +6467,7 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
     overrideStatus = false,
     sourcePokemon: Pokemon | null = null,
     ignoreField = false,
+    ignoreTypeImmunity = false,
   ): boolean {
     if (effect !== StatusEffect.FAINT) {
       // Status-overriding moves (i.e. Rest) fail if their respective status already exists;
@@ -6532,7 +6539,10 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
         break;
       }
       case StatusEffect.BURN:
-        isImmune = this.isOfType(PokemonType.FIRE);
+        // ER Spectral Flame (er move 966) burns "including Fire types": its
+        // status attr sets `ignoreTypeImmunity`, bypassing the Fire immunity
+        // for this move ONLY. Every other burn source keeps the immunity.
+        isImmune = !ignoreTypeImmunity && this.isOfType(PokemonType.FIRE);
         break;
     }
 
@@ -6599,6 +6609,7 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
     overrideStatus?: boolean,
     quiet = true,
     overrideMessage?: string,
+    ignoreTypeImmunity = false,
   ): boolean {
     // TODO: This needs to propagate failure status for status moves
     if (!effect) {
@@ -6614,7 +6625,7 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
       return this.addTag(BattlerTagType.ER_FROSTBITE, 0, undefined, sourcePokemon?.id);
     }
 
-    if (!this.canSetStatus(effect, quiet, overrideStatus, sourcePokemon)) {
+    if (!this.canSetStatus(effect, quiet, overrideStatus, sourcePokemon, false, ignoreTypeImmunity)) {
       return false;
     }
     if (this.isFainted() && effect !== StatusEffect.FAINT) {

@@ -396,7 +396,7 @@ export function initAbilities() {
       .attr(
         AttackTypeImmunityAbAttr,
         PokemonType.GROUND,
-        (pokemon: Pokemon) => !pokemon.getTag(GroundedTag) && !globalScene.arena.getTag(ArenaTagType.GRAVITY),
+        (pokemon: Pokemon) => !pokemon.getTag(GroundedTag) && !globalScene.arena.hasActiveGravity(),
       )
       .ignorable()
       .build(),

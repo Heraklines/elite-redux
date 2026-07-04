@@ -99,7 +99,7 @@ function mapErType(erTypeId: number | null): PokemonType | null {
 }
 
 /** How the injected form's `<base> -> form` (and optional revert) edges fire. */
-type FormChangeTriggerKind = "manual" | "ability";
+type FormChangeTriggerKind = "manual" | "manual-oneway" | "ability";
 
 /** One ER-custom battle-form injection spec. */
 interface ErCustomFormSpec {
@@ -117,6 +117,12 @@ interface ErCustomFormSpec {
    *     `triggerPokemonFormChange(.., SpeciesFormChangeManualTrigger)`); a revert
    *     edge (`form -> ""`) is also registered so the holder reverts above the
    *     threshold (Wishiwashi-style bidirectional School).
+   *   - "manual-oneway" → SpeciesFormChangeManualTrigger, but ONE-WAY: only the
+   *     `<base> -> form` transform edge is registered, NO revert. Used by fire-
+   *     interaction transforms like Flammable Coat (Lumbering Sloth -> Engulfed):
+   *     once transformed, the manual trigger has nothing to match and re-firing it
+   *     is a no-op. (A revert edge would send Engulfed back to base on the next
+   *     fire interaction — wrong; the dex change is permanent.)
    *   - "ability" → SpeciesFormChangeAbilityTrigger (Battle Bond reads this via
    *     PostVictoryFormChangeAbAttr); ONE-WAY (no revert edge), like Greninja.
    */
@@ -172,6 +178,19 @@ const ER_CUSTOM_FORM_SPECS: readonly ErCustomFormSpec[] = [
     formKey: "busted",
     formName: "Busted",
     trigger: "ability",
+  },
+  {
+    // Flammable Coat (669): Lumbering Sloth → Engulfed on a Fire interaction,
+    // one-way. The AbAttrs (FireUse/FireHitFormChangeAbAttr, wired in
+    // archetype-dispatcher case 669) fire `triggerPokemonFormChange(pokemon,
+    // SpeciesFormChangeManualTrigger)` when the holder is hit by / uses a Fire
+    // move; this injects the "engulfed" FORM onto base Lumbering Sloth plus the
+    // one-way `"" -> engulfed` edge for that manual trigger.
+    baseErId: 1049, // SPECIES_LUMBER_SLOTH → pkrg 10023
+    sourceErId: 1847, // SPECIES_LUMBERING_SLOTH_ENGULFED → pkrg 10439
+    formKey: "engulfed",
+    formName: "Engulfed",
+    trigger: "manual-oneway",
   },
 ];
 

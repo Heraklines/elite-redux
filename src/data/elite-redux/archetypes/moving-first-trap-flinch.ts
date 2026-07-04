@@ -36,14 +36,11 @@ export class MovingFirstTrapFlinchAbAttr extends PostAttackAbAttr {
   }
 
   override canApply(params: PostMoveInteractionAbAttrParams): boolean {
-    const { pokemon, opponent: target, hitResult } = params;
-    return (
-      super.canApply(params)
-      && hitResult < HitResult.NO_EFFECT
-      && pokemon.turnData.hitsLeft <= 1 // Moved first this turn: the target hasn't acted yet.
-      && !!target
-      && !target.turnData.acted
-    );
+    const { opponent: target, hitResult } = params;
+    // "Moving first" is read from the target's per-turn `acted` flag — NOT from
+    // the multi-hit counter. The trap applies on every moving-first hit; the
+    // flinch roll is additionally gated to the FIRST hit (handled in apply).
+    return super.canApply(params) && hitResult < HitResult.NO_EFFECT && !!target && !target.turnData.acted;
   }
 
   override apply(params: PostMoveInteractionAbAttrParams): void {
@@ -51,10 +48,13 @@ export class MovingFirstTrapFlinchAbAttr extends PostAttackAbAttr {
     if (simulated || !target) {
       return;
     }
-    // Trap always applies on a moving-first hit.
+    // Trap always applies on a moving-first hit (regardless of flinch success
+    // and regardless of which strike of a multi-hit move this is).
     target.addTag(BattlerTagType.TRAPPED, this.trapTurns, undefined, pokemon.id);
-    // Flinch on a separate roll.
-    if (pokemon.randBattleSeedInt(100) < this.flinchChance) {
+    // Flinch chance ONLY works on the FIRST hit of a multi-hit move (dex rule).
+    // First strike ⇔ hitsLeft still equals the total hitCount.
+    const firstHit = pokemon.turnData.hitCount === pokemon.turnData.hitsLeft;
+    if (firstHit && pokemon.randBattleSeedInt(100) < this.flinchChance) {
       target.addTag(BattlerTagType.FLINCHED, 1, undefined, pokemon.id);
     }
   }

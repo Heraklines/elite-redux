@@ -53,7 +53,10 @@ export type DamageProtectedTagType = ContactStatStageChangeProtectedTagType;
 /**
  * Subset of {@linkcode BattlerTagType}s related to protection effects that set a status effect on the attacker.
  */
-export type ContactSetStatusProtectedTagType = BattlerTagType.BANEFUL_BUNKER | BattlerTagType.BURNING_BULWARK;
+export type ContactSetStatusProtectedTagType =
+  | BattlerTagType.BANEFUL_BUNKER
+  | BattlerTagType.BURNING_BULWARK
+  | BattlerTagType.ER_PARALYZING_SHIELD;
 
 /**
  * Subset of {@linkcode BattlerTagType}s related to protection effects that change stat stages of the attacker.

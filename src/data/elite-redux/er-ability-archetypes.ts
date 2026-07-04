@@ -66,8 +66,8 @@ export const ER_ABILITY_ARCHETYPES: Readonly<Record<number, ErAbilityArchetypeEn
   254: { erAbilityId: 254, archetype: "bespoke", params: null },
   261: { erAbilityId: 261, archetype: "bespoke", params: null },
   264: { erAbilityId: 264, archetype: "stat-trigger-on-event", params: {"trigger":"on-ko","stats":[{"stat":"ATK","stages":1}]} },
-  266: { erAbilityId: 266, archetype: "composite-vanilla-mashup", params: {"parts":["Unnerve","Chilling Neigh"]} },
-  267: { erAbilityId: 267, archetype: "composite-vanilla-mashup", params: {"parts":["Unnerve","Grim Neigh"]} },
+  266: { erAbilityId: 266, archetype: "bespoke", params: null }, // As One (Ice Rider): Unnerve + Chilling Neigh, block ALL held items not just berries — see dispatchBespoke
+  267: { erAbilityId: 267, archetype: "bespoke", params: null }, // As One (Shadow Rider): Unnerve + Grim Neigh, block ALL held items not just berries — see dispatchBespoke
   268: { erAbilityId: 268, archetype: "bespoke", params: null },
   269: { erAbilityId: 269, archetype: "bespoke", params: null },
   270: { erAbilityId: 270, archetype: "bespoke", params: null },
@@ -105,7 +105,7 @@ export const ER_ABILITY_ARCHETYPES: Readonly<Record<number, ErAbilityArchetypeEn
   302: { erAbilityId: 302, archetype: "bespoke", params: null },
   303: { erAbilityId: 303, archetype: "bespoke", params: null }, // Fossilized: Rock +20% offense AND halves Rock dmg taken (composite — see dispatchBespoke)
   304: { erAbilityId: 304, archetype: "bespoke", params: null },
-  305: { erAbilityId: 305, archetype: "conditional-damage", params: {"condition":{"kind":"target-asleep"},"multiplier":2} },
+  305: { erAbilityId: 305, archetype: "conditional-damage", params: {"condition":{"kind":"any-active-asleep"},"multiplier":2} }, // Dreamcatcher: 2x when ANY active mon asleep (user/ally/opponent), not just target
   306: { erAbilityId: 306, archetype: "bespoke", params: null }, // Nocturnal: Dark moves +1.25x AND -25% dmg from Dark/Fairy (composite — see dispatchBespoke)
   307: { erAbilityId: 307, archetype: "passive-recovery", params: {"healFraction":0.0625} },
   308: { erAbilityId: 308, archetype: "type-conversion", params: {"sourceType":"NORMAL","targetType":"GROUND","multiplier":1.2} },
@@ -115,7 +115,7 @@ export const ER_ABILITY_ARCHETYPES: Readonly<Record<number, ErAbilityArchetypeEn
   312: { erAbilityId: 312, archetype: "bespoke", params: null }, // Dragonfly: add Dragon type on entry AND Ground immunity (composite — see dispatchBespoke)
   313: { erAbilityId: 313, archetype: "bespoke", params: null },
   314: { erAbilityId: 314, archetype: "bespoke", params: null },
-  315: { erAbilityId: 315, archetype: "type-conversion", params: {"sourceType":"NORMAL","targetType":"WATER","multiplier":1.2} },
+  315: { erAbilityId: 315, archetype: "bespoke", params: null }, // Hydrate — hand-wired (Normal->Water + conditional Water STAB / 10% drench); see dispatchBespoke
   316: { erAbilityId: 316, archetype: "entry-effect", params: {"effect":{"kind":"add-self-type","type":"STEEL"}} },
   317: { erAbilityId: 317, archetype: "damage-reduction-generic", params: {"filter":{"kind":"super-effective"},"reduction":0.35} },
   318: { erAbilityId: 318, archetype: "damage-reduction-generic", params: {"filter":{"kind":"super-effective"},"reduction":0.5} },
@@ -332,7 +332,7 @@ export const ER_ABILITY_ARCHETYPES: Readonly<Record<number, ErAbilityArchetypeEn
   534: { erAbilityId: 534, archetype: "bespoke", params: null },
   536: { erAbilityId: 536, archetype: "bespoke", params: null },
   537: { erAbilityId: 537, archetype: "chance-status-on-hit", params: {"chance":30,"status":"BLEED","onContactOnly":true,"direction":"both"} }, // Spike Armor: bleed on contact (defense) or offense (desc)
-  538: { erAbilityId: 538, archetype: "chance-status-on-hit", params: {"chance":30,"status":"BLEED","onContactOnly":false} },
+  538: { erAbilityId: 538, archetype: "chance-status-on-hit", params: {"chance":30,"status":"BLEED","onContactOnly":false,"filter":{"category":"SPECIAL"}} }, // Voodoo Power — "30% bleed when hit by SPECIAL attacks" (category filter)
   539: { erAbilityId: 539, archetype: "bespoke", params: null }, // Chrome Coat: 40% special damage reduction AND 0.9x Speed (special-side twin of Lead Coat 296 — see dispatchBespoke)
   540: { erAbilityId: 540, archetype: "type-conversion", params: {"sourceType":"NORMAL","targetType":"GHOST","multiplier":1.2,"flag":"SOUND_BASED"} },
   541: { erAbilityId: 541, archetype: "bespoke", params: null },
@@ -392,7 +392,7 @@ export const ER_ABILITY_ARCHETYPES: Readonly<Record<number, ErAbilityArchetypeEn
   619: { erAbilityId: 619, archetype: "bespoke", params: null },
   620: { erAbilityId: 620, archetype: "composite-vanilla-mashup", params: {"parts":["Seaweed","Water STAB"]} },
   621: { erAbilityId: 621, archetype: "bespoke", params: null },
-  622: { erAbilityId: 622, archetype: "chance-status-on-hit", params: {"chance":50,"status":"INFATUATION","filter":{"flag":"SOUND_BASED"},"direction":"offense"} }, // Beautiful Music: holder's SOUND move infatuates (desc)
+  622: { erAbilityId: 622, archetype: "bespoke", params: null }, // Beautiful Music: SOUND move 50% infatuate IGNORING gender (+ ER Atk/SpAtk halve) — see dispatchBespoke
   623: { erAbilityId: 623, archetype: "bespoke", params: null },
   624: { erAbilityId: 624, archetype: "type-conversion", params: {"sourceType":"NORMAL","targetType":"ICE","multiplier":1.2,"flag":"SOUND_BASED"} },
   625: { erAbilityId: 625, archetype: "bespoke", params: null },
@@ -463,7 +463,7 @@ export const ER_ABILITY_ARCHETYPES: Readonly<Record<number, ErAbilityArchetypeEn
   691: { erAbilityId: 691, archetype: "bespoke", params: null },
   692: { erAbilityId: 692, archetype: "bespoke", params: null },
   693: { erAbilityId: 693, archetype: "composite-vanilla-mashup", params: {"parts":["Disguise"]} },
-  694: { erAbilityId: 694, archetype: "composite-vanilla-mashup", params: {"parts":["Scrappy","Mold Breaker"]} },
+  694: { erAbilityId: 694, archetype: "bespoke", params: null }, // Blind Rage: Scrappy + Mold Breaker, but must NOT bypass base-stat abilities (Grass Pelt) — see dispatchBespoke
   695: { erAbilityId: 695, archetype: "bespoke", params: null },
   696: { erAbilityId: 696, archetype: "composite-vanilla-mashup", params: {"parts":["Tough Claws","Predator"]} },
   697: { erAbilityId: 697, archetype: "bespoke", params: null },
@@ -592,7 +592,7 @@ export const ER_ABILITY_ARCHETYPES: Readonly<Record<number, ErAbilityArchetypeEn
   815: { erAbilityId: 815, archetype: "bespoke", params: null },
   816: { erAbilityId: 816, archetype: "bespoke", params: null },
   817: { erAbilityId: 817, archetype: "bespoke", params: null },
-  818: { erAbilityId: 818, archetype: "composite-vanilla-mashup", params: {"parts":["Grappler","Serpent Bind"]} },
+  818: { erAbilityId: 818, archetype: "bespoke", params: null }, // Tentalock: Grappler + Serpent Bind, but the trap PROC is 6 turns / 1/6 HP (not Serpent Bind's 4-5) — see dispatchBespokeR48
   819: { erAbilityId: 819, archetype: "bespoke", params: null },
   820: { erAbilityId: 820, archetype: "bespoke", params: null },
   821: { erAbilityId: 821, archetype: "composite-vanilla-mashup", params: {"parts":["Scare","Bad Luck"]} },
@@ -639,7 +639,7 @@ export const ER_ABILITY_ARCHETYPES: Readonly<Record<number, ErAbilityArchetypeEn
   862: { erAbilityId: 862, archetype: "bespoke", params: null },
   863: { erAbilityId: 863, archetype: "composite-vanilla-mashup", params: {"parts":["Pyromancy","Cryomancy"]} },
   864: { erAbilityId: 864, archetype: "bespoke", params: null },
-  865: { erAbilityId: 865, archetype: "type-resist-or-absorb", params: {"type":"FIRE","effect":{"kind":"absorb","redirect":true,"statBoost":{"stat":"ATK","stages":1}}} },
+  865: { erAbilityId: 865, archetype: "type-resist-or-absorb", params: {"type":"FIRE","effect":{"kind":"absorb","redirect":true,"statBoost":{"highestAttack":true,"stages":1}}} }, // Heat Sink: Fire absorb boosts HIGHEST attacking stat (ATK vs SpAtk), not fixed ATK
   866: { erAbilityId: 866, archetype: "bespoke", params: null },
   867: { erAbilityId: 867, archetype: "composite-vanilla-mashup", params: {"parts":["Drizzle","Electro Surge"]} },
   868: { erAbilityId: 868, archetype: "bespoke", params: null },
@@ -661,7 +661,7 @@ export const ER_ABILITY_ARCHETYPES: Readonly<Record<number, ErAbilityArchetypeEn
   // move +1 (random-outspeed bug). Restored the SLICING_MOVE filter + first-turn (entry-
   // turn) gate, ER's approximation of "first move per entry". Minor divergence: the
   // literal "first per entry / resets on KO" isn't tracked (uses the entry turn instead).
-  882: { erAbilityId: 882, archetype: "priority-modifier", params: {"priority":1,"filter":{"flag":"SLICING_MOVE"},"condition":{"kind":"first-turn"}} },
+  882: { erAbilityId: 882, archetype: "bespoke", params: null }, // Edgelord — first Keen Edge move each entry gets +1 priority, resets on KO (see dispatchBespoke case 882, mirrors Sidewinder 676)
   883: { erAbilityId: 883, archetype: "bespoke", params: null },
   884: { erAbilityId: 884, archetype: "bespoke", params: null },
   885: { erAbilityId: 885, archetype: "bespoke", params: null },

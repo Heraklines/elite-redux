@@ -10,7 +10,8 @@ export type EntryHazardTagType =
   | ArenaTagType.TOXIC_SPIKES
   | ArenaTagType.STEALTH_ROCK
   | ArenaTagType.IMPRISON
-  | ArenaTagType.HOT_COALS;
+  | ArenaTagType.HOT_COALS
+  | ArenaTagType.CREEPING_THORNS;
 
 /** Subset of {@linkcode ArenaTagType}s that create {@link https://bulbapedia.bulbagarden.net/wiki/Category:Screen-creating_moves | screens}. */
 export type ArenaScreenTagType = ArenaTagType.REFLECT | ArenaTagType.LIGHT_SCREEN | ArenaTagType.AURORA_VEIL;

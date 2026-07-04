@@ -51,4 +51,17 @@ export enum ArenaTagType {
    * the Speed of grounded switch-ins by 1 stage, exactly like Sticky Web.
    */
   FOAMY_WEB = "FOAMY_WEB",
+  /**
+   * Elite Redux — Creeping Thorns: a Spikes-style entry hazard that damages the
+   * grounded switch-in (Spikes' layer-based 1/8, 1/6, 1/4 ratio) AND inflicts
+   * ER_BLEED on it. Deployed by the Loose Thorns ability (909, "Sets Creeping
+   * Thorns when hit by contact") and the Creeping Thorns / Caltrops moves.
+   */
+  CREEPING_THORNS = "CREEPING_THORNS",
+  /**
+   * Elite Redux — Clear Skies: while active, no new weather can be set (checked
+   * in {@linkcode Arena.canSetWeather}). Lasts 5 turns; does not block clearing
+   * to {@linkcode WeatherType.NONE}. Field-wide.
+   */
+  ER_WEATHER_LOCK = "ER_WEATHER_LOCK",
 }

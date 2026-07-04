@@ -405,6 +405,13 @@ export class MoveEffectPhase extends PokemonPhase {
       return [HitCheckResult.HIT, 1];
     }
 
+    // Elite Redux — Trepidation's Despair: while the ER_DESPAIR tag is active on
+    // the USER, every Psychic-type move it uses misses (for the tag's 3 turns).
+    // No vanilla "miss a specific type" primitive exists, so force the miss here.
+    if (user.getTag(BattlerTagType.ER_DESPAIR) && user.getMoveType(move) === PokemonType.PSYCHIC) {
+      return [HitCheckResult.MISS, 0];
+    }
+
     const fieldTargeted = isFieldTargeted(move);
 
     if (!target.isActive(true) && !fieldTargeted) {

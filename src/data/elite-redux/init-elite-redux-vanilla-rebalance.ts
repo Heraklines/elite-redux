@@ -68,6 +68,7 @@ import {
   PokemonTypeChangeAbAttr,
   PostAttackApplyBattlerTagAbAttr,
   PostAttackContactApplyStatusEffectAbAttr,
+  PostAttackRemoveTargetTypeAbAttr,
   PostAttackStealHeldItemAbAttr,
   PostBiomeChangeWeatherChangeAbAttr,
   PostDefendContactApplyTagChanceAbAttr,
@@ -125,6 +126,7 @@ import { getErAbilityDescription, getErAbilityRomDescription } from "#data/elite
 import { ER_ID_MAP } from "#data/elite-redux/er-id-map";
 import { ER_MOVES } from "#data/elite-redux/er-moves";
 import { initEliteReduxVanillaMovePatches } from "#data/elite-redux/init-elite-redux-vanilla-move-patches";
+import { Gender } from "#data/gender";
 import type { TerrainType } from "#data/terrain";
 import { AbilityId } from "#enums/ability-id";
 import { ArenaTagType } from "#enums/arena-tag-type";
@@ -487,14 +489,15 @@ const ABILITY_PATCHERS: ReadonlyMap<AbilityId, (ability: MutableAbility) => void
   // (FULL: "uses its Speed stat instead of Defense or Special Defense for damage
   // calculations"). Vanilla pokerogue wired the unrelated Gen-IV behaviour
   // (confusion-gated evasion ×2) — strip it and add the defensive-stat substitute,
-  // gated on the CONFUSED tag or "enraged". In ER, "enraged" is the vanilla TAUNT
-  // tag (per ER's TM12/Taunt text: "Enrages the foe so it can only use attack moves").
+  // gated on the CONFUSED tag or the ER_ENRAGE status (the enrage recoil status).
   [
     AbilityId.TANGLED_FEET,
     ab => {
       ab.attrs = ab.attrs.filter(a => !(a instanceof StatMultiplierAbAttr && a.stat === Stat.EVA));
       const sub = new DefensiveStatSubstituteAbAttr(Stat.SPD);
-      sub.addCondition(pokemon => !!pokemon.getTag(BattlerTagType.CONFUSED) || !!pokemon.getTag(BattlerTagType.TAUNT));
+      sub.addCondition(
+        pokemon => !!pokemon.getTag(BattlerTagType.CONFUSED) || !!pokemon.getTag(BattlerTagType.ER_ENRAGE),
+      );
       ab.attrs.push(sub);
     },
   ],
@@ -637,6 +640,7 @@ const ABILITY_PATCHERS: ReadonlyMap<AbilityId, (ability: MutableAbility) => void
   [AbilityId.BIG_PECKS, ab => rewriteBigPecks(ab)],
   // ILLUMINATE: replace with pure 1.2x accuracy boost.
   [AbilityId.ILLUMINATE, ab => rewriteIlluminate(ab)],
+  [AbilityId.RIVALRY, ab => rewriteRivalry(ab)],
   // CHEEK_POUCH: nulled in ER — clear attrs.
   [AbilityId.CHEEK_POUCH, ab => rewriteCheekPouch(ab)],
   // STALL: replace move-last priority with "30% less damage if hasn't moved yet".
@@ -2043,9 +2047,11 @@ class ErMagicianStealAbAttr extends PostAttackStealHeldItemAbAttr {
 }
 
 /**
- * Extend MERCILESS's ConditionalCritAbAttr predicate to include PARALYSIS +
- * SLEEP + ER_BLEED, in addition to vanilla POISON/TOXIC. We can't inspect
- * the captured closure, so we replace the attr with a fresh one.
+ * Extend MERCILESS's ConditionalCritAbAttr predicate to the ER 2.65 spec:
+ * "Guarantees critical hits against targets who are poisoned, paralyzed,
+ * bleeding, or have their speed lowered." (Vanilla only covers POISON/TOXIC;
+ * ER adds PARALYSIS, ER_BLEED, and speed-lowered — and does NOT include SLEEP.)
+ * We can't inspect the captured closure, so we replace the attr with a fresh one.
  */
 function extendMercilessConditions(ability: MutableAbility): void {
   for (let i = 0; i < ability.attrs.length; i++) {
@@ -2055,16 +2061,11 @@ function extendMercilessConditions(ability: MutableAbility): void {
           return false;
         }
         const eff = target.status?.effect;
-        if (
-          eff === StatusEffect.POISON
-          || eff === StatusEffect.TOXIC
-          || eff === StatusEffect.PARALYSIS
-          || eff === StatusEffect.SLEEP
-        ) {
+        if (eff === StatusEffect.POISON || eff === StatusEffect.TOXIC || eff === StatusEffect.PARALYSIS) {
           return true;
         }
-        // ER_BLEED is a custom battler tag.
-        return target.getTag?.(BattlerTagType.ER_BLEED) != null;
+        // Bleeding (custom battler tag) or speed-lowered.
+        return target.getTag?.(BattlerTagType.ER_BLEED) != null || target.getStatStage(Stat.SPD) < 0;
       });
     }
   }
@@ -2351,9 +2352,40 @@ function rewriteBigPecks(ability: MutableAbility): void {
  * Rewrite ILLUMINATE: replace lure/acc-immune attrs with pure 1.2x accuracy
  * multiplier.
  */
+/**
+ * Rewrite RIVALRY to the ER 2.65 spec: "Boosts the user's damage by 25% against
+ * same-gender Pokemon and reduces damage TAKEN by 25% from opposite-gender
+ * Pokemon." Vanilla's opposite-gender clause reduces damage DEALT (an outgoing
+ * MovePowerBoost 0.75x); ER makes it an INCOMING reduction instead. This also
+ * corrects every ER ability that composes Rivalry (e.g. Empress).
+ */
+function rewriteRivalry(ability: MutableAbility): void {
+  ability.attrs.length = 0;
+  ability.attrs.push(
+    new MovePowerBoostAbAttr(
+      (user, target) =>
+        user.gender !== Gender.GENDERLESS && target?.gender !== Gender.GENDERLESS && user.gender === target?.gender,
+      1.25,
+    ),
+  );
+  ability.attrs.push(
+    new ReceivedMoveDamageMultiplierAbAttr(
+      (defender, attacker) =>
+        defender.gender !== Gender.GENDERLESS
+        && attacker.gender !== Gender.GENDERLESS
+        && defender.gender !== attacker.gender,
+      0.75,
+    ),
+  );
+}
+
 function rewriteIlluminate(ability: MutableAbility): void {
+  // ER Illuminate: "Boosts the user's accuracy by 1.2x. Removes Ghost-typing on
+  // the target when landing an attack." (Both Refrigerator and Chandelier compose
+  // this rewritten Illuminate, so they inherit the Ghost-strip too.)
   ability.attrs.length = 0;
   ability.attrs.push(new StatMultiplierAbAttr(Stat.ACC, 1.2));
+  ability.attrs.push(new PostAttackRemoveTargetTypeAbAttr(PokemonType.GHOST));
 }
 
 /**

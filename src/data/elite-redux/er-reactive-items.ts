@@ -214,6 +214,11 @@ export function erApplyReactiveOnHit(
   if (!dealsDamage || !target.isActive(true)) {
     return;
   }
+  // As One (Calyrex riders) prevents opponents from consuming held items — this
+  // extends beyond berries to ER's single-use reactive items.
+  if (target.getOpponents().some(opp => opp.hasAbilityWithAttr("PreventItemUseAbAttr"))) {
+    return;
+  }
   for (const kind of ER_REACTIVE_KINDS) {
     const item = target
       .getHeldItems()

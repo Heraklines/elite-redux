@@ -33,6 +33,8 @@ export enum BattlerTagType {
   MIND_READER = "MIND_READER",
   BANEFUL_BUNKER = "BANEFUL_BUNKER",
   BURNING_BULWARK = "BURNING_BULWARK",
+  /** ER (Merculight): a full protect that paralyzes contact attackers. */
+  ER_PARALYZING_SHIELD = "ER_PARALYZING_SHIELD",
   ENDURING = "ENDURING",
   STURDY = "STURDY",
   PERISH_SONG = "PERISH_SONG",
@@ -124,4 +126,39 @@ export enum BattlerTagType {
    * switches out.
    */
   ER_ICE_STATUE = "ER_ICE_STATUE",
+  /**
+   * Elite Redux Parasitic Spores (ability 609): the contact-spread infection.
+   * The holder's contact moves apply this to the target; each turn-end the
+   * bearer loses 1/8 max HP (Ghost types immune). Persists until the bearer
+   * switches out. Independent of the ER "major status" tags (BLEED/FROSTBITE/
+   * FEAR) — a spored mon can still be bled/frozen/etc.
+   */
+  ER_PARASITIC_SPORES = "ER_PARASITIC_SPORES",
+  /**
+   * ER Trepidation's "Despair" seal. Applied to the foe for 3 turns; while
+   * present, EVERY Psychic-type move the holder USES misses (forced in the
+   * move hit-check). Serializable so it survives a mid-battle save.
+   */
+  ER_DESPAIR = "ER_DESPAIR",
+  /**
+   * Elite Redux Drenched (2.65): a water-soaked debuff applied by the Water-move
+   * drench chances (Water Gun, Hydro Pump, Surf, Waterlog, ...). While present,
+   * the holder moves LAST within its move-priority bracket (checked in
+   * {@linkcode Move.getPriorityModifier}) for 2 turns. It respects priority
+   * brackets — a higher-priority move still outspeeds — unlike a full Quash.
+   * Immune: Water-type Pokemon, water-immune abilities (Water Absorb / Dry Skin /
+   * Storm Drain), and {@linkcode DrenchImmunityAbAttr} (Amphibious, Old Mariner).
+   * Independent of the ER major-status tags (BLEED/FROSTBITE/FEAR).
+   */
+  ER_DRENCHED = "ER_DRENCHED",
+  /**
+   * Elite Redux Enrage (2.65): the bearer takes 33% of the damage it deals with
+   * its moves as recoil (applied after each of its moves; see {@linkcode
+   * ErEnrageTag}), and its moves are treated as recoil moves so Reckless boosts
+   * them. Lasts until the bearer switches out. Recoil is blocked by the same
+   * abilities that block move recoil (Rock Head / Steel Barrel / Brute Force via
+   * {@linkcode BlockRecoilDamageAttr}). Inflicted by Swagger, Flatter, Incite,
+   * Berserk DNA, etc.
+   */
+  ER_ENRAGE = "ER_ENRAGE",
 }

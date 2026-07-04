@@ -85,6 +85,16 @@ export class CounterAttackOnHitAbAttr extends PostDefendAbAttr {
     }
   }
 
+  /** Read-only accessor: the counter move id. */
+  public getMoveId(): MoveId {
+    return this.moveId;
+  }
+
+  /** Read-only accessor: the configured power override, or `undefined` for natural power. */
+  public getPower(): number | undefined {
+    return this.power;
+  }
+
   override canApply(params: PostMoveInteractionAbAttrParams): boolean {
     const { pokemon, opponent, move } = params;
     if (!opponent || opponent.isFainted() || pokemon.isFainted()) {

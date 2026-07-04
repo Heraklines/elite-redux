@@ -62,6 +62,16 @@ export class PostAttackScriptedMoveAbAttr extends PostAttackAbAttr {
     super(undefined, false);
   }
 
+  /** Read-only accessor: the scripted follow-up move id (used in tests). */
+  public getMoveId(): MoveId {
+    return this.opts.moveId;
+  }
+
+  /** Read-only accessor: the scripted follow-up power override, or `undefined`. */
+  public getPower(): number | undefined {
+    return this.opts.power;
+  }
+
   override canApply(params: PostMoveInteractionAbAttrParams): boolean {
     const { pokemon, move, opponent } = params;
     if (!opponent) {

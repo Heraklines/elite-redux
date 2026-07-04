@@ -51,7 +51,9 @@ import { dispatchMoveArchetype } from "#data/elite-redux/move-archetype-dispatch
 import {
   AddArenaTrapTagAttr,
   AddBattlerTagAttr,
+  AddTypeAttr,
   AttackMove,
+  AttackReducePpMoveAttr,
   ChargingAttackMove,
   ClearTerrainAttr,
   ClearWeatherAttr,
@@ -60,8 +62,10 @@ import {
   crashDamageFunc,
   DelayedAttackAttr,
   EatBerryAttr,
+  ErDrenchAttr,
   ErSuperEffectiveVsTypeAttr,
   FallDownAttr,
+  ForceLastAttr,
   ForceSwitchOutAttr,
   HighCritAttr,
   IgnoreOpponentStatStagesAttr,
@@ -662,6 +666,17 @@ function applyErMoveTarget(move: Move, erTarget: number, category: MoveCategory)
  * missed (audited against each move's in-game description). Keyed by ER move id.
  * Chance-based riders inherit the move's `chance` (set from `effectChance`).
  */
+/**
+ * Swap the archetype's auto-added generic {@linkcode BattlerTagType.ER_DRENCHED}
+ * applier (an `AddBattlerTagAttr` gated on the move's `chance` field, which the
+ * systemic effectChance -1 bug leaves at "guaranteed") for a fixed-chance
+ * {@linkcode ErDrenchAttr}. Every other archetype-wired attr is left intact.
+ */
+function replaceDrenchAttr(move: Move, drenchAttr: ErDrenchAttr): void {
+  move.attrs = move.attrs.filter(a => !(a instanceof AddBattlerTagAttr && a.tagType === BattlerTagType.ER_DRENCHED));
+  move.attrs.push(drenchAttr);
+}
+
 function applyErMoveBespokeRiders(move: Move, erId: number): void {
   switch (erId) {
     // (The genie-Storm quartet's ER field riders live in the VANILLA patch
@@ -669,8 +684,45 @@ function applyErMoveBespokeRiders(move: Move, erId: number): void {
     // ---- High critical-hit ratio ----
     case 772: // Pixie Slash
     case 773: // Seismic Blade
+    case 803: // Blazing Arrow — +1 crit stage (dex "+1 crit chance"); 20% burn from its chance-status row
     case 995: // Berserker Horn
       move.attr(HighCritAttr);
+      break;
+    // ---- Secondary-effect chance corrections (ER data ships effectChance 0/wrong;
+    // the archetype/classifier chance is not applied, so the secondary attr — added
+    // by the dispatcher/archetype above — fires at the wrong rate. Set Move.chance
+    // to the authoritative dex value here; the rider runs AFTER wiring so it wins. ----
+    case 1014: // Spread Bomb — dex 30% burn (ER effectChance ships 20)
+      move.chance = 30;
+      break;
+    case 1015: // Ball Toss — dex 20% flinch (ER effectChance ships 0 -> was guaranteed)
+      move.chance = 20;
+      break;
+    case 1017: // Shot Put — dex 30% Speed drop (ER effectChance ships 0 -> was guaranteed)
+      move.chance = 30;
+      break;
+    // (Saber Slashes / 1019's 20% flinch chance lives in its multi-hit case below.)
+    // ---- Drench-chance corrections (DRENCH now resolves to ER_DRENCHED; the
+    // archetype auto-added a generic applier gated on the buggy move.chance -1
+    // = guaranteed. Swap it for a fixed-chance ErDrenchAttr so the dex rate wins).
+    // (Rapid River's drench lives in its multi-hit case below.) ----
+    case 1004: // Waterlog — "Makes the target move last. 20% drench chance, 50% in rain."
+      // ForceLastAttr = the guaranteed this-turn Quash ("makes the target move last");
+      // ErDrenchAttr(20, 50) = the lasting 2-turn Drenched, rain-boosted to 50%.
+      replaceDrenchAttr(move, new ErDrenchAttr(20, 50));
+      move.attr(ForceLastAttr);
+      break;
+    case 1005: // Incite — "Adds the Dark type to the target and enrages them."
+      // Guaranteed (chance -1) so the enrage isn't gated by a shipped effectChance
+      // of 0. AddTypeAttr adds Dark to the target; ER_ENRAGE is the recoil status.
+      move.chance = -1;
+      move.attr(AddTypeAttr, PokemonType.DARK);
+      move.attr(AddBattlerTagAttr, BattlerTagType.ER_ENRAGE, false);
+      break;
+    // ---- Depletion Beam — cut 3 PP from the foe's last move (ER effect 357, unwired).
+    // Mega Launcher / PULSE boost already applied via its flag-tagged archetype row. ----
+    case 993:
+      move.attr(AttackReducePpMoveAttr, 3);
       break;
     case 994: // One-Inch Punch — high crit + never misses
       move.attr(HighCritAttr);
@@ -682,6 +734,13 @@ function applyErMoveBespokeRiders(move: Move, erId: number): void {
       break;
     case 779: // Supersonic Shot — always crits
       move.attr(CritOnlyAttr);
+      break;
+    case 842: // Rider Kick — "ignores the foe's ability. Can't miss." (Striker flag from archetype.)
+      move.ignoresAbilities();
+      move.accuracy = -1;
+      break;
+    case 797: // Diamond Arrow — "Cuts through foe's stat changes." (Archer flag from archetype.)
+      move.attr(IgnoreOpponentStatStagesAttr);
       break;
     // ---- Cannot miss (perfect accuracy) ----
     case 792: // Asteroid Shot
@@ -841,8 +900,10 @@ function applyErMoveBespokeRiders(move: Move, erId: number): void {
       move.attr(IgnoreOpponentStatStagesAttr);
       break;
     // ---- Accuracy drop on the foe ----
-    case 1011: // Prism Blast — reduces foe accuracy (also has ConfuseAttr)
-      move.attr(StatStageChangeAttr, [Stat.ACC], -1);
+    case 1011: // Prism Blast — RELIABLY reduces foe accuracy (dex), plus a 10% confuse
+      // (its chance-status row, gated by Move.chance=10). The accuracy drop must not
+      // share that 10% gate, so force it to 100% via effectChanceOverride.
+      move.attr(StatStageChangeAttr, [Stat.ACC], -1, false, { effectChanceOverride: 100 });
       break;
     // ---- Bleed / fear riders (ER tags), gated by Move.chance ----
     case 956: // Rip and Tear — lowers foe Speed + can't be used twice
@@ -928,14 +989,19 @@ function applyErMoveBespokeRiders(move: Move, erId: number): void {
       move.attr(DelayedAttackAttr, ChargeAnim.FUTURE_SIGHT_CHARGING, "moveTriggers:foresawAnAttack");
       break;
     // ---- Multi-hit (2 fixed) ----
-    case 946: // Rapid River — hits twice
+    case 946: // Rapid River — "A surge of water that hits twice. 10% drench chance."
       move.attr(MultiHitAttr, MultiHitType.TWO);
+      // Drench (ER_DRENCHED) at a fixed 10%; swap out the archetype's generic
+      // move.chance-gated applier so the dex rate wins over the -1 bug.
+      replaceDrenchAttr(move, new ErDrenchAttr(10));
       break;
     case 1019: // Saber Slashes (Iron Saber) — "Hits twice. Uses elec. or fire based
       // on effectiveness." The Electric/Fire best-effectiveness type pick + flinch
       // come from the type-conversion archetype dispatch; only the 2nd hit was
       // missing, so it struck once. Add the fixed 2-hit here.
       move.attr(MultiHitAttr, MultiHitType.TWO);
+      // dex "20% flinch" (ER effectChance ships 0 -> was guaranteed without this).
+      move.chance = 20;
       break;
     // ---- Conditional 1.5× vs a bleeding target ----
     case 959: // Terror Locks — 50% more damage if the foe is bleeding (+30% bleed via row)

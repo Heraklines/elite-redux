@@ -320,7 +320,7 @@ export const consecutiveUseRestriction = new MoveRestriction(
 
 /** Prevents a move from being selected if Gravity is in effect */
 export const gravityUseRestriction = new MoveRestriction(
-  () => globalScene.arena.hasTag(ArenaTagType.GRAVITY),
+  () => globalScene.arena.hasActiveGravity(),
   "battle:moveDisabledGravity",
 );
 

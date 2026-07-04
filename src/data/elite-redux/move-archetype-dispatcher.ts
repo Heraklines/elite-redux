@@ -55,11 +55,14 @@ import {
   AddTypeAttr,
   ClearWeatherAttr,
   ConfuseAttr,
-  EatBerryAttr,
+  ErRandomBerryEffectAttr,
+  ErRetrieveConsumedItemAttr,
+  ErStatusEffectIgnoreImmunityAttr,
   ErSuperEffectiveVsTypeAttr,
+  ErSuppressAbilitiesInFogAttr,
   FlinchAttr,
   ForceSwitchOutAttr,
-  HealOnAllyAttr,
+  HealUserAndAllyAttr,
   HitHealAttr,
   IgnoreOpponentStatStagesAttr,
   type Move,
@@ -68,6 +71,7 @@ import {
   MovePowerMultiplierAttr,
   MultiHitAttr,
   MultiHitPowerIncrementAttr,
+  ProtectAttr,
   RecoilAttr,
   RemoveTypeAttr,
   SacrificialAttr,
@@ -184,9 +188,9 @@ function collectFlagBitmask(rawFlags: unknown): number {
 /**
  * Resolve a classifier-emitted status name to either a vanilla `StatusEffect`
  * or a `BattlerTagType` (battler-tag-flavoured statuses like FLINCH,
- * CONFUSION, INFATUATION). ER-specific statuses (`BLEED`, `FROSTBITE`,
- * `DRENCH`) and curse/drowsy don't have a clean vanilla wiring — we return
- * `null` for those and the caller skips that piece.
+ * CONFUSION, INFATUATION). ER-specific statuses (`BLEED`, `FROSTBITE`, `FEAR`,
+ * `DRENCH`) are routed to their backing ER battler tags; only unrecognised
+ * names return `null` and the caller skips that piece.
  *
  * Returned discriminant:
  *  - `{ kind: "status", effect }` — a vanilla StatusEffect (POISON, BURN, …)
@@ -225,6 +229,8 @@ function resolveStatusName(raw: string): ResolvedStatus | null {
       return { kind: "tag", tag: BattlerTagType.ER_BLEED };
     case "FEAR":
       return { kind: "tag", tag: BattlerTagType.ER_FEAR };
+    case "DRENCH":
+      return { kind: "tag", tag: BattlerTagType.ER_DRENCHED };
     default:
       return null;
   }
@@ -662,10 +668,9 @@ function dispatchBespokeMove(erMoveId: number): MoveDispatchResult {
       // Raging Souls — sharply lowers user's SpAtk by 2.
       return ok(0, [new StatStageChangeAttr([Stat.SPATK], -2, true)]);
     case 897:
-      // Creeping Thorns — hurts foes on switch in. ER has its own Creeping
-      // Thorns tag, not in vanilla ArenaTagType. As a faithful approximation
-      // we deploy Spikes on the enemy side (same shape: damage on switch-in).
-      return ok(0, [new AddArenaTrapTagAttr(ArenaTagType.SPIKES, 0, false, false)]);
+      // Creeping Thorns — deploys the real ER Creeping Thorns hazard on the foe
+      // side (Spikes-style switch-in damage PLUS ER_BLEED).
+      return ok(0, [new AddArenaTrapTagAttr(ArenaTagType.CREEPING_THORNS, 0, false, false)]);
     case 935:
       // Megaton Hammer — ignores Protect. IGNORE_PROTECT flag handles this.
       return ok(MoveFlags.IGNORE_PROTECT | MoveFlags.HAMMER_BASED, []);
@@ -684,16 +689,23 @@ function dispatchBespokeMove(erMoveId: number): MoveDispatchResult {
       // DANCE_MOVE flag triggers Dancer-style ability copies.
       return ok(MoveFlags.DANCE_MOVE, [new StatStageChangeAttr([Stat.SPATK, Stat.SPD], 1, true)]);
     case 954:
-      // Kilobite — biting Steel move that drops foe's Speed by 1. The "+1 user
-      // Speed if foe immune to Speed drop" branch is bespoke; first-pass keeps
-      // the foe-speed drop only. BITING_MOVE flag enables Strong Jaw boost.
-      return ok(MoveFlags.BITING_MOVE, [new StatStageChangeAttr([Stat.SPD], -1)]);
+      // Kilobite — biting Steel move: "-1 Speed to foe OR +1 Speed to user."
+      // Drop the foe's Speed; when that can't apply (foe at -6 or a stat-drop
+      // immunity ability like Clear Body), the user gains +1 Speed instead.
+      // BITING_MOVE flag enables Strong Jaw boost.
+      return ok(MoveFlags.BITING_MOVE, [
+        new StatStageChangeAttr([Stat.SPD], -1),
+        new StatStageChangeAttr([Stat.SPD], 1, true, {
+          condition: (_u, target) =>
+            target != null && (target.getStatStage(Stat.SPD) <= -6 || target.hasAbilityWithAttr("ProtectStatAbAttr")),
+        }),
+      ]);
     case 955:
-      // Tangling Husk — +4 priority protect-style move that protects against
-      // non-Fire moves; slows attackers on contact. Both restrictions are
-      // bespoke (no vanilla "type-specific protect" or "slow-on-contact-protect"
-      // primitives). First-pass: generic Protect tag, matching Detect shape.
-      return ok(0, [new AddBattlerTagAttr(BattlerTagType.PROTECTED, true, true)]);
+      // Tangling Husk — protect that slows attackers on contact. SILK_TRAP =
+      // protect + -1 Speed to a contact attacker (the slow-on-contact clause).
+      // The "non-Fire moves only" filter is genuinely bespoke (no type-specific
+      // protect primitive) and remains deferred.
+      return ok(0, [new ProtectAttr(BattlerTagType.SILK_TRAP)]);
     case 962:
       // Sparkling Barrage — hits 3 times.
       return ok(0, [new MultiHitAttr(MultiHitType.THREE)]);
@@ -703,27 +715,38 @@ function dispatchBespokeMove(erMoveId: number): MoveDispatchResult {
       // with RECHARGING tag (self, 1 turn, last-hit-only) matches Hyper Beam.
       return ok(0, [new AddBattlerTagAttr(BattlerTagType.RECHARGING, true, false, 1, 1, true)]);
     case 964:
-      // Merculight — +4 priority protect-style status move that paralyzes
-      // attackers. The paralyze-on-protect is bespoke. First-pass: generic
-      // Protect tag (matching Detect/Protect shape).
-      return ok(0, [new AddBattlerTagAttr(BattlerTagType.PROTECTED, true, true)]);
+      // Merculight — +4 priority protect that paralyzes contact attackers (dex:
+      // "Evades attacks with certainty, paralyzing attackers"). ER_PARALYZING_SHIELD
+      // is the Baneful-Bunker-shaped protect tag that inflicts PARALYSIS on contact.
+      // ProtectAttr (not a bare AddBattlerTagAttr) is required so the block path fires the
+      // tag's CUSTOM lapse -> onContact -> PARALYSIS; it also carries the "may fail in
+      // succession" condition built in.
+      return ok(0, [new ProtectAttr(BattlerTagType.ER_PARALYZING_SHIELD)]);
     case 966:
-      // Spectral Flame — status move that burns the target. The "including
-      // Fire types" piece is bespoke (vanilla `StatusEffectAttr` honours type
-      // immunity); the fog-ability-suppression piece is deferred. As a first
-      // pass we inflict standard BURN.
-      return ok(0, [new StatusEffectAttr(StatusEffect.BURN, false)]);
+      // Spectral Flame — "Burns the target, including Fire types. Suppresses
+      // abilities in fog." ErStatusEffectIgnoreImmunityAttr bypasses the vanilla
+      // Fire burn-immunity for THIS move only (via trySetStatus' ignoreTypeImmunity
+      // flag); ErSuppressAbilitiesInFogAttr suppresses the target's ability, but
+      // ONLY when the active weather is FOG (no-op otherwise, so the burn still
+      // lands).
+      return ok(0, [
+        new ErStatusEffectIgnoreImmunityAttr(StatusEffect.BURN, false),
+        new ErSuppressAbilitiesInFogAttr(),
+      ]);
     case 967:
-      // Trepidation — ER status move that makes foe miss Psychic moves. No
-      // vanilla "miss-specific-type" primitive (this is closest to Foresight
-      // but inverted); first-pass: FlinchAttr as a small turn-disruption proxy.
-      // The damaging 20-BP body + 90 acc remains from the draft.
-      return ok(0, [new FlinchAttr()]);
+      // Trepidation — damaging move (20 BP body from the draft) that, on hit,
+      // applies ER_DESPAIR to the TARGET for 3 turns. While the tag is active
+      // every Psychic-type move the holder USES misses (forced in
+      // MoveEffectPhase.hitCheck — see ErDespairTag).
+      return ok(0, [new AddBattlerTagAttr(BattlerTagType.ER_DESPAIR, false, false, 3, 3)]);
     case 969:
-      // Fetch — status move that switches the user out (the "retrieves lost
-      // item" piece is bespoke and deferred — pokerogue's item system doesn't
-      // cleanly model "lost items"). ForceSwitchOutAttr(true) matches Teleport.
-      return ok(0, [new ForceSwitchOutAttr(true)]);
+      // Fetch — "The user retrieves its lost item and switches to an ally."
+      // ErRetrieveConsumedItemAttr restores the user's most-recently consumed
+      // berry (ER's only tracked "lost item" — same store Harvest restores from)
+      // as a held item, THEN ForceSwitchOutAttr(true) self-switches. Retrieve
+      // runs before the switch (attrs apply in order). Non-berry consumables
+      // aren't ledgered in this engine — see ErRetrieveConsumedItemAttr's note.
+      return ok(0, [new ErRetrieveConsumedItemAttr(), new ForceSwitchOutAttr(true)]);
     case 970:
       // Transmute — power 80 psychic move that "remakes the user's item on KO".
       // Pokerogue's modifier/item system doesn't surface a clean "regenerate
@@ -732,10 +755,10 @@ function dispatchBespokeMove(erMoveId: number): MoveDispatchResult {
       // exists; the 80 BP body from the draft remains.
       return skip("Transmute (er id 970): requires custom on-KO item-regen primitive in modifier system");
     case 971:
-      // Clear Skies — clears the current weather, regardless of type. The
-      // "prevents new weather for 5 turns" piece is bespoke and deferred
-      // (no vanilla weather-block primitive). We deploy a ClearWeatherAttr per
-      // weather type so whichever is active gets cleared.
+      // Clear Skies — "Clears the current weather AND prevents new weather from
+      // being set for 5 turns." A ClearWeatherAttr per weather type clears
+      // whichever is active, then the ER_WEATHER_LOCK arena tag (5 turns) blocks
+      // any new weather (checked in Arena.canSetWeather).
       return ok(0, [
         new ClearWeatherAttr(WeatherType.SUNNY),
         new ClearWeatherAttr(WeatherType.RAIN),
@@ -746,6 +769,7 @@ function dispatchBespokeMove(erMoveId: number): MoveDispatchResult {
         new ClearWeatherAttr(WeatherType.HEAVY_RAIN),
         new ClearWeatherAttr(WeatherType.HARSH_SUN),
         new ClearWeatherAttr(WeatherType.STRONG_WINDS),
+        new AddArenaTagAttr(ArenaTagType.ER_WEATHER_LOCK, 5),
       ]);
     case 974:
       // Vexing Void — 30% chance to lower SpDef. Move.chance (30) gates.
@@ -754,10 +778,10 @@ function dispatchBespokeMove(erMoveId: number): MoveDispatchResult {
       // Eclipse — heavy Dark damage, then user loses Dark typing.
       return ok(0, [new RemoveTypeAttr(PokemonType.DARK)]);
     case 977:
-      // Caltrops — sets spikes that ALSO inflict bleeding on switch-in. The
-      // bleed-on-switch-in piece is bespoke (no composite primitive). First-
-      // pass: deploy SPIKES alone, mirroring the Creeping Thorns (897) wiring.
-      return ok(0, [new AddArenaTrapTagAttr(ArenaTagType.SPIKES, 0, false, false)]);
+      // Caltrops — "sets spikes that ALSO inflict bleeding on switch-in." This
+      // is exactly the ER Creeping Thorns hazard (Spikes-style switch-in damage
+      // PLUS ER_BLEED), deployed on the foe side.
+      return ok(0, [new AddArenaTrapTagAttr(ArenaTagType.CREEPING_THORNS, 0, false, false)]);
     case 979:
       // Safe Passage — self-switch that protects the incoming ally with a
       // -35% damage reduction this turn. The damage-reduction piece is bespoke
@@ -820,9 +844,11 @@ function dispatchBespokeMove(erMoveId: number): MoveDispatchResult {
       // on Sandstorm/Hail. Duration is the move-set default (5).
       return ok(0, [new WeatherChangeAttr(WeatherType.TEMPEST_STORM)]);
     case 1016:
-      // Party Favors — Fairy damaging move that also heals user's ally by 25%.
-      // HealOnAllyAttr with healRatio 0.25 matches Pollen Puff's ally-heal shape.
-      return ok(0, [new HealOnAllyAttr(0.25)]);
+      // Party Favors — Fairy damaging move that ALSO heals the USER and its ally by
+      // 25% (dex: "Heals you and your ally by 25% and does damage"). HealOnAllyAttr
+      // was wrong: it only heals an ally the move TARGETS, but Party Favors targets the
+      // foe, so nothing healed. HealUserAndAllyAttr heals the user's own side post-hit.
+      return ok(0, [new HealUserAndAllyAttr(0.25)]);
     case 1017:
       // Shot Put — 30% chance to lower foe's Speed by 1. Move.chance gates.
       return ok(0, [new StatStageChangeAttr([Stat.SPD], -1)]);
@@ -838,9 +864,10 @@ function dispatchBespokeMove(erMoveId: number): MoveDispatchResult {
       // the +1 priority + the description making the trade-off clear.
       return ok(0, [new StatStageChangeAttr([Stat.ACC], -1)]);
     case 1022:
-      // Concoction — damaging Grass move that also consumes one of the user's
-      // berries. EatBerryAttr(selfTarget=true) matches the Stuff Cheeks shape.
-      return ok(0, [new EatBerryAttr(true)]);
+      // Concoction — "Attacks and uses a random berry effect." Applies a RANDOM
+      // berry's effect to the user unconditionally (no held berry needed, nothing
+      // consumed) — was EatBerryAttr, which only ate the user's own held berry.
+      return ok(0, [new ErRandomBerryEffectAttr()]);
     case 1023:
       // Hacksaw — "Super effective vs Steel." #374: a power boost cannot fix
       // the resisted Steel-vs-Steel matchup (and never shows the SE message);

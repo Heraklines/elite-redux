@@ -21,7 +21,7 @@ import { BattleType } from "#enums/battle-type";
 import { BattlerIndex } from "#enums/battler-index";
 import { BattlerTagLapseType } from "#enums/battler-tag-lapse-type";
 import { BattlerTagType } from "#enums/battler-tag-type";
-import type { BerryType } from "#enums/berry-type";
+import { BerryType } from "#enums/berry-type";
 import { Command } from "#enums/command";
 import { HitResult } from "#enums/hit-result";
 import { CommonAnim } from "#enums/move-anims-common";
@@ -1741,6 +1741,11 @@ export class MovePowerBoostAbAttr extends VariableMovePowerAbAttr {
   override apply({ power }: PreAttackModifyPowerAbAttrParams): void {
     power.value *= this.powerMultiplier;
   }
+
+  /** Read-only accessor for the configured power multiplier (used in tests). */
+  public getPowerMultiplier(): number {
+    return this.powerMultiplier;
+  }
 }
 
 /**
@@ -2166,6 +2171,43 @@ export class PostAttackApplyBattlerTagAbAttr extends PostAttackAbAttr {
         this.effects.length === 1 ? this.effects[0] : this.effects[pokemon.randBattleSeedInt(this.effects.length)];
       opponent.addTag(effect);
     }
+  }
+}
+
+/**
+ * Elite Redux — on a landed damaging hit, removes a specific type from the
+ * TARGET (ER Illuminate: "Removes Ghost-typing on target when landing an
+ * attack"). If removing it would leave the target typeless, it becomes
+ * {@linkcode PokemonType.UNKNOWN}. A target Terastallized into the removed type
+ * keeps it (an active Tera type can't be stripped).
+ */
+export class PostAttackRemoveTargetTypeAbAttr extends PostAttackAbAttr {
+  private readonly removedType: PokemonType;
+
+  constructor(removedType: PokemonType) {
+    super(undefined, false);
+    this.removedType = removedType;
+  }
+
+  override canApply(params: PostMoveInteractionAbAttrParams): boolean {
+    const { pokemon, opponent, move } = params;
+    return (
+      super.canApply(params)
+      && pokemon !== opponent
+      && move.category !== MoveCategory.STATUS
+      && opponent.isOfType(this.removedType)
+      && !(opponent.isTerastallized && opponent.getTeraType() === this.removedType)
+    );
+  }
+
+  override apply(params: PostMoveInteractionAbAttrParams): void {
+    const { opponent, simulated } = params;
+    if (simulated) {
+      return;
+    }
+    const kept = opponent.getTypes(true).filter(t => t !== this.removedType);
+    opponent.summonData.types = kept.length > 0 ? kept : [PokemonType.UNKNOWN];
+    opponent.updateInfo();
   }
 }
 
@@ -3926,6 +3968,117 @@ export class BugPowderImmunityAbAttr extends AbAttr {
 }
 
 /**
+ * Elite Redux — pure marker: infatuation the holder inflicts IGNORES the
+ * gender requirement (Beautiful Music: "50% chance to infatuate targets on
+ * hit... ignoring gender"). Consulted by `InfatuatedTag.canAdd`, which normally
+ * requires the target to be the opposite gender of the source.
+ */
+export class IgnoreGenderInfatuationAbAttr extends AbAttr {
+  constructor() {
+    super(false);
+  }
+
+  override apply(_params: AbAttrBaseParams): void {}
+}
+
+/**
+ * Elite Redux — pure marker for Blind Rage's tempered Mold Breaker. The holder's
+ * ability-ignore (Mold Breaker) must NOT bypass the target's abilities that
+ * modify BASE STATS (e.g. Grass Pelt, Fur Coat). Consulted in
+ * `Pokemon.getEffectiveStat`: even when the attacker ignores abilities, the
+ * defender's `StatMultiplierAbAttr`s still apply when the attacker carries this
+ * marker. (Immunity / damage-reduction / effect abilities are still bypassed.)
+ */
+export class PreserveBaseStatAbilitiesAbAttr extends AbAttr {
+  constructor() {
+    super(false);
+  }
+
+  override apply(_params: AbAttrBaseParams): void {}
+}
+
+/**
+ * Elite Redux — pure marker for "immune to being drenched" (Old Mariner 620,
+ * Amphibious 297, and any other ability whose ROM text says "provides immunity
+ * to being drenched").
+ *
+ * ⚠️ DRENCH is NOT yet implemented engine-wide in this port. The ER classifier
+ * emits a `DRENCH` secondary status on ~a dozen Water moves (Splash's 20%,
+ * Water Gun 10%, etc. — see `resolveStatusName`/`buildStatusAttrs`, which return
+ * `null` for it, and the note in `init-elite-redux-vanilla-move-patches.ts`), but
+ * there is no battler tag / state that represents "drenched" and no move actually
+ * applies it. Building DRENCH faithfully is out of scope here: its full ROM
+ * mechanic (what a drenched Pokemon suffers) is not defined by the data we have.
+ *
+ * This marker exists so the immunity is CORRECT-BY-CONSTRUCTION the moment DRENCH
+ * lands. When DRENCH is implemented, its application site MUST gate on this
+ * marker, i.e. skip drenching a target for which
+ * `target.hasAbilityWithAttr("DrenchImmunityAbAttr")` is true (the standard
+ * pokerogue immunity idiom, mirroring `StatusEffectImmunityAbAttr`). Until then
+ * the marker is inert (no drench source exists to block).
+ *
+ * DRENCH, when built, requires: (1) a `DRENCH` representation — most naturally an
+ * `ER_DRENCHED` {@linkcode BattlerTagType} (per-`SerializableBattlerTag`, like the
+ * other ER status tags) or a `StatusEffect` entry; (2) the drench-applying moves
+ * wired to inflict it (route `DRENCH` through `buildStatusAttrs`); and (3) the
+ * application gate calling into this marker before applying.
+ */
+export class DrenchImmunityAbAttr extends AbAttr {
+  constructor() {
+    super(false);
+  }
+
+  override apply(_params: AbAttrBaseParams): void {}
+}
+
+/**
+ * Elite Redux — pure marker granting immunity to the Stealth Rock switch-in
+ * hazard ("Absorbs ... Stealth Rocks": Molten Core, Mountaineer, Iceplumes).
+ * The holder takes no Stealth Rock damage and heals 1/4 max HP on switch-in
+ * instead. Consulted directly by {@linkcode StealthRockTag.activateTrap} via
+ * `hasAbilityWithAttr("StealthRockImmunityAbAttr")`.
+ */
+export class StealthRockImmunityAbAttr extends AbAttr {
+  constructor() {
+    super(false);
+  }
+
+  override apply(_params: AbAttrBaseParams): void {}
+}
+
+/**
+ * Elite Redux — pure marker: a foe of the holder that hurts ITSELF from confusion
+ * or enrage takes DOUBLE that self-inflicted damage (Cosmic Daze / Cosmic Dust:
+ * "confused and enraged enemies take twice as much damage when they hurt
+ * themselves from those statuses"). Consulted at the self-damage sites
+ * ({@linkcode ConfusedTag.lapse} confusion self-hit, {@linkcode ErEnrageTag.lapse}
+ * enrage recoil) via the self-hurting mon's `getOpponents(...).hasAbilityWithAttr`.
+ */
+export class DoubleSelfInflictedDamageAbAttr extends AbAttr {
+  constructor() {
+    super(false);
+  }
+
+  override apply(_params: AbAttrBaseParams): void {}
+}
+
+/**
+ * Elite Redux Clueless — pure marker: while the holder is on the field, the
+ * EFFECTS of Terrain and the Room field effects (Trick Room / Inverse Room) and
+ * Gravity are negated (they still exist and resume once the holder leaves, like
+ * Cloud Nine does for weather). Consulted via {@linkcode Arena.isFieldEffectSuppressed}
+ * at the terrain getter, the Room tag apply hooks, and the Gravity read sites.
+ * (Weather is negated by the separate {@linkcode SuppressWeatherEffectAbAttr}.)
+ */
+export class SuppressFieldEffectsAbAttr extends AbAttr {
+  constructor() {
+    super(false);
+  }
+
+  override apply(_params: AbAttrBaseParams): void {}
+}
+
+/**
  * Elite Redux — pure marker that makes the holder UNGROUNDED, like Levitate
  * (Hover 715, Fey Flight 843, etc. — "levitates / immune to Ground effects such
  * as Spikes and terrains"). Consulted by `Pokemon.isGrounded()`. Pair it with an
@@ -4606,6 +4759,30 @@ export class PostTurnAbAttr extends AbAttr {
 }
 
 /**
+ * Elite Redux Craving — "Eats/triggers a RANDOM berry effect at the end of every
+ * turn." Fires a random berry's effect on the holder each turn-end,
+ * unconditionally (no held berry required, nothing consumed). Distinct from
+ * Harvest, which only restores a berry already eaten this battle.
+ */
+export class PostTurnRandomBerryEffectAbAttr extends PostTurnAbAttr {
+  private static readonly BERRY_COUNT = Object.values(BerryType).filter(v => typeof v === "number").length;
+
+  override apply({ pokemon, simulated }: AbAttrBaseParams): void {
+    if (simulated) {
+      return;
+    }
+    const berry = pokemon.randBattleSeedInt(PostTurnRandomBerryEffectAbAttr.BERRY_COUNT) as BerryType;
+    globalScene.phaseManager.unshiftNew(
+      "CommonAnimPhase",
+      pokemon.getBattlerIndex(),
+      pokemon.getBattlerIndex(),
+      CommonAnim.USE_ITEM,
+    );
+    getBerryEffectFunc(berry)(pokemon);
+  }
+}
+
+/**
  * This attribute will heal 1/8th HP if the ability pokemon has the correct status.
  *
  * @sealed
@@ -5262,6 +5439,15 @@ export class DoubleBerryEffectAbAttr extends AbAttr {
  * Used by {@linkcode AbilityId.UNNERVE}, {@linkcode AbilityId.AS_ONE_GLASTRIER} and {@linkcode AbilityId.AS_ONE_SPECTRIER}
  */
 export class PreventBerryUseAbAttr extends CancelInteractionAbAttr {}
+
+/**
+ * Elite Redux — As One (Calyrex riders) "prevents all opposing Pokemon from
+ * consuming HELD ITEMS", not just berries. A superset of {@linkcode
+ * PreventBerryUseAbAttr}: an opponent carrying this marker blocks the holder's
+ * NON-berry single-use consumables too (e.g. ER reactive items). Berries are
+ * still covered by the paired `PreventBerryUseAbAttr` in berry-phase.
+ */
+export class PreventItemUseAbAttr extends CancelInteractionAbAttr {}
 
 /**
  * A Pokemon with this ability heals by a percentage of their maximum hp after eating a berry
@@ -6757,6 +6943,7 @@ export const AbilityAttrs = Object.freeze({
   CudChewRecordBerryAbAttr,
   DoubleBattleChanceAbAttr,
   DoubleBerryEffectAbAttr,
+  DoubleSelfInflictedDamageAbAttr,
   DownloadAbAttr,
   EffectSporeAbAttr,
   EnemyMinDamageRollAbAttr,
@@ -6764,6 +6951,9 @@ export const AbilityAttrs = Object.freeze({
   CritUseLowerDefensiveStatAbAttr,
   BadDreamsImmunityAbAttr,
   BugPowderImmunityAbAttr,
+  IgnoreGenderInfatuationAbAttr,
+  PreserveBaseStatAbilitiesAbAttr,
+  DrenchImmunityAbAttr,
   FloatAbAttr,
   PostWakeUpAbAttr,
   OverruleCritAbAttr,
@@ -6820,6 +7010,8 @@ export const AbilityAttrs = Object.freeze({
   PostAttackAbAttr,
   PostAttackApplyBattlerTagAbAttr,
   PostAttackApplyStatusEffectAbAttr,
+  PostAttackRemoveTargetTypeAbAttr,
+  PostTurnRandomBerryEffectAbAttr,
   PostAttackContactApplyStatusEffectAbAttr,
   PostAttackStealHeldItemAbAttr,
   PostBattleAbAttr,
@@ -6923,6 +7115,7 @@ export const AbilityAttrs = Object.freeze({
   PreWeatherDamageAbAttr,
   PreWeatherEffectAbAttr,
   PreventBerryUseAbAttr,
+  PreventItemUseAbAttr,
   PreventBypassSpeedChanceAbAttr,
   ProtectStatAbAttr,
   ReceivedMoveDamageMultiplierAbAttr,
@@ -6940,9 +7133,11 @@ export const AbilityAttrs = Object.freeze({
   SpeedBoostAbAttr,
   StabBoostAbAttr,
   StatMultiplierAbAttr,
+  StealthRockImmunityAbAttr,
   StatStageChangeCopyAbAttr,
   StatStageChangeMultiplierAbAttr,
   StatusEffectImmunityAbAttr,
+  SuppressFieldEffectsAbAttr,
   SuppressWeatherEffectAbAttr,
   SyncEncounterNatureAbAttr,
   SynchronizeStatusAbAttr,

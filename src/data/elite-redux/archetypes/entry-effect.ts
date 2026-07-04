@@ -46,6 +46,7 @@
 
 import { PostSummonAbAttr } from "#abilities/ab-attrs";
 import { globalScene } from "#app/global-scene";
+import { ER_SEED_CONFIG, ErSeedModifier } from "#data/elite-redux/er-terrain-seeds";
 import { PokemonMove } from "#data/moves/pokemon-move";
 import type { TerrainType } from "#data/terrain";
 import { ArenaTagSide } from "#enums/arena-tag-side";
@@ -284,7 +285,15 @@ export class EntryEffectAbAttr extends PostSummonAbAttr {
         if (choices.length === 0) {
           return;
         }
-        const pick = choices[pokemon.randBattleSeedInt(choices.length)];
+        // Zen Garden: a held terrain Seed (Grassy Seed / Psychic Seed) whose
+        // terrain is one of the choices GUARANTEES that terrain; otherwise the
+        // pick is random among the choices.
+        const seed = pokemon
+          .getHeldItems()
+          .find(
+            (m): m is ErSeedModifier => m instanceof ErSeedModifier && choices.includes(ER_SEED_CONFIG[m.kind].terrain),
+          );
+        const pick = seed ? ER_SEED_CONFIG[seed.kind].terrain : choices[pokemon.randBattleSeedInt(choices.length)];
         globalScene.arena.trySetTerrain(pick, false, pokemon, this.effect.turns > 0 ? this.effect.turns : undefined);
         return;
       }

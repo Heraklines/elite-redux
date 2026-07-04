@@ -979,9 +979,14 @@ export class ConfusedTag extends SerializableBattlerTag {
     if (pokemon.randBattleSeedInt(3) === 0 || Overrides.CONFUSION_ACTIVATION_OVERRIDE === true) {
       const atk = pokemon.getEffectiveStat(Stat.ATK);
       const def = pokemon.getEffectiveStat(Stat.DEF);
-      const damage = toDmgValue(
+      let damage = toDmgValue(
         ((((2 * pokemon.level) / 5 + 2) * 40 * atk) / def / 50 + 2) * (pokemon.randBattleSeedIntRange(85, 100) / 100),
       );
+      // ER Cosmic Daze / Cosmic Dust: a confused mon with an opponent that has
+      // the ability takes DOUBLE its confusion self-hit damage.
+      if (pokemon.getOpponents().some(o => o?.hasAbilityWithAttr("DoubleSelfInflictedDamageAbAttr"))) {
+        damage = toDmgValue(damage * 2);
+      }
       // Intentionally don't increment rage fist's hitCount
       phaseManager.queueMessage(i18next.t("battlerTags:confusedLapseHurtItself"));
       pokemon.damageAndUpdate(damage, { result: HitResult.CONFUSION });
@@ -1079,6 +1084,12 @@ export class InfatuatedTag extends SerializableBattlerTag {
     if (!source) {
       console.warn(`Failed to get source Pokemon for InfatuatedTag canAdd; id: ${this.sourceId}`);
       return false;
+    }
+
+    // ER Beautiful Music (and any source with IgnoreGenderInfatuationAbAttr)
+    // infatuates regardless of gender, incl. same-gender / genderless targets.
+    if (source.hasAbilityWithAttr("IgnoreGenderInfatuationAbAttr")) {
+      return true;
     }
 
     return pokemon.isOppositeGender(source);
@@ -4139,6 +4150,173 @@ export class ErIceStatueTag extends SerializableBattlerTag {
 }
 
 /**
+ * Elite Redux Parasitic Spores (ability 609). The contact-spread infection: the
+ * Parasect holder's contact moves apply this to the target. Each turn-end the
+ * bearer loses 1/8 max HP; Ghost types are immune. Persists until the bearer
+ * switches out (the default battler-tag lifetime; `turnCount` is a long 99 so it
+ * never self-expires mid-battle).
+ *
+ * Independent of the ER "major status" tags (BLEED/FROSTBITE/FEAR) — a spored
+ * mon can still be bled/frozen/etc. — so there is no mutual-exclusion guard.
+ * Honors Magic Guard (`BlockNonDirectDamageAbAttr`) like every other chip.
+ */
+export class ErParasiticSporesTag extends SerializableBattlerTag {
+  public override readonly tagType = BattlerTagType.ER_PARASITIC_SPORES;
+  constructor() {
+    super(BattlerTagType.ER_PARASITIC_SPORES, BattlerTagLapseType.TURN_END, 99);
+  }
+
+  override canAdd(pokemon: Pokemon): boolean {
+    // Ghost types are immune to the spores; don't re-apply if already spored.
+    if (pokemon.isOfType(PokemonType.GHOST)) {
+      return false;
+    }
+    return pokemon.getTag(BattlerTagType.ER_PARASITIC_SPORES) == null;
+  }
+
+  override lapse(pokemon: Pokemon, lapseType: BattlerTagLapseType): boolean {
+    const ret = lapseType !== BattlerTagLapseType.CUSTOM || super.lapse(pokemon, lapseType);
+    if (!ret) {
+      return false;
+    }
+    // Defensive: this fires every turn-end; an uncaught throw here breaks
+    // TurnEndPhase and softlocks the battle. Isolate the chip.
+    try {
+      const cancelled = new BooleanHolder(false);
+      applyAbAttrs("BlockNonDirectDamageAbAttr", { pokemon, cancelled });
+      if (!cancelled.value) {
+        pokemon.damageAndUpdate(toDmgValue(pokemon.getMaxHp() / 8), { result: HitResult.INDIRECT });
+        globalScene.phaseManager.queueMessage(
+          i18next.t("battle:hurtByItem", { pokemonNameWithAffix: getPokemonNameWithAffix(pokemon) }),
+        );
+      }
+    } catch (err) {
+      console.warn("[ER] ErParasiticSporesTag.lapse chip failed; skipping tick:", err);
+    }
+    return true;
+  }
+}
+
+/**
+ * Elite Redux Trepidation (er move 967). The damaging body lands, then this tag
+ * is applied to the TARGET for 3 turns. While present, EVERY Psychic-type move
+ * the holder USES misses — the miss is forced in `MoveEffectPhase.hitCheck`
+ * (there is no vanilla "miss a specific type" primitive). Ticks down at each
+ * turn end. Serializable so it survives a mid-battle save.
+ *
+ * Independent of the ER "major status" tags (BLEED/FROSTBITE/FEAR): a mon in
+ * despair can still be bled/frozen/etc., so there is no mutual-exclusion guard.
+ */
+export class ErDespairTag extends SerializableBattlerTag {
+  public override readonly tagType = BattlerTagType.ER_DESPAIR;
+  constructor(turnCount = 3) {
+    super(BattlerTagType.ER_DESPAIR, BattlerTagLapseType.TURN_END, turnCount);
+  }
+
+  override onAdd(pokemon: Pokemon): void {
+    super.onAdd(pokemon);
+    globalScene.phaseManager.queueMessage(
+      i18next.t("battlerTags:erDespairOnAdd", { pokemonNameWithAffix: getPokemonNameWithAffix(pokemon) }),
+    );
+  }
+}
+
+/**
+ * ER Drenched (2.65): while present the holder moves LAST within its move-priority
+ * bracket (see {@linkcode Move.getPriorityModifier}) for 2 turns. Purely an
+ * ordering debuff — no HP chip. Immune: Water-type Pokemon, "water immune" mons
+ * (an ability that nullifies Water moves — Water Absorb / Dry Skin / Storm Drain),
+ * and the `DrenchImmunityAbAttr` abilities (Amphibious, Old Mariner). Independent
+ * of the ER major-status tags, so a drenched mon can still be bled/frozen/feared.
+ */
+export class ErDrenchedTag extends SerializableBattlerTag {
+  public override readonly tagType = BattlerTagType.ER_DRENCHED;
+  constructor(turnCount = 2) {
+    super(BattlerTagType.ER_DRENCHED, BattlerTagLapseType.TURN_END, turnCount);
+  }
+
+  override canAdd(pokemon: Pokemon): boolean {
+    // Dex: "Water types are immune to this effect, same for water immune mons."
+    // Water-type Pokemon are outright immune.
+    if (pokemon.isOfType(PokemonType.WATER)) {
+      return false;
+    }
+    // "Can't become drenched" — Amphibious / Old Mariner (DrenchImmunityAbAttr).
+    if (pokemon.hasAbilityWithAttr("DrenchImmunityAbAttr")) {
+      return false;
+    }
+    // "Water immune mons" — any ability that nullifies incoming Water-type moves
+    // (Water Absorb, Dry Skin, Storm Drain, ...). Covers active + ER innate slots.
+    if (pokemon.getAbilityAttrs("TypeImmunityAbAttr").some(a => a.getImmuneType() === PokemonType.WATER)) {
+      return false;
+    }
+    return true;
+  }
+
+  override onAdd(pokemon: Pokemon): void {
+    super.onAdd(pokemon);
+    globalScene.phaseManager.queueMessage(
+      i18next.t("battlerTags:erDrenchedOnAdd", { pokemonNameWithAffix: getPokemonNameWithAffix(pokemon) }),
+    );
+  }
+}
+
+/**
+ * ER Enrage (2.65): the bearer takes 33% of the damage it deals with its moves as
+ * recoil, applied after each of its moves. Its moves are also treated as recoil
+ * moves (the Reckless 1.2x boost is applied in {@linkcode Move.calculateBattlePower}).
+ * Persists until the bearer switches out (a switch resets battler tags). Recoil is
+ * blocked by the abilities that block move recoil (Rock Head / Steel Barrel / Brute
+ * Force via {@linkcode BlockRecoilDamageAttr}) — the dex "immunity to enrage recoil".
+ */
+export class ErEnrageTag extends SerializableBattlerTag {
+  public override readonly tagType = BattlerTagType.ER_ENRAGE;
+  constructor() {
+    super(BattlerTagType.ER_ENRAGE, BattlerTagLapseType.AFTER_MOVE, 1);
+  }
+
+  override onAdd(pokemon: Pokemon): void {
+    super.onAdd(pokemon);
+    globalScene.phaseManager.queueMessage(
+      i18next.t("battlerTags:erEnrageOnAdd", { pokemonNameWithAffix: getPokemonNameWithAffix(pokemon) }),
+    );
+  }
+
+  override lapse(pokemon: Pokemon, lapseType: BattlerTagLapseType): boolean {
+    // Only the after-move tick applies recoil, and it NEVER expires the tag —
+    // Enrage lasts until switch-out (which resets battler tags).
+    if (lapseType !== BattlerTagLapseType.AFTER_MOVE) {
+      return true;
+    }
+    // Defensive: this fires after every move; an uncaught throw would break the
+    // move-end phase. Isolate the recoil so a bad state skips instead of stalling.
+    try {
+      const dealt = pokemon.turnData?.totalDamageDealt ?? 0;
+      if (dealt > 0) {
+        const cancelled = new BooleanHolder(false);
+        // Rock Head / Steel Barrel / Brute Force grant "immunity to enrage recoil".
+        applyAbAttrs("BlockRecoilDamageAttr", { pokemon, cancelled });
+        applyAbAttrs("BlockNonDirectDamageAbAttr", { pokemon, cancelled });
+        if (!cancelled.value) {
+          // ER Cosmic Daze / Cosmic Dust: an enraged mon with an opponent that
+          // has the ability takes DOUBLE its enrage recoil (self-inflicted).
+          const cosmicMult = pokemon.getOpponents().some(o => o?.hasAbilityWithAttr("DoubleSelfInflictedDamageAbAttr"))
+            ? 2
+            : 1;
+          pokemon.damageAndUpdate(toDmgValue(dealt * 0.33 * cosmicMult, 1), { result: HitResult.INDIRECT });
+          globalScene.phaseManager.queueMessage(
+            i18next.t("battlerTags:erEnrageRecoil", { pokemonNameWithAffix: getPokemonNameWithAffix(pokemon) }),
+          );
+        }
+      }
+    } catch (err) {
+      console.warn("[ER] ErEnrageTag.lapse recoil failed; skipping tick:", err);
+    }
+    return true;
+  }
+}
+
+/**
  * Retrieves a {@linkcode BattlerTag} based on the provided tag type, turn count, source move, and source ID.
  * @param sourceId - The ID of the pokemon adding the tag
  * @returns The corresponding {@linkcode BattlerTag} object.
@@ -4226,6 +4404,8 @@ export function getBattlerTag(
       return new ContactSetStatusProtectedTag(sourceMove, tagType, StatusEffect.POISON);
     case BattlerTagType.BURNING_BULWARK:
       return new ContactSetStatusProtectedTag(sourceMove, tagType, StatusEffect.BURN, false);
+    case BattlerTagType.ER_PARALYZING_SHIELD:
+      return new ContactSetStatusProtectedTag(sourceMove, tagType, StatusEffect.PARALYSIS);
     case BattlerTagType.ENDURING:
       return new EnduringTag(tagType, BattlerTagLapseType.TURN_END, sourceMove);
     case BattlerTagType.ENDURE_TOKEN:
@@ -4352,6 +4532,14 @@ export function getBattlerTag(
       return new ErSilkenDecreeTag(sourceId);
     case BattlerTagType.ER_ICE_STATUE:
       return new ErIceStatueTag();
+    case BattlerTagType.ER_PARASITIC_SPORES:
+      return new ErParasiticSporesTag();
+    case BattlerTagType.ER_DESPAIR:
+      return new ErDespairTag(turnCount || 3);
+    case BattlerTagType.ER_DRENCHED:
+      return new ErDrenchedTag();
+    case BattlerTagType.ER_ENRAGE:
+      return new ErEnrageTag();
   }
 }
 
@@ -4427,6 +4615,7 @@ export type BattlerTagTypeMap = {
   [BattlerTagType.MIND_READER]: ContactStatStageChangeProtectedTag;
   [BattlerTagType.BANEFUL_BUNKER]: ContactSetStatusProtectedTag;
   [BattlerTagType.BURNING_BULWARK]: ContactSetStatusProtectedTag;
+  [BattlerTagType.ER_PARALYZING_SHIELD]: ContactSetStatusProtectedTag;
   [BattlerTagType.ENDURING]: EnduringTag;
   [BattlerTagType.ENDURE_TOKEN]: EnduringTag;
   [BattlerTagType.STURDY]: SturdyTag;
@@ -4492,6 +4681,10 @@ export type BattlerTagTypeMap = {
   [BattlerTagType.ER_ITEM_DISABLED]: ErItemDisabledTag;
   [BattlerTagType.ER_SILKEN_DECREE]: ErSilkenDecreeTag;
   [BattlerTagType.ER_ICE_STATUE]: ErIceStatueTag;
+  [BattlerTagType.ER_PARASITIC_SPORES]: ErParasiticSporesTag;
+  [BattlerTagType.ER_DESPAIR]: ErDespairTag;
+  [BattlerTagType.ER_DRENCHED]: ErDrenchedTag;
+  [BattlerTagType.ER_ENRAGE]: ErEnrageTag;
 };
 
 /**

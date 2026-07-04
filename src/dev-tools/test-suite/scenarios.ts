@@ -22,6 +22,7 @@
  */
 
 import { loggedInUser } from "#app/account";
+import { TerrainType } from "#app/data/terrain";
 import { setClearMeOverrideAfterFirst, setPendingDevEnemyParty } from "#app/dev-tools/registry";
 import { getGameMode } from "#app/game-mode";
 import { globalScene } from "#app/global-scene";
@@ -188,6 +189,7 @@ const DEV_OVERRIDE_DEFAULTS = {
   // reset it so the forced time never leaks into the next scenario or a normal run.
   TIME_OF_DAY_OVERRIDE: null,
   STATUS_OVERRIDE: StatusEffect.NONE,
+  STARTING_TERRAIN_OVERRIDE: TerrainType.NONE,
   SHINY_OVERRIDE: null,
   VARIANT_OVERRIDE: null,
   ENEMY_STATUS_OVERRIDE: StatusEffect.NONE,
@@ -898,6 +900,109 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
   },
   // ===========================================================================
+  // Combat — DRENCH makes the target move last in its bracket (2 turns)
+  // ===========================================================================
+  {
+    label: "Drench: Water moves make a fast foe move last",
+    description:
+      "ER DRENCH status. Water moves have a chance to DRENCH the target (Hydro Pump\n"
+      + "30%, Surf 20%, Water Gun 10%). A drenched Pokemon moves LAST within its\n"
+      + "priority bracket for 2 turns, even if it is faster. The enemy Jolteon (130\n"
+      + "Speed) far out-speeds your Blastoise (78) and normally acts first each turn.\n"
+      + "DO: attack with Hydro Pump / Surf until the log shows 'Foe Jolteon became\n"
+      + "drenched!'. EXPECT: for the next 2 turns the Jolteon moves AFTER your\n"
+      + "Blastoise (same-priority moves), despite its higher Speed; then it goes\n"
+      + "first again. Its Defenses are maxed so it survives to show the order flip.\n"
+      + "(Amphibious / Old Mariner mons are immune and never get the message.)",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 60,
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.JOLTEON,
+        ENEMY_LEVEL_OVERRIDE: 60,
+        // Growl keeps the foe acting each turn so the move-order flip is visible
+        // in the log. (In ER Growl is a weak damaging move, but bulky Blastoise
+        // shrugs it off, and its Atk drop is irrelevant to your Special attacks.)
+        ENEMY_MOVESET_OVERRIDE: [MoveId.GROWL],
+      });
+      return [
+        makeStarter(SpeciesId.BLASTOISE, {
+          moveset: [MoveId.HYDRO_PUMP, MoveId.SURF, MoveId.WATER_GUN, MoveId.WHIRLPOOL],
+        }),
+      ];
+    },
+    // Max the fast foe's Defenses so it survives many Water hits and the 2-turn
+    // move-order flip is observable across several turns.
+    onBattleStart: () => {
+      boostEnemy([
+        [Stat.DEF, 6],
+        [Stat.SPDEF, 6],
+      ]);
+    },
+  },
+  // ===========================================================================
+  // Combat — Hydrate turns Normal moves into Water (+ Water STAB / drench)
+  // ===========================================================================
+  {
+    label: "Hydrate: Normal moves become Water-type",
+    description:
+      "ER Hydrate ability (id 315): 'Changes the user's Normal-type moves to Water-\n"
+      + "type. If the user is Water-type its Water-type moves have a 10% chance to\n"
+      + "drench, otherwise it gains Water STAB.' Your Snorlax has Hydrate forced\n"
+      + "active and is NOT Water-type, so it takes the Water-STAB branch. DO: use\n"
+      + "Body Slam (a Normal move) on the Fire-type Arcanine. EXPECT: 'It's super\n"
+      + "effective!' - Normal is neutral vs Fire, but Hydrate retyped Body Slam to\n"
+      + "Water, so it hits for x2 AND gets Water STAB. (A Water-type Hydrate user\n"
+      + "would instead have a 10% chance to drench with its Water moves.)",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 60,
+        // Snorlax is Normal (not Water) -> the STAB branch, and its innates don't
+        // matter because we force Hydrate as the ACTIVE ability.
+        ABILITY_OVERRIDE: erAbility(ErAbilityId.HYDRATE),
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.ARCANINE, // pure Fire -> Water is super effective
+        ENEMY_LEVEL_OVERRIDE: 60,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+      });
+      return [
+        makeStarter(SpeciesId.SNORLAX, {
+          moveset: [MoveId.BODY_SLAM, MoveId.HYPER_BEAM, MoveId.SURF, MoveId.REST],
+        }),
+      ];
+    },
+  },
+  // ===========================================================================
+  // Combat — ENRAGE makes the foe take 33% recoil on its attacks (until switch)
+  // ===========================================================================
+  {
+    label: "Enrage: Swagger makes the foe hurt itself with recoil",
+    description:
+      "ER ENRAGE status. Swagger (and Flatter/Incite, Berserk DNA) ENRAGE the\n"
+      + "target instead of confusing it: an enraged Pokemon takes 33% of the damage\n"
+      + "it deals with its moves as RECOIL, is affected by Reckless (+20% power),\n"
+      + "and stays enraged until it switches out. DO: use Swagger on the foe (it may\n"
+      + "miss - retry until it lands), then let the foe attack you. EXPECT: 'Foe\n"
+      + "Ursaring became enraged!' and its Attack sharply rises; then each time it\n"
+      + "attacks you see 'is hurt by its rage!' as it takes 33% recoil. Your Snorlax\n"
+      + "is bulky enough to tank the boosted hits. (Rock Head / Steel Barrel / Brute\n"
+      + "Force foes are immune to the enrage recoil.)",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 60,
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.URSARING, // strong physical attacker -> visible recoil
+        ENEMY_LEVEL_OVERRIDE: 60,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.BODY_SLAM],
+      });
+      return [
+        makeStarter(SpeciesId.SNORLAX, {
+          moveset: [MoveId.SWAGGER, MoveId.REST, MoveId.BODY_SLAM, MoveId.PROTECT],
+        }),
+      ];
+    },
+  },
+  // ===========================================================================
   // Multi-format — TRIPLE leads keep their slots across a wave (no vanishing lead)
   // ===========================================================================
   {
@@ -1515,6 +1620,113 @@ export const DEV_SCENARIOS: DevScenario[] = [
       return [
         makeStarter(SpeciesId.SNORLAX, {
           moveset: [MoveId.BODY_SLAM, MoveId.CRUNCH, MoveId.EARTHQUAKE, MoveId.REST],
+        }),
+      ];
+    },
+  },
+  // ===========================================================================
+  // ER ability fixes — Flammable Coat / Parasitic Spores / Old Mariner / Loose Thorns
+  // ===========================================================================
+  {
+    label: "Flammable Coat: Lumbering Sloth -> Engulfed on fire",
+    description:
+      "ER Flammable Coat (669): 'Transforms Lumbering Sloth into its Engulfed form when\n"
+      + "hit by Fire-type moves or when using Fire-type moves.' Your Lumbering Sloth has\n"
+      + "Flammable Coat + Ember; the enemy Snorlax uses Ember.\n"
+      + "DO: turn 1 use EMBER (or just let Snorlax's Ember hit you). EXPECT: Lumbering Sloth\n"
+      + "transforms into its ENGULFED form (sprite + stats change) and STAYS engulfed - it\n"
+      + "is a one-way change. Using a non-Fire move never transforms it.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_WAVE_OVERRIDE: 5,
+        STARTING_LEVEL_OVERRIDE: 50,
+        ABILITY_OVERRIDE: erAbility(ErAbilityId.FLAMMABLE_COAT),
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.SNORLAX,
+        ENEMY_LEVEL_OVERRIDE: 60,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.EMBER],
+      });
+      return [
+        makeStarter(erSpecies(ErSpeciesId.LUMBERING_SLOTH), {
+          moveset: [MoveId.EMBER, MoveId.TACKLE, MoveId.PROTECT, MoveId.REST],
+        }),
+      ];
+    },
+  },
+  {
+    label: "Parasitic Spores: spread on contact + 1/8 chip",
+    description:
+      "ER Parasitic Spores (609, Parasect): 'Each turn, affected Pokemon lose 1/8 max HP\n"
+      + "(Ghost immune). When using contact moves, spread spores to the target. Spores\n"
+      + "persist until switch-out.' Your Parasect has Parasitic Spores + Tackle (contact).\n"
+      + "DO: TACKLE the Snorlax. EXPECT: Snorlax is now infected and loses 1/8 HP EACH turn\n"
+      + "(on top of the field aura) and keeps bleeding HP even if you stop attacking. A\n"
+      + "Ghost-type target (swap the enemy) is IMMUNE and never gets the spores.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_WAVE_OVERRIDE: 5,
+        STARTING_LEVEL_OVERRIDE: 50,
+        ABILITY_OVERRIDE: erAbility(ErAbilityId.PARASITIC_SPORES),
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.SNORLAX,
+        ENEMY_LEVEL_OVERRIDE: 60,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+      });
+      return [
+        makeStarter(SpeciesId.PARASECT, {
+          moveset: [MoveId.TACKLE, MoveId.SCRATCH, MoveId.PROTECT, MoveId.SPORE],
+        }),
+      ];
+    },
+  },
+  {
+    label: "Loose Thorns: Creeping Thorns hazard on contact",
+    description:
+      "ER Loose Thorns (909): 'Sets Creeping Thorns when hit by contact.' Creeping Thorns\n"
+      + "is an entry hazard that BOTH damages a grounded switch-in AND makes it BLEED. Your\n"
+      + "Snorlax has Loose Thorns; the enemy is a trainer whose lead uses TACKLE (contact).\n"
+      + "DO: let the foe TACKLE you (Creeping Thorns deploys on the FOE's side), KO the lead\n"
+      + "so the trainer's next mon switches in. EXPECT: the incoming foe takes hazard damage\n"
+      + "AND starts bleeding (ER_BLEED chip each turn). A Rock/Ghost switch-in does not bleed.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_WAVE_OVERRIDE: 5,
+        STARTING_LEVEL_OVERRIDE: 80,
+        ABILITY_OVERRIDE: erAbility(ErAbilityId.LOOSE_THORNS),
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.MIGHTYENA,
+        ENEMY_LEVEL_OVERRIDE: 15,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.TACKLE],
+      });
+      return [
+        makeStarter(SpeciesId.SNORLAX, {
+          moveset: [MoveId.BODY_SLAM, MoveId.CRUNCH, MoveId.EARTHQUAKE, MoveId.REST],
+        }),
+      ];
+    },
+  },
+  {
+    label: "Old Mariner: Water STAB (drench immunity is a marker)",
+    description:
+      "ER Old Mariner (620, Dreadnaut): Seaweed (half Fire dmg + 2x vs Fire with Grass\n"
+      + "moves while Grass-type) + Water STAB regardless of typing + 'immunity to being\n"
+      + "drenched'. Your Dreadnaut has Old Mariner + Surf. DO: use SURF. EXPECT: Surf gets\n"
+      + "the 1.5x STAB boost even though Dreadnaut is not Water-type.\n"
+      + "NOTE: DRENCH is not yet implemented engine-wide (no move applies it), so the drench\n"
+      + "immunity is a correct-by-construction MARKER - nothing to observe in-battle yet.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_WAVE_OVERRIDE: 5,
+        STARTING_LEVEL_OVERRIDE: 60,
+        ABILITY_OVERRIDE: erAbility(ErAbilityId.OLD_MARINER),
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.SNORLAX,
+        ENEMY_LEVEL_OVERRIDE: 60,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+      });
+      return [
+        makeStarter(erSpecies(ErSpeciesId.DREADNAUT), {
+          moveset: [MoveId.SURF, MoveId.LEAF_BLADE, MoveId.FLAMETHROWER, MoveId.PROTECT],
         }),
       ];
     },
@@ -11749,6 +11961,465 @@ export const DEV_SCENARIOS: DevScenario[] = [
           moveset: [MoveId.METEOR_BEAM, MoveId.POWER_GEM, MoveId.FLASH_CANNON, MoveId.EARTH_POWER],
         }),
       ];
+    },
+  },
+  // ===========================================================================
+  // ER ABILITY AUDIT FIXES (2026 dex-faithfulness pass) — one scenario per fix.
+  // ===========================================================================
+  {
+    label: "Ability: Heat Sink boosts the HIGHEST attacking stat",
+    description:
+      "ER 2.65: Heat Sink 'Draws in Fire moves, absorbs them, and boosts the highest\n"
+      + "attacking stat by one stage.' Regice has SpAtk 100 > Atk 50, so the boost must\n"
+      + "go to SP. ATTACK. Reported: it always boosted Attack (the wrong stat on Regice).\n"
+      + "Your Regice has Heat Sink; the foe spams Ember.\n"
+      + "DO: use SPLASH and let the foe's EMBER hit you.\n"
+      + "EXPECT: the Ember is ABSORBED (no damage) and Regice's SP. ATTACK rises +1 (open\n"
+      + "the summary to read the arrows). Attack stays at +0.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_WAVE_OVERRIDE: 145,
+        STARTING_LEVEL_OVERRIDE: 100,
+        ABILITY_OVERRIDE: erAbility(ErAbilityId.HEAT_SINK),
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.SNORLAX,
+        ENEMY_LEVEL_OVERRIDE: 100,
+        ENEMY_ABILITY_OVERRIDE: AbilityId.BALL_FETCH,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.EMBER],
+      });
+      return [
+        makeStarter(SpeciesId.REGICE, {
+          moveset: [MoveId.SPLASH, MoveId.ICE_BEAM, MoveId.THUNDERBOLT, MoveId.REST],
+        }),
+      ];
+    },
+  },
+  {
+    label: "Ability: Last Stand scales Def/SpDef with missing HP",
+    description:
+      "ER 2.65: Last Stand 'Defense and Special Defense increase LINEARLY as HP drops -\n"
+      + "1.0x at full HP up to 1.6x at 0% (1.3x at 50%, 1.45x at 25%).' Reported: it was a\n"
+      + "flat single tier (no boost above 50%, a hard 1.6x below). Your Regirock has Last\n"
+      + "Stand; the foe chips you with Body Slam.\n"
+      + "DO: let the foe whittle your Regirock DOWN over several turns (use Splash / a weak\n"
+      + "move). Note how much each Body Slam takes as your HP falls.\n"
+      + "EXPECT: physical hits do LESS % damage the lower your HP gets - the bulk climbs\n"
+      + "smoothly, not in one jump at 50%. At ~half HP it is noticeably tankier; near\n"
+      + "death it is at its toughest.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_WAVE_OVERRIDE: 145,
+        STARTING_LEVEL_OVERRIDE: 100,
+        ABILITY_OVERRIDE: erAbility(ErAbilityId.LAST_STAND),
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.SNORLAX,
+        ENEMY_LEVEL_OVERRIDE: 100,
+        ENEMY_ABILITY_OVERRIDE: AbilityId.BALL_FETCH,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.BODY_SLAM],
+      });
+      return [
+        makeStarter(SpeciesId.REGIROCK, {
+          moveset: [MoveId.SPLASH, MoveId.STONE_EDGE, MoveId.EARTHQUAKE, MoveId.REST],
+        }),
+      ];
+    },
+  },
+  {
+    label: "Ability: Snow Song boosts ALL sound moves (+ Normal->Ice)",
+    description:
+      "ER 2.65: Snow Song 'Boosts the power of ALL sound-based moves by 20% and converts\n"
+      + "Normal-type sound moves to Ice.' Reported: the 1.2x only applied to the Normal\n"
+      + "sound moves (the ones being converted), not every sound move. Your Exploud has\n"
+      + "Snow Song and both a Normal sound move (Hyper Voice) and a non-Normal sound move\n"
+      + "(Overdrive, Electric).\n"
+      + "DO: use HYPER VOICE (turns Ice, super-effective on the Dragonite) then OVERDRIVE.\n"
+      + "EXPECT: BOTH sound moves hit ~20% harder than their raw power; Hyper Voice reads\n"
+      + "as ICE (super effective vs Dragonite). A non-sound move (Stomping Tantrum) gets\n"
+      + "no bonus - compare.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_WAVE_OVERRIDE: 145,
+        STARTING_LEVEL_OVERRIDE: 100,
+        ABILITY_OVERRIDE: erAbility(ErAbilityId.SNOW_SONG),
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.DRAGONITE,
+        ENEMY_LEVEL_OVERRIDE: 100,
+        ENEMY_ABILITY_OVERRIDE: AbilityId.BALL_FETCH,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+      });
+      return [
+        makeStarter(SpeciesId.EXPLOUD, {
+          moveset: [MoveId.HYPER_VOICE, MoveId.OVERDRIVE, MoveId.STOMPING_TANTRUM, MoveId.REST],
+        }),
+      ];
+    },
+  },
+  {
+    label: "Ability: Beautiful Music infatuates IGNORING gender",
+    description:
+      "ER 2.65: Beautiful Music 'Sound moves have a 50% chance to infatuate targets on\n"
+      + "hit, IGNORING gender (cutting their Atk and SpAtk in half).' Reported: it used\n"
+      + "vanilla infatuation, which needs the OPPOSITE gender - so a genderless or\n"
+      + "same-gender foe could never be infatuated. Your Exploud has Beautiful Music; the\n"
+      + "foe is a GENDERLESS Metagross.\n"
+      + "DO: use HYPER VOICE (a sound move) repeatedly (~50% per hit).\n"
+      + "EXPECT: within a few hits Metagross becomes INFATUATED despite being genderless,\n"
+      + "and its Attack/Sp.Atk are halved while infatuated (it hits much softer). Before\n"
+      + "the fix a genderless foe was never infatuated.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_WAVE_OVERRIDE: 145,
+        STARTING_LEVEL_OVERRIDE: 100,
+        ABILITY_OVERRIDE: erAbility(ErAbilityId.BEAUTIFUL_MUSIC),
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.METAGROSS,
+        ENEMY_LEVEL_OVERRIDE: 100,
+        ENEMY_ABILITY_OVERRIDE: AbilityId.BALL_FETCH,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+      });
+      return [
+        makeStarter(SpeciesId.EXPLOUD, {
+          moveset: [MoveId.HYPER_VOICE, MoveId.ECHOED_VOICE, MoveId.REST, MoveId.PROTECT],
+        }),
+      ];
+    },
+  },
+  {
+    label: "Ability: Denting Blows drops Def only on a connecting hammer",
+    description:
+      "ER 2.65: Denting Blows 'Lowers the target's Defense by one stage when HITTING with\n"
+      + "Hammer attacks, once per target per turn, after damage.' Reported: it queued the\n"
+      + "drop even on a MISS/immune target and had no once-per-turn lock. Your Conkeldurr\n"
+      + "has Denting Blows + Wood Hammer (a Hammer move) and Superpower (NOT a hammer).\n"
+      + "DO: use WOOD HAMMER on the foe (it connects). Then, on another try, use SUPERPOWER.\n"
+      + "EXPECT: WOOD HAMMER lowers the foe's Defense by exactly 1 (after the damage);\n"
+      + "SUPERPOWER does NOT (it is not a hammer move). A hammer move that MISSES leaves\n"
+      + "Defense unchanged.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_WAVE_OVERRIDE: 145,
+        STARTING_LEVEL_OVERRIDE: 100,
+        ABILITY_OVERRIDE: erAbility(ErAbilityId.DENTING_BLOWS),
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.SNORLAX,
+        ENEMY_LEVEL_OVERRIDE: 100,
+        ENEMY_ABILITY_OVERRIDE: AbilityId.BALL_FETCH,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+      });
+      return [
+        makeStarter(SpeciesId.CONKELDURR, {
+          moveset: [MoveId.WOOD_HAMMER, MoveId.SUPERPOWER, MoveId.MACH_PUNCH, MoveId.REST],
+        }),
+      ];
+    },
+  },
+  {
+    label: "Ability: From the Shadows traps when moving first",
+    description:
+      "ER 2.65: From the Shadows 'When the user moves FIRST, attacks trap the target and\n"
+      + "gain a 20% flinch chance (flinch only on the first hit of a multihit; the trap\n"
+      + "applies regardless).' Reported: the flinch/trap were gated to the LAST hit\n"
+      + "(inverted). Your fast Jolteon has From the Shadows.\n"
+      + "DO: use QUICK ATTACK / any attack while you outspeed the foe.\n"
+      + "EXPECT: on the hit the foe becomes TRAPPED (cannot switch/flee) every time you\n"
+      + "move first, and sometimes flinches. Trapping does NOT wait for a last hit.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_WAVE_OVERRIDE: 145,
+        STARTING_LEVEL_OVERRIDE: 100,
+        ABILITY_OVERRIDE: erAbility(ErAbilityId.FROM_THE_SHADOWS),
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.SNORLAX,
+        ENEMY_LEVEL_OVERRIDE: 100,
+        ENEMY_ABILITY_OVERRIDE: AbilityId.BALL_FETCH,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+      });
+      return [
+        makeStarter(SpeciesId.JOLTEON, {
+          moveset: [MoveId.QUICK_ATTACK, MoveId.THUNDERBOLT, MoveId.SHADOW_BALL, MoveId.REST],
+        }),
+      ];
+    },
+  },
+  {
+    label: "Ability: Strategic Pause +30% power (not 50%) when moving last",
+    description:
+      "ER 2.65: Strategic Pause 'When the user moves AFTER the target, boosts crit ratio\n"
+      + "by 2 stages AND attack power by 30%.' Reported: the crit was right but the power\n"
+      + "boost was 1.5x (+50%). Your SLOW Snorlax has Strategic Pause and moves last.\n"
+      + "DO: use BODY SLAM on the foe (you move after it).\n"
+      + "EXPECT: your move lands with a boosted crit chance and roughly +30% power (not\n"
+      + "+50%). If you move FIRST (foe slower) there is no bonus.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_WAVE_OVERRIDE: 145,
+        STARTING_LEVEL_OVERRIDE: 100,
+        ABILITY_OVERRIDE: erAbility(ErAbilityId.STRATEGIC_PAUSE),
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.JOLTEON,
+        ENEMY_LEVEL_OVERRIDE: 100,
+        ENEMY_ABILITY_OVERRIDE: AbilityId.BALL_FETCH,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+      });
+      return [
+        makeStarter(SpeciesId.SNORLAX, {
+          moveset: [MoveId.BODY_SLAM, MoveId.EARTHQUAKE, MoveId.CRUNCH, MoveId.REST],
+        }),
+      ];
+    },
+  },
+  {
+    label: "Ability: Tentalock traps for 6 turns (not 4-5)",
+    description:
+      "ER 2.65: Tentalock 'Grappler + gives attacks a 50% chance to trap the target for\n"
+      + "6 TURNS (1/6 max HP per turn), then drops their Speed each turn.' Reported: the\n"
+      + "trap PROC only lasted 4-5 turns (Serpent Bind's value) because Grappler's 6-turn\n"
+      + "extension didn't reach this proc. Your Tentacruel has Tentalock.\n"
+      + "DO: attack the bulky foe until the 50% trap procs (Scald/Sludge Bomb).\n"
+      + "EXPECT: once trapped the counter reads SIX turns of bind (1/6 HP each turn) and\n"
+      + "the foe's Speed drops each turn it stays in.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_WAVE_OVERRIDE: 145,
+        STARTING_LEVEL_OVERRIDE: 100,
+        ABILITY_OVERRIDE: erAbility(ErAbilityId.TENTALOCK),
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.SNORLAX,
+        ENEMY_LEVEL_OVERRIDE: 100,
+        ENEMY_ABILITY_OVERRIDE: AbilityId.BALL_FETCH,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+      });
+      return [
+        makeStarter(SpeciesId.TENTACRUEL, {
+          moveset: [MoveId.SLUDGE_BOMB, MoveId.SCALD, MoveId.SLUDGE_WAVE, MoveId.REST],
+        }),
+      ];
+    },
+  },
+  {
+    label: "Ability: Faraday Cage counters with a 50 BP Thunder Cage",
+    description:
+      "ER 2.65: Faraday Cage 'Uses Thunder Cage when hit by CONTACT moves - a 50 BP\n"
+      + "Electric special move that traps the foe.' Reported: it cast Thunder Cage at its\n"
+      + "natural 80 BP (too strong). Your Chesnaught has Faraday Cage; the foe makes\n"
+      + "contact with Body Slam.\n"
+      + "DO: use PROTECT-then-Splash / just tank the foe's BODY SLAM (a contact move).\n"
+      + "EXPECT: on being hit you retaliate with THUNDER CAGE that traps the foe, dealt at\n"
+      + "the reduced 50 BP (weaker than a full-power Thunder Cage). A NON-contact hit does\n"
+      + "not trigger it.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_WAVE_OVERRIDE: 145,
+        STARTING_LEVEL_OVERRIDE: 100,
+        ABILITY_OVERRIDE: erAbility(ErAbilityId.FARADAY_CAGE),
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.SNORLAX,
+        ENEMY_LEVEL_OVERRIDE: 100,
+        ENEMY_ABILITY_OVERRIDE: AbilityId.BALL_FETCH,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.BODY_SLAM],
+      });
+      return [
+        makeStarter(SpeciesId.CHESNAUGHT, {
+          moveset: [MoveId.SPLASH, MoveId.SPIKY_SHIELD, MoveId.WOOD_HAMMER, MoveId.REST],
+        }),
+      ];
+    },
+  },
+  {
+    label: "Ability: Steel Beetle - Normal moves become Bug with STAB",
+    description:
+      "ER 2.65: Steel Beetle 'Normal-type moves become Bug-type and GAIN STAB' (a real\n"
+      + "+0.5, i.e. 1.5x). Reported: the wire gave a flat 1.2x, and since Iron Heart is\n"
+      + "Ghost/Rock (no natural Bug STAB) that undershot the intended 1.5x. Your Golem\n"
+      + "(stand-in) has Steel Beetle forced.\n"
+      + "DO: use a Normal move (BODY SLAM) on the foe.\n"
+      + "EXPECT: the move resolves as BUG-type and hits ~1.5x harder than its raw power\n"
+      + "(full STAB), super-effective vs the Grass/Dark Cacturne.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_WAVE_OVERRIDE: 145,
+        STARTING_LEVEL_OVERRIDE: 100,
+        ABILITY_OVERRIDE: erAbility(ErAbilityId.STEEL_BEETLE),
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.CACTURNE,
+        ENEMY_LEVEL_OVERRIDE: 100,
+        ENEMY_ABILITY_OVERRIDE: AbilityId.BALL_FETCH,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+      });
+      return [
+        makeStarter(SpeciesId.GOLEM, {
+          moveset: [MoveId.BODY_SLAM, MoveId.EARTHQUAKE, MoveId.ROCK_SLIDE, MoveId.REST],
+        }),
+      ];
+    },
+  },
+  {
+    label: "Ability: Blind Rage does NOT bypass Grass Pelt (base-stat)",
+    description:
+      "ER 2.65: Blind Rage 'Scrappy + Mold Breaker, but does NOT bypass abilities that\n"
+      + "modify base stats such as Grass Pelt.' Reported: its Mold Breaker suppressed\n"
+      + "base-stat abilities too. Your Bewear has Blind Rage; the foe has GRASS PELT and\n"
+      + "the terrain is GRASSY (so Grass Pelt gives +50% Def).\n"
+      + "DO: hit the foe with a physical move (HAMMER ARM).\n"
+      + "EXPECT: the foe still takes REDUCED physical damage - Grass Pelt's Def boost is\n"
+      + "preserved (Blind Rage does not strip it). Ghost foes still take neutral Normal/\n"
+      + "Fighting (Scrappy) and immunity/damage-reduction abilities are still bypassed.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_WAVE_OVERRIDE: 145,
+        STARTING_LEVEL_OVERRIDE: 100,
+        ABILITY_OVERRIDE: erAbility(ErAbilityId.BLIND_RAGE),
+        STARTING_TERRAIN_OVERRIDE: TerrainType.GRASSY,
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.SNORLAX,
+        ENEMY_LEVEL_OVERRIDE: 100,
+        ENEMY_ABILITY_OVERRIDE: AbilityId.GRASS_PELT,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+      });
+      return [
+        makeStarter(SpeciesId.BEWEAR, {
+          moveset: [MoveId.HAMMER_ARM, MoveId.DOUBLE_EDGE, MoveId.EARTHQUAKE, MoveId.REST],
+        }),
+      ];
+    },
+  },
+  {
+    label: "Ability: Dreamscape doubles power when ANY mon is asleep",
+    description:
+      "ER 2.65: Dreamscape (Dreamcatcher) 'Doubles the power of moves when ANY active\n"
+      + "Pokemon is asleep (user/ally/opponent), + 20% more damage.' Reported: the 2x was\n"
+      + "gated on the TARGET being asleep only. Your Musharna has Dreamscape; the foe is\n"
+      + "put to sleep.\n"
+      + "DO: the foe starts ASLEEP - use PSYCHIC on it, then let it wake and compare.\n"
+      + "EXPECT: while ANY mon on the field is asleep your moves hit for DOUBLE power (plus\n"
+      + "the flat +20%). Note Comatose does NOT count as asleep for this.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_WAVE_OVERRIDE: 145,
+        STARTING_LEVEL_OVERRIDE: 100,
+        ABILITY_OVERRIDE: erAbility(ErAbilityId.DREAMSCAPE),
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.SNORLAX,
+        ENEMY_LEVEL_OVERRIDE: 100,
+        ENEMY_ABILITY_OVERRIDE: AbilityId.BALL_FETCH,
+        ENEMY_STATUS_OVERRIDE: StatusEffect.SLEEP,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+      });
+      return [
+        makeStarter(SpeciesId.MUSHARNA, {
+          moveset: [MoveId.PSYCHIC, MoveId.DAZZLING_GLEAM, MoveId.SHADOW_BALL, MoveId.REST],
+        }),
+      ];
+    },
+  },
+  // ===========================================================================
+  // Move - Trepidation: the foe's Psychic moves miss for 3 turns
+  // ===========================================================================
+  {
+    label: "Move: Trepidation seals the foe's Psychic moves (3 turns)",
+    description:
+      "ER 2.65 dex - Trepidation: 'The foe falls into despair. All Psychic-type moves\n"
+      + "they use miss for 3 turns.' It is a damaging move (small body), then applies the\n"
+      + "despair seal. The foe here is an Alakazam whose ONLY attacking move is Psychic\n"
+      + "(plus a non-Psychic Shadow Ball as a control).\n"
+      + "DO: use TREPIDATION on the Alakazam so it connects (retry if it misses - 90 acc).\n"
+      + "Then let it attack for the next few turns.\n"
+      + "EXPECT: 'Alakazam fell into despair!'. For the next 3 turns EVERY Psychic move it\n"
+      + "uses MISSES (no damage to you), while its non-Psychic Shadow Ball still HITS. After\n"
+      + "3 turns the despair wears off and its Psychic moves land again. (Before the fix\n"
+      + "Trepidation was a plain flinch proxy and Psychic moves connected normally.)",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_WAVE_OVERRIDE: 1,
+        STARTING_LEVEL_OVERRIDE: 100,
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.ALAKAZAM,
+        ENEMY_LEVEL_OVERRIDE: 60,
+        ENEMY_ABILITY_OVERRIDE: AbilityId.BALL_FETCH,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.PSYCHIC, MoveId.SHADOW_BALL],
+      });
+      return [
+        makeStarter(SpeciesId.SNORLAX, {
+          moveset: [erMove(ErMoveId.TREPIDATION), MoveId.BODY_SLAM, MoveId.REST, MoveId.CRUNCH],
+        }),
+      ];
+    },
+  },
+  // ===========================================================================
+  // Move - Spectral Flame: burns Fire types + suppresses abilities in fog
+  // ===========================================================================
+  {
+    label: "Move: Spectral Flame burns a Fire type (+ ability-suppress in fog)",
+    description:
+      "ER 2.65 dex - Spectral Flame: 'Burns the target, including Fire types. Suppresses\n"
+      + "abilities in fog.' The foe is a Fire-type Arcanine (normally immune to burn).\n"
+      + "DO: use SPECTRAL FLAME on the Arcanine (retry if it misses - 85 acc). Then set the\n"
+      + "field to fog with EERIE FOG and use SPECTRAL FLAME again.\n"
+      + "EXPECT: the Fire-type Arcanine IS burned by Spectral Flame (its HP chips each turn),\n"
+      + "even though a normal Will-O-Wisp would say 'it doesn't affect Arcanine'. In FOG, a\n"
+      + "Spectral Flame hit ALSO suppresses the target's ability (Intimidate/Flash Fire etc.\n"
+      + "stops working). Outside fog only the burn applies. (Before the fix Spectral Flame\n"
+      + "was a plain burn that Fire types shrugged off, with no fog suppression.)",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_WAVE_OVERRIDE: 1,
+        STARTING_LEVEL_OVERRIDE: 100,
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.ARCANINE,
+        ENEMY_LEVEL_OVERRIDE: 100,
+        ENEMY_ABILITY_OVERRIDE: AbilityId.INTIMIDATE,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+      });
+      return [
+        makeStarter(SpeciesId.GENGAR, {
+          moveset: [erMove(ErMoveId.SPECTRAL_FLAME), erMove(ErMoveId.EERIE_FOG), MoveId.SHADOW_BALL, MoveId.PROTECT],
+        }),
+      ];
+    },
+  },
+  // ===========================================================================
+  // Move - Fetch: retrieves the user's consumed berry, then switches out
+  // ===========================================================================
+  {
+    label: "Move: Fetch retrieves the eaten berry and switches out",
+    description:
+      "ER 2.65 dex - Fetch: 'The user retrieves its lost item and switches to an ally.' In\n"
+      + "this engine the only 'lost item' tracked is a CONSUMED BERRY, so Fetch restores the\n"
+      + "user's most-recently eaten berry as a held item, then self-switches. The Snorlax\n"
+      + "holds a Sitrus Berry and starts at ~30% HP so it eats the berry on the first hit.\n"
+      + "DO: let the foe (or your own chip) trigger the Sitrus Berry so it is eaten (HP jumps\n"
+      + "up, berry consumed). Then use FETCH.\n"
+      + "EXPECT: 'Snorlax got its <Sitrus Berry> back!' - the eaten berry returns as a held\n"
+      + "item, and Snorlax switches out to Munchlax. Open Check Team to confirm the Sitrus\n"
+      + "Berry is on Snorlax again. (Before the fix Fetch only switched and never returned\n"
+      + "the item.)",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_WAVE_OVERRIDE: 1,
+        STARTING_LEVEL_OVERRIDE: 50,
+        STARTING_HELD_ITEMS_OVERRIDE: [{ name: "BERRY", type: BerryType.SITRUS }],
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.MAGIKARP,
+        ENEMY_LEVEL_OVERRIDE: 40,
+        ENEMY_ABILITY_OVERRIDE: AbilityId.BALL_FETCH,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.TACKLE],
+      });
+      return [
+        makeStarter(SpeciesId.SNORLAX, {
+          moveset: [erMove(ErMoveId.FETCH), MoveId.BODY_SLAM, MoveId.REST, MoveId.CRUNCH],
+        }),
+        makeStarter(SpeciesId.MUNCHLAX, {
+          moveset: [MoveId.BODY_SLAM, MoveId.REST, MoveId.CRUNCH, MoveId.TACKLE],
+        }),
+      ];
+    },
+    onBattleStart: () => {
+      // Start the lead at ~30% HP so its Sitrus Berry (50% threshold) fires on the
+      // first hit - then Fetch has a consumed berry to retrieve.
+      const lead = globalScene.getPlayerPokemon();
+      if (lead) {
+        lead.hp = Math.max(1, Math.floor(lead.getMaxHp() * 0.3));
+      }
     },
   },
 ];

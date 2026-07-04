@@ -25,7 +25,7 @@ import {
 } from "#data/weather";
 import { AbilityId } from "#enums/ability-id";
 import { ArenaTagSide } from "#enums/arena-tag-side";
-import type { ArenaTagType } from "#enums/arena-tag-type";
+import { ArenaTagType } from "#enums/arena-tag-type";
 import type { BattlerIndex } from "#enums/battler-index";
 import { BiomeId } from "#enums/biome-id";
 import { BiomePoolTier } from "#enums/biome-pool-tier";
@@ -188,7 +188,33 @@ export class Arena {
     return this.weather?.weatherType ?? WeatherType.NONE;
   }
 
+  /**
+   * ER Clueless: `true` when an active field Pokemon negates field effects
+   * (Terrain / Rooms / Gravity) via {@linkcode SuppressFieldEffectsAbAttr}. The
+   * effects still EXIST (their tags/terrain stay set) and resume when the
+   * suppressor leaves — this only gates their application, mirroring how
+   * {@linkcode SuppressWeatherEffectAbAttr} (Cloud Nine) negates weather.
+   */
+  public isFieldEffectSuppressed(): boolean {
+    return globalScene
+      .getField(true)
+      .some(p => p.hasAbilityWithAttr("SuppressFieldEffectsAbAttr") && !p.summonData.abilitySuppressed);
+  }
+
+  /**
+   * Whether Gravity is active AND its effect is not negated by ER Clueless. Use
+   * this at Gravity EFFECT sites (grounding, accuracy, Gravity-flag moves), not
+   * for management (the tag itself stays set while suppressed).
+   */
+  public hasActiveGravity(): boolean {
+    return this.hasTag(ArenaTagType.GRAVITY) && !this.isFieldEffectSuppressed();
+  }
+
   public get terrainType(): TerrainType {
+    // Negated by ER Clueless while it is on the field (terrain object stays set).
+    if (this.isFieldEffectSuppressed()) {
+      return TerrainType.NONE;
+    }
     return this.terrain?.terrainType ?? TerrainType.NONE;
   }
 
@@ -354,6 +380,11 @@ export class Arena {
 
   /** @returns Whether or not the weather can be changed to the specified weather */
   public canSetWeather(weather: WeatherType): boolean {
+    // ER Clear Skies: while the weather-lock tag is up, no NEW weather can be set
+    // (clearing to NONE is still allowed so the lock and the clear can coexist).
+    if (weather !== WeatherType.NONE && this.getTag(ArenaTagType.ER_WEATHER_LOCK) != null) {
+      return false;
+    }
     return this.weatherType !== weather;
   }
 

@@ -379,6 +379,38 @@ export class ErSmokescreenTag extends SerializableArenaTag {
 }
 
 /**
+ * ER Clear Skies weather-lock: while present, no new weather can be set (checked
+ * in {@linkcode Arena.canSetWeather}). Purely a presence flag with no per-turn
+ * effect; lasts 5 turns and does not block clearing to NONE. Field-wide.
+ */
+export class ErWeatherLockTag extends SerializableArenaTag {
+  readonly tagType = ArenaTagType.ER_WEATHER_LOCK;
+  constructor(turnCount: number, sourceId: number | undefined, side: ArenaTagSide = ArenaTagSide.BOTH) {
+    super(turnCount, undefined, sourceId, side);
+  }
+
+  protected override get onAddMessageKey(): string {
+    return "";
+  }
+
+  protected override get onRemoveMessageKey(): string {
+    return "";
+  }
+
+  override onAdd(quiet = false): void {
+    if (!quiet) {
+      globalScene.phaseManager.queueMessage("The sky settled into a clear calm; no weather can take hold!");
+    }
+  }
+
+  override onRemove(quiet = false): void {
+    if (!quiet) {
+      globalScene.phaseManager.queueMessage("The clear calm over the field faded.");
+    }
+  }
+}
+
+/**
  * Reduces the damage of specific move categories in the arena.
  */
 export abstract class WeakenMoveScreenTag extends SerializableArenaTag {
@@ -966,6 +998,57 @@ class SpikesTag extends DamagingTrapTag {
 }
 
 /**
+ * Elite Redux — Creeping Thorns. A Spikes-style entry hazard that, in addition
+ * to the layer-based switch-in damage ({@linkcode SpikesTag}'s 1/8, 1/6, 1/4
+ * ratio), inflicts {@linkcode BattlerTagType.ER_BLEED} on the grounded
+ * switch-in. Deployed by the Loose Thorns ability (909) when hit by contact and
+ * by the Creeping Thorns / Caltrops moves.
+ *
+ * The bleed is applied AFTER the switch-in damage, and only when the damage
+ * actually landed (a Magic Guard mon shrugs off both the chip and — since the
+ * bleed's own per-turn tick is likewise Magic-Guard-blocked — the bleed).
+ * {@linkcode ErBleedTag.canAdd} already gates Rock/Ghost immunity and the
+ * ER-major-status exclusivity, so no extra guard is needed here.
+ */
+class CreepingThornsTag extends DamagingTrapTag {
+  public readonly tagType = ArenaTagType.CREEPING_THORNS;
+  override get maxLayers() {
+    return 3 as const;
+  }
+
+  constructor(sourceId: number | undefined, side: ArenaTagSide) {
+    // Not a vanilla move-based hazard; suppress the add/remove/trigger move-name
+    // dependency by sourcing from MoveId.NONE. Custom i18n keys below.
+    super(MoveId.NONE, sourceId, side);
+  }
+
+  protected override get onAddMessageKey(): string {
+    return "arenaTag:creepingThornsOnAdd" + this.i18nSideKey;
+  }
+
+  protected override get onRemoveMessageKey(): string {
+    return "arenaTag:creepingThornsOnRemove" + this.i18nSideKey;
+  }
+
+  protected override get triggerMessageKey(): string {
+    return "arenaTag:creepingThornsActivateTrap";
+  }
+
+  protected override getDamageHpRatio(_pokemon: Pokemon): number {
+    // Mirror Spikes: 1/8 for 1 layer, 1/6 for 2, 1/4 for 3.
+    return 1 / (10 - 2 * this.layers);
+  }
+
+  override activateTrap(simulated: boolean, pokemon: Pokemon): boolean {
+    const applied = super.activateTrap(simulated, pokemon);
+    if (!simulated && applied) {
+      pokemon.addTag(BattlerTagType.ER_BLEED, undefined, undefined, this.sourceId ?? undefined);
+    }
+    return applied;
+  }
+}
+
+/**
  * Arena Tag class for {@link https://bulbapedia.bulbagarden.net/wiki/Stealth_Rock_(move) | Stealth Rock}.
  * Applies up to 1 layer of Stealth Rocks, dealing percentage-based damage to any Pokémon
  * who is summoned into the trap based on the Rock type's type effectiveness.
@@ -993,6 +1076,27 @@ class StealthRockTag extends DamagingTrapTag {
 
   protected override get triggerMessageKey(): string {
     return "arenaTag:stealthRockActivateTrap";
+  }
+
+  override activateTrap(simulated: boolean, pokemon: Pokemon): boolean {
+    // ER "Absorbs ... Stealth Rocks" (Molten Core / Mountaineer / Iceplumes):
+    // no Stealth Rock switch-in damage, and heal 1/4 max HP instead.
+    if (pokemon.hasAbilityWithAttr("StealthRockImmunityAbAttr")) {
+      if (!simulated && !pokemon.isFullHp()) {
+        globalScene.phaseManager.unshiftNew(
+          "PokemonHealPhase",
+          pokemon.getBattlerIndex(),
+          toDmgValue(pokemon.getMaxHp() / 4),
+          i18next.t("abilityTriggers:typeImmunityHeal", {
+            pokemonNameWithAffix: getPokemonNameWithAffix(pokemon),
+            abilityName: "",
+          }),
+          true,
+        );
+      }
+      return false;
+    }
+    return super.activateTrap(simulated, pokemon);
   }
 
   protected override getDamageHpRatio(pokemon: Pokemon): number {
@@ -1299,6 +1403,11 @@ export class TrickRoomTag extends RoomArenaTag {
    * turn order should be reversed.
    */
   override apply(speedReversed: BooleanHolder): void {
+    // ER Clueless negates Rooms: the speed reversal is suppressed while a
+    // field-effect suppressor is present (the tag stays; effect resumes after).
+    if (globalScene.arena.isFieldEffectSuppressed()) {
+      return;
+    }
     speedReversed.value = !speedReversed.value;
   }
 }
@@ -1895,6 +2004,10 @@ export function getArenaTag(
       return new HotCoalsTag(sourceId, side);
     case ArenaTagType.FOAMY_WEB:
       return new FoamyWebTag(sourceId, side);
+    case ArenaTagType.CREEPING_THORNS:
+      return new CreepingThornsTag(sourceId, side);
+    case ArenaTagType.ER_WEATHER_LOCK:
+      return new ErWeatherLockTag(turnCount, sourceId, side);
     case ArenaTagType.STEALTH_ROCK:
       return new StealthRockTag(sourceId, side);
     case ArenaTagType.STICKY_WEB:
@@ -1966,6 +2079,8 @@ export type ArenaTagTypeMap = {
   [ArenaTagType.TOXIC_SPIKES]: ToxicSpikesTag;
   [ArenaTagType.HOT_COALS]: HotCoalsTag;
   [ArenaTagType.FOAMY_WEB]: FoamyWebTag;
+  [ArenaTagType.CREEPING_THORNS]: CreepingThornsTag;
+  [ArenaTagType.ER_WEATHER_LOCK]: ErWeatherLockTag;
   [ArenaTagType.STEALTH_ROCK]: StealthRockTag;
   [ArenaTagType.STICKY_WEB]: StickyWebTag;
   [ArenaTagType.TRICK_ROOM]: TrickRoomTag;

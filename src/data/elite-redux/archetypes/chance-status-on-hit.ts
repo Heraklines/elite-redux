@@ -57,6 +57,7 @@
 import { PostAttackAbAttr, PostDefendAbAttr, type PostMoveInteractionAbAttrParams } from "#abilities/ab-attrs";
 import { BattlerTagType } from "#enums/battler-tag-type";
 import { HitResult } from "#enums/hit-result";
+import type { MoveCategory } from "#enums/move-category";
 import { MoveFlags } from "#enums/move-flags";
 import type { MoveId } from "#enums/move-id";
 import type { PokemonType } from "#enums/pokemon-type";
@@ -107,7 +108,8 @@ const DAMAGING_HIT_RESULTS: ReadonlySet<HitResult> = new Set([
 export type ChanceStatusFilter =
   | { readonly flag: MoveFlags }
   | { readonly type: PokemonType }
-  | { readonly moveId: MoveId };
+  | { readonly moveId: MoveId }
+  | { readonly category: MoveCategory };
 
 /** Construction payload for {@linkcode ChanceStatusOnHitAbAttr}. */
 export interface ChanceStatusOnHitOptions {
@@ -782,6 +784,21 @@ export class ChanceBattlerTagOnAttackAbAttr extends PostAttackAbAttr {
     return this.contactExcluded;
   }
 
+  /** The configured fixed turn count, or `undefined` when a range/default is used. */
+  public getTurns(): number | undefined {
+    return this.turns;
+  }
+
+  /** The configured trap turn range `[min, max]`, or `undefined` when unset. */
+  public getTurnRange(): readonly [number, number] | undefined {
+    return this.turnRange;
+  }
+
+  /** The configured per-turn damage denominator override, or `undefined`. */
+  public getDamageDenominator(): number | undefined {
+    return this.damageDenominator;
+  }
+
   private matchesMove(move: Move, pokemon: Pokemon, target: Pokemon): boolean {
     if (this.moveIds !== undefined && !this.moveIds.includes(move.id)) {
       return false;
@@ -896,13 +913,21 @@ function resolveTagTurns(
  */
 function checkChanceStatusFilter(
   filter: ChanceStatusFilter,
-  move: { hasFlag(flag: MoveFlags): boolean; readonly type: PokemonType; readonly id: MoveId },
+  move: {
+    hasFlag(flag: MoveFlags): boolean;
+    readonly type: PokemonType;
+    readonly id: MoveId;
+    readonly category: MoveCategory;
+  },
 ): boolean {
   if ("flag" in filter) {
     return move.hasFlag(filter.flag);
   }
   if ("moveId" in filter) {
     return move.id === filter.moveId;
+  }
+  if ("category" in filter) {
+    return move.category === filter.category;
   }
   return move.type === filter.type;
 }

@@ -61,7 +61,7 @@ import {
 } from "#abilities/ab-attrs";
 import { globalScene } from "#app/global-scene";
 import type { PokemonType } from "#enums/pokemon-type";
-import type { BattleStat } from "#enums/stat";
+import { type BattleStat, Stat } from "#enums/stat";
 import { toDmgValue } from "#utils/common";
 
 /** Construction options for {@linkcode TypeAbsorbHealAbAttr}. */
@@ -171,5 +171,52 @@ export class TypeAbsorbStatBoostAbAttr extends TypeImmunityStatStageChangeAbAttr
       throw new Error("[TypeAbsorbStatBoostAbAttr] stages must be non-zero");
     }
     super(opts.type, opts.stat, opts.stages);
+  }
+}
+
+/** Construction options for {@linkcode TypeAbsorbHighestAttackStatBoostAbAttr}. */
+export interface TypeAbsorbHighestAttackStatBoostOptions {
+  /** The {@linkcode PokemonType} this ability is immune to. */
+  readonly type: PokemonType;
+  /** Number of stat stages to apply to the holder's highest attacking stat. */
+  readonly stages: number;
+}
+
+/**
+ * Absorb variant that boosts the holder's HIGHEST attacking stat (Attack vs
+ * Special Attack, whichever is greater) rather than a fixed stat. Wires ER's
+ * Heat Sink ("Fire-type moves boost the highest attacking stat of the user by
+ * one stage"). The stat is resolved at proc time from the current
+ * (stage-inclusive) stat values, so a mid-battle stat swing picks correctly.
+ */
+export class TypeAbsorbHighestAttackStatBoostAbAttr extends TypeImmunityStatStageChangeAbAttr {
+  private readonly boostStages: number;
+
+  constructor(opts: TypeAbsorbHighestAttackStatBoostOptions) {
+    if (opts.stages === 0) {
+      throw new Error("[TypeAbsorbHighestAttackStatBoostAbAttr] stages must be non-zero");
+    }
+    // The parent's stat field is unused (apply is overridden); pass ATK as a
+    // placeholder so the base contract is satisfied.
+    super(opts.type, Stat.ATK, opts.stages);
+    this.boostStages = opts.stages;
+  }
+
+  override apply(params: TypeMultiplierAbAttrParams): void {
+    const { cancelled, simulated, pokemon, typeMultiplier } = params;
+    // Mirror TypeImmunityStatStageChangeAbAttr.apply, but choose the stat.
+    typeMultiplier.value = 0; // Grant the immunity (TypeImmunityAbAttr base behavior)
+    cancelled.value = true; // Suppresses "No Effect" message
+    if (simulated) {
+      return;
+    }
+    const highest = pokemon.getStat(Stat.SPATK, false) > pokemon.getStat(Stat.ATK, false) ? Stat.SPATK : Stat.ATK;
+    globalScene.phaseManager.unshiftNew(
+      "StatStageChangePhase",
+      pokemon.getBattlerIndex(),
+      true,
+      [highest],
+      this.boostStages,
+    );
   }
 }

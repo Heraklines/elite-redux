@@ -25,7 +25,9 @@ export function getTypeDamageMultiplier(attackType: PokemonType, defType: Pokemo
   // while active (super-effective ↔ not-very-effective, immunities → 2x), the
   // same inversion an Inverse Battle applies. Done per single type because the
   // inversion does not commute with the dual-type product.
-  if (globalScene?.arena?.hasTag(ArenaTagType.INVERSE_ROOM)) {
+  // ER Clueless negates Rooms — the Inverse Room type inversion is suppressed
+  // while a field-effect suppressor is on the field (the tag stays set).
+  if (globalScene?.arena?.hasTag(ArenaTagType.INVERSE_ROOM) && !globalScene.arena.isFieldEffectSuppressed()) {
     if (multi.value < 1) {
       multi.value = 2;
     } else if (multi.value > 1) {

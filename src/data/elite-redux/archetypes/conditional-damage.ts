@@ -43,9 +43,10 @@
 // =============================================================================
 
 import { MovePowerBoostAbAttr } from "#abilities/ab-attrs";
+import { globalScene } from "#app/global-scene";
 import { BattlerTagType } from "#enums/battler-tag-type";
 import { BATTLE_STATS, type BattleStat } from "#enums/stat";
-import type { StatusEffect } from "#enums/status-effect";
+import { StatusEffect } from "#enums/status-effect";
 import type { Pokemon } from "#field/pokemon";
 import type { Move } from "#moves/move";
 
@@ -60,7 +61,8 @@ export type DamageCondition =
   | DamageConditionTargetConfused
   | DamageConditionTargetHasTag
   | DamageConditionTargetHasAnyTag
-  | DamageConditionTargetHasLoweredStat;
+  | DamageConditionTargetHasLoweredStat
+  | DamageConditionAnyActiveAsleep;
 
 /**
  * Boost when the target's `status.effect` is in {@linkcode statuses}. Omit
@@ -126,6 +128,17 @@ export interface DamageConditionTargetHasAnyTag {
  */
 export interface DamageConditionTargetHasLoweredStat {
   readonly kind: "target-has-lowered-stat";
+}
+
+/**
+ * Boost when ANY active Pokemon on the field (user, ally, or opponent) is
+ * genuinely asleep (status = SLEEP). Matches Dreamcatcher / Dreamscape: "doubles
+ * the power of the user's moves when any [active] Pokemon is asleep." Comatose
+ * does NOT count (it is an ability, not a SLEEP status) — matching the dex note
+ * "Does not activate against Comatose."
+ */
+export interface DamageConditionAnyActiveAsleep {
+  readonly kind: "any-active-asleep";
 }
 
 /** All valid {@linkcode DamageCondition.kind} discriminator strings. */
@@ -234,6 +247,10 @@ export class ConditionalDamageAbAttr extends MovePowerBoostAbAttr {
         return condition.tags.some(tag => target.getTag(tag) != null);
       case "target-has-lowered-stat":
         return ConditionalDamageAbAttr.evalAnyStatLowered(target);
+      case "any-active-asleep":
+        // Any active Pokemon (user/ally/opponent) genuinely asleep. Comatose is
+        // an ability, not a SLEEP status, so a Comatose mon does NOT satisfy it.
+        return globalScene.getField(true).some(p => p.status?.effect === StatusEffect.SLEEP);
     }
   }
 
