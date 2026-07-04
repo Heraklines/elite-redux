@@ -1,0 +1,277 @@
+url:      https://elite-redux-staging.pages.dev/
+build:    mr5qkls2-3q4l
+mode:     4  wave:20
+seed:     KwloZFIqCVaHAhdckXf2KPnp
+party:    Volcanion(L16 54hp f0), Swablu Redux(L16 45hp f0), Phione(L16 26hp f0), Solosis Redux(L11 19hp f0)
+enemy:    Finneon(L15), Golett(L15), Palpitoad(L15), Skitty(L15), Tinkatink(L15)
+
+----- CONSOLE -----
+[07:32:11.201] LOG: [coop:reward] advanceCoopInteractionForContinuation SKIP (isCoop=false fromSeq=-1 meInProgress=false)
+[07:32:12.305] LOG: %cStart Phase NewBattlePhase color:green;
+[07:32:12.305] LOG: Wave Seed: ^mY\Vit[T{wv~kyE^c 19
+[07:32:12.307] LOG: %cStart Phase MessagePhase color:green;
+[07:32:12.514] LOG: %cStart Phase ReturnPhase color:green;
+[07:32:12.631] LOG: %cStart Phase ReturnPhase color:green;
+[07:32:12.750] LOG: %cStart Phase ReturnPhase color:green;
+[07:32:12.866] LOG: %cStart Phase ShowTrainerPhase color:green;
+[07:32:12.984] LOG: %cStart Phase NextEncounterPhase color:green;
+[07:32:14.021] DEBUG: Session data saved to slot 1!
+[07:32:14.023] LOG: Wave Seed: ^mY\Vit[T{wv~kyE^c 19
+[07:32:28.008] LOG: %cStart Phase MysteryEncounterPhase color:green;
+[07:32:42.541] LOG: %cStart Phase MysteryEncounterOptionSelectedPhase color:green;
+[07:32:42.642] LOG: %cStart Phase MysteryEncounterRewardsPhase color:green;
+[07:32:42.642] LOG: %cStart Phase SelectModifierPhase color:green;
+[07:32:42.642] LOG: Wave Seed: ^mY\Vit[T{wv~kyE^c 19
+[07:32:43.784] LOG: %cStart Phase EggLapsePhase color:green;
+[07:32:43.784] LOG: %cStart Phase PostMysteryEncounterPhase color:green;
+[07:32:43.785] LOG: %cStart Phase NewBattlePhase color:green;
+[07:32:43.785] LOG: Wave Seed: _nZ]Wju\U|xwlzF_d 20
+[07:32:43.786] LOG: [er-ghost] wave 20: ghost 'phantozinho' (run ended at 21)
+[07:32:43.790] LOG: %cStart Phase NextEncounterPhase color:green;
+[07:32:43.812] LOG: Pokemon: Foe Finneon | Species ID: 456 | Level: 15 | Nature: Timid (+Spd/-Atk)
+[07:32:43.812] LOG: Stats (IVs): HP: 41 (18), Atk: 24 (14), Def: 24 (25), Spatk: 22 (12), Spdef: 23 (14), Spd: 31 (27)
+[07:32:43.812] LOG: Ability: Swift Swim | Passive Ability: Water Veil 
+[07:32:43.812] LOG: Moveset: ["Bubble Beam","Camouflage","Captivate","Splash"]
+[07:32:43.812] LOG: ER #419: elite BST cap (460 @ w20) - replacing Seismitoad (539) with Palpitoad (424)
+[07:32:43.827] LOG: Pokemon: Foe Palpitoad | Species ID: 536 | Level: 15 | Nature: Rash (+SpAtk/-SpDef)
+[07:32:43.827] LOG: Stats (IVs): HP: 49 (24), Atk: 30 (20), Def: 23 (25), Spatk: 33 (7), Spdef: 21 (30), Spd: 30 (18)
+[07:32:43.827] LOG: Ability: Damp | Passive Ability: Water Absorb 
+[07:32:43.827] LOG: Moveset: ["Bubble Beam","Sludge","Screech","Round"]
+[07:32:43.837] LOG: Pokemon: Foe Skitty | Species ID: 300 | Level: 15 | Nature: Naive (+Spd/-SpDef)
+[07:32:43.837] LOG: Stats (IVs): HP: 41 (1), Atk: 20 (10), Def: 26 (29), Spatk: 24 (5), Spdef: 20 (1), Spd: 24 (30)
+[07:32:43.837] LOG: Ability: Friend Guard | Passive Ability: Cute Charm 
+[07:32:43.837] LOG: Moveset: ["Captivate","Disarming Voice","Double Slap","Fake Out"]
+[07:32:43.846] LOG: Pokemon: Foe Golett | Species ID: 622 | Level: 15 | Nature: Adamant (+Atk/-SpAtk)
+[07:32:43.846] LOG: Stats (IVs): HP: 45 (22), Atk: 30 (8), Def: 26 (11), Spatk: 18 (7), Spdef: 26 (30), Spd: 15 (29)
+[07:32:43.847] LOG: Ability: Power Fists | Passive Ability: Vengeance 
+[07:32:43.847] LOG: Moveset: ["Imprison","Mega Punch","Stomp","Headlong Rush"]
+[07:32:43.855] LOG: Pokemon: Foe Tinkatink | Species ID: 957 | Level: 15 | Nature: Modest (+SpAtk/-Atk)
+[07:32:43.855] LOG: Stats (IVs): HP: 43 (17), Atk: 24 (19), Def: 21 (3), Spatk: 15 (30), Spdef: 28 (20), Spd: 24 (23)
+[07:32:43.855] LOG: Ability: Steelworker | Passive Ability: Super Slammer 
+[07:32:43.855] LOG: Moveset: ["Fairy Wind","Slam","Squeaky Hammer","Hacksaw"]
+[07:32:47.044] LOG: Generated AI funcs
+[07:32:47.158] DEBUG: Session data saved to slot 1!
+[07:32:47.158] LOG: Wave Seed: _nZ]Wju\U|xwlzF_d 20
+[07:32:47.375] LOG: Black Belt phantozinho
+[07:32:50.150] LOG: Dialogue saved as seen: dialogue:blackBelt.encounter.1
+[07:32:50.196] LOG: Black Belt phantozinho
+[07:32:50.726] LOG: %cStart Phase SummonPhase color:green;
+[07:32:50.727] LOG: phantozinho
+[07:32:51.026] LOG: %cStart Phase ShinySparklePhase color:green;
+[07:32:51.126] LOG: %cStart Phase SummonPhase color:green;
+[07:32:51.126] LOG: phantozinho
+[07:32:51.408] LOG: %cStart Phase SummonPhase color:green;
+[07:32:51.408] LOG: phantozinho
+[07:32:51.692] LOG: %cStart Phase ShinySparklePhase color:green;
+[07:32:51.791] LOG: %cStart Phase SummonPhase color:green;
+[07:32:52.075] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[07:32:52.080] LOG: %cStart Phase SummonPhase color:green;
+[07:32:52.276] WARN: cry/10677 not found
+[07:32:52.376] LOG: %cStart Phase ShinySparklePhase color:green;
+[07:32:52.475] LOG: %cStart Phase SummonPhase color:green;
+[07:32:52.759] LOG: %cStart Phase InitEncounterPhase color:green;
+[07:32:52.782] LOG: %cStart Phase PostSummonPhase color:green;
+[07:32:52.782] LOG: Ran PSP for: Phione
+[07:32:52.796] LOG: %cStart Phase PostSummonPhase color:green;
+[07:32:52.805] LOG: %cStart Phase PostSummonPhase color:green;
+[07:32:52.806] LOG: %cStart Phase ShowAbilityPhase color:green;
+[07:32:52.980] LOG: %cStart Phase MovePhase color:green;
+[07:32:52.980] LOG: %cUser: Phione
+Move: AQUA_RING
+Use Mode: INDIRECT color:orchid
+[07:32:53.019] LOG: %cStart Phase MessagePhase color:green;
+[07:32:53.108] LOG: %cStart Phase MoveEffectPhase color:green;
+[07:32:53.119] LOG: %cStart Phase MessagePhase color:green;
+[07:32:53.374] LOG: %cStart Phase MoveEndPhase color:green;
+[07:32:53.375] LOG: %cStart Phase HideAbilityPhase color:green;
+[07:32:53.430] LOG: %cStart Phase PostSummonPhase color:green;
+[07:32:53.430] LOG: Ran PSP for: Finneon
+[07:32:53.443] LOG: %cStart Phase PostSummonPhase color:green;
+[07:32:53.450] LOG: %cStart Phase PostSummonPhase color:green;
+[07:32:53.451] LOG: %cStart Phase ShowAbilityPhase color:green;
+[07:32:53.612] LOG: %cStart Phase MovePhase color:green;
+[07:32:53.613] LOG: %cUser: Finneon
+Move: AQUA_RING
+Use Mode: INDIRECT color:orchid
+[07:32:53.645] LOG: %cStart Phase MessagePhase color:green;
+[07:32:53.741] LOG: %cStart Phase MoveEffectPhase color:green;
+[07:32:53.752] LOG: %cStart Phase MessagePhase color:green;
+[07:32:54.008] LOG: %cStart Phase MoveEndPhase color:green;
+[07:32:54.008] LOG: %cStart Phase HideAbilityPhase color:green;
+[07:32:54.053] LOG: %cStart Phase PostSummonPhase color:green;
+[07:32:54.053] LOG: Ran PSP for: Skitty
+[07:32:54.063] LOG: %cStart Phase PostSummonPhase color:green;
+[07:32:54.068] LOG: %cStart Phase PostSummonPhase color:green;
+[07:32:54.072] LOG: %cStart Phase PostSummonPhase color:green;
+[07:32:54.072] LOG: Ran PSP for: Palpitoad
+[07:32:54.078] LOG: %cStart Phase PostSummonPhase color:green;
+[07:32:54.081] LOG: %cStart Phase PostSummonPhase color:green;
+[07:32:54.083] LOG: %cStart Phase PostSummonPhase color:green;
+[07:32:54.083] LOG: Ran PSP for: Volcanion
+[07:32:54.089] LOG: %cStart Phase PostSummonPhase color:green;
+[07:32:54.117] LOG: %cStart Phase ShowAbilityPhase color:green;
+[07:32:54.280] LOG: %cStart Phase CommonAnimPhase color:green;
+[07:32:54.281] LOG: %cStart Phase MessagePhase color:green;
+[07:32:54.492] LOG: %cStart Phase HideAbilityPhase color:green;
+[07:32:54.530] LOG: %cStart Phase PostSummonPhase color:green;
+[07:32:54.530] LOG: %cStart Phase PostSummonPhase color:green;
+[07:32:54.530] LOG: Ran PSP for: Swablu Redux
+[07:32:54.537] LOG: %cStart Phase PostSummonPhase color:green;
+[07:32:54.537] LOG: %cStart Phase PostSummonPhase color:green;
+[07:32:54.537] LOG: %cStart Phase TurnInitPhase color:green;
+[07:32:54.538] LOG: %cStart Phase CommandPhase color:green;
+[07:32:56.106] LOG: Move: THUNDERCLAP Move targets: {"targets":[3,4,1],"multiple":false} 
+Player Pokemon: Volcanion
+[07:32:56.110] LOG: %cStart Phase SelectTargetPhase color:green;
+[07:32:56.721] LOG: %cStart Phase CommandPhase color:green;
+[07:33:01.555] LOG: Move: ICE_BEAM Move targets: {"targets":[3,4,5,0,2],"multiple":false} 
+Player Pokemon: Swablu Redux
+[07:33:01.559] LOG: %cStart Phase SelectTargetPhase color:green;
+[07:33:02.389] LOG: %cStart Phase CommandPhase color:green;
+[07:33:03.614] LOG: Move: FREEZE_DRY Move targets: {"targets":[4,5,1],"multiple":false} 
+Player Pokemon: Phione
+[07:33:03.617] LOG: %cStart Phase SelectTargetPhase color:green;
+[07:33:04.557] LOG: %cStart Phase EnemyCommandPhase color:green;
+[07:33:04.590] LOG: Battle Seed: 9QW6iuYC1jLUJGCT
+[07:33:04.596] LOG: Move Pool: ["Bubble Beam","Camouflage","Captivate","Splash"]
+[07:33:04.596] LOG: Move Scores: [14.4375,0,6,0]
+[07:33:04.596] LOG: Sorted Move Pool: ["Bubble Beam","Captivate","Camouflage","Splash"]
+[07:33:04.596] LOG: Chosen Move: Bubble Beam
+[07:33:04.596] LOG: %cStart Phase EnemyCommandPhase color:green;
+[07:33:04.655] LOG: Move Pool: ["Bubble Beam","Sludge","Screech","Round"]
+[07:33:04.655] LOG: Move Scores: [14.625,36,0,12]
+[07:33:04.655] LOG: Sorted Move Pool: ["Sludge","Bubble Beam","Round","Screech"]
+[07:33:04.655] LOG: Chosen Move: Round
+[07:33:04.655] LOG: %cStart Phase EnemyCommandPhase color:green;
+[07:33:04.686] LOG: Move Pool: ["Captivate","Disarming Voice","Double Slap","Fake Out"]
+[07:33:04.686] LOG: Move Scores: [-20,12,30,19.5]
+[07:33:04.686] LOG: Sorted Move Pool: ["Double Slap","Fake Out","Disarming Voice","Captivate"]
+[07:33:04.686] LOG: Chosen Move: Double Slap
+[07:33:04.686] LOG: %cStart Phase TurnStartPhase color:green;
+[07:33:04.719] LOG: %cStart Phase MovePhase color:green;
+[07:33:04.719] LOG: %cUser: Volcanion
+Move: THUNDERCLAP
+Use Mode: NORMAL color:orchid
+[07:33:04.744] LOG: %cStart Phase MessagePhase color:green;
+[07:33:04.811] LOG: %cStart Phase MoveEffectPhase color:green;
+[07:33:04.814] LOG: crit stage: +0
+[07:33:04.817] LOG: Move: Thunderclap | Base damage: 28.342399999999998 | Power: 70 | Source attack: 56 | Target defense: 25
+[07:33:04.818] LOG: Move: Thunderclap | Attack damage: 26
+[07:33:04.819] LOG: %cStart Phase ShowAbilityPhase color:green;
+[07:33:04.982] LOG: %cStart Phase HideAbilityPhase color:green;
+[07:33:05.033] LOG: %cStart Phase DamageAnimPhase color:green;
+[07:33:05.066] LOG: %cStart Phase MessagePhase color:green;
+[07:33:05.296] LOG: %cStart Phase MoveEndPhase color:green;
+[07:33:05.307] LOG: %cStart Phase MovePhase color:green;
+[07:33:05.307] LOG: %cUser: Finneon
+Move: BUBBLE_BEAM
+Use Mode: NORMAL color:orchid
+[07:33:05.348] LOG: %cStart Phase ShowAbilityPhase color:green;
+[07:33:05.518] LOG: %cStart Phase HideAbilityPhase color:green;
+[07:33:05.566] LOG: %cStart Phase MessagePhase color:green;
+[07:33:05.712] LOG: %cStart Phase MoveEffectPhase color:green;
+[07:33:05.716] LOG: %cStart Phase ShowAbilityPhase color:green;
+[07:33:05.883] LOG: %cStart Phase StatStageChangePhase color:green;
+[07:33:05.895] LOG: %cStart Phase MessagePhase color:green;
+[07:33:06.128] LOG: %cStart Phase HideAbilityPhase color:green;
+[07:33:06.168] LOG: %cStart Phase MoveEndPhase color:green;
+[07:33:06.183] LOG: %cStart Phase MovePhase color:green;
+[07:33:06.183] LOG: %cUser: Phione
+Move: FREEZE_DRY
+Use Mode: NORMAL color:orchid
+[07:33:06.237] LOG: %cStart Phase MessagePhase color:green;
+[07:33:06.311] LOG: %cStart Phase MoveEffectPhase color:green;
+[07:33:06.315] LOG: crit stage: +0
+[07:33:06.319] LOG: Move: Freeze-Dry | Base damage: 20.504347826086956 | Power: 70 | Source attack: 38 | Target defense: 23
+[07:33:06.321] LOG: Move: Freeze-Dry | Attack damage: 40
+[07:33:06.329] LOG: %cStart Phase ShowAbilityPhase color:green;
+[07:33:06.499] LOG: %cStart Phase HideAbilityPhase color:green;
+[07:33:06.549] LOG: %cStart Phase DamageAnimPhase color:green;
+[07:33:06.587] LOG: %cStart Phase MessagePhase color:green;
+[07:33:06.813] LOG: %cStart Phase MoveEndPhase color:green;
+[07:33:06.822] LOG: %cStart Phase MovePhase color:green;
+[07:33:06.822] LOG: %cUser: Skitty
+Move: DOUBLE_SLAP
+Use Mode: NORMAL color:orchid
+[07:33:06.885] LOG: %cStart Phase MessagePhase color:green;
+[07:33:06.980] LOG: %cStart Phase MoveEffectPhase color:green;
+[07:33:06.985] LOG: crit stage: +0
+[07:33:06.990] LOG: Move: Double Slap | Base damage: 4.210526315789474 | Power: 25 | Source attack: 21 | Target defense: 38
+[07:33:06.991] LOG: Move: Double Slap | Attack damage: 5
+[07:33:07.003] WARN: Failed to get source Pokemon for InfatuatedTag canAdd; id: undefined
+[07:33:07.004] LOG: %cStart Phase DamageAnimPhase color:green;
+[07:33:07.032] LOG: %cStart Phase MoveEffectPhase color:green;
+[07:33:07.034] LOG: crit stage: +0
+[07:33:07.035] LOG: Move: Double Slap | Base damage: 4.210526315789474 | Power: 25 | Source attack: 21 | Target defense: 38
+[07:33:07.036] LOG: Move: Double Slap | Attack damage: 6
+[07:33:07.040] WARN: Failed to get source Pokemon for InfatuatedTag canAdd; id: undefined
+[07:33:07.040] LOG: %cStart Phase DamageAnimPhase color:green;
+[07:33:07.064] LOG: %cStart Phase MoveEffectPhase color:green;
+[07:33:07.065] LOG: crit stage: +0
+[07:33:07.068] LOG: Move: Double Slap | Base damage: 4.210526315789474 | Power: 25 | Source attack: 21 | Target defense: 38
+[07:33:07.069] LOG: Move: Double Slap | Attack damage: 5
+[07:33:07.070] LOG: %cStart Phase DamageAnimPhase color:green;
+[07:33:07.099] LOG: %cStart Phase MessagePhase color:green;
+[07:33:07.295] LOG: %cStart Phase MoveEndPhase color:green;
+[07:33:07.300] LOG: %cStart Phase MovePhase color:green;
+[07:33:07.300] LOG: %cUser: Palpitoad
+Move: ROUND
+Use Mode: NORMAL color:orchid
+[07:33:07.369] LOG: %cStart Phase MessagePhase color:green;
+[07:33:07.463] LOG: %cStart Phase MoveEffectPhase color:green;
+[07:33:07.467] LOG: crit stage: +0
+[07:33:07.472] LOG: Move: Round | Base damage: 10.842105263157896 | Power: 60 | Source attack: 35 | Target defense: 38
+[07:33:07.474] LOG: Move: Round | Attack damage: 5
+[07:33:07.489] LOG: %cStart Phase DamageAnimPhase color:green;
+[07:33:07.517] LOG: %cStart Phase MoveEndPhase color:green;
+[07:33:07.517] LOG: %cStart Phase MovePhase color:green;
+[07:33:07.517] LOG: %cUser: Swablu Redux
+Move: ICE_BEAM
+Use Mode: NORMAL color:orchid
+[07:33:07.548] LOG: %cStart Phase MessagePhase color:green;
+[07:33:07.645] LOG: %cStart Phase MoveEffectPhase color:green;
+[07:33:07.650] LOG: crit stage: +0
+[07:33:07.655] LOG: Move: Ice Beam | Base damage: 19.749565217391304 | Power: 90 | Source attack: 27 | Target defense: 23
+[07:33:07.658] LOG: Move: Ice Beam | Attack damage: 9
+[07:33:07.659] LOG: %cStart Phase ShowAbilityPhase color:green;
+[07:33:07.818] LOG: %cStart Phase HideAbilityPhase color:green;
+[07:33:07.868] LOG: %cStart Phase DamageAnimPhase color:green;
+[07:33:07.900] LOG: %cStart Phase MoveEndPhase color:green;
+[07:33:07.901] LOG: %cStart Phase CheckInterludePhase color:green;
+[07:33:07.901] LOG: %cStart Phase WeatherEffectPhase color:green;
+[07:33:07.986] LOG: %cStart Phase PositionalTagPhase color:green;
+[07:33:07.986] LOG: %cStart Phase BerryPhase color:green;
+[07:33:08.009] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[07:33:08.023] LOG: %cStart Phase TurnEndPhase color:green;
+[07:33:08.041] WARN: [coop:turn] host recorder: finalize with NO open recording -> turn=-1 events=0 (caller decides not to emit)
+[07:33:08.041] LOG: %cStart Phase PokemonHealPhase color:green;
+[07:33:08.045] LOG: %cStart Phase MessagePhase color:green;
+[07:33:08.230] LOG: %cStart Phase PokemonHealPhase color:green;
+[07:33:08.231] LOG: %cStart Phase DamageAnimPhase color:green;
+[07:33:08.243] LOG: %cStart Phase DamageAnimPhase color:green;
+[07:33:08.248] LOG: %cStart Phase FaintPhase color:green;
+[07:33:08.351] LOG: %cStart Phase MessagePhase color:green;
+[07:33:09.605] LOG: %cStart Phase ShowAbilityPhase color:green;
+[07:33:09.766] LOG: %cStart Phase StatStageChangePhase color:green;
+[07:33:09.770] LOG: %cStart Phase MessagePhase color:green;
+[07:33:09.979] LOG: %cStart Phase HideAbilityPhase color:green;
+[07:33:10.016] LOG: %cStart Phase VictoryPhase color:green;
+[07:33:10.017] LOG: Applied Soothe Bell 
+[07:33:10.017] LOG: %cStart Phase ExpPhase color:green;
+[07:33:10.018] LOG: Applied Super EXP. Charm 
+[07:33:10.018] LOG: Applied EXP. Charm 
+[07:33:10.862] LOG: 4266 4452 4428
+[07:33:10.966] LOG: %cStart Phase LevelUpPhase color:green;
+[07:33:10.968] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[07:33:10.968] LOG: Applied Super EXP. Charm 
+[07:33:10.968] LOG: Applied EXP. Charm 
+[07:33:10.969] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[07:33:10.969] LOG: %cStart Phase SwitchSummonPhase color:green;
+[07:33:11.197] LOG: phantozinho
+[07:33:11.431] LOG: %cStart Phase ShinySparklePhase color:green;
+[07:33:11.514] LOG: %cStart Phase PostSummonPhase color:green;
+[07:33:11.515] LOG: Ran PSP for: Golett
+[07:33:11.517] LOG: %cStart Phase PostSummonPhase color:green;
+[07:33:11.517] LOG: %cStart Phase PostSummonPhase color:green;
+[07:33:11.517] LOG: %cStart Phase TurnInitPhase color:green;
+[07:33:11.518] LOG: %cStart Phase CommandPhase color:green;
