@@ -1,0 +1,260 @@
+url:      https://elite-redux-staging.pages.dev/
+build:    mr5qkls2-3q4l
+mode:     4  wave:5
+seed:     KwloZFIqCVaHAhdckXf2KPnp
+party:    Volcanion(L6 27hp f0), Phione(L6 24hp f0), Swablu Redux(L6 13hp f0), Solosis Redux(L5 0hp f0)
+enemy:    Cetoddle Redux(L5), Mawile(L5), Croagunk(L5)
+
+----- CONSOLE -----
+[07:02:24.844] LOG: Applied X Speed 
+[07:02:24.844] LOG: Applied X Speed 
+[07:02:24.844] LOG: Applied X Speed 
+[07:02:24.844] LOG: Applied X Speed 
+[07:02:24.845] LOG: Applied X Speed 
+[07:02:24.845] LOG: Applied X Speed 
+[07:02:24.847] LOG: Applied X Speed 
+[07:02:24.847] LOG: Applied X Speed 
+[07:02:24.847] LOG: Applied X Speed 
+[07:02:24.848] LOG: Applied X Speed 
+[07:02:24.848] LOG: Applied X Speed 
+[07:02:24.848] LOG: Applied X Speed 
+[07:02:24.850] LOG: Applied X Speed 
+[07:02:24.850] LOG: Applied X Speed 
+[07:02:24.851] LOG: Applied X Speed 
+[07:02:24.851] LOG: Applied X Speed 
+[07:02:24.851] LOG: Applied X Speed 
+[07:02:24.851] LOG: Applied X Speed 
+[07:02:24.852] LOG: Applied X Speed 
+[07:02:24.852] LOG: Applied X Speed 
+[07:02:24.853] LOG: Applied X Speed 
+[07:02:24.853] LOG: Applied X Speed 
+[07:02:24.853] LOG: Applied X Speed 
+[07:02:24.853] LOG: Applied X Speed 
+[07:02:24.854] LOG: Applied X Speed 
+[07:02:24.855] LOG: Applied X Speed 
+[07:02:24.855] LOG: Applied X Speed 
+[07:02:24.855] LOG: Applied X Speed 
+[07:02:24.855] LOG: Applied X Speed 
+[07:02:24.856] LOG: Applied X Speed 
+[07:02:24.862] LOG: Applied X Speed 
+[07:02:24.862] LOG: Applied X Speed 
+[07:02:24.862] LOG: Applied X Speed 
+[07:02:24.863] LOG: Applied X Speed 
+[07:02:24.863] LOG: Applied X Speed 
+[07:02:24.863] LOG: Applied X Speed 
+[07:02:24.864] LOG: Applied X Speed 
+[07:02:24.864] LOG: Applied X Speed 
+[07:02:24.865] LOG: Applied X Speed 
+[07:02:24.865] LOG: Applied X Speed 
+[07:02:24.865] LOG: Applied X Speed 
+[07:02:24.865] LOG: Applied X Speed 
+[07:02:24.866] LOG: Move Pool: ["Body Slam","Sweet Scent","Astonish"]
+[07:02:24.866] LOG: Move Scores: [20,6,-20]
+[07:02:24.866] LOG: Sorted Move Pool: ["Body Slam","Sweet Scent","Astonish"]
+[07:02:24.866] LOG: Chosen Move: Body Slam
+[07:02:24.866] LOG: %cStart Phase EnemyCommandPhase color:green;
+[07:02:24.866] LOG: Applied X Speed 
+[07:02:24.867] LOG: Applied X Speed 
+[07:02:24.867] LOG: Applied X Speed 
+[07:02:24.867] LOG: Applied X Speed 
+[07:02:24.867] LOG: Applied X Speed 
+[07:02:24.868] LOG: Applied X Speed 
+[07:02:24.868] LOG: Applied X Speed 
+[07:02:24.868] LOG: Applied X Speed 
+[07:02:24.869] LOG: Applied X Speed 
+[07:02:24.869] LOG: Applied X Speed 
+[07:02:24.869] LOG: Applied X Speed 
+[07:02:24.870] LOG: Applied X Speed 
+[07:02:24.872] LOG: Applied X Speed 
+[07:02:24.872] LOG: Applied X Speed 
+[07:02:24.872] LOG: Applied X Speed 
+[07:02:24.872] LOG: Applied X Speed 
+[07:02:24.873] LOG: Applied X Speed 
+[07:02:24.873] LOG: Applied X Speed 
+[07:02:24.874] LOG: Applied X Speed 
+[07:02:24.874] LOG: Applied X Speed 
+[07:02:24.874] LOG: Applied X Speed 
+[07:02:24.874] LOG: Applied X Speed 
+[07:02:24.875] LOG: Applied X Speed 
+[07:02:24.875] LOG: Applied X Speed 
+[07:02:24.879] LOG: Applied X Speed 
+[07:02:24.879] LOG: Applied X Speed 
+[07:02:24.879] LOG: Applied X Speed 
+[07:02:24.879] LOG: Applied X Speed 
+[07:02:24.880] LOG: Applied X Speed 
+[07:02:24.880] LOG: Applied X Speed 
+[07:02:24.881] LOG: Applied X Speed 
+[07:02:24.881] LOG: Applied X Speed 
+[07:02:24.881] LOG: Applied X Speed 
+[07:02:24.881] LOG: Applied X Speed 
+[07:02:24.882] LOG: Applied X Speed 
+[07:02:24.882] LOG: Applied X Speed 
+[07:02:24.883] LOG: Move Pool: ["Poison Sting","Fake Out","Encore","Astonish"]
+[07:02:24.884] LOG: Move Scores: [16.5,-20,2,-20]
+[07:02:24.884] LOG: Sorted Move Pool: ["Poison Sting","Encore","Fake Out","Astonish"]
+[07:02:24.884] LOG: Chosen Move: Poison Sting
+[07:02:24.884] LOG: %cStart Phase TurnStartPhase color:green;
+[07:02:24.884] LOG: Applied X Speed 
+[07:02:24.885] LOG: Applied X Speed 
+[07:02:24.886] LOG: Applied X Speed 
+[07:02:24.886] LOG: Applied X Speed 
+[07:02:24.886] LOG: Applied X Speed 
+[07:02:24.887] LOG: Applied X Speed 
+[07:02:24.887] LOG: Applied X Speed 
+[07:02:24.887] LOG: Applied X Speed 
+[07:02:24.888] LOG: Applied X Speed 
+[07:02:24.888] LOG: Applied X Speed 
+[07:02:24.888] LOG: Applied X Speed 
+[07:02:24.889] LOG: Applied X Speed 
+[07:02:24.890] LOG: Applied X Speed 
+[07:02:24.890] LOG: Applied X Speed 
+[07:02:24.890] LOG: Applied X Speed 
+[07:02:24.890] LOG: Applied X Speed 
+[07:02:24.891] LOG: Applied X Speed 
+[07:02:24.891] LOG: Applied X Speed 
+[07:02:24.892] LOG: Applied X Speed 
+[07:02:24.892] LOG: Applied X Speed 
+[07:02:24.893] LOG: Applied X Speed 
+[07:02:24.893] LOG: Applied X Speed 
+[07:02:24.894] LOG: Applied X Speed 
+[07:02:24.895] LOG: Applied X Speed 
+[07:02:24.896] LOG: Applied X Speed 
+[07:02:24.896] LOG: Applied X Speed 
+[07:02:24.896] LOG: Applied X Speed 
+[07:02:24.897] LOG: Applied X Speed 
+[07:02:24.897] LOG: Applied X Speed 
+[07:02:24.898] LOG: Applied X Speed 
+[07:02:24.898] LOG: Applied X Speed 
+[07:02:24.898] LOG: Applied X Speed 
+[07:02:24.899] LOG: Applied X Speed 
+[07:02:24.899] LOG: Applied X Speed 
+[07:02:24.900] LOG: Applied X Speed 
+[07:02:24.901] LOG: Applied X Speed 
+[07:02:24.901] LOG: Applied X Speed 
+[07:02:24.901] LOG: Applied X Speed 
+[07:02:24.901] LOG: Applied X Speed 
+[07:02:24.902] LOG: Applied X Speed 
+[07:02:24.903] LOG: Applied X Speed 
+[07:02:24.903] LOG: Applied X Speed 
+[07:02:24.904] LOG: Applied X Speed 
+[07:02:24.904] LOG: Applied X Speed 
+[07:02:24.904] LOG: Applied X Speed 
+[07:02:24.905] LOG: Applied X Speed 
+[07:02:24.906] LOG: Applied X Speed 
+[07:02:24.907] LOG: Applied X Speed 
+[07:02:24.908] LOG: Applied X Speed 
+[07:02:24.908] LOG: Applied X Speed 
+[07:02:24.908] LOG: Applied X Speed 
+[07:02:24.909] LOG: Applied X Speed 
+[07:02:24.909] LOG: Applied X Speed 
+[07:02:24.909] LOG: Applied X Speed 
+[07:02:24.910] LOG: Applied X Speed 
+[07:02:24.910] LOG: Applied X Speed 
+[07:02:24.910] LOG: Applied X Speed 
+[07:02:24.911] LOG: %cStart Phase MovePhase color:green;
+[07:02:24.911] LOG: %cUser: Volcanion
+Move: FLAME_BURST
+Use Mode: NORMAL color:orchid
+[07:02:24.912] LOG: Applied X Speed 
+[07:02:24.913] LOG: Applied X Speed 
+[07:02:24.913] LOG: Applied X Speed 
+[07:02:24.914] LOG: Applied X Speed 
+[07:02:24.914] LOG: Applied X Speed 
+[07:02:24.914] LOG: Applied X Speed 
+[07:02:24.915] LOG: Applied X Speed 
+[07:02:24.915] LOG: Applied X Speed 
+[07:02:24.915] LOG: Applied X Speed 
+[07:02:24.916] LOG: Applied X Speed 
+[07:02:24.916] LOG: Applied X Speed 
+[07:02:24.916] LOG: Applied X Speed 
+[07:02:24.917] LOG: Applied X Speed 
+[07:02:24.918] LOG: Applied X Speed 
+[07:02:24.918] LOG: Applied X Speed 
+[07:02:24.918] LOG: Applied X Speed 
+[07:02:24.919] LOG: Applied X Speed 
+[07:02:24.919] LOG: Applied X Speed 
+[07:02:24.920] LOG: Applied X Speed 
+[07:02:24.920] LOG: Applied X Speed 
+[07:02:24.921] LOG: Applied X Speed 
+[07:02:24.921] LOG: Applied X Speed 
+[07:02:24.921] LOG: Applied X Speed 
+[07:02:24.922] LOG: %cStart Phase MessagePhase color:green;
+[07:02:24.987] LOG: %cStart Phase MoveEffectPhase color:green;
+[07:02:24.990] LOG: crit stage: +0
+[07:02:24.992] LOG: Move: Flame Burst | Base damage: 9.68 | Power: 40 | Source attack: 24 | Target defense: 11
+[07:02:24.994] LOG: Move: Flame Burst | Attack damage: 9
+[07:02:24.995] LOG: crit stage: +0
+[07:02:24.997] LOG: Move: Flame Burst | Base damage: 7.632000000000001 | Power: 40 | Source attack: 24 | Target defense: 15
+[07:02:24.998] LOG: Move: Flame Burst | Attack damage: 7
+[07:02:24.999] LOG: crit stage: +0
+[07:02:25.000] LOG: Move: Flame Burst | Base damage: 11.386666666666667 | Power: 40 | Source attack: 24 | Target defense: 9
+[07:02:25.000] LOG: Move: Flame Burst | Attack damage: 6
+[07:02:25.001] LOG: %cStart Phase DamageAnimPhase color:green;
+[07:02:25.023] LOG: %cStart Phase MessagePhase color:green;
+[07:02:25.222] LOG: %cStart Phase DamageAnimPhase color:green;
+[07:02:25.229] LOG: %cStart Phase DamageAnimPhase color:green;
+[07:02:25.257] LOG: %cStart Phase MessagePhase color:green;
+[07:02:25.471] LOG: %cStart Phase DamageAnimPhase color:green;
+[07:02:25.478] LOG: %cStart Phase DamageAnimPhase color:green;
+[07:02:25.506] LOG: %cStart Phase DamageAnimPhase color:green;
+[07:02:25.508] LOG: %cStart Phase FaintPhase color:green;
+[07:02:25.509] LOG: Applied X Speed 
+[07:02:25.510] LOG: Applied X Speed 
+[07:02:25.510] LOG: Applied X Speed 
+[07:02:25.511] LOG: Applied X Speed 
+[07:02:25.511] LOG: Applied X Speed 
+[07:02:25.512] LOG: Applied X Speed 
+[07:02:25.512] LOG: Applied X Speed 
+[07:02:25.512] LOG: Applied X Speed 
+[07:02:25.513] LOG: Applied X Speed 
+[07:02:25.514] LOG: Applied X Speed 
+[07:02:25.514] LOG: Applied X Speed 
+[07:02:25.514] LOG: Applied X Speed 
+[07:02:25.572] LOG: Applied X Speed 
+[07:02:25.573] LOG: Applied X Speed 
+[07:02:25.574] LOG: Applied X Speed 
+[07:02:25.575] LOG: Applied X Speed 
+[07:02:25.575] LOG: Applied X Speed 
+[07:02:25.576] LOG: Applied X Speed 
+[07:02:25.577] LOG: Applied X Speed 
+[07:02:25.578] LOG: Applied X Speed 
+[07:02:25.578] LOG: Applied X Speed 
+[07:02:25.579] LOG: Applied X Speed 
+[07:02:25.580] LOG: Applied X Speed 
+[07:02:25.581] LOG: Applied X Speed 
+[07:02:25.582] LOG: %cStart Phase MessagePhase color:green;
+[07:02:25.766] LOG: %cStart Phase ShowAbilityPhase color:green;
+[07:02:25.924] LOG: %cStart Phase StatStageChangePhase color:green;
+[07:02:25.926] LOG: %cStart Phase MessagePhase color:green;
+[07:02:26.137] LOG: %cStart Phase HideAbilityPhase color:green;
+[07:02:26.175] LOG: %cStart Phase VictoryPhase color:green;
+[07:02:26.176] LOG: %cStart Phase ExpPhase color:green;
+[07:02:26.392] LOG: %cStart Phase ExpPhase color:green;
+[07:02:26.591] LOG: %cStart Phase ExpPhase color:green;
+[07:02:33.893] LOG: %cStart Phase FaintPhase color:green;
+[07:02:33.897] LOG: Applied X Speed 
+[07:02:33.897] LOG: Applied X Speed 
+[07:02:33.898] LOG: Applied X Speed 
+[07:02:33.899] LOG: Applied X Speed 
+[07:02:33.899] LOG: Applied X Speed 
+[07:02:33.900] LOG: Applied X Speed 
+[07:02:33.901] LOG: Applied X Speed 
+[07:02:33.901] LOG: Applied X Speed 
+[07:02:33.902] LOG: Applied X Speed 
+[07:02:33.903] LOG: Applied X Speed 
+[07:02:33.903] LOG: Applied X Speed 
+[07:02:33.904] LOG: Applied X Speed 
+[07:02:33.904] WARN: cry/10628 not found
+[07:02:33.958] LOG: Applied X Speed 
+[07:02:33.959] LOG: Applied X Speed 
+[07:02:33.960] LOG: Applied X Speed 
+[07:02:33.961] LOG: Applied X Speed 
+[07:02:33.961] LOG: Applied X Speed 
+[07:02:33.962] LOG: Applied X Speed 
+[07:02:33.963] LOG: Applied X Speed 
+[07:02:33.964] LOG: Applied X Speed 
+[07:02:33.964] LOG: Applied X Speed 
+[07:02:33.965] LOG: Applied X Speed 
+[07:02:33.966] LOG: Applied X Speed 
+[07:02:33.966] LOG: Applied X Speed 
+[07:02:33.968] LOG: %cStart Phase MessagePhase color:green;
