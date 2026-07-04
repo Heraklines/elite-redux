@@ -101,7 +101,9 @@ jobs:
             echo "timestamp: ${TS}"
             echo
             echo "----- driver lines -----"
-            grep -E '^\[coop-soak\]' dev-logs/coop-soak/soak-output.txt || echo "(no [coop-soak] lines captured)"
+            # NOT line-anchored: vitest prefixes captured output with "stdout |" markers + ANSI codes,
+            # so an anchored grep missed every driver line (incl. the SEED) in run 28709099279's summary.
+            grep -E '\[coop-soak\]' dev-logs/coop-soak/soak-output.txt || echo "(no [coop-soak] lines captured)"
             echo
             echo "----- vitest result tail -----"
             tail -n 40 dev-logs/coop-soak/soak-output.txt || true
