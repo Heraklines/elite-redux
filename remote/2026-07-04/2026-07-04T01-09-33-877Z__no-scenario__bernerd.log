@@ -1,0 +1,291 @@
+url:      https://elite-redux-staging.pages.dev/
+build:    mr5n8px7-2um
+mode:     4  wave:1
+seed:     Pzf1L9GCSJq9fus4FOpPlmeX
+party:    Iron Valiant(L5 23hp f0), Gimmighoul(L5 23hp f0), Kecleon(L5 22hp f0), Marbeep(L5 23hp f0), Zigzagoon(L5 20hp f0), Snorunt Redux(L5 22hp f0)
+enemy:    Hoppip(L2), Patrat(L2), Bidoof(L2)
+
+----- CONSOLE -----
+[00:58:21.048] LOG: Ran PSP for: Ekans
+[00:58:21.052] LOG: %cStart Phase PostSummonPhase color:green;
+[00:58:21.053] LOG: %cStart Phase PostSummonPhase color:green;
+[00:58:21.053] LOG: %cStart Phase TurnInitPhase color:green;
+[00:58:21.053] LOG: %cStart Phase CommandPhase color:green;
+[00:58:23.318] WARN: cry/1006 not found
+[00:58:24.262] WARN: cry/1006 not found
+[00:58:27.563] WARN: cry/1006 not found
+[01:07:09.074] LOG: Move: SECRET_SWORD Move targets: {"targets":[3,4,1],"multiple":false} 
+Player Pokemon: Iron Valiant
+[01:07:09.078] LOG: %cStart Phase SelectTargetPhase color:green;
+[01:07:10.188] LOG: %cStart Phase CommandPhase color:green;
+[01:07:11.712] LOG: Move: PLAY_ROUGH Move targets: {"targets":[3,4,1],"multiple":false} 
+Player Pokemon: Iron Valiant
+[01:07:11.714] LOG: %cStart Phase SelectTargetPhase color:green;
+[01:07:12.730] LOG: %cStart Phase CommandPhase color:green;
+[01:07:15.297] LOG: %cStart Phase CommandPhase color:green;
+[01:07:23.652] WARN: cry/1006 not found
+[01:07:26.422] WARN: cry/1006 not found
+[01:07:26.620] WARN: cry/999 not found
+[01:07:29.767] DEBUG: Session data saved to slot 2!
+[01:07:30.863] LOG: Seed: wwsbN9jk6sFKg4k5edzIGl93
+[01:07:30.863] LOG: Wave Seed: wwsbN9jk6sFKg4k5edzIGl93 0
+[01:07:31.030] WARN: AnimationManager key already exists: prompt
+[01:07:31.030] WARN: AnimationManager key already exists: tera_sparkle
+[01:07:31.030] LOG: Seed: IO7itP9G8NxVLRX33tMU8sPX
+[01:07:31.030] LOG: Wave Seed: IO7itP9G8NxVLRX33tMU8sPX 0
+[01:07:33.534] LOG: %cStart Phase LoginPhase color:green;
+[01:07:33.956] LOG: Client Session: qjUdUBXu3keBPrDRt7uuGPLkvhNgSGPW
+[01:07:34.359] LOG: %cStart Phase TitlePhase color:green;
+[01:07:34.361] LOG: Getting Session Slot id: %d 2
+[01:07:34.374] LOG: use seasonal splash messages true
+[01:07:37.437] LOG: %cStart Phase SelectChallengePhase color:green;
+[01:07:38.242] LOG: %cStart Phase SelectStarterPhase color:green;
+[01:07:40.947] WARN: cry/10029 not found
+[01:07:40.956] WARN: cry/999 not found
+[01:07:40.960] WARN: cry/1006 not found
+[01:07:40.964] WARN: cry/10807 not found
+[01:07:45.639] LOG: Getting Session Slot id: %d 0
+[01:07:45.642] LOG: Getting Session Slot id: %d 1
+[01:07:45.644] LOG: Getting Session Slot id: %d 2
+[01:07:45.646] LOG: Getting Session Slot id: %d 3
+[01:07:45.646] LOG: Getting Session Slot id: %d 4
+[01:07:45.663] ERROR: TypeError: undefined is not a constructor
+TypeError: undefined is not a constructor
+    at ModifierData.toModifier (https://elite-redux-staging.pages.dev/assets/er-map-nodes-DuqLZmvz.js:6:497518)
+    at SessionSlot.setupWithData (https://elite-redux-staging.pages.dev/assets/battle-scene-C5imAQXg.js:1044:3574)
+    at https://elite-redux-staging.pages.dev/assets/battle-scene-C5imAQXg.js:1044:3935
+[01:07:45.663] ERROR: TypeError: undefined is not a constructor
+TypeError: undefined is not a constructor
+    at ModifierData.toModifier (https://elite-redux-staging.pages.dev/assets/er-map-nodes-DuqLZmvz.js:6:497518)
+    at SessionSlot.setupWithData (https://elite-redux-staging.pages.dev/assets/battle-scene-C5imAQXg.js:1044:3574)
+    at https://elite-redux-staging.pages.dev/assets/battle-scene-C5imAQXg.js:1044:3935
+[01:07:45.677] ERROR: TypeError: undefined is not a constructor
+TypeError: undefined is not a constructor
+    at ModifierData.toModifier (https://elite-redux-staging.pages.dev/assets/er-map-nodes-DuqLZmvz.js:6:497518)
+    at SessionSlot.setupWithData (https://elite-redux-staging.pages.dev/assets/battle-scene-C5imAQXg.js:1044:3574)
+    at https://elite-redux-staging.pages.dev/assets/battle-scene-C5imAQXg.js:1044:3935
+[01:07:45.677] LOG: Getting Session Slot id: %d 2
+[01:07:45.891] ERROR: Invalid save data JSON detected! Session not found.
+[01:07:45.892] ERROR: Invalid save data JSON detected! Session not found.
+[01:07:51.672] DEBUG: %cSending a request to delete session in slot %d color: blue 2
+[01:07:51.702] LOG: Wave Seed: JP8juQ:H9OyWMSY44uNV9tQY 1
+[01:07:51.703] LOG: %cStart Phase EncounterPhase color:green;
+[01:07:51.706] LOG: Starting species pool tier: UNCOMMON
+[01:07:51.716] LOG: Pokemon: Wild Venipede | Species ID: 543 | Level: 2 | Nature: Naive (+Spd/-SpDef)
+[01:07:51.716] LOG: Stats (IVs): HP: 13 (2), Atk: 6 (1), Def: 7 (2), Spatk: 6 (12), Spdef: 5 (20), Spd: 8 (24)
+[01:07:51.716] LOG: Ability: Unnerve | Passive Ability: Poison Point 
+[01:07:51.716] LOG: Moveset: ["Skitter Smack","Defense Curl","Rollout (P)","Poison Sting"]
+[01:07:51.716] LOG: Starting species pool tier: UNCOMMON
+[01:07:51.724] LOG: Pokemon: Wild Whismur | Species ID: 293 | Level: 2 | Nature: Serious (-)
+[01:07:51.724] LOG: Stats (IVs): HP: 14 (1), Atk: 7 (9), Def: 6 (30), Spatk: 8 (26), Spdef: 6 (15), Spd: 7 (31)
+[01:07:51.724] LOG: Ability: Loud Bang | Passive Ability: Soundproof 
+[01:07:51.724] LOG: Moveset: ["Growl","Howl","Astonish","Screech"]
+[01:07:51.725] LOG: Starting species pool tier: UNCOMMON
+[01:07:51.728] LOG: Pokemon: Wild Fidough | Species ID: 926 | Level: 2 | Nature: Naive (+Spd/-SpDef)
+[01:07:51.728] LOG: Stats (IVs): HP: 13 (15), Atk: 7 (4), Def: 7 (1), Spatk: 6 (29), Spdef: 6 (26), Spd: 8 (19)
+[01:07:51.728] LOG: Ability: Aroma Veil | Passive Ability: Well-Baked Body 
+[01:07:51.728] LOG: Moveset: ["Lovely Bite","Howl","Growl"]
+[01:07:53.431] DEBUG: Session data saved to slot 2!
+[01:07:53.432] LOG: Wave Seed: JP8juQ:H9OyWMSY44uNV9tQY 1
+[01:07:53.637] WARN: cry/926 not found
+[01:07:53.895] LOG: %cStart Phase SummonPhase color:green;
+[01:07:54.177] LOG: %cStart Phase ShinySparklePhase color:green;
+[01:07:54.293] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[01:07:54.296] LOG: %cStart Phase SummonPhase color:green;
+[01:07:54.476] WARN: cry/10029 not found
+[01:07:54.576] LOG: %cStart Phase SummonPhase color:green;
+[01:07:54.877] LOG: %cStart Phase ShinySparklePhase color:green;
+[01:07:54.976] LOG: %cStart Phase CheckSwitchPhase color:green;
+[01:07:56.143] LOG: %cStart Phase SwitchPhase color:green;
+[01:08:00.287] LOG: %cStart Phase CheckSwitchPhase color:green;
+[01:08:00.400] LOG: %cStart Phase CheckSwitchPhase color:green;
+[01:08:00.559] LOG: %cStart Phase InitEncounterPhase color:green;
+[01:08:00.571] LOG: %cStart Phase PostSummonPhase color:green;
+[01:08:00.578] LOG: %cStart Phase PostSummonPhase color:green;
+[01:08:00.578] LOG: Ran PSP for: Zigzagoon
+[01:08:00.586] LOG: %cStart Phase PostSummonPhase color:green;
+[01:08:00.591] LOG: %cStart Phase PostSummonPhase color:green;
+[01:08:00.603] LOG: %cStart Phase ShowAbilityPhase color:green;
+[01:08:00.788] LOG: %cStart Phase CommonAnimPhase color:green;
+[01:08:01.285] LOG: %cStart Phase MessagePhase color:green;
+[01:08:01.568] LOG: %cStart Phase HideAbilityPhase color:green;
+[01:08:01.611] LOG: %cStart Phase PostSummonPhase color:green;
+[01:08:01.612] LOG: Ran PSP for: Kecleon
+[01:08:01.620] LOG: %cStart Phase PostSummonPhase color:green;
+[01:08:01.625] LOG: %cStart Phase PostSummonPhase color:green;
+[01:08:01.625] LOG: %cStart Phase MovePhase color:green;
+[01:08:01.625] LOG: %cUser: Kecleon
+Move: SCRATCH
+Use Mode: INDIRECT color:orchid
+[01:08:01.639] LOG: %cStart Phase MessagePhase color:green;
+[01:08:01.734] LOG: %cStart Phase MoveEffectPhase color:green;
+[01:08:01.738] LOG: Battle Seed: ooi3XqR3WzTGv5hr
+[01:08:01.752] LOG: crit stage: +0
+[01:08:01.754] LOG: Move: Scratch | Base damage: 9.771428571428572 | Power: 40 | Source attack: 17 | Target defense: 7
+[01:08:01.755] LOG: Move: Scratch | Attack damage: 14
+[01:08:01.757] LOG: %cStart Phase DamageAnimPhase color:green;
+[01:08:01.791] LOG: %cStart Phase FaintPhase color:green;
+[01:08:02.755] LOG: %cStart Phase MessagePhase color:green;
+[01:08:04.200] LOG: %cStart Phase VictoryPhase color:green;
+[01:08:04.202] LOG: %cStart Phase ExpPhase color:green;
+[01:08:04.395] LOG: %cStart Phase ExpPhase color:green;
+[01:08:04.570] LOG: %cStart Phase ExpPhase color:green;
+[01:08:04.751] LOG: %cStart Phase MoveEndPhase color:green;
+[01:08:04.751] LOG: %cStart Phase ShowAbilityPhase color:green;
+[01:08:04.937] LOG: %cStart Phase HideAbilityPhase color:green;
+[01:08:04.985] LOG: %cStart Phase PostSummonPhase color:green;
+[01:08:04.985] LOG: Ran PSP for: Marbeep
+[01:08:04.993] LOG: %cStart Phase PostSummonPhase color:green;
+[01:08:04.996] LOG: %cStart Phase PostSummonPhase color:green;
+[01:08:04.996] LOG: %cStart Phase ShowAbilityPhase color:green;
+[01:08:05.162] LOG: %cStart Phase HideAbilityPhase color:green;
+[01:08:05.213] LOG: %cStart Phase PostSummonPhase color:green;
+[01:08:05.213] LOG: Ran PSP for: Venipede
+[01:08:05.216] LOG: %cStart Phase PostSummonPhase color:green;
+[01:08:05.216] LOG: Ran PSP for: Fidough
+[01:08:05.219] LOG: %cStart Phase PostSummonPhase color:green;
+[01:08:05.219] LOG: %cStart Phase PostSummonPhase color:green;
+[01:08:05.220] LOG: %cStart Phase PostSummonPhase color:green;
+[01:08:05.220] LOG: %cStart Phase PostSummonPhase color:green;
+[01:08:05.220] LOG: Ran PSP for: Whismur
+[01:08:05.221] LOG: %cStart Phase PostSummonPhase color:green;
+[01:08:05.221] LOG: %cStart Phase PostSummonPhase color:green;
+[01:08:05.221] LOG: %cStart Phase TurnInitPhase color:green;
+[01:08:05.222] LOG: %cStart Phase CommandPhase color:green;
+[01:08:06.397] DEBUG: Session data saved to slot 2!
+[01:08:06.702] DEBUG: Session data saved to slot 2!
+[01:08:07.515] LOG: Seed: KvVZIpbIn66jn7ThO23nEk0c
+[01:08:07.515] LOG: Wave Seed: KvVZIpbIn66jn7ThO23nEk0c 0
+[01:08:07.638] WARN: AnimationManager key already exists: prompt
+[01:08:07.638] WARN: AnimationManager key already exists: tera_sparkle
+[01:08:07.638] LOG: Seed: Pzf1L9GCSJq9fus4FOpPlmeX
+[01:08:07.638] LOG: Wave Seed: Pzf1L9GCSJq9fus4FOpPlmeX 0
+[01:08:10.306] LOG: %cStart Phase LoginPhase color:green;
+[01:08:10.820] LOG: Client Session: qjUdUBXu3keBPrDRt7uuGPLkvhNgSGPW
+[01:08:11.237] LOG: %cStart Phase TitlePhase color:green;
+[01:08:11.238] LOG: Getting Session Slot id: %d 2
+[01:08:11.244] LOG: use seasonal splash messages true
+[01:08:14.073] LOG: %cStart Phase SelectChallengePhase color:green;
+[01:08:15.000] LOG: %cStart Phase SelectStarterPhase color:green;
+[01:08:18.434] WARN: cry/10029 not found
+[01:08:18.449] WARN: cry/999 not found
+[01:08:18.454] WARN: cry/1006 not found
+[01:08:18.459] WARN: cry/10807 not found
+[01:08:20.457] LOG: Getting Session Slot id: %d 0
+[01:08:20.459] LOG: Getting Session Slot id: %d 1
+[01:08:20.461] LOG: Getting Session Slot id: %d 2
+[01:08:20.463] LOG: Getting Session Slot id: %d 3
+[01:08:20.463] LOG: Getting Session Slot id: %d 4
+[01:08:20.481] ERROR: TypeError: undefined is not a constructor
+TypeError: undefined is not a constructor
+    at ModifierData.toModifier (https://elite-redux-staging.pages.dev/assets/er-map-nodes-DuqLZmvz.js:6:497518)
+    at SessionSlot.setupWithData (https://elite-redux-staging.pages.dev/assets/battle-scene-C5imAQXg.js:1044:3574)
+    at https://elite-redux-staging.pages.dev/assets/battle-scene-C5imAQXg.js:1044:3935
+[01:08:20.481] ERROR: TypeError: undefined is not a constructor
+TypeError: undefined is not a constructor
+    at ModifierData.toModifier (https://elite-redux-staging.pages.dev/assets/er-map-nodes-DuqLZmvz.js:6:497518)
+    at SessionSlot.setupWithData (https://elite-redux-staging.pages.dev/assets/battle-scene-C5imAQXg.js:1044:3574)
+    at https://elite-redux-staging.pages.dev/assets/battle-scene-C5imAQXg.js:1044:3935
+[01:08:20.497] ERROR: TypeError: undefined is not a constructor
+TypeError: undefined is not a constructor
+    at ModifierData.toModifier (https://elite-redux-staging.pages.dev/assets/er-map-nodes-DuqLZmvz.js:6:497518)
+    at SessionSlot.setupWithData (https://elite-redux-staging.pages.dev/assets/battle-scene-C5imAQXg.js:1044:3574)
+    at https://elite-redux-staging.pages.dev/assets/battle-scene-C5imAQXg.js:1044:3935
+[01:08:20.498] LOG: Getting Session Slot id: %d 2
+[01:08:20.759] ERROR: Invalid save data JSON detected! Session not found.
+[01:08:20.760] ERROR: Invalid save data JSON detected! Session not found.
+[01:08:25.361] DEBUG: %cSending a request to delete session in slot %d color: blue 2
+[01:08:25.386] LOG: Wave Seed: Q{g2M:HDTKr:gvt5GPqQmnfY 1
+[01:08:25.387] LOG: %cStart Phase EncounterPhase color:green;
+[01:08:25.389] LOG: Starting species pool tier: COMMON
+[01:08:25.399] LOG: Pokemon: Wild Hoppip | Species ID: 187 | Level: 2 | Nature: Lonely (+Atk/-Def)
+[01:08:25.399] LOG: Stats (IVs): HP: 13 (16), Atk: 8 (14), Def: 5 (3), Spatk: 7 (15), Spdef: 7 (5), Spd: 7 (1)
+[01:08:25.399] LOG: Ability: Leaf Guard | Passive Ability: Chloroplast 
+[01:08:25.399] LOG: Moveset: ["Mega Drain","Stun Spore","Poison Powder","Quash"]
+[01:08:25.399] LOG: Starting species pool tier: COMMON
+[01:08:25.403] LOG: Pokemon: Wild Patrat | Species ID: 504 | Level: 2 | Nature: Naive (+Spd/-SpDef)
+[01:08:25.403] LOG: Stats (IVs): HP: 13 (1), Atk: 8 (24), Def: 6 (9), Spatk: 6 (8), Spdef: 6 (25), Spd: 9 (14)
+[01:08:25.404] LOG: Ability: Stakeout | Passive Ability: Analytic 
+[01:08:25.404] LOG: Moveset: ["Hyper Fang","Stuff Cheeks","Leer","Hypnosis"]
+[01:08:25.404] LOG: Starting species pool tier: COMMON
+[01:08:25.410] LOG: Pokemon: Wild Bidoof | Species ID: 399 | Level: 2 | Nature: Jolly (+Spd/-SpAtk)
+[01:08:25.410] LOG: Stats (IVs): HP: 15 (23), Atk: 6 (4), Def: 7 (11), Spatk: 5 (12), Spdef: 6 (10), Spd: 7 (27)
+[01:08:25.410] LOG: Ability: Lumberjack | Passive Ability: Unaware 
+[01:08:25.410] LOG: Moveset: ["Hyper Fang","Strength","Defense Curl","Mud Sport"]
+[01:08:26.666] DEBUG: Session data saved to slot 2!
+[01:08:26.666] LOG: Wave Seed: Q{g2M:HDTKr:gvt5GPqQmnfY 1
+[01:08:27.149] LOG: %cStart Phase SummonPhase color:green;
+[01:08:27.448] LOG: %cStart Phase ShinySparklePhase color:green;
+[01:08:27.564] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[01:08:27.566] LOG: %cStart Phase SummonPhase color:green;
+[01:08:27.757] WARN: cry/10029 not found
+[01:08:27.856] LOG: %cStart Phase SummonPhase color:green;
+[01:08:28.139] LOG: %cStart Phase ShinySparklePhase color:green;
+[01:08:28.239] LOG: %cStart Phase CheckSwitchPhase color:green;
+[01:08:29.281] LOG: %cStart Phase SwitchPhase color:green;
+[01:08:52.050] LOG: %cStart Phase SwitchSummonPhase color:green;
+[01:08:52.299] WARN: cry/1006 not found
+[01:08:52.428] LOG: %cStart Phase PostSummonPhase color:green;
+[01:08:52.428] LOG: Ran PSP for: Iron Valiant
+[01:08:52.431] LOG: %cStart Phase PostSummonPhase color:green;
+[01:08:52.431] LOG: %cStart Phase PostSummonPhase color:green;
+[01:08:52.432] LOG: %cStart Phase CheckSwitchPhase color:green;
+[01:08:52.697] LOG: %cStart Phase SwitchPhase color:green;
+[01:08:53.825] LOG: %cStart Phase SwitchSummonPhase color:green;
+[01:08:54.081] WARN: cry/999 not found
+[01:08:54.207] LOG: %cStart Phase PostSummonPhase color:green;
+[01:08:54.207] LOG: Ran PSP for: Gimmighoul
+[01:08:54.210] LOG: %cStart Phase PostSummonPhase color:green;
+[01:08:54.213] LOG: %cStart Phase ShowAbilityPhase color:green;
+[01:08:54.374] LOG: %cStart Phase MessagePhase color:green;
+[01:08:54.614] LOG: %cStart Phase HideAbilityPhase color:green;
+[01:08:54.650] LOG: %cStart Phase PostSummonPhase color:green;
+[01:08:54.650] LOG: %cStart Phase CheckSwitchPhase color:green;
+[01:08:55.063] LOG: %cStart Phase SwitchPhase color:green;
+[01:08:58.136] LOG: %cStart Phase SwitchSummonPhase color:green;
+[01:08:58.499] LOG: %cStart Phase ShinySparklePhase color:green;
+[01:08:58.589] LOG: %cStart Phase PostSummonPhase color:green;
+[01:08:58.589] LOG: Ran PSP for: Kecleon
+[01:08:58.591] LOG: %cStart Phase PostSummonPhase color:green;
+[01:08:58.591] LOG: %cStart Phase PostSummonPhase color:green;
+[01:08:58.591] LOG: %cStart Phase MovePhase color:green;
+[01:08:58.591] LOG: %cUser: Kecleon
+Move: SCRATCH
+Use Mode: INDIRECT color:orchid
+[01:08:58.602] LOG: %cStart Phase MessagePhase color:green;
+[01:08:58.705] LOG: %cStart Phase MoveEffectPhase color:green;
+[01:08:58.706] LOG: Battle Seed: VOwMtRBwElHMPG4F
+[01:08:58.723] LOG: crit stage: +0
+[01:08:58.724] LOG: Move: Scratch | Base damage: 12.88 | Power: 40 | Source attack: 17 | Target defense: 5
+[01:08:58.724] LOG: Move: Scratch | Attack damage: 18
+[01:08:58.725] LOG: %cStart Phase DamageAnimPhase color:green;
+[01:08:58.757] LOG: %cStart Phase FaintPhase color:green;
+[01:08:59.471] LOG: %cStart Phase MessagePhase color:green;
+[01:08:59.902] LOG: %cStart Phase VictoryPhase color:green;
+[01:08:59.903] LOG: %cStart Phase ExpPhase color:green;
+[01:09:00.106] LOG: %cStart Phase ExpPhase color:green;
+[01:09:00.407] LOG: %cStart Phase ExpPhase color:green;
+[01:09:00.724] LOG: %cStart Phase MoveEndPhase color:green;
+[01:09:00.724] LOG: %cStart Phase InitEncounterPhase color:green;
+[01:09:00.725] LOG: %cStart Phase PostSummonPhase color:green;
+[01:09:00.725] LOG: Ran PSP for: Patrat
+[01:09:00.727] LOG: %cStart Phase PostSummonPhase color:green;
+[01:09:00.727] LOG: %cStart Phase PostSummonPhase color:green;
+[01:09:00.727] LOG: %cStart Phase PostSummonPhase color:green;
+[01:09:00.727] LOG: Ran PSP for: Bidoof
+[01:09:00.728] LOG: %cStart Phase PostSummonPhase color:green;
+[01:09:00.728] LOG: %cStart Phase PostSummonPhase color:green;
+[01:09:00.728] LOG: %cStart Phase TurnInitPhase color:green;
+[01:09:00.728] LOG: %cStart Phase CommandPhase color:green;
+[01:09:02.895] LOG: Move: SECRET_SWORD Move targets: {"targets":[4,1],"multiple":false} 
+Player Pokemon: Iron Valiant
+[01:09:02.897] LOG: %cStart Phase SelectTargetPhase color:green;
+[01:09:03.688] LOG: %cStart Phase CommandPhase color:green;
+[01:09:04.869] LOG: Move: HAPPY_HOUR Move targets: {"targets":[1,0,2],"multiple":true} 
+Player Pokemon: Gimmighoul
+[01:09:04.871] LOG: %cStart Phase SelectTargetPhase color:green;
+[01:09:05.065] LOG: %cStart Phase CommandPhase color:green;
+[01:09:06.389] LOG: Move: FAKE_OUT Move targets: {"targets":[4,5,1],"multiple":false} 
+Player Pokemon: Kecleon
+[01:09:06.392] LOG: %cStart Phase SelectTargetPhase color:green;
+[01:09:06.954] LOG: %cStart Phase CommandPhase color:green;
