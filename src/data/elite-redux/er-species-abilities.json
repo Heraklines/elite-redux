@@ -35,6 +35,15 @@
       142
     ]
   },
+  "SPECIES_BRELOOM_MEGA": {
+    "ability1": 5135,
+    "hidden": 203,
+    "innates": [
+      5026,
+      137,
+      101
+    ]
+  },
   "SPECIES_DEERLING": {
     "ability1": 91,
     "ability2": 92,
@@ -75,6 +84,9 @@
       5563
     ]
   },
+  "SPECIES_GRANBULL_MEGA": {
+    "ability2": 62
+  },
   "SPECIES_GROWLITHE_REDUX": {
     "hidden": 1,
     "innates": [
@@ -82,6 +94,9 @@
       181,
       18
     ]
+  },
+  "SPECIES_HARIYAMA_MEGA": {
+    "ability1": 62
   },
   "SPECIES_HISUI_ZORUA": {
     "ability1": 5171,
@@ -93,11 +108,22 @@
       290
     ]
   },
+  "SPECIES_HOUNDOOM_MEGA_REDUX": {
+    "ability1": 138,
+    "ability2": 5327
+  },
   "SPECIES_HYDREIGON_REDUX_MEGA": {
     "innates": [
       5355,
       5085,
       5426
+    ]
+  },
+  "SPECIES_KANGASKHAN_MEGA": {
+    "innates": [
+      185,
+      113,
+      62
     ]
   },
   "SPECIES_KINGAMBIT_REDUX": {
@@ -118,6 +144,53 @@
       5169,
       22,
       5304
+    ]
+  },
+  "SPECIES_LUXRAY_MEGA": {
+    "innates": [
+      5410,
+      62,
+      5174
+    ]
+  },
+  "SPECIES_MACHAMP": {
+    "ability1": 125,
+    "hidden": 62
+  },
+  "SPECIES_MACHAMP_MEGA": {
+    "hidden": 62
+  },
+  "SPECIES_MACHAMP_REDUX": {
+    "hidden": 192,
+    "innates": [
+      5064,
+      89,
+      5059
+    ]
+  },
+  "SPECIES_MACHOKE": {
+    "ability1": 125,
+    "hidden": 89
+  },
+  "SPECIES_MACHOKE_REDUX": {
+    "hidden": 192,
+    "innates": [
+      99,
+      89,
+      5059
+    ]
+  },
+  "SPECIES_MACHOP": {
+    "ability1": 125,
+    "ability2": 89,
+    "hidden": 62
+  },
+  "SPECIES_MACHOP_REDUX": {
+    "hidden": 192,
+    "innates": [
+      99,
+      89,
+      5059
     ]
   },
   "SPECIES_MEDITITE": {
