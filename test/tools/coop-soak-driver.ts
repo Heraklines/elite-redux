@@ -73,12 +73,15 @@ import {
 } from "#data/elite-redux/coop/coop-runtime";
 import { COOP_GUEST_FIELD_INDEX, COOP_HOST_FIELD_INDEX } from "#data/elite-redux/coop/coop-session";
 import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
+import { COOP_UI_MIRRORED_MODES } from "#data/elite-redux/coop/coop-ui-registry";
+import { TerrainType } from "#data/terrain";
 import { BattleType } from "#enums/battle-type";
 import type { BattlerIndex } from "#enums/battler-index";
 import { Button } from "#enums/buttons";
 import { Command } from "#enums/command";
 import { GameModes } from "#enums/game-modes";
 import { UiMode } from "#enums/ui-mode";
+import { WeatherType } from "#enums/weather-type";
 import type { Pokemon } from "#field/pokemon";
 import { getCoopMeHostPresentation } from "#phases/coop-replay-me-phase";
 import { coopMeInteractionStartValue } from "#phases/mystery-encounter-phases";
@@ -96,6 +99,13 @@ import {
   withClient,
   withClientSync,
 } from "#test/tools/coop-duo-harness";
+import {
+  bandForSeq,
+  COOP_SOAK_SITUATIONS,
+  type CoopSoakSituation,
+  createSoakHitSet,
+  type SoakHitSet,
+} from "#test/tools/coop-soak-coverage";
 import type { PartyUiHandler } from "#ui/handlers/party-ui-handler";
 import fs from "node:fs";
 import path from "node:path";
@@ -235,6 +245,13 @@ export interface SoakResult {
    * fixed rival waves it crossed). Split into fixed vs random by whether the wave is a gameMode fixed battle.
    */
   trainerWaves: { total: number; fixed: number; random: number };
+  /**
+   * COMPLETENESS BACKSTOP (#849): every co-op interactive surface the run OBSERVED, per dimension (modes /
+   * relay kinds / seq bands / battle-flow situations). The EXPECTED set is derived from the registries, so
+   * a surface that is neither hit here nor declared undrivable auto-reds. The caller feeds this to
+   * {@linkcode logSoakCoverage} (always) + {@linkcode assertSoakCompleteness} (enforced at >= the gate).
+   */
+  hits: SoakHitSet;
 }
 
 /** Options for a single soak run. */
@@ -414,6 +431,28 @@ function pickTargets(hostScene: BattleScene): {
 // opens its CoopGuestFaintSwitchPhase PARTY picker (auto-picked by stubbing the one PARTY setMode during
 // the guest replay pump). See coop-duo-faint-switch.test.ts - this is that test's pattern, made continuous.
 // ---------------------------------------------------------------------------
+
+/**
+ * Restore ALL move PP on a scene's player party. #849 GOD-PARTY survivability knob: with a FIXED-slot
+ * seeded move picker + a god-tier party that reaches the deep endgame (waves 90+), a move's PP would
+ * eventually FULLY deplete, and the picker's last-resort fallback (the raw moveset, when every selectable
+ * move is spent) would hand `game.move.select` a no-PP move - which the framework rejects ("not in
+ * moveset", getMovePosition gates on `ppUsed < movePp`), STRANDING the run (seed 20260704 wave 90). This
+ * is the SAME class as the every-10-waves PartyHealPhase (which already restores PP), just applied per-wave
+ * so a long god run never strands on Struggle. It is a determinism/survivability knob (like startingLevel /
+ * force-hit / the moveset override), NOT content narrowing - it disables no enemy content and both engines
+ * still replay the SAME forced events. Called on the host at wave-start; the re-mirror + heal carry it to
+ * the guest (and it is applied to the guest directly too, defensively).
+ */
+function restorePlayerPartyPp(scene: BattleScene): void {
+  for (const mon of scene.getPlayerParty()) {
+    for (const mv of mon.getMoveset()) {
+      if (mv != null) {
+        mv.ppUsed = 0;
+      }
+    }
+  }
+}
 
 /** Tag co-op party-slot ownership on BOTH scenes (host owns EVEN slots, guest ODD) so a faint has a legal
  * same-owner bench. The per-wave mirror copies host `coopOwner` onto the guest, so tagging the host party
@@ -654,6 +693,114 @@ function phaseStateDump(rig: DuoRig): Record<string, unknown> {
 }
 
 // ---------------------------------------------------------------------------
+// #849 COMPLETENESS BACKSTOP taps (module-level so the driver body stays readable).
+// ---------------------------------------------------------------------------
+
+/**
+ * Install the coverage taps (test-side seam wraps, ZERO production change):
+ *   - RELAY tap on BOTH runtimes: every owner-sent choice/outcome records its `kind` (hits.kinds) + the
+ *     seq BAND it rides (bandForSeq -> hits.bands). ONE tap covers every kind + band the run ever sends,
+ *     INCLUDING future ones (a newly-registered kind that actually fires is recorded automatically; one
+ *     that never fires stays cold + is caught by the completeness assertion).
+ *   - PERMANENT guest ui.setMode recorder: every guest setMode targeting a co-op-MIRRORED UiMode records
+ *     hits.modes. The guest is the renderer, so it opens the mirrored screens the headless host bypass
+ *     never shows. The one-shot faint wrapper (driveGuestReplayTurnWithFaint) saves + calls THIS recorder
+ *     as its `realSetMode`, so the two compose.
+ */
+function installCoverageTaps(rig: DuoRig, hits: SoakHitSet): void {
+  const recordSend = (seq: number, kind: string): void => {
+    hits.kinds.add(kind);
+    const band = bandForSeq(seq);
+    if (band != null) {
+      hits.bands.add(band);
+    }
+  };
+  for (const runtime of [rig.hostRuntime, rig.guestRuntime]) {
+    const relay = runtime.interactionRelay as unknown as {
+      sendInteractionChoice: (seq: number, kind: string, choice: number, data?: number[]) => void;
+      sendInteractionOutcome: (seq: number, kind: string, outcome: unknown) => void;
+    };
+    const realChoice = relay.sendInteractionChoice.bind(relay);
+    const realOutcome = relay.sendInteractionOutcome.bind(relay);
+    relay.sendInteractionChoice = (seq, kind, choice, data): void => {
+      recordSend(seq, kind);
+      realChoice(seq, kind, choice, data);
+    };
+    relay.sendInteractionOutcome = (seq, kind, outcome): void => {
+      recordSend(seq, kind);
+      realOutcome(seq, kind, outcome);
+    };
+  }
+  const ui = rig.guestScene.ui as unknown as { setMode: (...args: unknown[]) => unknown };
+  const realSetMode = ui.setMode.bind(ui);
+  ui.setMode = (...args: unknown[]): unknown => {
+    const mode = args[0];
+    if (typeof mode === "number" && COOP_UI_MIRRORED_MODES.has(mode as UiMode)) {
+      hits.modes.add(mode as UiMode);
+    }
+    return realSetMode(...args);
+  };
+}
+
+/**
+ * Record the wave-start battle-SHAPE situations (reusing the host's already-rolled battle): wildDouble /
+ * single / triple for wild waves, trainerFixed / trainerRandom for trainer waves, and boss when an
+ * on-field enemy is a boss. Called once per wave at wave-start.
+ */
+function recordWaveStartSituations(rig: DuoRig, wave: number, hits: SoakHitSet): void {
+  const battle = rig.hostScene.currentBattle;
+  const battlerCount = battle.getBattlerCount();
+  if (battle.battleType === BattleType.TRAINER) {
+    hits.situations.add(
+      rig.hostScene.gameMode.isFixedBattle(wave)
+        ? COOP_SOAK_SITUATIONS.trainerFixed
+        : COOP_SOAK_SITUATIONS.trainerRandom,
+    );
+  } else if (battle.battleType === BattleType.WILD) {
+    hits.situations.add(
+      battlerCount >= 3
+        ? COOP_SOAK_SITUATIONS.triple
+        : battlerCount === 2
+          ? COOP_SOAK_SITUATIONS.wildDouble
+          : COOP_SOAK_SITUATIONS.single,
+    );
+  }
+  if (rig.hostScene.getEnemyField().some(e => e.isBoss())) {
+    hits.situations.add(COOP_SOAK_SITUATIONS.boss);
+  }
+}
+
+/**
+ * Record the per-turn situations sampled at TurnEndPhase (BEFORE the faint pickers drive, so fainted mons
+ * are still on-field): player faint count (singleFaint / doublePlayerFaint), arena weather / terrain
+ * presence, and a mid-turn enemy switch (an enemy field slot whose occupant id changed to a new live mon -
+ * a trainer sending its next mon after a KO, or an enemy voluntary switch). All PROBABILISTIC surfaces.
+ */
+function recordTurnSituations(rig: DuoRig, enemyIdsBefore: number[], hits: SoakHitSet): void {
+  const fainted = rig.hostScene.getPlayerField().filter(m => m?.isFainted()).length;
+  if (fainted >= 1) {
+    hits.situations.add(COOP_SOAK_SITUATIONS.singleFaint);
+  }
+  if (fainted >= 2) {
+    hits.situations.add(COOP_SOAK_SITUATIONS.doublePlayerFaint);
+  }
+  const arena = rig.hostScene.arena;
+  if (arena.weather != null && arena.weather.weatherType !== WeatherType.NONE) {
+    hits.situations.add(COOP_SOAK_SITUATIONS.weather);
+  }
+  if (arena.terrain != null && arena.terrain.terrainType !== TerrainType.NONE) {
+    hits.situations.add(COOP_SOAK_SITUATIONS.terrain);
+  }
+  const enemyIdsAfter = rig.hostScene.getEnemyField().map(e => e.id);
+  for (let i = 0; i < enemyIdsAfter.length; i++) {
+    if (enemyIdsAfter[i] !== enemyIdsBefore[i]) {
+      hits.situations.add(COOP_SOAK_SITUATIONS.enemySwitch);
+      break;
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
 // The driver.
 // ---------------------------------------------------------------------------
 
@@ -675,6 +822,17 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
   let resyncHeals = 0;
   let wavesCompleted = 0;
   const trainerWaves = { total: 0, fixed: 0, random: 0 };
+  // COMPLETENESS BACKSTOP (#849): the surfaces this run observes, populated by the taps installed below.
+  const hits = createSoakHitSet();
+
+  /** Record a battle-flow situation hit (idempotent; a Set). */
+  const hitSituation = (s: CoopSoakSituation): void => {
+    hits.situations.add(s);
+  };
+  /** Record a mirrored-UiMode hit (the command-issue tap uses this; the guest ui recorder filters itself). */
+  const hitMode = (m: UiMode): void => {
+    hits.modes.add(m);
+  };
 
   const bumpSkip = (kind: string): void => {
     skips[kind] = (skips[kind] ?? 0) + 1;
@@ -721,6 +879,11 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
   // tera / moveset via the production field snapshot + arena weather/terrain) - see healGuestFromHost.
   await healGuestFromHost(rig);
 
+  // COMPLETENESS BACKSTOP (#849): install the RELAY-send tap (both runtimes) + the permanent guest
+  // ui.setMode mirrored-mode recorder (test-side seam wraps, ZERO production change). See
+  // installCoverageTaps.
+  installCoverageTaps(rig, hits);
+
   // Wire the guest's OWN-slot command answer (the genuine production CoopBattleSync relay). The guest picks
   // the SAME move the host selects for the guest slot. #843: it reads the HOST's AUTHORITATIVE guest-slot mon
   // (not the guest's own wave-start mirror), so its PP-aware pick matches the host's playWave guest-select
@@ -745,11 +908,18 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
       && !guestSwitchMon.isTrapped()
     ) {
       actionScript.push(`wave ${wave} turn ${turn}: guest SWITCH -> party[${benchSlot}]`);
+      // #849 COMMAND-issue tap: a guest voluntary switch drives the COMMAND menu + the PARTY picker.
+      hitMode(UiMode.COMMAND);
+      hitMode(UiMode.PARTY);
       return { command: Command.POKEMON, cursor: benchSlot };
     }
     const guestMon = rig.hostScene.getPlayerField()[COOP_GUEST_FIELD_INDEX];
     const { guestTarget, guestTargetMon } = pickTargets(rig.hostScene);
     const { slot, moveId } = resolveChosenMove(guestMon, guestTargetMon, seed, wave, GUEST_SLOT_SALT);
+    // #849 COMMAND-issue tap: a guest FIGHT command drives COMMAND + FIGHT (+ TARGET_SELECT for the target).
+    hitMode(UiMode.COMMAND);
+    hitMode(UiMode.FIGHT);
+    hitMode(UiMode.TARGET_SELECT);
     return {
       command: Command.FIGHT,
       cursor: moveSlots.includes(slot) ? slot : (moveSlots[0] ?? 0),
@@ -963,6 +1133,9 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
   const playWave = async (wave: number): Promise<void> => {
     for (let t = 0; t < MAX_TURNS_PER_WAVE; t++) {
       const turn = rig.hostScene.currentBattle.turn;
+      // #849 per-turn SITUATION tap: snapshot the enemy on-field occupants BEFORE the turn so a mid-turn
+      // enemy switch (a trainer sending its next mon after a KO, or an enemy voluntary switch) is detectable.
+      const enemyIdsBefore = rig.hostScene.getEnemyField().map(e => e.id);
       await withClient(rig.hostCtx, async () => {
         const field = rig.hostScene.getPlayerField();
         // The host LOCALLY commands ONLY the slots it OWNS (coopOwner==="host"); a PARTNER (guest-owned)
@@ -1001,11 +1174,19 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
             const benchSlot = firstLegalBenchSlot(rig.hostScene, "host");
             if (switchesThisTurn(seed, wave, turn, HOST_SWITCH_SALT) && benchSlot >= 0 && !mon.isTrapped()) {
               game.doSwitchPokemon(benchSlot);
+              // #849 COMMAND-issue tap: a host voluntary switch drives the COMMAND menu + the PARTY picker.
+              hitMode(UiMode.COMMAND);
+              hitMode(UiMode.PARTY);
               if (isHostSlot) {
                 actionScript.push(`wave ${wave} turn ${turn}: host SWITCH -> party[${benchSlot}]`);
               }
             } else {
               game.move.select(moveId, fi, targetIndex);
+              // #849 COMMAND-issue tap: a host FIGHT command drives COMMAND + FIGHT (+ TARGET_SELECT for the
+              // target). The headless host bypasses the real UI, so the tap synthesizes the mode hits here.
+              hitMode(UiMode.COMMAND);
+              hitMode(UiMode.FIGHT);
+              hitMode(UiMode.TARGET_SELECT);
             }
           }
         }
@@ -1013,6 +1194,9 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
           actionScript.push(`wave ${wave}: host slot move=${hostMoveId} guest slot move=${guestMoveId}`);
         }
         await game.phaseInterceptor.to("TurnEndPhase");
+        // #849 per-turn SITUATION tap (sampled at TurnEndPhase, BEFORE the faint pickers drive so the
+        // fainted mons are still visible on-field): faints / weather / terrain / enemy switch.
+        recordTurnSituations(rig, enemyIdsBefore, hits);
         // #845 host-owned FAINT drive (the NO-PARK strand this run fixed). A HOST-owned mon that fainted
         // THIS turn opens its replacement SwitchPhase - the OWNER-path PARTY picker - at TURN END: AFTER this
         // TurnEndPhase, during the NEXT host crossing (the inter-turn to("CommandPhase") below, or - on a
@@ -1072,6 +1256,8 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
       return;
     }
     const guestShop = withClientSync(rig.guestCtx, () => new SelectModifierPhase()) as unknown as ShopPhaseSeam;
+    // #849: the reward shop is the real MODIFIER_SELECT surface (owner drives, watcher mirrors over the relay).
+    hitMode(UiMode.MODIFIER_SELECT);
 
     let action: string;
     if (hostOwns) {
@@ -1190,6 +1376,11 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
     if (crossedUndrivableWave(wave)) {
       break;
     }
+    // #849 GOD-PARTY: restore the host party's move PP at wave-start so a long god run never fully depletes
+    // a fixed-slot move + strands on a no-PP command (seed 20260704 wave 90). The re-mirror + heal below
+    // carry it to the guest; also applied to the guest directly (defensive). See restorePlayerPartyPp.
+    restorePlayerPartyPp(rig.hostScene);
+    withClientSync(rig.guestCtx, () => restorePlayerPartyPp(rig.guestScene));
     // Re-mirror the host's freshly-rolled battle onto the guest before each new wave (wave 1 was mirrored by
     // buildDuo), then faithfully re-sync the guest (held items / weather / modifiers / scalars).
     if (wave > 1) {
@@ -1208,6 +1399,10 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
       }
       actionScript.push(`wave ${wave}: TRAINER (${rig.hostScene.gameMode.isFixedBattle(wave) ? "fixed" : "random"})`);
     }
+
+    // #849 wave-start SITUATION tap: classify the wave's battle SHAPE (wildDouble / single / triple /
+    // trainerFixed / trainerRandom / boss) - see recordWaveStartSituations.
+    recordWaveStartSituations(rig, wave, hits);
 
     // BOSS-LIKE (auto-grant reward tail, interaction counter +0). Two classes:
     //   - a real BOSS (isBoss on an on-field enemy): its VictoryPhase auto-grants via ModifierRewardPhase.
@@ -1281,6 +1476,13 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
     }
   }
 
+  // #849: the #848 host-half-exhaustion terminal is a distinct situation the run REACHED (the run-end
+  // detector classified it). Recorded opportunistically; the surface itself is DECLARED undrivable (the
+  // ASYMMETRIC continuation is not driven), so this only enriches the report, never gates.
+  if (runEnded != null && /HALF exhausted/i.test(runEnded.reason)) {
+    hitSituation(COOP_SOAK_SITUATIONS.hostHalfExhausted);
+  }
+
   assertTeardown();
   return {
     seed,
@@ -1293,5 +1495,6 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
     findings,
     runEnded,
     trainerWaves,
+    hits,
   };
 }

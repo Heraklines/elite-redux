@@ -1,0 +1,807 @@
+/*
+ * SPDX-FileCopyrightText: 2024-2026 Pagefault Games
+ * SPDX-License-Identifier: AGPL-3.0-only
+ */
+
+// =============================================================================
+// CO-OP SOAK COMPLETENESS BACKSTOP (#849). The machine-enforced answer to the
+// maintainer's "make sure that all in-game interactions are being tested": the soak
+// must PROVE it exercises every registered co-op interactive surface it can drive, and
+// LOUDLY skip-count every surface it deliberately cannot. The EXPECTED set is derived
+// AT RUNTIME from the registries (never hardcoded), so NEW content (a newly-added
+// mirrored UiMode, a new relay kind, a new seq band) auto-REDS until it is either
+// driven by the soak or explicitly declared undrivable with a follow-up task.
+//
+// THE SURFACE MODEL. A co-op interactive "surface" is one (dimension, value) pair:
+//   - mode:<UiMode name>   - a co-op-MIRRORED UiMode (from COOP_UI_MIRRORED_MODES)
+//   - kind:<relay kind>    - a relay `kind` string (from COOP_RELAY_KINDS)
+//   - band:<seq band key>  - a relay seq band (from COOP_SEQ_BANDS)
+//   - situation:<name>     - a battle-flow situation (from COOP_SOAK_SITUATIONS, the
+//                            ONLY hand-listed dimension - no registry exists for it)
+//
+// THE PARTITION (asserted total + disjoint). EXPECTED (from the registries) splits as
+//   EXPECTED = UNDRIVABLE  U  GUARANTEED  U  PROBABILISTIC
+// where UNDRIVABLE is the hand-maintained registry of today's deliberate omissions
+// (each naming its follow-up coverage task), and DRIVABLE = EXPECTED - UNDRIVABLE splits
+// into GUARANTEED (hit every sufficiently-long run by construction) and PROBABILISTIC
+// (hit only some runs; asserted against a cross-run UNION ledger). Any EXPECTED surface
+// that is in NONE of the three is the ANTI-SILENT-DROP RED ("in a registry but neither
+// driven nor declared undrivable - classify it") - this is what makes new content
+// auto-red.
+//
+// GATING. The FULL enforcement (every GUARANTEED surface hit + the partition check)
+// runs only when the run surveyed at least COMPLETENESS_ASSERT_MIN waves. Below that
+// (the 25-wave PR default) the coverage is REPORT-ONLY (logSoakCoverage, assert
+// nothing) so PRs stay green + fast. See assertSoakCompleteness.
+//
+// This module imports the registries + the UiMode enum (leaves) + node fs/path; it does
+// NOT import the coop runtime, so it stays a pure test-side classifier.
+// =============================================================================
+
+import { COOP_RELAY_KINDS, COOP_SEQ_BANDS, coopSeqBandRange } from "#data/elite-redux/coop/coop-seq-registry";
+import { COOP_UI_MIRRORED_MODES } from "#data/elite-redux/coop/coop-ui-registry";
+import { UiMode } from "#enums/ui-mode";
+import fs from "node:fs";
+import path from "node:path";
+
+// ---------------------------------------------------------------------------
+// The situation dimension (the only hand-listed one - no registry exists for
+// battle-flow situations). Adding a value here without classifying it below is
+// caught by the partition check exactly like a new registry entry.
+// ---------------------------------------------------------------------------
+
+/**
+ * Every battle-flow SITUATION the soak tracks. A `const` object (not a TS `enum`) so the wire key is the
+ * literal string value AND the identifier stays the design's `COOP_SOAK_SITUATIONS` name (a PascalCase
+ * enum name / CONSTANT_CASE member rename would ripple through every tap). {@linkcode CoopSoakSituation}
+ * is the value union.
+ */
+export const COOP_SOAK_SITUATIONS = {
+  wildDouble: "wildDouble",
+  single: "single",
+  triple: "triple",
+  trainerRandom: "trainerRandom",
+  trainerFixed: "trainerFixed",
+  boss: "boss",
+  catch: "catch",
+  flee: "flee",
+  mega: "mega",
+  tera: "tera",
+  levelUpLearn: "levelUpLearn",
+  evolution: "evolution",
+  eggHatch: "eggHatch",
+  biomeBoundary: "biomeBoundary",
+  weather: "weather",
+  terrain: "terrain",
+  enemySwitch: "enemySwitch",
+  forceSwitchMove: "forceSwitchMove",
+  singleFaint: "singleFaint",
+  doublePlayerFaint: "doublePlayerFaint",
+  revivalBlessing: "revivalBlessing",
+  giveToPartner: "giveToPartner",
+  saveResume: "saveResume",
+  hotRejoin: "hotRejoin",
+  transportFault: "transportFault",
+  trio: "trio",
+  willYouSwitch: "willYouSwitch",
+  hostHalfExhausted: "hostHalfExhausted",
+} as const;
+
+/** The value union of {@linkcode COOP_SOAK_SITUATIONS}. */
+export type CoopSoakSituation = (typeof COOP_SOAK_SITUATIONS)[keyof typeof COOP_SOAK_SITUATIONS];
+
+// ---------------------------------------------------------------------------
+// The hit-set threaded through the soak run.
+// ---------------------------------------------------------------------------
+
+/** Every co-op interactive surface the run OBSERVED, per dimension. Populated by the driver's taps. */
+export interface SoakHitSet {
+  /** Co-op-mirrored UiModes the run opened / issued (the guest ui.setMode recorder + the command tap). */
+  modes: Set<UiMode>;
+  /** Relay `kind` strings the run sent (the relay-send tap on both runtimes). */
+  kinds: Set<string>;
+  /** Relay seq BAND keys the run sent (derived from each send's seq via bandForSeq). */
+  bands: Set<string>;
+  /** Battle-flow situation values the run reached (the wave-start + per-turn situation taps). */
+  situations: Set<string>;
+}
+
+/** A fresh, empty hit-set. */
+export function createSoakHitSet(): SoakHitSet {
+  return { modes: new Set(), kinds: new Set(), bands: new Set(), situations: new Set() };
+}
+
+// ---------------------------------------------------------------------------
+// Surface keys + the EXPECTED set (derived AT RUNTIME from the registries).
+// ---------------------------------------------------------------------------
+
+const modeKey = (m: UiMode): string => `mode:${UiMode[m]}`;
+const kindKey = (k: string): string => `kind:${k}`;
+const bandKey = (b: string): string => `band:${b}`;
+const sitKey = (s: string): string => `situation:${s}`;
+
+/**
+ * The EXPECTED surface set, derived AT RUNTIME from the registries (never hardcoded): every mirrored
+ * UiMode, every relay kind, every seq band, plus every situation. A new registry entry lands here
+ * automatically, so the partition check auto-reds it until it is classified.
+ */
+export function expectedSurfaces(): Set<string> {
+  const out = new Set<string>();
+  for (const m of COOP_UI_MIRRORED_MODES) {
+    out.add(modeKey(m));
+  }
+  for (const k of COOP_RELAY_KINDS) {
+    out.add(kindKey(k.kind));
+  }
+  for (const b of COOP_SEQ_BANDS) {
+    out.add(bandKey(b.key));
+  }
+  for (const s of Object.values(COOP_SOAK_SITUATIONS)) {
+    out.add(sitKey(s));
+  }
+  return out;
+}
+
+/** The set of surface keys the run actually HIT (from the threaded hit-set). */
+export function hitSurfaces(hits: SoakHitSet): Set<string> {
+  const out = new Set<string>();
+  for (const m of hits.modes) {
+    out.add(modeKey(m));
+  }
+  for (const k of hits.kinds) {
+    out.add(kindKey(k));
+  }
+  for (const b of hits.bands) {
+    out.add(bandKey(b));
+  }
+  for (const s of hits.situations) {
+    out.add(sitKey(s));
+  }
+  return out;
+}
+
+// ---------------------------------------------------------------------------
+// bandForSeq: scan COOP_SEQ_BANDS ranges (the relay-send tap uses this to derive
+// the band from a sent seq, so ONE tap covers every band, present and future).
+// ---------------------------------------------------------------------------
+
+/** The COOP_SEQ_BANDS band key whose range contains `seq`, or undefined if none does. */
+export function bandForSeq(seq: number): string | undefined {
+  for (const band of COOP_SEQ_BANDS) {
+    const { lo, hi } = coopSeqBandRange(band);
+    if (seq >= lo && seq <= hi) {
+      return band.key;
+    }
+  }
+  return;
+}
+
+// ---------------------------------------------------------------------------
+// The KNOWN-UNDRIVABLE registry: today's DELIBERATE omissions, each naming its
+// follow-up coverage task. A surface here is loudly skip-counted, never a RED.
+// When a follow-up lands, DELETE the entry (and move the surface to GUARANTEED /
+// PROBABILISTIC) - the run then enforces it.
+// ---------------------------------------------------------------------------
+
+/** One undrivable surface: WHY it cannot be driven today + the coverage task that will close it. */
+export interface UndrivableEntry {
+  reason: string;
+  followupTask: string;
+}
+
+/** Follow-up shorthand for the biggest gap: mid-run mystery-encounter driving (V1 COVERAGE GAP #1). */
+const ME_CONTINUATION = "V1 GAP #1: build a mid-run mystery-encounter continuation driver for the duo harness";
+/** Follow-up shorthand for the biome-heal work that lets the soak survive + drive biome boundaries. */
+const BIOME_BOUNDARY = "drive the every-10-waves biome boundary (biome market + biome pick) in the soak";
+
+/**
+ * Every surface the soak DELIBERATELY does not drive today, keyed by surface. DRIVABLE = EXPECTED minus
+ * these keys. Each entry names the follow-up coverage task that will close it. Keeping this EXHAUSTIVE is
+ * what lets the anti-silent-drop backstop distinguish "known omission" from "silently dropped surface".
+ */
+export const KNOWN_UNDRIVABLE: ReadonlyMap<string, UndrivableEntry> = new Map<string, UndrivableEntry>([
+  // ---- MODES ----
+  [
+    modeKey(UiMode.BALL),
+    {
+      reason: "capture flow not driven (headless host uses game.move.select, which bypasses the BALL menu)",
+      followupTask: "drive a seeded ball throw (game.doThrowPokeball) in the soak - the `catch` situation",
+    },
+  ],
+  [
+    modeKey(UiMode.SUMMARY),
+    {
+      reason: "the learn-move 'which move to forget' SUMMARY mirror is not driven (level-up learns are declined)",
+      followupTask: "drive a level-up move-learn that forces a forget - the `levelUpLearn` situation",
+    },
+  ],
+  [
+    modeKey(UiMode.MYSTERY_ENCOUNTER),
+    {
+      reason:
+        "mystery encounters are OFF (mysteryEncounterChance 0); the duo harness drives MEs only from a parked buildDuoForMe rig",
+      followupTask: ME_CONTINUATION,
+    },
+  ],
+  [
+    modeKey(UiMode.ER_QUIZ),
+    { reason: "the quiz minigame is only reachable via an ER quiz ME, which is OFF", followupTask: ME_CONTINUATION },
+  ],
+  [
+    modeKey(UiMode.COLOSSEUM),
+    { reason: "the Colosseum board is only reachable via a Colosseum ME, which is OFF", followupTask: ME_CONTINUATION },
+  ],
+  [
+    modeKey(UiMode.ER_BARGAIN),
+    {
+      reason: "Giratina's Bargain is only reachable via the ER_THE_BARGAIN ME, which is OFF",
+      followupTask: ME_CONTINUATION,
+    },
+  ],
+  [
+    modeKey(UiMode.BIOME_SHOP),
+    {
+      reason:
+        "the every-10-waves biome market is not driven (the re-mirror harness does not cross a biome boundary interaction)",
+      followupTask: BIOME_BOUNDARY,
+    },
+  ],
+
+  // ---- KINDS ----
+  [
+    kindKey("shop"),
+    {
+      reason: "reward-shop BUY (paid shop item) is not driven (the soak only takes/leaves the free reward pool)",
+      followupTask: "drive a reward-shop BUY in the soak shop",
+    },
+  ],
+  [
+    kindKey("reroll"),
+    {
+      reason: "reward-shop REROLL is not driven (seeded take/leave only)",
+      followupTask: "drive a reward-shop reroll in the soak shop",
+    },
+  ],
+  [
+    kindKey("check"),
+    { reason: "reward-shop transfer-CHECK is not driven", followupTask: "drive a reward-shop check in the soak shop" },
+  ],
+  [
+    kindKey("transfer"),
+    {
+      reason: "reward-shop item TRANSFER is not driven",
+      followupTask: "drive a reward-shop transfer in the soak shop",
+    },
+  ],
+  [
+    kindKey("lock"),
+    { reason: "reward-shop rarity LOCK is not driven", followupTask: "drive a reward-shop lock in the soak shop" },
+  ],
+  [kindKey("biomeShop"), { reason: "the biome market buy/leave relay is not driven", followupTask: BIOME_BOUNDARY }],
+  [kindKey("bargain"), { reason: "the Bargain outcome relay is ME-gated", followupTask: ME_CONTINUATION }],
+  [kindKey("coloBoard"), { reason: "the Colosseum board relay is ME-gated", followupTask: ME_CONTINUATION }],
+  [kindKey("coloPick"), { reason: "the Colosseum pick relay is ME-gated", followupTask: ME_CONTINUATION }],
+  [kindKey("mePresent"), { reason: "the ME present relay is ME-gated", followupTask: ME_CONTINUATION }],
+  [kindKey("meResync"), { reason: "the ME resync relay is ME-gated", followupTask: ME_CONTINUATION }],
+  [kindKey("me"), { reason: "the ME option-pick relay is ME-gated", followupTask: ME_CONTINUATION }],
+  [kindKey("meSub"), { reason: "the ME sub-option relay is ME-gated", followupTask: ME_CONTINUATION }],
+  [kindKey("meBtn"), { reason: "the ME button relay is ME-gated", followupTask: ME_CONTINUATION }],
+  [kindKey("quizAns"), { reason: "the quiz-answer relay is ME-gated", followupTask: ME_CONTINUATION }],
+  [
+    kindKey("revival"),
+    {
+      reason: "the Revival Blessing owner-pick relay is not driven (no revival item is taken)",
+      followupTask: "drive a Revival Blessing - the `revivalBlessing` situation",
+    },
+  ],
+  [
+    kindKey("abilityPicker"),
+    {
+      reason: "the ability-picker relay is only sent from ER ability-change phases the soak does not reach",
+      followupTask: "drive an ER ability-picker phase in the soak",
+    },
+  ],
+  [
+    kindKey("learnMove"),
+    {
+      reason: "the lockstep move-forget relay is not driven (level-up learns are declined)",
+      followupTask: "drive a level-up move-learn - the `levelUpLearn` situation",
+    },
+  ],
+  [
+    kindKey("learnMoveForward"),
+    {
+      reason: "the host->guest per-slot move-learn forward relay is not driven",
+      followupTask: "drive a level-up move-learn - the `levelUpLearn` situation",
+    },
+  ],
+  [
+    kindKey("dexSync"),
+    {
+      reason: "the dex/starter sync broadcast is only sent on a new-species catch, which is not driven",
+      followupTask: "catch a new species in the soak - the `catch` situation",
+    },
+  ],
+
+  // ---- BANDS ----
+  [
+    bandKey("revival"),
+    {
+      reason: "the revival seq band is only used by the Revival Blessing owner-pick, not driven",
+      followupTask: "drive a Revival Blessing - the `revivalBlessing` situation",
+    },
+  ],
+  [
+    bandKey("abilityPicker"),
+    {
+      reason: "the ability-picker seq band is not driven",
+      followupTask: "drive an ER ability-picker phase in the soak",
+    },
+  ],
+  [bandKey("biomeShop"), { reason: "the biome-market seq band is not driven", followupTask: BIOME_BOUNDARY }],
+  [bandKey("bargain"), { reason: "the Bargain seq band is ME-gated", followupTask: ME_CONTINUATION }],
+  [bandKey("colosseum"), { reason: "the Colosseum seq band is ME-gated", followupTask: ME_CONTINUATION }],
+  [bandKey("mePump"), { reason: "the ME pump seq band is ME-gated", followupTask: ME_CONTINUATION }],
+  [bandKey("meQuiz"), { reason: "the ME quiz seq band is ME-gated", followupTask: ME_CONTINUATION }],
+  [bandKey("meTerm"), { reason: "the ME terminal seq band is ME-gated", followupTask: ME_CONTINUATION }],
+  [
+    bandKey("learnMoveFwd"),
+    {
+      reason: "the move-learn forward seq band is not driven (level-up learns declined)",
+      followupTask: "drive a level-up move-learn - the `levelUpLearn` situation",
+    },
+  ],
+  [
+    bandKey("learnMove"),
+    {
+      reason: "the move-forget seq band is not driven (level-up learns declined)",
+      followupTask: "drive a level-up move-learn - the `levelUpLearn` situation",
+    },
+  ],
+  [
+    bandKey("dexSync"),
+    {
+      reason: "the dex-sync seq band is not driven (no new-species catch)",
+      followupTask: "catch a new species in the soak - the `catch` situation",
+    },
+  ],
+  [
+    bandKey("rejoinSync"),
+    {
+      reason: "the rejoin full-resync seq band is not driven (no hot-rejoin in the soak)",
+      followupTask: "drive a mid-run hot-rejoin - the `hotRejoin` situation",
+    },
+  ],
+
+  // ---- SITUATIONS ----
+  [
+    sitKey(COOP_SOAK_SITUATIONS.single),
+    {
+      reason: "the soak forces battleStyle 'double', so a single (1v1) wild wave never rolls",
+      followupTask: "run a single-battle-style soak variant to cover the 1-slot command path",
+    },
+  ],
+  [
+    sitKey(COOP_SOAK_SITUATIONS.triple),
+    { reason: "triple battles are not forced by the soak", followupTask: "run a triple-battle-style soak variant" },
+  ],
+  [
+    sitKey(COOP_SOAK_SITUATIONS.catch),
+    {
+      reason: "the soak never throws a ball (headless move.select bypass)",
+      followupTask: "drive a seeded catch attempt - the BALL mode + dexSync follow-ups",
+    },
+  ],
+  [
+    sitKey(COOP_SOAK_SITUATIONS.flee),
+    { reason: "the soak never flees a wild wave", followupTask: "drive a seeded flee attempt (game.doAttemptRun)" },
+  ],
+  [
+    sitKey(COOP_SOAK_SITUATIONS.mega),
+    {
+      reason:
+        "god-party mons spawn straight into their mega FORM (permanent here), so no in-battle mega-evolution EVENT fires",
+      followupTask: "drive an in-battle mega-evolution event (tera-style toggle)",
+    },
+  ],
+  [
+    sitKey(COOP_SOAK_SITUATIONS.tera),
+    { reason: "the soak never terastallizes", followupTask: "drive a seeded terastallize (move.select tera flag)" },
+  ],
+  [
+    sitKey(COOP_SOAK_SITUATIONS.levelUpLearn),
+    {
+      reason:
+        "level-up move-learn prompts are declined (they chain into the SUMMARY/learnMove sub-interactions the harness does not drive)",
+      followupTask: "drive a level-up move-learn that accepts + forces a forget",
+    },
+  ],
+  [
+    sitKey(COOP_SOAK_SITUATIONS.evolution),
+    {
+      reason: "no evolution is driven (Rare Candy / level-evolve reward is not taken; god-party spawns pre-evolved)",
+      followupTask: "drive an evolution in the soak",
+    },
+  ],
+  [
+    sitKey(COOP_SOAK_SITUATIONS.eggHatch),
+    { reason: "no egg hatch is driven in the continuous soak", followupTask: "drive an egg hatch in the soak" },
+  ],
+  [
+    sitKey(COOP_SOAK_SITUATIONS.biomeBoundary),
+    {
+      reason: "the re-mirror harness does not drive the biome boundary transition (biome market + biome pick)",
+      followupTask: BIOME_BOUNDARY,
+    },
+  ],
+  [
+    sitKey(COOP_SOAK_SITUATIONS.forceSwitchMove),
+    {
+      reason:
+        "the soak's fixed player moveset has no force-switch move (Roar/Whirlwind/Dragon Tail) and enemy-forced player switches are not tapped as a distinct situation",
+      followupTask: "add a force-switch move to a soak variant / tap enemy-forced player switches",
+    },
+  ],
+  [
+    sitKey(COOP_SOAK_SITUATIONS.revivalBlessing),
+    {
+      reason: "no Revival Blessing reward is taken, so the owner-pick relay never fires",
+      followupTask: "drive a Revival Blessing reward in the soak",
+    },
+  ],
+  [
+    sitKey(COOP_SOAK_SITUATIONS.giveToPartner),
+    {
+      reason: "the give-to-partner (party transfer) flow is not driven",
+      followupTask: "drive a give-to-partner transfer in the soak",
+    },
+  ],
+  [
+    sitKey(COOP_SOAK_SITUATIONS.saveResume),
+    {
+      reason: "the soak is a single continuous process; save + resume is not exercised",
+      followupTask: "drive a save/resume round-trip in the soak",
+    },
+  ],
+  [
+    sitKey(COOP_SOAK_SITUATIONS.hotRejoin),
+    {
+      reason: "no mid-run guest disconnect/rejoin is driven",
+      followupTask: "drive a hot-rejoin (guest drop + full-resync) in the soak",
+    },
+  ],
+  [
+    sitKey(COOP_SOAK_SITUATIONS.transportFault),
+    {
+      reason: "transport fault injection is covered by the dedicated fault test (coop-transport-fault), not the soak",
+      followupTask: "none - covered by the Layer-A transport-fault test",
+    },
+  ],
+  [
+    sitKey(COOP_SOAK_SITUATIONS.trio),
+    {
+      reason: "3-player co-op (trio seating) is not stood up by the two-engine harness",
+      followupTask: "extend the harness to a three-engine trio rig",
+    },
+  ],
+  [
+    sitKey(COOP_SOAK_SITUATIONS.willYouSwitch),
+    {
+      reason: "the 'will you switch?' post-KO prompt is not driven",
+      followupTask: "drive the will-you-switch prompt in the soak",
+    },
+  ],
+  [
+    sitKey(COOP_SOAK_SITUATIONS.hostHalfExhausted),
+    {
+      reason:
+        "the ASYMMETRIC host-half-exhaustion continuation (guest plays on after the host's half is out) is not driven; the #848 terminal is only detected + classified, not continued",
+      followupTask: "drive the asymmetric host-half-exhausted continuation (guest solo)",
+    },
+  ],
+]);
+
+// ---------------------------------------------------------------------------
+// The DRIVABLE classification: GUARANTEED (hit every 60+-wave run by construction)
+// vs PROBABILISTIC (hit only some runs; asserted via the cross-run union ledger).
+// These two sets PLUS the UNDRIVABLE registry must exactly partition EXPECTED (the
+// partition check enforces it) - so a new surface added to a registry that is NOT
+// placed in one of the three auto-reds as "unclassified".
+// ---------------------------------------------------------------------------
+
+/** Surfaces hit by CONSTRUCTION in every run of at least COMPLETENESS_ASSERT_MIN waves. All must be hit. */
+export const GUARANTEED_SURFACES: ReadonlySet<string> = new Set<string>([
+  // Modes: the headless command path issues these every wave; the reward shop opens every non-boss wave.
+  modeKey(UiMode.COMMAND),
+  modeKey(UiMode.FIGHT),
+  modeKey(UiMode.TARGET_SELECT),
+  modeKey(UiMode.PARTY),
+  modeKey(UiMode.MODIFIER_SELECT),
+  // Kinds: the reward shop take -> "reward", leave -> "skip". (The "switch" kind rides the FAINT-replacement
+  // interaction relay, NOT a voluntary switch - a voluntary switch is a battle-COMMAND-relay event on a
+  // separate channel - so it is faint-driven + PROBABILISTIC under the god-tier party, see below.)
+  kindKey("reward"),
+  kindKey("skip"),
+  // Bands: the reward channel.
+  bandKey("reward"),
+  // Situations: doubles wild waves, the fixed rival/evil-team gauntlet, and the every-10 boss cadence.
+  sitKey(COOP_SOAK_SITUATIONS.wildDouble),
+  sitKey(COOP_SOAK_SITUATIONS.trainerFixed),
+  sitKey(COOP_SOAK_SITUATIONS.boss),
+]);
+
+/**
+ * Surfaces the run hits only SOMETIMES (seed / content dependent). Asserted against the cross-run UNION
+ * ledger: the union across the last COMPLETENESS_LEDGER_WINDOW deep runs must cover each, else (once the
+ * ledger is mature) a RED for a probabilistic surface gone permanently cold. Before the ledger is mature
+ * a miss is a loud WARN, so a fresh checkout is never false-red.
+ *
+ * 🔴 #849 GOD-PARTY NOTE: the FAINT-replacement surfaces (`switch` kind + `faintSwitch` band + the
+ * singleFaint / doublePlayerFaint situations) were GUARANTEED under the old level-85 party (which fainted
+ * every few waves - that is where #845-#848 were found). The god-tier party deliberately AVOIDS wipes to
+ * reach the endgame, so it faints only OCCASIONALLY (a max-damage boss hit in the deep gauntlet), making
+ * these PROBABILISTIC: the cross-run ledger union covers them (a run that DOES faint records the whole
+ * faint-replacement channel). If the endgame turns out to faint the god party reliably, PROMOTE these back
+ * to GUARANTEED. The FAINT-PATH co-op machinery is important desync surface, so a run that never faints is
+ * itself a coverage note in the report (the faint path went unexercised that run).
+ */
+export const PROBABILISTIC_SURFACES: ReadonlySet<string> = new Set<string>([
+  sitKey(COOP_SOAK_SITUATIONS.trainerRandom),
+  sitKey(COOP_SOAK_SITUATIONS.weather),
+  sitKey(COOP_SOAK_SITUATIONS.terrain),
+  sitKey(COOP_SOAK_SITUATIONS.enemySwitch),
+  sitKey(COOP_SOAK_SITUATIONS.doublePlayerFaint),
+  sitKey(COOP_SOAK_SITUATIONS.singleFaint),
+  kindKey("switch"),
+  bandKey("faintSwitch"),
+]);
+
+// ---------------------------------------------------------------------------
+// Gating + ledger constants.
+// ---------------------------------------------------------------------------
+
+/**
+ * The wave depth at or above which the FULL GUARANTEED-set enforcement + partition check runs. Set to 60,
+ * DELIBERATELY below the soak's currently-achievable depth (the level-85 party caps ~68 at the level
+ * ceiling; a god-tier party reaches far deeper) and above any PR run (the 25-wave default). Below 60 the
+ * coverage is report-only. DOC: when the party clears 120+ reliably, RAISE this toward the full run length
+ * and MOVE more situations from UNDRIVABLE to DRIVABLE (mega at every god-mon form, biomeBoundary every 10,
+ * more trainer classes) - the endgame lights up far more surfaces than the level-85 survey ever did.
+ */
+export const COMPLETENESS_ASSERT_MIN = 60;
+
+/** Where the cross-run PROBABILISTIC union ledger lives. */
+export const COVERAGE_LEDGER_PATH = path.resolve(process.cwd(), "dev-logs", "coop-soak", "coverage-ledger.json");
+
+/** How many recent deep runs the PROBABILISTIC union is taken over. */
+const COMPLETENESS_LEDGER_WINDOW = 7;
+
+/** The ledger must have at least this many deep runs before a PROBABILISTIC miss is a hard RED (else WARN). */
+const COMPLETENESS_LEDGER_MATURE = 7;
+
+interface LedgerRun {
+  ts: string;
+  seed: number;
+  wavesCompleted: number;
+  surfaces: string[];
+}
+
+// ---------------------------------------------------------------------------
+// The report (logSoakCoverage) - the cold-surface list is the deliverable.
+// ---------------------------------------------------------------------------
+
+// eslint-disable-next-line no-console
+const log = (line: string): void => console.log(line);
+
+/** Sort a surface-key set for stable, readable logging. */
+function sorted(keys: Iterable<string>): string[] {
+  return [...keys].sort();
+}
+
+/**
+ * Print the full coverage report: what was hit per dimension, which GUARANTEED / PROBABILISTIC surfaces
+ * are cold, and the LOUD per-surface UNDRIVABLE skip-count list (each with its follow-up task). NEVER
+ * silent - every undrivable surface is named. Called for every run (report-only + enforce).
+ */
+export function logSoakCoverage(hits: SoakHitSet): void {
+  const hit = hitSurfaces(hits);
+  const expected = expectedSurfaces();
+
+  log("[coop-soak-coverage] ===== CO-OP SOAK COMPLETENESS REPORT =====");
+  log(
+    `[coop-soak-coverage] HIT modes=[${sorted(hit)
+      .filter(k => k.startsWith("mode:"))
+      .map(k => k.slice(5))
+      .join(", ")}]`,
+  );
+  log(`[coop-soak-coverage] HIT kinds=[${sorted(hits.kinds).join(", ")}]`);
+  log(`[coop-soak-coverage] HIT bands=[${sorted(hits.bands).join(", ")}]`);
+  log(`[coop-soak-coverage] HIT situations=[${sorted(hits.situations).join(", ")}]`);
+
+  // GUARANTEED status.
+  const guaranteedCold = sorted(GUARANTEED_SURFACES).filter(s => !hit.has(s));
+  const guaranteedHit = sorted(GUARANTEED_SURFACES).filter(s => hit.has(s));
+  log(
+    `[coop-soak-coverage] GUARANTEED hit ${guaranteedHit.length}/${GUARANTEED_SURFACES.size}: [${guaranteedHit.join(", ")}]`,
+  );
+  if (guaranteedCold.length > 0) {
+    log(`[coop-soak-coverage] 🔴 GUARANTEED COLD (regression if enforcing): [${guaranteedCold.join(", ")}]`);
+  }
+
+  // PROBABILISTIC status (this run).
+  const probHit = sorted(PROBABILISTIC_SURFACES).filter(s => hit.has(s));
+  const probCold = sorted(PROBABILISTIC_SURFACES).filter(s => !hit.has(s));
+  log(
+    `[coop-soak-coverage] PROBABILISTIC hit this run ${probHit.length}/${PROBABILISTIC_SURFACES.size}: [${probHit.join(", ")}]`,
+  );
+  if (probCold.length > 0) {
+    log(`[coop-soak-coverage] PROBABILISTIC cold this run (ledger union covers across runs): [${probCold.join(", ")}]`);
+  }
+
+  // UNDRIVABLE loud skip-count list - NEVER silent.
+  log(`[coop-soak-coverage] UNDRIVABLE (${KNOWN_UNDRIVABLE.size} deliberate omissions, each with a follow-up task):`);
+  for (const key of sorted(KNOWN_UNDRIVABLE.keys())) {
+    const entry = KNOWN_UNDRIVABLE.get(key)!;
+    const observed = hit.has(key) ? " [OBSERVED this run despite being undrivable - consider promoting]" : "";
+    log(`[coop-soak-coverage]   SKIP ${key} - ${entry.reason} => FOLLOW-UP: ${entry.followupTask}${observed}`);
+  }
+
+  // Any EXPECTED surface not in any of the three buckets (the anti-silent-drop signal).
+  const unclassified = sorted(expected).filter(
+    s => !KNOWN_UNDRIVABLE.has(s) && !GUARANTEED_SURFACES.has(s) && !PROBABILISTIC_SURFACES.has(s),
+  );
+  if (unclassified.length > 0) {
+    log(
+      `[coop-soak-coverage] 🔴 UNCLASSIFIED (in a registry but neither driven nor declared undrivable): [${unclassified.join(", ")}]`,
+    );
+  }
+  log("[coop-soak-coverage] ===========================================");
+}
+
+// ---------------------------------------------------------------------------
+// The ledger (cross-run PROBABILISTIC union).
+// ---------------------------------------------------------------------------
+
+function readLedger(ledgerPath: string): LedgerRun[] {
+  try {
+    if (!fs.existsSync(ledgerPath)) {
+      return [];
+    }
+    const raw = JSON.parse(fs.readFileSync(ledgerPath, "utf8"));
+    return Array.isArray(raw) ? (raw as LedgerRun[]) : [];
+  } catch {
+    // A corrupt ledger must never break the soak - start fresh (the union is only a soft PROBABILISTIC gate).
+    return [];
+  }
+}
+
+function appendLedger(ledgerPath: string, run: LedgerRun): LedgerRun[] {
+  const all = readLedger(ledgerPath);
+  all.push(run);
+  // Keep a bounded tail (a couple of windows of history is plenty).
+  const kept = all.slice(-COMPLETENESS_LEDGER_WINDOW * 2);
+  try {
+    fs.mkdirSync(path.dirname(ledgerPath), { recursive: true });
+    fs.writeFileSync(ledgerPath, JSON.stringify(kept, null, 2), "utf8");
+  } catch {
+    // Best-effort: a write failure must not fail the soak (the ledger is a cross-run convenience).
+  }
+  return kept;
+}
+
+// ---------------------------------------------------------------------------
+// The assertion.
+// ---------------------------------------------------------------------------
+
+/** Options for {@linkcode assertSoakCompleteness}. */
+export interface SoakCompletenessOptions {
+  /** How many waves the run actually surveyed (the enforcement gate reads this). */
+  wavesCompleted: number;
+  /** The run seed (named in every RED so a cold surface is replayable). */
+  seed: number;
+  /** Where the cross-run PROBABILISTIC union ledger lives. Defaults to COVERAGE_LEDGER_PATH. */
+  ledgerPath?: string;
+}
+
+/**
+ * THE BACKSTOP. Enforces (when the run is deep enough) that:
+ *   1. The three classification buckets (UNDRIVABLE / GUARANTEED / PROBABILISTIC) EXACTLY partition the
+ *      EXPECTED set derived from the registries - any EXPECTED surface in NONE of them is a RED
+ *      ("in a registry but neither driven nor declared undrivable - classify it"). This is what makes a
+ *      newly-added mirrored mode / relay kind / seq band auto-red.
+ *   2. Every GUARANTEED surface was HIT (else a RED naming the cold surface + dimension + seed).
+ *   3. Every PROBABILISTIC surface is covered by the cross-run UNION ledger (a hard RED once the ledger is
+ *      mature, a loud WARN before that).
+ *
+ * GATING: the full enforcement runs only when wavesCompleted >= COMPLETENESS_ASSERT_MIN. Below that it is
+ * REPORT-ONLY (logSoakCoverage handles the human-readable report; this asserts nothing). A run that ends
+ * via a runEnded terminal at >= the gate STILL enforces (the guaranteed cadence surfaces were all hit by
+ * that depth). Throws an Error on a RED (the vitest test fails with the exact cold surfaces + seed).
+ */
+export function assertSoakCompleteness(hits: SoakHitSet, opts: SoakCompletenessOptions): void {
+  const ledgerPath = opts.ledgerPath ?? COVERAGE_LEDGER_PATH;
+  const hit = hitSurfaces(hits);
+  const expected = expectedSurfaces();
+
+  // Below the gate: report-only. Do NOT touch the ledger (keep the union window to DEEP runs only).
+  if (opts.wavesCompleted < COMPLETENESS_ASSERT_MIN) {
+    log(
+      `[coop-soak-coverage] REPORT-ONLY (surveyed ${opts.wavesCompleted} < ${COMPLETENESS_ASSERT_MIN} waves): coverage logged, nothing enforced.`,
+    );
+    return;
+  }
+
+  log(
+    `[coop-soak-coverage] ENFORCING (surveyed ${opts.wavesCompleted} >= ${COMPLETENESS_ASSERT_MIN} waves, seed ${opts.seed}).`,
+  );
+
+  const reds: string[] = [];
+
+  // (1) PARTITION / anti-silent-drop: every EXPECTED surface must be classified.
+  const unclassified = sorted(expected).filter(
+    s => !KNOWN_UNDRIVABLE.has(s) && !GUARANTEED_SURFACES.has(s) && !PROBABILISTIC_SURFACES.has(s),
+  );
+  if (unclassified.length > 0) {
+    reds.push(
+      `ANTI-SILENT-DROP: ${unclassified.length} surface(s) are in a registry but neither driven nor declared `
+        + "undrivable - CLASSIFY each (add to KNOWN_UNDRIVABLE with a follow-up task, or to GUARANTEED / "
+        + `PROBABILISTIC): [${unclassified.join(", ")}]`,
+    );
+  }
+  // A classification key that names a surface NOT in EXPECTED is stale (a registry entry was removed) - warn.
+  const staleClassified = sorted(
+    new Set([...GUARANTEED_SURFACES, ...PROBABILISTIC_SURFACES, ...KNOWN_UNDRIVABLE.keys()]),
+  ).filter(s => !expected.has(s));
+  if (staleClassified.length > 0) {
+    log(
+      `[coop-soak-coverage] ⚠ STALE classification keys (no longer in any registry - prune): [${staleClassified.join(", ")}]`,
+    );
+  }
+
+  // (2) GUARANTEED: every one must be hit.
+  const guaranteedCold = sorted(GUARANTEED_SURFACES).filter(s => expected.has(s) && !hit.has(s));
+  if (guaranteedCold.length > 0) {
+    reds.push(
+      `GUARANTEED COLD: ${guaranteedCold.length} surface(s) that MUST be hit in a ${opts.wavesCompleted}-wave `
+        + `run were not driven (a real regression - replay SOAK_SEED=${opts.seed}): [${guaranteedCold.join(", ")}]`,
+    );
+  }
+
+  // (3) PROBABILISTIC: assert the cross-run UNION over the last window of DEEP runs (this run appended).
+  const kept = appendLedger(ledgerPath, {
+    ts: new Date().toISOString(),
+    seed: opts.seed,
+    wavesCompleted: opts.wavesCompleted,
+    surfaces: [...hit],
+  });
+  const window = kept.slice(-COMPLETENESS_LEDGER_WINDOW);
+  const union = new Set<string>();
+  for (const run of window) {
+    for (const s of run.surfaces) {
+      union.add(s);
+    }
+  }
+  const probCold = sorted(PROBABILISTIC_SURFACES).filter(s => expected.has(s) && !union.has(s));
+  if (probCold.length > 0) {
+    if (window.length >= COMPLETENESS_LEDGER_MATURE) {
+      reds.push(
+        `PROBABILISTIC COLD (union over the last ${window.length} deep runs): ${probCold.length} surface(s) `
+          + "have been cold across every recent run - investigate whether the seed space stopped reaching them "
+          + `(replay SOAK_SEED=${opts.seed}): [${probCold.join(", ")}]`,
+      );
+    } else {
+      log(
+        `[coop-soak-coverage] ⚠ PROBABILISTIC cold across the ${window.length} ledger run(s) so far (need ${COMPLETENESS_LEDGER_MATURE} `
+          + `to enforce; WARN only): [${probCold.join(", ")}]`,
+      );
+    }
+  }
+
+  if (reds.length > 0) {
+    throw new Error(
+      `[coop-soak-coverage] COMPLETENESS BACKSTOP FAILED (seed ${opts.seed}, ${opts.wavesCompleted} waves):\n`
+        + reds.map(r => `  - ${r}`).join("\n"),
+    );
+  }
+  log(`[coop-soak-coverage] ✅ COMPLETENESS BACKSTOP PASSED (seed ${opts.seed}).`);
+}

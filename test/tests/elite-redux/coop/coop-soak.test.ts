@@ -29,11 +29,31 @@ import { SpeciesId } from "#enums/species-id";
 import { Move } from "#moves/move";
 import { GameManager } from "#test/framework/game-manager";
 import { installDuoLogCapture } from "#test/tools/coop-duo-harness";
+import { assertSoakCompleteness, logSoakCoverage } from "#test/tools/coop-soak-coverage";
 import { announceSoakSeed, resolveSoakSeed, resolveSoakWaves, runCoopSoak } from "#test/tools/coop-soak-driver";
 import Phaser from "phaser";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, type MockInstance, vi } from "vitest";
 
 const RUN = process.env.ER_SCENARIO === "1";
+
+// #849 FULL-RUN capability: the maintainer wants the nightly to run to COMPLETION (reach + clear the ER
+// classic final boss at wave 200), not stop at the old level-85 wipe. The 25-wave PR default stays for
+// speed; pass SOAK_WAVES=200 (the full classic length) for a full endgame survey. A full run far exceeds
+// the old flat 10-minute cap, so scale the test timeout with the requested wave count (~10s/wave headroom
+// over the duo harness's per-wave cost), floored at 10 minutes so short runs are unaffected.
+//
+// 🔴 CURRENT DEPTH CEILING (seed 20260704, 2026-07-04): the god-tier party now surveys FAR past the old
+// wave-69 level-ceiling wipe - a clean 70-wave run passes all invariants + the completeness backstop, and
+// a full run reaches ~wave 140 before stranding. TWO late-game findings surfaced (exactly the point):
+//   1. wave 90 - a fixed-slot move FULLY depleted PP; the picker's last-resort fallback handed a no-PP
+//      move to game.move.select (getMovePosition gates on ppUsed<movePp) -> NO-PARK strand. FIXED in the
+//      driver (restorePlayerPartyPp at wave-start, a survivability knob like the every-10 heal).
+//   2. wave ~140 (a %10 boss/milestone) - the crossing into the next wave strands at an undriven
+//      SelectModifierPhase (MODIFIER_SELECT): the deep boss/milestone reward tail leaves a reward shop the
+//      processBossWave handling does not drain. OPEN late-game finding (a follow-up to the boss-reward-tail
+//      driver logic); until it lands, a SOAK_WAVES>=~140 run strands there. Use SOAK_WAVES<=130 for a
+//      currently-clean deep run; raise COMPLETENESS_ASSERT_MIN toward the full length as the ceiling rises.
+const SOAK_TEST_TIMEOUT_MS = Math.max(600_000, resolveSoakWaves() * 10_000);
 
 describe.skipIf(!RUN)("NIGHTLY co-op SOAK: seeded randomized two-engine run (#841)", () => {
   let phaserGame: Phaser.Game;
@@ -70,8 +90,18 @@ describe.skipIf(!RUN)("NIGHTLY co-op SOAK: seeded randomized two-engine run (#84
       // #843 REAL COMBAT: NO enemy overrides. Every wave fights its REAL generated species with its REAL
       // moveset / held items / ability, and the enemy AI plays real moves - so the guest replays real
       // incoming damage / status / stat-stages / procs through the per-turn checkpoint (the whole point of
-      // the soak). Winnability comes from a LEVEL EDGE (startingLevel 85), NOT from fake frail enemies.
-      .startingLevel(85)
+      // the soak).
+      // 🔴 #849 GOD-TIER LEVEL EDGE (maintainer directive: "we are not stopping until we can fully finish a
+      // run in co-op mode ... just start the run with [god-tier mons] so that we can actually clear the
+      // game and see if there are any problems"). The OLD level-85 party wiped ~wave 69 at the level
+      // ceiling, so the soak never saw waves 70-200 (higher biomes, the rival gauntlet, evil-team
+      // admins/bosses, the multi-bar final boss). A very high starting level is the maintainer's explicit,
+      // chosen method and is COVERAGE-POSITIVE (it REACHES content the soak never saw); it is NOT content
+      // narrowing (enemies are still their REAL selves). Paired with the framework's max-damage clamp +
+      // force-hit, a level-300 legendary party steamrolls the endgame so the run can CLEAR the final boss
+      // and surface LATE-GAME co-op desyncs. Leftovers gives passive sustain across the long gauntlet.
+      .startingLevel(300)
+      .startingHeldItems([{ name: "LEFTOVERS" }])
       // The player moveset IS overridden - but with FOUR real, varied, single-target DAMAGING moves (not a
       // narrowing). This is the explicitly-permitted determinism knob: the seeded slot picker
       // (chosenMoveSlot) fixes ONE slot per wave for BOTH engines, so a status / no-damage slot would make
@@ -111,81 +141,102 @@ describe.skipIf(!RUN)("NIGHTLY co-op SOAK: seeded randomized two-engine run (#84
     // best-effort
   });
 
-  it("plays a seeded randomized co-op run asserting DIGEST/LOCKSTEP/NO-PARK/TEARDOWN each wave", async () => {
-    const seed = resolveSoakSeed();
-    const waves = resolveSoakWaves();
-    // PRINT the seed FIRST THING so any failure is replayable with SOAK_SEED=<seed>.
-    announceSoakSeed(seed, waves);
+  it(
+    "plays a seeded randomized co-op run asserting DIGEST/LOCKSTEP/NO-PARK/TEARDOWN each wave",
+    async () => {
+      const seed = resolveSoakSeed();
+      const waves = resolveSoakWaves();
+      // PRINT the seed FIRST THING so any failure is replayable with SOAK_SEED=<seed>.
+      announceSoakSeed(seed, waves);
 
-    const started = Date.now();
-    // #843: a full SIX-mon party (like real co-op's 3-mon-per-player cap) so a player faint has a real
-    // bench to replace from - the driver tags party[0..2] host-owned, party[3..5] guest-owned and drives
-    // the #786 guest-chooses-its-own-replacement machinery when a guest-owned mon faints.
-    await game.classicMode.startBattle(
-      SpeciesId.SNORLAX,
-      SpeciesId.GENGAR,
-      SpeciesId.DRAGONITE,
-      SpeciesId.TYRANITAR,
-      SpeciesId.METAGROSS,
-      SpeciesId.GARCHOMP,
-    );
-    const result = await runCoopSoak(game, { seed, waves, logs });
-    const elapsedMs = Date.now() - started;
+      const started = Date.now();
+      // #843/#849: a full SIX-mon GOD-TIER party (like real co-op's 3-mon-per-player cap) so a player faint
+      // has a real bench to replace from - the driver tags party[0..2] host-owned, party[3..5] guest-owned
+      // and drives the #786 guest-chooses-its-own-replacement machinery when a guest-owned mon faints.
+      // 🔴 #849 maintainer directive: six OVERPOWERED mons that steamroll the ER endgame so the soak reaches
+      // and CLEARS waves 70-200 (where the late-game co-op desyncs live). The maintainer named Mega Moltres
+      // EX / Primal Cascoon / Eternatus / etc. as the method; PRIMAL CASCOON is the Hell FINAL-BOSS form
+      // (8-slot Angel's Wrath kit) and is boss-only, not fieldable as a player starter, so it is SUBSTITUTED
+      // with the strongest fieldable legendaries (NOTED per the directive - do not block on it). Mega/primal
+      // FORMS are not force-spawned here: they are fragile to force through the headless duo mirror, and a
+      // level-300 base legendary already OHKOs the endgame under the max-damage clamp - so the level edge,
+      // not the form, does the work (form-driving is a follow-up if a mega-evolution EVENT surface is wanted).
+      await game.classicMode.startBattle(
+        SpeciesId.ETERNATUS,
+        SpeciesId.RAYQUAZA,
+        SpeciesId.ARCEUS,
+        SpeciesId.MEWTWO,
+        SpeciesId.KYOGRE,
+        SpeciesId.ZACIAN,
+      );
+      const result = await runCoopSoak(game, { seed, waves, logs });
+      const elapsedMs = Date.now() - started;
 
-    // Report coverage + runtime (visible in the CI/console output; the nightly reads skip-counters here).
-    // eslint-disable-next-line no-console
-    console.log(
-      `[coop-soak] DONE seed=${seed} waves=${result.wavesCompleted}/${result.wavesRequested} `
-        + `resyncHeals=${result.resyncHeals} findings=${result.findings.length} `
-        + `trainerWaves=${result.trainerWaves.total} (fixed=${result.trainerWaves.fixed} random=${result.trainerWaves.random}) `
-        + `skips=${JSON.stringify(result.skips)} elapsedMs=${elapsedMs}`,
-    );
-    for (const f of result.findings) {
+      // Report coverage + runtime (visible in the CI/console output; the nightly reads skip-counters here).
       // eslint-disable-next-line no-console
       console.log(
-        `[coop-soak] FINDING [${f.fields}] waves ${f.firstWave}-${f.lastWave} x${f.occurrences} :: ${f.sample}`,
+        `[coop-soak] DONE seed=${seed} waves=${result.wavesCompleted}/${result.wavesRequested} `
+          + `resyncHeals=${result.resyncHeals} findings=${result.findings.length} `
+          + `trainerWaves=${result.trainerWaves.total} (fixed=${result.trainerWaves.fixed} random=${result.trainerWaves.random}) `
+          + `skips=${JSON.stringify(result.skips)} elapsedMs=${elapsedMs}`,
       );
-    }
+      for (const f of result.findings) {
+        // eslint-disable-next-line no-console
+        console.log(
+          `[coop-soak] FINDING [${f.fields}] waves ${f.firstWave}-${f.lastWave} x${f.occurrences} :: ${f.sample}`,
+        );
+      }
 
-    // #846 TERMINAL run-end: the host run can END mid-soak (a party WIPE on the evil-team fixed-trainer
-    // gauntlet -> GameOver -> Title). The driver detects it and stops the survey LOUDLY (a counted terminal
-    // outcome), NEVER a NO-PARK strand. A run-end is honest + acceptable (the survey covered every wave up
-    // to it under all four invariants); it is reported here so a coordinator can decide whether the wipe is
-    // a content-reality note (real-run heals fire but the level edge still loses to the gauntlet) or a
-    // fidelity gap. The PRIMARY DIGEST gate below still applies to the surveyed waves.
-    if (result.runEnded == null) {
-      // No terminal: the run surveyed every requested wave (no hard strand short-circuited it).
-      expect(result.wavesCompleted, "soak surveyed every requested wave").toBe(waves);
-    } else {
-      // eslint-disable-next-line no-console
-      console.log(
-        `[coop-soak] RUN ENDED at wave ${result.runEnded.wave} (seed ${seed}): ${result.runEnded.reason}. `
-          + `Surveyed ${result.wavesCompleted}/${waves} waves under all invariants before the terminal.`,
-      );
-      // The survey ended EARLY at a real terminal - it must have stopped before the last wave.
-      expect(result.wavesCompleted, "run-end stopped before the full requested count").toBeLessThan(waves);
-      // COVERAGE FLOOR (anti-narrowing): a run-end is only an acceptable terminal if the run got DEEP
-      // enough that the wipe is plausibly the level-85 ceiling losing to the late gauntlet - NOT a
-      // regression that weakened the party into an early wipe. A run-end below the proven-survivable
-      // baseline (SOAK_WAVES=30 completes clean at level 85 on multiple seeds) is a RED, not a silent
-      // green with reduced coverage. Floor = min(requested, 30) so a deliberately tiny run isn't false-red.
-      const coverageFloor = Math.min(waves, 30);
+      // #846 TERMINAL run-end: the host run can END mid-soak (a party WIPE on the evil-team fixed-trainer
+      // gauntlet -> GameOver -> Title). The driver detects it and stops the survey LOUDLY (a counted terminal
+      // outcome), NEVER a NO-PARK strand. A run-end is honest + acceptable (the survey covered every wave up
+      // to it under all four invariants); it is reported here so a coordinator can decide whether the wipe is
+      // a content-reality note (real-run heals fire but the level edge still loses to the gauntlet) or a
+      // fidelity gap. The PRIMARY DIGEST gate below still applies to the surveyed waves.
+      if (result.runEnded == null) {
+        // No terminal: the run surveyed every requested wave (no hard strand short-circuited it).
+        expect(result.wavesCompleted, "soak surveyed every requested wave").toBe(waves);
+      } else {
+        // eslint-disable-next-line no-console
+        console.log(
+          `[coop-soak] RUN ENDED at wave ${result.runEnded.wave} (seed ${seed}): ${result.runEnded.reason}. `
+            + `Surveyed ${result.wavesCompleted}/${waves} waves under all invariants before the terminal.`,
+        );
+        // The survey ended EARLY at a real terminal - it must have stopped before the last wave.
+        expect(result.wavesCompleted, "run-end stopped before the full requested count").toBeLessThan(waves);
+        // COVERAGE FLOOR (anti-narrowing): a run-end is only an acceptable terminal if the run got DEEP
+        // enough that the wipe is plausibly the level-85 ceiling losing to the late gauntlet - NOT a
+        // regression that weakened the party into an early wipe. A run-end below the proven-survivable
+        // baseline (SOAK_WAVES=30 completes clean at level 85 on multiple seeds) is a RED, not a silent
+        // green with reduced coverage. Floor = min(requested, 30) so a deliberately tiny run isn't false-red.
+        const coverageFloor = Math.min(waves, 30);
+        expect(
+          result.wavesCompleted,
+          `run-end at wave ${result.runEnded.wave} surveyed only ${result.wavesCompleted} waves - below the `
+            + `proven-survivable floor of ${coverageFloor} (a party this weak this early is a regression, `
+            + `not the late-game level ceiling; replay SOAK_SEED=${seed})`,
+        ).toBeGreaterThanOrEqual(coverageFloor);
+      }
+      // THE PRIMARY GATE: the soak found NO unhealed host-vs-guest DIGEST desync. A finding here is the
+      // machine doing its job - a REAL co-op divergence the resync did not converge; it is surfaced above +
+      // written to dev-logs/coop-soak/<...>/ with a replayable seed. This assertion is a FAITHFUL red on a
+      // real bug, never to be made green by narrowing content (see the driver header + the task report).
       expect(
-        result.wavesCompleted,
-        `run-end at wave ${result.runEnded.wave} surveyed only ${result.wavesCompleted} waves - below the `
-          + `proven-survivable floor of ${coverageFloor} (a party this weak this early is a regression, `
-          + `not the late-game level ceiling; replay SOAK_SEED=${seed})`,
-      ).toBeGreaterThanOrEqual(coverageFloor);
-    }
-    // THE PRIMARY GATE: the soak found NO unhealed host-vs-guest DIGEST desync. A finding here is the
-    // machine doing its job - a REAL co-op divergence the resync did not converge; it is surfaced above +
-    // written to dev-logs/coop-soak/<...>/ with a replayable seed. This assertion is a FAITHFUL red on a
-    // real bug, never to be made green by narrowing content (see the driver header + the task report).
-    expect(
-      result.findings,
-      `soak found ${result.findings.length} unhealed DIGEST desync(s) (replay SOAK_SEED=${seed}): `
-        + result.findings.map(f => `[${f.fields}]@${f.firstWave}`).join(", "),
-    ).toEqual([]);
-    logs.flush();
-  }, 600_000);
+        result.findings,
+        `soak found ${result.findings.length} unhealed DIGEST desync(s) (replay SOAK_SEED=${seed}): `
+          + result.findings.map(f => `[${f.fields}]@${f.firstWave}`).join(", "),
+      ).toEqual([]);
+
+      // #849 COMPLETENESS BACKSTOP: PROVE the soak exercised every co-op interactive surface it can drive,
+      // and LOUDLY skip-count every one it deliberately cannot (each with its follow-up task). The report is
+      // ALWAYS printed (the cold-surface list is the maintainer's deliverable); the ASSERTION is gated -
+      // report-only below COMPLETENESS_ASSERT_MIN waves (the 25-wave PR default stays fast + green), full
+      // enforcement at or above it (every GUARANTEED surface hit + the anti-silent-drop partition check, so a
+      // newly-added mirrored mode / relay kind / seq band auto-reds until it is driven or declared undrivable).
+      logSoakCoverage(result.hits);
+      assertSoakCompleteness(result.hits, { wavesCompleted: result.wavesCompleted, seed });
+      logs.flush();
+    },
+    SOAK_TEST_TIMEOUT_MS,
+  );
 });
