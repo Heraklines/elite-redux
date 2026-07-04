@@ -9,7 +9,7 @@
 // (9_100_000 + partySlot) and AWAITS the guest's chosen forget-slot; the guest opens the picker and
 // relays an index back; the host applies it - or, on a timeout / disconnect, keeps the mon's current
 // moves (the NO-HANG guarantee). This verifies that wire protocol + the no-hang fallback + the seq
-// disjointness from the 9_000_001 lockstep relay, engine-free over a LoopbackTransport (exactly the
+// disjointness from the learn-move lockstep relay seq, engine-free over a LoopbackTransport (exactly the
 // dead-but-verified pattern the relay primitives use). The engine-coupled apply lives in LearnMovePhase.
 
 import { CoopInteractionRelay } from "#data/elite-redux/coop/coop-interaction-relay";
@@ -17,8 +17,9 @@ import type { CoopInteractionOutcome } from "#data/elite-redux/coop/coop-transpo
 import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
 import { describe, expect, it } from "vitest";
 
-// Mirrors the constants in src/phases/learn-move-phase.ts (kept local so this stays engine-free).
-const COOP_LEARN_MOVE_SEQ = 9_000_001;
+// Mirrors the constants in src/data/elite-redux/coop/coop-seq-registry.ts (kept local so this stays
+// engine-free). #840: COOP_LEARN_MOVE_SEQ was relocated from 9_000_001 to a free base above every band.
+const COOP_LEARN_MOVE_SEQ = 9_500_000;
 const COOP_LEARN_MOVE_FWD_SEQ_BASE = 9_100_000;
 
 const forward = (
@@ -87,7 +88,7 @@ describe("co-op authoritative move-learn forward (#633 BUG3+5)", () => {
     expect(await awaited).toBeNull();
   });
 
-  it("the forward channel is DISJOINT per slot and from the 9_000_001 lockstep relay (no cross-consume)", async () => {
+  it("the forward channel is DISJOINT per slot and from the learn-move lockstep relay seq (no cross-consume)", async () => {
     const { host, guest } = createLoopbackPair();
     const hostRelay = new CoopInteractionRelay(host);
     const guestRelay = new CoopInteractionRelay(guest);

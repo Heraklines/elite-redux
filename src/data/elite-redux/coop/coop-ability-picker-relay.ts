@@ -29,6 +29,10 @@
 // =============================================================================
 
 import { coopLog } from "#data/elite-redux/coop/coop-debug";
+// #840: COOP_ABILITY_SEQ_BASE declared in coop-seq-registry (single source of truth), re-exported below.
+import { COOP_ABILITY_SEQ_BASE } from "#data/elite-redux/coop/coop-seq-registry";
+
+export { COOP_ABILITY_SEQ_BASE };
 
 /**
  * Sentinel `choice` for a relayed ER ability-picker OUTCOME. Distinct from every reward/shop
@@ -67,12 +71,11 @@ export const COOP_ABILITY_OP = {
  * The reward-shop watch loop awaits `interactionChoice` on the RAW shop seq; routing the ability
  * outcome on a distinct derived seq means the shop loop NEVER consumes it and the picker is the sole
  * awaiter (fixing the BLOCKING channel collision). The large fixed base keeps it clear of the shop
- * seq (small), the learn-move seq (9_000_001) and the ME seqs (~8-9 million). Two sequential ability
+ * seq (small), the learn-move seq and the ME seqs (~8-9 million). Two sequential ability
  * buys in one shop reuse the same derived seq SAFELY - each outcome is consumed by its picker's await
  * before the next picker runs (same as the shop loop reusing one seq across reward picks). Returns -1
  * for a non-co-op seq (the picker's `coopSeq < 0` guard already short-circuits before this is used).
  */
-export const COOP_ABILITY_SEQ_BASE = 6_000_000;
 export function coopAbilityPickerSeq(shopSeq: number): number {
   const derived = shopSeq < 0 ? -1 : COOP_ABILITY_SEQ_BASE + shopSeq;
   // Per-ability-picker (not hot): log the seq derivation so a misrouted/colliding ability-picker

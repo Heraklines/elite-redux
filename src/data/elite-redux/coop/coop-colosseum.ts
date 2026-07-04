@@ -64,6 +64,7 @@ import {
   getCoopNetcodeMode,
   isCoopAuthoritativeGuest,
 } from "#data/elite-redux/coop/coop-runtime";
+import { COOP_COLOSSEUM_SEQ_BASE } from "#data/elite-redux/coop/coop-seq-registry";
 import type { CoopInteractionOutcome, CoopSerializedEnemy } from "#data/elite-redux/coop/coop-transport";
 import { MysteryEncounterMode } from "#enums/mystery-encounter-mode";
 import { MysteryEncounterType } from "#enums/mystery-encounter-type";
@@ -84,7 +85,8 @@ import i18next from "i18next";
  * relay band (6M ability, 7M biome, 7.5M bargain, 8M ME pump, 9M ME term, 9.1M learn,
  * 9.2M dex), so a board present / decision never cross-consumes another channel.
  */
-export const COOP_COLOSSEUM_SEQ_BASE = 7_600_000;
+// #840: COOP_COLOSSEUM_SEQ_BASE declared in coop-seq-registry (single source of truth), re-exported here.
+export { COOP_COLOSSEUM_SEQ_BASE };
 
 /** #829: routing tag for the host's streamed board present (outcome inbox). */
 const COOP_COLOSSEUM_BOARD_KIND = "coloBoard";

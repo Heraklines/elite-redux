@@ -26,6 +26,15 @@
 // =============================================================================
 
 import { coopLog, coopWarn, isCoopDebug } from "#data/elite-redux/coop/coop-debug";
+// #840: seq bands now live in the single-source-of-truth registry; re-exported below under their
+// historical names so no call site changes (pure re-export, zero behavior change).
+import {
+  COOP_BARGAIN_SEQ_BASE,
+  COOP_BIOME_SHOP_SEQ_BASE,
+  COOP_DEX_SYNC_SEQ,
+  COOP_FAINT_SWITCH_SEQ_BASE,
+  COOP_REVIVAL_SEQ_BASE,
+} from "#data/elite-redux/coop/coop-seq-registry";
 import type {
   CoopInteractionOutcome,
   CoopMessage,
@@ -34,22 +43,19 @@ import type {
 } from "#data/elite-redux/coop/coop-transport";
 import { recordReplayInteraction } from "#data/elite-redux/replay-recorder";
 
+export {
+  COOP_BARGAIN_SEQ_BASE,
+  COOP_BIOME_SHOP_SEQ_BASE,
+  COOP_DEX_SYNC_SEQ,
+  COOP_FAINT_SWITCH_SEQ_BASE,
+  COOP_REVIVAL_SEQ_BASE,
+};
+
 /** Sentinel choices shared across interaction screens. */
 export const COOP_INTERACTION_LEAVE = -1;
 
-/**
- * #673 co-op biome market: DEDICATED derived seq namespace for the market's buy/leave relay
- * (clear of the shop cursor seqs, the faint-switch 90k band, and the ability picker 6M band),
- * and the rewardOptions reroll-namespace the owner streams the 16-slot stock under (the reward
- * shop's real reroll counts stay single digits, so 777 can never collide).
- */
-export const COOP_BIOME_SHOP_SEQ_BASE = 7_000_000;
-
-/** #794 shared acquisition: the fixed disjoint seq for host->guest dex/starter sync broadcasts. */
-export const COOP_DEX_SYNC_SEQ = 9_200_000;
-
-/** #795 Giratina's Bargain: disjoint seq band (+ pinned interaction counter) for the deal outcome. */
-export const COOP_BARGAIN_SEQ_BASE = 7_500_000;
+// #673 biome market / #794 dex sync / #795 bargain seq bases are declared in coop-seq-registry
+// and re-exported above.
 export function coopBiomeShopSeq(pinnedStart: number): number {
   return COOP_BIOME_SHOP_SEQ_BASE + Math.max(0, pinnedStart);
 }
@@ -118,16 +124,10 @@ function summarizeOutcome(o: CoopInteractionOutcome): string {
  */
 let coopFaintSwitchWaitMs = 60_000;
 
-/**
- * Seq namespace for guest-owned faint-replacement picks (#786): `BASE + fieldIndex`, shared
- * verbatim by the guest picker and the host's awaiting SwitchPhase. Deliberately NOT keyed by
- * turn - the host's SwitchPhase can run after TurnInit already advanced its counter while the
- * guest keys by the replayed turn (the live seq-9-vs-5 mismatch), and only one replacement per
- * slot can be outstanding at a time so the slot alone identifies the exchange.
- */
-export const COOP_FAINT_SWITCH_SEQ_BASE = 90_000;
-/** #809 revival owner-pick: `seq = BASE + fieldIndex` (same shape as the faint-switch band). */
-export const COOP_REVIVAL_SEQ_BASE = 95_000;
+// Seq namespace for guest-owned faint-replacement picks (#786): `BASE + fieldIndex`, shared
+// verbatim by the guest picker and the host's awaiting SwitchPhase (deliberately NOT keyed by
+// turn). #786 faint-switch (90k) / #809 revival (95k) seq bases are declared in
+// coop-seq-registry and re-exported above.
 
 /** #788: how long the HOST defers the next wave's party sync waiting for the partner's menu-done broadcast. */
 let coopWaveBarrierMs = 60_000;

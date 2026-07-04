@@ -1595,36 +1595,105 @@ function normalizeCoopErMapState(value: unknown): Record<string, unknown> {
 }
 
 /**
+ * Map every LIVE player-party `Pokemon.id` to its stable party-SLOT index (#839). A `Pokemon.id` is a
+ * per-client `randSeedInt` value: seed-deterministic mons share an id across clients, but a mon GRANTED
+ * mid-run by a mystery encounter (a #794 shared-acquisition catch/gift) is MATERIALIZED independently on
+ * each client and gets a DIFFERENT local id. Any save-data field keyed by that id (a held-item modifier
+ * arg, a money-streak / ward-stone entry) would then diverge the digest FOREVER even though both clients
+ * agree on the mon. The party ORDER is reconciled (the base checksum already hashes the speciesId
+ * sequence + the bench heal adopts it), so the slot index is the cross-client-stable identity to hash.
+ */
+function coopPartyIndexById(): Map<number, number> {
+  const map = new Map<number, number>();
+  try {
+    globalScene.getPlayerParty().forEach((p, i) => {
+      if (typeof p?.id === "number") {
+        map.set(p.id, i);
+      }
+    });
+  } catch {
+    /* scene not ready - callers fall back to the raw id (no crash, no false normalization) */
+  }
+  return map;
+}
+
+/**
+ * Replace a per-client `pokemonId` with its stable party-slot token for the digest (#839). A live
+ * party mon's id maps to `p<slotIndex>` (cross-client-equal); a value that is NOT a current party id
+ * (a small enum arg, a released/stale mon, a non-id number) is left RAW so a genuine change stays a
+ * hashed divergence (e.g. the digest guard test's synthetic non-party money-streak keys still detect).
+ */
+function coopNormalizePokemonId(value: unknown, partyIndexById: Map<number, number>): unknown {
+  if (typeof value === "number" && partyIndexById.has(value)) {
+    return `p${partyIndexById.get(value)}`;
+  }
+  return value;
+}
+
+/**
+ * Normalize a `[pokemonId, ...rest]` mon-keyed entry list (erMoneyStreaks `[id, streak]`, erWardStones
+ * `[id, tier, charges, waveProgress]`) for the digest (#839). The leading per-client `Pokemon.id` is
+ * mapped to its stable party-slot token; the rest of the tuple (streak / charges / waveProgress) is
+ * hashed unchanged so a real drift still moves the digest. Sorted by a canonical of the normalized
+ * entry so Map iteration order can never manufacture a divergence.
+ */
+function normalizeCoopMonKeyedEntries(list: unknown, partyIndexById: Map<number, number>): unknown[] {
+  if (!Array.isArray(list)) {
+    return [];
+  }
+  const out = (list as unknown[]).map(entry =>
+    Array.isArray(entry) && entry.length > 0
+      ? [coopNormalizePokemonId(entry[0], partyIndexById), ...entry.slice(1)]
+      : entry,
+  );
+  return out.sort((a, b) => {
+    const ca = canonicalize(a);
+    const cb = canonicalize(b);
+    return ca < cb ? -1 : ca > cb ? 1 : 0;
+  });
+}
+
+/**
  * Normalize the session save's `modifiers` list (#837) to the PLAYER-WIDE persistent modifiers with
  * their full `args`, sorted deterministically. This is the Stormglass-`chosenWeather` / temp-booster
  * internal-state coverage: the base checksum hashes `[typeId, stackCount]` only, so an arg-only change
  * (chosenWeather, charges) is invisible - carrying the full args here makes it a hashed divergence the
- * resync's {@linkcode reconcileCoopPlayerModifiers} can heal. Held items are EXCLUDED (they carry a
- * per-mon `pokemonId` in args + charge state that heals per-turn via the field snapshot; the resync's
- * bench heal cannot carry a bench charge, so hashing them here would detect-but-never-heal). Sorting is
+ * resync's {@linkcode reconcileCoopPlayerModifiers} can heal.
+ *
+ * Held items are EXCLUDED (#839): their `getArgs()[0]` is the holder's per-client `Pokemon.id` (a
+ * randSeedInt value that diverges across clients for an ME-GRANTED mon), so hashing them diverged the
+ * digest FOREVER; their on-field identity + stacks are already hashed by the base checksum's `heldItems`
+ * field and their bench charge heals per-turn (not via resync), so excluding them loses no coverage.
+ * The exclusion is a live `instanceof` over `globalScene.modifiers` (mirroring
+ * {@linkcode captureCoopPlayerModifiers}) - the whole `PokemonHeldItemModifier` subclass tree (berries,
+ * vitamins, stat boosters, form-change items, ...). The OLD className-STRING check was inert: it matched
+ * only the ABSTRACT base name `PokemonHeldItemModifier`, which is never a live instance, so every
+ * concrete held-item subclass (`BerryModifier`, `BaseStatModifier`, `TurnHealModifier`, ...) leaked into
+ * the digest with its per-client id. Any residual pokemonId embedded in a NON-held modifier's args is
+ * mapped to its party-slot token (defense-in-depth; a no-op for the usual player-wide modifiers). Sorted
  * by typeId then a canonical of the args, so array iteration order can never manufacture a divergence.
  */
-function normalizeCoopModifierBlobs(list: unknown): Record<string, unknown>[] {
-  if (!Array.isArray(list)) {
+function normalizeCoopModifierBlobs(partyIndexById: Map<number, number>): Record<string, unknown>[] {
+  let live: PersistentModifier[];
+  try {
+    live = (globalScene.modifiers ?? []) as PersistentModifier[];
+  } catch {
     return [];
   }
-  const heldClassNames = new Set(["PokemonHeldItemModifier", "PokemonFormChangeItemModifier"]);
   const blobs: Record<string, unknown>[] = [];
-  for (const raw of list as unknown[]) {
-    if (raw == null || typeof raw !== "object") {
+  for (const m of live) {
+    if (
+      !(m instanceof PersistentModifier)
+      || m instanceof PokemonHeldItemModifier
+      || m instanceof Modifier.PokemonFormChangeItemModifier
+    ) {
       continue;
     }
-    const data = raw as Record<string, unknown>;
-    const className = typeof data.className === "string" ? data.className : "";
-    // Held items ride the per-mon field snapshot; skip them (their pokemonId arg is per-client and their
-    // charge heal is per-turn field-based, not resync-based). Everything else is a player-wide modifier.
-    if (heldClassNames.has(className)) {
-      continue;
-    }
+    const data = new ModifierData(m, true);
     blobs.push({
-      typeId: typeof data.typeId === "string" ? data.typeId : "",
-      className,
-      args: data.args ?? [],
+      typeId: data.typeId,
+      className: data.className,
+      args: (Array.isArray(data.args) ? data.args : []).map(a => coopNormalizePokemonId(a, partyIndexById)),
       stackCount: typeof data.stackCount === "number" ? data.stackCount : 0,
       ...(data.typePregenArgs === undefined ? {} : { typePregenArgs: data.typePregenArgs }),
     });
@@ -1650,17 +1719,28 @@ function normalizeCoopModifierBlobs(list: unknown): Record<string, unknown>[] {
  */
 export function captureCoopSaveDataNormalized(): Record<string, unknown> {
   const session = globalScene.gameData.getSessionSaveData() as unknown as Record<string, unknown>;
+  // #839: a single live party id->slot map shared by the modifier + mon-keyed-substrate normalizers, so
+  // every per-client `Pokemon.id` the digest would otherwise hash raw collapses to its stable slot token.
+  const partyIndexById = coopPartyIndexById();
   const out: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(session)) {
     if (COOP_SAVEDATA_DIGEST_EXCLUDED_KEYS.has(key)) {
       continue;
     }
     if (key === "modifiers") {
-      out[key] = normalizeCoopModifierBlobs(value);
+      out[key] = normalizeCoopModifierBlobs(partyIndexById);
       continue;
     }
     if (key === "erMapState") {
       out[key] = normalizeCoopErMapState(value);
+      continue;
+    }
+    // ER mon-keyed substrates (#839): both key a per-client `Pokemon.id` (erMoneyStreaks `[id, streak]`,
+    // erWardStones `[id, tier, charges, waveProgress]`), so normalize the id to its stable party slot -
+    // otherwise an ME-granted mon (a divergent local id) diverges the digest forever, exactly like the
+    // held-item modifier args above.
+    if (key === "erMoneyStreaks" || key === "erWardStones") {
+      out[key] = normalizeCoopMonKeyedEntries(value, partyIndexById);
       continue;
     }
     out[key] = value;
@@ -2242,60 +2322,32 @@ export function reconcileCoopModifierStacks(hostModifiers: [string, number][] | 
  * player-wide modifier (`TEMP_STAT_STAGE_BOOSTER`, `SUPER_EXP_CHARM`, ...) that needs args to rebuild
  * stayed permanently `<absent>` on the guest, diverging the checksum every turn. This heals the WHOLE
  * list the same proven way per-mon held items heal ({@linkcode applyCoopHeldItemsForMon}):
- *  - ADD: for each host blob with no matching guest modifier (by `type.id`), RECONSTRUCT it via
+ *  - ADD: for each host blob with no matching guest modifier, RECONSTRUCT it via
  *    {@linkcode ModifierData.toModifier} (the same reconstruct path the held-item heal uses) and
  *    `addModifier` it (ignoreUpdate; the caller refreshes the bar once).
- *  - STACK: a guest modifier that matches a host blob's `type.id` has its `stackCount` SET to the host's
+ *  - STACK: a guest modifier that MATCHES a host blob has its `stackCount` SET to the host's
  *    (persistent-modifier effects read stackCount at apply time, so a direct set is side-effect-free).
  *  - REMOVE: a guest player-wide persistent modifier the host's blob set lacks is dropped.
+ *
+ * INSTANCE IDENTITY (#844): a modifier is matched to a host blob by (typeId, argsHash) - typeId PLUS a
+ * stable FNV-1a hash of its serialized (className, args) - NOT by typeId alone. A client can legitimately
+ * hold MULTIPLE DISTINCT instances of ONE typeId (two `TEMP_STAT_STAGE_BOOSTER`s for DIFFERENT stats;
+ * {@linkcode captureCoopPlayerModifiers} emits one blob PER instance), and the old typeId-only key
+ * COLLAPSED all N of them onto the first blob - a full-snapshot resync of such a client silently LOST
+ * instances (a state-destroying heal). Keying by instance identity reconciles N distinct instances to N.
+ * This also SUBSUMES the old #837 arg-only heal: a guest instance whose internal args drifted no longer
+ * matches the host blob's key, so it is REMOVED here and the host's correct-args instance is ADDED
+ * (reconstructed) - the same remove-and-reconstruct the #837 in-place swap did, now falling directly out
+ * of the instance-identity match (no separate arg-poke path). ER-custom classes reconstruct via the same
+ * `Modifier[className] ?? resolveErModifierClass(className)` resolver the held-item / enemy heals use
+ * (the only ER-custom player-wide relic on this path is the vanilla-namespaced `MapModifier`, which
+ * resolves; every ER-custom PersistentModifier subclass is a held item, excluded below).
  *
  * NEVER touches `PokemonHeldItemModifier` (per-mon, healed elsewhere) or `PokemonFormChangeItemModifier`
  * (form healed via snap.formIndex) - the host already excludes both from the blob set, and we re-guard
  * here so a guest-only one is never removed by this path. Gated authoritative by the caller. Returns true
  * if it changed anything (so the caller refreshes the bar once). Fully guarded.
  */
-/**
- * GUEST (#837): heal a player-wide modifier's INTERNAL args (Stormglass `chosenWeather`, a temp
- * booster's stat) by REPLACING the live modifier from the host's full `ModifierData` blob when the args
- * diverge. The `[typeId, stackCount]` path is blind to arg-only drift; the `saveDataDigest` now DETECTS
- * it (it hashes the full modifier blobs), so restore it through the SAME proven `ModifierData.toModifier`
- * reconstruct-and-swap the ADD branch uses (not an in-place arg poke). Returns true iff it replaced.
- * A no-op (returns false) when the live args already match or the reconstruct fails/yields a non-owned
- * modifier. Fully guarded.
- */
-function reconcilePlayerModifierArgs(live: PersistentModifier, blob: Record<string, unknown>): boolean {
-  try {
-    const liveArgs = canonicalize(live.getArgs());
-    const wantArgs = canonicalize(blob.args ?? []);
-    if (liveArgs === wantArgs) {
-      return false;
-    }
-    const data = new ModifierData(blob, false);
-    const rebuilt = data.toModifier(
-      Modifier[data.className as keyof typeof Modifier] ?? resolveErModifierClass(data.className),
-    );
-    if (
-      !(rebuilt instanceof PersistentModifier)
-      || rebuilt instanceof PokemonHeldItemModifier
-      || rebuilt instanceof Modifier.PokemonFormChangeItemModifier
-    ) {
-      return false;
-    }
-    if (typeof data.stackCount === "number") {
-      rebuilt.stackCount = data.stackCount;
-    }
-    coopWarn(
-      "heal",
-      `playerModifier ARGS typeId=${live.type.id} host=${wantArgs} guest=${liveArgs} -> reconstructed (#837)`,
-    );
-    globalScene.removeModifier(live);
-    globalScene.addModifier(rebuilt, true, false, false);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
 export function reconcileCoopPlayerModifiers(hostBlobs: Record<string, unknown>[] | undefined): boolean {
   if (!Array.isArray(hostBlobs)) {
     return false;
@@ -2307,27 +2359,41 @@ export function reconcileCoopPlayerModifiers(hostBlobs: Record<string, unknown>[
       m instanceof PersistentModifier
       && !(m instanceof PokemonHeldItemModifier)
       && !(m instanceof Modifier.PokemonFormChangeItemModifier);
-    // Host wanted stack + full blob per typeId (the host pre-filtered to owned modifiers).
-    const wantStackByType = new Map<string, number>();
-    const wantBlobByType = new Map<string, Record<string, unknown>>();
+    // Instance identity (#844): typeId + a stable hash of the serialized (className, args). N DISTINCT
+    // instances of one typeId key to N distinct slots (fixing the typeId-only collapse); an arg drift
+    // yields a different key (so it falls to REMOVE + reconstruct-ADD, subsuming the #837 arg heal).
+    const instanceKey = (typeId: string, className: unknown, args: unknown): string =>
+      `${typeId} ${fnv1a64(canonicalize([typeof className === "string" ? className : null, args ?? []]))}`;
+    // Host wanted instances, keyed by instance identity. A queue per key so a (pathological) identical-key
+    // duplicate still wants N instances, never one (the host pre-filtered to owned modifiers).
+    const wantByKey = new Map<string, { blob: Record<string, unknown>; stack: number }[]>();
     for (const raw of hostBlobs) {
       if (raw != null && typeof raw === "object") {
-        const typeId = (raw as Record<string, unknown>).typeId;
-        const stack = (raw as Record<string, unknown>).stackCount;
+        const blob = raw as Record<string, unknown>;
+        const typeId = blob.typeId;
         if (typeof typeId === "string") {
-          wantStackByType.set(typeId, typeof stack === "number" ? Math.max(0, Math.trunc(stack)) : 1);
-          wantBlobByType.set(typeId, raw as Record<string, unknown>);
+          const stackRaw = blob.stackCount;
+          const stack = typeof stackRaw === "number" ? Math.max(0, Math.trunc(stackRaw)) : 1;
+          const key = instanceKey(typeId, blob.className, blob.args);
+          const queue = wantByKey.get(key) ?? [];
+          queue.push({ blob, stack });
+          wantByKey.set(key, queue);
         }
       }
     }
-    // 1) REMOVE / ARGS / STACK: iterate a snapshot of the guest's owned player-wide modifiers.
-    const haveTypeIds = new Set<string>();
+    // 1) STACK / REMOVE: iterate a snapshot of the guest's owned player-wide modifiers. Each live modifier
+    // is serialized the SAME way the host serialized its blobs (`new ModifierData(m, false)`) so its
+    // instance key matches byte-for-byte. A match CONSUMES one host slot (direct stackCount SET, no
+    // re-apply - side-effect-free); an unmatched live modifier is dropped.
     for (const modifier of [...globalScene.modifiers]) {
       if (!isOwned(modifier)) {
         continue;
       }
-      const want = wantStackByType.get(modifier.type.id);
-      if (want === undefined || want <= 0) {
+      const liveData = new ModifierData(modifier, false);
+      const key = instanceKey(modifier.type.id, liveData.className, liveData.args);
+      const queue = wantByKey.get(key);
+      const wanted = queue !== undefined && queue.length > 0 ? queue.shift() : undefined;
+      if (wanted === undefined || wanted.stack <= 0) {
         coopWarn(
           "heal",
           `playerModifier REMOVE typeId=${modifier.type.id} host=0/absent guest.stack=${modifier.stackCount} -> removed`,
@@ -2337,58 +2403,49 @@ export function reconcileCoopPlayerModifiers(hostBlobs: Record<string, unknown>[
         }
         continue;
       }
-      haveTypeIds.add(modifier.type.id);
-      // ARGS heal (#837): if the modifier's INTERNAL args diverged (Stormglass chosenWeather, ...),
-      // REPLACE it from the host's full blob - this reconstructs with the host's stackCount too, so
-      // skip the stack-only branch below on a successful swap.
-      const wantBlob = wantBlobByType.get(modifier.type.id);
-      if (wantBlob !== undefined && reconcilePlayerModifierArgs(modifier, wantBlob)) {
-        changed = true;
-        continue;
-      }
-      if (modifier.stackCount !== want) {
+      if (modifier.stackCount !== wanted.stack) {
         coopWarn(
           "heal",
-          `playerModifier stack typeId=${modifier.type.id} host=${want} guest=${modifier.stackCount} -> applied`,
+          `playerModifier stack typeId=${modifier.type.id} host=${wanted.stack} guest=${modifier.stackCount} -> applied`,
         );
-        modifier.stackCount = want;
+        modifier.stackCount = wanted.stack;
         changed = true;
       }
     }
-    // 2) ADD: reconstruct any host blob the guest is missing (by type.id), via the same ModifierData
-    // path the per-mon held-item heal uses. This is the BUG 2 fix - the missing-modifier case.
-    for (const raw of hostBlobs) {
-      if (raw == null || typeof raw !== "object") {
-        continue;
-      }
-      const typeId = (raw as Record<string, unknown>).typeId;
-      if (typeof typeId !== "string" || haveTypeIds.has(typeId)) {
-        continue;
-      }
-      try {
-        const data = new ModifierData(raw as Record<string, unknown>, false);
-        const modifier = data.toModifier(
-          Modifier[data.className as keyof typeof Modifier] ?? resolveErModifierClass(data.className),
-        );
-        // Re-guard: only a player-wide, non-held, non-form persistent modifier may be added by this path.
-        if (
-          !(modifier instanceof PersistentModifier)
-          || modifier instanceof PokemonHeldItemModifier
-          || modifier instanceof Modifier.PokemonFormChangeItemModifier
-        ) {
+    // 2) ADD: any host slot NO live modifier consumed is an instance the guest lacks. Reconstruct it via
+    // the same ModifierData path the per-mon held-item heal uses (vanilla Modifier namespace, ER-custom
+    // fallback via resolveErModifierClass). This is the BUG 2 missing-modifier + the #844 missing-instance
+    // case (a second distinct same-typeId instance the guest had collapsed away).
+    for (const [, queue] of wantByKey) {
+      for (const { blob, stack } of queue) {
+        if (stack <= 0) {
           continue;
         }
-        if (typeof data.stackCount === "number") {
-          modifier.stackCount = data.stackCount;
+        try {
+          const data = new ModifierData(blob, false);
+          const modifier = data.toModifier(
+            Modifier[data.className as keyof typeof Modifier] ?? resolveErModifierClass(data.className),
+          );
+          // Re-guard: only a player-wide, non-held, non-form persistent modifier may be added by this path.
+          if (
+            !(modifier instanceof PersistentModifier)
+            || modifier instanceof PokemonHeldItemModifier
+            || modifier instanceof Modifier.PokemonFormChangeItemModifier
+          ) {
+            continue;
+          }
+          if (typeof data.stackCount === "number") {
+            modifier.stackCount = data.stackCount;
+          }
+          coopWarn(
+            "heal",
+            `playerModifier ADD typeId=${modifier.type.id} stack=${modifier.stackCount} (guest lacked it) -> added`,
+          );
+          globalScene.addModifier(modifier, true, false, false);
+          changed = true;
+        } catch {
+          /* one player-wide modifier failed to reconstruct; keep the rest */
         }
-        coopWarn(
-          "heal",
-          `playerModifier ADD typeId=${modifier.type.id} stack=${modifier.stackCount} (guest lacked it) -> added`,
-        );
-        globalScene.addModifier(modifier, true, false, false);
-        changed = true;
-      } catch {
-        /* one player-wide modifier failed to reconstruct; keep the rest */
       }
     }
     if (changed) {

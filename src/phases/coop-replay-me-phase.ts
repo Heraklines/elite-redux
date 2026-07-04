@@ -19,6 +19,7 @@ import {
 } from "#data/elite-redux/coop/coop-me-pin-state";
 import { COOP_ME_BATTLE_HANDOFF, COOP_ME_TERM_SEQ_BASE } from "#data/elite-redux/coop/coop-me-pump";
 import { getCoopBattleStreamer, getCoopController, getCoopInteractionRelay } from "#data/elite-redux/coop/coop-runtime";
+import { COOP_ME_PUMP_SEQ_BASE } from "#data/elite-redux/coop/coop-seq-registry";
 import type { CoopInteractionOutcome } from "#data/elite-redux/coop/coop-transport";
 import type { ErQuizQuestion } from "#data/elite-redux/er-quiz";
 import { MysteryEncounterMode } from "#enums/mystery-encounter-mode";
@@ -30,8 +31,7 @@ import type { OptionSelectConfig } from "#ui/handlers/abstract-option-select-ui-
 import { PartyUiMode } from "#ui/party-ui-handler";
 import i18next from "i18next";
 
-/** Same seq base the ME pump uses (coop-me-pump consumers key off `BASE + interactionCounter`). */
-const COOP_ME_PUMP_SEQ_BASE = 8_000_000;
+// #840: COOP_ME_PUMP_SEQ_BASE imported from the seq registry (was re-declared locally in 4 files).
 /** Defensive ceiling: a genuinely disconnected host never hangs the guest's encounter. Mirrors
  *  the relay's "wait for the human" default (a real owner reading dialogue must not trip it). */
 const COOP_ME_REPLAY_WAIT_MS = 1_200_000;

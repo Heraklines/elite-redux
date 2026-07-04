@@ -40,3 +40,7 @@ ignore:
    - vendor
    - _stats_deploy
    - stats/_stats_deploy
+   # Gitignored local output tree (tester log pulls, soak failure artifacts, sprite renders).
+   # The co-op soak driver names artifact dirs <timestamp>__seed-<s>__wave-<w> to match the
+   # dev-logs remote FILE naming convention - never lint generated output.
+   - dev-logs

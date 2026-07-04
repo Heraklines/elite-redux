@@ -22,6 +22,7 @@ import {
   isCoopAuthoritativeGuest,
   setCoopMeBattleInteractionCounter,
 } from "#data/elite-redux/coop/coop-runtime";
+import { COOP_ME_PUMP_SEQ_BASE } from "#data/elite-redux/coop/coop-seq-registry";
 import type { CoopInteractionOutcome } from "#data/elite-redux/coop/coop-transport";
 import { recordSinglePlayerInteraction } from "#data/elite-redux/replay-single-recording";
 import { ArenaTagSide } from "#enums/arena-tag-side";
@@ -57,7 +58,7 @@ import i18next from "i18next";
 // battle command relay / the shop relay); the pump auto-suspends for them via the
 // phase gate in ui.ts.
 // =============================================================================
-const COOP_ME_PUMP_SEQ_BASE = 8_000_000;
+// #840: COOP_ME_PUMP_SEQ_BASE imported from the seq registry (was re-declared locally in 4 files).
 /** Co-op authoritative non-battle ME (#633): the DISCONNECT ceiling for every host<->guest await
  *  (mirrors `CoopReplayMePhase` / the interaction relay default). NOT a deliberation timer - steady
  *  state resolves on the relayed message; this only fires for a genuinely disconnected partner. */

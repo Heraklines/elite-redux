@@ -33,16 +33,19 @@ import {
   coopMeInteractionStartValue,
 } from "#data/elite-redux/coop/coop-me-pin-state";
 import { getCoopController, getCoopInteractionRelay } from "#data/elite-redux/coop/coop-runtime";
+// #840: ME pump base + quiz base declared in coop-seq-registry (single source of truth). The pump
+// base was previously re-declared locally in 4 files; all now import the one canonical value.
+import { COOP_ME_PUMP_SEQ_BASE, COOP_ME_QUIZ_SEQ_BASE } from "#data/elite-redux/coop/coop-seq-registry";
 import type { CoopInteractionOutcome, CoopQuizWireQuestion } from "#data/elite-redux/coop/coop-transport";
+
+export { COOP_ME_QUIZ_SEQ_BASE };
 
 /**
  * Same ME sub-prompt seq base the pump / party / secondary relays key off
- * (`seq_me = BASE + coopMeInteractionStart`). Defined locally here (not imported) for the same
- * reason the other three call sites define it locally - it keeps this leaf free of the phase
- * modules that own the pump. The host streams the quiz SESSION on this exact channel so the
- * guest's CoopReplayMePhase reads it right where it already reads the party / secondary prompts.
+ * (`seq_me = BASE + coopMeInteractionStart`). Imported from the seq registry (#840). The host
+ * streams the quiz SESSION on this exact channel so the guest's CoopReplayMePhase reads it right
+ * where it already reads the party / secondary prompts.
  */
-const COOP_ME_PUMP_SEQ_BASE = 8_000_000;
 
 /**
  * Disconnect ceiling for the follower's wait on the owner's relayed answer (mirrors
@@ -58,7 +61,6 @@ const COOP_QUIZ_WAIT_MS = 1_200_000;
  * terminal seq family, so a quiz answer can never FIFO-collide with the session stream, the
  * party / secondary sub-picks, or the ME terminal.
  */
-export const COOP_ME_QUIZ_SEQ_BASE = 8_500_000;
 
 /**
  * The relay seq for the answer to question `index` of the ME pinned on `counter`. PER-QUESTION

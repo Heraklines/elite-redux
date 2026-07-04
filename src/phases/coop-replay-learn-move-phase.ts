@@ -88,7 +88,7 @@ export class CoopReplayLearnMovePhase extends Phase {
   private readonly partySlot: number;
   private readonly moveId: number;
   private readonly maxMoveCount: number;
-  /** Disjoint from the 9_000_001 lockstep relay and the 9_000_000 ME terminal; per-slot keyed. */
+  /** Disjoint from the learn-move lockstep relay and the 9M ME terminal band; per-slot keyed. */
   private readonly seq: number;
   /** Set in {@linkcode relayAndEnd} so the picker resolves the forward EXACTLY once. */
   private settled = false;

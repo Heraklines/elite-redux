@@ -30,6 +30,10 @@
 import { coopLog, isCoopDebug } from "#data/elite-redux/coop/coop-debug";
 import { COOP_INTERACTION_LEAVE, type CoopInteractionRelay } from "#data/elite-redux/coop/coop-interaction-relay";
 import { setCoopMeHandoffBattleStarted } from "#data/elite-redux/coop/coop-me-pin-state";
+// #840: COOP_ME_TERM_SEQ_BASE declared in coop-seq-registry (single source of truth), re-exported below.
+import { COOP_ME_TERM_SEQ_BASE } from "#data/elite-redux/coop/coop-seq-registry";
+
+export { COOP_ME_TERM_SEQ_BASE };
 
 /** Routing tag for relayed ME buttons (distinguishes them on the wire / in logs). */
 const ME_PUMP_KIND = "meBtn";
@@ -48,7 +52,6 @@ export const COOP_ME_BATTLE_HANDOFF = -1000;
  * start`). Three disjoint seq channels: `8_000_000 + start` (guest->host picks + host present /
  * resync outcomes), `9_000_000 + start` (host->guest terminal / handoff), RAW `start` (reward shop).
  */
-export const COOP_ME_TERM_SEQ_BASE = 9_000_000;
 
 /**
  * Relays the ME owner's authoritative inputs over a {@linkcode CoopInteractionRelay}. One

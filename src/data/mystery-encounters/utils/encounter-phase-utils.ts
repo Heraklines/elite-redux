@@ -19,6 +19,7 @@ import {
   getCoopInteractionRelay,
   getCoopNetcodeMode,
 } from "#data/elite-redux/coop/coop-runtime";
+import { COOP_ME_PUMP_SEQ_BASE } from "#data/elite-redux/coop/coop-seq-registry";
 import type { CoopInteractionOutcome } from "#data/elite-redux/coop/coop-transport";
 import type { Gender } from "#data/gender";
 import { getNatureName } from "#data/nature";
@@ -76,8 +77,7 @@ import i18next from "i18next";
 // secondary index on the guest->host pick channel (`seq_me`). Every await has the disconnect-ceiling
 // null-end routing to the not-selected / default branch (no host hang).
 // =============================================================================
-/** Same guest->host pick channel base the ME pump uses (`seq_me = BASE + coopMeInteractionStart`). */
-const COOP_ME_PUMP_SEQ_BASE = 8_000_000;
+// #840: COOP_ME_PUMP_SEQ_BASE imported from the seq registry (was re-declared locally in 4 files).
 /** Disconnect ceiling for every host<->guest ME await; steady state resolves on the relayed pick. */
 const COOP_ME_REPLAY_WAIT_MS = 1_200_000;
 /**

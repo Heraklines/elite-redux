@@ -14,6 +14,7 @@ import {
   getCoopUiMirror,
   markCoopLearnMoveForwardInFlight,
 } from "#data/elite-redux/coop/coop-runtime";
+import { COOP_LEARN_MOVE_FWD_SEQ_BASE, COOP_LEARN_MOVE_SEQ } from "#data/elite-redux/coop/coop-seq-registry";
 import type { CoopRole } from "#data/elite-redux/coop/coop-transport";
 import { erRecordAchievementLearnMove } from "#data/elite-redux/er-achievement-tracker";
 import { recordSinglePlayerInteraction } from "#data/elite-redux/replay-single-recording";
@@ -32,15 +33,16 @@ import i18next from "i18next";
 // Only the player whose mon is learning the move drives it; the partner watches and mirrors
 // the result so both clients transition together. All relayed on one dedicated seq (FIFO,
 // distinct from the small interaction-turn seqs the reward shop uses).
-export const COOP_LEARN_MOVE_SEQ = 9_000_001;
+// #840: COOP_LEARN_MOVE_SEQ + COOP_LEARN_MOVE_FWD_SEQ_BASE now live in coop-seq-registry;
+// re-exported here. COOP_LEARN_MOVE_SEQ was RELOCATED from 9_000_001 (which sat inside the 9M
+// ME-terminal band `COOP_ME_TERM_SEQ_BASE + counter`, a numeric overlap the collision test caught)
+// to a free base above every other band. Same-build: the send + await read this one const.
+export { COOP_LEARN_MOVE_FWD_SEQ_BASE, COOP_LEARN_MOVE_SEQ };
+
 /** How long the watcher waits for the owner's move-replace decision before giving up.
  *  20min: "wait for the human" - a slow decision must never trip a premature give-up (desync). */
 const COOP_LEARN_MOVE_WAIT_MS = 1_200_000;
 
-// Co-op AUTHORITATIVE host->guest move-learn forward (#633 BUG3+5). Disjoint from the 9_000_001
-// lockstep relay and the 9_000_000 ME terminal channel so a buffered forward never FIFO-collides.
-// Per-slot keying lets two queued level-up learns for DIFFERENT mons not cross-consume.
-export const COOP_LEARN_MOVE_FWD_SEQ_BASE = 9_100_000;
 /** The host awaits the guest's forwarded pick. "Wait for the human" but bounded so a disconnected /
  *  idle partner can never freeze the host: on a null / timeout the host keeps the mon's current moves. */
 export const COOP_LEARN_MOVE_FWD_WAIT_MS = 1_200_000;

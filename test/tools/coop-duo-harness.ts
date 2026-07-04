@@ -69,7 +69,11 @@ import { BattleScene } from "#app/battle-scene";
 import { getGameMode } from "#app/game-mode";
 import { globalScene, initGlobalScene } from "#app/global-scene";
 import { Phase } from "#app/phase";
-import { captureCoopPlayerModifiers, reconcileCoopPlayerModifiers } from "#data/elite-redux/coop/coop-battle-engine";
+import {
+  captureCoopPlayerModifiers,
+  reconcileArenaTags,
+  reconcileCoopPlayerModifiers,
+} from "#data/elite-redux/coop/coop-battle-engine";
 import {
   assembleCoopRuntime,
   type CoopRuntime,
@@ -98,6 +102,8 @@ import {
 } from "#data/elite-redux/er-relic-battle-state";
 import type { ReplayCommandEvent, ReplayTrace } from "#data/elite-redux/replay-trace";
 import { isReplayCommandEvent, isReplayInteractionEvent, validateReplayTrace } from "#data/elite-redux/replay-trace";
+import { Terrain, TerrainType } from "#data/terrain";
+import { Weather } from "#data/weather";
 import { BattleType } from "#enums/battle-type";
 import { BattlerIndex } from "#enums/battler-index";
 import { Button } from "#enums/buttons";
@@ -106,6 +112,7 @@ import { GameModes } from "#enums/game-modes";
 import type { MysteryEncounterType } from "#enums/mystery-encounter-type";
 import { TrainerSlot } from "#enums/trainer-slot";
 import { UiMode } from "#enums/ui-mode";
+import { WeatherType } from "#enums/weather-type";
 import { EnemyPokemon, PlayerPokemon, type Pokemon } from "#field/pokemon";
 import type { ModifierOverride } from "#modifiers/modifier-type";
 import { PokemonModifierType } from "#modifiers/modifier-type";
@@ -591,6 +598,35 @@ export function mirrorHostBattleToGuest(hostScene: BattleScene, guestScene: Batt
   // 1. Same game mode + arena/biome as the host.
   guestScene.gameMode = hostScene.gameMode;
   guestScene.newArena(hostScene.arena.biomeId);
+  // #843 WEATHER/TERRAIN carry: newArena above resets weather/terrain to NONE, but the host may have an
+  // active biome/move weather or terrain the per-wave checksum hashes (weatherType/terrainType). Carry the
+  // host's authoritative type + turns onto the guest arena AS PART OF THE MIRROR (a re-mirror is a full
+  // reset to the host, so this belongs here, not in a driver-side shim). New Weather/Terrain instances - never
+  // share the host's object. This is the fidelity adoptCoopHostRunConfig closed for seed/money/balls,
+  // extended to the arena, so the soak's driver heal no longer needs a reconcileGuestArena supplement.
+  const hostWeather = hostScene.arena.weather;
+  guestScene.arena.weather =
+    hostWeather == null || hostWeather.weatherType === WeatherType.NONE
+      ? null
+      : new Weather(hostWeather.weatherType, hostWeather.turnsLeft);
+  const hostTerrain = hostScene.arena.terrain;
+  guestScene.arena.terrain =
+    hostTerrain == null || hostTerrain.terrainType === TerrainType.NONE
+      ? null
+      : new Terrain(hostTerrain.terrainType, hostTerrain.turnsLeft);
+  // #843 ARENA-TAG carry: newArena also cleared entry hazards / screens / tailwind / FOAMY_WEB etc., which
+  // the per-wave checksum hashes by (tagType, side). A move that set an arena tag before the re-mirror
+  // would otherwise diverge purely as a mirror artifact (the CONTENT stays live). Rebuild the host's
+  // authoritative tag set on the guest arena via the SAME production heal the per-turn checkpoint uses
+  // (reconcileArenaTags reads globalScene.arena = the guest here, since the mirror runs in the guest ctx).
+  reconcileArenaTags(
+    hostScene.arena.tags.map(t => ({
+      tagType: t.tagType as unknown as string,
+      side: t.side as unknown as number,
+      turnCount: t.turnCount,
+      layers: (t as unknown as { layers?: number }).layers ?? 1,
+    })),
+  );
 
   // `party` is private on BattleScene; the harness writes it through an unknown cast (test-only).
   const guestSceneInternal = guestScene as unknown as { party: PlayerPokemon[] };
@@ -642,6 +678,16 @@ export function mirrorHostBattleToGuest(hostScene: BattleScene, guestScene: Batt
     (enemy as unknown as { coopOwner?: string | undefined }).coopOwner = (
       hostEnemy as unknown as { coopOwner?: string | undefined }
     ).coopOwner;
+    // #843 BOSS carry: the EnemyPokemon ctor above is passed boss=false, so an adopted BOSS renders +
+    // CHECKSUMS as a normal mon (its bossSegments/bossSegmentIndex diverge from the host's). Re-assert the
+    // host's authoritative boss state - segment count AND broken-shield index - AFTER the PokemonData
+    // round-trip. The checksum hashes bossSegments:bossSegmentIndex, so this is what lets a BOSS wave run
+    // the FULL wave-start DIGEST invariant instead of being skipped (mirrors coop-enemy-builder's boss
+    // adopt; setBoss with the EXPLICIT count never re-rolls segments from the guest's diverged wave RNG).
+    if (hostEnemy.isBoss()) {
+      enemy.setBoss(true, hostEnemy.bossSegments);
+      enemy.bossSegmentIndex = hostEnemy.bossSegmentIndex;
+    }
     enemyParty.push(enemy);
   }
   guestScene.currentBattle.enemyParty = enemyParty;

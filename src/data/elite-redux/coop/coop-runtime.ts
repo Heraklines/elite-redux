@@ -39,6 +39,7 @@ import { COOP_DEX_SYNC_SEQ, CoopInteractionRelay } from "#data/elite-redux/coop/
 import { meBattleHandoffKey } from "#data/elite-redux/coop/coop-me-battle-handoff";
 import { coopMeInteractionStartValue, setCoopMeInteractionStart } from "#data/elite-redux/coop/coop-me-pin-state";
 import { CoopMePump } from "#data/elite-redux/coop/coop-me-pump";
+import { COOP_REJOIN_SYNC_SEQ_BASE } from "#data/elite-redux/coop/coop-seq-registry";
 import { coopFieldIndexOf, coopOwnerOfFieldSlot } from "#data/elite-redux/coop/coop-session";
 import { CoopSessionController } from "#data/elite-redux/coop/coop-session-controller";
 import { SpoofGuest } from "#data/elite-redux/coop/coop-spoof-guest";
@@ -424,9 +425,20 @@ function wireCoopMeChecksumCheck(battleStream: CoopBattleStreamer): void {
       }
       coopLog("resync", `await stateSync resolve seq=${seq} blob=${blob.length}b -> applying`);
       try {
+        // #839: this heal fires MID-DIVERT - the stateSync reply resolves while the guest is diverting
+        // into (or parked in) CoopReplayMePhase for this same ME. Run it with `suppressResummon=true` so
+        // it stays a SAFE, advisory best-effort heal: it applies only the cheap per-mon scalar +
+        // module-let state writes and NEVER runs the heavy field COMPOSITION re-summon
+        // (reconcileCoopEnemyField / reconcileCoopPlayerField + per-mon initBattleInfo), which would tear
+        // down and rebuild the field sprites out from under the in-flight ME presentation. applyCoopFullSnapshot
+        // touches no phase queue and never cancels a relay waiter, so the ME divert proceeds regardless of
+        // whether this early heal converges - the AUTHORITATIVE convergence is the ME terminal's
+        // comprehensive meResync (applyCoopMeOutcome), which the guest still adopts. The still-diverged
+        // path below is advisory by design (#839): it must never disrupt the encounter.
         applyCoopFullSnapshot(
           JSON.parse(decompressFromBase64(blob)) as CoopFullBattleSnapshot,
           isCoopAuthoritativeGuest(),
+          /* suppressResummon */ true,
         );
         const healed = captureCoopChecksum();
         if (healed === ownerChecksum) {
@@ -793,8 +805,7 @@ function wireCoopDisconnectReaction(transport: CoopTransport, relay: CoopInterac
   });
 }
 
-/** #805: seq band for post-rejoin full resyncs (disjoint from turn + ME channels). */
-const COOP_REJOIN_SYNC_SEQ_BASE = 9_300_000;
+// #805 rejoin-resync seq band (#840: declared in coop-seq-registry, imported above).
 function wireCoopDexSync(transport: CoopTransport): void {
   offDexSync = transport.onMessage(msg => {
     if (msg.t !== "interactionOutcome" || msg.outcome.k !== "dexSync") {
@@ -849,6 +860,18 @@ function wireCoopLearnMoveForward(transport: CoopTransport): void {
 /** Co-op (#633 BUG3+5): clear a slot's in-flight learn-move picker mark once its phase ends. */
 export function clearCoopLearnMoveForwardInFlight(partySlot: number): void {
   learnMoveForwardInFlight.delete(partySlot);
+}
+
+/**
+ * Co-op (#843 soak TEARDOWN probe): whether the AUTHORITATIVE-guest learn-move-forward in-flight slot set
+ * is EMPTY. It is a process-global {@linkcode learnMoveForwardInFlight} with no other read point, so the
+ * soak's teardown invariant could not verify {@linkcode clearCoopRuntime} drained it (it calls
+ * `learnMoveForwardInFlight.clear()` internally). This READ-ONLY getter closes that gap: after
+ * clearCoopRuntime the soak asserts it returns true, so a leaked learn-move picker pin is detected instead
+ * of silently surviving into the next run. Pure read, no mutation.
+ */
+export function isCoopLearnMoveForwardInFlightEmpty(): boolean {
+  return learnMoveForwardInFlight.size === 0;
 }
 
 /**

@@ -1,7 +1,7 @@
 import { globalScene } from "#app/global-scene";
 // #789: registers the co-op controller name tag with the ui-mirror session hook (side effect).
 import "#ui/coop-controller-tag";
-import { coopLog, isCoopDebug } from "#data/elite-redux/coop/coop-debug";
+import { coopLog, coopWarn, isCoopDebug } from "#data/elite-redux/coop/coop-debug";
 import {
   coopMeBespokeHostDrives,
   coopMeHandoffBattleStarted,
@@ -16,6 +16,8 @@ import {
   getCoopUiMirror,
 } from "#data/elite-redux/coop/coop-runtime";
 import type { CoopUiMirrorEngine } from "#data/elite-redux/coop/coop-ui-mirror";
+// #840: the total UiMode co-op classification + the unmirrored-screen tripwire decision.
+import { coopUiClassOf, coopUnmirroredTripwireReason } from "#data/elite-redux/coop/coop-ui-registry";
 import type { Button } from "#enums/buttons";
 import { Device } from "#enums/devices";
 import { PlayerGender } from "#enums/player-gender";
@@ -725,6 +727,13 @@ export class UI extends Phaser.GameObjects.Container {
     // opens via setMode, not via local input). Cheap + idempotent; hard no-op in solo.
     if (globalScene.gameMode.isCoop) {
       getCoopUiMirror()?.attach(this.coopMirrorEngine());
+      // #840 unmirrored-screen tripwire. DEV/staging only (coopWarn is silenced in prod), zero
+      // behavior change: surface a non-mirrored interactive screen opening on this client while the
+      // PARTNER owns a live shared interaction - the pattern by which a new screen silently defaults
+      // to host-only in co-op. See coopUnmirroredTripwire.
+      if (isCoopDebug() && getCoopNetcodeMode() === "authoritative") {
+        this.coopUnmirroredTripwire(mode);
+      }
     }
     return new Promise(resolve => {
       if (this.mode === mode && !forceTransition) {
@@ -766,6 +775,29 @@ export class UI extends Phaser.GameObjects.Container {
         doSetMode();
       }
     });
+  }
+
+  /**
+   * #840 unmirrored-screen tripwire (DEV/staging only). Called at the single setMode chokepoint for
+   * an authoritative co-op session. Logs a coopWarn (never blocks - zero behavior change) when the
+   * mode about to open is NOT a mirrored, co-op-wired screen and the PARTNER currently owns a live
+   * shared interaction (an in-progress ME this client does not own, or a shop/screen this client is
+   * only WATCHING). That combination is the fingerprint of a new interactive screen leaking in
+   * host-only. A brand-new UiMode with no registry entry is a COMPILE error, so the undefined branch
+   * is only a defensive runtime out-of-range guard.
+   */
+  private coopUnmirroredTripwire(mode: UiMode): void {
+    if (coopUiClassOf(mode) === undefined) {
+      coopWarn("ui", `setMode(${UiMode[mode]}) has NO co-op UI classification (registry miss) - classify it`);
+      return;
+    }
+    const meCounter = coopMeInteractionStartValue();
+    const partnerOwnsMe = coopMeInProgress() && getCoopController()?.isLocalOwnerAtCounter(meCounter) === false;
+    const partnerOwnsMirror = getCoopUiMirror()?.isWatcher() === true;
+    const reason = coopUnmirroredTripwireReason(mode, partnerOwnsMe || partnerOwnsMirror);
+    if (reason != null) {
+      coopWarn("ui", reason);
+    }
   }
 
   getMode(): UiMode {

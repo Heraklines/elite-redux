@@ -42,10 +42,13 @@ import { erBiomeOverstayAnchor, setErBiomeOverstayAnchor } from "#data/elite-red
 import { getErMoneyStreakEntries, restoreErMoneyStreaks } from "#data/elite-redux/er-money-streak";
 import { getErRelicBattleState, restoreErRelicBattleState } from "#data/elite-redux/er-relic-battle-state";
 import { BattlerIndex } from "#enums/battler-index";
+import { BerryType } from "#enums/berry-type";
 import { Command } from "#enums/command";
 import { GameModes } from "#enums/game-modes";
 import { MoveId } from "#enums/move-id";
 import { SpeciesId } from "#enums/species-id";
+import { BerryModifier } from "#modifiers/modifier";
+import { BerryModifierType } from "#modifiers/modifier-type";
 import { SelectModifierPhase } from "#phases/select-modifier-phase";
 import { GameManager } from "#test/framework/game-manager";
 import {
@@ -267,6 +270,74 @@ describe.skipIf(!RUN)("#837 co-op full-save-data checksum digest + heal", () => 
     expect(healed.relic.lists.cursedIdol, "relic-battle-state healed through restoreErRelicBattleState").toEqual([
       111, 222,
     ]);
+    logs.flush();
+  }, 300_000);
+
+  it("GRANTED-MON HELD ITEM (#839): host + guest hold the SAME berry + streak on a slot-0 mon with DIFFERENT local ids -> save-data digest MATCHES", async () => {
+    // The live #839 softlock root: an ME-GRANTED mon (species 6100) is MATERIALIZED independently on
+    // each client, so its `Pokemon.id` DIFFERS host-vs-guest. Every save-data field keyed by that raw id
+    // (a held-item modifier's `getArgs()[0]`, a money-streak `[id, streak]` entry) then diverged the
+    // saveDataDigest FOREVER - the me-entry checksum never healed, the ME loop wedged. The fix: held
+    // items are EXCLUDED from the digest (their per-mon identity + stacks ride the base checksum's
+    // bi-keyed `heldItems` field), and mon-keyed ER substrates map the id to their stable party SLOT.
+    await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
+    const pair = createLoopbackPair();
+    const rig = await buildDuo(game, pair, setCoopRuntime, toCoop);
+    wireGuestCommand(rig);
+    // Per-client module-let isolation so the two engines can hold DIFFERENT money-streak maps (production
+    // is one process per client; the shared-state default would collapse them onto one map).
+    setCoopHarnessModuleLetIsolation(true);
+
+    const HOST_ID = 111_111; // the host's local id for the granted slot-0 mon
+    const GUEST_ID = 999_999; // the guest's DIFFERENT local id for the SAME slot-0 mon (the #839 root)
+
+    // Attach the SAME Sitrus berry + the SAME money-streak (survived 5 waves) to slot 0 on BOTH engines,
+    // each keyed by that engine's OWN divergent local id.
+    const seed = (id: number) => {
+      const lead = globalScene.getPlayerParty()[0];
+      lead.id = id;
+      globalScene.addModifier(new BerryModifier(new BerryModifierType(BerryType.SITRUS), id, BerryType.SITRUS), true);
+      restoreErMoneyStreaks([[id, 5]]);
+    };
+    const hostDigest = withClientSync(rig.hostCtx, () => {
+      seed(HOST_ID);
+      // Structural proof: the berry is EXCLUDED from the normalized modifier view (per-client id gone),
+      // and the money-streak key is the stable slot token, not the raw id.
+      const normalized = captureCoopSaveDataNormalized();
+      expect(
+        (normalized.modifiers as { className: string }[]).some(m => m.className === "BerryModifier"),
+        "the held-item berry is EXCLUDED from the save-data digest's modifier view (#839)",
+      ).toBe(false);
+      expect(normalized.erMoneyStreaks, "the money-streak id normalized to its stable party slot token").toEqual([
+        ["p0", 5],
+      ]);
+      return captureCoopSaveDataDigest();
+    });
+    const guestDigest = withClientSync(rig.guestCtx, () => {
+      seed(GUEST_ID);
+      return captureCoopSaveDataDigest();
+    });
+    expect(guestDigest, "the digest MATCHES despite the granted mon's divergent per-client ids (#839)").toBe(
+      hostDigest,
+    );
+
+    // CONTROL 1 - id-normalization does NOT blind a REAL drift: a money-streak VALUE change still moves
+    // the digest (only the per-client id is normalized away, the streak count stays hashed).
+    const guestDrifted = withClientSync(rig.guestCtx, () => {
+      restoreErMoneyStreaks([[GUEST_ID, 7]]);
+      return captureCoopSaveDataDigest();
+    });
+    expect(
+      guestDrifted,
+      "a money-streak VALUE change still diverges the digest (id-normalization is not a blind-spot)",
+    ).not.toBe(hostDigest);
+
+    // CONTROL 2 - restoring the streak value re-converges (deterministic, no residual divergence).
+    const guestRestored = withClientSync(rig.guestCtx, () => {
+      restoreErMoneyStreaks([[GUEST_ID, 5]]);
+      return captureCoopSaveDataDigest();
+    });
+    expect(guestRestored, "restoring the streak value re-converges the digest to the host").toBe(hostDigest);
     logs.flush();
   }, 300_000);
 

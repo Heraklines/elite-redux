@@ -1014,5 +1014,170 @@ describe.skipIf(!RUN)(
 
       logs.flush();
     }, 300_000);
+
+    // ===========================================================================================
+    // IT #6 - #839 MID-DIVERT ME-ENTRY HEAL SAFETY (the live co-op softlock). A guest-owned ME opens; the
+    // guest's me-entry full-state checksum MISMATCHES the host's (the live root: an ME-granted mon's
+    // divergent per-client id diverged the saveDataDigest - closed by the H1 fix in coop-savedata-digest,
+    // but ANY mismatch here must be handled the same). The guest requests a stateSync and applies the
+    // host's full snapshot WHILE it is diverting into CoopReplayMePhase. PRE-#839 that heal ran with
+    // suppressResummon=FALSE: the field COMPOSITION re-summon (reconcileCoopEnemyField / reconcileCoopPlayerField)
+    // tore the ME field/divert down out from under the parked selector -> the guest orphaned its
+    // CoopReplayMePhase and softlocked (one screen continued, the other could not). POST-#839 the heal is
+    // suppressResummon=TRUE (advisory, cheap scalar + module-let writes only; it never re-summons the
+    // field, never touches the phase queue, never cancels a relay waiter), so the divert SURVIVES and the
+    // ME proceeds to convergence regardless of whether the early heal fully closed the gap.
+    //
+    // This drives the REAL me-entry path (host stamps its authoritative checksum -> guest handler
+    // mismatches -> requestStateSync -> host answers with captureCoopFullSnapshot -> guest applies), so it
+    // asserts the runtime's OWN suppressResummon choice (a revert to FALSE fails the spy assert), then
+    // proves no orphan by completing the guest-owned ME (relay pick -> host applies -> lockstep convergence).
+    // ===========================================================================================
+    it("DUO ME (#839): a me-entry checksum MISMATCH mid-divert heals with suppressResummon=TRUE - the guest keeps its selector, never orphans CoopReplayMePhase, and completes the ME in lockstep", async () => {
+      await game.runToMysteryEncounter(MysteryEncounterType.DEPARTMENT_STORE_SALE, [
+        SpeciesId.SNORLAX,
+        SpeciesId.GENGAR,
+      ]);
+      const hostScene = game.scene;
+      expect(hostScene.currentBattle.battleType, "host reached a MYSTERY_ENCOUNTER wave").toBe(
+        BattleType.MYSTERY_ENCOUNTER,
+      );
+
+      const pair = createLoopbackPair();
+      const rig = await buildDuoForMe(game, pair, setCoopRuntime, toCoop);
+
+      // Seed counter 1 (ODD -> guest owns the ME, so it OPENS its own selector) - the IT #2 setup.
+      await withClient(rig.hostCtx, () => {
+        rig.hostRuntime.controller.advanceInteraction();
+      });
+      await withClient(rig.guestCtx, () => {
+        rig.guestRuntime.controller.advanceInteraction();
+      });
+      await drainLoopback();
+      const counterBefore = rig.hostRuntime.controller.interactionCounter();
+      expect(counterBefore, "the ME opens on interaction counter 1 (guest owns odd)").toBe(1);
+
+      const applyMeOutcomeSpy = vi.spyOn(coopEngine, "applyCoopMeOutcome");
+      const handleOptionSelectSpy = vi.spyOn(MysteryEncounterPhase.prototype, "handleOptionSelect");
+
+      // ===== STEP A (host): reach MysteryEncounterPhase - coopBeginMePump streams the presentation on 8M
+      // and coopHostAwaitGuestIndex parks AWAITING the guest's index (host can't take a human pick at an odd
+      // counter). This ALSO stamps the host's authoritative me-entry checksum (sendMeChecksum). =====
+      await withClient(rig.hostCtx, async () => {
+        await game.phaseInterceptor.to("MysteryEncounterPhase", false);
+        await game.phaseInterceptor.to("MysteryEncounterPhase");
+      });
+      await drainLoopback();
+
+      // ===== STEP B (guest): divert into CoopReplayMePhase - adopt the host presentation, resolve
+      // ownsMe=TRUE at counter 1, OPEN the selector. This is the in-flight mid-divert parked state. =====
+      const replay = await withClient(rig.guestCtx, () => startGuestMeReplay(rig.guestScene));
+      expect(
+        rig.guestScene.phaseManager.getCurrentPhase()?.phaseName,
+        "guest diverted into CoopReplayMePhase with its selector open",
+      ).toBe("CoopReplayMePhase");
+      const guestFieldBefore = withClientSync(rig.guestCtx, () => rig.guestScene.getPlayerField().length);
+
+      // ===== INJECT the mid-divert me-entry heal (#839): force a checksum MISMATCH (diverge the guest's
+      // money), then fire the REAL path - host stamps its authoritative checksum, the guest's onMeChecksum
+      // handler mismatches, requests a stateSync, the host answers with its full snapshot, and the guest
+      // applies it WHILE parked in the divert. =====
+      const applyFullSnapshotSpy = vi.spyOn(coopEngine, "applyCoopFullSnapshot");
+      const meSeq = (replay as unknown as { seq: number }).seq;
+      withClientSync(rig.guestCtx, () => {
+        rig.guestScene.money += 424_242; // diverge so captureCoopChecksum mismatches the host's
+      });
+      withClientSync(rig.hostCtx, () => {
+        rig.hostRuntime.battleStream.sendMeChecksum(meSeq, coopEngine.captureCoopChecksum());
+      });
+      // Complete the async round-trip across ctxs: (guest) recv checksum -> requestStateSync; (host) answer
+      // with its authoritative snapshot under the HOST scene; (guest) receive + apply the heal.
+      await withClient(rig.guestCtx, () => drainLoopback());
+      await withClient(rig.hostCtx, () => drainLoopback());
+      await withClient(rig.guestCtx, () => drainLoopback());
+
+      // The heal fired, and it was SAFE: suppressResummon=TRUE on every me-entry apply (the runtime's own
+      // choice - a revert to FALSE fails here). applyCoopFullSnapshot touches no phase queue and cancels no
+      // relay waiter, so the divert is undisturbed.
+      const heals = applyFullSnapshotSpy.mock.calls;
+      expect(heals.length, "the me-entry mismatch fired the stateSync heal mid-divert").toBeGreaterThan(0);
+      expect(
+        heals.every(c => c[2] === true),
+        "every mid-divert me-entry heal ran with suppressResummon=TRUE (advisory, no field re-summon) (#839)",
+      ).toBe(true);
+      applyFullSnapshotSpy.mockRestore();
+
+      // The in-flight ME divert SURVIVED the heal: the guest is STILL parked in CoopReplayMePhase (not
+      // orphaned), NOT settled, its on-field composition intact, and the money healed to the host's value.
+      expect(
+        rig.guestScene.phaseManager.getCurrentPhase()?.phaseName,
+        "guest is STILL in CoopReplayMePhase after the mid-divert heal (divert not orphaned) (#839)",
+      ).toBe("CoopReplayMePhase");
+      expect(
+        (replay as unknown as { settled: boolean }).settled,
+        "guest ME divert did NOT settle/leave on the advisory heal (#839)",
+      ).toBe(false);
+      expect(
+        withClientSync(rig.guestCtx, () => rig.guestScene.getPlayerField().length),
+        "guest on-field composition intact through the heal (no field re-summon torn it down) (#839)",
+      ).toBe(guestFieldBefore);
+
+      // ===== PROVE NO ORPHAN by completing the guest-owned ME through convergence (the IT #2 handshake).
+      // The selector is still live, so the guest relays its pick, the host applies it, and both advance in
+      // lockstep - impossible if the heal had orphaned the divert. =====
+      withClientSync(rig.guestCtx, () => relayGuestMeOptionIndexOnly(replay, 0));
+
+      let hostShop!: ShopPhaseSeam;
+      await withClient(rig.hostCtx, async () => {
+        await drainLoopback();
+        await game.phaseInterceptor.to("SelectModifierPhase", false);
+        hostShop = hostScene.phaseManager.getCurrentPhase() as unknown as ShopPhaseSeam;
+        hostShop.start();
+        await drainLoopback();
+      });
+      expect(
+        handleOptionSelectSpy,
+        "host applied the guest's relayed option post-heal (the divert selector was NOT orphaned) (#839)",
+      ).toHaveBeenCalled();
+
+      const guestShop = await withClient(rig.guestCtx, () => startGuestMeShopOwner(rig.guestScene));
+      withClientSync(rig.guestCtx, () => relayGuestMeShopLeaveSync(guestShop));
+
+      await withClient(rig.hostCtx, async () => {
+        for (let i = 0; i < 16; i++) {
+          await drainLoopback();
+          if (hostScene.phaseManager.getCurrentPhase()?.phaseName !== "SelectModifierPhase") {
+            break;
+          }
+        }
+        await game.phaseInterceptor.to("PostMysteryEncounterPhase");
+      });
+      const hostSeed = hostScene.seed;
+
+      const guestReplay = await withClient(rig.guestCtx, async () => {
+        startGuestMeOutcomeRace(replay);
+        return drainGuestMeReplayToSettle(replay);
+      });
+
+      // CONVERGENCE + LOCKSTEP: the guest settled once, applied the host's meResync once, its seed converged,
+      // and BOTH counters advanced exactly once - the ME proceeded to completion despite the mid-divert heal.
+      expect(guestReplay.settled, "guest CoopReplayMePhase settled (completed the ME after the heal) (#839)").toBe(
+        true,
+      );
+      expect(
+        applyMeOutcomeSpy.mock.calls.length,
+        "guest applied the host's comprehensive meResync exactly once (its authoritative convergence)",
+      ).toBe(1);
+      expect(rig.guestScene.seed, "guest RNG seed converged to the host's via meResync").toBe(hostSeed);
+      expect(rig.hostRuntime.controller.interactionCounter(), "host advanced once for the whole ME").toBe(
+        counterBefore + 1,
+      );
+      expect(
+        rig.guestRuntime.controller.interactionCounter(),
+        "guest advanced once for the whole ME (lockstep) - no softlock (#839)",
+      ).toBe(counterBefore + 1);
+
+      logs.flush();
+    }, 300_000);
   },
 );
