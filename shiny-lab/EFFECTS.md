@@ -1,13 +1,51 @@
-# Shiny Lab - effect catalog (v4)
+# Shiny Lab - effect catalog (v7)
 
 **Live for the team: https://shiny-lab.pages.dev** (Cloudflare Pages). Also
 `articuno-shiny-lab.html` on the Desktop (self-contained except sprites).
 
-**137 effects** in three **combinable** slots - pick one of each and they stack live.
+**357 effects** in three **combinable** slots - pick one of each and they stack live:
+**138 Palettes + 121 Surface FX + 98 Around FX** (v6 Discord-brainstorm batch + the v7
+mega-expansion doubled every catalog).
 **Species picker**: search any of ~992 Pokemon (top of the page); sprites stream from
 the er-assets CDN (jsDelivr, pinned sha) exactly like the game. Static previews:
 `contact-palette.png`, `contact-surface.png`, `contact-around.png`, `contact-combo.png`,
-`contact-cluster.png`, `contact-hd.png`.
+`contact-cluster.png`, `contact-cluster-algos.png`, `contact-hd.png`.
+
+## Clustering selector (new)
+The **Clustering** dropdown picks how the cluster palettes segment the sprite's colors:
+- **K-means RGB** (default) - the original: k-means on pixel colors, luma-sorted.
+- **Balanced distinct-colors** - sqrt-weighted k-means over the sprite's DISTINCT colors,
+  so a big body region can't swallow small-but-distinct ones (eyes, gems).
+- **Hue regions** - k-means in a hue/chroma cone: regions split by COLOR, a region's
+  shading ramp stays together.
+- **IEC-style** - modeled on the decompiled Inclement Emerald Customizer: neutrals
+  (outlines / whites / grays, sat < 0.05) get their own protected cluster, chromatic
+  colors group by single-linkage circular hue distance (variable K). Cleanest on
+  multi-hue mons; keeps outlines dark.
+- **Luma bands** - plain brightness quantiles (the old-ramp behavior, hue ignored).
+A/B them on `contact-cluster-algos.png` (rows = algo, cols = cluster palettes).
+
+## v6 - the Discord brainstorm batch
+Palettes: Blueprint, Who's That...?, Lavender Ghost, Overexposed, Hyperpigment, Pop Art.
+Surface: Neon Sign, Mist Veil, Rising Mist, Bloom, HD Lighting, Glass Warp, No Outline,
+Pulled Apart, Living Shadow. Around: Energy Helix + Atomic Orbit (the first **3D
+front/behind** effects - near arcs pass OVER the mon), Nuclear Winter, Sinister Sun,
+HD Stars, Double Team (sprite-sampling after-images), Ground Mist.
+
+## v7 - the mega-expansion (doubled everything)
+- **+69 palettes**: 30 material/world ramps (Platinum, Lapis, Eclipse, Peacock,
+  Cyberpunk, Porcelain, Voidfire, Arctic Night...), 17 technique transforms
+  (Complement, Teal & Orange split-tone, Noir, CGA, Virtual Boy, Glass/Phantom
+  translucents, Heat Map, Hue Glide, Stencil...), 14 new cluster combos (Bumblebee,
+  Tri Nebula, Quad Cyber, Penta Galaxy...).
+- **+62 surface FX**: Waterline reflection, VHS Tape, Pixel Sort, Code Rain, Honeycomb
+  Plate, Knitted, Kintsugi, Gem Plate, Paper Burn, Meltdown, Sequins, Reveal Scan,
+  Spotlight, Demake, Phosphor, CMYK Print, Origami, Watercolor, Inner Storm...
+- **+49 around FX**: Meteor Shower, Thunderstorm, Rainbow Arc, Moonrise, Whirlpool,
+  Blade Flurry, Clockwork, Fireworks, Chained / Cage of Light / Wind Ribbons / Ribbon
+  Dancer / Tiny Planets / Star Ring / Orbit Debris / Hex Barrier (all 3D front/behind),
+  Event Horizon, Hell Sigil, Portal, Personal Raincloud, Snow Globe, Manga Burst,
+  Shock Pulse (silhouette-shaped energy echoes), Paper Lanterns...
 
 ## Cluster palettes (the fix for "monotone" recolors)
 The old palettes are single-axis (luma ramp or hue shift), which collapses distinct

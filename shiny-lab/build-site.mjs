@@ -85,6 +85,7 @@ ${css}
       <div class="row"><label class="lp">Palette</label><select id="sel_palette" class="sel"></select></div>
       <div class="row"><label class="ls">Surface FX</label><select id="sel_surface" class="sel"></select></div>
       <div class="row"><label class="la">Around FX</label><select id="sel_around" class="sel"></select></div>
+      <div class="row"><label class="lp">Clustering</label><select id="sel_cluster" class="sel" title="How the cluster palettes segment the sprite's colors"></select></div>
       <div class="row"><label>Speed</label><input id="speed" type="range" min="0.1" max="3" step="0.05" value="1"></div>
       <div class="row"><label class="lp">Pal amount</label><input id="int_palette" type="range" min="0" max="1" step="0.02" value="1"></div>
       <div class="row"><label class="ls">Surf amount</label><input id="int_surface" type="range" min="0" max="1" step="0.02" value="1"></div>

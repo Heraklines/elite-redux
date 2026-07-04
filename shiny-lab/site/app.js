@@ -15,6 +15,13 @@ let PW = 0;
 let PH = 0;
 let curSpecies = LAB.def;
 let CL = null;
+let denseBuf = null;
+let clusterAlgo = "kmeans";
+function recomputeCL() {
+  if (denseBuf) {
+    CL = (CLUSTERING[clusterAlgo] || CLUSTERING.kmeans).fn(denseBuf, FW, FH, 5);
+  }
+}
 
 const PALS = ["base", ...ALL_PALETTE];
 const SLOTKIND = { palette: PALS, surface: ALL_AURA, around: ALL_AROUND };
@@ -121,7 +128,8 @@ async function loadSpecies(id) {
       dense = f;
     }
   }
-  CL = computeClusters(dense, FW, FH, 5);
+  denseBuf = dense;
+  recomputeCL();
   curSpecies = id;
   resizeCanvases();
   status("");
@@ -136,7 +144,17 @@ async function loadSpecies(id) {
 // ---- render a full look (palette + surface + around) onto a padded buffer -----
 function renderLook(slots, buf, ef, dist, t, out, amt) {
   const rawSa = makeSampler(buf);
-  const ac = { cx: dist.cx, cy: dist.cy };
+  // padded-normalized sprite sampler for around-FX that echo the mon (Double Team)
+  const sprPad = (nx, ny) => {
+    const sx2 = Math.round(nx * PW - 0.5) - PAD;
+    const sy2 = Math.round(ny * PH - 0.5) - PAD;
+    if (sx2 < 0 || sy2 < 0 || sx2 >= FW || sy2 >= FH) {
+      return [0, 0, 0, 0];
+    }
+    const i2 = (sy2 * FW + sx2) * 4;
+    return [buf[i2], buf[i2 + 1], buf[i2 + 2], buf[i2 + 3]];
+  };
+  const ac = { cx: dist.cx, cy: dist.cy, spr: sprPad };
   const ctx = {
     e: 0,
     sa: rawSa,
@@ -243,6 +261,22 @@ function renderLook(slots, buf, ef, dist, t, out, amt) {
             a = mix(aPal, a, amt.surf);
           }
           col = blended;
+        }
+        // front pass for 3D around-FX (helix / atomic orbit): the effect is also
+        // drawn OVER the sprite; the effect itself culls its "behind" half at df=0.
+        if (aro && AROUND_OVERLAY.has(aro)) {
+          const nx = (px + 0.5) / PW;
+          const ny = (py + 0.5) / PH;
+          const res = AROUND[aro](nx, ny, 0, t, ac);
+          let rc = [res[0], res[1], res[2]];
+          if (doTint && !NO_TINT.has(aro)) {
+            rc = tintTo(rc, tintH, tintS);
+          }
+          const oa = res[3] * amt.aro;
+          if (oa > 0) {
+            col = [mix(col[0], rc[0], oa), mix(col[1], rc[1], oa), mix(col[2], rc[2], oa)];
+            a = Math.min(1, a + oa * (1 - a));
+          }
         }
         out[k] = col[0] * 255;
         out[k + 1] = col[1] * 255;
@@ -362,6 +396,16 @@ function wireControls() {
     sel.addEventListener("change", e => {
       slots[k] = e.target.value;
       refreshHero();
+    });
+  }
+  const cs = document.getElementById("sel_cluster");
+  if (cs) {
+    for (const [key, alg] of Object.entries(CLUSTERING)) {
+      cs.appendChild(new Option(alg.label, key));
+    }
+    cs.addEventListener("change", e => {
+      clusterAlgo = e.target.value;
+      recomputeCL();
     });
   }
   document.getElementById("speed").addEventListener("input", e => (speed = +e.target.value));

@@ -114,7 +114,19 @@ function renderNative(kind, name, t) {
 
 function renderAround(name, t) {
   const out = new Uint8ClampedArray(PW * PH * 4);
-  const c = { cx: DIST.cx, cy: DIST.cy };
+  const c = {
+    cx: DIST.cx,
+    cy: DIST.cy,
+    spr: (nx, ny) => {
+      const sx2 = Math.round(nx * PW - 0.5) - PAD;
+      const sy2 = Math.round(ny * PH - 0.5) - PAD;
+      if (sx2 < 0 || sy2 < 0 || sx2 >= W || sy2 >= H) {
+        return [0, 0, 0, 0];
+      }
+      const i2 = (sy2 * W + sx2) * 4;
+      return [src[i2], src[i2 + 1], src[i2 + 2], src[i2 + 3]];
+    },
+  };
   for (let py = 0; py < PH; py++) {
     for (let px = 0; px < PW; px++) {
       const k = (py * PW + px) * 4;
@@ -123,10 +135,20 @@ function renderAround(name, t) {
       const inside = sx >= 0 && sy >= 0 && sx < W && sy < H && src[(sy * W + sx) * 4 + 3] > 0.02;
       if (inside) {
         const i = (sy * W + sx) * 4;
-        out[k] = src[i] * 255;
-        out[k + 1] = src[i + 1] * 255;
-        out[k + 2] = src[i + 2] * 255;
-        out[k + 3] = src[i + 3] * 255;
+        let col = [src[i], src[i + 1], src[i + 2]];
+        let a = src[i + 3];
+        if (FX.AROUND_OVERLAY.has(name)) {
+          const res = FX.AROUND[name]((px + 0.5) / PW, (py + 0.5) / PH, 0, t, c);
+          const oa = res[3];
+          if (oa > 0) {
+            col = [FX.mix(col[0], res[0], oa), FX.mix(col[1], res[1], oa), FX.mix(col[2], res[2], oa)];
+            a = Math.min(1, a + oa * (1 - a));
+          }
+        }
+        out[k] = col[0] * 255;
+        out[k + 1] = col[1] * 255;
+        out[k + 2] = col[2] * 255;
+        out[k + 3] = a * 255;
       } else {
         const nx = (px + 0.5) / PW;
         const ny = (py + 0.5) / PH;
