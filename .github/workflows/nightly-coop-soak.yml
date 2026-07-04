@@ -133,8 +133,10 @@ jobs:
             ART=$(ls -1dt dev-logs/coop-soak/*/ 2>/dev/null | head -n1 || true)
             if [ -n "$ART" ] && [ -d "$ART" ]; then
               [ -f "${ART}failure.json" ] && cp "${ART}failure.json" "$DEST/${TS}__coop-soak-failure__ci.log"
-              [ -f "${ART}host.log" ]  && head -c 1000000 "${ART}host.log"  > "$DEST/${TS}__coop-soak-host__ci.log"
-              [ -f "${ART}guest.log" ] && head -c 1000000 "${ART}guest.log" > "$DEST/${TS}__coop-soak-guest__ci.log"
+              # tail, not head: the strand/desync moment is at the END of the log - run 28710818213's
+              # head-capped bundle cut off the exact TitlePhase transition being triaged.
+              [ -f "${ART}host.log" ]  && tail -c 1000000 "${ART}host.log"  > "$DEST/${TS}__coop-soak-host__ci.log"
+              [ -f "${ART}guest.log" ] && tail -c 1000000 "${ART}guest.log" > "$DEST/${TS}__coop-soak-guest__ci.log"
             fi
           fi
 
