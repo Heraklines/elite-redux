@@ -3,9 +3,25 @@
 **Live for the team: https://shiny-lab.pages.dev** (Cloudflare Pages). Also
 `articuno-shiny-lab.html` on the Desktop (self-contained except sprites).
 
-**357 effects** in three **combinable** slots - pick one of each and they stack live:
-**138 Palettes + 121 Surface FX + 98 Around FX** (v6 Discord-brainstorm batch + the v7
-mega-expansion doubled every catalog).
+**364 effects** in three **combinable** slots - pick one of each and they stack live:
+**138 Palettes + 123 Surface FX + 103 Around FX** (v6 Discord-brainstorm batch + the v7
+mega-expansion doubled every catalog; v7.1 quality pass reworked the weak ones after
+zoomed per-frame triage - see `gen-zoom.mjs`, the per-effect multi-frame review tool).
+
+## v7.1 quality pass (zoom-triage driven)
+Every v6/v7 effect was rendered at 3x with 4 animation frames (`gen-zoom.mjs`) and
+judged; ~35 got rebuilt. Replaced outright: Tiger Stripes + Leopard Print -> **Ember
+Motes** and **Fairy Dust** (plus new **Glitter Storm**, **Firefly Glade**, **Soul
+Siphon** replacing Bubble Wrap, **Hypno Rings** replacing Moire). New particle auras:
+**Comet Orbit**, **Ember Spiral**, **Rune Orbit** (all 3D front/behind), **Petal
+Vortex**, **Prism Rain**. All square "particle" cells across the aura set became soft
+round glowing dots (Nuclear Winter, Moonrise/Snow Globe stars, Geyser droplet arcs,
+Confetti, Zero-G Lift). Chained now draws real alternating links; Wind Ribbons hug the
+body instead of smearing the frame. Nine samey palettes became structurally distinct
+mappings: Patina Bronze (two materials), Sandstone (hard strata bands), Heat Mirage
+(hue shimmer), Twilight Neon / Frozen Abyss / Ultra Grape (highlight snap-to-accent),
+Tidepool (3-zone split), Sunlit Grove (green/gold split-tone), Velvet Noir (crushed
+film grade).
 **Species picker**: search any of ~992 Pokemon (top of the page); sprites stream from
 the er-assets CDN (jsDelivr, pinned sha) exactly like the game. Static previews:
 `contact-palette.png`, `contact-surface.png`, `contact-around.png`, `contact-combo.png`,
