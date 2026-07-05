@@ -44,6 +44,16 @@
       101
     ]
   },
+  "SPECIES_DEDENNE": {
+    "ability1": 249,
+    "ability2": 5023,
+    "hidden": 5332,
+    "innates": [
+      82,
+      5019,
+      182
+    ]
+  },
   "SPECIES_DEERLING": {
     "ability1": 91,
     "ability2": 92,
@@ -82,6 +92,16 @@
       185,
       5206,
       5563
+    ]
+  },
+  "SPECIES_ETERNAL_FLOETTE": {
+    "ability1": 5576,
+    "ability2": 229,
+    "hidden": 187,
+    "innates": [
+      98,
+      178,
+      120
     ]
   },
   "SPECIES_FLYGON_REDUX_B": {
