@@ -1,0 +1,268 @@
+url:      https://elite-redux-staging.pages.dev/
+build:    mr7d8rjm-4avm
+mode:     4  wave:37
+seed:     KwloZFIqCVaHAhdckXf2KPnp
+party:    Volcanion(L27 86hp f0), Phione(L27 96hp f0), Swablu Redux(L24 51hp f0), Solosis Redux(L14 40hp f0)
+enemy:    
+
+----- CONSOLE -----
+[10:05:22.066] LOG: Wave Seed: pknh{mf}Wpu 37
+[10:05:22.138] LOG: %cStart Phase EncounterPhase color:green;
+[10:05:32.062] LOG: Wave Seed: pknh{mf}Wpu 37
+[10:05:49.461] LOG: %cStart Phase MysteryEncounterPhase color:green;
+[10:05:51.710] LOG: %cStart Phase MysteryEncounterOptionSelectedPhase color:green;
+[10:05:52.569] LOG: %cStart Phase MysteryEncounterPhase color:green;
+[10:05:53.003] LOG: %cStart Phase MysteryEncounterOptionSelectedPhase color:green;
+[10:05:53.470] LOG: %cStart Phase MessagePhase color:green;
+[10:05:53.859] LOG: %cStart Phase MysteryEncounterPhase color:green;
+[10:05:54.236] LOG: %cStart Phase MysteryEncounterOptionSelectedPhase color:green;
+[10:05:54.549] LOG: %cStart Phase MessagePhase color:green;
+[10:05:54.907] LOG: %cStart Phase MysteryEncounterPhase color:green;
+[10:05:55.244] LOG: %cStart Phase MysteryEncounterOptionSelectedPhase color:green;
+[10:05:55.552] LOG: %cStart Phase MessagePhase color:green;
+[10:05:55.870] LOG: %cStart Phase MysteryEncounterPhase color:green;
+[10:05:56.242] LOG: %cStart Phase MysteryEncounterOptionSelectedPhase color:green;
+[10:05:56.377] LOG: Pokemon: Wild Quilava | Species ID: 156 | Level: 33 | Nature: Brave (+Atk/-Spd) | Friendship: 70
+[10:05:56.378] LOG: Stats (IVs): HP: 92 (25), Atk: 63 (31), Def: 51 (25), Spatk: 64 (9), Spdef: 53 (18), Spd: 59 (16)
+[10:05:56.378] LOG: Ability: Sand Rush | Passive Ability: Blaze 
+[10:05:56.378] LOG: Moveset: ["Mud Bomb","Lava Plume","Double Kick","Smokescreen"]
+[10:05:58.155] LOG: Battle Seed: H9G8Yu1JYBLigMKD
+[10:05:58.159] LOG: %cStart Phase MessagePhase color:green;
+[10:05:59.159] LOG: %cStart Phase MysteryEncounterBattlePhase color:green;
+[10:05:59.210] LOG: %cStart Phase SummonPhase color:green;
+[10:05:59.427] LOG: %cStart Phase SummonPhase color:green;
+[10:05:59.698] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[10:05:59.703] LOG: %cStart Phase CheckSwitchPhase color:green;
+[10:06:01.228] LOG: %cStart Phase InitEncounterPhase color:green;
+[10:06:01.233] LOG: %cStart Phase PostSummonPhase color:green;
+[10:06:01.234] LOG: Ran PSP for: Quilava
+[10:06:01.235] LOG: %cStart Phase PostSummonPhase color:green;
+[10:06:01.236] LOG: %cStart Phase PostSummonPhase color:green;
+[10:06:01.236] LOG: %cStart Phase PostSummonPhase color:green;
+[10:06:01.236] LOG: Ran PSP for: Volcanion
+[10:06:01.237] LOG: %cStart Phase PostSummonPhase color:green;
+[10:06:01.242] LOG: %cStart Phase ShowAbilityPhase color:green;
+[10:06:01.428] LOG: %cStart Phase CommonAnimPhase color:green;
+[10:06:01.430] LOG: %cStart Phase MessagePhase color:green;
+[10:06:01.643] LOG: %cStart Phase HideAbilityPhase color:green;
+[10:06:01.680] LOG: %cStart Phase PostSummonPhase color:green;
+[10:06:01.682] LOG: %cStart Phase TurnInitPhase color:green;
+[10:06:01.684] LOG: %cStart Phase MysteryEncounterBattleStartCleanupPhase color:green;
+[10:06:01.686] LOG: %cStart Phase CommandPhase color:green;
+[10:06:02.570] LOG: Move: BUBBLE_BEAM Move targets: {"targets":[2],"multiple":false} 
+Player Pokemon: Volcanion
+[10:06:02.574] LOG: %cStart Phase EnemyCommandPhase color:green;
+[10:06:02.584] LOG: Applied Damage Token (enemy)
+[10:06:02.588] LOG: Applied Damage Token (enemy)
+[10:06:02.598] LOG: Move Pool: ["Mud Bomb","Lava Plume","Double Kick","Smokescreen"]
+[10:06:02.598] LOG: Move Scores: [51,-20,23,0]
+[10:06:02.598] LOG: Sorted Move Pool: ["Mud Bomb","Double Kick","Smokescreen","Lava Plume"]
+[10:06:02.598] LOG: Chosen Move: Double Kick
+[10:06:02.599] LOG: %cStart Phase TurnStartPhase color:green;
+[10:06:02.602] LOG: %cStart Phase MovePhase color:green;
+[10:06:02.602] LOG: %cUser: Quilava
+Move: DOUBLE_KICK
+Use Mode: NORMAL color:orchid
+[10:06:02.609] LOG: %cStart Phase MessagePhase color:green;
+[10:06:02.710] LOG: %cStart Phase MoveEffectPhase color:green;
+[10:06:02.720] LOG: crit stage: +0
+[10:06:02.723] LOG: Move: Double Kick | Base damage: 13.4912 | Power: 45 | Source attack: 63 | Target defense: 75
+[10:06:02.724] LOG: Applied Damage Token (enemy)
+[10:06:02.724] LOG: Move: Double Kick | Attack damage: 12
+[10:06:02.727] LOG: %cStart Phase DamageAnimPhase color:green;
+[10:06:02.750] LOG: %cStart Phase MoveEffectPhase color:green;
+[10:06:02.752] LOG: crit stage: +0
+[10:06:02.754] LOG: Move: Double Kick | Base damage: 13.4912 | Power: 45 | Source attack: 63 | Target defense: 75
+[10:06:02.755] LOG: Applied Damage Token (enemy)
+[10:06:02.755] LOG: Move: Double Kick | Attack damage: 11
+[10:06:02.757] LOG: %cStart Phase DamageAnimPhase color:green;
+[10:06:02.780] LOG: %cStart Phase MessagePhase color:green;
+[10:06:02.977] LOG: %cStart Phase MoveEndPhase color:green;
+[10:06:02.978] LOG: %cStart Phase MovePhase color:green;
+[10:06:02.978] LOG: %cUser: Volcanion
+Move: BUBBLE_BEAM
+Use Mode: NORMAL color:orchid
+[10:06:02.981] LOG: %cStart Phase MessagePhase color:green;
+[10:06:03.110] LOG: %cStart Phase MoveEffectPhase color:green;
+[10:06:03.114] LOG: crit stage: +0
+[10:06:03.116] LOG: Applied X Sp. Atk 
+[10:06:03.117] LOG: Move: Bubble Beam | Base damage: 15.041509433962265 | Power: 25 | Source attack: 108 | Target defense: 53
+[10:06:03.119] LOG: Applied Protection Token (enemy)
+[10:06:03.119] LOG: Move: Bubble Beam | Attack damage: 119
+[10:06:03.121] LOG: %cStart Phase DamageAnimPhase color:green;
+[10:06:03.146] LOG: %cStart Phase MessagePhase color:green;
+[10:06:03.360] LOG: %cStart Phase MessagePhase color:green;
+[10:06:03.560] LOG: %cStart Phase FaintPhase color:green;
+[10:06:03.630] LOG: %cStart Phase MessagePhase color:green;
+[10:06:03.950] LOG: %cStart Phase VictoryPhase color:green;
+[10:06:03.953] LOG: Applied Soothe Bell 
+[10:06:03.954] LOG: %cStart Phase ExpPhase color:green;
+[10:06:03.955] LOG: Applied Super EXP. Charm 
+[10:06:03.955] LOG: Applied EXP. Charm 
+[10:06:04.295] LOG: %cStart Phase LevelUpPhase color:green;
+[10:06:04.298] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[10:06:04.298] LOG: Applied Super EXP. Charm 
+[10:06:04.299] LOG: Applied EXP. Charm 
+[10:06:04.300] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[10:06:04.300] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[10:06:04.300] LOG: Applied Super EXP. Charm 
+[10:06:04.300] LOG: Applied EXP. Charm 
+[10:06:04.301] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[10:06:04.302] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[10:06:04.302] LOG: Applied Super EXP. Charm 
+[10:06:04.302] LOG: Applied EXP. Charm 
+[10:06:04.431] LOG: %cStart Phase LevelUpPhase color:green;
+[10:06:04.433] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[10:06:04.513] LOG: %cStart Phase MoveEndPhase color:green;
+[10:06:04.514] LOG: %cStart Phase CheckInterludePhase color:green;
+[10:06:04.514] LOG: %cStart Phase WeatherEffectPhase color:green;
+[10:06:04.577] LOG: %cStart Phase PositionalTagPhase color:green;
+[10:06:04.577] LOG: %cStart Phase BerryPhase color:green;
+[10:06:04.578] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[10:06:04.578] LOG: %cStart Phase TurnEndPhase color:green;
+[10:06:04.581] WARN: [coop:turn] host recorder: finalize with NO open recording -> turn=-1 events=0 (caller decides not to emit)
+[10:06:04.581] LOG: %cStart Phase BattleEndPhase color:green;
+[10:06:04.581] LOG: Battle Score: 157 (1 Turns x1)
+[10:06:04.582] LOG: Total Score: 4994
+[10:06:04.595] LOG: %cStart Phase MysteryEncounterRewardsPhase color:green;
+[10:06:05.254] LOG: %cStart Phase MysteryEncounterPhase color:green;
+[10:06:05.541] LOG: %cStart Phase MysteryEncounterOptionSelectedPhase color:green;
+[10:06:05.656] LOG: Pokemon: Wild Palossand | Species ID: 770 | Level: 40 | Nature: Hardy (-) | Friendship: 50
+[10:06:05.656] LOG: Stats (IVs): HP: 118 (0), Atk: 69 (11), Def: 104 (29), Spatk: 89 (10), Spdef: 72 (18), Spd: 37 (10)
+[10:06:05.657] LOG: Ability: Arena Trap | Passive Ability: Water Compaction 
+[10:06:05.657] LOG: Moveset: ["Ominous Wind","Mud Sport","Scorching Sands","Imprison"]
+[10:06:11.678] LOG: Battle Seed: H9G8Yu1JYBLigMKD
+[10:06:11.683] LOG: %cStart Phase MessagePhase color:green;
+[10:06:12.368] LOG: %cStart Phase MysteryEncounterBattlePhase color:green;
+[10:06:12.446] LOG: %cStart Phase SummonPhase color:green;
+[10:06:12.662] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[10:06:12.665] LOG: %cStart Phase CheckSwitchPhase color:green;
+[10:06:12.667] LOG: %cStart Phase InitEncounterPhase color:green;
+[10:06:12.668] LOG: %cStart Phase PostSummonPhase color:green;
+[10:06:12.668] LOG: Ran PSP for: Palossand
+[10:06:12.668] LOG: %cStart Phase PostSummonPhase color:green;
+[10:06:12.669] LOG: %cStart Phase PostSummonPhase color:green;
+[10:06:12.669] LOG: %cStart Phase TurnInitPhase color:green;
+[10:06:12.669] LOG: %cStart Phase CommandPhase color:green;
+[10:06:13.816] LOG: Move: BUBBLE_BEAM Move targets: {"targets":[2],"multiple":false} 
+Player Pokemon: Volcanion
+[10:06:13.819] LOG: %cStart Phase EnemyCommandPhase color:green;
+[10:06:13.824] LOG: Applied Damage Token (enemy)
+[10:06:13.828] LOG: Applied Damage Token (enemy)
+[10:06:13.832] LOG: Move Pool: ["Scorching Sands"]
+[10:06:13.833] LOG: Move Scores: [54]
+[10:06:13.833] LOG: Sorted Move Pool: ["Scorching Sands"]
+[10:06:13.833] LOG: Chosen Move: Scorching Sands
+[10:06:13.833] LOG: %cStart Phase TurnStartPhase color:green;
+[10:06:13.836] LOG: %cStart Phase MovePhase color:green;
+[10:06:13.836] LOG: %cUser: Volcanion
+Move: BUBBLE_BEAM
+Use Mode: NORMAL color:orchid
+[10:06:13.838] LOG: %cStart Phase MessagePhase color:green;
+[10:06:13.945] LOG: %cStart Phase MoveEffectPhase color:green;
+[10:06:13.948] LOG: crit stage: +0
+[10:06:13.951] LOG: Move: Bubble Beam | Base damage: 10.433333333333334 | Power: 25 | Source attack: 92 | Target defense: 72
+[10:06:13.953] LOG: Applied Protection Token (enemy)
+[10:06:13.953] LOG: Move: Bubble Beam | Attack damage: 19
+[10:06:13.956] LOG: %cStart Phase DamageAnimPhase color:green;
+[10:06:13.982] LOG: %cStart Phase ShowAbilityPhase color:green;
+[10:06:14.166] LOG: %cStart Phase StatStageChangePhase color:green;
+[10:06:14.171] LOG: %cStart Phase MessagePhase color:green;
+[10:06:14.413] LOG: %cStart Phase HideAbilityPhase color:green;
+[10:06:14.449] LOG: %cStart Phase MoveEffectPhase color:green;
+[10:06:14.452] LOG: crit stage: +0
+[10:06:14.454] LOG: Move: Bubble Beam | Base damage: 10.433333333333334 | Power: 25 | Source attack: 92 | Target defense: 72
+[10:06:14.455] LOG: Applied Protection Token (enemy)
+[10:06:14.456] LOG: Move: Bubble Beam | Attack damage: 20
+[10:06:14.458] LOG: %cStart Phase DamageAnimPhase color:green;
+[10:06:14.482] LOG: %cStart Phase ShowAbilityPhase color:green;
+[10:06:14.666] LOG: %cStart Phase StatStageChangePhase color:green;
+[10:06:14.670] LOG: %cStart Phase MessagePhase color:green;
+[10:06:14.914] LOG: %cStart Phase HideAbilityPhase color:green;
+[10:06:14.950] LOG: %cStart Phase MoveEffectPhase color:green;
+[10:06:14.954] LOG: crit stage: +0
+[10:06:14.957] LOG: Move: Bubble Beam | Base damage: 10.433333333333334 | Power: 25 | Source attack: 92 | Target defense: 72
+[10:06:14.959] LOG: Applied Protection Token (enemy)
+[10:06:14.959] LOG: Move: Bubble Beam | Attack damage: 22
+[10:06:14.962] LOG: %cStart Phase DamageAnimPhase color:green;
+[10:06:14.982] LOG: %cStart Phase ShowAbilityPhase color:green;
+[10:06:15.168] LOG: %cStart Phase StatStageChangePhase color:green;
+[10:06:15.171] LOG: %cStart Phase MessagePhase color:green;
+[10:06:15.429] LOG: %cStart Phase HideAbilityPhase color:green;
+[10:06:15.465] LOG: %cStart Phase MoveEffectPhase color:green;
+[10:06:15.468] LOG: crit stage: +0
+[10:06:15.470] LOG: Move: Bubble Beam | Base damage: 10.433333333333334 | Power: 25 | Source attack: 92 | Target defense: 72
+[10:06:15.471] LOG: Applied Protection Token (enemy)
+[10:06:15.472] LOG: Move: Bubble Beam | Attack damage: 19
+[10:06:15.473] LOG: %cStart Phase DamageAnimPhase color:green;
+[10:06:15.499] LOG: %cStart Phase ShowAbilityPhase color:green;
+[10:06:15.667] LOG: %cStart Phase StatStageChangePhase color:green;
+[10:06:15.671] LOG: %cStart Phase MessagePhase color:green;
+[10:06:15.929] LOG: %cStart Phase HideAbilityPhase color:green;
+[10:06:15.966] LOG: %cStart Phase MoveEffectPhase color:green;
+[10:06:15.969] LOG: crit stage: +0
+[10:06:15.972] LOG: Move: Bubble Beam | Base damage: 10.433333333333334 | Power: 25 | Source attack: 92 | Target defense: 72
+[10:06:15.973] LOG: Applied Protection Token (enemy)
+[10:06:15.974] LOG: Move: Bubble Beam | Attack damage: 20
+[10:06:15.976] LOG: %cStart Phase DamageAnimPhase color:green;
+[10:06:16.000] LOG: %cStart Phase MessagePhase color:green;
+[10:06:16.212] LOG: %cStart Phase ShowAbilityPhase color:green;
+[10:06:16.383] LOG: %cStart Phase StatStageChangePhase color:green;
+[10:06:16.385] LOG: %cStart Phase MessagePhase color:green;
+[10:06:16.646] LOG: %cStart Phase HideAbilityPhase color:green;
+[10:06:16.682] LOG: %cStart Phase MessagePhase color:green;
+[10:06:16.879] LOG: %cStart Phase MoveEndPhase color:green;
+[10:06:16.880] LOG: %cStart Phase MovePhase color:green;
+[10:06:16.880] LOG: %cUser: Palossand
+Move: SCORCHING_SANDS
+Use Mode: NORMAL color:orchid
+[10:06:16.885] LOG: %cStart Phase MessagePhase color:green;
+[10:06:17.031] LOG: %cStart Phase MoveEffectPhase color:green;
+[10:06:17.034] LOG: crit stage: +0
+[10:06:17.036] LOG: Move: Scorching Sands | Base damage: 42.728813559322035 | Power: 75 | Source attack: 89 | Target defense: 59
+[10:06:17.037] LOG: Applied Damage Token (enemy)
+[10:06:17.037] LOG: Move: Scorching Sands | Attack damage: 119
+[10:06:17.039] LOG: %cStart Phase DamageAnimPhase color:green;
+[10:06:17.066] LOG: %cStart Phase MessagePhase color:green;
+[10:06:17.297] LOG: %cStart Phase FaintPhase color:green;
+[10:06:17.367] LOG: %cStart Phase MessagePhase color:green;
+[10:06:17.945] LOG: %cStart Phase MoveEndPhase color:green;
+[10:06:17.945] LOG: %cStart Phase CheckInterludePhase color:green;
+[10:06:17.945] LOG: %cStart Phase WeatherEffectPhase color:green;
+[10:06:17.998] LOG: %cStart Phase PositionalTagPhase color:green;
+[10:06:17.998] LOG: %cStart Phase BerryPhase color:green;
+[10:06:17.998] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[10:06:17.998] LOG: %cStart Phase TurnEndPhase color:green;
+[10:06:18.000] WARN: [coop:turn] host recorder: finalize with NO open recording -> turn=-1 events=0 (caller decides not to emit)
+[10:06:18.000] LOG: %cStart Phase SwitchPhase color:green;
+[10:06:20.308] LOG: %cStart Phase SwitchSummonPhase color:green;
+[10:06:20.431] WARN: cry/10718 not found
+[10:06:20.534] LOG: %cStart Phase PostSummonPhase color:green;
+[10:06:20.534] LOG: Ran PSP for: Solosis Redux
+[10:06:20.535] LOG: %cStart Phase PostSummonPhase color:green;
+[10:06:20.535] LOG: %cStart Phase PostSummonPhase color:green;
+[10:06:20.536] LOG: %cStart Phase TurnInitPhase color:green;
+[10:06:20.537] LOG: %cStart Phase CommandPhase color:green;
+[10:06:24.437] DEBUG: Session data saved to slot 1!
+[10:06:25.855] LOG: Seed: hrZTWYjrSwNBGInm08UMPE8r
+[10:06:25.855] LOG: Wave Seed: hrZTWYjrSwNBGInm08UMPE8r 0
+[10:06:26.263] WARN: AnimationManager key already exists: prompt
+[10:06:26.263] WARN: AnimationManager key already exists: tera_sparkle
+[10:06:26.263] LOG: Seed: LYtdwTOb8RGYnQaDdAZqGjSq
+[10:06:26.263] LOG: Wave Seed: LYtdwTOb8RGYnQaDdAZqGjSq 0
+[10:06:29.966] LOG: %cStart Phase LoginPhase color:green;
+[10:06:30.290] LOG: Client Session: a3I7I5DQyuV4zsOYGmuDNHev1qihtPCj
+[10:06:30.771] LOG: %cStart Phase TitlePhase color:green;
+[10:06:30.772] LOG: Getting Session Slot id: %d 1
+[10:06:30.790] LOG: use seasonal splash messages true
+[10:06:40.959] LOG: Getting Session Slot id: %d 0
+[10:06:40.968] LOG: Getting Session Slot id: %d 1
+[10:06:40.973] LOG: Getting Session Slot id: %d 2
+[10:06:40.982] LOG: Getting Session Slot id: %d 3
+[10:06:40.988] LOG: Getting Session Slot id: %d 4
+[10:06:44.403] LOG: Getting Session Slot id: %d 1
+[10:06:44.409] LOG: Wave Seed: KwloZFIqCVaHAhdckXf2KPnp 0
+[10:06:44.409] LOG: Seed: KwloZFIqCVaHAhdckXf2KPnp
+[10:06:44.447] LOG: Wave Seed: pknh{mf}Wpu 37
+[10:06:44.509] LOG: %cStart Phase EncounterPhase color:green;
+[10:06:44.564] LOG: Wave Seed: pknh{mf}Wpu 37
