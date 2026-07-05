@@ -1,4 +1,13 @@
 {
+  "SPECIES_AMAURA": {
+    "ability1": 116,
+    "ability2": 174,
+    "innates": [
+      5056,
+      115,
+      5055
+    ]
+  },
   "SPECIES_ARASHINNE": {
     "innates": [
       82,
@@ -21,6 +30,9 @@
       181,
       18
     ]
+  },
+  "SPECIES_AURORUS": {
+    "ability2": 174
   },
   "SPECIES_BISHARP_REDUX": {
     "ability1": 128,
