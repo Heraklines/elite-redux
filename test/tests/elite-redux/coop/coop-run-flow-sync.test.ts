@@ -78,6 +78,7 @@ const state = (over: Partial<CoopChecksumState> = {}): CoopChecksumState => ({
   arenaTags: [],
   party: [1, 4],
   partyLevels: [50, 48],
+  benchHp: [[1, 120, 0]],
   money: 1000,
   modifiers: [["EXP_CHARM", 1]],
   heldItems: [[0, "LEFTOVERS", 1]],
@@ -117,6 +118,7 @@ describe("co-op run-flow sync pure core (#698, B7 + B8)", () => {
       field: [mon()],
       party: [1, 4],
       partyLevels: [50, 48],
+      benchHp: [[1, 120, 0]],
       arenaTags: [],
       modifiers: [["EXP_CHARM", 1]],
       heldItems: [[0, "LEFTOVERS", 1]],
@@ -133,6 +135,7 @@ describe("co-op run-flow sync pure core (#698, B7 + B8)", () => {
       arenaTags: [],
       party: [1, 4],
       partyLevels: [50, 48],
+      benchHp: [[1, 120, 0]],
       modifiers: [["EXP_CHARM", 1]],
       saveDataDigest: "0000000000000000",
       pokeballCounts: [

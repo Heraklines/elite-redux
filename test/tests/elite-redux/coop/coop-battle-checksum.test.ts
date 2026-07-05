@@ -50,6 +50,7 @@ const state = (over: Partial<CoopChecksumState> = {}): CoopChecksumState => ({
   arenaTags: [],
   party: [1, 4],
   partyLevels: [50, 48],
+  benchHp: [[1, 120, 0]],
   money: 1000,
   modifiers: [["EXP_CHARM", 1]],
   heldItems: [[0, "LEFTOVERS", 1]],
@@ -112,6 +113,7 @@ describe("co-op battle checksum pure core (#633, TRACK-2)", () => {
         field: [mon()],
         party: [1, 4],
         partyLevels: [50, 48],
+        benchHp: [[1, 120, 0]],
         arenaTags: [],
         modifiers: [["EXP_CHARM", 1]],
         heldItems: [[0, "LEFTOVERS", 1]],
@@ -132,6 +134,7 @@ describe("co-op battle checksum pure core (#633, TRACK-2)", () => {
         saveDataDigest: "0000000000000000",
         party: [1, 4],
         partyLevels: [50, 48],
+        benchHp: [[1, 120, 0]],
         modifiers: [["EXP_CHARM", 1]],
         pokeballCounts: [
           [0, 5],
@@ -209,6 +212,12 @@ describe("co-op battle checksum pure core (#633, TRACK-2)", () => {
       // The live revive-in-shop desync: same species at every slot (so `party` is unchanged) but a
       // bench mon's LEVEL differs between host + guest. partyLevels makes that detectable -> resync.
       expect(checksumState(state({ partyLevels: [51, 48] }))).not.toBe(base);
+    });
+    it("a changed BENCH-mon hp/fainted (#719 - a Revive on a fainted bench mon whose relay was DROPPED)", () => {
+      // The dropped-relay revive desync: same species + level at every slot (so `party` + `partyLevels`
+      // are unchanged), but a fainted BENCH mon revived on one client only. benchHp makes that hp/fainted
+      // divergence detectable -> the resync's benchParty heal revives it (backstop for a lost revive relay).
+      expect(checksumState(state({ benchHp: [[1, 0, 1]] }))).not.toBe(base);
     });
     it("a changed money", () => {
       expect(checksumState(state({ money: 999 }))).not.toBe(base);

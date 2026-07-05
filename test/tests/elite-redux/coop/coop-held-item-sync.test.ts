@@ -83,6 +83,7 @@ const state = (over: Partial<CoopChecksumState> = {}): CoopChecksumState => ({
   arenaTags: [],
   party: [1, 4],
   partyLevels: [50, 48],
+  benchHp: [[1, 120, 0]],
   money: 1000,
   modifiers: [["EXP_CHARM", 1]],
   heldItems: [[0, "LEFTOVERS", 1]],

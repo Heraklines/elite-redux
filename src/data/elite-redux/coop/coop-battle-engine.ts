@@ -1776,6 +1776,37 @@ export function captureCoopSaveDataDigest(): string {
 }
 
 /**
+ * Read every OFF-FIELD (bench) player mon's hp + fainted flag for the per-turn checksum (#719
+ * revive/heal backstop). Returns `[partyIndex, hp, faintedFlag]` per bench mon, in slot order
+ * (faintedFlag 1 = fainted, 0 = alive). ON-FIELD mons are EXCLUDED - their hp is already hashed by the
+ * field checksum and converged by the per-turn checkpoint; this extends the SAME coverage to the bench so
+ * a Revive on a FAINTED bench mon whose owner->watcher relay was DROPPED (the mon stays fainted forever on
+ * the watcher) becomes a DETECTABLE divergence the resync's `benchParty` heal closes - a gap the speciesId
+ * `party` list + `partyLevels` miss (a revive changes no species and no level). Fully guarded.
+ */
+function readBenchHpDigest(): [number, number, number][] {
+  const out: [number, number, number][] = [];
+  try {
+    const party = globalScene.getPlayerParty();
+    // "Bench" = party slots beyond the field (i >= battlerCount), the same slot model as
+    // firstLegalBenchSlot and the base field checksum. Do NOT use mon.isOnField(): the guest is a
+    // pure renderer whose field/summon state is unreliable, so it would misclassify its own on-field
+    // leads as bench and diverge from the host. The base field checksum already covers i < battlerCount.
+    const battlerCount = globalScene.currentBattle?.getBattlerCount() ?? 2;
+    for (let i = 0; i < party.length; i++) {
+      const mon = party[i];
+      if (mon == null || i < battlerCount) {
+        continue;
+      }
+      out.push([i, mon.hp, mon.isFainted() ? 1 : 0]);
+    }
+  } catch {
+    // A bad party read must never break the checksum capture (caller falls back to the sentinel).
+  }
+  return out;
+}
+
+/**
  * Capture the full authoritative battle state into its canonical checksum view. Read
  * ONLY at a stable turn boundary (start of CommandPhase) - never mid-resolution - so
  * both clients hash the same logical instant. Field mons are sorted by battler index.
@@ -1796,6 +1827,12 @@ export function captureCoopChecksumState(): CoopChecksumState {
     // Party LEVELS in slot order (#633 B4): detect a bench-mon level drift the speciesId-only
     // `party` list misses (the live revive-in-shop desync). Settled at the CommandPhase boundary.
     partyLevels: globalScene.getPlayerParty().map(p => p.level),
+    // BENCH-mon hp + fainted (#719 revive/heal backstop): the field checksum hashes ON-FIELD hp only, so a
+    // Revive on a FAINTED bench mon whose owner->watcher relay was DROPPED left the mon fainted forever on
+    // the watcher, INVISIBLE to the hash (a revive changes no species and no level, so `party`/`partyLevels`
+    // miss it). Hashing each off-field mon's [slot, hp, fainted] makes that divergence DETECTABLE -> the
+    // resync's benchParty heal revives it. Bench hp only moves on a revive/heal item, so no ordinary-turn noise.
+    benchHp: readBenchHpDigest(),
     money: globalScene.money,
     modifiers: readModifiers(),
     // On-field per-mon held-item digest (#633 RISKY #2/#3): a stack change (Bug-Bite/Knock-Off) or a

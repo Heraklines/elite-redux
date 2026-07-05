@@ -121,6 +121,18 @@ export interface CoopChecksumState {
    * many phases before the next wave's checksum), so it is deterministic and never a false-resync.
    */
   partyLevels: number[];
+  /**
+   * BENCH-mon hp + fainted state (#719 revive/heal backstop): one `[partyIndex, hp, faintedFlag]` entry
+   * per OFF-FIELD party mon, in slot order (faintedFlag 1 = fainted, 0 = alive). The base {@linkcode field}
+   * checksum hashes ON-FIELD hp only, so a Revive / Max Revive on a FAINTED bench mon - whose owner->watcher
+   * interaction relay was DROPPED (the #787 lost-relay class) - left the mon fainted forever on the watcher,
+   * INVISIBLE to the hash: a revive changes NO species (so `party` misses it) and NO level (so `partyLevels`
+   * misses it). Hashing each bench mon's hp+fainted makes that divergence DETECTABLE, so the checksum trips
+   * the same full-snapshot resync that HEALS it (its `benchParty` reconcile revives the mon). TARGETED: bench
+   * hp/fainted only moves on a revive/heal item, so it adds NO resync noise on ordinary turns (on-field mons
+   * already hash hp; this extends the SAME coverage to the bench). Slot order is meaningful - do NOT sort.
+   */
+  benchHp: [number, number, number][];
   money: number;
   /** Persistent modifiers as `[typeId, stackCount]`, sorted by `typeId`. */
   modifiers: [string, number][];
