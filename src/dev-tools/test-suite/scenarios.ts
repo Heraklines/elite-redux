@@ -1814,6 +1814,78 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
   },
   {
+    label: "(note) Co-op: a player out of Pokemon closes the faint picker (no stuck menu)",
+    description:
+      "CO-OP fix - verify with TWO clients (not a solo battle): when a player's ENTIRE half is fainted\n"
+      + "(no legal same-owner replacement) and that player's active mon faints, the forced 'choose a\n"
+      + "Pokemon' picker used to open with NO selectable option - every non-fainted party mon is either\n"
+      + "fainted or the PARTNER's (both blocked) - and the modal could not be cancelled, so that player was\n"
+      + "STUCK FOREVER in the choose menu and the turn never advanced ('when your partner runs out of\n"
+      + "pokemon the game waits forever', live seed 5ncYiLOw1a4JQZ0MAzWA1izj wave 3). Fixed: the picker now\n"
+      + "detects no-legal-same-owner replacement and CLOSES (that player is OUT), leaving the slot empty so\n"
+      + "the run continues with the surviving partner (asymmetric field); if BOTH halves are wiped it ends\n"
+      + "cleanly (game over). DO (2 clients): let ONE player lose its whole half (faint every mon it owns),\n"
+      + "then faint its active mon. EXPECT: no stuck choose menu; the picker closes; the partner keeps\n"
+      + "playing solo on the field; a both-halves-wiped case reaches a normal game over - never a hang.\n"
+      + "Duo-tested headlessly in test/tests/elite-redux/coop/coop-duo-half-wiped.test.ts.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({ STARTING_WAVE_OVERRIDE: 1, STARTING_LEVEL_OVERRIDE: 50 });
+      return [
+        makeStarter(SpeciesId.SNORLAX, { moveset: [MoveId.BODY_SLAM, MoveId.REST, MoveId.EARTHQUAKE, MoveId.CRUNCH] }),
+      ];
+    },
+  },
+  {
+    label: "(note) Co-op: lone-survivor faint replacement seats in your OWN slot (#799)",
+    description:
+      "CO-OP fix - verify with TWO clients (not a solo battle): with a HEAVILY-fainted party (both sides\n"
+      + "down to ~2 live mons) when only ONE legal replacement remains, the SOLO 'collapse the seat to slot\n"
+      + "0 in a double where 2/3 legal members fainted at once' behavior fired - which is NOT co-op-aware.\n"
+      + "Each player owns a FIXED field slot (host = left, guest = right); collapsing a guest replacement to\n"
+      + "the LEFT slot (or the two clients resolving the collapse differently off their own party views)\n"
+      + "seated the pick in the WRONG slot: the host seated it while the guest left that slot ABSENT, so the\n"
+      + "guest re-detected an empty slot and re-opened the picker in a loop ('switches in, instantly faints,\n"
+      + "endless loop', live seed 5ncYiLOw1a4JQZ0MAzWA1izj wave 3). Fixed: in co-op a replacement ALWAYS\n"
+      + "seats in the OWNER's own fixed slot, never collapsed to 0. DO (2 clients): get both parties down to\n"
+      + "~2 mons, faint the guest's active mon, and pick its LAST living bench mon. EXPECT: the pick comes\n"
+      + "out in the GUEST's own slot on BOTH screens (same species, same slot), stays alive, no re-open loop,\n"
+      + "no desync flash. Duo-tested headlessly in\n"
+      + "test/tests/elite-redux/coop/coop-duo-heavy-faint-seating.test.ts.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({ STARTING_WAVE_OVERRIDE: 1, STARTING_LEVEL_OVERRIDE: 50 });
+      return [
+        makeStarter(SpeciesId.CHARIZARD, {
+          moveset: [MoveId.FLAMETHROWER, MoveId.AIR_SLASH, MoveId.DRAGON_PULSE, MoveId.ROOST],
+        }),
+      ];
+    },
+  },
+  {
+    label: "(note) Co-op: a Revive in the shop syncs to BOTH clients (#719)",
+    description:
+      "CO-OP fix - verify with TWO clients (not a solo battle): a Revive / Max Revive is a party-target\n"
+      + "reward - the OWNER picks WHICH fainted mon to revive (restores HP + clears the fainted flag) and\n"
+      + "BOTH clients must apply it. The reported desync: the owner saw the mon revived, the partner never\n"
+      + "did, so the revived bench mon stayed fainted on the partner's client (live seed\n"
+      + "5ncYiLOw1a4JQZ0MAzWA1izj). Because a revive changes no LEVEL, the per-turn checksum (which hashes\n"
+      + "party species + levels, not bench HP) could not even detect it. Verified in the two-engine harness:\n"
+      + "the party-target REVIVE relay applies on the WATCHER too, zero forced resyncs. DO (2 clients):\n"
+      + "faint a bench mon, take a Revive in the reward shop, and pick that fainted mon. EXPECT: the mon is\n"
+      + "ALIVE (HP > 0) on BOTH screens, same HP, no desync. Regression-guarded headlessly in\n"
+      + "test/tests/elite-redux/coop/coop-duo-revive-sync.test.ts.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({ STARTING_WAVE_OVERRIDE: 1, STARTING_LEVEL_OVERRIDE: 50 });
+      return [
+        makeStarter(SpeciesId.BLASTOISE, {
+          moveset: [MoveId.SURF, MoveId.ICE_BEAM, MoveId.FLASH_CANNON, MoveId.RAPID_SPIN],
+        }),
+      ];
+    },
+  },
+  {
     label: "QoL: reward-shop long-desc auto-scroll (#557)",
     description:
       "#557 - long ER item descriptions auto-scroll in the REWARD screen instead of\n"
