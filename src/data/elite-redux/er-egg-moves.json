@@ -882,7 +882,7 @@
     "KNOCK_OFF"
   ],
   "SPECIES_DEDENNE": [
-    "BOOMBURST",
+    "DECORATE",
     "FAKE_OUT",
     "NASTY_PLOT",
     "REVIVAL_BLESSING"
@@ -1206,9 +1206,9 @@
     "DARK_VOID"
   ],
   "SPECIES_ETERNAL_FLOETTE": [
-    "MYSTICAL_FIRE",
+    "ATOMIC_FIRE",
     "CHLOROBLAST",
-    "LUSTER_PURGE",
+    "PSYCHO_WAVE",
     "QUIVER_DANCE"
   ],
   "SPECIES_ETERNATUS": [
@@ -1542,7 +1542,7 @@
     "RAGE_FIST"
   ],
   "SPECIES_GOOMY": [
-    "DRAGON_HAMMER",
+    "DRAGON_PULSE",
     "RECOVER",
     "CALM_MIND",
     "MAKE_IT_RAIN"
@@ -1794,8 +1794,8 @@
     "BITTER_BLADE"
   ],
   "SPECIES_HOOPA": [
-    "SUCKER_PUNCH",
-    "SECRET_SWORD",
+    "SPECTRAL_THIEF",
+    "AURA_FORCE",
     "FIERY_WRATH",
     "PHOTON_GEYSER"
   ],
@@ -2065,7 +2065,7 @@
   ],
   "SPECIES_KLEFKI": [
     "HEAL_BELL",
-    "ENCORE",
+    "NASTY_PLOT",
     "INSTRUCT",
     "TOPSY_TURVY"
   ],
@@ -2695,7 +2695,7 @@
   ],
   "SPECIES_NOIBAT": [
     "AEROBLAST",
-    "OVERDRIVE",
+    "PEBBLE_SHOWER",
     "NASTY_PLOT",
     "CLANGING_SCALES"
   ],
@@ -3156,10 +3156,10 @@
     "EARTHQUAKE"
   ],
   "SPECIES_PUMPKABOO": [
-    "SPIRIT_SHACKLE",
-    "FIRE_LASH",
-    "DIRE_CLAW",
-    "SAPPY_SEED"
+    "INFERNAL_PARADE",
+    "BURNING_JEALOUSY",
+    "BAD_EGG",
+    "SYRUP_BOMB"
   ],
   "SPECIES_PURRLOIN": [
     "DIRE_CLAW",
@@ -4364,7 +4364,7 @@
   "SPECIES_VOLCANION": [
     "STRANGE_STEAM",
     "CALM_MIND",
-    "SEARING_SHOT",
+    "EARTH_POWER",
     "THUNDERCLAP"
   ],
   "SPECIES_VOLTORB": [
