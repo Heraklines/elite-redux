@@ -1886,6 +1886,38 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
   },
   {
+    label: "(note) Co-op: your party ORDER stays synced when a lead faints + is replaced (#836)",
+    description:
+      "CO-OP fix - verify with TWO clients (not a solo battle): when a player's FIELD lead faints and a\n"
+      + "BENCH mon is sent out to replace it, the game swaps the party ARRAY so the replacement takes the\n"
+      + "field slot and the fainted lead moves to the bench slot it vacated. The HOST does this immediately;\n"
+      + "the partner (the pure renderer) used to mirror the host's OWN faint only on the NEXT turn - so if the\n"
+      + "wave ENDED first (or the replacement leveled up), the partner kept the OLD order and the two clients'\n"
+      + "party lists TRANSPOSED (live seed lzvAD3J749mCz1eNGVBSKWXW, Youngster Wes, wave 5). That one desync\n"
+      + "caused TWO reports: (1) 'my mon is a level behind my partner's' - the replacement's level-up landed\n"
+      + "on the wrong (transposed) slot on the partner and was dropped; (2) 'a mon switched in invisible then\n"
+      + "fainted for no reason' - the wrong mon sat at a field slot. Fixed: a host-owned faint-replacement now\n"
+      + "syncs the swap to the partner IMMEDIATELY (same as a partner-owned faint), the party-order heal no\n"
+      + "longer freezes a mis-slotted on-field mon, and the exp/level delivery falls back to mon IDENTITY so a\n"
+      + "level-up is never lost. DO (2 clients): faint your FIELD lead and send out a bench mon, then win the\n"
+      + "wave (ideally the replacement gets a KO + levels up). EXPECT: your party list is in the SAME order on\n"
+      + "BOTH screens, the replacement's level matches on both, no bench mon shows the wrong HP/fainted state,\n"
+      + "no re-summon flash or resync. Duo-tested headlessly in\n"
+      + "test/tests/elite-redux/coop/coop-duo-party-transposition.test.ts.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({ STARTING_WAVE_OVERRIDE: 1, STARTING_LEVEL_OVERRIDE: 50 });
+      return [
+        makeStarter(SpeciesId.CHIKORITA, {
+          moveset: [MoveId.RAZOR_LEAF, MoveId.BODY_SLAM, MoveId.SYNTHESIS, MoveId.REFLECT],
+        }),
+        makeStarter(SpeciesId.FENNEKIN, {
+          moveset: [MoveId.EMBER, MoveId.PSYBEAM, MoveId.QUICK_ATTACK, MoveId.HOWL],
+        }),
+      ];
+    },
+  },
+  {
     label: "QoL: reward-shop long-desc auto-scroll (#557)",
     description:
       "#557 - long ER item descriptions auto-scroll in the REWARD screen instead of\n"
