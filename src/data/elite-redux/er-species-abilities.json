@@ -1,4 +1,11 @@
 {
+  "SPECIES_ARASHINNE": {
+    "innates": [
+      82,
+      82,
+      182
+    ]
+  },
   "SPECIES_ARCANINE_MEGA_REDUX": {
     "hidden": 1,
     "innates": [
