@@ -1,0 +1,24 @@
+----- BUG REPORT (in-game) -----
+version:  1.11.19
+url:      https://elite-redux.pages.dev/
+ua:       Mozilla/5.0 (iPhone; CPU iPhone OS 18_7 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.5 Mobile/15E148 Safari/604.1
+mode:     0  wave:null  difficulty:ace
+seed:     RwfBzQmhsBb4MCIExODzVWPj
+party:    
+
+----- DESCRIPTION -----
+game refreshing constantly on a single battle every run can't get past it get soft locked out the run
+
+----- CONSOLE -----
+[19:44:41.680] LOG: %c %c %c %c %c Phaser v3.90.0 (WebGL | Web Audio) %c https://phaser.io/v390 background: #ff0000 background: #ffff00 background: #00ff00 background: #00ffff color: #ffffff; background: #000000 background: transparent
+[19:44:42.030] LOG: [ER] build mr1lenh7-fth8
+[19:45:20.714] DEBUG: Destroying loading scene
+[19:45:20.714] DEBUG: Destroyed loading scene
+[19:45:20.828] LOG: Seed: RwfBzQmhsBb4MCIExODzVWPj
+[19:45:20.828] LOG: Wave Seed: RwfBzQmhsBb4MCIExODzVWPj 0
+[19:45:24.574] LOG: %cStart Phase LoginPhase color:green;
+[19:45:24.775] LOG: Client Session: u7VeGY0446GfV1USI7P5QgbA0qOGoGSa
+[19:45:24.882] DEBUG: Using cached system data
+[19:45:24.934] LOG: %cStart Phase TitlePhase color:green;
+[19:45:24.934] LOG: Getting Session Slot id: %d 0
+[19:45:24.947] LOG: use seasonal splash messages true
