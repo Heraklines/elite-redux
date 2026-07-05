@@ -987,6 +987,74 @@ export async function driveGuestReplayTurn(guestScene: ReplayPumpScene, turn: nu
 }
 
 // ---------------------------------------------------------------------------
+// DETECTION MODEL (#807 guest-faint replacement tick race). The per-turn checkpoint / resync
+// HEALS state divergences, so a convergence-only assertion sees the two engines AGREE *after* the
+// heal and PASSES - never catching that the CHOOSER's screen showed a fainted replacement + a
+// re-picker before the heal. These primitives let a faint / switch / learn-move duo test assert the
+// PRESENTATION axis: (1) the PRE-HEAL presented state on the owner/chooser engine (the summoned
+// replacement must be the chosen species + hp>0, asserted BEFORE the finalize/checkpoint heals it),
+// and (2) that a player-facing interaction turn converged with ZERO forced resyncs (a resync means a
+// divergence the player could SEE - bounded-resync-OK is the wrong bar for an interaction turn).
+// ---------------------------------------------------------------------------
+
+/** The PRESENTED state of a player field slot on the given engine (species + hp + fainted). */
+export interface PresentedFieldMon {
+  speciesId: number;
+  hp: number;
+  fainted: boolean;
+}
+
+/**
+ * Read the PRESENTED state of a player FIELD slot on `scene` (what that engine's screen shows right
+ * now). MUST be called inside withClient/withClientSync for the owning ctx (so globalScene is that
+ * engine). Returns null when the slot is empty. Use it to assert a freshly summoned replacement is
+ * presented ALIVE (hp>0) + the CHOSEN species BEFORE any subsequent checkpoint heals it - a
+ * replacement that presents fainted on the chooser is a FAILURE even if the next checkpoint heals it.
+ */
+export function presentedFieldMon(scene: BattleScene, fieldIndex: number): PresentedFieldMon | null {
+  const mon = scene.getPlayerField()[fieldIndex];
+  if (mon == null) {
+    return null;
+  }
+  return { speciesId: mon.species?.speciesId ?? 0, hp: mon.hp, fainted: mon.isFainted() };
+}
+
+/** A live forced-resync probe: reports how many resyncs a runtime has requested + restores the stream. */
+export interface CoopResyncProbe {
+  /** Forced resyncs (requestStateSync calls) the runtime has issued since install. */
+  count(): number;
+  /** Uninstall the probe (restore the original requestStateSync). Call in afterEach. */
+  restore(): void;
+}
+
+/**
+ * Install a behavior-preserving probe on `runtime`'s streamer that COUNTS forced resyncs
+ * (requestStateSync) it issues - the detection-model signal for a player-facing divergence. It calls
+ * THROUGH to the real requestStateSync (so healing still happens + the run never hangs), only tallying.
+ * Assert `probe.count()` stays 0 across a faint-replacement (or any interaction) turn: a forced resync
+ * there means the guest's presented state diverged from the host's before the heal - the exact class the
+ * heal-then-assert harness masked. Uninstall with `restore()` so it never leaks across the shared
+ * (isolate:false) ER suite.
+ */
+export function installCoopResyncProbe(runtime: CoopRuntime): CoopResyncProbe {
+  const streamer = runtime.battleStream as unknown as {
+    requestStateSync: (turn: number) => Promise<string | null>;
+  };
+  const original = streamer.requestStateSync.bind(streamer);
+  let n = 0;
+  streamer.requestStateSync = (turn: number): Promise<string | null> => {
+    n += 1;
+    return original(turn);
+  };
+  return {
+    count: () => n,
+    restore: () => {
+      streamer.requestStateSync = original;
+    },
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Host reward-shop OWNER drive + guest WATCHER drive (real SelectModifierPhase, real
 // CoopInteractionRelay over the loopback). At interaction counter 0 the HOST owns the
 // shop and the GUEST watches (the production parity rule); buildDuo wires that. The owner

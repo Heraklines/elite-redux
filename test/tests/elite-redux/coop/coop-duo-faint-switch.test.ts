@@ -37,9 +37,12 @@ import { UiMode } from "#enums/ui-mode";
 import { GameManager } from "#test/framework/game-manager";
 import {
   buildDuo,
+  type CoopResyncProbe,
   type DuoRig,
   driveGuestReplayTurn,
+  installCoopResyncProbe,
   installDuoLogCapture,
+  presentedFieldMon,
   withClient,
   withClientSync,
 } from "#test/tools/coop-duo-harness";
@@ -59,6 +62,7 @@ describe.skipIf(!RUN)("co-op DUO guest-owned faint: the guest chooses its OWN re
   let phaserGame: Phaser.Game;
   let game: GameManager;
   let logs: ReturnType<typeof installDuoLogCapture>;
+  let resyncProbe: CoopResyncProbe | undefined;
 
   beforeAll(() => {
     phaserGame = new Phaser.Game({ type: Phaser.HEADLESS });
@@ -83,6 +87,8 @@ describe.skipIf(!RUN)("co-op DUO guest-owned faint: the guest chooses its OWN re
   });
 
   afterEach(() => {
+    resyncProbe?.restore();
+    resyncProbe = undefined;
     setCoopFaintSwitchWaitMs(60_000);
     logs.dispose();
     clearCoopRuntime();
@@ -104,6 +110,9 @@ describe.skipIf(!RUN)("co-op DUO guest-owned faint: the guest chooses its OWN re
     const pair = createLoopbackPair();
     const rig = await buildDuo(game, pair, setCoopRuntime, toCoop);
     wireGuestCommand(rig);
+    // DETECTION MODEL (#807): a guest-faint replacement is a PLAYER-FACING interaction - it must converge
+    // with ZERO forced resyncs (a resync means a divergence the chooser could see before the heal).
+    resyncProbe = installCoopResyncProbe(rig.guestRuntime);
 
     // The guest's lead (field slot 1, GENGAR) at 1 HP on BOTH engines so the host's own
     // ally-splashing EARTHQUAKE faints it deterministically. The BENCH (LAPRAS + CHARIZARD)
@@ -180,13 +189,23 @@ describe.skipIf(!RUN)("co-op DUO guest-owned faint: the guest chooses its OWN re
       await driveGuestReplayTurn(rig.guestScene, turn + 1);
     });
     withClientSync(rig.guestCtx, () => {
-      const guestReplacement = rig.guestScene.getPlayerField()[COOP_GUEST_FIELD_INDEX];
+      // PRE-HEAL presented state on the chooser: the summoned replacement is the CHOSEN species + ALIVE.
+      const rep = presentedFieldMon(rig.guestScene, COOP_GUEST_FIELD_INDEX);
       expect(
-        guestReplacement?.species.speciesId,
+        rep?.speciesId,
         "the GUEST materialized the replacement from the out-of-band checkpoint (no deadlock)",
       ).toBe(SpeciesId.CHARIZARD);
-      expect(guestReplacement?.isFainted(), "the replacement is battle-ready on the guest").toBe(false);
+      expect(
+        rep != null && rep.hp > 0 && !rep.fainted,
+        "the replacement is presented ALIVE on the guest (not instantly re-KO'd)",
+      ).toBe(true);
     });
+
+    // DETECTION MODEL: the faint-replacement crossing forced NO resync (heal-masked divergence guard).
+    expect(
+      resyncProbe.count(),
+      "the guest-faint replacement converged with ZERO forced resyncs (no player-facing divergence)",
+    ).toBe(0);
 
     // #799 (live Wingull/Chinchou transposition): after the replacement flow the two engines'
     // party ARRAYS must be permutation-identical INCLUDING ORDER - a transposition here is the

@@ -854,12 +854,22 @@ export function reconcileArenaTags(hostTags: CoopSerializedArenaTag[] | undefine
  * GUEST: snap the live field + arena to the host's authoritative `checkpoint`. Applied
  * at a turn boundary. Conservative + fully guarded: corrects numeric state only, and a
  * per-mon failure is swallowed so one bad entry can't break the rest of the battle.
+ *
+ * RETURNS whether the checkpoint was APPLIED (`true`) or REJECTED as stale by the #807
+ * monotonic-tick guard (`false`). The caller uses this to gate the COMPANION per-mon
+ * `fullField` snapshot + the checksum-verify: when a turn-resolution checkpoint is superseded
+ * by a NEWER out-of-band replacement checkpoint (the live guest-faint tick race, seed
+ * EW0gvphu5Ps8dmWDaUKqgr8x - a KOd slot's replacement summons, then the stale resolution's
+ * fullField re-applies the pre-summon FAINTED state and instantly re-KOs it), the stale
+ * checkpoint is rejected HERE but its ungated fullField would still clobber the freshly
+ * summoned replacement. Gating the fullField on this return keeps the two in lockstep so a
+ * stale companion snapshot can never override a newer field composition.
  */
-export function applyCoopCheckpoint(checkpoint: CoopBattleCheckpoint): void {
+export function applyCoopCheckpoint(checkpoint: CoopBattleCheckpoint): boolean {
   try {
     // #807: reject out-of-order/stale state (standard snapshot sequencing).
     if (!coopAcceptStateTick(checkpoint.tick, "checkpoint")) {
-      return;
+      return false;
     }
     coopLog(
       "checkpoint",
@@ -986,8 +996,10 @@ export function applyCoopCheckpoint(checkpoint: CoopBattleCheckpoint): void {
       globalScene.money = checkpoint.money;
       globalScene.updateMoneyText();
     }
+    return true;
   } catch {
     // A malformed checkpoint must never crash the guest's battle.
+    return false;
   }
 }
 
@@ -2226,8 +2238,16 @@ function applyFullMon(
     // dimension STOPS diverging each apply instead of looping. Gated authoritative; enemy-only.
     if (authoritativeGuest && mon instanceof EnemyPokemon && typeof snap.bossSegments === "number") {
       const want = snap.bossSegments;
-      if (mon.bossSegments !== want) {
-        coopWarn("resync", `boss divergence bi=${snap.bi} host.segments=${want} guest.segments=${mon.bossSegments}`);
+      // A freshly reconstructed guest EnemyPokemon (addEnemyPokemon) leaves `bossSegments`
+      // UNDEFINED until setBoss runs, while the host serializes 0 for a non-boss - so a bare
+      // `!==` logs a false "boss divergence" every turn for every ordinary enemy (live seed
+      // EW0gvphu5Ps8dmWDaUKqgr8x). Coalesce undefined->0 so only a REAL count divergence warns;
+      // setBoss below still runs idempotently either way.
+      if ((mon.bossSegments ?? 0) !== want) {
+        coopWarn(
+          "resync",
+          `boss divergence bi=${snap.bi} host.segments=${want} guest.segments=${mon.bossSegments ?? 0}`,
+        );
       }
       mon.setBoss(want > 0, want > 0 ? want : undefined);
       if (want > 0) {

@@ -847,13 +847,29 @@ export class CoopFinalizeTurnPhase extends Phase {
       // Snap the field + arena to the host's authoritative post-turn state. This is the SAME apply the
       // old synchronous path did, only now it runs AFTER the animation phases drained - so a faint that
       // already animated is reconciled as a no-op (the leaveField guards are idempotent on a removed mon).
-      applyCoopCheckpoint(this.checkpoint);
-      // Heal the COMPLETE on-field per-mon state the numeric checkpoint OMITS (#633 M2): moveset+PP /
-      // tera / boss / held items / ability / form, applied IN-LINE this turn via the proven applyFullMon
-      // (gated authoritative-guest). Runs AFTER the checkpoint so it is the authoritative final word on the
-      // on-field mons; ABSENT (older host) -> no-op, and the checksum-detect + resync heal still covers it.
-      applyCoopFieldSnapshot(this.fullField, isCoopAuthoritativeGuest());
-      this.verifyChecksum(this.checksum, this.preimage);
+      // RETURNS false when the #807 monotonic-tick guard REJECTED this checkpoint as STALE - which happens
+      // when a NEWER out-of-band replacement checkpoint (a guest-faint replacement summon) already advanced
+      // the applied tick past this turn's resolution. In that case this turn's companion `fullField` +
+      // checksum are ALSO stale: applying the fullField would re-apply the pre-summon FAINTED slot state and
+      // instantly re-KO the freshly summoned replacement (the live guest-faint tick race, seed
+      // EW0gvphu5Ps8dmWDaUKqgr8x). So gate BOTH on the checkpoint actually applying - a stale companion must
+      // never clobber the newer field composition, and comparing the guest's already-newer state against the
+      // stale host checksum would only manufacture a spurious forced resync.
+      const applied = applyCoopCheckpoint(this.checkpoint);
+      if (applied) {
+        // Heal the COMPLETE on-field per-mon state the numeric checkpoint OMITS (#633 M2): moveset+PP /
+        // tera / boss / held items / ability / form, applied IN-LINE this turn via the proven applyFullMon
+        // (gated authoritative-guest). Runs AFTER the checkpoint so it is the authoritative final word on the
+        // on-field mons; ABSENT (older host) -> no-op, and the checksum-detect + resync heal still covers it.
+        applyCoopFieldSnapshot(this.fullField, isCoopAuthoritativeGuest());
+        this.verifyChecksum(this.checksum, this.preimage);
+      } else {
+        coopWarn(
+          "checksum",
+          `guest finalize turn=${this.turn}: checkpoint STALE (superseded by a newer out-of-band replacement) `
+            + "-> skip fullField + checksum (would re-KO the summoned replacement / spurious resync)",
+        );
+      }
     } catch {
       // A bad stream payload must never hang the guest's turn.
       coopWarn("checksum", `guest finalize turn=${this.turn}: apply/verify threw (handled)`);

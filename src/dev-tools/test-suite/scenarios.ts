@@ -1789,6 +1789,31 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
   },
   {
+    label: "(note) Co-op: a faint replacement must not instantly re-KO on the chooser (#807)",
+    description:
+      "CO-OP fix - verify with TWO clients (not a solo battle): when the GUEST's active mon FAINTS and\n"
+      + "the guest PICKS a living bench mon, the host summons it correctly - but on the guest's screen the\n"
+      + "replacement used to INSTANTLY DIE and re-open the 'choose a Pokemon' picker in a LOOP, while the\n"
+      + "host recorded the choice fine (live seed EW0gvphu5Ps8dmWDaUKqgr8x, wave 8). Root cause: the host\n"
+      + "sends a post-faint checkpoint (slot fainted) and, after the summon, an out-of-band REPLACEMENT\n"
+      + "checkpoint (slot ALIVE) with a newer #807 tick; the guest applied the replacement, then the PARKED\n"
+      + "stale resolution's companion field-snapshot re-applied the pre-summon FAINTED hp=0 and re-KO'd the\n"
+      + "fresh replacement (then a forced resync). Fixed: the stale checkpoint's field-snapshot + checksum\n"
+      + "are now SKIPPED when the #807 guard rejects it, so a newer replacement can never be clobbered. DO\n"
+      + "(2 clients): let the GUEST's active mon faint with a living bench, then pick a bench mon. EXPECT:\n"
+      + "the chosen mon comes out and STAYS alive on BOTH screens; the picker does NOT re-open; no desync\n"
+      + "flash. Duo-tested headlessly in test/tests/elite-redux/coop/coop-duo-guest-faint-party-desync.test.ts.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({ STARTING_WAVE_OVERRIDE: 1, STARTING_LEVEL_OVERRIDE: 50 });
+      return [
+        makeStarter(SpeciesId.GENGAR, {
+          moveset: [MoveId.SHADOW_BALL, MoveId.SLUDGE_BOMB, MoveId.THUNDERBOLT, MoveId.DAZZLING_GLEAM],
+        }),
+      ];
+    },
+  },
+  {
     label: "QoL: reward-shop long-desc auto-scroll (#557)",
     description:
       "#557 - long ER item descriptions auto-scroll in the REWARD screen instead of\n"

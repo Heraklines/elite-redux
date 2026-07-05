@@ -58,13 +58,29 @@ export class CoopGuestFaintSwitchPhase extends Phase {
         this.fieldIndex,
         (slotIndex: number) => {
           const battlerCount = globalScene.currentBattle?.getBattlerCount() ?? 0;
-          if (slotIndex >= battlerCount && slotIndex < 6) {
+          const picked = globalScene.getPlayerParty()[slotIndex];
+          // DEFENSIVE guard (guest-faint desync, seed EW0gvphu5Ps8dmWDaUKqgr8x): never RELAY a bench
+          // mon this client's LOCAL state believes is FAINTED (hp<=0 or not battle-allowed). The
+          // FAINT_SWITCH picker already filters fainted mons, but a party-state desync (a stale bench
+          // hp / mis-ordered slot) could surface a locally-dead mon; relaying it would have the host
+          // summon a mon the guest then renders instantly-KO'd + re-open this picker in a loop. On a
+          // bad pick, RELAY NOTHING - the host auto-picks a legal replacement after its wait, so the
+          // run never stalls, and the guest converges on the host's authoritative summon.
+          const pickLegal =
+            slotIndex >= battlerCount && slotIndex < 6 && picked != null && picked.hp > 0 && picked.isAllowedInBattle();
+          if (pickLegal) {
             coopLog("replay", `guest own-faint picker PICK slot=${this.fieldIndex} -> party[${slotIndex}] seq=${seq}`);
             // #799 (Wingull/Chinchou wrong-mon summon): carry the picked mon's SPECIES so the
             // host can resolve the pick by IDENTITY when the two clients' party orders have
             // diverged (a blind slot index summons a DIFFERENT mon on the other engine).
-            const pickedSpecies = globalScene.getPlayerParty()[slotIndex]?.species?.speciesId ?? 0;
+            const pickedSpecies = picked.species?.speciesId ?? 0;
             relay.sendInteractionChoice(seq, "switch", slotIndex, [0, pickedSpecies]);
+          } else if (slotIndex >= battlerCount && slotIndex < 6) {
+            coopWarn(
+              "replay",
+              `guest own-faint picker slot=${this.fieldIndex} -> party[${slotIndex}] is locally fainted/illegal `
+                + `(hp=${picked?.hp ?? "-"}) -> NOT relayed, host auto-picks (guard)`,
+            );
           }
           void Promise.resolve(globalScene.ui.setMode(UiMode.MESSAGE)).then(() => this.end());
         },
