@@ -207,6 +207,21 @@ export class SwitchPhase extends BattlePhase {
           if (slotIndex >= globalScene.currentBattle.getBattlerCount() && slotIndex < 6) {
             const switchType = isBaton ? SwitchType.BATON_PASS : this.switchType;
             globalScene.phaseManager.unshiftNew("SwitchSummonPhase", switchType, fieldIndex, slotIndex, this.doReturn);
+            // #836 (live wave-5 party-order transposition): the host's SwitchSummonPhase SWAPS the party
+            // array (`party[slotIndex] = fainted; party[fieldIndex] = replacement`), but the WATCHER (the
+            // guest) mirrors a HOST-OWNED faint only at the NEXT turn resolution - so between the faint and
+            // the next turn the guest keeps the STALE order (its fainted lead still at fieldIndex, the
+            // replacement still on the bench). If the wave ends (or the replacement levels) before that
+            // turn arrives, the guest's `getPlayerParty()` order is TRANSPOSED vs the host: the per-slot
+            // exp deltas SKIP (wrong species at the slot) and the field/switch presentation lands on the
+            // wrong mon. The GUEST-owned faint path already pushes this out-of-band checkpoint (HALF B) so
+            // the partner materializes the replacement + mirrors the array swap IMMEDIATELY; do the SAME for
+            // a HOST-owned faint so both engines' party order stays byte-identical from the moment of the
+            // swap. Authoritative-only (the pure-renderer guest never reaches this branch; lockstep both run
+            // their own SwitchSummonPhase); the phase itself is a host-role-gated no-op besides.
+            if (getCoopNetcodeMode() === "authoritative") {
+              globalScene.phaseManager.unshiftNew("CoopPushReplacementCheckpointPhase");
+            }
           }
           globalScene.ui.setMode(UiMode.MESSAGE).then(() => super.end());
         },

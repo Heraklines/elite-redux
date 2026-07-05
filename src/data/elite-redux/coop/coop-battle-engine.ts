@@ -2542,10 +2542,20 @@ export function adoptCoopHostPlayerPartyOrder(hostParty: number[] | undefined): 
     // a wave boundary). New rule: pin ONLY mons that are genuinely ON FIELD right now (moving
     // those is the field reconcile's job); every other slot - including a lead-index slot whose
     // occupant is benched - is reorderable by identity to the host's exact sequence.
+    //
+    // #836 (live wave-5 party-order transposition): "genuinely on field" must ALSO mean the mon sits
+    // at a FRONT array slot. `getPlayerField()` reads `party.slice(0, playerCapacity)`, so the array
+    // order IS the field membership. A host faint-replacement transposition can leave the guest with an
+    // ALIVE mon whose SPRITE is on the field (`isOnField()` true) but that sits at a BENCH array index
+    // (>= capacity) while a FAINTED mon holds its front slot - a state where pinning the on-field mon at
+    // its bench index froze the transposition forever (the reorder could not pull it forward). Such a
+    // MISALIGNED on-field mon is NOT pinned: reordering it to its correct front slot is exactly what
+    // restores array/field consistency, so a transient transposition always heals on the next resync.
+    const playerCapacity = globalScene.currentBattle?.arrangement?.playerCapacity ?? 1;
     const pinned = new Set<number>();
     for (let i = 0; i < party.length; i++) {
       const mon = party[i];
-      if (mon != null && mon.isOnField() && mon.isActive()) {
+      if (mon != null && mon.isOnField() && mon.isActive() && i < playerCapacity) {
         pinned.add(i);
       }
     }
@@ -2913,15 +2923,8 @@ export function applyCoopExpDeltas(deltas: CoopExpDelta[] | undefined): void {
   }
   try {
     const party = globalScene.getPlayerParty();
-    for (const d of deltas) {
-      const mon = party[d.slot];
-      if (mon == null || (mon.species?.speciesId ?? -1) !== d.speciesId) {
-        coopLog(
-          "progression",
-          `expDelta SKIP slot=${d.slot} hostSpecies=${d.speciesId} guestSpecies=${mon?.species?.speciesId ?? -1} (left for benchParty heal)`,
-        );
-        continue; // slot / species disagreement -> leave for the resync benchParty heal.
-      }
+    // Apply one settled delta onto a resolved mon (level + exp + moveset, then recompute stats).
+    const applyToMon = (mon: Pokemon, d: CoopExpDelta): void => {
       if (typeof d.level === "number" && d.level > 0) {
         if (mon.level !== d.level) {
           coopWarn(
@@ -2952,6 +2955,45 @@ export function applyCoopExpDeltas(deltas: CoopExpDelta[] | undefined): void {
       }
       mon.calculateStats();
       void mon.updateInfo();
+    };
+    // PRIMARY key = stable party SLOT (the host's authoritative order). PASS 1 applies every delta whose
+    // guest slot already holds the host's species - the byte-identical-order common case. A mon claimed
+    // here is removed from the identity pool so a duplicate species can never be double-applied.
+    const claimed = new Set<Pokemon>();
+    const pending: CoopExpDelta[] = [];
+    for (const d of deltas) {
+      const mon = party[d.slot];
+      if (mon != null && (mon.species?.speciesId ?? -1) === d.speciesId) {
+        applyToMon(mon, d);
+        claimed.add(mon);
+      } else {
+        pending.push(d);
+      }
+    }
+    // PASS 2 (#836 additional robustness): a delta whose guest slot holds a DIFFERENT species is a
+    // TRANSIENT party-ORDER transposition (a host faint-replacement swap the guest has not mirrored yet,
+    // e.g. a bench mon that leveled sits at a different guest slot). Rather than DROP the settled
+    // level/exp/moveset (the live "my mon stayed a level behind" - the lost level-up never healed because
+    // the resync `benchParty` reconcile runs AFTER this apply), recover it by mon IDENTITY: apply to an
+    // as-yet-unclaimed party mon of the SAME species. Slot stays the primary key (PASS 1); this only fires
+    // for the mismatched remainder, and the claim set keeps duplicate-species mons 1:1. The real cure is
+    // keeping the party order identical (the switch-phase replacement checkpoint), but this guarantees the
+    // level-up is never lost even on a one-turn transposition window.
+    for (const d of pending) {
+      const mon = party.find(p => p != null && !claimed.has(p) && (p.species?.speciesId ?? -1) === d.speciesId);
+      if (mon == null) {
+        coopLog(
+          "progression",
+          `expDelta SKIP slot=${d.slot} hostSpecies=${d.speciesId} guestSpecies=${party[d.slot]?.species?.speciesId ?? -1} (no identity match - left for benchParty heal)`,
+        );
+        continue; // genuinely absent (a host-only evolution etc.) -> leave for the resync benchParty heal.
+      }
+      coopWarn(
+        "progression",
+        `expDelta slot=${d.slot} sp=${d.speciesId} guestSlot=${party.indexOf(mon)} recovered by IDENTITY (party-order transposition) -> applied`,
+      );
+      applyToMon(mon, d);
+      claimed.add(mon);
     }
   } catch {
     /* malformed exp deltas must never crash the guest's run */
