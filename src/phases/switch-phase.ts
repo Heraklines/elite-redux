@@ -72,9 +72,19 @@ export class SwitchPhase extends BattlePhase {
       return super.end();
     }
 
-    // Override field index to 0 in case of double battle where 2/3 remaining legal party members fainted at once
+    // Override field index to 0 in case of double battle where 2/3 remaining legal party members fainted at once.
+    // CO-OP (seed 5ncYiLOw1a4JQZ0MAzWA1izj heavily-fainted seating desync): the collapse-to-0 is a SOLO
+    // convenience (one lone survivor renders in the left slot), but in co-op each player owns a FIXED field
+    // slot (host = 0, guest = 1) and a replacement MUST land in the OWNER's own slot - collapsing a guest
+    // replacement to slot 0 (or resolving the override DIFFERENTLY on the two engines, since each computes
+    // getPokemonAllowedInBattle() off its own party view) seats the pick in the WRONG slot, so the host seats
+    // it while the guest leaves that slot ABSENT (`host={bi:1} guest=<absent>`) -> a checksum mismatch/resync
+    // and the "switches in, instantly faints, re-opens the picker" loop. In co-op ALWAYS keep this.fieldIndex.
+    const coopSlotOwnershipFixed = globalScene.gameMode.isCoop && getCoopController() != null;
     const fieldIndex =
-      globalScene.currentBattle.getBattlerCount() === 1 || globalScene.getPokemonAllowedInBattle().length > 1
+      coopSlotOwnershipFixed
+      || globalScene.currentBattle.getBattlerCount() === 1
+      || globalScene.getPokemonAllowedInBattle().length > 1
         ? this.fieldIndex
         : 0;
 
@@ -169,6 +179,22 @@ export class SwitchPhase extends BattlePhase {
           globalScene.ui.setMode(UiMode.MESSAGE).then(() => super.end());
         });
         return;
+      }
+      // OWNER, but this player's WHOLE half is wiped (no legal same-owner bench): opening the modal
+      // FAINT_SWITCH picker here STRANDS the owner FOREVER - every non-fainted party mon is either
+      // fainted (blocked by FilterNonFainted) or the PARTNER's (blocked by coopSwitchFilter), so the
+      // modal menu has NO selectable option and cannot be cancelled ("partner loses ALL Pokemon -> stuck
+      // in the choose menu"). Instead relay a NO-PICK sentinel + CLOSE, leaving the slot empty so the run
+      // continues with the surviving partner (asymmetric field, #828). If BOTH halves are wiped the modal
+      // impossibility guard above (getPokemonAllowedInBattle().every(onField)) already ended without a
+      // picker and the faint flow reaches game-over. Only a FORCED (modal) faint switch is closed this way.
+      if (this.isModal && this.coopAutoPickReplacement() < 0) {
+        coopLog(
+          "replay",
+          `owner slot=${this.fieldIndex}: no legal same-owner replacement (half wiped) -> close picker, slot stays empty`,
+        );
+        coopRelay.sendInteractionChoice(seq, "switch", -1, [0]);
+        return super.end();
       }
       // OWNER: pick normally, and relay the chosen slot (+ baton flag) so the watcher mirrors it.
       globalScene.ui.setMode(
