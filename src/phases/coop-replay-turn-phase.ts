@@ -6,7 +6,7 @@
 
 import { globalScene } from "#app/global-scene";
 import { Phase } from "#app/phase";
-import { applyCoopCheckpoint } from "#data/elite-redux/coop/coop-battle-engine";
+import { applyCoopAuthoritativeBattleState, applyCoopCheckpoint } from "#data/elite-redux/coop/coop-battle-engine";
 import { coopLog, coopWarn, isCoopDebug } from "#data/elite-redux/coop/coop-debug";
 import {
   coopHasPendingWaveAdvance,
@@ -125,7 +125,9 @@ export class CoopReplayTurnPhase extends Phase {
               "checkpoint",
               `guest apply OUT-OF-BAND checkpoint mid-park reason=${envelope.reason} turn=${this.turn}`,
             );
-            applyCoopCheckpoint(envelope.checkpoint);
+            if (applyCoopCheckpoint(envelope.checkpoint)) {
+              applyCoopAuthoritativeBattleState(envelope.authoritativeState, isCoopAuthoritativeGuest());
+            }
             const ownSlot = coopLocalOwnedPlayerFieldSlot();
             const ownMon = ownSlot == null ? undefined : globalScene.getPlayerField()[ownSlot];
             if (
@@ -181,6 +183,7 @@ export class CoopReplayTurnPhase extends Phase {
           raced.res.checksum,
           raced.res.preimage,
           raced.res.fullField,
+          raced.res.authoritativeState,
         );
         this.end();
         return;

@@ -4,6 +4,7 @@ import { getPokemonNameWithAffix } from "#app/messages";
 import { fieldPositionForSlot } from "#data/battle-format";
 import { canonicalize } from "#data/elite-redux/coop/coop-battle-checksum";
 import {
+  captureCoopAuthoritativeBattleState,
   captureCoopCheckpoint,
   captureCoopChecksum,
   captureCoopChecksumState,
@@ -233,7 +234,16 @@ export class TurnEndPhase extends FieldPhase {
         // instead of only via a checksum-mismatch resync round-trip. `?? undefined` keeps the wire field
         // ABSENT (never explicit null) when the capture returned nothing (empty field / read failure).
         const fullField = captureCoopFieldSnapshot() ?? undefined;
-        streamer.emitTurn(recording.turn, recording.events, checkpoint, captureCoopChecksum(), preimage, fullField);
+        const authoritativeState = captureCoopAuthoritativeBattleState(recording.turn) ?? undefined;
+        streamer.emitTurn(
+          recording.turn,
+          recording.events,
+          checkpoint,
+          captureCoopChecksum(),
+          preimage,
+          fullField,
+          authoritativeState,
+        );
       }
     } catch {
       /* a stream/capture failure must never break the host's turn */

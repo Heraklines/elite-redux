@@ -22,6 +22,7 @@
 
 import { globalScene } from "#app/global-scene";
 import { EntryHazardTag } from "#data/arena-tag";
+import { fieldPositionForSlot } from "#data/battle-format";
 import { coopAllowAccountWrite } from "#data/elite-redux/coop/coop-account-gate";
 import { isCoopAuthoritativeGuestGated } from "#data/elite-redux/coop/coop-authoritative-gate";
 import {
@@ -41,6 +42,8 @@ import {
 } from "#data/elite-redux/coop/coop-battle-checksum";
 import { coopLog, coopWarn, isCoopDebug } from "#data/elite-redux/coop/coop-debug";
 import type {
+  CoopAuthoritativeBattleStateV1,
+  CoopAuthoritativeFieldSeat,
   CoopBattleCheckpoint,
   CoopExpDelta,
   CoopFullBattleSnapshot,
@@ -60,11 +63,13 @@ import {
   restoreErRelicBattleState,
 } from "#data/elite-redux/er-relic-battle-state";
 import type { Gender } from "#data/gender";
+import { CustomPokemonData, PokemonBattleData, PokemonSummonData } from "#data/pokemon-data";
 import { Status } from "#data/status-effect";
 import type { TerrainType } from "#data/terrain";
 import type { AbilityId } from "#enums/ability-id";
 import type { ArenaTagSide } from "#enums/arena-tag-side";
 import type { ArenaTagType } from "#enums/arena-tag-type";
+import { BattleType } from "#enums/battle-type";
 import { BattlerIndex } from "#enums/battler-index";
 import { BattlerTagType } from "#enums/battler-tag-type";
 import type { BiomeId } from "#enums/biome-id";
@@ -83,7 +88,7 @@ import { ModifierData } from "#system/modifier-data";
 import { PokemonData } from "#system/pokemon-data";
 import type { StarterDataEntry } from "#types/save-data";
 import { EnemyBattleInfo } from "#ui/enemy-battle-info";
-import { getPokemonSpeciesForm } from "#utils/pokemon-utils";
+import { getPokemonSpecies, getPokemonSpeciesForm } from "#utils/pokemon-utils";
 import { compressToBase64, decompressFromBase64 } from "lz-string";
 
 /**
@@ -1996,6 +2001,526 @@ export function captureCoopFullSnapshot(): CoopFullBattleSnapshot | null {
   }
 }
 
+function pokemonDataForWire(mon: Pokemon): Record<string, unknown> {
+  return JSON.parse(JSON.stringify(new PokemonData(mon))) as Record<string, unknown>;
+}
+
+function captureCoopModifierBlobs(player: boolean): Record<string, unknown>[] {
+  try {
+    return globalScene
+      .findModifiers(m => m instanceof PersistentModifier, player)
+      .map(m => {
+        const data = new ModifierData(m, player);
+        return {
+          player: data.player,
+          typeId: data.typeId,
+          className: data.className,
+          args: data.args,
+          stackCount: data.stackCount,
+          ...(data.typePregenArgs === undefined ? {} : { typePregenArgs: data.typePregenArgs }),
+        };
+      });
+  } catch {
+    return [];
+  }
+}
+
+function readAuthoritativeSeat(mon: Pokemon): CoopAuthoritativeFieldSeat {
+  const side = mon.isPlayer() ? "player" : "enemy";
+  const boss = readBossState(mon);
+  return {
+    side,
+    bi: mon.getBattlerIndex(),
+    partyIndex: readPartyIndex(mon),
+    pokemonId: mon.id,
+    ...((mon as { coopOwner?: CoopRole }).coopOwner === undefined
+      ? {}
+      : { owner: (mon as { coopOwner?: CoopRole }).coopOwner }),
+    ...(side === "enemy" ? { bossSegmentIndex: boss.bossSegmentIndex } : {}),
+  };
+}
+
+function assertNoDuplicateAuthoritativeIds(parties: Record<string, unknown>[][]): boolean {
+  const seen = new Set<number>();
+  for (const party of parties) {
+    for (const raw of party) {
+      const id = raw.id;
+      if (typeof id !== "number") {
+        return false;
+      }
+      if (seen.has(id)) {
+        coopWarn("resync", `authoritativeState duplicate Pokemon.id=${id} -> capture/apply rejected`);
+        return false;
+      }
+      seen.add(id);
+    }
+  }
+  return true;
+}
+
+/**
+ * HOST: capture the normal-turn full authoritative state. Per-mon live state is
+ * carried by PokemonData.summonData; the field payload is seating only.
+ */
+export function captureCoopAuthoritativeBattleState(turn: number): CoopAuthoritativeBattleStateV1 | null {
+  try {
+    const playerParty = globalScene.getPlayerParty().map(pokemonDataForWire);
+    const enemyParty = globalScene.getEnemyParty().map(pokemonDataForWire);
+    if (!assertNoDuplicateAuthoritativeIds([playerParty, enemyParty])) {
+      return null;
+    }
+    const arena = globalScene.arena;
+    return {
+      version: 1,
+      tick: coopNextStateTick(),
+      wave: globalScene.currentBattle?.waveIndex ?? 0,
+      turn,
+      playerParty,
+      enemyParty,
+      field: getCoopSerializableField()
+        .map(readAuthoritativeSeat)
+        .sort((a, b) => a.bi - b.bi),
+      weather: arena.weather?.weatherType ?? 0,
+      weatherTurnsLeft: arena.weather?.turnsLeft ?? 0,
+      terrain: arena.terrain?.terrainType ?? 0,
+      terrainTurnsLeft: arena.terrain?.turnsLeft ?? 0,
+      arenaTags: readArenaTagViews(),
+      money: globalScene.money,
+      score: globalScene.score,
+      pokeballCounts: readPokeballCounts(),
+      playerModifiers: captureCoopModifierBlobs(true),
+      enemyModifiers: captureCoopModifierBlobs(false),
+      biomeId: arena.biomeId ?? 0,
+      seed: globalScene.seed ?? "",
+      waveSeed: globalScene.waveSeed ?? "",
+      erMoneyStreaks: getErMoneyStreakEntries(),
+      biomeOverstayAnchor: erBiomeOverstayAnchor(),
+      erRelicBattleState: getErRelicBattleState(),
+    };
+  } catch {
+    return null;
+  }
+}
+
+function parseAuthoritativeParty(rawParty: Record<string, unknown>[] | undefined): PokemonData[] | null {
+  if (!Array.isArray(rawParty)) {
+    return null;
+  }
+  const out: PokemonData[] = [];
+  for (const raw of rawParty) {
+    try {
+      out.push(new PokemonData(raw));
+    } catch {
+      return null;
+    }
+  }
+  return out;
+}
+
+function battleSpriteKey(mon: Pokemon): string {
+  try {
+    return mon.getBattleSpriteKey(mon.isPlayer(), false);
+  } catch {
+    return "";
+  }
+}
+
+function copyMovesetFromData(data: PokemonData): PokemonMove[] {
+  return (data.moveset ?? []).map(m => {
+    const move = new PokemonMove(m.moveId);
+    move.ppUsed = Math.max(0, Math.trunc(m.ppUsed ?? 0));
+    move.ppUp = Math.max(0, Math.trunc(m.ppUp ?? 0));
+    return move;
+  });
+}
+
+function applyAuthoritativeMonData(mon: Pokemon, data: PokemonData, authoritativeGuest: boolean): void {
+  const beforeSprite = battleSpriteKey(mon);
+  try {
+    mon.id = data.id;
+    mon.species = getPokemonSpecies(data.species);
+    mon.nickname = data.nickname;
+    mon.formIndex = data.formIndex;
+    mon.abilityIndex = data.abilityIndex;
+    mon.passive = data.passive;
+    mon.shiny = data.shiny;
+    mon.variant = data.variant;
+    mon.pokeball = data.pokeball;
+    mon.level = data.level;
+    mon.exp = data.exp;
+    mon.gender = data.gender;
+    mon.nature = data.nature;
+    mon.luck = data.luck;
+    mon.friendship = data.friendship;
+    mon.metLevel = data.metLevel;
+    mon.metBiome = data.metBiome;
+    mon.metSpecies = data.metSpecies;
+    mon.metWave = data.metWave;
+    mon.pauseEvolutions = data.pauseEvolutions;
+    mon.pokerus = data.pokerus;
+    mon.usedTMs = [...(data.usedTMs ?? [])];
+    mon.teraType = data.teraType;
+    mon.isTerastallized = data.isTerastallized;
+    mon.stellarTypesBoosted = [...(data.stellarTypesBoosted ?? [])];
+    mon.ivs = [...(data.ivs ?? [])];
+    mon.moveset = copyMovesetFromData(data);
+    mon.status = data.status
+      ? new Status(data.status.effect, data.status.toxicTurnCount, data.status.sleepTurnsRemaining)
+      : null;
+    mon.fusionSpecies = data.fusionSpecies ? getPokemonSpecies(data.fusionSpecies) : null;
+    mon.fusionFormIndex = data.fusionFormIndex;
+    mon.fusionAbilityIndex = data.fusionAbilityIndex;
+    mon.fusionShiny = data.fusionShiny;
+    mon.fusionVariant = data.fusionVariant;
+    mon.fusionGender = data.fusionGender;
+    mon.fusionLuck = data.fusionLuck;
+    mon.fusionTeraType = data.fusionTeraType;
+    mon.customPokemonData = new CustomPokemonData(data.customPokemonData);
+    mon.fusionCustomPokemonData = new CustomPokemonData(data.fusionCustomPokemonData);
+    mon.summonData = new PokemonSummonData(data.summonData);
+    mon.battleData = new PokemonBattleData(data.battleData);
+    if (data.coopOwner !== undefined) {
+      (mon as PlayerPokemon).coopOwner = data.coopOwner;
+    }
+    mon.calculateStats();
+    if (Array.isArray(data.stats) && data.stats.length > 0) {
+      mon.stats = [...data.stats];
+    }
+    mon.hp = Math.max(0, Math.min(Math.trunc(data.hp), mon.getMaxHp()));
+    if (authoritativeGuest && mon instanceof EnemyPokemon) {
+      mon.setBoss(data.boss === true || data.bossSegments > 0, data.bossSegments > 0 ? data.bossSegments : undefined);
+    }
+    const afterSprite = battleSpriteKey(mon);
+    if (beforeSprite !== "" && afterSprite !== "" && beforeSprite !== afterSprite) {
+      void mon
+        .loadAssets(false)
+        .then(() => {
+          try {
+            mon.playAnim();
+          } catch {
+            /* headless or torn-down sprite */
+          }
+          mon.updateInfo(true);
+        })
+        .catch(() => {});
+    } else {
+      void mon.updateInfo(true);
+    }
+  } catch {
+    /* one mon's authoritative data failed; checksum catches residual drift */
+  }
+}
+
+function constructAuthoritativePokemon(data: PokemonData, index: number): Pokemon | null {
+  try {
+    const battle = globalScene.currentBattle;
+    const mon = data.toPokemon(battle?.battleType ?? BattleType.WILD, index, battle?.double === true);
+    mon.setVisible(false);
+    mon.getSprite()?.setVisible(false);
+    return mon;
+  } catch {
+    return null;
+  }
+}
+
+function reconcileAuthoritativeParty(
+  side: "player" | "enemy",
+  hostParty: PokemonData[],
+  authoritativeGuest: boolean,
+): Pokemon[] {
+  const liveParty =
+    side === "player" ? (globalScene.getPlayerParty() as Pokemon[]) : (globalScene.getEnemyParty() as Pokemon[]);
+  const byId = new Map<number, Pokemon>();
+  for (const mon of liveParty) {
+    if (mon != null && typeof mon.id === "number" && !byId.has(mon.id)) {
+      byId.set(mon.id, mon);
+    }
+  }
+  const wantedIds = new Set(hostParty.map(p => p.id));
+  const ordered: Pokemon[] = [];
+  for (let i = 0; i < hostParty.length; i++) {
+    const data = hostParty[i];
+    let mon = byId.get(data.id);
+    if (mon == null) {
+      mon = constructAuthoritativePokemon(data, i) ?? undefined;
+    }
+    if (mon == null) {
+      continue;
+    }
+    applyAuthoritativeMonData(mon, data, authoritativeGuest);
+    ordered.push(mon);
+  }
+  for (const mon of liveParty) {
+    if (mon != null && !wantedIds.has(mon.id)) {
+      try {
+        if (mon.isOnField()) {
+          mon.leaveField(true, true, false);
+        }
+        if (side === "player") {
+          globalScene.removePokemonFromPlayerParty(mon as PlayerPokemon, true);
+        } else {
+          globalScene.field.remove(mon, true);
+          mon.destroy();
+        }
+      } catch {
+        /* stale extra cleanup is best-effort */
+      }
+    }
+  }
+  liveParty.length = 0;
+  liveParty.push(...ordered);
+  return ordered;
+}
+
+function activeFieldIndexForSeat(seat: CoopAuthoritativeFieldSeat): number {
+  const arrangement = globalScene.currentBattle?.arrangement;
+  if (seat.side === "enemy") {
+    return Math.max(0, seat.bi - (arrangement?.enemyOffset ?? BattlerIndex.ENEMY));
+  }
+  return seat.bi;
+}
+
+function ensureAuthoritativeFieldVisible(
+  mon: Pokemon,
+  seat: CoopAuthoritativeFieldSeat,
+  hostData: PokemonData | undefined,
+): void {
+  try {
+    if (hostData?.hp !== undefined && hostData.hp <= 0) {
+      if (mon.isOnField()) {
+        coopRemoveFromField(mon);
+      }
+      return;
+    }
+    const arrangement = globalScene.currentBattle?.arrangement;
+    const fieldIndex = activeFieldIndexForSeat(seat);
+    const capacity =
+      seat.side === "player"
+        ? (arrangement?.playerCapacity ?? (globalScene.currentBattle?.double ? 2 : 1))
+        : (arrangement?.enemyCapacity ?? (globalScene.currentBattle?.double ? 2 : 1));
+    const position = capacity <= 1 ? FieldPosition.CENTER : fieldPositionForSlot(fieldIndex, capacity);
+    void mon.setFieldPosition(position, 0);
+    if (!mon.isOnField()) {
+      globalScene.add.existing(mon);
+      globalScene.field.add(mon);
+      if (seat.side === "enemy") {
+        const playerPokemon: Pokemon | undefined = globalScene.getPlayerPokemon();
+        if (playerPokemon?.isOnField()) {
+          globalScene.field.moveBelow(mon, playerPokemon);
+        }
+        globalScene.currentBattle?.seenEnemyPartyMemberIds.add(mon.id);
+      }
+      mon.showInfo();
+      mon.setVisible(true);
+      mon.getSprite()?.setVisible(true);
+      void mon.loadAssets(true);
+      try {
+        mon.playAnim();
+      } catch {
+        /* headless */
+      }
+      mon.fieldSetup(true);
+    }
+    void mon.updateInfo(true);
+  } catch {
+    /* one field seating repair failed; keep the rest */
+  }
+}
+
+function reconcileAuthoritativeField(
+  state: CoopAuthoritativeBattleStateV1,
+  playerParty: PokemonData[],
+  enemyParty: PokemonData[],
+): void {
+  const playerById = new Map(playerParty.map(p => [p.id, p]));
+  const enemyById = new Map(enemyParty.map(p => [p.id, p]));
+  const liveById = new Map<number, Pokemon>();
+  for (const mon of [...(globalScene.getPlayerParty() as Pokemon[]), ...(globalScene.getEnemyParty() as Pokemon[])]) {
+    liveById.set(mon.id, mon);
+  }
+  const seatedIds = new Set<number>();
+  for (const seat of state.field) {
+    const party =
+      seat.side === "player" ? (globalScene.getPlayerParty() as Pokemon[]) : (globalScene.getEnemyParty() as Pokemon[]);
+    const data = seat.side === "player" ? playerById.get(seat.pokemonId) : enemyById.get(seat.pokemonId);
+    const fieldIndex = activeFieldIndexForSeat(seat);
+    let mon = liveById.get(seat.pokemonId);
+    const partyIndex = party.indexOf(mon as Pokemon);
+    if (mon != null && fieldIndex >= 0 && fieldIndex < party.length && partyIndex >= 0 && partyIndex !== fieldIndex) {
+      [party[fieldIndex], party[partyIndex]] = [party[partyIndex], party[fieldIndex]];
+    }
+    mon = party[fieldIndex] ?? mon;
+    if (mon == null || mon.id !== seat.pokemonId) {
+      continue;
+    }
+    if (seat.side === "enemy" && mon instanceof EnemyPokemon && seat.bossSegmentIndex !== undefined) {
+      mon.bossSegmentIndex = seat.bossSegmentIndex;
+    }
+    seatedIds.add(mon.id);
+    ensureAuthoritativeFieldVisible(mon, seat, data);
+  }
+  for (const mon of globalScene.getField(true)) {
+    if (mon != null && !seatedIds.has(mon.id)) {
+      coopRemoveFromField(mon);
+    }
+  }
+  globalScene.updateFieldScale();
+}
+
+function modifierInstanceKey(data: ModifierData): string {
+  return `${data.typeId}|${data.className}|${JSON.stringify(data.args ?? [])}|${JSON.stringify(data.typePregenArgs ?? [])}`;
+}
+
+function rawModifierInstanceKey(
+  raw: Record<string, unknown>,
+  player: boolean,
+): { key: string; data: ModifierData } | null {
+  try {
+    const data = new ModifierData(raw, player);
+    return { key: modifierInstanceKey(data), data };
+  } catch {
+    return null;
+  }
+}
+
+function pushPersistentModifier(modifier: PersistentModifier, player: boolean): void {
+  if (player) {
+    globalScene.modifiers.push(modifier);
+  } else {
+    (globalScene as unknown as { enemyModifiers: PersistentModifier[] }).enemyModifiers.push(modifier);
+  }
+}
+
+function reconcileAuthoritativeModifiers(rawBlobs: Record<string, unknown>[] | undefined, player: boolean): void {
+  if (!Array.isArray(rawBlobs)) {
+    return;
+  }
+  try {
+    const wanted = new Map<string, { raw: Record<string, unknown>; data: ModifierData }[]>();
+    for (const raw of rawBlobs) {
+      if (raw == null || typeof raw !== "object") {
+        continue;
+      }
+      const keyed = rawModifierInstanceKey(raw, player);
+      if (keyed == null) {
+        continue;
+      }
+      const queue = wanted.get(keyed.key) ?? [];
+      queue.push({ raw, data: keyed.data });
+      wanted.set(keyed.key, queue);
+    }
+    let changed = false;
+    for (const modifier of globalScene.findModifiers(m => m instanceof PersistentModifier, player)) {
+      const liveData = new ModifierData(modifier, player);
+      const queue = wanted.get(modifierInstanceKey(liveData));
+      const match = queue?.shift();
+      if (match == null) {
+        if (globalScene.removeModifier(modifier, !player)) {
+          changed = true;
+        }
+        continue;
+      }
+      if (typeof match.data.stackCount === "number" && modifier.stackCount !== match.data.stackCount) {
+        modifier.stackCount = match.data.stackCount;
+        changed = true;
+      }
+    }
+    for (const queue of wanted.values()) {
+      for (const { data } of queue) {
+        try {
+          const modifier = data.toModifier(
+            Modifier[data.className as keyof typeof Modifier] ?? resolveErModifierClass(data.className),
+          );
+          if (!(modifier instanceof PersistentModifier)) {
+            continue;
+          }
+          if (typeof data.stackCount === "number") {
+            modifier.stackCount = data.stackCount;
+          }
+          pushPersistentModifier(modifier, player);
+          changed = true;
+        } catch {
+          /* one missing modifier failed to reconstruct */
+        }
+      }
+    }
+    if (changed) {
+      globalScene.updateModifiers(player, true);
+    }
+  } catch {
+    /* malformed modifier payload must not crash the turn */
+  }
+}
+
+/**
+ * GUEST: apply the normal-turn authoritative state. Returns false only when the
+ * payload was absent, malformed, or stale by tick.
+ */
+export function applyCoopAuthoritativeBattleState(
+  state: CoopAuthoritativeBattleStateV1 | undefined,
+  authoritativeGuest = false,
+): boolean {
+  if (state === undefined) {
+    return false;
+  }
+  if (state.version !== 1) {
+    return false;
+  }
+  try {
+    const playerParty = parseAuthoritativeParty(state.playerParty);
+    const enemyParty = parseAuthoritativeParty(state.enemyParty);
+    if (playerParty == null || enemyParty == null) {
+      return false;
+    }
+    if (!assertNoDuplicateAuthoritativeIds([state.playerParty, state.enemyParty])) {
+      return false;
+    }
+    if (!coopAcceptStateTick(state.tick, "authoritativeState")) {
+      return false;
+    }
+    if (typeof state.biomeId === "number" && (globalScene.arena?.biomeId ?? -1) !== state.biomeId) {
+      globalScene.newArena(state.biomeId as BiomeId);
+    }
+    reconcileAuthoritativeParty("player", playerParty, authoritativeGuest);
+    reconcileAuthoritativeParty("enemy", enemyParty, authoritativeGuest);
+    reconcileAuthoritativeField(state, playerParty, enemyParty);
+    const arena = globalScene.arena;
+    if ((arena.weather?.weatherType ?? 0) !== state.weather) {
+      arena.trySetWeather(state.weather as WeatherType);
+    }
+    if ((arena.terrain?.terrainType ?? 0) !== state.terrain) {
+      arena.trySetTerrain(state.terrain as TerrainType, true);
+    }
+    reconcileArenaTags(state.arenaTags);
+    globalScene.money = state.money;
+    if (typeof state.score === "number") {
+      globalScene.score = state.score;
+    }
+    for (const [type, count] of state.pokeballCounts ?? []) {
+      if (typeof type === "number" && typeof count === "number") {
+        globalScene.pokeballCounts[type] = Math.max(0, Math.trunc(count));
+      }
+    }
+    reconcileAuthoritativeModifiers(state.playerModifiers, true);
+    reconcileAuthoritativeModifiers(state.enemyModifiers, false);
+    if (typeof state.seed === "string" && state.seed.length > 0) {
+      globalScene.setSeed(state.seed);
+    }
+    if (typeof state.waveSeed === "string" && state.waveSeed.length > 0) {
+      globalScene.waveSeed = state.waveSeed;
+      Phaser.Math.RND.sow([state.waveSeed]);
+    }
+    restoreCoopModuleLetSubstrates(state);
+    coopLog(
+      "resync",
+      `guest apply authoritativeState tick=${state.tick} wave=${state.wave} turn=${state.turn} party=${state.playerParty.length}/${state.enemyParty.length} field=${state.field.length}`,
+    );
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 /** Reconcile a live mon's battler tags to exactly the snapshot's tag-type set. */
 function reconcileTags(mon: Pokemon, wantTagTypes: number[]): void {
   try {
@@ -2613,7 +3138,9 @@ export function adoptCoopHostPlayerPartyOrder(hostParty: number[] | undefined): 
  * additive: an older host omits it (undefined) and that substrate is left untouched. Fully guarded so a
  * malformed substrate can never crash the guest's battle.
  */
-function restoreCoopModuleLetSubstrates(snapshot: CoopFullBattleSnapshot): void {
+function restoreCoopModuleLetSubstrates(
+  snapshot: Pick<CoopFullBattleSnapshot, "erMoneyStreaks" | "biomeOverstayAnchor" | "erRelicBattleState">,
+): void {
   try {
     if (Array.isArray(snapshot.erMoneyStreaks)) {
       coopLog("heal", `erMoneyStreaks host entries=${snapshot.erMoneyStreaks.length} -> restored (#837/#348)`);

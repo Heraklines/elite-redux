@@ -102,6 +102,7 @@ describe.skipIf(!RUN)("co-op DUO: two real engines over loopback (#633 feasibili
     // ONLY faked part of THIS smoke test; the next test wires a real guest engine instead.
     const guestEnd = pair.guest;
     let emittedTurnResolution = false;
+    let emittedAuthoritativeState: Record<string, unknown> | undefined;
     guestEnd.onMessage(msg => {
       if (msg.t === "commandRequest") {
         guestEnd.send({
@@ -113,6 +114,7 @@ describe.skipIf(!RUN)("co-op DUO: two real engines over loopback (#633 feasibili
       }
       if (msg.t === "turnResolution") {
         emittedTurnResolution = true;
+        emittedAuthoritativeState = msg.authoritativeState as Record<string, unknown> | undefined;
       }
     });
 
@@ -124,6 +126,16 @@ describe.skipIf(!RUN)("co-op DUO: two real engines over loopback (#633 feasibili
     await drainLoopback();
 
     expect(emittedTurnResolution, "host emitted a turnResolution over the loopback").toBe(true);
+    expect(emittedAuthoritativeState?.version, "turnResolution carries authoritativeState v1").toBe(1);
+    expect(emittedAuthoritativeState?.playerParty, "authoritativeState carries full PokemonData parties").toEqual(
+      expect.arrayContaining([expect.objectContaining({ summonData: expect.any(Object) })]),
+    );
+    const emittedField = emittedAuthoritativeState?.field as Record<string, unknown>[] | undefined;
+    expect(emittedField, "authoritativeState carries seating").toEqual(expect.any(Array));
+    expect(
+      emittedField?.every(seat => !("tags" in seat) && !("statStages" in seat) && !("transform" in seat)),
+      "authoritativeState.field is seating-only; live state rides PokemonData.summonData",
+    ).toBe(true);
     logs.flush();
   }, 120_000);
 

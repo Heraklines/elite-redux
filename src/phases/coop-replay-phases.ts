@@ -34,6 +34,7 @@ import { Phase } from "#app/phase";
 import { CommonBattleAnim, MoveAnim } from "#data/battle-anims";
 import { COOP_CHECKSUM_SENTINEL, canonicalize } from "#data/elite-redux/coop/coop-battle-checksum";
 import {
+  applyCoopAuthoritativeBattleState,
   applyCoopCaptureParty,
   applyCoopCheckpoint,
   applyCoopFieldSnapshot,
@@ -57,6 +58,7 @@ import {
 } from "#data/elite-redux/coop/coop-runtime";
 import { coopSwitchBlocksMonForOwner } from "#data/elite-redux/coop/coop-session";
 import type {
+  CoopAuthoritativeBattleStateV1,
   CoopBattleCheckpoint,
   CoopCapturePresentation,
   CoopFullBattleSnapshot,
@@ -835,6 +837,7 @@ export class CoopFinalizeTurnPhase extends Phase {
     private readonly checksum: string,
     private readonly preimage?: string,
     private readonly fullField?: CoopFullMonSnapshot[],
+    private readonly authoritativeState?: CoopAuthoritativeBattleStateV1,
   ) {
     super();
     this.turn = turn;
@@ -857,11 +860,19 @@ export class CoopFinalizeTurnPhase extends Phase {
       // stale host checksum would only manufacture a spurious forced resync.
       const applied = applyCoopCheckpoint(this.checkpoint);
       if (applied) {
-        // Heal the COMPLETE on-field per-mon state the numeric checkpoint OMITS (#633 M2): moveset+PP /
-        // tera / boss / held items / ability / form, applied IN-LINE this turn via the proven applyFullMon
-        // (gated authoritative-guest). Runs AFTER the checkpoint so it is the authoritative final word on the
-        // on-field mons; ABSENT (older host) -> no-op, and the checksum-detect + resync heal still covers it.
-        applyCoopFieldSnapshot(this.fullField, isCoopAuthoritativeGuest());
+        // New authoritative state wins when present: PokemonData.summonData carries the live battler
+        // state losslessly, while the legacy fullField tag-type list is only a fallback for older hosts.
+        const authoritativeApplied = applyCoopAuthoritativeBattleState(
+          this.authoritativeState,
+          isCoopAuthoritativeGuest(),
+        );
+        if (!authoritativeApplied) {
+          // Heal the COMPLETE on-field per-mon state the numeric checkpoint OMITS (#633 M2): moveset+PP /
+          // tera / boss / held items / ability / form, applied IN-LINE this turn via the proven applyFullMon
+          // (gated authoritative-guest). Runs AFTER the checkpoint so it is the authoritative final word on the
+          // on-field mons; ABSENT (older host) -> no-op, and the checksum-detect + resync heal still covers it.
+          applyCoopFieldSnapshot(this.fullField, isCoopAuthoritativeGuest());
+        }
         this.verifyChecksum(this.checksum, this.preimage);
       } else {
         coopWarn(

@@ -4,8 +4,13 @@
  * SPDX-License-Identifier: AGPL-3.0-only
  */
 
+import { globalScene } from "#app/global-scene";
 import { Phase } from "#app/phase";
-import { captureCoopCheckpoint, captureCoopChecksum } from "#data/elite-redux/coop/coop-battle-engine";
+import {
+  captureCoopAuthoritativeBattleState,
+  captureCoopCheckpoint,
+  captureCoopChecksum,
+} from "#data/elite-redux/coop/coop-battle-engine";
 import { coopLog, coopWarn } from "#data/elite-redux/coop/coop-debug";
 import { getCoopBattleStreamer, getCoopController } from "#data/elite-redux/coop/coop-runtime";
 
@@ -31,7 +36,12 @@ export class CoopPushReplacementCheckpointPhase extends Phase {
         const checkpoint = captureCoopCheckpoint();
         if (checkpoint != null) {
           coopLog("checkpoint", "host push OUT-OF-BAND replacement checkpoint (partner-slot auto-summon)");
-          streamer.sendCheckpoint("replacement", checkpoint, captureCoopChecksum());
+          streamer.sendCheckpoint(
+            "replacement",
+            checkpoint,
+            captureCoopChecksum(),
+            captureCoopAuthoritativeBattleState(globalScene.currentBattle?.turn ?? 0) ?? undefined,
+          );
         }
       }
     } catch {

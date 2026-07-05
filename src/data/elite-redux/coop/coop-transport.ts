@@ -41,7 +41,7 @@ export type CoopRole = "host" | "guest";
  * changes shape. Carried in the hello; a mismatch means one player runs a stale cached bundle -
  * the top source of unreproducible ghost bugs - and both get told to hard-refresh.
  */
-export const COOP_PROTOCOL_VERSION = "er-coop-10";
+export const COOP_PROTOCOL_VERSION = "er-coop-11";
 
 /**
  * Which co-op netcode the run uses (#633, selectable A/B). Two complete
@@ -463,6 +463,56 @@ export interface CoopFullBattleSnapshot {
 }
 
 /**
+ * Seating-only field entry for the normal authoritative turn payload. The live
+ * per-mon state rides through `PokemonData.summonData`; do not add lossy tag or
+ * stat overlays here.
+ */
+export interface CoopAuthoritativeFieldSeat {
+  side: "player" | "enemy";
+  /** Battler index at this battle-format slot. */
+  bi: number;
+  /** Index in the owning party array. */
+  partyIndex: number;
+  /** Host-stable Pokemon identity copied through PokemonData. */
+  pokemonId: number;
+  owner?: CoopRole;
+  /** Enemy boss active segment index, if not covered by PokemonData. */
+  bossSegmentIndex?: number;
+}
+
+/** Normal-turn host-authoritative battle/run state, versioned for additive rollout. */
+export interface CoopAuthoritativeBattleStateV1 {
+  version: 1;
+  tick: number;
+  wave: number;
+  turn: number;
+  /** Plain JSON `PokemonData[]`, authoritative order. */
+  playerParty: Record<string, unknown>[];
+  /** Plain JSON `PokemonData[]`, authoritative order. */
+  enemyParty: Record<string, unknown>[];
+  /** Seating only; mon state is in the matching PokemonData entry. */
+  field: CoopAuthoritativeFieldSeat[];
+  weather: number;
+  weatherTurnsLeft: number;
+  terrain: number;
+  terrainTurnsLeft: number;
+  arenaTags: CoopSerializedArenaTag[];
+  money: number;
+  score?: number;
+  pokeballCounts: [number, number][];
+  /** Full PersistentModifier blobs, including held items. */
+  playerModifiers: Record<string, unknown>[];
+  /** Full enemy PersistentModifier blobs, including held items. */
+  enemyModifiers: Record<string, unknown>[];
+  biomeId?: number;
+  seed?: string;
+  waveSeed?: string;
+  erMoneyStreaks?: [number, number][] | undefined;
+  biomeOverstayAnchor?: number | null | undefined;
+  erRelicBattleState?: ErRelicBattleStateData | undefined;
+}
+
+/**
  * One ordered visible thing that happened during a turn. The MVP renders only
  * `message` (narration) and relies on the checkpoint for outcomes; the richer kinds
  * drive per-move animation fidelity in a later pass.
@@ -836,13 +886,24 @@ export type CoopMessage =
        * Optional + additive - an older host omits it and the guest keeps its checksum-detect + resync heal.
        */
       fullField?: CoopFullMonSnapshot[];
+      /**
+       * Full normal-turn authoritative state. Version 1 uses PokemonData.summonData
+       * for live mon state and keeps field data seating-only.
+       */
+      authoritativeState?: CoopAuthoritativeBattleStateV1;
     }
   /**
    * Host -> guest (#633, LIVE-D): an out-of-turn authoritative checkpoint (after a
    * switch / capture / encounter start / resume). `reason` is a short tag for logging.
    * `checksum` (#633, TRACK-2): the host's full-state fingerprint at this boundary.
    */
-  | { t: "battleCheckpoint"; reason: string; checkpoint: CoopBattleCheckpoint; checksum: string }
+  | {
+      t: "battleCheckpoint";
+      reason: string;
+      checkpoint: CoopBattleCheckpoint;
+      checksum: string;
+      authoritativeState?: CoopAuthoritativeBattleStateV1;
+    }
   /**
    * Owner -> watcher (#633): the owner's pick on an ALTERNATING-control interaction
    * screen (reward shop / biome shop / mystery encounter). Same seed -> both clients

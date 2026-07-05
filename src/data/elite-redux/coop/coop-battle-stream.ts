@@ -24,6 +24,7 @@
 
 import { coopLog, coopWarn, isCoopDebug } from "#data/elite-redux/coop/coop-debug";
 import type {
+  CoopAuthoritativeBattleStateV1,
   CoopBattleCheckpoint,
   CoopBattleEvent,
   CoopCapturePresentation,
@@ -52,6 +53,8 @@ export interface CoopTurnResolution {
    * Optional + additive; an older host omits it and the guest keeps checksum-detect + resync heal.
    */
   fullField?: CoopFullMonSnapshot[];
+  /** Full normal-turn authoritative state, additive rollout. */
+  authoritativeState?: CoopAuthoritativeBattleStateV1;
 }
 
 /** An out-of-turn authoritative checkpoint + the host's matching full-state checksum. */
@@ -60,6 +63,8 @@ export interface CoopCheckpointEnvelope {
   checkpoint: CoopBattleCheckpoint;
   /** The host's full-state checksum at this boundary (#633, TRACK-2). */
   checksum: string;
+  /** Full authoritative state for intra-turn boundaries such as replacement unblock. */
+  authoritativeState?: CoopAuthoritativeBattleStateV1;
 }
 
 /** Options for {@linkcode CoopBattleStreamer} (timer injection for tests). */
@@ -278,10 +283,11 @@ export class CoopBattleStreamer {
     checksum: string,
     preimage?: string,
     fullField?: CoopFullMonSnapshot[],
+    authoritativeState?: CoopAuthoritativeBattleStateV1,
   ): void {
     coopLog(
       "replay",
-      `host SEND turnResolution turn=${turn} events=${events.length} checksum=${checksum} preimage=${preimage !== undefined} fullField=${fullField?.length ?? 0}`,
+      `host SEND turnResolution turn=${turn} events=${events.length} checksum=${checksum} preimage=${preimage !== undefined} fullField=${fullField?.length ?? 0} authoritativeState=${authoritativeState === undefined ? 0 : 1}`,
     );
     this.transport.send({
       t: "turnResolution",
@@ -291,6 +297,7 @@ export class CoopBattleStreamer {
       checksum,
       ...(preimage === undefined ? {} : { preimage }),
       ...(fullField === undefined ? {} : { fullField }),
+      ...(authoritativeState === undefined ? {} : { authoritativeState }),
     });
   }
 
@@ -313,9 +320,23 @@ export class CoopBattleStreamer {
    * HOST: send an out-of-turn authoritative checkpoint (after a switch / capture / resume),
    * stamped with the host's full-state `checksum` for the guest to verify (#633, TRACK-2).
    */
-  sendCheckpoint(reason: string, checkpoint: CoopBattleCheckpoint, checksum: string): void {
-    coopLog("checksum", `host SEND battleCheckpoint reason=${reason} checksum=${checksum}`);
-    this.transport.send({ t: "battleCheckpoint", reason, checkpoint, checksum });
+  sendCheckpoint(
+    reason: string,
+    checkpoint: CoopBattleCheckpoint,
+    checksum: string,
+    authoritativeState?: CoopAuthoritativeBattleStateV1,
+  ): void {
+    coopLog(
+      "checksum",
+      `host SEND battleCheckpoint reason=${reason} checksum=${checksum} authoritativeState=${authoritativeState === undefined ? 0 : 1}`,
+    );
+    this.transport.send({
+      t: "battleCheckpoint",
+      reason,
+      checkpoint,
+      checksum,
+      ...(authoritativeState === undefined ? {} : { authoritativeState }),
+    });
   }
 
   /** HOST: send the authoritative full-state snapshot answering a guest's `requestStateSync`. */
@@ -1158,6 +1179,7 @@ export class CoopBattleStreamer {
           checksum: msg.checksum,
           ...(msg.preimage === undefined ? {} : { preimage: msg.preimage }),
           ...(msg.fullField === undefined ? {} : { fullField: msg.fullField }),
+          ...(msg.authoritativeState === undefined ? {} : { authoritativeState: msg.authoritativeState }),
         };
         const resolver = this.pending.get(msg.turn);
         coopLog(
@@ -1199,7 +1221,12 @@ export class CoopBattleStreamer {
         // Buffer for the guest's next consumeCheckpoint() (applied at a turn boundary),
         // carrying the host's checksum so the guest can verify convergence after applying.
         coopLog("checksum", `guest RECV battleCheckpoint reason=${msg.reason} checksum=${msg.checksum}`);
-        this.lastCheckpoint = { reason: msg.reason, checkpoint: msg.checkpoint, checksum: msg.checksum };
+        this.lastCheckpoint = {
+          reason: msg.reason,
+          checkpoint: msg.checkpoint,
+          checksum: msg.checksum,
+          ...(msg.authoritativeState === undefined ? {} : { authoritativeState: msg.authoritativeState }),
+        };
         this.checkpointWaiter?.();
         this.checkpointHandler?.(msg.reason, msg.checkpoint);
         return;

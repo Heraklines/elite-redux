@@ -28,25 +28,35 @@
 
 import { getGameMode } from "#app/game-mode";
 import { globalScene } from "#app/global-scene";
+import { DisabledTag, EncoreTag, ErBleedTag, ErFearTag, ErFrostbiteTag, SubstituteTag } from "#data/battler-tags";
 import { modifierTypes } from "#data/data-lists";
 import {
+  applyCoopAuthoritativeBattleState,
   applyCoopFullSnapshot,
+  captureCoopAuthoritativeBattleState,
   captureCoopChecksum,
   captureCoopFullSnapshot,
+  resetCoopStateTicks,
 } from "#data/elite-redux/coop/coop-battle-engine";
 import { clearCoopRuntime, startLocalCoopSession } from "#data/elite-redux/coop/coop-runtime";
 import { COOP_GUEST_FIELD_INDEX, COOP_HOST_FIELD_INDEX } from "#data/elite-redux/coop/coop-session";
+import { PokemonSummonData } from "#data/pokemon-data";
 import { AbilityId } from "#enums/ability-id";
 import { ArenaTagSide } from "#enums/arena-tag-side";
 import { ArenaTagType } from "#enums/arena-tag-type";
+import { BattlerTagType } from "#enums/battler-tag-type";
 import { GameModes } from "#enums/game-modes";
 import { MoveId } from "#enums/move-id";
+import { MoveResult } from "#enums/move-result";
+import { MoveUseMode } from "#enums/move-use-mode";
 import { PokemonType } from "#enums/pokemon-type";
 import { SpeciesId } from "#enums/species-id";
 import type { PersistentModifier } from "#modifiers/modifier";
 import { PokemonMove } from "#moves/pokemon-move";
+import { PokemonData } from "#system/pokemon-data";
 import { GameManager } from "#test/framework/game-manager";
-import { getPokemonSpecies } from "#utils/pokemon-utils";
+import type { TurnMove } from "#types/turn-move";
+import { getPokemonSpecies, getPokemonSpeciesForm } from "#utils/pokemon-utils";
 import Phaser from "phaser";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -166,6 +176,102 @@ describe.skipIf(!RUN)("co-op battle checksum + resync - real engine (#633, TRACK
       applyCoopFullSnapshot(roundTripped);
     }
     expect(captureCoopChecksum()).toBe(hostChecksum);
+  });
+
+  it("(D) authoritative state round-trips exotic live summonData byte-identically and preserves Pokemon.id identity", async () => {
+    const field = await startCoopDouble();
+    resetCoopStateTicks();
+
+    const mon = field[COOP_HOST_FIELD_INDEX];
+    const source = field[COOP_GUEST_FIELD_INDEX];
+    const queuedMove: TurnMove = {
+      move: MoveId.SOLAR_BEAM,
+      targets: [source.getBattlerIndex()],
+      result: MoveResult.SUCCESS,
+      useMode: MoveUseMode.NORMAL,
+    };
+    const historyMove: TurnMove = {
+      move: MoveId.TACKLE,
+      targets: [source.getBattlerIndex()],
+      result: MoveResult.SUCCESS,
+      useMode: MoveUseMode.NORMAL,
+    };
+    const encore = new EncoreTag(source.id);
+    encore.loadTag({
+      tagType: BattlerTagType.ENCORE,
+      turnCount: 3,
+      sourceMove: MoveId.ENCORE,
+      sourceId: source.id,
+      moveId: MoveId.TACKLE,
+    });
+    const disabled = new DisabledTag(source.id);
+    disabled.loadTag({
+      tagType: BattlerTagType.DISABLED,
+      turnCount: 2,
+      sourceMove: MoveId.DISABLE,
+      sourceId: source.id,
+      moveId: MoveId.SPLASH,
+    });
+    const substitute = new SubstituteTag(MoveId.SUBSTITUTE, mon.id);
+    substitute.loadTag({
+      tagType: BattlerTagType.SUBSTITUTE,
+      turnCount: 0,
+      sourceMove: MoveId.SUBSTITUTE,
+      sourceId: mon.id,
+      hp: 17,
+    });
+    const bleed = new ErBleedTag();
+    bleed.loadTag({ tagType: BattlerTagType.ER_BLEED, turnCount: 42 });
+    const frostbite = new ErFrostbiteTag();
+    frostbite.loadTag({ tagType: BattlerTagType.ER_FROSTBITE, turnCount: 37 });
+    const fear = new ErFearTag();
+    fear.loadTag({ tagType: BattlerTagType.ER_FEAR, turnCount: 2 });
+
+    mon.summonData.statStages = [6, -6, 2, -2, 1, -1, 0];
+    mon.summonData.moveQueue = [queuedMove];
+    mon.summonData.moveHistory = [historyMove];
+    mon.summonData.types = [PokemonType.WATER, PokemonType.GRASS];
+    mon.summonData.addedType = PokemonType.GHOST;
+    mon.summonData.ability = AbilityId.MOXIE;
+    mon.summonData.passiveAbilities = [AbilityId.MOXIE, undefined, AbilityId.MOXIE];
+    mon.summonData.speciesForm = getPokemonSpeciesForm(SpeciesId.MAGIKARP, 0);
+    mon.summonData.stats = [111, 222, 333, 444, 555, 666];
+    mon.summonData.moveset = [new PokemonMove(MoveId.SPLASH), new PokemonMove(MoveId.TACKLE)];
+    mon.summonData.moveset[0].ppUsed = 3;
+    mon.summonData.tags = [encore, disabled, substitute, bleed, frostbite, fear];
+
+    const expectedSummonData = JSON.stringify(new PokemonData(mon).summonData);
+    const expectedId = mon.id;
+    const state = captureCoopAuthoritativeBattleState(globalScene.currentBattle.turn);
+    expect(state).not.toBeNull();
+    const roundTripped = JSON.parse(JSON.stringify(state));
+
+    for (const seat of roundTripped.field) {
+      expect(seat).not.toHaveProperty("tags");
+      expect(seat).not.toHaveProperty("statStages");
+      expect(seat).not.toHaveProperty("transform");
+    }
+    const hostMonWire = roundTripped.playerParty.find((p: Record<string, unknown>) => p.id === expectedId);
+    expect(hostMonWire?.summonData).toBeDefined();
+    expect((hostMonWire?.summonData as { tags: { tagType: number }[] }).tags.map(t => t.tagType).sort()).toEqual(
+      [
+        BattlerTagType.DISABLED,
+        BattlerTagType.ENCORE,
+        BattlerTagType.ER_BLEED,
+        BattlerTagType.ER_FEAR,
+        BattlerTagType.ER_FROSTBITE,
+        BattlerTagType.SUBSTITUTE,
+      ].sort(),
+    );
+
+    mon.summonData = new PokemonSummonData();
+    expect(JSON.stringify(new PokemonData(mon).summonData)).not.toBe(expectedSummonData);
+    expect(applyCoopAuthoritativeBattleState(roundTripped, true)).toBe(true);
+    expect(globalScene.getPlayerParty().find(p => p.id === expectedId)).toBe(mon);
+    expect(JSON.stringify(new PokemonData(mon).summonData)).toBe(expectedSummonData);
+    expect(mon.getTag(BattlerTagType.ER_BLEED)?.turnCount).toBe(42);
+    expect(mon.getTag(BattlerTagType.ER_FROSTBITE)?.turnCount).toBe(37);
+    expect(mon.getTag(BattlerTagType.ER_FEAR)?.turnCount).toBe(2);
   });
 
   // GAP 1 (#633): arena tags (hazards / screens / tailwind) are set by host MoveEffectPhases the
