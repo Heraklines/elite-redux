@@ -36,7 +36,11 @@
 
 import { globalScene } from "#app/global-scene";
 import { Phase } from "#app/phase";
-import { setCoopBiomeInteractionStart } from "#data/elite-redux/coop/coop-biome-pin-state";
+import {
+  coopBiomePickerAutoResolveMs,
+  coopBiomePickerAutoResolvesInTest,
+  setCoopBiomeInteractionStart,
+} from "#data/elite-redux/coop/coop-biome-pin-state";
 import { coopLog, coopWarn } from "#data/elite-redux/coop/coop-debug";
 import { COOP_BIOME_WAIT_MS } from "#data/elite-redux/coop/coop-interaction-relay";
 import {
@@ -140,6 +144,16 @@ export class ErCrossroadsPhase extends Phase {
 
   /** OWNER: drive the real Stay/Leave screen; each pick relays out + applies. */
   private coopOwnerFlow(pinned: number): void {
+    // #848 test-scoped: a headless multi-wave test never answers the real Stay/Leave prompt, so under
+    // vitest (unless the test opted into driving the picker) AUTO-RESOLVE to the deterministic fallback -
+    // the SAME seed path the watcher backstop uses, relayed like a normal pick so a two-engine watcher
+    // converges. Production (no VITEST) opens the real prompt below with no timeout.
+    if (coopBiomePickerAutoResolvesInTest()) {
+      const moveOn = erHasNotoriety(globalScene.currentBattle?.waveIndex ?? 0);
+      coopLog("reward", `crossroads OWNER auto-resolve (vitest, picker not driven) -> moveOn=${moveOn} (#848)`);
+      setTimeout(() => this.coopOwnerCommit(pinned, moveOn), coopBiomePickerAutoResolveMs());
+      return;
+    }
     const mirrorSeq = COOP_CROSSROADS_SEQ_BASE + pinned;
     const options: OptionSelectItem[] = [
       {
@@ -182,26 +196,35 @@ export class ErCrossroadsPhase extends Phase {
   /** WATCHER: open a read-only mirrored copy, await the owner's pick, apply it. */
   private async coopWatchFlow(pinned: number): Promise<void> {
     const mirrorSeq = COOP_CROSSROADS_SEQ_BASE + pinned;
-    // Read-only copy of the SAME screen for the cursor mirror. The handlers are cosmetic
-    // no-ops: the awaited relay is the sole authority (a replayed owner ACTION must never
-    // resolve the watcher against its own possibly-drifted cursor).
-    const watchOptions: OptionSelectItem[] = [
-      { label: "Stay", handler: () => true },
-      { label: "Leave", handler: () => true },
-    ];
-    try {
-      await new Promise<void>(resolve => {
-        globalScene.ui.showText(this.crossroadsPrompt(), null, () => resolve());
-      });
-      globalScene.ui.setMode(UiMode.OPTION_SELECT, { options: watchOptions, delay: 500 });
-      getCoopUiMirror()?.beginSession("watcher", UiMode.OPTION_SELECT, mirrorSeq);
-    } catch {
-      /* cosmetic - the awaited relay still drives the authoritative apply below */
+    // #848 test-scoped: under vitest (unless the test drives the picker) SKIP the cosmetic mirror screen
+    // and CAP the wait short, so a single-engine headless test whose local client is the WATCHER falls
+    // back fast instead of network-waiting the full human-deliberation timeout. Production opens the
+    // real mirror + waits the full generous window.
+    const autoResolve = coopBiomePickerAutoResolvesInTest();
+    if (!autoResolve) {
+      // Read-only copy of the SAME screen for the cursor mirror. The handlers are cosmetic
+      // no-ops: the awaited relay is the sole authority (a replayed owner ACTION must never
+      // resolve the watcher against its own possibly-drifted cursor).
+      const watchOptions: OptionSelectItem[] = [
+        { label: "Stay", handler: () => true },
+        { label: "Leave", handler: () => true },
+      ];
+      try {
+        // Show the prompt COSMETICALLY (never block the relay-await on a text-advance callback), then
+        // open the mirrored menu.
+        globalScene.ui.showText(this.crossroadsPrompt());
+        await globalScene.ui.setMode(UiMode.OPTION_SELECT, { options: watchOptions, delay: 500 });
+        getCoopUiMirror()?.beginSession("watcher", UiMode.OPTION_SELECT, mirrorSeq);
+      } catch {
+        /* cosmetic - the awaited relay still drives the authoritative apply below */
+      }
     }
     const relay = getCoopInteractionRelay();
-    const res =
-      relay == null ? null : await relay.awaitInteractionChoice(COOP_CROSSROADS_SEQ_BASE + pinned, COOP_BIOME_WAIT_MS);
-    getCoopUiMirror()?.endSession();
+    const waitMs = autoResolve ? coopBiomePickerAutoResolveMs() : COOP_BIOME_WAIT_MS;
+    const res = relay == null ? null : await relay.awaitInteractionChoice(COOP_CROSSROADS_SEQ_BASE + pinned, waitMs);
+    if (!autoResolve) {
+      getCoopUiMirror()?.endSession();
+    }
     let moveOn: boolean;
     if (res == null) {
       // ANTI-HANG (#848): disconnect / stall backstop. Both clients fall back to the SAME

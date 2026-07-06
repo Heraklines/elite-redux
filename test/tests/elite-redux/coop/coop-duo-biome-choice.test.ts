@@ -36,7 +36,9 @@ import { getGameMode } from "#app/game-mode";
 import { initGlobalScene } from "#app/global-scene";
 import {
   coopBiomeInteractionStartValue,
+  resetCoopBiomePickerDrivenByTest,
   setCoopBiomeInteractionStart,
+  setCoopBiomePickerDrivenByTest,
 } from "#data/elite-redux/coop/coop-biome-pin-state";
 import { CoopInteractionRelay, setCoopWaveBarrierMs } from "#data/elite-redux/coop/coop-interaction-relay";
 import { resetCoopRendezvousWaitMs, setCoopRendezvousWaitMs } from "#data/elite-redux/coop/coop-rendezvous";
@@ -121,6 +123,9 @@ describe.skipIf(!RUN)("co-op DUO biome choice: owner-alternated + mirrored cross
   beforeEach(() => {
     setCoopWaveBarrierMs(50);
     setCoopRendezvousWaitMs(50);
+    // This suite DRIVES the real crossroads / World-Map picker (the owner opens the actual screen and we
+    // invoke its callbacks), so opt OUT of the vitest owner auto-resolve. Reset in afterEach (anti-latch).
+    setCoopBiomePickerDrivenByTest();
     game = new GameManager(phaserGame);
     logs = installDuoLogCapture(`biome-choice-${Date.now()}`);
     game.override
@@ -137,6 +142,7 @@ describe.skipIf(!RUN)("co-op DUO biome choice: owner-alternated + mirrored cross
   afterEach(() => {
     setCoopWaveBarrierMs(60_000);
     resetCoopRendezvousWaitMs();
+    resetCoopBiomePickerDrivenByTest();
     resetErBiomeStructure();
     setErPendingNodes([]);
     logs.dispose();

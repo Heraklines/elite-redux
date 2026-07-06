@@ -4,6 +4,8 @@ import {
   clearCoopBiomeInteractionStart,
   coopBiomeInteractionInProgress,
   coopBiomeInteractionStartValue,
+  coopBiomePickerAutoResolveMs,
+  coopBiomePickerAutoResolvesInTest,
 } from "#data/elite-redux/coop/coop-biome-pin-state";
 import { coopLog, coopWarn } from "#data/elite-redux/coop/coop-debug";
 import { COOP_BIOME_WAIT_MS } from "#data/elite-redux/coop/coop-interaction-relay";
@@ -213,51 +215,73 @@ export class SelectBiomePhase extends BattlePhase {
 
   /** OWNER: drive the real ER_MAP picker + stream its cursor; relay the chosen biome, then apply. */
   private coopBiomePickOwner(revealed: ErRouteNode[], origin: BiomeId, pinned: number): void {
+    // #848 test-scoped: a headless multi-wave test never picks a World-Map node, so under vitest (unless
+    // the test drives the picker) AUTO-RESOLVE to the deterministic roll - the SAME seed path the watcher
+    // backstop uses, relayed like a normal pick so a two-engine watcher converges. Production opens the
+    // real ER_MAP picker below with no timeout.
+    if (coopBiomePickerAutoResolvesInTest()) {
+      const biome = this.generateNextBiome(globalScene.currentBattle.waveIndex + 1);
+      coopLog("reward", `biome pick OWNER auto-resolve (vitest, picker not driven) -> biome=${BiomeId[biome]} (#848)`);
+      setTimeout(() => this.coopBiomeOwnerCommit(revealed, pinned, biome), coopBiomePickerAutoResolveMs());
+      return;
+    }
     const mirrorSeq = COOP_BIOME_PICK_SEQ_BASE + pinned;
     globalScene.ui.setMode(UiMode.ER_MAP, {
       nodes: revealed,
       origin,
       onSelect: (biome: BiomeId) => {
         getCoopUiMirror()?.endSession();
-        const idx = revealed.findIndex(n => n.biome === biome);
-        try {
-          // Relay both the index AND the biome id: the watcher applies the biome verbatim, so a
-          // divergent revealed-list order could never land it in a different biome than the owner.
-          getCoopInteractionRelay()?.sendInteractionChoice(COOP_BIOME_PICK_SEQ_BASE + pinned, "biomePick", idx, [
-            biome,
-          ]);
-          coopLog("reward", `biome pick OWNER commit biome=${BiomeId[biome]} idx=${idx} pinnedStart=${pinned} (#848)`);
-        } catch {
-          coopWarn("reward", "biome pick OWNER relay send threw (handled - watcher heals on timeout) (#848)");
-        }
-        this.setNextBiomeAndEnd(biome);
+        this.coopBiomeOwnerCommit(revealed, pinned, biome);
       },
     });
     // Relay the owner's live cursor to the watcher's read-only copy (cosmetic; truth = the relay).
     getCoopUiMirror()?.beginSession("owner", UiMode.ER_MAP, mirrorSeq);
   }
 
+  /** OWNER terminal: relay the chosen biome (index + id), then apply it. */
+  private coopBiomeOwnerCommit(revealed: ErRouteNode[], pinned: number, biome: BiomeId): void {
+    const idx = revealed.findIndex(n => n.biome === biome);
+    try {
+      // Relay both the index AND the biome id: the watcher applies the biome verbatim, so a
+      // divergent revealed-list order could never land it in a different biome than the owner.
+      getCoopInteractionRelay()?.sendInteractionChoice(COOP_BIOME_PICK_SEQ_BASE + pinned, "biomePick", idx, [biome]);
+      coopLog("reward", `biome pick OWNER commit biome=${BiomeId[biome]} idx=${idx} pinnedStart=${pinned} (#848)`);
+    } catch {
+      coopWarn("reward", "biome pick OWNER relay send threw (handled - watcher heals on timeout) (#848)");
+    }
+    this.setNextBiomeAndEnd(biome);
+  }
+
   /** WATCHER: open a read-only mirrored copy, await the owner's biome, apply it authoritatively. */
   private async coopBiomePickWatch(revealed: ErRouteNode[], origin: BiomeId, pinned: number): Promise<void> {
     const mirrorSeq = COOP_BIOME_PICK_SEQ_BASE + pinned;
-    try {
-      await globalScene.ui.setMode(UiMode.ER_MAP, {
-        nodes: revealed,
-        origin,
-        // Read-only: a replayed owner ACTION must never resolve the watcher against its own cursor.
-        // The awaited relay below is the sole authority.
-        onSelect: () => {
-          /* cosmetic no-op */
-        },
-      });
-      getCoopUiMirror()?.beginSession("watcher", UiMode.ER_MAP, mirrorSeq);
-    } catch {
-      coopWarn("reward", "biome pick WATCHER map failed to open (still awaiting relay) (#848)");
+    // #848 test-scoped: under vitest (unless the test drives the picker) SKIP the cosmetic mirror map and
+    // CAP the wait short, so a single-engine headless test whose local client is the WATCHER falls back
+    // fast instead of network-waiting the full human-deliberation timeout. Production opens the real
+    // mirror + waits the full generous window.
+    const autoResolve = coopBiomePickerAutoResolvesInTest();
+    if (!autoResolve) {
+      try {
+        await globalScene.ui.setMode(UiMode.ER_MAP, {
+          nodes: revealed,
+          origin,
+          // Read-only: a replayed owner ACTION must never resolve the watcher against its own cursor.
+          // The awaited relay below is the sole authority.
+          onSelect: () => {
+            /* cosmetic no-op */
+          },
+        });
+        getCoopUiMirror()?.beginSession("watcher", UiMode.ER_MAP, mirrorSeq);
+      } catch {
+        coopWarn("reward", "biome pick WATCHER map failed to open (still awaiting relay) (#848)");
+      }
     }
     const relay = getCoopInteractionRelay();
-    const res =
-      relay == null ? null : await relay.awaitInteractionChoice(COOP_BIOME_PICK_SEQ_BASE + pinned, COOP_BIOME_WAIT_MS);
-    getCoopUiMirror()?.endSession();
+    const waitMs = autoResolve ? coopBiomePickerAutoResolveMs() : COOP_BIOME_WAIT_MS;
+    const res = relay == null ? null : await relay.awaitInteractionChoice(COOP_BIOME_PICK_SEQ_BASE + pinned, waitMs);
+    if (!autoResolve) {
+      getCoopUiMirror()?.endSession();
+    }
     let biome: BiomeId;
     if (res != null && res.data != null && res.data.length > 0) {
       biome = res.data[0] as BiomeId;

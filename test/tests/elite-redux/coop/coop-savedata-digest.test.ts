@@ -34,6 +34,10 @@ import {
   captureCoopSaveDataDigest,
   captureCoopSaveDataNormalized,
 } from "#data/elite-redux/coop/coop-battle-engine";
+import {
+  resetCoopBiomePickerDrivenByTest,
+  setCoopBiomePickerDrivenByTest,
+} from "#data/elite-redux/coop/coop-biome-pin-state";
 import { CoopInteractionRelay, setCoopWaveBarrierMs } from "#data/elite-redux/coop/coop-interaction-relay";
 import { clearCoopRuntime, setCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
 import { COOP_GUEST_FIELD_INDEX, COOP_HOST_FIELD_INDEX } from "#data/elite-redux/coop/coop-session";
@@ -114,6 +118,7 @@ describe.skipIf(!RUN)("#837 co-op full-save-data checksum digest + heal", () => 
     setCoopHarnessModuleLetIsolation(false);
     setErPendingNodes([]);
     resetErBiomeStructure();
+    resetCoopBiomePickerDrivenByTest();
     logs.dispose();
     clearCoopRuntime();
     vi.restoreAllMocks();
@@ -350,6 +355,9 @@ describe.skipIf(!RUN)("#837 co-op full-save-data checksum digest + heal", () => 
     // split run, but the player's choice is honored. This drives the REAL SelectBiomePhase owner/watcher over
     // both engines and asserts they land in the SAME owner-chosen biome, distinct from the deterministic roll.
     // (The full owner/mirror/relay + crossroads chain lives in coop-duo-biome-choice.test.ts.)
+    // This test DRIVES the real owner picker (mocked ER_MAP + invoked onSelect), so opt OUT of the vitest
+    // owner auto-resolve (reset in afterEach).
+    setCoopBiomePickerDrivenByTest();
     await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
     const pair = createLoopbackPair();
     const rig = await buildDuo(game, pair, setCoopRuntime, toCoop);
