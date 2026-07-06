@@ -1,5 +1,6 @@
 import { globalScene } from "#app/global-scene";
 import { getCoopController, isAuthoritativeBattleSession, isVersusSession } from "#data/elite-redux/coop/coop-runtime";
+import type { SerializedCommand } from "#data/elite-redux/coop/coop-transport";
 import { ER_DOOMED_SWITCH_THRESHOLD_MULT, erAssessThreat, getErAiProfile } from "#data/elite-redux/er-enemy-ai";
 import { getShowdownRelay } from "#data/elite-redux/showdown/showdown-battle-state";
 import { AbilityId } from "#enums/ability-id";
@@ -73,8 +74,10 @@ export class EnemyCommandPhase extends FieldPhase {
     const relay = getShowdownRelay();
     const turn = globalScene.currentBattle.turn;
     const command = relay == null ? null : await relay.requestEnemyCommand(turn);
-    if (command == null) {
-      // Disconnect / timeout: the enemy acts by AI so the duel never stalls.
+    // Host-authoritative validation: an out-of-range / illegal relayed pick falls back to the AI
+    // (same as a timeout), so a hostile/buggy peer can never force an illegal enemy action.
+    if (command == null || !this.isRelayedCommandLegal(command)) {
+      // Disconnect / timeout / illegal pick: the enemy acts by AI so the duel never stalls.
       this.resolveEnemyAiCommand();
       return;
     }
@@ -99,6 +102,24 @@ export class EnemyCommandPhase extends FieldPhase {
       };
     }
     this.end();
+  }
+
+  /**
+   * Host-authoritative legality of a RELAYED enemy command against THIS live enemy mon (streamed
+   * state can't cheat): a FIGHT must name a move the mon actually has; a POKEMON switch must target
+   * a real, non-fainted, benched party member. An illegal pick is rejected -> the caller AI-falls-back.
+   */
+  private isRelayedCommandLegal(command: SerializedCommand): boolean {
+    const enemyPokemon = globalScene.getEnemyField()[this.fieldIndex];
+    if (enemyPokemon == null) {
+      return false;
+    }
+    if (command.command === Command.POKEMON) {
+      const target = globalScene.getEnemyParty()[command.cursor];
+      return target != null && !target.isFainted() && !target.isOnField();
+    }
+    // FIGHT: the chosen move must be one the mon actually carries (never an injected arbitrary move).
+    return enemyPokemon.getMoveset().some(m => m?.moveId === command.moveId);
   }
 
   /** Roll the enemy AI's command for this slot (the vanilla / co-op-host / disconnect-fallback path). */

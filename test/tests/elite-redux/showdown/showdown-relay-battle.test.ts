@@ -112,6 +112,33 @@ describe.skipIf(!RUN)("Showdown enemy-command relay - live battle (C6v2b)", () =
     peer.dispose();
   });
 
+  it("VALIDATION: an ILLEGAL relayed move (not in the mon's moveset) falls back to AI", async () => {
+    startLocalCoopSession({ kind: "versus" });
+    const { host, guest } = createLoopbackPair();
+    const relay = new ShowdownCommandRelay(host);
+    const peer = new ShowdownCommandRelay(guest);
+    // SURF is NOT in the opponent's moveset ([TACKLE, BODY_SLAM, HEADBUTT, LEER]) - an injected move.
+    peer.onCommandRequest(() => ({
+      command: Command.FIGHT,
+      cursor: 0,
+      moveId: MoveId.SURF,
+      targets: [BattlerIndex.PLAYER],
+      useMode: MoveUseMode.NORMAL,
+    }));
+
+    const opponent = [mon({ speciesId: SpeciesId.SNORLAX })];
+    await startShowdown(game, opponent, relay, [SpeciesId.MILTANK]);
+
+    game.move.select(MoveId.TACKLE);
+    await game.phaseInterceptor.to("TurnEndPhase");
+
+    const enemyLastMove = game.scene.getEnemyPokemon()?.getLastXMoves(1)[0]?.move;
+    // The host rejected the illegal pick -> AI fallback; the enemy never used the injected SURF.
+    expect(enemyLastMove).not.toBe(MoveId.SURF);
+
+    peer.dispose();
+  });
+
   it("FALLBACK: with NO relay the enemy acts by AI - it does NOT use the relayed move", async () => {
     startLocalCoopSession({ kind: "versus" });
 
