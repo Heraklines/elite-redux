@@ -158,6 +158,7 @@ import { PokemonMove } from "#moves/pokemon-move";
 import { MysteryEncounter } from "#mystery-encounters/mystery-encounter";
 import { MysteryEncounterSaveData } from "#mystery-encounters/mystery-encounter-save-data";
 import { allMysteryEncounters, mysteryEncountersByBiome } from "#mystery-encounters/mystery-encounters";
+import { dedicatedRetryKeys } from "#plugins/cache-busted-loader-plugin";
 import {
   applyErShinyLabSpriteFxTexture,
   clearErShinyLabSpriteFxTexture,
@@ -502,6 +503,10 @@ export class BattleScene extends SceneBase {
     // ER: remember the resolved URLs so installErAtlasRetry can re-issue the whole
     // atlas with a cache-buster if this load errors (poisoned-cache bypass).
     this.erAtlasUrlsByKey.set(key, { png: `${atlasUrlBase}.png`, json: `${atlasUrlBase}.json` });
+    // ER (#844): this key's load-error retry is owned by installErAtlasRetry below;
+    // tell the generic CacheBustedLoaderPlugin retry to leave it alone so the two
+    // mechanisms never double-issue a retry for the same pokemon atlas.
+    dedicatedRetryKeys.add(key);
     this.installErAtlasRetry();
     this.load.atlas(key, `${atlasUrlBase}.png`, `${atlasUrlBase}.json`);
     // ER: a few ER-custom sprites shipped without alpha (flat opaque background),
