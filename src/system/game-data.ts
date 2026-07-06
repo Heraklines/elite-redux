@@ -1362,6 +1362,8 @@ export class GameData {
     return {
       seed: globalScene.seed,
       playTime: globalScene.sessionPlayTime,
+      // SHOWDOWN (modeId 7) must never be persisted - duels are ephemeral sessions; the
+      // showdown launch path (Task C1+) must never route a session into save slots.
       gameMode: globalScene.gameMode.modeId,
       dailyConfig: getSerializedDailyRunConfig(),
       party: globalScene.getPlayerParty().map(p => new PokemonData(p)),

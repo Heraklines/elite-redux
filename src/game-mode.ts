@@ -384,7 +384,7 @@ export class GameMode implements GameModeConfig {
         return waveIndex === 50;
       case GameModes.SHOWDOWN:
         // Single 1v1 duel: the first wave is the only (and final) wave.
-        // Provisional for B1 - Task C3 gives wave-final predicates their real treatment.
+        // TODO(C3): provisional for B1 - Task C3 gives wave-final predicates their real treatment.
         return waveIndex === 1;
     }
   }
@@ -518,6 +518,7 @@ export class GameMode implements GameModeConfig {
       case GameModes.COOP:
         return i18next.t("gameMode:coop");
       case GameModes.SHOWDOWN:
+        // TODO: add the gameMode:showdown locale entry (renders the raw key until then).
         return i18next.t("gameMode:showdown");
     }
   }
@@ -566,6 +567,7 @@ export class GameMode implements GameModeConfig {
       case GameModes.COOP:
         return i18next.t("gameMode:coop");
       case GameModes.SHOWDOWN:
+        // TODO: add the gameMode:showdown locale entry (renders the raw key until then).
         return i18next.t("gameMode:showdown");
     }
   }
