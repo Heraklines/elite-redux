@@ -2011,6 +2011,59 @@ export const DEV_SCENARIOS: DevScenario[] = [
       + "keep playing. EXPECT: both clients stay in the SAME biome and neither wedges in a resync loop at the\n"
       + "boundary. Duo-tested headlessly in test/tests/elite-redux/coop/coop-savedata-digest.test.ts\n"
       + "('DIVERGE + HEAL (#841 item 5)').",
+  },
+  {
+    label: "(note) Co-op: game-over tears the runtime down + no stale ME pins next run (#842)",
+    description:
+      "CO-OP structural fix - verify with TWO clients (not a solo battle), and primarily a CODE/TEST\n"
+      + "note (the leak is cross-RUN state, not a single-battle behavior).\n"
+      + "\n"
+      + "BUG: a game-over that landed WHILE a mystery encounter was in progress left the co-op runtime\n"
+      + "alive with its ME pins still set (coopMeInteractionStart / coopMeBattleInteractionCounter / the\n"
+      + "adopted host presentation) - those clear only at an ME TERMINAL, which a mid-ME game-over never\n"
+      + "reaches. GameOverPhase broadcast 'gameOver' to the partner but never tore the runtime down, so\n"
+      + "the stale pins leaked into the NEXT co-op run's first encounter (ME ownership / presentation\n"
+      + "desync on the fresh run).\n"
+      + "\n"
+      + "FIX: GameOverPhase now calls clearCoopRuntime() at its terminal step on BOTH clients (deferred\n"
+      + "past the gameOver broadcast so it flushes first), which also zeroes the full ME pin family.\n"
+      + "\n"
+      + "DO (2 clients): drive a run to a GAME-OVER while a mystery encounter is on screen (or right after\n"
+      + "entering one), then BOTH start a FRESH co-op run and reach the first mystery encounter. EXPECT:\n"
+      + "the fresh run's first ME has correct ownership/alternation (no 'both drive it' / 'neither drives\n"
+      + "it' desync) and its presentation is clean. Duo-tested headlessly in coop-game-over-teardown.test.ts.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({ STARTING_WAVE_OVERRIDE: 1, STARTING_LEVEL_OVERRIDE: 50 });
+      return [
+        makeStarter(SpeciesId.SNORLAX, {
+          moveset: [MoveId.BODY_SLAM, MoveId.CRUNCH, MoveId.EARTHQUAKE, MoveId.REST],
+        }),
+        makeStarter(SpeciesId.GENGAR, {
+          moveset: [MoveId.SHADOW_BALL, MoveId.SLUDGE_BOMB, MoveId.THUNDERBOLT, MoveId.DAZZLING_GLEAM],
+        }),
+      ];
+    },
+  },
+  {
+    label: "(note) Co-op: a forged cross-owner switch pick is dropped (malicious-peer hardening #829)",
+    description:
+      "CO-OP hardening - this is a CODE/TEST note: it defends against a MALICIOUS or buggy partner\n"
+      + "client and is NOT reproducible by normal play (a well-behaved client never sends a forged\n"
+      + "message).\n"
+      + "\n"
+      + "BUG: the interaction relay applied a partner's faint-replacement switch pick (which mon to send\n"
+      + "in) WITHOUT validating the partner actually owns the field slot the pick addresses. A crafted\n"
+      + "client could relay a switch for a slot it does not command.\n"
+      + "\n"
+      + "FIX: the relay now validates ownership on the faint-switch channel (the one channel where slot\n"
+      + "ownership is well-defined via the fixed 2-player seat map): a pick whose slot resolves to the\n"
+      + "RECEIVER's own seat can only be a forgery, so it is dropped with a loud [coop:security] console\n"
+      + "warning and never applied. Legitimate same-owner picks are untouched.\n"
+      + "\n"
+      + "VERIFY (code/test): normal 2-client faint-replacement still works (the guest picks its own\n"
+      + "replacement, the host summons it). A forged cross-owner pick is dropped + warned. Unit-tested in\n"
+      + "coop-malicious-peer-switch.test.ts; the legitimate path is guarded by coop-duo-faint-switch.test.ts.",
     setup: () => {
       resetDevOverrides();
       setOverrides({ STARTING_WAVE_OVERRIDE: 1, STARTING_LEVEL_OVERRIDE: 50 });
