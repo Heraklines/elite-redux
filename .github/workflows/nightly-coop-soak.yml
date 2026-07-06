@@ -2,8 +2,16 @@ name: Nightly Co-op Soak
 
 # Runs the seeded two-engine CO-OP SOAK (#841): a long randomized host+guest run that
 # finds desyncs / strands / leaks BY MACHINE (the DIGEST / LOCKSTEP / NO-PARK / TEARDOWN
-# invariants) instead of by live players. Nightly at ~03:00 UTC with SOAK_WAVES=150, and
-# manually dispatchable on demand with a custom wave count / seed:
+# invariants) instead of by live players. Nightly at ~03:00 UTC. It runs TWO profiles
+# (#832), serialized, each covering a different strand:
+#   - god   (SOAK_WAVES=150): the level-300 steamroller that reaches the deep endgame
+#            (waves 70-200) where the LATE-game desyncs live; faints only occasionally.
+#   - level (SOAK_WAVES=55):  the level-65 party that FAINTS reliably through its ~wave-40-48
+#            death spiral and WIPES cleanly (a legitimate terminal), staying below the ~60+
+#            ceiling - the faint/wipe/revive/switch channel (#834/#836/#845-#848), the
+#            historically RICHEST desync source. The soak PROMOTES the single-faint/switch/
+#            replace surfaces to GUARANTEED coverage for this profile.
+# Manually dispatchable on demand with a custom wave count / seed (applies to BOTH legs):
 #
 #   gh workflow run nightly-coop-soak.yml --ref feat/elite-redux-port \
 #       -R Heraklines/elite-redux -f soak_waves=200
@@ -45,6 +53,28 @@ jobs:
     if: github.repository == 'Heraklines/elite-redux'
     timeout-minutes: 90
     runs-on: ubuntu-latest
+    strategy:
+      # Keep BOTH profiles running even if one fails (they cover DIFFERENT strands - see below).
+      fail-fast: false
+      # SERIALIZE the two profiles. Both legs commit their result bundle to the `dev-logs` branch, and two
+      # concurrent pushes would non-fast-forward each other; max-parallel 1 keeps the pushes sequential. It
+      # fits the 90-min budget comfortably (god ~150 waves + level ~80 waves, the level party wiping ~68).
+      max-parallel: 1
+      matrix:
+        include:
+          # GOD (audit priority: the DEEP-WAVE strand). The level-300 legendary steamroller reaches the
+          # endgame (waves 70-200) where the LATE-game co-op desyncs live; it faints only occasionally.
+          - profile: god
+            waves_default: "150"
+          # LEVEL (#832, audit priority #2: the FAINT/WIPE/REVIVE/SWITCH channel - historically the RICHEST
+          # desync source, #834/#836/#845-#848). The level-65 party takes real damage and FAINTS reliably
+          # through its ~wave-40-48 death spiral, WIPING cleanly (GameOver -> Title) around wave ~48 - a
+          # legitimate terminal. A default of 55 lets the wipe land while staying BELOW the ~60+ razor's-edge
+          # ceiling (boss-segmented wild enemies + the deep boss-reward-tail strand - see the FINDINGS in the
+          # PR/report). The soak PROMOTES the single-faint/switch/replace surfaces to GUARANTEED for this
+          # profile (the same-turn double faint stays probabilistic).
+          - profile: level
+            waves_default: "55"
     steps:
       - uses: actions/checkout@v6
         with:
@@ -55,12 +85,16 @@ jobs:
 
       - uses: ./.github/actions/setup-deps
 
-      - name: Run the co-op soak
+      - name: Run the co-op soak (${{ matrix.profile }})
         id: soak
         continue-on-error: true
         env:
           ER_SCENARIO: "1"
-          SOAK_WAVES: ${{ github.event.inputs.soak_waves || '150' }}
+          # #832: run each matrix leg under its own SOAK_PROFILE (god = today's deep-wave run; level = the
+          # faint-heavy level-85 party). SOAK_PROFILE=god is byte-identical to leaving it unset.
+          SOAK_PROFILE: ${{ matrix.profile }}
+          # A manual-dispatch soak_waves (if given) overrides BOTH legs; otherwise each profile's default.
+          SOAK_WAVES: ${{ github.event.inputs.soak_waves || matrix.waves_default }}
           # Empty for a scheduled run / when not supplied -> the driver derives the seed from the date.
           SOAK_SEED: ${{ github.event.inputs.soak_seed }}
           NODE_OPTIONS: "--max-old-space-size=8192"
@@ -85,16 +119,21 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           SOAK_EXIT: ${{ steps.soak.outputs.exit }}
+          # #832: the profile scopes every committed filename so the two matrix legs never collide.
+          SOAK_PROFILE: ${{ matrix.profile }}
+          SOAK_WAVES: ${{ github.event.inputs.soak_waves || matrix.waves_default }}
         run: |
           set -euo pipefail
           DATE=$(date -u +%Y-%m-%d)
           TS=$(date -u +%Y-%m-%dT%H-%M-%SZ)
+          PROFILE="${SOAK_PROFILE:-god}"
           if [ "${SOAK_EXIT:-1}" = "0" ]; then VERDICT="PASS"; else VERDICT="FAIL"; fi
 
-          # Build the summary .log the maintainer reads first (seed / waves / verdict / skips / invariant).
+          # Build the summary .log the maintainer reads first (profile / seed / waves / verdict / skips).
           SUMMARY=$(mktemp)
           {
             echo "===== COOP SOAK RESULT ====="
+            echo "profile: ${PROFILE}"
             echo "verdict: ${VERDICT}"
             echo "waves_requested: ${SOAK_WAVES:-150}"
             echo "run: ${GITHUB_RUN_ID} (${GITHUB_REF_NAME})"
@@ -124,7 +163,7 @@ jobs:
 
           DEST="$TMP/remote/$DATE"
           mkdir -p "$DEST"
-          cp "$SUMMARY" "$DEST/${TS}__coop-soak__ci.log"
+          cp "$SUMMARY" "$DEST/${TS}__coop-soak-${PROFILE}__ci.log"
 
           # On FAILURE, also carry the replay script + both clients' captured logs (size-capped ~1MB each)
           # so the desync is triageable straight from the pulled bundle. The driver writes these into a
@@ -132,11 +171,11 @@ jobs:
           if [ "$VERDICT" = "FAIL" ]; then
             ART=$(ls -1dt dev-logs/coop-soak/*/ 2>/dev/null | head -n1 || true)
             if [ -n "$ART" ] && [ -d "$ART" ]; then
-              [ -f "${ART}failure.json" ] && cp "${ART}failure.json" "$DEST/${TS}__coop-soak-failure__ci.log"
+              [ -f "${ART}failure.json" ] && cp "${ART}failure.json" "$DEST/${TS}__coop-soak-${PROFILE}-failure__ci.log"
               # tail, not head: the strand/desync moment is at the END of the log - run 28710818213's
               # head-capped bundle cut off the exact TitlePhase transition being triaged.
-              [ -f "${ART}host.log" ]  && tail -c 1000000 "${ART}host.log"  > "$DEST/${TS}__coop-soak-host__ci.log"
-              [ -f "${ART}guest.log" ] && tail -c 1000000 "${ART}guest.log" > "$DEST/${TS}__coop-soak-guest__ci.log"
+              [ -f "${ART}host.log" ]  && tail -c 1000000 "${ART}host.log"  > "$DEST/${TS}__coop-soak-${PROFILE}-host__ci.log"
+              [ -f "${ART}guest.log" ] && tail -c 1000000 "${ART}guest.log" > "$DEST/${TS}__coop-soak-${PROFILE}-guest__ci.log"
             fi
           fi
 
@@ -149,7 +188,7 @@ jobs:
             echo "no results to commit"
           else
             git -C "$TMP" -c user.email="actions@github.com" -c user.name="nightly-coop-soak" \
-              commit -m "coop-soak ${VERDICT} ${TS} (run ${GITHUB_RUN_ID})"
+              commit -m "coop-soak ${PROFILE} ${VERDICT} ${TS} (run ${GITHUB_RUN_ID})"
             git -C "$TMP" push "$REPO_URL" HEAD:dev-logs
             echo "pushed soak results to dev-logs/remote/$DATE/"
           fi
@@ -158,7 +197,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: coop-soak-logs-${{ github.run_id }}
+          name: coop-soak-logs-${{ matrix.profile }}-${{ github.run_id }}
           path: dev-logs/coop-soak
           retention-days: 7
           if-no-files-found: warn
