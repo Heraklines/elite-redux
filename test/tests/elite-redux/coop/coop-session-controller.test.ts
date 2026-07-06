@@ -212,22 +212,27 @@ describe("co-op session controller (#633, P1)", () => {
       expect(h.interactionOwner()).toBe("guest"); // both converged
     });
 
-    it("the counter persists: restoreInteractionCounter resumes the order (round-trip)", () => {
-      const { host } = createLoopbackPair();
+    it("a resume re-initializes the interaction counter identically on both clients (#833: no persisted restore)", () => {
+      // #833 dangler cleanup: the interaction counter is NOT persisted in SessionSaveData, and the
+      // production-dead `restoreInteractionCounter` seam was removed (nothing to restore). A real
+      // resume relies on BOTH clients re-initializing the counter identically from the fresh runtime
+      // assembly - which is exactly base 0 (host owns the first interaction). Assert that invariant.
+      const { host, guest } = createLoopbackPair();
       const h = new CoopSessionController(host);
       h.advanceInteraction();
       h.advanceInteraction();
-      h.advanceInteraction(); // counter = 3 -> owner guest
-      const saved = h.interactionCounter();
-      expect(saved).toBe(3);
+      h.advanceInteraction(); // mid-run: counter = 3 -> owner guest
+      expect(h.interactionCounter()).toBe(3);
 
-      // A fresh controller (post-reload) restores the saved counter.
-      const { host: host2 } = createLoopbackPair();
-      const resumed = new CoopSessionController(host2);
-      expect(resumed.interactionOwner()).toBe("host"); // fresh = 0
-      resumed.restoreInteractionCounter(saved);
-      expect(resumed.interactionCounter()).toBe(3);
-      expect(resumed.interactionOwner()).toBe("guest"); // 3 is odd -> guest
+      // Post-reload: a fresh controller on EITHER role re-initializes to 0 (host owns interaction 0),
+      // so the even/odd ownership parity is preserved for a resume that re-enters from the top.
+      const { host: host2, guest: guest2 } = createLoopbackPair();
+      const resumedHost = new CoopSessionController(host2);
+      const resumedGuest = new CoopSessionController(guest2);
+      expect(resumedHost.interactionCounter()).toBe(0);
+      expect(resumedGuest.interactionCounter()).toBe(0);
+      expect(resumedHost.interactionOwner()).toBe("host"); // fresh = 0 -> host owns the first interaction
+      expect(resumedGuest.interactionOwner()).toBe("host"); // both clients agree
     });
 
     it("the snapshot carries the interaction owner + local-turn flag for the UI", () => {

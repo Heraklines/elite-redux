@@ -636,10 +636,11 @@ describe("co-op interaction-sync (#633 regression harness)", () => {
 
   // ===========================================================================
   // BUG2: a RESYNC at the wave boundary (the live trace had a checksum resync there) must
-  // NOT reseed the interaction counter or break the pin immunity. The ONLY method that
-  // reseeds the counter is restoreInteractionCounter (called solely on RESUME, never in the
-  // snapshot-apply / resync path), so a resync round-trip cannot reset the alternation. We
-  // assert the counter survives a stray gap broadcast UNCHANGED across a resync-style flow.
+  // NOT reseed the interaction counter or break the pin immunity. NOTHING on the message /
+  // snapshot-apply / resync path reseeds the counter (#833: the production-dead
+  // restoreInteractionCounter seam was removed - the counter is not persisted, so a resume
+  // re-initializes it identically on both clients instead of restoring). We assert the counter
+  // survives a stray gap broadcast UNCHANGED across a resync-style flow.
   // ===========================================================================
   it("RESYNC-INTERLEAVE: a wave-boundary resync does not reseed the counter and the pin stays immune (#633, BUG2)", async () => {
     const rig = makeRig();
@@ -650,9 +651,8 @@ describe("co-op interaction-sync (#633 regression harness)", () => {
 
     // Host advances and broadcasts during the gap (as in the live trace). At the wave
     // boundary a checksum/data-fingerprint round-trip also runs - it drives a snapshot/diff
-    // (a pure diagnostic), NOT a counter reseed. The counter-reseed entry point
-    // restoreInteractionCounter is resume-only and is NEVER invoked on the message path, so
-    // a fingerprint exchange leaves the counter untouched.
+    // (a pure diagnostic), NOT a counter reseed. Nothing on the message path reseeds the
+    // counter, so a fingerprint exchange leaves it untouched.
     rig.hostCtl.advanceInteraction(n); // host -> N+1, broadcasts N+1 (deferred on the guest)
     rig.hostCtl.snapshot(); // a resync-style snapshot read is pure (no counter mutation)
     rig.guestCtl.snapshot();
@@ -665,12 +665,6 @@ describe("co-op interaction-sync (#633 regression harness)", () => {
       "a wave-boundary resync does not reseed / bump the interaction counter",
     ).toBe(n);
     expect(rig.hostCtl.interactionCounter()).toBe(n + 1);
-
-    // restoreInteractionCounter (resume-only) is the ONLY thing that would reseed it; confirm
-    // it is a distinct, explicit path - calling it deliberately reseeds, proving the resync
-    // path (which does NOT call it) is what leaves the counter alone.
-    rig.guestCtl.restoreInteractionCounter(n); // explicit resume reseed (no-op here: already N)
-    expect(rig.guestCtl.interactionCounter(), "explicit resume reseed is the only counter-reset path").toBe(n);
 
     dispose(rig);
   });
