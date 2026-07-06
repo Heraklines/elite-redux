@@ -990,7 +990,7 @@ export class SelectModifierPhase extends BattlePhase {
   }
 
   copy(): SelectModifierPhase {
-    return globalScene.phaseManager.create(
+    const copied = globalScene.phaseManager.create(
       "SelectModifierPhase",
       this.rerollCount,
       this.modifierTiers,
@@ -1010,6 +1010,15 @@ export class SelectModifierPhase extends BattlePhase {
       },
       true,
     );
+    // Co-op (#837): the continuation copy MUST inherit the SAME pinned interaction counter this shop
+    // opened on. Without it the copy starts at -1 and, if its own terminal ever advances (a backed-out
+    // continuation picker re-shows + leaves the copy), coopAdvanceInteraction fires an UNPINNED
+    // (from=undefined) advance that unconditionally bumps + broadcasts the counter on the APPLIER only
+    // (the live "advance interaction from=-1 counter 11 -> 12"), while the real from-pinned commit
+    // no-ops - so the partner DEFERS the broadcast and lags N-behind, wedging the next battle. Pinned
+    // here, the copy's terminal advance is from-pinned + idempotent (a duplicate no-ops on both sides).
+    copied.coopInteractionStart = this.coopInteractionStart;
+    return copied;
   }
 
   addModifier(modifier: Modifier): boolean {
@@ -1168,7 +1177,22 @@ export class SelectModifierPhase extends BattlePhase {
     if (controller == null) {
       return;
     }
-    const from = this.coopInteractionStart >= 0 ? this.coopInteractionStart : undefined;
+    // Co-op (#837): NEVER fire an UNPINNED advance in a live co-op run. Every real co-op interaction
+    // pins coopInteractionStart in start() (and a continuation copy now inherits it, above), so a -1
+    // here is a SPURIOUS terminal on a phase that never opened as an interaction owner/watcher. An
+    // unpinned advanceInteraction(undefined) is non-idempotent: it unconditionally bumps + broadcasts
+    // the counter on THIS client only (the partner DEFERS the broadcast and lags N-behind), wedging the
+    // next battle ("after browsing the market i suddenly cannot choose a move"). Skip it LOUDLY - a
+    // from-pinned advance on the legitimate terminal keeps both clients lockstep.
+    if (this.coopInteractionStart < 0) {
+      coopWarn(
+        "reward",
+        `advance interaction SKIP unpinned (role=${controller.role} coopInteractionStart=-1 counter=${controller.interactionCounter()}) `
+          + "- refusing an asymmetric UNPINNED advance (#837); a from-pinned terminal advances both clients",
+      );
+      return;
+    }
+    const from = this.coopInteractionStart;
     const before = controller.interactionCounter();
     controller.advanceInteraction(from);
     coopLog(
