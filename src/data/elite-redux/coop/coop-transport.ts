@@ -1084,23 +1084,31 @@ export type CoopMessage =
   // Showdown 1v1 PvP (A4): additive wire messages layered on the SAME co-op
   // transport. Purely new `t` values, so a co-op client that never speaks Showdown
   // ignores them via the unknown-kind default arm (forward-safe, same rule as above).
+  //
+  // `matchId` SCOPE RULE: a matchId is minted by the ESCROW server at match
+  // registration, so it appears ONLY on escrow-coupled messages: `showdownStakeLock`
+  // (which only exists in the staked flow, post-registration) carries a plain
+  // `string`; `showdownResult` / `showdownVoid` carry `string | null` (null = a
+  // FRIENDLY / no-escrow match - friendlies still exchange result/void but have no
+  // server match). Every OTHER message is CONNECTION-scoped and carries no matchId:
+  // there is exactly one match per paired connection, and a rematch is a new pairing.
   // ===========================================================================
-  /** Either player -> peer: this player's wagered stake for the match (see {@linkcode ShowdownStakeOfferWire}). */
+  /** Either player -> peer: this player's wagered stake for the match (see {@linkcode ShowdownStakeOfferWire}). Connection-scoped. */
   | { t: "showdownStakeOffer"; offer: ShowdownStakeOfferWire }
-  /** Either player -> peer: the stake is locked in for `matchId` at the agreed `tier`. */
+  /** Either player -> peer: the stake is locked in for `matchId` at the agreed `tier` (escrow-coupled: post-registration). */
   | { t: "showdownStakeLock"; matchId: string; tier: number }
-  /** Either player -> peer: this player's full built team (see {@linkcode ShowdownMonManifestWire}). */
+  /** Either player -> peer: this player's full built team (see {@linkcode ShowdownMonManifestWire}). Connection-scoped. */
   | { t: "showdownTeam"; manifest: ShowdownMonManifestWire[] }
-  /** Either player -> peer: "my team is finalized"; `teamHash` fingerprints it for the anti-cheat cross-check. */
+  /** Either player -> peer: "my team is finalized"; `teamHash` fingerprints it for the anti-cheat cross-check. Connection-scoped. */
   | { t: "showdownReady"; teamHash: string }
-  /** Host -> peer: the peer's command is needed for this `turn` (the 1v1 analogue of `commandRequest`). */
+  /** Host -> peer: the peer's command is needed for this `turn` (the 1v1 analogue of `commandRequest`). Connection-scoped. */
   | { t: "showdownCommandRequest"; turn: number }
-  /** A player's battle command for their own mon this `turn` (reply to `showdownCommandRequest`). */
+  /** A player's battle command for their own mon this `turn` (reply to `showdownCommandRequest`). Connection-scoped. */
   | { t: "showdownCommand"; turn: number; command: SerializedCommand }
-  /** Host -> peer: the match resolved. `winner` is the winning role; `reason` is how it ended. */
-  | { t: "showdownResult"; matchId: string; winner: CoopRole; reason: "victory" | "forfeit" | "timeout" }
-  /** Either player -> peer: the match is VOIDED (no winner) - `reason` is why (anti-cheat / illegal team / drop). */
-  | { t: "showdownVoid"; matchId: string; reason: "checksum" | "illegalTeam" | "earlyDisconnect" };
+  /** Host -> peer: the match resolved. `winner` is the winning role; `reason` is how it ended. `matchId` is null for a friendly (no escrow). */
+  | { t: "showdownResult"; matchId: string | null; winner: CoopRole; reason: "victory" | "forfeit" | "timeout" }
+  /** Either player -> peer: the match is VOIDED (no winner) - `reason` is why. `matchId` is null for a friendly (no escrow). */
+  | { t: "showdownVoid"; matchId: string | null; reason: "checksum" | "illegalTeam" | "earlyDisconnect" };
 
 /** A transport moves {@linkcode CoopMessage}s between two paired clients. */
 export interface CoopTransport {
@@ -1183,6 +1191,22 @@ function summarizeCoopMessage(msg: CoopMessage): string {
       return "(re)request";
     case "rendezvous":
       return `point=${msg.point}`;
+    case "showdownStakeOffer":
+      return `offer=sp${msg.offer.speciesId} shiny=${msg.offer.shiny} v=${msg.offer.variant} cost=${msg.offer.cost}`;
+    case "showdownStakeLock":
+      return `match=${msg.matchId} tier=${msg.tier}`;
+    case "showdownTeam":
+      return `mons=${msg.manifest.length}`;
+    case "showdownReady":
+      return `hash=${msg.teamHash}`;
+    case "showdownCommandRequest":
+      return `turn=${msg.turn}`;
+    case "showdownCommand":
+      return `turn=${msg.turn} cmd=${msg.command.command} cursor=${msg.command.cursor}`;
+    case "showdownResult":
+      return `match=${msg.matchId} winner=${msg.winner} reason=${msg.reason}`;
+    case "showdownVoid":
+      return `match=${msg.matchId} reason=${msg.reason}`;
     default:
       return `t=${(msg as { t?: string }).t ?? "?"}`;
   }

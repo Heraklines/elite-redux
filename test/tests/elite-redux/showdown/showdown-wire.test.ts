@@ -32,8 +32,19 @@ const stakeToWire: ShowdownStakeOfferWire = {} as StakeOffer;
 const manifestToWire: ShowdownMonManifestWire = {} as ShowdownMonManifest;
 const wireToManifest: ShowdownMonManifest = {} as ShowdownMonManifestWire;
 
-/** Collect the guest's inbound messages, flushing the loopback microtask queue. */
-async function roundTrip(msg: CoopMessage): Promise<CoopMessage> {
+/**
+ * Send `msg` host -> guest over the loopback and assert it is a faithful WIRE
+ * round-trip. LoopbackTransport delivers BY REFERENCE, so a naive `toStrictEqual(msg)`
+ * would compare the object to itself and prove nothing about serializability. Instead
+ * we compare against a JSON re-hydration (what the real WebRTC channel actually
+ * carries), and separately assert that re-hydration deep-equals `msg` - a
+ * serializability guard (no functions / undefined / cycles slip through the wire).
+ */
+async function assertWireRoundTrip(msg: CoopMessage): Promise<void> {
+  const rehydrated = JSON.parse(JSON.stringify(msg)) as CoopMessage;
+  // Serializability guard: the message survives a JSON round-trip byte-for-byte.
+  expect(rehydrated).toStrictEqual(msg);
+
   const { host, guest } = createLoopbackPair();
   const received: CoopMessage[] = [];
   guest.onMessage(m => received.push(m));
@@ -43,7 +54,7 @@ async function roundTrip(msg: CoopMessage): Promise<CoopMessage> {
   await Promise.resolve();
   host.close();
   expect(received).toHaveLength(1);
-  return received[0];
+  expect(received[0]).toStrictEqual(rehydrated);
 }
 
 const sampleOffer: ShowdownStakeOfferWire = {
@@ -76,46 +87,46 @@ describe("showdown wire protocol", () => {
   });
 
   it("round-trips showdownStakeOffer", async () => {
-    const msg: CoopMessage = { t: "showdownStakeOffer", offer: sampleOffer };
-    expect(await roundTrip(msg)).toStrictEqual(msg);
+    await assertWireRoundTrip({ t: "showdownStakeOffer", offer: sampleOffer });
   });
 
   it("round-trips showdownStakeLock", async () => {
-    const msg: CoopMessage = { t: "showdownStakeLock", matchId: "m-1", tier: 102 };
-    expect(await roundTrip(msg)).toStrictEqual(msg);
+    await assertWireRoundTrip({ t: "showdownStakeLock", matchId: "m-1", tier: 102 });
   });
 
   it("round-trips showdownTeam", async () => {
-    const msg: CoopMessage = { t: "showdownTeam", manifest: [sampleManifest, sampleManifest] };
-    expect(await roundTrip(msg)).toStrictEqual(msg);
+    await assertWireRoundTrip({ t: "showdownTeam", manifest: [sampleManifest, sampleManifest] });
   });
 
   it("round-trips showdownReady", async () => {
-    const msg: CoopMessage = { t: "showdownReady", teamHash: "deadbeef" };
-    expect(await roundTrip(msg)).toStrictEqual(msg);
+    await assertWireRoundTrip({ t: "showdownReady", teamHash: "deadbeef" });
   });
 
   it("round-trips showdownCommandRequest", async () => {
-    const msg: CoopMessage = { t: "showdownCommandRequest", turn: 7 };
-    expect(await roundTrip(msg)).toStrictEqual(msg);
+    await assertWireRoundTrip({ t: "showdownCommandRequest", turn: 7 });
   });
 
   it("round-trips showdownCommand", async () => {
-    const msg: CoopMessage = {
+    await assertWireRoundTrip({
       t: "showdownCommand",
       turn: 7,
       command: { command: 0, cursor: 1, moveId: 85, targets: [2], useMode: 0 },
-    };
-    expect(await roundTrip(msg)).toStrictEqual(msg);
+    });
   });
 
-  it("round-trips showdownResult", async () => {
-    const msg: CoopMessage = { t: "showdownResult", matchId: "m-1", winner: "host", reason: "victory" };
-    expect(await roundTrip(msg)).toStrictEqual(msg);
+  it("round-trips showdownResult (escrow match)", async () => {
+    await assertWireRoundTrip({ t: "showdownResult", matchId: "m-1", winner: "host", reason: "victory" });
   });
 
-  it("round-trips showdownVoid", async () => {
-    const msg: CoopMessage = { t: "showdownVoid", matchId: "m-1", reason: "checksum" };
-    expect(await roundTrip(msg)).toStrictEqual(msg);
+  it("round-trips showdownResult (friendly, null matchId)", async () => {
+    await assertWireRoundTrip({ t: "showdownResult", matchId: null, winner: "guest", reason: "forfeit" });
+  });
+
+  it("round-trips showdownVoid (escrow match)", async () => {
+    await assertWireRoundTrip({ t: "showdownVoid", matchId: "m-1", reason: "checksum" });
+  });
+
+  it("round-trips showdownVoid (friendly, null matchId)", async () => {
+    await assertWireRoundTrip({ t: "showdownVoid", matchId: null, reason: "earlyDisconnect" });
   });
 });
