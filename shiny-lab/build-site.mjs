@@ -86,19 +86,32 @@ ${css}
       <div class="row"><label class="ls">Surface FX</label><select id="sel_surface" class="sel"></select></div>
       <div class="row"><label class="la">Around FX</label><select id="sel_around" class="sel"></select></div>
       <div class="row"><label class="lp">Clustering</label><select id="sel_cluster" class="sel" title="How the cluster palettes segment the sprite's colors"></select></div>
-      <div class="row"><label>Speed</label><input id="speed" type="range" min="0.1" max="3" step="0.05" value="1"></div>
+      <div class="row"><label>Speed (master)</label><input id="speed" type="range" min="0.1" max="3" step="0.05" value="1"></div>
       <div class="row"><label class="lp">Pal amount</label><input id="int_palette" type="range" min="0" max="1" step="0.02" value="1"></div>
       <div class="row"><label class="ls">Surf amount</label><input id="int_surface" type="range" min="0" max="1" step="0.02" value="1"></div>
       <div class="row"><label class="la">Aura amount</label><input id="int_around" type="range" min="0" max="1" step="0.02" value="1"></div>
-      <div class="row"><label>Seed</label><input id="seed" type="range" min="0" max="256" step="1" value="0"><button id="seedRand" class="mini" title="Randomize seed">&#127922;</button></div>
-      <div class="row"><label>Texture noise</label><input id="texscale" type="range" min="0.4" max="2" step="0.05" value="1"></div>
       <div class="row"><label>Protect</label>
         <label class="check"><input id="protectBlack" class="chk" type="checkbox">Black</label>
         <label class="check"><input id="protectWhite" class="chk" type="checkbox">White</label>
       </div>
-      <div class="row"><label>FX color</label>
-        <div class="seg" id="tintSeg"><button class="on" data-tint="default">Default</button><button data-tint="palette">Palette</button><button data-tint="custom">Custom</button></div>
-        <input id="fxcolor" type="color" value="#ff66cc" class="colorin" style="display:none">
+      <div class="row"><label>GBC colors</label>
+        <label class="check"><input id="gbcSnap" class="chk" type="checkbox">snap FX to the GBC gamut (RGB555)</label>
+      </div>
+      <div class="subhead ls">Surface FX params</div>
+      <div class="row"><label class="ls">Speed</label><input id="surf_speed" type="range" min="0" max="3" step="0.05" value="1"></div>
+      <div class="row"><label class="ls">Seed</label><input id="surf_seed" type="range" min="0" max="256" step="1" value="0"><button id="surf_seedRand" class="mini" title="Randomize seed">&#127922;</button></div>
+      <div class="row"><label class="ls">Texture noise</label><input id="surf_tex" type="range" min="0.4" max="2" step="0.05" value="1"></div>
+      <div class="row"><label class="ls">Color</label>
+        <div class="seg" id="tintSeg_surf"><button class="on" data-tint="default">Default</button><button data-tint="palette">Palette</button><button data-tint="custom">Custom</button></div>
+        <input id="fxcolor_surf" type="color" value="#ff66cc" class="colorin" style="display:none">
+      </div>
+      <div class="subhead la">Around FX params</div>
+      <div class="row"><label class="la">Speed</label><input id="aro_speed" type="range" min="0" max="3" step="0.05" value="1"></div>
+      <div class="row"><label class="la">Seed</label><input id="aro_seed" type="range" min="0" max="256" step="1" value="0"><button id="aro_seedRand" class="mini" title="Randomize seed">&#127922;</button></div>
+      <div class="row"><label class="la">Texture noise</label><input id="aro_tex" type="range" min="0.4" max="2" step="0.05" value="1"></div>
+      <div class="row"><label class="la">Color</label>
+        <div class="seg" id="tintSeg_aro"><button class="on" data-tint="default">Default</button><button data-tint="palette">Palette</button><button data-tint="custom">Custom</button></div>
+        <input id="fxcolor_aro" type="color" value="#66ccff" class="colorin" style="display:none">
       </div>
       <div class="row"><label>Backdrop</label>
         <div class="seg" id="bgSeg">

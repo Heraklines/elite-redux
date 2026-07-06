@@ -8,7 +8,7 @@
 const LAB = window.LAB;
 const CDN = LAB.cdn;
 const SPECIES = LAB.species;
-const PAD = 22;
+const PAD = 28;
 let FW = 0;
 let FH = 0;
 let PW = 0;
@@ -134,15 +134,22 @@ async function loadSpecies(id) {
   resizeCanvases();
   status("");
   // give each mon a different default texture seed (so e.g. Bioluminescent spots differ)
-  fxSeed = (id * 13) % 257;
-  const se = document.getElementById("seed");
-  if (se) {
-    se.value = fxSeed;
+  const s0 = (id * 13) % 257;
+  layerFx.surf.seed = s0;
+  layerFx.aro.seed = s0;
+  for (const elId of ["surf_seed", "aro_seed"]) {
+    const se = document.getElementById(elId);
+    if (se) {
+      se.value = s0;
+    }
   }
 }
 
 // ---- render a full look (palette + surface + around) onto a padded buffer -----
-function renderLook(slots, buf, ef, dist, t, out, amt) {
+// fx = per-layer params: { surf: {seed, scale, speed, mode, h, s}, aro: {...}, gbc }.
+// Surface and around each get their OWN noise seed / texture scale / speed / tint.
+function renderLook(slots, buf, ef, dist, t, out, amt, fx) {
+  fx = fx || fxLayerState();
   const rawSa = makeSampler(buf);
   // padded-normalized sprite sampler for around-FX that echo the mon (Double Team)
   const sprPad = (nx, ny) => {
@@ -180,29 +187,38 @@ function renderLook(slots, buf, ef, dist, t, out, amt) {
       }
     : rawSa;
   ctx.sa = sa;
-  // FX color: default = each effect's own colors; palette = match the palette's
-  // most colorful tone; custom = a hand-picked color (the aura color picker).
-  const doTint = fxColorMode !== "default";
-  let tintH = fxCustomH;
-  let tintS = fxCustomS;
-  if (fxColorMode === "palette") {
-    let best = -1;
-    const refs = CL
-      ? CL.cent
-      : [
-          [0.3, 0.4, 0.6],
-          [0.6, 0.7, 0.95],
-        ];
-    for (const cen of refs) {
-      const c = pal ? PALETTE[pal](cen[0], cen[1], cen[2], ctx) : cen;
-      const hsv = rgb2hsv(c[0], c[1], c[2]);
-      if (hsv[1] * hsv[2] > best) {
-        best = hsv[1] * hsv[2];
-        tintH = hsv[0];
-        tintS = Math.max(0.5, hsv[1]);
+  // FX color, PER LAYER: default = each effect's own colors; palette = match the
+  // palette's most colorful tone; custom = a hand-picked color per layer.
+  const resolveTint = cfg => {
+    if (cfg.mode === "default") {
+      return { on: false, h: 0, s: 0 };
+    }
+    let h = cfg.h;
+    let s = cfg.s;
+    if (cfg.mode === "palette") {
+      let best = -1;
+      const refs = CL
+        ? CL.cent
+        : [
+            [0.3, 0.4, 0.6],
+            [0.6, 0.7, 0.95],
+          ];
+      for (const cen of refs) {
+        const c = pal ? PALETTE[pal](cen[0], cen[1], cen[2], ctx) : cen;
+        const hsv = rgb2hsv(c[0], c[1], c[2]);
+        if (hsv[1] * hsv[2] > best) {
+          best = hsv[1] * hsv[2];
+          h = hsv[0];
+          s = Math.max(0.5, hsv[1]);
+        }
       }
     }
-  }
+    return { on: true, h, s };
+  };
+  const surfTint = resolveTint(fx.surf);
+  const aroTint = resolveTint(fx.aro);
+  const tS = t * fx.surf.speed;
+  const tA = t * fx.aro.speed;
   for (let py = 0; py < PH; py++) {
     for (let px = 0; px < PW; px++) {
       const k = (py * PW + px) * 4;
@@ -229,16 +245,17 @@ function renderLook(slots, buf, ef, dist, t, out, amt) {
           }
         }
         if (surf) {
+          setFxParams(fx.surf.seed, fx.surf.scale);
           const base2 = col;
           const aPal = a;
           let sc;
           if (surf === "prismatic") {
-            const off = 0.012 * (0.6 + 0.4 * Math.sin(t * 2));
+            const off = 0.012 * (0.6 + 0.4 * Math.sin(tS * 2));
             sc = [sa(x + off, y)[0], col[1], sa(x - off, y)[2]];
           } else if (surf === "glitch") {
             const slice = Math.floor(y * 16);
-            const rnd = vnoise(slice * 3.1 + 0.5, Math.floor(t * 8) * 1.3 + 0.5);
-            const dx = rnd > 0.62 ? (vnoise(slice + 9, Math.floor(t * 8)) - 0.5) * 0.14 : 0;
+            const rnd = vnoise(slice * 3.1 + 0.5, Math.floor(tS * 8) * 1.3 + 0.5);
+            const dx = rnd > 0.62 ? (vnoise(slice + 9, Math.floor(tS * 8)) - 0.5) * 0.14 : 0;
             const s2 = sa(x + dx, y);
             if (s2[3] <= 0.02) {
               out[k + 3] = 0;
@@ -248,12 +265,15 @@ function renderLook(slots, buf, ef, dist, t, out, amt) {
             sc = [sa(x + dx + 0.01, y)[0] * scan, s2[1] * scan, sa(x + dx - 0.01, y)[2] * scan];
             a = s2[3];
           } else {
-            const res = AURA[surf](base2[0], base2[1], base2[2], x, y, t, ctx);
+            const res = AURA[surf](base2[0], base2[1], base2[2], x, y, tS, ctx);
             sc = [res[0], res[1], res[2]];
             a = aPal * res[3];
           }
-          if (doTint && !NO_TINT.has(surf)) {
-            sc = tintTo(sc, tintH, tintS);
+          if (surfTint.on && !NO_TINT.has(surf)) {
+            sc = tintTo(sc, surfTint.h, surfTint.s);
+          }
+          if (fx.gbc) {
+            sc = gbcSnap(sc);
           }
           let blended = blendCol(base2, sc, SURFACE_BLEND[surf] || "normal");
           if (amt.surf < 1) {
@@ -265,12 +285,16 @@ function renderLook(slots, buf, ef, dist, t, out, amt) {
         // front pass for 3D around-FX (helix / atomic orbit): the effect is also
         // drawn OVER the sprite; the effect itself culls its "behind" half at df=0.
         if (aro && AROUND_OVERLAY.has(aro)) {
+          setFxParams(fx.aro.seed, fx.aro.scale);
           const nx = (px + 0.5) / PW;
           const ny = (py + 0.5) / PH;
-          const res = AROUND[aro](nx, ny, 0, t, ac);
+          const res = AROUND[aro](nx, ny, 0, tA, ac);
           let rc = [res[0], res[1], res[2]];
-          if (doTint && !NO_TINT.has(aro)) {
-            rc = tintTo(rc, tintH, tintS);
+          if (aroTint.on && !NO_TINT.has(aro)) {
+            rc = tintTo(rc, aroTint.h, aroTint.s);
+          }
+          if (fx.gbc) {
+            rc = gbcSnap(rc);
           }
           const oa = res[3] * amt.aro;
           if (oa > 0) {
@@ -283,18 +307,24 @@ function renderLook(slots, buf, ef, dist, t, out, amt) {
         out[k + 2] = col[2] * 255;
         out[k + 3] = a * 255;
       } else if (aro) {
+        setFxParams(fx.aro.seed, fx.aro.scale);
         const nx = (px + 0.5) / PW;
         const ny = (py + 0.5) / PH;
         const df = dist.d[py * PW + px];
-        const res = AROUND[aro](nx, ny, df, t, ac);
+        const res = AROUND[aro](nx, ny, df, tA, ac);
         let rc = [res[0], res[1], res[2]];
-        if (doTint && !NO_TINT.has(aro)) {
-          rc = tintTo(rc, tintH, tintS);
+        if (aroTint.on && !NO_TINT.has(aro)) {
+          rc = tintTo(rc, aroTint.h, aroTint.s);
         }
+        if (fx.gbc) {
+          rc = gbcSnap(rc);
+        }
+        // never hard-clip at the box edge: fade the aura out over the last px
+        const fade = edgeFalloff(px, py, PW, PH);
         out[k] = rc[0] * 255;
         out[k + 1] = rc[1] * 255;
         out[k + 2] = rc[2] * 255;
-        out[k + 3] = res[3] * amt.aro * 255;
+        out[k + 3] = res[3] * amt.aro * fade * 255;
       } else {
         out[k + 3] = 0;
       }
@@ -355,17 +385,22 @@ const heroCv = document.getElementById("heroCanvas");
 const heroCtx = heroCv.getContext("2d");
 let heroImg = null;
 const slots = { palette: "glacier", surface: "", around: "auroraveil" };
-let speed = 1;
+let speed = 1; // master speed (multiplies both layers)
 let palIntensity = 1;
 let surfIntensity = 1;
 let aroIntensity = 1;
-let fxSeed = 0;
-let fxScale = 1;
 let protectBlack = false;
 let protectWhite = false;
-let fxColorMode = "default"; // default | palette | custom
-let fxCustomH = 0.92;
-let fxCustomS = 0.7;
+let gbcMode = false;
+// per-layer FX params: surface and around each get their own seed / texture
+// noise / speed / color (mode: default | palette | custom).
+const layerFx = {
+  surf: { seed: 0, scale: 1, speed: 1, mode: "default", h: 0.92, s: 0.7 },
+  aro: { seed: 0, scale: 1, speed: 1, mode: "default", h: 0.92, s: 0.7 },
+};
+function fxLayerState() {
+  return { surf: layerFx.surf, aro: layerFx.aro, gbc: gbcMode };
+}
 
 const nameOf = kind => {
   const v = slots[kind];
@@ -412,30 +447,38 @@ function wireControls() {
   document.getElementById("int_palette").addEventListener("input", e => (palIntensity = +e.target.value));
   document.getElementById("int_surface").addEventListener("input", e => (surfIntensity = +e.target.value));
   document.getElementById("int_around").addEventListener("input", e => (aroIntensity = +e.target.value));
-  document.getElementById("seed").addEventListener("input", e => (fxSeed = +e.target.value));
-  document.getElementById("texscale").addEventListener("input", e => (fxScale = +e.target.value));
   document.getElementById("protectBlack").addEventListener("change", e => (protectBlack = e.target.checked));
   document.getElementById("protectWhite").addEventListener("change", e => (protectWhite = e.target.checked));
-  document.getElementById("seedRand").addEventListener("click", () => {
-    fxSeed = Math.floor(Math.random() * 257);
-    document.getElementById("seed").value = fxSeed;
-  });
-  document.querySelectorAll("#tintSeg button").forEach(btn =>
-    btn.addEventListener("click", () => {
-      document.querySelectorAll("#tintSeg button").forEach(x => x.classList.remove("on"));
-      btn.classList.add("on");
-      fxColorMode = btn.dataset.tint;
-      document.getElementById("fxcolor").style.display = fxColorMode === "custom" ? "" : "none";
-    }),
-  );
-  document.getElementById("fxcolor").addEventListener("input", e => {
-    const h = e.target.value, hsv = rgb2hsv(parseInt(h.slice(1, 3), 16) / 255, parseInt(h.slice(3, 5), 16) / 255, parseInt(h.slice(5, 7), 16) / 255);
-    fxCustomH = hsv[0];
-    fxCustomS = Math.max(0.5, hsv[1]);
-    fxColorMode = "custom";
-    document.querySelectorAll("#tintSeg button").forEach(x => x.classList.toggle("on", x.dataset.tint === "custom"));
-    document.getElementById("fxcolor").style.display = "";
-  });
+  document.getElementById("gbcSnap").addEventListener("change", e => (gbcMode = e.target.checked));
+  // per-layer params: same wiring for the surface and the around layer
+  for (const lay of ["surf", "aro"]) {
+    const P = layerFx[lay];
+    document.getElementById(lay + "_speed").addEventListener("input", e => (P.speed = +e.target.value));
+    document.getElementById(lay + "_seed").addEventListener("input", e => (P.seed = +e.target.value));
+    document.getElementById(lay + "_tex").addEventListener("input", e => (P.scale = +e.target.value));
+    document.getElementById(lay + "_seedRand").addEventListener("click", () => {
+      P.seed = Math.floor(Math.random() * 257);
+      document.getElementById(lay + "_seed").value = P.seed;
+    });
+    const seg = document.getElementById("tintSeg_" + lay);
+    const colorIn = document.getElementById("fxcolor_" + lay);
+    seg.querySelectorAll("button").forEach(btn =>
+      btn.addEventListener("click", () => {
+        seg.querySelectorAll("button").forEach(x => x.classList.remove("on"));
+        btn.classList.add("on");
+        P.mode = btn.dataset.tint;
+        colorIn.style.display = P.mode === "custom" ? "" : "none";
+      }),
+    );
+    colorIn.addEventListener("input", e => {
+      const h = e.target.value;
+      const hsv = rgb2hsv(parseInt(h.slice(1, 3), 16) / 255, parseInt(h.slice(3, 5), 16) / 255, parseInt(h.slice(5, 7), 16) / 255);
+      P.h = hsv[0];
+      P.s = Math.max(0.5, hsv[1]);
+      P.mode = "custom";
+      seg.querySelectorAll("button").forEach(x => x.classList.toggle("on", x.dataset.tint === "custom"));
+    });
+  }
   document.querySelectorAll("#bgSeg button").forEach(b =>
     b.addEventListener("click", () => {
       document.querySelectorAll("#bgSeg button").forEach(x => x.classList.remove("on"));
@@ -496,13 +539,13 @@ function loop(now) {
   if (frameBuf.length === 0 || !heroImg || !tiles[0] || !tiles[0].img) {
     return;
   }
-  setFxParams(fxSeed, fxScale);
   const t = now / 1000;
   const ai = Math.floor(t * 12) % frameBuf.length;
   const cur = frameBuf[ai];
   const ef = edgeFor(ai);
   const dist = distFor(ai);
-  renderLook(slots, cur, ef, dist, t * speed, heroImg.data, { pal: palIntensity, surf: surfIntensity, aro: aroIntensity });
+  const fxp = fxLayerState();
+  renderLook(slots, cur, ef, dist, t * speed, heroImg.data, { pal: palIntensity, surf: surfIntensity, aro: aroIntensity }, fxp);
   heroCtx.putImageData(heroImg, 0, 0);
   if (now - lastThumb > 60) {
     lastThumb = now;
@@ -510,7 +553,7 @@ function loop(now) {
     const N = Math.min(vis.length, 16);
     for (let j = 0; j < N; j++) {
       const tl = vis[(rr + j) % vis.length];
-      renderLook(tl.slots, cur, ef, dist, t, tl.img.data, { pal: 1, surf: 1, aro: 1 });
+      renderLook(tl.slots, cur, ef, dist, t, tl.img.data, { pal: 1, surf: 1, aro: 1 }, fxp);
       tl.ctx.putImageData(tl.img, 0, 0);
     }
     rr = vis.length > 0 ? (rr + N) % vis.length : 0;

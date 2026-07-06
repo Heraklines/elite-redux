@@ -279,6 +279,23 @@ header p {
 .row .check input {
   margin: 0;
 }
+/* per-layer param group headers (Surface FX params / Around FX params) */
+.subhead {
+  margin-top: 4px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--dim);
+}
+.subhead.ls {
+  color: var(--aura, var(--dim));
+}
+.subhead.la {
+  color: var(--aro, var(--dim));
+}
 input[type="range"] {
   flex: 1;
   accent-color: var(--pal);

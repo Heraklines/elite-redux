@@ -67,6 +67,21 @@ export function setFxParams(seed = 0, scale = 1) {
   FXSEED = seed;
   FXSCALE = scale;
 }
+// Around-FX must never hard-clip at the sprite-box edge: fade any off-sprite FX
+// out over the last `feather` px of the padded frame (the renderer multiplies the
+// around alpha by this). In-game the same falloff keeps auras from slamming into
+// the sprite's texture bounds.
+export function edgeFalloff(px, py, PW, PH, feather = 9) {
+  const d = Math.min(px + 0.5, py + 0.5, PW - px - 0.5, PH - py - 0.5);
+  const k = d / feather;
+  return k >= 1 ? 1 : k <= 0 ? 0 : k * k * (3 - 2 * k);
+}
+// Snap an FX color to the GBC-displayable gamut (RGB555 - 5 bits per channel).
+export const gbcSnap = c => [
+  Math.round(clamp(c[0]) * 31) / 31,
+  Math.round(clamp(c[1]) * 31) / 31,
+  Math.round(clamp(c[2]) * 31) / 31,
+];
 export const h2 = (x, y) => {
   const s = Math.sin(x * 127.1 + y * 311.7) * 43758.5453;
   return s - Math.floor(s);
@@ -858,17 +873,17 @@ export const PALETTE = {
   // Who's That...?: the quiz silhouette. Pure black, with the very lightest source
   // tones lifted a hair toward navy so the shape still reads on dark backdrops.
   whosthat: (r, g, b) => mix3(hx("000000"), hx("121631"), smooth(0.55, 1.0, luma(r, g, b))),
-  // Lavender Ghost (GB Haunter): whites stay, blacks become pale lavender,
-  // everything in between collapses to near-black with a purple cast.
+  // Lavender Ghost (GB Haunter): whites stay, blacks become pale lavender, the
+  // mid-tones collapse to a dark purple body. The old version used hard if-cuts
+  // (0.16 / 0.8), which banded ugly seams on smooth-shaded mons and turned
+  // mostly-mid-luma sprites into an unreadable black blob - now the three zones
+  // crossfade smoothly and the body keeps a readable purple ramp.
   lavender: (r, g, b) => {
     const L = luma(r, g, b);
-    if (L >= 0.8) {
-      return [r, g, b];
-    }
-    if (L <= 0.16) {
-      return mix3(hx("b9a6dc"), hx("d4c4ee"), L / 0.16);
-    }
-    return ramp(["0a0612", "1a1226"].map(hx), (L - 0.16) / 0.64);
+    const shadow = mix3(hx("b9a6dc"), hx("d4c4ee"), clamp(L / 0.16));
+    const body = ramp(["120a20", "251638", "382250"].map(hx), smooth(0.16, 0.8, L));
+    const c = mix3(shadow, body, smooth(0.1, 0.24, L));
+    return mix3(c, [r, g, b], smooth(0.7, 0.86, L));
   },
   // Overexposed: darken the lightest colours, push everything else close to white -
   // the sprite's highlights become its linework.
@@ -2444,11 +2459,13 @@ AURA.fireflyglade = (r, g, b, x, y, t) => {
   return [clamp(body[0] + k * 0.6), clamp(body[1] + k * 1.3), clamp(body[2] + k * 0.35), 1];
 };
 // Starfall: bright shooting stars raking diagonally across a dimmed body.
+// ph must ADVANCE with t (+t): head at ph=0 slides down-left, trail (ph>0) sits
+// up-right BEHIND it. With -t the head climbed and the trail led the motion.
 AURA.starfall = (r, g, b, x, y, t) => {
   const lane = Math.floor((x + y) * 6);
   const across = Math.abs(fract((x + y) * 6) - 0.5);
   const w = smooth(0.38, 0.06, across);
-  const ph = fract((x - y) * 1.1 - t * (0.45 + h2(lane, 1) * 0.3) + h2(lane, 2));
+  const ph = fract((x - y) * 1.1 + t * (0.45 + h2(lane, 1) * 0.3) + h2(lane, 2));
   const head = Math.pow(smooth(0.1, 0.0, ph), 2) * 1.5;
   const trail = smooth(0.45, 0.02, ph) * 0.75;
   const gate = h2(lane, 5) > 0.25 ? 1 : 0;
@@ -2846,6 +2863,7 @@ export const AROUND_OVERLAY = new Set([
   "cometorbit",
   "emberspiral",
   "runeorbit",
+  "fogbank",
 ]);
 // Energy Helix: a double strand winding around the mon, front arcs over the sprite.
 AROUND.helix = (nx, ny, df, t, c) => {
@@ -3858,12 +3876,25 @@ AROUND.shockpulse = (nx, ny, df, t) => {
   }
   return [0.55, 0.95, 1.0, a * 0.85];
 };
-// Fog Bank: a thick drifting fog layer swallowing the midsection.
+// Fog Bank: two drifting fog layers. The back layer swallows the midsection
+// behind the mon (as before); a second FRONT layer (fogbank is in AROUND_OVERLAY,
+// so it also draws OVER the sprite, df=0 there) drifts the other way and gets
+// steadily thicker toward the bottom of the box.
 AROUND.fogbank = (nx, ny, df, t) => {
+  const n2 = fbm(nx * 2.4 + t * 0.14 + 9.2, ny * 4.6 + 3.7);
+  const grow = smooth(0.34, 0.98, ny);
+  const front = clamp(n2 * 1.45 - 0.3 + grow * 0.3) * grow * 0.9;
+  if (df < 0.5) {
+    // overlay pass: only the front layer covers the mon
+    return [0.9, 0.92, 0.96, front];
+  }
   const n = fbm(nx * 3 - t * 0.18, ny * 6);
   const band = smooth(0.32, 0.55, ny) * smooth(0.95, 0.72, ny);
   const m = clamp(1 - df / 36);
-  return [0.85, 0.87, 0.92, clamp(n * band * 1.6 - 0.25) * m * 0.85];
+  const back = clamp(n * band * 1.6 - 0.25) * m * 0.85;
+  const a = clamp(back + front * (1 - back * 0.5));
+  const fmix = a > 0 ? clamp(front / (front + back + 1e-6)) : 0;
+  return [mix(0.85, 0.9, fmix), mix(0.87, 0.92, fmix), mix(0.92, 0.96, fmix), a];
 };
 // Comet Orbit: a blazing head with a long ember tail circles through the scene.
 AROUND.cometorbit = (nx, ny, df, t, c) => {
@@ -3984,6 +4015,106 @@ AROUND.prismrain = (nx, ny, df, t) => {
   const col = mix3([0.8, 0.92, 1], hsv2rgb(fract(h2(cx0, cy0) + t * 0.15), 0.85, 1), flash);
   const m = clamp(1 - df / 26);
   return [col[0], col[1], col[2], clamp(sliver * (0.5 + 0.5 * flash) + glow) * m];
+};
+// Lightning Zaps: one or two jagged bolts snap off the body in a random
+// direction, briefly and not too often - most of the time nothing shows.
+AROUND.zaps = (nx, ny, df, t, c) => {
+  if (df <= 0.01) {
+    return [0, 0, 0, 0];
+  }
+  let a = 0;
+  let hot = 0;
+  for (let k = 0; k < 2; k++) {
+    const cyc = t * 1.3 + k * 0.41 + h2(k + 1, 9.2) * 5;
+    const slot = Math.floor(cyc);
+    // most windows stay empty (the 2nd bolt much more so)
+    if (h2(slot * 1.31 + 0.17, 11 + k * 7) > (k === 0 ? 0.45 : 0.22)) {
+      continue;
+    }
+    const life = fract(cyc);
+    const flash = smooth(0.0, 0.03, life) * smooth(0.3, 0.12, life) * (0.7 + 0.3 * h2(slot, k + 3.3));
+    if (flash <= 0.02) {
+      continue;
+    }
+    const ang0 = h2(slot + k * 17, 3.7) * Math.PI * 2;
+    const dx = nx - c.cx;
+    const dy = ny - c.cy;
+    const r = Math.hypot(dx, dy);
+    if (r < 0.03) {
+      continue;
+    }
+    let da = Math.atan2(dy, dx) - ang0;
+    da = Math.atan2(Math.sin(da), Math.cos(da));
+    if (Math.abs(da) > 1.2) {
+      continue;
+    }
+    // jagged perpendicular displacement along the ray, finer kinks on top
+    const jig =
+      (vnoise(r * 26 + slot * 5.13, slot * 9.7 + k * 37.1) - 0.5) * 0.09 * Math.min(1, r * 7) +
+      (vnoise(r * 70 + slot * 3.7, slot * 4.3 + k * 23.7) - 0.5) * 0.022;
+    const off = Math.abs(r * Math.sin(da) - jig);
+    const width = 0.011 + r * 0.01;
+    const reach = smooth(0.55, 0.42, r);
+    const beam = smooth(width, width * 0.25, off) * reach;
+    const glow = smooth(width * 4.5, width, off) * reach * 0.3;
+    const kk = (beam + glow) * flash;
+    if (kk > a) {
+      a = kk;
+      hot = smooth(0.26, 0.08, r);
+    }
+  }
+  return [mix(0.78, 1, hot), mix(0.88, 1, hot), 1, clamp(a) * 0.95];
+};
+// Sakura Blossoms: five-petal cherry blossoms drifting gently down with a lazy
+// sway, loose petals fluttering between them.
+AROUND.blossoms = (nx, ny, df, t, c) => {
+  const m = clamp(1 - df / 30);
+  if (m <= 0) {
+    return [0, 0, 0, 0];
+  }
+  let out = [0, 0, 0, 0];
+  for (let layer = 0; layer < 2; layer++) {
+    const cell = layer === 0 ? 5 : 8;
+    const fall = layer === 0 ? 0.05 : 0.085;
+    const fy = ny - t * fall;
+    const fx0 = nx + Math.sin(ny * 2.2 + t * 0.4 + layer * 2.6) * 0.035;
+    const cx0 = Math.floor(fx0 * cell);
+    const cy0 = Math.floor(fy * cell);
+    if (h2(cx0 * 1.7 + layer * 13.1, cy0 * 2.3 + layer * 7.7) < (layer === 0 ? 0.62 : 0.55)) {
+      continue;
+    }
+    const jx = 0.3 + h2(cx0 + 4.2, cy0 + 1.1) * 0.4;
+    const jy = 0.3 + h2(cx0 + 8.8, cy0 + 3.3) * 0.4;
+    const lx = fract(fx0 * cell) - jx;
+    const ly = fract(fy * cell) - jy;
+    const spin = t * (0.5 + h2(cx0, cy0 + 9) * 0.6) * (h2(cx0 + 2, cy0) > 0.5 ? 1 : -1) + h2(cx0, cy0) * 6;
+    if (layer === 0) {
+      // a full five-petal blossom, slowly rotating
+      const R = 0.18 + h2(cx0 + 1, cy0 + 5) * 0.07;
+      const d = Math.hypot(lx, ly);
+      const ang = Math.atan2(ly, lx);
+      const rr = R * (0.58 + 0.42 * Math.abs(Math.cos((ang - spin * 0.5) * 2.5)));
+      if (d < rr && out[3] < 0.95) {
+        const rim = smooth(0.5, 1.0, d / rr);
+        const col = mix3(hx("ffe3ee"), hx("ff9ec8"), rim);
+        const heart = smooth(0.32, 0.1, d / R);
+        const cc = mix3(col, hx("ffd23a"), heart * 0.5);
+        out = [cc[0], cc[1], cc[2], 0.95];
+      }
+    } else {
+      // a single loose petal, fluttering end over end
+      const ca = Math.cos(spin);
+      const sa2 = Math.sin(spin);
+      const px2 = lx * ca - ly * sa2;
+      const py2 = lx * sa2 + ly * ca;
+      const flut = Math.max(0.3, Math.abs(Math.sin(spin * 1.3)));
+      if (Math.hypot(px2 / 0.16, py2 / (0.09 * flut)) < 1 && out[3] < 0.85) {
+        const shade = 0.82 + 0.18 * Math.sin(spin);
+        out = [shade, 0.72 * shade, 0.85 * shade, 0.85];
+      }
+    }
+  }
+  return [out[0], out[1], out[2], out[3] * m];
 };
 // Paper Lanterns: warm glowing lanterns floating up around the mon.
 AROUND.paperlanterns = (nx, ny, df, t) => {
@@ -4404,6 +4535,8 @@ export const LABELS = {
   emberspiral: "Ember Spiral",
   runeorbit: "Rune Orbit",
   prismrain: "Prism Rain",
+  zaps: "Lightning Zaps",
+  blossoms: "Sakura Blossoms",
 };
 
 // effects that read the edge field / are inherently "partial" (for tagging in UI)

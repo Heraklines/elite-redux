@@ -1,12 +1,30 @@
-# Shiny Lab - effect catalog (v7)
+# Shiny Lab - effect catalog (v7.2)
 
 **Live for the team: https://shiny-lab.pages.dev** (Cloudflare Pages). Also
 `articuno-shiny-lab.html` on the Desktop (self-contained except sprites).
 
-**364 effects** in three **combinable** slots - pick one of each and they stack live:
-**138 Palettes + 123 Surface FX + 103 Around FX** (v6 Discord-brainstorm batch + the v7
+**366 effects** in three **combinable** slots - pick one of each and they stack live:
+**138 Palettes + 123 Surface FX + 105 Around FX** (v6 Discord-brainstorm batch + the v7
 mega-expansion doubled every catalog; v7.1 quality pass reworked the weak ones after
 zoomed per-frame triage - see `gen-zoom.mjs`, the per-effect multi-frame review tool).
+
+## v7.2 - Psiell's feedback round (2026-07-06)
+- **Box-edge falloff**: around FX no longer hard-clip at the sprite-box edge - every
+  off-sprite aura fades out over the last ~9px (`edgeFalloff` in fx.mjs; fixes fog /
+  Manga Burst / rain / big auras cutting off at the box in battle). Canvas pad 22->28.
+- **Fog Bank** got a second FRONT layer that covers the mon and thickens toward the
+  bottom of the box (fogbank is an overlay effect now).
+- **Starfall** direction fixed - stars fall down-left with the trail behind (was
+  drifting up trail-first, "going backwards").
+- **Lavender Ghost** rebuilt without hard luma cuts - no more banding seams / black-blob
+  mons (the "ghost is wonky sometimes" report).
+- **NEW Lightning Zaps** (around): one or two jagged bolts snap off the body in a random
+  direction, briefly, not too often.
+- **NEW Sakura Blossoms** (around): five-petal blossoms drifting down with a lazy sway,
+  loose petals fluttering between them.
+- **Per-layer sliders**: Surface FX and Around FX each get their OWN Speed / Seed /
+  Texture noise / Color (Default-Palette-Custom) controls, plus the master speed.
+- **GBC colors** checkbox: snaps all FX colors to the GBC-displayable gamut (RGB555).
 
 ## v7.1 quality pass (zoom-triage driven)
 Every v6/v7 effect was rendered at 3x with 4 animation frames (`gen-zoom.mjs`) and
