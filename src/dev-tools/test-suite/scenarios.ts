@@ -665,6 +665,46 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
   },
   // ===========================================================================
+  // UI — reward shop soft-lock
+  // ===========================================================================
+  {
+    label: "Shop: no freeze with 'Shop' cursor + empty shop row (#853)",
+    description:
+      "#853 ('Page freezes completely after shop' / 'Evil Nugget corrupts game'). When\n"
+      + "your Shop-cursor-target setting is 'Shop', the reward screen auto-moves the cursor\n"
+      + "onto the shop row as it opens. On a wave with NO shop row (a x10 boss wave, or the\n"
+      + "WASTELAND biome whose rule removes the heal row) the old code threw while placing the\n"
+      + "cursor; the crash landed inside a promise so it left NO console error, the screen\n"
+      + "never accepted input, and the game silently soft-locked right after the shop options\n"
+      + "were rolled. This scenario starts in the Wasteland (empty shop row) on a normal wave.\n"
+      + "SETUP (do this FIRST): Options > 'Shop cursor target' = 'Shop'.\n"
+      + "DO: win the opening battle to reach the reward screen.\n"
+      + "EXPECT: the reward screen opens and is INTERACTIVE - the cursor sits on the rewards\n"
+      + "row (there is no shop row to land on) and you can pick/skip normally. Before the fix\n"
+      + "the screen appeared but froze (no input, no error). Set the setting back to 'Rewards'\n"
+      + "afterwards if you prefer. Regression: test/tests/elite-redux/er-shop-cursor-empty-row.test.ts.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_BIOME_OVERRIDE: BiomeId.WASTELAND,
+        STARTING_WAVE_OVERRIDE: 7,
+        STARTING_LEVEL_OVERRIDE: 100,
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.VOLTORB,
+        ENEMY_LEVEL_OVERRIDE: 5,
+        ENEMY_ABILITY_OVERRIDE: AbilityId.BALL_FETCH,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+      });
+      return [
+        makeStarter(SpeciesId.MEOWTH, {
+          moveset: [MoveId.SLASH, MoveId.FAKE_OUT, MoveId.BITE, MoveId.FURY_SWIPES],
+        }),
+        makeStarter(SpeciesId.PERSIAN, {
+          moveset: [MoveId.SLASH, MoveId.FAKE_OUT, MoveId.BITE, MoveId.FURY_SWIPES],
+        }),
+      ];
+    },
+  },
+  // ===========================================================================
   // QoL — out-of-battle party reorder
   // ===========================================================================
   {

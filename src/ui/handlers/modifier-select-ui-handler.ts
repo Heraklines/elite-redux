@@ -463,7 +463,15 @@ export class ModifierSelectUiHandler extends AwaitableUiHandler {
             if (globalScene.shopCursorTarget === ShopCursorTarget.CHECK_TEAM) {
               this.setRowCursor(0);
               this.setCursor(2);
-            } else if (globalScene.shopCursorTarget === ShopCursorTarget.SHOP && !hasShop) {
+            } else if (globalScene.shopCursorTarget === ShopCursorTarget.SHOP && this.shopOptionsRows.length === 0) {
+              // #853: fall back to the rewards row whenever there is NO shop row to land on.
+              // This covers both a mode with no shop (`!hasShop`, which leaves shopOptionsRows
+              // empty) AND a shop-enabled mode whose shop row is empty THIS wave (a x10 boss
+              // wave, or a `shopNoHeal` biome like the Wasteland). Without this, setRowCursor(SHOP)
+              // -> getRowItems(SHOP) dereferences shopOptionsRows.at(-1) (undefined) and throws
+              // inside this .then() chain, so the error surfaces as an unhandled rejection (no
+              // console error) and awaitingActionInput is never set: the reward screen renders but
+              // never accepts input -> silent soft-lock ("page froze completely after shop").
               this.setRowCursor(ShopCursorTarget.REWARDS);
               this.setCursor(0);
             } else {
