@@ -26,7 +26,6 @@
 import type { BattleScene } from "#app/battle-scene";
 import { getGameMode } from "#app/game-mode";
 import { initGlobalScene } from "#app/global-scene";
-import type { Phase } from "#app/phase";
 import { captureCoopChecksum, captureCoopChecksumState } from "#data/elite-redux/coop/coop-battle-engine";
 import { CoopBattleStreamer } from "#data/elite-redux/coop/coop-battle-stream";
 import { setCoopWaveBarrierMs } from "#data/elite-redux/coop/coop-interaction-relay";
@@ -43,7 +42,7 @@ import { GameManager } from "#test/framework/game-manager";
 import {
   buildDuo,
   type DuoRig,
-  drainLoopback,
+  driveGuestReplayTurn,
   driveGuestRewardWatch,
   driveHostRewardShopOwner,
   installDuoLogCapture,
@@ -69,70 +68,12 @@ function toCoop(scene: BattleScene): void {
   scene.gameMode = getGameMode(GameModes.COOP);
 }
 
-/**
- * The replay phases a guest turn drains PLUS the #782 instant-streaming CONTINUATION `CoopReplayTurnPhase`.
- * The shared {@linkcode driveGuestReplayTurn} intentionally OMITS the continuation from its drain set, so
- * when the host's live cue stream is split across arrivals (which fault injection makes the common case -
- * a dropped/delayed cue means the batch fills the rest LATER), the pump unshifts a continuation
- * CoopReplayTurnPhase and the shared driver returns BEFORE the finalize/checkpoint. In PRODUCTION the phase
- * pump auto-runs that continuation to the RESOLVE + CoopFinalizeTurnPhase; the manual harness driver does
- * not. So this file drives the continuation itself (a test-local enhanced driver - the shared harness is
- * untouched). This is EXACTLY the cue-loss heal we assert: the dropped live cues are batch-filled by the
- * unfaulted `turnResolution` (mergeLiveAndBatch) + the authoritative checkpoint.
- */
-const REPLAY_PHASES_WITH_CONTINUATION = new Set([
-  "MessagePhase",
-  "CoopPartnerSyncPhase",
-  "CoopMoveAnimReplayPhase",
-  "CoopHpDrainReplayPhase",
-  "CoopStatStageReplayPhase",
-  "CoopStatusReplayPhase",
-  "CoopFaintReplayPhase",
-  "CoopGuestFaintSwitchPhase",
-  "CoopReplayTurnPhase",
-  "CoopFinalizeTurnPhase",
-]);
-
-/** Minimal phase-manager surface the enhanced replay driver needs (the guest scene satisfies it). */
-interface ReplayPumpScene {
-  phaseManager: { create: (n: "CoopReplayTurnPhase", t: number) => Phase; getCurrentPhase(): Phase };
-}
-
-/**
- * Drive the guest's full replay for `turn` INCLUDING the #782 continuation CoopReplayTurnPhase, so the turn
- * always reaches its CoopFinalizeTurnPhase (checkpoint apply) even when a faulted cue stream splits the
- * turn's events across live increments + the batch. MUST be called inside withClient(guestCtx). Throws on a
- * genuine no-progress stall (same phase OBJECT repeated) so a real desync/hang still surfaces loudly.
- */
-async function driveGuestReplayFull(guestScene: ReplayPumpScene, turn: number): Promise<void> {
-  const replay = guestScene.phaseManager.create("CoopReplayTurnPhase", turn);
-  replay.start();
-  await drainLoopback();
-  let lastPhase: Phase | null = null;
-  let stall = 0;
-  for (let i = 0; i < 256; i++) {
-    const cur = guestScene.phaseManager.getCurrentPhase();
-    if (cur == null || !REPLAY_PHASES_WITH_CONTINUATION.has(cur.phaseName)) {
-      return;
-    }
-    // Stall detection by phase IDENTITY (a re-entered continuation is a NEW object each increment, so a
-    // real advance resets the counter; the same object stuck is a genuine hang).
-    if (cur === lastPhase) {
-      if (++stall > 24) {
-        throw new Error(`guest replay HANG: stuck on ${cur.phaseName} - see dev-logs/coop-duo/`);
-      }
-    } else {
-      stall = 0;
-    }
-    lastPhase = cur;
-    const wasFinalize = cur.phaseName === "CoopFinalizeTurnPhase";
-    cur.start();
-    await drainLoopback();
-    if (wasFinalize) {
-      return;
-    }
-  }
-}
+// #827: the continuation-aware replay driver now lives in the shared harness ({@linkcode driveGuestReplayTurn}
+// + the exported {@linkcode REPLAY_DRAIN_PHASES}, which folds in the #782 CONTINUATION CoopReplayTurnPhase and
+// uses phase-IDENTITY stall detection). Fault injection makes the cue stream split across arrivals the common
+// case, so the pump unshifts continuation CoopReplayTurnPhases; the shared driver drains them to the RESOLVE +
+// CoopFinalizeTurnPhase. This file used to keep its own copy of that set + driver - now it just calls the
+// shared one, so drain logic has a single source of truth.
 
 /** The convergence metrics one run yields (asserted by the caller + printed for the coverage report). */
 interface FaultRunResult {
@@ -278,7 +219,7 @@ describe.skipIf(!RUN)(
         const turn = rig.hostScene.currentBattle.turn;
         await hostPlayWave(rig);
         await withClient(rig.guestCtx, async () => {
-          await driveGuestReplayFull(rig.guestScene, turn);
+          await driveGuestReplayTurn(rig.guestScene, turn);
         });
         expect(
           rig.guestScene.currentBattle.enemyParty.every(e => e.isFainted()),
@@ -305,7 +246,7 @@ describe.skipIf(!RUN)(
         }
         // STRONGER byte-identical proof: the ENTIRE checksum state (field hp/status/stat-stages/tags + per-move
         // ppUsed + party/money/balls/modifiers/biome/seed) is identical, not just the save digest. This holds
-        // because the guest reaches CoopFinalizeTurnPhase (the checkpoint apply) via driveGuestReplayFull, and
+        // because the guest reaches CoopFinalizeTurnPhase (the checkpoint apply) via driveGuestReplayTurn, and
         // the checkpoint carries every field the faulted cues would have animated.
         expect(
           JSON.stringify(guestPostState),
@@ -433,7 +374,7 @@ describe.skipIf(!RUN)(
         const turn = rig.hostScene.currentBattle.turn;
         await hostPlayWave(rig);
         await withClient(rig.guestCtx, async () => {
-          await driveGuestReplayFull(rig.guestScene, turn);
+          await driveGuestReplayTurn(rig.guestScene, turn);
         });
         expect(
           rig.guestScene.currentBattle.enemyParty.every(e => e.isFainted()),

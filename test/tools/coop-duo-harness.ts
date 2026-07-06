@@ -932,8 +932,16 @@ export async function remirrorWave(rig: DuoRig): Promise<void> {
 // stall so a regression fails loudly with both clients' logs already captured.
 // ---------------------------------------------------------------------------
 
-/** The presentation phases CoopReplayTurnPhase unshifts + the deferred finalize, drained each turn. */
-const REPLAY_DRAIN_PHASES = new Set([
+/**
+ * The presentation phases CoopReplayTurnPhase unshifts + the deferred finalize, drained each turn. The
+ * SINGLE source of truth for the replay drain set (#827): the fault-injection file imports this instead
+ * of maintaining its own copy. INCLUDES the #782 instant-streaming CONTINUATION `CoopReplayTurnPhase` -
+ * when the host's live cue stream is split across arrivals (the common case under fault injection) the
+ * pump unshifts a continuation CoopReplayTurnPhase, which must be drained too or the turn never reaches
+ * its CoopFinalizeTurnPhase (checkpoint apply). A non-continuation turn never surfaces it, so its
+ * presence is a no-op for the ~30 non-faulted callers.
+ */
+export const REPLAY_DRAIN_PHASES = new Set([
   "MessagePhase",
   // #788 v2: the lockstep gate self-ends when the partner's advance broadcast is already seen
   // (or after the injectable barrier) - drive it like any replay phase or wave-2 never replays.
@@ -944,6 +952,10 @@ const REPLAY_DRAIN_PHASES = new Set([
   "CoopStatusReplayPhase",
   "CoopFaintReplayPhase",
   "CoopGuestFaintSwitchPhase",
+  // #827: the #782 instant-streaming continuation, folded into the shared set (was a separate copy in
+  // coop-duo-fault.test.ts). Stall detection below is by phase IDENTITY so a re-entered continuation
+  // (a NEW object each increment) resets the counter instead of reading as a hang.
+  "CoopReplayTurnPhase",
   "CoopFinalizeTurnPhase",
 ]);
 
@@ -962,21 +974,27 @@ export async function driveGuestReplayTurn(guestScene: ReplayPumpScene, turn: nu
   const replay = guestScene.phaseManager.create("CoopReplayTurnPhase", turn);
   replay.start();
   await drainLoopback();
-  let lastName = "";
+  // Stall detection by phase IDENTITY (#827): the #782 instant-streaming continuation re-enters as a NEW
+  // CoopReplayTurnPhase object each increment, so a real advance resets the counter; only the SAME object
+  // stuck is a genuine hang. Equivalent to the old name-based check for the non-continuation callers (their
+  // phase object changes every iteration anyway). The #847 finishTurnNoStream path still terminates the
+  // loop cleanly: on a host stall the pump ends WITHOUT a CoopFinalizeTurnPhase, so the next current phase
+  // is a turn-end phase outside this set and the loop returns.
+  let lastPhase: Phase | null = null;
   let stall = 0;
-  for (let i = 0; i < 64; i++) {
+  for (let i = 0; i < 256; i++) {
     const cur = guestScene.phaseManager.getCurrentPhase();
     if (cur == null || !REPLAY_DRAIN_PHASES.has(cur.phaseName)) {
       return;
     }
-    if (cur.phaseName === lastName) {
-      if (++stall > 16) {
+    if (cur === lastPhase) {
+      if (++stall > 24) {
         throw new Error(`guest replay HANG: stuck on ${cur.phaseName} - see dev-logs/coop-duo/`);
       }
     } else {
       stall = 0;
     }
-    lastName = cur.phaseName;
+    lastPhase = cur;
     const wasFinalize = cur.phaseName === "CoopFinalizeTurnPhase";
     cur.start();
     await drainLoopback();
