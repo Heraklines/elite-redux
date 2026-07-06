@@ -1,0 +1,63 @@
+----- BUG REPORT (in-game) -----
+version:  1.11.19
+url:      https://elite-redux.pages.dev/
+ua:       Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36 OPR/132.0.0.0
+mode:     4  wave:21  difficulty:youngster
+seed:     JDXeLXyLZg3QMBOeR2LGkzzl
+party:    Dragonite Delivery(L17 63/63)
+
+----- DESCRIPTION -----
+Freeze Post Shop
+
+----- CONSOLE -----
+[05:01:43.232] LOG: %c %c %c %c %c Phaser v3.90.0 (WebGL | Web Audio) %c https://phaser.io/v390 background: #ff0000 background: #ffff00 background: #00ff00 background: #00ffff color: #ffffff; background: #000000 background: transparent
+[05:01:44.469] LOG: [ER] build mr1lenh7-fth8
+[05:03:30.467] DEBUG: Destroying loading scene
+[05:03:30.467] DEBUG: Destroyed loading scene
+[05:03:30.553] LOG: Seed: A9Cty0ww9Y6v5ARsmPS1TR0x
+[05:03:30.553] LOG: Wave Seed: A9Cty0ww9Y6v5ARsmPS1TR0x 0
+[05:03:32.714] LOG: %cStart Phase LoginPhase color:green;
+[05:03:33.268] LOG: Client Session: Mp6MAJ9Q8O0riGaYJOVV5SlTiPt2gxmj
+[05:03:33.822] DEBUG: Using cached system data
+[05:03:33.929] LOG: %cStart Phase TitlePhase color:green;
+[05:03:33.930] LOG: Getting Session Slot id: %d 0
+[05:03:33.947] LOG: use seasonal splash messages true
+[05:03:34.744] LOG: Getting Session Slot id: %d 0
+[05:03:34.751] LOG: Wave Seed: JDXeLXyLZg3QMBOeR2LGkzzl 0
+[05:03:34.751] LOG: Seed: JDXeLXyLZg3QMBOeR2LGkzzl
+[05:03:34.783] LOG: Wave Seed: _Ymzamao|HfbWdzgGa\ 21
+[05:03:34.837] LOG: Applied Iron 
+[05:03:34.837] LOG: Applied Protein 
+[05:03:34.841] LOG: Applied Iron 
+[05:03:34.841] LOG: Applied Protein 
+[05:03:34.844] LOG: Applied Iron 
+[05:03:34.844] LOG: Applied Protein 
+[05:03:34.963] LOG: %cStart Phase EncounterPhase color:green;
+[05:03:34.969] LOG: Pokemon: Wild Slowpoke | Species ID: 79 | Level: 14 | Nature: Brave (+Atk/-Spd)
+[05:03:34.969] LOG: Stats (IVs): HP: 49 (2), Atk: 29 (26), Def: 25 (16), Spatk: 24 (10), Spdef: 19 (22), Spd: 11 (31)
+[05:03:34.969] LOG: Ability: Regenerator | Passive Ability: Oblivious 
+[05:03:34.969] LOG: Moveset: ["Confusion","Mud Sport","Yawn"]
+[05:03:34.970] LOG: Pokemon: Wild Wooper | Species ID: 194 | Level: 14 | Nature: Relaxed (+Def/-Spd)
+[05:03:34.970] LOG: Stats (IVs): HP: 45 (31), Atk: 23 (12), Def: 26 (15), Spatk: 24 (16), Spdef: 23 (12), Spd: 10 (25)
+[05:03:34.970] LOG: Ability: Wonder Skin | Passive Ability: Oblivious 
+[05:03:34.970] LOG: Moveset: ["Mud Shot","Slam","Yawn","Round"]
+[05:03:35.840] LOG: Wave Seed: _Ymzamao|HfbWdzgGa\ 21
+[05:03:36.471] LOG: %cStart Phase SummonPhase color:green;
+[05:03:36.677] LOG: Applied Iron 
+[05:03:36.677] LOG: Applied Protein 
+[05:03:36.713] WARN: cry/10752 not found
+[05:03:36.858] LOG: %cStart Phase InitEncounterPhase color:green;
+[05:03:36.862] LOG: %cStart Phase PostSummonPhase color:green;
+[05:03:36.862] LOG: Ran PSP for: Dragonite Delivery
+[05:03:36.864] LOG: %cStart Phase PostSummonPhase color:green;
+[05:03:36.866] LOG: %cStart Phase PostSummonPhase color:green;
+[05:03:36.867] LOG: %cStart Phase PostSummonPhase color:green;
+[05:03:36.867] LOG: Ran PSP for: Slowpoke
+[05:03:36.868] LOG: %cStart Phase PostSummonPhase color:green;
+[05:03:36.869] LOG: %cStart Phase PostSummonPhase color:green;
+[05:03:36.869] LOG: %cStart Phase PostSummonPhase color:green;
+[05:03:36.869] LOG: Ran PSP for: Wooper
+[05:03:36.870] LOG: %cStart Phase PostSummonPhase color:green;
+[05:03:36.870] LOG: %cStart Phase PostSummonPhase color:green;
+[05:03:36.870] LOG: %cStart Phase TurnInitPhase color:green;
+[05:03:36.871] LOG: %cStart Phase CommandPhase color:green;
