@@ -207,16 +207,19 @@ export interface UndrivableEntry {
  * SYNC surfaces (mePresent / meResync / meBtn / me + the MYSTERY_ENCOUNTER mode + the mePump/meTerm bands)
  * now FIRE for a DEPARTMENT_STORE_SALE host-owned ME. They stay listed here because the DEFAULT wave/shop
  * soak does NOT configure an ME leg (opts.meWaves unset) - they are exercised by the dedicated ME test, not
- * the default run - so the partition for the default profile is unchanged. REMAINING follow-up: (a) the
- * post-ME CONTINUATION into subsequent waves (a host-owned ME leaves the next wave's guest-owned reward-shop
- * handshake counter-desynced - the ME test surveys through the ME as its final wave); (b) guest-owned +
- * battle-handoff paths + the other ME types (bargain/colosseum/quiz) inline.
+ * the default run - so the partition for the default profile is unchanged. LANDED since BUILD 1: the post-ME
+ * CONTINUATION into subsequent waves (finding (a) - a harness pin leak, coopMeInteractionStart left set on the
+ * guest, fixed in processMeWave; the ME test now surveys PAST the ME) and the GUEST-OWNED non-battle path
+ * (driven inline at an odd-counter wild wave). REMAINING follow-up: the BATTLE-HANDOFF path + the other ME
+ * types (bargain/colosseum/quiz) inline.
  */
 const ME_CONTINUATION =
   "#633 BUILD 1 landed the inline ME leg (coop-soak-me.test.ts drives mePresent/meResync/meBtn/me + MYSTERY_ENCOUNTER); "
-  + "follow-up: post-ME continuation into subsequent waves + guest-owned/battle-handoff + bargain/colosseum/quiz inline";
+  + "post-ME survey + guest-owned paths now land too; follow-up: battle-handoff + bargain/colosseum/quiz inline";
 /** Follow-up shorthand for the biome-heal work that lets the soak survive + drive biome boundaries. */
-const BIOME_BOUNDARY = "drive the every-10-waves biome boundary (biome market + biome pick) in the soak";
+const BIOME_BOUNDARY =
+  "drive the two-engine biome-boundary crossroads/World-Map owner pick for real (setCoopBiomePickerDrivenByTest "
+  + "+ owner/watcher parity + biome pick), re-deriving the ME-leg counter parities the extra tick shifts (#848 follow-up)";
 
 /**
  * Every surface the soak DELIBERATELY does not drive today, keyed by surface. DRIVABLE = EXPECTED minus
@@ -277,6 +280,16 @@ export const KNOWN_UNDRIVABLE: ReadonlyMap<string, UndrivableEntry> = new Map<st
       followupTask: BIOME_BOUNDARY,
     },
   ],
+  [
+    // #848: the World-Map route chooser is now a MIRRORED mode (owner-alternated + mirrored biome pick). The
+    // soak crosses biome boundaries via the vitest AUTO-RESOLVE (no picker opened, no counter tick), so the
+    // ER_MAP mirror never opens - undrivable until the two-engine pick is driven for real (see BIOME_BOUNDARY).
+    modeKey(UiMode.ER_MAP),
+    {
+      reason: "the #848 World-Map biome picker auto-resolves in vitest (no mirrored ER_MAP opened, no counter tick)",
+      followupTask: BIOME_BOUNDARY,
+    },
+  ],
 
   // ---- KINDS ----
   [
@@ -309,6 +322,20 @@ export const KNOWN_UNDRIVABLE: ReadonlyMap<string, UndrivableEntry> = new Map<st
     { reason: "reward-shop rarity LOCK is not driven", followupTask: "drive a reward-shop lock in the soak shop" },
   ],
   [kindKey("biomeShop"), { reason: "the biome market buy/leave relay is not driven", followupTask: BIOME_BOUNDARY }],
+  // #848: the crossroads Stay/Leave + World-Map biome-pick owner relays. The soak's vitest auto-resolve
+  // bypasses both (no relay send), so neither kind fires - undrivable until the two-engine pick is driven
+  // for real (see BIOME_BOUNDARY).
+  [
+    kindKey("crossroads"),
+    { reason: "the #848 crossroads relay auto-resolves in vitest (no relay send)", followupTask: BIOME_BOUNDARY },
+  ],
+  [
+    kindKey("biomePick"),
+    {
+      reason: "the #848 World-Map biome-pick relay auto-resolves in vitest (no relay send)",
+      followupTask: BIOME_BOUNDARY,
+    },
+  ],
   [kindKey("bargain"), { reason: "the Bargain outcome relay is ME-gated", followupTask: ME_CONTINUATION }],
   [kindKey("coloBoard"), { reason: "the Colosseum board relay is ME-gated", followupTask: ME_CONTINUATION }],
   [kindKey("coloPick"), { reason: "the Colosseum pick relay is ME-gated", followupTask: ME_CONTINUATION }],
@@ -384,6 +411,20 @@ export const KNOWN_UNDRIVABLE: ReadonlyMap<string, UndrivableEntry> = new Map<st
     },
   ],
   [bandKey("biomeShop"), { reason: "the biome-market seq band is not driven", followupTask: BIOME_BOUNDARY }],
+  // #848: the crossroads (Stay/Leave) + World-Map biome-pick owner-alternated relays. The soak's vitest
+  // auto-resolve bypasses both with no relay send, so their seq bands never fire (undrivable until the
+  // two-engine pick is driven for real - see BIOME_BOUNDARY).
+  [
+    bandKey("crossroads"),
+    { reason: "the #848 crossroads seq band auto-resolves in vitest (no relay send)", followupTask: BIOME_BOUNDARY },
+  ],
+  [
+    bandKey("biomePick"),
+    {
+      reason: "the #848 World-Map biome-pick seq band auto-resolves in vitest (no relay send)",
+      followupTask: BIOME_BOUNDARY,
+    },
+  ],
   [bandKey("bargain"), { reason: "the Bargain seq band is ME-gated", followupTask: ME_CONTINUATION }],
   [bandKey("colosseum"), { reason: "the Colosseum seq band is ME-gated", followupTask: ME_CONTINUATION }],
   [bandKey("mePump"), { reason: "the ME pump seq band is ME-gated", followupTask: ME_CONTINUATION }],
@@ -482,7 +523,18 @@ export const KNOWN_UNDRIVABLE: ReadonlyMap<string, UndrivableEntry> = new Map<st
   [
     sitKey(COOP_SOAK_SITUATIONS.biomeBoundary),
     {
-      reason: "the re-mirror harness does not drive the biome boundary transition (biome market + biome pick)",
+      // #848: the crossroads/World-Map pick is now a REAL owner-alternated + mirrored co-op interaction
+      // (ErCrossroadsPhase / SelectBiomePhase). The authoritative soak does NOT drive it: it relies on the
+      // vitest-scoped AUTO-RESOLVE (coopBiomePickerAutoResolvesInTest) which bypasses the picker
+      // deterministically with NO counter tick, so the continuous run crosses biome boundaries without a
+      // strand. Driving the two-engine pick FOR REAL (setCoopBiomePickerDrivenByTest + owner/watcher parity
+      // + the biome pick) would ADD one interaction-counter tick per boundary, which shifts the ME-leg
+      // counter parities the coop-soak-me tests depend on (wave-12 host-owned / wave-15 guest-owned) - so it
+      // is a DEDICATED follow-up build, not folded into the ME-leg work (per the #848 handoff, declared here).
+      reason:
+        "the biome boundary crossroads/World-Map pick (#848) auto-resolves in vitest (no counter tick); "
+        + "driving the two-engine owner/watcher pick for real is a dedicated follow-up (it ticks the counter, "
+        + "shifting the ME-leg parities)",
       followupTask: BIOME_BOUNDARY,
     },
   ],
