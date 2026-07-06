@@ -69,6 +69,17 @@ export function setCoopRendezvousWaitMs(ms: number): void {
   coopRendezvousWaitMs = ms;
 }
 
+/**
+ * Restore the DEFAULT wait semantics (live 60s / vitest 50ms). Tests that override via
+ * {@linkcode setCoopRendezvousWaitMs} MUST restore with THIS in afterEach - restoring by setting
+ * 60_000 explicitly LATCHES the explicit flag and disables the vitest default for every LATER file
+ * in the shared-module suite run (the 2-file red of 2026-07-06).
+ */
+export function resetCoopRendezvousWaitMs(): void {
+  waitMsExplicitlySet = false;
+  coopRendezvousWaitMs = 60_000;
+}
+
 function defaultSchedule(cb: () => void, ms: number): () => void {
   const id = setTimeout(cb, ms);
   return () => clearTimeout(id);

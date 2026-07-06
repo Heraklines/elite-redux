@@ -33,7 +33,7 @@ import { initGlobalScene } from "#app/global-scene";
 import * as coopEngine from "#data/elite-redux/coop/coop-battle-engine";
 import { CoopBattleStreamer } from "#data/elite-redux/coop/coop-battle-stream";
 import { setCoopWaveBarrierMs } from "#data/elite-redux/coop/coop-interaction-relay";
-import { setCoopRendezvousWaitMs } from "#data/elite-redux/coop/coop-rendezvous";
+import { resetCoopRendezvousWaitMs, setCoopRendezvousWaitMs } from "#data/elite-redux/coop/coop-rendezvous";
 import { clearCoopRuntime, setCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
 import { COOP_GUEST_FIELD_INDEX, COOP_HOST_FIELD_INDEX } from "#data/elite-redux/coop/coop-session";
 import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
@@ -103,7 +103,7 @@ describe.skipIf(!RUN)("co-op DUO multi-wave: two real engines, real reward shop 
 
   afterEach(() => {
     setCoopWaveBarrierMs(60_000);
-    setCoopRendezvousWaitMs(60_000);
+    resetCoopRendezvousWaitMs();
     logs.dispose();
     clearCoopRuntime();
     // #710 harness-citizenship: buildDuo()/buildGuestScene() constructs a 2nd BattleScene (the guest),

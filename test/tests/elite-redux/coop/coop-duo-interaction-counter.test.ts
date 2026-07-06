@@ -26,7 +26,7 @@ import type { BattleScene } from "#app/battle-scene";
 import { getGameMode } from "#app/game-mode";
 import { initGlobalScene } from "#app/global-scene";
 import { setCoopWaveBarrierMs } from "#data/elite-redux/coop/coop-interaction-relay";
-import { setCoopRendezvousWaitMs } from "#data/elite-redux/coop/coop-rendezvous";
+import { resetCoopRendezvousWaitMs, setCoopRendezvousWaitMs } from "#data/elite-redux/coop/coop-rendezvous";
 import { clearCoopRuntime, setCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
 import { COOP_GUEST_FIELD_INDEX, COOP_HOST_FIELD_INDEX } from "#data/elite-redux/coop/coop-session";
 import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
@@ -91,7 +91,7 @@ describe.skipIf(!RUN)("co-op DUO interaction-counter symmetry (#837): no asymmet
 
   afterAll(() => {
     setCoopWaveBarrierMs(60_000);
-    setCoopRendezvousWaitMs(60_000);
+    resetCoopRendezvousWaitMs();
     logs?.dispose();
     clearCoopRuntime();
     initGlobalScene(game.scene);

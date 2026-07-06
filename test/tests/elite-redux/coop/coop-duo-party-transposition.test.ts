@@ -43,7 +43,7 @@ import {
   captureCoopExpDeltas,
 } from "#data/elite-redux/coop/coop-battle-engine";
 import { setCoopFaintSwitchWaitMs, setCoopWaveBarrierMs } from "#data/elite-redux/coop/coop-interaction-relay";
-import { setCoopRendezvousWaitMs } from "#data/elite-redux/coop/coop-rendezvous";
+import { resetCoopRendezvousWaitMs, setCoopRendezvousWaitMs } from "#data/elite-redux/coop/coop-rendezvous";
 import { clearCoopRuntime, setCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
 import { COOP_HOST_FIELD_INDEX } from "#data/elite-redux/coop/coop-session";
 import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
@@ -115,7 +115,7 @@ describe.skipIf(!RUN)(
     afterEach(() => {
       setCoopFaintSwitchWaitMs(60_000);
       setCoopWaveBarrierMs(60_000);
-      setCoopRendezvousWaitMs(60_000);
+      resetCoopRendezvousWaitMs();
       setCoopHarnessLiveEvents(false);
       accuracySpy?.mockRestore();
       accuracySpy = undefined;
