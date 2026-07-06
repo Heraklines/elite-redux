@@ -1143,7 +1143,9 @@ export function broadcastCoopOwnSlotCommand(fieldIndex: number, command: Seriali
       `broadcast own-slot fi=${fieldIndex} turn=${globalScene.currentBattle.turn} role=${active.controller.role} cmd=${command.command}`,
     );
   }
-  active.battleSync.broadcastLocalCommand(fieldIndex, globalScene.currentBattle.turn, command);
+  // #851: stamp the resolved owner (== active.controller.role past the guard above) so the peer's
+  // partner-slot await matches by owner even when a post-half-wipe recenter skews the field index.
+  active.battleSync.broadcastLocalCommand(fieldIndex, globalScene.currentBattle.turn, command, owner);
   // #record-replay: capture the deferred-target FIGHT own-slot command (no-op unless recording).
   recordCoopOwnSlotCommand(fieldIndex, command);
 }

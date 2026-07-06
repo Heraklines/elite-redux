@@ -27,7 +27,7 @@
 
 import { globalScene } from "#app/global-scene";
 import { coopLog, coopWarn, isCoopDebug } from "#data/elite-redux/coop/coop-debug";
-import type { CoopMessage, CoopTransport, SerializedCommand } from "#data/elite-redux/coop/coop-transport";
+import type { CoopMessage, CoopRole, CoopTransport, SerializedCommand } from "#data/elite-redux/coop/coop-transport";
 
 /** The inbound request a responder answers (the legal move slots the host offers). */
 export interface CoopCommandRequest {
@@ -64,8 +64,20 @@ function defaultSchedule(cb: () => void, ms: number): () => void {
   return () => clearTimeout(id);
 }
 
-/** Inbox / pending key: a command is matched by BOTH slot AND turn (#633 desync fix). */
-function commandKey(fieldIndex: number, turn: number): string {
+/**
+ * Inbox / pending key: a command is matched by BOTH slot AND turn (#633 desync fix).
+ *
+ * #851: when the sender's resolved `coopOwner` role is known it keys the SLOT dimension by
+ * OWNER, not the raw field index. A host-half-wipe recenter + party compaction (host-only)
+ * seats the surviving mon at DIFFERENT field indexes on the two engines until the guest's
+ * checkpoint reconcile catches up (host awaits fieldIndex 0, guest broadcasts fieldIndex 1),
+ * so a `fieldIndex`-keyed request could never match the guest's broadcast and hit the 20-min
+ * timeout -> the AI played the survivor's move alone (the live long-stall UX). The owner is
+ * invariant across that geometry skew, so both sides compute the SAME key. Falls back to the
+ * field index when the owner is absent (older client / a call site with no owner) - both sides
+ * then agree on the fieldIndex key exactly as before (version-handshake safe).
+ */
+function commandKey(fieldIndex: number, turn: number, owner?: CoopRole): string {
   // #819: scope by WAVE too - an ME-spawned battle resets `turn` to 1 within the run, so a
   // stale wave-N buffered command must never satisfy wave-M's request for the same slot+turn.
   let wave = 0;
@@ -74,7 +86,12 @@ function commandKey(fieldIndex: number, turn: number): string {
   } catch {
     /* engine-free tests have no scene - 0 scopes them all to one battle, the old behavior */
   }
-  return `${wave}:${fieldIndex}:${turn}`;
+  // #851: the OWNER (a role string, never numeric) keys the slot dimension when present; the
+  // field index (numeric) is the fallback. The two value spaces are disjoint, so a mixed session
+  // can never key-collide - but paired clients share a protocol version, so it is owner on both
+  // or fieldIndex on both.
+  const slot = owner ?? fieldIndex;
+  return `${wave}:${slot}:${turn}`;
 }
 
 /**
@@ -120,9 +137,20 @@ export class CoopBattleSync {
    * `moveSlots` the host computed as legal. Resolves with the peer's chosen
    * command, or `null` if no reply arrives within the timeout (caller -> AI).
    * A second request for the same slot supersedes the first (resolves it null).
+   *
+   * `owner` (#851, optional) is the awaited slot's resolved `coopOwner`
+   * (`coopOwnerOfPlayerFieldSlot(fieldIndex)`). When supplied it keys the pending
+   * request by OWNER so a post-half-wipe index skew (host compacted, guest not yet
+   * reconciled) still matches the peer's broadcast; absent, the legacy fieldIndex
+   * key is used (unchanged behavior).
    */
-  requestPartnerCommand(fieldIndex: number, turn: number, moveSlots: number[]): Promise<SerializedCommand | null> {
-    const key = commandKey(fieldIndex, turn);
+  requestPartnerCommand(
+    fieldIndex: number,
+    turn: number,
+    moveSlots: number[],
+    owner?: CoopRole,
+  ): Promise<SerializedCommand | null> {
+    const key = commandKey(fieldIndex, turn, owner);
     const slotPrefix = key.slice(0, key.lastIndexOf(":") + 1); // `wave:fieldIndex:` (#819)
     // Supersede any stale in-flight request on this SLOT (the turn has moved on, so an
     // older-turn await is moot) and prune any stale older-turn buffered command for it,
@@ -182,12 +210,14 @@ export class CoopBattleSync {
           `host requestPartnerCommand SEND fieldIndex=${fieldIndex} turn=${turn} moveSlots=[${moveSlots.join(",")}] (awaiting peer)`,
         );
       }
-      this.transport.send({ t: "commandRequest", fieldIndex, turn, moveSlots });
+      // #851: stamp the resolved owner (when known) so the peer's answerRequest reply echoes it
+      // and both sides key by owner; omitted when unknown so an older peer's fieldIndex key still matches.
+      this.transport.send({ t: "commandRequest", fieldIndex, turn, moveSlots, ...(owner == null ? {} : { owner }) });
     });
   }
 
   /** #812: requests that arrived before the responder installed (guest mid-replay). */
-  private readonly bufferedRequests: { fieldIndex: number; turn: number; moveSlots: number[] }[] = [];
+  private readonly bufferedRequests: { fieldIndex: number; turn: number; moveSlots: number[]; owner?: CoopRole }[] = [];
   /** #812: injected by the runtime (cycle-free); true = this client owns the field slot. */
   private slotOwnershipProbe: ((fieldIndex: number) => boolean) | null = null;
 
@@ -202,7 +232,7 @@ export class CoopBattleSync {
   }
 
   /** Run one inbound request through the installed responder and reply. */
-  private answerRequest(req: { fieldIndex: number; turn: number; moveSlots: number[] }): void {
+  private answerRequest(req: { fieldIndex: number; turn: number; moveSlots: number[]; owner?: CoopRole }): void {
     const responder = this.responder;
     if (responder == null) {
       return;
@@ -211,14 +241,29 @@ export class CoopBattleSync {
     if (isCoopDebug()) {
       coopLog(
         "relay",
-        `peer recv commandRequest fieldIndex=${req.fieldIndex} turn=${req.turn} moveSlots=[${req.moveSlots.join(",")}] -> reply command=${command.command} cursor=${command.cursor} moveId=${command.moveId ?? "-"}`,
+        `peer recv commandRequest fieldIndex=${req.fieldIndex} owner=${req.owner ?? "-"} turn=${req.turn} moveSlots=[${req.moveSlots.join(",")}] -> reply command=${command.command} cursor=${command.cursor} moveId=${command.moveId ?? "-"}`,
       );
     }
-    // Echo the request's turn so the awaiter matches by (fieldIndex, turn) (#633).
-    this.transport.send({ t: "command", fieldIndex: req.fieldIndex, turn: req.turn, command });
+    // Echo the request's turn AND owner so the awaiter matches by (owner|fieldIndex, turn) (#633/#851).
+    this.transport.send({
+      t: "command",
+      fieldIndex: req.fieldIndex,
+      turn: req.turn,
+      command,
+      ...(req.owner == null ? {} : { owner: req.owner }),
+    });
   }
 
-  /** PEER (guest / spoof): install the responder that answers inbound requests. */
+  /**
+   * PEER (guest / spoof): install the responder that answers inbound requests.
+   *
+   * NOTE (#851): the PRODUCTION guest never installs a responder here. In lockstep both clients
+   * command only their OWN slot and {@linkcode broadcastLocalCommand} it unprompted; the host's
+   * {@linkcode requestPartnerCommand} for the partner slot is matched against that independent
+   * broadcast, NOT a request/answer round-trip. The responder path is used only by the dev
+   * {@linkcode CoopSpoofGuest} and the tests. Both paths key by owner-then-fieldIndex identically,
+   * so the fix holds whichever one answers a given request.
+   */
   onCommandRequest(responder: CoopCommandResponder): void {
     this.responder = responder;
     // #812: drain requests that arrived while the responder was not yet installed (the
@@ -239,14 +284,16 @@ export class CoopBattleSync {
    * makes two real humans trade actual moves: each client commands only its own
    * slot interactively and broadcasts it; the other client awaits and applies it.
    */
-  broadcastLocalCommand(fieldIndex: number, turn: number, command: SerializedCommand): void {
+  broadcastLocalCommand(fieldIndex: number, turn: number, command: SerializedCommand, owner?: CoopRole): void {
     if (isCoopDebug()) {
       coopLog(
         "relay",
-        `broadcastLocalCommand SEND fieldIndex=${fieldIndex} turn=${turn} command=${command.command} cursor=${command.cursor} moveId=${command.moveId ?? "-"} targets=[${(command.targets ?? []).join(",")}]`,
+        `broadcastLocalCommand SEND fieldIndex=${fieldIndex} owner=${owner ?? "-"} turn=${turn} command=${command.command} cursor=${command.cursor} moveId=${command.moveId ?? "-"} targets=[${(command.targets ?? []).join(",")}]`,
       );
     }
-    this.transport.send({ t: "command", fieldIndex, turn, command });
+    // #851: stamp the local mon's resolved owner so the peer's awaiting request (which keys by the
+    // SAME owner) matches even when the survivor sits at a different field index across the two engines.
+    this.transport.send({ t: "command", fieldIndex, turn, command, ...(owner == null ? {} : { owner }) });
   }
 
   /** Whether a responder is installed (this client can answer requests). */
@@ -281,29 +328,43 @@ export class CoopBattleSync {
         if (ours) {
           coopLog(
             "relay",
-            `peer recv commandRequest fieldIndex=${msg.fieldIndex} turn=${msg.turn} before responder install -> BUFFERED (own slot, #812)`,
+            `peer recv commandRequest fieldIndex=${msg.fieldIndex} owner=${msg.owner ?? "-"} turn=${msg.turn} before responder install -> BUFFERED (own slot, #812)`,
           );
-          this.bufferedRequests.push({ fieldIndex: msg.fieldIndex, turn: msg.turn, moveSlots: msg.moveSlots });
+          this.bufferedRequests.push({
+            fieldIndex: msg.fieldIndex,
+            turn: msg.turn,
+            moveSlots: msg.moveSlots,
+            ...(msg.owner == null ? {} : { owner: msg.owner }),
+          });
           return;
         }
         coopWarn(
           "relay",
-          `peer recv commandRequest fieldIndex=${msg.fieldIndex} turn=${msg.turn} for a slot that is NOT ours -> DECLINE reply (host AI-falls-back, #693)`,
+          `peer recv commandRequest fieldIndex=${msg.fieldIndex} owner=${msg.owner ?? "-"} turn=${msg.turn} for a slot that is NOT ours -> DECLINE reply (host AI-falls-back, #693)`,
         );
+        // Echo the owner so the host's DECLINE resolver (keyed by owner when present) is found (#851).
         this.transport.send({
           t: "command",
           fieldIndex: msg.fieldIndex,
           turn: msg.turn,
           command: { command: 0, cursor: -1 } as SerializedCommand,
           decline: true,
+          ...(msg.owner == null ? {} : { owner: msg.owner }),
         });
         return;
       }
-      this.answerRequest({ fieldIndex: msg.fieldIndex, turn: msg.turn, moveSlots: msg.moveSlots });
+      this.answerRequest({
+        fieldIndex: msg.fieldIndex,
+        turn: msg.turn,
+        moveSlots: msg.moveSlots,
+        ...(msg.owner == null ? {} : { owner: msg.owner }),
+      });
       return;
     }
     if (msg.t === "command") {
-      const key = commandKey(msg.fieldIndex, msg.turn);
+      // #851: key by the sender's owner when present (stable across a post-half-wipe index skew),
+      // else the field index (unchanged). Both the pending resolver and any buffer use this key.
+      const key = commandKey(msg.fieldIndex, msg.turn, msg.owner);
       const resolver = this.pending.get(key);
       // #693: an explicit DECLINE resolves the awaiter with null -> the caller's AI
       // fallback commands the slot. Never treated as a real command.

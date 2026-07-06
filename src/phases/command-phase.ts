@@ -314,7 +314,10 @@ export class CommandPhase extends FieldPhase {
     );
     const moveset = partner.getMoveset();
     const moveSlots = moveset.map((m, i) => (m.isUsable(partner, false, true)[0] ? i : -1)).filter(i => i >= 0);
-    void sync.requestPartnerCommand(this.fieldIndex, globalScene.currentBattle.turn, moveSlots).then(cmd => {
+    // #851: key the request by the awaited slot's RESOLVED owner (computed above as `slotOwner`),
+    // so the guest's independent broadcast matches even after a host-half-wipe recenter reseats the
+    // survivor at a different field index than the guest has reconciled to (the 20-min-stall class).
+    void sync.requestPartnerCommand(this.fieldIndex, globalScene.currentBattle.turn, moveSlots, slotOwner).then(cmd => {
       // A relayed BALL / RUN (the partner threw a Poke Ball or fled) is applied
       // verbatim, NOT routed through the move path: its `cursor` is a ball type,
       // not a move slot, so applyWiredPartnerCommand would mis-read it as a move.
@@ -725,7 +728,9 @@ export class CommandPhase extends FieldPhase {
       // #633 Fix #4a: carry the Terastallize flag so the watcher teras the partner's mon.
       ...(tera ? { tera: true } : {}),
     };
-    sync.broadcastLocalCommand(this.fieldIndex, globalScene.currentBattle.turn, ownFightCommand);
+    // #851: stamp OUR resolved owner (== controller.role past the guard above) so the host's
+    // partner-slot await matches by owner even across a post-half-wipe field-index skew.
+    sync.broadcastLocalCommand(this.fieldIndex, globalScene.currentBattle.turn, ownFightCommand, controller.role);
     // #record-replay: capture the own-slot FIGHT command (no-op unless recording).
     recordCoopOwnSlotCommand(this.fieldIndex, ownFightCommand);
   }
@@ -1180,7 +1185,9 @@ export class CommandPhase extends FieldPhase {
       targets,
       ...(command === Command.POKEMON ? { baton } : {}),
     };
-    sync.broadcastLocalCommand(this.fieldIndex, globalScene.currentBattle.turn, ownActionCommand);
+    // #851: stamp OUR resolved owner (== controller.role past the guard above) so the peer's
+    // partner-slot await matches by owner even across a post-half-wipe field-index skew.
+    sync.broadcastLocalCommand(this.fieldIndex, globalScene.currentBattle.turn, ownActionCommand, controller.role);
     // #record-replay: capture the own-slot BALL/RUN/POKEMON command (no-op unless recording).
     recordCoopOwnSlotCommand(this.fieldIndex, ownActionCommand);
   }

@@ -731,10 +731,25 @@ export type CoopMessage =
    * is authoritative, so it sends the LEGAL move slots (indices into the partner
    * mon's moveset) it computed; the peer just picks one and replies with a
    * `command`. `moveSlots` empty => only Struggle is legal (#633, LIVE-C).
+   *
+   * `owner` (#851, additive optional) is the sender's RESOLVED `coopOwner` role for the
+   * awaited slot (`coopOwnerOfPlayerFieldSlot(fieldIndex)`). After a host-half-wipe recenter
+   * + party compaction the SURVIVOR sits at DIFFERENT field indexes on the two engines (the
+   * host compacted; the guest's reconcile lags a beat), so the legacy `fieldIndex`-only match
+   * key never matches and the request times out (the 20-min stall). The owner is STABLE across
+   * that divergent geometry, so both clients key the relay on it and the reply matches despite
+   * the index skew. Absent on an older client -> the receiver falls back to the `fieldIndex`
+   * key (version-handshake safe: paired clients share COOP_PROTOCOL_VERSION, so it is present
+   * on both or neither).
    */
-  | { t: "commandRequest"; fieldIndex: number; turn: number; moveSlots: number[] }
-  /** A player's battle command for their own field slot (phase P2 / LIVE-C reply). */
-  | { t: "command"; fieldIndex: number; turn: number; command: SerializedCommand; decline?: boolean }
+  | { t: "commandRequest"; fieldIndex: number; turn: number; moveSlots: number[]; owner?: CoopRole }
+  /**
+   * A player's battle command for their own field slot (phase P2 / LIVE-C reply). `owner`
+   * (#851, additive optional) mirrors {@linkcode commandRequest}'s owner: the sender's resolved
+   * `coopOwner` for the slot, so the awaiter matches by OWNER (stable across a post-half-wipe
+   * index skew) instead of the raw `fieldIndex`. Absent on an older client -> fieldIndex fallback.
+   */
+  | { t: "command"; fieldIndex: number; turn: number; command: SerializedCommand; decline?: boolean; owner?: CoopRole }
   | { t: "stallBeat"; waitingMs: number }
   /**
    * Either client -> peer (#839, reciprocal rendezvous barrier): "I reached sync `point`". A named
@@ -1055,9 +1070,9 @@ export interface CoopTransport {
 function summarizeCoopMessage(msg: CoopMessage): string {
   switch (msg.t) {
     case "command":
-      return `fi=${msg.fieldIndex} turn=${msg.turn} cmd=${msg.command.command} cursor=${msg.command.cursor} move=${msg.command.moveId ?? "-"}`;
+      return `fi=${msg.fieldIndex} owner=${msg.owner ?? "-"} turn=${msg.turn} cmd=${msg.command.command} cursor=${msg.command.cursor} move=${msg.command.moveId ?? "-"}`;
     case "commandRequest":
-      return `fi=${msg.fieldIndex} turn=${msg.turn} slots=${msg.moveSlots.length}`;
+      return `fi=${msg.fieldIndex} owner=${msg.owner ?? "-"} turn=${msg.turn} slots=${msg.moveSlots.length}`;
     case "switchChoice":
       return `fi=${msg.fieldIndex} slot=${msg.partySlot}`;
     case "rosterSync":
