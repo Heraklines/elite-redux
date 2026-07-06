@@ -1,0 +1,246 @@
+/*
+ * SPDX-FileCopyrightText: 2024-2026 Pagefault Games
+ *
+ * SPDX-License-Identifier: AGPL-3.0-only
+ */
+
+// =============================================================================
+// Co-op RECIPROCAL RENDEZVOUS barrier (#839). A two-sided ready handshake at a named
+// SYNC POINT: each client sends "I reached point P", and neither client is allowed to
+// CROSS P (commit the next state-advancing action) until it has ALSO seen the partner's
+// arrival for the SAME P. This is the missing RECIPROCAL guard for the co-op pacing class:
+// today the barriers are one-directional (a slow watcher waits for the owner), but the
+// FASTER player - including the interaction OWNER - can race arbitrarily ahead into a
+// position the two clients can't reconcile (the reward-shop pick before the partner has
+// finished the previous fight; the next battle command before the partner's faint
+// replacement is on the field). The rendezvous makes BOTH players wait at the barrier.
+//
+// This is DELIBERATELY SEPARATE from the interaction ALTERNATION counter
+// (coop-session-controller.ts owner=even/guest=odd): the counter says WHO picks; the
+// rendezvous says WHEN both may proceed. They must not be conflated.
+//
+// ROBUSTNESS (the three failure modes the co-op wire class demands):
+//   - EARLY ARRIVAL (#812 class): a partner's arrival that lands BEFORE this client
+//     installs its waiter is BUFFERED (remembered in a Set) and consumed on the next await.
+//   - DUPLICATE ARRIVAL: arrivals are set-membership, so a re-sent / re-delivered arrival
+//     for a point already seen is a harmless no-op (idempotent on both ends).
+//   - DEAD PARTNER: a partner that never arrives cannot strand the run forever - the await
+//     resolves `timedOut: true` after a generous, injectable timeout, emitting a LOUD WARN
+//     ("RENDEZVOUS TIMEOUT", assertable by the soak) so the leader PROCEEDS rather than hangs.
+//
+// Engine-FREE (transport + wire types only) so it is unit-testable headlessly over a
+// LoopbackTransport, exactly like CoopInteractionRelay / CoopBattleStreamer.
+// =============================================================================
+
+import { coopLog, coopWarn, isCoopDebug } from "#data/elite-redux/coop/coop-debug";
+import type { CoopMessage, CoopTransport } from "#data/elite-redux/coop/coop-transport";
+
+/**
+ * How long a rendezvous await blocks for the partner's arrival before giving up. The two live
+ * barriers (shop-pick-commit / next-command-open) wait for the partner to finish the PREVIOUS
+ * fight's animations / summon a faint replacement - a PACING wait bounded by battle presentation,
+ * NOT human deliberation - so this is the SHORT-but-generous class (matches `coopWaveBarrierMs` /
+ * `coopFaintSwitchWaitMs` at 60s), not the 20-min human-deliberation class the reward-choice relay
+ * uses. Injectable so tests never sit through the live-generous default.
+ */
+let coopRendezvousWaitMs = 60_000;
+
+export function getCoopRendezvousWaitMs(): number {
+  return coopRendezvousWaitMs;
+}
+
+export function setCoopRendezvousWaitMs(ms: number): void {
+  coopRendezvousWaitMs = ms;
+}
+
+function defaultSchedule(cb: () => void, ms: number): () => void {
+  const id = setTimeout(cb, ms);
+  return () => clearTimeout(id);
+}
+
+/** The outcome of a rendezvous await. */
+export interface CoopRendezvousResult {
+  /** The sync point this result is for. */
+  point: string;
+  /** True when the partner NEVER arrived and the anti-hang timeout fired (the run proceeds anyway). */
+  timedOut: boolean;
+}
+
+/** Options for {@linkcode CoopRendezvous} (timer injection for tests). */
+export interface CoopRendezvousOptions {
+  /** Default await timeout (ms). Falls back to {@linkcode getCoopRendezvousWaitMs}. */
+  timeoutMs?: number;
+  /** Timer injection (tests). Returns a cancel fn. Defaults to setTimeout/clearTimeout. */
+  schedule?: (cb: () => void, ms: number) => () => void;
+}
+
+/**
+ * Rides a {@linkcode CoopTransport} to run reciprocal two-sided rendezvous barriers. One instance
+ * per client. Both clients call {@linkcode rendezvous} (or {@linkcode arrive} + {@linkcode awaitPartner})
+ * for the SAME `point`; each resolves only once BOTH have arrived (or the anti-hang timeout fires).
+ */
+export class CoopRendezvous {
+  private readonly transport: CoopTransport;
+  private readonly defaultTimeoutMs: number;
+  private readonly schedule: (cb: () => void, ms: number) => () => void;
+  private readonly offMessage: () => void;
+
+  /** Points THIS client has arrived at (idempotent local arrival; suppresses a duplicate send). */
+  private readonly localArrived = new Set<string>();
+  /** Points the PARTNER has signaled arrival at (buffered even before we await; idempotent). */
+  private readonly partnerArrived = new Set<string>();
+  /** point -> resolver for the in-flight {@linkcode awaitPartner} (one at a time per point). */
+  private readonly pending = new Map<string, (res: CoopRendezvousResult) => void>();
+  /** point -> when each parked wait began (stall-watchdog age, mirrors the relay). */
+  private readonly pendingSince = new Map<string, number>();
+
+  constructor(transport: CoopTransport, opts: CoopRendezvousOptions = {}) {
+    this.transport = transport;
+    this.defaultTimeoutMs = opts.timeoutMs ?? getCoopRendezvousWaitMs();
+    this.schedule = opts.schedule ?? defaultSchedule;
+    this.offMessage = transport.onMessage(msg => this.handle(msg));
+  }
+
+  /**
+   * Signal (idempotently) that THIS client has reached sync `point`. A duplicate arrival for a point
+   * already sent is a no-op on the wire (the send is suppressed). Does NOT block - a client that only
+   * needs to LET the partner proceed (without waiting itself) calls this; the FASTER player calls
+   * {@linkcode rendezvous} to both arrive AND block.
+   */
+  arrive(point: string): void {
+    if (this.localArrived.has(point)) {
+      return;
+    }
+    this.localArrived.add(point);
+    coopLog("rendezvous", `ARRIVE point=${point} (send) role=${this.transport.role}`);
+    this.transport.send({ t: "rendezvous", point });
+  }
+
+  /**
+   * Block until the PARTNER has arrived at `point` (or the anti-hang timeout fires). Resolves
+   * immediately if the partner's arrival was already buffered. On timeout resolves `timedOut: true`
+   * after emitting a LOUD WARN - the caller then PROCEEDS rather than stranding the run.
+   */
+  awaitPartner(point: string, timeoutMs = this.defaultTimeoutMs): Promise<CoopRendezvousResult> {
+    if (this.partnerArrived.has(point)) {
+      if (isCoopDebug()) {
+        coopLog(
+          "rendezvous",
+          `AWAIT point=${point} -> partner already arrived (buffer-hit) role=${this.transport.role}`,
+        );
+      }
+      return Promise.resolve({ point, timedOut: false });
+    }
+    coopLog("rendezvous", `AWAIT point=${point} timeoutMs=${timeoutMs} -> network-wait role=${this.transport.role}`);
+    // Supersede any stale waiter parked on this point (only one await per point at a time).
+    const stale = this.pending.get(point);
+    if (stale !== undefined) {
+      coopWarn(
+        "rendezvous",
+        `AWAIT point=${point} SUPERSEDE stale waiter -> resolved timedOut role=${this.transport.role}`,
+      );
+      stale({ point, timedOut: true });
+    }
+    this.pendingSince.set(point, Date.now());
+    return new Promise<CoopRendezvousResult>(resolve => {
+      let settled = false;
+      let cancelTimer: () => void = () => {};
+      const finish = (res: CoopRendezvousResult) => {
+        if (settled) {
+          return;
+        }
+        settled = true;
+        cancelTimer();
+        if (this.pending.get(point) === finish) {
+          this.pending.delete(point);
+          this.pendingSince.delete(point);
+        }
+        if (res.timedOut) {
+          // The soak asserts on this exact substring. LOUD on purpose: a fired timeout means a
+          // partner that never reached the barrier, so proceeding is the anti-hang backstop.
+          coopWarn(
+            "rendezvous",
+            `RENDEZVOUS TIMEOUT point=${point} after ${timeoutMs}ms - partner never arrived; `
+              + `PROCEEDING (anti-hang backstop) role=${this.transport.role}`,
+          );
+        } else {
+          coopLog("rendezvous", `AWAIT point=${point} RESOLVE both-arrived role=${this.transport.role}`);
+        }
+        resolve(res);
+      };
+      this.pending.set(point, finish);
+      cancelTimer = this.schedule(() => finish({ point, timedOut: true }), timeoutMs);
+    });
+  }
+
+  /**
+   * The full reciprocal barrier: ARRIVE at `point`, then block until the partner has also arrived (or
+   * the anti-hang timeout fires). Both clients call this for the same point; the client that reached
+   * the barrier FIRST blocks until the other arrives, the client that reached it SECOND resolves at
+   * once (the first's arrival is already buffered). Neither crosses `point` until both have arrived.
+   */
+  rendezvous(point: string, timeoutMs = this.defaultTimeoutMs): Promise<CoopRendezvousResult> {
+    this.arrive(point);
+    return this.awaitPartner(point, timeoutMs);
+  }
+
+  /** Whether the partner has already arrived at `point` (a race check without parking a waiter). */
+  partnerHasArrived(point: string): boolean {
+    return this.partnerArrived.has(point);
+  }
+
+  /**
+   * Age (ms) of the OLDEST parked rendezvous wait, or -1 when none. Mirrors the interaction relay's
+   * watchdog probe: a positive value means this client is BLOCKED at a barrier waiting for the partner.
+   */
+  oldestNetworkWaitMs(): number {
+    let oldest = -1;
+    const now = Date.now();
+    for (const since of this.pendingSince.values()) {
+      const age = now - since;
+      if (age > oldest) {
+        oldest = age;
+      }
+    }
+    return oldest;
+  }
+
+  /** Stop listening and fail any in-flight waits (as timed out, so callers proceed). */
+  dispose(): void {
+    this.offMessage();
+    for (const finish of [...this.pending.values()]) {
+      finish({ point: "(disposed)", timedOut: true });
+    }
+    this.pending.clear();
+    this.pendingSince.clear();
+    this.localArrived.clear();
+    this.partnerArrived.clear();
+  }
+
+  private handle(msg: CoopMessage): void {
+    if (msg.t !== "rendezvous") {
+      return;
+    }
+    const { point } = msg;
+    if (this.partnerArrived.has(point)) {
+      // Idempotent: a duplicate / re-delivered arrival for a point already seen is a harmless no-op.
+      if (isCoopDebug()) {
+        coopLog("rendezvous", `RECV arrival point=${point} -> DUPLICATE (already seen) role=${this.transport.role}`);
+      }
+      return;
+    }
+    this.partnerArrived.add(point);
+    const waiter = this.pending.get(point);
+    if (waiter) {
+      if (isCoopDebug()) {
+        coopLog("rendezvous", `RECV arrival point=${point} -> deliver-to-waiter role=${this.transport.role}`);
+      }
+      waiter({ point, timedOut: false });
+      return;
+    }
+    // No waiter yet - buffer for the next awaitPartner(point) (the #812 early-arrival class).
+    if (isCoopDebug()) {
+      coopLog("rendezvous", `RECV arrival point=${point} -> BUFFER (no waiter yet) role=${this.transport.role}`);
+    }
+  }
+}

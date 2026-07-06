@@ -39,6 +39,7 @@ import { COOP_DEX_SYNC_SEQ, CoopInteractionRelay } from "#data/elite-redux/coop/
 import { meBattleHandoffKey } from "#data/elite-redux/coop/coop-me-battle-handoff";
 import { coopMeInteractionStartValue, setCoopMeInteractionStart } from "#data/elite-redux/coop/coop-me-pin-state";
 import { CoopMePump } from "#data/elite-redux/coop/coop-me-pump";
+import { CoopRendezvous } from "#data/elite-redux/coop/coop-rendezvous";
 import { COOP_REJOIN_SYNC_SEQ_BASE } from "#data/elite-redux/coop/coop-seq-registry";
 import { coopFieldIndexOf, coopOwnerOfFieldSlot } from "#data/elite-redux/coop/coop-session";
 import { CoopSessionController } from "#data/elite-redux/coop/coop-session-controller";
@@ -974,6 +975,8 @@ export interface CoopRuntime {
   uiMirror: CoopUiMirror;
   /** Owner->watcher AUTHORITATIVE input pump for whole mystery-encounter lockstep (#633). */
   mePump: CoopMePump;
+  /** Reciprocal two-sided rendezvous barriers at pacing sync points (#839). */
+  rendezvous: CoopRendezvous;
   /** The local client's transport endpoint. */
   localTransport: CoopTransport;
   /** The spoofed partner's transport endpoint (local dev only; absent for real peers). */
@@ -1065,6 +1068,11 @@ export function getCoopUiMirror(): CoopUiMirror | null {
 /** Convenience: the mystery-encounter input pump, or null when not in a co-op run. */
 export function getCoopMePump(): CoopMePump | null {
   return active?.mePump ?? null;
+}
+
+/** Convenience: the reciprocal rendezvous barriers (#839), or null when not in a co-op run. */
+export function getCoopRendezvous(): CoopRendezvous | null {
+  return active?.rendezvous ?? null;
 }
 
 /** Whether a co-op session is currently active. */
@@ -1533,6 +1541,7 @@ export function assembleCoopRuntime(
   const interactionRelay = new CoopInteractionRelay(transport);
   const uiMirror = new CoopUiMirror(transport);
   const mePump = new CoopMePump(interactionRelay);
+  const rendezvous = new CoopRendezvous(transport);
   const runtime: CoopRuntime = {
     controller,
     battleSync,
@@ -1540,6 +1549,7 @@ export function assembleCoopRuntime(
     interactionRelay,
     uiMirror,
     mePump,
+    rendezvous,
     localTransport: transport,
   };
   wireCoopGhostPoolSync(controller, battleStream);
@@ -1664,6 +1674,7 @@ export function clearCoopRuntime(): void {
   active.interactionRelay.dispose();
   active.uiMirror.dispose();
   active.mePump.endSession();
+  active.rendezvous.dispose();
   active.spoof?.dispose();
   // Drop the persistent move-learn forward listener + its in-flight slot set (#633 BUG3+5) so a
   // subsequent solo / lockstep run has no listener and spawns no CoopReplayLearnMovePhase.

@@ -726,6 +726,16 @@ export type CoopMessage =
   /** A player's battle command for their own field slot (phase P2 / LIVE-C reply). */
   | { t: "command"; fieldIndex: number; turn: number; command: SerializedCommand; decline?: boolean }
   | { t: "stallBeat"; waitingMs: number }
+  /**
+   * Either client -> peer (#839, reciprocal rendezvous barrier): "I reached sync `point`". A named
+   * two-sided ready handshake SEPARATE from the interaction alternation counter (the counter says WHO
+   * picks; this says WHEN both may proceed). Neither client crosses a barrier point until it has ALSO
+   * seen the partner's arrival for the same `point`. Idempotent (a re-sent arrival for a point already
+   * seen is a no-op) and buffer-safe (an arrival that lands before the peer installs its waiter is
+   * remembered). Points today: `cmd:<wave>:<turn>` (next-command-open) and `shop:<wave>:<counter>`
+   * (shop-pick-commit). See coop-rendezvous.ts.
+   */
+  | { t: "rendezvous"; point: string }
   /** #809: host asks the partner to pick a Revival Blessing target for its own mon. */
   | { t: "revivalPrompt"; fieldIndex: number }
   /** #810 resume flow: host offers to resume the saved run with this partner at `wave`. */
@@ -1093,6 +1103,8 @@ function summarizeCoopMessage(msg: CoopMessage): string {
       return `screen=${msg.screen}`;
     case "requestRunConfig":
       return "(re)request";
+    case "rendezvous":
+      return `point=${msg.point}`;
     default:
       return `t=${(msg as { t?: string }).t ?? "?"}`;
   }
