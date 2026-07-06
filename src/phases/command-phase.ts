@@ -21,12 +21,14 @@ import {
   getCoopNetcodeMode,
   getCoopRendezvous,
   getCoopRuntime,
+  isVersusSession,
   recordCoopOwnSlotCommand,
   recordCoopPartnerSlotCommand,
 } from "#data/elite-redux/coop/coop-runtime";
 import type { SerializedCommand } from "#data/elite-redux/coop/coop-transport";
 import { reloadCurrentWave } from "#data/elite-redux/er-reset-wave";
 import { recordSinglePlayerCommand } from "#data/elite-redux/replay-single-recording";
+import { getShowdownRelay } from "#data/elite-redux/showdown/showdown-battle-state";
 import { AbilityId } from "#enums/ability-id";
 import { ArenaTagSide } from "#enums/arena-tag-side";
 import { ArenaTagType } from "#enums/arena-tag-type";
@@ -46,6 +48,7 @@ import { getMoveTargets } from "#moves/move-utils";
 import { FieldPhase } from "#phases/field-phase";
 import type { MoveTargetSet } from "#types/move-target-set";
 import type { TurnMove } from "#types/turn-move";
+import type { ShowdownCommandArgs } from "#ui/showdown-command-ui-handler";
 import i18next from "i18next";
 
 export class CommandPhase extends FieldPhase {
@@ -426,6 +429,10 @@ export class CommandPhase extends FieldPhase {
       return;
     }
 
+    if (this.tryShowdownGuestCommand()) {
+      return;
+    }
+
     // Co-op (#839, next-command-open reciprocal barrier): we reached OUR OWN slot's command point with
     // our mon materialized on the field. Do NOT open the command UI until the PARTNER has ALSO reached
     // the same command point (both at command, both mons on field) - the missing reciprocal guard for
@@ -442,6 +449,37 @@ export class CommandPhase extends FieldPhase {
       return;
     }
     void pendingBarrier.then(() => this.openOwnCommandUi());
+  }
+
+  /**
+   * Showdown 1v1 (C5): on the versus GUEST, the player-side CommandPhase runs for the HOST's team
+   * (authoritatively the player side in the host's world), which the guest must NOT drive - the
+   * guest commands its OWN team, which is the ENEMY side. Instead of opening the player-field
+   * CommandUiHandler, open the dedicated {@linkcode UiMode.SHOWDOWN_COMMAND} menu (reads the ENEMY
+   * side = the guest's own team), and on the confirmed pick SHIP it via the relay
+   * ({@linkcode ShowdownCommandRelay.sendCommand}) - the HOST validates + simulates it. The guest
+   * then writes an inert, skipped command so the phase queue stays well-formed; TurnStartPhase
+   * diverts the whole turn to CoopReplayTurnPhase (the guest renders the host's authoritative
+   * outcome). Gated on the live versus GUEST, so solo / co-op / host are byte-for-byte unchanged.
+   */
+  private tryShowdownGuestCommand(): boolean {
+    if (!isVersusSession() || getCoopController()?.role !== "guest") {
+      return false;
+    }
+    const relay = getShowdownRelay();
+    const turn = globalScene.currentBattle.turn;
+    const finish = (command: SerializedCommand) => {
+      relay?.sendCommand(turn, command);
+      globalScene.currentBattle.turnCommands[this.fieldIndex] = {
+        command: Command.FIGHT,
+        move: { move: MoveId.NONE, targets: [], useMode: MoveUseMode.NORMAL },
+        skip: true,
+      };
+      this.end();
+    };
+    const args: ShowdownCommandArgs = { turn, onCommand: (_turn, command) => finish(command) };
+    globalScene.ui.setMode(UiMode.SHOWDOWN_COMMAND, args);
+    return true;
   }
 
   /** Open THIS client's own-slot command UI (FIGHT for a skip-to-fight ME, else the COMMAND menu). */

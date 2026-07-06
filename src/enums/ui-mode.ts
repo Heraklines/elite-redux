@@ -76,4 +76,6 @@ export enum UiMode {
   PROFILE,
   /** ER Ghost Trainer Editor: author how your published ghost (sprite/name/dialogue) looks to others. */
   GHOST_TRAINER_EDITOR,
+  /** Showdown 1v1: the versus GUEST's command menu (picks a move/switch for its own team, ships via relay). */
+  SHOWDOWN_COMMAND,
 }

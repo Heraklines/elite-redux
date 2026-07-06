@@ -196,6 +196,12 @@ export const COOP_UI_REGISTRY: Record<UiMode, CoopUiClass> = {
   // REVIEW: renaming a pokemon in a MERGED co-op party. Confirm each client renames only its own mon
   // (a shared-mon nickname write would be a latent divergence; cosmetic, not run-affecting).
   [UiMode.RENAME_POKEMON]: "local-only",
+
+  // Showdown 1v1 versus GUEST command menu (C5): LOCAL-ONLY by construction - each player drives
+  // its OWN team's command on its OWN client; only the resulting SerializedCommand crosses the wire
+  // (ShowdownCommandRelay.sendCommand), validated host-authoritatively. Never a co-op surface
+  // (versus is a distinct GameMode, not isCoop), so it never participates in the co-op mirror.
+  [UiMode.SHOWDOWN_COMMAND]: "local-only",
 };
 
 /**

@@ -84,6 +84,7 @@ import { SettingsDisplayUiHandler } from "#ui/settings-display-ui-handler";
 import { SettingsGamepadUiHandler } from "#ui/settings-gamepad-ui-handler";
 import { SettingsKeyboardUiHandler } from "#ui/settings-keyboard-ui-handler";
 import { SettingsUiHandler } from "#ui/settings-ui-handler";
+import { ShowdownCommandUiHandler } from "#ui/showdown-command-ui-handler";
 import { StarterSelectUiHandler } from "#ui/starter-select-ui-handler";
 import { SummaryUiHandler } from "#ui/summary-ui-handler";
 import { TargetSelectUiHandler } from "#ui/target-select-ui-handler";
@@ -237,6 +238,7 @@ export class UI extends Phaser.GameObjects.Container {
       new ErChallengeTextInputUiHandler(),
       new ProfileUiHandler(),
       new GhostTrainerEditorUiHandler(),
+      new ShowdownCommandUiHandler(),
     ];
   }
 
