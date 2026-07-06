@@ -174,10 +174,27 @@ export class ModifierSelectUiHandler extends AwaitableUiHandler {
     globalScene.addInfoToggle(this.moveInfoOverlay);
 
     // ER: dedicated, masked, auto-scrolling description box for ITEM descriptions.
-    // Drawn at the SAME coords/font/wrap as the battle message text (messageContainer
-    // at 12,-39; TextStyle.MESSAGE; wordWrap 1780) so it overlays the message box
-    // pixel-for-pixel - but it scrolls when the description overflows. The shared
-    // message box / MessageUiHandler is left untouched.
+    this.ensureItemDescText();
+  }
+
+  /**
+   * ER (#852): idempotently build the dedicated masked item-description box. Extracted
+   * from {@linkcode setup} so it can ALSO be built on demand at the first read
+   * ({@linkcode showItemDescription}). In the co-op WATCHER reward-shop mirror the screen
+   * is opened read-only and a relayed cursor button can drive `showItemDescription` before
+   * / without the normal `setup` path having built this pane - reading `displayHeight` off
+   * an unbuilt (undefined) text object was the live P0 crash (#852). Building lazily here
+   * guarantees the reader never touches an unbuilt object, in any launch order.
+   *
+   * Drawn at the SAME coords/font/wrap as the battle message text (messageContainer at
+   * 12,-39; TextStyle.MESSAGE; wordWrap 1780) so it overlays the message box pixel-for-pixel
+   * - but it scrolls when the description overflows. The shared message box /
+   * MessageUiHandler is left untouched.
+   */
+  private ensureItemDescText(): void {
+    if (this.itemDescText) {
+      return;
+    }
     this.itemDescText = addTextObject(ITEM_DESC_X, ITEM_DESC_Y, "", TextStyle.MESSAGE, {
       wordWrap: { width: 1780 },
     }).setOrigin(0, 0);
@@ -199,6 +216,9 @@ export class ModifierSelectUiHandler extends AwaitableUiHandler {
    * scroll if it overflows the visible height. Mirrors MoveInfoOverlay's scroll.
    */
   private showItemDescription(text: string): void {
+    // #852: build the pane on demand if the launch path (e.g. the co-op watcher mirror)
+    // reached here before `setup` built it - the reader below must never touch an unbuilt object.
+    this.ensureItemDescText();
     this.hideItemDescription();
     this.getUi().showText("", 0);
     this.itemDescText.setText(text);
@@ -222,6 +242,11 @@ export class ModifierSelectUiHandler extends AwaitableUiHandler {
     if (this.itemDescScroll) {
       this.itemDescScroll.remove();
       this.itemDescScroll = null;
+    }
+    // #852: `setCursor`/`clear` call this before any description is shown; if the pane was
+    // never built (co-op watcher launch order), there is nothing to hide - bail safely.
+    if (!this.itemDescText) {
+      return;
     }
     this.itemDescText.y = ITEM_DESC_Y;
     this.itemDescText.setText("");
