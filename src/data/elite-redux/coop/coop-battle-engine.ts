@@ -2182,8 +2182,16 @@ function copyMovesetFromData(data: PokemonData): PokemonMove[] {
   });
 }
 
+/**
+ * GUEST: apply the host's authoritative per-mon DATA in place (preserving the Phaser sprite). This is
+ * the DATA half only - it writes species/form/stats/status/summonData/etc. and does NOT touch the
+ * RENDER (battle-info bars, sprite atlas, boss dividers). The Phase-3 render differ
+ * ({@linkcode runCoopRenderDiffer}) owns ALL rendering: it runs AFTER the whole state apply, over every
+ * on-field mon, doing the unconditional cheap refresh + the sprite-key-gated re-summon. Keeping data
+ * and render separate is what lets the differ invert the granularity (a missed field degrades to a
+ * harmless extra refresh instead of a stale visual). See docs/plans Phase-3 spec (#838).
+ */
 function applyAuthoritativeMonData(mon: Pokemon, data: PokemonData, authoritativeGuest: boolean): void {
-  const beforeSprite = battleSpriteKey(mon);
   try {
     mon.id = data.id;
     mon.species = getPokemonSpecies(data.species);
@@ -2238,22 +2246,8 @@ function applyAuthoritativeMonData(mon: Pokemon, data: PokemonData, authoritativ
     if (authoritativeGuest && mon instanceof EnemyPokemon) {
       mon.setBoss(data.boss === true || data.bossSegments > 0, data.bossSegments > 0 ? data.bossSegments : undefined);
     }
-    const afterSprite = battleSpriteKey(mon);
-    if (beforeSprite !== "" && afterSprite !== "" && beforeSprite !== afterSprite) {
-      void mon
-        .loadAssets(false)
-        .then(() => {
-          try {
-            mon.playAnim();
-          } catch {
-            /* headless or torn-down sprite */
-          }
-          mon.updateInfo(true);
-        })
-        .catch(() => {});
-    } else {
-      void mon.updateInfo(true);
-    }
+    // NOTE: no render here. The Phase-3 differ (runCoopRenderDiffer) refreshes battle-info + re-summons
+    // on a sprite-key change AFTER the whole state apply, over every on-field mon.
   } catch {
     /* one mon's authoritative data failed; checksum catches residual drift */
   }
@@ -2555,6 +2549,95 @@ function reconcileAuthoritativeModifiers(rawBlobs: Record<string, unknown>[] | u
 }
 
 /**
+ * Snapshot the current on-field sprite key of every active mon, keyed by `Pokemon.id`. Captured
+ * BEFORE the authoritative data apply so {@linkcode runCoopRenderDiffer} can compare against the
+ * post-apply key and re-summon ONLY when the visual identity actually changed. A mon absent from
+ * this map after the apply is a NEWLY-seated field mon (the field reconcile already summoned it),
+ * so it is never re-summoned by the differ.
+ */
+function captureCoopOnFieldSpriteKeys(): Map<number, string> {
+  const keys = new Map<number, string>();
+  try {
+    for (const mon of globalScene.getField(true)) {
+      if (mon != null) {
+        keys.set(mon.id, battleSpriteKey(mon));
+      }
+    }
+  } catch {
+    /* a read failure just yields fewer pre-keys -> the differ degrades to an extra refresh */
+  }
+  return keys;
+}
+
+/**
+ * PHASE 3 render differ (#838): reconcile the guest's RENDER to the (already-applied) authoritative
+ * DATA after a full-state apply. The granularity is DELIBERATELY INVERTED so a missed field degrades
+ * to a harmless extra refresh, never a stale visual:
+ *
+ *  1. CHEAP REFRESH - runs UNCONDITIONALLY on every on-field mon + both held-item bars. These are the
+ *     SAME canonical calls the live game already makes after damage / an item change, so re-running
+ *     them every turn is idempotent and flicker-free:
+ *       - {@linkcode Pokemon.updateInfo} -> the battle-info bar (hp, the ER status badge incl.
+ *         bleed/frostbite/fear, name/gender/level/stat-stage text, shiny/tera icons);
+ *       - {@linkcode EnemyBattleInfo.updateBossSegments} -> the boss segment dividers (enemy);
+ *       - {@linkcode BattleScene.updateModifiers} for BOTH sides -> the held-item indicator bars. The
+ *         authoritative modifier reconcile only redraws on a detected change; re-running the canonical
+ *         bar rebuild here closes the "enemy items don't refresh on the guest" render gap (data
+ *         converged, bar stale) regardless of that gate.
+ *  2. EXPENSIVE RE-SUMMON - reload the atlas + replay the sprite, gated on the `getBattleSpriteKey`
+ *     INPUTS (species/form/shiny/variant/fusion/gender where it affects the sprite) via a before/after
+ *     key compare. So it only fires on a real visual-identity change (form change / transform), and a
+ *     coopLog line marks each one for diagnosability. The #845 absolute-positioning fix stays intact:
+ *     the field reconcile already seated the mon at the live platform base; this only swaps its atlas.
+ *
+ * Fully guarded per mon: one failed refresh never aborts the rest.
+ */
+function runCoopRenderDiffer(preSpriteKeys: Map<number, string>): void {
+  // Item indicators (both bars) - UNCONDITIONAL cheap refresh (the maintainer's "enemy items don't
+  // sync" render gap: the data converges but the bar never redraws when the reconcile sees no change).
+  try {
+    globalScene.updateModifiers(true, true);
+    globalScene.updateModifiers(false, true);
+  } catch {
+    /* held-item bar refresh is best-effort */
+  }
+  for (const mon of globalScene.getField(true)) {
+    if (mon == null) {
+      continue;
+    }
+    try {
+      // (1) CHEAP REFRESH - unconditional battle-info + boss-segment redraw.
+      void mon.updateInfo(true);
+      if (mon instanceof EnemyPokemon) {
+        const info = mon.getBattleInfo();
+        if (info instanceof EnemyBattleInfo) {
+          info.updateBossSegments(mon);
+        }
+      }
+      // (2) EXPENSIVE RE-SUMMON - only when the sprite-key INPUTS changed for a mon already on field.
+      const before = preSpriteKeys.get(mon.id) ?? "";
+      const after = battleSpriteKey(mon);
+      if (before !== "" && after !== "" && before !== after) {
+        coopLog("resync", `render differ: sprite-key change id=${mon.id} ${before} -> ${after} -> re-summon`);
+        void mon
+          .loadAssets(false)
+          .then(() => {
+            try {
+              mon.playAnim();
+            } catch {
+              /* headless or torn-down sprite */
+            }
+            void mon.updateInfo(true);
+          })
+          .catch(() => {});
+      }
+    } catch {
+      /* one mon's render refresh failed; the rest still refresh */
+    }
+  }
+}
+
+/**
  * GUEST: apply the normal-turn authoritative state. Returns false only when the
  * payload was absent, malformed, or stale by tick.
  */
@@ -2580,6 +2663,9 @@ export function applyCoopAuthoritativeBattleState(
     if (!coopAcceptStateTick(state.tick, "authoritativeState")) {
       return false;
     }
+    // PHASE 3 (#838): snapshot the on-field sprite keys BEFORE the data apply mutates species/form/
+    // shiny/etc., so the render differ below re-summons ONLY on an actual visual-identity change.
+    const preSpriteKeys = captureCoopOnFieldSpriteKeys();
     if (typeof state.biomeId === "number" && (globalScene.arena?.biomeId ?? -1) !== state.biomeId) {
       globalScene.newArena(state.biomeId as BiomeId);
     }
@@ -2613,6 +2699,10 @@ export function applyCoopAuthoritativeBattleState(
       Phaser.Math.RND.sow([state.waveSeed]);
     }
     restoreCoopModuleLetSubstrates(state);
+    // PHASE 3 (#838): reconcile the RENDER to the freshly-applied DATA over every on-field mon -
+    // unconditional cheap refresh (battle-info bars, status badge, boss segments, both held-item bars)
+    // + a sprite-key-gated re-summon. Runs LAST so it sees the final field composition + modifier state.
+    runCoopRenderDiffer(preSpriteKeys);
     coopLog(
       "resync",
       `guest apply authoritativeState tick=${state.tick} wave=${state.wave} turn=${state.turn} party=${state.playerParty.length}/${state.enemyParty.length} field=${state.field.length}`,

@@ -2008,6 +2008,41 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
   },
   {
+    label: "(note) Co-op: the partner's on-field visuals refresh every turn (bars, status, boss, items) (#838)",
+    description:
+      "CO-OP fix - verify with TWO clients (not a solo battle). Phase-3 RENDER DIFFER. The PARTNER is a pure\n"
+      + "renderer: it applies the host's authoritative full-state each turn but used to update on-field visuals\n"
+      + "AD-HOC, so a field that the apply forgot to redraw showed STALE on the partner while the data was\n"
+      + "correct - the class the #845 positioning fix + the hp-bar fixes chipped at one at a time. The clearest\n"
+      + "live instance (maintainer report, build mr9oh5r8-kjr @wave 7): 'enemy items don't seem synced' - the\n"
+      + "checksums (incl. the held-item digest) MATCHED, so the DATA was in sync; the ENEMY held-item bar on the\n"
+      + "partner simply never REDREW, because the modifier reconcile only redraws when it detects a change.\n"
+      + "Fixed: after every authoritative apply the partner now runs a systematic differ over every on-field\n"
+      + "mon - a CHEAP refresh runs UNCONDITIONALLY (battle-info bars: HP / status badge incl. bleed/frostbite/\n"
+      + "fear / name / gender / level / stat text; boss segment dividers; BOTH held-item bars), and the\n"
+      + "EXPENSIVE re-summon (reload the sprite atlas) fires ONLY when the sprite-key inputs change (species /\n"
+      + "form / shiny / variant / fusion / gender), i.e. a form change or Transform. So a missed field degrades\n"
+      + "to a harmless extra refresh, never a stale visual. DO (2 clients): fight a wave where the ENEMY holds a\n"
+      + "visible item (e.g. Leftovers) and takes damage / a status; on the OTHER client watch the enemy HP bar,\n"
+      + "status badge and held-item indicator. EXPECT: the partner's enemy item bar, HP bar, status badge and\n"
+      + "boss shields track the host EVERY turn (no stale bar), with NO sprite re-summon flash on a routine turn;\n"
+      + "a real form change / Transform DOES re-summon the sprite, on both clients. Duo-tested headlessly in\n"
+      + "test/tests/elite-redux/coop/coop-duo-render-differ.test.ts (+ the #845 render seam in\n"
+      + "coop-duo-enemy-switch-render.test.ts).",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({ STARTING_WAVE_OVERRIDE: 1, STARTING_LEVEL_OVERRIDE: 50 });
+      return [
+        makeStarter(SpeciesId.CHIKORITA, {
+          moveset: [MoveId.RAZOR_LEAF, MoveId.BODY_SLAM, MoveId.SYNTHESIS, MoveId.REFLECT],
+        }),
+        makeStarter(SpeciesId.FENNEKIN, {
+          moveset: [MoveId.EMBER, MoveId.PSYBEAM, MoveId.QUICK_ATTACK, MoveId.HOWL],
+        }),
+      ];
+    },
+  },
+  {
     label: "(note) Co-op: reciprocal pacing barriers + no counter drift (#839/#837)",
     description:
       "CO-OP fix - verify with TWO clients (not a solo battle). Two related pacing/sync fixes:\n"
