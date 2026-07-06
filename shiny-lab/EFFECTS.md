@@ -3,8 +3,8 @@
 **Live for the team: https://shiny-lab.pages.dev** (Cloudflare Pages). Also
 `articuno-shiny-lab.html` on the Desktop (self-contained except sprites).
 
-**368 effects** in three **combinable** slots - pick one of each and they stack live:
-**138 Palettes + 124 Surface FX + 106 Around FX** (v6 Discord-brainstorm batch + the v7
+**369 effects** in three **combinable** slots - pick one of each and they stack live:
+**138 Palettes + 125 Surface FX + 106 Around FX** (v6 Discord-brainstorm batch + the v7
 mega-expansion doubled every catalog; v7.1 quality pass reworked the weak ones after
 zoomed per-frame triage - see `gen-zoom.mjs`, the per-effect multi-frame review tool).
 
@@ -41,6 +41,15 @@ zoomed per-frame triage - see `gen-zoom.mjs`, the per-effect multi-frame review 
   after-images are SOLID colours forming a complementary triad with the mon's own
   dominant colour (e.g. orange Charizard gets a green echo and a purple echo).
   The original Double Team stays.
+- **Lightning Zaps upgrades**: random bolt length (0.5x-1.5x); every fired bolt
+  chains a fresh 20% roll for one more in the same instant (recursive, hard cap
+  10) for rare overcharged bursts; and each bolt rolls a DEPTH - ~45% arc in
+  FRONT of the sprite (overlay pass), the rest stay behind it.
+- **NEW Gen 1** (surface): the mon as it would look on the original Game Boy -
+  chunky half-res pixels with hard alpha, a dark Red/Blue-style outline, the
+  4-shade DMG green ramp, and selective 50% checkerboard dithering on midtones.
+  Texture-noise slider = chunk size; FX color modes re-tint the ramp (Super Game
+  Boy vibes).
 
 ## v7.1 quality pass (zoom-triage driven)
 Every v6/v7 effect was rendered at 3x with 4 animation frames (`gen-zoom.mjs`) and

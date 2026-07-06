@@ -2954,6 +2954,37 @@ AURA.demake = (r, g, b, x, y, t, ctx) => {
   }
   return [pal[bi][0], pal[bi][1], pal[bi][2], s2[3] > 0.02 ? 1 : 0];
 };
+// Gen 1: the mon as it would look on the original Game Boy - chunky half-res
+// pixels, hard alpha, the 4-shade DMG green ramp, and 2x2 ordered dithering
+// between shades exactly like the Red/Blue sprites. The texture-noise slider
+// re-scales the pixel chunk size; the FX color modes re-tint the ramp (Super
+// Game Boy style).
+AURA.genone = (r, g, b, x, y, t, ctx) => {
+  const s = Math.max(16, Math.round(44 / (FXSCALE || 1)));
+  const cxq = Math.floor(x * s);
+  const cyq = Math.floor(y * s);
+  const s2 = ctx?.sa ? ctx.sa((cxq + 0.5) / s, (cyq + 0.5) / s) : [r, g, b, 1];
+  if (s2[3] <= 0.4) {
+    return [0, 0, 0, 0]; // hard pixel alpha - no soft edges on a Game Boy
+  }
+  const DMG = ["0f380f", "306230", "8bac0f", "9bbc0f"].map(hx);
+  // hard dark outline like the Red/Blue sprites: any chunk bordering transparency
+  if (ctx?.sa) {
+    for (const [ox, oy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+      if (ctx.sa((cxq + ox + 0.5) / s, (cyq + oy + 0.5) / s)[3] <= 0.4) {
+        return [DMG[0][0], DMG[0][1], DMG[0][2], 1];
+      }
+    }
+  }
+  // 4 shades; genuine midtones get the classic 50% checkerboard dither,
+  // everything else stays a FLAT shade (Gen 1 dithered selectively, not evenly)
+  const v = clamp(Math.pow(luma(s2[0], s2[1], s2[2]), 0.85) * 3.4 - 0.2, 0, 3);
+  const base = Math.floor(v);
+  const frac = v - base;
+  let lvl = frac > 0.35 && frac < 0.65 ? base + ((cxq + cyq) & 1) : Math.round(v);
+  lvl = Math.max(0, Math.min(3, lvl));
+  return [DMG[lvl][0], DMG[lvl][1], DMG[lvl][2], 1];
+};
 // Marching Ants: an animated dashed selection crawling along the outline.
 AURA.marchingants = (r, g, b, x, y, t, ctx) => {
   const e = ctx?.e ?? 0;
@@ -4715,6 +4746,7 @@ export const LABELS = {
   blossoms: "Sakura Blossoms",
   astral: "Astral Form",
   triecho: "Double Team Tri",
+  genone: "Gen 1",
 };
 
 // effects that read the edge field / are inherently "partial" (for tagging in UI)
