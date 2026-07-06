@@ -1,0 +1,278 @@
+----- BUG REPORT (in-game) -----
+version:  1.11.19
+url:      https://elite-redux.pages.dev/
+ua:       Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36 Edg/149.0.0.0
+mode:     4  wave:2  difficulty:hell
+seed:     Tv02okdDRZnOAI9UMyahBYXl
+party:    Staryu(L5 19/19)
+
+----- DESCRIPTION -----
+Youngster wave 2 araquanid redux
+
+----- CONSOLE -----
+[21:56:59.108] LOG: %cUser: Staryu
+Move: BOUNCY_BUBBLE
+Use Mode: NORMAL color:orchid
+[21:56:59.108] LOG: %cStart Phase MessagePhase color:green;
+[21:56:59.299] LOG: %cStart Phase MoveEndPhase color:green;
+[21:56:59.299] LOG: %cStart Phase CheckInterludePhase color:green;
+[21:56:59.299] LOG: %cStart Phase WeatherEffectPhase color:green;
+[21:56:59.299] LOG: %cStart Phase PositionalTagPhase color:green;
+[21:56:59.299] LOG: %cStart Phase BerryPhase color:green;
+[21:56:59.299] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[21:56:59.299] LOG: %cStart Phase TurnEndPhase color:green;
+[21:56:59.300] WARN: [coop:turn] host recorder: finalize with NO open recording -> turn=-1 events=0 (caller decides not to emit)
+[21:56:59.300] LOG: %cStart Phase TurnInitPhase color:green;
+[21:56:59.300] LOG: %cStart Phase CommandPhase color:green;
+[21:56:59.825] LOG: Move: BOUNCY_BUBBLE Move targets: {"targets":[2],"multiple":false} 
+Player Pokemon: Staryu
+[21:56:59.826] LOG: %cStart Phase EnemyCommandPhase color:green;
+[21:56:59.826] LOG: Battle Seed: GiliaKPsNMmCY1Zg
+[21:56:59.827] LOG: Move Pool: ["After You","Hone Claws","Fake Out","Quick Attack"]
+[21:56:59.827] LOG: Move Scores: [-20,4,-20,8]
+[21:56:59.827] LOG: Sorted Move Pool: ["Quick Attack","Hone Claws","After You","Fake Out"]
+[21:56:59.827] LOG: Chosen Move: After You
+[21:56:59.827] LOG: %cStart Phase TurnStartPhase color:green;
+[21:56:59.828] LOG: %cStart Phase MovePhase color:green;
+[21:56:59.828] LOG: %cUser: Purrloin
+Move: AFTER_YOU
+Use Mode: NORMAL color:orchid
+[21:56:59.829] LOG: %cStart Phase MessagePhase color:green;
+[21:56:59.940] LOG: %cStart Phase MessagePhase color:green;
+[21:57:00.127] LOG: %cStart Phase MoveEndPhase color:green;
+[21:57:00.127] LOG: %cStart Phase MovePhase color:green;
+[21:57:00.127] LOG: %cUser: Staryu
+Move: BOUNCY_BUBBLE
+Use Mode: NORMAL color:orchid
+[21:57:00.128] LOG: %cStart Phase MessagePhase color:green;
+[21:57:00.239] LOG: %cStart Phase MoveEffectPhase color:green;
+[21:57:00.481] LOG: crit stage: +0
+[21:57:00.481] LOG: Move: Bouncy Bubble | Base damage: 10.914285714285715 | Power: 60 | Source attack: 13 | Target defense: 7
+[21:57:00.482] LOG: Move: Bouncy Bubble | Attack damage: 14
+[21:57:00.482] LOG: %cStart Phase DamageAnimPhase color:green;
+[21:57:00.490] LOG: %cStart Phase PokemonHealPhase color:green;
+[21:57:00.491] LOG: %cStart Phase MessagePhase color:green;
+[21:57:00.697] LOG: %cStart Phase FaintPhase color:green;
+[21:57:00.698] WARN: cry/509 not found
+[21:57:00.752] LOG: %cStart Phase MessagePhase color:green;
+[21:57:00.827] LOG: %cStart Phase VictoryPhase color:green;
+[21:57:00.827] LOG: %cStart Phase ExpPhase color:green;
+[21:57:01.085] LOG: %cStart Phase MoveEndPhase color:green;
+[21:57:01.085] LOG: %cStart Phase CheckInterludePhase color:green;
+[21:57:01.085] LOG: %cStart Phase WeatherEffectPhase color:green;
+[21:57:01.085] LOG: %cStart Phase PositionalTagPhase color:green;
+[21:57:01.085] LOG: %cStart Phase BerryPhase color:green;
+[21:57:01.085] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[21:57:01.085] LOG: %cStart Phase TurnEndPhase color:green;
+[21:57:01.085] WARN: [coop:turn] host recorder: finalize with NO open recording -> turn=-1 events=0 (caller decides not to emit)
+[21:57:01.085] LOG: %cStart Phase BattleEndPhase color:green;
+[21:57:01.085] LOG: Battle Score: 11 (2 Turns x0.84)
+[21:57:01.085] LOG: Total Score: 11
+[21:57:01.087] LOG: %cStart Phase EggLapsePhase color:green;
+[21:57:01.087] LOG: %cStart Phase SelectModifierPhase color:green;
+[21:57:01.087] LOG: Wave Seed: Uw13pleES[oPBJ:VNzbiCZYm 1
+[21:57:01.088] LOG: 0 0 [2,3,4,5]
+[21:57:01.088] LOG: {"id":"POKEBALL","localeKey":"","iconImage":"pb","group":"pb","soundName":"se/pb_bounce_1","tier":0,"pokeballType":0,"count":5} 
+[21:57:01.088] LOG: 8 4 [2,3,4,5]
+[21:57:01.088] LOG: {"id":"BERRY","localeKey":"","iconImage":"leppa_berry","group":"berry","soundName":"se/restore","tier":0,"berryType":10} 
+[21:57:01.088] LOG: 6 4 [2,3,4,5]
+[21:57:01.088] LOG: {"id":"LURE","localeKey":"modifierType:ModifierType.LURE","iconImage":"lure","group":"lure","soundName":"se/restore","tier":0,"maxBattles":10} 
+[21:57:03.662] LOG: %cStart Phase NewBattlePhase color:green;
+[21:57:03.662] LOG: Wave Seed: Vx24qmfFT\pQCK;WO{cjD[Zn 2
+[21:57:03.662] LOG: Starting trainer pool tier: COMMON
+[21:57:03.663] LOG: %cStart Phase ReturnPhase color:green;
+[21:57:03.773] LOG: %cStart Phase ShowTrainerPhase color:green;
+[21:57:03.877] LOG: %cStart Phase NextEncounterPhase color:green;
+[21:57:03.883] LOG: ER #419: elite BST cap (460 @ w2) - replacing Tauros Paldean Combat Breed (530) with Klawf (450)
+[21:57:03.891] LOG: Pokemon: Foe Klawf | Species ID: 950 | Level: 2 | Nature: Modest (+SpAtk/-Atk)
+[21:57:03.891] LOG: Stats (IVs): HP: 14 (31), Atk: 9 (31), Def: 10 (31), Spatk: 7 (31), Spdef: 6 (31), Spd: 8 (31)
+[21:57:03.891] LOG: Ability: Ambush | Passive Ability: Shell Armor 
+[21:57:03.891] LOG: Moveset: ["Diamond Storm","Moonblast","Moonlight","Follow Me"]
+[21:57:03.892] LOG: ER #419: elite BST cap (460 @ w2) - replacing Frostula (557) with Araquanid Redux (454)
+[21:57:03.902] LOG: Pokemon: Foe Araquanid Redux | Species ID: 10820 | Level: 2 | Nature: Timid (+Spd/-Atk)
+[21:57:03.902] LOG: Stats (IVs): HP: 15 (31), Atk: 8 (31), Def: 10 (31), Spatk: 7 (31), Spdef: 7 (31), Spd: 9 (31)
+[21:57:03.902] LOG: Ability: Water Absorb | Passive Ability: Deep Freeze 
+[21:57:03.902] LOG: Moveset: ["Tri Attack","Air Slash","Ancient Power","Sandsear Storm"]
+[21:57:04.143] LOG: Battle Seed: 1q1OKs45FXY7MxQQ
+[21:57:04.144] LOG: Generated AI funcs
+[21:57:04.190] DEBUG: Session data saved to slot 1!
+[21:57:04.190] LOG: Wave Seed: Vx24qmfFT\pQCK;WO{cjD[Zn 2
+[21:57:04.393] LOG: Lass Dianne
+[21:57:04.393] LOG: Dialogue dialogue:lass.encounter.5 skipped
+[21:57:04.423] LOG: Lass Dianne
+[21:57:04.763] LOG: %cStart Phase SummonPhase color:green;
+[21:57:04.763] LOG: Dianne
+[21:57:05.009] LOG: %cStart Phase SummonPhase color:green;
+[21:57:05.180] WARN: cry/120 not found
+[21:57:05.283] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[21:57:05.284] LOG: %cStart Phase InitEncounterPhase color:green;
+[21:57:05.284] LOG: %cStart Phase PostSummonPhase color:green;
+[21:57:05.284] LOG: Ran PSP for: Staryu
+[21:57:05.285] LOG: %cStart Phase PostSummonPhase color:green;
+[21:57:05.285] LOG: %cStart Phase PostSummonPhase color:green;
+[21:57:05.285] LOG: %cStart Phase PostSummonPhase color:green;
+[21:57:05.285] LOG: Ran PSP for: Klawf
+[21:57:05.285] LOG: %cStart Phase PostSummonPhase color:green;
+[21:57:05.285] LOG: %cStart Phase PostSummonPhase color:green;
+[21:57:05.285] LOG: %cStart Phase TurnInitPhase color:green;
+[21:57:05.285] LOG: %cStart Phase CommandPhase color:green;
+[21:57:07.026] LOG: Move: WATER_SHURIKEN Move targets: {"targets":[2],"multiple":false} 
+Player Pokemon: Staryu
+[21:57:07.027] LOG: %cStart Phase EnemyCommandPhase color:green;
+[21:57:07.029] LOG: %cStart Phase TurnStartPhase color:green;
+[21:57:07.029] LOG: %cStart Phase SwitchSummonPhase color:green;
+[21:57:07.030] LOG: Dianne
+[21:57:07.289] LOG: Dianne
+[21:57:07.381] WARN: cry/10820 not found
+[21:57:07.485] LOG: %cStart Phase PostSummonPhase color:green;
+[21:57:07.485] LOG: Ran PSP for: Araquanid Redux
+[21:57:07.485] LOG: %cStart Phase PostSummonPhase color:green;
+[21:57:07.486] LOG: %cStart Phase PostSummonPhase color:green;
+[21:57:07.486] LOG: %cStart Phase MovePhase color:green;
+[21:57:07.486] LOG: %cUser: Staryu
+Move: WATER_SHURIKEN
+Use Mode: NORMAL color:orchid
+[21:57:07.486] LOG: %cStart Phase MessagePhase color:green;
+[21:57:07.597] LOG: %cStart Phase MoveEffectPhase color:green;
+[21:57:07.598] LOG: %cStart Phase ShowAbilityPhase color:green;
+[21:57:07.752] LOG: %cStart Phase HideAbilityPhase color:green;
+[21:57:07.776] LOG: %cStart Phase MessagePhase color:green;
+[21:57:08.013] LOG: %cStart Phase MoveEndPhase color:green;
+[21:57:08.014] LOG: %cStart Phase CheckInterludePhase color:green;
+[21:57:08.014] LOG: %cStart Phase WeatherEffectPhase color:green;
+[21:57:08.014] LOG: %cStart Phase PositionalTagPhase color:green;
+[21:57:08.014] LOG: %cStart Phase BerryPhase color:green;
+[21:57:08.014] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[21:57:08.014] LOG: %cStart Phase TurnEndPhase color:green;
+[21:57:08.014] WARN: [coop:turn] host recorder: finalize with NO open recording -> turn=-1 events=0 (caller decides not to emit)
+[21:57:08.014] LOG: %cStart Phase TurnInitPhase color:green;
+[21:57:08.015] LOG: %cStart Phase CommandPhase color:green;
+[21:57:21.973] LOG: Move: MOONBLAST Move targets: {"targets":[2],"multiple":false} 
+Player Pokemon: Staryu
+[21:57:21.974] LOG: %cStart Phase EnemyCommandPhase color:green;
+[21:57:21.975] LOG: %cStart Phase TurnStartPhase color:green;
+[21:57:21.976] LOG: %cStart Phase SwitchSummonPhase color:green;
+[21:57:21.976] LOG: Dianne
+[21:57:22.238] LOG: Dianne
+[21:57:22.438] LOG: %cStart Phase PostSummonPhase color:green;
+[21:57:22.438] LOG: Ran PSP for: Klawf
+[21:57:22.438] LOG: %cStart Phase PostSummonPhase color:green;
+[21:57:22.438] LOG: %cStart Phase PostSummonPhase color:green;
+[21:57:22.438] LOG: %cStart Phase MovePhase color:green;
+[21:57:22.438] LOG: %cUser: Staryu
+Move: MOONBLAST
+Use Mode: NORMAL color:orchid
+[21:57:22.439] LOG: %cStart Phase MessagePhase color:green;
+[21:57:22.541] LOG: %cStart Phase MoveEffectPhase color:green;
+[21:57:22.542] LOG: Battle Seed: 1q1OKs45FXY7MxQQ
+[21:57:22.966] LOG: crit stage: +0
+[21:57:22.967] LOG: Move: Moonblast | Base damage: 23.171428571428574 | Power: 142.5 | Source attack: 13 | Target defense: 7
+[21:57:22.967] LOG: Move: Moonblast | Attack damage: 16
+[21:57:22.967] LOG: %cStart Phase DamageAnimPhase color:green;
+[21:57:22.975] LOG: %cStart Phase FaintPhase color:green;
+[21:57:25.813] LOG: %cStart Phase MessagePhase color:green;
+[21:57:26.117] LOG: %cStart Phase VictoryPhase color:green;
+[21:57:26.118] LOG: %cStart Phase ExpPhase color:green;
+[21:57:26.587] LOG: %cStart Phase LevelUpPhase color:green;
+[21:57:26.587] LOG: %cStart Phase MoveEndPhase color:green;
+[21:57:26.587] LOG: %cStart Phase CheckInterludePhase color:green;
+[21:57:26.587] LOG: %cStart Phase WeatherEffectPhase color:green;
+[21:57:26.587] LOG: %cStart Phase PositionalTagPhase color:green;
+[21:57:26.587] LOG: %cStart Phase BerryPhase color:green;
+[21:57:26.587] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[21:57:26.588] LOG: %cStart Phase TurnEndPhase color:green;
+[21:57:26.588] WARN: [coop:turn] host recorder: finalize with NO open recording -> turn=-1 events=0 (caller decides not to emit)
+[21:57:26.588] LOG: %cStart Phase SwitchSummonPhase color:green;
+[21:57:26.820] LOG: Dianne
+[21:57:26.915] WARN: cry/10820 not found
+[21:57:27.020] LOG: %cStart Phase PostSummonPhase color:green;
+[21:57:27.020] LOG: Ran PSP for: Araquanid Redux
+[21:57:27.020] LOG: %cStart Phase PostSummonPhase color:green;
+[21:57:27.020] LOG: %cStart Phase PostSummonPhase color:green;
+[21:57:27.020] LOG: %cStart Phase TurnInitPhase color:green;
+[21:57:27.020] LOG: %cStart Phase CommandPhase color:green;
+[21:57:29.380] DEBUG: Session data saved to slot 1!
+[21:57:29.944] LOG: Seed: ArOWuHLcUPIqfS5ir1C43VgB
+[21:57:29.944] LOG: Wave Seed: ArOWuHLcUPIqfS5ir1C43VgB 0
+[21:57:30.169] WARN: AnimationManager key already exists: prompt
+[21:57:30.169] WARN: AnimationManager key already exists: tera_sparkle
+[21:57:30.169] LOG: Seed: i6mv0WjhwFjTPLHGebUKw9xI
+[21:57:30.169] LOG: Wave Seed: i6mv0WjhwFjTPLHGebUKw9xI 0
+[21:57:31.548] LOG: %cStart Phase LoginPhase color:green;
+[21:57:31.782] LOG: Client Session: Exp3bsLw4etMKq1r8jbF8DziSTFCjETe
+[21:57:32.073] LOG: %cStart Phase TitlePhase color:green;
+[21:57:32.073] LOG: Getting Session Slot id: %d 1
+[21:57:32.080] LOG: use seasonal splash messages true
+[21:57:34.112] LOG: Getting Session Slot id: %d 0
+[21:57:34.113] LOG: Getting Session Slot id: %d 1
+[21:57:34.115] LOG: Getting Session Slot id: %d 2
+[21:57:34.116] LOG: Getting Session Slot id: %d 3
+[21:57:34.117] LOG: Getting Session Slot id: %d 4
+[21:57:34.142] LOG: Getting Session Slot id: %d 1
+[21:57:34.245] ERROR: Invalid save data JSON detected! Session not found.
+[21:57:34.246] ERROR: Invalid save data JSON detected! Session not found.
+[21:57:37.194] LOG: Lass Dianne
+[22:04:44.173] LOG: Getting Session Slot id: %d 1
+[22:04:44.175] LOG: Wave Seed: Tv02okdDRZnOAI9UMyahBYXl 0
+[22:04:44.175] LOG: Seed: Tv02okdDRZnOAI9UMyahBYXl
+[22:04:44.179] LOG: Wave Seed: Vx24qmfFT\pQCK;WO{cjD[Zn 2
+[22:04:44.238] LOG: %cStart Phase EncounterPhase color:green;
+[22:04:44.239] LOG: Pokemon: Foe Klawf | Species ID: 950 | Level: 2 | Nature: Modest (+SpAtk/-Atk)
+[22:04:44.239] LOG: Stats (IVs): HP: 15 (31), Atk: 8 (31), Def: 10 (31), Spatk: 8 (31), Spdef: 7 (31), Spd: 8 (31)
+[22:04:44.240] LOG: Ability: Ambush | Passive Ability: Shell Armor 
+[22:04:44.240] LOG: Moveset: ["Diamond Storm","Moonblast","Moonlight","Follow Me"]
+[22:04:44.240] LOG: Pokemon: Foe Araquanid Redux | Species ID: 10820 | Level: 2 | Nature: Timid (+Spd/-Atk)
+[22:04:44.240] LOG: Stats (IVs): HP: 15 (31), Atk: 8 (31), Def: 10 (31), Spatk: 7 (31), Spdef: 7 (31), Spd: 9 (31)
+[22:04:44.240] LOG: Ability: Water Absorb | Passive Ability: Deep Freeze 
+[22:04:44.240] LOG: Moveset: ["Tri Attack","Air Slash","Ancient Power","Sandsear Storm"]
+[22:04:44.270] LOG: Generated AI funcs
+[22:04:44.270] LOG: Wave Seed: Vx24qmfFT\pQCK;WO{cjD[Zn 2
+[22:04:44.474] LOG: Lass Dianne
+[22:04:44.475] LOG: Dialogue dialogue:lass.encounter.5 skipped
+[22:04:44.505] LOG: Lass Dianne
+[22:04:46.709] LOG: %cStart Phase SummonPhase color:green;
+[22:04:46.710] LOG: Dianne
+[22:04:46.955] LOG: %cStart Phase SummonPhase color:green;
+[22:04:47.125] WARN: cry/120 not found
+[22:04:47.229] LOG: %cStart Phase InitEncounterPhase color:green;
+[22:04:47.230] LOG: %cStart Phase PostSummonPhase color:green;
+[22:04:47.230] LOG: Ran PSP for: Staryu
+[22:04:47.230] LOG: %cStart Phase PostSummonPhase color:green;
+[22:04:47.230] LOG: %cStart Phase PostSummonPhase color:green;
+[22:04:47.231] LOG: %cStart Phase PostSummonPhase color:green;
+[22:04:47.231] LOG: Ran PSP for: Klawf
+[22:04:47.231] LOG: %cStart Phase PostSummonPhase color:green;
+[22:04:47.231] LOG: %cStart Phase PostSummonPhase color:green;
+[22:04:47.231] LOG: %cStart Phase TurnInitPhase color:green;
+[22:04:47.231] LOG: %cStart Phase CommandPhase color:green;
+[22:04:55.584] LOG: Move: BOUNCY_BUBBLE Move targets: {"targets":[2],"multiple":false} 
+Player Pokemon: Staryu
+[22:04:55.585] LOG: %cStart Phase EnemyCommandPhase color:green;
+[22:04:55.588] LOG: %cStart Phase TurnStartPhase color:green;
+[22:04:55.588] LOG: %cStart Phase SwitchSummonPhase color:green;
+[22:04:55.588] LOG: Dianne
+[22:04:55.848] LOG: Dianne
+[22:04:55.940] WARN: cry/10820 not found
+[22:04:56.044] LOG: %cStart Phase PostSummonPhase color:green;
+[22:04:56.044] LOG: Ran PSP for: Araquanid Redux
+[22:04:56.044] LOG: %cStart Phase PostSummonPhase color:green;
+[22:04:56.044] LOG: %cStart Phase PostSummonPhase color:green;
+[22:04:56.045] LOG: %cStart Phase MovePhase color:green;
+[22:04:56.045] LOG: %cUser: Staryu
+Move: BOUNCY_BUBBLE
+Use Mode: NORMAL color:orchid
+[22:04:56.045] LOG: %cStart Phase MessagePhase color:green;
+[22:04:56.156] LOG: %cStart Phase MoveEffectPhase color:green;
+[22:04:56.157] LOG: %cStart Phase ShowAbilityPhase color:green;
+[22:04:56.314] LOG: %cStart Phase HideAbilityPhase color:green;
+[22:04:56.340] LOG: %cStart Phase MessagePhase color:green;
+[22:04:56.576] LOG: %cStart Phase MoveEndPhase color:green;
+[22:04:56.576] LOG: %cStart Phase CheckInterludePhase color:green;
+[22:04:56.576] LOG: %cStart Phase WeatherEffectPhase color:green;
+[22:04:56.577] LOG: %cStart Phase PositionalTagPhase color:green;
+[22:04:56.577] LOG: %cStart Phase BerryPhase color:green;
+[22:04:56.577] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[22:04:56.577] LOG: %cStart Phase TurnEndPhase color:green;
+[22:04:56.578] WARN: [coop:turn] host recorder: finalize with NO open recording -> turn=-1 events=0 (caller decides not to emit)
+[22:04:56.578] LOG: %cStart Phase TurnInitPhase color:green;
+[22:04:56.578] LOG: %cStart Phase CommandPhase color:green;
