@@ -1,0 +1,289 @@
+url:      https://elite-redux-staging.pages.dev/
+build:    mr85z572-cfqg
+mode:     4  wave:72
+seed:     KwloZFIqCVaHAhdckXf2KPnp
+party:    Volcanion(L57 172hp f0), Altaria Redux(L58 145hp f1), Phione(L58 0hp f0), Reuniclus Redux(L56 0hp f1)
+enemy:    Delphox Battle Bond(L59), Rexcadrill(L59), Breloom Mega(L59), Xatu(L59), Gengar(L59), Guardozel(L59)
+
+----- COMMENT -----
+Send out glitch happened on both sides this time
+
+----- CONSOLE -----
+[05:15:09.419] LOG: Sorted Move Pool: ["Bullet Seed","Drain Punch","Fumigation Bomb","Fire Lash"]
+[05:15:09.419] LOG: Chosen Move: Bullet Seed
+[05:15:09.419] LOG: %cStart Phase EnemyCommandPhase color:green;
+[05:15:09.474] LOG: Move Pool: ["Drain Punch","Spore","Surging Strikes","Wave Crash"]
+[05:15:09.474] LOG: Move Scores: [15,10,18.375,13.875]
+[05:15:09.474] LOG: Sorted Move Pool: ["Surging Strikes","Drain Punch","Wave Crash","Spore"]
+[05:15:09.474] LOG: Chosen Move: Surging Strikes
+[05:15:09.474] LOG: %cStart Phase TurnStartPhase color:green;
+[05:15:09.513] LOG: %cStart Phase MovePhase color:green;
+[05:15:09.513] LOG: %cUser: Mega Reuniclus Redux
+Move: FLAME_BURST
+Use Mode: NORMAL color:orchid
+[05:15:09.551] LOG: %cStart Phase MessagePhase color:green;
+[05:15:09.683] LOG: %cStart Phase MoveEffectPhase color:green;
+[05:15:09.687] LOG: crit stage: +0
+[05:15:09.691] LOG: Move: Flame Burst | Base damage: 28.629933774834434 | Power: 40 | Source attack: 206 | Target defense: 151
+[05:15:09.692] LOG: Move: Flame Burst | Attack damage: 74
+[05:15:09.694] LOG: %cStart Phase DamageAnimPhase color:green;
+[05:15:09.721] LOG: %cStart Phase MessagePhase color:green;
+[05:15:09.934] LOG: %cStart Phase DamageAnimPhase color:green;
+[05:15:09.943] LOG: %cStart Phase MoveEndPhase color:green;
+[05:15:09.955] LOG: %cStart Phase MovePhase color:green;
+[05:15:09.955] LOG: %cUser: Breloom Mega
+Move: BULLET_SEED
+Use Mode: NORMAL color:orchid
+[05:15:10.030] LOG: %cStart Phase MessagePhase color:green;
+[05:15:10.116] LOG: %cStart Phase MoveEffectPhase color:green;
+[05:15:10.122] LOG: crit stage: +1
+[05:15:10.128] LOG: Move: Bullet Seed | Base damage: 28.995488721804513 | Power: 37.5 | Source attack: 187 | Target defense: 133
+[05:15:10.130] LOG: Move: Bullet Seed | Attack damage: 86
+[05:15:10.132] LOG: %cStart Phase DamageAnimPhase color:green;
+[05:15:10.155] LOG: %cStart Phase MoveEffectPhase color:green;
+[05:15:10.156] LOG: crit stage: +1
+[05:15:10.157] LOG: Move: Bullet Seed | Base damage: 28.995488721804513 | Power: 37.5 | Source attack: 187 | Target defense: 133
+[05:15:10.158] LOG: Move: Bullet Seed | Attack damage: 80
+[05:15:10.159] LOG: %cStart Phase DamageAnimPhase color:green;
+[05:15:10.188] LOG: %cStart Phase MoveEffectPhase color:green;
+[05:15:10.189] LOG: crit stage: +1
+[05:15:10.191] LOG: Move: Bullet Seed | Base damage: 28.995488721804513 | Power: 37.5 | Source attack: 187 | Target defense: 133
+[05:15:10.192] LOG: Move: Bullet Seed | Attack damage: 79
+[05:15:10.193] LOG: %cStart Phase DamageAnimPhase color:green;
+[05:15:10.222] LOG: %cStart Phase MessagePhase color:green;
+[05:15:10.434] LOG: %cStart Phase MessagePhase color:green;
+[05:15:10.633] LOG: %cStart Phase FaintPhase color:green;
+[05:15:10.747] LOG: %cStart Phase MessagePhase color:green;
+[05:15:11.213] LOG: %cStart Phase MoveEndPhase color:green;
+[05:15:11.222] LOG: %cStart Phase MovePhase color:green;
+[05:15:11.223] LOG: %cUser: Guardozel
+Move: SURGING_STRIKES
+Use Mode: NORMAL color:orchid
+[05:15:11.239] LOG: %cStart Phase MessagePhase color:green;
+[05:15:11.349] LOG: %cStart Phase MessagePhase color:green;
+[05:15:11.550] LOG: %cStart Phase MoveEndPhase color:green;
+[05:15:11.554] LOG: %cStart Phase MovePhase color:green;
+[05:15:11.554] LOG: %cStart Phase MoveEndPhase color:green;
+[05:15:11.555] LOG: %cStart Phase MovePhase color:green;
+[05:15:11.555] LOG: %cUser: Delphox Battle Bond
+Move: BLAST_BURN
+Use Mode: NORMAL color:orchid
+[05:15:11.571] LOG: %cStart Phase MessagePhase color:green;
+[05:15:11.701] LOG: %cStart Phase MessagePhase color:green;
+[05:15:11.900] LOG: %cStart Phase MoveEndPhase color:green;
+[05:15:11.900] LOG: %cStart Phase MovePhase color:green;
+[05:15:11.900] LOG: %cUser: Mega Altaria Redux
+Move: DECORATE
+Use Mode: NORMAL color:orchid
+[05:15:11.933] LOG: %cStart Phase MessagePhase color:green;
+[05:15:12.016] LOG: %cStart Phase MoveEffectPhase color:green;
+[05:15:12.019] LOG: crit stage: +0
+[05:15:12.022] LOG: Move: Decorate | Base damage: 52.658461538461545 | Power: 80 | Source attack: 147 | Target defense: 117
+[05:15:12.023] LOG: Move: Decorate | Attack damage: 50
+[05:15:12.024] LOG: %cStart Phase DamageAnimPhase color:green;
+[05:15:12.054] LOG: %cStart Phase MoveEndPhase color:green;
+[05:15:12.054] LOG: %cStart Phase CheckInterludePhase color:green;
+[05:15:12.054] LOG: %cStart Phase WeatherEffectPhase color:green;
+[05:15:12.054] LOG: %cStart Phase PositionalTagPhase color:green;
+[05:15:12.054] LOG: %cStart Phase BerryPhase color:green;
+[05:15:12.072] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[05:15:12.085] LOG: %cStart Phase TurnEndPhase color:green;
+[05:15:12.097] WARN: [coop:turn] host recorder: finalize with NO open recording -> turn=-1 events=0 (caller decides not to emit)
+[05:15:12.097] LOG: %cStart Phase SwitchPhase color:green;
+[05:15:12.097] LOG: %cStart Phase TurnInitPhase color:green;
+[05:15:12.097] LOG: %cStart Phase CommandPhase color:green;
+[05:15:15.497] LOG: Move: FLAME_BURST Move targets: {"targets":[3,4,5,1],"multiple":false} 
+Player Pokemon: Mega Reuniclus Redux
+[05:15:15.500] LOG: %cStart Phase SelectTargetPhase color:green;
+[05:15:16.396] LOG: %cStart Phase CommandPhase color:green;
+[05:15:18.494] LOG: Move: DECORATE Move targets: {"targets":[3,4,5,0],"multiple":false} 
+Player Pokemon: Mega Altaria Redux
+[05:15:18.498] LOG: %cStart Phase SelectTargetPhase color:green;
+[05:15:21.914] LOG: %cStart Phase EnemyCommandPhase color:green;
+[05:15:21.928] LOG: Applied X Sp. Def 
+[05:15:21.931] LOG: Applied X Sp. Def 
+[05:15:21.933] LOG: Applied X Sp. Def 
+[05:15:21.936] LOG: Applied X Sp. Def 
+[05:15:21.944] LOG: Battle Seed: TljJ0xQDHDLFTnwk
+[05:15:21.954] LOG: Move Pool: ["Giga Drain","Trump Card","Aqua Jet"]
+[05:15:21.954] LOG: Move Scores: [15,8,8]
+[05:15:21.954] LOG: Sorted Move Pool: ["Giga Drain","Trump Card","Aqua Jet"]
+[05:15:21.954] LOG: Chosen Move: Giga Drain
+[05:15:21.954] LOG: %cStart Phase EnemyCommandPhase color:green;
+[05:15:21.992] LOG: Move Pool: ["Drain Punch","Fire Lash","Fumigation Bomb","Bullet Seed"]
+[05:15:21.992] LOG: Move Scores: [25.5,3.9375,15,30]
+[05:15:21.992] LOG: Sorted Move Pool: ["Bullet Seed","Drain Punch","Fumigation Bomb","Fire Lash"]
+[05:15:21.992] LOG: Chosen Move: Bullet Seed
+[05:15:21.992] LOG: %cStart Phase EnemyCommandPhase color:green;
+[05:15:22.011] LOG: Move Pool: ["Drain Punch","Spore","Surging Strikes","Wave Crash"]
+[05:15:22.011] LOG: Move Scores: [15,10,-20,-20]
+[05:15:22.011] LOG: Sorted Move Pool: ["Drain Punch","Spore","Surging Strikes","Wave Crash"]
+[05:15:22.011] LOG: Chosen Move: Spore
+[05:15:22.011] LOG: %cStart Phase TurnStartPhase color:green;
+[05:15:22.031] LOG: %cStart Phase MovePhase color:green;
+[05:15:22.031] LOG: %cUser: Mega Reuniclus Redux
+Move: FLAME_BURST
+Use Mode: NORMAL color:orchid
+[05:15:22.047] LOG: %cStart Phase MessagePhase color:green;
+[05:15:22.144] LOG: %cStart Phase MoveEffectPhase color:green;
+[05:15:22.146] LOG: crit stage: +0
+[05:15:22.149] LOG: Move: Flame Burst | Base damage: 28.629933774834434 | Power: 40 | Source attack: 206 | Target defense: 151
+[05:15:22.150] LOG: Move: Flame Burst | Attack damage: 85
+[05:15:22.152] LOG: %cStart Phase DamageAnimPhase color:green;
+[05:15:22.178] LOG: %cStart Phase MessagePhase color:green;
+[05:15:22.374] LOG: %cStart Phase DamageAnimPhase color:green;
+[05:15:22.383] LOG: %cStart Phase FaintPhase color:green;
+[05:15:22.392] WARN: cry/10502 not found
+[05:15:22.470] LOG: %cStart Phase MessagePhase color:green;
+[05:15:22.849] LOG: %cStart Phase VictoryPhase color:green;
+[05:15:22.850] LOG: %cStart Phase ExpPhase color:green;
+[05:15:22.851] LOG: Applied Super EXP. Charm 
+[05:15:22.851] LOG: Applied EXP. Charm 
+[05:15:23.073] LOG: %cStart Phase ExpPhase color:green;
+[05:15:23.074] LOG: Applied Super EXP. Charm 
+[05:15:23.074] LOG: Applied EXP. Charm 
+[05:15:23.273] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[05:15:23.274] LOG: Applied Super EXP. Charm 
+[05:15:23.274] LOG: Applied EXP. Charm 
+[05:15:23.275] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[05:15:23.275] LOG: %cStart Phase MoveEndPhase color:green;
+[05:15:23.281] LOG: %cStart Phase MovePhase color:green;
+[05:15:23.282] LOG: %cUser: Guardozel
+Move: SPORE
+Use Mode: NORMAL color:orchid
+[05:15:23.297] LOG: %cStart Phase MessagePhase color:green;
+[05:15:23.388] LOG: %cStart Phase MoveEffectPhase color:green;
+[05:15:23.395] LOG: %cStart Phase ObtainStatusEffectPhase color:green;
+[05:15:23.397] LOG: %cStart Phase MessagePhase color:green;
+[05:15:23.620] LOG: %cStart Phase MoveEndPhase color:green;
+[05:15:23.625] LOG: %cStart Phase MovePhase color:green;
+[05:15:23.625] LOG: %cUser: Delphox Battle Bond
+Move: GIGA_DRAIN
+Use Mode: NORMAL color:orchid
+[05:15:23.644] LOG: %cStart Phase MessagePhase color:green;
+[05:15:23.787] LOG: %cStart Phase MoveEffectPhase color:green;
+[05:15:23.790] LOG: crit stage: +0
+[05:15:23.793] LOG: Applied X Sp. Def 
+[05:15:23.793] LOG: Move: Giga Drain | Base damage: 43.01224489795918 | Power: 75 | Source attack: 157 | Target defense: 147
+[05:15:23.794] LOG: Move: Giga Drain | Attack damage: 41
+[05:15:23.796] LOG: %cStart Phase DamageAnimPhase color:green;
+[05:15:23.823] LOG: %cStart Phase PokemonHealPhase color:green;
+[05:15:23.827] LOG: %cStart Phase MessagePhase color:green;
+[05:15:24.070] LOG: %cStart Phase MoveEndPhase color:green;
+[05:15:24.072] LOG: %cStart Phase MovePhase color:green;
+[05:15:24.072] LOG: %cUser: Mega Altaria Redux
+Move: DECORATE
+Use Mode: NORMAL color:orchid
+[05:15:24.074] LOG: %cStart Phase MessagePhase color:green;
+[05:15:24.320] LOG: %cStart Phase CommonAnimPhase color:green;
+[05:15:24.320] LOG: %cStart Phase MoveEndPhase color:green;
+[05:15:24.320] LOG: %cStart Phase MovePhase color:green;
+[05:15:24.321] LOG: %cStart Phase MoveEndPhase color:green;
+[05:15:24.321] LOG: %cStart Phase CheckInterludePhase color:green;
+[05:15:24.321] LOG: %cStart Phase WeatherEffectPhase color:green;
+[05:15:24.321] LOG: %cStart Phase PositionalTagPhase color:green;
+[05:15:24.321] LOG: %cStart Phase BerryPhase color:green;
+[05:15:24.343] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[05:15:24.352] LOG: %cStart Phase TurnEndPhase color:green;
+[05:15:24.363] WARN: [coop:turn] host recorder: finalize with NO open recording -> turn=-1 events=0 (caller decides not to emit)
+[05:15:24.363] LOG: %cStart Phase SwitchSummonPhase color:green;
+[05:15:24.555] LOG: maskguydude
+[05:15:24.654] LOG: Applied Protein (enemy)
+[05:15:24.656] LOG: Applied Iron (enemy)
+[05:15:24.657] LOG: Applied Zinc (enemy)
+[05:15:24.688] WARN: cry/10658 not found
+[05:15:24.807] LOG: %cStart Phase PostSummonPhase color:green;
+[05:15:24.807] LOG: Ran PSP for: Rexcadrill
+[05:15:24.809] LOG: %cStart Phase PostSummonPhase color:green;
+[05:15:24.809] LOG: %cStart Phase PostSummonPhase color:green;
+[05:15:24.809] LOG: %cStart Phase ShowAbilityPhase color:green;
+[05:15:24.980] LOG: %cStart Phase HideAbilityPhase color:green;
+[05:15:25.026] LOG: %cStart Phase TurnInitPhase color:green;
+[05:15:25.027] LOG: %cStart Phase CommandPhase color:green;
+[05:15:26.698] LOG: Move: BUBBLE_BEAM Move targets: {"targets":[3,4,1],"multiple":false} 
+Player Pokemon: Mega Reuniclus Redux
+[05:15:26.703] LOG: %cStart Phase SelectTargetPhase color:green;
+[05:15:27.394] LOG: %cStart Phase CommandPhase color:green;
+[05:15:29.600] LOG: Move: WATER_PLEDGE Move targets: {"targets":[3,4,0],"multiple":false} 
+Player Pokemon: Mega Altaria Redux
+[05:15:29.604] LOG: %cStart Phase SelectTargetPhase color:green;
+[05:15:30.570] LOG: %cStart Phase EnemyCommandPhase color:green;
+[05:15:30.583] LOG: Applied X Sp. Def 
+[05:15:30.586] LOG: Applied X Sp. Def 
+[05:15:30.588] LOG: Applied X Sp. Def 
+[05:15:30.591] LOG: Applied X Sp. Def 
+[05:15:30.597] LOG: Applied X Sp. Def 
+[05:15:30.601] LOG: Applied X Sp. Def 
+[05:15:30.605] LOG: Battle Seed: TljJ0xQDHDLFTnwk
+[05:15:30.621] LOG: Move Pool: ["Giga Drain","Trump Card","Aqua Jet","Blast Burn"]
+[05:15:30.621] LOG: Move Scores: [15,8,-20,9.28125]
+[05:15:30.621] LOG: Sorted Move Pool: ["Giga Drain","Blast Burn","Trump Card","Aqua Jet"]
+[05:15:30.622] LOG: Chosen Move: Giga Drain
+[05:15:30.622] LOG: %cStart Phase EnemyCommandPhase color:green;
+[05:15:30.636] LOG: Move Pool: ["Seismic Slam"]
+[05:15:30.637] LOG: Move Scores: [66]
+[05:15:30.637] LOG: Sorted Move Pool: ["Seismic Slam"]
+[05:15:30.637] LOG: Chosen Move: Seismic Slam
+[05:15:30.637] LOG: %cStart Phase TurnStartPhase color:green;
+[05:15:30.647] LOG: %cStart Phase MovePhase color:green;
+[05:15:30.647] LOG: %cUser: Delphox Battle Bond
+Move: GIGA_DRAIN
+Use Mode: NORMAL color:orchid
+[05:15:30.657] LOG: %cStart Phase MessagePhase color:green;
+[05:15:30.778] LOG: %cStart Phase MoveEffectPhase color:green;
+[05:15:30.781] LOG: crit stage: +0
+[05:15:30.784] LOG: Applied X Sp. Def 
+[05:15:30.784] LOG: Move: Giga Drain | Base damage: 26.912396694214877 | Power: 75 | Source attack: 157 | Target defense: 242
+[05:15:30.786] LOG: Move: Giga Drain | Attack damage: 12
+[05:15:30.787] LOG: %cStart Phase DamageAnimPhase color:green;
+[05:15:30.816] LOG: %cStart Phase PokemonHealPhase color:green;
+[05:15:30.816] LOG: %cStart Phase MessagePhase color:green;
+[05:15:31.039] LOG: %cStart Phase MoveEndPhase color:green;
+[05:15:31.042] LOG: %cStart Phase MovePhase color:green;
+[05:15:31.042] LOG: %cUser: Mega Altaria Redux
+Move: WATER_PLEDGE
+Use Mode: NORMAL color:orchid
+[05:15:31.043] LOG: %cStart Phase MessagePhase color:green;
+[05:15:31.289] LOG: %cStart Phase CommonAnimPhase color:green;
+[05:15:31.289] LOG: %cStart Phase MoveEndPhase color:green;
+[05:15:31.291] LOG: %cStart Phase MovePhase color:green;
+[05:15:31.291] LOG: %cUser: Rexcadrill
+Move: SEISMIC_SLAM
+Use Mode: NORMAL color:orchid
+[05:15:31.308] LOG: %cStart Phase MessagePhase color:green;
+[05:15:31.421] LOG: %cStart Phase MoveEffectPhase color:green;
+[05:15:31.424] LOG: crit stage: +0
+[05:15:31.426] LOG: Move: Seismic Slam | Base damage: 88.81739130434782 | Power: 120 | Source attack: 195 | Target defense: 138
+[05:15:31.428] LOG: Move: Seismic Slam | Attack damage: 237
+[05:15:31.430] LOG: %cStart Phase DamageAnimPhase color:green;
+[05:15:31.459] LOG: %cStart Phase MessagePhase color:green;
+[05:15:31.672] LOG: %cStart Phase DamageAnimPhase color:green;
+[05:15:31.679] LOG: %cStart Phase MessagePhase color:green;
+[05:15:31.922] LOG: %cStart Phase FaintPhase color:green;
+[05:15:31.928] WARN: cry/10720 not found
+[05:15:31.993] LOG: %cStart Phase MessagePhase color:green;
+[05:15:32.198] LOG: %cStart Phase MoveEndPhase color:green;
+[05:15:32.198] LOG: %cStart Phase MovePhase color:green;
+[05:15:32.199] LOG: %cStart Phase MoveEndPhase color:green;
+[05:15:32.199] LOG: %cStart Phase CheckInterludePhase color:green;
+[05:15:32.199] LOG: %cStart Phase WeatherEffectPhase color:green;
+[05:15:32.199] LOG: %cStart Phase PositionalTagPhase color:green;
+[05:15:32.199] LOG: %cStart Phase BerryPhase color:green;
+[05:15:32.202] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[05:15:32.205] LOG: %cStart Phase TurnEndPhase color:green;
+[05:15:32.211] WARN: [coop:turn] host recorder: finalize with NO open recording -> turn=-1 events=0 (caller decides not to emit)
+[05:15:32.211] LOG: %cStart Phase SwitchPhase color:green;
+[05:15:34.568] LOG: %cStart Phase SwitchSummonPhase color:green;
+[05:15:34.660] LOG: Applied Carbos 
+[05:15:34.800] LOG: %cStart Phase PostSummonPhase color:green;
+[05:15:34.801] LOG: Ran PSP for: Volcanion
+[05:15:34.801] LOG: %cStart Phase PostSummonPhase color:green;
+[05:15:34.802] LOG: Applied Mystical Rock 
+[05:15:34.813] LOG: Applied Mystical Rock 
+[05:15:34.813] LOG: %cStart Phase ShowAbilityPhase color:green;
+[05:15:34.982] LOG: %cStart Phase CommonAnimPhase color:green;
+[05:15:34.983] LOG: %cStart Phase MessagePhase color:green;
+[05:15:35.193] LOG: %cStart Phase HideAbilityPhase color:green;
+[05:15:35.238] LOG: %cStart Phase PostSummonPhase color:green;
+[05:15:35.238] LOG: %cStart Phase TurnInitPhase color:green;
+[05:15:35.239] LOG: %cStart Phase CommandPhase color:green;
