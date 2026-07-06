@@ -69,6 +69,42 @@ jobs:
             echo "WARNING: could not resolve er-assets HEAD - keeping the committed pin."
           fi
 
+      # jsDelivr caches per-SHA, so a fresh pin is COLD on the CDN edge and the first
+      # player fetches after a deploy can transiently fail; the game loader has no
+      # retry for the UI atlases, so one failed fetch means a whole session of
+      # __MISSING icons (the 2026-07-06 staging report: items/types/species icons all
+      # placeholder). Warm + VERIFY the critical UI atlases at the new pin before the
+      # build; if the pin will not serve after retries, fall back to the committed
+      # (last-good) pin so a deploy can never ship a cold/broken asset base.
+      - name: Warm + verify the er-assets pin on jsDelivr
+        run: |
+          if [ -z "${ER_ASSETS_SHA:-}" ]; then
+            echo "no freshly-resolved pin (committed pin in use) - skipping warm."
+            exit 0
+          fi
+          BASE="https://cdn.jsdelivr.net/gh/Heraklines/er-assets@${ER_ASSETS_SHA}"
+          FILES="images/items.png images/items.json images/types.png images/types.json images/statuses.png images/statuses.json"
+          FAILED=0
+          for f in $FILES; do
+            ok=0
+            for attempt in 1 2 3; do
+              code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 30 "$BASE/$f" || echo 000)
+              if [ "$code" = "200" ]; then ok=1; echo "warm OK $f"; break; fi
+              echo "warm attempt $attempt got $code for $f - retrying"
+              sleep 5
+            done
+            if [ "$ok" != "1" ]; then
+              echo "WARM FAILED for $f at pin ${ER_ASSETS_SHA}"
+              FAILED=1
+            fi
+          done
+          if [ "$FAILED" = "1" ]; then
+            echo "::warning::er-assets pin ${ER_ASSETS_SHA} did not fully serve on jsDelivr - falling back to the committed (last-good) pin."
+            echo "ER_ASSETS_SHA=" >> "$GITHUB_ENV"
+          else
+            echo "er-assets pin warmed + verified on jsDelivr."
+          fi
+
       - name: Build standalone bundle
         run: |
           # Re-assert vendored asset metadata immediately before the build, in
