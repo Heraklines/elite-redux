@@ -319,8 +319,9 @@ function renderLook(slots, buf, ef, dist, t, out, amt, fx) {
         if (fx.gbc) {
           rc = gbcSnap(rc);
         }
-        // never hard-clip at the box edge: fade the aura out over the last px
-        const fade = edgeFalloff(px, py, PW, PH);
+        // never hard-clip at the box edge: fray the aura into noise-driven wisps
+        // over the last px (drifts with the around layer's time)
+        const fade = edgeFalloff(px, py, PW, PH, tA);
         out[k] = rc[0] * 255;
         out[k + 1] = rc[1] * 255;
         out[k + 2] = rc[2] * 255;
