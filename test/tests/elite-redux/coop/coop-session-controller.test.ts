@@ -217,7 +217,7 @@ describe("co-op session controller (#633, P1)", () => {
       // production-dead `restoreInteractionCounter` seam was removed (nothing to restore). A real
       // resume relies on BOTH clients re-initializing the counter identically from the fresh runtime
       // assembly - which is exactly base 0 (host owns the first interaction). Assert that invariant.
-      const { host, guest } = createLoopbackPair();
+      const { host } = createLoopbackPair();
       const h = new CoopSessionController(host);
       h.advanceInteraction();
       h.advanceInteraction();

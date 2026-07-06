@@ -146,7 +146,7 @@ export class CoopSessionController {
   /** Both halves of the shared roster; local edits its own, partner's is mirrored. */
   private readonly roster = new CoopRoster();
   /** Whose turn it is to drive the current alternating interaction (#633, P4). */
-  private interactionTurn = new CoopInteractionTurn();
+  private readonly interactionTurn = new CoopInteractionTurn();
   /** The host-authoritative run config once received/known (#633, LIVE-C). */
   private _runConfig: CoopRunConfig | null = null;
   /**
