@@ -1,3 +1,6 @@
+import { erMegaTargetToBaseSpeciesId } from "#app/data/elite-redux/er-generic-pool-bans";
+import { ER_ID_MAP } from "#app/data/elite-redux/er-id-map";
+import { ER_MEGA_FORMS } from "#app/data/elite-redux/er-mega-forms";
 import {
   buildUnlockSnapshot,
   type ShowdownUnlockGameData,
@@ -189,6 +192,22 @@ describe("buildUnlockSnapshot", () => {
     it("rejects a species from another line", () => {
       expect(snap.isSpeciesInLine(SpeciesId.CHARMANDER, SpeciesId.SQUIRTLE)).toBe(false);
       expect(snap.isSpeciesInLine(SpeciesId.CHARMANDER, SpeciesId.BLASTOISE)).toBe(false);
+    });
+
+    it("accepts an ER custom mega-form species as in-line for its base root (anti-spoof)", () => {
+      // Pick a REAL mega form whose target resolves to a base via erMegaTargetToBaseSpeciesId:
+      // the mega form is a standalone custom species (id >= 10000), so isSpeciesInLine must
+      // resolve it back to its base before walking the line, or a legit mega pick is rejected.
+      const megaTargetPokeId = ER_MEGA_FORMS.map(entry => ER_ID_MAP.species[entry.targetErId]).find(
+        pkId => pkId !== undefined && erMegaTargetToBaseSpeciesId(pkId) !== undefined,
+      );
+      expect(megaTargetPokeId, "at least one ER mega target must resolve to a base").toBeDefined();
+      const baseRoot = erMegaTargetToBaseSpeciesId(megaTargetPokeId!)!;
+      // The mega-target custom species id is accepted as in-line for its base root...
+      expect(snap.isSpeciesInLine(baseRoot, megaTargetPokeId!)).toBe(true);
+      // ...but NOT for an unrelated root (the mega must not spoof into another line).
+      const otherRoot = baseRoot === SpeciesId.MEW ? SpeciesId.MEWTWO : SpeciesId.MEW;
+      expect(snap.isSpeciesInLine(otherRoot, megaTargetPokeId!)).toBe(false);
     });
   });
 });

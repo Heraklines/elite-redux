@@ -66,7 +66,14 @@ export function starterToManifest(starter: Starter, _gameData: ShowdownUnlockGam
  * the caught/variant DexAttr bits) so the gate accepts exactly what the player owns.
  */
 export function buildUnlockSnapshot(gameData: ShowdownUnlockGameData): UnlockSnapshot {
+  // Memoize the per-root legal-move set: `isMoveLegal` is called once per move on the
+  // team, so without this the level-move + egg-move tables are rescanned for every move.
+  const moveCache = new Map<number, Set<number>>();
   const collectStarterMoves = (rootSpeciesId: number): Set<number> => {
+    const cached = moveCache.get(rootSpeciesId);
+    if (cached) {
+      return cached;
+    }
     const pool = new Set<number>();
     for (const [level, moveId] of pokemonSpeciesLevelMoves[rootSpeciesId] ?? []) {
       if (level > 0 && level <= MAX_STARTER_MOVE_LEVEL) {
@@ -82,6 +89,7 @@ export function buildUnlockSnapshot(gameData: ShowdownUnlockGameData): UnlockSna
         }
       }
     }
+    moveCache.set(rootSpeciesId, pool);
     return pool;
   };
 

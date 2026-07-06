@@ -571,10 +571,14 @@ export class StarterSelectUiHandler extends MessageUiHandler {
    * Showdown: per-line teambuilder choices, keyed by the ROOT (grid) species id. Holds
    * the chosen evolution/mega STAGE to field and the held ITEM. Applied onto the
    * {@linkcode Starter} in {@linkcode addToParty}, and re-applied to an in-party mon when
-   * the player re-picks. Empty (and unused) in every non-showdown mode.
+   * the player re-picks. `prevItem` stashes the explicit pre-mega item so switching a mega
+   * stage back to a non-mega stage restores the player's earlier choice (see
+   * {@linkcode setShowdownStage}). Empty (and unused) in every non-showdown mode.
    */
-  private showdownSelections: Map<number, { speciesId: number; formIndex: number; item?: string | undefined }> =
-    new Map();
+  private showdownSelections: Map<
+    number,
+    { speciesId: number; formIndex: number; item?: string | undefined; prevItem?: string | undefined }
+  > = new Map();
   private startCursorObj: Phaser.GameObjects.NineSlice;
   private randomCursorObj: Phaser.GameObjects.NineSlice;
   /** ER: cursor for the "Use Last Team" action (sits above the Random button). */
@@ -2602,11 +2606,15 @@ export class StarterSelectUiHandler extends MessageUiHandler {
             // its Mega Stone, so the row shows locked and the error sound rejects a change.
             const selection = this.showdownSelections.get(this.lastSpecies.speciesId);
             const megaLocked = selection?.item === MEGA_STONE_ITEM;
-            let heldItemLabel = "Held Item";
+            let heldItemLabel: string;
             if (megaLocked) {
               heldItemLabel = "Held Item: Mega Stone (locked)";
             } else if (selection?.item) {
               heldItemLabel = `Held Item: ${getModifierType(modifierTypes[selection.item as ShowdownItemKey]).name}`;
+            } else {
+              // Unset: surface the effective default (SHOWDOWN_ITEM_POOL[0], applied at manifest time).
+              const defaultName = getModifierType(modifierTypes[SHOWDOWN_ITEM_POOL[0]]).name;
+              heldItemLabel = `Held Item: ${defaultName} (default)`;
             }
             options.push({
               label: heldItemLabel,
@@ -3836,8 +3844,10 @@ export class StarterSelectUiHandler extends MessageUiHandler {
   /**
    * Showdown: record the chosen stage for a line and re-stamp any in-party copy so
    * {@linkcode tryStart} fields the chosen stage. A mega stage force-locks the held-item
-   * slot to the mega-stone sentinel; leaving a mega clears that lock. Returns `false`
-   * (rejected, no change) when picking a mega would break the one-mega-per-team cap.
+   * slot to the mega-stone sentinel, stashing the player's explicit pre-mega item in
+   * `prevItem`; switching back to a non-mega stage restores that stashed choice (or the
+   * default when there was none). Returns `false` (rejected, no change) when picking a mega
+   * would break the one-mega-per-team cap.
    */
   private setShowdownStage(rootSpeciesId: number, speciesId: number, formIndex: number): boolean {
     const mega = isMegaStage(speciesId, formIndex);
@@ -3848,9 +3858,15 @@ export class StarterSelectUiHandler extends MessageUiHandler {
     selection.speciesId = speciesId;
     selection.formIndex = formIndex;
     if (mega) {
+      // Stash the explicit pre-mega choice (if any) before the stone overwrites it.
+      if (selection.item !== MEGA_STONE_ITEM) {
+        selection.prevItem = selection.item;
+      }
       selection.item = MEGA_STONE_ITEM;
     } else if (selection.item === MEGA_STONE_ITEM) {
-      selection.item = undefined;
+      // Leaving a mega: restore the player's explicit pre-mega item (undefined = default).
+      selection.item = selection.prevItem;
+      selection.prevItem = undefined;
     }
     this.showdownSelections.set(rootSpeciesId, selection);
     const index = this.starterSpecies.findIndex(s => s.speciesId === rootSpeciesId);
@@ -3927,8 +3943,9 @@ export class StarterSelectUiHandler extends MessageUiHandler {
 
   /**
    * Showdown: open the held-ITEM picker for the current grid line. Lists the curated
-   * {@linkcode SHOWDOWN_ITEM_POOL} (localized modifier names) plus a "None" clear. Not
-   * reachable for a mega stage - that slot is locked to the mega stone.
+   * {@linkcode SHOWDOWN_ITEM_POOL} (localized modifier names) - exactly one item per mon,
+   * no "None" option (an unset slot fields the pool default). Not reachable for a mega
+   * stage - that slot is locked to the mega stone.
    */
   private showShowdownItemOptions(): void {
     const ui = this.getUi();
@@ -6251,6 +6268,10 @@ export class StarterSelectUiHandler extends MessageUiHandler {
   }
 
   popStarter(index: number): void {
+    // Showdown: drop this line's stored stage/item so re-adding the mon later doesn't
+    // silently re-stamp a stale (e.g. mega) selection past the picker guards. Keyed by the
+    // root (grid) species id. No-op in non-showdown modes (the map is always empty there).
+    this.showdownSelections.delete(this.starterSpecies[index]?.speciesId);
     this.starterSpecies.splice(index, 1);
     this.starters.splice(index, 1);
 
@@ -6958,6 +6979,9 @@ export class StarterSelectUiHandler extends MessageUiHandler {
     while (this.starterSpecies.length > 0) {
       this.popStarter(this.starterSpecies.length - 1);
     }
+    // Showdown: drop all stored stage/item choices on screen exit so a later re-entry
+    // (same or a fresh run) starts clean instead of restoring stale selections.
+    this.showdownSelections.clear();
 
     if (this.statsMode) {
       this.toggleStatsMode(false);
