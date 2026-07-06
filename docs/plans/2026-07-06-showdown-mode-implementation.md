@@ -545,14 +545,36 @@ Settlement decisions produce **mutation records** (`{kind:"removeUnlock"|"grantU
 
 **Steps:** failing tests → implement → pass → tsc → checkpoint commit.
 
-### Task D3: Ante lobby UI
+### Task D3: Wager screen with full team preview (UPDATED 2026-07-06, maintainer)
+
+**FLOW REORDER (maintainer requirement):** the ante is bet with full knowledge of the matchup.
+New order: pair → teambuild → team exchange (C2) → **WAGER SCREEN** → stake lock →
+`/showdown/match` escrow → battle. (The old pairing→ante→teambuild order is dead: you must
+see what you're up against before betting.) "Friendly (no stakes)" remains always offered.
+
+**The screen (single screen, both players, polished within the game's pixel-UI idiom):**
+- **Team preview, both sides**: your 6 and the opponent's 6 on one screen — species icons
+  (the same icon pipeline the party/starter UIs use), with shiny/variant tint, held-item
+  mini-icon, and mega indicator per mon. Opponent name + title from their ghost profile (C7).
+- **Stake area**: your stake picker (owned shinies / high-cost unlocks, tier shown) + the
+  opponent's offered stake with tier; a tier-match indicator (match = lockable, mismatch =
+  which side is over/under); lock-in status lamps for both players.
+- Both-locked → rendezvous point (`showdown-wager-commit`) → escrow POST → battle.
+- **ui-mirror rules apply**: classify the new UiMode in `coop-ui-registry.ts`; the screen is
+  driven by local choice + wire-synced offer state (showdownStakeOffer/StakeLock), NOT a
+  mirrored cursor session (each player interacts with their own copy; only offers/locks sync).
+- **UI quality bar (maintainer: "make the ui nice")**: composed layout, no text collisions at
+  the game's x6 scale, readable tier/stake labels, consistent with existing panel chrome.
+  Render-harness `PAGE_RECIPES` entry `showdown-wager` with step-drives (pick stake → offer
+  shown → both lock) is MANDATORY; eyeball the PNGs; commit baselines.
 
 **Files:**
-- Create: `src/ui/handlers/showdown-ante-ui-handler.ts` + registration (grep how `BiomeShopUiHandler` registers a UI mode — mirror it)
-- Modify: `src/phases/title-phase.ts` showdown flow — insert ante step between pairing and teambuild; "Friendly (no stakes)" is always offered.
-- Test: render-harness `PAGE_RECIPES` entry `showdown-ante` (standing rule) + step-drive: pick stake → lock; pure tier-match logic is already tested (A1).
-
-Flow per design: pick one owned shiny/high-cost unlock → offer crosses wire (`showdownStakeOffer`) → both tiers equal → both `showdownStakeLock` → client POSTs `/showdown/match` → on 200, proceed to teambuild; any failure → friendly mode offer.
+- Create: `src/ui/handlers/showdown-wager-ui-handler.ts` + UiMode registration + ui-registry
+  classification.
+- Modify: title-phase showdown flow (the `// D3 ante lobby inserts here` seam moves to
+  post-teambuild per the reorder) + showdown-session.ts (wager step after ready, before battle).
+- Test: render-harness recipe + step-drive; stake tier-match logic already covered (A1);
+  offer/lock wire round-trip test over loopback.
 
 **Steps:** render-drive failing → implement → render pass + baseline → tsc → checkpoint commit.
 
