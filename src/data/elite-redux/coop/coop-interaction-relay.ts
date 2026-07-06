@@ -35,6 +35,10 @@ import {
   COOP_FAINT_SWITCH_SEQ_BASE,
   COOP_REVIVAL_SEQ_BASE,
 } from "#data/elite-redux/coop/coop-seq-registry";
+// #829 malicious-peer hardening: the fixed 2-player seat map (pure, engine-free) resolves which role
+// OWNS a field slot, so a forged cross-owner faint-replacement pick can be dropped WITHOUT consulting
+// the engine - keeping the relay fully unit-testable headlessly (coop-session imports no game engine).
+import { coopOwnerOfFieldIndex } from "#data/elite-redux/coop/coop-session";
 import type {
   CoopInteractionOutcome,
   CoopMessage,
@@ -53,6 +57,13 @@ export {
 
 /** Sentinel choices shared across interaction screens. */
 export const COOP_INTERACTION_LEAVE = -1;
+
+/**
+ * #829: the faint-replacement seq band is `COOP_FAINT_SWITCH_SEQ_BASE + fieldIndex` (the audit's 0-3
+ * offset). This is the ONE interactionChoice channel where the addressed slot's owner is well-defined
+ * (a fixed field seat), so it is the only band the malicious-peer owner check gates on.
+ */
+const COOP_FAINT_SWITCH_SLOT_COUNT = 4;
 
 // #673 biome market / #794 dex sync / #795 bargain seq bases are declared in coop-seq-registry
 // and re-exported above.
@@ -554,6 +565,38 @@ export class CoopInteractionRelay {
    */
   onRevivalPrompt: ((fieldIndex: number) => void) | null = null;
 
+  /**
+   * #829 malicious-peer hardening: whether a received `interactionChoice` at `seq` is a FORGED
+   * cross-owner faint-replacement switch. A faint-replacement pick (COOP_FAINT_SWITCH_SEQ_BASE +
+   * fieldIndex) is a CROSS-OWNER relay - the sending peer relays the replacement for ITS OWN field
+   * slot and the receiver (the authoritative host) applies that cursor to the slot. Every received
+   * message comes from our PEER (the remote role), so in the fixed 2-player seat map a pick whose slot
+   * resolves to THIS client's OWN seat is a forged switch for a mon the peer does not command. Such a
+   * message is dropped LOUDLY ([coop:security]) and never applied. Scoped to the faint-switch band
+   * ONLY - the sole interactionChoice channel where slot ownership is well defined; every other seq
+   * (reward / shop / ME / revival) returns false, so the legitimate owner paths (guarded by
+   * coop-duo-faint-switch + the duo suites) are byte-for-byte unaffected. Cheap + conservative + pure.
+   */
+  private isForgedCrossOwnerSwitch(seq: number, choice: number): boolean {
+    const faintSwitchSlot = seq - COOP_FAINT_SWITCH_SEQ_BASE;
+    if (faintSwitchSlot < 0 || faintSwitchSlot >= COOP_FAINT_SWITCH_SLOT_COUNT) {
+      return false;
+    }
+    const slotOwner = coopOwnerOfFieldIndex(faintSwitchSlot);
+    if (slotOwner !== this.transport.role) {
+      return false; // the addressed slot is the PEER's own seat -> a legitimate cross-owner pick.
+    }
+    // The addressed slot belongs to OUR seat, but the message is from the PEER -> a forged cross-owner
+    // switch. Un-gated console.warn (NOT coopWarn, which is silenced when co-op debug is off) so this
+    // surfaces even in a production build; never crash, never apply.
+    console.warn(
+      "[coop:security] dropped forged cross-owner switch: peer relayed a faint-replacement pick for "
+        + `field slot ${faintSwitchSlot} (owned by ${slotOwner}, this client's OWN seat) seq=${seq} `
+        + `choice=${choice} - a switch pick must come from the slot's owner`,
+    );
+    return true;
+  }
+
   private handle(msg: CoopMessage): void {
     if (msg.t === "revivalPrompt") {
       coopLog("relay", `RECV revivalPrompt fieldIndex=${msg.fieldIndex} (#809)`);
@@ -615,6 +658,11 @@ export class CoopInteractionRelay {
       return;
     }
     if (msg.t !== "interactionChoice") {
+      return;
+    }
+    // #829 malicious-peer hardening: drop a forged cross-owner faint-replacement switch pick before it
+    // is ever recorded / buffered / delivered / applied.
+    if (this.isForgedCrossOwnerSwitch(msg.seq, msg.choice)) {
       return;
     }
     const choice: CoopInteractionChoice = { choice: msg.choice, data: msg.data };
