@@ -2522,14 +2522,15 @@ AURA.astral = (r, g, b, x, y, t, ctx) => {
   // flat deep body with big soft nebula patches
   const neb = fbm(x * 2.6 + 7 + t * 0.03, y * 2.6 - t * 0.02);
   const body = mix3(hx("090f22"), hx("1d2b4d"), clamp(L * 0.4 + smooth(0.35, 0.85, neb) * 0.45));
-  // scattered body stars: small soft glowing dots (bigger than single pixels)
+  // scattered body stars: small soft glowing dots (bigger than single pixels).
+  // FXSEED reshuffles the star map, FXSCALE (texture-noise slider) sets density.
   let tw = 0;
-  const SCELL = 26;
+  const SCELL = 26 * FXSCALE;
   const bx = Math.floor(x * SCELL);
   const by = Math.floor(y * SCELL);
-  if (h2(bx, by) > 0.975) {
-    const axs = (bx + 0.25 + h2(bx + 7, by) * 0.5) / SCELL;
-    const ays = (by + 0.25 + h2(by + 9, bx) * 0.5) / SCELL;
+  if (h2(bx + FXSEED, by - FXSEED * 1.7) > 0.975) {
+    const axs = (bx + 0.25 + h2(bx + 7 + FXSEED, by) * 0.5) / SCELL;
+    const ays = (by + 0.25 + h2(by + 9, bx + FXSEED) * 0.5) / SCELL;
     const ds = Math.hypot(x - axs, y - ays);
     tw = smooth(0.013, 0.003, ds) * Math.pow(0.5 + 0.5 * Math.sin(t * 1.8 + h2(by, bx) * 25), 2);
   }
@@ -2544,14 +2545,14 @@ AURA.astral = (r, g, b, x, y, t, ctx) => {
   // candidate that lands on a line becomes a star, so the constellation actually
   // populates. The star is round and overflows the thin line it decorates.
   let node = 0;
-  const NCELL = 13;
+  const NCELL = 13 * FXSCALE;
   const gx = Math.floor(x * NCELL);
   const gy = Math.floor(y * NCELL);
-  if (ctx?.sa && h2(gx * 1.7 + 2, gy * 1.3 + 5) > 0.35) {
+  if (ctx?.sa && h2(gx * 1.7 + 2 + FXSEED, gy * 1.3 + 5 - FXSEED) > 0.35) {
     const R = 0.028;
     for (let k = 0; k < 2; k++) {
-      const ax = (gx + 0.2 + h2(gx + k * 11, gy) * 0.6) / NCELL;
-      const ay = (gy + 0.2 + h2(gy + 3, gx + k * 17) * 0.6) / NCELL;
+      const ax = (gx + 0.2 + h2(gx + k * 11 + FXSEED, gy) * 0.6) / NCELL;
+      const ay = (gy + 0.2 + h2(gy + 3, gx + k * 17 + FXSEED) * 0.6) / NCELL;
       const d = Math.hypot(x - ax, y - ay);
       if (d >= R * 2.8) {
         continue;
@@ -4131,10 +4132,10 @@ AROUND.zaps = (nx, ny, df, t, c) => {
   let a = 0;
   let hot = 0;
   for (let k = 0; k < 2; k++) {
-    const cyc = t * 1.3 + k * 0.41 + h2(k + 1, 9.2) * 5;
+    const cyc = t * 1.3 + k * 0.41 + h2(k + 1 + FXSEED, 9.2) * 5;
     const slot = Math.floor(cyc);
     // most windows stay empty (the 2nd bolt much more so)
-    if (h2(slot * 1.31 + 0.17, 11 + k * 7) > (k === 0 ? 0.45 : 0.22)) {
+    if (h2(slot * 1.31 + 0.17 + FXSEED, 11 + k * 7) > (k === 0 ? 0.45 : 0.22)) {
       continue;
     }
     const life = fract(cyc);
@@ -4142,7 +4143,7 @@ AROUND.zaps = (nx, ny, df, t, c) => {
     if (flash <= 0.02) {
       continue;
     }
-    const ang0 = h2(slot + k * 17, 3.7) * Math.PI * 2;
+    const ang0 = h2(slot + k * 17 + FXSEED * 1.3, 3.7) * Math.PI * 2;
     const dx = nx - c.cx;
     const dy = ny - c.cy;
     const r = Math.hypot(dx, dy);
@@ -4180,13 +4181,13 @@ AROUND.blossoms = (nx, ny, df, t, c) => {
   }
   let out = [0, 0, 0, 0];
   for (let layer = 0; layer < 2; layer++) {
-    const cell = layer === 0 ? 5 : 8;
+    const cell = (layer === 0 ? 5 : 8) * FXSCALE;
     const fall = layer === 0 ? 0.05 : 0.085;
     const fy = ny - t * fall;
     const fx0 = nx + Math.sin(ny * 2.2 + t * 0.4 + layer * 2.6) * 0.035;
     const cx0 = Math.floor(fx0 * cell);
     const cy0 = Math.floor(fy * cell);
-    if (h2(cx0 * 1.7 + layer * 13.1, cy0 * 2.3 + layer * 7.7) < (layer === 0 ? 0.62 : 0.55)) {
+    if (h2(cx0 * 1.7 + layer * 13.1 + FXSEED, cy0 * 2.3 + layer * 7.7 - FXSEED) < (layer === 0 ? 0.62 : 0.55)) {
       continue;
     }
     const jx = 0.3 + h2(cx0 + 4.2, cy0 + 1.1) * 0.4;
