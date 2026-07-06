@@ -1,3 +1,4 @@
+import { SHOWDOWN_ITEM_POOL, type ShowdownItemKey } from "#app/data/elite-redux/showdown/showdown-item-pool";
 import {
   MEGA_STONE_ITEM,
   type ShowdownMonManifest,
@@ -30,11 +31,17 @@ const allUnlocked: UnlockSnapshot = {
   isAbilityUnlocked: () => true,
   isNatureUnlocked: () => true,
   isMoveLegal: () => true,
+  isSpeciesInLine: () => true,
 };
 
 const noMegas = () => false;
 
 const rules = (violations: ReturnType<typeof validateShowdownTeam>) => violations.map(v => v.rule);
+
+// Deliberately type-violating input: validateShowdownTeam runs on untrusted JSON,
+// so we probe its runtime guards with shapes the compile-time type forbids.
+const hostile = (over: Record<string, unknown>): ShowdownMonManifest =>
+  ({ ...mon(), ...over }) as unknown as ShowdownMonManifest;
 
 describe("validateShowdownTeam", () => {
   it("accepts a fully legal team", () => {
@@ -206,5 +213,80 @@ describe("validateShowdownTeam", () => {
     expect(found).toContain("teamSize");
     expect(found).toContain("level");
     expect(found).toContain("item");
+  });
+
+  it("accepts a 1-move moveset (MIN_MOVES lower boundary)", () => {
+    const t = team();
+    t[0].moveset = [42];
+    const v = validateShowdownTeam(t, allUnlocked, noMegas);
+    expect(rules(v)).not.toContain("moves");
+  });
+
+  it("flags a NaN level (level)", () => {
+    const t = team();
+    t[0].level = Number.NaN;
+    const v = validateShowdownTeam(t, allUnlocked, noMegas);
+    expect(v).toContainEqual(expect.objectContaining({ rule: "level", slot: 0 }));
+  });
+
+  it("flags a species not in the claimed starter line (collection)", () => {
+    const t = team();
+    const unlocks: UnlockSnapshot = { ...allUnlocked, isSpeciesInLine: (_root, sp) => sp !== t[2].speciesId };
+    const v = validateShowdownTeam(t, unlocks, noMegas);
+    expect(v).toContainEqual(expect.objectContaining({ rule: "collection", slot: 2 }));
+  });
+
+  describe("hostile / malformed input (must reject, never throw)", () => {
+    it("rejects a non-array team (malformed)", () => {
+      const v = validateShowdownTeam(null as unknown as ShowdownMonManifest[], allUnlocked, noMegas);
+      expect(v).toContainEqual(expect.objectContaining({ rule: "malformed" }));
+    });
+
+    it("rejects a null ivs without throwing (malformed)", () => {
+      const t = team();
+      t[3] = hostile({ ivs: null });
+      let v: ReturnType<typeof validateShowdownTeam> = [];
+      expect(() => {
+        v = validateShowdownTeam(t, allUnlocked, noMegas);
+      }).not.toThrow();
+      expect(v).toContainEqual(expect.objectContaining({ rule: "malformed", slot: 3 }));
+    });
+
+    it("rejects a non-array moveset without throwing (malformed)", () => {
+      const t = team();
+      t[1] = hostile({ moveset: "abc" });
+      let v: ReturnType<typeof validateShowdownTeam> = [];
+      expect(() => {
+        v = validateShowdownTeam(t, allUnlocked, noMegas);
+      }).not.toThrow();
+      expect(v).toContainEqual(expect.objectContaining({ rule: "malformed", slot: 1 }));
+    });
+
+    it("rejects a non-string item without throwing (malformed)", () => {
+      const t = team();
+      t[0] = hostile({ item: 5 });
+      let v: ReturnType<typeof validateShowdownTeam> = [];
+      expect(() => {
+        v = validateShowdownTeam(t, allUnlocked, noMegas);
+      }).not.toThrow();
+      expect(v).toContainEqual(expect.objectContaining({ rule: "malformed", slot: 0 }));
+    });
+
+    it("skips other per-mon checks for a malformed slot but keeps team-wide checks", () => {
+      const t = team(5); // teamSize violation (team-wide)
+      t[0] = hostile({ ivs: null }); // malformed slot 0
+      const v = validateShowdownTeam(t, allUnlocked, noMegas);
+      const found = rules(v);
+      expect(found).toContain("malformed");
+      expect(found).toContain("teamSize");
+      // no ivs/level/item violation emitted for the malformed slot
+      expect(v.filter(x => x.slot === 0 && x.rule !== "malformed")).toEqual([]);
+    });
+  });
+});
+
+describe("MEGA_STONE_ITEM sentinel", () => {
+  it("never collides with a real item-pool key", () => {
+    expect(SHOWDOWN_ITEM_POOL.includes(MEGA_STONE_ITEM as ShowdownItemKey)).toBe(false);
   });
 });

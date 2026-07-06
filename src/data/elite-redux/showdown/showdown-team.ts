@@ -13,7 +13,11 @@
  */
 import { SHOWDOWN_ITEM_POOL, type ShowdownItemKey } from "#app/data/elite-redux/showdown/showdown-item-pool";
 
-/** Sentinel item value marking a mega mon's locked item slot. */
+/**
+ * Sentinel item value marking a mega mon's locked item slot.
+ * MUST never collide with a real `modifierTypes` key (a `ShowdownItemKey`), or a
+ * real item would be misread as the mega lock. The pool test asserts this holds.
+ */
 export const MEGA_STONE_ITEM = "MEGA_STONE";
 
 const TEAM_SIZE = 6;
@@ -44,6 +48,8 @@ export interface UnlockSnapshot {
   isAbilityUnlocked(rootSpeciesId: number, abilityIndex: number): boolean;
   isNatureUnlocked(rootSpeciesId: number, nature: number): boolean;
   isMoveLegal(rootSpeciesId: number, speciesId: number, moveId: number): boolean;
+  /** True iff `speciesId` genuinely belongs to the claimed `rootSpeciesId` starter line. */
+  isSpeciesInLine(rootSpeciesId: number, speciesId: number): boolean;
 }
 
 export type ShowdownRuleId =
@@ -55,7 +61,8 @@ export type ShowdownRuleId =
   | "collection"
   | "duplicate"
   | "ivs"
-  | "moves";
+  | "moves"
+  | "malformed";
 
 export interface ShowdownRuleViolation {
   rule: ShowdownRuleId;
@@ -66,6 +73,57 @@ export interface ShowdownRuleViolation {
 }
 
 const ITEM_POOL = new Set<string>(SHOWDOWN_ITEM_POOL as readonly ShowdownItemKey[]);
+
+const isInt = (v: unknown): v is number => typeof v === "number" && Number.isInteger(v);
+
+/**
+ * Structural precheck for ONE mon of untrusted (deserialized) JSON. Because
+ * `validateShowdownTeam` runs on the OPPONENT's manifest, a hostile/corrupt slot
+ * (e.g. `ivs: null`, `moveset: "abc"`, non-string `item`) must be REJECTED, never
+ * throw. Returns null when the slot is structurally sound; otherwise a reason.
+ * NB `formIndex` validity beyond "is an integer" stays delegated to `isMegaForm`
+ * and later engine-side construction — this layer only guards shape/types.
+ */
+function malformedReason(mon: unknown): string | null {
+  if (typeof mon !== "object" || mon === null) {
+    return "not an object";
+  }
+  const m = mon as Record<string, unknown>;
+  if (!isInt(m.speciesId)) {
+    return "speciesId must be an integer";
+  }
+  if (!isInt(m.rootSpeciesId)) {
+    return "rootSpeciesId must be an integer";
+  }
+  if (!isInt(m.formIndex)) {
+    return "formIndex must be an integer";
+  }
+  if (typeof m.level !== "number") {
+    return "level must be a number";
+  }
+  if (typeof m.shiny !== "boolean") {
+    return "shiny must be a boolean";
+  }
+  if (!isInt(m.variant)) {
+    return "variant must be an integer";
+  }
+  if (!isInt(m.abilityIndex)) {
+    return "abilityIndex must be an integer";
+  }
+  if (!isInt(m.nature)) {
+    return "nature must be an integer";
+  }
+  if (typeof m.item !== "string") {
+    return "item must be a string";
+  }
+  if (!Array.isArray(m.ivs) || m.ivs.some(iv => typeof iv !== "number")) {
+    return "ivs must be an array of numbers";
+  }
+  if (!Array.isArray(m.moveset) || m.moveset.some(mv => typeof mv !== "number")) {
+    return "moveset must be an array of numbers";
+  }
+  return null;
+}
 
 /** level: exactly 100. */
 function checkLevel(mon: ShowdownMonManifest, slot: number, out: ShowdownRuleViolation[]): void {
@@ -117,6 +175,15 @@ function checkCollection(
       rule: "collection",
       slot,
       message: `Species line ${mon.rootSpeciesId} is not unlocked (slot ${slot}).`,
+    });
+  }
+  // Anti-spoof: the concrete speciesId must actually belong to the claimed line,
+  // else a hostile client pairs an unlocked weak root with an arbitrary strong mon.
+  if (!unlocks.isSpeciesInLine(mon.rootSpeciesId, mon.speciesId)) {
+    out.push({
+      rule: "collection",
+      slot,
+      message: `Species ${mon.speciesId} is not in claimed starter line ${mon.rootSpeciesId} (slot ${slot}).`,
     });
   }
   if (mon.shiny && !unlocks.isShinyUnlocked(mon.rootSpeciesId, mon.variant)) {
@@ -191,6 +258,12 @@ export function validateShowdownTeam(
   unlocks: UnlockSnapshot,
   isMegaForm: (speciesId: number, formIndex: number) => boolean,
 ): ShowdownRuleViolation[] {
+  // Structural guard: the team may be untrusted deserialized JSON. A non-array
+  // input is unrecoverable — reject outright rather than throwing on `.length`.
+  if (!Array.isArray(team)) {
+    return [{ rule: "malformed", message: "Team must be an array of Pokemon." }];
+  }
+
   const violations: ShowdownRuleViolation[] = [];
 
   // teamSize: exactly 6 mons.
@@ -206,6 +279,18 @@ export function validateShowdownTeam(
 
   for (let slot = 0; slot < team.length; slot++) {
     const mon = team[slot];
+
+    // Per-mon structural guard: a malformed slot is rejected and its other
+    // per-mon checks are SKIPPED (they'd throw), but team-wide checks still run.
+    const malformed = malformedReason(mon);
+    if (malformed !== null) {
+      violations.push({
+        rule: "malformed",
+        slot,
+        message: `Malformed Pokemon (slot ${slot}): ${malformed}.`,
+      });
+      continue;
+    }
 
     // duplicate: no two mons share speciesId.
     if (seenSpecies.has(mon.speciesId)) {
