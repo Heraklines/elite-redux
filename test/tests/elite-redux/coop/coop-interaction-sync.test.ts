@@ -577,10 +577,9 @@ describe("co-op interaction-sync (#633 regression harness)", () => {
     // BUG2 ASSERTION: the guest's LIVE counter is NOT bumped by the gap broadcast - it is
     // deferred. So when the guest opens its next reward shop and pins the owner from the
     // live counter, it pins from N (still host-owned), exactly like the host did.
-    expect(
-      rig.guestCtl.interactionCounter(),
-      "the gap broadcast must NOT bump the guest live counter (deferred)",
-    ).toBe(n);
+    expect(rig.guestCtl.interactionCounter(), "the gap broadcast must NOT bump the guest live counter (deferred)").toBe(
+      n,
+    );
     expect(
       rig.guestCtl.isLocalOwnerAtCounter(rig.guestCtl.interactionCounter()),
       "guest pins WATCHER (host owns) at its un-poisoned live counter N",
