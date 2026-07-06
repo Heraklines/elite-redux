@@ -54,7 +54,13 @@ import type {
   CoopSerializedArenaTag,
   CoopSerializedEnemy,
 } from "#data/elite-redux/coop/coop-transport";
-import { erBiomeOverstayAnchor, setErBiomeOverstayAnchor } from "#data/elite-redux/er-biome-structure";
+import {
+  erBiomeOverstayAnchor,
+  getErBiomeLength,
+  getErBiomeStartWave,
+  setErBiomeOverstayAnchor,
+  setErBiomeStructureExtent,
+} from "#data/elite-redux/er-biome-structure";
 import { getErMoneyStreakEntries, restoreErMoneyStreaks } from "#data/elite-redux/er-money-streak";
 import { resolveErModifierClass } from "#data/elite-redux/er-persistent-modifiers";
 import {
@@ -1995,6 +2001,10 @@ export function captureCoopFullSnapshot(): CoopFullBattleSnapshot | null {
       erMoneyStreaks: getErMoneyStreakEntries(),
       biomeOverstayAnchor: erBiomeOverstayAnchor(),
       erRelicBattleState: getErRelicBattleState(),
+      // Biome-structure extent (#841 item 5): rolled length + start wave. The saveDataDigest DETECTS a
+      // drift here (via erMapState) but no heal carried it; the gated guest heal restores it through
+      // restoreErBiomeStructure. Captured unconditionally (additive); only READ in the gated heal.
+      erBiomeStructure: { biomeLength: getErBiomeLength(), biomeStartWave: getErBiomeStartWave() },
     };
   } catch {
     return null;
@@ -2096,6 +2106,10 @@ export function captureCoopAuthoritativeBattleState(turn: number): CoopAuthorita
       erMoneyStreaks: getErMoneyStreakEntries(),
       biomeOverstayAnchor: erBiomeOverstayAnchor(),
       erRelicBattleState: getErRelicBattleState(),
+      // Biome-structure extent (#841 item 5): rolled length + start wave. The saveDataDigest DETECTS a
+      // drift here (via erMapState) but no heal carried it; the gated guest heal restores it through
+      // restoreErBiomeStructure. Captured unconditionally (additive); only READ in the gated heal.
+      erBiomeStructure: { biomeLength: getErBiomeLength(), biomeStartWave: getErBiomeStartWave() },
     };
   } catch {
     return null;
@@ -3193,7 +3207,10 @@ export function adoptCoopHostPlayerPartyOrder(hostParty: number[] | undefined): 
  * malformed substrate can never crash the guest's battle.
  */
 function restoreCoopModuleLetSubstrates(
-  snapshot: Pick<CoopFullBattleSnapshot, "erMoneyStreaks" | "biomeOverstayAnchor" | "erRelicBattleState">,
+  snapshot: Pick<
+    CoopFullBattleSnapshot,
+    "erMoneyStreaks" | "biomeOverstayAnchor" | "erRelicBattleState" | "erBiomeStructure"
+  >,
 ): void {
   try {
     if (Array.isArray(snapshot.erMoneyStreaks)) {
@@ -3203,6 +3220,13 @@ function restoreCoopModuleLetSubstrates(
     if (snapshot.biomeOverstayAnchor !== undefined) {
       coopLog("heal", `biomeOverstayAnchor host=${snapshot.biomeOverstayAnchor} -> restored (#837/#504)`);
       setErBiomeOverstayAnchor(snapshot.biomeOverstayAnchor);
+    }
+    if (snapshot.erBiomeStructure !== undefined) {
+      coopLog(
+        "heal",
+        `erBiomeStructure host length=${snapshot.erBiomeStructure.biomeLength} startWave=${snapshot.erBiomeStructure.biomeStartWave} -> restored (#841 item 5)`,
+      );
+      setErBiomeStructureExtent(snapshot.erBiomeStructure.biomeLength, snapshot.erBiomeStructure.biomeStartWave);
     }
     if (snapshot.erRelicBattleState !== undefined) {
       coopLog(

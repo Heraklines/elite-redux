@@ -178,6 +178,23 @@ export function setErBiomeOverstayAnchor(anchor: number | null | undefined): voi
   overstayAnchorWave = typeof anchor === "number" && anchor > 0 ? Math.floor(anchor) : null;
 }
 
+/**
+ * Co-op (#841): force the biome-structure EXTENT (rolled length + start wave) to the host's authoritative
+ * values WITHOUT touching the overstay anchor or the leave-now flag (the complement of {@linkcode
+ * setErBiomeOverstayAnchor}, which is length/start-wave-blind). Both extent fields ride the saveDataDigest
+ * via erMapState's biome-structure trio, but - unlike the overstay anchor - no per-turn/resync heal carried
+ * them, so a divergence loop-DETECTED with no heal path (audit #841 item 5). Used by the gated guest resync
+ * heal so the extent converges through the substrate's own setter, not a hand-rolled write. An invalid
+ * length -> null (vanilla cadence); an invalid start wave leaves the current one intact. Additive: an older
+ * host omits the field and this is never called.
+ */
+export function setErBiomeStructureExtent(length: number | null | undefined, startWave: number | null | undefined): void {
+  currentLength = typeof length === "number" && length > 0 ? Math.floor(length) : null;
+  if (typeof startWave === "number" && startWave > 0) {
+    currentStartWave = Math.floor(startWave);
+  }
+}
+
 /** The current biome's rolled length, or null if it is on the vanilla cadence. */
 export function getErBiomeLength(): number | null {
   return currentLength;

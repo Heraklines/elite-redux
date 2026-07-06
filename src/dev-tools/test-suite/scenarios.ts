@@ -1991,6 +1991,40 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
   },
   {
+    label: "(note) Co-op: biome-boundary heal + same-biome travel (#841)",
+    description:
+      "CO-OP internal (verify with TWO clients across a biome BOUNDARY, ~every 10 waves) - two audit #841\n"
+      + "follow-ups on the world-map/biome layer. This is a DATA/sync note (nothing new to click), checkable\n"
+      + "headlessly:\n"
+      + "\n"
+      + "(1) SAME-BIOME TRAVEL (verified, no change): the interactive biome / World-Map node picker + the\n"
+      + "Stay/Leave Crossroads prompt are BYPASSED in co-op - both clients auto-resolve the next biome\n"
+      + "DETERMINISTICALLY from the shared, just-reset wave seed (select-biome-phase.ts / er-crossroads-phase.ts,\n"
+      + "#633), so two players can NEVER travel to different biomes. There is no owner/watcher pick here because\n"
+      + "there is no prompt to mirror.\n"
+      + "\n"
+      + "(2) BIOME-STRUCTURE HEAL (fixed): the rolled biome LENGTH + start wave (erRollBiomeLength, run by the\n"
+      + "host's SwitchBiomePhase) ride the saveDataDigest via erMapState, so a host-vs-guest drift is DETECTED -\n"
+      + "but before this fix no per-turn/resync heal carried them, so a divergence loop-detected with no heal\n"
+      + "path. The full-state resync now carries erBiomeStructure and heals it through restoreErBiomeStructure\n"
+      + "(alongside the money-streak / overstay / relic substrates). DO (2 clients): cross a biome boundary and\n"
+      + "keep playing. EXPECT: both clients stay in the SAME biome and neither wedges in a resync loop at the\n"
+      + "boundary. Duo-tested headlessly in test/tests/elite-redux/coop/coop-savedata-digest.test.ts\n"
+      + "('DIVERGE + HEAL (#841 item 5)').",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({ STARTING_WAVE_OVERRIDE: 1, STARTING_LEVEL_OVERRIDE: 50 });
+      return [
+        makeStarter(SpeciesId.SNORLAX, {
+          moveset: [MoveId.BODY_SLAM, MoveId.CRUNCH, MoveId.EARTHQUAKE, MoveId.REST],
+        }),
+        makeStarter(SpeciesId.GENGAR, {
+          moveset: [MoveId.SHADOW_BALL, MoveId.SLUDGE_BOMB, MoveId.THUNDERBOLT, MoveId.DAZZLING_GLEAM],
+        }),
+      ];
+    },
+  },
+  {
     label: "QoL: reward-shop long-desc auto-scroll (#557)",
     description:
       "#557 - long ER item descriptions auto-scroll in the REWARD screen instead of\n"

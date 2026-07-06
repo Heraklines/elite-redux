@@ -38,7 +38,13 @@ import { setCoopWaveBarrierMs } from "#data/elite-redux/coop/coop-interaction-re
 import { clearCoopRuntime, setCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
 import { COOP_GUEST_FIELD_INDEX, COOP_HOST_FIELD_INDEX } from "#data/elite-redux/coop/coop-session";
 import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
-import { erBiomeOverstayAnchor, setErBiomeOverstayAnchor } from "#data/elite-redux/er-biome-structure";
+import {
+  erBiomeOverstayAnchor,
+  getErBiomeLength,
+  getErBiomeStartWave,
+  restoreErBiomeStructure,
+  setErBiomeOverstayAnchor,
+} from "#data/elite-redux/er-biome-structure";
 import { getErMoneyStreakEntries, restoreErMoneyStreaks } from "#data/elite-redux/er-money-streak";
 import { getErRelicBattleState, restoreErRelicBattleState } from "#data/elite-redux/er-relic-battle-state";
 import { BattlerIndex } from "#enums/battler-index";
@@ -270,6 +276,90 @@ describe.skipIf(!RUN)("#837 co-op full-save-data checksum digest + heal", () => 
     expect(healed.relic.lists.cursedIdol, "relic-battle-state healed through restoreErRelicBattleState").toEqual([
       111, 222,
     ]);
+    logs.flush();
+  }, 300_000);
+
+  it("DIVERGE + HEAL (#841 item 5): a diverged biome-structure extent (length / start-wave) MISMATCHES the digest then heals via the resync", async () => {
+    // The erMapState biome-structure trio (biomeOverstayAnchor + biomeLength + biomeStartWave) rides the
+    // saveDataDigest (normalizeCoopErMapState), so a drift is DETECTED - but only the overstay anchor had a
+    // heal. The rolled length + start wave (set by SwitchBiomePhase's erRollBiomeLength, which the pure-
+    // renderer guest never runs) were carried by NO per-turn/resync heal, so a divergence loop-detected with
+    // no heal path. This proves the extent now rides the full-snapshot resync + heals to convergence.
+    await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
+    const pair = createLoopbackPair();
+    const rig = await buildDuo(game, pair, setCoopRuntime, toCoop);
+    wireGuestCommand(rig);
+
+    // Biome-structure is process-global (er-biome-structure module state), so we set the divergent extents
+    // INSIDE each digest-capture block (no per-client module-let isolation needed): the host rolled a variable
+    // biome (length 12, entered on wave 11); the pure-renderer guest never ran SwitchBiomePhase so its extent
+    // sits at the vanilla-cadence default (null length, start wave 1) - a real host-vs-guest drift.
+    const hostDigest = await withClient(rig.hostCtx, () => {
+      restoreErBiomeStructure(12, 11, null);
+      return captureCoopSaveDataDigest();
+    });
+    const guestDiverged = await withClient(rig.guestCtx, () => {
+      restoreErBiomeStructure(null, 1, null);
+      return captureCoopSaveDataDigest();
+    });
+    expect(guestDiverged, "the diverged biome-structure extent MISMATCHES the host digest (detected)").not.toBe(
+      hostDigest,
+    );
+
+    // The host (re-asserting its extent - the guest's set clobbered the shared module) builds the
+    // authoritative full-snapshot; the guest APPLIES it (the production resync heal path).
+    const snapshot = await withClient(rig.hostCtx, () => {
+      restoreErBiomeStructure(12, 11, null);
+      return captureCoopFullSnapshot();
+    });
+    expect(snapshot, "host built a full snapshot").not.toBeNull();
+    expect(snapshot?.erBiomeStructure, "the snapshot carries the host biome-structure extent").toEqual({
+      biomeLength: 12,
+      biomeStartWave: 11,
+    });
+
+    const healed = await withClient(rig.guestCtx, () => {
+      restoreErBiomeStructure(null, 1, null); // the guest's pre-heal divergent extent
+      applyCoopFullSnapshot(snapshot!, /* authoritativeGuest */ true, /* suppressResummon */ false);
+      return {
+        digest: captureCoopSaveDataDigest(),
+        length: getErBiomeLength(),
+        startWave: getErBiomeStartWave(),
+      };
+    });
+    expect(healed.length, "biome length healed through restoreErBiomeStructure").toBe(12);
+    expect(healed.startWave, "biome start wave healed").toBe(11);
+    expect(healed.digest, "the guest digest CONVERGED to the host after the biome-structure heal").toBe(hostDigest);
+    logs.flush();
+  }, 300_000);
+
+  it("SAME BIOME (#841 item 1): the co-op biome pick is bypassed - both engines auto-resolve the SAME next biome from the shared seed", async () => {
+    // Audit #841 item 1: the interactive biome / World-Map node picker (+ the Stay/Leave crossroads) is
+    // BYPASSED in co-op (select-biome-phase.ts / er-crossroads-phase.ts, #633). Instead BOTH clients
+    // auto-resolve the next biome DETERMINISTICALLY from the shared, just-reset wave seed, so two players
+    // can never travel to DIFFERENT biomes (there is no owner/watcher pick because there is no prompt). This
+    // drives the exact decision function (resetSeed -> generateRandomBiome) on both real engines + asserts
+    // they converge on the SAME biome; it also guards the seed pin the determinism relies on.
+    await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
+    const pair = createLoopbackPair();
+    const rig = await buildDuo(game, pair, setCoopRuntime, toCoop);
+    wireGuestCommand(rig);
+
+    // The guest is seed-pinned to the host (adoptCoopHostRunConfig, #658 - proven in coop-duo-launch-sync).
+    expect(rig.guestScene.seed, "the guest is seed-pinned to the host").toBe(rig.hostScene.seed);
+
+    // The co-op SelectBiomePhase decision, run headlessly on whichever engine is swapped in: reset the shared
+    // wave seed for the boundary wave, then roll the next biome (the phase's isCoop branch does exactly this
+    // via generateNextBiome -> generateRandomBiome for a non-END wave).
+    const pickBiome = (wave: number) => {
+      globalScene.resetSeed(wave);
+      return globalScene.generateRandomBiome(wave);
+    };
+
+    const WAVE = 11; // a biome-boundary wave (not a %50 END wave)
+    const hostBiome = await withClient(rig.hostCtx, () => pickBiome(WAVE));
+    const guestBiome = await withClient(rig.guestCtx, () => pickBiome(WAVE));
+    expect(guestBiome, "both engines land in the SAME biome (no independent pick -> no split run)").toBe(hostBiome);
     logs.flush();
   }, 300_000);
 

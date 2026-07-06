@@ -460,6 +460,14 @@ export interface CoopFullBattleSnapshot {
   biomeOverstayAnchor?: number | null | undefined;
   /** ER per-battle relic counters (Cursed Idol / Pharaoh's Ankh), wave-scoped (audit Part 1 #3). */
   erRelicBattleState?: ErRelicBattleStateData | undefined;
+  /**
+   * #486 biome-structure EXTENT (rolled biome length + start wave). Rides the saveDataDigest via
+   * erMapState's biome-structure trio (`normalizeCoopErMapState`), but - unlike `biomeOverstayAnchor` -
+   * NO per-turn/resync heal carried it, so a divergence loop-DETECTED with no heal path (audit #841 item
+   * 5). Carried here + healed through `restoreErBiomeStructure`. Optional + additive: an older host omits
+   * it and the guest leaves its biome-structure alone.
+   */
+  erBiomeStructure?: { biomeLength: number | null; biomeStartWave: number } | undefined;
 }
 
 /**
@@ -510,6 +518,8 @@ export interface CoopAuthoritativeBattleStateV1 {
   erMoneyStreaks?: [number, number][] | undefined;
   biomeOverstayAnchor?: number | null | undefined;
   erRelicBattleState?: ErRelicBattleStateData | undefined;
+  /** #486 biome-structure EXTENT (rolled length + start wave); healed via restoreErBiomeStructure (audit #841 item 5). */
+  erBiomeStructure?: { biomeLength: number | null; biomeStartWave: number } | undefined;
 }
 
 /**
