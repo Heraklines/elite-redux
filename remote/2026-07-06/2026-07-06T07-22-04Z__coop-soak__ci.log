@@ -1,0 +1,78 @@
+===== COOP SOAK RESULT =====
+verdict: FAIL
+waves_requested: 150
+run: 28774660256 (main)
+timestamp: 2026-07-06T07-22-04Z
+
+----- driver lines -----
+[22m[39m[coop-soak] SEED=20260706 WAVES=150 - replay this run with:  SOAK_SEED=20260706 SOAK_WAVES=150 ER_SCENARIO=1 npx vitest run test/tests/elite-redux/coop/coop-soak.test.ts
+[22m[39m[coop-soak] scalar-lag wave 5 @post-shop: guest trails host (expected renderer lag, converges at re-mirror) - money host=110 guest=0
+[22m[39m[coop-soak] scalar-lag wave 8 @post-shop: guest trails host (expected renderer lag, converges at re-mirror) - money host=390 guest=110
+[22m[39m[coop-soak] scalar-lag wave 13 @post-shop: guest trails host (expected renderer lag, converges at re-mirror) - money host=580 guest=390
+[22m[39m[coop-soak] scalar-lag wave 14 @post-shop: guest trails host (expected renderer lag, converges at re-mirror) - money host=780 guest=580
+[22m[39m[coop-soak] scalar-lag wave 19 @post-shop: guest trails host (expected renderer lag, converges at re-mirror) - money host=1440 guest=780
+[22m[39m[coop-soak] scalar-lag wave 25 @post-shop: guest trails host (expected renderer lag, converges at re-mirror) - money host=2270 guest=1440
+[22m[39m[coop-soak] scalar-lag wave 27 @post-shop: guest trails host (expected renderer lag, converges at re-mirror) - money host=3360 guest=2270
+[22m[39m[coop-soak] scalar-lag wave 28 @post-shop: guest trails host (expected renderer lag, converges at re-mirror) - money host=4320 guest=3360
+[coop-soak] scalar-lag wave 30 @boss-post-shop: guest trails host (expected renderer lag, converges at re-mirror) - money host=6340 guest=4320
+[22m[39m[coop-soak] scalar-lag wave 35 @post-shop: guest trails host (expected renderer lag, converges at re-mirror) - money host=7260 guest=6340
+[22m[39m[coop-soak] scalar-lag wave 43 @post-shop: guest trails host (expected renderer lag, converges at re-mirror) - money host=8710 guest=7260
+[22m[39m[coop-soak] scalar-lag wave 44 @post-shop: guest trails host (expected renderer lag, converges at re-mirror) - money host=10650 guest=9820
+[22m[39m[coop-soak] scalar-lag wave 55 @post-shop: guest trails host (expected renderer lag, converges at re-mirror) - money host=12700 guest=10650
+[22m[39m[coop-soak] scalar-lag wave 58 @post-shop: guest trails host (expected renderer lag, converges at re-mirror) - money host=14690 guest=12700
+[coop-soak] scalar-lag wave 60 @boss-post-shop: guest trails host (expected renderer lag, converges at re-mirror) - money host=18350 guest=14690
+[22m[39m[coop-soak] scalar-lag wave 62 @post-shop: guest trails host (expected renderer lag, converges at re-mirror) - money host=19900 guest=18350
+[22m[39m[coop-soak] scalar-lag wave 64 @post-shop: guest trails host (expected renderer lag, converges at re-mirror) - money host=21490 guest=19900
+[22m[39m[coop-soak] scalar-lag wave 66 @post-shop: guest trails host (expected renderer lag, converges at re-mirror) - money host=23940 guest=21490
+[22m[39m[coop-soak] scalar-lag wave 69 @post-shop: guest trails host (expected renderer lag, converges at re-mirror) - money host=25970 guest=23940
+[22m[39m[coop-soak] scalar-lag wave 73 @post-shop: guest trails host (expected renderer lag, converges at re-mirror) - money host=28400 guest=25970
+[22m[39m[coop-soak] scalar-lag wave 85 @post-shop: guest trails host (expected renderer lag, converges at re-mirror) - money host=33620 guest=30270
+[coop-soak] scalar-lag wave 90 @boss-post-shop: guest trails host (expected renderer lag, converges at re-mirror) - money host=39300 guest=33620
+[22m[39m[coop-soak] scalar-lag wave 95 @post-shop: guest trails host (expected renderer lag, converges at re-mirror) - money host=49790 guest=45470
+[22m[39m[coop-soak] scalar-lag wave 103 @post-shop: guest trails host (expected renderer lag, converges at re-mirror) - money host=54460 guest=49790
+[22m[39m[coop-soak] FINDING wave 106 @post-shop (seed 20260706): guest scalar OVER-grant - ball[1] host=10 guest=15 (guest OVER-grant)
+[22m[39m[coop-soak] FINDING wave 112 @post-turn (seed 20260706): unhealed DIGEST divergence [arenaTags] - arenaTags: host=[["TOXIC_SPIKES",1],["STEALTH_ROCK",1]] guest=[["STEALTH_ROCK",1],["TOXIC_SPIKES",1]]
+[22m[39m[coop-soak] scalar-lag wave 112 @post-shop: guest trails host (expected renderer lag, converges at re-mirror) - money host=57340 guest=54460
+[31m[1mSoakInvariantError[22m: [coop-soak] NO-PARK invariant breached at wave 114 (seed 20260706): wave driving threw (strand/stall): Cannot read properties of null (reading 'getEffectiveStat'). Artifact + both logs: /home/runner/work/elite-redux/elite-redux/dev-logs/coop-soak/2026-07-06T07-22-04-233Z__seed-20260706__wave-114. Replay: SOAK_SEED=20260706[39m
+
+----- vitest result tail -----
+[33m[coop:relay] AWAIT rewardOptions key=93:0 RESOLVE null (TIMEOUT or supersede) -> watcher falls back to own roll (DIVERGENT)[39m
+[33m[coop:relay] AWAIT rewardOptions key=95:0 RESOLVE null (TIMEOUT or supersede) -> watcher falls back to own roll (DIVERGENT)[39m
+[33m[coop:relay] AWAIT interactionChoice seq=91 -> STICKY-CANCELLED (resync rescue) resolve null[39m
+[33m[coop:relay] AWAIT interactionChoice seq=93 -> STICKY-CANCELLED (resync rescue) resolve null[39m
+[33m[coop:relay] AWAIT interactionChoice seq=95 -> STICKY-CANCELLED (resync rescue) resolve null[39m
+
+[90mstdout[2m | test/tests/elite-redux/coop/coop-soak.test.ts[2m:144:3[22m[2m[2m > [22m[2mNIGHTLY co-op SOAK: seeded randomized two-engine run (#841)[2m > [22m[2mplays a seeded randomized co-op run asserting DIGEST/LOCKSTEP/NO-PARK/TEARDOWN each wave
+[22m[39m[2m> [22m[30m[48;2;193;98;222m Test finished! [49m[39m
+    Name: [38;2;0;136;134mNIGHTLY co-op SOAK: seeded randomized two-engine run (#841) > plays a seeded randomized co-op run asserting DIGEST/LOCKSTEP/NO-PARK/TEARDOWN each wave[39m
+    Result: [31m[1m✗ Failed[22m[39m [2min[22m [33m147227[39m[2mms[22m
+    File: [38;2;210;155;14melite-redux/test/tests/elite-redux/coop/coop-soak.test.ts:144:3[39m
+
+[90mstdout[2m | test/tests/elite-redux/coop/coop-soak.test.ts
+[22m[39m[34mContinue to the next wave.[39m
+[34mContinue to the next wave.[39m
+
+[33m[39m[31mx[39m
+
+[31m⎯⎯⎯⎯⎯⎯⎯[39m[1m[41m Failed Tests 1 [49m[22m[31m⎯⎯⎯⎯⎯⎯⎯[39m
+
+[41m[1m FAIL [22m[49m [30m[45m main [49m[39m test/tests/elite-redux/coop/coop-soak.test.ts[2m:144:3[22m[2m > [22mNIGHTLY co-op SOAK: seeded randomized two-engine run (#841)[2m > [22mplays a seeded randomized co-op run asserting DIGEST/LOCKSTEP/NO-PARK/TEARDOWN each wave
+[31m[1mSoakInvariantError[22m: [coop-soak] NO-PARK invariant breached at wave 114 (seed 20260706): wave driving threw (strand/stall): Cannot read properties of null (reading 'getEffectiveStat'). Artifact + both logs: /home/runner/work/elite-redux/elite-redux/dev-logs/coop-soak/2026-07-06T07-22-04-233Z__seed-20260706__wave-114. Replay: SOAK_SEED=20260706[39m
+[36m [2m❯[22m fail test/tools/coop-soak-driver.ts:[2m954:11[22m[39m
+    [90m952|[39m       phaseState[33m:[39m [34mphaseStateDump[39m(rig)[33m,[39m
+    [90m953|[39m     })[33m;[39m
+    [90m954|[39m     [35mthrow[39m [35mnew[39m [33mSoakInvariantError[39m(invariant[33m,[39m seed[33m,[39m wave[33m,[39m detail[33m,[39m dir)[33m;[39m
+    [90m   |[39m           [31m^[39m
+    [90m955|[39m   }[33m;[39m
+    [90m956|[39m
+[90m [2m❯[22m runCoopSoak test/tools/coop-soak-driver.ts:[2m1437:7[22m[39m
+[90m [2m❯[22m test/tests/elite-redux/coop/coop-soak.test.ts:[2m172:22[22m[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯[22m[39m
+
+
+[2m Test Files [22m [1m[31m1 failed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[31m1 failed[39m[22m[90m (1)[39m
+[2m   Start at [22m 07:19:14
+[2m   Duration [22m 169.68s[2m (transform 17.09s, setup 21.00s, import 110ms, tests 147.68s, environment 734ms)[22m
+
