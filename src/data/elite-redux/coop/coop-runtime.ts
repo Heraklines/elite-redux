@@ -34,6 +34,7 @@ import {
 } from "#data/elite-redux/coop/coop-battle-engine";
 import { CoopBattleStreamer } from "#data/elite-redux/coop/coop-battle-stream";
 import { CoopBattleSync } from "#data/elite-redux/coop/coop-battle-sync";
+import { getCoopChecksumAssertionCount } from "#data/elite-redux/coop/coop-checksum-assert";
 import { coopLog, coopWarn, isCoopDebug } from "#data/elite-redux/coop/coop-debug";
 import { COOP_DEX_SYNC_SEQ, CoopInteractionRelay } from "#data/elite-redux/coop/coop-interaction-relay";
 import { meBattleHandoffKey } from "#data/elite-redux/coop/coop-me-battle-handoff";
@@ -680,7 +681,7 @@ export function wireCoopStallWatchdog(
         lastHealthAt = Date.now();
         coopLog(
           "health",
-          `tick=${coopSessionGeneration()}g turn=${globalScene.currentBattle?.turn ?? "-"} wave=${globalScene.currentBattle?.waveIndex ?? "-"} counter=${runtime.controller.interactionCounter?.() ?? "-"} wait=${localMs}ms peerBeat=${peerBeat ? `${Math.round((Date.now() - peerBeat.at) / 1000)}s` : "-"} transport=${transport.state}`,
+          `tick=${coopSessionGeneration()}g turn=${globalScene.currentBattle?.turn ?? "-"} wave=${globalScene.currentBattle?.waveIndex ?? "-"} counter=${runtime.controller.interactionCounter?.() ?? "-"} assertions=${getCoopChecksumAssertionCount()} wait=${localMs}ms peerBeat=${peerBeat ? `${Math.round((Date.now() - peerBeat.at) / 1000)}s` : "-"} transport=${transport.state}`,
         );
       }
       if (localMs >= COOP_STALL_REPORT_MS) {

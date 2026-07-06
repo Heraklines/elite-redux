@@ -42,6 +42,7 @@ import {
   captureCoopChecksum,
   captureCoopChecksumState,
 } from "#data/elite-redux/coop/coop-battle-engine";
+import { recordCoopChecksumAssertion } from "#data/elite-redux/coop/coop-checksum-assert";
 import { logCanonicalDiff } from "#data/elite-redux/coop/coop-data-fingerprint";
 import { coopLog, coopWarn, isCoopDebug } from "#data/elite-redux/coop/coop-debug";
 import { COOP_FAINT_SWITCH_SEQ_BASE } from "#data/elite-redux/coop/coop-interaction-relay";
@@ -912,15 +913,21 @@ export class CoopFinalizeTurnPhase extends Phase {
       coopLog("checksum", `guest verify turn=${this.turn}: MATCH host=guest=${hostChecksum}`);
       return;
     }
-    coopWarn("checksum", `turn=${this.turn} MISMATCH host=${hostChecksum} guest=${guestChecksum} -> resync`);
-    // DIAGNOSTIC (#633): log WHICH field(s) diverged by deep-diffing the host's pre-image
-    // (the canonical state its checksum hashed) against the guest's own. Only the opaque
-    // hashes cross the wire normally; the pre-image makes the divergent field observable.
+    // #838 Phase 5: a per-turn checksum mismatch is NO LONGER an expected heal event. The full-state
+    // authoritative payload (applied every finalize, ABOVE, before this verify) is supposed to converge
+    // EVERY hashed field - PP included, BY CONSTRUCTION through the serialized PokemonMove.ppUsed. So a
+    // mismatch is a LOUD, COUNTED ASSERTION: scream the exact diverging field(s) (reusing the #633
+    // canonical sub-diff of the host's streamed pre-image vs the guest's own recompute), TALLY it
+    // (surfaced in the #808 health line + read by the soak/duo harness as `assertions`), and STILL heal
+    // ONCE below as a safety net so a live player is never stranded. `stateSync` is now a rare-fault path.
     const hostObj = this.parseCanonical(hostPreimage);
-    if (hostObj !== undefined) {
-      const guestObj = this.parseCanonical(canonicalize(captureCoopChecksumState()));
-      logCanonicalDiff(`[coop-cs] turn=${this.turn}`, hostObj, guestObj);
-    }
+    const guestObj = hostObj === undefined ? undefined : this.parseCanonical(canonicalize(captureCoopChecksumState()));
+    const assertionCount = recordCoopChecksumAssertion(`turn=${this.turn}`, hostObj, guestObj);
+    coopWarn(
+      "checksum",
+      `turn=${this.turn} MISMATCH host=${hostChecksum} guest=${guestChecksum} assertion#${assertionCount} `
+        + "-> heal-once safety net (stateSync)",
+    );
     const resyncGen = coopSessionGeneration(); // #808
     void streamer.requestStateSync(this.turn).then(blob => {
       if (blob == null) {

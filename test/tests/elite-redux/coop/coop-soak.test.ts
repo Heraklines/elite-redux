@@ -171,7 +171,7 @@ describe.skipIf(!RUN)("NIGHTLY co-op SOAK: seeded randomized two-engine run (#84
       // eslint-disable-next-line no-console
       console.log(
         `[coop-soak] DONE seed=${seed} waves=${result.wavesCompleted}/${result.wavesRequested} `
-          + `resyncHeals=${result.resyncHeals} findings=${result.findings.length} `
+          + `resyncHeals=${result.resyncHeals} assertions=${result.assertions} findings=${result.findings.length} `
           + `trainerWaves=${result.trainerWaves.total} (fixed=${result.trainerWaves.fixed} random=${result.trainerWaves.random}) `
           + `skips=${JSON.stringify(result.skips)} elapsedMs=${elapsedMs}`,
       );
@@ -222,6 +222,18 @@ describe.skipIf(!RUN)("NIGHTLY co-op SOAK: seeded randomized two-engine run (#84
         `soak found ${result.findings.length} unhealed DIGEST desync(s) (replay SOAK_SEED=${seed}): `
           + result.findings.map(f => `[${f.fields}]@${f.firstWave}`).join(", "),
       ).toEqual([]);
+
+      // #838 Phase 5 GATE: the PRODUCTION per-turn checksum ASSERTION count must be ZERO. This is the
+      // guest's REAL CoopFinalizeTurnPhase.verifyChecksum tally (independent of the driver's boundary
+      // `resyncHeals` probe above): the full-state authoritative payload is supposed to converge every
+      // hashed field - PP included, BY CONSTRUCTION - so a normal-play run must never trip an assertion.
+      // A nonzero count is a real full-state gap (the exact class Phase 5 exists to surface); it is
+      // faithfully red, never to be greened by narrowing content.
+      expect(
+        result.assertions,
+        `soak tripped ${result.assertions} production checksum assertion(s) - the full-state payload left a `
+          + `per-turn divergence the heal-once had to close (replay SOAK_SEED=${seed}; see the [coop:ASSERT] lines)`,
+      ).toBe(0);
 
       // #849 COMPLETENESS BACKSTOP: PROVE the soak exercised every co-op interactive surface it can drive,
       // and LOUDLY skip-count every one it deliberately cannot (each with its follow-up task). The report is

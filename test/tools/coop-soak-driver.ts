@@ -67,6 +67,11 @@ import {
   reconcileCoopPlayerField,
 } from "#data/elite-redux/coop/coop-battle-engine";
 import {
+  getCoopChecksumAssertionCount,
+  resetCoopChecksumAssertionCount,
+  setCoopChecksumAssertSeverity,
+} from "#data/elite-redux/coop/coop-checksum-assert";
+import {
   clearCoopRuntime,
   getCoopInteractionRelay,
   getCoopMeBattleInteractionCounter,
@@ -337,6 +342,14 @@ export interface SoakResult {
   skips: Record<string, number>;
   /** How many DIGEST one-heal graces fired (a converged run is 0). */
   resyncHeals: number;
+  /**
+   * #838 Phase 5: how many PRODUCTION per-turn checksum ASSERTIONS fired during the run - the guest's
+   * real {@linkcode CoopFinalizeTurnPhase} `verifyChecksum` counting a mismatch the full-state payload
+   * failed to converge. This is INDEPENDENT of `resyncHeals` (which is the driver's own boundary probe):
+   * `assertions` reads the in-phase counter the live game increments. A converged run is `assertions=0`;
+   * any nonzero count is a real full-state-payload gap (the gate the maintainer flips to hard-fault later).
+   */
+  assertions: number;
   /** The action script (one line per decision) - also written into a failure artifact. */
   actionScript: string[];
   /** Per-boundary digest samples (for #842). */
@@ -1001,6 +1014,11 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
   const findings: SoakFinding[] = [];
   let resyncHeals = 0;
   let wavesCompleted = 0;
+  // #838 Phase 5: pin the LOUD assertion severity (console.error) and zero the counter so this run's
+  // production per-turn checksum assertions are read back cleanly (the ER suite shares module state across
+  // files with isolate:false, so a prior file's mismatch must not bleed into this run's `assertions`).
+  setCoopChecksumAssertSeverity("assert");
+  resetCoopChecksumAssertionCount();
   // #828 ASYMMETRIC CONTINUATION (BUILD 2): waves surveyed with the host half exhausted (guest solo).
   let guestSoloWaves = 0;
   // #633 MID-RUN ME CONTINUATION (BUILD 1): the mystery encounters driven inline this run.
@@ -1974,6 +1992,7 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
     wavesCompleted,
     skips,
     resyncHeals,
+    assertions: getCoopChecksumAssertionCount(),
     actionScript,
     boundaryDigests,
     findings,

@@ -332,6 +332,32 @@ function rekeyFieldByBi(state: unknown): unknown {
   }
 }
 
+/** The result of a canonical deep-diff: the differing leaf lines + whether the cap truncated them. */
+export interface CanonicalDiff {
+  /** One `  <path>: host=<v> guest=<v>` line per differing leaf (capped at {@linkcode MAX_DIFF_LEAVES}). */
+  lines: string[];
+  /** True when the cap was hit (strictly more leaves differ than are shown). */
+  truncated: boolean;
+}
+
+/**
+ * Collect (WITHOUT logging) the differing LEAF paths between two JSON-parsed canonical state objects
+ * (#838 Phase 5 - the shared machinery behind BOTH {@linkcode logCanonicalDiff} and the checksum
+ * ASSERTION emitter, so the loud `[coop:ASSERT]` line reuses the exact same field-by-field diff the
+ * `[coop-cs]` mismatch diagnostic does). The `field` array is re-keyed by battler index first (#633)
+ * so a single composition gap points at the real missing bi (`field.bi#1: host=... guest=<absent>`)
+ * instead of renumbering every entry. Never throws; capped at {@linkcode MAX_DIFF_LEAVES}.
+ */
+export function collectCanonicalDiff(host: unknown, guest: unknown): CanonicalDiff {
+  const out: string[] = [];
+  try {
+    collectLeafDiffs(rekeyFieldByBi(host), rekeyFieldByBi(guest), "", out);
+  } catch {
+    /* a diff walk failure must never crash the guest's battle */
+  }
+  return { lines: out, truncated: out.length >= MAX_DIFF_LEAVES };
+}
+
 /**
  * Log up to ~25 differing LEAF paths between two JSON-parsed canonical state objects under
  * `tag` (e.g. `"[coop-cs] turn=3"`). Prints the `tag` header then one indented line per
@@ -343,15 +369,13 @@ function rekeyFieldByBi(state: unknown): unknown {
  */
 export function logCanonicalDiff(tag: string, host: unknown, guest: unknown): void {
   try {
-    const out: string[] = [];
-    collectLeafDiffs(rekeyFieldByBi(host), rekeyFieldByBi(guest), "", out);
-    if (out.length === 0) {
+    const { lines, truncated } = collectCanonicalDiff(host, guest);
+    if (lines.length === 0) {
       console.warn(`${tag} no leaf differences found (structural / already converged)`);
       return;
     }
-    const truncated = out.length >= MAX_DIFF_LEAVES;
-    console.warn(`${tag} ${out.length}${truncated ? "+" : ""} differing field(s):`);
-    for (const line of out) {
+    console.warn(`${tag} ${lines.length}${truncated ? "+" : ""} differing field(s):`);
+    for (const line of lines) {
       console.warn(line);
     }
   } catch {
