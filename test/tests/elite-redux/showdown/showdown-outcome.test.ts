@@ -13,6 +13,7 @@ import {
   otherRole,
   timeoutResult,
   voidResult,
+  winnerFromLocalResult,
 } from "#data/elite-redux/showdown/showdown-outcome";
 import { describe, expect, it } from "vitest";
 
@@ -49,5 +50,13 @@ describe("showdown outcome detection (C6)", () => {
   it("otherRole flips the role", () => {
     expect(otherRole("host")).toBe("guest");
     expect(otherRole("guest")).toBe("host");
+  });
+
+  it("winnerFromLocalResult maps THIS client's (role, localWon) to the absolute winner role", () => {
+    // Won -> the local role IS the winner; lost -> the other role wins. All 4 combinations.
+    expect(winnerFromLocalResult("host", true)).toBe("host");
+    expect(winnerFromLocalResult("host", false)).toBe("guest");
+    expect(winnerFromLocalResult("guest", true)).toBe("guest");
+    expect(winnerFromLocalResult("guest", false)).toBe("host");
   });
 });

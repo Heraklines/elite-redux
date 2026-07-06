@@ -152,4 +152,21 @@ describe.skipIf(!RUN)("Showdown guest command menu (C5v2c)", () => {
     expect(shipped).toHaveLength(1);
     expect(shipped[0]).toMatchObject({ command: Command.POKEMON, cursor: 1, baton: false });
   });
+
+  it("shipped latch: a re-entrant confirm after shipping does NOT double-ship", async () => {
+    const own: ShowdownMonManifest[] = [mon({ speciesId: SpeciesId.CHARIZARD })];
+    const opponent: ShowdownMonManifest[] = [
+      mon({ speciesId: SpeciesId.CHARIZARD, moveset: [MoveId.TACKLE, MoveId.EMBER, MoveId.GROWL, MoveId.LEER] }),
+    ];
+    await runToShowdownCommand(game, own, opponent, [SpeciesId.CHARIZARD]);
+
+    const { handler, shipped } = openMenu();
+    handler.processInput(Button.ACTION); // root: Fight
+    handler.processInput(Button.ACTION); // fight: ship slot 0
+    // Extra confirms after the command was already shipped must be ignored (latch).
+    handler.processInput(Button.ACTION);
+    handler.processInput(Button.ACTION);
+
+    expect(shipped).toHaveLength(1);
+  });
 });

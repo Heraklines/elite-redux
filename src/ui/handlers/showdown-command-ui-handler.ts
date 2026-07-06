@@ -68,6 +68,8 @@ export class ShowdownCommandUiHandler extends UiHandler {
   private rows: MenuRow[] = [];
   private turn = 0;
   private onCommand: ShowdownCommandArgs["onCommand"] = () => {};
+  /** Set once a command is shipped for THIS open; blocks a re-entrant confirm from double-shipping/ending. */
+  private shipped = false;
 
   constructor() {
     super(UiMode.SHOWDOWN_COMMAND);
@@ -93,6 +95,7 @@ export class ShowdownCommandUiHandler extends UiHandler {
     this.turn = params.turn ?? globalScene.currentBattle?.turn ?? 0;
     this.onCommand = params.onCommand ?? (() => {});
     this.level = "root";
+    this.shipped = false;
     this.container.setVisible(true);
     this.render();
     return true;
@@ -149,7 +152,9 @@ export class ShowdownCommandUiHandler extends UiHandler {
         const pp = maxPp - m.ppUsed;
         return {
           label: `${m.getName()}  ${pp}/${maxPp}`,
-          // Out-of-PP moves are shown but not selectable (the host would reject them anyway).
+          // Out-of-PP moves are shown greyed but not selectable: the host authoritatively rejects a
+          // relayed FIGHT on a no-PP move (isRelayedCommandLegal) and AI-falls-back, so offering it here
+          // would just waste the pick - the display matches the host's validation.
           enabled: pp > 0,
           index: i,
         };
@@ -217,6 +222,9 @@ export class ShowdownCommandUiHandler extends UiHandler {
 
   /** Confirm the highlighted row: descend a level, or ship the built command. */
   private confirm(cursor: number): boolean {
+    if (this.shipped) {
+      return false; // already shipped this turn - ignore a re-entrant confirm
+    }
     const row = this.rows[cursor];
     if (row == null || !row.enabled) {
       this.getUi().playError();
@@ -242,7 +250,27 @@ export class ShowdownCommandUiHandler extends UiHandler {
   }
 
   private ship(command: SerializedCommand): void {
-    this.onCommand(this.turn, command);
+    if (this.shipped) {
+      return; // defensive: never double-ship / double-end
+    }
+    this.shipped = true;
+    // Capture before setMode(MESSAGE) - closing this menu runs clear(), which resets onCommand.
+    const turn = this.turn;
+    const onCommand = this.onCommand;
+    // Guest UX floor (#8): show a waiting notice while the host resolves the turn (mirrors co-op's
+    // "partner is choosing" MESSAGE) instead of leaving the screen blank; setMode(MESSAGE) also closes
+    // this menu. Raw-key fallback text is acceptable for now.
+    // TODO(i18n): add a dedicated `battle:showdownWaitingForOpponent` locale key.
+    // D4: turn-clock display (the 60s countdown) is deferred to Task D4.
+    globalScene.ui.setMode(UiMode.MESSAGE);
+    globalScene.ui.showText(
+      i18next.t("battle:showdownWaitingForOpponent", { defaultValue: "Waiting for opponent..." }),
+      null,
+      () => {},
+      null,
+      true,
+    );
+    onCommand(turn, command);
   }
 
   setCursor(cursor: number): boolean {

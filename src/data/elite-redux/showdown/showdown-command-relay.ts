@@ -165,6 +165,19 @@ export class ShowdownCommandRelay {
     this.transport.send({ t: "showdownCommand", turn, command });
   }
 
+  /**
+   * Fail any IN-FLIGHT {@linkcode requestEnemyCommand} (resolve `null` -> the caller AI-falls-back)
+   * WITHOUT tearing the relay down. Called on a channel disconnect (coop-runtime's disconnect reaction)
+   * so the host's awaiting enemy-command turn unblocks PROMPTLY (AI fallback) instead of waiting the full
+   * 60s turn timer - but the relay's listeners + responder survive so a within-grace rejoin can reuse it.
+   */
+  cancelPending(): void {
+    for (const finish of [...this.pending.values()]) {
+      finish(null);
+    }
+    this.pending.clear();
+  }
+
   /** Stop listening to the transport and fail any in-flight requests (null -> caller AI-falls-back). */
   dispose(): void {
     this.offMessage();

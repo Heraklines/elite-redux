@@ -49,6 +49,17 @@ export function otherRole(role: CoopRole): CoopRole {
 }
 
 /**
+ * PURE: the WINNING role from THIS client's viewpoint. A client knows only its OWN role and whether
+ * IT won (`localWon`); the wire `showdownResult.winner` is always an absolute {@linkcode CoopRole}, so
+ * map the local view to it: the local role when this client won, else the other role. Extracted from
+ * {@linkcode ShowdownResultPhase} (was an inline nested ternary) so the mapping is unit-testable and
+ * the two callers can't drift.
+ */
+export function winnerFromLocalResult(localRole: CoopRole, localWon: boolean): CoopRole {
+  return localWon ? localRole : otherRole(localRole);
+}
+
+/**
  * PURE: decide the winner from a KO sweep. The host's team occupies the authoritative PLAYER
  * side; the guest's team the ENEMY side. A side is SWEPT when all its mons have fainted. Returns
  * the surviving side's role, or `null` when the match is not yet decided by a sweep (both sides
@@ -69,17 +80,27 @@ export function detectShowdownVictory(hostTeamSwept: boolean, guestTeamSwept: bo
   return winner == null ? null : { kind: "result", winner, reason: "victory" };
 }
 
-/** PURE: the result decision when `loser` forfeits (the other side wins by forfeit). */
+/**
+ * PURE: the result decision when `loser` forfeits (the other side wins by forfeit).
+ * D4: wired by Task D4 (disconnect/forfeit lifecycle) - defined here so the wire shapes are stable.
+ */
 export function forfeitResult(loser: CoopRole): ShowdownResultDecision {
   return { kind: "result", winner: otherRole(loser), reason: "forfeit" };
 }
 
-/** PURE: the result decision when `loser` runs out its turn clock (the other side wins). */
+/**
+ * PURE: the result decision when `loser` runs out its turn clock (the other side wins).
+ * D4: wired by Task D4 (disconnect/forfeit lifecycle) - defined here so the wire shapes are stable.
+ */
 export function timeoutResult(loser: CoopRole): ShowdownResultDecision {
   return { kind: "result", winner: otherRole(loser), reason: "timeout" };
 }
 
-/** PURE: a void decision with the given reason (no winner). */
+/**
+ * PURE: a void decision with the given reason (no winner). The `"checksum"` reason is live (C6);
+ * D4: `"earlyDisconnect"` is wired by Task D4 (disconnect/forfeit lifecycle) - defined here so the
+ * wire shapes are stable.
+ */
 export function voidResult(reason: ShowdownVoidReason): ShowdownVoidDecision {
   return { kind: "void", reason };
 }

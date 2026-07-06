@@ -3,6 +3,7 @@ import { getCoopController, isAuthoritativeBattleSession, isVersusSession } from
 import type { SerializedCommand } from "#data/elite-redux/coop/coop-transport";
 import { ER_DOOMED_SWITCH_THRESHOLD_MULT, erAssessThreat, getErAiProfile } from "#data/elite-redux/er-enemy-ai";
 import { getShowdownRelay } from "#data/elite-redux/showdown/showdown-battle-state";
+import { getMoveTargets } from "#data/moves/move-utils";
 import { AbilityId } from "#enums/ability-id";
 import { BattlerTagType } from "#enums/battler-tag-type";
 import { Command } from "#enums/command";
@@ -45,6 +46,12 @@ export class EnemyCommandPhase extends FieldPhase {
     // engines resolve on the shared seed, so they stay in lockstep). Gated on the live guest
     // role, so solo / host play is byte-for-byte unchanged. Showdown-versus (C4) rides the SAME
     // guest short-circuit (its enemy side is the HOST's team; the guest never resolves it).
+    //
+    // PREDICATE ALIGNMENT (#6): this guest gate is a SHARED co-op+versus behavior, so it keys off the
+    // ENGINE-view predicate {@linkcode isAuthoritativeBattleSession} (`authoritative && (isCoop ||
+    // isShowdown)`); the host gate below is VERSUS-ONLY (a co-op host's enemy is AI, not a human), so it
+    // keys off the NETCODE-view predicate {@linkcode isVersusSession}. See the coop-runtime doc on
+    // `isVersusSession` for why the two views agree for a live versus match + when to reach for each.
     if (isAuthoritativeBattleSession() && getCoopController()?.role === "guest") {
       globalScene.currentBattle.turnCommands[globalScene.currentBattle.arrangement.enemyOffset + this.fieldIndex] = {
         command: Command.FIGHT,
@@ -90,11 +97,19 @@ export class EnemyCommandPhase extends FieldPhase {
         skip: this.skipTurn,
       };
     } else {
+      const moveId = command.moveId ?? MoveId.NONE;
+      // isRelayedCommandLegal already confirmed this enemy mon exists on the field.
+      const enemyPokemon = globalScene.getEnemyField()[this.fieldIndex];
       globalScene.currentBattle.turnCommands[slot] = {
         command: Command.FIGHT,
         move: {
-          move: command.moveId ?? MoveId.NONE,
-          targets: command.targets ?? [],
+          move: moveId,
+          // Host-authoritative targets (#4): IGNORE the relayed `command.targets` and RE-DERIVE them
+          // from the engine's own resolver. In a 1v1 the target set is deterministic (the sole opponent
+          // for an enemy move, or self for a self-target move), so a hostile/buggy peer can't aim a move
+          // at an illegal battler. A move that genuinely needs a live choice is still host-resolvable via
+          // the normal SelectTargetPhase; getMoveTargets gives the canonical set for the 1v1 case.
+          targets: getMoveTargets(enemyPokemon, moveId).targets,
           // SerializedCommand.useMode is a MoveUseMode value carried as a plain number on the wire.
           useMode: (command.useMode as MoveUseMode | undefined) ?? MoveUseMode.NORMAL,
         },
@@ -106,8 +121,9 @@ export class EnemyCommandPhase extends FieldPhase {
 
   /**
    * Host-authoritative legality of a RELAYED enemy command against THIS live enemy mon (streamed
-   * state can't cheat): a FIGHT must name a move the mon actually has; a POKEMON switch must target
-   * a real, non-fainted, benched party member. An illegal pick is rejected -> the caller AI-falls-back.
+   * state can't cheat): a FIGHT must name a move the mon actually carries AND that move must have PP
+   * remaining; a POKEMON switch must target a real, non-fainted, benched party member. An illegal pick
+   * is rejected -> the caller AI-falls-back.
    */
   private isRelayedCommandLegal(command: SerializedCommand): boolean {
     const enemyPokemon = globalScene.getEnemyField()[this.fieldIndex];
@@ -118,8 +134,10 @@ export class EnemyCommandPhase extends FieldPhase {
       const target = globalScene.getEnemyParty()[command.cursor];
       return target != null && !target.isFainted() && !target.isOnField();
     }
-    // FIGHT: the chosen move must be one the mon actually carries (never an injected arbitrary move).
-    return enemyPokemon.getMoveset().some(m => m?.moveId === command.moveId);
+    // FIGHT: the chosen move must be one the mon actually carries (never an injected arbitrary move)
+    // AND it must have PP left (#4) - a no-PP move can't legally be used, so it AI-falls-back instead.
+    const move = enemyPokemon.getMoveset().find(m => m?.moveId === command.moveId);
+    return move != null && !move.isOutOfPp();
   }
 
   /** Roll the enemy AI's command for this slot (the vanilla / co-op-host / disconnect-fallback path). */

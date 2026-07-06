@@ -7,7 +7,11 @@
 import { globalScene } from "#app/global-scene";
 import { clearCoopRuntime, getCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
 import { endShowdownBattle } from "#data/elite-redux/showdown/showdown-battle-state";
-import type { ShowdownResultReason, ShowdownVoidReason } from "#data/elite-redux/showdown/showdown-outcome";
+import {
+  type ShowdownResultReason,
+  type ShowdownVoidReason,
+  winnerFromLocalResult,
+} from "#data/elite-redux/showdown/showdown-outcome";
 import { BattlePhase } from "#phases/battle-phase";
 
 /**
@@ -58,18 +62,12 @@ export class ShowdownResultPhase extends BattlePhase {
         if (this.voided) {
           transport.send({ t: "showdownVoid", matchId: null, reason: this.reason as ShowdownVoidReason });
         } else {
+          // The winner as an absolute role: our own role when we won, else the other (pure, tested).
+          const localRole = getCoopRuntime()?.controller.role ?? "host";
           transport.send({
             t: "showdownResult",
             matchId: null,
-            // The winner from the LOCAL client's viewpoint (its own role when it won).
-            winner:
-              getCoopRuntime()?.controller.role === "guest"
-                ? this.localWon
-                  ? "guest"
-                  : "host"
-                : this.localWon
-                  ? "host"
-                  : "guest",
+            winner: winnerFromLocalResult(localRole, this.localWon),
             reason: this.reason as ShowdownResultReason,
           });
         }

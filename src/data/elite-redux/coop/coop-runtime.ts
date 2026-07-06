@@ -79,6 +79,7 @@ import {
   recordReplayCommand,
 } from "#data/elite-redux/replay-recorder";
 import type { ReplayCommandKind } from "#data/elite-redux/replay-trace";
+import { getShowdownRelay } from "#data/elite-redux/showdown/showdown-battle-state";
 import { BattlerIndex } from "#enums/battler-index";
 import { Command } from "#enums/command";
 import { UiMode } from "#enums/ui-mode";
@@ -399,6 +400,12 @@ function wireShowdownResult(transport: CoopTransport, controller: CoopSessionCon
     try {
       if (globalScene.phaseManager.getCurrentPhase()?.phaseName === "ShowdownResultPhase") {
         return; // already ending on this client
+      }
+      // AFK-guest (#7): if the guest's command menu is still open when the match ends, force it back to
+      // MESSAGE first - otherwise SHOWDOWN_COMMAND owns input and the just-unshifted ShowdownResultPhase
+      // parks behind it (the guest never sees the result). Best-effort; guarded by the outer try.
+      if (globalScene.ui.getMode() === UiMode.SHOWDOWN_COMMAND) {
+        globalScene.ui.setMode(UiMode.MESSAGE);
       }
       if (msg.t === "showdownVoid") {
         globalScene.phaseManager.unshiftNew("ShowdownResultPhase", false, msg.reason, true, true);
@@ -789,6 +796,14 @@ function wireCoopDisconnectReaction(transport: CoopTransport, relay: CoopInterac
     } catch {
       /* cancel failure must not cascade */
     }
+    // Showdown 1v1 (#5): a channel death must also unblock the host's in-flight requestEnemyCommand
+    // PROMPTLY (-> AI fallback) instead of stranding the turn on the 60s timer. cancelPending fails the
+    // waiters without tearing the relay down, so a within-grace rejoin can still use it.
+    try {
+      getShowdownRelay()?.cancelPending();
+    } catch {
+      /* cancel failure must not cascade */
+    }
     // Only the ACTIVE runtime owns the screen (the duo harness assembles two in one process).
     const isActiveRuntime = getCoopRuntime() === runtime;
     // #805 HOT REJOIN: re-dial the same pairing code within the grace window and swap the fresh
@@ -1090,6 +1105,20 @@ export function getCoopSessionKind(): CoopSessionKind {
 /**
  * Showdown 1v1 PvP (C1): whether THIS client is in a live 1v1 VERSUS (showdown) session.
  * Hard `false` for solo / classic co-op, so those paths are byte-for-byte unaffected.
+ *
+ * TWO VIEWS OF "SHOWDOWN", and when each is authoritative (predicate-alignment note, #6):
+ *   - NETCODE view - `controller.sessionKind === "versus"` ({@linkcode isVersusSession}). The session
+ *     role/kind is negotiated over the wire (host pins it, guest adopts it off `runConfig`); this is
+ *     the source of truth for "am I in a VERSUS match" and distinguishes versus from classic co-op.
+ *   - ENGINE view - `globalScene.gameMode.isShowdown` (consumed by {@linkcode isAuthoritativeBattleSession},
+ *     which is `authoritative && (isCoop || isShowdown)`). This is the scene-side mode flag; it groups
+ *     versus WITH co-op as "authoritative battle" so the SHARED host/guest battle seams (turn divert,
+ *     state stream, enemy-command short-circuit) treat both alike.
+ * For a live versus match BOTH are set (the mode is constructed SHOWDOWN and the runConfig kind is
+ * "versus"), so they agree. The SHARED seams key off the ENGINE view (co-op + versus); the VERSUS-ONLY
+ * seams (e.g. the host awaiting a relayed HUMAN enemy command, which a co-op host must NOT do - its
+ * enemy is AI) key off the NETCODE view. Rule of thumb: reach for `isAuthoritativeBattleSession` when
+ * the behavior is shared with co-op, and `isVersusSession` when it is versus-specific.
  */
 export function isVersusSession(): boolean {
   return active != null && active.controller.isVersusSession();
