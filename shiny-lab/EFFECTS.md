@@ -45,11 +45,12 @@ zoomed per-frame triage - see `gen-zoom.mjs`, the per-effect multi-frame review 
   chains a fresh 20% roll for one more in the same instant (recursive, hard cap
   10) for rare overcharged bursts; and each bolt rolls a DEPTH - ~45% arc in
   FRONT of the sprite (overlay pass), the rest stay behind it.
-- **NEW Gen 1** (surface): the mon as it would look on the original Game Boy -
-  chunky half-res pixels with hard alpha, a dark Red/Blue-style outline, the
-  4-shade DMG green ramp, and selective 50% checkerboard dithering on midtones.
-  Texture-noise slider = chunk size; FX color modes re-tint the ramp (Super Game
-  Boy vibes).
+- **NEW Gen 1** (surface): the mon as a Red/Blue sprite - chunky half-res pixels
+  with hard alpha, GREYSCALE 4-tone biased bright (Gen 1 bodies are mostly
+  white/light grey - matched against the real R/B sprite sheet), black silhouette
+  outline PLUS the sprite's own internal line art re-inked in black (local-contrast
+  detection), and selective 50% checkerboard dithering on midtones. Texture-noise
+  slider = chunk size; FX color modes re-tint the ramp (DMG green / Super Game Boy).
 
 ## v7.1 quality pass (zoom-triage driven)
 Every v6/v7 effect was rendered at 3x with 4 animation frames (`gen-zoom.mjs`) and

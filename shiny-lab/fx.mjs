@@ -2954,36 +2954,45 @@ AURA.demake = (r, g, b, x, y, t, ctx) => {
   }
   return [pal[bi][0], pal[bi][1], pal[bi][2], s2[3] > 0.02 ? 1 : 0];
 };
-// Gen 1: the mon as it would look on the original Game Boy - chunky half-res
-// pixels, hard alpha, the 4-shade DMG green ramp, and 2x2 ordered dithering
-// between shades exactly like the Red/Blue sprites. The texture-noise slider
-// re-scales the pixel chunk size; the FX color modes re-tint the ramp (Super
-// Game Boy style).
+// Gen 1: the mon as a Red/Blue sprite - chunky half-res pixels with hard alpha,
+// GREYSCALE 4-tone biased bright (Gen 1 bodies are mostly white/light grey),
+// heavy BLACK linework (silhouette outline + the sprite's own internal line art,
+// found by local contrast), and selective checkerboard dithering on midtones.
+// Texture-noise slider = chunk size; FX color modes re-tint the ramp (Super Game
+// Boy / DMG-green style).
 AURA.genone = (r, g, b, x, y, t, ctx) => {
   const s = Math.max(16, Math.round(44 / (FXSCALE || 1)));
   const cxq = Math.floor(x * s);
   const cyq = Math.floor(y * s);
-  const s2 = ctx?.sa ? ctx.sa((cxq + 0.5) / s, (cyq + 0.5) / s) : [r, g, b, 1];
+  const px2 = (cxq + 0.5) / s;
+  const py2 = (cyq + 0.5) / s;
+  const s2 = ctx?.sa ? ctx.sa(px2, py2) : [r, g, b, 1];
   if (s2[3] <= 0.4) {
     return [0, 0, 0, 0]; // hard pixel alpha - no soft edges on a Game Boy
   }
-  const DMG = ["0f380f", "306230", "8bac0f", "9bbc0f"].map(hx);
-  // hard dark outline like the Red/Blue sprites: any chunk bordering transparency
+  const GB = ["101010", "5a5a5a", "aaaaaa", "f8f8f8"].map(hx);
+  const Lc = luma(s2[0], s2[1], s2[2]);
   if (ctx?.sa) {
+    // silhouette outline: any chunk bordering transparency goes black
     for (const [ox, oy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
       if (ctx.sa((cxq + ox + 0.5) / s, (cyq + oy + 0.5) / s)[3] <= 0.4) {
-        return [DMG[0][0], DMG[0][1], DMG[0][2], 1];
+        return [GB[0][0], GB[0][1], GB[0][2], 1];
       }
     }
+    // internal line art: the sprite's own linework (darker than its surroundings)
+    // re-inks in black - this is what makes it read as a drawn Gen 1 sprite
+    if (_lineContrast(px2, py2, Lc, ctx).line > 0.35) {
+      return [GB[0][0], GB[0][1], GB[0][2], 1];
+    }
   }
-  // 4 shades; genuine midtones get the classic 50% checkerboard dither,
-  // everything else stays a FLAT shade (Gen 1 dithered selectively, not evenly)
-  const v = clamp(Math.pow(luma(s2[0], s2[1], s2[2]), 0.85) * 3.4 - 0.2, 0, 3);
+  // bright-biased 4 tones (Gen 1 bodies are mostly the two light shades);
+  // genuine midtones get the classic 50% checkerboard dither, flats stay flat
+  const v = clamp(Math.pow(Lc, 0.62) * 3.6 - 0.25, 0, 3);
   const base = Math.floor(v);
   const frac = v - base;
   let lvl = frac > 0.35 && frac < 0.65 ? base + ((cxq + cyq) & 1) : Math.round(v);
   lvl = Math.max(0, Math.min(3, lvl));
-  return [DMG[lvl][0], DMG[lvl][1], DMG[lvl][2], 1];
+  return [GB[lvl][0], GB[lvl][1], GB[lvl][2], 1];
 };
 // Marching Ants: an animated dashed selection crawling along the outline.
 AURA.marchingants = (r, g, b, x, y, t, ctx) => {
