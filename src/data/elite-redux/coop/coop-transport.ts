@@ -127,6 +127,39 @@ export interface CoopSerializedStarter {
   erShinyLabName?: string | undefined;
 }
 
+/**
+ * Showdown 1v1 PvP (A4): a player's stake offer serialized for the wire. Mirrors
+ * `showdown/showdown-stakes.ts` `StakeOffer` STRUCTURALLY (the transport stays the
+ * lowest layer and never imports showdown/, so the shape is re-declared here rather
+ * than imported; `variant` widens to `number` since the wire carries plain JSON).
+ */
+export interface ShowdownStakeOfferWire {
+  speciesId: number;
+  shiny: boolean;
+  variant: number;
+  erBlackShiny: boolean;
+  cost: number;
+}
+
+/**
+ * Showdown 1v1 PvP (A4): one team member serialized for the wire. Mirrors
+ * `showdown/showdown-team.ts` `ShowdownMonManifest` STRUCTURALLY (same one-way
+ * dependency rule as {@linkcode ShowdownStakeOfferWire} - declared here, not imported).
+ */
+export interface ShowdownMonManifestWire {
+  speciesId: number;
+  formIndex: number;
+  level: number;
+  shiny: boolean;
+  variant: number;
+  abilityIndex: number;
+  nature: number;
+  ivs: number[];
+  moveset: number[];
+  item: string;
+  rootSpeciesId: number;
+}
+
 // =============================================================================
 // Host-authoritative battle STREAMING shapes (#633, LIVE-D). The host is the only
 // resolution engine; the guest renders these. All plain JSON so they serialize over
@@ -1046,7 +1079,28 @@ export type CoopMessage =
    * -> `applyCoopAuthoritativeBattleState`). This is the sole post-battle progression channel (the
    * legacy per-slot exp-delta relay it superseded has been removed; an older client ignores an unknown `t`).
    */
-  | { t: "waveEndState"; wave: number; state: CoopAuthoritativeBattleStateV1 };
+  | { t: "waveEndState"; wave: number; state: CoopAuthoritativeBattleStateV1 }
+  // ===========================================================================
+  // Showdown 1v1 PvP (A4): additive wire messages layered on the SAME co-op
+  // transport. Purely new `t` values, so a co-op client that never speaks Showdown
+  // ignores them via the unknown-kind default arm (forward-safe, same rule as above).
+  // ===========================================================================
+  /** Either player -> peer: this player's wagered stake for the match (see {@linkcode ShowdownStakeOfferWire}). */
+  | { t: "showdownStakeOffer"; offer: ShowdownStakeOfferWire }
+  /** Either player -> peer: the stake is locked in for `matchId` at the agreed `tier`. */
+  | { t: "showdownStakeLock"; matchId: string; tier: number }
+  /** Either player -> peer: this player's full built team (see {@linkcode ShowdownMonManifestWire}). */
+  | { t: "showdownTeam"; manifest: ShowdownMonManifestWire[] }
+  /** Either player -> peer: "my team is finalized"; `teamHash` fingerprints it for the anti-cheat cross-check. */
+  | { t: "showdownReady"; teamHash: string }
+  /** Host -> peer: the peer's command is needed for this `turn` (the 1v1 analogue of `commandRequest`). */
+  | { t: "showdownCommandRequest"; turn: number }
+  /** A player's battle command for their own mon this `turn` (reply to `showdownCommandRequest`). */
+  | { t: "showdownCommand"; turn: number; command: SerializedCommand }
+  /** Host -> peer: the match resolved. `winner` is the winning role; `reason` is how it ended. */
+  | { t: "showdownResult"; matchId: string; winner: CoopRole; reason: "victory" | "forfeit" | "timeout" }
+  /** Either player -> peer: the match is VOIDED (no winner) - `reason` is why (anti-cheat / illegal team / drop). */
+  | { t: "showdownVoid"; matchId: string; reason: "checksum" | "illegalTeam" | "earlyDisconnect" };
 
 /** A transport moves {@linkcode CoopMessage}s between two paired clients. */
 export interface CoopTransport {
