@@ -1913,6 +1913,37 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
   },
   {
+    label: "(note) Co-op: the reward-shop WATCHER no longer CRASHES on a long item description (#852)",
+    description:
+      "CO-OP P0 fix - the crash needs TWO clients (a solo shop can't reproduce the WATCHER path). When the\n"
+      + "reward shop opens, the interaction OWNER drives the real menu and the PARTNER opens the SAME shop as\n"
+      + "a read-only WATCHER whose cursor mirrors the owner's live. The auto-scrolling item-description box\n"
+      + "(#557) reads the description text's displayHeight; on the WATCHER that pane could be reached before\n"
+      + "it was built, so the read hit an undefined object -> uncaught TypeError 'Cannot read properties of\n"
+      + "undefined (reading displayHeight)' ~190ms after the mirror opened. The guest DIED and the host waited\n"
+      + "at the shop forever (live build mr9oh5r8-kjr, wave 7). Fixed on two layers: (1) the description pane\n"
+      + "now builds ON DEMAND (ensureItemDescText) so the reader never touches an unbuilt object, and (2) the\n"
+      + "watcher cursor-mirror render is wrapped so ANY replay error is swallowed loudly and the session stays\n"
+      + "ALIVE (the shop is cosmetic on the watcher; the authoritative pick still commits). DO (2 clients):\n"
+      + "reach a reward shop and let ONE player hover the reward items while the OTHER just watches; the\n"
+      + "watcher's cursor mirrors onto the items and their (often long) descriptions. EXPECT: neither client\n"
+      + "crashes to black, the description box shows/scrolls on the owner, and the watcher stays in the shop\n"
+      + "until the pick is made (no dead client, no host hang). SOLO smoke (this scenario): win the opening\n"
+      + "battle, then in the shop hover the seeded item below and confirm its description renders + scrolls\n"
+      + "without error. Regression-guarded headlessly in coop-ui-mirror.test.ts (throwing-render survives) +\n"
+      + "test/tests/elite-redux/coop/coop-watcher-reward-desc-crash.test.ts (unbuilt pane rebuilt, no crash).",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({ STARTING_WAVE_OVERRIDE: 1, STARTING_LEVEL_OVERRIDE: 50 });
+      return [
+        makeStarter(SpeciesId.SNORLAX, {
+          moveset: [MoveId.BODY_SLAM, MoveId.REST, MoveId.CRUNCH, MoveId.EARTHQUAKE],
+        }),
+      ];
+    },
+    shopItems: [modifierTypes.ER_RELIC_CURSED_IDOL, modifierTypes.RARE_CANDY],
+  },
+  {
     label: "(note) Co-op: your party ORDER stays synced when a lead faints + is replaced (#836)",
     description:
       "CO-OP fix - verify with TWO clients (not a solo battle): when a player's FIELD lead faints and a\n"
