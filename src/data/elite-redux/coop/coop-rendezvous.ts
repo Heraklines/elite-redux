@@ -45,11 +45,27 @@ import type { CoopMessage, CoopTransport } from "#data/elite-redux/coop/coop-tra
  */
 let coopRendezvousWaitMs = 60_000;
 
+/**
+ * Under vitest the harness pumps the two engines COOPERATIVELY (one client's phases drain while the
+ * other is parked), so a genuine cross-client rendezvous can never resolve mid-pump - a test that
+ * reaches a barrier would sit through the full live-generous timeout PER COMMAND POINT (the 11-file
+ * suite red of 2026-07-06). Default the wait to a tiny value in the test env so every existing and
+ * future test gets it WITHOUT per-file injection; tests that exercise the barrier semantics
+ * explicitly (block-until-arrive, timeout-WARN) still override via {@linkcode setCoopRendezvousWaitMs}.
+ * Live builds never define VITEST, so production keeps the generous 60s anti-hang class.
+ */
+const VITEST_DEFAULT_WAIT_MS = 50;
+let waitMsExplicitlySet = false;
+
 export function getCoopRendezvousWaitMs(): number {
+  if (!waitMsExplicitlySet && typeof process !== "undefined" && process.env?.VITEST) {
+    return VITEST_DEFAULT_WAIT_MS;
+  }
   return coopRendezvousWaitMs;
 }
 
 export function setCoopRendezvousWaitMs(ms: number): void {
+  waitMsExplicitlySet = true;
   coopRendezvousWaitMs = ms;
 }
 
@@ -99,6 +115,16 @@ export class CoopRendezvous {
     this.defaultTimeoutMs = opts.timeoutMs ?? getCoopRendezvousWaitMs();
     this.schedule = opts.schedule ?? defaultSchedule;
     this.offMessage = transport.onMessage(msg => this.handle(msg));
+  }
+
+  /**
+   * True when the PARTNER's arrival for `point` has already been received (buffered or live). Lets a
+   * caller take a SYNCHRONOUS fast-path (arrive + proceed immediately, no promise) when there is
+   * nothing to wait for - deferring behind a `.then` when the partner is already here would reorder
+   * UI opens for no reason (the 2026-07-06 command-menu async regression).
+   */
+  hasPartnerArrived(point: string): boolean {
+    return this.partnerArrived.has(point);
   }
 
   /**

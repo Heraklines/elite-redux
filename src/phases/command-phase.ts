@@ -419,7 +419,15 @@ export class CommandPhase extends FieldPhase {
     // while the partner's replacement is not yet out / it already started a move, permanently locking
     // the other). A dead/stuck partner cannot strand us: the barrier resolves after a generous timeout
     // with a LOUD WARN and we PROCEED (the existing partner-command AI fallback then unwedges the turn).
-    void this.coopNextCommandBarrier().then(() => this.openOwnCommandUi());
+    const pendingBarrier = this.coopNextCommandBarrier();
+    if (pendingBarrier == null) {
+      // SYNC fast-path: solo / spoof / no rendezvous / partner-half-exhausted / partner ALREADY at this
+      // command point. Open immediately - deferring behind a `.then` when there is nothing to wait for
+      // reorders the UI open by a microtask for no reason (solo must stay byte-identical).
+      this.openOwnCommandUi();
+      return;
+    }
+    void pendingBarrier.then(() => this.openOwnCommandUi());
   }
 
   /** Open THIS client's own-slot command UI (FIGHT for a skip-to-fight ME, else the COMMAND menu). */
@@ -442,14 +450,19 @@ export class CommandPhase extends FieldPhase {
    * when there is no rendezvous - so solo / lockstep / dev is byte-identical. Never throws: a barrier
    * failure resolves so the command UI still opens.
    */
-  private async coopNextCommandBarrier(): Promise<void> {
+  /**
+   * Returns `null` when NO waiting is needed (the caller opens the command UI synchronously - solo /
+   * spoof / no rendezvous / partner half exhausted / partner already arrived at this command point),
+   * else a promise that resolves once the partner arrives (or the anti-hang timeout fires).
+   */
+  private coopNextCommandBarrier(): Promise<void> | null {
     try {
       if (!globalScene.gameMode.isCoop || getCoopRuntime()?.spoof != null) {
-        return;
+        return null;
       }
       const rendezvous = getCoopRendezvous();
       if (rendezvous == null) {
-        return;
+        return null;
       }
       const point = `cmd:${globalScene.currentBattle.waveIndex}:${globalScene.currentBattle.turn}`;
       // Asymmetric-field guard (#828 class): a partner whose HALF IS WIPED never reaches an own-slot
@@ -464,18 +477,31 @@ export class CommandPhase extends FieldPhase {
       if (!partnerHasCommandable) {
         coopLog("rendezvous", `next-command barrier ${point} ARRIVE-ONLY (partner half exhausted, no await)`);
         rendezvous.arrive(point);
-        return;
+        return null;
+      }
+      if (rendezvous.hasPartnerArrived(point)) {
+        // Partner is already here - arrive (idempotent) and proceed synchronously.
+        rendezvous.arrive(point);
+        coopLog("rendezvous", `next-command barrier ${point} SYNC pass (partner already arrived)`);
+        return null;
       }
       coopLog("rendezvous", `next-command barrier ARRIVE+AWAIT ${point} slot=${this.fieldIndex}`);
-      const result = await rendezvous.rendezvous(point, getCoopRendezvousWaitMs());
-      if (result.timedOut) {
-        coopWarn(
-          "rendezvous",
-          `next-command barrier ${point} TIMED OUT - partner never reached command; opening UI anyway (anti-hang)`,
-        );
-      }
+      return rendezvous
+        .rendezvous(point, getCoopRendezvousWaitMs())
+        .then(result => {
+          if (result.timedOut) {
+            coopWarn(
+              "rendezvous",
+              `next-command barrier ${point} TIMED OUT - partner never reached command; opening UI anyway (anti-hang)`,
+            );
+          }
+        })
+        .catch((e: unknown) => {
+          coopWarn("rendezvous", "next-command barrier threw (handled, opening UI)", e);
+        });
     } catch (e) {
       coopWarn("rendezvous", "next-command barrier threw (handled, opening UI)", e);
+      return null;
     }
   }
 
