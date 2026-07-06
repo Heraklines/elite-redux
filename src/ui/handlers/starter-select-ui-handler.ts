@@ -46,7 +46,8 @@ import {
 import { resetErRunTrainerTracking } from "#data/elite-redux/er-trainer-runtime-hook";
 import { isMegaStage, listEvolutionStages, listMegaStages } from "#data/elite-redux/showdown/showdown-evolutions";
 import { SHOWDOWN_ITEM_POOL, type ShowdownItemKey } from "#data/elite-redux/showdown/showdown-item-pool";
-import { MEGA_STONE_ITEM } from "#data/elite-redux/showdown/showdown-team";
+import { buildUnlockSnapshot, starterToManifest } from "#data/elite-redux/showdown/showdown-manifest";
+import { MEGA_STONE_ITEM, validateShowdownTeam } from "#data/elite-redux/showdown/showdown-team";
 import { GrowthRate, getGrowthRateColor } from "#data/exp";
 import { Gender, getGenderColor, getGenderSymbol } from "#data/gender";
 import { getNatureName } from "#data/nature";
@@ -6576,6 +6577,26 @@ export class StarterSelectUiHandler extends MessageUiHandler {
       }
       this.clearText();
     };
+
+    // Showdown: the party must be a fully legal 6v6 showdown team (size, level-100,
+    // items, one-mega cap, collection legality, IVs, moves). Run the shared rule engine on
+    // the manifests and refuse the start on the FIRST violation, surfaced like invalidParty.
+    if (globalScene.gameMode.isShowdown) {
+      const { gameData } = globalScene;
+      const manifests = this.starters.map(starter => starterToManifest(starter, gameData));
+      const violations = validateShowdownTeam(manifests, buildUnlockSnapshot(gameData), isMegaStage);
+      if (violations.length > 0) {
+        this.tutorialActive = true;
+        this.showText(
+          violations[0].message,
+          undefined,
+          () => this.showText("", 0, () => (this.tutorialActive = false)),
+          undefined,
+          true,
+        );
+        return true;
+      }
+    }
 
     const canStart = this.isPartyValid();
 
