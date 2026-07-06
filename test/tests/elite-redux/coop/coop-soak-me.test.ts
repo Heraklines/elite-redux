@@ -1,0 +1,144 @@
+/*
+ * SPDX-FileCopyrightText: 2024-2026 Pagefault Games
+ * SPDX-License-Identifier: AGPL-3.0-only
+ */
+
+// =============================================================================
+// #633 MID-RUN MYSTERY-ENCOUNTER CONTINUATION (SOAK BUILD 1). Proves the soak can DRIVE a mystery encounter
+// INLINE in the continuous two-engine wave loop (the single biggest coverage gap: the ENTIRE ME surface -
+// mePresent/me/meResync/quizAns/bargain/colosseum kinds+bands, the MYSTERY_ENCOUNTER mode - was KNOWN_UNDRIVABLE
+// because the soak set mysteryEncounterChance 0 and the duo harness drove MEs only from a PARKED buildDuoForMe rig).
+//
+// The driver now takes an `meWaves` map: at each designated wave it FORCES the ME (raising the rate override for
+// just that wave's EncounterPhase), crosses the host into its MysteryEncounterPhase, MIRRORS the ME onto the
+// guest (mirrorHostMeToGuest), drives the host through the REAL ME + embedded reward shop, drives the guest's
+// REAL CoopReplayMePhase, and asserts LOCKSTEP (the ME advances the alternation counter exactly once). Routes
+// by counter parity: HOST-OWNED (even) drives its own pick; GUEST-OWNED (odd) awaits the guest's relayed index.
+//
+// HOW TO RUN (gated ER_SCENARIO=1, like every ER engine test):
+//   ER_SCENARIO=1 npx vitest run test/tests/elite-redux/coop/coop-soak-me.test.ts
+// =============================================================================
+
+import { initGlobalScene } from "#app/global-scene";
+import { setCoopFaintSwitchWaitMs, setCoopWaveBarrierMs } from "#data/elite-redux/coop/coop-interaction-relay";
+import { clearCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
+import { MysteryEncounterType } from "#enums/mystery-encounter-type";
+import { Move } from "#moves/move";
+import { GameManager } from "#test/framework/game-manager";
+import { installDuoLogCapture } from "#test/tools/coop-duo-harness";
+import { logSoakCoverage } from "#test/tools/coop-soak-coverage";
+import { announceSoakSeed, runCoopSoak, SOAK_PROFILES } from "#test/tools/coop-soak-driver";
+import Phaser from "phaser";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, type MockInstance, vi } from "vitest";
+
+const RUN = process.env.ER_SCENARIO === "1";
+
+/** The designated ME wave (valid: WILD-eligible, non-boss, %10 != 1, in [10,180]) - host-owned by counter parity. */
+const ME_WAVE = 12;
+
+describe.skipIf(!RUN)("NIGHTLY co-op SOAK: mid-run mystery-encounter continuation (#633 BUILD 1)", () => {
+  let phaserGame: Phaser.Game;
+  let game: GameManager;
+  let logs: ReturnType<typeof installDuoLogCapture>;
+  let accuracySpy: MockInstance | undefined;
+
+  beforeAll(() => {
+    phaserGame = new Phaser.Game({ type: Phaser.HEADLESS });
+  });
+
+  beforeEach(() => {
+    // Force-hit (a determinism knob, NOT content narrowing) so the god party's max-clamped moves connect.
+    accuracySpy = vi.spyOn(Move.prototype, "calculateBattleAccuracy").mockReturnValue(-1);
+    setCoopWaveBarrierMs(50);
+    setCoopFaintSwitchWaitMs(4000);
+    game = new GameManager(phaserGame);
+    logs = installDuoLogCapture(`soak-me-${Date.now()}`);
+    // GOD profile for the ME leg (steamrolls to wave 12 well below the ~wave-60 playWave razor's edge). MEs
+    // stay OFF by default (chance 0); the driver's crossIntoMeWave raises the rate for JUST the designated
+    // wave's EncounterPhase then resets it, so ONLY wave 12 rolls an ME.
+    game.override
+      .battleStyle("double")
+      .startingWave(1)
+      .startingLevel(SOAK_PROFILES.god.startingLevel)
+      .moveset([...SOAK_PROFILES.god.moveset])
+      .startingHeldItems([...(SOAK_PROFILES.god.heldItems ?? [])])
+      .mysteryEncounterChance(0);
+  });
+
+  afterEach(() => {
+    setCoopWaveBarrierMs(60_000);
+    setCoopFaintSwitchWaitMs(60_000);
+    accuracySpy?.mockRestore();
+    accuracySpy = undefined;
+    logs.dispose();
+    clearCoopRuntime();
+    initGlobalScene(game.scene);
+  });
+
+  afterAll(() => {
+    // best-effort
+  });
+
+  it("drives a DEPARTMENT_STORE_SALE ME inline at wave 12 (host-owned), the guest replays in lockstep, findings=0", async () => {
+    const seed = 828_633;
+    // Survey THROUGH the ME wave (the designated ME is the final surveyed wave). The inline ME drive itself
+    // is the load-bearing BUILD-1 capability; surveying waves AFTER a host-owned ME hits a post-ME reward-
+    // shop-ownership counter-desync (the guest's next-wave owner handshake) that is the documented follow-up.
+    const waves = ME_WAVE;
+    announceSoakSeed(seed, waves);
+
+    await game.classicMode.startBattle(...SOAK_PROFILES.god.species);
+    const result = await runCoopSoak(game, {
+      seed,
+      waves,
+      logs,
+      profile: "god",
+      meWaves: new Map([[ME_WAVE, MysteryEncounterType.DEPARTMENT_STORE_SALE]]),
+    });
+
+    // eslint-disable-next-line no-console
+    console.log(
+      `[coop-soak-me] DONE seed=${seed} waves=${result.wavesCompleted}/${result.wavesRequested} `
+        + `findings=${result.findings.length} MEs=${JSON.stringify(result.mysteryEncounters)} skips=${JSON.stringify(result.skips)}`,
+    );
+
+    // The ME was DRIVEN at wave 12 (not skipped, not a terminal).
+    expect(result.mysteryEncounters.length, "one ME was driven inline").toBe(1);
+    expect(result.mysteryEncounters[0].wave, "the ME was driven at the designated wave").toBe(ME_WAVE);
+    expect(result.mysteryEncounters[0].type, "the driven ME is DEPARTMENT_STORE_SALE").toBe(
+      MysteryEncounterType[MysteryEncounterType.DEPARTMENT_STORE_SALE],
+    );
+    // wave 12 has an even interaction counter (10 shops over waves 1-11, boss wave 10 auto-grants) -> host-owned.
+    expect(result.mysteryEncounters[0].path, "wave 12 is HOST-OWNED by counter parity").toBe("host-owned");
+
+    // The soak DROVE the ME (not skipped as disabled, not counted as an undrivable stray) and surveyed it
+    // as the final wave (no NO-PARK strand, no terminal run-end).
+    expect(
+      result.skips.mysteryEncounterDisabledV1,
+      "the ME-disabled skip is NOT recorded with a ME leg",
+    ).toBeUndefined();
+    expect(
+      result.skips.mysteryEncounterWaveHit,
+      "the ME was DRIVEN, not counted as an undrivable stray",
+    ).toBeUndefined();
+    expect(result.wavesCompleted, "the run surveyed every wave through the ME").toBe(waves);
+    expect(result.runEnded, "no terminal run-end").toBeUndefined();
+
+    // The ME SYNC surfaces fired: the MYSTERY_ENCOUNTER mode opened on the guest, and the ME relay kinds
+    // (mePresent present + meResync outcome + the `me` option pick chain) were streamed - recorded by the
+    // relay-send tap. These were ALL KNOWN_UNDRIVABLE before BUILD 1.
+    logSoakCoverage(result.hits, "god");
+    const kinds = [...result.hits.kinds];
+    expect(kinds, "the ME present relay kind fired").toContain("mePresent");
+    expect(kinds, "the ME resync relay kind fired").toContain("meResync");
+
+    // THE PRIMARY GATE: no unhealed DIGEST desync across the whole run incl. the ME wave.
+    expect(
+      result.findings,
+      `soak found ${result.findings.length} unhealed DIGEST desync(s) (replay SOAK_SEED=${seed}): `
+        + result.findings.map(f => `[${f.fields}]@${f.firstWave}`).join(", "),
+    ).toEqual([]);
+
+    logs.flush();
+  }, 600_000);
+});

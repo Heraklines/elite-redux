@@ -200,8 +200,21 @@ export interface UndrivableEntry {
   followupTask: string;
 }
 
-/** Follow-up shorthand for the biggest gap: mid-run mystery-encounter driving (V1 COVERAGE GAP #1). */
-const ME_CONTINUATION = "V1 GAP #1: build a mid-run mystery-encounter continuation driver for the duo harness";
+/**
+ * Follow-up shorthand for the mid-run mystery-encounter surface. #633 BUILD 1 LANDED the inline ME
+ * continuation driver ({@linkcode coop-soak-driver}'s crossIntoMeWave + processMeWave, proven green by
+ * coop-soak-me.test.ts): a designated ME wave is FORCED + driven INLINE across BOTH engines, so the CORE ME
+ * SYNC surfaces (mePresent / meResync / meBtn / me + the MYSTERY_ENCOUNTER mode + the mePump/meTerm bands)
+ * now FIRE for a DEPARTMENT_STORE_SALE host-owned ME. They stay listed here because the DEFAULT wave/shop
+ * soak does NOT configure an ME leg (opts.meWaves unset) - they are exercised by the dedicated ME test, not
+ * the default run - so the partition for the default profile is unchanged. REMAINING follow-up: (a) the
+ * post-ME CONTINUATION into subsequent waves (a host-owned ME leaves the next wave's guest-owned reward-shop
+ * handshake counter-desynced - the ME test surveys through the ME as its final wave); (b) guest-owned +
+ * battle-handoff paths + the other ME types (bargain/colosseum/quiz) inline.
+ */
+const ME_CONTINUATION =
+  "#633 BUILD 1 landed the inline ME leg (coop-soak-me.test.ts drives mePresent/meResync/meBtn/me + MYSTERY_ENCOUNTER); "
+  + "follow-up: post-ME continuation into subsequent waves + guest-owned/battle-handoff + bargain/colosseum/quiz inline";
 /** Follow-up shorthand for the biome-heal work that lets the soak survive + drive biome boundaries. */
 const BIOME_BOUNDARY = "drive the every-10-waves biome boundary (biome market + biome pick) in the soak";
 

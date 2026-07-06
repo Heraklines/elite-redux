@@ -82,6 +82,7 @@ import { Button } from "#enums/buttons";
 import { Command } from "#enums/command";
 import { GameModes } from "#enums/game-modes";
 import { MoveId } from "#enums/move-id";
+import { MysteryEncounterType } from "#enums/mystery-encounter-type";
 import { SpeciesId } from "#enums/species-id";
 import { UiMode } from "#enums/ui-mode";
 import { WeatherType } from "#enums/weather-type";
@@ -95,11 +96,17 @@ import {
   buildDuo,
   type DuoLogs,
   type DuoRig,
+  drainGuestMeReplayToSettle,
+  driveGuestMeReplay,
   driveGuestReplayTurn,
   driveGuestRewardWatch,
   driveHostRewardShopOwner,
+  mirrorHostMeToGuest,
+  relayGuestMeOptionIndexOnly,
   remirrorWave,
   type ShopPhaseSeam,
+  startGuestMeOutcomeRace,
+  startGuestMeReplay,
   withClient,
   withClientSync,
 } from "#test/tools/coop-duo-harness";
@@ -111,6 +118,7 @@ import {
   type SoakHitSet,
   type SoakProfileName,
 } from "#test/tools/coop-soak-coverage";
+import { runMysteryEncounterToEnd } from "#test/utils/encounter-test-utils";
 import type { PartyUiHandler } from "#ui/handlers/party-ui-handler";
 import fs from "node:fs";
 import path from "node:path";
@@ -357,6 +365,12 @@ export interface SoakResult {
    */
   guestSoloWaves: number;
   /**
+   * #633 MID-RUN ME CONTINUATION (BUILD 1): the mystery encounters DRIVEN inline this run, one entry per
+   * ME wave: the wave, the forced type, and which authoritative path fired (host-owned / guest-owned /
+   * battle-handoff). Empty when {@linkcode SoakOptions.meWaves} is unset (MEs off, today's default).
+   */
+  mysteryEncounters: { wave: number; type: string; path: "host-owned" | "guest-owned" | "battle-handoff" }[];
+  /**
    * COMPLETENESS BACKSTOP (#849): every co-op interactive surface the run OBSERVED, per dimension (modes /
    * relay kinds / seq bands / battle-flow situations). The EXPECTED set is derived from the registries, so
    * a surface that is neither hit here nor declared undrivable auto-reds. The caller feeds this to
@@ -388,6 +402,17 @@ export interface SoakOptions {
    * to today (no revive-take, no other level-only behavior).
    */
   profile?: SoakProfileName;
+  /**
+   * #633 MID-RUN MYSTERY-ENCOUNTER CONTINUATION (BUILD 1). A map of wave index -> the {@linkcode
+   * MysteryEncounterType} to FORCE at that wave, driven INLINE through the real two-engine ME machinery
+   * (mirrorHostMeToGuest + the host MysteryEncounterPhase drive + the guest CoopReplayMePhase) rather than as
+   * a normal battle wave. Undefined (the default) = today's behavior byte-identically (MEs OFF, the soak is
+   * wave/shop-only). Each forced wave MUST be a legal ME wave (WILD-eligible, non-boss, %10 != 1, in
+   * [10,180]) and SHOULD stay below the ~wave-60 playWave razor's-edge on the level profile (use the god
+   * profile for the ME leg). The driver forces the ME by raising the ME rate override just for that wave's
+   * EncounterPhase then resetting it, so ONLY the designated waves roll an ME. See {@linkcode processMeWave}.
+   */
+  meWaves?: ReadonlyMap<number, MysteryEncounterType>;
 }
 
 /** A structured HARD invariant breach (LOCKSTEP / NO-PARK / TEARDOWN) the driver throws after writing the
@@ -976,6 +1001,8 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
   let wavesCompleted = 0;
   // #828 ASYMMETRIC CONTINUATION (BUILD 2): waves surveyed with the host half exhausted (guest solo).
   let guestSoloWaves = 0;
+  // #633 MID-RUN ME CONTINUATION (BUILD 1): the mystery encounters driven inline this run.
+  const mysteryEncounters: SoakResult["mysteryEncounters"] = [];
   // Whether the host half is CURRENTLY exhausted (so the transition is logged once, not every wave).
   let guestSoloActive = false;
   const trainerWaves = { total: 0, fixed: 0, random: 0 };
@@ -996,11 +1023,12 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
     actionScript.push(`SKIP ${kind}`);
   };
 
-  // 🔴 V1 COVERAGE GAP #1 (loud + skip-counted): the continuous soak does not yet drive MYSTERY ENCOUNTERS
-  // (the caller sets mysteryEncounterChance 0). The duo harness drives MEs only from a PARKED buildDuoForMe
-  // rig, not a mid-run continuation, so a random ME cannot be driven inline yet. Recorded here so it shows
-  // in the run's skip counters + report; see the report's COVERAGE DECISIONS for the concrete follow-up.
-  bumpSkip("mysteryEncounterDisabledV1");
+  // #633 BUILD 1: when NO ME leg is configured (opts.meWaves unset) the continuous soak is wave/shop-only -
+  // MEs stay OFF (the caller sets mysteryEncounterChance 0), skip-counted here for the report. When a ME leg
+  // IS configured, the designated waves are DRIVEN inline (processMeWave), so this skip is NOT recorded.
+  if (opts.meWaves == null || opts.meWaves.size === 0) {
+    bumpSkip("mysteryEncounterDisabledV1");
+  }
 
   // Optionally PIN the run seed BEFORE the mirror (determinism contract) so two runs are seed-aligned.
   if (opts.pinSeed != null) {
@@ -1483,6 +1511,135 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
     }
   };
 
+  // ---------------------------------------------------------------------------
+  // #633 MID-RUN MYSTERY-ENCOUNTER CONTINUATION (BUILD 1). Port buildDuoForMe's pump INLINE into the
+  // continuous wave loop: when a wave is a FORCED ME, mirror the host's ME onto the guest (mirrorHostMeToGuest,
+  // NOT the battle mirror - an ME wave has no enemy party), drive the host through the REAL MysteryEncounterPhase
+  // + embedded reward shop, drive the guest's REAL CoopReplayMePhase (driveGuestMeReplay), and assert LOCKSTEP.
+  // Routes the three authoritative paths by interaction-counter parity at the ME: HOST-OWNED (even, host drives
+  // its own UI), GUEST-OWNED (odd, host awaits the guest's relayed index via coopHostAwaitGuestIndex), and
+  // (a battle-spawning option would be) BATTLE-HANDOFF. A SAFE non-battle option is driven (the goal is SYNC-layer
+  // coverage, not every outcome branch). The relay-send tap (installCoverageTaps) records the ME kinds/bands
+  // automatically as the host/guest stream them; here we record the MYSTERY_ENCOUNTER mode + the ME manifest.
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Cross the host from wave W-1's shop INTO wave W's forced ME, parking at its {@linkcode MysteryEncounterPhase}
+   * (ME rolled + `currentBattle.mysteryEncounter` set, intro dialogue auto-advanced) so {@linkcode processMeWave}
+   * can mirror + drive it. FORCES the ME by raising the rate override for just this wave's EncounterPhase then
+   * resetting it to 0 (so ONLY the designated wave rolls an ME). MUST be called under host ctx by the caller.
+   */
+  const crossIntoMeWave = async (type: MysteryEncounterType): Promise<boolean> => {
+    game.override.mysteryEncounterChance(100).mysteryEncounter(type);
+    // Auto-advance the EncounterPhase intro dialogue (mirrors runToMysteryEncounter) so the crossing reaches
+    // MysteryEncounterPhase without a live prompt handler.
+    game.onNextPrompt(
+      "EncounterPhase",
+      UiMode.MESSAGE,
+      () => (game.scene.ui.getHandler() as unknown as { processInput(b: number): boolean }).processInput(Button.ACTION),
+      () => game.isCurrentPhase("MysteryEncounterPhase"),
+      true,
+    );
+    armHostFaintAutoPick();
+    await game.phaseInterceptor.to("MysteryEncounterPhase", false);
+    // Reset the rate so subsequent waves are normal battles again.
+    game.override.mysteryEncounterChance(0);
+    const isMe = rig.hostScene.currentBattle.battleType === BattleType.MYSTERY_ENCOUNTER;
+    if (!isMe) {
+      bumpSkip("meForceFailed");
+    }
+    return isMe;
+  };
+
+  /**
+   * Drive ONE mid-run ME wave across BOTH engines (BUILD 1). The host is parked at MysteryEncounterPhase (ME
+   * set) from {@linkcode crossIntoMeWave}. Mirror the host's ME onto the guest, then route by counter parity:
+   *   - HOST-OWNED (even counter): the host drives its OWN pick (option 1 = a SAFE non-battle option) + embedded
+   *     reward shop to PostMysteryEncounterPhase; the guest replays via driveGuestMeReplay (pure renderer).
+   *   - GUEST-OWNED (odd counter): the host AWAITS the guest's relayed option index; the guest starts its
+   *     CoopReplayMePhase, relays index 0, the host applies it programmatically + drives the embedded shop, then
+   *     the guest's deferred outcome/terminal race converges (the IT #2 STEP B/C/D handshake, inline).
+   * Advances the alternation counter exactly ONCE (like a shop). Asserts LOCKSTEP at start + end.
+   */
+  const processMeWave = async (wave: number, type: MysteryEncounterType): Promise<void> => {
+    // Mirror the host's CURRENT mystery encounter onto the guest (rebuilds the guest party + sets its ME).
+    await withClient(rig.guestCtx, () => mirrorHostMeToGuest(rig.hostScene, rig.guestScene));
+    assertLockstep(wave, "me-start");
+    const counterBefore = rig.hostRuntime.controller.interactionCounter();
+    const hostOwns = counterBefore % 2 === 0;
+    // #849: the guest opens the real MYSTERY_ENCOUNTER screen (the mirrored mode); record it.
+    hitMode(UiMode.MYSTERY_ENCOUNTER);
+
+    let mePath: "host-owned" | "guest-owned" | "battle-handoff";
+    if (hostOwns) {
+      // HOST-OWNED: the host drives its OWN pick off local input (the real MysteryEncounterUiHandler), runs the
+      // option chain to the embedded end-of-ME reward shop (leave), then to the true terminal. The guest is a
+      // pure renderer: its CoopReplayMePhase consumes the buffered present + meResync + LEAVE and advances once.
+      await withClient(rig.hostCtx, async () => {
+        await runMysteryEncounterToEnd(game, 1);
+        await game.phaseInterceptor.to("SelectModifierPhase", false);
+        const hostShop = rig.hostScene.phaseManager.getCurrentPhase() as unknown as ShopPhaseSeam;
+        if (hostShop.phaseName === "SelectModifierPhase") {
+          await driveHostRewardShopOwner(hostShop, { takeReward: false });
+        }
+        await game.phaseInterceptor.to("PostMysteryEncounterPhase");
+      });
+      await withClient(rig.guestCtx, () => driveGuestMeReplay(rig.guestScene));
+      mePath = "host-owned";
+    } else {
+      // GUEST-OWNED (odd counter): the host CANNOT take the human pick - it awaits the guest's relayed option
+      // index. Interleave the IT #2 handshake inline: (B) start the guest divert + relay index 0 under the guest
+      // ctx; (C) drain under the host ctx so coopHostAwaitGuestIndex resolves, apply the pick, drive the embedded
+      // shop (host is the pick WATCHER on a guest-owned ME), to PostMysteryEncounterPhase; (D) start the guest's
+      // deferred outcome/terminal race so it buffer-hits the meResync + LEAVE under the guest ctx and converges.
+      const replay = await withClient(rig.guestCtx, () => startGuestMeReplay(rig.guestScene));
+      withClientSync(rig.guestCtx, () => relayGuestMeOptionIndexOnly(replay, 0));
+      await withClient(rig.hostCtx, async () => {
+        await game.phaseInterceptor.to("SelectModifierPhase", false);
+        const hostShop = rig.hostScene.phaseManager.getCurrentPhase() as unknown as ShopPhaseSeam;
+        if (hostShop.phaseName === "SelectModifierPhase") {
+          await driveHostRewardShopOwner(hostShop, { takeReward: false });
+        }
+        await game.phaseInterceptor.to("PostMysteryEncounterPhase");
+      });
+      await withClient(rig.guestCtx, async () => {
+        startGuestMeOutcomeRace(replay);
+        await drainGuestMeReplayToSettle(replay);
+      });
+      mePath = "guest-owned";
+    }
+
+    // Clear any leftover ME onNextPrompt handlers (crossIntoMeWave's intro + runMysteryEncounterToEnd's option
+    // prompts): in the single-file FIFO prompt queue a stale ME prompt sits at the head and STARVES the NEXT
+    // wave's command prompt, so the following wave's game.move.select never fires and its CommandPhase strands
+    // (the exact footgun coop-duo-mystery IT #4 clears). Drain the queue so the continuous run's next wave is
+    // driven cleanly.
+    (game.promptHandler as unknown as { prompts: unknown[] }).prompts.length = 0;
+    // Clear the GUEST's leftover ME phase queue so its NEXT-wave replay does not re-divert into a spurious
+    // second CoopReplayMePhase (driveGuestMeReplay drives THROUGH the leave terminal but leaves the guest's
+    // post-ME phase queue populated - see the harness scope note). The next wave's remirror rebuilds the
+    // guest's currentBattle; this drops the stale ME phases so the replay runs a clean CoopReplayTurnPhase.
+    withClientSync(rig.guestCtx, () => rig.guestScene.phaseManager.clearPhaseQueue());
+
+    // The whole ME advanced the alternation counter EXACTLY once (like a shop). Assert LOCKSTEP.
+    const hostAfter = rig.hostRuntime.controller.interactionCounter();
+    const guestAfter = rig.guestRuntime.controller.interactionCounter();
+    if (hostAfter !== counterBefore + 1 || guestAfter !== counterBefore + 1) {
+      fail(
+        "lockstep",
+        wave,
+        `ME (${mePath}) did not advance both counters once (before=${counterBefore} host=${hostAfter} guest=${guestAfter})`,
+      );
+    }
+    assertLockstep(wave, "me-end");
+    mysteryEncounters.push({ wave, type: MysteryEncounterType[type], path: mePath });
+    actionScript.push(
+      `wave ${wave}: ME ${MysteryEncounterType[type]} driven (${mePath}, counter ${counterBefore}->${hostAfter})`,
+    );
+    // eslint-disable-next-line no-console
+    console.log(`[coop-soak] ME DRIVEN wave ${wave} (seed ${seed}): ${MysteryEncounterType[type]} [${mePath}]`);
+  };
+
   /**
    * A BOSS wave (every 10th). #843: the harness mirror now carries the host's authoritative boss segments
    * onto the guest enemy (mirrorHostBattleToGuest re-asserts setBoss + bossSegmentIndex), so the guest is a
@@ -1561,9 +1718,14 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
 
   /** True if wave>1 crossing hit a non-battle wave the continuous harness cannot drive (skip + stop). */
   const crossedUndrivableWave = (wave: number): boolean => {
-    if (wave > 1 && rig.hostScene.currentBattle.battleType === BattleType.MYSTERY_ENCOUNTER) {
-      // Continuous-run ME driving is not supported by the duo harness (V1 COVERAGE GAP #1). If an ME ever
-      // reaches here (a future run raising mysteryEncounterChance), count it + STOP cleanly - never silent.
+    if (
+      wave > 1
+      && rig.hostScene.currentBattle.battleType === BattleType.MYSTERY_ENCOUNTER
+      && opts.meWaves?.has(wave) !== true
+    ) {
+      // An UNDESIGNATED ME wave (a stray ME the harness cannot drive). A DESIGNATED ME wave (opts.meWaves) is
+      // DRIVEN inline by processMeWave (BUILD 1), so it does NOT stop the survey. If an unexpected ME ever
+      // reaches here, count it + STOP cleanly - never silent.
       bumpSkip("mysteryEncounterWaveHit");
       return true;
     }
@@ -1584,9 +1746,14 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
     // carry it to the guest; also applied to the guest directly (defensive). See restorePlayerPartyPp.
     restorePlayerPartyPp(rig.hostScene);
     withClientSync(rig.guestCtx, () => restorePlayerPartyPp(rig.guestScene));
+    // #633 BUILD 1: a DESIGNATED ME wave (the host is parked at MysteryEncounterPhase from crossIntoMeWave) is
+    // driven by processMeWave, which mirrors via mirrorHostMeToGuest (NOT the battle mirror) - so SKIP the
+    // normal wave re-mirror for it.
+    const meType = opts.meWaves?.get(wave);
+    const isMeWave = meType != null && rig.hostScene.currentBattle.battleType === BattleType.MYSTERY_ENCOUNTER;
     // Re-mirror the host's freshly-rolled battle onto the guest before each new wave (wave 1 was mirrored by
     // buildDuo), then faithfully re-sync the guest (held items / weather / modifiers / scalars).
-    if (wave > 1) {
+    if (wave > 1 && !isMeWave) {
       await remirrorWave(rig);
       await healGuestFromHost(rig);
     }
@@ -1626,9 +1793,12 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
     // wave unexpectedly auto-grants - no +1 assertion). The "god" profile keeps the ORIGINAL detection
     // BYTE-IDENTICALLY (its own deep-wave boss-reward-tail strand at ~wave 140 is the separate documented
     // follow-up; the 25-wave PR god run rolls no non-%10 boss wave, so this is behavior-preserving there).
-    const bossWave = wave % 10 === 0 || (profile !== "level" && rig.hostScene.getEnemyField().some(e => e.isBoss()));
+    const bossWave =
+      !isMeWave && (wave % 10 === 0 || (profile !== "level" && rig.hostScene.getEnemyField().some(e => e.isBoss())));
     try {
-      await (bossWave ? processBossWave(wave) : processNormalWave(wave));
+      // #633 BUILD 1: a designated ME wave routes through processMeWave (the inline two-engine ME pump); every
+      // other wave is a normal/boss battle.
+      await (isMeWave ? processMeWave(wave, meType) : bossWave ? processBossWave(wave) : processNormalWave(wave));
     } catch (e) {
       if (e instanceof SoakInvariantError) {
         throw e;
@@ -1697,9 +1867,16 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
     // opens its PARTY picker on this crossing - re-arm the auto-picker (guarded) so it is driven, not parked.
     if (wave < waves) {
       try {
+        // #633 BUILD 1: if the NEXT wave is a designated ME, cross into it (force + park at its
+        // MysteryEncounterPhase) instead of to("CommandPhase") - an ME wave has no CommandPhase.
+        const nextMeType = opts.meWaves?.get(wave + 1);
         await withClient(rig.hostCtx, async () => {
-          armHostFaintAutoPick();
-          await game.phaseInterceptor.to("CommandPhase");
+          if (nextMeType == null) {
+            armHostFaintAutoPick();
+            await game.phaseInterceptor.to("CommandPhase");
+          } else {
+            await crossIntoMeWave(nextMeType);
+          }
         });
       } catch (e) {
         // #846: the crossing itself can hit a run-end (a killing turn that also wiped the host, or a
@@ -1765,6 +1942,7 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
     runEnded,
     trainerWaves,
     guestSoloWaves,
+    mysteryEncounters,
     hits,
   };
 }
