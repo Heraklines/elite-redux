@@ -333,7 +333,68 @@ In showdown mode `tryStart` runs `validateShowdownTeam(manifests, buildUnlockSna
 
 ---
 
-## Phase C — Session + battle (ER_SCENARIO gate; duo-harness rule applies)
+## ⚠️ ARCHITECTURE RESET (2026-07-06, maintainer briefing) — READ BEFORE ANY PHASE C/D WORK
+
+The worktree is now synced to `heraklines/feat/elite-redux-port` (tip ee9370293) — the single
+source of truth. The co-op netcode was REWRITTEN since the June-30 base this plan was first
+written against. New tsc baseline on this base: **303 errors** (bare tip = with-stack = 303).
+Multiple agents land co-op commits on this branch daily — re-fetch + re-rebase before finalizing.
+
+**Current architecture (binding):**
+- **Full-state turn replication** (c18da4fb7 onward): host streams `CoopAuthoritativeBattleStateV1`
+  every turn — both parties as `PokemonData[]` in authoritative order (live state on summonData),
+  seating-only `field[]`, arena, money, modifiers. Guest applies wholesale keyed by `Pokemon.id`,
+  mutating in place — **the guest derives NOTHING**. Any guest-side re-computation of structural
+  state is dead architecture.
+- **Rendezvous barriers** (`coop-rendezvous.ts`): two-sided pacing points with cross-point release
+  + 60s anti-hang. Showdown sync points MUST use this primitive — do not invent another.
+- **Interaction counters hardened**: every interaction pins `coopInteractionStart`; unpinned
+  `advanceInteraction` is refused loudly. Never bump asymmetrically.
+- **ui-mirror machinery** (#818/#815): watcher never runs an engine; bespoke screens mirror via
+  the ui-mirror session machinery with live cursor mirroring. Showdown's wager/ready screens go
+  through `coop-ui-registry.ts`.
+- **New messages**: register kinds in `coop-transport.ts` AND seq bands in `coop-seq-registry.ts`
+  per existing conventions. Unregistered surfaces fail the soak completeness backstop loudly.
+- **DELETED**: netcodeMode, lockstep, pump-watcher (M3/M6 sweeps). Any reference = removed code.
+- **Do not regress**: party-order transposition (host-faint replacement checkpoints), enemy
+  switch-in absolute positioning, berry-counter pin, empty-enemy-party crossing skip.
+- **Account writes**: default-deny gates (#806) — wager settlement must be server-verified,
+  never client-asserted.
+- Required reading: `docs/plans/2026-07-05-coop-full-state-phase-0-design.md`,
+  `docs/plans/2026-07-06-coop-sync-gap-and-soak-coverage-audit.md`,
+  `docs/plans/2026-07-05-coop-refactor-resume-and-pacing-barriers.md`, the duo-harness header.
+
+**ADDENDUM — Showdown-specific deltas (maintainer):**
+1. **The enemy-side command relay is NEW, not reuse.** Co-op relays guest commands for a
+   player-side slot; the enemy side is AI. Showdown needs the host's EnemyCommandPhase (or
+   equivalent) to await a relayed human command — that interception point does not exist yet.
+   Small and clean to build (message shapes carry over), but it is BUILT, not found.
+2. **The guest needs a perspective flip.** A pure renderer of the host's world would show the
+   guest's own team on top as "enemies." Each player sees their team on the bottom — a
+   render-mapping layer (presentation-only side swap). Co-op never needed it; nothing exists.
+3. **Hidden information + host trust — accept explicitly.** The state stream sends the FULL
+   opposing party (movesets/items/bench) to the other client, and the host runs the engine — a
+   motivated host can cheat. Fine for friendlies; with permanent mon loss it must be a conscious,
+   DOCUMENTED decision. Minimum bar: settlement server-verified via the #806 gates. Full
+   server-refereed battles are a different project. State the trust model in the design doc.
+4. **Do-NOT-drag-in list**: interaction alternation, merged-party/3-mon-cap rules, coopOwner
+   tags, wave/shop/ME/biome machinery, inter-wave pacing barriers. Reusable core: transport +
+   lobby/matchmaking + session roles; authoritative engine + state stream + checksum/resync;
+   record→replay; ui-mirror (wager/ready screens); rendezvous primitive (ready-up). Showdown is
+   a NEW SESSION KIND on those seams. Team select = each player picks freely from their own box.
+
+**Hard rules**: deploy/PR only against feat/elite-redux-port; NEVER touch main/prod; solo and
+co-op byte-identical when showdown is off; every sync behavior proven in the duo harness
+(fails-before/passes-after); tsc zero-new (303); biome clean; in-game dev-suite scenario per
+standing rule.
+
+**Status after reset**: Phases A+B survived the rebase intact (15 commits, 96/96 tests, 0 new
+tsc). v1 C1 commit dropped (built on deleted netcodeMode); v1 C2 draft salvaged to scratchpad.
+The v1 Phase C below is SUPERSEDED as written — task GOALS remain valid (title entry, team
+exchange, battle bootstrap, command relay, result/void, duo test); mechanisms follow the new
+seams per this briefing + the architecture-map exploration.
+
+## Phase C (v1 — SUPERSEDED mechanisms; goals only; do not execute as written)
 
 ### Task C1: Title menu entry + showdown pairing
 
