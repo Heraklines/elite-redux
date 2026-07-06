@@ -3,8 +3,8 @@
 **Live for the team: https://shiny-lab.pages.dev** (Cloudflare Pages). Also
 `articuno-shiny-lab.html` on the Desktop (self-contained except sprites).
 
-**368 effects** in three **combinable** slots - pick one of each and they stack live:
-**138 Palettes + 125 Surface FX + 105 Around FX** (v6 Discord-brainstorm batch + the v7
+**367 effects** in three **combinable** slots - pick one of each and they stack live:
+**138 Palettes + 124 Surface FX + 105 Around FX** (v6 Discord-brainstorm batch + the v7
 mega-expansion doubled every catalog; v7.1 quality pass reworked the weak ones after
 zoomed per-frame triage - see `gen-zoom.mjs`, the per-effect multi-frame review tool).
 
@@ -25,15 +25,13 @@ zoomed per-frame triage - see `gen-zoom.mjs`, the per-effect multi-frame review 
 - **Per-layer sliders**: Surface FX and Around FX each get their OWN Speed / Seed /
   Texture noise / Color (Default-Palette-Custom) controls, plus the master speed.
 - **GBC colors** checkbox: snaps all FX colors to the GBC-displayable gamut (RGB555).
-- **NEW Astral Form** (surface): the living-constellation look - night-sky nebula body,
-  twinkling stars, and the sprite's OWN linework redrawn as broken pale-blue
-  constellation lines with star nodes. Linework is detected by local contrast (darker
-  than the surrounding body), so it follows any sprite's shape - light or dark mons.
-  Moody variant: darker flat body, segments slowly blink in and out.
-- **NEW Astral Form II** (surface): the clean "star chart" alternate for A/B - the FULL
-  constellation stays lit (no blinking), lines glow with a soft halo and a shimmer
-  traveling along them, star nodes are bigger 4-point glints. Compare with Astral Form
-  and keep the winner (or both).
+- **NEW Astral Form** (surface): the living-constellation star chart. Flat night-sky
+  body with soft nebula patches; the sprite's OWN linework stays lit as dim pale
+  strands (local-contrast detection, so it follows any sprite's shape), and BIG
+  glowing constellation stars - round core, soft halo, 4-point flare, slow pulse -
+  sit anchored on those strands, joined to each other by them. A shimmer travels
+  along the lines. (Iterated with the team: the earlier blinking variant and the
+  "Astral Form II" A/B candidate were folded into this final version.)
 
 ## v7.1 quality pass (zoom-triage driven)
 Every v6/v7 effect was rendered at 3x with 4 animation frames (`gen-zoom.mjs`) and
