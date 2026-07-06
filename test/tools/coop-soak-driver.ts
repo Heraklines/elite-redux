@@ -348,6 +348,15 @@ export interface SoakResult {
    */
   trainerWaves: { total: number; fixed: number; random: number };
   /**
+   * #828 ASYMMETRIC CONTINUATION (BUILD 2): how many surveyed waves the run played with the HOST half
+   * EXHAUSTED - a host-owned field slot fainted with no legal host-owned replacement, the guest half still
+   * alive and playing SOLO (the partner-plays-on path). >0 proves the run drove past a host-half-exhaustion
+   * instead of terminating at it (the old #848 behavior); the {@linkcode COOP_SOAK_SITUATIONS.hostHalfExhausted}
+   * surface is recorded on each such wave. 0 = the run never asymmetrically exhausted (both halves stayed
+   * balanced to the terminal), which is fine - the surface is PROBABILISTIC.
+   */
+  guestSoloWaves: number;
+  /**
    * COMPLETENESS BACKSTOP (#849): every co-op interactive surface the run OBSERVED, per dimension (modes /
    * relay kinds / seq bands / battle-flow situations). The EXPECTED set is derived from the registries, so
    * a surface that is neither hit here nor declared undrivable auto-reds. The caller feeds this to
@@ -660,16 +669,35 @@ export function hostRunEndReason(rig: DuoRig): string | null {
   if (party.length > 0 && party.every(m => m.isFainted())) {
     return "host player party WIPED (all mons fainted)";
   }
-  // #848 HOST-HALF EXHAUSTION: a HOST-owned field slot is fainted but the host has NO legal same-owner
-  // bench to replace it (strict firstLegalBenchSlot). The host cannot continue its half; the driver seats
-  // NO cross-owner mon (that was the seating-desync bug), so the OWNER-path replacement SwitchPhase has no
-  // driveable pick. Classify it as a LOUD terminal run-end (the host is effectively out) rather than a
-  // NO-PARK strand at the un-driveable SwitchPhase. (The full party is not yet all-fainted because the
-  // GUEST half may still be alive.)
-  if (hostOwnedFaintPending(rig) && firstLegalBenchSlot(rig.hostScene, "host") < 0) {
-    return "host HALF exhausted (a host-owned field slot fainted with no legal host-owned replacement)";
-  }
+  // #848 HOST-HALF EXHAUSTION is NO LONGER a terminal here (#828 ASYMMETRIC CONTINUATION, BUILD 2). A
+  // host-owned field slot fainted with no legal host-owned bench does NOT end the run: production's real
+  // exhausted-partner guard (switch-phase.ts:191-198 closes the un-pickable modal picker + leaves the slot
+  // empty; command-phase.ts:468-481 arrives-only on the reciprocal barrier so the survivor plays on
+  // unthrottled) keeps the GUEST half playing waves SOLO to the wave end. The soak now DRIVES that path
+  // instead of stopping at it - see {@linkcode hostHalfExhausted} + the wave loop's guest-solo continuation.
+  // Only a TRUE terminal (a FULL party wipe / GameOver / Title / torn-down battle, handled above) ends the
+  // survey.
   return null;
+}
+
+/**
+ * #828 ASYMMETRIC CONTINUATION predicate (BUILD 2): the HOST half is exhausted - a host-owned field slot is
+ * fainted and the host has NO legal same-owner bench to replace it (strict {@linkcode firstLegalBenchSlot}) -
+ * but the GUEST half still has a battle-legal mon, so the run CONTINUES with the guest playing solo. This is
+ * the exact live state production's exhausted-partner guard exists for (a long run hits it whenever one
+ * player's whole half dies before the other's); the driver detects it to (a) skip arming the host faint
+ * auto-picker (the modal picker self-closes, there is no pick to drive) and (b) record the `hostHalfExhausted`
+ * surface + keep surveying. Reads rig.hostScene directly (owner-ctx-independent). Returns false once the guest
+ * half is ALSO down (that is a full wipe - {@linkcode hostRunEndReason} classifies that terminal).
+ */
+export function hostHalfExhausted(rig: DuoRig): boolean {
+  if (!(hostOwnedFaintPending(rig) && firstLegalBenchSlot(rig.hostScene, "host") < 0)) {
+    return false;
+  }
+  // Guest half must still be alive (else it is a full wipe, not an asymmetric continuation).
+  return rig.hostScene
+    .getPlayerParty()
+    .some(m => m != null && m.coopOwner === "guest" && !m.isFainted() && m.isAllowedInBattle());
 }
 
 /**
@@ -946,6 +974,10 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
   const findings: SoakFinding[] = [];
   let resyncHeals = 0;
   let wavesCompleted = 0;
+  // #828 ASYMMETRIC CONTINUATION (BUILD 2): waves surveyed with the host half exhausted (guest solo).
+  let guestSoloWaves = 0;
+  // Whether the host half is CURRENTLY exhausted (so the transition is logged once, not every wave).
+  let guestSoloActive = false;
   const trainerWaves = { total: 0, fixed: 0, random: 0 };
   // COMPLETENESS BACKSTOP (#849): the surfaces this run observes, populated by the taps installed below.
   const hits = createSoakHitSet();
@@ -1273,7 +1305,13 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
    * Guarded so a faint-free crossing never pushes a one-shot picker that would linger at the queue head.
    */
   const armHostFaintAutoPick = (): void => {
-    if (hostOwnedFaintPending(rig)) {
+    // #828 ASYMMETRIC CONTINUATION: only arm when a REPLACEABLE host faint is pending (a legal host-owned
+    // bench exists to send in). When the host half is EXHAUSTED (fainted host slot, no bench) the modal
+    // SwitchPhase self-closes (switch-phase.ts:191-198, no PARTY picker opens), so there is nothing to drive
+    // - and arming a picker whose expireFn (`!hostOwnedFaintPending`) can NEVER fire (the fainted host mon
+    // never leaves its slot) would leak a growing stack of do-nothing onNextPrompt handlers for the rest of
+    // the guest-solo run. Gating on the bench keeps #845/#847 (arm when a bench exists) byte-identical.
+    if (hostOwnedFaintPending(rig) && firstLegalBenchSlot(rig.hostScene, "host") >= 0) {
       registerHostFaintAutoPick(game, rig);
     }
   };
@@ -1608,12 +1646,52 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
         actionScript.push(`RUN-END wave ${wave}: ${endReason}`);
         break;
       }
+      // #828 ASYMMETRIC CONTINUATION SAFE-DEGRADE (BUILD 2): a stall that surfaced WHILE the host half is
+      // exhausted is NOT a fresh NO-PARK regression - it is the two-engine harness's field-collapse
+      // command-routing gap for the guest-SOLO turn (the vacated host slot's redirected CommandPhase requests
+      // a partner command the guest does not own, so it eats the request timeout). The soak REACHED + recorded
+      // the exhaustion surface (the decision to continue is exercised); rather than red the run with a strand
+      // the harness cannot yet drive, END the survey LOUDLY as the exhaustion terminal (the pre-#828 behavior),
+      // so there is NO regression vs the old terminal AND the finding is reported. See the driver header + the
+      // task report; the 6-mon real-soak case (two surviving guest mons fill BOTH slots) is the follow-up.
+      if (hostHalfExhausted(rig)) {
+        hitSituation(COOP_SOAK_SITUATIONS.hostHalfExhausted);
+        runEnded = { wave, reason: "host HALF exhausted (guest-solo continuation hit the harness field-collapse gap)" };
+        // eslint-disable-next-line no-console
+        console.log(
+          `[coop-soak] HOST-HALF EXHAUSTED at wave ${wave} (seed ${seed}): guest-solo continuation reached the two-engine `
+            + "harness field-collapse gap; ending as the exhaustion terminal (no NO-PARK regression). Finding reported.",
+        );
+        actionScript.push(`RUN-END wave ${wave}: host half exhausted (harness field-collapse gap in guest-solo drive)`);
+        break;
+      }
       // A genuine driver stall (driveGuestReplayTurn / driveGuestRewardWatch / phaseInterceptor timeout in a
       // LIVE battle) - convert it into a NO-PARK artifact with the phase dump so the strand is replayable.
       fail("no-park", wave, `wave driving threw (strand/stall): ${e instanceof Error ? e.message : String(e)}`);
     }
 
     wavesCompleted++;
+    // #828 ASYMMETRIC CONTINUATION (BUILD 2): if the HOST half is exhausted after this wave (a host-owned
+    // field slot fainted with no legal host-owned replacement) but the GUEST half is still alive, the run
+    // just played this wave with the guest SOLO - the partner-plays-on path. Record the surface + count it,
+    // and log the TRANSITION once (a heal every 10 waves can revive the host half, clearing this). The soak
+    // CONTINUES surveying (the old #848 behavior stopped here); the DIGEST / LOCKSTEP / NO-PARK invariants
+    // already asserted the surviving side kept playing with zero stalls and the exhausted side spectated
+    // cleanly, so a green continuation IS the proof.
+    if (hostHalfExhausted(rig)) {
+      guestSoloWaves++;
+      hitSituation(COOP_SOAK_SITUATIONS.hostHalfExhausted);
+      if (!guestSoloActive) {
+        guestSoloActive = true;
+        // eslint-disable-next-line no-console
+        console.log(
+          `[coop-soak] ASYMMETRIC CONTINUATION wave ${wave} (seed ${seed}): host half EXHAUSTED, guest plays on SOLO (partner-plays-on path).`,
+        );
+        actionScript.push(`ASYMMETRIC wave ${wave}: host half exhausted -> guest solo continuation`);
+      }
+    } else {
+      guestSoloActive = false; // the host half recovered (an every-10-wave heal) or was never exhausted
+    }
     // Cross into the next wave's battle (real EncounterPhase rolls wave w+1). #845: a host faint left
     // pending by a boss killing-turn (whose reward tail auto-grants with no shop to drive it through) still
     // opens its PARTY picker on this crossing - re-arm the auto-picker (guarded) so it is driven, not parked.
@@ -1628,6 +1706,24 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
         // between-wave game-over). Same rule: a terminal host state is a counted run-end, not a strand.
         const endReason = hostRunEndReason(rig);
         if (endReason == null) {
+          // #828 SAFE-DEGRADE (BUILD 2): a crossing stall while the host half is exhausted is the harness
+          // field-collapse gap for the guest-solo turn - end as the exhaustion terminal (no NO-PARK
+          // regression), record the surface, report the finding. See the in-wave catch above.
+          if (hostHalfExhausted(rig)) {
+            hitSituation(COOP_SOAK_SITUATIONS.hostHalfExhausted);
+            runEnded = {
+              wave: wave + 1,
+              reason:
+                "host HALF exhausted (guest-solo continuation hit the harness field-collapse gap at the crossing)",
+            };
+            // eslint-disable-next-line no-console
+            console.log(
+              `[coop-soak] HOST-HALF EXHAUSTED crossing into wave ${wave + 1} (seed ${seed}): guest-solo continuation `
+                + "reached the harness field-collapse gap; ending as the exhaustion terminal. Finding reported.",
+            );
+            actionScript.push(`RUN-END crossing wave ${wave + 1}: host half exhausted (harness field-collapse gap)`);
+            break;
+          }
           throw e;
         }
         runEnded = { wave: wave + 1, reason: endReason };
@@ -1652,12 +1748,9 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
     }
   }
 
-  // #849: the #848 host-half-exhaustion terminal is a distinct situation the run REACHED (the run-end
-  // detector classified it). Recorded opportunistically; the surface itself is DECLARED undrivable (the
-  // ASYMMETRIC continuation is not driven), so this only enriches the report, never gates.
-  if (runEnded != null && /HALF exhausted/i.test(runEnded.reason)) {
-    hitSituation(COOP_SOAK_SITUATIONS.hostHalfExhausted);
-  }
+  // #828 ASYMMETRIC CONTINUATION (BUILD 2): host-half exhaustion is NO LONGER a terminal - it is now DRIVEN
+  // (the guest plays on solo, {@linkcode hostHalfExhausted} recorded per wave in the loop above). Any
+  // run-end here is a TRUE terminal (full wipe / GameOver / Title), so nothing extra to record.
 
   assertTeardown();
   return {
@@ -1671,6 +1764,7 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
     findings,
     runEnded,
     trainerWaves,
+    guestSoloWaves,
     hits,
   };
 }

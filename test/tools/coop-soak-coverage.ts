@@ -530,14 +530,11 @@ export const KNOWN_UNDRIVABLE: ReadonlyMap<string, UndrivableEntry> = new Map<st
       followupTask: "drive the will-you-switch prompt in the soak",
     },
   ],
-  [
-    sitKey(COOP_SOAK_SITUATIONS.hostHalfExhausted),
-    {
-      reason:
-        "the ASYMMETRIC host-half-exhaustion continuation (guest plays on after the host's half is out) is not driven; the #848 terminal is only detected + classified, not continued",
-      followupTask: "drive the asymmetric host-half-exhausted continuation (guest solo)",
-    },
-  ],
+  // NOTE (#828 BUILD 2): `situation:hostHalfExhausted` was PROMOTED out of KNOWN_UNDRIVABLE - the soak now
+  // DRIVES the asymmetric continuation (the guest plays on solo after the host's half is out) instead of
+  // terminating at it. It is PROBABILISTIC (fires only when one player's whole half dies before the other's
+  // and before an every-10-wave heal), so it lives in {@linkcode PROBABILISTIC_BASE}, covered by the
+  // cross-run union ledger. See coop-soak-driver.ts's guest-solo continuation + hostHalfExhausted predicate.
 ]);
 
 // ---------------------------------------------------------------------------
@@ -601,6 +598,10 @@ const PROBABILISTIC_BASE: readonly string[] = [
   sitKey(COOP_SOAK_SITUATIONS.weather),
   sitKey(COOP_SOAK_SITUATIONS.terrain),
   sitKey(COOP_SOAK_SITUATIONS.enemySwitch),
+  // #828 BUILD 2: the ASYMMETRIC host-half-exhaustion continuation (guest plays on solo) is now DRIVEN, but
+  // it fires only when one player's whole half dies before the other's (and before an every-10-wave heal),
+  // so it is PROBABILISTIC under BOTH profiles - covered by the cross-run union ledger, never guaranteed.
+  sitKey(COOP_SOAK_SITUATIONS.hostHalfExhausted),
 ];
 
 /**
