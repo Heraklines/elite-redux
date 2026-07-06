@@ -1,0 +1,66 @@
+===== COOP SOAK RESULT =====
+profile: level
+verdict: FAIL
+waves_requested: 150
+run: 28828186014 (feat/elite-redux-port)
+timestamp: 2026-07-06T22-47-38Z
+
+----- driver lines -----
+[22m[39m[coop-soak] SEED=20260706 WAVES=150 - replay this run with:  SOAK_SEED=20260706 SOAK_WAVES=150 ER_SCENARIO=1 npx vitest run test/tests/elite-redux/coop/coop-soak.test.ts
+[22m[39m[coop-soak] scalar-lag wave 5 @post-shop: guest trails host (expected renderer lag, converges at re-mirror) - money host=590 guest=480
+[22m[39m[coop-soak] scalar-lag wave 8 @post-shop: guest trails host (expected renderer lag, converges at re-mirror) - money host=870 guest=590
+[22m[39m[coop-soak] scalar-lag wave 13 @post-shop: guest trails host (expected renderer lag, converges at re-mirror) - money host=1060 guest=870
+[22m[39m[coop-soak] scalar-lag wave 14 @post-shop: guest trails host (expected renderer lag, converges at re-mirror) - money host=1260 guest=1060
+[coop-soak] scalar-lag wave 20 @boss-post-shop: guest trails host (expected renderer lag, converges at re-mirror) - money host=2570 guest=1260
+[22m[39m[coop-soak] scalar-lag wave 25 @post-shop: guest trails host (expected renderer lag, converges at re-mirror) - money host=3400 guest=2570
+[22m[39m[coop-soak] scalar-lag wave 27 @post-shop: guest trails host (expected renderer lag, converges at re-mirror) - money host=4490 guest=3400
+[22m[39m[coop-soak] scalar-lag wave 28 @post-shop: guest trails host (expected renderer lag, converges at re-mirror) - money host=5450 guest=4490
+[22m[39m[coop-soak] scalar-lag wave 35 @post-shop: guest trails host (expected renderer lag, converges at re-mirror) - money host=6370 guest=5450
+[22m[39m[coop-soak] scalar-lag wave 43 @post-shop: guest trails host (expected renderer lag, converges at re-mirror) - money host=7820 guest=6370
+[22m[39m[coop-soak] scalar-lag wave 44 @post-shop: guest trails host (expected renderer lag, converges at re-mirror) - money host=8650 guest=7820
+[coop-soak] scalar-lag wave 50 @boss-post-shop: guest trails host (expected renderer lag, converges at re-mirror) - money host=11720 guest=8650
+[22m[39m[coop-soak] scalar-lag wave 55 @post-shop: guest trails host (expected renderer lag, converges at re-mirror) - money host=13406 guest=11486
+[22m[39m[coop-soak] scalar-lag wave 58 @post-shop: guest trails host (expected renderer lag, converges at re-mirror) - money host=15494 guest=13406
+[31m[1mSoakInvariantError[22m: [coop-soak] NO-PARK invariant breached at wave 60 (seed 20260706): wave driving threw (strand/stall): PhaseInterceptor.to("TurnEndPhase") did not reach its target (soft-lock / freeze?): stuck at phase "CommandPhase", UI mode COMMAND (=2), interceptor state "interrupted".
+
+----- vitest result tail -----
+[coop:transport] state guest connected -> closed
+[coop:transport] state host connected -> disconnected
+[coop:relay] cancelWaiters() no orphaned waiters selected -> nothing cancelled (live waits spared)
+[coop:turn] host recorder: CLEAR (null-out) live emitter (was=true)
+[coop:session] coopAuthoritativeGuestPredicate CLEARED (-> solo/host/lockstep reads false)
+
+[90mstderr[2m | test/tests/elite-redux/coop/coop-soak.test.ts[2m:149:3[22m[2m[2m > [22m[2mNIGHTLY co-op SOAK: seeded randomized two-engine run (#841)[2m > [22m[2mplays a seeded randomized co-op run asserting DIGEST/LOCKSTEP/NO-PARK/TEARDOWN each wave
+[22m[39m[33m[coop:runtime] partner channel disconnected -> cancelling pending co-op waits (no 20-minute strand)[39m
+
+[90mstdout[2m | test/tests/elite-redux/coop/coop-soak.test.ts[2m:149:3[22m[2m[2m > [22m[2mNIGHTLY co-op SOAK: seeded randomized two-engine run (#841)[2m > [22m[2mplays a seeded randomized co-op run asserting DIGEST/LOCKSTEP/NO-PARK/TEARDOWN each wave
+[22m[39m[2m> [22m[30m[48;2;193;98;222m Test finished! [49m[39m
+    Name: [38;2;0;136;134mNIGHTLY co-op SOAK: seeded randomized two-engine run (#841) > plays a seeded randomized co-op run asserting DIGEST/LOCKSTEP/NO-PARK/TEARDOWN each wave[39m
+    Result: [31m[1m✗ Failed[22m[39m [2min[22m [33m110044[39m[2mms[22m
+    File: [38;2;210;155;14melite-redux/test/tests/elite-redux/coop/coop-soak.test.ts:149:3[39m
+
+[33m[39m[31mx[39m
+
+[31m⎯⎯⎯⎯⎯⎯⎯[39m[1m[41m Failed Tests 1 [49m[22m[31m⎯⎯⎯⎯⎯⎯⎯[39m
+
+[41m[1m FAIL [22m[49m [30m[45m main [49m[39m test/tests/elite-redux/coop/coop-soak.test.ts[2m:149:3[22m[2m > [22mNIGHTLY co-op SOAK: seeded randomized two-engine run (#841)[2m > [22mplays a seeded randomized co-op run asserting DIGEST/LOCKSTEP/NO-PARK/TEARDOWN each wave
+[31m[1mSoakInvariantError[22m: [coop-soak] NO-PARK invariant breached at wave 60 (seed 20260706): wave driving threw (strand/stall): PhaseInterceptor.to("TurnEndPhase") did not reach its target (soft-lock / freeze?): stuck at phase "CommandPhase", UI mode COMMAND (=2), interceptor state "interrupted".
+Original: Timed out in waitUntil!. Artifact + both logs: /home/runner/work/elite-redux/elite-redux/dev-logs/coop-soak/2026-07-06T22-47-38-125Z__seed-20260706__wave-60. Replay: SOAK_SEED=20260706[39m
+[36m [2m❯[22m fail test/tools/coop-soak-driver.ts:[2m1141:11[22m[39m
+    [90m1139|[39m       phaseState: phaseStateDump(rig),
+    [90m1140|[39m     });
+    [90m1141|[39m     throw new SoakInvariantError(invariant, seed, wave, detail, dir);
+    [90m   |[39m           [31m^[39m
+    [90m1142|[39m   };
+    [90m1143|[39m
+[90m [2m❯[22m runCoopSoak test/tools/coop-soak-driver.ts:[2m1876:7[22m[39m
+[90m [2m❯[22m test/tests/elite-redux/coop/coop-soak.test.ts:[2m167:22[22m[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯[22m[39m
+
+
+[2m Test Files [22m [1m[31m1 failed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[31m1 failed[39m[22m[90m (1)[39m
+[2m   Start at [22m 22:45:25
+[2m   Duration [22m 132.79s[2m (transform 17.39s, setup 21.30s, import 132ms, tests 110.49s, environment 714ms)[22m
+
