@@ -1,0 +1,91 @@
+----- BUG REPORT (in-game) -----
+version:  1.11.19
+url:      https://elite-redux.pages.dev/
+ua:       Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36 Edg/149.0.0.0
+mode:     4  wave:27  difficulty:youngster
+seed:     YrXkUsXO8pJhiHJvh6LIf9PG
+party:    Pignite(L24 75/84), Fomantis(L15 38/38), Darumaka(L16 52/52), Ponyta(L17 48/48)
+
+----- DESCRIPTION -----
+Evil Nugget corrupts game
+
+----- CONSOLE -----
+[19:42:04.722] LOG: %c %c %c %c %c Phaser v3.90.0 (WebGL | Web Audio) %c https://phaser.io/v390 background: #ff0000 background: #ffff00 background: #00ff00 background: #00ffff color: #ffffff; background: #000000 background: transparent
+[19:42:05.356] LOG: [ER] build mr1lenh7-fth8
+[19:43:29.413] DEBUG: Destroying loading scene
+[19:43:29.413] DEBUG: Destroyed loading scene
+[19:43:29.531] LOG: Seed: cZVSqWlaqn65R5wU76qBZMhk
+[19:43:29.531] LOG: Wave Seed: cZVSqWlaqn65R5wU76qBZMhk 0
+[19:43:32.919] LOG: %cStart Phase LoginPhase color:green;
+[19:43:34.440] LOG: Client Session: GtgXgnsHQXVllOVFoydGVuLaGD6mFyyY
+[19:43:35.481] DEBUG: Using cached system data
+[19:43:35.621] LOG: %cStart Phase TitlePhase color:green;
+[19:43:35.621] LOG: Getting Session Slot id: %d 3
+[19:43:35.641] LOG: use seasonal splash messages true
+[19:46:33.466] LOG: Getting Session Slot id: %d 3
+[19:46:33.485] LOG: Wave Seed: YrXkUsXO8pJhiHJvh6LIf9PG 0
+[19:46:33.485] LOG: Seed: YrXkUsXO8pJhiHJvh6LIf9PG
+[19:46:33.535] LOG: Wave Seed: tspsjSeceQgdTkb 27
+[19:46:33.633] LOG: %cStart Phase EncounterPhase color:green;
+[19:46:33.644] LOG: Pokemon: Wild Jigglypuff | Species ID: 39 | Level: 17 | Nature: Naive (+Spd/-SpDef)
+[19:46:33.645] LOG: Stats (IVs): HP: 65 (15), Atk: 23 (21), Def: 17 (13), Spatk: 36 (26), Spdef: 21 (31), Spd: 15 (12)
+[19:46:33.645] LOG: Ability: Competitive | Passive Ability: Cute Charm 
+[19:46:33.645] LOG: Moveset: ["Disarming Voice","Self-Destruct","Play Nice","Lucky Chant"]
+[19:46:36.669] LOG: Wave Seed: tspsjSeceQgdTkb 27
+[19:46:37.275] LOG: %cStart Phase SummonPhase color:green;
+[19:46:37.686] LOG: %cStart Phase CheckSwitchPhase color:green;
+[19:46:38.500] LOG: %cStart Phase InitEncounterPhase color:green;
+[19:46:38.502] LOG: %cStart Phase PostSummonPhase color:green;
+[19:46:38.502] LOG: Ran PSP for: Jigglypuff
+[19:46:38.503] LOG: %cStart Phase PostSummonPhase color:green;
+[19:46:38.503] LOG: %cStart Phase PostSummonPhase color:green;
+[19:46:38.504] LOG: %cStart Phase TurnInitPhase color:green;
+[19:46:38.507] LOG: %cStart Phase CommandPhase color:green;
+[19:46:41.818] LOG: %cStart Phase EnemyCommandPhase color:green;
+[19:46:41.845] LOG: Battle Seed: eNs21qrFOZAcRclW
+[19:46:41.845] LOG: Move Pool: ["Disarming Voice","Self-Destruct","Play Nice","Lucky Chant"]
+[19:46:41.845] LOG: Move Scores: [18,52.5,2,0]
+[19:46:41.845] LOG: Sorted Move Pool: ["Self-Destruct","Disarming Voice","Play Nice","Lucky Chant"]
+[19:46:41.845] LOG: Chosen Move: Play Nice
+[19:46:41.845] LOG: %cStart Phase TurnStartPhase color:green;
+[19:46:41.852] LOG: %cStart Phase AttemptCapturePhase color:green;
+[19:46:44.001] LOG: %cStart Phase VictoryPhase color:green;
+[19:46:44.004] LOG: Applied Soothe Bell 
+[19:46:44.007] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[19:46:44.007] LOG: Applied Super EXP. Charm 
+[19:46:44.007] LOG: Applied EXP. Charm 
+[19:46:44.008] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[19:46:44.008] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[19:46:44.008] LOG: Applied Super EXP. Charm 
+[19:46:44.008] LOG: Applied EXP. Charm 
+[19:46:44.009] LOG: %cStart Phase LevelUpPhase color:green;
+[19:46:44.015] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[19:46:44.015] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[19:46:44.016] LOG: Applied Super EXP. Charm 
+[19:46:44.016] LOG: Applied EXP. Charm 
+[19:46:44.017] LOG: %cStart Phase LevelUpPhase color:green;
+[19:46:44.018] LOG: %cStart Phase LearnMoveBatchPhase color:green;
+[19:46:45.505] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[19:46:45.506] LOG: %cStart Phase MovePhase color:green;
+[19:46:45.506] LOG: %cStart Phase MoveEndPhase color:green;
+[19:46:45.507] LOG: %cStart Phase CheckInterludePhase color:green;
+[19:46:45.508] LOG: %cStart Phase WeatherEffectPhase color:green;
+[19:46:45.833] LOG: %cStart Phase PositionalTagPhase color:green;
+[19:46:45.834] LOG: %cStart Phase BerryPhase color:green;
+[19:46:45.837] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[19:46:45.838] LOG: %cStart Phase TurnEndPhase color:green;
+[19:46:45.842] WARN: [coop:turn] host recorder: finalize with NO open recording -> turn=-1 events=0 (caller decides not to emit)
+[19:46:45.842] LOG: %cStart Phase BattleEndPhase color:green;
+[19:46:45.843] LOG: Battle Score: 71 (1 Turns x1)
+[19:46:45.843] LOG: Total Score: 1432
+[19:46:45.853] LOG: %cStart Phase EggLapsePhase color:green;
+[19:46:45.854] LOG: %cStart Phase SelectModifierPhase color:green;
+[19:46:45.856] LOG: Wave Seed: tspsjSeceQgdTkb 27
+[19:46:45.871] LOG: 7 4 [2,3,4,5]
+[19:46:45.872] LOG: {"id":"TEMP_STAT_STAGE_BOOSTER","localeKey":"","iconImage":"x_speed","soundName":"se/restore","tier":0,"stat":5,"nameKey":"x_speed","quantityKey":"percentage"} 
+[19:46:45.872] LOG: 0 0 [2,3,4,5]
+[19:46:45.872] LOG: {"id":"POKEBALL","localeKey":"","iconImage":"pb","group":"pb","soundName":"se/pb_bounce_1","tier":0,"pokeballType":0,"count":5} 
+[19:46:45.872] LOG: 15 9 [2,3,4,5,6,7,8,9,10,16,22]
+[19:46:45.873] LOG: GREAT 0
+[19:46:45.873] LOG: 13 9 [2,3,4,5,6,7,8,9,10,16,22]
+[19:46:45.873] LOG: {"id":"NUGGET","localeKey":"modifierType:ModifierType.NUGGET","iconImage":"nugget","group":"money","soundName":"se/buy","tier":1,"moneyMultiplier":1,"moneyMultiplierDescriptorKey":"modifierType:ModifierType.MoneyRewardModifierType.extra.small"} 
