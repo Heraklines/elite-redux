@@ -690,9 +690,9 @@ const RECIPES: Record<string, Recipe> = {
   // Showdown teambuilder: forces SHOWDOWN mode so the cost panel reads the deferred
   // 999 limit and the party cap is the full 6 (PLAYER_PARTY_MAX_SIZE). Same real screen
   // the player builds their 1v1 duel team on. steps open the per-species action menu
-  // (ACTION), move to the showdown-only "Field Stage" row (DOWN x2) and open the
-  // evolution/mega STAGE picker (ACTION) so the Bulbasaur line's stages + Venusaur megas
-  // are captured in the final snapshot.
+  // (ACTION) - step0 shows the showdown-only "Field Stage" + "Held Item" rows - then move
+  // to the "Held Item" row (DOWN x3) and open the held-item picker (ACTION) so the curated
+  // SHOWDOWN_ITEM_POOL (Leftovers, Shell Bell, ...) is captured in the final snapshot.
   "starter-select-showdown": {
     mode: UiMode.STARTER_SELECT,
     prepare: game => {
@@ -702,7 +702,7 @@ const RECIPES: Record<string, Recipe> = {
       }
       return [() => {}];
     },
-    steps: [Button.ACTION, Button.DOWN, Button.DOWN, Button.ACTION],
+    steps: [Button.ACTION, Button.DOWN, Button.DOWN, Button.DOWN, Button.ACTION],
   },
   // Demo of universal input driving: drives the real starter-select grid cursor. Each
   // `-stepN.png` shows the cursor highlight + detail panel moving - the same mechanism

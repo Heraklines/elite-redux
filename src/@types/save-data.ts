@@ -244,6 +244,12 @@ export interface Starter {
   showdownSpeciesId?: number | undefined;
   /** Showdown: the form index on {@linkcode showdownSpeciesId} (e.g. a mega form). */
   showdownFormIndex?: number | undefined;
+  /**
+   * Showdown: the held item this mon carries - a `ShowdownItemKey` from
+   * `SHOWDOWN_ITEM_POOL`, or the `MEGA_STONE_ITEM` sentinel (auto-set + locked when a mega
+   * stage is chosen). `undefined` until the player picks one.
+   */
+  showdownItem?: string | undefined;
 }
 
 // TODO: What type of number does this store?

@@ -16,7 +16,7 @@ import {
   POKERUS_STARTER_COUNT,
   speciesStarterCosts,
 } from "#balance/starters";
-import { allAbilities, allMoves, allSpecies } from "#data/data-lists";
+import { allAbilities, allMoves, allSpecies, modifierTypes } from "#data/data-lists";
 import { Egg, getEggTierForSpecies, MAX_EGG_COUNT } from "#data/egg";
 import { COOP_STARTER_COST_BUDGET } from "#data/elite-redux/coop/coop-roster";
 import { getCoopController } from "#data/elite-redux/coop/coop-runtime";
@@ -44,7 +44,9 @@ import {
   renderErShinyLabLook,
 } from "#data/elite-redux/er-shiny-lab-renderer";
 import { resetErRunTrainerTracking } from "#data/elite-redux/er-trainer-runtime-hook";
-import { listEvolutionStages, listMegaStages } from "#data/elite-redux/showdown/showdown-evolutions";
+import { isMegaStage, listEvolutionStages, listMegaStages } from "#data/elite-redux/showdown/showdown-evolutions";
+import { SHOWDOWN_ITEM_POOL, type ShowdownItemKey } from "#data/elite-redux/showdown/showdown-item-pool";
+import { MEGA_STONE_ITEM } from "#data/elite-redux/showdown/showdown-team";
 import { GrowthRate, getGrowthRateColor } from "#data/exp";
 import { Gender, getGenderColor, getGenderSymbol } from "#data/gender";
 import { getNatureName } from "#data/nature";
@@ -121,6 +123,7 @@ import {
 } from "#utils/common";
 import type { StarterPreferences } from "#utils/data";
 import { deepCopy, loadLastTeam, loadStarterPreferences, saveLastTeam, saveStarterPreferences } from "#utils/data";
+import { getModifierType } from "#utils/modifier-utils";
 import {
   isSlotEnabled,
   isSlotUnlocked,
@@ -569,7 +572,8 @@ export class StarterSelectUiHandler extends MessageUiHandler {
    * {@linkcode Starter} in {@linkcode addToParty}, and re-applied to an in-party mon when
    * the player re-picks. Empty (and unused) in every non-showdown mode.
    */
-  private showdownSelections: Map<number, { speciesId: number; formIndex: number; item?: string }> = new Map();
+  private showdownSelections: Map<number, { speciesId: number; formIndex: number; item?: string | undefined }> =
+    new Map();
   private startCursorObj: Phaser.GameObjects.NineSlice;
   private randomCursorObj: Phaser.GameObjects.NineSlice;
   /** ER: cursor for the "Use Last Team" action (sits above the Random button). */
@@ -2593,6 +2597,27 @@ export class StarterSelectUiHandler extends MessageUiHandler {
                 return true;
               },
             });
+            // Showdown: pick the held item (one per mon). A mega stage locks the slot to
+            // its Mega Stone, so the row shows locked and the error sound rejects a change.
+            const selection = this.showdownSelections.get(this.lastSpecies.speciesId);
+            const megaLocked = selection?.item === MEGA_STONE_ITEM;
+            let heldItemLabel = "Held Item";
+            if (megaLocked) {
+              heldItemLabel = "Held Item: Mega Stone (locked)";
+            } else if (selection?.item) {
+              heldItemLabel = `Held Item: ${getModifierType(modifierTypes[selection.item as ShowdownItemKey]).name}`;
+            }
+            options.push({
+              label: heldItemLabel,
+              handler: () => {
+                if (megaLocked) {
+                  ui.playError();
+                  return false;
+                }
+                this.showShowdownItemOptions();
+                return true;
+              },
+            });
           }
           if (this.speciesStarterMoves.length > 1) {
             // this lets you change the pokemon moves
@@ -3797,21 +3822,53 @@ export class StarterSelectUiHandler extends MessageUiHandler {
     }
     starter.showdownSpeciesId = selection.speciesId;
     starter.showdownFormIndex = selection.formIndex;
+    starter.showdownItem = selection.item;
+  }
+
+  /** Showdown: true if a DIFFERENT in-party line is already fielding a mega/primal. */
+  private showdownTeamHasOtherMega(rootSpeciesId: number): boolean {
+    return this.starters.some(
+      s => s.speciesId !== rootSpeciesId && isMegaStage(s.showdownSpeciesId ?? s.speciesId, s.showdownFormIndex ?? 0),
+    );
   }
 
   /**
    * Showdown: record the chosen stage for a line and re-stamp any in-party copy so
-   * {@linkcode tryStart} fields the chosen stage. Preserves an already-picked held item.
+   * {@linkcode tryStart} fields the chosen stage. A mega stage force-locks the held-item
+   * slot to the mega-stone sentinel; leaving a mega clears that lock. Returns `false`
+   * (rejected, no change) when picking a mega would break the one-mega-per-team cap.
    */
-  private setShowdownStage(rootSpeciesId: number, speciesId: number, formIndex: number): void {
+  private setShowdownStage(rootSpeciesId: number, speciesId: number, formIndex: number): boolean {
+    const mega = isMegaStage(speciesId, formIndex);
+    if (mega && this.showdownTeamHasOtherMega(rootSpeciesId)) {
+      return false;
+    }
     const selection = this.showdownSelections.get(rootSpeciesId) ?? { speciesId, formIndex };
     selection.speciesId = speciesId;
     selection.formIndex = formIndex;
+    if (mega) {
+      selection.item = MEGA_STONE_ITEM;
+    } else if (selection.item === MEGA_STONE_ITEM) {
+      selection.item = undefined;
+    }
     this.showdownSelections.set(rootSpeciesId, selection);
     const index = this.starterSpecies.findIndex(s => s.speciesId === rootSpeciesId);
     if (index >= 0) {
       this.starters[index].showdownSpeciesId = speciesId;
       this.starters[index].showdownFormIndex = formIndex;
+      this.starters[index].showdownItem = selection.item;
+    }
+    return true;
+  }
+
+  /** Showdown: record the chosen held item for a line and re-stamp any in-party copy. */
+  private setShowdownItem(rootSpeciesId: number, item: string): void {
+    const selection = this.showdownSelections.get(rootSpeciesId) ?? { speciesId: rootSpeciesId, formIndex: 0 };
+    selection.item = item;
+    this.showdownSelections.set(rootSpeciesId, selection);
+    const index = this.starterSpecies.findIndex(s => s.speciesId === rootSpeciesId);
+    if (index >= 0) {
+      this.starters[index].showdownItem = item;
     }
   }
 
@@ -3840,7 +3897,13 @@ export class StarterSelectUiHandler extends MessageUiHandler {
       options.push({
         label: `${species.name} ${mega.formName}`,
         handler: () => {
-          this.setShowdownStage(rootId, mega.speciesId, mega.formIndex);
+          // One-mega-per-team: reject a second mega with the error sound and keep the
+          // picker open (returning false leaves the menu up), mirroring the cost-cap
+          // rejection's playError feedback.
+          if (!this.setShowdownStage(rootId, mega.speciesId, mega.formIndex)) {
+            ui.playError();
+            return false;
+          }
           ui.setMode(UiMode.STARTER_SELECT);
           return true;
         },
@@ -3856,6 +3919,34 @@ export class StarterSelectUiHandler extends MessageUiHandler {
     // Return to STARTER_SELECT FIRST, then open the submenu - the same handoff the
     // Innates / Manage Moves / Manage Nature menus use (opening a new OPTION_SELECT
     // directly from inside the action menu's own OPTION_SELECT softlocks it).
+    ui.setMode(UiMode.STARTER_SELECT).then(() =>
+      ui.setModeWithoutClear(UiMode.OPTION_SELECT, { options, maxOptions: 8, yOffset: 47 }),
+    );
+  }
+
+  /**
+   * Showdown: open the held-ITEM picker for the current grid line. Lists the curated
+   * {@linkcode SHOWDOWN_ITEM_POOL} (localized modifier names) plus a "None" clear. Not
+   * reachable for a mega stage - that slot is locked to the mega stone.
+   */
+  private showShowdownItemOptions(): void {
+    const ui = this.getUi();
+    const rootId = this.lastSpecies.speciesId;
+    const options: OptionSelectItem[] = SHOWDOWN_ITEM_POOL.map(key => ({
+      label: getModifierType(modifierTypes[key]).name,
+      handler: () => {
+        this.setShowdownItem(rootId, key);
+        ui.setMode(UiMode.STARTER_SELECT);
+        return true;
+      },
+    }));
+    options.push({
+      label: i18next.t("menu:cancel"),
+      handler: () => {
+        ui.setMode(UiMode.STARTER_SELECT);
+        return true;
+      },
+    });
     ui.setMode(UiMode.STARTER_SELECT).then(() =>
       ui.setModeWithoutClear(UiMode.OPTION_SELECT, { options, maxOptions: 8, yOffset: 47 }),
     );
