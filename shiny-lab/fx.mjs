@@ -2472,53 +2472,93 @@ AURA.starfall = (r, g, b, x, y, t) => {
   const k = (head + trail) * gate * w;
   return [clamp(r * 0.55 + k), clamp(g * 0.6 + k * 0.95), clamp(b * 0.75 + k * 0.8), 1];
 };
+// shared by the Astral forms: linework strength via local luma contrast - a pixel
+// darker than its 4 neighbors is line art, whatever the sprite's overall brightness.
+// Also returns the "next to a line" signal (pixel brighter than its neighbors) used
+// for the glow halo. One neighbor loop serves both.
+const _lineContrast = (x, y, L, ctx) => {
+  if (!ctx?.sa) {
+    return { line: smooth(0.3, 0.16, L), near: 0 };
+  }
+  const stx = 1 / (ctx.W || 96);
+  const sty = 1 / (ctx.H || 96);
+  let nsum = 0;
+  let nc = 0;
+  for (const [ox, oy] of [[stx, 0], [-stx, 0], [0, sty], [0, -sty]]) {
+    const s = ctx.sa(x + ox, y + oy);
+    if (s[3] > 0.02) {
+      nsum += luma(s[0], s[1], s[2]);
+      nc++;
+    }
+  }
+  if (nc === 0) {
+    return { line: 0, near: 0 };
+  }
+  const d = nsum / nc - L;
+  return { line: smooth(0.02, 0.07, d), near: smooth(0.03, 0.1, -d) };
+};
 // Astral Form: the living-constellation look. The body becomes a deep night-sky
-// nebula with twinkling stars, and the sprite's OWN dark linework re-draws itself
-// as a broken pale-blue constellation with bright star nodes - so the effect
-// follows any sprite's shape automatically.
+// nebula with twinkling stars, and the sprite's OWN linework re-draws itself as a
+// broken pale-blue constellation with bright star nodes - so the effect follows
+// any sprite's shape automatically. Moody variant: segments blink in and out.
 AURA.astral = (r, g, b, x, y, t, ctx) => {
   const L = luma(r, g, b);
   const e = ctx?.e ?? 0;
-  // deep-space body: slow navy nebula clouds, brighter where the sprite was bright
+  // deep-space body: darker + flatter than v1 so the constellation pops
   const neb = fbm(x * 5 + t * 0.05, y * 5 - t * 0.03);
-  const body = mix3(hx("0e1730"), hx("2a3c66"), clamp(L * 0.55 + neb * 0.5));
-  const haze = mix3(body, hx("7a8fc0"), smooth(0.55, 0.95, neb) * 0.35);
+  const body = mix3(hx("0c1226"), hx("223354"), clamp(L * 0.5 + neb * 0.35));
+  const haze = mix3(body, hx("7a8fc0"), smooth(0.55, 0.95, neb) * 0.22);
   // tiny twinkling stars scattered through the body
   const sx = Math.floor(x * 46);
   const sy = Math.floor(y * 46);
   const tw = h2(sx, sy) > 0.958 ? Math.pow(0.5 + 0.5 * Math.sin(t * 2.2 + h2(sy, sx) * 25), 3) : 0;
-  // constellation: LINEWORK pixels - detected by local contrast (darker than the
-  // surrounding body), not absolute darkness, so it works on dark sprites too -
-  // redrawn pale blue, broken into segments that very slowly blink in and out
-  let line = 0;
-  if (ctx?.sa) {
-    const stx = 1 / (ctx.W || 96);
-    const sty = 1 / (ctx.H || 96);
-    let nsum = 0;
-    let nc = 0;
-    for (const [ox, oy] of [[stx, 0], [-stx, 0], [0, sty], [0, -sty]]) {
-      const s = ctx.sa(x + ox, y + oy);
-      if (s[3] > 0.02) {
-        nsum += luma(s[0], s[1], s[2]);
-        nc++;
-      }
-    }
-    const contrast = nc > 0 ? nsum / nc - L : 0;
-    line = smooth(0.025, 0.1, contrast);
-  } else {
-    line = smooth(0.3, 0.16, L);
-  }
+  // constellation lines, broken into segments that slowly blink in and out
+  const { line } = _lineContrast(x, y, L, ctx);
   const blink = Math.sin(t * 0.5 + h2(Math.floor(x * 22), Math.floor(y * 22)) * 6.28) * 0.07;
-  const seg = smooth(0.4, 0.54, fbm(x * 9 + 31, y * 9 - 17) + blink);
+  const seg = smooth(0.33, 0.48, fbm(x * 9 + 31, y * 9 - 17) + blink);
   const constel = line * seg;
   // bright star nodes sitting on the constellation lines
   const nx0 = Math.floor(x * 30);
   const ny0 = Math.floor(y * 30);
-  const node = constel > 0.4 && h2(nx0 * 1.3, ny0 * 1.7) > 0.9 ? 0.5 + 0.5 * Math.sin(t * 3 + h2(ny0, nx0) * 20) : 0;
+  const node = constel > 0.4 && h2(nx0 * 1.3, ny0 * 1.7) > 0.88 ? 0.6 + 0.4 * Math.sin(t * 3 + h2(ny0, nx0) * 20) : 0;
   // faint rim starlight so the silhouette still reads on dark backdrops
   const rim = smooth(0.35, 1, e) * 0.1;
-  let c = mix3(haze, hx("9db8e8"), clamp(constel));
-  c = [clamp(c[0] + tw * 0.9 + node + rim * 0.6), clamp(c[1] + tw * 0.9 + node + rim * 0.8), clamp(c[2] + tw + node + rim)];
+  let c = mix3(haze, hx("cfe0ff"), clamp(constel));
+  const boost = constel * 0.3 + tw * 0.9 + node + rim;
+  c = [clamp(c[0] + boost * 0.75), clamp(c[1] + boost * 0.85), clamp(c[2] + boost)];
+  return [c[0], c[1], c[2], 1];
+};
+// Astral Form II: the clean "star chart" alternate. Flat, darker night-sky body;
+// the FULL constellation stays lit (no blinking) with a soft glow halo and a
+// shimmer traveling along the lines; star nodes are bigger 4-point glints.
+AURA.astral2 = (r, g, b, x, y, t, ctx) => {
+  const L = luma(r, g, b);
+  const e = ctx?.e ?? 0;
+  // flat deep body with big soft nebula patches
+  const neb = fbm(x * 2.6 + 7 + t * 0.03, y * 2.6 - t * 0.02);
+  const body = mix3(hx("090f22"), hx("1d2b4d"), clamp(L * 0.4 + smooth(0.35, 0.85, neb) * 0.45));
+  // sparser but brighter stars
+  const sx = Math.floor(x * 40);
+  const sy = Math.floor(y * 40);
+  const tw = h2(sx, sy) > 0.972 ? Math.pow(0.5 + 0.5 * Math.sin(t * 1.8 + h2(sy, sx) * 25), 2) : 0;
+  // constellation: full linework, always lit, shimmer sliding along the lines
+  const { line, near } = _lineContrast(x, y, L, ctx);
+  const shim = 0.78 + 0.22 * Math.sin((x + y) * 30 - t * 2.5);
+  const constel = line * shim;
+  // glow halo on the pixels right next to a line
+  const halo = near * 0.2;
+  // 4-point star glints on the lines
+  const gx = Math.floor(x * 24);
+  const gy = Math.floor(y * 24);
+  let glint = 0;
+  if (line > 0.3 && h2(gx * 1.7 + 2, gy * 1.3 + 5) > 0.82) {
+    const ld = Math.abs(fract(x * 24) - 0.5) + Math.abs(fract(y * 24) - 0.5);
+    glint = smooth(0.4, 0.08, ld) * (0.65 + 0.35 * Math.sin(t * 2.4 + h2(gy, gx) * 20));
+  }
+  const rim = smooth(0.35, 1, e) * 0.12;
+  let c = mix3(body, hx("e6efff"), clamp(constel));
+  const boost = constel * 0.25 + halo + tw + glint + rim;
+  c = [clamp(c[0] + boost * 0.7), clamp(c[1] + boost * 0.82), clamp(c[2] + boost)];
   return [c[0], c[1], c[2], 1];
 };
 // Smolder: charcoal body, embers gnawing hot at the silhouette, sparks rising.
@@ -4587,6 +4627,7 @@ export const LABELS = {
   zaps: "Lightning Zaps",
   blossoms: "Sakura Blossoms",
   astral: "Astral Form",
+  astral2: "Astral Form II",
 };
 
 // effects that read the edge field / are inherently "partial" (for tagging in UI)
