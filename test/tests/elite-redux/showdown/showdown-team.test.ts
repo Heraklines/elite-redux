@@ -19,6 +19,8 @@ const mon = (over: Partial<ShowdownMonManifest> = {}): ShowdownMonManifest => ({
   moveset: [1, 2, 3, 4],
   item: "LEFTOVERS",
   rootSpeciesId: 4,
+  erBlackShiny: false,
+  baseCost: 4,
   ...over,
 });
 
@@ -236,6 +238,71 @@ describe("validateShowdownTeam", () => {
     expect(v).toContainEqual(expect.objectContaining({ rule: "collection", slot: 2 }));
   });
 
+  describe("field legality (Task B6): black shiny + cost brackets", () => {
+    it("rejects a black-shiny mon with its slot (blackShiny)", () => {
+      const t = team();
+      t[3].erBlackShiny = true;
+      const v = validateShowdownTeam(t, allUnlocked, noMegas);
+      expect(v).toContainEqual(expect.objectContaining({ rule: "blackShiny", slot: 3 }));
+    });
+
+    it("rejects a base-cost-10 mon (costCap)", () => {
+      const t = team();
+      t[0].baseCost = 10;
+      const v = validateShowdownTeam(t, allUnlocked, noMegas);
+      expect(v).toContainEqual(expect.objectContaining({ rule: "costCap", slot: 0 }));
+    });
+
+    it("rejects a base-cost-12 mon (costCap)", () => {
+      const t = team();
+      t[2].baseCost = 12;
+      const v = validateShowdownTeam(t, allUnlocked, noMegas);
+      expect(v).toContainEqual(expect.objectContaining({ rule: "costCap", slot: 2 }));
+    });
+
+    it("accepts a lone base-cost-9 mon among cost-7s (highCostLimit lower boundary)", () => {
+      const t = team(6, { baseCost: 7 });
+      t[0].baseCost = 9;
+      const v = validateShowdownTeam(t, allUnlocked, noMegas);
+      expect(rules(v)).not.toContain("highCostLimit");
+      expect(rules(v)).not.toContain("costCap");
+    });
+
+    it("accepts exactly one base-cost-8 mon (highCostLimit boundary)", () => {
+      const t = team(6, { baseCost: 7 });
+      t[4].baseCost = 8;
+      const v = validateShowdownTeam(t, allUnlocked, noMegas);
+      expect(rules(v)).not.toContain("highCostLimit");
+    });
+
+    it("rejects two base-cost-8 mons (highCostLimit)", () => {
+      const t = team(6, { baseCost: 7 });
+      t[0].baseCost = 8;
+      t[1].baseCost = 8;
+      const v = validateShowdownTeam(t, allUnlocked, noMegas);
+      expect(v).toContainEqual(expect.objectContaining({ rule: "highCostLimit" }));
+    });
+
+    it("rejects a cost-8 plus a cost-9 (mixed high-cost bracket, highCostLimit)", () => {
+      const t = team(6, { baseCost: 7 });
+      t[0].baseCost = 8;
+      t[5].baseCost = 9;
+      const v = validateShowdownTeam(t, allUnlocked, noMegas);
+      expect(v).toContainEqual(expect.objectContaining({ rule: "highCostLimit" }));
+    });
+
+    it("does not count a banned cost-10 mon toward the high-cost limit", () => {
+      // One legal high-cost (9) + one cost-10 (banned separately). The cost-10 must NOT
+      // push highCostCount to 2 — only costCap should fire, not highCostLimit.
+      const t = team(6, { baseCost: 7 });
+      t[0].baseCost = 9;
+      t[1].baseCost = 10;
+      const v = validateShowdownTeam(t, allUnlocked, noMegas);
+      expect(rules(v)).toContain("costCap");
+      expect(rules(v)).not.toContain("highCostLimit");
+    });
+  });
+
   describe("hostile / malformed input (must reject, never throw)", () => {
     it("rejects a non-array team (malformed)", () => {
       const v = validateShowdownTeam(null as unknown as ShowdownMonManifest[], allUnlocked, noMegas);
@@ -270,6 +337,26 @@ describe("validateShowdownTeam", () => {
         v = validateShowdownTeam(t, allUnlocked, noMegas);
       }).not.toThrow();
       expect(v).toContainEqual(expect.objectContaining({ rule: "malformed", slot: 0 }));
+    });
+
+    it("rejects a non-boolean erBlackShiny without throwing (malformed)", () => {
+      const t = team();
+      t[2] = hostile({ erBlackShiny: 1 });
+      let v: ReturnType<typeof validateShowdownTeam> = [];
+      expect(() => {
+        v = validateShowdownTeam(t, allUnlocked, noMegas);
+      }).not.toThrow();
+      expect(v).toContainEqual(expect.objectContaining({ rule: "malformed", slot: 2 }));
+    });
+
+    it("rejects a non-number baseCost without throwing (malformed)", () => {
+      const t = team();
+      t[4] = hostile({ baseCost: "8" });
+      let v: ReturnType<typeof validateShowdownTeam> = [];
+      expect(() => {
+        v = validateShowdownTeam(t, allUnlocked, noMegas);
+      }).not.toThrow();
+      expect(v).toContainEqual(expect.objectContaining({ rule: "malformed", slot: 4 }));
     });
 
     it("skips other per-mon checks for a malformed slot but keeps team-wide checks", () => {

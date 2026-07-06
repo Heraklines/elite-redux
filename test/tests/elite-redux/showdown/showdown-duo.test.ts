@@ -61,6 +61,8 @@ const magikarp = (): ShowdownMonManifest => ({
   moveset: [MoveId.SPLASH, MoveId.TACKLE, MoveId.FLAIL, MoveId.BOUNCE],
   item: "LEFTOVERS",
   rootSpeciesId: SpeciesId.MAGIKARP,
+  erBlackShiny: false,
+  baseCost: 4,
 });
 
 function toShowdown(scene: BattleScene): void {

@@ -169,6 +169,10 @@ export interface ShowdownMonManifestWire {
   moveset: number[];
   item: string;
   rootSpeciesId: number;
+  /** Task B6: picked as a Black Shiny (barred from being fielded). Mirror of the domain field. */
+  erBlackShiny: boolean;
+  /** Task B6: the LINE's BASE `speciesStarterCosts` value. Mirror of the domain field. */
+  baseCost: number;
 }
 
 // =============================================================================

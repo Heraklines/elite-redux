@@ -71,6 +71,32 @@ describe("starterToManifest", () => {
     expect(m.ivs).toEqual([31, 31, 31, 31, 31, 31]);
   });
 
+  it("populates erBlackShiny + baseCost from the starter and the raw cost table (Task B6)", () => {
+    // CHARMANDER's raw speciesStarterCosts base value is 3; default erBlackShiny is false.
+    const base = starterToManifest(baseStarter(), emptyGameData);
+    expect(base.erBlackShiny).toBe(false);
+    expect(base.baseCost).toBe(3);
+    // A black-shiny pick carries the flag through.
+    expect(starterToManifest(baseStarter({ erBlackShiny: true }), emptyGameData).erBlackShiny).toBe(true);
+  });
+
+  it("uses baseCost from the LINE ROOT (grid pick), not the fielded stage", () => {
+    // The grid pick (root) is CHARMANDER (cost 3); fielding an evolved CHARIZARD stage
+    // must NOT change baseCost — it stays the root's raw cost.
+    const m = starterToManifest(
+      baseStarter({ showdownSpeciesId: SpeciesId.CHARIZARD, showdownFormIndex: 0 }),
+      emptyGameData,
+    );
+    expect(m.rootSpeciesId).toBe(SpeciesId.CHARMANDER);
+    expect(m.baseCost).toBe(3);
+  });
+
+  it("falls back to baseCost 4 for a species absent from the cost table (?? 4)", () => {
+    // CHARIZARD is not a starter-cost key (only roots are), so the ?? 4 fallback applies.
+    const m = starterToManifest(baseStarter({ speciesId: SpeciesId.CHARIZARD }), emptyGameData);
+    expect(m.baseCost).toBe(4);
+  });
+
   it("copies arrays (no shared references with the starter)", () => {
     const starter = baseStarter();
     const m = starterToManifest(starter, emptyGameData);

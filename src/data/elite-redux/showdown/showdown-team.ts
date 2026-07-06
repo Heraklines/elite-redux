@@ -27,6 +27,18 @@ const IV_MIN = 0;
 const IV_MAX = 31;
 const MIN_MOVES = 1;
 const MAX_MOVES = 4;
+/**
+ * Field-legality cost brackets (Task B6, maintainer-decided). `baseCost` is the
+ * LINE's BASE `speciesStarterCosts` value (candy reductions are deliberately NOT
+ * applied — the manifest populates it from the raw table so a reduced candy cost
+ * can't dodge the bracket).
+ *  - baseCost >= COST_CAP: banned entirely.
+ *  - baseCost in [HIGH_COST_MIN, COST_CAP): "high-cost"; at most one per team.
+ *  - all others (baseCost < HIGH_COST_MIN): unrestricted.
+ */
+const COST_CAP = 10;
+const HIGH_COST_MIN = 8;
+const MAX_HIGH_COST = 1;
 
 export interface ShowdownMonManifest {
   speciesId: number;
@@ -40,6 +52,13 @@ export interface ShowdownMonManifest {
   moveset: number[];
   item: string;
   rootSpeciesId: number;
+  /** Task B6: this mon was picked as a Black Shiny — barred from being fielded. */
+  erBlackShiny: boolean;
+  /**
+   * Task B6: the LINE's BASE `speciesStarterCosts` value (candy-reduction-agnostic;
+   * the manifest reads the raw table so a reduction can't dodge the cost bracket).
+   */
+  baseCost: number;
 }
 
 export interface UnlockSnapshot {
@@ -62,6 +81,9 @@ export type ShowdownRuleId =
   | "duplicate"
   | "ivs"
   | "moves"
+  | "blackShiny"
+  | "costCap"
+  | "highCostLimit"
   | "malformed";
 
 export interface ShowdownRuleViolation {
@@ -121,6 +143,12 @@ function malformedReason(mon: unknown): string | null {
   }
   if (!Array.isArray(m.moveset) || m.moveset.some(mv => typeof mv !== "number")) {
     return "moveset must be an array of numbers";
+  }
+  if (typeof m.erBlackShiny !== "boolean") {
+    return "erBlackShiny must be a boolean";
+  }
+  if (!isInt(m.baseCost)) {
+    return "baseCost must be an integer";
   }
   return null;
 }
@@ -249,6 +277,34 @@ function checkMoves(
 }
 
 /**
+ * blackShiny (Task B6): a mon picked as a Black Shiny can never be FIELDED. This is a
+ * field-legality rule ONLY — black shinies remain fully stakeable in the ante system.
+ */
+function checkBlackShiny(mon: ShowdownMonManifest, slot: number, out: ShowdownRuleViolation[]): void {
+  if (mon.erBlackShiny) {
+    out.push({
+      rule: "blackShiny",
+      slot,
+      message: `Black Shinies can't enter Showdown (slot ${slot}).`,
+    });
+  }
+}
+
+/**
+ * costCap (Task B6): a mon whose LINE base cost is COST_CAP (10) or higher is banned
+ * outright. Uses the raw `speciesStarterCosts` base value, NOT the candy-reduced value.
+ */
+function checkCostCap(mon: ShowdownMonManifest, slot: number, out: ShowdownRuleViolation[]): void {
+  if (mon.baseCost >= COST_CAP) {
+    out.push({
+      rule: "costCap",
+      slot,
+      message: `Cost-${COST_CAP} Pokemon can't enter Showdown (slot ${slot} is cost ${mon.baseCost}).`,
+    });
+  }
+}
+
+/**
  * Validate a showdown team against the format rules and the player's collection.
  * Returns EVERY violation (never stops at the first). Per-mon violations carry a
  * 0-based `slot`.
@@ -276,6 +332,10 @@ export function validateShowdownTeam(
 
   const seenSpecies = new Set<number>();
   let megaCount = 0;
+  // Task B6: mons whose BASE cost is 8 or 9 (the [HIGH_COST_MIN, COST_CAP) bracket);
+  // a team may field at most MAX_HIGH_COST of them. Cost >= COST_CAP is banned outright
+  // by checkCostCap and does NOT count here.
+  let highCostCount = 0;
 
   for (let slot = 0; slot < team.length; slot++) {
     const mon = team[slot];
@@ -306,12 +366,17 @@ export function validateShowdownTeam(
     if (isMega) {
       megaCount++;
     }
+    if (mon.baseCost >= HIGH_COST_MIN && mon.baseCost < COST_CAP) {
+      highCostCount++;
+    }
 
     checkLevel(mon, slot, violations);
     checkItem(mon, slot, isMega, violations);
     checkCollection(mon, slot, unlocks, violations);
     checkIvs(mon, slot, violations);
     checkMoves(mon, slot, unlocks, violations);
+    checkBlackShiny(mon, slot, violations);
+    checkCostCap(mon, slot, violations);
   }
 
   // megaLimit: at most one mega/primal per team.
@@ -319,6 +384,14 @@ export function validateShowdownTeam(
     violations.push({
       rule: "megaLimit",
       message: `A team may include at most one Mega/Primal Pokemon (has ${megaCount}).`,
+    });
+  }
+
+  // highCostLimit: at most one mon of base cost 8 or 9 per team (team-wide).
+  if (highCostCount > MAX_HIGH_COST) {
+    violations.push({
+      rule: "highCostLimit",
+      message: `Only one Pokemon of cost ${HIGH_COST_MIN} or higher is allowed (has ${highCostCount}).`,
     });
   }
 

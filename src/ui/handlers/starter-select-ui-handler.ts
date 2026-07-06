@@ -3755,6 +3755,15 @@ export class StarterSelectUiHandler extends MessageUiHandler {
     teraType: PokemonType,
     randomSelection = false,
   ) {
+    // Showdown pick-time UX (Task B6): refuse a field-illegal pick BEFORE it is committed
+    // to the party, with a clear message. The authoritative gate is the validator run at
+    // tryStart / over the wire; this is the friendly early rejection so the player never
+    // assembles a team the start would silently bounce.
+    const showdownRejection = this.showdownAddRejection(species, dexAttr);
+    if (showdownRejection !== null) {
+      this.rejectShowdownPick(showdownRejection);
+      return;
+    }
     const props = globalScene.gameData.getSpeciesDexAttrProps(species, dexAttr);
     this.starterIcons[this.starterSpecies.length].setTexture(
       species.getIconAtlasKey(props.formIndex, props.shiny, props.variant),
@@ -3818,6 +3827,59 @@ export class StarterSelectUiHandler extends MessageUiHandler {
       getPokemonSpeciesForm(species.speciesId, props.formIndex).cry();
     }
     this.updateInstructions();
+  }
+
+  /**
+   * Showdown field-legality gate for a PICK (Task B6). Returns the rejection message when the
+   * mon may not be fielded, else null. Mirrors the `validateShowdownTeam` rules so a pick the
+   * validator would bounce is refused up front:
+   *  - a Black-Shiny pick can never be fielded (stakes are unaffected — it stays stakeable),
+   *  - base cost >= 10 is banned outright,
+   *  - at most ONE mon of base cost 8-9 per team.
+   * `baseCost` reads the RAW `speciesStarterCosts` table of the LINE ROOT (the grid pick is
+   * the root), NOT `getSpeciesStarterValue` — candy reductions must not dodge the bracket.
+   * Non-showdown modes always return null.
+   */
+  private showdownAddRejection(species: PokemonSpecies, dexAttr: bigint): string | null {
+    if (!globalScene.gameMode.isShowdown) {
+      return null;
+    }
+    const props = globalScene.gameData.getSpeciesDexAttrProps(species, dexAttr);
+    const { starterDataEntry } = this.getSpeciesData(species.speciesId);
+    // Black-shiny detection mirrors the `erBlackShiny` derivation in addToParty: the picked
+    // VARIANT must be the line's unlocked black tier AND the current pick must be shiny. A
+    // normal/shiny pick of the same species is legal.
+    const isBlackShinyPick =
+      !!this.starterPreferences[species.speciesId]?.erBlackShiny && !!starterDataEntry?.erBlackShiny && props.shiny;
+    if (isBlackShinyPick) {
+      return "Black Shinies can't enter Showdown."; // TODO(i18n)
+    }
+    const baseCost = speciesStarterCosts[species.speciesId] ?? 4;
+    if (baseCost >= 10) {
+      return "Cost-10 Pokémon can't enter Showdown."; // TODO(i18n)
+    }
+    if (baseCost >= 8) {
+      const partyHighCost = this.starters.some(s => {
+        const c = speciesStarterCosts[s.speciesId] ?? 4;
+        return c >= 8 && c < 10;
+      });
+      if (partyHighCost) {
+        return "Only one Pokémon of cost 8 or higher is allowed."; // TODO(i18n)
+      }
+    }
+    return null;
+  }
+
+  /**
+   * Surface a showdown pick rejection (Task B6) with the same tutorial-text pattern `tryStart`
+   * uses for a rejected start, then resync the point-value label (a caller may have optimistically
+   * bumped it via `tryUpdateValue` before `addToParty`) and play the error tone.
+   */
+  private rejectShowdownPick(message: string): void {
+    this.getUi().playError();
+    this.tryUpdateValue();
+    this.tutorialActive = true;
+    this.showText(message, undefined, () => this.showText("", 0, () => (this.tutorialActive = false)), undefined, true);
   }
 
   /**

@@ -27,6 +27,8 @@ const mon = (over: Partial<ShowdownMonManifest> = {}): ShowdownMonManifest => ({
   moveset: [53, 89, 63, 76],
   item: "LEFTOVERS",
   rootSpeciesId: 4,
+  erBlackShiny: false,
+  baseCost: 4,
   ...over,
 });
 

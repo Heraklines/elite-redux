@@ -42,6 +42,8 @@ const mon = (over: Partial<ShowdownMonManifest> = {}): ShowdownMonManifest => ({
   moveset: [1, 2, 3, 4],
   item: "LEFTOVERS",
   rootSpeciesId: 4,
+  erBlackShiny: false,
+  baseCost: 4,
   ...over,
 });
 
@@ -110,6 +112,43 @@ describe("Showdown manifest exchange + ready rendezvous (C2)", () => {
     await flush();
 
     await expect(hp).rejects.toMatchObject({ reason: "illegalTeam" });
+  });
+
+  it("an opponent manifest with a black shiny rejects BOTH clients (Task B6 field-legality)", async () => {
+    // The field-legality rules (blackShiny/costCap/highCostLimit) are pure rule-checks, not
+    // unlock-checks, so the PERMISSIVE_UNLOCKS the session uses still enforces them on the
+    // opponent's manifest. A RAW cheating peer that ships a black-shiny mon is rejected by the
+    // honest host (illegalTeam), and the void it sends rejects the cheater's client too.
+    const { host, guest } = createLoopbackPair();
+    const h = new ShowdownSession(host, { isMegaForm: noMegas });
+
+    const hp = h.negotiate(legalTeam(100));
+    const cheat = legalTeam(200);
+    cheat[2].erBlackShiny = true;
+    guest.send({ t: "showdownTeam", manifest: cheat });
+    guest.send({ t: "showdownReady", teamHash: showdownTeamHash(cheat) });
+    await flush();
+
+    await expect(hp).rejects.toMatchObject({ reason: "illegalTeam" });
+  });
+
+  it("an opponent's own black-shiny team self-voids and propagates to both sides (Task B6)", async () => {
+    // Symmetric to the malformed-team propagation: an honest guest that somehow assembled a
+    // black-shiny team fails its OWN defensive format check and voids, rejecting the host too.
+    const { host, guest } = createLoopbackPair();
+    const h = new ShowdownSession(host, { isMegaForm: noMegas });
+    const g = new ShowdownSession(guest, { isMegaForm: noMegas });
+
+    const hTeam = legalTeam(100);
+    const badTeam = legalTeam(200);
+    badTeam[1].erBlackShiny = true;
+
+    const hp = h.negotiate(hTeam);
+    const gp = g.negotiate(badTeam);
+    await flush();
+
+    await expect(gp).rejects.toMatchObject({ reason: "illegalTeam" });
+    await expect(hp).rejects.toMatchObject({ reason: "void" });
   });
 
   it("a tampered hash (ready hash != team manifest) rejects", async () => {

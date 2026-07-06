@@ -13,6 +13,7 @@
 import { speciesEggMoves } from "#balance/moves/egg-moves";
 import { pokemonPrevolutions } from "#balance/pokemon-evolutions";
 import { pokemonSpeciesLevelMoves } from "#balance/pokemon-level-moves";
+import { speciesStarterCosts } from "#balance/starters";
 import { erMegaTargetToBaseSpeciesId } from "#data/elite-redux/er-generic-pool-bans";
 import { SHOWDOWN_ITEM_POOL } from "#data/elite-redux/showdown/showdown-item-pool";
 import type { ShowdownMonManifest, UnlockSnapshot } from "#data/elite-redux/showdown/showdown-team";
@@ -57,6 +58,12 @@ export function starterToManifest(starter: Starter, _gameData: ShowdownUnlockGam
     moveset: [...(starter.moveset ?? [])],
     item: starter.showdownItem ?? DEFAULT_ITEM,
     rootSpeciesId: starter.speciesId,
+    // Task B6: whether this mon was picked as a Black Shiny (field-illegal; stakes unaffected).
+    erBlackShiny: starter.erBlackShiny ?? false,
+    // Task B6: the LINE's BASE starter cost from the raw table (grid pick == root == starter.speciesId).
+    // Deliberately NOT `getSpeciesStarterValue` (which applies candy reductions) so a reduced cost
+    // can't dodge the cost bracket. `?? 4` mirrors getSpeciesStarterValue's ER-custom fallback.
+    baseCost: speciesStarterCosts[starter.speciesId] ?? 4,
   };
 }
 

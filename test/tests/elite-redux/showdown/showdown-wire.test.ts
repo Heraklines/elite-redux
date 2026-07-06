@@ -77,6 +77,8 @@ const sampleManifest: ShowdownMonManifestWire = {
   moveset: [85, 98, 86, 57],
   item: "LIFE_ORB",
   rootSpeciesId: 172,
+  erBlackShiny: false,
+  baseCost: 6,
 };
 
 describe("showdown wire protocol", () => {
