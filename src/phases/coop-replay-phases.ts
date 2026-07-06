@@ -57,6 +57,7 @@ import {
   getCoopController,
   getCoopInteractionRelay,
   isCoopAuthoritativeGuest,
+  isVersusSession,
   queueCoopMeBattleVictoryTail,
 } from "#data/elite-redux/coop/coop-runtime";
 import { coopSwitchBlocksMonForOwner } from "#data/elite-redux/coop/coop-session";
@@ -1273,6 +1274,19 @@ export class CoopApplyResyncPhase extends Phase {
         } else {
           coopResyncUnhealedChecksum = this.hostChecksum;
           coopResyncUnhealedCount = 1;
+        }
+        // Showdown 1v1 (C6): when the safety-net resync EXHAUSTS its give-up cap on a still-diverged
+        // battle, no result may ride on a battle the two clients cannot reconcile - VOID the match.
+        // The result phase emits showdownVoid{checksum} to the peer and returns both to the title.
+        // Versus-only; co-op keeps its existing suppress-resummon-and-continue behavior untouched.
+        if (isVersusSession() && coopResyncUnhealedCount >= COOP_RESYNC_RESUMMON_GIVE_UP) {
+          coopWarn(
+            "resync",
+            `turn=${this.turn} showdown resync give-up (>=${COOP_RESYNC_RESUMMON_GIVE_UP}) -> showdownVoid{checksum}`,
+          );
+          globalScene.phaseManager.unshiftNew("ShowdownResultPhase", false, "checksum", true);
+          this.end();
+          return;
         }
         // DIAGNOSTIC (#633): the snapshot did NOT heal the divergence - log WHAT it failed to repair
         // by diffing the host pre-image against the guest's POST-APPLY state.

@@ -16,6 +16,7 @@ import {
   getCoopBattleStreamer,
   getCoopController,
   getCoopNetcodeMode,
+  isAuthoritativeBattleSession,
   maybeBeginReplayRecording,
 } from "#data/elite-redux/coop/coop-runtime";
 import type { CoopSerializedEnemy } from "#data/elite-redux/coop/coop-transport";
@@ -160,7 +161,10 @@ export class EncounterPhase extends BattlePhase {
 
   /** Whether THIS client must wait for + adopt the host's enemy party (co-op GUEST only). */
   private shouldAdoptCoopEnemyParty(): boolean {
-    if (this.loaded || !globalScene.gameMode.isCoop) {
+    // Showdown-versus (C5): the guest is a pure renderer here too - it adopts the host's streamed
+    // party (its OWN team, enemy-side in host-order) instead of rolling its own. isAuthoritative-
+    // BattleSession covers co-op OR showdown; solo/host fall through unchanged.
+    if (this.loaded || !isAuthoritativeBattleSession()) {
       return false;
     }
     const controller = getCoopController();
@@ -253,7 +257,9 @@ export class EncounterPhase extends BattlePhase {
    * non-host. Best-effort + guarded - never blocks or breaks the host's encounter.
    */
   private broadcastCoopEnemyParty(): void {
-    if (!globalScene.gameMode.isCoop) {
+    // Showdown-versus (C5): the host broadcasts the enemy party (the guest's team it built from
+    // the manifest) so the guest adopts these exact mons. Co-op OR showdown; solo/non-host no-op.
+    if (!isAuthoritativeBattleSession()) {
       return;
     }
     const controller = getCoopController();
@@ -293,7 +299,9 @@ export class EncounterPhase extends BattlePhase {
    * enemy-adopt. No-op for solo / guest / loaded. Best-effort + guarded - never breaks the host.
    */
   private broadcastCoopLaunchSnapshot(): void {
-    if (!globalScene.gameMode.isCoop || this.phaseName !== "EncounterPhase") {
+    // Showdown-versus (C5): the host pushes the full launch snapshot so the guest boots its render
+    // from the host's authoritative bytes. Co-op OR showdown; solo/guest/non-EncounterPhase no-op.
+    if (!isAuthoritativeBattleSession() || this.phaseName !== "EncounterPhase") {
       return;
     }
     const controller = getCoopController();

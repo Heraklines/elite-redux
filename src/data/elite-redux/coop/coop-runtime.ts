@@ -382,6 +382,35 @@ function wireCoopWaveResolved(controller: CoopSessionController, battleStream: C
 }
 
 /**
+ * Showdown 1v1 PvP (C6): route a RECEIVED `showdownResult` / `showdownVoid` to THIS client's
+ * terminal result phase so BOTH clients show the same outcome. The pure-renderer guest never runs
+ * VictoryPhase, so without this it would never learn the match ended; the host receives the guest's
+ * void the same way. Silent (does NOT re-emit -> no ping-pong) and idempotent (skips when the result
+ * phase is already running). Versus-only; a co-op peer never sends these `t` values.
+ */
+function wireShowdownResult(transport: CoopTransport, controller: CoopSessionController): void {
+  transport.onMessage(msg => {
+    if (msg.t !== "showdownResult" && msg.t !== "showdownVoid") {
+      return;
+    }
+    try {
+      if (globalScene.phaseManager.getCurrentPhase()?.phaseName === "ShowdownResultPhase") {
+        return; // already ending on this client
+      }
+      if (msg.t === "showdownVoid") {
+        globalScene.phaseManager.unshiftNew("ShowdownResultPhase", false, msg.reason, true, true);
+      } else {
+        // The received `winner` is a role; this client won iff it matches its own role.
+        const localWon = msg.winner === controller.role;
+        globalScene.phaseManager.unshiftNew("ShowdownResultPhase", localWon, msg.reason, false, true);
+      }
+    } catch {
+      /* routing the received result must never crash the receiver */
+    }
+  });
+}
+
+/**
  * Co-op WAVE-END authoritative capture responder (#838): the GUEST records the host's `waveEndState`
  * (the complete post-exp battle state) as a one-shot pending payload (guarded against a double-apply by
  * wave number). It is consumed in the guest's own `BattleEndPhase` (NOT applied here mid-message) so it
@@ -1696,6 +1725,7 @@ export function assembleCoopRuntime(
   wireCoopLearnMoveForward(transport);
   wireCoopLearnMoveBatchForward(transport);
   wireCoopDexSync(transport);
+  wireShowdownResult(transport, controller);
   wireCoopDisconnectReaction(transport, interactionRelay, runtime);
   wireCoopStallWatchdog(transport, interactionRelay, battleStream, runtime);
   // #812: ownership probe for pre-responder commandRequests (buffer own-slot, decline foreign).

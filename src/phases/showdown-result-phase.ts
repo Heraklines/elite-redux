@@ -30,21 +30,30 @@ export class ShowdownResultPhase extends BattlePhase {
   private readonly reason: ShowdownResultReason | ShowdownVoidReason;
   /** True when the match VOIDED (no winner) - overrides the win/loss line. */
   private readonly voided: boolean;
+  /** True when this phase was routed FROM a received peer message - it must NOT re-emit (no ping-pong). */
+  private readonly silent: boolean;
 
-  constructor(localWon: boolean, reason: ShowdownResultReason | ShowdownVoidReason = "victory", voided = false) {
+  constructor(
+    localWon: boolean,
+    reason: ShowdownResultReason | ShowdownVoidReason = "victory",
+    voided = false,
+    silent = false,
+  ) {
     super();
     this.localWon = localWon;
     this.reason = reason;
     this.voided = voided;
+    this.silent = silent;
   }
 
   start(): void {
     super.start();
 
     // Emit the outcome to the peer so both clients show the same result (friendly -> matchId null).
-    // Best-effort + guarded so a send can never strand the return to title.
+    // Best-effort + guarded so a send can never strand the return to title. Skipped when this phase
+    // was itself ROUTED from a received peer result/void (silent) - otherwise the two clients ping-pong.
     try {
-      const transport = getCoopRuntime()?.localTransport;
+      const transport = this.silent ? null : getCoopRuntime()?.localTransport;
       if (transport != null) {
         if (this.voided) {
           transport.send({ t: "showdownVoid", matchId: null, reason: this.reason as ShowdownVoidReason });
