@@ -589,6 +589,51 @@ see what you're up against before betting.) "Friendly (no stakes)" remains alway
 
 ---
 
+### Task B6: Teambuilder pick restrictions (added 2026-07-06, maintainer)
+
+Field-legality rules (STAKES UNAFFECTED — black shinies remain the top stake tier):
+- **Black shinies cannot be fielded** (`erBlackShiny` mons excluded from team selection).
+- **Base cost 10 and above: banned entirely.**
+- **At most ONE mon of base cost 8-9 per team**; all others must be cost ≤ 7.
+- Cost = `speciesStarterCosts` base value of the LINE (same value the teambuilder shows).
+
+Enforcement in BOTH layers:
+1. `validateShowdownTeam` — new rules `blackShiny`, `costCap`, `highCostLimit` (manifest gains
+   whatever fields the checks need, e.g. `erBlackShiny: boolean`, `baseCost: number`; wire
+   mirror updated; opponent manifests re-checked, so a hacked client can't field a banned mon).
+2. Starter-select pick-time UX — attempting to add a banned/over-limit mon is REJECTED with a
+   clear message (reuse the cost-cap rejection toast pattern): "Black Shinies can't enter
+   Showdown", "Cost-10 Pokémon can't enter Showdown", "Only one Pokémon of cost 8+ allowed".
+   Grid grey-out for banned mons in showdown mode where the existing affordability grey-out
+   supports it cheaply.
+
+### Task D5: Battle telemetry (added 2026-07-06, maintainer — "record everything")
+
+Purpose: balance analytics — what wins, what loses, item/move/species performance.
+
+**Storage decision (maintainer-approved):** a NEW dedicated D1 database (e.g. `er-telemetry`)
+— NOT er-saves (which is at ~402MB of its 500MB free-tier per-DB cap; that pressure is a
+separate ops issue flagged to the maintainer). Free-tier envelope: 500MB/DB, 5GB/account,
+100k row-writes/day — comfortably ~100k+ battles of runway at the sizes below.
+
+**What is recorded per match (host-side, at result/void time):**
+1. **Full replayable trace** (the cheap "everything"): both manifests + seed + ordered per-turn
+   commands + outcome — the existing `ReplayTrace` shape; battles are deterministic, so EVERY
+   future statistic is derivable offline by replaying. Gzip (reuse the `GZ1:` compressSave
+   pattern) → ~2-5KB per match, stored as a blob column.
+2. **Denormalized summary row** for direct SQL: matchId?, both usernames (or uids), winner,
+   reason (victory/forfeit/timeout/void+why), turn count, duration, per-side species/form/item
+   sixes, per-mon KOs dealt/received, damage dealt totals, switches, relay timeouts, checksum
+   resyncs, client versions.
+3. **Aggregate upserts** (optional v1.5): per-species and per-item usage/win counters for
+   zero-replay dashboards.
+
+**Pieces:** `showdown_battles` + `showdown_battle_stats` schema in a new `workers/er-telemetry`
+worker (or a new DB binding on er-save-api — decide by deploy simplicity, document); ingestion
+endpoint POST /telemetry/battle (authed, size-capped, rate-limited per account); client
+recorder riding the host's authoritative engine (begin at battle start, seal at result/void);
+pure-module tests + worker-logic tests per the D1 escrow test pattern.
+
 ## Completion gate (before calling the feature done)
 
 1. `npx tsc --noEmit` → exactly 285 errors (branch baseline).
