@@ -1,0 +1,259 @@
+/*
+ * SPDX-FileCopyrightText: 2024-2026 Pagefault Games
+ * SPDX-License-Identifier: AGPL-3.0-only
+ */
+
+// =============================================================================
+// PROBE #809 (matrix probe 4): ME-SHOP OWNER OVERRIDE - an ME with an embedded reward shop where the ME
+// OWNER differs from the shop's OPTION owner. Inside an authoritative mystery encounter the embedded shop's
+// two authorities SPLIT (#828, hardened by the #850 post-ME pin work):
+//   - OPTION authority (roll the pool + STREAM it vs adopt the streamed list) is FORCED to the HOST - it is
+//     the sole ME engine; the guest diverted into CoopReplayMePhase never ran the encounter, so a
+//     guest-rolled pool would diverge. So the host ALWAYS rolls + streams and the guest adopts.
+//   - PICK authority (drive the interactive pick + relay it) resolves off the shop's PINNED counter, which
+//     mid-ME is the ME's pinned counter (#850) - so the ME OWNER drives, regardless of the live counter.
+// On a GUEST-OWNED ME (odd counter) the two axes genuinely split: the HOST is the OPTION owner but the pick
+// WATCHER, and the GUEST is the option WATCHER (adopts) but the pick OWNER (drives). Pre-#828 the host was
+// FORCED to own the pick even on a guest-owned ME (the maintainer's live bug: they owned the event but the
+// relic pick behaved as the host's).
+//
+// This probe drives a GUEST-OWNED DEPARTMENT_STORE_SALE (embedded shop) across two real engines and asserts
+// the probe-4 invariant crisply: EXACTLY ONE driver (host shop is the reward-pick WATCHER, guest shop is the
+// OWNER - the ME owner drives even though the option owner is the OTHER player), the embedded shop is pinned
+// to the ME counter (not the drifting live counter, #850), it does NOT advance the counter on its own
+// (MAJOR-3), and the whole ME advances the alternation counter EXACTLY ONCE in lockstep with the guest
+// converging (seed + ME-save) to the host. It hardens the same #828/#850 split coop-duo-mystery IT #2 covers,
+// as the matrix's dedicated probe-4 regression guard.
+//
+// HOW TO RUN (gated ER_SCENARIO=1, like every ER engine test):
+//   ER_SCENARIO=1 npx vitest run test/tests/elite-redux/coop/coop-duo-me-shop-owner-override.test.ts
+// =============================================================================
+
+import type { BattleScene } from "#app/battle-scene";
+import { getGameMode } from "#app/game-mode";
+import { initGlobalScene } from "#app/global-scene";
+import * as coopEngine from "#data/elite-redux/coop/coop-battle-engine";
+import { clearCoopRuntime, setCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
+import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
+import { BattleType } from "#enums/battle-type";
+import { GameModes } from "#enums/game-modes";
+import { MysteryEncounterType } from "#enums/mystery-encounter-type";
+import { SpeciesId } from "#enums/species-id";
+import { MysteryEncounterPhase } from "#phases/mystery-encounter-phases";
+import { GameManager } from "#test/framework/game-manager";
+import {
+  buildDuoForMe,
+  drainGuestMeReplayToSettle,
+  drainLoopback,
+  installDuoLogCapture,
+  relayGuestMeOptionIndexOnly,
+  relayGuestMeShopLeaveSync,
+  type ShopPhaseSeam,
+  startGuestMeOutcomeRace,
+  startGuestMeReplay,
+  startGuestMeShopOwner,
+  withClient,
+  withClientSync,
+} from "#test/tools/coop-duo-harness";
+import Phaser from "phaser";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+
+const RUN = process.env.ER_SCENARIO === "1";
+
+/** A valid ME wave: WILD, non-boss, in [10,180], waveIndex % 10 != 1 (see isMysteryEncounterValidForWave). */
+const ME_WAVE = 12;
+
+function toCoop(scene: BattleScene): void {
+  scene.gameMode = getGameMode(GameModes.COOP);
+}
+
+describe.skipIf(!RUN)(
+  "co-op DUO ME-shop owner override: guest-owned ME drives the pick, host stays the option owner (#828/#850/#809)",
+  () => {
+    let phaserGame: Phaser.Game;
+    let game: GameManager;
+    let logs: ReturnType<typeof installDuoLogCapture>;
+
+    beforeAll(() => {
+      phaserGame = new Phaser.Game({ type: Phaser.HEADLESS });
+    });
+
+    beforeEach(() => {
+      game = new GameManager(phaserGame);
+      logs = installDuoLogCapture(`me-shop-owner-override-${Date.now()}`);
+      game.override
+        .battleStyle("double")
+        .startingWave(ME_WAVE)
+        .mysteryEncounterChance(100)
+        .startingLevel(50)
+        .disableTrainerWaves();
+    });
+
+    afterEach(() => {
+      logs.dispose();
+      clearCoopRuntime();
+      // #710 harness-citizenship: buildDuoForMe builds a 2nd BattleScene (the guest); restore the host scene.
+      initGlobalScene(game.scene);
+    });
+
+    afterAll(() => {
+      // best-effort
+    });
+
+    it("guest-owned ME embedded shop: exactly one driver (guest owns the pick), single counter advance, converges", async () => {
+      // REACH: park the host on a real DEPARTMENT_STORE_SALE ME (embedded reward shop).
+      await game.runToMysteryEncounter(MysteryEncounterType.DEPARTMENT_STORE_SALE, [
+        SpeciesId.SNORLAX,
+        SpeciesId.GENGAR,
+      ]);
+      const hostScene = game.scene;
+      expect(hostScene.currentBattle.battleType, "host reached a MYSTERY_ENCOUNTER wave").toBe(
+        BattleType.MYSTERY_ENCOUNTER,
+      );
+
+      const pair = createLoopbackPair();
+      const rig = await buildDuoForMe(game, pair, setCoopRuntime, toCoop);
+
+      // SEED the interaction counter to 1 (ODD -> the GUEST owns the ME + its embedded pick). Both controllers
+      // advance 0->1 and drain (the broadcasts only set a deferred pendingRemote, so neither double-advances).
+      await withClient(rig.hostCtx, () => {
+        rig.hostRuntime.controller.advanceInteraction();
+      });
+      await withClient(rig.guestCtx, () => {
+        rig.guestRuntime.controller.advanceInteraction();
+      });
+      await drainLoopback();
+      const counterBefore = rig.hostRuntime.controller.interactionCounter();
+      expect(counterBefore, "the ME opens on interaction counter 1 (guest owns odd)").toBe(1);
+      expect(rig.guestRuntime.controller.interactionCounter(), "guest also at counter 1").toBe(1);
+
+      const applyMeOutcomeSpy = vi.spyOn(coopEngine, "applyCoopMeOutcome");
+      const handleOptionSelectSpy = vi.spyOn(MysteryEncounterPhase.prototype, "handleOptionSelect");
+
+      // STEP A (host): reach MysteryEncounterPhase + run start(). The host does NOT own the pick at counter 1,
+      // so coopHostAwaitGuestIndex parks AWAITING the guest's relayed option index (no local drive).
+      await withClient(rig.hostCtx, async () => {
+        await game.phaseInterceptor.to("MysteryEncounterPhase", false);
+        await game.phaseInterceptor.to("MysteryEncounterPhase");
+      });
+      await drainLoopback();
+      expect(handleOptionSelectSpy, "host has NOT applied any option before the guest relays").not.toHaveBeenCalled();
+
+      // STEP B (guest): start the divert -> CoopReplayMePhase (resolves ownsMe=TRUE at counter 1, opens the
+      // selector), then SEND option index 0 (the shop) SYNCHRONOUSLY (send only; outcome race deferred to D).
+      const replay = await withClient(rig.guestCtx, () => startGuestMeReplay(rig.guestScene));
+      withClientSync(rig.guestCtx, () => relayGuestMeOptionIndexOnly(replay, 0));
+
+      // STEP C (host): flush the relayed index -> the host applies handleOptionSelect(0) programmatically and
+      // runs the option chain to the embedded reward shop. START the host shop: on a guest-owned ME it is the
+      // OPTION owner (rolls + STREAMS) but the reward-pick WATCHER, so it parks awaiting the guest's pick.
+      let hostShop!: ShopPhaseSeam;
+      await withClient(rig.hostCtx, async () => {
+        await drainLoopback(); // host await resolves under the HOST scene
+        await game.phaseInterceptor.to("SelectModifierPhase", false);
+        hostShop = hostScene.phaseManager.getCurrentPhase() as unknown as ShopPhaseSeam;
+        expect(hostShop.phaseName, "host reached the embedded end-of-ME reward shop").toBe("SelectModifierPhase");
+        hostShop.start(); // rolls + STREAMS options, parks awaiting the guest pick
+        await drainLoopback();
+
+        // #850 PIN: the embedded shop is pinned to the ME counter (odd), NOT the drifting live counter.
+        expect(hostShop.coopInteractionStart, "host shop pinned to the ME counter (odd -> guest owns the pick)").toBe(
+          counterBefore,
+        );
+        // PROBE-4 DRIVER SPLIT (host side): the host's embedded shop is the reward-pick WATCHER (it does NOT
+        // drive the pick) even though it IS the option owner - the "other player" from the ME owner's view.
+        expect(
+          hostShop.coopWatcher,
+          "the host's embedded shop is the reward-pick WATCHER on a guest-owned ME (option owner, not pick driver)",
+        ).toBe(true);
+      });
+
+      // The host applied the guest's relayed TOP-LEVEL pick programmatically (the guest-owned proof).
+      expect(
+        handleOptionSelectSpy,
+        "host applied the guest's relayed option via handleOptionSelect",
+      ).toHaveBeenCalled();
+      // MAJOR-3: the embedded ME reward shop suppresses its own advance mid-ME - still at the ME counter.
+      expect(
+        rig.hostRuntime.controller.interactionCounter(),
+        "embedded ME reward shop suppressed its own advance (MAJOR-3, still mid-ME)",
+      ).toBe(counterBefore);
+
+      // STEP C2 (guest): the GUEST owns the ME -> it OWNS the reward PICK. Open its embedded shop as the pick
+      // OWNER: it pins the same (odd) ME counter, ADOPTS the host's streamed options (never re-rolls its
+      // diverged pool), and drives. Relay the owner LEAVE synchronously (host applies it under host ctx in C3).
+      const guestShop = await withClient(rig.guestCtx, () => startGuestMeShopOwner(rig.guestScene));
+      // PROBE-4 DRIVER SPLIT (guest side): the guest's embedded shop DRIVES the pick (OWNER) - EXACTLY ONE
+      // driver across the two engines, and it is the ME owner (guest), not the option owner (host).
+      expect(
+        guestShop.coopWatcher,
+        "the guest's embedded shop DRIVES the reward pick (OWNER) on a guest-owned ME - the #828 fix",
+      ).toBe(false);
+      expect(guestShop.coopInteractionStart, "guest shop pinned to the SAME ME counter as the host").toBe(
+        counterBefore,
+      );
+      expect(
+        (guestShop.typeOptions as unknown[]).length,
+        "guest ADOPTED the host's streamed reward options (never re-rolled its diverged ME pool)",
+      ).toBeGreaterThan(0);
+      // EXACTLY ONE DRIVER (the crisp probe-4 invariant): the two shops disagree on coopWatcher - one drives,
+      // one watches - so there is never a double-driver or a zero-driver (the deadlock/duplicate-screen class).
+      expect(
+        hostShop.coopWatcher !== guestShop.coopWatcher,
+        "exactly one engine drives the embedded ME pick (host watches, guest drives)",
+      ).toBe(true);
+      withClientSync(rig.guestCtx, () => relayGuestMeShopLeaveSync(guestShop));
+
+      // STEP C3 (host): flush the guest owner's LEAVE -> host watcher applies it, the shop ends, and the option
+      // chain runs to PostMysteryEncounterPhase (streams meResync + LEAVE into the guest's buffer; advances once).
+      await withClient(rig.hostCtx, async () => {
+        for (let i = 0; i < 16; i++) {
+          await drainLoopback();
+          if (hostScene.phaseManager.getCurrentPhase()?.phaseName !== "SelectModifierPhase") {
+            break;
+          }
+        }
+        await game.phaseInterceptor.to("PostMysteryEncounterPhase");
+      });
+
+      // The host advanced the alternation counter EXACTLY ONCE for the whole ME (the embedded shop added none).
+      expect(rig.hostRuntime.controller.interactionCounter(), "host advanced the counter once for the whole ME").toBe(
+        counterBefore + 1,
+      );
+
+      const hostSeed = hostScene.seed;
+      const hostEncounteredEvents = JSON.stringify(hostScene.mysteryEncounterSaveData.encounteredEvents);
+
+      // STEP D (guest): start the outcome/terminal race (buffer-hits the host's meResync + LEAVE) and drain to
+      // the terminal - applyCoopMeOutcome + leave + advance all run against the GUEST scene (genuine converge).
+      const guestReplay = await withClient(rig.guestCtx, async () => {
+        startGuestMeOutcomeRace(replay);
+        return drainGuestMeReplayToSettle(replay);
+      });
+
+      // ----- ASSERTIONS -----
+      expect(guestReplay.settled, "guest CoopReplayMePhase settled (left the ME exactly once)").toBe(true);
+      expect(applyMeOutcomeSpy.mock.calls.length, "guest applied the host's comprehensive meResync exactly once").toBe(
+        1,
+      );
+
+      // CONVERGENCE: the guest's RNG seed + ME-save converged to the host's authoritative values via meResync.
+      expect(rig.guestScene.seed, "guest RNG seed converged to the host's via meResync").toBe(hostSeed);
+      expect(
+        JSON.stringify(rig.guestScene.mysteryEncounterSaveData.encounteredEvents),
+        "guest ME-save (encounteredEvents) converged to the host's via meResync",
+      ).toBe(hostEncounteredEvents);
+
+      // SINGLE COUNTER ADVANCE IN LOCKSTEP: the whole ME + embedded shop is ONE interaction on BOTH engines.
+      expect(rig.hostRuntime.controller.interactionCounter(), "host counter advanced exactly once for the ME").toBe(
+        counterBefore + 1,
+      );
+      expect(
+        rig.guestRuntime.controller.interactionCounter(),
+        "guest counter advanced exactly once (lockstep) - no double advance from the embedded shop",
+      ).toBe(counterBefore + 1);
+
+      logs.flush();
+    }, 300_000);
+  },
+);
