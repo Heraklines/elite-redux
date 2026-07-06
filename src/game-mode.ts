@@ -47,6 +47,9 @@ interface GameModeConfig {
   /** True for the 2-player Co-op mode (#633). Classic-like, but a shared run
    *  driven by two players over a P2P transport (doubles, 3 mons each). */
   isCoop?: boolean;
+  /** True for the Showdown mode: a single ephemeral 1v1 duel at level 100 (no
+   *  shops, no exp progression, no waves beyond the first, not a saved run). */
+  isShowdown?: boolean;
   /** Excludes this mode from daily-seed/leaderboard logic. */
   nonDeterministic?: boolean;
 }
@@ -71,6 +74,7 @@ export class GameMode implements GameModeConfig {
   public maxMysteryEncounterWave: number;
   public isLLMDirector: boolean;
   public isCoop: boolean;
+  public isShowdown: boolean;
   public nonDeterministic: boolean;
 
   constructor(modeId: GameModes, config: GameModeConfig, battleConfig?: FixedBattleConfigs) {
@@ -157,6 +161,9 @@ export class GameMode implements GameModeConfig {
     switch (this.modeId) {
       case GameModes.DAILY:
         return 20;
+      case GameModes.SHOWDOWN:
+        // Single 1v1 duel is fought at a fixed high level.
+        return 100;
       default:
         return 5;
     }
@@ -375,6 +382,10 @@ export class GameMode implements GameModeConfig {
         return waveIndex % 250 === 0;
       case GameModes.DAILY:
         return waveIndex === 50;
+      case GameModes.SHOWDOWN:
+        // Single 1v1 duel: the first wave is the only (and final) wave.
+        // Provisional for B1 - Task C3 gives wave-final predicates their real treatment.
+        return waveIndex === 1;
     }
   }
 
@@ -482,6 +493,7 @@ export class GameMode implements GameModeConfig {
       case GameModes.DAILY:
       case GameModes.LLM_DIRECTOR:
       case GameModes.COOP:
+      case GameModes.SHOWDOWN:
         return isBoss ? chances.classicBoss : chances.classicNonBoss;
       case GameModes.ENDLESS:
       case GameModes.SPLICED_ENDLESS:
@@ -505,6 +517,8 @@ export class GameMode implements GameModeConfig {
         return i18next.t("gameMode:llmDirector");
       case GameModes.COOP:
         return i18next.t("gameMode:coop");
+      case GameModes.SHOWDOWN:
+        return i18next.t("gameMode:showdown");
     }
   }
 
@@ -551,6 +565,8 @@ export class GameMode implements GameModeConfig {
         return i18next.t("gameMode:llmDirector");
       case GameModes.COOP:
         return i18next.t("gameMode:coop");
+      case GameModes.SHOWDOWN:
+        return i18next.t("gameMode:showdown");
     }
   }
 }
@@ -630,5 +646,16 @@ export function getGameMode(gameMode: GameModes): GameMode {
         },
         classicFixedBattles,
       );
+    case GameModes.SHOWDOWN:
+      // Showdown: a single ephemeral 1v1 duel fought at level 100.
+      // No shops (hasNoShop), no waves beyond the first (see isWaveFinal), and
+      // not a saved/continuable run - like DAILY it does NOT set `isClassic`, so
+      // it stays out of the classic saved-run / final-boss / ME paths.
+      // `nonDeterministic` keeps it out of daily-seed/leaderboard code.
+      return new GameMode(GameModes.SHOWDOWN, {
+        isShowdown: true,
+        hasNoShop: true,
+        nonDeterministic: true,
+      });
   }
 }
