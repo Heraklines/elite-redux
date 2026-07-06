@@ -114,7 +114,7 @@ import { UiMode } from "#enums/ui-mode";
 import { WeatherType } from "#enums/weather-type";
 import { EnemyPokemon, PlayerPokemon, type Pokemon } from "#field/pokemon";
 import type { ModifierOverride } from "#modifiers/modifier-type";
-import { PokemonModifierType } from "#modifiers/modifier-type";
+import { PokemonModifierType, PokemonReviveModifierType } from "#modifiers/modifier-type";
 import { MysteryEncounter } from "#mystery-encounters/mystery-encounter";
 import { getCoopMeHostPresentation, setCoopMeHostPresentation } from "#phases/coop-replay-me-phase";
 import {
@@ -1088,7 +1088,7 @@ export interface ShopPhaseSeam {
  */
 export async function driveHostRewardShopOwner(
   hostPhase: ShopPhaseSeam,
-  opts: { takeReward?: boolean } = {},
+  opts: { takeReward?: boolean; reviveSlot?: number } = {},
 ): Promise<number> {
   // start() resolves owner/watcher from the pinned counter, streams the rolled options to the watcher,
   // and opens the owner screen (the prompt handler would drive the UI; here we drive the logic directly).
@@ -1097,6 +1097,40 @@ export async function driveHostRewardShopOwner(
   const pinned = hostPhase.coopInteractionStart;
   const noop = () => false;
   let tookTerminalReward = false;
+  // #832 REVIVE-TAKE (level soak): when the caller passes a fainted `reviveSlot` AND this wave's REAL pool
+  // rolled a Revive (it gates on a fainted party member), TAKE it (revive that mon) over leaving it dead.
+  // A Revive is a party-target reward, so drive the ONE PARTY open the owner's openModifierMenu issues -
+  // the same technique as driveHostPartyRewardOwner, but folded in HERE so typeOptions is inspected AFTER
+  // start() (it is undefined before). Its applyModifier is TERMINAL (super.end() + coopAdvanceInteraction),
+  // so we do NOT also leave. Checked BEFORE takeReward so a revive wins when both are possible.
+  if (opts.reviveSlot != null && opts.reviveSlot >= 0) {
+    const reviveIdx = (hostPhase.typeOptions as { type?: unknown }[]).findIndex(
+      o => o?.type instanceof PokemonReviveModifierType,
+    );
+    if (reviveIdx >= 0) {
+      const ui = globalScene.ui as unknown as { setModeWithoutClear: (...args: unknown[]) => unknown };
+      const realSetModeWithoutClear = ui.setModeWithoutClear.bind(ui);
+      ui.setModeWithoutClear = (...args: unknown[]): unknown => {
+        if (args[0] === UiMode.PARTY) {
+          ui.setModeWithoutClear = realSetModeWithoutClear; // one-shot: restore before the picker callback
+          (args[3] as (slotIndex: number, option: number) => void)(opts.reviveSlot!, 0);
+          return;
+        }
+        return realSetModeWithoutClear(...args);
+      };
+      try {
+        hostPhase.selectRewardModifierOption(reviveIdx, noop);
+        // The picker callback's setMode(MODIFIER_SELECT).then(...) runs on a microtask; drain repeatedly.
+        for (let i = 0; i < 8; i++) {
+          await drainLoopback();
+        }
+      } finally {
+        ui.setModeWithoutClear = realSetModeWithoutClear; // restore even if the PARTY open never came
+      }
+      await drainLoopback();
+      return pinned;
+    }
+  }
   if (opts.takeReward) {
     // Find the first NON-party reward (a PokemonModifierType opens a party menu the headless autopilot
     // can't drive; a non-party item resolves immediately, relaying a REWARD pick + applying it). The
@@ -1271,19 +1305,15 @@ export async function driveGuestTmCaseRegression(
  */
 export async function driveHostPartyRewardOwner(
   hostPhase: ShopPhaseSeam,
-  opts: { slot?: number; option?: number; typeFilter?: (type: unknown) => boolean } = {},
+  opts: { slot?: number; option?: number } = {},
 ): Promise<number> {
   const slot = opts.slot ?? 0;
   const option = opts.option ?? 0;
   hostPhase.start();
   await drainLoopback();
   const pinned = hostPhase.coopInteractionStart;
-  // Find the target PARTY-TARGET reward. By default the FIRST party-target reward (the inverse of
-  // driveHostRewardShopOwner's non-party filter); an optional typeFilter narrows it to a SPECIFIC
-  // party-target modifier (e.g. a Revive, so a faint-heavy soak takes the Revive over an also-present TM
-  // that would strand on a learn-move continuation - #832).
-  const predicate = opts.typeFilter ?? ((t: unknown): boolean => t instanceof PokemonModifierType);
-  const idx = (hostPhase.typeOptions as { type?: unknown }[]).findIndex(o => predicate(o?.type));
+  // Find the first PARTY-TARGET reward (the inverse of driveHostRewardShopOwner's non-party filter).
+  const idx = (hostPhase.typeOptions as { type?: unknown }[]).findIndex(o => o?.type instanceof PokemonModifierType);
   if (idx < 0) {
     throw new Error("driveHostPartyRewardOwner: no party-target reward in the forced shop options");
   }

@@ -65,7 +65,7 @@ describe.skipIf(!RUN)("NIGHTLY co-op SOAK: seeded randomized two-engine run (#84
   let game: GameManager;
   let logs: ReturnType<typeof installDuoLogCapture>;
   let accuracySpy: MockInstance | undefined;
-  // #832 SOAK_PROFILE: "god" (default, byte-identical to today) or "level" (the faint-heavy level-85 party).
+  // #832 SOAK_PROFILE: "god" (default, byte-identical to today) or "level" (the faint-heavy level-65 party).
   // Resolved once per test in beforeEach so the override party + the coverage assertion agree on it.
   let profile: ReturnType<typeof resolveSoakProfile>;
 
@@ -95,7 +95,7 @@ describe.skipIf(!RUN)("NIGHTLY co-op SOAK: seeded randomized two-engine run (#84
     // #832 PROFILE-DRIVEN PARTY. The party (level + species + moveset + held items) comes from SOAK_PROFILES
     // so the override + the coverage assertion share one source of truth. "god" (default / SOAK_PROFILE unset)
     // is byte-identical to today (the level-300 legendary steamroller reaching the endgame); "level" is the
-    // faint-heavy level-85 party that GUARANTEES the faint/switch/replace channel (#845-#848).
+    // faint-heavy level-65 party that GUARANTEES the single-faint/switch/replace channel (#845-#848).
     profile = resolveSoakProfile();
     const party = SOAK_PROFILES[profile];
     // #843 REAL COMBAT: NO enemy overrides. Every wave fights its REAL generated species with its REAL
@@ -156,9 +156,9 @@ describe.skipIf(!RUN)("NIGHTLY co-op SOAK: seeded randomized two-engine run (#84
       // drives the #786 guest-chooses-its-own-replacement machinery when a mon faints. The species come from
       // the resolved SOAK_PROFILE (SOAK_PROFILES): "god" = six overpowered legendaries (ETERNATUS/RAYQUAZA/
       // ARCEUS/MEWTWO/KYOGRE/ZACIAN) that steamroll the endgame so the soak reaches waves 70-200; "level" =
-      // the proven level-85 team (SNORLAX/GENGAR/DRAGONITE/TYRANITAR/METAGROSS/GARCHOMP) that FAINTS reliably
-      // at the level ceiling so the faint/switch/replace channel is GUARANTEED. Mega/primal FORMS are not
-      // force-spawned (fragile through the headless duo mirror); the level EDGE, not the form, does the work.
+      // the level-65 team (SNORLAX/GENGAR/DRAGONITE/TYRANITAR/METAGROSS/GARCHOMP) that FAINTS reliably in its
+      // ~wave-40-48 death spiral so the single-faint/switch/replace channel is GUARANTEED. Mega/primal FORMS
+      // are not force-spawned (fragile through the headless duo mirror); the level EDGE does the work.
       await game.classicMode.startBattle(...SOAK_PROFILES[profile].species);
       const result = await runCoopSoak(game, { seed, waves, logs, profile });
       const elapsedMs = Date.now() - started;
@@ -196,10 +196,11 @@ describe.skipIf(!RUN)("NIGHTLY co-op SOAK: seeded randomized two-engine run (#84
         // The survey ended EARLY at a real terminal - it must have stopped before the last wave.
         expect(result.wavesCompleted, "run-end stopped before the full requested count").toBeLessThan(waves);
         // COVERAGE FLOOR (anti-narrowing): a run-end is only an acceptable terminal if the run got DEEP
-        // enough that the wipe is plausibly the level-85 ceiling losing to the late gauntlet - NOT a
-        // regression that weakened the party into an early wipe. A run-end below the proven-survivable
-        // baseline (SOAK_WAVES=30 completes clean at level 85 on multiple seeds) is a RED, not a silent
-        // green with reduced coverage. Floor = min(requested, 30) so a deliberately tiny run isn't false-red.
+        // enough that the wipe is plausibly the party's real ceiling losing to the gauntlet (god at the deep
+        // endgame, or the level-65 party's ~wave-40-48 death spiral) - NOT a regression that weakened the
+        // party into an early wipe. A run-end below the proven-survivable baseline (both profiles clear 30
+        // waves on multiple seeds) is a RED, not a silent green with reduced coverage. Floor = min(requested,
+        // 30) so a deliberately tiny run isn't false-red.
         const coverageFloor = Math.min(waves, 30);
         expect(
           result.wavesCompleted,

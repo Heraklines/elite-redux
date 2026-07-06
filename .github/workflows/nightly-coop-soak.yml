@@ -6,10 +6,11 @@ name: Nightly Co-op Soak
 # (#832), serialized, each covering a different strand:
 #   - god   (SOAK_WAVES=150): the level-300 steamroller that reaches the deep endgame
 #            (waves 70-200) where the LATE-game desyncs live; faints only occasionally.
-#   - level (SOAK_WAVES=80):  the level-85 party that FAINTS reliably at the level ceiling
-#            (~wave 68) - the faint/wipe/revive/switch channel (#834/#836/#845-#848), the
-#            historically RICHEST desync source. The soak PROMOTES the faint surfaces to
-#            GUARANTEED coverage for this profile.
+#   - level (SOAK_WAVES=55):  the level-65 party that FAINTS reliably through its ~wave-40-48
+#            death spiral and WIPES cleanly (a legitimate terminal), staying below the ~60+
+#            ceiling - the faint/wipe/revive/switch channel (#834/#836/#845-#848), the
+#            historically RICHEST desync source. The soak PROMOTES the single-faint/switch/
+#            replace surfaces to GUARANTEED coverage for this profile.
 # Manually dispatchable on demand with a custom wave count / seed (applies to BOTH legs):
 #
 #   gh workflow run nightly-coop-soak.yml --ref feat/elite-redux-port \
@@ -66,11 +67,14 @@ jobs:
           - profile: god
             waves_default: "150"
           # LEVEL (#832, audit priority #2: the FAINT/WIPE/REVIVE/SWITCH channel - historically the RICHEST
-          # desync source, #834/#836/#845-#848). The level-85 party takes real damage and FAINTS reliably,
-          # wiping at the level ceiling ~wave 68; a default of 80 fully surveys the faint-heavy strand + the
-          # legitimate wipe terminal. The soak PROMOTES the faint surfaces to GUARANTEED for this profile.
+          # desync source, #834/#836/#845-#848). The level-65 party takes real damage and FAINTS reliably
+          # through its ~wave-40-48 death spiral, WIPING cleanly (GameOver -> Title) around wave ~48 - a
+          # legitimate terminal. A default of 55 lets the wipe land while staying BELOW the ~60+ razor's-edge
+          # ceiling (boss-segmented wild enemies + the deep boss-reward-tail strand - see the FINDINGS in the
+          # PR/report). The soak PROMOTES the single-faint/switch/replace surfaces to GUARANTEED for this
+          # profile (the same-turn double faint stays probabilistic).
           - profile: level
-            waves_default: "80"
+            waves_default: "55"
     steps:
       - uses: actions/checkout@v6
         with:

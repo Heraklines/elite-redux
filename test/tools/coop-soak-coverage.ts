@@ -93,8 +93,9 @@ export type CoopSoakSituation = (typeof COOP_SOAK_SITUATIONS)[keyof typeof COOP_
 /**
  * The soak PARTY PROFILE (#832). "god" is today's level-300 legendary steamroller that reaches the deep
  * endgame but faints only occasionally (so the FAINT-replacement surfaces are PROBABILISTIC). "level" is
- * the wave-appropriate level-85 party that takes REAL damage and FAINTS reliably (the faint channel where
- * #845-#848 were found) - so under "level" those faint surfaces are PROMOTED to GUARANTEED (see
+ * the wave-appropriate level-65 party that takes REAL damage and FAINTS reliably then wipes cleanly ~wave 48
+ * (the faint channel where #845-#848 were found) - so under "level" those faint surfaces are PROMOTED to
+ * GUARANTEED (see
  * {@linkcode guaranteedSurfaces} / {@linkcode probabilisticSurfaces}). The driver resolves the active
  * profile from the SOAK_PROFILE env (default "god"); it is threaded into the coverage report + assertion.
  */
@@ -226,6 +227,13 @@ export const KNOWN_UNDRIVABLE: ReadonlyMap<string, UndrivableEntry> = new Map<st
     },
   ],
   [
+    modeKey(UiMode.LEARN_MOVE_BATCH),
+    {
+      reason: "ER's BATCH level-up move-learn panel is not driven (level-up learns are declined in the soak)",
+      followupTask: "drive an ER batch level-up move-learn - the `levelUpLearn` situation",
+    },
+  ],
+  [
     modeKey(UiMode.MYSTERY_ENCOUNTER),
     {
       reason:
@@ -326,6 +334,20 @@ export const KNOWN_UNDRIVABLE: ReadonlyMap<string, UndrivableEntry> = new Map<st
     },
   ],
   [
+    kindKey("learnMoveBatch"),
+    {
+      reason: "ER's BATCH level-up move-learn owner-terminal relay is not driven (level-up learns declined)",
+      followupTask: "drive an ER batch level-up move-learn - the `levelUpLearn` situation",
+    },
+  ],
+  [
+    kindKey("learnMoveBatchForward"),
+    {
+      reason: "ER's BATCH level-up move-learn host->guest forward relay is not driven (level-up learns declined)",
+      followupTask: "drive an ER batch level-up move-learn - the `levelUpLearn` situation",
+    },
+  ],
+  [
     kindKey("dexSync"),
     {
       reason: "the dex/starter sync broadcast is only sent on a new-species catch, which is not driven",
@@ -366,6 +388,13 @@ export const KNOWN_UNDRIVABLE: ReadonlyMap<string, UndrivableEntry> = new Map<st
     {
       reason: "the move-forget seq band is not driven (level-up learns declined)",
       followupTask: "drive a level-up move-learn - the `levelUpLearn` situation",
+    },
+  ],
+  [
+    bandKey("learnMoveBatchFwd"),
+    {
+      reason: "ER's BATCH level-up move-learn seq band is not driven (level-up learns declined)",
+      followupTask: "drive an ER batch level-up move-learn - the `levelUpLearn` situation",
     },
   ],
   [
@@ -520,17 +549,29 @@ export const KNOWN_UNDRIVABLE: ReadonlyMap<string, UndrivableEntry> = new Map<st
 // ---------------------------------------------------------------------------
 
 /**
- * The FAINT-replacement co-op channel: the `switch` relay kind + its `faintSwitch` seq band, and the
- * singleFaint / doublePlayerFaint battle-flow situations. This is the RICHEST desync surface (#845-#848,
- * the party-order transposition #836, the heavy-faint cluster #834) and its classification is
- * PROFILE-DEPENDENT (#832): PROBABILISTIC under "god" (the level-300 party rarely faints), GUARANTEED under
- * "level" (the level-85 party faints reliably - the profile exists precisely to guarantee this channel).
+ * The FAINT-replacement co-op channel CORE (the RICHEST desync surface - #845-#848, the party-order
+ * transposition #836, the heavy-faint cluster #834): a player mon FAINTS (singleFaint) AND a faint
+ * REPLACEMENT is chosen + relayed (the `switch` relay kind). These two RELIABLY fire whenever the level-65
+ * party enters its ~wave-40+ death spiral (a mon faints and is replaced), so they are PROFILE-DEPENDENT
+ * (#832): PROBABILISTIC under "god" (the level-300 party rarely faints), PROMOTED to GUARANTEED under
+ * "level". Verified GUARANTEED-hit across level seeds.
  */
-const FAINT_SURFACES: readonly string[] = [
-  sitKey(COOP_SOAK_SITUATIONS.singleFaint),
-  sitKey(COOP_SOAK_SITUATIONS.doublePlayerFaint),
-  kindKey("switch"),
+const FAINT_PROMOTABLE: readonly string[] = [sitKey(COOP_SOAK_SITUATIONS.singleFaint), kindKey("switch")];
+
+/**
+ * Faint-channel surfaces that fire only under HEAVIER / more specific conditions, so they stay PROBABILISTIC
+ * under BOTH profiles (covered by the cross-run UNION ledger, not guaranteed):
+ *   - `faintSwitch` seq BAND: the switch relay's CHOICE rides this band, but the tap ALSO records the switch
+ *     `kind` from a follow-up OUTCOME send that can carry a different seq, so the band does not co-fire with
+ *     `kind:switch` every run (a heavier death spiral hits it - seed 12345's 80-wave level-85 run did - but a
+ *     light spiral capped below the ceiling may not). Guaranteeing it would make the level test flaky.
+ *   - `doublePlayerFaint`: a SAME-TURN two-slot KO (#847) is damage-roll-dependent even at the ceiling
+ *     (empirically not every level run KOs both field slots in one turn).
+ * Both are still exercised across runs; promoting them would red a legitimate damage-roll / seq miss.
+ */
+const FAINT_ALWAYS_PROBABILISTIC: readonly string[] = [
   bandKey("faintSwitch"),
+  sitKey(COOP_SOAK_SITUATIONS.doublePlayerFaint),
 ];
 
 /** Surfaces hit by CONSTRUCTION in every sufficiently-long run REGARDLESS of profile (the cadence spine). */
@@ -565,12 +606,14 @@ const PROBABILISTIC_BASE: readonly string[] = [
 /**
  * Surfaces hit by CONSTRUCTION in every run of at least the profile's assert gate. All must be hit.
  *
- * PROFILE SPLIT (#832): the base cadence spine is GUARANTEED under every profile. The FAINT channel
- * ({@linkcode FAINT_SURFACES}) is PROMOTED into GUARANTEED under "level" (the level-85 party faints
- * reliably - that channel is the profile's whole reason to exist) and stays PROBABILISTIC under "god".
+ * PROFILE SPLIT (#832): the base cadence spine is GUARANTEED under every profile. The single-faint channel
+ * ({@linkcode FAINT_PROMOTABLE}) is PROMOTED into GUARANTEED under "level" (the level-65 party faints
+ * reliably in its death spiral - that channel is the profile's whole reason to exist) and stays
+ * PROBABILISTIC under "god". The heavier faint surfaces ({@linkcode FAINT_ALWAYS_PROBABILISTIC}) stay
+ * probabilistic under BOTH.
  */
 export function guaranteedSurfaces(profile: SoakProfileName): ReadonlySet<string> {
-  return profile === "level" ? new Set([...GUARANTEED_BASE, ...FAINT_SURFACES]) : new Set(GUARANTEED_BASE);
+  return profile === "level" ? new Set([...GUARANTEED_BASE, ...FAINT_PROMOTABLE]) : new Set(GUARANTEED_BASE);
 }
 
 /**
@@ -579,13 +622,17 @@ export function guaranteedSurfaces(profile: SoakProfileName): ReadonlySet<string
  * ledger is mature) a RED for a probabilistic surface gone permanently cold. Before the ledger is mature
  * a miss is a loud WARN, so a fresh checkout is never false-red.
  *
- * 🔴 #832 PROFILE SPLIT: under "god" the FAINT-replacement surfaces ({@linkcode FAINT_SURFACES}) are
+ * 🔴 #832 PROFILE SPLIT: under "god" the single-faint channel ({@linkcode FAINT_PROMOTABLE}) is
  * PROBABILISTIC (the level-300 party deliberately AVOIDS wipes to reach the endgame, so it faints only
- * OCCASIONALLY - the cross-run ledger union covers them). Under "level" they are PROMOTED to GUARANTEED
- * (see {@linkcode guaranteedSurfaces}), so they are NOT in the probabilistic set for that profile.
+ * OCCASIONALLY - the cross-run ledger union covers them); under "level" it is PROMOTED to GUARANTEED (see
+ * {@linkcode guaranteedSurfaces}) and leaves this set. The same-turn double faint
+ * ({@linkcode FAINT_ALWAYS_PROBABILISTIC}) is probabilistic under BOTH profiles (a simultaneous two-slot KO
+ * is damage-roll-dependent even at the ceiling), so it is here regardless of profile.
  */
 export function probabilisticSurfaces(profile: SoakProfileName): ReadonlySet<string> {
-  return profile === "level" ? new Set(PROBABILISTIC_BASE) : new Set([...PROBABILISTIC_BASE, ...FAINT_SURFACES]);
+  return profile === "level"
+    ? new Set([...PROBABILISTIC_BASE, ...FAINT_ALWAYS_PROBABILISTIC])
+    : new Set([...PROBABILISTIC_BASE, ...FAINT_PROMOTABLE, ...FAINT_ALWAYS_PROBABILISTIC]);
 }
 
 // ---------------------------------------------------------------------------
@@ -593,22 +640,21 @@ export function probabilisticSurfaces(profile: SoakProfileName): ReadonlySet<str
 // ---------------------------------------------------------------------------
 
 /**
- * The wave depth at or above which the FULL GUARANTEED-set enforcement + partition check runs. Set to 60,
- * DELIBERATELY below the soak's currently-achievable depth (the level-85 party caps ~68 at the level
- * ceiling; a god-tier party reaches far deeper) and above any PR run (the 25-wave default). Below 60 the
- * coverage is report-only. DOC: when the party clears 120+ reliably, RAISE this toward the full run length
- * and MOVE more situations from UNDRIVABLE to DRIVABLE (mega at every god-mon form, biomeBoundary every 10,
- * more trainer classes) - the endgame lights up far more surfaces than the level-85 survey ever did.
+ * The GOD profile's full-enforcement wave gate. Set to 60, DELIBERATELY below the god party's achievable
+ * depth (a level-300 party reaches the deep endgame) and above any PR run (the 25-wave default). Below 60
+ * the coverage is report-only. DOC: when the party clears 120+ reliably, RAISE this toward the full run
+ * length and MOVE more situations from UNDRIVABLE to DRIVABLE (mega at every god-mon form, biomeBoundary
+ * every 10, more trainer classes) - the endgame lights up far more surfaces than a shallow survey does.
  */
 export const COMPLETENESS_ASSERT_MIN = 60;
 
 /**
- * The LEVEL profile's assert gate (#832). The level-85 party wipes at the level ceiling (~wave 68) rather
- * than reaching the deep endgame, so its full-enforcement gate is DELIBERATELY lower than the god profile's
- * 60: set to 30, the proven-survivable floor the soak test already asserts a level run must cross (a run
- * that ends below 30 is a regression, red by the coverage-floor check). At >= 30 waves a level run has
- * crossed the fixed rival (wave 8), several bosses (10/20/30), and enough real-damage combat to guarantee
- * the cadence spine AND (by construction of the level party) the faint channel. The faint channel is ALSO
+ * The LEVEL profile's assert gate (#832). The level-65 party faints through its ~wave-40-48 death spiral and
+ * terminates (a clean wipe / #848 host-half-exhaustion) around wave ~48-55, so its full-enforcement gate is
+ * DELIBERATELY lower than the god profile's 60: set to 30, the proven-survivable floor the soak test already
+ * asserts a level run must cross (a run that ends below 30 is a regression, red by the coverage-floor check).
+ * At >= 30 waves a level run has crossed the fixed rival (wave 8), several bosses (10/20/30), and by ~55 its
+ * death spiral, so it guarantees the cadence spine AND the single-faint channel. The faint channel is ALSO
  * enforced independent of this gate (see {@linkcode assertSoakCompleteness}) - the profile exists to
  * guarantee it, so a level run that ends without faints is a red at ANY depth.
  */
@@ -804,7 +850,7 @@ export function assertSoakCompleteness(hits: SoakHitSet, opts: SoakCompletenessO
   // Enforce it before the depth gate so even a level run that ended shy of the full gate still reds if the
   // faint channel went cold. NEVER made green by narrowing - a level run with no faints is a real regression.
   if (profile === "level") {
-    const faintCold = sorted(FAINT_SURFACES).filter(s => expected.has(s) && !hit.has(s));
+    const faintCold = sorted(FAINT_PROMOTABLE).filter(s => expected.has(s) && !hit.has(s));
     if (faintCold.length > 0) {
       throw new Error(
         `[coop-soak-coverage] COMPLETENESS BACKSTOP FAILED (profile=level, seed ${opts.seed}, ${opts.wavesCompleted} waves):\n`

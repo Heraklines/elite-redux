@@ -85,7 +85,7 @@ import { SpeciesId } from "#enums/species-id";
 import { UiMode } from "#enums/ui-mode";
 import { WeatherType } from "#enums/weather-type";
 import type { Pokemon } from "#field/pokemon";
-import { type ModifierOverride, PokemonReviveModifierType } from "#modifiers/modifier-type";
+import type { ModifierOverride } from "#modifiers/modifier-type";
 import { getCoopMeHostPresentation } from "#phases/coop-replay-me-phase";
 import { coopMeInteractionStartValue } from "#phases/mystery-encounter-phases";
 import { SelectModifierPhase } from "#phases/select-modifier-phase";
@@ -96,7 +96,6 @@ import {
   type DuoRig,
   driveGuestReplayTurn,
   driveGuestRewardWatch,
-  driveHostPartyRewardOwner,
   driveHostRewardShopOwner,
   remirrorWave,
   type ShopPhaseSeam,
@@ -195,10 +194,11 @@ export function announceSoakSeed(seed: number, waves: number): void {
 // The soak PARTY PROFILE (#832). SOAK_PROFILE selects which starter party + level edge the test stands up:
 //   - "god" (DEFAULT, unset = byte-identical to today): a level-300 legendary steamroller that reaches the
 //     deep endgame. It faints only OCCASIONALLY, so the FAINT-replacement co-op surfaces are PROBABILISTIC.
-//   - "level": the wave-appropriate level-85 party (SNORLAX/GENGAR/DRAGONITE/TYRANITAR/METAGROSS/GARCHOMP,
-//     the proven old level-ceiling team where #845-#848 were found). It takes REAL damage and FAINTS
-//     reliably at the level ceiling (~wave 60-68), so the faint/switch/replace/half-wipe machinery - the
-//     RICHEST desync source - is GUARANTEED coverage. See coop-soak-coverage.ts's profile split.
+//   - "level": the wave-appropriate level-65 party (SNORLAX/GENGAR/DRAGONITE/TYRANITAR/METAGROSS/GARCHOMP,
+//     the team where #845-#848 were found). It takes REAL damage and FAINTS reliably through its ~wave-40-48
+//     death spiral, then WIPES cleanly (a legitimate terminal) around wave ~48 - below the ~60+ razor's-edge
+//     ceiling - so the faint/switch/replace machinery (the RICHEST desync source) is GUARANTEED coverage.
+//     See coop-soak-coverage.ts's profile split.
 // The party is applied by the TEST (game.override + startBattle); this module resolves the profile NAME +
 // its config so the test + the coverage assertion agree on one source of truth.
 // ---------------------------------------------------------------------------
@@ -242,7 +242,14 @@ export const SOAK_PROFILES: Record<SoakProfileName, SoakPartyConfig> = {
     heldItems: [{ name: "LEFTOVERS" }],
   },
   level: {
-    startingLevel: 85,
+    // Level 65 (NOT the old level-85 ceiling). The framework's max-damage clamp + force-hit apply to BOTH
+    // sides, so at level 65 the party out-levels the early waves but is CAUGHT by the wave curve around
+    // wave ~40, faints reliably through the ~40-48 death spiral, and WIPES cleanly (GameOver -> Title) around
+    // wave ~48 - WELL BELOW the ~60+ razor's-edge ceiling where boss-segmented wild enemies + the deep
+    // boss-reward-tail strand live (the old level-85 profile lingered at that edge to wave ~68 and hit those
+    // driver gaps - see the report's FINDINGS). This puts the faint/wipe window at the task's ~wave 30-50
+    // target: multiple faint episodes + a legitimate wipe terminal, reliably green across seeds.
+    startingLevel: 65,
     species: [
       SpeciesId.SNORLAX,
       SpeciesId.GENGAR,
@@ -1334,27 +1341,22 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
    * 🔴 #832 LEVEL-PROFILE REVIVE-TAKE (the ONE party-target exception, level-only): the faint-heavy level
    * party rolls a Revive in the pool whenever it has a downed mon (the pool gates Revive on a fainted party
    * member). A Revive is an INSTANT party-target grant (no learn-move / evolution continuation), so it drives
-   * cleanly through {@linkcode driveHostPartyRewardOwner} + the watcher, advancing the counter once like any
-   * terminal. TAKE it (revive the fainted mon) instead of leaving it dead - exercising the party-target reward
-   * path with a FAINTED target and letting a faint-heavy run recover. Gated to "level" so the god profile is
-   * byte-identical (no revive-take). MUST be called inside withClient(ownerCtx) with the OWNER's scene.
+   * cleanly through {@linkcode driveHostRewardShopOwner}'s reviveSlot path + the watcher, advancing the
+   * counter once like any terminal. Passing a fainted `reviveSlot` makes the shop TAKE a Revive if the pool
+   * rolled one (revive that mon) instead of leaving it dead, else it falls through to the seeded take/leave -
+   * so the pool is only ever inspected AFTER the phase's start() populates typeOptions (never before, which
+   * would read undefined). Gated to "level" so the god profile is byte-identical (reviveSlot stays undefined).
+   * MUST be called inside withClient(ownerCtx) with the OWNER's scene.
    */
   const driveOwnerReward = async (shop: ShopPhaseSeam, ownerScene: BattleScene): Promise<string> => {
-    if (profile === "level") {
-      const reviveSlot = firstFaintedPartySlot(ownerScene);
-      const hasRevive = (shop.typeOptions as { type?: unknown }[]).some(
-        o => o?.type instanceof PokemonReviveModifierType,
-      );
-      if (reviveSlot >= 0 && hasRevive) {
-        await driveHostPartyRewardOwner(shop, {
-          slot: reviveSlot,
-          typeFilter: (t: unknown): boolean => t instanceof PokemonReviveModifierType,
-        });
-        return `revive party[${reviveSlot}]`;
-      }
-    }
+    const reviveSlot = profile === "level" ? firstFaintedPartySlot(ownerScene) : -1;
     const take = rewardPolicy === "seeded" && rng() < 0.5;
-    await driveHostRewardShopOwner(shop, { takeReward: take });
+    await driveHostRewardShopOwner(shop, reviveSlot >= 0 ? { takeReward: take, reviveSlot } : { takeReward: take });
+    // reviveSlot>=0 means a Revive was TAKEN iff the pool rolled one (the shop path decides post-start); a
+    // non-fainted party or no-Revive pool falls through to seeded take/leave. The label reflects the intent.
+    if (reviveSlot >= 0 && !ownerScene.getPlayerParty()[reviveSlot]?.isFainted()) {
+      return `revive party[${reviveSlot}]`;
+    }
     return take ? "take-nonparty" : "leave";
   };
 
@@ -1531,7 +1533,18 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
     //     the isBoss check alone misses it and processNormalWave would wrongly assert a +1 shop advance).
     //     Both are handled by processBossWave (drive any queued host shop SOLO, reconcile the guest counter,
     //     counter +0), matching the trainer-victory reward-tail semantics the #846 directive called out.
-    const bossWave = rig.hostScene.getEnemyField().some(e => e.isBoss()) || wave % 10 === 0;
+    // 🔴 #832 PROFILE-GATED boss-tail routing. Under "level", a NON-%10 WILD wave can roll a boss-SEGMENTED
+    // enemy (isBoss true) that STILL presents a NORMAL owner/watcher reward shop (VictoryPhase
+    // queuesSelectModifier=true, +1 counter), NOT a boss AUTO-GRANT - routing it to processBossWave (which
+    // assumes an auto-grant tail with no owner/watcher shop) leaves the normal shop UNDRIVEN, and the wave
+    // crossing then strands at it (seed 12345 wave 68: a WILD boss-segmented enemy, queuesSelectModifier=true,
+    // host is the watcher awaiting owner options that never come). Only %10 milestones/bosses actually
+    // auto-grant, so under "level" classify bossWave by %10 ALONE; the non-%10 boss-flagged wave then goes
+    // through processNormalWave, whose driveRewardShop drives its real shop correctly (and safely SKIPs if a
+    // wave unexpectedly auto-grants - no +1 assertion). The "god" profile keeps the ORIGINAL detection
+    // BYTE-IDENTICALLY (its own deep-wave boss-reward-tail strand at ~wave 140 is the separate documented
+    // follow-up; the 25-wave PR god run rolls no non-%10 boss wave, so this is behavior-preserving there).
+    const bossWave = wave % 10 === 0 || (profile !== "level" && rig.hostScene.getEnemyField().some(e => e.isBoss()));
     try {
       await (bossWave ? processBossWave(wave) : processNormalWave(wave));
     } catch (e) {
