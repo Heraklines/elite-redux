@@ -159,6 +159,52 @@ describe("co-op live-cursor mirror (#633)", () => {
     watcher.dispose();
   });
 
+  it("a throwing applyButton (watcher render error) is swallowed - the session stays ALIVE (#852)", async () => {
+    // Live P0 #852: a UI render error while replaying a relayed cursor button (a reader touching
+    // an unbuilt object) escaped as an uncaught TypeError and KILLED the guest client. The mirror is
+    // COSMETIC, so a replay error must never kill the session: the drain swallows it (coopWarn) and
+    // keeps draining.
+    //
+    // FAILS-BEFORE is proven DETERMINISTICALLY here by draining SYNCHRONOUSLY: buttons that arrive
+    // BEFORE the watcher opens are buffered, then `beginSession("watcher")` adopts + drains them in
+    // the SAME synchronous call (coop-ui-mirror beginSession -> drain). So without the try/catch the
+    // throw escapes beginSession SYNCHRONOUSLY (this test throws); with it, beginSession returns
+    // cleanly. (The transport path delivers via queueMicrotask, which would only surface the escape
+    // as an async unhandled rejection - too weak to assert on.)
+    const { host, guest } = createLoopbackPair();
+    const watcher = new CoopUiMirror(guest);
+    const applied: number[] = [];
+    let throwOnButton = 80; // throw when replaying exactly this button
+    const throwingEngine: CoopUiMirrorEngine = {
+      getMode: () => MODE,
+      applyButton(button: number) {
+        if (button === throwOnButton) {
+          throwOnButton = -1;
+          throw new TypeError("Cannot read properties of undefined (reading 'displayHeight')");
+        }
+        applied.push(button);
+      },
+    };
+    watcher.attach(throwingEngine);
+
+    // Pre-buffer two buttons (arrive before the watcher session opens -> `early`). n=0 will THROW.
+    host.send({ t: "uiInput", seq: SEQ, n: 0, button: 80, mode: MODE });
+    host.send({ t: "uiInput", seq: SEQ, n: 1, button: 81, mode: MODE });
+    await flush();
+    expect(applied).toEqual([]); // nothing applied yet - watcher not open
+
+    // beginSession drains the buffered buttons SYNCHRONOUSLY. Without the fix, n=0's throw escapes
+    // right here and kills the client; with it, beginSession returns normally.
+    expect(() => watcher.beginSession("watcher", MODE, SEQ)).not.toThrow();
+
+    // The session survived the render error: it stayed bound + the loop kept draining, so the NEXT
+    // button (n=1) still applied. The choice-commit (not this cosmetic stream) remains authoritative.
+    expect(applied).toEqual([81]);
+    expect(watcher.isActive(MODE)).toBe(true);
+
+    watcher.dispose();
+  });
+
   it("the OWNER never replays into its own engine (it only sends)", async () => {
     const { host, guest } = createLoopbackPair();
     const owner = new CoopUiMirror(host);

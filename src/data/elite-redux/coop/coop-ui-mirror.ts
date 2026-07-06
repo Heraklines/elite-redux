@@ -24,7 +24,7 @@
 // other co-op relays.
 // =============================================================================
 
-import { coopLog, isCoopDebug } from "#data/elite-redux/coop/coop-debug";
+import { coopLog, coopWarn, isCoopDebug } from "#data/elite-redux/coop/coop-debug";
 import type { CoopMessage, CoopTransport } from "#data/elite-redux/coop/coop-transport";
 
 /** The live-engine surface the watcher needs, injected so the module stays unit-testable. */
@@ -197,7 +197,20 @@ export class CoopUiMirror {
         if (isCoopDebug()) {
           coopLog("interaction", `uiMirror WATCHER apply n=${s.n - 1} button=${next.button} mode=${next.mode}`);
         }
-        engine.applyButton(next.button);
+        // DEFENSE-IN-DEPTH (#852): the mirror is COSMETIC (see the module header) - the
+        // authoritative outcome is the choice-commit. A render/handler error while replaying a
+        // relayed cursor button (e.g. a UI reader touching an unbuilt object) must NEVER kill the
+        // watcher client: swallow it LOUDLY and keep the session alive. The screen continues with a
+        // degraded (frozen-cursor) mirror; the choice-commit + anti-hang machinery heal the rest.
+        try {
+          engine.applyButton(next.button);
+        } catch (e) {
+          coopWarn(
+            "interaction",
+            `uiMirror WATCHER applyButton threw (handled, session kept alive) n=${s.n - 1} button=${next.button} mode=${next.mode}`,
+            e,
+          );
+        }
       } else if (isCoopDebug()) {
         // Cosmetic drift drop (harmless; the choice-commit heals the screen) - still log it.
         coopLog(
