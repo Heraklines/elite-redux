@@ -102,6 +102,12 @@ import {
 } from "#data/elite-redux/er-relic-battle-state";
 import type { ReplayCommandEvent, ReplayTrace } from "#data/elite-redux/replay-trace";
 import { isReplayCommandEvent, isReplayInteractionEvent, validateReplayTrace } from "#data/elite-redux/replay-trace";
+import {
+  beginShowdownBattle,
+  getShowdownOpponentManifest,
+  getShowdownOwnManifest,
+} from "#data/elite-redux/showdown/showdown-battle-state";
+import { ShowdownCommandRelay } from "#data/elite-redux/showdown/showdown-command-relay";
 import { Terrain, TerrainType } from "#data/terrain";
 import { Weather } from "#data/weather";
 import { BattleType } from "#enums/battle-type";
@@ -113,6 +119,7 @@ import type { MysteryEncounterType } from "#enums/mystery-encounter-type";
 import { UiMode } from "#enums/ui-mode";
 import { WeatherType } from "#enums/weather-type";
 import { EnemyPokemon, PlayerPokemon, type Pokemon } from "#field/pokemon";
+import { type PersistentModifier, PokemonHeldItemModifier } from "#modifiers/modifier";
 import type { ModifierOverride } from "#modifiers/modifier-type";
 import { PokemonModifierType, PokemonReviveModifierType } from "#modifiers/modifier-type";
 import { MysteryEncounter } from "#mystery-encounters/mystery-encounter";
@@ -2120,4 +2127,134 @@ export async function replayCoopTrace(
 /** Build a fresh guest-side SelectModifierPhase for the watcher (under withClientSync, globalScene=guest). */
 function buildGuestShopPhase(): Phase {
   return globalScene.phaseManager.create("SelectModifierPhase");
+}
+
+// =============================================================================
+// SHOWDOWN 1v1 VERSUS RIG (C6v2d). A VERSUS-shaped two-engine rig - deliberately NOT the co-op
+// buildDuo shape: NO merged party, NO coopOwner field tags, NO interaction-alternation. The HOST
+// is a real engine whose OWN team is the PLAYER side and whose ENEMY side is the OPPONENT manifest
+// built as a TRAINER (the C3 bootstrap, already live before this is called). The GUEST is a pure
+// renderer booted from the host's battle (the same mirror the co-op guest uses), whose OWN team is
+// the authoritative ENEMY side. The guest's per-turn command rides the ShowdownCommandRelay (the
+// enemy-command seam), NOT CoopBattleSync. Both runtimes are pinned to the "versus" session kind so
+// isVersusSession()/isAuthoritativeBattleSession()/isShowdownGuestFlip() are all live.
+// =============================================================================
+
+/** The versus two-engine rig: both runtimes over one loopback pair, plus the enemy-command relays. */
+export interface ShowdownDuoRig {
+  hostScene: BattleScene;
+  guestScene: BattleScene;
+  hostRuntime: CoopRuntime;
+  guestRuntime: CoopRuntime;
+  hostCtx: ClientCtx;
+  guestCtx: ClientCtx;
+  pair: { host: CoopTransport; guest: CoopTransport };
+  /** The HOST's relay: its EnemyCommandPhase awaits the guest's command here (getShowdownRelay reads it). */
+  hostRelay: ShowdownCommandRelay;
+  /** The GUEST's peer relay: the test installs a responder / ships commands for the guest's own team. */
+  guestPeer: ShowdownCommandRelay;
+}
+
+/**
+ * Stand up the VERSUS two-engine rig over ONE {@linkcode createLoopbackPair}. The HOST GameManager
+ * MUST already be in a live SHOWDOWN battle (the C3 bootstrap: gameMode SHOWDOWN, opponent manifest
+ * fielded as a TRAINER enemy party, {@linkcode beginShowdownBattle} stashed). This assembles both
+ * runtimes pinned to the "versus" kind, builds the guest {@linkcode BattleScene}, mirrors the host's
+ * battle onto it (the guest's own team = the authoritative ENEMY side), creates the enemy-command
+ * relays and RE-stashes {@linkcode beginShowdownBattle} with the HOST relay (so the host's
+ * EnemyCommandPhase awaits it), then connects + drains the handshake.
+ *
+ * Deliberately does NOT tag `coopOwner` on the field (no merged party in versus) and does NOT wire a
+ * CoopBattleSync command answer (the guest commands its OWN team via the ShowdownCommandRelay).
+ */
+export async function buildShowdownDuo(
+  hostGame: GameManager,
+  pair: { host: CoopTransport; guest: CoopTransport },
+  setCoopRuntimeFn: (r: CoopRuntime) => void,
+  toShowdownGameMode: (scene: BattleScene) => void,
+): Promise<ShowdownDuoRig> {
+  const hostScene = hostGame.scene;
+  neutralizeCoopCandyBar(hostScene);
+  const hostRuntime = assembleCoopRuntime(pair.host, {
+    username: "Host",
+    netcodeMode: "authoritative",
+    kind: "versus",
+  });
+  const guestRuntime = assembleCoopRuntime(pair.guest, {
+    username: "Guest",
+    netcodeMode: "authoritative",
+    kind: "versus",
+  });
+  hostRuntime.controller.role = "host";
+  guestRuntime.controller.role = "guest";
+
+  // The host is already a showdown engine (idempotent flip). NO coopOwner tags - versus has no merged party.
+  toShowdownGameMode(hostScene);
+
+  // CLONE the host's ENEMY held-item modifiers (the manifest items - LEFTOVERS etc.) NOW, while
+  // globalScene is still the host (buildGuestScene below steals it). The co-op mirror only rebuilds
+  // PLAYER-wide modifiers; showdown enemies carry per-mon held items the checksum hashes (the on-field
+  // `heldItems` digest), so the guest must carry them or wave-start parity fails. In production the guest
+  // gets these off the enemy-party stream; here we clone the live modifier objects (each `.clone()`
+  // preserves pokemonId + stackCount, and the guest enemy keeps the host id via the PokemonData round-trip).
+  const clonedEnemyHeldItems: PersistentModifier[] = hostScene
+    .findModifiers(m => m instanceof PokemonHeldItemModifier, false)
+    .map(m => m.clone());
+
+  const hostCtx: ClientCtx = {
+    label: "host",
+    scene: hostScene,
+    runtime: hostRuntime,
+    rndState: Phaser.Math.RND.state(),
+    ghost: snapshotGhostState(),
+    moduleLets: snapshotModuleLets(),
+    mePins: { ...IDLE_ME_PINS },
+  };
+
+  // The 2nd real BattleScene (steals globalScene; withClient re-points it per pump).
+  const guestScene = buildGuestScene(hostGame);
+  const guestCtx: ClientCtx = {
+    label: "guest",
+    scene: guestScene,
+    runtime: guestRuntime,
+    rndState: Phaser.Math.RND.state(),
+    ghost: emptyGhostSnapshot(),
+    moduleLets: snapshotModuleLets(),
+    mePins: { ...IDLE_ME_PINS },
+  };
+  await withClient(guestCtx, () => {
+    toShowdownGameMode(guestScene);
+    // The mirror reconstructs the host's player field + FULL enemy party under the guest. Under the
+    // guest ctx the versus-guest flip is live, so the guest's own team (Enemy instances) constructs at
+    // the flipped BOTTOM position - a render-only concern that does NOT affect the authoritative order
+    // the checksum hashes (proven by the convergence assertions in the duo test).
+    mirrorHostBattleToGuest(hostScene, guestScene);
+    // Attach the cloned enemy held-item modifiers on the guest (the mirror skips them - see the clone
+    // above), so the guest's on-field `heldItems` digest matches the host's at wave start.
+    const guestEnemyModifiers = (guestScene as unknown as { enemyModifiers: PersistentModifier[] }).enemyModifiers;
+    for (const m of clonedEnemyHeldItems) {
+      guestEnemyModifiers.push(m);
+    }
+    guestScene.updateModifiers(false);
+  });
+
+  // The enemy-command relays: the HOST awaits the guest's command; the guest peer answers / ships it.
+  const hostRelay = new ShowdownCommandRelay(pair.host);
+  const guestPeer = new ShowdownCommandRelay(pair.guest);
+  // Re-stash the live match with the HOST relay so the host's EnemyCommandPhase (getShowdownRelay) awaits
+  // the guest's pick. The manifests were stashed by the C3 bootstrap; reuse them verbatim.
+  const own = getShowdownOwnManifest();
+  const opponent = getShowdownOpponentManifest();
+  if (own != null && opponent != null) {
+    beginShowdownBattle(own, opponent, hostRelay);
+  }
+
+  // Connect both controllers over the live loopback (exchange hello / runConfig).
+  setCoopRuntimeFn(hostRuntime);
+  hostRuntime.controller.connect();
+  setCoopRuntimeFn(guestRuntime);
+  guestRuntime.controller.connect();
+  await drainLoopback();
+
+  return { hostScene, guestScene, hostRuntime, guestRuntime, hostCtx, guestCtx, pair, hostRelay, guestPeer };
 }
