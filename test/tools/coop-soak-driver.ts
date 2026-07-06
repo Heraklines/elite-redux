@@ -80,9 +80,12 @@ import type { BattlerIndex } from "#enums/battler-index";
 import { Button } from "#enums/buttons";
 import { Command } from "#enums/command";
 import { GameModes } from "#enums/game-modes";
+import { MoveId } from "#enums/move-id";
+import { SpeciesId } from "#enums/species-id";
 import { UiMode } from "#enums/ui-mode";
 import { WeatherType } from "#enums/weather-type";
 import type { Pokemon } from "#field/pokemon";
+import { type ModifierOverride, PokemonReviveModifierType } from "#modifiers/modifier-type";
 import { getCoopMeHostPresentation } from "#phases/coop-replay-me-phase";
 import { coopMeInteractionStartValue } from "#phases/mystery-encounter-phases";
 import { SelectModifierPhase } from "#phases/select-modifier-phase";
@@ -93,6 +96,7 @@ import {
   type DuoRig,
   driveGuestReplayTurn,
   driveGuestRewardWatch,
+  driveHostPartyRewardOwner,
   driveHostRewardShopOwner,
   remirrorWave,
   type ShopPhaseSeam,
@@ -105,6 +109,7 @@ import {
   type CoopSoakSituation,
   createSoakHitSet,
   type SoakHitSet,
+  type SoakProfileName,
 } from "#test/tools/coop-soak-coverage";
 import type { PartyUiHandler } from "#ui/handlers/party-ui-handler";
 import fs from "node:fs";
@@ -184,6 +189,76 @@ export function announceSoakSeed(seed: number, waves: number): void {
   console.log(
     `[coop-soak] SEED=${seed} WAVES=${waves} - replay this run with:  SOAK_SEED=${seed} SOAK_WAVES=${waves} ER_SCENARIO=1 npx vitest run test/tests/elite-redux/coop/coop-soak.test.ts`,
   );
+}
+
+// ---------------------------------------------------------------------------
+// The soak PARTY PROFILE (#832). SOAK_PROFILE selects which starter party + level edge the test stands up:
+//   - "god" (DEFAULT, unset = byte-identical to today): a level-300 legendary steamroller that reaches the
+//     deep endgame. It faints only OCCASIONALLY, so the FAINT-replacement co-op surfaces are PROBABILISTIC.
+//   - "level": the wave-appropriate level-85 party (SNORLAX/GENGAR/DRAGONITE/TYRANITAR/METAGROSS/GARCHOMP,
+//     the proven old level-ceiling team where #845-#848 were found). It takes REAL damage and FAINTS
+//     reliably at the level ceiling (~wave 60-68), so the faint/switch/replace/half-wipe machinery - the
+//     RICHEST desync source - is GUARANTEED coverage. See coop-soak-coverage.ts's profile split.
+// The party is applied by the TEST (game.override + startBattle); this module resolves the profile NAME +
+// its config so the test + the coverage assertion agree on one source of truth.
+// ---------------------------------------------------------------------------
+
+/** A soak party spec: the overrides + species the test applies for a given SOAK_PROFILE. */
+export interface SoakPartyConfig {
+  /** The fixed starting level for the whole party (the winnability LEVEL EDGE / the fainting ceiling). */
+  startingLevel: number;
+  /**
+   * The six starter species (the driver tags host owns party[0..2], guest owns party[3..5]). A fixed 6-tuple
+   * (mutable so it spreads straight into game.classicMode.startBattle's fixed-arity variadic signature).
+   */
+  species: [SpeciesId, SpeciesId, SpeciesId, SpeciesId, SpeciesId, SpeciesId];
+  /**
+   * The four FORCED damaging moves (a determinism knob, NOT content narrowing): the seeded fixed-slot move
+   * picker needs every slot to deal damage or the wave NO-PARK stalls. Status/proc fidelity is exercised by
+   * the REAL enemy AI's incoming moves, replayed through the checkpoint.
+   */
+  moveset: readonly [MoveId, MoveId, MoveId, MoveId];
+  /**
+   * Starting held items forced on the party, or undefined for none. The god party carries LEFTOVERS for
+   * passive sustain across the long endgame gauntlet; the level party carries NONE (matching the proven
+   * level-ceiling profile) so it faints reliably rather than out-sustaining the wave curve.
+   */
+  heldItems: readonly ModifierOverride[] | undefined;
+}
+
+/** The two soak party profiles (#832). "god" is today's config verbatim (byte-identical when SOAK_PROFILE is unset). */
+export const SOAK_PROFILES: Record<SoakProfileName, SoakPartyConfig> = {
+  god: {
+    startingLevel: 300,
+    species: [
+      SpeciesId.ETERNATUS,
+      SpeciesId.RAYQUAZA,
+      SpeciesId.ARCEUS,
+      SpeciesId.MEWTWO,
+      SpeciesId.KYOGRE,
+      SpeciesId.ZACIAN,
+    ],
+    moveset: [MoveId.BODY_SLAM, MoveId.SHADOW_BALL, MoveId.FLAMETHROWER, MoveId.THUNDERBOLT],
+    heldItems: [{ name: "LEFTOVERS" }],
+  },
+  level: {
+    startingLevel: 85,
+    species: [
+      SpeciesId.SNORLAX,
+      SpeciesId.GENGAR,
+      SpeciesId.DRAGONITE,
+      SpeciesId.TYRANITAR,
+      SpeciesId.METAGROSS,
+      SpeciesId.GARCHOMP,
+    ],
+    moveset: [MoveId.BODY_SLAM, MoveId.SHADOW_BALL, MoveId.FLAMETHROWER, MoveId.THUNDERBOLT],
+    heldItems: undefined,
+  },
+};
+
+/** Resolve the soak party profile from the SOAK_PROFILE env (default "god" = today's behavior). */
+export function resolveSoakProfile(): SoakProfileName {
+  return process.env.SOAK_PROFILE?.trim().toLowerCase() === "level" ? "level" : "god";
 }
 
 // ---------------------------------------------------------------------------
@@ -271,6 +346,12 @@ export interface SoakOptions {
    * for the determinism contract (#842). Undefined for the soak = the framework's own run seed.
    */
   pinSeed?: string;
+  /**
+   * The party PROFILE (#832). Gates the LEVEL-only driver extensions (e.g. TAKE a Revive reward when the
+   * faint-heavy level party has a downed mon, instead of always leaving). Defaults to "god" - byte-identical
+   * to today (no revive-take, no other level-only behavior).
+   */
+  profile?: SoakProfileName;
 }
 
 /** A structured HARD invariant breach (LOCKSTEP / NO-PARK / TEARDOWN) the driver throws after writing the
@@ -492,6 +573,22 @@ export function firstLegalBenchSlot(scene: BattleScene, owner: "host" | "guest")
   for (let i = battlerCount; i < party.length; i++) {
     const mon = party[i];
     if (mon != null && !mon.isFainted() && mon.isAllowedInBattle() && mon.coopOwner === owner) {
+      return i;
+    }
+  }
+  return -1;
+}
+
+/**
+ * First FAINTED party slot (any owner), or -1 if the party is fully alive. #832: the faint-heavy level
+ * profile uses this to pick a Revive reward's target - a Revive is a party-wide item applied to a chosen
+ * slot (both engines apply to the SAME party[slot], so slot OWNERSHIP is irrelevant here, unlike a
+ * field-slot switch/replacement). Used only when a Revive actually rolled in the wave's real reward pool.
+ */
+export function firstFaintedPartySlot(scene: BattleScene): number {
+  const party = scene.getPlayerParty();
+  for (let i = 0; i < party.length; i++) {
+    if (party[i]?.isFainted()) {
       return i;
     }
   }
@@ -814,6 +911,7 @@ function recordTurnSituations(rig: DuoRig, enemyIdsBefore: number[], hits: SoakH
 export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise<SoakResult> {
   const { seed, waves, logs } = opts;
   const rewardPolicy = opts.rewardPolicy ?? "seeded";
+  const profile = opts.profile ?? "god";
   const rng = mulberry32(seed);
   const actionScript: string[] = [];
   const skips: Record<string, number> = {};
@@ -1232,8 +1330,29 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
    * driver (driveGuestTmCaseRegression, for the #698 repro) - not a general one - so TAKING a continuation
    * reward strands the guest on an un-driven sub-phase. Non-party rewards are all instant grants and drive
    * cleanly on both sides. Taking party-target rewards is the report's follow-up item after MEs.
+   *
+   * 🔴 #832 LEVEL-PROFILE REVIVE-TAKE (the ONE party-target exception, level-only): the faint-heavy level
+   * party rolls a Revive in the pool whenever it has a downed mon (the pool gates Revive on a fainted party
+   * member). A Revive is an INSTANT party-target grant (no learn-move / evolution continuation), so it drives
+   * cleanly through {@linkcode driveHostPartyRewardOwner} + the watcher, advancing the counter once like any
+   * terminal. TAKE it (revive the fainted mon) instead of leaving it dead - exercising the party-target reward
+   * path with a FAINTED target and letting a faint-heavy run recover. Gated to "level" so the god profile is
+   * byte-identical (no revive-take). MUST be called inside withClient(ownerCtx) with the OWNER's scene.
    */
-  const driveOwnerReward = async (shop: ShopPhaseSeam): Promise<string> => {
+  const driveOwnerReward = async (shop: ShopPhaseSeam, ownerScene: BattleScene): Promise<string> => {
+    if (profile === "level") {
+      const reviveSlot = firstFaintedPartySlot(ownerScene);
+      const hasRevive = (shop.typeOptions as { type?: unknown }[]).some(
+        o => o?.type instanceof PokemonReviveModifierType,
+      );
+      if (reviveSlot >= 0 && hasRevive) {
+        await driveHostPartyRewardOwner(shop, {
+          slot: reviveSlot,
+          typeFilter: (t: unknown): boolean => t instanceof PokemonReviveModifierType,
+        });
+        return `revive party[${reviveSlot}]`;
+      }
+    }
     const take = rewardPolicy === "seeded" && rng() < 0.5;
     await driveHostRewardShopOwner(shop, { takeReward: take });
     return take ? "take-nonparty" : "leave";
@@ -1261,10 +1380,10 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
 
     let action: string;
     if (hostOwns) {
-      action = await withClient(rig.hostCtx, () => driveOwnerReward(hostShop));
+      action = await withClient(rig.hostCtx, () => driveOwnerReward(hostShop, rig.hostScene));
       await withClient(rig.guestCtx, () => driveGuestRewardWatch(guestShop));
     } else {
-      action = await withClient(rig.guestCtx, () => driveOwnerReward(guestShop));
+      action = await withClient(rig.guestCtx, () => driveOwnerReward(guestShop, rig.guestScene));
       await withClient(rig.hostCtx, () => driveGuestRewardWatch(hostShop));
     }
     actionScript.push(`wave ${wave}: reward shop owner=${hostOwns ? "host" : "guest"} ${action}`);

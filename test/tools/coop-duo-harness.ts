@@ -1271,15 +1271,19 @@ export async function driveGuestTmCaseRegression(
  */
 export async function driveHostPartyRewardOwner(
   hostPhase: ShopPhaseSeam,
-  opts: { slot?: number; option?: number } = {},
+  opts: { slot?: number; option?: number; typeFilter?: (type: unknown) => boolean } = {},
 ): Promise<number> {
   const slot = opts.slot ?? 0;
   const option = opts.option ?? 0;
   hostPhase.start();
   await drainLoopback();
   const pinned = hostPhase.coopInteractionStart;
-  // Find the first PARTY-TARGET reward (the inverse of driveHostRewardShopOwner's non-party filter).
-  const idx = (hostPhase.typeOptions as { type?: unknown }[]).findIndex(o => o?.type instanceof PokemonModifierType);
+  // Find the target PARTY-TARGET reward. By default the FIRST party-target reward (the inverse of
+  // driveHostRewardShopOwner's non-party filter); an optional typeFilter narrows it to a SPECIFIC
+  // party-target modifier (e.g. a Revive, so a faint-heavy soak takes the Revive over an also-present TM
+  // that would strand on a learn-move continuation - #832).
+  const predicate = opts.typeFilter ?? ((t: unknown): boolean => t instanceof PokemonModifierType);
+  const idx = (hostPhase.typeOptions as { type?: unknown }[]).findIndex(o => predicate(o?.type));
   if (idx < 0) {
     throw new Error("driveHostPartyRewardOwner: no party-target reward in the forced shop options");
   }

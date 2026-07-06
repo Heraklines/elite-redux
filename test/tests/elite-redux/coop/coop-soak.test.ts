@@ -24,13 +24,18 @@
 import { initGlobalScene } from "#app/global-scene";
 import { setCoopFaintSwitchWaitMs, setCoopWaveBarrierMs } from "#data/elite-redux/coop/coop-interaction-relay";
 import { clearCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
-import { MoveId } from "#enums/move-id";
-import { SpeciesId } from "#enums/species-id";
 import { Move } from "#moves/move";
 import { GameManager } from "#test/framework/game-manager";
 import { installDuoLogCapture } from "#test/tools/coop-duo-harness";
 import { assertSoakCompleteness, logSoakCoverage } from "#test/tools/coop-soak-coverage";
-import { announceSoakSeed, resolveSoakSeed, resolveSoakWaves, runCoopSoak } from "#test/tools/coop-soak-driver";
+import {
+  announceSoakSeed,
+  resolveSoakProfile,
+  resolveSoakSeed,
+  resolveSoakWaves,
+  runCoopSoak,
+  SOAK_PROFILES,
+} from "#test/tools/coop-soak-driver";
 import Phaser from "phaser";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, type MockInstance, vi } from "vitest";
 
@@ -60,6 +65,9 @@ describe.skipIf(!RUN)("NIGHTLY co-op SOAK: seeded randomized two-engine run (#84
   let game: GameManager;
   let logs: ReturnType<typeof installDuoLogCapture>;
   let accuracySpy: MockInstance | undefined;
+  // #832 SOAK_PROFILE: "god" (default, byte-identical to today) or "level" (the faint-heavy level-85 party).
+  // Resolved once per test in beforeEach so the override party + the coverage assertion agree on it.
+  let profile: ReturnType<typeof resolveSoakProfile>;
 
   beforeAll(() => {
     phaserGame = new Phaser.Game({ type: Phaser.HEADLESS });
@@ -84,38 +92,31 @@ describe.skipIf(!RUN)("NIGHTLY co-op SOAK: seeded randomized two-engine run (#84
     setCoopFaintSwitchWaitMs(4000);
     game = new GameManager(phaserGame);
     logs = installDuoLogCapture(`soak-${Date.now()}`);
+    // #832 PROFILE-DRIVEN PARTY. The party (level + species + moveset + held items) comes from SOAK_PROFILES
+    // so the override + the coverage assertion share one source of truth. "god" (default / SOAK_PROFILE unset)
+    // is byte-identical to today (the level-300 legendary steamroller reaching the endgame); "level" is the
+    // faint-heavy level-85 party that GUARANTEES the faint/switch/replace channel (#845-#848).
+    profile = resolveSoakProfile();
+    const party = SOAK_PROFILES[profile];
+    // #843 REAL COMBAT: NO enemy overrides. Every wave fights its REAL generated species with its REAL
+    // moveset / held items / ability, and the enemy AI plays real moves - so the guest replays real incoming
+    // damage / status / stat-stages / procs through the per-turn checkpoint (the whole point of the soak).
+    // Winnability (god) / a fainting ceiling (level) comes from the party's LEVEL EDGE, not from fake frail
+    // enemies. The forced 4-move damaging moveset is the explicitly-permitted determinism knob: the seeded
+    // fixed-slot picker needs every slot to deal damage or a wave NO-PARK stalls; status/proc fidelity is
+    // exercised by the REAL enemy AI's incoming moves (replayed through the checkpoint). MYSTERY ENCOUNTERS
+    // stay OFF (V1 COVERAGE GAP #1 - the duo harness drives MEs only from a parked rig, not a mid-run
+    // continuation); the driver records a `mysteryEncounterDisabledV1` skip. Held items are profile-scoped
+    // (god carries LEFTOVERS for endgame sustain; level carries none so it faints reliably).
     game.override
       .battleStyle("double")
       .startingWave(1)
-      // #843 REAL COMBAT: NO enemy overrides. Every wave fights its REAL generated species with its REAL
-      // moveset / held items / ability, and the enemy AI plays real moves - so the guest replays real
-      // incoming damage / status / stat-stages / procs through the per-turn checkpoint (the whole point of
-      // the soak).
-      // 🔴 #849 GOD-TIER LEVEL EDGE (maintainer directive: "we are not stopping until we can fully finish a
-      // run in co-op mode ... just start the run with [god-tier mons] so that we can actually clear the
-      // game and see if there are any problems"). The OLD level-85 party wiped ~wave 69 at the level
-      // ceiling, so the soak never saw waves 70-200 (higher biomes, the rival gauntlet, evil-team
-      // admins/bosses, the multi-bar final boss). A very high starting level is the maintainer's explicit,
-      // chosen method and is COVERAGE-POSITIVE (it REACHES content the soak never saw); it is NOT content
-      // narrowing (enemies are still their REAL selves). Paired with the framework's max-damage clamp +
-      // force-hit, a level-300 legendary party steamrolls the endgame so the run can CLEAR the final boss
-      // and surface LATE-GAME co-op desyncs. Leftovers gives passive sustain across the long gauntlet.
-      .startingLevel(300)
-      .startingHeldItems([{ name: "LEFTOVERS" }])
-      // The player moveset IS overridden - but with FOUR real, varied, single-target DAMAGING moves (not a
-      // narrowing). This is the explicitly-permitted determinism knob: the seeded slot picker
-      // (chosenMoveSlot) fixes ONE slot per wave for BOTH engines, so a status / no-damage slot would make
-      // that whole wave deal zero damage and NO-PARK stall; four coverage damaging moves guarantee every
-      // seeded pick makes progress. Status / stat / proc fidelity is exercised by the REAL enemy AI's
-      // incoming moves (replayed through the checkpoint), which is where that coverage actually matters.
-      .moveset([MoveId.BODY_SLAM, MoveId.SHADOW_BALL, MoveId.FLAMETHROWER, MoveId.THUNDERBOLT])
-      // 🔴 V1 COVERAGE GAP #1 (see the driver header + the task report): MYSTERY ENCOUNTERS are OFF for the
-      // continuous soak. The duo harness drives MEs only from a PARKED buildDuoForMe rig (coop-duo-mystery
-      // helpers), NOT from a mid-run continuation, so a random ME mid-soak cannot yet be driven. This is a
-      // LOUD, skip-counted limitation (the driver records a `mysteryEncounterDisabledV1` skip), NOT a
-      // silent omission; the follow-up plan to drive MEs randomly is in the report. Do NOT treat this as
-      // adequate - it is the single biggest coverage gap.
+      .startingLevel(party.startingLevel)
+      .moveset([...party.moveset])
       .mysteryEncounterChance(0);
+    if (party.heldItems != null) {
+      game.override.startingHeldItems([...party.heldItems]);
+    }
     // TRAINER WAVES ARE ON (#846). The harness mirror (mirrorHostBattleToGuest) is now TRAINER-AWARE: it
     // rebuilds the guest battle with the host's trainer identity + the FULL enemy party (bench included)
     // keyed to the host's authoritative trainerSlot, so a RANDOM (rolled) trainer wave mirrors faithfully
@@ -150,26 +151,16 @@ describe.skipIf(!RUN)("NIGHTLY co-op SOAK: seeded randomized two-engine run (#84
       announceSoakSeed(seed, waves);
 
       const started = Date.now();
-      // #843/#849: a full SIX-mon GOD-TIER party (like real co-op's 3-mon-per-player cap) so a player faint
-      // has a real bench to replace from - the driver tags party[0..2] host-owned, party[3..5] guest-owned
-      // and drives the #786 guest-chooses-its-own-replacement machinery when a guest-owned mon faints.
-      // 🔴 #849 maintainer directive: six OVERPOWERED mons that steamroll the ER endgame so the soak reaches
-      // and CLEARS waves 70-200 (where the late-game co-op desyncs live). The maintainer named Mega Moltres
-      // EX / Primal Cascoon / Eternatus / etc. as the method; PRIMAL CASCOON is the Hell FINAL-BOSS form
-      // (8-slot Angel's Wrath kit) and is boss-only, not fieldable as a player starter, so it is SUBSTITUTED
-      // with the strongest fieldable legendaries (NOTED per the directive - do not block on it). Mega/primal
-      // FORMS are not force-spawned here: they are fragile to force through the headless duo mirror, and a
-      // level-300 base legendary already OHKOs the endgame under the max-damage clamp - so the level edge,
-      // not the form, does the work (form-driving is a follow-up if a mega-evolution EVENT surface is wanted).
-      await game.classicMode.startBattle(
-        SpeciesId.ETERNATUS,
-        SpeciesId.RAYQUAZA,
-        SpeciesId.ARCEUS,
-        SpeciesId.MEWTWO,
-        SpeciesId.KYOGRE,
-        SpeciesId.ZACIAN,
-      );
-      const result = await runCoopSoak(game, { seed, waves, logs });
+      // #832/#843/#849: a full SIX-mon party (like real co-op's 3-mon-per-player cap) so a player faint has a
+      // real bench to replace from - the driver tags party[0..2] host-owned, party[3..5] guest-owned and
+      // drives the #786 guest-chooses-its-own-replacement machinery when a mon faints. The species come from
+      // the resolved SOAK_PROFILE (SOAK_PROFILES): "god" = six overpowered legendaries (ETERNATUS/RAYQUAZA/
+      // ARCEUS/MEWTWO/KYOGRE/ZACIAN) that steamroll the endgame so the soak reaches waves 70-200; "level" =
+      // the proven level-85 team (SNORLAX/GENGAR/DRAGONITE/TYRANITAR/METAGROSS/GARCHOMP) that FAINTS reliably
+      // at the level ceiling so the faint/switch/replace channel is GUARANTEED. Mega/primal FORMS are not
+      // force-spawned (fragile through the headless duo mirror); the level EDGE, not the form, does the work.
+      await game.classicMode.startBattle(...SOAK_PROFILES[profile].species);
+      const result = await runCoopSoak(game, { seed, waves, logs, profile });
       const elapsedMs = Date.now() - started;
 
       // Report coverage + runtime (visible in the CI/console output; the nightly reads skip-counters here).
@@ -233,8 +224,11 @@ describe.skipIf(!RUN)("NIGHTLY co-op SOAK: seeded randomized two-engine run (#84
       // report-only below COMPLETENESS_ASSERT_MIN waves (the 25-wave PR default stays fast + green), full
       // enforcement at or above it (every GUARANTEED surface hit + the anti-silent-drop partition check, so a
       // newly-added mirrored mode / relay kind / seq band auto-reds until it is driven or declared undrivable).
-      logSoakCoverage(result.hits);
-      assertSoakCompleteness(result.hits, { wavesCompleted: result.wavesCompleted, seed });
+      // #832: pass the PROFILE so the assertion uses the right GUARANTEED/PROBABILISTIC split + gate. Under
+      // "level" the faint channel is GUARANTEED (enforced at any depth) and the gate is the level-ceiling
+      // floor (30); under "god" it is unchanged (faint PROBABILISTIC, gate 60).
+      logSoakCoverage(result.hits, profile);
+      assertSoakCompleteness(result.hits, { wavesCompleted: result.wavesCompleted, seed, profile });
       logs.flush();
     },
     SOAK_TEST_TIMEOUT_MS,

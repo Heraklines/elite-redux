@@ -90,6 +90,16 @@ export const COOP_SOAK_SITUATIONS = {
 /** The value union of {@linkcode COOP_SOAK_SITUATIONS}. */
 export type CoopSoakSituation = (typeof COOP_SOAK_SITUATIONS)[keyof typeof COOP_SOAK_SITUATIONS];
 
+/**
+ * The soak PARTY PROFILE (#832). "god" is today's level-300 legendary steamroller that reaches the deep
+ * endgame but faints only occasionally (so the FAINT-replacement surfaces are PROBABILISTIC). "level" is
+ * the wave-appropriate level-85 party that takes REAL damage and FAINTS reliably (the faint channel where
+ * #845-#848 were found) - so under "level" those faint surfaces are PROMOTED to GUARANTEED (see
+ * {@linkcode guaranteedSurfaces} / {@linkcode probabilisticSurfaces}). The driver resolves the active
+ * profile from the SOAK_PROFILE env (default "god"); it is threaded into the coverage report + assertion.
+ */
+export type SoakProfileName = "god" | "level";
+
 // ---------------------------------------------------------------------------
 // The hit-set threaded through the soak run.
 // ---------------------------------------------------------------------------
@@ -509,8 +519,22 @@ export const KNOWN_UNDRIVABLE: ReadonlyMap<string, UndrivableEntry> = new Map<st
 // placed in one of the three auto-reds as "unclassified".
 // ---------------------------------------------------------------------------
 
-/** Surfaces hit by CONSTRUCTION in every run of at least COMPLETENESS_ASSERT_MIN waves. All must be hit. */
-export const GUARANTEED_SURFACES: ReadonlySet<string> = new Set<string>([
+/**
+ * The FAINT-replacement co-op channel: the `switch` relay kind + its `faintSwitch` seq band, and the
+ * singleFaint / doublePlayerFaint battle-flow situations. This is the RICHEST desync surface (#845-#848,
+ * the party-order transposition #836, the heavy-faint cluster #834) and its classification is
+ * PROFILE-DEPENDENT (#832): PROBABILISTIC under "god" (the level-300 party rarely faints), GUARANTEED under
+ * "level" (the level-85 party faints reliably - the profile exists precisely to guarantee this channel).
+ */
+const FAINT_SURFACES: readonly string[] = [
+  sitKey(COOP_SOAK_SITUATIONS.singleFaint),
+  sitKey(COOP_SOAK_SITUATIONS.doublePlayerFaint),
+  kindKey("switch"),
+  bandKey("faintSwitch"),
+];
+
+/** Surfaces hit by CONSTRUCTION in every sufficiently-long run REGARDLESS of profile (the cadence spine). */
+const GUARANTEED_BASE: readonly string[] = [
   // Modes: the headless command path issues these every wave; the reward shop opens every non-boss wave.
   modeKey(UiMode.COMMAND),
   modeKey(UiMode.FIGHT),
@@ -519,7 +543,7 @@ export const GUARANTEED_SURFACES: ReadonlySet<string> = new Set<string>([
   modeKey(UiMode.MODIFIER_SELECT),
   // Kinds: the reward shop take -> "reward", leave -> "skip". (The "switch" kind rides the FAINT-replacement
   // interaction relay, NOT a voluntary switch - a voluntary switch is a battle-COMMAND-relay event on a
-  // separate channel - so it is faint-driven + PROBABILISTIC under the god-tier party, see below.)
+  // separate channel - so it is faint-driven: GUARANTEED under "level", PROBABILISTIC under "god".)
   kindKey("reward"),
   kindKey("skip"),
   // Bands: the reward channel.
@@ -528,7 +552,26 @@ export const GUARANTEED_SURFACES: ReadonlySet<string> = new Set<string>([
   sitKey(COOP_SOAK_SITUATIONS.wildDouble),
   sitKey(COOP_SOAK_SITUATIONS.trainerFixed),
   sitKey(COOP_SOAK_SITUATIONS.boss),
-]);
+];
+
+/** PROBABILISTIC base: seed/content-dependent surfaces that are probabilistic under EVERY profile. */
+const PROBABILISTIC_BASE: readonly string[] = [
+  sitKey(COOP_SOAK_SITUATIONS.trainerRandom),
+  sitKey(COOP_SOAK_SITUATIONS.weather),
+  sitKey(COOP_SOAK_SITUATIONS.terrain),
+  sitKey(COOP_SOAK_SITUATIONS.enemySwitch),
+];
+
+/**
+ * Surfaces hit by CONSTRUCTION in every run of at least the profile's assert gate. All must be hit.
+ *
+ * PROFILE SPLIT (#832): the base cadence spine is GUARANTEED under every profile. The FAINT channel
+ * ({@linkcode FAINT_SURFACES}) is PROMOTED into GUARANTEED under "level" (the level-85 party faints
+ * reliably - that channel is the profile's whole reason to exist) and stays PROBABILISTIC under "god".
+ */
+export function guaranteedSurfaces(profile: SoakProfileName): ReadonlySet<string> {
+  return profile === "level" ? new Set([...GUARANTEED_BASE, ...FAINT_SURFACES]) : new Set(GUARANTEED_BASE);
+}
 
 /**
  * Surfaces the run hits only SOMETIMES (seed / content dependent). Asserted against the cross-run UNION
@@ -536,25 +579,14 @@ export const GUARANTEED_SURFACES: ReadonlySet<string> = new Set<string>([
  * ledger is mature) a RED for a probabilistic surface gone permanently cold. Before the ledger is mature
  * a miss is a loud WARN, so a fresh checkout is never false-red.
  *
- * 🔴 #849 GOD-PARTY NOTE: the FAINT-replacement surfaces (`switch` kind + `faintSwitch` band + the
- * singleFaint / doublePlayerFaint situations) were GUARANTEED under the old level-85 party (which fainted
- * every few waves - that is where #845-#848 were found). The god-tier party deliberately AVOIDS wipes to
- * reach the endgame, so it faints only OCCASIONALLY (a max-damage boss hit in the deep gauntlet), making
- * these PROBABILISTIC: the cross-run ledger union covers them (a run that DOES faint records the whole
- * faint-replacement channel). If the endgame turns out to faint the god party reliably, PROMOTE these back
- * to GUARANTEED. The FAINT-PATH co-op machinery is important desync surface, so a run that never faints is
- * itself a coverage note in the report (the faint path went unexercised that run).
+ * 🔴 #832 PROFILE SPLIT: under "god" the FAINT-replacement surfaces ({@linkcode FAINT_SURFACES}) are
+ * PROBABILISTIC (the level-300 party deliberately AVOIDS wipes to reach the endgame, so it faints only
+ * OCCASIONALLY - the cross-run ledger union covers them). Under "level" they are PROMOTED to GUARANTEED
+ * (see {@linkcode guaranteedSurfaces}), so they are NOT in the probabilistic set for that profile.
  */
-export const PROBABILISTIC_SURFACES: ReadonlySet<string> = new Set<string>([
-  sitKey(COOP_SOAK_SITUATIONS.trainerRandom),
-  sitKey(COOP_SOAK_SITUATIONS.weather),
-  sitKey(COOP_SOAK_SITUATIONS.terrain),
-  sitKey(COOP_SOAK_SITUATIONS.enemySwitch),
-  sitKey(COOP_SOAK_SITUATIONS.doublePlayerFaint),
-  sitKey(COOP_SOAK_SITUATIONS.singleFaint),
-  kindKey("switch"),
-  bandKey("faintSwitch"),
-]);
+export function probabilisticSurfaces(profile: SoakProfileName): ReadonlySet<string> {
+  return profile === "level" ? new Set(PROBABILISTIC_BASE) : new Set([...PROBABILISTIC_BASE, ...FAINT_SURFACES]);
+}
 
 // ---------------------------------------------------------------------------
 // Gating + ledger constants.
@@ -570,8 +602,37 @@ export const PROBABILISTIC_SURFACES: ReadonlySet<string> = new Set<string>([
  */
 export const COMPLETENESS_ASSERT_MIN = 60;
 
-/** Where the cross-run PROBABILISTIC union ledger lives. */
+/**
+ * The LEVEL profile's assert gate (#832). The level-85 party wipes at the level ceiling (~wave 68) rather
+ * than reaching the deep endgame, so its full-enforcement gate is DELIBERATELY lower than the god profile's
+ * 60: set to 30, the proven-survivable floor the soak test already asserts a level run must cross (a run
+ * that ends below 30 is a regression, red by the coverage-floor check). At >= 30 waves a level run has
+ * crossed the fixed rival (wave 8), several bosses (10/20/30), and enough real-damage combat to guarantee
+ * the cadence spine AND (by construction of the level party) the faint channel. The faint channel is ALSO
+ * enforced independent of this gate (see {@linkcode assertSoakCompleteness}) - the profile exists to
+ * guarantee it, so a level run that ends without faints is a red at ANY depth.
+ */
+export const COMPLETENESS_ASSERT_MIN_LEVEL = 30;
+
+/** The full-enforcement wave gate for a profile (god: deep-endgame 60; level: level-ceiling floor 30). */
+export function completenessAssertMin(profile: SoakProfileName): number {
+  return profile === "level" ? COMPLETENESS_ASSERT_MIN_LEVEL : COMPLETENESS_ASSERT_MIN;
+}
+
+/** Where the cross-run PROBABILISTIC union ledger lives (the god profile's canonical path). */
 export const COVERAGE_LEDGER_PATH = path.resolve(process.cwd(), "dev-logs", "coop-soak", "coverage-ledger.json");
+
+/**
+ * The PROBABILISTIC union ledger path for a profile. The god profile keeps the canonical
+ * {@linkcode COVERAGE_LEDGER_PATH} (byte-identical to today); the level profile uses a SEPARATE ledger so
+ * its distinct probabilistic set (the faint surfaces are guaranteed, not probabilistic, under "level") is
+ * never mixed into the god union.
+ */
+export function coverageLedgerPath(profile: SoakProfileName): string {
+  return profile === "level"
+    ? path.resolve(process.cwd(), "dev-logs", "coop-soak", "coverage-ledger-level.json")
+    : COVERAGE_LEDGER_PATH;
+}
 
 /** How many recent deep runs the PROBABILISTIC union is taken over. */
 const COMPLETENESS_LEDGER_WINDOW = 7;
@@ -603,11 +664,13 @@ function sorted(keys: Iterable<string>): string[] {
  * are cold, and the LOUD per-surface UNDRIVABLE skip-count list (each with its follow-up task). NEVER
  * silent - every undrivable surface is named. Called for every run (report-only + enforce).
  */
-export function logSoakCoverage(hits: SoakHitSet): void {
+export function logSoakCoverage(hits: SoakHitSet, profile: SoakProfileName = "god"): void {
   const hit = hitSurfaces(hits);
   const expected = expectedSurfaces();
+  const guaranteed = guaranteedSurfaces(profile);
+  const probabilistic = probabilisticSurfaces(profile);
 
-  log("[coop-soak-coverage] ===== CO-OP SOAK COMPLETENESS REPORT =====");
+  log(`[coop-soak-coverage] ===== CO-OP SOAK COMPLETENESS REPORT (profile=${profile}) =====`);
   log(
     `[coop-soak-coverage] HIT modes=[${sorted(hit)
       .filter(k => k.startsWith("mode:"))
@@ -619,20 +682,18 @@ export function logSoakCoverage(hits: SoakHitSet): void {
   log(`[coop-soak-coverage] HIT situations=[${sorted(hits.situations).join(", ")}]`);
 
   // GUARANTEED status.
-  const guaranteedCold = sorted(GUARANTEED_SURFACES).filter(s => !hit.has(s));
-  const guaranteedHit = sorted(GUARANTEED_SURFACES).filter(s => hit.has(s));
-  log(
-    `[coop-soak-coverage] GUARANTEED hit ${guaranteedHit.length}/${GUARANTEED_SURFACES.size}: [${guaranteedHit.join(", ")}]`,
-  );
+  const guaranteedCold = sorted(guaranteed).filter(s => !hit.has(s));
+  const guaranteedHit = sorted(guaranteed).filter(s => hit.has(s));
+  log(`[coop-soak-coverage] GUARANTEED hit ${guaranteedHit.length}/${guaranteed.size}: [${guaranteedHit.join(", ")}]`);
   if (guaranteedCold.length > 0) {
     log(`[coop-soak-coverage] 🔴 GUARANTEED COLD (regression if enforcing): [${guaranteedCold.join(", ")}]`);
   }
 
   // PROBABILISTIC status (this run).
-  const probHit = sorted(PROBABILISTIC_SURFACES).filter(s => hit.has(s));
-  const probCold = sorted(PROBABILISTIC_SURFACES).filter(s => !hit.has(s));
+  const probHit = sorted(probabilistic).filter(s => hit.has(s));
+  const probCold = sorted(probabilistic).filter(s => !hit.has(s));
   log(
-    `[coop-soak-coverage] PROBABILISTIC hit this run ${probHit.length}/${PROBABILISTIC_SURFACES.size}: [${probHit.join(", ")}]`,
+    `[coop-soak-coverage] PROBABILISTIC hit this run ${probHit.length}/${probabilistic.size}: [${probHit.join(", ")}]`,
   );
   if (probCold.length > 0) {
     log(`[coop-soak-coverage] PROBABILISTIC cold this run (ledger union covers across runs): [${probCold.join(", ")}]`);
@@ -648,7 +709,7 @@ export function logSoakCoverage(hits: SoakHitSet): void {
 
   // Any EXPECTED surface not in any of the three buckets (the anti-silent-drop signal).
   const unclassified = sorted(expected).filter(
-    s => !KNOWN_UNDRIVABLE.has(s) && !GUARANTEED_SURFACES.has(s) && !PROBABILISTIC_SURFACES.has(s),
+    s => !KNOWN_UNDRIVABLE.has(s) && !guaranteed.has(s) && !probabilistic.has(s),
   );
   if (unclassified.length > 0) {
     log(
@@ -699,7 +760,13 @@ export interface SoakCompletenessOptions {
   wavesCompleted: number;
   /** The run seed (named in every RED so a cold surface is replayable). */
   seed: number;
-  /** Where the cross-run PROBABILISTIC union ledger lives. Defaults to COVERAGE_LEDGER_PATH. */
+  /**
+   * The party PROFILE (#832). Selects the GUARANTEED/PROBABILISTIC split (the faint channel is GUARANTEED
+   * under "level"), the enforcement wave gate (level: 30, god: 60), the ledger path, and the ALWAYS-ON
+   * level faint-channel check. Defaults to "god" (today's behavior).
+   */
+  profile?: SoakProfileName;
+  /** Where the cross-run PROBABILISTIC union ledger lives. Defaults to the profile's ledger path. */
   ledgerPath?: string;
 }
 
@@ -713,33 +780,59 @@ export interface SoakCompletenessOptions {
  *   3. Every PROBABILISTIC surface is covered by the cross-run UNION ledger (a hard RED once the ledger is
  *      mature, a loud WARN before that).
  *
- * GATING: the full enforcement runs only when wavesCompleted >= COMPLETENESS_ASSERT_MIN. Below that it is
- * REPORT-ONLY (logSoakCoverage handles the human-readable report; this asserts nothing). A run that ends
- * via a runEnded terminal at >= the gate STILL enforces (the guaranteed cadence surfaces were all hit by
- * that depth). Throws an Error on a RED (the vitest test fails with the exact cold surfaces + seed).
+ * GATING: the full enforcement runs only when wavesCompleted >= the PROFILE's gate (god: 60; level: 30).
+ * Below that it is REPORT-ONLY (logSoakCoverage handles the human-readable report; this asserts nothing).
+ * A run that ends via a runEnded terminal at >= the gate STILL enforces (the guaranteed cadence surfaces
+ * were all hit by that depth). Throws an Error on a RED (the vitest test fails with the exact cold surfaces
+ * + seed).
+ *
+ * 🔴 #832 LEVEL-PROFILE FAINT CHANNEL: under "level" the faint surfaces are the profile's whole reason to
+ * exist, so they are enforced at ANY depth (BEFORE the gate check) - a level run that ends without them is
+ * a RED even if it stopped short of the full gate.
  */
 export function assertSoakCompleteness(hits: SoakHitSet, opts: SoakCompletenessOptions): void {
-  const ledgerPath = opts.ledgerPath ?? COVERAGE_LEDGER_PATH;
+  const profile = opts.profile ?? "god";
+  const guaranteed = guaranteedSurfaces(profile);
+  const probabilistic = probabilisticSurfaces(profile);
+  const gate = completenessAssertMin(profile);
+  const ledgerPath = opts.ledgerPath ?? coverageLedgerPath(profile);
   const hit = hitSurfaces(hits);
   const expected = expectedSurfaces();
 
+  // 🔴 #832 LEVEL FAINT CHANNEL (always-on, gate-independent): the level party is BUILT to faint reliably,
+  // so the faint/switch/replace machinery (#845-#848 - the richest desync surface) MUST have been exercised.
+  // Enforce it before the depth gate so even a level run that ended shy of the full gate still reds if the
+  // faint channel went cold. NEVER made green by narrowing - a level run with no faints is a real regression.
+  if (profile === "level") {
+    const faintCold = sorted(FAINT_SURFACES).filter(s => expected.has(s) && !hit.has(s));
+    if (faintCold.length > 0) {
+      throw new Error(
+        `[coop-soak-coverage] COMPLETENESS BACKSTOP FAILED (profile=level, seed ${opts.seed}, ${opts.wavesCompleted} waves):\n`
+          + `  - LEVEL FAINT CHANNEL COLD: the level party is built to FAINT reliably, but ${faintCold.length} `
+          + "faint surface(s) went unexercised - the profile's whole point is to GUARANTEE the faint/switch/"
+          + `replace machinery (#845-#848). RED, not a narrowing (replay SOAK_SEED=${opts.seed} SOAK_PROFILE=level): `
+          + `[${faintCold.join(", ")}]`,
+      );
+    }
+  }
+
   // Below the gate: report-only. Do NOT touch the ledger (keep the union window to DEEP runs only).
-  if (opts.wavesCompleted < COMPLETENESS_ASSERT_MIN) {
+  if (opts.wavesCompleted < gate) {
     log(
-      `[coop-soak-coverage] REPORT-ONLY (surveyed ${opts.wavesCompleted} < ${COMPLETENESS_ASSERT_MIN} waves): coverage logged, nothing enforced.`,
+      `[coop-soak-coverage] REPORT-ONLY (profile=${profile}, surveyed ${opts.wavesCompleted} < ${gate} waves): coverage logged, nothing enforced.`,
     );
     return;
   }
 
   log(
-    `[coop-soak-coverage] ENFORCING (surveyed ${opts.wavesCompleted} >= ${COMPLETENESS_ASSERT_MIN} waves, seed ${opts.seed}).`,
+    `[coop-soak-coverage] ENFORCING (profile=${profile}, surveyed ${opts.wavesCompleted} >= ${gate} waves, seed ${opts.seed}).`,
   );
 
   const reds: string[] = [];
 
   // (1) PARTITION / anti-silent-drop: every EXPECTED surface must be classified.
   const unclassified = sorted(expected).filter(
-    s => !KNOWN_UNDRIVABLE.has(s) && !GUARANTEED_SURFACES.has(s) && !PROBABILISTIC_SURFACES.has(s),
+    s => !KNOWN_UNDRIVABLE.has(s) && !guaranteed.has(s) && !probabilistic.has(s),
   );
   if (unclassified.length > 0) {
     reds.push(
@@ -749,9 +842,9 @@ export function assertSoakCompleteness(hits: SoakHitSet, opts: SoakCompletenessO
     );
   }
   // A classification key that names a surface NOT in EXPECTED is stale (a registry entry was removed) - warn.
-  const staleClassified = sorted(
-    new Set([...GUARANTEED_SURFACES, ...PROBABILISTIC_SURFACES, ...KNOWN_UNDRIVABLE.keys()]),
-  ).filter(s => !expected.has(s));
+  const staleClassified = sorted(new Set([...guaranteed, ...probabilistic, ...KNOWN_UNDRIVABLE.keys()])).filter(
+    s => !expected.has(s),
+  );
   if (staleClassified.length > 0) {
     log(
       `[coop-soak-coverage] ⚠ STALE classification keys (no longer in any registry - prune): [${staleClassified.join(", ")}]`,
@@ -759,7 +852,7 @@ export function assertSoakCompleteness(hits: SoakHitSet, opts: SoakCompletenessO
   }
 
   // (2) GUARANTEED: every one must be hit.
-  const guaranteedCold = sorted(GUARANTEED_SURFACES).filter(s => expected.has(s) && !hit.has(s));
+  const guaranteedCold = sorted(guaranteed).filter(s => expected.has(s) && !hit.has(s));
   if (guaranteedCold.length > 0) {
     reds.push(
       `GUARANTEED COLD: ${guaranteedCold.length} surface(s) that MUST be hit in a ${opts.wavesCompleted}-wave `
@@ -781,7 +874,7 @@ export function assertSoakCompleteness(hits: SoakHitSet, opts: SoakCompletenessO
       union.add(s);
     }
   }
-  const probCold = sorted(PROBABILISTIC_SURFACES).filter(s => expected.has(s) && !union.has(s));
+  const probCold = sorted(probabilistic).filter(s => expected.has(s) && !union.has(s));
   if (probCold.length > 0) {
     if (window.length >= COMPLETENESS_LEDGER_MATURE) {
       reds.push(
