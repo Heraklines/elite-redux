@@ -62,6 +62,7 @@ import {
   captureCoopChecksumState,
   captureCoopFieldSnapshot,
   captureCoopSaveDataDigest,
+  captureCoopSaveDataNormalized,
 } from "#data/elite-redux/coop/coop-battle-engine";
 import {
   clearCoopRuntime,
@@ -266,6 +267,25 @@ export const SOAK_PROFILES: Record<SoakProfileName, SoakPartyConfig> = {
 /** Resolve the soak party profile from the SOAK_PROFILE env (default "god" = today's behavior). */
 export function resolveSoakProfile(): SoakProfileName {
   return process.env.SOAK_PROFILE?.trim().toLowerCase() === "level" ? "level" : "god";
+}
+
+/**
+ * Resolve the soak party STARTING LEVEL: env SOAK_LEVEL (a positive integer) overrides the resolved
+ * profile's fixed {@linkcode SoakPartyConfig.startingLevel}, or `undefined` when unset (the profile default
+ * stands). A diagnosis knob (#846): the level profile's fixed level-65 edge can be re-pointed to a deeper
+ * config (e.g. SOAK_LEVEL=55) to reproduce a level-config-specific digest divergence, without editing the
+ * profile table. Never a content change - it only shifts the winnability/fainting edge, exactly like the
+ * profile's own startingLevel.
+ */
+export function resolveSoakLevel(): number | undefined {
+  const env = process.env.SOAK_LEVEL;
+  if (env != null && env.trim() !== "") {
+    const n = Number(env);
+    if (Number.isFinite(n) && n > 0) {
+      return Math.floor(n);
+    }
+  }
+  return;
 }
 
 // ---------------------------------------------------------------------------
@@ -1079,9 +1099,33 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
       }
     }
     const fields = diffFields.join(",");
-    const sample = diffFields
+    let sample = diffFields
       .map(k => `${k}: host=${JSON.stringify(hostState[k])} guest=${JSON.stringify(guestState[k])}`)
       .join(" | ");
+    // #846 SAVE-DATA SUB-DIGEST BREAKDOWN (permanent diagnosability): the `saveDataDigest` checksum field is
+    // an OPAQUE 64-bit hash, so a divergence there names no substrate. When it is among the diverging fields,
+    // dump BOTH clients' NORMALIZED getSessionSaveData() and diff it KEY-BY-KEY, so the finding names the exact
+    // save-data section that drifted (money-streak / ward-stone / a modifier arg / a bench-mon field) instead
+    // of just "the digest differs". Cheap (already computed for the digest) and printed once per finding.
+    if (diffFields.includes("saveDataDigest")) {
+      const hostSave = await withClient(rig.hostCtx, () => JSON.parse(JSON.stringify(captureCoopSaveDataNormalized())));
+      const guestSave = await withClient(rig.guestCtx, () =>
+        JSON.parse(JSON.stringify(captureCoopSaveDataNormalized())),
+      );
+      const saveKeys = new Set<string>([...Object.keys(hostSave), ...Object.keys(guestSave)]);
+      const saveDiff = [...saveKeys]
+        .filter(k => JSON.stringify(hostSave[k]) !== JSON.stringify(guestSave[k]))
+        .map(k => `${k}: host=${JSON.stringify(hostSave[k])} guest=${JSON.stringify(guestSave[k])}`);
+      const saveSummary =
+        saveDiff.length > 0
+          ? `saveDataDigest SUB-DIFF keys=[${[...saveKeys]
+              .filter(k => JSON.stringify(hostSave[k]) !== JSON.stringify(guestSave[k]))
+              .join(",")}] :: ${saveDiff.join(" | ")}`
+          : "saveDataDigest diverged but NO normalized key differs (a NON-normalized substrate or a stripped-key edge - widen captureCoopSaveDataNormalized)";
+      sample = `${sample} || ${saveSummary}`;
+      // eslint-disable-next-line no-console
+      console.log(`[coop-soak] SAVE-DATA SUB-DIFF wave ${wave} @${where} (seed ${seed}): ${saveSummary}`);
+    }
     // eslint-disable-next-line no-console
     console.log(
       `[coop-soak] FINDING wave ${wave} @${where} (seed ${seed}): unhealed DIGEST divergence [${fields}] - ${sample}`,

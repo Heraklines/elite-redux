@@ -30,6 +30,7 @@ import { installDuoLogCapture } from "#test/tools/coop-duo-harness";
 import { assertSoakCompleteness, logSoakCoverage } from "#test/tools/coop-soak-coverage";
 import {
   announceSoakSeed,
+  resolveSoakLevel,
   resolveSoakProfile,
   resolveSoakSeed,
   resolveSoakWaves,
@@ -98,6 +99,9 @@ describe.skipIf(!RUN)("NIGHTLY co-op SOAK: seeded randomized two-engine run (#84
     // faint-heavy level-65 party that GUARANTEES the single-faint/switch/replace channel (#845-#848).
     profile = resolveSoakProfile();
     const party = SOAK_PROFILES[profile];
+    // #846 diagnosis knob: SOAK_LEVEL overrides the profile's fixed starting level (repro a level-config
+    // -specific digest divergence at a deeper edge, e.g. SOAK_LEVEL=55). Unset = the profile default stands.
+    const startingLevel = resolveSoakLevel() ?? party.startingLevel;
     // #843 REAL COMBAT: NO enemy overrides. Every wave fights its REAL generated species with its REAL
     // moveset / held items / ability, and the enemy AI plays real moves - so the guest replays real incoming
     // damage / status / stat-stages / procs through the per-turn checkpoint (the whole point of the soak).
@@ -111,7 +115,7 @@ describe.skipIf(!RUN)("NIGHTLY co-op SOAK: seeded randomized two-engine run (#84
     game.override
       .battleStyle("double")
       .startingWave(1)
-      .startingLevel(party.startingLevel)
+      .startingLevel(startingLevel)
       .moveset([...party.moveset])
       .mysteryEncounterChance(0);
     if (party.heldItems != null) {

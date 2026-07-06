@@ -1595,6 +1595,17 @@ const COOP_SAVEDATA_DIGEST_EXCLUDED_KEYS: ReadonlySet<string> = new Set<string>(
   "score",
   "playerFaints",
   "erUsedTrainerKeys",
+  // WAVE-CROSSING TRANSIENT (#846). During the host-ahead window of a wave crossing the HOST advances
+  // `currentBattle.waveIndex` (post-victory transition) while the pure-renderer guest is still finalizing
+  // the just-played wave, so the two read the digest ONE wave apart. The base FIELD checksum already
+  // EXCLUDES `waveIndex` for exactly this reason (a genuine wave desync is caught by the field/party hash,
+  // which would then differ - here it MATCHED, so this is only the transient skew). `erRelicBattleState`
+  // is coupled to the same skew (its `wave` field IS `currentBattle.waveIndex`); it stays HASHED but is
+  // NORMALIZED below to its wave-independent `lists` so the transient wave number drops out while a real
+  // relic-list divergence is still detected. Repro: SOAK_PROFILE=level SOAK_LEVEL=55 SOAK_SEED=12345
+  // diverged the digest at wave 52 on `waveIndex` + `erRelicBattleState.wave` ALONE (host 53 vs guest 52),
+  // with every other checksum field matching.
+  "waveIndex",
 ]);
 
 /**
@@ -1734,6 +1745,23 @@ function normalizeCoopModifierBlobs(partyIndexById: Map<number, number>): Record
 }
 
 /**
+ * Normalize the session save's `erRelicBattleState` (#846) to its wave-INDEPENDENT `lists` only. The raw
+ * value is `{ wave, lists }` where `wave` IS `currentBattle.waveIndex` (er-relic-battle-state.ts) - a
+ * wave-crossing transient that legitimately differs by one between the host (already advanced) and the
+ * pure-renderer guest (still finalizing the prior wave), manufacturing a FALSE digest desync exactly like
+ * the excluded raw `waveIndex`. Dropping `wave` and hashing only the per-battle relic `lists` keeps a REAL
+ * relic-list divergence (Cursed Idol / Pharaoh's Ankh ordinals) detectable while removing the transient.
+ * Tolerant of an absent/malformed field (older save / no relics).
+ */
+function normalizeCoopErRelicBattleState(value: unknown): Record<string, unknown> {
+  if (value == null || typeof value !== "object") {
+    return { lists: {} };
+  }
+  const lists = (value as { lists?: unknown }).lists;
+  return { lists: lists != null && typeof lists === "object" ? lists : {} };
+}
+
+/**
  * Build the NORMALIZED co-op save-data view (#837): the projection of `getSessionSaveData()` two
  * healthy clients agree on. DERIVED from the serializer so a new substrate is auto-covered; the
  * {@linkcode COOP_SAVEDATA_DIGEST_EXCLUDED_KEYS} denylist (each entry commented) strips the fields that
@@ -1756,6 +1784,11 @@ export function captureCoopSaveDataNormalized(): Record<string, unknown> {
     }
     if (key === "erMapState") {
       out[key] = normalizeCoopErMapState(value);
+      continue;
+    }
+    // #846: drop the wave-crossing-transient `wave` field, keep the sync-relevant relic `lists`.
+    if (key === "erRelicBattleState") {
+      out[key] = normalizeCoopErRelicBattleState(value);
       continue;
     }
     // ER mon-keyed substrates (#839): both key a per-client `Pokemon.id` (erMoneyStreaks `[id, streak]`,
@@ -1981,9 +2014,10 @@ export function captureCoopFullSnapshot(): CoopFullBattleSnapshot | null {
       // `modifiers` digest above can only fix a stack / remove an extra, never re-create one with args.
       // Captured UNCONDITIONALLY (additive); only READ inside the gated authoritative heal.
       playerModifiers: captureCoopPlayerModifiers(),
-      // Ball inventory (#633 RISKY #4): carried in the resync so the gated guest heal restores the
-      // host-only AttemptCapturePhase decrement the pure-renderer guest never applied.
-      pokeballCounts: readPokeballCounts(),
+      // Ball inventory is intentionally NOT carried in the resync snapshot (#843): the crossing/resync
+      // ball SET raced the reward-shop ADD (guest drifted ABOVE host). Balls converge ONLY through the
+      // end-of-turn authoritative state ({@linkcode captureCoopAuthoritativeBattleState}); the optional
+      // wire field stays for back-compat but the apply no longer reads it.
       // Full per-mon PokemonData for the WHOLE party (#633 B4): the resync now carries bench-mon
       // level / exp / form / friendship / moveset (+ a host off-field evolution's species) so the
       // revive-in-shop desync heals - the on-field-only `field` + speciesId-only `party` cannot.
@@ -3334,22 +3368,17 @@ export function applyCoopFullSnapshot(
       coopWarn("heal", `money host=${snapshot.money} guest=${globalScene.money} -> applied`);
     }
     globalScene.money = snapshot.money;
-    // Ball-inventory heal (#633 RISKY #4): the host decrements the ball count host-only in
-    // AttemptCapturePhase (which the pure-renderer guest never runs), so the guest's inventory drifts
-    // up; force the host's authoritative counts. Gated authoritative (solo / host / lockstep skip it -
-    // lockstep both decrement on their own AttemptCapturePhase, so the vector already matches).
-    if (authoritativeGuest && snapshot.pokeballCounts !== undefined) {
-      for (const [type, count] of snapshot.pokeballCounts) {
-        if (typeof type === "number" && typeof count === "number") {
-          const want = Math.max(0, Math.trunc(count));
-          const guestCount = globalScene.pokeballCounts[type];
-          if (guestCount !== want) {
-            coopWarn("heal", `pokeballCounts ballType=${type} host=${want} guest=${guestCount} -> applied`);
-          }
-          globalScene.pokeballCounts[type] = want;
-        }
-      }
-    }
+    // Ball inventory is NOT healed here (#843). The host decrements the ball count host-only in
+    // AttemptCapturePhase (the pure-renderer guest never runs it) and grants ball rewards through the
+    // reward shop; the guest converges to the host's count via the END-OF-TURN authoritative state
+    // ({@linkcode applyCoopAuthoritativeBattleState}, applied every finalize BEFORE the checksum verify),
+    // NOT via this resync/crossing snapshot. Healing balls HERE raced the reward-shop ADD: a resync fired
+    // by an UNRELATED field mismatch (e.g. a bench transposition) re-SET the ball count from the host's
+    // snapshot around a between-wave ball grant, so the SET and the ADD stacked wrongly and the guest's
+    // count drifted ABOVE the host's (soak seed 20260706 @wave 106: guest GREAT_BALL 15 vs host 10). Since
+    // the per-turn authoritative SET already reconciles balls at every turn boundary before the checksum is
+    // read (so a ball drift can never even TRIGGER a resync), carrying them ONLY there loses no coverage
+    // while removing the racing SET. See coop-held-item-sync.test.ts (#4).
     // Reconcile player-wide persistent modifiers (#698 / #633 GAP 2 + BUG 2): the FULL-blob reconcile
     // (add missing / remove extra / fix stacks) heals a host-only player-wide modifier the guest is
     // MISSING (a temp stat booster, an EXP charm, ...) - the root divergence the stack-only path could

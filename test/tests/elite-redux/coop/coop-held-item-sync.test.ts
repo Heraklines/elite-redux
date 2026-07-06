@@ -30,6 +30,7 @@ import { modifierTypes } from "#data/data-lists";
 import { type CoopChecksumState, checksumState } from "#data/elite-redux/coop/coop-battle-checksum";
 import {
   applyCoopFullSnapshot,
+  captureCoopAuthoritativeBattleState,
   captureCoopChecksum,
   captureCoopChecksumState,
   captureCoopFullSnapshot,
@@ -336,20 +337,34 @@ describe.skipIf(!RUN)("co-op held-item + ball heal - real engine (#698, RISKY #1
     expect(heldOf(b.id)).toEqual([]);
   });
 
-  it("(#4) a ball-count drift heals to the host's authoritative count", async () => {
+  it("(#4) the resync snapshot does NOT touch balls; the END-OF-TURN authoritative state carries them (#843)", async () => {
     await startCoopDouble();
     const hostCount = globalScene.pokeballCounts[0];
+    // The authoritative-turn state is the SOLE ball carrier; the resync snapshot must not race it.
+    const authoritative = captureCoopAuthoritativeBattleState(globalScene.currentBattle?.turn ?? 0);
     const snapshot = captureCoopFullSnapshot();
+    expect(authoritative).not.toBeNull();
     expect(snapshot).not.toBeNull();
+    // The authoritative state carries the ball inventory (the end-of-turn SET); the resync snapshot does not.
+    expect(authoritative?.pokeballCounts).toContainEqual([0, hostCount]);
+    expect(snapshot?.pokeballCounts).toBeUndefined();
 
     // GUEST drift: the pure-renderer never ran AttemptCapturePhase, so its count is higher.
     globalScene.pokeballCounts[0] = hostCount + 1;
+    // The drift IS still detectable in the checksum (balls stay hashed) so a real desync surfaces.
     expect(captureCoopChecksumState().pokeballCounts).toContainEqual([0, hostCount + 1]);
 
+    // 🔴 THE FIX (#843): the resync/crossing snapshot MUST NOT re-SET balls. Healing them here raced the
+    // reward-shop ADD (a resync fired by an unrelated field re-SET the count around a between-wave ball
+    // grant), drifting the guest ABOVE the host (soak seed 20260706 @wave 106). So the drift is left
+    // untouched by the full-snapshot heal - balls converge only via the authoritative state below.
     if (snapshot != null) {
       applyCoopFullSnapshot(snapshot, true);
     }
-    expect(globalScene.pokeballCounts[0]).toBe(hostCount);
+    expect(globalScene.pokeballCounts[0], "resync snapshot leaves balls untouched (no racing SET)").toBe(hostCount + 1);
+    // The heal path itself (the authoritative-state SET reconciling the guest back to the host's count) is
+    // exercised end-to-end across two real engines in coop-duo-pokeball-reward.test.ts + the soak; here the
+    // pure-core guarantee is that the resync snapshot no longer carries or re-SETs the ball inventory.
   });
 
   it("(gate) authoritativeGuest=false leaves held items + ball counts UNCHANGED (solo/host/lockstep)", async () => {

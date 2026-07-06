@@ -523,4 +523,26 @@ describe.skipIf(!RUN)("#837 co-op full-save-data checksum digest + heal", () => 
       "restored the copied moveset",
     ).toEqual(copiedMoves);
   }, 300_000);
+  it("NO FALSE DESYNC (#846): a WAVE-CROSSING transient (host-ahead waveIndex / relic wave) does NOT move the digest, but a relic-LISTS change does", async () => {
+    await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
+    const startWave = globalScene.currentBattle.waveIndex;
+
+    // Baseline digest at the current wave (fresh relic state, empty lists).
+    const d0 = captureCoopSaveDataDigest();
+
+    // Simulate the HOST-AHEAD wave-crossing window (#846): the host advanced its waveIndex (post-victory)
+    // while the pure-renderer guest is a wave behind. `waveIndex` is excluded and `erRelicBattleState.wave`
+    // (which IS the waveIndex) is normalized out, so this transient must NOT move the digest - the exact
+    // FALSE desync the level soak hit at wave 52 (host 53 vs guest 52).
+    globalScene.currentBattle.waveIndex = startWave + 1;
+    restoreErRelicBattleState({ wave: startWave + 1, lists: {} });
+    const d1 = captureCoopSaveDataDigest();
+    expect(d1, "the host-ahead waveIndex / relic-wave skew leaves the digest UNCHANGED").toBe(d0);
+
+    // DETECTION preserved: a real per-battle relic LISTS divergence still moves the digest (the sync-relevant
+    // part is kept; only the wave-coupled transient is dropped).
+    restoreErRelicBattleState({ wave: startWave + 1, lists: { cursedIdol: [7] } });
+    const d2 = captureCoopSaveDataDigest();
+    expect(d2, "a real relic-lists change still moves the digest (detection preserved)").not.toBe(d1);
+  }, 300_000);
 });
