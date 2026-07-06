@@ -1918,6 +1918,47 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
   },
   {
+    label: "(note) Co-op: reciprocal pacing barriers + no counter drift (#839/#837)",
+    description:
+      "CO-OP fix - verify with TWO clients (not a solo battle). Two related pacing/sync fixes:\n"
+      + "\n"
+      + "(1) RECIPROCAL BARRIERS (#839): the co-op advancement guards used to be one-directional - a slow\n"
+      + "watcher waited for the owner, but the FASTER player (incl. the interaction owner) could race\n"
+      + "arbitrarily ahead. Two live manifestations: (a) the reward-pick owner finished the fight + entered\n"
+      + "the NEXT fight while the partner was still finishing the PREVIOUS fight's animations; (b) a player\n"
+      + "reached its next move-choice while the partner's faint-replacement was not yet on the field - if the\n"
+      + "partner had already started a move it LOCKED the other player (the wave-12 'sync issue', seed\n"
+      + "xxAV2DTz2dWXK9Nzl0EGTONH). Fixed with an explicit two-sided RENDEZVOUS at two sync points: the reward\n"
+      + "PICK does not commit until BOTH reached the shop (shop:<wave>:<counter>), and the next CommandPhase\n"
+      + "UI does not open until BOTH are at the command point with their mons on the field (cmd:<wave>:<turn>).\n"
+      + "A dead/stuck partner can't strand the run - each barrier proceeds after a generous timeout with a\n"
+      + "LOUD 'RENDEZVOUS TIMEOUT' warning instead of hanging.\n"
+      + "\n"
+      + "(2) NO COUNTER DRIFT (#837): applying a continuation shop item (TM / Ability Capsule / Learner's\n"
+      + "Shroom) no longer bumps the shared interaction counter on the APPLIER only ('after browsing the\n"
+      + "market i suddenly cannot choose a move', seed lCSO1cfpilUUG07bQvwnROJJ wave 11). The back-out shop\n"
+      + "copy now stays pinned to the same interaction, and an unpinned advance is refused.\n"
+      + "\n"
+      + "DO (2 clients): play several waves. Have the reward-pick owner rush ahead (finish the fight fast)\n"
+      + "while the partner lingers; use a continuation item (a TM/Capsule) in the shop; faint a mon and pick a\n"
+      + "replacement while the partner is mid-turn. EXPECT: neither client ever locks the other out of picking\n"
+      + "a move; the reward pick waits for both at the shop; the interaction stays in step (no 'partner lock'\n"
+      + "wedging the next battle). Duo-tested headlessly in coop-duo-pacing-barriers.test.ts,\n"
+      + "coop-duo-interaction-counter.test.ts, and the coop-rendezvous.test.ts primitive suite.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({ STARTING_WAVE_OVERRIDE: 1, STARTING_LEVEL_OVERRIDE: 50 });
+      return [
+        makeStarter(SpeciesId.SNORLAX, {
+          moveset: [MoveId.BODY_SLAM, MoveId.CRUNCH, MoveId.EARTHQUAKE, MoveId.REST],
+        }),
+        makeStarter(SpeciesId.GENGAR, {
+          moveset: [MoveId.SHADOW_BALL, MoveId.SLUDGE_BOMB, MoveId.THUNDERBOLT, MoveId.DAZZLING_GLEAM],
+        }),
+      ];
+    },
+  },
+  {
     label: "QoL: reward-shop long-desc auto-scroll (#557)",
     description:
       "#557 - long ER item descriptions auto-scroll in the REWARD screen instead of\n"

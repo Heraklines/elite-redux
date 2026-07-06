@@ -43,6 +43,7 @@ import {
   captureCoopExpDeltas,
 } from "#data/elite-redux/coop/coop-battle-engine";
 import { setCoopFaintSwitchWaitMs, setCoopWaveBarrierMs } from "#data/elite-redux/coop/coop-interaction-relay";
+import { setCoopRendezvousWaitMs } from "#data/elite-redux/coop/coop-rendezvous";
 import { clearCoopRuntime, setCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
 import { COOP_HOST_FIELD_INDEX } from "#data/elite-redux/coop/coop-session";
 import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
@@ -93,6 +94,10 @@ describe.skipIf(!RUN)(
       accuracySpy = vi.spyOn(Move.prototype, "calculateBattleAccuracy").mockReturnValue(-1);
       setCoopFaintSwitchWaitMs(4000);
       setCoopWaveBarrierMs(50);
+      // #839 next-command barrier: the harness drives the host's turn then replays on the guest (never
+      // concurrent command points), so the host's barrier never sees the guest's arrival - fast-pass it
+      // via the anti-hang timeout instead of the 60s live default (same pattern as the wave barrier).
+      setCoopRendezvousWaitMs(50);
       setCoopHarnessLiveEvents(true);
       game = new GameManager(phaserGame);
       logs = installDuoLogCapture(`party-transposition-${Date.now()}`);
@@ -110,6 +115,7 @@ describe.skipIf(!RUN)(
     afterEach(() => {
       setCoopFaintSwitchWaitMs(60_000);
       setCoopWaveBarrierMs(60_000);
+      setCoopRendezvousWaitMs(60_000);
       setCoopHarnessLiveEvents(false);
       accuracySpy?.mockRestore();
       accuracySpy = undefined;

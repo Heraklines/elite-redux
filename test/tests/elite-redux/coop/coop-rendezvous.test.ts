@@ -13,6 +13,7 @@
 import { setCoopDebug } from "#data/elite-redux/coop/coop-debug";
 import { CoopRendezvous } from "#data/elite-redux/coop/coop-rendezvous";
 import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
+import { wrapCoopFaultPair } from "#test/tools/coop-fault-transport";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 /** Flush the loopback's queued microtask deliveries. */
@@ -153,6 +154,30 @@ describe("co-op reciprocal rendezvous primitive (#839)", () => {
     expect(timeoutWarn, "the timeout emits a LOUD 'RENDEZVOUS TIMEOUT' WARN the soak can assert on").toBeTruthy();
 
     host.dispose();
+  });
+
+  it("FAULT-INJECTION: the arrival is DROPPED on the wire -> both sides time out with the LOUD WARN", async () => {
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    // Wrap the loopback so EVERY rendezvous arrival is dropped (a partner whose arrival never lands).
+    const faulted = wrapCoopFaultPair(
+      createLoopbackPair(),
+      { drop: 1, reorder: 0, delay: 0, faultable: msg => msg.t === "rendezvous" },
+      { seed: 839 },
+    );
+    const host = new CoopRendezvous(faulted.host, { timeoutMs: 40 });
+    const guest = new CoopRendezvous(faulted.guest, { timeoutMs: 40 });
+
+    const [hr, gr] = await Promise.all([host.rendezvous("cmd:7:1"), guest.rendezvous("cmd:7:1")]);
+
+    expect(hr.timedOut, "host barrier timed out (partner arrival dropped)").toBe(true);
+    expect(gr.timedOut, "guest barrier timed out (partner arrival dropped)").toBe(true);
+    expect(faulted.faultsInjected(), "the fault transport actually dropped the arrivals").toBeGreaterThan(0);
+    const warns = warnSpy.mock.calls.filter(c => String(c[0]).includes("RENDEZVOUS TIMEOUT"));
+    expect(warns.length, "both sides emitted the soak-assertable 'RENDEZVOUS TIMEOUT' WARN").toBeGreaterThanOrEqual(2);
+
+    host.dispose();
+    guest.dispose();
+    faulted.host.close();
   });
 
   it("independent points do not interfere (a barrier at one point never satisfies another)", async () => {

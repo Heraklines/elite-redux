@@ -8,12 +8,14 @@ import {
   type CoopInteractionChoice,
 } from "#data/elite-redux/coop/coop-interaction-relay";
 import { coopGiveMonToPartner } from "#data/elite-redux/coop/coop-party-ops";
+import { getCoopRendezvousWaitMs } from "#data/elite-redux/coop/coop-rendezvous";
 import { reconstructRewardOptions, serializeRewardOptions } from "#data/elite-redux/coop/coop-reward-options";
 import {
   coopMeInProgress,
   getCoopController,
   getCoopInteractionRelay,
   getCoopNetcodeMode,
+  getCoopRendezvous,
   getCoopRuntime,
   getCoopUiMirror,
 } from "#data/elite-redux/coop/coop-runtime";
@@ -381,21 +383,19 @@ export class SelectModifierPhase extends BattlePhase {
       if (!coopIsWatcher && !spoofed) {
         this.coopSendRewardOptions();
       }
+      // #839 shop-pick-commit barrier: BOTH clients ARRIVE at the shop the instant they reach it. The
+      // owner is allowed to walk all the way TO the shop, but must not COMMIT a pick until the partner
+      // has ALSO reached it (the reciprocal guard the reward-shop asymmetry lacked: the owner could
+      // finish the fight + enter the NEXT fight while the partner was still finishing the previous one).
+      this.coopShopArrive();
       if (spoofed || ownsThisShop) {
         coopLog(
           "reward",
           `OWNER drives reward screen (start=${this.coopInteractionStart} role=${coopController.role} spoof=${spoofed} adoptsOptions=${coopIsWatcher} wave=${globalScene.currentBattle?.waveIndex})`,
         );
-        if (coopIsWatcher) {
-          // #828 guest pick-owner on a guest-owned ME: it does NOT roll (the HOST is the sole ME
-          // engine + streamed the pool), so ADOPT the host's streamed options first, THEN open the
-          // interactive owner screen + relay the pick exactly like a normal owner.
-          void this.startCoopOwnerAdoptOptions(modifierSelectCallback);
-          return;
-        }
-        this.resetModifierSelect(modifierSelectCallback);
-        // Co-op (#633): relay our cursor so the partner's screen mirrors it live.
-        this.coopBeginMirror("owner");
+        // The OWNER WAITS at the barrier until the partner reaches the shop, THEN opens the pickable
+        // screen (a dead partner resolves the wait via the anti-hang timeout so the owner never hangs).
+        void this.coopOpenOwnerShopAfterBarrier(modifierSelectCallback, coopIsWatcher, spoofed);
       } else {
         coopLog(
           "reward",
@@ -1206,6 +1206,81 @@ export class SelectModifierPhase extends BattlePhase {
     // awaited broadcast now always arrives promptly - the original harness failures predated
     // that symmetry. The v1 barrier (EncounterPhase defers the party sync) stays as backstop.
     globalScene.phaseManager.unshiftNew("CoopPartnerSyncPhase");
+  }
+
+  /**
+   * Co-op (#839): the shop-pick-commit rendezvous point for THIS interaction, or null when there is no
+   * pinned counter / wave. Both clients compute it identically from the wave + the PINNED interaction
+   * counter (never the live counter), so a mid-interaction reconcile can't move it.
+   */
+  private coopShopPoint(): string | null {
+    const wave = globalScene.currentBattle?.waveIndex ?? -1;
+    if (this.coopInteractionStart < 0 || wave < 0) {
+      return null;
+    }
+    return `shop:${wave}:${this.coopInteractionStart}`;
+  }
+
+  /**
+   * Co-op (#839): signal (idempotently) that THIS client has REACHED the shop. Sent by BOTH the owner
+   * and the watcher on entry, so the owner's barrier unblocks the moment the partner arrives. Hard
+   * no-op outside a live co-op run / in the hotseat-spoof path (no real partner to rendezvous with).
+   */
+  private coopShopArrive(): void {
+    if (!globalScene.gameMode.isCoop || getCoopRuntime()?.spoof != null) {
+      return;
+    }
+    const point = this.coopShopPoint();
+    const rendezvous = getCoopRendezvous();
+    if (point != null && rendezvous != null) {
+      rendezvous.arrive(point);
+    }
+  }
+
+  /**
+   * Co-op (#839): the OWNER waits at the shop-pick-commit barrier until the partner has ALSO reached the
+   * shop, THEN opens the pickable screen. A dead/stuck partner resolves the wait via the anti-hang
+   * timeout (LOUD WARN) so the owner never hangs. Never throws - a barrier failure still opens the screen.
+   */
+  private async coopOpenOwnerShopAfterBarrier(
+    modifierSelectCallback: ModifierSelectCallback,
+    coopIsWatcher: boolean,
+    spoofed: boolean,
+  ): Promise<void> {
+    await this.coopAwaitShopBarrier(spoofed);
+    if (coopIsWatcher) {
+      // #828 guest pick-owner on a guest-owned ME: it does NOT roll (the HOST is the sole ME engine +
+      // streamed the pool), so ADOPT the host's streamed options first, THEN open the owner screen.
+      await this.startCoopOwnerAdoptOptions(modifierSelectCallback);
+      return;
+    }
+    this.resetModifierSelect(modifierSelectCallback);
+    // Co-op (#633): relay our cursor so the partner's screen mirrors it live.
+    this.coopBeginMirror("owner");
+  }
+
+  /** Co-op (#839): block until the partner reaches the shop (or the anti-hang timeout fires). */
+  private async coopAwaitShopBarrier(spoofed: boolean): Promise<void> {
+    try {
+      if (spoofed) {
+        return; // hotseat: no real partner to wait for
+      }
+      const rendezvous = getCoopRendezvous();
+      const point = this.coopShopPoint();
+      if (rendezvous == null || point == null) {
+        return;
+      }
+      coopLog("rendezvous", `shop-pick-commit barrier AWAIT ${point}`);
+      const result = await rendezvous.awaitPartner(point, getCoopRendezvousWaitMs());
+      if (result.timedOut) {
+        coopWarn(
+          "rendezvous",
+          `shop-pick-commit barrier ${point} TIMED OUT - partner never reached the shop; opening pick screen anyway (anti-hang)`,
+        );
+      }
+    } catch (e) {
+      coopWarn("rendezvous", "shop-pick-commit barrier threw (handled, opening screen)", e);
+    }
   }
 
   /** OWNER: stash the current reward/shop selection so it is relayed once the party

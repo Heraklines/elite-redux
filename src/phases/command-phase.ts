@@ -5,19 +5,22 @@ import { TrappedTag } from "#data/battler-tags";
 import { getDailyEventSeedBoss } from "#data/daily-seed/daily-run";
 import { isDailyFinalBoss } from "#data/daily-seed/daily-seed-utils";
 import { captureCoopEnemies } from "#data/elite-redux/coop/coop-battle-engine";
-import { coopLog } from "#data/elite-redux/coop/coop-debug";
+import { coopLog, coopWarn } from "#data/elite-redux/coop/coop-debug";
 import { adoptCoopEnemiesStructural } from "#data/elite-redux/coop/coop-enemy-builder";
 import {
   applyWiredPartnerCommand,
   type ResolvedPartnerCommand,
   resolvePartnerCommand,
 } from "#data/elite-redux/coop/coop-partner-ai";
+import { getCoopRendezvousWaitMs } from "#data/elite-redux/coop/coop-rendezvous";
 import {
   coopOwnerOfPlayerFieldSlot,
   getCoopBattleStreamer,
   getCoopBattleSync,
   getCoopController,
   getCoopNetcodeMode,
+  getCoopRendezvous,
+  getCoopRuntime,
   recordCoopOwnSlotCommand,
   recordCoopPartnerSlotCommand,
 } from "#data/elite-redux/coop/coop-runtime";
@@ -409,6 +412,18 @@ export class CommandPhase extends FieldPhase {
       return;
     }
 
+    // Co-op (#839, next-command-open reciprocal barrier): we reached OUR OWN slot's command point with
+    // our mon materialized on the field. Do NOT open the command UI until the PARTNER has ALSO reached
+    // the same command point (both at command, both mons on field) - the missing reciprocal guard for
+    // the faint-replacement lock (the wave-12 "sync issue": one player reaches its next move-choice
+    // while the partner's replacement is not yet out / it already started a move, permanently locking
+    // the other). A dead/stuck partner cannot strand us: the barrier resolves after a generous timeout
+    // with a LOUD WARN and we PROCEED (the existing partner-command AI fallback then unwedges the turn).
+    void this.coopNextCommandBarrier().then(() => this.openOwnCommandUi());
+  }
+
+  /** Open THIS client's own-slot command UI (FIGHT for a skip-to-fight ME, else the COMMAND menu). */
+  private openOwnCommandUi(): void {
     if (
       globalScene.currentBattle.isBattleMysteryEncounter()
       && globalScene.currentBattle.mysteryEncounter?.skipToFightInput
@@ -417,6 +432,50 @@ export class CommandPhase extends FieldPhase {
       globalScene.ui.setMode(UiMode.FIGHT, this.fieldIndex);
     } else {
       globalScene.ui.setMode(UiMode.COMMAND, this.fieldIndex);
+    }
+  }
+
+  /**
+   * Co-op (#839): the RECIPROCAL next-command rendezvous. Resolves once BOTH clients have reached this
+   * wave+turn's command point (each arrives when it opens its OWN materialized slot's command). A no-op
+   * (resolves immediately) outside a live co-op run, in the hotseat/spoof path (no real partner), or
+   * when there is no rendezvous - so solo / lockstep / dev is byte-identical. Never throws: a barrier
+   * failure resolves so the command UI still opens.
+   */
+  private async coopNextCommandBarrier(): Promise<void> {
+    try {
+      if (!globalScene.gameMode.isCoop || getCoopRuntime()?.spoof != null) {
+        return;
+      }
+      const rendezvous = getCoopRendezvous();
+      if (rendezvous == null) {
+        return;
+      }
+      const point = `cmd:${globalScene.currentBattle.waveIndex}:${globalScene.currentBattle.turn}`;
+      // Asymmetric-field guard (#828 class): a partner whose HALF IS WIPED never reaches an own-slot
+      // command point, so awaiting them would eat the full timeout EVERY TURN for the rest of the run.
+      // If the partner owns no battle-legal mon, arrive (so any pending partner-side wait resolves) but
+      // do NOT await - the survivor plays on unthrottled.
+      const controller = getCoopController();
+      const partnerRole = controller?.role === "host" ? "guest" : "host";
+      const partnerHasCommandable = globalScene
+        .getPlayerParty()
+        .some(p => p != null && p.coopOwner === partnerRole && !p.isFainted() && p.isAllowedInBattle());
+      if (!partnerHasCommandable) {
+        coopLog("rendezvous", `next-command barrier ${point} ARRIVE-ONLY (partner half exhausted, no await)`);
+        rendezvous.arrive(point);
+        return;
+      }
+      coopLog("rendezvous", `next-command barrier ARRIVE+AWAIT ${point} slot=${this.fieldIndex}`);
+      const result = await rendezvous.rendezvous(point, getCoopRendezvousWaitMs());
+      if (result.timedOut) {
+        coopWarn(
+          "rendezvous",
+          `next-command barrier ${point} TIMED OUT - partner never reached command; opening UI anyway (anti-hang)`,
+        );
+      }
+    } catch (e) {
+      coopWarn("rendezvous", "next-command barrier threw (handled, opening UI)", e);
     }
   }
 
