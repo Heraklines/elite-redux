@@ -166,7 +166,7 @@ describe("#812: pre-responder commandRequest buffering (the 'wrong move / didn't
     guestSync.setSlotOwnershipProbe(() => true); // the slot is ours - responder is coming
 
     // Host asks while the guest has NO responder yet (mid-replay in production).
-    const reply = hostSync.requestPartnerCommand(1, 3, [1, 2, 3, 4], 5_000);
+    const reply = hostSync.requestPartnerCommand(1, 3, [1, 2, 3, 4]);
     await new Promise(r => setTimeout(r, 10));
 
     // The responder installs late (replay finished) - the buffered request must be answered.
@@ -184,8 +184,124 @@ describe("#812: pre-responder commandRequest buffering (the 'wrong move / didn't
     const guestSync = new CoopBattleSync(guest);
     guestSync.setSlotOwnershipProbe(() => false); // both clients think the slot is the other's
 
-    const res = await hostSync.requestPartnerCommand(0, 1, [1], 5_000);
+    const res = await hostSync.requestPartnerCommand(0, 1, [1]);
     expect(res, "declined -> null -> host AI fallback (deadlock broken)").toBeNull();
+    hostSync.dispose();
+    guestSync.dispose();
+  });
+});
+
+describe("#851: OWNER-keyed relay survives a post-half-wipe field-index skew", () => {
+  // The REAL #851: after a HOST-half-wipe recenter + party compaction (host-only), the surviving
+  // GUEST mon sits at field index 0 on the HOST (compacted) but is still at index 1 on the GUEST
+  // (its checkpoint reconcile lags a beat). In production the guest never installs a responder - the
+  // host's requestPartnerCommand is matched ONLY against the guest's independent broadcastLocalCommand.
+  // With the LEGACY fieldIndex key (`wave:0:turn` vs `wave:1:turn`) the two never match, the request
+  // eats the 20-min timeout, and the AI plays the survivor's move alone (the live long-stall UX). The
+  // owner ("guest") is INVARIANT across that index skew, so keying by owner matches despite the skew.
+
+  it("FAILS-BEFORE model: divergent field indexes with NO owner never match -> the request times out (null)", async () => {
+    const { host, guest } = createLoopbackPair();
+    // Short, self-firing timeout so the never-matching request resolves promptly for the assertion.
+    const hostSync = new CoopBattleSync(host, {
+      timeoutMs: 5,
+      schedule: cb => {
+        const id = setTimeout(cb, 5);
+        return () => clearTimeout(id);
+      },
+    });
+    const guestSync = new CoopBattleSync(guest);
+
+    // HOST awaits the survivor at its COMPACTED index 0; the GUEST broadcasts the SAME mon at its
+    // un-reconciled index 1. No owner is stamped (the pre-fix behavior), so the keys are `wave:0` vs
+    // `wave:1` and never meet. This is the 20-min-stall root cause, reproduced as a prompt timeout.
+    const awaited = hostSync.requestPartnerCommand(0, 7, [0, 1, 2]);
+    guestSync.broadcastLocalCommand(1, 7, { command: Command.FIGHT, cursor: 2, moveId: 777, targets: [2] });
+
+    expect(await awaited, "fieldIndex-keyed relay CANNOT match the skewed indexes -> null (the stall)").toBeNull();
+    hostSync.dispose();
+    guestSync.dispose();
+  });
+
+  it("PASSES-AFTER: stamping the OWNER matches the skewed indexes; EXACTLY ONE command is consumed", async () => {
+    const { host, guest } = createLoopbackPair();
+    const hostSync = new CoopBattleSync(host);
+    const guestSync = new CoopBattleSync(guest);
+
+    // Count the `command` messages the HOST endpoint receives - the guest broadcasts exactly one.
+    let commandsReceived = 0;
+    const off = host.onMessage(msg => {
+      if (msg.t === "command") {
+        commandsReceived++;
+      }
+    });
+
+    // HOST awaits the survivor at COMPACTED index 0, owner "guest"; GUEST broadcasts the SAME mon at
+    // its un-reconciled index 1, owner "guest". Divergent field indexes, IDENTICAL owner -> the owner
+    // key `wave:guest:turn` matches on both sides, so the human's actual pick crosses the wire.
+    const awaited = hostSync.requestPartnerCommand(0, 7, [0, 1, 2], "guest");
+    guestSync.broadcastLocalCommand(1, 7, { command: Command.FIGHT, cursor: 2, moveId: 777, targets: [2] }, "guest");
+
+    const cmd = await awaited;
+    expect(cmd, "the owner key matched despite the index skew (no timeout, no AI)").not.toBeNull();
+    expect(cmd?.command).toBe(Command.FIGHT);
+    expect(cmd?.cursor).toBe(2);
+    expect(cmd?.moveId).toBe(777); // the human's actual pick, not an AI fallback
+    expect(cmd?.targets).toEqual([2]);
+    // Let any (nonexistent) further microtask deliveries settle, then assert exactly one was consumed.
+    await new Promise(r => setTimeout(r, 0));
+    expect(commandsReceived, "the guest broadcast EXACTLY ONE command for the survivor slot").toBe(1);
+
+    off();
+    hostSync.dispose();
+    guestSync.dispose();
+  });
+
+  it("owner keying is symmetric: the guest awaiting the HOST's mon matches across the same skew", async () => {
+    // The reciprocal direction (each client awaits the PARTNER slot in lockstep): the GUEST awaits the
+    // host's mon by owner "host", the HOST broadcasts its own mon by owner "host" - matched across a
+    // divergent index exactly the same way, so a live double never strands either partner-await.
+    const { host, guest } = createLoopbackPair();
+    const hostSync = new CoopBattleSync(host);
+    const guestSync = new CoopBattleSync(guest);
+
+    const awaited = guestSync.requestPartnerCommand(1, 4, [0, 1], "host");
+    hostSync.broadcastLocalCommand(0, 4, { command: Command.FIGHT, cursor: 1, moveId: 88 }, "host");
+
+    const cmd = await awaited;
+    expect(cmd?.moveId).toBe(88);
+    expect(cmd?.cursor).toBe(1);
+    hostSync.dispose();
+    guestSync.dispose();
+  });
+
+  it("a buffered owner-keyed broadcast that lands BEFORE the request still resolves it (race + owner)", async () => {
+    const { host, guest } = createLoopbackPair();
+    const hostSync = new CoopBattleSync(host);
+    const guestSync = new CoopBattleSync(guest);
+
+    // The guest is faster: it broadcasts (owner "guest", index 1) before the host reaches its await
+    // for the survivor at compacted index 0. The buffer is owner-keyed, so the later request consumes it.
+    guestSync.broadcastLocalCommand(1, 9, { command: Command.FIGHT, cursor: 0, moveId: 3 }, "guest");
+    await new Promise(r => setTimeout(r, 0)); // let it land in the host inbox (owner-keyed)
+
+    const cmd = await hostSync.requestPartnerCommand(0, 9, [0, 1], "guest");
+    expect(cmd?.moveId).toBe(3);
+    hostSync.dispose();
+    guestSync.dispose();
+  });
+
+  it("the responder (SpoofGuest) path also echoes the owner so its reply matches the owner key", async () => {
+    const { host, guest } = createLoopbackPair();
+    const hostSync = new CoopBattleSync(host);
+    const guestSync = new CoopBattleSync(guest);
+    // The dev/spoof responder path (not production, but must not regress): it answers by owner too.
+    guestSync.onCommandRequest(({ moveSlots }) => ({ command: Command.FIGHT, cursor: moveSlots[0], moveId: 123 }));
+
+    const cmd = await hostSync.requestPartnerCommand(0, 2, [4, 5], "guest");
+    expect(cmd?.command).toBe(Command.FIGHT);
+    expect(cmd?.cursor).toBe(4);
+    expect(cmd?.moveId).toBe(123);
     hostSync.dispose();
     guestSync.dispose();
   });
