@@ -2,8 +2,8 @@ name: Nightly Co-op Soak
 
 # Runs the seeded two-engine CO-OP SOAK (#841): a long randomized host+guest run that
 # finds desyncs / strands / leaks BY MACHINE (the DIGEST / LOCKSTEP / NO-PARK / TEARDOWN
-# invariants) instead of by live players. Nightly at ~03:00 UTC. It runs TWO profiles
-# (#832), serialized, each covering a different strand:
+# invariants) instead of by live players. Nightly at ~03:00 UTC. It runs THREE legs
+# (#832 profiles + #633/#828 coverage), serialized, each covering a different strand:
 #   - god   (SOAK_WAVES=150): the level-300 steamroller that reaches the deep endgame
 #            (waves 70-200) where the LATE-game desyncs live; faints only occasionally.
 #   - level (SOAK_WAVES=55):  the level-65 party that FAINTS reliably through its ~wave-40-48
@@ -11,7 +11,14 @@ name: Nightly Co-op Soak
 #            ceiling - the faint/wipe/revive/switch channel (#834/#836/#845-#848), the
 #            historically RICHEST desync source. The soak PROMOTES the single-faint/switch/
 #            replace surfaces to GUARANTEED coverage for this profile.
-# Manually dispatchable on demand with a custom wave count / seed (applies to BOTH legs):
+#   - me-asym (#633 BUILD 1 + #828 BUILD 2): the two coverage tests that are ONLY driven when
+#            explicitly invoked (a designated ME wave driven INLINE across both engines +
+#            host-half exhaustion driven as a guest-solo continuation, not a terminal). These
+#            run a DIFFERENT test path (coop-soak-me + coop-soak-asymmetric), not the default
+#            soak, so the ME / asymmetric surfaces get nightly coverage instead of orphaning
+#            behind a manual invocation. This leg NEVER touches the byte-identical default soak.
+# Manually dispatchable on demand with a custom wave count / seed (applies to BOTH profile legs;
+# the me-asym leg hardcodes its own wave counts, so the dispatch inputs do not affect it):
 #
 #   gh workflow run nightly-coop-soak.yml --ref feat/elite-redux-port \
 #       -R Heraklines/elite-redux -f soak_waves=200
@@ -66,6 +73,8 @@ jobs:
           # endgame (waves 70-200) where the LATE-game co-op desyncs live; it faints only occasionally.
           - profile: god
             waves_default: "150"
+            # The default seeded soak (byte-identical to leaving SOAK_PROFILE unset for the god leg).
+            test_path: "test/tests/elite-redux/coop/coop-soak.test.ts"
           # LEVEL (#832, audit priority #2: the FAINT/WIPE/REVIVE/SWITCH channel - historically the RICHEST
           # desync source, #834/#836/#845-#848). The level-65 party takes real damage and FAINTS reliably
           # through its ~wave-40-48 death spiral, WIPING cleanly (GameOver -> Title) around wave ~48 - a
@@ -75,6 +84,22 @@ jobs:
           # profile (the same-turn double faint stays probabilistic).
           - profile: level
             waves_default: "55"
+            test_path: "test/tests/elite-redux/coop/coop-soak.test.ts"
+          # ME-ASYM (#633 BUILD 1 + #828 BUILD 2). These two tests are gated ER_SCENARIO=1 like every ER
+          # engine test but are NOT part of the default soak file, so without this leg they would only ever
+          # run on a manual invocation (orphaned coverage). This leg runs them nightly:
+          #   - coop-soak-me.test.ts:         a designated ME wave driven INLINE across both engines (the ME
+          #                                   sync surface: mePresent / meResync / MYSTERY_ENCOUNTER mode).
+          #   - coop-soak-asymmetric.test.ts: host-half exhaustion driven as a guest-solo continuation (the
+          #                                   partner-plays-on path), NOT a terminal.
+          # Both hardcode their own party profile + wave counts, so SOAK_PROFILE / SOAK_WAVES are inert here
+          # (SOAK_PROFILE=me-asym resolves to the default "god" in resolveSoakProfile, and neither test reads
+          # it - each passes profile:"god" to runCoopSoak explicitly). waves_default is carried only to keep
+          # the shared env block uniform; it changes nothing for these tests. The distinct profile token scopes
+          # this leg's committed result filenames so they never collide with the god / level bundles.
+          - profile: me-asym
+            waves_default: "150"
+            test_path: "test/tests/elite-redux/coop/coop-soak-me.test.ts test/tests/elite-redux/coop/coop-soak-asymmetric.test.ts"
     steps:
       - uses: actions/checkout@v6
         with:
@@ -107,7 +132,7 @@ jobs:
           # in the final gate (run 28708860699 concluded success on a wave-27 NO-PARK strand). Capture the
           # pipeline's real exit code explicitly and ALWAYS write it.
           set +e
-          npx vitest run test/tests/elite-redux/coop/coop-soak.test.ts --reporter=dot 2>&1 \
+          npx vitest run ${{ matrix.test_path }} --reporter=dot 2>&1 \
             | tee dev-logs/coop-soak/soak-output.txt
           soak_exit=${PIPESTATUS[0]}
           set -e
