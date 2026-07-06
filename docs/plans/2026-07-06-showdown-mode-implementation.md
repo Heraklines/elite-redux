@@ -394,6 +394,41 @@ This is the standing-rule gate for the whole sync layer: run the WHOLE `test/tes
 
 ---
 
+### Task C-REBASE: move the stack onto feat/elite-redux-port (added 2026-07-06, CORRECTION)
+
+DISCOVERY: `coop-me-authoritative` is stale — only 3 unique commits (ER version bump + 2
+shiny-lab commits). ALL co-op work plus 233 newer commits live on `feat/elite-redux-port`,
+including the complete **Ghost Trainer Editor** (main menu → Profile → ghost customization):
+`src/data/elite-redux/er-ghost-profile.ts` (GhostTrainerProfile: displayName, title,
+dialogue.intro / .defeatPlayer / .defeated), `src/data/elite-redux/er-trainer-fx.ts`
+(entrance + aura trainer FX, achievement-point purchases),
+`src/ui/handlers/{profile-ui-handler,ghost-trainer-editor-ui-handler}.ts`, snapshot
+`presentation` field (uploaded via `runs.presentation`, sanitized on upload AND re-sanitized on
+apply, applied to ghost trainers at battle setup ~er-ghost-teams.ts:1210).
+
+After C1-C6 lands + reviews close: cherry-pick the showdown stack onto a detached HEAD at
+`feat/elite-redux-port` tip (no branches, no pushes). Re-run ALL gates (showdown suite, coop
+ER_SCENARIO regression, tsc baseline RE-MEASURED on the new base, render baselines re-verified).
+Reconcile the 2 stray shiny-lab commits (check for equivalents on the new base first).
+
+### Task C7: Opponent presentation in showdown — REUSE the Ghost Trainer profile (rewritten)
+
+Runs AFTER the rebase, against the real system. NO new customization features — pure reuse:
+
+- Wire: the player's `sanitizeGhostProfile(gameData.ghostProfile)` + per-mon `erShinyLab` looks
+  cross the transport with the team exchange (additive field(s) on the showdown team/ready
+  messages, mirroring the ghost snapshot's `presentation` + `GhostMember.erShinyLab` shapes).
+- Receipt: ALWAYS re-run `sanitizeGhostProfile` on the received profile (same rule the ghost
+  path enforces), then apply through the SAME code path ghost battles use for trainer
+  presentation (intro line at battle start, entrance/aura trainer FX, name/title plate) and the
+  Shiny Lab per-mon restore (`erShinyLab` + `erShinyLabSuppressLocal`).
+- Result lines: winner sees the loser's `dialogue.defeated`; loser sees the winner's
+  `dialogue.defeatPlayer` — fire them in the showdown result phase, mirroring ghost-battle
+  victory/defeat line handling.
+- Both clients render the opponent presentation (host side + guest replay side).
+- Verification: render-harness/scenario per standing rules; a duo-level assertion that the
+  profile survives the wire round-trip sanitized.
+
 ## Phase D — Escrow + settlement
 
 ### Task D1: Escrow domain logic (pure) + worker endpoints
