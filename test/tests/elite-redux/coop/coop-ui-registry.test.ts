@@ -60,6 +60,7 @@ describe("#840 co-op UI classification registry (unmirrored-screen tripwire)", (
       "COLOSSEUM",
       "COMMAND",
       "ER_BARGAIN",
+      "ER_MAP",
       "ER_QUIZ",
       "FIGHT",
       "LEARN_MOVE_BATCH",

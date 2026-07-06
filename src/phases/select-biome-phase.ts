@@ -1,7 +1,23 @@
 import { globalScene } from "#app/global-scene";
 import { allBiomes } from "#data/data-lists";
-import { getCoopController } from "#data/elite-redux/coop/coop-runtime";
 import {
+  clearCoopBiomeInteractionStart,
+  coopBiomeInteractionInProgress,
+  coopBiomeInteractionStartValue,
+} from "#data/elite-redux/coop/coop-biome-pin-state";
+import { coopLog, coopWarn } from "#data/elite-redux/coop/coop-debug";
+import { COOP_BIOME_WAIT_MS } from "#data/elite-redux/coop/coop-interaction-relay";
+import {
+  advanceCoopInteractionForContinuation,
+  getCoopController,
+  getCoopInteractionRelay,
+  getCoopRuntime,
+  getCoopUiMirror,
+} from "#data/elite-redux/coop/coop-runtime";
+import { COOP_BIOME_PICK_SEQ_BASE } from "#data/elite-redux/coop/coop-seq-registry";
+import type { CoopSessionController } from "#data/elite-redux/coop/coop-session-controller";
+import {
+  type ErRouteNode,
   erBiomeRoutingActive,
   getErPendingNodes,
   getErPrevBiome,
@@ -22,6 +38,17 @@ import { enumValueToKey } from "#utils/enums";
 export class SelectBiomePhase extends BattlePhase {
   public readonly phaseName = "SelectBiomePhase";
 
+  /**
+   * Co-op (#848): the interaction counter to advance ONCE at the terminal, or -1 when this
+   * transition ticks no alternation counter. Set when this phase participates in a biome
+   * interaction: a chained crossroads-Leave (always, so the deferred crossroads terminal lands
+   * here) or a multi-node World-Map pick (pinned at the picker). A purely-deterministic natural
+   * transition with no picker leaves it -1 and never ticks the shared counter.
+   */
+  private coopAdvancePinned = -1;
+  /** Co-op (#848): whether this phase completes a deferred crossroads-Leave interaction. */
+  private coopChained = false;
+
   start() {
     super.start();
 
@@ -31,6 +58,15 @@ export class SelectBiomePhase extends BattlePhase {
     const currentBiome = globalScene.arena.biomeId;
     const currentWaveIndex = globalScene.currentBattle.waveIndex;
     const nextWaveIndex = currentWaveIndex + 1;
+
+    // Co-op (#848): a crossroads LEAVE deferred its owner-alternated terminal to this phase (the
+    // whole Stay/Leave->biome decision is ONE interaction). Adopt its pin so this phase advances the
+    // shared counter exactly once at its terminal, whatever biome path it resolves through below.
+    const coopController = globalScene.gameMode.isCoop ? getCoopController() : null;
+    if (coopController != null && coopBiomeInteractionInProgress()) {
+      this.coopChained = true;
+      this.coopAdvancePinned = coopBiomeInteractionStartValue();
+    }
 
     if (
       (gameMode.isClassic && gameMode.isWaveFinal(nextWaveIndex + 9))
@@ -51,16 +87,6 @@ export class SelectBiomePhase extends BattlePhase {
       return;
     }
 
-    // Co-op (#633): the biome / World-Map route pickers are interactive and run
-    // INDEPENDENTLY on each client - two players choosing different biomes split the
-    // run apart. Auto-pick the next biome DETERMINISTICALLY from the shared, just-
-    // reset wave seed so both clients land in the SAME biome with no prompt. Solo /
-    // non-coop keeps the full ER World Map + biome chooser below.
-    if (globalScene.gameMode.isCoop && getCoopController() != null) {
-      this.setNextBiomeAndEnd(this.generateNextBiome(nextWaveIndex));
-      return;
-    }
-
     // ER (#486): the branching World Map graph. Build the next-biome node set
     // (base links + 50%-rolled unexpected adjacents, minus the biome we came
     // from, with reveal gated by Map Upgrade tier) and let the player choose.
@@ -71,6 +97,17 @@ export class SelectBiomePhase extends BattlePhase {
       const nodes = pending.length > 0 ? pending : rollErNextBiomeNodes(currentBiome, getErPrevBiome());
       const revealed = nodes.filter(n => n.revealed);
       if (revealed.length > 1) {
+        // Co-op (#848): the ER World Map route pick is an owner-alternated, MIRRORED interaction -
+        // the OWNER drives the real picker + streams its cursor, the WATCHER opens a read-only copy
+        // and adopts the owner's relayed biome. Restore the CORE mechanic co-op used to amputate.
+        if (coopController != null) {
+          if (this.coopAdvancePinned < 0) {
+            // Natural biome-end multi-node pick (not chained from a crossroads): pin its own counter.
+            this.coopAdvancePinned = coopController.interactionCounter();
+          }
+          this.coopBiomePickFlow(coopController, revealed, currentBiome, this.coopAdvancePinned);
+          return;
+        }
         // Present the choice as the branching World Map node picker (#486). Only the
         // REVEALED nodes are offered - the extra (green) "upgrade" node appears ONLY
         // when a Map Upgrade item actually reveals it; we no longer surface locked
@@ -83,7 +120,7 @@ export class SelectBiomePhase extends BattlePhase {
           nodes: revealed,
           origin: currentBiome,
           onSelect: (biome: BiomeId) => {
-            // #record-replay (single-player): capture the World-Map biome pick (no-op unless recording / co-op).
+            // #record-replay (single-player): capture the World-Map biome pick (no-op unless recording).
             recordSinglePlayerInteraction("biome", biome);
             this.setNextBiomeAndEnd(biome);
           },
@@ -105,13 +142,16 @@ export class SelectBiomePhase extends BattlePhase {
         .filter(b => !Array.isArray(b) || !randSeedInt(b[1]))
         .map(b => (Array.isArray(b) ? b[0] : b));
 
-      if (biomes.length > 1 && globalScene.findModifier(m => m instanceof MapModifier)) {
+      // Co-op (#848): the vanilla biome-link picker is NOT the ER World Map; rather than open an
+      // unmirrored prompt in co-op, auto-resolve it deterministically (both clients share the wave
+      // seed, so randSeedItem lands identically). No alternation tick (no picker shown).
+      if (coopController == null && biomes.length > 1 && globalScene.findModifier(m => m instanceof MapModifier)) {
         const biomeSelectItems = biomes.map(b => {
           return {
             label: getBiomeName(b),
             handler: () => {
               globalScene.ui.setMode(UiMode.MESSAGE);
-              // #record-replay (single-player): capture the biome-link pick (no-op unless recording / co-op).
+              // #record-replay (single-player): capture the biome-link pick (no-op unless recording).
               recordSinglePlayerInteraction("biome", b);
               this.setNextBiomeAndEnd(b);
               return true;
@@ -145,6 +185,98 @@ export class SelectBiomePhase extends BattlePhase {
     }
 
     this.setNextBiomeAndEnd(this.generateNextBiome(nextWaveIndex));
+  }
+
+  // ---------------------------------------------------------------------------
+  // Co-op (#848) owner-alternated + mirrored ER World Map route pick.
+  // ---------------------------------------------------------------------------
+
+  /** Decide owner vs watcher off the pinned interaction counter and branch. */
+  private coopBiomePickFlow(
+    controller: CoopSessionController,
+    revealed: ErRouteNode[],
+    origin: BiomeId,
+    pinned: number,
+  ): void {
+    const spoofed = getCoopRuntime()?.spoof != null;
+    const owns = spoofed || controller.isLocalOwnerAtCounter(pinned);
+    coopLog(
+      "reward",
+      `biome pick owner/watcher decision: pinnedStart=${pinned} role=${controller.role} spoof=${spoofed} chained=${this.coopChained} -> ${owns ? "OWNER" : "WATCHER"} (#848)`,
+    );
+    if (owns) {
+      this.coopBiomePickOwner(revealed, origin, pinned);
+    } else {
+      void this.coopBiomePickWatch(revealed, origin, pinned);
+    }
+  }
+
+  /** OWNER: drive the real ER_MAP picker + stream its cursor; relay the chosen biome, then apply. */
+  private coopBiomePickOwner(revealed: ErRouteNode[], origin: BiomeId, pinned: number): void {
+    const mirrorSeq = COOP_BIOME_PICK_SEQ_BASE + pinned;
+    globalScene.ui.setMode(UiMode.ER_MAP, {
+      nodes: revealed,
+      origin,
+      onSelect: (biome: BiomeId) => {
+        getCoopUiMirror()?.endSession();
+        const idx = revealed.findIndex(n => n.biome === biome);
+        try {
+          // Relay both the index AND the biome id: the watcher applies the biome verbatim, so a
+          // divergent revealed-list order could never land it in a different biome than the owner.
+          getCoopInteractionRelay()?.sendInteractionChoice(COOP_BIOME_PICK_SEQ_BASE + pinned, "biomePick", idx, [
+            biome,
+          ]);
+          coopLog("reward", `biome pick OWNER commit biome=${BiomeId[biome]} idx=${idx} pinnedStart=${pinned} (#848)`);
+        } catch {
+          coopWarn("reward", "biome pick OWNER relay send threw (handled - watcher heals on timeout) (#848)");
+        }
+        this.setNextBiomeAndEnd(biome);
+      },
+    });
+    // Relay the owner's live cursor to the watcher's read-only copy (cosmetic; truth = the relay).
+    getCoopUiMirror()?.beginSession("owner", UiMode.ER_MAP, mirrorSeq);
+  }
+
+  /** WATCHER: open a read-only mirrored copy, await the owner's biome, apply it authoritatively. */
+  private async coopBiomePickWatch(revealed: ErRouteNode[], origin: BiomeId, pinned: number): Promise<void> {
+    const mirrorSeq = COOP_BIOME_PICK_SEQ_BASE + pinned;
+    try {
+      await globalScene.ui.setMode(UiMode.ER_MAP, {
+        nodes: revealed,
+        origin,
+        // Read-only: a replayed owner ACTION must never resolve the watcher against its own cursor.
+        // The awaited relay below is the sole authority.
+        onSelect: () => {
+          /* cosmetic no-op */
+        },
+      });
+      getCoopUiMirror()?.beginSession("watcher", UiMode.ER_MAP, mirrorSeq);
+    } catch {
+      coopWarn("reward", "biome pick WATCHER map failed to open (still awaiting relay) (#848)");
+    }
+    const relay = getCoopInteractionRelay();
+    const res =
+      relay == null ? null : await relay.awaitInteractionChoice(COOP_BIOME_PICK_SEQ_BASE + pinned, COOP_BIOME_WAIT_MS);
+    getCoopUiMirror()?.endSession();
+    let biome: BiomeId;
+    if (res != null && res.data != null && res.data.length > 0) {
+      biome = res.data[0] as BiomeId;
+      coopLog("reward", `biome pick WATCHER: owner biome=${BiomeId[biome]} received pinnedStart=${pinned} (#848)`);
+    } else if (res != null && res.choice >= 0 && res.choice < revealed.length) {
+      biome = revealed[res.choice].biome;
+      coopLog("reward", `biome pick WATCHER: owner idx=${res.choice} -> biome=${BiomeId[biome]} (#848)`);
+    } else {
+      // ANTI-HANG (#848): disconnect / stall backstop. Fall back to the SAME deterministic roll both
+      // clients compute off the just-reset shared wave seed, so the fallback cannot desync.
+      biome = this.generateNextBiome(globalScene.currentBattle.waveIndex + 1);
+      coopWarn(
+        "reward",
+        `biome pick WATCHER: owner pick TIMEOUT/disconnect -> deterministic fallback biome=${BiomeId[biome]} (#848)`,
+      );
+    }
+    // Tear the map back down before the biome-switch flow runs, then apply.
+    await globalScene.ui.setMode(UiMode.MESSAGE);
+    this.setNextBiomeAndEnd(biome);
   }
 
   private generateNextBiome(waveIndex: number): BiomeId {
@@ -186,6 +318,15 @@ export class SelectBiomePhase extends BattlePhase {
       }
     }
     globalScene.phaseManager.unshiftNew("SwitchBiomePhase", nextBiome);
+    // Co-op (#848): terminate the biome interaction with the single from-pinned advance (idempotent,
+    // #837). Fires when this phase participated in an interaction: a chained crossroads-Leave (always)
+    // or a multi-node World-Map pick. A purely-deterministic natural transition never ticks the counter.
+    if (this.coopAdvancePinned >= 0) {
+      advanceCoopInteractionForContinuation(this.coopAdvancePinned);
+      if (this.coopChained) {
+        clearCoopBiomeInteractionStart();
+      }
+    }
     this.end();
   }
 }

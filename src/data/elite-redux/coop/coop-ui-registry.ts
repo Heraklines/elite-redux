@@ -182,9 +182,14 @@ export const COOP_UI_REGISTRY: Record<UiMode, CoopUiClass> = {
   // both clients unmirrored it is exactly the unmirrored-screen class this registry guards against.
   [UiMode.ER_MAP_PICKER]: "local-only",
 
-  // The World-Map overlay (revealed nodes + fragments): a read-only view; erMapState rides the
-  // launch/save snapshot so both clients render the same data.
-  [UiMode.ER_MAP]: "local-only",
+  // The World Map (UiMode.ER_MAP): DUAL-USE. As the read-only J overlay it is a per-client view
+  // (erMapState rides the launch/save snapshot so both clients render the same data). In PICK MODE
+  // it is the every-biome-end route chooser, now owner-alternated + mirrored in co-op (#848): the
+  // interaction OWNER drives the real picker and the WATCHER opens a read-only copy that mirrors the
+  // owner's live cursor (coop-ui-mirror.ts) and adopts the owner's relayed biome on COOP_BIOME_PICK_SEQ_BASE
+  // + interactionCounter (select-biome-phase.ts). Classified "mirrored" so the mirrored picker never trips
+  // the unmirrored-screen tripwire (the watcher legitimately opens ER_MAP it does not "own").
+  [UiMode.ER_MAP]: "mirrored",
 
   // REVIEW: renaming a pokemon in a MERGED co-op party. Confirm each client renames only its own mon
   // (a shared-mon nickname write would be a latent divergence; cosmetic, not run-affecting).

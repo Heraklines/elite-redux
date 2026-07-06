@@ -73,6 +73,20 @@ export const COOP_LEARN_MOVE_FWD_SEQ_BASE = 9_100_000;
  * channels so a buffered batch present/terminal never FIFO-collides.
  */
 export const COOP_LEARN_MOVE_BATCH_FWD_SEQ_BASE = 9_150_000;
+/**
+ * The every-5-waves CROSSROADS Stay/Leave owner-alternated pick: `BASE + pinnedStart` (interaction
+ * counter) (#848 co-op biome choice). The interaction OWNER drives the real crossroads screen and the
+ * WATCHER mirrors it; the owner relays the Stay(0)/Leave(1) choice. Disjoint band above every other.
+ */
+export const COOP_CROSSROADS_SEQ_BASE = 9_600_000;
+/**
+ * The ER World-Map biome PICK owner-alternated relay: `BASE + pinnedStart` (interaction counter) (#848
+ * co-op biome choice). The OWNER drives the real ER_MAP route picker + cursor-mirror; the WATCHER opens a
+ * mirrored read-only copy and adopts the owner's relayed biome. Chains off the crossroads (a Leave shares
+ * the crossroads' pinned counter so the whole decision is ONE interaction / one terminal advance), or
+ * pins its own counter at a natural biome-end multi-node transition. Disjoint band above the crossroads.
+ */
+export const COOP_BIOME_PICK_SEQ_BASE = 9_700_000;
 /** Host->guest dex/starter sync broadcasts: a fixed disjoint seq (#794). */
 export const COOP_DEX_SYNC_SEQ = 9_200_000;
 /** Rejoin full-resync request: `BASE + (Date.now() % 100_000)`. */
@@ -230,6 +244,20 @@ export const COOP_SEQ_BANDS: readonly CoopSeqBand[] = [
     offset: "fixed singleton (#840: relocated from 9_000_001)",
     owner: "learn-move-phase.ts",
   },
+  {
+    key: "crossroads",
+    base: COOP_CROSSROADS_SEQ_BASE,
+    maxOffset: COOP_MAX_REACHABLE_COUNTER,
+    offset: "+ pinnedStart (interaction counter)",
+    owner: "er-crossroads-phase.ts",
+  },
+  {
+    key: "biomePick",
+    base: COOP_BIOME_PICK_SEQ_BASE,
+    maxOffset: COOP_MAX_REACHABLE_COUNTER,
+    offset: "+ pinnedStart (interaction counter)",
+    owner: "select-biome-phase.ts",
+  },
 ];
 
 /** The inclusive numeric range `[lo, hi]` a band occupies at realistic magnitudes. */
@@ -322,4 +350,7 @@ export const COOP_RELAY_KINDS: readonly CoopRelayKind[] = [
   },
   // Dex sync.
   { kind: "dexSync", transport: "outcome", band: "dexSync", sender: "coop-runtime.ts" },
+  // Co-op biome choice (#848): the every-5-waves crossroads + the ER World-Map biome pick.
+  { kind: "crossroads", transport: "choice", band: "crossroads", sender: "er-crossroads-phase.ts" },
+  { kind: "biomePick", transport: "choice", band: "biomePick", sender: "select-biome-phase.ts" },
 ];
