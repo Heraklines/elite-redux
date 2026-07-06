@@ -1,0 +1,66 @@
+===== COOP SOAK RESULT =====
+profile: me-asym
+verdict: FAIL
+waves_requested: 150
+run: 28828186014 (feat/elite-redux-port)
+timestamp: 2026-07-06T22-49-29Z
+
+----- driver lines -----
+[22m[39m[coop-soak] SEED=828633 WAVES=12 - replay this run with:  SOAK_SEED=828633 SOAK_WAVES=12 ER_SCENARIO=1 npx vitest run test/tests/elite-redux/coop/coop-soak.test.ts
+[22m[39m[coop-soak] scalar-lag wave 5 @post-shop: guest trails host (expected renderer lag, converges at re-mirror) - money host=110 guest=0
+[22m[39m[coop-soak] scalar-lag wave 8 @post-shop: guest trails host (expected renderer lag, converges at re-mirror) - money host=390 guest=110
+[coop-soak] ME DRIVEN wave 12 (seed 828633): DEPARTMENT_STORE_SALE [host-owned]
+[22m[39m[coop-soak] SEED=828633 WAVES=14 - replay this run with:  SOAK_SEED=828633 SOAK_WAVES=14 ER_SCENARIO=1 npx vitest run test/tests/elite-redux/coop/coop-soak.test.ts
+[22m[39m[coop-soak] scalar-lag wave 5 @post-shop: guest trails host (expected renderer lag, converges at re-mirror) - money host=110 guest=0
+[22m[39m[coop-soak] scalar-lag wave 8 @post-shop: guest trails host (expected renderer lag, converges at re-mirror) - money host=390 guest=110
+[coop-soak] ME DRIVEN wave 12 (seed 828633): DEPARTMENT_STORE_SALE [host-owned]
+[22m[39m[coop-soak] scalar-lag wave 13 @post-shop: guest trails host (expected renderer lag, converges at re-mirror) - money host=580 guest=390
+[22m[39m[coop-soak] scalar-lag wave 14 @post-shop: guest trails host (expected renderer lag, converges at re-mirror) - money host=780 guest=580
+[22m[39m[coop-soak] SEED=828633 WAVES=16 - replay this run with:  SOAK_SEED=828633 SOAK_WAVES=16 ER_SCENARIO=1 npx vitest run test/tests/elite-redux/coop/coop-soak.test.ts
+[22m[39m[coop-soak] scalar-lag wave 5 @post-shop: guest trails host (expected renderer lag, converges at re-mirror) - money host=110 guest=0
+[22m[39m[coop-soak] scalar-lag wave 8 @post-shop: guest trails host (expected renderer lag, converges at re-mirror) - money host=390 guest=110
+[22m[39m[coop-soak] scalar-lag wave 13 @post-shop: guest trails host (expected renderer lag, converges at re-mirror) - money host=580 guest=390
+[22m[39m[coop-soak] scalar-lag wave 14 @post-shop: guest trails host (expected renderer lag, converges at re-mirror) - money host=780 guest=580
+[coop-soak] ME DRIVEN wave 15 (seed 828633): DEPARTMENT_STORE_SALE [guest-owned]
+
+----- vitest result tail -----
+[33m[39m[32m·[39m[90mstdout[2m | test/tests/elite-redux/coop/coop-soak-me.test.ts[2m:201:3[22m[2m[2m > [22m[2mNIGHTLY co-op SOAK: mid-run mystery-encounter continuation (#633 BUILD 1)[2m > [22m[2mdrives a GUEST-OWNED ME inline (counter parity), then surveys past it, findings=0
+[22m[39m[2m> [22m[30m[48;2;193;98;222m Test finished! [49m[39m
+    Name: [38;2;0;136;134mNIGHTLY co-op SOAK: mid-run mystery-encounter continuation (#633 BUILD 1) > drives a GUEST-OWNED ME inline (counter parity), then surveys past it, findings=0[39m
+    Result: [32m[1m✓ Passed[22m[39m [2min[22m [33m17473[39m[2mms[22m
+    File: [38;2;210;155;14melite-redux/test/tests/elite-redux/coop/coop-soak-me.test.ts:201:3[39m
+
+[33m[39m[32m·[39m
+[31m⎯⎯⎯⎯⎯⎯[39m[1m[41m Unhandled Errors [49m[22m[31m⎯⎯⎯⎯⎯⎯[39m
+[31m[1m
+Vitest caught 1 unhandled error during the test run.
+This might cause false positive tests. Resolve unhandled errors to make sure your tests are not affected.[22m[39m
+
+[31m⎯⎯⎯⎯[39m[1m[41m Unhandled Rejection [49m[22m[31m⎯⎯⎯⎯⎯[39m
+[31m[1mTypeError[22m: Cannot read properties of null (reading 'waveIndex')[39m
+[36m [2m❯[22m SelectModifierPhase.getRerollCost src/phases/select-modifier-phase.ts:[2m943:43[22m[39m
+    [90m941|[39m
+    [90m942|[39m     [35mconst[39m baseMultiplier [33m=[39m [33mMath[39m[33m.[39m[34mmin[39m(
+    [90m943|[39m       Math.ceil(globalScene.currentBattle.waveIndex / 10) * baseValue …
+    [90m   |[39m                                           [31m^[39m
+    [90m944|[39m       [33mNumber[39m[33m.[39m[33mMAX_SAFE_INTEGER[39m[33m,[39m
+    [90m945|[39m     )[33m;[39m
+[90m [2m❯[22m SelectModifierPhase.resetModifierSelect src/phases/select-modifier-phase.ts:[2m904:12[22m[39m
+[90m [2m❯[22m SelectModifierPhase.coopOpenOwnerShopAfterBarrier src/phases/select-modifier-phase.ts:[2m1257:10[22m[39m
+[90m [2m❯[22m processTicksAndRejections node:internal/process/task_queues:[2m105:5[22m[39m
+[90m [2m❯[22m runNextTicks node:internal/process/task_queues:[2m69:3[22m[39m
+[90m [2m❯[22m processTimers node:internal/timers:[2m540:9[22m[39m
+
+[31mThis error originated in "[1mtest/tests/elite-redux/coop/coop-soak-me.test.ts[22m" test file. It doesn't mean the error was thrown inside the file itself, but while it was running.[39m
+[31mThe latest test that might've caused the error is "[1msurveys TWO waves PAST a host-owned ME with NO post-ME pin leak (no spurious second ME), findings=0[22m". It might mean one of the following:
+- The error was thrown, while Vitest was running this test.
+- If the error occurred after the test had been completed, this was the last documented test before it was thrown.[39m
+[31m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[39m
+
+
+[2m Test Files [22m [1m[32m2 passed[39m[22m[90m (2)[39m
+[2m      Tests [22m [1m[32m5 passed[39m[22m[90m (5)[39m
+[2m     Errors [22m [1m[31m1 error[39m[22m
+[2m   Start at [22m 22:48:14
+[2m   Duration [22m 74.57s[2m (transform 35.83s, setup 46.75s, import 290ms, tests 58.19s, environment 1.58s)[22m
+
