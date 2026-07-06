@@ -73,7 +73,7 @@ export function setFxParams(seed = 0, scale = 1) {
 // the FX FRAYS into wisps at the edge instead of stopping in a clean straight band
 // (tester feedback: a uniform fade still reads as an abrupt stop). In-game the
 // same falloff keeps auras from slamming into the sprite's texture bounds.
-export function edgeFalloff(px, py, PW, PH, t = 0, feather = 12) {
+export function edgeFalloff(px, py, PW, PH, t = 0, feather = 16) {
   const d = Math.min(px + 0.5, py + 0.5, PW - px - 0.5, PH - py - 0.5);
   if (d >= feather) {
     return 1;
@@ -84,11 +84,13 @@ export function edgeFalloff(px, py, PW, PH, t = 0, feather = 12) {
   const k = d / feather;
   // per-position fade depth: where the noise is low the FX reaches almost to the
   // border, where it is high the fade starts deeper inside - wispy, and it drifts
-  const n = fbm((px / PW) * 6.5 + t * 0.09, (py / PH) * 6.5 - t * 0.06);
-  const th = 0.25 + clamp(n) * 0.75;
+  const n = fbm((px / PW) * 8 + t * 0.09, (py / PH) * 8 - t * 0.06);
+  // stretch the noise contrast (fbm clusters mid-range) so the wisps really cut
+  const n2 = smooth(0.32, 0.68, n);
+  const th = 0.15 + n2 * 0.85;
   const kk = clamp(k / th);
   // hard ramp on the outermost couple of px so the very border is always ~0
-  return kk * kk * (3 - 2 * kk) * clamp(k * 6);
+  return kk * kk * (3 - 2 * kk) * clamp(k * 8);
 }
 // Snap an FX color to the GBC-displayable gamut (RGB555 - 5 bits per channel).
 export const gbcSnap = c => [
