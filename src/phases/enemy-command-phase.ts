@@ -1,6 +1,7 @@
 import { globalScene } from "#app/global-scene";
-import { getCoopController, isAuthoritativeBattleSession } from "#data/elite-redux/coop/coop-runtime";
+import { getCoopController, isAuthoritativeBattleSession, isVersusSession } from "#data/elite-redux/coop/coop-runtime";
 import { ER_DOOMED_SWITCH_THRESHOLD_MULT, erAssessThreat, getErAiProfile } from "#data/elite-redux/er-enemy-ai";
+import { getShowdownRelay } from "#data/elite-redux/showdown/showdown-battle-state";
 import { AbilityId } from "#enums/ability-id";
 import { BattlerTagType } from "#enums/battler-tag-type";
 import { Command } from "#enums/command";
@@ -52,6 +53,56 @@ export class EnemyCommandPhase extends FieldPhase {
       return this.end();
     }
 
+    // Showdown 1v1 (C4): the HOST awaits the REMOTE player's command for this enemy slot instead
+    // of rolling the AI (the enemy side is a real human). On a timeout/null (disconnect) it falls
+    // back to the AI so the turn never hangs. The guest short-circuit above already handled the
+    // guest; solo / co-op never take this branch (isVersusSession is false).
+    if (isVersusSession() && getCoopController()?.role === "host") {
+      void this.resolveVersusEnemyCommand();
+      return;
+    }
+
+    this.resolveEnemyAiCommand();
+  }
+
+  /**
+   * Showdown 1v1 (C4): resolve THIS enemy slot's command from the remote player's relay, or fall
+   * back to the AI on a timeout/disconnect (null) so the turn never hangs.
+   */
+  private async resolveVersusEnemyCommand(): Promise<void> {
+    const relay = getShowdownRelay();
+    const turn = globalScene.currentBattle.turn;
+    const command = relay == null ? null : await relay.requestEnemyCommand(turn);
+    if (command == null) {
+      // Disconnect / timeout: the enemy acts by AI so the duel never stalls.
+      this.resolveEnemyAiCommand();
+      return;
+    }
+    const slot = globalScene.currentBattle.arrangement.enemyOffset + this.fieldIndex;
+    if (command.command === Command.POKEMON) {
+      globalScene.currentBattle.turnCommands[slot] = {
+        command: Command.POKEMON,
+        cursor: command.cursor,
+        args: [command.baton ?? false],
+        skip: this.skipTurn,
+      };
+    } else {
+      globalScene.currentBattle.turnCommands[slot] = {
+        command: Command.FIGHT,
+        move: {
+          move: command.moveId ?? MoveId.NONE,
+          targets: command.targets ?? [],
+          // SerializedCommand.useMode is a MoveUseMode value carried as a plain number on the wire.
+          useMode: (command.useMode as MoveUseMode | undefined) ?? MoveUseMode.NORMAL,
+        },
+        skip: this.skipTurn,
+      };
+    }
+    this.end();
+  }
+
+  /** Roll the enemy AI's command for this slot (the vanilla / co-op-host / disconnect-fallback path). */
+  private resolveEnemyAiCommand(): void {
     const enemyPokemon = globalScene.getEnemyField()[this.fieldIndex];
 
     const battle = globalScene.currentBattle;
@@ -121,7 +172,8 @@ export class EnemyCommandPhase extends FieldPhase {
 
             battle.enemySwitchCounter++;
 
-            return this.end();
+            this.end();
+            return;
           }
         }
       }
