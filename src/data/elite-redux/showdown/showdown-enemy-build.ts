@@ -1,0 +1,121 @@
+/*
+ * SPDX-FileCopyrightText: 2024-2026 Pagefault Games
+ *
+ * SPDX-License-Identifier: AGPL-3.0-only
+ */
+
+// =============================================================================
+// Showdown 1v1 PvP (C3): ENGINE-side enemy-party construction. The host fields the
+// OPPONENT's team as a TRAINER (so the 6-mon party switches, can't be caught, and wins on
+// wipe - the exact 1v1 shape) whose members are built VERBATIM from the manifest.
+//
+// Reuse: the opponent trainer is flagged {@linkcode markTrainerAsShowdown} (mirroring the
+// ghost-trainer flag) and its `Trainer.genPartyMember` is intercepted by
+// {@linkcode applyShowdownOverride} (hooked next to the ghost override in trainer.ts). Each
+// member is built with `globalScene.addEnemyPokemon` and its identity restored from the manifest
+// (species / form / level / ability / nature / IVs / moveset / shiny). Built DIRECTLY (not via
+// the co-op enemy reconstructor) so this module does NOT drag the heavy coop-battle-engine into
+// battle-scene / trainer's module-load graph (that edge tripped a load-order cycle).
+//
+// Verbatim (no wave-scaling): the showdown branch is EXEMPTED from `enforceErEliteBstCurve`
+// (er-trainer-runtime-hook.ts), so a level-100 team is fielded exactly as built (no wave-1 BST
+// swap / devolve). Megas keep their `formIndex` (permamega; built at TrainerSlot.TRAINER so the
+// wild-mega reset never fires - it is NONE-only). The MEGA_STONE sentinel maps to NO runtime
+// modifier (the form carries the stats); a whitelist item is granted as its held-item modifier.
+// =============================================================================
+
+import { globalScene } from "#app/global-scene";
+import { modifierTypes } from "#data/data-lists";
+import { getShowdownOpponentManifest } from "#data/elite-redux/showdown/showdown-battle-state";
+import { showdownHeldItemKey } from "#data/elite-redux/showdown/showdown-enemy";
+import type { ShowdownMonManifest } from "#data/elite-redux/showdown/showdown-team";
+import type { Nature } from "#enums/nature";
+import { PartyMemberStrength } from "#enums/party-member-strength";
+import { TrainerSlot } from "#enums/trainer-slot";
+import type { EnemyPokemon } from "#field/pokemon";
+import type { Trainer } from "#field/trainer";
+import type { PokemonHeldItemModifier } from "#modifiers/modifier";
+import { PokemonMove } from "#moves/pokemon-move";
+import type { Variant } from "#sprites/variant";
+import { TrainerPartyTemplate } from "#trainers/trainer-party-template";
+import { getPokemonSpecies } from "#utils/pokemon-utils";
+
+/** Trainers flagged as the showdown OPPONENT (their party is the opponent manifest). */
+const SHOWDOWN_TRAINERS = new WeakSet<Trainer>();
+
+/**
+ * Flag `trainer` as the showdown opponent and shadow its party template so it fields exactly
+ * `teamSize` mons (capped at 6). Mirrors {@linkcode markTrainerAsGhost}: the shared trainer
+ * config is untouched; only this instance's team size + override hook change.
+ */
+export function markTrainerAsShowdown(trainer: Trainer, teamSize: number): void {
+  SHOWDOWN_TRAINERS.add(trainer);
+  const size = Math.max(1, Math.min(teamSize, 6));
+  trainer.getPartyTemplate = () => new TrainerPartyTemplate(size, PartyMemberStrength.STRONGER);
+}
+
+/** Whether `trainer` is a showdown opponent (its members come from the manifest). */
+export function isShowdownTrainer(trainer: Trainer): boolean {
+  return SHOWDOWN_TRAINERS.has(trainer);
+}
+
+/** Build ONE showdown enemy from a manifest mon, verbatim (BST-curve exempt), at `slot`. */
+function buildShowdownEnemy(mon: ShowdownMonManifest, slot: TrainerSlot): EnemyPokemon {
+  const species = getPokemonSpecies(mon.speciesId);
+  // No dataSource: the constructor rolls a moveset/shiny we override below. Showdown is exempt
+  // from enforceErEliteBstCurve, so the species is NOT swapped/devolved at wave 1.
+  const enemy = globalScene.addEnemyPokemon(species, mon.level, slot);
+  // Restore the manifest identity. Megas: TrainerSlot.TRAINER never triggers the wild-mega reset.
+  if (mon.formIndex >= 0 && mon.formIndex < (enemy.species.forms?.length ?? 1)) {
+    enemy.formIndex = mon.formIndex;
+  }
+  enemy.abilityIndex = mon.abilityIndex;
+  enemy.nature = mon.nature as Nature;
+  enemy.shiny = mon.shiny;
+  enemy.variant = mon.variant as Variant;
+  if (mon.ivs.length === 6) {
+    enemy.ivs = mon.ivs.map(iv => Math.max(0, Math.min(31, Math.floor(iv) || 0)));
+  }
+  if (mon.moveset.length > 0) {
+    const moves = mon.moveset.map(id => new PokemonMove(id));
+    enemy.moveset = moves;
+    enemy.summonData.moveset = moves.slice();
+  }
+  enemy.calculateStats();
+  enemy.generateName();
+  enemy.hp = enemy.getMaxHp();
+  return enemy;
+}
+
+/**
+ * Build the showdown opponent's member for `index` from the stashed opponent manifest, or `null`
+ * when this is not a showdown trainer / the index is beyond the team (so the caller falls through
+ * to its normal generation). Hooked into `Trainer.genPartyMember` beside the ghost override.
+ */
+export function applyShowdownOverride(trainer: Trainer, index: number): EnemyPokemon | null {
+  if (!SHOWDOWN_TRAINERS.has(trainer)) {
+    return null;
+  }
+  const manifest = getShowdownOpponentManifest();
+  if (manifest == null || index >= manifest.length) {
+    return null;
+  }
+  try {
+    const mon = manifest[index];
+    // Double-battle trainers alternate the slot; a 1v1 single fields TrainerSlot.TRAINER for all.
+    const slot = !trainer.isDouble() || !(index % 2) ? TrainerSlot.TRAINER : TrainerSlot.TRAINER_PARTNER;
+    const enemy = buildShowdownEnemy(mon, slot);
+    // The whitelist held item (MEGA_STONE / empty -> none), granted verbatim.
+    const itemKey = showdownHeldItemKey(mon);
+    if (itemKey != null) {
+      const factory = modifierTypes[itemKey as keyof typeof modifierTypes];
+      const held = factory?.().newModifier(enemy) as PokemonHeldItemModifier | null;
+      if (held != null) {
+        void globalScene.addEnemyModifier(held, true);
+      }
+    }
+    return enemy;
+  } catch {
+    return null;
+  }
+}

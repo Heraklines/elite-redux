@@ -267,6 +267,12 @@ export class VictoryPhase extends PokemonPhase {
         }
 
         globalScene.phaseManager.pushNew("NewBattlePhase");
+      } else if (gameMode.isShowdown) {
+        // Showdown 1v1 (C3): the opponent's team is swept -> the LOCAL player won the duel. Route
+        // to the ephemeral result flow (message + return to title, NO save/score/clear), never the
+        // classic GameOver path. C6 emits the showdownResult wire message from the result phase.
+        globalScene.currentBattle.battleType = BattleType.CLEAR;
+        globalScene.phaseManager.pushNew("ShowdownResultPhase", true, "victory");
       } else {
         globalScene.currentBattle.battleType = BattleType.CLEAR;
         globalScene.score += gameMode.getClearScoreBonus();

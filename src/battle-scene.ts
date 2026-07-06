@@ -76,6 +76,8 @@ import { applyErTrainerHeldItems } from "#data/elite-redux/er-trainer-runtime-ho
 import { ErWardStoneModifier } from "#data/elite-redux/er-ward-stones";
 import { erBattleFormDumpToBaseSpeciesId } from "#data/elite-redux/init-elite-redux-er-custom-form-changes";
 import { CASCOON_ANGELS_WRATH_MOVES } from "#data/elite-redux/init-elite-redux-movesets";
+import { getShowdownOpponentManifest } from "#data/elite-redux/showdown/showdown-battle-state";
+import { markTrainerAsShowdown } from "#data/elite-redux/showdown/showdown-enemy-build";
 import type { SpeciesFormChangeTrigger } from "#data/form-change-triggers";
 import { SpeciesFormChangeManualTrigger, SpeciesFormChangeTimeOfDayTrigger } from "#data/form-change-triggers";
 import { Gender } from "#data/gender";
@@ -1818,6 +1820,20 @@ export class BattleScene extends SceneBase {
    */
   private handleNonFixedBattle(resolved: NewBattleInitialProps): void {
     const { waveIndex } = resolved;
+    // Showdown 1v1 (C3): the opponent's negotiated team is fielded as a TRAINER (6-mon party,
+    // switching, no catch, win-on-wipe - the 1v1 shape), built VERBATIM from the manifest via
+    // the genPartyMember showdown hook (markTrainerAsShowdown). Wins over every wild/trainer/
+    // ghost roll. Only fires for a live showdown match on the HOST; the guest renders the host's
+    // streamed party. Showdown-only, so co-op / solo are byte-for-byte unaffected.
+    const showdownManifest = this.gameMode.isShowdown ? getShowdownOpponentManifest() : null;
+    if (showdownManifest != null && showdownManifest.length > 0) {
+      resolved.battleType = BattleType.TRAINER;
+      const opponent = new Trainer(TrainerType.VETERAN, TrainerVariant.DEFAULT);
+      markTrainerAsShowdown(opponent, showdownManifest.length);
+      this.field.add(opponent);
+      resolved.trainer = opponent;
+      return;
+    }
     // ER ghost gauntlet (#217): begin pre-fetching ghost teams well before the
     // endgame waves where they spawn (no-op except once, around wave 150).
     maybePrefetchGhostTeams(waveIndex);
@@ -3737,6 +3753,12 @@ export class BattleScene extends SceneBase {
   generateEnemyModifiers(heldModifiersConfigs?: HeldModifierConfig[][]): Promise<void> {
     return new Promise(resolve => {
       if (this.currentBattle.isClassicFinalBoss) {
+        return resolve();
+      }
+      // Showdown 1v1 (C3): the opponent's held items are EXACTLY the manifest's whitelist items,
+      // granted verbatim when each member was built (applyShowdownOverride). Skip the random
+      // trainer/per-mon held-item roll so no extra items are added. Showdown-only.
+      if (this.gameMode.isShowdown) {
         return resolve();
       }
       const difficultyWaveIndex = this.gameMode.getWaveForDifficulty(this.currentBattle.waveIndex);

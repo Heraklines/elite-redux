@@ -1064,10 +1064,33 @@ export function isVersusSession(): boolean {
  * Whether THIS client is the GUEST of a live AUTHORITATIVE co-op session (#633). The single read
  * point for the "guest renders, host is authoritative" gates that must NOT mutate shared
  * host-owned state (e.g. the shared money pool). Hard `false` for solo / lockstep / the host, so
- * those paths are byte-for-byte unaffected.
+ * those paths are byte-for-byte unaffected. Netcode-only (does NOT read `gameMode`), so it is
+ * ALSO true for a showdown-versus guest (versus rides the SAME authoritative substrate).
  */
 export function isCoopAuthoritativeGuest(): boolean {
   return active != null && getCoopNetcodeMode() === "authoritative" && active.controller.role === "guest";
+}
+
+/**
+ * Showdown 1v1 PvP (C3-C6): the SINGLE centralized predicate for the CORE-BATTLE authoritative
+ * seams (turn-start divert / turn-end stream / command relay / engine capture+apply / enemy
+ * command / victory routing). True when a live AUTHORITATIVE runtime exists AND the mode is a
+ * co-op-STYLE battle (classic co-op OR 1v1 showdown-versus). This is what lets showdown ride the
+ * co-op full-state stream/replay stack WITHOUT re-implementing it: co-op keeps
+ * `gameMode.isCoop`, versus adds `gameMode.isShowdown`, both authoritative.
+ *
+ * Purely ADDITIVE for the existing seams: a classic co-op run is never `isShowdown` and solo has
+ * no active runtime (so this is false) -> solo / co-op are byte-for-byte unaffected. Reads
+ * `globalScene`, so it is an ENGINE-side predicate (unlike {@linkcode getCoopNetcodeMode}); the
+ * `?? false` guards the rare pre-scene call. The ONLY sites converted to this are the ~dozen core-
+ * battle gates - the shop / ME / biome / egg `.isCoop` sites stay co-op-only (do-not-drag-in).
+ */
+export function isAuthoritativeBattleSession(): boolean {
+  if (active == null || getCoopNetcodeMode() !== "authoritative") {
+    return false;
+  }
+  const mode = globalScene?.gameMode;
+  return (mode?.isCoop ?? false) || (mode?.isShowdown ?? false);
 }
 
 /** Convenience: the live battle-command relay, or null when not in a co-op run. */

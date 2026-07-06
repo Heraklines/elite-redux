@@ -7,6 +7,7 @@ import {
   coopLocalOwnedPlayerFieldSlot,
   getCoopController,
   getCoopNetcodeMode,
+  isAuthoritativeBattleSession,
 } from "#data/elite-redux/coop/coop-runtime";
 import { beginCoopRecording } from "#data/elite-redux/coop/coop-turn-recorder";
 import { ArenaTagSide } from "#enums/arena-tag-side";
@@ -85,8 +86,9 @@ export class TurnStartPhase extends FieldPhase {
     // resolves the turn normally, opening a turn recording so its narration is captured
     // + streamed. In LOCKSTEP this block is SKIPPED entirely so both engines resolve the
     // turn normally (the move stays visibly synced). Gated on a live co-op role, so solo
-    // / non-co-op play is byte-for-byte unchanged.
-    if (globalScene.gameMode.isCoop && getCoopNetcodeMode() === "authoritative") {
+    // / non-co-op play is byte-for-byte unchanged. Showdown-versus (C3) rides the SAME divert
+    // via isAuthoritativeBattleSession() (co-op OR showdown, authoritative).
+    if (isAuthoritativeBattleSession()) {
       const role = getCoopController()?.role;
       // DIAGNOSTIC (#633 trainer-victory deadlock): log the authoritative guest-diversion guard so a
       // live capture shows the mode+role at the divert decision - a silent "lockstep" fallback here is

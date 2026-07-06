@@ -10,6 +10,7 @@ import {
   applyErRivalOverride,
   applyErRosterOverride,
 } from "#data/elite-redux/er-trainer-runtime-hook";
+import { applyShowdownOverride } from "#data/elite-redux/showdown/showdown-enemy-build";
 import type { PokemonSpecies } from "#data/pokemon-species";
 import { ArenaTagSide } from "#enums/arena-tag-side";
 import { Challenges } from "#enums/challenges";
@@ -382,6 +383,15 @@ export class Trainer extends Phaser.GameObjects.Container {
       () => {
         const template = this.getPartyTemplate();
         const strength: PartyMemberStrength = template.getStrength(index);
+
+        // Showdown 1v1 hook (C3): a trainer flagged as the showdown OPPONENT fields the
+        // negotiated manifest team VERBATIM (built from the opponent manifest, BST-curve exempt).
+        // Checked FIRST - it wins over every roster/rival/ghost override for the duel.
+        const showdown = applyShowdownOverride(this, index);
+        if (showdown !== null) {
+          ret = showdown;
+          return;
+        }
 
         // ER ghost hook (#217): if this trainer was flagged as a cross-player
         // "ghost" (endgame gauntlet), field the stored team. Checked FIRST so it

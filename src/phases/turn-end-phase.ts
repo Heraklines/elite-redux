@@ -10,7 +10,11 @@ import {
   captureCoopChecksumState,
   captureCoopFieldSnapshot,
 } from "#data/elite-redux/coop/coop-battle-engine";
-import { getCoopBattleStreamer, getCoopController, getCoopNetcodeMode } from "#data/elite-redux/coop/coop-runtime";
+import {
+  getCoopBattleStreamer,
+  getCoopController,
+  isAuthoritativeBattleSession,
+} from "#data/elite-redux/coop/coop-runtime";
 import { endCoopRecording } from "#data/elite-redux/coop/coop-turn-recorder";
 import { getErBiomeRule } from "#data/elite-redux/er-biome-rules";
 import { erApplyFieldMedic } from "#data/elite-redux/er-relics";
@@ -214,7 +218,8 @@ export class TurnEndPhase extends FieldPhase {
    */
   private emitCoopTurn(): void {
     const recording = endCoopRecording();
-    if (!globalScene.gameMode.isCoop || getCoopNetcodeMode() !== "authoritative") {
+    // Core-battle authoritative stream: co-op OR showdown-versus (C3). Solo/non-host no-op.
+    if (!isAuthoritativeBattleSession()) {
       return;
     }
     const controller = getCoopController();

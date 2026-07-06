@@ -138,6 +138,7 @@ import { ShinySparklePhase } from "#phases/shiny-sparkle-phase";
 import { ShowAbilityPhase } from "#phases/show-ability-phase";
 import { ShowPartyExpBarPhase } from "#phases/show-party-exp-bar-phase";
 import { ShowTrainerPhase } from "#phases/show-trainer-phase";
+import { ShowdownResultPhase } from "#phases/showdown-result-phase";
 import { StatStageChangePhase } from "#phases/stat-stage-change-phase";
 import { SummonMissingPhase } from "#phases/summon-missing-phase";
 import { SummonPhase } from "#phases/summon-phase";
@@ -279,6 +280,7 @@ const PHASES = Object.freeze({
   ShiftSummonPhase,
   ShinySparklePhase,
   ShowAbilityPhase,
+  ShowdownResultPhase,
   ShowPartyExpBarPhase,
   ShowTrainerPhase,
   StatStageChangePhase,

@@ -1123,8 +1123,13 @@ export function enforceErEliteBstCurve(enemy: EnemyPokemon): void {
     // legitimately exceed the cap), the delve guardians (#494) are MEANT to climb
     // past the wave cap with depth, and catch-bosses are hand-built. Never let the
     // wave-ladder cap rewrite an encounter's chosen species.
+    // Showdown 1v1 (C3): the opponent's team is a hand-built, exchanged, level-100 team meant
+    // to be fielded EXACTLY as built - the wave-1 BST ladder would swap/devolve it. Exempt it
+    // like the other curated-content paths (daily / colosseum / ME). Showdown-only -> no other
+    // mode's curve is touched.
     if (
       globalScene.gameMode?.isDaily ||
+      globalScene.gameMode?.isShowdown ||
       erColosseumBattleActive ||
       (globalScene.currentBattle?.isBattleMysteryEncounter?.() ?? false)
     ) {

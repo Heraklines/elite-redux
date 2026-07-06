@@ -1,5 +1,5 @@
 import { globalScene } from "#app/global-scene";
-import { getCoopController, getCoopNetcodeMode } from "#data/elite-redux/coop/coop-runtime";
+import { getCoopController, isAuthoritativeBattleSession } from "#data/elite-redux/coop/coop-runtime";
 import { ER_DOOMED_SWITCH_THRESHOLD_MULT, erAssessThreat, getErAiProfile } from "#data/elite-redux/er-enemy-ai";
 import { AbilityId } from "#enums/ability-id";
 import { BattlerTagType } from "#enums/battler-tag-type";
@@ -41,12 +41,9 @@ export class EnemyCommandPhase extends FieldPhase {
     // the phase queue stays well-formed and the guest's TurnStartPhase diverts the whole
     // turn to CoopReplayTurnPhase. In LOCKSTEP the guest rolls the enemy AI NORMALLY (both
     // engines resolve on the shared seed, so they stay in lockstep). Gated on the live guest
-    // role, so solo / host play is byte-for-byte unchanged.
-    if (
-      globalScene.gameMode.isCoop
-      && getCoopNetcodeMode() === "authoritative"
-      && getCoopController()?.role === "guest"
-    ) {
+    // role, so solo / host play is byte-for-byte unchanged. Showdown-versus (C4) rides the SAME
+    // guest short-circuit (its enemy side is the HOST's team; the guest never resolves it).
+    if (isAuthoritativeBattleSession() && getCoopController()?.role === "guest") {
       globalScene.currentBattle.turnCommands[globalScene.currentBattle.arrangement.enemyOffset + this.fieldIndex] = {
         command: Command.FIGHT,
         move: { move: MoveId.NONE, targets: [], useMode: MoveUseMode.NORMAL },

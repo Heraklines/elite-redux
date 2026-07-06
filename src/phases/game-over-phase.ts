@@ -54,6 +54,14 @@ export class GameOverPhase extends BattlePhase {
   start() {
     super.start();
 
+    // Showdown 1v1 (C3): a versus match NEVER runs the classic game-over (no save / ribbons /
+    // achievements / cloud). Route the player's loss (or an unexpected showdown game-over) to the
+    // ephemeral showdown result flow instead. Showdown-only -> every other mode is untouched.
+    if (globalScene.gameMode.isShowdown) {
+      globalScene.phaseManager.unshiftNew("ShowdownResultPhase", this.isVictory, "victory");
+      return this.end();
+    }
+
     // Co-op (#633, authoritative wave-advance handshake): the host's run ended. Signal the guest
     // renderer so the protocol is complete. The guest currently treats `gameOver` as terminal
     // (it does not run the next-wave victory tail; the full guest game-over render is a TODO) -
