@@ -91,6 +91,15 @@ export interface CoopRendezvousResult {
   point: string;
   /** True when the partner NEVER arrived and the anti-hang timeout fired (the run proceeds anyway). */
   timedOut: boolean;
+  /**
+   * #847 CROSS-POINT RELEASE: set to the OTHER sync point `Q` the partner arrived at while we awaited
+   * this point `P`. The partner having reached a DIFFERENT point that we have NOT locally reached proves
+   * it diverged onto another branch and will NEVER arrive at `P` (the berry-bush deadlock: the reward
+   * owner walked to the shop while the partner opened a phantom next command). Resolving is then an INFO
+   * release (NOT the anti-hang WARN) - the caller proceeds exactly as on timeout and the downstream
+   * catch-up machinery reconciles.
+   */
+  crossPoint?: string;
 }
 
 /** Options for {@linkcode CoopRendezvous} (timer injection for tests). */
@@ -168,6 +177,18 @@ export class CoopRendezvous {
       }
       return Promise.resolve({ point, timedOut: false });
     }
+    // #847 CROSS-POINT RELEASE (buffered): the partner's arrival for a DIFFERENT sync point may already be
+    // buffered BEFORE this await installs (the berry-bush trace: the guest had the host's `shop:3:2` arrival
+    // buffered before it opened its `cmd:3:2` await). Check the buffer for a FOREIGN arrival at await-START,
+    // not just on live receipt - a partner parked at Q proves it will never reach P. Resolve INFO (not WARN).
+    const buffered = this.foreignArrival(point);
+    if (buffered !== undefined) {
+      coopLog(
+        "rendezvous",
+        `AWAIT point=${point} -> CROSS-POINT release (partner already at ${buffered}, buffered) role=${this.transport.role}`,
+      );
+      return Promise.resolve({ point, timedOut: false, crossPoint: buffered });
+    }
     coopLog("rendezvous", `AWAIT point=${point} timeoutMs=${timeoutMs} -> network-wait role=${this.transport.role}`);
     // Supersede any stale waiter parked on this point (only one await per point at a time).
     const stale = this.pending.get(point);
@@ -200,8 +221,15 @@ export class CoopRendezvous {
             `RENDEZVOUS TIMEOUT point=${point} after ${timeoutMs}ms - partner never arrived; `
               + `PROCEEDING (anti-hang backstop) role=${this.transport.role}`,
           );
-        } else {
+        } else if (res.crossPoint === undefined) {
           coopLog("rendezvous", `AWAIT point=${point} RESOLVE both-arrived role=${this.transport.role}`);
+        } else {
+          // #847 CROSS-POINT: the partner is at ANOTHER sync point and will never reach P. INFO, not WARN -
+          // this is a healthy divergence release (no hang), distinct from the dead-partner timeout above.
+          coopLog(
+            "rendezvous",
+            `AWAIT point=${point} CROSS-POINT release (partner at ${res.crossPoint}) role=${this.transport.role}`,
+          );
         }
         resolve(res);
       };
@@ -275,9 +303,48 @@ export class CoopRendezvous {
       waiter({ point, timedOut: false });
       return;
     }
+    // #847 CROSS-POINT RELEASE (live): no waiter for THIS point, but we may be parked awaiting a DIFFERENT
+    // point. If this arrival is for a point we have NOT locally reached (excluding it never satisfies our
+    // OWN progression), the partner has diverged onto another branch and will never reach the point(s) we
+    // await - release each such parked waiter INFO (crossPoint), NOT the dead-partner WARN. The arrival
+    // itself stays BUFFERED (partnerArrived) so its own eventual await still buffer-hits both-arrived.
+    if (this.pending.size > 0 && !this.localArrived.has(point)) {
+      let released = false;
+      for (const [waitPoint, finish] of [...this.pending.entries()]) {
+        if (waitPoint !== point) {
+          coopLog(
+            "rendezvous",
+            `RECV arrival point=${point} -> CROSS-POINT release of AWAIT ${waitPoint} role=${this.transport.role}`,
+          );
+          finish({ point: waitPoint, timedOut: false, crossPoint: point });
+          released = true;
+        }
+      }
+      if (released) {
+        return;
+      }
+    }
     // No waiter yet - buffer for the next awaitPartner(point) (the #812 early-arrival class).
     if (isCoopDebug()) {
       coopLog("rendezvous", `RECV arrival point=${point} -> BUFFER (no waiter yet) role=${this.transport.role}`);
     }
+  }
+
+  /**
+   * #847 CROSS-POINT RELEASE helper: the first buffered PARTNER arrival for a point OTHER than
+   * `exceptPoint` that we have NOT locally reached, or undefined when none. A partner arrival at a point
+   * we have ALSO locally arrived at is NOT foreign - it is a shared sync point behind/at us (e.g. the
+   * previous turn's command barrier the caller's synchronous fast-path passed without consuming), so
+   * excluding it prevents a stale past-point from spuriously cross-releasing the NEXT barrier. Only a
+   * point the partner reached that we never will (a divergent branch: `shop:` while we await `cmd:`) is
+   * a genuine cross-point release.
+   */
+  private foreignArrival(exceptPoint: string): string | undefined {
+    for (const q of this.partnerArrived) {
+      if (q !== exceptPoint && !this.localArrived.has(q)) {
+        return q;
+      }
+    }
+    return;
   }
 }

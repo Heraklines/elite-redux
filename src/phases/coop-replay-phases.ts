@@ -48,6 +48,7 @@ import { COOP_FAINT_SWITCH_SEQ_BASE } from "#data/elite-redux/coop/coop-interact
 import {
   consumeCoopPendingWaveAdvance,
   coopHasPendingWaveAdvance,
+  coopMeHandoffBattleWon,
   coopOwnerOfPlayerFieldSlot,
   coopSessionGeneration,
   coopWaveAdvanceSignaledFor,
@@ -55,6 +56,7 @@ import {
   getCoopController,
   getCoopInteractionRelay,
   isCoopAuthoritativeGuest,
+  queueCoopMeBattleVictoryTail,
 } from "#data/elite-redux/coop/coop-runtime";
 import { coopSwitchBlocksMonForOwner } from "#data/elite-redux/coop/coop-session";
 import type {
@@ -1010,6 +1012,13 @@ export class CoopFinalizeTurnPhase extends Phase {
       // shop) never sends -> softlock right after the battle. Peeking the pending advance routes that
       // case through the TERMINAL branch (run the victory tail, NO turn advance), like a multi-turn wave.
       const waveEnding = coopWaveAdvanceSignaledFor(wave) || coopHasPendingWaveAdvance();
+      // #847 ME battle-handoff phantom-turn softlock: the host's ME-battle WIN never emits `waveResolved`
+      // (VictoryPhase's isMysteryEncounter branch returns BEFORE broadcastCoopWaveResolved), so neither
+      // guard above fires - the guest would open a phantom turn N+1 for a battle the host already won +
+      // left for the ME reward shop (both barriers then deadlock at different points, the berry-bush
+      // freeze). Detect the ME-battle win DIRECTLY (spawned ME battle, all enemies fainted per the host's
+      // authoritative checkpoint) and run the ME victory tail instead of looping into a new command.
+      const meBattleWon = !waveEnding && coopMeHandoffBattleWon();
       if (waveEnding) {
         // FINAL turn of an already-/about-to-be-resolved wave: be TERMINAL. Run the wave-advance tail
         // (VictoryPhase / BattleEnd / GameOver - exactly once, one-shot + wave-guarded) and DO NOT queue
@@ -1023,6 +1032,17 @@ export class CoopFinalizeTurnPhase extends Phase {
         // mark NOW (the wave boundary) or the new wave's turn 1 is killed as a "stale duplicate".
         getCoopBattleStreamer()?.clearFinalizedMark();
         this.maybeRunCoopWaveAdvance();
+      } else if (meBattleWon) {
+        // #847: TERMINAL final turn of an ME-spawned battle. Run the ME victory tail (VictoryPhase ->
+        // handleMysteryEncounterVictory -> reward shop) and DO NOT queue turn-end - opening a phantom
+        // command here is the exact live freeze (the guest awaits a turn N+1 the host never sends while
+        // the host awaits the guest at the reward shop).
+        coopWarn(
+          "replay",
+          `guest finalize turn=${this.turn}: suppressing phantom turn after ME battle-handoff WIN (running ME victory tail, NOT queuing turn-end)`,
+        );
+        getCoopBattleStreamer()?.clearFinalizedMark();
+        queueCoopMeBattleVictoryTail();
       } else {
         // BUG1 (faint auto-switch premature-victory deadlock): the authoritative guest is a PURE
         // RENDERER and the checkpoint applied at the top of start() already carries the host's

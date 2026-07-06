@@ -494,6 +494,14 @@ export class CommandPhase extends FieldPhase {
               "rendezvous",
               `next-command barrier ${point} TIMED OUT - partner never reached command; opening UI anyway (anti-hang)`,
             );
+          } else if (result.crossPoint !== undefined) {
+            // #847 CROSS-POINT: the partner is already at another sync point (e.g. the reward shop) and
+            // will never reach this command point. Open the UI immediately - the downstream catch-up
+            // machinery reconciles. INFO, not the anti-hang WARN (no dead partner, no 60s wait).
+            coopLog(
+              "rendezvous",
+              `next-command barrier ${point} CROSS-POINT release (partner at ${result.crossPoint}); opening UI`,
+            );
           }
         })
         .catch((e: unknown) => {

@@ -37,7 +37,11 @@ import { CoopBattleSync } from "#data/elite-redux/coop/coop-battle-sync";
 import { coopLog, coopWarn, isCoopDebug } from "#data/elite-redux/coop/coop-debug";
 import { COOP_DEX_SYNC_SEQ, CoopInteractionRelay } from "#data/elite-redux/coop/coop-interaction-relay";
 import { meBattleHandoffKey } from "#data/elite-redux/coop/coop-me-battle-handoff";
-import { coopMeInteractionStartValue, setCoopMeInteractionStart } from "#data/elite-redux/coop/coop-me-pin-state";
+import {
+  coopMeHandoffBattleStarted,
+  coopMeInteractionStartValue,
+  setCoopMeInteractionStart,
+} from "#data/elite-redux/coop/coop-me-pin-state";
 import { CoopMePump } from "#data/elite-redux/coop/coop-me-pump";
 import { CoopRendezvous } from "#data/elite-redux/coop/coop-rendezvous";
 import { COOP_REJOIN_SYNC_SEQ_BASE } from "#data/elite-redux/coop/coop-seq-registry";
@@ -69,6 +73,7 @@ import {
   recordReplayCommand,
 } from "#data/elite-redux/replay-recorder";
 import type { ReplayCommandKind } from "#data/elite-redux/replay-trace";
+import { BattlerIndex } from "#enums/battler-index";
 import { Command } from "#enums/command";
 import { UiMode } from "#enums/ui-mode";
 import { PokemonData } from "#system/pokemon-data";
@@ -1350,6 +1355,59 @@ function coopMeHandoffActive(): boolean {
     && getCoopNetcodeMode() === "authoritative"
     && coopMeBattleInteractionCounter >= 0
   );
+}
+
+/**
+ * GUEST (#847, ME battle-handoff phantom-turn softlock): whether the SPAWNED ME battle has been WON by
+ * the host and the guest must now run the ME victory tail instead of opening a phantom next command.
+ *
+ * THE GAP: the authoritative wave-advance handshake (`coopHasPendingWaveAdvance` / the `waveResolved`
+ * message) is the guest's ONLY signal to stop looping a resolved battle - but the host NEVER broadcasts
+ * it for an ME-spawned battle. `VictoryPhase` takes the `isMysteryEncounter` branch (handleMysteryEncounter
+ * Victory + return) BEFORE `broadcastCoopWaveResolved("win")`, so no wave-advance is ever pending for the
+ * ME battle. The guest, a pure renderer that never runs its own FaintPhase/VictoryPhase, finalizes the
+ * winning turn with NO pending advance and falls into the turn-advance branch -> a phantom turn N+1 for a
+ * battle the host already won + left for the reward shop (the berry-bush deadlock: both barriers then
+ * wait at different points).
+ *
+ * THE SIGNAL: we are the authoritative GUEST inside a STARTED ME-handoff battle and every enemy is
+ * fainted. `CoopFinalizeTurnPhase` applies the host's authoritative checkpoint BEFORE calling finishTurn,
+ * so a fully-fainted enemy party is the host's REAL win (not a locally-chipped premature victory - the
+ * BUG1 hazard the normal path guards against, which reads local chip damage, not the checkpoint). This is
+ * deterministic (no dependency on the reward-options message having arrived), and it naturally handles a
+ * multi-turn ME battle (false until the LAST turn KOs the field).
+ */
+export function coopMeHandoffBattleWon(): boolean {
+  if (!coopMeHandoffActive() || !coopMeHandoffBattleStarted() || active!.controller.role !== "guest") {
+    return false;
+  }
+  const enemies = globalScene.getEnemyParty();
+  return enemies.length > 0 && enemies.every(e => e == null || e.isFainted());
+}
+
+/**
+ * GUEST (#847): queue the ME-spawned battle's VICTORY tail so the guest transitions to the ME reward
+ * shop (as its counter-parity owner/watcher) instead of a phantom next command. `VictoryPhase`'s
+ * `isMysteryEncounter` branch runs `handleMysteryEncounterVictory` -> `BattleEndPhase` ->
+ * `MysteryEncounterRewardsPhase` -> the guest's own `SelectModifierPhase` (the reward watcher on a
+ * host-owned ME), whose entry arrives at the shop rendezvous point so the host's shop-barrier resolves.
+ * Addresses the last enemy by `id` (an off-field but present party member after the checkpoint), falling
+ * back to the player lead when none remains, exactly like {@linkcode maybeRunCoopWaveAdvance}'s win arm.
+ * Best-effort + guarded - a failure here must never hang the guest's run.
+ */
+export function queueCoopMeBattleVictoryTail(): void {
+  try {
+    const lastEnemy = globalScene.getEnemyParty().at(-1);
+    const battlerArg = lastEnemy == null ? BattlerIndex.PLAYER : lastEnemy.id;
+    coopLog(
+      "me",
+      `guest ME battle WON: queuing VictoryPhase (ME reward tail, NOT a phantom turn) battler=${battlerArg}`,
+    );
+    globalScene.phaseManager.pushNew("VictoryPhase", battlerArg);
+  } catch (e) {
+    /* the ME victory tail is best-effort; a failure here must never hang the guest's run */
+    coopWarn("me", "queueCoopMeBattleVictoryTail threw (handled)", e);
+  }
 }
 
 /**

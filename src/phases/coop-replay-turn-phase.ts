@@ -11,8 +11,10 @@ import { coopLog, coopWarn, isCoopDebug } from "#data/elite-redux/coop/coop-debu
 import {
   coopHasPendingWaveAdvance,
   coopLocalOwnedPlayerFieldSlot,
+  coopMeHandoffBattleWon,
   getCoopBattleStreamer,
   isCoopAuthoritativeGuest,
+  queueCoopMeBattleVictoryTail,
 } from "#data/elite-redux/coop/coop-runtime";
 import type { CoopBattleEvent } from "#data/elite-redux/coop/coop-transport";
 import { coopNarrateMoveUsed } from "#phases/coop-replay-phases";
@@ -336,13 +338,20 @@ export class CoopReplayTurnPhase extends Phase {
       // the original turn-end run. (CoopReplayTurnPhase is guest-only; the gate is for symmetry and so a
       // future lockstep guest is unaffected.)
       if (isCoopAuthoritativeGuest()) {
-        // #698 softlock: do NOT advance the turn when a wave-advance is already PENDING (the host has won
-        // the wave). Incrementing here would start a phantom turn N+1 the host already passed -> the guest
-        // then awaits a turn-N+1 resolution the host (now in the reward shop) never sends -> softlock right
-        // after the battle. This is the same hazard the streamed finishTurn guards via
-        // coopHasPendingWaveAdvance; mirror it here. With an advance pending, end the turn flat - the
-        // host's pending waveResolved drives the post-battle tail on the next finalize / checkpoint resync.
-        if (!coopHasPendingWaveAdvance()) {
+        // #847 ME battle-handoff WIN (host-stall fallback): the host's ME-battle win emits NO waveResolved
+        // (VictoryPhase's isMysteryEncounter branch returns first), so coopHasPendingWaveAdvance is false
+        // here even though the ME battle is over. Detect it directly and run the ME victory tail (reward
+        // shop) instead of a phantom turn - otherwise a host stall on the ME battle's final turn strands
+        // the guest with no reward transition.
+        if (coopMeHandoffBattleWon()) {
+          queueCoopMeBattleVictoryTail();
+        } else if (!coopHasPendingWaveAdvance()) {
+          // #698 softlock: do NOT advance the turn when a wave-advance is already PENDING (the host has won
+          // the wave). Incrementing here would start a phantom turn N+1 the host already passed -> the guest
+          // then awaits a turn-N+1 resolution the host (now in the reward shop) never sends -> softlock right
+          // after the battle. This is the same hazard the streamed finishTurn guards via
+          // coopHasPendingWaveAdvance; mirror it here. With an advance pending, end the turn flat - the
+          // host's pending waveResolved drives the post-battle tail on the next finalize / checkpoint resync.
           globalScene.currentBattle.incrementTurn();
           globalScene.phaseManager.dynamicQueueManager.clearLastTurnOrder();
         }

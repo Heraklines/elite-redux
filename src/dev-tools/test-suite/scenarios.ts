@@ -10573,6 +10573,34 @@ export const DEV_SCENARIOS: DevScenario[] = [
       );
     },
   },
+  // Co-op - ME battle-handoff -> reward shop deadlock (the "berry bush" freeze, #847). NEEDS TWO LIVE
+  // CLIENTS, so this is a (note): drive it in a real co-op session, not a single-client dev battle.
+  {
+    label: "(note) Co-op: berry-bush ME reward freeze (#847)",
+    description:
+      "#847 co-op ME BATTLE-HANDOFF -> REWARD SHOP deadlock (the 'berry bush' P0: after a mystery-\n"
+      + "encounter battle ends, NEITHER player can pick the rewards - the run is frozen). ROOT CAUSE:\n"
+      + "an ME whose option spawns a battle hands off to the host-authoritative battle path; when the\n"
+      + "host WINS, VictoryPhase takes the isMysteryEncounter branch BEFORE broadcasting the co-op\n"
+      + "wave-advance, so the guest never got a signal to stop the battle. It opened a PHANTOM next-turn\n"
+      + "command for a battle the host already left for the shop -> each client waited at a DIFFERENT\n"
+      + "sync barrier (host at shop:W:C, guest at cmd:W:C+1) -> both ate the full 60s anti-hang -> freeze.\n"
+      + "FIX: (1) the guest detects the ME-battle win directly and runs the reward tail instead of a\n"
+      + "phantom turn; (2) the rendezvous CROSS-POINT releases a barrier the moment the partner is proven\n"
+      + "to be at another sync point (no 60s wait). VERIFY IN A REAL 2-CLIENT SESSION: play a co-op run\n"
+      + "to a battle-spawning ME (e.g. the berry-bush / Fight-or-Flight class), let the host win the\n"
+      + "fight, and CHECK both clients reach the reward shop and CAN pick - no freeze, no 60s stall, and\n"
+      + "NO '[coop:rendezvous] RENDEZVOUS TIMEOUT' WARN in the console. Headless proof (2 real engines):\n"
+      + "test/tests/elite-redux/coop/coop-duo-me-battle-reward.test.ts + coop-rendezvous.test.ts.",
+    setup: () => {
+      resetDevOverrides();
+      return [
+        makeStarter(SpeciesId.SNORLAX, {
+          moveset: [MoveId.BODY_SLAM, MoveId.CRUNCH, MoveId.EARTHQUAKE, MoveId.PROTECT],
+        }),
+      ];
+    },
+  },
   // Co-op - per-mon HELD ITEMS + the ball inventory sync to the guest (#698 RISKY #1-#4)
   {
     label: "Co-op: held items + ball counts sync (#698 RISKY #1-#4)",
