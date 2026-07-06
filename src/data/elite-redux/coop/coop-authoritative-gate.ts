@@ -21,6 +21,9 @@ import { coopLog, isCoopDebug } from "#data/elite-redux/coop/coop-debug";
 /** The live predicate, installed by coop-runtime; `null` (the default) reads as `false`. */
 let predicate: (() => boolean) | null = null;
 
+/** The live showdown-guest-flip predicate, installed by coop-runtime; `null` reads as `false`. */
+let showdownFlipPredicate: (() => boolean) | null = null;
+
 /**
  * coop-runtime ONLY: install (or clear, with `null`) the real {@linkcode isCoopAuthoritativeGuestGated}
  * predicate. Called once when a session is registered and cleared on teardown so a subsequent solo /
@@ -51,6 +54,29 @@ export function isCoopAuthoritativeGuestGated(): boolean {
       coopLog("session", "isCoopAuthoritativeGuestGated -> true (authoritative GUEST gates a structural mutation)");
     }
     return result;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * coop-runtime ONLY: install (or clear, with `null`) the real {@linkcode isShowdownGuestFlipGated}
+ * predicate. Called once when a session is registered and cleared on teardown.
+ */
+export function setShowdownGuestFlipPredicate(fn: (() => boolean) | null): void {
+  showdownFlipPredicate = fn;
+}
+
+/**
+ * Whether THIS client is the versus GUEST (the presentation perspective flip is active), read
+ * through the cycle-free gate so `pokemon.ts` / the battle-info panels can consult it without
+ * importing coop-runtime (a value-level import cycle). Hard `false` before any session / solo /
+ * co-op / host, so those render paths are byte-for-byte unchanged. A throwing predicate reads
+ * `false`. Presentation-only: the caller uses it read-only at render, never to mutate state.
+ */
+export function isShowdownGuestFlipGated(): boolean {
+  try {
+    return showdownFlipPredicate?.() === true;
   } catch {
     return false;
   }

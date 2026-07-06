@@ -1,4 +1,5 @@
 import { globalScene } from "#app/global-scene";
+import { isShowdownGuestFlipGated } from "#data/elite-redux/coop/coop-authoritative-gate";
 import { Stat } from "#enums/stat";
 import { TextStyle } from "#enums/text-style";
 import { UiTheme } from "#enums/ui-theme";
@@ -57,7 +58,14 @@ export class EnemyBattleInfo extends BattleInfo {
       },
     };
 
-    super(140, -141, false, posParams);
+    // Showdown 1v1 (C5) perspective flip: an EnemyBattleInfo normally sits TOP-LEFT. On the versus
+    // GUEST it is attached to the local player's OWN team (presented on the BOTTOM), so it moves to
+    // the player BOTTOM-RIGHT corner. The `false` (enemy) flag - which drives class chrome (flyout,
+    // no exp bar) - is UNCHANGED; only the CORNER is swapped, so the guest's own team's panel renders
+    // enemy chrome at the bottom (a documented presentation limitation). Hard-false off the versus-
+    // guest path, so solo / co-op / host construct at the identical top-left (byte-identical).
+    const flip = isShowdownGuestFlipGated();
+    super(flip ? Math.floor(globalScene.scaledCanvas.width) - 10 : 140, flip ? -72 : -141, false, posParams);
 
     this.ownedIcon = globalScene.add
       .sprite(0, 0, "icon_owned")

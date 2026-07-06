@@ -59,7 +59,10 @@ import { allAbilities, allMoves } from "#data/data-lists";
 import { PersistentFieldAuraAbAttr } from "#data/elite-redux/archetypes/persistent-field-aura";
 import { suppressesOpponentDamageBoosts } from "#data/elite-redux/archetypes/post-defend-suppress-opponent-damage-boost";
 import { coopAllowAccountWrite } from "#data/elite-redux/coop/coop-account-gate";
-import { isCoopAuthoritativeGuestGated } from "#data/elite-redux/coop/coop-authoritative-gate";
+import {
+  isCoopAuthoritativeGuestGated,
+  isShowdownGuestFlipGated,
+} from "#data/elite-redux/coop/coop-authoritative-gate";
 import { coopAttributeNewMon, coopHalfIsFull } from "#data/elite-redux/coop/coop-session";
 import type { CoopRole } from "#data/elite-redux/coop/coop-transport";
 import { isCoopRecording, recordCoopEvent } from "#data/elite-redux/coop/coop-turn-recorder";
@@ -122,6 +125,7 @@ import {
   erWardStoneTagLabel,
   findErWardStone,
 } from "#data/elite-redux/er-ward-stones";
+import { presentationSideIsPlayer } from "#data/elite-redux/showdown/showdown-perspective";
 import { getLevelTotalExp } from "#data/exp";
 import {
   SpeciesFormChangeActiveTrigger,
@@ -618,7 +622,7 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
         this,
         0,
         0,
-        `pkmn__${this.isPlayer() ? "back__" : ""}sub`,
+        `pkmn__${this.presentationIsBack() ? "back__" : ""}sub`,
         undefined,
         true,
       );
@@ -898,7 +902,13 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
       ),
     );
 
-    if (this.isPlayer() || this.getFusionSpeciesForm(false, useIllusion)) {
+    // Showdown 1v1 (C5): the versus GUEST's OWN team (authoritatively ENEMY instances) renders BACK
+    // sprites via the perspective flip, so their back atlas MUST be preloaded here or they'd show a
+    // substitute placeholder. `presentationIsBack()` collapses to `isPlayer()` off the versus-guest
+    // path, so solo / co-op / host preload exactly as before (byte-identical). The host's team on the
+    // guest (Player instances flipped to FRONT) needs no back atlas - its front is loaded by the
+    // species-form loadAssets above.
+    if (this.presentationIsBack() || this.getFusionSpeciesForm(false, useIllusion)) {
       // Guard against re-issuing an already-loaded (or in-flight) atlas: a
       // duplicate `loadPokemonAtlas` for the same key orphans files in Phaser's
       // shared loader and can wedge ALL sprite loads (the species loader has the
@@ -1004,7 +1014,7 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
     // ER Black Shinies (#349): also gap-fill the FRONT `-erblack` anim for
     // PLAYER black shinies (summary screen / catch panel play the front key,
     // which the back-keyed build below never covers).
-    const animKeys = new Set([this.getBattleSpriteKey(this.isPlayer(), ignoreOverride)]);
+    const animKeys = new Set([this.getBattleSpriteKey(this.presentationIsBack(), ignoreOverride)]);
     const erBlackFrontAnimKey = this.getBattleSpriteKey(false, ignoreOverride);
     if (erBlackFrontAnimKey.endsWith("-erblack")) {
       animKeys.add(erBlackFrontAnimKey);
@@ -1167,9 +1177,31 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
     return basePath;
   }
 
+  /**
+   * Showdown 1v1 (C5): whether THIS mon renders on the ON-SCREEN PLAYER (bottom) side from this
+   * client's viewpoint. Normally `=== isPlayer()`. On the versus GUEST the perspective flip inverts
+   * it so the guest's OWN team (authoritatively the ENEMY side) presents on the bottom and the host's
+   * team on top. Presentation-only + read-only: it feeds ONLY render decisions (back-vs-front sprite
+   * default, info-panel slide direction) - never authoritative state / the checksum - and collapses
+   * to `isPlayer()` off the versus-guest path (solo / co-op / host byte-identical).
+   */
+  private presentationIsPlayerSide(): boolean {
+    return presentationSideIsPlayer(this.isPlayer(), isShowdownGuestFlipGated());
+  }
+
+  /**
+   * Showdown 1v1 (C5): the DEFAULT battle-sprite orientation (BACK sprite vs front). The player-side
+   * mons face away (back sprite), so this is exactly {@linkcode presentationIsPlayerSide} - the guest's
+   * own team (bottom) shows back sprites, the host's team (top) shows front. Collapses to `isPlayer()`
+   * off the versus-guest path.
+   */
+  private presentationIsBack(): boolean {
+    return this.presentationIsPlayerSide();
+  }
+
   getBattleSpriteAtlasPath(back?: boolean, ignoreOverride?: boolean): string {
     if (back === undefined) {
-      back = this.isPlayer();
+      back = this.presentationIsBack();
     }
     // Same rationale as `getSpriteAtlasPath`: delegate to the species form's
     // override so ER-custom BACK sprites resolve to `elite-redux/{slug}/back`
@@ -1222,7 +1254,7 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
 
   getBattleSpriteId(back?: boolean, ignoreOverride?: boolean): string {
     if (back === undefined) {
-      back = this.isPlayer();
+      back = this.presentationIsBack();
     }
 
     const formIndex = this.summonData.illusion?.formIndex ?? this.formIndex;
@@ -1255,7 +1287,7 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
   getBattleSpriteKey(back?: boolean, ignoreOverride?: boolean): string {
     const base = `pkmn__${this.getBattleSpriteId(back, ignoreOverride)}`;
     if (back === undefined) {
-      back = this.isPlayer();
+      back = this.presentationIsBack();
     }
     // ER Black Shinies (#349): distinct texture key for the t4 atlas
     // (numeric scheme OR slug-based ER-custom scheme). The resolved atlas
@@ -1278,7 +1310,7 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
 
   getFusionBattleSpriteId(back?: boolean, ignoreOverride?: boolean): string {
     if (back === undefined) {
-      back = this.isPlayer();
+      back = this.presentationIsBack();
     }
 
     const fusionFormIndex = this.summonData.illusion?.fusionFormIndex ?? this.fusionFormIndex;
@@ -1298,7 +1330,7 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
 
   getFusionBattleSpriteAtlasPath(back?: boolean, ignoreOverride?: boolean): string {
     if (back === undefined) {
-      back = this.isPlayer();
+      back = this.presentationIsBack();
     }
     // Delegate to the fusion species form's `getSpriteAtlasPath` override (same
     // ER-custom key-vs-path scheme fix as `getBattleSpriteAtlasPath`), so an
@@ -4408,7 +4440,10 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
       } else {
         globalScene.fieldUI.moveAbove(this.battleInfo, otherBattleInfo);
       }
-      this.battleInfo.setX(this.battleInfo.x + (this.isPlayer() ? 150 : this.isBoss() ? -198 : -150));
+      // Showdown 1v1 (C5): the panel slides IN from its on-screen corner; `presentationIsPlayerSide()`
+      // maps the flipped guest to that corner (identity off the versus-guest path). The exp-bar mask
+      // nudge stays keyed to `isPlayer()` (the exp bar is PlayerBattleInfo chrome, bound to the class).
+      this.battleInfo.setX(this.battleInfo.x + (this.presentationIsPlayerSide() ? 150 : this.isBoss() ? -198 : -150));
       this.battleInfo.setVisible(true);
       if (this.isPlayer()) {
         // TODO: How do you get this to not require a private property access?
@@ -4416,7 +4451,7 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
       }
       globalScene.tweens.add({
         targets: [this.battleInfo, this.battleInfo.expMaskRect],
-        x: this.isPlayer() ? "-=150" : `+=${this.isBoss() ? 246 : 150}`,
+        x: this.presentationIsPlayerSide() ? "-=150" : `+=${this.isBoss() ? 246 : 150}`,
         duration: 1000,
         ease: "Cubic.easeOut",
       });
@@ -4429,7 +4464,7 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
       if (this.battleInfo?.visible) {
         globalScene.tweens.add({
           targets: [this.battleInfo, this.battleInfo.expMaskRect],
-          x: this.isPlayer() ? "+=150" : `-=${this.isBoss() ? 246 : 150}`,
+          x: this.presentationIsPlayerSide() ? "+=150" : `-=${this.isBoss() ? 246 : 150}`,
           duration: 500,
           ease: "Cubic.easeIn",
           onComplete: () => {
@@ -4438,7 +4473,9 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
               this["battleInfo"].expMaskRect.x -= 150;
             }
             this.battleInfo.setVisible(false);
-            this.battleInfo.setX(this.battleInfo.x - (this.isPlayer() ? 150 : this.isBoss() ? -198 : -150));
+            this.battleInfo.setX(
+              this.battleInfo.x - (this.presentationIsPlayerSide() ? 150 : this.isBoss() ? -198 : -150),
+            );
             resolve();
           },
         });
@@ -7582,7 +7619,26 @@ export class PlayerPokemon extends Pokemon {
     nature?: Nature,
     dataSource?: Pokemon | PokemonData,
   ) {
-    super(106, 148, species, level, abilityIndex, formIndex, gender, shiny, variant, ivs, nature, dataSource);
+    // Showdown 1v1 (C5) perspective flip: a PlayerPokemon is the LOCAL player's own mon and normally
+    // sits BOTTOM (106, 148). On the versus GUEST the local player's own team is the authoritative
+    // ENEMY side, so PlayerPokemon here is actually the OPPONENT (the host's team) and must render at
+    // the TOP (the enemy base 236, 84). `isShowdownGuestFlipGated()` is hard-false off the versus-guest
+    // path, so solo / co-op / host construct at the identical (106, 148) - byte-for-byte unchanged.
+    // Presentation-only: the base container x/y is not part of authoritative state / the checksum.
+    super(
+      isShowdownGuestFlipGated() ? 236 : 106,
+      isShowdownGuestFlipGated() ? 84 : 148,
+      species,
+      level,
+      abilityIndex,
+      formIndex,
+      gender,
+      shiny,
+      variant,
+      ivs,
+      nature,
+      dataSource,
+    );
 
     if (Overrides.STATUS_OVERRIDE) {
       this.status = new Status(Overrides.STATUS_OVERRIDE, 0, 4);
@@ -8310,9 +8366,13 @@ export class EnemyPokemon extends Pokemon {
     dataSource?: PokemonData,
     forRival = false,
   ) {
+    // Showdown 1v1 (C5) perspective flip: an EnemyPokemon normally sits TOP (236, 84). On the versus
+    // GUEST the authoritative ENEMY side is the local player's OWN team, which must render at the
+    // BOTTOM (the player base 106, 148). Hard-false off the versus-guest path, so solo / co-op / host
+    // construct at the identical (236, 84). Presentation-only (not authoritative state / checksum).
     super(
-      236,
-      84,
+      isShowdownGuestFlipGated() ? 106 : 236,
+      isShowdownGuestFlipGated() ? 148 : 84,
       species,
       level,
       dataSource?.abilityIndex,

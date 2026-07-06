@@ -1,4 +1,5 @@
 import { globalScene } from "#app/global-scene";
+import { isShowdownGuestFlipGated } from "#data/elite-redux/coop/coop-authoritative-gate";
 import { getLevelRelExp, getLevelTotalExp } from "#data/exp";
 import { ExpGainsSpeed } from "#enums/exp-gains-speed";
 import { Stat } from "#enums/stat";
@@ -41,7 +42,13 @@ export class PlayerBattleInfo extends BattleInfo {
         statOverflow: 1,
       },
     };
-    super(Math.floor(globalScene.scaledCanvas.width) - 10, -72, true, posParams);
+    // Showdown 1v1 (C5) perspective flip: a PlayerBattleInfo normally sits BOTTOM-RIGHT. On the
+    // versus GUEST it is attached to the OPPONENT (the host's team, presented on TOP), so it moves to
+    // the enemy TOP-LEFT corner (140, -141). The `true` (player) flag - which drives class chrome (exp
+    // bar, HP numbers) - is UNCHANGED; only the CORNER is swapped. Hard-false off the versus-guest
+    // path, so solo / co-op / host construct at the identical bottom-right (byte-identical).
+    const flip = isShowdownGuestFlipGated();
+    super(flip ? 140 : Math.floor(globalScene.scaledCanvas.width) - 10, flip ? -141 : -72, true, posParams);
 
     this.hpNumbersContainer = globalScene.add.container(-15, 10).setName("container_hp");
 

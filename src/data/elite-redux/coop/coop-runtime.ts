@@ -19,7 +19,10 @@
 // =============================================================================
 
 import { globalScene } from "#app/global-scene";
-import { setCoopAuthoritativeGuestPredicate } from "#data/elite-redux/coop/coop-authoritative-gate";
+import {
+  setCoopAuthoritativeGuestPredicate,
+  setShowdownGuestFlipPredicate,
+} from "#data/elite-redux/coop/coop-authoritative-gate";
 import { COOP_CHECKSUM_SENTINEL } from "#data/elite-redux/coop/coop-battle-checksum";
 import {
   applyCoopDexDelta,
@@ -1047,6 +1050,9 @@ export function setCoopRuntime(runtime: CoopRuntime): void {
   // Install the cycle-free authoritative-guest predicate (#633 B6) so `field/pokemon.ts` can gate the
   // Shedinja party-add without importing this module (which would close a value-level import cycle).
   setCoopAuthoritativeGuestPredicate(isCoopAuthoritativeGuest);
+  // Install the cycle-free showdown-guest-flip predicate (C5) so the render layer (pokemon.ts /
+  // battle-info panels) can consult the versus-guest perspective flip without importing this module.
+  setShowdownGuestFlipPredicate(isShowdownGuestFlip);
 }
 
 /** The live co-op session, or null when not in a co-op run. */
@@ -1120,6 +1126,19 @@ export function isAuthoritativeBattleSession(): boolean {
   }
   const mode = globalScene?.gameMode;
   return (mode?.isCoop ?? false) || (mode?.isShowdown ?? false);
+}
+
+/**
+ * Showdown 1v1 PvP (C5): whether THIS client is the versus GUEST, i.e. whether the PRESENTATION
+ * perspective flip is active. The guest's own team is authoritatively the ENEMY side (host-ordered);
+ * the flip is a RENDER-ONLY side swap so the guest sees its team on the bottom. HARD `false` for
+ * solo / co-op / the host (classic co-op guests share ONE player-side team and must NOT flip - this
+ * is narrower than {@linkcode isCoopAuthoritativeGuest}, which is true for co-op guests too), so
+ * every render site wrapped with this collapses to identity and is byte-for-byte unchanged off the
+ * versus-guest path. Read-only at render; NEVER used to mutate authoritative order/state.
+ */
+export function isShowdownGuestFlip(): boolean {
+  return isVersusSession() && getCoopController()?.role === "guest";
 }
 
 /** Convenience: the live battle-command relay, or null when not in a co-op run. */
@@ -1876,6 +1895,7 @@ export function clearCoopRuntime(): void {
   coopMeBattleInteractionCounter = -1;
   // Clear the cycle-free authoritative-guest predicate so a subsequent solo / lockstep run reads false.
   setCoopAuthoritativeGuestPredicate(null);
+  setShowdownGuestFlipPredicate(null);
   // #record-replay: stop + drop the captured trace at run teardown so the next run records fresh.
   clearReplayRecording();
   active = null;
