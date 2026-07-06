@@ -58,11 +58,13 @@ import { getGameMode } from "#app/game-mode";
 import {
   adoptCoopHostPlayerPartyOrder,
   applyCoopFieldSnapshot,
+  captureCoopCheckpoint,
   captureCoopChecksum,
   captureCoopChecksumState,
   captureCoopFieldSnapshot,
   captureCoopSaveDataDigest,
   captureCoopSaveDataNormalized,
+  reconcileCoopPlayerField,
 } from "#data/elite-redux/coop/coop-battle-engine";
 import {
   clearCoopRuntime,
@@ -1317,8 +1319,20 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
   const assertPostTurnConverged = async (wave: number): Promise<void> => {
     await checkDigest(wave, "post-turn", async () => {
       const snap = await withClient(rig.hostCtx, () => captureCoopFieldSnapshot());
+      // #849 (World A): the post-turn one-heal is a LESSER mechanism than production's full resync. Neither
+      // applyCoopFieldSnapshot (writes per-BI data WITHOUT reordering) nor adoptCoopHostPlayerPartyOrder
+      // (reorders only the OFF-FIELD bench; on-field leads are PINNED) can reposition an ON-FIELD
+      // TRANSPOSITION - two on-field mons the host and guest hold in SWAPPED slots (a voluntary-switch party
+      // transposition production converges via reconcileCoopPlayerField, seed 20260706 wave 61). Without this
+      // the transposition stays diverged here and is mis-recorded as a REAL finding. Run production's actual
+      // field reconcile (reconcileCoopPlayerField over the host checkpoint's field) FIRST, so the one-heal is
+      // a faithful resync analogue - only a divergence production's resync ALSO cannot converge is a finding.
+      const checkpoint = await withClient(rig.hostCtx, () => captureCoopCheckpoint());
       const hostParty = rig.hostScene.getPlayerParty().map(p => p.species.speciesId);
       await withClient(rig.guestCtx, () => {
+        if (checkpoint != null) {
+          reconcileCoopPlayerField(checkpoint.field);
+        }
         applyCoopFieldSnapshot(snap ?? undefined, true);
         adoptCoopHostPlayerPartyOrder(hostParty);
       });
