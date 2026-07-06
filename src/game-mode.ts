@@ -383,8 +383,9 @@ export class GameMode implements GameModeConfig {
       case GameModes.DAILY:
         return waveIndex === 50;
       case GameModes.SHOWDOWN:
-        // Single 1v1 duel: the first wave is the only (and final) wave.
-        // TODO(C3): provisional for B1 - Task C3 gives wave-final predicates their real treatment.
+        // Single 1v1 duel (C3): wave 1 is the only wave, so it is always the final wave.
+        // After it resolves the run routes to the showdown result flow (C6), never a next
+        // wave / shop / save. Owned here per the C3 task (the B1 provisional is now real).
         return waveIndex === 1;
     }
   }
