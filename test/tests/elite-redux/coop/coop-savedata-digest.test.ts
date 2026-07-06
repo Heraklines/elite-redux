@@ -34,14 +34,16 @@ import {
   captureCoopSaveDataDigest,
   captureCoopSaveDataNormalized,
 } from "#data/elite-redux/coop/coop-battle-engine";
-import { setCoopWaveBarrierMs } from "#data/elite-redux/coop/coop-interaction-relay";
+import { CoopInteractionRelay, setCoopWaveBarrierMs } from "#data/elite-redux/coop/coop-interaction-relay";
 import { clearCoopRuntime, setCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
 import { COOP_GUEST_FIELD_INDEX, COOP_HOST_FIELD_INDEX } from "#data/elite-redux/coop/coop-session";
 import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
+import { type ErRouteNode, setErPendingNodes } from "#data/elite-redux/er-biome-routing";
 import {
   erBiomeOverstayAnchor,
   getErBiomeLength,
   getErBiomeStartWave,
+  resetErBiomeStructure,
   restoreErBiomeStructure,
   setErBiomeOverstayAnchor,
 } from "#data/elite-redux/er-biome-structure";
@@ -49,17 +51,21 @@ import { getErMoneyStreakEntries, restoreErMoneyStreaks } from "#data/elite-redu
 import { getErRelicBattleState, restoreErRelicBattleState } from "#data/elite-redux/er-relic-battle-state";
 import { BattlerIndex } from "#enums/battler-index";
 import { BerryType } from "#enums/berry-type";
+import { BiomeId } from "#enums/biome-id";
 import { Command } from "#enums/command";
 import { GameModes } from "#enums/game-modes";
 import { MoveId } from "#enums/move-id";
 import { SpeciesId } from "#enums/species-id";
+import { UiMode } from "#enums/ui-mode";
 import { BerryModifier } from "#modifiers/modifier";
 import { BerryModifierType } from "#modifiers/modifier-type";
+import { SelectBiomePhase } from "#phases/select-biome-phase";
 import { SelectModifierPhase } from "#phases/select-modifier-phase";
 import { GameManager } from "#test/framework/game-manager";
 import {
   buildDuo,
   type DuoRig,
+  drainLoopback,
   driveGuestReplayTurn,
   driveGuestRewardWatch,
   driveHostRewardShopOwner,
@@ -71,7 +77,7 @@ import {
   withClientSync,
 } from "#test/tools/coop-duo-harness";
 import Phaser from "phaser";
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 const RUN = process.env.ER_SCENARIO === "1";
 
@@ -106,8 +112,11 @@ describe.skipIf(!RUN)("#837 co-op full-save-data checksum digest + heal", () => 
   afterEach(() => {
     setCoopWaveBarrierMs(60_000);
     setCoopHarnessModuleLetIsolation(false);
+    setErPendingNodes([]);
+    resetErBiomeStructure();
     logs.dispose();
     clearCoopRuntime();
+    vi.restoreAllMocks();
     initGlobalScene(game.scene);
   });
 
@@ -333,13 +342,14 @@ describe.skipIf(!RUN)("#837 co-op full-save-data checksum digest + heal", () => 
     logs.flush();
   }, 300_000);
 
-  it("SAME BIOME (#841 item 1): the co-op biome pick is bypassed - both engines auto-resolve the SAME next biome from the shared seed", async () => {
-    // Audit #841 item 1: the interactive biome / World-Map node picker (+ the Stay/Leave crossroads) is
-    // BYPASSED in co-op (select-biome-phase.ts / er-crossroads-phase.ts, #633). Instead BOTH clients
-    // auto-resolve the next biome DETERMINISTICALLY from the shared, just-reset wave seed, so two players
-    // can never travel to DIFFERENT biomes (there is no owner/watcher pick because there is no prompt). This
-    // drives the exact decision function (resetSeed -> generateRandomBiome) on both real engines + asserts
-    // they converge on the SAME biome; it also guards the seed pin the determinism relies on.
+  it("SAME BIOME (#841 item 1, owner-pick): the OWNER relays a NON-DEFAULT World-Map biome and BOTH engines adopt it", async () => {
+    // Audit #841 item 1, FLIPPED for #848: the ER World-Map biome pick is no longer BYPASSED in co-op - it
+    // is an OWNER-ALTERNATED, MIRRORED interaction (select-biome-phase.ts). The interaction OWNER drives the
+    // real ER_MAP picker and relays its CHOSEN biome; the WATCHER adopts that biome verbatim. So both clients
+    // converge on the OWNER'S CHOICE (which can be a NON-DEFAULT node, NOT the old deterministic roll) - no
+    // split run, but the player's choice is honored. This drives the REAL SelectBiomePhase owner/watcher over
+    // both engines and asserts they land in the SAME owner-chosen biome, distinct from the deterministic roll.
+    // (The full owner/mirror/relay + crossroads chain lives in coop-duo-biome-choice.test.ts.)
     await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
     const pair = createLoopbackPair();
     const rig = await buildDuo(game, pair, setCoopRuntime, toCoop);
@@ -348,18 +358,143 @@ describe.skipIf(!RUN)("#837 co-op full-save-data checksum digest + heal", () => 
     // The guest is seed-pinned to the host (adoptCoopHostRunConfig, #658 - proven in coop-duo-launch-sync).
     expect(rig.guestScene.seed, "the guest is seed-pinned to the host").toBe(rig.hostScene.seed);
 
-    // The co-op SelectBiomePhase decision, run headlessly on whichever engine is swapped in: reset the shared
-    // wave seed for the boundary wave, then roll the next biome (the phase's isCoop branch does exactly this
-    // via generateNextBiome -> generateRandomBiome for a non-END wave).
-    const pickBiome = (wave: number) => {
-      globalScene.resetSeed(wave);
-      return globalScene.generateRandomBiome(wave);
+    const WAVE = 11; // a biome-boundary wave (not a %50 END wave)
+    rig.hostScene.currentBattle.waveIndex = WAVE;
+    rig.guestScene.currentBattle.waveIndex = WAVE;
+    // Two REVEALED onward nodes (shared er-map state); the owner picks the SECOND (a non-default choice).
+    setErPendingNodes([
+      { biome: BiomeId.FOREST, revealed: true },
+      { biome: BiomeId.VOLCANO, revealed: true },
+    ] satisfies ErRouteNode[]);
+    const chosen = BiomeId.VOLCANO;
+
+    // What the OLD deterministic bypass WOULD have rolled (so we prove the owner's pick is honored INSTEAD).
+    const deterministicRoll = await withClient(rig.hostCtx, () => {
+      rig.hostScene.resetSeed(WAVE);
+      return rig.hostScene.generateRandomBiome(WAVE + 1);
+    });
+
+    const counter = rig.hostRuntime.controller.interactionCounter();
+    const hostOwns = counter % 2 === 0;
+    const ownerCtx = hostOwns ? rig.hostCtx : rig.guestCtx;
+    const watcherCtx = hostOwns ? rig.guestCtx : rig.hostCtx;
+    const hostSwitch = vi.spyOn(rig.hostScene.phaseManager, "unshiftNew");
+    const guestSwitch = vi.spyOn(rig.guestScene.phaseManager, "unshiftNew");
+    const biomeArg = (spy: typeof hostSwitch): BiomeId | undefined =>
+      spy.mock.calls.find(c => c[0] === "SwitchBiomePhase")?.[1] as BiomeId | undefined;
+
+    // Headless UI capture: record the ER_MAP picker config so the owner can commit its non-default pick.
+    interface ErMapMock {
+      box: { onSelect?: (b: BiomeId) => void };
+      restore: () => void;
+    }
+    const mockErMap = (scene: BattleScene): ErMapMock => {
+      const ui = scene.ui as unknown as { setMode: (m: number, ...a: unknown[]) => Promise<void> };
+      const real = ui.setMode.bind(ui);
+      const box: { onSelect?: (b: BiomeId) => void } = {};
+      ui.setMode = (m: number, ...a: unknown[]): Promise<void> => {
+        if (m === UiMode.ER_MAP) {
+          box.onSelect = (a[0] as { onSelect: (b: BiomeId) => void }).onSelect;
+        }
+        return Promise.resolve();
+      };
+      return {
+        box,
+        restore: () => {
+          ui.setMode = real;
+        },
+      };
     };
 
-    const WAVE = 11; // a biome-boundary wave (not a %50 END wave)
-    const hostBiome = await withClient(rig.hostCtx, () => pickBiome(WAVE));
-    const guestBiome = await withClient(rig.guestCtx, () => pickBiome(WAVE));
-    expect(guestBiome, "both engines land in the SAME biome (no independent pick -> no split run)").toBe(hostBiome);
+    const ownerMock = mockErMap(ownerCtx.scene);
+    const watcherMock = mockErMap(watcherCtx.scene);
+    try {
+      // OWNER drives the real picker + relays its chosen biome (buffered for the watcher).
+      await withClient(ownerCtx, async () => {
+        const phase = new SelectBiomePhase();
+        phase.start();
+        ownerMock.box.onSelect!(chosen);
+        await drainLoopback();
+      });
+      // WATCHER opens the mirrored copy + adopts the owner's relayed biome.
+      await withClient(watcherCtx, async () => {
+        const phase = new SelectBiomePhase();
+        phase.start();
+        for (let i = 0; i < 40; i++) {
+          await drainLoopback();
+          if (biomeArg(hostOwns ? guestSwitch : hostSwitch) !== undefined) {
+            return;
+          }
+        }
+        throw new Error("biome pick WATCH HANG: the watcher never adopted the owner's biome");
+      });
+    } finally {
+      ownerMock.restore();
+      watcherMock.restore();
+    }
+
+    // BOTH engines switch to the OWNER'S chosen biome (no split run) - and it is the player's pick, NOT the
+    // old deterministic roll (so the choice is genuinely restored, not re-derived).
+    expect(biomeArg(hostSwitch), "host adopts the owner's chosen biome").toBe(chosen);
+    expect(biomeArg(guestSwitch), "guest adopts the SAME owner-chosen biome").toBe(chosen);
+    expect(chosen, "the owner picked a NON-DEFAULT node (not the deterministic auto-roll)").not.toBe(deterministicRoll);
+    logs.flush();
+  }, 300_000);
+
+  it("SAME BIOME (#841 item 1, timeout fallback): a disconnected owner backstops BOTH engines to the SAME deterministic roll", async () => {
+    // The anti-hang backstop (#848): if the owner never picks (disconnect / stall), each client falls back to
+    // the deterministic roll it computes off the shared, just-reset wave seed - the SAME value on both, so the
+    // fallback CANNOT desync (it is exactly the old bypass behavior, now only on the timeout path). This drives
+    // the fallback decision on both engines + asserts they converge, guarding the seed pin it relies on.
+    await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
+    const pair = createLoopbackPair();
+    const rig = await buildDuo(game, pair, setCoopRuntime, toCoop);
+    wireGuestCommand(rig);
+
+    expect(rig.guestScene.seed, "the guest is seed-pinned to the host").toBe(rig.hostScene.seed);
+
+    const WAVE = 11;
+    rig.hostScene.currentBattle.waveIndex = WAVE;
+    rig.guestScene.currentBattle.waveIndex = WAVE;
+    setErPendingNodes([
+      { biome: BiomeId.FOREST, revealed: true },
+      { biome: BiomeId.VOLCANO, revealed: true },
+    ] satisfies ErRouteNode[]);
+    // Force every relay await to TIME OUT (a disconnected owner) -> the deterministic fallback. Only the
+    // WATCHER falls back: the OWNER drives the real picker (no timeout); on a true disconnect it is gone.
+    vi.spyOn(CoopInteractionRelay.prototype, "awaitInteractionChoice").mockResolvedValue(null);
+
+    const counter = rig.hostRuntime.controller.interactionCounter();
+    const hostOwns = counter % 2 === 0;
+    const watcherCtx = hostOwns ? rig.guestCtx : rig.hostCtx;
+
+    // The deterministic roll BOTH engines compute off the shared, just-reset wave seed (identical by #658
+    // seed pin) - so if both fell back they would match; the fallback cannot desync.
+    const rollUnder = (ctx: typeof rig.hostCtx): Promise<BiomeId> =>
+      withClient(ctx, () => {
+        ctx.scene.resetSeed(WAVE);
+        return ctx.scene.generateRandomBiome(WAVE + 1);
+      });
+    const hostRoll = await rollUnder(rig.hostCtx);
+    const guestRoll = await rollUnder(rig.guestCtx);
+    expect(guestRoll, "the deterministic fallback roll is identical on both engines (cannot desync)").toBe(hostRoll);
+
+    // The WATCHER engine runs the biome pick alone; the owner never sends -> it backstops to the roll.
+    const watcherFallback = await withClient(watcherCtx, async () => {
+      const spy = vi.spyOn(watcherCtx.scene.phaseManager, "unshiftNew");
+      const phase = new SelectBiomePhase();
+      phase.start();
+      for (let i = 0; i < 10; i++) {
+        await drainLoopback();
+        const biome = spy.mock.calls.find(c => c[0] === "SwitchBiomePhase")?.[1] as BiomeId | undefined;
+        if (biome !== undefined) {
+          return biome;
+        }
+      }
+      return;
+    });
+    expect(watcherFallback, "the watcher resolved on timeout (never hangs)").not.toBeUndefined();
+    expect(watcherFallback, "the watcher's fallback IS the deterministic shared-seed roll").toBe(hostRoll);
     logs.flush();
   }, 300_000);
 
