@@ -197,4 +197,60 @@ describe.skipIf(!RUN)("NIGHTLY co-op SOAK: mid-run mystery-encounter continuatio
 
     logs.flush();
   }, 600_000);
+
+  it("drives a GUEST-OWNED ME inline (counter parity), then surveys past it, findings=0", async () => {
+    // #633 FOLLOW-UP (ME LEG VARIANT: the GUEST-OWNED non-battle path - the IT #2 handshake's OTHER
+    // direction). BUILD 1 drove only the HOST-OWNED path (wave 12, even counter). A single ME at wave 13 has
+    // an ODD interaction counter (waves 1-12 advance it 11 times: shops at 1-9 + 11 + 12, boss wave 10 auto-
+    // grants +0), so counter parity routes wave 13 to the GUEST as owner: processMeWave takes the guest-owned
+    // branch (startGuestMeReplay + relayGuestMeOptionIndexOnly + startGuestMeOutcomeRace +
+    // drainGuestMeReplayToSettle - the host is the pick WATCHER, awaiting the guest's relayed option index via
+    // coopHostAwaitGuestIndex). This exercises the reciprocal of the host-owned drive across two real engines,
+    // INLINE in the continuous wave loop. Surveying wave 14 past it re-confirms the post-ME pin clear (finding
+    // (a)) holds for the guest-owned path too (the guest-owned drive leaves the SAME coopMeInteractionStart pin
+    // set). NB a single ME at wave 13 (not a wave-12 + wave-13 pair) is used deliberately: crossing directly
+    // from one ME wave INTO the next is a separate flow the continuous harness does not yet drive.
+    const seed = 828_633;
+    const GUEST_ME_WAVE = 15; // odd counter (14 - 1 milestone = 13) -> guest-owned; wild-eligible for this seed
+    const waves = GUEST_ME_WAVE + 1; // survey the wave past the guest-owned ME
+    announceSoakSeed(seed, waves);
+
+    await game.classicMode.startBattle(...SOAK_PROFILES.god.species);
+    const result = await runCoopSoak(game, {
+      seed,
+      waves,
+      logs,
+      profile: "god",
+      meWaves: new Map([[GUEST_ME_WAVE, MysteryEncounterType.DEPARTMENT_STORE_SALE]]),
+    });
+
+    // eslint-disable-next-line no-console
+    console.log(
+      `[coop-soak-me] GUEST-OWNED-ME DONE seed=${seed} waves=${result.wavesCompleted}/${result.wavesRequested} `
+        + `findings=${result.findings.length} MEs=${JSON.stringify(result.mysteryEncounters)} skips=${JSON.stringify(result.skips)}`,
+    );
+
+    // The GUEST-OWNED non-battle path was driven inline at wave 13 (the reciprocal of BUILD 1's host-owned).
+    expect(result.mysteryEncounters.length, "the designated ME was driven inline").toBe(1);
+    expect(result.mysteryEncounters[0].wave, "the ME was driven at the designated wave").toBe(GUEST_ME_WAVE);
+    expect(result.mysteryEncounters[0].path, "wave 13 is GUEST-OWNED by counter parity").toBe("guest-owned");
+    expect(
+      result.skips.mysteryEncounterWaveHit,
+      "no undrivable stray ME was counted (the guest-owned ME was DRIVEN)",
+    ).toBeUndefined();
+
+    // The survey reached wave 14 past the guest-owned ME (no stall, no terminal) - the guest-owned drive's
+    // post-ME pin clear holds too.
+    expect(result.wavesCompleted, "the run surveyed every wave THROUGH + PAST the guest-owned ME").toBe(waves);
+    expect(result.runEnded, "no terminal run-end past the ME").toBeUndefined();
+
+    // THE PRIMARY GATE: no unhealed DIGEST desync across the guest-owned ME wave and the wave after it.
+    expect(
+      result.findings,
+      `soak found ${result.findings.length} unhealed DIGEST desync(s) across the guest-owned ME (replay SOAK_SEED=${seed}): `
+        + result.findings.map(f => `[${f.fields}]@${f.firstWave}`).join(", "),
+    ).toEqual([]);
+
+    logs.flush();
+  }, 600_000);
 });
