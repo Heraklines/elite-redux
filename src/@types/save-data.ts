@@ -236,6 +236,14 @@ export interface Starter {
   erShinyLabName?: string | undefined;
   /** Co-op (#633 Fix #3): the owning player's canonical luck for this mon. */
   coopLuck?: number | undefined;
+  /**
+   * Showdown: the concrete evolution STAGE the player chose to field for this line
+   * (the grid pick is the root; this is the evolved species actually sent into the
+   * 1v1 duel). `undefined` for every non-showdown starter, so save-compat is untouched.
+   */
+  showdownSpeciesId?: number | undefined;
+  /** Showdown: the form index on {@linkcode showdownSpeciesId} (e.g. a mega form). */
+  showdownFormIndex?: number | undefined;
 }
 
 // TODO: What type of number does this store?

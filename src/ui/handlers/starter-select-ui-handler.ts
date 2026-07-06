@@ -44,6 +44,7 @@ import {
   renderErShinyLabLook,
 } from "#data/elite-redux/er-shiny-lab-renderer";
 import { resetErRunTrainerTracking } from "#data/elite-redux/er-trainer-runtime-hook";
+import { listEvolutionStages, listMegaStages } from "#data/elite-redux/showdown/showdown-evolutions";
 import { GrowthRate, getGrowthRateColor } from "#data/exp";
 import { Gender, getGenderColor, getGenderSymbol } from "#data/gender";
 import { getNatureName } from "#data/nature";
@@ -562,6 +563,13 @@ export class StarterSelectUiHandler extends MessageUiHandler {
   /** Co-op (#633): partner-status banner ("<name>: ready", "P2: 2/3", ...). Hidden off co-op. */
   private coopStatusText: Phaser.GameObjects.Text;
   private coopStatusUnsub: (() => void) | null = null;
+  /**
+   * Showdown: per-line teambuilder choices, keyed by the ROOT (grid) species id. Holds
+   * the chosen evolution/mega STAGE to field and the held ITEM. Applied onto the
+   * {@linkcode Starter} in {@linkcode addToParty}, and re-applied to an in-party mon when
+   * the player re-picks. Empty (and unused) in every non-showdown mode.
+   */
+  private showdownSelections: Map<number, { speciesId: number; formIndex: number; item?: string }> = new Map();
   private startCursorObj: Phaser.GameObjects.NineSlice;
   private randomCursorObj: Phaser.GameObjects.NineSlice;
   /** ER: cursor for the "Use Last Team" action (sits above the Random button). */
@@ -2576,6 +2584,16 @@ export class StarterSelectUiHandler extends MessageUiHandler {
               },
             },
           );
+          if (globalScene.gameMode.isShowdown) {
+            // Showdown: pick which evolution/mega stage of this line to field at lv100.
+            options.push({
+              label: "Field Stage",
+              handler: () => {
+                this.showShowdownStageOptions();
+                return true;
+              },
+            });
+          }
           if (this.speciesStarterMoves.length > 1) {
             // this lets you change the pokemon moves
             const showSwapOptions = (moveset: StarterMoveset) => {
@@ -3753,12 +3771,94 @@ export class StarterSelectUiHandler extends MessageUiHandler {
         !!this.starterPreferences[species.speciesId]?.erBlackShiny && !!starterDataEntry?.erBlackShiny && props.shiny,
     };
 
+    // Showdown: stamp the chosen evolution/mega STAGE + held ITEM onto the starter (the
+    // grid pick is the root; the fielded mon is the chosen stage). Left undefined when the
+    // player never opened the picker, in which case the base form is fielded.
+    if (globalScene.gameMode.isShowdown) {
+      this.applyShowdownSelection(starter, species.speciesId);
+    }
+
     this.starters.push(starter);
     this.starterSpecies.push(species);
     if (this.speciesLoaded.get(species.speciesId) || randomSelection) {
       getPokemonSpeciesForm(species.speciesId, props.formIndex).cry();
     }
     this.updateInstructions();
+  }
+
+  /**
+   * Showdown: stamp the recorded stage choice from {@linkcode showdownSelections} onto a
+   * starter. No-op when the player never opened the picker (base form is fielded then).
+   */
+  private applyShowdownSelection(starter: Starter, rootSpeciesId: number): void {
+    const selection = this.showdownSelections.get(rootSpeciesId);
+    if (!selection) {
+      return;
+    }
+    starter.showdownSpeciesId = selection.speciesId;
+    starter.showdownFormIndex = selection.formIndex;
+  }
+
+  /**
+   * Showdown: record the chosen stage for a line and re-stamp any in-party copy so
+   * {@linkcode tryStart} fields the chosen stage. Preserves an already-picked held item.
+   */
+  private setShowdownStage(rootSpeciesId: number, speciesId: number, formIndex: number): void {
+    const selection = this.showdownSelections.get(rootSpeciesId) ?? { speciesId, formIndex };
+    selection.speciesId = speciesId;
+    selection.formIndex = formIndex;
+    this.showdownSelections.set(rootSpeciesId, selection);
+    const index = this.starterSpecies.findIndex(s => s.speciesId === rootSpeciesId);
+    if (index >= 0) {
+      this.starters[index].showdownSpeciesId = speciesId;
+      this.starters[index].showdownFormIndex = formIndex;
+    }
+  }
+
+  /**
+   * Showdown: open the evolution/mega STAGE picker for the current grid species (the line
+   * root). Evolution stages field the reachable base form; mega/primal stages field the
+   * mega form (and will lock the held-item slot - handled by the item picker).
+   */
+  private showShowdownStageOptions(): void {
+    const ui = this.getUi();
+    const rootId = this.lastSpecies.speciesId;
+    const options: OptionSelectItem[] = [];
+    for (const stageId of listEvolutionStages(rootId)) {
+      const species = getPokemonSpecies(stageId as SpeciesId);
+      options.push({
+        label: species.name,
+        handler: () => {
+          this.setShowdownStage(rootId, stageId, 0);
+          ui.setMode(UiMode.STARTER_SELECT);
+          return true;
+        },
+      });
+    }
+    for (const mega of listMegaStages(rootId)) {
+      const species = getPokemonSpecies(mega.speciesId as SpeciesId);
+      options.push({
+        label: `${species.name} ${mega.formName}`,
+        handler: () => {
+          this.setShowdownStage(rootId, mega.speciesId, mega.formIndex);
+          ui.setMode(UiMode.STARTER_SELECT);
+          return true;
+        },
+      });
+    }
+    options.push({
+      label: i18next.t("menu:cancel"),
+      handler: () => {
+        ui.setMode(UiMode.STARTER_SELECT);
+        return true;
+      },
+    });
+    // Return to STARTER_SELECT FIRST, then open the submenu - the same handoff the
+    // Innates / Manage Moves / Manage Nature menus use (opening a new OPTION_SELECT
+    // directly from inside the action menu's own OPTION_SELECT softlocks it).
+    ui.setMode(UiMode.STARTER_SELECT).then(() =>
+      ui.setModeWithoutClear(UiMode.OPTION_SELECT, { options, maxOptions: 8, yOffset: 47 }),
+    );
   }
 
   updatePartyIcon(species: PokemonSpecies, index: number) {
