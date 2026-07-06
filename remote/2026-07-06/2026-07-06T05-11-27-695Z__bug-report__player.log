@@ -1,0 +1,51 @@
+----- BUG REPORT (in-game) -----
+version:  1.11.19
+url:      https://elite-redux.pages.dev/
+ua:       Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36 OPR/132.0.0.0
+mode:     4  wave:15  difficulty:youngster
+seed:     3gIU5QWDLgLoOEO8m8Lytn8z
+party:    Dragonite Delivery(L13 48/50)
+
+----- DESCRIPTION -----
+ME Freeze post shop and biome change
+
+----- CONSOLE -----
+[05:09:34.728] LOG: %c %c %c %c %c Phaser v3.90.0 (WebGL | Web Audio) %c https://phaser.io/v390 background: #ff0000 background: #ffff00 background: #00ff00 background: #00ffff color: #ffffff; background: #000000 background: transparent
+[05:09:35.632] LOG: [ER] build mr1lenh7-fth8
+[05:11:02.995] DEBUG: Destroying loading scene
+[05:11:02.996] DEBUG: Destroyed loading scene
+[05:11:03.082] LOG: Seed: 7bZtdLnl8aaZO4atN4LCK2Ic
+[05:11:03.082] LOG: Wave Seed: 7bZtdLnl8aaZO4atN4LCK2Ic 0
+[05:11:05.488] LOG: %cStart Phase LoginPhase color:green;
+[05:11:06.015] LOG: Client Session: 5c80NSH94LsE6LnG5v0Txq8N5ae68TXc
+[05:11:06.532] DEBUG: Using cached system data
+[05:11:06.652] LOG: %cStart Phase TitlePhase color:green;
+[05:11:06.652] LOG: Getting Session Slot id: %d 0
+[05:11:06.670] LOG: use seasonal splash messages true
+[05:11:09.753] LOG: Getting Session Slot id: %d 0
+[05:11:09.761] LOG: Wave Seed: 3gIU5QWDLgLoOEO8m8Lytn8z 0
+[05:11:09.761] LOG: Seed: 3gIU5QWDLgLoOEO8m8Lytn8z
+[05:11:09.796] LOG: Wave Seed: BvXdD`fS[v[~^T^G|G[}G 15
+[05:11:09.992] LOG: %cStart Phase EncounterPhase color:green;
+[05:11:09.996] LOG: Pokemon: Wild Goldeen | Species ID: 118 | Level: 10 | Nature: Serious (-)
+[05:11:09.996] LOG: Stats (IVs): HP: 29 (8), Atk: 21 (3), Def: 19 (25), Spatk: 14 (22), Spdef: 15 (7), Spd: 22 (7)
+[05:11:09.996] LOG: Ability: Swift Swim | Passive Ability: Lightning Rod 
+[05:11:09.996] LOG: Moveset: ["Bubble Beam","Hyper Drill","Water Sport","Peck"]
+[05:11:09.997] LOG: Pokemon: Wild Chewtle | Species ID: 833 | Level: 10 | Nature: Serious (-)
+[05:11:09.997] LOG: Stats (IVs): HP: 32 (28), Atk: 18 (3), Def: 18 (30), Spatk: 14 (14), Spdef: 14 (14), Spd: 15 (13)
+[05:11:09.997] LOG: Ability: Looter | Passive Ability: Strong Jaw 
+[05:11:09.997] LOG: Moveset: ["Razor Shell","Growl","Tackle"]
+[05:11:10.838] LOG: Wave Seed: BvXdD`fS[v[~^T^G|G[}G 15
+[05:11:11.465] LOG: %cStart Phase SummonPhase color:green;
+[05:11:11.707] WARN: cry/10752 not found
+[05:11:11.852] LOG: %cStart Phase InitEncounterPhase color:green;
+[05:11:11.856] LOG: %cStart Phase PostSummonPhase color:green;
+[05:11:11.856] LOG: Ran PSP for: Goldeen
+[05:11:11.858] LOG: %cStart Phase PostSummonPhase color:green;
+[05:11:11.859] LOG: %cStart Phase PostSummonPhase color:green;
+[05:11:11.859] LOG: %cStart Phase PostSummonPhase color:green;
+[05:11:11.859] LOG: Ran PSP for: Chewtle
+[05:11:11.860] LOG: %cStart Phase PostSummonPhase color:green;
+[05:11:11.860] LOG: %cStart Phase PostSummonPhase color:green;
+[05:11:11.860] LOG: %cStart Phase TurnInitPhase color:green;
+[05:11:11.861] LOG: %cStart Phase CommandPhase color:green;
