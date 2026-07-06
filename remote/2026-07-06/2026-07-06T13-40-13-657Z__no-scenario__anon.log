@@ -1,0 +1,267 @@
+url:      https://elite-redux-staging.pages.dev/
+build:    mr99b3es-16k3
+mode:     4  wave:42
+seed:     SVIvhlEROHTeblNYrdFfNI7i
+party:    Gyaradeath(L38 107hp f1), Toxtricity Redux Fuzz(L38 116hp f0), Servine(L34 0hp f0), Pawniard Redux(L33 82hp f0), Machamp Redux(L37 109hp f0), Basculin(L37 110hp f2)
+enemy:    Grovyle(L35), Growlithe(L35), Swellow(L35)
+
+----- CONSOLE -----
+[13:39:17.885] LOG: Applied Super EXP. Charm 
+[13:39:17.885] LOG: Applied EXP. Charm 
+[13:39:18.005] LOG: %cStart Phase LevelUpPhase color:green;
+[13:39:18.006] LOG: %cStart Phase LearnMoveBatchPhase color:green;
+[13:39:19.425] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[13:39:19.484] LOG: %cStart Phase MoveEndPhase color:green;
+[13:39:19.484] LOG: %cStart Phase MovePhase color:green;
+[13:39:19.484] LOG: %cUser: Growlithe
+Move: OUTRAGE
+Use Mode: NORMAL color:orchid
+[13:39:19.488] LOG: %cStart Phase MessagePhase color:green;
+[13:39:19.598] LOG: %cStart Phase MoveEffectPhase color:green;
+[13:39:19.600] LOG: crit stage: +0
+[13:39:19.600] LOG: Move: Outrage | Base damage: 34.457142857142856 | Power: 120 | Source attack: 71 | Target defense: 84
+[13:39:19.600] LOG: Move: Outrage | Attack damage: 31
+[13:39:19.601] LOG: %cStart Phase DamageAnimPhase color:green;
+[13:39:19.612] LOG: %cStart Phase MoveEndPhase color:green;
+[13:39:19.612] LOG: %cStart Phase CheckInterludePhase color:green;
+[13:39:19.612] LOG: %cStart Phase WeatherEffectPhase color:green;
+[13:39:19.612] LOG: %cStart Phase PositionalTagPhase color:green;
+[13:39:19.612] LOG: %cStart Phase BerryPhase color:green;
+[13:39:19.613] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[13:39:19.615] LOG: %cStart Phase TurnEndPhase color:green;
+[13:39:19.617] WARN: [coop:turn] host recorder: finalize with NO open recording -> turn=-1 events=0 (caller decides not to emit)
+[13:39:19.618] LOG: %cStart Phase ShowAbilityPhase color:green;
+[13:39:19.775] LOG: %cStart Phase DamageAnimPhase color:green;
+[13:39:19.776] WARN: Texture "%s" has no frame "%s" __MISSING fire
+[13:39:19.776] LOG: %cStart Phase MessagePhase color:green;
+[13:39:19.980] LOG: %cStart Phase HideAbilityPhase color:green;
+[13:39:20.005] LOG: %cStart Phase SwitchSummonPhase color:green;
+[13:39:20.083] WARN: Texture "%s" has no frame "%s" __MISSING grass
+[13:39:20.235] LOG: Ivy
+[13:39:20.236] WARN: Texture "%s" has no frame "%s" __MISSING grass
+[13:39:20.308] WARN: Texture "%s" has no frame "%s" __MISSING grass
+[13:39:20.308] WARN: Texture "%s" has no frame "%s" __MISSING fire
+[13:39:20.309] LOG: Applied Iron (enemy)
+[13:39:20.309] WARN: Texture "%s" has no frame "%s" __MISSING 58
+[13:39:20.309] LOG: Growlithe's variant icon does not exist. Replacing with default.
+[13:39:20.309] WARN: Texture "%s" has no frame "%s" __MISSING 58
+[13:39:20.438] LOG: %cStart Phase PostSummonPhase color:green;
+[13:39:20.438] LOG: Ran PSP for: Grovyle
+[13:39:20.438] LOG: %cStart Phase PostSummonPhase color:green;
+[13:39:20.438] LOG: %cStart Phase PostSummonPhase color:green;
+[13:39:20.438] LOG: %cStart Phase TurnInitPhase color:green;
+[13:39:20.438] LOG: %cStart Phase CommandPhase color:green;
+[13:39:21.417] LOG: Move: WATERFALL Move targets: {"targets":[2,3,1],"multiple":false} 
+Player Pokemon: Mega Gyaradeath X
+[13:39:21.418] LOG: %cStart Phase SelectTargetPhase color:green;
+[13:39:21.986] LOG: %cStart Phase CommandPhase color:green;
+[13:39:23.725] LOG: Battle Seed: Ta0459QotwGgdun7
+[13:39:23.726] LOG: Move: THRASH Move targets: {"targets":[3],"multiple":false} 
+Player Pokemon: Mega Gyaradeath X
+[13:39:23.728] LOG: %cStart Phase CommandPhase color:green;
+[13:39:25.119] LOG: Move: TORCH_SONG Move targets: {"targets":[2,3,0],"multiple":false} 
+Player Pokemon: Toxtricity Redux Fuzz
+[13:39:25.121] LOG: %cStart Phase SelectTargetPhase color:green;
+[13:39:25.665] LOG: %cStart Phase EnemyCommandPhase color:green;
+[13:39:25.683] LOG: Applied X Sp. Atk 
+[13:39:25.684] LOG: Applied Multi Lens 
+[13:39:25.684] LOG: Applied X Sp. Atk 
+[13:39:25.685] LOG: Applied Multi Lens 
+[13:39:25.685] LOG: Applied Black Glasses 
+[13:39:25.686] LOG: Applied X Sp. Atk 
+[13:39:25.686] LOG: Applied Multi Lens 
+[13:39:25.686] LOG: Applied X Sp. Atk 
+[13:39:25.687] LOG: Applied Multi Lens 
+[13:39:25.690] LOG: Move Pool: ["Leech Blade","Dragon Claw","X-Scissor","Sharpen"]
+[13:39:25.690] LOG: Move Scores: [36.18421052631579,23.684210526315788,3.6,20]
+[13:39:25.691] LOG: Sorted Move Pool: ["Leech Blade","Dragon Claw","Sharpen","X-Scissor"]
+[13:39:25.691] LOG: Chosen Move: Leech Blade
+[13:39:25.691] LOG: ER AI: experimental brain (sharpness 1)
+[13:39:25.691] LOG: %cStart Phase EnemyCommandPhase color:green;
+[13:39:25.691] LOG: %cStart Phase TurnStartPhase color:green;
+[13:39:25.696] LOG: %cStart Phase MovePhase color:green;
+[13:39:25.696] LOG: %cUser: Toxtricity Redux Fuzz
+Move: TORCH_SONG
+Use Mode: NORMAL color:orchid
+[13:39:25.701] LOG: %cStart Phase MessagePhase color:green;
+[13:39:25.810] LOG: %cStart Phase MoveEffectPhase color:green;
+[13:39:25.810] LOG: Applied Multi Lens 
+[13:39:25.811] LOG: crit stage: +0
+[13:39:25.811] LOG: Applied X Sp. Atk 
+[13:39:25.812] LOG: Move: Torch Song | Base damage: 73.97072786885245 | Power: 114.4 | Source attack: 117 | Target defense: 61
+[13:39:25.812] LOG: Applied Multi Lens 
+[13:39:25.812] LOG: Move: Torch Song | Attack damage: 153
+[13:39:25.813] LOG: %cStart Phase DamageAnimPhase color:green;
+[13:39:25.822] WARN: Texture "%s" has no frame "%s" __MISSING grass
+[13:39:25.824] LOG: %cStart Phase MessagePhase color:green;
+[13:39:26.010] LOG: %cStart Phase MessagePhase color:green;
+[13:39:26.210] LOG: %cStart Phase StatStageChangePhase color:green;
+[13:39:26.212] LOG: %cStart Phase MessagePhase color:green;
+[13:39:26.446] LOG: %cStart Phase MessagePhase color:green;
+[13:39:26.634] LOG: %cStart Phase FaintPhase color:green;
+[13:39:26.634] WARN: Texture "%s" has no frame "%s" __MISSING grass
+[13:39:26.690] WARN: Texture "%s" has no frame "%s" __MISSING grass
+[13:39:26.690] LOG: %cStart Phase MessagePhase color:green;
+[13:39:26.739] LOG: %cStart Phase VictoryPhase color:green;
+[13:39:26.739] LOG: %cStart Phase ExpPhase color:green;
+[13:39:26.739] LOG: Applied Super EXP. Charm 
+[13:39:26.739] LOG: Applied EXP. Charm 
+[13:39:27.047] LOG: %cStart Phase LevelUpPhase color:green;
+[13:39:27.048] LOG: %cStart Phase LearnMoveBatchPhase color:green;
+[13:39:36.975] LOG: %cStart Phase ExpPhase color:green;
+[13:39:36.975] LOG: Applied Super EXP. Charm 
+[13:39:36.975] LOG: Applied EXP. Charm 
+[13:39:37.641] LOG: %cStart Phase LevelUpPhase color:green;
+[13:39:37.641] LOG: %cStart Phase LearnMoveBatchPhase color:green;
+[13:39:44.866] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[13:39:44.866] LOG: Applied Super EXP. Charm 
+[13:39:44.866] LOG: Applied EXP. Charm 
+[13:39:44.986] LOG: %cStart Phase LevelUpPhase color:green;
+[13:39:44.986] LOG: Applied Protein 
+[13:39:44.986] LOG: Applied Zinc 
+[13:39:44.986] LOG: Applied Soul Dew 
+[13:39:44.986] LOG: Applied Soul Dew 
+[13:39:44.986] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[13:39:45.046] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[13:39:45.046] LOG: Applied Super EXP. Charm 
+[13:39:45.046] LOG: Applied EXP. Charm 
+[13:39:45.179] LOG: %cStart Phase LevelUpPhase color:green;
+[13:39:45.180] LOG: %cStart Phase LearnMoveBatchPhase color:green;
+[13:39:57.672] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[13:39:57.731] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[13:39:57.731] LOG: Applied Super EXP. Charm 
+[13:39:57.731] LOG: Applied EXP. Charm 
+[13:39:57.862] LOG: %cStart Phase LevelUpPhase color:green;
+[13:39:57.862] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[13:39:57.918] LOG: %cStart Phase MoveEndPhase color:green;
+[13:39:57.920] LOG: %cStart Phase MovePhase color:green;
+[13:39:57.920] LOG: %cUser: Mega Gyaradeath X
+Move: THRASH
+Use Mode: NORMAL color:orchid
+[13:39:57.922] LOG: %cStart Phase MessagePhase color:green;
+[13:39:58.166] LOG: %cStart Phase MessagePhase color:green;
+[13:39:58.287] LOG: %cStart Phase MoveEffectPhase color:green;
+[13:39:58.288] LOG: crit stage: +0
+[13:39:58.288] LOG: Move: Thrash | Base damage: 108.4448 | Power: 120 | Source attack: 132 | Target defense: 50
+[13:39:58.289] LOG: Move: Thrash | Attack damage: 48
+[13:39:58.289] LOG: %cStart Phase DamageAnimPhase color:green;
+[13:39:58.300] WARN: Texture "%s" has no frame "%s" __MISSING fire
+[13:39:58.301] LOG: %cStart Phase FaintPhase color:green;
+[13:39:58.301] WARN: Texture "%s" has no frame "%s" __MISSING fire
+[13:39:58.361] WARN: Texture "%s" has no frame "%s" __MISSING fire
+[13:39:58.361] LOG: %cStart Phase MessagePhase color:green;
+[13:39:58.784] LOG: %cStart Phase ShowAbilityPhase color:green;
+[13:39:58.949] LOG: %cStart Phase PokemonHealPhase color:green;
+[13:39:58.950] LOG: %cStart Phase MessagePhase color:green;
+[13:39:59.202] LOG: %cStart Phase HideAbilityPhase color:green;
+[13:39:59.227] LOG: %cStart Phase VictoryPhase color:green;
+[13:39:59.229] LOG: %cStart Phase ExpPhase color:green;
+[13:39:59.229] LOG: Applied Super EXP. Charm 
+[13:39:59.229] LOG: Applied EXP. Charm 
+[13:39:59.366] LOG: 54120 56180 54872
+[13:39:59.434] LOG: %cStart Phase LevelUpPhase color:green;
+[13:39:59.435] LOG: %cStart Phase ExpPhase color:green;
+[13:39:59.435] LOG: Applied Super EXP. Charm 
+[13:39:59.435] LOG: Applied EXP. Charm 
+[13:40:00.130] LOG: 54780 56840 54872
+[13:40:00.197] LOG: %cStart Phase LevelUpPhase color:green;
+[13:40:00.197] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[13:40:00.197] LOG: Applied Super EXP. Charm 
+[13:40:00.198] LOG: Applied EXP. Charm 
+[13:40:00.198] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[13:40:00.198] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[13:40:00.198] LOG: Applied Super EXP. Charm 
+[13:40:00.198] LOG: Applied EXP. Charm 
+[13:40:00.198] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[13:40:00.198] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[13:40:00.198] LOG: Applied Super EXP. Charm 
+[13:40:00.198] LOG: Applied EXP. Charm 
+[13:40:00.198] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[13:40:00.198] LOG: %cStart Phase MoveEndPhase color:green;
+[13:40:00.199] LOG: %cStart Phase MovePhase color:green;
+[13:40:00.199] LOG: %cStart Phase MoveEndPhase color:green;
+[13:40:00.199] LOG: %cStart Phase MovePhase color:green;
+[13:40:00.199] LOG: %cStart Phase MoveEndPhase color:green;
+[13:40:00.199] LOG: %cStart Phase CheckInterludePhase color:green;
+[13:40:00.199] LOG: %cStart Phase WeatherEffectPhase color:green;
+[13:40:00.199] LOG: %cStart Phase PositionalTagPhase color:green;
+[13:40:00.199] LOG: %cStart Phase BerryPhase color:green;
+[13:40:00.200] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[13:40:00.200] LOG: %cStart Phase TurnEndPhase color:green;
+[13:40:00.200] WARN: [coop:turn] host recorder: finalize with NO open recording -> turn=-1 events=0 (caller decides not to emit)
+[13:40:00.201] LOG: %cStart Phase BattleEndPhase color:green;
+[13:40:00.201] LOG: Battle Score: 379 (2 Turns x0.88)
+[13:40:00.201] LOG: Total Score: 7905
+[13:40:00.202] WARN: Texture "%s" has no frame "%s" __MISSING grass
+[13:40:00.202] WARN: Texture "%s" has no frame "%s" __MISSING fire
+[13:40:00.207] LOG: Applied Protein 
+[13:40:00.207] LOG: Applied Zinc 
+[13:40:00.207] LOG: Applied Soul Dew 
+[13:40:00.207] LOG: Applied Soul Dew 
+[13:40:00.208] WARN: Texture "%s" has no frame "%s" __MISSING exp_charm
+[13:40:00.209] WARN: Texture "%s" has no frame "%s" __MISSING super_exp_charm
+[13:40:00.209] WARN: Texture "%s" has no frame "%s" __MISSING exp_share
+[13:40:00.209] WARN: Texture "%s" has no frame "%s" __MISSING map
+[13:40:00.209] WARN: Texture "%s" has no frame "%s" __MISSING mega_bracelet
+[13:40:00.209] WARN: Texture "%s" has no frame "%s" __MISSING amulet_coin
+[13:40:00.209] WARN: Texture "%s" has no frame "%s" __MISSING x_sp_atk
+[13:40:00.210] WARN: Texture "%s" has no frame "%s" __MISSING lucarionite
+[13:40:00.210] WARN: Texture "%s" has no frame "%s" __MISSING black_glasses
+[13:40:00.210] WARN: Texture "%s" has no frame "%s" __MISSING zoom_lens
+[13:40:00.210] LOG: %cStart Phase TrainerVictoryPhase color:green;
+[13:40:00.211] LOG: Rival Ivy
+[13:40:00.761] LOG: Rival Ivy
+[13:40:00.761] LOG: Dialogue dialogue:rival2Female.victory.1 skipped
+[13:40:00.761] LOG: %cStart Phase MoneyRewardPhase color:green;
+[13:40:00.762] LOG: Applied Amulet Coin 
+[13:40:01.124] LOG: %cStart Phase ModifierRewardPhase color:green;
+[13:40:01.125] LOG: Applied Protein 
+[13:40:01.125] LOG: Applied Zinc 
+[13:40:01.125] LOG: Applied Soul Dew 
+[13:40:01.125] LOG: Applied Soul Dew 
+[13:40:01.126] WARN: Texture "%s" has no frame "%s" __MISSING exp_charm
+[13:40:01.126] WARN: Texture "%s" has no frame "%s" __MISSING super_exp_charm
+[13:40:01.126] WARN: Texture "%s" has no frame "%s" __MISSING exp_share
+[13:40:01.126] WARN: Texture "%s" has no frame "%s" __MISSING map
+[13:40:01.126] WARN: Texture "%s" has no frame "%s" __MISSING mega_bracelet
+[13:40:01.126] WARN: Texture "%s" has no frame "%s" __MISSING amulet_coin
+[13:40:01.127] WARN: Texture "%s" has no frame "%s" __MISSING x_sp_atk
+[13:40:01.128] WARN: Texture "%s" has no frame "%s" __MISSING lucarionite
+[13:40:01.128] WARN: Texture "%s" has no frame "%s" __MISSING black_glasses
+[13:40:01.128] WARN: Texture "%s" has no frame "%s" __MISSING zoom_lens
+[13:40:01.128] WARN: item_fanfare not found
+[13:40:01.452] LOG: %cStart Phase ModifierRewardPhase color:green;
+[13:40:01.452] WARN: item_fanfare not found
+[13:40:01.888] LOG: %cStart Phase ModifierRewardPhase color:green;
+[13:40:01.888] WARN: item_fanfare not found
+[13:40:02.228] LOG: %cStart Phase ModifierRewardPhase color:green;
+[13:40:02.228] WARN: item_fanfare not found
+[13:40:02.549] LOG: %cStart Phase EggLapsePhase color:green;
+[13:40:02.549] LOG: %cStart Phase SelectModifierPhase color:green;
+[13:40:02.549] LOG: Wave Seed: }s o|yr~xpxsa 42
+[13:40:02.557] LOG: 9 4 [3,4,5,6]
+[13:40:02.557] LOG: {"id":"TM_CASE","localeKey":"","iconImage":"tm_case","soundName":"se/restore","tier":0} 
+[13:40:02.557] LOG: 7 4 [3,4,5,6]
+[13:40:02.557] LOG: {"id":"TEMP_STAT_STAGE_BOOSTER","localeKey":"","iconImage":"x_accuracy","soundName":"se/restore","tier":0,"stat":6,"nameKey":"x_accuracy","quantityKey":"stage"} 
+[13:40:02.557] LOG: 2 0 [3,4,5,6]
+[13:40:02.557] LOG: {"id":"POTION","localeKey":"modifierType:ModifierType.POTION","iconImage":"potion","group":"potion","soundName":"se/restore","tier":0,"restorePoints":20,"restorePercent":10,"healStatus":false} 
+[13:40:02.557] LOG: 0 0 [3,4,5,6]
+[13:40:02.557] LOG: {"id":"POKEBALL","localeKey":"","iconImage":"pb","group":"pb","soundName":"se/pb_bounce_1","tier":0,"pokeballType":0,"count":5} 
+[13:40:02.559] WARN: Texture "%s" has no frame "%s" __MISSING tm_case
+[13:40:02.559] WARN: Texture "%s" has no frame "%s" __MISSING tm_case
+[13:40:02.560] WARN: Texture "%s" has no frame "%s" __MISSING potion
+[13:40:02.560] WARN: Texture "%s" has no frame "%s" __MISSING potion
+[13:40:02.561] WARN: Texture "%s" has no frame "%s" __MISSING pb
+[13:40:02.561] WARN: Texture "%s" has no frame "%s" __MISSING pb
+[13:40:02.562] WARN: Texture "%s" has no frame "%s" __MISSING potion
+[13:40:02.563] WARN: Texture "%s" has no frame "%s" __MISSING ether
+[13:40:02.564] WARN: Texture "%s" has no frame "%s" __MISSING revive
+[13:40:02.565] WARN: Texture "%s" has no frame "%s" __MISSING full_heal
+[13:40:02.566] WARN: Texture "%s" has no frame "%s" __MISSING super_potion
+[13:40:02.568] WARN: Texture "%s" has no frame "%s" __MISSING exp_charm
+[13:40:02.568] WARN: Texture "%s" has no frame "%s" __MISSING super_exp_charm
+[13:40:02.568] WARN: Texture "%s" has no frame "%s" __MISSING exp_share
+[13:40:02.568] WARN: Texture "%s" has no frame "%s" __MISSING map
+[13:40:02.568] WARN: Texture "%s" has no frame "%s" __MISSING mega_bracelet
+[13:40:02.568] WARN: Texture "%s" has no frame "%s" __MISSING amulet_coin
+[13:40:02.568] WARN: Texture "%s" has no frame "%s" __MISSING x_sp_atk
