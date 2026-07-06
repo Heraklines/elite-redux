@@ -29,7 +29,9 @@
 import type { BattleScene } from "#app/battle-scene";
 import { getGameMode } from "#app/game-mode";
 import { initGlobalScene } from "#app/global-scene";
+import { CoopBattleSync } from "#data/elite-redux/coop/coop-battle-sync";
 import { setCoopFaintSwitchWaitMs, setCoopWaveBarrierMs } from "#data/elite-redux/coop/coop-interaction-relay";
+import { resetCoopRendezvousWaitMs, setCoopRendezvousWaitMs } from "#data/elite-redux/coop/coop-rendezvous";
 import { clearCoopRuntime, setCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
 import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
 import { BattlerIndex } from "#enums/battler-index";
@@ -48,7 +50,7 @@ import {
 } from "#test/tools/coop-duo-harness";
 import { hostHalfExhausted, hostOwnedFaintPending, hostRunEndReason } from "#test/tools/coop-soak-driver";
 import Phaser from "phaser";
-import { afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 const RUN = process.env.ER_SCENARIO === "1";
 
@@ -79,6 +81,7 @@ describe.skipIf(!RUN)("co-op SOAK asymmetric continuation: host half out, guest 
     game = new GameManager(phaserGame);
     logs = installDuoLogCapture(`soak-asymmetric-${Date.now()}`);
     setCoopWaveBarrierMs(50);
+    setCoopRendezvousWaitMs(50);
     setCoopFaintSwitchWaitMs(4000);
     // Level-100 MAGIKARP foes with a harmless GROWL: they never KO the guest and the guest never KOs them,
     // so the wave stays open for a sustained run of SOLO guest turns (the continuation we want to observe).
@@ -96,6 +99,7 @@ describe.skipIf(!RUN)("co-op SOAK asymmetric continuation: host half out, guest 
   afterEach(() => {
     setCoopWaveBarrierMs(60_000);
     setCoopFaintSwitchWaitMs(60_000);
+    resetCoopRendezvousWaitMs();
     logs.dispose();
     clearCoopRuntime();
     initGlobalScene(game.scene);
@@ -189,16 +193,109 @@ describe.skipIf(!RUN)("co-op SOAK asymmetric continuation: host half out, guest 
     // lockstep. The host half stays exhausted at this point.
     expect(hostHalfExhausted(rig), "the host half is still exhausted at the next command point").toBe(true);
 
-    // 🔴 SCOPE + FINDING (BUILD 2): SUSTAINED multi-turn guest-SOLO play past this first crossing exposes a
-    // TWO-ENGINE HARNESS field-collapse gap - once the host slot vacates, the guest survivor renders into slot
-    // 0 and the vacated (host) slot's REDIRECTED CommandPhase requests a partner command for a slot the guest
-    // does NOT own, so it eats the request timeout. The real 6-mon soak reaches the SAME 1-vacated-host +
-    // 1-alive-guest field, so the driver SAFE-DEGRADES a stall-while-exhausted to the (pre-#828) clean
-    // exhaustion terminal instead of a NO-PARK regression, records the `hostHalfExhausted` surface, and reports
-    // the finding. Fully DRIVING the sustained guest-solo turn (relaying the surviving-side command through the
-    // vacated-slot redirect) is the follow-up. This test asserts the DECISION + the first clean crossing, which
-    // is the load-bearing #828 change; it deliberately does NOT drive further to avoid asserting on the gap.
+    // #851 CORRECTED FINDING: the earlier "field-collapse gap / redirected vacated-slot CommandPhase re-issues a
+    // duplicate partner request that eats the timeout" diagnosis is WRONG (verified: see the sustained-solo test
+    // below + the #851 report). Once the host slot vacates, the party COMPACTS the fainted host mon to the back,
+    // so getPlayerField() puts the guest survivor at index 0 and turn-init queues EXACTLY ONE CommandPhase (the
+    // vacated slot is inactive -> no phase for it, no redirect, no duplicate request). handleFieldIndexLogic's
+    // co-op redirect only runs in the SAME one-active-mon state and is a no-op there (fieldIndex already points at
+    // the survivor). The guest-solo turn therefore resolves with EXACTLY ONE requestPartnerCommand per turn - the
+    // sustained-solo test below drives 6 solo turns and asserts precisely that (fails-model of the old diagnosis:
+    // it predicted a 2nd request + timeout; none occurs). See coop-soak-driver.ts's safe-degrade note for why the
+    // driver-level backstop remains until the multi-WAVE guest-solo crossing (reward shop + new wave) is driven.
 
+    logs.flush();
+  }, 300_000);
+
+  // #851 SUSTAINED GUEST-SOLO CONTINUATION. Drive the surviving guest's OWN turns for several turns AFTER the host
+  // half is exhausted, and assert the load-bearing invariant the old (wrong) diagnosis denied: each solo turn issues
+  // EXACTLY ONE requestPartnerCommand for the survivor's slot and the turn resolves with NO stall / NO timeout, host
+  // and guest agree on the survivor's field index (converged geometry), and the interaction counters stay in
+  // lockstep. This is the direct duo repro for #851: the old model predicted a duplicate request + 20-min timeout on
+  // the FIRST solo turn; in fact every solo turn is clean.
+  it("SUSTAINED guest-solo: each post-exhaustion turn issues EXACTLY ONE partner request and resolves, no timeout, geometry converged, lockstep", async () => {
+    // party[0] = BULBASAUR (HOST, frail, will faint) ; party[1] = SNORLAX (GUEST, bulky survivor). Argument order
+    // is preserved by startBattle, so index-based tagging seats the frail host mon at slot 0 and the bulky guest
+    // survivor at slot 1 - the exact asymmetric geometry the exhaustion produces.
+    await game.classicMode.startBattle(SpeciesId.BULBASAUR, SpeciesId.SNORLAX);
+    const pair = createLoopbackPair();
+    const rig = await buildDuo(game, pair, setCoopRuntime, toCoop);
+    tagOwnership(rig);
+
+    const field = rig.hostScene.getPlayerField();
+    const hostFieldIdx = field.findIndex(m => m.coopOwner === "host");
+    expect(hostFieldIdx, "a host-owned field slot exists").toBeGreaterThanOrEqual(0);
+    const hostMon = field[hostFieldIdx];
+
+    // The guest answers the host's relay: turn 1 EARTHQUAKE (spread) faints the 1-HP host ally; every solo turn
+    // after that a harmless SPLASH, so the wave stays open and the survivor keeps commanding turn after turn.
+    rig.guestRuntime.battleSync.onCommandRequest(({ turn }) => {
+      if (turn <= 1) {
+        return { command: Command.FIGHT, cursor: 0, moveId: MoveId.EARTHQUAKE, targets: [BattlerIndex.ENEMY] };
+      }
+      return { command: Command.FIGHT, cursor: 1, moveId: MoveId.SPLASH, targets: [BattlerIndex.PLAYER_2] };
+    });
+    rig.hostScene.getPlayerField()[hostFieldIdx].hp = 1;
+    withClientSync(rig.guestCtx, () => {
+      rig.guestScene.getPlayerField()[hostFieldIdx].hp = 1;
+    });
+
+    const turn0 = rig.hostScene.currentBattle.turn;
+
+    // TURN 1: host plays a harmless SPLASH on its own slot; the guest's relayed EARTHQUAKE faints the 1-HP host mon.
+    await withClient(rig.hostCtx, async () => {
+      game.move.select(MoveId.SPLASH, hostFieldIdx);
+      await game.phaseInterceptor.to("TurnEndPhase");
+    });
+    expect(hostMon.isFainted(), "the host-owned mon fainted (host half now exhausted)").toBe(true);
+    await withClient(rig.guestCtx, () => driveGuestReplayTurn(rig.guestScene, turn0));
+
+    // GEOMETRY CONVERGENCE: both engines seat the survivor at the SAME field index after the half-wipe compaction.
+    // (A host/guest disagreement here is the real live-desync class - here they agree, so the relay key matches.)
+    const hostSurvivorIdx = rig.hostScene.getPlayerField().findIndex(m => m?.isActive());
+    const guestSurvivorIdx = withClientSync(rig.guestCtx, () =>
+      rig.guestScene.getPlayerField().findIndex(m => m?.isActive()),
+    );
+    expect(hostSurvivorIdx, "host seats the survivor at a valid slot").toBeGreaterThanOrEqual(0);
+    expect(
+      guestSurvivorIdx,
+      "host and guest agree on the survivor's field index (converged geometry, relay key matches)",
+    ).toBe(hostSurvivorIdx);
+
+    // Spy on the relay: count requestPartnerCommand per solo turn - the old diagnosis predicted a DUPLICATE per turn.
+    const spy = vi.spyOn(CoopBattleSync.prototype, "requestPartnerCommand");
+
+    const SOLO_TURNS = 6;
+    for (let t = 0; t < SOLO_TURNS; t++) {
+      const before = spy.mock.calls.length;
+      const turnNo = rig.hostScene.currentBattle.turn;
+      await withClient(rig.hostCtx, async () => {
+        // Keep the survivor topped up so we isolate command-routing from combat attrition (a survivability knob,
+        // like the soak's per-wave PP restore - it disables no content; both engines still replay the SAME turn).
+        for (const m of rig.hostScene.getPlayerField()) {
+          if (m?.isActive()) {
+            m.hp = m.getMaxHp();
+          }
+        }
+        // Drives the survivor's whole turn: its CommandPhase -> partner request -> relay resolve -> TurnEndPhase.
+        // The old diagnosis said THIS call would eat the 20-min request timeout; it resolves promptly instead.
+        await game.phaseInterceptor.to("TurnEndPhase");
+      });
+      const turnCalls = spy.mock.calls.slice(before).filter(c => c[1] === turnNo);
+      expect(
+        turnCalls.length,
+        `solo turn ${turnNo}: EXACTLY ONE partner command request (old diagnosis predicted a duplicate here)`,
+      ).toBe(1);
+      // The survivor is still up and the host half is still exhausted (the continuation kept going, no terminal).
+      expect(hostHalfExhausted(rig), `solo turn ${turnNo}: host half still exhausted, guest still soloing`).toBe(true);
+      // LOCKSTEP: the surviving-side turn advanced both engines' interaction counters identically.
+      expect(
+        rig.hostRuntime.controller.interactionCounter(),
+        `solo turn ${turnNo}: interaction counters in lockstep`,
+      ).toBe(rig.guestRuntime.controller.interactionCounter());
+    }
+
+    spy.mockRestore();
     logs.flush();
   }, 300_000);
 });

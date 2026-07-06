@@ -1848,14 +1848,18 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
         actionScript.push(`RUN-END wave ${wave}: ${endReason}`);
         break;
       }
-      // #828 ASYMMETRIC CONTINUATION SAFE-DEGRADE (BUILD 2): a stall that surfaced WHILE the host half is
-      // exhausted is NOT a fresh NO-PARK regression - it is the two-engine harness's field-collapse
-      // command-routing gap for the guest-SOLO turn (the vacated host slot's redirected CommandPhase requests
-      // a partner command the guest does not own, so it eats the request timeout). The soak REACHED + recorded
-      // the exhaustion surface (the decision to continue is exercised); rather than red the run with a strand
-      // the harness cannot yet drive, END the survey LOUDLY as the exhaustion terminal (the pre-#828 behavior),
-      // so there is NO regression vs the old terminal AND the finding is reported. See the driver header + the
-      // task report; the 6-mon real-soak case (two surviving guest mons fill BOTH slots) is the follow-up.
+      // #828/#851 ASYMMETRIC CONTINUATION SAFE-DEGRADE (BUILD 2): a stall that surfaced WHILE the host half is
+      // exhausted is treated as an exhaustion terminal rather than a fresh NO-PARK regression. NB (#851): the old
+      // "vacated host slot's REDIRECTED CommandPhase re-issues a duplicate partner request that eats the timeout"
+      // explanation is WRONG - VERIFIED in coop-soak-asymmetric.test.ts's SUSTAINED guest-solo test: the party
+      // compacts the survivor to slot 0, turn-init queues EXACTLY ONE CommandPhase (the inactive vacated slot gets
+      // none, so there is no redirect and no duplicate), and every guest-SOLO TURN resolves with exactly one
+      // requestPartnerCommand and no timeout. The single-battle guest-solo TURN is therefore driven cleanly and
+      // this in-wave degrade is effectively dormant for it. This backstop REMAINS only for the multi-WAVE
+      // guest-solo crossing (winning a wave solo -> the owner/watcher reward shop -> the next wave with an
+      // exhausted host half), which the continuous harness does not yet drive; that + the true live-desync class
+      // (the relay keys the partner command by fieldIndex, which can skew if the guest's post-recenter geometry
+      // ever disagrees with the host's - see the #851 report) is the remaining follow-up.
       if (hostHalfExhausted(rig)) {
         hitSituation(COOP_SOAK_SITUATIONS.hostHalfExhausted);
         runEnded = { wave, reason: "host HALF exhausted (guest-solo continuation hit the harness field-collapse gap)" };
@@ -1915,9 +1919,11 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
         // between-wave game-over). Same rule: a terminal host state is a counted run-end, not a strand.
         const endReason = hostRunEndReason(rig);
         if (endReason == null) {
-          // #828 SAFE-DEGRADE (BUILD 2): a crossing stall while the host half is exhausted is the harness
-          // field-collapse gap for the guest-solo turn - end as the exhaustion terminal (no NO-PARK
-          // regression), record the surface, report the finding. See the in-wave catch above.
+          // #828/#851 SAFE-DEGRADE (BUILD 2): a crossing stall while the host half is exhausted ends as the
+          // exhaustion terminal (no NO-PARK regression), records the surface, reports the finding. This is the
+          // multi-WAVE crossing the in-wave catch above notes as the remaining follow-up (reward shop + next-wave
+          // start with an exhausted host half); the guest-solo TURN itself is driven cleanly (verified - see the
+          // in-wave note + coop-soak-asymmetric.test.ts). NOT the debunked "duplicate partner request" gap.
           if (hostHalfExhausted(rig)) {
             hitSituation(COOP_SOAK_SITUATIONS.hostHalfExhausted);
             runEnded = {
