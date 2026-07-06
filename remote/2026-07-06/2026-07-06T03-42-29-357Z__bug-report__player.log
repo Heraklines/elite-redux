@@ -1,0 +1,270 @@
+----- BUG REPORT (in-game) -----
+version:  1.11.19
+url:      https://elite-redux.pages.dev/
+ua:       Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36 OPR/132.0.0.0
+mode:     4  wave:40  difficulty:youngster
+seed:     Ryd45pgO1DxsUuSioJsayu2N
+party:    Dragonite Delivery(L34 116/116)
+
+----- DESCRIPTION -----
+Discipline doesn't allow you to switch while rampaging
+
+----- CONSOLE -----
+[03:41:30.574] LOG: Move: Sky Quake | Attack damage: 764
+[03:41:30.574] LOG: %cStart Phase DamageAnimPhase color:green;
+[03:41:30.583] LOG: %cStart Phase MessagePhase color:green;
+[03:41:30.872] LOG: %cStart Phase DamageAnimPhase color:green;
+[03:41:30.886] LOG: %cStart Phase MessagePhase color:green;
+[03:41:31.176] LOG: %cStart Phase FaintPhase color:green;
+[03:41:32.700] LOG: %cStart Phase MessagePhase color:green;
+[03:41:32.962] LOG: %cStart Phase ShowAbilityPhase color:green;
+[03:41:33.185] LOG: %cStart Phase StatStageChangePhase color:green;
+[03:41:33.187] LOG: %cStart Phase MessagePhase color:green;
+[03:41:33.512] LOG: %cStart Phase StatStageChangePhase color:green;
+[03:41:33.514] LOG: %cStart Phase MessagePhase color:green;
+[03:41:33.834] LOG: %cStart Phase HideAbilityPhase color:green;
+[03:41:33.865] LOG: %cStart Phase VictoryPhase color:green;
+[03:41:33.865] LOG: Applied Soothe Bell 
+[03:41:33.865] LOG: %cStart Phase FaintPhase color:green;
+[03:41:33.866] WARN: cry/10810 not found
+[03:41:33.943] LOG: %cStart Phase MessagePhase color:green;
+[03:41:34.108] LOG: %cStart Phase ShowAbilityPhase color:green;
+[03:41:34.332] LOG: %cStart Phase StatStageChangePhase color:green;
+[03:41:34.333] LOG: %cStart Phase MessagePhase color:green;
+[03:41:34.659] LOG: %cStart Phase StatStageChangePhase color:green;
+[03:41:34.661] LOG: %cStart Phase MessagePhase color:green;
+[03:41:34.980] LOG: %cStart Phase HideAbilityPhase color:green;
+[03:41:35.011] LOG: %cStart Phase VictoryPhase color:green;
+[03:41:35.012] LOG: Applied Soothe Bell 
+[03:41:35.012] LOG: %cStart Phase MoveEndPhase color:green;
+[03:41:35.013] LOG: %cStart Phase MovePhase color:green;
+[03:41:35.013] LOG: %cStart Phase MoveEndPhase color:green;
+[03:41:35.013] LOG: %cStart Phase MovePhase color:green;
+[03:41:35.013] LOG: %cStart Phase MoveEndPhase color:green;
+[03:41:35.013] LOG: %cStart Phase CheckInterludePhase color:green;
+[03:41:35.013] LOG: %cStart Phase WeatherEffectPhase color:green;
+[03:41:35.090] LOG: %cStart Phase PositionalTagPhase color:green;
+[03:41:35.090] LOG: %cStart Phase BerryPhase color:green;
+[03:41:35.091] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[03:41:35.091] LOG: %cStart Phase PostTurnStatusEffectPhase color:green;
+[03:41:35.092] LOG: %cStart Phase MessagePhase color:green;
+[03:41:35.429] LOG: %cStart Phase TurnEndPhase color:green;
+[03:41:35.431] WARN: [coop:turn] host recorder: finalize with NO open recording -> turn=-1 events=0 (caller decides not to emit)
+[03:41:35.431] LOG: %cStart Phase BattleEndPhase color:green;
+[03:41:35.431] LOG: Battle Score: 295 (2 Turns x0.9)
+[03:41:35.431] LOG: Total Score: 3607
+[03:41:35.438] LOG: Applied Zinc 
+[03:41:35.441] LOG: %cStart Phase TrainerVictoryPhase color:green;
+[03:41:35.442] LOG: Poké Fan Isabel
+[03:41:36.075] LOG: Poké Fan Isabel
+[03:41:36.076] LOG: Dialogue dialogue:pokefanFemale.victory.1 skipped
+[03:41:36.076] LOG: %cStart Phase MoneyRewardPhase color:green;
+[03:41:36.076] LOG: Applied Amulet Coin 
+[03:41:36.281] LOG: %cStart Phase EggLapsePhase color:green;
+[03:41:36.282] LOG: %cStart Phase SelectModifierPhase color:green;
+[03:41:36.282] LOG: Wave Seed: xZ[uWj{ypXt 38
+[03:41:36.283] LOG: 15 9 [3,4,5,6,7,8,9,10,12,16,22]
+[03:41:36.283] LOG: GREAT 0
+[03:41:36.283] LOG: 2 0 [3,4,5,6,7,8,9,10,12,16,22]
+[03:41:36.283] LOG: {"id":"FULL_HEAL","localeKey":"modifierType:ModifierType.FULL_HEAL","iconImage":"full_heal","soundName":"se/restore","tier":1} 
+[03:41:36.283] LOG: 1 0 [3,4,5,6,7,8,9,10,12,16,22]
+[03:41:36.283] LOG: {"id":"PP_UP","localeKey":"modifierType:ModifierType.PP_UP","iconImage":"pp_up","group":"ppUp","soundName":"se/restore","tier":1,"upPoints":1} 
+[03:41:36.283] LOG: 0 0 [3,4,5,6]
+[03:41:36.283] LOG: {"id":"POKEBALL","localeKey":"","iconImage":"pb","group":"pb","soundName":"se/pb_bounce_1","tier":0,"pokeballType":0,"count":5} 
+[03:41:41.455] LOG: %cStart Phase NewBattlePhase color:green;
+[03:41:41.455] LOG: Wave Seed: y [\vXk|zq Yu 39
+[03:41:41.456] LOG: %cStart Phase NextEncounterPhase color:green;
+[03:41:41.457] LOG: Starting species pool tier: COMMON
+[03:41:41.457] LOG: Replaced HOPPIP with SKIPLOOM
+[03:41:41.464] LOG: Pokemon: Wild Skiploom | Species ID: 188 | Level: 24 | Nature: Adamant (+Atk/-SpAtk)
+[03:41:41.464] LOG: Stats (IVs): HP: 62 (8), Atk: 36 (4), Def: 34 (23), Spatk: 30 (13), Spdef: 41 (20), Spd: 53 (3)
+[03:41:41.464] LOG: Ability: Infiltrator | Passive Ability: Chloroplast 
+[03:41:41.464] LOG: Moveset: ["Mega Drain","Flatter","Synthesis","Fairy Wind"]
+[03:41:41.464] LOG: Starting species pool tier: COMMON
+[03:41:41.474] LOG: Pokemon: Wild Petilil | Species ID: 548 | Level: 26 | Nature: Mild (+SpAtk/-Def)
+[03:41:41.474] LOG: Stats (IVs): HP: 59 (1), Atk: 29 (23), Def: 30 (12), Spatk: 50 (14), Spdef: 33 (10), Spd: 21 (2)
+[03:41:41.474] LOG: Ability: Hospitality | Passive Ability: Natural Cure 
+[03:41:41.474] LOG: Moveset: ["Magical Leaf","Pollen Puff","Encore","Mega Drain"]
+[03:41:41.611] LOG: Battle Seed: AbBijitvq5c8vbjA
+[03:41:41.705] DEBUG: Session data saved to slot 0!
+[03:41:41.706] LOG: Wave Seed: y [\vXk|zq Yu 39
+[03:41:41.995] WARN: cry/548 not found
+[03:41:42.336] LOG: %cStart Phase InitEncounterPhase color:green;
+[03:41:42.336] LOG: %cStart Phase PostSummonPhase color:green;
+[03:41:42.336] LOG: Ran PSP for: Skiploom
+[03:41:42.337] LOG: %cStart Phase PostSummonPhase color:green;
+[03:41:42.338] LOG: %cStart Phase PostSummonPhase color:green;
+[03:41:42.338] LOG: %cStart Phase PostSummonPhase color:green;
+[03:41:42.338] LOG: Ran PSP for: Petilil
+[03:41:42.338] LOG: %cStart Phase PostSummonPhase color:green;
+[03:41:42.338] LOG: %cStart Phase PostSummonPhase color:green;
+[03:41:42.339] LOG: %cStart Phase ShowAbilityPhase color:green;
+[03:41:42.560] LOG: %cStart Phase PokemonHealPhase color:green;
+[03:41:42.560] LOG: %cStart Phase MessagePhase color:green;
+[03:41:42.869] LOG: %cStart Phase HideAbilityPhase color:green;
+[03:41:42.900] LOG: %cStart Phase TurnInitPhase color:green;
+[03:41:42.900] LOG: %cStart Phase CommandPhase color:green;
+[03:41:44.527] LOG: Move: RAGING_FURY Move targets: {"targets":[3],"multiple":false} 
+Player Pokemon: Dragonite Delivery
+[03:41:44.528] LOG: %cStart Phase EnemyCommandPhase color:green;
+[03:41:44.530] LOG: Applied X Sp. Def 
+[03:41:44.532] LOG: Applied X Sp. Def 
+[03:41:44.539] LOG: Move Pool: ["Mega Drain","Flatter","Synthesis","Fairy Wind"]
+[03:41:44.539] LOG: Move Scores: [3.328125,3,-7,20]
+[03:41:44.539] LOG: Sorted Move Pool: ["Fairy Wind","Mega Drain","Flatter","Synthesis"]
+[03:41:44.539] LOG: Chosen Move: Fairy Wind
+[03:41:44.539] LOG: %cStart Phase EnemyCommandPhase color:green;
+[03:41:44.541] LOG: Applied X Sp. Def 
+[03:41:44.544] LOG: Applied X Sp. Def 
+[03:41:44.546] LOG: Applied X Sp. Def 
+[03:41:44.553] LOG: Move Pool: ["Magical Leaf","Pollen Puff","Encore","Mega Drain"]
+[03:41:44.553] LOG: Move Scores: [3.65625,9.5,2,2.90625]
+[03:41:44.553] LOG: Sorted Move Pool: ["Pollen Puff","Magical Leaf","Mega Drain","Encore"]
+[03:41:44.553] LOG: Chosen Move: Magical Leaf
+[03:41:44.553] LOG: %cStart Phase TurnStartPhase color:green;
+[03:41:44.559] LOG: %cStart Phase MovePhase color:green;
+[03:41:44.559] LOG: %cUser: Skiploom
+Move: FAIRY_WIND
+Use Mode: NORMAL color:orchid
+[03:41:44.565] LOG: %cStart Phase MessagePhase color:green;
+[03:41:44.701] LOG: %cStart Phase MoveEffectPhase color:green;
+[03:41:44.703] LOG: crit stage: +0
+[03:41:44.705] LOG: Applied X Sp. Def 
+[03:41:44.705] LOG: Move: Fairy Wind | Base damage: 4.017391304347826 | Power: 40 | Source attack: 30 | Target defense: 138
+[03:41:44.705] LOG: Move: Fairy Wind | Attack damage: 12
+[03:41:44.706] LOG: %cStart Phase DamageAnimPhase color:green;
+[03:41:44.715] LOG: %cStart Phase MessagePhase color:green;
+[03:41:44.986] LOG: %cStart Phase MessagePhase color:green;
+[03:41:45.278] LOG: %cStart Phase MoveEndPhase color:green;
+[03:41:45.279] LOG: %cStart Phase MovePhase color:green;
+[03:41:45.279] LOG: %cUser: Dragonite Delivery
+Move: RAGING_FURY
+Use Mode: NORMAL color:orchid
+[03:41:45.282] LOG: %cStart Phase MessagePhase color:green;
+[03:41:45.466] LOG: %cStart Phase MoveEffectPhase color:green;
+[03:41:45.467] LOG: crit stage: +0
+[03:41:45.468] LOG: Move: Raging Fury | Base damage: 507.44 | Power: 120 | Source attack: 405 | Target defense: 30
+[03:41:45.468] LOG: Move: Raging Fury | Attack damage: 492
+[03:41:45.469] LOG: %cStart Phase DamageAnimPhase color:green;
+[03:41:45.480] LOG: %cStart Phase MessagePhase color:green;
+[03:41:45.769] LOG: %cStart Phase FaintPhase color:green;
+[03:41:45.771] WARN: cry/548 not found
+[03:41:45.850] LOG: %cStart Phase MessagePhase color:green;
+[03:41:46.106] LOG: %cStart Phase ShowAbilityPhase color:green;
+[03:41:46.328] LOG: %cStart Phase StatStageChangePhase color:green;
+[03:41:46.329] LOG: %cStart Phase MessagePhase color:green;
+[03:41:46.655] LOG: %cStart Phase StatStageChangePhase color:green;
+[03:41:46.657] LOG: %cStart Phase MessagePhase color:green;
+[03:41:46.976] LOG: %cStart Phase HideAbilityPhase color:green;
+[03:41:47.008] LOG: %cStart Phase VictoryPhase color:green;
+[03:41:47.009] LOG: Applied Soothe Bell 
+[03:41:47.009] LOG: %cStart Phase MoveEndPhase color:green;
+[03:41:47.009] LOG: %cStart Phase MovePhase color:green;
+[03:41:47.009] LOG: %cStart Phase MoveEndPhase color:green;
+[03:41:47.009] LOG: %cStart Phase CheckInterludePhase color:green;
+[03:41:47.009] LOG: %cStart Phase WeatherEffectPhase color:green;
+[03:41:47.087] LOG: %cStart Phase PositionalTagPhase color:green;
+[03:41:47.088] LOG: %cStart Phase BerryPhase color:green;
+[03:41:47.088] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[03:41:47.089] LOG: %cStart Phase TurnEndPhase color:green;
+[03:41:47.090] WARN: [coop:turn] host recorder: finalize with NO open recording -> turn=-1 events=0 (caller decides not to emit)
+[03:41:47.090] LOG: %cStart Phase TurnInitPhase color:green;
+[03:41:47.090] LOG: %cStart Phase CommandPhase color:green;
+[03:41:47.091] LOG: Move: RAGING_FURY Move targets: {"targets":[3],"multiple":false} 
+Player Pokemon: Dragonite Delivery
+[03:41:47.092] LOG: %cStart Phase EnemyCommandPhase color:green;
+[03:41:47.094] LOG: Applied X Sp. Def 
+[03:41:47.096] LOG: Applied X Sp. Def 
+[03:41:47.096] LOG: Battle Seed: AbBijitvq5c8vbjA
+[03:41:47.098] LOG: Move Pool: ["Mega Drain","Flatter","Synthesis","Fairy Wind"]
+[03:41:47.098] LOG: Move Scores: [3.328125,3,-7,20]
+[03:41:47.099] LOG: Sorted Move Pool: ["Fairy Wind","Mega Drain","Flatter","Synthesis"]
+[03:41:47.099] LOG: Chosen Move: Mega Drain
+[03:41:47.099] LOG: %cStart Phase TurnStartPhase color:green;
+[03:41:47.100] LOG: %cStart Phase MovePhase color:green;
+[03:41:47.100] LOG: %cUser: Dragonite Delivery
+Move: RAGING_FURY
+Use Mode: IGNORE_PP color:orchid
+[03:41:47.101] LOG: %cStart Phase MessagePhase color:green;
+[03:41:47.274] LOG: %cStart Phase MoveEffectPhase color:green;
+[03:41:47.275] LOG: crit stage: +0
+[03:41:47.276] LOG: Move: Raging Fury | Base damage: 521.755294117647 | Power: 120 | Source attack: 472 | Target defense: 34
+[03:41:47.276] LOG: Move: Raging Fury | Attack damage: 506
+[03:41:47.277] LOG: %cStart Phase DamageAnimPhase color:green;
+[03:41:47.287] LOG: %cStart Phase MessagePhase color:green;
+[03:41:47.577] LOG: %cStart Phase ShowAbilityPhase color:green;
+[03:41:47.796] LOG: %cStart Phase MessagePhase color:green;
+[03:41:48.178] LOG: %cStart Phase HideAbilityPhase color:green;
+[03:41:48.210] LOG: %cStart Phase FaintPhase color:green;
+[03:41:49.204] LOG: %cStart Phase MessagePhase color:green;
+[03:41:49.703] LOG: %cStart Phase ShowAbilityPhase color:green;
+[03:41:49.926] LOG: %cStart Phase StatStageChangePhase color:green;
+[03:41:49.927] LOG: %cStart Phase MessagePhase color:green;
+[03:41:50.253] LOG: %cStart Phase StatStageChangePhase color:green;
+[03:41:50.255] LOG: %cStart Phase MessagePhase color:green;
+[03:41:50.575] LOG: %cStart Phase HideAbilityPhase color:green;
+[03:41:50.606] LOG: %cStart Phase VictoryPhase color:green;
+[03:41:50.606] LOG: Applied Soothe Bell 
+[03:41:50.607] LOG: %cStart Phase MoveEndPhase color:green;
+[03:41:50.607] LOG: %cStart Phase MovePhase color:green;
+[03:41:50.607] LOG: %cStart Phase MoveEndPhase color:green;
+[03:41:50.607] LOG: %cStart Phase CheckInterludePhase color:green;
+[03:41:50.607] LOG: %cStart Phase WeatherEffectPhase color:green;
+[03:41:50.685] LOG: %cStart Phase PositionalTagPhase color:green;
+[03:41:50.685] LOG: %cStart Phase BerryPhase color:green;
+[03:41:50.685] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[03:41:50.685] LOG: %cStart Phase TurnEndPhase color:green;
+[03:41:50.686] WARN: [coop:turn] host recorder: finalize with NO open recording -> turn=-1 events=0 (caller decides not to emit)
+[03:41:50.686] LOG: %cStart Phase BattleEndPhase color:green;
+[03:41:50.686] LOG: Battle Score: 109 (2 Turns x0.84)
+[03:41:50.686] LOG: Total Score: 3716
+[03:41:50.690] LOG: Applied Zinc 
+[03:41:50.693] LOG: %cStart Phase EggLapsePhase color:green;
+[03:41:50.693] LOG: %cStart Phase SelectModifierPhase color:green;
+[03:41:50.693] LOG: Wave Seed: y [\vXk|zq Yu 39
+[03:41:50.694] LOG: 1 0 [4,5,6]
+[03:41:50.694] LOG: {"id":"RARE_CANDY","localeKey":"modifierType:ModifierType.RARE_CANDY","iconImage":"rare_candy","soundName":"se/restore","tier":0} 
+[03:41:50.694] LOG: 0 0 [2,3,4,5,6,7,8,9,10,12,16,22]
+[03:41:50.694] LOG: {"id":"GREAT_BALL","localeKey":"","iconImage":"gb","group":"pb","soundName":"se/pb_bounce_1","tier":1,"pokeballType":1,"count":5} 
+[03:41:50.694] LOG: 0 0 [4,5,6]
+[03:41:50.694] LOG: {"id":"POKEBALL","localeKey":"","iconImage":"pb","group":"pb","soundName":"se/pb_bounce_1","tier":0,"pokeballType":0,"count":5} 
+[03:41:50.694] LOG: 3 0 [4,5,6]
+[03:41:50.694] LOG: {"id":"SUPER_POTION","localeKey":"modifierType:ModifierType.SUPER_POTION","iconImage":"super_potion","group":"potion","soundName":"se/restore","tier":0,"restorePoints":50,"restorePercent":25,"healStatus":false} 
+[03:41:52.906] WARN: cry/10752 not found
+[03:41:58.486] LOG: %cStart Phase NewBattlePhase color:green;
+[03:41:58.486] LOG: Wave Seed: z¡\]wYl }{r¡Zv 40
+[03:41:58.486] LOG: %cStart Phase NextEncounterPhase color:green;
+[03:41:58.487] LOG: Starting species pool tier: BOSS_RARE
+[03:41:58.488] LOG: Replaced TORTERRA with GROTLE
+[03:41:58.496] LOG: Pokemon: Wild Grotle | Species ID: 388 | Level: 26 | Nature: Relaxed (+Def/-Spd)
+[03:41:58.496] LOG: Stats (IVs): HP: 82 (21), Atk: 58 (30), Def: 64 (26), Spatk: 36 (24), Spdef: 42 (21), Spd: 27 (18)
+[03:41:58.496] LOG: Ability: Grounded | Passive Ability: Overgrow | Boss Bars: 2
+[03:41:58.496] LOG: Moveset: ["Wood Hammer","Growth","Sleep Powder","Fertile Fangs"]
+[03:41:58.496] LOG: Starting species pool tier: BOSS
+[03:41:58.497] LOG: ER #419: elite BST cap (520 @ w40) - replacing Jumpluff (535) with Skiploom (380)
+[03:41:58.513] LOG: Pokemon: Wild Skiploom | Species ID: 188 | Level: 29 | Nature: Timid (+Spd/-Atk)
+[03:41:58.513] LOG: Stats (IVs): HP: 72 (3), Atk: 38 (21), Def: 39 (17), Spatk: 45 (28), Spdef: 43 (16), Spd: 70 (17)
+[03:41:58.513] LOG: Ability: Infiltrator | Passive Ability: Chloroplast | Boss Bars: 2
+[03:41:58.513] LOG: Moveset: ["Aerial Ace","Synthesis","Growth","Wish"]
+[03:41:58.657] LOG: {"id":"ATTACK_TYPE_BOOSTER","localeKey":"","iconImage":"miracle_seed","soundName":"se/restore","tier":2,"moveType":11,"boostPercent":20} (enemy)
+[03:41:58.658] LOG: {"id":"BASE_STAT_BOOSTER","localeKey":"","iconImage":"hp_up","soundName":"se/restore","tier":1,"stat":0,"key":"hp_up"} (enemy)
+[03:41:58.658] LOG: {"id":"BERRY","localeKey":"","iconImage":"salac_berry","group":"berry","soundName":"se/restore","tier":0,"berryType":7} (enemy)
+[03:41:58.658] LOG: {"id":"BASE_STAT_BOOSTER","localeKey":"","iconImage":"carbos","soundName":"se/restore","tier":1,"stat":5,"key":"carbos"} (enemy)
+[03:41:58.658] LOG: Battle Seed: f8myCUHOpkWQxMbP
+[03:41:58.658] LOG: Applied HP Up (enemy)
+[03:41:58.659] LOG: Applied Carbos (enemy)
+[03:41:58.747] DEBUG: Session data saved to slot 0!
+[03:41:58.748] LOG: Wave Seed: z¡\]wYl }{r¡Zv 40
+[03:41:59.375] LOG: %cStart Phase InitEncounterPhase color:green;
+[03:41:59.375] LOG: %cStart Phase PostSummonPhase color:green;
+[03:41:59.375] LOG: Ran PSP for: Skiploom
+[03:41:59.376] LOG: %cStart Phase PostSummonPhase color:green;
+[03:41:59.377] LOG: %cStart Phase PostSummonPhase color:green;
+[03:41:59.377] LOG: %cStart Phase PostSummonPhase color:green;
+[03:41:59.377] LOG: Ran PSP for: Grotle
+[03:41:59.377] LOG: %cStart Phase PostSummonPhase color:green;
+[03:41:59.377] LOG: %cStart Phase ShowAbilityPhase color:green;
+[03:41:59.598] LOG: %cStart Phase HideAbilityPhase color:green;
+[03:41:59.635] LOG: %cStart Phase PostSummonPhase color:green;
+[03:41:59.635] LOG: %cStart Phase TurnInitPhase color:green;
+[03:41:59.635] LOG: %cStart Phase CommandPhase color:green;
