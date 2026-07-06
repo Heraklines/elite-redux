@@ -2011,6 +2011,18 @@ export const DEV_SCENARIOS: DevScenario[] = [
       + "keep playing. EXPECT: both clients stay in the SAME biome and neither wedges in a resync loop at the\n"
       + "boundary. Duo-tested headlessly in test/tests/elite-redux/coop/coop-savedata-digest.test.ts\n"
       + "('DIVERGE + HEAL (#841 item 5)').",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({ STARTING_WAVE_OVERRIDE: 1, STARTING_LEVEL_OVERRIDE: 50 });
+      return [
+        makeStarter(SpeciesId.SNORLAX, {
+          moveset: [MoveId.BODY_SLAM, MoveId.CRUNCH, MoveId.EARTHQUAKE, MoveId.REST],
+        }),
+        makeStarter(SpeciesId.GENGAR, {
+          moveset: [MoveId.SHADOW_BALL, MoveId.SLUDGE_BOMB, MoveId.THUNDERBOLT, MoveId.DAZZLING_GLEAM],
+        }),
+      ];
+    },
   },
   {
     label: "(note) Co-op: game-over tears the runtime down + no stale ME pins next run (#842)",
