@@ -37,6 +37,7 @@ export function setCoopMeInteractionStart(counter: number): void {
   coopMeInteractionStart = counter;
   if (counter < 0) {
     coopMeHandoffBattle = false; // the ME ended - the handoff exemption ends with it
+    coopMeHandoffBattleWave = -1; // #847: the win-tail scope ends with the handoff
     coopMeBespokeHost = false; // #823: ditto for the bespoke host-drive window
     // #834: let the phase module drop its adopted host presentation with the pin (a mid-ME
     // GameOver reaches clearCoopRuntime without an ME terminal; a stale presentation must not
@@ -56,9 +57,20 @@ export function setCoopMeInteractionStart(counter: number): void {
 // (already-closed) ME narration channel. This flag marks "the handoff battle has started".
 let coopMeHandoffBattle = false;
 
+// #847: the wave the handoff battle started on, so the guest's ME-battle-won victory-tail check can be
+// SCOPED to that exact battle. A stale handoff flag (an ME whose terminal never cleared it, or - under
+// vitest `isolate:false` - module state latched across a test-file boundary) must not be able to misfire
+// the victory tail on an UNRELATED later battle at a different wave. -1 when no handoff battle is live.
+let coopMeHandoffBattleWave = -1;
+
 /** Whether the in-progress ME has handed off to its spawned battle (#817). */
 export function coopMeHandoffBattleStarted(): boolean {
   return coopMeHandoffBattle;
+}
+
+/** #847: the wave the handoff battle started on (-1 when none), for scoping the ME-battle-won check. */
+export function coopMeHandoffBattleWaveValue(): number {
+  return coopMeHandoffBattleWave;
 }
 
 // #823: a BESPOKE mini-game ME (quiz/braille/footprints...) is running on the HOST while the
@@ -86,7 +98,13 @@ export function setOnMePinCleared(fn: (() => void) | null): void {
   onMePinCleared = fn;
 }
 
-/** Mark the ME battle handoff as started (host pump end + guest terminal set this). */
-export function setCoopMeHandoffBattleStarted(): void {
+/**
+ * Mark the ME battle handoff as started (host pump end + guest terminal set this). `wave` is the wave the
+ * spawned battle runs on (#847), recorded so the guest's ME-battle-won victory-tail check is SCOPED to
+ * this battle - a stale flag can never misfire the tail on a later, unrelated battle. Defaults to -1 for
+ * callers that don't have the wave handy (the host side, which never runs the guest-only win check).
+ */
+export function setCoopMeHandoffBattleStarted(wave = -1): void {
   coopMeHandoffBattle = true;
+  coopMeHandoffBattleWave = wave;
 }

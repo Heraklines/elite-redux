@@ -32,12 +32,13 @@
 import type { BattleScene } from "#app/battle-scene";
 import { getGameMode } from "#app/game-mode";
 import { initGlobalScene } from "#app/global-scene";
-import { coopMeHandoffBattleStarted } from "#data/elite-redux/coop/coop-me-pin-state";
+import { coopMeHandoffBattleStarted, setCoopMeInteractionStart } from "#data/elite-redux/coop/coop-me-pin-state";
 import {
   clearCoopRuntime,
   coopMeHandoffBattleWon,
   coopMeInProgress,
   getCoopRendezvous,
+  setCoopMeBattleInteractionCounter,
   setCoopRuntime,
 } from "#data/elite-redux/coop/coop-runtime";
 import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
@@ -93,6 +94,15 @@ describe.skipIf(!RUN)("co-op DUO ME battle-handoff -> reward shop deadlock (#847
   afterEach(() => {
     logs.dispose();
     clearCoopRuntime();
+    // #847 harness citizenship (vitest isolate:false): this test drives a battle HANDOFF (finishWithout
+    // Leaving) but NOT the ME terminal, so the process-global ME/handoff module state stays SET. The
+    // ClientCtx swap only carries coopMeInteractionStart / coopMeBattleInteractionCounter (per the harness
+    // header), NOT the handoff flag/wave - so force the FULL ME family back to idle here, or a later
+    // ER_SCENARIO file (e.g. coop-guest-faint-no-local-victory) inherits a latched handoff state.
+    // (clearCoopRuntime already resets these via setCoopMeInteractionStart(-1); this is the explicit,
+    // self-documenting belt-and-suspenders the citizenship rule asks for.)
+    setCoopMeInteractionStart(-1); // clears the pin + coopMeHandoffBattle + coopMeHandoffBattleWave (#847)
+    setCoopMeBattleInteractionCounter(-1); // clears the runtime ME counter (coopMeHandoffActive gate)
     // #710 harness-citizenship: buildDuoForMe()/buildGuestScene() constructs a 2nd BattleScene (the
     // guest), whose ctor steals globalScene. Restore the host GameManager scene for the next file.
     initGlobalScene(game.scene);

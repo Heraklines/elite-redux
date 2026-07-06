@@ -39,6 +39,7 @@ import { COOP_DEX_SYNC_SEQ, CoopInteractionRelay } from "#data/elite-redux/coop/
 import { meBattleHandoffKey } from "#data/elite-redux/coop/coop-me-battle-handoff";
 import {
   coopMeHandoffBattleStarted,
+  coopMeHandoffBattleWaveValue,
   coopMeInteractionStartValue,
   setCoopMeInteractionStart,
 } from "#data/elite-redux/coop/coop-me-pin-state";
@@ -1378,6 +1379,15 @@ function coopMeHandoffActive(): boolean {
  * multi-turn ME battle (false until the LAST turn KOs the field).
  */
 export function coopMeHandoffBattleWon(): boolean {
+  // #847 ROBUSTNESS (checked FIRST, throw-free): scope the win to the handoff's OWN battle. The handoff
+  // flag records the wave the spawned battle started on; a stale flag (an ME whose terminal never cleared
+  // it, or module state latched across a vitest `isolate:false` file boundary) must NOT misfire the
+  // victory tail on an unrelated later battle. Read only waveIndex here (cheap, never throws on a partial
+  // stub scene) so a mismatch returns BEFORE touching gameMode / the enemy party.
+  const handoffWave = coopMeHandoffBattleWaveValue();
+  if (handoffWave < 0 || globalScene.currentBattle?.waveIndex !== handoffWave) {
+    return false;
+  }
   if (!coopMeHandoffActive() || !coopMeHandoffBattleStarted() || active!.controller.role !== "guest") {
     return false;
   }

@@ -784,7 +784,9 @@ export class CoopReplayMePhase extends Phase {
     coopLog("me", "ME terminal: battle-handoff, ending phase WITHOUT leaving encounter", {
       counter: this.interactionCounter,
     });
-    setCoopMeHandoffBattleStarted(); // #817: ME gates stand down - the battle runs the normal sync
+    // #817: ME gates stand down - the battle runs the normal sync. #847: record the wave so the guest's
+    // ME-battle-won victory-tail check is scoped to THIS battle (a stale flag can't misfire on a later one).
+    setCoopMeHandoffBattleStarted(globalScene.currentBattle?.waveIndex ?? -1);
     hideCoopControllerTag();
     // #819 (live BOTH-stuck at the ME battle): the guest's field is EMPTY here - its own
     // wave roll's summon chain was purged at the divert (#813) and the host's ME-battle
