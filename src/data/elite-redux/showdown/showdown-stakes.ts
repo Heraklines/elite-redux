@@ -5,11 +5,13 @@
  * ER black shiny above all. Two offers may be wagered against each other
  * only when their tiers are EQUAL.
  */
+/** DexAttr DEFAULT_VARIANT / VARIANT_2 / VARIANT_3 */
+export type StakeVariant = 0 | 1 | 2;
+
 export interface StakeOffer {
   speciesId: number;
   shiny: boolean;
-  /** 0 | 1 | 2 — DexAttr DEFAULT_VARIANT / VARIANT_2 / VARIANT_3 */
-  variant: number;
+  variant: StakeVariant;
   erBlackShiny: boolean;
   /** speciesStarterCosts value for the line (only meaningful when !shiny) */
   cost: number;

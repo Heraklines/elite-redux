@@ -9,7 +9,7 @@
 **Tech Stack:** TypeScript + Phaser (client), Cloudflare Workers + D1 (escrow), vitest (all tests). Worktree: `C:/Users/Hafida/pokerogue/.worktrees/showdown`, **detached HEAD at `coop-me-authoritative` tip — NO new branches, NO pushes.**
 
 **Ground rules from project CLAUDE.md (binding):**
-- `npx tsc --noEmit` baseline is **267 errors**. More = you broke something.
+- `npx tsc --noEmit` baseline on THIS branch tip is **285 errors** (measured; the project CLAUDE.md's 267 is stale for this branch). More than 285 = you broke something.
 - Any screen change goes through the render harness (`test/tools/render-ui-page.test.ts`) — reproduce before, verify after, new screen ⇒ new `PAGE_RECIPES` entry.
 - Any sync-layer code gets a two-engine repro in `test/tools/coop-duo-harness.ts` patterns.
 - ER engine tests are gated `ER_SCENARIO=1`. PowerShell: `$env:ER_SCENARIO="1"; npx vitest run <path>`.
@@ -441,7 +441,7 @@ Flow per design: pick one owned shiny/high-cost unlock → offer crosses wire (`
 
 ## Completion gate (before calling the feature done)
 
-1. `npx tsc --noEmit` → exactly 267 errors.
+1. `npx tsc --noEmit` → exactly 285 errors (branch baseline).
 2. Full ungated suite: `npx vitest run test/tests/elite-redux/showdown/`.
 3. `ER_SCENARIO=1` full `coop/` + `showdown/` dirs green (globalScene citizenship).
 4. Render-harness: `starter-select`, `starter-select-showdown`, `showdown-ante` baselines committed and diff-clean.
