@@ -5,7 +5,7 @@ import { pokemonEvolutions } from "#balance/pokemon-evolutions";
 import { bypassLogin } from "#constants/app-constants";
 import { modifierTypes } from "#data/data-lists";
 import { getCharVariantFromDialogue } from "#data/dialogue";
-import { broadcastCoopWaveResolved } from "#data/elite-redux/coop/coop-runtime";
+import { broadcastCoopWaveResolved, clearCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
 import { enqueueFounderPublish, recordLocalDraftAttempt } from "#data/elite-redux/er-community-challenges";
 import { getFounderRunState, setFounderRunState } from "#data/elite-redux/er-community-run-state";
 import { recordGhostTeamOnGameOver } from "#data/elite-redux/er-ghost-teams";
@@ -256,6 +256,16 @@ export class GameOverPhase extends BattlePhase {
               // auto-publishes the draft (flips draft->active); a LOSS still records the
               // attempt locally so the draft is NOT lost and stays in MY CHALLENGES to finalize.
               this.recordFounderRunOutcome();
+              // Co-op (#829/#834): the run is over - tear the co-op runtime down on THIS client so the
+              // run-over tail cleans up on BOTH clients (drop the detached ME listeners + stall watchdog,
+              // close the transport, and zero the ME pins so nothing leaks into the next co-op run). Placed
+              // at the TERMINAL step - well after start()'s broadcastCoopWaveResolved("gameOver"), whose
+              // handler queues this same GameOverPhase on the guest - so that gameOver broadcast flushes to
+              // the peer FIRST (the transport delivers on a microtask and close() drops anything still in
+              // flight; an immediate teardown would strand the guest on the lost wave). Each client tears
+              // down its OWN runtime when its OWN GameOverPhase reaches here. No-op for solo (clearCoopRuntime
+              // early-returns when there is no active session).
+              clearCoopRuntime();
               globalScene.phaseManager.pushNew("PostGameOverPhase", globalScene.sessionSlotId, endCardPhase);
               this.end();
             });

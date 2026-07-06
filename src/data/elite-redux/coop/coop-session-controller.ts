@@ -418,7 +418,15 @@ export class CoopSessionController {
     return result;
   }
 
-  /** The raw interaction counter (persisted with the run so a resume continues the order). */
+  /**
+   * The raw interaction counter (the alternating-owner order). NOTE: this is NOT persisted in
+   * `SessionSaveData` - a co-op resume does NOT restore it. Both clients re-initialize it identically
+   * from the fresh runtime assembly (base 0), which preserves the even/odd ownership parity for a
+   * resume that re-enters an interaction from the TOP (the common case). A resume landing INSIDE an
+   * in-progress interaction (mid-ME / pending shop handoff) is not restorable as a half-state - see
+   * `docs/coop-structural-gaps.md` Part 3 (the dedicated `restoreInteractionCounter` seam was removed
+   * as production-dead: the counter is never saved, so there was nothing for it to restore).
+   */
   interactionCounter(): number {
     const counter = this.interactionTurn.toJSON();
     if (isCoopDebug()) {
@@ -477,16 +485,13 @@ export class CoopSessionController {
     this.emit();
   }
 
-  /** Restore the interaction order from the persisted run record (on resume). */
-  restoreInteractionCounter(counter: number): void {
-    const before = this.interactionTurn.toJSON();
-    this.interactionTurn = CoopInteractionTurn.fromJSON(counter);
-    coopLog(
-      "interaction",
-      `restoreInteractionCounter (resume) raw=${counter} counter ${before} -> ${this.interactionTurn.toJSON()} role=${this.role}`,
-    );
-    this.emit();
-  }
+  // #833 dangler cleanup: `restoreInteractionCounter(counter)` was removed here. It was
+  // PRODUCTION-DEAD - the interaction counter is not carried in `SessionSaveData`, so a real resume
+  // never had a value to restore; it re-initializes the counter identically on both clients from the
+  // fresh runtime assembly (see `interactionCounter()` above + `docs/coop-structural-gaps.md` Part 3
+  // for the save/resume-mid-interaction limitation). Wiring it into resume would first require adding
+  // the counter to `SessionSaveData` (a schema change, not a local seam), so the dead method was
+  // dropped rather than left dangling.
 
   /**
    * HOST: publish the authoritative run config (ER difficulty + challenge set) so
