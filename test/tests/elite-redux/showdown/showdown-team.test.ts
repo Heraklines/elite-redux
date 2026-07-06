@@ -1,7 +1,11 @@
 import { SHOWDOWN_ITEM_POOL, type ShowdownItemKey } from "#app/data/elite-redux/showdown/showdown-item-pool";
 import {
   MEGA_STONE_ITEM,
+  SHOWDOWN_BLACK_SHINY_MESSAGE,
+  SHOWDOWN_COST_CAP_MESSAGE,
+  SHOWDOWN_HIGH_COST_MESSAGE,
   type ShowdownMonManifest,
+  showdownFieldLegalityReason,
   type UnlockSnapshot,
   validateShowdownTeam,
 } from "#app/data/elite-redux/showdown/showdown-team";
@@ -369,6 +373,55 @@ describe("validateShowdownTeam", () => {
       // no ivs/level/item violation emitted for the malformed slot
       expect(v.filter(x => x.slot === 0 && x.rule !== "malformed")).toEqual([]);
     });
+  });
+});
+
+describe("showdownFieldLegalityReason (shared UI/validator verdict, Task B6)", () => {
+  it("passes a legal low-cost non-black mon", () => {
+    expect(showdownFieldLegalityReason(7, false, false)).toBeNull();
+    expect(showdownFieldLegalityReason(4, false, true)).toBeNull(); // party high-cost irrelevant below the bracket
+  });
+
+  it("returns the black-shiny message, taking precedence over any cost verdict", () => {
+    expect(showdownFieldLegalityReason(4, true, false)).toBe(SHOWDOWN_BLACK_SHINY_MESSAGE);
+    // Even a would-be cost-cap mon reports black-shiny first (matches validator precedence).
+    expect(showdownFieldLegalityReason(10, true, true)).toBe(SHOWDOWN_BLACK_SHINY_MESSAGE);
+  });
+
+  it("returns the cost-cap message at the cap boundary and above", () => {
+    expect(showdownFieldLegalityReason(10, false, false)).toBe(SHOWDOWN_COST_CAP_MESSAGE);
+    expect(showdownFieldLegalityReason(12, false, false)).toBe(SHOWDOWN_COST_CAP_MESSAGE);
+    expect(showdownFieldLegalityReason(9, false, false)).not.toBe(SHOWDOWN_COST_CAP_MESSAGE);
+  });
+
+  it("returns the high-cost message only for a SECOND cost-8/9 mon", () => {
+    expect(showdownFieldLegalityReason(8, false, false)).toBeNull(); // first high-cost is fine
+    expect(showdownFieldLegalityReason(9, false, false)).toBeNull();
+    expect(showdownFieldLegalityReason(8, false, true)).toBe(SHOWDOWN_HIGH_COST_MESSAGE);
+    expect(showdownFieldLegalityReason(9, false, true)).toBe(SHOWDOWN_HIGH_COST_MESSAGE);
+  });
+
+  it("agrees with validateShowdownTeam: same verdict strings drive both layers", () => {
+    // Each validator field-legality violation message must START WITH the shared constant the
+    // helper returns (the validator only APPENDS slot detail) — proving one source of truth.
+    const black = team();
+    black[0].erBlackShiny = true;
+    const blackMsg = validateShowdownTeam(black, allUnlocked, noMegas).find(x => x.rule === "blackShiny")?.message;
+    expect(blackMsg?.startsWith(SHOWDOWN_BLACK_SHINY_MESSAGE)).toBe(true);
+    expect(showdownFieldLegalityReason(4, true, false)).toBe(SHOWDOWN_BLACK_SHINY_MESSAGE);
+
+    const costly = team();
+    costly[0].baseCost = 11;
+    const costMsg = validateShowdownTeam(costly, allUnlocked, noMegas).find(x => x.rule === "costCap")?.message;
+    expect(costMsg?.startsWith(SHOWDOWN_COST_CAP_MESSAGE)).toBe(true);
+    expect(showdownFieldLegalityReason(11, false, false)).toBe(SHOWDOWN_COST_CAP_MESSAGE);
+
+    const high = team(6, { baseCost: 7 });
+    high[0].baseCost = 8;
+    high[1].baseCost = 9;
+    const highMsg = validateShowdownTeam(high, allUnlocked, noMegas).find(x => x.rule === "highCostLimit")?.message;
+    expect(highMsg?.startsWith(SHOWDOWN_HIGH_COST_MESSAGE)).toBe(true);
+    expect(showdownFieldLegalityReason(9, false, true)).toBe(SHOWDOWN_HIGH_COST_MESSAGE);
   });
 });
 

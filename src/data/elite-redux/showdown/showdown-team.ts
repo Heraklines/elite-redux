@@ -36,9 +36,44 @@ const MAX_MOVES = 4;
  *  - baseCost in [HIGH_COST_MIN, COST_CAP): "high-cost"; at most one per team.
  *  - all others (baseCost < HIGH_COST_MIN): unrestricted.
  */
-const COST_CAP = 10;
-const HIGH_COST_MIN = 8;
-const MAX_HIGH_COST = 1;
+export const COST_CAP = 10;
+export const HIGH_COST_MIN = 8;
+export const MAX_HIGH_COST = 1;
+
+/**
+ * Player-facing field-legality messages (Task B6). SINGLE SOURCE for both the pick-time UI
+ * gate (`showdownAddRejection`) and the validator; the validator may APPEND slot detail. The
+ * two cost strings derive from the threshold constants so a threshold change updates the text
+ * too. Accented "Pokémon" everywhere.
+ */
+export const SHOWDOWN_BLACK_SHINY_MESSAGE = "Black Shinies can't enter Showdown.";
+export const SHOWDOWN_COST_CAP_MESSAGE = `Cost-${COST_CAP} Pokémon can't enter Showdown.`;
+export const SHOWDOWN_HIGH_COST_MESSAGE = `Only one Pokémon of cost ${HIGH_COST_MIN} or higher is allowed.`;
+
+/**
+ * PURE field-legality verdict for ONE candidate mon (Task B6) — the single source of truth
+ * shared by the pick-time UI gate and (via the same thresholds/strings) the validator. Returns
+ * the exact player-facing message, or null when the mon may be fielded. Order matches the
+ * validator's precedence: black shiny, then the hard cost cap, then the one-per-team high-cost
+ * bracket. `baseCost` MUST be the LINE's raw `speciesStarterCosts` value (candy-reduction-agnostic).
+ * `partyAlreadyHasHighCost` = the rest of the team already fields a cost-8/9 mon.
+ */
+export function showdownFieldLegalityReason(
+  baseCost: number,
+  erBlackShiny: boolean,
+  partyAlreadyHasHighCost: boolean,
+): string | null {
+  if (erBlackShiny) {
+    return SHOWDOWN_BLACK_SHINY_MESSAGE;
+  }
+  if (baseCost >= COST_CAP) {
+    return SHOWDOWN_COST_CAP_MESSAGE;
+  }
+  if (baseCost >= HIGH_COST_MIN && partyAlreadyHasHighCost) {
+    return SHOWDOWN_HIGH_COST_MESSAGE;
+  }
+  return null;
+}
 
 export interface ShowdownMonManifest {
   speciesId: number;
@@ -285,7 +320,7 @@ function checkBlackShiny(mon: ShowdownMonManifest, slot: number, out: ShowdownRu
     out.push({
       rule: "blackShiny",
       slot,
-      message: `Black Shinies can't enter Showdown (slot ${slot}).`,
+      message: `${SHOWDOWN_BLACK_SHINY_MESSAGE} (slot ${slot})`,
     });
   }
 }
@@ -299,7 +334,7 @@ function checkCostCap(mon: ShowdownMonManifest, slot: number, out: ShowdownRuleV
     out.push({
       rule: "costCap",
       slot,
-      message: `Cost-${COST_CAP} Pokemon can't enter Showdown (slot ${slot} is cost ${mon.baseCost}).`,
+      message: `${SHOWDOWN_COST_CAP_MESSAGE} (slot ${slot} is cost ${mon.baseCost})`,
     });
   }
 }
@@ -391,7 +426,7 @@ export function validateShowdownTeam(
   if (highCostCount > MAX_HIGH_COST) {
     violations.push({
       rule: "highCostLimit",
-      message: `Only one Pokemon of cost ${HIGH_COST_MIN} or higher is allowed (has ${highCostCount}).`,
+      message: `${SHOWDOWN_HIGH_COST_MESSAGE} (has ${highCostCount})`,
     });
   }
 
