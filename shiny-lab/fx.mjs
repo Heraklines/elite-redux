@@ -2989,6 +2989,7 @@ export const AROUND_OVERLAY = new Set([
   "emberspiral",
   "runeorbit",
   "fogbank",
+  "zaps",
 ]);
 // Energy Helix: a double strand winding around the mon, front arcs over the sprite.
 AROUND.helix = (nx, ny, df, t, c) => {
@@ -4176,11 +4177,11 @@ AROUND.prismrain = (nx, ny, df, t) => {
 // and not too often - most of the time nothing shows. Each bolt has a random
 // length (0.5x-1.5x), and every fired bolt chains: a 20% roll spawns one more in
 // the same instant, re-rolled recursively (hard cap 10 total) - so now and then
-// the mon overcharges and bursts with bolts.
+// the mon overcharges and bursts with bolts. Bolts also roll a DEPTH: ~45% are
+// FRONT bolts that arc over the sprite (zaps is in AROUND_OVERLAY; the overlay
+// pass calls with df=0), the rest stay behind the mon.
 AROUND.zaps = (nx, ny, df, t, c) => {
-  if (df <= 0.01) {
-    return [0, 0, 0, 0];
-  }
+  const onBody = df <= 0.01;
   const dx = nx - c.cx;
   const dy = ny - c.cy;
   const r = Math.hypot(dx, dy);
@@ -4210,6 +4211,10 @@ AROUND.zaps = (nx, ny, df, t, c) => {
         break;
       }
       budget--;
+      const front = h2(slot * 3.1 + j * 19 + k * 7.3, 4.9) < 0.45;
+      if (onBody && !front) {
+        continue; // behind the mon
+      }
       const fl2 = flash * (0.7 + 0.3 * h2(slot + j * 7, k + 3.3));
       const ang0 = h2(slot + k * 17 + j * 39 + FXSEED * 1.3, 3.7) * Math.PI * 2;
       const len = 0.5 + h2(slot + j * 23, k * 9 + 6.1); // 0.5x .. 1.5x
