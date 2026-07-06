@@ -3,8 +3,8 @@
 **Live for the team: https://shiny-lab.pages.dev** (Cloudflare Pages). Also
 `articuno-shiny-lab.html` on the Desktop (self-contained except sprites).
 
-**366 effects** in three **combinable** slots - pick one of each and they stack live:
-**138 Palettes + 123 Surface FX + 105 Around FX** (v6 Discord-brainstorm batch + the v7
+**367 effects** in three **combinable** slots - pick one of each and they stack live:
+**138 Palettes + 124 Surface FX + 105 Around FX** (v6 Discord-brainstorm batch + the v7
 mega-expansion doubled every catalog; v7.1 quality pass reworked the weak ones after
 zoomed per-frame triage - see `gen-zoom.mjs`, the per-effect multi-frame review tool).
 
@@ -25,6 +25,10 @@ zoomed per-frame triage - see `gen-zoom.mjs`, the per-effect multi-frame review 
 - **Per-layer sliders**: Surface FX and Around FX each get their OWN Speed / Seed /
   Texture noise / Color (Default-Palette-Custom) controls, plus the master speed.
 - **GBC colors** checkbox: snaps all FX colors to the GBC-displayable gamut (RGB555).
+- **NEW Astral Form** (surface): the living-constellation look - night-sky nebula body,
+  twinkling stars, and the sprite's OWN linework redrawn as broken pale-blue
+  constellation lines with star nodes. Linework is detected by local contrast (darker
+  than the surrounding body), so it follows any sprite's shape - light or dark mons.
 
 ## v7.1 quality pass (zoom-triage driven)
 Every v6/v7 effect was rendered at 3x with 4 animation frames (`gen-zoom.mjs`) and
