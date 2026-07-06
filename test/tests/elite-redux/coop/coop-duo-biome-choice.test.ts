@@ -72,9 +72,11 @@ function toCoop(scene: BattleScene): void {
 }
 
 /** Headless UI capture: record the last ER_MAP / OPTION_SELECT config; fire showText callbacks. */
+type ErMapCfg = { nodes?: ErRouteNode[]; origin?: BiomeId; onSelect: (b: BiomeId) => void };
+type OptionCfg = { options: { label: string; handler: () => boolean }[] };
 interface UiCapture {
-  erMapConfig?: { nodes?: ErRouteNode[]; origin?: BiomeId; onSelect: (b: BiomeId) => void };
-  optionConfig?: { options: { label: string; handler: () => boolean }[] };
+  erMapConfig?: ErMapCfg;
+  optionConfig?: OptionCfg;
   restore: () => void;
 }
 
@@ -93,9 +95,9 @@ function installUiCapture(scene: BattleScene): UiCapture {
   };
   ui.setMode = (mode: number, ...args: unknown[]): Promise<void> => {
     if (mode === UiMode.ER_MAP) {
-      cap.erMapConfig = args[0] as UiCapture["erMapConfig"];
+      cap.erMapConfig = args[0] as ErMapCfg;
     } else if (mode === UiMode.OPTION_SELECT) {
-      cap.optionConfig = args[0] as UiCapture["optionConfig"];
+      cap.optionConfig = args[0] as OptionCfg;
     }
     return Promise.resolve();
   };

@@ -1789,6 +1789,33 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
   },
   {
+    label: "(note) Co-op: the World-Map biome CHOICE + crossroads are owner-alternated + mirrored (#848)",
+    description:
+      "CO-OP fix - verify with TWO clients (not a solo battle): the ER World Map biome pick and the\n"
+      + "every-5-waves Stay/Leave crossroads used to be AMPUTATED in co-op - both clients silently\n"
+      + "auto-rolled the next biome off the shared seed with NO prompt, so the core 'choose your route'\n"
+      + "mechanic was gone for co-op players. #848 restores it as an OWNER-ALTERNATED, MIRRORED\n"
+      + "interaction (the SAME alternation as the reward shop / ME / bargain - the shared interaction\n"
+      + "counter parity): one player OWNS the decision, drives the real crossroads + World Map screen,\n"
+      + "and the PARTNER sees the SAME screens with the owner's cursor moving live, then both apply the\n"
+      + "owner's choice. DO (2 clients): play ~5 waves into a biome to reach the CROSSROADS. EXPECT: the\n"
+      + "Stay/Leave prompt opens on BOTH screens but only ONE player (the current interaction owner) can\n"
+      + "move the cursor / pick; the partner watches it live. On LEAVE the World Map route picker opens\n"
+      + "on BOTH screens (same owner drives); when the owner picks a node, BOTH clients travel to the\n"
+      + "SAME chosen biome (NOT a random roll) and land with the same biome length. The WHOLE Stay/Leave\n"
+      + "-> map decision is ONE interaction: the picker owner FLIPS to the other player at the NEXT\n"
+      + "crossroads. If the owner disconnects, both clients fall back to the same deterministic roll (no\n"
+      + "hang, no split run). Duo-tested headlessly in\n"
+      + "test/tests/elite-redux/coop/coop-duo-biome-choice.test.ts.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({ STARTING_WAVE_OVERRIDE: 1, STARTING_LEVEL_OVERRIDE: 50 });
+      return [
+        makeStarter(SpeciesId.SNORLAX, { moveset: [MoveId.TACKLE, MoveId.BODY_SLAM, MoveId.REST, MoveId.SNORE] }),
+      ];
+    },
+  },
+  {
     label: "(note) Co-op: a faint replacement must not instantly re-KO on the chooser (#807)",
     description:
       "CO-OP fix - verify with TWO clients (not a solo battle): when the GUEST's active mon FAINTS and\n"
