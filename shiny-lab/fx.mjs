@@ -4172,51 +4172,66 @@ AROUND.prismrain = (nx, ny, df, t) => {
   const m = clamp(1 - df / 26);
   return [col[0], col[1], col[2], clamp(sliver * (0.5 + 0.5 * flash) + glow) * m];
 };
-// Lightning Zaps: one or two jagged bolts snap off the body in a random
-// direction, briefly and not too often - most of the time nothing shows.
+// Lightning Zaps: jagged bolts snap off the body in random directions, briefly
+// and not too often - most of the time nothing shows. Each bolt has a random
+// length (0.5x-1.5x), and every fired bolt chains: a 20% roll spawns one more in
+// the same instant, re-rolled recursively (hard cap 10 total) - so now and then
+// the mon overcharges and bursts with bolts.
 AROUND.zaps = (nx, ny, df, t, c) => {
   if (df <= 0.01) {
     return [0, 0, 0, 0];
   }
+  const dx = nx - c.cx;
+  const dy = ny - c.cy;
+  const r = Math.hypot(dx, dy);
+  if (r < 0.03) {
+    return [0, 0, 0, 0];
+  }
+  const angP = Math.atan2(dy, dx);
   let a = 0;
   let hot = 0;
-  for (let k = 0; k < 2; k++) {
+  const MAXB = 10;
+  let budget = MAXB;
+  for (let k = 0; k < 2 && budget > 0; k++) {
     const cyc = t * 1.3 + k * 0.41 + h2(k + 1 + FXSEED, 9.2) * 5;
     const slot = Math.floor(cyc);
-    // most windows stay empty (the 2nd bolt much more so)
+    // most windows stay empty (the 2nd base bolt much more so)
     if (h2(slot * 1.31 + 0.17 + FXSEED, 11 + k * 7) > (k === 0 ? 0.45 : 0.22)) {
       continue;
     }
     const life = fract(cyc);
-    const flash = smooth(0.0, 0.03, life) * smooth(0.3, 0.12, life) * (0.7 + 0.3 * h2(slot, k + 3.3));
+    const flash = smooth(0.0, 0.03, life) * smooth(0.3, 0.12, life);
     if (flash <= 0.02) {
       continue;
     }
-    const ang0 = h2(slot + k * 17 + FXSEED * 1.3, 3.7) * Math.PI * 2;
-    const dx = nx - c.cx;
-    const dy = ny - c.cy;
-    const r = Math.hypot(dx, dy);
-    if (r < 0.03) {
-      continue;
-    }
-    let da = Math.atan2(dy, dx) - ang0;
-    da = Math.atan2(Math.sin(da), Math.cos(da));
-    if (Math.abs(da) > 1.2) {
-      continue;
-    }
-    // jagged perpendicular displacement along the ray, finer kinks on top
-    const jig =
-      (vnoise(r * 26 + slot * 5.13, slot * 9.7 + k * 37.1) - 0.5) * 0.09 * Math.min(1, r * 7) +
-      (vnoise(r * 70 + slot * 3.7, slot * 4.3 + k * 23.7) - 0.5) * 0.022;
-    const off = Math.abs(r * Math.sin(da) - jig);
-    const width = 0.011 + r * 0.01;
-    const reach = smooth(0.55, 0.42, r);
-    const beam = smooth(width, width * 0.25, off) * reach;
-    const glow = smooth(width * 4.5, width, off) * reach * 0.3;
-    const kk = (beam + glow) * flash;
-    if (kk > a) {
-      a = kk;
-      hot = smooth(0.26, 0.08, r);
+    for (let j = 0; j < MAXB && budget > 0; j++) {
+      // the window's first bolt always draws; each extra needs a fresh 20% roll
+      if (j > 0 && h2(slot * 2.7 + j * 13.3 + FXSEED, 29 + k * 5) > 0.2) {
+        break;
+      }
+      budget--;
+      const fl2 = flash * (0.7 + 0.3 * h2(slot + j * 7, k + 3.3));
+      const ang0 = h2(slot + k * 17 + j * 39 + FXSEED * 1.3, 3.7) * Math.PI * 2;
+      const len = 0.5 + h2(slot + j * 23, k * 9 + 6.1); // 0.5x .. 1.5x
+      let da = angP - ang0;
+      da = Math.atan2(Math.sin(da), Math.cos(da));
+      if (Math.abs(da) > 1.2) {
+        continue;
+      }
+      // jagged perpendicular displacement along the ray, finer kinks on top
+      const jig =
+        (vnoise(r * 26 + slot * 5.13 + j * 61, slot * 9.7 + k * 37.1 + j * 17) - 0.5) * 0.09 * Math.min(1, r * 7) +
+        (vnoise(r * 70 + slot * 3.7 + j * 31, slot * 4.3 + k * 23.7) - 0.5) * 0.022;
+      const off = Math.abs(r * Math.sin(da) - jig);
+      const width = 0.011 + r * 0.01;
+      const reach = smooth(0.55 * len, 0.42 * len, r);
+      const beam = smooth(width, width * 0.25, off) * reach;
+      const glow = smooth(width * 4.5, width, off) * reach * 0.3;
+      const kk = (beam + glow) * fl2;
+      if (kk > a) {
+        a = kk;
+        hot = smooth(0.26, 0.08, r);
+      }
     }
   }
   return [mix(0.78, 1, hot), mix(0.88, 1, hot), 1, clamp(a) * 0.95];
