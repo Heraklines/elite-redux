@@ -2230,6 +2230,18 @@ function reconcileAuthoritativeParty(
 ): Pokemon[] {
   const liveParty =
     side === "player" ? (globalScene.getPlayerParty() as Pokemon[]) : (globalScene.getEnemyParty() as Pokemon[]);
+  // #840: an EMPTY authoritative party for this side is "no info for this side right now", NOT "this side
+  // has zero members". It occurs when the snapshot is captured mid-crossing - a between-waves POST_BATTLE_
+  // SWITCH pushes CoopPushReplacementCheckpointPhase AFTER NewBattlePhase reset currentBattle but BEFORE
+  // the next EncounterPhase spawns the foes, so getEnemyParty() is transiently empty on the host. Falling
+  // through would `liveParty.length = 0` this renderer's LIVE enemy party (and destroy each member below),
+  // stranding a queued phase on the now-null field slot (the getEffectiveStat NO-PARK strand). Leave the
+  // live side untouched; the populated side (the player half, carrying the switch's reorder) still applies,
+  // and real enemy state lands at the next turn boundary. A genuine in-battle side is never empty (fainted
+  // members stay in the party at hp 0), so this only skips the transient no-info case.
+  if (hostParty.length === 0) {
+    return liveParty;
+  }
   const byId = new Map<number, Pokemon>();
   for (const mon of liveParty) {
     if (mon != null && typeof mon.id === "number" && !byId.has(mon.id)) {
