@@ -1918,6 +1918,38 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
   },
   {
+    label: "(note) Co-op: the trainer's next mon RENDERS on the partner after a foe faints (#845)",
+    description:
+      "CO-OP fix - verify with TWO clients (not a solo battle): in a DOUBLE trainer battle, KO one of the\n"
+      + "trainer's on-field mons so the trainer sends its NEXT reserve. The HOST runs a real summon and shows\n"
+      + "2v2. The PARTNER (the pure renderer) receives the new foe through the host's authoritative full-state\n"
+      + "apply, which for a NEW Pokemon id took the reconstruct path and seated the mon as DATA ONLY - it built\n"
+      + "the foe but placed its sprite with a RELATIVE position nudge from the ctor-default base, so once the\n"
+      + "live enemy platform had moved (field scale / a fusion / the biome layout) the sprite landed OFF the\n"
+      + "platform: the partner saw an EMPTY enemy slot (1v2) while the host saw 2v2, and the battle kept\n"
+      + "working because the data was correct (live wave-12 trainer, seed pjQuKHgYao8WW2QCPLtKIhcP). Fixed:\n"
+      + "when the authoritative field seats an id with no live rendered occupant at that slot, the partner now\n"
+      + "runs the REAL field-summon presentation (the same helper the checkpoint reconcile uses) - it removes\n"
+      + "the fainted predecessor FIRST, derives the ABSOLUTE platform base from the surviving ally, seats the\n"
+      + "sprite + HP bar (+ boss shields), and never re-summons an already-rendered mon (no flicker). DO\n"
+      + "(2 clients): in a double trainer fight, KO ONE of the two foes and let the trainer send its next.\n"
+      + "EXPECT: the replacement APPEARS on BOTH screens in the correct slot (2v2), with its HP bar, no empty\n"
+      + "slot on either client, and no re-summon flash / forced resync. Duo-tested headlessly in\n"
+      + "test/tests/elite-redux/coop/coop-duo-enemy-switch-render.test.ts.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({ STARTING_WAVE_OVERRIDE: 1, STARTING_LEVEL_OVERRIDE: 50 });
+      return [
+        makeStarter(SpeciesId.CHIKORITA, {
+          moveset: [MoveId.RAZOR_LEAF, MoveId.BODY_SLAM, MoveId.SYNTHESIS, MoveId.REFLECT],
+        }),
+        makeStarter(SpeciesId.FENNEKIN, {
+          moveset: [MoveId.EMBER, MoveId.PSYBEAM, MoveId.QUICK_ATTACK, MoveId.HOWL],
+        }),
+      ];
+    },
+  },
+  {
     label: "(note) Co-op: reciprocal pacing barriers + no counter drift (#839/#837)",
     description:
       "CO-OP fix - verify with TWO clients (not a solo battle). Two related pacing/sync fixes:\n"

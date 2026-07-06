@@ -2311,8 +2311,42 @@ function ensureAuthoritativeFieldVisible(
         ? (arrangement?.playerCapacity ?? (globalScene.currentBattle?.double ? 2 : 1))
         : (arrangement?.enemyCapacity ?? (globalScene.currentBattle?.double ? 2 : 1));
     const position = capacity <= 1 ? FieldPosition.CENTER : fieldPositionForSlot(fieldIndex, capacity);
-    void mon.setFieldPosition(position, 0);
-    if (!mon.isOnField()) {
+    if (mon.isOnField()) {
+      // Already rendered at this slot: re-assert the slot position only (the no-flicker gate - never
+      // re-summon a mon that is already on the field).
+      void mon.setFieldPosition(position, 0);
+    } else {
+      // #845: this battler slot has NO live rendered occupant of this id yet - a NEW id seated into the
+      // field (the trainer's faint-replacement, or a caught/ME-granted mon entering play). A bare data
+      // seat (add-to-field + a RELATIVE setFieldPosition, which only nudges by the slot-offset DELTA from
+      // the mon's current x/y) leaves a freshly reconstructed mon at its ctor-default base - which is NOT
+      // the LIVE enemy/player platform once updateFieldScale / a fusion / the biome layout has moved it -
+      // so the sprite lands off-platform: the guest's "empty slot" (2v2 on the host, 1v2 on the guest).
+      // Run the SAME field-summon presentation the checkpoint reconcile uses (summonCoopEnemyField /
+      // summonCoopPlayerField): remove the fainted predecessor at this slot FIRST, derive the ABSOLUTE
+      // platform base from a LIVE ally, then seat + show + (enemy) boss-shield redraw.
+      const liveSideField =
+        seat.side === "enemy"
+          ? (globalScene.getEnemyField(true) as Pokemon[])
+          : (globalScene.getPlayerField(true) as Pokemon[]);
+      // Predecessor-first: drop any live on-field mon still holding this battler slot (a KOd foe the host
+      // no longer seats here) so the incoming is never co-resident with it - mirrors the outgoing
+      // `leaveField` in summonCoopEnemyField. The post-seat orphan sweep stays as an idempotent backstop.
+      for (const stale of liveSideField) {
+        if (stale != null && stale !== mon && stale.id !== mon.id && stale.getBattlerIndex() === seat.bi) {
+          coopRemoveFromField(stale);
+        }
+      }
+      // Absolute base from a LIVE ally (its x/y minus its own slot offset = the shared platform base);
+      // pre-set CENTER so the following setFieldPosition ALWAYS applies the slot offset from that base
+      // (never early-returns on an already-matching fieldPosition, which would strand x/y at the default).
+      const liveAlly = liveSideField.find(p => p != null && p !== mon && p.isActive() && p.isOnField());
+      if (liveAlly != null) {
+        const allyOffset = liveAlly.getFieldPositionOffset();
+        mon.fieldPosition = FieldPosition.CENTER;
+        mon.setPosition(liveAlly.x - allyOffset[0], liveAlly.y - allyOffset[1]);
+      }
+      void mon.setFieldPosition(position, 0);
       globalScene.add.existing(mon);
       globalScene.field.add(mon);
       if (seat.side === "enemy") {
@@ -2332,6 +2366,14 @@ function ensureAuthoritativeFieldVisible(
         /* headless */
       }
       mon.fieldSetup(true);
+      // Redraw the boss-shield dividers now (showInfo only makes the bar visible); a boss replacement
+      // otherwise shows no segments until the next numeric apply. Mirrors summonCoopEnemyField.
+      if (seat.side === "enemy") {
+        const info = mon.getBattleInfo();
+        if (info instanceof EnemyBattleInfo) {
+          info.updateBossSegments(mon as EnemyPokemon);
+        }
+      }
     }
     void mon.updateInfo(true);
   } catch {
