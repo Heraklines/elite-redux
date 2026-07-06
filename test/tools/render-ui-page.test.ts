@@ -687,6 +687,22 @@ const RECIPES: Record<string, Recipe> = {
       return [() => {}];
     },
   },
+  // Showdown teambuilder: forces SHOWDOWN mode so the cost panel reads the deferred
+  // 999 limit and the party cap is the full 6 (PLAYER_PARTY_MAX_SIZE). Same real screen
+  // the player builds their 1v1 duel team on. steps opens the per-species action menu so
+  // the showdown-only "Field Stage" / "Held Item" rows are captured (RIGHT to a caught
+  // species, then the action button opens the menu).
+  "starter-select-showdown": {
+    mode: UiMode.STARTER_SELECT,
+    prepare: game => {
+      game.scene.gameMode = getGameMode(GameModes.SHOWDOWN);
+      for (let id = 1; id <= 151; id++) {
+        caughtSpecies(game, id as SpeciesId);
+      }
+      return [() => {}];
+    },
+    steps: [Button.ACTION],
+  },
   // Demo of universal input driving: drives the real starter-select grid cursor. Each
   // `-stepN.png` shows the cursor highlight + detail panel moving - the same mechanism
   // reproduces navigation/scroll bugs and input-triggered crashes on ANY screen/menu.

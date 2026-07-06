@@ -280,6 +280,12 @@ const languageSettings: { [key: string]: LanguageSetting } = {
 
 const valueReductionMax = 2;
 
+// Showdown: the starter-cost budget is deferred by design (teams are built at
+// level 100 from the player's OWN unlocked collection, so a point ceiling would
+// only get in the way). This effectively-unlimited limit keeps the cost panel
+// from ever rejecting an owned pick.
+const SHOWDOWN_VALUE_LIMIT = 999;
+
 // Position of UI elements
 const filterBarHeight = 17;
 const speciesContainerX = 109; // if team on the RIGHT: 109 / if on the LEFT: 143
@@ -3994,6 +4000,13 @@ export class StarterSelectUiHandler extends MessageUiHandler {
     // the affordability grey-out leaves cells gated ONLY by challenge legality.
     if (this.rosterPickMode) {
       return Number.POSITIVE_INFINITY;
+    }
+    // Showdown: teams are built at level 100 from the player's own unlocked
+    // collection, and the point budget is deferred by design - so no cost ceiling
+    // gates selection. A flat, effectively-unlimited limit keeps the cost panel
+    // from ever rejecting an owned pick.
+    if (globalScene.gameMode.isShowdown) {
+      return SHOWDOWN_VALUE_LIMIT;
     }
     // Co-op (#633): each player picks their OWN team on their OWN screen with an
     // independent 5-point budget (two players ~= the solo 10-point pool), not the
