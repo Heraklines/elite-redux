@@ -141,4 +141,60 @@ describe.skipIf(!RUN)("NIGHTLY co-op SOAK: mid-run mystery-encounter continuatio
 
     logs.flush();
   }, 600_000);
+
+  it("surveys TWO waves PAST a host-owned ME with NO post-ME pin leak (no spurious second ME), findings=0", async () => {
+    // #633 FOLLOW-UP (finding (a) - POST-ME COUNTER DESYNC): before this landed, surveying waves AFTER a
+    // HOST-OWNED ME STALLED - the guest's next-wave replay re-diverted a SPURIOUS SECOND ME and the wave's
+    // owner/watcher handshake never converged. ROOT CAUSE (a HARNESS LEAK, not a production bug): in
+    // production the guest's ME interaction pin (coopMeInteractionStart) is cleared at its true post-ME
+    // boundary by PostMysteryEncounterPhase.start()'s authoritative-guest guard (coopClearMePinForGuest),
+    // AFTER the embedded watcher reward shop drains. The two-engine harness drives the guest ONLY through the
+    // CoopReplayMePhase LEAVE terminal (driveGuestMeReplay's documented scope), NOT its PostMysteryEncounterPhase,
+    // so the pin leaked into guestCtx.mePins and coopMeInProgress() stayed TRUE - the next guest pump re-diverted.
+    // The driver now mirrors the production post-ME boundary clear in processMeWave, so the survey continues.
+    // Reuse the FIRST test's seed (828_633), which is proven to steamroll cleanly THROUGH wave 12 (the
+    // pre-ME waves are known-green), so extending to wave 14 isolates the POST-ME behavior at 13 + 14.
+    const seed = 828_633;
+    const waves = ME_WAVE + 2; // drive the ME at 12, then survey 13 + 14 as plain battle waves
+    announceSoakSeed(seed, waves);
+
+    await game.classicMode.startBattle(...SOAK_PROFILES.god.species);
+    const result = await runCoopSoak(game, {
+      seed,
+      waves,
+      logs,
+      profile: "god",
+      meWaves: new Map([[ME_WAVE, MysteryEncounterType.DEPARTMENT_STORE_SALE]]),
+    });
+
+    // eslint-disable-next-line no-console
+    console.log(
+      `[coop-soak-me] POST-ME-SURVEY DONE seed=${seed} waves=${result.wavesCompleted}/${result.wavesRequested} `
+        + `findings=${result.findings.length} MEs=${JSON.stringify(result.mysteryEncounters)} skips=${JSON.stringify(result.skips)}`,
+    );
+
+    // EXACTLY ONE ME was driven (the designated wave-12 host-owned ME); the guest never re-diverted a spurious
+    // SECOND ME on wave 13/14 (the leak's signature - it surfaced as an undrivable stray or a stall).
+    expect(result.mysteryEncounters.length, "exactly one ME driven - no spurious post-ME second ME").toBe(1);
+    expect(result.mysteryEncounters[0].wave, "the one ME was the designated wave-12 ME").toBe(ME_WAVE);
+    expect(result.mysteryEncounters[0].path, "wave 12 is HOST-OWNED by counter parity").toBe("host-owned");
+    expect(
+      result.skips.mysteryEncounterWaveHit,
+      "no undrivable stray ME was counted on the post-ME waves (the leak's signature)",
+    ).toBeUndefined();
+
+    // The survey reached EVERY wave past the ME (no stall, no terminal). This is the load-bearing assertion:
+    // the post-ME waves 13 + 14 were driven as normal owner/watcher battle waves, in lockstep.
+    expect(result.wavesCompleted, "the run surveyed every wave THROUGH + PAST the ME").toBe(waves);
+    expect(result.runEnded, "no terminal run-end past the ME").toBeUndefined();
+
+    // THE PRIMARY GATE: no unhealed DIGEST desync across the ME wave AND the two waves after it.
+    expect(
+      result.findings,
+      `soak found ${result.findings.length} unhealed DIGEST desync(s) past the ME (replay SOAK_SEED=${seed}): `
+        + result.findings.map(f => `[${f.fields}]@${f.firstWave}`).join(", "),
+    ).toEqual([]);
+
+    logs.flush();
+  }, 600_000);
 });

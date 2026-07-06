@@ -89,7 +89,7 @@ import { WeatherType } from "#enums/weather-type";
 import type { Pokemon } from "#field/pokemon";
 import type { ModifierOverride } from "#modifiers/modifier-type";
 import { getCoopMeHostPresentation } from "#phases/coop-replay-me-phase";
-import { coopMeInteractionStartValue } from "#phases/mystery-encounter-phases";
+import { coopClearMePinForGuest, coopMeInteractionStartValue } from "#phases/mystery-encounter-phases";
 import { SelectModifierPhase } from "#phases/select-modifier-phase";
 import type { GameManager } from "#test/framework/game-manager";
 import {
@@ -1619,7 +1619,25 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
     // second CoopReplayMePhase (driveGuestMeReplay drives THROUGH the leave terminal but leaves the guest's
     // post-ME phase queue populated - see the harness scope note). The next wave's remirror rebuilds the
     // guest's currentBattle; this drops the stale ME phases so the replay runs a clean CoopReplayTurnPhase.
-    withClientSync(rig.guestCtx, () => rig.guestScene.phaseManager.clearPhaseQueue());
+    // #633 FOLLOW-UP (finding (a) - POST-ME COUNTER DESYNC, the HARNESS LEAK): ALSO clear the guest's ME
+    // interaction pin here. driveGuestMeReplay / the guest-owned drive above run the guest's ME divert
+    // (coopSetMePinForGuest sets coopMeInteractionStart so coopMeInProgress() is TRUE across the whole guest
+    // ME, exactly as production) but stop at the CoopReplayMePhase LEAVE terminal - they never drive the
+    // guest's PostMysteryEncounterPhase, whose authoritative-guest guard is where production CLEARS the pin
+    // (coopClearMePinForGuest, after the embedded watcher shop drains). Without this the pin leaks into
+    // guestCtx.mePins, so the NEXT wave's guest pump reads coopMeInProgress() TRUE and RE-DIVERTS a spurious
+    // second ME - the guest never drives that wave's (guest-owned) reward-shop terminal and the host watcher
+    // hangs (seed 828633 wave 13: "watcher neither left nor advanced ... owner terminal never arrived").
+    // Mirror the production post-ME boundary clear under the guest ctx (so guestCtx.mePins gets the -1 on
+    // swap-back), exactly as PostMysteryEncounterPhase.start() does for the authoritative guest. Use the ASYNC
+    // withClient (NOT withClientSync): ONLY withClient persists the mutated ME pins back into the ctx on exit
+    // (`ctx.mePins = readMePins()`, line ~406); withClientSync deliberately drops them (it restores prev.mePins
+    // without saving), so a coopClearMePinForGuest under withClientSync would set the global to -1 but leave
+    // guestCtx.mePins.start at the leaked ME counter - the exact no-op that let the spurious re-divert persist.
+    await withClient(rig.guestCtx, () => {
+      rig.guestScene.phaseManager.clearPhaseQueue();
+      coopClearMePinForGuest();
+    });
 
     // The whole ME advanced the alternation counter EXACTLY once (like a shop). Assert LOCKSTEP.
     const hostAfter = rig.hostRuntime.controller.interactionCounter();
