@@ -1,0 +1,281 @@
+----- BUG REPORT (in-game) -----
+version:  1.11.19
+url:      https://elite-redux.pages.dev/
+ua:       Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:152.0) Gecko/20100101 Firefox/152.0
+mode:     0  wave:null  difficulty:hell
+seed:     Bcgj3ZAB2nvySGKOUbD7Qvri
+party:    
+
+----- DESCRIPTION -----
+Radiance the ability, doesn't prevent dark type moves from damaging you.
+
+----- CONSOLE -----
+[13:34:56.787] LOG: %cStart Phase MessagePhase color:green;
+[13:34:57.356] LOG: %cStart Phase VictoryPhase color:green;
+[13:34:57.357] LOG: %cStart Phase MoveEndPhase color:green;
+[13:34:57.357] LOG: %cStart Phase MovePhase color:green;
+[13:34:57.357] LOG: %cStart Phase MoveEndPhase color:green;
+[13:34:57.357] LOG: %cStart Phase CheckInterludePhase color:green;
+[13:34:57.357] LOG: %cStart Phase WeatherEffectPhase color:green;
+[13:34:58.154] LOG: %cStart Phase PositionalTagPhase color:green;
+[13:34:58.154] LOG: %cStart Phase BerryPhase color:green;
+[13:34:58.154] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[13:34:58.155] LOG: %cStart Phase TurnEndPhase color:green;
+[13:34:58.156] WARN: [coop:turn] host recorder: finalize with NO open recording -> turn=-1 events=0 (caller decides not to emit)
+[13:34:58.156] LOG: %cStart Phase MessagePhase color:green;
+[13:34:58.554] LOG: %cStart Phase SwitchSummonPhase color:green;
+[13:34:58.888] LOG: Matt
+[13:34:59.005] LOG: Applied Iron (enemy)
+[13:34:59.005] LOG: Applied Carbos (enemy)
+[13:34:59.005] LOG: Applied Zinc (enemy)
+[13:34:59.006] LOG: Applied Iron (enemy)
+[13:34:59.006] LOG: Applied Protein (enemy)
+[13:34:59.007] LOG: Applied Zinc (enemy)
+[13:34:59.008] LOG: Applied Carbos (enemy)
+[13:34:59.008] LOG: Applied Zinc (enemy)
+[13:34:59.206] LOG: %cStart Phase PostSummonPhase color:green;
+[13:34:59.206] LOG: Ran PSP for: Azumarill
+[13:34:59.206] LOG: %cStart Phase PostSummonPhase color:green;
+[13:34:59.208] LOG: %cStart Phase ShowAbilityPhase color:green;
+[13:34:59.439] LOG: %cStart Phase CommonAnimPhase color:green;
+[13:35:00.155] LOG: %cStart Phase MessagePhase color:green;
+[13:35:00.506] LOG: %cStart Phase HideAbilityPhase color:green;
+[13:35:00.540] LOG: %cStart Phase PostSummonPhase color:green;
+[13:35:00.541] LOG: %cStart Phase ShowAbilityPhase color:green;
+[13:35:00.790] LOG: %cStart Phase MovePhase color:green;
+[13:35:00.790] LOG: %cUser: Azumarill
+Move: AQUA_RING
+Use Mode: INDIRECT color:orchid
+[13:35:00.791] LOG: %cStart Phase MessagePhase color:green;
+[13:35:00.990] LOG: %cStart Phase MoveEffectPhase color:green;
+[13:35:01.008] LOG: %cStart Phase MessagePhase color:green;
+[13:35:01.406] LOG: %cStart Phase MoveEndPhase color:green;
+[13:35:01.407] LOG: %cStart Phase HideAbilityPhase color:green;
+[13:35:01.441] LOG: %cStart Phase TurnInitPhase color:green;
+[13:35:01.441] LOG: %cStart Phase CommandPhase color:green;
+[13:35:21.284] LOG: Move: LUMINA_CRASH Move targets: {"targets":[2],"multiple":false} 
+Player Pokemon: Solrock System
+[13:35:21.285] LOG: %cStart Phase EnemyCommandPhase color:green;
+[13:35:21.297] LOG: Battle Seed: K1hzS4XoIRLVaL2H
+[13:35:21.308] LOG: Move Pool: ["Star Crash","Surf","Perish Song","Strength"]
+[13:35:21.308] LOG: Move Scores: [267.40353460972017,249.1178203240059,211.97496318114875,245.68924889543445]
+[13:35:21.308] LOG: Sorted Move Pool: ["Star Crash","Surf","Strength","Perish Song"]
+[13:35:21.308] LOG: Chosen Move: Star Crash
+[13:35:21.308] LOG: ER AI: experimental brain (sharpness 1)
+[13:35:21.308] LOG: %cStart Phase TurnStartPhase color:green;
+[13:35:21.309] LOG: %cStart Phase MovePhase color:green;
+[13:35:21.309] LOG: %cUser: Solrock System
+Move: LUMINA_CRASH
+Use Mode: NORMAL color:orchid
+[13:35:21.311] LOG: %cStart Phase MessagePhase color:green;
+[13:35:21.494] LOG: %cStart Phase MoveEffectPhase color:green;
+[13:35:22.428] LOG: crit stage: +0
+[13:35:22.431] LOG: Move: Lumina Crash | Base damage: 50.8 | Power: 80 | Source attack: 155 | Target defense: 124
+[13:35:22.432] LOG: Move: Lumina Crash | Attack damage: 68
+[13:35:22.433] LOG: %cStart Phase DamageAnimPhase color:green;
+[13:35:22.462] LOG: %cStart Phase StatStageChangePhase color:green;
+[13:35:22.715] LOG: %cStart Phase MessagePhase color:green;
+[13:35:23.061] LOG: %cStart Phase MoveEndPhase color:green;
+[13:35:23.062] LOG: %cStart Phase MovePhase color:green;
+[13:35:23.062] LOG: %cUser: Azumarill
+Move: STAR_CRASH
+Use Mode: NORMAL color:orchid
+[13:35:23.065] LOG: %cStart Phase MessagePhase color:green;
+[13:35:23.262] LOG: %cStart Phase MoveEffectPhase color:green;
+[13:35:24.430] LOG: crit stage: +0
+[13:35:24.432] LOG: Move: Star Crash | Base damage: 65.19424460431654 | Power: 120 | Source attack: 150 | Target defense: 139
+[13:35:24.432] LOG: Move: Star Crash | Attack damage: 85
+[13:35:24.433] LOG: %cStart Phase DamageAnimPhase color:green;
+[13:35:24.465] LOG: %cStart Phase DamageAnimPhase color:green;
+[13:35:24.467] LOG: %cStart Phase MessagePhase color:green;
+[13:35:24.830] LOG: %cStart Phase MoveEndPhase color:green;
+[13:35:24.830] LOG: %cStart Phase CheckInterludePhase color:green;
+[13:35:24.830] LOG: %cStart Phase WeatherEffectPhase color:green;
+[13:35:25.632] LOG: %cStart Phase PositionalTagPhase color:green;
+[13:35:25.632] LOG: %cStart Phase BerryPhase color:green;
+[13:35:25.632] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[13:35:25.633] LOG: %cStart Phase TurnEndPhase color:green;
+[13:35:25.635] WARN: [coop:turn] host recorder: finalize with NO open recording -> turn=-1 events=0 (caller decides not to emit)
+[13:35:25.635] LOG: %cStart Phase PokemonHealPhase color:green;
+[13:35:25.851] LOG: %cStart Phase MessagePhase color:green;
+[13:35:26.197] LOG: %cStart Phase TurnInitPhase color:green;
+[13:35:26.199] LOG: %cStart Phase CommandPhase color:green;
+[13:35:55.716] LOG: Move: DIAMOND_STORM Move targets: {"targets":[2],"multiple":true} 
+Player Pokemon: Solrock System
+[13:35:55.717] LOG: %cStart Phase EnemyCommandPhase color:green;
+[13:35:55.729] LOG: %cStart Phase TurnStartPhase color:green;
+[13:35:55.730] LOG: %cStart Phase SwitchSummonPhase color:green;
+[13:35:55.730] LOG: Matt
+[13:35:56.111] LOG: Matt
+[13:35:56.229] LOG: Applied Iron (enemy)
+[13:35:56.229] LOG: Applied Protein (enemy)
+[13:35:56.229] LOG: Applied Zinc (enemy)
+[13:35:56.230] LOG: Applied Carbos (enemy)
+[13:35:56.230] LOG: Applied Zinc (enemy)
+[13:35:56.230] LOG: Applied Iron (enemy)
+[13:35:56.230] LOG: Applied Carbos (enemy)
+[13:35:56.230] LOG: Applied Zinc (enemy)
+[13:35:56.428] LOG: %cStart Phase PostSummonPhase color:green;
+[13:35:56.429] LOG: Ran PSP for: Sharpedo
+[13:35:56.429] LOG: %cStart Phase PostSummonPhase color:green;
+[13:35:56.429] LOG: %cStart Phase PostSummonPhase color:green;
+[13:35:56.429] LOG: %cStart Phase MovePhase color:green;
+[13:35:56.429] LOG: %cUser: Solrock System
+Move: DIAMOND_STORM
+Use Mode: NORMAL color:orchid
+[13:35:56.430] LOG: %cStart Phase MessagePhase color:green;
+[13:35:56.644] LOG: %cStart Phase MoveEffectPhase color:green;
+[13:35:56.645] LOG: Battle Seed: K1hzS4XoIRLVaL2H
+[13:35:57.529] LOG: crit stage: +0
+[13:35:57.530] LOG: Move: Diamond Storm | Base damage: 101.52631578947368 | Power: 100 | Source attack: 155 | Target defense: 76
+[13:35:57.531] LOG: Move: Diamond Storm | Attack damage: 138
+[13:35:57.531] LOG: %cStart Phase DamageAnimPhase color:green;
+[13:35:57.563] LOG: %cStart Phase StatStageChangePhase color:green;
+[13:35:57.818] LOG: %cStart Phase MessagePhase color:green;
+[13:35:58.162] LOG: %cStart Phase FaintPhase color:green;
+[13:35:59.648] LOG: %cStart Phase MessagePhase color:green;
+[13:35:59.861] LOG: %cStart Phase VictoryPhase color:green;
+[13:35:59.861] LOG: %cStart Phase MoveEndPhase color:green;
+[13:35:59.861] LOG: %cStart Phase CheckInterludePhase color:green;
+[13:35:59.861] LOG: %cStart Phase WeatherEffectPhase color:green;
+[13:36:00.649] LOG: %cStart Phase PositionalTagPhase color:green;
+[13:36:00.649] LOG: %cStart Phase BerryPhase color:green;
+[13:36:00.650] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[13:36:00.650] LOG: %cStart Phase TurnEndPhase color:green;
+[13:36:00.652] WARN: [coop:turn] host recorder: finalize with NO open recording -> turn=-1 events=0 (caller decides not to emit)
+[13:36:00.652] LOG: %cStart Phase SwitchSummonPhase color:green;
+[13:36:00.982] LOG: Matt
+[13:36:01.100] LOG: Applied Iron (enemy)
+[13:36:01.100] LOG: Applied Carbos (enemy)
+[13:36:01.100] LOG: Applied Zinc (enemy)
+[13:36:01.101] LOG: Applied Iron (enemy)
+[13:36:01.101] LOG: Applied Protein (enemy)
+[13:36:01.101] LOG: Applied Zinc (enemy)
+[13:36:01.102] LOG: Applied Carbos (enemy)
+[13:36:01.102] LOG: Applied Zinc (enemy)
+[13:36:01.300] LOG: %cStart Phase PostSummonPhase color:green;
+[13:36:01.300] LOG: Ran PSP for: Azumarill
+[13:36:01.301] LOG: %cStart Phase PostSummonPhase color:green;
+[13:36:01.301] LOG: %cStart Phase PostSummonPhase color:green;
+[13:36:01.301] LOG: %cStart Phase ShowAbilityPhase color:green;
+[13:36:01.534] LOG: %cStart Phase MovePhase color:green;
+[13:36:01.534] LOG: %cUser: Azumarill
+Move: AQUA_RING
+Use Mode: INDIRECT color:orchid
+[13:36:01.536] LOG: %cStart Phase MessagePhase color:green;
+[13:36:01.733] LOG: %cStart Phase MoveEffectPhase color:green;
+[13:36:01.750] LOG: %cStart Phase MessagePhase color:green;
+[13:36:02.150] LOG: %cStart Phase MoveEndPhase color:green;
+[13:36:02.150] LOG: %cStart Phase HideAbilityPhase color:green;
+[13:36:02.184] LOG: %cStart Phase TurnInitPhase color:green;
+[13:36:02.184] LOG: %cStart Phase CommandPhase color:green;
+[13:36:20.456] LOG: %cStart Phase EnemyCommandPhase color:green;
+[13:36:20.465] LOG: Battle Seed: K1hzS4XoIRLVaL2H
+[13:36:20.472] LOG: Move Pool: ["Star Crash","Strength"]
+[13:36:20.472] LOG: Move Scores: [233.24742268041237,233.24742268041237]
+[13:36:20.472] LOG: Sorted Move Pool: ["Star Crash","Strength"]
+[13:36:20.472] LOG: Chosen Move: Star Crash
+[13:36:20.472] LOG: ER AI: experimental brain (sharpness 1)
+[13:36:20.472] LOG: %cStart Phase TurnStartPhase color:green;
+[13:36:20.472] LOG: %cStart Phase SwitchSummonPhase color:green;
+[13:36:20.754] LOG: Applied Iron 
+[13:36:20.801] WARN: cry/10043 not found
+[13:36:20.953] LOG: %cStart Phase MessagePhase color:green;
+[13:36:21.269] LOG: %cStart Phase PostSummonPhase color:green;
+[13:36:21.269] LOG: Ran PSP for: Sagaracas
+[13:36:21.269] LOG: %cStart Phase PostSummonPhase color:green;
+[13:36:21.269] LOG: %cStart Phase PostSummonPhase color:green;
+[13:36:21.269] LOG: %cStart Phase MovePhase color:green;
+[13:36:21.269] LOG: %cUser: Azumarill
+Move: STAR_CRASH
+Use Mode: NORMAL color:orchid
+[13:36:21.271] LOG: %cStart Phase MessagePhase color:green;
+[13:36:21.469] LOG: %cStart Phase MoveEffectPhase color:green;
+[13:36:22.621] LOG: crit stage: +0
+[13:36:22.622] LOG: Move: Star Crash | Base damage: 75.81512605042016 | Power: 120 | Source attack: 150 | Target defense: 119
+[13:36:22.622] LOG: Move: Star Crash | Attack damage: 98
+[13:36:22.624] LOG: %cStart Phase DamageAnimPhase color:green;
+[13:36:22.655] LOG: %cStart Phase DamageAnimPhase color:green;
+[13:36:22.657] LOG: %cStart Phase MessagePhase color:green;
+[13:36:23.020] LOG: %cStart Phase FaintPhase color:green;
+[13:36:23.021] WARN: cry/10043 not found
+[13:36:23.104] LOG: %cStart Phase MessagePhase color:green;
+[13:36:23.796] LOG: %cStart Phase MoveEndPhase color:green;
+[13:36:23.797] LOG: %cStart Phase CheckInterludePhase color:green;
+[13:36:23.797] LOG: %cStart Phase WeatherEffectPhase color:green;
+[13:36:23.797] LOG: %cStart Phase PositionalTagPhase color:green;
+[13:36:23.797] LOG: %cStart Phase BerryPhase color:green;
+[13:36:23.797] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[13:36:23.797] LOG: %cStart Phase TurnEndPhase color:green;
+[13:36:23.798] WARN: [coop:turn] host recorder: finalize with NO open recording -> turn=-1 events=0 (caller decides not to emit)
+[13:36:23.798] LOG: %cStart Phase PokemonHealPhase color:green;
+[13:36:24.024] LOG: %cStart Phase MessagePhase color:green;
+[13:36:24.372] LOG: %cStart Phase SwitchPhase color:green;
+[13:36:26.496] LOG: %cStart Phase SwitchSummonPhase color:green;
+[13:36:26.626] LOG: Applied Iron 
+[13:36:26.675] WARN: cry/10770 not found
+[13:36:26.826] LOG: %cStart Phase PostSummonPhase color:green;
+[13:36:26.826] LOG: Ran PSP for: Solrock System
+[13:36:26.826] LOG: %cStart Phase PostSummonPhase color:green;
+[13:36:26.826] LOG: %cStart Phase ShowAbilityPhase color:green;
+[13:36:27.059] LOG: %cStart Phase HideAbilityPhase color:green;
+[13:36:27.109] LOG: %cStart Phase PostSummonPhase color:green;
+[13:36:27.111] LOG: %cStart Phase ShowAbilityPhase color:green;
+[13:36:27.359] LOG: %cStart Phase CommonAnimPhase color:green;
+[13:36:28.059] LOG: %cStart Phase MessagePhase color:green;
+[13:36:28.409] LOG: %cStart Phase HideAbilityPhase color:green;
+[13:36:28.443] LOG: %cStart Phase TurnInitPhase color:green;
+[13:36:28.444] LOG: %cStart Phase CommandPhase color:green;
+[13:36:32.399] LOG: Move: LUMINA_CRASH Move targets: {"targets":[2],"multiple":false} 
+Player Pokemon: Solrock System
+[13:36:32.400] LOG: %cStart Phase EnemyCommandPhase color:green;
+[13:36:32.417] LOG: Battle Seed: K1hzS4XoIRLVaL2H
+[13:36:32.425] LOG: Move Pool: ["Star Crash","Strength"]
+[13:36:32.425] LOG: Move Scores: [308.24742268041234,308.24742268041234]
+[13:36:32.425] LOG: Sorted Move Pool: ["Star Crash","Strength"]
+[13:36:32.425] LOG: Chosen Move: Star Crash
+[13:36:32.425] LOG: ER AI: experimental brain (sharpness 1)
+[13:36:32.425] LOG: %cStart Phase TurnStartPhase color:green;
+[13:36:32.426] LOG: %cStart Phase MovePhase color:green;
+[13:36:32.427] LOG: %cUser: Solrock System
+Move: LUMINA_CRASH
+Use Mode: NORMAL color:orchid
+[13:36:32.428] LOG: %cStart Phase MessagePhase color:green;
+[13:36:32.596] LOG: %cStart Phase MoveEffectPhase color:green;
+[13:36:33.532] LOG: crit stage: +0
+[13:36:33.532] LOG: Move: Lumina Crash | Base damage: 50.8 | Power: 80 | Source attack: 155 | Target defense: 124
+[13:36:33.533] LOG: Move: Lumina Crash | Attack damage: 65
+[13:36:33.533] LOG: %cStart Phase DamageAnimPhase color:green;
+[13:36:33.566] LOG: %cStart Phase StatStageChangePhase color:green;
+[13:36:33.816] LOG: %cStart Phase MessagePhase color:green;
+[13:36:34.164] LOG: %cStart Phase MoveEndPhase color:green;
+[13:36:34.164] LOG: %cStart Phase MovePhase color:green;
+[13:36:34.164] LOG: %cUser: Azumarill
+Move: STAR_CRASH
+Use Mode: NORMAL color:orchid
+[13:36:34.167] LOG: %cStart Phase MessagePhase color:green;
+[13:36:34.365] LOG: %cStart Phase MoveEffectPhase color:green;
+[13:36:35.534] LOG: crit stage: +0
+[13:36:35.534] LOG: Move: Star Crash | Base damage: 65.19424460431654 | Power: 120 | Source attack: 150 | Target defense: 139
+[13:36:35.535] LOG: Move: Star Crash | Attack damage: 96
+[13:36:35.536] LOG: %cStart Phase DamageAnimPhase color:green;
+[13:36:35.568] LOG: %cStart Phase DamageAnimPhase color:green;
+[13:36:35.570] LOG: %cStart Phase MessagePhase color:green;
+[13:36:35.933] LOG: %cStart Phase FaintPhase color:green;
+[13:36:35.935] WARN: cry/10770 not found
+[13:36:36.019] LOG: %cStart Phase MessagePhase color:green;
+[13:36:36.436] LOG: %cStart Phase GameOverPhase color:green;
+[13:36:37.586] LOG: Getting Session Slot id: %d 1
+[13:36:37.614] LOG: Team Aqua Admin Matt
+[13:36:37.614] LOG: %cStart Phase PostGameOverPhase color:green;
+[13:36:37.719] DEBUG: Session data saved to slot 1!
+[13:36:40.531] LOG: Seed: Bcgj3ZAB2nvySGKOUbD7Qvri
+[13:36:40.531] LOG: Wave Seed: Bcgj3ZAB2nvySGKOUbD7Qvri 0
+[13:36:40.532] LOG: %cStart Phase TitlePhase color:green;
+[13:36:40.542] LOG: use seasonal splash messages true
+[13:37:15.245] LOG: %cStart Phase SelectStarterPhase color:green;
+[13:37:37.838] LOG: %cStart Phase TitlePhase color:green;
+[13:37:37.842] LOG: use seasonal splash messages true
+[13:38:00.054] LOG: %cStart Phase SelectStarterPhase color:green;
+[13:38:22.965] LOG: %cStart Phase TitlePhase color:green;
+[13:38:22.969] LOG: use seasonal splash messages true
