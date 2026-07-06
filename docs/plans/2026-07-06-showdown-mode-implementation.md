@@ -394,6 +394,38 @@ The v1 Phase C below is SUPERSEDED as written — task GOALS remain valid (title
 exchange, battle bootstrap, command relay, result/void, duo test); mechanisms follow the new
 seams per this briefing + the architecture-map exploration.
 
+## Trust model (Showdown 1v1) — explicit, deliberate (addendum #3)
+
+Showdown is host-authoritative on the SAME co-op full-state stack. That buys a shared,
+byte-identical battle for free, and it carries the co-op trust properties forward — stated
+here so no one mistakes friendly-match trust for tournament-grade trust:
+
+- **The host runs the engine → the host can cheat.** All battle resolution (RNG, damage,
+  AI-vs-relayed commands, faints) happens on ONE client (the session host). A modified host
+  can bias its own rolls. This is acceptable for FRIENDLY matches; it is NOT a
+  server-refereed battle. Full server simulation is a different project (explicitly deferred).
+- **Full opposing party is visible to the other client.** The authoritative state stream
+  sends BOTH parties as complete `PokemonData[]` (movesets, items, bench, IVs) every turn —
+  that is how the guest renders without deriving anything. So there is NO hidden information:
+  a motivated client can read the opponent's full team/bench off the wire. Accepted; showdown
+  is open-team by design (each player already exchanges a full manifest at C2 ready-up).
+- **Cross-client team validation is FORMAT-only.** At C2 each client validates the OPPONENT's
+  manifest against STRUCTURAL rules only (team size, level 100, one item, ≤1 mega, mega-item
+  lock, IV bounds, duplicates) using an all-permissive `UnlockSnapshot` — a client cannot see
+  the opponent's collection, so COLLECTION legality (root/shiny/ability/nature/move unlocks)
+  is enforced by the opponent's OWN client at team-build (against its own unlocks) and, in
+  Phase D, by the server. The `showdownReady{teamHash}` fnv1a64 commit is an anti-tamper
+  cross-check (ready hash must equal the hash of the manifest actually sent), not a
+  collection proof.
+- **Settlement is server-verified (Phase D), never client-asserted.** Permanent mon
+  gain/loss rides on the #806/#807 account-write gates + the escrow ledger: the server records
+  the outcome and honest clients apply it; a hacked client can dodge its OWN local loss but the
+  ledger records it and it can never TAKE an unlock that was not awarded. Until Phase D lands,
+  matches are FRIENDLY (`matchId: null`, no stakes) — a permanent free-play mode.
+
+Bottom line: friendlies are fun and fair-enough between cooperating players; stakes are only
+as safe as the Phase-D server verification, and the battle engine itself remains host-trusted.
+
 ## Phase C (v1 — SUPERSEDED mechanisms; goals only; do not execute as written)
 
 ### Task C1: Title menu entry + showdown pairing
