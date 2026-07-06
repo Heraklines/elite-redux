@@ -3,8 +3,8 @@
 **Live for the team: https://shiny-lab.pages.dev** (Cloudflare Pages). Also
 `articuno-shiny-lab.html` on the Desktop (self-contained except sprites).
 
-**367 effects** in three **combinable** slots - pick one of each and they stack live:
-**138 Palettes + 124 Surface FX + 105 Around FX** (v6 Discord-brainstorm batch + the v7
+**368 effects** in three **combinable** slots - pick one of each and they stack live:
+**138 Palettes + 124 Surface FX + 106 Around FX** (v6 Discord-brainstorm batch + the v7
 mega-expansion doubled every catalog; v7.1 quality pass reworked the weak ones after
 zoomed per-frame triage - see `gen-zoom.mjs`, the per-effect multi-frame review tool).
 
@@ -32,6 +32,15 @@ zoomed per-frame triage - see `gen-zoom.mjs`, the per-effect multi-frame review 
   sit anchored on those strands, joined to each other by them. A shimmer travels
   along the lines. (Iterated with the team: the earlier blinking variant and the
   "Astral Form II" A/B candidate were folded into this final version.)
+- **Feet-line anchoring**: the distance field now exports `fy` (the silhouette's
+  bottom), and the ground FX center on it instead of hanging a half-ring below the
+  mon (tester: "the top of the circle was matched to the feet instead of the
+  middle"). Realigned: Ring of Fire, Whirlpool, Magic Circle, Geyser, Equalizer,
+  Creeping Shadow, Foot Frost, Underglow, Ground Mist.
+- **NEW Double Team Tri** (around): Double Team's better-dressed sibling - the two
+  after-images are SOLID colours forming a complementary triad with the mon's own
+  dominant colour (e.g. orange Charizard gets a green echo and a purple echo).
+  The original Double Team stays.
 
 ## v7.1 quality pass (zoom-triage driven)
 Every v6/v7 effect was rendered at 3x with 4 animation frames (`gen-zoom.mjs`) and

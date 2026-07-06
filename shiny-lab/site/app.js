@@ -161,7 +161,19 @@ function renderLook(slots, buf, ef, dist, t, out, amt, fx) {
     const i2 = (sy2 * FW + sx2) * 4;
     return [buf[i2], buf[i2 + 1], buf[i2 + 2], buf[i2 + 3]];
   };
-  const ac = { cx: dist.cx, cy: dist.cy, spr: sprPad };
+  // dominant (most colorful) cluster color - Double Team Tri builds its triad from it
+  let mainCol = null;
+  if (CL) {
+    let best = -1;
+    for (const cen of CL.cent) {
+      const hsv = rgb2hsv(cen[0], cen[1], cen[2]);
+      if (hsv[1] * hsv[2] > best) {
+        best = hsv[1] * hsv[2];
+        mainCol = cen;
+      }
+    }
+  }
+  const ac = { cx: dist.cx, cy: dist.cy, fy: dist.fy, spr: sprPad, main: mainCol };
   const ctx = {
     e: 0,
     sa: rawSa,

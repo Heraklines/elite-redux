@@ -193,6 +193,7 @@ export function computeDist(buf, FW, FH, PAD) {
   let cx = 0;
   let cy = 0;
   let cnt = 0;
+  let maxY = -1;
   for (let py = 0; py < PH; py++) {
     for (let px = 0; px < PW; px++) {
       const sx = px - PAD;
@@ -203,6 +204,9 @@ export function computeDist(buf, FW, FH, PAD) {
         cx += px;
         cy += py;
         cnt++;
+        if (py > maxY) {
+          maxY = py;
+        }
       }
     }
   }
@@ -244,7 +248,16 @@ export function computeDist(buf, FW, FH, PAD) {
       d[y * PW + x] = v;
     }
   }
-  return { PW, PH, d, cx: cnt ? cx / cnt / PW : 0.5, cy: cnt ? cy / cnt / PH : 0.45 };
+  // fy = the FEET line (bottom of the silhouette, normalized) - ground-anchored
+  // FX center on this instead of guessing from the centroid
+  return {
+    PW,
+    PH,
+    d,
+    cx: cnt ? cx / cnt / PW : 0.5,
+    cy: cnt ? cy / cnt / PH : 0.45,
+    fy: maxY >= 0 ? (maxY + 1) / PH : 0.82,
+  };
 }
 
 // ---- color clustering (k-means on the sprite's real palette) --------------
@@ -682,6 +695,7 @@ export const NO_TINT = new Set([
   "rainbowglitter",
   "neonsign",
   "echoes",
+  "triecho",
   "soapswirl",
   "discoball",
   "tiedye",
@@ -1646,8 +1660,9 @@ AROUND.wingflame = (nx, ny, df, t, c) => {
   const v = clamp(n * m * reg * 3 - 0.2);
   return [...ramp(G.inferno, clamp(v * 1.2)), clamp(v * 1.7)];
 };
-AROUND.footfrost = (nx, ny, df, t) => {
-  const reg = smooth(0.55, 0.85, ny);
+AROUND.footfrost = (nx, ny, df, t, c) => {
+  const gy = c?.fy ?? 0.82;
+  const reg = smooth(gy - 0.27, gy + 0.03, ny);
   const n = fbm(nx * 7, ny * 7 + t * 0.3);
   const m = clamp(1 - df / 18);
   return [0.7, 0.85, 1.0, clamp(n * m * reg * 2 - 0.2) * 0.85];
@@ -1659,8 +1674,9 @@ AROUND.crown = (nx, ny, df, t, c) => {
   const ring = smooth(0.035, 0, Math.abs(r - 0.13)) * (ny < c.cy ? 1 : 0);
   return [1, 0.92, 0.6, ring * (0.7 + 0.3 * Math.sin(t * 3)) * 0.95];
 };
-AROUND.underlight = (nx, ny, df, t) => {
-  const reg = smooth(0.55, 1.0, ny);
+AROUND.underlight = (nx, ny, df, t, c) => {
+  const gy = c?.fy ?? 0.82;
+  const reg = smooth(gy - 0.27, gy + 0.18, ny);
   const m = clamp(1 - df / 20);
   return [1.0, 0.8, 0.5, reg * m * 0.6 * (0.85 + 0.15 * Math.sin(t * 2))];
 };
@@ -1685,7 +1701,7 @@ AROUND.sideaura = (nx, ny, df, t) => {
 };
 AROUND.magiccircle = (nx, ny, df, t, c) => {
   const ex = nx - c.cx;
-  const ey = (ny - (c.cy + 0.34)) * 2.6;
+  const ey = (ny - (c.fy ?? c.cy + 0.34)) * 2.6; // circle centered on the feet line
   const r = Math.hypot(ex, ey);
   const ang = Math.atan2(ey, ex);
   const ring = smooth(0.03, 0, Math.abs(r - 0.2));
@@ -3118,9 +3134,38 @@ AROUND.echoes = (nx, ny, df, t, c) => {
   }
   return out;
 };
+// Double Team Tri: like Double Team but the after-images are SOLID colours - the
+// two echoes take the two other hues of a triad built from the mon's dominant
+// colour (c.main, the most colorful cluster centroid), so mon + echoes read as a
+// complementary tri palette. Only a hint of the sprite's own shading is kept.
+AROUND.triecho = (nx, ny, df, t, c) => {
+  if (!c.spr) {
+    return [0, 0, 0, 0];
+  }
+  const sway = 0.014 * Math.sin(t * 1.5);
+  const base = c.main ? rgb2hsv(c.main[0], c.main[1], c.main[2]) : [0.6, 0.7, 0.85];
+  const sat = Math.max(0.6, base[1]);
+  let out = [0, 0, 0, 0];
+  for (const [dir, rot] of [
+    [-1, 1 / 3],
+    [1, 2 / 3],
+  ]) {
+    const s2 = c.spr(nx - dir * (0.1 + sway * dir), ny + Math.abs(sway) * 0.4);
+    if (s2[3] > 0.02) {
+      const L = luma(s2[0], s2[1], s2[2]);
+      const col = hsv2rgb(fract(base[0] + rot), sat, clamp(0.5 + L * 0.4));
+      const a = 0.68 * s2[3];
+      if (a > out[3]) {
+        out = [col[0], col[1], col[2], a];
+      }
+    }
+  }
+  return out;
+};
 // Ground Mist: white rolling fog hugging the mon's feet (pairs with Rising Mist).
-AROUND.lowmist = (nx, ny, df, t) => {
-  const reg = smooth(0.48, 0.85, ny);
+AROUND.lowmist = (nx, ny, df, t, c) => {
+  const gy = c?.fy ?? 0.82;
+  const reg = smooth(gy - 0.34, gy + 0.03, ny);
   const n = fbm(nx * 4 + t * 0.14, ny * 5 - t * 0.06);
   const m = clamp(1 - df / 20);
   return [0.88, 0.92, 0.97, clamp(n * reg * m * 1.9 - 0.25) * 0.85];
@@ -3289,7 +3334,7 @@ AROUND.moonrise = (nx, ny, df, t, c) => {
 // Geyser: real droplet arcs - water beads launch up and fall in parabolas.
 AROUND.geyser = (nx, ny, df, t, c) => {
   const bx = c.cx;
-  const by = c.cy + 0.34;
+  const by = c.fy ?? c.cy + 0.34; // erupts from the feet line
   let k = 0;
   for (let i = 0; i < 14; i++) {
     const ph = fract(t * 0.55 + h2(i, 1));
@@ -3304,10 +3349,11 @@ AROUND.geyser = (nx, ny, df, t, c) => {
 };
 // Whirlpool: swirling water rings coiling at the feet.
 AROUND.whirlpool = (nx, ny, df, t, c) => {
-  const fy = (ny - (c.cy + 0.34)) * 2.6;
+  const gy = c.fy ?? c.cy + 0.34; // ellipse CENTERED on the feet line, not hanging below it
+  const ey = (ny - gy) * 2.6;
   const fx0 = nx - c.cx;
-  const r = Math.hypot(fx0, fy);
-  const ang = Math.atan2(fy, fx0);
+  const r = Math.hypot(fx0, ey);
+  const ang = Math.atan2(ey, fx0);
   const swirl = Math.sin(ang * 3 + r * 26 - t * 4);
   const band = smooth(0.5, 0.42, r) * smooth(0.06, 0.14, r) * (ny > c.cy ? 1 : 0);
   const a = smooth(0.35, 0.9, swirl) * band;
@@ -3721,7 +3767,7 @@ AROUND.glyphrain = (nx, ny, df, t) => {
 // Ring of Fire: a burning ground ring encircling the feet.
 AROUND.firering = (nx, ny, df, t, c) => {
   const ex = nx - c.cx;
-  const ey = (ny - (c.cy + 0.33)) * 2.7;
+  const ey = (ny - (c.fy ?? c.cy + 0.33)) * 2.7; // ring centered on the feet line
   const r = Math.hypot(ex, ey);
   const ang = Math.atan2(ey, ex);
   const n = fbm(ang * 1.6 + 5, t * 1.4);
@@ -3732,17 +3778,18 @@ AROUND.firering = (nx, ny, df, t, c) => {
 };
 // Creeping Shadow: a dark pool below, tendrils climbing the air behind.
 AROUND.creepingshadow = (nx, ny, df, t, c) => {
-  const pool = smooth(0.45, 0.1, Math.hypot(nx - c.cx, (ny - (c.cy + 0.36)) * 3.2)) * 0.85;
+  const pool = smooth(0.45, 0.1, Math.hypot(nx - c.cx, (ny - (c.fy ?? c.cy + 0.36)) * 3.2)) * 0.85;
   const n = fbm(nx * 6 + 9, ny * 5 - t * 0.5);
   const tendril = clamp(n * clamp(1 - df / 12) * smooth(0.2, 0.7, ny) * 2.2 - 0.75);
   const a = clamp(pool + tendril);
   return [0.06, 0.02, 0.12, a * 0.92];
 };
-// Equalizer: audio bars bouncing along the ground line.
-AROUND.equalizer = (nx, ny, df, t) => {
+// Equalizer: audio bars bouncing along the ground line (= the feet line).
+AROUND.equalizer = (nx, ny, df, t, c) => {
+  const gy = (c?.fy ?? 0.96) + 0.02;
   const gx = Math.floor(nx * 18);
   const hgt = 0.06 + 0.2 * h2(gx, Math.floor(t * 5)) * (0.6 + 0.4 * Math.sin(t * 3 + gx));
-  const bar = Math.abs(fract(nx * 18) - 0.5) < 0.32 && ny > 0.96 - hgt && ny < 0.97 ? 1 : 0;
+  const bar = Math.abs(fract(nx * 18) - 0.5) < 0.32 && ny > gy - hgt && ny < gy + 0.01 ? 1 : 0;
   const m = clamp(1 - df / 26);
   const col = hsv2rgb(mix(0.35, 0.0, clamp(hgt / 0.26)), 0.9, 1);
   return [col[0], col[1], col[2], bar * m * 0.95];
@@ -4647,6 +4694,7 @@ export const LABELS = {
   zaps: "Lightning Zaps",
   blossoms: "Sakura Blossoms",
   astral: "Astral Form",
+  triecho: "Double Team Tri",
 };
 
 // effects that read the edge field / are inherently "partial" (for tagging in UI)
