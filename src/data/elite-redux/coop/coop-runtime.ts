@@ -57,6 +57,7 @@ import type {
   CoopNetcodeMode,
   CoopRole,
   CoopSerializedEnemy,
+  CoopSessionKind,
   CoopWaveOutcome,
 } from "#data/elite-redux/coop/coop-transport";
 import {
@@ -1043,6 +1044,23 @@ export function getCoopNetcodeMode(): CoopNetcodeMode {
 }
 
 /**
+ * Showdown 1v1 PvP (C1): the active session kind, or `"coop"` when there is no live session.
+ * `"versus"` is a 1v1 showdown match on the co-op substrate. Deliberately does NOT touch
+ * globalScene - a pure runtime read so the engine-free unit tests can call it.
+ */
+export function getCoopSessionKind(): CoopSessionKind {
+  return active?.controller.sessionKind ?? "coop";
+}
+
+/**
+ * Showdown 1v1 PvP (C1): whether THIS client is in a live 1v1 VERSUS (showdown) session.
+ * Hard `false` for solo / classic co-op, so those paths are byte-for-byte unaffected.
+ */
+export function isVersusSession(): boolean {
+  return active != null && active.controller.isVersusSession();
+}
+
+/**
  * Whether THIS client is the GUEST of a live AUTHORITATIVE co-op session (#633). The single read
  * point for the "guest renders, host is authoritative" gates that must NOT mutate shared
  * host-owned state (e.g. the shared money pool). Hard `false` for solo / lockstep / the host, so
@@ -1541,11 +1559,15 @@ export function coopMeOwnerRelayBattleHandoff(): void {
  * over a WebRTC transport instead. Any prior session is torn down first.
  */
 export function startLocalCoopSession(
-  opts: { username?: string | undefined; netcodeMode?: CoopNetcodeMode | undefined } = {},
+  opts: {
+    username?: string | undefined;
+    netcodeMode?: CoopNetcodeMode | undefined;
+    kind?: CoopSessionKind | undefined;
+  } = {},
 ): CoopRuntime {
   coopLog(
     "launch",
-    `startLocalCoopSession username=${opts.username ?? "(default)"} netcode=${opts.netcodeMode ?? "authoritative"}`,
+    `startLocalCoopSession username=${opts.username ?? "(default)"} netcode=${opts.netcodeMode ?? "authoritative"} kind=${opts.kind ?? "coop"}`,
   );
   clearCoopRuntime();
   const { host, guest } = createLoopbackPair();
@@ -1575,7 +1597,11 @@ export function startLocalCoopSession(
  */
 export function connectCoopSession(
   transport: CoopTransport,
-  opts: { username?: string | undefined; netcodeMode?: CoopNetcodeMode | undefined } = {},
+  opts: {
+    username?: string | undefined;
+    netcodeMode?: CoopNetcodeMode | undefined;
+    kind?: CoopSessionKind | undefined;
+  } = {},
 ): CoopRuntime {
   coopLog(
     "launch",
@@ -1606,13 +1632,21 @@ export function connectCoopSession(
  */
 export function assembleCoopRuntime(
   transport: CoopTransport,
-  opts: { username?: string | undefined; netcodeMode?: CoopNetcodeMode | undefined } = {},
+  opts: {
+    username?: string | undefined;
+    netcodeMode?: CoopNetcodeMode | undefined;
+    kind?: CoopSessionKind | undefined;
+  } = {},
 ): CoopRuntime {
   const controller = new CoopSessionController(transport, { username: opts.username, version: COOP_PROTOCOL_VERSION });
   // Pin the chosen netcode (#633, selectable A/B). On the HOST this is the source of
   // truth that rides along in broadcastRunConfig; on the GUEST it is only the pre-
   // runConfig default (the host's value overwrites it on receipt). Default lockstep.
   controller.setNetcodeMode(opts.netcodeMode ?? "authoritative");
+  // Showdown 1v1 PvP (C1): pin the session kind the same way. On the HOST it rides along
+  // in broadcastRunConfig; on the GUEST it is only the pre-runConfig default (the host's
+  // value overwrites it on receipt). Default "coop" so co-op stays byte-identical.
+  controller.setSessionKind(opts.kind ?? "coop");
   const battleSync = new CoopBattleSync(transport);
   const battleStream = new CoopBattleStreamer(transport);
   const interactionRelay = new CoopInteractionRelay(transport);

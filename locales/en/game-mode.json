@@ -7,5 +7,6 @@
   "unknown": "Unknown",
   "challenge": "Challenge",
   "llmDirector": "Director",
-  "coop": "Co-op"
+  "coop": "Co-op",
+  "showdown": "Showdown (1v1)"
 }

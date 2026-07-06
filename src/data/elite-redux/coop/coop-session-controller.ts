@@ -30,7 +30,13 @@ import {
 import { coopLog, coopWarn, isCoopDebug } from "#data/elite-redux/coop/coop-debug";
 import { CoopRoster, type CoopRosterEntry } from "#data/elite-redux/coop/coop-roster";
 import { CoopInteractionTurn, type CoopPlayerId, coopSeatOfRole } from "#data/elite-redux/coop/coop-session";
-import type { CoopMessage, CoopNetcodeMode, CoopRole, CoopTransport } from "#data/elite-redux/coop/coop-transport";
+import type {
+  CoopMessage,
+  CoopNetcodeMode,
+  CoopRole,
+  CoopSessionKind,
+  CoopTransport,
+} from "#data/elite-redux/coop/coop-transport";
 
 /** Reserved {@linkcode CoopMessage} `screen` tag carrying the interaction-turn
  *  counter (host-authoritative; the guest mirrors it). Distinct from a real
@@ -63,6 +69,12 @@ export interface CoopRunConfig {
    * implementation. Optional + additive (absent -> `"lockstep"`, the default).
    */
   netcodeMode?: CoopNetcodeMode | undefined;
+  /**
+   * Showdown 1v1 PvP (C1): the session kind. `"coop"` (default when absent) is the
+   * classic shared run; `"versus"` is a 1v1 showdown match (teams don't merge). The host
+   * pins it and the guest adopts it via the `runConfig`, exactly like {@linkcode netcodeMode}.
+   */
+  kind?: CoopSessionKind | undefined;
 }
 
 /** The other role: host's partner is guest and vice-versa. */
@@ -160,6 +172,12 @@ export class CoopSessionController {
    * value off the `runConfig`. Every co-op gate reads this single source of truth.
    */
   private _netcodeMode: CoopNetcodeMode = "authoritative";
+  /**
+   * Showdown 1v1 PvP (C1): the session kind. Defaults to `"coop"` (the classic shared run);
+   * the HOST pins `"versus"` at session start via {@linkcode setSessionKind} and the GUEST
+   * adopts the host's value off the `runConfig`. Read via {@linkcode isVersusSession}.
+   */
+  private _sessionKind: CoopSessionKind = "coop";
   private _localReady = false;
   private _partnerReady = false;
   private _partnerConnected = false;
@@ -380,6 +398,20 @@ export class CoopSessionController {
    * authoritative state. Only meaningful once {@linkcode bothReady} is true.
    */
   mergedLaunchParty(): (CoopRosterEntry | null)[] {
+    // Showdown 1v1 PvP (C1): versus does NOT merge. Each client launches with ITS OWN
+    // picks as the player party (slots 0..n, pick order); the OPPONENT's team crosses via
+    // the showdown manifest (C2) and becomes the ENEMY side (C3), never a merged half. The
+    // coop path below is untouched (byte-identical) - only the versus kind branches here.
+    if (this._sessionKind === "versus") {
+      const own = this.roster.entries(this.role);
+      const party: (CoopRosterEntry | null)[] = own.map(entry => entry);
+      coopLog(
+        "launch",
+        `mergedLaunchParty(versus) role=${this.role} kind=versus own=${party.length} `
+          + `party=[${party.map((e, i) => `${i}:${e === null ? "empty" : `sp${e.speciesId}`}`).join(" ")}]`,
+      );
+      return party;
+    }
     const merged = this.roster.toMergedParty();
     // LAUNCH / ROLE ANCHOR (#633): the single line that anchors every later log -
     // role, netcode, run seed, difficulty, and the MERGED-PARTY composition per slot
@@ -527,9 +559,16 @@ export class CoopSessionController {
     // Pin the active netcode (#633, selectable A/B) into the retained config so the
     // self-healing `requestRunConfig` re-broadcast (and any later read) carries it.
     const netcodeMode = config.netcodeMode ?? this._netcodeMode;
-    this._runConfig = { ...config, netcodeMode };
+    // Showdown 1v1 PvP (C1): pin the session kind into the retained config so the
+    // self-healing re-broadcast (and any later read) carries it, exactly like netcode.
+    const kind = config.kind ?? this._sessionKind;
+    this._runConfig = { ...config, netcodeMode, kind };
     this._netcodeMode = netcodeMode;
-    coopLog("runtime", `host broadcast difficulty=${config.difficulty} netcode=${netcodeMode} (role=${this.role})`);
+    this._sessionKind = kind;
+    coopLog(
+      "runtime",
+      `host broadcast difficulty=${config.difficulty} netcode=${netcodeMode} kind=${kind} (role=${this.role})`,
+    );
     this.transport.send({
       t: "runConfig",
       difficulty: config.difficulty,
@@ -538,6 +577,8 @@ export class CoopSessionController {
       ...(config.seed === undefined ? {} : { seed: config.seed }),
       // The host's chosen netcode (#633, selectable A/B) so the guest adopts it.
       netcodeMode,
+      // The host's session kind (Showdown C1) so the guest adopts it.
+      kind,
     });
     this.emit();
   }
@@ -578,6 +619,29 @@ export class CoopSessionController {
    */
   setNetcodeMode(mode: CoopNetcodeMode): void {
     this._netcodeMode = mode;
+  }
+
+  /**
+   * Showdown 1v1 PvP (C1): the active session kind. `"coop"` by default; the HOST pins it
+   * at session start via {@linkcode setSessionKind} and the GUEST adopts the host's value
+   * off the `runConfig`. The single read point for every showdown-vs-coop gate.
+   */
+  get sessionKind(): CoopSessionKind {
+    return this._sessionKind;
+  }
+
+  /**
+   * Showdown 1v1 PvP (C1): pin the session kind. The HOST calls this at session start; the
+   * chosen kind rides along in {@linkcode broadcastRunConfig} so the guest adopts it, exactly
+   * like {@linkcode setNetcodeMode}. Harmless on the guest before the host's runConfig arrives.
+   */
+  setSessionKind(kind: CoopSessionKind): void {
+    this._sessionKind = kind;
+  }
+
+  /** Showdown 1v1 PvP (C1): whether this is a 1v1 versus (showdown) session. */
+  isVersusSession(): boolean {
+    return this._sessionKind === "versus";
   }
 
   /** Current state snapshot from the local point of view. */
@@ -779,9 +843,19 @@ export class CoopSessionController {
           // The guest adopts the host's chosen netcode (#633 M3: authoritative-only); an
           // absent value (an in-flight save from before this field) means "authoritative".
           const netcodeMode = msg.netcodeMode ?? "authoritative";
-          coopLog("runtime", `guest received difficulty=${msg.difficulty} netcode=${netcodeMode}`);
+          // Showdown 1v1 PvP (C1): adopt the host's session kind; absent -> "coop" (an
+          // older host / in-flight save), so co-op stays byte-identical.
+          const kind = msg.kind ?? "coop";
+          coopLog("runtime", `guest received difficulty=${msg.difficulty} netcode=${netcodeMode} kind=${kind}`);
           this._netcodeMode = netcodeMode;
-          this._runConfig = { difficulty: msg.difficulty, challenges: msg.challenges, seed: msg.seed, netcodeMode };
+          this._sessionKind = kind;
+          this._runConfig = {
+            difficulty: msg.difficulty,
+            challenges: msg.challenges,
+            seed: msg.seed,
+            netcodeMode,
+            kind,
+          };
           this.emit();
         }
         break;

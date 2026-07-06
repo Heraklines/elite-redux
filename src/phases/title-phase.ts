@@ -12,7 +12,7 @@ import { modifierTypes } from "#data/data-lists";
 import { CoopLobbyController, type LobbyPlayer } from "#data/elite-redux/coop/coop-lobby";
 import { readCoopResumeMarker } from "#data/elite-redux/coop/coop-resume-marker";
 import { getCoopBattleStreamer, getCoopController, startLocalCoopSession } from "#data/elite-redux/coop/coop-runtime";
-import type { CoopNetcodeMode } from "#data/elite-redux/coop/coop-transport";
+import type { CoopNetcodeMode, CoopSessionKind } from "#data/elite-redux/coop/coop-transport";
 import { buildInfernoFeed } from "#data/elite-redux/er-community-challenge-inferno";
 import { applyCommunityChallengeToRun } from "#data/elite-redux/er-community-challenge-launch";
 import type { CommunityChallengeConfig } from "#data/elite-redux/er-community-challenges";
@@ -145,6 +145,17 @@ export class TitlePhase extends Phase {
               label: GameMode.getModeName(GameModes.COOP),
               handler: () => {
                 this.openCoopLobby(setModeAndEnd, "authoritative");
+                return true;
+              },
+            });
+            // Showdown (C1): a 1v1 PvP "versus" match on the SAME lobby/pairing flow as
+            // co-op, launching GameModes.SHOWDOWN with the versus session kind. Same
+            // dev/beta/devTools gate as co-op above.
+            // D3 ante lobby inserts here (stake wager between pairing and teambuild).
+            options.push({
+              label: GameMode.getModeName(GameModes.SHOWDOWN),
+              handler: () => {
+                this.openCoopLobby(setModeAndEnd, "authoritative", "versus", GameModes.SHOWDOWN);
                 return true;
               },
             });
@@ -358,7 +369,19 @@ export class TitlePhase extends Phase {
    * the mode menu ("lockstep" | "authoritative"); it is threaded into both the local
    * spoof session and the real-match host controller so the guest adopts it.
    */
-  private openCoopLobby(setModeAndEnd: (gameMode: GameModes) => void, netcodeMode: CoopNetcodeMode): void {
+  /**
+   * Open the pairing lobby for a co-op OR showdown session. `sessionKind` + `launchMode`
+   * default to the classic co-op path (byte-identical); Showdown (C1) passes
+   * `("versus", GameModes.SHOWDOWN)` to launch a 1v1 match on the SAME lobby/pairing flow.
+   * The kind rides into the session via {@linkcode startLocalCoopSession}/the controller so
+   * the guest adopts it off the host's runConfig.
+   */
+  private openCoopLobby(
+    setModeAndEnd: (gameMode: GameModes) => void,
+    netcodeMode: CoopNetcodeMode,
+    sessionKind: CoopSessionKind = "coop",
+    launchMode: GameModes = GameModes.COOP,
+  ): void {
     const username = loggedInUser?.username ?? "Player";
     // #810 barrier: how long the GUEST waits for the host's Resume/New Game decision before
     // an anti-hang fallback to NEW GAME. Comfortably longer than the host's own 60s resume
@@ -424,8 +447,8 @@ export class TitlePhase extends Phase {
           handler: () => {
             stage.destroy();
             controller?.cancel();
-            startLocalCoopSession({ username, netcodeMode });
-            setModeAndEnd(GameModes.COOP);
+            startLocalCoopSession({ username, netcodeMode, kind: sessionKind });
+            setModeAndEnd(launchMode);
             return true;
           },
         });
@@ -501,6 +524,9 @@ export class TitlePhase extends Phase {
         // kept for the wire config's back-compat field.
         if (runtime.controller.role === "host") {
           runtime.controller.setNetcodeMode(netcodeMode);
+          // Showdown 1v1 PvP (C1): pin the session kind on the host so it rides into the
+          // guest via broadcastRunConfig (co-op default is unchanged).
+          runtime.controller.setSessionKind(sessionKind);
         }
         const controller = runtime.controller;
         const partner = controller.partnerName ?? "Partner";
@@ -508,7 +534,7 @@ export class TitlePhase extends Phase {
         stage.setStatus("Connected! Starting co-op...");
         const startNewRun = () => {
           stage.destroy();
-          setModeAndEnd(GameModes.COOP);
+          setModeAndEnd(launchMode);
         };
 
         // #810 RESUME FLOW (maintainer directive): after the ACCEPT handshake, decide RESUME

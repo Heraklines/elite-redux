@@ -55,6 +55,17 @@ export const COOP_PROTOCOL_VERSION = "er-coop-11";
  */
 export type CoopNetcodeMode = "lockstep" | "authoritative";
 
+/**
+ * Showdown 1v1 PvP (C1): the SESSION KIND layered on the same co-op transport/session
+ * machinery. `"coop"` is the classic shared-run co-op (the merged party, the alternating
+ * interactions - the default when absent, so an older peer that never sends it is treated
+ * as co-op). `"versus"` is a 1v1 showdown match: the two teams do NOT merge (each player's
+ * own picks are their party; the opponent's team arrives via the showdown manifest and
+ * becomes the ENEMY side). The HOST decides it at session start and the guest adopts it
+ * from the `runConfig` (threaded exactly like {@linkcode CoopNetcodeMode}).
+ */
+export type CoopSessionKind = "coop" | "versus";
+
 /** Connection lifecycle of a transport. */
 export type CoopConnectionState = "connecting" | "connected" | "disconnected" | "closed";
 
@@ -845,6 +856,12 @@ export type CoopMessage =
       challenges: { id: number; value: number; severity: number }[];
       seed?: string;
       netcodeMode?: CoopNetcodeMode;
+      /**
+       * Showdown 1v1 PvP (C1): the session kind the host pins so the guest adopts it.
+       * Optional + additive (absent -> `"coop"`, so an older peer / in-flight save stays
+       * valid and unaffected).
+       */
+      kind?: CoopSessionKind;
     }
   /**
    * Guest -> host (#633): "(re)send me the runConfig". The host broadcasts `runConfig`
@@ -1141,7 +1158,7 @@ function summarizeCoopMessage(msg: CoopMessage): string {
     case "rosterSync":
       return `role=${msg.role} entries=${msg.entries.length} ready=${msg.ready}`;
     case "runConfig":
-      return `diff=${msg.difficulty} netcode=${msg.netcodeMode ?? "(lockstep)"} seed=${msg.seed != null}`;
+      return `diff=${msg.difficulty} netcode=${msg.netcodeMode ?? "(lockstep)"} kind=${msg.kind ?? "coop"} seed=${msg.seed != null}`;
     case "stateSync":
       return `seq=${msg.seq} blob=${msg.blob.length}b`;
     case "requestStateSync":

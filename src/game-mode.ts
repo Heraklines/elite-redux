@@ -518,7 +518,6 @@ export class GameMode implements GameModeConfig {
       case GameModes.COOP:
         return i18next.t("gameMode:coop");
       case GameModes.SHOWDOWN:
-        // TODO: add the gameMode:showdown locale entry (renders the raw key until then).
         return i18next.t("gameMode:showdown");
     }
   }
@@ -567,7 +566,6 @@ export class GameMode implements GameModeConfig {
       case GameModes.COOP:
         return i18next.t("gameMode:coop");
       case GameModes.SHOWDOWN:
-        // TODO: add the gameMode:showdown locale entry (renders the raw key until then).
         return i18next.t("gameMode:showdown");
     }
   }
