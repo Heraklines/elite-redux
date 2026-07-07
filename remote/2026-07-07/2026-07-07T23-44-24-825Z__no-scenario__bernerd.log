@@ -1,0 +1,278 @@
+url:      https://elite-redux-staging.pages.dev/
+build:    mrba2bmh-8520
+mode:     4  wave:152
+seed:     Pzf1L9GCSJq9fus4FOpPlmeX
+party:    Iron Valiant(L139 389hp f0), Gholdengo(L141 180hp f0), Glalie Redux(L140 397hp f1), Kecleon(L125 323hp f0), Zigzagoon(L118 254hp f0), Amphybuzz(L115 413hp f0)
+enemy:    Persian(L134), Pyroar(L134), Slyduck(L134)
+
+----- COMMENT -----
+take down still does recoil
+
+----- CONSOLE -----
+[23:43:40.162] LOG: Ran PSP for: Gholdengo
+[23:43:40.175] LOG: %cStart Phase PostSummonPhase color:green;
+[23:43:40.181] LOG: %cStart Phase PostSummonPhase color:green;
+[23:43:40.186] LOG: %cStart Phase PostSummonPhase color:green;
+[23:43:40.186] LOG: Ran PSP for: Persian
+[23:43:40.192] LOG: %cStart Phase PostSummonPhase color:green;
+[23:43:40.197] LOG: %cStart Phase PostSummonPhase color:green;
+[23:43:40.200] LOG: %cStart Phase PostSummonPhase color:green;
+[23:43:40.200] LOG: Ran PSP for: Slyduck
+[23:43:40.205] LOG: %cStart Phase PostSummonPhase color:green;
+[23:43:40.207] LOG: %cStart Phase ShowAbilityPhase color:green;
+[23:43:40.386] LOG: %cStart Phase StatStageChangePhase color:green;
+[23:43:40.387] LOG: %cStart Phase StatStageChangePhase color:green;
+[23:43:40.566] LOG: %cStart Phase MessagePhase color:green;
+[23:43:40.796] LOG: %cStart Phase StatStageChangePhase color:green;
+[23:43:40.971] LOG: %cStart Phase MessagePhase color:green;
+[23:43:41.211] LOG: %cStart Phase StatStageChangePhase color:green;
+[23:43:41.211] LOG: %cStart Phase StatStageChangePhase color:green;
+[23:43:41.391] LOG: %cStart Phase MessagePhase color:green;
+[23:43:41.602] LOG: %cStart Phase StatStageChangePhase color:green;
+[23:43:41.790] LOG: %cStart Phase MessagePhase color:green;
+[23:43:42.002] LOG: %cStart Phase HideAbilityPhase color:green;
+[23:43:42.038] LOG: %cStart Phase PostSummonPhase color:green;
+[23:43:42.039] LOG: %cStart Phase ShowAbilityPhase color:green;
+[23:43:42.217] LOG: %cStart Phase StatStageChangePhase color:green;
+[23:43:42.399] LOG: %cStart Phase MessagePhase color:green;
+[23:43:42.614] LOG: %cStart Phase StatStageChangePhase color:green;
+[23:43:42.801] LOG: %cStart Phase MessagePhase color:green;
+[23:43:43.011] LOG: %cStart Phase StatStageChangePhase color:green;
+[23:43:43.198] LOG: %cStart Phase MessagePhase color:green;
+[23:43:43.395] LOG: %cStart Phase StatStageChangePhase color:green;
+[23:43:43.583] LOG: %cStart Phase MessagePhase color:green;
+[23:43:43.810] LOG: %cStart Phase HideAbilityPhase color:green;
+[23:43:43.846] LOG: %cStart Phase ShowAbilityPhase color:green;
+[23:43:44.015] LOG: %cStart Phase MessagePhase color:green;
+[23:43:44.261] LOG: %cStart Phase HideAbilityPhase color:green;
+[23:43:44.301] LOG: %cStart Phase PostSummonPhase color:green;
+[23:43:44.301] LOG: Ran PSP for: Iron Valiant
+[23:43:44.309] LOG: %cStart Phase PostSummonPhase color:green;
+[23:43:44.312] LOG: %cStart Phase PostSummonPhase color:green;
+[23:43:44.312] LOG: Ran PSP for: Mega Glalie Redux
+[23:43:44.317] LOG: %cStart Phase PostSummonPhase color:green;
+[23:43:44.318] LOG: %cStart Phase PostSummonPhase color:green;
+[23:43:44.319] LOG: %cStart Phase PostSummonPhase color:green;
+[23:43:44.319] LOG: Ran PSP for: Pyroar
+[23:43:44.322] LOG: %cStart Phase PostSummonPhase color:green;
+[23:43:44.324] LOG: %cStart Phase ShowAbilityPhase color:green;
+[23:43:44.493] LOG: %cStart Phase StatStageChangePhase color:green;
+[23:43:44.672] LOG: %cStart Phase MessagePhase color:green;
+[23:43:44.903] LOG: %cStart Phase StatStageChangePhase color:green;
+[23:43:45.099] LOG: %cStart Phase MessagePhase color:green;
+[23:43:45.328] LOG: %cStart Phase StatStageChangePhase color:green;
+[23:43:45.517] LOG: %cStart Phase MessagePhase color:green;
+[23:43:45.711] LOG: %cStart Phase HideAbilityPhase color:green;
+[23:43:45.748] LOG: %cStart Phase PostSummonPhase color:green;
+[23:43:45.748] LOG: %cStart Phase PostSummonPhase color:green;
+[23:43:45.748] LOG: %cStart Phase TurnInitPhase color:green;
+[23:43:45.749] LOG: %cStart Phase CommandPhase color:green;
+[23:43:51.276] LOG: Move: SACRED_SWORD Move targets: {"targets":[3,4,1],"multiple":false} 
+Player Pokemon: Iron Valiant
+[23:43:51.278] LOG: %cStart Phase SelectTargetPhase color:green;
+[23:43:52.350] LOG: %cStart Phase CommandPhase color:green;
+[23:43:52.727] LOG: %cStart Phase CommandPhase color:green;
+[23:43:53.184] LOG: Move: SACRED_SWORD Move targets: {"targets":[3,4,1],"multiple":false} 
+Player Pokemon: Iron Valiant
+[23:43:53.186] LOG: %cStart Phase SelectTargetPhase color:green;
+[23:43:53.809] LOG: %cStart Phase CommandPhase color:green;
+[23:44:00.934] LOG: Move: MAKE_IT_RAIN Move targets: {"targets":[3,4,5],"multiple":true} 
+Player Pokemon: Gholdengo
+[23:44:00.936] LOG: %cStart Phase SelectTargetPhase color:green;
+[23:44:01.249] LOG: %cStart Phase CommandPhase color:green;
+[23:44:03.157] LOG: Move: SUCKER_PUNCH Move targets: {"targets":[4,5,1],"multiple":false} 
+Player Pokemon: Mega Glalie Redux
+[23:44:03.158] LOG: %cStart Phase SelectTargetPhase color:green;
+[23:44:03.582] LOG: %cStart Phase CommandPhase color:green;
+[23:44:04.765] LOG: Move: TAKE_DOWN Move targets: {"targets":[4,5,1],"multiple":false} 
+Player Pokemon: Mega Glalie Redux
+[23:44:04.766] LOG: %cStart Phase SelectTargetPhase color:green;
+[23:44:05.398] LOG: %cStart Phase EnemyCommandPhase color:green;
+[23:44:05.405] LOG: Applied Black Glasses (enemy)
+[23:44:05.406] LOG: Applied Black Glasses (enemy)
+[23:44:05.423] LOG: Move Pool: ["Hyper Beam","Hypnosis","Mimic","Beatdown"]
+[23:44:05.423] LOG: Move Scores: [2,10,-20,4.71875]
+[23:44:05.423] LOG: Sorted Move Pool: ["Hypnosis","Beatdown","Hyper Beam","Mimic"]
+[23:44:05.423] LOG: Chosen Move: Hypnosis
+[23:44:05.423] LOG: %cStart Phase EnemyCommandPhase color:green;
+[23:44:05.444] WARN: BattlerTag ENDURING is missing a score!
+[23:44:05.446] WARN: BattlerTag ENDURING is missing a score!
+[23:44:05.447] LOG: Move Pool: ["Echoed Voice","Flare Blitz","Endure","Yawn"]
+[23:44:05.447] LOG: Move Scores: [13.5,63,-20,5]
+[23:44:05.447] LOG: Sorted Move Pool: ["Flare Blitz","Echoed Voice","Yawn","Endure"]
+[23:44:05.447] LOG: Chosen Move: Flare Blitz
+[23:44:05.447] LOG: %cStart Phase EnemyCommandPhase color:green;
+[23:44:05.459] LOG: Move Pool: ["Wicked Blow"]
+[23:44:05.459] LOG: Move Scores: [69]
+[23:44:05.459] LOG: Sorted Move Pool: ["Wicked Blow"]
+[23:44:05.459] LOG: Chosen Move: Wicked Blow
+[23:44:05.459] LOG: %cStart Phase TurnStartPhase color:green;
+[23:44:05.470] LOG: %cStart Phase MovePhase color:green;
+[23:44:05.470] LOG: %cUser: Persian
+Move: HYPNOSIS
+Use Mode: NORMAL color:orchid
+[23:44:05.481] LOG: %cStart Phase MessagePhase color:green;
+[23:44:05.560] LOG: %cStart Phase MoveEffectPhase color:green;
+[23:44:05.577] WARN: Texture "%s" has no frame "%s" PRAS- Confuse Ray 1
+[23:44:05.877] WARN: Texture "%s" has no frame "%s" PRAS- Confuse Ray 1
+[23:44:05.894] WARN: Texture "%s" has no frame "%s" PRAS- Confuse Ray 1
+[23:44:05.911] WARN: Texture "%s" has no frame "%s" PRAS- Confuse Ray 1
+[23:44:06.044] WARN: Texture "%s" has no frame "%s" PRAS- Confuse Ray 1
+[23:44:06.060] WARN: Texture "%s" has no frame "%s" PRAS- Confuse Ray 1
+[23:44:06.077] WARN: Texture "%s" has no frame "%s" PRAS- Confuse Ray 1
+[23:44:06.094] WARN: Texture "%s" has no frame "%s" PRAS- Confuse Ray 1
+[23:44:06.110] WARN: Texture "%s" has no frame "%s" PRAS- Confuse Ray 1
+[23:44:06.127] WARN: Texture "%s" has no frame "%s" PRAS- Confuse Ray 1
+[23:44:06.144] WARN: Texture "%s" has no frame "%s" PRAS- Confuse Ray 1
+[23:44:06.472] LOG: %cStart Phase ObtainStatusEffectPhase color:green;
+[23:44:06.741] LOG: %cStart Phase MessagePhase color:green;
+[23:44:06.952] LOG: %cStart Phase MoveEndPhase color:green;
+[23:44:06.961] LOG: %cStart Phase MovePhase color:green;
+[23:44:06.961] LOG: %cUser: Gholdengo
+Move: MAKE_IT_RAIN
+Use Mode: NORMAL color:orchid
+[23:44:06.962] LOG: %cStart Phase MessagePhase color:green;
+[23:44:07.185] LOG: %cStart Phase CommonAnimPhase color:green;
+[23:44:07.494] LOG: %cStart Phase MoveEndPhase color:green;
+[23:44:07.503] LOG: %cStart Phase MovePhase color:green;
+[23:44:07.503] LOG: %cUser: Slyduck
+Move: WICKED_BLOW
+Use Mode: NORMAL color:orchid
+[23:44:07.553] LOG: %cStart Phase MessagePhase color:green;
+[23:44:07.635] LOG: %cStart Phase MoveEffectPhase color:green;
+[23:44:08.012] LOG: crit stage: +2
+[23:44:08.016] LOG: Move: Wicked Blow | Base damage: 180.72528221512246 | Power: 93.33333333333333 | Source attack: 539 | Target defense: 313
+[23:44:08.017] LOG: Move: Wicked Blow | Attack damage: 707
+[23:44:08.018] LOG: Applied Focus Band 
+[23:44:08.019] LOG: %cStart Phase DamageAnimPhase color:green;
+[23:44:08.046] LOG: %cStart Phase MessagePhase color:green;
+[23:44:08.302] LOG: %cStart Phase MessagePhase color:green;
+[23:44:08.527] LOG: %cStart Phase MessagePhase color:green;
+[23:44:08.744] LOG: %cStart Phase MoveEndPhase color:green;
+[23:44:08.750] LOG: %cStart Phase MovePhase color:green;
+[23:44:08.750] LOG: %cUser: Pyroar
+Move: FLARE_BLITZ
+Use Mode: NORMAL color:orchid
+[23:44:08.788] LOG: %cStart Phase MessagePhase color:green;
+[23:44:08.885] LOG: %cStart Phase MoveEffectPhase color:green;
+[23:44:09.371] LOG: crit stage: +2
+[23:44:09.375] LOG: Move: Flare Blitz | Base damage: 106.8761661341853 | Power: 120 | Source attack: 246 | Target defense: 313
+[23:44:09.376] LOG: Move: Flare Blitz | Attack damage: 461
+[23:44:09.378] LOG: %cStart Phase DamageAnimPhase color:green;
+[23:44:09.382] LOG: %cStart Phase MessagePhase color:green;
+[23:44:09.628] LOG: %cStart Phase MessagePhase color:green;
+[23:44:09.827] LOG: %cStart Phase MessagePhase color:green;
+[23:44:10.044] LOG: %cStart Phase MoveEndPhase color:green;
+[23:44:10.045] LOG: %cStart Phase MovePhase color:green;
+[23:44:10.045] LOG: %cUser: Iron Valiant
+Move: SACRED_SWORD
+Use Mode: NORMAL color:orchid
+[23:44:10.059] LOG: %cStart Phase MessagePhase color:green;
+[23:44:10.194] LOG: %cStart Phase MoveEffectPhase color:green;
+[23:44:10.196] LOG: Applied Wide Lens 
+[23:44:10.661] LOG: crit stage: +2
+[23:44:10.664] LOG: Move: Sacred Sword | Base damage: 161.26625 | Power: 90 | Source attack: 297 | Target defense: 192
+[23:44:10.665] LOG: Move: Sacred Sword | Attack damage: 328
+[23:44:10.666] LOG: %cStart Phase ShowAbilityPhase color:green;
+[23:44:10.822] LOG: %cStart Phase HideAbilityPhase color:green;
+[23:44:10.872] LOG: %cStart Phase DamageAnimPhase color:green;
+[23:44:10.904] LOG: %cStart Phase MoveEffectPhase color:green;
+[23:44:10.905] LOG: Applied Wide Lens 
+[23:44:11.394] LOG: crit stage: +2
+[23:44:11.398] LOG: Move: Sacred Sword | Base damage: 161.26625 | Power: 90 | Source attack: 297 | Target defense: 192
+[23:44:11.399] LOG: Move: Sacred Sword | Attack damage: 294
+[23:44:11.400] LOG: %cStart Phase DamageAnimPhase color:green;
+[23:44:11.430] LOG: %cStart Phase MessagePhase color:green;
+[23:44:11.644] LOG: %cStart Phase MessagePhase color:green;
+[23:44:11.844] LOG: %cStart Phase FaintPhase color:green;
+[23:44:13.257] LOG: %cStart Phase MessagePhase color:green;
+[23:44:13.450] LOG: %cStart Phase VictoryPhase color:green;
+[23:44:13.450] LOG: Applied Soothe Bell 
+[23:44:13.451] LOG: Applied Soothe Bell 
+[23:44:13.451] LOG: Applied Lucky Egg 
+[23:44:13.451] LOG: Applied Soothe Bell 
+[23:44:13.451] LOG: Applied Lucky Egg 
+[23:44:13.451] LOG: %cStart Phase ExpPhase color:green;
+[23:44:13.451] LOG: Applied Super EXP. Charm 
+[23:44:13.451] LOG: Applied EXP. Charm 
+[23:44:13.709] LOG: %cStart Phase LevelUpPhase color:green;
+[23:44:13.709] LOG: %cStart Phase ExpPhase color:green;
+[23:44:13.710] LOG: Applied Super EXP. Charm 
+[23:44:13.710] LOG: Applied EXP. Charm 
+[23:44:13.913] LOG: %cStart Phase LevelUpPhase color:green;
+[23:44:13.913] LOG: Applied Calcium 
+[23:44:13.913] LOG: Applied HP Up 
+[23:44:13.913] LOG: Applied Carbos 
+[23:44:13.913] LOG: Applied Soul Dew 
+[23:44:13.913] LOG: Applied Soul Dew 
+[23:44:13.914] LOG: %cStart Phase ExpPhase color:green;
+[23:44:13.914] LOG: Applied Super EXP. Charm 
+[23:44:13.914] LOG: Applied EXP. Charm 
+[23:44:14.112] LOG: %cStart Phase LevelUpPhase color:green;
+[23:44:14.112] LOG: Applied Protein 
+[23:44:14.113] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[23:44:14.113] LOG: Applied Super EXP. Charm 
+[23:44:14.113] LOG: Applied EXP. Charm 
+[23:44:14.113] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[23:44:14.113] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[23:44:14.113] LOG: Applied Super EXP. Charm 
+[23:44:14.113] LOG: Applied EXP. Charm 
+[23:44:14.114] LOG: %cStart Phase LevelUpPhase color:green;
+[23:44:14.114] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[23:44:14.114] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[23:44:14.114] LOG: Applied Super EXP. Charm 
+[23:44:14.114] LOG: Applied EXP. Charm 
+[23:44:14.114] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[23:44:14.114] LOG: %cStart Phase MoveEndPhase color:green;
+[23:44:14.115] LOG: %cStart Phase MovePhase color:green;
+[23:44:14.115] LOG: %cUser: Mega Glalie Redux
+Move: TAKE_DOWN
+Use Mode: NORMAL color:orchid
+[23:44:14.132] LOG: %cStart Phase MessagePhase color:green;
+[23:44:14.236] LOG: %cStart Phase MoveEffectPhase color:green;
+[23:44:14.571] LOG: crit stage: +2
+[23:44:14.574] LOG: Move: Take Down | Base damage: 67.26028368794327 | Power: 95 | Source attack: 167 | Target defense: 282
+[23:44:14.575] LOG: Move: Take Down | Attack damage: 181
+[23:44:14.578] LOG: %cStart Phase DamageAnimPhase color:green;
+[23:44:14.606] LOG: %cStart Phase MessagePhase color:green;
+[23:44:14.819] LOG: %cStart Phase DamageAnimPhase color:green;
+[23:44:14.826] LOG: %cStart Phase MessagePhase color:green;
+[23:44:15.044] LOG: %cStart Phase MoveEndPhase color:green;
+[23:44:15.044] LOG: %cStart Phase CheckInterludePhase color:green;
+[23:44:15.044] LOG: %cStart Phase WeatherEffectPhase color:green;
+[23:44:15.044] LOG: %cStart Phase PositionalTagPhase color:green;
+[23:44:15.044] LOG: %cStart Phase BerryPhase color:green;
+[23:44:15.053] LOG: Applied Lum Berry 
+[23:44:15.053] LOG: Applied Apicot Berry 
+[23:44:15.060] LOG: Applied Lansat Berry 
+[23:44:15.060] LOG: Applied Petaya Berry 
+[23:44:15.060] LOG: Applied Sitrus Berry 
+[23:44:15.060] LOG: Applied Liechi Berry 
+[23:44:15.061] LOG: Applied Calcium 
+[23:44:15.061] LOG: Applied HP Up 
+[23:44:15.061] LOG: Applied Carbos 
+[23:44:15.061] LOG: Applied Soul Dew 
+[23:44:15.061] LOG: Applied Soul Dew 
+[23:44:15.061] LOG: Applied Protein 
+[23:44:15.076] LOG: %cStart Phase CommonAnimPhase color:green;
+[23:44:15.386] LOG: %cStart Phase MessagePhase color:green;
+[23:44:15.602] LOG: %cStart Phase ResetStatusPhase color:green;
+[23:44:15.603] LOG: %cStart Phase StatStageChangePhase color:green;
+[23:44:15.792] LOG: %cStart Phase MessagePhase color:green;
+[23:44:16.036] LOG: %cStart Phase MessagePhase color:green;
+[23:44:16.269] LOG: %cStart Phase StatStageChangePhase color:green;
+[23:44:16.453] LOG: %cStart Phase MessagePhase color:green;
+[23:44:16.686] LOG: %cStart Phase PokemonHealPhase color:green;
+[23:44:16.894] LOG: Applied Healing Charm 
+[23:44:16.898] LOG: %cStart Phase MessagePhase color:green;
+[23:44:17.177] LOG: %cStart Phase StatStageChangePhase color:green;
+[23:44:17.368] LOG: %cStart Phase MessagePhase color:green;
+[23:44:17.594] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[23:44:17.612] LOG: %cStart Phase TurnEndPhase color:green;
+[23:44:17.617] LOG: Applied Leftovers 
+[23:44:17.623] WARN: [coop:turn] host recorder: finalize with NO open recording -> turn=-1 events=0 (caller decides not to emit)
+[23:44:17.623] LOG: %cStart Phase PokemonHealPhase color:green;
+[23:44:17.794] LOG: Applied Healing Charm 
+[23:44:17.801] LOG: %cStart Phase MessagePhase color:green;
+[23:44:18.094] LOG: %cStart Phase TurnInitPhase color:green;
+[23:44:18.094] LOG: %cStart Phase CommandPhase color:green;
