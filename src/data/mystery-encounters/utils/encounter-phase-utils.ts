@@ -166,6 +166,49 @@ export function coopHostStreamSecondaryAwaitIndex(labels: string[]): Promise<num
 }
 
 /**
+ * Co-op authoritative non-battle ME (#855): an ME GRANTED a mon while the party is full, so the
+ * replace-or-skip picker is the ME OWNER's (the guest's) decision - not the sole-engine host's. Stream a
+ * `catchFull` sub-prompt on `seq_me` (the guest opens the REAL picker + relays the chosen party slot) and
+ * await the guest's slot, REUSING the exact sender + awaiter + disconnect ceiling the party/secondary
+ * sub-prompt path ({@linkcode coopHostStreamSecondaryAwaitIndex} / {@linkcode selectPokemonForOption})
+ * already uses. Resolves to:
+ *  - the guest's 0-based party slot to REPLACE (0..partySize-1) on a live pick, or
+ *  - `null` when the guest cancelled (an out-of-range slot), disconnected, or the await hit its ceiling -
+ *    in every case the caller LOUDLY declines the grant (the mon is not added), never hangs.
+ * The caller MUST have gated on {@linkcode coopHostAwaitsGuestSubPick} first - this opens no local UI and
+ * is a bare relay off the awaiting host, so solo / host-owned never reach it and stay byte-identical.
+ */
+export function coopHostStreamCatchFullAwaitSlot(pokemonName: string): Promise<number | null> {
+  const seqMe = COOP_ME_PUMP_SEQ_BASE + coopMeInteractionStartValue();
+  const relay = getCoopInteractionRelay();
+  const prompt: CoopInteractionOutcome = {
+    k: "mePresent",
+    tokens: {},
+    meetsReqs: [],
+    labels: [],
+    subPrompt: { kind: "catchFull", pokemonName },
+  };
+  coopLog("me", "host streams catch-FULL replace-or-skip sub-prompt + awaits guest slot (#855)", { seq: seqMe });
+  relay?.sendInteractionOutcome(seqMe, "mePresent", prompt);
+  const awaited = relay?.awaitInteractionChoice(seqMe, COOP_ME_REPLAY_WAIT_MS) ?? Promise.resolve(null);
+  return awaited.then(pick => {
+    const slot = pick?.choice ?? null;
+    const partySize = globalScene.getPlayerParty().length;
+    if (slot == null || slot < 0 || slot >= partySize) {
+      coopWarn("me", "host: catch-full guest declined/out-of-range/timeout; the granted mon is NOT added (#855)", {
+        seq: seqMe,
+        slot,
+        partySize,
+        fromNull: pick == null,
+      });
+      return null;
+    }
+    coopLog("me", "host received guest catch-full replace slot (#855)", { seq: seqMe, slot });
+    return slot;
+  });
+}
+
+/**
  * Animates exclamation sprite over trainer's head at start of encounter
  * @param scene
  */

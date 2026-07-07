@@ -5,6 +5,7 @@ import { speciesStarterCosts } from "#balance/starters";
 import { modifierTypes } from "#data/data-lists";
 import { coopAllowAccountWrite } from "#data/elite-redux/coop/coop-account-gate";
 import { coopAttributeNewMon } from "#data/elite-redux/coop/coop-session";
+import { erRecordAchievementRelease } from "#data/elite-redux/er-achievement-tracker";
 import { communitySpeciesAllowed } from "#data/elite-redux/er-community-run-state";
 import { Gender } from "#data/gender";
 import {
@@ -33,6 +34,10 @@ import {
   queueEncounterMessage,
   showEncounterText,
 } from "#mystery-encounters/encounter-dialogue-utils";
+import {
+  coopHostAwaitsGuestSubPick,
+  coopHostStreamCatchFullAwaitSlot,
+} from "#mystery-encounters/encounter-phase-utils";
 import { achvs } from "#system/achv";
 import type { PartyOption } from "#ui/party-ui-handler";
 import { PartyUiMode } from "#ui/party-ui-handler";
@@ -733,6 +738,36 @@ export async function catchPokemon(
           ? coopAttributeNewMon(globalScene.getPlayerParty()) === null
           : globalScene.getPlayerParty().length === 6;
         if (mePartyFull) {
+          // Co-op AUTHORITATIVE host on a GUEST-OWNED ME (#855, live P0): the replace-or-skip picker is
+          // the ME OWNER's (the guest's) decision, but the sole-engine host runs this catch. The host
+          // cannot drive the picker (its input is gated on a guest-owned ME) and must NOT open a local
+          // one - that froze BOTH clients (the host on an undrivable CONFIRM/PARTY, the guest awaiting a
+          // terminal the host never reached). Stream a `catchFull` sub-prompt, await the guest's relayed
+          // slot, and apply the release+add AUTHORITATIVELY; a null (decline / cancel / disconnect /
+          // timeout) LOUDLY declines the grant (the mon is not added), never hangs. Solo / host-owned MEs
+          // fall through to the real local promptRelease below (byte-identical).
+          if (coopHostAwaitsGuestSubPick()) {
+            void coopHostStreamCatchFullAwaitSlot(pokemon.getNameToRender()).then(slot => {
+              const party = globalScene.getPlayerParty();
+              if (slot != null && slot >= 0 && slot < party.length) {
+                // The guest picked a slot to REPLACE. Free it exactly as PartyUiHandler.doRelease does
+                // (strip its held-item modifiers, splice it out, record the release achievement, destroy),
+                // then addToParty into the now-freed slot - the freed half lets coopAttributeNewMon
+                // attribute the new mon correctly. This is the solo RELEASE flow's release-then-add,
+                // driven by the relayed slot instead of the host's (undrivable) local UI.
+                void globalScene.removePartyMemberModifiers(slot);
+                const released = party.splice(slot, 1)[0];
+                erRecordAchievementRelease(released.species.speciesId);
+                released.destroy();
+                addToParty(slot);
+              } else {
+                // Decline: the granted mon is not added (the "skip" branch of the solo picker).
+                removePokemon();
+                end();
+              }
+            });
+            return;
+          }
           const promptRelease = () => {
             globalScene.ui.showText(
               i18next.t("battle:partyFull", {

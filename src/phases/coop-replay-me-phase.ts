@@ -621,9 +621,28 @@ export class CoopReplayMePhase extends Phase {
    */
   private openSubPickCapture(
     relay: NonNullable<ReturnType<typeof getCoopInteractionRelay>>,
-    subPrompt: { kind: "party" } | { kind: "secondary"; labels: string[] },
+    subPrompt: { kind: "party" } | { kind: "secondary"; labels: string[] } | { kind: "catchFull"; pokemonName: string },
   ): void {
     const restoreMode = globalScene.ui.getMode();
+    if (subPrompt.kind === "catchFull") {
+      // #855: an ME granted a mon while the party is full. The guest (the ME owner) drives the REAL
+      // replace-or-skip decision locally and relays ONLY the chosen slot; the sole-engine host applies the
+      // authoritative release+add (coopHostStreamCatchFullAwaitSlot). Show the party-full text, then open a
+      // NON-mutating PARTY/SELECT picker (SELECT so the guest's pure-renderer party is never spliced locally
+      // - the host owns the mutation); a cancel relays an out-of-range slot, and the host skips the grant.
+      const pokemonName = subPrompt.pokemonName;
+      coopLog("me", "opening local catch-FULL replace-or-skip capture (#855)", { seq: this.seq, restoreMode });
+      globalScene.ui.showText(i18next.t("battle:partyFull", { pokemonName }), null, () => {
+        void globalScene.ui.setMode(UiMode.PARTY, PartyUiMode.SELECT, -1, (slotIndex: number) => {
+          coopLog("me", "captured catch-full replace slot (#855)", { seq: this.seq, slotIndex });
+          void globalScene.ui.setMode(restoreMode).then(() => {
+            this.relayGuestSubPick(slotIndex);
+            this.awaitOutcomeThenTerminal(relay);
+          });
+        });
+      });
+      return;
+    }
     if (subPrompt.kind === "party") {
       coopLog("me", "opening local PARTY sub-pick capture", { seq: this.seq, restoreMode });
       // Party target: open the same PARTY/SELECT screen the host's selectPokemonForOption opens, capture

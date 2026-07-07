@@ -62,8 +62,10 @@ export const COOP_UI_REGISTRY: Record<UiMode, CoopUiClass> = {
 
   // Party screen: carries the faint-replacement owner-pick relay (switch-phase.ts,
   // coop-guest-faint-switch-phase.ts) + ME party/secondary sub-prompt captures streamed as a
-  // subPrompt (encounter-phase-utils.ts selectPokemonForOption) + party-target reward drive. Also
-  // used for plain local party viewing, but the mirrored interactions make "mirrored" the safe class.
+  // subPrompt (encounter-phase-utils.ts selectPokemonForOption) + the #855 ME catch-FULL replace-or-skip
+  // sub-prompt (the guest drives PARTY/SELECT, the host applies the release+add - coopHostStreamCatchFullAwaitSlot
+  // / coop-replay-me-phase openSubPickCapture) + party-target reward drive. Also used for plain local party
+  // viewing, but the mirrored interactions make "mirrored" the safe class.
   [UiMode.PARTY]: "mirrored",
 
   // Summary: DUAL-USE. The move-learn ("which move to forget") cursor mirror rides UiMode.SUMMARY

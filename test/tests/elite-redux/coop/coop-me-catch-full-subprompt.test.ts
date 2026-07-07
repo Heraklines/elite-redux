@@ -1,0 +1,198 @@
+/*
+ * SPDX-FileCopyrightText: 2024-2026 Pagefault Games
+ * SPDX-License-Identifier: AGPL-3.0-only
+ */
+
+// Co-op authoritative non-battle ME - CATCH-FULL replace-or-skip sub-prompt relay (#855, live P0).
+// When an ME GRANTS a mon while the party is full, catchPokemon() opens a replace-or-skip picker
+// (UiMode.CONFIRM "fullParty" -> UiMode.PARTY RELEASE). On a GUEST-OWNED ME the sole-engine HOST runs
+// this catch but CANNOT drive that picker (its input is gated on a guest-owned ME), and the guest is a
+// pure renderer awaiting the host's terminal - so BOTH clients froze (the reported live P0). The fix
+// mirrors the party/secondary sub-prompt path (coop-me-yesno-subprompt.test.ts is the sibling):
+//
+//   1. HOST side - coopHostStreamCatchFullAwaitSlot STREAMS a `mePresent` carrying
+//      `subPrompt: { kind: "catchFull", pokemonName }` on seq_me's OUTCOME inbox (the channel the guest's
+//      CoopReplayMePhase.openSubPickCapture reads), AWAITS the guest's relayed slot on the SAME seq_me
+//      CHOICE inbox, and RESOLVES to that slot (0..partySize-1) on a live pick - or to `null` when the
+//      guest cancels / relays out-of-range / times out / disconnects (the anti-hang LOUD decline: the
+//      granted mon is simply not added, the host never hangs).
+//   2. GUEST side - CoopReplayMePhase.openSubPickCapture opens a NON-mutating PARTY/SELECT picker off the
+//      streamed catchFull sub-prompt and relays ONLY the chosen slot; the host owns the release+add.
+//
+// Engine-free: the real production helper + the real CoopReplayMePhase drive over a LoopbackTransport
+// (assembled runtime), no GameManager / no Phaser boot. The seq BASE is the value the ME pump keys off.
+
+import type { BattleScene } from "#app/battle-scene";
+import { globalScene, initGlobalScene } from "#app/global-scene";
+import { CoopInteractionRelay } from "#data/elite-redux/coop/coop-interaction-relay";
+import { setCoopMeInteractionStart } from "#data/elite-redux/coop/coop-me-pin-state";
+import {
+  assembleCoopRuntime,
+  clearCoopRuntime,
+  getCoopInteractionRelay,
+  setCoopRuntime,
+} from "#data/elite-redux/coop/coop-runtime";
+import type { CoopInteractionOutcome, CoopMessage } from "#data/elite-redux/coop/coop-transport";
+import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
+import { UiMode } from "#enums/ui-mode";
+import { coopHostStreamCatchFullAwaitSlot } from "#mystery-encounters/encounter-phase-utils";
+import { CoopReplayMePhase } from "#phases/coop-replay-me-phase";
+import { PartyUiMode } from "#ui/party-ui-handler";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+/** The seq base the ME pump / CoopReplayMePhase key off (`BASE + interactionCounter`); see coop-me-pump.ts. */
+const COOP_ME_PUMP_SEQ_BASE = 8_000_000;
+
+/** Let the loopback deliver-microtasks flush. */
+const flush = () => new Promise<void>(r => setTimeout(r, 0));
+
+describe("co-op ME catch-FULL replace-or-skip sub-prompt relay (#855)", () => {
+  let prevGlobalScene: BattleScene;
+
+  beforeEach(() => {
+    prevGlobalScene = globalScene;
+  });
+
+  afterEach(() => {
+    clearCoopRuntime();
+    setCoopMeInteractionStart(-1); // drop the ME pin so the next file starts clean
+    // Citizenship (#710): restore the real scene so the NEXT ER_SCENARIO file's GameManager does not reuse
+    // one of this file's stubs. Order-robust: each stub file restores before the next file's beforeEach.
+    initGlobalScene(prevGlobalScene);
+  });
+
+  /**
+   * Stand up an authoritative HOST runtime (its interactionRelay is what `getCoopInteractionRelay` in the
+   * helper returns), pin the ME on `start`, install a stub scene whose `getPlayerParty()` reports a full
+   * party (the helper range-checks the relayed slot against it), and pair a bare GUEST relay on the other
+   * loopback end so the test can watch what the guest receives and reply as the guest owner would.
+   */
+  const hostRig = (start: number, partySize = 6) => {
+    const { host, guest } = createLoopbackPair();
+    const runtime = assembleCoopRuntime(host, { username: "Host", netcodeMode: "authoritative" });
+    setCoopRuntime(runtime);
+    setCoopMeInteractionStart(start);
+    initGlobalScene({
+      gameMode: { isCoop: true },
+      getPlayerParty: () => new Array(partySize).fill({}),
+    } as unknown as BattleScene);
+    const guestRelay = new CoopInteractionRelay(guest);
+    return { seqMe: COOP_ME_PUMP_SEQ_BASE + start, guestRelay, runtime };
+  };
+
+  it("HOST streams a {kind:'catchFull'} sub-prompt and resolves to the guest owner's relayed replace slot", async () => {
+    const { seqMe, guestRelay } = hostRig(3);
+
+    // The host (sole engine) reaches catchPokemon on a guest-owned ME with a full party and calls the helper.
+    const hostAwait = coopHostStreamCatchFullAwaitSlot("Rattata");
+
+    // The guest's CoopReplayMePhase adopts the streamed catch-full sub-prompt on seq_me's OUTCOME inbox.
+    const seen = await guestRelay.awaitInteractionOutcome(seqMe);
+    expect(seen?.k).toBe("mePresent");
+    if (seen?.k !== "mePresent") {
+      throw new Error("presentation kind lost over the wire");
+    }
+    expect(seen.subPrompt).toEqual({ kind: "catchFull", pokemonName: "Rattata" });
+
+    // The guest relays its captured replace slot (2) on the SAME seq_me CHOICE inbox (kind "meSub").
+    guestRelay.sendInteractionChoice(seqMe, "meSub", 2);
+
+    // The helper resolves to exactly the guest's slot (the host then releases slot 2 + adds the new mon there).
+    expect(await hostAwait).toBe(2);
+  });
+
+  it("HOST LOUDLY declines (resolves null) when the guest cancels / relays an out-of-range slot (skip the grant)", async () => {
+    // A full party is 6 mons; the guest's SELECT cancel relays an out-of-range slot (== party length, 6).
+    // The helper must surface that as `null` so the caller runs the "skip" branch (the granted mon is NOT
+    // added), never adds into a bad slot, and never hangs.
+    const { seqMe, guestRelay } = hostRig(5, 6);
+    const hostAwait = coopHostStreamCatchFullAwaitSlot("Rattata");
+
+    const seen = await guestRelay.awaitInteractionOutcome(seqMe);
+    expect(seen?.k === "mePresent" ? seen.subPrompt : undefined).toEqual({ kind: "catchFull", pokemonName: "Rattata" });
+
+    guestRelay.sendInteractionChoice(seqMe, "meSub", 6); // cancel / out-of-range (== party length) -> skip
+    expect(await hostAwait).toBeNull();
+  });
+
+  it("HOST anti-hang: a null await (disconnect / timeout ceiling) resolves to null (declines, never hangs)", async () => {
+    // The disconnect ceiling / a partner-gone await resolves `null`; the helper maps that to the same LOUD
+    // decline as an out-of-range pick. Force the underlying await null (the timeout path) via the live relay.
+    hostRig(7);
+    const relay = getCoopInteractionRelay();
+    expect(relay).not.toBeNull();
+    vi.spyOn(relay!, "awaitInteractionChoice").mockResolvedValue(null);
+
+    expect(await coopHostStreamCatchFullAwaitSlot("Rattata")).toBeNull();
+  });
+
+  it("GUEST opens a PARTY/SELECT replace picker off the catch-full sub-prompt and relays the chosen slot", async () => {
+    // Stand up an authoritative GUEST runtime + a bare HOST observer on the other loopback end, and a stub
+    // scene whose ui captures setMode calls and immediately fires the party-selection callback with slot 2.
+    const { host, guest } = createLoopbackPair();
+    const runtime = assembleCoopRuntime(guest, { username: "Guest", netcodeMode: "authoritative" });
+    setCoopRuntime(runtime);
+    const counter = 1; // ODD -> the guest owns this ME
+    setCoopMeInteractionStart(counter);
+    const hostObserver = new CoopInteractionRelay(host);
+
+    const setModeCalls: unknown[][] = [];
+    initGlobalScene({
+      gameMode: { isCoop: true },
+      ui: {
+        getMode: () => UiMode.MYSTERY_ENCOUNTER,
+        showText: (_t: string, _d: unknown, cb?: () => void) => cb?.(),
+        setMode: (...args: unknown[]) => {
+          setModeCalls.push(args);
+          const cb = args.find(a => typeof a === "function") as ((slot: number) => void) | undefined;
+          cb?.(2); // the guest picks slot 2 to replace
+          return Promise.resolve();
+        },
+      },
+    } as unknown as BattleScene);
+
+    const phase = new CoopReplayMePhase(counter);
+    // Cut the loop: after relaying the slot the real openSubPickCapture calls awaitOutcomeThenTerminal to
+    // await the NEXT sub-prompt / terminal - a no-op here (this test isolates the single sub-pick relay).
+    (phase as unknown as { awaitOutcomeThenTerminal: () => void }).awaitOutcomeThenTerminal = () => {};
+
+    // Arm the host observer BEFORE driving so the relayed pick can never race ahead of the waiter.
+    const relayedP = hostObserver.awaitInteractionChoice(COOP_ME_PUMP_SEQ_BASE + counter, 1000);
+
+    (
+      phase as unknown as {
+        openSubPickCapture: (r: ReturnType<typeof getCoopInteractionRelay>, s: unknown) => void;
+      }
+    ).openSubPickCapture(getCoopInteractionRelay(), { kind: "catchFull", pokemonName: "Rattata" });
+
+    await flush();
+
+    // It opened the NON-mutating PARTY/SELECT picker (not a local RELEASE splice on the pure-renderer guest).
+    expect(
+      setModeCalls.some(c => c[0] === UiMode.PARTY && c[1] === PartyUiMode.SELECT),
+      "guest opened a PARTY/SELECT replace picker",
+    ).toBe(true);
+    // And relayed exactly the chosen slot (2) to the host on seq_me (the host applies the release+add).
+    const relayed = await relayedP;
+    expect(relayed?.choice, "guest relayed the chosen replace slot to the host").toBe(2);
+  });
+
+  it("the catch-full sub-prompt wire shape is pure JSON (survives a serialize round-trip byte-identical)", () => {
+    // No runtime needed: the exact `mePresent` the helper streams must be plain JSON (the transport
+    // structured-clones it), so the catchFull relay can never lose the pokemonName or the subPrompt kind.
+    const present: CoopInteractionOutcome = {
+      k: "mePresent",
+      tokens: {},
+      meetsReqs: [],
+      labels: [],
+      subPrompt: { kind: "catchFull", pokemonName: "Mr. Mime" },
+    };
+    const msg: CoopMessage = {
+      t: "interactionOutcome",
+      seq: COOP_ME_PUMP_SEQ_BASE + 1,
+      kind: "mePresent",
+      outcome: present,
+    };
+    expect(JSON.parse(JSON.stringify(msg))).toEqual(msg);
+  });
+});

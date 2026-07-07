@@ -617,7 +617,10 @@ export type CoopInteractionOutcome =
    * The optional `subPrompt` is streamed as a FOLLOW-UP `mePresent` right before the host opens
    * an engine sub-prompt (party target / secondary menu), telling the guest which local capture
    * screen to open. The `quiz` variant (#818) instead streams a WHOLE ErQuizPhase session (its
-   * questions + stopOnWrong) so both clients run the identical quiz. Plain JSON only (strings /
+   * questions + stopOnWrong) so both clients run the identical quiz. The `catchFull` variant (#855)
+   * is streamed when an ME GRANTS a mon while the party is full: the guest (the ME owner) drives the
+   * real replace-or-skip picker and relays the chosen slot; the host applies the release+add
+   * authoritatively (`pokemonName` is only for the guest's party-full text). Plain JSON only (strings /
    * booleans / the inline `CoopQuizWireQuestion`), no engine types.
    */
   | {
@@ -628,7 +631,8 @@ export type CoopInteractionOutcome =
       subPrompt?:
         | { kind: "party" }
         | { kind: "secondary"; labels: string[] }
-        | { kind: "quiz"; questions: CoopQuizWireQuestion[]; stopOnWrong: boolean };
+        | { kind: "quiz"; questions: CoopQuizWireQuestion[]; stopOnWrong: boolean }
+        | { kind: "catchFull"; pokemonName: string };
     }
   /**
    * Co-op authoritative non-battle ME (#633 B2 / MAJOR-2 / P4): the comprehensive ME-terminal
