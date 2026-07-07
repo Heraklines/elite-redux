@@ -154,6 +154,30 @@ describe.skipIf(!RUN)("Showdown versus battle bootstrap (C3v2b)", () => {
     expect(bench[0].type.id).toBe("SHELL_BELL");
   });
 
+  it("bootstraps a 1v1 SINGLE-mon versus match (B7 item 10 short party)", async () => {
+    // A team may now field as few as 1 mon. A 1-vs-1 single-mon match must build its one-mon
+    // player + enemy parties and reach CommandPhase (the enemy build + battle handle short parties).
+    const opponent: ShowdownMonManifest[] = [
+      mon({ speciesId: SpeciesId.CHARIZARD, rootSpeciesId: SpeciesId.CHARMANDER, item: "LEFTOVERS" }),
+    ];
+    const own: ShowdownMonManifest[] = [
+      mon({ speciesId: SpeciesId.SNORLAX, rootSpeciesId: SpeciesId.SNORLAX, item: "SHELL_BELL" }),
+    ];
+
+    await runToShowdownCommand(game, own, opponent, [SpeciesId.SNORLAX]);
+
+    expect(game.scene.getPlayerParty().length).toBe(1);
+    expect(game.scene.getEnemyParty().length).toBe(1);
+    expect(game.scene.currentBattle.battleType).toBe(BattleType.TRAINER);
+    expect(game.scene.gameMode.isWaveFinal(1)).toBe(true);
+    // The lone own mon still carries its manifest held item (item 6 works for a 1-mon party too).
+    const heldOnPlayer = game.scene.findModifiers(
+      m => m instanceof PokemonHeldItemModifier && m.pokemonId === game.scene.getPlayerParty()[0].id,
+      true,
+    );
+    expect(heldOnPlayer).toHaveLength(1);
+  });
+
   it("attaches NO runtime modifier for a mega mon's locked (MEGA_STONE) item slot (B7 item 6)", async () => {
     const opponent: ShowdownMonManifest[] = [
       mon({ speciesId: SpeciesId.CHARIZARD, rootSpeciesId: SpeciesId.CHARMANDER, item: "LEFTOVERS" }),

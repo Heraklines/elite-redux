@@ -20,7 +20,11 @@ import { SHOWDOWN_ITEM_POOL, type ShowdownItemKey } from "#app/data/elite-redux/
  */
 export const MEGA_STONE_ITEM = "MEGA_STONE";
 
-const TEAM_SIZE = 6;
+// B7 item 10 (maintainer-decided): a team may field 1 to 6 mons (was exactly 6), so a player
+// can start a versus match with a partial team. Every OTHER rule (duplicate species, one-mega,
+// cost brackets, per-mon legality) is unchanged.
+const MIN_TEAM_SIZE = 1;
+const MAX_TEAM_SIZE = 6;
 const REQUIRED_LEVEL = 100;
 const IV_COUNT = 6;
 const IV_MIN = 0;
@@ -369,11 +373,11 @@ export function validateShowdownTeam(
 
   const violations: ShowdownRuleViolation[] = [];
 
-  // teamSize: exactly 6 mons.
-  if (team.length !== TEAM_SIZE) {
+  // teamSize: 1 to 6 mons (B7 item 10).
+  if (team.length < MIN_TEAM_SIZE || team.length > MAX_TEAM_SIZE) {
     violations.push({
       rule: "teamSize",
-      message: `Team must have exactly ${TEAM_SIZE} Pokemon (has ${team.length}).`,
+      message: `Team must have ${MIN_TEAM_SIZE}-${MAX_TEAM_SIZE} Pokemon (has ${team.length}).`,
     });
   }
 

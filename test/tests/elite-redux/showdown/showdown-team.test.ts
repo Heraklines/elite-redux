@@ -54,8 +54,17 @@ describe("validateShowdownTeam", () => {
     expect(validateShowdownTeam(team(), allUnlocked, noMegas)).toEqual([]);
   });
 
-  it("flags a 5-member team (teamSize)", () => {
-    const v = validateShowdownTeam(team(5), allUnlocked, noMegas);
+  // B7 item 10: a team may field 1 to 6 mons. Sizes 1-5 are ACCEPTED (were rejected as != 6).
+  it("accepts a 5-member team (teamSize 1-6)", () => {
+    expect(validateShowdownTeam(team(5), allUnlocked, noMegas)).toEqual([]);
+  });
+
+  it("accepts a 1-member team (teamSize 1-6)", () => {
+    expect(validateShowdownTeam(team(1), allUnlocked, noMegas)).toEqual([]);
+  });
+
+  it("flags an empty (0-member) team (teamSize)", () => {
+    const v = validateShowdownTeam(team(0), allUnlocked, noMegas);
     expect(v).toContainEqual(expect.objectContaining({ rule: "teamSize" }));
   });
 
@@ -211,7 +220,7 @@ describe("validateShowdownTeam", () => {
   });
 
   it("returns ALL violations, not just the first", () => {
-    const t = team(5); // teamSize violation
+    const t = team(7); // teamSize violation (over the 1-6 max)
     t[0].level = 99; // level violation
     t[1].item = "NOT_A_REAL_ITEM"; // item violation
     const v = validateShowdownTeam(t, allUnlocked, noMegas);
@@ -364,7 +373,7 @@ describe("validateShowdownTeam", () => {
     });
 
     it("skips other per-mon checks for a malformed slot but keeps team-wide checks", () => {
-      const t = team(5); // teamSize violation (team-wide)
+      const t = team(7); // teamSize violation (team-wide, over the 1-6 max)
       t[0] = hostile({ ivs: null }); // malformed slot 0
       const v = validateShowdownTeam(t, allUnlocked, noMegas);
       const found = rules(v);
