@@ -96,6 +96,36 @@ export function disposePendingShowdownSession(): void {
 }
 
 /**
+ * B7 item 14b: rejoin re-senders. A WebRTC drop is healed by {@linkcode WebRtcTransport.replaceChannel}
+ * (the transport instance + its listeners SURVIVE - only the inner channel is swapped), so the pre-battle
+ * components stay bound. What is LOST are the frames sent while the channel was dark. Each surviving
+ * pre-battle component (the negotiation {@linkcode ShowdownSession}, the wager handler) registers an
+ * IDEMPOTENT re-sender of its current state; on a versus rejoin the coop runtime fires them all, so the
+ * peer that missed a team/ready/offer/arrival in the dark window gets it again and the handshake completes
+ * instead of one client stranding on the wager while the other never leaves teambuild.
+ */
+const rejoinResenders = new Set<() => void>();
+
+/** Register an idempotent rejoin re-sender. Returns an unregister fn (call on the component's teardown). */
+export function addShowdownRejoinResender(resend: () => void): () => void {
+  rejoinResenders.add(resend);
+  return () => {
+    rejoinResenders.delete(resend);
+  };
+}
+
+/** Fire every registered rejoin re-sender (called by the coop runtime after a versus rejoin succeeds). */
+export function fireShowdownRejoinResend(): void {
+  for (const resend of [...rejoinResenders]) {
+    try {
+      resend();
+    } catch (err) {
+      console.warn("[showdown-rejoin] a rejoin re-sender threw (ignored)", err);
+    }
+  }
+}
+
+/**
  * Begin a showdown match: stash both teams (+ the optional enemy-command relay + the opponent's
  * sanitized presentation). Idempotent overwrite (a rematch replaces the prior state). `relay` is
  * null for a host-solo bootstrap; `opponentProfile` is null when the opponent authored no profile.

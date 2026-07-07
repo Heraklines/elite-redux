@@ -40,6 +40,7 @@ import { canonicalize, fnv1a64 } from "#data/elite-redux/coop/coop-battle-checks
 import { CoopRendezvous, getCoopRendezvousWaitMs } from "#data/elite-redux/coop/coop-rendezvous";
 import type { CoopMessage, CoopTransport } from "#data/elite-redux/coop/coop-transport";
 import { type GhostTrainerProfile, sanitizeGhostProfile } from "#data/elite-redux/er-ghost-profile";
+import { addShowdownRejoinResender } from "#data/elite-redux/showdown/showdown-battle-state";
 import { isMegaStage } from "#data/elite-redux/showdown/showdown-evolutions";
 import {
   type ShowdownMonManifest,
@@ -223,6 +224,10 @@ export class ShowdownSession {
     ownManifest: ShowdownMonManifest[];
   } | null = null;
   private done = false;
+  /** B7 item 14b: our own SANITIZED presentation, kept so a rejoin can re-send the exact `showdownTeam`. */
+  private ownProfile: GhostTrainerProfile | null = null;
+  /** B7 item 14b: unregisters this session's rejoin re-sender (set in {@linkcode negotiate}). */
+  private offRejoin: (() => void) | null = null;
 
   constructor(transport: CoopTransport, opts: ShowdownSessionOptions = {}) {
     this.transport = transport;
@@ -276,16 +281,44 @@ export class ShowdownSession {
     // Send our team + our authored presentation (C7; sanitized locally before shipping so we never
     // send garbage - the receiver re-sanitizes regardless) + our ready commit (the hash of our own
     // manifest; presentation is NOT part of the team hash - it's cosmetic and not anti-cheat surface).
+    this.ownProfile = sanitizeGhostProfile(ownProfile);
+    // B7 item 14b: register a rejoin re-sender BEFORE the first send, so a drop between here and the
+    // gate is healed. It re-ships our team+ready (+ any rendezvous arrival) idempotently on reconnect.
+    this.offRejoin = addShowdownRejoinResender(() => this.resendHandshake());
     this.transport.send({
       t: "showdownTeam",
       manifest: ownManifest,
-      presentation: sanitizeGhostProfile(ownProfile),
+      presentation: this.ownProfile,
       showdownProto: SHOWDOWN_PROTO_VERSION,
     });
     this.transport.send({ t: "showdownReady", teamHash: showdownTeamHash(ownManifest) });
     // The opponent's messages may already be buffered (they raced ahead); try to settle now.
     this.tryGate();
     return promise;
+  }
+
+  /**
+   * B7 item 14b: re-send this client's handshake state after a WebRTC rejoin. The transport instance
+   * survived (replaceChannel), but the frames we sent while the channel was dark were LOST, so the
+   * peer may be missing our team/ready/ready-arrival. Re-ship them idempotently: the peer's session
+   * re-sets the same values (guarded gate), the team hash is deterministic, and the rendezvous ignores
+   * a duplicate arrival - so replaying can only complete a stranded handshake, never corrupt a live one.
+   */
+  resendHandshake(): void {
+    const settle = this.settle;
+    if (settle == null || this.done) {
+      return; // nothing in flight (never negotiated / already settled)
+    }
+    this.transport.send({
+      t: "showdownTeam",
+      manifest: settle.ownManifest,
+      presentation: this.ownProfile,
+      showdownProto: SHOWDOWN_PROTO_VERSION,
+    });
+    this.transport.send({ t: "showdownReady", teamHash: showdownTeamHash(settle.ownManifest) });
+    // If we already crossed into the ready barrier, re-send our arrival too (the peer may have missed
+    // it in the dark window, otherwise both would strand waiting for each other).
+    this.rendezvous.resendArrivals();
   }
 
   /** Stop listening to the transport and drop any pending negotiation. Idempotent (B7 item 8:
@@ -295,6 +328,8 @@ export class ShowdownSession {
       return;
     }
     this.disposed = true;
+    this.offRejoin?.(); // B7 item 14b: stop re-sending our handshake on a rejoin once we're done
+    this.offRejoin = null;
     this.cancelTimeout();
     this.offMessage();
     if (this.ownsRendezvous) {

@@ -255,6 +255,20 @@ export class CoopRendezvous {
   }
 
   /**
+   * B7 item 14b (rejoin): RE-SEND every local arrival on the wire. {@linkcode arrive} suppresses a
+   * duplicate send once a point is in {@linkcode localArrived}, so after a WebRTC rejoin the partner
+   * that missed our original arrival in the dark window would never get it. This bypasses the
+   * suppression to replay them; the partner's {@linkcode handle} is idempotent (a point already seen
+   * is a harmless no-op), so replaying is always safe.
+   */
+  resendArrivals(): void {
+    for (const point of this.localArrived) {
+      coopLog("rendezvous", `RESEND arrival point=${point} (rejoin) role=${this.transport.role}`);
+      this.transport.send({ t: "rendezvous", point });
+    }
+  }
+
+  /**
    * Age (ms) of the OLDEST parked rendezvous wait, or -1 when none. Mirrors the interaction relay's
    * watchdog probe: a positive value means this client is BLOCKED at a barrier waiting for the partner.
    */

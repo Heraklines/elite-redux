@@ -80,7 +80,11 @@ import {
   recordReplayCommand,
 } from "#data/elite-redux/replay-recorder";
 import type { ReplayCommandKind } from "#data/elite-redux/replay-trace";
-import { disposePendingShowdownRelay, getShowdownRelay } from "#data/elite-redux/showdown/showdown-battle-state";
+import {
+  disposePendingShowdownRelay,
+  fireShowdownRejoinResend,
+  getShowdownRelay,
+} from "#data/elite-redux/showdown/showdown-battle-state";
 import { ShowdownLifecycle } from "#data/elite-redux/showdown/showdown-lifecycle";
 import { otherRole } from "#data/elite-redux/showdown/showdown-outcome";
 import { ShowdownSpoof } from "#data/elite-redux/showdown/showdown-spoof";
@@ -913,6 +917,14 @@ function wireCoopDisconnectReaction(transport: CoopTransport, relay: CoopInterac
             return;
           }
           coopLog("runtime", "rejoin SUCCESS -> channel re-established in place");
+          // B7 item 14b: the transport survived (replaceChannel), so the showdown pre-battle listeners
+          // are still bound - but the frames sent while the channel was dark are LOST. In a versus session
+          // fire every registered rejoin re-sender so the negotiation session + wager handler re-ship
+          // their team/ready/offer/lock/arrival idempotently and a stranded pre-battle handshake completes.
+          if (isActiveRuntime && isVersusSession()) {
+            coopLog("runtime", "rejoin: firing showdown pre-battle re-senders (versus)");
+            fireShowdownRejoinResend();
+          }
           if (isActiveRuntime) {
             try {
               globalScene.ui.showText("Partner reconnected!", null, undefined, 3000);
