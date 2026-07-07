@@ -9,13 +9,16 @@
 // ones (tera + the relayed flags) are verified here; evolution + level-up move-learn are
 // deterministic co-op-skip / route-through-relay, exercised by their phase gates.
 
+import { COOP_INTERACTION_LEAVE, CoopInteractionRelay } from "#data/elite-redux/coop/coop-interaction-relay";
+import { applyWiredPartnerCommand } from "#data/elite-redux/coop/coop-partner-ai";
+import { COOP_STORMGLASS_SEQ } from "#data/elite-redux/coop/coop-seq-registry";
+import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
+import { STORMGLASS_WEATHER_CHOICES } from "#data/elite-redux/er-relics";
 import { Command } from "#enums/command";
 import { MoveId } from "#enums/move-id";
 import { MoveUseMode } from "#enums/move-use-mode";
 import { SpeciesId } from "#enums/species-id";
-import { applyWiredPartnerCommand } from "#data/elite-redux/coop/coop-partner-ai";
-import { COOP_INTERACTION_LEAVE, CoopInteractionRelay } from "#data/elite-redux/coop/coop-interaction-relay";
-import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
+import { WeatherType } from "#enums/weather-type";
 import { GameManager } from "#test/framework/game-manager";
 import Phaser from "phaser";
 import { beforeAll, beforeEach, describe, expect, it } from "vitest";
@@ -48,6 +51,43 @@ describe("co-op switch relay carries Baton Pass (#633 Fix #4g)", () => {
     owner.sendInteractionChoice(0, "switch", COOP_INTERACTION_LEAVE);
     const res = await watcher.awaitInteractionChoice(0);
     expect(res?.choice).toBe(COOP_INTERACTION_LEAVE);
+  });
+});
+
+describe("co-op Stormglass one-time weather-pick relay (#130 co-op wiring)", () => {
+  // The ER Stormglass relic prompts ONCE per run to CHOOSE the battle weather - a run-affecting value
+  // hashed into the battle checksum. Before wiring, ErStormglassPickerPhase opened UiMode.OPTION_SELECT
+  // on BOTH clients at wave start, so each human picked independently -> divergent weather -> checksum
+  // resync storm (the systematic #855 unmirrored-screen class). Now the HOST OWNS the pick and relays the
+  // chosen weather INDEX on the fixed COOP_STORMGLASS_SEQ; the GUEST awaits it and adopts the identical
+  // weather (never opening its own picker). This exercises that wire end-to-end.
+  it("the host relays the chosen weather INDEX and the guest maps it back to the identical WeatherType", async () => {
+    const { host, guest } = createLoopbackPair();
+    const owner = new CoopInteractionRelay(host);
+    const watcher = new CoopInteractionRelay(guest);
+
+    // Owner (host) picks Sandstorm (index 2 in STORMGLASS_WEATHER_CHOICES).
+    const sandstormIndex = STORMGLASS_WEATHER_CHOICES.findIndex(c => c.weather === WeatherType.SANDSTORM);
+    expect(sandstormIndex).toBeGreaterThanOrEqual(0);
+    owner.sendInteractionChoice(COOP_STORMGLASS_SEQ, "stormglass", sandstormIndex);
+
+    const res = await watcher.awaitInteractionChoice(COOP_STORMGLASS_SEQ);
+    expect(res?.choice).toBe(sandstormIndex);
+    // The guest maps the relayed index back to the exact weather the host chose (the phase's adopt path).
+    expect(STORMGLASS_WEATHER_CHOICES[res!.choice].weather).toBe(WeatherType.SANDSTORM);
+  });
+
+  it("a watcher that never receives the pick resolves null (heals via checkpoint, never hangs)", async () => {
+    const { guest } = createLoopbackPair();
+    const watcher = new CoopInteractionRelay(guest, {
+      timeoutMs: 5,
+      schedule: (cb, _ms) => {
+        setTimeout(cb, 0);
+        return () => {};
+      },
+    });
+    const res = await watcher.awaitInteractionChoice(COOP_STORMGLASS_SEQ);
+    expect(res).toBeNull(); // the guest leaves the weather unset; the per-turn checkpoint converges it
   });
 });
 

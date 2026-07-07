@@ -27,6 +27,10 @@
 
 import { globalScene } from "#app/global-scene";
 import { Phase } from "#app/phase";
+import { coopLog, coopWarn } from "#data/elite-redux/coop/coop-debug";
+import { COOP_BIOME_WAIT_MS } from "#data/elite-redux/coop/coop-interaction-relay";
+import { getCoopController, getCoopInteractionRelay, getCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
+import { COOP_STORMGLASS_SEQ } from "#data/elite-redux/coop/coop-seq-registry";
 import {
   erStormglassApplyChosenWeather,
   getStormglassWeather,
@@ -39,12 +43,16 @@ import type { OptionSelectItem } from "#ui/abstract-option-select-ui-handler";
 
 /** The short line shown above the weather list. Clean text, no em dash. */
 const STORMGLASS_PROMPT = "The Stormglass hums. Choose the weather it conjures for 5 turns.";
+/** The line the WATCHER shows while the owning player picks (co-op). Clean text, no em dash. */
+const STORMGLASS_WATCH_PROMPT = "The Stormglass hums. Your partner is choosing the weather...";
 
 export class ErStormglassPickerPhase extends Phase {
   public readonly phaseName = "ErStormglassPickerPhase";
 
   /** Guards against a double input resolving the prompt twice. */
   private resolving = false;
+  /** Co-op (#130): this client drives the real picker (host / solo); the guest watches + adopts. */
+  private coopOwner = true;
 
   start(): void {
     super.start();
@@ -57,15 +65,34 @@ export class ErStormglassPickerPhase extends Phase {
       this.end();
       return;
     }
+    // Co-op (#130): the chosen weather is run-affecting (hashed into the battle checksum), so an
+    // unmirrored per-client prompt diverges the shared run - the systematic #855 class. The HOST OWNS
+    // this one-time pick (deterministic, no interaction-counter alternation needed): it drives the real
+    // picker and relays the chosen weather INDEX on the fixed COOP_STORMGLASS_SEQ; the GUEST never opens
+    // the picker, adopts the relayed index, and heals via the per-turn checkpoint on timeout. Solo /
+    // non-coop keeps the plain local picker.
+    const controller = globalScene.gameMode.isCoop ? getCoopController() : null;
+    if (controller != null) {
+      const spoofed = getCoopRuntime()?.spoof != null;
+      this.coopOwner = spoofed || controller.role === "host";
+      coopLog(
+        "reward",
+        `stormglass owner/watcher decision: role=${controller.role} spoof=${spoofed} -> ${this.coopOwner ? "OWNER" : "WATCHER"} (#130)`,
+      );
+      if (!this.coopOwner) {
+        void this.coopWatch();
+        return;
+      }
+    }
     this.openPicker();
   }
 
   /** Show the prompt line, then the 5-weather option select. */
   private openPicker(): void {
     globalScene.ui.showText(STORMGLASS_PROMPT, null, () => {
-      const options: OptionSelectItem[] = STORMGLASS_WEATHER_CHOICES.map(choice => ({
+      const options: OptionSelectItem[] = STORMGLASS_WEATHER_CHOICES.map((choice, index) => ({
         label: choice.label,
-        handler: () => this.pick(choice.weather),
+        handler: () => this.pick(choice.weather, index),
       }));
       globalScene.ui.setMode(UiMode.OPTION_SELECT, { options });
     });
@@ -74,14 +101,24 @@ export class ErStormglassPickerPhase extends Phase {
   /**
    * Record the chosen weather through the EXISTING setter (persists it on the
    * relic + refreshes the modifier bar), apply it for this battle, then end.
-   * Returns true so the OPTION_SELECT handler treats the press as handled.
+   * In co-op the OWNER relays the chosen INDEX so the watcher adopts the same
+   * weather. Returns true so the OPTION_SELECT handler treats the press as handled.
    */
-  private pick(weather: WeatherType): boolean {
+  private pick(weather: WeatherType, index: number): boolean {
     if (this.resolving) {
       return true;
     }
     this.resolving = true;
     setStormglassWeather(weather);
+    // Co-op OWNER: relay the chosen weather index so the guest applies the identical weather.
+    if (globalScene.gameMode.isCoop && this.coopOwner) {
+      try {
+        getCoopInteractionRelay()?.sendInteractionChoice(COOP_STORMGLASS_SEQ, "stormglass", index);
+        coopLog("reward", `stormglass OWNER commit weather=${weather} index=${index} (#130)`);
+      } catch {
+        coopWarn("reward", "stormglass OWNER relay send threw (handled - watcher heals on checkpoint) (#130)");
+      }
+    }
     // Tear the option menu back down to MESSAGE before applying + ending so the
     // following encounter flow doesn't race the dead OPTION_SELECT (the bargain
     // sub-menu softlock class). The chosen weather wins over the biome ambient.
@@ -90,5 +127,32 @@ export class ErStormglassPickerPhase extends Phase {
       this.end();
     });
     return true;
+  }
+
+  /**
+   * Co-op WATCHER (#130): never open the picker. Await the owner's relayed weather index and adopt the
+   * identical weather; on timeout leave it unset (the per-turn checkpoint carries the owner's chosenWeather
+   * and heals the divergence), so this can never hang the guest's wave-start queue.
+   */
+  private async coopWatch(): Promise<void> {
+    try {
+      globalScene.ui.showText(STORMGLASS_WATCH_PROMPT);
+    } catch {
+      /* cosmetic */
+    }
+    const relay = getCoopInteractionRelay();
+    const res = relay == null ? null : await relay.awaitInteractionChoice(COOP_STORMGLASS_SEQ, COOP_BIOME_WAIT_MS);
+    const choice = STORMGLASS_WEATHER_CHOICES[res?.choice ?? -1];
+    if (choice == null) {
+      coopWarn(
+        "reward",
+        `stormglass WATCHER: ${res == null ? "TIMEOUT" : "bad index"} -> leave unset, checkpoint heals (#130)`,
+      );
+    } else {
+      setStormglassWeather(choice.weather);
+      coopLog("reward", `stormglass WATCHER adopt weather=${choice.weather} index=${res?.choice} (#130)`);
+      erStormglassApplyChosenWeather();
+    }
+    void globalScene.ui.setMode(UiMode.MESSAGE).then(() => this.end());
   }
 }

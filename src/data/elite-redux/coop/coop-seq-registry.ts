@@ -87,6 +87,15 @@ export const COOP_CROSSROADS_SEQ_BASE = 9_600_000;
  * pins its own counter at a natural biome-end multi-node transition. Disjoint band above the crossroads.
  */
 export const COOP_BIOME_PICK_SEQ_BASE = 9_700_000;
+/**
+ * The one-time ER Stormglass weather PICK owner-driven relay: a FIXED singleton seq (#130 co-op wiring).
+ * The Stormglass relic prompts ONCE per run (getStormglassWeather() persists after the first pick), and
+ * that pick is a run-affecting weather choice hashed into the battle checksum - so an unmirrored per-client
+ * prompt diverges the shared run. The HOST drives the real picker and relays the chosen weather INDEX; the
+ * GUEST never opens the picker, adopts the relayed index, and heals via the checkpoint on timeout. Because
+ * the prompt is one-time it needs no interaction-counter offset - a fixed singleton above every other band.
+ */
+export const COOP_STORMGLASS_SEQ = 9_800_000;
 /** Host->guest dex/starter sync broadcasts: a fixed disjoint seq (#794). */
 export const COOP_DEX_SYNC_SEQ = 9_200_000;
 /** Rejoin full-resync request: `BASE + (Date.now() % 100_000)`. */
@@ -258,6 +267,13 @@ export const COOP_SEQ_BANDS: readonly CoopSeqBand[] = [
     offset: "+ pinnedStart (interaction counter)",
     owner: "select-biome-phase.ts",
   },
+  {
+    key: "stormglass",
+    base: COOP_STORMGLASS_SEQ,
+    maxOffset: 0,
+    offset: "fixed singleton (one-time weather pick)",
+    owner: "er-stormglass-picker-phase.ts",
+  },
 ];
 
 /** The inclusive numeric range `[lo, hi]` a band occupies at realistic magnitudes. */
@@ -353,4 +369,6 @@ export const COOP_RELAY_KINDS: readonly CoopRelayKind[] = [
   // Co-op biome choice (#848): the every-5-waves crossroads + the ER World-Map biome pick.
   { kind: "crossroads", transport: "choice", band: "crossroads", sender: "er-crossroads-phase.ts" },
   { kind: "biomePick", transport: "choice", band: "biomePick", sender: "select-biome-phase.ts" },
+  // ER Stormglass one-time weather pick (#130 co-op wiring): host drives, relays the chosen weather index.
+  { kind: "stormglass", transport: "choice", band: "stormglass", sender: "er-stormglass-picker-phase.ts" },
 ];
