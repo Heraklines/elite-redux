@@ -360,6 +360,10 @@ export class TitlePhase extends Phase {
    */
   private openCoopLobby(setModeAndEnd: (gameMode: GameModes) => void, netcodeMode: CoopNetcodeMode): void {
     const username = loggedInUser?.username ?? "Player";
+    // #810 barrier: how long the GUEST waits for the host's Resume/New Game decision before
+    // an anti-hang fallback to NEW GAME. Comfortably longer than the host's own 60s resume
+    // offer timeout, so a slow-but-alive human host never trips it; only a dead peer does.
+    const COOP_RESUME_GUEST_WAIT_MS = 120_000;
     let listSig: string | null = null;
     let controller: CoopLobbyController | null = null;
     let lastPlayers: LobbyPlayer[] = [];
@@ -498,17 +502,64 @@ export class TitlePhase extends Phase {
         if (runtime.controller.role === "host") {
           runtime.controller.setNetcodeMode(netcodeMode);
         }
-        const partner = runtime.controller.partnerName ?? "Partner";
+        const controller = runtime.controller;
+        const partner = controller.partnerName ?? "Partner";
         stage.setSeat(1, { name: partner, detail: "Connected", dot: "green" });
         stage.setStatus("Connected! Starting co-op...");
         const startNewRun = () => {
           stage.destroy();
           setModeAndEnd(GameModes.COOP);
         };
-        // #810 RESUME FLOW: the lobby remembers a saved run with THIS partner.
-        // GUEST: arm the offer handler first (the host's offer can arrive any moment).
-        if (runtime.controller.role === "guest") {
-          runtime.controller.armResumeOfferHandler(wave => {
+
+        // #810 RESUME FLOW (maintainer directive): after the ACCEPT handshake, decide RESUME
+        // vs NEW GAME BEFORE anyone advances into starter-select. The HOST owns the decision
+        // (it holds the authoritative save + its own resume marker, which BOTH clients now
+        // record); the GUEST mirrors a waiting state. BARRIER: neither side calls startNewRun
+        // until the choice resolves. Identity is gated by the marker's exact (self, partner)
+        // account pair, so a save is never offered/loaded with a different partner.
+        if (controller.role === "guest") {
+          // GUEST: block on the host's decision. Show a mirrored "waiting" state - NO "press to
+          // start" (that was the barrier hole: the guest could start a new run while the host
+          // was still deciding to resume). Release on EITHER the resume OFFER or the START-NEW
+          // signal; an anti-hang timeout falls back to NEW GAME with a loud warn if the host
+          // goes silent (dropped signal / dead peer).
+          stage.setStatus(`Connected! Waiting for ${partner}...`);
+          globalScene.ui.setMode(UiMode.MESSAGE);
+          globalScene.ui.resetModeChain();
+          globalScene.ui.showText(`Connected! Waiting for ${partner} to choose Resume or New Game...`, null);
+
+          let settled = false;
+          /** Claim the single decision; returns true only for the first caller. */
+          const claim = (): boolean => {
+            if (settled) {
+              return false;
+            }
+            settled = true;
+            return true;
+          };
+          const guestWaitTimer = setTimeout(() => {
+            if (claim()) {
+              console.warn(
+                `[coop-resume] guest: no Resume/New Game from ${partner} in ${COOP_RESUME_GUEST_WAIT_MS}ms -> NEW GAME (anti-hang)`,
+              );
+              startNewRun();
+            }
+          }, COOP_RESUME_GUEST_WAIT_MS);
+
+          // Host chose New Game (or had no save / we declined / the offer timed out): release.
+          controller.armResumeStartNewHandler(() => {
+            clearTimeout(guestWaitTimer);
+            if (claim()) {
+              startNewRun();
+            }
+          });
+          // Host offers to resume: surface accept/decline. Keep the start-new handler live (the
+          // host can still time out and release us); only a user answer here claims the decision.
+          controller.armResumeOfferHandler(wave => {
+            clearTimeout(guestWaitTimer);
+            if (settled) {
+              return;
+            }
             globalScene.ui.showText(
               `${partner} wants to resume your saved co-op run (wave ${wave}). Accept?`,
               null,
@@ -516,13 +567,17 @@ export class TitlePhase extends Phase {
                 globalScene.ui.setMode(
                   UiMode.CONFIRM,
                   () => {
-                    runtime.controller.replyResume(true);
-                    stage.destroy();
-                    void this.coopGuestResumeBoot(wave);
+                    if (claim()) {
+                      controller.replyResume(true);
+                      stage.destroy();
+                      void this.coopGuestResumeBoot(wave);
+                    }
                   },
                   () => {
-                    runtime.controller.replyResume(false);
-                    startNewRun();
+                    if (claim()) {
+                      controller.replyResume(false);
+                      startNewRun();
+                    }
                   },
                 );
               },
@@ -530,43 +585,50 @@ export class TitlePhase extends Phase {
               true,
             );
           });
-        }
-        // HOST: if a saved run with this partner exists, offer to resume it.
-        const marker = runtime.controller.role === "host" ? readCoopResumeMarker(partner) : null;
-        if (marker != null) {
-          globalScene.ui.showText(
-            `Found a saved co-op run with ${partner} (wave ${marker.wave}). Resume it?`,
-            null,
-            () => {
-              globalScene.ui.setMode(
-                UiMode.CONFIRM,
-                () => {
-                  globalScene.ui.setMode(UiMode.MESSAGE);
-                  globalScene.ui.showText(`Waiting for ${partner} to accept...`, null);
-                  void runtime.controller.offerResume(marker.wave).then(accepted => {
-                    if (accepted) {
-                      stage.destroy();
-                      void this.loadSaveSlot(marker.slot);
-                    } else {
-                      globalScene.ui.showText(
-                        `${partner} declined. Starting a new run.`,
-                        null,
-                        startNewRun,
-                        null,
-                        true,
-                      );
-                    }
-                  });
-                },
-                startNewRun,
-              );
-            },
-            null,
-            true,
-          );
           return;
         }
-        globalScene.ui.showText("Connected to your partner!\nPress to start co-op.", null, startNewRun, null, true);
+
+        // HOST: is there a saved run with EXACTLY this partner (self+partner account pair)?
+        const marker = readCoopResumeMarker(controller.localName(), controller.partnerName);
+        // Every host non-resume path relays the release so the waiting guest never hangs.
+        const hostStartNew = () => {
+          controller.sendResumeStartNew();
+          startNewRun();
+        };
+        if (marker == null) {
+          controller.sendResumeStartNew();
+          globalScene.ui.showText("Connected to your partner!\nPress to start co-op.", null, startNewRun, null, true);
+          return;
+        }
+        // Offer the HOST a real RESUME / NEW GAME choice.
+        globalScene.ui.showText(
+          `Found a saved co-op run with ${partner} (wave ${marker.wave}). Resume it?`,
+          null,
+          () => {
+            globalScene.ui.setMode(
+              UiMode.CONFIRM,
+              () => {
+                // RESUME: relay the offer; both proceed identically on accept. offerResume has
+                // its own 60s no-reply timeout -> resolves false -> we fall to NEW GAME (and
+                // release the guest), so the barrier can never hang on an unresponsive guest.
+                globalScene.ui.setMode(UiMode.MESSAGE);
+                globalScene.ui.showText(`Waiting for ${partner} to accept...`, null);
+                void controller.offerResume(marker.wave).then(accepted => {
+                  if (accepted) {
+                    stage.destroy();
+                    void this.loadSaveSlot(marker.slot);
+                  } else {
+                    globalScene.ui.showText(`${partner} declined. Starting a new run.`, null, hostStartNew, null, true);
+                  }
+                });
+              },
+              // NEW GAME: release the guest and start fresh.
+              hostStartNew,
+            );
+          },
+          null,
+          true,
+        );
       },
       onError: e => {
         globalScene.ui.showText(`Co-op error:\n${e}`, null, backToTitle, null, true);

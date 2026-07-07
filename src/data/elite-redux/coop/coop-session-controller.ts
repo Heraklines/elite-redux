@@ -142,6 +142,9 @@ export class CoopSessionController {
   private resumeOfferHandler: ((wave: number) => void) | null = null;
   private pendingResumeOfferWave: number | null = null;
   private resumeReplyWaiter: ((accept: boolean) => void) | null = null;
+  /** #810 barrier: guest-side "start new" handler + buffered flag (host's release signal). */
+  private resumeStartNewHandler: (() => void) | null = null;
+  private pendingResumeStartNew = false;
 
   /** Both halves of the shared roster; local edits its own, partner's is mirrored. */
   private readonly roster = new CoopRoster();
@@ -245,6 +248,28 @@ export class CoopSessionController {
   replyResume(accept: boolean): void {
     coopLog("launch", `SEND resumeReply accept=${accept} (#810)`);
     this.transport.send({ t: "resumeReply", accept });
+  }
+
+  /**
+   * #810 barrier GUEST: arm the "host chose new game" release handler. If the host's
+   * `resumeStartNew` already arrived (the wire beat the UI), it fires immediately from
+   * the buffer - so the guest can never miss the release and hang.
+   */
+  armResumeStartNewHandler(handler: () => void): void {
+    this.resumeStartNewHandler = handler;
+    if (this.pendingResumeStartNew) {
+      this.pendingResumeStartNew = false;
+      handler();
+    }
+  }
+
+  /**
+   * #810 barrier HOST: tell the guest to stop waiting and proceed to a NEW game. Sent on
+   * every non-resume outcome (no save, host picked New Game, guest declined, offer timeout).
+   */
+  sendResumeStartNew(): void {
+    coopLog("launch", "SEND resumeStartNew (#810 barrier release)");
+    this.transport.send({ t: "resumeStartNew" });
   }
 
   /** Announce ourselves to the partner. Call once the transport is connected. */
@@ -637,6 +662,19 @@ export class CoopSessionController {
         const waiter = this.resumeReplyWaiter;
         this.resumeReplyWaiter = null;
         waiter?.(msg.accept);
+        break;
+      }
+      case "resumeStartNew": {
+        // #810 barrier release: buffer if the guest UI has not armed its handler yet
+        // (the release can beat the arm), else fire it now.
+        coopLog("launch", "RECV resumeStartNew (#810 barrier release)");
+        if (this.resumeStartNewHandler == null) {
+          this.pendingResumeStartNew = true;
+        } else {
+          const handler = this.resumeStartNewHandler;
+          this.resumeStartNewHandler = null;
+          handler();
+        }
         break;
       }
       case "hello": {

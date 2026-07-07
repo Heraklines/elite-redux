@@ -13,7 +13,7 @@ import { CoopSessionController } from "#data/elite-redux/coop/coop-session-contr
 import type { CoopConnectionState, CoopMessage } from "#data/elite-redux/coop/coop-transport";
 import { COOP_PROTOCOL_VERSION } from "#data/elite-redux/coop/coop-transport";
 import { type CoopWireChannel, WebRtcTransport } from "#data/elite-redux/coop/coop-webrtc-transport";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 /** In-process mock of a data channel implementing {@linkcode CoopWireChannel}.
  *  Two are cross-wired (`link`) to simulate the two ends of an open channel. */
@@ -309,17 +309,75 @@ describe("#810: resume offer/reply protocol + marker", () => {
     await expect(decline).resolves.toBe(false);
   });
 
-  it("resume marker: records, matches the partner case-insensitively, rejects others, clears", async () => {
+  it("barrier: host sendResumeStartNew releases the guest (buffered if armed late)", () => {
+    const a = new MockWire();
+    const b = new MockWire();
+    a.peer = b;
+    b.peer = a;
+    const host = new CoopSessionController(new WebRtcTransport("host", a), { username: "H" });
+    const guest = new CoopSessionController(new WebRtcTransport("guest", b), { username: "G" });
+    host.connect();
+    guest.connect();
+
+    // Host releases BEFORE the guest arms: the release must buffer, not vanish (or the guest hangs).
+    host.sendResumeStartNew();
+    let released = 0;
+    guest.armResumeStartNewHandler(() => {
+      released++;
+    });
+    expect(released, "buffered release fired on arm").toBe(1);
+
+    // Armed-first path: a fresh release fires immediately on the next send.
+    let released2 = 0;
+    guest.armResumeStartNewHandler(() => {
+      released2++;
+    });
+    host.sendResumeStartNew();
+    expect(released2).toBe(1);
+  });
+
+  it("barrier: an unanswered resume offer times out to declined (host never hangs)", async () => {
+    vi.useFakeTimers();
+    try {
+      const a = new MockWire();
+      const b = new MockWire();
+      a.peer = b;
+      b.peer = a;
+      const host = new CoopSessionController(new WebRtcTransport("host", a), { username: "H" });
+      const guest = new CoopSessionController(new WebRtcTransport("guest", b), { username: "G" });
+      host.connect();
+      guest.connect();
+
+      // Guest arms but NEVER replies (AFK / dropped): the host's promise must still resolve.
+      guest.armResumeOfferHandler(() => {
+        /* deliberately no reply */
+      });
+      const reply = host.offerResume(55);
+      await vi.advanceTimersByTimeAsync(60_000);
+      await expect(reply, "no-reply offer resolves declined after the 60s timeout").resolves.toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("resume marker: records the (self,partner) pair, matches case-insensitively, gates identity, clears", async () => {
     const { recordCoopResumeMarker, readCoopResumeMarker, clearCoopResumeMarker } = await import(
       "#data/elite-redux/coop/coop-resume-marker"
     );
     clearCoopResumeMarker();
-    expect(readCoopResumeMarker("Alice")).toBeNull();
-    recordCoopResumeMarker(3, "Alice", 27);
-    expect(readCoopResumeMarker("alice")?.slot, "case-insensitive partner match").toBe(3);
-    expect(readCoopResumeMarker("alice")?.wave).toBe(27);
-    expect(readCoopResumeMarker("Bob"), "different partner does not match").toBeNull();
+    expect(readCoopResumeMarker("Alice", "Bob")).toBeNull();
+    recordCoopResumeMarker(3, "Alice", "Bob", 27);
+    // Exact pair matches, case-insensitively on BOTH identities.
+    expect(readCoopResumeMarker("alice", "bob")?.slot, "case-insensitive pair match").toBe(3);
+    expect(readCoopResumeMarker("ALICE", "BOB")?.wave).toBe(27);
+    // Identity gate (maintainer negative case): a save is NEVER offered with a different partner...
+    expect(readCoopResumeMarker("Alice", "Carol"), "different partner does not match").toBeNull();
+    // ...nor to a different local account on the same browser.
+    expect(readCoopResumeMarker("Zoe", "Bob"), "different self does not match").toBeNull();
+    // Missing either identity -> no match.
+    expect(readCoopResumeMarker(null, "Bob")).toBeNull();
+    expect(readCoopResumeMarker("Alice", null)).toBeNull();
     clearCoopResumeMarker();
-    expect(readCoopResumeMarker("Alice"), "cleared").toBeNull();
+    expect(readCoopResumeMarker("Alice", "Bob"), "cleared").toBeNull();
   });
 });

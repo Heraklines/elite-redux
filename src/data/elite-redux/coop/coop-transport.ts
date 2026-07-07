@@ -788,6 +788,13 @@ export type CoopMessage =
   | { t: "resumeOffer"; wave: number }
   /** #810 resume flow: guest's answer to the offer. */
   | { t: "resumeReply"; accept: boolean }
+  /**
+   * #810 resume flow (barrier): host tells the guest "no resume - proceed to a NEW game".
+   * Sent whenever the host will NOT resume (no matching save, host picked New Game, guest
+   * declined, or the offer timed out), so the guest never sits blocked waiting for an offer
+   * that will never come. The guest treats it as the release signal for its wait barrier.
+   */
+  | { t: "resumeStartNew" }
   /** A forced/voluntary switch replacement: bring in party `partySlot` to `fieldIndex` (P2). */
   | { t: "switchChoice"; fieldIndex: number; partySlot: number }
   /**

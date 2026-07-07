@@ -1980,17 +1980,17 @@ export class GameData {
       clientSessionId,
     };
 
-    // #810: the lobby's resume memory. Whenever the HOST saves a co-op session into a
-    // slot, remember WHICH partner + slot + wave, so the next lobby connect with the
-    // same partner can offer Resume instead of always starting a new game.
+    // #810 (maintainer directive): the lobby's resume memory. Whenever EITHER client saves
+    // a co-op session into its own slot, remember the exact participant PAIR (self + partner
+    // account identities) + slot + wave. Recorded on BOTH sides (not host-only) because the
+    // lobby re-assigns host/guest every connect - so whichever client becomes host next finds
+    // its own local marker + slot to offer Resume, instead of always starting a new game.
     if (globalScene.gameMode?.isCoop === true && globalScene.sessionSlotId >= 0) {
       const controller = getCoopRuntime()?.controller;
-      if (controller?.role === "host" && controller.partnerName) {
-        recordCoopResumeMarker(
-          globalScene.sessionSlotId,
-          controller.partnerName,
-          globalScene.currentBattle?.waveIndex ?? 0,
-        );
+      const partner = controller?.partnerName;
+      const self = controller?.localName();
+      if (self && partner) {
+        recordCoopResumeMarker(globalScene.sessionSlotId, self, partner, globalScene.currentBattle?.waveIndex ?? 0);
       }
     }
 

@@ -2449,6 +2449,44 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
   },
   {
+    label: "(note) Co-op: RESUME a saved run with the same partner on reconnect (#810)",
+    description:
+      "CO-OP LOBBY fix - verify with TWO logged-in clients (not a solo battle). This is a lobby/flow fix,\n"
+      + "so it is NOT reproducible in a single dropped-into-battle scenario - follow the DO/EXPECT below.\n"
+      + "\n"
+      + "WHAT WAS BROKEN LIVE: reconnecting in the lobby with a partner you had a saved co-op run with always\n"
+      + "started a NEW game - the Resume offer never appeared. The resume memory (marker) was recorded and\n"
+      + "read HOST-ONLY, but the lobby re-assigns host/guest every connect (whoever ACCEPTS the join request\n"
+      + "becomes host). When the previous guest accepted and became host, it looked up a marker it never wrote\n"
+      + "-> no offer -> new game. FIX: BOTH clients now record the marker, keyed on the exact player-account\n"
+      + "PAIR (both usernames), and BOTH read it on connect - so whichever client is host this session finds\n"
+      + "its own local save + offers Resume. A BARRIER holds the guest at a 'Waiting for <host>...' state until\n"
+      + "the host's Resume/New Game choice is relayed (no more racing into a new run); an anti-hang timeout\n"
+      + "falls back to New Game with a loud warn.\n"
+      + "\n"
+      + "DO (2 logged-in clients A + B): play a co-op run a few waves in so it auto-saves. Both leave to Title.\n"
+      + "Re-enter the co-op lobby on both, ask/accept to pair the SAME two accounts. EXPECT on ACCEPT: the HOST\n"
+      + "sees 'Found a saved co-op run with <partner> (wave N). Resume it?' - pick Resume; the guest sees\n"
+      + "'<host> wants to resume... Accept?' - accept; the run RESUMES at wave N on BOTH (converged), instead\n"
+      + "of starting a new game. Repeat but have the OTHER account accept (roles swapped) - the offer must\n"
+      + "STILL appear (the live bug). Pick NEW GAME instead -> both start a fresh co-op cleanly. Pair with a\n"
+      + "DIFFERENT partner C -> NO offer (identity-gated; a save is never offered to the wrong partner).\n"
+      + "Duo-tested headlessly in coop-duo-resume.test.ts (offer->accept->converge, New Game release, identity\n"
+      + "gate) and the offer/reply/start-new protocol + marker gate in coop-webrtc-transport.test.ts.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({ STARTING_WAVE_OVERRIDE: 1, STARTING_LEVEL_OVERRIDE: 50 });
+      return [
+        makeStarter(SpeciesId.SNORLAX, {
+          moveset: [MoveId.BODY_SLAM, MoveId.CRUNCH, MoveId.EARTHQUAKE, MoveId.REST],
+        }),
+        makeStarter(SpeciesId.GENGAR, {
+          moveset: [MoveId.SHADOW_BALL, MoveId.SLUDGE_BOMB, MoveId.THUNDERBOLT, MoveId.DAZZLING_GLEAM],
+        }),
+      ];
+    },
+  },
+  {
     label: "(note) Co-op: biome-boundary heal + same-biome travel (#841)",
     description:
       "CO-OP internal (verify with TWO clients across a biome BOUNDARY, ~every 10 waves) - two audit #841\n"
