@@ -617,8 +617,14 @@ export const KNOWN_UNDRIVABLE: ReadonlyMap<string, UndrivableEntry> = new Map<st
   [
     sitKey(COOP_SOAK_SITUATIONS.saveResume),
     {
-      reason: "the soak is a single continuous process; save + resume is not exercised",
-      followupTask: "drive a save/resume round-trip in the soak",
+      reason:
+        "the DEFAULT soak is a single continuous process (no save/resume); the resume leg "
+        + "(coop-soak-resume.test.ts) serializes the host session mid-run + reboots the guest from the snapshot",
+      followupTask:
+        "#807/#810/#849 BUILD 3 landed the inline save-resume leg (coop-soak-driver resumeWaves + "
+        + "coop-soak-resume.test.ts serializes the host session, reboots the GUEST via applyCoopLaunchSession, "
+        + "and asserts byte-equal convergence + a green continuation); the default run does no save/resume, so "
+        + "the default partition is unchanged",
     },
   ],
   [

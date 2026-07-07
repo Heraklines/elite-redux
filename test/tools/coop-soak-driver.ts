@@ -461,6 +461,16 @@ export interface SoakOptions {
    * movesets so the learn's setMove is visible (a MOVESET_OVERRIDE masks getMoveset()); see the leg test.
    */
   learnMoveWaves?: ReadonlySet<number>;
+  /**
+   * #807/#810/#849 SAVE-RESUME LEG (BUILD 3). A set of wave indices where the soak SERIALIZES the host's live
+   * session mid-run, PERTURBS the guest so it diverges, then REBOOTS the guest from the host snapshot (the
+   * #807/#810 coopGuestResumeBoot core, {@linkcode GameData.applyCoopLaunchSession}) and asserts the guest
+   * CONVERGES byte-equal to the host (full parity, zero divergence at boot). The run then CONTINUES - the
+   * next wave's re-mirror re-syncs the guest - so a resume at wave N of a >=N+2 run proves the run stays green
+   * for 2+ more waves. This lights the `saveResume` situation. Undefined (the default) = byte-identical to
+   * today (a single continuous process, no save/resume exercised).
+   */
+  resumeWaves?: ReadonlySet<number>;
 }
 
 /** A structured HARD invariant breach (LOCKSTEP / NO-PARK / TEARDOWN) the driver throws after writing the
@@ -1997,7 +2007,7 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
     const LEARN_SLOT = COOP_GUEST_FIELD_INDEX; // slot 1 = guest-owned (host opens watcher, guest owns the pick)
     const targetHost = rig.hostScene.getPlayerParty()[LEARN_SLOT];
     const hostMovesetFull = targetHost != null && targetHost.getMoveset(true).filter(m => m != null).length >= 4;
-    const alreadyKnows = targetHost != null && targetHost.getMoveset(true).some(m => m?.moveId === LEARN_NEW_MOVE);
+    const alreadyKnows = targetHost?.getMoveset(true).some(m => m?.moveId === LEARN_NEW_MOVE) ?? false;
     if (targetHost == null || targetHost.coopOwner !== "guest" || !hostMovesetFull || alreadyKnows) {
       // Not a full-moveset guest-owned mon (or it already knows the move): degrade to a normal wave.
       bumpSkip("learnMoveTargetNotEligible");
@@ -2065,6 +2075,65 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
     await driveRewardShop(wave);
     assertLockstep(wave, "learn-move-wave-end");
     assertScalarConvergence(wave, "post-shop");
+  };
+
+  // ---------------------------------------------------------------------------
+  // #807/#810 SAVE-RESUME LEG (BUILD 3). Serialize the host's live session mid-run, PERTURB the guest so it
+  // diverges, REBOOT the guest from the host snapshot (coopGuestResumeBoot / applyCoopLaunchSession), and
+  // assert full byte-equal parity at boot (the #807/#810 resume machinery). Ports coop-duo-resume.ts's
+  // convergence proof INLINE into the continuous run: after the resume the wave loop crosses + re-mirrors as
+  // normal, so a resume at wave N proves the run stays green for the remaining waves. This lights the
+  // `saveResume` situation.
+  // ---------------------------------------------------------------------------
+
+  /** Serialize a scene's coherent session EXACTLY as a real RESUME load broadcasts it (bigint-safe JSON). */
+  const serializeHostLaunchSnapshot = (): string =>
+    JSON.stringify(rig.hostScene.gameData.getSessionSaveData(), (_k, v: unknown) =>
+      typeof v === "bigint" ? v.toString() : v,
+    );
+
+  /**
+   * Drive ONE save/resume wave: play the wave normally, then serialize the host session, perturb + REBOOT the
+   * guest from the snapshot, and assert the guest converged byte-equal to the host (a miss is a loud finding).
+   * The next wave's re-mirror re-syncs the guest, so the run continues from here.
+   */
+  const processResumeWave = async (wave: number): Promise<void> => {
+    // Play the wave (parity + combat + shop) exactly like a normal wave first.
+    await processNormalWave(wave);
+
+    // Serialize the host's live session + capture its full-state checksum (the resume TARGET).
+    const hostJson = await withClient(rig.hostCtx, () => serializeHostLaunchSnapshot());
+    const hostChecksum = await withClient(rig.hostCtx, () => captureCoopChecksum());
+
+    // PERTURB the guest so its state DIVERGES from the host - makes the convergence proof meaningful.
+    await withClient(rig.guestCtx, () => {
+      rig.guestScene.money += 987_654;
+    });
+    const guestBefore = await withClient(rig.guestCtx, () => captureCoopChecksum());
+    const perturbed = guestBefore !== hostChecksum;
+
+    // REBOOT the guest from the host's saved snapshot (the #807/#810 coopGuestResumeBoot core) ...
+    const booted = await withClient(rig.guestCtx, () => rig.guestScene.gameData.applyCoopLaunchSession(hostJson));
+    // ... and it must CONVERGE byte-equal to the host (a resumed run cannot diverge at boot).
+    const guestAfter = await withClient(rig.guestCtx, () => captureCoopChecksum());
+
+    hitSituation(COOP_SOAK_SITUATIONS.saveResume);
+    if (!booted) {
+      recordFinding(wave, "resumeBootFailed", `guest applyCoopLaunchSession returned false at wave ${wave}`);
+    } else if (guestAfter !== hostChecksum) {
+      recordFinding(
+        wave,
+        "resumeNotConverged",
+        `guest full-state checksum did NOT equal the host's after resume boot: host=${hostChecksum} guest=${guestAfter}`,
+      );
+    }
+    actionScript.push(
+      `wave ${wave}: SAVE/RESUME round-trip (perturbed=${perturbed} booted=${booted} converged=${guestAfter === hostChecksum})`,
+    );
+    // eslint-disable-next-line no-console
+    console.log(
+      `[coop-soak] SAVE/RESUME wave ${wave} (seed ${seed}): booted=${booted} converged=${guestAfter === hostChecksum}`,
+    );
   };
 
   /** INVARIANT (d) TEARDOWN: clear the runtime, then assert no runtime / relay / ME pin survives. */
@@ -2183,19 +2252,26 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
     // #848 LEARN-MOVE LEG (BUILD 2): a designated learn-move wave (normal, non-ME/boss/catch) routes through
     // processLearnMoveWave (which degrades to a normal wave if the target mon is ineligible).
     const isLearnMoveWave = opts.learnMoveWaves?.has(wave) === true && !isMeWave && !bossWave && !isCatchWave;
+    // #807/#810 SAVE-RESUME LEG (BUILD 3): a designated resume wave (normal, non-ME/boss/catch/learn) plays as
+    // a normal wave then does a save/resume round-trip at wave-end (processResumeWave).
+    const isResumeWave =
+      opts.resumeWaves?.has(wave) === true && !isMeWave && !bossWave && !isCatchWave && !isLearnMoveWave;
     try {
       // #633 BUILD 1: a designated ME wave routes through processMeWave (the inline two-engine ME pump); a
       // designated catch wave through processCatchWave; a designated learn-move wave through
-      // processLearnMoveWave; every other wave is a normal/boss battle.
+      // processLearnMoveWave; a designated resume wave through processResumeWave; every other wave is a
+      // normal/boss battle.
       await (isMeWave
         ? processMeWave(wave, meType)
         : isCatchWave
           ? processCatchWave(wave)
           : isLearnMoveWave
             ? processLearnMoveWave(wave)
-            : bossWave
-              ? processBossWave(wave)
-              : processNormalWave(wave));
+            : isResumeWave
+              ? processResumeWave(wave)
+              : bossWave
+                ? processBossWave(wave)
+                : processNormalWave(wave));
     } catch (e) {
       if (e instanceof SoakInvariantError) {
         throw e;
