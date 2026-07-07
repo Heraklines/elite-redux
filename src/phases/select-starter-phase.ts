@@ -385,7 +385,11 @@ export class SelectStarterPhase extends Phase {
 
     // The handshake can take a moment (real peer) or fail (drop). Show a waiting notice during the await
     // so the player is never staring at a blank screen with no escape (mirrors the guest command handler).
-    globalScene.ui.setMode(UiMode.MESSAGE);
+    // AWAITED (staging bug, 2026-07-07): for the SECOND confirmer the negotiate below resolves
+    // INSTANTLY (both teams already exchanged) - a fire-and-forget setMode(MESSAGE) here would still
+    // be mid-transition when the flow opens SHOWDOWN_WAGER, and its completion then CLOBBERS the
+    // wager screen (the deterministic "second player never gets the wager" one-sided lock).
+    await globalScene.ui.setMode(UiMode.MESSAGE);
     globalScene.ui.showText(
       i18next.t("battle:showdownWaitingForOpponent", { defaultValue: "Waiting for opponent..." }),
       null,
@@ -435,7 +439,9 @@ export class SelectStarterPhase extends Phase {
         void this.launchShowdownBattle(starters, role, matchId);
       },
     };
-    globalScene.ui.setMode(UiMode.SHOWDOWN_WAGER, wagerArgs);
+    // Await so no later UI transition can silently displace the wager screen; both players must
+    // sit on it until the commit rendezvous (10-minute human-deliberation class).
+    await globalScene.ui.setMode(UiMode.SHOWDOWN_WAGER, wagerArgs);
   }
 
   /**
