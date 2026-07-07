@@ -15,6 +15,7 @@ import {
   selectShowdownResultLine,
   winnerFromLocalResult,
 } from "#data/elite-redux/showdown/showdown-outcome";
+import { UiMode } from "#enums/ui-mode";
 import { BattlePhase } from "#phases/battle-phase";
 
 /**
@@ -112,10 +113,21 @@ export class ShowdownResultPhase extends BattlePhase {
     };
 
     // Play the opponent's authored win/lose line FIRST (when present), then the result banner.
-    if (opponentLine == null) {
-      showResult();
+    const runResultText = () => {
+      if (opponentLine == null) {
+        showResult();
+      } else {
+        globalScene.ui.showText(opponentLine, null, showResult, null, true);
+      }
+    };
+    // This phase can be routed from ANY prior UI mode: a mid-battle victory/forfeit already sits on the
+    // MESSAGE handler, but a PRE-BATTLE abandon (a drop during the wager window) enters with the WAGER
+    // screen still up. Ensure the MESSAGE handler is active first, or the result text can't render/advance
+    // and the return to title strands. When already on MESSAGE we keep the exact synchronous path.
+    if (globalScene.ui.getMode() === UiMode.MESSAGE) {
+      runResultText();
     } else {
-      globalScene.ui.showText(opponentLine, null, showResult, null, true);
+      void globalScene.ui.setMode(UiMode.MESSAGE).then(runResultText);
     }
   }
 }

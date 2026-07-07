@@ -281,8 +281,10 @@ export class ShowdownWagerUiHandler extends UiHandler {
       // the server's confirmation. Until D1 wires the escrow endpoint, staked play is disabled and only
       // the friendly path proceeds. Do NOT proceed to battle on a staked lock in this wave.
       // ---------------------------------------------------------------------------------------------
+      // commitStakedMatch plays playError itself; return FALSE so processInput does NOT stack a playSelect
+      // on top (the escrow refusal is not a successful selection).
       this.commitStakedMatch(offer);
-      return true;
+      return false;
     }
     // FRIENDLY commit: light our lamp + cross the reciprocal commit barrier. When BOTH have crossed
     // (or the anti-hang timeout fires), proceed to battle exactly once.

@@ -29,7 +29,12 @@ import {
 import { coopGuestSessionSlot, coopHostSessionSlot } from "#data/elite-redux/coop/coop-session";
 import type { CoopRole, CoopSerializedStarter } from "#data/elite-redux/coop/coop-transport";
 import { sanitizeGhostProfile } from "#data/elite-redux/er-ghost-profile";
-import { beginShowdownBattle, endShowdownBattle } from "#data/elite-redux/showdown/showdown-battle-state";
+import {
+  beginShowdownBattle,
+  disposePendingShowdownRelay,
+  endShowdownBattle,
+  setPendingShowdownRelay,
+} from "#data/elite-redux/showdown/showdown-battle-state";
 import { ShowdownCommandRelay } from "#data/elite-redux/showdown/showdown-command-relay";
 import { starterToManifest } from "#data/elite-redux/showdown/showdown-manifest";
 import {
@@ -49,6 +54,7 @@ import { SaveSlotUiMode } from "#ui/handlers/save-slot-select-ui-handler";
 import type { ShowdownWagerArgs } from "#ui/showdown-wager-ui-handler";
 import { applyChallenges } from "#utils/challenge-utils";
 import { getPokemonSpecies } from "#utils/pokemon-utils";
+import i18next from "i18next";
 import SoundFade from "phaser3-rex-plugins/plugins/soundfade";
 
 export class SelectStarterPhase extends Phase {
@@ -331,14 +337,29 @@ export class SelectStarterPhase extends Phase {
     // runtime's shared rendezvous so the `showdown-ready` barrier uses the one live instance.
     const session = new ShowdownSession(runtime.localTransport, { rendezvous: runtime.rendezvous });
     const relay = new ShowdownCommandRelay(runtime.localTransport);
+    // Give the relay a lifetime symmetric with the session: stash it so EVERY non-commit exit (negotiate
+    // failure/timeout below, an abort, or a wager-window disconnect) disposes it. The wager commit adopts
+    // it into the live match state (beginShowdownBattle clears the pending slot).
+    setPendingShowdownRelay(relay);
     const ownProfile = sanitizeGhostProfile(globalScene.gameData.ghostProfile);
+
+    // The handshake can take a moment (real peer) or fail (drop). Show a waiting notice during the await
+    // so the player is never staring at a blank screen with no escape (mirrors the guest command handler).
+    globalScene.ui.setMode(UiMode.MESSAGE);
+    globalScene.ui.showText(
+      i18next.t("battle:showdownWaitingForOpponent", { defaultValue: "Waiting for opponent..." }),
+      null,
+      () => {},
+      null,
+      true,
+    );
 
     let result: ShowdownNegotiationResult;
     try {
       result = await session.negotiate(manifests, ownProfile);
     } catch (err) {
       session.dispose();
-      relay.dispose();
+      disposePendingShowdownRelay();
       this.abortShowdown(
         err instanceof ShowdownNegotiationError ? showdownRejectMessage(err) : "The versus match could not start.",
       );
@@ -395,6 +416,9 @@ export class SelectStarterPhase extends Phase {
   /** Showdown 1v1 (D0): tear the versus session down and return to the title with a message. */
   private abortShowdown(message: string): void {
     endShowdownBattle();
+    // Dispose a still-pending pre-battle relay (a wager-window abort never fired onCommit, so the relay
+    // was never adopted into the match state - endShowdownBattle can't have reached it).
+    disposePendingShowdownRelay();
     clearCoopRuntime();
     globalScene.ui.setMode(UiMode.MESSAGE);
     globalScene.ui.showText(
@@ -591,6 +615,8 @@ function showdownRejectMessage(err: ShowdownNegotiationError): string {
       return "The opponent's team was rejected (illegal team).";
     case "hashMismatch":
       return "The opponent's team failed the anti-tamper check.";
+    case "timeout":
+      return "The opponent did not respond in time.";
     default:
       return "The versus match was cancelled.";
   }

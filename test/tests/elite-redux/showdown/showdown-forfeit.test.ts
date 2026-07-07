@@ -15,6 +15,7 @@ import { getGameMode } from "#app/game-mode";
 import { clearCoopRuntime, startLocalCoopSession } from "#data/elite-redux/coop/coop-runtime";
 import { beginShowdownBattle, endShowdownBattle } from "#data/elite-redux/showdown/showdown-battle-state";
 import type { ShowdownMonManifest } from "#data/elite-redux/showdown/showdown-team";
+import { Button } from "#enums/buttons";
 import { GameModes } from "#enums/game-modes";
 import { MoveId } from "#enums/move-id";
 import { SpeciesId } from "#enums/species-id";
@@ -86,18 +87,28 @@ describe.skipIf(!RUN)("Showdown forfeit flow (D4)", () => {
     expect(game.scene.ui.getMode()).toBe(UiMode.MENU);
   });
 
-  it("confirming Forfeit routes the duel to the ephemeral result and back to the title", async () => {
+  it("confirming Forfeit (driven through the real MENU + CONFIRM) routes to the result and back to title", async () => {
     startLocalCoopSession({ kind: "versus" });
     await startShowdown();
 
-    // The forfeit transition the menu's confirm runs: clear the in-flight turn, queue the ephemeral
-    // result (local loss by forfeit), and end the current battle phase so the manager runs it.
-    game.scene.phaseManager.clearPhaseQueue();
-    game.scene.phaseManager.unshiftNew("ShowdownResultPhase", false, "forfeit", false, false);
-    game.scene.phaseManager.getCurrentPhase()?.end();
+    // Answer the forfeit CONFIRM overlay YES (cursor 0) the instant it opens. The overlay is set up by
+    // the REAL MenuUiHandler.forfeitShowdown() (its confirm-prompt callback), so this drives the genuine
+    // trigger end-to-end rather than inlining the phase-queue sequence by hand.
+    game.onNextPrompt("CommandPhase", UiMode.CONFIRM, () => {
+      const confirm = game.scene.ui.getHandler();
+      confirm.setCursor(0);
+      confirm.processInput(Button.ACTION);
+    });
 
-    // Reaching ShowdownResultPhase proves the mid-battle transition; it then returns to the title
-    // WITHOUT saving (a versus match is ephemeral), so we end on TitlePhase.
+    // Open the in-battle MENU and drive the real Forfeit path: UP wraps the cursor to the enum-last
+    // FORFEIT row (shown ONLY in a live showdown battle), ACTION invokes MenuUiHandler.forfeitShowdown().
+    await game.scene.ui.setMode(UiMode.MENU);
+    const menu = game.scene.ui.getHandler();
+    menu.processInput(Button.UP);
+    menu.processInput(Button.ACTION);
+
+    // Reaching ShowdownResultPhase proves the real mid-battle forfeit transition; it then returns to the
+    // title WITHOUT saving (a versus match is ephemeral), so we end on TitlePhase.
     await game.phaseInterceptor.to("ShowdownResultPhase");
     await game.phaseInterceptor.to("TitlePhase");
     expect(game.scene.phaseManager.getCurrentPhase()?.phaseName).toBe("TitlePhase");

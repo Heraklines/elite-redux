@@ -80,7 +80,7 @@ import {
   recordReplayCommand,
 } from "#data/elite-redux/replay-recorder";
 import type { ReplayCommandKind } from "#data/elite-redux/replay-trace";
-import { getShowdownRelay } from "#data/elite-redux/showdown/showdown-battle-state";
+import { disposePendingShowdownRelay, getShowdownRelay } from "#data/elite-redux/showdown/showdown-battle-state";
 import { ShowdownLifecycle } from "#data/elite-redux/showdown/showdown-lifecycle";
 import { otherRole } from "#data/elite-redux/showdown/showdown-outcome";
 import { ShowdownSpoof } from "#data/elite-redux/showdown/showdown-spoof";
@@ -795,9 +795,15 @@ export function wireCoopStallWatchdog(
  * {@linkcode ShowdownResultPhase}. Best-effort + fully guarded so an abandonment can never crash the
  * loop. Only called from the REAL-peer rejoin-FAILURE path (a genuine WebRTC drop), never over the
  * loopback/spoof path - so it can't fire during the two-engine harness's transport teardown.
+ *
+ * Exported so the PRE-BATTLE disconnect path (a drop during the wager window: no currentBattle -> turn 0
+ * -> the void branch) is directly testable without staging a live WebRTC drop.
  */
-function routeShowdownAbandon(runtime: CoopRuntime): void {
+export function routeShowdownAbandon(runtime: CoopRuntime): void {
   try {
+    // A drop before the battle boots (during negotiate / the wager window) left a pre-battle relay
+    // pending with no live match to adopt it; dispose it here so its transport listener doesn't leak.
+    disposePendingShowdownRelay();
     const droppedRole = otherRole(runtime.controller.role); // the partner (opponent) is the one that dropped
     const turn = globalScene.currentBattle?.turn ?? 0;
     const lifecycle = new ShowdownLifecycle();

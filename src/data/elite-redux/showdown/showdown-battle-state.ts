@@ -36,6 +36,32 @@ interface ShowdownBattleState {
 let state: ShowdownBattleState | null = null;
 
 /**
+ * A relay created during the PRE-BATTLE flow (negotiate -> wager) but not yet handed to a live match.
+ * Held here so an abort / disconnect BEFORE the wager commit can dispose it - giving the relay a
+ * lifetime symmetric with the {@linkcode ShowdownSession} (which every non-commit exit already disposes).
+ * {@linkcode beginShowdownBattle} adopts it into the live state (clearing this slot without disposing);
+ * {@linkcode disposePendingShowdownRelay} tears down a still-pending relay on any non-commit exit.
+ */
+let pendingRelay: ShowdownCommandRelay | null = null;
+
+/**
+ * Stash the pre-battle relay so a pre-commit abort can dispose it. Disposes any prior pending relay we
+ * are replacing (a fresh flow supersedes an old one). Pass null to simply clear the slot.
+ */
+export function setPendingShowdownRelay(relay: ShowdownCommandRelay | null): void {
+  if (pendingRelay != null && pendingRelay !== relay) {
+    pendingRelay.dispose();
+  }
+  pendingRelay = relay;
+}
+
+/** Dispose + clear a still-pending pre-battle relay (a non-commit exit: negotiate fail / wager abandon). */
+export function disposePendingShowdownRelay(): void {
+  pendingRelay?.dispose();
+  pendingRelay = null;
+}
+
+/**
  * Begin a showdown match: stash both teams (+ the optional enemy-command relay + the opponent's
  * sanitized presentation). Idempotent overwrite (a rematch replaces the prior state). `relay` is
  * null for a host-solo bootstrap; `opponentProfile` is null when the opponent authored no profile.
@@ -46,6 +72,12 @@ export function beginShowdownBattle(
   relay: ShowdownCommandRelay | null = null,
   opponentProfile: GhostTrainerProfile | null = null,
 ): void {
+  // Adopt the pre-battle relay into the live state: clear the pending slot WITHOUT disposing the
+  // adopted relay (endShowdownBattle owns its teardown now). Dispose a stale, non-adopted pending relay.
+  if (pendingRelay != null && pendingRelay !== relay) {
+    pendingRelay.dispose();
+  }
+  pendingRelay = null;
   state = { ownManifest, opponentManifest, relay, opponentProfile };
 }
 

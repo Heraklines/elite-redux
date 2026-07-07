@@ -80,6 +80,7 @@ export class ShowdownSpoof {
   private readonly transport: CoopTransport;
   private readonly offTrigger: () => void;
   private begun = false;
+  private disposed = false;
 
   constructor(transport: CoopTransport) {
     this.transport = transport;
@@ -115,6 +116,11 @@ export class ShowdownSpoof {
       this.session
         .negotiate(this.team, null)
         .then(() => {
+          // The negotiate promise settles asynchronously; if we were disposed meanwhile (teardown /
+          // abort), the transport + rendezvous are already torn down, so DO NOT send onto a dead channel.
+          if (this.disposed) {
+            return;
+          }
           this.transport.send({
             t: "showdownStakeOffer",
             offer: { speciesId: 0, shiny: false, variant: 0, erBlackShiny: false, cost: 0 },
@@ -129,6 +135,7 @@ export class ShowdownSpoof {
   }
 
   dispose(): void {
+    this.disposed = true;
     this.offTrigger();
     this.session.dispose();
     this.relay.dispose();

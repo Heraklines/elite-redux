@@ -37,7 +37,7 @@
 // =============================================================================
 
 import { canonicalize, fnv1a64 } from "#data/elite-redux/coop/coop-battle-checksum";
-import { CoopRendezvous } from "#data/elite-redux/coop/coop-rendezvous";
+import { CoopRendezvous, getCoopRendezvousWaitMs } from "#data/elite-redux/coop/coop-rendezvous";
 import type { CoopMessage, CoopTransport } from "#data/elite-redux/coop/coop-transport";
 import { type GhostTrainerProfile, sanitizeGhostProfile } from "#data/elite-redux/er-ghost-profile";
 import { isMegaStage } from "#data/elite-redux/showdown/showdown-evolutions";
@@ -62,7 +62,18 @@ export const SHOWDOWN_WAGER_COMMIT_POINT = "showdown-wager-commit";
 export type IsMegaFormPredicate = (speciesId: number, formIndex: number) => boolean;
 
 /** Why a showdown negotiation rejected (surfaced to the UI / result flow). */
-export type ShowdownRejectReason = "illegalTeam" | "hashMismatch" | "void";
+export type ShowdownRejectReason = "illegalTeam" | "hashMismatch" | "void" | "timeout";
+
+/**
+ * Default whole-handshake anti-strand timeout: reuses the co-op rendezvous wait convention
+ * ({@linkcode getCoopRendezvousWaitMs} - 60s live, ~50ms under vitest) so a peer that never
+ * completes the exchange (drops between connect and team-send, or never crosses the ready
+ * barrier) rejects "timeout" instead of stranding the caller forever. Injectable for tests.
+ */
+function defaultSchedule(cb: () => void, ms: number): () => void {
+  const id = setTimeout(cb, ms);
+  return () => clearTimeout(id);
+}
 
 /** A rejected negotiation carries the reason + (for a local rule failure) the violations. */
 export class ShowdownNegotiationError extends Error {
@@ -106,6 +117,14 @@ export interface ShowdownSessionOptions {
    * the same transport when omitted (engine-free tests / a standalone negotiation).
    */
   rendezvous?: CoopRendezvous;
+  /**
+   * Whole-handshake timeout (ms) before {@linkcode ShowdownSession.negotiate} rejects "timeout".
+   * Covers BOTH the team-exchange step AND the ready barrier. Defaults to
+   * {@linkcode getCoopRendezvousWaitMs} (60s live / ~50ms under vitest).
+   */
+  timeoutMs?: number;
+  /** Timer injection (tests). Returns a cancel fn. Defaults to setTimeout/clearTimeout. */
+  schedule?: (cb: () => void, ms: number) => () => void;
 }
 
 /**
@@ -147,6 +166,10 @@ export class ShowdownSession {
   private readonly rendezvous: CoopRendezvous;
   private readonly ownsRendezvous: boolean;
   private readonly offMessage: () => void;
+  private readonly timeoutMs: number;
+  private readonly schedule: (cb: () => void, ms: number) => () => void;
+  /** Cancels the in-flight whole-handshake timeout (no-op until {@linkcode negotiate} arms it). */
+  private cancelTimeout: () => void = () => {};
 
   /** The opponent's received team, or null until `showdownTeam` arrives. */
   private opponentManifest: ShowdownMonManifest[] | null = null;
@@ -172,6 +195,8 @@ export class ShowdownSession {
     this.isMegaForm = opts.isMegaForm ?? isMegaStage;
     this.ownsRendezvous = opts.rendezvous == null;
     this.rendezvous = opts.rendezvous ?? new CoopRendezvous(transport);
+    this.timeoutMs = opts.timeoutMs ?? getCoopRendezvousWaitMs();
+    this.schedule = opts.schedule ?? defaultSchedule;
     this.offMessage = transport.onMessage(msg => this.handle(msg));
   }
 
@@ -193,6 +218,14 @@ export class ShowdownSession {
     const promise = new Promise<ShowdownNegotiationResult>((resolve, reject) => {
       this.settle = { resolve, reject, ownManifest };
     });
+    // Arm the whole-handshake anti-strand timeout FIRST (covers team-exchange AND the ready barrier):
+    // if the peer never completes the exchange or never crosses the barrier, reject "timeout" so the
+    // caller surfaces a message + escapes rather than stranding forever. Cancelled on any settle/dispose.
+    this.cancelTimeout = this.schedule(() => {
+      this.finishReject(
+        new ShowdownNegotiationError("timeout", `showdown negotiation timed out after ${this.timeoutMs}ms`),
+      );
+    }, this.timeoutMs);
     // Defensive FORMAT self-check before shipping our team (the collection legality was
     // already checked against our OWN unlocks at team-build; this is the cheap structural
     // guard - team size / level / item / mega / IVs / duplicates). A structurally-broken
@@ -216,6 +249,7 @@ export class ShowdownSession {
 
   /** Stop listening to the transport and drop any pending negotiation. */
   dispose(): void {
+    this.cancelTimeout();
     this.offMessage();
     if (this.ownsRendezvous) {
       this.rendezvous.dispose();
@@ -306,6 +340,7 @@ export class ShowdownSession {
     if (settle == null || this.done) {
       return;
     }
+    this.cancelTimeout();
     this.done = true;
     this.settle = null;
     settle.resolve(result);
@@ -316,6 +351,7 @@ export class ShowdownSession {
     if (settle == null || this.done) {
       return;
     }
+    this.cancelTimeout();
     this.done = true;
     this.settle = null;
     settle.reject(error);

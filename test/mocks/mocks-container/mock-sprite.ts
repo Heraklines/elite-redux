@@ -34,6 +34,10 @@ export class MockSprite implements MockGameObject {
     this.pipelineData = {};
     this.texture = {
       key: texture || "",
+      // Phaser.Textures.Texture.has(frameName): whether the atlas holds that frame. Headless has no real
+      // atlas, so report "absent" - callers that probe a specific frame (e.g. an icon variant-missing
+      // fallback) then take their base-frame branch instead of throwing on a missing method.
+      has: (_frame?: string | number) => false,
     };
     this.anims = {
       pause: () => null,
