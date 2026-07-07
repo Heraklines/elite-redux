@@ -1978,6 +1978,19 @@ function readFullMon(mon: Pokemon): CoopFullMonSnapshot {
 }
 
 /**
+ * #838 UNIFY: the id-based authoritative full-state for a CROSSING / RESYNC / ME-terminal context, with
+ * `pokeballCounts` STRIPPED. The unified apply ({@linkcode applyCoopAuthoritativeBattleState}) SETs balls
+ * from this payload, but the resync/ME path must NOT (#843): a crossing SET raced a between-wave ball
+ * grant and drifted the guest ABOVE the host. Balls converge ONLY through the per-turn end-of-turn state
+ * (the sanctioned carrier), so this variant carries an empty ball list (the apply's `?? []` guard then
+ * skips the ball SET). Returns null on a capture failure (duplicate ids) so the legacy fallback still runs.
+ */
+function captureCoopResyncAuthoritativeState(): CoopAuthoritativeBattleStateV1 | undefined {
+  const state = captureCoopAuthoritativeBattleState(globalScene.currentBattle?.turn ?? 0);
+  return state == null ? undefined : { ...state, pokeballCounts: [] };
+}
+
+/**
  * HOST: serialize the FULL authoritative battle state to heal a guest desync (#633,
  * TRACK-2). Carries every detail the per-turn checkpoint can't: ability, form, per-move
  * PP, battler tags, arena tags, party order, money, modifier stacks. Returns null when
@@ -2039,6 +2052,12 @@ export function captureCoopFullSnapshot(): CoopFullBattleSnapshot | null {
       // drift here (via erMapState) but no heal carried it; the gated guest heal restores it through
       // restoreErBiomeStructure. Captured unconditionally (additive); only READ in the gated heal.
       erBiomeStructure: { biomeLength: getErBiomeLength(), biomeStartWave: getErBiomeStartWave() },
+      // #838 UNIFY: the id-based authoritative full-state (whole party as PokemonData, seating, arena,
+      // modifiers, money, ER substrates). When present the guest heals via applyCoopAuthoritativeBattleState
+      // (mutate-in-place by Pokemon.id) instead of the legacy species-order + benchParty reconcile above -
+      // a strict superset of those fields. `?? undefined` keeps the wire field ABSENT on a capture failure
+      // (duplicate ids) so the legacy fallback still runs.
+      authoritativeState: captureCoopResyncAuthoritativeState(),
     };
   } catch {
     return null;
@@ -3386,6 +3405,21 @@ export function applyCoopFullSnapshot(
   authoritativeGuest = false,
   suppressResummon = false,
 ): void {
+  // #838 UNIFY: an AUTHORITATIVE GUEST adopting a modern host's id-based authoritative full-state uses the
+  // SAME apply the live turns use (mutate-in-place by Pokemon.id, reconstruct/remove by id, adopt host party
+  // order, instance-keyed modifiers, render differ) - a strict SUPERSET of the legacy species-order +
+  // benchParty reconcile below, so that whole legacy path is skipped. It gates on its OWN monotonic tick
+  // (authoritativeState.tick), so the snapshot.tick check is not needed here. suppressResummon is irrelevant
+  // (the differ's re-summon is sprite-key-gated / flicker-free). The `authoritativeGuest` GATE preserves the
+  // legacy defensive no-op for a NON-authoritative (host / solo / lockstep) apply, which the id-based apply -
+  // that mutates by id unconditionally - would otherwise violate; production only ever applies as the guest.
+  // The resync/ME authoritativeState is captured with pokeballCounts STRIPPED (#843): balls converge ONLY
+  // through the per-turn end-of-turn state, never a crossing/resync SET that races a between-wave ball grant.
+  if (snapshot.authoritativeState !== undefined && authoritativeGuest) {
+    applyCoopAuthoritativeBattleState(snapshot.authoritativeState, authoritativeGuest);
+    return;
+  }
+  // ---- Legacy fallback: a NON-authoritative apply, an OLDER host, or a field-less capture. ----
   // #807: reject out-of-order/stale state (standard snapshot sequencing).
   if (!coopAcceptStateTick(snapshot.tick, "fullSnapshot")) {
     return;
@@ -4209,29 +4243,42 @@ export function captureCoopMeOutcome(): Extract<CoopInteractionOutcome, { k: "me
     seed: globalScene.seed,
     waveSeed: globalScene.waveSeed,
     dex: captureCoopDexDelta(),
+    // #838 UNIFY: the id-based authoritative full-state (captured off-field too, unlike `base` which is
+    // null with no live field). The guest adopts THIS instead of the species-based `party` reconcile.
+    // Balls stripped (#843) - the ME terminal is a crossing context, so balls stay per-turn-only.
+    authoritativeState: captureCoopResyncAuthoritativeState(),
   };
 }
 
 /**
- * GUEST: adopt the host's comprehensive ME-terminal resync (#633, P4). Applies the full-battle
- * snapshot (existing covered fields), then reconciles the party FIELD-BY-FIELD onto live objects,
- * replaces the ME-save events wholesale (plain data), restores the RNG cursor so the guest's seed
- * pointer matches after the host alone consumed `randSeedInt`, and merges the dex / starter blob.
- * Fully guarded as a WHOLE so a partial-blob apply can never hang or crash the guest - the per-turn
- * checksum re-syncs any residual drift.
- *
- * DEFERRED (#633 RISKY B4): this calls {@linkcode applyCoopFullSnapshot}`(o.base)` with `authoritativeGuest`
- * defaulting to `false` (the engine must NOT import the runtime to compute the gate - that is an import
- * cycle), so the new ON-FIELD held-item heal (#1/#2/#3) and ball-count heal (#4) do NOT fire at the ME
- * terminal; they heal on the NEXT per-turn checkpoint resync instead. Threading an `authoritativeGuest`
- * param through here from a cycle-free caller is a separate follow-up, not this batch.
+ * GUEST: adopt the host's comprehensive ME-terminal resync (#633, P4). #838 UNIFY: a modern host carries
+ * the id-based authoritative full-state, so the guest converges the party / field / arena / modifiers /
+ * ER substrates through {@linkcode applyCoopAuthoritativeBattleState} (mutate-in-place by `Pokemon.id`) -
+ * the same apply the live turns use - instead of the legacy species-based party reconcile. It then
+ * replaces the ME-save events wholesale (plain data), restores the RNG cursor so the guest's seed pointer
+ * matches after the host alone consumed `randSeedInt`, and merges the dex / starter blob. `authoritativeGuest`
+ * is passed `true` (applyCoopMeOutcome is definitionally the guest adopting the host's terminal, so no
+ * runtime import is needed to compute the gate), so the full held-item / enemy-boss reconcile that the old
+ * `base`-with-false path deferred now runs here. Falls back to `base` + the species party apply only for an
+ * older host that omits `authoritativeState`. Fully guarded as a WHOLE so a partial-blob apply can never
+ * hang or crash the guest - the per-turn checksum re-syncs any residual drift.
  */
 export function applyCoopMeOutcome(o: Extract<CoopInteractionOutcome, { k: "meResync" }>): void {
   try {
-    if (o.base != null) {
-      applyCoopFullSnapshot(o.base);
+    // #838 UNIFY: a modern host carries the id-based authoritative full-state (captured off-field too).
+    // Adopt it via the SAME apply the live turns use - mutate-in-place by Pokemon.id, reconstruct/remove
+    // by id, adopt host party order - replacing the legacy species-based `applyCoopMePartyFromData` + the
+    // `base` species-order/benchParty heal. authoritativeGuest=true: applyCoopMeOutcome is definitionally
+    // the GUEST adopting the host's ME terminal (no runtime import needed to know that), so the full
+    // modifier / enemy-boss reconcile runs. Falls back to base + species party only for an older host.
+    if (o.authoritativeState === undefined) {
+      if (o.base != null) {
+        applyCoopFullSnapshot(o.base);
+      }
+      applyCoopMePartyFromData(o.party);
+    } else {
+      applyCoopAuthoritativeBattleState(o.authoritativeState, true);
     }
-    applyCoopMePartyFromData(o.party);
     // mysteryEncounterSaveData: replace encounteredEvents wholesale (it is plain data).
     if (typeof o.meSaveData === "string" && o.meSaveData.length > 0) {
       globalScene.mysteryEncounterSaveData.encounteredEvents = JSON.parse(o.meSaveData);

@@ -187,7 +187,17 @@ describe.skipIf(!RUN)("co-op ME outcome resync (#633, CHANGE-4 / P4) - live capt
     const full = captureCoopMeOutcome();
     expect(full.party.length).toBe(3);
     const targetLen = Math.max(2, onField);
-    const shrunk = { ...full, party: full.party.slice(0, targetLen) };
+    // #838 UNIFY: the guest now converges the ME party via the id-based authoritativeState apply (remove
+    // extra ids), not the species-based `party` reconcile - so model the host SHRINK on BOTH the legacy
+    // `party` (older-host fallback) AND `authoritativeState.playerParty` (the id-based path the guest uses).
+    const shrunk = {
+      ...full,
+      party: full.party.slice(0, targetLen),
+      authoritativeState:
+        full.authoritativeState === undefined
+          ? undefined
+          : { ...full.authoritativeState, playerParty: full.authoritativeState.playerParty.slice(0, targetLen) },
+    };
 
     const survivingSpecies = scene
       .getPlayerParty()

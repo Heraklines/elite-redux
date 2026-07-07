@@ -468,6 +468,14 @@ export interface CoopFullBattleSnapshot {
    * it and the guest leaves its biome-structure alone.
    */
   erBiomeStructure?: { biomeLength: number | null; biomeStartWave: number } | undefined;
+  /**
+   * #838 UNIFY: the id-based authoritative full-state. When present the guest adopts THIS via the same
+   * apply the live turns use (mutate-in-place by `Pokemon.id`, reconstruct/remove by id, adopt host party
+   * order, instance-keyed modifiers) instead of the legacy species-order + benchParty reconcile the rest
+   * of this payload feeds. A strict superset of the legacy party/field/modifier fields above (which stay
+   * for an older host / a field-less capture). Optional + additive.
+   */
+  authoritativeState?: CoopAuthoritativeBattleStateV1 | undefined;
 }
 
 /**
@@ -642,6 +650,14 @@ export type CoopInteractionOutcome =
       seed: string;
       waveSeed: string;
       dex: string;
+      /**
+       * #838 UNIFY: the id-based authoritative full-state (captured off-field too, unlike `base`). When
+       * present the guest adopts the ME-terminal party / field / arena / modifiers / substrates via the
+       * SAME apply the live turns use (mutate-in-place by `Pokemon.id`), replacing the species-based
+       * `party` reconcile + `base` species-order/benchParty heal. Optional + additive: an older host omits
+       * it and the guest falls back to `base` + `party`.
+       */
+      authoritativeState?: CoopAuthoritativeBattleStateV1 | undefined;
     }
   /**
    * Co-op AUTHORITATIVE move-learn forward (#633 BUG3+5): the HOST is the sole engine, but a
