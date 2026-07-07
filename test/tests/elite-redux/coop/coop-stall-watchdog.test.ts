@@ -92,6 +92,44 @@ describe("#806 stall watchdog end-to-end (keepalive + mutual-wait detection + re
     expect(guestResolved, "guest's parked wait was cancelled by recovery").toBe(true);
   });
 
+  it("#857 R2: idle keepalive pings are NOT a deadlock signal (idle channel + pings -> watchdog never fires)", async () => {
+    const a = new MockWire();
+    const b = new MockWire();
+    a.peer = b;
+    b.peer = a;
+    const hostT = new WebRtcTransport("host", a);
+    const guestT = new WebRtcTransport("guest", b);
+    const hostRelay = new CoopInteractionRelay(hostT);
+    const guestRelay = new CoopInteractionRelay(guestT);
+    const stubRuntime = { controller: { versionMismatch: false } } as unknown as CoopRuntime;
+    wireCoopStallWatchdog(hostT, hostRelay, idleStream, stubRuntime);
+    wireCoopStallWatchdog(guestT, guestRelay, idleStream, stubRuntime);
+
+    // BOTH peers keep the idle channel warm with #857 keepalive pings (the two-humans-parked-at-the-
+    // pre-battle-barrier shape), but NEITHER is in a network wait. Pings are transport-internal and must
+    // never be miscounted as liveness/deadlock traffic - the watchdog must stay quiet through them.
+    hostT.startKeepalive(5_000);
+    guestT.startKeepalive(5_000);
+
+    // Park a lone one-sided wait so there IS something recovery would wrongly cancel if it fired.
+    const hostWait = hostRelay.awaitInteractionChoice(444_444, 1_200_000);
+    let resolved = false;
+    void hostWait.then(() => {
+      resolved = true;
+    });
+
+    // A full minute of keepalive pings + a one-sided wait: no mutual deadlock -> recovery never fires.
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(resolved, "idle keepalive pings never trip the stall watchdog").toBe(false);
+
+    // The peer eventually answers like a human would: the wait resolves normally (channel stayed healthy).
+    guestRelay.sendInteractionChoice(444_444, "test", 7);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(resolved).toBe(true);
+    expect(hostT.state).toBe("connected");
+    expect(guestT.state).toBe("connected");
+  });
+
   it("one-sided waiting never triggers (a human browsing a shop is not a deadlock)", async () => {
     const a = new MockWire();
     const b = new MockWire();

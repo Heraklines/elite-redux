@@ -271,8 +271,12 @@ export class WebRtcTransport implements CoopTransport {
  * Adapt a real {@linkcode RTCDataChannel} into a {@linkcode WebRtcTransport}. Call
  * this once the signaling handshake has produced an open (or opening) data channel.
  */
-export function webRtcTransportFromChannel(role: CoopRole, channel: RTCDataChannel): WebRtcTransport {
-  const transport = new WebRtcTransport(role, wireFromRtcChannel(role, channel));
+export function webRtcTransportFromChannel(
+  role: CoopRole,
+  channel: RTCDataChannel,
+  pc?: RTCPeerConnection,
+): WebRtcTransport {
+  const transport = new WebRtcTransport(role, wireFromRtcChannel(role, channel, pc));
   // #857: keep the real (live-network) channel warm so a long idle wait can't trip the ICE consent /
   // NAT-binding timeout and start the reconnect flap. The keepalive lives on the transport INSTANCE,
   // so it persists across #805 hot-rejoin replaceChannel swaps and is cancelled on close().
@@ -284,8 +288,17 @@ export function webRtcTransportFromChannel(role: CoopRole, channel: RTCDataChann
  * Adapt a raw RTCDataChannel to the {@linkcode CoopWireChannel} surface. Factored out of
  * {@linkcode webRtcTransportFromChannel} so hot rejoin (#805) can wrap a freshly re-dialed
  * channel and {@linkcode WebRtcTransport.replaceChannel} it into the LIVE transport.
+ *
+ * #857 (round 2 - the intermittent FLAP): the owning {@linkcode RTCPeerConnection} is bound here so
+ * closing the wire ALSO closes its pc. Each #805 hot rejoin dials a FRESH pc
+ * ({@linkcode exchangeAndOpenChannel}); before this, {@linkcode WebRtcTransport.replaceChannel} closed
+ * only the superseded data CHANNEL and the old pc was never closed - so every rejoin LEAKED a live
+ * ICE/DTLS/TURN session, and a superseded (zombie) pc's teardown landed a
+ * "User-Initiated Abort, reason=Close called" onto the freshly-established channel ~1s after it opened,
+ * dropping it and re-triggering the rejoin: a permanent disconnect/reconnect flap. Retiring the pc with
+ * its wire fully removes the zombie so it can't abort the live connection.
  */
-export function wireFromRtcChannel(role: CoopRole, channel: RTCDataChannel): CoopWireChannel {
+export function wireFromRtcChannel(role: CoopRole, channel: RTCDataChannel, pc?: RTCPeerConnection): CoopWireChannel {
   // #857: capture the raw channel error message so the transport can surface the DROP REASON on the
   // reconnect banner (previously log-only, then discarded). Still logged for the captured console.
   let lastError: string | undefined;
@@ -302,7 +315,21 @@ export function wireFromRtcChannel(role: CoopRole, channel: RTCDataChannel): Coo
       return lastError;
     },
     send: data => channel.send(data),
-    close: () => channel.close(),
+    close: () => {
+      // #857 R2: retire the data channel AND its owning peer connection together. replaceChannel closes
+      // the SUPERSEDED wire on every rejoin; without also closing the pc, the old connection stayed
+      // alive (holding ICE/DTLS/TURN) and its teardown aborted the fresh channel -> the reconnect flap.
+      try {
+        channel.close();
+      } catch {
+        /* the channel may already be closed */
+      }
+      try {
+        pc?.close();
+      } catch {
+        /* the pc may already be closed */
+      }
+    },
     onMessage: handler => {
       channel.addEventListener("message", ev => handler(String(ev.data)));
     },

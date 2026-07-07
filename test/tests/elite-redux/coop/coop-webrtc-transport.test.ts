@@ -12,7 +12,12 @@ import { CoopInteractionRelay } from "#data/elite-redux/coop/coop-interaction-re
 import { CoopSessionController } from "#data/elite-redux/coop/coop-session-controller";
 import type { CoopConnectionState, CoopMessage } from "#data/elite-redux/coop/coop-transport";
 import { COOP_PROTOCOL_VERSION } from "#data/elite-redux/coop/coop-transport";
-import { COOP_KEEPALIVE_MS, type CoopWireChannel, WebRtcTransport } from "#data/elite-redux/coop/coop-webrtc-transport";
+import {
+  COOP_KEEPALIVE_MS,
+  type CoopWireChannel,
+  WebRtcTransport,
+  wireFromRtcChannel,
+} from "#data/elite-redux/coop/coop-webrtc-transport";
 import { describe, expect, it, vi } from "vitest";
 
 /** In-process mock of a data channel implementing {@linkcode CoopWireChannel}.
@@ -309,6 +314,52 @@ describe("hot rejoin (#805): replaceChannel swaps a fresh wire into the LIVE tra
     expect(guestGot.filter(t => t === "waveResolved").length).toBe(1);
     hostWireA.close();
     expect(host.state).toBe("connected");
+  });
+});
+
+describe("#857 R2 (intermittent flap): the hot-rejoin transport retires the SUPERSEDED RTCPeerConnection", () => {
+  // Minimal duck-typed stand-ins for the real DOM RTC objects (browser-only; not constructible headless).
+  // wireFromRtcChannel only touches these members, so a structural fake exercises the close path exactly.
+  function fakeChannel(log: string[], readyState = "open"): RTCDataChannel {
+    return {
+      readyState,
+      send: (d: string) => log.push(`ch.send:${d}`),
+      close: () => log.push("ch.close"),
+      addEventListener: (type: string) => log.push(`ch.on:${type}`),
+    } as unknown as RTCDataChannel;
+  }
+  function fakePc(log: string[]): RTCPeerConnection {
+    return {
+      close: () => log.push("pc.close"),
+    } as unknown as RTCPeerConnection;
+  }
+
+  it("REGRESSION (flap root): closing a wire closes BOTH the data channel and its OWNING pc (no leaked zombie pc)", () => {
+    const log: string[] = [];
+    const wire = wireFromRtcChannel("host", fakeChannel(log), fakePc(log));
+
+    // Superseding a wire (what replaceChannel does to the OLD wire on every #805 hot rejoin) must retire
+    // the pc too. Before the fix the pc was never closed -> it stayed live (ICE/DTLS/TURN) and a superseded
+    // (zombie) pc later aborted the fresh channel ("User-Initiated Abort, reason=Close called") -> the flap.
+    wire.close();
+    expect(log).toContain("ch.close");
+    expect(log).toContain("pc.close");
+  });
+
+  it("replaceChannel retires the OLD generation's pc and leaves the NEW one live (the leak that caused the flap)", () => {
+    const oldLog: string[] = [];
+    const newLog: string[] = [];
+    const transport = new WebRtcTransport("host", wireFromRtcChannel("host", fakeChannel(oldLog), fakePc(oldLog)));
+    expect(transport.state).toBe("connected");
+
+    // Hot rejoin (#805): a freshly-dialed channel+pc swaps into the LIVE transport in place.
+    transport.replaceChannel(wireFromRtcChannel("host", fakeChannel(newLog), fakePc(newLog)));
+    expect(transport.state).toBe("connected");
+
+    // The superseded pc is fully retired (before the fix it leaked and later aborted the live channel)...
+    expect(oldLog).toContain("pc.close");
+    // ...and the live pc is untouched (still carrying the session).
+    expect(newLog).not.toContain("pc.close");
   });
 });
 

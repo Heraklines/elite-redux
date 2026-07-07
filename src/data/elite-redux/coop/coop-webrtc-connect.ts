@@ -221,7 +221,11 @@ export interface CoopConnectOptions {
  * host = offerer, guest = answerer. Resolves with the open RTCDataChannel. Shared
  * by every connect entrypoint (manual host/guest + matchmaking).
  */
-async function exchangeAndOpenChannel(code: string, role: CoopRole, ice?: CoopIceConfig): Promise<RTCDataChannel> {
+async function exchangeAndOpenChannel(
+  code: string,
+  role: CoopRole,
+  ice?: CoopIceConfig,
+): Promise<{ channel: RTCDataChannel; pc: RTCPeerConnection }> {
   coopLog("launch", `exchange SDP start code=${code} role=${role} (ice=${ice ? "override" : "fetched"})`);
   const iceServers = ice ? buildIceServers(ice) : await fetchIceServers();
   const pc = new RTCPeerConnection({ iceServers });
@@ -232,38 +236,51 @@ async function exchangeAndOpenChannel(code: string, role: CoopRole, ice?: CoopIc
     coopLog("launch", `pcConnectionState=${pc.connectionState} code=${code} role=${role}`);
   });
 
-  if (role === "host") {
-    const channel = pc.createDataChannel("coop", { ordered: true });
-    const offer = await pc.createOffer();
-    await pc.setLocalDescription(offer);
-    await waitForIceComplete(pc);
-    coopLog("launch", `host pushing offer code=${code} (ICE gathered)`);
-    await pushSignal(code, "host", JSON.stringify(pc.localDescription));
+  // #857 R2: hand the caller BOTH the channel and its owning pc so the transport can close the pc when
+  // this connection is superseded on a hot rejoin (#805). Leaking the pc left a zombie that aborted the
+  // next channel -> the flap. On ANY failure before the channel opens, close the pc here (an aborted
+  // attempt must not leak its own pc either).
+  try {
+    if (role === "host") {
+      const channel = pc.createDataChannel("coop", { ordered: true });
+      const offer = await pc.createOffer();
+      await pc.setLocalDescription(offer);
+      await waitForIceComplete(pc);
+      coopLog("launch", `host pushing offer code=${code} (ICE gathered)`);
+      await pushSignal(code, "host", JSON.stringify(pc.localDescription));
 
-    const answer = await pollPeerSignal(code, "host");
-    coopLog("launch", `host received answer code=${code} -> setRemoteDescription`);
-    await pc.setRemoteDescription(JSON.parse(answer) as RTCSessionDescriptionInit);
-    return waitForChannelOpen(channel);
-  }
+      const answer = await pollPeerSignal(code, "host");
+      coopLog("launch", `host received answer code=${code} -> setRemoteDescription`);
+      await pc.setRemoteDescription(JSON.parse(answer) as RTCSessionDescriptionInit);
+      return { channel: await waitForChannelOpen(channel), pc };
+    }
 
-  const channelPromise = new Promise<RTCDataChannel>(resolve => {
-    pc.addEventListener("datachannel", ev => {
-      coopLog(
-        "launch",
-        `guest datachannel event label=${ev.channel.label} state=${ev.channel.readyState} code=${code}`,
-      );
-      resolve(ev.channel);
+    const channelPromise = new Promise<RTCDataChannel>(resolve => {
+      pc.addEventListener("datachannel", ev => {
+        coopLog(
+          "launch",
+          `guest datachannel event label=${ev.channel.label} state=${ev.channel.readyState} code=${code}`,
+        );
+        resolve(ev.channel);
+      });
     });
-  });
-  const offer = await pollPeerSignal(code, "guest");
-  coopLog("launch", `guest received offer code=${code} -> answering`);
-  await pc.setRemoteDescription(JSON.parse(offer) as RTCSessionDescriptionInit);
-  const answer = await pc.createAnswer();
-  await pc.setLocalDescription(answer);
-  await waitForIceComplete(pc);
-  coopLog("launch", `guest pushing answer code=${code} (ICE gathered)`);
-  await pushSignal(code, "guest", JSON.stringify(pc.localDescription));
-  return waitForChannelOpen(await channelPromise);
+    const offer = await pollPeerSignal(code, "guest");
+    coopLog("launch", `guest received offer code=${code} -> answering`);
+    await pc.setRemoteDescription(JSON.parse(offer) as RTCSessionDescriptionInit);
+    const answer = await pc.createAnswer();
+    await pc.setLocalDescription(answer);
+    await waitForIceComplete(pc);
+    coopLog("launch", `guest pushing answer code=${code} (ICE gathered)`);
+    await pushSignal(code, "guest", JSON.stringify(pc.localDescription));
+    return { channel: await waitForChannelOpen(await channelPromise), pc };
+  } catch (e) {
+    try {
+      pc.close();
+    } catch {
+      /* the pc may already be closed */
+    }
+    throw e;
+  }
 }
 
 /**
@@ -293,8 +310,8 @@ function makeCoopRejoinDriver(
       attempt++;
       coopLog("launch", `rejoin attempt ${attempt} code=${code} role=${role} elapsed=${Date.now() - startedAt}ms`);
       try {
-        const channel = await exchangeAndOpenChannel(code, role, ice);
-        transport.replaceChannel(wireFromRtcChannel(role, channel));
+        const { channel, pc } = await exchangeAndOpenChannel(code, role, ice);
+        transport.replaceChannel(wireFromRtcChannel(role, channel, pc));
         coopLog("launch", `rejoin SUCCESS attempt=${attempt} code=${code} role=${role}`);
         return true;
       } catch (e) {
@@ -317,8 +334,8 @@ export async function connectCoopWithCode(
     throw new Error("coop networking is not configured (VITE_COOP_SERVER_URL unset)");
   }
   coopLog("launch", `connectCoopWithCode code=${code} role=${role} username=${opts.username ?? "(default)"}`);
-  const channel = await exchangeAndOpenChannel(code, role, opts.ice);
-  const transport = webRtcTransportFromChannel(role, channel);
+  const { channel, pc } = await exchangeAndOpenChannel(code, role, opts.ice);
+  const transport = webRtcTransportFromChannel(role, channel, pc);
   const runtime = connectCoopSession(transport, { username: opts.username });
   runtime.rejoinDriver = makeCoopRejoinDriver(code, role, transport, opts.ice);
   return runtime;
@@ -345,8 +362,8 @@ export async function connectCoopAsHost(
   // rest of this function blocks waiting for the guest to connect.
   opts.onCode?.(code);
 
-  const channel = await exchangeAndOpenChannel(code, "host", opts.ice);
-  const transport = webRtcTransportFromChannel("host", channel);
+  const { channel, pc } = await exchangeAndOpenChannel(code, "host", opts.ice);
+  const transport = webRtcTransportFromChannel("host", channel, pc);
   const runtime = connectCoopSession(transport, { username: opts.username });
   runtime.rejoinDriver = makeCoopRejoinDriver(code, "host", transport, opts.ice);
   coopLog("launch", `host session live code=${code}`);
@@ -365,8 +382,8 @@ export async function connectCoopAsGuest(code: string, opts: CoopConnectOptions 
   }
   coopLog("launch", `connectCoopAsGuest code=${code} username=${opts.username ?? "(default)"}`);
   await postJson("/coop/join", { code, guest: opts.username ?? "Player 2" });
-  const channel = await exchangeAndOpenChannel(code, "guest", opts.ice);
-  const transport = webRtcTransportFromChannel("guest", channel);
+  const { channel, pc } = await exchangeAndOpenChannel(code, "guest", opts.ice);
+  const transport = webRtcTransportFromChannel("guest", channel, pc);
   const runtime = connectCoopSession(transport, { username: opts.username });
   runtime.rejoinDriver = makeCoopRejoinDriver(code, "guest", transport, opts.ice);
   return runtime;
