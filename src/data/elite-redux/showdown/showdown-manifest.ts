@@ -76,6 +76,34 @@ export function starterToManifest(starter: Starter, _gameData: ShowdownUnlockGam
  * the caught/variant DexAttr bits) so the gate accepts exactly what the player owns.
  */
 export function buildUnlockSnapshot(gameData: ShowdownUnlockGameData): UnlockSnapshot {
+  // B7 item 7 (live blocker): ability + egg-move unlocks are POOLED under the evolution
+  // line's absolute root in `starterData`, exactly as `GameData.getStarterDataEntry` does
+  // (`getRootStarterSpeciesId` -> ER-mega base -> `getRootSpeciesId()` walk to the baby root),
+  // so a line whose grid starter is NOT its own pooling root (a baby pre-evo like Pichu /
+  // Cleffa, or an ER-mega base) keeps its ability unlocks under a DIFFERENT `starterData` key.
+  // Reading `starterData[rootSpeciesId]` raw (the grid pick) then finds an empty entry and
+  // false-rejects a legitimately-owned ability ("Ability N is not unlocked"). Normalize the
+  // `starterData` key to the same pooling root the picker read from. Pure: mirrors the walk
+  // over `pokemonPrevolutions` (+ the ER-mega base hop) with no engine lookup. (The AbilityAttr
+  // BIT mapping `1 << abilityIndex` is already canonical - `PokemonSpecies` normalizes an empty
+  // second ability slot to a duplicate of ability 1, so the hidden ability always sits at index
+  // 2 with the ABILITY_HIDDEN bit, and the encoder in `setPokemonCaught` stores `1 << index`.)
+  const starterRootCache = new Map<number, number>();
+  const starterRoot = (rootSpeciesId: number): number => {
+    const cached = starterRootCache.get(rootSpeciesId);
+    if (cached !== undefined) {
+      return cached;
+    }
+    let cur = erMegaTargetToBaseSpeciesId(rootSpeciesId) ?? rootSpeciesId;
+    const seen = new Set<number>();
+    while (pokemonPrevolutions[cur] !== undefined && !seen.has(cur)) {
+      seen.add(cur);
+      cur = pokemonPrevolutions[cur];
+    }
+    starterRootCache.set(rootSpeciesId, cur);
+    return cur;
+  };
+
   // Memoize the per-(root, fielded-species) legal-move set: `isMoveLegal` is called once
   // per move on the team, so without this the full learnset + egg tables are rescanned for
   // every move. Keyed by BOTH ids because legality now depends on the FIELDED stage's
@@ -110,8 +138,9 @@ export function buildUnlockSnapshot(gameData: ShowdownUnlockGameData): UnlockSna
       return (caughtAttr & variantBit) !== 0n;
     },
     isAbilityUnlocked(rootSpeciesId, abilityIndex) {
-      // AbilityAttr: ABILITY_1=1<<0, ABILITY_2=1<<1, ABILITY_HIDDEN=1<<2.
-      const abilityAttr = gameData.starterData[rootSpeciesId]?.abilityAttr ?? 0;
+      // AbilityAttr: ABILITY_1=1<<0, ABILITY_2=1<<1, ABILITY_HIDDEN=1<<2. Read the entry under
+      // the POOLING root (see `starterRoot`), where the game stores the unlock, not the raw grid pick.
+      const abilityAttr = gameData.starterData[starterRoot(rootSpeciesId)]?.abilityAttr ?? 0;
       return (abilityAttr & (1 << abilityIndex)) !== 0;
     },
     isNatureUnlocked(rootSpeciesId, nature) {

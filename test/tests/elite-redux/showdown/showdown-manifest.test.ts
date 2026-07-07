@@ -12,8 +12,10 @@ import {
 } from "#app/data/elite-redux/showdown/showdown-manifest";
 import { MEGA_STONE_ITEM } from "#app/data/elite-redux/showdown/showdown-team";
 import { speciesEggMoves } from "#balance/moves/egg-moves";
+import { pokemonPrevolutions } from "#balance/pokemon-evolutions";
 import { pokemonSpeciesLevelMoves } from "#balance/pokemon-level-moves";
 import { speciesTmMoves } from "#balance/tms";
+import { AbilityAttr } from "#enums/ability-attr";
 import { DexAttr } from "#enums/dex-attr";
 import type { MoveId } from "#enums/move-id";
 import { Nature } from "#enums/nature";
@@ -182,6 +184,45 @@ describe("buildUnlockSnapshot", () => {
       expect(snap.isAbilityUnlocked(SpeciesId.CHARMANDER, 0)).toBe(true);
       expect(snap.isAbilityUnlocked(SpeciesId.CHARMANDER, 1)).toBe(false);
       expect(snap.isAbilityUnlocked(SpeciesId.CHARMANDER, 2)).toBe(true);
+    });
+
+    it("accepts a 1-regular+hidden species' HIDDEN ability (index 2) when unlocked", () => {
+      // Charmander is Blaze + hidden Solar Power (empty 2nd slot -> normalized to a Blaze dup),
+      // so its hidden ability sits at index 2 with the ABILITY_HIDDEN bit - NOT index 1.
+      const snap = buildUnlockSnapshot(
+        gameData({ starterData: { [SpeciesId.CHARMANDER]: { abilityAttr: AbilityAttr.ABILITY_HIDDEN, eggMoves: 0 } } }),
+      );
+      expect(snap.isAbilityUnlocked(SpeciesId.CHARMANDER, 2)).toBe(true);
+    });
+
+    it("rejects a genuinely locked ability", () => {
+      // Only ABILITY_1 unlocked -> the hidden ability (index 2) stays rejected.
+      const snap = buildUnlockSnapshot(
+        gameData({ starterData: { [SpeciesId.CHARMANDER]: { abilityAttr: AbilityAttr.ABILITY_1, eggMoves: 0 } } }),
+      );
+      expect(snap.isAbilityUnlocked(SpeciesId.CHARMANDER, 2)).toBe(false);
+    });
+
+    it("resolves unlocks under the evolution-line ROOT the game pools them on (B7 item 7)", () => {
+      // The game pools ability unlocks under the line's absolute prevolution root
+      // (GameData.getStarterDataEntry). ER inserts CUSTOM pre-evolutions into many lines (e.g.
+      // Pikachu's prevo here is an ER custom, id 10194 - NOT Pichu), so a grid starter is very
+      // often NOT its own pooling root. Walk Charmeleon down to its actual root the same way, put
+      // the unlock there, and assert the grid pick (Charmeleon) resolves - the snapshot MUST
+      // normalize or it reads an empty starterData entry and false-rejects (the live blocker).
+      let root: number = SpeciesId.CHARMELEON;
+      const seen = new Set<number>();
+      while (pokemonPrevolutions[root] !== undefined && !seen.has(root)) {
+        seen.add(root);
+        root = pokemonPrevolutions[root];
+      }
+      expect(root, "Charmeleon should pool under a distinct prevolution root").not.toBe(SpeciesId.CHARMELEON);
+      const snap = buildUnlockSnapshot(
+        gameData({ starterData: { [root]: { abilityAttr: AbilityAttr.ABILITY_HIDDEN, eggMoves: 0 } } }),
+      );
+      // rootSpeciesId = the grid pick CHARMELEON; the unlock lives under the pooling root.
+      expect(snap.isAbilityUnlocked(SpeciesId.CHARMELEON, 2)).toBe(true); // hidden, unlocked under root
+      expect(snap.isAbilityUnlocked(SpeciesId.CHARMELEON, 1)).toBe(false); // ability2 not unlocked
     });
   });
 
