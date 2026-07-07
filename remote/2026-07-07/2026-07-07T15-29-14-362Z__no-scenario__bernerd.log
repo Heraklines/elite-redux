@@ -1,0 +1,276 @@
+url:      https://elite-redux-staging.pages.dev/
+build:    mrarj08z-845p
+mode:     4  wave:78
+seed:     Pzf1L9GCSJq9fus4FOpPlmeX
+party:    Glalie Redux(L64 205hp f0), Gholdengo(L65 209hp f0), Iron Valiant(L64 184hp f0), Amphybuzz(L36 136hp f0), Zigzagoon(L36 84hp f0), Kecleon(L61 163hp f0)
+enemy:    Crobat(L64), Crobat(L62), Houndoom(L61)
+
+----- COMMENT -----
+Gholdengo's candy is separate from Gimmighoul
+
+----- CONSOLE -----
+[15:28:04.061] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[15:28:04.061] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[15:28:04.061] LOG: Applied Super EXP. Charm 
+[15:28:04.061] LOG: Applied EXP. Charm 
+[15:28:04.061] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[15:28:04.061] LOG: %cStart Phase MoveEndPhase color:green;
+[15:28:04.065] LOG: %cStart Phase MovePhase color:green;
+[15:28:04.065] LOG: %cUser: Iron Valiant
+Move: DRAIN_PUNCH
+Use Mode: NORMAL color:orchid
+[15:28:04.074] LOG: %cStart Phase MessagePhase color:green;
+[15:28:04.183] LOG: %cStart Phase MoveEffectPhase color:green;
+[15:28:04.184] LOG: %cStart Phase MessagePhase color:green;
+[15:28:04.433] LOG: %cStart Phase MoveEndPhase color:green;
+[15:28:04.435] LOG: %cStart Phase MovePhase color:green;
+[15:28:04.435] LOG: %cStart Phase MoveEndPhase color:green;
+[15:28:04.436] LOG: %cStart Phase MovePhase color:green;
+[15:28:04.436] LOG: %cUser: Toedscruel
+Move: POWER_WHIP
+Use Mode: NORMAL color:orchid
+[15:28:04.448] LOG: %cStart Phase MessagePhase color:green;
+[15:28:04.554] LOG: %cStart Phase MoveEffectPhase color:green;
+[15:28:04.834] LOG: crit stage: +0
+[15:28:04.836] LOG: Move: Power Whip | Base damage: 50.30608695652174 | Power: 120 | Source attack: 112 | Target defense: 138
+[15:28:04.836] LOG: Move: Power Whip | Attack damage: 70
+[15:28:04.837] LOG: %cStart Phase DamageAnimPhase color:green;
+[15:28:04.869] LOG: %cStart Phase FaintPhase color:green;
+[15:28:04.872] LOG: Applied Reviver Seed 
+[15:28:04.872] LOG: Applied Calcium 
+[15:28:04.872] LOG: Applied HP Up 
+[15:28:04.872] LOG: Applied Carbos 
+[15:28:04.873] LOG: Applied Protein 
+[15:28:04.880] LOG: %cStart Phase PokemonHealPhase color:green;
+[15:28:05.087] LOG: %cStart Phase MessagePhase color:green;
+[15:28:05.333] LOG: %cStart Phase MoveEndPhase color:green;
+[15:28:05.333] LOG: %cStart Phase MovePhase color:green;
+[15:28:05.333] LOG: %cUser: Gholdengo
+Move: ASTRAL_BARRAGE
+Use Mode: NORMAL color:orchid
+[15:28:05.341] LOG: %cStart Phase MessagePhase color:green;
+[15:28:05.475] LOG: %cStart Phase MoveEffectPhase color:green;
+[15:28:05.476] LOG: %cStart Phase MessagePhase color:green;
+[15:28:05.725] LOG: %cStart Phase MoveEndPhase color:green;
+[15:28:05.725] LOG: %cStart Phase CheckInterludePhase color:green;
+[15:28:05.725] LOG: %cStart Phase WeatherEffectPhase color:green;
+[15:28:05.725] LOG: %cStart Phase PositionalTagPhase color:green;
+[15:28:05.725] LOG: %cStart Phase BerryPhase color:green;
+[15:28:05.732] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[15:28:05.737] LOG: %cStart Phase TurnEndPhase color:green;
+[15:28:05.743] WARN: [coop:turn] host recorder: finalize with NO open recording -> turn=-1 events=0 (caller decides not to emit)
+[15:28:05.743] LOG: %cStart Phase TurnInitPhase color:green;
+[15:28:05.743] LOG: %cStart Phase CommandPhase color:green;
+[15:28:07.805] LOG: Move: EXTREME_SPEED Move targets: {"targets":[4,1],"multiple":false} 
+Player Pokemon: Kecleon
+[15:28:07.807] LOG: %cStart Phase SelectTargetPhase color:green;
+[15:28:08.015] LOG: %cStart Phase CommandPhase color:green;
+[15:28:09.798] LOG: Move: GEAR_UP Move targets: {"targets":[1],"multiple":false} 
+Player Pokemon: Gholdengo
+[15:28:09.800] LOG: %cStart Phase CommandPhase color:green;
+[15:28:10.414] LOG: Move: DRAIN_PUNCH Move targets: {"targets":[4,1],"multiple":false} 
+Player Pokemon: Iron Valiant
+[15:28:10.416] LOG: %cStart Phase SelectTargetPhase color:green;
+[15:28:10.665] LOG: %cStart Phase EnemyCommandPhase color:green;
+[15:28:10.681] LOG: Battle Seed: BNFNsV0VS9PEvJ1C
+[15:28:10.687] LOG: Move Pool: ["Spore","Scatter Blast","Power Whip","Encore"]
+[15:28:10.687] LOG: Move Scores: [10,19.5,31.5,2]
+[15:28:10.687] LOG: Sorted Move Pool: ["Power Whip","Scatter Blast","Spore","Encore"]
+[15:28:10.687] LOG: Chosen Move: Scatter Blast
+[15:28:10.687] LOG: %cStart Phase TurnStartPhase color:green;
+[15:28:10.694] LOG: %cStart Phase MovePhase color:green;
+[15:28:10.694] LOG: %cUser: Kecleon
+Move: EXTREME_SPEED
+Use Mode: NORMAL color:orchid
+[15:28:10.699] LOG: %cStart Phase MessagePhase color:green;
+[15:28:10.808] LOG: %cStart Phase MoveEffectPhase color:green;
+[15:28:11.392] LOG: crit stage: +0
+[15:28:11.394] LOG: Move: Extreme Speed | Base damage: 81.36842105263158 | Power: 80 | Source attack: 145 | Target defense: 76
+[15:28:11.395] LOG: Move: Extreme Speed | Attack damage: 74
+[15:28:11.395] LOG: %cStart Phase DamageAnimPhase color:green;
+[15:28:11.427] LOG: %cStart Phase MoveEndPhase color:green;
+[15:28:11.430] LOG: %cStart Phase MovePhase color:green;
+[15:28:11.430] LOG: %cUser: Gholdengo
+Move: GEAR_UP
+Use Mode: NORMAL color:orchid
+[15:28:11.440] LOG: %cStart Phase MessagePhase color:green;
+[15:28:11.550] LOG: %cStart Phase MoveEffectPhase color:green;
+[15:28:12.590] LOG: %cStart Phase StatStageChangePhase color:green;
+[15:28:12.775] LOG: %cStart Phase MessagePhase color:green;
+[15:28:13.017] LOG: %cStart Phase StatStageChangePhase color:green;
+[15:28:13.211] LOG: %cStart Phase MessagePhase color:green;
+[15:28:13.450] LOG: %cStart Phase MoveEndPhase color:green;
+[15:28:13.451] LOG: %cStart Phase MovePhase color:green;
+[15:28:13.451] LOG: %cUser: Iron Valiant
+Move: DRAIN_PUNCH
+Use Mode: NORMAL color:orchid
+[15:28:13.465] LOG: %cStart Phase MessagePhase color:green;
+[15:28:13.574] LOG: %cStart Phase MoveEffectPhase color:green;
+[15:28:13.576] LOG: Applied Wide Lens 
+[15:28:13.917] LOG: crit stage: +0
+[15:28:13.919] LOG: Move: Drain Punch | Base damage: 116.39473684210526 | Power: 75 | Source attack: 210 | Target defense: 76
+[15:28:13.920] LOG: Move: Drain Punch | Attack damage: 120
+[15:28:13.920] LOG: %cStart Phase DamageAnimPhase color:green;
+[15:28:13.947] LOG: %cStart Phase PokemonHealPhase color:green;
+[15:28:13.949] LOG: %cStart Phase MessagePhase color:green;
+[15:28:14.162] LOG: %cStart Phase FaintPhase color:green;
+[15:28:16.219] LOG: %cStart Phase MessagePhase color:green;
+[15:28:16.414] LOG: %cStart Phase VictoryPhase color:green;
+[15:28:16.414] LOG: Applied Soothe Bell 
+[15:28:16.414] LOG: Applied Soothe Bell 
+[15:28:16.414] LOG: %cStart Phase ExpPhase color:green;
+[15:28:16.415] LOG: Applied Super EXP. Charm 
+[15:28:16.415] LOG: Applied EXP. Charm 
+[15:28:16.713] LOG: %cStart Phase LevelUpPhase color:green;
+[15:28:16.714] LOG: %cStart Phase LearnMoveBatchPhase color:green;
+[15:28:18.158] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[15:28:18.158] LOG: Applied Super EXP. Charm 
+[15:28:18.158] LOG: Applied EXP. Charm 
+[15:28:18.158] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[15:28:18.158] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[15:28:18.158] LOG: Applied Super EXP. Charm 
+[15:28:18.159] LOG: Applied EXP. Charm 
+[15:28:18.159] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[15:28:18.159] LOG: %cStart Phase MoveEndPhase color:green;
+[15:28:18.159] LOG: %cStart Phase MovePhase color:green;
+[15:28:18.159] LOG: %cStart Phase MoveEndPhase color:green;
+[15:28:18.160] LOG: %cStart Phase CheckInterludePhase color:green;
+[15:28:18.160] LOG: %cStart Phase WeatherEffectPhase color:green;
+[15:28:18.160] LOG: %cStart Phase PositionalTagPhase color:green;
+[15:28:18.160] LOG: %cStart Phase BerryPhase color:green;
+[15:28:18.162] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[15:28:18.163] LOG: %cStart Phase TurnEndPhase color:green;
+[15:28:18.166] WARN: [coop:turn] host recorder: finalize with NO open recording -> turn=-1 events=0 (caller decides not to emit)
+[15:28:18.166] LOG: %cStart Phase BattleEndPhase color:green;
+[15:28:18.166] LOG: Battle Score: 461 (3 Turns x0.87)
+[15:28:18.166] LOG: Total Score: 17365
+[15:28:18.177] LOG: Applied Calcium 
+[15:28:18.177] LOG: Applied HP Up 
+[15:28:18.177] LOG: Applied Carbos 
+[15:28:18.177] LOG: Applied Protein 
+[15:28:18.181] LOG: %cStart Phase ShowAbilityPhase color:green;
+[15:28:18.181] LOG: %cStart Phase HideAbilityPhase color:green;
+[15:28:18.219] LOG: %cStart Phase MessagePhase color:green;
+[15:28:18.473] LOG: %cStart Phase TrainerVictoryPhase color:green;
+[15:28:18.475] LOG: Veteran Julia
+[15:28:18.823] LOG: Veteran Julia
+[15:28:19.155] LOG: Dialogue saved as seen: dialogue:veteranFemale.victory.1
+[15:28:19.155] LOG: %cStart Phase MoneyRewardPhase color:green;
+[15:28:19.505] LOG: %cStart Phase EggLapsePhase color:green;
+[15:28:19.505] LOG: %cStart Phase SelectModifierPhase color:green;
+[15:28:19.505] LOG: Wave Seed: Ç³~ ¾³ÂÀ½¹º²¥ 77
+[15:28:19.527] LOG: Applied Golden Poké Ball 
+[15:28:19.527] LOG: 1 0 []
+[15:28:19.527] LOG: {"id":"RARE_CANDY","localeKey":"modifierType:ModifierType.RARE_CANDY","iconImage":"rare_candy","soundName":"se/restore","tier":0} 
+[15:28:19.527] LOG: 6 0 []
+[15:28:19.528] LOG: {"id":"LURE","localeKey":"modifierType:ModifierType.LURE","iconImage":"lure","group":"lure","soundName":"se/restore","tier":0,"maxBattles":10} 
+[15:28:19.528] LOG: 6 0 []
+[15:28:19.528] LOG: {"id":"LURE","localeKey":"modifierType:ModifierType.LURE","iconImage":"lure","group":"lure","soundName":"se/restore","tier":0,"maxBattles":10} 
+[15:28:19.528] LOG: 5 0 []
+[15:28:19.528] LOG: {"id":"MAX_ETHER","localeKey":"modifierType:ModifierType.MAX_ETHER","iconImage":"max_ether","group":"ether","soundName":"se/restore","tier":0,"restorePoints":-1} 
+[15:28:19.528] LOG: 2 0 []
+[15:28:19.528] LOG: {"id":"POTION","localeKey":"modifierType:ModifierType.POTION","iconImage":"potion","group":"potion","soundName":"se/restore","tier":0,"restorePoints":20,"restorePercent":10,"healStatus":false} 
+[15:28:33.895] WARN: Texture "%s" has no frame "%s" items er_bug_gem
+[15:28:33.895] WARN: Texture "%s" has no frame "%s" items er_grass_gem
+[15:28:33.896] WARN: Texture "%s" has no frame "%s" items er_poison_gem
+[15:28:33.896] WARN: Texture "%s" has no frame "%s" items er_grassy_seed
+[15:28:33.958] WARN: Texture "%s" has no frame "%s" items er_bug_gem
+[15:28:33.958] WARN: Texture "%s" has no frame "%s" items er_grass_gem
+[15:28:33.958] WARN: Texture "%s" has no frame "%s" items er_poison_gem
+[15:28:33.958] WARN: Texture "%s" has no frame "%s" items er_grassy_seed
+[15:28:43.044] WARN: Texture "%s" has no frame "%s" items er_bug_gem
+[15:28:43.044] WARN: Texture "%s" has no frame "%s" items er_grass_gem
+[15:28:43.044] WARN: Texture "%s" has no frame "%s" items er_poison_gem
+[15:28:43.044] WARN: Texture "%s" has no frame "%s" items er_grassy_seed
+[15:28:43.107] WARN: Texture "%s" has no frame "%s" items er_bug_gem
+[15:28:43.108] WARN: Texture "%s" has no frame "%s" items er_grass_gem
+[15:28:43.108] WARN: Texture "%s" has no frame "%s" items er_poison_gem
+[15:28:43.108] WARN: Texture "%s" has no frame "%s" items er_grassy_seed
+[15:28:44.807] LOG: Applied Soothe Bell 
+[15:28:44.808] LOG: Applied Calcium 
+[15:28:44.808] LOG: Applied HP Up 
+[15:28:44.808] LOG: Applied Carbos 
+[15:28:44.817] LOG: %cStart Phase LevelUpPhase color:green;
+[15:28:44.817] LOG: %cStart Phase NewBattlePhase color:green;
+[15:28:44.817] LOG: Wave Seed: È´¡¿´ÃÁ¾º»³¦ 78
+[15:28:44.817] LOG: %cStart Phase NextEncounterPhase color:green;
+[15:28:44.818] LOG: Starting species pool tier: BOSS
+[15:28:44.827] LOG: Pokemon: Wild Crobat | Species ID: 169 | Level: 64 | Nature: Modest (+SpAtk/-Atk)
+[15:28:44.827] LOG: Stats (IVs): HP: 186 (21), Atk: 120 (28), Def: 115 (14), Spatk: 132 (20), Spdef: 122 (20), Spd: 179 (12)
+[15:28:44.827] LOG: Ability: Momentum | Passive Ability: Scare | Boss Bars: 2
+[15:28:44.827] LOG: Moveset: ["Air Cutter","Hypnosis","Double-Edge","Screech"]
+[15:28:44.827] LOG: Starting species pool tier: BOSS
+[15:28:44.834] LOG: Pokemon: Wild Crobat | Species ID: 169 | Level: 62 | Nature: Docile (-)
+[15:28:44.834] LOG: Stats (IVs): HP: 179 (5), Atk: 135 (26), Def: 109 (16), Spatk: 121 (23), Spdef: 120 (23), Spd: 176 (14)
+[15:28:44.835] LOG: Ability: Mountaineer | Passive Ability: Scare | Boss Bars: 2
+[15:28:44.835] LOG: Moveset: ["Dual Wingbeat","Brave Bird","Synchronoise","Giga Drain"]
+[15:28:44.835] LOG: Starting species pool tier: BOSS
+[15:28:44.840] LOG: Pokemon: Wild Houndoom | Species ID: 229 | Level: 61 | Nature: Bold (+Def/-Atk)
+[15:28:44.840] LOG: Stats (IVs): HP: 173 (15), Atk: 133 (17), Def: 81 (12), Spatk: 149 (28), Spdef: 102 (3), Spd: 147 (19)
+[15:28:44.840] LOG: Ability: Molten Down | Passive Ability: Nocturnal | Boss Bars: 2
+[15:28:44.840] LOG: Moveset: ["Eclipse","Sludge Wave","Crunch","Overheat"]
+[15:28:44.841] LOG: {"id":"BASE_STAT_BOOSTER","localeKey":"","iconImage":"protein","soundName":"se/restore","tier":1,"stat":1,"key":"protein"} (enemy)
+[15:28:44.841] LOG: {"id":"BASE_STAT_BOOSTER","localeKey":"","iconImage":"protein","soundName":"se/restore","tier":1,"stat":1,"key":"protein"} (enemy)
+[15:28:44.841] LOG: {"id":"BERRY","localeKey":"","iconImage":"sitrus_berry","group":"berry","soundName":"se/restore","tier":0,"berryType":0} (enemy)
+[15:28:44.841] LOG: {"id":"BERRY","localeKey":"","iconImage":"salac_berry","group":"berry","soundName":"se/restore","tier":0,"berryType":7} (enemy)
+[15:28:44.841] LOG: {"id":"BERRY","localeKey":"","iconImage":"leppa_berry","group":"berry","soundName":"se/restore","tier":0,"berryType":10} (enemy)
+[15:28:44.841] LOG: {"id":"BERRY","localeKey":"","iconImage":"leppa_berry","group":"berry","soundName":"se/restore","tier":0,"berryType":10} (enemy)
+[15:28:44.841] LOG: {"id":"BERRY","localeKey":"","iconImage":"leppa_berry","group":"berry","soundName":"se/restore","tier":0,"berryType":10} (enemy)
+[15:28:44.841] LOG: {"id":"BERRY","localeKey":"","iconImage":"sitrus_berry","group":"berry","soundName":"se/restore","tier":0,"berryType":0} (enemy)
+[15:28:44.841] LOG: {"id":"BERRY","localeKey":"","iconImage":"sitrus_berry","group":"berry","soundName":"se/restore","tier":0,"berryType":0} (enemy)
+[15:28:44.841] LOG: {"id":"BERRY","localeKey":"","iconImage":"starf_berry","group":"berry","soundName":"se/restore","tier":0,"berryType":9} (enemy)
+[15:28:44.841] LOG: {"id":"BERRY","localeKey":"","iconImage":"petaya_berry","group":"berry","soundName":"se/restore","tier":0,"berryType":5} (enemy)
+[15:28:44.841] LOG: {"id":"BERRY","localeKey":"","iconImage":"leppa_berry","group":"berry","soundName":"se/restore","tier":0,"berryType":10} (enemy)
+[15:28:44.841] LOG: {"id":"LUCKY_EGG","localeKey":"modifierType:ModifierType.LUCKY_EGG","iconImage":"lucky_egg","soundName":"se/restore","tier":3,"boostPercent":40} (enemy)
+[15:28:44.841] LOG: {"id":"BASE_STAT_BOOSTER","localeKey":"","iconImage":"protein","soundName":"se/restore","tier":1,"stat":1,"key":"protein"} (enemy)
+[15:28:44.841] LOG: {"id":"BERRY","localeKey":"","iconImage":"petaya_berry","group":"berry","soundName":"se/restore","tier":0,"berryType":5} (enemy)
+[15:28:44.841] LOG: {"id":"BERRY","localeKey":"","iconImage":"lansat_berry","group":"berry","soundName":"se/restore","tier":0,"berryType":8} (enemy)
+[15:28:44.841] LOG: {"id":"BERRY","localeKey":"","iconImage":"lum_berry","group":"berry","soundName":"se/restore","tier":0,"berryType":1} (enemy)
+[15:28:44.841] LOG: {"id":"BERRY","localeKey":"","iconImage":"sitrus_berry","group":"berry","soundName":"se/restore","tier":0,"berryType":0} (enemy)
+[15:28:44.841] LOG: {"id":"BERRY","localeKey":"","iconImage":"ganlon_berry","group":"berry","soundName":"se/restore","tier":0,"berryType":4} (enemy)
+[15:28:44.841] LOG: {"id":"BERRY","localeKey":"","iconImage":"lansat_berry","group":"berry","soundName":"se/restore","tier":0,"berryType":8} (enemy)
+[15:28:44.841] LOG: {"id":"BERRY","localeKey":"","iconImage":"leppa_berry","group":"berry","soundName":"se/restore","tier":0,"berryType":10} (enemy)
+[15:28:44.841] LOG: Battle Seed: JltkD3LH6ASoNX4G
+[15:28:44.841] LOG: Applied Protein (enemy)
+[15:28:44.841] LOG: Applied Protein (enemy)
+[15:28:44.884] DEBUG: Session data saved to slot 2!
+[15:28:44.884] LOG: Wave Seed: È´¡¿´ÃÁ¾º»³¦ 78
+[15:28:45.352] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[15:28:45.352] LOG: %cStart Phase CheckSwitchPhase color:green;
+[15:28:45.541] LOG: %cStart Phase CheckSwitchPhase color:green;
+[15:28:45.783] LOG: %cStart Phase CheckSwitchPhase color:green;
+[15:28:45.991] LOG: %cStart Phase InitEncounterPhase color:green;
+[15:28:45.994] LOG: %cStart Phase PostSummonPhase color:green;
+[15:28:45.994] LOG: Ran PSP for: Crobat
+[15:28:45.999] LOG: %cStart Phase PostSummonPhase color:green;
+[15:28:46.001] LOG: %cStart Phase PostSummonPhase color:green;
+[15:28:46.004] LOG: %cStart Phase ShowAbilityPhase color:green;
+[15:28:46.179] LOG: %cStart Phase StatStageChangePhase color:green;
+[15:28:46.371] LOG: %cStart Phase MessagePhase color:green;
+[15:28:46.616] LOG: %cStart Phase StatStageChangePhase color:green;
+[15:28:46.808] LOG: %cStart Phase MessagePhase color:green;
+[15:28:47.025] LOG: %cStart Phase HideAbilityPhase color:green;
+[15:28:47.063] LOG: %cStart Phase PostSummonPhase color:green;
+[15:28:47.063] LOG: Ran PSP for: Crobat
+[15:28:47.068] LOG: %cStart Phase PostSummonPhase color:green;
+[15:28:47.069] LOG: %cStart Phase PostSummonPhase color:green;
+[15:28:47.073] LOG: %cStart Phase ShowAbilityPhase color:green;
+[15:28:47.247] LOG: %cStart Phase StatStageChangePhase color:green;
+[15:28:47.454] LOG: %cStart Phase MessagePhase color:green;
+[15:28:47.693] LOG: %cStart Phase StatStageChangePhase color:green;
+[15:28:47.878] LOG: %cStart Phase MessagePhase color:green;
+[15:28:48.091] LOG: %cStart Phase StatStageChangePhase color:green;
+[15:28:48.282] LOG: %cStart Phase MessagePhase color:green;
+[15:28:48.508] LOG: %cStart Phase HideAbilityPhase color:green;
+[15:28:48.544] LOG: %cStart Phase PostSummonPhase color:green;
+[15:28:48.544] LOG: Ran PSP for: Houndoom
+[15:28:48.548] LOG: %cStart Phase PostSummonPhase color:green;
+[15:28:48.548] LOG: %cStart Phase PostSummonPhase color:green;
+[15:28:48.548] LOG: %cStart Phase TurnInitPhase color:green;
+[15:28:48.549] LOG: %cStart Phase CommandPhase color:green;
+[15:28:52.227] ERROR: [uncaught] Uncaught TypeError: Cannot read properties of undefined (reading 'passive') @ https://elite-redux-staging.pages.dev/assets/BBCodeText-DsPSSNhA.js:1:80827
+[15:28:52.228] ERROR: [uncaught] Uncaught TypeError: Cannot read properties of undefined (reading 'passive') @ https://elite-redux-staging.pages.dev/assets/BBCodeText-DsPSSNhA.js:1:80827
+[15:28:52.598] ERROR: [uncaught] Uncaught TypeError: Cannot read properties of undefined (reading 'passive') @ https://elite-redux-staging.pages.dev/assets/BBCodeText-DsPSSNhA.js:1:80827
+[15:28:52.598] ERROR: [uncaught] Uncaught TypeError: Cannot read properties of undefined (reading 'passive') @ https://elite-redux-staging.pages.dev/assets/BBCodeText-DsPSSNhA.js:1:80827
+[15:28:53.681] ERROR: [uncaught] Uncaught TypeError: Cannot read properties of undefined (reading 'passive') @ https://elite-redux-staging.pages.dev/assets/BBCodeText-DsPSSNhA.js:1:80827
+[15:28:53.682] ERROR: [uncaught] Uncaught TypeError: Cannot read properties of undefined (reading 'passive') @ https://elite-redux-staging.pages.dev/assets/BBCodeText-DsPSSNhA.js:1:80827
