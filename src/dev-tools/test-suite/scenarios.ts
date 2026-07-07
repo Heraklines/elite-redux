@@ -1984,6 +1984,37 @@ export const DEV_SCENARIOS: DevScenario[] = [
     shopItems: [modifierTypes.ER_RELIC_CURSED_IDOL, modifierTypes.RARE_CANDY],
   },
   {
+    label: "(note) Co-op: the post-ME reward-shop WATCHER survives a stale out-of-range relayed pick (#854)",
+    description:
+      "CO-OP P0 fix - needs TWO clients on a Town-Raffle-class ME (a solo shop can't reproduce the WATCHER\n"
+      + "path). After the ME, its embedded reward shop opens: the interaction OWNER drives the real menu and\n"
+      + "the PARTNER opens the SAME shop as a read-only WATCHER that replays the owner's relayed picks against\n"
+      + "its adopted option pool. In the live capture (build mr9sx2n9-96kr, ER_TOWN_RAFFLE wave 9) a STALE\n"
+      + "reward pick with an OUT-OF-RANGE cursor (choice=4 while the adopted pool held 2 options) sat buffered\n"
+      + "on the reward seq; the watcher fed that cursor to selectRewardModifierOption, which read\n"
+      + "typeOptions[cursor].type of undefined -> uncaught TypeError. The guest DIED mid-watch: (a) its\n"
+      + "reward-cursor mirror never closed, so the ME/shop screen OVERLAID the continuing game ('the screen\n"
+      + "never dismisses'), and (b) it never consumed the owner's real LEAVE, so it STRANDED a wave behind\n"
+      + "while the host moved on ('stuck after a mystery event'). Fixed: the WATCHER now IGNORES an\n"
+      + "out-of-range relayed reward/shop cursor (the cosmetic pick can't crash it) and keeps waiting for the\n"
+      + "authoritative terminal, and the guest's ME terminal force-closes any lingering reward mirror. DO (2\n"
+      + "clients): play through a Town Raffle (or any ME with a reward shop), let ONE player drive the post-ME\n"
+      + "shop and LEAVE while the OTHER watches. EXPECT: neither client crashes to black, the watcher's ME/shop\n"
+      + "screen dismisses, and BOTH advance to the next wave in lockstep (no stuck-a-wave-behind). Reproduced\n"
+      + "+ regression-guarded headlessly over two real engines in\n"
+      + "test/tests/elite-redux/coop/coop-duo-me-reward-oob.test.ts (fails-before: the exact TypeError +\n"
+      + "watcher hang; passes-after: skip + LEAVE + lockstep + mirror closed).",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({ STARTING_WAVE_OVERRIDE: 1, STARTING_LEVEL_OVERRIDE: 50 });
+      return [
+        makeStarter(SpeciesId.SNORLAX, {
+          moveset: [MoveId.BODY_SLAM, MoveId.REST, MoveId.CRUNCH, MoveId.EARTHQUAKE],
+        }),
+      ];
+    },
+  },
+  {
     label: "(note) Co-op: your party ORDER stays synced when a lead faints + is replaced (#836)",
     description:
       "CO-OP fix - verify with TWO clients (not a solo battle): when a player's FIELD lead faints and a\n"
