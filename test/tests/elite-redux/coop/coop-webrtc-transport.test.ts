@@ -12,7 +12,7 @@ import { CoopInteractionRelay } from "#data/elite-redux/coop/coop-interaction-re
 import { CoopSessionController } from "#data/elite-redux/coop/coop-session-controller";
 import type { CoopConnectionState, CoopMessage } from "#data/elite-redux/coop/coop-transport";
 import { COOP_PROTOCOL_VERSION } from "#data/elite-redux/coop/coop-transport";
-import { type CoopWireChannel, WebRtcTransport } from "#data/elite-redux/coop/coop-webrtc-transport";
+import { COOP_KEEPALIVE_MS, type CoopWireChannel, WebRtcTransport } from "#data/elite-redux/coop/coop-webrtc-transport";
 import { describe, expect, it, vi } from "vitest";
 
 /** In-process mock of a data channel implementing {@linkcode CoopWireChannel}.
@@ -21,6 +21,8 @@ class MockWire implements CoopWireChannel {
   readyState = "open";
   peer: MockWire | null = null;
   sent: string[] = [];
+  /** #857: settable so a test can assert the transport surfaces the channel's last error as the drop reason. */
+  lastError: string | undefined = undefined;
   private msgHandler: ((d: string) => void) | null = null;
   private openHandler: (() => void) | null = null;
   private closeHandler: (() => void) | null = null;
@@ -110,9 +112,9 @@ describe("co-op WebRTC transport (#633, P6) - framing", () => {
     wire.injectRaw(JSON.stringify({ noTypeField: true })); // object without `t`
     expect(received).toHaveLength(0); // all ignored
 
-    // A well-formed frame still gets through.
-    wire.injectRaw(JSON.stringify({ t: "ping", ts: 1 }));
-    expect(received).toEqual([{ t: "ping", ts: 1 }]);
+    // A well-formed (non-keepalive) frame still gets through.
+    wire.injectRaw(JSON.stringify({ t: "stallBeat", waitingMs: 1 }));
+    expect(received).toEqual([{ t: "stallBeat", waitingMs: 1 }]);
   });
 
   it("close() flips to closed, notifies listeners, and silences further sends", () => {
@@ -137,6 +139,104 @@ describe("co-op WebRTC transport (#633, P6) - framing", () => {
     const t = new WebRtcTransport("host", wire);
     t.send({ t: "ping", ts: 3 });
     expect(wire.sent).toHaveLength(0); // state is "connecting", not "connected"
+  });
+});
+
+describe("#857 keepalive: an idle data channel is kept warm so it can't idle out into the reconnect flap", () => {
+  /** A manual scheduler: captures the keepalive callback so the test drives ticks deterministically. */
+  class ManualSchedule {
+    private cb: (() => void) | null = null;
+    ms = -1;
+    readonly schedule = (fn: () => void, interval: number): (() => void) => {
+      this.cb = fn;
+      this.ms = interval;
+      return () => {
+        this.cb = null;
+      };
+    };
+    tick(): void {
+      this.cb?.();
+    }
+  }
+
+  it("REGRESSION (flap root): an idle connected channel sends a keepalive ping on each tick", () => {
+    const wire = new MockWire();
+    const t = new WebRtcTransport("host", wire);
+    const sched = new ManualSchedule();
+
+    // Before startKeepalive, an idle channel sends NOTHING (the pre-fix behavior that let it idle out).
+    sched.tick();
+    expect(wire.sent).toHaveLength(0);
+
+    t.startKeepalive(COOP_KEEPALIVE_MS, sched.schedule);
+    expect(sched.ms).toBe(COOP_KEEPALIVE_MS);
+
+    // Now every tick keeps the path warm with a ping frame (the fix).
+    sched.tick();
+    sched.tick();
+    expect(wire.sent).toHaveLength(2);
+    for (const frame of wire.sent) {
+      expect(JSON.parse(frame).t).toBe("ping");
+    }
+  });
+
+  it("does not ping when disconnected/closed (no traffic on a dead wire)", () => {
+    const wire = new MockWire();
+    wire.readyState = "connecting"; // -> transport starts "connecting", not "connected"
+    const t = new WebRtcTransport("host", wire);
+    const sched = new ManualSchedule();
+    t.startKeepalive(COOP_KEEPALIVE_MS, sched.schedule);
+
+    sched.tick();
+    expect(wire.sent).toHaveLength(0); // not connected yet
+
+    wire.fireOpen(); // -> connected
+    sched.tick();
+    expect(wire.sent).toHaveLength(1); // now warms the path
+
+    t.close();
+    const before = wire.sent.length;
+    sched.tick(); // the timer is cancelled on close; even if driven, a closed transport sends nothing
+    expect(wire.sent.length).toBe(before);
+  });
+
+  it("startKeepalive is idempotent (a second call does not start a second timer)", () => {
+    const wire = new MockWire();
+    const t = new WebRtcTransport("host", wire);
+    let scheduled = 0;
+    const schedule = (_cb: () => void, _ms: number) => {
+      scheduled++;
+      return () => {};
+    };
+    t.startKeepalive(COOP_KEEPALIVE_MS, schedule);
+    t.startKeepalive(COOP_KEEPALIVE_MS, schedule);
+    expect(scheduled).toBe(1);
+  });
+
+  it("keepalive ping/pong frames are transport-internal (never surface to the session layer)", () => {
+    const { a, b } = linkedWires();
+    const host = new WebRtcTransport("host", a);
+    const guest = new WebRtcTransport("guest", b);
+    const guestGot: string[] = [];
+    guest.onMessage(m => guestGot.push(m.t));
+
+    // A keepalive from the host is swallowed by the guest transport (no fan-out)...
+    host.send({ t: "ping", ts: 1 });
+    host.send({ t: "pong", ts: 2 });
+    expect(guestGot).toHaveLength(0);
+
+    // ...but a real gameplay frame still flows through.
+    host.send({ t: "waveResolved", wave: 3, outcome: "win" });
+    expect(guestGot).toEqual(["waveResolved"]);
+  });
+
+  it("disconnectReason() surfaces the wire's last channel error for the reconnect banner", () => {
+    const wire = new MockWire();
+    const t = new WebRtcTransport("guest", wire);
+    expect(t.disconnectReason()).toBeUndefined();
+
+    wire.lastError = "User-Initiated Abort, reason=Close called";
+    expect(t.disconnectReason()).toBe("User-Initiated Abort, reason=Close called");
   });
 });
 

@@ -849,13 +849,38 @@ function wireCoopDisconnectReaction(transport: CoopTransport, relay: CoopInterac
     }
     // Only the ACTIVE runtime owns the screen (the duo harness assembles two in one process).
     const isActiveRuntime = getCoopRuntime() === runtime;
+    // #857: a PROTOCOL-VERSION mismatch (one player on a stale cached build) can never be healed by
+    // re-dialing - the fresh channel would just drop again on the same incompatibility, producing the
+    // endless redial FLAP. Surface a clear, persistent instruction instead and do NOT enter the loop.
+    if (runtime.controller.versionMismatch) {
+      coopWarn("runtime", "channel dropped with a protocol-version mismatch -> NOT redial-looping (stale build)");
+      if (isActiveRuntime) {
+        try {
+          globalScene.ui.showText(
+            "Version mismatch with your partner - both players update your client (hard refresh, Ctrl+F5) and reconnect.",
+            null,
+            undefined,
+            10000,
+          );
+        } catch {
+          /* cosmetic */
+        }
+      }
+      return;
+    }
     // #805 HOT REJOIN: re-dial the same pairing code within the grace window and swap the fresh
     // channel into the live transport - the whole session survives in place. One loop at a time.
     if (runtime.rejoinDriver != null && !rejoining) {
       rejoining = true;
       if (isActiveRuntime) {
         try {
-          globalScene.ui.showText("Connection lost. Trying to reconnect (up to 2 minutes)...", null, undefined, 4000);
+          // #857: carry the DROP REASON (the raw channel error, e.g. the SCTP abort text) into the
+          // banner so a live capture shows WHY the channel died instead of a bare "connection lost".
+          const reason = transport.disconnectReason?.();
+          const banner = reason
+            ? `Connection lost (${reason}). Trying to reconnect (up to 2 minutes)...`
+            : "Connection lost. Trying to reconnect (up to 2 minutes)...";
+          globalScene.ui.showText(banner, null, undefined, 4000);
         } catch {
           /* cosmetic */
         }

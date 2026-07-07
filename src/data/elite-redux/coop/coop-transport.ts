@@ -1196,6 +1196,12 @@ export interface CoopTransport {
   onStateChange(handler: (state: CoopConnectionState) => void): () => void;
   /** Tear down the connection. */
   close(): void;
+  /**
+   * #857 (optional): a human-readable reason the LIVE channel most recently dropped (the raw SCTP
+   * abort / error text). Surfaced by the real WebRTC transport for the reconnect banner; absent on
+   * the in-process loopback (which has no wire-level error to report).
+   */
+  disconnectReason?(): string | undefined;
 }
 
 /**

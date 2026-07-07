@@ -26,6 +26,24 @@ import { coopLog, coopWarn, isCoopDebug } from "#data/elite-redux/coop/coop-debu
 import type { CoopConnectionState, CoopMessage, CoopRole, CoopTransport } from "#data/elite-redux/coop/coop-transport";
 
 /**
+ * #857 KEEPALIVE interval. An idle co-op data channel that carries no frames for ~30s loses ICE
+ * consent freshness (RFC 7675) / its NAT (or TURN) binding, and Chrome unilaterally tears the
+ * channel down. That fires the #805 hot rejoin, whose freshly-dialed channel then idles out again -
+ * a permanent disconnect/reconnect FLAP from starter-select onward, because two humans parked at the
+ * pre-battle / resume barrier send NO game traffic for minutes (the live regression: the recent long
+ * pre-battle waits made the idle window routinely exceed the 30s consent timeout). A tiny periodic
+ * ping keeps the path warm so a long idle wait survives. Both endpoints ping independently (no reply
+ * needed), and ping/pong frames are TRANSPORT-INTERNAL - they never surface to the session layer.
+ */
+export const COOP_KEEPALIVE_MS = 5_000;
+
+/** Default keepalive scheduler (real timer); injectable so unit tests drive ticks deterministically. */
+function defaultKeepaliveSchedule(cb: () => void, ms: number): () => void {
+  const id = setInterval(cb, ms);
+  return () => clearInterval(id);
+}
+
+/**
  * The minimal data-channel surface the transport needs - satisfied by a real
  * RTCDataChannel (via {@linkcode webRtcTransportFromChannel}) and by a test mock.
  * Uses explicit `on*` registration methods (not DOM `on*` props) so the mock is
@@ -44,6 +62,12 @@ export interface CoopWireChannel {
   onOpen(handler: () => void): void;
   /** Register the channel-close handler. */
   onClose(handler: () => void): void;
+  /**
+   * #857: the most recent RAW channel error message (e.g. the SCTP abort reason
+   * "User-Initiated Abort, reason=Close called"), captured so the reconnect banner can carry
+   * the reason the channel died. Optional (absent on a mock / when no error has fired).
+   */
+  readonly lastError?: string | undefined;
 }
 
 /**
@@ -59,6 +83,8 @@ export class WebRtcTransport implements CoopTransport {
   private wireGeneration = 0;
   private readonly msgHandlers = new Set<(msg: CoopMessage) => void>();
   private readonly stateHandlers = new Set<(state: CoopConnectionState) => void>();
+  /** #857 keepalive: cancel handle for the running ping timer (null until {@linkcode startKeepalive}). */
+  private keepaliveCancel: (() => void) | null = null;
 
   constructor(role: CoopRole, wire: CoopWireChannel) {
     this.role = role;
@@ -118,6 +144,43 @@ export class WebRtcTransport implements CoopTransport {
     return this._state;
   }
 
+  /**
+   * #857: the reason the LIVE channel most recently died (the raw SCTP abort / error text, e.g.
+   * "User-Initiated Abort, reason=Close called"), or undefined if none was captured. Surfaced so the
+   * reconnect banner can tell the player WHY the channel dropped instead of a bare "connection lost".
+   */
+  disconnectReason(): string | undefined {
+    return this.wire.lastError;
+  }
+
+  /**
+   * #857: begin periodic keepalive pings so an idle data channel never goes ~30s without a validated
+   * packet (which would trip ICE consent freshness / a NAT-binding expiry and tear the channel down ->
+   * the disconnect/reconnect flap). Idempotent; a running timer is left in place. The scheduler is
+   * injectable for deterministic unit tests. `intervalMs <= 0` disables it (used by the loopback/tests).
+   */
+  startKeepalive(
+    intervalMs: number = COOP_KEEPALIVE_MS,
+    schedule: (cb: () => void, ms: number) => () => void = defaultKeepaliveSchedule,
+  ): void {
+    if (this.keepaliveCancel != null || intervalMs <= 0) {
+      return;
+    }
+    this.keepaliveCancel = schedule(() => this.sendKeepalive(), intervalMs);
+  }
+
+  /** Send one keepalive ping if the current wire is open and connected (best-effort; never throws). */
+  private sendKeepalive(): void {
+    if (this._state !== "connected" || this.wire.readyState !== "open") {
+      return;
+    }
+    try {
+      this.wire.send(JSON.stringify({ t: "ping", ts: Date.now() } satisfies CoopMessage));
+    } catch {
+      /* the channel may have died between the state check and the send - the close event will fire */
+    }
+  }
+
   send(msg: CoopMessage): void {
     if (this._state !== "connected" || this.wire.readyState !== "open") {
       if (isCoopDebug()) {
@@ -151,6 +214,8 @@ export class WebRtcTransport implements CoopTransport {
 
   close(): void {
     coopLog("webrtc", `close() role=${this.role} state=${this._state}`);
+    this.keepaliveCancel?.();
+    this.keepaliveCancel = null;
     this.setState("closed");
     this.wire.close();
     this.msgHandlers.clear();
@@ -182,6 +247,11 @@ export class WebRtcTransport implements CoopTransport {
     }
     if (parsed != null && typeof parsed === "object" && typeof (parsed as { t?: unknown }).t === "string") {
       const msg = parsed as CoopMessage;
+      // #857: keepalive frames are TRANSPORT-INTERNAL - swallow them (no fan-out, no per-frame log
+      // spam) so the ~5s ping cadence stays invisible to the session layer and the captured logs.
+      if (msg.t === "ping" || msg.t === "pong") {
+        return;
+      }
       if (isCoopDebug()) {
         coopLog("webrtc", `raw rx role=${this.role} t=${msg.t} bytes=${data.length} handlers=${this.msgHandlers.size}`);
       }
@@ -202,7 +272,12 @@ export class WebRtcTransport implements CoopTransport {
  * this once the signaling handshake has produced an open (or opening) data channel.
  */
 export function webRtcTransportFromChannel(role: CoopRole, channel: RTCDataChannel): WebRtcTransport {
-  return new WebRtcTransport(role, wireFromRtcChannel(role, channel));
+  const transport = new WebRtcTransport(role, wireFromRtcChannel(role, channel));
+  // #857: keep the real (live-network) channel warm so a long idle wait can't trip the ICE consent /
+  // NAT-binding timeout and start the reconnect flap. The keepalive lives on the transport INSTANCE,
+  // so it persists across #805 hot-rejoin replaceChannel swaps and is cancelled on close().
+  transport.startKeepalive();
+  return transport;
 }
 
 /**
@@ -211,15 +286,20 @@ export function webRtcTransportFromChannel(role: CoopRole, channel: RTCDataChann
  * channel and {@linkcode WebRtcTransport.replaceChannel} it into the LIVE transport.
  */
 export function wireFromRtcChannel(role: CoopRole, channel: RTCDataChannel): CoopWireChannel {
-  // Log-only: surface the raw channel error event (NOT wired into message flow / state), so a live
-  // DataChannel error is visible in the captured log instead of being silently swallowed.
+  // #857: capture the raw channel error message so the transport can surface the DROP REASON on the
+  // reconnect banner (previously log-only, then discarded). Still logged for the captured console.
+  let lastError: string | undefined;
   channel.addEventListener("error", ev => {
     const errLike = (ev as { error?: { message?: string } }).error;
-    coopWarn("webrtc", `channel ERROR role=${role} readyState=${channel.readyState} err=${errLike?.message ?? "?"}`);
+    lastError = errLike?.message ?? "?";
+    coopWarn("webrtc", `channel ERROR role=${role} readyState=${channel.readyState} err=${lastError}`);
   });
   const wire: CoopWireChannel = {
     get readyState() {
       return channel.readyState;
+    },
+    get lastError() {
+      return lastError;
     },
     send: data => channel.send(data),
     close: () => channel.close(),
