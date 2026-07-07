@@ -1,0 +1,261 @@
+url:      https://elite-redux-staging.pages.dev/
+build:    mraz9x9s-91gs
+mode:     6  wave:1
+seed:     G6UPiptfx7IkscD0SEZL1WrD
+party:    Ponyta(L5 21hp f0), Trapinch Redux(L5 21hp f0), Goldeen(L5 21hp f0), Spearow(L5 20hp f0)
+enemy:    Pidgey(L2), Abra(L2)
+
+----- COMMENT -----
+reconnection
+
+----- CONSOLE -----
+[18:28:12.681] LOG: Wave Seed: H7VQjqugy8JltdE1TF[M2XsE 1
+[18:28:13.127] LOG: %cStart Phase SummonPhase color:green;
+[18:28:13.625] WARN: cry/77 not found
+[18:28:13.713] LOG: %cStart Phase ShinySparklePhase color:green;
+[18:28:13.812] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[18:28:13.814] LOG: %cStart Phase SummonPhase color:green;
+[18:28:14.043] WARN: cry/10794 not found
+[18:28:14.113] WARN: [coop:webrtc] channel ERROR role=host readyState=closed err=User-Initiated Abort, reason=Close called
+[18:28:14.113] LOG: [coop:webrtc] channel CLOSE role=host state=connected gen=1
+[18:28:14.113] LOG: [coop:webrtc] state role=host connected -> disconnected
+[18:28:14.113] WARN: [coop:runtime] partner channel disconnected -> cancelling pending co-op waits (no 20-minute strand)
+[18:28:14.113] LOG: [coop:relay] cancelWaiters() no orphaned waiters selected -> nothing cancelled (live waits spared)
+[18:28:14.114] LOG: [coop:launch] rejoin attempt 1 code=PSXPZF role=host elapsed=0ms
+[18:28:14.114] LOG: [coop:launch] exchange SDP start code=PSXPZF role=host (ice=fetched)
+[18:28:14.130] LOG: %cStart Phase ShinySparklePhase color:green;
+[18:28:14.228] LOG: %cStart Phase CheckSwitchPhase color:green;
+[18:28:14.228] LOG: %cStart Phase CheckSwitchPhase color:green;
+[18:28:14.228] LOG: %cStart Phase InitEncounterPhase color:green;
+[18:28:14.234] LOG: %cStart Phase PostSummonPhase color:green;
+[18:28:14.234] LOG: Ran PSP for: Ponyta
+[18:28:14.238] LOG: %cStart Phase PostSummonPhase color:green;
+[18:28:14.241] LOG: %cStart Phase PostSummonPhase color:green;
+[18:28:14.243] LOG: %cStart Phase ShowAbilityPhase color:green;
+[18:28:14.444] LOG: %cStart Phase MessagePhase color:green;
+[18:28:14.540] LOG: [coop:launch] ICE from worker /coop/ice servers=1
+[18:28:14.741] LOG: %cStart Phase HideAbilityPhase color:green;
+[18:28:14.778] LOG: %cStart Phase PostSummonPhase color:green;
+[18:28:14.778] LOG: Ran PSP for: Trapinch Redux
+[18:28:14.782] LOG: %cStart Phase PostSummonPhase color:green;
+[18:28:14.783] LOG: %cStart Phase PostSummonPhase color:green;
+[18:28:14.784] LOG: %cStart Phase ShowAbilityPhase color:green;
+[18:28:14.870] LOG: [coop:launch] host pushing offer code=PSXPZF (ICE gathered)
+[18:28:14.870] LOG: [coop:launch] pushSignal code=PSXPZF role=host sdpBytes=2103
+[18:28:14.919] LOG: [coop:interaction] interactionCounter() read -> 0 (role=host)
+[18:28:14.919] LOG: [coop:health] tick=0g turn=1 wave=1 counter=0 assertions=0 wait=-1ms peerBeat=- transport=disconnected
+[18:28:14.977] LOG: %cStart Phase MessagePhase color:green;
+[18:28:15.145] LOG: [coop:launch] await peer signal start code=PSXPZF role=host timeout=60000ms
+[18:28:15.315] LOG: %cStart Phase HideAbilityPhase color:green;
+[18:28:15.344] LOG: %cStart Phase PostSummonPhase color:green;
+[18:28:15.344] LOG: Ran PSP for: Abra
+[18:28:15.345] LOG: %cStart Phase PostSummonPhase color:green;
+[18:28:15.345] LOG: %cStart Phase PostSummonPhase color:green;
+[18:28:15.345] LOG: %cStart Phase PostSummonPhase color:green;
+[18:28:15.346] LOG: Ran PSP for: Pidgey
+[18:28:15.346] LOG: %cStart Phase PostSummonPhase color:green;
+[18:28:15.346] LOG: %cStart Phase PostSummonPhase color:green;
+[18:28:15.346] LOG: %cStart Phase TurnInitPhase color:green;
+[18:28:15.347] LOG: %cStart Phase CommandPhase color:green;
+[18:28:15.347] LOG: [coop:replay] host SEND enemyPartySync wave=1 count=2 meType=-
+[18:28:15.348] WARN: [coop:webrtc] raw send DROP (not open) role=host t=enemyPartySync state=disconnected readyState=closed
+[18:28:15.349] LOG: [coop:battle] CommandPhase slot=0 turn=1 owner=host role=host -> LOCAL UI
+[18:28:15.349] LOG: [coop:rendezvous] next-command barrier ARRIVE+AWAIT cmd:1:1 slot=0
+[18:28:15.349] LOG: [coop:rendezvous] ARRIVE point=cmd:1:1 (send) role=host
+[18:28:15.349] WARN: [coop:webrtc] raw send DROP (not open) role=host t=rendezvous state=disconnected readyState=closed
+[18:28:15.350] LOG: [coop:rendezvous] AWAIT point=cmd:1:1 timeoutMs=60000 -> network-wait role=host
+[18:28:16.756] LOG: [coop:launch] await peer signal resolve code=PSXPZF role=host (1410b)
+[18:28:16.756] LOG: [coop:launch] host received answer code=PSXPZF -> setRemoteDescription
+[18:28:16.760] LOG: [coop:launch] iceConnectionState=checking code=PSXPZF role=host
+[18:28:16.760] LOG: [coop:launch] await data channel open (state=connecting timeout=30000ms)
+[18:28:16.761] LOG: [coop:launch] pcConnectionState=connecting code=PSXPZF role=host
+[18:28:16.989] LOG: [coop:launch] iceConnectionState=connected code=PSXPZF role=host
+[18:28:17.220] LOG: [coop:launch] pcConnectionState=connected code=PSXPZF role=host
+[18:28:17.384] LOG: [coop:launch] data channel OPEN
+[18:28:17.384] LOG: [coop:webrtc] replaceChannel role=host gen=2 readyState=open
+[18:28:17.384] LOG: [coop:webrtc] state role=host disconnected -> connected
+[18:28:17.384] LOG: [coop:launch] rejoin SUCCESS attempt=1 code=PSXPZF role=host
+[18:28:17.384] LOG: [coop:runtime] rejoin SUCCESS -> channel re-established in place
+[18:28:17.543] LOG: [coop:webrtc] raw rx role=host t=requestStateSync bytes=47 handlers=11
+[18:28:17.543] LOG: [coop:resync] host RECV requestStateSync turn=9396576 seq=2
+[18:28:17.543] LOG: [coop:resync] recv requestStateSync turn=9396576 seq=2 role=host
+[18:28:17.552] LOG: [coop:resync] send stateSync seq=2 blob=11456b
+[18:28:17.553] LOG: [coop:resync] host SEND stateSync seq=2 blobLen=11456
+[18:28:17.553] LOG: [coop:webrtc] raw tx role=host t=stateSync bytes=11491
+[18:28:18.564] WARN: [coop:webrtc] channel ERROR role=host readyState=closed err=User-Initiated Abort, reason=Close called
+[18:28:18.564] LOG: [coop:webrtc] channel CLOSE role=host state=connected gen=2
+[18:28:18.564] LOG: [coop:webrtc] state role=host connected -> disconnected
+[18:28:18.564] WARN: [coop:runtime] partner channel disconnected -> cancelling pending co-op waits (no 20-minute strand)
+[18:28:18.564] LOG: [coop:relay] cancelWaiters() no orphaned waiters selected -> nothing cancelled (live waits spared)
+[18:28:18.566] LOG: [coop:launch] rejoin attempt 1 code=PSXPZF role=host elapsed=0ms
+[18:28:18.566] LOG: [coop:launch] exchange SDP start code=PSXPZF role=host (ice=fetched)
+[18:28:18.851] LOG: [coop:launch] ICE from worker /coop/ice servers=1
+[18:28:19.230] LOG: [coop:launch] host pushing offer code=PSXPZF (ICE gathered)
+[18:28:19.230] LOG: [coop:launch] pushSignal code=PSXPZF role=host sdpBytes=2104
+[18:28:19.532] LOG: [coop:launch] await peer signal start code=PSXPZF role=host timeout=60000ms
+[18:28:21.332] LOG: [coop:launch] await peer signal resolve code=PSXPZF role=host (1407b)
+[18:28:21.333] LOG: [coop:launch] host received answer code=PSXPZF -> setRemoteDescription
+[18:28:21.335] LOG: [coop:launch] iceConnectionState=checking code=PSXPZF role=host
+[18:28:21.337] LOG: [coop:launch] await data channel open (state=connecting timeout=30000ms)
+[18:28:21.337] LOG: [coop:launch] pcConnectionState=connecting code=PSXPZF role=host
+[18:28:21.387] LOG: [coop:launch] iceConnectionState=disconnected code=PSXPZF role=host
+[18:28:21.388] LOG: [coop:launch] pcConnectionState=disconnected code=PSXPZF role=host
+[18:28:21.546] LOG: [coop:launch] iceConnectionState=connected code=PSXPZF role=host
+[18:28:21.776] LOG: [coop:launch] pcConnectionState=connected code=PSXPZF role=host
+[18:28:21.932] LOG: [coop:launch] data channel OPEN
+[18:28:21.932] LOG: [coop:webrtc] replaceChannel role=host gen=3 readyState=open
+[18:28:21.932] LOG: [coop:webrtc] state role=host disconnected -> connected
+[18:28:21.932] LOG: [coop:launch] rejoin SUCCESS attempt=1 code=PSXPZF role=host
+[18:28:21.932] LOG: [coop:runtime] rejoin SUCCESS -> channel re-established in place
+[18:28:22.079] LOG: [coop:webrtc] raw rx role=host t=requestStateSync bytes=47 handlers=11
+[18:28:22.079] LOG: [coop:resync] host RECV requestStateSync turn=9301116 seq=3
+[18:28:22.079] LOG: [coop:resync] recv requestStateSync turn=9301116 seq=3 role=host
+[18:28:22.086] LOG: [coop:resync] send stateSync seq=3 blob=11464b
+[18:28:22.086] LOG: [coop:resync] host SEND stateSync seq=3 blobLen=11464
+[18:28:22.086] LOG: [coop:webrtc] raw tx role=host t=stateSync bytes=11499
+[18:28:22.849] WARN: [coop:webrtc] channel ERROR role=host readyState=closed err=User-Initiated Abort, reason=Close called
+[18:28:22.849] LOG: [coop:webrtc] channel CLOSE role=host state=connected gen=3
+[18:28:22.849] LOG: [coop:webrtc] state role=host connected -> disconnected
+[18:28:22.849] WARN: [coop:runtime] partner channel disconnected -> cancelling pending co-op waits (no 20-minute strand)
+[18:28:22.850] LOG: [coop:relay] cancelWaiters() no orphaned waiters selected -> nothing cancelled (live waits spared)
+[18:28:22.850] LOG: [coop:launch] rejoin attempt 1 code=PSXPZF role=host elapsed=0ms
+[18:28:22.850] LOG: [coop:launch] exchange SDP start code=PSXPZF role=host (ice=fetched)
+[18:28:23.147] LOG: [coop:launch] ICE from worker /coop/ice servers=1
+[18:28:23.529] LOG: [coop:launch] host pushing offer code=PSXPZF (ICE gathered)
+[18:28:23.529] LOG: [coop:launch] pushSignal code=PSXPZF role=host sdpBytes=2100
+[18:28:23.860] LOG: [coop:launch] await peer signal start code=PSXPZF role=host timeout=60000ms
+[18:28:24.436] LOG: [coop:launch] iceConnectionState=disconnected code=PSXPZF role=host
+[18:28:24.436] LOG: [coop:launch] pcConnectionState=disconnected code=PSXPZF role=host
+[18:28:25.431] LOG: [coop:launch] await peer signal resolve code=PSXPZF role=host (1411b)
+[18:28:25.431] LOG: [coop:launch] host received answer code=PSXPZF -> setRemoteDescription
+[18:28:25.434] LOG: [coop:launch] iceConnectionState=checking code=PSXPZF role=host
+[18:28:25.436] LOG: [coop:launch] await data channel open (state=connecting timeout=30000ms)
+[18:28:25.437] LOG: [coop:launch] pcConnectionState=connecting code=PSXPZF role=host
+[18:28:25.690] LOG: [coop:launch] iceConnectionState=connected code=PSXPZF role=host
+[18:28:26.072] LOG: [coop:launch] pcConnectionState=connected code=PSXPZF role=host
+[18:28:26.276] LOG: [coop:launch] data channel OPEN
+[18:28:26.276] LOG: [coop:webrtc] replaceChannel role=host gen=4 readyState=open
+[18:28:26.276] LOG: [coop:webrtc] state role=host disconnected -> connected
+[18:28:26.277] LOG: [coop:launch] rejoin SUCCESS attempt=1 code=PSXPZF role=host
+[18:28:26.277] LOG: [coop:runtime] rejoin SUCCESS -> channel re-established in place
+[18:28:26.433] LOG: [coop:webrtc] raw rx role=host t=requestStateSync bytes=47 handlers=11
+[18:28:26.434] LOG: [coop:resync] host RECV requestStateSync turn=9305468 seq=4
+[18:28:26.434] LOG: [coop:resync] recv requestStateSync turn=9305468 seq=4 role=host
+[18:28:26.449] LOG: [coop:resync] send stateSync seq=4 blob=11472b
+[18:28:26.449] LOG: [coop:resync] host SEND stateSync seq=4 blobLen=11472
+[18:28:26.449] LOG: [coop:webrtc] raw tx role=host t=stateSync bytes=11507
+[18:28:27.016] WARN: [coop:webrtc] channel ERROR role=host readyState=closed err=User-Initiated Abort, reason=Close called
+[18:28:27.016] LOG: [coop:webrtc] channel CLOSE role=host state=connected gen=4
+[18:28:27.017] LOG: [coop:webrtc] state role=host connected -> disconnected
+[18:28:27.017] WARN: [coop:runtime] partner channel disconnected -> cancelling pending co-op waits (no 20-minute strand)
+[18:28:27.017] LOG: [coop:relay] cancelWaiters() no orphaned waiters selected -> nothing cancelled (live waits spared)
+[18:28:27.018] LOG: [coop:launch] rejoin attempt 1 code=PSXPZF role=host elapsed=0ms
+[18:28:27.018] LOG: [coop:launch] exchange SDP start code=PSXPZF role=host (ice=fetched)
+[18:28:27.272] LOG: [coop:launch] ICE from worker /coop/ice servers=1
+[18:28:27.586] LOG: [coop:launch] host pushing offer code=PSXPZF (ICE gathered)
+[18:28:27.586] LOG: [coop:launch] pushSignal code=PSXPZF role=host sdpBytes=2103
+[18:28:27.933] LOG: [coop:launch] await peer signal start code=PSXPZF role=host timeout=60000ms
+[18:28:27.935] LOG: [coop:launch] iceConnectionState=disconnected code=PSXPZF role=host
+[18:28:27.935] LOG: [coop:launch] pcConnectionState=disconnected code=PSXPZF role=host
+[18:28:29.552] LOG: [coop:launch] await peer signal resolve code=PSXPZF role=host (1407b)
+[18:28:29.552] LOG: [coop:launch] host received answer code=PSXPZF -> setRemoteDescription
+[18:28:29.553] LOG: [coop:launch] iceConnectionState=checking code=PSXPZF role=host
+[18:28:29.555] LOG: [coop:launch] await data channel open (state=connecting timeout=30000ms)
+[18:28:29.555] LOG: [coop:launch] pcConnectionState=connecting code=PSXPZF role=host
+[18:28:29.853] LOG: [coop:launch] iceConnectionState=connected code=PSXPZF role=host
+[18:28:30.065] LOG: [coop:launch] pcConnectionState=connected code=PSXPZF role=host
+[18:28:30.229] LOG: [coop:launch] data channel OPEN
+[18:28:30.230] LOG: [coop:webrtc] replaceChannel role=host gen=5 readyState=open
+[18:28:30.230] LOG: [coop:webrtc] state role=host disconnected -> connected
+[18:28:30.230] LOG: [coop:launch] rejoin SUCCESS attempt=1 code=PSXPZF role=host
+[18:28:30.230] LOG: [coop:runtime] rejoin SUCCESS -> channel re-established in place
+[18:28:30.385] LOG: [coop:webrtc] raw rx role=host t=requestStateSync bytes=47 handlers=11
+[18:28:30.385] LOG: [coop:resync] host RECV requestStateSync turn=9309418 seq=5
+[18:28:30.385] LOG: [coop:resync] recv requestStateSync turn=9309418 seq=5 role=host
+[18:28:30.390] LOG: [coop:resync] send stateSync seq=5 blob=11480b
+[18:28:30.390] LOG: [coop:resync] host SEND stateSync seq=5 blobLen=11480
+[18:28:30.390] LOG: [coop:webrtc] raw tx role=host t=stateSync bytes=11515
+[18:28:31.189] WARN: [coop:webrtc] channel ERROR role=host readyState=closed err=User-Initiated Abort, reason=Close called
+[18:28:31.189] LOG: [coop:webrtc] channel CLOSE role=host state=connected gen=5
+[18:28:31.189] LOG: [coop:webrtc] state role=host connected -> disconnected
+[18:28:31.189] WARN: [coop:runtime] partner channel disconnected -> cancelling pending co-op waits (no 20-minute strand)
+[18:28:31.189] LOG: [coop:relay] cancelWaiters() no orphaned waiters selected -> nothing cancelled (live waits spared)
+[18:28:31.190] LOG: [coop:launch] rejoin attempt 1 code=PSXPZF role=host elapsed=0ms
+[18:28:31.190] LOG: [coop:launch] exchange SDP start code=PSXPZF role=host (ice=fetched)
+[18:28:31.429] LOG: [coop:launch] pcConnectionState=failed code=PSXPZF role=host
+[18:28:31.446] LOG: [coop:launch] ICE from worker /coop/ice servers=1
+[18:28:31.785] LOG: [coop:launch] host pushing offer code=PSXPZF (ICE gathered)
+[18:28:31.785] LOG: [coop:launch] pushSignal code=PSXPZF role=host sdpBytes=2101
+[18:28:32.033] LOG: [coop:launch] await peer signal start code=PSXPZF role=host timeout=60000ms
+[18:28:32.129] LOG: [coop:launch] iceConnectionState=disconnected code=PSXPZF role=host
+[18:28:32.130] LOG: [coop:launch] pcConnectionState=disconnected code=PSXPZF role=host
+[18:28:33.652] LOG: [coop:launch] await peer signal resolve code=PSXPZF role=host (1411b)
+[18:28:33.652] LOG: [coop:launch] host received answer code=PSXPZF -> setRemoteDescription
+[18:28:33.654] LOG: [coop:launch] iceConnectionState=checking code=PSXPZF role=host
+[18:28:33.657] LOG: [coop:launch] await data channel open (state=connecting timeout=30000ms)
+[18:28:33.657] LOG: [coop:launch] pcConnectionState=connecting code=PSXPZF role=host
+[18:28:33.875] LOG: [coop:launch] iceConnectionState=connected code=PSXPZF role=host
+[18:28:34.111] LOG: [coop:launch] pcConnectionState=connected code=PSXPZF role=host
+[18:28:34.292] LOG: [coop:launch] data channel OPEN
+[18:28:34.293] LOG: [coop:webrtc] replaceChannel role=host gen=6 readyState=open
+[18:28:34.293] LOG: [coop:webrtc] state role=host disconnected -> connected
+[18:28:34.293] LOG: [coop:launch] rejoin SUCCESS attempt=1 code=PSXPZF role=host
+[18:28:34.293] LOG: [coop:runtime] rejoin SUCCESS -> channel re-established in place
+[18:28:34.389] LOG: [coop:launch] pcConnectionState=failed code=PSXPZF role=host
+[18:28:34.447] LOG: [coop:webrtc] raw rx role=host t=requestStateSync bytes=47 handlers=11
+[18:28:34.447] LOG: [coop:resync] host RECV requestStateSync turn=9313481 seq=6
+[18:28:34.447] LOG: [coop:resync] recv requestStateSync turn=9313481 seq=6 role=host
+[18:28:34.454] LOG: [coop:resync] send stateSync seq=6 blob=11452b
+[18:28:34.454] LOG: [coop:resync] host SEND stateSync seq=6 blobLen=11452
+[18:28:34.454] LOG: [coop:webrtc] raw tx role=host t=stateSync bytes=11487
+[18:28:35.352] WARN: [coop:webrtc] channel ERROR role=host readyState=closed err=User-Initiated Abort, reason=Close called
+[18:28:35.352] LOG: [coop:webrtc] channel CLOSE role=host state=connected gen=6
+[18:28:35.352] LOG: [coop:webrtc] state role=host connected -> disconnected
+[18:28:35.352] WARN: [coop:runtime] partner channel disconnected -> cancelling pending co-op waits (no 20-minute strand)
+[18:28:35.352] LOG: [coop:relay] cancelWaiters() no orphaned waiters selected -> nothing cancelled (live waits spared)
+[18:28:35.353] LOG: [coop:launch] rejoin attempt 1 code=PSXPZF role=host elapsed=0ms
+[18:28:35.353] LOG: [coop:launch] exchange SDP start code=PSXPZF role=host (ice=fetched)
+[18:28:35.622] LOG: [coop:launch] ICE from worker /coop/ice servers=1
+[18:28:35.956] LOG: [coop:launch] host pushing offer code=PSXPZF (ICE gathered)
+[18:28:35.956] LOG: [coop:launch] pushSignal code=PSXPZF role=host sdpBytes=2105
+[18:28:36.210] LOG: [coop:launch] iceConnectionState=disconnected code=PSXPZF role=host
+[18:28:36.210] LOG: [coop:launch] pcConnectionState=disconnected code=PSXPZF role=host
+[18:28:36.240] LOG: [coop:launch] await peer signal start code=PSXPZF role=host timeout=60000ms
+[18:28:37.913] LOG: [coop:launch] pcConnectionState=failed code=PSXPZF role=host
+[18:28:38.569] LOG: [coop:launch] await peer signal resolve code=PSXPZF role=host (1409b)
+[18:28:38.569] LOG: [coop:launch] host received answer code=PSXPZF -> setRemoteDescription
+[18:28:38.571] LOG: [coop:launch] iceConnectionState=checking code=PSXPZF role=host
+[18:28:38.573] LOG: [coop:launch] await data channel open (state=connecting timeout=30000ms)
+[18:28:38.573] LOG: [coop:launch] pcConnectionState=connecting code=PSXPZF role=host
+[18:28:38.856] LOG: [coop:launch] iceConnectionState=connected code=PSXPZF role=host
+[18:28:39.242] LOG: [coop:launch] pcConnectionState=connected code=PSXPZF role=host
+[18:28:39.418] LOG: [coop:launch] data channel OPEN
+[18:28:39.418] LOG: [coop:webrtc] replaceChannel role=host gen=7 readyState=open
+[18:28:39.418] LOG: [coop:webrtc] state role=host disconnected -> connected
+[18:28:39.418] LOG: [coop:launch] rejoin SUCCESS attempt=1 code=PSXPZF role=host
+[18:28:39.418] LOG: [coop:runtime] rejoin SUCCESS -> channel re-established in place
+[18:28:39.478] WARN: [coop:webrtc] channel ERROR role=host readyState=closed err=User-Initiated Abort, reason=Close called
+[18:28:39.478] LOG: [coop:webrtc] channel CLOSE role=host state=connected gen=7
+[18:28:39.478] LOG: [coop:webrtc] state role=host connected -> disconnected
+[18:28:39.478] WARN: [coop:runtime] partner channel disconnected -> cancelling pending co-op waits (no 20-minute strand)
+[18:28:39.478] LOG: [coop:relay] cancelWaiters() no orphaned waiters selected -> nothing cancelled (live waits spared)
+[18:28:39.479] LOG: [coop:launch] rejoin attempt 1 code=PSXPZF role=host elapsed=0ms
+[18:28:39.479] LOG: [coop:launch] exchange SDP start code=PSXPZF role=host (ice=fetched)
+[18:28:39.724] LOG: [coop:launch] ICE from worker /coop/ice servers=1
+[18:28:40.054] LOG: [coop:launch] host pushing offer code=PSXPZF (ICE gathered)
+[18:28:40.054] LOG: [coop:launch] pushSignal code=PSXPZF role=host sdpBytes=2102
+[18:28:40.237] LOG: [coop:launch] iceConnectionState=disconnected code=PSXPZF role=host
+[18:28:40.237] LOG: [coop:launch] pcConnectionState=disconnected code=PSXPZF role=host
+[18:28:40.336] LOG: [coop:launch] await peer signal start code=PSXPZF role=host timeout=60000ms
+[18:28:42.090] LOG: [coop:launch] pcConnectionState=failed code=PSXPZF role=host
+[18:28:44.926] LOG: [coop:interaction] interactionCounter() read -> 0 (role=host)
+[18:28:44.926] LOG: [coop:health] tick=0g turn=1 wave=1 counter=0 assertions=0 wait=-1ms peerBeat=- transport=disconnected
+[18:28:45.277] LOG: [coop:launch] iceConnectionState=disconnected code=PSXPZF role=host
+[18:28:45.277] LOG: [coop:launch] pcConnectionState=disconnected code=PSXPZF role=host
+[18:28:46.269] LOG: [coop:launch] pcConnectionState=failed code=PSXPZF role=host
+[18:28:50.280] LOG: [coop:launch] pcConnectionState=failed code=PSXPZF role=host
+[18:28:55.307] LOG: [coop:launch] pcConnectionState=failed code=PSXPZF role=host
+[18:29:15.254] LOG: [coop:interaction] interactionCounter() read -> 0 (role=host)
+[18:29:15.254] LOG: [coop:health] tick=0g turn=1 wave=1 counter=0 assertions=0 wait=-1ms peerBeat=- transport=disconnected
+[18:29:16.262] WARN: [coop:rendezvous] RENDEZVOUS TIMEOUT point=cmd:1:1 after 60000ms - partner never arrived; PROCEEDING (anti-hang backstop) role=host
+[18:29:16.262] WARN: [coop:rendezvous] next-command barrier cmd:1:1 TIMED OUT - partner never reached command; opening UI anyway (anti-hang)
