@@ -2083,6 +2083,46 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
   },
   {
+    label: "(note) Co-op: an ME that GRANTS a mon with a FULL party no longer freezes both clients (#855)",
+    description:
+      "CO-OP fix - verify with TWO clients (not a solo battle): a mystery event that GRANTS a mon (e.g.\n"
+      + "The Pokemon Salesman's buy option, Regional Emissary) used to FREEZE the whole session when the\n"
+      + "party was full - the replace-or-skip picker opened but NEITHER co-op player could drive it (the\n"
+      + "live P0). #855 wires it like the other ME sub-prompts: on a GUEST-OWNED ME the mon's RECIPIENT\n"
+      + "(the ME owner) drives the REAL replace-or-skip picker locally and relays only the chosen slot;\n"
+      + "the sole-engine host applies the release+add authoritatively (a decline / cancel / disconnect\n"
+      + "just skips the grant, never hangs). DO (2 clients): fill BOTH players' halves of the party (3\n"
+      + "each = 6 total), then have the PARTNER (guest) trigger + choose an ME option that GRANTS a mon.\n"
+      + "EXPECT: the 'party is full' replace-or-skip picker opens and is DRIVABLE by the player who owns\n"
+      + "the event (pick a slot to replace, or Cancel to skip); the mon is added to the picked slot (or\n"
+      + "skipped) on BOTH clients; neither screen freezes. A HOST-owned ME grant is unchanged. Handshake\n"
+      + "tested headlessly in test/tests/elite-redux/coop/coop-me-catch-full-subprompt.test.ts.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({ STARTING_WAVE_OVERRIDE: 1, STARTING_LEVEL_OVERRIDE: 20 });
+      // A FULL 6-mon party so a co-op run splits into two full 3-mon halves - the condition that opens
+      // the replace-or-skip picker on the next ME mon grant.
+      return [
+        makeStarter(SpeciesId.SNORLAX, { moveset: [MoveId.TACKLE, MoveId.BODY_SLAM, MoveId.REST, MoveId.SNORE] }),
+        makeStarter(SpeciesId.GENGAR, {
+          moveset: [MoveId.SHADOW_BALL, MoveId.SLUDGE_BOMB, MoveId.HYPNOSIS, MoveId.DARK_PULSE],
+        }),
+        makeStarter(SpeciesId.PIKACHU, {
+          moveset: [MoveId.THUNDERBOLT, MoveId.QUICK_ATTACK, MoveId.IRON_TAIL, MoveId.NUZZLE],
+        }),
+        makeStarter(SpeciesId.CHARIZARD, {
+          moveset: [MoveId.FLAMETHROWER, MoveId.AIR_SLASH, MoveId.DRAGON_PULSE, MoveId.ROOST],
+        }),
+        makeStarter(SpeciesId.BLASTOISE, {
+          moveset: [MoveId.SURF, MoveId.ICE_BEAM, MoveId.FLASH_CANNON, MoveId.RAPID_SPIN],
+        }),
+        makeStarter(SpeciesId.VENUSAUR, {
+          moveset: [MoveId.GIGA_DRAIN, MoveId.SLUDGE_BOMB, MoveId.SYNTHESIS, MoveId.LEECH_SEED],
+        }),
+      ];
+    },
+  },
+  {
     label: "(note) Co-op: the World-Map biome CHOICE + crossroads are owner-alternated + mirrored (#848)",
     description:
       "CO-OP fix - verify with TWO clients (not a solo battle): the ER World Map biome pick and the\n"
