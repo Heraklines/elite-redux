@@ -384,6 +384,22 @@ export class AttemptCapturePhase extends PokemonPhase {
           const partyFull = globalScene.gameMode.isCoop
             ? coopAttributeNewMon(party) === null
             : party.length === PLAYER_PARTY_MAX_SIZE;
+          // Co-op wiring-audit REVIEW (finding #3, docs/plans/2026-07-07-coop-screen-wiring-audit.md):
+          // this full-party RELEASE picker runs HOST-ONLY (AttemptCapturePhase is in the renderer
+          // DENIED set, coop-renderer-gate.ts), so it CANNOT hang - but for a GUEST-thrown catch
+          // (`this.throwerRole === "guest"`) it lets the HOST decide releases from the MERGED party,
+          // which can release the host's OWN mons and mis-attribute the guest's catch to the host
+          // (the #800 class). The correct fix is the #855 catchFull relay applied to the wild path:
+          // the RECIPIENT (the catching player, `this.throwerRole`) drives a non-mutating PARTY/SELECT
+          // picker and the authoritative host applies the release+add from the relayed slot, scoped to
+          // the recipient's own `coopOwner` half - reusing `coopHostStreamCatchFullAwaitSlot` /
+          // `CoopReplayMePhase.openSubPickCapture` (ME path) via the live-battle precedent of
+          // `CoopGuestFaintSwitchPhase` (host `awaitInteractionChoice` on a new `catchFull` seq band +
+          // a guest picker dispatched off a live catch-full presentation at coop-replay-turn-phase.ts,
+          // timeout => DECLINE the grant, never hangs). DEFERRED from the closeout batch: it is an
+          // all-or-nothing landing (the seq/kind registry guards require band+kind+consumer together)
+          // and needs a new two-engine harness scenario (the guest never runs this phase today), which
+          // is disproportionate to a benign, non-blocking case. Tracked here + in the audit doc.
           if (partyFull) {
             const promptRelease = () => {
               globalScene.ui.showText(
