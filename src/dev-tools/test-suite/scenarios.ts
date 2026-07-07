@@ -2167,16 +2167,19 @@ export const DEV_SCENARIOS: DevScenario[] = [
     shopItems: [modifierTypes.ER_DEX_NAV],
   },
   {
-    label: "(note) Co-op: an ME TRAINER (event) battle is a DOUBLE - plus a trainer-sprite residual (#802/#818)",
+    label: "(note) Co-op: an ME TRAINER (event) battle is a DOUBLE - trainer-sprite crash now FIXED (#802/#818)",
     description:
-      "CO-OP behavior + a REPORTED RESIDUAL - verify with TWO clients (a doubles run): a mystery event\n"
-      + "that spawns a TRAINER battle (e.g. Mysterious Challengers) is forced to a DOUBLE so both players\n"
-      + "field a mon (#818, closing #802's 'trainer event ran as singles in a doubles run'). DO: trigger\n"
-      + "an ME trainer battle in co-op. EXPECT: a DOUBLE trainer battle (2 enemy slots), never a single.\n"
-      + "RESIDUAL (reported, NOT fixed): #818 forces the DOUBLE variant on WHATEVER trainer the ME rolls,\n"
-      + "but most trainer configs have hasDouble=false, so the Trainer builds a single sprite pair while\n"
-      + "its variant stays DOUBLE - WATCH for a crash / missing second trainer sprite at the trainer\n"
-      + "SUMMON (a Trainer sprite/variant fix is owed). Format verified headlessly in\n"
+      "CO-OP behavior - verify with TWO clients (a doubles run): a mystery event that spawns a TRAINER\n"
+      + "battle (e.g. Mysterious Challengers) is forced to a DOUBLE so both players field a mon (#818,\n"
+      + "closing #802's 'trainer event ran as singles in a doubles run'). DO: trigger an ME trainer battle\n"
+      + "in co-op. EXPECT: a DOUBLE trainer battle (2 enemy slots), never a single.\n"
+      + "FIXED (was a crash-at-summon): #818 forces the DOUBLE variant on WHATEVER trainer the ME rolls,\n"
+      + "but most trainer configs have hasDouble=false, so the Trainer builds a SINGLE sprite pair while\n"
+      + "its variant stays DOUBLE. The sprite accessors used to index a partner sprite that was never\n"
+      + "added and threw at the trainer SUMMON; the Trainer sprite path now gates the partner sprite on\n"
+      + "hasPartnerSprite() (matching the ctor), so the summon shows ONE trainer sprite and never crashes.\n"
+      + "EXPECT: the trainer appears (single sprite) and the double battle plays out - no black-screen\n"
+      + "crash. Verified headlessly in test/tests/elite-redux/trainer-forced-double-sprite.test.ts and\n"
       + "test/tests/elite-redux/coop/coop-me-trainer-battle-double.test.ts.",
     setup: () => {
       resetDevOverrides();

@@ -263,6 +263,23 @@ export class Trainer extends Phaser.GameObjects.Container {
     return this.variant === TrainerVariant.DOUBLE;
   }
 
+  /**
+   * Whether this trainer was built with a SEPARATE partner trainer sprite (a true two-trainer
+   * duo like Tate & Liza). The ctor only adds the partner sprite pair when the EFFECTIVE sprite
+   * variant is DOUBLE, i.e. it demotes to a single sprite pair when `!config.hasDouble` (see the
+   * `switch (this.variant)` demotion + the `variant === DOUBLE && !doubleOnly` guard in the ctor).
+   *
+   * A co-op / doubles-challenge force-double against a NORMAL single trainer keeps
+   * `this.variant === DOUBLE` for GAMEPLAY (both players get an enemy-facing slot, two enemy mons)
+   * but has hasDouble=false, so only ONE trainer sprite exists. The sprite accessors below must
+   * agree with that construction guard - reading `this.variant` alone makes them index a partner
+   * sprite that was never added and throw at the trainer summon (`initSprite`/`getSprites`).
+   * `doubleOnly` classes render a single combined sprite, so they are excluded too.
+   */
+  private hasPartnerSprite(): boolean {
+    return this.variant === TrainerVariant.DOUBLE && this.config.hasDouble && !this.config.doubleOnly;
+  }
+
   getMixedBattleBgm(): string {
     return this.config.mixedBattleBgm;
   }
@@ -851,7 +868,7 @@ export class Trainer extends Phaser.GameObjects.Container {
     this.tryPlaySprite(sprites[0], tintSprites[0], trainerAnimConfig);
 
     // Queue an animation for the second trainer if this is a double battle against two separate trainers
-    if (this.variant === TrainerVariant.DOUBLE && !this.config.doubleOnly) {
+    if (this.hasPartnerSprite()) {
       const partnerTrainerAnimConfig = {
         key: this.getKey(true),
         repeat: 0,
@@ -864,7 +881,7 @@ export class Trainer extends Phaser.GameObjects.Container {
 
   getSprites(): Phaser.GameObjects.Sprite[] {
     const ret: Phaser.GameObjects.Sprite[] = [this.getAt(0)];
-    if (this.variant === TrainerVariant.DOUBLE && !this.config.doubleOnly) {
+    if (this.hasPartnerSprite()) {
       ret.push(this.getAt(2));
     }
     return ret;
@@ -872,7 +889,7 @@ export class Trainer extends Phaser.GameObjects.Container {
 
   getTintSprites(): Phaser.GameObjects.Sprite[] {
     const ret: Phaser.GameObjects.Sprite[] = [this.getAt(1)];
-    if (this.variant === TrainerVariant.DOUBLE && !this.config.doubleOnly) {
+    if (this.hasPartnerSprite()) {
       ret.push(this.getAt(3));
     }
     return ret;
