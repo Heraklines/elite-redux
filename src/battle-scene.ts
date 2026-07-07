@@ -1850,6 +1850,15 @@ export class BattleScene extends SceneBase {
     const trainer = new Trainer(trainerType, female ? TrainerVariant.FEMALE : TrainerVariant.DEFAULT);
     markTrainerAsShowdown(trainer, teamSize);
     applyGhostTrainerPresentation(trainer, profile);
+    // Baseline identity (staging fix 2026-07-07): a live opponent WITHOUT an authored ghost
+    // profile (or one with no displayName) must still face you under their real ACCOUNT NAME -
+    // not the trainer class's random NPC name. An authored displayName, when present, wins.
+    if (!profile?.displayName) {
+      const partnerName = getCoopController()?.partnerName;
+      if (partnerName) {
+        trainer.name = partnerName;
+      }
+    }
     return trainer;
   }
 

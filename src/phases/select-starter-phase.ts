@@ -49,6 +49,7 @@ import {
   ShowdownSession,
 } from "#data/elite-redux/showdown/showdown-session";
 import { buildShowdownStakePool } from "#data/elite-redux/showdown/showdown-stake-pool";
+import type { ShowdownMonManifest } from "#data/elite-redux/showdown/showdown-team";
 import { beginShowdownTelemetry } from "#data/elite-redux/showdown/showdown-telemetry";
 import { SpeciesFormChangeMoveLearnedTrigger } from "#data/form-change-triggers";
 import { Gender } from "#data/gender";
@@ -436,7 +437,7 @@ export class SelectStarterPhase extends Phase {
           hostTeam: manifests,
           guestTeam: result.opponentManifest,
         });
-        void this.launchShowdownBattle(starters, role, matchId);
+        void this.launchShowdownBattle(starters, role, matchId, manifests);
       },
     };
     // Await so no later UI transition can silently displace the wager screen; both players must
@@ -450,7 +451,12 @@ export class SelectStarterPhase extends Phase {
    * from the host's authoritative launch snapshot (its player side IS the host's team) - there is no
    * correct local fallback for the guest, so a missed snapshot aborts cleanly.
    */
-  private async launchShowdownBattle(starters: Starter[], role: CoopRole, matchId: string | null): Promise<void> {
+  private async launchShowdownBattle(
+    starters: Starter[],
+    role: CoopRole,
+    matchId: string | null,
+    ownManifests?: ShowdownMonManifest[],
+  ): Promise<void> {
     // B7 item 11: the run launch is DEFERRED to here (post wager-commit), so it can't race the wager
     // screen the way item-4's team-confirm `startRun` did. Pin the neutral run difficulty ("ace", the
     // module default) on BOTH clients: a versus battle is a manifest-built level-100 6v6, so difficulty
@@ -485,7 +491,7 @@ export class SelectStarterPhase extends Phase {
     globalScene.sessionSlotId = slot;
     // ignoreMovesetValidation: the showdown team was assembled with explicit movesets - keep them
     // verbatim (the legality pass would strip them and desync the relayed enemy commands).
-    void globalScene.ui.setMode(UiMode.MESSAGE).then(() => this.initBattle(starters, true));
+    void globalScene.ui.setMode(UiMode.MESSAGE).then(() => this.initBattle(starters, true, undefined, ownManifests));
   }
 
   /** Showdown 1v1 (D0): tear the versus session down and return to the title with a message. */
@@ -518,15 +524,30 @@ export class SelectStarterPhase extends Phase {
    *   The merged party is interleaved (host0, guest0, host1, ...), so `coopOwners[i]` is the
    *   owner of `starters[i]`. Omitted / `undefined` for solo and all other modes.
    */
-  initBattle(starters: Starter[], ignoreMovesetValidation = false, coopOwners?: CoopRole[]) {
+  initBattle(
+    starters: Starter[],
+    ignoreMovesetValidation = false,
+    coopOwners?: CoopRole[],
+    showdownManifests?: ShowdownMonManifest[],
+  ) {
     const party = globalScene.getPlayerParty();
     const loadPokemonAssets: Promise<void>[] = [];
+    // Showdown 1v1 (staging fix 2026-07-07): the HOST's OWN party must be fielded from the
+    // MANIFEST (the validated fielded stage/mega + level-100 identity the opponent also builds
+    // from), not the raw grid Starter whose speciesId is the LINE ROOT. Without this the player
+    // fielded base forms (Charmander) while the opponent correctly saw the picked stage
+    // (Mega Charizard) built from the same manifest - an asymmetric, wrong battle.
+    // Threaded EXPLICITLY (not read from the showdown-battle-state global): the two-engine duo
+    // harness runs both clients in one process, where a global read here poisons the host's
+    // party with the guest's stash (caught by showdown-duo.test.ts).
+    const ownManifests = globalScene.gameMode.isShowdown ? (showdownManifests ?? null) : null;
     starters.forEach((starter: Starter, i: number) => {
       if (!i && Overrides.STARTER_SPECIES_OVERRIDE) {
         starter.speciesId = Overrides.STARTER_SPECIES_OVERRIDE;
       }
-      const species = getPokemonSpecies(starter.speciesId);
-      let starterFormIndex = starter.formIndex;
+      const showdownMon = ownManifests?.[i] ?? null;
+      const species = getPokemonSpecies(showdownMon?.speciesId ?? starter.speciesId);
+      let starterFormIndex = showdownMon?.formIndex ?? starter.formIndex;
       if (
         starter.speciesId in Overrides.STARTER_FORM_OVERRIDES
         && Overrides.STARTER_FORM_OVERRIDES[starter.speciesId] != null

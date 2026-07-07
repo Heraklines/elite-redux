@@ -537,10 +537,14 @@ export class TitlePhase extends Phase {
         // kept for the wire config's back-compat field.
         if (runtime.controller.role === "host") {
           runtime.controller.setNetcodeMode(netcodeMode);
-          // Showdown 1v1 PvP (C1): pin the session kind on the host so it rides into the
-          // guest via broadcastRunConfig (co-op default is unchanged).
-          runtime.controller.setSessionKind(sessionKind);
         }
+        // Showdown 1v1 (staging fix 2026-07-07): pin the session kind on BOTH roles. Both clients
+        // entered this lobby through the same menu entry, so the kind is local knowledge. The old
+        // host-only pin relied on broadcastRunConfig to carry it to the guest - that broadcast was
+        // removed with the deferred run launch (B7 item 11), which silently left the GUEST on
+        // "coop" and disabled every versus gate (perspective flip, showdown command menu, pure-
+        // renderer divert): the guest then ran a full live engine on the host's snapshot.
+        runtime.controller.setSessionKind(sessionKind);
         const controller = runtime.controller;
         const partner = controller.partnerName ?? "Partner";
         stage.setSeat(1, { name: partner, detail: "Connected", dot: "green" });
@@ -921,9 +925,8 @@ export class TitlePhase extends Phase {
       if (
         (this.gameMode === GameModes.CHALLENGE || this.gameMode === GameModes.COOP)
         && !isCoopGuest
-        && !this.pendingCommunityConfig // B7 item 14a: a VERSUS (showdown) session goes Title/lobby -> SelectStarterPhase directly, never // the challenge picker. A correctly-launched versus run has gameMode SHOWDOWN (already excluded // here), but guard on the session KIND too so a versus run can never surface the picker even if
-        && // its gameMode were ever misread as COOP. Co-op (kind "coop") is unaffected.
-        !isVersusSession()
+        && !this.pendingCommunityConfig // B7 item 14a: a VERSUS (showdown) session goes Title/lobby -> SelectStarterPhase directly, never // the challenge picker. A correctly-launched versus run has gameMode SHOWDOWN (already excluded // here), but guard on the session KIND too so a versus run can never surface the picker even if // its gameMode were ever misread as COOP. Co-op (kind "coop") is unaffected.
+        && !isVersusSession()
       ) {
         globalScene.phaseManager.pushNew("SelectChallengePhase");
       } else {
