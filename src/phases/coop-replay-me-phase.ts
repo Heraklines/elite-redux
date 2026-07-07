@@ -246,6 +246,17 @@ export class CoopReplayMePhase extends Phase {
         coopLog("me", "shop-handoff notification under a foreign scene (harness ctx); deferring", { key });
         return;
       }
+      // #860 (Professor quiz stuck, sibling of #859): on the QUIZ-class MEs the phantom battle
+      // chain runs BEFORE this handoff arrives, so the shop phase queued below can never START -
+      // the guest then misses its counter-6 shop window entirely, and the #859 dissolve at the
+      // TERMINAL (85s later) advances the counter first, re-keying the pending shop one number
+      // past the host's buffered options/pick (guest awaits key 7:0, data sits at 6:0 -> stuck).
+      // Dissolve the phantom HERE, the moment the shop handoff lands, so the shop opens at the
+      // still-pinned counter. No-op when nothing is parked (the gift-ME ordering); guarded so a
+      // genuine battle-handoff replay turn is never touched.
+      if (!coopMeHandoffBattleStarted()) {
+        abortActiveCoopReplayTurnPhase("ME embedded-shop handoff (#860)");
+      }
       // #818: a reward shop can FOLLOW a quiz handoff (Dormant Guardian's relic screen after
       // the braille trial). Once the QUIZ already settled this phase DETACHED, settleForWatcherShop's
       // `settled` guard would no-op, so open the guest shop DIRECTLY here - exactly once

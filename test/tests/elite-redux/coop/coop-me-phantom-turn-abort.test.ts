@@ -97,4 +97,20 @@ describe.skipIf(!RUN)("coop #859 - phantom ME turn dissolve", () => {
     // The registry cleared - a later abort is a no-op (no stale instance leaks to the next wave).
     expect(abortActiveCoopReplayTurnPhase("post-end (test)")).toBe(false);
   });
+
+  it("#860 quiz ordering: an abort landing IMMEDIATELY after start (shop handoff race) still dissolves", async () => {
+    const { guest } = createLoopbackPair();
+    const streamer = new CoopBattleStreamer(guest);
+    vi.spyOn(coopRuntime, "getCoopBattleStreamer").mockReturnValue(streamer);
+
+    const phase = new CoopReplayTurnPhase(1, 0);
+    phase.start();
+    // The quiz-class MEs deliver the embedded-shop handoff while the pump is still spinning up -
+    // the abort must catch it via the loop-top flag check even before the park settles.
+    expect(abortActiveCoopReplayTurnPhase("ME embedded-shop handoff (test #860)")).toBe(true);
+    await new Promise(resolve => setTimeout(resolve, 10));
+
+    expect(shiftPhase).toHaveBeenCalledTimes(1); // ended - the queued shop phase can start at the pinned counter
+    expect(unshiftNew).not.toHaveBeenCalled();
+  });
 });
