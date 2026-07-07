@@ -1,0 +1,21 @@
+url:      https://elite-redux-staging.pages.dev/
+build:    mra3pslw-9a5
+mode:     0  wave:?
+seed:     9siN0oIEbZch2lrEnmrK9DLe
+party:    
+enemy:    
+
+----- CONSOLE -----
+[03:42:59.191] LOG: %c %c %c %c %c Phaser v3.90.0 (WebGL | Web Audio) %c https://phaser.io/v390 background: #ff0000 background: #ffff00 background: #00ff00 background: #00ffff color: #ffffff; background: #000000 background: transparent
+[03:43:00.681] LOG: [ER] build mra3pslw-9a5
+[03:43:01.132] LOG: [dev-tools] loaded — 465 scenarios + Send Logs button
+[04:46:09.563] DEBUG: Destroying loading scene
+[04:46:09.563] DEBUG: Destroyed loading scene
+[04:46:09.620] LOG: Seed: 9siN0oIEbZch2lrEnmrK9DLe
+[04:46:09.621] LOG: Wave Seed: 9siN0oIEbZch2lrEnmrK9DLe 0
+[04:46:11.453] LOG: %cStart Phase LoginPhase color:green;
+[04:46:12.099] LOG: Client Session: 6q5hff7J5kA7ipSJpwuTuYjndWILKHm5
+[04:46:12.462] LOG: %cStart Phase TitlePhase color:green;
+[04:46:12.463] LOG: Getting Session Slot id: %d 0
+[04:46:12.478] LOG: use seasonal splash messages true
+[04:46:29.246] LOG: [coop:lobby] start announce name=Arctic Flame
