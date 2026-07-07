@@ -36,6 +36,19 @@ describe("Showdown wager wire + rendezvous (D3)", () => {
     expect(received).toEqual(offer);
   });
 
+  it("a stake LOCK round-trips with the escrow matchId + tier (D3b)", async () => {
+    const { host, guest } = createLoopbackPair();
+    let received: { matchId: string; tier: number } | null = null;
+    guest.onMessage(m => {
+      if (m.t === "showdownStakeLock") {
+        received = { matchId: m.matchId, tier: m.tier };
+      }
+    });
+    host.send({ t: "showdownStakeLock", matchId: "abc-123", tier: 102 });
+    await flush();
+    expect(received).toEqual({ matchId: "abc-123", tier: 102 });
+  });
+
   it("both sides crossing showdown-wager-commit resolves the commit barrier", async () => {
     const { host, guest } = createLoopbackPair();
     const hrv = new CoopRendezvous(host, { timeoutMs: 10_000 });

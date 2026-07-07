@@ -36,12 +36,14 @@ import {
   setPendingShowdownRelay,
 } from "#data/elite-redux/showdown/showdown-battle-state";
 import { ShowdownCommandRelay } from "#data/elite-redux/showdown/showdown-command-relay";
+import { reportShowdownBattleEntered } from "#data/elite-redux/showdown/showdown-escrow-client";
 import { starterToManifest } from "#data/elite-redux/showdown/showdown-manifest";
 import {
   ShowdownNegotiationError,
   type ShowdownNegotiationResult,
   ShowdownSession,
 } from "#data/elite-redux/showdown/showdown-session";
+import { buildShowdownStakePool } from "#data/elite-redux/showdown/showdown-stake-pool";
 import { SpeciesFormChangeMoveLearnedTrigger } from "#data/form-change-triggers";
 import { Gender } from "#data/gender";
 import { ChallengeType } from "#enums/challenge-type";
@@ -376,9 +378,13 @@ export class SelectStarterPhase extends Phase {
       role,
       transport: runtime.localTransport,
       rendezvous: runtime.rendezvous,
-      onCommit: () => {
-        beginShowdownBattle(manifests, result.opponentManifest, relay, result.opponentProfile);
-        void this.launchShowdownBattle(starters, role);
+      // D3b: the FULL wagerable collection + the two players' account identities (escrow participants).
+      stakePool: buildShowdownStakePool(globalScene.gameData),
+      ownUsername: runtime.controller.localName(),
+      opponentUsername: runtime.controller.partnerName ?? "",
+      onCommit: (matchId: string | null) => {
+        beginShowdownBattle(manifests, result.opponentManifest, relay, result.opponentProfile, matchId);
+        void this.launchShowdownBattle(starters, role, matchId);
       },
     };
     globalScene.ui.setMode(UiMode.SHOWDOWN_WAGER, wagerArgs);
@@ -390,7 +396,13 @@ export class SelectStarterPhase extends Phase {
    * from the host's authoritative launch snapshot (its player side IS the host's team) - there is no
    * correct local fallback for the guest, so a missed snapshot aborts cleanly.
    */
-  private async launchShowdownBattle(starters: Starter[], role: CoopRole): Promise<void> {
+  private async launchShowdownBattle(starters: Starter[], role: CoopRole, matchId: string | null): Promise<void> {
+    // D1/D2: for a STAKED match, ping the escrow that the battle started (both clients). This sets the
+    // server's `battlePhaseEntered` flag that gates a lone survivor's forfeit/timeout settlement.
+    // Best-effort + fire-and-forget — it never blocks the launch.
+    if (matchId != null) {
+      void reportShowdownBattleEntered(matchId).catch(() => {});
+    }
     if (role === "guest") {
       globalScene.sessionSlotId = coopGuestSessionSlot(globalScene.sessionSlotId);
       void globalScene.ui.setMode(UiMode.MESSAGE).then(async () => {

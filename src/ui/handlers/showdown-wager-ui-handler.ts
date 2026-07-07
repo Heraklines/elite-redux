@@ -39,6 +39,7 @@ import type {
   ShowdownStakeOfferWire,
 } from "#data/elite-redux/coop/coop-transport";
 import type { GhostTrainerProfile } from "#data/elite-redux/er-ghost-profile";
+import { registerShowdownMatch } from "#data/elite-redux/showdown/showdown-escrow-client";
 import { isMegaStage } from "#data/elite-redux/showdown/showdown-evolutions";
 import type { ShowdownItemKey } from "#data/elite-redux/showdown/showdown-item-pool";
 import { SHOWDOWN_WAGER_COMMIT_POINT } from "#data/elite-redux/showdown/showdown-session";
@@ -68,8 +69,21 @@ export interface ShowdownWagerArgs {
   transport: CoopTransport | null;
   /** The shared reciprocal rendezvous for the commit barrier; null in the render harness. */
   rendezvous: CoopRendezvous | null;
-  /** Called ONCE both players have committed the friendly match. Proceeds to battle. */
-  onCommit: () => void;
+  /**
+   * D3b: THIS player's full wagerable collection (owned shinies / eligible unlocks, tier-sorted),
+   * built via {@linkcode buildShowdownStakePool}. When omitted (render harness), the picker derives
+   * a representative pool from the built team so the screen still renders offline.
+   */
+  stakePool?: StakeOffer[];
+  /** D3b: this player's account username (the escrow participant identity). Empty in the harness. */
+  ownUsername?: string;
+  /** D3b: the opponent's account username (the escrow participant identity). Empty in the harness. */
+  opponentUsername?: string;
+  /**
+   * Called ONCE both players have committed. `matchId` is the escrow server's id for a STAKED
+   * match, or null for a FRIENDLY (no-escrow) match. Proceeds to battle.
+   */
+  onCommit: (matchId: string | null) => void;
 }
 
 /** A row in the stake picker: an offer plus its display label. `offer === null` is Friendly. */
@@ -135,6 +149,15 @@ export class ShowdownWagerUiHandler extends UiHandler {
   private opponentLocked = false;
   /** Guards the one-shot commit so both-locked can't fire {@linkcode ShowdownWagerArgs.onCommit} twice. */
   private committed = false;
+  // ---- D3b staked-escrow state -------------------------------------------------------------------
+  /** The escrow server's match id once registered (host) / adopted (guest); null until then. */
+  private serverMatchId: string | null = null;
+  /** The opponent's locked tier (from their `showdownStakeLock`), for the both-locked cross-check. */
+  private opponentLockedTier: number | null = null;
+  /** Guards the async escrow registration against a double-fire. */
+  private escrowBusy = false;
+  /** First visible picker row (scroll window offset) — the pool can be hundreds of entries. */
+  private scrollTop = 0;
 
   constructor() {
     super(UiMode.SHOWDOWN_WAGER);
@@ -160,8 +183,12 @@ export class ShowdownWagerUiHandler extends UiHandler {
     this.ownLocked = false;
     this.opponentLocked = false;
     this.committed = false;
+    this.serverMatchId = null;
+    this.opponentLockedTier = null;
+    this.escrowBusy = false;
+    this.scrollTop = 0;
     this.cursor = 0;
-    this.choices = this.buildChoices(params.ownTeam);
+    this.choices = this.buildChoices(params);
 
     // Wire: listen for the opponent's offer (tier-match display) + their commit arrival (lock lamp).
     this.offMessage?.();
@@ -174,17 +201,30 @@ export class ShowdownWagerUiHandler extends UiHandler {
     return true;
   }
 
-  /** How many staked options to list beneath Friendly (kept short so the picker never overflows). */
-  private static readonly MAX_STAKE_OPTIONS = 4;
+  /** How many picker rows are visible at once (the rest scroll under the window). */
+  private static readonly VISIBLE_ROWS = 5;
 
-  /** Build the stake picker rows: Friendly first, then the team's highest DISTINCT-tier stakes. */
-  private buildChoices(team: ShowdownMonManifest[]): StakeChoice[] {
+  /**
+   * Build the stake picker rows: Friendly first, then the player's FULL wagerable collection
+   * (D3b — owned shinies / eligible unlocks, tier-sorted highest first via {@linkcode buildShowdownStakePool}).
+   * The pool can be hundreds of entries, so the render windows it (see {@linkcode scrollTop}).
+   * When no `stakePool` is provided (render harness), derives a representative pool from the built
+   * team so the screen still renders offline.
+   */
+  private buildChoices(params: ShowdownWagerArgs): StakeChoice[] {
     const rows: StakeChoice[] = [
       { offer: null, label: i18next.t("battle:showdownWagerNoStake", { defaultValue: "Friendly (no stakes)" }) },
     ];
-    // Wave-2 seam: the stake pool should widen to the player's FULL owned-shinies / eligible-unlocks
-    // collection (design). This wave derives representative offers from the built team (deduped by tier,
-    // highest first) so the tier + tier-match wire path is fully exercised while real staking is gated.
+    const pool = params.stakePool ?? this.teamDerivedPool(params.ownTeam);
+    for (const offer of pool) {
+      const species = getPokemonSpecies(offer.speciesId);
+      rows.push({ offer, label: `${species?.name ?? `#${offer.speciesId}`} - ${tierLabel(offer)}` });
+    }
+    return rows;
+  }
+
+  /** Harness/offline fallback: a representative pool derived from the built team (deduped by tier). */
+  private teamDerivedPool(team: ShowdownMonManifest[]): StakeOffer[] {
     const byTier = new Map<number, StakeOffer>();
     for (const mon of team) {
       const offer = manifestToStakeOffer(mon);
@@ -192,14 +232,7 @@ export class ShowdownWagerUiHandler extends UiHandler {
         byTier.set(stakeTier(offer), offer);
       }
     }
-    const top = [...byTier.values()]
-      .sort((a, b) => stakeTier(b) - stakeTier(a))
-      .slice(0, ShowdownWagerUiHandler.MAX_STAKE_OPTIONS);
-    for (const offer of top) {
-      const species = getPokemonSpecies(offer.speciesId);
-      rows.push({ offer, label: `${species?.name ?? `#${offer.speciesId}`} - ${tierLabel(offer)}` });
-    }
-    return rows;
+    return [...byTier.values()].sort((a, b) => stakeTier(b) - stakeTier(a));
   }
 
   private handleWire(msg: CoopMessage): void {
@@ -207,9 +240,23 @@ export class ShowdownWagerUiHandler extends UiHandler {
       this.opponentOffer = isFriendlyWire(msg.offer)
         ? null
         : { ...msg.offer, variant: msg.offer.variant as StakeVariant };
+      // An offer (not a lock) means the peer is NOT locked in: clear their staked-lock state so a
+      // host registration-failure re-offer visibly un-lights their lamp.
+      this.opponentLocked = false;
+      this.opponentLockedTier = null;
       this.render();
+    } else if (msg.t === "showdownStakeLock") {
+      // The opponent locked a STAKED offer. matchId != "" is the HOST's confirmed escrow id (adopted
+      // by the guest). Light their lamp + try to cross the commit once both are locked.
+      this.opponentLocked = true;
+      this.opponentLockedTier = msg.tier;
+      if (msg.matchId) {
+        this.serverMatchId = msg.matchId;
+      }
+      this.render();
+      this.tryStakedCommit();
     } else if (msg.t === "rendezvous" && msg.point === SHOWDOWN_WAGER_COMMIT_POINT) {
-      // The opponent committed the friendly match: light their lock lamp (their rendezvous arrival).
+      // The opponent committed the FRIENDLY match: light their lock lamp (their rendezvous arrival).
       this.opponentLocked = true;
       this.render();
     }
@@ -263,28 +310,31 @@ export class ShowdownWagerUiHandler extends UiHandler {
       return false;
     }
     this.cursor = (this.cursor + dir + n) % n;
+    this.ensureCursorVisible();
     this.broadcastOffer();
     this.render();
     return true;
   }
 
-  /** Confirm the highlighted stake: commit friendly, or refuse a staked lock (escrow gated). */
+  /** Keep the highlighted row inside the scroll window (the pool can be hundreds of entries). */
+  private ensureCursorVisible(): void {
+    const visible = ShowdownWagerUiHandler.VISIBLE_ROWS;
+    if (this.cursor < this.scrollTop) {
+      this.scrollTop = this.cursor;
+    } else if (this.cursor >= this.scrollTop + visible) {
+      this.scrollTop = this.cursor - visible + 1;
+    }
+    this.scrollTop = Math.max(0, Math.min(this.scrollTop, Math.max(0, this.choices.length - visible)));
+  }
+
+  /** Confirm the highlighted stake: lock a staked wager (escrow) or commit friendly. */
   private confirmLock(): boolean {
-    if (this.ownLocked) {
+    if (this.ownLocked || this.escrowBusy) {
       return false;
     }
     const offer = this.selectedOffer();
     if (offer != null) {
-      // ---- WAVE-2 ESCROW SEAM (D1) ----------------------------------------------------------------
-      // A real staked match locks HERE: POST /showdown/match to register the escrow hold, then on the
-      // server's matchId send `showdownStakeLock{matchId, tier}` and gate the commit on both locks +
-      // the server's confirmation. Until D1 wires the escrow endpoint, staked play is disabled and only
-      // the friendly path proceeds. Do NOT proceed to battle on a staked lock in this wave.
-      // ---------------------------------------------------------------------------------------------
-      // commitStakedMatch plays playError itself; return FALSE so processInput does NOT stack a playSelect
-      // on top (the escrow refusal is not a successful selection).
-      this.commitStakedMatch(offer);
-      return false;
+      return this.lockStakedOffer(offer);
     }
     // FRIENDLY commit: light our lamp + cross the reciprocal commit barrier. When BOTH have crossed
     // (or the anti-hang timeout fires), proceed to battle exactly once.
@@ -298,32 +348,113 @@ export class ShowdownWagerUiHandler extends UiHandler {
     void rv.rendezvous(SHOWDOWN_WAGER_COMMIT_POINT).then(() => {
       this.opponentLocked = true;
       this.render();
-      this.proceed();
+      this.proceed(null);
     });
     return true;
   }
 
   /**
-   * WAVE-1 escrow gate: a staked lock is not yet available (escrow is D1/wave-2). Surface the honest
-   * message and leave the pick unlocked so the player can fall back to Friendly. This is the ONE seam
-   * D1 replaces with the POST /showdown/match escrow registration.
+   * D3b: lock a STAKED offer. Refuses when the opponent hasn't offered a matching-tier stake yet
+   * (keeps the pick unlocked so the player can adjust or fall back to Friendly). Otherwise lights the
+   * lamp, broadcasts `showdownStakeLock`, and tries to cross the commit once both are locked.
    */
-  private commitStakedMatch(_offer: StakeOffer): void {
-    globalScene.ui.playError();
-    // A brief, self-clearing notice under the panel; the screen stays open on Friendly-only.
-    this.flash(
-      i18next.t("battle:showdownWagerEscrowUnavailable", {
-        defaultValue: "Escrow not yet available - Friendly only",
-      }),
-    );
+  private lockStakedOffer(offer: StakeOffer): boolean {
+    if (this.opponentOffer == null || !stakesMatch(offer, this.opponentOffer)) {
+      globalScene.ui.playError();
+      this.flash(
+        i18next.t("battle:showdownWagerNeedMatch", {
+          defaultValue: "Stakes must match tier to lock - or pick Friendly",
+        }),
+      );
+      return false;
+    }
+    this.ownLocked = true;
+    this.render();
+    // Broadcast our lock (carrying the confirmed escrow id once WE are the registrar and have it).
+    this.args?.transport?.send({
+      t: "showdownStakeLock",
+      matchId: this.serverMatchId ?? "",
+      tier: stakeTier(offer),
+    });
+    this.tryStakedCommit();
+    return true;
   }
 
-  private proceed(): void {
+  /**
+   * D3b: when BOTH players have locked matching stakes, cross into battle. The HOST is the escrow
+   * registrar: it POSTs /showdown/match, then re-broadcasts `showdownStakeLock` carrying the confirmed
+   * matchId and proceeds. The GUEST waits for that confirmed id, then proceeds. A registration failure
+   * un-locks the host and re-offers (the friendly path stays available). No-op until both are locked.
+   */
+  private tryStakedCommit(): void {
+    if (!this.ownLocked || !this.opponentLocked || this.committed) {
+      return;
+    }
+    const offer = this.selectedOffer();
+    const opp = this.opponentOffer;
+    if (offer == null || opp == null || !stakesMatch(offer, opp)) {
+      return; // tiers drifted apart — wait for a fresh matching lock
+    }
+    if (this.args?.role === "guest") {
+      // The guest never registers; it proceeds once the host's confirmed id has arrived.
+      if (this.serverMatchId != null) {
+        this.proceed(this.serverMatchId);
+      }
+      return;
+    }
+    // HOST: register the escrow hold exactly once.
+    if (this.serverMatchId != null) {
+      this.proceed(this.serverMatchId);
+      return;
+    }
+    if (this.escrowBusy) {
+      return;
+    }
+    void this.registerAsHost(offer, opp);
+  }
+
+  /** HOST-side escrow registration (async). On success, confirm the lock to the guest and proceed. */
+  private async registerAsHost(hostStake: StakeOffer, guestStake: StakeOffer): Promise<void> {
+    const args = this.args;
+    if (args == null) {
+      return;
+    }
+    this.escrowBusy = true;
+    const matchId = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+    const result = await registerShowdownMatch({
+      matchId,
+      hostUid: args.ownUsername ?? "",
+      guestUid: args.opponentUsername ?? "",
+      hostStake,
+      guestStake,
+    });
+    this.escrowBusy = false;
+    if (!result.ok) {
+      // Escrow unreachable / rejected: fall back cleanly. Un-lock + re-offer so the guest's lamp
+      // clears, and tell the player. Friendly remains available.
+      this.ownLocked = false;
+      globalScene.ui.playError();
+      this.flash(
+        i18next.t("battle:showdownWagerEscrowFailed", {
+          defaultValue: "Escrow unavailable - Friendly only",
+        }),
+      );
+      this.broadcastOffer();
+      this.render();
+      return;
+    }
+    this.serverMatchId = result.matchId;
+    // Re-broadcast the lock WITH the confirmed id so the guest adopts it and proceeds.
+    args.transport?.send({ t: "showdownStakeLock", matchId: result.matchId, tier: stakeTier(hostStake) });
+    this.proceed(result.matchId);
+  }
+
+  private proceed(matchId: string | null): void {
     if (this.committed) {
       return;
     }
     this.committed = true;
-    this.args?.onCommit();
+    this.args?.onCommit(matchId);
   }
 
   // ---- rendering ---------------------------------------------------------------------------------
@@ -475,15 +606,33 @@ export class ShowdownWagerUiHandler extends UiHandler {
         TextStyle.SUMMARY_HEADER,
       ),
     );
-    this.choices.forEach((choice, i) => {
+    // Window the picker: only VISIBLE_ROWS rows show at once (the pool can be hundreds of entries).
+    const visible = ShowdownWagerUiHandler.VISIBLE_ROWS;
+    const end = Math.min(this.scrollTop + visible, this.choices.length);
+    for (let i = this.scrollTop; i < end; i++) {
+      const choice = this.choices[i];
       const rowText = addTextObject(
         pickerX + 8,
-        ShowdownWagerUiHandler.PICKER_ROW_Y + i * rowH,
+        ShowdownWagerUiHandler.PICKER_ROW_Y + (i - this.scrollTop) * rowH,
         choice.label,
         this.ownLocked && i !== this.cursor ? TextStyle.SHADOW_TEXT : TextStyle.WINDOW,
       );
       this.add(rowText);
-    });
+    }
+    // Scroll affordance: "+N more" below when the pool overflows the window.
+    if (this.choices.length > end) {
+      this.add(
+        addTextObject(
+          pickerX + 8,
+          ShowdownWagerUiHandler.PICKER_ROW_Y + visible * rowH,
+          i18next.t("battle:showdownWagerMore", {
+            count: this.choices.length - end,
+            defaultValue: `▼ +${this.choices.length - end} more`,
+          }),
+          TextStyle.SHADOW_TEXT,
+        ),
+      );
+    }
 
     // Right column: offers + tier-match + lock lamps.
     const rightX = 176;
@@ -593,7 +742,7 @@ export class ShowdownWagerUiHandler extends UiHandler {
     }
     this.cursorObj.setPosition(
       10,
-      ShowdownWagerUiHandler.PICKER_ROW_Y + this.cursor * ShowdownWagerUiHandler.PICKER_ROW_H + 3,
+      ShowdownWagerUiHandler.PICKER_ROW_Y + (this.cursor - this.scrollTop) * ShowdownWagerUiHandler.PICKER_ROW_H + 3,
     );
     this.cursorObj.setVisible(this.choices.length > 0 && !this.ownLocked);
   }

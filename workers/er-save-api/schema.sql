@@ -212,8 +212,8 @@ CREATE INDEX IF NOT EXISTS idx_ccb_user ON community_challenge_bookmarks (user_i
 -- report columns hold each side's attestation (ResultReport JSON).
 CREATE TABLE IF NOT EXISTS showdown_matches (
   id                TEXT    PRIMARY KEY,
-  host_uid          INTEGER NOT NULL,
-  guest_uid         INTEGER NOT NULL,
+  host_uid          TEXT    NOT NULL,
+  guest_uid         TEXT    NOT NULL,
   host_stake_json   TEXT    NOT NULL,
   guest_stake_json  TEXT    NOT NULL,
   state             TEXT    NOT NULL DEFAULT 'open',
@@ -229,7 +229,7 @@ CREATE TABLE IF NOT EXISTS showdown_matches (
 -- at once. Claimed via INSERT ... ON CONFLICT DO NOTHING + meta.changes; released on
 -- settle/void. stake_key = "<species>:<shiny>:<variant>:<blackShiny>".
 CREATE TABLE IF NOT EXISTS showdown_stake_holds (
-  uid        INTEGER NOT NULL,
+  uid        TEXT    NOT NULL,
   stake_key  TEXT    NOT NULL,
   match_id   TEXT    NOT NULL,
   created_at INTEGER NOT NULL,
@@ -242,7 +242,7 @@ CREATE TABLE IF NOT EXISTS showdown_stake_holds (
 CREATE TABLE IF NOT EXISTS showdown_settlements (
   id            INTEGER PRIMARY KEY AUTOINCREMENT,
   match_id      TEXT    NOT NULL,
-  uid           INTEGER NOT NULL,
+  uid           TEXT    NOT NULL,
   mutation_json TEXT    NOT NULL,
   created_at    INTEGER NOT NULL,
   applied_at    INTEGER

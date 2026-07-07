@@ -58,11 +58,15 @@ async function escrowFetch(path: string, init: RequestInit): Promise<Response | 
   }
 }
 
-/** POST /showdown/match — register the escrow hold. Resolves the server matchId or null on any failure. */
+/**
+ * POST /showdown/match — register the escrow hold. `hostUid`/`guestUid` are the two
+ * players' account USERNAMES (the escrow's participant identity; the client has no numeric
+ * account id). Resolves the server matchId or an error on any failure.
+ */
 export async function registerShowdownMatch(args: {
   matchId: string;
-  hostUid: number;
-  guestUid: number;
+  hostUid: string;
+  guestUid: string;
   hostStake: StakeOffer;
   guestStake: StakeOffer;
 }): Promise<{ ok: true; matchId: string } | { ok: false; error: string }> {

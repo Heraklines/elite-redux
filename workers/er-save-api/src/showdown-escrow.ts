@@ -55,11 +55,17 @@ export interface ResultReport {
   at: number;
 }
 
+/**
+ * Account identity of a participant. The client has no numeric account id — only its
+ * USERNAME (the token's `u`) — so escrow keys by that stable string, not a numeric uid.
+ */
+export type Participant = string;
+
 /** The authoritative match ledger row (plain data; persisted to D1 by the worker). */
 export interface ShowdownMatchRecord {
   id: string;
-  hostUid: number;
-  guestUid: number;
+  hostUid: Participant;
+  guestUid: Participant;
   hostStake: StakeRecord;
   guestStake: StakeRecord;
   state: MatchState;
@@ -81,9 +87,25 @@ export interface ShowdownMatchRecord {
  * future server-driven candy path but is NOT emitted by `resolveSettlement`.
  */
 export type SettlementMutation =
-  | { uid: number; kind: "removeUnlock"; speciesId: number; shiny: boolean; variant: number; erBlackShiny: boolean }
-  | { uid: number; kind: "grantUnlock"; speciesId: number; shiny: boolean; variant: number; erBlackShiny: boolean }
-  | { uid: number; kind: "grantCandy"; speciesId: number; candy: number };
+  | {
+      uid: Participant;
+      kind: "removeUnlock";
+      speciesId: number;
+      shiny: boolean;
+      variant: number;
+      erBlackShiny: boolean;
+      cost: number;
+    }
+  | {
+      uid: Participant;
+      kind: "grantUnlock";
+      speciesId: number;
+      shiny: boolean;
+      variant: number;
+      erBlackShiny: boolean;
+      cost: number;
+    }
+  | { uid: Participant; kind: "grantCandy"; speciesId: number; candy: number };
 
 /** The result of registering a match: the fresh record, or a validation error. */
 export type RegisterResult = { ok: true; match: ShowdownMatchRecord } | { ok: false; error: string };
@@ -144,8 +166,8 @@ export function isStakeRecord(v: unknown): v is StakeRecord {
  */
 export function registerMatch(
   id: string,
-  hostUid: number,
-  guestUid: number,
+  hostUid: Participant,
+  guestUid: Participant,
   hostStake: StakeRecord,
   guestStake: StakeRecord,
   now: number,
@@ -190,7 +212,7 @@ export function recordBattlePhaseEntered(match: ShowdownMatchRecord): ShowdownMa
 }
 
 /** The role of `uid` in this match, or null if it isn't a participant. */
-export function roleOf(match: ShowdownMatchRecord, uid: number): MatchRole | null {
+export function roleOf(match: ShowdownMatchRecord, uid: Participant): MatchRole | null {
   if (uid === match.hostUid) {
     return "host";
   }
@@ -222,7 +244,7 @@ function settle(match: ShowdownMatchRecord, winner: MatchRole, now: number): Sho
  */
 export function applyResultReport(
   match: ShowdownMatchRecord,
-  reporterUid: number,
+  reporterUid: Participant,
   winner: MatchRole,
   reason: ResultReason,
   now: number,
@@ -295,6 +317,7 @@ export function resolveSettlement(match: ShowdownMatchRecord): SettlementMutatio
       shiny: loserStake.shiny,
       variant: loserStake.variant,
       erBlackShiny: loserStake.erBlackShiny,
+      cost: loserStake.cost,
     },
     {
       uid: winnerUid,
@@ -303,6 +326,7 @@ export function resolveSettlement(match: ShowdownMatchRecord): SettlementMutatio
       shiny: loserStake.shiny,
       variant: loserStake.variant,
       erBlackShiny: loserStake.erBlackShiny,
+      cost: loserStake.cost,
     },
   ];
 }
