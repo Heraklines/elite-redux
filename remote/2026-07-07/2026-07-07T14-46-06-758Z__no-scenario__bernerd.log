@@ -1,0 +1,280 @@
+url:      https://elite-redux-staging.pages.dev/
+build:    mraqpbrh-6c8b
+mode:     4  wave:53
+seed:     Pzf1L9GCSJq9fus4FOpPlmeX
+party:    Kecleon(L41 112hp f0), Gimmighoul(L43 121hp f0), Iron Valiant(L40 0hp f0), Amphybuzz(L32 122hp f0), Zigzagoon(L32 76hp f0), Glalie Redux(L32 108hp f0)
+enemy:    Lombre(L34), Shellos(L35), Swalot(L37)
+
+----- COMMENT -----
+Gimmighoul had FNT status and I could use a full heal on it
+
+----- CONSOLE -----
+[14:44:51.286] LOG: %cStart Phase MovePhase color:green;
+[14:44:51.286] LOG: %cUser: Kecleon
+Move: FAKE_OUT
+Use Mode: NORMAL color:orchid
+[14:44:51.298] LOG: %cStart Phase MessagePhase color:green;
+[14:44:51.372] LOG: %cStart Phase ShowAbilityPhase color:green;
+[14:44:51.549] LOG: %cStart Phase MessagePhase color:green;
+[14:44:51.814] LOG: %cStart Phase HideAbilityPhase color:green;
+[14:44:51.849] LOG: %cStart Phase MoveEffectPhase color:green;
+[14:44:52.223] LOG: crit stage: +0
+[14:44:52.226] LOG: Move: Fake Out | Base damage: 133.27441860465117 | Power: 40 | Source attack: 392 | Target defense: 43
+[14:44:52.227] LOG: Move: Fake Out | Attack damage: 183
+[14:44:52.228] LOG: %cStart Phase DamageAnimPhase color:green;
+[14:44:52.258] LOG: %cStart Phase FaintPhase color:green;
+[14:44:53.390] LOG: %cStart Phase MessagePhase color:green;
+[14:44:53.552] LOG: %cStart Phase VictoryPhase color:green;
+[14:44:53.553] LOG: Applied Soothe Bell 
+[14:44:53.553] LOG: Applied Soothe Bell 
+[14:44:53.553] LOG: %cStart Phase ExpPhase color:green;
+[14:44:53.553] LOG: Applied Super EXP. Charm 
+[14:44:53.553] LOG: Applied EXP. Charm 
+[14:44:53.899] LOG: %cStart Phase LevelUpPhase color:green;
+[14:44:53.900] LOG: %cStart Phase ExpPhase color:green;
+[14:44:53.900] LOG: Applied Super EXP. Charm 
+[14:44:53.900] LOG: Applied EXP. Charm 
+[14:44:54.174] LOG: %cStart Phase ExpPhase color:green;
+[14:44:54.174] LOG: Applied Super EXP. Charm 
+[14:44:54.174] LOG: Applied EXP. Charm 
+[14:44:54.374] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[14:44:54.374] LOG: Applied Super EXP. Charm 
+[14:44:54.375] LOG: Applied EXP. Charm 
+[14:44:54.375] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[14:44:54.375] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[14:44:54.375] LOG: Applied Super EXP. Charm 
+[14:44:54.375] LOG: Applied EXP. Charm 
+[14:44:54.376] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[14:44:54.376] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[14:44:54.376] LOG: Applied Super EXP. Charm 
+[14:44:54.376] LOG: Applied EXP. Charm 
+[14:44:54.376] LOG: %cStart Phase LevelUpPhase color:green;
+[14:44:54.376] LOG: Applied Protein 
+[14:44:54.377] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[14:44:54.377] LOG: %cStart Phase MoveEndPhase color:green;
+[14:44:54.381] LOG: %cStart Phase MovePhase color:green;
+[14:44:54.381] LOG: %cUser: Gimmighoul
+Move: ASTONISH
+Use Mode: NORMAL color:orchid
+[14:44:54.400] LOG: %cStart Phase MessagePhase color:green;
+[14:44:54.489] LOG: %cStart Phase MoveEffectPhase color:green;
+[14:44:54.490] LOG: Applied Wide Lens 
+[14:44:54.723] LOG: crit stage: +1
+[14:44:54.725] LOG: Move: Astonish | Base damage: 9.886829268292683 | Power: 40 | Source attack: 43 | Target defense: 82
+[14:44:54.726] LOG: Move: Astonish | Attack damage: 7
+[14:44:54.728] LOG: %cStart Phase DamageAnimPhase color:green;
+[14:44:54.758] LOG: %cStart Phase MoveEndPhase color:green;
+[14:44:54.763] LOG: %cStart Phase MovePhase color:green;
+[14:44:54.764] LOG: %cUser: Iron Valiant
+Move: PIXIE_SLASH
+Use Mode: NORMAL color:orchid
+[14:44:54.784] LOG: %cStart Phase MessagePhase color:green;
+[14:44:54.897] LOG: %cStart Phase MoveEffectPhase color:green;
+[14:44:54.898] LOG: Applied Wide Lens 
+[14:44:55.948] LOG: crit stage: +1
+[14:44:55.951] LOG: Move: Pixie Slash | Base damage: 93.52000000000002 | Power: 90 | Source attack: 130 | Target defense: 45
+[14:44:55.951] LOG: Move: Pixie Slash | Attack damage: 110
+[14:44:55.952] LOG: %cStart Phase DamageAnimPhase color:green;
+[14:44:55.978] LOG: %cStart Phase FaintPhase color:green;
+[14:44:56.846] LOG: %cStart Phase MessagePhase color:green;
+[14:44:57.078] LOG: %cStart Phase VictoryPhase color:green;
+[14:44:57.080] LOG: Applied Soothe Bell 
+[14:44:57.080] LOG: Applied Soothe Bell 
+[14:44:57.080] LOG: %cStart Phase ExpPhase color:green;
+[14:44:57.080] LOG: Applied Super EXP. Charm 
+[14:44:57.080] LOG: Applied EXP. Charm 
+[14:44:57.298] LOG: %cStart Phase ExpPhase color:green;
+[14:44:57.298] LOG: Applied Super EXP. Charm 
+[14:44:57.298] LOG: Applied EXP. Charm 
+[14:44:57.499] LOG: %cStart Phase ExpPhase color:green;
+[14:44:57.499] LOG: Applied Super EXP. Charm 
+[14:44:57.499] LOG: Applied EXP. Charm 
+[14:44:57.698] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[14:44:57.699] LOG: Applied Super EXP. Charm 
+[14:44:57.699] LOG: Applied EXP. Charm 
+[14:44:57.699] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[14:44:57.699] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[14:44:57.699] LOG: Applied Super EXP. Charm 
+[14:44:57.699] LOG: Applied EXP. Charm 
+[14:44:57.700] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[14:44:57.700] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[14:44:57.700] LOG: Applied Super EXP. Charm 
+[14:44:57.700] LOG: Applied EXP. Charm 
+[14:44:57.700] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[14:44:57.700] LOG: %cStart Phase MoveEndPhase color:green;
+[14:44:57.703] LOG: %cStart Phase MovePhase color:green;
+[14:44:57.703] LOG: %cUser: Swalot
+Move: ACID
+Use Mode: NORMAL color:orchid
+[14:44:57.704] LOG: %cStart Phase MessagePhase color:green;
+[14:44:57.914] LOG: %cStart Phase MoveEndPhase color:green;
+[14:44:57.915] LOG: %cStart Phase MovePhase color:green;
+[14:44:57.915] LOG: %cStart Phase MoveEndPhase color:green;
+[14:44:57.916] LOG: %cStart Phase MovePhase color:green;
+[14:44:57.916] LOG: %cStart Phase MoveEndPhase color:green;
+[14:44:57.916] LOG: %cStart Phase CheckInterludePhase color:green;
+[14:44:57.916] LOG: %cStart Phase WeatherEffectPhase color:green;
+[14:44:58.489] LOG: %cStart Phase PositionalTagPhase color:green;
+[14:44:58.489] LOG: %cStart Phase BerryPhase color:green;
+[14:44:58.495] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[14:44:58.501] LOG: %cStart Phase TurnEndPhase color:green;
+[14:44:58.509] WARN: [coop:turn] host recorder: finalize with NO open recording -> turn=-1 events=0 (caller decides not to emit)
+[14:44:58.509] LOG: %cStart Phase MessagePhase color:green;
+[14:44:58.730] LOG: %cStart Phase DamageAnimPhase color:green;
+[14:44:58.733] LOG: %cStart Phase MessagePhase color:green;
+[14:44:59.014] LOG: %cStart Phase DamageAnimPhase color:green;
+[14:44:59.017] LOG: %cStart Phase MessagePhase color:green;
+[14:44:59.264] LOG: %cStart Phase DamageAnimPhase color:green;
+[14:44:59.267] LOG: %cStart Phase MessagePhase color:green;
+[14:44:59.506] LOG: %cStart Phase DamageAnimPhase color:green;
+[14:44:59.509] LOG: %cStart Phase MessagePhase color:green;
+[14:44:59.722] LOG: %cStart Phase DamageAnimPhase color:green;
+[14:44:59.726] LOG: %cStart Phase MessagePhase color:green;
+[14:44:59.964] LOG: %cStart Phase DamageAnimPhase color:green;
+[14:44:59.967] LOG: %cStart Phase TurnInitPhase color:green;
+[14:44:59.967] LOG: %cStart Phase CommandPhase color:green;
+[14:45:01.096] LOG: Move: ZIPPY_ZAP Move targets: {"targets":[5,1],"multiple":false} 
+Player Pokemon: Kecleon
+[14:45:01.098] LOG: %cStart Phase SelectTargetPhase color:green;
+[14:45:01.394] LOG: %cStart Phase CommandPhase color:green;
+[14:45:03.220] LOG: Move: GEAR_UP Move targets: {"targets":[1],"multiple":false} 
+Player Pokemon: Iron Valiant
+[14:45:03.221] LOG: %cStart Phase CommandPhase color:green;
+[14:45:04.427] LOG: Move: HAPPY_HOUR Move targets: {"targets":[2,0,1],"multiple":true} 
+Player Pokemon: Gimmighoul
+[14:45:04.429] LOG: %cStart Phase SelectTargetPhase color:green;
+[14:45:04.619] LOG: %cStart Phase EnemyCommandPhase color:green;
+[14:45:04.671] LOG: Battle Seed: 8vQEWpG4NeWfiPiu
+[14:45:04.672] LOG: Move Pool: ["Acid","Self-Destruct"]
+[14:45:04.672] LOG: Move Scores: [54,36]
+[14:45:04.672] LOG: Sorted Move Pool: ["Acid","Self-Destruct"]
+[14:45:04.672] LOG: Chosen Move: Self-Destruct
+[14:45:04.672] LOG: %cStart Phase TurnStartPhase color:green;
+[14:45:04.676] LOG: %cStart Phase MovePhase color:green;
+[14:45:04.676] LOG: %cUser: Kecleon
+Move: ZIPPY_ZAP
+Use Mode: NORMAL color:orchid
+[14:45:04.680] LOG: %cStart Phase MessagePhase color:green;
+[14:45:04.756] LOG: %cStart Phase ShowAbilityPhase color:green;
+[14:45:04.924] LOG: %cStart Phase MessagePhase color:green;
+[14:45:05.189] LOG: %cStart Phase HideAbilityPhase color:green;
+[14:45:05.224] LOG: %cStart Phase MoveEffectPhase color:green;
+[14:45:05.956] LOG: crit stage: +0
+[14:45:05.958] LOG: Move: Zippy Zap | Base damage: 47.32682926829268 | Power: 50 | Source attack: 202 | Target defense: 82
+[14:45:05.959] LOG: Move: Zippy Zap | Attack damage: 49
+[14:45:05.960] LOG: %cStart Phase DamageAnimPhase color:green;
+[14:45:05.991] LOG: %cStart Phase MessagePhase color:green;
+[14:45:06.205] LOG: %cStart Phase MoveEndPhase color:green;
+[14:45:06.208] LOG: %cStart Phase MovePhase color:green;
+[14:45:06.208] LOG: %cUser: Gimmighoul
+Move: HAPPY_HOUR
+Use Mode: NORMAL color:orchid
+[14:45:06.216] LOG: %cStart Phase MessagePhase color:green;
+[14:45:06.330] LOG: %cStart Phase MoveEffectPhase color:green;
+[14:45:06.724] LOG: %cStart Phase MessagePhase color:green;
+[14:45:06.981] LOG: %cStart Phase MoveEndPhase color:green;
+[14:45:06.982] LOG: %cStart Phase MovePhase color:green;
+[14:45:06.982] LOG: %cUser: Iron Valiant
+Move: GEAR_UP
+Use Mode: NORMAL color:orchid
+[14:45:06.997] LOG: %cStart Phase MessagePhase color:green;
+[14:45:07.122] LOG: %cStart Phase MoveEffectPhase color:green;
+[14:45:08.148] LOG: %cStart Phase StatStageChangePhase color:green;
+[14:45:08.342] LOG: %cStart Phase MessagePhase color:green;
+[14:45:08.581] LOG: %cStart Phase StatStageChangePhase color:green;
+[14:45:08.767] LOG: %cStart Phase MessagePhase color:green;
+[14:45:09.014] LOG: %cStart Phase MoveEndPhase color:green;
+[14:45:09.014] LOG: %cStart Phase MovePhase color:green;
+[14:45:09.014] LOG: %cUser: Swalot
+Move: SELF_DESTRUCT
+Use Mode: NORMAL color:orchid
+[14:45:09.030] LOG: %cStart Phase MessagePhase color:green;
+[14:45:09.155] LOG: %cStart Phase MoveEffectPhase color:green;
+[14:45:10.057] LOG: crit stage: +0
+[14:45:10.059] LOG: Move: Self-Destruct | Base damage: 66.07441860465116 | Power: 200 | Source attack: 82 | Target defense: 86
+[14:45:10.060] LOG: Move: Self-Destruct | Attack damage: 42
+[14:45:10.061] LOG: %cStart Phase ShowAbilityPhase color:green;
+[14:45:10.210] LOG: %cStart Phase HideAbilityPhase color:green;
+[14:45:10.243] LOG: %cStart Phase MessagePhase color:green;
+[14:45:10.489] LOG: %cStart Phase DamageAnimPhase color:green;
+[14:45:10.507] LOG: %cStart Phase MessagePhase color:green;
+[14:45:10.730] LOG: %cStart Phase DamageAnimPhase color:green;
+[14:45:10.734] LOG: %cStart Phase FaintPhase color:green;
+[14:45:11.951] LOG: %cStart Phase MessagePhase color:green;
+[14:45:12.136] LOG: %cStart Phase VictoryPhase color:green;
+[14:45:12.136] LOG: Applied Soothe Bell 
+[14:45:12.136] LOG: Applied Soothe Bell 
+[14:45:12.136] LOG: %cStart Phase ExpPhase color:green;
+[14:45:12.137] LOG: Applied Super EXP. Charm 
+[14:45:12.137] LOG: Applied EXP. Charm 
+[14:45:12.365] LOG: %cStart Phase ExpPhase color:green;
+[14:45:12.365] LOG: Applied Super EXP. Charm 
+[14:45:12.366] LOG: Applied EXP. Charm 
+[14:45:12.649] LOG: %cStart Phase LevelUpPhase color:green;
+[14:45:12.650] LOG: %cStart Phase ExpPhase color:green;
+[14:45:12.650] LOG: Applied Super EXP. Charm 
+[14:45:12.650] LOG: Applied EXP. Charm 
+[14:45:12.882] LOG: %cStart Phase LevelUpPhase color:green;
+[14:45:12.882] LOG: Applied Calcium 
+[14:45:12.882] LOG: Applied HP Up 
+[14:45:12.883] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[14:45:12.883] LOG: Applied Super EXP. Charm 
+[14:45:12.883] LOG: Applied EXP. Charm 
+[14:45:12.884] LOG: %cStart Phase LevelUpPhase color:green;
+[14:45:12.884] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[14:45:12.884] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[14:45:12.884] LOG: Applied Super EXP. Charm 
+[14:45:12.884] LOG: Applied EXP. Charm 
+[14:45:12.885] LOG: %cStart Phase LevelUpPhase color:green;
+[14:45:12.885] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[14:45:12.885] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[14:45:12.885] LOG: Applied Super EXP. Charm 
+[14:45:12.885] LOG: Applied EXP. Charm 
+[14:45:12.885] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[14:45:12.885] LOG: %cStart Phase MoveEndPhase color:green;
+[14:45:12.886] LOG: %cStart Phase CheckInterludePhase color:green;
+[14:45:12.886] LOG: %cStart Phase WeatherEffectPhase color:green;
+[14:45:13.455] LOG: %cStart Phase PositionalTagPhase color:green;
+[14:45:13.456] LOG: %cStart Phase BerryPhase color:green;
+[14:45:13.459] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[14:45:13.461] LOG: %cStart Phase TurnEndPhase color:green;
+[14:45:13.466] WARN: [coop:turn] host recorder: finalize with NO open recording -> turn=-1 events=0 (caller decides not to emit)
+[14:45:13.466] LOG: %cStart Phase MessagePhase color:green;
+[14:45:13.705] LOG: %cStart Phase DamageAnimPhase color:green;
+[14:45:13.709] LOG: %cStart Phase MessagePhase color:green;
+[14:45:13.922] LOG: %cStart Phase DamageAnimPhase color:green;
+[14:45:13.924] LOG: %cStart Phase MessagePhase color:green;
+[14:45:14.172] LOG: %cStart Phase DamageAnimPhase color:green;
+[14:45:14.177] LOG: %cStart Phase MessagePhase color:green;
+[14:45:14.405] LOG: %cStart Phase DamageAnimPhase color:green;
+[14:45:14.409] LOG: %cStart Phase MessagePhase color:green;
+[14:45:14.647] LOG: %cStart Phase DamageAnimPhase color:green;
+[14:45:14.649] LOG: %cStart Phase MessagePhase color:green;
+[14:45:14.905] LOG: %cStart Phase DamageAnimPhase color:green;
+[14:45:14.909] LOG: %cStart Phase FaintPhase color:green;
+[14:45:17.623] LOG: %cStart Phase MessagePhase color:green;
+[14:45:17.819] LOG: %cStart Phase BattleEndPhase color:green;
+[14:45:17.820] LOG: Battle Score: 270 (2 Turns x0.92)
+[14:45:17.820] LOG: Total Score: 8312
+[14:45:17.829] LOG: Applied Calcium 
+[14:45:17.829] LOG: Applied HP Up 
+[14:45:17.829] LOG: Applied Protein 
+[14:45:17.831] LOG: %cStart Phase ShowAbilityPhase color:green;
+[14:45:17.831] LOG: %cStart Phase HideAbilityPhase color:green;
+[14:45:17.857] LOG: %cStart Phase MessagePhase color:green;
+[14:45:18.078] LOG: %cStart Phase EggLapsePhase color:green;
+[14:45:18.078] LOG: %cStart Phase SelectModifierPhase color:green;
+[14:45:18.078] LOG: Wave Seed: ¯fn|x¦nª¨i{¥¡¢ 53
+[14:45:18.089] LOG: Applied Golden Poké Ball 
+[14:45:18.089] LOG: 2 0 [5,6,7,8,16,22]
+[14:45:18.089] LOG: {"id":"FULL_HEAL","localeKey":"modifierType:ModifierType.FULL_HEAL","iconImage":"full_heal","soundName":"se/restore","tier":1} 
+[14:45:18.089] LOG: 15 4 [5,6,7,8,16,22]
+[14:45:18.089] LOG: GREAT 1
+[14:45:18.089] LOG: 4 0 [5,6,7,8,16,22]
+[14:45:18.089] LOG: {"id":"MAX_REVIVE","localeKey":"modifierType:ModifierType.MAX_REVIVE","iconImage":"max_revive","group":"revive","soundName":"se/restore","tier":1,"restorePoints":0,"restorePercent":100,"healStatus":false} 
+[14:45:18.090] LOG: 9 0 []
+[14:45:18.090] LOG: {"id":"TM_CASE","localeKey":"","iconImage":"tm_case","soundName":"se/restore","tier":0} 
+[14:45:18.090] LOG: 3 0 []
+[14:45:18.090] LOG: {"id":"SUPER_POTION","localeKey":"modifierType:ModifierType.SUPER_POTION","iconImage":"super_potion","group":"potion","soundName":"se/restore","tier":0,"restorePoints":50,"restorePercent":25,"healStatus":false} 
+[14:45:18.090] LOG: 4 0 []
+[14:45:18.090] LOG: {"id":"ETHER","localeKey":"modifierType:ModifierType.ETHER","iconImage":"ether","group":"ether","soundName":"se/restore","tier":0,"restorePoints":10} 
