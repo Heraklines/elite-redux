@@ -1,0 +1,267 @@
+----- BUG REPORT (in-game) -----
+version:  1.11.19
+url:      https://elite-redux.pages.dev/
+ua:       Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36
+mode:     4  wave:182  difficulty:hell
+seed:     rWeE4YvgEokudEZJaSHdzX3h
+party:    Dracovish(L188 949/949), Empoleon(L183 557/557), Gastrodon(L183 655/655), Toxapex(L183 524/524), Buizel(L183 451/451), Inteleon(L183 524/524)
+
+----- DESCRIPTION -----
+bleed not curing under full heal
+
+----- CONSOLE -----
+[02:23:37.948] LOG: Applied Calcium (enemy)
+[02:23:37.948] LOG: Applied Iron (enemy)
+[02:23:37.948] LOG: Applied HP Up (enemy)
+[02:23:37.948] LOG: Applied Zinc (enemy)
+[02:23:37.948] LOG: Applied Calcium (enemy)
+[02:23:37.948] LOG: Applied Zinc (enemy)
+[02:23:38.198] LOG: %cStart Phase PostSummonPhase color:green;
+[02:23:38.198] LOG: Ran PSP for: Sandslash
+[02:23:38.198] LOG: %cStart Phase PostSummonPhase color:green;
+[02:23:38.198] LOG: %cStart Phase PostSummonPhase color:green;
+[02:23:38.199] LOG: %cStart Phase MovePhase color:green;
+[02:23:38.199] LOG: %cUser: Mega Dracovish
+Move: FISHIOUS_REND
+Use Mode: NORMAL color:orchid
+[02:23:38.200] LOG: %cStart Phase MessagePhase color:green;
+[02:23:38.454] LOG: %cStart Phase MoveEffectPhase color:green;
+[02:23:38.455] LOG: Applied Wide Lens 
+[02:23:38.455] LOG: Battle Seed: f8JRm8MVUXdbeSjI
+[02:23:38.771] LOG: Applied Scope Lens 
+[02:23:38.772] LOG: crit stage: +1
+[02:23:38.772] LOG: Applied Mystic Water 
+[02:23:38.772] LOG: Move: Fishious Rend | Base damage: 3748.1805168986084 | Power: 475 | Source attack: 2666 | Target defense: 503
+[02:23:38.773] LOG: Move: Fishious Rend | Attack damage: 2726
+[02:23:38.773] LOG: Applied Amulet Coin 
+[02:23:38.773] LOG: Applied Golden Punch 
+[02:23:38.773] LOG: Applied King’s Rock 
+[02:23:38.774] LOG: %cStart Phase ShowAbilityPhase color:green;
+[02:23:39.072] LOG: %cStart Phase HideAbilityPhase color:green;
+[02:23:39.122] LOG: %cStart Phase DamageAnimPhase color:green;
+[02:23:39.139] LOG: %cStart Phase ShowAbilityPhase color:green;
+[02:23:39.447] LOG: %cStart Phase MessagePhase color:green;
+[02:23:39.938] LOG: %cStart Phase DamageAnimPhase color:green;
+[02:23:39.939] LOG: %cStart Phase HideAbilityPhase color:green;
+[02:23:39.989] LOG: %cStart Phase MessagePhase color:green;
+[02:23:40.354] LOG: %cStart Phase FaintPhase color:green;
+[02:23:41.438] LOG: %cStart Phase MessagePhase color:green;
+[02:23:43.608] LOG: %cStart Phase ShowAbilityPhase color:green;
+[02:23:43.922] LOG: %cStart Phase PokemonHealPhase color:green;
+[02:23:44.096] LOG: Applied Healing Charm 
+[02:23:44.097] LOG: %cStart Phase MessagePhase color:green;
+[02:23:44.604] LOG: %cStart Phase HideAbilityPhase color:green;
+[02:23:44.646] LOG: %cStart Phase VictoryPhase color:green;
+[02:23:44.647] LOG: Applied Soothe Bell 
+[02:23:44.647] LOG: Applied Lucky Egg 
+[02:23:44.647] LOG: %cStart Phase ExpPhase color:green;
+[02:23:44.647] LOG: Applied Super EXP. Charm 
+[02:23:44.647] LOG: Applied EXP. Charm 
+[02:23:45.731] LOG: %cStart Phase LevelUpPhase color:green;
+[02:23:45.731] LOG: Applied Protein 
+[02:23:45.731] LOG: Applied Zinc 
+[02:23:45.731] LOG: Applied Carbos 
+[02:23:45.731] LOG: Applied HP Up 
+[02:23:45.731] LOG: Applied Iron 
+[02:23:45.731] LOG: Applied Macho Brace 
+[02:23:45.731] LOG: Applied Soul Dew 
+[02:23:45.731] LOG: Applied Macho Brace 
+[02:23:45.731] LOG: Applied Macho Brace 
+[02:23:45.731] LOG: Applied Soul Dew 
+[02:23:45.731] LOG: Applied Macho Brace 
+[02:23:45.731] LOG: Applied Macho Brace 
+[02:23:45.731] LOG: Applied Macho Brace 
+[02:23:45.732] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[02:23:45.732] LOG: Applied Super EXP. Charm 
+[02:23:45.732] LOG: Applied EXP. Charm 
+[02:23:45.732] LOG: %cStart Phase LevelUpPhase color:green;
+[02:23:45.732] LOG: Applied Calcium 
+[02:23:45.732] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[02:23:45.732] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[02:23:45.732] LOG: Applied Super EXP. Charm 
+[02:23:45.732] LOG: Applied EXP. Charm 
+[02:23:45.733] LOG: %cStart Phase LevelUpPhase color:green;
+[02:23:45.733] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[02:23:45.733] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[02:23:45.733] LOG: Applied Super EXP. Charm 
+[02:23:45.733] LOG: Applied EXP. Charm 
+[02:23:45.733] LOG: %cStart Phase LevelUpPhase color:green;
+[02:23:45.733] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[02:23:45.733] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[02:23:45.733] LOG: Applied Super EXP. Charm 
+[02:23:45.733] LOG: Applied EXP. Charm 
+[02:23:45.734] LOG: %cStart Phase LevelUpPhase color:green;
+[02:23:45.734] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[02:23:45.734] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[02:23:45.734] LOG: Applied Super EXP. Charm 
+[02:23:45.734] LOG: Applied EXP. Charm 
+[02:23:45.734] LOG: %cStart Phase LevelUpPhase color:green;
+[02:23:45.734] LOG: Applied Calcium 
+[02:23:45.734] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[02:23:45.734] LOG: %cStart Phase MoveEndPhase color:green;
+[02:23:45.734] LOG: %cStart Phase MovePhase color:green;
+[02:23:45.734] LOG: %cStart Phase MoveEndPhase color:green;
+[02:23:45.734] LOG: %cStart Phase CheckInterludePhase color:green;
+[02:23:45.734] LOG: %cStart Phase WeatherEffectPhase color:green;
+[02:23:45.735] LOG: %cStart Phase PositionalTagPhase color:green;
+[02:23:45.735] LOG: %cStart Phase BerryPhase color:green;
+[02:23:45.735] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[02:23:45.735] LOG: %cStart Phase TurnEndPhase color:green;
+[02:23:45.736] WARN: [coop:turn] host recorder: finalize with NO open recording -> turn=-1 events=0 (caller decides not to emit)
+[02:23:45.736] LOG: %cStart Phase SwitchSummonPhase color:green;
+[02:23:46.188] LOG: Molayne
+[02:23:46.321] LOG: Applied Protein (enemy)
+[02:23:46.322] LOG: Applied HP Up (enemy)
+[02:23:46.322] LOG: Applied Carbos (enemy)
+[02:23:46.322] LOG: Applied Calcium (enemy)
+[02:23:46.322] LOG: Applied HP Up (enemy)
+[02:23:46.322] LOG: Applied Iron (enemy)
+[02:23:46.322] LOG: Applied Protein (enemy)
+[02:23:46.322] LOG: Applied Calcium (enemy)
+[02:23:46.322] LOG: Applied Zinc (enemy)
+[02:23:46.322] LOG: Applied Carbos (enemy)
+[02:23:46.322] LOG: Applied Calcium (enemy)
+[02:23:46.322] LOG: Applied Iron (enemy)
+[02:23:46.322] LOG: Applied Carbos (enemy)
+[02:23:46.322] LOG: Applied Calcium (enemy)
+[02:23:46.322] LOG: Applied Iron (enemy)
+[02:23:46.323] LOG: Applied Calcium (enemy)
+[02:23:46.323] LOG: Applied Iron (enemy)
+[02:23:46.323] LOG: Applied HP Up (enemy)
+[02:23:46.323] LOG: Applied Zinc (enemy)
+[02:23:46.323] LOG: Applied Calcium (enemy)
+[02:23:46.323] LOG: Applied Zinc (enemy)
+[02:23:46.580] LOG: %cStart Phase PostSummonPhase color:green;
+[02:23:46.580] LOG: Ran PSP for: Magnezone
+[02:23:46.580] LOG: %cStart Phase PostSummonPhase color:green;
+[02:23:46.580] LOG: %cStart Phase PostSummonPhase color:green;
+[02:23:46.580] LOG: %cStart Phase TurnInitPhase color:green;
+[02:23:46.580] LOG: %cStart Phase CommandPhase color:green;
+[02:25:38.092] LOG: Move: FISHIOUS_REND Move targets: {"targets":[2],"multiple":false} 
+Player Pokemon: Mega Dracovish
+[02:25:38.093] LOG: %cStart Phase EnemyCommandPhase color:green;
+[02:25:38.095] LOG: Applied Soft Sand 
+[02:25:38.097] LOG: Applied Mystic Water 
+[02:25:38.099] LOG: Applied Dragon Fang 
+[02:25:38.101] LOG: Applied Never-Melt Ice 
+[02:25:38.104] LOG: Battle Seed: f8JRm8MVUXdbeSjI
+[02:25:38.106] WARN: BattlerTag AUTOTOMIZED is missing a score!
+[02:25:38.108] WARN: BattlerTag AUTOTOMIZED is missing a score!
+[02:25:38.108] LOG: Applied Soft Sand 
+[02:25:38.110] LOG: Applied Mystic Water 
+[02:25:38.111] LOG: Applied Dragon Fang 
+[02:25:38.112] LOG: Applied Never-Melt Ice 
+[02:25:38.114] LOG: Move Pool: ["Plasma Pulse","Flamethrower","Flash Cannon","Autotomize"]
+[02:25:38.114] LOG: Move Scores: [-355,-355,-355,-355]
+[02:25:38.115] LOG: Sorted Move Pool: ["Plasma Pulse","Flamethrower","Flash Cannon","Autotomize"]
+[02:25:38.115] LOG: Chosen Move: Plasma Pulse
+[02:25:38.115] LOG: ER AI: experimental brain (sharpness 1)
+[02:25:38.115] LOG: %cStart Phase TurnStartPhase color:green;
+[02:25:38.115] LOG: %cStart Phase MovePhase color:green;
+[02:25:38.115] LOG: %cUser: Mega Dracovish
+Move: FISHIOUS_REND
+Use Mode: NORMAL color:orchid
+[02:25:38.116] LOG: %cStart Phase MessagePhase color:green;
+[02:25:38.343] LOG: %cStart Phase MoveEffectPhase color:green;
+[02:25:38.344] LOG: Applied Wide Lens 
+[02:25:38.660] LOG: Applied Scope Lens 
+[02:25:38.660] LOG: crit stage: +1
+[02:25:38.660] LOG: Applied Mystic Water 
+[02:25:38.661] LOG: Move: Fishious Rend | Base damage: 4005.606451612903 | Power: 475 | Source attack: 2736 | Target defense: 496
+[02:25:38.661] LOG: Move: Fishious Rend | Attack damage: 2884
+[02:25:38.662] LOG: Applied Amulet Coin 
+[02:25:38.663] LOG: Applied Golden Punch 
+[02:25:38.664] LOG: %cStart Phase ShowAbilityPhase color:green;
+[02:25:38.961] LOG: %cStart Phase HideAbilityPhase color:green;
+[02:25:39.010] LOG: %cStart Phase DamageAnimPhase color:green;
+[02:25:39.027] LOG: %cStart Phase MessagePhase color:green;
+[02:25:39.393] LOG: %cStart Phase FaintPhase color:green;
+[02:25:41.527] LOG: %cStart Phase MessagePhase color:green;
+[02:25:42.630] LOG: %cStart Phase VictoryPhase color:green;
+[02:25:42.630] LOG: Applied Soothe Bell 
+[02:25:42.630] LOG: Applied Lucky Egg 
+[02:25:42.630] LOG: %cStart Phase ExpPhase color:green;
+[02:25:42.630] LOG: Applied Super EXP. Charm 
+[02:25:42.630] LOG: Applied EXP. Charm 
+[02:26:10.625] LOG: 6959154 7771696 7184551
+[02:26:10.801] LOG: %cStart Phase LevelUpPhase color:green;
+[02:26:10.801] LOG: Applied Protein 
+[02:26:10.801] LOG: Applied Zinc 
+[02:26:10.801] LOG: Applied Carbos 
+[02:26:10.801] LOG: Applied HP Up 
+[02:26:10.801] LOG: Applied Iron 
+[02:26:10.801] LOG: Applied Macho Brace 
+[02:26:10.801] LOG: Applied Soul Dew 
+[02:26:10.801] LOG: Applied Macho Brace 
+[02:26:10.801] LOG: Applied Macho Brace 
+[02:26:10.801] LOG: Applied Soul Dew 
+[02:26:10.801] LOG: Applied Macho Brace 
+[02:26:10.802] LOG: Applied Macho Brace 
+[02:26:10.802] LOG: Applied Macho Brace 
+[02:26:10.802] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[02:26:10.802] LOG: Applied Super EXP. Charm 
+[02:26:10.802] LOG: Applied EXP. Charm 
+[02:26:10.803] LOG: %cStart Phase LevelUpPhase color:green;
+[02:26:10.803] LOG: Applied Calcium 
+[02:26:10.803] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[02:26:10.803] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[02:26:10.803] LOG: Applied Super EXP. Charm 
+[02:26:10.803] LOG: Applied EXP. Charm 
+[02:26:10.803] LOG: %cStart Phase LevelUpPhase color:green;
+[02:26:10.803] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[02:26:10.803] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[02:26:10.803] LOG: Applied Super EXP. Charm 
+[02:26:10.803] LOG: Applied EXP. Charm 
+[02:26:10.804] LOG: %cStart Phase LevelUpPhase color:green;
+[02:26:10.804] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[02:26:10.804] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[02:26:10.804] LOG: Applied Super EXP. Charm 
+[02:26:10.804] LOG: Applied EXP. Charm 
+[02:26:10.804] LOG: %cStart Phase LevelUpPhase color:green;
+[02:26:10.805] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[02:26:10.805] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[02:26:10.805] LOG: Applied Super EXP. Charm 
+[02:26:10.805] LOG: Applied EXP. Charm 
+[02:26:10.805] LOG: %cStart Phase LevelUpPhase color:green;
+[02:26:10.805] LOG: Applied Calcium 
+[02:26:10.805] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[02:26:10.805] LOG: %cStart Phase MoveEndPhase color:green;
+[02:26:10.806] LOG: %cStart Phase MessagePhase color:green;
+[02:26:11.258] LOG: %cStart Phase MovePhase color:green;
+[02:26:11.259] LOG: %cStart Phase MoveEndPhase color:green;
+[02:26:11.259] LOG: %cStart Phase CheckInterludePhase color:green;
+[02:26:11.259] LOG: %cStart Phase WeatherEffectPhase color:green;
+[02:26:11.259] LOG: %cStart Phase PositionalTagPhase color:green;
+[02:26:11.259] LOG: %cStart Phase BerryPhase color:green;
+[02:26:11.259] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[02:26:11.259] LOG: %cStart Phase TurnEndPhase color:green;
+[02:26:11.261] WARN: [coop:turn] host recorder: finalize with NO open recording -> turn=-1 events=0 (caller decides not to emit)
+[02:26:11.261] LOG: %cStart Phase SwitchSummonPhase color:green;
+[02:26:11.725] LOG: Molayne
+[02:26:11.859] LOG: Applied Calcium (enemy)
+[02:26:11.859] LOG: Applied Iron (enemy)
+[02:26:11.860] LOG: Applied HP Up (enemy)
+[02:26:11.860] LOG: Applied Zinc (enemy)
+[02:26:11.860] LOG: Applied HP Up (enemy)
+[02:26:11.860] LOG: Applied Iron (enemy)
+[02:26:11.860] LOG: Applied Protein (enemy)
+[02:26:11.860] LOG: Applied Calcium (enemy)
+[02:26:11.860] LOG: Applied Zinc (enemy)
+[02:26:11.860] LOG: Applied Carbos (enemy)
+[02:26:11.860] LOG: Applied Calcium (enemy)
+[02:26:11.860] LOG: Applied Iron (enemy)
+[02:26:11.861] LOG: Applied Carbos (enemy)
+[02:26:11.861] LOG: Applied Calcium (enemy)
+[02:26:11.861] LOG: Applied Iron (enemy)
+[02:26:11.861] LOG: Applied Protein (enemy)
+[02:26:11.861] LOG: Applied HP Up (enemy)
+[02:26:11.861] LOG: Applied Carbos (enemy)
+[02:26:11.861] LOG: Applied Calcium (enemy)
+[02:26:11.861] LOG: Applied Calcium (enemy)
+[02:26:11.861] LOG: Applied Zinc (enemy)
+[02:26:12.118] LOG: %cStart Phase PostSummonPhase color:green;
+[02:26:12.118] LOG: Ran PSP for: Dugtrio
+[02:26:12.118] LOG: %cStart Phase PostSummonPhase color:green;
+[02:26:12.118] LOG: %cStart Phase PostSummonPhase color:green;
+[02:26:12.118] LOG: %cStart Phase TurnInitPhase color:green;
+[02:26:12.118] LOG: %cStart Phase CommandPhase color:green;
