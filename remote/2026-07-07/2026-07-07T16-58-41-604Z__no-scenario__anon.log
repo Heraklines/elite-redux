@@ -1,0 +1,235 @@
+url:      https://elite-redux-staging.pages.dev/
+build:    mravmpmu-im9m
+mode:     6  wave:?
+seed:     EwhyNeiAtUSdLSh0zeUzRYtZ
+party:    
+enemy:    
+
+----- COMMENT -----
+dunno whats happening perma disconnect recconect loop
+
+----- CONSOLE -----
+[16:55:19.868] LOG: %c %c %c %c %c Phaser v3.90.0 (WebGL | Web Audio) %c https://phaser.io/v390 background: #ff0000 background: #ffff00 background: #00ff00 background: #00ffff color: #ffffff; background: #000000 background: transparent
+[16:55:20.305] LOG: [ER] build mravmpmu-im9m
+[16:55:20.351] LOG: [dev-tools] loaded — 470 scenarios + Send Logs button
+[16:55:32.275] DEBUG: Destroying loading scene
+[16:55:32.275] DEBUG: Destroyed loading scene
+[16:55:32.410] LOG: Seed: EwhyNeiAtUSdLSh0zeUzRYtZ
+[16:55:32.410] LOG: Wave Seed: EwhyNeiAtUSdLSh0zeUzRYtZ 0
+[16:55:34.125] LOG: %cStart Phase LoginPhase color:green;
+[16:55:34.391] LOG: Client Session: Ud6sKfMSgQqKDcRgjBZ4FnhTasdHXBne
+[16:55:34.668] DEBUG: Using cached system data
+[16:55:34.719] LOG: %cStart Phase TitlePhase color:green;
+[16:55:34.722] LOG: use seasonal splash messages true
+[16:56:17.460] LOG: [coop:lobby] start announce name=Psiell_QA
+[16:56:18.383] LOG: [coop:lobby] announced id=21e5db33-c537-43f4-b026-9857f4668431 -> begin polling
+[16:56:19.365] LOG: [coop:lobby] poll players=1
+[16:56:21.872] LOG: [coop:lobby] poll players=1
+[16:56:24.081] LOG: [coop:lobby] cancel (id=21e5db33-c537-43f4-b026-9857f4668431 connecting=false)
+[16:56:24.081] LOG: %cStart Phase TitlePhase color:green;
+[16:56:24.085] LOG: use seasonal splash messages true
+[16:56:25.742] LOG: [coop:lobby] start announce name=Psiell_QA
+[16:56:26.636] LOG: [coop:lobby] announced id=0a41ee28-d5d2-46d2-9665-4af280fc4eb9 -> begin polling
+[16:56:27.618] LOG: [coop:lobby] poll players=1
+[16:56:28.647] LOG: [coop:lobby] request target=8a8b363e-cdc4-470a-be63-d37e53909085 (self=0a41ee28-d5d2-46d2-9665-4af280fc4eb9)
+[16:56:30.103] LOG: [coop:lobby] poll players=1
+[16:56:31.206] LOG: [coop:lobby] poll: incoming request from=8a8b363e-cdc4-470a-be63-d37e53909085 name=JarilG
+[16:56:31.206] LOG: [coop:lobby] poll players=1
+[16:56:32.505] LOG: [coop:lobby] respond accept=true from=8a8b363e-cdc4-470a-be63-d37e53909085 (self=0a41ee28-d5d2-46d2-9665-4af280fc4eb9)
+[16:56:33.681] LOG: [coop:lobby] poll players=1
+[16:56:33.847] LOG: [coop:launch] lobby connect code=73E8DC role=host name=Psiell_QA
+[16:56:33.848] LOG: [coop:launch] connectCoopWithCode code=73E8DC role=host username=Psiell_QA
+[16:56:33.848] LOG: [coop:launch] exchange SDP start code=73E8DC role=host (ice=fetched)
+[16:56:34.641] LOG: [coop:launch] ICE from worker /coop/ice servers=1
+[16:56:34.793] LOG: [coop:launch] host pushing offer code=73E8DC (ICE gathered)
+[16:56:34.793] LOG: [coop:launch] pushSignal code=73E8DC role=host sdpBytes=1363
+[16:56:35.547] LOG: [coop:launch] await peer signal start code=73E8DC role=host timeout=60000ms
+[16:56:39.939] LOG: [coop:launch] await peer signal resolve code=73E8DC role=host (1420b)
+[16:56:39.939] LOG: [coop:launch] host received answer code=73E8DC -> setRemoteDescription
+[16:56:39.940] LOG: [coop:launch] await data channel open (state=connecting timeout=30000ms)
+[16:56:39.940] LOG: [coop:launch] iceConnectionState=checking code=73E8DC role=host
+[16:56:39.940] LOG: [coop:launch] pcConnectionState=connecting code=73E8DC role=host
+[16:56:39.989] LOG: [coop:launch] iceConnectionState=connected code=73E8DC role=host
+[16:56:40.117] LOG: [coop:launch] pcConnectionState=connected code=73E8DC role=host
+[16:56:40.214] LOG: [coop:launch] data channel OPEN
+[16:56:40.214] LOG: [coop:webrtc] ctor role=host readyState=open state=connected
+[16:56:40.214] LOG: [coop:launch] connectCoopSession role=host state=connected username=Psiell_QA netcode=authoritative
+[16:56:40.214] LOG: [coop:stream] streamer CONSTRUCT timeout=1200000ms onMessage registered
+[16:56:40.214] LOG: [coop:stream] guest REGISTER onGhostPool handler (bufferedEarly=false)
+[16:56:40.214] LOG: [coop:stream] host REGISTER onStateSyncRequest handler (was=false)
+[16:56:40.214] LOG: [coop:stream] host REGISTER onEnemyPartyRequest handler (was=false)
+[16:56:40.214] LOG: [coop:stream] guest REGISTER onWaveResolved handler (was=false)
+[16:56:40.214] LOG: [coop:stream] guest REGISTER onWaveEndState handler (was=false)
+[16:56:40.214] LOG: [coop:stream] watcher REGISTER onMeChecksum handler (was=false)
+[16:56:40.214] LOG: [coop:turn] host recorder: REGISTER live emitter (was=false)
+[16:56:40.214] LOG: [coop:session] coopAuthoritativeGuestPredicate INSTALLED
+[16:56:40.214] LOG: [coop:launch] peer session ready role=host netcode=authoritative -> connecting
+[16:56:40.214] LOG: [coop:launch] session connect role=host partnerRole=guest netcode=authoritative username=Psiell_QA version=er-coop-11 tiebreak=0.6023070549570796
+[16:56:40.214] LOG: [coop:webrtc] raw tx role=host t=hello bytes=103
+[16:56:40.237] LOG: [coop:checksum] dataFingerprint compute moveMap=e9b828360aafb9e2(1032) movesData=61fa3383767be347(1107) movesName=fad7fe8932ec09a1(1107) movesets=6eb276198552346d(1908) abilitiesData=3088ac8089021d9e(1047) abilitiesName=7c302bdd9cc50a0b(1047)
+[16:56:40.237] LOG: [coop:webrtc] raw tx role=host t=dataFingerprint bytes=329
+[16:56:40.237] LOG: [coop:launch] lobby connected code=73E8DC role=host -> onConnected
+[16:56:40.238] LOG: [coop:launch] SEND resumeStartNew (#810 barrier release)
+[16:56:40.238] LOG: [coop:webrtc] raw tx role=host t=resumeStartNew bytes=22
+[16:56:40.239] LOG: [coop:webrtc] raw rx role=host t=hello bytes=102 handlers=11
+[16:56:40.239] LOG: [coop:launch] hello recv partner=JarilG partnerRole=guest (local role=host; no conflict)
+[16:56:40.239] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[16:56:40.239] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[16:56:40.259] LOG: [coop:webrtc] raw rx role=host t=dataFingerprint bytes=329 handlers=11
+[16:56:40.259] LOG: [coop:checksum] MATCH - data tables identical across clients
+[16:56:43.398] LOG: [coop-launch] title challenge-gate: role=host isCoopGuest=false -> SelectChallengePhase
+[16:56:43.398] LOG: %cStart Phase SelectChallengePhase color:green;
+[16:56:45.215] LOG: [coop:interaction] interactionCounter() read -> 0 (role=host)
+[16:56:45.215] LOG: [coop:health] tick=0g turn=- wave=- counter=0 assertions=0 wait=-1ms peerBeat=- transport=connected
+[16:56:58.538] LOG: %cStart Phase SelectStarterPhase color:green;
+[16:56:58.538] LOG: [coop-launch] startCoopSelect role=host partnerConnected=true partnerReady=false
+[16:56:58.588] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[16:56:58.588] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[16:57:06.874] WARN: cry/661 not found
+[16:57:12.077] LOG: [coop:webrtc] channel CLOSE role=host state=connected gen=0
+[16:57:12.077] LOG: [coop:webrtc] state role=host connected -> disconnected
+[16:57:12.077] WARN: [coop:runtime] partner channel disconnected -> cancelling pending co-op waits (no 20-minute strand)
+[16:57:12.077] LOG: [coop:relay] cancelWaiters() no orphaned waiters selected -> nothing cancelled (live waits spared)
+[16:57:12.077] LOG: [coop:launch] rejoin attempt 1 code=73E8DC role=host elapsed=0ms
+[16:57:12.077] LOG: [coop:launch] exchange SDP start code=73E8DC role=host (ice=fetched)
+[16:57:12.782] LOG: [coop:launch] ICE from worker /coop/ice servers=1
+[16:57:12.939] LOG: [coop:launch] host pushing offer code=73E8DC (ICE gathered)
+[16:57:12.940] LOG: [coop:launch] pushSignal code=73E8DC role=host sdpBytes=1363
+[16:57:13.714] LOG: [coop:launch] await peer signal start code=73E8DC role=host timeout=60000ms
+[16:57:15.350] LOG: [coop:interaction] interactionCounter() read -> 0 (role=host)
+[16:57:15.350] LOG: [coop:health] tick=0g turn=- wave=- counter=0 assertions=0 wait=-1ms peerBeat=- transport=disconnected
+[16:57:18.114] LOG: [coop:launch] await peer signal resolve code=73E8DC role=host (1418b)
+[16:57:18.114] LOG: [coop:launch] host received answer code=73E8DC -> setRemoteDescription
+[16:57:18.115] LOG: [coop:launch] await data channel open (state=connecting timeout=30000ms)
+[16:57:18.115] LOG: [coop:launch] iceConnectionState=checking code=73E8DC role=host
+[16:57:18.115] LOG: [coop:launch] pcConnectionState=connecting code=73E8DC role=host
+[16:57:18.161] LOG: [coop:launch] iceConnectionState=connected code=73E8DC role=host
+[16:57:18.294] LOG: [coop:launch] pcConnectionState=connected code=73E8DC role=host
+[16:57:18.387] LOG: [coop:launch] data channel OPEN
+[16:57:18.387] LOG: [coop:webrtc] replaceChannel role=host gen=1 readyState=open
+[16:57:18.387] LOG: [coop:webrtc] state role=host disconnected -> connected
+[16:57:18.387] LOG: [coop:launch] rejoin SUCCESS attempt=1 code=73E8DC role=host
+[16:57:18.387] LOG: [coop:runtime] rejoin SUCCESS -> channel re-established in place
+[16:57:18.394] LOG: [coop:webrtc] raw rx role=host t=requestStateSync bytes=47 handlers=11
+[16:57:18.394] LOG: [coop:resync] host RECV requestStateSync turn=9340145 seq=1
+[16:57:18.394] LOG: [coop:resync] recv requestStateSync turn=9340145 seq=1 role=host
+[16:57:18.394] WARN: [coop:resync] host has no live snapshot for requestStateSync seq=1 -> no reply
+[16:57:20.741] LOG: [coop:webrtc] channel CLOSE role=host state=connected gen=1
+[16:57:20.742] LOG: [coop:webrtc] state role=host connected -> disconnected
+[16:57:20.742] WARN: [coop:runtime] partner channel disconnected -> cancelling pending co-op waits (no 20-minute strand)
+[16:57:20.742] LOG: [coop:relay] cancelWaiters() no orphaned waiters selected -> nothing cancelled (live waits spared)
+[16:57:20.742] LOG: [coop:launch] rejoin attempt 1 code=73E8DC role=host elapsed=0ms
+[16:57:20.742] LOG: [coop:launch] exchange SDP start code=73E8DC role=host (ice=fetched)
+[16:57:21.409] LOG: [coop:launch] ICE from worker /coop/ice servers=1
+[16:57:21.568] LOG: [coop:launch] host pushing offer code=73E8DC (ICE gathered)
+[16:57:21.569] LOG: [coop:launch] pushSignal code=73E8DC role=host sdpBytes=1359
+[16:57:22.371] LOG: [coop:launch] await peer signal start code=73E8DC role=host timeout=60000ms
+[16:57:26.830] LOG: [coop:launch] await peer signal resolve code=73E8DC role=host (1415b)
+[16:57:26.830] LOG: [coop:launch] host received answer code=73E8DC -> setRemoteDescription
+[16:57:26.831] LOG: [coop:launch] await data channel open (state=connecting timeout=30000ms)
+[16:57:26.832] LOG: [coop:launch] iceConnectionState=checking code=73E8DC role=host
+[16:57:26.832] LOG: [coop:launch] pcConnectionState=connecting code=73E8DC role=host
+[16:57:26.876] LOG: [coop:launch] iceConnectionState=connected code=73E8DC role=host
+[16:57:27.032] LOG: [coop:launch] pcConnectionState=connected code=73E8DC role=host
+[16:57:27.123] LOG: [coop:launch] data channel OPEN
+[16:57:27.123] LOG: [coop:webrtc] replaceChannel role=host gen=2 readyState=open
+[16:57:27.123] LOG: [coop:webrtc] state role=host disconnected -> connected
+[16:57:27.123] LOG: [coop:launch] rejoin SUCCESS attempt=1 code=73E8DC role=host
+[16:57:27.123] LOG: [coop:runtime] rejoin SUCCESS -> channel re-established in place
+[16:57:27.136] LOG: [coop:webrtc] raw rx role=host t=requestStateSync bytes=47 handlers=11
+[16:57:27.136] LOG: [coop:resync] host RECV requestStateSync turn=9348889 seq=2
+[16:57:27.136] LOG: [coop:resync] recv requestStateSync turn=9348889 seq=2 role=host
+[16:57:27.136] WARN: [coop:resync] host has no live snapshot for requestStateSync seq=2 -> no reply
+[16:57:45.391] LOG: [coop:interaction] interactionCounter() read -> 0 (role=host)
+[16:57:45.391] LOG: [coop:health] tick=0g turn=- wave=- counter=0 assertions=0 wait=-1ms peerBeat=- transport=connected
+[16:57:46.295] LOG: [coop:webrtc] channel CLOSE role=host state=connected gen=2
+[16:57:46.295] LOG: [coop:webrtc] state role=host connected -> disconnected
+[16:57:46.295] WARN: [coop:runtime] partner channel disconnected -> cancelling pending co-op waits (no 20-minute strand)
+[16:57:46.295] LOG: [coop:relay] cancelWaiters() no orphaned waiters selected -> nothing cancelled (live waits spared)
+[16:57:46.296] LOG: [coop:launch] rejoin attempt 1 code=73E8DC role=host elapsed=0ms
+[16:57:46.296] LOG: [coop:launch] exchange SDP start code=73E8DC role=host (ice=fetched)
+[16:57:46.586] WARN: cry/10794 not found
+[16:57:47.067] LOG: [coop:launch] ICE from worker /coop/ice servers=1
+[16:57:47.219] LOG: [coop:launch] host pushing offer code=73E8DC (ICE gathered)
+[16:57:47.219] LOG: [coop:launch] pushSignal code=73E8DC role=host sdpBytes=1361
+[16:57:47.282] LOG: Trapinch Redux's icon __BASE does not match getIconId with female: false, formIndex: 0, shiny: true, variant: 2
+[16:57:47.977] LOG: [coop:launch] await peer signal start code=73E8DC role=host timeout=60000ms
+[16:57:52.352] LOG: [coop:launch] await peer signal resolve code=73E8DC role=host (1418b)
+[16:57:52.352] LOG: [coop:launch] host received answer code=73E8DC -> setRemoteDescription
+[16:57:52.354] LOG: [coop:launch] await data channel open (state=connecting timeout=30000ms)
+[16:57:52.354] LOG: [coop:launch] iceConnectionState=checking code=73E8DC role=host
+[16:57:52.354] LOG: [coop:launch] pcConnectionState=connecting code=73E8DC role=host
+[16:57:52.401] LOG: [coop:launch] iceConnectionState=connected code=73E8DC role=host
+[16:57:52.565] LOG: [coop:launch] pcConnectionState=connected code=73E8DC role=host
+[16:57:52.662] LOG: [coop:launch] data channel OPEN
+[16:57:52.662] LOG: [coop:webrtc] replaceChannel role=host gen=3 readyState=open
+[16:57:52.662] LOG: [coop:webrtc] state role=host disconnected -> connected
+[16:57:52.662] LOG: [coop:launch] rejoin SUCCESS attempt=1 code=73E8DC role=host
+[16:57:52.662] LOG: [coop:runtime] rejoin SUCCESS -> channel re-established in place
+[16:57:52.663] LOG: [coop:webrtc] raw rx role=host t=requestStateSync bytes=47 handlers=11
+[16:57:52.663] LOG: [coop:resync] host RECV requestStateSync turn=9374410 seq=3
+[16:57:52.663] LOG: [coop:resync] recv requestStateSync turn=9374410 seq=3 role=host
+[16:57:52.663] WARN: [coop:resync] host has no live snapshot for requestStateSync seq=3 -> no reply
+[16:57:54.808] LOG: [coop:webrtc] channel CLOSE role=host state=connected gen=3
+[16:57:54.809] LOG: [coop:webrtc] state role=host connected -> disconnected
+[16:57:54.809] WARN: [coop:runtime] partner channel disconnected -> cancelling pending co-op waits (no 20-minute strand)
+[16:57:54.809] LOG: [coop:relay] cancelWaiters() no orphaned waiters selected -> nothing cancelled (live waits spared)
+[16:57:54.810] LOG: [coop:launch] rejoin attempt 1 code=73E8DC role=host elapsed=0ms
+[16:57:54.810] LOG: [coop:launch] exchange SDP start code=73E8DC role=host (ice=fetched)
+[16:57:55.482] LOG: [coop:launch] ICE from worker /coop/ice servers=1
+[16:57:55.632] LOG: [coop:launch] host pushing offer code=73E8DC (ICE gathered)
+[16:57:55.632] LOG: [coop:launch] pushSignal code=73E8DC role=host sdpBytes=1361
+[16:57:56.408] LOG: [coop:launch] await peer signal start code=73E8DC role=host timeout=60000ms
+[16:57:59.061] LOG: [coop:launch] await peer signal resolve code=73E8DC role=host (1417b)
+[16:57:59.061] LOG: [coop:launch] host received answer code=73E8DC -> setRemoteDescription
+[16:57:59.062] LOG: [coop:launch] await data channel open (state=connecting timeout=30000ms)
+[16:57:59.063] LOG: [coop:launch] iceConnectionState=checking code=73E8DC role=host
+[16:57:59.063] LOG: [coop:launch] pcConnectionState=connecting code=73E8DC role=host
+[16:57:59.114] LOG: [coop:launch] iceConnectionState=connected code=73E8DC role=host
+[16:57:59.258] LOG: [coop:launch] pcConnectionState=connected code=73E8DC role=host
+[16:57:59.352] LOG: [coop:launch] data channel OPEN
+[16:57:59.352] LOG: [coop:webrtc] replaceChannel role=host gen=4 readyState=open
+[16:57:59.352] LOG: [coop:webrtc] state role=host disconnected -> connected
+[16:57:59.352] LOG: [coop:launch] rejoin SUCCESS attempt=1 code=73E8DC role=host
+[16:57:59.352] LOG: [coop:runtime] rejoin SUCCESS -> channel re-established in place
+[16:57:59.359] LOG: [coop:webrtc] raw rx role=host t=requestStateSync bytes=47 handlers=11
+[16:57:59.359] LOG: [coop:resync] host RECV requestStateSync turn=9381112 seq=4
+[16:57:59.359] LOG: [coop:resync] recv requestStateSync turn=9381112 seq=4 role=host
+[16:57:59.359] WARN: [coop:resync] host has no live snapshot for requestStateSync seq=4 -> no reply
+[16:58:02.385] WARN: cry/10697 not found
+[16:58:03.365] LOG: [coop:webrtc] channel CLOSE role=host state=connected gen=4
+[16:58:03.365] LOG: [coop:webrtc] state role=host connected -> disconnected
+[16:58:03.365] WARN: [coop:runtime] partner channel disconnected -> cancelling pending co-op waits (no 20-minute strand)
+[16:58:03.365] LOG: [coop:relay] cancelWaiters() no orphaned waiters selected -> nothing cancelled (live waits spared)
+[16:58:03.366] LOG: [coop:launch] rejoin attempt 1 code=73E8DC role=host elapsed=0ms
+[16:58:03.366] LOG: [coop:launch] exchange SDP start code=73E8DC role=host (ice=fetched)
+[16:58:04.050] LOG: [coop:launch] ICE from worker /coop/ice servers=1
+[16:58:04.208] LOG: [coop:launch] host pushing offer code=73E8DC (ICE gathered)
+[16:58:04.208] LOG: [coop:launch] pushSignal code=73E8DC role=host sdpBytes=1363
+[16:58:04.970] LOG: [coop:launch] await peer signal start code=73E8DC role=host timeout=60000ms
+[16:58:09.315] LOG: [coop:launch] await peer signal resolve code=73E8DC role=host (1418b)
+[16:58:09.315] LOG: [coop:launch] host received answer code=73E8DC -> setRemoteDescription
+[16:58:09.316] LOG: [coop:launch] await data channel open (state=connecting timeout=30000ms)
+[16:58:09.317] LOG: [coop:launch] iceConnectionState=checking code=73E8DC role=host
+[16:58:09.317] LOG: [coop:launch] pcConnectionState=connecting code=73E8DC role=host
+[16:58:09.361] LOG: [coop:launch] iceConnectionState=connected code=73E8DC role=host
+[16:58:09.500] LOG: [coop:launch] pcConnectionState=connected code=73E8DC role=host
+[16:58:09.595] LOG: [coop:launch] data channel OPEN
+[16:58:09.596] LOG: [coop:webrtc] replaceChannel role=host gen=5 readyState=open
+[16:58:09.596] LOG: [coop:webrtc] state role=host disconnected -> connected
+[16:58:09.596] LOG: [coop:launch] rejoin SUCCESS attempt=1 code=73E8DC role=host
+[16:58:09.596] LOG: [coop:runtime] rejoin SUCCESS -> channel re-established in place
+[16:58:09.604] LOG: [coop:webrtc] raw rx role=host t=requestStateSync bytes=47 handlers=11
+[16:58:09.604] LOG: [coop:resync] host RECV requestStateSync turn=9391348 seq=5
+[16:58:09.604] LOG: [coop:resync] recv requestStateSync turn=9391348 seq=5 role=host
+[16:58:09.604] WARN: [coop:resync] host has no live snapshot for requestStateSync seq=5 -> no reply
+[16:58:11.811] LOG: [coop:webrtc] channel CLOSE role=host state=connected gen=5
+[16:58:11.811] LOG: [coop:webrtc] state role=host connected -> disconnected
+[16:58:11.811] WARN: [coop:runtime] partner channel disconnected -> cancelling pending co-op waits (no 20-minute strand)
+[16:58:11.811] LOG: [coop:relay] cancelWaiters() no orphaned waiters selected -> nothing cancelled (live waits spared)
+[16:58:11.812] LOG: [coop:launch] rejoin attempt 1 code=73E8DC role=host elapsed=0ms
+[16:58:11.812] LOG: [coop:launch] exchange SDP start code=73E8DC role=host (ice=fetched)
+[16:58:12.484] LOG: [coop:launch] ICE from worker /coop/ice servers=1
+[16:58:12.650] LOG: [coop:launch] host pushing offer code=73E8DC (ICE gathered)
+[16:58:12.650] LOG: [coop:launch] pushSignal code=73E8DC role=host sdpBytes=1363
+[16:58:13.408] LOG: [coop:launch] await peer signal start code=73E8DC role=host timeout=60000ms
