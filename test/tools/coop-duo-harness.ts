@@ -69,6 +69,7 @@ import { BattleScene } from "#app/battle-scene";
 import { getGameMode } from "#app/game-mode";
 import { globalScene, initGlobalScene } from "#app/global-scene";
 import { Phase } from "#app/phase";
+import { isShowdownGuestFlipGated } from "#data/elite-redux/coop/coop-authoritative-gate";
 import {
   captureCoopPlayerModifiers,
   reconcileArenaTags,
@@ -108,6 +109,7 @@ import {
   getShowdownOwnManifest,
 } from "#data/elite-redux/showdown/showdown-battle-state";
 import { ShowdownCommandRelay } from "#data/elite-redux/showdown/showdown-command-relay";
+import { swapArenaTagSide } from "#data/elite-redux/showdown/showdown-side-swap";
 import { Terrain, TerrainType } from "#data/terrain";
 import { Weather } from "#data/weather";
 import { BattleType } from "#enums/battle-type";
@@ -116,10 +118,11 @@ import { Button } from "#enums/buttons";
 import { Command } from "#enums/command";
 import { GameModes } from "#enums/game-modes";
 import type { MysteryEncounterType } from "#enums/mystery-encounter-type";
+import { TrainerSlot } from "#enums/trainer-slot";
 import { UiMode } from "#enums/ui-mode";
 import { WeatherType } from "#enums/weather-type";
 import { EnemyPokemon, PlayerPokemon, type Pokemon } from "#field/pokemon";
-import { type PersistentModifier, PokemonHeldItemModifier } from "#modifiers/modifier";
+import { PersistentModifier } from "#modifiers/modifier";
 import type { ModifierOverride } from "#modifiers/modifier-type";
 import { PokemonModifierType, PokemonReviveModifierType } from "#modifiers/modifier-type";
 import { MysteryEncounter } from "#mystery-encounters/mystery-encounter";
@@ -610,6 +613,13 @@ export function mirrorHostBattleToGuest(hostScene: BattleScene, guestScene: Batt
   //    mismatch appeared + self-healed via a resync. After it the guest's wave-start checksum MATCHES the
   //    host's, so a residual mismatch is a REAL divergence.
   adoptCoopHostRunConfig(hostScene, guestScene);
+  // SHOWDOWN (Task F1): when the versus-guest flip is live (this mirror runs under the guest ctx), the
+  // guest boots into its LOCAL orientation - its OWN team (the host's ENEMY side) becomes its local
+  // PLAYER party, and the opponent (the host's PLAYER side) its local ENEMY. This reproduces what the
+  // production launch-snapshot ingress swap (swapSessionData) produces, so the egress un-swap in
+  // captureVersusGuestChecksumState maps back to the host's authoritative orientation and the wave-start
+  // checksums converge. FALSE for co-op / solo (byte-identical mirror as before).
+  const flip = isShowdownGuestFlipGated();
   // 1. Same game mode + arena/biome as the host.
   guestScene.gameMode = hostScene.gameMode;
   guestScene.newArena(hostScene.arena.biomeId);
@@ -637,7 +647,9 @@ export function mirrorHostBattleToGuest(hostScene: BattleScene, guestScene: Batt
   reconcileArenaTags(
     hostScene.arena.tags.map(t => ({
       tagType: t.tagType as unknown as string,
-      side: t.side as unknown as number,
+      // Flip the tag SIDE for the versus guest's local orientation (a host ENEMY-side hazard targets the
+      // guest's own team, so on the guest it sits on the local PLAYER side).
+      side: flip ? swapArenaTagSide(t.side as unknown as number) : (t.side as unknown as number),
       turnCount: t.turnCount,
       layers: (t as unknown as { layers?: number }).layers ?? 1,
     })),
@@ -650,7 +662,9 @@ export function mirrorHostBattleToGuest(hostScene: BattleScene, guestScene: Batt
   //    mon DIRECTLY (not scene.addPlayerPokemon, whose init() builds the battle-info UI / sprites the
   //    headless guest scene can't fully back) - the ctor does the logical build; we skip init().
   guestSceneInternal.party = [];
-  for (const hostMon of hostScene.getPlayerParty()) {
+  // Versus flip: the guest's local PLAYER party is the host's ENEMY party (its own team). Co-op: the
+  // host's own player party (the shared team).
+  for (const hostMon of flip ? hostScene.getEnemyParty() : hostScene.getPlayerParty()) {
     const data = new PokemonData(hostMon);
     const mon = new PlayerPokemon(
       getPokemonSpecies(hostMon.species.speciesId),
@@ -664,7 +678,8 @@ export function mirrorHostBattleToGuest(hostScene: BattleScene, guestScene: Batt
       hostMon.nature,
       data,
     );
-    mon.coopOwner = hostMon.coopOwner ?? "host";
+    // coopOwner is a runtime tag (typed on PlayerPokemon; the versus-flip source may be an EnemyPokemon).
+    mon.coopOwner = (hostMon as PlayerPokemon).coopOwner ?? "host";
     mon.calculateStats();
     guestSceneInternal.party.push(mon);
   }
@@ -679,7 +694,9 @@ export function mirrorHostBattleToGuest(hostScene: BattleScene, guestScene: Batt
   });
   guestScene.currentBattle.turn = hostBattle.turn;
   const enemyParty: EnemyPokemon[] = [];
-  for (const hostEnemy of hostScene.getEnemyParty()) {
+  // Versus flip: the guest's local ENEMY party is the host's PLAYER party (the opponent). Co-op: the
+  // host's own enemy party.
+  for (const hostEnemy of flip ? hostScene.getPlayerParty() : hostScene.getEnemyParty()) {
     const data = new PokemonData(hostEnemy);
     const enemy = new EnemyPokemon(
       getPokemonSpecies(hostEnemy.species.speciesId),
@@ -692,8 +709,9 @@ export function mirrorHostBattleToGuest(hostScene: BattleScene, guestScene: Batt
       // gives the variant-double SLOT GATING (getPartyMemberMatchupScores / getNextSummonIndex filter
       // benched reserves by trainerSlot) the same reserve pool the host has, so the enemy-switch machinery
       // (a trainer sending its next mon after a KO) reconstructs the RIGHT bench mon on-field, which the
-      // per-turn checkpoint then reconciles into the guest's on-field checksum.
-      hostEnemy.trainerSlot,
+      // per-turn checkpoint then reconciles into the guest's on-field checksum. Versus flip: the source is
+      // a host PLAYER mon (no trainerSlot), so its local-enemy incarnation gets TrainerSlot.NONE.
+      flip ? TrainerSlot.NONE : (hostEnemy as EnemyPokemon).trainerSlot,
       false,
       false,
       data,
@@ -708,9 +726,11 @@ export function mirrorHostBattleToGuest(hostScene: BattleScene, guestScene: Batt
     // round-trip. The checksum hashes bossSegments:bossSegmentIndex, so this is what lets a BOSS wave run
     // the FULL wave-start DIGEST invariant instead of being skipped (mirrors coop-enemy-builder's boss
     // adopt; setBoss with the EXPLICIT count never re-rolls segments from the guest's diverged wave RNG).
-    if (hostEnemy.isBoss()) {
-      enemy.setBoss(true, hostEnemy.bossSegments);
-      enemy.bossSegmentIndex = hostEnemy.bossSegmentIndex;
+    // Boss state is a PvE concept (never in a versus manifest team); the flipped source is a host player
+    // mon anyway, so only carry it on the co-op path.
+    if (!flip && (hostEnemy as EnemyPokemon).isBoss()) {
+      enemy.setBoss(true, (hostEnemy as EnemyPokemon).bossSegments);
+      enemy.bossSegmentIndex = (hostEnemy as EnemyPokemon).bossSegmentIndex;
     }
     enemyParty.push(enemy);
   }
@@ -2191,22 +2211,20 @@ export async function buildShowdownDuo(
   // The host is already a showdown engine (idempotent flip). NO coopOwner tags - versus has no merged party.
   toShowdownGameMode(hostScene);
 
-  // CLONE the host's ENEMY held-item modifiers (the manifest items - LEFTOVERS etc.) NOW, while
-  // globalScene is still the host (buildGuestScene below steals it). The co-op mirror only rebuilds
-  // PLAYER-wide modifiers; showdown enemies carry per-mon held items the checksum hashes (the on-field
-  // `heldItems` digest), so the guest must carry them or wave-start parity fails. In production the guest
-  // gets these off the enemy-party stream; here we clone the live modifier objects (each `.clone()`
-  // preserves pokemonId + stackCount, and the guest enemy keeps the host id via the PokemonData round-trip).
-  const clonedEnemyHeldItems: PersistentModifier[] = hostScene
-    .findModifiers(m => m instanceof PokemonHeldItemModifier, false)
+  // CLONE the host's FULL persistent-modifier stacks (BOTH sides) NOW, while globalScene is still the
+  // host (buildGuestScene below steals it). The mirror's PokemonData round-trip carries no modifier
+  // objects, and the checksum hashes both the aggregate player `modifiers` list AND the on-field
+  // `heldItems` digest - so the guest must carry EVERY persistent modifier (per-mon held items AND
+  // player-wide items like MAP), or wave-start parity fails. VERSUS FLIP (Task F1): the guest's LOCAL
+  // player modifiers are the host's ENEMY stack (its own team) and its LOCAL enemy modifiers the host's
+  // PLAYER stack - exactly the launch-snapshot swap production applies (getSessionSaveData serializes
+  // every modifier; swapSessionData trades the two lists). Each `.clone()` preserves pokemonId + stack,
+  // and the guest mons keep the host ids via the PokemonData round-trip so held items rebind by id.
+  const clonedHostEnemyModifiers: PersistentModifier[] = hostScene
+    .findModifiers(m => m instanceof PersistentModifier, false)
     .map(m => m.clone());
-  // B7 item 6: the host now attaches its OWN party's manifest held items too (each own mon carries
-  // its whitelist item). The player-party mirror below (PokemonData round-trip) does NOT carry
-  // held-item modifiers, and the checksum hashes the on-field `heldItems` digest, so clone the host's
-  // PLAYER held items and re-attach them on the guest - exactly as the real guest gets them off the
-  // launch snapshot (getSessionSaveData serializes every modifier, held items included).
-  const clonedPlayerHeldItems: PersistentModifier[] = hostScene
-    .findModifiers(m => m instanceof PokemonHeldItemModifier, true)
+  const clonedHostPlayerModifiers: PersistentModifier[] = hostScene
+    .findModifiers(m => m instanceof PersistentModifier, true)
     .map(m => m.clone());
 
   const hostCtx: ClientCtx = {
@@ -2232,22 +2250,23 @@ export async function buildShowdownDuo(
   };
   await withClient(guestCtx, () => {
     toShowdownGameMode(guestScene);
-    // The mirror reconstructs the host's player field + FULL enemy party under the guest. Under the
-    // guest ctx the versus-guest flip is live, so the guest's own team (Enemy instances) constructs at
-    // the flipped BOTTOM position - a render-only concern that does NOT affect the authoritative order
-    // the checksum hashes (proven by the convergence assertions in the duo test).
+    // The mirror reconstructs the guest's world in its LOCAL (flipped) orientation (Task F1): its OWN
+    // team is its local PLAYER party (bottom) and the opponent (host team) its local ENEMY party (top).
     mirrorHostBattleToGuest(hostScene, guestScene);
-    // Attach the cloned enemy held-item modifiers on the guest (the mirror skips them - see the clone
-    // above), so the guest's on-field `heldItems` digest matches the host's at wave start.
-    const guestEnemyModifiers = (guestScene as unknown as { enemyModifiers: PersistentModifier[] }).enemyModifiers;
-    for (const m of clonedEnemyHeldItems) {
-      guestEnemyModifiers.push(m);
-    }
-    // B7 item 6: re-attach the host's PLAYER held items on the guest (the mirror skips them, like the
-    // enemy ones above) so the guest's on-field player `heldItems` digest matches the host at wave start.
+    // Reconstruct the guest's persistent-modifier stacks in its LOCAL (flipped) orientation. The mirror's
+    // adoptCoopHostRunConfig rebuilt the host's PLAYER-wide modifiers onto the guest PLAYER side (correct
+    // for co-op, WRONG for versus where they are the opponent's), so CLEAR both lists and repopulate from
+    // the host's cloned stacks flipped: guest PLAYER <- host ENEMY (own team), guest ENEMY <- host PLAYER
+    // (opponent). This mirrors the launch-snapshot swap, so the egress un-swap reproduces the host's hash.
     const guestPlayerModifiers = (guestScene as unknown as { modifiers: PersistentModifier[] }).modifiers;
-    for (const m of clonedPlayerHeldItems) {
+    const guestEnemyModifiers = (guestScene as unknown as { enemyModifiers: PersistentModifier[] }).enemyModifiers;
+    guestPlayerModifiers.length = 0;
+    guestEnemyModifiers.length = 0;
+    for (const m of clonedHostEnemyModifiers) {
       guestPlayerModifiers.push(m);
+    }
+    for (const m of clonedHostPlayerModifiers) {
+      guestEnemyModifiers.push(m);
     }
     guestScene.updateModifiers(false);
   });

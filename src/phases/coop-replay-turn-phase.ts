@@ -6,6 +6,7 @@
 
 import { globalScene } from "#app/global-scene";
 import { Phase } from "#app/phase";
+import { isShowdownGuestFlipGated } from "#data/elite-redux/coop/coop-authoritative-gate";
 import { applyCoopAuthoritativeBattleState, applyCoopCheckpoint } from "#data/elite-redux/coop/coop-battle-engine";
 import { coopLog, coopWarn, isCoopDebug } from "#data/elite-redux/coop/coop-debug";
 import {
@@ -17,6 +18,7 @@ import {
   queueCoopMeBattleVictoryTail,
 } from "#data/elite-redux/coop/coop-runtime";
 import type { CoopBattleEvent } from "#data/elite-redux/coop/coop-transport";
+import { swapBattleEvent } from "#data/elite-redux/showdown/showdown-side-swap";
 import { coopNarrateMoveUsed } from "#phases/coop-replay-phases";
 
 /**
@@ -310,6 +312,13 @@ export class CoopReplayTurnPhase extends Phase {
    * hang the turn - the checkpoint still corrects its state.
    */
   private renderEvents(events: CoopBattleEvent[]): void {
+    // SHOWDOWN (Task F1): reflect every bi-bearing event into the versus guest's LOCAL orientation so the
+    // replay phases animate the correct sprites (a missed bi = a move/hp/faint on the wrong side). Swapped
+    // at RENDER time (the guest's own context), covering both the live per-event and batched paths that
+    // merge into here. No-op off the versus-guest path.
+    if (isShowdownGuestFlipGated()) {
+      events = events.map(swapBattleEvent);
+    }
     coopLog("replay", `guest replay turn=${this.turn}: rendering ${events.length} event(s)`);
     // Running per-mon hp so multi-hit drains chain (hit1: cur->hp1, hit2: hp1->hp2, ...). Seeded
     // lazily from the live (pre-checkpoint) hp the first time a mon is seen. INSTANCE state (#782):

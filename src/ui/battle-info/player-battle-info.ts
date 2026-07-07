@@ -41,11 +41,6 @@ export class PlayerBattleInfo extends BattleInfo {
         statOverflow: 1,
       },
     };
-    // Showdown 1v1 perspective flip (reworked, staging fix 2026-07-07): the CLASS now follows the
-    // PRESENTATION side (the versus guest's OWN team constructs a PlayerBattleInfo, the opponent an
-    // EnemyBattleInfo - see initBattleInfo in pokemon.ts), so this panel ALWAYS sits at its normal
-    // bottom-right corner with its normal player chrome. The old corner-only swap double-flipped
-    // once the class swap landed and left player chrome on the opponent.
     super(Math.floor(globalScene.scaledCanvas.width) - 10, -72, true, posParams);
 
     this.hpNumbersContainer = globalScene.add.container(-15, 10).setName("container_hp");

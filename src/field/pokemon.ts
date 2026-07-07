@@ -59,10 +59,7 @@ import { allAbilities, allMoves } from "#data/data-lists";
 import { PersistentFieldAuraAbAttr } from "#data/elite-redux/archetypes/persistent-field-aura";
 import { suppressesOpponentDamageBoosts } from "#data/elite-redux/archetypes/post-defend-suppress-opponent-damage-boost";
 import { coopAllowAccountWrite } from "#data/elite-redux/coop/coop-account-gate";
-import {
-  isCoopAuthoritativeGuestGated,
-  isShowdownGuestFlipGated,
-} from "#data/elite-redux/coop/coop-authoritative-gate";
+import { isCoopAuthoritativeGuestGated } from "#data/elite-redux/coop/coop-authoritative-gate";
 import { coopAttributeNewMon, coopHalfIsFull } from "#data/elite-redux/coop/coop-session";
 import type { CoopRole } from "#data/elite-redux/coop/coop-transport";
 import { isCoopRecording, recordCoopEvent } from "#data/elite-redux/coop/coop-turn-recorder";
@@ -125,7 +122,6 @@ import {
   erWardStoneTagLabel,
   findErWardStone,
 } from "#data/elite-redux/er-ward-stones";
-import { presentationSideIsPlayer } from "#data/elite-redux/showdown/showdown-perspective";
 import { getLevelTotalExp } from "#data/exp";
 import {
   SpeciesFormChangeActiveTrigger,
@@ -1186,14 +1182,14 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
    * to `isPlayer()` off the versus-guest path (solo / co-op / host byte-identical).
    */
   private presentationIsPlayerSide(): boolean {
-    return presentationSideIsPlayer(this.isPlayer(), isShowdownGuestFlipGated());
+    return this.isPlayer();
   }
 
   /**
-   * Showdown 1v1 (C5): the DEFAULT battle-sprite orientation (BACK sprite vs front). The player-side
-   * mons face away (back sprite), so this is exactly {@linkcode presentationIsPlayerSide} - the guest's
-   * own team (bottom) shows back sprites, the host's team (top) shows front. Collapses to `isPlayer()`
-   * off the versus-guest path.
+   * The DEFAULT battle-sprite orientation (BACK sprite vs front): the player-side mons face away
+   * (back sprite). Task F1 collapsed the former Showdown presentation flip into the data-level side
+   * swap (`showdown-side-swap.ts`), so rendering is now correct by construction on every client and
+   * this is simply {@linkcode isPlayer}.
    */
   private presentationIsBack(): boolean {
     return this.presentationIsPlayerSide();
@@ -7622,26 +7618,7 @@ export class PlayerPokemon extends Pokemon {
     nature?: Nature,
     dataSource?: Pokemon | PokemonData,
   ) {
-    // Showdown 1v1 (C5) perspective flip: a PlayerPokemon is the LOCAL player's own mon and normally
-    // sits BOTTOM (106, 148). On the versus GUEST the local player's own team is the authoritative
-    // ENEMY side, so PlayerPokemon here is actually the OPPONENT (the host's team) and must render at
-    // the TOP (the enemy base 236, 84). `isShowdownGuestFlipGated()` is hard-false off the versus-guest
-    // path, so solo / co-op / host construct at the identical (106, 148) - byte-for-byte unchanged.
-    // Presentation-only: the base container x/y is not part of authoritative state / the checksum.
-    super(
-      isShowdownGuestFlipGated() ? 236 : 106,
-      isShowdownGuestFlipGated() ? 84 : 148,
-      species,
-      level,
-      abilityIndex,
-      formIndex,
-      gender,
-      shiny,
-      variant,
-      ivs,
-      nature,
-      dataSource,
-    );
+    super(106, 148, species, level, abilityIndex, formIndex, gender, shiny, variant, ivs, nature, dataSource);
 
     if (Overrides.STATUS_OVERRIDE) {
       this.status = new Status(Overrides.STATUS_OVERRIDE, 0, 4);
@@ -7688,19 +7665,9 @@ export class PlayerPokemon extends Pokemon {
   }
 
   initBattleInfo(): void {
-    // Showdown 1v1 perspective flip (staging fix 2026-07-07): on the versus GUEST the authoritative
-    // PLAYER side is the OPPONENT's team, presented top - it gets the ENEMY-style panel chrome (no
-    // exp bar / HP numbers), exactly what a player expects to see on the foe. Hard-false elsewhere.
-    if (isShowdownGuestFlipGated()) {
-      const info = new EnemyBattleInfo();
-      this.battleInfo = info;
-      // Upcast: the base initInfo accepts any Pokemon; the subclass narrows for its own internals.
-      (info as BattleInfo).initInfo(this);
-    } else {
-      const info = new PlayerBattleInfo();
-      this.battleInfo = info;
-      info.initInfo(this);
-    }
+    const info = new PlayerBattleInfo();
+    this.battleInfo = info;
+    info.initInfo(this);
   }
 
   override isPlayer(): this is PlayerPokemon {
@@ -8381,13 +8348,9 @@ export class EnemyPokemon extends Pokemon {
     dataSource?: PokemonData,
     forRival = false,
   ) {
-    // Showdown 1v1 (C5) perspective flip: an EnemyPokemon normally sits TOP (236, 84). On the versus
-    // GUEST the authoritative ENEMY side is the local player's OWN team, which must render at the
-    // BOTTOM (the player base 106, 148). Hard-false off the versus-guest path, so solo / co-op / host
-    // construct at the identical (236, 84). Presentation-only (not authoritative state / checksum).
     super(
-      isShowdownGuestFlipGated() ? 106 : 236,
-      isShowdownGuestFlipGated() ? 148 : 84,
+      236,
+      84,
       species,
       level,
       dataSource?.abilityIndex,
@@ -8494,15 +8457,6 @@ export class EnemyPokemon extends Pokemon {
       if (this.battleInfo instanceof EnemyBattleInfo) {
         this.battleInfo.updateBossSegments(this);
       }
-    } else if (isShowdownGuestFlipGated()) {
-      // Showdown 1v1 perspective flip (staging fix 2026-07-07): the versus GUEST's OWN team is the
-      // authoritative ENEMY side, presented bottom - it gets the PLAYER-style panel chrome (HP bar
-      // with numbers), what a player expects on their own mon. Boss segments are a PvE concept and
-      // never occur in a manifest-built versus team, so the boss redraw is skipped safely.
-      const info = new PlayerBattleInfo();
-      this.battleInfo = info;
-      // Upcast: the base initInfo accepts any Pokemon; the subclass narrows for its own internals.
-      (info as BattleInfo).initInfo(this);
     } else {
       const info = new EnemyBattleInfo();
       this.battleInfo = info;

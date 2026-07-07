@@ -24,7 +24,10 @@ import { globalScene } from "#app/global-scene";
 import { EntryHazardTag } from "#data/arena-tag";
 import { fieldPositionForSlot } from "#data/battle-format";
 import { coopAllowAccountWrite } from "#data/elite-redux/coop/coop-account-gate";
-import { isCoopAuthoritativeGuestGated } from "#data/elite-redux/coop/coop-authoritative-gate";
+import {
+  isCoopAuthoritativeGuestGated,
+  isShowdownGuestFlipGated,
+} from "#data/elite-redux/coop/coop-authoritative-gate";
 import {
   buildCheckpoint,
   type CoopArenaView,
@@ -67,6 +70,12 @@ import {
   getErRelicBattleState,
   restoreErRelicBattleState,
 } from "#data/elite-redux/er-relic-battle-state";
+import {
+  swapArenaTagSide,
+  swapAuthoritativeState,
+  swapBi,
+  swapCheckpoint,
+} from "#data/elite-redux/showdown/showdown-side-swap";
 import type { Gender } from "#data/gender";
 import { CustomPokemonData, PokemonBattleData, PokemonSummonData } from "#data/pokemon-data";
 import { Status } from "#data/status-effect";
@@ -877,6 +886,13 @@ export function reconcileArenaTags(hostTags: CoopSerializedArenaTag[] | undefine
  */
 export function applyCoopCheckpoint(checkpoint: CoopBattleCheckpoint): boolean {
   try {
+    // SHOWDOWN (Task F1): reflect the legacy numeric checkpoint (slot/bi-keyed hp/status/stages + arena
+    // tags) into the versus guest's LOCAL orientation before it reconciles the field. Distinct coordinate
+    // space from the id-keyed authoritativeState (which rides the same turnResolution and is swapped in
+    // applyCoopAuthoritativeBattleState); each is swapped exactly once. No-op off the versus-guest path.
+    if (isShowdownGuestFlipGated()) {
+      checkpoint = swapCheckpoint(checkpoint);
+    }
     // #807: reject out-of-order/stale state (standard snapshot sequencing).
     if (!coopAcceptStateTick(checkpoint.tick, "checkpoint")) {
       return false;
@@ -1636,10 +1652,13 @@ function normalizeCoopErMapState(value: unknown): Record<string, unknown> {
  * agree on the mon. The party ORDER is reconciled (the base checksum already hashes the speciesId
  * sequence + the bench heal adopts it), so the slot index is the cross-client-stable identity to hash.
  */
-function coopPartyIndexById(): Map<number, number> {
+function coopPartyIndexById(versusGuest = false): Map<number, number> {
   const map = new Map<number, number>();
   try {
-    globalScene.getPlayerParty().forEach((p, i) => {
+    // SHOWDOWN egress (Task F1): the versus guest maps its state BACK to authoritative orientation
+    // for the digest, so the "player" party the modifier ids collapse against is its LOCAL ENEMY
+    // party (the host's team) - matching the host's own player-party slot tokens.
+    (versusGuest ? globalScene.getEnemyParty() : globalScene.getPlayerParty()).forEach((p, i) => {
       if (typeof p?.id === "number") {
         map.set(p.id, i);
       }
@@ -1706,10 +1725,19 @@ function normalizeCoopMonKeyedEntries(list: unknown, partyIndexById: Map<number,
  * mapped to its party-slot token (defense-in-depth; a no-op for the usual player-wide modifiers). Sorted
  * by typeId then a canonical of the args, so array iteration order can never manufacture a divergence.
  */
-function normalizeCoopModifierBlobs(partyIndexById: Map<number, number>): Record<string, unknown>[] {
+function normalizeCoopModifierBlobs(
+  partyIndexById: Map<number, number>,
+  versusGuest = false,
+): Record<string, unknown>[] {
   let live: PersistentModifier[];
   try {
-    live = (globalScene.modifiers ?? []) as PersistentModifier[];
+    // SHOWDOWN egress (Task F1): in authoritative orientation the "player" persistent modifiers are
+    // the host's, which on the versus guest live on its LOCAL ENEMY side - so hash those instead.
+    live = (
+      versusGuest
+        ? globalScene.findModifiers(m => m instanceof PersistentModifier, false)
+        : (globalScene.modifiers ?? [])
+    ) as PersistentModifier[];
   } catch {
     return [];
   }
@@ -1722,7 +1750,7 @@ function normalizeCoopModifierBlobs(partyIndexById: Map<number, number>): Record
     ) {
       continue;
     }
-    const data = new ModifierData(m, true);
+    const data = new ModifierData(m, !versusGuest);
     blobs.push({
       typeId: data.typeId,
       className: data.className,
@@ -1767,18 +1795,19 @@ function normalizeCoopErRelicBattleState(value: unknown): Record<string, unknown
  * legitimately diverge, and `modifiers` / `erMapState` are normalized to their sync-relevant subset.
  * Returns a plain object (used both by the digest hash and the deep-diff diagnostics).
  */
-export function captureCoopSaveDataNormalized(): Record<string, unknown> {
+export function captureCoopSaveDataNormalized(versusGuest = false): Record<string, unknown> {
   const session = globalScene.gameData.getSessionSaveData() as unknown as Record<string, unknown>;
   // #839: a single live party id->slot map shared by the modifier + mon-keyed-substrate normalizers, so
   // every per-client `Pokemon.id` the digest would otherwise hash raw collapses to its stable slot token.
-  const partyIndexById = coopPartyIndexById();
+  // SHOWDOWN egress (Task F1): the versus guest sources the authoritative (host) side (see coopPartyIndexById).
+  const partyIndexById = coopPartyIndexById(versusGuest);
   const out: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(session)) {
     if (COOP_SAVEDATA_DIGEST_EXCLUDED_KEYS.has(key)) {
       continue;
     }
     if (key === "modifiers") {
-      out[key] = normalizeCoopModifierBlobs(partyIndexById);
+      out[key] = normalizeCoopModifierBlobs(partyIndexById, versusGuest);
       continue;
     }
     if (key === "erMapState") {
@@ -1810,9 +1839,9 @@ export function captureCoopSaveDataNormalized(): Record<string, unknown> {
  * the existing full-snapshot resync heals it. Returns the read-failure sentinel on any error so the
  * comparison is skipped (never a resync on a transient read failure), mirroring {@linkcode captureCoopChecksum}.
  */
-export function captureCoopSaveDataDigest(): string {
+export function captureCoopSaveDataDigest(versusGuest = false): string {
   try {
-    return fnv1a64(canonicalize(captureCoopSaveDataNormalized()));
+    return fnv1a64(canonicalize(captureCoopSaveDataNormalized(versusGuest)));
   } catch {
     return COOP_CHECKSUM_SENTINEL;
   }
@@ -1855,6 +1884,12 @@ function readBenchHpDigest(): [number, number, number][] {
  * both clients hash the same logical instant. Field mons are sorted by battler index.
  */
 export function captureCoopChecksumState(): CoopChecksumState {
+  // SHOWDOWN egress (Task F1): the versus guest holds its live scene in LOCAL orientation (its own
+  // team = player side). Map it BACK to the host's AUTHORITATIVE orientation before hashing so the two
+  // clients compare the SAME world. All three guest checksum call sites route through here.
+  if (isShowdownGuestFlipGated()) {
+    return captureVersusGuestChecksumState();
+  }
   const arena = globalScene.arena;
   const field = globalScene
     .getField(true)
@@ -1899,6 +1934,80 @@ export function captureCoopChecksumState(): CoopChecksumState {
     // so a mid-wave recompute yields the SAME value (constant within a wave); measured cheap enough to
     // recompute every turn (see #837 report), so no per-wave cache is needed.
     saveDataDigest: captureCoopSaveDataDigest(),
+  };
+}
+
+/** Off-field ENEMY-party hp/fainted digest - the egress mirror of {@linkcode readBenchHpDigest}. */
+function readEnemyBenchHpDigest(): [number, number, number][] {
+  const out: [number, number, number][] = [];
+  try {
+    const party = globalScene.getEnemyParty();
+    const battlerCount = globalScene.currentBattle?.getBattlerCount() ?? 2;
+    for (let i = 0; i < party.length; i++) {
+      const mon = party[i];
+      if (mon == null || i < battlerCount) {
+        continue;
+      }
+      out.push([i, mon.hp, mon.isFainted() ? 1 : 0]);
+    }
+  } catch {
+    /* a bad enemy-party read must never break the checksum capture */
+  }
+  return out;
+}
+
+/**
+ * SHOWDOWN egress (Task F1): capture the versus guest's checksum view mapped BACK to the host's
+ * AUTHORITATIVE orientation, so `hostChecksum === guestChecksum` holds turn-over-turn.
+ *
+ * The guest's live scene is the mirror of the host's: its LOCAL player party is the host's ENEMY
+ * party and vice versa (both full rosters are id-keyed-replicated every turn, so bench state is
+ * present on both). To reproduce the host's PLAYER-centric checksum this capture (a) sources the
+ * party/level/bench/modifier fields from the guest's LOCAL ENEMY side (the host's team), (b) reflects
+ * the bi of every on-field mon + held-item entry and the side of every arena tag, and (c) hashes the
+ * save-data digest in authoritative orientation. `pokeballCounts`, `money`, `weather`, `terrain`,
+ * `biomeId` and `seed` are host-authoritative (the guest already adopted them), so they pass through.
+ */
+function captureVersusGuestChecksumState(): CoopChecksumState {
+  const arena = globalScene.arena;
+  const field = globalScene
+    .getField(true)
+    .filter((m): m is Pokemon => m != null)
+    .map(readChecksumMon)
+    .map(mon => ({ ...mon, bi: swapBi(mon.bi) }))
+    .sort((a, b) => a.bi - b.bi);
+  const enemyParty = globalScene.getEnemyParty();
+  const arenaTags = readArenaTags()
+    .map(([tagType, side]) => [tagType, swapArenaTagSide(side)] as [number, number])
+    .sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+  const modifiers = (() => {
+    try {
+      return globalScene
+        .findModifiers(() => true, false)
+        .map(m => [m.type.id, m.stackCount] as [string, number])
+        .sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : a[1] - b[1]));
+    } catch {
+      return [] as [string, number][];
+    }
+  })();
+  const heldItems = readHeldItemDigest()
+    .map(([bi, typeId, stack]) => [swapBi(bi), typeId, stack] as [number, string, number])
+    .sort((a, b) => a[0] - b[0] || (a[1] < b[1] ? -1 : a[1] > b[1] ? 1 : a[2] - b[2]));
+  return {
+    field,
+    weather: arena.weather?.weatherType ?? 0,
+    terrain: arena.terrain?.terrainType ?? 0,
+    arenaTags,
+    party: enemyParty.map(p => p.species.speciesId),
+    partyLevels: enemyParty.map(p => p.level),
+    benchHp: readEnemyBenchHpDigest(),
+    money: globalScene.money,
+    modifiers,
+    heldItems,
+    pokeballCounts: readPokeballCounts(),
+    biomeId: arena.biomeId ?? 0,
+    seed: globalScene.seed ?? "",
+    saveDataDigest: captureCoopSaveDataDigest(true),
   };
 }
 
@@ -2672,6 +2781,15 @@ export function applyCoopAuthoritativeBattleState(
   }
   if (state.version !== 1) {
     return false;
+  }
+  // SHOWDOWN (Task F1): the versus guest holds its world in LOCAL orientation (own team = local player
+  // side). Reflect the host's authoritative state into that orientation HERE - the single canonical
+  // id-keyed apply that turnResolution / battleCheckpoint / waveEndState / stateSync-snapshot all funnel
+  // through, so the swap fires exactly ONCE per payload regardless of the carrier. The swap runs at APPLY
+  // time (always the guest's own context), not at wire-receive (which, in the shared-process duo harness,
+  // can be the host's context). No-op for solo/co-op/host (versus-guest-only gate).
+  if (isShowdownGuestFlipGated()) {
+    state = swapAuthoritativeState(state);
   }
   try {
     const playerParty = parseAuthoritativeParty(state.playerParty);

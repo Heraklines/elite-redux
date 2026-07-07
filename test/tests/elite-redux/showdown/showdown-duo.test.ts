@@ -27,6 +27,7 @@ import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
 import { beginShowdownBattle, endShowdownBattle } from "#data/elite-redux/showdown/showdown-battle-state";
 import { detectShowdownVictory } from "#data/elite-redux/showdown/showdown-outcome";
 import type { ShowdownMonManifest } from "#data/elite-redux/showdown/showdown-team";
+import { PokemonMove } from "#data/moves/pokemon-move";
 import { BattlerIndex } from "#enums/battler-index";
 import { Command } from "#enums/command";
 import { GameModes } from "#enums/game-modes";
@@ -82,8 +83,6 @@ describe.skipIf(!RUN)("Showdown versus - two-engine end-to-end proof (C6v2d)", (
   beforeEach(() => {
     game = new GameManager(phaserGame);
     logs = installDuoLogCapture(`showdown-duo-${Date.now()}`);
-    // The host OHKOs the guest's frail team: PIKACHU + THUNDERBOLT is 4x on Magikarp (Water/Flying).
-    game.override.moveset([MoveId.THUNDERBOLT]);
     // globalScene citizenship: capture BEFORE any guest-scene swap (buildShowdownDuo builds a 2nd scene).
     prevScene = globalScene as unknown as BattleScene;
   });
@@ -108,6 +107,18 @@ describe.skipIf(!RUN)("Showdown versus - two-engine end-to-end proof (C6v2d)", (
       new SelectStarterPhase().initBattle(starters);
     });
     await game.phaseInterceptor.to("CommandPhase");
+    // The host OHKOs the guest's frail team: PIKACHU + THUNDERBOLT is 4x on Magikarp (Water/Flying).
+    // Bake THUNDERBOLT into the host's own Pikachu DIRECTLY (not a global Overrides.MOVESET_OVERRIDE):
+    // the override overlays the PLAYER lead's slot 0, but on the flipped guest the local player is the
+    // guest's OWN Magikarp - it would corrupt its manifest moveset and diverge the wave-start checksum.
+    // A direct set on the host mon rides the mirror into the guest's ENEMY Pikachu (correct), while the
+    // guest's Magikarp keeps its real manifest moves.
+    game.scene.getPlayerParty()[0].moveset = [
+      new PokemonMove(MoveId.THUNDERBOLT),
+      new PokemonMove(MoveId.TACKLE),
+      new PokemonMove(MoveId.THUNDER_WAVE),
+      new PokemonMove(MoveId.QUICK_ATTACK),
+    ];
   }
 
   it("streams turns to the guest (checksums converge) and both observe the same KO-sweep result", async () => {
@@ -151,10 +162,11 @@ describe.skipIf(!RUN)("Showdown versus - two-engine end-to-end proof (C6v2d)", (
       await driveGuestReplayTurn(rig.guestScene, turn);
     });
 
-    // (a) The stream APPLIED on the guest: it converged to the host-KO'd state (its own team fainted).
+    // (a) The stream APPLIED on the guest: it converged to the host-KO'd state. Task F1: the guest's OWN
+    // team is now its LOCAL PLAYER party (the data-level flip), so the swept side is its player party.
     expect(
-      rig.guestScene.getEnemyParty().every(e => e.isFainted()),
-      "guest converged to the host-KO'd enemy state",
+      rig.guestScene.getPlayerParty().every(p => p.isFainted()),
+      "guest converged to the host-KO'd state (its own team, now the local player party, fainted)",
     ).toBe(true);
     const hostSwept = rig.hostScene.getPlayerParty().every(p => p.isFainted());
     const guestSwept = rig.hostScene.getEnemyParty().every(e => e.isFainted());

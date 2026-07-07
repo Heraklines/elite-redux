@@ -57,10 +57,6 @@ export class EnemyBattleInfo extends BattleInfo {
       },
     };
 
-    // Showdown 1v1 perspective flip (reworked, staging fix 2026-07-07): the CLASS now follows the
-    // PRESENTATION side (see initBattleInfo in pokemon.ts), so this panel ALWAYS sits at its normal
-    // top-left corner with its normal enemy chrome. The old corner-only swap ("enemy chrome at the
-    // bottom" limitation) is superseded by the class swap - the maintainer rejected that limitation.
     super(140, -141, false, posParams);
 
     this.ownedIcon = globalScene.add

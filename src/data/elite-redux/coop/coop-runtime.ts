@@ -410,9 +410,10 @@ function wireShowdownResult(transport: CoopTransport, controller: CoopSessionCon
         return; // already ending on this client
       }
       // AFK-guest (#7): if the guest's command menu is still open when the match ends, force it back to
-      // MESSAGE first - otherwise SHOWDOWN_COMMAND owns input and the just-unshifted ShowdownResultPhase
-      // parks behind it (the guest never sees the result). Best-effort; guarded by the outer try.
-      if (globalScene.ui.getMode() === UiMode.SHOWDOWN_COMMAND) {
+      // MESSAGE first - otherwise the command menu owns input and the just-unshifted ShowdownResultPhase
+      // parks behind it (the guest never sees the result). Task F1: the guest now uses the NORMAL
+      // player-side COMMAND menu (its own team is its local player party). Best-effort; guarded.
+      if (globalScene.ui.getMode() === UiMode.COMMAND) {
         globalScene.ui.setMode(UiMode.MESSAGE);
       }
       if (msg.t === "showdownVoid") {
@@ -1259,18 +1260,14 @@ export function isAuthoritativeBattleSession(): boolean {
  * versus-guest path. Read-only at render; NEVER used to mutate authoritative order/state.
  */
 export function isShowdownGuestFlip(): boolean {
-  // TEMPORARILY DISABLED (staging stabilization 2026-07-08): the presentation-level flip is
-  // spread across ~30 gate checks with construction-time vs live sampling hazards, and kept
-  // regressing live (front sprites, swapped panel chrome, a summon crash) despite each site
-  // testing green in isolation. With the flip OFF, the versus guest renders the stable
-  // authoritative view (its own team on the TOP/enemy side) - visually inverted but every
-  // mechanic (showdown command menu, relay, results, forfeit) is proven in this configuration.
-  // The REAL flip is being rebuilt at the DATA level (swap sides once at the guest's world-
-  // adoption boundary, so all rendering is naturally correct) - see the plan doc follow-up.
-  // All flip machinery (predicate installs, presentation helpers, panel-class selection)
-  // stays in place and reactivates by restoring the line below.
-  return false;
-  // return isVersusSession() && getCoopController()?.role === "guest";
+  // Task F1 (2026-07-08): the DATA-LEVEL side swap. The failed presentation-level flip (~30 scattered
+  // render gates with construction-vs-live sampling hazards) is REMOVED; the world is now re-oriented
+  // ONCE at the guest's authoritative-ingress boundary (`showdown-side-swap.ts`), so the guest's own
+  // team IS its local PLAYER party and all rendering is correct by construction. This predicate now
+  // gates the DATA mappers (ingress side swap + egress checksum un-swap) plus the one legitimate
+  // guest-only presentation choice left - the C7 opponent-trainer re-skin. HARD `false` for solo /
+  // co-op / host (narrower than isCoopAuthoritativeGuest, which is true for co-op guests too).
+  return isVersusSession() && getCoopController()?.role === "guest";
 }
 
 /** Convenience: the live battle-command relay, or null when not in a co-op run. */

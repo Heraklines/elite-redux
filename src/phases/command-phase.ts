@@ -30,6 +30,10 @@ import { reloadCurrentWave } from "#data/elite-redux/er-reset-wave";
 import { recordSinglePlayerCommand } from "#data/elite-redux/replay-single-recording";
 import { getShowdownRelay } from "#data/elite-redux/showdown/showdown-battle-state";
 import { SHOWDOWN_TURN_TIMER_MS } from "#data/elite-redux/showdown/showdown-command-relay";
+import {
+  buildShowdownFightCommand,
+  buildShowdownSwitchCommand,
+} from "#data/elite-redux/showdown/showdown-guest-command";
 import { AbilityId } from "#enums/ability-id";
 import { ArenaTagSide } from "#enums/arena-tag-side";
 import { ArenaTagType } from "#enums/arena-tag-type";
@@ -49,7 +53,6 @@ import { getMoveTargets } from "#moves/move-utils";
 import { FieldPhase } from "#phases/field-phase";
 import type { MoveTargetSet } from "#types/move-target-set";
 import type { TurnMove } from "#types/turn-move";
-import type { ShowdownCommandArgs } from "#ui/showdown-command-ui-handler";
 import i18next from "i18next";
 
 export class CommandPhase extends FieldPhase {
@@ -62,7 +65,7 @@ export class CommandPhase extends FieldPhase {
   private isSwitch = false;
 
   /** Showdown versus-host 60s turn clock (timeout id); null when unarmed. */
-  private showdownHostClock: number | null = null;
+  private showdownTurnClock: number | null = null;
 
   constructor(fieldIndex: number) {
     super();
@@ -433,10 +436,6 @@ export class CommandPhase extends FieldPhase {
       return;
     }
 
-    if (this.tryShowdownGuestCommand()) {
-      return;
-    }
-
     // Co-op (#839, next-command-open reciprocal barrier): we reached OUR OWN slot's command point with
     // our mon materialized on the field. Do NOT open the command UI until the PARTNER has ALSO reached
     // the same command point (both at command, both mons on field) - the missing reciprocal guard for
@@ -456,33 +455,59 @@ export class CommandPhase extends FieldPhase {
   }
 
   /**
-   * Showdown 1v1 (C5): on the versus GUEST, the player-side CommandPhase runs for the HOST's team
-   * (authoritatively the player side in the host's world), which the guest must NOT drive - the
-   * guest commands its OWN team, which is the ENEMY side. Instead of opening the player-field
-   * CommandUiHandler, open the dedicated {@linkcode UiMode.SHOWDOWN_COMMAND} menu (reads the ENEMY
-   * side = the guest's own team), and on the confirmed pick SHIP it via the relay
-   * ({@linkcode ShowdownCommandRelay.sendCommand}) - the HOST validates + simulates it. The guest
-   * then writes an inert, skipped command so the phase queue stays well-formed; TurnStartPhase
-   * diverts the whole turn to CoopReplayTurnPhase (the guest renders the host's authoritative
-   * outcome). Gated on the live versus GUEST, so solo / co-op / host are byte-for-byte unchanged.
+   * Showdown 1v1 (Task F1): on the versus GUEST, its OWN team is now its LOCAL PLAYER party (the
+   * data-level side swap), so the NORMAL player-side command UI runs against real data. The guest
+   * must not RESOLVE the turn (the host is the sole engine); it SHIPS the resolved command via the
+   * relay ({@linkcode ShowdownCommandRelay.sendCommand}) and writes an inert skip so the phase queue
+   * stays well-formed (TurnStartPhase then diverts the turn to CoopReplayTurnPhase and the guest
+   * renders the host's authoritative outcome). Intercepted at the commit point in
+   * {@linkcode handleCommand}, mirroring the co-op own-slot broadcast shape. Gated on the live versus
+   * GUEST, so solo / co-op / host are byte-for-byte unchanged.
+   *
+   * `cursor` is the move slot (FIGHT/TERA) or the party slot (POKEMON) - the same raw index the host
+   * validates against ITS enemy party, aligned 1:1 because the side-swap preserves party ORDER.
+   * Targets are a presentation default (the host re-derives them). Returns true when it shipped.
    */
-  private tryShowdownGuestCommand(): boolean {
+  private tryShipShowdownGuestCommand(command: Command, cursor: number, useMode: boolean | MoveUseMode): boolean {
     if (!isVersusSession() || getCoopController()?.role !== "guest") {
       return false;
     }
-    const relay = getShowdownRelay();
-    const turn = globalScene.currentBattle.turn;
-    const finish = (command: SerializedCommand) => {
-      relay?.sendCommand(turn, command);
-      globalScene.currentBattle.turnCommands[this.fieldIndex] = {
-        command: Command.FIGHT,
-        move: { move: MoveId.NONE, targets: [], useMode: MoveUseMode.NORMAL },
-        skip: true,
-      };
-      this.end();
+    let serialized: SerializedCommand;
+    if (command === Command.FIGHT || command === Command.TERA) {
+      const moveId = this.getPokemon().getMoveset()[cursor]?.moveId;
+      if (moveId == null) {
+        return false;
+      }
+      serialized = buildShowdownFightCommand(cursor, moveId);
+      if (typeof useMode !== "boolean") {
+        serialized.useMode = useMode;
+      }
+      if (command === Command.TERA) {
+        serialized.tera = true;
+      }
+    } else if (command === Command.POKEMON) {
+      serialized = buildShowdownSwitchCommand(cursor);
+      serialized.baton = typeof useMode === "boolean" ? useMode : false;
+    } else {
+      // BALL / RUN / SHIFT have no meaning in a versus trainer 1v1; let them fall through (they are
+      // not selectable in this mode, so this branch is unreachable in practice).
+      return false;
+    }
+    getShowdownRelay()?.sendCommand(globalScene.currentBattle.turn, serialized);
+    globalScene.currentBattle.turnCommands[this.fieldIndex] = {
+      command: Command.FIGHT,
+      move: { move: MoveId.NONE, targets: [], useMode: MoveUseMode.NORMAL },
+      skip: true,
     };
-    const args: ShowdownCommandArgs = { turn, onCommand: (_turn, command) => finish(command) };
-    globalScene.ui.setMode(UiMode.SHOWDOWN_COMMAND, args);
+    globalScene.ui.setMode(UiMode.MESSAGE);
+    globalScene.ui.showText(
+      i18next.t("battle:showdownOpponentChoosing", { defaultValue: "Move locked in! Opponent is choosing..." }),
+      null,
+      () => {},
+      null,
+      true,
+    );
+    this.end();
     return true;
   }
 
@@ -497,23 +522,24 @@ export class CommandPhase extends FieldPhase {
     } else {
       globalScene.ui.setMode(UiMode.COMMAND, this.fieldIndex);
     }
-    this.startShowdownHostClock();
+    this.startShowdownTurnClock();
   }
 
   /**
-   * Showdown 1v1 (staging fix 2026-07-07): the HOST's own command pick gets the SAME 60s turn
-   * clock the guest already has. Without it the host could deliberate forever while the guest
-   * (whose relay pick is buffered host-side) stared at "waiting" with no recourse - a live
-   * 3.5-minute stall was log-confirmed. On expiry: auto-pick the lead's first usable move
-   * (mirrors the guest's autoShipOnTimeout). Versus-HOST-only; cleared on phase end.
+   * Showdown 1v1: BOTH clients get a 60s turn clock (Task F1 folds the guest's onto the same code as
+   * the host's). Without it a client could deliberate forever while its opponent - whose pick is
+   * already committed/buffered - stared at "waiting" with no recourse (a live 3.5-minute stall was
+   * log-confirmed for the host). On expiry: auto-pick the lead's first usable move and drive it
+   * through {@linkcode handleCommand} - which EXECUTES it on the host and SHIPS it on the guest (the
+   * versus-guest interception). Versus-only; cleared on phase end.
    */
-  private startShowdownHostClock(): void {
-    if (!isVersusSession() || getCoopController()?.role !== "host") {
+  private startShowdownTurnClock(): void {
+    if (!isVersusSession()) {
       return;
     }
-    this.clearShowdownHostClock();
-    this.showdownHostClock = window.setTimeout(() => {
-      this.showdownHostClock = null;
+    this.clearShowdownTurnClock();
+    this.showdownTurnClock = window.setTimeout(() => {
+      this.showdownTurnClock = null;
       try {
         const lead = globalScene.getPlayerField()[this.fieldIndex];
         const idx = lead?.getMoveset().findIndex(m => m != null && !m.isOutOfPp());
@@ -527,11 +553,11 @@ export class CommandPhase extends FieldPhase {
     }, SHOWDOWN_TURN_TIMER_MS);
   }
 
-  /** Clear the versus-host turn clock (no-op when none armed). */
-  private clearShowdownHostClock(): void {
-    if (this.showdownHostClock != null) {
-      window.clearTimeout(this.showdownHostClock);
-      this.showdownHostClock = null;
+  /** Clear the versus turn clock (no-op when none armed). */
+  private clearShowdownTurnClock(): void {
+    if (this.showdownTurnClock != null) {
+      window.clearTimeout(this.showdownTurnClock);
+      this.showdownTurnClock = null;
     }
   }
 
@@ -1177,6 +1203,12 @@ export class CommandPhase extends FieldPhase {
     useMode: boolean | MoveUseMode = false,
     move?: TurnMove,
   ): boolean {
+    // SHOWDOWN 1v1 (Task F1): the versus guest SHIPS its own-slot pick to the host instead of
+    // resolving it locally (the host is the sole engine). Intercept BEFORE any local execution.
+    if (this.tryShipShowdownGuestCommand(command, cursor, useMode)) {
+      return true;
+    }
+
     let success = false;
 
     switch (command) {
@@ -1337,7 +1369,7 @@ export class CommandPhase extends FieldPhase {
   }
 
   end() {
-    this.clearShowdownHostClock();
+    this.clearShowdownTurnClock();
     globalScene.ui.setMode(UiMode.MESSAGE).then(() => super.end());
   }
 }

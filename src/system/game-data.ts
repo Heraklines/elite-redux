@@ -16,6 +16,7 @@ import { getSerializedDailyRunConfig, parseDailySeed } from "#data/daily-seed/da
 import { allMoves, allSpecies } from "#data/data-lists";
 import { Egg } from "#data/egg";
 import { coopGateAccountWrite } from "#data/elite-redux/coop/coop-account-gate";
+import { isShowdownGuestFlipGated } from "#data/elite-redux/coop/coop-authoritative-gate";
 import { coopWarn } from "#data/elite-redux/coop/coop-debug";
 import { recordCoopResumeMarker } from "#data/elite-redux/coop/coop-resume-marker";
 import {
@@ -45,6 +46,7 @@ import { grantErShinyLabSavedLookToSave, mergeErShinyLabSaveData } from "#data/e
 import { sanitizeTrainerFxSaveData, type TrainerFxSaveData } from "#data/elite-redux/er-trainer-fx";
 import { getErUsedTrainerKeys, restoreErRunTrainerTracking } from "#data/elite-redux/er-trainer-runtime-hook";
 import { getErWardStoneEntries, restoreErWardStones } from "#data/elite-redux/er-ward-stones";
+import { swapSessionData } from "#data/elite-redux/showdown/showdown-side-swap";
 import { pokemonFormChanges } from "#data/pokemon-forms";
 import type { PokemonSpecies } from "#data/pokemon-species";
 import { loadPositionalTag } from "#data/positional-tags/load-positional-tag";
@@ -1544,6 +1546,13 @@ export class GameData {
     } catch (err) {
       console.warn("[coop-launch] applyCoopLaunchSession: unparseable snapshot, falling back", err);
       return false;
+    }
+    // SHOWDOWN (Task F1): the versus guest boots into its LOCAL orientation - its own team (authored
+    // as the host's ENEMY side) becomes its local PLAYER party. Reflect the parsed session here, the
+    // guest's world-adoption boundary, before initSessionFromData rebuilds party/enemyParty. No-op
+    // for solo/co-op/host (versus-guest-only gate).
+    if (isShowdownGuestFlipGated()) {
+      sessionData = swapSessionData(sessionData);
     }
     await this.initSessionFromData(sessionData);
     return true;
