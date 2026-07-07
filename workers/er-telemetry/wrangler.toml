@@ -13,7 +13,7 @@ compatibility_date = "2024-11-01"
 [[d1_databases]]
 binding = "DB"
 database_name = "er-telemetry"
-database_id = "REPLACE_WITH_D1_ID"   # set after `wrangler d1 create er-telemetry`
+database_id = "e75604f0-bef9-49ef-aba7-d93779e48b8f"   # set after `wrangler d1 create er-telemetry`
 
 # Secrets (set with `wrangler secret put`, DO NOT commit real values):
 #   npx wrangler secret put SESSION_SECRET   # MUST equal er-save-api's SESSION_SECRET
