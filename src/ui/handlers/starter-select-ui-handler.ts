@@ -4109,8 +4109,18 @@ export class StarterSelectUiHandler extends MessageUiHandler {
     // stays keyed on the ROOT species id so the per-slot identity is stable. Base behavior is
     // byte-identical in every other mode (iconSpecies === species, iconFormIndex === props).
     const renderStage = this.showdownRenderStage(species.speciesId);
-    const iconSpecies = renderStage?.species ?? species;
-    const iconFormIndex = renderStage?.formIndex ?? props.formIndex;
+    let iconSpecies = renderStage?.species ?? species;
+    let iconFormIndex = renderStage?.formIndex ?? props.formIndex;
+    // B7 item 9: an ER-custom stage icon that isn't in the texture cache would render as a missing
+    // box. If the stage's icon atlas isn't loaded, fall back to the BASE species icon (always loaded)
+    // so the slot is never blank - the base is at least a correct, present icon for the line.
+    if (
+      renderStage
+      && !globalScene.textures.exists(iconSpecies.getIconAtlasKey(iconFormIndex, props.shiny, props.variant))
+    ) {
+      iconSpecies = species;
+      iconFormIndex = props.formIndex;
+    }
     this.starterIcons[index].setTexture(iconSpecies.getIconAtlasKey(iconFormIndex, props.shiny, props.variant));
     this.starterIcons[index].setFrame(iconSpecies.getIconId(props.female, iconFormIndex, props.shiny, props.variant));
     this.checkIconId(this.starterIcons[index], iconSpecies, props.female, iconFormIndex, props.shiny, props.variant);
@@ -6424,22 +6434,10 @@ export class StarterSelectUiHandler extends MessageUiHandler {
 
     for (let s = 0; s < this.starterSpecies.length; s++) {
       const species = this.starterSpecies[s];
-      const currentDexAttr = this.getCurrentDexProps(species.speciesId);
-      const props = globalScene.gameData.getSpeciesDexAttrProps(species, currentDexAttr);
-      this.starterIcons[s]
-        .setTexture(species.getIconAtlasKey(props.formIndex, props.shiny, props.variant))
-        .setFrame(species.getIconId(props.female, props.formIndex, props.shiny, props.variant));
-      this.checkIconId(this.starterIcons[s], species, props.female, props.formIndex, props.shiny, props.variant);
-      this.refreshShinyLabIconFx(
-        this.starterIcons[s],
-        species,
-        props.female,
-        props.formIndex,
-        props.shiny,
-        props.variant,
-        `starter-party-shiny-lab-icon-${s}-${species.speciesId}`,
-        false,
-      );
+      // B7 item 9: re-render each remaining party icon through updatePartyIcon so it re-applies the
+      // showdown Field-Stage override. The old inline render always drew the BASE form, so removing
+      // a mon reverted every other slot's evolved/mega icon back to its base (the maintainer report).
+      this.updatePartyIcon(species, s);
       if (s >= index) {
         this.starterCursorObjs[s]
           .setPosition(this.starterCursorObjs[s + 1].x, this.starterCursorObjs[s + 1].y)
