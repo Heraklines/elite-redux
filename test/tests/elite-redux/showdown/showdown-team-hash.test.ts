@@ -46,7 +46,7 @@ describe("showdownTeamHash transport-shape canonicality", () => {
   it("survives a manifest that DOES carry an undefined-valued optional key", () => {
     // Even if a future field regresses to `key: undefined`, the hash must stay
     // transport-canonical because showdownTeamHash round-trips before hashing.
-    const m = starterToManifest(starter(), emptyGameData) as Record<string, unknown>;
+    const m: Record<string, unknown> = { ...starterToManifest(starter(), emptyGameData) };
     const withUndefined = { ...m, erShinyLab: undefined };
     expect(showdownTeamHash([withUndefined as never])).toBe(
       showdownTeamHash(JSON.parse(JSON.stringify([withUndefined]))),
