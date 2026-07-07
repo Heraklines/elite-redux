@@ -220,6 +220,23 @@ const ME_CONTINUATION =
 const BIOME_BOUNDARY =
   "drive the two-engine biome-boundary crossroads/World-Map owner pick for real (setCoopBiomePickerDrivenByTest "
   + "+ owner/watcher parity + biome pick), re-deriving the ME-leg counter parities the extra tick shifts (#848 follow-up)";
+/**
+ * Follow-up shorthand for the mid-run CATCH surfaces. #843/#849 BUILD 1 LANDED the inline catch leg (the
+ * coop-soak-driver `catchWaves` knob, proven green by coop-soak-catch.test.ts): on a designated WILD wave the
+ * driver isolates one foe (a spread move faints the first, a DEF/SPDEF-bulked survivor absorbs it) and
+ * HOST-throws a MASTER_BALL via the real game.doThrowPokeball -> AttemptCapturePhase -> capture ->
+ * broadcastCoopWaveResolved("capture") + the dexSync broadcast, then reconciles the GUEST party
+ * (applyCoopCaptureParty) + dex (the dexSync stream) + ball inventory, asserting BOTH accounts' dex credit +
+ * ball convergence. So the BALL mode + the `catch` situation + the dexSync kind/band FIRE for that leg. They
+ * stay listed here because the DEFAULT wave/shop soak does NOT configure a catch leg (opts.catchWaves unset) -
+ * they are exercised by the dedicated catch test, not the default run - so the default-profile partition is
+ * unchanged. REMAINING follow-up: the FULL-party box/release catch sub-flow + a GUEST-owned (relayed) throw.
+ */
+const CATCH_LEG =
+  "#843/#849 BUILD 1 landed the inline catch leg (coop-soak-driver catchWaves + coop-soak-catch.test.ts drives "
+  + "BALL + the `catch` situation + dexSync, asserting BOTH dex credits + ball convergence); the default "
+  + "wave/shop soak configures no catch leg, so the default partition is unchanged; follow-up: full-party "
+  + "box/release + a guest-owned (relayed) throw";
 
 /**
  * Every surface the soak DELIBERATELY does not drive today, keyed by surface. DRIVABLE = EXPECTED minus
@@ -231,8 +248,10 @@ export const KNOWN_UNDRIVABLE: ReadonlyMap<string, UndrivableEntry> = new Map<st
   [
     modeKey(UiMode.BALL),
     {
-      reason: "capture flow not driven (headless host uses game.move.select, which bypasses the BALL menu)",
-      followupTask: "drive a seeded ball throw (game.doThrowPokeball) in the soak - the `catch` situation",
+      reason:
+        "the DEFAULT wave/shop soak never throws a ball (headless move.select bypasses the BALL menu); the "
+        + "catch leg (coop-soak-catch.test.ts) DRIVES the real BALL menu via game.doThrowPokeball",
+      followupTask: CATCH_LEG,
     },
   ],
   [
@@ -390,8 +409,10 @@ export const KNOWN_UNDRIVABLE: ReadonlyMap<string, UndrivableEntry> = new Map<st
   [
     kindKey("dexSync"),
     {
-      reason: "the dex/starter sync broadcast is only sent on a new-species catch, which is not driven",
-      followupTask: "catch a new species in the soak - the `catch` situation",
+      reason:
+        "the dex/starter sync broadcast is only sent on a catch, which the DEFAULT run does not drive; the "
+        + "catch leg (coop-soak-catch.test.ts) DRIVES it (both accounts credited)",
+      followupTask: CATCH_LEG,
     },
   ],
 
@@ -454,8 +475,8 @@ export const KNOWN_UNDRIVABLE: ReadonlyMap<string, UndrivableEntry> = new Map<st
   [
     bandKey("dexSync"),
     {
-      reason: "the dex-sync seq band is not driven (no new-species catch)",
-      followupTask: "catch a new species in the soak - the `catch` situation",
+      reason: "the dex-sync seq band is not driven by the DEFAULT run (no catch); the catch leg drives it",
+      followupTask: CATCH_LEG,
     },
   ],
   [
@@ -481,8 +502,8 @@ export const KNOWN_UNDRIVABLE: ReadonlyMap<string, UndrivableEntry> = new Map<st
   [
     sitKey(COOP_SOAK_SITUATIONS.catch),
     {
-      reason: "the soak never throws a ball (headless move.select bypass)",
-      followupTask: "drive a seeded catch attempt - the BALL mode + dexSync follow-ups",
+      reason: "the DEFAULT soak never throws a ball (headless move.select bypass); the catch leg drives a catch",
+      followupTask: CATCH_LEG,
     },
   ],
   [

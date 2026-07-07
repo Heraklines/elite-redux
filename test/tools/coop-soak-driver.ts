@@ -57,10 +57,13 @@ import type { BattleScene } from "#app/battle-scene";
 import { getGameMode } from "#app/game-mode";
 import {
   adoptCoopHostPlayerPartyOrder,
+  applyCoopCaptureParty,
   applyCoopFieldSnapshot,
+  captureCoopCaptureParty,
   captureCoopCheckpoint,
   captureCoopChecksum,
   captureCoopChecksumState,
+  captureCoopDexBaseline,
   captureCoopFieldSnapshot,
   captureCoopSaveDataDigest,
   captureCoopSaveDataNormalized,
@@ -77,6 +80,7 @@ import {
   getCoopMeBattleInteractionCounter,
   getCoopRuntime,
   isCoopLearnMoveForwardInFlightEmpty,
+  setCoopDexSyncDelayMs,
   setCoopRuntime,
 } from "#data/elite-redux/coop/coop-runtime";
 import { COOP_GUEST_FIELD_INDEX, COOP_HOST_FIELD_INDEX } from "#data/elite-redux/coop/coop-session";
@@ -90,7 +94,9 @@ import { Command } from "#enums/command";
 import { GameModes } from "#enums/game-modes";
 import { MoveId } from "#enums/move-id";
 import { MysteryEncounterType } from "#enums/mystery-encounter-type";
+import { PokeballType } from "#enums/pokeball";
 import { SpeciesId } from "#enums/species-id";
+import { Stat } from "#enums/stat";
 import { UiMode } from "#enums/ui-mode";
 import { WeatherType } from "#enums/weather-type";
 import type { Pokemon } from "#field/pokemon";
@@ -104,6 +110,7 @@ import {
   type DuoLogs,
   type DuoRig,
   drainGuestMeReplayToSettle,
+  drainLoopback,
   driveGuestMeReplay,
   driveGuestReplayTurn,
   driveGuestRewardWatch,
@@ -428,6 +435,19 @@ export interface SoakOptions {
    * EncounterPhase then resetting it, so ONLY the designated waves roll an ME. See {@linkcode processMeWave}.
    */
   meWaves?: ReadonlyMap<number, MysteryEncounterType>;
+  /**
+   * #843/#849 CATCH LEG (BUILD 1). A set of wave indices where the soak DRIVES a seeded ball throw ->
+   * capture -> dexSync instead of an all-faint win. On each such wave the driver faints ONE wild enemy (the
+   * host attacks it while the guest SWITCHES, so no move redirect KOs the survivor), then HOST-throws a
+   * MASTER_BALL at the lone survivor via the real {@linkcode GameManager.doThrowPokeball} (opens the real
+   * BALL menu -> AttemptCapturePhase -> capture -> broadcastCoopWaveResolved("capture") + the dexSync
+   * broadcast), reconciles the GUEST to the host's post-catch party ({@linkcode applyCoopCaptureParty}) +
+   * dex (the {@linkcode captureCoopDexBaseline}-scoped dexSync stream) + ball inventory, and asserts BOTH
+   * accounts' dex credit + ball-count convergence (the #843 pokeball-drift guard). Undefined (the default)
+   * = byte-identical to today (no catch driven; the `catch` situation + BALL mode + dexSync kind/band stay
+   * declared-undrivable for the default run). Each designated wave MUST be a WILD non-boss double.
+   */
+  catchWaves?: ReadonlySet<number>;
 }
 
 /** A structured HARD invariant breach (LOCKSTEP / NO-PARK / TEARDOWN) the driver throws after writing the
@@ -1055,6 +1075,14 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
     game.scene.setSeed(opts.pinSeed);
   }
 
+  // #843 CATCH LEG (BUILD 1): when a catch leg is configured, shorten the dexSync broadcast delay so the
+  // host's post-catch dexSync timer fires DURING the guest-ctx reconcile drain (not during the host throw),
+  // landing the partner dex credit on the GUEST account deterministically. The default run has no catch leg,
+  // so this is never touched (the production 500ms default stands). The catch TEST restores it in afterEach.
+  if (opts.catchWaves != null && opts.catchWaves.size > 0) {
+    setCoopDexSyncDelayMs(200);
+  }
+
   // TRAINER WAVES ARE SURVEYED (#846). Both FIXED trainer battles (rivals 8/25/55/95/145/195, evil-team
   // grunts/admins/bosses + E4/champion) AND RANDOM (rolled) trainer waves now run: the caller NO LONGER sets
   // .disableTrainerWaves(), and the harness mirror (mirrorHostBattleToGuest) is TRAINER-AWARE - it rebuilds
@@ -1428,7 +1456,17 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
                 actionScript.push(`wave ${wave} turn ${turn}: host SWITCH -> party[${benchSlot}]`);
               }
             } else {
-              game.move.select(moveId, fi, targetIndex);
+              // A MULTI-TARGET (spread) move must NOT be handed a targetIndex (game.move.select asserts), so
+              // omit it for spread moves (they auto-target). The default profile's moveset has no spread moves,
+              // so this is byte-identical there; it only matters for a catch-leg variant whose moveset carries
+              // a spread move for the isolation turn (see processCatchWave).
+              const isSpread =
+                mon
+                  .getMoveset()
+                  .find(m => m?.moveId === moveId)
+                  ?.getMove()
+                  .isMultiTarget() ?? false;
+              game.move.select(moveId, fi, isSpread ? undefined : targetIndex);
               // #849 COMMAND-issue tap: a host FIGHT command drives COMMAND + FIGHT (+ TARGET_SELECT for the
               // target). The headless host bypasses the real UI, so the tap synthesizes the mode hits here.
               hitMode(UiMode.COMMAND);
@@ -1736,6 +1774,191 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
     assertScalarConvergence(wave, "post-shop"); // #843 pokeball-drift classifier (money + ball inventory)
   };
 
+  // ---------------------------------------------------------------------------
+  // #843 CATCH LEG (BUILD 1). Drive a SEEDED ball throw -> capture -> dexSync across BOTH engines on a
+  // designated WILD double wave, and assert BOTH accounts' dex credit + ball-count convergence (the #843
+  // pokeball-drift guard). The doubles constraint (you cannot throw at two live foes - `noPokeballMulti`)
+  // is handled by fainting ONE enemy first: the host attacks it while the guest SWITCHES (no damage, so no
+  // move redirect KOs the survivor), leaving a LONE foe. The AttemptCapturePhase is UNSHIFTED (runs before
+  // any partner MovePhase - turn-start-phase.ts), so the host's ball throw on the sole survivor resolves the
+  // capture and ends the wave cleanly. The guest is a pure renderer: it reconciles the host's post-catch
+  // PARTY via applyCoopCaptureParty (the real #633 B1/B2 handshake) and its DEX via the real dexSync stream
+  // (the #794 partner-account credit), and its ball inventory via the wave-boundary adopt analogue. All are
+  // PRODUCTION heal mechanisms, not content narrowing.
+  // ---------------------------------------------------------------------------
+
+  /** The ball the catch leg throws. MASTER_BALL guarantees the capture on a non-boss wild (no weaken needed). */
+  const CATCH_BALL = PokeballType.MASTER_BALL;
+
+  /**
+   * Drive ONE catch wave. Falls back to a normal wave (skip-counted, never silent) when the wave is not a
+   * catchable WILD double or the survivor cannot be isolated - so a mis-designated catch wave degrades
+   * safely instead of stranding. On a capture: asserts BOTH accounts' dex credit + ball-count convergence;
+   * a miss on any of these is RECORDED as a loud finding (the run continues + the soak test then reds).
+   */
+  const processCatchWave = async (wave: number): Promise<void> => {
+    await assertWaveBoundary(wave); // (a)+(b) wave-start clean-start parity (before any ball grant)
+
+    const battle = rig.hostScene.currentBattle;
+    const liveEnemies = rig.hostScene.getEnemyField().filter(e => !e.isFainted());
+    if (battle.battleType !== BattleType.WILD || liveEnemies.length < 2 || liveEnemies.some(e => e.isBoss())) {
+      // Not a catchable wild double (trainer / single / boss-segmented): degrade to a normal wave.
+      bumpSkip("catchWaveNotCatchableWildDouble");
+      await playWave(wave);
+      await assertPostTurnConverged(wave);
+      await driveRewardShop(wave);
+      assertScalarConvergence(wave, "post-shop");
+      return;
+    }
+
+    const hostBalls = rig.hostScene.pokeballCounts as unknown as Record<number, number>;
+    const survivor = liveEnemies[1]; // the second foe we will isolate + catch
+    const rootId = survivor.species.getRootSpeciesId();
+    const hostPartyBefore = rig.hostScene.getPlayerParty().length;
+
+    // ===== TURN 1: faint the FIRST foe with a SPREAD move so the wave drops to a lone survivor to catch. =====
+    // A MULTI-TARGET (spread) move auto-targets BOTH foes and needs NO TARGET_SELECT UI - which is essential
+    // here: a single-target host move opens SelectTargetPhase whose target prompt is driven off the
+    // prompt-interval, and that interval does NOT drive the target UI while the host is parked awaiting the
+    // partner-slot command relay (SelectTargetPhase is not an endBySetMode interrupt phase), so a single-target
+    // setup move STRANDS the host (seed 424242 wave 3). The spread move hits both foes: the first faints, the
+    // survivor's boosted HP absorbs the splash. This is why the catch leg's moveset MUST carry a spread move.
+    const turn1 = rig.hostScene.currentBattle.turn;
+    const hostMon0 = rig.hostScene.getPlayerField()[COOP_HOST_FIELD_INDEX];
+    const spreadMove = hostMon0
+      .getMoveset()
+      .filter((m): m is NonNullable<typeof m> => m != null)
+      .find(m => m.isUsable(hostMon0, false, true)[0] && m.getMove().isMultiTarget());
+    if (spreadMove == null) {
+      // No spread move available - the single-target path strands here (see above). Degrade loudly.
+      bumpSkip("catchNoSpreadMove");
+      await playWave(wave);
+      await assertPostTurnConverged(wave);
+      await driveRewardShop(wave);
+      assertScalarConvergence(wave, "post-shop");
+      return;
+    }
+    // Keep the survivor ALIVE through the isolation turn by making it near-unkillable via a huge DEFENSE +
+    // SPDEF (so the spread hit AND the guest's move deal ~0), NOT by bulking HP. HP is hashed by the per-turn
+    // checksum, so an HP change would count a transient host-vs-guest divergence the checkpoint heals (a #838
+    // assertion); DEF/SPDEF are NOT hashed, and with them boosted the survivor stays at FULL hp on both
+    // engines - byte-identical checksums, no assertion. The boost is host-only (the host is the authoritative
+    // damage engine; the guest replays the streamed ~0 damage). A determinism knob, reset by the next mirror.
+    survivor.stats[Stat.DEF] = 1_000_000_000;
+    survivor.stats[Stat.SPDEF] = 1_000_000_000;
+    await withClient(rig.hostCtx, async () => {
+      hitMode(UiMode.COMMAND);
+      hitMode(UiMode.FIGHT);
+      // Spread move: omit the target so game.move.select registers the multi-target confirm prompt (which does
+      // processInput(ACTION) with no cursor) rather than asserting a target was passed to a spread move.
+      game.move.select(spreadMove.moveId, COOP_HOST_FIELD_INDEX);
+      await game.phaseInterceptor.to("TurnEndPhase");
+      // #845: a HOST-owned mon can faint on the isolation turn (a real enemy hit); arm its replacement picker
+      // POST-HOC so the crossing to the throw's CommandPhase drives it instead of stranding at the PARTY UI.
+      armHostFaintAutoPick();
+    });
+    await withClient(rig.guestCtx, () => driveGuestReplayTurnWithFaint(rig, turn1));
+
+    if (rig.hostScene.getEnemyField().filter(e => !e.isFainted()).length !== 1) {
+      // The survivor was not isolated (an ally proc / weather KO'd it, or the first foe survived) - degrade.
+      bumpSkip("catchSurvivorNotIsolated");
+      await withClient(rig.hostCtx, () => game.phaseInterceptor.to("CommandPhase"));
+      await playWave(wave);
+      await assertPostTurnConverged(wave);
+      await driveRewardShop(wave);
+      assertScalarConvergence(wave, "post-shop");
+      return;
+    }
+
+    // ===== TURN 2: HOST throws the ball at the lone survivor via the REAL BALL menu -> AttemptCapturePhase. =====
+    await withClient(rig.hostCtx, async () => {
+      armHostFaintAutoPick(); // drive any host faint replacement opened on this crossing
+      await game.phaseInterceptor.to("CommandPhase");
+    });
+    // Grant the host a catch ball (a determinism knob, like the moveset override), reconcile the guest so the
+    // checksum stays matched, then SCOPE the dexSync delta to this catch (the run-start baseline). Done HERE
+    // (right before the throw, after the isolation turn) so turn 1 is byte-for-byte the normal command path.
+    hostBalls[CATCH_BALL] = (hostBalls[CATCH_BALL] ?? 0) + 1;
+    withClientSync(rig.guestCtx, () => {
+      rig.guestScene.pokeballCounts = { ...rig.hostScene.pokeballCounts };
+    });
+    await withClient(rig.hostCtx, () => captureCoopDexBaseline());
+    hitMode(UiMode.COMMAND);
+    hitMode(UiMode.BALL); // the real BALL menu opens on the host throw (doThrowPokeball drives it)
+    hitSituation(COOP_SOAK_SITUATIONS.catch);
+    await withClient(rig.hostCtx, async () => {
+      game.doThrowPokeball(CATCH_BALL);
+      // A capture ends the wave BEFORE TurnEndPhase (the AttemptCapturePhase -> BattleEndPhase). Advance and
+      // tolerate the "never reached TurnEndPhase" throw (the battle ended) - the party-length check is truth.
+      await game.phaseInterceptor.to("TurnEndPhase").catch(() => {});
+    });
+    const captured = rig.hostScene.getPlayerParty().length === hostPartyBefore + 1;
+    actionScript.push(`wave ${wave}: CATCH throw sp=${rootId} captured=${captured}`);
+    // eslint-disable-next-line no-console
+    console.log(`[coop-soak] CATCH wave ${wave} (seed ${seed}): sp=${rootId} captured=${captured}`);
+
+    if (!captured) {
+      // A Master Ball on a non-boss wild should always capture; a miss is a loud finding. Finish the wave
+      // normally so the run continues (the enemy survived the throw turn - drive it down).
+      recordFinding(wave, "catchFailed", `Master Ball did not capture sp=${rootId} on wild wave ${wave}`);
+      await withClient(rig.hostCtx, () => game.phaseInterceptor.to("CommandPhase").catch(() => {}));
+      if (hostRunEndReason(rig) == null && rig.hostScene.currentBattle?.enemyParty.some(e => !e.isFainted())) {
+        await playWave(wave);
+      }
+      await driveRewardShop(wave);
+      assertScalarConvergence(wave, "post-shop");
+      return;
+    }
+
+    // ===== GUEST reconcile (production heal analogues): party + dex + ball inventory. =====
+    const captureParty = await withClient(rig.hostCtx, () => captureCoopCaptureParty());
+    await withClient(rig.guestCtx, async () => {
+      applyCoopCaptureParty(JSON.parse(JSON.stringify(captureParty)));
+      // Let the delayed dexSync timer fire UNDER the guest ctx so the partner ACCOUNT is credited (the merge
+      // lands on the guest gameData). The host relay's send delivers over the loopback synchronously here.
+      for (let i = 0; i < 12; i++) {
+        await new Promise(resolve => setTimeout(resolve, 60));
+        await drainLoopback();
+      }
+    });
+    withClientSync(rig.guestCtx, () => {
+      rig.guestScene.pokeballCounts = { ...rig.hostScene.pokeballCounts };
+    });
+
+    // ===== ASSERT both accounts' dex credit + ball-count convergence (the #843 guard). =====
+    const hostDex = rig.hostScene.gameData.dexData[rootId]?.caughtAttr ?? 0n;
+    const guestDex = rig.guestScene.gameData.dexData[rootId]?.caughtAttr ?? 0n;
+    if (hostDex === 0n) {
+      recordFinding(wave, "catchHostDexUncredited", `host account dex NOT credited for caught sp=${rootId}`);
+    }
+    if (guestDex === 0n) {
+      recordFinding(
+        wave,
+        "catchGuestDexUncredited",
+        `partner (guest) account dex NOT credited via the dexSync stream for caught sp=${rootId}`,
+      );
+    }
+    const gBalls = rig.guestScene.pokeballCounts as unknown as Record<number, number>;
+    const ballDrift = Object.keys(hostBalls).filter(k => hostBalls[Number(k)] !== gBalls[Number(k)]);
+    if (ballDrift.length > 0) {
+      recordFinding(
+        wave,
+        "catchBallDrift",
+        `post-catch ball counts diverged host-vs-guest for types [${ballDrift.join(",")}]`,
+      );
+    }
+    // eslint-disable-next-line no-console
+    console.log(
+      `[coop-soak] CATCH wave ${wave}: host dex=${hostDex !== 0n} guest dex=${guestDex !== 0n} ballDrift=${ballDrift.length === 0 ? "none" : ballDrift.join(",")}`,
+    );
+
+    // ===== Reward shop + boundary (the captured wave still awards the wave-win reward pool). =====
+    withClientSync(rig.guestCtx, () => rig.guestScene.phaseManager.clearPhaseQueue());
+    await driveRewardShop(wave);
+    assertLockstep(wave, "catch-wave-end");
+    assertScalarConvergence(wave, "post-shop");
+  };
+
   /** INVARIANT (d) TEARDOWN: clear the runtime, then assert no runtime / relay / ME pin survives. */
   const assertTeardown = (): void => {
     clearCoopRuntime();
@@ -1845,10 +2068,20 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
     // follow-up; the 25-wave PR god run rolls no non-%10 boss wave, so this is behavior-preserving there).
     const bossWave =
       !isMeWave && (wave % 10 === 0 || (profile !== "level" && rig.hostScene.getEnemyField().some(e => e.isBoss())));
+    // #843 CATCH LEG (BUILD 1): a DESIGNATED catch wave (opts.catchWaves) that is a normal (non-ME, non-boss)
+    // wild wave routes through processCatchWave (which itself degrades to a normal wave if the wave turns out
+    // uncatchable). Boss / ME waves are never catch waves.
+    const isCatchWave = opts.catchWaves?.has(wave) === true && !isMeWave && !bossWave;
     try {
-      // #633 BUILD 1: a designated ME wave routes through processMeWave (the inline two-engine ME pump); every
-      // other wave is a normal/boss battle.
-      await (isMeWave ? processMeWave(wave, meType) : bossWave ? processBossWave(wave) : processNormalWave(wave));
+      // #633 BUILD 1: a designated ME wave routes through processMeWave (the inline two-engine ME pump); a
+      // designated catch wave through processCatchWave; every other wave is a normal/boss battle.
+      await (isMeWave
+        ? processMeWave(wave, meType)
+        : isCatchWave
+          ? processCatchWave(wave)
+          : bossWave
+            ? processBossWave(wave)
+            : processNormalWave(wave));
     } catch (e) {
       if (e instanceof SoakInvariantError) {
         throw e;
