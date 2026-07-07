@@ -201,6 +201,15 @@
       5304
     ]
   },
+  "SPECIES_LUMINOSITEON": {
+    "ability1": 5232,
+    "ability2": 168,
+    "innates": [
+      114,
+      5551,
+      35
+    ]
+  },
   "SPECIES_LUXRAY_MEGA": {
     "innates": [
       5410,
