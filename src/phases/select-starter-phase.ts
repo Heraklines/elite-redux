@@ -32,9 +32,11 @@ import { sanitizeGhostProfile } from "#data/elite-redux/er-ghost-profile";
 import {
   beginShowdownBattle,
   disposePendingShowdownRelay,
+  disposePendingShowdownSession,
   endShowdownBattle,
   getShowdownOwnManifest,
   setPendingShowdownRelay,
+  setPendingShowdownSession,
 } from "#data/elite-redux/showdown/showdown-battle-state";
 import { ShowdownCommandRelay } from "#data/elite-redux/showdown/showdown-command-relay";
 import { buildShowdownHeldItem } from "#data/elite-redux/showdown/showdown-enemy-build";
@@ -64,6 +66,20 @@ import SoundFade from "phaser3-rex-plugins/plugins/soundfade";
 
 export class SelectStarterPhase extends Phase {
   public readonly phaseName = "SelectStarterPhase";
+
+  /**
+   * B7 item 8: whenever this phase ends - including the player BACKING OUT of starter select to the
+   * title (`tryExit` -> `toTitleScreen` -> `getCurrentPhase().end()`), which never runs the versus
+   * flow's own cleanup - dispose any still-pending showdown session + relay so their transport
+   * listeners are torn down. No-op in every other mode / after the flow already disposed them (both
+   * are idempotent), so the normal launch path is unaffected.
+   */
+  end(): void {
+    disposePendingShowdownSession();
+    disposePendingShowdownRelay();
+    super.end();
+  }
+
   start() {
     super.start();
 
@@ -319,9 +335,26 @@ export class SelectStarterPhase extends Phase {
    */
   private startShowdownSelect(): void {
     const controller = getCoopController()!;
+    const runtime = getCoopRuntime();
+    if (runtime == null) {
+      this.abortShowdown("Lost the versus connection.");
+      return;
+    }
+    // B7 item 8 (CRITICAL): construct the ShowdownSession + enemy-command relay NOW, BEFORE
+    // starter select opens. The session registers its transport listener in its constructor and
+    // BUFFERS the opponent's `showdownTeam`/`showdownReady`, so if the peer finishes teambuild
+    // FIRST its team is captured instead of arriving at a transport with no session listener and
+    // being dropped forever (the live "flow dead-ends to the title, no wager screen" bug: negotiate
+    // then awaited a message already gone and timed out at 60s). A stale session/relay from a prior
+    // aborted flow is superseded (disposed) by the setPending* calls. The SAME instances are threaded
+    // into runShowdownFlow so negotiate() consumes the buffered peer team.
+    const session = new ShowdownSession(runtime.localTransport, { rendezvous: runtime.rendezvous });
+    const relay = new ShowdownCommandRelay(runtime.localTransport);
+    setPendingShowdownSession(session);
+    setPendingShowdownRelay(relay);
     globalScene.ui.setMode(UiMode.STARTER_SELECT, (starters: Starter[]) => {
       globalScene.ui.clearText();
-      void this.runShowdownFlow(starters, controller.role);
+      void this.runShowdownFlow(starters, controller.role, session, relay);
     });
   }
 
@@ -331,21 +364,22 @@ export class SelectStarterPhase extends Phase {
    * wager's both-locked commit it stashes the match ({@linkcode beginShowdownBattle}, with the live
    * enemy-command relay) and launches the battle. A negotiation rejection aborts cleanly to the title.
    */
-  private async runShowdownFlow(starters: Starter[], role: CoopRole): Promise<void> {
+  private async runShowdownFlow(
+    starters: Starter[],
+    role: CoopRole,
+    session: ShowdownSession,
+    relay: ShowdownCommandRelay,
+  ): Promise<void> {
     const runtime = getCoopRuntime();
     if (runtime == null) {
       this.abortShowdown("Lost the versus connection.");
       return;
     }
     const manifests = starters.map(s => starterToManifest(s, globalScene.gameData));
-    // The session + relay ride the SAME live transport the co-op runtime owns; the session reuses the
-    // runtime's shared rendezvous so the `showdown-ready` barrier uses the one live instance.
-    const session = new ShowdownSession(runtime.localTransport, { rendezvous: runtime.rendezvous });
-    const relay = new ShowdownCommandRelay(runtime.localTransport);
-    // Give the relay a lifetime symmetric with the session: stash it so EVERY non-commit exit (negotiate
-    // failure/timeout below, an abort, or a wager-window disconnect) disposes it. The wager commit adopts
-    // it into the live match state (beginShowdownBattle clears the pending slot).
-    setPendingShowdownRelay(relay);
+    // B7 item 8: the session + relay were constructed at flow START (startShowdownSelect) so the
+    // session's listener has been BUFFERING the opponent's team while THIS client built its own.
+    // negotiate() below consumes whatever the peer already sent. The pending-slot lifetimes (set in
+    // startShowdownSelect) mean EVERY non-commit exit disposes both; the wager commit adopts the relay.
     const ownProfile = sanitizeGhostProfile(globalScene.gameData.ghostProfile);
 
     // The handshake can take a moment (real peer) or fail (drop). Show a waiting notice during the await
@@ -363,7 +397,7 @@ export class SelectStarterPhase extends Phase {
     try {
       result = await session.negotiate(manifests, ownProfile);
     } catch (err) {
-      session.dispose();
+      disposePendingShowdownSession();
       disposePendingShowdownRelay();
       this.abortShowdown(
         err instanceof ShowdownNegotiationError ? showdownRejectMessage(err) : "The versus match could not start.",
@@ -371,8 +405,8 @@ export class SelectStarterPhase extends Phase {
       return;
     }
     // Keep the shared rendezvous alive (ownsRendezvous=false) for the wager-commit barrier; drop the
-    // session's own team/ready listeners (their job is done).
-    session.dispose();
+    // session's own team/ready listeners (their job is done) via the pending slot.
+    disposePendingShowdownSession();
 
     const wagerArgs: ShowdownWagerArgs = {
       ownTeam: manifests,
@@ -441,8 +475,10 @@ export class SelectStarterPhase extends Phase {
   /** Showdown 1v1 (D0): tear the versus session down and return to the title with a message. */
   private abortShowdown(message: string): void {
     endShowdownBattle();
-    // Dispose a still-pending pre-battle relay (a wager-window abort never fired onCommit, so the relay
-    // was never adopted into the match state - endShowdownBattle can't have reached it).
+    // Dispose a still-pending pre-battle session + relay (a negotiate-window abort never fired onCommit,
+    // so neither was adopted into the match state - endShowdownBattle can't have reached them). B7 item 8:
+    // the session's transport listener MUST be torn down or it keeps buffering on a dead flow.
+    disposePendingShowdownSession();
     disposePendingShowdownRelay();
     clearCoopRuntime();
     globalScene.ui.setMode(UiMode.MESSAGE);

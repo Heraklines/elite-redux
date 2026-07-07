@@ -19,6 +19,7 @@
 
 import type { GhostTrainerProfile } from "#data/elite-redux/er-ghost-profile";
 import type { ShowdownCommandRelay } from "#data/elite-redux/showdown/showdown-command-relay";
+import type { ShowdownSession } from "#data/elite-redux/showdown/showdown-session";
 import type { ShowdownMonManifest } from "#data/elite-redux/showdown/showdown-team";
 
 interface ShowdownBattleState {
@@ -65,6 +66,33 @@ export function setPendingShowdownRelay(relay: ShowdownCommandRelay | null): voi
 export function disposePendingShowdownRelay(): void {
   pendingRelay?.dispose();
   pendingRelay = null;
+}
+
+/**
+ * B7 item 8: the {@linkcode ShowdownSession} created at showdown-flow START - BEFORE starter select
+ * opens - so its transport listener is live and BUFFERS the opponent's `showdownTeam`/`showdownReady`
+ * even when the peer confirms its team FIRST (otherwise those messages arrive with no session listener
+ * and are dropped forever, stranding negotiate until it times out -> the "dead-ends to title" bug).
+ * Held here (like {@linkcode pendingRelay}) so EVERY exit - negotiate resolve/reject, abort, OR backing
+ * out of starter select - can dispose the listener.
+ */
+let pendingSession: ShowdownSession | null = null;
+
+/**
+ * Stash the pre-negotiate session so any exit can dispose its transport listener. Disposes any prior
+ * pending session we are replacing (a fresh flow supersedes an old one). Pass null to clear the slot.
+ */
+export function setPendingShowdownSession(session: ShowdownSession | null): void {
+  if (pendingSession != null && pendingSession !== session) {
+    pendingSession.dispose();
+  }
+  pendingSession = session;
+}
+
+/** Dispose + clear a still-pending pre-negotiate session (negotiate done / abort / starter-select back-out). */
+export function disposePendingShowdownSession(): void {
+  pendingSession?.dispose();
+  pendingSession = null;
 }
 
 /**

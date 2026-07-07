@@ -187,6 +187,8 @@ export class ShowdownSession {
   private receivedVoid: string | null = null;
   /** Guards the one-shot barrier arrival so a re-entrant gate can't arrive twice. */
   private crossingBarrier = false;
+  /** Idempotency guard for {@linkcode dispose} (B7 item 8: disposed via both the pending slot and the flow). */
+  private disposed = false;
 
   /** The in-flight negotiation promise plumbing (set by {@linkcode negotiate}). */
   private settle: {
@@ -253,8 +255,13 @@ export class ShowdownSession {
     return promise;
   }
 
-  /** Stop listening to the transport and drop any pending negotiation. */
+  /** Stop listening to the transport and drop any pending negotiation. Idempotent (B7 item 8:
+   *  the pending-session slot AND the flow both dispose, so a double call must be a safe no-op). */
   dispose(): void {
+    if (this.disposed) {
+      return;
+    }
+    this.disposed = true;
     this.cancelTimeout();
     this.offMessage();
     if (this.ownsRendezvous) {
