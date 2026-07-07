@@ -1,0 +1,262 @@
+url:      https://elite-redux-staging.pages.dev/
+build:    mrb19we4-75d5
+mode:     6  wave:14
+seed:     Z9KNAjYeD6OTSNTWRfSgV3mg
+party:    Sunkern(L11 36hp f0), Victini(L10 43hp f0), Chikorita(L6 23hp f0), Mareep(L6 26hp f0), Cyndaquil(L6 22hp f0), Zigzagoon(L7 24hp f0)
+enemy:    Drowzee(L9), Trubbish(L9)
+
+----- COMMENT -----
+Waves desynced
+
+----- CONSOLE -----
+[19:42:23.267] LOG: [coop:reward] OWNER drives reward screen (start=14 role=host spoof=false adoptsOptions=false wave=13)
+[19:42:23.267] LOG: [coop:rendezvous] shop-pick-commit barrier AWAIT shop:13:14
+[19:42:23.267] LOG: [coop:rendezvous] AWAIT point=shop:13:14 timeoutMs=60000 -> network-wait role=host
+[19:42:23.310] LOG: [coop:webrtc] raw rx role=host t=rendezvous bytes=39 handlers=11
+[19:42:23.310] LOG: [coop:rendezvous] RECV arrival point=shop:13:14 -> deliver-to-waiter role=host
+[19:42:23.310] LOG: [coop:rendezvous] AWAIT point=shop:13:14 RESOLVE both-arrived role=host
+[19:42:23.310] LOG: [coop:owner] ownerOf(counter=14) seat=0 -> owner=host
+[19:42:23.310] LOG: [coop:owner] isLocalOwnerAtCounter(pinnedCounter=14) parity=0 owner=host role=host -> true
+[19:42:23.321] LOG: [coop:interaction] mirror begin role=owner mirrorSeq=896 interactionStart=14 reroll=0
+[19:42:23.322] LOG: [coop:interaction] uiMirror beginSession role=owner mode=6 seq=896 early=0
+[19:42:23.507] LOG: [coop:me] ui: host streams ME narration (showText) {"len":26,"preview":"Continue to the next wave."}
+[19:42:23.507] LOG: [coop:me] host stream ME-message len=26
+[19:42:23.507] LOG: [coop:replay] host SEND meMessage len=26
+[19:42:23.507] LOG: [coop:webrtc] raw tx role=host t=meMessage bytes=53
+[19:42:23.507] LOG: [coop:me] ui: host streams ME narration (showText) {"len":26,"preview":"Continue to the next wave."}
+[19:42:23.507] LOG: [coop:me] host stream ME-message len=26
+[19:42:23.507] LOG: [coop:replay] host SEND meMessage len=26
+[19:42:23.507] LOG: [coop:webrtc] raw tx role=host t=meMessage bytes=53
+[19:42:24.420] LOG: [coop:interaction] uiMirror OWNER send seq=896 n=0 button=4 modeBefore=6
+[19:42:24.420] LOG: [coop:webrtc] raw tx role=host t=uiInput bytes=51
+[19:42:24.420] LOG: [coop:owner] ownerOf(counter=14) seat=0 -> owner=host
+[19:42:24.420] LOG: [coop:owner] isLocalOwnerAtCounter(pinnedCounter=14) parity=0 owner=host role=host -> true
+[19:42:24.423] LOG: [coop:owner] ownerOf(counter=14) seat=0 -> owner=host
+[19:42:24.423] LOG: [coop:owner] isLocalOwnerAtCounter(pinnedCounter=14) parity=0 owner=host role=host -> true
+[19:42:24.423] LOG: [coop:relay] OWNER send seq=14 kind=skip choice=-1 data=[] role=host
+[19:42:24.423] LOG: [coop:relay] SEND interactionChoice seq=14 kind=skip choice=-1 data=-
+[19:42:24.423] LOG: [coop:webrtc] raw tx role=host t=interactionChoice bytes=60
+[19:42:24.423] LOG: %cStart Phase EggLapsePhase color:green;
+[19:42:24.423] LOG: %cStart Phase PostMysteryEncounterPhase color:green;
+[19:42:24.424] LOG: [coop:owner] ownerOf(counter=14) seat=0 -> owner=host
+[19:42:24.424] LOG: [coop:owner] isLocalOwnerAtCounter(pinnedCounter=14) parity=0 owner=host role=host -> true
+[19:42:24.424] LOG: [coop:me] ui: host streams ME narration (showText) {"len":57,"preview":"The Delibird flock happily waddles off i"}
+[19:42:24.424] LOG: [coop:me] host stream ME-message len=57
+[19:42:24.424] LOG: [coop:replay] host SEND meMessage len=57
+[19:42:24.424] LOG: [coop:webrtc] raw tx role=host t=meMessage bytes=84
+[19:42:24.933] LOG: [coop:interaction] interactionCounter() read -> 14 (role=host)
+[19:42:24.933] LOG: [coop:health] tick=0g turn=1 wave=13 counter=14 assertions=0 wait=-1ms peerBeat=5s transport=connected
+[19:42:25.010] LOG: [coop:webrtc] raw rx role=host t=stallBeat bytes=35 handlers=11
+[19:42:25.541] LOG: [coop:owner] ownerOf(counter=14) seat=0 -> owner=host
+[19:42:25.541] LOG: [coop:owner] isLocalOwnerAtCounter(pinnedCounter=14) parity=0 owner=host role=host -> true
+[19:42:25.541] LOG: [coop:me] ui: owner scroll-skip press NOT relayed (handler not ready) {"button":4}
+[19:42:25.541] LOG: [coop:owner] ownerOf(counter=14) seat=0 -> owner=host
+[19:42:25.541] LOG: [coop:owner] isLocalOwnerAtCounter(pinnedCounter=14) parity=0 owner=host role=host -> true
+[19:42:25.541] LOG: [coop:me] ui: host streams ME narration (showText) {"len":31,"preview":"What a curious little exchange!"}
+[19:42:25.541] LOG: [coop:me] host stream ME-message len=31
+[19:42:25.541] LOG: [coop:replay] host SEND meMessage len=31
+[19:42:25.541] LOG: [coop:webrtc] raw tx role=host t=meMessage bytes=58
+[19:42:25.542] LOG: [coop:me] ui: owner scroll-skip press NOT relayed (handler not ready) {"button":5}
+[19:42:25.882] LOG: [coop:owner] ownerOf(counter=14) seat=0 -> owner=host
+[19:42:25.882] LOG: [coop:owner] isLocalOwnerAtCounter(pinnedCounter=14) parity=0 owner=host role=host -> true
+[19:42:25.882] LOG: [coop:me] ui: owner scroll-skip press NOT relayed (handler not ready) {"button":4}
+[19:42:25.882] LOG: [coop:owner] ownerOf(counter=14) seat=0 -> owner=host
+[19:42:25.882] LOG: [coop:owner] isLocalOwnerAtCounter(pinnedCounter=14) parity=0 owner=host role=host -> true
+[19:42:25.882] LOG: [coop:me] host streams comprehensive ME-terminal resync (meResync) {"seq":8000014,"counter":14}
+[19:42:25.887] LOG: [coop:relay] SEND interactionOutcome seq=8000014 kind=meResync k=meResync
+[19:42:25.887] LOG: [coop:webrtc] raw tx role=host t=interactionOutcome bytes=57358
+[19:42:25.887] LOG: [coop:me] coopEndMePump: close pump + advance alternation {"counter":14}
+[19:42:25.888] LOG: [coop:pump] OWNER terminal: relay LEAVE sentinel {"termSeq":9000014,"sentinel":-1}
+[19:42:25.888] LOG: [coop:relay] SEND interactionChoice seq=9000014 kind=meBtn choice=-1 data=-
+[19:42:25.888] LOG: [coop:webrtc] raw tx role=host t=interactionChoice bytes=66
+[19:42:25.888] LOG: [coop:pump] end session {"wasOwner":true,"seq":8000014,"termSeq":9000014}
+[19:42:25.888] LOG: [coop:interaction] CoopInteractionTurn.advance INCREMENT (fromCounter=14) counter 14 -> 15
+[19:42:25.888] LOG: [coop:interaction] advanceInteraction ADVANCED+BROADCAST (fromCounter=14) counter 14 -> 15 role=host; send interaction screen=__turn__ choice=15
+[19:42:25.888] LOG: [coop:webrtc] raw tx role=host t=interaction bytes=51
+[19:42:25.888] LOG: [coop:owner] ownerOf(counter=15) seat=1 -> owner=guest
+[19:42:25.888] LOG: [coop:owner] ownerOf(counter=15) seat=1 -> owner=guest
+[19:42:25.888] LOG: [coop-launch] proceedIfReady launched=true localTeam=3 bothReady=true role=host partnerReady=true
+[19:42:25.888] LOG: [coop:me] interaction-counter 14 -> -1 (ME end)
+[19:42:25.888] LOG: %cStart Phase NewBattlePhase color:green;
+[19:42:25.888] LOG: Wave Seed: hGY\OxgsRD]ba\be`taudA{u 14
+[19:42:25.888] LOG: %cStart Phase NextEncounterPhase color:green;
+[19:42:25.890] LOG: Starting species pool tier: COMMON
+[19:42:25.896] LOG: Pokemon: Wild Drowzee | Species ID: 96 | Level: 9 | Nature: Serious (-)
+[19:42:25.896] LOG: Stats (IVs): HP: 32 (6), Atk: 15 (20), Def: 15 (23), Spatk: 20 (25), Spdef: 23 (22), Spd: 14 (21)
+[19:42:25.896] LOG: Ability: Magic Bounce | Passive Ability: Hypnotist 
+[19:42:25.896] LOG: Moveset: ["Confusion","Quash","Hypnosis","Poison Gas"]
+[19:42:25.896] LOG: Starting species pool tier: COMMON
+[19:42:25.901] LOG: Pokemon: Wild Trubbish | Species ID: 568 | Level: 9 | Nature: Calm (+SpDef/-Atk)
+[19:42:25.901] LOG: Stats (IVs): HP: 30 (24), Atk: 14 (30), Def: 20 (20), Spatk: 13 (19), Spdef: 20 (23), Spd: 17 (10)
+[19:42:25.901] LOG: Ability: Poison Touch | Passive Ability: Stench 
+[19:42:25.901] LOG: Moveset: ["Sludge","Body Slam","Bad Egg","Tackle"]
+[19:42:25.901] LOG: [coop:me] ui: owner scroll-skip press NOT relayed (handler not ready) {"button":5}
+[19:42:26.071] LOG: [coop:webrtc] raw rx role=host t=interaction bytes=51 handlers=11
+[19:42:26.071] LOG: [coop:interaction] RECV interaction broadcast (deferred catch-up net) received=15 localBefore=15 role=host -> no defer (local >= received)
+[19:42:26.071] WARN: [coop:interaction] CoopInteractionTurn.mergeRemote DEFER (remote=15, counter=15, pendingRemote=15) live counter UNCHANGED (folds in at next advance if still ahead)
+[19:42:26.071] LOG: [coop:owner] ownerOf(counter=15) seat=1 -> owner=guest
+[19:42:26.071] LOG: [coop:owner] ownerOf(counter=15) seat=1 -> owner=guest
+[19:42:26.071] LOG: [coop-launch] proceedIfReady launched=true localTeam=3 bothReady=true role=host partnerReady=true
+[19:42:26.682] LOG: [coop:replay] host SEND enemyPartySync wave=14 count=2 meType=-
+[19:42:26.682] LOG: [coop:webrtc] raw tx role=host t=enemyPartySync bytes=509
+[19:42:26.682] LOG: [coop:launch] resume marker recorded slot=2 self=JarilG partner=BlizzardFrostwalker wave=14 (#810)
+[19:42:26.740] DEBUG: Session data saved to slot 2!
+[19:42:26.740] LOG: Wave Seed: hGY\OxgsRD]ba\be`taudA{u 14
+[19:42:26.940] WARN: cry/96 not found
+[19:42:27.192] LOG: %cStart Phase SummonPhase color:green;
+[19:42:27.385] WARN: cry/191 not found
+[19:42:27.486] LOG: %cStart Phase ReturnPhase color:green;
+[19:42:27.514] LOG: Applied X Speed 
+[19:42:27.514] LOG: Applied X Speed 
+[19:42:27.514] LOG: Applied X Speed 
+[19:42:27.514] LOG: Applied X Speed 
+[19:42:27.515] LOG: Applied X Speed 
+[19:42:27.515] LOG: Applied X Speed 
+[19:42:27.515] LOG: Applied X Speed 
+[19:42:27.515] LOG: Applied X Speed 
+[19:42:27.516] LOG: Applied X Speed 
+[19:42:27.592] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[19:42:27.593] LOG: %cStart Phase SummonPhase color:green;
+[19:42:27.874] LOG: %cStart Phase ShinySparklePhase color:green;
+[19:42:27.985] LOG: %cStart Phase CheckSwitchPhase color:green;
+[19:42:27.985] LOG: %cStart Phase CheckSwitchPhase color:green;
+[19:42:27.985] LOG: %cStart Phase InitEncounterPhase color:green;
+[19:42:27.985] LOG: Applied X Speed 
+[19:42:27.986] LOG: Applied X Speed 
+[19:42:27.986] LOG: Applied X Speed 
+[19:42:27.986] LOG: Applied X Speed 
+[19:42:27.986] LOG: Applied X Speed 
+[19:42:27.987] LOG: Applied X Speed 
+[19:42:27.987] LOG: %cStart Phase PostSummonPhase color:green;
+[19:42:27.987] LOG: Ran PSP for: Victini
+[19:42:27.987] LOG: Applied X Speed 
+[19:42:27.987] LOG: Applied X Speed 
+[19:42:27.987] LOG: Applied X Speed 
+[19:42:27.987] LOG: Applied X Speed 
+[19:42:27.988] LOG: Applied X Speed 
+[19:42:27.988] LOG: Applied X Speed 
+[19:42:27.989] LOG: Applied X Speed 
+[19:42:27.989] LOG: %cStart Phase PostSummonPhase color:green;
+[19:42:27.989] LOG: Applied X Speed 
+[19:42:27.989] LOG: Applied X Speed 
+[19:42:27.990] LOG: Applied X Speed 
+[19:42:27.990] LOG: Applied X Speed 
+[19:42:27.990] LOG: Applied X Speed 
+[19:42:27.990] LOG: %cStart Phase PostSummonPhase color:green;
+[19:42:27.992] LOG: %cStart Phase ShowAbilityPhase color:green;
+[19:42:28.154] LOG: %cStart Phase MessagePhase color:green;
+[19:42:28.402] LOG: %cStart Phase HideAbilityPhase color:green;
+[19:42:28.428] LOG: %cStart Phase ShowAbilityPhase color:green;
+[19:42:28.601] LOG: %cStart Phase HideAbilityPhase color:green;
+[19:42:28.639] LOG: Applied X Speed 
+[19:42:28.639] LOG: Applied X Speed 
+[19:42:28.639] LOG: %cStart Phase PostSummonPhase color:green;
+[19:42:28.639] LOG: Ran PSP for: Trubbish
+[19:42:28.640] LOG: Applied X Speed 
+[19:42:28.640] LOG: Applied X Speed 
+[19:42:28.640] LOG: %cStart Phase PostSummonPhase color:green;
+[19:42:28.641] LOG: Applied X Speed 
+[19:42:28.641] LOG: Applied X Speed 
+[19:42:28.641] LOG: %cStart Phase PostSummonPhase color:green;
+[19:42:28.641] LOG: Applied X Speed 
+[19:42:28.641] LOG: %cStart Phase PostSummonPhase color:green;
+[19:42:28.641] LOG: Ran PSP for: Sunkern
+[19:42:28.641] LOG: Applied X Speed 
+[19:42:28.642] LOG: Applied X Speed 
+[19:42:28.642] LOG: Applied X Speed 
+[19:42:28.642] LOG: %cStart Phase PostSummonPhase color:green;
+[19:42:28.643] LOG: Applied X Speed 
+[19:42:28.644] LOG: Applied X Speed 
+[19:42:28.644] LOG: Applied X Speed 
+[19:42:28.644] LOG: Applied X Speed 
+[19:42:28.644] LOG: Applied X Speed 
+[19:42:28.645] LOG: Applied X Speed 
+[19:42:28.645] LOG: Applied X Speed 
+[19:42:28.645] LOG: Applied X Speed 
+[19:42:28.646] LOG: Applied X Speed 
+[19:42:28.646] LOG: %cStart Phase ShowAbilityPhase color:green;
+[19:42:28.807] LOG: %cStart Phase CommonAnimPhase color:green;
+[19:42:28.807] LOG: %cStart Phase MessagePhase color:green;
+[19:42:29.052] LOG: %cStart Phase HideAbilityPhase color:green;
+[19:42:29.079] LOG: Applied X Speed 
+[19:42:29.079] LOG: %cStart Phase PostSummonPhase color:green;
+[19:42:29.079] LOG: Applied X Speed 
+[19:42:29.079] LOG: Applied X Speed 
+[19:42:29.080] LOG: %cStart Phase ShowAbilityPhase color:green;
+[19:42:29.243] LOG: %cStart Phase MessagePhase color:green;
+[19:42:29.475] LOG: %cStart Phase HideAbilityPhase color:green;
+[19:42:29.501] LOG: %cStart Phase ShowAbilityPhase color:green;
+[19:42:29.664] LOG: %cStart Phase MessagePhase color:green;
+[19:42:29.868] LOG: %cStart Phase HideAbilityPhase color:green;
+[19:42:29.894] LOG: %cStart Phase ShowAbilityPhase color:green;
+[19:42:30.082] LOG: %cStart Phase MessagePhase color:green;
+[19:42:30.327] LOG: %cStart Phase HideAbilityPhase color:green;
+[19:42:30.354] LOG: %cStart Phase ShowAbilityPhase color:green;
+[19:42:30.524] LOG: %cStart Phase HideAbilityPhase color:green;
+[19:42:30.562] LOG: %cStart Phase PostSummonPhase color:green;
+[19:42:30.562] LOG: Ran PSP for: Drowzee
+[19:42:30.563] LOG: %cStart Phase PostSummonPhase color:green;
+[19:42:30.563] LOG: %cStart Phase PostSummonPhase color:green;
+[19:42:30.563] LOG: %cStart Phase TurnInitPhase color:green;
+[19:42:30.563] LOG: %cStart Phase CommandPhase color:green;
+[19:42:30.563] LOG: [coop:replay] host SEND enemyPartySync wave=14 count=2 meType=-
+[19:42:30.563] LOG: [coop:webrtc] raw tx role=host t=enemyPartySync bytes=509
+[19:42:30.564] LOG: [coop:battle] CommandPhase slot=0 turn=1 owner=host role=host -> LOCAL UI
+[19:42:30.564] LOG: [coop:rendezvous] next-command barrier ARRIVE+AWAIT cmd:14:1 slot=0
+[19:42:30.564] LOG: [coop:rendezvous] ARRIVE point=cmd:14:1 (send) role=host
+[19:42:30.564] LOG: [coop:webrtc] raw tx role=host t=rendezvous bytes=37
+[19:42:30.564] LOG: [coop:rendezvous] AWAIT point=cmd:14:1 timeoutMs=60000 -> network-wait role=host
+[19:42:35.004] LOG: [coop:webrtc] raw rx role=host t=stallBeat bytes=35 handlers=11
+[19:42:40.007] LOG: [coop:webrtc] raw rx role=host t=stallBeat bytes=35 handlers=11
+[19:42:45.007] LOG: [coop:webrtc] raw rx role=host t=stallBeat bytes=35 handlers=11
+[19:42:50.012] LOG: [coop:webrtc] raw rx role=host t=stallBeat bytes=35 handlers=11
+[19:42:54.936] LOG: [coop:interaction] interactionCounter() read -> 15 (role=host)
+[19:42:54.936] LOG: [coop:health] tick=0g turn=1 wave=14 counter=15 assertions=0 wait=-1ms peerBeat=5s transport=connected
+[19:42:55.011] LOG: [coop:webrtc] raw rx role=host t=stallBeat bytes=35 handlers=11
+[19:43:00.012] LOG: [coop:webrtc] raw rx role=host t=stallBeat bytes=35 handlers=11
+[19:43:05.004] LOG: [coop:webrtc] raw rx role=host t=stallBeat bytes=35 handlers=11
+[19:43:10.002] LOG: [coop:webrtc] raw rx role=host t=stallBeat bytes=35 handlers=11
+[19:43:15.008] LOG: [coop:webrtc] raw rx role=host t=stallBeat bytes=35 handlers=11
+[19:43:20.006] LOG: [coop:webrtc] raw rx role=host t=stallBeat bytes=35 handlers=11
+[19:43:24.937] LOG: [coop:interaction] interactionCounter() read -> 15 (role=host)
+[19:43:24.937] LOG: [coop:health] tick=0g turn=1 wave=14 counter=15 assertions=0 wait=-1ms peerBeat=5s transport=connected
+[19:43:25.012] LOG: [coop:webrtc] raw rx role=host t=stallBeat bytes=35 handlers=11
+[19:43:30.018] LOG: [coop:webrtc] raw rx role=host t=stallBeat bytes=35 handlers=11
+[19:43:30.584] WARN: [coop:rendezvous] RENDEZVOUS TIMEOUT point=cmd:14:1 after 60000ms - partner never arrived; PROCEEDING (anti-hang backstop) role=host
+[19:43:30.584] WARN: [coop:rendezvous] next-command barrier cmd:14:1 TIMED OUT - partner never reached command; opening UI anyway (anti-hang)
+[19:43:35.005] LOG: [coop:webrtc] raw rx role=host t=stallBeat bytes=35 handlers=11
+[19:43:40.015] LOG: [coop:webrtc] raw rx role=host t=stallBeat bytes=35 handlers=11
+[19:43:45.020] LOG: [coop:webrtc] raw rx role=host t=stallBeat bytes=35 handlers=11
+[19:43:50.026] LOG: [coop:webrtc] raw rx role=host t=stallBeat bytes=35 handlers=11
+[19:43:55.017] LOG: [coop:webrtc] raw rx role=host t=stallBeat bytes=35 handlers=11
+[19:43:59.927] LOG: [coop:interaction] interactionCounter() read -> 15 (role=host)
+[19:43:59.927] LOG: [coop:health] tick=0g turn=1 wave=14 counter=15 assertions=0 wait=-1ms peerBeat=5s transport=connected
+[19:44:00.010] LOG: [coop:webrtc] raw rx role=host t=stallBeat bytes=35 handlers=11
+[19:44:05.008] LOG: [coop:webrtc] raw rx role=host t=stallBeat bytes=36 handlers=11
+[19:44:10.004] LOG: [coop:webrtc] raw rx role=host t=stallBeat bytes=36 handlers=11
+[19:44:15.020] LOG: [coop:webrtc] raw rx role=host t=stallBeat bytes=36 handlers=11
+[19:44:20.025] LOG: [coop:webrtc] raw rx role=host t=stallBeat bytes=36 handlers=11
+[19:44:25.020] LOG: [coop:webrtc] raw rx role=host t=stallBeat bytes=36 handlers=11
+[19:44:30.023] LOG: [coop:webrtc] raw rx role=host t=stallBeat bytes=36 handlers=11
+[19:44:30.484] LOG: [coop:interaction] interactionCounter() read -> 15 (role=host)
+[19:44:30.484] LOG: [coop:health] tick=0g turn=1 wave=14 counter=15 assertions=0 wait=-1ms peerBeat=0s transport=connected
+[19:44:35.027] LOG: [coop:webrtc] raw rx role=host t=stallBeat bytes=36 handlers=11
+[19:44:40.011] LOG: [coop:webrtc] raw rx role=host t=stallBeat bytes=36 handlers=11
+[19:44:45.006] LOG: [coop:webrtc] raw rx role=host t=stallBeat bytes=36 handlers=11
+[19:44:50.009] LOG: [coop:webrtc] raw rx role=host t=stallBeat bytes=36 handlers=11
+[19:44:55.012] LOG: [coop:webrtc] raw rx role=host t=stallBeat bytes=36 handlers=11
+[19:45:00.004] LOG: [coop:webrtc] raw rx role=host t=stallBeat bytes=36 handlers=11
+[19:45:00.488] LOG: [coop:interaction] interactionCounter() read -> 15 (role=host)
+[19:45:00.488] LOG: [coop:health] tick=0g turn=1 wave=14 counter=15 assertions=0 wait=-1ms peerBeat=0s transport=connected
+[19:45:05.002] LOG: [coop:webrtc] raw rx role=host t=stallBeat bytes=36 handlers=11
+[19:45:10.013] LOG: [coop:webrtc] raw rx role=host t=stallBeat bytes=36 handlers=11
+[19:45:13.017] LOG: Move: QUIVER_DANCE Move targets: {"targets":[0],"multiple":false} 
+Player Pokemon: Sunkern
+[19:45:13.017] LOG: [coop:relay] broadcastLocalCommand SEND fieldIndex=0 owner=host turn=1 command=0 cursor=0 moveId=483 targets=[0]
+[19:45:13.017] LOG: [coop:webrtc] raw tx role=host t=command bytes=128
+[19:45:13.018] LOG: %cStart Phase CommandPhase color:green;
+[19:45:13.019] LOG: [coop:battle] CommandPhase slot=1 turn=1 owner=guest role=host -> partner path
+[19:45:13.019] LOG: [coop:relay] host requestPartnerCommand SEND fieldIndex=1 turn=1 moveSlots=[0,1,2,3] (awaiting peer)
+[19:45:13.019] LOG: [coop:webrtc] raw tx role=host t=commandRequest bytes=84
+[19:45:15.012] LOG: [coop:webrtc] raw rx role=host t=stallBeat bytes=36 handlers=11
+[19:45:20.013] LOG: [coop:webrtc] raw rx role=host t=stallBeat bytes=36 handlers=11
