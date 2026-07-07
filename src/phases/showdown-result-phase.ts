@@ -23,6 +23,7 @@ import {
   selectShowdownResultLine,
   winnerFromLocalResult,
 } from "#data/elite-redux/showdown/showdown-outcome";
+import { sealShowdownTelemetry } from "#data/elite-redux/showdown/showdown-telemetry";
 import { UiMode } from "#enums/ui-mode";
 import { BattlePhase } from "#phases/battle-phase";
 
@@ -110,6 +111,14 @@ export class ShowdownResultPhase extends BattlePhase {
         .then(() => syncShowdownPendingSettlements(globalScene.gameData))
         .catch(() => {});
     }
+
+    // D5: seal + fire-and-forget the HOST's battle telemetry (no-op for the guest / no active record).
+    // Records ALL matches (friendly + staked) for balance analytics; a send failure only logs.
+    sealShowdownTelemetry({
+      winner: this.voided ? null : winnerFromLocalResult(localRole, this.localWon),
+      reason: this.reason,
+      voided: this.voided,
+    });
 
     // Ephemeral match: drop the showdown + co-op runtime state. NEVER persisted (no saveAll).
     endShowdownBattle();

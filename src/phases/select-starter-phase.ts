@@ -44,6 +44,7 @@ import {
   ShowdownSession,
 } from "#data/elite-redux/showdown/showdown-session";
 import { buildShowdownStakePool } from "#data/elite-redux/showdown/showdown-stake-pool";
+import { beginShowdownTelemetry } from "#data/elite-redux/showdown/showdown-telemetry";
 import { SpeciesFormChangeMoveLearnedTrigger } from "#data/form-change-triggers";
 import { Gender } from "#data/gender";
 import { ChallengeType } from "#enums/challenge-type";
@@ -384,6 +385,16 @@ export class SelectStarterPhase extends Phase {
       opponentUsername: runtime.controller.partnerName ?? "",
       onCommit: (matchId: string | null) => {
         beginShowdownBattle(manifests, result.opponentManifest, relay, result.opponentProfile, matchId);
+        // D5: begin the HOST-side battle telemetry record (no-op for the guest). hostTeam is the
+        // host's own team; guestTeam the opponent's - correct because begin only records for the host.
+        beginShowdownTelemetry({
+          role,
+          matchId,
+          hostUid: runtime.controller.localName(),
+          guestUid: runtime.controller.partnerName ?? "",
+          hostTeam: manifests,
+          guestTeam: result.opponentManifest,
+        });
         void this.launchShowdownBattle(starters, role, matchId);
       },
     };

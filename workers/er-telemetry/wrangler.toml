@@ -1,0 +1,24 @@
+# Cloudflare Worker — Elite Redux Showdown battle TELEMETRY (Task D5).
+# A DEDICATED worker + D1 database, separate from er-saves (which is under DB-cap pressure).
+# NOT DEPLOYED by this change — activation is a maintainer step (see the plan doc's
+# "Phase D wave 2 — ACTIVATION NOTES").
+
+name = "er-telemetry"
+main = "src/index.ts"
+compatibility_date = "2024-11-01"
+
+# D1 (SQLite) database holding one row per showdown match. Create it once with:
+#   npx wrangler d1 create er-telemetry
+# then paste the returned database_id below.
+[[d1_databases]]
+binding = "DB"
+database_name = "er-telemetry"
+database_id = "REPLACE_WITH_D1_ID"   # set after `wrangler d1 create er-telemetry`
+
+# Secrets (set with `wrangler secret put`, DO NOT commit real values):
+#   npx wrangler secret put SESSION_SECRET   # MUST equal er-save-api's SESSION_SECRET
+# SESSION_SECRET is the SHARED HMAC key so the client's existing session token verifies here.
+
+[vars]
+# Optional: restrict which site origin may post telemetry. "*" (or unset) allows any origin.
+ALLOWED_ORIGIN = "*"
