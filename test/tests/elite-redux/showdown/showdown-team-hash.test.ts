@@ -1,4 +1,4 @@
-import { starterToManifest } from "#app/data/elite-redux/showdown/showdown-manifest";
+import { type ShowdownUnlockGameData, starterToManifest } from "#app/data/elite-redux/showdown/showdown-manifest";
 import { showdownTeamHash } from "#app/data/elite-redux/showdown/showdown-session";
 import type { Starter } from "#types/save-data";
 import { describe, expect, it } from "vitest";
@@ -11,6 +11,8 @@ import { describe, expect, it } from "vitest";
  * ready gate. Loopback tests pass objects by reference and structurally cannot catch
  * this, hence this explicit JSON-round-trip lock.
  */
+
+const emptyGameData: ShowdownUnlockGameData = { dexData: {}, starterData: {} };
 
 const starter = (over: Partial<Starter> = {}): Starter =>
   ({
@@ -28,12 +30,15 @@ const starter = (over: Partial<Starter> = {}): Starter =>
 
 describe("showdownTeamHash transport-shape canonicality", () => {
   it("starterToManifest omits the erShinyLab key entirely for a non-shiny mon", () => {
-    const manifest = starterToManifest(starter(), undefined);
+    const manifest = starterToManifest(starter(), emptyGameData);
     expect("erShinyLab" in manifest).toBe(false);
   });
 
   it("hash of the in-memory manifest equals the hash of its JSON round-trip", () => {
-    const team = [starterToManifest(starter(), undefined), starterToManifest(starter({ speciesId: 7 }), undefined)];
+    const team = [
+      starterToManifest(starter(), emptyGameData),
+      starterToManifest(starter({ speciesId: 7 }), emptyGameData),
+    ];
     const rehydrated = JSON.parse(JSON.stringify(team));
     expect(showdownTeamHash(team)).toBe(showdownTeamHash(rehydrated));
   });
@@ -41,7 +46,7 @@ describe("showdownTeamHash transport-shape canonicality", () => {
   it("survives a manifest that DOES carry an undefined-valued optional key", () => {
     // Even if a future field regresses to `key: undefined`, the hash must stay
     // transport-canonical because showdownTeamHash round-trips before hashing.
-    const m = starterToManifest(starter(), undefined) as Record<string, unknown>;
+    const m = starterToManifest(starter(), emptyGameData) as Record<string, unknown>;
     const withUndefined = { ...m, erShinyLab: undefined };
     expect(showdownTeamHash([withUndefined as never])).toBe(
       showdownTeamHash(JSON.parse(JSON.stringify([withUndefined]))),
