@@ -29,6 +29,7 @@ import {
 import { coopGuestSessionSlot, coopHostSessionSlot } from "#data/elite-redux/coop/coop-session";
 import type { CoopRole, CoopSerializedStarter } from "#data/elite-redux/coop/coop-transport";
 import { sanitizeGhostProfile } from "#data/elite-redux/er-ghost-profile";
+import { setErDifficulty } from "#data/elite-redux/er-run-difficulty";
 import {
   beginShowdownBattle,
   disposePendingShowdownRelay,
@@ -444,6 +445,15 @@ export class SelectStarterPhase extends Phase {
    * correct local fallback for the guest, so a missed snapshot aborts cleanly.
    */
   private async launchShowdownBattle(starters: Starter[], role: CoopRole, matchId: string | null): Promise<void> {
+    // B7 item 11: the run launch is DEFERRED to here (post wager-commit), so it can't race the wager
+    // screen the way item-4's team-confirm `startRun` did. Pin the neutral run difficulty ("ace", the
+    // module default) on BOTH clients: a versus battle is a manifest-built level-100 6v6, so difficulty
+    // is cosmetic (item 4) - but a PRIOR run left as "hell" would otherwise leak hell enemy-level
+    // scaling into the match, so it MUST be reset. No runConfig broadcast is needed (showdown clients
+    // run independent battles: host authoritative, guest snapshot-boot; `kind=versus` is pinned at
+    // session connect, not via runConfig), and no ER per-run reset matters (the enemy is manifest-built,
+    // bypassing the ER roster/ghost/map machinery entirely).
+    setErDifficulty("ace");
     // D1/D2: for a STAKED match, ping the escrow that the battle started (both clients). This sets the
     // server's `battlePhaseEntered` flag that gates a lone survivor's forfeit/timeout settlement.
     // Best-effort + fire-and-forget — it never blocks the launch.
@@ -699,6 +709,9 @@ function showdownRejectMessage(err: ShowdownNegotiationError): string {
       return "The opponent's team failed the anti-tamper check.";
     case "timeout":
       return "The opponent did not respond in time.";
+    case "protoMismatch":
+      // B7 item 11: a stale cached bundle on one side. Tell BOTH players to hard-refresh.
+      return "Your game versions differ - hard-refresh (Ctrl+Shift+R) both clients and retry.";
     default:
       return "The versus match was cancelled.";
   }

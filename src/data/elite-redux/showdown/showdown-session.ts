@@ -52,6 +52,16 @@ import {
 export const SHOWDOWN_READY_RENDEZVOUS_POINT = "showdown-ready";
 
 /**
+ * B7 item 11: the SHOWDOWN protocol version, carried on the `showdownTeam` exchange (the first MUTUAL
+ * showdown message, before the wager). Bump on ANY change to the showdown wire shape / flow so two
+ * clients on different bundles fail the negotiation with a clear "hard-refresh" message instead of
+ * desyncing one-sided (the "showdown doesn't appear for the other person" class - a stale service-worker
+ * cache). Separate from {@linkcode COOP_PROTOCOL_VERSION} (which gates co-op pairing) so co-op is
+ * unaffected; both clients exchange it, so EITHER can detect the other running an old build.
+ */
+export const SHOWDOWN_PROTO_VERSION = 1;
+
+/**
  * The reciprocal rendezvous point both clients cross once both have LOCKED IN at the wager screen (D3).
  * Defined here (engine-free) rather than on the UI handler so the wager handler AND the vs-CPU spoof
  * share it without either pulling the Phaser UI layer into the co-op runtime.
@@ -76,7 +86,7 @@ export function getShowdownPickWaitMs(): number {
 export type IsMegaFormPredicate = (speciesId: number, formIndex: number) => boolean;
 
 /** Why a showdown negotiation rejected (surfaced to the UI / result flow). */
-export type ShowdownRejectReason = "illegalTeam" | "hashMismatch" | "void" | "timeout";
+export type ShowdownRejectReason = "illegalTeam" | "hashMismatch" | "void" | "timeout" | "protoMismatch";
 
 /**
  * Default whole-handshake anti-strand timeout: reuses the co-op rendezvous wait convention
@@ -193,6 +203,8 @@ export class ShowdownSession {
 
   /** The opponent's received team, or null until `showdownTeam` arrives. */
   private opponentManifest: ShowdownMonManifest[] | null = null;
+  /** B7 item 11: the opponent's showdown protocol version (arrives on `showdownTeam`), or undefined. */
+  private opponentProto: number | undefined;
   /** Task C7: the opponent's sanitized presentation (arrives on `showdownTeam`), or null. */
   private opponentProfile: GhostTrainerProfile | null = null;
   /** The opponent's committed hash, or null until `showdownReady` arrives. */
@@ -264,7 +276,12 @@ export class ShowdownSession {
     // Send our team + our authored presentation (C7; sanitized locally before shipping so we never
     // send garbage - the receiver re-sanitizes regardless) + our ready commit (the hash of our own
     // manifest; presentation is NOT part of the team hash - it's cosmetic and not anti-cheat surface).
-    this.transport.send({ t: "showdownTeam", manifest: ownManifest, presentation: sanitizeGhostProfile(ownProfile) });
+    this.transport.send({
+      t: "showdownTeam",
+      manifest: ownManifest,
+      presentation: sanitizeGhostProfile(ownProfile),
+      showdownProto: SHOWDOWN_PROTO_VERSION,
+    });
     this.transport.send({ t: "showdownReady", teamHash: showdownTeamHash(ownManifest) });
     // The opponent's messages may already be buffered (they raced ahead); try to settle now.
     this.tryGate();
@@ -292,6 +309,8 @@ export class ShowdownSession {
       case "showdownTeam":
         // ShowdownMonManifestWire is structurally identical to ShowdownMonManifest; adopt it.
         this.opponentManifest = msg.manifest as ShowdownMonManifest[];
+        // B7 item 11: the sender's showdown protocol version (undefined from a pre-guard build).
+        this.opponentProto = msg.showdownProto;
         // Task C7: ALWAYS re-sanitize the received presentation before use (the ghost path's rule) -
         // a hostile peer must not bypass the length caps / control-char stripping / enum clamps.
         this.opponentProfile = sanitizeGhostProfile(msg.presentation);
@@ -320,6 +339,17 @@ export class ShowdownSession {
     // A received void rejects immediately (the peer already rejected our/their team).
     if (this.receivedVoid != null) {
       this.finishReject(new ShowdownNegotiationError("void", `opponent voided the match: ${this.receivedVoid}`));
+      return;
+    }
+    // B7 item 11: proto guard - the instant the opponent's team arrives, verify its showdown protocol
+    // version. A stale cached client sends an old (or, pre-guard, absent) version; abort the versus flow
+    // cleanly with a hard-refresh message + void the peer, rather than desyncing one-sided. Checked
+    // before the ready barrier so a stale peer that stops after `showdownTeam` still fails fast.
+    if (this.opponentManifest != null && this.opponentProto !== SHOWDOWN_PROTO_VERSION) {
+      this.voidAndReject(
+        "protoMismatch",
+        `showdown protocol mismatch: ours=${SHOWDOWN_PROTO_VERSION} opponent=${this.opponentProto ?? "none"}`,
+      );
       return;
     }
     // Need BOTH the opponent's team AND their ready commit before gating.

@@ -1161,7 +1161,18 @@ export type CoopMessage =
    * `presentation` is absent/null when the player authored no profile. The receiver ALWAYS re-sanitizes
    * it (`sanitizeGhostProfile`) before applying - a hostile peer must not bypass sanitize. Connection-scoped.
    */
-  | { t: "showdownTeam"; manifest: ShowdownMonManifestWire[]; presentation?: ShowdownProfileWire | null }
+  | {
+      t: "showdownTeam";
+      manifest: ShowdownMonManifestWire[];
+      presentation?: ShowdownProfileWire | null;
+      /**
+       * B7 item 11: the sender's SHOWDOWN protocol version. Additive + optional so a co-op peer (which
+       * never sends this message) is unaffected and a pre-guard showdown client simply omits it (read as
+       * a mismatch). A version difference means one client runs a stale cached bundle - the receiver
+       * aborts the versus flow cleanly with a hard-refresh message instead of desyncing one-sided.
+       */
+      showdownProto?: number;
+    }
   /** Either player -> peer: "my team is finalized"; `teamHash` fingerprints it for the anti-cheat cross-check. Connection-scoped. */
   | { t: "showdownReady"; teamHash: string }
   /** Host -> peer: the peer's command is needed for this `turn` (the 1v1 analogue of `commandRequest`). Connection-scoped. */
