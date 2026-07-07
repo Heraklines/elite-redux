@@ -3999,11 +3999,10 @@ export class StarterSelectUiHandler extends MessageUiHandler {
       this.starters[index].showdownSpeciesId = speciesId;
       this.starters[index].showdownFormIndex = formIndex;
       this.starters[index].showdownItem = selection.item;
-      // B7 item 1: refresh this line's party mini-icon to the newly picked stage.
-      this.updatePartyIcon(this.starterSpecies[index], index);
     }
-    // B7 item 1: re-render the big preview sprite so the picked stage shows at once (the
-    // stage picker acts on the currently-highlighted line, so lastSpecies is this root).
+    // B7 item 1: re-render the big preview sprite so the picked stage shows at once (the stage picker
+    // acts on the currently-highlighted line, so lastSpecies is this root). Item 12: the party mini-icon
+    // is NOT refreshed here - it always shows the base form, so a stage pick never changes it.
     if (this.lastSpecies?.speciesId === rootSpeciesId) {
       this.refreshPreviewSprite();
     }
@@ -4104,31 +4103,18 @@ export class StarterSelectUiHandler extends MessageUiHandler {
 
   updatePartyIcon(species: PokemonSpecies, index: number) {
     const props = globalScene.gameData.getSpeciesDexAttrProps(species, this.getCurrentDexProps(species.speciesId));
-    // Showdown (B7 item 1): the party mini-icon shows the picked Field Stage's icon (evolution
-    // / mega), keeping the root pick's shiny/variant so it stays shiny-tinted. The FX cache key
-    // stays keyed on the ROOT species id so the per-slot identity is stable. Base behavior is
-    // byte-identical in every other mode (iconSpecies === species, iconFormIndex === props).
-    const renderStage = this.showdownRenderStage(species.speciesId);
-    let iconSpecies = renderStage?.species ?? species;
-    let iconFormIndex = renderStage?.formIndex ?? props.formIndex;
-    // B7 item 9: an ER-custom stage icon that isn't in the texture cache would render as a missing
-    // box. If the stage's icon atlas isn't loaded, fall back to the BASE species icon (always loaded)
-    // so the slot is never blank - the base is at least a correct, present icon for the line.
-    if (
-      renderStage
-      && !globalScene.textures.exists(iconSpecies.getIconAtlasKey(iconFormIndex, props.shiny, props.variant))
-    ) {
-      iconSpecies = species;
-      iconFormIndex = props.formIndex;
-    }
-    this.starterIcons[index].setTexture(iconSpecies.getIconAtlasKey(iconFormIndex, props.shiny, props.variant));
-    this.starterIcons[index].setFrame(iconSpecies.getIconId(props.female, iconFormIndex, props.shiny, props.variant));
-    this.checkIconId(this.starterIcons[index], iconSpecies, props.female, iconFormIndex, props.shiny, props.variant);
+    // Showdown (B7 item 12): the party mini-icon ALWAYS renders the ROOT/base species icon, never the
+    // picked Field Stage (maintainer-clarified intent). The picked stage is visible ONLY on the big
+    // preview sprite (refreshPreviewSprite). This is the single party-icon render path - item 9 routes
+    // popStarter through it so removal re-renders correctly - and it draws the base form in every mode.
+    this.starterIcons[index].setTexture(species.getIconAtlasKey(props.formIndex, props.shiny, props.variant));
+    this.starterIcons[index].setFrame(species.getIconId(props.female, props.formIndex, props.shiny, props.variant));
+    this.checkIconId(this.starterIcons[index], species, props.female, props.formIndex, props.shiny, props.variant);
     this.refreshShinyLabIconFx(
       this.starterIcons[index],
-      iconSpecies,
+      species,
       props.female,
-      iconFormIndex,
+      props.formIndex,
       props.shiny,
       props.variant,
       `starter-party-shiny-lab-icon-${index}-${species.speciesId}`,
@@ -6835,16 +6821,23 @@ export class StarterSelectUiHandler extends MessageUiHandler {
                 return true;
               },
             });
-            // Showdown 1v1 (B7 item 4): a versus match is a single level-100 fight, so the
-            // ER run difficulty (trainer roster tier / enemy-level scaling / shiny+candy
-            // multipliers) is purely cosmetic in a manifest-built 6v6. Skip the chooser on
-            // BOTH clients ("why am I picking Hell for one fight") and fix the neutral default
-            // ("ace" - the module DEFAULT_DIFFICULTY, a vanilla non-scaling tier). No host->guest
-            // difficulty handshake is needed: each client sets the same constant locally, and the
-            // host's startRun still broadcasts it for coherence. Placed BEFORE the co-op guest
-            // wait below so the versus guest never sits on "Waiting for the host to choose...".
+            // Showdown 1v1 (B7 item 4 + item 11): a versus match SKIPS the ER difficulty chooser
+            // ("why am I picking Hell for one fight"), but it MUST NOT call `startRun` here.
+            // `startRun` is the CO-OP RUN LAUNCHER (it broadcasts runConfig + resets ER run state +
+            // drives the run-launch scene/UI pipeline); firing it at team-confirm races the versus
+            // negotiate->wager flow and ~3s later setModes OVER the live SHOWDOWN_WAGER screen,
+            // tearing it down (log-confirmed: the guest's wager silently dies, the host's later
+            // wager-commit finds no listener). Instead hand off to `runShowdownFlow` ONLY (via the
+            // starter-select callback); the run is actually launched at the WAGER COMMIT
+            // (SelectStarterPhase.launchShowdownBattle), where the "ace" difficulty + ER-run prep
+            // now live. Nothing run-launch-related runs on either client until BOTH lock in.
             if (globalScene.gameMode.isShowdown) {
-              startRun("ace");
+              const showdownStarters = this.starters.slice(0);
+              saveLastTeam(showdownStarters); // remember the team even if the match aborts at the wager
+              ui.setMode(UiMode.STARTER_SELECT);
+              const showdownCallback = this.starterSelectCallback;
+              this.starterSelectCallback = null;
+              showdownCallback?.(showdownStarters);
               return;
             }
             // ER Community Challenge: a launched community card forces its run
