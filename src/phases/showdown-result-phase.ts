@@ -6,10 +6,13 @@
 
 import { globalScene } from "#app/global-scene";
 import { clearCoopRuntime, getCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
-import { endShowdownBattle } from "#data/elite-redux/showdown/showdown-battle-state";
+import { resolveGhostDialogue } from "#data/elite-redux/er-ghost-profile";
+import { buildGhostDialogueCtx } from "#data/elite-redux/er-ghost-teams";
+import { endShowdownBattle, getShowdownOpponentProfile } from "#data/elite-redux/showdown/showdown-battle-state";
 import {
   type ShowdownResultReason,
   type ShowdownVoidReason,
+  selectShowdownResultLine,
   winnerFromLocalResult,
 } from "#data/elite-redux/showdown/showdown-outcome";
 import { BattlePhase } from "#phases/battle-phase";
@@ -53,6 +56,13 @@ export class ShowdownResultPhase extends BattlePhase {
   start(): void {
     super.start();
 
+    // Task C7: the opponent's win/lose dialogue line, resolved BEFORE endShowdownBattle drops the
+    // stashed profile. Ghost semantics: the WINNER hears the opponent's `defeated` line, the LOSER
+    // hears the opponent's `defeatPlayer` line; a void shows none. Tokens resolve against our own
+    // live end-of-battle state (the encountering player). Skipped silently when there's no line.
+    const rawLine = selectShowdownResultLine(getShowdownOpponentProfile(), this.localWon, this.voided);
+    const opponentLine = rawLine ? resolveGhostDialogue(rawLine, buildGhostDialogueCtx()) : null;
+
     // Emit the outcome to the peer so both clients show the same result (friendly -> matchId null).
     // Best-effort + guarded so a send can never strand the return to title. Skipped when this phase
     // was itself ROUTED from a received peer result/void (silent) - otherwise the two clients ping-pong.
@@ -86,17 +96,26 @@ export class ShowdownResultPhase extends BattlePhase {
         ? "You won the Showdown!"
         : "You lost the Showdown.";
 
-    globalScene.ui.showText(
-      message,
-      null,
-      () => {
-        // Return to the title WITHOUT saving - a showdown run never writes a session.
-        globalScene.reset();
-        globalScene.phaseManager.unshiftNew("TitlePhase");
-        this.end();
-      },
-      null,
-      true,
-    );
+    const showResult = () => {
+      globalScene.ui.showText(
+        message,
+        null,
+        () => {
+          // Return to the title WITHOUT saving - a showdown run never writes a session.
+          globalScene.reset();
+          globalScene.phaseManager.unshiftNew("TitlePhase");
+          this.end();
+        },
+        null,
+        true,
+      );
+    };
+
+    // Play the opponent's authored win/lose line FIRST (when present), then the result banner.
+    if (opponentLine == null) {
+      showResult();
+    } else {
+      globalScene.ui.showText(opponentLine, null, showResult, null, true);
+    }
   }
 }

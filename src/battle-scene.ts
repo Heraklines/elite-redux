@@ -32,7 +32,7 @@ import { getDailyMysteryEncounter } from "#data/daily-seed/daily-run";
 import { allMoves, allSpecies, biomeDepths, modifierTypes } from "#data/data-lists";
 import { classicFinalBossDialogue } from "#data/dialogue";
 import { ER_SILKEN_DECREE_ABILITY_ID } from "#data/elite-redux/abilities/silken-decree";
-import { getCoopBattleStreamer, getCoopController } from "#data/elite-redux/coop/coop-runtime";
+import { getCoopBattleStreamer, getCoopController, isShowdownGuestFlip } from "#data/elite-redux/coop/coop-runtime";
 import { grantErAchievementReward } from "#data/elite-redux/er-achievement-rewards";
 import { erExtraRivalTypeForWave } from "#data/elite-redux/er-battle-frequency";
 import {
@@ -58,9 +58,14 @@ import {
 } from "#data/elite-redux/er-black-shinies";
 import { clearErFightTokens } from "#data/elite-redux/er-fight-tokens";
 import { isErFinalBossSpecies } from "#data/elite-redux/er-final-boss";
-import { sanitizeGhostProfile } from "#data/elite-redux/er-ghost-profile";
+import { type GhostTrainerProfile, sanitizeGhostProfile } from "#data/elite-redux/er-ghost-profile";
 import type { GhostTeamSnapshot } from "#data/elite-redux/er-ghost-teams";
-import { markTrainerAsGhost, maybePrefetchGhostTeams, takeGhostForWave } from "#data/elite-redux/er-ghost-teams";
+import {
+  applyGhostTrainerPresentation,
+  markTrainerAsGhost,
+  maybePrefetchGhostTeams,
+  takeGhostForWave,
+} from "#data/elite-redux/er-ghost-teams";
 import { recordErBiomeVisited } from "#data/elite-redux/er-map-nodes";
 import { erTeamMoneyBonusPercent } from "#data/elite-redux/er-money-streak";
 import { erGauntletActive, erGauntletPickMeType, erGauntletWaveKind } from "#data/elite-redux/er-mystery-gauntlet";
@@ -76,7 +81,10 @@ import { applyErTrainerHeldItems } from "#data/elite-redux/er-trainer-runtime-ho
 import { ErWardStoneModifier } from "#data/elite-redux/er-ward-stones";
 import { erBattleFormDumpToBaseSpeciesId } from "#data/elite-redux/init-elite-redux-er-custom-form-changes";
 import { CASCOON_ANGELS_WRATH_MOVES } from "#data/elite-redux/init-elite-redux-movesets";
-import { getShowdownOpponentManifest } from "#data/elite-redux/showdown/showdown-battle-state";
+import {
+  getShowdownOpponentManifest,
+  getShowdownOpponentProfile,
+} from "#data/elite-redux/showdown/showdown-battle-state";
 import { markTrainerAsShowdown } from "#data/elite-redux/showdown/showdown-enemy-build";
 import type { SpeciesFormChangeTrigger } from "#data/form-change-triggers";
 import { SpeciesFormChangeManualTrigger, SpeciesFormChangeTimeOfDayTrigger } from "#data/form-change-triggers";
@@ -1809,9 +1817,40 @@ export class BattleScene extends SceneBase {
     resolved.battleType = props.battleType;
     resolved.double = props.double;
     resolved.trainer = props.trainerData?.toTrainer();
+    // Task C7: the versus GUEST reconstructs the host's session, whose trainer is authoritatively the
+    // ENEMY side (the guest's OWN team) fielded behind the guest's own profile. On the guest's flipped
+    // screen that trainer draws at the TOP = the OPPONENT (host), so re-skin it with the HOST's authored
+    // profile (the guest's opponentProfile from the C2 exchange). The party is adopted from the host's
+    // stream, so the rebuilt trainer is purely cosmetic (sprite/name/title/dialogue/FX). No profile ->
+    // a plain Veteran, identical to before.
+    if (resolved.trainer != null && this.gameMode.isShowdown && isShowdownGuestFlip()) {
+      const teamSize = getShowdownOpponentManifest()?.length ?? resolved.trainer.getPartyTemplate().size;
+      resolved.trainer = this.buildShowdownTrainer(getShowdownOpponentProfile(), teamSize);
+    }
     if (resolved.trainer) {
       this.field.add(resolved.trainer);
     }
+  }
+
+  /**
+   * Task C7: build the showdown OPPONENT trainer from the opponent's authored ghost-trainer `profile`.
+   * Sprite/class + gender are chosen at CONSTRUCTION (mirroring {@linkcode createGhostTrainer}); the
+   * name/title/dialogue/FX are applied via the SHARED ghost helper {@linkcode applyGhostTrainerPresentation}
+   * so ghost + showdown presentation stay byte-identical. Used by BOTH clients: the HOST fields the guest's
+   * team behind the guest's profile; the GUEST re-skins its flipped-top trainer with the host's profile.
+   * `teamSize` sizes the party (the party itself is adopted from the stream on the guest). A null profile
+   * yields a plain Veteran.
+   */
+  private buildShowdownTrainer(profile: GhostTrainerProfile | null, teamSize: number): Trainer {
+    const authoredType =
+      profile?.trainerType != null && trainerConfigs[profile.trainerType] ? profile.trainerType : null;
+    const trainerType = authoredType ?? TrainerType.VETERAN;
+    const hasGenders = !!trainerConfigs[trainerType]?.hasGenders;
+    const female = hasGenders && profile?.female === true;
+    const trainer = new Trainer(trainerType, female ? TrainerVariant.FEMALE : TrainerVariant.DEFAULT);
+    markTrainerAsShowdown(trainer, teamSize);
+    applyGhostTrainerPresentation(trainer, profile);
+    return trainer;
   }
 
   /**
@@ -1828,8 +1867,10 @@ export class BattleScene extends SceneBase {
     const showdownManifest = this.gameMode.isShowdown ? getShowdownOpponentManifest() : null;
     if (showdownManifest != null && showdownManifest.length > 0) {
       resolved.battleType = BattleType.TRAINER;
-      const opponent = new Trainer(TrainerType.VETERAN, TrainerVariant.DEFAULT);
-      markTrainerAsShowdown(opponent, showdownManifest.length);
+      // Task C7: field the opponent behind their authored ghost-trainer profile (sprite/class/name/
+      // title/dialogue/FX) - the SAME presentation ghost battles use. Profile is null when the
+      // opponent authored none (plain Veteran).
+      const opponent = this.buildShowdownTrainer(getShowdownOpponentProfile(), showdownManifest.length);
       this.field.add(opponent);
       resolved.trainer = opponent;
       return;

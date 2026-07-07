@@ -86,6 +86,7 @@ import {
   ER_SHINY_LAB_MINI_ICON_RENDER_PAD,
   erShinyLabSpriteFxStateKey,
   getErShinyLabNameStyleForSpecies,
+  getErShinyLabSavedLookForSpecies,
   getErShinyLabSpeciesIconSource,
   getErShinyLabSpriteFxLookForSpecies,
   hasErShinyLabAnySpriteFx,
@@ -3836,6 +3837,10 @@ export class StarterSelectUiHandler extends MessageUiHandler {
     // player never opened the picker, in which case the base form is fielded.
     if (globalScene.gameMode.isShowdown) {
       this.applyShowdownSelection(starter, species.speciesId);
+      // Task C7: carry the OWNER's equipped Shiny Lab look so the opponent's client renders this
+      // mon's custom shiny effects (mirrors the co-op #785 carry + the ghost capture). Shiny-gated
+      // by the helper (returns undefined for a non-shiny / lookless pick), so a plain shiny is unaffected.
+      (starter as Starter).erShinyLab = getErShinyLabSavedLookForSpecies(species.speciesId, props.shiny);
     }
 
     this.starters.push(starter);

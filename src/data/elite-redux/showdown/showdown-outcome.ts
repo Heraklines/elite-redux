@@ -21,6 +21,7 @@
 // =============================================================================
 
 import type { CoopRole } from "#data/elite-redux/coop/coop-transport";
+import type { GhostTrainerProfile } from "#data/elite-redux/er-ghost-profile";
 
 /** How a decisive showdown match ended (the `showdownResult.reason` domain). */
 export type ShowdownResultReason = "victory" | "forfeit" | "timeout";
@@ -103,4 +104,24 @@ export function timeoutResult(loser: CoopRole): ShowdownResultDecision {
  */
 export function voidResult(reason: ShowdownVoidReason): ShowdownVoidDecision {
   return { kind: "void", reason };
+}
+
+/**
+ * PURE (Task C7): the OPPONENT'S ghost-trainer dialogue line to show at the result screen, mirroring
+ * ghost-battle victory/defeat line semantics EXACTLY:
+ *   - the client that WON shows the opponent's `dialogue.defeated`  (the line the opponent says when IT is defeated),
+ *   - the client that LOST shows the opponent's `dialogue.defeatPlayer` (the line the opponent says when IT wins).
+ * A VOID shows NO line (returns undefined). Also undefined when the opponent has no profile / no matching
+ * line, so callers skip silently. Returns the RAW authored line (placeholder tokens are resolved by the
+ * caller against its own live battle state, like the ghost dialogue getters).
+ */
+export function selectShowdownResultLine(
+  profile: GhostTrainerProfile | null | undefined,
+  localWon: boolean,
+  voided: boolean,
+): string | undefined {
+  if (voided || !profile?.dialogue) {
+    return;
+  }
+  return localWon ? profile.dialogue.defeated : profile.dialogue.defeatPlayer;
 }

@@ -1162,7 +1162,7 @@ const GHOST_BY_TRAINER = new WeakMap<Trainer, GhostTeamSnapshot>();
  * end-of-battle state. {slayer} (the mon that KO'd the most of the ghost's team) needs
  * per-faint attribution that isn't tracked yet, so v1 falls back to the lead.
  */
-function buildGhostDialogueCtx(): GhostDialogueContext {
+export function buildGhostDialogueCtx(): GhostDialogueContext {
   const party = globalScene?.getPlayerParty?.() ?? [];
   const nameOf = (p: (typeof party)[number]): string | undefined => p?.getNameToRender?.() || p?.name || undefined;
   const lead = party.length > 0 ? nameOf(party[0]) : undefined;
@@ -1210,52 +1210,71 @@ export function markTrainerAsGhost(trainer: Trainer, snapshot: GhostTeamSnapshot
   // ER Ghost Trainer Editor: apply the uploader's authored presentation. Sprite/class
   // + gender are chosen at construction (createGhostTrainer); here we apply the custom
   // name, title, and battle dialogue. Re-sanitised - it arrives from an untrusted peer.
-  // Dialogue getters resolve placeholder tokens LAZILY (at display time) so post-battle
-  // tokens use end-of-battle state. Mapping: intro -> encounter, defeated -> victory
-  // (player wins), defeatPlayer/afterWin -> defeat (trainer wins).
-  const pres = sanitizeGhostProfile(snapshot.presentation);
-  if (pres) {
-    if (pres.displayName) {
-      trainer.name = pres.displayName;
-    }
-    if (pres.title) {
-      const shownName = trainer.name;
-      const title = pres.title;
-      trainer.getName = (_slot: TrainerSlot = TrainerSlot.NONE, includeTitle = false): string =>
-        includeTitle && shownName ? `${title} ${shownName}`.trim() : shownName;
-    }
-    const d = pres.dialogue;
-    if (d?.intro) {
-      const intro = d.intro;
-      trainer.getEncounterMessages = () => [resolveGhostDialogue(intro, buildGhostDialogueCtx())];
-    }
-    if (d?.defeated) {
-      const defeated = d.defeated;
-      trainer.getVictoryMessages = () => [resolveGhostDialogue(defeated, buildGhostDialogueCtx())];
-    }
-    const lossLines = [d?.defeatPlayer, d?.afterWin].filter((l): l is string => !!l);
-    if (lossLines.length > 0) {
-      trainer.getDefeatMessages = () => lossLines.map(l => resolveGhostDialogue(l, buildGhostDialogueCtx()));
-    }
-    // ER Ghost Trainer FX: the equipped entrance + aura. Both arrive already
-    // clamped by sanitizeGhostProfile (approach -> known enum, aura -> known
-    // AROUND id), so an untrusted peer can't smuggle an arbitrary effect. The
-    // entrance is consumed by the per-trainer tween in encounter-phase; the aura
-    // overlay is built lazily once the trainer is revealed (applyErGhostAuraFx).
-    if (pres.approach && pres.approach !== "default") {
-      trainer.erGhostApproach = pres.approach;
-    }
-    if (pres.aura && pres.showAuraInBattle) {
-      trainer.erGhostAura = pres.aura;
-    }
-    // FX tuning (already clamped to their bands by sanitizeGhostProfile): apply the
-    // speed + intensity multipliers to both the entrance tween and the aura overlay.
-    if (pres.fxSpeed !== undefined) {
-      trainer.erGhostFxSpeed = pres.fxSpeed;
-    }
-    if (pres.fxIntensity !== undefined) {
-      trainer.erGhostFxIntensity = pres.fxIntensity;
-    }
+  applyGhostTrainerPresentation(trainer, sanitizeGhostProfile(snapshot.presentation));
+}
+
+/**
+ * Apply an authored GHOST-TRAINER {@linkcode GhostTrainerProfile} presentation onto a live
+ * `Trainer`: the custom name, the title plate, the three battle-dialogue arrays, and the entrance
+ * + aura FX. Sprite/class + gender are NOT set here (they are chosen at CONSTRUCTION - see
+ * `createGhostTrainer` / the showdown trainer builder); this covers everything applied to the built
+ * instance. `pres` MUST already be sanitized by the caller (`sanitizeGhostProfile`), since it may
+ * arrive from an untrusted peer; a null profile is a no-op. Dialogue getters resolve placeholder
+ * tokens LAZILY (at display time) via `buildCtx` so post-battle tokens use end-of-battle state.
+ * Mapping: intro -> encounter, defeated -> victory (player wins), defeatPlayer/afterWin -> defeat
+ * (trainer wins).
+ *
+ * SHARED by ghost battles ({@linkcode markTrainerAsGhost}) and showdown 1v1 (C7 - the opponent's
+ * profile on the enemy trainer, both clients). Extracted verbatim so ghost behavior is byte-identical.
+ */
+export function applyGhostTrainerPresentation(
+  trainer: Trainer,
+  pres: GhostTrainerProfile | null,
+  buildCtx: () => GhostDialogueContext = buildGhostDialogueCtx,
+): void {
+  if (!pres) {
+    return;
+  }
+  if (pres.displayName) {
+    trainer.name = pres.displayName;
+  }
+  if (pres.title) {
+    const shownName = trainer.name;
+    const title = pres.title;
+    trainer.getName = (_slot: TrainerSlot = TrainerSlot.NONE, includeTitle = false): string =>
+      includeTitle && shownName ? `${title} ${shownName}`.trim() : shownName;
+  }
+  const d = pres.dialogue;
+  if (d?.intro) {
+    const intro = d.intro;
+    trainer.getEncounterMessages = () => [resolveGhostDialogue(intro, buildCtx())];
+  }
+  if (d?.defeated) {
+    const defeated = d.defeated;
+    trainer.getVictoryMessages = () => [resolveGhostDialogue(defeated, buildCtx())];
+  }
+  const lossLines = [d?.defeatPlayer, d?.afterWin].filter((l): l is string => !!l);
+  if (lossLines.length > 0) {
+    trainer.getDefeatMessages = () => lossLines.map(l => resolveGhostDialogue(l, buildCtx()));
+  }
+  // ER Ghost Trainer FX: the equipped entrance + aura. Both arrive already
+  // clamped by sanitizeGhostProfile (approach -> known enum, aura -> known
+  // AROUND id), so an untrusted peer can't smuggle an arbitrary effect. The
+  // entrance is consumed by the per-trainer tween in encounter-phase; the aura
+  // overlay is built lazily once the trainer is revealed (applyErGhostAuraFx).
+  if (pres.approach && pres.approach !== "default") {
+    trainer.erGhostApproach = pres.approach;
+  }
+  if (pres.aura && pres.showAuraInBattle) {
+    trainer.erGhostAura = pres.aura;
+  }
+  // FX tuning (already clamped to their bands by sanitizeGhostProfile): apply the
+  // speed + intensity multipliers to both the entrance tween and the aura overlay.
+  if (pres.fxSpeed !== undefined) {
+    trainer.erGhostFxSpeed = pres.fxSpeed;
+  }
+  if (pres.fxIntensity !== undefined) {
+    trainer.erGhostFxIntensity = pres.fxIntensity;
   }
 }
 

@@ -64,6 +64,10 @@ export function starterToManifest(starter: Starter, _gameData: ShowdownUnlockGam
     // Deliberately NOT `getSpeciesStarterValue` (which applies candy reductions) so a reduced cost
     // can't dodge the cost bracket. `?? 4` mirrors getSpeciesStarterValue's ER-custom fallback.
     baseCost: speciesStarterCosts[starter.speciesId] ?? 4,
+    // Task C7: the owner's per-mon Shiny Lab look, mirroring the ghost capture's serializeShinyLabLook
+    // semantics: only on a SHINY mon, and only the carried look (stamped at build via the equipped
+    // look). A non-shiny (or lookless) mon carries no look, so the field is dropped entirely.
+    erShinyLab: starter.shiny && starter.erShinyLab ? [...starter.erShinyLab] : undefined,
   };
 }
 

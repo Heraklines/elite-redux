@@ -17,6 +17,7 @@
 //   - `relay`           : the enemy-command relay (C4), or null for a host-solo bootstrap test.
 // =============================================================================
 
+import type { GhostTrainerProfile } from "#data/elite-redux/er-ghost-profile";
 import type { ShowdownCommandRelay } from "#data/elite-redux/showdown/showdown-command-relay";
 import type { ShowdownMonManifest } from "#data/elite-redux/showdown/showdown-team";
 
@@ -24,20 +25,28 @@ interface ShowdownBattleState {
   ownManifest: ShowdownMonManifest[];
   opponentManifest: ShowdownMonManifest[];
   relay: ShowdownCommandRelay | null;
+  /**
+   * Task C7: the OPPONENT's authored ghost-trainer presentation (already sanitized on receipt),
+   * or null when the opponent authored none. The host applies it to the enemy trainer; the guest
+   * applies it to the flipped-top trainer; the result phase reads its win/lose dialogue lines.
+   */
+  opponentProfile: GhostTrainerProfile | null;
 }
 
 let state: ShowdownBattleState | null = null;
 
 /**
- * Begin a showdown match: stash both teams (+ the optional enemy-command relay). Idempotent
- * overwrite (a rematch replaces the prior state). `relay` is null for a host-solo bootstrap.
+ * Begin a showdown match: stash both teams (+ the optional enemy-command relay + the opponent's
+ * sanitized presentation). Idempotent overwrite (a rematch replaces the prior state). `relay` is
+ * null for a host-solo bootstrap; `opponentProfile` is null when the opponent authored no profile.
  */
 export function beginShowdownBattle(
   ownManifest: ShowdownMonManifest[],
   opponentManifest: ShowdownMonManifest[],
   relay: ShowdownCommandRelay | null = null,
+  opponentProfile: GhostTrainerProfile | null = null,
 ): void {
-  state = { ownManifest, opponentManifest, relay };
+  state = { ownManifest, opponentManifest, relay, opponentProfile };
 }
 
 /** The live match state, or null when no showdown match is active. */
@@ -53,6 +62,15 @@ export function getShowdownOpponentManifest(): ShowdownMonManifest[] | null {
 /** THIS client's own team, or null. */
 export function getShowdownOwnManifest(): ShowdownMonManifest[] | null {
   return state?.ownManifest ?? null;
+}
+
+/**
+ * Task C7: the OPPONENT's sanitized ghost-trainer presentation (sprite/class/name/title/dialogue/FX),
+ * or null when no match is active / the opponent authored none. The battle bootstrap applies it to the
+ * enemy trainer (host) / flipped-top trainer (guest); the result phase reads its win/lose dialogue.
+ */
+export function getShowdownOpponentProfile(): GhostTrainerProfile | null {
+  return state?.opponentProfile ?? null;
 }
 
 /** The enemy-command relay (C4), or null (host-solo bootstrap / no match). */

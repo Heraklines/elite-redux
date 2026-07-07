@@ -94,6 +94,13 @@ export interface ShowdownMonManifest {
    * the manifest reads the raw table so a reduction can't dodge the cost bracket).
    */
   baseCost: number;
+  /**
+   * Task C7: the owner's per-mon Shiny Lab look (the encoded `ErShinyLabSavedLook` tuple) when the
+   * mon is shiny AND a custom look is equipped; absent otherwise. Structurally a `number[]` so the
+   * pure rule engine imports no shiny-lab type; the opponent's client re-normalizes it (byte-clamped)
+   * before applying. Mirrors the ghost snapshot's `GhostMember.erShinyLab`.
+   */
+  erShinyLab?: number[] | undefined;
 }
 
 export interface UnlockSnapshot {
@@ -184,6 +191,11 @@ function malformedReason(mon: unknown): string | null {
   }
   if (!isInt(m.baseCost)) {
     return "baseCost must be an integer";
+  }
+  // erShinyLab is OPTIONAL (cosmetic); when present it must be an array of numbers. The apply
+  // side re-normalizes (byte-clamps) it, so we only guard the shape here, never the values.
+  if (m.erShinyLab !== undefined && (!Array.isArray(m.erShinyLab) || m.erShinyLab.some(n => typeof n !== "number"))) {
+    return "erShinyLab must be an array of numbers when present";
   }
   return null;
 }

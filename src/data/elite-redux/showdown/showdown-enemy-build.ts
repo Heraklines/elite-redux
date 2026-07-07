@@ -26,6 +26,7 @@
 
 import { globalScene } from "#app/global-scene";
 import { modifierTypes } from "#data/data-lists";
+import { normalizeErShinyLabSavedLook } from "#data/elite-redux/er-shiny-lab-effects";
 import { getShowdownOpponentManifest } from "#data/elite-redux/showdown/showdown-battle-state";
 import { showdownHeldItemKey } from "#data/elite-redux/showdown/showdown-enemy";
 import type { ShowdownMonManifest } from "#data/elite-redux/showdown/showdown-team";
@@ -73,6 +74,12 @@ function buildShowdownEnemy(mon: ShowdownMonManifest, slot: TrainerSlot): EnemyP
   enemy.nature = mon.nature as Nature;
   enemy.shiny = mon.shiny;
   enemy.variant = mon.variant as Variant;
+  // Task C7: restore the owner's per-mon Shiny Lab look, shiny-gated exactly like the ghost apply
+  // (applyErGhostOverride). `erShinyLabSuppressLocal` blocks this client's own equipped look from
+  // leaking onto the opponent's mon; the normalized look (byte-clamped) is applied only when shiny.
+  // Black shinies are banned from showdown teams (B6), so the black tier is irrelevant here.
+  enemy.customPokemonData.erShinyLabSuppressLocal = true;
+  enemy.customPokemonData.erShinyLab = mon.shiny ? normalizeErShinyLabSavedLook(mon.erShinyLab) : undefined;
   if (mon.ivs.length === 6) {
     enemy.ivs = mon.ivs.map(iv => Math.max(0, Math.min(31, Math.floor(iv) || 0)));
   }

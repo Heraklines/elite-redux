@@ -173,6 +173,43 @@ export interface ShowdownMonManifestWire {
   erBlackShiny: boolean;
   /** Task B6: the LINE's BASE `speciesStarterCosts` value. Mirror of the domain field. */
   baseCost: number;
+  /**
+   * Task C7: the owner's per-mon Shiny Lab look (the encoded `ErShinyLabSavedLook` tuple), when
+   * the mon is shiny AND a custom look is equipped; absent otherwise. Structurally a `number[]`
+   * so the transport imports no shiny-lab type; the opponent's client re-normalizes it (byte-clamped)
+   * before applying, so a hostile peer can't smuggle an out-of-range look. Mirrors the ghost
+   * snapshot's `GhostMember.erShinyLab`.
+   */
+  erShinyLab?: number[] | undefined;
+}
+
+/**
+ * Showdown 1v1 PvP (C7): the opponent's authored GHOST-TRAINER presentation, serialized for the
+ * team exchange. Mirrors `er-ghost-profile.ts` `GhostTrainerProfile` STRUCTURALLY (the transport
+ * never imports the ghost module - same one-way rule as {@linkcode ShowdownMonManifestWire}). Every
+ * field is optional; the RECEIVING client ALWAYS re-runs `sanitizeGhostProfile` before applying, so
+ * a hostile peer cannot bypass the length caps / control-char stripping / enum clamps.
+ */
+export interface ShowdownProfileWire {
+  trainerType?: number | undefined;
+  female?: boolean | undefined;
+  displayName?: string | undefined;
+  title?: string | undefined;
+  dialogue?:
+    | {
+        intro?: string | undefined;
+        defeatPlayer?: string | undefined;
+        defeated?: string | undefined;
+        afterWin?: string | undefined;
+      }
+    | undefined;
+  tintColor?: number | undefined;
+  aura?: string | undefined;
+  showAuraInBattle?: boolean | undefined;
+  approach?: string | undefined;
+  fxSpeed?: number | undefined;
+  fxIntensity?: number | undefined;
+  music?: string | undefined;
 }
 
 // =============================================================================
@@ -1118,8 +1155,13 @@ export type CoopMessage =
   | { t: "showdownStakeOffer"; offer: ShowdownStakeOfferWire }
   /** Either player -> peer: the stake is locked in for `matchId` at the agreed `tier` (escrow-coupled: post-registration). */
   | { t: "showdownStakeLock"; matchId: string; tier: number }
-  /** Either player -> peer: this player's full built team (see {@linkcode ShowdownMonManifestWire}). Connection-scoped. */
-  | { t: "showdownTeam"; manifest: ShowdownMonManifestWire[] }
+  /**
+   * Either player -> peer: this player's full built team (see {@linkcode ShowdownMonManifestWire}),
+   * plus this player's authored GHOST-TRAINER `presentation` (C7; sprite/class/name/title/dialogue/FX).
+   * `presentation` is absent/null when the player authored no profile. The receiver ALWAYS re-sanitizes
+   * it (`sanitizeGhostProfile`) before applying - a hostile peer must not bypass sanitize. Connection-scoped.
+   */
+  | { t: "showdownTeam"; manifest: ShowdownMonManifestWire[]; presentation?: ShowdownProfileWire | null }
   /** Either player -> peer: "my team is finalized"; `teamHash` fingerprints it for the anti-cheat cross-check. Connection-scoped. */
   | { t: "showdownReady"; teamHash: string }
   /** Host -> peer: the peer's command is needed for this `turn` (the 1v1 analogue of `commandRequest`). Connection-scoped. */
@@ -1217,7 +1259,7 @@ function summarizeCoopMessage(msg: CoopMessage): string {
     case "showdownStakeLock":
       return `match=${msg.matchId} tier=${msg.tier}`;
     case "showdownTeam":
-      return `mons=${msg.manifest.length}`;
+      return `mons=${msg.manifest.length} pres=${msg.presentation == null ? "-" : "y"}`;
     case "showdownReady":
       return `hash=${msg.teamHash}`;
     case "showdownCommandRequest":

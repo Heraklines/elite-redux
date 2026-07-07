@@ -39,6 +39,7 @@
 import { canonicalize, fnv1a64 } from "#data/elite-redux/coop/coop-battle-checksum";
 import { CoopRendezvous } from "#data/elite-redux/coop/coop-rendezvous";
 import type { CoopMessage, CoopTransport } from "#data/elite-redux/coop/coop-transport";
+import { type GhostTrainerProfile, sanitizeGhostProfile } from "#data/elite-redux/er-ghost-profile";
 import { isMegaStage } from "#data/elite-redux/showdown/showdown-evolutions";
 import {
   type ShowdownMonManifest,
@@ -77,6 +78,12 @@ export interface ShowdownNegotiationResult {
   opponentManifest: ShowdownMonManifest[];
   /** The opponent's committed team hash (== the fingerprint of their manifest). */
   opponentTeamHash: string;
+  /**
+   * Task C7: the opponent's authored ghost-trainer presentation, RE-SANITIZED on receipt (a hostile
+   * peer must not bypass sanitize), or null when the opponent sent none. Stashed on the showdown battle
+   * state so the enemy-trainer presentation + result-line handling can read it.
+   */
+  opponentProfile: GhostTrainerProfile | null;
 }
 
 /** Options for {@linkcode ShowdownSession}. */
@@ -136,6 +143,8 @@ export class ShowdownSession {
 
   /** The opponent's received team, or null until `showdownTeam` arrives. */
   private opponentManifest: ShowdownMonManifest[] | null = null;
+  /** Task C7: the opponent's sanitized presentation (arrives on `showdownTeam`), or null. */
+  private opponentProfile: GhostTrainerProfile | null = null;
   /** The opponent's committed hash, or null until `showdownReady` arrives. */
   private opponentTeamHash: string | null = null;
   /** A received `showdownVoid` reason (rejects the negotiation), or null. */
@@ -167,7 +176,10 @@ export class ShowdownSession {
    * {@linkcode ShowdownNegotiationError} on an illegal opponent team, a hash mismatch, or a
    * received void.
    */
-  negotiate(ownManifest: ShowdownMonManifest[]): Promise<ShowdownNegotiationResult> {
+  negotiate(
+    ownManifest: ShowdownMonManifest[],
+    ownProfile: GhostTrainerProfile | null = null,
+  ): Promise<ShowdownNegotiationResult> {
     if (this.settle != null) {
       return Promise.reject(new ShowdownNegotiationError("void", "negotiate() already in progress"));
     }
@@ -185,8 +197,10 @@ export class ShowdownSession {
       this.voidAndReject("illegalTeam", `own team failed validation: ${ownViolations[0].message}`, ownViolations);
       return promise;
     }
-    // Send our team + our ready commit (the hash of our own manifest).
-    this.transport.send({ t: "showdownTeam", manifest: ownManifest });
+    // Send our team + our authored presentation (C7; sanitized locally before shipping so we never
+    // send garbage - the receiver re-sanitizes regardless) + our ready commit (the hash of our own
+    // manifest; presentation is NOT part of the team hash - it's cosmetic and not anti-cheat surface).
+    this.transport.send({ t: "showdownTeam", manifest: ownManifest, presentation: sanitizeGhostProfile(ownProfile) });
     this.transport.send({ t: "showdownReady", teamHash: showdownTeamHash(ownManifest) });
     // The opponent's messages may already be buffered (they raced ahead); try to settle now.
     this.tryGate();
@@ -208,6 +222,9 @@ export class ShowdownSession {
       case "showdownTeam":
         // ShowdownMonManifestWire is structurally identical to ShowdownMonManifest; adopt it.
         this.opponentManifest = msg.manifest as ShowdownMonManifest[];
+        // Task C7: ALWAYS re-sanitize the received presentation before use (the ghost path's rule) -
+        // a hostile peer must not bypass the length caps / control-char stripping / enum clamps.
+        this.opponentProfile = sanitizeGhostProfile(msg.presentation);
         this.tryGate();
         break;
       case "showdownReady":
@@ -264,8 +281,9 @@ export class ShowdownSession {
       return;
     }
     this.crossingBarrier = true;
+    const opponentProfile = this.opponentProfile;
     void this.rendezvous.rendezvous(SHOWDOWN_READY_RENDEZVOUS_POINT).then(() => {
-      this.finishResolve({ ownManifest: settle.ownManifest, opponentManifest, opponentTeamHash });
+      this.finishResolve({ ownManifest: settle.ownManifest, opponentManifest, opponentTeamHash, opponentProfile });
     });
   }
 
