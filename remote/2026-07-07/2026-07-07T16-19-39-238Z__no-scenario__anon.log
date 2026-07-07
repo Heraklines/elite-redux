@@ -1,0 +1,131 @@
+url:      https://elite-redux-staging.pages.dev/
+build:    mraufk29-hqry
+mode:     7  wave:?
+seed:     IM87BXWVdcsn20lrbbx4YFU3
+party:    
+enemy:    
+
+----- CONSOLE -----
+[16:11:38.927] LOG: %c %c %c %c %c Phaser v3.90.0 (WebGL | Web Audio) %c https://phaser.io/v390 background: #ff0000 background: #ffff00 background: #00ff00 background: #00ffff color: #ffffff; background: #000000 background: transparent
+[16:11:39.257] LOG: [ER] build mraufk29-hqry
+[16:11:39.303] LOG: [dev-tools] loaded — 470 scenarios + Send Logs button
+[16:11:56.399] DEBUG: Destroying loading scene
+[16:11:56.399] DEBUG: Destroyed loading scene
+[16:11:56.478] LOG: Seed: IM87BXWVdcsn20lrbbx4YFU3
+[16:11:56.478] LOG: Wave Seed: IM87BXWVdcsn20lrbbx4YFU3 0
+[16:12:00.940] LOG: %cStart Phase LoginPhase color:green;
+[16:12:01.111] LOG: Client Session: PY7idcYiu9u4Aj22i7TdU7gCwuYW86va
+[16:12:01.578] LOG: %cStart Phase TitlePhase color:green;
+[16:12:01.579] LOG: Getting Session Slot id: %d 4
+[16:12:01.595] LOG: use seasonal splash messages true
+[16:12:13.737] LOG: [coop:lobby] start announce name=Heraklines1
+[16:12:14.572] LOG: [coop:lobby] announced id=bd5f83e3-df16-4786-ac34-630eb6601b52 -> begin polling
+[16:12:14.933] LOG: [coop:lobby] poll players=0
+[16:12:16.807] LOG: [coop:lobby] poll players=1
+[16:12:18.742] LOG: [coop:lobby] poll: incoming request from=4eaa17bc-f244-4c2a-979f-3592b8b76820 name=test4
+[16:12:18.749] LOG: [coop:lobby] poll players=1
+[16:12:19.324] LOG: [coop:lobby] respond accept=true from=4eaa17bc-f244-4c2a-979f-3592b8b76820 (self=bd5f83e3-df16-4786-ac34-630eb6601b52)
+[16:12:19.954] LOG: [coop:launch] lobby connect code=TPZ96X role=host name=Heraklines1
+[16:12:19.956] LOG: [coop:launch] connectCoopWithCode code=TPZ96X role=host username=Heraklines1
+[16:12:19.957] LOG: [coop:launch] exchange SDP start code=TPZ96X role=host (ice=fetched)
+[16:12:20.334] LOG: [coop:launch] ICE from worker /coop/ice servers=1
+[16:12:20.723] LOG: [coop:launch] host pushing offer code=TPZ96X (ICE gathered)
+[16:12:20.723] LOG: [coop:launch] pushSignal code=TPZ96X role=host sdpBytes=2094
+[16:12:21.032] LOG: [coop:launch] await peer signal start code=TPZ96X role=host timeout=60000ms
+[16:12:21.191] LOG: [coop:launch] iceConnectionState=checking code=TPZ96X role=host
+[16:12:21.191] LOG: [coop:launch] pcConnectionState=connecting code=TPZ96X role=host
+[16:12:22.666] LOG: [coop:launch] await peer signal resolve code=TPZ96X role=host (778b)
+[16:12:22.666] LOG: [coop:launch] host received answer code=TPZ96X -> setRemoteDescription
+[16:12:22.672] LOG: [coop:launch] await data channel open (state=connecting timeout=30000ms)
+[16:12:22.675] LOG: [coop:launch] iceConnectionState=connected code=TPZ96X role=host
+[16:12:22.690] LOG: [coop:launch] pcConnectionState=connected code=TPZ96X role=host
+[16:12:22.698] LOG: [coop:launch] data channel OPEN
+[16:12:22.698] LOG: [coop:webrtc] ctor role=host readyState=open state=connected
+[16:12:22.698] LOG: [coop:launch] connectCoopSession role=host state=connected username=Heraklines1 netcode=authoritative
+[16:12:22.699] LOG: [coop:stream] streamer CONSTRUCT timeout=1200000ms onMessage registered
+[16:12:22.700] LOG: [coop:stream] guest REGISTER onGhostPool handler (bufferedEarly=false)
+[16:12:22.700] LOG: [coop:stream] host REGISTER onStateSyncRequest handler (was=false)
+[16:12:22.700] LOG: [coop:stream] host REGISTER onEnemyPartyRequest handler (was=false)
+[16:12:22.700] LOG: [coop:stream] guest REGISTER onWaveResolved handler (was=false)
+[16:12:22.701] LOG: [coop:stream] guest REGISTER onWaveEndState handler (was=false)
+[16:12:22.701] LOG: [coop:stream] watcher REGISTER onMeChecksum handler (was=false)
+[16:12:22.702] LOG: [coop:turn] host recorder: REGISTER live emitter (was=false)
+[16:12:22.702] LOG: [coop:session] coopAuthoritativeGuestPredicate INSTALLED
+[16:12:22.702] LOG: [coop:launch] peer session ready role=host netcode=authoritative -> connecting
+[16:12:22.702] LOG: [coop:launch] session connect role=host partnerRole=guest netcode=authoritative username=Heraklines1 version=er-coop-11 tiebreak=0.6948263103040109
+[16:12:22.702] LOG: [coop:webrtc] raw tx role=host t=hello bytes=105
+[16:12:22.747] LOG: [coop:checksum] dataFingerprint compute moveMap=e9b828360aafb9e2(1032) movesData=61fa3383767be347(1107) movesName=fad7fe8932ec09a1(1107) movesets=6eb276198552346d(1908) abilitiesData=3088ac8089021d9e(1047) abilitiesName=7c302bdd9cc50a0b(1047)
+[16:12:22.752] LOG: [coop:webrtc] raw tx role=host t=dataFingerprint bytes=329
+[16:12:22.752] LOG: [coop:launch] lobby connected code=TPZ96X role=host -> onConnected
+[16:12:22.756] LOG: %cStart Phase SelectStarterPhase color:green;
+[16:12:22.758] LOG: [coop:webrtc] raw rx role=host t=hello bytes=100 handlers=13
+[16:12:22.758] LOG: [coop:launch] hello recv partner=test4 partnerRole=guest (local role=host; no conflict)
+[16:12:22.759] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[16:12:22.759] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[16:12:22.759] LOG: [coop:webrtc] raw rx role=host t=dataFingerprint bytes=329 handlers=13
+[16:12:22.759] WARN: [coop:checksum] MISMATCH sections=movesName,abilitiesName - movesName local=fad7fe8932ec09a1(1107) peer=30e2bf626b99790e(1107) abilitiesName local=7c302bdd9cc50a0b(1047) peer=fe1b451b3ba80b76(1047)
+[16:12:28.468] LOG: [coop:interaction] interactionCounter() read -> 0 (role=host)
+[16:12:28.468] LOG: [coop:health] tick=0g turn=- wave=- counter=0 assertions=0 wait=-1ms peerBeat=- transport=connected
+[16:12:36.906] LOG: Spearow's icon __BASE does not match getIconId with female: false, formIndex: 0, shiny: true, variant: 2
+[16:12:40.133] LOG: [coop-runconfig] startRun role=host willBroadcast=true difficulty=ace
+[16:12:40.133] LOG: [coop:runtime] host broadcast difficulty=ace netcode=authoritative kind=versus (role=host)
+[16:12:40.133] LOG: [coop:webrtc] raw tx role=host t=runConfig bytes=132
+[16:12:40.133] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[16:12:40.133] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[16:12:40.135] LOG: [coop:webrtc] raw tx role=host t=showdownTeam bytes=274
+[16:12:40.136] LOG: [coop:webrtc] raw tx role=host t=showdownReady bytes=51
+[16:12:50.314] LOG: [coop:webrtc] raw rx role=host t=showdownTeam bytes=271 handlers=13
+[16:12:50.315] LOG: [coop:webrtc] raw rx role=host t=showdownReady bytes=51 handlers=13
+[16:12:50.315] LOG: [coop:rendezvous] ARRIVE point=showdown-ready (send) role=host
+[16:12:50.315] LOG: [coop:webrtc] raw tx role=host t=rendezvous bytes=43
+[16:12:50.315] LOG: [coop:rendezvous] AWAIT point=showdown-ready timeoutMs=600000 -> network-wait role=host
+[16:12:50.316] LOG: [coop:webrtc] raw rx role=host t=rendezvous bytes=43 handlers=13
+[16:12:50.316] LOG: [coop:rendezvous] RECV arrival point=showdown-ready -> deliver-to-waiter role=host
+[16:12:50.317] LOG: [coop:rendezvous] AWAIT point=showdown-ready RESOLVE both-arrived role=host
+[16:12:50.339] LOG: [coop:webrtc] raw tx role=host t=showdownStakeOffer bytes=106
+[16:12:50.365] LOG: [coop:webrtc] raw rx role=host t=showdownStakeOffer bytes=106 handlers=13
+[16:12:53.871] LOG: [coop:webrtc] raw tx role=host t=showdownStakeOffer bytes=106
+[16:12:54.623] LOG: [coop:webrtc] raw tx role=host t=showdownStakeOffer bytes=106
+[16:12:57.362] LOG: [coop:webrtc] raw tx role=host t=showdownStakeOffer bytes=106
+[16:12:57.604] LOG: [coop:webrtc] raw tx role=host t=showdownStakeOffer bytes=106
+[16:12:58.174] LOG: [coop:webrtc] raw tx role=host t=showdownStakeOffer bytes=106
+[16:12:58.376] LOG: [coop:webrtc] raw tx role=host t=showdownStakeOffer bytes=106
+[16:12:58.687] LOG: [coop:webrtc] raw tx role=host t=showdownStakeOffer bytes=106
+[16:13:01.179] LOG: [coop:webrtc] raw tx role=host t=showdownStakeOffer bytes=106
+[16:13:01.778] LOG: [coop:webrtc] raw tx role=host t=showdownStakeOffer bytes=106
+[16:13:02.704] LOG: [coop:interaction] interactionCounter() read -> 0 (role=host)
+[16:13:02.704] LOG: [coop:health] tick=0g turn=- wave=- counter=0 assertions=0 wait=-1ms peerBeat=- transport=connected
+[16:13:03.247] LOG: [coop:webrtc] raw tx role=host t=showdownStakeOffer bytes=106
+[16:13:03.958] LOG: [coop:webrtc] raw tx role=host t=showdownStakeOffer bytes=106
+[16:13:05.535] LOG: [coop:webrtc] raw tx role=host t=showdownStakeOffer bytes=106
+[16:13:05.907] LOG: [coop:webrtc] raw tx role=host t=showdownStakeOffer bytes=106
+[16:13:06.262] LOG: [coop:webrtc] raw tx role=host t=showdownStakeOffer bytes=106
+[16:13:15.534] LOG: [coop:webrtc] raw tx role=host t=showdownStakeOffer bytes=106
+[16:13:16.026] LOG: [coop:webrtc] raw tx role=host t=showdownStakeOffer bytes=106
+[16:13:24.193] LOG: [coop:rendezvous] ARRIVE point=showdown-wager-commit (send) role=host
+[16:13:24.193] LOG: [coop:webrtc] raw tx role=host t=rendezvous bytes=50
+[16:13:24.193] LOG: [coop:rendezvous] AWAIT point=showdown-wager-commit timeoutMs=600000 -> network-wait role=host
+[16:13:33.292] LOG: [coop:interaction] interactionCounter() read -> 0 (role=host)
+[16:13:33.293] LOG: [coop:health] tick=0g turn=- wave=- counter=0 assertions=0 wait=-1ms peerBeat=- transport=connected
+[16:14:03.293] LOG: [coop:interaction] interactionCounter() read -> 0 (role=host)
+[16:14:03.293] LOG: [coop:health] tick=0g turn=- wave=- counter=0 assertions=0 wait=-1ms peerBeat=- transport=connected
+[16:14:38.282] LOG: [coop:interaction] interactionCounter() read -> 0 (role=host)
+[16:14:38.282] LOG: [coop:health] tick=0g turn=- wave=- counter=0 assertions=0 wait=-1ms peerBeat=- transport=connected
+[16:15:08.291] LOG: [coop:interaction] interactionCounter() read -> 0 (role=host)
+[16:15:08.291] LOG: [coop:health] tick=0g turn=- wave=- counter=0 assertions=0 wait=-1ms peerBeat=- transport=connected
+[16:15:43.290] LOG: [coop:interaction] interactionCounter() read -> 0 (role=host)
+[16:15:43.290] LOG: [coop:health] tick=0g turn=- wave=- counter=0 assertions=0 wait=-1ms peerBeat=- transport=connected
+[16:16:18.279] LOG: [coop:interaction] interactionCounter() read -> 0 (role=host)
+[16:16:18.279] LOG: [coop:health] tick=0g turn=- wave=- counter=0 assertions=0 wait=-1ms peerBeat=- transport=connected
+[16:16:48.290] LOG: [coop:interaction] interactionCounter() read -> 0 (role=host)
+[16:16:48.290] LOG: [coop:health] tick=0g turn=- wave=- counter=0 assertions=0 wait=-1ms peerBeat=- transport=connected
+[16:17:23.280] LOG: [coop:interaction] interactionCounter() read -> 0 (role=host)
+[16:17:23.280] LOG: [coop:health] tick=0g turn=- wave=- counter=0 assertions=0 wait=-1ms peerBeat=- transport=connected
+[16:17:58.277] LOG: [coop:interaction] interactionCounter() read -> 0 (role=host)
+[16:17:58.277] LOG: [coop:health] tick=0g turn=- wave=- counter=0 assertions=0 wait=-1ms peerBeat=- transport=connected
+[16:18:28.277] LOG: [coop:interaction] interactionCounter() read -> 0 (role=host)
+[16:18:28.277] LOG: [coop:health] tick=0g turn=- wave=- counter=0 assertions=0 wait=-1ms peerBeat=- transport=connected
+[16:19:03.275] LOG: [coop:interaction] interactionCounter() read -> 0 (role=host)
+[16:19:03.276] LOG: [coop:health] tick=0g turn=- wave=- counter=0 assertions=0 wait=-1ms peerBeat=- transport=connected
+[16:19:33.276] LOG: [coop:interaction] interactionCounter() read -> 0 (role=host)
+[16:19:33.276] LOG: [coop:health] tick=0g turn=- wave=- counter=0 assertions=0 wait=-1ms peerBeat=- transport=connected
