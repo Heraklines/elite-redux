@@ -771,13 +771,16 @@ const RECIPES: Record<string, Recipe> = {
   },
   // Showdown teambuilder: forces SHOWDOWN mode so the cost panel reads the deferred
   // 999 limit and the party cap is the full 6 (PLAYER_PARTY_MAX_SIZE). Same real screen
-  // the player builds their 1v1 duel team on. steps open the per-species action menu
-  // (ACTION), walk to the showdown-only "Field Stage" row (DOWN x2), open the stage picker
-  // (ACTION), select a later EVOLUTION stage (DOWN x2 -> Venusaur), and pick it (ACTION).
-  // B7 item 1: the final STARTER_SELECT snapshot then shows the PICKED stage in the big
-  // preview sprite (evolution/mega, no longer the base form). NOTE (baseline drift): this
-  // recipe's golden baseline predates both the step change and the stage-render override -
-  // re-accept it with ER_UPDATE_BASELINE=1 (a fresh baseline for this recipe is expected).
+  // the player builds their 1v1 duel team on. B7 item 15 ("everything follows the stage"):
+  // the custom render drives the REAL teambuilder code paths - Bulbasaur is added to the party
+  // (addToParty) and then FIELDED as its terminal evolution Venusaur (setShowdownStage, which
+  // re-runs setSpeciesDetails). The final snapshot must show the PICKED stage EVERYWHERE it
+  // follows: the big PREVIEW sprite (Venusaur), the PARTY MINI-ICON in slot 0 (a Venusaur icon,
+  // not Bulbasaur), and the ABILITY + TYPE + FORM detail fields (the fielded form's data). The
+  // GRID keeps base icons (species browser). Driven directly (not via the action-menu keystrokes)
+  // because the harness's universal input driver can't reliably re-open the action menu after a
+  // cross-mode round-trip; the render path exercises the same production methods. NOTE (baseline
+  // drift): re-accept the golden with ER_UPDATE_BASELINE=1 (a fresh baseline is expected).
   "starter-select-showdown": {
     mode: UiMode.STARTER_SELECT,
     prepare: game => {
@@ -787,7 +790,37 @@ const RECIPES: Record<string, Recipe> = {
       }
       return [() => {}];
     },
-    steps: [Button.ACTION, Button.DOWN, Button.DOWN, Button.ACTION, Button.DOWN, Button.DOWN, Button.ACTION],
+    render: game => {
+      game.scene.gameMode = getGameMode(GameModes.SHOWDOWN);
+      const ui: any = game.scene.ui;
+      const registered: any = ui.handlers[UiMode.STARTER_SELECT];
+      let handler: any = registered;
+      try {
+        handler = new registered.constructor();
+      } catch {
+        handler = registered;
+      }
+      handler.setup();
+      handler.show([() => {}]);
+      const internals: any = handler;
+      const bulbasaur = getPokemonSpecies(SpeciesId.BULBASAUR);
+      internals.lastSpecies = bulbasaur;
+      internals.speciesStarterDexEntry = game.scene.gameData.dexData[SpeciesId.BULBASAUR];
+      internals.setSpeciesDetails(bulbasaur, {}, false);
+      internals.addToParty(
+        bulbasaur,
+        internals.dexAttrCursor,
+        internals.abilityCursor,
+        internals.natureCursor,
+        internals.starterMoveset?.slice() ?? [],
+        internals.teraCursor,
+      );
+      // Field the terminal evolution - re-stamps the in-party starter AND re-renders the detail
+      // panel + party icon through the real item-15 display path.
+      internals.setShowdownStage(SpeciesId.BULBASAUR, SpeciesId.VENUSAUR, 0);
+      ui.setActiveHandler?.(handler);
+      return handler;
+    },
   },
   // Showdown WAGER screen (D3): both teams previewed (icons + held-item mini-icons + a mega badge),
   // the opponent's name/title, the stake picker + tier-match + lock lamps. Offline (transport/

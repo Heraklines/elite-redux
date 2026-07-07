@@ -3793,20 +3793,10 @@ export class StarterSelectUiHandler extends MessageUiHandler {
       return false;
     }
     const props = globalScene.gameData.getSpeciesDexAttrProps(species, dexAttr);
-    this.starterIcons[this.starterSpecies.length].setTexture(
-      species.getIconAtlasKey(props.formIndex, props.shiny, props.variant),
-    );
-    this.starterIcons[this.starterSpecies.length].setFrame(
-      species.getIconId(props.female, props.formIndex, props.shiny, props.variant),
-    );
-    this.checkIconId(
-      this.starterIcons[this.starterSpecies.length],
-      species,
-      props.female,
-      props.formIndex,
-      props.shiny,
-      props.variant,
-    );
+    // Showdown (B7 item 15): the party mini-icon follows the picked Field Stage. The stage is read
+    // from `showdownSelections` (keyed by root), which restore-last-team seeds before this add and
+    // the interactive stage pick sets, so the icon shows the fielded form the moment it is chosen.
+    this.renderShowdownAwarePartyIcon(this.starterIcons[this.starterSpecies.length], species, props);
     this.refreshShinyLabIconFx(
       this.starterIcons[this.starterSpecies.length],
       species,
@@ -4000,11 +3990,13 @@ export class StarterSelectUiHandler extends MessageUiHandler {
       this.starters[index].showdownFormIndex = formIndex;
       this.starters[index].showdownItem = selection.item;
     }
-    // B7 item 1: re-render the big preview sprite so the picked stage shows at once (the stage picker
-    // acts on the currently-highlighted line, so lastSpecies is this root). Item 12: the party mini-icon
-    // is NOT refreshed here - it always shows the base form, so a stage pick never changes it.
+    // B7 item 15: re-render the WHOLE detail panel so the picked stage shows at once - the big
+    // preview sprite, the party mini-icon (updatePartyIcon, called inside for an in-party mon), the
+    // ability + type + form fields (fielded-form display), AND the move pool (starterMoveset is
+    // re-derived against the new fielded stage's legal set). The stage picker acts on the currently
+    // highlighted line, so lastSpecies is this root. Supersedes the item-1/item-12 preview-only refresh.
     if (this.lastSpecies?.speciesId === rootSpeciesId) {
-      this.refreshPreviewSprite();
+      this.setSpeciesDetails(this.lastSpecies);
     }
     return true;
   }
@@ -4103,13 +4095,9 @@ export class StarterSelectUiHandler extends MessageUiHandler {
 
   updatePartyIcon(species: PokemonSpecies, index: number) {
     const props = globalScene.gameData.getSpeciesDexAttrProps(species, this.getCurrentDexProps(species.speciesId));
-    // Showdown (B7 item 12): the party mini-icon ALWAYS renders the ROOT/base species icon, never the
-    // picked Field Stage (maintainer-clarified intent). The picked stage is visible ONLY on the big
-    // preview sprite (refreshPreviewSprite). This is the single party-icon render path - item 9 routes
-    // popStarter through it so removal re-renders correctly - and it draws the base form in every mode.
-    this.starterIcons[index].setTexture(species.getIconAtlasKey(props.formIndex, props.shiny, props.variant));
-    this.starterIcons[index].setFrame(species.getIconId(props.female, props.formIndex, props.shiny, props.variant));
-    this.checkIconId(this.starterIcons[index], species, props.female, props.formIndex, props.shiny, props.variant);
+    this.renderShowdownAwarePartyIcon(this.starterIcons[index], species, props);
+    // The Shiny Lab look stays keyed on the ROOT line (its custom-shiny palette is per-line), so the
+    // FX overlay uses the ROOT form index even when the icon follows an evolved/mega Field Stage.
     this.refreshShinyLabIconFx(
       this.starterIcons[index],
       species,
@@ -4120,6 +4108,49 @@ export class StarterSelectUiHandler extends MessageUiHandler {
       `starter-party-shiny-lab-icon-${index}-${species.speciesId}`,
       false,
     );
+  }
+
+  /**
+   * Showdown-aware party mini-icon render (B7 item 15). Draws the icon for `species` at the given
+   * cosmetic `props`, but when a Field Stage is picked for this line the icon FOLLOWS the fielded
+   * form (evolved OR mega) - matching the big preview sprite. This SUPERSEDES the earlier item-12
+   * base-only rule (maintainer-decided: "everything follows the stage").
+   *
+   * Uses the wager screen's robust icon pattern (item 14c): set the atlas key + frame
+   * UNCONDITIONALLY, then a fallback chain fielded -> fielded-non-shiny-base -> ROOT line base ->
+   * neutral placeholder, so a missing form frame / un-loaded custom atlas is never a broken box.
+   * In every non-showdown mode the stage override is a no-op (renderStage is null there), so the
+   * ROOT/base icon renders exactly as before.
+   */
+  private renderShowdownAwarePartyIcon(
+    icon: Phaser.GameObjects.Sprite,
+    species: PokemonSpecies,
+    props: { female: boolean; formIndex: number; shiny: boolean; variant: number },
+  ): void {
+    const renderStage = this.showdownRenderStage(species.speciesId);
+    const iconSpecies = renderStage?.species ?? species;
+    const iconFormIndex = renderStage?.formIndex ?? props.formIndex;
+    const wantId = iconSpecies.getIconId(props.female, iconFormIndex, props.shiny, props.variant);
+    icon.setTexture(iconSpecies.getIconAtlasKey(iconFormIndex, props.shiny, props.variant)).setFrame(wantId);
+    if (icon.frame.name === wantId) {
+      return; // fielded frame resolved cleanly
+    }
+    // Missing frame (e.g. a variant/shiny form icon, or an un-loaded ER-custom form sheet): fall
+    // back to the fielded species' NON-SHINY base frame first (mirrors BattleScene.addPokemonIcon).
+    const baseId = iconSpecies.getIconId(false, iconFormIndex, false, 0);
+    if (icon.texture.has(baseId)) {
+      icon.setFrame(baseId);
+      return;
+    }
+    // Whole fielded sheet absent: fall back to the ROOT line's boot-loaded base icon, then - as a
+    // last resort - the neutral placeholder, so a slot is never left showing a broken box.
+    const rootFrame = species.getIconId(false, 0, false, 0);
+    icon.setTexture(species.getIconAtlasKey(0, false, 0));
+    if (icon.texture.has(rootFrame)) {
+      icon.setFrame(rootFrame);
+    } else {
+      icon.setTexture("pokemon_icons_0").setFrame("unknown");
+    }
   }
 
   /**
@@ -6209,10 +6240,19 @@ export class StarterSelectUiHandler extends MessageUiHandler {
         //      (mirrors getPokemonSpeciesForm's out-of-range behavior).
         //   2. The resolved AbilityId having no `allAbilities` entry. Fall back
         //      to AbilityId.NONE (the "—" entry) so `.name` never crashes.
+        // Showdown (B7 item 15): when a Field Stage is picked, the ability + form-dependent detail
+        // fields (types, form name) DISPLAY the FIELDED form's data - the picked abilityIndex is
+        // mapped onto the FIELDED species' ability list, exactly what battle-time fielding does.
+        // Unlock/cycle semantics stay ROOT-based (the abilityIndex is validated against the root's
+        // unlocks upstream; this only reconciles the DISPLAY layout of a differently-shaped
+        // evolved/mega ability list). No-op in every other mode / when no stage is picked.
+        const displayStage = globalScene.gameMode.isShowdown ? this.showdownRenderStage(species.speciesId) : null;
+        const displaySpecies = displayStage?.species ?? this.lastSpecies;
+        const displayFormIndex = displayStage ? displayStage.formIndex : (formIndex ?? 0);
         const formForAbility =
-          this.lastSpecies.forms?.length > 1
-            ? (this.lastSpecies.forms[formIndex ?? 0] ?? this.lastSpecies)
-            : this.lastSpecies;
+          displaySpecies.forms?.length > 1
+            ? (displaySpecies.forms[displayFormIndex] ?? displaySpecies)
+            : displaySpecies;
         const ability: Ability = allAbilities[formForAbility.getAbility(abilityIndex!)] ?? allAbilities[AbilityId.NONE];
 
         const isHidden = abilityIndex === (this.lastSpecies.ability2 ? 2 : 1);
@@ -6316,8 +6356,11 @@ export class StarterSelectUiHandler extends MessageUiHandler {
           return this.starterMoveset?.indexOf(move) === i;
         }) as StarterMoveset;
 
-        const speciesForm = getPokemonSpeciesForm(species.speciesId, formIndex!); // TODO: is the bang correct?
-        const formText = species.getFormNameToDisplay(formIndex);
+        // Showdown (B7 item 15): the type icons + form name follow the FIELDED stage too (they are
+        // form-dependent detail fields). `displaySpecies`/`displayFormIndex` resolve to the picked
+        // stage in showdown, else to the root species/form (identical to the pre-item-15 behavior).
+        const speciesForm = getPokemonSpeciesForm(displaySpecies.speciesId, displayFormIndex);
+        const formText = displaySpecies.getFormNameToDisplay(displayFormIndex);
         this.pokemonFormText.setText(formText);
 
         this.setTypeIcons(speciesForm.type1, speciesForm.type2);
@@ -6693,6 +6736,17 @@ export class StarterSelectUiHandler extends MessageUiHandler {
         const cost = globalScene.gameData.getSpeciesStarterValue(e.species.speciesId);
         if (!this.tryUpdateValue(cost, true)) {
           break; // remaining starters would exceed the value limit
+        }
+        // Showdown (B7 item 15): re-seed this line's saved Field Stage / held item into
+        // `showdownSelections` BEFORE the add so `applyShowdownSelection` re-stamps the fielded
+        // stage AND the party mini-icon (rendered inside addToParty) follows it. The saved Starter
+        // persists these fields (saveLastTeam), so a restored evolved/mega team comes back as saved.
+        if (globalScene.gameMode.isShowdown && e.saved.showdownSpeciesId !== undefined) {
+          this.showdownSelections.set(e.species.speciesId, {
+            speciesId: e.saved.showdownSpeciesId,
+            formIndex: e.saved.showdownFormIndex ?? 0,
+            item: e.saved.showdownItem,
+          });
         }
         this.addToParty(
           e.species,
