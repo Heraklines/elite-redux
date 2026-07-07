@@ -1,0 +1,160 @@
+url:      https://elite-redux-staging.pages.dev/
+build:    mrb5thgk-imlr
+mode:     7  wave:1
+seed:     plQ5j7nR7gHzZIvVR2UegSL3
+party:    Stahlos(L100 291hp f1), Kaiosea(L100 321hp f0)
+enemy:    Simsala(L100), Vulnona(L100)
+
+----- COMMENT -----
+still doesnt work, back sprite in the wrong position and enemy mon was puton my side too
+
+----- CONSOLE -----
+[21:30:06.677] LOG: %c %c %c %c %c Phaser v3.90.0 (WebGL | Web Audio) %c https://phaser.io/v390 background: #ff0000 background: #ffff00 background: #00ff00 background: #00ffff color: #ffffff; background: #000000 background: transparent
+[21:30:07.243] LOG: [ER] build mrb5thgk-imlr
+[21:30:07.654] LOG: [dev-tools] loaded — 473 scenarios + Send Logs button
+[21:30:27.106] DEBUG: Destroying loading scene
+[21:30:27.106] DEBUG: Destroyed loading scene
+[21:30:27.189] LOG: Seed: fMgz9AVkbIJ6V9k2q1vcl80h
+[21:30:27.189] LOG: Wave Seed: fMgz9AVkbIJ6V9k2q1vcl80h 0
+[21:30:41.910] LOG: %cStart Phase LoginPhase color:green;
+[21:30:42.125] LOG: Client Session: Nce0mHEaqhaCdkUVVEjVlXR7aZj1lV5o
+[21:30:42.852] LOG: %cStart Phase TitlePhase color:green;
+[21:30:42.853] LOG: Getting Session Slot id: %d 0
+[21:30:42.866] LOG: use seasonal splash messages true
+[21:30:46.099] LOG: [coop:lobby] start announce name=test4
+[21:30:46.399] LOG: [coop:lobby] announced id=baea4b6d-6279-448b-9db9-964fa5aa8156 -> begin polling
+[21:30:46.692] LOG: [coop:lobby] poll players=1
+[21:30:48.043] LOG: [coop:lobby] request target=cca5a43b-92f9-4544-ba95-bcdfa2ba8b87 (self=baea4b6d-6279-448b-9db9-964fa5aa8156)
+[21:30:48.480] LOG: [coop:lobby] poll players=1
+[21:30:48.762] LOG: [coop:lobby] poll players=1
+[21:30:50.536] LOG: [coop:lobby] poll players=1
+[21:30:52.331] LOG: [coop:lobby] poll matched code=GTNC8J role=guest -> connect
+[21:30:52.331] LOG: [coop:launch] lobby connect code=GTNC8J role=guest name=test4
+[21:30:52.334] LOG: [coop:launch] connectCoopWithCode code=GTNC8J role=guest username=test4
+[21:30:52.334] LOG: [coop:launch] exchange SDP start code=GTNC8J role=guest (ice=fetched)
+[21:30:52.585] LOG: [coop:launch] ICE from worker /coop/ice servers=1
+[21:30:52.589] LOG: [coop:launch] await peer signal start code=GTNC8J role=guest timeout=60000ms
+[21:30:52.851] LOG: [coop:launch] await peer signal resolve code=GTNC8J role=guest (1943b)
+[21:30:52.851] LOG: [coop:launch] guest received offer code=GTNC8J -> answering
+[21:30:52.883] LOG: [coop:launch] iceConnectionState=checking code=GTNC8J role=guest
+[21:30:52.884] LOG: [coop:launch] pcConnectionState=connecting code=GTNC8J role=guest
+[21:30:52.885] LOG: [coop:launch] iceConnectionState=connected code=GTNC8J role=guest
+[21:30:52.886] LOG: [coop:launch] guest pushing answer code=GTNC8J (ICE gathered)
+[21:30:52.886] LOG: [coop:launch] pushSignal code=GTNC8J role=guest sdpBytes=779
+[21:30:53.668] LOG: [coop:launch] pcConnectionState=connected code=GTNC8J role=guest
+[21:30:53.671] LOG: [coop:launch] guest datachannel event label=coop state=open code=GTNC8J
+[21:30:53.671] LOG: [coop:launch] data channel already open
+[21:30:53.671] LOG: [coop:webrtc] ctor role=guest readyState=open state=connected
+[21:30:53.672] LOG: [coop:launch] connectCoopSession role=guest state=connected username=test4 netcode=authoritative
+[21:30:53.673] LOG: [coop:stream] streamer CONSTRUCT timeout=1200000ms onMessage registered
+[21:30:53.674] LOG: [coop:stream] guest REGISTER onGhostPool handler (bufferedEarly=false)
+[21:30:53.674] LOG: [coop:stream] host REGISTER onStateSyncRequest handler (was=false)
+[21:30:53.674] LOG: [coop:stream] host REGISTER onEnemyPartyRequest handler (was=false)
+[21:30:53.674] LOG: [coop:stream] guest REGISTER onWaveResolved handler (was=false)
+[21:30:53.674] LOG: [coop:stream] guest REGISTER onWaveEndState handler (was=false)
+[21:30:53.674] LOG: [coop:stream] watcher REGISTER onMeChecksum handler (was=false)
+[21:30:53.675] LOG: [coop:turn] host recorder: REGISTER live emitter (was=false)
+[21:30:53.675] LOG: [coop:session] coopAuthoritativeGuestPredicate INSTALLED
+[21:30:53.675] LOG: [coop:launch] peer session ready role=guest netcode=authoritative -> connecting
+[21:30:53.676] LOG: [coop:launch] session connect role=guest partnerRole=host netcode=authoritative username=test4 version=er-coop-11 tiebreak=0.4514699334632196
+[21:30:53.676] LOG: [coop:webrtc] raw tx role=guest t=hello bytes=100
+[21:30:53.731] LOG: [coop:checksum] dataFingerprint compute moveMap=e9b828360aafb9e2(1032) movesData=61fa3383767be347(1107) movesName=30e2bf626b99790e(1107) movesets=6eb276198552346d(1908) abilitiesData=3088ac8089021d9e(1047) abilitiesName=fe1b451b3ba80b76(1047)
+[21:30:53.731] LOG: [coop:webrtc] raw tx role=guest t=dataFingerprint bytes=329
+[21:30:53.731] LOG: [coop:launch] lobby connected code=GTNC8J role=guest -> onConnected
+[21:30:53.735] LOG: [coop:session] isCoopAuthoritativeGuestGated -> true (authoritative GUEST gates a structural mutation)
+[21:30:53.736] LOG: [coop:session] isCoopAuthoritativeGuestGated -> true (authoritative GUEST gates a structural mutation)
+[21:30:53.736] LOG: %cStart Phase SelectStarterPhase color:green;
+[21:30:53.737] LOG: [coop:webrtc] channel OPEN role=guest gen=0
+[21:30:53.739] LOG: [coop:webrtc] raw rx role=guest t=hello bytes=105 handlers=13
+[21:30:53.739] LOG: [coop:launch] hello recv partner=Heraklines1 partnerRole=host (local role=guest; no conflict)
+[21:30:53.739] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[21:30:53.739] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[21:30:53.740] LOG: [coop:webrtc] raw rx role=guest t=dataFingerprint bytes=329 handlers=13
+[21:30:53.740] WARN: [coop:checksum] MISMATCH sections=movesName,abilitiesName - movesName local=30e2bf626b99790e(1107) peer=fad7fe8932ec09a1(1107) abilitiesName local=fe1b451b3ba80b76(1047) peer=7c302bdd9cc50a0b(1047)
+[21:30:58.676] LOG: [coop:interaction] interactionCounter() read -> 0 (role=guest)
+[21:30:58.676] LOG: [coop:health] tick=0g turn=- wave=- counter=0 assertions=0 wait=-1ms peerBeat=- transport=connected
+[21:31:28.676] LOG: [coop:interaction] interactionCounter() read -> 0 (role=guest)
+[21:31:28.676] LOG: [coop:health] tick=0g turn=- wave=- counter=0 assertions=0 wait=-1ms peerBeat=- transport=connected
+[21:31:44.682] LOG: [coop:webrtc] raw rx role=guest t=showdownTeam bytes=578 handlers=13
+[21:31:44.682] LOG: [coop:webrtc] raw rx role=guest t=showdownReady bytes=51 handlers=13
+[21:31:50.933] WARN: cry/63 not found
+[21:31:58.679] LOG: [coop:interaction] interactionCounter() read -> 0 (role=guest)
+[21:31:58.679] LOG: [coop:health] tick=0g turn=- wave=- counter=0 assertions=0 wait=-1ms peerBeat=- transport=connected
+[21:32:13.877] WARN: cry/37 not found
+[21:32:16.272] LOG: [coop:webrtc] raw tx role=guest t=showdownTeam bytes=517
+[21:32:16.272] LOG: [coop:webrtc] raw tx role=guest t=showdownReady bytes=51
+[21:32:16.272] LOG: [coop:rendezvous] ARRIVE point=showdown-ready (send) role=guest
+[21:32:16.273] LOG: [coop:webrtc] raw tx role=guest t=rendezvous bytes=43
+[21:32:16.273] LOG: [coop:rendezvous] AWAIT point=showdown-ready timeoutMs=600000 -> network-wait role=guest
+[21:32:16.280] LOG: [coop:webrtc] raw rx role=guest t=rendezvous bytes=43 handlers=13
+[21:32:16.280] LOG: [coop:rendezvous] RECV arrival point=showdown-ready -> deliver-to-waiter role=guest
+[21:32:16.281] LOG: [coop:rendezvous] AWAIT point=showdown-ready RESOLVE both-arrived role=guest
+[21:32:16.294] LOG: [coop:webrtc] raw tx role=guest t=showdownStakeOffer bytes=106
+[21:32:16.322] LOG: [coop:webrtc] raw rx role=guest t=showdownStakeOffer bytes=106 handlers=13
+[21:32:17.224] LOG: [coop:rendezvous] ARRIVE point=showdown-wager-commit (send) role=guest
+[21:32:17.225] LOG: [coop:webrtc] raw tx role=guest t=rendezvous bytes=50
+[21:32:17.225] LOG: [coop:rendezvous] AWAIT point=showdown-wager-commit timeoutMs=600000 -> network-wait role=guest
+[21:32:18.630] LOG: [coop:webrtc] raw rx role=guest t=rendezvous bytes=50 handlers=13
+[21:32:18.630] LOG: [coop:rendezvous] RECV arrival point=showdown-wager-commit -> deliver-to-waiter role=guest
+[21:32:18.630] LOG: [coop:rendezvous] AWAIT point=showdown-wager-commit RESOLVE both-arrived role=guest
+[21:32:18.659] LOG: [coop-launch] guest: awaiting host launch snapshot (push-snapshot boot, no poll)
+[21:32:18.659] LOG: [coop:stream] guest awaitLaunchSnapshot wave=1 START timeout=1200000ms
+[21:32:20.920] LOG: [coop:webrtc] raw rx role=guest t=enemyPartySync bytes=603 handlers=12
+[21:32:20.920] LOG: [coop:replay] guest RECV enemyPartySync wave=1 count=2 -> buffered (no waiter)
+[21:32:20.927] LOG: [coop:webrtc] raw rx role=guest t=launchSnapshot bytes=10130 handlers=12
+[21:32:20.927] LOG: [coop:replay] guest RECV launchSnapshot wave=1 sessionLen=9062 -> parked waiter
+[21:32:20.927] LOG: [coop:stream] guest awaitLaunchSnapshot wave=1 RESOLVE len=9062
+[21:32:20.930] LOG: Wave Seed: plQ5j7nR7gHzZIvVR2UegSL3 0
+[21:32:20.930] LOG: Seed: plQ5j7nR7gHzZIvVR2UegSL3
+[21:32:20.967] LOG: Wave Seed: qmR6k8oS8hI{[JwWS3VfhTM4 1
+[21:32:21.374] WARN: [asset-retry] load error key=PRAS-Dragon Dance BG - retry 1/2 with cache-buster
+[21:32:21.706] WARN: [asset-retry] load error key=PRAS-Dragon Dance BG - retry 2/2 via fastly mirror + cache-buster
+[21:32:21.845] ERROR: [asset-retry] PERMANENT load failure key=PRAS-Dragon Dance BG url=images/battle_anims/PRAS-Dragon Dance BG.png
+[21:32:22.264] LOG: [coop-launch] guest: booted from host snapshot -> LOADED EncounterPhase (no generation)
+[21:32:22.264] LOG: [coop:session] isCoopAuthoritativeGuestGated -> true (authoritative GUEST gates a structural mutation)
+[21:32:22.265] LOG: %cStart Phase EncounterPhase color:green;
+[21:32:22.265] LOG: [coop:stream] guest consumeEnemyParty wave=1 -> 2 enemies
+[21:32:22.266] LOG: [coop:stream] guest awaitEnemyParty wave=1 RESOLVE (buffered race) count=2
+[21:32:22.270] LOG: Pokemon: Mega-Simsala (Gegner) | Species ID: 65 | Level: 100 | Nature: Robust (-)
+[21:32:22.270] LOG: Stats (IVs): HP: 251 (31), Atk: 136 (31), Def: 166 (31), Spatk: 386 (31), Spdef: 246 (31), Spd: 336 (31)
+[21:32:22.270] LOG: Ability: Mystic Power | Passive Ability: Psychic Mind 
+[21:32:22.270] LOG: Moveset: ["Teleport","Psykraft","Telekinese","Seitentausch (N)"]
+[21:32:22.270] LOG: Pokemon: Vulnona (Gegner) | Species ID: 38 | Level: 100 | Nature: Robust (-)
+[21:32:22.271] LOG: Stats (IVs): HP: 287 (31), Atk: 188 (31), Def: 186 (31), Spatk: 218 (31), Spdef: 236 (31), Spd: 236 (31)
+[21:32:22.271] LOG: Ability: Flaming Soul | Passive Ability: Pyromancy 
+[21:32:22.271] LOG: Moveset: ["Funkenflug","Magieflamme","Mondgewalt","Phantomparade"]
+[21:32:22.435] LOG: Generated AI funcs
+[21:32:22.441] LOG: Wave Seed: qmR6k8oS8hI{[JwWS3VfhTM4 1
+[21:32:22.647] LOG: Veteran Heraklines1
+[21:32:23.413] LOG: Dialogue saved as seen: dialogue:veteran.encounter.1
+[21:32:23.448] LOG: Veteran Heraklines1
+[21:32:23.939] LOG: [coop:session] isCoopAuthoritativeGuestGated -> true (authoritative GUEST gates a structural mutation)
+[21:32:23.940] LOG: [coop:session] isCoopAuthoritativeGuestGated -> true (authoritative GUEST gates a structural mutation)
+[21:32:23.940] LOG: [coop:session] isCoopAuthoritativeGuestGated -> true (authoritative GUEST gates a structural mutation)
+[21:32:23.940] LOG: [coop:session] isCoopAuthoritativeGuestGated -> true (authoritative GUEST gates a structural mutation)
+[21:32:23.941] LOG: %cStart Phase SummonPhase color:green;
+[21:32:23.941] LOG: Heraklines1
+[21:32:24.117] WARN: cry/65-mega not found
+[21:32:24.221] LOG: %cStart Phase EncounterPhase color:green;
+[21:32:24.224] LOG: Pokemon: Mega-Simsala (Gegner) | Species ID: 65 | Level: 100 | Nature: Robust (-)
+[21:32:24.224] LOG: Stats (IVs): HP: 251 (31), Atk: 136 (31), Def: 166 (31), Spatk: 386 (31), Spdef: 246 (31), Spd: 336 (31)
+[21:32:24.224] LOG: Ability: Mystic Power | Passive Ability: Psychic Mind 
+[21:32:24.224] LOG: Moveset: ["Teleport","Psykraft","Telekinese","Seitentausch (N)"]
+[21:32:24.224] LOG: Pokemon: Vulnona (Gegner) | Species ID: 38 | Level: 100 | Nature: Robust (-)
+[21:32:24.224] LOG: Stats (IVs): HP: 287 (31), Atk: 188 (31), Def: 186 (31), Spatk: 218 (31), Spdef: 236 (31), Spd: 236 (31)
+[21:32:24.225] LOG: Ability: Flaming Soul | Passive Ability: Pyromancy 
+[21:32:24.225] LOG: Moveset: ["Funkenflug","Magieflamme","Mondgewalt","Phantomparade"]
+[21:32:26.008] LOG: Generated AI funcs
+[21:32:26.009] LOG: Wave Seed: qmR6k8oS8hI{[JwWS3VfhTM4 1
+[21:32:26.222] LOG: Veteran Heraklines1
+[21:32:27.008] LOG: Dialogue saved as seen: dialogue:veteran.encounter.1
+[21:32:27.043] LOG: Veteran Heraklines1
+[21:32:27.582] LOG: [coop:session] isCoopAuthoritativeGuestGated -> true (authoritative GUEST gates a structural mutation)
+[21:32:27.583] LOG: [coop:session] isCoopAuthoritativeGuestGated -> true (authoritative GUEST gates a structural mutation)
+[21:32:27.584] LOG: %cStart Phase SummonPhase color:green;
+[21:32:27.584] LOG: Heraklines1
+[21:32:27.766] WARN: cry/65-mega not found
+[21:32:27.867] LOG: %cStart Phase SummonPhase color:green;
+[21:32:28.030] ERROR: [uncaught] Uncaught TypeError: Cannot read properties of undefined (reading 'x') @ https://elite-redux-staging.pages.dev/assets/er-map-nodes-CLtqmkJr.js:6:455343
+[21:32:33.676] LOG: [coop:interaction] interactionCounter() read -> 0 (role=guest)
+[21:32:33.676] LOG: [coop:health] tick=0g turn=1 wave=1 counter=0 assertions=0 wait=-1ms peerBeat=- transport=connected
