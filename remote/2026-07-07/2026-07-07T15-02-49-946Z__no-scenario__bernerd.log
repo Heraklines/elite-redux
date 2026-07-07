@@ -1,0 +1,282 @@
+url:      https://elite-redux-staging.pages.dev/
+build:    mrarj08z-845p
+mode:     4  wave:60
+seed:     Pzf1L9GCSJq9fus4FOpPlmeX
+party:    Kecleon(L48 90hp f0), Iron Valiant(L48 96hp f0), Gholdengo(L48 0hp f0), Amphybuzz(L37 139hp f0), Zigzagoon(L37 86hp f0), Glalie Redux(L38 69hp f0)
+enemy:    Drifblim(L47), Mimikyu(L39), Ceruledge(L46)
+
+----- COMMENT -----
+with 1 ceruledge left as an enemy, my pokemon fainted and it became 1v2 instead of 1v3
+
+----- CONSOLE -----
+[15:01:38.850] LOG: crit stage: +1
+[15:01:38.853] LOG: Move: Pixie Slash | Base damage: 29.31034482758621 | Power: 90 | Source attack: 75 | Target defense: 87
+[15:01:38.854] LOG: Move: Pixie Slash | Attack damage: 19
+[15:01:38.855] LOG: %cStart Phase ShowAbilityPhase color:green;
+[15:01:39.010] LOG: %cStart Phase HideAbilityPhase color:green;
+[15:01:39.060] LOG: %cStart Phase DamageAnimPhase color:green;
+[15:01:39.094] LOG: %cStart Phase MessagePhase color:green;
+[15:01:39.316] LOG: %cStart Phase MoveEndPhase color:green;
+[15:01:39.321] LOG: %cStart Phase MovePhase color:green;
+[15:01:39.321] LOG: %cUser: Iron Valiant
+Move: PIXIE_SLASH
+Use Mode: NORMAL color:orchid
+[15:01:39.351] LOG: %cStart Phase MessagePhase color:green;
+[15:01:39.441] LOG: %cStart Phase MoveEffectPhase color:green;
+[15:01:39.443] LOG: Applied Wide Lens 
+[15:01:40.500] LOG: crit stage: +1
+[15:01:40.503] LOG: Move: Pixie Slash | Base damage: 77.85246753246753 | Power: 90 | Source attack: 156 | Target defense: 77
+[15:01:40.505] LOG: Move: Pixie Slash | Attack damage: 0
+[15:01:40.505] LOG: %cStart Phase MessagePhase color:green;
+[15:01:40.749] LOG: %cStart Phase DamageAnimPhase color:green;
+[15:01:40.754] LOG: %cStart Phase QuietFormChangePhase color:green;
+[15:01:40.879] LOG: Applied Carbos (enemy)
+[15:01:40.879] LOG: Applied Iron (enemy)
+[15:01:40.879] LOG: Applied Zinc (enemy)
+[15:01:40.880] LOG: Applied Carbos (enemy)
+[15:01:40.880] LOG: Applied HP Up (enemy)
+[15:01:41.370] LOG: %cStart Phase MoveEndPhase color:green;
+[15:01:41.374] LOG: %cStart Phase MovePhase color:green;
+[15:01:41.375] LOG: %cUser: Ceruledge
+Move: FIRE_PLEDGE
+Use Mode: NORMAL color:orchid
+[15:01:41.403] LOG: %cStart Phase MessagePhase color:green;
+[15:01:41.508] LOG: %cStart Phase MoveEffectPhase color:green;
+[15:01:41.878] LOG: crit stage: +1
+[15:01:41.881] LOG: Move: Fire Pledge | Base damage: 44.06109090909091 | Power: 90 | Source attack: 126 | Target defense: 110
+[15:01:41.882] LOG: Move: Fire Pledge | Attack damage: 91
+[15:01:41.883] LOG: %cStart Phase DamageAnimPhase color:green;
+[15:01:41.911] LOG: %cStart Phase MessagePhase color:green;
+[15:01:42.125] LOG: %cStart Phase MoveEndPhase color:green;
+[15:01:42.127] LOG: %cStart Phase MovePhase color:green;
+[15:01:42.127] LOG: %cUser: Gholdengo
+Move: ASTRAL_BARRAGE
+Use Mode: NORMAL color:orchid
+[15:01:42.148] LOG: %cStart Phase MessagePhase color:green;
+[15:01:42.274] LOG: %cStart Phase MoveEffectPhase color:green;
+[15:01:42.275] LOG: Applied Wide Lens 
+[15:01:42.277] LOG: Applied Wide Lens 
+[15:01:42.278] LOG: Applied Wide Lens 
+[15:01:42.918] LOG: crit stage: +1
+[15:01:42.920] LOG: Move: Astral Barrage | Base damage: 30.65655172413793 | Power: 120 | Source attack: 49 | Target defense: 87
+[15:01:42.920] LOG: Move: Astral Barrage | Attack damage: 51
+[15:01:42.921] LOG: crit stage: +1
+[15:01:42.923] LOG: Move: Astral Barrage | Base damage: 30.01258426966292 | Power: 120 | Source attack: 49 | Target defense: 89
+[15:01:42.924] LOG: Move: Astral Barrage | Attack damage: 46
+[15:01:42.924] LOG: crit stage: +1
+[15:01:42.926] LOG: Move: Astral Barrage | Base damage: 25.084444444444443 | Power: 120 | Source attack: 49 | Target defense: 108
+[15:01:42.927] LOG: Move: Astral Barrage | Attack damage: 31
+[15:01:42.927] LOG: %cStart Phase DamageAnimPhase color:green;
+[15:01:42.953] LOG: %cStart Phase MessagePhase color:green;
+[15:01:43.166] LOG: %cStart Phase DamageAnimPhase color:green;
+[15:01:43.194] LOG: %cStart Phase MessagePhase color:green;
+[15:01:43.416] LOG: %cStart Phase DamageAnimPhase color:green;
+[15:01:43.444] LOG: %cStart Phase MessagePhase color:green;
+[15:01:43.666] LOG: %cStart Phase MoveEndPhase color:green;
+[15:01:43.666] LOG: %cStart Phase MovePhase color:green;
+[15:01:43.666] LOG: %cUser: Drifblim
+Move: FUMIGATION_BOMB
+Use Mode: NORMAL color:orchid
+[15:01:43.701] LOG: %cStart Phase MessagePhase color:green;
+[15:01:43.816] LOG: %cStart Phase MoveEffectPhase color:green;
+[15:01:44.167] LOG: crit stage: +0
+[15:01:44.169] LOG: Move: Fumigation Bomb | Base damage: 31.68543689320388 | Power: 75 | Source attack: 98 | Target defense: 103
+[15:01:44.170] LOG: Move: Fumigation Bomb | Attack damage: 0
+[15:01:44.171] LOG: %cStart Phase MessagePhase color:green;
+[15:01:44.391] LOG: %cStart Phase MoveEndPhase color:green;
+[15:01:44.391] LOG: %cStart Phase CheckInterludePhase color:green;
+[15:01:44.391] LOG: %cStart Phase WeatherEffectPhase color:green;
+[15:01:44.491] WARN: Texture "%s" has no frame "%s" PRAS- Confuse Ray 1
+[15:01:44.963] LOG: %cStart Phase PositionalTagPhase color:green;
+[15:01:44.963] LOG: %cStart Phase BerryPhase color:green;
+[15:01:44.983] LOG: Applied Lansat Berry 
+[15:01:44.983] LOG: Applied Liechi Berry 
+[15:01:44.983] LOG: Applied Sitrus Berry 
+[15:01:44.984] LOG: Applied Calcium 
+[15:01:44.984] LOG: Applied HP Up 
+[15:01:44.984] LOG: Applied Protein 
+[15:01:44.989] LOG: %cStart Phase CommonAnimPhase color:green;
+[15:01:45.317] LOG: %cStart Phase MessagePhase color:green;
+[15:01:45.558] LOG: %cStart Phase StatStageChangePhase color:green;
+[15:01:45.749] LOG: %cStart Phase MessagePhase color:green;
+[15:01:45.999] LOG: %cStart Phase PokemonHealPhase color:green;
+[15:01:46.213] LOG: %cStart Phase MessagePhase color:green;
+[15:01:46.491] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[15:01:46.509] LOG: %cStart Phase TurnEndPhase color:green;
+[15:01:46.524] WARN: [coop:turn] host recorder: finalize with NO open recording -> turn=-1 events=0 (caller decides not to emit)
+[15:01:46.524] LOG: %cStart Phase TurnInitPhase color:green;
+[15:01:46.525] LOG: %cStart Phase CommandPhase color:green;
+[15:01:48.813] LOG: Move: ZIPPY_ZAP Move targets: {"targets":[3,4,1],"multiple":false} 
+Player Pokemon: Kecleon
+[15:01:48.815] LOG: %cStart Phase SelectTargetPhase color:green;
+[15:01:49.180] LOG: %cStart Phase CommandPhase color:green;
+[15:01:50.406] LOG: Move: ASTRAL_BARRAGE Move targets: {"targets":[3,4,5],"multiple":true} 
+Player Pokemon: Gholdengo
+[15:01:50.408] LOG: %cStart Phase SelectTargetPhase color:green;
+[15:01:50.615] LOG: %cStart Phase CommandPhase color:green;
+[15:01:51.572] LOG: Move: PIXIE_SLASH Move targets: {"targets":[4,5,1],"multiple":false} 
+Player Pokemon: Iron Valiant
+[15:01:51.574] LOG: %cStart Phase SelectTargetPhase color:green;
+[15:01:51.671] LOG: %cStart Phase EnemyCommandPhase color:green;
+[15:01:51.694] LOG: Battle Seed: CQIhjWEvanDJzSOu
+[15:01:51.699] LOG: Move Pool: ["Infernal Parade"]
+[15:01:51.699] LOG: Move Scores: [30]
+[15:01:51.699] LOG: Sorted Move Pool: ["Infernal Parade"]
+[15:01:51.699] LOG: Chosen Move: Infernal Parade
+[15:01:51.699] LOG: %cStart Phase EnemyCommandPhase color:green;
+[15:01:51.710] LOG: Applied Miracle Seed (enemy)
+[15:01:51.711] LOG: Applied Miracle Seed (enemy)
+[15:01:51.712] LOG: Applied Miracle Seed (enemy)
+[15:01:51.723] LOG: Move Pool: ["Squeaky Hammer","Sharpen","Pixie Slash","Wood Hammer"]
+[15:01:51.723] LOG: Move Scores: [12.1875,2,15.1875,8.625]
+[15:01:51.723] LOG: Sorted Move Pool: ["Pixie Slash","Squeaky Hammer","Wood Hammer","Sharpen"]
+[15:01:51.723] LOG: Chosen Move: Wood Hammer
+[15:01:51.723] LOG: %cStart Phase EnemyCommandPhase color:green;
+[15:01:51.735] LOG: Move Pool: ["Bitter Blade","Flame Tongue","Fire Pledge"]
+[15:01:51.735] LOG: Move Scores: [66,63,27]
+[15:01:51.735] LOG: Sorted Move Pool: ["Bitter Blade","Flame Tongue","Fire Pledge"]
+[15:01:51.735] LOG: Chosen Move: Bitter Blade
+[15:01:51.735] LOG: %cStart Phase TurnStartPhase color:green;
+[15:01:51.746] LOG: %cStart Phase MovePhase color:green;
+[15:01:51.746] LOG: %cUser: Kecleon
+Move: ZIPPY_ZAP
+Use Mode: NORMAL color:orchid
+[15:01:51.755] LOG: %cStart Phase MessagePhase color:green;
+[15:01:51.833] LOG: %cStart Phase ShowAbilityPhase color:green;
+[15:01:52.001] LOG: %cStart Phase MessagePhase color:green;
+[15:01:52.266] LOG: %cStart Phase HideAbilityPhase color:green;
+[15:01:52.302] LOG: %cStart Phase MoveEffectPhase color:green;
+[15:01:52.964] LOG: crit stage: +0
+[15:01:52.966] LOG: Move: Zippy Zap | Base damage: 40.16 | Power: 50 | Source attack: 117 | Target defense: 65
+[15:01:52.972] LOG: Move: Zippy Zap | Attack damage: 124
+[15:01:52.973] LOG: %cStart Phase ShowAbilityPhase color:green;
+[15:01:53.135] LOG: %cStart Phase HideAbilityPhase color:green;
+[15:01:53.186] LOG: %cStart Phase DamageAnimPhase color:green;
+[15:01:53.209] LOG: %cStart Phase MessagePhase color:green;
+[15:01:53.441] LOG: %cStart Phase MessagePhase color:green;
+[15:01:53.658] LOG: %cStart Phase MessagePhase color:green;
+[15:01:53.874] LOG: %cStart Phase MoveEndPhase color:green;
+[15:01:53.884] LOG: %cStart Phase MovePhase color:green;
+[15:01:53.884] LOG: %cUser: Drifblim
+Move: EXPLOSION
+Use Mode: FOLLOW_UP color:orchid
+[15:01:53.900] LOG: %cStart Phase MessagePhase color:green;
+[15:01:54.025] LOG: %cStart Phase MoveEffectPhase color:green;
+[15:01:54.038] LOG: %cStart Phase ShowAbilityPhase color:green;
+[15:01:54.202] LOG: %cStart Phase HideAbilityPhase color:green;
+[15:01:54.252] LOG: %cStart Phase MessagePhase color:green;
+[15:01:54.474] LOG: %cStart Phase MessagePhase color:green;
+[15:01:54.708] LOG: %cStart Phase MessagePhase color:green;
+[15:01:54.958] LOG: %cStart Phase DamageAnimPhase color:green;
+[15:01:54.962] LOG: %cStart Phase FaintPhase color:green;
+[15:01:56.824] LOG: %cStart Phase MessagePhase color:green;
+[15:01:56.897] LOG: %cStart Phase VictoryPhase color:green;
+[15:01:56.897] LOG: Applied Soothe Bell 
+[15:01:56.897] LOG: Applied Soothe Bell 
+[15:01:56.897] LOG: Applied Lucky Egg 
+[15:01:56.897] LOG: %cStart Phase ExpPhase color:green;
+[15:01:56.897] LOG: Applied Super EXP. Charm 
+[15:01:56.898] LOG: Applied EXP. Charm 
+[15:01:57.155] LOG: 117323 120375 119577
+[15:01:57.260] LOG: %cStart Phase LevelUpPhase color:green;
+[15:01:57.261] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[15:01:57.261] LOG: Applied Super EXP. Charm 
+[15:01:57.261] LOG: Applied EXP. Charm 
+[15:01:57.262] LOG: %cStart Phase LevelUpPhase color:green;
+[15:01:57.263] LOG: %cStart Phase LearnMoveBatchPhase color:green;
+[15:02:03.342] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[15:02:03.342] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[15:02:03.342] LOG: Applied Super EXP. Charm 
+[15:02:03.342] LOG: Applied EXP. Charm 
+[15:02:03.343] LOG: %cStart Phase LevelUpPhase color:green;
+[15:02:03.343] LOG: %cStart Phase LearnMoveBatchPhase color:green;
+[15:02:04.346] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[15:02:04.347] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[15:02:04.347] LOG: Applied Super EXP. Charm 
+[15:02:04.347] LOG: Applied EXP. Charm 
+[15:02:04.347] LOG: %cStart Phase LevelUpPhase color:green;
+[15:02:04.347] LOG: Applied Protein 
+[15:02:04.347] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[15:02:04.347] LOG: %cStart Phase MoveEndPhase color:green;
+[15:02:04.352] LOG: %cStart Phase MovePhase color:green;
+[15:02:04.352] LOG: %cUser: Mimikyu
+Move: WOOD_HAMMER
+Use Mode: NORMAL color:orchid
+[15:02:04.367] LOG: %cStart Phase MessagePhase color:green;
+[15:02:04.466] LOG: %cStart Phase MoveEffectPhase color:green;
+[15:02:04.717] LOG: crit stage: +0
+[15:02:04.718] LOG: Applied Miracle Seed (enemy)
+[15:02:04.720] LOG: Move: Wood Hammer | Base damage: 36.56 | Power: 144 | Source attack: 75 | Target defense: 110
+[15:02:04.720] LOG: Move: Wood Hammer | Attack damage: 14
+[15:02:04.722] LOG: %cStart Phase DamageAnimPhase color:green;
+[15:02:04.752] LOG: %cStart Phase MessagePhase color:green;
+[15:02:04.974] LOG: %cStart Phase DamageAnimPhase color:green;
+[15:02:04.979] LOG: %cStart Phase MessagePhase color:green;
+[15:02:05.241] LOG: %cStart Phase MoveEndPhase color:green;
+[15:02:05.246] LOG: %cStart Phase MovePhase color:green;
+[15:02:05.246] LOG: %cUser: Iron Valiant
+Move: PIXIE_SLASH
+Use Mode: NORMAL color:orchid
+[15:02:05.268] LOG: %cStart Phase MessagePhase color:green;
+[15:02:05.374] LOG: %cStart Phase MoveEffectPhase color:green;
+[15:02:05.375] LOG: Applied Wide Lens 
+[15:02:06.434] LOG: crit stage: +1
+[15:02:06.437] LOG: Move: Pixie Slash | Base damage: 80.79792207792208 | Power: 90 | Source attack: 159 | Target defense: 77
+[15:02:06.438] LOG: Move: Pixie Slash | Attack damage: 95
+[15:02:06.439] LOG: %cStart Phase DamageAnimPhase color:green;
+[15:02:06.469] LOG: %cStart Phase FaintPhase color:green;
+[15:02:07.922] LOG: %cStart Phase MessagePhase color:green;
+[15:02:08.197] LOG: %cStart Phase ShowAbilityPhase color:green;
+[15:02:08.368] LOG: %cStart Phase QuietFormChangePhase color:green;
+[15:02:08.369] LOG: %cStart Phase HideAbilityPhase color:green;
+[15:02:08.416] LOG: %cStart Phase VictoryPhase color:green;
+[15:02:08.416] LOG: Applied Soothe Bell 
+[15:02:08.416] LOG: Applied Soothe Bell 
+[15:02:08.416] LOG: Applied Lucky Egg 
+[15:02:08.416] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[15:02:08.416] LOG: Applied Super EXP. Charm 
+[15:02:08.416] LOG: Applied EXP. Charm 
+[15:02:08.417] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[15:02:08.417] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[15:02:08.417] LOG: Applied Super EXP. Charm 
+[15:02:08.417] LOG: Applied EXP. Charm 
+[15:02:08.417] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[15:02:08.417] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[15:02:08.417] LOG: Applied Super EXP. Charm 
+[15:02:08.417] LOG: Applied EXP. Charm 
+[15:02:08.418] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[15:02:08.418] LOG: %cStart Phase MoveEndPhase color:green;
+[15:02:08.420] LOG: %cStart Phase MovePhase color:green;
+[15:02:08.421] LOG: %cUser: Ceruledge
+Move: BITTER_BLADE
+Use Mode: NORMAL color:orchid
+[15:02:08.432] LOG: %cStart Phase MessagePhase color:green;
+[15:02:08.574] LOG: %cStart Phase MoveEffectPhase color:green;
+[15:02:09.159] LOG: crit stage: +1
+[15:02:09.161] LOG: Move: Bitter Blade | Base damage: 44.06109090909091 | Power: 90 | Source attack: 126 | Target defense: 110
+[15:02:09.162] LOG: Move: Bitter Blade | Attack damage: 70
+[15:02:09.163] LOG: %cStart Phase ShowAbilityPhase color:green;
+[15:02:09.318] LOG: %cStart Phase HideAbilityPhase color:green;
+[15:02:09.368] LOG: %cStart Phase DamageAnimPhase color:green;
+[15:02:09.393] LOG: %cStart Phase MessagePhase color:green;
+[15:02:09.616] LOG: %cStart Phase PokemonHealPhase color:green;
+[15:02:09.620] LOG: %cStart Phase MessagePhase color:green;
+[15:02:09.849] LOG: %cStart Phase MessagePhase color:green;
+[15:02:10.045] LOG: %cStart Phase FaintPhase color:green;
+[15:02:12.585] LOG: %cStart Phase MessagePhase color:green;
+[15:02:13.297] LOG: %cStart Phase MoveEndPhase color:green;
+[15:02:13.298] LOG: %cStart Phase MovePhase color:green;
+[15:02:13.298] LOG: %cStart Phase MoveEndPhase color:green;
+[15:02:13.298] LOG: %cStart Phase MovePhase color:green;
+[15:02:13.298] LOG: %cStart Phase MoveEndPhase color:green;
+[15:02:13.299] LOG: %cStart Phase CheckInterludePhase color:green;
+[15:02:13.299] LOG: %cStart Phase WeatherEffectPhase color:green;
+[15:02:13.366] WARN: Texture "%s" has no frame "%s" PRAS- Confuse Ray 1
+[15:02:13.858] LOG: %cStart Phase PositionalTagPhase color:green;
+[15:02:13.858] LOG: %cStart Phase BerryPhase color:green;
+[15:02:13.860] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[15:02:13.862] LOG: %cStart Phase TurnEndPhase color:green;
+[15:02:13.865] WARN: [coop:turn] host recorder: finalize with NO open recording -> turn=-1 events=0 (caller decides not to emit)
+[15:02:13.865] LOG: %cStart Phase SwitchPhase color:green;
+[15:02:13.865] LOG: %cStart Phase TurnInitPhase color:green;
+[15:02:13.865] LOG: %cStart Phase CommandPhase color:green;
