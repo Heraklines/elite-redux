@@ -1,0 +1,263 @@
+url:      https://elite-redux-staging.pages.dev/
+build:    mrb47h9h-s04
+mode:     7  wave:1
+seed:     79DDFtnuSVxEDYW6cNnFIZfT
+party:    Glurak(L100 299hp f1), Quappo(L100 321hp f0)
+enemy:    Gallopa(L100), Stahlos(L100)
+
+----- CONSOLE -----
+[20:44:48.815] LOG: [coop:lobby] poll players=0
+[20:44:50.946] LOG: [coop:lobby] poll players=0
+[20:44:52.992] LOG: [coop:lobby] poll players=0
+[20:44:54.932] LOG: [coop:lobby] poll players=0
+[20:44:56.830] LOG: [coop:lobby] poll players=0
+[20:44:58.700] LOG: [coop:lobby] poll players=0
+[20:45:00.583] LOG: [coop:lobby] poll players=0
+[20:45:02.465] LOG: [coop:lobby] poll players=0
+[20:45:04.339] LOG: [coop:lobby] poll players=0
+[20:45:06.206] LOG: [coop:lobby] poll players=0
+[20:45:08.104] LOG: [coop:lobby] poll players=1
+[20:45:10.099] LOG: [coop:lobby] poll: incoming request from=c3c88fd5-e692-4c94-9f67-f743c4f47483 name=Heraklines1
+[20:45:10.110] LOG: [coop:lobby] poll players=1
+[20:45:10.939] LOG: [coop:lobby] respond accept=true from=c3c88fd5-e692-4c94-9f67-f743c4f47483 (self=e5a6b0e7-f1b6-4e82-944b-784346124e51)
+[20:45:11.442] LOG: [coop:launch] lobby connect code=PVHSQ2 role=host name=test4
+[20:45:11.445] LOG: [coop:launch] connectCoopWithCode code=PVHSQ2 role=host username=test4
+[20:45:11.446] LOG: [coop:launch] exchange SDP start code=PVHSQ2 role=host (ice=fetched)
+[20:45:11.834] LOG: [coop:launch] ICE from worker /coop/ice servers=1
+[20:45:12.325] LOG: [coop:launch] host pushing offer code=PVHSQ2 (ICE gathered)
+[20:45:12.325] LOG: [coop:launch] pushSignal code=PVHSQ2 role=host sdpBytes=1941
+[20:45:12.681] LOG: [coop:launch] await peer signal start code=PVHSQ2 role=host timeout=60000ms
+[20:45:14.143] LOG: [coop:launch] iceConnectionState=checking code=PVHSQ2 role=host
+[20:45:14.144] LOG: [coop:launch] pcConnectionState=connecting code=PVHSQ2 role=host
+[20:45:15.730] LOG: [coop:launch] await peer signal resolve code=PVHSQ2 role=host (778b)
+[20:45:15.730] LOG: [coop:launch] host received answer code=PVHSQ2 -> setRemoteDescription
+[20:45:15.737] LOG: [coop:launch] await data channel open (state=connecting timeout=30000ms)
+[20:45:15.767] LOG: [coop:launch] iceConnectionState=connected code=PVHSQ2 role=host
+[20:45:15.770] LOG: [coop:launch] pcConnectionState=connected code=PVHSQ2 role=host
+[20:45:15.778] LOG: [coop:launch] data channel OPEN
+[20:45:15.780] LOG: [coop:webrtc] ctor role=host readyState=open state=connected
+[20:45:15.781] LOG: [coop:launch] connectCoopSession role=host state=connected username=test4 netcode=authoritative
+[20:45:15.783] LOG: [coop:stream] streamer CONSTRUCT timeout=1200000ms onMessage registered
+[20:45:15.784] LOG: [coop:stream] guest REGISTER onGhostPool handler (bufferedEarly=false)
+[20:45:15.785] LOG: [coop:stream] host REGISTER onStateSyncRequest handler (was=false)
+[20:45:15.786] LOG: [coop:stream] host REGISTER onEnemyPartyRequest handler (was=false)
+[20:45:15.786] LOG: [coop:stream] guest REGISTER onWaveResolved handler (was=false)
+[20:45:15.787] LOG: [coop:stream] guest REGISTER onWaveEndState handler (was=false)
+[20:45:15.787] LOG: [coop:stream] watcher REGISTER onMeChecksum handler (was=false)
+[20:45:15.788] LOG: [coop:turn] host recorder: REGISTER live emitter (was=false)
+[20:45:15.790] LOG: [coop:session] coopAuthoritativeGuestPredicate INSTALLED
+[20:45:15.791] LOG: [coop:launch] peer session ready role=host netcode=authoritative -> connecting
+[20:45:15.791] LOG: [coop:launch] session connect role=host partnerRole=guest netcode=authoritative username=test4 version=er-coop-11 tiebreak=0.0004939123762097708
+[20:45:15.791] LOG: [coop:webrtc] raw tx role=host t=hello bytes=102
+[20:45:15.884] LOG: [coop:checksum] dataFingerprint compute moveMap=e9b828360aafb9e2(1032) movesData=61fa3383767be347(1107) movesName=30e2bf626b99790e(1107) movesets=6eb276198552346d(1908) abilitiesData=3088ac8089021d9e(1047) abilitiesName=fe1b451b3ba80b76(1047)
+[20:45:15.899] LOG: [coop:webrtc] raw tx role=host t=dataFingerprint bytes=329
+[20:45:15.900] LOG: [coop:launch] lobby connected code=PVHSQ2 role=host -> onConnected
+[20:45:15.915] LOG: %cStart Phase SelectStarterPhase color:green;
+[20:45:15.927] LOG: [coop:webrtc] raw rx role=host t=hello bytes=106 handlers=13
+[20:45:15.928] LOG: [coop:launch] hello recv partner=Heraklines1 partnerRole=guest (local role=host; no conflict)
+[20:45:15.929] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[20:45:15.929] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[20:45:15.932] LOG: [coop:webrtc] raw rx role=host t=dataFingerprint bytes=329 handlers=13
+[20:45:15.932] WARN: [coop:checksum] MISMATCH sections=movesName,abilitiesName - movesName local=30e2bf626b99790e(1107) peer=fad7fe8932ec09a1(1107) abilitiesName local=fe1b451b3ba80b76(1047) peer=7c302bdd9cc50a0b(1047)
+[20:45:20.792] LOG: [coop:interaction] interactionCounter() read -> 0 (role=host)
+[20:45:20.792] LOG: [coop:health] tick=0g turn=- wave=- counter=0 assertions=0 wait=-1ms peerBeat=- transport=connected
+[20:45:31.718] WARN: cry/4 not found
+[20:45:50.819] LOG: [coop:interaction] interactionCounter() read -> 0 (role=host)
+[20:45:50.819] LOG: [coop:health] tick=0g turn=- wave=- counter=0 assertions=0 wait=-1ms peerBeat=- transport=connected
+[20:46:25.791] LOG: [coop:interaction] interactionCounter() read -> 0 (role=host)
+[20:46:25.792] LOG: [coop:health] tick=0g turn=- wave=- counter=0 assertions=0 wait=-1ms peerBeat=- transport=connected
+[20:46:30.389] LOG: [coop:webrtc] raw rx role=host t=showdownTeam bytes=568 handlers=13
+[20:46:30.390] LOG: [coop:webrtc] raw rx role=host t=showdownReady bytes=51 handlers=13
+[20:46:39.182] WARN: cry/60 not found
+[20:46:41.359] LOG: [coop:webrtc] raw tx role=host t=showdownTeam bytes=510
+[20:46:41.360] LOG: [coop:webrtc] raw tx role=host t=showdownReady bytes=51
+[20:46:41.363] LOG: [coop:rendezvous] ARRIVE point=showdown-ready (send) role=host
+[20:46:41.363] LOG: [coop:webrtc] raw tx role=host t=rendezvous bytes=43
+[20:46:41.364] LOG: [coop:rendezvous] AWAIT point=showdown-ready timeoutMs=600000 -> network-wait role=host
+[20:46:41.382] LOG: [coop:webrtc] raw rx role=host t=rendezvous bytes=43 handlers=13
+[20:46:41.382] LOG: [coop:rendezvous] RECV arrival point=showdown-ready -> deliver-to-waiter role=host
+[20:46:41.383] LOG: [coop:rendezvous] AWAIT point=showdown-ready RESOLVE both-arrived role=host
+[20:46:41.437] LOG: [coop:webrtc] raw tx role=host t=showdownStakeOffer bytes=106
+[20:46:41.476] LOG: [coop:webrtc] raw rx role=host t=showdownStakeOffer bytes=106 handlers=13
+[20:46:45.033] LOG: [coop:rendezvous] ARRIVE point=showdown-wager-commit (send) role=host
+[20:46:45.033] LOG: [coop:webrtc] raw tx role=host t=rendezvous bytes=50
+[20:46:45.033] LOG: [coop:rendezvous] AWAIT point=showdown-wager-commit timeoutMs=600000 -> network-wait role=host
+[20:46:47.423] LOG: [coop:webrtc] raw rx role=host t=rendezvous bytes=50 handlers=13
+[20:46:47.423] LOG: [coop:rendezvous] RECV arrival point=showdown-wager-commit -> deliver-to-waiter role=host
+[20:46:47.423] LOG: [coop:rendezvous] AWAIT point=showdown-wager-commit RESOLVE both-arrived role=host
+[20:46:48.113] WARN: [asset-retry] load error key=PRAS-Dragon Dance BG - retry 1/2 with cache-buster
+[20:46:48.272] WARN: [asset-retry] load error key=PRAS-Dragon Dance BG - retry 2/2 via fastly mirror + cache-buster
+[20:46:48.914] ERROR: [asset-retry] PERMANENT load failure key=PRAS-Dragon Dance BG url=images/battle_anims/PRAS-Dragon Dance BG.png
+[20:46:50.368] LOG: Wave Seed: 8:EEGuovTWyFEZX7dOoGJ[gU 1
+[20:46:50.373] LOG: %cStart Phase EncounterPhase color:green;
+[20:46:50.645] LOG: Pokemon: Mega-Gallopa (Gegner) | Species ID: 78 | Level: 100 | Nature: Robust (-)
+[20:46:50.645] LOG: Stats (IVs): HP: 311 (31), Atk: 296 (31), Def: 236 (31), Spatk: 226 (31), Spdef: 236 (31), Spd: 296 (31)
+[20:46:50.645] LOG: Ability: Achtlos | Passive Ability: Temposchub 
+[20:46:50.645] LOG: Moveset: ["Schmetterramme","Volttackle","Doppelkick","Flammenrad"]
+[20:46:50.682] LOG: Pokemon: Stahlos (Gegner) | Species ID: 208 | Level: 100 | Nature: Robust (-)
+[20:46:50.682] LOG: Stats (IVs): HP: 291 (31), Atk: 246 (31), Def: 436 (31), Spatk: 146 (31), Spdef: 186 (31), Spd: 76 (31)
+[20:46:50.683] LOG: Ability: Aftershock | Passive Ability: Lead Coat 
+[20:46:50.683] LOG: Moveset: ["Rückentzug","Steinpolitur","Walzer (P)","Finale"]
+[20:46:52.096] LOG: Generated AI funcs
+[20:46:52.099] LOG: [coop:replay] host SEND enemyPartySync wave=1 count=2 meType=-
+[20:46:52.099] LOG: [coop:webrtc] raw tx role=host t=enemyPartySync bytes=603
+[20:46:52.112] LOG: [coop:replay] host SEND launchSnapshot wave=1 sessionLen=9092
+[20:46:52.113] LOG: [coop:webrtc] raw tx role=host t=launchSnapshot bytes=10162
+[20:46:52.124] LOG: Wave Seed: 8:EEGuovTWyFEZX7dOoGJ[gU 1
+[20:46:52.345] LOG: Veteran Heraklines1
+[20:46:55.357] LOG: Dialogue saved as seen: dialogue:veteran.encounter.2
+[20:46:55.415] LOG: Veteran Heraklines1
+[20:46:55.792] LOG: [coop:interaction] interactionCounter() read -> 0 (role=host)
+[20:46:55.792] LOG: [coop:health] tick=0g turn=1 wave=1 counter=0 assertions=0 wait=-1ms peerBeat=- transport=connected
+[20:46:59.808] LOG: %cStart Phase SummonPhase color:green;
+[20:46:59.809] LOG: Heraklines1
+[20:47:00.163] WARN: cry/78-mega not found
+[20:47:00.374] LOG: %cStart Phase ShinySparklePhase color:green;
+[20:47:00.626] LOG: %cStart Phase ShinySparklePhase color:green;
+[20:47:00.841] LOG: %cStart Phase SummonPhase color:green;
+[20:47:01.175] WARN: cry/6-mega-x not found
+[20:47:01.427] LOG: %cStart Phase ShinySparklePhase color:green;
+[20:47:01.642] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[20:47:01.646] LOG: %cStart Phase InitEncounterPhase color:green;
+[20:47:01.653] LOG: %cStart Phase PostSummonPhase color:green;
+[20:47:01.654] LOG: Ran PSP for: Mega-Gallopa
+[20:47:01.657] LOG: %cStart Phase PostSummonPhase color:green;
+[20:47:01.657] LOG: %cStart Phase PostSummonPhase color:green;
+[20:47:01.658] LOG: %cStart Phase PostSummonPhase color:green;
+[20:47:01.658] LOG: Ran PSP for: Mega-Glurak X
+[20:47:01.658] LOG: %cStart Phase PostSummonPhase color:green;
+[20:47:01.658] LOG: %cStart Phase PostSummonPhase color:green;
+[20:47:01.658] LOG: %cStart Phase TurnInitPhase color:green;
+[20:47:01.659] LOG: %cStart Phase CommandPhase color:green;
+[20:47:12.837] LOG: [coop:webrtc] raw rx role=host t=showdownCommand bytes=106 handlers=12
+[20:47:12.837] LOG: [coop:relay] showdown recv command turn=1 command=0 -> BUFFERED (no awaiter yet)
+[20:47:25.792] LOG: [coop:interaction] interactionCounter() read -> 0 (role=host)
+[20:47:25.792] LOG: [coop:health] tick=0g turn=1 wave=1 counter=0 assertions=0 wait=-1ms peerBeat=- transport=connected
+[20:47:25.795] LOG: [coop:webrtc] raw rx role=host t=stallBeat bytes=35 handlers=12
+[20:47:30.797] LOG: [coop:webrtc] raw rx role=host t=stallBeat bytes=35 handlers=12
+[20:47:35.797] LOG: [coop:webrtc] raw rx role=host t=stallBeat bytes=35 handlers=12
+[20:47:40.798] LOG: [coop:webrtc] raw rx role=host t=stallBeat bytes=35 handlers=12
+[20:47:45.796] LOG: [coop:webrtc] raw rx role=host t=stallBeat bytes=35 handlers=12
+[20:47:51.410] LOG: [coop:webrtc] raw rx role=host t=stallBeat bytes=35 handlers=12
+[20:47:55.796] LOG: [coop:webrtc] raw rx role=host t=stallBeat bytes=35 handlers=12
+[20:47:55.797] LOG: [coop:interaction] interactionCounter() read -> 0 (role=host)
+[20:47:55.797] LOG: [coop:health] tick=0g turn=1 wave=1 counter=0 assertions=0 wait=-1ms peerBeat=0s transport=connected
+[20:48:01.251] LOG: [coop:webrtc] raw rx role=host t=stallBeat bytes=35 handlers=12
+[20:48:05.795] LOG: [coop:webrtc] raw rx role=host t=stallBeat bytes=35 handlers=12
+[20:48:10.796] LOG: [coop:webrtc] raw rx role=host t=stallBeat bytes=35 handlers=12
+[20:48:15.804] LOG: [coop:webrtc] raw rx role=host t=stallBeat bytes=35 handlers=12
+[20:48:20.795] LOG: [coop:webrtc] raw rx role=host t=stallBeat bytes=35 handlers=12
+[20:48:25.798] LOG: [coop:webrtc] raw rx role=host t=stallBeat bytes=35 handlers=12
+[20:48:30.792] LOG: [coop:interaction] interactionCounter() read -> 0 (role=host)
+[20:48:30.792] LOG: [coop:health] tick=0g turn=1 wave=1 counter=0 assertions=0 wait=-1ms peerBeat=5s transport=connected
+[20:48:30.799] LOG: [coop:webrtc] raw rx role=host t=stallBeat bytes=35 handlers=12
+[20:48:35.795] LOG: [coop:webrtc] raw rx role=host t=stallBeat bytes=35 handlers=12
+[20:48:40.796] LOG: [coop:webrtc] raw rx role=host t=stallBeat bytes=35 handlers=12
+[20:48:45.795] LOG: [coop:webrtc] raw rx role=host t=stallBeat bytes=35 handlers=12
+[20:48:51.277] LOG: [coop:webrtc] raw rx role=host t=stallBeat bytes=35 handlers=12
+[20:48:55.913] LOG: [coop:webrtc] raw rx role=host t=stallBeat bytes=36 handlers=12
+[20:49:00.793] LOG: [coop:interaction] interactionCounter() read -> 0 (role=host)
+[20:49:00.793] LOG: [coop:health] tick=0g turn=1 wave=1 counter=0 assertions=0 wait=-1ms peerBeat=5s transport=connected
+[20:49:01.264] LOG: [coop:webrtc] raw rx role=host t=stallBeat bytes=36 handlers=12
+[20:49:06.264] LOG: [coop:webrtc] raw rx role=host t=stallBeat bytes=36 handlers=12
+[20:49:11.257] LOG: [coop:webrtc] raw rx role=host t=stallBeat bytes=36 handlers=12
+[20:49:16.255] LOG: [coop:webrtc] raw rx role=host t=stallBeat bytes=36 handlers=12
+[20:49:21.277] LOG: [coop:webrtc] raw rx role=host t=stallBeat bytes=36 handlers=12
+[20:49:26.248] LOG: [coop:webrtc] raw rx role=host t=stallBeat bytes=36 handlers=12
+[20:49:30.795] LOG: [coop:interaction] interactionCounter() read -> 0 (role=host)
+[20:49:30.795] LOG: [coop:health] tick=0g turn=1 wave=1 counter=0 assertions=0 wait=-1ms peerBeat=5s transport=connected
+[20:49:31.252] LOG: [coop:webrtc] raw rx role=host t=stallBeat bytes=36 handlers=12
+[20:49:36.248] LOG: [coop:webrtc] raw rx role=host t=stallBeat bytes=36 handlers=12
+[20:49:41.250] LOG: [coop:webrtc] raw rx role=host t=stallBeat bytes=36 handlers=12
+[20:49:46.247] LOG: [coop:webrtc] raw rx role=host t=stallBeat bytes=36 handlers=12
+[20:49:51.250] LOG: [coop:webrtc] raw rx role=host t=stallBeat bytes=36 handlers=12
+[20:49:56.251] LOG: [coop:webrtc] raw rx role=host t=stallBeat bytes=36 handlers=12
+[20:50:01.250] LOG: [coop:webrtc] raw rx role=host t=stallBeat bytes=36 handlers=12
+[20:50:05.792] LOG: [coop:interaction] interactionCounter() read -> 0 (role=host)
+[20:50:05.792] LOG: [coop:health] tick=0g turn=1 wave=1 counter=0 assertions=0 wait=-1ms peerBeat=5s transport=connected
+[20:50:06.246] LOG: [coop:webrtc] raw rx role=host t=stallBeat bytes=36 handlers=12
+[20:50:11.457] LOG: [coop:webrtc] raw rx role=host t=stallBeat bytes=36 handlers=12
+[20:50:16.246] LOG: [coop:webrtc] raw rx role=host t=stallBeat bytes=36 handlers=12
+[20:50:21.252] LOG: [coop:webrtc] raw rx role=host t=stallBeat bytes=36 handlers=12
+[20:50:26.268] LOG: [coop:webrtc] raw rx role=host t=stallBeat bytes=36 handlers=12
+[20:50:31.271] LOG: [coop:webrtc] raw rx role=host t=stallBeat bytes=36 handlers=12
+[20:50:36.260] LOG: [coop:interaction] interactionCounter() read -> 0 (role=host)
+[20:50:36.261] LOG: [coop:health] tick=0g turn=1 wave=1 counter=0 assertions=0 wait=-1ms peerBeat=5s transport=connected
+[20:50:36.262] LOG: [coop:webrtc] raw rx role=host t=stallBeat bytes=36 handlers=12
+[20:50:41.268] LOG: [coop:webrtc] raw rx role=host t=stallBeat bytes=36 handlers=12
+[20:50:48.797] LOG: [coop:webrtc] raw rx role=host t=stallBeat bytes=36 handlers=12
+[20:50:50.802] LOG: [coop:webrtc] raw rx role=host t=stallBeat bytes=36 handlers=12
+[20:50:51.449] LOG: Move: AEROBLAST Move targets: {"targets":[2],"multiple":false} 
+Player Pokemon: Mega-Glurak X
+[20:50:51.453] LOG: %cStart Phase EnemyCommandPhase color:green;
+[20:50:51.455] LOG: [coop:relay] showdown host requestEnemyCommand turn=1 -> consumed BUFFERED command=0
+[20:50:51.457] LOG: %cStart Phase TurnStartPhase color:green;
+[20:50:51.458] LOG: [coop:turn] host recorder: begin turn=1 (no prior open recording)
+[20:50:51.470] LOG: %cStart Phase MovePhase color:green;
+[20:50:51.471] LOG: %cUser: Mega-Gallopa
+Move: HEADLONG_RUSH
+Use Mode: NORMAL color:orchid
+[20:50:51.480] LOG: [coop:turn] host recorder: append turn=1 seq=0 k=moveUsed total=1 live=true
+[20:50:51.480] LOG: [coop:runtime] ME-stream live-event host turn=1 seq=0 k=moveUsed
+[20:50:51.480] LOG: [coop:replay] host EMIT live battleEvent turn=1 seq=0 k=moveUsed
+[20:50:51.480] LOG: [coop:webrtc] raw tx role=host t=battleEvent bytes=95
+[20:50:51.483] LOG: %cStart Phase MessagePhase color:green;
+[20:50:51.973] LOG: %cStart Phase MoveEffectPhase color:green;
+[20:50:51.984] LOG: [coop:turn] host recorder: append turn=1 seq=1 k=message total=2 live=true
+[20:50:51.985] LOG: [coop:runtime] ME-stream live-event host turn=1 seq=1 k=message
+[20:50:51.985] LOG: [coop:replay] host EMIT live battleEvent turn=1 seq=1 k=message
+[20:50:51.985] LOG: [coop:webrtc] raw tx role=host t=battleEvent bytes=109
+[20:50:51.987] LOG: %cStart Phase ShowAbilityPhase color:green;
+[20:50:52.193] LOG: %cStart Phase HideAbilityPhase color:green;
+[20:50:52.296] LOG: %cStart Phase MessagePhase color:green;
+[20:50:52.890] LOG: %cStart Phase MoveEndPhase color:green;
+[20:50:52.892] LOG: %cStart Phase MovePhase color:green;
+[20:50:52.892] LOG: %cUser: Mega-Glurak X
+Move: AEROBLAST
+Use Mode: NORMAL color:orchid
+[20:50:52.895] LOG: [coop:turn] host recorder: append turn=1 seq=2 k=moveUsed total=3 live=true
+[20:50:52.896] LOG: [coop:runtime] ME-stream live-event host turn=1 seq=2 k=moveUsed
+[20:50:52.896] LOG: [coop:replay] host EMIT live battleEvent turn=1 seq=2 k=moveUsed
+[20:50:52.896] LOG: [coop:webrtc] raw tx role=host t=battleEvent bytes=95
+[20:50:52.898] LOG: %cStart Phase MessagePhase color:green;
+[20:50:53.391] LOG: %cStart Phase MoveEffectPhase color:green;
+[20:50:53.394] LOG: Battle Seed: ffsQXaf7XX6rVW07
+[20:50:57.067] LOG: crit stage: +1
+[20:50:57.076] LOG: Move: Luftstoß | Base damage: 111.44915254237289 | Power: 125 | Source attack: 246 | Target defense: 236
+[20:50:57.079] LOG: Move: Luftstoß | Attack damage: 55
+[20:50:57.081] LOG: [coop:turn] host recorder: append turn=1 seq=3 k=hp total=4 live=true
+[20:50:57.081] LOG: [coop:runtime] ME-stream live-event host turn=1 seq=3 k=hp
+[20:50:57.081] LOG: [coop:replay] host EMIT live battleEvent turn=1 seq=3 k=hp
+[20:50:57.081] LOG: [coop:webrtc] raw tx role=host t=battleEvent bytes=91
+[20:50:57.083] LOG: [coop:turn] host recorder: append turn=1 seq=4 k=message total=5 live=true
+[20:50:57.083] LOG: [coop:runtime] ME-stream live-event host turn=1 seq=4 k=message
+[20:50:57.083] LOG: [coop:replay] host EMIT live battleEvent turn=1 seq=4 k=message
+[20:50:57.083] LOG: [coop:webrtc] raw tx role=host t=battleEvent bytes=98
+[20:50:57.087] LOG: %cStart Phase DamageAnimPhase color:green;
+[20:50:57.193] LOG: %cStart Phase MessagePhase color:green;
+[20:50:57.492] LOG: %cStart Phase MoveEndPhase color:green;
+[20:50:57.493] LOG: %cStart Phase CheckInterludePhase color:green;
+[20:50:57.494] LOG: %cStart Phase WeatherEffectPhase color:green;
+[20:50:57.495] LOG: %cStart Phase PositionalTagPhase color:green;
+[20:50:57.495] LOG: %cStart Phase BerryPhase color:green;
+[20:50:57.497] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[20:50:57.499] LOG: %cStart Phase TurnEndPhase color:green;
+[20:50:57.505] LOG: [coop:turn] host recorder: finalize turn=1 events=5 seq=5
+[20:50:57.509] LOG: [coop:checkpoint] build field=2 weather=0/0 terrain=0/0 arenaTags=0 money=0 mons=[bi0:sp6/hp299-299/st0/fnt0 bi2:sp78/hp256-311/st0/fnt0]
+[20:50:57.509] LOG: [coop:checkpoint] host capture field=2 weather=0 terrain=0 money=0 arenaTags=0 mons=[bi0:sp6/hp299-299/st0/fnt0 bi2:sp78/hp256-311/st0/fnt0]
+[20:50:57.521] LOG: [coop:checksum] capture digest=0a61b3132621d706 field=2 biome=0 seed=79DDFtnuSVxEDYW6cNnFIZfT weather=0 terrain=0 money=0 party=[6,62] partyLevels=[100,100] arenaTags=0 modifiers=2 heldItemsDigest=0 pokeballs=[0:5,1:0,2:0,3:0,4:0] mons=[bi0:sp6/hp299-299/st0/ab181/form1/tera0:9/boss0:0 bi2:sp78/hp256-311/st0/ab120/form2/tera0:9/boss0:0]
+[20:50:57.521] LOG: [coop:replay] host SEND turnResolution turn=1 events=5 checksum=0a61b3132621d706 preimage=true fullField=2 authoritativeState=1
+[20:50:57.523] LOG: [coop:webrtc] raw tx role=host t=turnResolution bytes=11674
+[20:50:57.524] LOG: %cStart Phase ShowAbilityPhase color:green;
+[20:50:57.693] LOG: %cStart Phase StatStageChangePhase color:green;
+[20:50:57.900] LOG: %cStart Phase MessagePhase color:green;
+[20:50:58.291] LOG: %cStart Phase HideAbilityPhase color:green;
+[20:50:58.346] LOG: %cStart Phase TurnInitPhase color:green;
+[20:50:58.347] LOG: %cStart Phase CommandPhase color:green;
+[20:51:02.012] LOG: [coop:webrtc] raw rx role=host t=showdownCommand bytes=106 handlers=12
+[20:51:02.013] LOG: [coop:relay] showdown recv command turn=2 command=0 -> BUFFERED (no awaiter yet)
+[20:51:11.297] LOG: [coop:interaction] interactionCounter() read -> 0 (role=host)
+[20:51:11.297] LOG: [coop:health] tick=0g turn=2 wave=1 counter=0 assertions=0 wait=-1ms peerBeat=20s transport=connected
+[20:51:16.253] LOG: [coop:webrtc] raw rx role=host t=stallBeat bytes=35 handlers=12
+[20:51:21.247] LOG: [coop:webrtc] raw rx role=host t=stallBeat bytes=35 handlers=12
+[20:51:26.286] LOG: [coop:webrtc] raw rx role=host t=stallBeat bytes=35 handlers=12
