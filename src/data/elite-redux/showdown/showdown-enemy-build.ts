@@ -33,7 +33,7 @@ import type { ShowdownMonManifest } from "#data/elite-redux/showdown/showdown-te
 import type { Nature } from "#enums/nature";
 import { PartyMemberStrength } from "#enums/party-member-strength";
 import { TrainerSlot } from "#enums/trainer-slot";
-import type { EnemyPokemon } from "#field/pokemon";
+import type { EnemyPokemon, Pokemon } from "#field/pokemon";
 import type { Trainer } from "#field/trainer";
 import type { PokemonHeldItemModifier } from "#modifiers/modifier";
 import { PokemonMove } from "#moves/pokemon-move";
@@ -58,6 +58,34 @@ export function markTrainerAsShowdown(trainer: Trainer, teamSize: number): void 
 /** Whether `trainer` is a showdown opponent (its members come from the manifest). */
 export function isShowdownTrainer(trainer: Trainer): boolean {
   return SHOWDOWN_TRAINERS.has(trainer);
+}
+
+/**
+ * Build the whitelist held-item modifier for `pokemon` from its manifest mon, or `null` when
+ * NO runtime modifier applies (the `MEGA_STONE` sentinel / an empty item / an unknown key).
+ *
+ * SHARED by the opponent-side enemy build AND the player-side own-party attach (B7 item 6), so
+ * BOTH sides field a BYTE-EQUAL held-item set - your own party carries exactly what the
+ * opponent's client fields for you from your manifest. The registry key is pinned as the
+ * modifier type id so the modifier serializes with a resolvable `typeId`
+ * (`getModifierTypeFuncById`): the guest boots the host's session snapshot + authoritative turn
+ * stream, which would otherwise DROP an id-less held item. ER item factories already pin their
+ * own (equal) id, so the guard only fills the vanilla items.
+ */
+export function buildShowdownHeldItem(pokemon: Pokemon, mon: ShowdownMonManifest): PokemonHeldItemModifier | null {
+  const itemKey = showdownHeldItemKey(mon);
+  if (itemKey == null) {
+    return null;
+  }
+  const factory = modifierTypes[itemKey as keyof typeof modifierTypes];
+  if (factory == null) {
+    return null;
+  }
+  const type = factory();
+  if (!type.id) {
+    type.id = itemKey;
+  }
+  return (type.newModifier(pokemon) as PokemonHeldItemModifier | null) ?? null;
 }
 
 /** Build ONE showdown enemy from a manifest mon, verbatim (BST-curve exempt), at `slot`. */
@@ -112,14 +140,11 @@ export function applyShowdownOverride(trainer: Trainer, index: number): EnemyPok
     // Double-battle trainers alternate the slot; a 1v1 single fields TrainerSlot.TRAINER for all.
     const slot = !trainer.isDouble() || !(index % 2) ? TrainerSlot.TRAINER : TrainerSlot.TRAINER_PARTNER;
     const enemy = buildShowdownEnemy(mon, slot);
-    // The whitelist held item (MEGA_STONE / empty -> none), granted verbatim.
-    const itemKey = showdownHeldItemKey(mon);
-    if (itemKey != null) {
-      const factory = modifierTypes[itemKey as keyof typeof modifierTypes];
-      const held = factory?.().newModifier(enemy) as PokemonHeldItemModifier | null;
-      if (held != null) {
-        void globalScene.addEnemyModifier(held, true);
-      }
+    // The whitelist held item (MEGA_STONE / empty -> none), granted verbatim via the SHARED
+    // builder the player-side attach also uses (byte-equal item set on both sides).
+    const held = buildShowdownHeldItem(enemy, mon);
+    if (held != null) {
+      void globalScene.addEnemyModifier(held, true);
     }
     return enemy;
   } catch {

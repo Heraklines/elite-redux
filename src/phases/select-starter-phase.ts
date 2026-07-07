@@ -33,9 +33,11 @@ import {
   beginShowdownBattle,
   disposePendingShowdownRelay,
   endShowdownBattle,
+  getShowdownOwnManifest,
   setPendingShowdownRelay,
 } from "#data/elite-redux/showdown/showdown-battle-state";
 import { ShowdownCommandRelay } from "#data/elite-redux/showdown/showdown-command-relay";
+import { buildShowdownHeldItem } from "#data/elite-redux/showdown/showdown-enemy-build";
 import { reportShowdownBattleEntered } from "#data/elite-redux/showdown/showdown-escrow-client";
 import { starterToManifest } from "#data/elite-redux/showdown/showdown-manifest";
 import {
@@ -599,6 +601,27 @@ export class SelectStarterPhase extends Phase {
     });
     overrideModifiers();
     overrideHeldItems(party[0]);
+    // Showdown 1v1 (B7 item 6): attach each OWN mon's manifest held item to the PLAYER party -
+    // the SAME mapping (buildShowdownHeldItem) the opponent's client fields for you, so both
+    // sides field a byte-equal held-item set. MEGA_STONE / unset -> no runtime modifier. The
+    // host is the only client that runs initBattle for showdown (the guest boots from the host's
+    // launch snapshot, which carries these modifiers; the authoritative turn stream then relays
+    // them each turn), and the party is built in the same order as the stashed own manifest.
+    if (globalScene.gameMode.isShowdown) {
+      const ownManifest = getShowdownOwnManifest();
+      if (ownManifest != null) {
+        party.forEach((pokemon, i) => {
+          const heldMon = ownManifest[i];
+          if (heldMon == null) {
+            return;
+          }
+          const held = buildShowdownHeldItem(pokemon, heldMon);
+          if (held != null) {
+            globalScene.addModifier(held, true);
+          }
+        });
+      }
+    }
     Promise.all(loadPokemonAssets).then(() => {
       // Guard: the menu BGM may not exist (e.g. the AudioContext never started
       // because the browser blocked autoplay). Fading out a null sound throws,

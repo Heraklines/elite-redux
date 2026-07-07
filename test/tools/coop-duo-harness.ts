@@ -2200,6 +2200,14 @@ export async function buildShowdownDuo(
   const clonedEnemyHeldItems: PersistentModifier[] = hostScene
     .findModifiers(m => m instanceof PokemonHeldItemModifier, false)
     .map(m => m.clone());
+  // B7 item 6: the host now attaches its OWN party's manifest held items too (each own mon carries
+  // its whitelist item). The player-party mirror below (PokemonData round-trip) does NOT carry
+  // held-item modifiers, and the checksum hashes the on-field `heldItems` digest, so clone the host's
+  // PLAYER held items and re-attach them on the guest - exactly as the real guest gets them off the
+  // launch snapshot (getSessionSaveData serializes every modifier, held items included).
+  const clonedPlayerHeldItems: PersistentModifier[] = hostScene
+    .findModifiers(m => m instanceof PokemonHeldItemModifier, true)
+    .map(m => m.clone());
 
   const hostCtx: ClientCtx = {
     label: "host",
@@ -2234,6 +2242,12 @@ export async function buildShowdownDuo(
     const guestEnemyModifiers = (guestScene as unknown as { enemyModifiers: PersistentModifier[] }).enemyModifiers;
     for (const m of clonedEnemyHeldItems) {
       guestEnemyModifiers.push(m);
+    }
+    // B7 item 6: re-attach the host's PLAYER held items on the guest (the mirror skips them, like the
+    // enemy ones above) so the guest's on-field player `heldItems` digest matches the host at wave start.
+    const guestPlayerModifiers = (guestScene as unknown as { modifiers: PersistentModifier[] }).modifiers;
+    for (const m of clonedPlayerHeldItems) {
+      guestPlayerModifiers.push(m);
     }
     guestScene.updateModifiers(false);
   });

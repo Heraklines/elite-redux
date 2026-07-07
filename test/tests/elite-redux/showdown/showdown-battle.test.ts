@@ -15,7 +15,7 @@ import { getGameMode } from "#app/game-mode";
 import type { GhostTrainerProfile } from "#data/elite-redux/er-ghost-profile";
 import { normalizeErShinyLabSavedLook } from "#data/elite-redux/er-shiny-lab-effects";
 import { beginShowdownBattle, endShowdownBattle } from "#data/elite-redux/showdown/showdown-battle-state";
-import type { ShowdownMonManifest } from "#data/elite-redux/showdown/showdown-team";
+import { MEGA_STONE_ITEM, type ShowdownMonManifest } from "#data/elite-redux/showdown/showdown-team";
 import { BattleType } from "#enums/battle-type";
 import { GameModes } from "#enums/game-modes";
 import { MoveId } from "#enums/move-id";
@@ -123,6 +123,55 @@ describe.skipIf(!RUN)("Showdown versus battle bootstrap (C3v2b)", () => {
     expect(game.scene.gameMode.isShowdown).toBe(true);
     expect(game.scene.gameMode.isWaveFinal(1)).toBe(true);
     expect(game.scene.currentBattle.waveIndex).toBe(1);
+  });
+
+  it("attaches each OWN mon's manifest held item to the PLAYER party (B7 item 6)", async () => {
+    const opponent: ShowdownMonManifest[] = [
+      mon({ speciesId: SpeciesId.CHARIZARD, rootSpeciesId: SpeciesId.CHARMANDER, item: "LEFTOVERS" }),
+    ];
+    // Own team: distinct item CLASSES per mon (Leftovers vs Shell Bell) so a per-mon assertion
+    // proves the manifest item - not a shared default - lands on the right PlayerPokemon.
+    const own: ShowdownMonManifest[] = [
+      mon({ speciesId: SpeciesId.VENUSAUR, rootSpeciesId: SpeciesId.BULBASAUR, item: "LEFTOVERS" }),
+      mon({ speciesId: SpeciesId.SNORLAX, rootSpeciesId: SpeciesId.SNORLAX, item: "SHELL_BELL" }),
+    ];
+
+    await runToShowdownCommand(game, own, opponent, [SpeciesId.VENUSAUR, SpeciesId.SNORLAX]);
+
+    const playerParty = game.scene.getPlayerParty();
+    expect(playerParty.length).toBe(2);
+    const heldOn = (id: number) =>
+      game.scene.findModifiers(m => m instanceof PokemonHeldItemModifier && m.pokemonId === id, true);
+    const lead = heldOn(playerParty[0].id);
+    const bench = heldOn(playerParty[1].id);
+    // Exactly one held item per own mon, and the two are distinct classes (Leftovers vs Shell Bell),
+    // proving each mon's OWN manifest item is applied to the PLAYER side (was previously unapplied).
+    expect(lead).toHaveLength(1);
+    expect(bench).toHaveLength(1);
+    expect(lead[0].constructor.name).not.toBe(bench[0].constructor.name);
+    // The type id is pinned to the registry key so the modifier round-trips to the guest.
+    expect(lead[0].type.id).toBe("LEFTOVERS");
+    expect(bench[0].type.id).toBe("SHELL_BELL");
+  });
+
+  it("attaches NO runtime modifier for a mega mon's locked (MEGA_STONE) item slot (B7 item 6)", async () => {
+    const opponent: ShowdownMonManifest[] = [
+      mon({ speciesId: SpeciesId.CHARIZARD, rootSpeciesId: SpeciesId.CHARMANDER, item: "LEFTOVERS" }),
+    ];
+    // Charizard fielded as its Mega X form (formIndex 1): item slot is the MEGA_STONE sentinel,
+    // which maps to NO runtime modifier (permamega - the form carries the stats).
+    const own: ShowdownMonManifest[] = [
+      mon({ speciesId: SpeciesId.CHARIZARD, rootSpeciesId: SpeciesId.CHARMANDER, formIndex: 1, item: MEGA_STONE_ITEM }),
+    ];
+
+    await runToShowdownCommand(game, own, opponent, [SpeciesId.CHARIZARD]);
+
+    const playerParty = game.scene.getPlayerParty();
+    const held = game.scene.findModifiers(
+      m => m instanceof PokemonHeldItemModifier && m.pokemonId === playerParty[0].id,
+      true,
+    );
+    expect(held).toHaveLength(0);
   });
 
   it("applies the opponent's ghost-trainer profile to the enemy trainer + shiny-lab look to the mon (C7)", async () => {
