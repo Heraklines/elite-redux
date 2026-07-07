@@ -1,0 +1,277 @@
+url:      https://elite-redux-staging.pages.dev/
+build:    mrb36yk9-s38
+mode:     4  wave:115
+seed:     Pzf1L9GCSJq9fus4FOpPlmeX
+party:    Iron Valiant(L104 293hp f0), Gholdengo(L104 288hp f0), Kecleon(L93 135hp f0), Glalie Redux(L104 0hp f0), Amphybuzz(L83 301hp f0), Zigzagoon(L85 185hp f0)
+enemy:    Rhyperior(L100), Kangaskhan(L96), Honchkrow(L94), Persian(L96), Pentadug(L94), Nidoqueen(L96)
+
+----- COMMENT -----
+bad luck blocked Fake Out flinch but should only block chances that are not 100%
+
+----- CONSOLE -----
+[20:16:50.171] LOG: %cStart Phase PostSummonPhase color:green;
+[20:16:50.171] LOG: %cStart Phase MovePhase color:green;
+[20:16:50.171] LOG: %cUser: Kecleon
+Move: SCRATCH
+Use Mode: INDIRECT color:orchid
+[20:16:50.189] LOG: %cStart Phase MessagePhase color:green;
+[20:16:50.268] LOG: %cStart Phase MoveEffectPhase color:green;
+[20:16:50.269] LOG: Battle Seed: YhSEOLM4BydDTQSy
+[20:16:50.285] LOG: crit stage: +0
+[20:16:50.286] LOG: Move: Scratch | Base damage: 38.54709677419355 | Power: 40 | Source attack: 219 | Target defense: 186
+[20:16:50.287] LOG: Move: Scratch | Attack damage: 45
+[20:16:50.287] LOG: %cStart Phase DamageAnimPhase color:green;
+[20:16:50.320] LOG: %cStart Phase MoveEndPhase color:green;
+[20:16:50.320] LOG: %cStart Phase TurnInitPhase color:green;
+[20:16:50.320] LOG: %cStart Phase CommandPhase color:green;
+[20:16:51.806] LOG: Move: PIXIE_SLASH Move targets: {"targets":[3,4,1],"multiple":false} 
+Player Pokemon: Iron Valiant
+[20:16:51.808] LOG: %cStart Phase SelectTargetPhase color:green;
+[20:16:52.340] LOG: %cStart Phase CommandPhase color:green;
+[20:16:52.715] LOG: %cStart Phase CommandPhase color:green;
+[20:16:53.674] LOG: Move: PSYBLADE Move targets: {"targets":[3,4,1],"multiple":false} 
+Player Pokemon: Iron Valiant
+[20:16:53.675] LOG: %cStart Phase SelectTargetPhase color:green;
+[20:16:54.057] LOG: %cStart Phase CommandPhase color:green;
+[20:16:54.874] LOG: Move: MAKE_IT_RAIN Move targets: {"targets":[3,4,5],"multiple":true} 
+Player Pokemon: Gholdengo
+[20:16:54.876] LOG: %cStart Phase SelectTargetPhase color:green;
+[20:16:55.165] LOG: %cStart Phase CommandPhase color:green;
+[20:16:56.816] LOG: Move: FAKE_OUT Move targets: {"targets":[4,5,1],"multiple":false} 
+Player Pokemon: Kecleon
+[20:16:56.818] LOG: %cStart Phase SelectTargetPhase color:green;
+[20:16:57.574] LOG: %cStart Phase EnemyCommandPhase color:green;
+[20:16:57.596] WARN: BattlerTag ENDURING is missing a score!
+[20:16:57.600] WARN: BattlerTag ENDURING is missing a score!
+[20:16:57.600] LOG: Move Pool: ["Barb Barrage","Earthquake","Toxic","Endure"]
+[20:16:57.600] LOG: Move Scores: [-20,66,0,-20]
+[20:16:57.600] LOG: Sorted Move Pool: ["Earthquake","Toxic","Barb Barrage","Endure"]
+[20:16:57.600] LOG: Chosen Move: Earthquake
+[20:16:57.600] LOG: %cStart Phase EnemyCommandPhase color:green;
+[20:16:57.618] LOG: Applied Black Glasses (enemy)
+[20:16:57.628] LOG: Applied Black Glasses (enemy)
+[20:16:57.638] LOG: Applied Black Glasses (enemy)
+[20:16:57.655] LOG: Move Pool: ["Covet","Crunch","Outrage","Curse"]
+[20:16:57.655] LOG: Move Scores: [15.75,18,24,0]
+[20:16:57.655] LOG: Sorted Move Pool: ["Outrage","Crunch","Covet","Curse"]
+[20:16:57.655] LOG: Chosen Move: Crunch
+[20:16:57.655] LOG: %cStart Phase EnemyCommandPhase color:green;
+[20:16:57.682] LOG: Move Pool: ["Aerial Ace"]
+[20:16:57.682] LOG: Move Scores: [63]
+[20:16:57.682] LOG: Sorted Move Pool: ["Aerial Ace"]
+[20:16:57.683] LOG: Chosen Move: Aerial Ace
+[20:16:57.683] LOG: %cStart Phase TurnStartPhase color:green;
+[20:16:57.706] LOG: %cStart Phase MovePhase color:green;
+[20:16:57.706] LOG: %cUser: Kecleon
+Move: FAKE_OUT
+Use Mode: NORMAL color:orchid
+[20:16:57.725] LOG: %cStart Phase MessagePhase color:green;
+[20:16:57.751] LOG: %cStart Phase MoveEffectPhase color:green;
+[20:16:58.036] LOG: crit stage: +0
+[20:16:58.040] LOG: Move: Fake Out | Base damage: 61.629473684210524 | Power: 40 | Source attack: 219 | Target defense: 114
+[20:16:58.041] LOG: Move: Fake Out | Attack damage: 78
+[20:16:58.043] LOG: %cStart Phase DamageAnimPhase color:green;
+[20:16:58.070] LOG: %cStart Phase MoveEndPhase color:green;
+[20:16:58.083] LOG: %cStart Phase MovePhase color:green;
+[20:16:58.083] LOG: %cUser: Gholdengo
+Move: MAKE_IT_RAIN
+Use Mode: NORMAL color:orchid
+[20:16:58.103] LOG: %cStart Phase MessagePhase color:green;
+[20:16:58.217] LOG: %cStart Phase MoveEffectPhase color:green;
+[20:16:58.218] LOG: Applied Multi Lens 
+[20:16:58.218] LOG: Applied Wide Lens 
+[20:16:58.219] LOG: Applied Wide Lens 
+[20:16:58.219] LOG: Applied Wide Lens 
+[20:16:58.703] LOG: crit stage: +1
+[20:16:58.705] LOG: Applied Metal Coat 
+[20:16:58.707] LOG: Move: Make It Rain | Base damage: 120.37400000000001 | Power: 144 | Source attack: 181 | Target defense: 192
+[20:16:58.707] LOG: Applied Multi Lens 
+[20:16:58.708] LOG: Move: Make It Rain | Attack damage: 71
+[20:16:58.713] LOG: crit stage: +1
+[20:16:58.714] LOG: Applied Metal Coat 
+[20:16:58.715] LOG: Move: Make It Rain | Base damage: 103.91842152466369 | Power: 144 | Source attack: 181 | Target defense: 223
+[20:16:58.715] LOG: Applied Multi Lens 
+[20:16:58.716] LOG: Move: Make It Rain | Attack damage: 85
+[20:16:58.717] LOG: crit stage: +1
+[20:16:58.717] LOG: Applied Metal Coat 
+[20:16:58.718] LOG: Move: Make It Rain | Base damage: 138.09465868263476 | Power: 144 | Source attack: 181 | Target defense: 167
+[20:16:58.718] LOG: Applied Multi Lens 
+[20:16:58.719] LOG: Move: Make It Rain | Attack damage: 79
+[20:16:58.719] LOG: %cStart Phase DamageAnimPhase color:green;
+[20:16:58.736] LOG: %cStart Phase MessagePhase color:green;
+[20:16:58.968] LOG: %cStart Phase StatStageChangePhase color:green;
+[20:16:59.154] LOG: %cStart Phase MessagePhase color:green;
+[20:16:59.401] LOG: %cStart Phase ObtainStatusEffectPhase color:green;
+[20:16:59.551] LOG: %cStart Phase MessagePhase color:green;
+[20:16:59.784] LOG: %cStart Phase DamageAnimPhase color:green;
+[20:16:59.822] LOG: %cStart Phase MessagePhase color:green;
+[20:17:00.067] LOG: %cStart Phase DamageAnimPhase color:green;
+[20:17:00.106] LOG: %cStart Phase MessagePhase color:green;
+[20:17:00.334] LOG: %cStart Phase MoveEffectPhase color:green;
+[20:17:00.335] LOG: Applied Wide Lens 
+[20:17:00.335] LOG: Applied Wide Lens 
+[20:17:00.335] LOG: Applied Wide Lens 
+[20:17:00.789] LOG: crit stage: +1
+[20:17:00.791] LOG: Applied Metal Coat 
+[20:17:00.793] LOG: Move: Make It Rain | Base damage: 96.83000000000001 | Power: 144 | Source attack: 145 | Target defense: 192
+[20:17:00.793] LOG: Applied Multi Lens 
+[20:17:00.795] LOG: Move: Make It Rain | Attack damage: 20
+[20:17:00.797] LOG: crit stage: +1
+[20:17:00.797] LOG: Applied Metal Coat 
+[20:17:00.799] LOG: Move: Make It Rain | Base damage: 83.6473542600897 | Power: 144 | Source attack: 145 | Target defense: 223
+[20:17:00.799] LOG: Applied Multi Lens 
+[20:17:00.800] LOG: Move: Make It Rain | Attack damage: 19
+[20:17:00.800] LOG: crit stage: +1
+[20:17:00.801] LOG: Applied Metal Coat 
+[20:17:00.802] LOG: Move: Make It Rain | Base damage: 111.02610778443115 | Power: 144 | Source attack: 145 | Target defense: 167
+[20:17:00.803] LOG: Applied Multi Lens 
+[20:17:00.803] LOG: Move: Make It Rain | Attack damage: 20
+[20:17:00.804] LOG: %cStart Phase DamageAnimPhase color:green;
+[20:17:00.819] LOG: %cStart Phase StatStageChangePhase color:green;
+[20:17:01.012] LOG: %cStart Phase MessagePhase color:green;
+[20:17:01.234] LOG: %cStart Phase DamageAnimPhase color:green;
+[20:17:01.252] LOG: %cStart Phase DamageAnimPhase color:green;
+[20:17:01.269] LOG: %cStart Phase MessagePhase color:green;
+[20:17:01.484] LOG: %cStart Phase MoveEndPhase color:green;
+[20:17:01.490] LOG: %cStart Phase MovePhase color:green;
+[20:17:01.490] LOG: %cUser: Honchkrow
+Move: AERIAL_ACE
+Use Mode: NORMAL color:orchid
+[20:17:01.525] LOG: %cStart Phase MessagePhase color:green;
+[20:17:01.634] LOG: %cStart Phase MoveEffectPhase color:green;
+[20:17:01.903] LOG: crit stage: +0
+[20:17:01.906] LOG: Move: Aerial Ace | Base damage: 74.7272 | Power: 78 | Source attack: 259 | Target defense: 220
+[20:17:01.908] LOG: Move: Aerial Ace | Attack damage: 0
+[20:17:01.909] LOG: %cStart Phase MessagePhase color:green;
+[20:17:02.118] LOG: %cStart Phase MoveEndPhase color:green;
+[20:17:02.125] LOG: %cStart Phase MovePhase color:green;
+[20:17:02.125] LOG: %cUser: Iron Valiant
+Move: PSYBLADE
+Use Mode: NORMAL color:orchid
+[20:17:02.165] LOG: %cStart Phase MessagePhase color:green;
+[20:17:02.334] LOG: %cStart Phase MessagePhase color:green;
+[20:17:02.492] LOG: %cStart Phase MoveEffectPhase color:green;
+[20:17:02.495] LOG: Applied Wide Lens 
+[20:17:02.510] WARN: Texture "%s" has no frame "%s" PRAS- Psycho Cut 1
+[20:17:02.601] WARN: Texture "%s" has no frame "%s" PRAS- Psycho Cut 1
+[20:17:02.618] WARN: Texture "%s" has no frame "%s" PRAS- Psycho Cut 1
+[20:17:02.869] LOG: crit stage: +1
+[20:17:02.874] LOG: Move: Psyblade | Base damage: 133.8761290322581 | Power: 85 | Source attack: 334 | Target defense: 186
+[20:17:02.876] LOG: Move: Psyblade | Attack damage: 143
+[20:17:02.877] LOG: %cStart Phase ShowAbilityPhase color:green;
+[20:17:03.038] LOG: %cStart Phase HideAbilityPhase color:green;
+[20:17:03.088] LOG: %cStart Phase DamageAnimPhase color:green;
+[20:17:03.121] LOG: %cStart Phase MoveEffectPhase color:green;
+[20:17:03.121] LOG: Applied Wide Lens 
+[20:17:03.151] WARN: Texture "%s" has no frame "%s" PRAS- Psycho Cut 1
+[20:17:03.242] WARN: Texture "%s" has no frame "%s" PRAS- Psycho Cut 1
+[20:17:03.259] WARN: Texture "%s" has no frame "%s" PRAS- Psycho Cut 1
+[20:17:03.511] LOG: crit stage: +1
+[20:17:03.514] LOG: Move: Psyblade | Base damage: 133.8761290322581 | Power: 85 | Source attack: 334 | Target defense: 186
+[20:17:03.515] LOG: Move: Psyblade | Attack damage: 136
+[20:17:03.516] LOG: %cStart Phase DamageAnimPhase color:green;
+[20:17:03.544] LOG: %cStart Phase MessagePhase color:green;
+[20:17:03.759] LOG: %cStart Phase MessagePhase color:green;
+[20:17:03.959] LOG: %cStart Phase FaintPhase color:green;
+[20:17:05.201] LOG: %cStart Phase MessagePhase color:green;
+[20:17:05.380] LOG: %cStart Phase VictoryPhase color:green;
+[20:17:05.380] LOG: Applied Soothe Bell 
+[20:17:05.381] LOG: Applied Soothe Bell 
+[20:17:05.381] LOG: %cStart Phase ExpPhase color:green;
+[20:17:05.381] LOG: Applied Super EXP. Charm 
+[20:17:05.381] LOG: Applied EXP. Charm 
+[20:17:05.572] LOG: 1213094 1242242 1216259
+[20:17:05.669] LOG: %cStart Phase LevelUpPhase color:green;
+[20:17:05.670] LOG: %cStart Phase ExpPhase color:green;
+[20:17:05.670] LOG: Applied Super EXP. Charm 
+[20:17:05.670] LOG: Applied EXP. Charm 
+[20:17:05.835] LOG: %cStart Phase LevelUpPhase color:green;
+[20:17:05.836] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[20:17:05.836] LOG: Applied Super EXP. Charm 
+[20:17:05.836] LOG: Applied EXP. Charm 
+[20:17:05.836] LOG: %cStart Phase LevelUpPhase color:green;
+[20:17:05.836] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[20:17:05.836] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[20:17:05.836] LOG: Applied Super EXP. Charm 
+[20:17:05.836] LOG: Applied EXP. Charm 
+[20:17:05.837] LOG: %cStart Phase LevelUpPhase color:green;
+[20:17:05.837] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[20:17:05.837] LOG: %cStart Phase MoveEndPhase color:green;
+[20:17:05.838] LOG: %cStart Phase MovePhase color:green;
+[20:17:05.838] LOG: %cUser: Mega Kangaskhan
+Move: CRUNCH
+Use Mode: NORMAL color:orchid
+[20:17:05.860] LOG: %cStart Phase MessagePhase color:green;
+[20:17:05.993] LOG: %cStart Phase MoveEffectPhase color:green;
+[20:17:06.273] LOG: crit stage: +0
+[20:17:06.274] LOG: Applied Black Glasses (enemy)
+[20:17:06.276] LOG: Move: Crunch | Base damage: 189.5545365853658 | Power: 124 | Source attack: 307 | Target defense: 164
+[20:17:06.276] LOG: Move: Crunch | Attack damage: 87
+[20:17:06.277] LOG: %cStart Phase ShowAbilityPhase color:green;
+[20:17:06.435] LOG: %cStart Phase HideAbilityPhase color:green;
+[20:17:06.486] LOG: %cStart Phase ShowAbilityPhase color:green;
+[20:17:06.655] LOG: %cStart Phase HideAbilityPhase color:green;
+[20:17:06.704] LOG: %cStart Phase DamageAnimPhase color:green;
+[20:17:06.736] LOG: %cStart Phase MoveEffectPhase color:green;
+[20:17:07.043] LOG: crit stage: +0
+[20:17:07.044] LOG: Applied Black Glasses (enemy)
+[20:17:07.045] LOG: Move: Crunch | Base damage: 189.5545365853658 | Power: 124 | Source attack: 307 | Target defense: 164
+[20:17:07.045] LOG: Move: Crunch | Attack damage: 21
+[20:17:07.046] LOG: %cStart Phase DamageAnimPhase color:green;
+[20:17:07.079] LOG: %cStart Phase MessagePhase color:green;
+[20:17:07.305] LOG: %cStart Phase MessagePhase color:green;
+[20:17:07.509] LOG: %cStart Phase MoveEndPhase color:green;
+[20:17:07.509] LOG: %cStart Phase MovePhase color:green;
+[20:17:07.509] LOG: %cStart Phase MoveEndPhase color:green;
+[20:17:07.510] LOG: %cStart Phase CheckInterludePhase color:green;
+[20:17:07.510] LOG: %cStart Phase WeatherEffectPhase color:green;
+[20:17:07.510] LOG: %cStart Phase PositionalTagPhase color:green;
+[20:17:07.510] LOG: %cStart Phase BerryPhase color:green;
+[20:17:07.514] LOG: Applied Leppa Berry 
+[20:17:07.515] LOG: Applied Calcium 
+[20:17:07.515] LOG: Applied HP Up 
+[20:17:07.515] LOG: Applied Carbos 
+[20:17:07.516] LOG: Applied Protein 
+[20:17:07.525] LOG: Applied Sitrus Berry (enemy)
+[20:17:07.526] LOG: Applied Lansat Berry (enemy)
+[20:17:07.526] LOG: Applied Calcium (enemy)
+[20:17:07.526] LOG: Applied Iron (enemy)
+[20:17:07.526] LOG: Applied Zinc (enemy)
+[20:17:07.526] LOG: Applied HP Up (enemy)
+[20:17:07.526] LOG: Applied Protein (enemy)
+[20:17:07.526] LOG: Applied Carbos (enemy)
+[20:17:07.526] LOG: Applied Calcium (enemy)
+[20:17:07.526] LOG: Applied Zinc (enemy)
+[20:17:07.526] LOG: Applied Calcium (enemy)
+[20:17:07.527] LOG: Applied HP Up (enemy)
+[20:17:07.527] LOG: Applied Zinc (enemy)
+[20:17:07.527] LOG: Applied Iron (enemy)
+[20:17:07.531] LOG: %cStart Phase CommonAnimPhase color:green;
+[20:17:07.852] LOG: %cStart Phase MessagePhase color:green;
+[20:17:08.159] LOG: %cStart Phase CommonAnimPhase color:green;
+[20:17:08.468] LOG: %cStart Phase PokemonHealPhase color:green;
+[20:17:08.666] LOG: %cStart Phase MessagePhase color:green;
+[20:17:08.968] LOG: %cStart Phase MessagePhase color:green;
+[20:17:09.201] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[20:17:09.210] LOG: %cStart Phase TurnEndPhase color:green;
+[20:17:09.219] WARN: [coop:turn] host recorder: finalize with NO open recording -> turn=-1 events=0 (caller decides not to emit)
+[20:17:09.219] LOG: %cStart Phase SwitchSummonPhase color:green;
+[20:17:09.451] LOG: Giovanni
+[20:17:09.519] LOG: Applied HP Up (enemy)
+[20:17:09.519] LOG: Applied Zinc (enemy)
+[20:17:09.519] LOG: Applied Iron (enemy)
+[20:17:09.519] LOG: Applied HP Up (enemy)
+[20:17:09.519] LOG: Applied Protein (enemy)
+[20:17:09.519] LOG: Applied Carbos (enemy)
+[20:17:09.519] LOG: Applied Calcium (enemy)
+[20:17:09.520] LOG: Applied Zinc (enemy)
+[20:17:09.520] LOG: Applied Calcium (enemy)
+[20:17:09.520] LOG: Applied Calcium (enemy)
+[20:17:09.520] LOG: Applied Iron (enemy)
+[20:17:09.520] LOG: Applied Zinc (enemy)
+[20:17:09.673] LOG: %cStart Phase PostSummonPhase color:green;
+[20:17:09.673] LOG: Ran PSP for: Rhyperior
+[20:17:09.677] LOG: %cStart Phase PostSummonPhase color:green;
+[20:17:09.677] LOG: %cStart Phase PostSummonPhase color:green;
+[20:17:09.677] LOG: %cStart Phase TurnInitPhase color:green;
+[20:17:09.677] LOG: %cStart Phase CommandPhase color:green;
