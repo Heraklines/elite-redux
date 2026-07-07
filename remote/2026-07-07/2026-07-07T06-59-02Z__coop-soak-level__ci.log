@@ -1,0 +1,65 @@
+===== COOP SOAK RESULT =====
+profile: level
+verdict: FAIL
+waves_requested: 55
+run: 28847428334 (main)
+timestamp: 2026-07-07T06-59-02Z
+
+----- driver lines -----
+[22m[39m[coop-soak] SEED=20260707 WAVES=55 - replay this run with:  SOAK_SEED=20260707 SOAK_WAVES=55 ER_SCENARIO=1 npx vitest run test/tests/elite-redux/coop/coop-soak.test.ts
+[22m[39m[coop-soak] scalar-lag wave 5 @post-shop: guest trails host (expected renderer lag, converges at re-mirror) - money host=810 guest=700
+[22m[39m[coop-soak] scalar-lag wave 8 @post-shop: guest trails host (expected renderer lag, converges at re-mirror) - money host=1090 guest=810
+[22m[39m[coop-soak] scalar-lag wave 13 @post-shop: guest trails host (expected renderer lag, converges at re-mirror) - money host=1280 guest=1090
+[22m[39m[coop-soak] scalar-lag wave 14 @post-shop: guest trails host (expected renderer lag, converges at re-mirror) - money host=1480 guest=1280
+[coop-soak] scalar-lag wave 20 @boss-post-shop: guest trails host (expected renderer lag, converges at re-mirror) - money host=2790 guest=1480
+[22m[39m[coop-soak] scalar-lag wave 25 @post-shop: guest trails host (expected renderer lag, converges at re-mirror) - money host=4280 guest=3450
+[22m[39m[coop-soak] scalar-lag wave 27 @post-shop: guest trails host (expected renderer lag, converges at re-mirror) - money host=5370 guest=4280
+[22m[39m[coop-soak] scalar-lag wave 28 @post-shop: guest trails host (expected renderer lag, converges at re-mirror) - money host=6330 guest=5370
+[22m[39m[coop-soak] scalar-lag wave 35 @post-shop: guest trails host (expected renderer lag, converges at re-mirror) - money host=7250 guest=6330
+[22m[39m[coop-soak] scalar-lag wave 43 @post-shop: guest trails host (expected renderer lag, converges at re-mirror) - money host=8700 guest=7250
+[22m[39m[coop-soak] scalar-lag wave 44 @post-shop: guest trails host (expected renderer lag, converges at re-mirror) - money host=9530 guest=8700
+[coop-soak] scalar-lag wave 50 @boss-post-shop: guest trails host (expected renderer lag, converges at re-mirror) - money host=12220 guest=9340
+[22m[39m[coop-soak] scalar-lag wave 55 @post-shop: guest trails host (expected renderer lag, converges at re-mirror) - money host=14140 guest=12220
+[22m[39m[coop-soak] DONE seed=20260707 waves=55/55 resyncHeals=1 assertions=1 findings=0 trainerWaves=13 (fixed=5 random=8) skips={"mysteryEncounterDisabledV1":1} elapsedMs=83126
+
+----- vitest result tail -----
+[22m[39m[33m[coop:runtime] partner channel disconnected -> cancelling pending co-op waits (no 20-minute strand)[39m
+
+[90mstdout[2m | test/tests/elite-redux/coop/coop-soak.test.ts[2m:149:3[22m[2m[2m > [22m[2mNIGHTLY co-op SOAK: seeded randomized two-engine run (#841)[2m > [22m[2mplays a seeded randomized co-op run asserting DIGEST/LOCKSTEP/NO-PARK/TEARDOWN each wave
+[22m[39m[coop-soak] DONE seed=20260707 waves=55/55 resyncHeals=1 assertions=1 findings=0 trainerWaves=13 (fixed=5 random=8) skips={"mysteryEncounterDisabledV1":1} elapsedMs=83126
+
+[90mstdout[2m | test/tests/elite-redux/coop/coop-soak.test.ts[2m:149:3[22m[2m[2m > [22m[2mNIGHTLY co-op SOAK: seeded randomized two-engine run (#841)[2m > [22m[2mplays a seeded randomized co-op run asserting DIGEST/LOCKSTEP/NO-PARK/TEARDOWN each wave
+[22m[39m[2m> [22m[30m[48;2;193;98;222m Test finished! [49m[39m
+    Name: [38;2;0;136;134mNIGHTLY co-op SOAK: seeded randomized two-engine run (#841) > plays a seeded randomized co-op run asserting DIGEST/LOCKSTEP/NO-PARK/TEARDOWN each wave[39m
+    Result: [31m[1m✗ Failed[22m[39m [2min[22m [33m84207[39m[2mms[22m
+    File: [38;2;210;155;14melite-redux/test/tests/elite-redux/coop/coop-soak.test.ts:149:3[39m
+
+[33m[39m[31mx[39m
+
+[31m⎯⎯⎯⎯⎯⎯⎯[39m[1m[41m Failed Tests 1 [49m[22m[31m⎯⎯⎯⎯⎯⎯⎯[39m
+
+[41m[1m FAIL [22m[49m [30m[45m main [49m[39m test/tests/elite-redux/coop/coop-soak.test.ts[2m:149:3[22m[2m > [22mNIGHTLY co-op SOAK: seeded randomized two-engine run (#841)[2m > [22mplays a seeded randomized co-op run asserting DIGEST/LOCKSTEP/NO-PARK/TEARDOWN each wave
+[31m[1mAssertionError[22m: soak tripped 1 production checksum assertion(s) - the full-state payload left a per-turn divergence the heal-once had to close (replay SOAK_SEED=20260707; see the [coop:ASSERT] lines): expected 1 to be +0 // Object.is equality[39m
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- 0[39m
+[31m+ 1[39m
+
+[36m [2m❯[22m test/tests/elite-redux/coop/coop-soak.test.ts:[2m236:9[22m[39m
+    [90m234|[39m         `soak tripped ${result.assertions} production checksum asserti…
+    [90m235|[39m           + `per-turn divergence the heal-once had to close (replay SO…
+    [90m236|[39m       )[33m.[39m[34mtoBe[39m([34m0[39m)[33m;[39m
+    [90m   |[39m         [31m^[39m
+    [90m237|[39m
+    [90m238|[39m       // #849 COMPLETENESS BACKSTOP: PROVE the soak exercised every co…
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯[22m[39m
+
+
+[2m Test Files [22m [1m[31m1 failed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[31m1 failed[39m[22m[90m (1)[39m
+[2m   Start at [22m 06:57:14
+[2m   Duration [22m 107.53s[2m (transform 17.71s, setup 21.84s, import 136ms, tests 84.67s, environment 715ms)[22m
+
