@@ -25,8 +25,28 @@ export class ErDexNavPhase extends Phase {
 
   private picksLeft = ErDexNavPhase.PICK_COUNT;
 
+  /**
+   * Co-op (wiring audit): true ONLY on the reward WATCHER. The Dex Nav is the item USER's (the reward
+   * OWNER's) per-account dex write; the watcher applies the same consumable only to keep the shop in
+   * lockstep, so it must NOT open the species picker. Threaded from {@linkcode ErDexNavModifier.apply}.
+   */
+  private readonly coopIsWatcher: boolean;
+
+  constructor(coopIsWatcher = false) {
+    super();
+    this.coopIsWatcher = coopIsWatcher;
+  }
+
   start(): void {
     super.start();
+    // Co-op (wiring audit): the picker is a PER-ACCOUNT dex write owned by the item USER (the reward
+    // owner). On the WATCHER, opening it would show an unexpected, drivable screen and grant the watcher
+    // free dex entries from the owner's item. The dex is not run-checksummed, so no relay/adopt is
+    // needed - the watcher simply skips. Byte-identical off the watcher (solo / owner / lockstep).
+    if (this.coopIsWatcher) {
+      this.end();
+      return;
+    }
     this.promptPick();
   }
 
