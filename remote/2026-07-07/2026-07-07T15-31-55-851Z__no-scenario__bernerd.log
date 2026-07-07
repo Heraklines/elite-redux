@@ -1,0 +1,273 @@
+url:      https://elite-redux-staging.pages.dev/
+build:    mrarj08z-845p
+mode:     4  wave:80
+seed:     Pzf1L9GCSJq9fus4FOpPlmeX
+party:    Glalie Redux(L64 41hp f0), Iron Valiant(L64 11hp f0), Gholdengo(L65 0hp f0), Amphybuzz(L41 153hp f0), Zigzagoon(L42 96hp f0), Kecleon(L62 165hp f0)
+enemy:    Morpekyll(L72), Toxicroak(L70), Grimmsnarl(L75), Mawile Redux(L70), Liepard(L70)
+
+----- COMMENT -----
+One opponent fainted, one of mine fainted. Battle then becomes 2 (me) v 3
+
+----- CONSOLE -----
+[15:31:00.746] LOG: %cStart Phase EnemyCommandPhase color:green;
+[15:31:00.789] LOG: Move Pool: ["Crunch","Shadow Fangs"]
+[15:31:00.789] LOG: Move Scores: [5.90625,12]
+[15:31:00.789] LOG: Sorted Move Pool: ["Shadow Fangs","Crunch"]
+[15:31:00.789] LOG: Chosen Move: Crunch
+[15:31:00.789] LOG: %cStart Phase EnemyCommandPhase color:green;
+[15:31:00.792] LOG: Applied Black Belt (enemy)
+[15:31:00.793] LOG: Applied Black Belt (enemy)
+[15:31:00.801] WARN: BattlerTag MIND_READER is missing a score!
+[15:31:00.804] WARN: BattlerTag MIND_READER is missing a score!
+[15:31:00.804] LOG: Move Pool: ["Drain Punch","Cross Poison","Mind Reader","Hydro Pump"]
+[15:31:00.804] LOG: Move Scores: [10.875,81,-20,18]
+[15:31:00.804] LOG: Sorted Move Pool: ["Cross Poison","Hydro Pump","Drain Punch","Mind Reader"]
+[15:31:00.804] LOG: Chosen Move: Cross Poison
+[15:31:00.804] LOG: %cStart Phase EnemyCommandPhase color:green;
+[15:31:00.810] LOG: Applied Black Glasses (enemy)
+[15:31:00.815] LOG: Applied Black Glasses (enemy)
+[15:31:00.827] LOG: Move Pool: ["Sucker Punch","Fake Tears","Assist","X-Scissor"]
+[15:31:00.827] LOG: Move Scores: [54,6,0,4.6875]
+[15:31:00.827] LOG: Sorted Move Pool: ["Sucker Punch","Fake Tears","X-Scissor","Assist"]
+[15:31:00.827] LOG: Chosen Move: Sucker Punch
+[15:31:00.827] LOG: %cStart Phase TurnStartPhase color:green;
+[15:31:00.838] LOG: %cStart Phase MovePhase color:green;
+[15:31:00.838] LOG: %cUser: Liepard
+Move: SUCKER_PUNCH
+Use Mode: NORMAL color:orchid
+[15:31:00.851] LOG: %cStart Phase MessagePhase color:green;
+[15:31:00.917] LOG: %cStart Phase MoveEffectPhase color:green;
+[15:31:01.343] LOG: crit stage: +4
+[15:31:01.344] LOG: Applied Black Glasses (enemy)
+[15:31:01.346] LOG: Move: Sucker Punch | Base damage: 62.95675675675676 | Power: 84 | Source attack: 179 | Target defense: 148
+[15:31:01.347] LOG: Move: Sucker Punch | Attack damage: 369
+[15:31:01.347] LOG: %cStart Phase DamageAnimPhase color:green;
+[15:31:01.368] LOG: %cStart Phase MessagePhase color:green;
+[15:31:01.570] LOG: %cStart Phase MessagePhase color:green;
+[15:31:01.792] LOG: %cStart Phase FaintPhase color:green;
+[15:31:04.356] LOG: %cStart Phase MessagePhase color:green;
+[15:31:05.122] LOG: %cStart Phase MoveEndPhase color:green;
+[15:31:05.126] LOG: %cStart Phase MovePhase color:green;
+[15:31:05.126] LOG: %cUser: Iron Valiant
+Move: DRAIN_PUNCH
+Use Mode: NORMAL color:orchid
+[15:31:05.142] LOG: %cStart Phase MessagePhase color:green;
+[15:31:05.203] LOG: %cStart Phase MoveEffectPhase color:green;
+[15:31:05.204] LOG: Applied Wide Lens 
+[15:31:05.517] LOG: crit stage: +2
+[15:31:05.521] LOG: Move: Drain Punch | Base damage: 95.48387096774194 | Power: 75 | Source attack: 210 | Target defense: 93
+[15:31:05.522] LOG: Move: Drain Punch | Attack damage: 257
+[15:31:05.524] LOG: %cStart Phase DamageAnimPhase color:green;
+[15:31:05.552] LOG: %cStart Phase MessagePhase color:green;
+[15:31:05.766] LOG: %cStart Phase PokemonHealPhase color:green;
+[15:31:05.766] LOG: %cStart Phase MessagePhase color:green;
+[15:31:05.992] LOG: %cStart Phase FaintPhase color:green;
+[15:31:07.187] LOG: %cStart Phase MessagePhase color:green;
+[15:31:07.665] LOG: %cStart Phase VictoryPhase color:green;
+[15:31:07.665] LOG: Applied Soothe Bell 
+[15:31:07.665] LOG: Applied Soothe Bell 
+[15:31:07.666] LOG: Applied Lucky Egg 
+[15:31:07.666] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[15:31:07.666] LOG: Applied Super EXP. Charm 
+[15:31:07.666] LOG: Applied EXP. Charm 
+[15:31:07.667] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[15:31:07.667] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[15:31:07.667] LOG: Applied Super EXP. Charm 
+[15:31:07.667] LOG: Applied EXP. Charm 
+[15:31:07.667] LOG: %cStart Phase LevelUpPhase color:green;
+[15:31:07.668] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[15:31:07.668] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[15:31:07.668] LOG: Applied Super EXP. Charm 
+[15:31:07.668] LOG: Applied EXP. Charm 
+[15:31:07.668] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[15:31:07.668] LOG: %cStart Phase MoveEndPhase color:green;
+[15:31:07.674] LOG: %cStart Phase MovePhase color:green;
+[15:31:07.674] LOG: %cUser: Toxicroak
+Move: CROSS_POISON
+Use Mode: NORMAL color:orchid
+[15:31:07.687] LOG: %cStart Phase MessagePhase color:green;
+[15:31:07.816] LOG: %cStart Phase MoveEffectPhase color:green;
+[15:31:07.819] LOG: Applied Wide Lens (enemy)
+[15:31:08.497] LOG: crit stage: +3
+[15:31:08.499] LOG: Move: Cross Poison | Base damage: 33.30434782608695 | Power: 40 | Source attack: 180 | Target defense: 138
+[15:31:08.499] LOG: Move: Cross Poison | Attack damage: 140
+[15:31:08.500] LOG: %cStart Phase DamageAnimPhase color:green;
+[15:31:08.528] LOG: %cStart Phase MessagePhase color:green;
+[15:31:08.733] LOG: %cStart Phase MoveEffectPhase color:green;
+[15:31:08.735] LOG: Applied Wide Lens (enemy)
+[15:31:09.442] LOG: crit stage: +3
+[15:31:09.445] LOG: Move: Cross Poison | Base damage: 33.30434782608695 | Power: 40 | Source attack: 180 | Target defense: 138
+[15:31:09.446] LOG: Move: Cross Poison | Attack damage: 33
+[15:31:09.447] LOG: %cStart Phase DamageAnimPhase color:green;
+[15:31:09.479] LOG: %cStart Phase MessagePhase color:green;
+[15:31:09.682] LOG: %cStart Phase MessagePhase color:green;
+[15:31:09.900] LOG: %cStart Phase MessagePhase color:green;
+[15:31:10.100] LOG: %cStart Phase MoveEndPhase color:green;
+[15:31:10.103] LOG: %cStart Phase MovePhase color:green;
+[15:31:10.104] LOG: %cUser: Mawile Redux
+Move: CRUNCH
+Use Mode: NORMAL color:orchid
+[15:31:10.122] LOG: %cStart Phase MessagePhase color:green;
+[15:31:10.250] LOG: %cStart Phase MoveEffectPhase color:green;
+[15:31:10.542] LOG: crit stage: +3
+[15:31:10.543] LOG: Move: Crunch | Base damage: 80.89142857142856 | Power: 104 | Source attack: 177 | Target defense: 140
+[15:31:10.544] LOG: Move: Crunch | Attack damage: 59
+[15:31:10.544] LOG: %cStart Phase DamageAnimPhase color:green;
+[15:31:10.577] LOG: %cStart Phase MessagePhase color:green;
+[15:31:10.775] LOG: %cStart Phase MessagePhase color:green;
+[15:31:11.008] LOG: %cStart Phase StatStageChangePhase color:green;
+[15:31:11.206] LOG: %cStart Phase MessagePhase color:green;
+[15:31:11.424] LOG: %cStart Phase ShowAbilityPhase color:green;
+[15:31:11.603] LOG: %cStart Phase StatStageChangePhase color:green;
+[15:31:11.782] LOG: %cStart Phase MessagePhase color:green;
+[15:31:12.008] LOG: %cStart Phase HideAbilityPhase color:green;
+[15:31:12.044] LOG: %cStart Phase ShowAbilityPhase color:green;
+[15:31:12.211] LOG: %cStart Phase StatStageChangePhase color:green;
+[15:31:12.397] LOG: %cStart Phase MessagePhase color:green;
+[15:31:12.641] LOG: %cStart Phase HideAbilityPhase color:green;
+[15:31:12.668] LOG: %cStart Phase MoveEndPhase color:green;
+[15:31:12.669] LOG: %cStart Phase MovePhase color:green;
+[15:31:12.669] LOG: %cStart Phase MoveEndPhase color:green;
+[15:31:12.669] LOG: %cStart Phase MovePhase color:green;
+[15:31:12.669] LOG: %cUser: Glalie Redux
+Move: BEATDOWN
+Use Mode: NORMAL color:orchid
+[15:31:12.676] LOG: %cStart Phase MessagePhase color:green;
+[15:31:12.808] LOG: %cStart Phase MoveEffectPhase color:green;
+[15:31:13.108] LOG: crit stage: +3
+[15:31:13.110] LOG: Move: Beatdown | Base damage: 20.07142857142857 | Power: 25 | Source attack: 165 | Target defense: 126
+[15:31:13.111] LOG: Move: Beatdown | Attack damage: 45
+[15:31:13.112] LOG: %cStart Phase DamageAnimPhase color:green;
+[15:31:13.135] LOG: %cStart Phase MessagePhase color:green;
+[15:31:13.341] LOG: %cStart Phase MoveEffectPhase color:green;
+[15:31:13.625] LOG: crit stage: +3
+[15:31:13.628] LOG: Move: Beatdown | Base damage: 20.07142857142857 | Power: 25 | Source attack: 165 | Target defense: 126
+[15:31:13.630] LOG: Move: Beatdown | Attack damage: 42
+[15:31:13.630] LOG: %cStart Phase DamageAnimPhase color:green;
+[15:31:13.661] LOG: %cStart Phase MessagePhase color:green;
+[15:31:13.858] LOG: %cStart Phase MoveEffectPhase color:green;
+[15:31:14.142] LOG: crit stage: +3
+[15:31:14.145] LOG: Move: Beatdown | Base damage: 20.07142857142857 | Power: 25 | Source attack: 165 | Target defense: 126
+[15:31:14.146] LOG: Move: Beatdown | Attack damage: 38
+[15:31:14.148] LOG: %cStart Phase DamageAnimPhase color:green;
+[15:31:14.177] LOG: %cStart Phase MessagePhase color:green;
+[15:31:14.392] LOG: %cStart Phase ObtainStatusEffectPhase color:green;
+[15:31:14.734] LOG: %cStart Phase MessagePhase color:green;
+[15:31:14.966] LOG: %cStart Phase MoveEffectPhase color:green;
+[15:31:15.250] LOG: crit stage: +3
+[15:31:15.252] LOG: Move: Beatdown | Base damage: 20.07142857142857 | Power: 25 | Source attack: 165 | Target defense: 126
+[15:31:15.253] LOG: Move: Beatdown | Attack damage: 42
+[15:31:15.254] LOG: %cStart Phase DamageAnimPhase color:green;
+[15:31:15.276] LOG: %cStart Phase MessagePhase color:green;
+[15:31:15.474] LOG: %cStart Phase MoveEffectPhase color:green;
+[15:31:15.759] LOG: crit stage: +3
+[15:31:15.762] LOG: Move: Beatdown | Base damage: 20.07142857142857 | Power: 25 | Source attack: 165 | Target defense: 126
+[15:31:15.763] LOG: Move: Beatdown | Attack damage: 41
+[15:31:15.776] LOG: %cStart Phase DamageAnimPhase color:green;
+[15:31:15.793] LOG: %cStart Phase MessagePhase color:green;
+[15:31:15.992] LOG: %cStart Phase MessagePhase color:green;
+[15:31:16.191] LOG: %cStart Phase FaintPhase color:green;
+[15:31:16.196] WARN: cry/10735 not found
+[15:31:16.253] LOG: %cStart Phase MessagePhase color:green;
+[15:31:16.498] LOG: %cStart Phase VictoryPhase color:green;
+[15:31:16.498] LOG: Applied Soothe Bell 
+[15:31:16.499] LOG: Applied Soothe Bell 
+[15:31:16.500] LOG: Applied Lucky Egg 
+[15:31:16.500] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[15:31:16.500] LOG: Applied Super EXP. Charm 
+[15:31:16.500] LOG: Applied EXP. Charm 
+[15:31:16.501] LOG: %cStart Phase LevelUpPhase color:green;
+[15:31:16.501] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[15:31:16.501] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[15:31:16.501] LOG: Applied Super EXP. Charm 
+[15:31:16.501] LOG: Applied EXP. Charm 
+[15:31:16.502] LOG: %cStart Phase LevelUpPhase color:green;
+[15:31:16.502] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[15:31:16.502] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[15:31:16.502] LOG: Applied Super EXP. Charm 
+[15:31:16.502] LOG: Applied EXP. Charm 
+[15:31:16.502] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[15:31:16.502] LOG: %cStart Phase MoveEndPhase color:green;
+[15:31:16.503] LOG: %cStart Phase CheckInterludePhase color:green;
+[15:31:16.503] LOG: %cStart Phase WeatherEffectPhase color:green;
+[15:31:16.503] LOG: %cStart Phase PositionalTagPhase color:green;
+[15:31:16.503] LOG: %cStart Phase BerryPhase color:green;
+[15:31:16.505] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[15:31:16.507] LOG: %cStart Phase TurnEndPhase color:green;
+[15:31:16.510] WARN: [coop:turn] host recorder: finalize with NO open recording -> turn=-1 events=0 (caller decides not to emit)
+[15:31:16.510] LOG: %cStart Phase SwitchPhase color:green;
+[15:31:16.510] LOG: %cStart Phase SwitchSummonPhase color:green;
+[15:31:16.725] LOG: Marnie
+[15:31:16.793] LOG: Applied Carbos (enemy)
+[15:31:16.793] LOG: Applied Protein (enemy)
+[15:31:16.793] LOG: Applied Iron (enemy)
+[15:31:16.793] LOG: Applied Zinc (enemy)
+[15:31:16.793] LOG: Applied HP Up (enemy)
+[15:31:16.793] LOG: Applied Protein (enemy)
+[15:31:16.794] LOG: Applied HP Up (enemy)
+[15:31:16.794] LOG: Applied Carbos (enemy)
+[15:31:16.794] LOG: Applied Calcium (enemy)
+[15:31:16.794] LOG: Applied Iron (enemy)
+[15:31:16.794] LOG: Applied Zinc (enemy)
+[15:31:16.794] LOG: Applied HP Up (enemy)
+[15:31:16.794] LOG: Applied Protein (enemy)
+[15:31:16.794] LOG: Applied Iron (enemy)
+[15:31:16.794] LOG: Applied Carbos (enemy)
+[15:31:16.938] LOG: %cStart Phase PostSummonPhase color:green;
+[15:31:16.938] LOG: Ran PSP for: Grimmsnarl
+[15:31:16.939] LOG: %cStart Phase PostSummonPhase color:green;
+[15:31:16.939] LOG: %cStart Phase MovePhase color:green;
+[15:31:16.939] LOG: %cUser: Grimmsnarl
+Move: SCRATCH
+Use Mode: INDIRECT color:orchid
+[15:31:16.943] LOG: %cStart Phase MessagePhase color:green;
+[15:31:17.074] LOG: %cStart Phase MoveEffectPhase color:green;
+[15:31:17.076] LOG: Battle Seed: u3EDheZsBD1621G2
+[15:31:17.092] LOG: crit stage: +3
+[15:31:17.093] LOG: Applied Silk Scarf (enemy)
+[15:31:17.095] LOG: Move: Scratch | Base damage: 47.202285714285715 | Power: 48 | Source attack: 206 | Target defense: 140
+[15:31:17.097] LOG: Move: Scratch | Attack damage: 67
+[15:31:17.098] LOG: %cStart Phase DamageAnimPhase color:green;
+[15:31:17.128] LOG: %cStart Phase MessagePhase color:green;
+[15:31:17.325] LOG: %cStart Phase ShowAbilityPhase color:green;
+[15:31:17.503] LOG: %cStart Phase StatStageChangePhase color:green;
+[15:31:17.697] LOG: %cStart Phase MessagePhase color:green;
+[15:31:17.925] LOG: %cStart Phase HideAbilityPhase color:green;
+[15:31:17.961] LOG: %cStart Phase ShowAbilityPhase color:green;
+[15:31:18.128] LOG: %cStart Phase StatStageChangePhase color:green;
+[15:31:18.311] LOG: %cStart Phase MessagePhase color:green;
+[15:31:18.558] LOG: %cStart Phase HideAbilityPhase color:green;
+[15:31:18.594] LOG: %cStart Phase MoveEndPhase color:green;
+[15:31:18.594] LOG: %cStart Phase PostSummonPhase color:green;
+[15:31:18.597] LOG: %cStart Phase ShowAbilityPhase color:green;
+[15:31:18.766] LOG: %cStart Phase StatStageChangePhase color:green;
+[15:31:18.963] LOG: %cStart Phase MessagePhase color:green;
+[15:31:19.191] LOG: %cStart Phase HideAbilityPhase color:green;
+[15:31:19.228] LOG: %cStart Phase ShowAbilityPhase color:green;
+[15:31:19.395] LOG: %cStart Phase StatStageChangePhase color:green;
+[15:31:19.572] LOG: %cStart Phase MessagePhase color:green;
+[15:31:19.808] LOG: %cStart Phase HideAbilityPhase color:green;
+[15:31:19.845] LOG: %cStart Phase SwitchSummonPhase color:green;
+[15:31:20.066] LOG: Marnie
+[15:31:20.135] LOG: Applied Calcium (enemy)
+[15:31:20.135] LOG: Applied Iron (enemy)
+[15:31:20.135] LOG: Applied Zinc (enemy)
+[15:31:20.135] LOG: Applied HP Up (enemy)
+[15:31:20.135] LOG: Applied Protein (enemy)
+[15:31:20.135] LOG: Applied Zinc (enemy)
+[15:31:20.135] LOG: Applied HP Up (enemy)
+[15:31:20.135] LOG: Applied Protein (enemy)
+[15:31:20.136] LOG: Applied HP Up (enemy)
+[15:31:20.136] LOG: Applied Carbos (enemy)
+[15:31:20.136] LOG: Applied Carbos (enemy)
+[15:31:20.136] LOG: Applied Protein (enemy)
+[15:31:20.136] LOG: Applied Iron (enemy)
+[15:31:20.136] LOG: Applied Iron (enemy)
+[15:31:20.136] LOG: Applied Carbos (enemy)
+[15:31:20.167] WARN: cry/10048 not found
+[15:31:20.301] LOG: %cStart Phase PostSummonPhase color:green;
+[15:31:20.301] LOG: Ran PSP for: Morpekyll
+[15:31:20.303] LOG: %cStart Phase PostSummonPhase color:green;
+[15:31:20.303] LOG: %cStart Phase PostSummonPhase color:green;
+[15:31:20.304] LOG: %cStart Phase TurnInitPhase color:green;
+[15:31:20.304] LOG: %cStart Phase CommandPhase color:green;
