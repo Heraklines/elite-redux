@@ -1259,7 +1259,18 @@ export function isAuthoritativeBattleSession(): boolean {
  * versus-guest path. Read-only at render; NEVER used to mutate authoritative order/state.
  */
 export function isShowdownGuestFlip(): boolean {
-  return isVersusSession() && getCoopController()?.role === "guest";
+  // TEMPORARILY DISABLED (staging stabilization 2026-07-08): the presentation-level flip is
+  // spread across ~30 gate checks with construction-time vs live sampling hazards, and kept
+  // regressing live (front sprites, swapped panel chrome, a summon crash) despite each site
+  // testing green in isolation. With the flip OFF, the versus guest renders the stable
+  // authoritative view (its own team on the TOP/enemy side) - visually inverted but every
+  // mechanic (showdown command menu, relay, results, forfeit) is proven in this configuration.
+  // The REAL flip is being rebuilt at the DATA level (swap sides once at the guest's world-
+  // adoption boundary, so all rendering is naturally correct) - see the plan doc follow-up.
+  // All flip machinery (predicate installs, presentation helpers, panel-class selection)
+  // stays in place and reactivates by restoring the line below.
+  return false;
+  // return isVersusSession() && getCoopController()?.role === "guest";
 }
 
 /** Convenience: the live battle-command relay, or null when not in a co-op run. */
