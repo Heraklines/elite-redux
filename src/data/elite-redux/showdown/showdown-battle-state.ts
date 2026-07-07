@@ -31,6 +31,12 @@ interface ShowdownBattleState {
    * applies it to the flipped-top trainer; the result phase reads its win/lose dialogue lines.
    */
   opponentProfile: GhostTrainerProfile | null;
+  /**
+   * Task D1/D2: the escrow server's match id for a STAKED match, or null for a FRIENDLY match
+   * (no escrow). The result phase reports the outcome + applies settlement only when this is set;
+   * the `showdownResult` / `showdownVoid` wire messages carry it verbatim.
+   */
+  matchId: string | null;
 }
 
 let state: ShowdownBattleState | null = null;
@@ -71,6 +77,7 @@ export function beginShowdownBattle(
   opponentManifest: ShowdownMonManifest[],
   relay: ShowdownCommandRelay | null = null,
   opponentProfile: GhostTrainerProfile | null = null,
+  matchId: string | null = null,
 ): void {
   // Adopt the pre-battle relay into the live state: clear the pending slot WITHOUT disposing the
   // adopted relay (endShowdownBattle owns its teardown now). Dispose a stale, non-adopted pending relay.
@@ -78,7 +85,7 @@ export function beginShowdownBattle(
     pendingRelay.dispose();
   }
   pendingRelay = null;
-  state = { ownManifest, opponentManifest, relay, opponentProfile };
+  state = { ownManifest, opponentManifest, relay, opponentProfile, matchId };
 }
 
 /** The live match state, or null when no showdown match is active. */
@@ -108,6 +115,11 @@ export function getShowdownOpponentProfile(): GhostTrainerProfile | null {
 /** The enemy-command relay (C4), or null (host-solo bootstrap / no match). */
 export function getShowdownRelay(): ShowdownCommandRelay | null {
   return state?.relay ?? null;
+}
+
+/** Task D1/D2: the escrow match id for a STAKED match, or null for a friendly (no escrow). */
+export function getShowdownMatchId(): string | null {
+  return state?.matchId ?? null;
 }
 
 /** Whether a showdown match is active (both teams stashed). */

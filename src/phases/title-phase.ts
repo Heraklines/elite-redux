@@ -17,6 +17,7 @@ import { buildInfernoFeed } from "#data/elite-redux/er-community-challenge-infer
 import { applyCommunityChallengeToRun } from "#data/elite-redux/er-community-challenge-launch";
 import type { CommunityChallengeConfig } from "#data/elite-redux/er-community-challenges";
 import { resetCommunityRunState } from "#data/elite-redux/er-community-run-state";
+import { syncShowdownPendingSettlements } from "#data/elite-redux/showdown/showdown-escrow-client";
 import { Gender } from "#data/gender";
 import { BattleType } from "#enums/battle-type";
 import { GameModes } from "#enums/game-modes";
@@ -62,6 +63,13 @@ export class TitlePhase extends Phase {
       globalScene.playBgm("winter_title", true);
     } else {
       globalScene.playBgm("title", true);
+    }
+
+    // Showdown escrow (D2): self-apply any settlements a staked match resolved while this
+    // device was offline. Fire-and-forget + best-effort — a failure/absent endpoint is a no-op,
+    // and it never blocks the title. Only when logged in (the pending queue is per-account).
+    if (loggedInUser != null) {
+      void syncShowdownPendingSettlements(globalScene.gameData).catch(() => {});
     }
 
     const lastSlot = await this.checkLastSaveSlot();

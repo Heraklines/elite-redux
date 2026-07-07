@@ -8,7 +8,15 @@ import { globalScene } from "#app/global-scene";
 import { clearCoopRuntime, getCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
 import { resolveGhostDialogue } from "#data/elite-redux/er-ghost-profile";
 import { buildGhostDialogueCtx } from "#data/elite-redux/er-ghost-teams";
-import { endShowdownBattle, getShowdownOpponentProfile } from "#data/elite-redux/showdown/showdown-battle-state";
+import {
+  endShowdownBattle,
+  getShowdownMatchId,
+  getShowdownOpponentProfile,
+} from "#data/elite-redux/showdown/showdown-battle-state";
+import {
+  reportShowdownResult,
+  syncShowdownPendingSettlements,
+} from "#data/elite-redux/showdown/showdown-escrow-client";
 import {
   type ShowdownResultReason,
   type ShowdownVoidReason,
@@ -64,20 +72,24 @@ export class ShowdownResultPhase extends BattlePhase {
     const rawLine = selectShowdownResultLine(getShowdownOpponentProfile(), this.localWon, this.voided);
     const opponentLine = rawLine ? resolveGhostDialogue(rawLine, buildGhostDialogueCtx()) : null;
 
-    // Emit the outcome to the peer so both clients show the same result (friendly -> matchId null).
-    // Best-effort + guarded so a send can never strand the return to title. Skipped when this phase
-    // was itself ROUTED from a received peer result/void (silent) - otherwise the two clients ping-pong.
+    // The escrow match id (null for a FRIENDLY match). Read BEFORE endShowdownBattle drops it.
+    const matchId = getShowdownMatchId();
+    const localRole = getCoopRuntime()?.controller.role ?? "host";
+
+    // Emit the outcome to the peer so both clients show the same result (matchId carried verbatim:
+    // real id for a staked match, null for a friendly). Best-effort + guarded so a send can never
+    // strand the return to title. Skipped when this phase was itself ROUTED from a received peer
+    // result/void (silent) - otherwise the two clients ping-pong.
     try {
       const transport = this.silent ? null : getCoopRuntime()?.localTransport;
       if (transport != null) {
         if (this.voided) {
-          transport.send({ t: "showdownVoid", matchId: null, reason: this.reason as ShowdownVoidReason });
+          transport.send({ t: "showdownVoid", matchId, reason: this.reason as ShowdownVoidReason });
         } else {
           // The winner as an absolute role: our own role when we won, else the other (pure, tested).
-          const localRole = getCoopRuntime()?.controller.role ?? "host";
           transport.send({
             t: "showdownResult",
-            matchId: null,
+            matchId,
             winner: winnerFromLocalResult(localRole, this.localWon),
             reason: this.reason as ShowdownResultReason,
           });
@@ -85,6 +97,18 @@ export class ShowdownResultPhase extends BattlePhase {
       }
     } catch {
       /* a result/void send failure must never block the return to title */
+    }
+
+    // STAKED match (D1/D2): report the decisive outcome to the escrow server via dual attestation,
+    // then self-apply any settlement it produced. Fire-and-forget + fully guarded — the escrow round
+    // trip must NEVER block or strand the return to title, and an offline/unreachable escrow simply
+    // leaves the settlement for the next login sync. A VOID has no winner to attest, so it isn't
+    // reported here (a conflict/silence-timeout resolves the ledger server-side; see D1).
+    if (matchId != null && !this.voided) {
+      const winner = winnerFromLocalResult(localRole, this.localWon);
+      void reportShowdownResult(matchId, winner, this.reason as ShowdownResultReason)
+        .then(() => syncShowdownPendingSettlements(globalScene.gameData))
+        .catch(() => {});
     }
 
     // Ephemeral match: drop the showdown + co-op runtime state. NEVER persisted (no saveAll).

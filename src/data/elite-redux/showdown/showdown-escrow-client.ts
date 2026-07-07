@@ -1,0 +1,170 @@
+/*
+ * SPDX-FileCopyrightText: 2024-2026 Pagefault Games
+ *
+ * SPDX-License-Identifier: AGPL-3.0-only
+ */
+
+// =============================================================================
+// Showdown 1v1 escrow — CLIENT network helper (Task D1/D2 wiring). Thin fetch wrappers
+// around the er-save-api /showdown/* routes, mirroring the auth (session cookie -> Bearer)
+// and base-URL (VITE_SERVER_URL) conventions the rest of the client already uses
+// (`api-base.ts` + the devtest progress fetch).
+//
+// EVERY call is best-effort and returns a discriminated result — a failure NEVER throws
+// into the battle/result flow. When the endpoint is unset (local dev) or unreachable, the
+// call resolves to an error result and the caller falls back to the FRIENDLY path (the
+// friendly match never touches the server), keeping showdown fully playable offline.
+// =============================================================================
+
+import { SESSION_ID_COOKIE_NAME } from "#app/constants";
+import {
+  applySettlementMutations,
+  type SettlementGameData,
+  type ShowdownSettlementMutation,
+} from "#data/elite-redux/showdown/showdown-settlement";
+import type { StakeOffer } from "#data/elite-redux/showdown/showdown-stakes";
+import { getCookie } from "#utils/cookies";
+
+/** A pending settlement row for THIS player: the DB row id + the mutation to apply. */
+export interface ShowdownPendingItem {
+  id: number;
+  matchId: string;
+  mutation: ShowdownSettlementMutation;
+}
+
+/** The escrow base URL, or null when cloud saves are not configured (local dev). */
+function escrowBase(): string | null {
+  const url = (import.meta.env as { VITE_SERVER_URL?: string }).VITE_SERVER_URL ?? "";
+  return url ? url.replace(/\/$/, "") : null;
+}
+
+async function escrowFetch(path: string, init: RequestInit): Promise<Response | null> {
+  const base = escrowBase();
+  if (!base) {
+    return null;
+  }
+  try {
+    return await fetch(`${base}${path}`, {
+      ...init,
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: getCookie(SESSION_ID_COOKIE_NAME),
+        ...(init.headers ?? {}),
+      },
+    });
+  } catch {
+    // offline / no endpoint — surface as a null (the caller falls back to friendly).
+    return null;
+  }
+}
+
+/** POST /showdown/match — register the escrow hold. Resolves the server matchId or null on any failure. */
+export async function registerShowdownMatch(args: {
+  matchId: string;
+  hostUid: number;
+  guestUid: number;
+  hostStake: StakeOffer;
+  guestStake: StakeOffer;
+}): Promise<{ ok: true; matchId: string } | { ok: false; error: string }> {
+  const res = await escrowFetch("/showdown/match", { method: "POST", body: JSON.stringify(args) });
+  if (!res) {
+    return { ok: false, error: "escrow unreachable" };
+  }
+  if (!res.ok) {
+    return { ok: false, error: `escrow rejected (${res.status})` };
+  }
+  try {
+    const body = (await res.json()) as { matchId?: unknown };
+    if (typeof body.matchId === "string") {
+      return { ok: true, matchId: body.matchId };
+    }
+  } catch {
+    /* fallthrough */
+  }
+  return { ok: false, error: "escrow bad response" };
+}
+
+/** POST /showdown/battle-entered — both clients ping at battle start (sets the lone-report gate). Best-effort. */
+export async function reportShowdownBattleEntered(matchId: string): Promise<void> {
+  await escrowFetch("/showdown/battle-entered", { method: "POST", body: JSON.stringify({ matchId }) });
+}
+
+/**
+ * POST /showdown/result — report the outcome (dual attestation). Returns the settlement
+ * mutations to apply when THIS report settled the match, else an empty array (pending/void).
+ */
+export async function reportShowdownResult(
+  matchId: string,
+  winner: "host" | "guest",
+  reason: "victory" | "forfeit" | "timeout",
+): Promise<{ resolution: "settled" | "void" | "pending"; mutations: ShowdownSettlementMutation[] }> {
+  const res = await escrowFetch("/showdown/result", {
+    method: "POST",
+    body: JSON.stringify({ matchId, winner, reason }),
+  });
+  if (!res || !res.ok) {
+    return { resolution: "pending", mutations: [] };
+  }
+  try {
+    const body = (await res.json()) as { resolution?: unknown };
+    const resolution = body.resolution === "settled" || body.resolution === "void" ? body.resolution : "pending";
+    // The settle response does NOT carry this uid's mutations directly (they land in the
+    // pending queue); the caller fetches + applies them via fetchShowdownPending so the
+    // login-time and result-time apply paths share one implementation.
+    return { resolution, mutations: [] };
+  } catch {
+    return { resolution: "pending", mutations: [] };
+  }
+}
+
+/** GET /showdown/pending — the unapplied settlement mutations for this player. Empty on any failure. */
+export async function fetchShowdownPending(): Promise<ShowdownPendingItem[]> {
+  const res = await escrowFetch("/showdown/pending", { method: "GET" });
+  if (!res || !res.ok) {
+    return [];
+  }
+  try {
+    const body = (await res.json()) as { items?: unknown };
+    if (!Array.isArray(body.items)) {
+      return [];
+    }
+    return body.items.filter(
+      (x): x is ShowdownPendingItem =>
+        !!x && typeof x === "object" && typeof (x as ShowdownPendingItem).id === "number",
+    );
+  } catch {
+    return [];
+  }
+}
+
+/** POST /showdown/pending/ack — mark the given settlement rows applied. Best-effort. */
+export async function ackShowdownPending(ids: number[]): Promise<void> {
+  if (ids.length === 0) {
+    return;
+  }
+  await escrowFetch("/showdown/pending/ack", { method: "POST", body: JSON.stringify({ ids }) });
+}
+
+/**
+ * Fetch → apply → ack any unapplied settlements for this player. Called at login/session
+ * start (self-apply anything a match settled while this device was offline) AND right after
+ * a staked match reports its result. Best-effort; returns the count applied (0 on any failure).
+ *
+ * At-most-once caveat: the ack follows the local apply, so a rare apply-succeeds-then-ack-fails
+ * window could re-return a row next sync. The server never returns an ACKED row, so the window
+ * is a single failed ack; documented rather than adding a client-side dedupe ledger for wave 2.
+ */
+export async function syncShowdownPendingSettlements(gameData: SettlementGameData): Promise<number> {
+  const items = await fetchShowdownPending();
+  if (items.length === 0) {
+    return 0;
+  }
+  const applied = applySettlementMutations(
+    items.map(i => i.mutation),
+    gameData,
+  );
+  if (applied > 0) {
+    await ackShowdownPending(items.map(i => i.id));
+  }
+  return applied;
+}
