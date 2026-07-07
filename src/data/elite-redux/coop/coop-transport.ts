@@ -1045,7 +1045,17 @@ export type CoopMessage =
    * the-wrong-mon desync). Orthogonal to the proven `waveResolved` handshake (that arm is untouched);
    * an older client ignores an unknown `t`. Idempotent: absolute SETs guarded by per-slot speciesId.
    */
-  | { t: "expResolved"; wave: number; deltas: CoopExpDelta[] };
+  | { t: "expResolved"; wave: number; deltas: CoopExpDelta[] }
+  /**
+   * Host -> guest (#838 WAVE-END authoritative capture): the COMPLETE post-exp authoritative battle
+   * state, captured in the host's `BattleEndPhase` AFTER the wave's whole exp/level/evolution chain
+   * drained - so the guest's levels / exp / learned moves / evolved species CONVERGE through the
+   * between-wave shop off a single id-based full-state apply ({@linkcode CoopAuthoritativeBattleStateV1}
+   * -> `applyCoopAuthoritativeBattleState`), NOT the legacy per-slot `expResolved` delta relay. It
+   * supersedes `expResolved`; both ride the wire during the transition (an older client ignores an
+   * unknown `t`).
+   */
+  | { t: "waveEndState"; wave: number; state: CoopAuthoritativeBattleStateV1 };
 
 /** A transport moves {@linkcode CoopMessage}s between two paired clients. */
 export interface CoopTransport {

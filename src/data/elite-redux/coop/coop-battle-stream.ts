@@ -209,6 +209,8 @@ export class CoopBattleStreamer {
     | null = null;
   /** GUEST: handler for the host's settled post-exp per-slot deltas (#633 B5, authoritative EXP). */
   private expResolvedHandler: ((wave: number, deltas: CoopExpDelta[]) => void) | null = null;
+  /** GUEST: handler for the host's WAVE-END authoritative full-state snapshot (#838). */
+  private waveEndStateHandler: ((wave: number, state: CoopAuthoritativeBattleStateV1) => void) | null = null;
 
   /** GUEST (#825): the host's rolled ME type per wave (from enemyPartySync). */
   private readonly meTypeByWave = new Map<number, number>();
@@ -383,6 +385,28 @@ export class CoopBattleStreamer {
   onExpResolved(handler: (wave: number, deltas: CoopExpDelta[]) => void): void {
     coopLog("stream", `guest REGISTER onExpResolved handler (was=${this.expResolvedHandler != null})`);
     this.expResolvedHandler = handler;
+  }
+
+  /**
+   * HOST (#838 WAVE-END authoritative capture): stream the COMPLETE post-exp authoritative battle
+   * state for `wave`, captured in the host's `BattleEndPhase` AFTER the wave's exp/level/evolution
+   * chain drained. The guest adopts it via a single id-based full-state apply, so its levels / exp /
+   * learned moves / evolved species converge through the between-wave shop off the same wire the live
+   * turns use. Supersedes the per-slot `expResolved` relay (both ride during the transition).
+   */
+  sendWaveEndState(wave: number, state: CoopAuthoritativeBattleStateV1): void {
+    coopLog("replay", `host SEND waveEndState wave=${wave} tick=${state.tick} party=${state.playerParty.length}`);
+    this.transport.send({ t: "waveEndState", wave, state });
+  }
+
+  /**
+   * GUEST (#838): subscribe to the host's WAVE-END authoritative full-state snapshot. The handler
+   * stores a one-shot pending payload the guest's `BattleEndPhase` consumes + applies (id-based
+   * full-state apply). Wave-guarded by the caller.
+   */
+  onWaveEndState(handler: (wave: number, state: CoopAuthoritativeBattleStateV1) => void): void {
+    coopLog("stream", `guest REGISTER onWaveEndState handler (was=${this.waveEndStateHandler != null})`);
+    this.waveEndStateHandler = handler;
   }
 
   /**
@@ -1112,6 +1136,7 @@ export class CoopBattleStreamer {
     this.meMessageHandler = null;
     this.waveResolvedHandler = null;
     this.expResolvedHandler = null;
+    this.waveEndStateHandler = null;
   }
 
   private handle(msg: CoopMessage): void {
@@ -1302,6 +1327,15 @@ export class CoopBattleStreamer {
           coopWarn("replay", `guest RECV expResolved wave=${msg.wave} DROPPED (no handler registered)`);
         }
         this.expResolvedHandler?.(msg.wave, msg.deltas);
+        return;
+      case "waveEndState":
+        // GUEST (#838): the host's WAVE-END authoritative full-state snapshot - the guest adopts it in
+        // BattleEndPhase so its levels / exp / learned moves / evolved species converge in the shop window.
+        coopLog("replay", `guest RECV waveEndState wave=${msg.wave} tick=${msg.state.tick}`);
+        if (this.waveEndStateHandler == null) {
+          coopWarn("replay", `guest RECV waveEndState wave=${msg.wave} DROPPED (no handler registered)`);
+        }
+        this.waveEndStateHandler?.(msg.wave, msg.state);
         return;
       case "ghostPool":
         // Deliver to a live handler, else buffer (the broadcast can land before the

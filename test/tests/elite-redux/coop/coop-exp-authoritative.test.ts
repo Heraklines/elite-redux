@@ -13,13 +13,41 @@
 // verifies (1) the wire variant round-trips, (2) capture/apply makes a divergent guest party CONVERGE,
 // and (3) the per-slot speciesId GUARD skips a host-evolved slot (leaving it for the resync benchParty).
 
+import type { BattleScene } from "#app/battle-scene";
 import { getGameMode } from "#app/game-mode";
-import { applyCoopExpDeltas, captureCoopExpDeltas } from "#data/elite-redux/coop/coop-battle-engine";
-import { clearCoopRuntime, startLocalCoopSession } from "#data/elite-redux/coop/coop-runtime";
+import { initGlobalScene } from "#app/global-scene";
+import {
+  applyCoopAuthoritativeBattleState,
+  applyCoopExpDeltas,
+  captureCoopExpDeltas,
+} from "#data/elite-redux/coop/coop-battle-engine";
+import { setCoopWaveBarrierMs } from "#data/elite-redux/coop/coop-interaction-relay";
+import { resetCoopRendezvousWaitMs, setCoopRendezvousWaitMs } from "#data/elite-redux/coop/coop-rendezvous";
+import {
+  broadcastCoopWaveEndState,
+  clearCoopRuntime,
+  consumeCoopPendingWaveEndState,
+  setCoopRuntime,
+  startLocalCoopSession,
+} from "#data/elite-redux/coop/coop-runtime";
+import { COOP_GUEST_FIELD_INDEX, COOP_HOST_FIELD_INDEX } from "#data/elite-redux/coop/coop-session";
 import type { CoopExpDelta, CoopMessage } from "#data/elite-redux/coop/coop-transport";
+import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
+import { BattlerIndex } from "#enums/battler-index";
+import { Command } from "#enums/command";
 import { GameModes } from "#enums/game-modes";
+import { MoveId } from "#enums/move-id";
 import { SpeciesId } from "#enums/species-id";
+import { PokemonMove } from "#moves/pokemon-move";
 import { GameManager } from "#test/framework/game-manager";
+import {
+  buildDuo,
+  drainLoopback,
+  driveGuestReplayTurn,
+  installDuoLogCapture,
+  withClient,
+  withClientSync,
+} from "#test/tools/coop-duo-harness";
 import { getPokemonSpecies } from "#utils/pokemon-utils";
 import Phaser from "phaser";
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
@@ -168,4 +196,130 @@ describe.skipIf(!RUN)("co-op authoritative EXP (#633 B5) - live capture/apply co
     expect(scene.getPlayerParty()[0].level).toBe(30);
     expect(scene.getPlayerParty()[0].exp).toBe(40_000);
   });
+});
+
+// =============================================================================
+// #838 WAVE-END authoritative capture - the SUCCESSOR to the per-slot exp-delta relay above. The host
+// streams the COMPLETE post-exp battle state (whole party as PokemonData) in its BattleEndPhase; the
+// GUEST adopts it via ONE id-based full-state apply (applyCoopAuthoritativeBattleState), so its levels /
+// exp / learned moves / evolved species converge in the SHOP WINDOW off the same wire the live turns use.
+//
+// This is the GUARD the soak CANNOT be (the soak driver re-mirrors the guest at each wave START, which
+// false-greens any between-wave exp gap). Here TWO real engines run over the loopback: the host plays a
+// wave, the guest replays it, then we assert the guest's STALE (pure-renderer, exp gated off) level / exp
+// / moveset CONVERGE to the host's the moment the wave-end snapshot is applied - during the shop window,
+// BEFORE any wave-start re-mirror, and WITHOUT the exp-delta relay (applyCoopExpDeltas is never called).
+// =============================================================================
+function toCoop(scene: BattleScene): void {
+  scene.gameMode = getGameMode(GameModes.COOP);
+}
+
+describe.skipIf(!RUN)("co-op WAVE-END authoritative capture (#838) - guest converges in the shop window", () => {
+  let phaserGame: Phaser.Game;
+  let game: GameManager;
+  let logs: ReturnType<typeof installDuoLogCapture>;
+
+  beforeAll(() => {
+    phaserGame = new Phaser.Game({ type: Phaser.HEADLESS });
+  });
+
+  beforeEach(() => {
+    setCoopWaveBarrierMs(50);
+    setCoopRendezvousWaitMs(50);
+    game = new GameManager(phaserGame);
+    logs = installDuoLogCapture(`waveend-${Date.now()}`);
+    game.override
+      .battleStyle("double")
+      .startingWave(1)
+      .enemySpecies(SpeciesId.MAGIKARP)
+      .enemyLevel(1)
+      .enemyMoveset(MoveId.SPLASH)
+      .startingLevel(50)
+      .moveset([MoveId.TACKLE, MoveId.SPLASH])
+      .disableTrainerWaves();
+  });
+
+  afterEach(() => {
+    setCoopWaveBarrierMs(60_000);
+    resetCoopRendezvousWaitMs();
+    logs.dispose();
+    clearCoopRuntime();
+    // #710 harness-citizenship: buildDuo builds a 2nd BattleScene (the guest) which steals globalScene.
+    initGlobalScene(game.scene);
+  });
+
+  it("the host's WAVE-END snapshot converges the guest's stale level / exp / learned move (no exp-delta relay)", async () => {
+    await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
+    const pair = createLoopbackPair();
+    const rig = await buildDuo(game, pair, setCoopRuntime, toCoop);
+    // Wire the guest's OWN-slot command answer (the genuine production CoopBattleSync relay).
+    rig.guestRuntime.battleSync.onCommandRequest(({ moveSlots }) => ({
+      command: Command.FIGHT,
+      cursor: moveSlots.length > 0 ? moveSlots[0] : 0,
+      moveId: MoveId.TACKLE,
+      targets: [BattlerIndex.ENEMY_2],
+    }));
+
+    // ===== Host plays wave 1 to a win; the guest replays it (both now on the just-won field = shop window). =====
+    const turn = rig.hostScene.currentBattle.turn;
+    await withClient(rig.hostCtx, async () => {
+      game.move.select(MoveId.TACKLE, COOP_HOST_FIELD_INDEX, BattlerIndex.ENEMY);
+      game.move.select(MoveId.TACKLE, COOP_GUEST_FIELD_INDEX, BattlerIndex.ENEMY_2);
+      await game.phaseInterceptor.to("TurnEndPhase");
+    });
+    await withClient(rig.guestCtx, () => driveGuestReplayTurn(rig.guestScene, turn));
+
+    // ===== Stage the host lead's SETTLED post-exp state, exactly as the exp/level chain would leave it =====
+    // BEFORE the host's BattleEndPhase emits: a level-up, credited exp, and a level-up MOVE the guest (which
+    // runs no LevelUpPhase) would never learn on its own.
+    const hostLead = rig.hostScene.getPlayerParty()[0];
+    const learnedMoveId = MoveId.HYPER_BEAM; // not in the starting [TACKLE, SPLASH] moveset
+    withClientSync(rig.hostCtx, () => {
+      hostLead.level = 60;
+      hostLead.exp = 300_000;
+      hostLead.moveset = [new PokemonMove(MoveId.TACKLE), new PokemonMove(learnedMoveId)];
+      hostLead.calculateStats();
+    });
+    const hostLevel = hostLead.level;
+    const hostExp = hostLead.exp;
+    const hostMoveIds = hostLead.getMoveset().map(m => m.moveId);
+
+    // The guest holds the SAME mon by Pokemon.id (the mirror is a PokemonData round-trip) but is STALE:
+    // still level 50 with no HYPER_BEAM - the exact between-wave divergence a shop window would show.
+    const guestLeadBefore = rig.guestScene.getPlayerParty().find(p => p.id === hostLead.id);
+    expect(guestLeadBefore, "the guest holds the host lead by Pokemon.id (id-based apply premise)").toBeDefined();
+    expect(guestLeadBefore!.level, "guest lead level is STALE before the wave-end apply").toBeLessThan(hostLevel);
+    expect(
+      guestLeadBefore!.getMoveset().some(m => m.moveId === learnedMoveId),
+      "guest lead lacks the host's level-up move before the wave-end apply",
+    ).toBe(false);
+
+    // ===== HOST BattleEndPhase emit: stream the WAVE-END authoritative snapshot (post-exp). =====
+    await withClient(rig.hostCtx, async () => {
+      broadcastCoopWaveEndState();
+      await drainLoopback();
+    });
+
+    // ===== GUEST BattleEndPhase branch: adopt the wave-end snapshot via the id-based full-state apply. This
+    // is the exact production seam (consume the pending wave-end state, then applyCoopAuthoritativeBattleState)
+    // - the exp-delta relay (applyCoopExpDeltas) is NEVER called. =====
+    const applied = withClientSync(rig.guestCtx, () =>
+      applyCoopAuthoritativeBattleState(consumeCoopPendingWaveEndState() ?? undefined, true),
+    );
+    expect(applied, "the guest applied the host's wave-end authoritative snapshot").toBe(true);
+
+    // ===== CONVERGED in the shop window: same mon by id, same level / exp, and the host's level-up move learned. =====
+    const guestLeadAfter = rig.guestScene.getPlayerParty().find(p => p.id === hostLead.id);
+    expect(
+      guestLeadAfter,
+      "the guest still holds the host lead by id after the apply (mutated in place)",
+    ).toBeDefined();
+    expect(guestLeadAfter!.level, "guest lead level converged to the host's post-exp level").toBe(hostLevel);
+    expect(guestLeadAfter!.exp, "guest lead exp converged to the host's credited exp").toBe(hostExp);
+    expect(
+      guestLeadAfter!.getMoveset().map(m => m.moveId),
+      "guest lead learned the host's level-up moveset (the move it never ran a LevelUpPhase for)",
+    ).toEqual(hostMoveIds);
+    logs.flush();
+  }, 240_000);
 });

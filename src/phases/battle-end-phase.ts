@@ -1,10 +1,12 @@
 import { applyAbAttrs } from "#abilities/apply-ab-attrs";
 import { globalScene } from "#app/global-scene";
-import { applyCoopExpDeltas } from "#data/elite-redux/coop/coop-battle-engine";
+import { applyCoopAuthoritativeBattleState, applyCoopExpDeltas } from "#data/elite-redux/coop/coop-battle-engine";
 import { coopLog } from "#data/elite-redux/coop/coop-debug";
 import {
   broadcastCoopExpResolved,
+  broadcastCoopWaveEndState,
   consumeCoopPendingExpDeltas,
+  consumeCoopPendingWaveEndState,
   isCoopAuthoritativeGuest,
 } from "#data/elite-redux/coop/coop-runtime";
 import { erAdvanceCommunityItemCharges } from "#data/elite-redux/er-community-items";
@@ -27,30 +29,7 @@ export class BattleEndPhase extends BattlePhase {
   start() {
     super.start();
 
-    // Co-op authoritative (#633 B5): EXP authority lands HERE, after the wave's whole exp/level/
-    // evolution chain has drained (those phases are unshifted ahead of this pushed BattleEndPhase).
-    //  - HOST: stream each party slot's SETTLED exp/level/moveset so the guest can mirror it (the
-    //    pre-exp `waveResolved` win-broadcast would carry STALE values - `applyPartyExp` only QUEUES
-    //    the exp phases; the mutation happens later inside them).
-    //  - GUEST: its own `applyPartyExp` is gated off (victory-phase.ts), so adopt the host's settled
-    //    deltas here - level/exp + the level-up moves it never learned (it runs no LevelUpPhase).
-    // Both are hard no-ops off the authoritative path (host gate internal; guest gate explicit), so
-    // solo / host-owner / lockstep are byte-for-byte unchanged.
-    // HOST: stream settled per-slot exp deltas (internally no-op off host). Log on co-op only so
-    // solo / lockstep stay silent; the broadcast itself decides whether anything goes on the wire.
-    if (globalScene.gameMode.isCoop) {
-      coopLog("progression", `expResolved BROADCAST wave=${globalScene.currentBattle.waveIndex} (host streams settled deltas)`);
-    }
-    broadcastCoopExpResolved();
-    if (isCoopAuthoritativeGuest()) {
-      // GUEST: adopt the host's settled deltas (level/exp + level-up moves it never learned).
-      const deltas = consumeCoopPendingExpDeltas() ?? undefined;
-      coopLog(
-        "progression",
-        `GUEST applyExpDeltas APPLY wave=${globalScene.currentBattle.waveIndex} count=${deltas?.length ?? 0} slots=[${deltas?.map(d => `${d.slot}:lv${d.level}:exp${d.exp}`).join(",") ?? ""}]`,
-      );
-      applyCoopExpDeltas(deltas);
-    }
+    this.syncCoopWaveEndProgression();
 
     // cull any extra `BattleEnd` phases from the queue.
     this.isVictory ||= globalScene.phaseManager.hasPhaseOfType(
@@ -119,5 +98,48 @@ export class BattleEndPhase extends BattlePhase {
 
     globalScene.updateModifiers();
     this.end();
+  }
+
+  /**
+   * Co-op authoritative progression sync. Party progression authority lands HERE, after the wave's whole
+   * exp/level/evolution chain has drained (those phases are unshifted ahead of this pushed BattleEndPhase).
+   *  - HOST: streams the WAVE-END authoritative full-state snapshot (#838, whole party as PokemonData) so
+   *    the guest converges levels / exp / learned moves / evolved species through the between-wave shop.
+   *    The legacy per-slot `expResolved` delta relay (#633 B5) still rides alongside during the transition.
+   *  - GUEST: its own `applyPartyExp` is gated off (victory-phase.ts), so it adopts the host's wave-end
+   *    snapshot via ONE id-based full-state apply, falling back to the per-slot deltas only when the
+   *    snapshot is absent (older host / capture failure) so no coverage is lost.
+   * Both arms are hard no-ops off the authoritative path (host gates internal; guest gate explicit), so
+   * solo / host-owner / lockstep are byte-for-byte unchanged.
+   */
+  private syncCoopWaveEndProgression(): void {
+    if (globalScene.gameMode.isCoop) {
+      coopLog(
+        "progression",
+        `expResolved BROADCAST wave=${globalScene.currentBattle.waveIndex} (host streams settled deltas)`,
+      );
+    }
+    broadcastCoopExpResolved();
+    broadcastCoopWaveEndState();
+    if (!isCoopAuthoritativeGuest()) {
+      return;
+    }
+    // GUEST: adopt the host's WAVE-END authoritative full-state snapshot via one id-based apply.
+    const waveEndState = consumeCoopPendingWaveEndState() ?? undefined;
+    const applied = applyCoopAuthoritativeBattleState(waveEndState, true);
+    coopLog(
+      "progression",
+      `GUEST waveEndState APPLY wave=${globalScene.currentBattle.waveIndex} applied=${applied} tick=${waveEndState?.tick ?? -1}`,
+    );
+    if (applied) {
+      return;
+    }
+    // Legacy fallback: adopt the host's settled per-slot deltas (level/exp + level-up moves).
+    const deltas = consumeCoopPendingExpDeltas() ?? undefined;
+    coopLog(
+      "progression",
+      `GUEST applyExpDeltas FALLBACK wave=${globalScene.currentBattle.waveIndex} count=${deltas?.length ?? 0} slots=[${deltas?.map(d => `${d.slot}:lv${d.level}:exp${d.exp}`).join(",") ?? ""}]`,
+    );
+    applyCoopExpDeltas(deltas);
   }
 }
