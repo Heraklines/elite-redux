@@ -1,0 +1,267 @@
+url:      https://elite-redux-staging.pages.dev/
+build:    mrb47h9h-s04
+mode:     4  wave:139
+seed:     Pzf1L9GCSJq9fus4FOpPlmeX
+party:    Kecleon(L113 291hp f0), Gholdengo(L126 459hp f0), Glalie Redux(L126 399hp f1), Iron Valiant(L121 316hp f0), Amphybuzz(L100 361hp f0), Zigzagoon(L102 221hp f0)
+enemy:    
+
+----- CONSOLE -----
+[21:27:55.745] LOG: %cStart Phase MessagePhase color:green;
+[21:27:56.025] LOG: %cStart Phase HideAbilityPhase color:green;
+[21:27:56.061] LOG: %cStart Phase MoveEffectPhase color:green;
+[21:27:56.792] LOG: Applied Dire Hit 
+[21:27:56.792] LOG: crit stage: +3
+[21:27:56.793] LOG: Move: Zippy Zap | Base damage: 35.64255319148936 | Power: 50 | Source attack: 134 | Target defense: 188
+[21:27:56.794] LOG: Move: Zippy Zap | Attack damage: 45
+[21:27:56.794] LOG: %cStart Phase DamageAnimPhase color:green;
+[21:27:56.828] LOG: %cStart Phase MoveEndPhase color:green;
+[21:27:56.830] LOG: %cStart Phase MovePhase color:green;
+[21:27:56.830] LOG: %cUser: Mega Glalie Redux
+Move: SUCKER_PUNCH
+Use Mode: NORMAL color:orchid
+[21:27:56.848] LOG: %cStart Phase MessagePhase color:green;
+[21:27:56.950] LOG: %cStart Phase MoveEffectPhase color:green;
+[21:27:57.367] LOG: Applied Dire Hit 
+[21:27:57.368] LOG: crit stage: +4
+[21:27:57.370] LOG: Move: Sucker Punch | Base damage: 588.88 | Power: 70 | Source attack: 1504 | Target defense: 188
+[21:27:57.370] LOG: Move: Sucker Punch | Attack damage: 1501
+[21:27:57.371] LOG: %cStart Phase DamageAnimPhase color:green;
+[21:27:57.402] LOG: %cStart Phase MessagePhase color:green;
+[21:27:57.608] LOG: %cStart Phase FaintPhase color:green;
+[21:27:59.965] LOG: %cStart Phase MessagePhase color:green;
+[21:28:00.173] LOG: %cStart Phase ShowAbilityPhase color:green;
+[21:28:00.336] LOG: %cStart Phase PokemonHealPhase color:green;
+[21:28:00.497] LOG: %cStart Phase MessagePhase color:green;
+[21:28:00.742] LOG: %cStart Phase HideAbilityPhase color:green;
+[21:28:00.776] LOG: %cStart Phase VictoryPhase color:green;
+[21:28:00.777] LOG: Applied Soothe Bell 
+[21:28:00.777] LOG: Applied Soothe Bell 
+[21:28:00.777] LOG: Applied Soothe Bell 
+[21:28:00.781] LOG: %cStart Phase ExpPhase color:green;
+[21:28:00.781] LOG: Applied Super EXP. Charm 
+[21:28:00.781] LOG: Applied EXP. Charm 
+[21:28:01.003] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[21:28:01.003] LOG: Applied Super EXP. Charm 
+[21:28:01.004] LOG: Applied EXP. Charm 
+[21:28:01.004] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[21:28:01.004] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[21:28:01.004] LOG: Applied Super EXP. Charm 
+[21:28:01.005] LOG: Applied EXP. Charm 
+[21:28:01.005] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[21:28:01.005] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[21:28:01.005] LOG: Applied Super EXP. Charm 
+[21:28:01.005] LOG: Applied EXP. Charm 
+[21:28:01.006] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[21:28:01.006] LOG: %cStart Phase MoveEndPhase color:green;
+[21:28:01.006] LOG: %cStart Phase MovePhase color:green;
+[21:28:01.006] LOG: %cStart Phase MoveEndPhase color:green;
+[21:28:01.006] LOG: %cStart Phase CheckInterludePhase color:green;
+[21:28:01.006] LOG: %cStart Phase WeatherEffectPhase color:green;
+[21:28:01.006] LOG: %cStart Phase PositionalTagPhase color:green;
+[21:28:01.006] LOG: %cStart Phase BerryPhase color:green;
+[21:28:01.011] LOG: Applied Sitrus Berry 
+[21:28:01.012] LOG: Applied Calcium 
+[21:28:01.012] LOG: Applied HP Up 
+[21:28:01.012] LOG: Applied Carbos 
+[21:28:01.013] LOG: Applied Protein 
+[21:28:01.027] LOG: %cStart Phase CommonAnimPhase color:green;
+[21:28:01.027] LOG: %cStart Phase PokemonHealPhase color:green;
+[21:28:01.231] LOG: %cStart Phase MessagePhase color:green;
+[21:28:01.500] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[21:28:01.505] LOG: %cStart Phase TurnEndPhase color:green;
+[21:28:01.510] WARN: [coop:turn] host recorder: finalize with NO open recording -> turn=-1 events=0 (caller decides not to emit)
+[21:28:01.510] LOG: %cStart Phase BattleEndPhase color:green;
+[21:28:01.510] LOG: Battle Score: 0 (3 Turns x0)
+[21:28:01.511] LOG: Total Score: 47276
+[21:28:01.524] LOG: Applied Calcium 
+[21:28:01.525] LOG: Applied HP Up 
+[21:28:01.525] LOG: Applied Carbos 
+[21:28:01.525] LOG: Applied Protein 
+[21:28:01.533] LOG: %cStart Phase ShowAbilityPhase color:green;
+[21:28:01.533] LOG: %cStart Phase HideAbilityPhase color:green;
+[21:28:01.567] LOG: %cStart Phase MessagePhase color:green;
+[21:28:01.733] LOG: %cStart Phase EggLapsePhase color:green;
+[21:28:01.734] LOG: %cStart Phase SelectModifierPhase color:green;
+[21:28:01.735] LOG: Wave Seed: ÚĄð»ÖÃÑÍÝÔûÃðÿý¾ÐÙúÚö÷ïâ 138
+[21:28:01.756] LOG: Applied Golden Poké Ball 
+[21:28:01.756] LOG: 13 6 [2,3,4,5,7,8,16,22]
+[21:28:01.756] LOG: {"id":"NUGGET","localeKey":"modifierType:ModifierType.NUGGET","iconImage":"nugget","group":"money","soundName":"se/buy","tier":1,"moneyMultiplier":1,"moneyMultiplierDescriptorKey":"modifierType:ModifierType.MoneyRewardModifierType.extra.small"} 
+[21:28:01.756] LOG: 5 0 []
+[21:28:01.756] LOG: {"id":"MAX_ETHER","localeKey":"modifierType:ModifierType.MAX_ETHER","iconImage":"max_ether","group":"ether","soundName":"se/restore","tier":0,"restorePoints":-1} 
+[21:28:01.756] LOG: 5 0 [10,11,12,13,14,23]
+[21:28:01.756] LOG: ULTRA 0
+[21:28:01.756] LOG: 22 5 [10,11,12,13,14,23]
+[21:28:01.756] LOG: {"id":"EXP_SHARE","localeKey":"modifierType:ModifierType.EXP_SHARE","iconImage":"exp_share","soundName":"se/restore","tier":2} 
+[21:28:01.756] LOG: 2 0 []
+[21:28:01.756] LOG: {"id":"POTION","localeKey":"modifierType:ModifierType.POTION","iconImage":"potion","group":"potion","soundName":"se/restore","tier":0,"restorePoints":20,"restorePercent":10,"healStatus":false} 
+[21:28:01.756] LOG: 20 7 [2,3,4,5,7,8,16,22]
+[21:28:01.756] LOG: {"id":"BASE_STAT_BOOSTER","localeKey":"","iconImage":"carbos","soundName":"se/restore","tier":1,"stat":5,"key":"carbos"} 
+[21:28:01.756] LOG: 0 0 [2,3,4,5,7,8,16,22]
+[21:28:01.756] LOG: {"id":"GREAT_BALL","localeKey":"","iconImage":"gb","group":"pb","soundName":"se/pb_bounce_1","tier":1,"pokeballType":1,"count":5} 
+[21:28:10.049] LOG: %cStart Phase NewBattlePhase color:green;
+[21:28:10.049] LOG: Wave Seed: Ûąñ¼×ÄÒÎÞÕüÄñĀþ¿ÑÚûÛ÷øðã 139
+[21:28:10.052] LOG: %cStart Phase ReturnPhase color:green;
+[21:28:10.159] LOG: %cStart Phase ReturnPhase color:green;
+[21:28:10.275] LOG: %cStart Phase ReturnPhase color:green;
+[21:28:10.392] LOG: %cStart Phase ShowTrainerPhase color:green;
+[21:28:10.500] LOG: %cStart Phase NextEncounterPhase color:green;
+[21:28:10.510] LOG: New species: {"speciesId":646,"_formIndex":0,"_generation":5,"type1":15,"type2":14,"height":3,"weight":325,"ability1":224,"ability2":174,"abilityHidden":117,"baseTotal":660,"baseStats":[125,130,90,130,90,95],"catchRate":3,"baseFriendship":0,"baseExp":330,"genderDiffs":false,"isStarterSelectable":false,"_passives":[246,5055,5007],"name":"Kyurem","subLegendary":false,"legendary":true,"mythical":false,"category":"Boundary Pokémon","growthRate":4,"malePercent":null,"canChangeForm":true,"forms":[{"speciesId":646,"_formIndex":0,"_generation":5,"type1":15,"type2":14,"height":3,"weight":325,"ability1":224,"ability2":174,"abilityHidden":117,"baseTotal":660,"baseStats":[125,130,90,130,90,95],"catchRate":3,"baseFriendship":0,"baseExp":330,"genderDiffs":false,"isStarterSelectable":true,"_passives":[246,5055,5007],"formName":"Normal","formKey":"","formSpriteKey":null,"isUnobtainable":false,"starterSelectableKeys":["10","50","10-pc","50-pc","red","orange","yellow","green","blue","indigo","violet"]},{"speciesId":646,"_formIndex":1,"_generation":5,"type1":15,"type2":14,"height":3.3,"weight":325,"ability1":224,"ability2":174,"abilityHidden":117,"baseTotal":700,"baseStats":[125,170,100,120,90,95],"catchRate":3,"baseFriendship":0,"baseExp":350,"genderDiffs":false,"isStarterSelectable":false,"_passives":[164,5055,136],"formName":"Black","formKey":"black","formSpriteKey":null,"isUnobtainable":false,"starterSelectableKeys":["10","50","10-pc","50-pc","red","orange","yellow","green","blue","indigo","violet"]},{"speciesId":646,"_formIndex":2,"_generation":5,"type1":15,"type2":14,"height":3.6,"weight":325,"ability1":224,"ability2":174,"abilityHidden":117,"baseTotal":700,"baseStats":[125,120,90,170,100,95],"catchRate":3,"baseFriendship":0,"baseExp":350,"genderDiffs":false,"isStarterSelectable":false,"_passives":[163,5055,5007],"formName":"White","formKey":"white","formSpriteKey":null,"isUnobtainable":false,"starterSelectableKeys":["10","50","10-pc","50-pc","red","orange","yellow","green","blu…[truncated]
+[21:28:10.511] LOG: New species: {"speciesId":370,"_formIndex":0,"_generation":3,"type1":10,"type2":17,"height":0.6,"weight":8.7,"ability1":93,"ability2":33,"abilityHidden":41,"baseTotal":400,"baseStats":[53,30,55,90,65,107],"catchRate":225,"baseFriendship":70,"baseExp":116,"genderDiffs":false,"isStarterSelectable":false,"_passives":[220,136,5238],"name":"Luvdisc","subLegendary":false,"legendary":false,"mythical":false,"category":"Rendezvous Pokémon","growthRate":1,"malePercent":25,"canChangeForm":false,"forms":[]}
+[21:28:10.512] LOG: New species: {"speciesId":695,"_formIndex":0,"_generation":6,"type1":12,"type2":0,"height":1,"weight":21,"ability1":146,"ability2":5208,"abilityHidden":94,"baseTotal":481,"baseStats":[62,55,52,109,94,109],"catchRate":75,"baseFriendship":50,"baseExp":168,"genderDiffs":false,"isStarterSelectable":false,"_passives":[5060,87,31],"name":"Heliolisk","subLegendary":false,"legendary":false,"mythical":false,"category":"Generator Pokémon","growthRate":2,"malePercent":50,"canChangeForm":false,"forms":[]}
+[21:28:10.513] LOG: New species: {"speciesId":149,"_formIndex":0,"_generation":1,"type1":15,"type2":2,"height":2.2,"weight":210,"ability1":263,"ability2":5013,"abilityHidden":5010,"baseTotal":600,"baseStats":[91,134,95,100,100,80],"catchRate":45,"baseFriendship":35,"baseExp":300,"genderDiffs":false,"isStarterSelectable":false,"_passives":[136,5066,184],"name":"Dragonite","subLegendary":false,"legendary":false,"mythical":false,"category":"Dragon Pokémon","growthRate":4,"malePercent":50,"canChangeForm":false,"forms":[{"speciesId":149,"_formIndex":0,"_generation":1,"type1":15,"type2":2,"height":2.2,"weight":210,"ability1":263,"ability2":5013,"abilityHidden":5010,"baseTotal":600,"baseStats":[91,134,95,100,100,80],"catchRate":45,"baseFriendship":35,"baseExp":300,"genderDiffs":false,"isStarterSelectable":true,"_passives":[136,5066,184],"formName":"Normal","formKey":"","formSpriteKey":null,"isUnobtainable":false,"starterSelectableKeys":["10","50","10-pc","50-pc","red","orange","yellow","green","blue","indigo","violet"]},{"speciesId":149,"_formIndex":1,"_generation":1,"type1":15,"type2":2,"height":2.2,"weight":210,"ability1":32,"ability2":13,"abilityHidden":5226,"baseTotal":700,"baseStats":[91,124,115,145,125,100],"catchRate":45,"baseFriendship":35,"baseExp":300,"genderDiffs":false,"isStarterSelectable":false,"_passives":[5662,5025,39],"formName":"Mega Y","formKey":"mega-y","formSpriteKey":null,"isUnobtainable":false,"starterSelectableKeys":["10","50","10-pc","50-pc","red","orange","yellow","green","blue","indigo","violet"],"__erFormSpriteRedirect":true},{"speciesId":149,"_formIndex":2,"_generation":1,"type1":15,"type2":12,"height":2.2,"weight":210,"ability1":136,"ability2":136,"abilityHidden":136,"baseTotal":700,"baseStats":[91,159,120,125,125,80],"catchRate":45,"baseFriendship":35,"baseExp":300,"genderDiffs":false,"isStarterSelectable":false,"_passives":[206,5125,5126],"formName":"Mega","formKey":"mega","formSpriteKey":null,"isUnobtainable":false,"starterSelectableKeys":["10","50","10-pc","5…[truncated]
+[21:28:10.515] LOG: New species: {"speciesId":713,"_formIndex":0,"_generation":6,"type1":14,"type2":null,"height":2,"weight":505,"ability1":5,"ability2":115,"abilityHidden":5079,"baseTotal":554,"baseStats":[95,117,184,44,86,28],"catchRate":55,"baseFriendship":50,"baseExp":180,"genderDiffs":false,"isStarterSelectable":false,"_passives":[5055,5064,5045],"name":"Avalugg","subLegendary":false,"legendary":false,"mythical":false,"category":"Iceberg Pokémon","growthRate":2,"malePercent":50,"canChangeForm":false,"forms":[{"speciesId":713,"_formIndex":0,"_generation":6,"type1":14,"type2":null,"height":2,"weight":505,"ability1":5,"ability2":115,"abilityHidden":5079,"baseTotal":554,"baseStats":[95,117,184,44,86,28],"catchRate":55,"baseFriendship":50,"baseExp":180,"genderDiffs":false,"isStarterSelectable":true,"_passives":[5055,5064,5045],"formName":"Normal","formKey":"","formSpriteKey":null,"isUnobtainable":false,"starterSelectableKeys":["10","50","10-pc","50-pc","red","orange","yellow","green","blue","indigo","violet"]},{"speciesId":713,"_formIndex":1,"_generation":6,"type1":14,"type2":5,"height":2,"weight":505,"ability1":101,"ability2":5045,"abilityHidden":5079,"baseTotal":554,"baseStats":[95,127,184,34,76,38],"catchRate":55,"baseFriendship":50,"baseExp":180,"genderDiffs":false,"isStarterSelectable":false,"_passives":[5056,5064,173],"formName":"Hisuian","formKey":"hisui","formSpriteKey":null,"isUnobtainable":false,"starterSelectableKeys":["10","50","10-pc","50-pc","red","orange","yellow","green","blue","indigo","violet"],"__erFormSpriteRedirect":true}]}
+[21:28:10.519] LOG: New species: {"speciesId":350,"_formIndex":0,"_generation":3,"type1":10,"type2":17,"height":6.2,"weight":162,"ability1":5094,"ability2":172,"abilityHidden":63,"baseTotal":540,"baseStats":[95,60,79,100,125,81],"catchRate":60,"baseFriendship":50,"baseExp":189,"genderDiffs":true,"isStarterSelectable":false,"_passives":[5010,91,5045],"name":"Milotic","subLegendary":false,"legendary":false,"mythical":false,"category":"Tender Pokémon","growthRate":0,"malePercent":50,"canChangeForm":false,"forms":[{"speciesId":350,"_formIndex":0,"_generation":3,"type1":10,"type2":17,"height":6.2,"weight":162,"ability1":5094,"ability2":172,"abilityHidden":63,"baseTotal":540,"baseStats":[95,60,79,100,125,81],"catchRate":60,"baseFriendship":50,"baseExp":189,"genderDiffs":false,"isStarterSelectable":true,"_passives":[5010,91,5045],"formName":"Normal","formKey":"","formSpriteKey":null,"isUnobtainable":false,"starterSelectableKeys":["10","50","10-pc","50-pc","red","orange","yellow","green","blue","indigo","violet"]},{"speciesId":350,"_formIndex":1,"_generation":3,"type1":10,"type2":17,"height":6.2,"weight":162,"ability1":5214,"ability2":5238,"abilityHidden":5636,"baseTotal":640,"baseStats":[95,69,110,129,156,81],"catchRate":60,"baseFriendship":50,"baseExp":189,"genderDiffs":false,"isStarterSelectable":false,"_passives":[5010,221,91],"formName":"Mega","formKey":"mega","formSpriteKey":null,"isUnobtainable":false,"starterSelectableKeys":["10","50","10-pc","50-pc","red","orange","yellow","green","blue","indigo","violet"],"__erFormSpriteRedirect":true}],"__erSpeciesSpriteDispatch":true}
+[21:28:15.780] DEBUG: Session data saved to slot 2!
+[21:28:15.781] LOG: Wave Seed: Ûąñ¼×ÄÒÎÞÕüÄñĀþ¿ÑÚûÛ÷øðã 139
+[21:28:17.259] LOG: %cStart Phase MysteryEncounterPhase color:green;
+[21:28:23.343] LOG: %cStart Phase MysteryEncounterOptionSelectedPhase color:green;
+[21:28:24.399] LOG: Pokemon: Foe Heliolisk | Species ID: 695 | Level: 113 | Nature: Docile (-) | Friendship: 50
+[21:28:24.399] LOG: Stats (IVs): HP: 292 (31), Atk: 137 (31), Def: 124 (31), Spatk: 304 (31), Spdef: 232 (31), Spd: 249 (31)
+[21:28:24.399] LOG: Ability: Sand Rush | Passive Ability: Short Circuit 
+[21:28:24.399] LOG: Moveset: ["Coil","Rising Voltage","Extreme Speed","Weather Ball"]
+[21:28:24.406] LOG: Pokemon: Foe Dragonite | Species ID: 149 | Level: 126 | Nature: Hardy (-) | Friendship: 35
+[21:28:24.406] LOG: Stats (IVs): HP: 386 (31), Atk: 377 (31), Def: 254 (30), Spatk: 262 (28), Spdef: 286 (30), Spd: 211 (27)
+[21:28:24.406] LOG: Ability: Rampage | Passive Ability: Multiscale | Boss Bars: 3
+[21:28:24.406] LOG: Moveset: ["Gigaton Hammer","Make It Rain","Focus Blast","Outrage"]
+[21:28:24.411] LOG: Pokemon: Foe Milotic | Species ID: 350 | Level: 126 | Nature: Serious (-) | Friendship: 50
+[21:28:24.411] LOG: Stats (IVs): HP: 390 (29), Atk: 195 (31), Def: 189 (31), Spatk: 324 (30), Spdef: 342 (31), Spd: 214 (31)
+[21:28:24.411] LOG: Ability: Competitive | Passive Ability: Prism Scales 
+[21:28:24.411] LOG: Moveset: ["Gunk Shot","Rain Flush","Take Down","Moonblast"]
+[21:28:24.416] LOG: Pokemon: Foe Kyurem | Species ID: 646 | Level: 121 | Nature: Bashful (-) | Friendship: 0
+[21:28:24.416] LOG: Stats (IVs): HP: 449 (25), Atk: 326 (30), Def: 202 (29), Spatk: 323 (22), Spdef: 245 (31), Spd: 274 (31)
+[21:28:24.416] LOG: Ability: Snow Warning | Passive Ability: Ice Scales | Boss Bars: 3
+[21:28:24.416] LOG: Moveset: ["Glacial Lance","Dragon Rush","Pixie Slash","Hypnosis","Psyblade"]
+[21:28:24.420] LOG: Pokemon: Foe Avalugg | Species ID: 713 | Level: 100 | Nature: Hardy (-) | Friendship: 50
+[21:28:24.420] LOG: Stats (IVs): HP: 319 (31), Atk: 257 (31), Def: 375 (31), Spatk: 105 (31), Spdef: 206 (31), Spd: 68 (31)
+[21:28:24.420] LOG: Ability: Fort Knox | Passive Ability: Permafrost 
+[21:28:24.420] LOG: Moveset: ["Quiver Dance","Stone Axe","Pollen Puff","Mountain Gale"]
+[21:28:24.425] LOG: Pokemon: Foe Luvdisc | Species ID: 370 | Level: 102 | Nature: Hardy (-) | Friendship: 70
+[21:28:24.425] LOG: Stats (IVs): HP: 234 (31), Atk: 97 (31), Def: 132 (31), Spatk: 180 (31), Spdef: 161 (31), Spd: 229 (31)
+[21:28:24.425] LOG: Ability: Hydration | Passive Ability: Soul-Heart 
+[21:28:24.425] LOG: Moveset: ["Double-Edge","Extreme Speed","Scald","Heart Swap"]
+[21:28:25.974] LOG: Battle Seed: WOwXGjuI7Xe7WcVz
+[21:28:25.977] LOG: Applied Protein (enemy)
+[21:28:25.977] LOG: Applied Iron (enemy)
+[21:28:25.977] LOG: Applied Calcium (enemy)
+[21:28:25.977] LOG: Applied Zinc (enemy)
+[21:28:25.978] LOG: Applied Old Gateau (enemy)
+[21:28:25.978] LOG: Applied Calcium (enemy)
+[21:28:25.978] LOG: Applied HP Up (enemy)
+[21:28:25.978] LOG: Applied Carbos (enemy)
+[21:28:25.979] LOG: Applied Old Gateau (enemy)
+[21:28:25.979] LOG: Applied Protein (enemy)
+[21:28:25.979] LOG: Applied Protein (enemy)
+[21:28:25.979] LOG: Applied Iron (enemy)
+[21:28:25.979] LOG: Applied Calcium (enemy)
+[21:28:25.979] LOG: Applied Zinc (enemy)
+[21:28:25.979] LOG: Applied Old Gateau (enemy)
+[21:28:25.979] LOG: Applied Old Gateau (enemy)
+[21:28:25.980] LOG: %cStart Phase MysteryEncounterBattlePhase color:green;
+[21:28:25.981] LOG: ???
+[21:28:26.341] LOG: %cStart Phase SummonPhase color:green;
+[21:28:26.341] LOG: ???
+[21:28:26.489] LOG: Applied Old Gateau (enemy)
+[21:28:26.490] LOG: Applied Calcium (enemy)
+[21:28:26.490] LOG: Applied HP Up (enemy)
+[21:28:26.490] LOG: Applied Carbos (enemy)
+[21:28:26.490] LOG: Applied Old Gateau (enemy)
+[21:28:26.490] LOG: Applied Protein (enemy)
+[21:28:26.490] LOG: Applied Protein (enemy)
+[21:28:26.490] LOG: Applied Iron (enemy)
+[21:28:26.490] LOG: Applied Calcium (enemy)
+[21:28:26.490] LOG: Applied Zinc (enemy)
+[21:28:26.490] LOG: Applied Old Gateau (enemy)
+[21:28:26.490] LOG: Applied Old Gateau (enemy)
+[21:28:26.634] LOG: %cStart Phase SummonPhase color:green;
+[21:28:26.784] LOG: Applied Calcium 
+[21:28:26.785] LOG: Applied HP Up 
+[21:28:26.785] LOG: Applied Carbos 
+[21:28:26.785] LOG: Applied Protein 
+[21:28:26.933] LOG: %cStart Phase ShinySparklePhase color:green;
+[21:28:27.033] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[21:28:27.036] LOG: %cStart Phase InitEncounterPhase color:green;
+[21:28:27.038] LOG: %cStart Phase PostSummonPhase color:green;
+[21:28:27.038] LOG: Ran PSP for: Heliolisk
+[21:28:27.039] LOG: %cStart Phase PostSummonPhase color:green;
+[21:28:27.040] LOG: %cStart Phase PostSummonPhase color:green;
+[21:28:27.040] LOG: %cStart Phase PostSummonPhase color:green;
+[21:28:27.040] LOG: Ran PSP for: Kecleon
+[21:28:27.041] LOG: %cStart Phase PostSummonPhase color:green;
+[21:28:27.041] LOG: %cStart Phase PostSummonPhase color:green;
+[21:28:27.041] LOG: %cStart Phase MovePhase color:green;
+[21:28:27.041] LOG: %cUser: Kecleon
+Move: SCRATCH
+Use Mode: INDIRECT color:orchid
+[21:28:27.044] LOG: %cStart Phase MessagePhase color:green;
+[21:28:27.166] LOG: %cStart Phase MoveEffectPhase color:green;
+[21:28:27.184] LOG: Applied Dire Hit 
+[21:28:27.184] LOG: crit stage: +1
+[21:28:27.185] LOG: Move: Scratch | Base damage: 52.09742574257426 | Power: 40 | Source attack: 268 | Target defense: 202
+[21:28:27.186] LOG: Move: Scratch | Attack damage: 71
+[21:28:27.187] LOG: %cStart Phase DamageAnimPhase color:green;
+[21:28:27.218] LOG: %cStart Phase MoveEndPhase color:green;
+[21:28:27.219] LOG: %cStart Phase TurnInitPhase color:green;
+[21:28:27.219] LOG: %cStart Phase MysteryEncounterBattleStartCleanupPhase color:green;
+[21:28:27.220] LOG: %cStart Phase CommandPhase color:green;
+[21:28:28.348] LOG: Move: FAKE_OUT Move targets: {"targets":[2],"multiple":false} 
+Player Pokemon: Kecleon
+[21:28:28.350] LOG: %cStart Phase EnemyCommandPhase color:green;
+[21:28:28.362] LOG: Move Pool: ["Coil","Rising Voltage","Extreme Speed","Weather Ball"]
+[21:28:28.362] LOG: Move Scores: [6,21,16,10]
+[21:28:28.362] LOG: Sorted Move Pool: ["Rising Voltage","Extreme Speed","Weather Ball","Coil"]
+[21:28:28.362] LOG: Chosen Move: Extreme Speed
+[21:28:28.363] LOG: %cStart Phase TurnStartPhase color:green;
+[21:28:28.364] LOG: %cStart Phase MovePhase color:green;
+[21:28:28.364] LOG: %cUser: Kecleon
+Move: FAKE_OUT
+Use Mode: NORMAL color:orchid
+[21:28:28.365] LOG: %cStart Phase MessagePhase color:green;
+[21:28:28.458] LOG: %cStart Phase MoveEffectPhase color:green;
+[21:28:28.826] LOG: Applied Dire Hit 
+[21:28:28.826] LOG: crit stage: +1
+[21:28:28.829] LOG: Move: Fake Out | Base damage: 52.09742574257426 | Power: 40 | Source attack: 268 | Target defense: 202
+[21:28:28.830] LOG: Move: Fake Out | Attack damage: 77
+[21:28:28.832] LOG: %cStart Phase DamageAnimPhase color:green;
+[21:28:28.860] LOG: %cStart Phase MoveEndPhase color:green;
+[21:28:28.860] LOG: %cStart Phase MovePhase color:green;
+[21:28:28.860] LOG: %cUser: Heliolisk
+Move: EXTREME_SPEED
+Use Mode: NORMAL color:orchid
+[21:28:28.861] LOG: %cStart Phase MessagePhase color:green;
+[21:28:29.075] LOG: %cStart Phase MoveEndPhase color:green;
+[21:28:29.076] LOG: %cStart Phase CheckInterludePhase color:green;
+[21:28:29.076] LOG: %cStart Phase WeatherEffectPhase color:green;
+[21:28:29.076] LOG: %cStart Phase PositionalTagPhase color:green;
+[21:28:29.076] LOG: %cStart Phase BerryPhase color:green;
+[21:28:29.077] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[21:28:29.078] LOG: %cStart Phase TurnEndPhase color:green;
+[21:28:29.079] WARN: [coop:turn] host recorder: finalize with NO open recording -> turn=-1 events=0 (caller decides not to emit)
+[21:28:29.079] LOG: %cStart Phase TurnInitPhase color:green;
+[21:28:29.080] LOG: %cStart Phase CommandPhase color:green;
+[21:28:49.011] LOG: Seed: uSMw5luWpim6pOohQYs8H9Kz
+[21:28:49.011] LOG: Wave Seed: uSMw5luWpim6pOohQYs8H9Kz 0
+[21:28:49.013] LOG: Getting Session Slot id: %d 2
+[21:28:49.019] LOG: Wave Seed: Pzf1L9GCSJq9fus4FOpPlmeX 0
+[21:28:49.019] LOG: Seed: Pzf1L9GCSJq9fus4FOpPlmeX
+[21:28:49.033] LOG: Wave Seed: Ûąñ¼×ÄÒÎÞÕüÄñĀþ¿ÑÚûÛ÷øðã 139
+[21:28:49.035] LOG: Applied Calcium 
+[21:28:49.035] LOG: Applied HP Up 
+[21:28:49.035] LOG: Applied Carbos 
+[21:28:49.035] LOG: Applied Protein 
+[21:28:49.037] LOG: Applied Calcium 
+[21:28:49.037] LOG: Applied HP Up 
+[21:28:49.037] LOG: Applied Carbos 
+[21:28:49.037] LOG: Applied Protein 
+[21:28:49.040] LOG: Applied Calcium 
+[21:28:49.040] LOG: Applied HP Up 
+[21:28:49.040] LOG: Applied Carbos 
+[21:28:49.040] LOG: Applied Protein 
+[21:28:49.043] LOG: %cStart Phase EncounterPhase color:green;
+[21:28:49.044] LOG: New species: {"speciesId":646,"_formIndex":0,"_generation":5,"type1":15,"type2":14,"height":3,"weight":325,"ability1":224,"ability2":174,"abilityHidden":117,"baseTotal":660,"baseStats":[125,130,90,130,90,95],"catchRate":3,"baseFriendship":0,"baseExp":330,"genderDiffs":false,"isStarterSelectable":false,"_passives":[246,5055,5007],"name":"Kyurem","subLegendary":false,"legendary":true,"mythical":false,"category":"Boundary Pokémon","growthRate":4,"malePercent":null,"canChangeForm":true,"forms":[{"speciesId":646,"_formIndex":0,"_generation":5,"type1":15,"type2":14,"height":3,"weight":325,"ability1":224,"ability2":174,"abilityHidden":117,"baseTotal":660,"baseStats":[125,130,90,130,90,95],"catchRate":3,"baseFriendship":0,"baseExp":330,"genderDiffs":false,"isStarterSelectable":true,"_passives":[246,5055,5007],"formName":"Normal","formKey":"","formSpriteKey":null,"isUnobtainable":false,"starterSelectableKeys":["10","50","10-pc","50-pc","red","orange","yellow","green","blue","indigo","violet"]},{"speciesId":646,"_formIndex":1,"_generation":5,"type1":15,"type2":14,"height":3.3,"weight":325,"ability1":224,"ability2":174,"abilityHidden":117,"baseTotal":700,"baseStats":[125,170,100,120,90,95],"catchRate":3,"baseFriendship":0,"baseExp":350,"genderDiffs":false,"isStarterSelectable":false,"_passives":[164,5055,136],"formName":"Black","formKey":"black","formSpriteKey":null,"isUnobtainable":false,"starterSelectableKeys":["10","50","10-pc","50-pc","red","orange","yellow","green","blue","indigo","violet"]},{"speciesId":646,"_formIndex":2,"_generation":5,"type1":15,"type2":14,"height":3.6,"weight":325,"ability1":224,"ability2":174,"abilityHidden":117,"baseTotal":700,"baseStats":[125,120,90,170,100,95],"catchRate":3,"baseFriendship":0,"baseExp":350,"genderDiffs":false,"isStarterSelectable":false,"_passives":[163,5055,5007],"formName":"White","formKey":"white","formSpriteKey":null,"isUnobtainable":false,"starterSelectableKeys":["10","50","10-pc","50-pc","red","orange","yellow","green","blu…[truncated]
+[21:28:49.044] LOG: New species: {"speciesId":370,"_formIndex":0,"_generation":3,"type1":10,"type2":17,"height":0.6,"weight":8.7,"ability1":93,"ability2":33,"abilityHidden":41,"baseTotal":400,"baseStats":[53,30,55,90,65,107],"catchRate":225,"baseFriendship":70,"baseExp":116,"genderDiffs":false,"isStarterSelectable":false,"_passives":[220,136,5238],"name":"Luvdisc","subLegendary":false,"legendary":false,"mythical":false,"category":"Rendezvous Pokémon","growthRate":1,"malePercent":25,"canChangeForm":false,"forms":[]}
+[21:28:49.045] LOG: New species: {"speciesId":531,"_formIndex":0,"_generation":5,"type1":0,"type2":null,"height":1.1,"weight":31,"ability1":194,"ability2":5484,"abilityHidden":301,"baseTotal":485,"baseStats":[103,60,96,80,96,50],"catchRate":255,"baseFriendship":50,"baseExp":390,"genderDiffs":false,"isStarterSelectable":false,"_passives":[5527,144,205],"name":"Audino","subLegendary":false,"legendary":false,"mythical":false,"category":"Hearing Pokémon","growthRate":1,"malePercent":50,"canChangeForm":true,"forms":[{"speciesId":531,"_formIndex":0,"_generation":5,"type1":0,"type2":null,"height":1.1,"weight":31,"ability1":194,"ability2":5484,"abilityHidden":301,"baseTotal":485,"baseStats":[103,60,96,80,96,50],"catchRate":255,"baseFriendship":50,"baseExp":390,"genderDiffs":false,"isStarterSelectable":true,"_passives":[5527,144,205],"formName":"Normal","formKey":"","formSpriteKey":null,"isUnobtainable":false,"starterSelectableKeys":["10","50","10-pc","50-pc","red","orange","yellow","green","blue","indigo","violet"]},{"speciesId":531,"_formIndex":1,"_generation":5,"type1":0,"type2":17,"height":1.5,"weight":32,"ability1":257,"ability2":5484,"abilityHidden":194,"baseTotal":585,"baseStats":[103,90,126,90,126,50],"catchRate":255,"baseFriendship":50,"baseExp":390,"genderDiffs":false,"isStarterSelectable":false,"_passives":[5238,5214,205],"formName":"Mega","formKey":"mega","formSpriteKey":null,"isUnobtainable":false,"starterSelectableKeys":["10","50","10-pc","50-pc","red","orange","yellow","green","blue","indigo","violet"],"__erFormSpriteRedirect":true}],"__erSpeciesSpriteDispatch":true}
+[21:28:49.046] LOG: New species: {"speciesId":348,"_formIndex":0,"_generation":3,"type1":5,"type2":6,"height":1.5,"weight":68.2,"ability1":4,"ability2":5009,"abilityHidden":5064,"baseTotal":515,"baseStats":[75,125,120,70,80,45],"catchRate":45,"baseFriendship":50,"baseExp":173,"genderDiffs":false,"isStarterSelectable":false,"_passives":[5041,5053,52],"name":"Armaldo","subLegendary":false,"legendary":false,"mythical":false,"category":"Plate Pokémon","growthRate":0,"malePercent":87.5,"canChangeForm":false,"forms":[]}
+[21:28:49.046] LOG: New species: {"speciesId":802,"_formIndex":0,"_generation":7,"type1":1,"type2":7,"height":0.7,"weight":22.2,"ability1":101,"ability2":5329,"abilityHidden":5188,"baseTotal":600,"baseStats":[90,125,80,90,90,125],"catchRate":3,"baseFriendship":0,"baseExp":300,"genderDiffs":false,"isStarterSelectable":false,"_passives":[5193,5250,260],"name":"Marshadow","subLegendary":false,"legendary":false,"mythical":true,"category":"Gloomdweller Pokémon","growthRate":4,"malePercent":null,"canChangeForm":true,"forms":[{"speciesId":802,"_formIndex":0,"_generation":7,"type1":1,"type2":7,"height":0.7,"weight":22.2,"ability1":101,"ability2":5329,"abilityHidden":5188,"baseTotal":600,"baseStats":[90,125,80,90,90,125],"catchRate":3,"baseFriendship":0,"baseExp":300,"genderDiffs":false,"isStarterSelectable":true,"_passives":[5193,5250,260],"formName":"Normal","formKey":"","formSpriteKey":null,"isUnobtainable":false,"starterSelectableKeys":["10","50","10-pc","50-pc","red","orange","yellow","green","blue","indigo","violet"]},{"speciesId":802,"_formIndex":1,"_generation":7,"type1":1,"type2":7,"height":0.7,"weight":22.2,"ability1":101,"ability2":5329,"abilityHidden":5188,"baseTotal":600,"baseStats":[90,125,80,90,90,125],"catchRate":3,"baseFriendship":0,"baseExp":300,"genderDiffs":false,"isStarterSelectable":false,"_passives":[5193,5250,260],"formName":"Zenith","formKey":"zenith","formSpriteKey":null,"isUnobtainable":true,"starterSelectableKeys":["10","50","10-pc","50-pc","red","orange","yellow","green","blue","indigo","violet"]}]}
+[21:28:49.046] LOG: New species: {"speciesId":2670,"_formIndex":0,"_generation":6,"type1":17,"type2":null,"height":0.2,"weight":0.9,"ability1":5576,"ability2":229,"abilityHidden":187,"baseTotal":551,"baseStats":[74,65,67,125,128,92],"catchRate":120,"baseFriendship":70,"baseExp":243,"genderDiffs":false,"isStarterSelectable":false,"_passives":[98,178,120],"name":"Floette","subLegendary":true,"legendary":false,"mythical":false,"category":"Single Bloom Pokémon","growthRate":2,"malePercent":0,"canChangeForm":false,"forms":[]}
+[21:28:52.209] LOG: Wave Seed: Ûąñ¼×ÄÒÎÞÕüÄñĀþ¿ÑÚûÛ÷øðã 139
+[21:28:54.538] LOG: %cStart Phase MysteryEncounterPhase color:green;
