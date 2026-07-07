@@ -18,10 +18,10 @@
 //   - Two LOCK lamps (yours + theirs). Locking the FRIENDLY option crosses the reciprocal
 //     `showdown-wager-commit` rendezvous; once BOTH have crossed, the screen proceeds to battle.
 //
-// WAVE-1 ESCROW GATE (D3): locking an ACTUAL stake is DISABLED behind the escrow (wave 2). The
-// stake UI works fully through offer + tier-match, but the lock button for a staked offer
-// surfaces "Escrow not yet available - Friendly only". D1 plugs the POST /showdown/match escrow
-// call in at the ONE clearly-marked seam (`commitStakedMatch`).
+// STAKED LOCK (D3b, wave 2): locking a staked offer runs the real escrow handshake. The HOST is the
+// registrar (POST /showdown/match via {@linkcode registerShowdownMatch}); it re-broadcasts
+// `showdownStakeLock{matchId, tier}` with the confirmed id, and both-locked crosses into battle. A
+// registration failure un-locks + re-offers so the Friendly path stays available (escrow may be offline).
 //
 // LOCAL-ONLY (coop-ui-registry): each player drives its OWN copy; only offers + the commit
 // rendezvous sync (mirroring the SHOWDOWN_COMMAND precedent). The transport + rendezvous are
