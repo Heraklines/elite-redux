@@ -127,6 +127,7 @@ import {
   StealthRockImmunityAbAttr,
   SuppressFieldEffectsAbAttr,
   SuppressWeatherEffectAbAttr,
+  SwitchWhileRampagingAbAttr,
   UserFieldMoveTypePowerBoostAbAttr,
 } from "#abilities/ab-attrs";
 import { globalScene } from "#app/global-scene";
@@ -3546,9 +3547,18 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
       ]);
     case 437:
       // Radiance — "+20% accuracy; Dark moves fail when user is present."
-      // Wire the accuracy boost (matches Compound Eyes pattern); Dark-move
-      // failure-on-field deferred.
-      return ok([new StatMultiplierAbAttr(Stat.ACC, 1.2)]);
+      // Accuracy boost (matches Compound Eyes pattern) + the holder's Dark-move
+      // immunity. The field-wide "Dark moves fail" half is wired globally by
+      // `patchDarkMovesForRadiance` (a MoveCondition on every statically-Dark
+      // move). That condition is attached at init by the move's DECLARED type, so
+      // a move that becomes Dark at RUNTIME (Deviate/Hydrate-style -ate abilities,
+      // Judgment/Multi-Attack via plate/memory, Tera Blast when Tera-Dark) slips
+      // past it and still hits the Radiance holder (the reported "dark moves still
+      // damage you" bug). AttackTypeImmunityAbAttr resolves the attacker's move
+      // type at defend time (`getMoveType`), so it catches those dynamic-Dark
+      // attacks against the holder. (Static-Dark moves are already failed earlier
+      // by the field-wide condition, so this never double-fires for them.)
+      return ok([new StatMultiplierAbAttr(Stat.ACC, 1.2), new AttackTypeImmunityAbAttr(PokemonType.DARK)]);
     case 947:
       // Echolocation — "In fog, deal 20% more damage and never miss." +20%
       // power in fog and all moves always hit while fog is active.
@@ -5167,12 +5177,18 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
       // status-immunity bypass) is in the R48 case 349.
       return SKIP_BESPOKE;
     case 387:
-      // Discipline — "Can't be confused or intimidated" (+ Scare). The
-      // status-immunity archetype dropped CONFUSION (not a vanilla StatusEffect
-      // — it's a BattlerTag). Wire confusion immunity via BattlerTagImmunity +
-      // Intimidate/Scare immunity. ("Can switch while rampaging" — escape from
-      // locked moves — still needs a dedicated primitive.)
-      return ok([new IntimidateImmunityAbAttrEr(), new BattlerTagImmunityAbAttr(BattlerTagType.CONFUSED)]);
+      // Discipline — "Can switch while rampaging. Can't be confused or
+      // intimidated" (+ Scare). Three halves: (1) SwitchWhileRampagingAbAttr lets
+      // the holder open the command menu (and switch out) while FRENZY-locked
+      // (Thrash / Outrage / Petal Dance) — consulted in CommandPhase; (2)
+      // confusion immunity via BattlerTagImmunity (CONFUSION is a BattlerTag, not
+      // a vanilla StatusEffect, so the status-immunity archetype dropped it); (3)
+      // Intimidate/Scare immunity.
+      return ok([
+        new SwitchWhileRampagingAbAttr(),
+        new IntimidateImmunityAbAttrEr(),
+        new BattlerTagImmunityAbAttr(BattlerTagType.CONFUSED),
+      ]);
     case 303:
       // Fossilized — C-source + description: "Halves dmg taken by Rock moves.
       // Boosts own Rock moves by 1.2x." Composite: offensive Rock x1.2 +

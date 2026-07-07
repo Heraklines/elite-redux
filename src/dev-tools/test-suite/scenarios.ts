@@ -526,6 +526,76 @@ export const DEV_SCENARIOS: DevScenario[] = [
   ...BG_CHECK_SCENARIOS,
   ...BG_BIOME_SCENARIOS,
   // ===========================================================================
+  // Ability - Discipline lets you switch out WHILE rampaging (Outrage/Thrash)
+  // ===========================================================================
+  {
+    label: "Ability: Discipline switches mid-rampage",
+    description:
+      "Discipline (2.65 dex): 'Can switch while rampaging. Can't be confused or\n"
+      + "intimidated.' A rampage move (Outrage/Thrash/Petal Dance) normally locks you\n"
+      + "in - the command menu never opens and you're forced to keep attacking. With\n"
+      + "Discipline you keep the choice to switch out.\n"
+      + "DO: turn 1, use Outrage on the foe. Turn 2 (still rampaging), open the command\n"
+      + "menu, choose Pokemon, and switch to Magikarp.\n"
+      + "EXPECT: the command menu OPENS on turn 2 and the switch goes through ('Come\n"
+      + "back, Snorlax! Go! Magikarp!'). Before the fix you were locked into Outrage and\n"
+      + "could not switch. (A mon WITHOUT Discipline stays locked - that's still correct.)",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_WAVE_OVERRIDE: 145,
+        STARTING_LEVEL_OVERRIDE: 100,
+        ABILITY_OVERRIDE: erAbility(5125), // Discipline
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.CHANSEY, // tanky, won't KO you mid-test
+        ENEMY_LEVEL_OVERRIDE: 100,
+        ENEMY_ABILITY_OVERRIDE: AbilityId.BALL_FETCH,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+      });
+      return [
+        makeStarter(SpeciesId.SNORLAX, {
+          moveset: [MoveId.OUTRAGE, MoveId.BODY_SLAM, MoveId.REST, MoveId.SPLASH],
+        }),
+        makeStarter(SpeciesId.MAGIKARP, {
+          moveset: [MoveId.SPLASH, MoveId.TACKLE, MoveId.FLAIL, MoveId.BOUNCE],
+        }),
+      ];
+    },
+  },
+  // ===========================================================================
+  // Ability - Radiance is immune to Dark moves, incl. moves made Dark at runtime
+  // ===========================================================================
+  {
+    label: "Ability: Radiance blocks Dark moves",
+    description:
+      "Radiance (2.65 dex): '+20% accuracy; Dark moves fail when user is present.' The\n"
+      + "field-wide 'Dark moves fail' half already worked for moves that are Dark by\n"
+      + "default, but a move that becomes Dark at RUNTIME (here the foe's Deviate turns\n"
+      + "its Normal Tackle into a Dark move) slipped past it and still damaged you - the\n"
+      + "reported bug. The fix also makes the Radiance holder itself immune to Dark by\n"
+      + "the move's real runtime type.\n"
+      + "DO: let the foe (Gengar with Deviate) hit you with Tackle - Deviate makes it a\n"
+      + "Dark move. Attack back with Body Slam over a couple of turns.\n"
+      + "EXPECT: the foe's Dark-ified Tackle does NOTHING to your Snorlax (no damage /\n"
+      + "'it doesn't affect Snorlax'). Before the fix it dealt full damage.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_WAVE_OVERRIDE: 145,
+        STARTING_LEVEL_OVERRIDE: 100,
+        ABILITY_OVERRIDE: erAbility(5173), // Radiance
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.GENGAR,
+        ENEMY_LEVEL_OVERRIDE: 100,
+        ENEMY_ABILITY_OVERRIDE: erAbility(5501), // Deviate - Normal moves become Dark
+        ENEMY_MOVESET_OVERRIDE: [MoveId.TACKLE],
+      });
+      return [
+        makeStarter(SpeciesId.SNORLAX, {
+          moveset: [MoveId.BODY_SLAM, MoveId.REST, MoveId.CRUNCH, MoveId.SPLASH],
+        }),
+      ];
+    },
+  },
+  // ===========================================================================
   // Dev tool — in-battle "Reset wave" command (dev/staging only)
   // ===========================================================================
   {

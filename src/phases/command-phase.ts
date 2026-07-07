@@ -211,6 +211,17 @@ export class CommandPhase extends FieldPhase {
       return false;
     }
 
+    // ER Discipline ("Can switch while rampaging"): a FRENZY-locked move (Thrash /
+    // Outrage / Petal Dance) normally auto-repeats from the queue, so the command
+    // menu never opens and the holder cannot switch. When the holder carries the
+    // Discipline marker, do NOT auto-execute while the FRENZY tag is active — fall
+    // through to open the menu so a voluntary switch (or another command) is
+    // available. Gated on the FRENZY tag specifically so two-turn CHARGING moves
+    // (Solar Beam / Dig / Fly) are unaffected.
+    if (playerPokemon.getTag(BattlerTagType.FRENZY) && playerPokemon.hasAbilityWithAttr("SwitchWhileRampagingAbAttr")) {
+      return false;
+    }
+
     const queuedMove = moveQueue[0];
     if (queuedMove.move === MoveId.NONE) {
       this.handleCommand(Command.FIGHT, -1);

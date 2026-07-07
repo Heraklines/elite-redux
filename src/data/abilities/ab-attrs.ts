@@ -3982,6 +3982,25 @@ export class IgnoreGenderInfatuationAbAttr extends AbAttr {
 }
 
 /**
+ * Elite Redux — pure marker for Discipline's "can switch while rampaging" clause
+ * (2.65 dex: "Can switch while rampaging. Can't be confused or intimidated."). A
+ * FRENZY-locked move (Thrash / Outrage / Petal Dance) normally forces the holder
+ * to auto-repeat the queued move, so `CommandPhase` never opens the command menu
+ * and the player cannot switch out. When the holder carries this marker,
+ * `CommandPhase.tryExecuteQueuedMove` skips the auto-execute WHILE the FRENZY tag
+ * is active, so the menu opens and a voluntary switch (or any other command) is
+ * available again. (The confusion / Intimidate immunity halves are wired
+ * separately via BattlerTagImmunity + IntimidateImmunity.)
+ */
+export class SwitchWhileRampagingAbAttr extends AbAttr {
+  constructor() {
+    super(false);
+  }
+
+  override apply(_params: AbAttrBaseParams): void {}
+}
+
+/**
  * Elite Redux — pure marker for Blind Rage's tempered Mold Breaker. The holder's
  * ability-ignore (Mold Breaker) must NOT bypass the target's abilities that
  * modify BASE STATS (e.g. Grass Pelt, Fur Coat). Consulted in
@@ -6953,6 +6972,7 @@ export const AbilityAttrs = Object.freeze({
   BugPowderImmunityAbAttr,
   IgnoreGenderInfatuationAbAttr,
   PreserveBaseStatAbilitiesAbAttr,
+  SwitchWhileRampagingAbAttr,
   DrenchImmunityAbAttr,
   FloatAbAttr,
   PostWakeUpAbAttr,
