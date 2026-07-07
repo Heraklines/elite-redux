@@ -13,6 +13,7 @@ import { adoptCoopEnemiesStructural } from "#data/elite-redux/coop/coop-enemy-bu
 import type { CoopInteractionChoice } from "#data/elite-redux/coop/coop-interaction-relay";
 import { meBattleHandoffKey } from "#data/elite-redux/coop/coop-me-battle-handoff";
 import {
+  coopMeHandoffBattleStarted,
   coopMeInteractionStartValue,
   setCoopMeHandoffBattleStarted,
   setOnMePinCleared,
@@ -30,6 +31,7 @@ import type { ErQuizQuestion } from "#data/elite-redux/er-quiz";
 import { MysteryEncounterMode } from "#enums/mystery-encounter-mode";
 import { UiMode } from "#enums/ui-mode";
 import { leaveEncounterWithoutBattle } from "#mystery-encounters/encounter-phase-utils";
+import { abortActiveCoopReplayTurnPhase } from "#phases/coop-replay-turn-phase";
 import type { ErQuizResult } from "#phases/er-quiz-phase";
 import { hideCoopControllerTag, showCoopControllerTagFor } from "#ui/coop-controller-tag";
 import type { OptionSelectConfig } from "#ui/handlers/abstract-option-select-ui-handler";
@@ -984,6 +986,16 @@ export class CoopReplayMePhase extends Phase {
         // before it reached coopEndMirror), the reward uiMirror stayed OPEN and overlaid the continuing
         // game ("the ME screen never dismisses"). endSession is idempotent - a no-op if already closed.
         getCoopUiMirror()?.endSession();
+        // #859 (Delibird-gift wave desync): on a NON-battle ME the watcher-shop LEAVE can fall
+        // through into the ME wave's leftover battle chain (TurnInit -> Command -> TurnStart ->
+        // CoopReplayTurnPhase) BEFORE this terminal fires - a phantom turn parked awaiting a
+        // battle the host never fights (the host is already in the NEXT wave).
+        // leaveEncounterWithoutBattle clears only the QUEUE, so dissolve the RUNNING phantom
+        // first. A real battle handoff never takes this detached branch, but guard anyway - its
+        // replay turn is genuine.
+        if (!coopMeHandoffBattleStarted()) {
+          abortActiveCoopReplayTurnPhase("detached non-battle ME terminal (#859)");
+        }
         try {
           leaveEncounterWithoutBattle();
         } catch {

@@ -970,6 +970,22 @@ export class CoopBattleStreamer {
    * "waiting for host" notice and applies the next checkpoint when it lands). If the
    * host already sent it (race), the buffered resolution returns immediately.
    */
+  /**
+   * #859: resolve a PARKED turn wait immediately (null) so an aborted PHANTOM replay phase - a
+   * non-battle ME's leftover turn, see CoopReplayTurnPhase.abortPhantom - dissolves instead of
+   * sleeping the full timeout. The caller sets its own aborted flag BEFORE calling this, so the
+   * null resolution is interpreted as "aborted", never as a host stall.
+   */
+  abortTurnWait(turn: number): boolean {
+    const pending = this.pending.get(turn);
+    if (pending == null) {
+      return false;
+    }
+    coopWarn("replay", `guest awaitTurn turn=${turn} ABORT (phantom turn dissolve #859)`);
+    pending(null);
+    return true;
+  }
+
   awaitTurn(turn: number): Promise<CoopTurnResolution | null> {
     // Supersede any stale waiter for this turn.
     const staleTurn = this.pending.get(turn);

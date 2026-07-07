@@ -40,6 +40,21 @@ import { coopNarrateMoveUsed } from "#phases/coop-replay-phases";
  * streamer's grace: the guest still ends the turn (it re-syncs on the next checkpoint) rather
  * than hanging forever.
  */
+/**
+ * #859 (phantom ME turn): the currently-RUNNING replay instance. A detached NON-battle ME terminal
+ * ({@linkcode CoopReplayMePhase}.leaveDefensive) dissolves it via
+ * {@linkcode abortActiveCoopReplayTurnPhase} when the watcher-shop LEAVE fell through into the ME
+ * wave's leftover TurnInit/Command/TurnStart chain BEFORE the terminal fired - a parked pump
+ * awaiting a battle the host never fights (`leaveEncounterWithoutBattle` clears only the QUEUE,
+ * never the running phase, so without this the guest sleeps the full 20-min turn timeout while
+ * the host plays the next wave alone - the maintainer's Delibird-gift wave-13/14 desync).
+ */
+let activeCoopReplayTurnPhase: CoopReplayTurnPhase | null = null;
+
+export function abortActiveCoopReplayTurnPhase(reason: string): boolean {
+  return activeCoopReplayTurnPhase?.abortPhantom(reason) ?? false;
+}
+
 export class CoopReplayTurnPhase extends Phase {
   public readonly phaseName = "CoopReplayTurnPhase";
 
@@ -48,6 +63,8 @@ export class CoopReplayTurnPhase extends Phase {
   private readonly rendered: number;
   /** #782 live pump: the per-mon hp chain carried ACROSS pump continuations (multi-hit drains). */
   private readonly fromHpByBi: Map<number, number>;
+  /** #859: set by {@linkcode abortPhantom} - the pump ends WITHOUT finalize/turn-advance. */
+  private aborted = false;
 
   constructor(turn: number, rendered = 0, hpChain?: [number, number][]) {
     super();
@@ -56,8 +73,33 @@ export class CoopReplayTurnPhase extends Phase {
     this.fromHpByBi = new Map(hpChain ?? []);
   }
 
+  /**
+   * #859: dissolve this phase as a PHANTOM turn (a non-battle ME's leftover battle chain). Sets
+   * the aborted flag FIRST, then wakes the parked pump by resolving its turn wait null - the
+   * pump checks the flag before interpreting the null as a host stall, so it ends cleanly with
+   * no finalize, no turn advance, and no re-queued CommandPhase; the queue rebuilt by
+   * `leaveEncounterWithoutBattle` (the real next wave) then proceeds.
+   */
+  public abortPhantom(reason: string): boolean {
+    if (this.aborted) {
+      return true;
+    }
+    this.aborted = true;
+    coopWarn("replay", `guest replay turn=${this.turn}: ABORT phantom turn (${reason}) - dissolving parked pump`);
+    getCoopBattleStreamer()?.abortTurnWait(this.turn);
+    return true;
+  }
+
+  public override end(): void {
+    if (activeCoopReplayTurnPhase === this) {
+      activeCoopReplayTurnPhase = null;
+    }
+    super.end();
+  }
+
   public override start(): void {
     super.start();
+    activeCoopReplayTurnPhase = this;
     const streamer = getCoopBattleStreamer();
     if (streamer == null) {
       // No live session (defensive): just end the turn so the run never hangs.
@@ -94,6 +136,13 @@ export class CoopReplayTurnPhase extends Phase {
   private async pump(streamer: NonNullable<ReturnType<typeof getCoopBattleStreamer>>): Promise<void> {
     try {
       for (;;) {
+        // #859: a detached ME terminal dissolved this phase as a PHANTOM turn (no host battle
+        // exists) - end WITHOUT finalize/turn-advance so the rebuilt queue (next wave) runs.
+        if (this.aborted) {
+          coopWarn("replay", `guest replay turn=${this.turn}: phantom turn dissolved (#859) -> end without finalize`);
+          this.end();
+          return;
+        }
         // 1) Present any contiguous live events buffered right now, then continue via a
         //    continuation phase so the presentations actually play before the next drain.
         const increment = streamer.consumeLiveEventsFrom(this.turn, this.rendered);
@@ -111,6 +160,13 @@ export class CoopReplayTurnPhase extends Phase {
         }
         // 2) Nothing buffered: race the host's resolution against the next live arrival.
         const raced = await streamer.awaitTurnOrLiveEvent(this.turn, this.rendered);
+        // #859: the abort wakes this park by resolving the turn wait null - check the flag
+        // BEFORE the stall branch below can misread that null as a host stall.
+        if (this.aborted) {
+          coopWarn("replay", `guest replay turn=${this.turn}: phantom turn dissolved (#859) -> end without finalize`);
+          this.end();
+          return;
+        }
         if (raced.kind === "live") {
           continue; // drain the fresh arrival(s) on the next loop iteration
         }

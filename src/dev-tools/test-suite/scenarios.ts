@@ -2319,6 +2319,28 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
   },
   {
+    label: "(note) Co-op: gift-type mystery event no longer desyncs the WAVES (#859)",
+    description:
+      "CO-OP P0 fix - verify with TWO REAL clients on staging. A NON-battle mystery event (e.g. the\n"
+      + "Delibird gift) used to strand the WATCHER: after the owner picked and left, the watcher's client\n"
+      + "silently entered a phantom battle turn for the EVENT wave (a battle that does not exist) and froze\n"
+      + "there forever, while the owner advanced to the next wave alone and timed out waiting at the command\n"
+      + "barrier (live 2026-07-07 capture: host at wave 14, guest stuck at wave 13, wait climbing past 170s).\n"
+      + "Fixed: the event's end signal now dissolves the phantom turn so the watcher follows into the next\n"
+      + "wave. DO (2 clients): play co-op until a gift/narration-style mystery event (no fight) with a reward\n"
+      + "screen; the owner picks and continues. EXPECT: BOTH clients land in the SAME next wave together and\n"
+      + "both can command their mons - no one stuck on a frozen screen while the other plays. Regression\n"
+      + "coverage: test/tests/elite-redux/coop/coop-me-phantom-turn-abort.test.ts (4 cases incl. the parked\n"
+      + "phase dissolving with no finalize).",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({ STARTING_WAVE_OVERRIDE: 1, STARTING_LEVEL_OVERRIDE: 50 });
+      return [
+        makeStarter(SpeciesId.SNORLAX, { moveset: [MoveId.BODY_SLAM, MoveId.REST, MoveId.EARTHQUAKE, MoveId.CRUNCH] }),
+      ];
+    },
+  },
+  {
     label: "(note) Co-op: lone-survivor faint replacement seats in your OWN slot (#799)",
     description:
       "CO-OP fix - verify with TWO clients (not a solo battle): with a HEAVILY-fainted party (both sides\n"
