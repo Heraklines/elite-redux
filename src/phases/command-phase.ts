@@ -29,6 +29,7 @@ import type { SerializedCommand } from "#data/elite-redux/coop/coop-transport";
 import { reloadCurrentWave } from "#data/elite-redux/er-reset-wave";
 import { recordSinglePlayerCommand } from "#data/elite-redux/replay-single-recording";
 import { getShowdownRelay } from "#data/elite-redux/showdown/showdown-battle-state";
+import { SHOWDOWN_TURN_TIMER_MS } from "#data/elite-redux/showdown/showdown-command-relay";
 import { AbilityId } from "#enums/ability-id";
 import { ArenaTagSide } from "#enums/arena-tag-side";
 import { ArenaTagType } from "#enums/arena-tag-type";
@@ -59,6 +60,9 @@ export class CommandPhase extends FieldPhase {
    * Whether the command phase is handling a switch command
    */
   private isSwitch = false;
+
+  /** Showdown versus-host 60s turn clock (timeout id); null when unarmed. */
+  private showdownHostClock: number | null = null;
 
   constructor(fieldIndex: number) {
     super();
@@ -492,6 +496,42 @@ export class CommandPhase extends FieldPhase {
       globalScene.ui.setMode(UiMode.FIGHT, this.fieldIndex);
     } else {
       globalScene.ui.setMode(UiMode.COMMAND, this.fieldIndex);
+    }
+    this.startShowdownHostClock();
+  }
+
+  /**
+   * Showdown 1v1 (staging fix 2026-07-07): the HOST's own command pick gets the SAME 60s turn
+   * clock the guest already has. Without it the host could deliberate forever while the guest
+   * (whose relay pick is buffered host-side) stared at "waiting" with no recourse - a live
+   * 3.5-minute stall was log-confirmed. On expiry: auto-pick the lead's first usable move
+   * (mirrors the guest's autoShipOnTimeout). Versus-HOST-only; cleared on phase end.
+   */
+  private startShowdownHostClock(): void {
+    if (!isVersusSession() || getCoopController()?.role !== "host") {
+      return;
+    }
+    this.clearShowdownHostClock();
+    this.showdownHostClock = window.setTimeout(() => {
+      this.showdownHostClock = null;
+      try {
+        const lead = globalScene.getPlayerField()[this.fieldIndex];
+        const idx = lead?.getMoveset().findIndex(m => m != null && !m.isOutOfPp());
+        if (idx != null && idx >= 0) {
+          globalScene.ui.setMode(UiMode.MESSAGE);
+          this.handleCommand(Command.FIGHT, idx);
+        }
+      } catch {
+        /* the clock must never crash the command phase; a failed auto-pick leaves the menu open */
+      }
+    }, SHOWDOWN_TURN_TIMER_MS);
+  }
+
+  /** Clear the versus-host turn clock (no-op when none armed). */
+  private clearShowdownHostClock(): void {
+    if (this.showdownHostClock != null) {
+      window.clearTimeout(this.showdownHostClock);
+      this.showdownHostClock = null;
     }
   }
 
@@ -1297,6 +1337,7 @@ export class CommandPhase extends FieldPhase {
   }
 
   end() {
+    this.clearShowdownHostClock();
     globalScene.ui.setMode(UiMode.MESSAGE).then(() => super.end());
   }
 }

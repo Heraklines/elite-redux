@@ -323,10 +323,12 @@ export class ShowdownCommandUiHandler extends UiHandler {
     // Guest UX floor (#8): show a waiting notice while the host resolves the turn (mirrors co-op's
     // "partner is choosing" MESSAGE) instead of leaving the screen blank; setMode(MESSAGE) also closes
     // this menu. Raw-key fallback text is acceptable for now.
-    // TODO(i18n): add a dedicated `battle:showdownWaitingForOpponent` locale key.
+    // TODO(i18n): add a dedicated `battle:showdownOpponentChoosing` locale key.
+    // Distinct from the pre-battle handshake's "Waiting for opponent..." (staging UX fix): the
+    // pick is already SHIPPED; the host player is still choosing, then resolves + streams.
     globalScene.ui.setMode(UiMode.MESSAGE);
     globalScene.ui.showText(
-      i18next.t("battle:showdownWaitingForOpponent", { defaultValue: "Waiting for opponent..." }),
+      i18next.t("battle:showdownOpponentChoosing", { defaultValue: "Move locked in! Opponent is choosing..." }),
       null,
       () => {},
       null,

@@ -7596,7 +7596,8 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
 }
 
 export class PlayerPokemon extends Pokemon {
-  protected declare battleInfo: PlayerBattleInfo;
+  // Showdown versus-guest flip: the panel CLASS follows the presentation side (initBattleInfo),
+  // so the base `battleInfo: BattleInfo` declaration is NOT narrowed here - either chrome fits.
   public compatibleTms: MoveId[];
   /**
    * Co-op ownership tag (#633, P1g): in co-op mode the single shared 6-slot party
@@ -7685,8 +7686,19 @@ export class PlayerPokemon extends Pokemon {
   }
 
   initBattleInfo(): void {
-    this.battleInfo = new PlayerBattleInfo();
-    this.battleInfo.initInfo(this);
+    // Showdown 1v1 perspective flip (staging fix 2026-07-07): on the versus GUEST the authoritative
+    // PLAYER side is the OPPONENT's team, presented top - it gets the ENEMY-style panel chrome (no
+    // exp bar / HP numbers), exactly what a player expects to see on the foe. Hard-false elsewhere.
+    if (isShowdownGuestFlipGated()) {
+      const info = new EnemyBattleInfo();
+      this.battleInfo = info;
+      // Upcast: the base initInfo accepts any Pokemon; the subclass narrows for its own internals.
+      (info as BattleInfo).initInfo(this);
+    } else {
+      const info = new PlayerBattleInfo();
+      this.battleInfo = info;
+      info.initInfo(this);
+    }
   }
 
   override isPlayer(): this is PlayerPokemon {
@@ -8348,7 +8360,8 @@ export class PlayerPokemon extends Pokemon {
 }
 
 export class EnemyPokemon extends Pokemon {
-  protected declare battleInfo: EnemyBattleInfo;
+  // Showdown versus-guest flip: the panel CLASS follows the presentation side (initBattleInfo),
+  // so the base `battleInfo: BattleInfo` declaration is NOT narrowed here - either chrome fits.
   public trainerSlot: TrainerSlot;
   public aiType: AiType;
   public bossSegments: number;
@@ -8476,11 +8489,23 @@ export class EnemyPokemon extends Pokemon {
 
   initBattleInfo(): void {
     if (this.battleInfo) {
-      this.battleInfo.updateBossSegments(this);
+      if (this.battleInfo instanceof EnemyBattleInfo) {
+        this.battleInfo.updateBossSegments(this);
+      }
+    } else if (isShowdownGuestFlipGated()) {
+      // Showdown 1v1 perspective flip (staging fix 2026-07-07): the versus GUEST's OWN team is the
+      // authoritative ENEMY side, presented bottom - it gets the PLAYER-style panel chrome (HP bar
+      // with numbers), what a player expects on their own mon. Boss segments are a PvE concept and
+      // never occur in a manifest-built versus team, so the boss redraw is skipped safely.
+      const info = new PlayerBattleInfo();
+      this.battleInfo = info;
+      // Upcast: the base initInfo accepts any Pokemon; the subclass narrows for its own internals.
+      (info as BattleInfo).initInfo(this);
     } else {
-      this.battleInfo = new EnemyBattleInfo();
-      this.battleInfo.initInfo(this);
-      this.battleInfo.updateBossSegments(this);
+      const info = new EnemyBattleInfo();
+      this.battleInfo = info;
+      info.initInfo(this);
+      info.updateBossSegments(this);
     }
   }
 
@@ -9258,7 +9283,9 @@ export class EnemyPokemon extends Pokemon {
       if (clearedBossSegmentIndex <= this.bossSegmentIndex) {
         this.handleBossSegmentCleared(clearedBossSegmentIndex);
       }
-      this.battleInfo.updateBossSegments(this);
+      if (this.battleInfo instanceof EnemyBattleInfo) {
+        this.battleInfo.updateBossSegments(this);
+      }
     }
 
     return ret;
@@ -9426,10 +9453,14 @@ export class EnemyPokemon extends Pokemon {
    * Passing undefined will hide the window
    */
   public updateEffectiveness(effectiveness?: string) {
-    this.battleInfo.updateEffectiveness(effectiveness);
+    if (this.battleInfo instanceof EnemyBattleInfo) {
+      this.battleInfo.updateEffectiveness(effectiveness);
+    }
   }
 
   public toggleFlyout(visible: boolean): void {
-    this.battleInfo.toggleFlyout(visible);
+    if (this.battleInfo instanceof EnemyBattleInfo) {
+      this.battleInfo.toggleFlyout(visible);
+    }
   }
 }

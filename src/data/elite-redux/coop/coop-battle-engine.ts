@@ -2185,7 +2185,11 @@ function parseAuthoritativeParty(rawParty: Record<string, unknown>[] | undefined
 
 function battleSpriteKey(mon: Pokemon): string {
   try {
-    return mon.getBattleSpriteKey(mon.isPlayer(), false);
+    // Presentation-aware (staging fix 2026-07-07): the DEFAULT back-arg resolves through the
+    // versus-guest perspective flip (`presentationIsBack()`), which collapses to `isPlayer()` for
+    // solo/co-op - passing `mon.isPlayer()` explicitly re-textured the versus guest's OWN team
+    // (authoritative enemies, presented player-side) with FRONT sprites on every state apply.
+    return mon.getBattleSpriteKey(undefined, false);
   } catch {
     return "";
   }

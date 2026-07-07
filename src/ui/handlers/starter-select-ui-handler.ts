@@ -5903,7 +5903,12 @@ export class StarterSelectUiHandler extends MessageUiHandler {
     if (!this.lastSpecies) {
       return;
     }
-    const passiveAbilityIds = this.lastSpecies.getPassiveAbilities(formIndex);
+    // Showdown (staging fix 2026-07-07): the passive SLOTS follow the picked field stage too
+    // (item 15) - the fielded species' passive set is what battles. Identity off-showdown.
+    const stage = globalScene.gameMode.isShowdown ? this.showdownRenderStage(this.lastSpecies.speciesId) : null;
+    const passiveSpecies = stage?.species ?? this.lastSpecies;
+    const passiveFormIndex = stage ? stage.formIndex : formIndex;
+    const passiveAbilityIds = passiveSpecies.getPassiveAbilities(passiveFormIndex);
     // All 3 slot text objects: slot 0 = legacy `pokemonPassiveText`, slots 1-2 = new.
     const slotTexts: [Phaser.GameObjects.Text, Phaser.GameObjects.Text, Phaser.GameObjects.Text] = [
       this.pokemonPassiveText,
@@ -6261,7 +6266,11 @@ export class StarterSelectUiHandler extends MessageUiHandler {
           .setShadowColor(getTextColor(isHidden ? TextStyle.SUMMARY_GOLD : TextStyle.SUMMARY_ALT, true));
 
         const passiveAttr = starterDataEntry.passiveAttr;
-        const passiveAbility = allAbilities[this.lastSpecies.getPassiveAbility(formIndex)];
+        // Showdown (staging fix 2026-07-07): passives follow the picked FIELD STAGE like the
+        // ability above (item 15 "everything follows the stage") - the fielded species/form's
+        // passive set is what battles, so it is what the panel must show. Unlock gating
+        // (passiveAttr) stays keyed to the root starter entry. Identity off-showdown.
+        const passiveAbility = allAbilities[displaySpecies.getPassiveAbility(displayFormIndex)];
 
         if (this.pokemonAbilityText.visible) {
           if (this.activeTooltip === "ABILITY") {
