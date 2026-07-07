@@ -39,6 +39,7 @@ import type {
   ShowdownStakeOfferWire,
 } from "#data/elite-redux/coop/coop-transport";
 import type { GhostTrainerProfile } from "#data/elite-redux/er-ghost-profile";
+import { addShowdownRejoinResender } from "#data/elite-redux/showdown/showdown-battle-state";
 import { registerShowdownMatch } from "#data/elite-redux/showdown/showdown-escrow-client";
 import { isMegaStage } from "#data/elite-redux/showdown/showdown-evolutions";
 import type { ShowdownItemKey } from "#data/elite-redux/showdown/showdown-item-pool";
@@ -140,6 +141,8 @@ export class ShowdownWagerUiHandler extends UiHandler {
   private dynamic: Phaser.GameObjects.GameObject[] = [];
   private cursorObj: Phaser.GameObjects.Image | null = null;
   private offMessage: (() => void) | null = null;
+  /** B7 item 14b: unregisters this handler's rejoin re-sender (mirrors {@linkcode offMessage}'s lifetime). */
+  private offRejoin: (() => void) | null = null;
 
   private args: ShowdownWagerArgs | null = null;
   private choices: StakeChoice[] = [];
@@ -193,6 +196,11 @@ export class ShowdownWagerUiHandler extends UiHandler {
     // Wire: listen for the opponent's offer (tier-match display) + their commit arrival (lock lamp).
     this.offMessage?.();
     this.offMessage = params.transport?.onMessage(msg => this.handleWire(msg)) ?? null;
+    // B7 item 14b: register a rejoin re-sender so a WebRTC drop on the wager screen re-ships our offer /
+    // lock / commit-arrival the opponent missed while dark (the transport listener above survives the
+    // rejoin; only the in-flight frames are lost). Mirrors the offMessage lifetime.
+    this.offRejoin?.();
+    this.offRejoin = addShowdownRejoinResender(() => this.resendState());
     // Broadcast our INITIAL offer (Friendly by default) so the opponent's screen shows it immediately.
     this.broadcastOffer();
 
@@ -260,6 +268,21 @@ export class ShowdownWagerUiHandler extends UiHandler {
       this.opponentLocked = true;
       this.render();
     }
+  }
+
+  /**
+   * B7 item 14b: re-ship this client's wager state after a WebRTC rejoin (the opponent missed our
+   * frames while the channel was dark). Idempotent: re-broadcasts our current offer (their tier-match
+   * display recovers), re-sends our stake lock if we locked a staked offer (their lock lamp re-lights),
+   * and replays our wager-commit rendezvous arrival if we crossed it. All receivers dedupe.
+   */
+  private resendState(): void {
+    this.broadcastOffer();
+    const offer = this.selectedOffer();
+    if (this.ownLocked && offer != null) {
+      this.args?.transport?.send({ t: "showdownStakeLock", matchId: this.serverMatchId ?? "", tier: stakeTier(offer) });
+    }
+    this.args?.rendezvous?.resendArrivals();
   }
 
   /** Send THIS client's currently-selected offer over the wire (Friendly sentinel when null). */
@@ -539,25 +562,43 @@ export class ShowdownWagerUiHandler extends UiHandler {
   /** A single mon: species icon (shiny/variant frame) + held-item mini-icon + mega badge. */
   private renderMonIcon(mon: ShowdownMonManifest, x: number, y: number): void {
     const mega = isMegaStage(mon.speciesId, mon.formIndex);
-    // Mega/primal forms use ER-custom icon frames that don't render reliably in a compact strip; show
-    // the ROOT line's base icon and let the "M" badge convey the mega. Non-megas use their own icon.
-    const iconSpeciesId = mega ? mon.rootSpeciesId : mon.speciesId;
-    const iconFormIndex = mega ? 0 : mon.formIndex;
+    // B7 item 14c: the wager is the MATCHUP preview, so show the FIELDED form - the manifest's own
+    // species + formIndex (evolved OR mega icon). The base-form rule is teambuilder-only (item 12);
+    // here the "M" badge still marks a mega for a quick read on top of the mega icon.
+    const iconSpeciesId = mon.speciesId;
+    const iconFormIndex = mon.formIndex;
     const species = getPokemonSpecies(iconSpeciesId);
     if (species != null) {
-      // Integer 0.5 scale (matches the party/starter team-icon strip) avoids atlas-frame bleed.
+      // Integer 0.5 scale (matches the party/starter team-icon strip) avoids atlas-frame bleed. The
+      // atlas key is set on the sprite ctor UNCONDITIONALLY (so the boot-loaded sheet is used, and the
+      // render harness's texture injector records + resolves it) - do NOT gate on textures.exists(),
+      // which would leave the key unrequested and blank every icon.
       const wantId = species.getIconId(false, iconFormIndex, mon.shiny, mon.variant);
       const icon = globalScene.add
         .sprite(x, y, species.getIconAtlasKey(iconFormIndex, mon.shiny, mon.variant))
         .setOrigin(0.5, 0)
         .setScale(0.5);
       icon.setFrame(wantId);
-      // A missing variant icon leaves setFrame on the wrong frame; fall back to the base frame
-      // (mirrors BattleScene.addPokemonIcon's variant-missing guard).
+      // B7 item 14c: a missing frame/atlas leaves setFrame on the wrong frame. Fall back to the fielded
+      // species' NON-SHINY base frame (variant-missing guard, mirrors BattleScene.addPokemonIcon), then -
+      // if the whole fielded sheet is absent (an ER-custom form icon that never loaded) - to the ROOT
+      // line's base icon (a boot-loaded starter sheet) so a slot is never a broken box.
       if (icon.frame.name !== wantId) {
         const baseId = species.getIconId(false, iconFormIndex, false, 0);
         if (icon.texture.has(baseId)) {
           icon.setFrame(baseId);
+        } else {
+          const rootSpecies = getPokemonSpecies(mon.rootSpeciesId);
+          const rootFrame = rootSpecies?.getIconId(false, 0, false, 0);
+          if (rootSpecies != null && rootFrame != null) {
+            icon.setTexture(rootSpecies.getIconAtlasKey(0, false, 0));
+          }
+          // Last resort (even the root sheet absent): the neutral placeholder, never a broken box.
+          if (rootFrame != null && icon.texture.has(rootFrame)) {
+            icon.setFrame(rootFrame);
+          } else {
+            icon.setTexture("pokemon_icons_0").setFrame("unknown");
+          }
         }
       }
       this.add(icon);
@@ -760,6 +801,9 @@ export class ShowdownWagerUiHandler extends UiHandler {
     super.clear();
     this.offMessage?.();
     this.offMessage = null;
+    // B7 item 14b: drop the rejoin re-sender so a later (in-battle) rejoin doesn't re-broadcast a stale offer.
+    this.offRejoin?.();
+    this.offRejoin = null;
     this.clearDynamic();
     if (this.cursorObj) {
       this.cursorObj.destroy();
