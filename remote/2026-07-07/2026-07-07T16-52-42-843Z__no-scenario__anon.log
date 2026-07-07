@@ -1,0 +1,258 @@
+url:      https://elite-redux-staging.pages.dev/
+build:    mravmpmu-im9m
+mode:     4  wave:112
+seed:     KwloZFIqCVaHAhdckXf2KPnp
+party:    Reuniclus Redux(L93 335hp f1), Phione(L94 291hp f0), Altaria Redux(L94 265hp f1), Volcanion(L94 277hp f0), Tinkaton(L84 256hp f1), Garganacl(L83 263hp f0)
+enemy:    Bronzong(L91), Beautifly(L91), Skuntank(L91), Mothim(L93), Rotom(L93), Tangrowth(L97)
+
+----- CONSOLE -----
+[16:52:15.418] LOG: Applied X Speed 
+[16:52:15.418] LOG: Applied X Speed 
+[16:52:15.419] LOG: %cStart Phase PositionalTagPhase color:green;
+[16:52:15.419] LOG: %cStart Phase BerryPhase color:green;
+[16:52:15.419] LOG: Applied X Speed 
+[16:52:15.420] LOG: Applied X Speed 
+[16:52:15.420] LOG: Applied X Speed 
+[16:52:15.421] LOG: Applied X Speed 
+[16:52:15.421] LOG: Applied X Speed 
+[16:52:15.422] LOG: Applied X Speed 
+[16:52:15.422] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[16:52:15.422] LOG: Applied X Speed 
+[16:52:15.423] LOG: Applied X Speed 
+[16:52:15.423] LOG: Applied X Speed 
+[16:52:15.424] LOG: Applied X Speed 
+[16:52:15.425] LOG: Applied X Speed 
+[16:52:15.425] LOG: Applied X Speed 
+[16:52:15.425] LOG: %cStart Phase TurnEndPhase color:green;
+[16:52:15.427] LOG: Applied X Speed 
+[16:52:15.428] LOG: Applied X Speed 
+[16:52:15.428] LOG: Applied X Speed 
+[16:52:15.429] LOG: Applied X Speed 
+[16:52:15.430] LOG: Applied X Speed 
+[16:52:15.430] LOG: Applied X Speed 
+[16:52:15.431] LOG: Applied X Speed 
+[16:52:15.432] LOG: Applied X Speed 
+[16:52:15.432] LOG: Applied X Speed 
+[16:52:15.432] LOG: Applied X Speed 
+[16:52:15.433] LOG: Applied X Speed 
+[16:52:15.433] LOG: Applied X Speed 
+[16:52:15.447] WARN: [coop:turn] host recorder: finalize with NO open recording -> turn=-1 events=0 (caller decides not to emit)
+[16:52:15.447] LOG: %cStart Phase PokemonHealPhase color:green;
+[16:52:15.452] LOG: %cStart Phase MessagePhase color:green;
+[16:52:15.679] LOG: %cStart Phase PokemonHealPhase color:green;
+[16:52:15.679] LOG: %cStart Phase MessagePhase color:green;
+[16:52:15.896] LOG: %cStart Phase PokemonHealPhase color:green;
+[16:52:15.897] LOG: %cStart Phase MessagePhase color:green;
+[16:52:16.162] LOG: %cStart Phase MessagePhase color:green;
+[16:52:16.429] LOG: %cStart Phase CommonAnimPhase color:green;
+[16:52:16.429] LOG: %cStart Phase DamageAnimPhase color:green;
+[16:52:16.441] LOG: %cStart Phase MessagePhase color:green;
+[16:52:16.733] LOG: %cStart Phase MessagePhase color:green;
+[16:52:16.979] LOG: %cStart Phase MessagePhase color:green;
+[16:52:17.214] LOG: %cStart Phase MessagePhase color:green;
+[16:52:17.479] LOG: %cStart Phase BattleEndPhase color:green;
+[16:52:17.481] LOG: Battle Score: 238 (1 Turns x1)
+[16:52:17.481] LOG: Total Score: 38249
+[16:52:17.515] LOG: Applied Carbos 
+[16:52:17.556] LOG: %cStart Phase EggLapsePhase color:green;
+[16:52:17.557] LOG: %cStart Phase SelectModifierPhase color:green;
+[16:52:17.557] LOG: Wave Seed: ºæÛÞÉµ¸à²ÅÐ·°×ÓÒÚÇÕ¡º¿Ýß 111
+[16:52:17.560] LOG: Applied X Speed 
+[16:52:17.560] LOG: Applied X Speed 
+[16:52:17.561] LOG: Applied X Speed 
+[16:52:17.562] LOG: Applied X Speed 
+[16:52:17.563] LOG: Applied X Speed 
+[16:52:17.563] LOG: Applied X Speed 
+[16:52:17.564] LOG: Applied X Speed 
+[16:52:17.566] LOG: Applied X Speed 
+[16:52:17.566] LOG: Applied X Speed 
+[16:52:17.567] LOG: Applied X Speed 
+[16:52:17.567] LOG: Applied X Speed 
+[16:52:17.567] LOG: Applied X Speed 
+[16:52:17.568] LOG: Applied X Speed 
+[16:52:17.568] LOG: Applied X Speed 
+[16:52:17.569] LOG: Applied X Speed 
+[16:52:17.569] LOG: Applied X Speed 
+[16:52:17.569] LOG: Applied X Speed 
+[16:52:17.570] LOG: Applied X Speed 
+[16:52:17.570] LOG: Applied X Speed 
+[16:52:17.571] LOG: Applied X Speed 
+[16:52:17.571] LOG: Applied X Speed 
+[16:52:17.571] LOG: Applied X Speed 
+[16:52:17.572] LOG: Applied X Speed 
+[16:52:17.572] LOG: Applied X Speed 
+[16:52:17.573] LOG: Applied X Speed 
+[16:52:17.574] LOG: Applied X Speed 
+[16:52:17.574] LOG: Applied X Speed 
+[16:52:17.574] LOG: Applied X Speed 
+[16:52:17.578] LOG: Applied X Speed 
+[16:52:17.578] LOG: Applied X Speed 
+[16:52:17.579] LOG: Applied Golden Poké Ball 
+[16:52:17.580] LOG: 6 4 [2,3,4,5]
+[16:52:17.580] LOG: {"id":"LURE","localeKey":"modifierType:ModifierType.LURE","iconImage":"lure","group":"lure","soundName":"se/restore","tier":0,"maxBattles":10} 
+[16:52:17.580] LOG: 15 9 [2,3,4,5,6,7,8,9,10,16,22]
+[16:52:17.580] LOG: GREAT 0
+[16:52:17.580] LOG: 15 9 [2,3,4,5,6,7,8,9,10,16,22]
+[16:52:17.580] LOG: GREAT 0
+[16:52:17.580] LOG: 0 0 [2,3,4,5,6,7,8,9,10,16,22]
+[16:52:17.580] LOG: {"id":"GREAT_BALL","localeKey":"","iconImage":"gb","group":"pb","soundName":"se/pb_bounce_1","tier":1,"pokeballType":1,"count":5} 
+[16:52:17.580] LOG: 18 10 [2,3,4,5,6,7,8,9,10,16,22]
+[16:52:17.581] LOG: {"id":"MEMORY_MUSHROOM","localeKey":"modifierType:ModifierType.MEMORY_MUSHROOM","iconImage":"big_mushroom","soundName":"se/restore","tier":1} 
+[16:52:17.581] LOG: 6 4 [2,3,4,5]
+[16:52:17.581] LOG: {"id":"LURE","localeKey":"modifierType:ModifierType.LURE","iconImage":"lure","group":"lure","soundName":"se/restore","tier":0,"maxBattles":10} 
+[16:52:17.581] LOG: 9 4 [2,3,4,5]
+[16:52:17.581] LOG: {"id":"TM_CASE","localeKey":"","iconImage":"tm_case","soundName":"se/restore","tier":0} 
+[16:52:17.582] LOG: 0 0 [2,3,4,5]
+[16:52:17.582] LOG: {"id":"POKEBALL","localeKey":"","iconImage":"pb","group":"pb","soundName":"se/pb_bounce_1","tier":0,"pokeballType":0,"count":5} 
+[16:52:17.582] LOG: 8 4 [2,3,4,5]
+[16:52:17.582] LOG: {"id":"BERRY","localeKey":"","iconImage":"leppa_berry","group":"berry","soundName":"se/restore","tier":0,"berryType":10} 
+[16:52:17.582] LOG: 7 4 [2,3,4,5]
+[16:52:17.582] LOG: {"id":"TEMP_STAT_STAGE_BOOSTER","localeKey":"","iconImage":"x_sp_atk","soundName":"se/restore","tier":0,"stat":3,"nameKey":"x_sp_atk","quantityKey":"percentage"} 
+[16:52:17.583] LOG: 9 4 [2,3,4,5]
+[16:52:17.583] LOG: {"id":"TM_CASE","localeKey":"","iconImage":"tm_case","soundName":"se/restore","tier":0} 
+[16:52:17.583] LOG: 0 0 [2,3,4,5]
+[16:52:17.583] LOG: {"id":"POKEBALL","localeKey":"","iconImage":"pb","group":"pb","soundName":"se/pb_bounce_1","tier":0,"pokeballType":0,"count":5} 
+[16:52:17.583] LOG: 8 4 [2,3,4,5]
+[16:52:17.583] LOG: {"id":"BERRY","localeKey":"","iconImage":"sitrus_berry","group":"berry","soundName":"se/restore","tier":0,"berryType":0} 
+[16:52:17.584] LOG: 7 4 [2,3,4,5]
+[16:52:17.584] LOG: {"id":"TEMP_STAT_STAGE_BOOSTER","localeKey":"","iconImage":"x_speed","soundName":"se/restore","tier":0,"stat":5,"nameKey":"x_speed","quantityKey":"percentage"} 
+[16:52:17.584] LOG: 0 0 [2,3,4,5]
+[16:52:17.584] LOG: {"id":"POKEBALL","localeKey":"","iconImage":"pb","group":"pb","soundName":"se/pb_bounce_1","tier":0,"pokeballType":0,"count":5} 
+[16:52:17.584] LOG: 7 4 [2,3,4,5]
+[16:52:17.584] LOG: {"id":"TEMP_STAT_STAGE_BOOSTER","localeKey":"","iconImage":"x_sp_atk","soundName":"se/restore","tier":0,"stat":3,"nameKey":"x_sp_atk","quantityKey":"percentage"} 
+[16:52:17.585] LOG: 9 4 [2,3,4,5]
+[16:52:17.585] LOG: {"id":"TM_CASE","localeKey":"","iconImage":"tm_case","soundName":"se/restore","tier":0} 
+[16:52:17.585] LOG: 7 4 [2,3,4,5]
+[16:52:17.585] LOG: {"id":"TEMP_STAT_STAGE_BOOSTER","localeKey":"","iconImage":"x_sp_atk","soundName":"se/restore","tier":0,"stat":3,"nameKey":"x_sp_atk","quantityKey":"percentage"} 
+[16:52:17.585] LOG: 1 0 [2,3,4,5]
+[16:52:17.585] LOG: {"id":"RARE_CANDY","localeKey":"modifierType:ModifierType.RARE_CANDY","iconImage":"rare_candy","soundName":"se/restore","tier":0} 
+[16:52:17.586] LOG: 9 4 [2,3,4,5]
+[16:52:17.586] LOG: {"id":"TM_CASE","localeKey":"","iconImage":"tm_case","soundName":"se/restore","tier":0} 
+[16:52:17.586] LOG: 9 4 [2,3,4,5]
+[16:52:17.586] LOG: {"id":"TM_CASE","localeKey":"","iconImage":"tm_case","soundName":"se/restore","tier":0} 
+[16:52:17.586] LOG: 6 4 [2,3,4,5]
+[16:52:17.586] LOG: {"id":"LURE","localeKey":"modifierType:ModifierType.LURE","iconImage":"lure","group":"lure","soundName":"se/restore","tier":0,"maxBattles":10} 
+[16:52:17.586] LOG: 0 0 [2,3,4,5]
+[16:52:17.586] LOG: {"id":"POKEBALL","localeKey":"","iconImage":"pb","group":"pb","soundName":"se/pb_bounce_1","tier":0,"pokeballType":0,"count":5} 
+[16:52:17.587] LOG: 9 4 [2,3,4,5]
+[16:52:17.587] LOG: {"id":"TM_CASE","localeKey":"","iconImage":"tm_case","soundName":"se/restore","tier":0} 
+[16:52:17.587] LOG: 0 0 [2,3,4,5]
+[16:52:17.587] LOG: {"id":"POKEBALL","localeKey":"","iconImage":"pb","group":"pb","soundName":"se/pb_bounce_1","tier":0,"pokeballType":0,"count":5} 
+[16:52:17.587] LOG: 9 4 [2,3,4,5]
+[16:52:17.587] LOG: {"id":"TM_CASE","localeKey":"","iconImage":"tm_case","soundName":"se/restore","tier":0} 
+[16:52:17.588] LOG: 7 4 [2,3,4,5]
+[16:52:17.588] LOG: {"id":"TEMP_STAT_STAGE_BOOSTER","localeKey":"","iconImage":"x_speed","soundName":"se/restore","tier":0,"stat":5,"nameKey":"x_speed","quantityKey":"percentage"} 
+[16:52:17.588] LOG: 7 4 [2,3,4,5]
+[16:52:17.588] LOG: {"id":"TEMP_STAT_STAGE_BOOSTER","localeKey":"","iconImage":"x_sp_def","soundName":"se/restore","tier":0,"stat":4,"nameKey":"x_sp_def","quantityKey":"percentage"} 
+[16:52:17.588] LOG: 0 0 [2,3,4,5]
+[16:52:17.588] LOG: {"id":"POKEBALL","localeKey":"","iconImage":"pb","group":"pb","soundName":"se/pb_bounce_1","tier":0,"pokeballType":0,"count":5} 
+[16:52:17.589] LOG: 7 4 [2,3,4,5]
+[16:52:17.589] LOG: {"id":"TEMP_STAT_STAGE_BOOSTER","localeKey":"","iconImage":"x_speed","soundName":"se/restore","tier":0,"stat":5,"nameKey":"x_speed","quantityKey":"percentage"} 
+[16:52:17.589] LOG: 0 0 [2,3,4,5]
+[16:52:17.589] LOG: {"id":"POKEBALL","localeKey":"","iconImage":"pb","group":"pb","soundName":"se/pb_bounce_1","tier":0,"pokeballType":0,"count":5} 
+[16:52:17.589] LOG: 0 0 [2,3,4,5]
+[16:52:17.589] LOG: {"id":"POKEBALL","localeKey":"","iconImage":"pb","group":"pb","soundName":"se/pb_bounce_1","tier":0,"pokeballType":0,"count":5} 
+[16:52:17.590] LOG: 9 4 [2,3,4,5]
+[16:52:17.590] LOG: {"id":"TM_CASE","localeKey":"","iconImage":"tm_case","soundName":"se/restore","tier":0} 
+[16:52:17.590] LOG: 7 4 [2,3,4,5]
+[16:52:17.590] LOG: {"id":"TEMP_STAT_STAGE_BOOSTER","localeKey":"","iconImage":"x_accuracy","soundName":"se/restore","tier":0,"stat":6,"nameKey":"x_accuracy","quantityKey":"stage"} 
+[16:52:37.051] LOG: Applied Carbos 
+[16:52:37.107] LOG: %cStart Phase NewBattlePhase color:green;
+[16:52:37.107] LOG: Wave Seed: »çÜßÊ¶¹á³ÆÑ¸±ØÔÓÛÈÖ¢»ÀÞà 112
+[16:52:37.109] LOG: Applied X Speed 
+[16:52:37.109] LOG: Applied X Speed 
+[16:52:37.110] LOG: Applied X Speed 
+[16:52:37.110] LOG: Applied X Speed 
+[16:52:37.110] LOG: Applied X Speed 
+[16:52:37.111] LOG: Applied X Speed 
+[16:52:37.111] LOG: Applied X Speed 
+[16:52:37.112] LOG: Applied X Speed 
+[16:52:37.112] LOG: Applied X Speed 
+[16:52:37.113] LOG: Applied X Speed 
+[16:52:37.113] LOG: Applied X Speed 
+[16:52:37.114] LOG: Applied X Speed 
+[16:52:37.114] LOG: Applied X Speed 
+[16:52:37.114] LOG: Applied X Speed 
+[16:52:37.118] LOG: Applied X Speed 
+[16:52:37.118] LOG: Applied X Speed 
+[16:52:37.119] LOG: %cStart Phase MessagePhase color:green;
+[16:52:37.270] LOG: %cStart Phase MessagePhase color:green;
+[16:52:37.536] LOG: %cStart Phase MessagePhase color:green;
+[16:52:37.820] LOG: Applied X Speed 
+[16:52:37.822] LOG: Applied X Speed 
+[16:52:37.824] LOG: Applied X Speed 
+[16:52:37.825] LOG: Applied X Speed 
+[16:52:37.826] LOG: Applied X Speed 
+[16:52:37.827] LOG: Applied X Speed 
+[16:52:37.828] LOG: %cStart Phase ReturnPhase color:green;
+[16:52:37.873] LOG: Applied X Speed 
+[16:52:37.873] LOG: Applied X Speed 
+[16:52:37.873] LOG: Applied X Speed 
+[16:52:37.874] LOG: Applied X Speed 
+[16:52:37.874] LOG: Applied X Speed 
+[16:52:37.875] LOG: Applied X Speed 
+[16:52:37.875] LOG: Applied X Speed 
+[16:52:37.876] LOG: Applied X Speed 
+[16:52:37.954] LOG: Applied X Speed 
+[16:52:37.956] LOG: Applied X Speed 
+[16:52:37.956] LOG: %cStart Phase ReturnPhase color:green;
+[16:52:37.988] LOG: Applied X Speed 
+[16:52:37.989] LOG: Applied X Speed 
+[16:52:37.989] LOG: Applied X Speed 
+[16:52:37.990] LOG: Applied X Speed 
+[16:52:37.990] LOG: Applied X Speed 
+[16:52:37.990] LOG: Applied X Speed 
+[16:52:37.991] LOG: Applied X Speed 
+[16:52:37.991] LOG: Applied X Speed 
+[16:52:38.070] LOG: %cStart Phase ReturnPhase color:green;
+[16:52:38.108] LOG: Applied X Speed 
+[16:52:38.109] LOG: Applied X Speed 
+[16:52:38.109] LOG: Applied X Speed 
+[16:52:38.110] LOG: Applied X Speed 
+[16:52:38.111] LOG: Applied X Speed 
+[16:52:38.111] LOG: Applied X Speed 
+[16:52:38.112] LOG: Applied X Speed 
+[16:52:38.112] LOG: Applied X Speed 
+[16:52:38.185] LOG: %cStart Phase ShowTrainerPhase color:green;
+[16:52:38.303] LOG: %cStart Phase NextEncounterPhase color:green;
+[16:52:38.311] LOG: COMMON
+[16:52:38.311] LOG: Bronzong
+[16:52:38.345] LOG: Pokemon: Foe Bronzong | Species ID: 437 | Level: 91 | Nature: Impish (+Def/-SpAtk)
+[16:52:38.345] LOG: Stats (IVs): HP: 224 (16), Atk: 166 (26), Def: 243 (20), Spatk: 145 (14), Spdef: 235 (15), Spd: 91 (25)
+[16:52:38.345] LOG: Ability: Lead Coat | Passive Ability: Steely Spirit 
+[16:52:38.345] LOG: Moveset: ["Twin Beam","Spin Out","Heal Bell","Rock Polish"]
+[16:52:38.345] LOG: COMMON
+[16:52:38.345] LOG: Beautifly
+[16:52:38.370] LOG: Pokemon: Foe Beautifly | Species ID: 267 | Level: 91 | Nature: Calm (+SpDef/-Atk)
+[16:52:38.370] LOG: Stats (IVs): HP: 225 (13), Atk: 91 (19), Def: 142 (24), Spatk: 193 (26), Spdef: 227 (19), Spd: 183 (15)
+[16:52:38.370] LOG: Ability: Giant Wings | Passive Ability: Majestic Moth 
+[16:52:38.370] LOG: Moveset: ["Struggle Bug","Giga Drain","Air Cutter","Quiver Dance"]
+[16:52:38.370] LOG: COMMON
+[16:52:38.370] LOG: Skuntank
+[16:52:38.386] LOG: Pokemon: Foe Skuntank | Species ID: 435 | Level: 91 | Nature: Hardy (-)
+[16:52:38.386] LOG: Stats (IVs): HP: 304 (22), Atk: 119 (26), Def: 172 (14), Spatk: 218 (11), Spdef: 138 (19), Spd: 180 (17)
+[16:52:38.386] LOG: Ability: Unburden | Passive Ability: Corrosion 
+[16:52:38.386] LOG: Moveset: ["Poison Jab","Sucker Punch","Stuff Cheeks","Fire Blast"]
+[16:52:38.387] LOG: COMMON
+[16:52:38.387] LOG: Bronzong
+[16:52:38.387] LOG: Duplicate species detected, prompting reroll...
+[16:52:38.387] LOG: Rerolling party member...
+[16:52:38.387] LOG: COMMON
+[16:52:38.387] LOG: Mothim
+[16:52:38.409] LOG: Pokemon: Foe Mothim | Species ID: 414 | Level: 93 | Nature: Quirky (-)
+[16:52:38.410] LOG: Stats (IVs): HP: 238 (25), Atk: 215 (19), Def: 142 (27), Spatk: 219 (27), Spdef: 130 (29), Spd: 201 (27)
+[16:52:38.410] LOG: Ability: Overcoat | Passive Ability: Tinted Lens 
+[16:52:38.410] LOG: Moveset: ["Web Shot","Zephyr Rush","Confide","Victory Dance"]
+[16:52:38.410] LOG: ULTRA_RARE
+[16:52:38.410] LOG: Downgraded trainer Pokemon rarity tier from ULTRA_RARE to SUPER_RARE
+[16:52:38.410] LOG: Rotom
+[16:52:38.424] LOG: Pokemon: Foe Rotom | Species ID: 479 | Level: 93 | Nature: Quirky (-)
+[16:52:38.424] LOG: Stats (IVs): HP: 199 (12), Atk: 138 (21), Def: 220 (19), Spatk: 239 (14), Spdef: 210 (25), Spd: 169 (30)
+[16:52:38.424] LOG: Ability: Water Absorb | Passive Ability: Levitate 
+[16:52:38.424] LOG: Moveset: ["Hydro Pump","Discharge","Grudge","Ice Beam"]
+[16:52:38.424] LOG: UNCOMMON
+[16:52:38.424] LOG: Tangrowth
+[16:52:38.435] LOG: Pokemon: Foe Tangrowth | Species ID: 465 | Level: 97 | Nature: Serious (-)
+[16:52:38.435] LOG: Stats (IVs): HP: 325 (29), Atk: 211 (17), Def: 260 (24), Spatk: 220 (26), Spdef: 113 (21), Spd: 110 (25)
+[16:52:38.435] LOG: Ability: Battle Armor | Passive Ability: Regenerator 
+[16:52:38.435] LOG: Moveset: ["Leaf Storm","Body Slam","Worry Seed","Power Trick"]
