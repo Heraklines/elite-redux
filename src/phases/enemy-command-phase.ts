@@ -2,6 +2,8 @@ import { globalScene } from "#app/global-scene";
 import { getCoopController, isAuthoritativeBattleSession, isVersusSession } from "#data/elite-redux/coop/coop-runtime";
 import type { SerializedCommand } from "#data/elite-redux/coop/coop-transport";
 import { ER_DOOMED_SWITCH_THRESHOLD_MULT, erAssessThreat, getErAiProfile } from "#data/elite-redux/er-enemy-ai";
+import { isReplayRecording, recordReplayCommand } from "#data/elite-redux/replay-recorder";
+import type { ReplayCommandKind } from "#data/elite-redux/replay-trace";
 import { getShowdownRelay } from "#data/elite-redux/showdown/showdown-battle-state";
 import { getMoveTargets } from "#data/moves/move-utils";
 import { AbilityId } from "#enums/ability-id";
@@ -86,6 +88,8 @@ export class EnemyCommandPhase extends FieldPhase {
     if (command == null || !this.isRelayedCommandLegal(command)) {
       // Disconnect / timeout / illegal pick: the enemy acts by AI so the duel never stalls.
       this.resolveEnemyAiCommand();
+      // D5 telemetry: capture the AI-fallback enemy command actually committed (no-op unless recording).
+      this.recordVersusEnemyCommand();
       return;
     }
     const slot = globalScene.currentBattle.arrangement.enemyOffset + this.fieldIndex;
@@ -116,7 +120,45 @@ export class EnemyCommandPhase extends FieldPhase {
         skip: this.skipTurn,
       };
     }
+    // D5 telemetry: capture the RELAYED enemy command actually committed (no-op unless recording).
+    this.recordVersusEnemyCommand();
     this.end();
+  }
+
+  /**
+   * D5 telemetry: RECORD the finalized enemy-slot command (relayed OR AI-fallback) into the replay trace
+   * so a showdown match records BOTH sides' per-turn decisions. Reads the committed `turnCommands[slot]`
+   * (source-agnostic) and maps it to a {@linkcode ReplayCommandKind}. No-op unless recording (showdown
+   * host only). The enemy slot is `enemyOffset + fieldIndex`, so its `slotFieldIndex` is distinct from the
+   * host's player-side commands (slots 0/1) - a future showdown loader tells the two sides apart.
+   */
+  private recordVersusEnemyCommand(): void {
+    if (!isReplayRecording()) {
+      return;
+    }
+    const battle = globalScene.currentBattle;
+    const slot = battle.arrangement.enemyOffset + this.fieldIndex;
+    const tc = battle.turnCommands[slot];
+    if (tc == null || tc.skip) {
+      return; // an inert/skipped enemy turn contributes no decision
+    }
+    let kind: ReplayCommandKind;
+    if (tc.command === Command.POKEMON) {
+      kind = { kind: "switch", partyIndex: tc.cursor ?? 0 };
+    } else {
+      const enemyPokemon = globalScene.getEnemyField()[this.fieldIndex];
+      const moveId = tc.move?.move ?? MoveId.NONE;
+      const moveIndex = enemyPokemon?.getMoveset().findIndex(m => m?.moveId === moveId) ?? -1;
+      const target = tc.move?.targets?.[0];
+      kind = target == null ? { kind: "move", moveIndex } : { kind: "move", moveIndex, target };
+    }
+    recordReplayCommand({
+      type: "command",
+      wave: battle.waveIndex,
+      turn: battle.turn,
+      slotFieldIndex: slot,
+      command: kind,
+    });
   }
 
   /**

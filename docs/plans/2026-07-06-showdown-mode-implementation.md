@@ -674,3 +674,7 @@ npx wrangler deploy
 ```
 
 The client posts to `${VITE_SERVER_URL_TELEMETRY}` (falls back to `${VITE_SERVER_URL}` host with the telemetry worker route if unset — see `showdown-telemetry.ts`). Telemetry is fire-and-forget: a failed/absent endpoint only logs, never blocks the result flow.
+
+**Replay-trace capture (D5, complete):** the showdown HOST records a real `ReplayTrace` — recording begins at EncounterPhase (`coop-runtime.maybeBeginReplayRecording`, gated `isCoop || isShowdown` + host role), the host's own player-side commands ride the existing single-player command tap, and the enemy side's per-turn command (relayed-or-AI) is tapped in `EnemyCommandPhase`'s versus branch. So the telemetry blob carries seed + host roster + BOTH sides' ordered per-turn commands → every stat is derivable offline by replaying.
+
+**FOLLOW-UP (not in scope — offline tooling):** a showdown-specific replay LOADER (a `replayShowdownTrace`-style re-drive, mirroring `replayCoopTrace` / `replaySingleTrace`) is still to be built. The captured trace's `roster` is the HOST's player party; the ENEMY party for a faithful re-drive comes from the telemetry payload's `guestTeam` manifest (or a future `enemyRoster` header field). The DATA is captured completely now; the re-drive harness can follow.

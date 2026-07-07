@@ -11,12 +11,14 @@
 // result/void it seals a compact record + summary and fire-and-forgets it to the
 // telemetry worker (`workers/er-telemetry`, POST /telemetry/battle).
 //
-// SCOPE (deliberate, documented): this records the match SETUP (both full manifests +
-// seed → the STARTING state is reproducible) + the OUTCOME summary derivable at result
-// time (winner, reason, turns, duration, per-side species/form/item sixes). A full
-// per-turn command trace would need a tap inside the live engine's turn loop (an engine
-// change) — out of scope here; when the existing ReplayTrace recorder happens to be on,
-// its trace is attached opportunistically (best-effort, zero coupling).
+// SCOPE: records the match SETUP (both full manifests + seed → the STARTING state is
+// reproducible) + the OUTCOME summary (winner, reason, turns, duration, per-side species/
+// form/item sixes) + the FULL per-turn ReplayTrace. Recording is begun for the showdown HOST
+// at EncounterPhase (coop-runtime.maybeBeginReplayRecording); the host's own player-side
+// commands ride the existing single-player command tap (fires for any non-coop recording run),
+// and the ENEMY side's per-turn command (relayed-or-AI) is tapped in EnemyCommandPhase's versus
+// branch — so `getReplayTrace()` at seal carries BOTH sides' decisions and every stat is derivable
+// offline by replaying (see the plan doc's "showdown replay loader" follow-up for the re-drive tool).
 //
 // GZIP SIDE (decision): the payload is sent as PLAIN JSON (a 30-turn match is well under
 // the worker's 64KB body cap); the WORKER gzips it into the `trace_gz` blob before storing.

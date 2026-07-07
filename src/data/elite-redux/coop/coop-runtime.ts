@@ -1340,7 +1340,15 @@ export function broadcastCoopOwnSlotCommand(fieldIndex: number, command: Seriali
  * + a live-wave provider for interaction pruning. Hard no-op off the live co-op host. Best-effort.
  */
 export function maybeBeginReplayRecording(): void {
-  if (!globalScene.gameMode.isCoop || active == null || active.controller.role !== "host") {
+  // Enable on the authoritative HOST of a CO-OP run OR a SHOWDOWN 1v1 (D5 telemetry: showdown is
+  // deterministic - seed + both rosters + the ordered both-side commands replay it 1:1). Both ride the
+  // same coop runtime + host role; the guest never records (its taps stay no-ops). Co-op is byte-identical
+  // (its branch is unchanged); showdown is purely additive.
+  if (
+    (!globalScene.gameMode.isCoop && !globalScene.gameMode.isShowdown)
+    || active == null
+    || active.controller.role !== "host"
+  ) {
     return;
   }
   if (isReplayRecording()) {
@@ -1349,7 +1357,9 @@ export function maybeBeginReplayRecording(): void {
   beginReplayRecording({
     seed: globalScene.seed,
     gameModeId: globalScene.gameMode.modeId,
-    // The MERGED co-op party as serialized PokemonData (each mon already carries its coopOwner tag).
+    // The HOST's player-side party as serialized PokemonData (co-op: the merged party with coopOwner tags;
+    // showdown: the host's own team). The enemy side (showdown opponent) is captured in the telemetry
+    // payload's guestTeam manifest + the recorded enemy-command events - see the showdown replay follow-up.
     roster: globalScene.getPlayerParty().map(p => new PokemonData(p)),
     coopRunConfig: active.controller.runConfig() ?? undefined,
     currentWave: () => globalScene.currentBattle?.waveIndex ?? 0,
