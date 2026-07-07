@@ -1,0 +1,275 @@
+url:      https://elite-redux-staging.pages.dev/
+build:    mrarj08z-845p
+mode:     4  wave:58
+seed:     Pzf1L9GCSJq9fus4FOpPlmeX
+party:    Kecleon(L47 106hp f0), Gholdengo(L48 114hp f0), Iron Valiant(L46 121hp f0), Amphybuzz(L36 136hp f0), Zigzagoon(L36 84hp f0), Glalie Redux(L36 63hp f0)
+enemy:    Marowak(L37), Trevenant(L39), Gengar(L37)
+
+----- COMMENT -----
+Items cannot be transferred to the second and third slots without moving their positions
+
+----- CONSOLE -----
+[14:57:28.683] WARN: Texture "%s" has no frame "%s" PRAS- Confuse Ray 1
+[14:57:28.700] WARN: Texture "%s" has no frame "%s" PRAS- Confuse Ray 1
+[14:57:28.716] WARN: Texture "%s" has no frame "%s" PRAS- Confuse Ray 1
+[14:57:28.733] WARN: Texture "%s" has no frame "%s" PRAS- Confuse Ray 1
+[14:57:29.047] LOG: %cStart Phase ObtainStatusEffectPhase color:green;
+[14:57:29.358] LOG: %cStart Phase MessagePhase color:green;
+[14:57:29.591] LOG: %cStart Phase MoveEndPhase color:green;
+[14:57:29.599] LOG: %cStart Phase MovePhase color:green;
+[14:57:29.599] LOG: %cUser: Gholdengo
+Move: ASTRAL_BARRAGE
+Use Mode: NORMAL color:orchid
+[14:57:29.619] LOG: %cStart Phase MessagePhase color:green;
+[14:57:29.732] LOG: %cStart Phase MoveEffectPhase color:green;
+[14:57:29.733] LOG: Applied Wide Lens 
+[14:57:29.734] LOG: Applied Wide Lens 
+[14:57:29.735] LOG: Applied Wide Lens 
+[14:57:30.377] LOG: crit stage: +1
+[14:57:30.379] LOG: Move: Astral Barrage | Base damage: 123.2342857142857 | Power: 120 | Source attack: 170 | Target defense: 70
+[14:57:30.380] LOG: Move: Astral Barrage | Attack damage: 96
+[14:57:30.381] LOG: crit stage: +1
+[14:57:30.383] LOG: Move: Astral Barrage | Base damage: 108.08 | Power: 120 | Source attack: 170 | Target defense: 80
+[14:57:30.383] LOG: Move: Astral Barrage | Attack damage: 190
+[14:57:30.384] LOG: crit stage: +1
+[14:57:30.386] LOG: Move: Astral Barrage | Base damage: 123.2342857142857 | Power: 120 | Source attack: 170 | Target defense: 70
+[14:57:30.387] LOG: Move: Astral Barrage | Attack damage: 100
+[14:57:30.388] LOG: %cStart Phase DamageAnimPhase color:green;
+[14:57:30.409] LOG: %cStart Phase DamageAnimPhase color:green;
+[14:57:30.434] LOG: %cStart Phase MessagePhase color:green;
+[14:57:30.655] LOG: %cStart Phase ShowAbilityPhase color:green;
+[14:57:30.827] LOG: %cStart Phase PokemonHealPhase color:green;
+[14:57:30.829] LOG: %cStart Phase HideAbilityPhase color:green;
+[14:57:30.868] LOG: %cStart Phase DamageAnimPhase color:green;
+[14:57:30.902] LOG: %cStart Phase MessagePhase color:green;
+[14:57:31.124] LOG: %cStart Phase FaintPhase color:green;
+[14:57:32.288] LOG: %cStart Phase MessagePhase color:green;
+[14:57:32.530] LOG: %cStart Phase VictoryPhase color:green;
+[14:57:32.531] LOG: Applied Soothe Bell 
+[14:57:32.531] LOG: Applied Soothe Bell 
+[14:57:32.531] LOG: %cStart Phase ExpPhase color:green;
+[14:57:32.531] LOG: Applied Super EXP. Charm 
+[14:57:32.531] LOG: Applied EXP. Charm 
+[14:57:32.742] LOG: %cStart Phase ExpPhase color:green;
+[14:57:32.743] LOG: Applied Super EXP. Charm 
+[14:57:32.743] LOG: Applied EXP. Charm 
+[14:57:32.943] LOG: %cStart Phase ExpPhase color:green;
+[14:57:32.943] LOG: Applied Super EXP. Charm 
+[14:57:32.943] LOG: Applied EXP. Charm 
+[14:57:33.435] LOG: %cStart Phase LevelUpPhase color:green;
+[14:57:33.436] LOG: %cStart Phase LearnMoveBatchPhase color:green;
+[14:57:40.291] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[14:57:40.291] LOG: Applied Super EXP. Charm 
+[14:57:40.291] LOG: Applied EXP. Charm 
+[14:57:40.291] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[14:57:40.291] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[14:57:40.291] LOG: Applied Super EXP. Charm 
+[14:57:40.291] LOG: Applied EXP. Charm 
+[14:57:40.292] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[14:57:40.292] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[14:57:40.292] LOG: Applied Super EXP. Charm 
+[14:57:40.292] LOG: Applied EXP. Charm 
+[14:57:40.292] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[14:57:40.292] LOG: %cStart Phase FaintPhase color:green;
+[14:57:42.508] LOG: %cStart Phase MessagePhase color:green;
+[14:57:42.789] LOG: %cStart Phase VictoryPhase color:green;
+[14:57:42.789] LOG: Applied Soothe Bell 
+[14:57:42.789] LOG: Applied Soothe Bell 
+[14:57:42.791] LOG: %cStart Phase ExpPhase color:green;
+[14:57:42.791] LOG: Applied Super EXP. Charm 
+[14:57:42.791] LOG: Applied EXP. Charm 
+[14:57:43.068] LOG: %cStart Phase LevelUpPhase color:green;
+[14:57:43.069] LOG: %cStart Phase ExpPhase color:green;
+[14:57:43.069] LOG: Applied Super EXP. Charm 
+[14:57:43.069] LOG: Applied EXP. Charm 
+[14:57:43.180] LOG: 117848 120260 119577
+[14:57:43.285] LOG: %cStart Phase LevelUpPhase color:green;
+[14:57:43.285] LOG: Applied Calcium 
+[14:57:43.285] LOG: Applied HP Up 
+[14:57:43.286] LOG: %cStart Phase ExpPhase color:green;
+[14:57:43.286] LOG: Applied Super EXP. Charm 
+[14:57:43.286] LOG: Applied EXP. Charm 
+[14:57:43.417] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[14:57:43.418] LOG: Applied Super EXP. Charm 
+[14:57:43.418] LOG: Applied EXP. Charm 
+[14:57:43.418] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[14:57:43.418] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[14:57:43.418] LOG: Applied Super EXP. Charm 
+[14:57:43.418] LOG: Applied EXP. Charm 
+[14:57:43.418] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[14:57:43.418] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[14:57:43.419] LOG: Applied Super EXP. Charm 
+[14:57:43.419] LOG: Applied EXP. Charm 
+[14:57:43.419] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[14:57:43.419] LOG: %cStart Phase MoveEndPhase color:green;
+[14:57:43.421] LOG: %cStart Phase MovePhase color:green;
+[14:57:43.421] LOG: %cUser: Gengar
+Move: OMINOUS_WIND
+Use Mode: NORMAL color:orchid
+[14:57:43.422] LOG: %cStart Phase MessagePhase color:green;
+[14:57:43.649] LOG: %cStart Phase CommonAnimPhase color:green;
+[14:57:43.916] LOG: %cStart Phase MoveEndPhase color:green;
+[14:57:43.918] LOG: %cStart Phase MovePhase color:green;
+[14:57:43.918] LOG: %cStart Phase MoveEndPhase color:green;
+[14:57:43.918] LOG: %cStart Phase MovePhase color:green;
+[14:57:43.918] LOG: %cStart Phase MoveEndPhase color:green;
+[14:57:43.918] LOG: %cStart Phase CheckInterludePhase color:green;
+[14:57:43.918] LOG: %cStart Phase WeatherEffectPhase color:green;
+[14:57:43.999] WARN: Texture "%s" has no frame "%s" PRAS- Confuse Ray 1
+[14:57:44.495] LOG: %cStart Phase PositionalTagPhase color:green;
+[14:57:44.496] LOG: %cStart Phase BerryPhase color:green;
+[14:57:44.502] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[14:57:44.507] LOG: %cStart Phase TurnEndPhase color:green;
+[14:57:44.511] WARN: [coop:turn] host recorder: finalize with NO open recording -> turn=-1 events=0 (caller decides not to emit)
+[14:57:44.511] LOG: %cStart Phase TurnInitPhase color:green;
+[14:57:44.511] LOG: %cStart Phase CommandPhase color:green;
+[14:57:46.513] LOG: Move: ZIPPY_ZAP Move targets: {"targets":[5,1],"multiple":false} 
+Player Pokemon: Kecleon
+[14:57:46.515] LOG: %cStart Phase SelectTargetPhase color:green;
+[14:57:46.798] LOG: %cStart Phase CommandPhase color:green;
+[14:57:49.672] LOG: Move: HAPPY_HOUR Move targets: {"targets":[1,0,2],"multiple":true} 
+Player Pokemon: Gholdengo
+[14:57:49.674] LOG: %cStart Phase SelectTargetPhase color:green;
+[14:57:49.914] LOG: %cStart Phase CommandPhase color:green;
+[14:57:52.964] LOG: Move: DRAIN_PUNCH Move targets: {"targets":[5,1],"multiple":false} 
+Player Pokemon: Iron Valiant
+[14:57:52.966] LOG: %cStart Phase SelectTargetPhase color:green;
+[14:57:53.423] LOG: %cStart Phase CommandPhase color:green;
+[14:57:54.530] LOG: Move: PIXIE_SLASH Move targets: {"targets":[5,1],"multiple":false} 
+Player Pokemon: Iron Valiant
+[14:57:54.531] LOG: %cStart Phase SelectTargetPhase color:green;
+[14:57:54.763] LOG: %cStart Phase EnemyCommandPhase color:green;
+[14:57:54.775] LOG: Battle Seed: WIGZqE8ByU8InRU8
+[14:57:54.776] LOG: Move Pool: ["Ominous Wind"]
+[14:57:54.776] LOG: Move Scores: [51]
+[14:57:54.776] LOG: Sorted Move Pool: ["Ominous Wind"]
+[14:57:54.776] LOG: Chosen Move: Ominous Wind
+[14:57:54.776] LOG: %cStart Phase TurnStartPhase color:green;
+[14:57:54.785] LOG: %cStart Phase MovePhase color:green;
+[14:57:54.785] LOG: %cUser: Kecleon
+Move: ZIPPY_ZAP
+Use Mode: NORMAL color:orchid
+[14:57:54.790] LOG: %cStart Phase MessagePhase color:green;
+[14:57:54.883] LOG: %cStart Phase ShowAbilityPhase color:green;
+[14:57:55.051] LOG: %cStart Phase MessagePhase color:green;
+[14:57:55.333] LOG: %cStart Phase HideAbilityPhase color:green;
+[14:57:55.367] LOG: %cStart Phase MoveEffectPhase color:green;
+[14:57:56.133] LOG: crit stage: +0
+[14:57:56.135] LOG: Move: Zippy Zap | Base damage: 44.714285714285715 | Power: 50 | Source attack: 115 | Target defense: 56
+[14:57:56.136] LOG: Move: Zippy Zap | Attack damage: 70
+[14:57:56.137] LOG: %cStart Phase DamageAnimPhase color:green;
+[14:57:56.169] LOG: %cStart Phase MessagePhase color:green;
+[14:57:56.366] LOG: %cStart Phase FaintPhase color:green;
+[14:57:57.544] LOG: %cStart Phase MessagePhase color:green;
+[14:57:57.722] LOG: %cStart Phase VictoryPhase color:green;
+[14:57:57.722] LOG: Applied Soothe Bell 
+[14:57:57.722] LOG: Applied Soothe Bell 
+[14:57:57.723] LOG: %cStart Phase ExpPhase color:green;
+[14:57:57.723] LOG: Applied Super EXP. Charm 
+[14:57:57.723] LOG: Applied EXP. Charm 
+[14:57:57.925] LOG: %cStart Phase ExpPhase color:green;
+[14:57:57.925] LOG: Applied Super EXP. Charm 
+[14:57:57.925] LOG: Applied EXP. Charm 
+[14:57:58.109] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[14:57:58.109] LOG: Applied Super EXP. Charm 
+[14:57:58.109] LOG: Applied EXP. Charm 
+[14:57:58.109] LOG: %cStart Phase LevelUpPhase color:green;
+[14:57:58.110] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[14:57:58.110] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[14:57:58.110] LOG: Applied Super EXP. Charm 
+[14:57:58.110] LOG: Applied EXP. Charm 
+[14:57:58.110] LOG: %cStart Phase LevelUpPhase color:green;
+[14:57:58.110] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[14:57:58.110] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[14:57:58.110] LOG: Applied Super EXP. Charm 
+[14:57:58.110] LOG: Applied EXP. Charm 
+[14:57:58.110] LOG: %cStart Phase LevelUpPhase color:green;
+[14:57:58.111] LOG: Applied Protein 
+[14:57:58.111] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[14:57:58.111] LOG: %cStart Phase MoveEndPhase color:green;
+[14:57:58.112] LOG: %cStart Phase MovePhase color:green;
+[14:57:58.112] LOG: %cUser: Gholdengo
+Move: HAPPY_HOUR
+Use Mode: NORMAL color:orchid
+[14:57:58.114] LOG: %cStart Phase MessagePhase color:green;
+[14:57:58.249] LOG: %cStart Phase MoveEffectPhase color:green;
+[14:57:58.636] LOG: %cStart Phase MessagePhase color:green;
+[14:57:58.899] LOG: %cStart Phase MoveEndPhase color:green;
+[14:57:58.901] LOG: %cStart Phase MovePhase color:green;
+[14:57:58.901] LOG: %cUser: Iron Valiant
+Move: PIXIE_SLASH
+Use Mode: NORMAL color:orchid
+[14:57:58.905] LOG: %cStart Phase MessagePhase color:green;
+[14:57:59.025] LOG: %cStart Phase MessagePhase color:green;
+[14:57:59.225] LOG: %cStart Phase MoveEndPhase color:green;
+[14:57:59.225] LOG: %cStart Phase MovePhase color:green;
+[14:57:59.225] LOG: %cStart Phase MoveEndPhase color:green;
+[14:57:59.225] LOG: %cStart Phase CheckInterludePhase color:green;
+[14:57:59.225] LOG: %cStart Phase WeatherEffectPhase color:green;
+[14:57:59.308] WARN: Texture "%s" has no frame "%s" PRAS- Confuse Ray 1
+[14:57:59.799] LOG: %cStart Phase PositionalTagPhase color:green;
+[14:57:59.800] LOG: %cStart Phase BerryPhase color:green;
+[14:57:59.803] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[14:57:59.806] LOG: %cStart Phase TurnEndPhase color:green;
+[14:57:59.811] WARN: [coop:turn] host recorder: finalize with NO open recording -> turn=-1 events=0 (caller decides not to emit)
+[14:57:59.811] LOG: %cStart Phase BattleEndPhase color:green;
+[14:57:59.811] LOG: Battle Score: 0 (2 Turns x0)
+[14:57:59.811] LOG: Total Score: 9598
+[14:57:59.813] LOG: Applied Calcium 
+[14:57:59.813] LOG: Applied HP Up 
+[14:57:59.814] LOG: Applied Protein 
+[14:57:59.826] LOG: Applied Calcium 
+[14:57:59.826] LOG: Applied HP Up 
+[14:57:59.826] LOG: Applied Protein 
+[14:57:59.828] LOG: %cStart Phase ShowAbilityPhase color:green;
+[14:57:59.829] LOG: %cStart Phase HideAbilityPhase color:green;
+[14:57:59.859] LOG: %cStart Phase ShowAbilityPhase color:green;
+[14:57:59.859] LOG: %cStart Phase MessagePhase color:green;
+[14:58:00.091] LOG: %cStart Phase HideAbilityPhase color:green;
+[14:58:00.117] LOG: %cStart Phase MessagePhase color:green;
+[14:58:00.622] LOG: %cStart Phase EggLapsePhase color:green;
+[14:58:00.622] LOG: %cStart Phase SelectModifierPhase color:green;
+[14:58:00.622] LOG: Wave Seed: ´ ks}«s ¯­nª¦§ 58
+[14:58:00.647] LOG: Applied Golden Poké Ball 
+[14:58:00.647] LOG: 4 0 []
+[14:58:00.647] LOG: {"id":"ETHER","localeKey":"modifierType:ModifierType.ETHER","iconImage":"ether","group":"ether","soundName":"se/restore","tier":0,"restorePoints":10} 
+[14:58:00.647] LOG: 1 0 [2,3,4,5,6,7,8,16,22]
+[14:58:00.647] LOG: {"id":"PP_UP","localeKey":"modifierType:ModifierType.PP_UP","iconImage":"pp_up","group":"ppUp","soundName":"se/restore","tier":1,"upPoints":1} 
+[14:58:00.647] LOG: 2 0 []
+[14:58:00.647] LOG: {"id":"POTION","localeKey":"modifierType:ModifierType.POTION","iconImage":"potion","group":"potion","soundName":"se/restore","tier":0,"restorePoints":20,"restorePercent":10,"healStatus":false} 
+[14:58:00.647] LOG: 3 0 []
+[14:58:00.647] LOG: {"id":"SUPER_POTION","localeKey":"modifierType:ModifierType.SUPER_POTION","iconImage":"super_potion","group":"potion","soundName":"se/restore","tier":0,"restorePoints":50,"restorePercent":25,"healStatus":false} 
+[14:58:00.648] LOG: 3 0 []
+[14:58:00.648] LOG: {"id":"SUPER_POTION","localeKey":"modifierType:ModifierType.SUPER_POTION","iconImage":"super_potion","group":"potion","soundName":"se/restore","tier":0,"restorePoints":50,"restorePercent":25,"healStatus":false} 
+[14:58:00.648] LOG: 0 0 []
+[14:58:00.648] LOG: {"id":"POKEBALL","localeKey":"","iconImage":"pb","group":"pb","soundName":"se/pb_bounce_1","tier":0,"pokeballType":0,"count":5} 
+[14:58:24.391] LOG: Applied Calcium 
+[14:58:24.391] LOG: Applied HP Up 
+[14:58:24.392] LOG: Applied Protein 
+[14:58:24.395] LOG: Applied Calcium 
+[14:58:24.395] LOG: Applied HP Up 
+[14:58:24.396] LOG: Applied Protein 
+[14:58:24.398] LOG: Applied Calcium 
+[14:58:24.398] LOG: Applied HP Up 
+[14:58:24.398] LOG: Applied Protein 
+[14:58:24.400] LOG: Applied Calcium 
+[14:58:24.400] LOG: Applied HP Up 
+[14:58:24.400] LOG: Applied Protein 
+[14:58:24.402] LOG: Applied Calcium 
+[14:58:24.402] LOG: Applied HP Up 
+[14:58:24.402] LOG: Applied Protein 
+[14:58:24.404] LOG: Applied Calcium 
+[14:58:24.404] LOG: Applied HP Up 
+[14:58:24.404] LOG: Applied Protein 
+[14:58:24.405] LOG: Applied Calcium 
+[14:58:24.405] LOG: Applied HP Up 
+[14:58:24.406] LOG: Applied Protein 
+[14:58:24.407] LOG: Applied Calcium 
+[14:58:24.407] LOG: Applied HP Up 
+[14:58:24.407] LOG: Applied Protein 
+[14:58:24.409] LOG: Applied Calcium 
+[14:58:24.409] LOG: Applied HP Up 
+[14:58:24.409] LOG: Applied Protein 
+[14:58:30.209] LOG: Applied Calcium 
+[14:58:30.209] LOG: Applied HP Up 
+[14:58:30.210] LOG: Applied Protein 
