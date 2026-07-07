@@ -1,0 +1,261 @@
+url:      https://elite-redux-staging.pages.dev/
+build:    mrb19we4-75d5
+mode:     6  wave:13
+seed:     Z9KNAjYeD6OTSNTWRfSgV3mg
+party:    Sunkern(L11 36hp f0), Victini(L10 43hp f0), Chikorita(L6 23hp f0), Mareep(L6 26hp f0), Cyndaquil(L6 22hp f0), Zigzagoon(L7 24hp f0)
+enemy:    
+
+----- COMMENT -----
+Evil Delibirds desynced waves
+
+----- CONSOLE -----
+[19:42:06.211] LOG: [coop:owner] ownerOf(counter=14) seat=0 -> owner=host
+[19:42:06.211] LOG: [coop:owner] isLocalOwnerAtCounter(pinnedCounter=14) parity=0 owner=host role=guest -> false
+[19:42:06.211] LOG: [coop:me] meCursor APPLIED index=1 mode=47
+[19:42:06.213] LOG: [coop:webrtc] raw rx role=guest t=interactionChoice bytes=65 handlers=11
+[19:42:06.213] LOG: [coop:relay] RECV interactionChoice seq=8000014 -> BUFFER inbox depth=9 choice=3 data=-
+[19:42:07.363] LOG: [coop:webrtc] raw rx role=guest t=interactionChoice bytes=65 handlers=11
+[19:42:07.364] LOG: [coop:relay] RECV interactionChoice seq=8000014 -> BUFFER inbox depth=10 choice=4 data=-
+[19:42:07.385] LOG: [coop:webrtc] raw rx role=guest t=interactionChoice bytes=65 handlers=11
+[19:42:07.385] LOG: [coop:relay] RECV interactionChoice seq=8000014 -> BUFFER inbox depth=11 choice=5 data=-
+[19:42:08.252] LOG: [coop:webrtc] raw rx role=guest t=interactionChoice bytes=65 handlers=11
+[19:42:08.252] LOG: [coop:relay] RECV interactionChoice seq=8000014 -> BUFFER inbox depth=12 choice=4 data=-
+[19:42:08.254] LOG: [coop:webrtc] raw rx role=guest t=interactionChoice bytes=65 handlers=11
+[19:42:08.254] LOG: [coop:relay] RECV interactionChoice seq=8000014 -> BUFFER inbox depth=13 choice=5 data=-
+[19:42:08.718] LOG: [coop:webrtc] raw rx role=guest t=interactionChoice bytes=65 handlers=11
+[19:42:08.718] LOG: [coop:relay] RECV interactionChoice seq=8000014 -> BUFFER inbox depth=14 choice=6 data=-
+[19:42:08.982] LOG: [coop:webrtc] raw rx role=guest t=interactionChoice bytes=65 handlers=11
+[19:42:08.984] LOG: [coop:relay] RECV interactionChoice seq=8000014 -> BUFFER inbox depth=15 choice=3 data=-
+[19:42:09.335] LOG: [coop:webrtc] raw rx role=guest t=interactionChoice bytes=65 handlers=11
+[19:42:09.335] LOG: [coop:relay] RECV interactionChoice seq=8000014 -> BUFFER inbox depth=16 choice=4 data=-
+[19:42:09.337] LOG: [coop:webrtc] raw rx role=guest t=interactionChoice bytes=65 handlers=11
+[19:42:09.338] LOG: [coop:relay] RECV interactionChoice seq=8000014 -> BUFFER inbox depth=17 choice=5 data=-
+[19:42:09.879] LOG: [coop:webrtc] raw rx role=guest t=interactionChoice bytes=65 handlers=11
+[19:42:09.880] LOG: [coop:relay] RECV interactionChoice seq=8000014 -> BUFFER inbox depth=18 choice=4 data=-
+[19:42:09.895] LOG: [coop:webrtc] raw rx role=guest t=meCursor bytes=26 handlers=11
+[19:42:09.896] LOG: [coop:owner] ownerOf(counter=14) seat=0 -> owner=host
+[19:42:09.896] LOG: [coop:owner] isLocalOwnerAtCounter(pinnedCounter=14) parity=0 owner=host role=guest -> false
+[19:42:09.896] LOG: [coop:owner] ownerOf(counter=14) seat=0 -> owner=host
+[19:42:09.896] LOG: [coop:owner] isLocalOwnerAtCounter(pinnedCounter=14) parity=0 owner=host role=guest -> false
+[19:42:09.896] LOG: [coop:me] meCursor APPLIED index=0 mode=47
+[19:42:09.897] LOG: [coop:webrtc] raw rx role=guest t=interactionChoice bytes=65 handlers=11
+[19:42:09.897] LOG: [coop:relay] RECV interactionChoice seq=8000014 -> BUFFER inbox depth=19 choice=5 data=-
+[19:42:09.897] LOG: [coop:webrtc] raw rx role=guest t=meMessage bytes=50 handlers=11
+[19:42:09.897] LOG: [coop:stream] guest RECV meMessage len=23 -> handler
+[19:42:09.898] LOG: [coop:me] ui: host streams ME narration (showText) {"len":23,"preview":"Select an item to give."}
+[19:42:11.984] LOG: [coop:webrtc] raw rx role=guest t=interactionChoice bytes=65 handlers=11
+[19:42:11.984] LOG: [coop:relay] RECV interactionChoice seq=8000014 -> BUFFER inbox depth=20 choice=6 data=-
+[19:42:13.362] LOG: [coop:webrtc] raw tx role=guest t=stallBeat bytes=35
+[19:42:13.592] LOG: [coop:webrtc] raw rx role=guest t=meCursor bytes=26 handlers=11
+[19:42:13.592] LOG: [coop:owner] ownerOf(counter=14) seat=0 -> owner=host
+[19:42:13.593] LOG: [coop:owner] isLocalOwnerAtCounter(pinnedCounter=14) parity=0 owner=host role=guest -> false
+[19:42:13.593] LOG: [coop:owner] ownerOf(counter=14) seat=0 -> owner=host
+[19:42:13.593] LOG: [coop:owner] isLocalOwnerAtCounter(pinnedCounter=14) parity=0 owner=host role=guest -> false
+[19:42:13.593] LOG: [coop:me] meCursor APPLIED index=1 mode=47
+[19:42:13.594] LOG: [coop:webrtc] raw rx role=guest t=interactionChoice bytes=65 handlers=11
+[19:42:13.594] LOG: [coop:relay] RECV interactionChoice seq=8000014 -> BUFFER inbox depth=21 choice=3 data=-
+[19:42:13.830] LOG: [coop:webrtc] raw rx role=guest t=interactionChoice bytes=65 handlers=11
+[19:42:13.830] LOG: [coop:relay] RECV interactionChoice seq=8000014 -> BUFFER inbox depth=22 choice=4 data=-
+[19:42:13.845] LOG: [coop:webrtc] raw rx role=guest t=interactionChoice bytes=65 handlers=11
+[19:42:13.846] LOG: [coop:relay] RECV interactionChoice seq=8000014 -> BUFFER inbox depth=23 choice=5 data=-
+[19:42:14.281] LOG: [coop:webrtc] raw rx role=guest t=interactionChoice bytes=65 handlers=11
+[19:42:14.282] LOG: [coop:relay] RECV interactionChoice seq=8000014 -> BUFFER inbox depth=24 choice=3 data=-
+[19:42:14.903] LOG: [coop:webrtc] raw rx role=guest t=interactionChoice bytes=65 handlers=11
+[19:42:14.903] LOG: [coop:relay] RECV interactionChoice seq=8000014 -> BUFFER inbox depth=25 choice=2 data=-
+[19:42:15.177] LOG: [coop:webrtc] raw rx role=guest t=interactionChoice bytes=65 handlers=11
+[19:42:15.178] LOG: [coop:relay] RECV interactionChoice seq=8000014 -> BUFFER inbox depth=26 choice=4 data=-
+[19:42:15.184] LOG: [coop:webrtc] raw rx role=guest t=interactionChoice bytes=65 handlers=11
+[19:42:15.184] LOG: [coop:relay] RECV interactionChoice seq=8000014 -> BUFFER inbox depth=27 choice=5 data=-
+[19:42:16.190] LOG: [coop:webrtc] raw rx role=guest t=interactionChoice bytes=65 handlers=11
+[19:42:16.192] LOG: [coop:relay] RECV interactionChoice seq=8000014 -> BUFFER inbox depth=28 choice=6 data=-
+[19:42:16.439] LOG: [coop:webrtc] raw rx role=guest t=interactionChoice bytes=65 handlers=11
+[19:42:16.440] LOG: [coop:relay] RECV interactionChoice seq=8000014 -> BUFFER inbox depth=29 choice=3 data=-
+[19:42:16.701] LOG: [coop:webrtc] raw rx role=guest t=interactionChoice bytes=65 handlers=11
+[19:42:16.701] LOG: [coop:relay] RECV interactionChoice seq=8000014 -> BUFFER inbox depth=30 choice=1 data=-
+[19:42:16.885] LOG: [coop:webrtc] raw rx role=guest t=interactionChoice bytes=65 handlers=11
+[19:42:16.885] LOG: [coop:relay] RECV interactionChoice seq=8000014 -> BUFFER inbox depth=31 choice=1 data=-
+[19:42:17.078] LOG: [coop:webrtc] raw rx role=guest t=interactionChoice bytes=65 handlers=11
+[19:42:17.078] LOG: [coop:relay] RECV interactionChoice seq=8000014 -> BUFFER inbox depth=32 choice=1 data=-
+[19:42:17.266] LOG: [coop:webrtc] raw rx role=guest t=interactionChoice bytes=65 handlers=11
+[19:42:17.267] LOG: [coop:relay] RECV interactionChoice seq=8000014 -> BUFFER inbox depth=33 choice=1 data=-
+[19:42:17.451] LOG: [coop:webrtc] raw rx role=guest t=interactionChoice bytes=65 handlers=11
+[19:42:17.451] LOG: [coop:relay] RECV interactionChoice seq=8000014 -> BUFFER inbox depth=34 choice=4 data=-
+[19:42:17.464] LOG: [coop:webrtc] raw rx role=guest t=interactionChoice bytes=65 handlers=11
+[19:42:17.465] LOG: [coop:relay] RECV interactionChoice seq=8000014 -> BUFFER inbox depth=35 choice=5 data=-
+[19:42:17.913] LOG: [coop:webrtc] raw rx role=guest t=interactionChoice bytes=65 handlers=11
+[19:42:17.914] LOG: [coop:relay] RECV interactionChoice seq=8000014 -> BUFFER inbox depth=36 choice=4 data=-
+[19:42:17.930] LOG: [coop:webrtc] raw rx role=guest t=meCursor bytes=26 handlers=11
+[19:42:17.931] LOG: [coop:owner] ownerOf(counter=14) seat=0 -> owner=host
+[19:42:17.931] LOG: [coop:owner] isLocalOwnerAtCounter(pinnedCounter=14) parity=0 owner=host role=guest -> false
+[19:42:17.931] LOG: [coop:owner] ownerOf(counter=14) seat=0 -> owner=host
+[19:42:17.931] LOG: [coop:owner] isLocalOwnerAtCounter(pinnedCounter=14) parity=0 owner=host role=guest -> false
+[19:42:17.931] LOG: [coop:me] meCursor APPLIED index=0 mode=47
+[19:42:17.931] LOG: [coop:webrtc] raw rx role=guest t=interactionChoice bytes=65 handlers=11
+[19:42:17.931] LOG: [coop:relay] RECV interactionChoice seq=8000014 -> BUFFER inbox depth=37 choice=5 data=-
+[19:42:17.932] LOG: [coop:webrtc] raw rx role=guest t=meMessage bytes=50 handlers=11
+[19:42:17.932] LOG: [coop:stream] guest RECV meMessage len=23 -> handler
+[19:42:17.932] LOG: [coop:me] ui: host streams ME narration (showText) {"len":23,"preview":"Select an item to give."}
+[19:42:18.364] LOG: [coop:webrtc] raw tx role=guest t=stallBeat bytes=35
+[19:42:19.910] LOG: [coop:webrtc] raw rx role=guest t=interactionChoice bytes=65 handlers=11
+[19:42:19.910] LOG: [coop:relay] RECV interactionChoice seq=8000014 -> BUFFER inbox depth=38 choice=1 data=-
+[19:42:20.224] LOG: [coop:webrtc] raw rx role=guest t=interactionChoice bytes=65 handlers=11
+[19:42:20.225] LOG: [coop:relay] RECV interactionChoice seq=8000014 -> BUFFER inbox depth=39 choice=4 data=-
+[19:42:20.226] LOG: [coop:webrtc] raw rx role=guest t=interactionChoice bytes=65 handlers=11
+[19:42:20.226] LOG: [coop:relay] RECV interactionChoice seq=8000014 -> BUFFER inbox depth=40 choice=5 data=-
+[19:42:20.232] LOG: [coop:webrtc] raw rx role=guest t=meMessage bytes=113 handlers=11
+[19:42:20.232] LOG: [coop:stream] guest RECV meMessage len=85 -> handler
+[19:42:20.233] LOG: [coop:me] ui: host streams ME narration (showText) {"len":85,"preview":"You toss the Enigma Berry to the Delibir"}
+[19:42:20.729] LOG: [coop:webrtc] raw rx role=guest t=meMessage bytes=80 handlers=11
+[19:42:20.729] LOG: [coop:stream] guest RECV meMessage len=53 -> handler
+[19:42:20.730] LOG: [coop:me] ui: host streams ME narration (showText) {"len":53,"preview":"They turn back to you and happily give y"}
+[19:42:21.203] LOG: [coop:webrtc] raw rx role=guest t=meMessage bytes=51 handlers=11
+[19:42:21.203] LOG: [coop:stream] guest RECV meMessage len=23 -> handler
+[19:42:21.203] LOG: [coop:me] ui: host streams ME narration (showText) {"len":23,"preview":"You received\nCandy Jar!"}
+[19:42:21.660] LOG: [coop:webrtc] raw rx role=guest t=rewardOptions bytes=54 handlers=11
+[19:42:21.660] LOG: [coop:relay] RECV rewardOptions key=14:0 -> BUFFER rewardOptionsInbox (latest-wins) count=0
+[19:42:21.661] LOG: [coop:owner] ownerOf(counter=14) seat=0 -> owner=host
+[19:42:21.661] LOG: [coop:owner] isLocalOwnerAtCounter(pinnedCounter=14) parity=0 owner=host role=guest -> false
+[19:42:21.661] LOG: [coop:me] SHOP HANDOFF: host opened the embedded ME reward shop - running guest shop as ME-owner role (#821/#828) {"counter":14,"ownsMe":false}
+[19:42:21.662] LOG: [coop:reward] guest ME embedded-shop handoff: reward stock (reroll 0) -> SelectModifierPhase (#821) {"counter":14}
+[19:42:21.663] LOG: [coop:session] isCoopAuthoritativeGuestGated -> true (authoritative GUEST gates a structural mutation)
+[19:42:21.663] LOG: [coop:stream] guest UNREGISTER onMeMessage handler (null-out)
+[19:42:21.663] LOG: %cStart Phase SelectModifierPhase color:green;
+[19:42:21.663] LOG: [coop:interaction] interactionCounter() read -> 14 (role=guest)
+[19:42:21.663] LOG: Wave Seed: gFX[NwfrQC\a`[ad_s`tc@zt 13
+[19:42:21.664] LOG: [coop:owner] ownerOf(counter=14) seat=0 -> owner=host
+[19:42:21.665] LOG: [coop:owner] isLocalOwnerAtCounter(pinnedCounter=14) parity=0 owner=host role=guest -> false
+[19:42:21.665] LOG: [coop:interaction] interactionCounter() read -> 14 (role=guest)
+[19:42:21.665] LOG: [coop:reward] owner/watcher decision: pinnedStart=14 liveCounter=14 parity=0 role=guest pick=WATCHER option=ADOPT spoof=false
+[19:42:21.666] LOG: [coop:rendezvous] ARRIVE point=shop:13:14 (send) role=guest
+[19:42:21.666] LOG: [coop:webrtc] raw tx role=guest t=rendezvous bytes=39
+[19:42:21.666] LOG: [coop:reward] WATCHER waits for partner's reward picks (start=14 role=guest wave=13)
+[19:42:21.668] LOG: [coop:me] ui: host streams ME narration (showText) {"len":73,"preview":"JarilG's turn: they are picking the rewa"}
+[19:42:21.671] LOG: [coop:reward] WATCHER awaiting owner reward options (start=14 reroll=0 localCount=0)
+[19:42:21.672] LOG: [coop:relay] AWAIT rewardOptions key=14:0 timeoutMs=1200000 -> BUFFER-HIT resolve count=0
+[19:42:21.672] LOG: [coop:shop] reconstructRewardOptions OK count=0 ids=[]
+[19:42:21.672] LOG: [coop:reward] WATCHER ADOPTED owner reward options (was=0 now=0 ids=[])
+[19:42:21.673] LOG: [coop:owner] ownerOf(counter=14) seat=0 -> owner=host
+[19:42:21.673] LOG: [coop:owner] isLocalOwnerAtCounter(pinnedCounter=14) parity=0 owner=host role=guest -> false
+[19:42:21.725] LOG: [coop:interaction] mirror begin role=watcher mirrorSeq=896 interactionStart=14 reroll=0
+[19:42:21.726] LOG: [coop:interaction] uiMirror beginSession role=watcher mode=6 seq=896 early=15
+[19:42:21.726] LOG: [coop:relay] AWAIT interactionChoice seq=14 timeoutMs=1200000 -> network-wait
+[19:42:21.727] LOG: [coop:webrtc] raw rx role=guest t=rendezvous bytes=39 handlers=11
+[19:42:21.727] LOG: [coop:rendezvous] RECV arrival point=shop:13:14 -> BUFFER (no waiter yet) role=guest
+[19:42:21.894] LOG: [coop:me] ui: host streams ME narration (showText) {"len":26,"preview":"Continue to the next wave."}
+[19:42:21.896] LOG: [coop:me] ui: host streams ME narration (showText) {"len":26,"preview":"Continue to the next wave."}
+[19:42:21.897] LOG: [coop:webrtc] raw rx role=guest t=meMessage bytes=53 handlers=11
+[19:42:21.897] LOG: [coop:stream] guest RECV meMessage len=26 -> DROPPED (no handler)
+[19:42:21.897] LOG: [coop:webrtc] raw rx role=guest t=meMessage bytes=53 handlers=11
+[19:42:21.898] LOG: [coop:stream] guest RECV meMessage len=26 -> DROPPED (no handler)
+[19:42:22.812] LOG: [coop:webrtc] raw rx role=guest t=uiInput bytes=51 handlers=11
+[19:42:22.812] LOG: [coop:interaction] uiMirror WATCHER apply n=0 button=4 mode=6
+[19:42:22.820] LOG: [coop:webrtc] raw rx role=guest t=interactionChoice bytes=60 handlers=11
+[19:42:22.820] LOG: [coop:relay] RECV interactionChoice seq=14 -> deliver-to-waiter choice=-1 data=-
+[19:42:22.820] LOG: [coop:relay] AWAIT interactionChoice seq=14 RESOLVE choice=-1 data=-
+[19:42:22.820] LOG: [coop:reward] WATCHER applying relayed action seq=14 act=LEAVE choice=-1 data=-
+[19:42:22.822] LOG: [coop:owner] ownerOf(counter=14) seat=0 -> owner=host
+[19:42:22.822] LOG: [coop:owner] isLocalOwnerAtCounter(pinnedCounter=14) parity=0 owner=host role=guest -> false
+[19:42:22.831] LOG: %cStart Phase TurnInitPhase color:green;
+[19:42:22.832] LOG: [coop:session] isCoopAuthoritativeGuestGated -> true (authoritative GUEST gates a structural mutation)
+[19:42:22.833] LOG: [coop:session] isCoopAuthoritativeGuestGated -> true (authoritative GUEST gates a structural mutation)
+[19:42:22.834] LOG: [coop:session] isCoopAuthoritativeGuestGated -> true (authoritative GUEST gates a structural mutation)
+[19:42:22.835] LOG: %cStart Phase MysteryEncounterBattleStartCleanupPhase color:green;
+[19:42:22.836] LOG: %cStart Phase CommandPhase color:green;
+[19:42:22.837] LOG: [coop:stream] guest consumeEnemyParty wave=13 -> null (buffered=none)
+[19:42:22.839] LOG: [coop:battle] CommandPhase slot=0 turn=1 owner=host role=guest -> partner path
+[19:42:22.840] LOG: [coop:owner] ownerOf(counter=14) seat=0 -> owner=host
+[19:42:22.840] LOG: [coop:owner] isLocalOwnerAtCounter(pinnedCounter=14) parity=0 owner=host role=guest -> false
+[19:42:22.840] LOG: %cStart Phase TurnStartPhase color:green;
+[19:42:22.841] LOG: [coop:session] isCoopAuthoritativeGuestGated -> true (authoritative GUEST gates a structural mutation)
+[19:42:22.841] LOG: %cStart Phase CoopReplayTurnPhase color:green;
+[19:42:22.841] LOG: [coop:replay] guest replay turn=1: live pump start (awaiting host events/resolution)
+[19:42:22.841] LOG: [coop:replay] guest awaitTurn turn=1 START timeout=1200000ms
+[19:42:22.842] LOG: [coop:webrtc] raw rx role=guest t=meMessage bytes=84 handlers=11
+[19:42:22.843] LOG: [coop:stream] guest RECV meMessage len=57 -> DROPPED (no handler)
+[19:42:23.365] LOG: [coop:webrtc] raw tx role=guest t=stallBeat bytes=35
+[19:42:23.940] LOG: [coop:webrtc] raw rx role=guest t=meMessage bytes=58 handlers=11
+[19:42:23.940] LOG: [coop:stream] guest RECV meMessage len=31 -> DROPPED (no handler)
+[19:42:24.389] LOG: [coop:webrtc] raw rx role=guest t=interactionOutcome bytes=57358 handlers=11
+[19:42:24.390] LOG: [coop:relay] RECV interactionOutcome seq=8000014 -> deliver-to-waiter k=meResync
+[19:42:24.390] LOG: [coop:relay] AWAIT interactionOutcome seq=8000014 RESOLVE k=meResync
+[19:42:24.392] LOG: [coop:me] host sent comprehensive outcome (meResync); applying {"seq":8000014}
+[19:42:24.421] LOG: [coop:heal] erMoneyStreaks host entries=6 -> restored (#837/#348)
+[19:42:24.421] LOG: [coop:heal] biomeOverstayAnchor host=null -> restored (#837/#504)
+[19:42:24.421] LOG: [coop:heal] erBiomeStructure host length=19 startWave=12 -> restored (#841 item 5)
+[19:42:24.421] LOG: [coop:heal] erRelicBattleState host wave=13 -> restored (#837)
+[19:42:24.427] LOG: [coop:resync] guest apply authoritativeState tick=51 wave=13 turn=1 party=6/0 field=1
+[19:42:24.429] LOG: [coop:webrtc] raw rx role=guest t=interactionChoice bytes=66 handlers=11
+[19:42:24.429] LOG: [coop:relay] RECV interactionChoice seq=9000014 -> deliver-to-waiter choice=-1 data=-
+[19:42:24.429] LOG: [coop:relay] AWAIT interactionChoice seq=9000014 RESOLVE choice=-1 data=-
+[19:42:24.429] LOG: [coop:me] host terminal resolved {"seqTerm":9000014,"action":-1,"isHandoff":false}
+[19:42:24.429] LOG: [coop:me] detached ME terminal after watcher shop/quiz: leaving + advancing (#821/#818) {"counter":14}
+[19:42:24.430] LOG: [coop:session] isCoopAuthoritativeGuestGated -> true (authoritative GUEST gates a structural mutation)
+[19:42:24.430] LOG: [coop:session] isCoopAuthoritativeGuestGated -> true (authoritative GUEST gates a structural mutation)
+[19:42:24.430] LOG: [coop:interaction] CoopInteractionTurn.advance INCREMENT (fromCounter=14) counter 14 -> 15
+[19:42:24.430] LOG: [coop:interaction] advanceInteraction ADVANCED+BROADCAST (fromCounter=14) counter 14 -> 15 role=guest; send interaction screen=__turn__ choice=15
+[19:42:24.430] LOG: [coop:webrtc] raw tx role=guest t=interaction bytes=51
+[19:42:24.430] LOG: [coop:owner] ownerOf(counter=15) seat=1 -> owner=guest
+[19:42:24.430] LOG: [coop:owner] ownerOf(counter=15) seat=1 -> owner=guest
+[19:42:24.430] LOG: [coop-launch] proceedIfReady launched=true localTeam=3 bothReady=true role=guest partnerReady=true
+[19:42:24.430] LOG: [coop:webrtc] raw rx role=guest t=interaction bytes=51 handlers=11
+[19:42:24.430] LOG: [coop:interaction] RECV interaction broadcast (deferred catch-up net) received=15 localBefore=15 role=guest -> no defer (local >= received)
+[19:42:24.430] WARN: [coop:interaction] CoopInteractionTurn.mergeRemote DEFER (remote=15, counter=15, pendingRemote=15) live counter UNCHANGED (folds in at next advance if still ahead)
+[19:42:24.430] LOG: [coop:owner] ownerOf(counter=15) seat=1 -> owner=guest
+[19:42:24.431] LOG: [coop:owner] ownerOf(counter=15) seat=1 -> owner=guest
+[19:42:24.431] LOG: [coop-launch] proceedIfReady launched=true localTeam=3 bothReady=true role=guest partnerReady=true
+[19:42:25.076] LOG: [coop:webrtc] raw rx role=guest t=enemyPartySync bytes=509 handlers=11
+[19:42:25.076] LOG: [coop:replay] guest RECV enemyPartySync wave=14 count=2 -> buffered (no waiter)
+[19:42:28.959] LOG: [coop:webrtc] raw rx role=guest t=enemyPartySync bytes=509 handlers=11
+[19:42:28.960] LOG: [coop:replay] guest RECV enemyPartySync wave=14 count=2 -> buffered (no waiter)
+[19:42:28.961] LOG: [coop:webrtc] raw rx role=guest t=rendezvous bytes=37 handlers=11
+[19:42:28.962] LOG: [coop:rendezvous] RECV arrival point=cmd:14:1 -> BUFFER (no waiter yet) role=guest
+[19:42:33.360] LOG: [coop:interaction] interactionCounter() read -> 15 (role=guest)
+[19:42:33.360] LOG: [coop:health] tick=0g turn=1 wave=13 counter=15 assertions=0 wait=10518ms peerBeat=700s transport=connected
+[19:42:33.360] LOG: [coop:webrtc] raw tx role=guest t=stallBeat bytes=35
+[19:42:38.360] LOG: [coop:webrtc] raw tx role=guest t=stallBeat bytes=35
+[19:42:43.368] LOG: [coop:webrtc] raw tx role=guest t=stallBeat bytes=35
+[19:42:48.366] LOG: [coop:webrtc] raw tx role=guest t=stallBeat bytes=35
+[19:42:53.365] LOG: [coop:webrtc] raw tx role=guest t=stallBeat bytes=35
+[19:42:58.360] LOG: [coop:webrtc] raw tx role=guest t=stallBeat bytes=35
+[19:43:03.360] LOG: [coop:interaction] interactionCounter() read -> 15 (role=guest)
+[19:43:03.360] LOG: [coop:health] tick=0g turn=1 wave=13 counter=15 assertions=0 wait=40518ms peerBeat=730s transport=connected
+[19:43:03.361] LOG: [coop:webrtc] raw tx role=guest t=stallBeat bytes=35
+[19:43:08.362] LOG: [coop:webrtc] raw tx role=guest t=stallBeat bytes=35
+[19:43:13.362] LOG: [coop:webrtc] raw tx role=guest t=stallBeat bytes=35
+[19:43:18.359] LOG: [coop:webrtc] raw tx role=guest t=stallBeat bytes=35
+[19:43:23.359] LOG: [coop:webrtc] raw tx role=guest t=stallBeat bytes=35
+[19:43:28.364] LOG: [coop:webrtc] raw tx role=guest t=stallBeat bytes=35
+[19:43:33.360] LOG: [coop:interaction] interactionCounter() read -> 15 (role=guest)
+[19:43:33.360] LOG: [coop:health] tick=0g turn=1 wave=13 counter=15 assertions=0 wait=70518ms peerBeat=760s transport=connected
+[19:43:33.360] LOG: [coop:webrtc] raw tx role=guest t=stallBeat bytes=35
+[19:43:38.363] LOG: [coop:webrtc] raw tx role=guest t=stallBeat bytes=35
+[19:43:43.362] LOG: [coop:webrtc] raw tx role=guest t=stallBeat bytes=35
+[19:43:48.370] LOG: [coop:webrtc] raw tx role=guest t=stallBeat bytes=35
+[19:43:53.372] LOG: [coop:webrtc] raw tx role=guest t=stallBeat bytes=35
+[19:43:58.362] LOG: [coop:webrtc] raw tx role=guest t=stallBeat bytes=35
+[19:44:03.359] LOG: [coop:webrtc] raw tx role=guest t=stallBeat bytes=36
+[19:44:08.363] LOG: [coop:interaction] interactionCounter() read -> 15 (role=guest)
+[19:44:08.364] LOG: [coop:health] tick=0g turn=1 wave=13 counter=15 assertions=0 wait=105521ms peerBeat=795s transport=connected
+[19:44:08.364] LOG: [coop:webrtc] raw tx role=guest t=stallBeat bytes=36
+[19:44:13.377] LOG: [coop:webrtc] raw tx role=guest t=stallBeat bytes=36
+[19:44:18.379] LOG: [coop:webrtc] raw tx role=guest t=stallBeat bytes=36
+[19:44:23.372] LOG: [coop:webrtc] raw tx role=guest t=stallBeat bytes=36
+[19:44:28.377] LOG: [coop:webrtc] raw tx role=guest t=stallBeat bytes=36
+[19:44:33.383] LOG: [coop:webrtc] raw tx role=guest t=stallBeat bytes=36
+[19:44:38.367] LOG: [coop:interaction] interactionCounter() read -> 15 (role=guest)
+[19:44:38.367] LOG: [coop:health] tick=0g turn=1 wave=13 counter=15 assertions=0 wait=135525ms peerBeat=825s transport=connected
+[19:44:38.368] LOG: [coop:webrtc] raw tx role=guest t=stallBeat bytes=36
+[19:44:43.360] LOG: [coop:webrtc] raw tx role=guest t=stallBeat bytes=36
+[19:44:48.365] LOG: [coop:webrtc] raw tx role=guest t=stallBeat bytes=36
+[19:44:53.369] LOG: [coop:webrtc] raw tx role=guest t=stallBeat bytes=36
+[19:44:58.362] LOG: [coop:webrtc] raw tx role=guest t=stallBeat bytes=36
+[19:45:03.360] LOG: [coop:webrtc] raw tx role=guest t=stallBeat bytes=36
+[19:45:08.365] LOG: [coop:webrtc] raw tx role=guest t=stallBeat bytes=36
+[19:45:11.407] LOG: [coop:webrtc] raw rx role=guest t=command bytes=128 handlers=11
+[19:45:11.408] LOG: [coop:relay] recv command fieldIndex=0 turn=1 command=0 -> BUFFERED (no awaiter yet)
+[19:45:11.408] LOG: [coop:webrtc] raw rx role=guest t=commandRequest bytes=84 handlers=11
+[19:45:11.408] LOG: [coop:relay] peer recv commandRequest fieldIndex=1 owner=guest turn=1 before responder install -> BUFFERED (own slot, #812)
+[19:45:13.360] LOG: [coop:interaction] interactionCounter() read -> 15 (role=guest)
+[19:45:13.361] LOG: [coop:health] tick=0g turn=1 wave=13 counter=15 assertions=0 wait=170518ms peerBeat=860s transport=connected
+[19:45:13.361] LOG: [coop:webrtc] raw tx role=guest t=stallBeat bytes=36
+[19:45:18.365] LOG: [coop:webrtc] raw tx role=guest t=stallBeat bytes=36
