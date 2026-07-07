@@ -3922,8 +3922,7 @@ export class StarterSelectUiHandler extends MessageUiHandler {
    * move-swap picker can never offer a move the start-time validator would reject. Only
    * meaningful in showdown mode (the fielded stage falls back to the grid species otherwise).
    */
-  private showdownLegalMovePool(): MoveId[] {
-    const rootId = this.lastSpecies.speciesId;
+  private showdownLegalMovePool(rootId: number = this.lastSpecies.speciesId): MoveId[] {
     const selection = this.showdownSelections.get(rootId);
     const fieldedSpeciesId = selection?.speciesId ?? rootId;
     const eggBits = this.getSpeciesData(rootId).starterDataEntry.eggMoves;
@@ -6339,8 +6338,17 @@ export class StarterSelectUiHandler extends MessageUiHandler {
             ? speciesEggMoves[species.speciesId].filter((_: any, em: number) => starterDataEntry.eggMoves & (1 << em))
             : [],
         );
+        // Showdown (B7 item 16): the move-swap picker offers the FIELDED stage's FULL legal
+        // learnset (item 3), so the re-derived moveset must ACCEPT that whole pool - otherwise a
+        // swapped-in TM / high-level move (legal, but NOT in the vanilla early-move pool) is
+        // filtered right back out here on the very next setSpeciesDetails and the swap silently
+        // reverts. Only the FILTER widens; the fill-to-4 below still seeds from the vanilla pool so
+        // a fresh mon defaults to its early moves. No-op in every other mode (uses availableStarterMoves).
+        const moveFilterPool = globalScene.gameMode.isShowdown
+          ? this.showdownLegalMovePool(species.speciesId)
+          : availableStarterMoves;
         this.starterMoveset = (moveData || (this.speciesStarterMoves.slice(0, 4) as StarterMoveset)).filter(m =>
-          availableStarterMoves.find(sm => sm === m),
+          moveFilterPool.find(sm => sm === m),
         ) as StarterMoveset;
         // Consolidate move data if it contains an incompatible move
         if (this.starterMoveset.length < 4 && this.starterMoveset.length < availableStarterMoves.length) {
