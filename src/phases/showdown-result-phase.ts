@@ -140,9 +140,26 @@ export class ShowdownResultPhase extends BattlePhase {
         null,
         () => {
           // Return to the title WITHOUT saving - a showdown run never writes a session.
-          globalScene.reset();
-          globalScene.phaseManager.unshiftNew("TitlePhase");
-          this.end();
+          // Mirror the game-over title-return recipe (staging fix 2026-07-07): hide + fade the
+          // battle scene and CLEAR the phase queue BEFORE resetting, or the stale battle
+          // field/menu stays rendered underneath the incoming title menu (the reported
+          // "title menu on top of the frozen battle" after a forfeit).
+          globalScene.fadeOutBgm(500, true);
+          const activeBattlers = globalScene.getField().filter(p => p?.isActive(true));
+          for (const battler of activeBattlers) {
+            battler.hideInfo();
+          }
+          void globalScene.ui.fadeOut(500).then(() => {
+            for (const battler of activeBattlers) {
+              battler.setVisible(false);
+            }
+            globalScene.setFieldScale(1, true);
+            globalScene.phaseManager.clearPhaseQueue();
+            globalScene.ui.clearText();
+            globalScene.reset();
+            globalScene.phaseManager.unshiftNew("TitlePhase");
+            this.end();
+          });
         },
         null,
         true,
