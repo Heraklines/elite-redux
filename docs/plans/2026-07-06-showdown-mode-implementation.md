@@ -678,3 +678,29 @@ The client posts to `${VITE_SERVER_URL_TELEMETRY}` (falls back to `${VITE_SERVER
 **Replay-trace capture (D5, complete):** the showdown HOST records a real `ReplayTrace` — recording begins at EncounterPhase (`coop-runtime.maybeBeginReplayRecording`, gated `isCoop || isShowdown` + host role), the host's own player-side commands ride the existing single-player command tap, and the enemy side's per-turn command (relayed-or-AI) is tapped in `EnemyCommandPhase`'s versus branch. So the telemetry blob carries seed + host roster + BOTH sides' ordered per-turn commands → every stat is derivable offline by replaying.
 
 **FOLLOW-UP (not in scope — offline tooling):** a showdown-specific replay LOADER (a `replayShowdownTrace`-style re-drive, mirroring `replayCoopTrace` / `replaySingleTrace`) is still to be built. The captured trace's `roster` is the HOST's player party; the ENEMY party for a faithful re-drive comes from the telemetry payload's `guestTeam` manifest (or a future `enemyRoster` header field). The DATA is captured completely now; the re-drive harness can follow.
+
+## Task F1: Data-level guest perspective flip (added 2026-07-08, replaces the C5 presentation flip)
+
+The presentation-level flip is DISABLED (isShowdownGuestFlip returns false) after three live
+regression rounds: ~30 scattered gate checks with construction-time vs live sampling hazards
+(front sprites, swapped panel chrome, a summon crash at pokemon.ts showInfo). Rebuild:
+
+**Design — swap sides ONCE at the guest's world-adoption boundary.** One pure module
+(`showdown-side-swap.ts`) maps every AUTHORITATIVE ingress on the versus guest into its LOCAL
+orientation (own team = local PLAYER party as PlayerPokemon; opponent = local ENEMY party):
+launch snapshot (party/enemyParty, playerModifiers/enemyModifiers incl. per-modifier player
+flags, arena tag sides), per-turn CoopAuthoritativeBattleStateV1 (parties, modifiers, field
+seats side+bi via arrangement offsets), battle EVENTS (bi remap so replay phases animate the
+right sprites), the legacy checkpoint/stateSync safety net, and the egress side: checksum +
+saveDataDigest computed over the guest state re-mapped BACK to authoritative orientation so
+host/guest compares stay apples-to-apples. Guest command flow becomes the NORMAL player-side
+CommandPhase (its team IS the local player party) shipping via the relay instead of executing
+(the coop guest's own-slot shape). All presentation patches (presentation helpers, panel-class
+swap, ctor coord swaps, back-atlas gate flips, the SHOWDOWN_COMMAND enemy-reading menu) are
+then REMOVED - rendering is naturally correct by construction. Party ORDER is preserved by the
+mapper so guest switch indexes align with host-side enemy-party validation.
+
+Proof: mapper unit tests (round-trip: swap∘swap = identity; every side-keyed field), duo
+end-to-end (guest boots swapped, real turns, checksum convergence via the unswap, KO sweep,
+both clients same result), solo/coop byte-identity (mapper invoked only on versus-guest seams),
+full coop regression bar.
