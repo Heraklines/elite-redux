@@ -545,6 +545,17 @@ export class TitlePhase extends Phase {
           setModeAndEnd(launchMode);
         };
 
+        // Showdown 1v1 (B7 item 5): a versus match is EPHEMERAL - it never saves, never resumes,
+        // and never picks a save slot. The co-op RESUME / NEW-GAME barrier below (readCoopResumeMarker,
+        // the guest resume-decision wait, loadSaveSlot) is a co-op-only feature; running it for versus
+        // surfaced an unselectable "wait for the partner to resume or start a new game?" prompt that
+        // HARD SOFT-LOCKED both clients post-pairing. Skip the entire barrier for versus on BOTH roles
+        // and go straight into the versus teambuild (the negotiate step is the real sync point).
+        if (sessionKind === "versus") {
+          startNewRun();
+          return;
+        }
+
         // #810 RESUME FLOW (maintainer directive): after the ACCEPT handshake, decide RESUME
         // vs NEW GAME BEFORE anyone advances into starter-select. The HOST owns the decision
         // (it holds the authoritative save + its own resume marker, which BOTH clients now

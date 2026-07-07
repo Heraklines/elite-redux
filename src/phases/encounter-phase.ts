@@ -665,16 +665,26 @@ export class EncounterPhase extends BattlePhase {
           // weather/terrain), so PUSH the launch snapshot for the guest to boot from. Placed after
           // the weather/terrain set so the snapshot carries them; before saveAll (same coherent point).
           this.broadcastCoopLaunchSnapshot();
-          globalScene.gameData
-            .saveAll(true, battle.waveIndex % 20 === 1 || (globalScene.lastSavePlayTime ?? 0) >= 1200)
-            .then(success => {
-              globalScene.disableMenu = false;
-              if (!success) {
-                return globalScene.reset(true);
-              }
-              this.doEncounter();
-              globalScene.resetSeed();
-            });
+          if (globalScene.gameMode.isShowdown) {
+            // Showdown 1v1 (B7 item 5): a versus match is EPHEMERAL - it NEVER writes a session
+            // (no localStorage slot, no cloud `updateAll` push). Skip the per-wave saveAll entirely
+            // and boot the encounter directly. The guest already boots from the host's launch
+            // snapshot (the `this.loaded` branch above), so only the host reaches here.
+            globalScene.disableMenu = false;
+            this.doEncounter();
+            globalScene.resetSeed();
+          } else {
+            globalScene.gameData
+              .saveAll(true, battle.waveIndex % 20 === 1 || (globalScene.lastSavePlayTime ?? 0) >= 1200)
+              .then(success => {
+                globalScene.disableMenu = false;
+                if (!success) {
+                  return globalScene.reset(true);
+                }
+                this.doEncounter();
+                globalScene.resetSeed();
+              });
+          }
         }
       });
     });
