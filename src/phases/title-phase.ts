@@ -11,7 +11,12 @@ import { getDailyRunStarters, startDailyEventChallenges } from "#data/daily-seed
 import { modifierTypes } from "#data/data-lists";
 import { CoopLobbyController, type LobbyPlayer } from "#data/elite-redux/coop/coop-lobby";
 import { readCoopResumeMarker } from "#data/elite-redux/coop/coop-resume-marker";
-import { getCoopBattleStreamer, getCoopController, startLocalCoopSession } from "#data/elite-redux/coop/coop-runtime";
+import {
+  getCoopBattleStreamer,
+  getCoopController,
+  isVersusSession,
+  startLocalCoopSession,
+} from "#data/elite-redux/coop/coop-runtime";
 import type { CoopNetcodeMode, CoopSessionKind } from "#data/elite-redux/coop/coop-transport";
 import { buildInfernoFeed } from "#data/elite-redux/er-community-challenge-inferno";
 import { applyCommunityChallengeToRun } from "#data/elite-redux/er-community-challenge-launch";
@@ -916,7 +921,9 @@ export class TitlePhase extends Phase {
       if (
         (this.gameMode === GameModes.CHALLENGE || this.gameMode === GameModes.COOP)
         && !isCoopGuest
-        && !this.pendingCommunityConfig
+        && !this.pendingCommunityConfig // B7 item 14a: a VERSUS (showdown) session goes Title/lobby -> SelectStarterPhase directly, never // the challenge picker. A correctly-launched versus run has gameMode SHOWDOWN (already excluded // here), but guard on the session KIND too so a versus run can never surface the picker even if
+        && // its gameMode were ever misread as COOP. Co-op (kind "coop") is unaffected.
+        !isVersusSession()
       ) {
         globalScene.phaseManager.pushNew("SelectChallengePhase");
       } else {
