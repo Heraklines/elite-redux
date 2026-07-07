@@ -66,8 +66,11 @@ export function starterToManifest(starter: Starter, _gameData: ShowdownUnlockGam
     baseCost: speciesStarterCosts[starter.speciesId] ?? 4,
     // Task C7: the owner's per-mon Shiny Lab look, mirroring the ghost capture's serializeShinyLabLook
     // semantics: only on a SHINY mon, and only the carried look (stamped at build via the equipped
-    // look). A non-shiny (or lookless) mon carries no look, so the field is dropped entirely.
-    erShinyLab: starter.shiny && starter.erShinyLab ? [...starter.erShinyLab] : undefined,
+    // look). A non-shiny (or lookless) mon carries no look, so the KEY IS OMITTED ENTIRELY -
+    // an `erShinyLab: undefined` entry would be dropped by the real transport's JSON framing
+    // but kept by Object.keys locally, poisoning the team hash (ready-gate void on every
+    // real match; loopback tests can't see it because they pass objects by reference).
+    ...(starter.shiny && starter.erShinyLab ? { erShinyLab: [...starter.erShinyLab] } : {}),
   };
 }
 

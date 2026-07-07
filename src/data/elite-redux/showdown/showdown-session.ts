@@ -147,9 +147,15 @@ const PERMISSIVE_UNLOCKS: UnlockSnapshot = {
  * sorted, numbers normalized). Both clients compute it over their OWN manifest and commit
  * it in `showdownReady`; the receiver recomputes it over the manifest the peer actually sent
  * and rejects a mismatch (the peer tampered its hash vs its team). Pure - exported for tests.
+ *
+ * The manifest is JSON-round-tripped BEFORE hashing so the fingerprint is computed over the
+ * exact shape the real transport delivers: `JSON.stringify` drops `undefined`-valued keys,
+ * so hashing the raw in-memory object would commit a different fingerprint than the receiver
+ * can ever recompute (the erShinyLab ready-gate void class). Loopback passes references and
+ * cannot catch this - the round-trip makes the hash transport-shape-canonical by construction.
  */
 export function showdownTeamHash(manifest: ShowdownMonManifest[]): string {
-  return fnv1a64(canonicalize(manifest));
+  return fnv1a64(canonicalize(JSON.parse(JSON.stringify(manifest))));
 }
 
 /**
