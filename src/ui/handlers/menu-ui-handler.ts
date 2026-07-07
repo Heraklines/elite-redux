@@ -32,6 +32,9 @@ enum MenuOptions {
   COMMUNITY,
   SAVE_AND_QUIT,
   LOG_OUT,
+  // Showdown 1v1 (D4): concede the duel. Appended LAST so excluding it (every non-showdown context)
+  // never shifts another option's index, keeping the processInput adjustedCursor mapping intact.
+  FORFEIT,
 }
 
 let wikiUrl = "https://wiki.pokerogue.net/start";
@@ -81,6 +84,11 @@ export class MenuUiHandler extends MessageUiHandler {
         options: [MenuOptions.EGG_GACHA, MenuOptions.EGG_LIST],
       },
       { condition: bypassLogin, options: [MenuOptions.LOG_OUT] },
+      // Showdown 1v1 (D4): Forfeit shows ONLY inside a live showdown battle.
+      {
+        condition: !(globalScene.gameMode.isShowdown && globalScene.currentBattle != null),
+        options: [MenuOptions.FORFEIT],
+      },
     ];
 
     this.menuOptions = getEnumValues(MenuOptions).filter(m => {
@@ -135,6 +143,13 @@ export class MenuUiHandler extends MessageUiHandler {
       },
       { condition: bypassLogin, options: [MenuOptions.LOG_OUT] },
       { condition: !globalScene.currentBattle, options: [MenuOptions.SAVE_AND_QUIT] },
+      // Showdown 1v1 (D4): a versus match is ephemeral (never saved) - hide Save and Quit and offer
+      // Forfeit instead. Forfeit shows ONLY inside a live showdown battle.
+      { condition: globalScene.gameMode.isShowdown, options: [MenuOptions.SAVE_AND_QUIT] },
+      {
+        condition: !(globalScene.gameMode.isShowdown && globalScene.currentBattle != null),
+        options: [MenuOptions.FORFEIT],
+      },
     ];
 
     this.menuOptions = getEnumValues(MenuOptions).filter(m => {
@@ -144,7 +159,13 @@ export class MenuUiHandler extends MessageUiHandler {
     this.optionSelectText = addTextObject(
       0,
       0,
-      this.menuOptions.map(o => `${i18next.t(`menuUiHandler:${toCamelCase(MenuOptions[o])}`)}`).join("\n"),
+      this.menuOptions
+        .map(o =>
+          o === MenuOptions.FORFEIT
+            ? i18next.t("menuUiHandler:forfeit", { defaultValue: "Forfeit" })
+            : i18next.t(`menuUiHandler:${toCamelCase(MenuOptions[o])}`),
+        )
+        .join("\n"),
       TextStyle.WINDOW,
       { maxLines: this.menuOptions.length },
     );
@@ -574,6 +595,40 @@ export class MenuUiHandler extends MessageUiHandler {
     return true;
   }
 
+  /**
+   * Showdown 1v1 (D4): concede the duel. Confirms, then routes BOTH clients to the ephemeral result:
+   * {@linkcode ShowdownResultPhase} (localWon=false, reason forfeit) emits `showdownResult{winner:
+   * opponent, forfeit}` to the peer - whose wireShowdownResult routes its own silent result - and
+   * returns both to the title. The in-flight turn is cleared so the duel ends immediately.
+   */
+  private forfeitShowdown(): void {
+    const ui = this.getUi();
+    ui.showText(
+      i18next.t("menuUiHandler:forfeitShowdownConfirm", {
+        defaultValue: "Forfeit the Showdown? You will lose the match.",
+      }),
+      null,
+      () => {
+        ui.setOverlayMode(
+          UiMode.CONFIRM,
+          () => {
+            globalScene.phaseManager.clearPhaseQueue();
+            globalScene.phaseManager.unshiftNew("ShowdownResultPhase", false, "forfeit", false, false);
+            // End the current battle phase so the manager runs the queued result phase; CommandPhase.end
+            // resets the UI to MESSAGE, dropping the menu + confirm overlays before the result renders.
+            globalScene.phaseManager.getCurrentPhase()?.end();
+          },
+          () => {
+            ui.revertMode();
+            this.showText("", 0);
+          },
+          false,
+          -98,
+        );
+      },
+    );
+  }
+
   processInput(button: Button): boolean {
     const ui = this.getUi();
 
@@ -581,6 +636,14 @@ export class MenuUiHandler extends MessageUiHandler {
     let error = false;
 
     if (button === Button.ACTION) {
+      // Showdown 1v1 (D4): Forfeit is resolved from the ACTUAL selected option, bypassing the
+      // adjustedCursor heuristic below (Forfeit is enum-last + only shown in a showdown battle, so it
+      // never affects the mapping of any other option).
+      if (this.menuOptions[this.cursor] === MenuOptions.FORFEIT) {
+        this.forfeitShowdown();
+        ui.playSelect();
+        return true;
+      }
       let adjustedCursor = this.cursor;
       const excludedMenu = this.excludedMenus().find(e => e.condition);
       if (excludedMenu !== undefined && excludedMenu.options !== undefined && excludedMenu.options.length > 0) {

@@ -40,6 +40,7 @@ import { CoopBattleSync } from "#data/elite-redux/coop/coop-battle-sync";
 import { getCoopChecksumAssertionCount } from "#data/elite-redux/coop/coop-checksum-assert";
 import { coopLog, coopWarn, isCoopDebug } from "#data/elite-redux/coop/coop-debug";
 import { COOP_DEX_SYNC_SEQ, CoopInteractionRelay } from "#data/elite-redux/coop/coop-interaction-relay";
+import { COOP_DISCONNECT_GRACE_MS } from "#data/elite-redux/coop/coop-lifecycle";
 import { meBattleHandoffKey } from "#data/elite-redux/coop/coop-me-battle-handoff";
 import {
   coopMeHandoffBattleStarted,
@@ -80,6 +81,8 @@ import {
 } from "#data/elite-redux/replay-recorder";
 import type { ReplayCommandKind } from "#data/elite-redux/replay-trace";
 import { getShowdownRelay } from "#data/elite-redux/showdown/showdown-battle-state";
+import { ShowdownLifecycle } from "#data/elite-redux/showdown/showdown-lifecycle";
+import { otherRole } from "#data/elite-redux/showdown/showdown-outcome";
 import { ShowdownSpoof } from "#data/elite-redux/showdown/showdown-spoof";
 import { BattlerIndex } from "#enums/battler-index";
 import { Command } from "#enums/command";
@@ -785,6 +788,39 @@ export function wireCoopStallWatchdog(
   };
 }
 
+/**
+ * Showdown 1v1 (D4): the PARTNER (opponent) dropped and did NOT reconnect within the 2-minute grace.
+ * Resolve the abandoned match via {@linkcode ShowdownLifecycle} (turn < threshold -> void
+ * earlyDisconnect; at/above -> the local SURVIVOR wins by timeout) and route to the ephemeral
+ * {@linkcode ShowdownResultPhase}. Best-effort + fully guarded so an abandonment can never crash the
+ * loop. Only called from the REAL-peer rejoin-FAILURE path (a genuine WebRTC drop), never over the
+ * loopback/spoof path - so it can't fire during the two-engine harness's transport teardown.
+ */
+function routeShowdownAbandon(runtime: CoopRuntime): void {
+  try {
+    const droppedRole = otherRole(runtime.controller.role); // the partner (opponent) is the one that dropped
+    const turn = globalScene.currentBattle?.turn ?? 0;
+    const lifecycle = new ShowdownLifecycle();
+    lifecycle.setTurn(turn);
+    lifecycle.disconnect(droppedRole, 0);
+    const outcome = lifecycle.resolveOnAbandon(droppedRole, COOP_DISCONNECT_GRACE_MS + 1);
+    if (outcome == null) {
+      return;
+    }
+    globalScene.phaseManager.clearPhaseQueue();
+    if (outcome.kind === "void") {
+      globalScene.phaseManager.unshiftNew("ShowdownResultPhase", false, outcome.reason, true, false);
+    } else {
+      const localWon = outcome.winner === runtime.controller.role;
+      globalScene.phaseManager.unshiftNew("ShowdownResultPhase", localWon, outcome.reason, false, false);
+    }
+    // Advance out of the (now un-continuable) battle phase into the queued result.
+    globalScene.phaseManager.getCurrentPhase()?.end();
+  } catch {
+    /* abandonment routing must never crash the game loop */
+  }
+}
+
 function wireCoopDisconnectReaction(transport: CoopTransport, relay: CoopInteractionRelay, runtime: CoopRuntime): void {
   let rejoining = false;
   offDisconnectReaction = transport.onStateChange(state => {
@@ -824,6 +860,13 @@ function wireCoopDisconnectReaction(transport: CoopTransport, relay: CoopInterac
           rejoining = false;
           if (!ok) {
             coopWarn("runtime", "rejoin FAILED (grace expired) -> continuing without the partner");
+            // Showdown 1v1 (D4): a versus opponent that never reconnected ends the match - void (early)
+            // or a survivor win (mid-match), routed to the ephemeral result. Co-op keeps its own
+            // continue-solo behavior below.
+            if (isActiveRuntime && isVersusSession()) {
+              routeShowdownAbandon(runtime);
+              return;
+            }
             if (isActiveRuntime) {
               try {
                 globalScene.ui.showText(

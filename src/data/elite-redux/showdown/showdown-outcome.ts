@@ -82,25 +82,25 @@ export function detectShowdownVictory(hostTeamSwept: boolean, guestTeamSwept: bo
 }
 
 /**
- * PURE: the result decision when `loser` forfeits (the other side wins by forfeit).
- * D4: wired by Task D4 (disconnect/forfeit lifecycle) - defined here so the wire shapes are stable.
+ * PURE: the result decision when `loser` forfeits (the other side wins by forfeit). Wired by the
+ * forfeit menu (D4) via {@linkcode ShowdownResultPhase}.
  */
 export function forfeitResult(loser: CoopRole): ShowdownResultDecision {
   return { kind: "result", winner: otherRole(loser), reason: "forfeit" };
 }
 
 /**
- * PURE: the result decision when `loser` runs out its turn clock (the other side wins).
- * D4: wired by Task D4 (disconnect/forfeit lifecycle) - defined here so the wire shapes are stable.
+ * PURE: the result decision when `loser` runs out its turn clock / abandons after the match is under
+ * way (the other side wins). Wired by the disconnect lifecycle (D4, {@linkcode ShowdownLifecycle}).
  */
 export function timeoutResult(loser: CoopRole): ShowdownResultDecision {
   return { kind: "result", winner: otherRole(loser), reason: "timeout" };
 }
 
 /**
- * PURE: a void decision with the given reason (no winner). The `"checksum"` reason is live (C6);
- * D4: `"earlyDisconnect"` is wired by Task D4 (disconnect/forfeit lifecycle) - defined here so the
- * wire shapes are stable.
+ * PURE: a void decision with the given reason (no winner). `"checksum"` is the diverged-battle
+ * give-up (C6); `"earlyDisconnect"` is an abandonment before the match got under way (D4,
+ * {@linkcode ShowdownLifecycle}); `"illegalTeam"` is the C2 negotiation rejection.
  */
 export function voidResult(reason: ShowdownVoidReason): ShowdownVoidDecision {
   return { kind: "void", reason };

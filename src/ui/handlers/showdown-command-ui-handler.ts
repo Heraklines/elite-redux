@@ -21,6 +21,7 @@
 
 import { globalScene } from "#app/global-scene";
 import type { SerializedCommand } from "#data/elite-redux/coop/coop-transport";
+import { SHOWDOWN_TURN_TIMER_MS } from "#data/elite-redux/showdown/showdown-command-relay";
 import {
   buildShowdownFightCommand,
   buildShowdownSwitchCommand,
@@ -61,6 +62,8 @@ export class ShowdownCommandUiHandler extends UiHandler {
   private container: Phaser.GameObjects.Container;
   private window: Phaser.GameObjects.NineSlice;
   private titleText: Phaser.GameObjects.Text;
+  /** D4: the LOCAL turn-clock countdown (top-right of the window). */
+  private clockText: Phaser.GameObjects.Text;
   private rowTexts: Phaser.GameObjects.Text[] = [];
   private cursorObj: Phaser.GameObjects.Image | null = null;
 
@@ -70,6 +73,9 @@ export class ShowdownCommandUiHandler extends UiHandler {
   private onCommand: ShowdownCommandArgs["onCommand"] = () => {};
   /** Set once a command is shipped for THIS open; blocks a re-entrant confirm from double-shipping/ending. */
   private shipped = false;
+  /** D4 turn clock: seconds left + the repeating timer, or null when not running. */
+  private secondsLeft = 0;
+  private clockEvent: Phaser.Time.TimerEvent | null = null;
 
   constructor() {
     super(UiMode.SHOWDOWN_COMMAND);
@@ -87,6 +93,11 @@ export class ShowdownCommandUiHandler extends UiHandler {
 
     this.titleText = addTextObject(8, 4, "", TextStyle.WINDOW);
     this.container.add(this.titleText);
+
+    // D4 turn clock: a compact top-right countdown.
+    this.clockText = addTextObject(112, 4, "", TextStyle.WINDOW);
+    this.clockText.setOrigin(1, 0);
+    this.container.add(this.clockText);
   }
 
   override show(args: any[]): boolean {
@@ -97,8 +108,59 @@ export class ShowdownCommandUiHandler extends UiHandler {
     this.level = "root";
     this.shipped = false;
     this.container.setVisible(true);
+    this.startTurnClock();
     this.render();
     return true;
+  }
+
+  /**
+   * D4 turn clock: a LOCAL 60s countdown started when the menu opens. CAVEAT (documented): this is the
+   * GUEST'S OWN clock, NOT synced to the host's authoritative relay timer (SHOWDOWN_TURN_TIMER_MS) - so
+   * transport latency + the moment the two menus opened can skew it by up to a round-trip. It is a UX
+   * hint, not the source of truth: if it runs out, the guest auto-ships its lead move to unblock its
+   * CommandPhase, and the host's own timer (which IS authoritative) AI-falls-back independently.
+   */
+  private startTurnClock(): void {
+    this.stopTurnClock();
+    this.secondsLeft = Math.round(SHOWDOWN_TURN_TIMER_MS / 1000);
+    this.updateClockText();
+    this.clockEvent =
+      globalScene.time?.addEvent?.({
+        delay: 1000,
+        loop: true,
+        callback: () => this.tickTurnClock(),
+      }) ?? null;
+  }
+
+  private tickTurnClock(): void {
+    this.secondsLeft = Math.max(0, this.secondsLeft - 1);
+    this.updateClockText();
+    if (this.secondsLeft <= 0) {
+      this.stopTurnClock();
+      this.autoShipOnTimeout();
+    }
+  }
+
+  private updateClockText(): void {
+    this.clockText.setText(`${this.secondsLeft}s`);
+    // Warn red under 10s.
+    this.clockText.setColor(this.secondsLeft <= 10 ? "#f84040" : "#f8f8f8");
+  }
+
+  private stopTurnClock(): void {
+    this.clockEvent?.remove();
+    this.clockEvent = null;
+  }
+
+  /** Local clock expired: ship the active mon's lead move so this CommandPhase unblocks (host is authoritative). */
+  private autoShipOnTimeout(): void {
+    if (this.shipped) {
+      return;
+    }
+    const move = this.getActive()?.getMoveset()[0];
+    if (move != null) {
+      this.ship(buildShowdownFightCommand(0, move.moveId));
+    }
   }
 
   /** The guest's active mon: authoritatively the ENEMY lead (its own team's fielded mon). */
@@ -254,6 +316,7 @@ export class ShowdownCommandUiHandler extends UiHandler {
       return; // defensive: never double-ship / double-end
     }
     this.shipped = true;
+    this.stopTurnClock();
     // Capture before setMode(MESSAGE) - closing this menu runs clear(), which resets onCommand.
     const turn = this.turn;
     const onCommand = this.onCommand;
@@ -261,7 +324,6 @@ export class ShowdownCommandUiHandler extends UiHandler {
     // "partner is choosing" MESSAGE) instead of leaving the screen blank; setMode(MESSAGE) also closes
     // this menu. Raw-key fallback text is acceptable for now.
     // TODO(i18n): add a dedicated `battle:showdownWaitingForOpponent` locale key.
-    // D4: turn-clock display (the 60s countdown) is deferred to Task D4.
     globalScene.ui.setMode(UiMode.MESSAGE);
     globalScene.ui.showText(
       i18next.t("battle:showdownWaitingForOpponent", { defaultValue: "Waiting for opponent..." }),
@@ -287,6 +349,7 @@ export class ShowdownCommandUiHandler extends UiHandler {
 
   clear(): void {
     super.clear();
+    this.stopTurnClock();
     this.container.setVisible(false);
     for (const t of this.rowTexts) {
       t.destroy();
