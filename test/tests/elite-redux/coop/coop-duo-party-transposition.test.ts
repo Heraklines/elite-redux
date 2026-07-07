@@ -12,9 +12,10 @@
 // resolution, so between the faint and that turn - or forever, if the wave ends first - the guest kept the
 // STALE order: its fainted lead still at the front slot, the replacement still on the bench. That party-order
 // TRANSPOSITION is the ONE root of TWO live symptoms:
-//   1. EXP/level desync ("my mon is a level behind my partner's"): the host streams settled per-SLOT exp
-//      deltas at BattleEndPhase; the guest applies them keyed by slot + guarded by species, so a transposed
-//      slot holds the WRONG species and the leveled bench mon's level-up is SKIPPED and lost.
+//   1. EXP/level desync ("my mon is a level behind my partner's"): the host streams the settled post-exp
+//      state at BattleEndPhase; the guest adopts it. Under the OLD per-slot exp-delta relay a transposed
+//      slot held the WRONG species and the leveled bench mon's level-up was SKIPPED and lost; the id-based
+//      wave-end full-state apply that replaced it mutates by Pokemon.id, so the level-up follows the mon.
 //   2. Switch-in / faint presentation on the wrong mon: `getPlayerField()` reads `party.slice(0, capacity)`,
 //      so a transposed array puts the wrong mon at a field slot (the "switch-in invisible then it fainted"
 //      report).
@@ -23,10 +24,10 @@
 //   SOURCE (switch-phase.ts OWNER branch): a HOST-owned faint-replacement pushes the SAME out-of-band
 //     `CoopPushReplacementCheckpointPhase` the GUEST-owned path already pushes, so the guest materializes
 //     the replacement + mirrors the array swap IMMEDIATELY - both engines' party order stays byte-identical.
-//   BACKSTOP (coop-battle-engine.ts adoptCoopHostPlayerPartyOrder + applyCoopExpDeltas): a transient
-//     transposition ALWAYS heals - the party-order adopt no longer PINS an on-field mon that sits at a BENCH
-//     array index (a misaligned slot must be reorderable to the front), and the exp-delta apply recovers a
-//     slot-mismatched level-up by mon IDENTITY instead of dropping it.
+//   BACKSTOP (coop-battle-engine.ts adoptCoopHostPlayerPartyOrder): a transient transposition ALWAYS heals
+//     - the party-order adopt no longer PINS an on-field mon that sits at a BENCH array index (a misaligned
+//     slot must be reorderable to the front), and the id-based wave-end full-state apply lands each mon's
+//     level-up by Pokemon.id regardless of any residual slot skew.
 //
 // HOW TO RUN (gated ER_SCENARIO=1, like every ER engine test):
 //   ER_SCENARIO=1 npx vitest run test/tests/elite-redux/coop/coop-duo-party-transposition.test.ts
@@ -37,14 +38,18 @@ import { getGameMode } from "#app/game-mode";
 import { initGlobalScene } from "#app/global-scene";
 import {
   adoptCoopHostPlayerPartyOrder,
+  applyCoopAuthoritativeBattleState,
   applyCoopCheckpoint,
-  applyCoopExpDeltas,
   captureCoopChecksumState,
-  captureCoopExpDeltas,
 } from "#data/elite-redux/coop/coop-battle-engine";
 import { setCoopFaintSwitchWaitMs, setCoopWaveBarrierMs } from "#data/elite-redux/coop/coop-interaction-relay";
 import { resetCoopRendezvousWaitMs, setCoopRendezvousWaitMs } from "#data/elite-redux/coop/coop-rendezvous";
-import { clearCoopRuntime, setCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
+import {
+  broadcastCoopWaveEndState,
+  clearCoopRuntime,
+  consumeCoopPendingWaveEndState,
+  setCoopRuntime,
+} from "#data/elite-redux/coop/coop-runtime";
 import { COOP_HOST_FIELD_INDEX } from "#data/elite-redux/coop/coop-session";
 import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
 import { Command } from "#enums/command";
@@ -57,6 +62,7 @@ import {
   buildDuo,
   type CoopResyncProbe,
   type DuoRig,
+  drainLoopback,
   driveGuestReplayTurn,
   installCoopResyncProbe,
   installDuoLogCapture,
@@ -220,14 +226,23 @@ describe.skipIf(!RUN)(
       ).toEqual(hostOrderAfter);
 
       // The bench mon that took the field (FENNEKIN, host slot 0) fights on + levels up: settle it on the host,
-      // then deliver the host's per-slot exp deltas exactly as the guest's BattleEndPhase does.
+      // then deliver the host's WAVE-END authoritative snapshot exactly as the guest's BattleEndPhase does
+      // (the host broadcasts, the guest adopts it via the id-based full-state apply).
       rig.hostScene.getPlayerParty()[0].level = 55;
       rig.hostScene.getPlayerParty()[0].exp += 5000;
-      const deltas = withClientSync(rig.hostCtx, () => captureCoopExpDeltas());
-      withClientSync(rig.guestCtx, () => applyCoopExpDeltas(deltas));
+      rig.hostScene.getPlayerParty()[0].calculateStats();
+      await withClient(rig.hostCtx, async () => {
+        broadcastCoopWaveEndState();
+        await drainLoopback();
+      });
+      const waveEndApplied = withClientSync(rig.guestCtx, () =>
+        applyCoopAuthoritativeBattleState(consumeCoopPendingWaveEndState() ?? undefined, true),
+      );
+      expect(waveEndApplied, "the guest adopted the host's wave-end authoritative snapshot").toBe(true);
 
-      // LAYER 2 ASSERTION: the leveled mon's level-up LANDED on the guest (keyed by the now-identical slot;
-      // PRE-FIX the transposed slot held CHIKORITA so the delta was SKIPPED and FENNEKIN stayed a level behind).
+      // LAYER 2 ASSERTION: the leveled mon's level-up LANDED on the guest FENNEKIN. The id-based wave-end
+      // apply mutates by Pokemon.id, so the level-up follows the mon regardless of any residual slot skew
+      // (PRE-FIX the OLD per-slot exp-delta relay SKIPPED the transposed slot and FENNEKIN stayed a level behind).
       const guestFennekinLevel = withClientSync(rig.guestCtx, () => {
         const fen = rig.guestScene.getPlayerParty().find(p => p.species?.speciesId === SpeciesId.FENNEKIN);
         return fen?.level ?? -1;

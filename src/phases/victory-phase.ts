@@ -50,28 +50,28 @@ export class VictoryPhase extends PokemonPhase {
       globalScene.gameData.gameStats.pokemonDefeated++;
     }
 
-    // Co-op authoritative (#633 B5): the guest is a PURE RENDERER; the HOST computes exp and streams
-    // the SETTLED per-slot exp/level/moveset on `expResolved` (applied in the guest's BattleEndPhase).
-    // Running applyPartyExp here would re-derive a DIVERGENT amount (different participantIds; one
-    // VictoryPhase per wave vs the host's one per faint) -> a different level/evolution path -> the
-    // relayed learn-move slot hits a DIFFERENT mon on the guest (the live learn-move-on-the-wrong-mon
-    // desync). Skip for the authoritative GUEST only; solo / host / lockstep are unchanged.
-    // KNOWN RESIDUAL (cosmetic): the guest no longer animates the exp bar / "grew to Lv. N" / level-up
-    // move-learn prompt. State is still correct (the deltas carry exp/level/moveset); the host streams
-    // narration via the event channel. Consistent with the authoritative renderer model.
+    // Co-op authoritative (#838): the guest is a PURE RENDERER; the HOST computes exp and streams the
+    // SETTLED post-exp battle state on `waveEndState` (adopted via one id-based full-state apply in the
+    // guest's BattleEndPhase). Running applyPartyExp here would re-derive a DIVERGENT amount (different
+    // participantIds; one VictoryPhase per wave vs the host's one per faint) -> a different
+    // level/evolution path -> the relayed learn-move slot hits a DIFFERENT mon on the guest (the live
+    // learn-move-on-the-wrong-mon desync). Skip for the authoritative GUEST only; solo / host / lockstep
+    // are unchanged. KNOWN RESIDUAL (cosmetic): the guest no longer animates the exp bar / "grew to Lv. N"
+    // / level-up move-learn prompt. State is still correct (the wave-end snapshot carries exp/level/moveset);
+    // the host streams narration via the event channel. Consistent with the authoritative renderer model.
     if (isCoopAuthoritativeGuest()) {
       // Co-op authoritative GUEST: SKIP local exp computation (it would diverge - different
-      // participantIds, one VictoryPhase/wave vs the host's one/faint). The settled per-slot
-      // exp/level/moveset arrives on `expResolved` and is applied in the guest's BattleEndPhase.
+      // participantIds, one VictoryPhase/wave vs the host's one/faint). The settled post-exp state
+      // arrives on `waveEndState` and is applied in the guest's BattleEndPhase.
       coopLog(
         "progression",
-        `GUEST applyPartyExp SKIP wave=${globalScene.currentBattle.waveIndex} koMon=${this.getPokemon().name} (awaiting host expResolved)`,
+        `GUEST applyPartyExp SKIP wave=${globalScene.currentBattle.waveIndex} koMon=${this.getPokemon().name} (awaiting host waveEndState)`,
       );
     } else {
       const expValue = this.getPokemon().getExpValue();
-      // Co-op authoritative HOST (and solo/lockstep): we COMPUTE exp locally and stream the settled
-      // per-slot result. Log on co-op only (solo/lockstep skip silently) so the host's exp computation
-      // can be paired with the guest's skip + apply in the captured log.
+      // Co-op authoritative HOST (and solo/lockstep): we COMPUTE exp locally; the settled post-exp state
+      // is streamed on `waveEndState` at BattleEndPhase. Log on co-op only (solo/lockstep skip silently)
+      // so the host's exp computation can be paired with the guest's skip + apply in the captured log.
       if (globalScene.gameMode.isCoop) {
         coopLog(
           "progression",

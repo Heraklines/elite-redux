@@ -172,31 +172,6 @@ export interface CoopSerializedRewardOption {
 }
 
 /**
- * One party member's HOST-AUTHORITATIVE POST-EXP result (#633 B5). Captured AFTER the wave's
- * ExpPhase / ShowPartyExpBarPhase / LevelUpPhase / EvolutionPhase chain has fully drained (in the
- * host's BattleEndPhase), so `exp` / `level` / `moveset` are the settled, fully-credited
- * authoritative values - NOT the pre-wave snapshot (`applyPartyExp` only QUEUES the exp phases; the
- * mutation happens later inside them, so a capture at VictoryPhase's win-broadcast would be stale).
- * Keyed by STABLE party-SLOT index (host & guest parties are permutation-identical via order-adopt /
- * capture / ME reconcile), validated by `speciesId` (a slot whose species disagrees is SKIPPED, e.g.
- * a host-evolved mon the guest has not evolved - that slot heals via the resync `benchParty` instead).
- * The guest SETS these verbatim instead of running its own divergent `applyPartyExp` (which would
- * compute a different amount: different participantIds, one VictoryPhase per wave vs one per faint).
- */
-export interface CoopExpDelta {
-  /** Party slot index in `getPlayerParty()` order (host-authoritative). */
-  slot: number;
-  /** `speciesId` at that slot (the guest SKIPS a slot whose species disagrees). */
-  speciesId: number;
-  /** Host's settled absolute exp after the whole wave's exp chain ran. */
-  exp: number;
-  /** Host's settled absolute level. */
-  level: number;
-  /** Host's settled moveset (`moveId` + `ppUsed` + `ppUp`) so guest-skipped level-up moves converge. */
-  moveset: { moveId: number; ppUsed: number; ppUp: number }[];
-}
-
-/**
  * One arena tag carried in the per-turn checkpoint (#633 GAP 1). Hazards / screens / tailwind
  * (Stealth Rock, Spikes, Reflect, Light Screen, Tailwind, ...) are set by host MoveEffectPhases
  * the guest never runs, so without carrying them the guest never gains them and the checksum -
@@ -1064,23 +1039,12 @@ export type CoopMessage =
       capturePresentation?: CoopCapturePresentation | undefined;
     }
   /**
-   * Host -> guest (#633 B5, authoritative EXP): the host's SETTLED per-slot exp / level / moveset
-   * after the wave's whole exp/level/evolution chain drained (emitted from the host's
-   * `BattleEndPhase`, NOT the pre-exp `waveResolved`). The guest - whose own `applyPartyExp` is
-   * gated off - ADOPTS these verbatim so its exp/level/moveset converge with the host's; this makes
-   * both clients' VictoryPhase -> LevelUp -> LearnMove target the SAME mon (the live learn-move-on-
-   * the-wrong-mon desync). Orthogonal to the proven `waveResolved` handshake (that arm is untouched);
-   * an older client ignores an unknown `t`. Idempotent: absolute SETs guarded by per-slot speciesId.
-   */
-  | { t: "expResolved"; wave: number; deltas: CoopExpDelta[] }
-  /**
    * Host -> guest (#838 WAVE-END authoritative capture): the COMPLETE post-exp authoritative battle
    * state, captured in the host's `BattleEndPhase` AFTER the wave's whole exp/level/evolution chain
    * drained - so the guest's levels / exp / learned moves / evolved species CONVERGE through the
    * between-wave shop off a single id-based full-state apply ({@linkcode CoopAuthoritativeBattleStateV1}
-   * -> `applyCoopAuthoritativeBattleState`), NOT the legacy per-slot `expResolved` delta relay. It
-   * supersedes `expResolved`; both ride the wire during the transition (an older client ignores an
-   * unknown `t`).
+   * -> `applyCoopAuthoritativeBattleState`). This is the sole post-battle progression channel (the
+   * legacy per-slot exp-delta relay it superseded has been removed; an older client ignores an unknown `t`).
    */
   | { t: "waveEndState"; wave: number; state: CoopAuthoritativeBattleStateV1 };
 
@@ -1157,8 +1121,6 @@ function summarizeCoopMessage(msg: CoopMessage): string {
       return `ts=${msg.ts}`;
     case "waveResolved":
       return `wave=${msg.wave} outcome=${msg.outcome} captureParty=${msg.captureParty?.length ?? "-"} cap=${msg.capturePresentation == null ? "-" : `sp${msg.capturePresentation.speciesId}`}`;
-    case "expResolved":
-      return `wave=${msg.wave} deltas=${msg.deltas.length}`;
     case "dataFingerprint":
       return "fp";
     case "interaction":
