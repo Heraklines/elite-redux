@@ -646,3 +646,31 @@ pure-module tests + worker-logic tests per the D1 escrow test pattern.
 ## Explicitly deferred (do NOT build)
 
 - Cost ceiling; dual-lockstep/server sim; rankings/matchmaking; multi-item stakes; spectating; `wrangler` deploy of the new endpoints (maintainer does deploys — the code ships, activation is a maintainer step, same as the devtest routes precedent).
+
+---
+
+## Phase D wave 2 — ACTIVATION NOTES (maintainer-only; I cannot deploy)
+
+All Phase-D-wave-2 code ships behind existing infrastructure. Two maintainer steps activate it, both mirroring the devtest-routes precedent (no new env vars, no schema migration — the tables self-create on first hit).
+
+### D1 — Showdown escrow endpoints (er-save-api)
+The routes `POST /showdown/match`, `POST /showdown/battle-entered`, `POST /showdown/result`, `GET /showdown/pending`, `POST /showdown/pending/ack` live in `workers/er-save-api/src/index.ts` (pure state machine in `src/showdown-escrow.ts`). They use the EXISTING `er-saves` D1 binding + `SESSION_SECRET`; the three tables (`showdown_matches`, `showdown_stake_holds`, `showdown_settlements`) self-create via `ensureShowdownTables` on first hit. To go live:
+
+```
+cd workers/er-save-api && npx wrangler deploy
+```
+
+No new secret / binding / migration is required. `schema.sql` lists the tables so a fresh DB matches. Until redeployed, the client's staked-match POSTs fail cleanly and the wager screen falls back to Friendly-only (the friendly path never touches the server).
+
+### D5 — Battle telemetry (NEW worker + NEW D1 database)
+`workers/er-telemetry/` is a NEW worker with its OWN `wrangler.toml` bound to a NEW D1 database `er-telemetry` (keeps the ~402MB `er-saves` DB unpressured). It reuses the SAME HMAC token scheme as er-save-api, so it needs the SAME `SESSION_SECRET` set as a secret. To go live:
+
+```
+cd workers/er-telemetry
+npx wrangler d1 create er-telemetry            # then paste the returned database_id into wrangler.toml
+npx wrangler d1 execute er-telemetry --remote --file ./schema.sql
+npx wrangler secret put SESSION_SECRET         # SAME value as er-save-api's SESSION_SECRET (shared HMAC)
+npx wrangler deploy
+```
+
+The client posts to `${VITE_SERVER_URL_TELEMETRY}` (falls back to `${VITE_SERVER_URL}` host with the telemetry worker route if unset — see `showdown-telemetry.ts`). Telemetry is fire-and-forget: a failed/absent endpoint only logs, never blocks the result flow.

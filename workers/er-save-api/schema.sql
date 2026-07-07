@@ -200,3 +200,51 @@ CREATE TABLE IF NOT EXISTS community_challenge_bookmarks (
   PRIMARY KEY (user_id, challenge_id)
 );
 CREATE INDEX IF NOT EXISTS idx_ccb_user ON community_challenge_bookmarks (user_id, created_at DESC);
+
+-- Showdown 1v1 stake escrow (Task D1). The server records match outcomes via dual
+-- attestation and emits per-uid settlement MUTATION records; saves are opaque so
+-- honest clients fetch (/showdown/pending) + apply + ack. All three tables are
+-- auto-created by the worker on first /showdown hit (ensureShowdownTables), so an
+-- already-deployed DB needs no migration; listed here so a fresh DB matches.
+
+-- One escrow match. host/guest_stake_json are the anted StakeOffer blobs; state is
+-- 'open' | 'settled' | 'void'; battle_entered gates lone-report settlement; the
+-- report columns hold each side's attestation (ResultReport JSON).
+CREATE TABLE IF NOT EXISTS showdown_matches (
+  id                TEXT    PRIMARY KEY,
+  host_uid          INTEGER NOT NULL,
+  guest_uid         INTEGER NOT NULL,
+  host_stake_json   TEXT    NOT NULL,
+  guest_stake_json  TEXT    NOT NULL,
+  state             TEXT    NOT NULL DEFAULT 'open',
+  battle_entered    INTEGER NOT NULL DEFAULT 0,
+  host_report_json  TEXT,
+  guest_report_json TEXT,
+  winner            TEXT,                   -- 'host' | 'guest' once settled
+  created_at        INTEGER NOT NULL,
+  resolved_at       INTEGER
+);
+
+-- One row per (uid, staked-unlock): a stake can't be committed to two live matches
+-- at once. Claimed via INSERT ... ON CONFLICT DO NOTHING + meta.changes; released on
+-- settle/void. stake_key = "<species>:<shiny>:<variant>:<blackShiny>".
+CREATE TABLE IF NOT EXISTS showdown_stake_holds (
+  uid        INTEGER NOT NULL,
+  stake_key  TEXT    NOT NULL,
+  match_id   TEXT    NOT NULL,
+  created_at INTEGER NOT NULL,
+  PRIMARY KEY (uid, stake_key)
+);
+
+-- Per-uid settlement mutations to fetch-and-apply. mutation_json is a
+-- SettlementMutation ({kind:'removeUnlock'|'grantUnlock'|'grantCandy', ...});
+-- applied_at is NULL until the client acks it applied.
+CREATE TABLE IF NOT EXISTS showdown_settlements (
+  id            INTEGER PRIMARY KEY AUTOINCREMENT,
+  match_id      TEXT    NOT NULL,
+  uid           INTEGER NOT NULL,
+  mutation_json TEXT    NOT NULL,
+  created_at    INTEGER NOT NULL,
+  applied_at    INTEGER
+);
+CREATE INDEX IF NOT EXISTS idx_showdown_settle_uid ON showdown_settlements (uid, applied_at);

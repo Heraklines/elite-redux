@@ -29,6 +29,20 @@
 // Workers Paid plan (50M writes/mo) scales to ~40,000.
 // =============================================================================
 
+import {
+  applyResultReport,
+  isStakeRecord,
+  type MatchRole,
+  type ResultReason,
+  recordBattlePhaseEntered,
+  registerMatch,
+  resolveSettlement,
+  roleOf,
+  type SettlementMutation,
+  type ShowdownMatchRecord,
+  type StakeRecord,
+} from "./showdown-escrow";
+
 interface Env {
   DB: D1Database;
   /** Secret used to sign/verify session tokens. Set via `wrangler secret put`. */
@@ -2774,6 +2788,355 @@ async function handleCommunityAchvTally(url: URL, env: Env, cors: Record<string,
 }
 
 // #endregion
+// #region showdown escrow (Task D1)
+// -----------------------------------------------------------------------------
+// Showdown 1v1 stake escrow. The PURE state machine + settlement logic lives in
+// ./showdown-escrow.ts (unit-tested with no CF deps); this layer only persists
+// records to D1 and shuttles the pure decisions. Saves are opaque, so the server
+// NEVER edits a save — it records outcomes and stores per-uid MUTATION records
+// that honest clients fetch (/showdown/pending) + apply + ack.
+//
+// Routes (all authed via authUser):
+//   POST /showdown/match          register + hold both stakes (conditional-claim)
+//   POST /showdown/battle-entered  both clients ping at battle start (sets flag)
+//   POST /showdown/result          dual-attestation report -> settle | void
+//   GET  /showdown/pending         unapplied settlement mutations for this uid
+//   POST /showdown/pending/ack     mark settlement rows applied
+// -----------------------------------------------------------------------------
+
+/** Lone-report silence timer: a survivor's solo forfeit/timeout win settles only after this. */
+const SHOWDOWN_SILENCE_MS = 120_000;
+/** Defensive body cap for the small showdown POSTs (stakes/reports are tiny JSON). */
+const SHOWDOWN_MAX_BODY = 8_192;
+
+let showdownTablesReady = false;
+async function ensureShowdownTables(env: Env): Promise<void> {
+  if (showdownTablesReady) {
+    return;
+  }
+  await env.DB.prepare(
+    `CREATE TABLE IF NOT EXISTS showdown_matches (
+       id               TEXT    PRIMARY KEY,
+       host_uid         INTEGER NOT NULL,
+       guest_uid        INTEGER NOT NULL,
+       host_stake_json  TEXT    NOT NULL,
+       guest_stake_json TEXT    NOT NULL,
+       state            TEXT    NOT NULL DEFAULT 'open',
+       battle_entered   INTEGER NOT NULL DEFAULT 0,
+       host_report_json TEXT,
+       guest_report_json TEXT,
+       winner           TEXT,
+       created_at       INTEGER NOT NULL,
+       resolved_at      INTEGER
+     )`,
+  ).run();
+  // One row per (uid, staked-unlock): a stake can't be committed to two live matches
+  // at once. Claimed via INSERT ... ON CONFLICT DO NOTHING + meta.changes (the same
+  // conditional-claim idiom as er-coop-api handleLobbyPick). Released on settle/void.
+  await env.DB.prepare(
+    `CREATE TABLE IF NOT EXISTS showdown_stake_holds (
+       uid        INTEGER NOT NULL,
+       stake_key  TEXT    NOT NULL,
+       match_id   TEXT    NOT NULL,
+       created_at INTEGER NOT NULL,
+       PRIMARY KEY (uid, stake_key)
+     )`,
+  ).run();
+  await env.DB.prepare(
+    `CREATE TABLE IF NOT EXISTS showdown_settlements (
+       id            INTEGER PRIMARY KEY AUTOINCREMENT,
+       match_id      TEXT    NOT NULL,
+       uid           INTEGER NOT NULL,
+       mutation_json TEXT    NOT NULL,
+       created_at    INTEGER NOT NULL,
+       applied_at    INTEGER
+     )`,
+  ).run();
+  await env.DB.prepare(
+    "CREATE INDEX IF NOT EXISTS idx_showdown_settle_uid ON showdown_settlements (uid, applied_at)",
+  ).run();
+  showdownTablesReady = true;
+}
+
+/** Best-effort per-uid rate limit (per isolate; bounds abuse within a warm worker). */
+const showdownRate = new Map<number, { count: number; resetAt: number }>();
+const SHOWDOWN_RATE_WINDOW_MS = 60_000;
+const SHOWDOWN_RATE_MAX = 120;
+function showdownRateLimited(uid: number, now: number): boolean {
+  const slot = showdownRate.get(uid);
+  if (!slot || now >= slot.resetAt) {
+    showdownRate.set(uid, { count: 1, resetAt: now + SHOWDOWN_RATE_WINDOW_MS });
+    return false;
+  }
+  slot.count++;
+  return slot.count > SHOWDOWN_RATE_MAX;
+}
+
+/** Read a JSON body under the size cap, or null on oversize/parse failure. */
+async function readShowdownBody(request: Request): Promise<Record<string, unknown> | null> {
+  const raw = await request.text();
+  if (raw.length > SHOWDOWN_MAX_BODY) {
+    return null;
+  }
+  try {
+    const obj = JSON.parse(raw);
+    return typeof obj === "object" && obj !== null ? (obj as Record<string, unknown>) : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Canonical stake identity (uid + this == the staked unlock) for the hold table. */
+function stakeKey(s: StakeRecord): string {
+  return `${s.speciesId}:${s.shiny ? 1 : 0}:${s.variant}:${s.erBlackShiny ? 1 : 0}`;
+}
+
+/** Deserialize a persisted match row into the pure `ShowdownMatchRecord`. */
+function rowToMatch(row: Record<string, unknown>): ShowdownMatchRecord | null {
+  try {
+    const parse = (s: unknown) => (typeof s === "string" && s.length > 0 ? JSON.parse(s) : null);
+    return {
+      id: String(row.id),
+      hostUid: Number(row.host_uid),
+      guestUid: Number(row.guest_uid),
+      hostStake: parse(row.host_stake_json) as StakeRecord,
+      guestStake: parse(row.guest_stake_json) as StakeRecord,
+      state: row.state as ShowdownMatchRecord["state"],
+      battlePhaseEntered: Number(row.battle_entered) === 1,
+      hostReport: parse(row.host_report_json),
+      guestReport: parse(row.guest_report_json),
+      winner: (row.winner as MatchRole | null) ?? null,
+      createdAt: Number(row.created_at),
+      resolvedAt: row.resolved_at == null ? null : Number(row.resolved_at),
+    };
+  } catch {
+    return null;
+  }
+}
+
+async function loadMatch(env: Env, id: string): Promise<ShowdownMatchRecord | null> {
+  const row = await env.DB.prepare("SELECT * FROM showdown_matches WHERE id = ?1").bind(id).first();
+  return row ? rowToMatch(row as Record<string, unknown>) : null;
+}
+
+/** Statement that writes a match's mutable state (report/winner/state/battle flag). */
+function persistMatchStmt(env: Env, m: ShowdownMatchRecord) {
+  return env.DB.prepare(
+    `UPDATE showdown_matches
+        SET state = ?2, battle_entered = ?3, host_report_json = ?4, guest_report_json = ?5,
+            winner = ?6, resolved_at = ?7
+      WHERE id = ?1`,
+  ).bind(
+    m.id,
+    m.state,
+    m.battlePhaseEntered ? 1 : 0,
+    m.hostReport ? JSON.stringify(m.hostReport) : null,
+    m.guestReport ? JSON.stringify(m.guestReport) : null,
+    m.winner,
+    m.resolvedAt,
+  );
+}
+
+/**
+ * On settlement: store the per-uid mutation records (idempotent — ON CONFLICT is
+ * impossible without a natural key, so guard by only writing when none exist yet)
+ * and release BOTH stake holds. Batched so it commits atomically with the match update.
+ */
+async function finalizeSettlement(env: Env, m: ShowdownMatchRecord, now: number): Promise<void> {
+  const stmts = [persistMatchStmt(env, m)];
+  // Release the escrow holds for this match (settle or void both free the stakes).
+  stmts.push(env.DB.prepare("DELETE FROM showdown_stake_holds WHERE match_id = ?1").bind(m.id));
+  if (m.state === "settled") {
+    // Guard idempotency: only emit settlement rows the first time (none exist yet).
+    const existing = await env.DB.prepare("SELECT COUNT(*) AS c FROM showdown_settlements WHERE match_id = ?1")
+      .bind(m.id)
+      .first<{ c: number }>();
+    if ((existing?.c ?? 0) === 0) {
+      for (const mut of resolveSettlement(m)) {
+        stmts.push(
+          env.DB.prepare(
+            "INSERT INTO showdown_settlements (match_id, uid, mutation_json, created_at, applied_at) VALUES (?1, ?2, ?3, ?4, NULL)",
+          ).bind(m.id, mut.uid, JSON.stringify(mut), now),
+        );
+      }
+    }
+  }
+  await env.DB.batch(stmts);
+}
+
+async function handleShowdownMatch(request: Request, auth: TokenPayload, env: Env, cors: Record<string, string>) {
+  const now = Date.now();
+  if (showdownRateLimited(auth.uid, now)) {
+    return text("Too many requests.", 429, cors);
+  }
+  const body = await readShowdownBody(request);
+  if (body == null) {
+    return json({ error: "invalid body" }, 400, cors);
+  }
+  await ensureShowdownTables(env);
+
+  const id = typeof body.matchId === "string" ? body.matchId : "";
+  const hostUid = Number(body.hostUid);
+  const guestUid = Number(body.guestUid);
+  const hostStake = body.hostStake;
+  const guestStake = body.guestStake;
+  // The caller MUST be one of the two named participants (anti-spoof: you can't register
+  // a match between two other players).
+  if (auth.uid !== hostUid && auth.uid !== guestUid) {
+    return json({ error: "not a participant" }, 403, cors);
+  }
+  if (!isStakeRecord(hostStake) || !isStakeRecord(guestStake)) {
+    return json({ error: "malformed stake" }, 400, cors);
+  }
+
+  // Idempotent: a re-register of the same id just returns the existing match.
+  const existing = await loadMatch(env, id);
+  if (existing) {
+    return json({ ok: true, matchId: existing.id, state: existing.state }, 200, cors);
+  }
+
+  const reg = registerMatch(id, hostUid, guestUid, hostStake, guestStake, now);
+  if (!reg.ok) {
+    return json({ error: reg.error }, 422, cors);
+  }
+  const m = reg.match;
+
+  // Claim BOTH stake holds + insert the match atomically. ON CONFLICT DO NOTHING makes
+  // an already-held stake a no-op (changes = 0); if either failed to claim we roll back
+  // our own inserts (the match + any hold WE added) and report the conflict.
+  const holdInsert = (uid: number, s: StakeRecord) =>
+    env.DB.prepare(
+      "INSERT INTO showdown_stake_holds (uid, stake_key, match_id, created_at) VALUES (?1, ?2, ?3, ?4) ON CONFLICT(uid, stake_key) DO NOTHING",
+    ).bind(uid, stakeKey(s), m.id, now);
+  const results = await env.DB.batch([
+    holdInsert(m.hostUid, m.hostStake),
+    holdInsert(m.guestUid, m.guestStake),
+    env.DB.prepare(
+      `INSERT INTO showdown_matches
+           (id, host_uid, guest_uid, host_stake_json, guest_stake_json, state, battle_entered, created_at)
+         VALUES (?1, ?2, ?3, ?4, ?5, 'open', 0, ?6)
+         ON CONFLICT(id) DO NOTHING`,
+    ).bind(m.id, m.hostUid, m.guestUid, JSON.stringify(m.hostStake), JSON.stringify(m.guestStake), now),
+  ]);
+  const hostClaimed = (results[0]?.meta.changes ?? 0) > 0;
+  const guestClaimed = (results[1]?.meta.changes ?? 0) > 0;
+  if (!hostClaimed || !guestClaimed) {
+    // Lost the race on at least one stake. Roll back our own inserts.
+    await env.DB.batch([
+      env.DB.prepare("DELETE FROM showdown_stake_holds WHERE match_id = ?1").bind(m.id),
+      env.DB.prepare("DELETE FROM showdown_matches WHERE id = ?1").bind(m.id),
+    ]);
+    return json({ error: "a stake is already committed to another match" }, 409, cors);
+  }
+  return json({ ok: true, matchId: m.id, state: "open" }, 200, cors);
+}
+
+async function handleShowdownBattleEntered(
+  request: Request,
+  auth: TokenPayload,
+  env: Env,
+  cors: Record<string, string>,
+) {
+  const now = Date.now();
+  if (showdownRateLimited(auth.uid, now)) {
+    return text("Too many requests.", 429, cors);
+  }
+  const body = await readShowdownBody(request);
+  if (body == null) {
+    return json({ error: "invalid body" }, 400, cors);
+  }
+  await ensureShowdownTables(env);
+  const id = typeof body.matchId === "string" ? body.matchId : "";
+  const m = await loadMatch(env, id);
+  if (!m) {
+    return json({ error: "no such match" }, 404, cors);
+  }
+  if (roleOf(m, auth.uid) === null) {
+    return json({ error: "not a participant" }, 403, cors);
+  }
+  const next = recordBattlePhaseEntered(m);
+  if (next !== m) {
+    await persistMatchStmt(env, next).run();
+  }
+  return json({ ok: true, state: next.state, battleEntered: next.battlePhaseEntered }, 200, cors);
+}
+
+async function handleShowdownResult(request: Request, auth: TokenPayload, env: Env, cors: Record<string, string>) {
+  const now = Date.now();
+  if (showdownRateLimited(auth.uid, now)) {
+    return text("Too many requests.", 429, cors);
+  }
+  const body = await readShowdownBody(request);
+  if (body == null) {
+    return json({ error: "invalid body" }, 400, cors);
+  }
+  await ensureShowdownTables(env);
+  const id = typeof body.matchId === "string" ? body.matchId : "";
+  const winner = body.winner;
+  const reason = body.reason;
+  if (winner !== "host" && winner !== "guest") {
+    return json({ error: "invalid winner" }, 400, cors);
+  }
+  if (reason !== "victory" && reason !== "forfeit" && reason !== "timeout") {
+    return json({ error: "invalid reason" }, 400, cors);
+  }
+  const m = await loadMatch(env, id);
+  if (!m) {
+    return json({ error: "no such match" }, 404, cors);
+  }
+  if (roleOf(m, auth.uid) === null) {
+    return json({ error: "not a participant" }, 403, cors);
+  }
+  const applied = applyResultReport(m, auth.uid, winner as MatchRole, reason as ResultReason, now, SHOWDOWN_SILENCE_MS);
+  if (applied.resolution === "settled" || applied.resolution === "void") {
+    await finalizeSettlement(env, applied.match, now);
+  } else {
+    await persistMatchStmt(env, applied.match).run();
+  }
+  return json({ ok: true, resolution: applied.resolution, state: applied.match.state }, 200, cors);
+}
+
+async function handleShowdownPending(auth: TokenPayload, env: Env, cors: Record<string, string>) {
+  await ensureShowdownTables(env);
+  const { results } = await env.DB.prepare(
+    "SELECT id, match_id, mutation_json FROM showdown_settlements WHERE uid = ?1 AND applied_at IS NULL ORDER BY id ASC LIMIT 200",
+  )
+    .bind(auth.uid)
+    .all<{ id: number; match_id: string; mutation_json: string }>();
+  const items = (results ?? [])
+    .map(r => {
+      try {
+        return { id: r.id, matchId: r.match_id, mutation: JSON.parse(r.mutation_json) as SettlementMutation };
+      } catch {
+        return null;
+      }
+    })
+    .filter((x): x is { id: number; matchId: string; mutation: SettlementMutation } => x !== null);
+  return json({ items }, 200, cors);
+}
+
+async function handleShowdownPendingAck(request: Request, auth: TokenPayload, env: Env, cors: Record<string, string>) {
+  const now = Date.now();
+  const body = await readShowdownBody(request);
+  if (body == null) {
+    return json({ error: "invalid body" }, 400, cors);
+  }
+  await ensureShowdownTables(env);
+  const ids = Array.isArray(body.ids) ? body.ids.filter((v): v is number => Number.isInteger(v)).slice(0, 200) : [];
+  if (ids.length === 0) {
+    return json({ ok: true, acked: 0 }, 200, cors);
+  }
+  // Only ack rows belonging to THIS uid (a client can't ack someone else's settlement).
+  const placeholders = ids.map((_, i) => `?${i + 2}`).join(",");
+  const res = await env.DB.prepare(
+    `UPDATE showdown_settlements SET applied_at = ?1 WHERE applied_at IS NULL AND uid = ?${ids.length + 2} AND id IN (${placeholders})`,
+  )
+    .bind(now, ...ids, auth.uid)
+    .run();
+  return json({ ok: true, acked: res.meta.changes ?? 0 }, 200, cors);
+}
+
+// #endregion
 
 export default {
   async scheduled(_event: ScheduledEvent, env: Env, ctx: ExecutionContext): Promise<void> {
@@ -2909,6 +3272,22 @@ export default {
       // so the worker can't read achvUnlocks itself). Only TRACKED_ACHV_IDS are stored.
       if (pathname === "/community/achv" && method === "POST") {
         return await handleCommunityAchvReport(request, auth, env, cors);
+      }
+      // Showdown 1v1 escrow (D1). All authed; the pure state machine is in ./showdown-escrow.ts.
+      if (pathname === "/showdown/match" && method === "POST") {
+        return await handleShowdownMatch(request, auth, env, cors);
+      }
+      if (pathname === "/showdown/battle-entered" && method === "POST") {
+        return await handleShowdownBattleEntered(request, auth, env, cors);
+      }
+      if (pathname === "/showdown/result" && method === "POST") {
+        return await handleShowdownResult(request, auth, env, cors);
+      }
+      if (pathname === "/showdown/pending" && method === "GET") {
+        return await handleShowdownPending(auth, env, cors);
+      }
+      if (pathname === "/showdown/pending/ack" && method === "POST") {
+        return await handleShowdownPendingAck(request, auth, env, cors);
       }
 
       return text("Not found.", 404, cors);
