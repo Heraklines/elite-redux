@@ -448,6 +448,19 @@ export interface SoakOptions {
    * declared-undrivable for the default run). Each designated wave MUST be a WILD non-boss double.
    */
   catchWaves?: ReadonlySet<number>;
+  /**
+   * #848/#849 LEARN-MOVE LEG (BUILD 2). A set of wave indices where the soak DRIVES a level-up move-learn that
+   * ACCEPTS + forces a forget across BOTH engines (instead of the default decline), and asserts moveset
+   * convergence. On each such wave, after the battle, the driver forces the real ER
+   * {@linkcode LearnMoveBatchPhase} on a full-moveset GUEST-owned mon: the host opens the read-only WATCHER
+   * panel + streams the present, the guest opens the OWNER panel + picks the replacement (accept, forget slot
+   * 0), and the host applies the guest's pick authoritatively - the #848 shared batch-panel path. This lights
+   * the LEARN_MOVE_BATCH mode + the learnMoveBatch/learnMoveBatchForward kinds + the learnMoveBatchFwd band +
+   * the `levelUpLearn` situation, and asserts BOTH engines' moveset converged. Undefined (the default) =
+   * byte-identical to today (level-up learns declined). The caller MUST give the party RAW (not overridden)
+   * movesets so the learn's setMove is visible (a MOVESET_OVERRIDE masks getMoveset()); see the leg test.
+   */
+  learnMoveWaves?: ReadonlySet<number>;
 }
 
 /** A structured HARD invariant breach (LOCKSTEP / NO-PARK / TEARDOWN) the driver throws after writing the
@@ -1790,6 +1803,9 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
   /** The ball the catch leg throws. MASTER_BALL guarantees the capture on a non-boss wild (no weaken needed). */
   const CATCH_BALL = PokeballType.MASTER_BALL;
 
+  /** The move the learn-move leg teaches (NOT in the soak's forced moveset, so the accept/forget always fires). */
+  const LEARN_NEW_MOVE = MoveId.WATER_GUN;
+
   /**
    * Drive ONE catch wave. Falls back to a normal wave (skip-counted, never silent) when the wave is not a
    * catchable WILD double or the survivor cannot be isolated - so a mis-designated catch wave degrades
@@ -1959,6 +1975,98 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
     assertScalarConvergence(wave, "post-shop");
   };
 
+  // ---------------------------------------------------------------------------
+  // #848 LEARN-MOVE LEG (BUILD 2). Drive a level-up move-learn that ACCEPTS + forces a forget across BOTH
+  // engines (instead of the default decline), and assert moveset convergence. Ports coop-duo-learn-move.ts's
+  // guest-owned case INLINE into the continuous run: on a designated wave the driver forces the real ER
+  // LearnMoveBatchPhase on a full-moveset GUEST-owned mon (slot 1) at wave-start; the host opens the read-only
+  // WATCHER panel + streams the present, the guest opens the OWNER panel + picks the replacement (accept,
+  // forget slot 0), and the host applies the guest's pick authoritatively (the #848 shared batch-panel path).
+  // The relay-send tap records the learnMoveBatch/learnMoveBatchForward kinds + the band automatically; here we
+  // record the LEARN_MOVE_BATCH mode + the `levelUpLearn` situation and assert BOTH movesets converged.
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Drive ONE learn-move wave: at wave-start, force + drive a guest-owned mon's batch-panel move-learn
+   * (accept + forget) across both engines, assert moveset convergence + no picker strand, then play the wave
+   * + reward shop as normal. Degrades (skip-counted) when the target mon is not a full-moveset guest-owned mon.
+   */
+  const processLearnMoveWave = async (wave: number): Promise<void> => {
+    await assertWaveBoundary(wave); // (a)+(b) wave-start clean-start parity
+
+    const LEARN_SLOT = COOP_GUEST_FIELD_INDEX; // slot 1 = guest-owned (host opens watcher, guest owns the pick)
+    const targetHost = rig.hostScene.getPlayerParty()[LEARN_SLOT];
+    const hostMovesetFull = targetHost != null && targetHost.getMoveset(true).filter(m => m != null).length >= 4;
+    const alreadyKnows = targetHost != null && targetHost.getMoveset(true).some(m => m?.moveId === LEARN_NEW_MOVE);
+    if (targetHost == null || targetHost.coopOwner !== "guest" || !hostMovesetFull || alreadyKnows) {
+      // Not a full-moveset guest-owned mon (or it already knows the move): degrade to a normal wave.
+      bumpSkip("learnMoveTargetNotEligible");
+      await playWave(wave);
+      await assertPostTurnConverged(wave);
+      await driveRewardShop(wave);
+      assertScalarConvergence(wave, "post-shop");
+      return;
+    }
+    const forgotten = targetHost.moveset[0]?.moveId;
+
+    // HOST (sole engine): force the batch phase on the GUEST-owned mon. withClientSync = SEND-ONLY: it streams
+    // the present (queued, not yet delivered) + opens the host's read-only WATCHER panel; the await is parked.
+    withClientSync(rig.hostCtx, () => {
+      rig.hostScene.phaseManager.create("LearnMoveBatchPhase", LEARN_SLOT, [LEARN_NEW_MOVE]).start();
+    });
+    hitMode(UiMode.LEARN_MOVE_BATCH);
+    // GUEST: draining under the guest ctx delivers the present -> the persistent listener opens the OWNER panel.
+    await withClient(rig.guestCtx, () => drainLoopback());
+    // GUEST (mon owner) drives the real panel: ACTION selects the learnable move -> full moveset -> pickSlot;
+    // ACTION assigns it over slot 0 -> learned, list empties -> finish/done relays the terminal + closes.
+    withClientSync(rig.guestCtx, () => {
+      if (rig.guestScene.ui.getMode() === UiMode.LEARN_MOVE_BATCH) {
+        rig.guestScene.ui.processInput(Button.ACTION);
+        rig.guestScene.ui.processInput(Button.ACTION);
+      }
+    });
+    // HOST: the relayed terminal resolves the parked await under the HOST ctx; the host applies + closes.
+    await withClient(rig.hostCtx, () => drainLoopback());
+
+    hitSituation(COOP_SOAK_SITUATIONS.levelUpLearn);
+    // ASSERT convergence: the host applied the guest's pick (NEW_MOVE learned over the forgotten slot), the
+    // guest's local copy converged, and the picker released (no strand). Each miss is a loud finding.
+    const hostMoves = targetHost.moveset.map(m => m?.moveId);
+    const guestMoves = rig.guestScene.getPlayerParty()[LEARN_SLOT]?.moveset.map(m => m?.moveId) ?? [];
+    if (!hostMoves.includes(LEARN_NEW_MOVE) || (forgotten != null && hostMoves.includes(forgotten))) {
+      recordFinding(
+        wave,
+        "learnMoveHostNotApplied",
+        `host moveset did not learn ${LEARN_NEW_MOVE} / forget ${forgotten}: [${hostMoves.join(",")}]`,
+      );
+    }
+    if (!guestMoves.includes(LEARN_NEW_MOVE)) {
+      recordFinding(
+        wave,
+        "learnMoveGuestNotConverged",
+        `guest moveset did not converge to ${LEARN_NEW_MOVE}: [${guestMoves.join(",")}]`,
+      );
+    }
+    if (!isCoopLearnMoveForwardInFlightEmpty()) {
+      recordFinding(wave, "learnMovePickerStranded", "a learn-move picker was left in-flight (strand)");
+    }
+    actionScript.push(
+      `wave ${wave}: LEARN-MOVE guest-owned slot ${LEARN_SLOT} learned ${LEARN_NEW_MOVE} forget ${forgotten}`,
+    );
+    // eslint-disable-next-line no-console
+    console.log(
+      `[coop-soak] LEARN-MOVE wave ${wave} (seed ${seed}): host=[${hostMoves.join(",")}] guest=[${guestMoves.join(",")}]`,
+    );
+
+    // Clear any leftover batch-panel phases on the guest, then play the wave + shop as normal.
+    withClientSync(rig.guestCtx, () => rig.guestScene.phaseManager.clearPhaseQueue());
+    await playWave(wave);
+    await assertPostTurnConverged(wave);
+    await driveRewardShop(wave);
+    assertLockstep(wave, "learn-move-wave-end");
+    assertScalarConvergence(wave, "post-shop");
+  };
+
   /** INVARIANT (d) TEARDOWN: clear the runtime, then assert no runtime / relay / ME pin survives. */
   const assertTeardown = (): void => {
     clearCoopRuntime();
@@ -2072,16 +2180,22 @@ export async function runCoopSoak(game: GameManager, opts: SoakOptions): Promise
     // wild wave routes through processCatchWave (which itself degrades to a normal wave if the wave turns out
     // uncatchable). Boss / ME waves are never catch waves.
     const isCatchWave = opts.catchWaves?.has(wave) === true && !isMeWave && !bossWave;
+    // #848 LEARN-MOVE LEG (BUILD 2): a designated learn-move wave (normal, non-ME/boss/catch) routes through
+    // processLearnMoveWave (which degrades to a normal wave if the target mon is ineligible).
+    const isLearnMoveWave = opts.learnMoveWaves?.has(wave) === true && !isMeWave && !bossWave && !isCatchWave;
     try {
       // #633 BUILD 1: a designated ME wave routes through processMeWave (the inline two-engine ME pump); a
-      // designated catch wave through processCatchWave; every other wave is a normal/boss battle.
+      // designated catch wave through processCatchWave; a designated learn-move wave through
+      // processLearnMoveWave; every other wave is a normal/boss battle.
       await (isMeWave
         ? processMeWave(wave, meType)
         : isCatchWave
           ? processCatchWave(wave)
-          : bossWave
-            ? processBossWave(wave)
-            : processNormalWave(wave));
+          : isLearnMoveWave
+            ? processLearnMoveWave(wave)
+            : bossWave
+              ? processBossWave(wave)
+              : processNormalWave(wave));
     } catch (e) {
       if (e instanceof SoakInvariantError) {
         throw e;

@@ -237,6 +237,28 @@ const CATCH_LEG =
   + "BALL + the `catch` situation + dexSync, asserting BOTH dex credits + ball convergence); the default "
   + "wave/shop soak configures no catch leg, so the default partition is unchanged; follow-up: full-party "
   + "box/release + a guest-owned (relayed) throw";
+/**
+ * Follow-up shorthand for the level-up move-learn BATCH surfaces. #848/#849 BUILD 2 LANDED the inline
+ * learn-move leg (the coop-soak-driver `learnMoveWaves` knob, proven green by coop-soak-learn-move.test.ts):
+ * on a designated wave the driver forces the real ER LearnMoveBatchPhase on a full-moveset GUEST-owned mon -
+ * the host opens the WATCHER panel, the guest opens the OWNER panel + picks the replacement (accept, forget),
+ * and the host applies it authoritatively (the #848 shared batch-panel path) - so the LEARN_MOVE_BATCH mode +
+ * the learnMoveBatch/learnMoveBatchForward kinds + the learnMoveBatchFwd band + the `levelUpLearn` situation
+ * FIRE, with BOTH movesets asserted converged. They stay listed here because the DEFAULT run declines level-up
+ * learns (opts.learnMoveWaves unset) - they are exercised by the dedicated learn-move test, not the default
+ * run - so the default-profile partition is unchanged.
+ */
+const LEARN_MOVE_BATCH_LEG =
+  "#848/#849 BUILD 2 landed the inline learn-move leg (coop-soak-driver learnMoveWaves + "
+  + "coop-soak-learn-move.test.ts drives the batch LearnMoveBatchPhase accept+forget across both engines, "
+  + "asserting moveset convergence); the default run declines level-up learns, so the default partition is "
+  + "unchanged";
+/** Follow-up shorthand for the PER-MOVE (TM) learn-forward surfaces the batch level-up leg does NOT drive. */
+const LEARN_MOVE_PERMOVE =
+  "the per-move LearnMovePhase forward path (SUMMARY forget picker + learnMove/learnMoveForward) is the TM "
+  + "learn path, NOT the level-up path (#848 routes level-up learns through the batch panel - landed, see "
+  + "coop-soak-learn-move.test.ts); follow-up: drive a TM learn-forward in the soak (coop-duo-exploration "
+  + "PROBE #800 covers it standalone)";
 
 /**
  * Every surface the soak DELIBERATELY does not drive today, keyed by surface. DRIVABLE = EXPECTED minus
@@ -257,15 +279,19 @@ export const KNOWN_UNDRIVABLE: ReadonlyMap<string, UndrivableEntry> = new Map<st
   [
     modeKey(UiMode.SUMMARY),
     {
-      reason: "the learn-move 'which move to forget' SUMMARY mirror is not driven (level-up learns are declined)",
-      followupTask: "drive a level-up move-learn that forces a forget - the `levelUpLearn` situation",
+      reason:
+        "the 'which move to forget' SUMMARY mirror is the PER-MOVE (TM) LearnMovePhase picker, not driven; the "
+        + "level-up learn now uses the batch panel (LEARN_MOVE_BATCH), so SUMMARY is TM-only",
+      followupTask: LEARN_MOVE_PERMOVE,
     },
   ],
   [
     modeKey(UiMode.LEARN_MOVE_BATCH),
     {
-      reason: "ER's BATCH level-up move-learn panel is not driven (level-up learns are declined in the soak)",
-      followupTask: "drive an ER batch level-up move-learn - the `levelUpLearn` situation",
+      reason:
+        "the DEFAULT run declines level-up learns; the learn-move leg (coop-soak-learn-move.test.ts) DRIVES "
+        + "ER's BATCH level-up Move Learn panel across both engines",
+      followupTask: LEARN_MOVE_BATCH_LEG,
     },
   ],
   [
@@ -381,29 +407,35 @@ export const KNOWN_UNDRIVABLE: ReadonlyMap<string, UndrivableEntry> = new Map<st
   [
     kindKey("learnMove"),
     {
-      reason: "the lockstep move-forget relay is not driven (level-up learns are declined)",
-      followupTask: "drive a level-up move-learn - the `levelUpLearn` situation",
+      reason:
+        "the lockstep move-forget relay rides the PER-MOVE (TM) LearnMovePhase forward, not the level-up "
+        + "path (which now uses the batch panel); the TM path is not driven by the default run",
+      followupTask: LEARN_MOVE_PERMOVE,
     },
   ],
   [
     kindKey("learnMoveForward"),
     {
-      reason: "the host->guest per-slot move-learn forward relay is not driven",
-      followupTask: "drive a level-up move-learn - the `levelUpLearn` situation",
+      reason: "the host->guest per-slot move-learn forward relay is the PER-MOVE (TM) path, not driven",
+      followupTask: LEARN_MOVE_PERMOVE,
     },
   ],
   [
     kindKey("learnMoveBatch"),
     {
-      reason: "ER's BATCH level-up move-learn owner-terminal relay is not driven (level-up learns declined)",
-      followupTask: "drive an ER batch level-up move-learn - the `levelUpLearn` situation",
+      reason:
+        "the DEFAULT run declines level-up learns; the learn-move leg DRIVES ER's BATCH level-up owner-terminal "
+        + "relay (learnMoveBatch)",
+      followupTask: LEARN_MOVE_BATCH_LEG,
     },
   ],
   [
     kindKey("learnMoveBatchForward"),
     {
-      reason: "ER's BATCH level-up move-learn host->guest forward relay is not driven (level-up learns declined)",
-      followupTask: "drive an ER batch level-up move-learn - the `levelUpLearn` situation",
+      reason:
+        "the DEFAULT run declines level-up learns; the learn-move leg DRIVES ER's BATCH host->guest forward "
+        + "relay (learnMoveBatchForward)",
+      followupTask: LEARN_MOVE_BATCH_LEG,
     },
   ],
   [
@@ -454,22 +486,22 @@ export const KNOWN_UNDRIVABLE: ReadonlyMap<string, UndrivableEntry> = new Map<st
   [
     bandKey("learnMoveFwd"),
     {
-      reason: "the move-learn forward seq band is not driven (level-up learns declined)",
-      followupTask: "drive a level-up move-learn - the `levelUpLearn` situation",
+      reason: "the move-learn forward seq band is the PER-MOVE (TM) path, not driven (level-up uses the batch band)",
+      followupTask: LEARN_MOVE_PERMOVE,
     },
   ],
   [
     bandKey("learnMove"),
     {
-      reason: "the move-forget seq band is not driven (level-up learns declined)",
-      followupTask: "drive a level-up move-learn - the `levelUpLearn` situation",
+      reason: "the move-forget seq band is the PER-MOVE (TM) path, not driven (level-up uses the batch band)",
+      followupTask: LEARN_MOVE_PERMOVE,
     },
   ],
   [
     bandKey("learnMoveBatchFwd"),
     {
-      reason: "ER's BATCH level-up move-learn seq band is not driven (level-up learns declined)",
-      followupTask: "drive an ER batch level-up move-learn - the `levelUpLearn` situation",
+      reason: "the DEFAULT run declines level-up learns; the learn-move leg DRIVES ER's BATCH level-up seq band",
+      followupTask: LEARN_MOVE_BATCH_LEG,
     },
   ],
   [
@@ -526,8 +558,9 @@ export const KNOWN_UNDRIVABLE: ReadonlyMap<string, UndrivableEntry> = new Map<st
     sitKey(COOP_SOAK_SITUATIONS.levelUpLearn),
     {
       reason:
-        "level-up move-learn prompts are declined (they chain into the SUMMARY/learnMove sub-interactions the harness does not drive)",
-      followupTask: "drive a level-up move-learn that accepts + forces a forget",
+        "the DEFAULT run declines level-up move-learn prompts; the learn-move leg (coop-soak-learn-move.test.ts) "
+        + "DRIVES a level-up learn that ACCEPTS + forces a forget across both engines (moveset convergence asserted)",
+      followupTask: LEARN_MOVE_BATCH_LEG,
     },
   ],
   [
