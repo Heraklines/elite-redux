@@ -1,0 +1,278 @@
+url:      https://elite-redux-staging.pages.dev/
+build:    mrb47h9h-s04
+mode:     4  wave:138
+seed:     Pzf1L9GCSJq9fus4FOpPlmeX
+party:    Kecleon(L112 284hp f0), Gholdengo(L126 171hp f0), Glalie Redux(L125 396hp f1), Iron Valiant(L120 144hp f0), Amphybuzz(L100 361hp f0), Zigzagoon(L101 219hp f0)
+enemy:    Darkrai(L111), Froslass(L104), Moltres(L109)
+
+----- COMMENT -----
+Triples doesn't show the speed order for all 6 pokemon
+
+----- CONSOLE -----
+[21:25:20.260] LOG: Move: TAKE_DOWN Move targets: {"targets":[4,5,1],"multiple":false} 
+Player Pokemon: Mega Glalie Redux
+[21:25:20.262] LOG: %cStart Phase SelectTargetPhase color:green;
+[21:25:21.030] LOG: %cStart Phase EnemyCommandPhase color:green;
+[21:25:21.087] WARN: BattlerTag THROAT_CHOPPED is missing a score!
+[21:25:21.088] WARN: BattlerTag THROAT_CHOPPED is missing a score!
+[21:25:21.088] WARN: BattlerTag THROAT_CHOPPED is missing a score!
+[21:25:21.127] WARN: BattlerTag THROAT_CHOPPED is missing a score!
+[21:25:21.146] LOG: Move Pool: ["Dark Void","Throat Chop","Raging Souls","Requiem"]
+[21:25:21.146] LOG: Move Scores: [10,54,46,19]
+[21:25:21.146] LOG: Sorted Move Pool: ["Throat Chop","Raging Souls","Requiem","Dark Void"]
+[21:25:21.146] LOG: Chosen Move: Throat Chop
+[21:25:21.146] LOG: %cStart Phase EnemyCommandPhase color:green;
+[21:25:21.155] LOG: Applied Silk Scarf (enemy)
+[21:25:21.157] LOG: Applied Silk Scarf (enemy)
+[21:25:21.175] LOG: Applied Black Glasses (enemy)
+[21:25:21.191] LOG: Applied Black Glasses (enemy)
+[21:25:21.206] LOG: Applied Black Glasses (enemy)
+[21:25:21.238] LOG: Move Pool: ["Raging Souls","Last Resort","Trump Card","Crunch"]
+[21:25:21.238] LOG: Move Scores: [14.4375,-20,-20,4.21875]
+[21:25:21.238] LOG: Sorted Move Pool: ["Raging Souls","Crunch","Last Resort","Trump Card"]
+[21:25:21.238] LOG: Chosen Move: Raging Souls
+[21:25:21.238] LOG: %cStart Phase EnemyCommandPhase color:green;
+[21:25:21.253] LOG: Applied Black Glasses (enemy)
+[21:25:21.268] LOG: Applied Black Glasses (enemy)
+[21:25:21.287] LOG: Applied Black Glasses (enemy)
+[21:25:21.305] LOG: Move Pool: ["Punishment"]
+[21:25:21.305] LOG: Move Scores: [90]
+[21:25:21.305] LOG: Sorted Move Pool: ["Punishment"]
+[21:25:21.305] LOG: Chosen Move: Punishment
+[21:25:21.305] LOG: %cStart Phase TurnStartPhase color:green;
+[21:25:21.340] LOG: %cStart Phase MovePhase color:green;
+[21:25:21.340] LOG: %cUser: Kecleon
+Move: FAKE_OUT
+Use Mode: NORMAL color:orchid
+[21:25:21.372] LOG: %cStart Phase MessagePhase color:green;
+[21:25:21.470] LOG: %cStart Phase ShowAbilityPhase color:green;
+[21:25:21.642] LOG: %cStart Phase MessagePhase color:green;
+[21:25:21.912] LOG: %cStart Phase HideAbilityPhase color:green;
+[21:25:21.948] LOG: %cStart Phase MoveEffectPhase color:green;
+[21:25:22.311] LOG: Applied Dire Hit 
+[21:25:22.311] LOG: crit stage: +3
+[21:25:22.314] LOG: Move: Fake Out | Base damage: 41.83616 | Power: 40 | Source attack: 266 | Target defense: 250
+[21:25:22.315] LOG: Move: Fake Out | Attack damage: 80
+[21:25:22.321] LOG: %cStart Phase DamageAnimPhase color:green;
+[21:25:22.340] LOG: %cStart Phase MessagePhase color:green;
+[21:25:22.545] LOG: %cStart Phase MoveEndPhase color:green;
+[21:25:22.560] LOG: %cStart Phase MovePhase color:green;
+[21:25:22.561] LOG: %cUser: Moltres
+Move: PUNISHMENT
+Use Mode: NORMAL color:orchid
+[21:25:22.615] LOG: %cStart Phase MessagePhase color:green;
+[21:25:22.712] LOG: %cStart Phase MoveEffectPhase color:green;
+[21:25:22.729] WARN: Texture "%s" has no frame "%s" PRAS- Psycho Cut 1
+[21:25:22.729] WARN: Texture "%s" has no frame "%s" PRAS- Psycho Cut 1
+[21:25:23.112] LOG: crit stage: +3
+[21:25:23.113] LOG: Applied Black Glasses (enemy)
+[21:25:23.115] LOG: Move: Punishment | Base damage: 141.1899574468085 | Power: 223 | Source attack: 193 | Target defense: 282
+[21:25:23.115] LOG: Move: Punishment | Attack damage: 597
+[21:25:23.116] LOG: %cStart Phase DamageAnimPhase color:green;
+[21:25:23.149] LOG: %cStart Phase MessagePhase color:green;
+[21:25:23.362] LOG: %cStart Phase MessagePhase color:green;
+[21:25:23.595] LOG: %cStart Phase FaintPhase color:green;
+[21:25:26.157] LOG: %cStart Phase MessagePhase color:green;
+[21:25:26.225] LOG: %cStart Phase MoveEndPhase color:green;
+[21:25:26.233] LOG: %cStart Phase MovePhase color:green;
+[21:25:26.233] LOG: %cUser: Froslass
+Move: RAGING_SOULS
+Use Mode: NORMAL color:orchid
+[21:25:26.260] LOG: %cStart Phase MessagePhase color:green;
+[21:25:26.353] LOG: %cStart Phase MoveEffectPhase color:green;
+[21:25:27.038] LOG: crit stage: +2
+[21:25:27.042] LOG: Move: Raging Souls | Base damage: 77.92981132075471 | Power: 130 | Source attack: 213 | Target defense: 318
+[21:25:27.043] LOG: Move: Raging Souls | Attack damage: 74
+[21:25:27.045] LOG: %cStart Phase DamageAnimPhase color:green;
+[21:25:27.076] LOG: %cStart Phase MessagePhase color:green;
+[21:25:27.270] LOG: %cStart Phase MessagePhase color:green;
+[21:25:27.505] LOG: %cStart Phase StatStageChangePhase color:green;
+[21:25:27.691] LOG: %cStart Phase MessagePhase color:green;
+[21:25:27.937] LOG: %cStart Phase ShowAbilityPhase color:green;
+[21:25:28.106] LOG: %cStart Phase StatStageChangePhase color:green;
+[21:25:28.297] LOG: %cStart Phase MessagePhase color:green;
+[21:25:28.520] LOG: %cStart Phase HideAbilityPhase color:green;
+[21:25:28.557] LOG: %cStart Phase ShowAbilityPhase color:green;
+[21:25:28.740] LOG: %cStart Phase StatStageChangePhase color:green;
+[21:25:28.935] LOG: %cStart Phase MessagePhase color:green;
+[21:25:29.162] LOG: %cStart Phase HideAbilityPhase color:green;
+[21:25:29.189] LOG: %cStart Phase MoveEndPhase color:green;
+[21:25:29.193] LOG: %cStart Phase MovePhase color:green;
+[21:25:29.193] LOG: %cStart Phase MoveEndPhase color:green;
+[21:25:29.195] LOG: %cStart Phase MovePhase color:green;
+[21:25:29.195] LOG: %cUser: Mega Glalie Redux
+Move: TAKE_DOWN
+Use Mode: NORMAL color:orchid
+[21:25:29.227] LOG: %cStart Phase MessagePhase color:green;
+[21:25:29.303] LOG: %cStart Phase MoveEffectPhase color:green;
+[21:25:29.637] LOG: Applied Dire Hit 
+[21:25:29.638] LOG: crit stage: +4
+[21:25:29.640] LOG: Move: Take Down | Base damage: 536.0927536231884 | Power: 95 | Source attack: 1119 | Target defense: 207
+[21:25:29.641] LOG: Move: Take Down | Attack damage: 566
+[21:25:29.643] LOG: %cStart Phase DamageAnimPhase color:green;
+[21:25:29.673] LOG: %cStart Phase StatStageChangePhase color:green;
+[21:25:29.673] LOG: %cStart Phase MessagePhase color:green;
+[21:25:29.870] LOG: %cStart Phase DamageAnimPhase color:green;
+[21:25:29.875] LOG: %cStart Phase MessagePhase color:green;
+[21:25:30.104] LOG: %cStart Phase FaintPhase color:green;
+[21:25:31.825] LOG: %cStart Phase MessagePhase color:green;
+[21:25:32.018] LOG: %cStart Phase ShowAbilityPhase color:green;
+[21:25:32.190] LOG: %cStart Phase PokemonHealPhase color:green;
+[21:25:32.412] LOG: %cStart Phase MessagePhase color:green;
+[21:25:32.637] LOG: %cStart Phase HideAbilityPhase color:green;
+[21:25:32.673] LOG: %cStart Phase VictoryPhase color:green;
+[21:25:32.674] LOG: Applied Soothe Bell 
+[21:25:32.675] LOG: Applied Lucky Egg 
+[21:25:32.675] LOG: %cStart Phase ExpPhase color:green;
+[21:25:32.675] LOG: Applied Super EXP. Charm 
+[21:25:32.675] LOG: Applied EXP. Charm 
+[21:25:32.994] LOG: %cStart Phase LevelUpPhase color:green;
+[21:25:32.995] LOG: %cStart Phase ExpPhase color:green;
+[21:25:32.995] LOG: Applied Super EXP. Charm 
+[21:25:32.995] LOG: Applied EXP. Charm 
+[21:25:33.181] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[21:25:33.181] LOG: Applied Super EXP. Charm 
+[21:25:33.181] LOG: Applied EXP. Charm 
+[21:25:33.182] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[21:25:33.182] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[21:25:33.182] LOG: Applied Super EXP. Charm 
+[21:25:33.182] LOG: Applied EXP. Charm 
+[21:25:33.182] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[21:25:33.182] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[21:25:33.183] LOG: Applied Super EXP. Charm 
+[21:25:33.183] LOG: Applied EXP. Charm 
+[21:25:33.183] LOG: %cStart Phase LevelUpPhase color:green;
+[21:25:33.184] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[21:25:33.184] LOG: %cStart Phase MoveEndPhase color:green;
+[21:25:33.184] LOG: %cStart Phase MovePhase color:green;
+[21:25:33.184] LOG: %cUser: Darkrai
+Move: THROAT_CHOP
+Use Mode: NORMAL color:orchid
+[21:25:33.184] LOG: %cStart Phase MessagePhase color:green;
+[21:25:33.395] LOG: %cStart Phase MoveEndPhase color:green;
+[21:25:33.395] LOG: %cStart Phase CheckInterludePhase color:green;
+[21:25:33.395] LOG: %cStart Phase WeatherEffectPhase color:green;
+[21:25:33.395] LOG: %cStart Phase PositionalTagPhase color:green;
+[21:25:33.395] LOG: %cStart Phase BerryPhase color:green;
+[21:25:33.407] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[21:25:33.415] LOG: %cStart Phase TurnEndPhase color:green;
+[21:25:33.422] WARN: [coop:turn] host recorder: finalize with NO open recording -> turn=-1 events=0 (caller decides not to emit)
+[21:25:33.422] LOG: %cStart Phase SwitchPhase color:green;
+[21:25:33.423] LOG: %cStart Phase TurnInitPhase color:green;
+[21:25:33.423] LOG: %cStart Phase CommandPhase color:green;
+[21:25:37.297] DEBUG: Session data saved to slot 2!
+[21:25:39.211] LOG: Seed: HXS5BV4NG03x9IZXOek02gcz
+[21:25:39.212] LOG: Wave Seed: HXS5BV4NG03x9IZXOek02gcz 0
+[21:25:39.506] WARN: AnimationManager key already exists: prompt
+[21:25:39.506] WARN: AnimationManager key already exists: tera_sparkle
+[21:25:39.506] LOG: Seed: 0SzXCOqxZZ43DSpDJMyF8pAv
+[21:25:39.506] LOG: Wave Seed: 0SzXCOqxZZ43DSpDJMyF8pAv 0
+[21:25:42.785] LOG: %cStart Phase LoginPhase color:green;
+[21:25:43.189] LOG: Client Session: LrbZAAZC2oWcb8X719xOs4yYLZf9e0ku
+[21:25:43.665] LOG: %cStart Phase TitlePhase color:green;
+[21:25:43.666] LOG: Getting Session Slot id: %d 2
+[21:25:43.699] LOG: use seasonal splash messages true
+[21:25:43.964] LOG: Getting Session Slot id: %d 2
+[21:25:43.975] LOG: Wave Seed: Pzf1L9GCSJq9fus4FOpPlmeX 0
+[21:25:43.975] LOG: Seed: Pzf1L9GCSJq9fus4FOpPlmeX
+[21:25:44.004] LOG: Wave Seed: ÚĄð»ÖÃÑÍÝÔûÃðÿý¾ÐÙúÚö÷ïâ 138
+[21:25:44.027] LOG: Applied Calcium 
+[21:25:44.027] LOG: Applied HP Up 
+[21:25:44.027] LOG: Applied Carbos 
+[21:25:44.028] LOG: Applied Protein 
+[21:25:44.031] LOG: Applied Calcium 
+[21:25:44.032] LOG: Applied HP Up 
+[21:25:44.032] LOG: Applied Carbos 
+[21:25:44.032] LOG: Applied Protein 
+[21:25:44.035] LOG: Applied Calcium 
+[21:25:44.035] LOG: Applied HP Up 
+[21:25:44.035] LOG: Applied Carbos 
+[21:25:44.035] LOG: Applied Protein 
+[21:25:44.038] LOG: Applied Iron (enemy)
+[21:25:44.038] LOG: Applied Zinc (enemy)
+[21:25:44.038] LOG: Applied Zinc (enemy)
+[21:25:44.038] LOG: Applied Carbos (enemy)
+[21:25:44.227] LOG: %cStart Phase EncounterPhase color:green;
+[21:25:44.229] LOG: Pokemon: Wild Darkrai | Species ID: 491 | Level: 111 | Nature: Adamant (+Atk/-SpAtk)
+[21:25:44.229] LOG: Stats (IVs): HP: 298 (20), Atk: 244 (15), Def: 250 (23), Spatk: 286 (12), Spdef: 238 (12), Spd: 311 (26)
+[21:25:44.229] LOG: Ability: Frisk | Passive Ability: Levitate | Boss Bars: 2
+[21:25:44.230] LOG: Moveset: ["Dark Void","Throat Chop","Raging Souls","Requiem"]
+[21:25:44.230] LOG: Pokemon: Wild Froslass | Species ID: 478 | Level: 104 | Nature: Impish (+Def/-SpAtk)
+[21:25:44.230] LOG: Stats (IVs): HP: 271 (11), Atk: 172 (21), Def: 188 (19), Spatk: 213 (4), Spdef: 176 (11), Spd: 263 (29)
+[21:25:44.230] LOG: Ability: Chilling Presence | Passive Ability: Cryomancy | Boss Bars: 1
+[21:25:44.230] LOG: Moveset: ["Raging Souls","Last Resort","Trump Card","Crunch"]
+[21:25:44.230] LOG: Pokemon: Wild Moltres | Species ID: 4146 | Level: 109 | Nature: Mild (+SpAtk/-Def)
+[21:25:44.231] LOG: Stats (IVs): HP: 332 (16), Atk: 193 (3), Def: 207 (27), Spatk: 275 (25), Spdef: 287 (9), Spd: 231 (10)
+[21:25:44.231] LOG: Ability: Soul Eater | Passive Ability: Dark Aura | Boss Bars: 2
+[21:25:44.231] LOG: Moveset: ["Fiery Wrath","Blast Burn","Punishment","Mean Look"]
+[21:25:44.233] LOG: Applied Iron (enemy)
+[21:25:44.233] LOG: Applied Zinc (enemy)
+[21:25:44.234] LOG: Applied Zinc (enemy)
+[21:25:44.234] LOG: Applied Carbos (enemy)
+[21:25:44.237] LOG: Wave Seed: ÚĄð»ÖÃÑÍÝÔûÃðÿý¾ÐÙúÚö÷ïâ 138
+[21:25:44.728] LOG: %cStart Phase SummonPhase color:green;
+[21:25:44.867] LOG: Applied Calcium 
+[21:25:44.867] LOG: Applied HP Up 
+[21:25:44.868] LOG: Applied Carbos 
+[21:25:44.868] LOG: Applied Protein 
+[21:25:44.996] LOG: %cStart Phase ShinySparklePhase color:green;
+[21:25:45.080] LOG: %cStart Phase CheckSwitchPhase color:green;
+[21:25:45.373] LOG: %cStart Phase CheckSwitchPhase color:green;
+[21:25:45.580] LOG: %cStart Phase CheckSwitchPhase color:green;
+[21:25:45.773] LOG: %cStart Phase InitEncounterPhase color:green;
+[21:25:45.776] LOG: %cStart Phase PostSummonPhase color:green;
+[21:25:45.776] LOG: Ran PSP for: Moltres
+[21:25:45.783] LOG: %cStart Phase PostSummonPhase color:green;
+[21:25:45.787] LOG: %cStart Phase PostSummonPhase color:green;
+[21:25:45.787] LOG: %cStart Phase ShowAbilityPhase color:green;
+[21:25:45.950] LOG: %cStart Phase MessagePhase color:green;
+[21:25:46.188] LOG: %cStart Phase HideAbilityPhase color:green;
+[21:25:46.226] LOG: %cStart Phase PostSummonPhase color:green;
+[21:25:46.226] LOG: Ran PSP for: Froslass
+[21:25:46.231] LOG: %cStart Phase PostSummonPhase color:green;
+[21:25:46.232] LOG: %cStart Phase MovePhase color:green;
+[21:25:46.232] LOG: %cUser: Froslass
+Move: ICY_WIND
+Use Mode: INDIRECT color:orchid
+[21:25:46.255] LOG: %cStart Phase MessagePhase color:green;
+[21:25:46.362] LOG: %cStart Phase MoveEffectPhase color:green;
+[21:25:46.366] LOG: Battle Seed: Ycn8SXxlwgbqf9ar
+[21:25:46.373] LOG: crit stage: +2
+[21:25:46.376] LOG: Move: Icy Wind | Base damage: 8.03038961038961 | Power: 10 | Source attack: 213 | Target defense: 308
+[21:25:46.376] LOG: Move: Icy Wind | Attack damage: 3
+[21:25:46.377] LOG: %cStart Phase ShowAbilityPhase color:green;
+[21:25:46.534] LOG: %cStart Phase HideAbilityPhase color:green;
+[21:25:46.583] LOG: %cStart Phase DamageAnimPhase color:green;
+[21:25:46.616] LOG: %cStart Phase MessagePhase color:green;
+[21:25:46.830] LOG: %cStart Phase StatStageChangePhase color:green;
+[21:25:47.020] LOG: %cStart Phase MessagePhase color:green;
+[21:25:47.247] LOG: %cStart Phase MoveEndPhase color:green;
+[21:25:47.249] LOG: %cStart Phase PostSummonPhase color:green;
+[21:25:47.249] LOG: %cStart Phase PostSummonPhase color:green;
+[21:25:47.249] LOG: Ran PSP for: Darkrai
+[21:25:47.254] LOG: %cStart Phase PostSummonPhase color:green;
+[21:25:47.274] LOG: %cStart Phase ShowAbilityPhase color:green;
+[21:25:47.460] LOG: %cStart Phase MessagePhase color:green;
+[21:25:47.739] LOG: %cStart Phase MessagePhase color:green;
+[21:25:48.188] LOG: %cStart Phase MessagePhase color:green;
+[21:25:49.055] LOG: %cStart Phase HideAbilityPhase color:green;
+[21:25:49.093] LOG: %cStart Phase PostSummonPhase color:green;
+[21:25:49.093] LOG: %cStart Phase TurnInitPhase color:green;
+[21:25:49.094] LOG: %cStart Phase CommandPhase color:green;
+[21:25:54.036] LOG: Move: FAKE_OUT Move targets: {"targets":[3,4,1],"multiple":false} 
+Player Pokemon: Kecleon
+[21:25:54.038] LOG: %cStart Phase SelectTargetPhase color:green;
+[21:25:54.356] LOG: %cStart Phase CommandPhase color:green;
+[21:25:56.519] LOG: Move: FAKE_OUT Move targets: {"targets":[3,4,1],"multiple":false} 
+Player Pokemon: Kecleon
+[21:25:56.522] LOG: %cStart Phase SelectTargetPhase color:green;
+[21:25:57.037] LOG: %cStart Phase CommandPhase color:green;
+[21:26:01.770] LOG: %cStart Phase CommandPhase color:green;
+[21:26:24.294] LOG: Move: FAKE_OUT Move targets: {"targets":[3,4,1],"multiple":false} 
+Player Pokemon: Kecleon
+[21:26:24.297] LOG: %cStart Phase SelectTargetPhase color:green;
+[21:26:25.333] LOG: %cStart Phase CommandPhase color:green;
+[21:26:27.555] LOG: Move: FAKE_OUT Move targets: {"targets":[3,4,1],"multiple":false} 
+Player Pokemon: Kecleon
+[21:26:27.557] LOG: %cStart Phase SelectTargetPhase color:green;
+[21:26:27.999] LOG: %cStart Phase CommandPhase color:green;
