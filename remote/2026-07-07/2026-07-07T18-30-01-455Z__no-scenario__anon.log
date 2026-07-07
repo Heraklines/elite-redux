@@ -1,0 +1,261 @@
+url:      https://elite-redux-staging.pages.dev/
+build:    mraz9x9s-91gs
+mode:     6  wave:1
+seed:     G6UPiptfx7IkscD0SEZL1WrD
+party:    Ponyta(L5 21hp f0), Trapinch Redux(L5 21hp f0), Goldeen(L5 21hp f0), Spearow(L5 20hp f0)
+enemy:    Pidgey(L2), Abra(L2)
+
+----- COMMENT -----
+connection lost problems psiell
+
+----- CONSOLE -----
+[18:28:13.955] WARN: cry/63 not found
+[18:28:14.179] LOG: [coop:session] isCoopAuthoritativeGuestGated -> true (authoritative GUEST gates a structural mutation)
+[18:28:14.179] LOG: %cStart Phase SummonPhase color:green;
+[18:28:14.345] WARN: cry/77 not found
+[18:28:14.446] LOG: [coop:session] isCoopAuthoritativeGuestGated -> true (authoritative GUEST gates a structural mutation)
+[18:28:14.446] LOG: %cStart Phase ShinySparklePhase color:green;
+[18:28:14.546] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[18:28:14.546] LOG: %cStart Phase SummonPhase color:green;
+[18:28:14.713] WARN: cry/10794 not found
+[18:28:14.791] LOG: [coop:launch] await peer signal resolve code=PSXPZF role=guest (2103b)
+[18:28:14.791] LOG: [coop:launch] guest received offer code=PSXPZF -> answering
+[18:28:14.794] LOG: [coop:launch] iceConnectionState=checking code=PSXPZF role=guest
+[18:28:14.794] LOG: [coop:launch] pcConnectionState=connecting code=PSXPZF role=guest
+[18:28:14.813] LOG: [coop:session] isCoopAuthoritativeGuestGated -> true (authoritative GUEST gates a structural mutation)
+[18:28:14.813] LOG: %cStart Phase ShinySparklePhase color:green;
+[18:28:14.912] LOG: %cStart Phase CheckSwitchPhase color:green;
+[18:28:14.912] LOG: %cStart Phase CheckSwitchPhase color:green;
+[18:28:14.912] LOG: %cStart Phase InitEncounterPhase color:green;
+[18:28:14.912] LOG: [coop:session] isCoopAuthoritativeGuestGated -> true (authoritative GUEST gates a structural mutation)
+[18:28:14.913] LOG: [coop:session] isCoopAuthoritativeGuestGated -> true (authoritative GUEST gates a structural mutation)
+[18:28:14.913] LOG: [coop:session] isCoopAuthoritativeGuestGated -> true (authoritative GUEST gates a structural mutation)
+[18:28:14.913] LOG: [coop:session] isCoopAuthoritativeGuestGated -> true (authoritative GUEST gates a structural mutation)
+[18:28:14.914] LOG: %cStart Phase PostSummonPhase color:green;
+[18:28:14.914] LOG: Ran PSP for: Ponyta
+[18:28:14.916] LOG: %cStart Phase PostSummonPhase color:green;
+[18:28:14.917] LOG: %cStart Phase PostSummonPhase color:green;
+[18:28:14.918] LOG: %cStart Phase ShowAbilityPhase color:green;
+[18:28:14.935] LOG: [coop:launch] guest pushing answer code=PSXPZF (ICE gathered)
+[18:28:14.935] LOG: [coop:launch] pushSignal code=PSXPZF role=guest sdpBytes=1410
+[18:28:15.071] LOG: %cStart Phase MessagePhase color:green;
+[18:28:15.354] LOG: %cStart Phase HideAbilityPhase color:green;
+[18:28:15.379] LOG: %cStart Phase PostSummonPhase color:green;
+[18:28:15.379] LOG: Ran PSP for: Trapinch Redux
+[18:28:15.380] LOG: %cStart Phase PostSummonPhase color:green;
+[18:28:15.381] LOG: %cStart Phase PostSummonPhase color:green;
+[18:28:15.381] LOG: %cStart Phase ShowAbilityPhase color:green;
+[18:28:15.541] LOG: %cStart Phase MessagePhase color:green;
+[18:28:15.821] LOG: %cStart Phase HideAbilityPhase color:green;
+[18:28:15.847] LOG: %cStart Phase PostSummonPhase color:green;
+[18:28:15.847] LOG: Ran PSP for: Abra
+[18:28:15.847] LOG: %cStart Phase PostSummonPhase color:green;
+[18:28:15.848] LOG: %cStart Phase PostSummonPhase color:green;
+[18:28:15.848] LOG: %cStart Phase PostSummonPhase color:green;
+[18:28:15.848] LOG: Ran PSP for: Pidgey
+[18:28:15.848] LOG: %cStart Phase PostSummonPhase color:green;
+[18:28:15.848] LOG: %cStart Phase PostSummonPhase color:green;
+[18:28:15.848] LOG: %cStart Phase InitEncounterPhase color:green;
+[18:28:15.848] LOG: [coop:session] isCoopAuthoritativeGuestGated -> true (authoritative GUEST gates a structural mutation)
+[18:28:15.848] LOG: [coop:session] isCoopAuthoritativeGuestGated -> true (authoritative GUEST gates a structural mutation)
+[18:28:15.848] LOG: [coop:session] isCoopAuthoritativeGuestGated -> true (authoritative GUEST gates a structural mutation)
+[18:28:15.848] LOG: [coop:session] isCoopAuthoritativeGuestGated -> true (authoritative GUEST gates a structural mutation)
+[18:28:15.849] LOG: %cStart Phase PostSummonPhase color:green;
+[18:28:15.849] LOG: Ran PSP for: Ponyta
+[18:28:15.850] LOG: %cStart Phase PostSummonPhase color:green;
+[18:28:15.852] LOG: %cStart Phase PostSummonPhase color:green;
+[18:28:15.852] LOG: %cStart Phase ShowAbilityPhase color:green;
+[18:28:16.007] LOG: %cStart Phase MessagePhase color:green;
+[18:28:16.090] LOG: [coop:launch] iceConnectionState=connected code=PSXPZF role=guest
+[18:28:16.246] LOG: [coop:launch] pcConnectionState=connected code=PSXPZF role=guest
+[18:28:16.287] LOG: %cStart Phase HideAbilityPhase color:green;
+[18:28:16.313] LOG: %cStart Phase PostSummonPhase color:green;
+[18:28:16.313] LOG: Ran PSP for: Trapinch Redux
+[18:28:16.314] LOG: %cStart Phase PostSummonPhase color:green;
+[18:28:16.314] LOG: %cStart Phase PostSummonPhase color:green;
+[18:28:16.315] LOG: %cStart Phase ShowAbilityPhase color:green;
+[18:28:16.471] LOG: %cStart Phase MessagePhase color:green;
+[18:28:16.575] LOG: [coop:launch] guest datachannel event label=coop state=open code=PSXPZF
+[18:28:16.575] LOG: [coop:launch] data channel already open
+[18:28:16.576] LOG: [coop:webrtc] replaceChannel role=guest gen=2 readyState=open
+[18:28:16.576] LOG: [coop:webrtc] state role=guest disconnected -> connected
+[18:28:16.576] LOG: [coop:launch] rejoin SUCCESS attempt=1 code=PSXPZF role=guest
+[18:28:16.576] LOG: [coop:runtime] rejoin SUCCESS -> channel re-established in place
+[18:28:16.576] LOG: [coop:resync] post-rejoin full resync request seq=9396576
+[18:28:16.576] WARN: [coop:resync] guest requestStateSync turn=9396576 superseding 1 older in-flight resync(s)
+[18:28:16.576] WARN: [coop:resync] guest requestStateSync turn=9340399 seq=1 -> null (timeout/superseded)
+[18:28:16.576] LOG: [coop:resync] guest requestStateSync turn=9396576 seq=2 START timeout=1200000ms
+[18:28:16.576] LOG: [coop:webrtc] raw tx role=guest t=requestStateSync bytes=47
+[18:28:16.576] WARN: [coop:resync] post-rejoin stateSync TIMEOUT/null seq=9340399 (checksum backstop heals next turn)
+[18:28:16.576] LOG: [coop:webrtc] channel OPEN role=guest gen=2
+[18:28:16.968] LOG: [coop:webrtc] raw rx role=guest t=stateSync bytes=11491 handlers=11
+[18:28:16.968] LOG: [coop:resync] guest RECV stateSync seq=2 blobLen=11456 -> parked waiter
+[18:28:16.968] LOG: [coop:resync] guest requestStateSync turn=9396576 seq=2 RESOLVE blobLen=11456
+[18:28:16.971] LOG: [coop:heal] erMoneyStreaks host entries=0 -> restored (#837/#348)
+[18:28:16.971] LOG: [coop:heal] biomeOverstayAnchor host=null -> restored (#837/#504)
+[18:28:16.971] LOG: [coop:heal] erBiomeStructure host length=null startWave=1 -> restored (#841 item 5)
+[18:28:16.971] LOG: [coop:heal] erRelicBattleState host wave=1 -> restored (#837)
+[18:28:16.973] LOG: [coop:resync] guest apply authoritativeState tick=2 wave=1 turn=1 party=4/2 field=4
+[18:28:16.973] LOG: [coop:resync] post-rejoin snapshot applied seq=9396576 blob=11456b
+[18:28:17.599] LOG: [coop:webrtc] channel CLOSE role=guest state=connected gen=2
+[18:28:17.599] LOG: [coop:webrtc] state role=guest connected -> disconnected
+[18:28:17.599] WARN: [coop:runtime] partner channel disconnected -> cancelling pending co-op waits (no 20-minute strand)
+[18:28:17.599] LOG: [coop:relay] cancelWaiters() no orphaned waiters selected -> nothing cancelled (live waits spared)
+[18:28:17.600] LOG: [coop:launch] rejoin attempt 1 code=PSXPZF role=guest elapsed=0ms
+[18:28:17.600] LOG: [coop:launch] exchange SDP start code=PSXPZF role=guest (ice=fetched)
+[18:28:18.263] LOG: [coop:launch] ICE from worker /coop/ice servers=1
+[18:28:18.264] LOG: [coop:launch] await peer signal start code=PSXPZF role=guest timeout=60000ms
+[18:28:19.094] LOG: [coop:launch] await peer signal resolve code=PSXPZF role=guest (2104b)
+[18:28:19.094] LOG: [coop:launch] guest received offer code=PSXPZF -> answering
+[18:28:19.097] LOG: [coop:launch] iceConnectionState=checking code=PSXPZF role=guest
+[18:28:19.097] LOG: [coop:launch] pcConnectionState=connecting code=PSXPZF role=guest
+[18:28:19.239] LOG: [coop:launch] guest pushing answer code=PSXPZF (ICE gathered)
+[18:28:19.239] LOG: [coop:launch] pushSignal code=PSXPZF role=guest sdpBytes=1407
+[18:28:20.656] LOG: [coop:launch] iceConnectionState=connected code=PSXPZF role=guest
+[18:28:20.814] LOG: [coop:launch] pcConnectionState=connected code=PSXPZF role=guest
+[18:28:21.115] LOG: [coop:launch] guest datachannel event label=coop state=open code=PSXPZF
+[18:28:21.116] LOG: [coop:launch] data channel already open
+[18:28:21.116] LOG: [coop:webrtc] replaceChannel role=guest gen=3 readyState=open
+[18:28:21.116] LOG: [coop:webrtc] state role=guest disconnected -> connected
+[18:28:21.116] LOG: [coop:launch] rejoin SUCCESS attempt=1 code=PSXPZF role=guest
+[18:28:21.116] LOG: [coop:runtime] rejoin SUCCESS -> channel re-established in place
+[18:28:21.116] LOG: [coop:resync] post-rejoin full resync request seq=9301116
+[18:28:21.116] LOG: [coop:resync] guest requestStateSync turn=9301116 seq=3 START timeout=1200000ms
+[18:28:21.116] LOG: [coop:webrtc] raw tx role=guest t=requestStateSync bytes=47
+[18:28:21.116] LOG: [coop:webrtc] channel OPEN role=guest gen=3
+[18:28:21.445] LOG: [coop:webrtc] raw rx role=guest t=stateSync bytes=11499 handlers=11
+[18:28:21.445] LOG: [coop:resync] guest RECV stateSync seq=3 blobLen=11464 -> parked waiter
+[18:28:21.445] LOG: [coop:resync] guest requestStateSync turn=9301116 seq=3 RESOLVE blobLen=11464
+[18:28:21.448] LOG: [coop:heal] erMoneyStreaks host entries=0 -> restored (#837/#348)
+[18:28:21.448] LOG: [coop:heal] biomeOverstayAnchor host=null -> restored (#837/#504)
+[18:28:21.448] LOG: [coop:heal] erBiomeStructure host length=null startWave=1 -> restored (#841 item 5)
+[18:28:21.448] LOG: [coop:heal] erRelicBattleState host wave=1 -> restored (#837)
+[18:28:21.450] LOG: [coop:resync] guest apply authoritativeState tick=4 wave=1 turn=1 party=4/2 field=4
+[18:28:21.450] LOG: [coop:resync] post-rejoin snapshot applied seq=9301116 blob=11464b
+[18:28:21.882] LOG: [coop:webrtc] channel CLOSE role=guest state=connected gen=3
+[18:28:21.882] LOG: [coop:webrtc] state role=guest connected -> disconnected
+[18:28:21.882] WARN: [coop:runtime] partner channel disconnected -> cancelling pending co-op waits (no 20-minute strand)
+[18:28:21.882] LOG: [coop:relay] cancelWaiters() no orphaned waiters selected -> nothing cancelled (live waits spared)
+[18:28:21.882] LOG: [coop:launch] rejoin attempt 1 code=PSXPZF role=guest elapsed=0ms
+[18:28:21.882] LOG: [coop:launch] exchange SDP start code=PSXPZF role=guest (ice=fetched)
+[18:28:22.546] LOG: [coop:launch] ICE from worker /coop/ice servers=1
+[18:28:22.547] LOG: [coop:launch] await peer signal start code=PSXPZF role=guest timeout=60000ms
+[18:28:23.388] LOG: [coop:launch] await peer signal resolve code=PSXPZF role=guest (2100b)
+[18:28:23.388] LOG: [coop:launch] guest received offer code=PSXPZF -> answering
+[18:28:23.390] LOG: [coop:launch] iceConnectionState=checking code=PSXPZF role=guest
+[18:28:23.390] LOG: [coop:launch] pcConnectionState=connecting code=PSXPZF role=guest
+[18:28:23.532] LOG: [coop:launch] guest pushing answer code=PSXPZF (ICE gathered)
+[18:28:23.532] LOG: [coop:launch] pushSignal code=PSXPZF role=guest sdpBytes=1411
+[18:28:24.755] LOG: [coop:launch] iceConnectionState=connected code=PSXPZF role=guest
+[18:28:25.068] LOG: [coop:launch] pcConnectionState=connected code=PSXPZF role=guest
+[18:28:25.467] LOG: [coop:launch] guest datachannel event label=coop state=open code=PSXPZF
+[18:28:25.467] LOG: [coop:launch] data channel already open
+[18:28:25.467] LOG: [coop:webrtc] replaceChannel role=guest gen=4 readyState=open
+[18:28:25.467] LOG: [coop:webrtc] state role=guest disconnected -> connected
+[18:28:25.467] LOG: [coop:launch] rejoin SUCCESS attempt=1 code=PSXPZF role=guest
+[18:28:25.467] LOG: [coop:runtime] rejoin SUCCESS -> channel re-established in place
+[18:28:25.468] LOG: [coop:resync] post-rejoin full resync request seq=9305468
+[18:28:25.468] LOG: [coop:resync] guest requestStateSync turn=9305468 seq=4 START timeout=1200000ms
+[18:28:25.468] LOG: [coop:webrtc] raw tx role=guest t=requestStateSync bytes=47
+[18:28:25.468] LOG: [coop:webrtc] channel OPEN role=guest gen=4
+[18:28:25.869] LOG: [coop:webrtc] raw rx role=guest t=stateSync bytes=11507 handlers=11
+[18:28:25.869] LOG: [coop:resync] guest RECV stateSync seq=4 blobLen=11472 -> parked waiter
+[18:28:25.869] LOG: [coop:resync] guest requestStateSync turn=9305468 seq=4 RESOLVE blobLen=11472
+[18:28:25.872] LOG: [coop:heal] erMoneyStreaks host entries=0 -> restored (#837/#348)
+[18:28:25.872] LOG: [coop:heal] biomeOverstayAnchor host=null -> restored (#837/#504)
+[18:28:25.872] LOG: [coop:heal] erBiomeStructure host length=null startWave=1 -> restored (#841 item 5)
+[18:28:25.872] LOG: [coop:heal] erRelicBattleState host wave=1 -> restored (#837)
+[18:28:25.873] LOG: [coop:resync] guest apply authoritativeState tick=6 wave=1 turn=1 party=4/2 field=4
+[18:28:25.874] LOG: [coop:resync] post-rejoin snapshot applied seq=9305468 blob=11472b
+[18:28:26.049] LOG: [coop:webrtc] channel CLOSE role=guest state=connected gen=4
+[18:28:26.049] LOG: [coop:webrtc] state role=guest connected -> disconnected
+[18:28:26.049] WARN: [coop:runtime] partner channel disconnected -> cancelling pending co-op waits (no 20-minute strand)
+[18:28:26.049] LOG: [coop:relay] cancelWaiters() no orphaned waiters selected -> nothing cancelled (live waits spared)
+[18:28:26.049] LOG: [coop:launch] rejoin attempt 1 code=PSXPZF role=guest elapsed=0ms
+[18:28:26.049] LOG: [coop:launch] exchange SDP start code=PSXPZF role=guest (ice=fetched)
+[18:28:26.691] LOG: [coop:launch] ICE from worker /coop/ice servers=1
+[18:28:26.691] LOG: [coop:launch] await peer signal start code=PSXPZF role=guest timeout=60000ms
+[18:28:27.538] LOG: [coop:launch] await peer signal resolve code=PSXPZF role=guest (2103b)
+[18:28:27.539] LOG: [coop:launch] guest received offer code=PSXPZF -> answering
+[18:28:27.541] LOG: [coop:launch] iceConnectionState=checking code=PSXPZF role=guest
+[18:28:27.541] LOG: [coop:launch] pcConnectionState=connecting code=PSXPZF role=guest
+[18:28:27.683] LOG: [coop:launch] guest pushing answer code=PSXPZF (ICE gathered)
+[18:28:27.683] LOG: [coop:launch] pushSignal code=PSXPZF role=guest sdpBytes=1407
+[18:28:28.862] LOG: [coop:launch] iceConnectionState=connected code=PSXPZF role=guest
+[18:28:29.056] LOG: [coop:launch] pcConnectionState=connected code=PSXPZF role=guest
+[18:28:29.417] LOG: [coop:launch] guest datachannel event label=coop state=open code=PSXPZF
+[18:28:29.418] LOG: [coop:launch] data channel already open
+[18:28:29.418] LOG: [coop:webrtc] replaceChannel role=guest gen=5 readyState=open
+[18:28:29.418] LOG: [coop:webrtc] state role=guest disconnected -> connected
+[18:28:29.418] LOG: [coop:launch] rejoin SUCCESS attempt=1 code=PSXPZF role=guest
+[18:28:29.418] LOG: [coop:runtime] rejoin SUCCESS -> channel re-established in place
+[18:28:29.418] LOG: [coop:resync] post-rejoin full resync request seq=9309418
+[18:28:29.418] LOG: [coop:resync] guest requestStateSync turn=9309418 seq=5 START timeout=1200000ms
+[18:28:29.418] LOG: [coop:webrtc] raw tx role=guest t=requestStateSync bytes=47
+[18:28:29.418] LOG: [coop:webrtc] channel OPEN role=guest gen=5
+[18:28:29.750] LOG: [coop:webrtc] raw rx role=guest t=stateSync bytes=11515 handlers=11
+[18:28:29.750] LOG: [coop:resync] guest RECV stateSync seq=5 blobLen=11480 -> parked waiter
+[18:28:29.750] LOG: [coop:resync] guest requestStateSync turn=9309418 seq=5 RESOLVE blobLen=11480
+[18:28:29.752] LOG: [coop:heal] erMoneyStreaks host entries=0 -> restored (#837/#348)
+[18:28:29.752] LOG: [coop:heal] biomeOverstayAnchor host=null -> restored (#837/#504)
+[18:28:29.752] LOG: [coop:heal] erBiomeStructure host length=null startWave=1 -> restored (#841 item 5)
+[18:28:29.752] LOG: [coop:heal] erRelicBattleState host wave=1 -> restored (#837)
+[18:28:29.754] LOG: [coop:resync] guest apply authoritativeState tick=8 wave=1 turn=1 party=4/2 field=4
+[18:28:29.754] LOG: [coop:resync] post-rejoin snapshot applied seq=9309418 blob=11480b
+[18:28:30.220] LOG: [coop:webrtc] channel CLOSE role=guest state=connected gen=5
+[18:28:30.220] LOG: [coop:webrtc] state role=guest connected -> disconnected
+[18:28:30.220] WARN: [coop:runtime] partner channel disconnected -> cancelling pending co-op waits (no 20-minute strand)
+[18:28:30.220] LOG: [coop:relay] cancelWaiters() no orphaned waiters selected -> nothing cancelled (live waits spared)
+[18:28:30.220] LOG: [coop:launch] rejoin attempt 1 code=PSXPZF role=guest elapsed=0ms
+[18:28:30.220] LOG: [coop:launch] exchange SDP start code=PSXPZF role=guest (ice=fetched)
+[18:28:30.874] LOG: [coop:launch] ICE from worker /coop/ice servers=1
+[18:28:30.875] LOG: [coop:launch] await peer signal start code=PSXPZF role=guest timeout=60000ms
+[18:28:31.707] LOG: [coop:launch] await peer signal resolve code=PSXPZF role=guest (2101b)
+[18:28:31.707] LOG: [coop:launch] guest received offer code=PSXPZF -> answering
+[18:28:31.709] LOG: [coop:launch] iceConnectionState=checking code=PSXPZF role=guest
+[18:28:31.709] LOG: [coop:launch] pcConnectionState=connecting code=PSXPZF role=guest
+[18:28:31.850] LOG: [coop:launch] guest pushing answer code=PSXPZF (ICE gathered)
+[18:28:31.850] LOG: [coop:launch] pushSignal code=PSXPZF role=guest sdpBytes=1411
+[18:28:32.978] LOG: [coop:launch] iceConnectionState=connected code=PSXPZF role=guest
+[18:28:33.138] LOG: [coop:launch] pcConnectionState=connected code=PSXPZF role=guest
+[18:28:33.480] LOG: [coop:launch] guest datachannel event label=coop state=open code=PSXPZF
+[18:28:33.480] LOG: [coop:launch] data channel already open
+[18:28:33.480] LOG: [coop:webrtc] replaceChannel role=guest gen=6 readyState=open
+[18:28:33.480] LOG: [coop:webrtc] state role=guest disconnected -> connected
+[18:28:33.480] LOG: [coop:launch] rejoin SUCCESS attempt=1 code=PSXPZF role=guest
+[18:28:33.480] LOG: [coop:runtime] rejoin SUCCESS -> channel re-established in place
+[18:28:33.481] LOG: [coop:resync] post-rejoin full resync request seq=9313481
+[18:28:33.481] LOG: [coop:resync] guest requestStateSync turn=9313481 seq=6 START timeout=1200000ms
+[18:28:33.481] LOG: [coop:webrtc] raw tx role=guest t=requestStateSync bytes=47
+[18:28:33.481] LOG: [coop:webrtc] channel OPEN role=guest gen=6
+[18:28:33.829] LOG: [coop:webrtc] raw rx role=guest t=stateSync bytes=11487 handlers=11
+[18:28:33.829] LOG: [coop:resync] guest RECV stateSync seq=6 blobLen=11452 -> parked waiter
+[18:28:33.829] LOG: [coop:resync] guest requestStateSync turn=9313481 seq=6 RESOLVE blobLen=11452
+[18:28:33.832] LOG: [coop:heal] erMoneyStreaks host entries=0 -> restored (#837/#348)
+[18:28:33.832] LOG: [coop:heal] biomeOverstayAnchor host=null -> restored (#837/#504)
+[18:28:33.832] LOG: [coop:heal] erBiomeStructure host length=null startWave=1 -> restored (#841 item 5)
+[18:28:33.832] LOG: [coop:heal] erRelicBattleState host wave=1 -> restored (#837)
+[18:28:33.833] LOG: [coop:resync] guest apply authoritativeState tick=10 wave=1 turn=1 party=4/2 field=4
+[18:28:33.833] LOG: [coop:resync] post-rejoin snapshot applied seq=9313481 blob=11452b
+[18:28:34.387] LOG: [coop:webrtc] channel CLOSE role=guest state=connected gen=6
+[18:28:34.387] LOG: [coop:webrtc] state role=guest connected -> disconnected
+[18:28:34.388] WARN: [coop:runtime] partner channel disconnected -> cancelling pending co-op waits (no 20-minute strand)
+[18:28:34.388] LOG: [coop:relay] cancelWaiters() no orphaned waiters selected -> nothing cancelled (live waits spared)
+[18:28:34.388] LOG: [coop:launch] rejoin attempt 1 code=PSXPZF role=guest elapsed=0ms
+[18:28:34.388] LOG: [coop:launch] exchange SDP start code=PSXPZF role=guest (ice=fetched)
+[18:28:35.039] LOG: [coop:launch] ICE from worker /coop/ice servers=1
+[18:28:35.040] LOG: [coop:launch] await peer signal start code=PSXPZF role=guest timeout=60000ms
+[18:28:35.871] LOG: [coop:launch] await peer signal resolve code=PSXPZF role=guest (2105b)
+[18:28:35.871] LOG: [coop:launch] guest received offer code=PSXPZF -> answering
+[18:28:35.874] LOG: [coop:launch] iceConnectionState=checking code=PSXPZF role=guest
+[18:28:35.874] LOG: [coop:launch] pcConnectionState=connecting code=PSXPZF role=guest
+[18:28:36.015] LOG: [coop:launch] guest pushing answer code=PSXPZF (ICE gathered)
+[18:28:36.015] LOG: [coop:launch] pushSignal code=PSXPZF role=guest sdpBytes=1409
+[18:28:37.967] LOG: [coop:launch] iceConnectionState=connected code=PSXPZF role=guest
+[18:28:38.279] LOG: [coop:launch] pcConnectionState=connected code=PSXPZF role=guest
+[18:28:39.313] LOG: [coop:interaction] interactionCounter() read -> 0 (role=guest)
+[18:28:39.313] LOG: [coop:health] tick=0g turn=1 wave=1 counter=0 assertions=0 wait=-1ms peerBeat=- transport=disconnected
+[18:29:09.359] LOG: [coop:interaction] interactionCounter() read -> 0 (role=guest)
+[18:29:09.359] LOG: [coop:health] tick=0g turn=1 wave=1 counter=0 assertions=0 wait=-1ms peerBeat=- transport=disconnected
+[18:29:39.478] LOG: [coop:interaction] interactionCounter() read -> 0 (role=guest)
+[18:29:39.478] LOG: [coop:health] tick=0g turn=1 wave=1 counter=0 assertions=0 wait=-1ms peerBeat=- transport=disconnected
