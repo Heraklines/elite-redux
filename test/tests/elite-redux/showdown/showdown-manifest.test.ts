@@ -71,6 +71,26 @@ describe("starterToManifest", () => {
     expect(m.ivs).toEqual([31, 31, 31, 31, 31, 31]);
   });
 
+  it("carries the per-mon Shiny Lab look on a SHINY pick, dropping it otherwise (Task C7)", () => {
+    // A 14-number encoded SavedLook tuple (the carried #785 look, stamped at build).
+    const look = [1, 2, 3, 200, 150, 100, 96, 0, 0, 0, 0, 0, 128, 128];
+    // Shiny + carried look -> the look round-trips onto the manifest (a COPY, not the same ref).
+    const shinyM = starterToManifest(
+      baseStarter({ shiny: true, erShinyLab: look as Starter["erShinyLab"] }),
+      emptyGameData,
+    );
+    expect(shinyM.erShinyLab).toEqual(look);
+    expect(shinyM.erShinyLab).not.toBe(look);
+    // Non-shiny drops the look entirely (mirrors serializeShinyLabLook's shiny gate).
+    const dullM = starterToManifest(
+      baseStarter({ shiny: false, erShinyLab: look as Starter["erShinyLab"] }),
+      emptyGameData,
+    );
+    expect(dullM.erShinyLab).toBeUndefined();
+    // A shiny with NO carried look carries none.
+    expect(starterToManifest(baseStarter({ shiny: true }), emptyGameData).erShinyLab).toBeUndefined();
+  });
+
   it("populates erBlackShiny + baseCost from the starter and the raw cost table (Task B6)", () => {
     // CHARMANDER's raw speciesStarterCosts base value is 3; default erBlackShiny is false.
     const base = starterToManifest(baseStarter(), emptyGameData);

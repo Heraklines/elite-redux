@@ -12,9 +12,11 @@
 import type {
   CoopMessage,
   ShowdownMonManifestWire,
+  ShowdownProfileWire,
   ShowdownStakeOfferWire,
 } from "#app/data/elite-redux/coop/coop-transport";
 import { createLoopbackPair } from "#app/data/elite-redux/coop/coop-transport";
+import type { GhostTrainerProfile } from "#app/data/elite-redux/er-ghost-profile";
 import type { StakeOffer } from "#app/data/elite-redux/showdown/showdown-stakes";
 import type { ShowdownMonManifest } from "#app/data/elite-redux/showdown/showdown-team";
 import { describe, expect, it } from "vitest";
@@ -31,6 +33,9 @@ import { describe, expect, it } from "vitest";
 const stakeToWire: ShowdownStakeOfferWire = {} as StakeOffer;
 const manifestToWire: ShowdownMonManifestWire = {} as ShowdownMonManifest;
 const wireToManifest: ShowdownMonManifest = {} as ShowdownMonManifestWire;
+// Task C7: the domain GhostTrainerProfile assigns to the wire mirror (domain -> wire; the wire
+// widens `trainerType`/`approach` to number/string, so only this direction holds without a cast).
+const profileToWire: ShowdownProfileWire = {} as GhostTrainerProfile;
 
 /**
  * Send `msg` host -> guest over the loopback and assert it is a faithful WIRE
@@ -79,13 +84,32 @@ const sampleManifest: ShowdownMonManifestWire = {
   rootSpeciesId: 172,
   erBlackShiny: false,
   baseCost: 6,
+  // Task C7: the per-mon Shiny Lab look tuple rides the manifest and must survive the wire.
+  erShinyLab: [1, 2, 3, 200, 150, 100, 96, 0, 0, 0, 0, 0, 128, 128],
+};
+
+const sampleProfile: ShowdownProfileWire = {
+  trainerType: 12,
+  female: true,
+  displayName: "Nightshade",
+  title: "The Undying",
+  dialogue: {
+    intro: "We meet at last, {player}.",
+    defeatPlayer: "Your {lead} was never enough.",
+    defeated: "Well fought.",
+  },
+  aura: "aura_ember",
+  showAuraInBattle: true,
+  approach: "fromShadow",
+  fxSpeed: 1.5,
+  fxIntensity: 0.75,
 };
 
 describe("showdown wire protocol", () => {
   it("keeps wire and domain shapes structurally compatible", () => {
     // Runtime no-op; the value is the compile-time assignment above. Referencing the
     // consts here keeps them "used" (and dodges biome's noVoid) without a suppression.
-    expect([stakeToWire, manifestToWire, wireToManifest]).toHaveLength(3);
+    expect([stakeToWire, manifestToWire, wireToManifest, profileToWire]).toHaveLength(4);
   });
 
   it("round-trips showdownStakeOffer", async () => {
@@ -98,6 +122,18 @@ describe("showdown wire protocol", () => {
 
   it("round-trips showdownTeam", async () => {
     await assertWireRoundTrip({ t: "showdownTeam", manifest: [sampleManifest, sampleManifest] });
+  });
+
+  it("round-trips showdownTeam with a presentation profile (Task C7)", async () => {
+    await assertWireRoundTrip({
+      t: "showdownTeam",
+      manifest: [sampleManifest, sampleManifest],
+      presentation: sampleProfile,
+    });
+  });
+
+  it("round-trips showdownTeam with a null presentation (Task C7 - no authored profile)", async () => {
+    await assertWireRoundTrip({ t: "showdownTeam", manifest: [sampleManifest], presentation: null });
   });
 
   it("round-trips showdownReady", async () => {

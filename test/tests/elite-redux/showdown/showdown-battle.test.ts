@@ -12,12 +12,16 @@
 // =============================================================================
 
 import { getGameMode } from "#app/game-mode";
+import type { GhostTrainerProfile } from "#data/elite-redux/er-ghost-profile";
+import { normalizeErShinyLabSavedLook } from "#data/elite-redux/er-shiny-lab-effects";
 import { beginShowdownBattle, endShowdownBattle } from "#data/elite-redux/showdown/showdown-battle-state";
 import type { ShowdownMonManifest } from "#data/elite-redux/showdown/showdown-team";
 import { BattleType } from "#enums/battle-type";
 import { GameModes } from "#enums/game-modes";
 import { MoveId } from "#enums/move-id";
 import { SpeciesId } from "#enums/species-id";
+import { TrainerSlot } from "#enums/trainer-slot";
+import { TrainerType } from "#enums/trainer-type";
 import { UiMode } from "#enums/ui-mode";
 import { PokemonHeldItemModifier } from "#modifiers/modifier";
 import { SelectStarterPhase } from "#phases/select-starter-phase";
@@ -51,11 +55,12 @@ async function runToShowdownCommand(
   own: ShowdownMonManifest[],
   opponent: ShowdownMonManifest[],
   playerSpecies: SpeciesId[],
+  opponentProfile: GhostTrainerProfile | null = null,
 ): Promise<void> {
   await game.runToTitle();
   game.onNextPrompt("TitlePhase", UiMode.TITLE, () => {
     game.scene.gameMode = getGameMode(GameModes.SHOWDOWN);
-    beginShowdownBattle(own, opponent);
+    beginShowdownBattle(own, opponent, null, opponentProfile);
     const starters = generateStarters(game.scene, playerSpecies);
     game.scene.phaseManager.pushNew("EncounterPhase", false);
     const selectStarterPhase = new SelectStarterPhase();
@@ -118,5 +123,45 @@ describe.skipIf(!RUN)("Showdown versus battle bootstrap (C3v2b)", () => {
     expect(game.scene.gameMode.isShowdown).toBe(true);
     expect(game.scene.gameMode.isWaveFinal(1)).toBe(true);
     expect(game.scene.currentBattle.waveIndex).toBe(1);
+  });
+
+  it("applies the opponent's ghost-trainer profile to the enemy trainer + shiny-lab look to the mon (C7)", async () => {
+    // A 14-number encoded SavedLook whose first (loadout) byte is non-zero, so it decodes to a
+    // real look (normalizeErShinyLabSavedLook keeps it) and lands on the enemy mon's customPokemonData.
+    const look = [1, 2, 3, 200, 150, 100, 96, 0, 0, 0, 0, 0, 128, 128];
+    const opponent: ShowdownMonManifest[] = [
+      mon({ speciesId: SpeciesId.CHARIZARD, rootSpeciesId: SpeciesId.CHARMANDER, shiny: true, erShinyLab: look }),
+      mon({ speciesId: SpeciesId.BLASTOISE, rootSpeciesId: SpeciesId.SQUIRTLE, shiny: false }),
+    ];
+    const own: ShowdownMonManifest[] = [mon({ speciesId: SpeciesId.VENUSAUR, rootSpeciesId: SpeciesId.BULBASAUR })];
+
+    // The opponent authored an ACE_TRAINER sprite, a name + title, and the three dialogue lines
+    // (no placeholder tokens, so the lines assert literally).
+    const profile: GhostTrainerProfile = {
+      trainerType: TrainerType.ACE_TRAINER,
+      displayName: "Nightshade",
+      title: "The Undying",
+      dialogue: { intro: "Face me!", defeated: "You bested me.", defeatPlayer: "You never stood a chance." },
+    };
+
+    await runToShowdownCommand(game, own, opponent, [SpeciesId.VENUSAUR], profile);
+
+    const trainer = game.scene.currentBattle.trainer!;
+    // Sprite/class from the profile.
+    expect(trainer.config.trainerType).toBe(TrainerType.ACE_TRAINER);
+    // Name + title plate.
+    expect(trainer.name).toBe("Nightshade");
+    expect(trainer.getName(TrainerSlot.TRAINER, true)).toBe("The Undying Nightshade");
+    // The three dialogue arrays mapped from the profile (intro/defeated/defeatPlayer).
+    expect(trainer.getEncounterMessages()).toEqual(["Face me!"]);
+    expect(trainer.getVictoryMessages()).toEqual(["You bested me."]);
+    expect(trainer.getDefeatMessages()).toEqual(["You never stood a chance."]);
+
+    // The shiny mon's Shiny Lab look landed on its customPokemonData (suppress-local on, look restored);
+    // the non-shiny mon carries no look.
+    const enemyParty = game.scene.getEnemyParty();
+    expect(enemyParty[0].customPokemonData.erShinyLabSuppressLocal).toBe(true);
+    expect(enemyParty[0].customPokemonData.erShinyLab).toEqual(normalizeErShinyLabSavedLook(look));
+    expect(enemyParty[1].customPokemonData.erShinyLab).toBeUndefined();
   });
 });
