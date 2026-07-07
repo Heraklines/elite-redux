@@ -31,6 +31,7 @@
 
 import {
   applyResultReport,
+  finalizeExpiredLoneReport,
   isStakeRecord,
   type MatchRole,
   type ResultReason,
@@ -41,6 +42,7 @@ import {
   type SettlementMutation,
   type ShowdownMatchRecord,
   type StakeRecord,
+  voidMatch,
 } from "./showdown-escrow";
 
 interface Env {
@@ -2964,6 +2966,61 @@ async function finalizeSettlement(env: Env, m: ShowdownMatchRecord, now: number)
   await env.DB.batch(stmts);
 }
 
+/**
+ * M1: sweep a uid's OPEN matches and settle any lone survivor report past the silence window
+ * (lazy finalization on the pending poll — no cron). Best-effort; a sweep failure never blocks
+ * the poll (the caller still gets whatever rows already exist).
+ */
+async function sweepExpiredLoneReports(env: Env, uid: string): Promise<void> {
+  try {
+    const now = Date.now();
+    const { results } = await env.DB.prepare(
+      "SELECT * FROM showdown_matches WHERE state = 'open' AND (host_uid = ?1 OR guest_uid = ?1) LIMIT 50",
+    )
+      .bind(uid)
+      .all();
+    for (const row of results ?? []) {
+      const m = rowToMatch(row as Record<string, unknown>);
+      if (m == null) {
+        continue;
+      }
+      const finalized = finalizeExpiredLoneReport(m, now, SHOWDOWN_SILENCE_MS);
+      if (finalized.resolution === "settled" || finalized.resolution === "void") {
+        await finalizeSettlement(env, finalized.match, now);
+      }
+    }
+  } catch (err) {
+    console.error("er-save-api sweepExpiredLoneReports (non-fatal):", err);
+  }
+}
+
+async function handleShowdownVoid(request: Request, auth: TokenPayload, env: Env, cors: Record<string, string>) {
+  const now = Date.now();
+  if (showdownRateLimited(auth.u, now)) {
+    return text("Too many requests.", 429, cors);
+  }
+  const body = await readShowdownBody(request);
+  if (body == null) {
+    return json({ error: "invalid body" }, 400, cors);
+  }
+  await ensureShowdownTables(env);
+  const id = typeof body.matchId === "string" ? body.matchId : "";
+  const m = await loadMatch(env, id);
+  if (!m) {
+    return json({ error: "no such match" }, 404, cors);
+  }
+  if (roleOf(m, auth.u) === null) {
+    return json({ error: "not a participant" }, 403, cors);
+  }
+  // Idempotent: only an OPEN match transitions to void; a resolved match returns its state unchanged.
+  const voided = voidMatch(m, now);
+  if (voided !== m) {
+    // Release both stake holds via the same finalize path (void emits no settlement rows).
+    await finalizeSettlement(env, voided, now);
+  }
+  return json({ ok: true, state: voided.state }, 200, cors);
+}
+
 async function handleShowdownMatch(request: Request, auth: TokenPayload, env: Env, cors: Record<string, string>) {
   const now = Date.now();
   if (showdownRateLimited(auth.u, now)) {
@@ -2989,10 +3046,14 @@ async function handleShowdownMatch(request: Request, auth: TokenPayload, env: En
     return json({ error: "malformed stake" }, 400, cors);
   }
 
-  // Idempotent: a re-register of the same id just returns the existing match.
+  // Idempotent: a re-register of the same id returns the existing match. M3: surface the row's
+  // STATE explicitly and mark a TERMINAL row (settled/void) as not-ok, so the client treats a stale
+  // matchId as a failure (re-register fresh or fall back to Friendly) rather than entering battle on
+  // an already-resolved escrow.
   const existing = await loadMatch(env, id);
   if (existing) {
-    return json({ ok: true, matchId: existing.id, state: existing.state }, 200, cors);
+    const terminal = existing.state !== "open";
+    return json({ ok: !terminal, matchId: existing.id, state: existing.state }, 200, cors);
   }
 
   const reg = registerMatch(id, hostUid, guestUid, hostStake, guestStake, now);
@@ -3098,6 +3159,10 @@ async function handleShowdownResult(request: Request, auth: TokenPayload, env: E
 
 async function handleShowdownPending(auth: TokenPayload, env: Env, cors: Record<string, string>) {
   await ensureShowdownTables(env);
+  // M1 (lazy finalization, no cron): before returning rows, sweep THIS uid's OPEN matches and settle
+  // any lone survivor report that is now past the silence window - so an honest survivor's payout
+  // materializes on its next poll.
+  await sweepExpiredLoneReports(env, auth.u);
   const { results } = await env.DB.prepare(
     "SELECT id, match_id, mutation_json FROM showdown_settlements WHERE uid = ?1 AND applied_at IS NULL ORDER BY id ASC LIMIT 200",
   )
@@ -3282,6 +3347,9 @@ export default {
       }
       if (pathname === "/showdown/result" && method === "POST") {
         return await handleShowdownResult(request, auth, env, cors);
+      }
+      if (pathname === "/showdown/void" && method === "POST") {
+        return await handleShowdownVoid(request, auth, env, cors);
       }
       if (pathname === "/showdown/pending" && method === "GET") {
         return await handleShowdownPending(auth, env, cors);

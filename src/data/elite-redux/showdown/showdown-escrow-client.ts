@@ -78,7 +78,12 @@ export async function registerShowdownMatch(args: {
     return { ok: false, error: `escrow rejected (${res.status})` };
   }
   try {
-    const body = (await res.json()) as { matchId?: unknown };
+    const body = (await res.json()) as { matchId?: unknown; ok?: unknown; state?: unknown };
+    // M3: a TERMINAL existing row (settled/void) comes back ok:false with its state — treat a stale
+    // matchId as a failure so the caller re-registers fresh or falls back to Friendly.
+    if (body.ok === false) {
+      return { ok: false, error: `escrow match not open (${String(body.state ?? "terminal")})` };
+    }
     if (typeof body.matchId === "string") {
       return { ok: true, matchId: body.matchId };
     }
@@ -91,6 +96,14 @@ export async function registerShowdownMatch(args: {
 /** POST /showdown/battle-entered — both clients ping at battle start (sets the lone-report gate). Best-effort. */
 export async function reportShowdownBattleEntered(matchId: string): Promise<void> {
   await escrowFetch("/showdown/battle-entered", { method: "POST", body: JSON.stringify({ matchId }) });
+}
+
+/**
+ * POST /showdown/void — release both stake holds for a VOIDED staked match (I4). Best-effort +
+ * fire-and-forget; a failure only means the holds linger until the server's own resolution. Idempotent.
+ */
+export async function reportShowdownVoid(matchId: string): Promise<void> {
+  await escrowFetch("/showdown/void", { method: "POST", body: JSON.stringify({ matchId }) });
 }
 
 /**
@@ -150,24 +163,41 @@ export async function ackShowdownPending(ids: number[]): Promise<void> {
 }
 
 /**
- * Fetch → apply → ack any unapplied settlements for this player. Called at login/session
- * start (self-apply anything a match settled while this device was offline) AND right after
- * a staked match reports its result. Best-effort; returns the count applied (0 on any failure).
+ * Fetch → apply → persist → ack any unapplied settlements for this player. Called at login/session
+ * start (self-apply anything a match settled while this device was offline) AND right after a staked
+ * match reports its result. Best-effort; returns the count applied (0 on any failure).
  *
- * At-most-once caveat: the ack follows the local apply, so a rare apply-succeeds-then-ack-fails
- * window could re-return a row next sync. The server never returns an ACKED row, so the window
- * is a single failed ack; documented rather than adding a client-side dedupe ledger for wave 2.
+ * Correctness ordering (reviewer I2/I3): fetch → filter out ids already in the persisted ledger →
+ * apply the fresh ones (which appends their ids to the ledger, inside the account-write batch) →
+ * AWAIT `saveSystem(true)` → ack ONLY on save success. If the save fails we do NOT ack: the ledger
+ * (already persisted-or-not is retried) plus the server never re-serving an acked row keep re-apply
+ * safe, and the next login re-fetches and re-attempts the save+ack without re-mutating (ledger skip).
  */
 export async function syncShowdownPendingSettlements(gameData: SettlementGameData): Promise<number> {
   const items = await fetchShowdownPending();
   if (items.length === 0) {
     return 0;
   }
+  const ledger = new Set(Array.isArray(gameData.showdownAppliedSettlements) ? gameData.showdownAppliedSettlements : []);
+  const fresh = items.filter(i => !ledger.has(i.id));
+  if (fresh.length === 0) {
+    // Everything was already applied locally but the ack never landed (save/ack failed before).
+    // Re-ack (server-idempotent) so the rows finally clear; no mutation is re-run.
+    await ackShowdownPending(items.map(i => i.id));
+    return 0;
+  }
+  const freshIds = fresh.map(i => i.id);
   const applied = applySettlementMutations(
-    items.map(i => i.mutation),
+    fresh.map(i => i.mutation),
     gameData,
+    freshIds,
   );
-  if (applied > 0) {
+  if (applied === 0) {
+    return 0;
+  }
+  // I3: persist BEFORE acking. Ack (all fetched ids, incl. any already-in-ledger) ONLY on save success.
+  const saved = (await gameData.saveSystem?.(true)) ?? false;
+  if (saved) {
     await ackShowdownPending(items.map(i => i.id));
   }
   return applied;

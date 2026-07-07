@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 // worker-test pattern per the plan doc's Task D1).
 import {
   applyResultReport,
+  finalizeExpiredLoneReport,
   recordBattlePhaseEntered,
   registerMatch,
   resolveSettlement,
@@ -239,5 +240,43 @@ describe("resolveSettlement — mutation records", () => {
       erBlackShiny: false,
       cost: 5,
     });
+  });
+});
+
+describe("finalizeExpiredLoneReport (M1 lazy finalization)", () => {
+  it("settles a lone report once battle-entered AND the silence window has elapsed", () => {
+    let m = recordBattlePhaseEntered(freshMatch());
+    m = applyResultReport(m, "alice", "host", "timeout", 2000, SILENCE).match; // lone report at t=2000
+    // Before the window: pending.
+    expect(finalizeExpiredLoneReport(m, 2000 + SILENCE - 1, SILENCE).resolution).toBe("pending");
+    // After the window: settled to the reported winner.
+    const done = finalizeExpiredLoneReport(m, 2000 + SILENCE, SILENCE);
+    expect(done.resolution).toBe("settled");
+    expect(done.match.winner).toBe("host");
+  });
+
+  it("never finalizes without battlePhaseEntered, or with no/both reports", () => {
+    // No battle entered.
+    let pre = freshMatch();
+    pre = applyResultReport(pre, "alice", "host", "timeout", 2000, SILENCE).match;
+    expect(finalizeExpiredLoneReport(pre, 2000 + SILENCE * 10, SILENCE).resolution).toBe("pending");
+    // Battle entered but NO report.
+    const empty = recordBattlePhaseEntered(freshMatch());
+    expect(finalizeExpiredLoneReport(empty, 2000 + SILENCE * 10, SILENCE).resolution).toBe("pending");
+  });
+
+  it("is idempotent on an already-resolved match", () => {
+    let m = recordBattlePhaseEntered(freshMatch());
+    m = applyResultReport(m, "alice", "guest", "victory", 2000, SILENCE).match;
+    m = applyResultReport(m, "bob", "guest", "victory", 2001, SILENCE).match; // settled
+    expect(finalizeExpiredLoneReport(m, 9_999_999, SILENCE).resolution).toBe("settled");
+  });
+});
+
+describe("concurrency (M4): distinct stakes register independently", () => {
+  it("a player can register two matches with DIFFERENT stakes", () => {
+    const a = registerMatch("mA", "alice", "bob", nonShiny(8), nonShiny(8), 1000);
+    const b = registerMatch("mB", "alice", "carol", shiny(1), shiny(1), 1000);
+    expect(a.ok && b.ok).toBe(true);
   });
 });

@@ -54,6 +54,7 @@ function stubGameData(rootId: number, dex: DexEntry, starter: StarterDataEntry) 
     getRootStarterSpeciesId: (id: number) => id,
     getStarterDataEntry: (id: number) => (starterData[id] ??= starterEntry()),
     addStarterCandy,
+    showdownAppliedSettlements: [],
     saveSystem,
   };
   return { gameData, dexData, starterData, addStarterCandy, saveSystem };
@@ -95,14 +96,55 @@ describe("applySettlementMutations — removeUnlock bit surgery", () => {
     expect(starterData[1].candyCount).toBe(0);
   });
 
-  it("black-shiny stake lost: clears the erBlackShiny starter flag", () => {
+  it("black-shiny stake lost: clears the erBlackShiny flag + VARIANT_3 + SHINY, keeps base", () => {
     const caught = BASE | DexAttr.SHINY | DexAttr.VARIANT_3;
-    const { gameData, starterData } = stubGameData(6, dexEntry(caught), starterEntry({ erBlackShiny: true }));
+    const { gameData, dexData, starterData } = stubGameData(6, dexEntry(caught), starterEntry({ erBlackShiny: true }));
     applySettlementMutations(
       [{ kind: "removeUnlock", speciesId: 6, shiny: true, variant: 2, erBlackShiny: true, cost: 5 }],
       gameData,
     );
     expect(starterData[6].erBlackShiny).toBe(false);
+    expect(dexData[6].caughtAttr & DexAttr.VARIANT_3).toBe(0n);
+    expect(dexData[6].caughtAttr & DexAttr.SHINY).toBe(0n);
+    expect(dexData[6].caughtAttr & BASE).toBe(BASE);
+  });
+
+  // C1: multi-variant owner staking ONE variant keeps the other variant AND the species-global SHINY.
+  it("multi-variant shiny owner loses one variant: the other variant + SHINY survive", () => {
+    const caught = BASE | DexAttr.SHINY | DexAttr.VARIANT_2 | DexAttr.VARIANT_3;
+    const { gameData, dexData } = stubGameData(6, dexEntry(caught), starterEntry());
+    // Stake the variant-2 (VARIANT_3) shiny; the variant-1 (VARIANT_2) shiny is separately owned.
+    applySettlementMutations(
+      [{ kind: "removeUnlock", speciesId: 6, shiny: true, variant: 2, erBlackShiny: false, cost: 5 }],
+      gameData,
+    );
+    expect(dexData[6].caughtAttr & DexAttr.VARIANT_3).toBe(0n); // only the staked variant cleared
+    expect(dexData[6].caughtAttr & DexAttr.VARIANT_2).toBe(DexAttr.VARIANT_2); // other variant survives
+    expect(dexData[6].caughtAttr & DexAttr.SHINY).toBe(DexAttr.SHINY); // SHINY survives (variant remains)
+  });
+
+  // C2 both directions on a stub owning BOTH the black and regular variant-3 (indistinguishable bits).
+  it("black+regular-v3 owner: losing the BLACK clears the flag + VARIANT_3", () => {
+    const caught = BASE | DexAttr.SHINY | DexAttr.VARIANT_3;
+    const { gameData, dexData, starterData } = stubGameData(6, dexEntry(caught), starterEntry({ erBlackShiny: true }));
+    applySettlementMutations(
+      [{ kind: "removeUnlock", speciesId: 6, shiny: true, variant: 2, erBlackShiny: true, cost: 5 }],
+      gameData,
+    );
+    expect(starterData[6].erBlackShiny).toBe(false);
+    expect(dexData[6].caughtAttr & DexAttr.VARIANT_3).toBe(0n);
+  });
+
+  it("black+regular-v3 owner: losing the REGULAR v3 leaves VARIANT_3 + the black intact (flag-only)", () => {
+    const caught = BASE | DexAttr.SHINY | DexAttr.VARIANT_3;
+    const { gameData, dexData, starterData } = stubGameData(6, dexEntry(caught), starterEntry({ erBlackShiny: true }));
+    // A regular variant-2 (VARIANT_3) remove while the black is owned: the black still needs VARIANT_3.
+    applySettlementMutations(
+      [{ kind: "removeUnlock", speciesId: 6, shiny: true, variant: 2, erBlackShiny: false, cost: 5 }],
+      gameData,
+    );
+    expect(dexData[6].caughtAttr & DexAttr.VARIANT_3).toBe(DexAttr.VARIANT_3); // black still needs it
+    expect(starterData[6].erBlackShiny).toBe(true); // the black survives
   });
 });
 
@@ -149,6 +191,19 @@ describe("applySettlementMutations — grantUnlock", () => {
     // shiny v2 → 40 + 2*20 = 80 candy.
     expect(addStarterCandy).toHaveBeenCalledWith(6, 80);
   });
+
+  // I1: a BLACK grant to a winner who owns the regular variant-3 (VARIANT_3 bit set) but NOT the black
+  // flag must GRANT the black (set the flag + bits), never candy — the check keys on erBlackShiny.
+  it("black grant to a regular-v3 owner: sets the black flag, not candy", () => {
+    const owned = BASE | DexAttr.SHINY | DexAttr.VARIANT_3; // regular v3, but erBlackShiny=false
+    const { gameData, starterData, addStarterCandy } = stubGameData(6, dexEntry(owned), starterEntry());
+    applySettlementMutations(
+      [{ kind: "grantUnlock", speciesId: 6, shiny: true, variant: 2, erBlackShiny: true, cost: 5 }],
+      gameData,
+    );
+    expect(starterData[6].erBlackShiny).toBe(true);
+    expect(addStarterCandy).not.toHaveBeenCalled();
+  });
 });
 
 describe("settlementCandyAmount formula", () => {
@@ -175,12 +230,37 @@ describe("account-write gate", () => {
     expect(isCoopAccountWriteAllowed()).toBe(false);
   });
 
-  it("triggers a system-save push after applying", () => {
+  it("does NOT save itself (the sync orchestration owns the save→ack ordering)", () => {
     const { gameData, saveSystem } = stubGameData(1, dexEntry(0n), starterEntry());
     applySettlementMutations(
       [{ kind: "grantUnlock", speciesId: 1, shiny: false, variant: 0, erBlackShiny: false, cost: 5 }],
       gameData,
     );
-    expect(saveSystem).toHaveBeenCalledWith(true);
+    expect(saveSystem).not.toHaveBeenCalled();
+  });
+});
+
+describe("applied-settlement ledger (I2)", () => {
+  it("appends applied row ids to the ledger in the same batch", () => {
+    const { gameData } = stubGameData(1, dexEntry(0n), starterEntry());
+    applySettlementMutations(
+      [{ kind: "grantUnlock", speciesId: 1, shiny: false, variant: 0, erBlackShiny: false, cost: 5 }],
+      gameData,
+      [42, 43],
+    );
+    expect(gameData.showdownAppliedSettlements).toEqual([42, 43]);
+  });
+
+  it("dedupes and caps the ledger to the newest 200 ids (FIFO)", () => {
+    const { gameData } = stubGameData(1, dexEntry(0n), starterEntry());
+    gameData.showdownAppliedSettlements = Array.from({ length: 200 }, (_, i) => i); // 0..199
+    applySettlementMutations(
+      [{ kind: "grantCandy", speciesId: 1, candy: 5 }],
+      gameData,
+      [199, 200], // 199 is a dup; 200 is new
+    );
+    expect(gameData.showdownAppliedSettlements).toHaveLength(200);
+    expect(gameData.showdownAppliedSettlements.at(-1)).toBe(200);
+    expect(gameData.showdownAppliedSettlements.at(0)).toBe(1); // 0 evicted (FIFO)
   });
 });

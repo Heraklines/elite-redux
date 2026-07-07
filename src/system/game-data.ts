@@ -296,6 +296,9 @@ export class GameData {
   /** Persistent state for LLM Director runs (story bible, beat history, alignment, …). */
   public llmDirectorState: LLMDirectorState = defaultDirectorState();
 
+  /** Showdown 1v1 (D2/I2): applied-settlement row-id ledger (capped FIFO), persisted in the system save. */
+  public showdownAppliedSettlements: number[] = [];
+
   /**
    * @param fromRaw - If true, will skip initialization of fields that are normally randomized on new game start. Used for the admin panel; default `false`
    */
@@ -336,6 +339,7 @@ export class GameData {
     this.trainerFx = {};
     this.autoEggRestock = defaultAutoEggRestockSettings();
     this.llmDirectorState = defaultDirectorState();
+    this.showdownAppliedSettlements = [];
     this.initDexData();
     this.initStarterData();
     this.applyLocalAllStartersDebug();
@@ -360,6 +364,7 @@ export class GameData {
       unlockPity: this.unlockPity.slice(0),
       autoEggRestock: this.autoEggRestock,
       llmDirectorState: this.llmDirectorState,
+      showdownAppliedSettlements: this.showdownAppliedSettlements.slice(0),
       freeLegendaryEggsGranted: this.freeLegendaryEggsGranted,
       erShinyLabAvailableEffects: this.erShinyLabAvailableEffects.slice(0),
       ghostProfile: this.ghostProfile,
@@ -910,6 +915,9 @@ export class GameData {
 
     this.autoEggRestock = mergeAutoEggRestockSettings(systemData.autoEggRestock);
     this.llmDirectorState = mergeDirectorState(systemData.llmDirectorState);
+    this.showdownAppliedSettlements = Array.isArray(systemData.showdownAppliedSettlements)
+      ? systemData.showdownAppliedSettlements.filter(n => Number.isInteger(n)).slice(-200)
+      : [];
     this.erShinyLabAvailableEffects =
       systemData.erShinyLabAvailableEffects?.map(v => Math.max(0, Math.min(255, Math.round(v)))) ?? [];
     this.ghostProfile = sanitizeGhostProfile(systemData.ghostProfile) ?? null;

@@ -45,18 +45,35 @@ export function buildShowdownStakePool(gameData: StakePoolGameData): StakeOffer[
       continue; // not owned — nothing to stake from this line
     }
     const cost = (speciesStarterCosts as Record<number, number>)[rootId] ?? 0;
-    // Non-shiny species stake (the base line unlock).
-    offers.push({ speciesId: rootId, shiny: false, variant: 0, erBlackShiny: false, cost });
+    const isShiny = (entry.caughtAttr & DexAttr.SHINY) !== 0n;
+    const hasBlack = gameData.starterData[rootId]?.erBlackShiny === true;
+
+    // M2 (reviewer ruling): a NON-SHINY line stake ("lose the species") is offered ONLY when the
+    // line owns NO shiny variant — this keeps the "clear the whole line" removal from ever orphaning
+    // a shiny, since a shiny owner can never stake the bare species.
+    if (!isShiny) {
+      offers.push({ speciesId: rootId, shiny: false, variant: 0, erBlackShiny: false, cost });
+    }
+
     // One shiny stake per owned variant.
-    if (entry.caughtAttr & DexAttr.SHINY) {
+    if (isShiny) {
       for (const [variant, bit] of VARIANT_BITS) {
-        if (entry.caughtAttr & bit) {
-          offers.push({ speciesId: rootId, shiny: true, variant, erBlackShiny: false, cost });
+        if (!(entry.caughtAttr & bit)) {
+          continue;
         }
+        // C2 (reviewer ruling): when the line owns the BLACK shiny, the save model can't distinguish
+        // "owns black" from "owns black + regular v3" (they share the VARIANT_3 bit), so the regular
+        // variant-3 (v2) stake is SUPPRESSED — only the BLACK is stakeable for that top slot. Lower
+        // variants (v0/v1) stay individually stakeable.
+        if (variant === 2 && hasBlack) {
+          continue;
+        }
+        offers.push({ speciesId: rootId, shiny: true, variant, erBlackShiny: false, cost });
       }
     }
-    // ER black shiny (top tier).
-    if (gameData.starterData[rootId]?.erBlackShiny) {
+
+    // ER black shiny (top tier) — the only v3-tier stake when the black is owned.
+    if (hasBlack) {
       offers.push({ speciesId: rootId, shiny: true, variant: 2, erBlackShiny: true, cost });
     }
   }

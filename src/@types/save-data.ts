@@ -50,6 +50,12 @@ export interface SystemSaveData {
   /** Optional for back-compat with saves created before the LLM Director feature. */
   llmDirectorState?: LLMDirectorState;
   /**
+   * Showdown 1v1 (D2/I2): the applied-settlement ledger — showdown_settlements row ids already
+   * applied locally, capped FIFO. Lets an honest client skip re-applying a row whose server ack
+   * never landed. Optional for back-compat (absent = empty).
+   */
+  showdownAppliedSettlements?: number[];
+  /**
    * One-time gift flag: `true` once the player has received the free 2 Legendary
    * eggs grant. Absent on saves predating the grant (treated as `false`, so the
    * grant fires exactly once and never again). See

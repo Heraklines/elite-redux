@@ -47,9 +47,18 @@ export interface SettlementGameData {
   getRootStarterSpeciesId(speciesId: number): number;
   getStarterDataEntry(speciesId: number): StarterDataEntry;
   addStarterCandy(speciesId: number, count: number): boolean;
+  /**
+   * I2: the persisted applied-settlement ledger (showdown_settlements row ids already applied),
+   * capped FIFO. `syncShowdownPendingSettlements` skips ids in it, so a re-fetch after an ack that
+   * never landed can't double-apply. Persisted in the system save (back-compat optional there).
+   */
+  showdownAppliedSettlements: number[];
   /** Push the system save (dex/starter unlocks) to local + cloud. Optional so the stub can omit it. */
   saveSystem?(forceSync?: boolean): Promise<boolean>;
 }
+
+/** Cap on the persisted applied-settlement ledger (FIFO — the newest 200 ids are kept). */
+export const SHOWDOWN_LEDGER_CAP = 200;
 
 /** The higher shiny-tier dex bit for a stake variant (0 = base variant — never a shiny-only bit). */
 function shinyVariantBit(variant: number): bigint {
@@ -91,6 +100,9 @@ export function settlementCandyAmount(stake: {
 const BASE_CAUGHT_ATTR =
   DexAttr.NON_SHINY | DexAttr.MALE | DexAttr.FEMALE | DexAttr.DEFAULT_VARIANT | DexAttr.DEFAULT_FORM;
 
+/** The unambiguous shiny-TIER bits (v1/v2). DEFAULT_VARIANT is the shared base-form bit, not counted. */
+const SHINY_TIER_BITS = DexAttr.VARIANT_2 | DexAttr.VARIANT_3;
+
 /** True when this dex entry already owns the shiny variant the stake describes. */
 function ownsShinyVariant(entry: DexEntry, variant: number): boolean {
   if (!(entry.caughtAttr & DexAttr.SHINY)) {
@@ -101,31 +113,53 @@ function ownsShinyVariant(entry: DexEntry, variant: number): boolean {
   return bit === 0n ? true : (entry.caughtAttr & bit) !== 0n;
 }
 
+/** Clear the species-global SHINY flag ONLY when no shiny-tier variant bit (v1/v2) remains (C1). */
+function clearShinyIfNoVariantRemains(entry: DexEntry): void {
+  if ((entry.caughtAttr & SHINY_TIER_BITS) === 0n) {
+    entry.caughtAttr &= ~DexAttr.SHINY;
+  }
+}
+
 function applyRemoveUnlock(gameData: SettlementGameData, mut: ShowdownSettlementMutation & { kind: "removeUnlock" }) {
   const rootId = gameData.getRootStarterSpeciesId(mut.speciesId);
   const entry = gameData.dexData[rootId];
   if (!entry) {
     return;
   }
-  if (mut.shiny || mut.erBlackShiny) {
-    // Shiny stake: strip the SHINY flag + this variant's higher bit. NEVER clears
-    // DEFAULT_VARIANT / the base caught bits, so the underlying species stays unlocked.
-    let mask = DexAttr.SHINY | shinyVariantBit(mut.variant);
-    if (mut.erBlackShiny) {
-      mask |= DexAttr.VARIANT_3;
+  const starter = gameData.starterData[rootId];
+
+  if (mut.erBlackShiny) {
+    // C2 (pool-restricted model): losing the BLACK shiny. The regular variant-3 is NOT separately
+    // stakeable while black is owned (see buildShowdownStakePool), and the save model can't
+    // distinguish "owns black" from "owns black + regular v3" (they share the VARIANT_3 bit + the
+    // erBlackShiny flag), so losing black clears the flag + its backing VARIANT_3 bit, then clears
+    // the species-global SHINY only when no other shiny-tier variant survives.
+    if (starter) {
+      starter.erBlackShiny = false;
     }
-    entry.caughtAttr &= ~mask;
-    if (mut.erBlackShiny) {
-      const starter = gameData.starterData[rootId];
-      if (starter) {
-        starter.erBlackShiny = false;
-      }
+    entry.caughtAttr &= ~DexAttr.VARIANT_3;
+    clearShinyIfNoVariantRemains(entry);
+  } else if (mut.shiny) {
+    // C1: losing a REGULAR shiny variant. Clear ONLY this variant's dedicated bit; clear the
+    // species-global SHINY only when no OTHER shiny-tier variant bit remains. DEFAULT_VARIANT (v0)
+    // has no dedicated bit (it doubles as the base-form bit — the shared-bit exception), so a v0
+    // remove clears SHINY iff no higher variant survives, and is otherwise a no-op on the bits.
+    const bit = shinyVariantBit(mut.variant);
+    // Defensive (M2/C2 pool restrictions make this unreachable in practice): a regular v3 remove
+    // while the line STILL owns the black leaves VARIANT_3 alone (the black needs it) — flag-only
+    // bookkeeping, so the black survives.
+    if (bit === DexAttr.VARIANT_3 && starter?.erBlackShiny) {
+      return;
     }
+    if (bit !== 0n) {
+      entry.caughtAttr &= ~bit;
+    }
+    clearShinyIfNoVariantRemains(entry);
   } else {
-    // Species stake: the whole line unlock is forfeited — clear caughtAttr + zero the
-    // shared candy bucket (mirrors the er-redux-dex-redirect transfer idiom's reset).
+    // Non-shiny species stake (pool: only offered when the line owns NO shiny variant — see M2 in
+    // buildShowdownStakePool — so clearing the whole line can never orphan a shiny). Clear caughtAttr
+    // + zero the shared candy bucket (mirrors the er-redux-dex-redirect transfer idiom's reset).
     entry.caughtAttr = 0n;
-    const starter = gameData.starterData[rootId];
     if (starter) {
       starter.candyCount = 0;
     }
@@ -138,7 +172,17 @@ function applyGrantUnlock(gameData: SettlementGameData, mut: ShowdownSettlementM
   if (!entry) {
     return;
   }
-  const alreadyOwned = mut.shiny || mut.erBlackShiny ? ownsShinyVariant(entry, mut.variant) : entry.caughtAttr !== 0n;
+  // I1: a black-shiny grant's already-owned check keys on the erBlackShiny FLAG (not the VARIANT_3
+  // bit, which a regular v3 owner also sets) — so a winner who owns regular v3 but not the black is
+  // NOT "already owned" and is granted the black, never candy.
+  let alreadyOwned: boolean;
+  if (mut.erBlackShiny) {
+    alreadyOwned = gameData.starterData[rootId]?.erBlackShiny === true;
+  } else if (mut.shiny) {
+    alreadyOwned = ownsShinyVariant(entry, mut.variant);
+  } else {
+    alreadyOwned = entry.caughtAttr !== 0n;
+  }
   if (alreadyOwned) {
     // Already owned → candy conversion (the client decides this; the server can't read saves).
     gameData.addStarterCandy(rootId, settlementCandyAmount(mut));
@@ -162,17 +206,20 @@ function applyGrantUnlock(gameData: SettlementGameData, mut: ShowdownSettlementM
 }
 
 /**
- * Apply a batch of settlement mutations to `gameData` and push the system save.
- * Wrapped in the account-write allowlist scope; returns the count applied.
+ * Apply a batch of settlement mutations to `gameData`, appending `appliedIds` to the persisted
+ * ledger (I2, capped FIFO) INSIDE the same account-write allowlist scope as the apply. Does NOT
+ * push the save — the caller (`syncShowdownPendingSettlements`) controls the save→ack ordering
+ * (I3). Returns the count applied.
  */
 export function applySettlementMutations(
   mutations: ShowdownSettlementMutation[],
   gameData: SettlementGameData,
+  appliedIds: number[] = [],
 ): number {
   if (!Array.isArray(mutations) || mutations.length === 0) {
     return 0;
   }
-  const applied = coopAllowAccountWrite("showdown-settlement", () => {
+  return coopAllowAccountWrite("showdown-settlement", () => {
     let n = 0;
     for (const mut of mutations) {
       switch (mut.kind) {
@@ -190,12 +237,18 @@ export function applySettlementMutations(
           break;
       }
     }
+    // I2: record the applied row ids in the ledger (deduped, newest-200 FIFO) in the SAME batch,
+    // so a subsequent re-fetch (after an ack that never landed) skips them instead of re-mutating.
+    if (n > 0 && appliedIds.length > 0) {
+      const existing = Array.isArray(gameData.showdownAppliedSettlements) ? gameData.showdownAppliedSettlements : [];
+      const merged = [...existing];
+      for (const id of appliedIds) {
+        if (!merged.includes(id)) {
+          merged.push(id);
+        }
+      }
+      gameData.showdownAppliedSettlements = merged.slice(-SHOWDOWN_LEDGER_CAP);
+    }
     return n;
   });
-  if (applied > 0) {
-    // Persist the changed unlocks (local + cloud). Fire-and-forget: a failed push is
-    // re-attempted on the next save; settlement is idempotent server-side (acked rows).
-    void gameData.saveSystem?.(true);
-  }
-  return applied;
 }

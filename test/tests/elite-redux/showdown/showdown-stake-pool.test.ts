@@ -70,6 +70,30 @@ describe("buildShowdownStakePool", () => {
     expect(shinies).toEqual([0, 1, 2]); // default + variant2 + variant3 all owned
   });
 
+  // M2: a line that owns ANY shiny variant does NOT offer the bare non-shiny "lose the species" stake.
+  it("does NOT offer a non-shiny stake when the line owns a shiny", () => {
+    const caught = BASE | DexAttr.SHINY | DexAttr.DEFAULT_VARIANT;
+    const gd: StakePoolGameData = { dexData: { [A]: entry(caught) }, starterData: { [A]: starter() } };
+    const pool = buildShowdownStakePool(gd);
+    expect(pool.filter(o => !o.shiny && !o.erBlackShiny)).toHaveLength(0);
+    expect(pool.some(o => o.shiny)).toBe(true);
+  });
+
+  // C2: owning BOTH the black and regular variant-3, only the BLACK is stakeable for the top slot.
+  it("suppresses the regular variant-3 stake when the black is owned (black only)", () => {
+    const caught = BASE | DexAttr.SHINY | DexAttr.VARIANT_2 | DexAttr.VARIANT_3;
+    const gd: StakePoolGameData = {
+      dexData: { [A]: entry(caught) },
+      starterData: { [A]: starter({ erBlackShiny: true }) },
+    };
+    const pool = buildShowdownStakePool(gd);
+    // No REGULAR (non-black) variant-2 (VARIANT_3) offer.
+    expect(pool.filter(o => o.shiny && !o.erBlackShiny && o.variant === 2)).toHaveLength(0);
+    // The black IS offered; lower regular variants (v0/v1) still are.
+    expect(pool.filter(o => o.erBlackShiny)).toHaveLength(1);
+    expect(pool.filter(o => o.shiny && !o.erBlackShiny && o.variant === 1)).toHaveLength(1);
+  });
+
   it("emits a black-shiny stake at the top tier", () => {
     const caught = BASE | DexAttr.SHINY | DexAttr.VARIANT_3;
     const gd: StakePoolGameData = {

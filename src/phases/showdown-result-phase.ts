@@ -15,6 +15,7 @@ import {
 } from "#data/elite-redux/showdown/showdown-battle-state";
 import {
   reportShowdownResult,
+  reportShowdownVoid,
   syncShowdownPendingSettlements,
 } from "#data/elite-redux/showdown/showdown-escrow-client";
 import {
@@ -110,6 +111,9 @@ export class ShowdownResultPhase extends BattlePhase {
       void reportShowdownResult(matchId, winner, this.reason as ShowdownResultReason)
         .then(() => syncShowdownPendingSettlements(globalScene.gameData))
         .catch(() => {});
+    } else if (matchId != null && this.voided) {
+      // I4: a VOIDED staked match releases both escrow holds server-side (no winner to attest).
+      void reportShowdownVoid(matchId).catch(() => {});
     }
 
     // D5: seal + fire-and-forget the HOST's battle telemetry (no-op for the guest / no active record).

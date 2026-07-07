@@ -21,6 +21,16 @@
 // the battle actually started (`battlePhaseEntered`) AND the peer has been silent
 // past an injected silence timer (the survivor's forfeit/timeout win). A lone
 // report before the battle started never settles — the match voids instead.
+//
+// CONCURRENCY (M4): a stake HOLD is keyed by (uid, staked-unlock), NOT by player — so a
+// player MAY have several live matches at once AS LONG AS each stakes a DIFFERENT unlock.
+// Two matches trying to hold the SAME unlock for the same uid is what the conditional
+// hold-claim rejects; distinct stakes are deliberately allowed to run concurrently.
+//
+// LAZY FINALIZATION (M1): there is no cron. A lone survivor's report settles only after
+// the silence window, so `GET /showdown/pending` sweeps the caller's OPEN matches through
+// {@linkcode finalizeExpiredLoneReport} before returning rows — an honest survivor's payout
+// materializes the next time it polls, no background job required.
 // =============================================================================
 
 /**
@@ -284,6 +294,34 @@ export function applyResultReport(
     return { match: next, resolution: "settled" };
   }
   return { match: next, resolution: "pending" };
+}
+
+/**
+ * M1 (lazy finalization): settle an OPEN match that has a single lone report, once the battle was
+ * entered AND the silence window has elapsed. Called by `GET /showdown/pending` over the caller's
+ * open matches (no cron). A no-op (returns `pending`) for a match that isn't a settle-able lone
+ * report yet; idempotent for an already-resolved match.
+ */
+export function finalizeExpiredLoneReport(
+  match: ShowdownMatchRecord,
+  now: number,
+  silenceTimeoutMs: number,
+): ApplyReportResult {
+  if (match.state === "settled" || match.state === "void") {
+    return { match, resolution: match.state };
+  }
+  if (!match.battlePhaseEntered) {
+    return { match, resolution: "pending" };
+  }
+  const reports = [match.hostReport, match.guestReport].filter((r): r is ResultReport => r !== null);
+  if (reports.length !== 1) {
+    return { match, resolution: "pending" }; // no report, or both present (applyResultReport handles that)
+  }
+  const report = reports[0];
+  if (now - report.at >= silenceTimeoutMs) {
+    return { match: settle(match, report.winner, now), resolution: "settled" };
+  }
+  return { match, resolution: "pending" };
 }
 
 /** Void a match (conflict, illegal team, early disconnect). Idempotent; holds released by the worker. */
