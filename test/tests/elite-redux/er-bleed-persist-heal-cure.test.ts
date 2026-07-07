@@ -5,39 +5,41 @@
  */
 
 // =============================================================================
-// ER BLEED spec regression (the "Bleed isn't working how it's supposed to" bug).
-// The 2.65 dex spec: bleed (1) chips 1/16 max HP/turn, (2) prevents healing,
-// (3) negates stat boosts, (4) Rock/Ghost immune, (5) is removed ONLY by using a
-// healing MOVE (which then heals nothing), and (6) must NOT be removed by
-// switching out or by applying/curing a different status.
-//
-// Points 1-4 were already correct; this suite guards the two fixes:
-//   - point 5: a healing MOVE cures bleed and heals 0; a NON-move heal (Leftovers)
-//     heals 0 but leaves the bleed in place.
-//   - point 6: bleed survives a switch-out (it lived in summonData and was wiped),
-//     and a cure-all path no longer targets it (ER_AILMENT_TAGS excludes ER_BLEED).
+// ER BLEED cure spec - UPDATED per the maintainer directive (2026-07-07, the
+// "someone in prod cannot heal bleed through any means" report): every ER
+// status is curable through the NORMAL means (Full Heal / Lum / Heal Bell /
+// cure abilities), and bleed is ADDITIONALLY cured by ANY healing:
+//   - any PokemonHealPhase source (healing move, Leftovers, Wish, terrain,
+//     recovery abilities) - the heal is consumed to cure it, restoring no HP
+//     (the ROM's "prevents healing" flavor is kept);
+//   - any HP-restoring ITEM (Potion family) - which also heals normally.
+// Unchanged: bleed persists across switch-out; a fainted mon drops it.
+// (The old spec reading - healing MOVES only, cure-alls spare bleed - is
+// superseded; this suite was rewritten from asserting that behavior.)
 //
 // The battle cases are ER_SCENARIO=1 gated; the ER_AILMENT_TAGS membership check
 // is a plain unit assertion (no battle boot).
 // =============================================================================
 
+import { modifierTypes } from "#data/data-lists";
 import { ER_AILMENT_TAGS } from "#data/elite-redux/er-status-cure";
 import { AbilityId } from "#enums/ability-id";
 import { BattlerTagType } from "#enums/battler-tag-type";
 import { MoveId } from "#enums/move-id";
 import { SpeciesId } from "#enums/species-id";
+import { PokemonHpRestoreModifier, PokemonStatusHealModifier } from "#modifiers/modifier";
 import { GameManager } from "#test/framework/game-manager";
 import Phaser from "phaser";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, test } from "vitest";
 
 const RUN = process.env.ER_SCENARIO === "1";
 
-describe("ER BLEED - cure-all no longer targets bleed (point 6)", () => {
-  test("ER_AILMENT_TAGS excludes ER_BLEED but keeps frostbite + fear", () => {
+describe("ER BLEED - a normal cure-all clears bleed too (2026-07-07 directive)", () => {
+  test("ER_AILMENT_TAGS includes bleed, frostbite AND fear", () => {
     // A cure-all (Lum / Full Heal / Heal Bell / Natural Cure / Shed Skin / Healer)
-    // clears every tag in this set. Bleed must NOT be in it - only a healing move
-    // removes bleed.
-    expect(ER_AILMENT_TAGS).not.toContain(BattlerTagType.ER_BLEED);
+    // clears every tag in this set - since the 2026-07-07 directive that includes
+    // bleed (live players previously could not shake it off at all).
+    expect(ER_AILMENT_TAGS).toContain(BattlerTagType.ER_BLEED);
     expect(ER_AILMENT_TAGS).toContain(BattlerTagType.ER_FROSTBITE);
     expect(ER_AILMENT_TAGS).toContain(BattlerTagType.ER_FEAR);
   });
@@ -107,7 +109,7 @@ describe.skipIf(!RUN)("ER BLEED - persistence + heal-move-only cure", () => {
     expect(player.hp).toBe(hpBefore);
   });
 
-  it("point 5: a NON-move heal (Leftovers) restores 0 HP and does NOT cure bleed", async () => {
+  it("ANY heal source cures bleed: Leftovers restores 0 HP but removes the bleed", async () => {
     game.override.startingHeldItems([{ name: "LEFTOVERS" }]);
     await game.classicMode.startBattle(SpeciesId.SNORLAX);
     const player = game.field.getPlayerPokemon();
@@ -116,11 +118,41 @@ describe.skipIf(!RUN)("ER BLEED - persistence + heal-move-only cure", () => {
     const hpBefore = player.hp;
 
     game.move.select(MoveId.HARDEN);
-    await game.phaseInterceptor.to("TurnEndPhase");
+    // The Leftovers heal phase is unshifted DURING TurnEndPhase - run through to
+    // the next turn so it has actually resolved before asserting.
+    await game.toNextTurn();
 
-    // Leftovers is not a healing MOVE: it heals nothing on a bled mon and must
-    // leave the bleed in place, so the mon takes the net 1/16 chip this turn.
-    expect(player.getTag(BattlerTagType.ER_BLEED)).toBeDefined();
-    expect(player.hp).toBeLessThan(hpBefore);
+    // 2026-07-07 directive: ANY healing cures bleed. The Leftovers tick is
+    // consumed to cure it (no HP gained from it this turn).
+    expect(player.getTag(BattlerTagType.ER_BLEED)).toBeUndefined();
+    expect(player.hp).toBeLessThanOrEqual(hpBefore);
+  });
+
+  it("a Full Heal (status-cure item) clears bleed", async () => {
+    await game.classicMode.startBattle(SpeciesId.SNORLAX);
+    const player = game.field.getPlayerPokemon();
+    expect(player.addTag(BattlerTagType.ER_BLEED)).toBe(true);
+
+    const fullHeal = modifierTypes.FULL_HEAL().newModifier(player) as PokemonStatusHealModifier;
+    expect(fullHeal).toBeInstanceOf(PokemonStatusHealModifier);
+    expect(fullHeal.apply(player)).toBe(true);
+
+    expect(player.getTag(BattlerTagType.ER_BLEED)).toBeUndefined();
+  });
+
+  it("a plain Potion (HP-restore item) cures bleed AND heals normally", async () => {
+    await game.classicMode.startBattle(SpeciesId.SNORLAX);
+    const player = game.field.getPlayerPokemon();
+    player.hp = Math.floor(player.getMaxHp() / 2);
+    expect(player.addTag(BattlerTagType.ER_BLEED)).toBe(true);
+    const hpBefore = player.hp;
+
+    const potion = modifierTypes.POTION().newModifier(player) as PokemonHpRestoreModifier;
+    expect(potion).toBeInstanceOf(PokemonHpRestoreModifier);
+    expect(potion.apply(player, 1)).toBe(true);
+
+    // Items are the generous path: the bleed is cured AND the HP restores.
+    expect(player.getTag(BattlerTagType.ER_BLEED)).toBeUndefined();
+    expect(player.hp).toBeGreaterThan(hpBefore);
   });
 });

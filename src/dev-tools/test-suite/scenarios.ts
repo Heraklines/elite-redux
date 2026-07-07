@@ -1126,6 +1126,47 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
   },
   // ===========================================================================
+  // Status — BLEED is curable through any healing + any normal status cure
+  // ===========================================================================
+  {
+    label: "Bleed is curable: any heal or any status cure removes it",
+    description:
+      "Bleed cure fix ('someone in prod cannot heal bleed through any means'). Bleed used to be\n"
+      + "removable ONLY by a healing MOVE; per the new spec ALL ER statuses (bleed/frostbite/fear)\n"
+      + "are curable through normal means (Full Heal/Restore, Lum, Heal Bell, cure abilities), and\n"
+      + "bleed is ADDITIONALLY cured by ANY healing: any heal-over-time or healing move consumes\n"
+      + "the heal to cure it (restores 0 HP that tick), and any Potion-family item cures it while\n"
+      + "healing normally.\n"
+      + "DO: the foe has Blood Stain (spreads bleed on contact) - hit it with a CONTACT move\n"
+      + "(Body Slam/Crunch) so your mon starts bleeding. Then try each cure on separate runs:\n"
+      + "(a) Recover, (b) Rest, (c) win and use the guaranteed shop Potion or Full Heal on the\n"
+      + "bled mon.\n"
+      + "EXPECT: every one of those removes the bleeding ('...was healed!'). Nothing leaves you\n"
+      + "stuck bleeding.\n"
+      + "(Regression: test/tests/elite-redux/er-bleed-persist-heal-cure.test.ts +\n"
+      + "er-status-cure-generalization.test.ts.)",
+    shopItems: [modifierTypes.POTION, modifierTypes.FULL_HEAL],
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_WAVE_OVERRIDE: 1,
+        STARTING_LEVEL_OVERRIDE: 40,
+        ENEMY_LEVEL_OVERRIDE: 30,
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.SNORLAX,
+        ENEMY_ABILITY_OVERRIDE: erAbility(ErAbilityId.BLOOD_STAIN),
+        ENEMY_MOVESET_OVERRIDE: [MoveId.HARDEN],
+      });
+      return [
+        makeStarter(SpeciesId.SNORLAX, {
+          moveset: [MoveId.BODY_SLAM, MoveId.RECOVER, MoveId.CRUNCH, MoveId.REST],
+        }),
+        makeStarter(SpeciesId.PIKACHU, {
+          moveset: [MoveId.THUNDERBOLT, MoveId.QUICK_ATTACK, MoveId.SURF, MoveId.IRON_TAIL],
+        }),
+      ];
+    },
+  },
+  // ===========================================================================
   // Multi-format — TRIPLE: lone-vs-lone survivors can still target each other
   // ===========================================================================
   {

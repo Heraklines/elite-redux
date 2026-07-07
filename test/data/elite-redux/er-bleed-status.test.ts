@@ -36,8 +36,10 @@ describe("ER status — Bleed", () => {
       .enemyLevel(100)
       .enemyAbility(AbilityId.BALL_FETCH)
       .enemySpecies(SpeciesId.SHUCKLE)
-      .enemyMoveset(MoveId.SPLASH)
-      .moveset([MoveId.SPLASH, MoveId.RECOVER]);
+      // HARDEN as the no-op: ER's SPLASH maps to a 40-power damaging move, so
+      // using it here polluted the HP assertions (pre-existing red).
+      .enemyMoveset(MoveId.HARDEN)
+      .moveset([MoveId.HARDEN, MoveId.RECOVER]);
   });
 
   test("chips 1/16 max HP at turn end", async () => {
@@ -46,7 +48,7 @@ describe("ER status — Bleed", () => {
     player.addTag(BattlerTagType.ER_BLEED);
     const before = player.hp;
 
-    game.move.select(MoveId.SPLASH);
+    game.move.select(MoveId.HARDEN);
     await game.phaseInterceptor.to("TurnEndPhase");
 
     expect(before - player.hp).toBe(Math.max(Math.floor(player.getMaxHp() / 16), 1));

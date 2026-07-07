@@ -38,13 +38,17 @@ import type { Pokemon } from "#field/pokemon";
  *   - FEAR has no vanilla single-status analogue, so only the cure-ALL paths
  *     above remove it.
  *
- * BLEED is deliberately EXCLUDED: per the ER dex it is removed ONLY by using a
- * healing MOVE (Recover/Roost/Rest/...), handled in `PokemonHealPhase` via the
- * `isHealMove` discriminator. A cure-all (Lum/Full Heal/Heal Bell/Natural
- * Cure/Shed Skin/Healer) must NOT clear bleed, and switching it out must not
- * either (bleed persists across switch like a non-volatile status).
+ * BLEED is included per the maintainer directive (2026-07-07): every ER status
+ * is curable through the NORMAL means, and bleed is ADDITIONALLY cured by ANY
+ * healing - any HP-heal source in `PokemonHealPhase` (the heal is consumed to
+ * cure it, restoring no HP, per the ROM's "prevents healing") and any
+ * HP-restoring item (`PokemonHpRestoreModifier`). It still persists across
+ * switch like a non-volatile status. (The old dex-reading that reserved the
+ * cure for healing MOVES only is superseded - live players could effectively
+ * never shake bleed off.)
  */
 export const ER_AILMENT_TAGS: readonly BattlerTagType[] = [
+  BattlerTagType.ER_BLEED,
   BattlerTagType.ER_FROSTBITE,
   BattlerTagType.ER_FEAR,
 ] as const;
@@ -101,19 +105,13 @@ export function clearErAilments(pokemon: Pokemon): boolean {
 }
 
 /**
- * Clear EVERY ER status, INCLUDING Bleed — for the every-10-waves full-team REST
- * (`PartyHealPhase`), which is a Pokémon-Center-style full restore between waves.
- * This differs from {@linkcode clearErAilments} (which deliberately spares Bleed for
- * in-battle cure-alls per the dex): the between-wave rest should leave the party
- * fully healthy, so Bleed/Frostbite/Fear all clear.
+ * Clear EVERY ER status - kept as the {@linkcode PartyHealPhase} entry point
+ * (the every-10-waves full-team rest). Since Bleed joined
+ * {@linkcode ER_AILMENT_TAGS} (maintainer directive 2026-07-07), this is now an
+ * alias of {@linkcode clearErAilments}.
  *
  * @returns `true` if at least one ER status tag was removed.
  */
 export function clearAllErStatuses(pokemon: Pokemon): boolean {
-  let cleared = clearErAilments(pokemon);
-  if (pokemon.getTag(BattlerTagType.ER_BLEED) != null) {
-    pokemon.removeTag(BattlerTagType.ER_BLEED);
-    cleared = true;
-  }
-  return cleared;
+  return clearErAilments(pokemon);
 }

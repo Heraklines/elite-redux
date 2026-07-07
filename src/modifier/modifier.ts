@@ -2159,10 +2159,13 @@ export class PokemonHpRestoreModifier extends ConsumablePokemonModifier {
       }
       if (this.fainted || this.healStatus) {
         pokemon.resetStatus(true, true, false, false);
-        // Full Restore clears ER custom ailments (Frostbite / Fear) too; vanilla
-        // resetStatus only touches pokemon.status. (Bleed is deliberately spared per
-        // the dex - only a healing move clears it in battle.)
+        // Full Restore / Revive clear ER custom ailments (Bleed / Frostbite /
+        // Fear) too; vanilla resetStatus only touches pokemon.status.
         clearErAilments(pokemon);
+      } else if (pokemon.getTag(BattlerTagType.ER_BLEED) != null) {
+        // Bleed is cured by ANY healing (maintainer directive 2026-07-07) -
+        // a plain Potion counts. The item still restores its HP normally.
+        pokemon.removeTag(BattlerTagType.ER_BLEED);
       }
       pokemon.hp = Math.min(
         pokemon.hp

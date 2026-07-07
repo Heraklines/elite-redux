@@ -38,11 +38,14 @@ describe.skipIf(!RUN)("ER status cure generalization", () => {
     game = new GameManager(phaserGame);
   });
 
-  it("ER_AILMENT_TAGS holds frostbite + fear but NOT bleed (heal-move-only) or mechanical riders", () => {
-    // BLEED is deliberately EXCLUDED: per the ER dex it is removed ONLY by a healing
-    // move, never by a cure-all (Lum / Full Heal / Heal Bell / Natural Cure / ...).
-    expect([...ER_AILMENT_TAGS].sort()).toEqual([BattlerTagType.ER_FROSTBITE, BattlerTagType.ER_FEAR].sort());
-    expect(ER_AILMENT_TAGS).not.toContain(BattlerTagType.ER_BLEED);
+  it("ER_AILMENT_TAGS holds bleed + frostbite + fear but not the mechanical riders", () => {
+    // 2026-07-07 maintainer directive: ALL ER statuses (bleed included) are curable
+    // through the normal means (Lum / Full Heal / Heal Bell / Natural Cure / ...).
+    expect([...ER_AILMENT_TAGS].sort()).toEqual(
+      [BattlerTagType.ER_BLEED, BattlerTagType.ER_FROSTBITE, BattlerTagType.ER_FEAR].sort(),
+    );
+    expect(ER_AILMENT_TAGS).not.toContain(BattlerTagType.ER_ITEM_DISABLED);
+    expect(ER_AILMENT_TAGS).not.toContain(BattlerTagType.ER_ICE_STATUE);
   });
 
   // NB: the ER major statuses are mutually exclusive (a mon cannot be both
@@ -74,7 +77,7 @@ describe.skipIf(!RUN)("ER status cure generalization", () => {
     expect(clearErAilments(mon)).toBe(false);
   });
 
-  it("Heal Bell (cure-ALL move) does NOT clear ER Bleed (heal-move-only)", async () => {
+  it("Heal Bell (cure-ALL move) clears ER Bleed too (2026-07-07 directive)", async () => {
     game.override
       .battleStyle("single")
       .ability(AbilityId.BALL_FETCH)
@@ -92,7 +95,8 @@ describe.skipIf(!RUN)("ER status cure generalization", () => {
     game.move.select(MoveId.HEAL_BELL);
     await game.toNextTurn();
 
-    // ER BLEED is NEVER removed by a cure-all - only a healing move clears it.
-    expect(mon.getTag(BattlerTagType.ER_BLEED)).toBeDefined();
+    // Since the 2026-07-07 directive every normal cure-all clears bleed as well
+    // (live players previously could not remove it at all).
+    expect(mon.getTag(BattlerTagType.ER_BLEED)).toBeUndefined();
   });
 });
