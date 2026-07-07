@@ -42,10 +42,12 @@ import {
 } from "#data/elite-redux/coop/coop-biome-pin-state";
 import { coopLog, coopWarn } from "#data/elite-redux/coop/coop-debug";
 import { COOP_BIOME_WAIT_MS } from "#data/elite-redux/coop/coop-interaction-relay";
+import { getCoopRendezvousWaitMs } from "#data/elite-redux/coop/coop-rendezvous";
 import {
   advanceCoopInteractionForContinuation,
   getCoopController,
   getCoopInteractionRelay,
+  getCoopRendezvous,
   getCoopRuntime,
   getCoopUiMirror,
 } from "#data/elite-redux/coop/coop-runtime";
@@ -124,10 +126,6 @@ export class ErCrossroadsPhase extends Phase {
 
   /** Decide owner vs watcher off the pinned interaction counter and branch. */
   private async coopStart(controller: CoopSessionController): Promise<void> {
-    if (this.coopStartCounter < 0) {
-      this.coopStartCounter = controller.interactionCounter();
-    }
-    const pinned = this.coopStartCounter;
     // #848 test-scoped: a headless multi-wave test never answers the real Stay/Leave prompt. Under vitest
     // (unless the test drives the picker) resolve it DETERMINISTICALLY + SYNCHRONOUSLY, exactly like the
     // pre-#848 co-op bypass: NO interaction-counter tick and NO chained pin. This is required because the
@@ -135,12 +133,14 @@ export class ErCrossroadsPhase extends Phase {
     // would run this phase - a counter tick here would advance the host alone and breach the two-engine
     // LOCKSTEP invariant. Ticking is production behavior (both engines run the phase in lockstep, or the
     // guest runs it via VictoryPhase); the opted-in duo test exercises + asserts that path for real. Live
-    // builds (no VITEST) keep the real owner/watcher prompt with the counter tick below.
+    // builds (no VITEST) keep the real owner/watcher prompt with the counter tick below. This branch runs
+    // FIRST, before the #858 boundary barrier: an async await here would resume OUTSIDE the two-engine
+    // harness's per-client ctx swap and advance the WRONG engine.
     if (coopBiomePickerAutoResolvesInTest()) {
       const moveOn = erHasNotoriety(globalScene.currentBattle?.waveIndex ?? 0);
       coopLog(
         "reward",
-        `crossroads AUTO-RESOLVE (vitest, picker not driven, no counter tick) -> moveOn=${moveOn} pinned=${pinned} (#848)`,
+        `crossroads AUTO-RESOLVE (vitest, picker not driven, no counter tick) -> moveOn=${moveOn} (#848)`,
       );
       globalScene.ui.setMode(UiMode.MESSAGE);
       if (moveOn) {
@@ -153,6 +153,25 @@ export class ErCrossroadsPhase extends Phase {
       return;
     }
     const spoofed = getCoopRuntime()?.spoof != null;
+    // #858 BOUNDARY BARRIER: the every-10-waves biome shop and this every-5-waves crossroads are TWO
+    // owner-alternated interactions that fall on the SAME wave boundary. Reciprocally rendezvous here so
+    // BOTH clients have LEFT the shop (its interaction terminated on both) before EITHER pins this
+    // interaction's counter + splits owner/watcher. Without it, a partner that finished the shop and raced
+    // ahead into this crossroads (or whose shop-watch timed out while the owner legitimately still held the
+    // market) broadcasts an ADVANCED interaction counter; the lagging client's own shop-terminal advance
+    // then CATCHES UP past this interaction's counter (the coop-session `pendingRemote` fold), so it pins
+    // the WRONG counter, mismatches the relay seq, times out, and fires the deterministic Stay/Leave
+    // fallback ONE-SIDED -> one client leaves + changes biome while the other stays -> biome divergence.
+    // The barrier makes the pin below read in LOCKSTEP; the anti-hang fallback can then only fire when the
+    // owner is TRULY absent (both time out at the barrier together), never while it holds another screen and
+    // never one-sided. Skipped in the hotseat spoof path (no real peer to rendezvous with).
+    if (!spoofed) {
+      await this.coopAwaitBoundaryBarrier();
+    }
+    if (this.coopStartCounter < 0) {
+      this.coopStartCounter = controller.interactionCounter();
+    }
+    const pinned = this.coopStartCounter;
     const owns = spoofed || controller.isLocalOwnerAtCounter(pinned);
     coopLog(
       "reward",
@@ -162,6 +181,40 @@ export class ErCrossroadsPhase extends Phase {
       this.coopOwnerFlow(pinned);
     } else {
       await this.coopWatchFlow(pinned);
+    }
+  }
+
+  /**
+   * Co-op (#858): the reciprocal boundary barrier between the preceding biome-shop interaction and this
+   * one. Blocks until the PARTNER has ALSO reached this wave's crossroads (i.e. both clients have left the
+   * shop), so neither pins the interaction counter while the other still holds the shop. The point derives
+   * from the WAVE only (never the interaction counter - a drifting counter is the very thing this guards),
+   * so both clients compute it identically. A dead partner resolves via the anti-hang timeout (LOUD WARN)
+   * so this never strands the run. Never throws.
+   */
+  private async coopAwaitBoundaryBarrier(): Promise<void> {
+    try {
+      const rendezvous = getCoopRendezvous();
+      const wave = globalScene.currentBattle?.waveIndex ?? -1;
+      if (rendezvous == null || wave < 0) {
+        return;
+      }
+      const point = `xroads:${wave}`;
+      coopLog("rendezvous", `crossroads boundary barrier RENDEZVOUS ${point} (#858)`);
+      const result = await rendezvous.rendezvous(point, getCoopRendezvousWaitMs());
+      if (result.timedOut) {
+        coopWarn(
+          "rendezvous",
+          `crossroads boundary barrier ${point} TIMED OUT - partner never left the shop; proceeding (anti-hang) (#858)`,
+        );
+      } else if (result.crossPoint !== undefined) {
+        coopLog(
+          "rendezvous",
+          `crossroads boundary barrier ${point} CROSS-POINT release (partner at ${result.crossPoint}); proceeding (#858)`,
+        );
+      }
+    } catch (e) {
+      coopWarn("rendezvous", "crossroads boundary barrier threw (handled, proceeding) (#858)", e);
     }
   }
 

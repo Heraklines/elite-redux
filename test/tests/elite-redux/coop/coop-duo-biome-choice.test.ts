@@ -174,10 +174,15 @@ describe.skipIf(!RUN)("co-op DUO biome choice: owner-alternated + mirrored cross
     resolving: boolean;
   }
 
-  /** Drive the OWNER crossroads: start (opens mocked OPTION_SELECT), then press Stay(0)/Leave(1). */
+  /** Drive the OWNER crossroads: start (opens mocked OPTION_SELECT after the #858 boundary barrier), then
+   *  press Stay(0)/Leave(1). The owner drives alone here, so its reciprocal boundary barrier resolves via
+   *  the anti-hang timeout (setCoopRendezvousWaitMs(50)) - poll for the menu across it. */
   async function driveCrossroadsOwner(cap: UiCapture, moveOn: boolean): Promise<void> {
     const phase = new ErCrossroadsPhase();
     phase.start();
+    for (let i = 0; i < 80 && cap.optionConfig == null; i++) {
+      await drainLoopback();
+    }
     const opts = cap.optionConfig?.options;
     expect(opts, "owner crossroads opened the Stay/Leave menu (mirrored)").toBeDefined();
     // Press Stay (0) or Leave (1).
@@ -382,7 +387,9 @@ describe.skipIf(!RUN)("co-op DUO biome choice: owner-alternated + mirrored cross
       await withClient(watcherCtx, async () => {
         const phase = new SelectBiomePhase();
         phase.start();
-        for (let i = 0; i < 10; i++) {
+        // #858: the watcher first crosses its natural-pick boundary barrier (owner absent -> anti-hang
+        // timeout at setCoopRendezvousWaitMs(50)), THEN falls back on the mocked relay timeout - poll across.
+        for (let i = 0; i < 80; i++) {
           await drainLoopback();
           fallbackBiome = switchSpy.mock.calls.find(c => c[0] === "SwitchBiomePhase")?.[1] as BiomeId | undefined;
           if (fallbackBiome !== undefined) {

@@ -39,6 +39,7 @@ import {
   setCoopBiomePickerDrivenByTest,
 } from "#data/elite-redux/coop/coop-biome-pin-state";
 import { CoopInteractionRelay, setCoopWaveBarrierMs } from "#data/elite-redux/coop/coop-interaction-relay";
+import { resetCoopRendezvousWaitMs, setCoopRendezvousWaitMs } from "#data/elite-redux/coop/coop-rendezvous";
 import { clearCoopRuntime, setCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
 import { COOP_GUEST_FIELD_INDEX, COOP_HOST_FIELD_INDEX } from "#data/elite-redux/coop/coop-session";
 import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
@@ -100,6 +101,9 @@ describe.skipIf(!RUN)("#837 co-op full-save-data checksum digest + heal", () => 
 
   beforeEach(() => {
     setCoopWaveBarrierMs(50);
+    // #858: the biome-pick tests below drive one side at a time, so the boundary barrier resolves via the
+    // fast anti-hang timeout - keep it tiny + explicit (do not lean on the module-global vitest default).
+    setCoopRendezvousWaitMs(50);
     game = new GameManager(phaserGame);
     logs = installDuoLogCapture(`savedata-digest-${Date.now()}`);
     game.override
@@ -115,6 +119,7 @@ describe.skipIf(!RUN)("#837 co-op full-save-data checksum digest + heal", () => 
 
   afterEach(() => {
     setCoopWaveBarrierMs(60_000);
+    resetCoopRendezvousWaitMs();
     setCoopHarnessModuleLetIsolation(false);
     setErPendingNodes([]);
     resetErBiomeStructure();
@@ -417,10 +422,16 @@ describe.skipIf(!RUN)("#837 co-op full-save-data checksum digest + heal", () => 
     const ownerMock = mockErMap(ownerCtx.scene);
     const watcherMock = mockErMap(watcherCtx.scene);
     try {
-      // OWNER drives the real picker + relays its chosen biome (buffered for the watcher).
+      // OWNER drives the real picker + relays its chosen biome (buffered for the watcher). #858: the picker
+      // opens AFTER the reciprocal boundary barrier; driven alone here it resolves via the anti-hang timeout,
+      // so poll for the ER_MAP config across it before committing the pick.
       await withClient(ownerCtx, async () => {
         const phase = new SelectBiomePhase();
         phase.start();
+        for (let i = 0; i < 80 && ownerMock.box.onSelect == null; i++) {
+          await drainLoopback();
+        }
+        expect(ownerMock.box.onSelect, "owner opened the ER_MAP picker after the boundary barrier").toBeDefined();
         ownerMock.box.onSelect!(chosen);
         await drainLoopback();
       });
@@ -492,7 +503,9 @@ describe.skipIf(!RUN)("#837 co-op full-save-data checksum digest + heal", () => 
       const spy = vi.spyOn(watcherCtx.scene.phaseManager, "unshiftNew");
       const phase = new SelectBiomePhase();
       phase.start();
-      for (let i = 0; i < 10; i++) {
+      // #858: the watcher first crosses its natural-pick boundary barrier (owner absent -> anti-hang timeout),
+      // THEN falls back on the mocked relay timeout - poll across both.
+      for (let i = 0; i < 80; i++) {
         await drainLoopback();
         const biome = spy.mock.calls.find(c => c[0] === "SwitchBiomePhase")?.[1] as BiomeId | undefined;
         if (biome !== undefined) {

@@ -2217,6 +2217,36 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
   },
   {
+    label: "(note) Co-op: the wave-10 biome SHOP -> crossroads/map boundary no longer desyncs the biome (#858)",
+    description:
+      "CO-OP fix - verify with TWO clients (not a solo battle): at an every-10-waves boundary the biome\n"
+      + "SHOP and the #848 crossroads / World-Map biome pick fall on the SAME wave. They are two separate\n"
+      + "owner-alternated interactions and had NO barrier between them, so the faster player (the shop\n"
+      + "WATCHER, who becomes the crossroads OWNER) could finish the shop and race the whole crossroads +\n"
+      + "biome pick while the shop OWNER still had the market open. When the shopper finally left, its own\n"
+      + "shop-terminal counter advance FOLDED past the crossroads counter, so it pinned the wrong one,\n"
+      + "timed out the relay, and fired the Stay/Leave fallback ONE-SIDED: live wave-10 desync - the map\n"
+      + "opened on the non-shopping player, then JUMPED screens when the shop closed (freezing the\n"
+      + "shopper's input), and the other player advanced to wave 11 with NO biome change (a split run).\n"
+      + "Fixed with a reciprocal RENDEZVOUS barrier at the crossroads / biome-pick ENTRY: BOTH clients must\n"
+      + "have LEFT the shop before either pins the boundary interaction + splits owner/watcher, so neither\n"
+      + "can race ahead and the anti-hang fallback can only fire when the owner is TRULY gone (both fall\n"
+      + "back identically, never one-sided). DO (2 clients): reach a wave-10 x0 boundary where the biome\n"
+      + "shop opens AND a crossroads / map pick follows; have DIFFERENT players drive the shop vs the map,\n"
+      + "and try both orders (shopper leaves first / picker acts first). EXPECT: the shop closes on BOTH\n"
+      + "before the crossroads/map opens; exactly ONE player drives the map while the other watches (no\n"
+      + "frozen input, no screen jump); BOTH land in the SAME biome (or both Stay) and advance to the same\n"
+      + "next wave - never a one-sided biome change. Duo-tested headlessly in\n"
+      + "test/tests/elite-redux/coop/coop-duo-biome-boundary.test.ts.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({ STARTING_WAVE_OVERRIDE: 1, STARTING_LEVEL_OVERRIDE: 50 });
+      return [
+        makeStarter(SpeciesId.SNORLAX, { moveset: [MoveId.TACKLE, MoveId.BODY_SLAM, MoveId.REST, MoveId.SNORE] }),
+      ];
+    },
+  },
+  {
     label: "(note) Co-op: a faint replacement must not instantly re-KO on the chooser (#807)",
     description:
       "CO-OP fix - verify with TWO clients (not a solo battle): when the GUEST's active mon FAINTS and\n"

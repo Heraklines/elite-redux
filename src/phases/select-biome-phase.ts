@@ -8,10 +8,12 @@ import {
 } from "#data/elite-redux/coop/coop-biome-pin-state";
 import { coopLog, coopWarn } from "#data/elite-redux/coop/coop-debug";
 import { COOP_BIOME_WAIT_MS } from "#data/elite-redux/coop/coop-interaction-relay";
+import { getCoopRendezvousWaitMs } from "#data/elite-redux/coop/coop-rendezvous";
 import {
   advanceCoopInteractionForContinuation,
   getCoopController,
   getCoopInteractionRelay,
+  getCoopRendezvous,
   getCoopRuntime,
   getCoopUiMirror,
 } from "#data/elite-redux/coop/coop-runtime";
@@ -116,11 +118,11 @@ export class SelectBiomePhase extends BattlePhase {
         // the OWNER drives the real picker + streams its cursor, the WATCHER opens a read-only copy
         // and adopts the owner's relayed biome. Restore the CORE mechanic co-op used to amputate.
         if (coopController != null) {
-          if (this.coopAdvancePinned < 0) {
-            // Natural biome-end multi-node pick (not chained from a crossroads): pin its own counter.
-            this.coopAdvancePinned = coopController.interactionCounter();
-          }
-          this.coopBiomePickFlow(coopController, revealed, currentBiome, this.coopAdvancePinned);
+          // #858: the counter is pinned INSIDE coopBiomePickFlow, AFTER the boundary barrier (for a natural
+          // pick) - never here, where a partner racing ahead from the preceding biome-shop interaction could
+          // drift it. A chained crossroads-Leave already set coopAdvancePinned above (its crossroads entry
+          // barriered) and coopBiomePickFlow keeps it.
+          void this.coopBiomePickFlow(coopController, revealed, currentBiome);
           return;
         }
         // Present the choice as the branching World Map node picker (#486). Only the
@@ -207,28 +209,40 @@ export class SelectBiomePhase extends BattlePhase {
   // ---------------------------------------------------------------------------
 
   /** Decide owner vs watcher off the pinned interaction counter and branch. */
-  private coopBiomePickFlow(
+  private async coopBiomePickFlow(
     controller: CoopSessionController,
     revealed: ErRouteNode[],
     origin: BiomeId,
-    pinned: number,
-  ): void {
+  ): Promise<void> {
     // #848 test-scoped: a headless multi-wave test never picks a World-Map node. Under vitest (unless the
     // test drives the picker) AUTO-RESOLVE SYNCHRONOUSLY + deterministically on BOTH engines (generateNext
     // Biome off the just-reset shared wave seed -> identical biome -> both advance the pinned counter once,
     // staying in lockstep). Synchronous by design: an async relay/timer here would resume OUTSIDE the two-
     // engine harness's per-client ctx swap and advance the wrong engine. Production keeps the real
-    // owner/watcher picker below with no timeout.
+    // owner/watcher picker below with no timeout. (start() already returned for auto-resolve, so this branch
+    // is defensive; it runs BEFORE the #858 boundary barrier to keep the auto-resolve path synchronous.)
     if (coopBiomePickerAutoResolvesInTest()) {
       const biome = this.generateNextBiome(globalScene.currentBattle.waveIndex + 1);
-      coopLog(
-        "reward",
-        `biome pick AUTO-RESOLVE (vitest, picker not driven) -> biome=${BiomeId[biome]} pinned=${pinned} (#848)`,
-      );
+      coopLog("reward", `biome pick AUTO-RESOLVE (vitest, picker not driven) -> biome=${BiomeId[biome]} (#848)`);
       this.setNextBiomeAndEnd(biome);
       return;
     }
     const spoofed = getCoopRuntime()?.spoof != null;
+    // #858 BOUNDARY BARRIER: for a NATURAL biome-end pick (NOT chained from a crossroads Leave - that already
+    // barriered at its own crossroads entry) the preceding every-10-waves biome-shop interaction must
+    // terminate on BOTH clients before this interaction pins its counter. Same one-sided-fallback ->
+    // biome-divergence guard as the crossroads (see ErCrossroadsPhase.coopAwaitBoundaryBarrier): a partner
+    // that finished the shop and raced ahead could otherwise drift the lagging client's counter (the
+    // coop-session pendingRemote fold) past this interaction, mismatching the relay seq and forcing a
+    // one-sided deterministic fallback. Skipped when chained (already barriered) or spoofed (no real peer).
+    if (!this.coopChained && !spoofed) {
+      await this.coopAwaitBoundaryBarrier();
+    }
+    if (this.coopAdvancePinned < 0) {
+      // Natural biome-end multi-node pick: pin its own counter AFTER the boundary barrier, in lockstep.
+      this.coopAdvancePinned = controller.interactionCounter();
+    }
+    const pinned = this.coopAdvancePinned;
     const owns = spoofed || controller.isLocalOwnerAtCounter(pinned);
     coopLog(
       "reward",
@@ -237,7 +251,40 @@ export class SelectBiomePhase extends BattlePhase {
     if (owns) {
       this.coopBiomePickOwner(revealed, origin, pinned);
     } else {
-      void this.coopBiomePickWatch(revealed, origin, pinned);
+      await this.coopBiomePickWatch(revealed, origin, pinned);
+    }
+  }
+
+  /**
+   * Co-op (#858): the reciprocal boundary barrier between the preceding biome-shop interaction and a NATURAL
+   * biome-end pick. Blocks until the partner has ALSO reached this wave's biome choice (both left the shop),
+   * so neither pins the interaction counter while the other still holds the shop. The point derives from the
+   * WAVE only (never the drifting counter), so both compute it identically. A dead partner resolves via the
+   * anti-hang timeout (LOUD WARN) so this never strands the run. Never throws.
+   */
+  private async coopAwaitBoundaryBarrier(): Promise<void> {
+    try {
+      const rendezvous = getCoopRendezvous();
+      const wave = globalScene.currentBattle?.waveIndex ?? -1;
+      if (rendezvous == null || wave < 0) {
+        return;
+      }
+      const point = `biomepick:${wave}`;
+      coopLog("rendezvous", `biome-pick boundary barrier RENDEZVOUS ${point} (#858)`);
+      const result = await rendezvous.rendezvous(point, getCoopRendezvousWaitMs());
+      if (result.timedOut) {
+        coopWarn(
+          "rendezvous",
+          `biome-pick boundary barrier ${point} TIMED OUT - partner never left the shop; proceeding (anti-hang) (#858)`,
+        );
+      } else if (result.crossPoint !== undefined) {
+        coopLog(
+          "rendezvous",
+          `biome-pick boundary barrier ${point} CROSS-POINT release (partner at ${result.crossPoint}); proceeding (#858)`,
+        );
+      }
+    } catch (e) {
+      coopWarn("rendezvous", "biome-pick boundary barrier threw (handled, proceeding) (#858)", e);
     }
   }
 
