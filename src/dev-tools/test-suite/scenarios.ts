@@ -2265,6 +2265,30 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
   },
   {
+    label: "(note) Co-op: an IDLE connection no longer flaps disconnect/reconnect (#857)",
+    description:
+      "CO-OP P0 fix - verify with TWO REAL clients on staging (a live WebRTC path, NOT a solo battle or the\n"
+      + "loopback): two players used to connect fine, then flap disconnect/reconnect endlessly from\n"
+      + "starter-select onward (live 2026-07-07 jari/anon capture: gen=0 dies at ~31s with the peer seeing\n"
+      + "'User-Initiated Abort, reason=Close called', then #805 hot-rejoin re-dials forever). Root cause: an\n"
+      + "IDLE data channel (both humans parked at the pre-battle / resume barrier sending no game traffic)\n"
+      + "loses ICE consent freshness / its NAT-or-TURN binding at ~30s and the browser tears it down. Fixed:\n"
+      + "the transport now sends a tiny keepalive ping every 5s so an idle channel stays warm. DO (2 clients):\n"
+      + "pair up, both reach SELECT STARTER, then WAIT 60-90s WITHOUT touching anything. EXPECT: the\n"
+      + "connection stays up - NO 'Connection lost...' banner, no reconnect churn - and you can still pick +\n"
+      + "start normally. Also: a genuine drop now shows the REASON in the banner, and a version mismatch shows\n"
+      + "a persistent 'update your client (Ctrl+F5)' message instead of redial-looping. This is a browser/\n"
+      + "prod-only phenomenon (the ICE consent timeout can't reproduce headlessly), so it is unit-tested\n"
+      + "instead in test/tests/elite-redux/coop/coop-webrtc-transport.test.ts (the '#857 keepalive' block).",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({ STARTING_WAVE_OVERRIDE: 1, STARTING_LEVEL_OVERRIDE: 50 });
+      return [
+        makeStarter(SpeciesId.SNORLAX, { moveset: [MoveId.BODY_SLAM, MoveId.REST, MoveId.EARTHQUAKE, MoveId.CRUNCH] }),
+      ];
+    },
+  },
+  {
     label: "(note) Co-op: lone-survivor faint replacement seats in your OWN slot (#799)",
     description:
       "CO-OP fix - verify with TWO clients (not a solo battle): with a HEAVILY-fainted party (both sides\n"
