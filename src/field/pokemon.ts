@@ -4440,14 +4440,16 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
       } else {
         globalScene.fieldUI.moveAbove(this.battleInfo, otherBattleInfo);
       }
-      // Showdown 1v1 (C5): the panel slides IN from its on-screen corner; `presentationIsPlayerSide()`
-      // maps the flipped guest to that corner (identity off the versus-guest path). The exp-bar mask
-      // nudge stays keyed to `isPlayer()` (the exp bar is PlayerBattleInfo chrome, bound to the class).
+      // Showdown 1v1 (C5, reworked): the panel slides IN from its on-screen corner;
+      // `presentationIsPlayerSide()` maps the flipped guest to that corner (identity off the
+      // versus-guest path). The exp-bar mask nudge keys on the PANEL CLASS, not `isPlayer()` -
+      // under the flip a player-side mon wears the ENEMY panel (no expMaskRect), and the old
+      // isPlayer() guard dereferenced undefined and crashed the guest's summon (staging 2026-07-07).
       this.battleInfo.setX(this.battleInfo.x + (this.presentationIsPlayerSide() ? 150 : this.isBoss() ? -198 : -150));
       this.battleInfo.setVisible(true);
-      if (this.isPlayer()) {
+      if (this.battleInfo instanceof PlayerBattleInfo) {
         // TODO: How do you get this to not require a private property access?
-        this["battleInfo"].expMaskRect.x += 150;
+        this.battleInfo.expMaskRect.x += 150;
       }
       globalScene.tweens.add({
         targets: [this.battleInfo, this.battleInfo.expMaskRect],
@@ -4468,9 +4470,9 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
           duration: 500,
           ease: "Cubic.easeIn",
           onComplete: () => {
-            if (this.isPlayer()) {
-              // TODO: How do you get this to not require a private property access?
-              this["battleInfo"].expMaskRect.x -= 150;
+            // Panel-class keyed, mirroring showInfo (the flip decouples panel chrome from isPlayer()).
+            if (this.battleInfo instanceof PlayerBattleInfo) {
+              this.battleInfo.expMaskRect.x -= 150;
             }
             this.battleInfo.setVisible(false);
             this.battleInfo.setX(
