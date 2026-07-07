@@ -137,20 +137,25 @@ describe.skipIf(!RUN)("ER triple battles - positional adjacency in move targetin
     expect(bi(foes[2].getAdjacentAllies())).toEqual([4]); // enemy RIGHT <-> enemy centre
   });
 
-  it("a wing's single-target move fails (never the ally) when every reachable foe is dead", async () => {
-    // Bug: a single-target NEAR_OTHER move (foe OR ally selectable) auto-fell-back to the adjacent
-    // ALLY once the wing's two adjacent foes died while the wave kept going via a non-adjacent foe,
-    // so "attack the dead foe" hit your own teammate. It must fail (no reachable live foe) instead.
+  it("a LONE surviving foe counts as CENTER: the wing reaches it (no unwinnable stalemate)", async () => {
+    // Original bug guarded here: a single-target NEAR_OTHER move auto-fell-back to the adjacent
+    // ALLY once the wing's two adjacent foes died, so "attack" hit your own teammate.
+    // UPDATED SEMANTICS (2026-07-07 "one pokemon left and you can't hit it" report): a side's
+    // LONE active survivor is visually recentered by faint-phase, and targeting adjacency now
+    // agrees (effectiveBattlerId treats it as the CENTER slot). So the last foe IS reachable
+    // from a wing - a collapsed triple can always end - and the ally remains a MANUAL pick,
+    // never a forced fallback (the move stays single-target).
     await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.PIKACHU, SpeciesId.EEVEE);
     const pLeft = globalScene.getPlayerField()[0];
     const foes = globalScene.getEnemyField();
-    // Kill the LEFT wing's two adjacent foes (enemy LEFT@3 + CENTRE@4); RIGHT@5 (non-adjacent) lives.
+    // Kill the LEFT wing's two adjacent foes (enemy LEFT@3 + CENTRE@4); RIGHT@5 survives alone
+    // and therefore counts as recentered.
     foes[0].hp = 0;
     foes[1].hp = 0;
 
-    const dead = getMoveTargets(pLeft, MoveId.TACKLE).targets;
-    expect(dead).not.toContain(1); // NOT the adjacent ally (the reported bug)
-    expect(dead).toHaveLength(0); // no reachable live foe -> the move fails
+    const targets = getMoveTargets(pLeft, MoveId.TACKLE);
+    expect(targets.targets, "the lone (recentered) survivor is reachable from the wing").toContain(5);
+    expect(targets.multiple, "still a single manual pick - the ally is never force-hit").toBe(false);
   });
 
   it("keeps the ally selectable while a reachable foe is still alive", async () => {

@@ -1,4 +1,5 @@
 import { globalScene } from "#app/global-scene";
+import type { BattlerId } from "#data/battle-format";
 import { allMoves } from "#data/data-lists";
 import { BattlerIndex } from "#enums/battler-index";
 import { BattlerTagType } from "#enums/battler-tag-type";
@@ -198,8 +199,29 @@ function applyTripleAdjacency(user: Pokemon, move: Move, moveTarget: MoveTarget,
   if (move.type === PokemonType.FLYING || move.hasFlag(MoveFlags.PULSE_MOVE)) {
     return set;
   }
-  const userId = arrangement.locate(user.getBattlerIndex());
-  return set.filter(p => p === user || arrangement.isAdjacent(userId, arrangement.locate(p.getBattlerIndex())));
+  const userId = effectiveBattlerId(user);
+  return set.filter(p => p === user || arrangement.isAdjacent(userId, effectiveBattlerId(p)));
+}
+
+/**
+ * The battler's position for ADJACENCY purposes. A mon that is the ONLY active mon left
+ * on its side has been visually recentered (the faint-phase / summon recenter), so
+ * adjacency must treat it as the CENTER slot too - otherwise a triple that collapses to
+ * lone-vs-lone in opposite wings can never end: neither side can target the other (the
+ * "one pokemon left and you can't hit it" report). Everyone else keeps their slot id.
+ */
+export function effectiveBattlerId(pokemon: Pokemon): BattlerId {
+  const arrangement = globalScene.currentBattle.arrangement;
+  const id = arrangement.locate(pokemon.getBattlerIndex());
+  if (id.side < 0) {
+    return id;
+  }
+  const sideField = pokemon.isPlayer() ? globalScene.getPlayerField() : globalScene.getEnemyField();
+  const active = sideField.filter(p => p.isActive(true));
+  if (active.length === 1 && active[0] === pokemon) {
+    return { side: id.side, position: Math.floor((arrangement.capacityOf(id.side) - 1) / 2) };
+  }
+  return id;
 }
 
 export const frenzyMissFunc: UserMoveConditionFunc = (user: Pokemon, move: Move) => {

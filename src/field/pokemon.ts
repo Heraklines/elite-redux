@@ -210,7 +210,7 @@ import {
 } from "#modifiers/modifier";
 import { applyMoveAttrs } from "#moves/apply-attrs";
 import type { Move } from "#moves/move";
-import { getMoveTargets } from "#moves/move-utils";
+import { effectiveBattlerId, getMoveTargets } from "#moves/move-utils";
 import { PokemonMove } from "#moves/pokemon-move";
 import {
   ErShinyLabSpriteFxOverlay,
@@ -4523,8 +4523,9 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
     if (!arrangement) {
       return opponents;
     }
-    const selfId = arrangement.locate(this.getBattlerIndex());
-    return opponents.filter(p => arrangement.isAdjacent(selfId, arrangement.locate(p.getBattlerIndex())));
+    // effectiveBattlerId: a lone recentered survivor counts as CENTER (see move-utils).
+    const selfId = effectiveBattlerId(this);
+    return opponents.filter(p => arrangement.isAdjacent(selfId, effectiveBattlerId(p)));
   }
 
   getOpponentDescriptor(): string {
@@ -4553,8 +4554,9 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
     if (!arrangement) {
       return allies;
     }
-    const selfId = arrangement.locate(this.getBattlerIndex());
-    return allies.filter(p => arrangement.isAdjacent(selfId, arrangement.locate(p.getBattlerIndex())));
+    // effectiveBattlerId: a lone recentered survivor counts as CENTER (see move-utils).
+    const selfId = effectiveBattlerId(this);
+    return allies.filter(p => arrangement.isAdjacent(selfId, effectiveBattlerId(p)));
   }
 
   /**

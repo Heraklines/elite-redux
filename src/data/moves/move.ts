@@ -9787,7 +9787,11 @@ export class ForceLastAttr extends MoveEffectAttr {
 
 const failOnBossCondition: MoveConditionFunc = (_user, target, _move) => !target.isBossImmune();
 
-const failIfSingleBattle: MoveConditionFunc = (_user, _target, _move) => globalScene.currentBattle.double;
+// Multi-battle-only moves (Helping Hand, Follow Me, Ally Switch, ...). NB `double` is
+// FALSE in a triple (it means "exactly 2 slots"), so this must read the battler count -
+// the old `.double` read made every one of these moves fail in a 3v3.
+const failIfSingleBattle: MoveConditionFunc = (_user, _target, _move) =>
+  globalScene.currentBattle.getBattlerCount() > 1;
 
 const failIfLastCondition: MoveConditionFunc = () => globalScene.phaseManager.hasPhaseOfType("MovePhase");
 

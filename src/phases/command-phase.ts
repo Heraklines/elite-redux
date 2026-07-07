@@ -1228,8 +1228,13 @@ export class CommandPhase extends FieldPhase {
 
   cancel() {
     if (this.fieldIndex) {
-      globalScene.phaseManager.unshiftNew("CommandPhase", 0);
-      globalScene.phaseManager.unshiftNew("CommandPhase", 1);
+      // Re-queue EVERY slot up to and INCLUDING this one. The old hardcoded 0+1 pair
+      // dropped a triple's slot 2 from the turn when the player backed out of the third
+      // mon's prompt - its command stayed null and the turn ran without it (tester
+      // report: "press b to back up to the first mon, it skips your third mons move").
+      for (let i = 0; i <= this.fieldIndex; i++) {
+        globalScene.phaseManager.unshiftNew("CommandPhase", i);
+      }
       this.end();
     }
   }

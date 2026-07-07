@@ -1126,6 +1126,149 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
   },
   // ===========================================================================
+  // Multi-format — TRIPLE: lone-vs-lone survivors can still target each other
+  // ===========================================================================
+  {
+    label: "(triple) Lone survivor vs lone foe: you can still hit it",
+    description:
+      "Triple targeting fix. Reported: 'you defeat all the enemy pokemon, sometimes there's one\n"
+      + "pokemon left and you can't hit it' - with one player mon vs one foe in OPPOSITE wings,\n"
+      + "neither could target the other (a stalemate). Cause: the faint recenter was VISUAL only;\n"
+      + "targeting adjacency still used the original slot. Now a lone survivor counts as CENTER\n"
+      + "for targeting on both sides.\n"
+      + "DO: this is a 3v3 wild triple; your two side mons know Memento - self-faint BOTH (leaving\n"
+      + "only your LEFT Snorlax), then KO the two foes you can reach (left + middle).\n"
+      + "EXPECT: your lone mon slides to the middle and CAN target + hit the last remaining foe\n"
+      + "(and it can hit you back). No unhittable staring contest.\n"
+      + "(Unit-tested in test/tools/repro-triple-battle-bugs-3.test.ts '#6'.)",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_WAVE_OVERRIDE: 1,
+        STARTING_LEVEL_OVERRIDE: 60,
+        BATTLE_STYLE_OVERRIDE: "triple",
+        ENEMY_LEVEL_OVERRIDE: 5,
+      });
+      return [
+        makeStarter(SpeciesId.SNORLAX, {
+          moveset: [MoveId.BODY_SLAM, MoveId.TACKLE, MoveId.CRUNCH, MoveId.REST],
+        }),
+        makeStarter(SpeciesId.PIKACHU, {
+          moveset: [MoveId.MEMENTO, MoveId.THUNDERBOLT, MoveId.QUICK_ATTACK, MoveId.IRON_TAIL],
+        }),
+        makeStarter(SpeciesId.GENGAR, {
+          moveset: [MoveId.MEMENTO, MoveId.SHADOW_BALL, MoveId.SLUDGE_BOMB, MoveId.THUNDERBOLT],
+        }),
+      ];
+    },
+  },
+  // ===========================================================================
+  // Multi-format — TRIPLE: Helping Hand works (was failing in every 3v3)
+  // ===========================================================================
+  {
+    label: "(triple) Helping Hand works in a 3v3",
+    description:
+      "Triple move fix. Reported: 'Helping hand also doesn't work in 3v3' - it (and every other\n"
+      + "multi-battle-only move: Follow Me, Ally Switch, Coaching, ...) printed 'But it failed!'\n"
+      + "in a triple. Cause: their shared condition read `battle.double`, which is FALSE in a\n"
+      + "triple. Now it checks the battler count.\n"
+      + "DO: in this 3v3, use the LEFT mon's Helping Hand on your MIDDLE mon, then attack with the\n"
+      + "middle mon. Also try the MIDDLE mon's Helping Hand (it can pick either wing).\n"
+      + "EXPECT: 'X is ready to help Y!' - no 'But it failed!' - and the helped mon's attack hits\n"
+      + "noticeably harder (1.5x). (Unit-tested in test/tools/repro-triple-battle-bugs-3.test.ts '#7'.)",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_WAVE_OVERRIDE: 1,
+        STARTING_LEVEL_OVERRIDE: 60,
+        BATTLE_STYLE_OVERRIDE: "triple",
+        ENEMY_LEVEL_OVERRIDE: 20,
+      });
+      return [
+        makeStarter(SpeciesId.SNORLAX, {
+          moveset: [MoveId.HELPING_HAND, MoveId.BODY_SLAM, MoveId.CRUNCH, MoveId.REST],
+        }),
+        makeStarter(SpeciesId.PIKACHU, {
+          moveset: [MoveId.HELPING_HAND, MoveId.THUNDERBOLT, MoveId.QUICK_ATTACK, MoveId.SURF],
+        }),
+        makeStarter(SpeciesId.GARCHOMP, {
+          moveset: [MoveId.HELPING_HAND, MoveId.EARTHQUAKE, MoveId.DRAGON_CLAW, MoveId.STONE_EDGE],
+        }),
+      ];
+    },
+  },
+  // ===========================================================================
+  // Multi-format — TRIPLE: B-backout re-prompts ALL your mons (3rd not skipped)
+  // ===========================================================================
+  {
+    label: "(triple) Backing out (B) doesn't skip your 3rd mon's move",
+    description:
+      "Triple command-menu fix. Reported: 'pick your first and second mons moves then change your\n"
+      + "mind and press B to back up to the first mon again - it skips your third mons move\n"
+      + "entirely'. Cause: the backout re-queued only slots 1+2 (a doubles leftover), dropping the\n"
+      + "third slot's prompt; its command stayed empty and the turn ran without it.\n"
+      + "DO: pick a move for mon 1 and mon 2, then on mon 3's menu press B twice to back up to\n"
+      + "mon 1. Re-pick moves for ALL of them.\n"
+      + "EXPECT: after re-picking mon 1 and mon 2, mon 3 IS prompted again, and all three mons act\n"
+      + "this turn. (Unit-tested in test/tools/repro-triple-battle-bugs-3.test.ts '#8'.)",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_WAVE_OVERRIDE: 1,
+        STARTING_LEVEL_OVERRIDE: 60,
+        BATTLE_STYLE_OVERRIDE: "triple",
+        ENEMY_LEVEL_OVERRIDE: 20,
+      });
+      return [
+        makeStarter(SpeciesId.SNORLAX, {
+          moveset: [MoveId.BODY_SLAM, MoveId.EARTHQUAKE, MoveId.CRUNCH, MoveId.REST],
+        }),
+        makeStarter(SpeciesId.PIKACHU, {
+          moveset: [MoveId.THUNDERBOLT, MoveId.QUICK_ATTACK, MoveId.SURF, MoveId.IRON_TAIL],
+        }),
+        makeStarter(SpeciesId.GARCHOMP, {
+          moveset: [MoveId.EARTHQUAKE, MoveId.DRAGON_CLAW, MoveId.STONE_EDGE, MoveId.SWORDS_DANCE],
+        }),
+      ];
+    },
+  },
+  // ===========================================================================
+  // Multi-format — TRIPLE: trainer reserves refill fainted slots (no 2v3)
+  // ===========================================================================
+  {
+    label: "(triple) Trainer reserves refill fainted slots (no lasting 2v3)",
+    description:
+      "Triple trainer-battle guard. Reported: 'if the trainer has 4 pokemon, it will sometimes\n"
+      + "fail to send out a new pokemon and will resume it as a 2v3'. Single KOs, wing KOs,\n"
+      + "spread-move double-KOs and end-of-turn poison faints are all covered by unit tests\n"
+      + "(test/tools/repro-triple-battle-bugs-3.test.ts '#5a-#5d' - all green); if you can still\n"
+      + "reproduce a lasting 2v3, REPORT THE EXACT SITUATION (which slot fainted, from what).\n"
+      + "DO: fight triple TRAINER battles; KO foes in different slots, incl. two in one turn with\n"
+      + "Earthquake, while the trainer still has reserves.\n"
+      + "EXPECT: every KO'd slot is refilled while reserves remain - the enemy side never stays\n"
+      + "short-handed.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_WAVE_OVERRIDE: 5,
+        STARTING_LEVEL_OVERRIDE: 60,
+        BATTLE_STYLE_OVERRIDE: "triple",
+        ENEMY_LEVEL_OVERRIDE: 20,
+      });
+      return [
+        makeStarter(SpeciesId.SNORLAX, {
+          moveset: [MoveId.BODY_SLAM, MoveId.EARTHQUAKE, MoveId.CRUNCH, MoveId.REST],
+        }),
+        makeStarter(SpeciesId.PIKACHU, {
+          moveset: [MoveId.THUNDERBOLT, MoveId.QUICK_ATTACK, MoveId.SURF, MoveId.IRON_TAIL],
+        }),
+        makeStarter(SpeciesId.GARCHOMP, {
+          moveset: [MoveId.EARTHQUAKE, MoveId.DRAGON_CLAW, MoveId.STONE_EDGE, MoveId.SWORDS_DANCE],
+        }),
+      ];
+    },
+  },
+  // ===========================================================================
   // Combat — Cotton Down lowers FOES' Speed only, not the ally (double battle)
   // ===========================================================================
   {
