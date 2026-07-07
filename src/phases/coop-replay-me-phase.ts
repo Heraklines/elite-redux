@@ -18,7 +18,12 @@ import {
   setOnMePinCleared,
 } from "#data/elite-redux/coop/coop-me-pin-state";
 import { COOP_ME_BATTLE_HANDOFF, COOP_ME_TERM_SEQ_BASE } from "#data/elite-redux/coop/coop-me-pump";
-import { getCoopBattleStreamer, getCoopController, getCoopInteractionRelay } from "#data/elite-redux/coop/coop-runtime";
+import {
+  getCoopBattleStreamer,
+  getCoopController,
+  getCoopInteractionRelay,
+  getCoopUiMirror,
+} from "#data/elite-redux/coop/coop-runtime";
 import { COOP_ME_PUMP_SEQ_BASE } from "#data/elite-redux/coop/coop-seq-registry";
 import type { CoopInteractionOutcome } from "#data/elite-redux/coop/coop-transport";
 import type { ErQuizQuestion } from "#data/elite-redux/er-quiz";
@@ -788,6 +793,9 @@ export class CoopReplayMePhase extends Phase {
     // ME-battle-won victory-tail check is scoped to THIS battle (a stale flag can't misfire on a later one).
     setCoopMeHandoffBattleStarted(globalScene.currentBattle?.waveIndex ?? -1);
     hideCoopControllerTag();
+    // #854: force-close any lingering reward/ME cursor mirror before the spawned battle runs - a mirror
+    // an abandoned pre-battle embedded shop left open would otherwise overlay the ME battle's command UI.
+    getCoopUiMirror()?.endSession();
     // #819 (live BOTH-stuck at the ME battle): the guest's field is EMPTY here - its own
     // wave roll's summon chain was purged at the divert (#813) and the host's ME-battle
     // summons run in a phase only the host executes. Adopt the host's streamed battle party
@@ -952,6 +960,11 @@ export class CoopReplayMePhase extends Phase {
         coopLog("me", "detached ME terminal after watcher shop/quiz: leaving + advancing (#821/#818)", {
           counter: this.interactionCounter,
         });
+        // #854: force-close any lingering reward/ME cursor mirror. When the embedded watcher shop was
+        // ABANDONED (its watch crashed on a stale pick, or leaveEncounterWithoutBattle cleared its phase
+        // before it reached coopEndMirror), the reward uiMirror stayed OPEN and overlaid the continuing
+        // game ("the ME screen never dismisses"). endSession is idempotent - a no-op if already closed.
+        getCoopUiMirror()?.endSession();
         try {
           leaveEncounterWithoutBattle();
         } catch {
@@ -975,6 +988,9 @@ export class CoopReplayMePhase extends Phase {
       counter: this.interactionCounter,
     });
     hideCoopControllerTag();
+    // #854: force-close any lingering reward/ME cursor mirror at the ME terminal (see the detached
+    // branch above) - a mirror the abandoned embedded shop never closed must not overlay the next wave.
+    getCoopUiMirror()?.endSession();
     this.settled = true;
     coopMeHostPresentation = null;
     this.offMeMessage?.();

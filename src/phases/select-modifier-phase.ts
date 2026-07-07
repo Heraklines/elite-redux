@@ -460,6 +460,22 @@ export class SelectModifierPhase extends BattlePhase {
       shopOptions[
         rowCursor > 2 || shopOptions.length <= SHOP_OPTIONS_ROW_LIMIT ? cursor : cursor + SHOP_OPTIONS_ROW_LIMIT
       ];
+    // #854: an out-of-range relayed shop cursor (a stale/superseded pick, or a pool divergence) must
+    // NEVER crash the WATCHER on `shopOption.type` of undefined (the reward-branch sibling of the
+    // out-of-range guard in applyRelayedRewardAction). On the watcher, ignore it + keep waiting for the
+    // authoritative terminal; the owner path can't produce this from real UI, but degrade safely there too.
+    if (shopOption == null) {
+      if (this.coopWatcher) {
+        coopWarn(
+          "reward",
+          `WATCHER ignoring OUT-OF-RANGE relayed shop cursor row=${rowCursor} cursor=${cursor} (stock=${shopOptions.length}) `
+            + "- stale/divergent pick; keep waiting for the authoritative terminal (#854)",
+        );
+        return false;
+      }
+      globalScene.ui.playError();
+      return false;
+    }
     const modifierType = shopOption.type;
     // Apply Black Sludge to healing item cost
     const healingItemCost = new NumberHolder(shopOption.cost);
@@ -1507,6 +1523,25 @@ export class SelectModifierPhase extends BattlePhase {
       return false;
     }
     if (act === COOP_ACT_REWARD) {
+      // #854: a relayed reward cursor OUT OF RANGE of this client's adopted option pool is a wire
+      // anomaly - a stale/superseded pick left buffered on the reward seq (the live 'stuck after a
+      // mystery event' capture: a phantom `choice=4 data=[0]` sat in the reward inbox when the post-ME
+      // shop watch armed, while the ADOPTED pool held only 2 options), or a genuine pool divergence.
+      // Applying it read `typeOptions[cursor].type` of undefined and CRASHED the watcher
+      // (unhandledrejection) - killing the reward-shop phase FOREVER: the guest stranded a wave behind
+      // AND the reward-cursor uiMirror never closed (it overlaid the continuing game). Ignore it LOUDLY
+      // and keep waiting for the authoritative terminal (the owner's LEAVE, or the ME 9M terminal), which
+      // the cosmetic mirror is subordinate to - mirroring the uiMirror drain's #852 "never kill the
+      // watcher" defense-in-depth.
+      if (action.choice < 0 || action.choice >= this.typeOptions.length) {
+        this.coopRelayedMoney = -1;
+        coopWarn(
+          "reward",
+          `WATCHER ignoring OUT-OF-RANGE relayed reward cursor=${action.choice} (pool=${this.typeOptions.length}) `
+            + "- stale/divergent pick; keep waiting for the authoritative terminal (#854)",
+        );
+        return false;
+      }
       this.coopRelayedSlot = data[1] ?? -1;
       this.coopRelayedOption = data[2] ?? 0;
       // coopRelayedMoney (set above) drives applyModifier's set-verbatim for a PAID reward (#698);
