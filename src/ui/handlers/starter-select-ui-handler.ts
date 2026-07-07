@@ -46,6 +46,7 @@ import {
 import { resetErRunTrainerTracking } from "#data/elite-redux/er-trainer-runtime-hook";
 import { isMegaStage, listEvolutionStages, listMegaStages } from "#data/elite-redux/showdown/showdown-evolutions";
 import { SHOWDOWN_ITEM_POOL, type ShowdownItemKey } from "#data/elite-redux/showdown/showdown-item-pool";
+import { collectShowdownLegalMoves, collectUnlockedEggMoves } from "#data/elite-redux/showdown/showdown-legal-moves";
 import { buildUnlockSnapshot, starterToManifest } from "#data/elite-redux/showdown/showdown-manifest";
 import {
   COST_CAP,
@@ -2642,7 +2643,15 @@ export class StarterSelectUiHandler extends MessageUiHandler {
               },
             });
           }
-          if (this.speciesStarterMoves.length > 1) {
+          // Showdown (B7 item 3): the move-swap picker offers the FIELDED stage's FULL legal
+          // learnset (every level-up move at any level + TM/tutor moves + pre-evo inheritance)
+          // plus the line's unlocked egg moves - the exact set `isMoveLegal` accepts, so a
+          // picked move can never be rejected at start. Every other mode keeps the vanilla
+          // early-level `speciesStarterMoves` pool byte-for-byte.
+          const movePool: MoveId[] = globalScene.gameMode.isShowdown
+            ? this.showdownLegalMovePool()
+            : this.speciesStarterMoves;
+          if (movePool.length > 1) {
             // this lets you change the pokemon moves
             const showSwapOptions = (moveset: StarterMoveset) => {
               this.blockInput = true;
@@ -2663,7 +2672,7 @@ export class StarterSelectUiHandler extends MessageUiHandler {
                                 `${i18next.t("starterSelectUiHandler:selectMoveSwapWith")} ${allMoves[m].name}.`,
                                 null,
                                 () => {
-                                  const possibleMoves = this.speciesStarterMoves.filter((sm: MoveId) => sm !== m);
+                                  const possibleMoves = movePool.filter((sm: MoveId) => sm !== m);
                                   this.moveInfoOverlay.show(allMoves[possibleMoves[0]]);
 
                                   ui.setModeWithoutClear(UiMode.OPTION_SELECT, {
@@ -3915,6 +3924,41 @@ export class StarterSelectUiHandler extends MessageUiHandler {
     starter.showdownItem = selection.item;
   }
 
+  /**
+   * Showdown (B7 item 3): the FULL legal move pool for the current grid line's FIELDED
+   * stage - every level-up move (any level) + TM / tutor move of the fielded species (with
+   * pre-evolution inheritance) plus the line's UNLOCKED egg moves. Uses the SAME shared
+   * {@linkcode collectShowdownLegalMoves} helper as the validator's `isMoveLegal`, so the
+   * move-swap picker can never offer a move the start-time validator would reject. Only
+   * meaningful in showdown mode (the fielded stage falls back to the grid species otherwise).
+   */
+  private showdownLegalMovePool(): MoveId[] {
+    const rootId = this.lastSpecies.speciesId;
+    const selection = this.showdownSelections.get(rootId);
+    const fieldedSpeciesId = selection?.speciesId ?? rootId;
+    const eggBits = this.getSpeciesData(rootId).starterDataEntry.eggMoves;
+    return [...collectShowdownLegalMoves(rootId, fieldedSpeciesId, collectUnlockedEggMoves(rootId, eggBits))];
+  }
+
+  /**
+   * Showdown (B7 item 1): the PICKED Field Stage to RENDER for a line, or null when no stage
+   * was picked (or not in showdown mode) - the caller then renders the base grid species as
+   * before. Returns the concrete stage species + its form index so the preview sprite, the
+   * party mini-icon, and the grid icon all show the chosen evolution / mega instead of the
+   * base form. Purely a render override: the underlying dex cosmetics (shiny/variant/female)
+   * and the per-line Shiny Lab look are unaffected.
+   */
+  private showdownRenderStage(rootSpeciesId: number): { species: PokemonSpecies; formIndex: number } | null {
+    if (!globalScene.gameMode.isShowdown) {
+      return null;
+    }
+    const selection = this.showdownSelections.get(rootSpeciesId);
+    if (!selection) {
+      return null;
+    }
+    return { species: getPokemonSpecies(selection.speciesId as SpeciesId), formIndex: selection.formIndex };
+  }
+
   /** Showdown: true if a DIFFERENT in-party line is already fielding a mega/primal. */
   private showdownTeamHasOtherMega(rootSpeciesId: number): boolean {
     return this.starters.some(
@@ -3955,6 +3999,13 @@ export class StarterSelectUiHandler extends MessageUiHandler {
       this.starters[index].showdownSpeciesId = speciesId;
       this.starters[index].showdownFormIndex = formIndex;
       this.starters[index].showdownItem = selection.item;
+      // B7 item 1: refresh this line's party mini-icon to the newly picked stage.
+      this.updatePartyIcon(this.starterSpecies[index], index);
+    }
+    // B7 item 1: re-render the big preview sprite so the picked stage shows at once (the
+    // stage picker acts on the currently-highlighted line, so lastSpecies is this root).
+    if (this.lastSpecies?.speciesId === rootSpeciesId) {
+      this.refreshPreviewSprite();
     }
     return true;
   }
@@ -4053,14 +4104,21 @@ export class StarterSelectUiHandler extends MessageUiHandler {
 
   updatePartyIcon(species: PokemonSpecies, index: number) {
     const props = globalScene.gameData.getSpeciesDexAttrProps(species, this.getCurrentDexProps(species.speciesId));
-    this.starterIcons[index].setTexture(species.getIconAtlasKey(props.formIndex, props.shiny, props.variant));
-    this.starterIcons[index].setFrame(species.getIconId(props.female, props.formIndex, props.shiny, props.variant));
-    this.checkIconId(this.starterIcons[index], species, props.female, props.formIndex, props.shiny, props.variant);
+    // Showdown (B7 item 1): the party mini-icon shows the picked Field Stage's icon (evolution
+    // / mega), keeping the root pick's shiny/variant so it stays shiny-tinted. The FX cache key
+    // stays keyed on the ROOT species id so the per-slot identity is stable. Base behavior is
+    // byte-identical in every other mode (iconSpecies === species, iconFormIndex === props).
+    const renderStage = this.showdownRenderStage(species.speciesId);
+    const iconSpecies = renderStage?.species ?? species;
+    const iconFormIndex = renderStage?.formIndex ?? props.formIndex;
+    this.starterIcons[index].setTexture(iconSpecies.getIconAtlasKey(iconFormIndex, props.shiny, props.variant));
+    this.starterIcons[index].setFrame(iconSpecies.getIconId(props.female, iconFormIndex, props.shiny, props.variant));
+    this.checkIconId(this.starterIcons[index], iconSpecies, props.female, iconFormIndex, props.shiny, props.variant);
     this.refreshShinyLabIconFx(
       this.starterIcons[index],
-      species,
+      iconSpecies,
       props.female,
-      props.formIndex,
+      iconFormIndex,
       props.shiny,
       props.variant,
       `starter-party-shiny-lab-icon-${index}-${species.speciesId}`,
@@ -5624,6 +5682,14 @@ export class StarterSelectUiHandler extends MessageUiHandler {
     }
     const props = globalScene.gameData.getSpeciesDexAttrProps(species, this.getCurrentDexProps(species.speciesId));
     const female = props.female ?? false;
+    // Showdown (B7 item 1): when the line has a picked Field Stage (evolution / mega), the
+    // big preview shows THAT stage's species + form, not the base. The shiny/variant/female
+    // cosmetics still come from the root pick, and the Shiny Lab look stays keyed on the ROOT
+    // (its custom-shiny palette is per-line), so the picked stage still renders shiny-tinted.
+    // No-op in every non-showdown mode (renderSpecies === species, renderFormIndex === props).
+    const renderStage = this.showdownRenderStage(species.speciesId);
+    const renderSpecies = renderStage?.species ?? species;
+    const renderFormIndex = renderStage?.formIndex ?? props.formIndex;
     const labPreview = props.shiny ? this.getStarterShinyLabPreview(species.speciesId) : null;
     const labPaletteId = props.shiny
       ? (labPreview?.loadout.palette ?? getErShinyLabPaletteIdForSpecies(species.speciesId))
@@ -5632,7 +5698,7 @@ export class StarterSelectUiHandler extends MessageUiHandler {
     const labPaletteVariant: Variant = 0;
     const textureShiny = labPaletteId ? false : props.shiny;
     const textureVariant = labPaletteId ? labPaletteVariant : props.variant;
-    const spriteKey = species.getSpriteKey(female, props.formIndex, textureShiny, textureVariant);
+    const spriteKey = renderSpecies.getSpriteKey(female, renderFormIndex, textureShiny, textureVariant);
     const initialLabCacheKey = labPaletteId
       ? ensureErShinyLabPaletteVariantCache(spriteKey, labPaletteId, labPaletteVariant)
       : null;
@@ -5658,7 +5724,7 @@ export class StarterSelectUiHandler extends MessageUiHandler {
         : null;
       if (globalScene.anims.exists(spriteKey) && (!labPaletteId || labCacheKey)) {
         const shaderSpriteKey = labCacheKey ?? spriteKey;
-        this.speciesLoaded.set(species.speciesId, true);
+        this.speciesLoaded.set(renderSpecies.speciesId, true);
         this.pokemonSprite
           .play(spriteKey)
           .setPipelineData("shiny", labPaletteId ? true : props.shiny)
@@ -5687,12 +5753,12 @@ export class StarterSelectUiHandler extends MessageUiHandler {
     }
     this.spriteLoadInFlight = true;
     this.spriteLoadAttempts.set(spriteKey, (this.spriteLoadAttempts.get(spriteKey) ?? 0) + 1);
-    species
+    renderSpecies
       // spriteOnly: ER customs have no cry, and vanilla cries aren't needed in
       // the preview — skipping audio is what keeps the loader from piling up.
       // ER-custom species route through ErCustomSpecies.loadAssets here (its
       // `_shiny`/`_shiny2`/`_shiny3` paths), so all custom sprites still load.
-      .loadAssets(female, props.formIndex, textureShiny, textureVariant, true, false, true)
+      .loadAssets(female, renderFormIndex, textureShiny, textureVariant, true, false, true)
       .catch(() => {})
       .then(() => {
         this.spriteLoadInFlight = false;
@@ -6771,6 +6837,18 @@ export class StarterSelectUiHandler extends MessageUiHandler {
                 return true;
               },
             });
+            // Showdown 1v1 (B7 item 4): a versus match is a single level-100 fight, so the
+            // ER run difficulty (trainer roster tier / enemy-level scaling / shiny+candy
+            // multipliers) is purely cosmetic in a manifest-built 6v6. Skip the chooser on
+            // BOTH clients ("why am I picking Hell for one fight") and fix the neutral default
+            // ("ace" - the module DEFAULT_DIFFICULTY, a vanilla non-scaling tier). No host->guest
+            // difficulty handshake is needed: each client sets the same constant locally, and the
+            // host's startRun still broadcasts it for coherence. Placed BEFORE the co-op guest
+            // wait below so the versus guest never sits on "Waiting for the host to choose...".
+            if (globalScene.gameMode.isShowdown) {
+              startRun("ace");
+              return;
+            }
             // ER Community Challenge: a launched community card forces its run
             // difficulty (already applied to the gameMode in TitlePhase.end), so
             // skip the difficulty chooser and launch directly. Consume the gate so

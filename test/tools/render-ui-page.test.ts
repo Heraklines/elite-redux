@@ -772,9 +772,12 @@ const RECIPES: Record<string, Recipe> = {
   // Showdown teambuilder: forces SHOWDOWN mode so the cost panel reads the deferred
   // 999 limit and the party cap is the full 6 (PLAYER_PARTY_MAX_SIZE). Same real screen
   // the player builds their 1v1 duel team on. steps open the per-species action menu
-  // (ACTION) - step0 shows the showdown-only "Field Stage" + "Held Item" rows - then move
-  // to the "Held Item" row (DOWN x3) and open the held-item picker (ACTION) so the curated
-  // SHOWDOWN_ITEM_POOL (Leftovers, Shell Bell, ...) is captured in the final snapshot.
+  // (ACTION), walk to the showdown-only "Field Stage" row (DOWN x2), open the stage picker
+  // (ACTION), select a later EVOLUTION stage (DOWN x2 -> Venusaur), and pick it (ACTION).
+  // B7 item 1: the final STARTER_SELECT snapshot then shows the PICKED stage in the big
+  // preview sprite (evolution/mega, no longer the base form). NOTE (baseline drift): this
+  // recipe's golden baseline predates both the step change and the stage-render override -
+  // re-accept it with ER_UPDATE_BASELINE=1 (a fresh baseline for this recipe is expected).
   "starter-select-showdown": {
     mode: UiMode.STARTER_SELECT,
     prepare: game => {
@@ -784,7 +787,7 @@ const RECIPES: Record<string, Recipe> = {
       }
       return [() => {}];
     },
-    steps: [Button.ACTION, Button.DOWN, Button.DOWN, Button.DOWN, Button.ACTION],
+    steps: [Button.ACTION, Button.DOWN, Button.DOWN, Button.ACTION, Button.DOWN, Button.DOWN, Button.ACTION],
   },
   // Showdown WAGER screen (D3): both teams previewed (icons + held-item mini-icons + a mega badge),
   // the opponent's name/title, the stake picker + tier-match + lock lamps. Offline (transport/

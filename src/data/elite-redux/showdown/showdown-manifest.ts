@@ -6,16 +6,16 @@
  * The predicates read real save state (`dexData` caught/nature bits, `starterData`
  * ability/egg-move bits) but resolve line membership + move legality against the static
  * balance tables - so this module is unit-testable with a small stubbed `gameData` shape
- * and no engine boot. Move legality MIRRORS EXACTLY what starter-select lets a player
- * assemble: the species' early level-up moves (levels 1-5) plus its unlocked egg moves.
- * The fork exposes no TMs in starter select, so none are legal here.
+ * and no engine boot. Move legality (B7 item 3) is the FIELDED stage's FULL legal
+ * learnset - every level-up move (any level, incl. pre-evolution inheritance), every
+ * TM / tutor move - plus the line's UNLOCKED egg moves, computed by the shared
+ * {@linkcode collectShowdownLegalMoves} helper the teambuilder's move picker also uses.
  */
-import { speciesEggMoves } from "#balance/moves/egg-moves";
 import { pokemonPrevolutions } from "#balance/pokemon-evolutions";
-import { pokemonSpeciesLevelMoves } from "#balance/pokemon-level-moves";
 import { speciesStarterCosts } from "#balance/starters";
 import { erMegaTargetToBaseSpeciesId } from "#data/elite-redux/er-generic-pool-bans";
 import { SHOWDOWN_ITEM_POOL } from "#data/elite-redux/showdown/showdown-item-pool";
+import { collectShowdownLegalMoves, collectUnlockedEggMoves } from "#data/elite-redux/showdown/showdown-legal-moves";
 import type { ShowdownMonManifest, UnlockSnapshot } from "#data/elite-redux/showdown/showdown-team";
 import { DexAttr } from "#enums/dex-attr";
 import type { Starter } from "#types/save-data";
@@ -24,10 +24,6 @@ import type { Starter } from "#types/save-data";
 const SHOWDOWN_LEVEL = 100;
 /** Item fielded when the player never picked one - the first curated pool entry. */
 const DEFAULT_ITEM = SHOWDOWN_ITEM_POOL[0];
-/** Egg-move bitmask width (four egg-move slots per starter). */
-const EGG_MOVE_SLOTS = 4;
-/** Starter select auto-selects + lets the player assemble level-up moves up to this level. */
-const MAX_STARTER_MOVE_LEVEL = 5;
 
 /**
  * The slice of `GameData` the snapshot reads. The real `globalScene.gameData` satisfies this
@@ -80,30 +76,24 @@ export function starterToManifest(starter: Starter, _gameData: ShowdownUnlockGam
  * the caught/variant DexAttr bits) so the gate accepts exactly what the player owns.
  */
 export function buildUnlockSnapshot(gameData: ShowdownUnlockGameData): UnlockSnapshot {
-  // Memoize the per-root legal-move set: `isMoveLegal` is called once per move on the
-  // team, so without this the level-move + egg-move tables are rescanned for every move.
-  const moveCache = new Map<number, Set<number>>();
-  const collectStarterMoves = (rootSpeciesId: number): Set<number> => {
-    const cached = moveCache.get(rootSpeciesId);
+  // Memoize the per-(root, fielded-species) legal-move set: `isMoveLegal` is called once
+  // per move on the team, so without this the full learnset + egg tables are rescanned for
+  // every move. Keyed by BOTH ids because legality now depends on the FIELDED stage's
+  // learnset (level-up/TM/tutor) plus the ROOT's unlocked egg moves (B7 item 3).
+  const moveCache = new Map<string, Set<number>>();
+  const legalMovesFor = (rootSpeciesId: number, fieldedSpeciesId: number): Set<number> => {
+    const key = `${rootSpeciesId}:${fieldedSpeciesId}`;
+    const cached = moveCache.get(key);
     if (cached) {
       return cached;
     }
-    const pool = new Set<number>();
-    for (const [level, moveId] of pokemonSpeciesLevelMoves[rootSpeciesId] ?? []) {
-      if (level > 0 && level <= MAX_STARTER_MOVE_LEVEL) {
-        pool.add(moveId);
-      }
-    }
-    const eggMoves = speciesEggMoves[rootSpeciesId];
-    if (eggMoves) {
-      const eggBits = gameData.starterData[rootSpeciesId]?.eggMoves ?? 0;
-      for (let slot = 0; slot < EGG_MOVE_SLOTS; slot++) {
-        if (eggBits & (1 << slot)) {
-          pool.add(eggMoves[slot]);
-        }
-      }
-    }
-    moveCache.set(rootSpeciesId, pool);
+    const eggBits = gameData.starterData[rootSpeciesId]?.eggMoves ?? 0;
+    const pool = collectShowdownLegalMoves(
+      rootSpeciesId,
+      fieldedSpeciesId,
+      collectUnlockedEggMoves(rootSpeciesId, eggBits),
+    );
+    moveCache.set(key, pool);
     return pool;
   };
 
@@ -129,8 +119,8 @@ export function buildUnlockSnapshot(gameData: ShowdownUnlockGameData): UnlockSna
       const natureAttr = gameData.dexData[rootSpeciesId]?.natureAttr ?? 0;
       return (natureAttr & (1 << (nature + 1))) !== 0;
     },
-    isMoveLegal(rootSpeciesId, _speciesId, moveId) {
-      return collectStarterMoves(rootSpeciesId).has(moveId);
+    isMoveLegal(rootSpeciesId, speciesId, moveId) {
+      return legalMovesFor(rootSpeciesId, speciesId).has(moveId);
     },
     isSpeciesInLine(rootSpeciesId, speciesId) {
       // An ER custom mega-form species resolves to its base before walking the line.

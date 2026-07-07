@@ -2,6 +2,10 @@ import { erMegaTargetToBaseSpeciesId } from "#app/data/elite-redux/er-generic-po
 import { ER_ID_MAP } from "#app/data/elite-redux/er-id-map";
 import { ER_MEGA_FORMS } from "#app/data/elite-redux/er-mega-forms";
 import {
+  collectShowdownFreeMoves,
+  collectShowdownLegalMoves,
+} from "#app/data/elite-redux/showdown/showdown-legal-moves";
+import {
   buildUnlockSnapshot,
   type ShowdownUnlockGameData,
   starterToManifest,
@@ -9,7 +13,9 @@ import {
 import { MEGA_STONE_ITEM } from "#app/data/elite-redux/showdown/showdown-team";
 import { speciesEggMoves } from "#balance/moves/egg-moves";
 import { pokemonSpeciesLevelMoves } from "#balance/pokemon-level-moves";
+import { speciesTmMoves } from "#balance/tms";
 import { DexAttr } from "#enums/dex-attr";
+import type { MoveId } from "#enums/move-id";
 import { Nature } from "#enums/nature";
 import { SpeciesId } from "#enums/species-id";
 import type { Starter } from "#types/save-data";
@@ -191,35 +197,67 @@ describe("buildUnlockSnapshot", () => {
     });
   });
 
+  // B7 item 3: move legality is the FIELDED stage's FULL legal learnset (every level-up
+  // move at ANY level + TM/tutor + pre-evo inheritance) plus the line's UNLOCKED egg moves.
   describe("isMoveLegal", () => {
-    it("accepts an early (level 1-5) level-up move of the root", () => {
-      const early = (pokemonSpeciesLevelMoves[SpeciesId.CHARMANDER] ?? []).find(([lvl]) => lvl > 0 && lvl <= 5);
-      expect(early, "Charmander should have a level 1-5 move").toBeDefined();
+    it("accepts an early (level 1-5) level-up move of the fielded species", () => {
+      const early = (pokemonSpeciesLevelMoves[SpeciesId.CHARIZARD] ?? []).find(([lvl]) => lvl > 0 && lvl <= 5);
+      expect(early, "Charizard should have a level 1-5 move").toBeDefined();
       const snap = buildUnlockSnapshot(emptyGameData);
       expect(snap.isMoveLegal(SpeciesId.CHARMANDER, SpeciesId.CHARIZARD, early![1])).toBe(true);
     });
 
-    it("rejects a move that is neither an early level-up move nor an unlocked egg move", () => {
+    it("accepts a HIGH-level (level > 5) level-up move of the fielded species (widened)", () => {
+      const late = (pokemonSpeciesLevelMoves[SpeciesId.CHARIZARD] ?? []).find(([lvl]) => lvl > 5);
+      expect(late, "Charizard should have a level > 5 move").toBeDefined();
+      const snap = buildUnlockSnapshot(emptyGameData);
+      expect(snap.isMoveLegal(SpeciesId.CHARMANDER, SpeciesId.CHARIZARD, late![1])).toBe(true);
+    });
+
+    it("accepts a TM/tutor move that is NOT a level-up move of the fielded species", () => {
+      // A move Charizard learns only by TM (in `speciesTmMoves`) and never by level-up.
+      const levelMoveIds = new Set((pokemonSpeciesLevelMoves[SpeciesId.CHARIZARD] ?? []).map(([, mv]) => mv));
+      const tmEntries = speciesTmMoves[SpeciesId.CHARIZARD] ?? [];
+      const tmOnly = tmEntries
+        .map(entry => (Array.isArray(entry) ? entry[1] : entry))
+        .find(mv => !levelMoveIds.has(mv));
+      expect(tmOnly, "Charizard should have a TM-only move").toBeDefined();
+      const snap = buildUnlockSnapshot(emptyGameData);
+      expect(snap.isMoveLegal(SpeciesId.CHARMANDER, SpeciesId.CHARIZARD, tmOnly!)).toBe(true);
+    });
+
+    it("rejects a move the fielded species cannot learn by any free source or unlocked egg", () => {
       const snap = buildUnlockSnapshot(emptyGameData);
       expect(snap.isMoveLegal(SpeciesId.CHARMANDER, SpeciesId.CHARIZARD, 999999)).toBe(false);
     });
 
-    it("accepts an egg move only once its slot bit is unlocked", () => {
+    it("keeps a PURE egg move (not in the free learnset) unlock-gated on the root", () => {
       const eggMoves = speciesEggMoves[SpeciesId.CHARMANDER];
       expect(eggMoves, "Charmander should have egg moves").toBeDefined();
+      // Field Charmander itself (root == fielded) so egg-move gating is the ONLY variable.
+      const free = collectShowdownFreeMoves(SpeciesId.CHARMANDER, SpeciesId.CHARMANDER);
+      // Pick an egg move that is genuinely EARNED - not already free via level-up/TM/tutor.
+      const pureEgg = eggMoves.find((mv, slot) => slot < 4 && mv != null && !free.has(mv));
+      expect(pureEgg, "Charmander should have an egg move outside its free learnset").toBeDefined();
+      const slot = eggMoves.indexOf(pureEgg!);
       const locked = buildUnlockSnapshot(
         gameData({ starterData: { [SpeciesId.CHARMANDER]: { abilityAttr: 0, eggMoves: 0 } } }),
       );
       const unlocked = buildUnlockSnapshot(
-        gameData({ starterData: { [SpeciesId.CHARMANDER]: { abilityAttr: 0, eggMoves: 0b0001 } } }),
+        gameData({ starterData: { [SpeciesId.CHARMANDER]: { abilityAttr: 0, eggMoves: 1 << slot } } }),
       );
-      // The first egg move is illegal while its slot is locked, legal once unlocked -
-      // unless it happens to double as an early level-up move (then it is always legal).
-      const isAlsoLevelMove = (pokemonSpeciesLevelMoves[SpeciesId.CHARMANDER] ?? []).some(
-        ([lvl, mv]) => lvl > 0 && lvl <= 5 && mv === eggMoves[0],
-      );
-      expect(locked.isMoveLegal(SpeciesId.CHARMANDER, SpeciesId.CHARMANDER, eggMoves[0])).toBe(isAlsoLevelMove);
-      expect(unlocked.isMoveLegal(SpeciesId.CHARMANDER, SpeciesId.CHARMANDER, eggMoves[0])).toBe(true);
+      expect(locked.isMoveLegal(SpeciesId.CHARMANDER, SpeciesId.CHARMANDER, pureEgg!)).toBe(false);
+      expect(unlocked.isMoveLegal(SpeciesId.CHARMANDER, SpeciesId.CHARMANDER, pureEgg!)).toBe(true);
+    });
+
+    it("collectShowdownLegalMoves unions the free learnset with the supplied unlocked egg moves", () => {
+      const fakeEgg = 999999 as MoveId;
+      const free = collectShowdownFreeMoves(SpeciesId.CHARMANDER, SpeciesId.CHARIZARD);
+      const withEgg = collectShowdownLegalMoves(SpeciesId.CHARMANDER, SpeciesId.CHARIZARD, [fakeEgg]);
+      expect(withEgg.has(fakeEgg)).toBe(true);
+      for (const mv of free) {
+        expect(withEgg.has(mv)).toBe(true);
+      }
     });
   });
 
