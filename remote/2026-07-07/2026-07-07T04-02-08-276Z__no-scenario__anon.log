@@ -1,0 +1,261 @@
+url:      https://elite-redux-staging.pages.dev/
+build:    mra3pslw-9a5
+mode:     6  wave:2
+seed:     QlUoolv1Uz9b9pHV8d7laOqt
+party:    Unown(L5 19hp f28), Fennekin(L5 19hp f0), Wurmple(L5 21hp f0), Ledyba(L5 20hp f0), Goldeen(L5 21hp f0), Pidove(L5 23hp f0)
+enemy:    
+
+----- COMMENT -----
+party is full when getting a pokemon and none of the players can choose to replace a mon or not take it, the selection is stuck.
+
+----- CONSOLE -----
+[04:00:28.830] LOG: %cStart Phase MessagePhase color:green;
+[04:00:29.110] LOG: %cStart Phase FaintPhase color:green;
+[04:00:29.204] LOG: %cStart Phase MessagePhase color:green;
+[04:00:32.799] LOG: %cStart Phase VictoryPhase color:green;
+[04:00:32.799] LOG: [coop:progression] HOST applyPartyExp COMPUTE wave=1 expValue=20.6 koMon=Rookidee
+[04:00:32.802] LOG: [coop:runtime] send waveResolved wave=1 outcome=win (host)
+[04:00:32.802] LOG: [coop:replay] host SEND waveResolved wave=1 outcome=win
+[04:00:32.802] LOG: [coop:webrtc] raw tx role=host t=waveResolved bytes=45
+[04:00:32.805] LOG: %cStart Phase ExpPhase color:green;
+[04:00:32.981] LOG: %cStart Phase ExpPhase color:green;
+[04:00:33.212] LOG: %cStart Phase MoveEndPhase color:green;
+[04:00:33.213] LOG: %cStart Phase MovePhase color:green;
+[04:00:33.213] LOG: %cStart Phase MoveEndPhase color:green;
+[04:00:33.214] LOG: %cStart Phase CheckInterludePhase color:green;
+[04:00:33.214] LOG: %cStart Phase WeatherEffectPhase color:green;
+[04:00:33.215] LOG: %cStart Phase PositionalTagPhase color:green;
+[04:00:33.215] LOG: %cStart Phase BerryPhase color:green;
+[04:00:33.220] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[04:00:33.223] LOG: %cStart Phase TurnEndPhase color:green;
+[04:00:33.231] LOG: [coop:turn] host recorder: finalize turn=1 events=11 seq=11
+[04:00:33.236] LOG: [coop:checkpoint] build field=4 weather=0/0 terrain=0/0 arenaTags=0 money=1000 mons=[bi0:sp201/hp19-22/st0/fnt0 bi1:sp653/hp19-19/st0/fnt0 bi2:sp821/hp0-13/st7/fnt1 bi3:sp273/hp0-13/st7/fnt1]
+[04:00:33.236] LOG: [coop:checkpoint] host capture field=4 weather=0 terrain=0 money=1000 arenaTags=0 mons=[bi0:sp201/hp19-22/st0/fnt0 bi1:sp653/hp19-19/st0/fnt0 bi2:sp821/hp0-13/st7/fnt1 bi3:sp273/hp0-13/st7/fnt1]
+[04:00:33.253] LOG: [coop:checksum] capture digest=b09d6d2fb56f4051 field=2 biome=0 seed=QlUoolv1Uz9b9pHV8d7laOqt weather=0 terrain=0 money=1000 party=[201,653,265,165,118,519] partyLevels=[5,5,5,5,5,5] arenaTags=0 modifiers=1 heldItemsDigest=0 pokeballs=[0:5,1:0,2:0,3:0,4:0] mons=[bi0:sp201/hp19-22/st0/ab107/form28/tera0:13/boss0:0 bi1:sp653/hp19-19/st0/ab5017/form0/tera0:9/boss0:0]
+[04:00:33.253] LOG: [coop:replay] host SEND turnResolution turn=1 events=11 checksum=b09d6d2fb56f4051 preimage=true fullField=4 authoritativeState=1
+[04:00:33.256] LOG: [coop:webrtc] raw tx role=host t=turnResolution bytes=21099
+[04:00:33.257] LOG: %cStart Phase BattleEndPhase color:green;
+[04:00:33.258] LOG: [coop:progression] expResolved BROADCAST wave=1 (host streams settled deltas)
+[04:00:33.260] LOG: [coop:runtime] send expResolved wave=1 deltas=6 (host)
+[04:00:33.260] LOG: [coop:replay] host SEND expResolved wave=1 deltas=6
+[04:00:33.260] LOG: [coop:webrtc] raw tx role=host t=expResolved bytes=1228
+[04:00:33.263] LOG: [coop:runtime] send waveEndState wave=1 tick=3 (host)
+[04:00:33.263] LOG: [coop:replay] host SEND waveEndState wave=1 tick=3 party=6
+[04:00:33.264] LOG: [coop:webrtc] raw tx role=host t=waveEndState bytes=16903
+[04:00:33.266] LOG: Battle Score: 19 (1 Turns x1)
+[04:00:33.266] LOG: Total Score: 19
+[04:00:33.298] LOG: %cStart Phase EggLapsePhase color:green;
+[04:00:33.298] LOG: %cStart Phase SelectModifierPhase color:green;
+[04:00:33.298] LOG: [coop:interaction] interactionCounter() read -> 0 (role=host)
+[04:00:33.298] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[04:00:33.298] LOG: [coop:owner] isLocalOwnerAtCounter(pinnedCounter=0) parity=0 owner=host role=host -> true
+[04:00:33.298] LOG: Wave Seed: RmVppmw2V{:c:qIW9e8mbPru 1
+[04:00:33.308] LOG: 7 5 [2,3,4,5,6]
+[04:00:33.308] LOG: {"id":"TEMP_STAT_STAGE_BOOSTER","localeKey":"","iconImage":"x_speed","soundName":"se/restore","tier":0,"stat":5,"nameKey":"x_speed","quantityKey":"percentage"} 
+[04:00:33.308] LOG: 0 0 [9,17]
+[04:00:33.308] LOG: {"id":"ROGUE_BALL","localeKey":"","iconImage":"rb","group":"pb","soundName":"se/pb_bounce_1","tier":3,"pokeballType":3,"count":5} 
+[04:00:33.309] LOG: 27 7 [1,10,11,12,13,14,23]
+[04:00:33.309] LOG: {"id":"ER_COPPER_ROD","localeKey":"","iconImage":"quick_claw","iconTint":14256208,"soundName":"se/restore","tier":2} 
+[04:00:33.309] LOG: 24 7 [1,10,11,12,13,14,23]
+[04:00:33.309] LOG: {"id":"QUICK_CLAW","localeKey":"modifierType:ModifierType.QUICK_CLAW","iconImage":"quick_claw","soundName":"se/restore","tier":2} 
+[04:00:33.309] LOG: 32 7 [1,10,11,12,13,14,23]
+[04:00:33.309] LOG: {"id":"ER_DEX_NAV","localeKey":"","iconImage":"dex_nav","soundName":"se/restore","tier":2} 
+[04:00:33.309] LOG: 3 1 [1,10,11,12,13,14,23]
+[04:00:33.309] LOG: {"id":"PP_MAX","localeKey":"modifierType:ModifierType.PP_MAX","iconImage":"pp_max","group":"ppUp","soundName":"se/restore","tier":2,"upPoints":3} 
+[04:00:33.309] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[04:00:33.309] LOG: [coop:owner] isLocalOwnerAtCounter(pinnedCounter=0) parity=0 owner=host role=host -> true
+[04:00:33.309] LOG: [coop:interaction] interactionCounter() read -> 0 (role=host)
+[04:00:33.309] LOG: [coop:reward] owner/watcher decision: pinnedStart=0 liveCounter=0 parity=0 role=host pick=OWNER option=ROLL spoof=false
+[04:00:33.309] LOG: [coop:shop] serializeRewardOptions count=3 ids=[TEMP_STAT_STAGE_BOOSTER,ROGUE_BALL,PP_MAX] tiers=[0,3,2]
+[04:00:33.309] LOG: [coop:reward] OWNER streams reward options (start=0 reroll=0 count=3 ids=[TEMP_STAT_STAGE_BOOSTER,ROGUE_BALL,PP_MAX])
+[04:00:33.309] LOG: [coop:relay] SEND rewardOptions seq=0 reroll=0 count=3 ids=[TEMP_STAT_STAGE_BOOSTER,ROGUE_BALL,PP_MAX]
+[04:00:33.310] LOG: [coop:webrtc] raw tx role=host t=rewardOptions bytes=243
+[04:00:33.310] LOG: [coop:rendezvous] ARRIVE point=shop:1:0 (send) role=host
+[04:00:33.310] LOG: [coop:webrtc] raw tx role=host t=rendezvous bytes=37
+[04:00:33.310] LOG: [coop:reward] OWNER drives reward screen (start=0 role=host spoof=false adoptsOptions=false wave=1)
+[04:00:33.310] LOG: [coop:rendezvous] shop-pick-commit barrier AWAIT shop:1:0
+[04:00:33.310] LOG: [coop:rendezvous] AWAIT point=shop:1:0 timeoutMs=60000 -> network-wait role=host
+[04:00:33.324] LOG: [coop:webrtc] raw rx role=host t=rendezvous bytes=37 handlers=10
+[04:00:33.324] LOG: [coop:rendezvous] RECV arrival point=shop:1:0 -> deliver-to-waiter role=host
+[04:00:33.324] LOG: [coop:rendezvous] AWAIT point=shop:1:0 RESOLVE both-arrived role=host
+[04:00:33.348] LOG: [coop:interaction] mirror begin role=owner mirrorSeq=0 interactionStart=0 reroll=0
+[04:00:33.351] LOG: [coop:interaction] uiMirror beginSession role=owner mode=6 seq=0 early=0
+[04:00:33.555] LOG: [coop:interaction] uiMirror OWNER send seq=0 n=0 button=5 modeBefore=6
+[04:00:33.555] LOG: [coop:webrtc] raw tx role=host t=uiInput bytes=49
+[04:00:34.806] LOG: [coop:interaction] uiMirror OWNER send seq=0 n=1 button=3 modeBefore=6
+[04:00:34.807] LOG: [coop:webrtc] raw tx role=host t=uiInput bytes=49
+[04:00:35.194] LOG: [coop:interaction] uiMirror OWNER send seq=0 n=2 button=3 modeBefore=6
+[04:00:35.194] LOG: [coop:webrtc] raw tx role=host t=uiInput bytes=49
+[04:00:35.829] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[04:00:35.829] LOG: [coop:owner] isLocalOwnerAtCounter(pinnedCounter=0) parity=0 owner=host role=host -> true
+[04:00:35.830] LOG: [coop:interaction] uiMirror OWNER send seq=0 n=3 button=5 modeBefore=6
+[04:00:35.830] LOG: [coop:webrtc] raw tx role=host t=uiInput bytes=49
+[04:00:38.945] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[04:00:38.946] LOG: [coop:owner] isLocalOwnerAtCounter(pinnedCounter=0) parity=0 owner=host role=host -> true
+[04:00:38.946] LOG: [coop:relay] OWNER send seq=0 kind=reward choice=2 data=[0,0,3001] role=host
+[04:00:38.947] LOG: [coop:relay] SEND interactionChoice seq=0 kind=reward choice=2 data=[0,0,3001]
+[04:00:38.947] LOG: [coop:webrtc] raw tx role=host t=interactionChoice bytes=78
+[04:00:38.971] LOG: %cStart Phase NewBattlePhase color:green;
+[04:00:38.972] LOG: Wave Seed: SnWqqnx3W|;d;rJX:f9ncQsv 2
+[04:00:38.979] LOG: %cStart Phase ReturnPhase color:green;
+[04:00:38.984] LOG: [coop:interaction] interactionCounter() read -> 0 (role=host)
+[04:00:38.985] LOG: [coop:interaction] CoopInteractionTurn.advance INCREMENT (fromCounter=0) counter 0 -> 1
+[04:00:38.985] LOG: [coop:interaction] advanceInteraction ADVANCED+BROADCAST (fromCounter=0) counter 0 -> 1 role=host; send interaction screen=__turn__ choice=1
+[04:00:38.985] LOG: [coop:webrtc] raw tx role=host t=interaction bytes=50
+[04:00:38.985] LOG: [coop:owner] ownerOf(counter=1) seat=1 -> owner=guest
+[04:00:38.986] LOG: [coop:owner] ownerOf(counter=1) seat=1 -> owner=guest
+[04:00:38.986] LOG: [coop-launch] proceedIfReady launched=true localTeam=3 bothReady=true role=host partnerReady=true
+[04:00:38.986] LOG: [coop:interaction] interactionCounter() read -> 1 (role=host)
+[04:00:38.986] LOG: [coop:reward] advance interaction (role=host from=0 counter 0 -> 1)
+[04:00:39.030] LOG: [coop:webrtc] raw rx role=host t=interaction bytes=50 handlers=10
+[04:00:39.030] LOG: [coop:interaction] RECV interaction broadcast (deferred catch-up net) received=1 localBefore=1 role=host -> no defer (local >= received)
+[04:00:39.030] WARN: [coop:interaction] CoopInteractionTurn.mergeRemote DEFER (remote=1, counter=1, pendingRemote=1) live counter UNCHANGED (folds in at next advance if still ahead)
+[04:00:39.031] LOG: [coop:owner] ownerOf(counter=1) seat=1 -> owner=guest
+[04:00:39.031] LOG: [coop:owner] ownerOf(counter=1) seat=1 -> owner=guest
+[04:00:39.031] LOG: [coop-launch] proceedIfReady launched=true localTeam=3 bothReady=true role=host partnerReady=true
+[04:00:39.205] LOG: %cStart Phase CoopPartnerSyncPhase color:green;
+[04:00:39.206] LOG: [coop:interaction] interactionCounter() read -> 1 (role=host)
+[04:00:39.206] LOG: %cStart Phase ReturnPhase color:green;
+[04:00:39.255] LOG: %cStart Phase ShowTrainerPhase color:green;
+[04:00:39.400] LOG: %cStart Phase NextEncounterPhase color:green;
+[04:00:44.265] LOG: [coop:replay] host SEND enemyPartySync wave=2 count=0 meType=13
+[04:00:44.266] LOG: [coop:webrtc] raw tx role=host t=enemyPartySync bytes=56
+[04:00:44.267] LOG: [coop:launch] resume marker recorded slot=4 partner=test4 wave=2 (#810)
+[04:00:44.676] DEBUG: Session data saved to slot 4!
+[04:00:44.679] LOG: Wave Seed: SnWqqnx3W|;d;rJX:f9ncQsv 2
+[04:00:49.848] LOG: %cStart Phase MysteryEncounterPhase color:green;
+[04:00:49.917] LOG: [coop:interaction] interactionCounter() read -> 1 (role=host)
+[04:00:49.918] LOG: [coop:me] interaction-counter -1 -> 1 (ME begin)
+[04:00:49.918] LOG: [coop:me] coopBeginMePump owner resolution (authoritative-only) {"counter":1,"seq":8000001,"role":"host","spoofed":false,"hostDrives":true}
+[04:00:49.919] LOG: [coop:owner] ownerOf(counter=1) seat=1 -> owner=guest
+[04:00:49.919] LOG: [coop:owner] isLocalOwnerAtCounter(pinnedCounter=1) parity=1 owner=guest role=host -> false
+[04:00:49.919] LOG: [coop:pump] begin OWNER session {"seq":8000001,"termSeq":9000001}
+[04:00:49.919] LOG: [coop:me] ME owner streamed entry checksum {"seq":8000001}
+[04:00:49.926] LOG: [coop:checksum] capture digest=53183dc271ea09af field=1 biome=0 seed=QlUoolv1Uz9b9pHV8d7laOqt weather=0 terrain=0 money=1000 party=[201,653,265,165,118,519] partyLevels=[5,5,5,5,5,5] arenaTags=0 modifiers=1 heldItemsDigest=0 pokeballs=[0:5,1:0,2:0,3:0,4:0] mons=[bi0:sp201/hp19-22/st0/ab107/form28/tera0:13/boss0:0]
+[04:00:49.926] LOG: [coop:checksum] owner SEND meChecksum seq=8000001 checksum=53183dc271ea09af
+[04:00:49.926] LOG: [coop:webrtc] raw tx role=host t=meChecksum bytes=62
+[04:00:49.928] LOG: [coop:me] host streams ME presentation (mePresent) {"seq":8000001,"opts":2,"labels":2,"tokens":6}
+[04:00:49.928] LOG: [coop:relay] SEND interactionOutcome seq=8000001 kind=mePresent k=mePresent opts=2
+[04:00:49.928] LOG: [coop:webrtc] raw tx role=host t=interactionOutcome bytes=266
+[04:00:49.929] LOG: [coop:owner] ownerOf(counter=1) seat=1 -> owner=guest
+[04:00:49.929] LOG: [coop:owner] isLocalOwnerAtCounter(pinnedCounter=1) parity=1 owner=guest role=host -> false
+[04:00:49.929] LOG: [coop:me] host awaits guest ME option index {"seq":8000001,"timeoutMs":1200000}
+[04:00:49.932] LOG: [coop:relay] AWAIT interactionChoice seq=8000001 timeoutMs=1200000 -> network-wait
+[04:00:50.816] LOG: [coop:owner] ownerOf(counter=1) seat=1 -> owner=guest
+[04:00:50.816] LOG: [coop:owner] isLocalOwnerAtCounter(pinnedCounter=1) parity=1 owner=guest role=host -> false
+[04:00:50.817] LOG: [coop:me] ui: host blocks local press on guest-owned ME (applies relayed index) {"button":3}
+[04:00:52.224] LOG: [coop:webrtc] raw rx role=host t=meCursor bytes=26 handlers=10
+[04:00:52.225] LOG: [coop:owner] ownerOf(counter=1) seat=1 -> owner=guest
+[04:00:52.225] LOG: [coop:owner] isLocalOwnerAtCounter(pinnedCounter=1) parity=1 owner=guest role=host -> false
+[04:00:52.226] LOG: [coop:owner] ownerOf(counter=1) seat=1 -> owner=guest
+[04:00:52.226] LOG: [coop:owner] isLocalOwnerAtCounter(pinnedCounter=1) parity=1 owner=guest role=host -> false
+[04:00:52.226] LOG: [coop:me] meCursor APPLIED index=1 mode=47
+[04:00:52.637] LOG: [coop:webrtc] raw rx role=host t=meCursor bytes=26 handlers=10
+[04:00:52.637] LOG: [coop:owner] ownerOf(counter=1) seat=1 -> owner=guest
+[04:00:52.638] LOG: [coop:owner] isLocalOwnerAtCounter(pinnedCounter=1) parity=1 owner=guest role=host -> false
+[04:00:52.638] LOG: [coop:owner] ownerOf(counter=1) seat=1 -> owner=guest
+[04:00:52.639] LOG: [coop:owner] isLocalOwnerAtCounter(pinnedCounter=1) parity=1 owner=guest role=host -> false
+[04:00:52.639] LOG: [coop:me] meCursor APPLIED index=0 mode=47
+[04:00:53.604] LOG: [coop:webrtc] raw rx role=host t=interactionChoice bytes=62 handlers=10
+[04:00:53.605] LOG: [coop:relay] RECV interactionChoice seq=8000001 -> deliver-to-waiter choice=0 data=-
+[04:00:53.605] LOG: [coop:relay] AWAIT interactionChoice seq=8000001 RESOLVE choice=0 data=-
+[04:00:53.606] LOG: [coop:me] host received guest ME option index {"seq":8000001,"index":0}
+[04:00:53.606] LOG: [coop:me] host applies relayed guest option programmatically {"seq":8000001,"index":0,"encounter":"THE_POKEMON_SALESMAN"}
+[04:00:53.608] LOG: [coop:owner] ownerOf(counter=1) seat=1 -> owner=guest
+[04:00:53.608] LOG: [coop:owner] isLocalOwnerAtCounter(pinnedCounter=1) parity=1 owner=guest role=host -> false
+[04:00:53.617] LOG: [coop:me] ui: host streams ME narration (showText) {"len":50,"preview":"You paid an outrageous sum and bought th"}
+[04:00:53.617] LOG: [coop:me] host stream ME-message len=50
+[04:00:53.618] LOG: [coop:replay] host SEND meMessage len=50
+[04:00:53.618] LOG: [coop:webrtc] raw tx role=host t=meMessage bytes=77
+[04:00:57.358] LOG: [coop:interaction] interactionCounter() read -> 1 (role=host)
+[04:00:57.358] LOG: [coop:health] tick=0g turn=1 wave=2 counter=1 assertions=0 wait=-1ms peerBeat=- transport=connected
+[04:00:57.518] LOG: [coop:owner] ownerOf(counter=1) seat=1 -> owner=guest
+[04:00:57.518] LOG: [coop:owner] isLocalOwnerAtCounter(pinnedCounter=1) parity=1 owner=guest role=host -> false
+[04:00:57.518] LOG: [coop:me] ui: host ADVANCES engine dialogue on guest-owned ME (#816) {"button":5}
+[04:00:57.545] LOG: [coop:owner] ownerOf(counter=1) seat=1 -> owner=guest
+[04:00:57.545] LOG: [coop:owner] isLocalOwnerAtCounter(pinnedCounter=1) parity=1 owner=guest role=host -> false
+[04:00:57.546] LOG: %cStart Phase MysteryEncounterOptionSelectedPhase color:green;
+[04:00:57.551] LOG: [coop:me] ui: host streams ME narration (showDialogue) {"len":17,"preview":"Excellent choice!"}
+[04:00:57.551] LOG: [coop:me] host stream ME-message len=17
+[04:00:57.552] LOG: [coop:replay] host SEND meMessage len=17
+[04:00:57.552] LOG: [coop:webrtc] raw tx role=host t=meMessage bytes=44
+[04:00:58.538] LOG: [coop:owner] ownerOf(counter=1) seat=1 -> owner=guest
+[04:00:58.538] LOG: [coop:owner] isLocalOwnerAtCounter(pinnedCounter=1) parity=1 owner=guest role=host -> false
+[04:00:58.538] LOG: [coop:me] ui: host ADVANCES engine dialogue on guest-owned ME (#816) {"button":5}
+[04:00:58.538] LOG: [coop:me] ui: host streams ME narration (showDialogue) {"len":41,"preview":"I can see you’ve a keen eye for business"}
+[04:00:58.538] LOG: [coop:me] host stream ME-message len=41
+[04:00:58.538] LOG: [coop:replay] host SEND meMessage len=41
+[04:00:58.539] LOG: [coop:webrtc] raw tx role=host t=meMessage bytes=68
+[04:00:59.686] LOG: [coop:owner] ownerOf(counter=1) seat=1 -> owner=guest
+[04:00:59.687] LOG: [coop:owner] isLocalOwnerAtCounter(pinnedCounter=1) parity=1 owner=guest role=host -> false
+[04:00:59.687] LOG: [coop:me] ui: host ADVANCES engine dialogue on guest-owned ME (#816) {"button":5}
+[04:00:59.688] LOG: [coop:me] ui: host streams ME narration (showDialogue) {"len":47,"preview":"Oh, yeah…@d{64} Returns not accepted, go"}
+[04:00:59.688] LOG: [coop:me] host stream ME-message len=47
+[04:00:59.688] LOG: [coop:replay] host SEND meMessage len=47
+[04:00:59.689] LOG: [coop:webrtc] raw tx role=host t=meMessage bytes=74
+[04:01:00.849] LOG: [coop:owner] ownerOf(counter=1) seat=1 -> owner=guest
+[04:01:00.849] LOG: [coop:owner] isLocalOwnerAtCounter(pinnedCounter=1) parity=1 owner=guest role=host -> false
+[04:01:00.849] LOG: [coop:me] ui: host ADVANCES engine dialogue on guest-owned ME (#816) {"button":5}
+[04:01:00.986] LOG: [coop:me] ui: host streams ME narration (showText) {"len":16,"preview":"You got Shuppet!"}
+[04:01:00.986] LOG: [coop:me] host stream ME-message len=16
+[04:01:00.986] LOG: [coop:replay] host SEND meMessage len=16
+[04:01:00.986] LOG: [coop:webrtc] raw tx role=host t=meMessage bytes=43
+[04:01:02.748] LOG: [coop:owner] ownerOf(counter=1) seat=1 -> owner=guest
+[04:01:02.748] LOG: [coop:owner] isLocalOwnerAtCounter(pinnedCounter=1) parity=1 owner=guest role=host -> false
+[04:01:02.748] LOG: [coop:me] ui: host ADVANCES engine dialogue on guest-owned ME (#816) {"button":5}
+[04:01:02.749] LOG: [coop:account] account-write scope OPEN (me-catch) depth=1
+[04:01:02.764] LOG: [coop:me] ui: host streams ME narration (showText) {"len":63,"preview":"Your party is full.\nRelease a Pokémon to"}
+[04:01:02.764] LOG: [coop:me] host stream ME-message len=63
+[04:01:02.764] LOG: [coop:replay] host SEND meMessage len=63
+[04:01:02.764] LOG: [coop:webrtc] raw tx role=host t=meMessage bytes=91
+[04:01:03.001] LOG: [coop:owner] ownerOf(counter=1) seat=1 -> owner=guest
+[04:01:03.001] LOG: [coop:owner] isLocalOwnerAtCounter(pinnedCounter=1) parity=1 owner=guest role=host -> false
+[04:01:03.264] LOG: [coop:relay] SEND interactionOutcome seq=9200000 kind=dexSync k=dexSync
+[04:01:03.264] LOG: [coop:webrtc] raw tx role=host t=interactionOutcome bytes=872
+[04:01:03.265] LOG: [coop:runtime] dexSync broadcast (acquisition -> partner account credited)
+[04:01:05.523] LOG: [coop:owner] ownerOf(counter=1) seat=1 -> owner=guest
+[04:01:05.524] LOG: [coop:owner] isLocalOwnerAtCounter(pinnedCounter=1) parity=1 owner=guest role=host -> false
+[04:01:05.524] LOG: [coop:me] ui: host blocks local press on guest-owned ME (applies relayed index) {"button":1}
+[04:01:05.707] LOG: [coop:owner] ownerOf(counter=1) seat=1 -> owner=guest
+[04:01:05.710] LOG: [coop:owner] isLocalOwnerAtCounter(pinnedCounter=1) parity=1 owner=guest role=host -> false
+[04:01:05.710] LOG: [coop:me] ui: host blocks local press on guest-owned ME (applies relayed index) {"button":1}
+[04:01:06.256] LOG: [coop:owner] ownerOf(counter=1) seat=1 -> owner=guest
+[04:01:06.256] LOG: [coop:owner] isLocalOwnerAtCounter(pinnedCounter=1) parity=1 owner=guest role=host -> false
+[04:01:06.256] LOG: [coop:me] ui: host blocks local press on guest-owned ME (applies relayed index) {"button":1}
+[04:01:07.363] LOG: [coop:webrtc] raw rx role=host t=stallBeat bytes=35 handlers=10
+[04:01:07.723] LOG: [coop:owner] ownerOf(counter=1) seat=1 -> owner=guest
+[04:01:07.724] LOG: [coop:owner] isLocalOwnerAtCounter(pinnedCounter=1) parity=1 owner=guest role=host -> false
+[04:01:07.724] LOG: [coop:me] ui: host blocks local press on guest-owned ME (applies relayed index) {"button":2}
+[04:01:07.961] LOG: [coop:owner] ownerOf(counter=1) seat=1 -> owner=guest
+[04:01:07.961] LOG: [coop:owner] isLocalOwnerAtCounter(pinnedCounter=1) parity=1 owner=guest role=host -> false
+[04:01:07.962] LOG: [coop:me] ui: host blocks local press on guest-owned ME (applies relayed index) {"button":1}
+[04:01:11.837] LOG: [coop:owner] ownerOf(counter=1) seat=1 -> owner=guest
+[04:01:11.837] LOG: [coop:owner] isLocalOwnerAtCounter(pinnedCounter=1) parity=1 owner=guest role=host -> false
+[04:01:11.837] LOG: [coop:me] ui: host blocks local press on guest-owned ME (applies relayed index) {"button":5}
+[04:01:12.012] LOG: [coop:owner] ownerOf(counter=1) seat=1 -> owner=guest
+[04:01:12.012] LOG: [coop:owner] isLocalOwnerAtCounter(pinnedCounter=1) parity=1 owner=guest role=host -> false
+[04:01:12.012] LOG: [coop:me] ui: host blocks local press on guest-owned ME (applies relayed index) {"button":5}
+[04:01:12.320] LOG: [coop:owner] ownerOf(counter=1) seat=1 -> owner=guest
+[04:01:12.320] LOG: [coop:owner] isLocalOwnerAtCounter(pinnedCounter=1) parity=1 owner=guest role=host -> false
+[04:01:12.320] LOG: [coop:me] ui: host blocks local press on guest-owned ME (applies relayed index) {"button":6}
+[04:01:12.363] LOG: [coop:webrtc] raw rx role=host t=stallBeat bytes=35 handlers=10
+[04:01:12.502] LOG: [coop:owner] ownerOf(counter=1) seat=1 -> owner=guest
+[04:01:12.502] LOG: [coop:owner] isLocalOwnerAtCounter(pinnedCounter=1) parity=1 owner=guest role=host -> false
+[04:01:12.503] LOG: [coop:me] ui: host blocks local press on guest-owned ME (applies relayed index) {"button":5}
+[04:01:12.809] LOG: [coop:owner] ownerOf(counter=1) seat=1 -> owner=guest
+[04:01:12.810] LOG: [coop:owner] isLocalOwnerAtCounter(pinnedCounter=1) parity=1 owner=guest role=host -> false
+[04:01:12.810] LOG: [coop:me] ui: host blocks local press on guest-owned ME (applies relayed index) {"button":6}
+[04:01:12.928] LOG: [coop:owner] ownerOf(counter=1) seat=1 -> owner=guest
+[04:01:12.928] LOG: [coop:owner] isLocalOwnerAtCounter(pinnedCounter=1) parity=1 owner=guest role=host -> false
+[04:01:12.928] LOG: [coop:me] ui: host blocks local press on guest-owned ME (applies relayed index) {"button":5}
+[04:01:13.132] LOG: [coop:owner] ownerOf(counter=1) seat=1 -> owner=guest
+[04:01:13.133] LOG: [coop:owner] isLocalOwnerAtCounter(pinnedCounter=1) parity=1 owner=guest role=host -> false
+[04:01:13.133] LOG: [coop:me] ui: host blocks local press on guest-owned ME (applies relayed index) {"button":1}
+[04:01:17.374] LOG: [coop:webrtc] raw rx role=host t=stallBeat bytes=35 handlers=10
+[04:01:22.446] LOG: [coop:webrtc] raw rx role=host t=stallBeat bytes=35 handlers=10
+[04:01:32.360] LOG: [coop:interaction] interactionCounter() read -> 1 (role=host)
+[04:01:32.361] LOG: [coop:health] tick=0g turn=1 wave=2 counter=1 assertions=0 wait=-1ms peerBeat=10s transport=connected
+[04:01:58.345] LOG: [coop:webrtc] raw rx role=host t=stallBeat bytes=35 handlers=10
+[04:02:03.282] LOG: [coop:webrtc] raw rx role=host t=stallBeat bytes=35 handlers=10
+[04:02:03.313] LOG: [coop:interaction] interactionCounter() read -> 1 (role=host)
+[04:02:03.314] LOG: [coop:health] tick=0g turn=1 wave=2 counter=1 assertions=0 wait=-1ms peerBeat=0s transport=connected
