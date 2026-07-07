@@ -1613,7 +1613,12 @@ export class GameData {
     // transport-connected runtime; startLocalCoopSession would clearCoopRuntime + spoof a
     // partner, severing the live peer. Only (re)establish when there is no active session
     // (the from-title resume path); the live launch keeps its real runtime untouched.
-    if (globalScene.gameMode.isCoop) {
+    if (globalScene.gameMode.isShowdown) {
+      // Showdown 1v1 (D0): the versus GUEST boots from the host's launch snapshot over the LIVE
+      // versus transport. Showdown never resumes/spoofs (it is a friendly, non-persisted match), and
+      // the live runtime MUST be preserved here - clearing it (the non-co-op branch below) would sever
+      // the peer mid-launch and strip the enemy-command relay. Leave the active runtime untouched.
+    } else if (globalScene.gameMode.isCoop) {
       if (getCoopRuntime() == null) {
         startLocalCoopSession();
       }

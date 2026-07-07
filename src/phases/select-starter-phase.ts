@@ -20,6 +20,7 @@ const COOP_LAUNCH_WAVE = 1;
 import { coopLog } from "#data/elite-redux/coop/coop-debug";
 import type { CoopRosterEntry } from "#data/elite-redux/coop/coop-roster";
 import {
+  clearCoopRuntime,
   getCoopBattleStreamer,
   getCoopController,
   getCoopNetcodeMode,
@@ -27,6 +28,15 @@ import {
 } from "#data/elite-redux/coop/coop-runtime";
 import { coopGuestSessionSlot, coopHostSessionSlot } from "#data/elite-redux/coop/coop-session";
 import type { CoopRole, CoopSerializedStarter } from "#data/elite-redux/coop/coop-transport";
+import { sanitizeGhostProfile } from "#data/elite-redux/er-ghost-profile";
+import { beginShowdownBattle, endShowdownBattle } from "#data/elite-redux/showdown/showdown-battle-state";
+import { ShowdownCommandRelay } from "#data/elite-redux/showdown/showdown-command-relay";
+import { starterToManifest } from "#data/elite-redux/showdown/showdown-manifest";
+import {
+  ShowdownNegotiationError,
+  type ShowdownNegotiationResult,
+  ShowdownSession,
+} from "#data/elite-redux/showdown/showdown-session";
 import { SpeciesFormChangeMoveLearnedTrigger } from "#data/form-change-triggers";
 import { Gender } from "#data/gender";
 import { ChallengeType } from "#enums/challenge-type";
@@ -36,6 +46,7 @@ import { overrideHeldItems, overrideModifiers } from "#modifiers/modifier";
 import { getErShinyLabEquippedNameForSpecies, getErShinyLabSavedLookForSpecies } from "#sprites/er-shiny-lab-sprite-fx";
 import type { Starter } from "#types/save-data";
 import { SaveSlotUiMode } from "#ui/handlers/save-slot-select-ui-handler";
+import type { ShowdownWagerArgs } from "#ui/showdown-wager-ui-handler";
 import { applyChallenges } from "#utils/challenge-utils";
 import { getPokemonSpecies } from "#utils/pokemon-utils";
 import SoundFade from "phaser3-rex-plugins/plugins/soundfade";
@@ -69,6 +80,16 @@ export class SelectStarterPhase extends Phase {
     // for both to lock in, then the host launches the merged party.
     if (globalScene.gameMode.isCoop && getCoopController()) {
       this.startCoopSelect();
+      return;
+    }
+
+    // Showdown 1v1 (D0): each player builds their OWN team, exchanges + validates it with the
+    // opponent (negotiate), then wagers; the HOST launches its team as the player side (the opponent
+    // is fielded as the enemy trainer, built from its manifest in newBattle) and the GUEST boots from
+    // the host's launch snapshot (its player side IS the host's team). Teams do NOT merge - distinct
+    // from co-op. Only versus (a live/vs-CPU showdown session) takes this branch.
+    if (globalScene.gameMode.isShowdown && getCoopController()) {
+      this.startShowdownSelect();
       return;
     }
 
@@ -282,6 +303,113 @@ export class SelectStarterPhase extends Phase {
   }
 
   /**
+   * Showdown 1v1 (D0): drive the versus team-build starter-select, then run the post-teambuild
+   * handshake (negotiate -> wager -> battle) once the player locks in their team.
+   */
+  private startShowdownSelect(): void {
+    const controller = getCoopController()!;
+    globalScene.ui.setMode(UiMode.STARTER_SELECT, (starters: Starter[]) => {
+      globalScene.ui.clearText();
+      void this.runShowdownFlow(starters, controller.role);
+    });
+  }
+
+  /**
+   * Showdown 1v1 (D0): build this client's manifests, NEGOTIATE them with the opponent (team exchange
+   * + mutual FORMAT validation + the `showdown-ready` barrier), then open the WAGER screen (D3). On the
+   * wager's both-locked commit it stashes the match ({@linkcode beginShowdownBattle}, with the live
+   * enemy-command relay) and launches the battle. A negotiation rejection aborts cleanly to the title.
+   */
+  private async runShowdownFlow(starters: Starter[], role: CoopRole): Promise<void> {
+    const runtime = getCoopRuntime();
+    if (runtime == null) {
+      this.abortShowdown("Lost the versus connection.");
+      return;
+    }
+    const manifests = starters.map(s => starterToManifest(s, globalScene.gameData));
+    // The session + relay ride the SAME live transport the co-op runtime owns; the session reuses the
+    // runtime's shared rendezvous so the `showdown-ready` barrier uses the one live instance.
+    const session = new ShowdownSession(runtime.localTransport, { rendezvous: runtime.rendezvous });
+    const relay = new ShowdownCommandRelay(runtime.localTransport);
+    const ownProfile = sanitizeGhostProfile(globalScene.gameData.ghostProfile);
+
+    let result: ShowdownNegotiationResult;
+    try {
+      result = await session.negotiate(manifests, ownProfile);
+    } catch (err) {
+      session.dispose();
+      relay.dispose();
+      this.abortShowdown(
+        err instanceof ShowdownNegotiationError ? showdownRejectMessage(err) : "The versus match could not start.",
+      );
+      return;
+    }
+    // Keep the shared rendezvous alive (ownsRendezvous=false) for the wager-commit barrier; drop the
+    // session's own team/ready listeners (their job is done).
+    session.dispose();
+
+    const wagerArgs: ShowdownWagerArgs = {
+      ownTeam: manifests,
+      opponentTeam: result.opponentManifest,
+      opponentProfile: result.opponentProfile,
+      role,
+      transport: runtime.localTransport,
+      rendezvous: runtime.rendezvous,
+      onCommit: () => {
+        beginShowdownBattle(manifests, result.opponentManifest, relay, result.opponentProfile);
+        void this.launchShowdownBattle(starters, role);
+      },
+    };
+    globalScene.ui.setMode(UiMode.SHOWDOWN_WAGER, wagerArgs);
+  }
+
+  /**
+   * Showdown 1v1 (D0): launch the negotiated match. The HOST fields its OWN team as the player side
+   * (the enemy trainer is built from the stashed opponent manifest in `newBattle`); the GUEST boots
+   * from the host's authoritative launch snapshot (its player side IS the host's team) - there is no
+   * correct local fallback for the guest, so a missed snapshot aborts cleanly.
+   */
+  private async launchShowdownBattle(starters: Starter[], role: CoopRole): Promise<void> {
+    if (role === "guest") {
+      globalScene.sessionSlotId = coopGuestSessionSlot(globalScene.sessionSlotId);
+      void globalScene.ui.setMode(UiMode.MESSAGE).then(async () => {
+        if (await this.tryCoopGuestSnapshotBoot()) {
+          return;
+        }
+        this.abortShowdown("Did not receive the match from the host.");
+      });
+      return;
+    }
+    // HOST: pick a SAFE save slot (first empty; never overwrite an existing run). Showdown never
+    // persists (the result phase never saves), but newBattle still needs a valid slot id.
+    const slot = await coopHostSessionSlot(
+      async s => localStorage.getItem(getSessionDataLocalStorageKey(s)) != null,
+      globalScene.sessionSlotId,
+    );
+    globalScene.sessionSlotId = slot;
+    // ignoreMovesetValidation: the showdown team was assembled with explicit movesets - keep them
+    // verbatim (the legality pass would strip them and desync the relayed enemy commands).
+    void globalScene.ui.setMode(UiMode.MESSAGE).then(() => this.initBattle(starters, true));
+  }
+
+  /** Showdown 1v1 (D0): tear the versus session down and return to the title with a message. */
+  private abortShowdown(message: string): void {
+    endShowdownBattle();
+    clearCoopRuntime();
+    globalScene.ui.setMode(UiMode.MESSAGE);
+    globalScene.ui.showText(
+      message,
+      null,
+      () => {
+        globalScene.phaseManager.toTitleScreen();
+        this.end();
+      },
+      null,
+      true,
+    );
+  }
+
+  /**
    * Initialize starters before starting the first battle
    * @param starters - Array of {@linkcode Starter}s with which to start the battle
    * @param ignoreMovesetValidation - Skip starter-legality moveset validation (dev scenarios)
@@ -453,6 +581,18 @@ export class SelectStarterPhase extends Phase {
       });
       this.end();
     });
+  }
+}
+
+/** Showdown 1v1 (D0): a player-facing reason line for a rejected negotiation. */
+function showdownRejectMessage(err: ShowdownNegotiationError): string {
+  switch (err.reason) {
+    case "illegalTeam":
+      return "The opponent's team was rejected (illegal team).";
+    case "hashMismatch":
+      return "The opponent's team failed the anti-tamper check.";
+    default:
+      return "The versus match was cancelled.";
   }
 }
 

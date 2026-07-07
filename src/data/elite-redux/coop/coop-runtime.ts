@@ -80,6 +80,7 @@ import {
 } from "#data/elite-redux/replay-recorder";
 import type { ReplayCommandKind } from "#data/elite-redux/replay-trace";
 import { getShowdownRelay } from "#data/elite-redux/showdown/showdown-battle-state";
+import { ShowdownSpoof } from "#data/elite-redux/showdown/showdown-spoof";
 import { BattlerIndex } from "#enums/battler-index";
 import { Command } from "#enums/command";
 import { UiMode } from "#enums/ui-mode";
@@ -1039,6 +1040,11 @@ export interface CoopRuntime {
   /** The stand-in player 2 (local dev only). */
   spoof?: SpoofGuest;
   /**
+   * Showdown 1v1 (D0): the vs-CPU stand-in OPPONENT (local dev only; versus session kind). Speaks the
+   * showdown wire (negotiate + friendly wager + enemy-command relay) so the friendly flow plays solo.
+   */
+  showdownSpoof?: ShowdownSpoof;
+  /**
    * #805 hot rejoin: re-dials the SAME pairing code/role and swaps the fresh channel into the
    * LIVE transport (set by the real-peer connect entrypoints; absent over loopback/spoof).
    * Resolves true when the channel is re-established within the grace window.
@@ -1678,6 +1684,11 @@ export function startLocalCoopSession(
   runtime.controller.setNetcodeMode(opts.netcodeMode ?? "authoritative");
   runtime.partnerTransport = guest;
   runtime.spoof = new SpoofGuest(guest);
+  // Showdown 1v1 (D0): a versus vs-CPU session also stands up the showdown-speaking spoof opponent on
+  // the guest endpoint so negotiate + wager + the enemy-command relay play through solo.
+  if ((opts.kind ?? "coop") === "versus") {
+    runtime.showdownSpoof = new ShowdownSpoof(guest);
+  }
   setCoopRuntime(runtime);
   coopLog(
     "launch",
@@ -1888,6 +1899,7 @@ export function clearCoopRuntime(): void {
   active.mePump.endSession();
   active.rendezvous.dispose();
   active.spoof?.dispose();
+  active.showdownSpoof?.dispose();
   // Drop the persistent move-learn forward listener + its in-flight slot set (#633 BUG3+5) so a
   // subsequent solo / lockstep run has no listener and spawns no CoopReplayLearnMovePhase.
   offLearnMoveForward?.();
