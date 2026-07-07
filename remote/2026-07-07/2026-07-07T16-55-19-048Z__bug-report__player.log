@@ -1,0 +1,275 @@
+----- BUG REPORT (in-game) -----
+version:  1.11.19
+url:      https://elite-redux.pages.dev/
+ua:       Mozilla/5.0 (X11; CrOS x86_64 14541.0.0) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36
+mode:     4  wave:41  difficulty:elite
+seed:     FTA4brQ05MxfjC3WoBTyrnIY
+party:    Scovillain(L32 93/93), Yveltal(L32 132/132), Ampharos(L32 122/122), Orbeetle(L32 90/90), Ninetales(L32 98/98), Marshtomp(L32 103/103)
+
+----- DESCRIPTION -----
+Substitute failed to protect when it should have
+
+----- CONSOLE -----
+[16:48:19.314] LOG: %cStart Phase TurnEndPhase color:green;
+[16:48:19.315] WARN: [coop:turn] host recorder: finalize with NO open recording -> turn=-1 events=0 (caller decides not to emit)
+[16:48:19.315] LOG: %cStart Phase BattleEndPhase color:green;
+[16:48:19.315] LOG: Battle Score: 90 (1 Turns x1)
+[16:48:19.315] LOG: Total Score: 4257
+[16:48:19.332] LOG: %cStart Phase EggLapsePhase color:green;
+[16:48:19.333] LOG: %cStart Phase MessagePhase color:green;
+[16:48:21.006] LOG: %cStart Phase EggHatchPhase color:green;
+[16:48:29.315] LOG: %cStart Phase SelectModifierPhase color:green;
+[16:48:29.315] LOG: Wave Seed: lzgZwV[siY}hzo 38
+[16:48:29.323] LOG: 7 0 []
+[16:48:29.323] LOG: {"id":"TEMP_STAT_STAGE_BOOSTER","localeKey":"","iconImage":"x_accuracy","soundName":"se/restore","tier":0,"stat":6,"nameKey":"x_accuracy","quantityKey":"stage"} 
+[16:48:29.323] LOG: 0 0 []
+[16:48:29.323] LOG: {"id":"POKEBALL","localeKey":"","iconImage":"pb","group":"pb","soundName":"se/pb_bounce_1","tier":0,"pokeballType":0,"count":5} 
+[16:48:29.324] LOG: 20 8 [2,3,4,5,6,7,8,16,22]
+[16:48:29.324] LOG: {"id":"BASE_STAT_BOOSTER","localeKey":"","iconImage":"zinc","soundName":"se/restore","tier":1,"stat":4,"key":"zinc"} 
+[16:48:29.324] LOG: 1 0 [2,3,4,5,6,7,8,16,22]
+[16:48:29.324] LOG: {"id":"PP_UP","localeKey":"modifierType:ModifierType.PP_UP","iconImage":"pp_up","group":"ppUp","soundName":"se/restore","tier":1,"upPoints":1} 
+[16:48:29.324] LOG: 1 0 []
+[16:48:29.324] LOG: {"id":"RARE_CANDY","localeKey":"modifierType:ModifierType.RARE_CANDY","iconImage":"rare_candy","soundName":"se/restore","tier":0} 
+[16:48:29.325] LOG: 0 0 []
+[16:48:29.325] LOG: {"id":"POKEBALL","localeKey":"","iconImage":"pb","group":"pb","soundName":"se/pb_bounce_1","tier":0,"pokeballType":0,"count":5} 
+[16:48:29.325] LOG: 7 0 []
+[16:48:29.325] LOG: {"id":"TEMP_STAT_STAGE_BOOSTER","localeKey":"","iconImage":"x_speed","soundName":"se/restore","tier":0,"stat":5,"nameKey":"x_speed","quantityKey":"percentage"} 
+[16:48:29.325] LOG: 9 0 []
+[16:48:29.325] LOG: {"id":"TM_CASE","localeKey":"","iconImage":"tm_case","soundName":"se/restore","tier":0} 
+[16:48:29.325] LOG: 3 0 []
+[16:48:29.325] LOG: {"id":"SUPER_POTION","localeKey":"modifierType:ModifierType.SUPER_POTION","iconImage":"super_potion","group":"potion","soundName":"se/restore","tier":0,"restorePoints":50,"restorePercent":25,"healStatus":false} 
+[16:48:46.124] LOG: %cStart Phase NewBattlePhase color:green;
+[16:48:46.124] LOG: Wave Seed: m{h[xW\tjZ~i{ p 39
+[16:48:46.127] LOG: %cStart Phase ReturnPhase color:green;
+[16:48:46.592] LOG: %cStart Phase ReturnPhase color:green;
+[16:48:47.124] LOG: %cStart Phase ShowTrainerPhase color:green;
+[16:48:47.656] LOG: %cStart Phase NextEncounterPhase color:green;
+[16:48:47.924] DEBUG: Session data saved to slot 2!
+[16:48:47.925] LOG: Wave Seed: m{h[xW\tjZ~i{ p 39
+[16:48:51.919] LOG: %cStart Phase MysteryEncounterPhase color:green;
+[16:48:56.742] LOG: %cStart Phase MysteryEncounterOptionSelectedPhase color:green;
+[16:48:56.743] LOG: %cStart Phase MysteryEncounterRewardsPhase color:green;
+[16:48:56.743] LOG: %cStart Phase SelectModifierPhase color:green;
+[16:48:56.743] LOG: Wave Seed: m{h[xW\tjZ~i{ p 39
+[16:48:56.745] LOG: 0 0 [4,5]
+[16:48:56.745] LOG: {"id":"POKEBALL","localeKey":"","iconImage":"pb","group":"pb","soundName":"se/pb_bounce_1","tier":0,"pokeballType":0,"count":5} 
+[16:49:17.203] LOG: %cStart Phase EggLapsePhase color:green;
+[16:49:17.203] LOG: %cStart Phase PostMysteryEncounterPhase color:green;
+[16:49:17.203] LOG: %cStart Phase NewBattlePhase color:green;
+[16:49:17.203] LOG: Wave Seed: n|i\yX]u k[j|¡q 40
+[16:49:17.204] LOG: %cStart Phase NextEncounterPhase color:green;
+[16:49:17.207] LOG: Starting species pool tier: BOSS_RARE
+[16:49:17.208] LOG: Replaced PERRSERKER with GALAR_MEOWTH
+[16:49:17.238] LOG: Pokemon: Wild Meowth | Species ID: 4052 | Level: 25 | Nature: Bashful (-)
+[16:49:17.238] LOG: Stats (IVs): HP: 63 (12), Atk: 43 (7), Def: 33 (17), Spatk: 40 (15), Spdef: 28 (26), Spd: 25 (14)
+[16:49:17.238] LOG: Ability: Sniper | Passive Ability: Tough Claws | Boss Bars: 2
+[16:49:17.238] LOG: Moveset: ["Bullet Punch","Iron Tail","Smelling Salts","Smart Strike"]
+[16:49:17.522] LOG: {"id":"BERRY","localeKey":"","iconImage":"sitrus_berry","group":"berry","soundName":"se/restore","tier":0,"berryType":0} (enemy)
+[16:49:17.522] LOG: {"id":"BERRY","localeKey":"","iconImage":"leppa_berry","group":"berry","soundName":"se/restore","tier":0,"berryType":10} (enemy)
+[16:49:17.522] LOG: Battle Seed: SfbWQPm4UGdtGpGf
+[16:49:17.623] DEBUG: Session data saved to slot 2!
+[16:49:17.624] LOG: Wave Seed: n|i\yX]u k[j|¡q 40
+[16:49:19.690] LOG: %cStart Phase SummonPhase color:green;
+[16:49:21.071] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[16:49:21.074] LOG: %cStart Phase CheckSwitchPhase color:green;
+[16:49:21.496] LOG: %cStart Phase InitEncounterPhase color:green;
+[16:49:21.498] LOG: %cStart Phase PostSummonPhase color:green;
+[16:49:21.498] LOG: Ran PSP for: Orbeetle
+[16:49:21.500] LOG: %cStart Phase PostSummonPhase color:green;
+[16:49:21.501] LOG: %cStart Phase PostSummonPhase color:green;
+[16:49:21.508] LOG: %cStart Phase ShowAbilityPhase color:green;
+[16:49:22.274] LOG: %cStart Phase MessagePhase color:green;
+[16:49:23.304] LOG: %cStart Phase HideAbilityPhase color:green;
+[16:49:23.408] LOG: %cStart Phase PostSummonPhase color:green;
+[16:49:23.408] LOG: Ran PSP for: Meowth
+[16:49:23.409] LOG: %cStart Phase PostSummonPhase color:green;
+[16:49:23.409] LOG: %cStart Phase PostSummonPhase color:green;
+[16:49:23.409] LOG: %cStart Phase TurnInitPhase color:green;
+[16:49:23.410] LOG: %cStart Phase CommandPhase color:green;
+[16:49:29.443] LOG: Move: LUSTER_PURGE Move targets: {"targets":[2],"multiple":false} 
+Player Pokemon: Orbeetle
+[16:49:29.451] LOG: %cStart Phase EnemyCommandPhase color:green;
+[16:49:29.466] LOG: Move Pool: ["Iron Tail"]
+[16:49:29.467] LOG: Move Scores: [923.25]
+[16:49:29.467] LOG: Sorted Move Pool: ["Iron Tail"]
+[16:49:29.467] LOG: Chosen Move: Iron Tail
+[16:49:29.467] LOG: ER AI: standard brain (sharpness 0.85)
+[16:49:29.467] LOG: %cStart Phase TurnStartPhase color:green;
+[16:49:29.468] LOG: %cStart Phase MovePhase color:green;
+[16:49:29.468] LOG: %cUser: Meowth
+Move: IRON_TAIL
+Use Mode: NORMAL color:orchid
+[16:49:29.474] LOG: %cStart Phase MessagePhase color:green;
+[16:49:30.037] LOG: %cStart Phase MoveEffectPhase color:green;
+[16:49:31.106] LOG: crit stage: +1
+[16:49:31.110] LOG: Move: Iron Tail | Base damage: 16.535529411764706 | Power: 117 | Source attack: 44 | Target defense: 85
+[16:49:31.116] LOG: Move: Iron Tail | Attack damage: 28
+[16:49:31.117] LOG: %cStart Phase MessagePhase color:green;
+[16:49:32.338] LOG: %cStart Phase DamageAnimPhase color:green;
+[16:49:32.475] LOG: %cStart Phase StatStageChangePhase color:green;
+[16:49:33.374] LOG: %cStart Phase MessagePhase color:green;
+[16:49:34.438] LOG: %cStart Phase MoveEndPhase color:green;
+[16:49:34.439] LOG: %cStart Phase MovePhase color:green;
+[16:49:34.439] LOG: %cUser: Orbeetle
+Move: LUSTER_PURGE
+Use Mode: NORMAL color:orchid
+[16:49:34.444] LOG: %cStart Phase MessagePhase color:green;
+[16:49:35.038] LOG: %cStart Phase MoveEffectPhase color:green;
+[16:49:37.241] LOG: crit stage: +0
+[16:49:37.244] LOG: Move: Luster Purge | Base damage: 74.56774193548387 | Power: 95 | Source attack: 80 | Target defense: 31
+[16:49:37.245] LOG: Move: Luster Purge | Attack damage: 53
+[16:49:37.249] LOG: %cStart Phase DamageAnimPhase color:green;
+[16:49:37.374] LOG: %cStart Phase StatStageChangePhase color:green;
+[16:49:38.276] LOG: %cStart Phase MessagePhase color:green;
+[16:49:39.371] LOG: %cStart Phase MessagePhase color:green;
+[16:49:40.454] LOG: %cStart Phase StatStageChangePhase color:green;
+[16:49:41.360] LOG: %cStart Phase MessagePhase color:green;
+[16:49:42.454] LOG: %cStart Phase MoveEndPhase color:green;
+[16:49:42.454] LOG: %cStart Phase CheckInterludePhase color:green;
+[16:49:42.454] LOG: %cStart Phase WeatherEffectPhase color:green;
+[16:49:42.454] LOG: %cStart Phase PositionalTagPhase color:green;
+[16:49:42.454] LOG: %cStart Phase BerryPhase color:green;
+[16:49:42.457] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[16:49:42.458] LOG: %cStart Phase TurnEndPhase color:green;
+[16:49:42.463] WARN: [coop:turn] host recorder: finalize with NO open recording -> turn=-1 events=0 (caller decides not to emit)
+[16:49:42.463] LOG: %cStart Phase TurnInitPhase color:green;
+[16:49:42.463] LOG: %cStart Phase CommandPhase color:green;
+[16:49:47.464] LOG: Move: BUG_BUZZ Move targets: {"targets":[2],"multiple":false} 
+Player Pokemon: Orbeetle
+[16:49:47.468] LOG: %cStart Phase EnemyCommandPhase color:green;
+[16:49:47.477] LOG: Battle Seed: SfbWQPm4UGdtGpGf
+[16:49:47.494] LOG: Move Pool: ["Bullet Punch","Iron Tail","Smelling Salts","Smart Strike"]
+[16:49:47.494] LOG: Move Scores: [1014.1666666666666,927,1003.3333333333334,1023.3333333333334]
+[16:49:47.494] LOG: Sorted Move Pool: ["Smart Strike","Bullet Punch","Smelling Salts","Iron Tail"]
+[16:49:47.494] LOG: Chosen Move: Smart Strike
+[16:49:47.494] LOG: ER AI: standard brain (sharpness 0.85)
+[16:49:47.494] LOG: %cStart Phase TurnStartPhase color:green;
+[16:49:47.496] LOG: %cStart Phase MovePhase color:green;
+[16:49:47.496] LOG: %cUser: Meowth
+Move: SMART_STRIKE
+Use Mode: NORMAL color:orchid
+[16:49:47.500] LOG: %cStart Phase MessagePhase color:green;
+[16:49:48.054] LOG: %cStart Phase MoveEffectPhase color:green;
+[16:49:49.989] LOG: crit stage: +1
+[16:49:49.992] LOG: Move: Smart Strike | Base damage: 19.16 | Power: 91 | Source attack: 44 | Target defense: 56
+[16:49:49.992] LOG: Move: Smart Strike | Attack damage: 26
+[16:49:49.993] LOG: %cStart Phase DamageAnimPhase color:green;
+[16:49:50.123] LOG: %cStart Phase FaintPhase color:green;
+[16:49:50.422] LOG: %cStart Phase MessagePhase color:green;
+[16:49:51.323] LOG: %cStart Phase MoveEndPhase color:green;
+[16:49:51.324] LOG: %cStart Phase MovePhase color:green;
+[16:49:51.324] LOG: %cStart Phase MoveEndPhase color:green;
+[16:49:51.324] LOG: %cStart Phase CheckInterludePhase color:green;
+[16:49:51.324] LOG: %cStart Phase WeatherEffectPhase color:green;
+[16:49:51.324] LOG: %cStart Phase PositionalTagPhase color:green;
+[16:49:51.324] LOG: %cStart Phase BerryPhase color:green;
+[16:49:51.325] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[16:49:51.325] LOG: %cStart Phase TurnEndPhase color:green;
+[16:49:51.328] WARN: [coop:turn] host recorder: finalize with NO open recording -> turn=-1 events=0 (caller decides not to emit)
+[16:49:51.328] LOG: %cStart Phase SwitchPhase color:green;
+[16:50:00.283] LOG: %cStart Phase SwitchSummonPhase color:green;
+[16:50:01.289] LOG: %cStart Phase PostSummonPhase color:green;
+[16:50:01.289] LOG: Ran PSP for: Scovillain
+[16:50:01.289] LOG: %cStart Phase PostSummonPhase color:green;
+[16:50:01.289] LOG: %cStart Phase PostSummonPhase color:green;
+[16:50:01.290] LOG: %cStart Phase TurnInitPhase color:green;
+[16:50:01.290] LOG: %cStart Phase CommandPhase color:green;
+[16:50:02.249] LOG: Move: FIRE_LASH Move targets: {"targets":[2],"multiple":false} 
+Player Pokemon: Scovillain
+[16:50:02.253] LOG: %cStart Phase EnemyCommandPhase color:green;
+[16:50:02.266] LOG: Battle Seed: SfbWQPm4UGdtGpGf
+[16:50:02.299] LOG: Move Pool: ["Bullet Punch","Iron Tail","Smelling Salts","Smart Strike"]
+[16:50:02.299] LOG: Move Scores: [6.451612903225807,1.9596774193548385,2.2983870967741935,1.6935483870967742]
+[16:50:02.299] LOG: Sorted Move Pool: ["Bullet Punch","Smelling Salts","Iron Tail","Smart Strike"]
+[16:50:02.299] LOG: Chosen Move: Bullet Punch
+[16:50:02.299] LOG: ER AI: standard brain (sharpness 0.85)
+[16:50:02.299] LOG: %cStart Phase TurnStartPhase color:green;
+[16:50:02.301] LOG: %cStart Phase MovePhase color:green;
+[16:50:02.301] LOG: %cUser: Meowth
+Move: BULLET_PUNCH
+Use Mode: NORMAL color:orchid
+[16:50:02.304] LOG: %cStart Phase MessagePhase color:green;
+[16:50:02.869] LOG: %cStart Phase MoveEffectPhase color:green;
+[16:50:03.404] LOG: crit stage: +1
+[16:50:03.407] LOG: Move: Bullet Punch | Base damage: 11.984 | Power: 52 | Source attack: 44 | Target defense: 55
+[16:50:03.409] LOG: Move: Bullet Punch | Attack damage: 8
+[16:50:03.410] LOG: %cStart Phase DamageAnimPhase color:green;
+[16:50:03.540] LOG: %cStart Phase MessagePhase color:green;
+[16:50:04.603] LOG: %cStart Phase MoveEndPhase color:green;
+[16:50:04.603] LOG: %cStart Phase MovePhase color:green;
+[16:50:04.603] LOG: %cUser: Scovillain
+Move: FIRE_LASH
+Use Mode: NORMAL color:orchid
+[16:50:04.609] LOG: %cStart Phase MessagePhase color:green;
+[16:50:05.186] LOG: %cStart Phase MoveEffectPhase color:green;
+[16:50:06.087] LOG: crit stage: +0
+[16:50:06.089] LOG: Move: Fire Lash | Base damage: 55.937777777777775 | Power: 80 | Source attack: 82 | Target defense: 36
+[16:50:06.090] LOG: Move: Fire Lash | Attack damage: 164
+[16:50:06.092] LOG: %cStart Phase DamageAnimPhase color:green;
+[16:50:06.222] LOG: %cStart Phase MessagePhase color:green;
+[16:50:07.253] LOG: %cStart Phase MessagePhase color:green;
+[16:50:08.220] LOG: %cStart Phase FaintPhase color:green;
+[16:50:08.489] LOG: %cStart Phase MessagePhase color:green;
+[16:50:08.946] LOG: %cStart Phase VictoryPhase color:green;
+[16:50:08.947] LOG: %cStart Phase MoveEndPhase color:green;
+[16:50:08.947] LOG: %cStart Phase CheckInterludePhase color:green;
+[16:50:08.947] LOG: %cStart Phase PositionalTagPhase color:green;
+[16:50:08.947] LOG: %cStart Phase TurnEndPhase color:green;
+[16:50:08.950] WARN: [coop:turn] host recorder: finalize with NO open recording -> turn=-1 events=0 (caller decides not to emit)
+[16:50:08.950] LOG: %cStart Phase BattleEndPhase color:green;
+[16:50:08.950] LOG: Battle Score: 50 (3 Turns x0.76)
+[16:50:08.950] LOG: Total Score: 4307
+[16:50:08.961] LOG: %cStart Phase EggLapsePhase color:green;
+[16:50:08.961] LOG: %cStart Phase MessagePhase color:green;
+[16:50:09.770] LOG: %cStart Phase EggHatchPhase color:green;
+[16:50:13.353] LOG: %cStart Phase ModifierRewardPhase color:green;
+[16:50:14.015] LOG: %cStart Phase SelectModifierPhase color:green;
+[16:51:01.510] LOG: %cStart Phase PartyHealPhase color:green;
+[16:51:04.569] LOG: %cStart Phase ResetStatusPhase color:green;
+[16:51:04.570] LOG: %cStart Phase ResetStatusPhase color:green;
+[16:51:04.571] LOG: %cStart Phase ResetStatusPhase color:green;
+[16:51:04.571] LOG: %cStart Phase ResetStatusPhase color:green;
+[16:51:04.571] LOG: %cStart Phase ResetStatusPhase color:green;
+[16:51:04.572] LOG: %cStart Phase ResetStatusPhase color:green;
+[16:51:04.572] LOG: %cStart Phase ErCrossroadsPhase color:green;
+[16:51:08.302] LOG: %cStart Phase SelectBiomePhase color:green;
+[16:51:08.303] LOG: Wave Seed: n|i\yX]u k[j|¡q 40
+[16:51:13.481] LOG: %cStart Phase PartyHealPhase color:green;
+[16:51:16.535] LOG: %cStart Phase ResetStatusPhase color:green;
+[16:51:16.537] LOG: %cStart Phase ResetStatusPhase color:green;
+[16:51:16.537] LOG: %cStart Phase ResetStatusPhase color:green;
+[16:51:16.538] LOG: %cStart Phase ResetStatusPhase color:green;
+[16:51:16.538] LOG: %cStart Phase ResetStatusPhase color:green;
+[16:51:16.538] LOG: %cStart Phase ResetStatusPhase color:green;
+[16:51:16.539] LOG: %cStart Phase SwitchBiomePhase color:green;
+[16:51:18.568] LOG: %cStart Phase NewBattlePhase color:green;
+[16:51:18.568] LOG: Wave Seed: o}j]zY^v¡l\k}¢r 41
+[16:51:18.571] LOG: %cStart Phase ReturnPhase color:green;
+[16:51:19.102] LOG: %cStart Phase ShowTrainerPhase color:green;
+[16:51:19.634] LOG: %cStart Phase NewBiomeEncounterPhase color:green;
+[16:51:19.638] LOG: Starting species pool tier: BOSS
+[16:51:19.664] LOG: Pokemon: Wild Hariyama | Species ID: 297 | Level: 26 | Nature: Modest (+SpAtk/-Atk)
+[16:51:19.664] LOG: Stats (IVs): HP: 117 (24), Atk: 65 (4), Def: 47 (21), Spatk: 29 (20), Spdef: 47 (22), Spd: 34 (12)
+[16:51:19.664] LOG: Ability: Guts | Passive Ability: Thick Fat | Boss Bars: 2
+[16:51:19.664] LOG: Moveset: ["Brick Break","Chip Away","Belly Drum","Storm Throw"]
+[16:51:19.954] LOG: {"id":"BERRY","localeKey":"","iconImage":"leppa_berry","group":"berry","soundName":"se/restore","tier":0,"berryType":10} (enemy)
+[16:51:19.954] LOG: {"id":"BERRY","localeKey":"","iconImage":"leppa_berry","group":"berry","soundName":"se/restore","tier":0,"berryType":10} (enemy)
+[16:51:19.955] LOG: Battle Seed: e8W1TRXi2E4ARn0r
+[16:51:20.076] DEBUG: Session data saved to slot 2!
+[16:51:20.988] LOG: Wave Seed: o}j]zY^v¡l\k}¢r 41
+[16:51:23.069] LOG: %cStart Phase LevelCapPhase color:green;
+[16:51:39.093] LOG: %cStart Phase SummonPhase color:green;
+[16:51:40.483] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[16:51:40.486] LOG: %cStart Phase CheckSwitchPhase color:green;
+[16:52:07.220] LOG: %cStart Phase SwitchPhase color:green;
+[16:54:02.766] LOG: %cStart Phase InitEncounterPhase color:green;
+[16:54:02.768] LOG: %cStart Phase PostSummonPhase color:green;
+[16:54:02.768] LOG: Ran PSP for: Scovillain
+[16:54:02.769] LOG: %cStart Phase PostSummonPhase color:green;
+[16:54:02.769] LOG: %cStart Phase PostSummonPhase color:green;
+[16:54:02.770] LOG: %cStart Phase PostSummonPhase color:green;
+[16:54:02.770] LOG: Ran PSP for: Hariyama
+[16:54:02.770] LOG: %cStart Phase PostSummonPhase color:green;
+[16:54:02.770] LOG: %cStart Phase PostSummonPhase color:green;
+[16:54:02.770] LOG: %cStart Phase TurnInitPhase color:green;
+[16:54:02.770] LOG: %cStart Phase CommandPhase color:green;
