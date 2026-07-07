@@ -2123,6 +2123,70 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
   },
   {
+    label: "(note) Co-op: every reward-shop party sub-picker syncs to both clients (wiring audit)",
+    description:
+      "CO-OP behavior - verify with TWO clients (not a solo battle): every party-target reward whose\n"
+      + "pick opens a sub-picker - DNA Splicer (fuse two mons), a held item / vitamin / Rare Candy\n"
+      + "(PARTY/MODIFIER), Ether (PARTY/MOVE_MODIFIER), a TM, Memory Mushroom, Learner's Shroom, TM Case\n"
+      + "(the teach-a-move pickers) - is driven by the reward OWNER and MIRRORED on the WATCHER. DO (2\n"
+      + "clients): on an alternating reward interaction, the OWNER picks one of these and chooses a mon\n"
+      + "(+ a move for the teach pickers). EXPECT: the outcome is IDENTICAL on BOTH clients (same fusion\n"
+      + "/ held item / restored PP / taught move) and the alternating-interaction counter advances in\n"
+      + "lockstep; a teach-a-move reward learns the move on both and NEVER orphans/hangs the shop. Duo-\n"
+      + "tested headlessly in test/tests/elite-redux/coop/coop-duo-reward-subpickers.test.ts.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({ STARTING_WAVE_OVERRIDE: 1, STARTING_LEVEL_OVERRIDE: 50 });
+      return [
+        makeStarter(SpeciesId.SNORLAX, { moveset: [MoveId.TACKLE, MoveId.BODY_SLAM, MoveId.REST, MoveId.SNORE] }),
+        makeStarter(SpeciesId.GENGAR, {
+          moveset: [MoveId.SHADOW_BALL, MoveId.SLUDGE_BOMB, MoveId.HYPNOSIS, MoveId.DARK_PULSE],
+        }),
+      ];
+    },
+    shopItems: [modifierTypes.DNA_SPLICERS, modifierTypes.ETHER, modifierTypes.MEMORY_MUSHROOM],
+  },
+  {
+    label: "(note) Co-op: the Dex Nav species picker opens only for the item USER (wiring audit)",
+    description:
+      "CO-OP fix - verify with TWO clients (not a solo battle): the ER Dex Nav consumable registers\n"
+      + "species in the PER-ACCOUNT pokedex via a species picker. In the alternating reward shop the\n"
+      + "WATCHER applies the SAME consumable to keep the shop in lockstep, so pre-fix BOTH clients opened\n"
+      + "the (drivable) picker - an unexpected screen on the partner PLUS free dex entries from the\n"
+      + "owner's item. Now it is owner-gated. DO (2 clients): the reward OWNER picks a Dex Nav. EXPECT:\n"
+      + "the 'choose a Pokemon to register' picker opens ONLY on the OWNER (the item user); the WATCHER\n"
+      + "sees NO picker and gets NO dex entries from it. Each player's dex is their own. Gated headlessly\n"
+      + "in test/tests/elite-redux/coop/coop-dexnav-owner-gate.test.ts.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({ STARTING_WAVE_OVERRIDE: 1, STARTING_LEVEL_OVERRIDE: 50 });
+      return [
+        makeStarter(SpeciesId.SNORLAX, { moveset: [MoveId.TACKLE, MoveId.BODY_SLAM, MoveId.REST, MoveId.SNORE] }),
+      ];
+    },
+    shopItems: [modifierTypes.ER_DEX_NAV],
+  },
+  {
+    label: "(note) Co-op: an ME TRAINER (event) battle is a DOUBLE - plus a trainer-sprite residual (#802/#818)",
+    description:
+      "CO-OP behavior + a REPORTED RESIDUAL - verify with TWO clients (a doubles run): a mystery event\n"
+      + "that spawns a TRAINER battle (e.g. Mysterious Challengers) is forced to a DOUBLE so both players\n"
+      + "field a mon (#818, closing #802's 'trainer event ran as singles in a doubles run'). DO: trigger\n"
+      + "an ME trainer battle in co-op. EXPECT: a DOUBLE trainer battle (2 enemy slots), never a single.\n"
+      + "RESIDUAL (reported, NOT fixed): #818 forces the DOUBLE variant on WHATEVER trainer the ME rolls,\n"
+      + "but most trainer configs have hasDouble=false, so the Trainer builds a single sprite pair while\n"
+      + "its variant stays DOUBLE - WATCH for a crash / missing second trainer sprite at the trainer\n"
+      + "SUMMON (a Trainer sprite/variant fix is owed). Format verified headlessly in\n"
+      + "test/tests/elite-redux/coop/coop-me-trainer-battle-double.test.ts.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({ STARTING_WAVE_OVERRIDE: 1, STARTING_LEVEL_OVERRIDE: 50 });
+      return [
+        makeStarter(SpeciesId.SNORLAX, { moveset: [MoveId.TACKLE, MoveId.BODY_SLAM, MoveId.REST, MoveId.SNORE] }),
+      ];
+    },
+  },
+  {
     label: "(note) Co-op: the World-Map biome CHOICE + crossroads are owner-alternated + mirrored (#848)",
     description:
       "CO-OP fix - verify with TWO clients (not a solo battle): the ER World Map biome pick and the\n"
