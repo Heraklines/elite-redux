@@ -58,6 +58,20 @@ export const SHOWDOWN_READY_RENDEZVOUS_POINT = "showdown-ready";
  */
 export const SHOWDOWN_WAGER_COMMIT_POINT = "showdown-wager-commit";
 
+/**
+ * How long the pre-battle pipeline waits for the OTHER player across the slow human steps
+ * (their teambuild after you confirmed; their stake browsing after you locked). Maintainer
+ * rule: teambuilding gets AT LEAST 10 minutes - the co-op 60s rendezvous default is for
+ * mid-battle sync points, not for a human assembling a team. ~50ms under vitest so the
+ * timeout tests stay fast (mirrors the getCoopRendezvousWaitMs convention).
+ */
+export function getShowdownPickWaitMs(): number {
+  if (typeof process !== "undefined" && process.env?.VITEST) {
+    return 50;
+  }
+  return 600_000;
+}
+
 /** Predicate telling whether `(speciesId, formIndex)` is a mega/primal battle form. */
 export type IsMegaFormPredicate = (speciesId: number, formIndex: number) => boolean;
 
@@ -203,7 +217,9 @@ export class ShowdownSession {
     this.isMegaForm = opts.isMegaForm ?? isMegaStage;
     this.ownsRendezvous = opts.rendezvous == null;
     this.rendezvous = opts.rendezvous ?? new CoopRendezvous(transport);
-    this.timeoutMs = opts.timeoutMs ?? getCoopRendezvousWaitMs();
+    // Human-deliberation class, NOT the 60s pacing class: the first confirmer waits here
+    // through the ENTIRE remainder of the peer's teambuild (maintainer: >= 10 minutes).
+    this.timeoutMs = opts.timeoutMs ?? getShowdownPickWaitMs();
     this.schedule = opts.schedule ?? defaultSchedule;
     this.offMessage = transport.onMessage(msg => this.handle(msg));
   }
@@ -336,7 +352,7 @@ export class ShowdownSession {
     }
     this.crossingBarrier = true;
     const opponentProfile = this.opponentProfile;
-    void this.rendezvous.rendezvous(SHOWDOWN_READY_RENDEZVOUS_POINT).then(() => {
+    void this.rendezvous.rendezvous(SHOWDOWN_READY_RENDEZVOUS_POINT, getShowdownPickWaitMs()).then(() => {
       this.finishResolve({ ownManifest: settle.ownManifest, opponentManifest, opponentTeamHash, opponentProfile });
     });
   }

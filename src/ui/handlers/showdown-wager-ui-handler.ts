@@ -42,7 +42,7 @@ import type { GhostTrainerProfile } from "#data/elite-redux/er-ghost-profile";
 import { registerShowdownMatch } from "#data/elite-redux/showdown/showdown-escrow-client";
 import { isMegaStage } from "#data/elite-redux/showdown/showdown-evolutions";
 import type { ShowdownItemKey } from "#data/elite-redux/showdown/showdown-item-pool";
-import { SHOWDOWN_WAGER_COMMIT_POINT } from "#data/elite-redux/showdown/showdown-session";
+import { getShowdownPickWaitMs, SHOWDOWN_WAGER_COMMIT_POINT } from "#data/elite-redux/showdown/showdown-session";
 import { type StakeOffer, type StakeVariant, stakesMatch, stakeTier } from "#data/elite-redux/showdown/showdown-stakes";
 import type { ShowdownMonManifest } from "#data/elite-redux/showdown/showdown-team";
 import { Button } from "#enums/buttons";
@@ -345,7 +345,9 @@ export class ShowdownWagerUiHandler extends UiHandler {
       // Offline preview (render harness) / no runtime: nothing to sync against; just light the lamp.
       return true;
     }
-    void rv.rendezvous(SHOWDOWN_WAGER_COMMIT_POINT).then(() => {
+    // Human-deliberation wait: the peer may browse stakes for minutes after we lock (maintainer:
+    // the pre-battle pipeline allows >= 10 minutes; the 60s rendezvous default is a pacing class).
+    void rv.rendezvous(SHOWDOWN_WAGER_COMMIT_POINT, getShowdownPickWaitMs()).then(() => {
       this.opponentLocked = true;
       this.render();
       this.proceed(null);
