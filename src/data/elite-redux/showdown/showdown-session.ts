@@ -51,6 +51,13 @@ import {
 /** The reciprocal rendezvous point both clients cross once both teams are validated + ready. */
 export const SHOWDOWN_READY_RENDEZVOUS_POINT = "showdown-ready";
 
+/**
+ * The reciprocal rendezvous point both clients cross once both have LOCKED IN at the wager screen (D3).
+ * Defined here (engine-free) rather than on the UI handler so the wager handler AND the vs-CPU spoof
+ * share it without either pulling the Phaser UI layer into the co-op runtime.
+ */
+export const SHOWDOWN_WAGER_COMMIT_POINT = "showdown-wager-commit";
+
 /** Predicate telling whether `(speciesId, formIndex)` is a mega/primal battle form. */
 export type IsMegaFormPredicate = (speciesId: number, formIndex: number) => boolean;
 

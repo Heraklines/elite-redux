@@ -202,6 +202,12 @@ export const COOP_UI_REGISTRY: Record<UiMode, CoopUiClass> = {
   // (ShowdownCommandRelay.sendCommand), validated host-authoritatively. Never a co-op surface
   // (versus is a distinct GameMode, not isCoop), so it never participates in the co-op mirror.
   [UiMode.SHOWDOWN_COMMAND]: "local-only",
+
+  // Showdown 1v1 versus WAGER screen (D3): LOCAL-ONLY by construction - each player drives its OWN
+  // copy (its own stake picker + lock), and only the resulting stake OFFER / lock crosses the wire
+  // (showdownStakeOffer + the showdown-wager-commit rendezvous), mirroring the SHOWDOWN_COMMAND
+  // precedent. Never a co-op surface (versus is a distinct GameMode, not isCoop).
+  [UiMode.SHOWDOWN_WAGER]: "local-only",
 };
 
 /**

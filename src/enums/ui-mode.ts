@@ -78,4 +78,6 @@ export enum UiMode {
   GHOST_TRAINER_EDITOR,
   /** Showdown 1v1: the versus GUEST's command menu (picks a move/switch for its own team, ships via relay). */
   SHOWDOWN_COMMAND,
+  /** Showdown 1v1: the pre-battle WAGER screen (both teams previewed, stake picker, both-ready commit). */
+  SHOWDOWN_WAGER,
 }

@@ -33,6 +33,7 @@ import { bargainAbilityDescription } from "#data/elite-redux/er-bargain-sins";
 import { applyErBlackShinyKit } from "#data/elite-redux/er-black-shinies";
 import { buildInfernoFeed } from "#data/elite-redux/er-community-challenge-inferno";
 import { buildDemoChallengesConfig } from "#data/elite-redux/er-community-challenges";
+import type { GhostTrainerProfile } from "#data/elite-redux/er-ghost-profile";
 import { recordErBiomeVisited } from "#data/elite-redux/er-map-nodes";
 import { STORMGLASS_WEATHER_CHOICES } from "#data/elite-redux/er-relics";
 import {
@@ -43,6 +44,8 @@ import {
   setErShinyLabOwnedBit,
   unlockErShinyLabNameFx,
 } from "#data/elite-redux/er-shiny-lab-effects";
+import { listMegaStages } from "#data/elite-redux/showdown/showdown-evolutions";
+import type { ShowdownMonManifest } from "#data/elite-redux/showdown/showdown-team";
 import { trainerConfigs } from "#data/trainers/trainer-config";
 import { AbilityId } from "#enums/ability-id";
 import { BattleType } from "#enums/battle-type";
@@ -81,6 +84,7 @@ import {
 import { buildDemoConfig } from "#ui/er-shiny-lab-ui-handler";
 import { PartyUiMode } from "#ui/party-ui-handler";
 import { SaveSlotUiMode } from "#ui/save-slot-select-ui-handler";
+import type { ShowdownWagerArgs } from "#ui/showdown-wager-ui-handler";
 import { getModifierType } from "#utils/modifier-utils";
 import { getPokemonSpecies } from "#utils/pokemon-utils";
 import { copyFileSync, existsSync, mkdirSync, writeFileSync } from "node:fs";
@@ -408,6 +412,84 @@ function shimUiAndShow(game: GameManager, mode: UiMode, args: any[]): any {
   return handler;
 }
 
+/** Build the demo args for the Showdown WAGER screen (D3): two full teams + an opponent profile. */
+function showdownWagerArgs(): [ShowdownWagerArgs] {
+  const mon = (over: Partial<ShowdownMonManifest>): ShowdownMonManifest => ({
+    speciesId: SpeciesId.BULBASAUR,
+    formIndex: 0,
+    level: 100,
+    shiny: false,
+    variant: 0,
+    abilityIndex: 0,
+    nature: 0,
+    ivs: [31, 31, 31, 31, 31, 31],
+    moveset: [MoveId.TACKLE, MoveId.GROWL, MoveId.VINE_WHIP, MoveId.LEECH_SEED],
+    item: "LEFTOVERS",
+    rootSpeciesId: SpeciesId.BULBASAUR,
+    erBlackShiny: false,
+    baseCost: 4,
+    ...over,
+  });
+  // A real mega form (for the mega badge); fall back to base if the line exposes none headlessly.
+  const charMega = listMegaStages(SpeciesId.CHARIZARD)[0];
+  const ownTeam: ShowdownMonManifest[] = [
+    mon({
+      speciesId: SpeciesId.BLASTOISE,
+      rootSpeciesId: SpeciesId.BLASTOISE,
+      shiny: true,
+      variant: 2,
+      item: "SHELL_BELL",
+      baseCost: 7,
+    }),
+    mon({ speciesId: SpeciesId.VENUSAUR, rootSpeciesId: SpeciesId.VENUSAUR, item: "LEFTOVERS", baseCost: 7 }),
+    charMega == null
+      ? mon({ speciesId: SpeciesId.CHARIZARD, rootSpeciesId: SpeciesId.CHARIZARD, item: "FLAME_ORB", baseCost: 8 })
+      : mon({
+          speciesId: charMega.speciesId,
+          formIndex: charMega.formIndex,
+          rootSpeciesId: SpeciesId.CHARIZARD,
+          item: "MEGA_STONE",
+          baseCost: 8,
+        }),
+    mon({
+      speciesId: SpeciesId.PIKACHU,
+      rootSpeciesId: SpeciesId.PIKACHU,
+      shiny: true,
+      variant: 0,
+      item: "FOCUS_BAND",
+      baseCost: 3,
+    }),
+    mon({ speciesId: SpeciesId.SNORLAX, rootSpeciesId: SpeciesId.SNORLAX, item: "TOXIC_ORB", baseCost: 6 }),
+    mon({ speciesId: SpeciesId.GYARADOS, rootSpeciesId: SpeciesId.GYARADOS, item: "QUICK_CLAW", baseCost: 6 }),
+  ];
+  const opponentTeam: ShowdownMonManifest[] = [
+    mon({ speciesId: SpeciesId.TYRANITAR, rootSpeciesId: SpeciesId.LARVITAR, item: "LEFTOVERS", baseCost: 7 }),
+    mon({ speciesId: SpeciesId.GENGAR, rootSpeciesId: SpeciesId.GASTLY, item: "KINGS_ROCK", baseCost: 6 }),
+    mon({
+      speciesId: SpeciesId.ALAKAZAM,
+      rootSpeciesId: SpeciesId.ABRA,
+      shiny: true,
+      variant: 1,
+      item: "FOCUS_BAND",
+      baseCost: 6,
+    }),
+    mon({ speciesId: SpeciesId.DRAGONITE, rootSpeciesId: SpeciesId.DRATINI, item: "FLAME_ORB", baseCost: 7 }),
+    mon({ speciesId: SpeciesId.LAPRAS, rootSpeciesId: SpeciesId.LAPRAS, item: "SHELL_BELL", baseCost: 6 }),
+    mon({ speciesId: SpeciesId.MACHAMP, rootSpeciesId: SpeciesId.MACHOP, item: "TOXIC_ORB", baseCost: 6 }),
+  ];
+  const opponentProfile: GhostTrainerProfile = { displayName: "Rival Red", title: "Champion" };
+  const args: ShowdownWagerArgs = {
+    ownTeam,
+    opponentTeam,
+    opponentProfile,
+    role: "host",
+    transport: null,
+    rendezvous: null,
+    onCommit: () => {},
+  };
+  return [args];
+}
+
 const RECIPES: Record<string, Recipe> = {
   bargain: {
     mode: UiMode.ER_BARGAIN,
@@ -703,6 +785,21 @@ const RECIPES: Record<string, Recipe> = {
       return [() => {}];
     },
     steps: [Button.ACTION, Button.DOWN, Button.DOWN, Button.DOWN, Button.ACTION],
+  },
+  // Showdown WAGER screen (D3): both teams previewed (icons + held-item mini-icons + a mega badge),
+  // the opponent's name/title, the stake picker + tier-match + lock lamps. Offline (transport/
+  // rendezvous null): the local lock lamp still lights. steps drive the picker (DOWN to a staked
+  // option -> its offer + tier row updates), then ACTION back on Friendly is proven via the -stepN
+  // shots; the main PNG ends on the last state. Static text/icons -> exact diff.
+  "showdown-wager": {
+    mode: UiMode.SHOWDOWN_WAGER,
+    prepare: game => {
+      game.scene.gameMode = getGameMode(GameModes.SHOWDOWN);
+      return showdownWagerArgs();
+    },
+    // DOWN x2 walks onto a staked option (its "You: ..." offer + tier-match row change); ACTION on a
+    // STAKED row surfaces the escrow-unavailable notice (no lock). The final -stepN shows that path.
+    steps: [Button.DOWN, Button.DOWN, Button.ACTION],
   },
   // Demo of universal input driving: drives the real starter-select grid cursor. Each
   // `-stepN.png` shows the cursor highlight + detail panel moving - the same mechanism
