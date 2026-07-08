@@ -39,7 +39,13 @@ import { CoopBattleStreamer } from "#data/elite-redux/coop/coop-battle-stream";
 import { CoopBattleSync } from "#data/elite-redux/coop/coop-battle-sync";
 import { getCoopChecksumAssertionCount } from "#data/elite-redux/coop/coop-checksum-assert";
 import { coopLog, coopWarn, isCoopDebug } from "#data/elite-redux/coop/coop-debug";
-import { COOP_DEX_SYNC_SEQ, CoopInteractionRelay } from "#data/elite-redux/coop/coop-interaction-relay";
+import {
+  COOP_DEX_SYNC_SEQ,
+  CoopInteractionRelay,
+  isCoopFaintSwitchSeq,
+  isCoopFaintSwitchWindowOpen,
+  resetCoopFaintSwitchWindows,
+} from "#data/elite-redux/coop/coop-interaction-relay";
 import { COOP_DISCONNECT_GRACE_MS } from "#data/elite-redux/coop/coop-lifecycle";
 import { meBattleHandoffKey } from "#data/elite-redux/coop/coop-me-battle-handoff";
 import {
@@ -733,6 +739,14 @@ export function wireCoopStallWatchdog(
           `tick=${coopSessionGeneration()}g turn=${globalScene.currentBattle?.turn ?? "-"} wave=${globalScene.currentBattle?.waveIndex ?? "-"} counter=${runtime.controller.interactionCounter?.() ?? "-"} assertions=${getCoopChecksumAssertionCount()} wait=${localMs}ms peerBeat=${peerBeat ? `${Math.round((Date.now() - peerBeat.at) / 1000)}s` : "-"} transport=${transport.state}`,
         );
       }
+      // #806 faint-replacement suppression: a live human choosing (or the host awaiting) a faint
+      // replacement legitimately parks BOTH engines in network waits. Do NOT keepalive-report that as a
+      // stall and do NOT deadlock-recover during it - the reward shop gets this exemption for free (its
+      // owner is in UI); the faint window needs it explicit because both sides ARE in network waits. The
+      // faint-switch wait's own timeout still fires, so a genuinely-dead partner is never masked.
+      if (isCoopFaintSwitchWindowOpen()) {
+        return;
+      }
       if (localMs >= COOP_STALL_REPORT_MS) {
         transport.send({ t: "stallBeat", waitingMs: localMs });
       }
@@ -756,7 +770,14 @@ export function wireCoopStallWatchdog(
           }
         }
         try {
-          relay.cancelWaiters(() => true);
+          // RESYNC RESCUE: cancel the parked waits so their timeout/AI fallbacks fire immediately - but
+          // SPARE a pending faint-replacement pick (COOP_FAINT_SWITCH_SEQ_BASE band). A stateSync snapshot
+          // never invalidates a replacement the human is still choosing; dropping it would insta-AI-pick and
+          // kill the real pick (the live "let my attack go through after the switch-in" jank). The pick's own
+          // getCoopFaintSwitchWaitMs timeout still bounds it, and a genuine DISCONNECT still cancels the band
+          // (wireCoopDisconnectReaction cancels unconditionally). Band-wide: protects co-op AND versus, which
+          // share this seq band.
+          relay.cancelWaiters(seq => !isCoopFaintSwitchSeq(seq));
         } catch {
           /* recovery must never throw */
         }
@@ -2041,6 +2062,9 @@ export function clearCoopRuntime(): void {
   offDisconnectReaction = null;
   offStallWatchdog?.();
   offStallWatchdog = null;
+  // A session teardown mid-faint-pick (disconnect / GameOver while a picker was open) must not leave the
+  // watchdog-suppression pin set for the NEXT session - reset the depth to 0 (the pin is per-client global).
+  resetCoopFaintSwitchWindows();
   learnMoveForwardInFlight.clear();
   learnMoveBatchForwardInFlight.clear();
   active.localTransport.close();

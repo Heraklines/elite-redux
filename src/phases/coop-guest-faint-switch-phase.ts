@@ -7,7 +7,12 @@
 import { globalScene } from "#app/global-scene";
 import { Phase } from "#app/phase";
 import { coopLog, coopWarn } from "#data/elite-redux/coop/coop-debug";
-import { COOP_FAINT_SWITCH_SEQ_BASE, getCoopFaintSwitchWaitMs } from "#data/elite-redux/coop/coop-interaction-relay";
+import {
+  beginCoopFaintSwitchWindow,
+  COOP_FAINT_SWITCH_SEQ_BASE,
+  endCoopFaintSwitchWindow,
+  getCoopFaintSwitchWaitMs,
+} from "#data/elite-redux/coop/coop-interaction-relay";
 import { getCoopController, getCoopInteractionRelay } from "#data/elite-redux/coop/coop-runtime";
 import { UiMode } from "#enums/ui-mode";
 import { PartyUiHandler, PartyUiMode } from "#ui/handlers/party-ui-handler";
@@ -51,12 +56,19 @@ export class CoopGuestFaintSwitchPhase extends Phase {
     }
     const seq = COOP_FAINT_SWITCH_SEQ_BASE + this.fieldIndex;
     coopLog("replay", `guest own-faint picker OPEN slot=${this.fieldIndex} seq=${seq} (choose your replacement)`);
+    // Suppress the stall watchdog while THIS human's replacement picker is open: the guest's replay is
+    // parked in a network wait for the host's next turn (which legitimately can't arrive until this pick),
+    // so the mutual-wait watchdog would otherwise misread the deliberation as a deadlock ~20s in and pull a
+    // stateSync. Paired 1:1 with endCoopFaintSwitchWindow on pick (the select callback) or on an open
+    // failure (the catch) - exactly one of the two runs.
+    beginCoopFaintSwitchWindow();
     try {
       globalScene.ui.setMode(
         UiMode.PARTY,
         PartyUiMode.FAINT_SWITCH,
         this.fieldIndex,
         (slotIndex: number) => {
+          endCoopFaintSwitchWindow();
           const battlerCount = globalScene.currentBattle?.getBattlerCount() ?? 0;
           const picked = globalScene.getPlayerParty()[slotIndex];
           // DEFENSIVE guard (guest-faint desync, seed EW0gvphu5Ps8dmWDaUKqgr8x): never RELAY a bench
@@ -88,6 +100,7 @@ export class CoopGuestFaintSwitchPhase extends Phase {
       );
     } catch {
       // A UI failure must never hang the guest's replay; the host auto-picks after its wait.
+      endCoopFaintSwitchWindow();
       coopWarn("replay", `guest own-faint picker slot=${this.fieldIndex} failed to open (handled, host auto-picks)`);
       this.end();
     }

@@ -1,6 +1,11 @@
 import { globalScene } from "#app/global-scene";
 import { coopLog, coopWarn } from "#data/elite-redux/coop/coop-debug";
-import { COOP_FAINT_SWITCH_SEQ_BASE, getCoopFaintSwitchWaitMs } from "#data/elite-redux/coop/coop-interaction-relay";
+import {
+  beginCoopFaintSwitchWindow,
+  COOP_FAINT_SWITCH_SEQ_BASE,
+  endCoopFaintSwitchWindow,
+  getCoopFaintSwitchWaitMs,
+} from "#data/elite-redux/coop/coop-interaction-relay";
 import {
   coopOwnerOfPlayerFieldSlot,
   getCoopController,
@@ -116,9 +121,14 @@ export class SwitchPhase extends BattlePhase {
           // disconnected or idle partner.
           globalScene.ui.showText("Waiting for your partner to choose their next Pokemon...");
           const faintSeq = COOP_FAINT_SWITCH_SEQ_BASE + this.fieldIndex;
+          // Suppress the stall watchdog while awaiting the partner's HUMAN pick (see
+          // ShowdownEnemyFaintSwitchPhase for the rationale): a slow-but-alive partner must not be misread as
+          // a deadlock. Paired 1:1 with endCoopFaintSwitchWindow in the .then (always runs).
+          beginCoopFaintSwitchWindow();
           void coopRelay
             .awaitInteractionChoice(faintSeq, getCoopFaintSwitchWaitMs(), COOP_SWITCH_CHOICE_KINDS)
             .then(res => {
+              endCoopFaintSwitchWindow();
               const battlerCount = globalScene.currentBattle.getBattlerCount();
               let slotIndex = res?.choice ?? -1;
               // #799 (live Wingull/Chinchou wrong-mon summon): the pick carries the chosen mon's

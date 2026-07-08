@@ -6,7 +6,12 @@
 
 import { globalScene } from "#app/global-scene";
 import { coopLog } from "#data/elite-redux/coop/coop-debug";
-import { COOP_FAINT_SWITCH_SEQ_BASE, getCoopFaintSwitchWaitMs } from "#data/elite-redux/coop/coop-interaction-relay";
+import {
+  beginCoopFaintSwitchWindow,
+  COOP_FAINT_SWITCH_SEQ_BASE,
+  endCoopFaintSwitchWindow,
+  getCoopFaintSwitchWaitMs,
+} from "#data/elite-redux/coop/coop-interaction-relay";
 import { getCoopInteractionRelay } from "#data/elite-redux/coop/coop-runtime";
 import { COOP_SWITCH_CHOICE_KINDS } from "#data/elite-redux/coop/coop-seq-registry";
 import { SwitchType } from "#enums/switch-type";
@@ -54,7 +59,14 @@ export class ShowdownEnemyFaintSwitchPhase extends BattlePhase {
     const faintSeq = COOP_FAINT_SWITCH_SEQ_BASE + this.fieldIndex;
     coopLog("replay", `versus host awaiting opponent replacement pick slot=${this.fieldIndex} seq=${faintSeq}`);
     globalScene.ui.showText("Waiting for the opponent to choose their next Pokemon...");
+    // Suppress the stall watchdog for the whole await: a slow-but-alive opponent parks BOTH engines in
+    // network waits (this relay pick + the guest's replay), which the mutual-wait watchdog would otherwise
+    // misread as a deadlock ~20s in and "recover" by cancelling this pick + pulling a stateSync. Paired
+    // 1:1 with endCoopFaintSwitchWindow in the .then (which always runs - the await resolves null on
+    // timeout / disconnect / resync-rescue), so the pin never leaks.
+    beginCoopFaintSwitchWindow();
     void relay.awaitInteractionChoice(faintSeq, getCoopFaintSwitchWaitMs(), COOP_SWITCH_CHOICE_KINDS).then(res => {
+      endCoopFaintSwitchWindow();
       let slotIndex = res?.choice ?? -1;
       const party = globalScene.getEnemyParty();
       // #799 identity resolution: the pick carries the chosen mon's SPECIES (data[1]); if the two

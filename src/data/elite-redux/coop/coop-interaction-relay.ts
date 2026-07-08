@@ -65,6 +65,55 @@ export const COOP_INTERACTION_LEAVE = -1;
  */
 const COOP_FAINT_SWITCH_SLOT_COUNT = 4;
 
+/**
+ * Whether `seq` addresses a faint-REPLACEMENT pick (the `COOP_FAINT_SWITCH_SEQ_BASE + fieldIndex` band).
+ * Shared by BOTH co-op (the host's authoritative {@linkcode SwitchPhase} branch #786) and showdown-versus
+ * (the host's {@linkcode ShowdownEnemyFaintSwitchPhase}) - both await the guest's HUMAN replacement choice
+ * under this same band. A pending pick on this band must SURVIVE a resync rescue: a stateSync snapshot never
+ * invalidates a replacement the human is still choosing (dropping it makes the host insta-AI-pick, killing
+ * the human's real pick). Only a genuine partner DISCONNECT cancels this band. Used by the resync-rescue
+ * cancellation predicates to spare it while still cancelling every other (reward/shop/ME/revival) wait.
+ */
+export function isCoopFaintSwitchSeq(seq: number): boolean {
+  const slot = seq - COOP_FAINT_SWITCH_SEQ_BASE;
+  return slot >= 0 && slot < COOP_FAINT_SWITCH_SLOT_COUNT;
+}
+
+/**
+ * #806 STALL-WATCHDOG SUPPRESSION (faint-replacement window). While a faint-replacement pick is pending -
+ * the host AWAITING the partner's relayed choice ({@linkcode ShowdownEnemyFaintSwitchPhase} / the co-op
+ * {@linkcode SwitchPhase} #786 branch) OR the guest's own picker OPEN ({@linkcode CoopGuestFaintSwitchPhase})
+ * - a slow-but-alive HUMAN legitimately parks BOTH engines in network waits (the host on the relay pick, the
+ * guest's replay on the next turn), which the mutual-wait watchdog would misread as a deadlock ~20s in and
+ * "recover" by cancelling the pick + pulling a stateSync (the live guest-vs-faint jank). This is the same
+ * exemption the reward shop gets for free (its OWNER is in UI, not a network wait); the faint window needs it
+ * explicit because BOTH sides ARE in network waits. Registered on BOTH roles; a counter (not a bool) so
+ * concurrent double-faint windows nest safely. The bounding faint-switch wait ({@linkcode getCoopFaintSwitchWaitMs})
+ * still fires its own timeout, so a genuinely-dead partner is never masked - the watchdog just stops
+ * false-firing during a live human's deliberation.
+ */
+let coopFaintSwitchWindowDepth = 0;
+
+/** Register that a faint-replacement pick window has OPENED on this client (host await or guest picker). */
+export function beginCoopFaintSwitchWindow(): void {
+  coopFaintSwitchWindowDepth++;
+}
+
+/** Register that a faint-replacement pick window has CLOSED on this client. Clamped at 0 (never negative). */
+export function endCoopFaintSwitchWindow(): void {
+  coopFaintSwitchWindowDepth = Math.max(0, coopFaintSwitchWindowDepth - 1);
+}
+
+/** Whether ANY faint-replacement pick window is currently open on this client (the watchdog suppression gate). */
+export function isCoopFaintSwitchWindowOpen(): boolean {
+  return coopFaintSwitchWindowDepth > 0;
+}
+
+/** Reset the faint-switch window depth (test cleanup + hard session teardown - never leak a suppression pin). */
+export function resetCoopFaintSwitchWindows(): void {
+  coopFaintSwitchWindowDepth = 0;
+}
+
 // #673 biome market / #794 dex sync / #795 bargain seq bases are declared in coop-seq-registry
 // and re-exported above.
 export function coopBiomeShopSeq(pinnedStart: number): number {

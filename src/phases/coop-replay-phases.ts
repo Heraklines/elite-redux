@@ -45,7 +45,7 @@ import {
 import { recordCoopChecksumAssertion } from "#data/elite-redux/coop/coop-checksum-assert";
 import { logCanonicalDiff } from "#data/elite-redux/coop/coop-data-fingerprint";
 import { coopLog, coopWarn, isCoopDebug } from "#data/elite-redux/coop/coop-debug";
-import { COOP_FAINT_SWITCH_SEQ_BASE } from "#data/elite-redux/coop/coop-interaction-relay";
+import { COOP_FAINT_SWITCH_SEQ_BASE, isCoopFaintSwitchSeq } from "#data/elite-redux/coop/coop-interaction-relay";
 import {
   consumeCoopPendingWaveAdvance,
   coopHasPendingWaveAdvance,
@@ -966,8 +966,14 @@ export class CoopFinalizeTurnPhase extends Phase {
         // the old cancel-all so a resync can never hang. This .then is message-driven (the host's
         // stateSync reply), so it runs INDEPENDENT of the stuck phase and can actually unblock it.
         const interactionController = getCoopController();
-        getCoopInteractionRelay()?.cancelWaiters(seq =>
-          interactionController == null ? true : interactionController.peerAdvancedPastInteraction(seq),
+        // Band-wide with the watchdog's rescue: a pending faint-replacement pick is NEVER orphaned by a
+        // resync (a stateSync snapshot does not invalidate a replacement the human is still choosing), so
+        // spare the COOP_FAINT_SWITCH_SEQ_BASE band here too - only its own timeout / a genuine disconnect
+        // cancels it. Every other watcher wait keeps the scoped orphan cancellation.
+        getCoopInteractionRelay()?.cancelWaiters(
+          seq =>
+            !isCoopFaintSwitchSeq(seq)
+            && (interactionController == null ? true : interactionController.peerAdvancedPastInteraction(seq)),
         );
         // BLOCKING-1 (#633, async resync race guard): the apply now re-summons field mons, vacates
         // slots, and rebuilds boss bars - running THAT inline here (a detached promise continuation,

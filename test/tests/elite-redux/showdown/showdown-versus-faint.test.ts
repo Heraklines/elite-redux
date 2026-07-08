@@ -24,9 +24,24 @@
 import type { BattleScene } from "#app/battle-scene";
 import { getGameMode } from "#app/game-mode";
 import { globalScene, initGlobalScene } from "#app/global-scene";
-import { setCoopFaintSwitchWaitMs } from "#data/elite-redux/coop/coop-interaction-relay";
-import { clearCoopRuntime, setCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
-import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
+import type { CoopBattleStreamer } from "#data/elite-redux/coop/coop-battle-stream";
+import {
+  beginCoopFaintSwitchWindow,
+  COOP_FAINT_SWITCH_SEQ_BASE,
+  type CoopInteractionChoice,
+  CoopInteractionRelay,
+  endCoopFaintSwitchWindow,
+  resetCoopFaintSwitchWindows,
+  setCoopFaintSwitchWaitMs,
+} from "#data/elite-redux/coop/coop-interaction-relay";
+import {
+  type CoopRuntime,
+  clearCoopRuntime,
+  setCoopRuntime,
+  wireCoopStallWatchdog,
+} from "#data/elite-redux/coop/coop-runtime";
+import { COOP_SWITCH_CHOICE_KINDS } from "#data/elite-redux/coop/coop-seq-registry";
+import { type CoopTransport, createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
 import { beginShowdownBattle, endShowdownBattle } from "#data/elite-redux/showdown/showdown-battle-state";
 import type { ShowdownMonManifest } from "#data/elite-redux/showdown/showdown-team";
 import { PokemonMove } from "#data/moves/pokemon-move";
@@ -54,7 +69,7 @@ import {
 import { generateStarters } from "#test/utils/game-manager-utils";
 import type { PartyUiHandler } from "#ui/handlers/party-ui-handler";
 import Phaser from "phaser";
-import { afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 const RUN = process.env.ER_SCENARIO === "1";
 
@@ -376,4 +391,159 @@ describe.skipIf(!RUN)("Showdown versus - faint-replacement two-engine proof (the
 
     logs.flush();
   }, 300_000);
+});
+
+// =============================================================================
+// The last rough edge (staging 2026-07-08 ~03:21): a slow-but-alive opponent choosing its faint
+// replacement tripped the #806 mutual-wait STALL WATCHDOG ~20s in (the faint wait is 60s), which
+// "recovered" by cancelling the host's pending pick + pulling a stateSync - so the host insta-AI-picked
+// instead of honoring the human's real choice ("it let my attack go through after the switch-in"). Two
+// coupled defects, proven here over REAL transports + relays + the REAL production watchdog with fake time
+// (the coop-stall-watchdog.test.ts pattern), driving the exact faint-replacement seq band:
+//   (d) DEFECT 1 - the watchdog is SUPPRESSED while a faint pick is pending (the pin the real phases set):
+//       a 30s deliberation past the 20s trigger reports ZERO stallBeats (so no mutual-wait detection, so no
+//       resync), and the host still HONORS the guest's actual late pick (not the AI -1).
+//   (e) DEFECT 2 - even when a resync rescue DOES fire (pin off, to isolate the exclusion), the real
+//       cancelWaiters(...) at coop-runtime.ts SPARES the COOP_FAINT_SWITCH_SEQ_BASE band: an ordinary
+//       interaction wait is cancelled, but the pending faint pick SURVIVES and still honors the late pick.
+//   (f) a GENUINE disconnect still cancels the band (the drop path cancels unconditionally) - no strand.
+// This describe needs no engine (no ER_SCENARIO gate) - it exercises the netcode layer directly.
+// =============================================================================
+describe("Showdown versus - faint stall-watchdog suppression + resync-rescue band-exclusion (defects 1 & 2)", () => {
+  /** The single faint-replacement slot the host awaits (versus is 1v1 -> fieldIndex 0). */
+  const FAINT_SEQ = COOP_FAINT_SWITCH_SEQ_BASE + 0;
+  /** A watchdog stub reporting a fixed oldest-network-wait (the guest's parked replay leg). */
+  const streamWaiting = (ms: number): CoopBattleStreamer =>
+    ({ oldestNetworkWaitMs: () => ms }) as unknown as CoopBattleStreamer;
+  /** The watchdog only reads controller.versionMismatch + interactionCounter + identity. */
+  const stubRuntime = (): CoopRuntime =>
+    ({ controller: { versionMismatch: false, interactionCounter: () => 0 } }) as unknown as CoopRuntime;
+
+  let prevSceneW: BattleScene;
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    // A harmless stub scene so the watchdog's ~30s health line (globalScene.currentBattle?.turn) never
+    // throws headlessly and swallow the tick (which would silently disarm the watchdog under test).
+    prevSceneW = globalScene as unknown as BattleScene;
+    initGlobalScene({ currentBattle: null } as unknown as BattleScene);
+    resetCoopFaintSwitchWindows();
+  });
+
+  afterEach(() => {
+    resetCoopFaintSwitchWindows();
+    vi.clearAllTimers();
+    vi.useRealTimers();
+    initGlobalScene(prevSceneW);
+  });
+
+  it("(d) SLOW PICK: a live-but-slow opponent past the 20s trigger reports NO stall + host honors the real pick", async () => {
+    const pair = createLoopbackPair();
+    // Versus: the seat-map forgery check is disabled (the guest legitimately relays enemy-side faint picks).
+    const hostRelay = new CoopInteractionRelay(pair.host, { isVersus: () => true });
+    const guestRelay = new CoopInteractionRelay(pair.guest, { isVersus: () => true });
+    // Transport message-type counters: a stallBeat is the watchdog's stall REPORT (strictly upstream of a
+    // requestStateSync resync); zero beats => no mutual-wait detection => no resync could ever fire.
+    let stallBeats = 0;
+    let resyncRequests = 0;
+    const tap = (t: CoopTransport): void => {
+      t.onMessage(m => {
+        if (m.t === "stallBeat") {
+          stallBeats++;
+        }
+        if (m.t === "requestStateSync") {
+          resyncRequests++;
+        }
+      });
+    };
+    tap(pair.host);
+    tap(pair.guest);
+    const runtime = stubRuntime();
+    // Host localMs comes from the relay pick it awaits; the guest's localMs models its parked replay leg.
+    wireCoopStallWatchdog(pair.host, hostRelay, streamWaiting(-1), runtime);
+    wireCoopStallWatchdog(pair.guest, guestRelay, streamWaiting(999_999), runtime);
+
+    // The faint window is OPEN on this client - exactly the pin ShowdownEnemyFaintSwitchPhase (host await)
+    // and CoopGuestFaintSwitchPhase (guest picker) register. Suppresses the watchdog on BOTH legs.
+    beginCoopFaintSwitchWindow();
+    // The host parks on the guest's faint-replacement pick (the ShowdownEnemyFaintSwitchPhase await).
+    let hostRes: CoopInteractionChoice | null | undefined;
+    const hostAwait = hostRelay.awaitInteractionChoice(FAINT_SEQ, 1_200_000, COOP_SWITCH_CHOICE_KINDS).then(r => {
+      hostRes = r;
+    });
+
+    // 30 seconds of a slow-but-alive human: well past the 20s watchdog trigger, within the 60s faint wait.
+    await vi.advanceTimersByTimeAsync(30_000);
+
+    // DEFECT-1 RED-PROOF: with the suppression pin honored the watchdog reports nothing; revert the
+    // `if (isCoopFaintSwitchWindowOpen()) return;` guard and both parked legs beat -> stallBeats > 0.
+    expect(stallBeats, "a suppressed watchdog sends NO stallBeat while a faint pick is pending (defect 1)").toBe(0);
+    expect(resyncRequests, "no resync was requested during the human's deliberation").toBe(0);
+    expect(hostRes, "the host's faint await SURVIVED the whole watchdog window (never cancelled)").toBeUndefined();
+
+    // The opponent finally picks (late but in time): the host HONORS the real pick, never AI-falls-back.
+    guestRelay.sendInteractionChoice(FAINT_SEQ, "switch", GUEST_PICK_SLOT, [0, 0]);
+    await vi.advanceTimersByTimeAsync(0);
+    endCoopFaintSwitchWindow();
+    await hostAwait;
+    expect(hostRes?.choice, "the host resolved with the OPPONENT'S actual pick, not the AI -1 sentinel").toBe(
+      GUEST_PICK_SLOT,
+    );
+  });
+
+  it("(e) RESYNC DURING PICK: a real mutual-wait resync rescue SPARES the faint band, cancels the rest", async () => {
+    const pair = createLoopbackPair();
+    const hostRelay = new CoopInteractionRelay(pair.host, { isVersus: () => true });
+    const guestRelay = new CoopInteractionRelay(pair.guest, { isVersus: () => true });
+    const runtime = stubRuntime();
+    wireCoopStallWatchdog(pair.host, hostRelay, streamWaiting(-1), runtime);
+    wireCoopStallWatchdog(pair.guest, guestRelay, streamWaiting(-1), runtime);
+
+    // The suppression pin is deliberately NOT set here: we WANT the mutual-wait recovery to fire so it runs
+    // the REAL cancelWaiters(seq => !isCoopFaintSwitchSeq(seq)) at coop-runtime.ts, isolating the band
+    // exclusion (defect 2) from the suppression (defect 1).
+    const CONTROL_SEQ = 500_000; // an ordinary (reward/shop) watcher wait parked alongside the faint pick.
+    let faintRes: CoopInteractionChoice | null | undefined;
+    let controlRes: CoopInteractionChoice | null | undefined;
+    const faintAwait = hostRelay.awaitInteractionChoice(FAINT_SEQ, 1_200_000, COOP_SWITCH_CHOICE_KINDS).then(r => {
+      faintRes = r;
+    });
+    void hostRelay.awaitInteractionChoice(CONTROL_SEQ, 1_200_000).then(r => {
+      controlRes = r;
+    });
+    // The peer is also parked (its replay leg) so the mutual-wait cycle is REAL and recovery fires on both.
+    void guestRelay.awaitInteractionChoice(777_777, 1_200_000).then(() => {});
+
+    await vi.advanceTimersByTimeAsync(30_000);
+
+    // The resync rescue cancelled the ordinary interaction wait (unchanged behavior)...
+    expect(controlRes, "an ordinary (non-faint) watcher wait IS still cancelled by the resync rescue").toBeNull();
+    // ...but SPARED the faint-replacement pick. DEFECT-2 RED-PROOF: revert the exclusion (cancelWaiters(() =>
+    // true)) and this pick is cancelled too -> faintRes becomes null.
+    expect(faintRes, "the faint-replacement await SURVIVES the resync rescue (defect 2)").toBeUndefined();
+
+    // The host still gets + honors the guest's late pick after the rescue.
+    guestRelay.sendInteractionChoice(FAINT_SEQ, "switch", GUEST_PICK_SLOT, [0, 0]);
+    await vi.advanceTimersByTimeAsync(0);
+    await faintAwait;
+    expect(faintRes?.choice, "the host honored the guest's real late pick after the resync rescue").toBe(
+      GUEST_PICK_SLOT,
+    );
+  });
+
+  it("(f) DISCONNECT DURING PICK: a genuine partner drop STILL cancels the faint band (no 20-minute strand)", async () => {
+    const pair = createLoopbackPair();
+    const hostRelay = new CoopInteractionRelay(pair.host, { isVersus: () => true });
+    let res: CoopInteractionChoice | null | undefined;
+    const parked = hostRelay.awaitInteractionChoice(FAINT_SEQ, 1_200_000, COOP_SWITCH_CHOICE_KINDS).then(r => {
+      res = r;
+    });
+    // The disconnect path (wireCoopDisconnectReaction) cancels EVERY wait unconditionally - the band
+    // exclusion is scoped to the RESYNC RESCUE only, so a real drop must still terminate this pick (-> the
+    // host's AI fallback), never leave it stranded on the 60s/20-min timer.
+    hostRelay.cancelWaiters(() => true);
+    await vi.advanceTimersByTimeAsync(0);
+    await parked;
+    expect(res, "a genuine disconnect resolves the faint await to null (-> host AI fallback), no hang").toBeNull();
+  });
 });
