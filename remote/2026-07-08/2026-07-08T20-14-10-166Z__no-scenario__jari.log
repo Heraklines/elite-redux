@@ -1,0 +1,264 @@
+url:      https://elite-redux-staging.pages.dev/
+build:    mrc9a598-g33b
+mode:     6  wave:21
+seed:     jxmlj7GoD67IuH2sUP1sR8PE
+party:    Snorunt Redux(L14 46hp f0), Iron Scythe(L16 63hp f0), Meowth(L11 33hp f0), Bulbasaur(L10 32hp f0), Scyther(L9 34hp f0)
+enemy:    Rattata(L13), Lillipup(L14)
+
+----- COMMENT -----
+Game freeze coop
+
+----- CONSOLE -----
+[20:09:55.234] LOG: %cStart Phase ShowAbilityPhase color:green;
+[20:09:55.396] LOG: %cStart Phase HideAbilityPhase color:green;
+[20:09:55.436] LOG: %cStart Phase VictoryPhase color:green;
+[20:09:55.436] LOG: [coop:progression] HOST applyPartyExp COMPUTE wave=20 expValue=188.2 koMon=Aipom
+[20:09:55.436] LOG: %cStart Phase ExpPhase color:green;
+[20:09:55.436] LOG: Applied Super EXP. Charm 
+[20:09:55.436] LOG: Applied EXP. Charm 
+[20:09:55.676] LOG: %cStart Phase ExpPhase color:green;
+[20:09:55.676] LOG: Applied Super EXP. Charm 
+[20:09:55.676] LOG: Applied EXP. Charm 
+[20:09:55.975] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[20:09:55.976] LOG: Applied Super EXP. Charm 
+[20:09:55.976] LOG: Applied EXP. Charm 
+[20:09:55.976] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[20:09:55.976] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[20:09:55.976] LOG: Applied Super EXP. Charm 
+[20:09:55.976] LOG: Applied EXP. Charm 
+[20:09:55.977] LOG: %cStart Phase LevelUpPhase color:green;
+[20:09:55.977] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[20:09:55.977] LOG: %cStart Phase FaintPhase color:green;
+[20:09:57.117] LOG: %cStart Phase MessagePhase color:green;
+[20:09:57.319] LOG: %cStart Phase ShowAbilityPhase color:green;
+[20:09:57.482] LOG: %cStart Phase HideAbilityPhase color:green;
+[20:09:57.521] LOG: %cStart Phase VictoryPhase color:green;
+[20:09:57.521] LOG: [coop:progression] HOST applyPartyExp COMPUTE wave=20 expValue=418.2 koMon=Marowak
+[20:09:57.522] LOG: [coop:runtime] send waveResolved wave=20 outcome=win (host)
+[20:09:57.522] LOG: [coop:replay] host SEND waveResolved wave=20 outcome=win
+[20:09:57.522] LOG: [coop:webrtc] raw tx role=host t=waveResolved bytes=46
+[20:09:57.522] LOG: %cStart Phase ExpPhase color:green;
+[20:09:57.522] LOG: Applied Super EXP. Charm 
+[20:09:57.522] LOG: Applied EXP. Charm 
+[20:09:57.900] LOG: %cStart Phase LevelUpPhase color:green;
+[20:09:57.901] LOG: %cStart Phase ExpPhase color:green;
+[20:09:57.901] LOG: Applied Super EXP. Charm 
+[20:09:57.901] LOG: Applied EXP. Charm 
+[20:09:58.070] LOG: 3915 4665 4096
+[20:09:58.154] LOG: %cStart Phase LevelUpPhase color:green;
+[20:09:58.155] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[20:09:58.155] LOG: Applied Super EXP. Charm 
+[20:09:58.155] LOG: Applied EXP. Charm 
+[20:09:58.156] LOG: %cStart Phase LevelUpPhase color:green;
+[20:09:58.156] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[20:09:58.156] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[20:09:58.156] LOG: Applied Super EXP. Charm 
+[20:09:58.156] LOG: Applied EXP. Charm 
+[20:09:58.156] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[20:09:58.156] LOG: %cStart Phase MoveEndPhase color:green;
+[20:09:58.157] LOG: %cStart Phase MovePhase color:green;
+[20:09:58.157] LOG: %cStart Phase MoveEndPhase color:green;
+[20:09:58.157] LOG: %cStart Phase MovePhase color:green;
+[20:09:58.158] LOG: %cUser: Snorunt Redux
+Move: PLAY_ROUGH
+Use Mode: NORMAL color:orchid
+[20:09:58.159] LOG: [coop:turn] host recorder: append turn=1 seq=6 k=moveUsed total=7 live=true
+[20:09:58.159] LOG: [coop:runtime] ME-stream live-event host turn=1 seq=6 k=moveUsed
+[20:09:58.159] LOG: [coop:replay] host EMIT live battleEvent turn=1 seq=6 k=moveUsed
+[20:09:58.159] LOG: [coop:webrtc] raw tx role=host t=battleEvent bytes=95
+[20:09:58.159] LOG: [coop:turn] host recorder: append turn=1 seq=7 k=message total=8 live=true
+[20:09:58.159] LOG: [coop:runtime] ME-stream live-event host turn=1 seq=7 k=message
+[20:09:58.159] LOG: [coop:replay] host EMIT live battleEvent turn=1 seq=7 k=message
+[20:09:58.159] LOG: [coop:webrtc] raw tx role=host t=battleEvent bytes=84
+[20:09:58.159] LOG: %cStart Phase MessagePhase color:green;
+[20:09:58.300] LOG: %cStart Phase MessagePhase color:green;
+[20:09:58.490] LOG: %cStart Phase MoveEndPhase color:green;
+[20:09:58.491] LOG: %cStart Phase MovePhase color:green;
+[20:09:58.491] LOG: %cStart Phase MoveEndPhase color:green;
+[20:09:58.491] LOG: %cStart Phase CheckInterludePhase color:green;
+[20:09:58.491] LOG: %cStart Phase PositionalTagPhase color:green;
+[20:09:58.491] LOG: %cStart Phase TurnEndPhase color:green;
+[20:09:58.491] LOG: [coop:turn] host recorder: finalize turn=1 events=8 seq=8
+[20:09:58.491] LOG: [coop:checkpoint] build field=4 weather=0/0 terrain=0/0 arenaTags=0 money=3101 mons=[bi0:sp10807/hp46-46/st0/fnt0 bi1:sp10066/hp63-63/st0/fnt0 bi2:sp190/hp0-40/st7/fnt1 bi3:sp105/hp0-47/st7/fnt1]
+[20:09:58.491] LOG: [coop:checkpoint] host capture field=4 weather=0 terrain=0 money=3101 arenaTags=0 mons=[bi0:sp10807/hp46-46/st0/fnt0 bi1:sp10066/hp63-63/st0/fnt0 bi2:sp190/hp0-40/st7/fnt1 bi3:sp105/hp0-47/st7/fnt1]
+[20:09:58.493] LOG: [coop:checksum] capture digest=3212c62368d99b6a field=2 biome=4 seed=jxmlj7GoD67IuH2sUP1sR8PE weather=0 terrain=0 money=3101 party=[10807,10066,52,1,123] partyLevels=[14,16,11,10,9] arenaTags=0 modifiers=12 heldItemsDigest=6 pokeballs=[0:5,1:0,2:0,3:0,4:0] mons=[bi0:sp10807/hp46-46/st0/ab158/form0/tera0:16/boss0:0 bi1:sp10066/hp63-63/st0/ab5157/form0/tera0:3/boss0:0]
+[20:09:58.493] LOG: [coop:replay] host SEND turnResolution turn=1 events=8 checksum=3212c62368d99b6a preimage=true fullField=4 authoritativeState=1
+[20:09:58.493] LOG: [coop:webrtc] raw tx role=host t=turnResolution bytes=21678
+[20:09:58.493] LOG: %cStart Phase BattleEndPhase color:green;
+[20:09:58.493] LOG: [coop:progression] waveEndState BROADCAST wave=20 (host streams authoritative snapshot)
+[20:09:58.493] LOG: [coop:runtime] send waveEndState wave=20 tick=82 (host)
+[20:09:58.493] LOG: [coop:replay] host SEND waveEndState wave=20 tick=82 party=5
+[20:09:58.493] LOG: [coop:webrtc] raw tx role=host t=waveEndState bytes=16624
+[20:09:58.493] LOG: Battle Score: 193 (1 Turns x1)
+[20:09:58.494] LOG: Total Score: 1263
+[20:09:58.503] LOG: %cStart Phase TrainerVictoryPhase color:green;
+[20:09:58.504] LOG: [coop:progression] coopBossVoucherReward DECISION isCoop=true creditedFirstTime=false -> NO-QUEUE (lockstep queue-len parity)
+[20:09:58.504] LOG: Gym Leader Whitney
+[20:09:59.045] LOG: [coop:progression] coopVictoryDialogue DECISION isCoop=true -> SKIP (constant 0 awaits, lockstep-safe)
+[20:09:59.045] LOG: %cStart Phase MoneyRewardPhase color:green;
+[20:09:59.287] LOG: %cStart Phase ModifierRewardPhase color:green;
+[20:09:59.486] LOG: %cStart Phase EggLapsePhase color:green;
+[20:09:59.486] LOG: %cStart Phase ModifierRewardPhase color:green;
+[20:09:59.876] LOG: %cStart Phase SelectModifierPhase color:green;
+[20:09:59.877] LOG: [coop:interaction] interactionCounter() read -> 22 (role=host)
+[20:09:59.877] LOG: [coop:owner] ownerOf(counter=22) seat=0 -> owner=host
+[20:09:59.877] LOG: [coop:owner] isLocalOwnerAtCounter(pinnedCounter=22) parity=0 owner=host role=host -> true
+[20:09:59.877] LOG: [coop:reward] biome market roles: pinnedStart=22 inMe=false role=host spoof=false pick=OWNER option=ROLL+STREAM
+[20:09:59.879] LOG: [coop:shop] serializeRewardOptions count=13 ids=[AMULET_COIN,RELIC_GOLD,MEGA_BRACELET,TM_CASE,BASE_STAT_BOOSTER,ER_SPIKED_KNUCKLES,ER_POWER_HERB,TEMP_STAT_STAGE_BOOSTER,ROGUE_BALL,DIRE_HIT,ER_LUCKY_HEART,MINT,ER_RUSTY_CLAW] tiers=[2,3,3,0,2,2,2,0,3,1,2,2,2]
+[20:09:59.879] LOG: [coop:relay] SEND rewardOptions seq=22 reroll=777 count=13 ids=[AMULET_COIN,RELIC_GOLD,MEGA_BRACELET,TM_CASE,BASE_STAT_BOOSTER,ER_SPIKED_KNUCKLES,ER_POWER_HERB,TEMP_STAT_STAGE_BOOSTER,ROGUE_BALL,DIRE_HIT,ER_LUCKY_HEART,MINT,ER_RUSTY_CLAW]
+[20:09:59.879] LOG: [coop:webrtc] raw tx role=host t=rewardOptions bytes=870
+[20:10:01.328] LOG: [coop:relay] SEND interactionChoice seq=7000022 kind=biomeShop kind=? choice=1 data=[-1,6131]
+[20:10:01.329] LOG: [coop:webrtc] raw tx role=host t=interactionChoice bytes=86
+[20:10:02.843] LOG: [coop:relay] SEND interactionChoice seq=7000022 kind=biomeShop kind=? choice=2 data=[-1,3431]
+[20:10:02.843] LOG: [coop:webrtc] raw tx role=host t=interactionChoice bytes=86
+[20:10:06.419] LOG: [coop:relay] SEND interactionChoice seq=7000022 kind=biomeShop kind=? choice=0 data=[-1,2261]
+[20:10:06.419] LOG: [coop:webrtc] raw tx role=host t=interactionChoice bytes=86
+[20:10:07.393] LOG: [coop:relay] SEND interactionChoice seq=7000022 kind=biomeShop kind=? choice=0 data=[-1,1091]
+[20:10:07.393] LOG: [coop:webrtc] raw tx role=host t=interactionChoice bytes=86
+[20:10:07.727] LOG: Applied Amulet Coin 
+[20:10:10.193] LOG: [coop:relay] SEND interactionChoice seq=7000022 kind=biomeShop kind=? choice=-1 data=-
+[20:10:10.193] LOG: [coop:webrtc] raw tx role=host t=interactionChoice bytes=70
+[20:10:10.194] LOG: [coop:interaction] interactionCounter() read -> 22 (role=host)
+[20:10:10.194] LOG: [coop:interaction] CoopInteractionTurn.advance INCREMENT (fromCounter=22) counter 22 -> 23
+[20:10:10.194] LOG: [coop:interaction] advanceInteraction ADVANCED+BROADCAST (fromCounter=22) counter 22 -> 23 role=host; send interaction screen=__turn__ choice=23
+[20:10:10.194] LOG: [coop:webrtc] raw tx role=host t=interaction bytes=51
+[20:10:10.194] LOG: [coop:owner] ownerOf(counter=23) seat=1 -> owner=guest
+[20:10:10.194] LOG: [coop:owner] ownerOf(counter=23) seat=1 -> owner=guest
+[20:10:10.194] LOG: [coop-launch] proceedIfReady launched=true localTeam=3 bothReady=true role=host partnerReady=true
+[20:10:10.194] LOG: [coop:interaction] interactionCounter() read -> 23 (role=host)
+[20:10:10.194] LOG: [coop:reward] advance interaction from CONTINUATION commit (role=host from=22 counter 22 -> 23)
+[20:10:10.199] LOG: %cStart Phase PartyHealPhase color:green;
+[20:10:11.840] LOG: [coop:webrtc] raw rx role=host t=rendezvous bytes=37 handlers=11
+[20:10:11.840] LOG: [coop:rendezvous] RECV arrival point=cmd:21:1 -> BUFFER (no waiter yet) role=host
+[20:10:11.853] LOG: [coop:webrtc] raw rx role=host t=interaction bytes=51 handlers=11
+[20:10:11.853] LOG: [coop:interaction] RECV interaction broadcast (deferred catch-up net) received=23 localBefore=23 role=host -> no defer (local >= received)
+[20:10:11.853] WARN: [coop:interaction] CoopInteractionTurn.mergeRemote DEFER (remote=23, counter=23, pendingRemote=23) live counter UNCHANGED (folds in at next advance if still ahead)
+[20:10:11.853] LOG: [coop:owner] ownerOf(counter=23) seat=1 -> owner=guest
+[20:10:11.853] LOG: [coop:owner] ownerOf(counter=23) seat=1 -> owner=guest
+[20:10:11.853] LOG: [coop-launch] proceedIfReady launched=true localTeam=3 bothReady=true role=host partnerReady=true
+[20:10:12.645] LOG: %cStart Phase ResetStatusPhase color:green;
+[20:10:12.646] LOG: %cStart Phase ResetStatusPhase color:green;
+[20:10:12.646] LOG: %cStart Phase ResetStatusPhase color:green;
+[20:10:12.646] LOG: %cStart Phase ResetStatusPhase color:green;
+[20:10:12.647] LOG: %cStart Phase ResetStatusPhase color:green;
+[20:10:12.647] LOG: %cStart Phase NewBattlePhase color:green;
+[20:10:12.647] LOG: Wave Seed: L\YKL^]GjeFgMeZ 21
+[20:10:12.647] LOG: %cStart Phase NextEncounterPhase color:green;
+[20:10:12.648] LOG: Starting species pool tier: COMMON
+[20:10:12.655] LOG: Pokemon: Wild Rattata | Species ID: 19 | Level: 13 | Nature: Sassy (+SpDef/-Spd)
+[20:10:12.655] LOG: Stats (IVs): HP: 33 (17), Atk: 19 (2), Def: 15 (11), Spatk: 11 (2), Spdef: 16 (1), Spd: 23 (24)
+[20:10:12.655] LOG: Ability: Hustle | Passive Ability: Guts 
+[20:10:12.655] LOG: Moveset: ["Quick Attack","Fire Fang","Tail Whip","Ice Fang"]
+[20:10:12.655] LOG: Starting species pool tier: COMMON
+[20:10:12.660] LOG: Pokemon: Wild Lillipup | Species ID: 506 | Level: 14 | Nature: Modest (+SpAtk/-Atk)
+[20:10:12.660] LOG: Stats (IVs): HP: 37 (4), Atk: 25 (30), Def: 18 (3), Spatk: 14 (0), Spdef: 20 (23), Spd: 24 (7)
+[20:10:12.660] LOG: Ability: Vital Spirit | Passive Ability: Fluffy 
+[20:10:12.660] LOG: Moveset: ["Tackle","Odor Sleuth","Roar","Howl"]
+[20:10:12.661] LOG: {"id":"BERRY","localeKey":"","iconImage":"lum_berry","group":"berry","soundName":"se/restore","tier":0,"berryType":1} (enemy)
+[20:10:12.661] LOG: [coop:replay] host SEND enemyPartySync wave=21 count=2 meType=-1
+[20:10:12.662] LOG: [coop:webrtc] raw tx role=host t=enemyPartySync bytes=620
+[20:10:12.663] LOG: [coop:launch] resume marker recorded slot=3 self=JarilG partner=CappuTester wave=21 (#810)
+[20:10:12.732] DEBUG: Session data saved to slot 3!
+[20:10:12.734] LOG: Wave Seed: L\YKL^]GjeFgMeZ 21
+[20:10:12.955] WARN: cry/506 not found
+[20:10:13.219] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[20:10:13.219] LOG: %cStart Phase CheckSwitchPhase color:green;
+[20:10:13.219] LOG: %cStart Phase CheckSwitchPhase color:green;
+[20:10:13.219] LOG: %cStart Phase InitEncounterPhase color:green;
+[20:10:13.220] LOG: %cStart Phase PostSummonPhase color:green;
+[20:10:13.220] LOG: Ran PSP for: Lillipup
+[20:10:13.221] LOG: %cStart Phase PostSummonPhase color:green;
+[20:10:13.221] LOG: %cStart Phase PostSummonPhase color:green;
+[20:10:13.221] LOG: %cStart Phase PostSummonPhase color:green;
+[20:10:13.221] LOG: Ran PSP for: Rattata
+[20:10:13.222] LOG: %cStart Phase PostSummonPhase color:green;
+[20:10:13.222] LOG: %cStart Phase PostSummonPhase color:green;
+[20:10:13.222] LOG: %cStart Phase TurnInitPhase color:green;
+[20:10:13.222] LOG: %cStart Phase CommandPhase color:green;
+[20:10:13.222] LOG: [coop:replay] host SEND enemyPartySync wave=21 count=2 meType=-
+[20:10:13.222] LOG: [coop:webrtc] raw tx role=host t=enemyPartySync bytes=608
+[20:10:13.223] LOG: [coop:battle] CommandPhase slot=0 turn=1 owner=host role=host -> LOCAL UI
+[20:10:13.223] LOG: [coop:rendezvous] ARRIVE point=cmd:21:1 (send) role=host
+[20:10:13.223] LOG: [coop:webrtc] raw tx role=host t=rendezvous bytes=37
+[20:10:13.223] LOG: [coop:rendezvous] next-command barrier cmd:21:1 SYNC pass (partner already arrived)
+[20:10:13.846] LOG: Applied X Attack 
+[20:10:13.847] LOG: Applied X Attack 
+[20:10:13.853] LOG: Applied X Attack 
+[20:10:13.854] LOG: Applied X Attack 
+[20:10:14.390] LOG: [coop:webrtc] raw rx role=host t=rendezvous bytes=37 handlers=11
+[20:10:14.390] LOG: [coop:rendezvous] RECV arrival point=cmd:21:2 -> BUFFER (no waiter yet) role=host
+[20:10:14.473] LOG: Applied X Attack 
+[20:10:14.474] LOG: Applied X Attack 
+[20:10:14.809] LOG: Applied X Attack 
+[20:10:14.810] LOG: Applied X Attack 
+[20:10:15.715] LOG: Applied X Attack 
+[20:10:15.717] LOG: Applied X Attack 
+[20:10:16.157] LOG: Applied X Attack 
+[20:10:16.158] LOG: Applied X Attack 
+[20:10:16.877] LOG: [coop:interaction] interactionCounter() read -> 23 (role=host)
+[20:10:16.877] LOG: [coop:health] tick=0g turn=1 wave=21 counter=23 assertions=0 wait=-1ms peerBeat=125s transport=connected
+[20:10:17.643] LOG: Applied X Attack 
+[20:10:17.644] LOG: Applied X Attack 
+[20:10:18.525] LOG: Move: SWORDS_DANCE Move targets: {"targets":[0],"multiple":false} 
+Player Pokemon: Snorunt Redux
+[20:10:18.526] LOG: [coop:relay] broadcastLocalCommand SEND fieldIndex=0 owner=host turn=1 command=0 cursor=3 moveId=14 targets=[0]
+[20:10:18.526] LOG: [coop:webrtc] raw tx role=host t=command bytes=127
+[20:10:18.527] LOG: %cStart Phase CommandPhase color:green;
+[20:10:18.527] LOG: [coop:battle] CommandPhase slot=1 turn=1 owner=guest role=host -> partner path
+[20:10:18.527] LOG: [coop:relay] host requestPartnerCommand SEND fieldIndex=1 turn=1 moveSlots=[0,1,2,3] (awaiting peer)
+[20:10:18.527] LOG: [coop:webrtc] raw tx role=host t=commandRequest bytes=84
+[20:10:27.115] LOG: [coop:webrtc] raw rx role=host t=stallBeat bytes=35 handlers=11
+[20:10:32.115] LOG: [coop:webrtc] raw rx role=host t=stallBeat bytes=35 handlers=11
+[20:10:37.107] LOG: [coop:webrtc] raw rx role=host t=stallBeat bytes=35 handlers=11
+[20:10:42.143] LOG: [coop:webrtc] raw rx role=host t=stallBeat bytes=35 handlers=11
+[20:10:47.106] LOG: [coop:webrtc] raw rx role=host t=stallBeat bytes=35 handlers=11
+[20:10:52.105] LOG: [coop:webrtc] raw rx role=host t=stallBeat bytes=35 handlers=11
+[20:10:52.354] LOG: [coop:interaction] interactionCounter() read -> 23 (role=host)
+[20:10:52.354] LOG: [coop:health] tick=0g turn=1 wave=21 counter=23 assertions=0 wait=-1ms peerBeat=0s transport=connected
+[20:10:57.215] LOG: [coop:webrtc] raw rx role=host t=stallBeat bytes=35 handlers=11
+[20:11:02.103] LOG: [coop:webrtc] raw rx role=host t=stallBeat bytes=35 handlers=11
+[20:11:07.106] LOG: [coop:webrtc] raw rx role=host t=stallBeat bytes=35 handlers=11
+[20:11:12.127] LOG: [coop:webrtc] raw rx role=host t=stallBeat bytes=35 handlers=11
+[20:11:17.116] LOG: [coop:webrtc] raw rx role=host t=stallBeat bytes=35 handlers=11
+[20:11:22.114] LOG: [coop:webrtc] raw rx role=host t=stallBeat bytes=35 handlers=11
+[20:11:26.868] LOG: [coop:interaction] interactionCounter() read -> 23 (role=host)
+[20:11:26.868] LOG: [coop:health] tick=0g turn=1 wave=21 counter=23 assertions=0 wait=-1ms peerBeat=5s transport=connected
+[20:11:27.112] LOG: [coop:webrtc] raw rx role=host t=stallBeat bytes=35 handlers=11
+[20:11:32.115] LOG: [coop:webrtc] raw rx role=host t=stallBeat bytes=35 handlers=11
+[20:11:37.117] LOG: [coop:webrtc] raw rx role=host t=stallBeat bytes=35 handlers=11
+[20:11:42.103] LOG: [coop:webrtc] raw rx role=host t=stallBeat bytes=35 handlers=11
+[20:11:47.110] LOG: [coop:webrtc] raw rx role=host t=stallBeat bytes=35 handlers=11
+[20:11:52.122] LOG: [coop:webrtc] raw rx role=host t=stallBeat bytes=35 handlers=11
+[20:11:57.102] LOG: [coop:webrtc] raw rx role=host t=stallBeat bytes=36 handlers=11
+[20:11:57.361] LOG: [coop:interaction] interactionCounter() read -> 23 (role=host)
+[20:11:57.361] LOG: [coop:health] tick=0g turn=1 wave=21 counter=23 assertions=0 wait=-1ms peerBeat=0s transport=connected
+[20:12:02.108] LOG: [coop:webrtc] raw rx role=host t=stallBeat bytes=36 handlers=11
+[20:12:07.533] LOG: [coop:webrtc] raw rx role=host t=stallBeat bytes=36 handlers=11
+[20:12:12.103] LOG: [coop:webrtc] raw rx role=host t=stallBeat bytes=36 handlers=11
+[20:12:17.103] LOG: [coop:webrtc] raw rx role=host t=stallBeat bytes=36 handlers=11
+[20:12:22.103] LOG: [coop:webrtc] raw rx role=host t=stallBeat bytes=36 handlers=11
+[20:12:27.107] LOG: [coop:webrtc] raw rx role=host t=stallBeat bytes=36 handlers=11
+[20:12:31.879] LOG: [coop:interaction] interactionCounter() read -> 23 (role=host)
+[20:12:31.879] LOG: [coop:health] tick=0g turn=1 wave=21 counter=23 assertions=0 wait=-1ms peerBeat=5s transport=connected
+[20:12:32.109] LOG: [coop:webrtc] raw rx role=host t=stallBeat bytes=36 handlers=11
+[20:12:37.114] LOG: [coop:webrtc] raw rx role=host t=stallBeat bytes=36 handlers=11
+[20:12:42.118] LOG: [coop:webrtc] raw rx role=host t=stallBeat bytes=36 handlers=11
+[20:12:47.110] LOG: [coop:webrtc] raw rx role=host t=stallBeat bytes=36 handlers=11
+[20:12:52.104] LOG: [coop:webrtc] raw rx role=host t=stallBeat bytes=36 handlers=11
+[20:12:57.131] LOG: [coop:webrtc] raw rx role=host t=stallBeat bytes=36 handlers=11
+[20:13:02.110] LOG: [coop:webrtc] raw rx role=host t=stallBeat bytes=36 handlers=11
+[20:13:02.353] LOG: [coop:interaction] interactionCounter() read -> 23 (role=host)
+[20:13:02.353] LOG: [coop:health] tick=0g turn=1 wave=21 counter=23 assertions=0 wait=-1ms peerBeat=0s transport=connected
+[20:13:07.112] LOG: [coop:webrtc] raw rx role=host t=stallBeat bytes=36 handlers=11
+[20:13:12.106] LOG: [coop:webrtc] raw rx role=host t=stallBeat bytes=36 handlers=11
+[20:13:17.114] LOG: [coop:webrtc] raw rx role=host t=stallBeat bytes=36 handlers=11
+[20:13:22.121] LOG: [coop:webrtc] raw rx role=host t=stallBeat bytes=36 handlers=11
+[20:13:27.111] LOG: [coop:webrtc] raw rx role=host t=stallBeat bytes=36 handlers=11
+[20:13:32.126] LOG: [coop:webrtc] raw rx role=host t=stallBeat bytes=36 handlers=11
+[20:13:32.364] LOG: [coop:interaction] interactionCounter() read -> 23 (role=host)
+[20:13:32.364] LOG: [coop:health] tick=0g turn=1 wave=21 counter=23 assertions=0 wait=-1ms peerBeat=0s transport=connected
+[20:13:37.127] LOG: [coop:webrtc] raw rx role=host t=stallBeat bytes=36 handlers=11
+[20:13:42.105] LOG: [coop:webrtc] raw rx role=host t=stallBeat bytes=36 handlers=11
+[20:13:47.136] LOG: [coop:webrtc] raw rx role=host t=stallBeat bytes=36 handlers=11
+[20:13:52.124] LOG: [coop:webrtc] raw rx role=host t=stallBeat bytes=36 handlers=11
+[20:13:57.126] LOG: [coop:webrtc] raw rx role=host t=stallBeat bytes=36 handlers=11
