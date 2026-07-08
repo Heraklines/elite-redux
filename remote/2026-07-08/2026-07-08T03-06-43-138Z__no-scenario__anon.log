@@ -1,0 +1,41 @@
+url:      https://elite-redux-staging.pages.dev/
+build:    mrbfz16x-gbp
+mode:     ?  wave:?
+seed:     RqIvBSvSmU4U1XZ1y3Zs71LE
+party:    
+enemy:    
+
+----- COMMENT -----
+Co-op
+
+----- CONSOLE -----
+[03:05:27.547] LOG: %c %c %c %c %c Phaser v3.90.0 (WebGL | Web Audio) %c https://phaser.io/v390 background: #ff0000 background: #ffff00 background: #00ff00 background: #00ffff color: #ffffff; background: #000000 background: transparent
+[03:05:27.887] LOG: [ER] build mrbfz16x-gbp
+[03:05:27.999] LOG: [dev-tools] loaded — 473 scenarios + Send Logs button
+[03:05:35.479] DEBUG: Destroying loading scene
+[03:05:35.479] DEBUG: Destroyed loading scene
+[03:05:35.546] LOG: Seed: RqIvBSvSmU4U1XZ1y3Zs71LE
+[03:05:35.546] LOG: Wave Seed: RqIvBSvSmU4U1XZ1y3Zs71LE 0
+[03:05:38.891] LOG: %cStart Phase LoginPhase color:green;
+[03:05:39.218] LOG: Client Session: oWAAXrxFwmj9ULf64qyOOGQllL7yIXgi
+[03:05:39.520] DEBUG: Using cached system data
+[03:05:39.611] LOG: %cStart Phase TitlePhase color:green;
+[03:05:39.613] LOG: Getting Session Slot id: %d 4
+[03:05:39.628] LOG: use seasonal splash messages true
+[03:05:59.805] LOG: Getting Session Slot id: %d 0
+[03:05:59.819] LOG: Getting Session Slot id: %d 1
+[03:05:59.827] LOG: Getting Session Slot id: %d 2
+[03:05:59.836] LOG: Getting Session Slot id: %d 3
+[03:05:59.842] LOG: Getting Session Slot id: %d 4
+[03:05:59.849] LOG: Getting Session Slot id: %d 0
+[03:06:00.017] LOG: Getting Session Slot id: %d 4
+[03:06:13.058] LOG: Getting Session Slot id: %d 4
+[03:06:13.063] WARN: [coop:launch] loadSession slot=4 REFUSED: co-op save without a live partner connection (#807)
+[03:06:13.065] ERROR: TypeError: Cannot read properties of undefined (reading 'getStartingBiome')
+TypeError: Cannot read properties of undefined (reading 'getStartingBiome')
+    at TitlePhase.end (https://elite-redux-staging.pages.dev/assets/battle-scene-BNcQAkbJ.js:462:857)
+    at TitlePhase.loadSaveSlot (https://elite-redux-staging.pages.dev/assets/battle-scene-BNcQAkbJ.js:461:1362)
+[03:06:13.066] ERROR: [unhandledrejection] TypeError: Cannot read properties of undefined (reading 'isCoop')
+TypeError: Cannot read properties of undefined (reading 'isCoop')
+    at UI.showText (https://elite-redux-staging.pages.dev/assets/battle-scene-BNcQAkbJ.js:1046:16647)
+    at TitlePhase.loadSaveSlot (https://elite-redux-staging.pages.dev/assets/battle-scene-BNcQAkbJ.js:461:1399)
