@@ -1,0 +1,16 @@
+url:      https://elite-redux-staging.pages.dev/
+build:    mrc9a598-g33b
+mode:     0  wave:?
+seed:     AC3WePDzwJiHEUzVmj7ZkRDH
+party:    
+enemy:    
+
+----- CONSOLE -----
+[17:01:30.302] LOG: %c %c %c %c %c Phaser v3.90.0 (WebGL | Web Audio) %c https://phaser.io/v390 background: #ff0000 background: #ffff00 background: #00ff00 background: #00ffff color: #ffffff; background: #000000 background: transparent
+[17:01:31.797] LOG: [ER] build mrc9a598-g33b
+[17:01:32.114] LOG: [dev-tools] loaded — 476 scenarios + Send Logs button
+[17:02:07.170] DEBUG: Destroying loading scene
+[17:02:07.172] DEBUG: Destroyed loading scene
+[17:02:07.327] LOG: Seed: AC3WePDzwJiHEUzVmj7ZkRDH
+[17:02:07.327] LOG: Wave Seed: AC3WePDzwJiHEUzVmj7ZkRDH 0
+[17:02:14.016] LOG: %cStart Phase LoginPhase color:green;
