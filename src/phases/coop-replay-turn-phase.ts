@@ -188,10 +188,21 @@ export class CoopReplayTurnPhase extends Phase {
             if (applyCoopCheckpoint(envelope.checkpoint)) {
               applyCoopAuthoritativeBattleState(envelope.authoritativeState, isCoopAuthoritativeGuest());
             }
-            const ownSlot = coopLocalOwnedPlayerFieldSlot();
-            const ownMon = ownSlot == null ? undefined : globalScene.getPlayerField()[ownSlot];
+            // Showdown versus (Task F1): the versus guest owns its ENTIRE player field (a 1v1 -> field
+            // slot 0). The co-op seat map used by coopLocalOwnedPlayerFieldSlot() resolves the fixed
+            // GUEST slot (COOP_GUEST_FIELD_INDEX = 1), which is EMPTY in a 1v1 single battle - so the
+            // co-op path never saw the refilled slot as OURS and never opened the guest's
+            // post-replacement CommandPhase, leaving the guest parked in replay while the host awaited a
+            // turn-N+1 command that could only arrive after a ~60s auto-pick timeout (the versus
+            // faint-replacement stall). Branch at the CALL SITE exactly like
+            // CoopFaintReplayPhase.maybeOpenOwnReplacementPicker (do NOT change the co-op seat map): the
+            // versus guest's refilled own slot is its (single) active player field slot.
+            const ownSlot = isShowdownGuestFlipGated()
+              ? globalScene.getPlayerField().findIndex(m => m?.isActive() === true)
+              : coopLocalOwnedPlayerFieldSlot();
+            const ownMon = ownSlot < 0 ? undefined : globalScene.getPlayerField()[ownSlot];
             if (
-              ownSlot != null
+              ownSlot >= 0
               && ownMon?.isActive() === true
               && globalScene.currentBattle.turnCommands[ownSlot] == null
             ) {

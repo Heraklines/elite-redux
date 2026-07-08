@@ -41,8 +41,14 @@ import {
   wireCoopStallWatchdog,
 } from "#data/elite-redux/coop/coop-runtime";
 import { COOP_SWITCH_CHOICE_KINDS } from "#data/elite-redux/coop/coop-seq-registry";
-import { type CoopTransport, createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
-import { beginShowdownBattle, endShowdownBattle } from "#data/elite-redux/showdown/showdown-battle-state";
+import { type CoopTransport, createLoopbackPair, type SerializedCommand } from "#data/elite-redux/coop/coop-transport";
+import {
+  beginShowdownBattle,
+  endShowdownBattle,
+  getShowdownOpponentManifest,
+  getShowdownOwnManifest,
+} from "#data/elite-redux/showdown/showdown-battle-state";
+import { ShowdownCommandRelay } from "#data/elite-redux/showdown/showdown-command-relay";
 import type { ShowdownMonManifest } from "#data/elite-redux/showdown/showdown-team";
 import { PokemonMove } from "#data/moves/pokemon-move";
 import { BattlerIndex } from "#enums/battler-index";
@@ -58,6 +64,7 @@ import { GameManager } from "#test/framework/game-manager";
 import {
   buildShowdownDuo,
   type CoopResyncProbe,
+  drainLoopback,
   driveGuestReplayTurn,
   installCoopResyncProbe,
   installDuoLogCapture,
@@ -79,6 +86,12 @@ const GUEST_BENCH_1 = SpeciesId.LAPRAS;
 const GUEST_BENCH_2 = SpeciesId.GYARADOS;
 /** The guest deliberately picks its SECOND bench (slot 2), so the host summoning it proves the round-trip. */
 const GUEST_PICK_SLOT = 2;
+/**
+ * The replacement (GYARADOS) ships its SECOND move slot for the NEXT full command turn (test g). A
+ * distinctive, non-SPLASH move so "the host consumed the GUEST'S real pick" is unambiguous (its moveset
+ * is [SPLASH, WATERFALL, CRUNCH, EARTHQUAKE] - slot 1 = WATERFALL).
+ */
+const GUEST_TURN2_MOVE_SLOT = 1;
 
 /** The HOST's own team: a PIKACHU lead + a SNORLAX bench (its double-KO replacement). */
 const HOST_LEAD = SpeciesId.PIKACHU;
@@ -267,6 +280,144 @@ describe.skipIf(!RUN)("Showdown versus - faint-replacement two-engine proof (the
       expect(rep != null && rep.hp > 0 && !rep.fainted, "the guest's replacement is presented ALIVE").toBe(true);
     });
     expect(resyncProbe.count(), "the guest-faint replacement converged with ZERO forced resyncs").toBe(0);
+
+    logs.flush();
+  }, 300_000);
+
+  it("(g) guest faint -> replacement -> NEXT FULL COMMAND TURN: the guest OPENS its command + ships it, the host consumes it (no auto-pick), converged", async () => {
+    // The live 3-minute stall (staging 2026-07-08, seed 8R6YUXPA09j91WKIWv28avEo): after the guest's own
+    // mon faints and a replacement is summoned, the guest entered turn N+1 in REPLAY instead of COMMAND -
+    // it never opened its CommandPhase, so the host's turn-N+1 enemy-command await could only resolve via a
+    // stacked ~60s auto-pick timeout. The existing (a)/(b) tests stopped at the checkpoint materialization
+    // and never drove a FULL command turn after the replacement, so they missed it. This drives the guest's
+    // REAL post-replacement CommandPhase end-to-end.
+    await startHostShowdown(guestTeam(), [MoveId.THUNDERBOLT, MoveId.TACKLE, MoveId.THUNDER_WAVE, MoveId.QUICK_ATTACK]);
+    const pair = createLoopbackPair();
+    const rig = await buildShowdownDuo(game, pair, setCoopRuntime, toShowdown);
+    wireGuestSplash(rig);
+    resyncProbe = installCoopResyncProbe(rig.guestRuntime);
+
+    rig.hostScene.getEnemyField()[0].hp = 1;
+    withClientSync(rig.guestCtx, () => {
+      rig.guestScene.getPlayerField()[0].hp = 1;
+    });
+
+    const turn = rig.hostScene.currentBattle.turn;
+
+    // HOST turn N: THUNDERBOLT KOs the guest's Magikarp.
+    await withClient(rig.hostCtx, async () => {
+      game.move.select(MoveId.THUNDERBOLT, 0, BattlerIndex.ENEMY);
+      await game.phaseInterceptor.to("TurnEndPhase");
+    });
+    expect(rig.hostScene.getEnemyField()[0]?.isFainted() ?? true, "the guest's lead fainted on the host").toBe(true);
+
+    // GUEST replays turn N: its own faint opens the picker and relays slot 2 (GYARADOS).
+    const pickerOpened = await driveGuestReplayPickingBench(rig, turn);
+    expect(pickerOpened, "the versus guest's own-team faint OPENED its replacement picker").toBe(true);
+
+    // HOST crosses to turn N+1 CommandPhase: summons THE GUEST'S pick + streams the out-of-band replacement
+    // checkpoint the guest's pump consumes.
+    await withClient(rig.hostCtx, async () => {
+      await game.phaseInterceptor.to("CommandPhase");
+    });
+    expect(
+      rig.hostScene.getEnemyField()[0]?.species.speciesId,
+      "the host summoned the guest's picked replacement (GYARADOS)",
+    ).toBe(GUEST_BENCH_2);
+
+    // Probe the HOST's enemy-command resolution for turn N+1 - it MUST resolve with the guest's shipped
+    // pick, NOT null (a null is the 60s auto-pick timeout the live stall depended on).
+    let hostTurn2Cmd: SerializedCommand | null | undefined;
+    const origReq = rig.hostRelay.requestEnemyCommand.bind(rig.hostRelay);
+    (
+      rig.hostRelay as unknown as { requestEnemyCommand: (t: number) => Promise<SerializedCommand | null> }
+    ).requestEnemyCommand = (t: number): Promise<SerializedCommand | null> =>
+      origReq(t).then(c => {
+        if (t === turn + 1) {
+          hostTurn2Cmd = c;
+        }
+        return c;
+      });
+
+    // GUEST replays turn N+1: the pump consumes the replacement checkpoint and OPENS the guest's OWN
+    // CommandPhase (the fix) instead of parking in replay; drive that command to ship WATERFALL. The
+    // guest ships over ITS transport (guestPeer) - beginShowdownBattle points getShowdownRelay at it for
+    // the send, then restores the host relay (the harness shares the process-global showdown state).
+    let shipped: SerializedCommand | null = null;
+    const offTap = rig.pair.host.onMessage(m => {
+      if (m.t === "showdownCommand" && m.turn === turn + 1) {
+        shipped = m.command;
+      }
+    });
+    await withClient(rig.guestCtx, async () => {
+      // Keep the guest's command UI open a NO-OP headlessly (the guest scene lacks a full command
+      // handler); we drive the pick directly via handleCommand below.
+      const ui = rig.guestScene.ui as unknown as { setMode: (...args: unknown[]) => unknown };
+      const realSetMode = ui.setMode.bind(ui);
+      ui.setMode = (...args: unknown[]): unknown => {
+        if (args[0] === UiMode.COMMAND || args[0] === UiMode.MESSAGE || args[0] === UiMode.FIGHT) {
+          return Promise.resolve();
+        }
+        return realSetMode(...args);
+      };
+      try {
+        await driveGuestReplayTurn(rig.guestScene, turn + 1);
+        const cur = rig.guestScene.phaseManager.getCurrentPhase();
+        // RED-PROOF ANCHOR (defect 1): with the seat-slot bug the pump never opens the command turn -
+        // the current phase stays CoopReplayTurnPhase (the guest parked in replay) and this fails.
+        expect(cur?.phaseName, "the guest OPENED its own CommandPhase for turn N+1 (not replay) - defect-1 fix").toBe(
+          "CommandPhase",
+        );
+        const own = getShowdownOwnManifest();
+        const opp = getShowdownOpponentManifest();
+        if (own != null && opp != null) {
+          beginShowdownBattle(own, opp, rig.guestPeer);
+          try {
+            (cur as unknown as { handleCommand: (c: Command, cursor: number) => boolean }).handleCommand(
+              Command.FIGHT,
+              GUEST_TURN2_MOVE_SLOT,
+            );
+          } finally {
+            beginShowdownBattle(own, opp, rig.hostRelay);
+          }
+        }
+        await drainLoopback();
+      } finally {
+        ui.setMode = realSetMode;
+      }
+    });
+    offTap();
+
+    expect(shipped, "the guest SHIPPED a showdownCommand for turn N+1 (opened command, not replay)").not.toBeNull();
+    expect(
+      (shipped as SerializedCommand | null)?.moveId,
+      "the guest shipped its chosen move (WATERFALL) for turn N+1",
+    ).toBe(MoveId.WATERFALL);
+
+    // HOST resolves turn N+1: its EnemyCommandPhase consumes the buffered guest command, NOT the AI timeout.
+    await withClient(rig.hostCtx, async () => {
+      game.move.select(MoveId.THUNDERBOLT, 0, BattlerIndex.ENEMY);
+      await game.phaseInterceptor.to("TurnEndPhase");
+    });
+    expect(
+      hostTurn2Cmd?.moveId,
+      "the host consumed the GUEST'S real turn-N+1 command (WATERFALL), not a ~60s auto-pick (null)",
+    ).toBe(MoveId.WATERFALL);
+
+    // GUEST finalizes turn N+1: drain the continuation replay to its checkpoint. No stall (the harness
+    // throws on a >24-iter no-progress hang), converged with ZERO forced resyncs.
+    await withClient(rig.guestCtx, async () => {
+      await driveGuestReplayTurn(rig.guestScene, turn + 1);
+    });
+    expect(resyncProbe.count(), "the full command turn after the replacement converged with ZERO forced resyncs").toBe(
+      0,
+    );
+    // Defect-2 net: the guest never DROPPED an early command request (the "before responder install ->
+    // ignored" line is gone - it BUFFERS + answers on install now).
+    expect(
+      logs.guest.some(l => l.includes("before responder install -> ignored")),
+      "no showdown commandRequest was DROPPED as 'ignored' (defect-2 buffering)",
+    ).toBe(false);
 
     logs.flush();
   }, 300_000);
@@ -545,5 +696,43 @@ describe("Showdown versus - faint stall-watchdog suppression + resync-rescue ban
     await vi.advanceTimersByTimeAsync(0);
     await parked;
     expect(res, "a genuine disconnect resolves the faint await to null (-> host AI fallback), no hang").toBeNull();
+  });
+
+  it("(h) RESPONDER-RACE BUFFER: a showdown commandRequest arriving BEFORE the peer installs its responder is BUFFERED + answered on install, not dropped", async () => {
+    // Defect-2 regression net for the SHOWDOWN command relay (the #812-mirror). The host asks for the
+    // enemy command for turn N+1 a beat BEFORE the guest's CommandPhase installs its responder; the request
+    // must be buffered by TURN and answered the instant onCommandRequest installs the responder, instead of
+    // being DROPPED ("before responder install -> ignored") - the race the live stall rode alongside defect 1.
+    const pair = createLoopbackPair();
+    const hostRelay = new ShowdownCommandRelay(pair.host, { timeoutMs: 5_000 });
+    const guestRelay = new ShowdownCommandRelay(pair.guest);
+    const TURN = 6;
+
+    // HOST asks for turn-6's enemy command; the request reaches the guest BEFORE it installs a responder.
+    let hostRes: SerializedCommand | null | undefined;
+    void hostRelay.requestEnemyCommand(TURN).then(r => {
+      hostRes = r;
+    });
+    await vi.advanceTimersByTimeAsync(0); // deliver the request to the guest (no responder yet -> BUFFERED)
+
+    // The guest installs its responder a beat LATER (its CommandPhase just opened). The buffered request is
+    // answered on install. RED-PROOF: revert the buffer (handleRequest drops it as "ignored") and this is
+    // never answered -> hostRes stays undefined (the assertion below fails).
+    guestRelay.onCommandRequest(() => ({
+      command: Command.FIGHT,
+      cursor: GUEST_TURN2_MOVE_SLOT,
+      moveId: MoveId.WATERFALL,
+      targets: [BattlerIndex.PLAYER],
+      useMode: MoveUseMode.NORMAL,
+    }));
+    await vi.advanceTimersByTimeAsync(0); // deliver the on-install answer back to the host
+
+    expect(
+      hostRes?.moveId,
+      "the buffered pre-install commandRequest was ANSWERED on install (WATERFALL), not dropped",
+    ).toBe(MoveId.WATERFALL);
+
+    hostRelay.dispose();
+    guestRelay.dispose();
   });
 });

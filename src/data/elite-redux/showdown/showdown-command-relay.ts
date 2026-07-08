@@ -81,6 +81,13 @@ export class ShowdownCommandRelay {
    * instantly instead of dropping the move and timing out to the AI.
    */
   private readonly inbox = new Map<number, SerializedCommand>();
+  /**
+   * #812-mirror: request TURNS that arrived before this peer installed its responder (it was still
+   * replaying the previous turn when the host asked for this turn's command). Buffered here KEYED BY
+   * TURN and answered the instant {@linkcode onCommandRequest} installs the responder, instead of
+   * being DROPPED (the versus race that otherwise only recovered via a stacked ~60s host auto-pick).
+   */
+  private readonly bufferedRequests = new Set<number>();
   private responder: ShowdownCommandResponder | null = null;
   private readonly offMessage: () => void;
 
@@ -146,6 +153,19 @@ export class ShowdownCommandRelay {
   /** PEER: install the responder that answers inbound enemy-command requests. */
   onCommandRequest(responder: ShowdownCommandResponder): void {
     this.responder = responder;
+    // #812-mirror: drain any requests that arrived while the responder was not yet installed (the peer
+    // was still replaying the previous turn). Answer each buffered turn on install so a request arriving
+    // a beat before the guest's CommandPhase installs its responder is honored, not lost.
+    if (this.bufferedRequests.size === 0) {
+      return;
+    }
+    const buffered = [...this.bufferedRequests];
+    this.bufferedRequests.clear();
+    for (const turn of buffered) {
+      coopLog("relay", `showdown answering BUFFERED commandRequest turn=${turn} (#812-mirror)`);
+      const command = responder({ turn });
+      this.transport.send({ t: "showdownCommand", turn, command });
+    }
   }
 
   /** Whether a responder is installed (this client can answer requests). */
@@ -186,6 +206,7 @@ export class ShowdownCommandRelay {
     }
     this.pending.clear();
     this.inbox.clear();
+    this.bufferedRequests.clear();
     this.responder = null;
   }
 
@@ -201,12 +222,19 @@ export class ShowdownCommandRelay {
   private handleRequest(turn: number): void {
     const responder = this.responder;
     if (responder == null) {
-      // No responder yet (peer not at its command UI); the host's own turn-timer + AI fallback
-      // bounds the worst case, so simply ignore - a re-request or the peer's unprompted sendCommand
-      // will satisfy the host.
+      // #812-mirror: a missing responder is TRANSIENT - the peer is still replaying the previous turn
+      // when the host already asks for this turn's command. BUFFER the turn (keyed by turn) and answer it
+      // the instant onCommandRequest installs the responder, instead of DROPPING it (the versus race that
+      // otherwise only recovered via a stacked ~60s host auto-pick timeout). A 1v1 has a single enemy
+      // slot that is always "ours", so - unlike the co-op #812 path - there is no ownership decline
+      // branch. The host's own turn-timer + AI fallback still bounds the worst case, so this cannot hang.
       if (isCoopDebug()) {
-        coopLog("relay", `showdown peer recv commandRequest turn=${turn} before responder install -> ignored`);
+        coopLog(
+          "relay",
+          `showdown peer recv commandRequest turn=${turn} before responder install -> BUFFERED (#812-mirror)`,
+        );
       }
+      this.bufferedRequests.add(turn);
       return;
     }
     const command = responder({ turn });
