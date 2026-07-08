@@ -46,7 +46,7 @@ function isPokemon(p: Pokemon | HasPokemon): p is Pokemon {
   return typeof (p as HasPokemon).getPokemon !== "function";
 }
 
-function getPokemon(p: Pokemon | HasPokemon): Pokemon {
+function getPokemon(p: Pokemon | HasPokemon): Pokemon | undefined {
   return isPokemon(p) ? p : p.getPokemon();
 }
 
@@ -57,19 +57,23 @@ function getPokemon(p: Pokemon | HasPokemon): Pokemon {
 function sortBySpeed<T extends Pokemon | HasPokemon>(groupedPokemonList: T[][]): void {
   const { setOrder } = globalScene.turnCommandManager;
 
+  // Null-safe (showdown guest launch 2026-07-08): a queued HasPokemon entry can resolve to an
+  // UNDEFINED pokemon on the versus guest mid-launch (its battler slot fields a beat later in
+  // the streamed summon order); the comparator must tolerate it (sorts last / stable) instead
+  // of crashing the whole launch. Identical ordering when every entry resolves (solo/co-op).
   // If a set turn order was provided, use that in ascending order.
   if (setOrder) {
     groupedPokemonList.sort((a, b) => {
-      const aIndex = getPokemon(a[0]).getBattlerIndex();
-      const bIndex = getPokemon(b[0]).getBattlerIndex();
+      const aIndex = getPokemon(a[0])?.getBattlerIndex() ?? Number.MAX_SAFE_INTEGER;
+      const bIndex = getPokemon(b[0])?.getBattlerIndex() ?? Number.MAX_SAFE_INTEGER;
       return setOrder.indexOf(aIndex) - setOrder.indexOf(bIndex);
     });
     return;
   }
 
   groupedPokemonList.sort((a, b) => {
-    const aSpeed = getPokemon(a[0]).getEffectiveStat(Stat.SPD);
-    const bSpeed = getPokemon(b[0]).getEffectiveStat(Stat.SPD);
+    const aSpeed = getPokemon(a[0])?.getEffectiveStat(Stat.SPD) ?? 0;
+    const bSpeed = getPokemon(b[0])?.getEffectiveStat(Stat.SPD) ?? 0;
 
     return bSpeed - aSpeed;
   });
@@ -93,7 +97,7 @@ function groupPokemon<T extends Pokemon | HasPokemon>(pokemonList: readonly T[])
   for (const pkmn of pokemonList) {
     const pokemon = getPokemon(pkmn);
     const lastGroup = runs.at(-1);
-    if (lastGroup != null && lastGroup.length > 0 && getPokemon(lastGroup[0]) === pokemon) {
+    if (pokemon != null && lastGroup != null && lastGroup.length > 0 && getPokemon(lastGroup[0]) === pokemon) {
       lastGroup.push(pkmn);
     } else {
       runs.push([pkmn]);
