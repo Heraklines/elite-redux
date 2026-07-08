@@ -2789,6 +2789,39 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
   },
   {
+    label: "(note) Showdown 1v1: after YOU KO the opponent's mon, its replacement is on-field BEFORE your next move",
+    description:
+      "SHOWDOWN VERSUS fix - verify with TWO clients in a live 1v1 versus match (not a solo battle). Live\n"
+      + "report (build mrbqqcbr): the GUEST KO'd the HOST's mon; the host picked + summoned its own\n"
+      + "replacement; but the guest's NEXT move menu opened with an EMPTY enemy platform - 'when I fainted\n"
+      + "your mon I had to choose a move to SEE your new pokemon, so I had to blindly choose'. Root cause: a\n"
+      + "host-owned faint rides the vanilla SwitchPhase, which summons the replacement AFTER the turn's\n"
+      + "resolution is streamed, as a SEPARATE out-of-band replacement checkpoint the guest only consumes in\n"
+      + "the NEXT turn's replay pump - but the guest's own TurnInitPhase opened its command menu BEFORE that\n"
+      + "pump, so the enemy platform still showed the fainted mon (empty). The guest-OWN-faint direction never\n"
+      + "hit this because its own fainted slot already defers the command into the pump. FIX\n"
+      + "(turn-init-phase.ts): on the versus guest, when there is no active enemy on the field (a host\n"
+      + "replacement is pending), DEFER opening its command - the replay pump opens it AFTER rendering the\n"
+      + "replacement, mirroring the own-faint path (deterministic wait on the specific replacement\n"
+      + "checkpoint, host-stall-bounded, no spin/timeout). DO (2 clients): as the GUEST, KO the HOST's active\n"
+      + "mon while the host has a bench; the host picks a replacement. EXPECT: your next move menu opens with\n"
+      + "the host's REPLACEMENT already drawn on the enemy platform (its correct species, full HP) - never an\n"
+      + "empty platform you must guess against. Duo-tested headlessly in\n"
+      + "test/tests/elite-redux/showdown/showdown-versus-host-faint.test.ts (case i, with a revert red-proof).",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({ STARTING_WAVE_OVERRIDE: 1, STARTING_LEVEL_OVERRIDE: 50 });
+      return [
+        makeStarter(SpeciesId.SNORLAX, {
+          moveset: [MoveId.BODY_SLAM, MoveId.CRUNCH, MoveId.EARTHQUAKE, MoveId.REST],
+        }),
+        makeStarter(SpeciesId.GENGAR, {
+          moveset: [MoveId.SHADOW_BALL, MoveId.SLUDGE_BOMB, MoveId.THUNDERBOLT, MoveId.DAZZLING_GLEAM],
+        }),
+      ];
+    },
+  },
+  {
     label: "QoL: reward-shop long-desc auto-scroll (#557)",
     description:
       "#557 - long ER item descriptions auto-scroll in the REWARD screen instead of\n"

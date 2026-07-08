@@ -1,5 +1,6 @@
 import { consumePendingDevBattleSetup } from "#app/dev-tools/registry";
 import { globalScene } from "#app/global-scene";
+import { isShowdownGuestFlipGated } from "#data/elite-redux/coop/coop-authoritative-gate";
 import { getErBiomeRule } from "#data/elite-redux/er-biome-rules";
 import { BattleType } from "#enums/battle-type";
 import { MovePhaseTimingModifier } from "#enums/move-phase-timing-modifier";
@@ -87,6 +88,21 @@ export class TurnInitPhase extends FieldPhase {
       return;
     }
 
+    // Showdown 1v1 (versus HOST-faint replacement): the versus GUEST is a pure renderer whose ENEMY
+    // side is the remote host's team. When the host's own mon faints, the host summons its replacement
+    // AFTER streaming this turn's resolution, as a SEPARATE out-of-band `reason=replacement` checkpoint
+    // the guest only consumes in the NEXT turn's replay pump (CoopReplayTurnPhase). If we open the
+    // guest's CommandPhase here (its own TurnInit) while the enemy platform is still empty, the guest
+    // commands BLIND - "i had to choose a move to SEE your new pokemon". So when the versus guest has no
+    // active enemy on the field (a host replacement is pending), DEFER opening the guest's own command:
+    // skip it here and let the replay pump's checkpoint branch open it AFTER it applies the enemy
+    // replacement (the SAME deferred-command mechanism the guest-OWN-faint path already uses, keyed on
+    // the enemy slot instead of the own slot). Deterministic - the pump PARKS on the specific
+    // replacement checkpoint (host-stall fallback bounds it), no spin, no timeout. If the replacement
+    // already rendered by now (the non-racy timing) this is false and the command opens normally.
+    const deferVersusGuestCommandForEnemyReplacement =
+      isShowdownGuestFlipGated() && !globalScene.getEnemyField().some(e => e?.isActive());
+
     globalScene.getField().forEach((pokemon, i) => {
       if (pokemon?.isActive()) {
         if (pokemon.isPlayer()) {
@@ -96,7 +112,9 @@ export class TurnInitPhase extends FieldPhase {
         pokemon.resetTurnData();
 
         if (pokemon.isPlayer()) {
-          globalScene.phaseManager.pushNew("CommandPhase", i);
+          if (!deferVersusGuestCommandForEnemyReplacement) {
+            globalScene.phaseManager.pushNew("CommandPhase", i);
+          }
         } else {
           // Multi-format: the enemy's position within its side (== i - enemyOffset, which is
           // BattlerIndex.ENEMY in binary but shifts in triple). getFieldIndex is self-consistent.
