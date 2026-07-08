@@ -134,6 +134,14 @@ export class ShowdownResultPhase extends BattlePhase {
         ? "You won the Showdown!"
         : "You lost the Showdown.";
 
+    // The ghost OPPONENT trainer is a Phaser container parented to `globalScene.field` (built by
+    // buildShowdownTrainer, added via `field.add`). `globalScene.reset()` destroys the party pokemon
+    // and nulls `currentBattle` but NEVER removes this trainer container, so it is orphaned on the field
+    // and lingers over the incoming title (the reported "trainer stays on top of the titlescreen").
+    // Captured HERE, before reset() drops the `currentBattle` reference, and destroyed in the teardown
+    // below. Deterministic for every outcome (win / loss / void) and every entry mode.
+    const enemyTrainer = globalScene.currentBattle?.trainer ?? null;
+
     const showResult = () => {
       globalScene.ui.showText(
         message,
@@ -152,6 +160,20 @@ export class ShowdownResultPhase extends BattlePhase {
           void globalScene.ui.fadeOut(500).then(() => {
             for (const battler of activeBattlers) {
               battler.setVisible(false);
+            }
+            // Hide + REMOVE + DESTROY the orphaned ghost opponent trainer (reset() would leave it on the
+            // field). Mirrors reset()'s own ME-introVisuals teardown (`field.remove(child, true)`): the
+            // explicit remove splices it out of the field's display list AND destroys it (sprites +
+            // ghost-aura FX), so it can never draw over the title. setVisible(false) first guarantees it
+            // is hidden even if the destroy is a no-op on a stale handle. Guarded so a teardown failure
+            // can never strand the return to title.
+            try {
+              if (enemyTrainer != null) {
+                enemyTrainer.setVisible(false);
+                globalScene.field.remove(enemyTrainer, true);
+              }
+            } catch {
+              /* a trainer teardown failure must never block the return to title */
             }
             globalScene.setFieldScale(1, true);
             globalScene.phaseManager.clearPhaseQueue();
