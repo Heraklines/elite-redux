@@ -1,0 +1,270 @@
+url:      https://elite-redux-staging.pages.dev/
+build:    mrc9a598-g33b
+mode:     6  wave:21
+seed:     jxmlj7GoD67IuH2sUP1sR8PE
+party:    Snorunt Redux(L14 46hp f0), Iron Scythe(L16 63hp f0), Meowth(L11 33hp f0), Bulbasaur(L10 32hp f0), Scyther(L9 34hp f0)
+enemy:    Rattata(L13), Lillipup(L14)
+
+----- COMMENT -----
+Only Up/down/left/right key-buttons is working, all others buttons stoped working
+
+----- CONSOLE -----
+[20:10:14.207] LOG: [coop:session] isCoopAuthoritativeGuestGated -> true (authoritative GUEST gates a structural mutation)
+[20:10:14.207] LOG: [coop:session] isCoopAuthoritativeGuestGated -> true (authoritative GUEST gates a structural mutation)
+[20:10:14.207] LOG: [coop:session] isCoopAuthoritativeGuestGated -> true (authoritative GUEST gates a structural mutation)
+[20:10:14.215] LOG: %cStart Phase CoopInertPhase color:green;
+[20:10:14.215] LOG: %cStart Phase CoopInertPhase color:green;
+[20:10:14.215] LOG: %cStart Phase TurnStartPhase color:green;
+[20:10:14.215] LOG: [coop:session] isCoopAuthoritativeGuestGated -> true (authoritative GUEST gates a structural mutation)
+[20:10:14.216] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[20:10:14.216] LOG: %cStart Phase CheckSwitchPhase color:green;
+[20:10:14.216] LOG: %cStart Phase CheckSwitchPhase color:green;
+[20:10:14.216] LOG: %cStart Phase InitEncounterPhase color:green;
+[20:10:14.216] LOG: [coop:session] isCoopAuthoritativeGuestGated -> true (authoritative GUEST gates a structural mutation)
+[20:10:14.216] LOG: [coop:session] isCoopAuthoritativeGuestGated -> true (authoritative GUEST gates a structural mutation)
+[20:10:14.217] LOG: %cStart Phase PostSummonPhase color:green;
+[20:10:14.217] LOG: Ran PSP for: Lillipup
+[20:10:14.222] LOG: %cStart Phase PostSummonPhase color:green;
+[20:10:14.223] LOG: %cStart Phase PostSummonPhase color:green;
+[20:10:14.223] LOG: %cStart Phase PostSummonPhase color:green;
+[20:10:14.223] LOG: Ran PSP for: Rattata
+[20:10:14.223] LOG: %cStart Phase PostSummonPhase color:green;
+[20:10:14.223] LOG: %cStart Phase PostSummonPhase color:green;
+[20:10:14.223] LOG: %cStart Phase CoopReplayTurnPhase color:green;
+[20:10:14.223] LOG: [coop:replay] guest replay turn=2: live pump start (awaiting host events/resolution)
+[20:10:14.223] LOG: [coop:replay] guest awaitTurn turn=2 START timeout=1200000ms
+[20:10:17.435] LOG: [coop:webrtc] raw rx role=guest t=command bytes=127 handlers=11
+[20:10:17.435] LOG: [coop:relay] recv command fieldIndex=0 turn=1 command=0 -> BUFFERED (no awaiter yet)
+[20:10:17.436] LOG: [coop:webrtc] raw rx role=guest t=commandRequest bytes=84 handlers=11
+[20:10:17.436] LOG: [coop:relay] peer recv commandRequest fieldIndex=1 owner=guest turn=1 before responder install -> BUFFERED (own slot, #812)
+[20:10:25.846] LOG: [coop:webrtc] raw tx role=guest t=stallBeat bytes=35
+[20:10:30.845] LOG: [coop:webrtc] raw tx role=guest t=stallBeat bytes=35
+[20:10:35.845] LOG: [coop:interaction] interactionCounter() read -> 23 (role=guest)
+[20:10:35.845] LOG: [coop:health] tick=0g turn=2 wave=21 counter=23 assertions=2 wait=22733ms peerBeat=- transport=connected
+[20:10:35.845] LOG: [coop:webrtc] raw tx role=guest t=stallBeat bytes=35
+[20:10:40.845] LOG: [coop:webrtc] raw tx role=guest t=stallBeat bytes=35
+[20:10:45.845] LOG: [coop:webrtc] raw tx role=guest t=stallBeat bytes=35
+[20:10:50.844] LOG: [coop:webrtc] raw tx role=guest t=stallBeat bytes=35
+[20:10:55.844] LOG: [coop:webrtc] raw tx role=guest t=stallBeat bytes=35
+[20:11:00.844] LOG: [coop:webrtc] raw tx role=guest t=stallBeat bytes=35
+[20:11:05.843] LOG: [coop:webrtc] raw tx role=guest t=stallBeat bytes=35
+[20:11:10.844] LOG: [coop:interaction] interactionCounter() read -> 23 (role=guest)
+[20:11:10.844] LOG: [coop:health] tick=0g turn=2 wave=21 counter=23 assertions=2 wait=57732ms peerBeat=- transport=connected
+[20:11:10.844] LOG: [coop:webrtc] raw tx role=guest t=stallBeat bytes=35
+[20:11:13.130] WARN: [coop:rendezvous] RENDEZVOUS TIMEOUT point=cmd:21:2 after 60000ms - partner never arrived; PROCEEDING (anti-hang backstop) role=guest
+[20:11:13.130] WARN: [coop:rendezvous] next-command barrier cmd:21:2 TIMED OUT - partner never reached command; opening UI anyway (anti-hang)
+[20:11:13.149] ERROR: [unhandledrejection] TypeError: Cannot read properties of null (reading 'getPokemon')
+TypeError: Cannot read properties of null (reading 'getPokemon')
+    at CommandUiHandler.show (https://elite-redux-staging.pages.dev/assets/battle-scene-Kk4Dr9wQ.js:996:18201)
+    at doSetMode (https://elite-redux-staging.pages.dev/assets/battle-scene-Kk4Dr9wQ.js:1047:1731)
+    at https://elite-redux-staging.pages.dev/assets/battle-scene-Kk4Dr9wQ.js:1047:1953
+    at new Promise (<anonymous>)
+    at UI.setModeInternal (https://elite-redux-staging.pages.dev/assets/battle-scene-Kk4Dr9wQ.js:1047:1440)
+    at UI.setMode (https://elite-redux-staging.pages.dev/assets/battle-scene-Kk4Dr9wQ.js:1047:2314)
+    at CommandPhase.openOwnCommandUi (https://elite-redux-staging.pages.dev/assets/battle-scene-Kk4Dr9wQ.js:19:107644)
+    at https://elite-redux-staging.pages.dev/assets/battle-scene-Kk4Dr9wQ.js:19:106789
+[20:11:14.958] ERROR: [uncaught] Uncaught TypeError: z.phaseManager.getCurrentPhase(...).getFieldIndex is not a function @ https://elite-redux-staging.pages.dev/assets/battle-scene-Kk4Dr9wQ.js:996:18921
+[20:11:15.845] LOG: [coop:webrtc] raw tx role=guest t=stallBeat bytes=35
+[20:11:16.527] ERROR: [uncaught] Uncaught TypeError: z.phaseManager.getCurrentPhase(...).getFieldIndex is not a function @ https://elite-redux-staging.pages.dev/assets/battle-scene-Kk4Dr9wQ.js:996:18921
+[20:11:17.329] ERROR: [uncaught] Uncaught TypeError: z.phaseManager.getCurrentPhase(...).getFieldIndex is not a function @ https://elite-redux-staging.pages.dev/assets/battle-scene-Kk4Dr9wQ.js:996:18921
+[20:11:17.663] ERROR: [uncaught] Uncaught TypeError: z.phaseManager.getCurrentPhase(...).getFieldIndex is not a function @ https://elite-redux-staging.pages.dev/assets/battle-scene-Kk4Dr9wQ.js:996:18921
+[20:11:18.729] ERROR: [uncaught] Uncaught TypeError: z.phaseManager.getCurrentPhase(...).getPokemon is not a function @ https://elite-redux-staging.pages.dev/assets/battle-scene-Kk4Dr9wQ.js:996:19046
+[20:11:20.294] ERROR: [uncaught] Uncaught TypeError: y.getFieldIndex is not a function @ https://elite-redux-staging.pages.dev/assets/battle-scene-Kk4Dr9wQ.js:1031:24886
+[20:11:20.644] ERROR: [uncaught] Uncaught TypeError: y.handleCommand is not a function @ https://elite-redux-staging.pages.dev/assets/battle-scene-Kk4Dr9wQ.js:1031:24770
+[20:11:20.843] LOG: [coop:webrtc] raw tx role=guest t=stallBeat bytes=35
+[20:11:21.060] ERROR: [uncaught] Uncaught TypeError: y.getFieldIndex is not a function @ https://elite-redux-staging.pages.dev/assets/battle-scene-Kk4Dr9wQ.js:1031:24886
+[20:11:21.827] ERROR: [uncaught] Uncaught TypeError: y.getFieldIndex is not a function @ https://elite-redux-staging.pages.dev/assets/battle-scene-Kk4Dr9wQ.js:1031:24886
+[20:11:23.049] ERROR: [uncaught] Uncaught TypeError: y.getFieldIndex is not a function @ https://elite-redux-staging.pages.dev/assets/battle-scene-Kk4Dr9wQ.js:1031:24886
+[20:11:23.477] ERROR: [uncaught] Uncaught TypeError: y.getFieldIndex is not a function @ https://elite-redux-staging.pages.dev/assets/battle-scene-Kk4Dr9wQ.js:1031:24886
+[20:11:23.610] ERROR: [uncaught] Uncaught TypeError: y.getFieldIndex is not a function @ https://elite-redux-staging.pages.dev/assets/battle-scene-Kk4Dr9wQ.js:1031:24886
+[20:11:24.216] ERROR: [uncaught] Uncaught TypeError: y.getFieldIndex is not a function @ https://elite-redux-staging.pages.dev/assets/battle-scene-Kk4Dr9wQ.js:1031:24886
+[20:11:24.417] ERROR: [uncaught] Uncaught TypeError: y.getFieldIndex is not a function @ https://elite-redux-staging.pages.dev/assets/battle-scene-Kk4Dr9wQ.js:1031:24886
+[20:11:25.727] ERROR: [uncaught] Uncaught TypeError: y.getFieldIndex is not a function @ https://elite-redux-staging.pages.dev/assets/battle-scene-Kk4Dr9wQ.js:1031:24886
+[20:11:25.842] LOG: [coop:webrtc] raw tx role=guest t=stallBeat bytes=35
+[20:11:25.977] ERROR: [uncaught] Uncaught TypeError: y.getFieldIndex is not a function @ https://elite-redux-staging.pages.dev/assets/battle-scene-Kk4Dr9wQ.js:1031:24886
+[20:11:26.144] ERROR: [uncaught] Uncaught TypeError: y.getFieldIndex is not a function @ https://elite-redux-staging.pages.dev/assets/battle-scene-Kk4Dr9wQ.js:1031:24886
+[20:11:26.310] ERROR: [uncaught] Uncaught TypeError: y.getFieldIndex is not a function @ https://elite-redux-staging.pages.dev/assets/battle-scene-Kk4Dr9wQ.js:1031:24886
+[20:11:26.593] ERROR: [uncaught] Uncaught TypeError: y.getFieldIndex is not a function @ https://elite-redux-staging.pages.dev/assets/battle-scene-Kk4Dr9wQ.js:1031:24886
+[20:11:27.168] ERROR: [uncaught] Uncaught TypeError: y.getFieldIndex is not a function @ https://elite-redux-staging.pages.dev/assets/battle-scene-Kk4Dr9wQ.js:1031:24886
+[20:11:27.377] ERROR: [uncaught] Uncaught TypeError: y.getFieldIndex is not a function @ https://elite-redux-staging.pages.dev/assets/battle-scene-Kk4Dr9wQ.js:1031:24886
+[20:11:27.583] ERROR: [uncaught] Uncaught TypeError: y.getFieldIndex is not a function @ https://elite-redux-staging.pages.dev/assets/battle-scene-Kk4Dr9wQ.js:1031:24886
+[20:11:27.710] ERROR: [uncaught] Uncaught TypeError: y.getFieldIndex is not a function @ https://elite-redux-staging.pages.dev/assets/battle-scene-Kk4Dr9wQ.js:1031:24886
+[20:11:28.050] ERROR: [uncaught] Uncaught TypeError: y.getFieldIndex is not a function @ https://elite-redux-staging.pages.dev/assets/battle-scene-Kk4Dr9wQ.js:1031:24886
+[20:11:28.326] ERROR: [uncaught] Uncaught TypeError: y.getFieldIndex is not a function @ https://elite-redux-staging.pages.dev/assets/battle-scene-Kk4Dr9wQ.js:1031:24886
+[20:11:28.496] ERROR: [uncaught] Uncaught TypeError: y.getFieldIndex is not a function @ https://elite-redux-staging.pages.dev/assets/battle-scene-Kk4Dr9wQ.js:1031:24886
+[20:11:28.667] ERROR: [uncaught] Uncaught TypeError: y.getFieldIndex is not a function @ https://elite-redux-staging.pages.dev/assets/battle-scene-Kk4Dr9wQ.js:1031:24886
+[20:11:28.750] ERROR: [uncaught] Uncaught TypeError: y.getFieldIndex is not a function @ https://elite-redux-staging.pages.dev/assets/battle-scene-Kk4Dr9wQ.js:1031:24886
+[20:11:28.877] ERROR: [uncaught] Uncaught TypeError: y.getFieldIndex is not a function @ https://elite-redux-staging.pages.dev/assets/battle-scene-Kk4Dr9wQ.js:1031:24886
+[20:11:28.993] ERROR: [uncaught] Uncaught TypeError: y.getFieldIndex is not a function @ https://elite-redux-staging.pages.dev/assets/battle-scene-Kk4Dr9wQ.js:1031:24886
+[20:11:29.027] ERROR: [uncaught] Uncaught TypeError: y.getFieldIndex is not a function @ https://elite-redux-staging.pages.dev/assets/battle-scene-Kk4Dr9wQ.js:1031:24886
+[20:11:29.750] ERROR: [uncaught] Uncaught TypeError: y.getFieldIndex is not a function @ https://elite-redux-staging.pages.dev/assets/battle-scene-Kk4Dr9wQ.js:1031:24886
+[20:11:30.842] LOG: [coop:webrtc] raw tx role=guest t=stallBeat bytes=35
+[20:11:35.842] LOG: [coop:webrtc] raw tx role=guest t=stallBeat bytes=35
+[20:11:40.842] LOG: [coop:webrtc] raw tx role=guest t=stallBeat bytes=35
+[20:11:45.842] LOG: [coop:interaction] interactionCounter() read -> 23 (role=guest)
+[20:11:45.842] LOG: [coop:health] tick=0g turn=2 wave=21 counter=23 assertions=2 wait=92730ms peerBeat=- transport=connected
+[20:11:45.842] LOG: [coop:webrtc] raw tx role=guest t=stallBeat bytes=35
+[20:11:50.842] LOG: [coop:webrtc] raw tx role=guest t=stallBeat bytes=35
+[20:11:55.842] LOG: [coop:webrtc] raw tx role=guest t=stallBeat bytes=36
+[20:11:57.942] ERROR: [uncaught] Uncaught TypeError: y.getFieldIndex is not a function @ https://elite-redux-staging.pages.dev/assets/battle-scene-Kk4Dr9wQ.js:1031:24886
+[20:11:58.259] ERROR: [uncaught] Uncaught TypeError: y.getFieldIndex is not a function @ https://elite-redux-staging.pages.dev/assets/battle-scene-Kk4Dr9wQ.js:1031:24886
+[20:11:58.676] ERROR: [uncaught] Uncaught TypeError: y.getFieldIndex is not a function @ https://elite-redux-staging.pages.dev/assets/battle-scene-Kk4Dr9wQ.js:1031:24886
+[20:11:58.825] ERROR: [uncaught] Uncaught TypeError: y.getFieldIndex is not a function @ https://elite-redux-staging.pages.dev/assets/battle-scene-Kk4Dr9wQ.js:1031:24886
+[20:12:00.096] ERROR: [uncaught] Uncaught TypeError: y.getFieldIndex is not a function @ https://elite-redux-staging.pages.dev/assets/battle-scene-Kk4Dr9wQ.js:1031:24886
+[20:12:00.276] ERROR: [uncaught] Uncaught TypeError: y.getFieldIndex is not a function @ https://elite-redux-staging.pages.dev/assets/battle-scene-Kk4Dr9wQ.js:1031:24886
+[20:12:00.425] ERROR: [uncaught] Uncaught TypeError: y.getFieldIndex is not a function @ https://elite-redux-staging.pages.dev/assets/battle-scene-Kk4Dr9wQ.js:1031:24886
+[20:12:00.810] ERROR: [uncaught] Uncaught TypeError: y.getFieldIndex is not a function @ https://elite-redux-staging.pages.dev/assets/battle-scene-Kk4Dr9wQ.js:1031:24886
+[20:12:00.841] LOG: [coop:webrtc] raw tx role=guest t=stallBeat bytes=36
+[20:12:01.027] ERROR: [uncaught] Uncaught TypeError: y.getFieldIndex is not a function @ https://elite-redux-staging.pages.dev/assets/battle-scene-Kk4Dr9wQ.js:1031:24886
+[20:12:01.098] ERROR: [uncaught] Uncaught TypeError: y.getFieldIndex is not a function @ https://elite-redux-staging.pages.dev/assets/battle-scene-Kk4Dr9wQ.js:1031:24886
+[20:12:01.243] ERROR: [uncaught] Uncaught TypeError: y.getFieldIndex is not a function @ https://elite-redux-staging.pages.dev/assets/battle-scene-Kk4Dr9wQ.js:1031:24886
+[20:12:01.342] ERROR: [uncaught] Uncaught TypeError: y.getFieldIndex is not a function @ https://elite-redux-staging.pages.dev/assets/battle-scene-Kk4Dr9wQ.js:1031:24886
+[20:12:04.859] ERROR: [uncaught] Uncaught TypeError: y.getFieldIndex is not a function @ https://elite-redux-staging.pages.dev/assets/battle-scene-Kk4Dr9wQ.js:1031:24886
+[20:12:05.143] ERROR: [uncaught] Uncaught TypeError: y.getFieldIndex is not a function @ https://elite-redux-staging.pages.dev/assets/battle-scene-Kk4Dr9wQ.js:1031:24886
+[20:12:05.215] ERROR: [uncaught] Uncaught TypeError: y.getFieldIndex is not a function @ https://elite-redux-staging.pages.dev/assets/battle-scene-Kk4Dr9wQ.js:1031:24886
+[20:12:05.343] ERROR: [uncaught] Uncaught TypeError: y.getFieldIndex is not a function @ https://elite-redux-staging.pages.dev/assets/battle-scene-Kk4Dr9wQ.js:1031:24886
+[20:12:05.441] ERROR: [uncaught] Uncaught TypeError: y.getFieldIndex is not a function @ https://elite-redux-staging.pages.dev/assets/battle-scene-Kk4Dr9wQ.js:1031:24886
+[20:12:05.542] ERROR: [uncaught] Uncaught TypeError: y.getFieldIndex is not a function @ https://elite-redux-staging.pages.dev/assets/battle-scene-Kk4Dr9wQ.js:1031:24886
+[20:12:05.665] ERROR: [uncaught] Uncaught TypeError: y.getFieldIndex is not a function @ https://elite-redux-staging.pages.dev/assets/battle-scene-Kk4Dr9wQ.js:1031:24886
+[20:12:05.831] ERROR: [uncaught] Uncaught TypeError: y.getFieldIndex is not a function @ https://elite-redux-staging.pages.dev/assets/battle-scene-Kk4Dr9wQ.js:1031:24886
+[20:12:05.843] LOG: [coop:webrtc] raw tx role=guest t=stallBeat bytes=36
+[20:12:06.192] ERROR: [uncaught] Uncaught TypeError: y.getFieldIndex is not a function @ https://elite-redux-staging.pages.dev/assets/battle-scene-Kk4Dr9wQ.js:1031:24886
+[20:12:10.841] LOG: [coop:webrtc] raw tx role=guest t=stallBeat bytes=36
+[20:12:15.842] LOG: [coop:webrtc] raw tx role=guest t=stallBeat bytes=36
+[20:12:20.846] LOG: [coop:interaction] interactionCounter() read -> 23 (role=guest)
+[20:12:20.846] LOG: [coop:health] tick=0g turn=2 wave=21 counter=23 assertions=2 wait=127734ms peerBeat=- transport=connected
+[20:12:20.846] LOG: [coop:webrtc] raw tx role=guest t=stallBeat bytes=36
+[20:12:22.758] ERROR: [uncaught] Uncaught TypeError: y.getFieldIndex is not a function @ https://elite-redux-staging.pages.dev/assets/battle-scene-Kk4Dr9wQ.js:1031:24886
+[20:12:24.758] ERROR: [uncaught] Uncaught TypeError: y.handleCommand is not a function @ https://elite-redux-staging.pages.dev/assets/battle-scene-Kk4Dr9wQ.js:1031:24770
+[20:12:24.959] ERROR: [uncaught] Uncaught TypeError: y.handleCommand is not a function @ https://elite-redux-staging.pages.dev/assets/battle-scene-Kk4Dr9wQ.js:1031:24770
+[20:12:25.093] ERROR: [uncaught] Uncaught TypeError: y.handleCommand is not a function @ https://elite-redux-staging.pages.dev/assets/battle-scene-Kk4Dr9wQ.js:1031:24770
+[20:12:25.198] ERROR: [uncaught] Uncaught TypeError: y.getFieldIndex is not a function @ https://elite-redux-staging.pages.dev/assets/battle-scene-Kk4Dr9wQ.js:1031:24886
+[20:12:25.324] ERROR: [uncaught] Uncaught TypeError: y.handleCommand is not a function @ https://elite-redux-staging.pages.dev/assets/battle-scene-Kk4Dr9wQ.js:1031:24770
+[20:12:25.425] ERROR: [uncaught] Uncaught TypeError: y.getFieldIndex is not a function @ https://elite-redux-staging.pages.dev/assets/battle-scene-Kk4Dr9wQ.js:1031:24886
+[20:12:25.543] ERROR: [uncaught] Uncaught TypeError: y.handleCommand is not a function @ https://elite-redux-staging.pages.dev/assets/battle-scene-Kk4Dr9wQ.js:1031:24770
+[20:12:25.647] ERROR: [uncaught] Uncaught TypeError: y.handleCommand is not a function @ https://elite-redux-staging.pages.dev/assets/battle-scene-Kk4Dr9wQ.js:1031:24770
+[20:12:25.791] ERROR: [uncaught] Uncaught TypeError: y.handleCommand is not a function @ https://elite-redux-staging.pages.dev/assets/battle-scene-Kk4Dr9wQ.js:1031:24770
+[20:12:25.844] LOG: [coop:webrtc] raw tx role=guest t=stallBeat bytes=36
+[20:12:25.864] ERROR: [uncaught] Uncaught TypeError: y.getFieldIndex is not a function @ https://elite-redux-staging.pages.dev/assets/battle-scene-Kk4Dr9wQ.js:1031:24886
+[20:12:26.016] ERROR: [uncaught] Uncaught TypeError: y.handleCommand is not a function @ https://elite-redux-staging.pages.dev/assets/battle-scene-Kk4Dr9wQ.js:1031:24770
+[20:12:26.024] ERROR: [uncaught] Uncaught TypeError: y.handleCommand is not a function @ https://elite-redux-staging.pages.dev/assets/battle-scene-Kk4Dr9wQ.js:1031:24770
+[20:12:30.842] LOG: [coop:webrtc] raw tx role=guest t=stallBeat bytes=36
+[20:12:31.714] ERROR: [uncaught] Uncaught TypeError: y.handleCommand is not a function @ https://elite-redux-staging.pages.dev/assets/battle-scene-Kk4Dr9wQ.js:1031:24770
+[20:12:31.897] ERROR: [uncaught] Uncaught TypeError: y.handleCommand is not a function @ https://elite-redux-staging.pages.dev/assets/battle-scene-Kk4Dr9wQ.js:1031:24770
+[20:12:32.724] ERROR: [uncaught] Uncaught TypeError: y.getFieldIndex is not a function @ https://elite-redux-staging.pages.dev/assets/battle-scene-Kk4Dr9wQ.js:1031:24886
+[20:12:34.307] ERROR: [uncaught] Uncaught TypeError: y.getFieldIndex is not a function @ https://elite-redux-staging.pages.dev/assets/battle-scene-Kk4Dr9wQ.js:1031:24886
+[20:12:34.643] ERROR: [uncaught] Uncaught TypeError: y.getFieldIndex is not a function @ https://elite-redux-staging.pages.dev/assets/battle-scene-Kk4Dr9wQ.js:1031:24886
+[20:12:34.840] ERROR: [uncaught] Uncaught TypeError: y.getFieldIndex is not a function @ https://elite-redux-staging.pages.dev/assets/battle-scene-Kk4Dr9wQ.js:1031:24886
+[20:12:34.958] ERROR: [uncaught] Uncaught TypeError: y.getFieldIndex is not a function @ https://elite-redux-staging.pages.dev/assets/battle-scene-Kk4Dr9wQ.js:1031:24886
+[20:12:35.842] LOG: [coop:webrtc] raw tx role=guest t=stallBeat bytes=36
+[20:12:40.856] LOG: [coop:webrtc] raw tx role=guest t=stallBeat bytes=36
+[20:12:42.307] ERROR: [uncaught] Uncaught TypeError: y.handleCommand is not a function @ https://elite-redux-staging.pages.dev/assets/battle-scene-Kk4Dr9wQ.js:1031:24770
+[20:12:42.517] ERROR: [uncaught] Uncaught TypeError: y.handleCommand is not a function @ https://elite-redux-staging.pages.dev/assets/battle-scene-Kk4Dr9wQ.js:1031:24770
+[20:12:42.724] ERROR: [uncaught] Uncaught TypeError: y.handleCommand is not a function @ https://elite-redux-staging.pages.dev/assets/battle-scene-Kk4Dr9wQ.js:1031:24770
+[20:12:42.830] ERROR: [uncaught] Uncaught TypeError: y.getFieldIndex is not a function @ https://elite-redux-staging.pages.dev/assets/battle-scene-Kk4Dr9wQ.js:1031:24886
+[20:12:42.957] ERROR: [uncaught] Uncaught TypeError: y.handleCommand is not a function @ https://elite-redux-staging.pages.dev/assets/battle-scene-Kk4Dr9wQ.js:1031:24770
+[20:12:43.075] ERROR: [uncaught] Uncaught TypeError: y.getFieldIndex is not a function @ https://elite-redux-staging.pages.dev/assets/battle-scene-Kk4Dr9wQ.js:1031:24886
+[20:12:43.160] ERROR: [uncaught] Uncaught TypeError: y.handleCommand is not a function @ https://elite-redux-staging.pages.dev/assets/battle-scene-Kk4Dr9wQ.js:1031:24770
+[20:12:44.007] ERROR: [uncaught] Uncaught TypeError: y.getFieldIndex is not a function @ https://elite-redux-staging.pages.dev/assets/battle-scene-Kk4Dr9wQ.js:1031:24886
+[20:12:44.207] ERROR: [uncaught] Uncaught TypeError: y.getFieldIndex is not a function @ https://elite-redux-staging.pages.dev/assets/battle-scene-Kk4Dr9wQ.js:1031:24886
+[20:12:44.957] ERROR: [uncaught] Uncaught TypeError: y.getFieldIndex is not a function @ https://elite-redux-staging.pages.dev/assets/battle-scene-Kk4Dr9wQ.js:1031:24886
+[20:12:45.242] ERROR: [uncaught] Uncaught TypeError: y.getFieldIndex is not a function @ https://elite-redux-staging.pages.dev/assets/battle-scene-Kk4Dr9wQ.js:1031:24886
+[20:12:45.430] ERROR: [uncaught] Uncaught TypeError: y.getFieldIndex is not a function @ https://elite-redux-staging.pages.dev/assets/battle-scene-Kk4Dr9wQ.js:1031:24886
+[20:12:45.606] ERROR: [uncaught] Uncaught TypeError: y.getFieldIndex is not a function @ https://elite-redux-staging.pages.dev/assets/battle-scene-Kk4Dr9wQ.js:1031:24886
+[20:12:45.807] ERROR: [uncaught] Uncaught TypeError: y.getFieldIndex is not a function @ https://elite-redux-staging.pages.dev/assets/battle-scene-Kk4Dr9wQ.js:1031:24886
+[20:12:45.846] LOG: [coop:webrtc] raw tx role=guest t=stallBeat bytes=36
+[20:12:46.007] ERROR: [uncaught] Uncaught TypeError: y.getFieldIndex is not a function @ https://elite-redux-staging.pages.dev/assets/battle-scene-Kk4Dr9wQ.js:1031:24886
+[20:12:46.730] ERROR: [uncaught] Uncaught TypeError: y.getFieldIndex is not a function @ https://elite-redux-staging.pages.dev/assets/battle-scene-Kk4Dr9wQ.js:1031:24886
+[20:12:46.929] ERROR: [uncaught] Uncaught TypeError: y.getFieldIndex is not a function @ https://elite-redux-staging.pages.dev/assets/battle-scene-Kk4Dr9wQ.js:1031:24886
+[20:12:47.097] ERROR: [uncaught] Uncaught TypeError: y.getFieldIndex is not a function @ https://elite-redux-staging.pages.dev/assets/battle-scene-Kk4Dr9wQ.js:1031:24886
+[20:12:47.243] ERROR: [uncaught] Uncaught TypeError: y.getFieldIndex is not a function @ https://elite-redux-staging.pages.dev/assets/battle-scene-Kk4Dr9wQ.js:1031:24886
+[20:12:47.407] ERROR: [uncaught] Uncaught TypeError: y.getFieldIndex is not a function @ https://elite-redux-staging.pages.dev/assets/battle-scene-Kk4Dr9wQ.js:1031:24886
+[20:12:47.575] ERROR: [uncaught] Uncaught TypeError: y.getFieldIndex is not a function @ https://elite-redux-staging.pages.dev/assets/battle-scene-Kk4Dr9wQ.js:1031:24886
+[20:12:50.841] LOG: [coop:webrtc] raw tx role=guest t=stallBeat bytes=36
+[20:12:55.841] LOG: [coop:interaction] interactionCounter() read -> 23 (role=guest)
+[20:12:55.842] LOG: [coop:health] tick=0g turn=2 wave=21 counter=23 assertions=2 wait=162729ms peerBeat=- transport=connected
+[20:12:55.842] LOG: [coop:webrtc] raw tx role=guest t=stallBeat bytes=36
+[20:13:00.842] LOG: [coop:webrtc] raw tx role=guest t=stallBeat bytes=36
+[20:13:05.844] LOG: [coop:webrtc] raw tx role=guest t=stallBeat bytes=36
+[20:13:10.842] LOG: [coop:webrtc] raw tx role=guest t=stallBeat bytes=36
+[20:13:15.855] LOG: [coop:webrtc] raw tx role=guest t=stallBeat bytes=36
+[20:13:20.855] LOG: [coop:webrtc] raw tx role=guest t=stallBeat bytes=36
+[20:13:25.845] LOG: [coop:interaction] interactionCounter() read -> 23 (role=guest)
+[20:13:25.845] LOG: [coop:health] tick=0g turn=2 wave=21 counter=23 assertions=2 wait=192733ms peerBeat=- transport=connected
+[20:13:25.845] LOG: [coop:webrtc] raw tx role=guest t=stallBeat bytes=36
+[20:13:30.854] LOG: [coop:webrtc] raw tx role=guest t=stallBeat bytes=36
+[20:13:35.844] LOG: [coop:webrtc] raw tx role=guest t=stallBeat bytes=36
+[20:13:40.844] LOG: [coop:webrtc] raw tx role=guest t=stallBeat bytes=36
+[20:13:45.871] LOG: [coop:webrtc] raw tx role=guest t=stallBeat bytes=36
+[20:13:50.843] LOG: [coop:webrtc] raw tx role=guest t=stallBeat bytes=36
+[20:13:55.854] LOG: [coop:interaction] interactionCounter() read -> 23 (role=guest)
+[20:13:55.854] LOG: [coop:health] tick=0g turn=2 wave=21 counter=23 assertions=2 wait=222742ms peerBeat=- transport=connected
+[20:13:55.854] LOG: [coop:webrtc] raw tx role=guest t=stallBeat bytes=36
+[20:14:00.211] ERROR: [uncaught] Uncaught TypeError: y.handleCommand is not a function @ https://elite-redux-staging.pages.dev/assets/battle-scene-Kk4Dr9wQ.js:1031:24770
+[20:14:00.355] ERROR: [uncaught] Uncaught TypeError: y.getFieldIndex is not a function @ https://elite-redux-staging.pages.dev/assets/battle-scene-Kk4Dr9wQ.js:1031:24886
+[20:14:00.471] ERROR: [uncaught] Uncaught TypeError: y.handleCommand is not a function @ https://elite-redux-staging.pages.dev/assets/battle-scene-Kk4Dr9wQ.js:1031:24770
+[20:14:00.577] ERROR: [uncaught] Uncaught TypeError: y.getFieldIndex is not a function @ https://elite-redux-staging.pages.dev/assets/battle-scene-Kk4Dr9wQ.js:1031:24886
+[20:14:00.710] ERROR: [uncaught] Uncaught TypeError: y.handleCommand is not a function @ https://elite-redux-staging.pages.dev/assets/battle-scene-Kk4Dr9wQ.js:1031:24770
+[20:14:00.837] ERROR: [uncaught] Uncaught TypeError: y.getFieldIndex is not a function @ https://elite-redux-staging.pages.dev/assets/battle-scene-Kk4Dr9wQ.js:1031:24886
+[20:14:00.854] LOG: [coop:webrtc] raw tx role=guest t=stallBeat bytes=36
+[20:14:00.965] ERROR: [uncaught] Uncaught TypeError: y.handleCommand is not a function @ https://elite-redux-staging.pages.dev/assets/battle-scene-Kk4Dr9wQ.js:1031:24770
+[20:14:01.110] ERROR: [uncaught] Uncaught TypeError: y.getFieldIndex is not a function @ https://elite-redux-staging.pages.dev/assets/battle-scene-Kk4Dr9wQ.js:1031:24886
+[20:14:01.237] ERROR: [uncaught] Uncaught TypeError: y.handleCommand is not a function @ https://elite-redux-staging.pages.dev/assets/battle-scene-Kk4Dr9wQ.js:1031:24770
+[20:14:01.338] ERROR: [uncaught] Uncaught TypeError: y.getFieldIndex is not a function @ https://elite-redux-staging.pages.dev/assets/battle-scene-Kk4Dr9wQ.js:1031:24886
+[20:14:01.471] ERROR: [uncaught] Uncaught TypeError: y.handleCommand is not a function @ https://elite-redux-staging.pages.dev/assets/battle-scene-Kk4Dr9wQ.js:1031:24770
+[20:14:01.571] ERROR: [uncaught] Uncaught TypeError: y.getFieldIndex is not a function @ https://elite-redux-staging.pages.dev/assets/battle-scene-Kk4Dr9wQ.js:1031:24886
+[20:14:01.687] ERROR: [uncaught] Uncaught TypeError: y.handleCommand is not a function @ https://elite-redux-staging.pages.dev/assets/battle-scene-Kk4Dr9wQ.js:1031:24770
+[20:14:01.794] ERROR: [uncaught] Uncaught TypeError: y.getFieldIndex is not a function @ https://elite-redux-staging.pages.dev/assets/battle-scene-Kk4Dr9wQ.js:1031:24886
+[20:14:01.894] ERROR: [uncaught] Uncaught TypeError: y.handleCommand is not a function @ https://elite-redux-staging.pages.dev/assets/battle-scene-Kk4Dr9wQ.js:1031:24770
+[20:14:02.010] ERROR: [uncaught] Uncaught TypeError: y.getFieldIndex is not a function @ https://elite-redux-staging.pages.dev/assets/battle-scene-Kk4Dr9wQ.js:1031:24886
+[20:14:02.129] ERROR: [uncaught] Uncaught TypeError: y.handleCommand is not a function @ https://elite-redux-staging.pages.dev/assets/battle-scene-Kk4Dr9wQ.js:1031:24770
+[20:14:02.238] ERROR: [uncaught] Uncaught TypeError: y.getFieldIndex is not a function @ https://elite-redux-staging.pages.dev/assets/battle-scene-Kk4Dr9wQ.js:1031:24886
+[20:14:02.388] ERROR: [uncaught] Uncaught TypeError: y.handleCommand is not a function @ https://elite-redux-staging.pages.dev/assets/battle-scene-Kk4Dr9wQ.js:1031:24770
+[20:14:02.471] ERROR: [uncaught] Uncaught TypeError: y.getFieldIndex is not a function @ https://elite-redux-staging.pages.dev/assets/battle-scene-Kk4Dr9wQ.js:1031:24886
+[20:14:02.621] ERROR: [uncaught] Uncaught TypeError: y.handleCommand is not a function @ https://elite-redux-staging.pages.dev/assets/battle-scene-Kk4Dr9wQ.js:1031:24770
+[20:14:02.710] ERROR: [uncaught] Uncaught TypeError: y.getFieldIndex is not a function @ https://elite-redux-staging.pages.dev/assets/battle-scene-Kk4Dr9wQ.js:1031:24886
+[20:14:02.854] ERROR: [uncaught] Uncaught TypeError: y.handleCommand is not a function @ https://elite-redux-staging.pages.dev/assets/battle-scene-Kk4Dr9wQ.js:1031:24770
+[20:14:02.961] ERROR: [uncaught] Uncaught TypeError: y.getFieldIndex is not a function @ https://elite-redux-staging.pages.dev/assets/battle-scene-Kk4Dr9wQ.js:1031:24886
+[20:14:03.075] ERROR: [uncaught] Uncaught TypeError: y.handleCommand is not a function @ https://elite-redux-staging.pages.dev/assets/battle-scene-Kk4Dr9wQ.js:1031:24770
+[20:14:03.176] ERROR: [uncaught] Uncaught TypeError: y.getFieldIndex is not a function @ https://elite-redux-staging.pages.dev/assets/battle-scene-Kk4Dr9wQ.js:1031:24886
+[20:14:03.302] ERROR: [uncaught] Uncaught TypeError: y.handleCommand is not a function @ https://elite-redux-staging.pages.dev/assets/battle-scene-Kk4Dr9wQ.js:1031:24770
+[20:14:03.404] ERROR: [uncaught] Uncaught TypeError: y.getFieldIndex is not a function @ https://elite-redux-staging.pages.dev/assets/battle-scene-Kk4Dr9wQ.js:1031:24886
+[20:14:03.527] ERROR: [uncaught] Uncaught TypeError: y.handleCommand is not a function @ https://elite-redux-staging.pages.dev/assets/battle-scene-Kk4Dr9wQ.js:1031:24770
+[20:14:03.638] ERROR: [uncaught] Uncaught TypeError: y.getFieldIndex is not a function @ https://elite-redux-staging.pages.dev/assets/battle-scene-Kk4Dr9wQ.js:1031:24886
+[20:14:03.770] ERROR: [uncaught] Uncaught TypeError: y.handleCommand is not a function @ https://elite-redux-staging.pages.dev/assets/battle-scene-Kk4Dr9wQ.js:1031:24770
+[20:14:03.921] ERROR: [uncaught] Uncaught TypeError: y.getFieldIndex is not a function @ https://elite-redux-staging.pages.dev/assets/battle-scene-Kk4Dr9wQ.js:1031:24886
+[20:14:04.070] ERROR: [uncaught] Uncaught TypeError: y.handleCommand is not a function @ https://elite-redux-staging.pages.dev/assets/battle-scene-Kk4Dr9wQ.js:1031:24770
+[20:14:05.854] LOG: [coop:webrtc] raw tx role=guest t=stallBeat bytes=36
+[20:14:10.844] LOG: [coop:webrtc] raw tx role=guest t=stallBeat bytes=36
+[20:14:15.874] LOG: [coop:webrtc] raw tx role=guest t=stallBeat bytes=36
+[20:14:20.854] LOG: [coop:webrtc] raw tx role=guest t=stallBeat bytes=36
+[20:14:21.316] ERROR: [uncaught] Uncaught TypeError: y.getFieldIndex is not a function @ https://elite-redux-staging.pages.dev/assets/battle-scene-Kk4Dr9wQ.js:1031:24886
+[20:14:25.842] LOG: [coop:webrtc] raw tx role=guest t=stallBeat bytes=36
+[20:14:30.842] LOG: [coop:interaction] interactionCounter() read -> 23 (role=guest)
+[20:14:30.842] LOG: [coop:health] tick=0g turn=2 wave=21 counter=23 assertions=2 wait=257730ms peerBeat=- transport=connected
+[20:14:30.842] LOG: [coop:webrtc] raw tx role=guest t=stallBeat bytes=36
+[20:14:35.851] LOG: [coop:webrtc] raw tx role=guest t=stallBeat bytes=36
+[20:14:40.853] LOG: [coop:webrtc] raw tx role=guest t=stallBeat bytes=36
+[20:14:45.856] LOG: [coop:webrtc] raw tx role=guest t=stallBeat bytes=36
+[20:14:50.852] LOG: [coop:webrtc] raw tx role=guest t=stallBeat bytes=36
+[20:14:55.841] LOG: [coop:webrtc] raw tx role=guest t=stallBeat bytes=36
+[20:15:00.851] LOG: [coop:interaction] interactionCounter() read -> 23 (role=guest)
+[20:15:00.851] LOG: [coop:health] tick=0g turn=2 wave=21 counter=23 assertions=2 wait=287739ms peerBeat=- transport=connected
+[20:15:00.851] LOG: [coop:webrtc] raw tx role=guest t=stallBeat bytes=36
+[20:15:05.851] LOG: [coop:webrtc] raw tx role=guest t=stallBeat bytes=36
+[20:15:10.842] LOG: [coop:webrtc] raw tx role=guest t=stallBeat bytes=36
+[20:15:15.850] LOG: [coop:webrtc] raw tx role=guest t=stallBeat bytes=36
+[20:15:16.486] ERROR: [uncaught] Uncaught TypeError: y.getFieldIndex is not a function @ https://elite-redux-staging.pages.dev/assets/battle-scene-Kk4Dr9wQ.js:1031:24886
+[20:15:20.850] LOG: [coop:webrtc] raw tx role=guest t=stallBeat bytes=36
+[20:15:25.850] LOG: [coop:webrtc] raw tx role=guest t=stallBeat bytes=36
+[20:15:30.850] LOG: [coop:webrtc] raw tx role=guest t=stallBeat bytes=36
+[20:15:35.850] LOG: [coop:interaction] interactionCounter() read -> 23 (role=guest)
+[20:15:35.850] LOG: [coop:health] tick=0g turn=2 wave=21 counter=23 assertions=2 wait=322738ms peerBeat=- transport=connected
+[20:15:35.850] LOG: [coop:webrtc] raw tx role=guest t=stallBeat bytes=36
+[20:15:36.990] ERROR: [uncaught] Uncaught TypeError: y.getFieldIndex is not a function @ https://elite-redux-staging.pages.dev/assets/battle-scene-Kk4Dr9wQ.js:1031:24886
+[20:15:37.236] ERROR: [uncaught] Uncaught TypeError: y.getFieldIndex is not a function @ https://elite-redux-staging.pages.dev/assets/battle-scene-Kk4Dr9wQ.js:1031:24886
+[20:15:37.439] ERROR: [uncaught] Uncaught TypeError: y.getFieldIndex is not a function @ https://elite-redux-staging.pages.dev/assets/battle-scene-Kk4Dr9wQ.js:1031:24886
+[20:15:37.672] ERROR: [uncaught] Uncaught TypeError: y.getFieldIndex is not a function @ https://elite-redux-staging.pages.dev/assets/battle-scene-Kk4Dr9wQ.js:1031:24886
+[20:15:40.849] LOG: [coop:webrtc] raw tx role=guest t=stallBeat bytes=36
+[20:15:45.849] LOG: [coop:webrtc] raw tx role=guest t=stallBeat bytes=36
+[20:15:50.850] LOG: [coop:webrtc] raw tx role=guest t=stallBeat bytes=36
