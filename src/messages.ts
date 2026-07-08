@@ -25,7 +25,10 @@ export function getPokemonNameWithAffix(pokemon: Pokemon | undefined, useIllusio
   }
 
   // Even though the final boss is a "wild"/"trainerless" Pokemon, it uses "Foe" instead of "Wild"
-  const useFoePrefix = globalScene.currentBattle.isClassicFinalBoss || pokemon.hasTrainer();
+  // Null-safe (showdown guest boot 2026-07-08): enemy mons are reconstructed from the host's
+  // launch snapshot BEFORE any battle exists (initSessionFromData -> toPokemon -> initBattleInfo
+  // -> flyout -> here), so `currentBattle` can legitimately be null at name-resolution time.
+  const useFoePrefix = globalScene.currentBattle?.isClassicFinalBoss || pokemon.hasTrainer();
   const i18nkey = useFoePrefix ? "battle:foePokemonWithAffix" : "battle:wildPokemonWithAffix";
   return i18next.t(i18nkey, { pokemonName });
 }
