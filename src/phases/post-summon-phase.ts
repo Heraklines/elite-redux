@@ -2,6 +2,7 @@ import { applyAbAttrs } from "#abilities/apply-ab-attrs";
 import { globalScene } from "#app/global-scene";
 import { EntryHazardTag } from "#data/arena-tag";
 import { MysteryEncounterPostSummonTag } from "#data/battler-tags";
+import { isShowdownGuestFlipGated } from "#data/elite-redux/coop/coop-authoritative-gate";
 import { getErBiomeRule } from "#data/elite-redux/er-biome-rules";
 import { erApplyCursedIdol } from "#data/elite-redux/er-relics";
 import { erApplyTerrainSeeds } from "#data/elite-redux/er-terrain-seeds";
@@ -20,6 +21,18 @@ export class PostSummonPhase extends PokemonPhase {
 
   start() {
     super.start();
+
+    // SHOWDOWN versus GUEST (2026-07-08 turn-1/switch-in summon desync): the pure-renderer versus guest
+    // boots from the host's launch snapshot and runs its OWN summon chain, so it would DERIVE each lead's
+    // on-entry effects here (entry hazards, ER biome Spd-drop / entry-status - the latter RNG-driven via
+    // randBattleSeedInt, terrain seeds, cursed idol). None of that is authoritative on the guest; it renders
+    // the host's streamed post-summon + adopts the authoritative checkpoint instead. Skip the derivation
+    // entirely (the mon is already placed on field by SummonPhase; only effects live here). Versus-guest
+    // ONLY (isShowdownGuestFlip), so CO-OP / solo / host are byte-for-byte unaffected.
+    if (isShowdownGuestFlipGated()) {
+      this.end();
+      return;
+    }
 
     const pokemon = this.getPokemon();
     console.log("Ran PSP for:", pokemon.name);
