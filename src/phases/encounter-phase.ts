@@ -984,6 +984,27 @@ export class EncounterPhase extends BattlePhase {
       // `isOnField` guard keeps it idempotent for any slot already present (e.g. a restored double).
       const playerCapacity = globalScene.currentBattle.arrangement.playerCapacity;
       const party = globalScene.getPlayerParty();
+      // Showdown versus GUEST (F1 root fix 2026-07-08): the "lead is already restored" assumption
+      // holds for a mid-run save RESUME, but the versus launch snapshot is taken PRE-SUMMON -
+      // nobody is on field in the session, so the guest's own lead was NEVER summoned. Every
+      // downstream crash of the launch chain (speed-order sort, sparkle, the post-summon ability
+      // queue's getField()[bi] round-trip) was this one hole: an empty player side. Give the lead
+      // a REAL SummonPhase - pushed BEFORE the InitEncounterPhase push below, so the order matches
+      // the host exactly (enemy trainer sends out first, then the player, then post-summons).
+      if (
+        isVersusSession()
+        && getCoopController()?.role === "guest"
+        && party[0] != null
+        && !party[0].isFainted()
+        && !party[0].isOnField()
+      ) {
+        globalScene.phaseManager.pushNew("SummonPhase", 0);
+        // Mirror the fresh-launch path: a singles lead is re-centered by the position toggle
+        // (without it the summoned mon sits at the doubles-left slot - the "wrong spot").
+        if (playerCapacity === 1) {
+          globalScene.phaseManager.pushNew("ToggleDoublePositionPhase", false);
+        }
+      }
       for (let i = 1; i < playerCapacity && i < party.length; i++) {
         const pokemon = party[i];
         if (!pokemon || pokemon.isFainted() || pokemon.isOnField()) {
