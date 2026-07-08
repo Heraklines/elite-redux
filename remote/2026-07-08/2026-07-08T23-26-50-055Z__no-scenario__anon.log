@@ -1,0 +1,44 @@
+url:      https://elite-redux-staging.pages.dev/
+build:    mrc9a598-g33b
+mode:     4  wave:14
+seed:     0XyObFBq7hXjSsdv9xMD0yfC
+party:    Phione(L12 48hp f0), Swablu Redux(L12 36hp f0), Mantyke(L11 34hp f0), Chinchou(L8 32hp f0), Finneon(L7 26hp f0), Clobbopus(L9 30hp f0)
+enemy:    
+
+----- COMMENT -----
+Checking Prinplups pokedex after getting one in run crashes game
+
+----- CONSOLE -----
+[23:25:48.799] LOG: %c %c %c %c %c Phaser v3.90.0 (WebGL | Web Audio) %c https://phaser.io/v390 background: #ff0000 background: #ffff00 background: #00ff00 background: #00ffff color: #ffffff; background: #000000 background: transparent
+[23:25:49.165] LOG: [ER] build mrc9a598-g33b
+[23:25:49.273] LOG: [dev-tools] loaded — 476 scenarios + Send Logs button
+[23:25:54.594] DEBUG: Destroying loading scene
+[23:25:54.594] DEBUG: Destroyed loading scene
+[23:25:54.651] LOG: Seed: oaWe1u2mO8vrgFT3oMlXkEpP
+[23:25:54.651] LOG: Wave Seed: oaWe1u2mO8vrgFT3oMlXkEpP 0
+[23:25:56.613] LOG: %cStart Phase LoginPhase color:green;
+[23:25:56.952] LOG: Client Session: 5kwv7CgOwnf7ju1NSeLYq8g4T8RfHhhS
+[23:25:57.347] DEBUG: Using cached system data
+[23:25:57.427] LOG: %cStart Phase TitlePhase color:green;
+[23:25:57.428] LOG: Getting Session Slot id: %d 2
+[23:25:57.445] LOG: use seasonal splash messages true
+[23:26:02.441] LOG: Getting Session Slot id: %d 0
+[23:26:02.446] LOG: Getting Session Slot id: %d 1
+[23:26:02.450] LOG: Getting Session Slot id: %d 2
+[23:26:02.453] LOG: Getting Session Slot id: %d 3
+[23:26:02.457] LOG: Getting Session Slot id: %d 4
+[23:26:02.623] LOG: Getting Session Slot id: %d 2
+[23:26:04.974] LOG: Getting Session Slot id: %d 2
+[23:26:04.978] LOG: Wave Seed: 0XyObFBq7hXjSsdv9xMD0yfC 0
+[23:26:04.979] LOG: Seed: 0XyObFBq7hXjSsdv9xMD0yfC
+[23:26:05.001] LOG: Wave Seed: >f]pTPEvfxarG[R>tQ 14
+[23:26:05.055] LOG: %cStart Phase EncounterPhase color:green;
+[23:26:13.797] WARN: [asset-retry] load error key=PRAS-Dragon Dance BG - retry 1/2 with cache-buster
+[23:26:13.861] WARN: [asset-retry] load error key=PRAS-Dragon Dance BG - retry 2/2 via fastly mirror + cache-buster
+[23:26:15.591] ERROR: [asset-retry] PERMANENT load failure key=PRAS-Dragon Dance BG url=images/battle_anims/PRAS-Dragon Dance BG.png
+[23:26:15.595] LOG: Wave Seed: >f]pTPEvfxarG[R>tQ 14
+[23:26:17.307] LOG: %cStart Phase MysteryEncounterPhase color:green;
+[23:26:18.985] LOG: %cStart Phase MysteryEncounterOptionSelectedPhase color:green;
+[23:26:20.409] LOG: [coop:account] account-write scope OPEN (me-catch) depth=1
+[23:26:21.763] WARN: cry/393 not found
+[23:26:23.202] ERROR: [uncaught] Uncaught TypeError: Cannot create property 'form' on number '0' @ https://elite-redux-staging.pages.dev/assets/battle-scene-Kk4Dr9wQ.js:1004:9586
