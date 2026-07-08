@@ -17,6 +17,7 @@ import {
   getCoopController,
   getCoopNetcodeMode,
   isAuthoritativeBattleSession,
+  isVersusSession,
   maybeBeginReplayRecording,
 } from "#data/elite-redux/coop/coop-runtime";
 import type { CoopSerializedEnemy } from "#data/elite-redux/coop/coop-transport";
@@ -161,10 +162,11 @@ export class EncounterPhase extends BattlePhase {
 
   /** Whether THIS client must wait for + adopt the host's enemy party (co-op GUEST only). */
   private shouldAdoptCoopEnemyParty(): boolean {
-    // Showdown-versus (C5): the guest is a pure renderer here too - it adopts the host's streamed
-    // party (its OWN team, enemy-side in host-order) instead of rolling its own. isAuthoritative-
-    // BattleSession covers co-op OR showdown; solo/host fall through unchanged.
-    if (this.loaded || !isAuthoritativeBattleSession()) {
+    // Showdown-versus (F1, 2026-07-08): the versus guest NEVER adopts - its whole world (both
+    // parties, side-SWAPPED to its local orientation) comes from the launch snapshot; the
+    // enemyPartySync payload is authoritative-oriented (the guest's OWN team) and adopting it
+    // would overwrite the swapped enemy side with the wrong party (the double-launch bug).
+    if (this.loaded || !isAuthoritativeBattleSession() || isVersusSession()) {
       return false;
     }
     const controller = getCoopController();

@@ -940,7 +940,16 @@ export class TitlePhase extends Phase {
       globalScene.playBgm();
     }
 
-    globalScene.phaseManager.pushNew("EncounterPhase", this.loaded);
+    // Showdown 1v1 (staging fix 2026-07-08): the versus GUEST's battle launches ONLY from the
+    // post-wager snapshot boot (tryCoopGuestSnapshotBoot pushes its own LOADED EncounterPhase).
+    // The standard new-run EncounterPhase queued here ran FIRST as an UNLOADED encounter -
+    // adopting the UNSWAPPED coop enemy payload and generating a second world on top of the
+    // swapped snapshot (the log-confirmed double-launch: two EncounterPhases, three summons,
+    // dangling queue entries). The HOST keeps this phase - its initBattle feeds it.
+    const isVersusGuestLaunch = this.gameMode === GameModes.SHOWDOWN && getCoopController()?.role === "guest";
+    if (!isVersusGuestLaunch) {
+      globalScene.phaseManager.pushNew("EncounterPhase", this.loaded);
+    }
 
     // RESUME: a saved LLM Director run rehydrates llmDirectorState (bible,
     // beat history, factionRep, alignment, flags) but the runtime queue's
