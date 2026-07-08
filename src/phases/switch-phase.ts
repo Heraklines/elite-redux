@@ -6,6 +6,7 @@ import {
   getCoopController,
   getCoopInteractionRelay,
   getCoopNetcodeMode,
+  isVersusSession,
 } from "#data/elite-redux/coop/coop-runtime";
 import { COOP_SWITCH_CHOICE_KINDS } from "#data/elite-redux/coop/coop-seq-registry";
 import { coopSwitchBlocksMonForOwner } from "#data/elite-redux/coop/coop-session";
@@ -241,11 +242,26 @@ export class SwitchPhase extends BattlePhase {
         if (slotIndex >= globalScene.currentBattle.getBattlerCount() && slotIndex < 6) {
           const switchType = option === PartyOption.PASS_BATON ? SwitchType.BATON_PASS : this.switchType;
           globalScene.phaseManager.unshiftNew("SwitchSummonPhase", switchType, fieldIndex, slotIndex, this.doReturn);
+          this.maybePushVersusHostReplacementCheckpoint();
         }
         globalScene.ui.setMode(UiMode.MESSAGE).then(() => super.end());
       },
       PartyUiHandler.FilterNonFainted,
     );
+  }
+
+  /**
+   * Showdown 1v1: the versus HOST's OWN faint rides the vanilla picker (gameMode.isCoop is false), so it
+   * skips the co-op owner path's #836 out-of-band replacement checkpoint. Push it here so the GUEST
+   * materializes the host's replacement on its OPPONENT field + mirrors the party-array reorder
+   * IMMEDIATELY, exactly as the co-op host-owned faint does - otherwise the guest keeps rendering the
+   * fainted lead until the next turn resolution. Host-only (the pure-renderer guest never reaches its own
+   * SwitchPhase); the checkpoint phase is host-role-gated + a no-op besides. Solo / co-op never enter here.
+   */
+  private maybePushVersusHostReplacementCheckpoint(): void {
+    if (isVersusSession() && getCoopController()?.role === "host") {
+      globalScene.phaseManager.unshiftNew("CoopPushReplacementCheckpointPhase");
+    }
   }
 
   /**

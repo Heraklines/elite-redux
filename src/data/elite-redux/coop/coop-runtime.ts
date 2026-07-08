@@ -1886,7 +1886,10 @@ export function assembleCoopRuntime(
   controller.setSessionKind(opts.kind ?? "coop");
   const battleSync = new CoopBattleSync(transport);
   const battleStream = new CoopBattleStreamer(transport);
-  const interactionRelay = new CoopInteractionRelay(transport);
+  // Showdown 1v1: the interaction relay disables its #829 seat-map forged-switch check in versus (the
+  // guest legitimately relays faint-replacement picks for the host's enemy side). Live predicate so the
+  // guest - whose kind flips "coop" -> "versus" only on runConfig receipt - is correct after adoption.
+  const interactionRelay = new CoopInteractionRelay(transport, { isVersus: () => controller.isVersusSession() });
   const uiMirror = new CoopUiMirror(transport);
   const mePump = new CoopMePump(interactionRelay);
   const rendezvous = new CoopRendezvous(transport);

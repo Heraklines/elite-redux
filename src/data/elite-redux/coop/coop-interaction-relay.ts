@@ -96,6 +96,17 @@ export interface CoopInteractionRelayOptions {
   timeoutMs?: number;
   /** Timer injection (tests). Returns a cancel fn. Defaults to setTimeout/clearTimeout. */
   schedule?: (cb: () => void, ms: number) => () => void;
+  /**
+   * Showdown 1v1 (versus faint-replacement): live predicate for "this is a VERSUS session". The
+   * #829 forged-cross-owner-switch check keys off the fixed 2-player CO-OP seat map (slot 0 -> host,
+   * slot 1 -> guest), which does NOT hold in versus - there the guest owns the WHOLE enemy side and
+   * legitimately relays faint-replacement picks for the host's enemy field slots (whose seat-map owner
+   * is "host"). So in versus the seat-map forgery check is disabled (the picks are validated for
+   * legality by the awaiting host phase instead). Injected as a predicate so the relay stays
+   * engine-free (the runtime wires `() => controller.isVersusSession()`, live-correct even for the
+   * guest, whose kind flips from "coop" to "versus" only on `runConfig` receipt). Defaults to co-op.
+   */
+  isVersus?: () => boolean;
 }
 
 // The owner is a human shopping / reading an ME, so the watcher's wait must comfortably
@@ -192,6 +203,7 @@ export class CoopInteractionRelay {
   private readonly transport: CoopTransport;
   private readonly timeoutMs: number;
   private readonly schedule: (cb: () => void, ms: number) => () => void;
+  private readonly isVersus: () => boolean;
   private readonly offMessage: () => void;
 
   /** seq -> FIFO queue of choices that arrived before their waiter. */
@@ -227,6 +239,7 @@ export class CoopInteractionRelay {
     this.transport = transport;
     this.timeoutMs = opts.timeoutMs ?? DEFAULT_TIMEOUT_MS;
     this.schedule = opts.schedule ?? defaultSchedule;
+    this.isVersus = opts.isVersus ?? (() => false);
     this.offMessage = transport.onMessage(msg => this.handle(msg));
   }
 
@@ -679,6 +692,12 @@ export class CoopInteractionRelay {
   private isForgedCrossOwnerSwitch(seq: number, choice: number): boolean {
     const faintSwitchSlot = seq - COOP_FAINT_SWITCH_SEQ_BASE;
     if (faintSwitchSlot < 0 || faintSwitchSlot >= COOP_FAINT_SWITCH_SLOT_COUNT) {
+      return false;
+    }
+    // Showdown 1v1: the fixed 2-player seat map does not hold - the guest owns the WHOLE enemy side and
+    // relays faint-replacement picks for the host's enemy field slots (seat-map owner "host"). Disable
+    // the seat-map forgery check here; the awaiting host phase validates the pick's legality instead.
+    if (this.isVersus()) {
       return false;
     }
     const slotOwner = coopOwnerOfFieldIndex(faintSwitchSlot);

@@ -3,6 +3,7 @@ import { globalScene } from "#app/global-scene";
 import { getPokemonNameWithAffix } from "#app/messages";
 import { allMoves } from "#data/data-lists";
 import { classicFinalBossDialogue } from "#data/dialogue";
+import { getCoopController, isVersusSession } from "#data/elite-redux/coop/coop-runtime";
 import { isCoopRecording, withCoopMessageRecordingSuppressed } from "#data/elite-redux/coop/coop-turn-recorder";
 import {
   erRecordAchievementEnemyFaint,
@@ -247,7 +248,17 @@ export class FaintPhase extends PokemonPhase {
                 && (!globalScene.currentBattle.double || p.trainerSlot === (pokemon as EnemyPokemon).trainerSlot),
             ).length > 0;
         if (hasReservePartyMember) {
-          globalScene.phaseManager.pushNew("SwitchSummonPhase", SwitchType.SWITCH, this.fieldIndex, -1, false, false);
+          // Showdown 1v1 (versus faint-replacement): the enemy side is the remote human GUEST's own
+          // team, so the HOST must AWAIT the guest's relayed replacement pick instead of AI auto-picking
+          // (the guest's renderer opens its own faint picker off this streamed faint and relays the
+          // choice). The dedicated phase awaits that pick, validates it, summons it, and AI-falls-back on
+          // a timeout/illegal pick so the duel never stalls. A co-op host (its enemy is AI) or any
+          // non-versus trainer keeps the vanilla inline auto-pick below.
+          if (isVersusSession() && getCoopController()?.role === "host") {
+            globalScene.phaseManager.pushNew("ShowdownEnemyFaintSwitchPhase", this.fieldIndex);
+          } else {
+            globalScene.phaseManager.pushNew("SwitchSummonPhase", SwitchType.SWITCH, this.fieldIndex, -1, false, false);
+          }
           willSwitchIn = true;
         }
       }

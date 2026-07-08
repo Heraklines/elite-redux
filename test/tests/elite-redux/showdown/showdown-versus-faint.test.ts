@@ -1,0 +1,379 @@
+/*
+ * SPDX-FileCopyrightText: 2024-2026 Pagefault Games
+ * SPDX-License-Identifier: AGPL-3.0-only
+ */
+
+// =============================================================================
+// Showdown 1v1 VERSUS faint-replacement - TWO-ENGINE proof (the live guest-vs-faint stall).
+// The live bug (staging 2026-07-08): a double KO on turn 2 stranded BOTH clients forever. The
+// GUEST's own-team faint hit the co-op ownership gate (own-faint picker gate ... owner=host != guest
+// -> skip), so the guest never opened its replacement picker and stalled; the HOST, on the versus
+// ENEMY (= the guest's team) faint, AI-auto-picked instead of awaiting the guest's human choice, and
+// its next turn awaited a guest command that never came. This proves the fix end-to-end over one
+// loopback pair with BOTH real engines:
+//   (a) single KO of the GUEST's lead -> the guest's picker OPENS (gate fires), relays the pick, the
+//       HOST summons THE GUEST'S CHOSEN mon (by party index), the match continues a turn after.
+//   (b) DOUBLE KO with a bench on both sides (the live case) -> BOTH replacements resolve (host's own
+//       vanilla picker + host awaiting the guest's relayed enemy pick), no stall, next-turn convergence.
+//   (c) the guest never answers -> the HOST auto-picks after its (vitest-shortened) wait; no stall.
+//
+// HOW TO RUN (gated ER_SCENARIO=1, like every ER engine test):
+//   ER_SCENARIO=1 npx vitest run test/tests/elite-redux/showdown/showdown-versus-faint.test.ts
+// =============================================================================
+
+import type { BattleScene } from "#app/battle-scene";
+import { getGameMode } from "#app/game-mode";
+import { globalScene, initGlobalScene } from "#app/global-scene";
+import { setCoopFaintSwitchWaitMs } from "#data/elite-redux/coop/coop-interaction-relay";
+import { clearCoopRuntime, setCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
+import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
+import { beginShowdownBattle, endShowdownBattle } from "#data/elite-redux/showdown/showdown-battle-state";
+import type { ShowdownMonManifest } from "#data/elite-redux/showdown/showdown-team";
+import { PokemonMove } from "#data/moves/pokemon-move";
+import { BattlerIndex } from "#enums/battler-index";
+import { Button } from "#enums/buttons";
+import { Command } from "#enums/command";
+import { GameModes } from "#enums/game-modes";
+import { MoveId } from "#enums/move-id";
+import { MoveUseMode } from "#enums/move-use-mode";
+import { SpeciesId } from "#enums/species-id";
+import { UiMode } from "#enums/ui-mode";
+import { SelectStarterPhase } from "#phases/select-starter-phase";
+import { GameManager } from "#test/framework/game-manager";
+import {
+  buildShowdownDuo,
+  type CoopResyncProbe,
+  driveGuestReplayTurn,
+  installCoopResyncProbe,
+  installDuoLogCapture,
+  presentedFieldMon,
+  type ShowdownDuoRig,
+  withClient,
+  withClientSync,
+} from "#test/tools/coop-duo-harness";
+import { generateStarters } from "#test/utils/game-manager-utils";
+import type { PartyUiHandler } from "#ui/handlers/party-ui-handler";
+import Phaser from "phaser";
+import { afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
+
+const RUN = process.env.ER_SCENARIO === "1";
+
+/** The guest's OWN team: a frail MAGIKARP lead + two distinct benches (LAPRAS, GYARADOS). */
+const GUEST_LEAD = SpeciesId.MAGIKARP;
+const GUEST_BENCH_1 = SpeciesId.LAPRAS;
+const GUEST_BENCH_2 = SpeciesId.GYARADOS;
+/** The guest deliberately picks its SECOND bench (slot 2), so the host summoning it proves the round-trip. */
+const GUEST_PICK_SLOT = 2;
+
+/** The HOST's own team: a PIKACHU lead + a SNORLAX bench (its double-KO replacement). */
+const HOST_LEAD = SpeciesId.PIKACHU;
+const HOST_BENCH = SpeciesId.SNORLAX;
+
+const manifest = (speciesId: SpeciesId, moveset: MoveId[]): ShowdownMonManifest => ({
+  speciesId,
+  formIndex: 0,
+  level: 100,
+  shiny: false,
+  variant: 0,
+  abilityIndex: 0,
+  nature: 0,
+  ivs: [31, 31, 31, 31, 31, 31],
+  moveset,
+  item: "LEFTOVERS",
+  rootSpeciesId: speciesId,
+  erBlackShiny: false,
+  baseCost: 4,
+});
+
+/** The guest's 3-mon team as an opponent manifest (the host fields it as the ENEMY party). */
+const guestTeam = (): ShowdownMonManifest[] => [
+  manifest(GUEST_LEAD, [MoveId.SPLASH, MoveId.TACKLE, MoveId.FLAIL, MoveId.BOUNCE]),
+  manifest(GUEST_BENCH_1, [MoveId.SPLASH, MoveId.ICE_BEAM, MoveId.SURF, MoveId.BODY_SLAM]),
+  manifest(GUEST_BENCH_2, [MoveId.SPLASH, MoveId.WATERFALL, MoveId.CRUNCH, MoveId.EARTHQUAKE]),
+];
+
+function toShowdown(scene: BattleScene): void {
+  scene.gameMode = getGameMode(GameModes.SHOWDOWN);
+}
+
+describe.skipIf(!RUN)("Showdown versus - faint-replacement two-engine proof (the live guest-vs-faint stall)", () => {
+  let phaserGame: Phaser.Game;
+  let game: GameManager;
+  let logs: ReturnType<typeof installDuoLogCapture>;
+  let resyncProbe: CoopResyncProbe | undefined;
+  let prevScene: BattleScene;
+
+  beforeAll(() => {
+    phaserGame = new Phaser.Game({ type: Phaser.HEADLESS });
+  });
+
+  beforeEach(() => {
+    game = new GameManager(phaserGame);
+    logs = installDuoLogCapture(`showdown-versus-faint-${Date.now()}`);
+    // Bounded host wait so a buffered guest pick resolves instantly, and the NO-ANSWER timeout test
+    // (c) falls to the AI after a short delay instead of the 60s live default.
+    setCoopFaintSwitchWaitMs(4000);
+    prevScene = globalScene as unknown as BattleScene;
+  });
+
+  afterEach(() => {
+    resyncProbe?.restore();
+    resyncProbe = undefined;
+    setCoopFaintSwitchWaitMs(60_000);
+    logs.dispose();
+    endShowdownBattle();
+    clearCoopRuntime();
+    initGlobalScene(prevScene);
+  });
+
+  /**
+   * Boot the HOST into a live showdown battle (C3 bootstrap) versus `opponent`, reach the first
+   * CommandPhase, and bake `hostLeadMoves` directly onto the host's fielded PIKACHU (a direct set,
+   * not a global override, so it rides the mirror into the guest's ENEMY Pikachu without corrupting
+   * the guest's own manifest moveset - see showdown-duo.test.ts).
+   */
+  async function startHostShowdown(opponent: ShowdownMonManifest[], hostLeadMoves: MoveId[]): Promise<void> {
+    await game.runToTitle();
+    game.onNextPrompt("TitlePhase", UiMode.TITLE, () => {
+      game.scene.gameMode = getGameMode(GameModes.SHOWDOWN);
+      beginShowdownBattle([manifest(HOST_LEAD, hostLeadMoves)], opponent);
+      const starters = generateStarters(game.scene, [HOST_LEAD, HOST_BENCH]);
+      game.scene.phaseManager.pushNew("EncounterPhase", false);
+      new SelectStarterPhase().initBattle(starters);
+    });
+    await game.phaseInterceptor.to("CommandPhase");
+    game.scene.getPlayerParty()[0].moveset = hostLeadMoves.map(m => new PokemonMove(m));
+  }
+
+  /** The guest answers the host's per-turn enemy-command await with a harmless SPLASH (its own team). */
+  function wireGuestSplash(rig: ShowdownDuoRig): void {
+    rig.guestPeer.onCommandRequest(() => ({
+      command: Command.FIGHT,
+      cursor: 0,
+      moveId: MoveId.SPLASH,
+      targets: [BattlerIndex.PLAYER],
+      useMode: MoveUseMode.NORMAL,
+    }));
+  }
+
+  /**
+   * Drive the guest's replay for `turn`, intercepting the ONE `UiMode.PARTY` open (its own-team faint
+   * picker, {@linkcode CoopGuestFaintSwitchPhase}) to pick {@linkcode GUEST_PICK_SLOT} - the relay send +
+   * seq keying stay fully real. Returns whether the picker actually OPENED (the gate fired - the crisp
+   * red-proof anchor: with the co-op ownership gate un-branched the picker never opens on the versus guest).
+   */
+  async function driveGuestReplayPickingBench(rig: ShowdownDuoRig, turn: number): Promise<boolean> {
+    let pickerOpened = false;
+    await withClient(rig.guestCtx, async () => {
+      const ui = rig.guestScene.ui as unknown as { setMode: (...args: unknown[]) => unknown };
+      const realSetMode = ui.setMode.bind(ui);
+      ui.setMode = (...args: unknown[]): unknown => {
+        if (args[0] === UiMode.PARTY) {
+          pickerOpened = true;
+          ui.setMode = realSetMode; // one-shot
+          (args[3] as (slotIndex: number, option: number) => void)(GUEST_PICK_SLOT, 0);
+          return;
+        }
+        if (args[0] === UiMode.MESSAGE) {
+          return; // the picker's close transition - a no-op headlessly
+        }
+        return realSetMode(...args);
+      };
+      try {
+        await driveGuestReplayTurn(rig.guestScene, turn);
+      } finally {
+        ui.setMode = realSetMode;
+      }
+    });
+    return pickerOpened;
+  }
+
+  /** Register a one-shot driver for the HOST's OWN vanilla faint picker (its own team's replacement). */
+  function driveHostOwnFaintPicker(): void {
+    game.onNextPrompt("SwitchPhase", UiMode.PARTY, () => {
+      const handler = game.scene.ui.getHandler() as PartyUiHandler;
+      handler.setCursor(1); // the host's bench (SNORLAX)
+      handler.processInput(Button.ACTION); // select it
+      handler.processInput(Button.ACTION); // send it out
+    });
+  }
+
+  it("(a) single KO of the guest's lead: the picker OPENS, the host summons THE GUEST'S pick, match continues", async () => {
+    await startHostShowdown(guestTeam(), [MoveId.THUNDERBOLT, MoveId.TACKLE, MoveId.THUNDER_WAVE, MoveId.QUICK_ATTACK]);
+    const pair = createLoopbackPair();
+    const rig = await buildShowdownDuo(game, pair, setCoopRuntime, toShowdown);
+    wireGuestSplash(rig);
+    // A guest-team faint is a player-facing interaction: it must converge with ZERO forced resyncs.
+    resyncProbe = installCoopResyncProbe(rig.guestRuntime);
+
+    // The guest's lead (host's ENEMY lead) at 1 HP on BOTH engines so THUNDERBOLT KOs it deterministically.
+    rig.hostScene.getEnemyField()[0].hp = 1;
+    withClientSync(rig.guestCtx, () => {
+      rig.guestScene.getPlayerField()[0].hp = 1;
+    });
+
+    const turn = rig.hostScene.currentBattle.turn;
+
+    // HOST turn: THUNDERBOLT the guest's Magikarp (its EnemyCommandPhase awaits the guest's SPLASH).
+    await withClient(rig.hostCtx, async () => {
+      game.move.select(MoveId.THUNDERBOLT, 0, BattlerIndex.ENEMY);
+      await game.phaseInterceptor.to("TurnEndPhase");
+    });
+    expect(rig.hostScene.getEnemyField()[0]?.isFainted() ?? true, "the guest's lead fainted on the host").toBe(true);
+
+    // GUEST replays turn 1: its OWN faint opens the picker (the GATE fires) and relays slot 2 (GYARADOS).
+    const pickerOpened = await driveGuestReplayPickingBench(rig, turn);
+    // RED-PROOF ANCHOR: with the co-op ownership gate un-branched for versus this is false (the log line
+    // stays "own-faint picker gate ... owner=host != guest -> skip") and the whole flow collapses.
+    expect(pickerOpened, "the versus guest's own-team faint OPENED its replacement picker (gate fires)").toBe(true);
+
+    // HOST crosses to the next CommandPhase: its ShowdownEnemyFaintSwitchPhase consumes the buffered pick
+    // and summons THE GUEST'S CHOICE (not the AI's), then the duel continues (no stall).
+    await withClient(rig.hostCtx, async () => {
+      await game.phaseInterceptor.to("CommandPhase");
+    });
+    expect(
+      rig.hostScene.phaseManager.getCurrentPhase()?.phaseName,
+      "the host reached the next CommandPhase - the match continues a turn after (no stall)",
+    ).toBe("CommandPhase");
+    expect(
+      rig.hostScene.getEnemyField()[0]?.species.speciesId,
+      "the host summoned THE GUEST'S picked mon (GYARADOS, party slot 2) - the relay round-trip",
+    ).toBe(GUEST_BENCH_2);
+    expect(rig.hostScene.getEnemyField()[0]?.isFainted(), "the summoned replacement is battle-ready").toBe(false);
+
+    // The guest materializes its own replacement from the out-of-band checkpoint (turn+1 pump).
+    await withClient(rig.guestCtx, async () => {
+      await driveGuestReplayTurn(rig.guestScene, turn + 1);
+    });
+    withClientSync(rig.guestCtx, () => {
+      const rep = presentedFieldMon(rig.guestScene, 0);
+      expect(rep?.speciesId, "the guest materialized ITS pick (GYARADOS) on its own player field").toBe(GUEST_BENCH_2);
+      expect(rep != null && rep.hp > 0 && !rep.fainted, "the guest's replacement is presented ALIVE").toBe(true);
+    });
+    expect(resyncProbe.count(), "the guest-faint replacement converged with ZERO forced resyncs").toBe(0);
+
+    logs.flush();
+  }, 300_000);
+
+  it("(b) DOUBLE KO with bench on both sides (the live case): both replacements resolve, no stall, converged", async () => {
+    // EXPLOSION self-faints the host's Pikachu AND KOs the guest's Magikarp the same turn -> a genuine 1v1
+    // double faint (each side's lead down, each with a bench) - the exact live case.
+    await startHostShowdown(guestTeam(), [MoveId.EXPLOSION, MoveId.TACKLE, MoveId.THUNDER_WAVE, MoveId.QUICK_ATTACK]);
+    const pair = createLoopbackPair();
+    const rig = await buildShowdownDuo(game, pair, setCoopRuntime, toShowdown);
+    wireGuestSplash(rig);
+    resyncProbe = installCoopResyncProbe(rig.guestRuntime);
+
+    rig.hostScene.getEnemyField()[0].hp = 1;
+    withClientSync(rig.guestCtx, () => {
+      rig.guestScene.getPlayerField()[0].hp = 1;
+    });
+
+    const turn = rig.hostScene.currentBattle.turn;
+
+    // HOST turn: EXPLOSION -> the host's own Pikachu faints (self-KO) AND the guest's Magikarp faints.
+    await withClient(rig.hostCtx, async () => {
+      game.move.select(MoveId.EXPLOSION, 0, BattlerIndex.ENEMY);
+      await game.phaseInterceptor.to("TurnEndPhase");
+    });
+    expect(rig.hostScene.getPlayerField()[0]?.isFainted() ?? true, "the HOST's own lead fainted (Explosion)").toBe(
+      true,
+    );
+    expect(rig.hostScene.getEnemyField()[0]?.isFainted() ?? true, "the GUEST's lead fainted the same turn").toBe(true);
+
+    // GUEST replays turn 1: its OWN faint opens the picker (gate fires) and relays slot 2 (GYARADOS).
+    const pickerOpened = await driveGuestReplayPickingBench(rig, turn);
+    expect(pickerOpened, "the versus guest's own-team faint OPENED its picker in the double-KO turn").toBe(true);
+
+    // HOST crosses: BOTH replacement flows run in the SAME crossing - the host's OWN vanilla picker (driven
+    // here) AND the ShowdownEnemyFaintSwitchPhase awaiting the guest's buffered pick. Neither deadlocks.
+    driveHostOwnFaintPicker();
+    await withClient(rig.hostCtx, async () => {
+      await game.phaseInterceptor.to("CommandPhase");
+    });
+    expect(
+      rig.hostScene.phaseManager.getCurrentPhase()?.phaseName,
+      "the host crossed to the next CommandPhase - the double KO did not deadlock",
+    ).toBe("CommandPhase");
+    expect(
+      rig.hostScene.getPlayerField()[0]?.species.speciesId,
+      "the host summoned ITS OWN replacement (SNORLAX) via the vanilla picker",
+    ).toBe(HOST_BENCH);
+    expect(
+      rig.hostScene.getEnemyField()[0]?.species.speciesId,
+      "the host summoned the GUEST'S replacement (GYARADOS) via the awaited relay",
+    ).toBe(GUEST_BENCH_2);
+    expect(rig.hostScene.getPlayerField()[0]?.isFainted(), "the host's own replacement is battle-ready").toBe(false);
+    expect(rig.hostScene.getEnemyField()[0]?.isFainted(), "the guest's replacement is battle-ready").toBe(false);
+
+    // The guest consumes the out-of-band checkpoint (turn+1 pump): BOTH swapped sides materialize.
+    await withClient(rig.guestCtx, async () => {
+      await driveGuestReplayTurn(rig.guestScene, turn + 1);
+    });
+    withClientSync(rig.guestCtx, () => {
+      const ownRep = presentedFieldMon(rig.guestScene, 0);
+      expect(ownRep?.speciesId, "the guest materialized ITS OWN replacement (GYARADOS)").toBe(GUEST_BENCH_2);
+      expect(ownRep != null && ownRep.hp > 0 && !ownRep.fainted, "the guest's replacement is alive").toBe(true);
+    });
+    // NEXT-TURN CONVERGENCE. Zero forced resyncs means the guest VERIFIED the host's streamed
+    // replacement-checkpoint checksum and adopted the double-KO state WITHOUT a forced heal - i.e. the
+    // per-turn checksums MATCHED across the crossing (a mismatch forces a resync). This is the harness's
+    // own definition of convergence, and the same proof the co-op faint tests use: a raw post-hoc
+    // captureCoopChecksum would diverge only on the DOCUMENTED, orthogonal move-PP desync (the host used
+    // EXPLOSION; the pure-renderer guest never decrements PP - see CLAUDE.md), not on any faint-replacement
+    // divergence.
+    expect(resyncProbe.count(), "the double-KO crossing converged with ZERO forced resyncs").toBe(0);
+    // The guest's OWN team ARRAY is permutation-identical INCLUDING ORDER across the flip (its local
+    // player party equals the host's ENEMY-side order) - so a wrong-mon / transposition on the side the
+    // guest actually chose from is caught. (The OPPONENT bench array order is the host's own-faint #836
+    // concern - it rides the vanilla SwitchPhase in versus and self-heals on the next turn resolution;
+    // the guest never acts on its enemy party, so it is cosmetic here. The opponent FIELD lead - what the
+    // guest renders + the host commands - IS asserted converged below.)
+    const hostEnemyOrder = rig.hostScene.getEnemyParty().map(p => p?.species?.speciesId ?? 0);
+    const guestPlayerOrder = rig.guestScene.getPlayerParty().map(p => p?.species?.speciesId ?? 0);
+    expect(guestPlayerOrder, "the guest's own team order matches the host's enemy-side order (flip)").toEqual(
+      hostEnemyOrder,
+    );
+    expect(
+      rig.guestScene.getEnemyField()[0]?.species.speciesId,
+      "the guest's opponent FIELD lead converged to the host's own replacement (SNORLAX)",
+    ).toBe(HOST_BENCH);
+
+    logs.flush();
+  }, 300_000);
+
+  it("(c) the guest never answers: the host auto-picks after its (shortened) wait; no stall", async () => {
+    // Short host wait so the AI fallback fires quickly when no relayed pick arrives.
+    setCoopFaintSwitchWaitMs(100);
+    await startHostShowdown(guestTeam(), [MoveId.THUNDERBOLT, MoveId.TACKLE, MoveId.THUNDER_WAVE, MoveId.QUICK_ATTACK]);
+    const pair = createLoopbackPair();
+    const rig = await buildShowdownDuo(game, pair, setCoopRuntime, toShowdown);
+    wireGuestSplash(rig);
+
+    rig.hostScene.getEnemyField()[0].hp = 1;
+
+    // HOST turn: KO the guest's lead. The GUEST is deliberately NOT driven, so no replacement pick is ever
+    // relayed - the host's ShowdownEnemyFaintSwitchPhase await must TIME OUT and AI-pick, never stall.
+    await withClient(rig.hostCtx, async () => {
+      game.move.select(MoveId.THUNDERBOLT, 0, BattlerIndex.ENEMY);
+      await game.phaseInterceptor.to("TurnEndPhase");
+    });
+    expect(rig.hostScene.getEnemyField()[0]?.isFainted() ?? true, "the guest's lead fainted on the host").toBe(true);
+
+    await withClient(rig.hostCtx, async () => {
+      await game.phaseInterceptor.to("CommandPhase");
+    });
+    expect(
+      rig.hostScene.phaseManager.getCurrentPhase()?.phaseName,
+      "the host reached CommandPhase via the AI fallback - no stall on a silent guest",
+    ).toBe("CommandPhase");
+    const summoned = rig.hostScene.getEnemyField()[0];
+    expect(
+      summoned != null && !summoned.isFainted() && summoned.species.speciesId !== GUEST_LEAD,
+      "the host AI-summoned a live enemy replacement (a bench mon) after the timeout",
+    ).toBe(true);
+
+    logs.flush();
+  }, 300_000);
+});

@@ -57,6 +57,7 @@ import {
   getCoopController,
   getCoopInteractionRelay,
   isCoopAuthoritativeGuest,
+  isShowdownGuestFlip,
   isVersusSession,
   queueCoopMeBattleVictoryTail,
 } from "#data/elite-redux/coop/coop-runtime";
@@ -533,24 +534,32 @@ export class CoopFaintReplayPhase extends PokemonPhase {
       if (this.battlerIndex >= battlerCount) {
         return; // enemy-side faint
       }
-      const slotOwner = coopOwnerOfPlayerFieldSlot(this.battlerIndex);
-      if (slotOwner !== controller.role) {
+      // Showdown 1v1 (versus faint-replacement, guest side): the F1 data-level side swap makes the
+      // versus guest's LOCAL player party its OWN team, so EVERY local player-field slot is OWN - the
+      // co-op seat map (`coopOwnerOfPlayerFieldSlot`, slot 0 -> host) does NOT apply. Branch at the call
+      // site (do NOT change the co-op semantics of `coopOwnerOfPlayerFieldSlot`): in versus-guest the
+      // slot is always own, so the same picker flow opens and relays to the awaiting host.
+      const versusGuest = isShowdownGuestFlip();
+      const isOwnSlot = versusGuest ? true : coopOwnerOfPlayerFieldSlot(this.battlerIndex) === controller.role;
+      if (!isOwnSlot) {
         coopLog(
           "replay",
-          `own-faint picker gate bi=${this.battlerIndex}: owner=${slotOwner} != ${controller.role} -> skip`,
+          `own-faint picker gate bi=${this.battlerIndex}: owner=${coopOwnerOfPlayerFieldSlot(this.battlerIndex)} != ${controller.role} -> skip`,
         );
         return; // the partner's mon - the partner (or the host fallback) picks
       }
       const party = globalScene.getPlayerParty();
       // NOT isAllowedInBattle(): the renderer's mirrored bench can miss full init state, and
       // LEGALITY is the host's call anyway (it re-validates the pick, auto-picking on illegal).
-      // This gate only decides whether a picker is worth SHOWING.
+      // This gate only decides whether a picker is worth SHOWING. In versus the guest owns its WHOLE
+      // team (the co-op `coopOwner` seat tag is a co-op-only concept - do NOT block on it), so every
+      // non-fainted bench mon is a legal replacement.
       const hasBench = party.some(
         (mon, i) =>
           i >= battlerCount
           && i < 6
           && !mon.isFainted()
-          && !coopSwitchBlocksMonForOwner(controller.role, mon.coopOwner),
+          && (versusGuest || !coopSwitchBlocksMonForOwner(controller.role, mon.coopOwner)),
       );
       if (!hasBench) {
         coopLog(
