@@ -1,0 +1,274 @@
+url:      https://elite-redux-staging.pages.dev/
+build:    mrc9a598-g33b
+mode:     0  wave:2
+seed:     ehPJroOt8Yoa2Xkw14Vawe8I
+party:    Chimchar(L5 12hp f0), Treecko(L5 19hp f0), Quaxly(L5 21hp f0)
+enemy:    Taillow(L2), Trumbeak(L2)
+
+----- CONSOLE -----
+[17:40:09.182] LOG: Moveset: ["Struggle Bug","Web Shot","Tackle","Poison Sting"]
+[17:40:10.203] DEBUG: Session data saved to slot 0!
+[17:40:10.204] LOG: Wave Seed: fiQKspPu9Zpb3Ylx25Wbxf9J 1
+[17:40:11.599] LOG: %cStart Phase SummonPhase color:green;
+[17:40:12.180] WARN: cry/912 not found
+[17:40:12.530] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[17:40:12.532] LOG: %cStart Phase CheckSwitchPhase color:green;
+[17:40:13.047] LOG: %cStart Phase SwitchPhase color:green;
+[17:40:14.201] LOG: %cStart Phase SwitchSummonPhase color:green;
+[17:40:14.891] WARN: cry/390 not found
+[17:40:15.242] LOG: %cStart Phase PostSummonPhase color:green;
+[17:40:15.243] LOG: Ran PSP for: Chimchar
+[17:40:15.243] LOG: %cStart Phase PostSummonPhase color:green;
+[17:40:15.243] LOG: %cStart Phase CoopPushReplacementCheckpointPhase color:green;
+[17:40:15.244] LOG: [coop:checkpoint] build field=2 weather=0/0 terrain=0/0 arenaTags=0 money=1000 mons=[bi0:sp390/hp20-20/st0/fnt0 bi2:sp265/hp14-14/st0/fnt0]
+[17:40:15.244] LOG: [coop:checkpoint] host capture field=2 weather=0 terrain=0 money=1000 arenaTags=0 mons=[bi0:sp390/hp20-20/st0/fnt0 bi2:sp265/hp14-14/st0/fnt0]
+[17:40:15.244] LOG: [coop:checkpoint] host push OUT-OF-BAND replacement checkpoint (partner-slot auto-summon)
+[17:40:15.246] LOG: [coop:checksum] capture digest=bdb4a0f8e52c311a field=2 biome=0 seed=ehPJroOt8Yoa2Xkw14Vawe8I weather=0 terrain=0 money=1000 party=[390,252,912] partyLevels=[5,5,5] arenaTags=0 modifiers=1 heldItemsDigest=0 pokeballs=[0:5,1:0,2:0,3:0,4:0] mons=[bi0:sp390/hp20-20/st0/ab89/form0/tera0:9/boss0:0 bi2:sp265/hp14-14/st0/ab19/form0/tera0:6/boss0:0]
+[17:40:15.248] LOG: [coop:checksum] host SEND battleCheckpoint reason=replacement checksum=bdb4a0f8e52c311a authoritativeState=1
+[17:40:15.248] LOG: [coop:transport] send host t=battleCheckpoint reason=replacement checksum=bdb4a0f8e52c311a
+[17:40:15.248] LOG: %cStart Phase InitEncounterPhase color:green;
+[17:40:15.248] LOG: %cStart Phase PostSummonPhase color:green;
+[17:40:15.248] LOG: Ran PSP for: Wurmple
+[17:40:15.249] LOG: %cStart Phase PostSummonPhase color:green;
+[17:40:15.249] LOG: %cStart Phase PostSummonPhase color:green;
+[17:40:15.249] LOG: %cStart Phase TurnInitPhase color:green;
+[17:40:15.249] LOG: %cStart Phase CommandPhase color:green;
+[17:40:15.252] LOG: [coop:transport] recv guest t=battleCheckpoint reason=replacement checksum=bdb4a0f8e52c311a handlers=5
+[17:40:16.758] LOG: Move: EMBER Move targets: {"targets":[2],"multiple":false} 
+Player Pokemon: Chimchar
+[17:40:16.761] LOG: %cStart Phase EnemyCommandPhase color:green;
+[17:40:16.765] LOG: Battle Seed: XikVx0z5rI9oLipd
+[17:40:16.769] LOG: Move Pool: ["Struggle Bug","Web Shot","Tackle","Poison Sting"]
+[17:40:16.769] LOG: Move Scores: [15.375,10.5,8,11]
+[17:40:16.769] LOG: Sorted Move Pool: ["Struggle Bug","Poison Sting","Web Shot","Tackle"]
+[17:40:16.769] LOG: Chosen Move: Poison Sting
+[17:40:16.769] LOG: %cStart Phase TurnStartPhase color:green;
+[17:40:16.770] LOG: %cStart Phase MovePhase color:green;
+[17:40:16.770] LOG: %cUser: Wurmple
+Move: POISON_STING
+Use Mode: NORMAL color:orchid
+[17:40:16.773] LOG: %cStart Phase MessagePhase color:green;
+[17:40:17.187] LOG: %cStart Phase MoveEffectPhase color:green;
+[17:40:17.787] LOG: crit stage: +0
+[17:40:17.789] LOG: Move: Poison Sting | Base damage: 3.3440000000000003 | Power: 40 | Source attack: 6 | Target defense: 10
+[17:40:17.789] LOG: Move: Poison Sting | Attack damage: 3
+[17:40:17.791] LOG: %cStart Phase DamageAnimPhase color:green;
+[17:40:17.821] LOG: %cStart Phase MoveEndPhase color:green;
+[17:40:17.821] LOG: %cStart Phase MovePhase color:green;
+[17:40:17.821] LOG: %cUser: Chimchar
+Move: EMBER
+Use Mode: NORMAL color:orchid
+[17:40:17.823] LOG: %cStart Phase MessagePhase color:green;
+[17:40:18.168] LOG: %cStart Phase MoveEffectPhase color:green;
+[17:40:18.552] LOG: crit stage: +0
+[17:40:18.554] LOG: Move: Ember | Base damage: 4.514285714285714 | Power: 20 | Source attack: 11 | Target defense: 7
+[17:40:18.554] LOG: Move: Ember | Attack damage: 12
+[17:40:18.556] LOG: %cStart Phase DamageAnimPhase color:green;
+[17:40:18.587] LOG: %cStart Phase MessagePhase color:green;
+[17:40:19.266] LOG: %cStart Phase MoveEndPhase color:green;
+[17:40:19.266] LOG: %cStart Phase CheckInterludePhase color:green;
+[17:40:19.266] LOG: %cStart Phase WeatherEffectPhase color:green;
+[17:40:19.266] LOG: %cStart Phase PositionalTagPhase color:green;
+[17:40:19.266] LOG: %cStart Phase BerryPhase color:green;
+[17:40:19.267] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[17:40:19.267] LOG: %cStart Phase TurnEndPhase color:green;
+[17:40:19.267] WARN: [coop:turn] host recorder: finalize with NO open recording -> turn=-1 events=0 (caller decides not to emit)
+[17:40:19.268] LOG: %cStart Phase TurnInitPhase color:green;
+[17:40:19.268] LOG: %cStart Phase CommandPhase color:green;
+[17:40:19.552] LOG: Move: EMBER Move targets: {"targets":[2],"multiple":false} 
+Player Pokemon: Chimchar
+[17:40:19.554] LOG: %cStart Phase EnemyCommandPhase color:green;
+[17:40:19.558] LOG: Battle Seed: XikVx0z5rI9oLipd
+[17:40:19.560] LOG: Move Pool: ["Struggle Bug","Web Shot","Tackle","Poison Sting"]
+[17:40:19.560] LOG: Move Scores: [15.375,10.5,8,11]
+[17:40:19.560] LOG: Sorted Move Pool: ["Struggle Bug","Poison Sting","Web Shot","Tackle"]
+[17:40:19.560] LOG: Chosen Move: Struggle Bug
+[17:40:19.560] LOG: %cStart Phase TurnStartPhase color:green;
+[17:40:19.561] LOG: %cStart Phase MovePhase color:green;
+[17:40:19.561] LOG: %cUser: Chimchar
+Move: EMBER
+Use Mode: NORMAL color:orchid
+[17:40:19.561] LOG: %cStart Phase MessagePhase color:green;
+[17:40:19.897] LOG: %cStart Phase MoveEffectPhase color:green;
+[17:40:20.298] LOG: crit stage: +0
+[17:40:20.299] LOG: Move: Ember | Base damage: 4.514285714285714 | Power: 20 | Source attack: 11 | Target defense: 7
+[17:40:20.299] LOG: Move: Ember | Attack damage: 11
+[17:40:20.300] LOG: %cStart Phase DamageAnimPhase color:green;
+[17:40:20.333] LOG: %cStart Phase MessagePhase color:green;
+[17:40:21.012] LOG: %cStart Phase FaintPhase color:green;
+[17:40:21.928] LOG: %cStart Phase MessagePhase color:green;
+[17:40:22.181] LOG: %cStart Phase VictoryPhase color:green;
+[17:40:22.182] LOG: %cStart Phase ExpPhase color:green;
+[17:40:22.727] LOG: %cStart Phase MoveEndPhase color:green;
+[17:40:22.727] LOG: %cStart Phase MovePhase color:green;
+[17:40:22.727] LOG: %cStart Phase MoveEndPhase color:green;
+[17:40:22.728] LOG: %cStart Phase CheckInterludePhase color:green;
+[17:40:22.728] LOG: %cStart Phase WeatherEffectPhase color:green;
+[17:40:22.728] LOG: %cStart Phase PositionalTagPhase color:green;
+[17:40:22.728] LOG: %cStart Phase BerryPhase color:green;
+[17:40:22.728] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[17:40:22.728] LOG: %cStart Phase TurnEndPhase color:green;
+[17:40:22.728] WARN: [coop:turn] host recorder: finalize with NO open recording -> turn=-1 events=0 (caller decides not to emit)
+[17:40:22.728] LOG: %cStart Phase BattleEndPhase color:green;
+[17:40:22.728] LOG: Battle Score: 11 (2 Turns x0.84)
+[17:40:22.728] LOG: Total Score: 11
+[17:40:22.736] LOG: %cStart Phase EggLapsePhase color:green;
+[17:40:22.736] LOG: %cStart Phase SelectModifierPhase color:green;
+[17:40:22.737] LOG: Wave Seed: fiQKspPu9Zpb3Ylx25Wbxf9J 1
+[17:40:22.738] LOG: 0 0 [2,3,4,5]
+[17:40:22.738] LOG: {"id":"POKEBALL","localeKey":"","iconImage":"pb","group":"pb","soundName":"se/pb_bounce_1","tier":0,"pokeballType":0,"count":5} 
+[17:40:22.738] LOG: 19 9 [2,3,4,5,6,7,8,9,10,22]
+[17:40:22.738] LOG: {"id":"ER_ABILITY_CAPSULE","localeKey":"","iconImage":"ability_capsule","soundName":"se/restore","tier":1} 
+[17:40:22.739] LOG: 0 0 [2,3,4,5]
+[17:40:22.739] LOG: {"id":"POKEBALL","localeKey":"","iconImage":"pb","group":"pb","soundName":"se/pb_bounce_1","tier":0,"pokeballType":0,"count":5} 
+[17:40:22.739] LOG: 7 4 [2,3,4,5]
+[17:40:22.739] LOG: {"id":"TEMP_STAT_STAGE_BOOSTER","localeKey":"","iconImage":"x_defense","soundName":"se/restore","tier":0,"stat":2,"nameKey":"x_defense","quantityKey":"percentage"} 
+[17:40:22.739] LOG: 6 4 [2,3,4,5]
+[17:40:22.739] LOG: {"id":"LURE","localeKey":"modifierType:ModifierType.LURE","iconImage":"lure","group":"lure","soundName":"se/restore","tier":0,"maxBattles":10} 
+[17:40:26.240] WARN: cry/390 not found
+[17:40:27.641] LOG: [coop:interaction] interactionCounter() read -> 0 (role=host)
+[17:40:27.641] LOG: [coop:health] tick=0g turn=3 wave=1 counter=0 assertions=0 wait=-1ms peerBeat=- transport=connected
+[17:40:30.711] WARN: cry/912 not found
+[17:40:32.940] WARN: cry/252 not found
+[17:40:35.942] LOG: %cStart Phase ErAbilityCapsulePhase color:green;
+[17:40:57.643] LOG: [coop:interaction] interactionCounter() read -> 0 (role=host)
+[17:40:57.643] LOG: [coop:health] tick=0g turn=3 wave=1 counter=0 assertions=0 wait=-1ms peerBeat=- transport=connected
+[17:41:22.664] LOG: [coop:reward] advanceCoopInteractionForContinuation SKIP (isCoop=false fromSeq=-1 meInProgress=false)
+[17:41:22.665] LOG: %cStart Phase NewBattlePhase color:green;
+[17:41:22.665] LOG: Wave Seed: gjRLtqQv:[qc4Zmy36Xcyg:K 2
+[17:41:22.665] LOG: Starting trainer pool tier: COMMON
+[17:41:22.668] LOG: %cStart Phase ReturnPhase color:green;
+[17:41:23.025] LOG: %cStart Phase ShowTrainerPhase color:green;
+[17:41:23.374] LOG: %cStart Phase NextEncounterPhase color:green;
+[17:41:23.379] LOG: ER #419: elite BST cap (460 @ w2) - replacing Toucannon (525) with Trumbeak (355)
+[17:41:23.396] LOG: Pokemon: Foe Trumbeak | Species ID: 732 | Level: 2 | Nature: Jolly (+Spd/-SpAtk)
+[17:41:23.396] LOG: Stats (IVs): HP: 14 (31), Atk: 8 (31), Def: 7 (31), Spatk: 6 (31), Spdef: 7 (31), Spd: 8 (31)
+[17:41:23.396] LOG: Ability: Super Luck | Passive Ability: Flock 
+[17:41:23.396] LOG: Moveset: ["Starburst","Rocket Shot","Beak Blast","Pyro Ball"]
+[17:41:23.397] LOG: ER #419: elite BST cap (460 @ w2) - replacing Swellow (465) with Taillow (295)
+[17:41:23.413] LOG: Pokemon: Foe Taillow | Species ID: 276 | Level: 2 | Nature: Naive (+Spd/-SpDef)
+[17:41:23.413] LOG: Stats (IVs): HP: 14 (31), Atk: 7 (31), Def: 7 (31), Spatk: 7 (31), Spdef: 5 (31), Spd: 8 (31)
+[17:41:23.413] LOG: Ability: Air Blower | Passive Ability: Flock 
+[17:41:23.413] LOG: Moveset: ["Boomburst","Floaty Fall","Heat Wave","Mind Reader"]
+[17:41:25.750] LOG: Battle Seed: eOV4aqotDtT8S4fG
+[17:41:25.752] LOG: Applied Soul Dew (enemy)
+[17:41:25.753] LOG: Applied Soul Dew (enemy)
+[17:41:25.754] LOG: Generated AI funcs
+[17:41:25.851] DEBUG: Session data saved to slot 0!
+[17:41:25.852] LOG: Wave Seed: gjRLtqQv:[qc4Zmy36Xcyg:K 2
+[17:41:26.535] LOG: Lass Flo
+[17:41:27.095] LOG: Dialogue saved as seen: dialogue:lass.encounter.6
+[17:41:27.188] LOG: Lass Flo
+[17:41:28.018] LOG: %cStart Phase SummonPhase color:green;
+[17:41:28.018] LOG: Flo
+[17:41:28.433] LOG: Applied Soul Dew (enemy)
+[17:41:28.434] LOG: Applied Soul Dew (enemy)
+[17:41:28.880] LOG: %cStart Phase SummonPhase color:green;
+[17:41:29.480] WARN: cry/390 not found
+[17:41:29.828] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[17:41:29.830] LOG: %cStart Phase InitEncounterPhase color:green;
+[17:41:29.831] LOG: %cStart Phase PostSummonPhase color:green;
+[17:41:29.831] LOG: Ran PSP for: Chimchar
+[17:41:29.832] LOG: %cStart Phase PostSummonPhase color:green;
+[17:41:29.832] LOG: %cStart Phase PostSummonPhase color:green;
+[17:41:29.832] LOG: Ran PSP for: Trumbeak
+[17:41:29.832] LOG: %cStart Phase PostSummonPhase color:green;
+[17:41:29.832] LOG: %cStart Phase PostSummonPhase color:green;
+[17:41:29.833] LOG: %cStart Phase TurnInitPhase color:green;
+[17:41:29.833] LOG: %cStart Phase CommandPhase color:green;
+[17:41:31.044] LOG: Move: EMBER Move targets: {"targets":[2],"multiple":false} 
+Player Pokemon: Chimchar
+[17:41:31.046] LOG: %cStart Phase EnemyCommandPhase color:green;
+[17:41:31.059] LOG: Move Pool: ["Starburst","Rocket Shot","Beak Blast","Pyro Ball"]
+[17:41:31.059] LOG: Move Scores: [-60.5,-95,-50,-92]
+[17:41:31.060] LOG: Sorted Move Pool: ["Beak Blast","Starburst","Pyro Ball","Rocket Shot"]
+[17:41:31.060] LOG: Chosen Move: Beak Blast
+[17:41:31.060] LOG: ER AI: experimental brain (sharpness 1)
+[17:41:31.060] LOG: %cStart Phase TurnStartPhase color:green;
+[17:41:31.061] LOG: %cStart Phase MoveHeaderPhase color:green;
+[17:41:31.062] LOG: %cStart Phase MessagePhase color:green;
+[17:41:31.875] LOG: %cStart Phase MovePhase color:green;
+[17:41:31.875] LOG: %cUser: Chimchar
+Move: EMBER
+Use Mode: NORMAL color:orchid
+[17:41:31.877] LOG: %cStart Phase MessagePhase color:green;
+[17:41:32.222] LOG: %cStart Phase MoveEffectPhase color:green;
+[17:41:32.623] LOG: crit stage: +0
+[17:41:32.624] LOG: Move: Ember | Base damage: 4.514285714285714 | Power: 20 | Source attack: 11 | Target defense: 7
+[17:41:32.625] LOG: Move: Ember | Attack damage: 6
+[17:41:32.626] LOG: %cStart Phase DamageAnimPhase color:green;
+[17:41:32.641] LOG: [coop:interaction] interactionCounter() read -> 0 (role=host)
+[17:41:32.641] LOG: [coop:health] tick=0g turn=1 wave=2 counter=0 assertions=0 wait=-1ms peerBeat=- transport=connected
+[17:41:32.658] LOG: %cStart Phase ObtainStatusEffectPhase color:green;
+[17:41:32.873] LOG: %cStart Phase MessagePhase color:green;
+[17:41:33.587] LOG: %cStart Phase MoveEndPhase color:green;
+[17:41:33.588] LOG: %cStart Phase MovePhase color:green;
+[17:41:33.588] LOG: %cUser: Trumbeak
+Move: BEAK_BLAST
+Use Mode: NORMAL color:orchid
+[17:41:33.592] LOG: %cStart Phase MessagePhase color:green;
+[17:41:34.003] LOG: %cStart Phase MoveEffectPhase color:green;
+[17:41:34.870] LOG: crit stage: +1
+[17:41:34.871] LOG: Move: Beak Blast | Base damage: 8.047999999999998 | Power: 120 | Source attack: 9 | Target defense: 10
+[17:41:34.872] LOG: Move: Beak Blast | Attack damage: 5
+[17:41:34.873] LOG: %cStart Phase DamageAnimPhase color:green;
+[17:41:34.905] LOG: %cStart Phase MoveEndPhase color:green;
+[17:41:34.905] LOG: %cStart Phase CheckInterludePhase color:green;
+[17:41:34.905] LOG: %cStart Phase WeatherEffectPhase color:green;
+[17:41:34.906] LOG: %cStart Phase PositionalTagPhase color:green;
+[17:41:34.906] LOG: %cStart Phase BerryPhase color:green;
+[17:41:34.906] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[17:41:34.907] LOG: %cStart Phase PostTurnStatusEffectPhase color:green;
+[17:41:35.134] LOG: %cStart Phase MessagePhase color:green;
+[17:41:35.899] LOG: %cStart Phase TurnEndPhase color:green;
+[17:41:35.901] WARN: [coop:turn] host recorder: finalize with NO open recording -> turn=-1 events=0 (caller decides not to emit)
+[17:41:35.901] LOG: %cStart Phase TurnInitPhase color:green;
+[17:41:35.901] LOG: %cStart Phase CommandPhase color:green;
+[17:41:36.568] LOG: Move: DOUBLE_KICK Move targets: {"targets":[2],"multiple":false} 
+Player Pokemon: Chimchar
+[17:41:36.570] LOG: %cStart Phase EnemyCommandPhase color:green;
+[17:41:36.574] LOG: %cStart Phase TurnStartPhase color:green;
+[17:41:36.575] LOG: %cStart Phase SwitchSummonPhase color:green;
+[17:41:36.576] LOG: Flo
+[17:41:37.446] LOG: Flo
+[17:41:37.697] LOG: Applied Soul Dew (enemy)
+[17:41:37.698] LOG: Applied Soul Dew (enemy)
+[17:41:38.132] LOG: %cStart Phase PostSummonPhase color:green;
+[17:41:38.132] LOG: Ran PSP for: Taillow
+[17:41:38.132] LOG: %cStart Phase PostSummonPhase color:green;
+[17:41:38.133] LOG: %cStart Phase MovePhase color:green;
+[17:41:38.133] LOG: %cUser: Chimchar
+Move: DOUBLE_KICK
+Use Mode: NORMAL color:orchid
+[17:41:38.135] LOG: %cStart Phase MessagePhase color:green;
+[17:41:38.510] LOG: %cStart Phase MoveEffectPhase color:green;
+[17:41:38.512] LOG: Battle Seed: eOV4aqotDtT8S4fG
+[17:41:38.695] LOG: crit stage: +0
+[17:41:38.696] LOG: Move: Double Kick | Base damage: 8.6 | Power: 45 | Source attack: 11 | Target defense: 6
+[17:41:38.697] LOG: Move: Double Kick | Attack damage: 8
+[17:41:38.697] LOG: %cStart Phase DamageAnimPhase color:green;
+[17:41:38.730] LOG: %cStart Phase MoveEffectPhase color:green;
+[17:41:38.927] LOG: crit stage: +0
+[17:41:38.928] LOG: Move: Double Kick | Base damage: 8.6 | Power: 45 | Source attack: 11 | Target defense: 6
+[17:41:38.929] LOG: Move: Double Kick | Attack damage: 11
+[17:41:38.929] LOG: %cStart Phase DamageAnimPhase color:green;
+[17:41:38.962] LOG: %cStart Phase MessagePhase color:green;
+[17:41:39.608] LOG: %cStart Phase MessagePhase color:green;
+[17:41:40.240] LOG: %cStart Phase FaintPhase color:green;
+[17:41:40.940] LOG: %cStart Phase MessagePhase color:green;
+[17:41:41.207] LOG: %cStart Phase VictoryPhase color:green;
+[17:41:41.210] LOG: %cStart Phase ExpPhase color:green;
+[17:41:41.971] LOG: %cStart Phase MoveEndPhase color:green;
+[17:41:41.971] LOG: %cStart Phase PostSummonPhase color:green;
+[17:41:41.972] LOG: %cStart Phase MovePhase color:green;
+[17:41:41.972] LOG: %cStart Phase MoveEndPhase color:green;
+[17:41:41.972] LOG: %cStart Phase CheckInterludePhase color:green;
+[17:41:41.972] LOG: %cStart Phase WeatherEffectPhase color:green;
+[17:41:41.972] LOG: %cStart Phase PositionalTagPhase color:green;
+[17:41:41.972] LOG: %cStart Phase BerryPhase color:green;
+[17:41:41.972] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[17:41:41.972] LOG: %cStart Phase TurnEndPhase color:green;
+[17:41:41.972] WARN: [coop:turn] host recorder: finalize with NO open recording -> turn=-1 events=0 (caller decides not to emit)
+[17:41:41.972] LOG: %cStart Phase ShowdownEnemyFaintSwitchPhase color:green;
+[17:41:41.973] LOG: [coop:replay] versus host awaiting opponent replacement pick slot=0 seq=90000
+[17:41:41.974] LOG: [coop:relay] AWAIT interactionChoice seq=90000 timeoutMs=60000 expected=[switch] -> network-wait
