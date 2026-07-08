@@ -1,0 +1,22 @@
+url:      https://elite-redux-staging.pages.dev/
+build:    mrbo8q1a-gaa
+mode:     0  wave:?
+seed:     oTZTptWv1uig3XBDOi4PvdZW
+party:    
+enemy:    
+
+----- COMMENT -----
+Game freeze when backing out of dev logs
+
+----- CONSOLE -----
+[06:46:54.901] LOG: %c %c %c %c %c Phaser v3.90.0 (WebGL | Web Audio) %c https://phaser.io/v390 background: #ff0000 background: #ffff00 background: #00ff00 background: #00ffff color: #ffffff; background: #000000 background: transparent
+[06:46:55.596] LOG: [ER] build mrbo8q1a-gaa
+[06:46:55.624] LOG: [dev-tools] loaded — 475 scenarios + Send Logs button
+[06:47:13.021] DEBUG: Destroying loading scene
+[06:47:13.021] DEBUG: Destroyed loading scene
+[06:47:13.213] LOG: Seed: oTZTptWv1uig3XBDOi4PvdZW
+[06:47:13.213] LOG: Wave Seed: oTZTptWv1uig3XBDOi4PvdZW 0
+[06:47:19.674] LOG: %cStart Phase LoginPhase color:green;
+[06:47:20.241] LOG: Client Session: 0taznlgJQxHqvEegha4WaRUZIYFaHJLl
+[06:47:21.080] LOG: %cStart Phase TitlePhase color:green;
+[06:47:21.107] LOG: use seasonal splash messages true
