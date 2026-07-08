@@ -1,0 +1,283 @@
+url:      https://elite-redux-staging.pages.dev/
+build:    mrc9a598-g33b
+mode:     4  wave:16
+seed:     8qTfcBYmEfSU9ZxXYKIR5GTk
+party:    Mudbray(L13 44hp f0), Sobble(L13 33hp f0), Rookidee(L8 26hp f0), Varoom(L12 25hp f0), Pikachu(L10 15hp f0)
+enemy:    Lillipup(L10), Pikachu(L10), Fidough(L10)
+
+----- COMMENT -----
+well just caught it and he has zero moves
+
+----- CONSOLE -----
+[22:26:01.958] LOG: %cStart Phase CheckSwitchPhase color:green;
+[22:26:02.798] LOG: %cStart Phase CheckSwitchPhase color:green;
+[22:26:03.143] LOG: %cStart Phase CheckSwitchPhase color:green;
+[22:26:03.670] LOG: %cStart Phase InitEncounterPhase color:green;
+[22:26:03.674] LOG: %cStart Phase PostSummonPhase color:green;
+[22:26:03.674] LOG: Ran PSP for: Sobble
+[22:26:03.678] LOG: %cStart Phase PostSummonPhase color:green;
+[22:26:03.679] LOG: %cStart Phase ShowAbilityPhase color:green;
+[22:26:03.836] LOG: %cStart Phase MessagePhase color:green;
+[22:26:04.041] LOG: %cStart Phase HideAbilityPhase color:green;
+[22:26:04.068] LOG: %cStart Phase PostSummonPhase color:green;
+[22:26:04.070] LOG: %cStart Phase PostSummonPhase color:green;
+[22:26:04.070] LOG: Ran PSP for: Pikachu
+[22:26:04.073] LOG: %cStart Phase PostSummonPhase color:green;
+[22:26:04.076] LOG: %cStart Phase PostSummonPhase color:green;
+[22:26:04.078] LOG: %cStart Phase PostSummonPhase color:green;
+[22:26:04.078] LOG: Ran PSP for: Mudbray
+[22:26:04.080] LOG: %cStart Phase PostSummonPhase color:green;
+[22:26:04.081] LOG: %cStart Phase PostSummonPhase color:green;
+[22:26:04.082] LOG: %cStart Phase PostSummonPhase color:green;
+[22:26:04.082] LOG: Ran PSP for: Fidough
+[22:26:04.083] LOG: %cStart Phase PostSummonPhase color:green;
+[22:26:04.084] LOG: %cStart Phase PostSummonPhase color:green;
+[22:26:04.085] LOG: %cStart Phase PostSummonPhase color:green;
+[22:26:04.085] LOG: Ran PSP for: Lillipup
+[22:26:04.086] LOG: %cStart Phase PostSummonPhase color:green;
+[22:26:04.086] LOG: %cStart Phase PostSummonPhase color:green;
+[22:26:04.086] LOG: %cStart Phase PostSummonPhase color:green;
+[22:26:04.086] LOG: Ran PSP for: Varoom
+[22:26:04.087] LOG: %cStart Phase PostSummonPhase color:green;
+[22:26:04.087] LOG: %cStart Phase PostSummonPhase color:green;
+[22:26:04.087] LOG: %cStart Phase TurnInitPhase color:green;
+[22:26:04.087] LOG: %cStart Phase CommandPhase color:green;
+[22:26:05.808] LOG: Move: BODY_PRESS Move targets: {"targets":[3,4,1],"multiple":false} 
+Player Pokemon: Mudbray
+[22:26:05.810] LOG: %cStart Phase SelectTargetPhase color:green;
+[22:26:09.569] LOG: %cStart Phase CommandPhase color:green;
+[22:26:12.208] LOG: Move: SCALD Move targets: {"targets":[3,4,5,0,2],"multiple":false} 
+Player Pokemon: Sobble
+[22:26:12.209] LOG: %cStart Phase SelectTargetPhase color:green;
+[22:26:13.280] LOG: %cStart Phase CommandPhase color:green;
+[22:26:15.708] LOG: Move: BARRAGE Move targets: {"targets":[4,5,1],"multiple":false} 
+Player Pokemon: Varoom
+[22:26:15.710] LOG: %cStart Phase SelectTargetPhase color:green;
+[22:26:16.336] LOG: %cStart Phase EnemyCommandPhase color:green;
+[22:26:16.336] LOG: Applied X Defense 
+[22:26:16.338] LOG: Applied X Defense 
+[22:26:16.339] LOG: Battle Seed: 93T0fGKB95Losrdd
+[22:26:16.339] WARN: BattlerTag IGNORE_GHOST is missing a score!
+[22:26:16.339] WARN: BattlerTag IGNORE_GHOST is missing a score!
+[22:26:16.339] WARN: BattlerTag IGNORE_GHOST is missing a score!
+[22:26:16.340] WARN: BattlerTag IGNORE_GHOST is missing a score!
+[22:26:16.340] LOG: Move Pool: ["Tackle","Roar","Howl","Odor Sleuth"]
+[22:26:16.340] LOG: Move Scores: [12,-20,2,0]
+[22:26:16.340] LOG: Sorted Move Pool: ["Tackle","Howl","Odor Sleuth","Roar"]
+[22:26:16.340] LOG: Chosen Move: Tackle
+[22:26:16.340] LOG: %cStart Phase EnemyCommandPhase color:green;
+[22:26:16.340] LOG: %cStart Phase EnemyCommandPhase color:green;
+[22:26:16.342] LOG: Applied X Defense 
+[22:26:16.343] LOG: Applied X Defense 
+[22:26:16.346] LOG: Move Pool: ["Lovely Bite","Growl","Howl"]
+[22:26:16.346] LOG: Move Scores: [6.1171875,2,2]
+[22:26:16.346] LOG: Sorted Move Pool: ["Lovely Bite","Growl","Howl"]
+[22:26:16.346] LOG: Chosen Move: Growl
+[22:26:16.346] LOG: %cStart Phase TurnStartPhase color:green;
+[22:26:16.365] LOG: %cStart Phase MovePhase color:green;
+[22:26:16.365] LOG: %cUser: Sobble
+Move: SCALD
+Use Mode: NORMAL color:orchid
+[22:26:16.381] LOG: %cStart Phase MessagePhase color:green;
+[22:26:16.436] LOG: %cStart Phase MoveEffectPhase color:green;
+[22:26:16.608] LOG: crit stage: +0
+[22:26:16.609] LOG: Applied X Sp. Atk 
+[22:26:16.609] LOG: Move: Scald | Base damage: 30.512000000000004 | Power: 96 | Source attack: 33 | Target defense: 16
+[22:26:16.609] LOG: Move: Scald | Attack damage: 43
+[22:26:16.610] LOG: %cStart Phase DamageAnimPhase color:green;
+[22:26:16.620] LOG: %cStart Phase FaintPhase color:green;
+[22:26:16.624] WARN: cry/926 not found
+[22:26:16.678] LOG: %cStart Phase MessagePhase color:green;
+[22:26:17.102] LOG: %cStart Phase VictoryPhase color:green;
+[22:26:17.103] LOG: %cStart Phase ExpPhase color:green;
+[22:26:17.103] LOG: Applied Super EXP. Charm 
+[22:26:17.103] LOG: Applied EXP. Charm 
+[22:26:17.320] LOG: %cStart Phase ExpPhase color:green;
+[22:26:17.320] LOG: Applied Super EXP. Charm 
+[22:26:17.320] LOG: Applied EXP. Charm 
+[22:26:17.509] LOG: %cStart Phase ExpPhase color:green;
+[22:26:17.509] LOG: Applied Super EXP. Charm 
+[22:26:17.509] LOG: Applied EXP. Charm 
+[22:26:17.709] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[22:26:17.709] LOG: Applied Super EXP. Charm 
+[22:26:17.709] LOG: Applied EXP. Charm 
+[22:26:17.709] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[22:26:17.709] LOG: %cStart Phase MoveEndPhase color:green;
+[22:26:17.711] LOG: %cStart Phase MovePhase color:green;
+[22:26:17.711] LOG: %cUser: Pikachu
+Move: STRUGGLE
+Use Mode: IGNORE_PP color:orchid
+[22:26:17.719] LOG: %cStart Phase MessagePhase color:green;
+[22:26:17.819] LOG: %cStart Phase MessagePhase color:green;
+[22:26:17.975] LOG: %cStart Phase MoveEffectPhase color:green;
+[22:26:18.075] LOG: crit stage: +0
+[22:26:18.075] LOG: Applied X Defense 
+[22:26:18.075] LOG: Move: Struggle | Base damage: 5.483870967741936 | Power: 50 | Source attack: 18 | Target defense: 31
+[22:26:18.076] LOG: Move: Struggle | Attack damage: 5
+[22:26:18.076] LOG: %cStart Phase DamageAnimPhase color:green;
+[22:26:18.087] LOG: %cStart Phase DamageAnimPhase color:green;
+[22:26:18.087] LOG: %cStart Phase MessagePhase color:green;
+[22:26:18.330] LOG: %cStart Phase ShowAbilityPhase color:green;
+[22:26:18.486] LOG: %cStart Phase StatStageChangePhase color:green;
+[22:26:18.665] LOG: %cStart Phase MessagePhase color:green;
+[22:26:18.875] LOG: %cStart Phase HideAbilityPhase color:green;
+[22:26:18.898] LOG: %cStart Phase MoveEndPhase color:green;
+[22:26:18.899] LOG: %cStart Phase MovePhase color:green;
+[22:26:18.899] LOG: %cUser: Mudbray
+Move: BODY_PRESS
+Use Mode: NORMAL color:orchid
+[22:26:18.907] LOG: %cStart Phase MessagePhase color:green;
+[22:26:19.008] LOG: %cStart Phase MoveEffectPhase color:green;
+[22:26:19.141] LOG: crit stage: +0
+[22:26:19.142] LOG: Applied X Defense 
+[22:26:19.142] LOG: Move: Body Press | Base damage: 30.16 | Power: 80 | Source attack: 44 | Target defense: 18
+[22:26:19.143] LOG: Move: Body Press | Attack damage: 25
+[22:26:19.143] LOG: %cStart Phase DamageAnimPhase color:green;
+[22:26:19.153] LOG: %cStart Phase MessagePhase color:green;
+[22:26:19.352] LOG: %cStart Phase MoveEndPhase color:green;
+[22:26:19.353] LOG: %cStart Phase MovePhase color:green;
+[22:26:19.353] LOG: %cStart Phase MoveEndPhase color:green;
+[22:26:19.354] LOG: %cStart Phase MovePhase color:green;
+[22:26:19.354] LOG: %cUser: Lillipup
+Move: TACKLE
+Use Mode: NORMAL color:orchid
+[22:26:19.362] LOG: %cStart Phase MessagePhase color:green;
+[22:26:19.469] LOG: %cStart Phase MoveEffectPhase color:green;
+[22:26:19.536] LOG: crit stage: +0
+[22:26:19.536] LOG: Applied X Defense 
+[22:26:19.536] LOG: Move: Tackle | Base damage: 4.290909090909091 | Power: 40 | Source attack: 21 | Target defense: 44
+[22:26:19.537] LOG: Move: Tackle | Attack damage: 6
+[22:26:19.537] LOG: %cStart Phase DamageAnimPhase color:green;
+[22:26:19.548] LOG: %cStart Phase ShowAbilityPhase color:green;
+[22:26:19.703] LOG: %cStart Phase StatStageChangePhase color:green;
+[22:26:19.882] LOG: %cStart Phase MessagePhase color:green;
+[22:26:20.091] LOG: %cStart Phase HideAbilityPhase color:green;
+[22:26:20.114] LOG: %cStart Phase MoveEndPhase color:green;
+[22:26:20.115] LOG: %cStart Phase MovePhase color:green;
+[22:26:20.115] LOG: %cUser: Varoom
+Move: BARRAGE
+Use Mode: NORMAL color:orchid
+[22:26:20.120] LOG: %cStart Phase MessagePhase color:green;
+[22:26:20.208] LOG: %cStart Phase MessagePhase color:green;
+[22:26:20.397] LOG: %cStart Phase MoveEndPhase color:green;
+[22:26:20.397] LOG: %cStart Phase CheckInterludePhase color:green;
+[22:26:20.397] LOG: %cStart Phase WeatherEffectPhase color:green;
+[22:26:20.397] LOG: %cStart Phase PositionalTagPhase color:green;
+[22:26:20.397] LOG: %cStart Phase BerryPhase color:green;
+[22:26:20.401] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[22:26:20.405] LOG: %cStart Phase TurnEndPhase color:green;
+[22:26:20.408] WARN: [coop:turn] host recorder: finalize with NO open recording -> turn=-1 events=0 (caller decides not to emit)
+[22:26:20.408] LOG: %cStart Phase ShowAbilityPhase color:green;
+[22:26:20.564] LOG: %cStart Phase StatStageChangePhase color:green;
+[22:26:20.743] LOG: %cStart Phase MessagePhase color:green;
+[22:26:20.936] LOG: %cStart Phase HideAbilityPhase color:green;
+[22:26:20.959] LOG: %cStart Phase TurnInitPhase color:green;
+[22:26:20.959] LOG: %cStart Phase CommandPhase color:green;
+[22:26:49.303] LOG: Move: STOMPING_TANTRUM Move targets: {"targets":[3,4,1],"multiple":false} 
+Player Pokemon: Mudbray
+[22:26:49.304] LOG: %cStart Phase SelectTargetPhase color:green;
+[22:26:50.892] LOG: %cStart Phase CommandPhase color:green;
+[22:26:51.720] LOG: %cStart Phase CommandPhase color:green;
+[22:26:53.319] LOG: Move: SHORE_UP Move targets: {"targets":[0],"multiple":false} 
+Player Pokemon: Mudbray
+[22:26:53.321] LOG: %cStart Phase CommandPhase color:green;
+[22:26:54.292] LOG: Move: SCALD Move targets: {"targets":[3,4,0,2],"multiple":false} 
+Player Pokemon: Sobble
+[22:26:54.293] LOG: %cStart Phase SelectTargetPhase color:green;
+[22:26:54.764] LOG: %cStart Phase CommandPhase color:green;
+[22:26:57.800] LOG: %cStart Phase EnemyCommandPhase color:green;
+[22:26:57.801] LOG: Applied X Defense 
+[22:26:57.803] LOG: Applied X Defense 
+[22:26:57.804] LOG: Battle Seed: 93T0fGKB95Losrdd
+[22:26:57.804] WARN: BattlerTag IGNORE_GHOST is missing a score!
+[22:26:57.804] WARN: BattlerTag IGNORE_GHOST is missing a score!
+[22:26:57.804] WARN: BattlerTag IGNORE_GHOST is missing a score!
+[22:26:57.806] WARN: BattlerTag IGNORE_GHOST is missing a score!
+[22:26:57.806] LOG: Move Pool: ["Tackle","Roar","Howl","Odor Sleuth"]
+[22:26:57.806] LOG: Move Scores: [12,-20,2,0]
+[22:26:57.806] LOG: Sorted Move Pool: ["Tackle","Howl","Odor Sleuth","Roar"]
+[22:26:57.806] LOG: Chosen Move: Tackle
+[22:26:57.806] LOG: %cStart Phase EnemyCommandPhase color:green;
+[22:26:57.806] LOG: %cStart Phase TurnStartPhase color:green;
+[22:26:57.813] LOG: %cStart Phase SwitchSummonPhase color:green;
+[22:26:57.981] LOG: Applied Zinc 
+[22:26:58.008] WARN: cry/821 not found
+[22:26:58.118] LOG: %cStart Phase PostSummonPhase color:green;
+[22:26:58.118] LOG: Ran PSP for: Rookidee
+[22:26:58.118] LOG: %cStart Phase PostSummonPhase color:green;
+[22:26:58.119] LOG: %cStart Phase ShowAbilityPhase color:green;
+[22:26:58.270] LOG: %cStart Phase StatStageChangePhase color:green;
+[22:26:58.448] LOG: %cStart Phase MessagePhase color:green;
+[22:26:58.664] LOG: %cStart Phase HideAbilityPhase color:green;
+[22:26:58.687] LOG: %cStart Phase PostSummonPhase color:green;
+[22:26:58.688] LOG: %cStart Phase MovePhase color:green;
+[22:26:58.688] LOG: %cUser: Sobble
+Move: SCALD
+Use Mode: NORMAL color:orchid
+[22:26:58.696] LOG: %cStart Phase MessagePhase color:green;
+[22:26:58.781] LOG: %cStart Phase MoveEffectPhase color:green;
+[22:26:58.959] LOG: crit stage: +0
+[22:26:58.959] LOG: Applied X Sp. Atk 
+[22:26:58.959] LOG: Move: Scald | Base damage: 34.58514285714286 | Power: 96 | Source attack: 33 | Target defense: 14
+[22:26:58.959] LOG: Move: Scald | Attack damage: 46
+[22:26:58.960] LOG: %cStart Phase DamageAnimPhase color:green;
+[22:26:58.970] LOG: %cStart Phase FaintPhase color:green;
+[22:26:59.549] LOG: %cStart Phase MessagePhase color:green;
+[22:26:59.736] LOG: %cStart Phase VictoryPhase color:green;
+[22:26:59.736] LOG: %cStart Phase ExpPhase color:green;
+[22:26:59.737] LOG: Applied Super EXP. Charm 
+[22:26:59.737] LOG: Applied EXP. Charm 
+[22:26:59.937] LOG: %cStart Phase ExpPhase color:green;
+[22:26:59.937] LOG: Applied Super EXP. Charm 
+[22:26:59.937] LOG: Applied EXP. Charm 
+[22:27:00.203] LOG: %cStart Phase ExpPhase color:green;
+[22:27:00.203] LOG: Applied Super EXP. Charm 
+[22:27:00.203] LOG: Applied EXP. Charm 
+[22:27:00.481] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[22:27:00.481] LOG: Applied Super EXP. Charm 
+[22:27:00.481] LOG: Applied EXP. Charm 
+[22:27:00.481] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[22:27:00.481] LOG: %cStart Phase MoveEndPhase color:green;
+[22:27:00.482] LOG: %cStart Phase MovePhase color:green;
+[22:27:00.482] LOG: %cUser: Pikachu
+Move: STRUGGLE
+Use Mode: IGNORE_PP color:orchid
+[22:27:00.486] LOG: %cStart Phase MessagePhase color:green;
+[22:27:00.592] LOG: %cStart Phase MessagePhase color:green;
+[22:27:00.742] LOG: %cStart Phase MoveEffectPhase color:green;
+[22:27:00.847] LOG: crit stage: +0
+[22:27:00.848] LOG: Applied X Defense 
+[22:27:00.848] LOG: Move: Struggle | Base damage: 6.5 | Power: 50 | Source attack: 18 | Target defense: 24
+[22:27:00.848] LOG: Move: Struggle | Attack damage: 6
+[22:27:00.848] LOG: %cStart Phase DamageAnimPhase color:green;
+[22:27:00.859] LOG: %cStart Phase DamageAnimPhase color:green;
+[22:27:00.860] LOG: %cStart Phase MessagePhase color:green;
+[22:27:01.097] LOG: %cStart Phase MoveEndPhase color:green;
+[22:27:01.098] LOG: %cStart Phase MovePhase color:green;
+[22:27:01.098] LOG: %cUser: Mudbray
+Move: SHORE_UP
+Use Mode: NORMAL color:orchid
+[22:27:01.102] LOG: %cStart Phase MessagePhase color:green;
+[22:27:01.197] LOG: %cStart Phase MoveEffectPhase color:green;
+[22:27:01.392] LOG: %cStart Phase PokemonHealPhase color:green;
+[22:27:01.394] LOG: %cStart Phase MessagePhase color:green;
+[22:27:01.608] LOG: %cStart Phase MoveEndPhase color:green;
+[22:27:01.609] LOG: %cStart Phase MovePhase color:green;
+[22:27:01.609] LOG: %cStart Phase MoveEndPhase color:green;
+[22:27:01.609] LOG: %cStart Phase CheckInterludePhase color:green;
+[22:27:01.609] LOG: %cStart Phase WeatherEffectPhase color:green;
+[22:27:01.609] LOG: %cStart Phase PositionalTagPhase color:green;
+[22:27:01.609] LOG: %cStart Phase BerryPhase color:green;
+[22:27:01.611] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[22:27:01.613] LOG: %cStart Phase TurnEndPhase color:green;
+[22:27:01.615] WARN: [coop:turn] host recorder: finalize with NO open recording -> turn=-1 events=0 (caller decides not to emit)
+[22:27:01.615] LOG: %cStart Phase TurnInitPhase color:green;
+[22:27:01.615] LOG: %cStart Phase CommandPhase color:green;
+[22:27:03.060] LOG: %cStart Phase CommandPhase color:green;
+[22:27:03.060] LOG: %cStart Phase CommandPhase color:green;
+[22:27:03.061] LOG: %cStart Phase EnemyCommandPhase color:green;
+[22:27:03.061] LOG: Battle Seed: 93T0fGKB95Losrdd
+[22:27:03.061] LOG: %cStart Phase TurnStartPhase color:green;
+[22:27:03.065] LOG: %cStart Phase AttemptCapturePhase color:green;
+[22:27:04.148] LOG: [coop:account] account-write scope OPEN (own-catch) depth=1
+[22:27:04.206] LOG: Applied Zinc 
