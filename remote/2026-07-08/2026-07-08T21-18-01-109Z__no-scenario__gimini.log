@@ -1,0 +1,269 @@
+url:      https://elite-redux-staging.pages.dev/
+build:    mrc9a598-g33b
+mode:     0  wave:?
+seed:     Fmg5rmRiKz0R3hgYIugsUaSg
+party:    
+enemy:    
+
+----- CONSOLE -----
+[21:14:55.794] LOG: %cStart Phase PostSummonPhase color:green;
+[21:14:55.795] LOG: Ran PSP for: Hoppip
+[21:14:55.798] LOG: %cStart Phase PostSummonPhase color:green;
+[21:14:55.800] LOG: %cStart Phase PostSummonPhase color:green;
+[21:14:55.803] LOG: %cStart Phase PostSummonPhase color:green;
+[21:14:55.804] LOG: %cStart Phase PostSummonPhase color:green;
+[21:14:55.804] LOG: %cStart Phase PostSummonPhase color:green;
+[21:14:55.804] LOG: Ran PSP for: Petilil
+[21:14:55.806] LOG: %cStart Phase PostSummonPhase color:green;
+[21:14:55.807] LOG: %cStart Phase PostSummonPhase color:green;
+[21:14:55.807] LOG: %cStart Phase ShowAbilityPhase color:green;
+[21:14:55.972] LOG: %cStart Phase PokemonHealPhase color:green;
+[21:14:55.972] LOG: %cStart Phase MessagePhase color:green;
+[21:14:56.218] LOG: %cStart Phase HideAbilityPhase color:green;
+[21:14:56.254] LOG: %cStart Phase TurnInitPhase color:green;
+[21:14:56.254] LOG: %cStart Phase CommandPhase color:green;
+[21:14:58.882] LOG: Move: CHIP_AWAY Move targets: {"targets":[3,4,1],"multiple":false} 
+Player Pokemon: Regigigas
+[21:14:58.883] LOG: %cStart Phase SelectTargetPhase color:green;
+[21:15:00.255] LOG: %cStart Phase CommandPhase color:green;
+[21:15:01.757] LOG: Move: AIR_CUTTER Move targets: {"targets":[3,4,5],"multiple":true} 
+Player Pokemon: Dreepy
+[21:15:01.759] LOG: %cStart Phase SelectTargetPhase color:green;
+[21:15:02.255] LOG: %cStart Phase CommandPhase color:green;
+[21:15:09.589] LOG: Move: DEFENSE_CURL Move targets: {"targets":[2],"multiple":false} 
+Player Pokemon: Venipede
+[21:15:09.591] LOG: %cStart Phase EnemyCommandPhase color:green;
+[21:15:09.604] LOG: Move Pool: ["Mega Drain","Growth","Pollen Puff","After You"]
+[21:15:09.604] LOG: Move Scores: [6.75,0,7.5,0]
+[21:15:09.604] LOG: Sorted Move Pool: ["Pollen Puff","Mega Drain","Growth","After You"]
+[21:15:09.604] LOG: Chosen Move: Mega Drain
+[21:15:09.604] LOG: %cStart Phase EnemyCommandPhase color:green;
+[21:15:09.637] LOG: Move Pool: ["Mega Drain","Tickle","Stun Spore","Fairy Wind"]
+[21:15:09.637] LOG: Move Scores: [6.9375,2,10,33]
+[21:15:09.637] LOG: Sorted Move Pool: ["Fairy Wind","Stun Spore","Mega Drain","Tickle"]
+[21:15:09.637] LOG: Chosen Move: Fairy Wind
+[21:15:09.637] LOG: %cStart Phase EnemyCommandPhase color:green;
+[21:15:09.675] LOG: Move Pool: ["Mega Drain","Poison Powder","Quash","Stun Spore"]
+[21:15:09.675] LOG: Move Scores: [3.328125,10,0,10]
+[21:15:09.675] LOG: Sorted Move Pool: ["Poison Powder","Stun Spore","Mega Drain","Quash"]
+[21:15:09.675] LOG: Chosen Move: Poison Powder
+[21:15:09.676] LOG: %cStart Phase TurnStartPhase color:green;
+[21:15:09.712] LOG: %cStart Phase MovePhase color:green;
+[21:15:09.712] LOG: %cUser: Cottonee
+Move: FAIRY_WIND
+Use Mode: NORMAL color:orchid
+[21:15:09.741] LOG: %cStart Phase MessagePhase color:green;
+[21:15:09.801] LOG: %cStart Phase MoveEffectPhase color:green;
+[21:15:09.852] WARN: Texture "%s" has no frame "%s" PRAS- Fairy Wind 1
+[21:15:09.868] WARN: Texture "%s" has no frame "%s" PRAS- Fairy Wind 1
+[21:15:09.902] WARN: Texture "%s" has no frame "%s" PRAS- Fairy Wind 1
+[21:15:09.935] WARN: Texture "%s" has no frame "%s" PRAS- Fairy Wind 1
+[21:15:09.969] WARN: Texture "%s" has no frame "%s" PRAS- Fairy Wind 1
+[21:15:10.019] WARN: Texture "%s" has no frame "%s" PRAS- Fairy Wind 1
+[21:15:10.036] WARN: Texture "%s" has no frame "%s" PRAS- Fairy Wind 1
+[21:15:10.085] WARN: Texture "%s" has no frame "%s" PRAS- Fairy Wind 1
+[21:15:10.135] WARN: Texture "%s" has no frame "%s" PRAS- Fairy Wind 1
+[21:15:10.486] LOG: crit stage: +0
+[21:15:10.487] LOG: Move: Fairy Wind | Base damage: 6.457142857142857 | Power: 40 | Source attack: 13 | Target defense: 14
+[21:15:10.488] LOG: Move: Fairy Wind | Attack damage: 17
+[21:15:10.488] LOG: %cStart Phase DamageAnimPhase color:green;
+[21:15:10.521] LOG: %cStart Phase MessagePhase color:green;
+[21:15:10.752] LOG: %cStart Phase MoveEndPhase color:green;
+[21:15:10.757] LOG: %cStart Phase MovePhase color:green;
+[21:15:10.757] LOG: %cUser: Dreepy
+Move: AIR_CUTTER
+Use Mode: NORMAL color:orchid
+[21:15:10.776] LOG: %cStart Phase MessagePhase color:green;
+[21:15:10.885] LOG: %cStart Phase MoveEffectPhase color:green;
+[21:15:11.203] LOG: crit stage: +1
+[21:15:11.205] LOG: Move: Air Cutter | Base damage: 22.825 | Power: 87.5 | Source attack: 28 | Target defense: 16
+[21:15:11.205] LOG: Move: Air Cutter | Attack damage: 31
+[21:15:11.206] LOG: crit stage: +1
+[21:15:11.207] LOG: Move: Air Cutter | Base damage: 19.53684210526316 | Power: 87.5 | Source attack: 28 | Target defense: 19
+[21:15:11.208] LOG: Move: Air Cutter | Attack damage: 29
+[21:15:11.208] LOG: crit stage: +1
+[21:15:11.209] LOG: Move: Air Cutter | Base damage: 24.213333333333335 | Power: 87.5 | Source attack: 28 | Target defense: 15
+[21:15:11.210] LOG: Move: Air Cutter | Attack damage: 43
+[21:15:11.210] LOG: %cStart Phase DamageAnimPhase color:green;
+[21:15:11.238] LOG: %cStart Phase MessagePhase color:green;
+[21:15:11.452] LOG: %cStart Phase DamageAnimPhase color:green;
+[21:15:11.488] LOG: %cStart Phase MessagePhase color:green;
+[21:15:11.718] LOG: %cStart Phase DamageAnimPhase color:green;
+[21:15:11.754] LOG: %cStart Phase MessagePhase color:green;
+[21:15:11.985] LOG: %cStart Phase FaintPhase color:green;
+[21:15:12.988] LOG: %cStart Phase MessagePhase color:green;
+[21:15:13.071] LOG: %cStart Phase VictoryPhase color:green;
+[21:15:13.072] LOG: Applied Soothe Bell 
+[21:15:13.072] LOG: %cStart Phase ExpPhase color:green;
+[21:15:13.072] LOG: Applied Super EXP. Charm 
+[21:15:13.072] LOG: Applied EXP. Charm 
+[21:15:13.354] LOG: %cStart Phase ExpPhase color:green;
+[21:15:13.355] LOG: Applied Super EXP. Charm 
+[21:15:13.355] LOG: Applied EXP. Charm 
+[21:15:13.604] LOG: %cStart Phase ExpPhase color:green;
+[21:15:13.604] LOG: Applied Super EXP. Charm 
+[21:15:13.604] LOG: Applied EXP. Charm 
+[21:15:13.938] LOG: %cStart Phase LevelUpPhase color:green;
+[21:15:13.939] LOG: %cStart Phase FaintPhase color:green;
+[21:15:14.772] LOG: %cStart Phase MessagePhase color:green;
+[21:15:15.271] LOG: %cStart Phase VictoryPhase color:green;
+[21:15:15.272] LOG: Applied Soothe Bell 
+[21:15:15.272] LOG: %cStart Phase ExpPhase color:green;
+[21:15:15.272] LOG: Applied Super EXP. Charm 
+[21:15:15.272] LOG: Applied EXP. Charm 
+[21:15:15.554] LOG: %cStart Phase ExpPhase color:green;
+[21:15:15.554] LOG: Applied Super EXP. Charm 
+[21:15:15.554] LOG: Applied EXP. Charm 
+[21:15:15.804] LOG: %cStart Phase ExpPhase color:green;
+[21:15:15.804] LOG: Applied Super EXP. Charm 
+[21:15:15.804] LOG: Applied EXP. Charm 
+[21:15:16.538] LOG: %cStart Phase FaintPhase color:green;
+[21:15:16.541] WARN: cry/187 not found
+[21:15:16.622] LOG: %cStart Phase MessagePhase color:green;
+[21:15:17.188] LOG: %cStart Phase VictoryPhase color:green;
+[21:15:17.189] LOG: Applied Soothe Bell 
+[21:15:17.190] LOG: %cStart Phase ExpPhase color:green;
+[21:15:17.190] LOG: Applied Super EXP. Charm 
+[21:15:17.190] LOG: Applied EXP. Charm 
+[21:15:17.837] LOG: %cStart Phase LevelUpPhase color:green;
+[21:15:17.838] LOG: %cStart Phase ExpPhase color:green;
+[21:15:17.838] LOG: Applied Super EXP. Charm 
+[21:15:17.838] LOG: Applied EXP. Charm 
+[21:15:18.304] LOG: %cStart Phase ExpPhase color:green;
+[21:15:18.304] LOG: Applied Super EXP. Charm 
+[21:15:18.304] LOG: Applied EXP. Charm 
+[21:15:18.820] LOG: %cStart Phase MoveEndPhase color:green;
+[21:15:18.822] LOG: %cStart Phase MovePhase color:green;
+[21:15:18.822] LOG: %cUser: Regigigas
+Move: CHIP_AWAY
+Use Mode: NORMAL color:orchid
+[21:15:18.824] LOG: %cStart Phase MessagePhase color:green;
+[21:15:18.952] LOG: %cStart Phase MessagePhase color:green;
+[21:15:19.168] LOG: %cStart Phase MoveEndPhase color:green;
+[21:15:19.170] LOG: %cStart Phase MovePhase color:green;
+[21:15:19.170] LOG: %cStart Phase MoveEndPhase color:green;
+[21:15:19.170] LOG: %cStart Phase MovePhase color:green;
+[21:15:19.170] LOG: %cUser: Venipede
+Move: DEFENSE_CURL
+Use Mode: NORMAL color:orchid
+[21:15:19.174] LOG: %cStart Phase MessagePhase color:green;
+[21:15:19.285] LOG: %cStart Phase MoveEffectPhase color:green;
+[21:15:19.569] LOG: %cStart Phase StatStageChangePhase color:green;
+[21:15:19.754] LOG: %cStart Phase MessagePhase color:green;
+[21:15:19.968] LOG: %cStart Phase MoveEndPhase color:green;
+[21:15:19.969] LOG: %cStart Phase MovePhase color:green;
+[21:15:19.969] LOG: %cStart Phase MoveEndPhase color:green;
+[21:15:19.969] LOG: %cStart Phase CheckInterludePhase color:green;
+[21:15:19.969] LOG: %cStart Phase WeatherEffectPhase color:green;
+[21:15:19.969] LOG: %cStart Phase PositionalTagPhase color:green;
+[21:15:19.969] LOG: %cStart Phase BerryPhase color:green;
+[21:15:19.971] LOG: Applied Sitrus Berry 
+[21:15:19.975] LOG: %cStart Phase CommonAnimPhase color:green;
+[21:15:19.975] LOG: %cStart Phase PokemonHealPhase color:green;
+[21:15:20.188] LOG: %cStart Phase MessagePhase color:green;
+[21:15:20.468] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[21:15:20.470] LOG: %cStart Phase TurnEndPhase color:green;
+[21:15:20.474] WARN: [coop:turn] host recorder: finalize with NO open recording -> turn=-1 events=0 (caller decides not to emit)
+[21:15:20.474] LOG: %cStart Phase PokemonHealPhase color:green;
+[21:15:20.474] LOG: %cStart Phase MessagePhase color:green;
+[21:15:20.701] LOG: %cStart Phase PokemonHealPhase color:green;
+[21:15:20.904] LOG: %cStart Phase MessagePhase color:green;
+[21:15:21.117] LOG: %cStart Phase BattleEndPhase color:green;
+[21:15:21.117] LOG: Battle Score: 106 (1 Turns x1)
+[21:15:21.117] LOG: Total Score: 1097
+[21:15:21.131] LOG: %cStart Phase EggLapsePhase color:green;
+[21:15:21.131] LOG: %cStart Phase SelectModifierPhase color:green;
+[21:15:21.131] LOG: Wave Seed: tqucgpiQUWDW`^@yQ_FF 15
+[21:15:21.142] LOG: 2 0 [3,4,5]
+[21:15:21.142] LOG: {"id":"POTION","localeKey":"modifierType:ModifierType.POTION","iconImage":"potion","group":"potion","soundName":"se/restore","tier":0,"restorePoints":20,"restorePercent":10,"healStatus":false} 
+[21:15:21.144] LOG: 2 0 [3,4,5]
+[21:15:21.144] LOG: {"id":"POTION","localeKey":"modifierType:ModifierType.POTION","iconImage":"potion","group":"potion","soundName":"se/restore","tier":0,"restorePoints":20,"restorePercent":10,"healStatus":false} 
+[21:15:21.144] LOG: 6 3 [3,4,5]
+[21:15:21.144] LOG: {"id":"LURE","localeKey":"modifierType:ModifierType.LURE","iconImage":"lure","group":"lure","soundName":"se/restore","tier":0,"maxBattles":10} 
+[21:15:21.144] LOG: 9 3 [3,4,5]
+[21:15:21.144] LOG: {"id":"TM_CASE","localeKey":"","iconImage":"tm_case","soundName":"se/restore","tier":0} 
+[21:15:46.380] LOG: %cStart Phase LearnMovePhase color:green;
+[21:15:49.138] WARN: cry/885 not found
+[21:15:51.690] LOG: [coop:reward] advanceCoopInteractionForContinuation SKIP (isCoop=false fromSeq=-1 meInProgress=false)
+[21:15:53.481] LOG: %cStart Phase ErCrossroadsPhase color:green;
+[21:16:07.965] LOG: %cStart Phase SelectBiomePhase color:green;
+[21:16:07.965] LOG: Wave Seed: tqucgpiQUWDW`^@yQ_FF 15
+[21:16:25.070] LOG: %cStart Phase SwitchBiomePhase color:green;
+[21:16:25.486] LOG: %cStart Phase NewBattlePhase color:green;
+[21:16:25.486] LOG: Wave Seed: urvdhqjRVXEXa_AzR`GG 16
+[21:16:25.487] LOG: Starting trainer pool tier: UNCOMMON
+[21:16:25.491] LOG: %cStart Phase ReturnPhase color:green;
+[21:16:25.603] LOG: %cStart Phase ReturnPhase color:green;
+[21:16:25.719] LOG: %cStart Phase ReturnPhase color:green;
+[21:16:25.837] LOG: %cStart Phase ShowTrainerPhase color:green;
+[21:16:25.952] LOG: %cStart Phase NewBiomeEncounterPhase color:green;
+[21:16:25.960] LOG: Mudbray
+[21:16:25.980] LOG: Pokemon: Foe Mudbray | Species ID: 749 | Level: 10 | Nature: Naive (+Spd/-SpDef)
+[21:16:25.980] LOG: Stats (IVs): HP: 36 (26), Atk: 27 (22), Def: 21 (7), Spatk: 14 (7), Spdef: 14 (13), Spd: 17 (5)
+[21:16:25.980] LOG: Ability: Stamina | Passive Ability: Own Tempo 
+[21:16:25.980] LOG: Moveset: ["Stomping Tantrum","Mega Kick","Double Kick","Rock Blast"]
+[21:16:25.982] LOG: Rhyhorn
+[21:16:26.002] LOG: Pokemon: Foe Rhyhorn | Species ID: 111 | Level: 10 | Nature: Modest (+SpAtk/-Atk)
+[21:16:26.002] LOG: Stats (IVs): HP: 38 (25), Atk: 21 (19), Def: 25 (17), Spatk: 13 (1), Spdef: 13 (13), Spd: 18 (4)
+[21:16:26.002] LOG: Ability: Lightning Rod | Passive Ability: Solid Rock 
+[21:16:26.002] LOG: Moveset: ["Smack Down","Slam","Tail Whip","Fury Attack"]
+[21:16:26.004] LOG: Yamask
+[21:16:26.021] LOG: Pokemon: Foe Yamask | Species ID: 4562 | Level: 10 | Nature: Calm (+SpDef/-Atk)
+[21:16:26.021] LOG: Stats (IVs): HP: 30 (10), Atk: 14 (13), Def: 22 (17), Spatk: 11 (13), Spdef: 22 (16), Spd: 13 (6)
+[21:16:26.021] LOG: Ability: Ill Will | Passive Ability: Vengeance 
+[21:16:26.021] LOG: Moveset: ["Astonish","Pain Split","Destiny Bond"]
+[21:16:36.017] LOG: Generated AI funcs
+[21:16:36.179] DEBUG: Session data saved to slot 0!
+[21:16:36.181] LOG: Wave Seed: urvdhqjRVXEXa_AzR`GG 16
+[21:16:36.390] LOG: Depot Agent Hank
+[21:16:37.270] LOG: %cStart Phase SummonPhase color:green;
+[21:16:37.271] LOG: Hank
+[21:16:37.534] LOG: %cStart Phase SummonPhase color:green;
+[21:16:37.535] LOG: Hank
+[21:16:37.818] LOG: %cStart Phase SummonPhase color:green;
+[21:16:37.818] LOG: Hank
+[21:16:38.101] LOG: %cStart Phase SummonPhase color:green;
+[21:16:38.286] WARN: cry/486 not found
+[21:16:38.401] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[21:16:38.404] LOG: %cStart Phase SummonPhase color:green;
+[21:16:38.585] WARN: cry/885 not found
+[21:16:38.701] LOG: %cStart Phase SummonPhase color:green;
+[21:16:39.001] LOG: %cStart Phase InitEncounterPhase color:green;
+[21:16:39.007] LOG: %cStart Phase PostSummonPhase color:green;
+[21:16:39.008] LOG: Ran PSP for: Dreepy
+[21:16:39.017] LOG: %cStart Phase PostSummonPhase color:green;
+[21:16:39.025] LOG: %cStart Phase PostSummonPhase color:green;
+[21:16:39.028] LOG: %cStart Phase PostSummonPhase color:green;
+[21:16:39.029] LOG: Ran PSP for: Regigigas
+[21:16:39.034] LOG: %cStart Phase PostSummonPhase color:green;
+[21:16:39.038] LOG: %cStart Phase PostSummonPhase color:green;
+[21:16:39.041] LOG: %cStart Phase PostSummonPhase color:green;
+[21:16:39.041] LOG: Ran PSP for: Rhyhorn
+[21:16:39.046] LOG: %cStart Phase PostSummonPhase color:green;
+[21:16:39.046] LOG: Ran PSP for: Venipede
+[21:16:39.050] LOG: %cStart Phase PostSummonPhase color:green;
+[21:16:39.053] LOG: %cStart Phase PostSummonPhase color:green;
+[21:16:39.056] LOG: %cStart Phase PostSummonPhase color:green;
+[21:16:39.057] LOG: %cStart Phase PostSummonPhase color:green;
+[21:16:39.058] LOG: %cStart Phase PostSummonPhase color:green;
+[21:16:39.058] LOG: Ran PSP for: Mudbray
+[21:16:39.061] LOG: %cStart Phase PostSummonPhase color:green;
+[21:16:39.062] LOG: %cStart Phase PostSummonPhase color:green;
+[21:16:39.062] LOG: %cStart Phase PostSummonPhase color:green;
+[21:16:39.062] LOG: Ran PSP for: Yamask
+[21:16:39.064] LOG: %cStart Phase PostSummonPhase color:green;
+[21:16:39.064] LOG: %cStart Phase PostSummonPhase color:green;
+[21:16:39.064] LOG: %cStart Phase TurnInitPhase color:green;
+[21:16:39.064] LOG: %cStart Phase CommandPhase color:green;
+[21:17:40.136] DEBUG: Session data saved to slot 0!
+[21:17:42.256] LOG: Seed: rM5QSOwHhyHmkAXmx6wcKIDg
+[21:17:42.256] LOG: Wave Seed: rM5QSOwHhyHmkAXmx6wcKIDg 0
+[21:17:42.746] WARN: AnimationManager key already exists: prompt
+[21:17:42.746] WARN: AnimationManager key already exists: tera_sparkle
+[21:17:42.746] LOG: Seed: Fmg5rmRiKz0R3hgYIugsUaSg
+[21:17:42.746] LOG: Wave Seed: Fmg5rmRiKz0R3hgYIugsUaSg 0
+[21:17:48.785] LOG: %cStart Phase LoginPhase color:green;
+[21:17:49.226] LOG: Client Session: nQsovepiHii3nfDYjB4QPfemi9soyFH2
+[21:17:49.783] LOG: %cStart Phase TitlePhase color:green;
+[21:17:49.784] LOG: Getting Session Slot id: %d 0
+[21:17:49.805] LOG: use seasonal splash messages true
