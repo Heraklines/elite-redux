@@ -282,8 +282,16 @@ describe("showdown-side-swap: checkpoint + full snapshot safety net", () => {
 describe("showdown-side-swap: session data (launch/resume boot)", () => {
   function sampleSession(): SessionSaveData {
     return {
-      party: [{ id: 1 }, { id: 2 }],
-      enemyParty: [{ id: 3 }, { id: 4 }],
+      // Real PokemonData always carries a `player` flag; the guest's own team is authored as the host's
+      // ENEMY roster (player:false), so the swap must flip it to player:true (-> PlayerPokemon on boot).
+      party: [
+        { id: 1, player: true },
+        { id: 2, player: true },
+      ],
+      enemyParty: [
+        { id: 3, player: false },
+        { id: 4, player: false },
+      ],
       modifiers: [{ player: true, typeId: "A" }],
       enemyModifiers: [
         { player: false, typeId: "B" },
@@ -298,10 +306,14 @@ describe("showdown-side-swap: session data (launch/resume boot)", () => {
     } as unknown as SessionSaveData;
   }
 
-  it("trades party <-> enemyParty preserving order", () => {
+  it("trades party <-> enemyParty preserving order and re-flags each mon's player flag", () => {
     const s = swapSessionData(sampleSession());
     expect((s.party as unknown as { id: number }[]).map(p => p.id)).toEqual([3, 4]);
     expect((s.enemyParty as unknown as { id: number }[]).map(p => p.id)).toEqual([1, 2]);
+    // The guest's own team (ids 3/4, authored as the host ENEMY roster) becomes its local PLAYER
+    // side -> player:true (so PokemonData.toPokemon rebuilds PlayerPokemon); the opponent -> player:false.
+    expect((s.party as unknown as { player: boolean }[]).every(p => p.player === true)).toBe(true);
+    expect((s.enemyParty as unknown as { player: boolean }[]).every(p => p.player === false)).toBe(true);
   });
 
   it("trades modifiers <-> enemyModifiers and re-sets each player flag", () => {

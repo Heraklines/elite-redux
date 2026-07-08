@@ -181,6 +181,19 @@ export function swapFullSnapshot(snap: CoopFullBattleSnapshot): CoopFullBattleSn
  */
 export function swapSessionData(session: SessionSaveData): SessionSaveData {
   const { party, enemyParty } = session;
+  // The rosters trade sides AND each mon's `player` flag flips, so PokemonData.toPokemon reconstructs
+  // the correct SUBCLASS on the guest: the guest's own team (authored as the host's ENEMY roster) must
+  // rebuild as PlayerPokemon (its local player side), and the opponent (host PLAYER roster) as
+  // EnemyPokemon. Without this the guest's player party rebuilds as EnemyPokemon, whose getBattlerIndex
+  // looks in the ENEMY field and returns -1, so every getField()[bi] round-trip in the launch chain
+  // (PostSummonPhasePriorityQueue.queueAbilityPhase etc.) dereferences undefined and crashes. Mirrors
+  // the modifier-list `player` re-flag below; flipping each mon twice keeps `swap∘swap` an involution.
+  for (const p of enemyParty ?? []) {
+    (p as { player?: boolean }).player = true;
+  }
+  for (const p of party ?? []) {
+    (p as { player?: boolean }).player = false;
+  }
   session.party = enemyParty;
   session.enemyParty = party;
 
