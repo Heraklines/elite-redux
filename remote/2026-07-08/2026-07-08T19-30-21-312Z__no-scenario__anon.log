@@ -1,0 +1,130 @@
+url:      https://elite-redux-staging.pages.dev/
+build:    mrc9a598-g33b
+mode:     4  wave:1
+seed:     bfS7Bwj70bZIv7qbQOgfRUAG
+party:    Honedge Redux(L5 20hp f0), Aron Redux(L5 21hp f0), Snorunt Redux(L5 22hp f0), Weavile Redux(L5 24hp f0)
+enemy:    Pidgey(L2), Wurmple(L2), Spearow(L2)
+
+----- CONSOLE -----
+[19:16:24.594] LOG: %c %c %c %c %c Phaser v3.90.0 (WebGL | Web Audio) %c https://phaser.io/v390 background: #ff0000 background: #ffff00 background: #00ff00 background: #00ffff color: #ffffff; background: #000000 background: transparent
+[19:16:25.081] LOG: [ER] build mrc9a598-g33b
+[19:16:25.093] LOG: [dev-tools] loaded — 476 scenarios + Send Logs button
+[19:16:32.417] DEBUG: Destroying loading scene
+[19:16:32.417] DEBUG: Destroyed loading scene
+[19:16:32.502] LOG: Seed: bfS7Bwj70bZIv7qbQOgfRUAG
+[19:16:32.502] LOG: Wave Seed: bfS7Bwj70bZIv7qbQOgfRUAG 0
+[19:16:33.597] LOG: %cStart Phase LoginPhase color:green;
+[19:16:34.018] LOG: Client Session: dJRhHmHb8RAhLlVAo30deSOlWUetd2D0
+[19:16:34.436] LOG: %cStart Phase TitlePhase color:green;
+[19:16:34.446] LOG: use seasonal splash messages true
+[19:26:58.553] LOG: %cStart Phase SelectStarterPhase color:green;
+[19:27:00.528] LOG: %cStart Phase TitlePhase color:green;
+[19:27:00.534] LOG: use seasonal splash messages true
+[19:27:16.649] LOG: %cStart Phase TitlePhase color:green;
+[19:27:16.655] LOG: use seasonal splash messages true
+[19:27:21.673] LOG: %cStart Phase SelectChallengePhase color:green;
+[19:27:28.144] LOG: %cStart Phase SelectStarterPhase color:green;
+[19:27:55.902] WARN: cry/10724 not found
+[19:27:56.327] WARN: cry/10843 not found
+[19:27:57.036] WARN: cry/10677 not found
+[19:27:59.395] WARN: cry/10690 not found
+[19:27:59.968] WARN: cry/10839 not found
+[19:28:00.042] WARN: cry/10807 not found
+[19:28:01.132] WARN: cry/763 not found
+[19:28:32.908] WARN: cry/10690 not found
+[19:29:00.930] LOG: %cSaving starter preferences color: blue
+[19:29:02.009] LOG: %cSaving starter preferences color: blue
+[19:29:02.323] LOG: %cSaving starter preferences color: blue
+[19:29:22.107] LOG: %cSaving starter preferences color: blue
+[19:29:39.920] LOG: Getting Session Slot id: %d 0
+[19:29:39.921] LOG: Getting Session Slot id: %d 1
+[19:29:39.922] LOG: Getting Session Slot id: %d 2
+[19:29:39.923] LOG: Getting Session Slot id: %d 3
+[19:29:39.923] LOG: Getting Session Slot id: %d 4
+[19:29:40.156] ERROR: Invalid save data JSON detected! Session not found.
+[19:29:40.157] ERROR: Invalid save data JSON detected! Session not found.
+[19:29:40.159] ERROR: Invalid save data JSON detected! Session not found.
+[19:29:40.170] ERROR: Invalid save data JSON detected! Session not found.
+[19:29:40.182] ERROR: Invalid save data JSON detected! Session not found.
+[19:29:42.389] LOG: Wave Seed: cgT8Cxk81c[Jw8rcRPhgSVBH 1
+[19:29:42.391] LOG: %cStart Phase EncounterPhase color:green;
+[19:29:42.394] LOG: Starting species pool tier: COMMON
+[19:29:42.406] LOG: Pokemon: Wild Pidgey | Species ID: 16 | Level: 2 | Nature: Docile (-)
+[19:29:42.406] LOG: Stats (IVs): HP: 13 (4), Atk: 6 (11), Def: 7 (30), Spatk: 7 (23), Spdef: 6 (18), Spd: 7 (5)
+[19:29:42.406] LOG: Ability: Guts | Passive Ability: Flock 
+[19:29:42.406] LOG: Moveset: ["Air Cutter","Steel Wing","Quick Attack","Gust"]
+[19:29:42.406] LOG: Starting species pool tier: COMMON
+[19:29:42.407] LOG: Replaced CASCOON with WURMPLE
+[19:29:42.414] LOG: Pokemon: Wild Wurmple | Species ID: 265 | Level: 2 | Nature: Lonely (+Atk/-Def)
+[19:29:42.414] LOG: Stats (IVs): HP: 13 (8), Atk: 8 (13), Def: 5 (23), Spatk: 6 (27), Spdef: 6 (2), Spd: 5 (8)
+[19:29:42.414] LOG: Ability: Shield Dust | Passive Ability: Swarm 
+[19:29:42.414] LOG: Moveset: ["Web Shot","Struggle Bug","Poison Sting","Tackle"]
+[19:29:42.414] LOG: Starting species pool tier: COMMON
+[19:29:42.422] LOG: Pokemon: Wild Spearow | Species ID: 21 | Level: 2 | Nature: Lax (+Def/-SpDef)
+[19:29:42.422] LOG: Stats (IVs): HP: 14 (31), Atk: 7 (4), Def: 7 (24), Spatk: 6 (20), Spdef: 5 (17), Spd: 8 (20)
+[19:29:42.422] LOG: Ability: Accelerate | Passive Ability: Frisk 
+[19:29:42.422] LOG: Moveset: ["Air Cutter","Lash Out","Quick Guard","Detect"]
+[19:29:42.904] DEBUG: Session data saved to slot 0!
+[19:29:42.905] LOG: Wave Seed: cgT8Cxk81c[Jw8rcRPhgSVBH 1
+[19:29:43.114] WARN: cry/16 not found
+[19:29:43.115] WARN: cry/21 not found
+[19:29:43.382] LOG: %cStart Phase SummonPhase color:green;
+[19:29:43.564] WARN: cry/10690 not found
+[19:29:43.664] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[19:29:43.665] LOG: %cStart Phase SummonPhase color:green;
+[19:29:43.847] WARN: cry/10839 not found
+[19:29:43.964] LOG: %cStart Phase SummonPhase color:green;
+[19:29:44.147] WARN: cry/10807 not found
+[19:29:44.263] LOG: %cStart Phase CheckSwitchPhase color:green;
+[19:29:44.264] LOG: %cStart Phase CheckSwitchPhase color:green;
+[19:29:44.264] LOG: %cStart Phase CheckSwitchPhase color:green;
+[19:29:44.264] LOG: %cStart Phase InitEncounterPhase color:green;
+[19:29:44.270] LOG: %cStart Phase PostSummonPhase color:green;
+[19:29:44.270] LOG: Ran PSP for: Snorunt Redux
+[19:29:44.275] LOG: %cStart Phase PostSummonPhase color:green;
+[19:29:44.278] LOG: %cStart Phase PostSummonPhase color:green;
+[19:29:44.280] LOG: %cStart Phase PostSummonPhase color:green;
+[19:29:44.280] LOG: Ran PSP for: Honedge Redux
+[19:29:44.284] LOG: %cStart Phase PostSummonPhase color:green;
+[19:29:44.286] LOG: %cStart Phase PostSummonPhase color:green;
+[19:29:44.287] LOG: %cStart Phase PostSummonPhase color:green;
+[19:29:44.287] LOG: Ran PSP for: Aron Redux
+[19:29:44.289] LOG: %cStart Phase PostSummonPhase color:green;
+[19:29:44.291] LOG: %cStart Phase PostSummonPhase color:green;
+[19:29:44.291] LOG: %cStart Phase ShowAbilityPhase color:green;
+[19:29:44.449] LOG: %cStart Phase MovePhase color:green;
+[19:29:44.449] LOG: %cUser: Aron Redux
+Move: AQUA_RING
+Use Mode: INDIRECT color:orchid
+[19:29:44.456] LOG: %cStart Phase MessagePhase color:green;
+[19:29:44.580] LOG: %cStart Phase MoveEffectPhase color:green;
+[19:29:44.600] LOG: %cStart Phase MessagePhase color:green;
+[19:29:44.880] LOG: %cStart Phase MoveEndPhase color:green;
+[19:29:44.880] LOG: %cStart Phase HideAbilityPhase color:green;
+[19:29:44.917] LOG: %cStart Phase PostSummonPhase color:green;
+[19:29:44.917] LOG: Ran PSP for: Spearow
+[19:29:44.919] LOG: %cStart Phase PostSummonPhase color:green;
+[19:29:44.920] LOG: %cStart Phase PostSummonPhase color:green;
+[19:29:44.925] LOG: %cStart Phase ShowAbilityPhase color:green;
+[19:29:45.081] LOG: %cStart Phase HideAbilityPhase color:green;
+[19:29:45.132] LOG: %cStart Phase PostSummonPhase color:green;
+[19:29:45.132] LOG: Ran PSP for: Pidgey
+[19:29:45.133] LOG: %cStart Phase PostSummonPhase color:green;
+[19:29:45.133] LOG: %cStart Phase PostSummonPhase color:green;
+[19:29:45.133] LOG: %cStart Phase PostSummonPhase color:green;
+[19:29:45.133] LOG: Ran PSP for: Wurmple
+[19:29:45.134] LOG: %cStart Phase PostSummonPhase color:green;
+[19:29:45.135] LOG: %cStart Phase PostSummonPhase color:green;
+[19:29:45.135] LOG: %cStart Phase TurnInitPhase color:green;
+[19:29:45.135] LOG: %cStart Phase CommandPhase color:green;
+[19:29:49.512] LOG: Move: SHADOW_CLAW Move targets: {"targets":[3,4],"multiple":true} 
+Player Pokemon: Honedge Redux
+[19:29:49.514] LOG: %cStart Phase SelectTargetPhase color:green;
+[19:29:51.450] LOG: %cStart Phase CommandPhase color:green;
+[19:29:53.656] LOG: Move: SHADOW_CLAW Move targets: {"targets":[3,4],"multiple":true} 
+Player Pokemon: Honedge Redux
+[19:29:53.657] LOG: %cStart Phase SelectTargetPhase color:green;
+[19:30:00.482] LOG: %cStart Phase CommandPhase color:green;
+[19:30:03.904] LOG: Move: ROCK_SMASH Move targets: {"targets":[3,4,1],"multiple":false} 
+Player Pokemon: Honedge Redux
+[19:30:03.905] LOG: %cStart Phase SelectTargetPhase color:green;
