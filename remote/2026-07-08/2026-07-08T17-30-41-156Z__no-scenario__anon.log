@@ -1,0 +1,32 @@
+url:      https://elite-redux-staging.pages.dev/
+build:    mrc9a598-g33b
+mode:     0  wave:?
+seed:     xkYUo1UBUkvEtEcgIHBxwsKm
+party:    
+enemy:    
+
+----- CONSOLE -----
+[17:28:36.385] LOG: %c %c %c %c %c Phaser v3.90.0 (WebGL | Web Audio) %c https://phaser.io/v390 background: #ff0000 background: #ffff00 background: #00ff00 background: #00ffff color: #ffffff; background: #000000 background: transparent
+[17:28:37.130] LOG: [ER] build mrc9a598-g33b
+[17:28:37.313] LOG: [dev-tools] loaded — 476 scenarios + Send Logs button
+[17:28:53.178] DEBUG: Destroying loading scene
+[17:28:53.178] DEBUG: Destroyed loading scene
+[17:28:53.395] LOG: Seed: xkYUo1UBUkvEtEcgIHBxwsKm
+[17:28:53.395] LOG: Wave Seed: xkYUo1UBUkvEtEcgIHBxwsKm 0
+[17:28:54.926] LOG: %cStart Phase LoginPhase color:green;
+[17:29:01.934] LOG: %cStart Phase LoginPhase color:green;
+[17:29:35.616] LOG: %cStart Phase LoginPhase color:green;
+[17:29:53.839] LOG: %cStart Phase LoginPhase color:green;
+[17:30:09.472] WARN: Login failed! 401 
+[17:30:10.796] WARN: Login failed! 401 
+[17:30:12.136] WARN: Login failed! 401 
+[17:30:24.073] WARN: Login failed! 401 
+[17:30:25.413] WARN: Login failed! 401 
+[17:30:26.807] WARN: Login failed! 401 
+[17:30:28.106] WARN: Login failed! 401 
+[17:30:29.415] WARN: Login failed! 401 
+[17:30:30.736] WARN: Login failed! 401 
+[17:30:32.103] WARN: Login failed! 401 
+[17:30:33.376] WARN: Login failed! 401 
+[17:30:34.712] WARN: Login failed! 401 
+[17:30:36.006] WARN: Login failed! 401 
