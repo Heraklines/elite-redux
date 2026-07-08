@@ -2,6 +2,7 @@ import { globalScene } from "#app/global-scene";
 import { coopLog } from "#data/elite-redux/coop/coop-debug";
 import { COOP_REVIVAL_SEQ_BASE, getCoopFaintSwitchWaitMs } from "#data/elite-redux/coop/coop-interaction-relay";
 import { getCoopController, getCoopInteractionRelay } from "#data/elite-redux/coop/coop-runtime";
+import { COOP_REVIVAL_CHOICE_KINDS } from "#data/elite-redux/coop/coop-seq-registry";
 import { SwitchType } from "#enums/switch-type";
 import { UiMode } from "#enums/ui-mode";
 import type { PlayerPokemon } from "#field/pokemon";
@@ -68,7 +69,7 @@ export class RevivalBlessingPhase extends BattlePhase {
     const seq = COOP_REVIVAL_SEQ_BASE + fieldIndex;
     coopLog("replay", `revival owner-pick: awaiting partner pick seq=${seq} (user slot=${fieldIndex})`);
     relay.promptRevival(fieldIndex);
-    void relay.awaitInteractionChoice(seq, getCoopFaintSwitchWaitMs()).then(res => {
+    void relay.awaitInteractionChoice(seq, getCoopFaintSwitchWaitMs(), COOP_REVIVAL_CHOICE_KINDS).then(res => {
       const party = globalScene.getPlayerParty();
       let slotIndex = res?.choice ?? -1;
       const pickedSpecies = res?.data?.[1] ?? 0;

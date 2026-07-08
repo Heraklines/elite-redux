@@ -13,7 +13,10 @@ import {
   getCoopUiMirror,
   setCoopLearnMoveBatchPickerOpener,
 } from "#data/elite-redux/coop/coop-runtime";
-import { COOP_LEARN_MOVE_BATCH_FWD_SEQ_BASE } from "#data/elite-redux/coop/coop-seq-registry";
+import {
+  COOP_LEARN_MOVE_BATCH_CHOICE_KINDS,
+  COOP_LEARN_MOVE_BATCH_FWD_SEQ_BASE,
+} from "#data/elite-redux/coop/coop-seq-registry";
 import { erRecordAchievementLearnMove } from "#data/elite-redux/er-achievement-tracker";
 import type { MoveId } from "#enums/move-id";
 import { UiMode } from "#enums/ui-mode";
@@ -174,16 +177,18 @@ export function openCoopLearnMoveBatchPickerInline(
   void globalScene.ui.setModeWithoutClear(UiMode.LEARN_MOVE_BATCH, watchDeps).then(() => {
     mirror?.beginSession("watcher", UiMode.LEARN_MOVE_BATCH, seq);
   });
-  void relay.awaitInteractionChoice(seq, COOP_LEARN_MOVE_BATCH_WAIT_MS).then(res => {
-    if (res == null || res.choice === COOP_LEARN_MOVE_BATCH_FALLBACK) {
-      coopLog("learnmove", "guest watcher batch terminal null/fallback -> close (moveset converges via checkpoint)", {
-        seq,
-      });
-      finishWatch(null);
-      return;
-    }
-    finishWatch(decodeCoopLearnMoveBatchTerminal(res.choice, res.data));
-  });
+  void relay
+    .awaitInteractionChoice(seq, COOP_LEARN_MOVE_BATCH_WAIT_MS, COOP_LEARN_MOVE_BATCH_CHOICE_KINDS)
+    .then(res => {
+      if (res == null || res.choice === COOP_LEARN_MOVE_BATCH_FALLBACK) {
+        coopLog("learnmove", "guest watcher batch terminal null/fallback -> close (moveset converges via checkpoint)", {
+          seq,
+        });
+        finishWatch(null);
+        return;
+      }
+      finishWatch(decodeCoopLearnMoveBatchTerminal(res.choice, res.data));
+    });
 }
 
 // Register with the session runtime (loaded at boot via the phase-manager side-effect import) so the

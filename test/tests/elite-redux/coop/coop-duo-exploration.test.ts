@@ -851,8 +851,11 @@ describe.skipIf(!RUN)("co-op DUO exploration sweep (maintainer directive)", () =
     gengar.moveset = FULL_MOVESET.map(m => new PokemonMove(m));
 
     // The GUEST's pick (forget slot 0) is PRE-BUFFERED - the host's forward await buffer-hits.
+    // #861: send the REAL forward kind "learnMove" (the value the guest's coopGuestForwardOwnedLearnMove /
+    // CoopReplayLearnMovePhase actually send on this channel); the host await declares COOP_LEARN_MOVE_CHOICE_KINDS
+    // and kind-validation now re-buffers a mismatched kind, so the fixture must use the genuine one.
     withClientSync(rig.guestCtx, () => {
-      getCoopInteractionRelay()?.sendInteractionChoice(COOP_LEARN_MOVE_FWD_SEQ_BASE + PARTY_SLOT, "learnMoveFwd", 0);
+      getCoopInteractionRelay()?.sendInteractionChoice(COOP_LEARN_MOVE_FWD_SEQ_BASE + PARTY_SLOT, "learnMove", 0);
     });
 
     // HOST: spy the wire for the forward emission, stub the read-only UI, run the phase.

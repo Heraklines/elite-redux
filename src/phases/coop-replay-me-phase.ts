@@ -25,7 +25,7 @@ import {
   getCoopInteractionRelay,
   getCoopUiMirror,
 } from "#data/elite-redux/coop/coop-runtime";
-import { COOP_ME_PUMP_SEQ_BASE } from "#data/elite-redux/coop/coop-seq-registry";
+import { COOP_ME_CHOICE_KINDS, COOP_ME_PUMP_SEQ_BASE } from "#data/elite-redux/coop/coop-seq-registry";
 import type { CoopInteractionOutcome } from "#data/elite-redux/coop/coop-transport";
 import type { ErQuizQuestion } from "#data/elite-redux/er-quiz";
 import { MysteryEncounterMode } from "#enums/mystery-encounter-mode";
@@ -481,7 +481,7 @@ export class CoopReplayMePhase extends Phase {
     const terminalArm: MeTerminalArm =
       inheritedTerminalArm
       ?? this.liveTerminalArm
-      ?? relay.awaitInteractionChoice(this.seqTerm, COOP_ME_REPLAY_WAIT_MS).then(action => ({
+      ?? relay.awaitInteractionChoice(this.seqTerm, COOP_ME_REPLAY_WAIT_MS, COOP_ME_CHOICE_KINDS).then(action => ({
         tag: "terminal" as const,
         action,
       }));
@@ -723,7 +723,7 @@ export class CoopReplayMePhase extends Phase {
       seqTerm: this.seqTerm,
       timeoutMs: COOP_ME_REPLAY_WAIT_MS,
     });
-    void relay.awaitInteractionChoice(this.seqTerm, COOP_ME_REPLAY_WAIT_MS).then(action => {
+    void relay.awaitInteractionChoice(this.seqTerm, COOP_ME_REPLAY_WAIT_MS, COOP_ME_CHOICE_KINDS).then(action => {
       this.handleTerminalAction(action);
     });
   }
@@ -801,7 +801,7 @@ export class CoopReplayMePhase extends Phase {
         && relayRef != null
         && coopMeBattleEndDelegate({ interactionCounter: counter, seqTerm: this.seqTerm, relay: relayRef });
       if (!delegateOwnsTerminal) {
-        void relayRef?.awaitInteractionChoice(this.seqTerm, COOP_ME_REPLAY_WAIT_MS).then(() => {
+        void relayRef?.awaitInteractionChoice(this.seqTerm, COOP_ME_REPLAY_WAIT_MS, COOP_ME_CHOICE_KINDS).then(() => {
           if (coopMeInteractionStartValue() === counter) {
             coopLog("me", "detached ME end after battle handoff: leaving + advancing (#822)", { counter });
             try {

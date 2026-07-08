@@ -23,6 +23,7 @@ import {
   clearCoopRuntime,
   coopBroadcastDexSync,
   getCoopRuntime,
+  purgeCoopBufferedArrivals,
   startLocalCoopSession,
 } from "#data/elite-redux/coop/coop-runtime";
 import {
@@ -1638,6 +1639,14 @@ export class GameData {
     } else if (globalScene.gameMode.isCoop) {
       if (getCoopRuntime() == null) {
         startLocalCoopSession();
+      } else {
+        // #861: adopting a launch/resume session onto a LIVE runtime (the guest boots from the host's
+        // snapshot; a from-title resume re-applies the save). Interaction seqs reset per session/epoch, so
+        // any relay/rendezvous message BUFFERED from the prior epoch sits at a seq this new epoch reuses -
+        // and a plain FIFO buffer-hit would satisfy the new await with the STALE pick (the reward-shop P0).
+        // Drop the buffered arrivals so only THIS epoch's genuine picks can resolve an await; the live
+        // runtime (transport, listeners) is otherwise untouched.
+        purgeCoopBufferedArrivals("applyCoopLaunchSession (resume/launch adopt)");
       }
     } else {
       clearCoopRuntime();

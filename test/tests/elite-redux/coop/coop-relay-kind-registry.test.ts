@@ -14,7 +14,24 @@
 // is the sender/consumer mismatch bug, caught at build time instead of live.
 // =============================================================================
 
-import { COOP_RELAY_KINDS, COOP_SEQ_BANDS } from "#data/elite-redux/coop/coop-seq-registry";
+import {
+  COOP_ABILITY_CHOICE_KINDS,
+  COOP_BIOME_PICK_CHOICE_KINDS,
+  COOP_BIOME_SHOP_CHOICE_KINDS,
+  COOP_COLO_CHOICE_KINDS,
+  COOP_CROSSROADS_CHOICE_KINDS,
+  COOP_LEARN_MOVE_BATCH_CHOICE_KINDS,
+  COOP_LEARN_MOVE_CHOICE_KINDS,
+  COOP_ME_CHOICE_KINDS,
+  COOP_QUIZ_CHOICE_KINDS,
+  COOP_RELAY_KINDS,
+  COOP_REVIVAL_CHOICE_KINDS,
+  COOP_REWARD_CHOICE_KINDS,
+  COOP_SEQ_BANDS,
+  COOP_STORMGLASS_CHOICE_KINDS,
+  COOP_SWITCH_CHOICE_KINDS,
+  coopRegisteredChoiceKinds,
+} from "#data/elite-redux/coop/coop-seq-registry";
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
@@ -125,6 +142,34 @@ describe("#840 co-op relay-kind registry (wiring completeness, one layer down)",
   it("the consuming machinery for BOTH transports exists (no sender-only relay direction)", () => {
     expect(ALL_SRC.includes("awaitInteractionChoice("), "an interactionChoice consumer must exist").toBe(true);
     expect(ALL_SRC.includes("awaitInteractionOutcome("), "an interactionOutcome consumer must exist").toBe(true);
+  });
+
+  it("#861 every awaitInteractionChoice expected-kind set contains ONLY registered choice kinds", () => {
+    const choiceKinds = new Set(coopRegisteredChoiceKinds());
+    const sets: [string, readonly string[]][] = [
+      ["COOP_REWARD_CHOICE_KINDS", COOP_REWARD_CHOICE_KINDS],
+      ["COOP_ME_CHOICE_KINDS", COOP_ME_CHOICE_KINDS],
+      ["COOP_SWITCH_CHOICE_KINDS", COOP_SWITCH_CHOICE_KINDS],
+      ["COOP_REVIVAL_CHOICE_KINDS", COOP_REVIVAL_CHOICE_KINDS],
+      ["COOP_ABILITY_CHOICE_KINDS", COOP_ABILITY_CHOICE_KINDS],
+      ["COOP_BIOME_SHOP_CHOICE_KINDS", COOP_BIOME_SHOP_CHOICE_KINDS],
+      ["COOP_BIOME_PICK_CHOICE_KINDS", COOP_BIOME_PICK_CHOICE_KINDS],
+      ["COOP_CROSSROADS_CHOICE_KINDS", COOP_CROSSROADS_CHOICE_KINDS],
+      ["COOP_STORMGLASS_CHOICE_KINDS", COOP_STORMGLASS_CHOICE_KINDS],
+      ["COOP_LEARN_MOVE_CHOICE_KINDS", COOP_LEARN_MOVE_CHOICE_KINDS],
+      ["COOP_LEARN_MOVE_BATCH_CHOICE_KINDS", COOP_LEARN_MOVE_BATCH_CHOICE_KINDS],
+      ["COOP_QUIZ_CHOICE_KINDS", COOP_QUIZ_CHOICE_KINDS],
+      ["COOP_COLO_CHOICE_KINDS", COOP_COLO_CHOICE_KINDS],
+    ];
+    const offenders: string[] = [];
+    for (const [name, set] of sets) {
+      for (const kind of set) {
+        if (!choiceKinds.has(kind)) {
+          offenders.push(`${name} -> "${kind}"`);
+        }
+      }
+    }
+    expect(offenders, `expected-kind entries not a registered choice kind: ${offenders.join(", ")}`).toEqual([]);
   });
 
   it("the k-discriminated outcome kinds (dexSync, learnMoveForward) each have a handler", () => {

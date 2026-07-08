@@ -81,6 +81,13 @@ export interface CoopInteractionChoice {
   choice: number;
   /** Optional extra indices (party-target slot, ME sub-option); undefined when none. */
   data: number[] | undefined;
+  /**
+   * #861: the wire `kind` this choice was sent with (reward / me / switch / ...). Carried through so the
+   * KIND-VALIDATION on {@linkcode CoopInteractionRelay.awaitInteractionChoice} can re-buffer (never resolve
+   * on) a stale/cross-family choice that landed at a REUSED seq. Always set for messages received off the
+   * wire; may be undefined for a synthetic choice.
+   */
+  kind?: string;
 }
 
 /** Options for {@linkcode CoopInteractionRelay} (timer injection for tests). */
@@ -104,7 +111,29 @@ function defaultSchedule(cb: () => void, ms: number): () => void {
 
 /** Compact, log-safe one-line summary of a relayed choice (never dumps a blob). */
 function summarizeChoice(c: CoopInteractionChoice): string {
-  return `choice=${c.choice} data=${c.data === undefined ? "-" : `[${c.data.join(",")}]`}`;
+  return `kind=${c.kind ?? "?"} choice=${c.choice} data=${c.data === undefined ? "-" : `[${c.data.join(",")}]`}`;
+}
+
+/**
+ * #861: whether a received/buffered choice `kind` is one the awaiting site declared it consumes. A site that
+ * passes NO `expectedKinds` (or an empty set) opts out of validation entirely (legacy behavior - accept any),
+ * so an un-migrated call site and the primitive relay tests are byte-for-byte unaffected. When a set IS
+ * declared, an undefined kind (a synthetic choice with no wire kind) is rejected so it can never masquerade
+ * as a legitimate pick.
+ */
+function kindAccepted(kind: string | undefined, expectedKinds: readonly string[] | undefined): boolean {
+  if (expectedKinds === undefined || expectedKinds.length === 0) {
+    return true;
+  }
+  return kind !== undefined && expectedKinds.includes(kind);
+}
+
+/** #861: an in-flight {@linkcode CoopInteractionRelay.awaitInteractionChoice} waiter + its declared kinds. */
+interface CoopChoiceWaiter {
+  /** Resolve the parked await (a matching choice, or null on timeout/supersede). */
+  readonly finish: (res: CoopInteractionChoice | null) => void;
+  /** The kinds this await legitimately consumes; undefined = validation opted out (accept any). */
+  readonly expectedKinds: readonly string[] | undefined;
 }
 
 /** Compact, log-safe one-line summary of a host-resolved interaction outcome (discriminated by `k`). */
@@ -167,8 +196,12 @@ export class CoopInteractionRelay {
 
   /** seq -> FIFO queue of choices that arrived before their waiter. */
   private readonly inbox = new Map<number, CoopInteractionChoice[]>();
-  /** seq -> resolver for the in-flight {@linkcode awaitInteractionChoice} (one at a time). */
-  private readonly pending = new Map<number, (res: CoopInteractionChoice | null) => void>();
+  /**
+   * seq -> the in-flight {@linkcode awaitInteractionChoice} waiter (one at a time). #861: the waiter carries
+   * its `expectedKinds` so {@linkcode handle} can re-buffer (never deliver) an incoming choice whose kind is
+   * outside the set - the kind-validation twin of the buffer scan.
+   */
+  private readonly pending = new Map<number, CoopChoiceWaiter>();
   /** #806 stall watchdog: when each parked network wait began (same keys as `pending`). */
   private readonly pendingSince = new Map<number, number>();
   /** seq -> FIFO queue of OUTCOMES that arrived before their waiter (#633, TRACK-2 Phase C). */
@@ -229,33 +262,69 @@ export class CoopInteractionRelay {
    * WATCHER: take the next owner choice for interaction `seq` (FIFO). Resolves
    * immediately if one is already buffered, else waits for the next to arrive, or
    * resolves `null` on timeout (the watcher then leaves the screen, never hangs).
+   *
+   * #861 KIND-VALIDATION: the caller declares the `expectedKinds` it legitimately consumes. A
+   * buffered/incoming choice whose kind is OUTSIDE that set is RE-BUFFERED (kept in the inbox) and
+   * loudly logged - it never resolves the waiter. This closes the P0 where a STALE, minutes-old
+   * buffered choice at a REUSED seq (interaction counters reset per session/epoch) satisfied a new
+   * epoch's reward await ahead of the host's genuine pick. Passing no `expectedKinds` opts out of
+   * validation (legacy behavior - accept any), so the primitive relay tests are unaffected.
    */
-  awaitInteractionChoice(seq: number, timeoutMs = this.timeoutMs): Promise<CoopInteractionChoice | null> {
+  awaitInteractionChoice(
+    seq: number,
+    timeoutMs = this.timeoutMs,
+    expectedKinds?: readonly string[],
+  ): Promise<CoopInteractionChoice | null> {
     if (this.cancelledSeqs.has(seq)) {
       coopWarn("relay", `AWAIT interactionChoice seq=${seq} -> STICKY-CANCELLED (resync rescue) resolve null`);
       return Promise.resolve(null);
     }
     const queue = this.inbox.get(seq);
     if (queue !== undefined && queue.length > 0) {
-      const next = queue.shift()!;
-      if (queue.length === 0) {
-        this.inbox.delete(seq);
+      // #861: scan FIFO for the first buffered entry whose kind this site accepts. Entries with a
+      // NON-accepted kind (a stale/cross-family arrival at this reused seq) are LEFT in the queue
+      // (re-buffered) and loudly logged - they never resolve this await. Legitimate same-family picks
+      // keep strict FIFO order because we take the FIRST accepted one.
+      const matchIdx = queue.findIndex(entry => kindAccepted(entry.kind, expectedKinds));
+      if (matchIdx >= 0) {
+        for (let i = 0; i < matchIdx; i++) {
+          coopWarn(
+            "relay",
+            `AWAIT interactionChoice seq=${seq} SKIP buffered WRONG-KIND entry kind=${queue[i].kind ?? "?"} `
+              + `(expected [${(expectedKinds ?? []).join(",")}]) -> re-buffered, NOT resolved (#861)`,
+          );
+        }
+        const next = queue.splice(matchIdx, 1)[0];
+        if (queue.length === 0) {
+          this.inbox.delete(seq);
+        }
+        if (isCoopDebug()) {
+          coopLog(
+            "relay",
+            `AWAIT interactionChoice seq=${seq} timeoutMs=${timeoutMs} -> BUFFER-HIT resolve ${summarizeChoice(next)}`,
+          );
+        }
+        return Promise.resolve(next);
       }
-      if (isCoopDebug()) {
-        coopLog(
-          "relay",
-          `AWAIT interactionChoice seq=${seq} timeoutMs=${timeoutMs} -> BUFFER-HIT resolve ${summarizeChoice(next)}`,
-        );
-      }
-      return Promise.resolve(next);
+      // No accepted entry buffered: the ones present are all wrong-kind. Leave them re-buffered and
+      // fall through to a network wait for the genuine pick.
+      coopWarn(
+        "relay",
+        `AWAIT interactionChoice seq=${seq} all ${queue.length} buffered entries WRONG-KIND `
+          + `(expected [${(expectedKinds ?? []).join(",")}]) -> re-buffered, network-wait (#861)`,
+      );
     }
-    coopLog("relay", `AWAIT interactionChoice seq=${seq} timeoutMs=${timeoutMs} -> network-wait`);
+    coopLog(
+      "relay",
+      `AWAIT interactionChoice seq=${seq} timeoutMs=${timeoutMs} expected=[${(expectedKinds ?? []).join(",")}] -> network-wait`,
+    );
     this.pendingSince.set(seq, Date.now());
     // Supersede any stale waiter parked on this seq.
-    if (this.pending.has(seq)) {
+    const prior = this.pending.get(seq);
+    if (prior !== undefined) {
       coopWarn("relay", `AWAIT interactionChoice seq=${seq} SUPERSEDE stale waiter -> resolved null`);
+      prior.finish(null);
     }
-    this.pending.get(seq)?.(null);
     return new Promise<CoopInteractionChoice | null>(resolve => {
       let settled = false;
       let cancelTimer: () => void = () => {};
@@ -265,7 +334,7 @@ export class CoopInteractionRelay {
         }
         settled = true;
         cancelTimer();
-        if (this.pending.get(seq) === finish) {
+        if (this.pending.get(seq)?.finish === finish) {
           this.pendingSince.delete(seq);
           this.pending.delete(seq);
         }
@@ -276,7 +345,7 @@ export class CoopInteractionRelay {
         }
         resolve(res);
       };
-      this.pending.set(seq, finish);
+      this.pending.set(seq, { finish, expectedKinds });
       cancelTimer = this.schedule(() => finish(null), timeoutMs);
     });
   }
@@ -487,10 +556,10 @@ export class CoopInteractionRelay {
     const choiceFinishers: Array<(res: CoopInteractionChoice | null) => void> = [];
     const outcomeFinishers: Array<(res: CoopInteractionOutcome | null) => void> = [];
     const rewardFinishers: Array<(res: CoopSerializedRewardOption[] | null) => void> = [];
-    for (const [seq, finish] of this.pending) {
+    for (const [seq, waiter] of this.pending) {
       if (shouldCancel(seq)) {
         seqs.add(seq);
-        choiceFinishers.push(finish);
+        choiceFinishers.push(waiter.finish);
       }
     }
     for (const [seq, finish] of this.outcomePending) {
@@ -540,8 +609,8 @@ export class CoopInteractionRelay {
       coopLog("relay", "dispose() (no in-flight waiters)");
     }
     this.offMessage();
-    for (const finish of [...this.pending.values()]) {
-      finish(null);
+    for (const waiter of [...this.pending.values()]) {
+      waiter.finish(null);
     }
     for (const finish of [...this.outcomePending.values()]) {
       finish(null);
@@ -556,6 +625,36 @@ export class CoopInteractionRelay {
     this.outcomeInbox.clear();
     this.rewardOptionsPending.clear();
     this.rewardOptionsInbox.clear();
+    this.cancelledSeqs.clear();
+  }
+
+  /**
+   * #861 SESSION-BOUNDARY PURGE: drop every BUFFERED arrival (choice / outcome / rewardOptions) and the
+   * sticky-cancel marks, WITHOUT tearing down the transport listener or failing any LIVE waiter. Called at
+   * every session boundary where the SAME relay instance is carried across a session/epoch change (a resume
+   * boot / launch adopt onto a live runtime, a hot-rejoin full-resync): interaction seqs reset per epoch
+   * (the reward channel is base 0 + a counter), so a prior epoch's buffered message sits at a seq the NEW
+   * epoch will reuse, and a plain FIFO buffer-hit would satisfy the new await with the stale pick (the P0).
+   * Purging the buffers guarantees only THIS epoch's genuine, freshly-arriving picks can ever resolve an
+   * await. Unlike {@linkcode dispose} the relay stays alive - the session continues after the boundary.
+   */
+  purgeBufferedArrivals(reason: string): void {
+    const buffered = this.inbox.size + this.outcomeInbox.size + this.rewardOptionsInbox.size + this.cancelledSeqs.size;
+    if (buffered > 0) {
+      coopWarn(
+        "relay",
+        `purgeBufferedArrivals(${reason}) dropping inbox=${this.inbox.size} outcomeInbox=${this.outcomeInbox.size} `
+          + `rewardOptionsInbox=${this.rewardOptionsInbox.size} cancelledSeqs=${this.cancelledSeqs.size} `
+          + "(#861 stale-session isolation)",
+      );
+    } else {
+      coopLog("relay", `purgeBufferedArrivals(${reason}) nothing buffered (#861)`);
+    }
+    this.inbox.clear();
+    this.outcomeInbox.clear();
+    this.rewardOptionsInbox.clear();
+    // A seq sticky-cancelled in the PRIOR epoch must not keep resolving null in the NEW epoch (seqs reuse
+    // low counters), so clear the cancel marks alongside the buffers.
     this.cancelledSeqs.clear();
   }
 
@@ -665,7 +764,8 @@ export class CoopInteractionRelay {
     if (this.isForgedCrossOwnerSwitch(msg.seq, msg.choice)) {
       return;
     }
-    const choice: CoopInteractionChoice = { choice: msg.choice, data: msg.data };
+    // #861: carry the wire `kind` onto the choice so the KIND-VALIDATION can gate delivery + buffer-hits.
+    const choice: CoopInteractionChoice = { choice: msg.choice, data: msg.data, kind: msg.kind };
     // #record-replay: capture this RECEIVED (partner-owned) interaction pick so the host's single trace
     // captures EVERY committed interaction, not just its own (no-op unless recording on the host).
     recordReplayInteraction({
@@ -676,14 +776,24 @@ export class CoopInteractionRelay {
       ...(msg.data === undefined ? {} : { data: [...msg.data] }),
     });
     const waiter = this.pending.get(msg.seq);
-    if (waiter) {
+    // #861: only deliver straight to a parked waiter when the incoming kind is one that waiter declared it
+    // consumes. A mismatch (a stale/cross-family arrival at this reused seq) is NOT delivered - it falls
+    // through to the buffer + is loudly logged, and the waiter stays parked for its genuine pick.
+    if (waiter && kindAccepted(msg.kind, waiter.expectedKinds)) {
       if (isCoopDebug()) {
         coopLog("relay", `RECV interactionChoice seq=${msg.seq} -> deliver-to-waiter ${summarizeChoice(choice)}`);
       }
-      waiter(choice);
+      waiter.finish(choice);
       return;
     }
-    // No waiter yet - buffer FIFO for the next awaitInteractionChoice(seq).
+    if (waiter) {
+      coopWarn(
+        "relay",
+        `RECV interactionChoice seq=${msg.seq} kind=${msg.kind} MISMATCH parked waiter `
+          + `(expected [${(waiter.expectedKinds ?? []).join(",")}]) -> BUFFER, waiter stays parked (#861)`,
+      );
+    }
+    // No (accepting) waiter yet - buffer FIFO for the next awaitInteractionChoice(seq).
     const queue = this.inbox.get(msg.seq) ?? [];
     queue.push(choice);
     this.inbox.set(msg.seq, queue);

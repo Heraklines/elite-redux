@@ -935,6 +935,15 @@ function wireCoopDisconnectReaction(transport: CoopTransport, relay: CoopInterac
           }
           // The GUEST missed events while dark: pull the host's full authoritative snapshot.
           if (isCoopAuthoritativeGuest()) {
+            // #861: the channel was dark - any relay/rendezvous message BUFFERED before the drop (or a
+            // pre-drop epoch's leftover) must not satisfy a post-rejoin await ahead of the authoritative
+            // snapshot. Purge the buffers first, then pull + apply the host's full state.
+            try {
+              relay.purgeBufferedArrivals("post-rejoin full-resync (#805)");
+              runtime.rendezvous.purgeBufferedArrivals("post-rejoin full-resync (#805)");
+            } catch {
+              /* purge must never break the resync path */
+            }
             const seq = COOP_REJOIN_SYNC_SEQ_BASE + (Date.now() % 100_000);
             coopLog("resync", `post-rejoin full resync request seq=${seq}`);
             const gen = coopSessionGeneration(); // #808
@@ -1298,6 +1307,19 @@ export function getCoopMePump(): CoopMePump | null {
 /** Convenience: the reciprocal rendezvous barriers (#839), or null when not in a co-op run. */
 export function getCoopRendezvous(): CoopRendezvous | null {
   return active?.rendezvous ?? null;
+}
+
+/**
+ * #861 SESSION-BOUNDARY PURGE: drop every BUFFERED relay + rendezvous arrival on the LIVE runtime without
+ * tearing it down, so a prior session/epoch's stale buffered message can never satisfy a NEW epoch's await.
+ * Call at every boundary where the SAME runtime is carried across a session/epoch change: a resume boot /
+ * launch adopt onto a live runtime ({@linkcode GameData.applyCoopLaunchSession}) and a hot-rejoin
+ * full-resync. A no-op outside a live session. `clearCoopRuntime` needs no call - its `dispose()` already
+ * drops everything as the runtime is torn down.
+ */
+export function purgeCoopBufferedArrivals(reason: string): void {
+  active?.interactionRelay.purgeBufferedArrivals(reason);
+  active?.rendezvous.purgeBufferedArrivals(reason);
 }
 
 /** Whether a co-op session is currently active. */

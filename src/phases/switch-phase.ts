@@ -7,6 +7,7 @@ import {
   getCoopInteractionRelay,
   getCoopNetcodeMode,
 } from "#data/elite-redux/coop/coop-runtime";
+import { COOP_SWITCH_CHOICE_KINDS } from "#data/elite-redux/coop/coop-seq-registry";
 import { coopSwitchBlocksMonForOwner } from "#data/elite-redux/coop/coop-session";
 import { SwitchType } from "#enums/switch-type";
 import { UiMode } from "#enums/ui-mode";
@@ -114,60 +115,62 @@ export class SwitchPhase extends BattlePhase {
           // disconnected or idle partner.
           globalScene.ui.showText("Waiting for your partner to choose their next Pokemon...");
           const faintSeq = COOP_FAINT_SWITCH_SEQ_BASE + this.fieldIndex;
-          void coopRelay.awaitInteractionChoice(faintSeq, getCoopFaintSwitchWaitMs()).then(res => {
-            const battlerCount = globalScene.currentBattle.getBattlerCount();
-            let slotIndex = res?.choice ?? -1;
-            // #799 (live Wingull/Chinchou wrong-mon summon): the pick carries the chosen mon's
-            // SPECIES (data[1]). If the two clients' party orders diverged, the blind slot index
-            // points at a DIFFERENT mon here - resolve by IDENTITY instead and log the drift.
-            const pickedSpecies = res?.data?.[1] ?? 0;
-            if (pickedSpecies > 0 && slotIndex >= 0) {
-              const atSlot = globalScene.getPlayerParty()[slotIndex];
-              if (atSlot?.species?.speciesId !== pickedSpecies) {
-                const bySpecies = globalScene
-                  .getPlayerParty()
-                  .findIndex((p, i) => i >= battlerCount && i < 6 && p?.species?.speciesId === pickedSpecies);
-                if (bySpecies >= 0) {
-                  coopWarn(
-                    "replay",
-                    `partner pick slot=${slotIndex} holds sp${atSlot?.species?.speciesId ?? 0} but partner picked sp${pickedSpecies} -> resolved by identity to slot=${bySpecies} (party-order drift)`,
-                  );
-                  slotIndex = bySpecies;
+          void coopRelay
+            .awaitInteractionChoice(faintSeq, getCoopFaintSwitchWaitMs(), COOP_SWITCH_CHOICE_KINDS)
+            .then(res => {
+              const battlerCount = globalScene.currentBattle.getBattlerCount();
+              let slotIndex = res?.choice ?? -1;
+              // #799 (live Wingull/Chinchou wrong-mon summon): the pick carries the chosen mon's
+              // SPECIES (data[1]). If the two clients' party orders diverged, the blind slot index
+              // points at a DIFFERENT mon here - resolve by IDENTITY instead and log the drift.
+              const pickedSpecies = res?.data?.[1] ?? 0;
+              if (pickedSpecies > 0 && slotIndex >= 0) {
+                const atSlot = globalScene.getPlayerParty()[slotIndex];
+                if (atSlot?.species?.speciesId !== pickedSpecies) {
+                  const bySpecies = globalScene
+                    .getPlayerParty()
+                    .findIndex((p, i) => i >= battlerCount && i < 6 && p?.species?.speciesId === pickedSpecies);
+                  if (bySpecies >= 0) {
+                    coopWarn(
+                      "replay",
+                      `partner pick slot=${slotIndex} holds sp${atSlot?.species?.speciesId ?? 0} but partner picked sp${pickedSpecies} -> resolved by identity to slot=${bySpecies} (party-order drift)`,
+                    );
+                    slotIndex = bySpecies;
+                  }
                 }
               }
-            }
-            const picked = globalScene.getPlayerParty()[slotIndex];
-            const legal =
-              slotIndex >= battlerCount
-              && slotIndex < 6
-              && picked?.isAllowedInBattle() === true
-              && !coopSwitchBlocksMonForOwner(coopOwnerOfPlayerFieldSlot(this.fieldIndex), picked.coopOwner);
-            if (!legal) {
-              coopLog(
-                "replay",
-                `partner replacement pick seq=${faintSeq} ${res == null ? "TIMED OUT" : `illegal (${slotIndex})`} -> auto-pick`,
-              );
-              slotIndex = this.coopAutoPickReplacement();
-            }
-            if (slotIndex >= battlerCount && slotIndex < 6) {
-              globalScene.phaseManager.unshiftNew(
-                "SwitchSummonPhase",
-                this.switchType,
-                fieldIndex,
-                slotIndex,
-                this.doReturn,
-              );
-              // #633 guest-faint deadlock: push an OUT-OF-BAND checkpoint AFTER the summon
-              // (FIFO on this level) so the guest materializes the replacement NOW and can
-              // command it - the next turn resolution can never arrive without that command.
-              globalScene.phaseManager.unshiftNew("CoopPushReplacementCheckpointPhase");
-            }
-            void Promise.resolve(globalScene.ui.setMode(UiMode.MESSAGE)).then(() => super.end());
-          });
+              const picked = globalScene.getPlayerParty()[slotIndex];
+              const legal =
+                slotIndex >= battlerCount
+                && slotIndex < 6
+                && picked?.isAllowedInBattle() === true
+                && !coopSwitchBlocksMonForOwner(coopOwnerOfPlayerFieldSlot(this.fieldIndex), picked.coopOwner);
+              if (!legal) {
+                coopLog(
+                  "replay",
+                  `partner replacement pick seq=${faintSeq} ${res == null ? "TIMED OUT" : `illegal (${slotIndex})`} -> auto-pick`,
+                );
+                slotIndex = this.coopAutoPickReplacement();
+              }
+              if (slotIndex >= battlerCount && slotIndex < 6) {
+                globalScene.phaseManager.unshiftNew(
+                  "SwitchSummonPhase",
+                  this.switchType,
+                  fieldIndex,
+                  slotIndex,
+                  this.doReturn,
+                );
+                // #633 guest-faint deadlock: push an OUT-OF-BAND checkpoint AFTER the summon
+                // (FIFO on this level) so the guest materializes the replacement NOW and can
+                // command it - the next turn resolution can never arrive without that command.
+                globalScene.phaseManager.unshiftNew("CoopPushReplacementCheckpointPhase");
+              }
+              void Promise.resolve(globalScene.ui.setMode(UiMode.MESSAGE)).then(() => super.end());
+            });
           return;
         }
         // LOCKSTEP WATCHER: do not open the picker; apply the owner's relayed replacement.
-        void coopRelay.awaitInteractionChoice(seq, COOP_SWITCH_WAIT_MS).then(res => {
+        void coopRelay.awaitInteractionChoice(seq, COOP_SWITCH_WAIT_MS, COOP_SWITCH_CHOICE_KINDS).then(res => {
           const slotIndex = res?.choice ?? -1;
           if (slotIndex >= globalScene.currentBattle.getBattlerCount() && slotIndex < 6) {
             // Co-op (#633 Fix #4g): carry the BATON_PASS flag relayed in data[0]. Without it the

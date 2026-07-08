@@ -17,7 +17,7 @@ import {
   getCoopRuntime,
   getCoopUiMirror,
 } from "#data/elite-redux/coop/coop-runtime";
-import { COOP_BIOME_PICK_SEQ_BASE } from "#data/elite-redux/coop/coop-seq-registry";
+import { COOP_BIOME_PICK_CHOICE_KINDS, COOP_BIOME_PICK_SEQ_BASE } from "#data/elite-redux/coop/coop-seq-registry";
 import type { CoopSessionController } from "#data/elite-redux/coop/coop-session-controller";
 import {
   type ErRouteNode,
@@ -337,7 +337,13 @@ export class SelectBiomePhase extends BattlePhase {
     }
     const relay = getCoopInteractionRelay();
     const res =
-      relay == null ? null : await relay.awaitInteractionChoice(COOP_BIOME_PICK_SEQ_BASE + pinned, COOP_BIOME_WAIT_MS);
+      relay == null
+        ? null
+        : await relay.awaitInteractionChoice(
+            COOP_BIOME_PICK_SEQ_BASE + pinned,
+            COOP_BIOME_WAIT_MS,
+            COOP_BIOME_PICK_CHOICE_KINDS,
+          );
     getCoopUiMirror()?.endSession();
     let biome: BiomeId;
     if (res != null && res.data != null && res.data.length > 0) {

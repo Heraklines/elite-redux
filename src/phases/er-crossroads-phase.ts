@@ -51,7 +51,7 @@ import {
   getCoopRuntime,
   getCoopUiMirror,
 } from "#data/elite-redux/coop/coop-runtime";
-import { COOP_CROSSROADS_SEQ_BASE } from "#data/elite-redux/coop/coop-seq-registry";
+import { COOP_CROSSROADS_CHOICE_KINDS, COOP_CROSSROADS_SEQ_BASE } from "#data/elite-redux/coop/coop-seq-registry";
 import type { CoopSessionController } from "#data/elite-redux/coop/coop-session-controller";
 import { erHasNotoriety } from "#data/elite-redux/er-biome-notoriety";
 import { erMarkBiomeStay, setErLeaveBiomeNow } from "#data/elite-redux/er-biome-structure";
@@ -281,7 +281,13 @@ export class ErCrossroadsPhase extends Phase {
     }
     const relay = getCoopInteractionRelay();
     const res =
-      relay == null ? null : await relay.awaitInteractionChoice(COOP_CROSSROADS_SEQ_BASE + pinned, COOP_BIOME_WAIT_MS);
+      relay == null
+        ? null
+        : await relay.awaitInteractionChoice(
+            COOP_CROSSROADS_SEQ_BASE + pinned,
+            COOP_BIOME_WAIT_MS,
+            COOP_CROSSROADS_CHOICE_KINDS,
+          );
     getCoopUiMirror()?.endSession();
     let moveOn: boolean;
     if (res == null) {

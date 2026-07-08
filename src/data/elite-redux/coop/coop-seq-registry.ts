@@ -372,3 +372,48 @@ export const COOP_RELAY_KINDS: readonly CoopRelayKind[] = [
   // ER Stormglass one-time weather pick (#130 co-op wiring): host drives, relays the chosen weather index.
   { kind: "stormglass", transport: "choice", band: "stormglass", sender: "er-stormglass-picker-phase.ts" },
 ];
+
+// ---------------------------------------------------------------------------
+// #861 KIND-VALIDATION expected-kind sets. Every `awaitInteractionChoice` call site declares the
+// EXACT set of relay `kind`s it legitimately consumes; the relay re-buffers (never resolves on) any
+// buffered/incoming choice whose kind is outside that set. This closes the P0 where a STALE, minutes-
+// old buffered choice at a REUSED seq (interaction counters reset per session/epoch) satisfied a new
+// epoch's await instead of the genuine pick. The sets are the SINGLE SOURCE for each site and are
+// asserted (each kind is a registered `transport:"choice"` kind) by the kind-registry test.
+//
+// CONSERVATIVE by construction: a site that legitimately alternates across several kinds (the reward
+// shop, the ME pump/terminal) lists ALL of them, so a legitimate pick is NEVER re-buffered - only a
+// cross-family stale/forged kind is rejected.
+// ---------------------------------------------------------------------------
+
+/** The reward shop watch loop (select-modifier-phase.ts): the whole raw-counter reward channel. */
+export const COOP_REWARD_CHOICE_KINDS = ["reward", "shop", "skip", "reroll", "check", "transfer", "lock"] as const;
+/** The mystery-encounter pump/terminal awaits (present-pick / sub-pick / terminal LEAVE button). */
+export const COOP_ME_CHOICE_KINDS = ["me", "meSub", "meBtn"] as const;
+/** Faint / voluntary switch replacement picks (switch-phase.ts). */
+export const COOP_SWITCH_CHOICE_KINDS = ["switch"] as const;
+/** Revival Blessing owner pick (revival-blessing-phase.ts). */
+export const COOP_REVIVAL_CHOICE_KINDS = ["revival"] as const;
+/** Ability-picker relay (er-(greater-)ability-*-phase.ts). */
+export const COOP_ABILITY_CHOICE_KINDS = ["abilityPicker"] as const;
+/** Biome market buy/leave (biome-shop-phase.ts). */
+export const COOP_BIOME_SHOP_CHOICE_KINDS = ["biomeShop"] as const;
+/** ER World-Map biome pick (select-biome-phase.ts). */
+export const COOP_BIOME_PICK_CHOICE_KINDS = ["biomePick"] as const;
+/** Every-5-waves crossroads Stay/Leave (er-crossroads-phase.ts). */
+export const COOP_CROSSROADS_CHOICE_KINDS = ["crossroads"] as const;
+/** One-time Stormglass weather pick (er-stormglass-picker-phase.ts). */
+export const COOP_STORMGLASS_CHOICE_KINDS = ["stormglass"] as const;
+/** Lockstep + per-slot-forward "which move to forget" pick (learn-move-phase.ts). */
+export const COOP_LEARN_MOVE_CHOICE_KINDS = ["learnMove"] as const;
+/** Shared batch level-up Move Learn panel terminal (learn-move-batch-phase.ts). */
+export const COOP_LEARN_MOVE_BATCH_CHOICE_KINDS = ["learnMoveBatch"] as const;
+/** ME quiz answer relay (coop-quiz-mirror.ts). */
+export const COOP_QUIZ_CHOICE_KINDS = ["quizAns"] as const;
+/** Colosseum board Continue/Cash-out decision (coop-colosseum.ts). */
+export const COOP_COLO_CHOICE_KINDS = ["coloPick"] as const;
+
+/** Every registered `transport:"choice"` kind (used by the kind-validation registry test). */
+export function coopRegisteredChoiceKinds(): string[] {
+  return COOP_RELAY_KINDS.filter(k => k.transport === "choice").map(k => k.kind);
+}

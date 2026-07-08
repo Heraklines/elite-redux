@@ -30,7 +30,7 @@ import { Phase } from "#app/phase";
 import { coopLog, coopWarn } from "#data/elite-redux/coop/coop-debug";
 import { COOP_BIOME_WAIT_MS } from "#data/elite-redux/coop/coop-interaction-relay";
 import { getCoopController, getCoopInteractionRelay, getCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
-import { COOP_STORMGLASS_SEQ } from "#data/elite-redux/coop/coop-seq-registry";
+import { COOP_STORMGLASS_CHOICE_KINDS, COOP_STORMGLASS_SEQ } from "#data/elite-redux/coop/coop-seq-registry";
 import {
   erStormglassApplyChosenWeather,
   getStormglassWeather,
@@ -141,7 +141,10 @@ export class ErStormglassPickerPhase extends Phase {
       /* cosmetic */
     }
     const relay = getCoopInteractionRelay();
-    const res = relay == null ? null : await relay.awaitInteractionChoice(COOP_STORMGLASS_SEQ, COOP_BIOME_WAIT_MS);
+    const res =
+      relay == null
+        ? null
+        : await relay.awaitInteractionChoice(COOP_STORMGLASS_SEQ, COOP_BIOME_WAIT_MS, COOP_STORMGLASS_CHOICE_KINDS);
     const choice = STORMGLASS_WEATHER_CHOICES[res?.choice ?? -1];
     if (choice == null) {
       coopWarn(

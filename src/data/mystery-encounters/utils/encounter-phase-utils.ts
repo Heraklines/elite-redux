@@ -19,7 +19,7 @@ import {
   getCoopInteractionRelay,
   getCoopNetcodeMode,
 } from "#data/elite-redux/coop/coop-runtime";
-import { COOP_ME_PUMP_SEQ_BASE } from "#data/elite-redux/coop/coop-seq-registry";
+import { COOP_ME_CHOICE_KINDS, COOP_ME_PUMP_SEQ_BASE } from "#data/elite-redux/coop/coop-seq-registry";
 import type { CoopInteractionOutcome } from "#data/elite-redux/coop/coop-transport";
 import type { Gender } from "#data/gender";
 import { getNatureName } from "#data/nature";
@@ -153,7 +153,8 @@ export function coopHostStreamSecondaryAwaitIndex(labels: string[]): Promise<num
     labels: labels.length,
   });
   relay?.sendInteractionOutcome(seqMe, "mePresent", prompt);
-  const awaited = relay?.awaitInteractionChoice(seqMe, COOP_ME_REPLAY_WAIT_MS) ?? Promise.resolve(null);
+  const awaited =
+    relay?.awaitInteractionChoice(seqMe, COOP_ME_REPLAY_WAIT_MS, COOP_ME_CHOICE_KINDS) ?? Promise.resolve(null);
   return awaited.then(pick => {
     const idx = pick?.choice ?? null;
     coopLog("me", "host received guest bespoke yes/no sub-pick (#827)", {
@@ -190,7 +191,8 @@ export function coopHostStreamCatchFullAwaitSlot(pokemonName: string): Promise<n
   };
   coopLog("me", "host streams catch-FULL replace-or-skip sub-prompt + awaits guest slot (#855)", { seq: seqMe });
   relay?.sendInteractionOutcome(seqMe, "mePresent", prompt);
-  const awaited = relay?.awaitInteractionChoice(seqMe, COOP_ME_REPLAY_WAIT_MS) ?? Promise.resolve(null);
+  const awaited =
+    relay?.awaitInteractionChoice(seqMe, COOP_ME_REPLAY_WAIT_MS, COOP_ME_CHOICE_KINDS) ?? Promise.resolve(null);
   return awaited.then(pick => {
     const slot = pick?.choice ?? null;
     const partySize = globalScene.getPlayerParty().length;
@@ -804,7 +806,7 @@ export function selectPokemonForOption(
       };
       coopLog("me", "host streams PARTY sub-prompt + awaits guest slot", { seq: seqMe });
       relay?.sendInteractionOutcome(seqMe, "mePresent", partyPrompt);
-      void relay?.awaitInteractionChoice(seqMe, COOP_ME_REPLAY_WAIT_MS).then(async pick => {
+      void relay?.awaitInteractionChoice(seqMe, COOP_ME_REPLAY_WAIT_MS, COOP_ME_CHOICE_KINDS).then(async pick => {
         // A null (disconnected guest) maps past the party tail => the not-selected branch.
         const slotIndex = pick?.choice ?? globalScene.getPlayerParty().length;
         coopLog("me", "host received guest party sub-pick", {
@@ -844,7 +846,7 @@ export function selectPokemonForOption(
           labels: secondaryOptions.length,
         });
         relay?.sendInteractionOutcome(seqMe, "mePresent", secondaryPrompt);
-        void relay?.awaitInteractionChoice(seqMe, COOP_ME_REPLAY_WAIT_MS).then(sec => {
+        void relay?.awaitInteractionChoice(seqMe, COOP_ME_REPLAY_WAIT_MS, COOP_ME_CHOICE_KINDS).then(sec => {
           globalScene.currentBattle.mysteryEncounter!.setDialogueToken("selectedPokemon", pokemon.getNameToRender());
           const idx = sec?.choice ?? -1;
           coopLog("me", "host received guest secondary sub-pick", {

@@ -35,6 +35,7 @@ import {
 } from "#data/elite-redux/coop/coop-ability-picker-relay";
 import { coopLog } from "#data/elite-redux/coop/coop-debug";
 import { advanceCoopInteractionForContinuation, getCoopInteractionRelay } from "#data/elite-redux/coop/coop-runtime";
+import { COOP_ABILITY_CHOICE_KINDS } from "#data/elite-redux/coop/coop-seq-registry";
 import { erRunUnlockableInnateSlots } from "#data/elite-redux/er-ability-capsule";
 import {
   GREATER_CAPSULE_RUN_UNLOCK_COUNT,
@@ -302,7 +303,11 @@ export class ErGreaterAbilityCapsulePhase extends Phase {
       this.end();
       return;
     }
-    const action = await relay.awaitInteractionChoice(coopAbilityPickerSeq(this.coopSeq), COOP_ABILITY_WAIT_MS);
+    const action = await relay.awaitInteractionChoice(
+      coopAbilityPickerSeq(this.coopSeq),
+      COOP_ABILITY_WAIT_MS,
+      COOP_ABILITY_CHOICE_KINDS,
+    );
     const data = action?.data ?? [COOP_ABILITY_OP.CANCEL];
     const op = data[0];
     coopLog(

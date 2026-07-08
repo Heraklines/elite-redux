@@ -19,6 +19,7 @@ import {
   getCoopRuntime,
   getCoopUiMirror,
 } from "#data/elite-redux/coop/coop-runtime";
+import { COOP_REWARD_CHOICE_KINDS } from "#data/elite-redux/coop/coop-seq-registry";
 import {
   COOP_ACT_CHECK,
   COOP_CHECK_OP_FORM_ITEM,
@@ -1440,7 +1441,7 @@ export class SelectModifierPhase extends BattlePhase {
     // the owner's picks and hang ("watcher stuck / cursor at the wrong spots").
     const seq = this.coopInteractionStart;
     for (;;) {
-      const action = await relay.awaitInteractionChoice(seq, COOP_REWARD_WAIT_MS);
+      const action = await relay.awaitInteractionChoice(seq, COOP_REWARD_WAIT_MS, COOP_REWARD_CHOICE_KINDS);
       if (action == null) {
         coopLog("reward", "WATCHER timed out waiting for partner -> leaving reward screen");
         this.coopEndMirror();

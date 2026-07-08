@@ -35,7 +35,11 @@ import {
 import { getCoopController, getCoopInteractionRelay } from "#data/elite-redux/coop/coop-runtime";
 // #840: ME pump base + quiz base declared in coop-seq-registry (single source of truth). The pump
 // base was previously re-declared locally in 4 files; all now import the one canonical value.
-import { COOP_ME_PUMP_SEQ_BASE, COOP_ME_QUIZ_SEQ_BASE } from "#data/elite-redux/coop/coop-seq-registry";
+import {
+  COOP_ME_PUMP_SEQ_BASE,
+  COOP_ME_QUIZ_SEQ_BASE,
+  COOP_QUIZ_CHOICE_KINDS,
+} from "#data/elite-redux/coop/coop-seq-registry";
 import type { CoopInteractionOutcome, CoopQuizWireQuestion } from "#data/elite-redux/coop/coop-transport";
 
 export { COOP_ME_QUIZ_SEQ_BASE };
@@ -128,7 +132,7 @@ export function coopQuizAwaitRemoteAnswer(index: number): Promise<number> | null
   const counter = coopMeInteractionStartValue();
   const seq = coopQuizAnswerSeq(counter, index);
   coopLog("me", `quiz FOLLOW arm remote-answer wait index=${index} seq=${seq} counter=${counter} (#818)`);
-  return relay.awaitInteractionChoice(seq, COOP_QUIZ_WAIT_MS).then(a => {
+  return relay.awaitInteractionChoice(seq, COOP_QUIZ_WAIT_MS, COOP_QUIZ_CHOICE_KINDS).then(a => {
     const choice = a?.choice ?? -1;
     coopLog("me", `quiz FOLLOW remote-answer resolved index=${index} choice=${choice} seq=${seq} (#818)`);
     return choice;

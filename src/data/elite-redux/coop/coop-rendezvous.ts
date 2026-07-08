@@ -296,6 +296,27 @@ export class CoopRendezvous {
     this.partnerArrived.clear();
   }
 
+  /**
+   * #861 SESSION-BOUNDARY PURGE: drop the buffered arrival state (this client's own arrivals + the
+   * PARTNER's buffered arrivals) WITHOUT tearing down the listener or failing a LIVE waiter. Called at the
+   * same session/epoch boundaries as {@linkcode CoopInteractionRelay.purgeBufferedArrivals}: a prior epoch's
+   * buffered partner-arrival for a point the NEW epoch reuses (points are wave-scoped, and a resume/rejoin
+   * lands on the same wave) could CROSS-POINT-release a fresh await with a stale arrival. Purging guarantees
+   * only this epoch's genuine arrivals resolve a barrier. The session continues after the boundary.
+   */
+  purgeBufferedArrivals(reason: string): void {
+    const buffered = this.localArrived.size + this.partnerArrived.size;
+    if (buffered > 0) {
+      coopWarn(
+        "rendezvous",
+        `purgeBufferedArrivals(${reason}) dropping localArrived=${this.localArrived.size} `
+          + `partnerArrived=${this.partnerArrived.size} (#861 stale-session isolation)`,
+      );
+    }
+    this.localArrived.clear();
+    this.partnerArrived.clear();
+  }
+
   private handle(msg: CoopMessage): void {
     if (msg.t !== "rendezvous") {
       return;

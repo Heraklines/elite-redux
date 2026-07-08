@@ -37,6 +37,7 @@ import {
   getCoopInteractionRelay,
   getCoopRuntime,
 } from "#data/elite-redux/coop/coop-runtime";
+import { COOP_BIOME_SHOP_CHOICE_KINDS } from "#data/elite-redux/coop/coop-seq-registry";
 import { erBiomeStockCount } from "#data/elite-redux/er-biome-economy";
 import { ModifierTier } from "#enums/modifier-tier";
 import { UiMode } from "#enums/ui-mode";
@@ -360,7 +361,7 @@ export class BiomeShopPhase extends SelectModifierPhase {
     }
     const seq = coopBiomeShopSeq(this.coopBiomeStart);
     for (;;) {
-      const action = await relay.awaitInteractionChoice(seq, COOP_BIOME_WAIT_MS);
+      const action = await relay.awaitInteractionChoice(seq, COOP_BIOME_WAIT_MS, COOP_BIOME_SHOP_CHOICE_KINDS);
       if (action == null || action.choice === COOP_INTERACTION_LEAVE) {
         break;
       }

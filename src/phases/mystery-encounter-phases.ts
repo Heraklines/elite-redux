@@ -22,7 +22,7 @@ import {
   isCoopAuthoritativeGuest,
   setCoopMeBattleInteractionCounter,
 } from "#data/elite-redux/coop/coop-runtime";
-import { COOP_ME_PUMP_SEQ_BASE } from "#data/elite-redux/coop/coop-seq-registry";
+import { COOP_ME_CHOICE_KINDS, COOP_ME_PUMP_SEQ_BASE } from "#data/elite-redux/coop/coop-seq-registry";
 import type { CoopInteractionOutcome } from "#data/elite-redux/coop/coop-transport";
 import { recordSinglePlayerInteraction } from "#data/elite-redux/replay-single-recording";
 import { ArenaTagSide } from "#enums/arena-tag-side";
@@ -382,7 +382,7 @@ export class MysteryEncounterPhase extends Phase {
     // #817 visibility: the shop's controller tag (top of screen, named, amber) while the
     // PARTNER decides - never drawn into the message box, so nothing layers over the options.
     showCoopControllerTagFor(false);
-    void relay.awaitInteractionChoice(seqMe, COOP_ME_REPLAY_WAIT_MS).then(choice => {
+    void relay.awaitInteractionChoice(seqMe, COOP_ME_REPLAY_WAIT_MS, COOP_ME_CHOICE_KINDS).then(choice => {
       if (choice == null || choice.choice < 0) {
         // D1 null-end: a disconnected guest must never hang the host's engine - safe-leave + close.
         coopWarn("me", "host await guest index null/negative (disconnected guest); safe-leave", {

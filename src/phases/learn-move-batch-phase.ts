@@ -8,7 +8,10 @@ import {
   getCoopNetcodeMode,
   getCoopUiMirror,
 } from "#data/elite-redux/coop/coop-runtime";
-import { COOP_LEARN_MOVE_BATCH_FWD_SEQ_BASE } from "#data/elite-redux/coop/coop-seq-registry";
+import {
+  COOP_LEARN_MOVE_BATCH_CHOICE_KINDS,
+  COOP_LEARN_MOVE_BATCH_FWD_SEQ_BASE,
+} from "#data/elite-redux/coop/coop-seq-registry";
 import type { CoopRole } from "#data/elite-redux/coop/coop-transport";
 import { erRecordAchievementLearnMove } from "#data/elite-redux/er-achievement-tracker";
 import { recordSinglePlayerInteraction } from "#data/elite-redux/replay-single-recording";
@@ -396,7 +399,11 @@ export class LearnMoveBatchPhase extends PlayerPartyMemberPokemonPhase {
     } catch (e) {
       coopWarn("learnmove", "host watcher batch panel failed to open (still awaiting terminal) (#848)", e);
     }
-    const res = await relay.awaitInteractionChoice(seq, COOP_LEARN_MOVE_BATCH_WAIT_MS);
+    const res = await relay.awaitInteractionChoice(
+      seq,
+      COOP_LEARN_MOVE_BATCH_WAIT_MS,
+      COOP_LEARN_MOVE_BATCH_CHOICE_KINDS,
+    );
     mirror?.endSession();
     if (res == null) {
       coopWarn("learnmove", "guest batch terminal null (timeout/disconnect); keeping current moves (#848)", { seq });

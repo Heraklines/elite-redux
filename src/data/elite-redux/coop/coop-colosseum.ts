@@ -64,7 +64,11 @@ import {
   getCoopNetcodeMode,
   isCoopAuthoritativeGuest,
 } from "#data/elite-redux/coop/coop-runtime";
-import { COOP_COLOSSEUM_SEQ_BASE } from "#data/elite-redux/coop/coop-seq-registry";
+import {
+  COOP_COLO_CHOICE_KINDS,
+  COOP_COLOSSEUM_SEQ_BASE,
+  COOP_ME_CHOICE_KINDS,
+} from "#data/elite-redux/coop/coop-seq-registry";
 import type { CoopInteractionOutcome, CoopSerializedEnemy } from "#data/elite-redux/coop/coop-transport";
 import { MysteryEncounterMode } from "#enums/mystery-encounter-mode";
 import { MysteryEncounterType } from "#enums/mystery-encounter-type";
@@ -184,7 +188,7 @@ export function coopColosseumAwaitDecision(timeoutMs?: number): Promise<number |
   }
   const seq = coopColosseumSeq(coopMeInteractionStartValue());
   coopLog("me", "colosseum: await board decision (#829)", { seq, timeoutMs: timeoutMs ?? "default" });
-  return relay.awaitInteractionChoice(seq, timeoutMs).then(pick => pick?.choice ?? null);
+  return relay.awaitInteractionChoice(seq, timeoutMs, COOP_COLO_CHOICE_KINDS).then(pick => pick?.choice ?? null);
 }
 
 /**
@@ -273,7 +277,7 @@ export async function runColosseumGuestRoundLoop(
   // post-cash-out) must never be lost to a fresh await on an emptied 9M inbox (the #818/#831 latent-race
   // lesson). Created BEFORE the first board await so the waiter is registered the instant we claim.
   const terminalArm = relay
-    .awaitInteractionChoice(seqTerm, COOP_COLOSSEUM_WAIT_MS)
+    .awaitInteractionChoice(seqTerm, COOP_COLOSSEUM_WAIT_MS, COOP_ME_CHOICE_KINDS)
     .then(action => ({ tag: "term" as const, action }));
 
   while (coopColosseumStillPinned(counter)) {
@@ -316,7 +320,9 @@ export async function runColosseumGuestRoundLoop(
       decision = await ops.driveBoard(labels);
     } else {
       ops.showTag(false);
-      decision = await relay.awaitInteractionChoice(boardSeq, COOP_COLOSSEUM_WAIT_MS).then(p => p?.choice ?? null);
+      decision = await relay
+        .awaitInteractionChoice(boardSeq, COOP_COLOSSEUM_WAIT_MS, COOP_COLO_CHOICE_KINDS)
+        .then(p => p?.choice ?? null);
     }
     coopLog("me", "colosseum loop: board decision resolved (#829)", {
       counter,

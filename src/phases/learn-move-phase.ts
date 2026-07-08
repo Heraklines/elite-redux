@@ -14,7 +14,11 @@ import {
   getCoopUiMirror,
   markCoopLearnMoveForwardInFlight,
 } from "#data/elite-redux/coop/coop-runtime";
-import { COOP_LEARN_MOVE_FWD_SEQ_BASE, COOP_LEARN_MOVE_SEQ } from "#data/elite-redux/coop/coop-seq-registry";
+import {
+  COOP_LEARN_MOVE_CHOICE_KINDS,
+  COOP_LEARN_MOVE_FWD_SEQ_BASE,
+  COOP_LEARN_MOVE_SEQ,
+} from "#data/elite-redux/coop/coop-seq-registry";
 import type { CoopRole } from "#data/elite-redux/coop/coop-transport";
 import { erRecordAchievementLearnMove } from "#data/elite-redux/er-achievement-tracker";
 import { recordSinglePlayerInteraction } from "#data/elite-redux/replay-single-recording";
@@ -174,7 +178,11 @@ export class LearnMovePhase extends PlayerPartyMemberPokemonPhase {
     // Mirror the owner's cursor onto this screen; adopts any owner buttons that arrived first.
     mirror?.beginSession("watcher", UiMode.SUMMARY, COOP_LEARN_MOVE_SEQ);
 
-    const res = await relay.awaitInteractionChoice(COOP_LEARN_MOVE_SEQ, COOP_LEARN_MOVE_WAIT_MS);
+    const res = await relay.awaitInteractionChoice(
+      COOP_LEARN_MOVE_SEQ,
+      COOP_LEARN_MOVE_WAIT_MS,
+      COOP_LEARN_MOVE_CHOICE_KINDS,
+    );
     mirror?.endSession();
     await this.applyForgetResult(res?.choice ?? pokemon.getMaxMoveCount(), move, pokemon);
   }
@@ -329,7 +337,7 @@ export class LearnMovePhase extends PlayerPartyMemberPokemonPhase {
     await globalScene.ui.setModeWithoutClear(UiMode.SUMMARY, pokemon, SummaryUiMode.LEARN_MOVE, move, () => {});
     mirror?.beginSession("watcher", UiMode.SUMMARY, COOP_LEARN_MOVE_SEQ);
 
-    const res = await relay.awaitInteractionChoice(seq, COOP_LEARN_MOVE_FWD_WAIT_MS);
+    const res = await relay.awaitInteractionChoice(seq, COOP_LEARN_MOVE_FWD_WAIT_MS, COOP_LEARN_MOVE_CHOICE_KINDS);
     mirror?.endSession();
     if (res == null) {
       coopWarn("learnmove", "guest forward pick null (timeout/disconnect); keeping current moves", { slot, seq });
