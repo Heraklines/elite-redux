@@ -1,0 +1,267 @@
+url:      https://elite-redux-staging.pages.dev/
+build:    mrc9a598-g33b
+mode:     4  wave:1
+seed:     N4MNfBsD3c6QgxDwD9wWth9l
+party:    Kartana Fallen(L5 32hp f0)
+enemy:    Seedot(L2), Shroomish(L2), Zigzagoon(L2)
+
+----- COMMENT -----
+Some abilitys pokemons that change it moves to hit all opossing pokemons isnt working in 3v3, Like Blademaster from Kartana fallen can hit all the three opossingp pokemons, but the Sweeping Edge from Iron Scythe can't
+
+----- CONSOLE -----
+[20:28:25.048] LOG: 8 1 [3]
+[20:28:25.048] LOG: {"id":"BERRY","localeKey":"","iconImage":"apicot_berry","group":"berry","soundName":"se/restore","tier":0,"berryType":6} 
+[20:28:25.048] LOG: 7 1 [3]
+[20:28:25.048] LOG: {"id":"TEMP_STAT_STAGE_BOOSTER","localeKey":"","iconImage":"x_attack","soundName":"se/restore","tier":0,"stat":1,"nameKey":"x_attack","quantityKey":"percentage"} 
+[20:28:26.375] LOG: %cStart Phase NewBattlePhase color:green;
+[20:28:26.375] LOG: Wave Seed: losz\QT<ZZiMtWoKUOZvYonl 5
+[20:28:26.383] LOG: %cStart Phase ReturnPhase color:green;
+[20:28:26.540] LOG: %cStart Phase ReturnPhase color:green;
+[20:28:26.689] LOG: %cStart Phase ReturnPhase color:green;
+[20:28:26.868] LOG: %cStart Phase ShowTrainerPhase color:green;
+[20:28:27.035] LOG: %cStart Phase NextEncounterPhase color:green;
+[20:28:27.057] LOG: COMMON
+[20:28:27.057] LOG: Zigzagoon
+[20:28:27.076] LOG: Pokemon: Foe Zigzagoon | Species ID: 263 | Level: 4 | Nature: Lax (+Def/-SpDef)
+[20:28:27.077] LOG: Stats (IVs): HP: 17 (27), Atk: 10 (28), Def: 10 (20), Spatk: 8 (27), Spdef: 7 (9), Spd: 10 (19)
+[20:28:27.077] LOG: Ability: Scrappy | Passive Ability: Pickup 
+[20:28:27.077] LOG: Moveset: ["Double-Edge","Stomping Tantrum","Odor Sleuth","Mud Sport"]
+[20:28:27.077] LOG: COMMON
+[20:28:27.077] LOG: Wurmple
+[20:28:27.098] LOG: Pokemon: Foe Wurmple | Species ID: 265 | Level: 4 | Nature: Modest (+SpAtk/-Atk)
+[20:28:27.099] LOG: Stats (IVs): HP: 18 (15), Atk: 8 (7), Def: 8 (19), Spatk: 8 (13), Spdef: 8 (2), Spd: 6 (8)
+[20:28:27.099] LOG: Ability: Suction Cups | Passive Ability: Swarm 
+[20:28:27.099] LOG: Moveset: ["Web Shot","Tackle","Struggle Bug","Poison Sting"]
+[20:28:27.100] LOG: UNCOMMON
+[20:28:27.100] LOG: Downgraded trainer Pokemon rarity tier from UNCOMMON to COMMON
+[20:28:27.100] LOG: Patrat
+[20:28:27.123] LOG: Pokemon: Foe Patrat | Species ID: 504 | Level: 4 | Nature: Lax (+Def/-SpDef)
+[20:28:27.124] LOG: Stats (IVs): HP: 17 (29), Atk: 10 (6), Def: 10 (7), Spatk: 8 (30), Spdef: 8 (6), Spd: 11 (20)
+[20:28:27.124] LOG: Ability: Stakeout | Passive Ability: Analytic 
+[20:28:27.124] LOG: Moveset: ["Hyper Fang","Focus Energy","Leer","Stuff Cheeks"]
+[20:28:27.472] LOG: Generated AI funcs
+[20:28:27.546] DEBUG: Session data saved to slot 0!
+[20:28:27.548] LOG: Wave Seed: losz\QT<ZZiMtWoKUOZvYonl 5
+[20:28:27.855] LOG: Youngster Beltran
+[20:28:28.072] LOG: Dialogue saved as seen: dialogue:youngster.encounter.12
+[20:28:28.141] LOG: Youngster Beltran
+[20:28:28.702] LOG: %cStart Phase SummonPhase color:green;
+[20:28:28.703] LOG: Beltran
+[20:28:28.951] WARN: cry/263 not found
+[20:28:29.102] LOG: %cStart Phase SummonPhase color:green;
+[20:28:29.102] LOG: Beltran
+[20:28:29.368] WARN: cry/265 not found
+[20:28:29.520] LOG: %cStart Phase SummonPhase color:green;
+[20:28:29.521] LOG: Beltran
+[20:28:29.934] LOG: %cStart Phase SummonPhase color:green;
+[20:28:30.205] WARN: cry/10066 not found
+[20:28:30.334] LOG: %cStart Phase ShinySparklePhase color:green;
+[20:28:30.483] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[20:28:30.487] LOG: %cStart Phase SummonPhase color:green;
+[20:28:30.800] WARN: cry/131 not found
+[20:28:30.945] LOG: %cStart Phase SummonPhase color:green;
+[20:28:31.221] WARN: cry/132 not found
+[20:28:31.362] LOG: %cStart Phase InitEncounterPhase color:green;
+[20:28:31.373] LOG: %cStart Phase PostSummonPhase color:green;
+[20:28:31.373] LOG: Ran PSP for: Iron Scythe
+[20:28:31.380] LOG: %cStart Phase PostSummonPhase color:green;
+[20:28:31.383] LOG: %cStart Phase PostSummonPhase color:green;
+[20:28:31.383] LOG: Ran PSP for: Lapras
+[20:28:31.390] LOG: %cStart Phase PostSummonPhase color:green;
+[20:28:31.395] LOG: %cStart Phase PostSummonPhase color:green;
+[20:28:31.397] LOG: %cStart Phase PostSummonPhase color:green;
+[20:28:31.398] LOG: Ran PSP for: Ditto
+[20:28:31.401] LOG: %cStart Phase PostSummonPhase color:green;
+[20:28:31.403] LOG: %cStart Phase PostSummonPhase color:green;
+[20:28:31.404] LOG: %cStart Phase PostSummonPhase color:green;
+[20:28:31.404] LOG: Ran PSP for: Zigzagoon
+[20:28:31.406] LOG: %cStart Phase PostSummonPhase color:green;
+[20:28:31.408] LOG: %cStart Phase PostSummonPhase color:green;
+[20:28:31.409] LOG: %cStart Phase PostSummonPhase color:green;
+[20:28:31.409] LOG: Ran PSP for: Patrat
+[20:28:31.411] LOG: %cStart Phase PostSummonPhase color:green;
+[20:28:31.412] LOG: %cStart Phase PostSummonPhase color:green;
+[20:28:31.413] LOG: %cStart Phase PostSummonPhase color:green;
+[20:28:31.413] LOG: Ran PSP for: Wurmple
+[20:28:31.414] LOG: %cStart Phase PostSummonPhase color:green;
+[20:28:31.414] LOG: %cStart Phase PostSummonPhase color:green;
+[20:28:31.414] LOG: %cStart Phase PostSummonPhase color:green;
+[20:28:31.415] LOG: %cStart Phase TurnInitPhase color:green;
+[20:28:31.415] LOG: %cStart Phase CommandPhase color:green;
+[20:28:32.343] LOG: Move: SHADOW_CLAW Move targets: {"targets":[3,4],"multiple":true} 
+Player Pokemon: Iron Scythe
+[20:28:32.353] LOG: %cStart Phase SelectTargetPhase color:green;
+[20:28:33.191] LOG: %cStart Phase CommandPhase color:green;
+[20:29:11.867] DEBUG: Session data saved to slot 0!
+[20:29:14.603] LOG: Seed: zkngd8btEVwSw8rJmGzlEI5p
+[20:29:14.604] LOG: Wave Seed: zkngd8btEVwSw8rJmGzlEI5p 0
+[20:29:15.948] WARN: AnimationManager key already exists: prompt
+[20:29:15.949] WARN: AnimationManager key already exists: tera_sparkle
+[20:29:15.949] LOG: Seed: dsH4d7vgALjvi4ajOr74cPBG
+[20:29:15.949] LOG: Wave Seed: dsH4d7vgALjvi4ajOr74cPBG 0
+[20:29:22.695] LOG: %cStart Phase LoginPhase color:green;
+[20:29:23.303] LOG: Client Session: qkSmPwPLg0UfzLofU6A6v3CDJj3RFxhr
+[20:29:24.051] LOG: %cStart Phase TitlePhase color:green;
+[20:29:24.062] LOG: Getting Session Slot id: %d 0
+[20:29:24.103] LOG: use seasonal splash messages true
+[20:29:51.273] LOG: %cStart Phase SelectChallengePhase color:green;
+[20:29:53.940] LOG: %cStart Phase SelectStarterPhase color:green;
+[20:29:57.405] WARN: cry/10066 not found
+[20:29:57.414] WARN: cry/131 not found
+[20:29:57.423] WARN: cry/132 not found
+[20:29:57.453] WARN: cry/10066 not found
+[20:29:57.461] WARN: cry/131 not found
+[20:29:57.468] WARN: cry/132 not found
+[20:30:01.502] LOG: Getting Session Slot id: %d 0
+[20:30:01.508] LOG: Getting Session Slot id: %d 1
+[20:30:01.524] LOG: Getting Session Slot id: %d 2
+[20:30:01.530] LOG: Getting Session Slot id: %d 3
+[20:30:01.533] LOG: Getting Session Slot id: %d 4
+[20:30:01.539] LOG: Getting Session Slot id: %d 0
+[20:30:01.915] ERROR: Invalid save data JSON detected! Session not found.
+[20:30:01.933] ERROR: Invalid save data JSON detected! Session not found.
+[20:30:01.934] ERROR: Invalid save data JSON detected! Session not found.
+[20:30:01.935] ERROR: Invalid save data JSON detected! Session not found.
+[20:30:07.497] DEBUG: %cSending a request to delete session in slot %d color: blue 0
+[20:30:07.542] LOG: Wave Seed: etI5e8whBMkwj5bkPs85dQCH 1
+[20:30:07.544] LOG: %cStart Phase EncounterPhase color:green;
+[20:30:07.553] LOG: Starting species pool tier: RARE
+[20:30:07.583] LOG: Pokemon: Wild Surskit | Species ID: 283 | Level: 2 | Nature: Modest (+SpAtk/-Atk)
+[20:30:07.583] LOG: Stats (IVs): HP: 13 (8), Atk: 5 (16), Def: 7 (16), Spatk: 8 (11), Spdef: 7 (8), Spd: 7 (5)
+[20:30:07.583] LOG: Ability: Aroma Veil | Passive Ability: Torrent 
+[20:30:07.583] LOG: Moveset: ["Brine","Water Sport","Detect","Quick Attack"]
+[20:30:07.584] LOG: Starting species pool tier: COMMON
+[20:30:07.606] LOG: Pokemon: Wild Rattata | Species ID: 19 | Level: 2 | Nature: Naughty (+Atk/-SpDef)
+[20:30:07.606] LOG: Stats (IVs): HP: 13 (20), Atk: 8 (2), Def: 6 (14), Spatk: 6 (24), Spdef: 5 (27), Spd: 7 (3)
+[20:30:07.607] LOG: Ability: Normalize | Passive Ability: Guts 
+[20:30:07.607] LOG: Moveset: ["Quick Attack","Thunder Fang","Ice Fang","Fire Fang"]
+[20:30:07.607] LOG: Starting species pool tier: COMMON
+[20:30:07.631] LOG: Pokemon: Wild Wooloo | Species ID: 831 | Level: 2 | Nature: Quirky (-)
+[20:30:07.632] LOG: Stats (IVs): HP: 14 (31), Atk: 7 (11), Def: 7 (12), Spatk: 7 (28), Spdef: 7 (12), Spd: 7 (25)
+[20:30:07.632] LOG: Ability: Scrappy | Passive Ability: Let's Roll 
+[20:30:07.633] LOG: Moveset: ["Growl","Rollout (P)","Guard Split","Yawn"]
+[20:30:09.209] DEBUG: Session data saved to slot 0!
+[20:30:09.210] LOG: Wave Seed: etI5e8whBMkwj5bkPs85dQCH 1
+[20:30:09.514] WARN: cry/19 not found
+[20:30:09.865] LOG: %cStart Phase SummonPhase color:green;
+[20:30:10.141] WARN: cry/10066 not found
+[20:30:10.295] LOG: %cStart Phase ShinySparklePhase color:green;
+[20:30:10.440] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[20:30:10.447] LOG: %cStart Phase SummonPhase color:green;
+[20:30:10.726] WARN: cry/131 not found
+[20:30:10.874] LOG: %cStart Phase InitEncounterPhase color:green;
+[20:30:10.883] LOG: %cStart Phase PostSummonPhase color:green;
+[20:30:10.884] LOG: Ran PSP for: Iron Scythe
+[20:30:10.891] LOG: %cStart Phase PostSummonPhase color:green;
+[20:30:10.893] LOG: %cStart Phase PostSummonPhase color:green;
+[20:30:10.893] LOG: Ran PSP for: Lapras
+[20:30:10.895] LOG: %cStart Phase PostSummonPhase color:green;
+[20:30:10.897] LOG: %cStart Phase PostSummonPhase color:green;
+[20:30:10.898] LOG: %cStart Phase PostSummonPhase color:green;
+[20:30:10.898] LOG: Ran PSP for: Rattata
+[20:30:10.900] LOG: %cStart Phase PostSummonPhase color:green;
+[20:30:10.900] LOG: Ran PSP for: Surskit
+[20:30:10.902] LOG: %cStart Phase PostSummonPhase color:green;
+[20:30:10.902] LOG: Ran PSP for: Wooloo
+[20:30:10.904] LOG: %cStart Phase PostSummonPhase color:green;
+[20:30:10.905] LOG: %cStart Phase PostSummonPhase color:green;
+[20:30:10.906] LOG: %cStart Phase PostSummonPhase color:green;
+[20:30:10.909] LOG: %cStart Phase PostSummonPhase color:green;
+[20:30:10.910] LOG: %cStart Phase PostSummonPhase color:green;
+[20:30:10.912] LOG: %cStart Phase MovePhase color:green;
+[20:30:10.912] LOG: %cUser: Wooloo
+Move: DEFENSE_CURL
+Use Mode: FOLLOW_UP color:orchid
+[20:30:10.918] LOG: %cStart Phase MessagePhase color:green;
+[20:30:11.059] LOG: %cStart Phase MoveEffectPhase color:green;
+[20:30:11.078] LOG: %cStart Phase StatStageChangePhase color:green;
+[20:30:11.372] LOG: %cStart Phase MessagePhase color:green;
+[20:30:11.673] LOG: %cStart Phase MoveEndPhase color:green;
+[20:30:11.680] LOG: %cStart Phase PostSummonPhase color:green;
+[20:30:11.681] LOG: %cStart Phase PostSummonPhase color:green;
+[20:30:11.681] LOG: %cStart Phase TurnInitPhase color:green;
+[20:30:11.682] LOG: %cStart Phase CommandPhase color:green;
+[20:30:12.608] LOG: Move: SHADOW_CLAW Move targets: {"targets":[3,4],"multiple":true} 
+Player Pokemon: Iron Scythe
+[20:30:12.618] LOG: %cStart Phase SelectTargetPhase color:green;
+[20:30:13.189] LOG: %cStart Phase CommandPhase color:green;
+[20:30:15.154] LOG: Move: BITTER_BLADE Move targets: {"targets":[3,4],"multiple":true} 
+Player Pokemon: Iron Scythe
+[20:30:15.164] LOG: %cStart Phase SelectTargetPhase color:green;
+[20:30:15.786] LOG: %cStart Phase CommandPhase color:green;
+[20:30:16.922] DEBUG: Session data saved to slot 0!
+[20:30:18.128] LOG: Seed: SSUE0kneHgn7itbKbTxql6nZ
+[20:30:18.129] LOG: Wave Seed: SSUE0kneHgn7itbKbTxql6nZ 0
+[20:30:18.918] WARN: AnimationManager key already exists: prompt
+[20:30:18.919] WARN: AnimationManager key already exists: tera_sparkle
+[20:30:18.920] LOG: Seed: N4MNfBsD3c6QgxDwD9wWth9l
+[20:30:18.920] LOG: Wave Seed: N4MNfBsD3c6QgxDwD9wWth9l 0
+[20:30:23.861] LOG: %cStart Phase LoginPhase color:green;
+[20:30:24.324] LOG: Client Session: qkSmPwPLg0UfzLofU6A6v3CDJj3RFxhr
+[20:30:25.009] LOG: %cStart Phase TitlePhase color:green;
+[20:30:25.014] LOG: Getting Session Slot id: %d 0
+[20:30:25.032] LOG: use seasonal splash messages true
+[20:30:28.638] LOG: %cStart Phase SelectStarterPhase color:green;
+[20:30:31.662] LOG: %cStart Phase TitlePhase color:green;
+[20:30:31.682] LOG: Getting Session Slot id: %d 0
+[20:30:31.705] LOG: use seasonal splash messages true
+[20:30:34.221] LOG: %cStart Phase SelectChallengePhase color:green;
+[20:30:36.953] LOG: %cStart Phase SelectStarterPhase color:green;
+[20:30:42.566] WARN: cry/10777 not found
+[20:30:45.497] LOG: Getting Session Slot id: %d 0
+[20:30:45.501] LOG: Getting Session Slot id: %d 1
+[20:30:45.505] LOG: Getting Session Slot id: %d 2
+[20:30:45.510] LOG: Getting Session Slot id: %d 3
+[20:30:45.515] LOG: Getting Session Slot id: %d 4
+[20:30:45.519] LOG: Getting Session Slot id: %d 0
+[20:30:45.790] ERROR: Invalid save data JSON detected! Session not found.
+[20:30:45.901] ERROR: Invalid save data JSON detected! Session not found.
+[20:30:45.911] ERROR: Invalid save data JSON detected! Session not found.
+[20:30:45.914] ERROR: Invalid save data JSON detected! Session not found.
+[20:30:51.457] DEBUG: %cSending a request to delete session in slot %d color: blue 0
+[20:30:51.486] LOG: Wave Seed: O5NOgCtE4d7RhyExE:xXui:m 1
+[20:30:51.486] LOG: %cStart Phase EncounterPhase color:green;
+[20:30:51.496] LOG: Starting species pool tier: UNCOMMON
+[20:30:51.527] LOG: Pokemon: Wild Seedot | Species ID: 273 | Level: 2 | Nature: Jolly (+Spd/-SpAtk)
+[20:30:51.527] LOG: Stats (IVs): HP: 14 (24), Atk: 7 (25), Def: 7 (5), Spatk: 5 (0), Spdef: 6 (16), Spd: 7 (19)
+[20:30:51.528] LOG: Ability: Aftermath | Passive Ability: Overgrow 
+[20:30:51.529] LOG: Moveset: ["Explosion","Harden","Growth","Synthesis"]
+[20:30:51.529] LOG: Starting species pool tier: UNCOMMON
+[20:30:51.552] LOG: Pokemon: Wild Shroomish | Species ID: 285 | Level: 2 | Nature: Naive (+Spd/-SpDef)
+[20:30:51.552] LOG: Stats (IVs): HP: 14 (27), Atk: 6 (10), Def: 7 (1), Spatk: 6 (0), Spdef: 6 (25), Spd: 7 (29)
+[20:30:51.552] LOG: Ability: Technician | Passive Ability: Effect Spore 
+[20:30:51.553] LOG: Moveset: ["Trailblaze","Mega Drain","Poison Powder","Stun Spore"]
+[20:30:51.553] LOG: Starting species pool tier: COMMON
+[20:30:51.577] LOG: Pokemon: Wild Zigzagoon | Species ID: 263 | Level: 2 | Nature: Brave (+Atk/-Spd)
+[20:30:51.577] LOG: Stats (IVs): HP: 13 (1), Atk: 8 (14), Def: 6 (15), Spatk: 6 (11), Spdef: 7 (19), Spd: 7 (27)
+[20:30:51.577] LOG: Ability: Scrappy | Passive Ability: Pickup 
+[20:30:51.578] LOG: Moveset: ["Double-Edge","Mud Sport","Stomping Tantrum","Odor Sleuth"]
+[20:30:53.557] DEBUG: Session data saved to slot 0!
+[20:30:53.558] LOG: Wave Seed: O5NOgCtE4d7RhyExE:xXui:m 1
+[20:30:53.862] WARN: cry/285 not found
+[20:30:53.862] WARN: cry/263 not found
+[20:30:54.213] LOG: %cStart Phase SummonPhase color:green;
+[20:30:54.496] WARN: cry/10777 not found
+[20:30:54.639] LOG: %cStart Phase InitEncounterPhase color:green;
+[20:30:54.646] LOG: %cStart Phase PostSummonPhase color:green;
+[20:30:54.646] LOG: Ran PSP for: Kartana Fallen
+[20:30:54.653] LOG: %cStart Phase PostSummonPhase color:green;
+[20:30:54.654] LOG: %cStart Phase PostSummonPhase color:green;
+[20:30:54.654] LOG: %cStart Phase PostSummonPhase color:green;
+[20:30:54.655] LOG: Ran PSP for: Zigzagoon
+[20:30:54.657] LOG: %cStart Phase PostSummonPhase color:green;
+[20:30:54.657] LOG: Ran PSP for: Shroomish
+[20:30:54.658] LOG: %cStart Phase PostSummonPhase color:green;
+[20:30:54.658] LOG: Ran PSP for: Seedot
+[20:30:54.659] LOG: %cStart Phase PostSummonPhase color:green;
+[20:30:54.660] LOG: %cStart Phase PostSummonPhase color:green;
+[20:30:54.660] LOG: %cStart Phase PostSummonPhase color:green;
+[20:30:54.661] LOG: %cStart Phase PostSummonPhase color:green;
+[20:30:54.661] LOG: %cStart Phase PostSummonPhase color:green;
+[20:30:54.661] LOG: %cStart Phase PostSummonPhase color:green;
+[20:30:54.661] LOG: %cStart Phase TurnInitPhase color:green;
+[20:30:54.661] LOG: %cStart Phase CommandPhase color:green;
+[20:30:55.383] LOG: Move: MIGHTY_CLEAVE Move targets: {"targets":[3,4,5],"multiple":true} 
+Player Pokemon: Kartana Fallen
+[20:30:55.402] LOG: %cStart Phase SelectTargetPhase color:green;
+[20:30:56.186] LOG: %cStart Phase CommandPhase color:green;
