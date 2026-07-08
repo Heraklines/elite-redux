@@ -32,6 +32,7 @@ import { getDailyMysteryEncounter } from "#data/daily-seed/daily-run";
 import { allMoves, allSpecies, biomeDepths, modifierTypes } from "#data/data-lists";
 import { classicFinalBossDialogue } from "#data/dialogue";
 import { ER_SILKEN_DECREE_ABILITY_ID } from "#data/elite-redux/abilities/silken-decree";
+import { COOP_WAVE_NO_ME } from "#data/elite-redux/coop/coop-battle-stream";
 import { getCoopBattleStreamer, getCoopController, isShowdownGuestFlip } from "#data/elite-redux/coop/coop-runtime";
 import { grantErAchievementReward } from "#data/elite-redux/er-achievement-rewards";
 import { erExtraRivalTypeForWave } from "#data/elite-redux/er-battle-frequency";
@@ -1948,11 +1949,37 @@ export class BattleScene extends SceneBase {
       }
     }
 
+    // #862 (live wave-TYPE desync, testers gtgeli/duck-dodgers wave 9): the ME PRESENCE roll
+    // below depends on per-client PITY state (encounterSpawnChance), which diverges permanently
+    // after any one-sided ME anomaly - same seed, host rolled WILD while the guest rolled an ME
+    // and parked 20min awaiting a presentation the host never sends. The wave TYPE is therefore
+    // HOST-AUTHORITATIVE for the co-op guest: adopt the host's verdict from the wave-start sync
+    // when it has arrived (>= 0 = ME of that type, NO_ME = never an ME even if the local roll
+    // fires). No sync yet -> fall through to the local roll; the MysteryEncounterPhase divert
+    // guard catches a late-arriving negative verdict.
+    const coopMeVerdict =
+      this.gameMode.isCoop && getCoopController()?.role === "guest"
+        ? getCoopBattleStreamer()?.meTypeForWave(waveIndex)
+        : undefined;
+    if (coopMeVerdict !== undefined && coopMeVerdict !== COOP_WAVE_NO_ME && !Overrides.BATTLE_TYPE_OVERRIDE) {
+      resolved.battleType = BattleType.MYSTERY_ENCOUNTER;
+      this.mysteryEncounterSaveData.encounterSpawnChance = BASE_MYSTERY_ENCOUNTER_SPAWN_WEIGHT;
+      console.log(`[coop:me] wave=${waveIndex} HOST verdict: ME - adopting MYSTERY_ENCOUNTER (#862)`);
+      return;
+    }
+    if (coopMeVerdict === COOP_WAVE_NO_ME) {
+      console.log(`[coop:me] wave=${waveIndex} HOST verdict: NO ME - local presence roll suppressed (#862)`);
+    }
+
     // Check for mystery encounter
     // Can only occur in place of a standard (non-boss) wild battle, waves 10-180
     // NB: battle type checks are offloaded to `isWaveMysteryEncounter`
     // TODO: This means MEs can generate when the override is set to `BattleType.WILD`
-    if (!Overrides.BATTLE_TYPE_OVERRIDE && this.isWaveMysteryEncounter(resolved.battleType, waveIndex)) {
+    if (
+      !Overrides.BATTLE_TYPE_OVERRIDE
+      && coopMeVerdict !== COOP_WAVE_NO_ME
+      && this.isWaveMysteryEncounter(resolved.battleType, waveIndex)
+    ) {
       resolved.battleType = BattleType.MYSTERY_ENCOUNTER;
       // Reset to base spawn weight
       this.mysteryEncounterSaveData.encounterSpawnChance = BASE_MYSTERY_ENCOUNTER_SPAWN_WEIGHT;
@@ -4674,7 +4701,9 @@ export class BattleScene extends SceneBase {
     } else if (
       this.gameMode.isCoop
       && getCoopController()?.role === "guest"
-      && getCoopBattleStreamer()?.meTypeForWave(this.currentBattle.waveIndex) !== undefined
+      && getCoopBattleStreamer()?.meTypeForWave(this.currentBattle.waveIndex) !== undefined // #862: the verdict can now be the explicit NO-ME sentinel - never adopt that as a type
+      && // (reaching here with NO_ME means the wave-type guard raced; fall through to local pick).
+      getCoopBattleStreamer()?.meTypeForWave(this.currentBattle.waveIndex) !== COOP_WAVE_NO_ME
     ) {
       // #825: the host's wave-start sync already told us its rolled ME type - adopt it
       // verbatim so both screens run the SAME encounter (live 'different events').

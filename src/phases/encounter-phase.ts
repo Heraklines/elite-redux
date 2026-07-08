@@ -9,6 +9,7 @@ import { initEncounterAnims, loadEncounterAnimAssets } from "#data/battle-anims"
 import { fieldPositionForSlot } from "#data/battle-format";
 import { getCharVariantFromDialogue } from "#data/dialogue";
 import { captureCoopDexBaseline, captureCoopEnemies } from "#data/elite-redux/coop/coop-battle-engine";
+import { COOP_WAVE_NO_ME } from "#data/elite-redux/coop/coop-battle-stream";
 import { coopWarn } from "#data/elite-redux/coop/coop-debug";
 import { buildCoopEnemy } from "#data/elite-redux/coop/coop-enemy-builder";
 import { getCoopWaveBarrierMs } from "#data/elite-redux/coop/coop-interaction-relay";
@@ -283,7 +284,16 @@ export class EncounterPhase extends BattlePhase {
         if (!caughtUp) {
           coopWarn("replay", `wave-start barrier wave=${wave} timed out -> sending party anyway (resync heals)`);
         }
-        streamer.sendEnemyParty(wave, enemies, globalScene.currentBattle?.mysteryEncounter?.encounterType);
+        // #862: the wave-start sync ALWAYS states the ME verdict - the encounter type when the
+        // host rolled an ME, the explicit NO-ME sentinel otherwise. The guest's own presence
+        // roll runs off per-client pity state that diverges after any one-sided ME anomaly
+        // (live: host wild vs guest ME at the same wave 9, same seed), so the guest adopts
+        // this verdict in both directions instead of trusting its local roll.
+        streamer.sendEnemyParty(
+          wave,
+          enemies,
+          globalScene.currentBattle?.mysteryEncounter?.encounterType ?? COOP_WAVE_NO_ME,
+        );
       });
     } catch {
       /* a serialize/send failure must never break the host's encounter */

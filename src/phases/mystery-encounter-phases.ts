@@ -3,6 +3,7 @@ import { globalScene } from "#app/global-scene";
 import { Phase } from "#app/phase";
 import { getCharVariantFromDialogue } from "#data/dialogue";
 import { captureCoopChecksum, captureCoopMeOutcome } from "#data/elite-redux/coop/coop-battle-engine";
+import { COOP_WAVE_NO_ME } from "#data/elite-redux/coop/coop-battle-stream";
 import { coopLog, coopWarn } from "#data/elite-redux/coop/coop-debug";
 import { COOP_INTERACTION_LEAVE } from "#data/elite-redux/coop/coop-interaction-relay";
 import {
@@ -26,6 +27,7 @@ import { COOP_ME_CHOICE_KINDS, COOP_ME_PUMP_SEQ_BASE } from "#data/elite-redux/c
 import type { CoopInteractionOutcome } from "#data/elite-redux/coop/coop-transport";
 import { recordSinglePlayerInteraction } from "#data/elite-redux/replay-single-recording";
 import { ArenaTagSide } from "#enums/arena-tag-side";
+import { BattleType } from "#enums/battle-type";
 import { BattlerTagLapseType } from "#enums/battler-tag-lapse-type";
 import { BattlerTagType } from "#enums/battler-tag-type";
 import { MysteryEncounterMode } from "#enums/mystery-encounter-mode";
@@ -237,6 +239,23 @@ export class MysteryEncounterPhase extends Phase {
     // is transparent: CoopReplayMePhase ends on the battle-handoff sentinel and the existing
     // host-authoritative ME-battle path takes over.
     if (isCoopAuthoritativeGuest()) {
+      // #862 (live wave-TYPE desync): the guest's ME PRESENCE roll runs off per-client pity
+      // state that diverges after any one-sided ME anomaly - this wave can be a SELF-ROLLED
+      // phantom the host never has (host verdict from the wave-start sync: NO ME). Diverting
+      // would park CoopReplayMePhase 20min awaiting a presentation that never comes while the
+      // host fights a normal battle. Drop the phantom: back to a WILD battle turn - the
+      // buffered enemyPartySync + per-turn stream reconcile the field from the host.
+      const meVerdict = getCoopBattleStreamer()?.meTypeForWave(globalScene.currentBattle?.waveIndex ?? -1);
+      if (meVerdict === COOP_WAVE_NO_ME) {
+        coopWarn("me", "guest SELF-ROLLED an ME but the HOST has NONE this wave - dropping the phantom ME (#862)", {
+          wave: globalScene.currentBattle?.waveIndex,
+        });
+        globalScene.currentBattle.mysteryEncounter = undefined;
+        globalScene.currentBattle.battleType = BattleType.WILD;
+        globalScene.phaseManager.unshiftNew("TurnInitPhase");
+        this.end();
+        return;
+      }
       const interactionCounter = getCoopController()?.interactionCounter() ?? -1;
       coopLog("me", "authoritative guest: diverting MysteryEncounterPhase -> CoopReplayMePhase", {
         counter: interactionCounter,

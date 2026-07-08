@@ -82,6 +82,14 @@ export interface CoopBattleStreamerOptions {
 const DEFAULT_TIMEOUT_MS = 1_200_000;
 
 /**
+ * #862: the host's wave-start enemyPartySync states an explicit NEGATIVE ME verdict with this
+ * sentinel - "this wave has NO mystery encounter". Only the wave-start send (encounter-phase)
+ * passes a verdict; mid-battle syncs stay silent so a battle-handoff sync can never record a
+ * false no-ME for an ME wave.
+ */
+export const COOP_WAVE_NO_ME = -1;
+
+/**
  * How many past turns of buffered LIVE battle events to retain (#633, animation layer). A handful is
  * plenty: a turn's events are consumed at that turn's boundary, so retention only needs to cover a
  * late event for the turn just before the one being rendered. Bounded so a long run never leaks memory.
@@ -212,7 +220,15 @@ export class CoopBattleStreamer {
   /** GUEST (#825): the host's rolled ME type per wave (from enemyPartySync). */
   private readonly meTypeByWave = new Map<number, number>();
 
-  /** GUEST (#825): the host's ME type for `wave`, if its wave-start sync arrived. */
+  /**
+   * GUEST (#825/#862): the host's ME verdict for `wave`, if its wave-start sync arrived.
+   * `>= 0` = the host rolled THIS MysteryEncounterType; {@linkcode COOP_WAVE_NO_ME} = the
+   * host explicitly rolled NO ME (#862: the guest's own presence roll depends on per-client
+   * pity state that diverges after any one-sided ME anomaly - same seed, different verdict -
+   * so the guest must adopt the host's verdict in BOTH directions); `undefined` = no
+   * wave-start sync received yet (fall back to the local roll; the MysteryEncounterPhase
+   * divert guard catches a late-arriving negative verdict).
+   */
   meTypeForWave(wave: number): number | undefined {
     return this.meTypeByWave.get(wave);
   }
