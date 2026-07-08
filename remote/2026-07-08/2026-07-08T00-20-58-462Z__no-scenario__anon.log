@@ -1,0 +1,121 @@
+url:      https://elite-redux-staging.pages.dev/
+build:    mrbbnsh0-3pr4
+mode:     7  wave:?
+seed:     vcCKyPL4XuTYhIxchQjiFWVn
+party:    
+enemy:    
+
+----- COMMENT -----
+never getting to the battle on my side
+
+----- CONSOLE -----
+[00:18:03.682] LOG: %c %c %c %c %c Phaser v3.90.0 (WebGL | Web Audio) %c https://phaser.io/v390 background: #ff0000 background: #ffff00 background: #00ff00 background: #00ffff color: #ffffff; background: #000000 background: transparent
+[00:18:04.454] LOG: [ER] build mrbbnsh0-3pr4
+[00:18:04.770] LOG: [dev-tools] loaded — 473 scenarios + Send Logs button
+[00:18:27.959] DEBUG: Destroying loading scene
+[00:18:27.959] DEBUG: Destroyed loading scene
+[00:18:28.018] LOG: Seed: pUDm4z7X2R4UWQ96xlXUp78g
+[00:18:28.018] LOG: Wave Seed: pUDm4z7X2R4UWQ96xlXUp78g 0
+[00:18:35.225] LOG: %cStart Phase LoginPhase color:green;
+[00:18:35.403] LOG: Client Session: MF1iAm878xo5WkaS4fizaCVnberiwMbQ
+[00:18:35.786] DEBUG: Using cached system data
+[00:18:35.891] LOG: %cStart Phase TitlePhase color:green;
+[00:18:35.892] LOG: Getting Session Slot id: %d 4
+[00:18:35.906] LOG: use seasonal splash messages true
+[00:18:41.149] LOG: [coop:lobby] start announce name=Heraklines1
+[00:18:41.446] LOG: [coop:lobby] announced id=a855327f-71f5-46b0-a4ff-a5dca71cc544 -> begin polling
+[00:18:41.751] LOG: [coop:lobby] poll players=1
+[00:18:42.223] LOG: [coop:lobby] request target=38d8c253-0cc6-4d67-81fe-6e0dee4885c8 (self=a855327f-71f5-46b0-a4ff-a5dca71cc544)
+[00:18:42.869] LOG: [coop:lobby] poll players=1
+[00:18:44.674] LOG: [coop:lobby] poll matched code=6M86QB role=guest -> connect
+[00:18:44.674] LOG: [coop:launch] lobby connect code=6M86QB role=guest name=Heraklines1
+[00:18:44.676] LOG: [coop:launch] connectCoopWithCode code=6M86QB role=guest username=Heraklines1
+[00:18:44.676] LOG: [coop:launch] exchange SDP start code=6M86QB role=guest (ice=fetched)
+[00:18:45.277] LOG: [coop:launch] ICE from worker /coop/ice servers=1
+[00:18:45.281] LOG: [coop:launch] await peer signal start code=6M86QB role=guest timeout=60000ms
+[00:18:46.875] LOG: [coop:launch] await peer signal resolve code=6M86QB role=guest (2102b)
+[00:18:46.875] LOG: [coop:launch] guest received offer code=6M86QB -> answering
+[00:18:46.893] LOG: [coop:launch] iceConnectionState=checking code=6M86QB role=guest
+[00:18:46.893] LOG: [coop:launch] pcConnectionState=connecting code=6M86QB role=guest
+[00:18:46.896] LOG: [coop:launch] iceConnectionState=connected code=6M86QB role=guest
+[00:18:46.896] LOG: [coop:launch] guest pushing answer code=6M86QB (ICE gathered)
+[00:18:46.896] LOG: [coop:launch] pushSignal code=6M86QB role=guest sdpBytes=778
+[00:18:47.230] LOG: [coop:launch] pcConnectionState=connected code=6M86QB role=guest
+[00:18:47.232] LOG: [coop:launch] guest datachannel event label=coop state=open code=6M86QB
+[00:18:47.232] LOG: [coop:launch] data channel already open
+[00:18:47.232] LOG: [coop:webrtc] ctor role=guest readyState=open state=connected
+[00:18:47.233] LOG: [coop:launch] connectCoopSession role=guest state=connected username=Heraklines1 netcode=authoritative
+[00:18:47.234] LOG: [coop:stream] streamer CONSTRUCT timeout=1200000ms onMessage registered
+[00:18:47.234] LOG: [coop:stream] guest REGISTER onGhostPool handler (bufferedEarly=false)
+[00:18:47.234] LOG: [coop:stream] host REGISTER onStateSyncRequest handler (was=false)
+[00:18:47.234] LOG: [coop:stream] host REGISTER onEnemyPartyRequest handler (was=false)
+[00:18:47.234] LOG: [coop:stream] guest REGISTER onWaveResolved handler (was=false)
+[00:18:47.234] LOG: [coop:stream] guest REGISTER onWaveEndState handler (was=false)
+[00:18:47.234] LOG: [coop:stream] watcher REGISTER onMeChecksum handler (was=false)
+[00:18:47.234] LOG: [coop:turn] host recorder: REGISTER live emitter (was=false)
+[00:18:47.235] LOG: [coop:session] coopAuthoritativeGuestPredicate INSTALLED
+[00:18:47.235] LOG: [coop:launch] peer session ready role=guest netcode=authoritative -> connecting
+[00:18:47.235] LOG: [coop:launch] session connect role=guest partnerRole=host netcode=authoritative username=Heraklines1 version=er-coop-11 tiebreak=0.6570862347815418
+[00:18:47.235] LOG: [coop:webrtc] raw tx role=guest t=hello bytes=106
+[00:18:47.279] LOG: [coop:checksum] dataFingerprint compute moveMap=e9b828360aafb9e2(1032) movesData=61fa3383767be347(1107) movesName=fad7fe8932ec09a1(1107) movesets=6eb276198552346d(1908) abilitiesData=3088ac8089021d9e(1047) abilitiesName=7c302bdd9cc50a0b(1047)
+[00:18:47.280] LOG: [coop:webrtc] raw tx role=guest t=dataFingerprint bytes=329
+[00:18:47.280] LOG: [coop:launch] lobby connected code=6M86QB role=guest -> onConnected
+[00:18:47.282] LOG: [coop:session] isCoopAuthoritativeGuestGated -> true (authoritative GUEST gates a structural mutation)
+[00:18:47.283] LOG: [coop:session] isCoopAuthoritativeGuestGated -> true (authoritative GUEST gates a structural mutation)
+[00:18:47.283] LOG: %cStart Phase SelectStarterPhase color:green;
+[00:18:47.284] LOG: [coop:webrtc] channel OPEN role=guest gen=0
+[00:18:47.285] LOG: [coop:webrtc] raw rx role=guest t=hello bytes=104 handlers=13
+[00:18:47.286] LOG: [coop:launch] hello recv partner=Heraklines1 partnerRole=host (local role=guest; no conflict)
+[00:18:47.286] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[00:18:47.286] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[00:18:47.291] LOG: [coop:webrtc] raw rx role=guest t=dataFingerprint bytes=329 handlers=13
+[00:18:47.292] LOG: [coop:checksum] MATCH - data tables identical across clients
+[00:18:52.267] LOG: [coop:interaction] interactionCounter() read -> 0 (role=guest)
+[00:18:52.267] LOG: [coop:health] tick=0g turn=- wave=- counter=0 assertions=0 wait=-1ms peerBeat=- transport=connected
+[00:19:27.244] LOG: [coop:interaction] interactionCounter() read -> 0 (role=guest)
+[00:19:27.244] LOG: [coop:health] tick=0g turn=- wave=- counter=0 assertions=0 wait=-1ms peerBeat=- transport=connected
+[00:19:57.262] LOG: [coop:interaction] interactionCounter() read -> 0 (role=guest)
+[00:19:57.262] LOG: [coop:health] tick=0g turn=- wave=- counter=0 assertions=0 wait=-1ms peerBeat=- transport=connected
+[00:19:58.069] LOG: [coop:webrtc] raw rx role=guest t=showdownTeam bytes=750 handlers=13
+[00:19:58.071] LOG: [coop:webrtc] raw rx role=guest t=showdownReady bytes=51 handlers=13
+[00:20:04.033] WARN: cry/4 not found
+[00:20:22.365] WARN: cry/56 not found
+[00:20:27.205] LOG: [coop:webrtc] raw tx role=guest t=showdownTeam bytes=692
+[00:20:27.206] LOG: [coop:webrtc] raw tx role=guest t=showdownReady bytes=51
+[00:20:27.206] LOG: [coop:rendezvous] ARRIVE point=showdown-ready (send) role=guest
+[00:20:27.206] LOG: [coop:webrtc] raw tx role=guest t=rendezvous bytes=43
+[00:20:27.207] LOG: [coop:rendezvous] AWAIT point=showdown-ready timeoutMs=600000 -> network-wait role=guest
+[00:20:27.216] LOG: [coop:webrtc] raw rx role=guest t=rendezvous bytes=43 handlers=13
+[00:20:27.216] LOG: [coop:rendezvous] RECV arrival point=showdown-ready -> deliver-to-waiter role=guest
+[00:20:27.217] LOG: [coop:rendezvous] AWAIT point=showdown-ready RESOLVE both-arrived role=guest
+[00:20:27.238] LOG: [coop:webrtc] raw tx role=guest t=showdownStakeOffer bytes=106
+[00:20:27.260] LOG: [coop:webrtc] raw rx role=guest t=showdownStakeOffer bytes=106 handlers=13
+[00:20:28.130] LOG: [coop:rendezvous] ARRIVE point=showdown-wager-commit (send) role=guest
+[00:20:28.130] LOG: [coop:webrtc] raw tx role=guest t=rendezvous bytes=50
+[00:20:28.130] LOG: [coop:rendezvous] AWAIT point=showdown-wager-commit timeoutMs=600000 -> network-wait role=guest
+[00:20:30.465] LOG: [coop:webrtc] raw rx role=guest t=rendezvous bytes=50 handlers=13
+[00:20:30.465] LOG: [coop:rendezvous] RECV arrival point=showdown-wager-commit -> deliver-to-waiter role=guest
+[00:20:30.465] LOG: [coop:rendezvous] AWAIT point=showdown-wager-commit RESOLVE both-arrived role=guest
+[00:20:30.500] LOG: [coop-launch] guest: awaiting host launch snapshot (push-snapshot boot, no poll)
+[00:20:30.500] LOG: [coop:stream] guest awaitLaunchSnapshot wave=1 START timeout=1200000ms
+[00:20:32.203] LOG: [coop:interaction] interactionCounter() read -> 0 (role=guest)
+[00:20:32.203] LOG: [coop:health] tick=0g turn=- wave=- counter=0 assertions=0 wait=-1ms peerBeat=- transport=connected
+[00:20:35.839] LOG: [coop:webrtc] raw rx role=guest t=enemyPartySync bytes=618 handlers=12
+[00:20:35.839] LOG: [coop:replay] guest RECV enemyPartySync wave=1 count=2 -> buffered (no waiter)
+[00:20:35.844] LOG: [coop:webrtc] raw rx role=guest t=launchSnapshot bytes=10132 handlers=12
+[00:20:35.844] LOG: [coop:replay] guest RECV launchSnapshot wave=1 sessionLen=9064 -> parked waiter
+[00:20:35.844] LOG: [coop:stream] guest awaitLaunchSnapshot wave=1 RESOLVE len=9064
+[00:20:35.849] LOG: Wave Seed: vcCKyPL4XuTYhIxchQjiFWVn 0
+[00:20:35.849] LOG: Seed: vcCKyPL4XuTYhIxchQjiFWVn
+[00:20:35.876] ERROR: [unhandledrejection] TypeError: Cannot read properties of null (reading 'isClassicFinalBoss')
+TypeError: Cannot read properties of null (reading 'isClassicFinalBoss')
+    at getPokemonNameWithAffix (https://elite-redux-staging.pages.dev/assets/er-ghost-teams-Bb48QcJg.js:1:5406)
+    at BattleFlyout.initInfo (https://elite-redux-staging.pages.dev/assets/er-map-nodes-a6MhVyqU.js:6:399565)
+    at EnemyBattleInfo.initInfo (https://elite-redux-staging.pages.dev/assets/er-map-nodes-a6MhVyqU.js:6:402533)
+    at EnemyPokemon.initBattleInfo (https://elite-redux-staging.pages.dev/assets/er-map-nodes-a6MhVyqU.js:6:498682)
+    at EnemyPokemon.init (https://elite-redux-staging.pages.dev/assets/er-map-nodes-a6MhVyqU.js:6:414379)
+    at BattleScene.addEnemyPokemon (https://elite-redux-staging.pages.dev/assets/battle-scene-JgOTyk1j.js:1047:17374)
+    at PokemonData.toPokemon (https://elite-redux-staging.pages.dev/assets/er-map-nodes-a6MhVyqU.js:6:513669)
+    at GameData.initSessionFromData (https://elite-redux-staging.pages.dev/assets/battle-scene-JgOTyk1j.js:1005:186233)
+    at GameData.applyCoopLaunchSession (https://elite-redux-staging.pages.dev/assets/battle-scene-JgOTyk1j.js:1005:185601)
+    at SelectStarterPhase.tryCoopGuestSnapshotBoot (https://elite-redux-staging.pages.dev/assets/battle-scene-JgOTyk1j.js:460:33880)
