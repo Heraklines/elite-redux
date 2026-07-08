@@ -1,0 +1,261 @@
+url:      https://elite-redux-staging.pages.dev/
+build:    mrbdf344-7vdy
+mode:     6  wave:9
+seed:     KGWORAiAJw0kPUn5XuSanDcY
+party:    Makuhita Redux(L9 28hp f0), Scorbunny(L9 25hp f0), Magikarp(L5 18hp f0), Kricketot(L5 20hp f0), Lunatone(L5 25hp f0), Scyther(L5 23hp f0)
+enemy:    Ekans(L7), Wurmple(L6)
+
+----- COMMENT -----
+stuck in event
+
+----- CONSOLE -----
+[01:35:35.191] LOG: [coop:replay] guest replay turn=2: live increment seq=3..3
+[01:35:35.191] LOG: [coop:replay] guest replay turn=2: rendering 1 event(s)
+[01:35:35.191] LOG: [coop:replay] guest replay turn=2: present k=faint
+[01:35:35.192] LOG: [coop:session] isCoopAuthoritativeGuestGated -> true (authoritative GUEST gates a structural mutation)
+[01:35:35.192] LOG: [coop:replay] guest replay turn=2: rendered phases [faint=1]
+[01:35:35.192] LOG: [coop:session] isCoopAuthoritativeGuestGated -> true (authoritative GUEST gates a structural mutation)
+[01:35:35.192] LOG: %cStart Phase CoopFaintReplayPhase color:green;
+[01:35:35.193] LOG: [coop:replay] present faint bi=2 narrate=true
+[01:35:35.194] WARN: cry/816 not found
+[01:35:35.198] LOG: [coop:webrtc] raw rx role=guest t=battleEvent bytes=91 handlers=11
+[01:35:35.198] LOG: [coop:replay] guest RECV live battleEvent turn=2 seq=4 k=message
+[01:35:35.257] LOG: %cStart Phase MessagePhase color:green;
+[01:35:35.724] LOG: %cStart Phase CoopReplayTurnPhase color:green;
+[01:35:35.724] LOG: [coop:replay] guest live-pump drain turn=2 seq=4..4
+[01:35:35.724] LOG: [coop:replay] guest replay turn=2: live increment seq=4..4
+[01:35:35.724] LOG: [coop:replay] guest replay turn=2: rendering 1 event(s)
+[01:35:35.724] LOG: [coop:replay] guest replay turn=2: present k=message
+[01:35:35.724] LOG: [coop:replay] guest replay turn=2: rendered phases [message=1]
+[01:35:35.725] LOG: [coop:session] isCoopAuthoritativeGuestGated -> true (authoritative GUEST gates a structural mutation)
+[01:35:35.725] LOG: %cStart Phase MessagePhase color:green;
+[01:35:35.948] LOG: %cStart Phase CoopReplayTurnPhase color:green;
+[01:35:35.949] WARN: [coop:stream] guest awaitTurn turn=2 superseding stale waiter
+[01:35:35.949] WARN: [coop:replay] guest awaitTurn turn=2 STALL -> null (timeout/superseded)
+[01:35:35.950] LOG: [coop:replay] guest awaitTurn turn=2 START timeout=1200000ms
+[01:35:36.856] LOG: [coop:webrtc] raw rx role=guest t=waveResolved bytes=45 handlers=11
+[01:35:36.857] LOG: [coop:replay] guest RECV waveResolved wave=8 outcome=win
+[01:35:36.857] LOG: [coop:runtime] recv waveResolved wave=8 outcome=win role=guest netcode=authoritative
+[01:35:36.857] LOG: [coop:runtime] pend waveResolved wave=8 outcome=win (prevPending=none)
+[01:35:39.319] LOG: [coop:webrtc] raw rx role=guest t=battleEvent bytes=95 handlers=11
+[01:35:39.319] LOG: [coop:replay] guest RECV live battleEvent turn=2 seq=5 k=moveUsed
+[01:35:39.320] LOG: [coop:replay] guest live-pump drain turn=2 seq=5..5
+[01:35:39.320] LOG: [coop:replay] guest replay turn=2: live increment seq=5..5
+[01:35:39.320] LOG: [coop:replay] guest replay turn=2: rendering 1 event(s)
+[01:35:39.320] LOG: [coop:replay] guest replay turn=2: present k=moveUsed
+[01:35:39.322] LOG: [coop:session] isCoopAuthoritativeGuestGated -> true (authoritative GUEST gates a structural mutation)
+[01:35:39.322] LOG: [coop:replay] guest replay turn=2: rendered phases [moveUsed=1]
+[01:35:39.322] LOG: [coop:session] isCoopAuthoritativeGuestGated -> true (authoritative GUEST gates a structural mutation)
+[01:35:39.322] LOG: %cStart Phase MessagePhase color:green;
+[01:35:39.323] LOG: [coop:webrtc] raw rx role=guest t=battleEvent bytes=84 handlers=11
+[01:35:39.323] LOG: [coop:replay] guest RECV live battleEvent turn=2 seq=6 k=message
+[01:35:39.461] LOG: %cStart Phase CoopMoveAnimReplayPhase color:green;
+[01:35:39.462] LOG: [coop:replay] present move bi=0 moveId=444 targets=1
+[01:35:39.462] LOG: %cStart Phase CoopReplayTurnPhase color:green;
+[01:35:39.462] LOG: [coop:replay] guest live-pump drain turn=2 seq=6..6
+[01:35:39.462] LOG: [coop:replay] guest replay turn=2: live increment seq=6..6
+[01:35:39.462] LOG: [coop:replay] guest replay turn=2: rendering 1 event(s)
+[01:35:39.462] LOG: [coop:replay] guest replay turn=2: present k=message
+[01:35:39.462] LOG: [coop:replay] guest replay turn=2: rendered phases [message=1]
+[01:35:39.462] LOG: [coop:session] isCoopAuthoritativeGuestGated -> true (authoritative GUEST gates a structural mutation)
+[01:35:39.463] LOG: %cStart Phase MessagePhase color:green;
+[01:35:39.663] LOG: %cStart Phase CoopReplayTurnPhase color:green;
+[01:35:39.664] WARN: [coop:stream] guest awaitTurn turn=2 superseding stale waiter
+[01:35:39.664] WARN: [coop:replay] guest awaitTurn turn=2 STALL -> null (timeout/superseded)
+[01:35:39.664] LOG: [coop:replay] guest awaitTurn turn=2 START timeout=1200000ms
+[01:35:39.853] LOG: [coop:webrtc] raw rx role=guest t=turnResolution bytes=21058 handlers=11
+[01:35:39.853] LOG: [coop:replay] guest RECV turnResolution turn=2 events=7 checksum=d6243be492f03483 -> parked waiter
+[01:35:39.853] LOG: [coop:replay] guest awaitTurn turn=2 RESOLVE events=7 checksum=d6243be492f03483
+[01:35:39.853] LOG: [coop:replay] guest consume live events turn=2 count=0
+[01:35:39.853] LOG: [coop:replay] guest replay turn=2: RESOLVE renderedLive=7 remaining=0 batch=7
+[01:35:39.853] LOG: [coop:replay] guest replay turn=2: rendering 0 event(s)
+[01:35:39.853] LOG: [coop:replay] guest replay turn=2: rendered phases [none]
+[01:35:39.854] LOG: [coop:replay] guest replay turn=2: unshift CoopFinalizeTurnPhase (checkpoint apply deferred)
+[01:35:39.854] LOG: [coop:session] isCoopAuthoritativeGuestGated -> true (authoritative GUEST gates a structural mutation)
+[01:35:39.854] LOG: %cStart Phase CoopFinalizeTurnPhase color:green;
+[01:35:39.854] LOG: [coop:checksum] guest finalize turn=2: apply checkpoint + verify checksum=d6243be492f03483
+[01:35:39.854] LOG: [coop:checkpoint] guest apply field=4 weather=0 terrain=0 arenaTags=0
+[01:35:39.854] WARN: [coop:checkpoint] mon bi=0 hp host=28 guest=25 status host=0 guest=0 -> applied
+[01:35:39.855] LOG: [coop:session] isCoopAuthoritativeGuestGated -> true (authoritative GUEST gates a structural mutation)
+[01:35:39.859] LOG: [coop:heal] erMoneyStreaks host entries=6 -> restored (#837/#348)
+[01:35:39.860] LOG: [coop:heal] biomeOverstayAnchor host=null -> restored (#837/#504)
+[01:35:39.860] LOG: [coop:heal] erBiomeStructure host length=null startWave=1 -> restored (#841 item 5)
+[01:35:39.860] LOG: [coop:heal] erRelicBattleState host wave=8 -> restored (#837)
+[01:35:39.874] LOG: [coop:resync] guest apply authoritativeState tick=38 wave=8 turn=2 party=6/2 field=4
+[01:35:39.877] LOG: [coop:checksum] capture digest=d6243be492f03483 field=2 biome=0 seed=KGWORAiAJw0kPUn5XuSanDcY weather=0 terrain=0 money=1950 party=[10843,813,129,401,337,123] partyLevels=[9,9,5,5,5,5] arenaTags=0 modifiers=1 heldItemsDigest=0 pokeballs=[0:10,1:0,2:5,3:0,4:0] mons=[bi0:sp10843/hp28-32/st0/ab40/form0/tera0:9/boss0:0 bi1:sp813/hp5-30/st0/ab236/form0/tera0:9/boss0:0]
+[01:35:39.877] LOG: [coop:checksum] guest verify turn=2: MATCH host=guest=d6243be492f03483
+[01:35:39.878] WARN: [coop:replay] guest finalize turn=2: suppressing phantom turn after wave-advance signaled wave=8 (terminal final turn, NOT queuing turn-end)
+[01:35:39.878] LOG: [coop:runtime] consume wave-advance wave=8 outcome=win (lastResolved 7 -> 8)
+[01:35:39.878] LOG: [coop:replay] guest wave-advance outcome=win wave=8 battleType=TRAINER queues=VictoryPhase
+[01:35:39.878] LOG: [coop:session] isCoopAuthoritativeGuestGated -> true (authoritative GUEST gates a structural mutation)
+[01:35:39.879] LOG: [coop:replay] guest finalize turn=2: END (checkpoint applied, turn-end queued)
+[01:35:39.879] LOG: %cStart Phase VictoryPhase color:green;
+[01:35:39.879] LOG: [coop:progression] GUEST applyPartyExp SKIP wave=8 koMon=Rookidee (awaiting host waveEndState)
+[01:35:39.879] LOG: [coop:session] isCoopAuthoritativeGuestGated -> true (authoritative GUEST gates a structural mutation)
+[01:35:39.880] LOG: [coop:session] isCoopAuthoritativeGuestGated -> true (authoritative GUEST gates a structural mutation)
+[01:35:39.880] LOG: [coop:session] isCoopAuthoritativeGuestGated -> true (authoritative GUEST gates a structural mutation)
+[01:35:39.880] LOG: [coop:session] isCoopAuthoritativeGuestGated -> true (authoritative GUEST gates a structural mutation)
+[01:35:39.880] LOG: [coop:session] isCoopAuthoritativeGuestGated -> true (authoritative GUEST gates a structural mutation)
+[01:35:39.880] LOG: %cStart Phase BattleEndPhase color:green;
+[01:35:39.880] LOG: [coop:progression] waveEndState BROADCAST wave=8 (host streams authoritative snapshot)
+[01:35:39.880] LOG: [coop:runtime] consume waveEndState wave=7 tick=34
+[01:35:39.881] WARN: [coop:resync] authoritativeState tick=34 STALE (lastApplied=38) -> REJECTED (#807)
+[01:35:39.881] LOG: [coop:progression] GUEST waveEndState APPLY wave=8 applied=false tick=34
+[01:35:39.881] LOG: Battle Score: 0 (1 Turns x1)
+[01:35:39.881] LOG: Total Score: 384
+[01:35:39.902] LOG: %cStart Phase TrainerVictoryPhase color:green;
+[01:35:39.903] LOG: [coop:session] isCoopAuthoritativeGuestGated -> true (authoritative GUEST gates a structural mutation)
+[01:35:39.903] LOG: [coop:session] isCoopAuthoritativeGuestGated -> true (authoritative GUEST gates a structural mutation)
+[01:35:39.923] LOG: [coop:session] isCoopAuthoritativeGuestGated -> true (authoritative GUEST gates a structural mutation)
+[01:35:39.923] LOG: Rival Ivy
+[01:35:39.932] LOG: [coop:interaction] interactionCounter() read -> 7 (role=guest)
+[01:35:39.933] LOG: [coop:health] tick=0g turn=2 wave=8 counter=7 assertions=2 wait=-1ms peerBeat=115s transport=connected
+[01:35:39.963] LOG: [coop:webrtc] raw rx role=guest t=waveEndState bytes=17022 handlers=11
+[01:35:39.964] LOG: [coop:replay] guest RECV waveEndState wave=8 tick=39
+[01:35:39.964] LOG: [coop:runtime] pend waveEndState wave=8 tick=39
+[01:35:40.771] LOG: [coop:progression] coopVictoryDialogue DECISION isCoop=true -> SKIP (constant 0 awaits, lockstep-safe)
+[01:35:40.771] LOG: %cStart Phase MoneyRewardPhase color:green;
+[01:35:41.155] LOG: %cStart Phase ModifierRewardPhase color:green;
+[01:35:41.585] LOG: %cStart Phase ModifierRewardPhase color:green;
+[01:35:41.769] LOG: [coop:webrtc] raw rx role=guest t=rendezvous bytes=37 handlers=11
+[01:35:41.769] LOG: [coop:rendezvous] RECV arrival point=shop:8:7 -> BUFFER (no waiter yet) role=guest
+[01:35:41.986] LOG: %cStart Phase EggLapsePhase color:green;
+[01:35:41.986] LOG: %cStart Phase SelectModifierPhase color:green;
+[01:35:41.987] LOG: [coop:interaction] interactionCounter() read -> 7 (role=guest)
+[01:35:41.987] LOG: [coop:owner] ownerOf(counter=7) seat=1 -> owner=guest
+[01:35:41.987] LOG: [coop:owner] isLocalOwnerAtCounter(pinnedCounter=7) parity=1 owner=guest role=guest -> true
+[01:35:41.987] LOG: Wave Seed: SO_WZIqIR8sX]v=`}[ivLka 8
+[01:35:41.996] LOG: 14 10 [2,3,4,5,6,7,8,9,10,12,22]
+[01:35:41.996] LOG: GREAT 1
+[01:35:41.996] LOG: 17 10 [2,3,4,5,6,7,8,9,10,12,22]
+[01:35:41.996] LOG: {"id":"SOOTHE_BELL","localeKey":"modifierType:ModifierType.SOOTHE_BELL","iconImage":"soothe_bell","soundName":"se/restore","tier":1} 
+[01:35:41.996] LOG: 7 3 [4,5,6]
+[01:35:41.997] LOG: {"id":"TEMP_STAT_STAGE_BOOSTER","localeKey":"","iconImage":"x_accuracy","soundName":"se/restore","tier":0,"stat":6,"nameKey":"x_accuracy","quantityKey":"stage"} 
+[01:35:41.998] LOG: 0 0 [4,5,6]
+[01:35:41.998] LOG: {"id":"POKEBALL","localeKey":"","iconImage":"pb","group":"pb","soundName":"se/pb_bounce_1","tier":0,"pokeballType":0,"count":5} 
+[01:35:41.999] LOG: 8 3 [4,5,6]
+[01:35:41.999] LOG: {"id":"BERRY","localeKey":"","iconImage":"sitrus_berry","group":"berry","soundName":"se/restore","tier":0,"berryType":0} 
+[01:35:41.999] LOG: [coop:owner] ownerOf(counter=7) seat=1 -> owner=guest
+[01:35:42.000] LOG: [coop:owner] isLocalOwnerAtCounter(pinnedCounter=7) parity=1 owner=guest role=guest -> true
+[01:35:42.000] LOG: [coop:interaction] interactionCounter() read -> 7 (role=guest)
+[01:35:42.000] LOG: [coop:reward] owner/watcher decision: pinnedStart=7 liveCounter=7 parity=1 role=guest pick=OWNER option=ROLL spoof=false
+[01:35:42.000] LOG: [coop:shop] serializeRewardOptions count=3 ids=[SOOTHE_BELL,POKEBALL,BERRY] tiers=[1,0,0]
+[01:35:42.000] LOG: [coop:reward] OWNER streams reward options (start=7 reroll=0 count=3 ids=[SOOTHE_BELL,POKEBALL,BERRY])
+[01:35:42.001] LOG: [coop:relay] SEND rewardOptions seq=7 reroll=0 count=3 ids=[SOOTHE_BELL,POKEBALL,BERRY]
+[01:35:42.001] LOG: [coop:webrtc] raw tx role=guest t=rewardOptions bytes=228
+[01:35:42.001] LOG: [coop:rendezvous] ARRIVE point=shop:8:7 (send) role=guest
+[01:35:42.001] LOG: [coop:webrtc] raw tx role=guest t=rendezvous bytes=37
+[01:35:42.002] LOG: [coop:reward] OWNER drives reward screen (start=7 role=guest spoof=false adoptsOptions=false wave=8)
+[01:35:42.002] LOG: [coop:rendezvous] shop-pick-commit barrier AWAIT shop:8:7
+[01:35:42.002] LOG: [coop:rendezvous] AWAIT point=shop:8:7 -> partner already arrived (buffer-hit) role=guest
+[01:35:42.043] LOG: [coop:interaction] mirror begin role=owner mirrorSeq=448 interactionStart=7 reroll=0
+[01:35:42.046] LOG: [coop:interaction] uiMirror beginSession role=owner mode=6 seq=448 early=0
+[01:35:46.404] LOG: [coop:interaction] uiMirror OWNER send seq=448 n=0 button=0 modeBefore=6
+[01:35:46.405] LOG: [coop:webrtc] raw tx role=guest t=uiInput bytes=51
+[01:35:46.747] LOG: [coop:owner] ownerOf(counter=7) seat=1 -> owner=guest
+[01:35:46.747] LOG: [coop:owner] isLocalOwnerAtCounter(pinnedCounter=7) parity=1 owner=guest role=guest -> true
+[01:35:46.749] LOG: [coop:interaction] uiMirror OWNER send seq=448 n=1 button=5 modeBefore=6
+[01:35:46.749] LOG: [coop:webrtc] raw tx role=guest t=uiInput bytes=51
+[01:35:47.891] LOG: [coop:owner] ownerOf(counter=7) seat=1 -> owner=guest
+[01:35:47.892] LOG: [coop:owner] isLocalOwnerAtCounter(pinnedCounter=7) parity=1 owner=guest role=guest -> true
+[01:35:47.892] LOG: [coop:relay] OWNER send seq=7 kind=shop choice=0 data=[1,2,1,3,19791,1911] role=guest
+[01:35:47.893] LOG: [coop:relay] SEND interactionChoice seq=7 kind=shop kind=? choice=0 data=[1,2,1,3,19791,1911]
+[01:35:47.893] LOG: [coop:webrtc] raw tx role=guest t=interactionChoice bytes=86
+[01:35:48.299] LOG: [coop:interaction] uiMirror OWNER send seq=448 n=2 button=1 modeBefore=6
+[01:35:48.300] LOG: [coop:webrtc] raw tx role=guest t=uiInput bytes=51
+[01:35:48.597] LOG: [coop:interaction] uiMirror OWNER send seq=448 n=3 button=3 modeBefore=6
+[01:35:48.597] LOG: [coop:webrtc] raw tx role=guest t=uiInput bytes=51
+[01:35:49.082] LOG: [coop:interaction] uiMirror OWNER send seq=448 n=4 button=2 modeBefore=6
+[01:35:49.082] LOG: [coop:webrtc] raw tx role=guest t=uiInput bytes=51
+[01:35:49.881] LOG: [coop:owner] ownerOf(counter=7) seat=1 -> owner=guest
+[01:35:49.881] LOG: [coop:owner] isLocalOwnerAtCounter(pinnedCounter=7) parity=1 owner=guest role=guest -> true
+[01:35:49.882] LOG: [coop:interaction] uiMirror OWNER send seq=448 n=5 button=5 modeBefore=6
+[01:35:49.883] LOG: [coop:webrtc] raw tx role=guest t=uiInput bytes=51
+[01:35:52.927] LOG: [coop:owner] ownerOf(counter=7) seat=1 -> owner=guest
+[01:35:52.927] LOG: [coop:owner] isLocalOwnerAtCounter(pinnedCounter=7) parity=1 owner=guest role=guest -> true
+[01:35:52.927] LOG: [coop:relay] OWNER send seq=7 kind=reward choice=0 data=[0,0,3] role=guest
+[01:35:52.927] LOG: [coop:relay] SEND interactionChoice seq=7 kind=reward kind=? choice=0 data=[0,0,3]
+[01:35:52.927] LOG: [coop:webrtc] raw tx role=guest t=interactionChoice bytes=75
+[01:35:52.947] LOG: %cStart Phase NewBattlePhase color:green;
+[01:35:52.948] LOG: Wave Seed: TP`X[JrJS9tY^w>a~\jwMlb 9
+[01:35:52.949] LOG: [coop:session] isCoopAuthoritativeGuestGated -> true (authoritative GUEST gates a structural mutation)
+[01:35:52.949] LOG: [coop:session] isCoopAuthoritativeGuestGated -> true (authoritative GUEST gates a structural mutation)
+[01:35:52.949] LOG: [coop:session] isCoopAuthoritativeGuestGated -> true (authoritative GUEST gates a structural mutation)
+[01:35:52.949] LOG: [coop:session] isCoopAuthoritativeGuestGated -> true (authoritative GUEST gates a structural mutation)
+[01:35:52.949] LOG: %cStart Phase ReturnPhase color:green;
+[01:35:52.951] LOG: [coop:interaction] interactionCounter() read -> 7 (role=guest)
+[01:35:52.951] LOG: [coop:interaction] CoopInteractionTurn.advance INCREMENT (fromCounter=7) counter 7 -> 8
+[01:35:52.951] LOG: [coop:interaction] advanceInteraction ADVANCED+BROADCAST (fromCounter=7) counter 7 -> 8 role=guest; send interaction screen=__turn__ choice=8
+[01:35:52.951] LOG: [coop:webrtc] raw tx role=guest t=interaction bytes=50
+[01:35:52.951] LOG: [coop:owner] ownerOf(counter=8) seat=0 -> owner=host
+[01:35:52.951] LOG: [coop:owner] ownerOf(counter=8) seat=0 -> owner=host
+[01:35:52.951] LOG: [coop-launch] proceedIfReady launched=true localTeam=3 bothReady=true role=guest partnerReady=true
+[01:35:52.951] LOG: [coop:interaction] interactionCounter() read -> 8 (role=guest)
+[01:35:52.951] LOG: [coop:reward] advance interaction (role=guest from=7 counter 7 -> 8)
+[01:35:52.951] LOG: [coop:session] isCoopAuthoritativeGuestGated -> true (authoritative GUEST gates a structural mutation)
+[01:35:53.058] LOG: %cStart Phase CoopPartnerSyncPhase color:green;
+[01:35:53.058] LOG: [coop:interaction] interactionCounter() read -> 8 (role=guest)
+[01:35:53.058] LOG: [coop:interaction] partner-sync gate: waiting for partner to reach counter=8
+[01:35:53.150] LOG: [coop:webrtc] raw rx role=guest t=interaction bytes=50 handlers=11
+[01:35:53.150] LOG: [coop:interaction] RECV interaction broadcast (deferred catch-up net) received=8 localBefore=8 role=guest -> no defer (local >= received)
+[01:35:53.150] WARN: [coop:interaction] CoopInteractionTurn.mergeRemote DEFER (remote=8, counter=8, pendingRemote=8) live counter UNCHANGED (folds in at next advance if still ahead)
+[01:35:53.150] LOG: [coop:owner] ownerOf(counter=8) seat=0 -> owner=host
+[01:35:53.150] LOG: [coop:owner] ownerOf(counter=8) seat=0 -> owner=host
+[01:35:53.150] LOG: [coop-launch] proceedIfReady launched=true localTeam=3 bothReady=true role=guest partnerReady=true
+[01:35:53.150] LOG: [coop:interaction] partner-sync gate: partner reached counter=8 -> proceed
+[01:35:53.151] LOG: %cStart Phase ReturnPhase color:green;
+[01:35:53.306] LOG: %cStart Phase ShowTrainerPhase color:green;
+[01:35:53.419] LOG: %cStart Phase NextEncounterPhase color:green;
+[01:35:53.419] LOG: [coop:stream] guest consumeEnemyParty wave=9 -> null (buffered=none)
+[01:35:53.420] LOG: [coop:stream] guest awaitEnemyParty wave=9 START timeout=120000ms
+[01:35:53.652] LOG: [coop:webrtc] raw rx role=guest t=enemyPartySync bytes=505 handlers=11
+[01:35:53.653] LOG: [coop:replay] guest RECV enemyPartySync wave=9 count=2 -> parked waiter
+[01:35:53.653] LOG: [coop:stream] guest awaitEnemyParty wave=9 RESOLVE count=2
+[01:35:53.702] LOG: [coop:enemy] buildCoopEnemy ADOPT bi=0 species=23 form=0 lv=7 abilityIdx=0 nature=1 gender=1 shiny=false hp=24/24 moves=4 heldItems=0
+[01:35:53.722] LOG: [coop:enemy] buildCoopEnemy ADOPT bi=0 species=265 form=0 lv=6 abilityIdx=1 nature=13 gender=1 shiny=false hp=22/22 moves=4 heldItems=0
+[01:35:53.746] LOG: Starting species pool tier: COMMON
+[01:35:53.746] LOG: Replaced WEEDLE with KAKUNA
+[01:35:53.750] LOG: 16 10 [2,3,4,5,6,7,8,9,10,12,22]
+[01:35:53.750] LOG: {"id":"ER_UPGRADED_MAP","localeKey":"","iconImage":"map","iconTint":16765514,"soundName":"se/restore","tier":1} 
+[01:35:54.162] LOG: [coop:webrtc] raw rx role=guest t=enemyPartySync bytes=505 handlers=11
+[01:35:54.163] LOG: [coop:replay] guest RECV enemyPartySync wave=9 count=2 -> buffered (no waiter)
+[01:35:54.173] LOG: [coop:webrtc] raw rx role=guest t=rendezvous bytes=36 handlers=11
+[01:35:54.173] LOG: [coop:rendezvous] RECV arrival point=cmd:9:1 -> BUFFER (no waiter yet) role=guest
+[01:35:57.472] LOG: [coop:launch] resume marker recorded slot=0 self=Duck Dodgers partner=gtgelibeta wave=9 (#810)
+[01:35:57.630] DEBUG: Session data saved to slot 0!
+[01:35:57.631] LOG: Wave Seed: TP`X[JrJS9tY^w>a~\jwMlb 9
+[01:35:59.762] LOG: [coop:session] isCoopAuthoritativeGuestGated -> true (authoritative GUEST gates a structural mutation)
+[01:35:59.762] LOG: [coop:session] isCoopAuthoritativeGuestGated -> true (authoritative GUEST gates a structural mutation)
+[01:35:59.762] LOG: [coop:session] isCoopAuthoritativeGuestGated -> true (authoritative GUEST gates a structural mutation)
+[01:35:59.762] LOG: [coop:session] isCoopAuthoritativeGuestGated -> true (authoritative GUEST gates a structural mutation)
+[01:35:59.762] LOG: [coop:session] isCoopAuthoritativeGuestGated -> true (authoritative GUEST gates a structural mutation)
+[01:35:59.766] LOG: %cStart Phase MysteryEncounterPhase color:green;
+[01:35:59.767] LOG: [coop:interaction] interactionCounter() read -> 8 (role=guest)
+[01:35:59.767] LOG: [coop:me] authoritative guest: diverting MysteryEncounterPhase -> CoopReplayMePhase {"counter":8,"wave":9}
+[01:35:59.767] LOG: [coop:me] coopSetMePinForGuest {"before":-1,"after":8}
+[01:35:59.767] LOG: [coop:me] interaction-counter -1 -> 8 (ME begin)
+[01:35:59.768] LOG: [coop:me] purged 3 stale summon-chain phases at ME divert (#813)
+[01:35:59.768] LOG: [coop:session] isCoopAuthoritativeGuestGated -> true (authoritative GUEST gates a structural mutation)
+[01:35:59.768] LOG: [coop:owner] ownerOf(counter=8) seat=0 -> owner=host
+[01:35:59.768] LOG: [coop:owner] isLocalOwnerAtCounter(pinnedCounter=8) parity=0 owner=host role=guest -> false
+[01:35:59.768] LOG: %cStart Phase InitEncounterPhase color:green;
+[01:35:59.768] LOG: [coop:session] isCoopAuthoritativeGuestGated -> true (authoritative GUEST gates a structural mutation)
+[01:35:59.768] LOG: %cStart Phase PostSummonPhase color:green;
+[01:35:59.768] LOG: Ran PSP for: Ekans
+[01:35:59.768] LOG: %cStart Phase PostSummonPhase color:green;
+[01:35:59.768] LOG: %cStart Phase PostSummonPhase color:green;
+[01:35:59.769] LOG: %cStart Phase CoopReplayMePhase color:green;
+[01:35:59.769] LOG: [coop:me] guest diverted into CoopReplayMePhase {"counter":8,"seqMe":8000008,"seqTerm":9000008,"wave":9}
+[01:35:59.769] LOG: [coop:stream] guest REGISTER onMeMessage handler (was=false)
+[01:35:59.769] LOG: [coop:me] await host presentation (mePresent) {"seq":8000008,"timeoutMs":1200000}
+[01:35:59.769] LOG: [coop:relay] AWAIT interactionOutcome seq=8000008 timeoutMs=1200000 -> network-wait
+[01:36:14.902] LOG: [coop:interaction] interactionCounter() read -> 8 (role=guest)
+[01:36:14.902] LOG: [coop:health] tick=0g turn=1 wave=9 counter=8 assertions=2 wait=-1ms peerBeat=150s transport=connected
+[01:36:44.904] LOG: [coop:interaction] interactionCounter() read -> 8 (role=guest)
+[01:36:44.904] LOG: [coop:health] tick=0g turn=1 wave=9 counter=8 assertions=2 wait=-1ms peerBeat=180s transport=connected
+[01:37:19.904] LOG: [coop:interaction] interactionCounter() read -> 8 (role=guest)
+[01:37:19.904] LOG: [coop:health] tick=0g turn=1 wave=9 counter=8 assertions=2 wait=-1ms peerBeat=215s transport=connected
+[01:37:32.060] LOG: [coop:webrtc] raw rx role=guest t=command bytes=128 handlers=11
+[01:37:32.060] LOG: [coop:relay] recv command fieldIndex=0 turn=1 command=0 -> BUFFERED (no awaiter yet)
+[01:37:32.060] LOG: [coop:webrtc] raw rx role=guest t=commandRequest bytes=84 handlers=11
+[01:37:32.061] LOG: [coop:relay] peer recv commandRequest fieldIndex=1 owner=guest turn=1 before responder install -> BUFFERED (own slot, #812)
