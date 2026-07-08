@@ -1,0 +1,270 @@
+url:      https://elite-redux-staging.pages.dev/
+build:    mrc9a598-g33b
+mode:     4  wave:15
+seed:     8qTfcBYmEfSU9ZxXYKIR5GTk
+party:    Mudbray(L12 33hp f0), Sobble(L11 35hp f0), Varoom(L11 27hp f0), Rookidee(L7 24hp f0)
+enemy:    Wynaut(L9), Mantyke(L9), Riolu(L9), Togepi(L9)
+
+----- COMMENT -----
+pokemon right and left sprites are displaced after a berry pokemon even
+
+----- CONSOLE -----
+[22:23:49.790] LOG: %cStart Phase MoveEndPhase color:green;
+[22:23:49.791] LOG: %cStart Phase MovePhase color:green;
+[22:23:49.791] LOG: %cUser: Mudbray
+Move: STOMPING_TANTRUM
+Use Mode: NORMAL color:orchid
+[22:23:49.792] LOG: %cStart Phase MessagePhase color:green;
+[22:23:49.901] LOG: %cStart Phase MessagePhase color:green;
+[22:23:50.090] LOG: %cStart Phase MoveEndPhase color:green;
+[22:23:50.090] LOG: %cStart Phase MovePhase color:green;
+[22:23:50.090] LOG: %cStart Phase MoveEndPhase color:green;
+[22:23:50.090] LOG: %cStart Phase MovePhase color:green;
+[22:23:50.090] LOG: %cStart Phase MoveEndPhase color:green;
+[22:23:50.090] LOG: %cStart Phase CheckInterludePhase color:green;
+[22:23:50.090] LOG: %cStart Phase WeatherEffectPhase color:green;
+[22:23:50.090] LOG: %cStart Phase PositionalTagPhase color:green;
+[22:23:50.090] LOG: %cStart Phase BerryPhase color:green;
+[22:23:50.091] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[22:23:50.092] LOG: %cStart Phase TurnEndPhase color:green;
+[22:23:50.093] WARN: [coop:turn] host recorder: finalize with NO open recording -> turn=-1 events=0 (caller decides not to emit)
+[22:23:50.093] LOG: %cStart Phase ShowAbilityPhase color:green;
+[22:23:50.246] LOG: %cStart Phase StatStageChangePhase color:green;
+[22:23:50.424] LOG: %cStart Phase MessagePhase color:green;
+[22:23:50.623] LOG: %cStart Phase HideAbilityPhase color:green;
+[22:23:50.646] LOG: %cStart Phase BattleEndPhase color:green;
+[22:23:50.646] LOG: Battle Score: 73 (2 Turns x0.92)
+[22:23:50.646] LOG: Total Score: 793
+[22:23:50.650] LOG: Applied Zinc 
+[22:23:50.652] LOG: %cStart Phase EggLapsePhase color:green;
+[22:23:50.652] LOG: %cStart Phase SelectModifierPhase color:green;
+[22:23:50.652] LOG: Wave Seed: E~aspOfzRs`bFgefXV_BTax 13
+[22:23:50.659] LOG: 6 3 [3,4,5]
+[22:23:50.659] LOG: {"id":"LURE","localeKey":"modifierType:ModifierType.LURE","iconImage":"lure","group":"lure","soundName":"se/restore","tier":0,"maxBattles":10} 
+[22:23:50.659] LOG: 2 0 [3,4,5]
+[22:23:50.659] LOG: {"id":"POTION","localeKey":"modifierType:ModifierType.POTION","iconImage":"potion","group":"potion","soundName":"se/restore","tier":0,"restorePoints":20,"restorePercent":10,"healStatus":false} 
+[22:23:50.659] LOG: 14 9 [2,3,4,5,6,7,8,9,10,22]
+[22:23:50.659] LOG: GREAT 0
+[22:23:50.659] LOG: 0 0 [2,3,4,5,6,7,8,9,10,22]
+[22:23:50.659] LOG: {"id":"GREAT_BALL","localeKey":"","iconImage":"gb","group":"pb","soundName":"se/pb_bounce_1","tier":1,"pokeballType":1,"count":5} 
+[22:23:54.997] LOG: %cStart Phase NewBattlePhase color:green;
+[22:23:54.997] LOG: Wave Seed: FbtqPg{StacGhfgYW`CUby 14
+[22:23:54.998] LOG: %cStart Phase ReturnPhase color:green;
+[22:23:55.107] LOG: %cStart Phase ReturnPhase color:green;
+[22:23:55.212] LOG: %cStart Phase ReturnPhase color:green;
+[22:23:55.318] LOG: %cStart Phase ShowTrainerPhase color:green;
+[22:23:55.418] LOG: %cStart Phase NextEncounterPhase color:green;
+[22:23:55.420] LOG: Starting species pool tier: UNCOMMON
+[22:23:56.924] DEBUG: Session data saved to slot 1!
+[22:23:56.924] LOG: Wave Seed: FbtqPg{StacGhfgYW`CUby 14
+[22:23:58.418] LOG: %cStart Phase MysteryEncounterPhase color:green;
+[22:24:05.251] LOG: %cStart Phase MysteryEncounterOptionSelectedPhase color:green;
+[22:24:05.342] LOG: Pokemon: Wild Pikachu | Species ID: 25 | Level: 10 | Nature: Naive (+Spd/-SpDef) | Friendship: 50
+[22:24:05.342] LOG: Stats (IVs): HP: 31 (29), Atk: 21 (4), Def: 15 (8), Spatk: 22 (24), Spdef: 16 (14), Spd: 33 (17)
+[22:24:05.342] LOG: Ability: Generator | Passive Ability: Short Circuit | Boss Bars: 2
+[22:24:05.342] LOG: Moveset: ["Thunder Wave","Double Team"]
+[22:24:05.454] LOG: {"id":"BERRY","localeKey":"","iconImage":"sitrus_berry","group":"berry","soundName":"se/restore","tier":0,"berryType":0} (enemy)
+[22:24:05.454] LOG: %cStart Phase MysteryEncounterBattlePhase color:green;
+[22:24:05.454] LOG: %cStart Phase SummonPhase color:green;
+[22:24:05.557] WARN: cry/25 not found
+[22:24:05.662] LOG: %cStart Phase SummonPhase color:green;
+[22:24:05.807] LOG: Applied Zinc 
+[22:24:05.834] WARN: cry/965 not found
+[22:24:05.940] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[22:24:05.940] LOG: %cStart Phase CheckSwitchPhase color:green;
+[22:24:07.229] LOG: %cStart Phase SwitchPhase color:green;
+[22:24:08.220] LOG: %cStart Phase SwitchSummonPhase color:green;
+[22:24:08.401] LOG: Applied Zinc 
+[22:24:08.429] WARN: cry/749 not found
+[22:24:08.535] LOG: %cStart Phase PostSummonPhase color:green;
+[22:24:08.535] LOG: Ran PSP for: Mudbray
+[22:24:08.535] LOG: %cStart Phase PostSummonPhase color:green;
+[22:24:08.535] LOG: %cStart Phase PostSummonPhase color:green;
+[22:24:08.535] LOG: %cStart Phase InitEncounterPhase color:green;
+[22:24:08.535] LOG: %cStart Phase PostSummonPhase color:green;
+[22:24:08.535] LOG: Ran PSP for: Pikachu
+[22:24:08.535] LOG: %cStart Phase PostSummonPhase color:green;
+[22:24:08.536] LOG: %cStart Phase ShowAbilityPhase color:green;
+[22:24:08.690] LOG: %cStart Phase MessagePhase color:green;
+[22:24:08.957] LOG: %cStart Phase HideAbilityPhase color:green;
+[22:24:08.979] LOG: %cStart Phase PostSummonPhase color:green;
+[22:24:08.979] LOG: %cStart Phase TurnInitPhase color:green;
+[22:24:08.979] LOG: %cStart Phase MysteryEncounterBattleStartCleanupPhase color:green;
+[22:24:08.980] LOG: %cStart Phase CommandPhase color:green;
+[22:24:10.118] LOG: Move: STOMPING_TANTRUM Move targets: {"targets":[2],"multiple":false} 
+Player Pokemon: Mudbray
+[22:24:10.119] LOG: %cStart Phase EnemyCommandPhase color:green;
+[22:24:10.119] LOG: Battle Seed: xSBAkUIuyiEdJ4GK
+[22:24:10.120] LOG: Move Pool: ["Thunder Wave","Double Team"]
+[22:24:10.120] LOG: Move Scores: [10,2]
+[22:24:10.120] LOG: Sorted Move Pool: ["Thunder Wave","Double Team"]
+[22:24:10.120] LOG: Chosen Move: Thunder Wave
+[22:24:10.120] LOG: %cStart Phase TurnStartPhase color:green;
+[22:24:10.120] LOG: %cStart Phase MovePhase color:green;
+[22:24:10.120] LOG: %cUser: Pikachu
+Move: THUNDER_WAVE
+Use Mode: NORMAL color:orchid
+[22:24:10.121] LOG: %cStart Phase MessagePhase color:green;
+[22:24:10.245] LOG: %cStart Phase MoveEffectPhase color:green;
+[22:24:10.246] LOG: %cStart Phase MessagePhase color:green;
+[22:24:10.462] LOG: %cStart Phase MoveEndPhase color:green;
+[22:24:10.462] LOG: %cStart Phase MovePhase color:green;
+[22:24:10.462] LOG: %cUser: Mudbray
+Move: STOMPING_TANTRUM
+Use Mode: NORMAL color:orchid
+[22:24:10.463] LOG: %cStart Phase MessagePhase color:green;
+[22:24:10.579] LOG: %cStart Phase MoveEffectPhase color:green;
+[22:24:10.601] WARN: cry/749 not found
+[22:24:10.668] WARN: cry/749 not found
+[22:24:10.729] WARN: cry/749 not found
+[22:24:10.801] LOG: crit stage: +0
+[22:24:10.802] LOG: Move: Stomping Tantrum | Base damage: 18.8 | Power: 75 | Source attack: 28 | Target defense: 15
+[22:24:10.802] LOG: Move: Stomping Tantrum | Attack damage: 50
+[22:24:10.802] LOG: %cStart Phase DamageAnimPhase color:green;
+[22:24:10.813] LOG: %cStart Phase StatStageChangePhase color:green;
+[22:24:10.813] LOG: %cStart Phase MessagePhase color:green;
+[22:24:11.012] LOG: %cStart Phase FaintPhase color:green;
+[22:24:11.013] WARN: cry/25 not found
+[22:24:11.068] LOG: %cStart Phase MessagePhase color:green;
+[22:24:11.385] LOG: %cStart Phase VictoryPhase color:green;
+[22:24:11.385] LOG: %cStart Phase ExpPhase color:green;
+[22:24:11.385] LOG: Applied Super EXP. Charm 
+[22:24:11.385] LOG: Applied EXP. Charm 
+[22:24:11.785] LOG: %cStart Phase LevelUpPhase color:green;
+[22:24:11.785] LOG: Applied Zinc 
+[22:24:11.785] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[22:24:11.785] LOG: Applied Super EXP. Charm 
+[22:24:11.785] LOG: Applied EXP. Charm 
+[22:24:11.785] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[22:24:11.785] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[22:24:11.785] LOG: Applied Super EXP. Charm 
+[22:24:11.785] LOG: Applied EXP. Charm 
+[22:24:11.785] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[22:24:11.786] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[22:24:11.786] LOG: Applied Super EXP. Charm 
+[22:24:11.786] LOG: Applied EXP. Charm 
+[22:24:11.786] LOG: %cStart Phase LevelUpPhase color:green;
+[22:24:11.786] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[22:24:11.786] LOG: %cStart Phase MoveEndPhase color:green;
+[22:24:11.786] LOG: %cStart Phase CheckInterludePhase color:green;
+[22:24:11.786] LOG: %cStart Phase WeatherEffectPhase color:green;
+[22:24:11.786] LOG: %cStart Phase PositionalTagPhase color:green;
+[22:24:11.786] LOG: %cStart Phase BerryPhase color:green;
+[22:24:11.786] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[22:24:11.786] LOG: %cStart Phase TurnEndPhase color:green;
+[22:24:11.786] WARN: [coop:turn] host recorder: finalize with NO open recording -> turn=-1 events=0 (caller decides not to emit)
+[22:24:11.786] LOG: %cStart Phase BattleEndPhase color:green;
+[22:24:11.786] LOG: Battle Score: 100 (1 Turns x1)
+[22:24:11.786] LOG: Total Score: 893
+[22:24:11.788] LOG: Applied Zinc 
+[22:24:11.790] LOG: %cStart Phase MysteryEncounterRewardsPhase color:green;
+[22:24:11.791] LOG: Applied Zinc 
+[22:24:11.792] LOG: Applied Zinc 
+[22:24:11.794] LOG: %cStart Phase MessagePhase color:green;
+[22:24:12.212] LOG: %cStart Phase SelectModifierPhase color:green;
+[22:24:12.212] LOG: Wave Seed: FbtqPg{StacGhfgYW`CUby 14
+[22:24:14.353] LOG: Applied Zinc 
+[22:24:14.357] LOG: %cStart Phase EggLapsePhase color:green;
+[22:24:14.357] LOG: %cStart Phase PostMysteryEncounterPhase color:green;
+[22:24:14.358] LOG: %cStart Phase NewBattlePhase color:green;
+[22:24:14.358] LOG: Wave Seed: GcurQh|TubdHighZXaDVcz 15
+[22:24:14.358] LOG: Starting trainer pool tier: COMMON
+[22:24:14.359] LOG: %cStart Phase ReturnPhase color:green;
+[22:24:14.462] LOG: %cStart Phase ShowTrainerPhase color:green;
+[22:24:14.562] LOG: %cStart Phase NextEncounterPhase color:green;
+[22:24:14.563] LOG: UNCOMMON
+[22:24:14.564] LOG: Wynaut
+[22:24:14.569] LOG: Pokemon: Foe Wynaut | Species ID: 360 | Level: 9 | Nature: Bashful (-)
+[22:24:14.569] LOG: Stats (IVs): HP: 38 (9), Atk: 10 (21), Def: 15 (1), Spatk: 11 (19), Spdef: 15 (17), Spd: 10 (1)
+[22:24:14.569] LOG: Ability: Magic Guard | Passive Ability: Sticky Hold 
+[22:24:14.569] LOG: Moveset: ["Destiny Bond","Encore"]
+[22:24:14.569] LOG: COMMON
+[22:24:14.569] LOG: Mantyke
+[22:24:14.574] LOG: Pokemon: Foe Mantyke | Species ID: 458 | Level: 9 | Nature: Jolly (+Spd/-SpAtk)
+[22:24:14.574] LOG: Stats (IVs): HP: 29 (12), Atk: 9 (19), Def: 15 (24), Spatk: 16 (18), Spdef: 27 (7), Spd: 17 (5)
+[22:24:14.574] LOG: Ability: Rain Dish | Passive Ability: Water Veil 
+[22:24:14.574] LOG: Moveset: ["Air Cutter","Bubble Beam","Mud Sport","Tackle"]
+[22:24:14.574] LOG: UNCOMMON
+[22:24:14.574] LOG: Riolu
+[22:24:14.579] LOG: Pokemon: Foe Riolu | Species ID: 447 | Level: 9 | Nature: Naughty (+Atk/-SpDef)
+[22:24:14.579] LOG: Stats (IVs): HP: 28 (10), Atk: 22 (22), Def: 14 (18), Spatk: 13 (20), Spdef: 10 (4), Spd: 17 (31)
+[22:24:14.579] LOG: Ability: Quick Feet | Passive Ability: Fighter 
+[22:24:14.579] LOG: Moveset: ["Quick Attack","Detect","Meditate"]
+[22:24:14.579] LOG: UNCOMMON
+[22:24:14.579] LOG: Wynaut
+[22:24:14.579] LOG: Duplicate species detected, prompting reroll...
+[22:24:14.579] LOG: Rerolling party member...
+[22:24:14.579] LOG: COMMON
+[22:24:14.579] LOG: Togepi
+[22:24:14.584] LOG: Pokemon: Foe Togepi | Species ID: 175 | Level: 9 | Nature: Lax (+Def/-SpDef)
+[22:24:14.584] LOG: Stats (IVs): HP: 27 (17), Atk: 9 (21), Def: 19 (5), Spatk: 12 (10), Spdef: 17 (28), Spd: 8 (11)
+[22:24:14.584] LOG: Ability: Prankster | Passive Ability: Super Luck 
+[22:24:14.584] LOG: Moveset: ["Happy Hour","Yawn","Growl","Encore"]
+[22:24:14.693] LOG: Battle Seed: v7XAf3BsWQB19b3v
+[22:24:14.693] LOG: Applied Iron (enemy)
+[22:24:14.694] LOG: Applied Iron (enemy)
+[22:24:14.694] LOG: Generated AI funcs
+[22:24:14.750] DEBUG: Session data saved to slot 1!
+[22:24:14.750] LOG: Wave Seed: GcurQh|TubdHighZXaDVcz 15
+[22:24:14.952] LOG: Breeder Addison
+[22:24:15.235] LOG: Dialogue saved as seen: dialogue:breeder.encounter.1
+[22:24:15.269] LOG: Breeder Addison
+[22:24:15.629] LOG: %cStart Phase SummonPhase color:green;
+[22:24:15.629] LOG: Addison
+[22:24:15.752] LOG: Applied Iron (enemy)
+[22:24:15.879] LOG: %cStart Phase SummonPhase color:green;
+[22:24:15.879] LOG: Addison
+[22:24:16.007] LOG: Applied Iron (enemy)
+[22:24:16.140] LOG: %cStart Phase SummonPhase color:green;
+[22:24:16.140] LOG: Addison
+[22:24:16.263] LOG: Applied Iron (enemy)
+[22:24:16.390] LOG: %cStart Phase SummonPhase color:green;
+[22:24:16.535] LOG: Applied Zinc 
+[22:24:16.562] WARN: cry/749 not found
+[22:24:16.662] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[22:24:16.663] LOG: %cStart Phase SummonPhase color:green;
+[22:24:16.807] LOG: Applied Zinc 
+[22:24:16.835] WARN: cry/816 not found
+[22:24:16.940] LOG: %cStart Phase SummonPhase color:green;
+[22:24:17.085] LOG: Applied Zinc 
+[22:24:17.112] WARN: cry/965 not found
+[22:24:17.212] LOG: %cStart Phase InitEncounterPhase color:green;
+[22:24:17.215] LOG: %cStart Phase PostSummonPhase color:green;
+[22:24:17.215] LOG: Ran PSP for: Sobble
+[22:24:17.219] LOG: %cStart Phase PostSummonPhase color:green;
+[22:24:17.220] LOG: %cStart Phase ShowAbilityPhase color:green;
+[22:24:17.374] LOG: %cStart Phase MessagePhase color:green;
+[22:24:17.579] LOG: %cStart Phase HideAbilityPhase color:green;
+[22:24:17.604] LOG: %cStart Phase PostSummonPhase color:green;
+[22:24:17.606] LOG: %cStart Phase PostSummonPhase color:green;
+[22:24:17.606] LOG: Ran PSP for: Mudbray
+[22:24:17.609] LOG: %cStart Phase PostSummonPhase color:green;
+[22:24:17.611] LOG: %cStart Phase PostSummonPhase color:green;
+[22:24:17.612] LOG: %cStart Phase PostSummonPhase color:green;
+[22:24:17.612] LOG: Ran PSP for: Riolu
+[22:24:17.614] LOG: %cStart Phase PostSummonPhase color:green;
+[22:24:17.615] LOG: %cStart Phase PostSummonPhase color:green;
+[22:24:17.616] LOG: %cStart Phase PostSummonPhase color:green;
+[22:24:17.616] LOG: Ran PSP for: Varoom
+[22:24:17.617] LOG: %cStart Phase PostSummonPhase color:green;
+[22:24:17.618] LOG: %cStart Phase PostSummonPhase color:green;
+[22:24:17.618] LOG: %cStart Phase PostSummonPhase color:green;
+[22:24:17.618] LOG: Ran PSP for: Mantyke
+[22:24:17.619] LOG: %cStart Phase PostSummonPhase color:green;
+[22:24:17.619] LOG: %cStart Phase PostSummonPhase color:green;
+[22:24:17.620] LOG: %cStart Phase ShowAbilityPhase color:green;
+[22:24:17.774] LOG: %cStart Phase MovePhase color:green;
+[22:24:17.774] LOG: %cUser: Mantyke
+Move: AQUA_RING
+Use Mode: INDIRECT color:orchid
+[22:24:17.781] LOG: %cStart Phase MessagePhase color:green;
+[22:24:17.884] LOG: %cStart Phase MoveEffectPhase color:green;
+[22:24:17.891] LOG: %cStart Phase MessagePhase color:green;
+[22:24:18.157] LOG: %cStart Phase MoveEndPhase color:green;
+[22:24:18.157] LOG: %cStart Phase HideAbilityPhase color:green;
+[22:24:18.180] LOG: %cStart Phase PostSummonPhase color:green;
+[22:24:18.180] LOG: Ran PSP for: Wynaut
+[22:24:18.181] LOG: %cStart Phase PostSummonPhase color:green;
+[22:24:18.181] LOG: %cStart Phase PostSummonPhase color:green;
+[22:24:18.181] LOG: %cStart Phase TurnInitPhase color:green;
+[22:24:18.181] LOG: %cStart Phase CommandPhase color:green;
