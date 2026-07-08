@@ -1,0 +1,280 @@
+url:      https://elite-redux-staging.pages.dev/
+build:    mrc9a598-g33b
+mode:     4  wave:7
+seed:     ebfzsTXaZBFpH5HQO1jBzP77
+party:    Regigigas(L8 25hp f0), Dreepy(L7 8hp f0)
+enemy:    Happiny(L5), Wooloo(L5), Lechonk(L5)
+
+----- CONSOLE -----
+[21:06:50.006] LOG: %cStart Phase MovePhase color:green;
+[21:06:50.006] LOG: %cStart Phase MoveEndPhase color:green;
+[21:06:50.006] LOG: %cStart Phase CheckInterludePhase color:green;
+[21:06:50.006] LOG: %cStart Phase WeatherEffectPhase color:green;
+[21:06:50.006] LOG: %cStart Phase PositionalTagPhase color:green;
+[21:06:50.006] LOG: %cStart Phase BerryPhase color:green;
+[21:06:50.011] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[21:06:50.015] LOG: %cStart Phase PostTurnStatusEffectPhase color:green;
+[21:06:50.372] LOG: %cStart Phase MessagePhase color:green;
+[21:06:50.605] LOG: %cStart Phase PostTurnStatusEffectPhase color:green;
+[21:06:50.606] LOG: %cStart Phase TurnEndPhase color:green;
+[21:06:50.610] WARN: [coop:turn] host recorder: finalize with NO open recording -> turn=-1 events=0 (caller decides not to emit)
+[21:06:50.610] LOG: %cStart Phase TurnInitPhase color:green;
+[21:06:50.610] LOG: %cStart Phase CommandPhase color:green;
+[21:06:51.096] LOG: Move: CHIP_AWAY Move targets: {"targets":[4,1],"multiple":false} 
+Player Pokemon: Regigigas
+[21:06:51.098] LOG: %cStart Phase SelectTargetPhase color:green;
+[21:06:51.342] LOG: %cStart Phase CommandPhase color:green;
+[21:06:51.817] LOG: Move: AIR_CUTTER Move targets: {"targets":[4,5],"multiple":true} 
+Player Pokemon: Dreepy
+[21:06:51.818] LOG: %cStart Phase SelectTargetPhase color:green;
+[21:06:52.033] LOG: %cStart Phase EnemyCommandPhase color:green;
+[21:06:52.040] LOG: Battle Seed: xy32xabQQOvNQdPC
+[21:06:52.043] LOG: Move Pool: ["Growl","Air Cutter","Flail","Peck"]
+[21:06:52.043] LOG: Move Scores: [2,25.5,-20,30]
+[21:06:52.043] LOG: Sorted Move Pool: ["Peck","Air Cutter","Growl","Flail"]
+[21:06:52.043] LOG: Chosen Move: Peck
+[21:06:52.043] LOG: %cStart Phase EnemyCommandPhase color:green;
+[21:06:52.047] LOG: Move Pool: ["Scratch","Defense Curl","Fury Swipes"]
+[21:06:52.047] LOG: Move Scores: [-20,2,-20]
+[21:06:52.047] LOG: Sorted Move Pool: ["Defense Curl","Scratch","Fury Swipes"]
+[21:06:52.047] LOG: Chosen Move: Defense Curl
+[21:06:52.047] LOG: %cStart Phase TurnStartPhase color:green;
+[21:06:52.055] LOG: %cStart Phase MovePhase color:green;
+[21:06:52.055] LOG: %cUser: Dreepy
+Move: AIR_CUTTER
+Use Mode: NORMAL color:orchid
+[21:06:52.058] LOG: %cStart Phase MessagePhase color:green;
+[21:06:52.139] LOG: %cStart Phase MoveEffectPhase color:green;
+[21:06:52.456] LOG: crit stage: +1
+[21:06:52.458] LOG: Move: Air Cutter | Base damage: 21.2 | Power: 87.5 | Source attack: 16 | Target defense: 7
+[21:06:52.459] LOG: Move: Air Cutter | Attack damage: 10
+[21:06:52.459] LOG: crit stage: +1
+[21:06:52.460] LOG: Move: Air Cutter | Base damage: 12.338461538461537 | Power: 87.5 | Source attack: 16 | Target defense: 13
+[21:06:52.460] LOG: Move: Air Cutter | Attack damage: 11
+[21:06:52.461] LOG: %cStart Phase DamageAnimPhase color:green;
+[21:06:52.492] LOG: %cStart Phase DamageAnimPhase color:green;
+[21:06:52.524] LOG: %cStart Phase FaintPhase color:green;
+[21:06:53.407] LOG: %cStart Phase MessagePhase color:green;
+[21:06:53.609] LOG: %cStart Phase VictoryPhase color:green;
+[21:06:53.609] LOG: %cStart Phase ExpPhase color:green;
+[21:06:53.823] LOG: %cStart Phase ExpPhase color:green;
+[21:06:54.040] LOG: %cStart Phase FaintPhase color:green;
+[21:06:54.041] WARN: cry/161 not found
+[21:06:54.107] LOG: %cStart Phase MessagePhase color:green;
+[21:06:54.191] LOG: %cStart Phase VictoryPhase color:green;
+[21:06:54.192] LOG: %cStart Phase ExpPhase color:green;
+[21:06:54.507] LOG: %cStart Phase ExpPhase color:green;
+[21:06:54.923] LOG: %cStart Phase MoveEndPhase color:green;
+[21:06:54.924] LOG: %cStart Phase MovePhase color:green;
+[21:06:54.925] LOG: %cUser: Regigigas
+Move: CHIP_AWAY
+Use Mode: NORMAL color:orchid
+[21:06:54.925] LOG: %cStart Phase MessagePhase color:green;
+[21:06:55.072] LOG: %cStart Phase MessagePhase color:green;
+[21:06:55.272] LOG: %cStart Phase MoveEndPhase color:green;
+[21:06:55.273] LOG: %cStart Phase MovePhase color:green;
+[21:06:55.273] LOG: %cStart Phase MoveEndPhase color:green;
+[21:06:55.273] LOG: %cStart Phase MovePhase color:green;
+[21:06:55.273] LOG: %cStart Phase MoveEndPhase color:green;
+[21:06:55.273] LOG: %cStart Phase CheckInterludePhase color:green;
+[21:06:55.273] LOG: %cStart Phase WeatherEffectPhase color:green;
+[21:06:55.273] LOG: %cStart Phase PositionalTagPhase color:green;
+[21:06:55.274] LOG: %cStart Phase BerryPhase color:green;
+[21:06:55.274] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[21:06:55.275] LOG: %cStart Phase PostTurnStatusEffectPhase color:green;
+[21:06:55.639] LOG: %cStart Phase MessagePhase color:green;
+[21:06:55.872] LOG: %cStart Phase PostTurnStatusEffectPhase color:green;
+[21:06:55.872] LOG: %cStart Phase TurnEndPhase color:green;
+[21:06:55.873] WARN: [coop:turn] host recorder: finalize with NO open recording -> turn=-1 events=0 (caller decides not to emit)
+[21:06:55.873] LOG: %cStart Phase BattleEndPhase color:green;
+[21:06:55.874] LOG: Battle Score: 64 (2 Turns x0.92)
+[21:06:55.874] LOG: Total Score: 293
+[21:06:55.885] LOG: %cStart Phase EggLapsePhase color:green;
+[21:06:55.886] LOG: %cStart Phase SelectModifierPhase color:green;
+[21:06:55.886] LOG: Wave Seed: khlyZ^g`HLvN;NWU7pHV== 6
+[21:06:55.889] LOG: 0 0 [3,4,5,6,7,22]
+[21:06:55.889] LOG: {"id":"GREAT_BALL","localeKey":"","iconImage":"gb","group":"pb","soundName":"se/pb_bounce_1","tier":1,"pokeballType":1,"count":5} 
+[21:06:55.889] LOG: 4 1 [3]
+[21:06:55.890] LOG: {"id":"ETHER","localeKey":"modifierType:ModifierType.ETHER","iconImage":"ether","group":"ether","soundName":"se/restore","tier":0,"restorePoints":10} 
+[21:06:55.890] LOG: 0 0 [3]
+[21:06:55.890] LOG: {"id":"POKEBALL","localeKey":"","iconImage":"pb","group":"pb","soundName":"se/pb_bounce_1","tier":0,"pokeballType":0,"count":5} 
+[21:06:55.890] LOG: 2 0 [3]
+[21:06:55.890] LOG: {"id":"POTION","localeKey":"modifierType:ModifierType.POTION","iconImage":"potion","group":"potion","soundName":"se/restore","tier":0,"restorePoints":20,"restorePercent":10,"healStatus":false} 
+[21:07:01.479] LOG: %cStart Phase NewBattlePhase color:green;
+[21:07:01.480] LOG: Wave Seed: limz[_haIMwO<OXV8qIW>> 7
+[21:07:01.480] LOG: %cStart Phase NextEncounterPhase color:green;
+[21:07:01.482] LOG: Starting species pool tier: RARE
+[21:07:01.498] LOG: Pokemon: Wild Happiny | Species ID: 440 | Level: 5 | Nature: Sassy (+SpDef/-Spd)
+[21:07:01.499] LOG: Stats (IVs): HP: 26 (21), Atk: 5 (3), Def: 6 (21), Spatk: 7 (12), Spdef: 14 (13), Spd: 7 (0)
+[21:07:01.499] LOG: Ability: Regenerator | Passive Ability: Cute Charm 
+[21:07:01.499] LOG: Moveset: ["Double Slap","Defense Curl","Growl","Tail Whip"]
+[21:07:01.499] LOG: Starting species pool tier: COMMON
+[21:07:01.516] LOG: Pokemon: Wild Lechonk | Species ID: 915 | Level: 5 | Nature: Bashful (-)
+[21:07:01.516] LOG: Stats (IVs): HP: 20 (8), Atk: 11 (1), Def: 11 (1), Spatk: 8 (6), Spdef: 11 (25), Spd: 9 (26)
+[21:07:01.516] LOG: Ability: Strong Jaw | Passive Ability: Thick Fat 
+[21:07:01.516] LOG: Moveset: ["Hyper Fang","Quick Attack","Sweet Scent","Tail Whip"]
+[21:07:01.516] LOG: Starting species pool tier: COMMON
+[21:07:01.532] LOG: Pokemon: Wild Wooloo | Species ID: 831 | Level: 5 | Nature: Brave (+Atk/-Spd)
+[21:07:01.532] LOG: Stats (IVs): HP: 20 (16), Atk: 13 (22), Def: 11 (11), Spatk: 11 (11), Spdef: 10 (15), Spd: 9 (16)
+[21:07:01.532] LOG: Ability: Scrappy | Passive Ability: Let's Roll 
+[21:07:01.532] LOG: Moveset: ["Growl","Guard Split","Tackle","Rollout (P)"]
+[21:07:02.129] DEBUG: Session data saved to slot 0!
+[21:07:02.130] LOG: Wave Seed: limz[_haIMwO<OXV8qIW>> 7
+[21:07:02.608] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[21:07:02.608] LOG: %cStart Phase InitEncounterPhase color:green;
+[21:07:02.610] LOG: %cStart Phase PostSummonPhase color:green;
+[21:07:02.610] LOG: Ran PSP for: Wooloo
+[21:07:02.613] LOG: %cStart Phase PostSummonPhase color:green;
+[21:07:02.615] LOG: %cStart Phase PostSummonPhase color:green;
+[21:07:02.616] LOG: %cStart Phase MovePhase color:green;
+[21:07:02.616] LOG: %cUser: Wooloo
+Move: DEFENSE_CURL
+Use Mode: FOLLOW_UP color:orchid
+[21:07:02.629] LOG: %cStart Phase MessagePhase color:green;
+[21:07:02.755] LOG: %cStart Phase MoveEffectPhase color:green;
+[21:07:03.040] LOG: %cStart Phase StatStageChangePhase color:green;
+[21:07:03.227] LOG: %cStart Phase MessagePhase color:green;
+[21:07:03.455] LOG: %cStart Phase MoveEndPhase color:green;
+[21:07:03.457] LOG: %cStart Phase PostSummonPhase color:green;
+[21:07:03.457] LOG: Ran PSP for: Lechonk
+[21:07:03.460] LOG: %cStart Phase PostSummonPhase color:green;
+[21:07:03.461] LOG: %cStart Phase PostSummonPhase color:green;
+[21:07:03.461] LOG: %cStart Phase PostSummonPhase color:green;
+[21:07:03.461] LOG: Ran PSP for: Happiny
+[21:07:03.464] LOG: %cStart Phase PostSummonPhase color:green;
+[21:07:03.464] LOG: %cStart Phase PostSummonPhase color:green;
+[21:07:03.464] LOG: %cStart Phase TurnInitPhase color:green;
+[21:07:03.464] LOG: %cStart Phase CommandPhase color:green;
+[21:07:13.418] LOG: Move: CHIP_AWAY Move targets: {"targets":[3,4,1],"multiple":false} 
+Player Pokemon: Regigigas
+[21:07:13.420] LOG: %cStart Phase SelectTargetPhase color:green;
+[21:07:14.217] LOG: %cStart Phase CommandPhase color:green;
+[21:07:14.924] LOG: Move: AIR_CUTTER Move targets: {"targets":[3,4,5],"multiple":true} 
+Player Pokemon: Dreepy
+[21:07:14.926] LOG: %cStart Phase SelectTargetPhase color:green;
+[21:07:15.360] LOG: %cStart Phase EnemyCommandPhase color:green;
+[21:07:15.365] LOG: Battle Seed: k47BbgSDI8WGVwMO
+[21:07:15.366] LOG: Move Pool: ["Double Slap","Defense Curl","Growl","Tail Whip"]
+[21:07:15.366] LOG: Move Scores: [30,2,2,2]
+[21:07:15.366] LOG: Sorted Move Pool: ["Double Slap","Defense Curl","Growl","Tail Whip"]
+[21:07:15.366] LOG: Chosen Move: Double Slap
+[21:07:15.366] LOG: %cStart Phase EnemyCommandPhase color:green;
+[21:07:15.374] LOG: Move Pool: ["Hyper Fang","Quick Attack","Sweet Scent","Tail Whip"]
+[21:07:15.375] LOG: Move Scores: [28.5,-20,6,2]
+[21:07:15.375] LOG: Sorted Move Pool: ["Hyper Fang","Sweet Scent","Tail Whip","Quick Attack"]
+[21:07:15.375] LOG: Chosen Move: Sweet Scent
+[21:07:15.375] LOG: %cStart Phase EnemyCommandPhase color:green;
+[21:07:15.382] LOG: Move Pool: ["Growl","Guard Split","Tackle","Rollout (P)"]
+[21:07:15.382] LOG: Move Scores: [2,0,12,8]
+[21:07:15.382] LOG: Sorted Move Pool: ["Tackle","Rollout (P)","Growl","Guard Split"]
+[21:07:15.382] LOG: Chosen Move: Rollout (P)
+[21:07:15.382] LOG: %cStart Phase TurnStartPhase color:green;
+[21:07:15.398] LOG: %cStart Phase MovePhase color:green;
+[21:07:15.398] LOG: %cUser: Dreepy
+Move: AIR_CUTTER
+Use Mode: NORMAL color:orchid
+[21:07:15.408] LOG: %cStart Phase MessagePhase color:green;
+[21:07:15.488] LOG: %cStart Phase MoveEffectPhase color:green;
+[21:07:15.803] LOG: crit stage: +1
+[21:07:15.805] LOG: Move: Air Cutter | Base damage: 24.4 | Power: 87.5 | Source attack: 16 | Target defense: 6
+[21:07:15.805] LOG: Move: Air Cutter | Attack damage: 17
+[21:07:15.806] LOG: crit stage: +1
+[21:07:15.808] LOG: Move: Air Cutter | Base damage: 14.218181818181817 | Power: 87.5 | Source attack: 16 | Target defense: 11
+[21:07:15.808] LOG: Move: Air Cutter | Attack damage: 10
+[21:07:15.809] LOG: crit stage: +1
+[21:07:15.810] LOG: Move: Air Cutter | Base damage: 10.4 | Power: 87.5 | Source attack: 16 | Target defense: 16
+[21:07:15.810] LOG: Move: Air Cutter | Attack damage: 7
+[21:07:15.811] LOG: %cStart Phase DamageAnimPhase color:green;
+[21:07:15.837] LOG: %cStart Phase DamageAnimPhase color:green;
+[21:07:15.872] LOG: %cStart Phase DamageAnimPhase color:green;
+[21:07:15.904] LOG: %cStart Phase MoveEndPhase color:green;
+[21:07:15.907] LOG: %cStart Phase MovePhase color:green;
+[21:07:15.907] LOG: %cUser: Regigigas
+Move: CHIP_AWAY
+Use Mode: NORMAL color:orchid
+[21:07:15.921] LOG: %cStart Phase MessagePhase color:green;
+[21:07:16.018] LOG: %cStart Phase MoveEffectPhase color:green;
+[21:07:16.319] LOG: crit stage: +0
+[21:07:16.320] LOG: Move: Chip Away | Base damage: 30.363636363636363 | Power: 75 | Source attack: 40 | Target defense: 11
+[21:07:16.321] LOG: Move: Chip Away | Attack damage: 52
+[21:07:16.322] LOG: %cStart Phase DamageAnimPhase color:green;
+[21:07:16.356] LOG: %cStart Phase FaintPhase color:green;
+[21:07:17.473] LOG: %cStart Phase MessagePhase color:green;
+[21:07:17.598] LOG: %cStart Phase VictoryPhase color:green;
+[21:07:17.598] LOG: %cStart Phase ExpPhase color:green;
+[21:07:18.671] LOG: %cStart Phase ExpPhase color:green;
+[21:07:19.221] LOG: %cStart Phase MoveEndPhase color:green;
+[21:07:19.223] LOG: %cStart Phase MovePhase color:green;
+[21:07:19.224] LOG: %cStart Phase MoveEndPhase color:green;
+[21:07:19.224] LOG: %cStart Phase MovePhase color:green;
+[21:07:19.224] LOG: %cUser: Wooloo
+Move: ROLLOUT
+Use Mode: NORMAL color:orchid
+[21:07:19.232] LOG: %cStart Phase MessagePhase color:green;
+[21:07:19.351] LOG: %cStart Phase MoveEffectPhase color:green;
+[21:07:20.186] LOG: crit stage: +0
+[21:07:20.188] LOG: Move: Rollout (P) | Base damage: 9.563636363636363 | Power: 80 | Source attack: 13 | Target defense: 11
+[21:07:20.189] LOG: Move: Rollout (P) | Attack damage: 8
+[21:07:20.189] LOG: %cStart Phase DamageAnimPhase color:green;
+[21:07:20.221] LOG: %cStart Phase MoveEndPhase color:green;
+[21:07:20.221] LOG: %cStart Phase MovePhase color:green;
+[21:07:20.221] LOG: %cUser: Happiny
+Move: DOUBLE_SLAP
+Use Mode: NORMAL color:orchid
+[21:07:20.230] LOG: %cStart Phase MessagePhase color:green;
+[21:07:20.352] LOG: %cStart Phase MoveEffectPhase color:green;
+[21:07:20.569] LOG: crit stage: +0
+[21:07:20.570] LOG: Move: Double Slap | Base damage: 2.3846153846153846 | Power: 25 | Source attack: 5 | Target defense: 26
+[21:07:20.571] LOG: Move: Double Slap | Attack damage: 3
+[21:07:20.573] WARN: Failed to get source Pokemon for InfatuatedTag canAdd; id: undefined
+[21:07:20.573] LOG: %cStart Phase DamageAnimPhase color:green;
+[21:07:20.606] LOG: %cStart Phase MoveEffectPhase color:green;
+[21:07:20.836] LOG: crit stage: +0
+[21:07:20.837] LOG: Move: Double Slap | Base damage: 2.3846153846153846 | Power: 25 | Source attack: 5 | Target defense: 26
+[21:07:20.838] LOG: Move: Double Slap | Attack damage: 3
+[21:07:20.839] WARN: Failed to get source Pokemon for InfatuatedTag canAdd; id: undefined
+[21:07:20.839] LOG: %cStart Phase DamageAnimPhase color:green;
+[21:07:20.871] LOG: %cStart Phase MessagePhase color:green;
+[21:07:21.068] LOG: %cStart Phase MoveEndPhase color:green;
+[21:07:21.068] LOG: %cStart Phase CheckInterludePhase color:green;
+[21:07:21.068] LOG: %cStart Phase WeatherEffectPhase color:green;
+[21:07:21.069] LOG: %cStart Phase PositionalTagPhase color:green;
+[21:07:21.069] LOG: %cStart Phase BerryPhase color:green;
+[21:07:21.072] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[21:07:21.075] LOG: %cStart Phase PostTurnStatusEffectPhase color:green;
+[21:07:21.435] LOG: %cStart Phase MessagePhase color:green;
+[21:07:21.668] LOG: %cStart Phase PostTurnStatusEffectPhase color:green;
+[21:07:21.669] LOG: %cStart Phase TurnEndPhase color:green;
+[21:07:21.675] WARN: [coop:turn] host recorder: finalize with NO open recording -> turn=-1 events=0 (caller decides not to emit)
+[21:07:21.675] LOG: %cStart Phase TurnInitPhase color:green;
+[21:07:21.675] LOG: %cStart Phase CommandPhase color:green;
+[21:07:23.571] LOG: Move: EXTREME_SPEED Move targets: {"targets":[3,4,1],"multiple":false} 
+Player Pokemon: Regigigas
+[21:07:23.573] LOG: %cStart Phase SelectTargetPhase color:green;
+[21:07:23.891] LOG: %cStart Phase CommandPhase color:green;
+[21:07:25.091] LOG: Move: AIR_CUTTER Move targets: {"targets":[3,4],"multiple":true} 
+Player Pokemon: Dreepy
+[21:07:25.094] LOG: %cStart Phase SelectTargetPhase color:green;
+[21:07:25.446] LOG: %cStart Phase EnemyCommandPhase color:green;
+[21:07:25.450] LOG: Battle Seed: k47BbgSDI8WGVwMO
+[21:07:25.452] LOG: Move Pool: ["Double Slap","Defense Curl","Growl","Tail Whip"]
+[21:07:25.452] LOG: Move Scores: [30,2,2,2]
+[21:07:25.452] LOG: Sorted Move Pool: ["Double Slap","Defense Curl","Growl","Tail Whip"]
+[21:07:25.452] LOG: Chosen Move: Growl
+[21:07:25.452] LOG: %cStart Phase EnemyCommandPhase color:green;
+[21:07:25.464] LOG: Move Pool: ["Growl","Tackle","Rollout (P)"]
+[21:07:25.465] LOG: Move Scores: [2,12,16]
+[21:07:25.465] LOG: Sorted Move Pool: ["Rollout (P)","Tackle","Growl"]
+[21:07:25.465] LOG: Chosen Move: Rollout (P)
+[21:07:25.465] LOG: %cStart Phase TurnStartPhase color:green;
+[21:07:25.475] LOG: %cStart Phase MovePhase color:green;
+[21:07:25.475] LOG: %cUser: Regigigas
+Move: EXTREME_SPEED
+Use Mode: NORMAL color:orchid
+[21:07:25.484] LOG: %cStart Phase MessagePhase color:green;
+[21:07:25.585] LOG: %cStart Phase MoveEffectPhase color:green;
+[21:07:26.219] LOG: crit stage: +0
+[21:07:26.220] LOG: Move: Extreme Speed | Base damage: 22.8 | Power: 80 | Source attack: 40 | Target defense: 16
+[21:07:26.221] LOG: Move: Extreme Speed | Attack damage: 42
+[21:07:26.221] LOG: %cStart Phase DamageAnimPhase color:green;
+[21:07:26.254] LOG: %cStart Phase FaintPhase color:green;
