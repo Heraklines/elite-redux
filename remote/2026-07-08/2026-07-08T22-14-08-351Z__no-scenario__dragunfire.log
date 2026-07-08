@@ -1,0 +1,270 @@
+url:      https://elite-redux-staging.pages.dev/
+build:    mrc9a598-g33b
+mode:     4  wave:1
+seed:     8qTfcBYmEfSU9ZxXYKIR5GTk
+party:    Varoom(L5 21hp f0), Sobble(L5 21hp f0), Mudbray(L5 23hp f0)
+enemy:    Scatterbug(L2), Rattata(L2), Pidgey(L2)
+
+----- COMMENT -----
+seems that one of the pokemon name is missing in the textbox
+
+----- CONSOLE -----
+[22:05:43.947] LOG: [coop:lobby] poll players=0
+[22:05:45.796] LOG: [coop:lobby] poll players=0
+[22:05:47.644] LOG: [coop:lobby] poll players=0
+[22:05:49.499] LOG: [coop:lobby] poll players=0
+[22:05:51.344] LOG: [coop:lobby] poll players=0
+[22:05:53.170] LOG: [coop:lobby] poll players=0
+[22:05:55.034] LOG: [coop:lobby] poll players=0
+[22:05:56.907] LOG: [coop:lobby] poll players=0
+[22:05:58.760] LOG: [coop:lobby] poll players=0
+[22:06:00.610] LOG: [coop:lobby] poll players=0
+[22:06:02.477] LOG: [coop:lobby] poll players=0
+[22:06:04.320] LOG: [coop:lobby] poll players=0
+[22:06:06.155] LOG: [coop:lobby] poll players=0
+[22:06:08.013] LOG: [coop:lobby] poll players=0
+[22:06:09.853] LOG: [coop:lobby] poll players=0
+[22:06:11.674] LOG: [coop:lobby] poll players=0
+[22:06:13.544] LOG: [coop:lobby] poll players=0
+[22:06:15.383] LOG: [coop:lobby] poll players=0
+[22:06:17.243] LOG: [coop:lobby] poll players=0
+[22:06:19.076] LOG: [coop:lobby] poll players=0
+[22:06:20.897] LOG: [coop:lobby] poll players=0
+[22:06:22.716] LOG: [coop:lobby] poll players=0
+[22:06:24.537] LOG: [coop:lobby] poll players=0
+[22:06:26.402] LOG: [coop:lobby] poll players=0
+[22:06:28.245] LOG: [coop:lobby] poll players=0
+[22:06:30.079] LOG: [coop:lobby] poll players=0
+[22:06:31.913] LOG: [coop:lobby] poll players=0
+[22:06:33.755] LOG: [coop:lobby] poll players=0
+[22:06:35.568] LOG: [coop:lobby] poll players=0
+[22:06:37.399] LOG: [coop:lobby] poll players=0
+[22:06:39.214] LOG: [coop:lobby] poll players=0
+[22:06:41.026] LOG: [coop:lobby] poll players=0
+[22:06:42.857] LOG: [coop:lobby] poll players=0
+[22:06:44.695] LOG: [coop:lobby] poll players=0
+[22:06:46.527] LOG: [coop:lobby] poll players=0
+[22:06:48.366] LOG: [coop:lobby] poll players=0
+[22:06:50.200] LOG: [coop:lobby] poll players=0
+[22:06:52.028] LOG: [coop:lobby] poll players=0
+[22:06:53.853] LOG: [coop:lobby] poll players=0
+[22:06:55.661] LOG: [coop:lobby] poll players=0
+[22:06:57.464] LOG: [coop:lobby] poll players=0
+[22:06:59.290] LOG: [coop:lobby] poll players=0
+[22:07:01.122] LOG: [coop:lobby] poll players=0
+[22:07:02.941] LOG: [coop:lobby] poll players=0
+[22:07:04.781] LOG: [coop:lobby] poll players=0
+[22:07:06.625] LOG: [coop:lobby] poll players=0
+[22:07:08.471] LOG: [coop:lobby] poll players=0
+[22:07:10.301] LOG: [coop:lobby] poll players=0
+[22:07:12.132] LOG: [coop:lobby] poll players=0
+[22:07:13.975] LOG: [coop:lobby] poll players=0
+[22:07:15.810] LOG: [coop:lobby] poll players=0
+[22:07:17.659] LOG: [coop:lobby] poll players=0
+[22:07:19.508] LOG: [coop:lobby] poll players=0
+[22:07:21.381] LOG: [coop:lobby] poll players=0
+[22:07:23.239] LOG: [coop:lobby] poll players=0
+[22:07:25.086] LOG: [coop:lobby] poll players=0
+[22:07:26.963] LOG: [coop:lobby] poll players=0
+[22:07:28.803] LOG: [coop:lobby] poll players=0
+[22:07:30.652] LOG: [coop:lobby] poll players=0
+[22:07:32.522] LOG: [coop:lobby] poll players=0
+[22:07:34.380] LOG: [coop:lobby] poll players=0
+[22:07:36.271] LOG: [coop:lobby] poll players=0
+[22:07:38.106] LOG: [coop:lobby] poll players=0
+[22:07:39.941] LOG: [coop:lobby] poll players=0
+[22:07:41.796] LOG: [coop:lobby] poll players=0
+[22:07:43.622] LOG: [coop:lobby] poll players=0
+[22:07:45.459] LOG: [coop:lobby] poll players=0
+[22:07:47.298] LOG: [coop:lobby] poll players=0
+[22:07:49.128] LOG: [coop:lobby] poll players=0
+[22:07:50.954] LOG: [coop:lobby] poll players=0
+[22:07:51.171] LOG: [coop:lobby] cancel (id=5a37403d-f0f6-4f79-b458-ca47be9e95cc connecting=false)
+[22:07:51.171] LOG: %cStart Phase TitlePhase color:green;
+[22:07:51.171] LOG: Getting Session Slot id: %d 0
+[22:07:51.181] LOG: use seasonal splash messages true
+[22:08:09.947] LOG: %cStart Phase SelectChallengePhase color:green;
+[22:08:47.725] LOG: %cStart Phase SelectStarterPhase color:green;
+[22:09:58.365] LOG: %cSaving starter preferences color: blue
+[22:09:58.781] LOG: %cSaving starter preferences color: blue
+[22:11:37.223] WARN: cry/965 not found
+[22:11:59.784] LOG: %cSaving starter preferences color: blue
+[22:12:00.156] LOG: %cSaving starter preferences color: blue
+[22:12:01.218] LOG: %cSaving starter preferences color: blue
+[22:12:01.656] LOG: %cSaving starter preferences color: blue
+[22:12:02.068] LOG: %cSaving starter preferences color: blue
+[22:12:02.495] LOG: %cSaving starter preferences color: blue
+[22:12:02.884] LOG: %cSaving starter preferences color: blue
+[22:12:03.907] LOG: %cSaving starter preferences color: blue
+[22:12:05.057] LOG: %cSaving starter preferences color: blue
+[22:12:05.345] LOG: %cSaving starter preferences color: blue
+[22:12:06.229] LOG: %cSaving starter preferences color: blue
+[22:12:06.557] LOG: %cSaving starter preferences color: blue
+[22:12:07.956] LOG: %cSaving starter preferences color: blue
+[22:12:08.256] LOG: %cSaving starter preferences color: blue
+[22:12:10.600] WARN: cry/816 not found
+[22:12:13.761] WARN: cry/816 not found
+[22:12:43.312] WARN: cry/749 not found
+[22:12:43.896] LOG: %cSaving starter preferences color: blue
+[22:12:44.257] LOG: %cSaving starter preferences color: blue
+[22:12:45.323] LOG: %cSaving starter preferences color: blue
+[22:12:45.640] LOG: %cSaving starter preferences color: blue
+[22:12:46.185] LOG: %cSaving starter preferences color: blue
+[22:12:47.207] LOG: %cSaving starter preferences color: blue
+[22:12:47.518] LOG: %cSaving starter preferences color: blue
+[22:12:48.769] LOG: %cSaving starter preferences color: blue
+[22:12:49.485] LOG: %cSaving starter preferences color: blue
+[22:12:49.996] LOG: %cSaving starter preferences color: blue
+[22:12:50.218] LOG: %cSaving starter preferences color: blue
+[22:12:59.753] LOG: Getting Session Slot id: %d 0
+[22:12:59.756] LOG: Getting Session Slot id: %d 1
+[22:12:59.757] LOG: Getting Session Slot id: %d 2
+[22:12:59.758] LOG: Getting Session Slot id: %d 3
+[22:12:59.758] LOG: Getting Session Slot id: %d 4
+[22:12:59.759] LOG: Getting Session Slot id: %d 0
+[22:12:59.948] ERROR: Invalid save data JSON detected! Session not found.
+[22:12:59.950] ERROR: Invalid save data JSON detected! Session not found.
+[22:12:59.951] ERROR: Invalid save data JSON detected! Session not found.
+[22:12:59.951] ERROR: Invalid save data JSON detected! Session not found.
+[22:13:08.988] LOG: Wave Seed: 9rUgdCZnFgTV:[yYZLJS6HUl 1
+[22:13:08.989] LOG: %cStart Phase EncounterPhase color:green;
+[22:13:08.992] LOG: Starting species pool tier: COMMON
+[22:13:09.004] LOG: Pokemon: Wild Scatterbug | Species ID: 664 | Level: 2 | Nature: Jolly (+Spd/-SpAtk)
+[22:13:09.004] LOG: Stats (IVs): HP: 13 (23), Atk: 6 (13), Def: 6 (2), Spatk: 5 (4), Spdef: 6 (30), Spd: 7 (28)
+[22:13:09.004] LOG: Ability: Swarm | Passive Ability: Shield Dust 
+[22:13:09.004] LOG: Moveset: ["Skitter Smack","Stun Spore","Poison Powder","Tackle"]
+[22:13:09.004] LOG: Starting species pool tier: COMMON
+[22:13:09.011] LOG: Pokemon: Wild Rattata | Species ID: 19 | Level: 2 | Nature: Quiet (+SpAtk/-Spd)
+[22:13:09.011] LOG: Stats (IVs): HP: 13 (18), Atk: 7 (4), Def: 6 (3), Spatk: 7 (27), Spdef: 6 (25), Spd: 7 (29)
+[22:13:09.011] LOG: Ability: Hustle | Passive Ability: Guts 
+[22:13:09.011] LOG: Moveset: ["Tackle","Thunder Fang","Ice Fang","Fire Fang"]
+[22:13:09.011] LOG: Starting species pool tier: COMMON
+[22:13:09.017] LOG: Pokemon: Wild Pidgey | Species ID: 16 | Level: 2 | Nature: Impish (+Def/-SpAtk)
+[22:13:09.017] LOG: Stats (IVs): HP: 13 (9), Atk: 6 (20), Def: 7 (2), Spatk: 6 (12), Spdef: 6 (18), Spd: 7 (9)
+[22:13:09.017] LOG: Ability: Guts | Passive Ability: Flock 
+[22:13:09.017] LOG: Moveset: ["Air Cutter","Sand Attack","Steel Wing","Peck"]
+[22:13:09.444] DEBUG: Session data saved to slot 1!
+[22:13:09.445] LOG: Wave Seed: 9rUgdCZnFgTV:[yYZLJS6HUl 1
+[22:13:09.850] WARN: cry/19 not found
+[22:13:09.850] WARN: cry/16 not found
+[22:13:10.317] LOG: %cStart Phase SummonPhase color:green;
+[22:13:10.650] WARN: cry/965 not found
+[22:13:10.855] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[22:13:10.856] LOG: %cStart Phase SummonPhase color:green;
+[22:13:11.189] WARN: cry/816 not found
+[22:13:11.388] LOG: %cStart Phase SummonPhase color:green;
+[22:13:11.722] WARN: cry/749 not found
+[22:13:11.922] LOG: %cStart Phase InitEncounterPhase color:green;
+[22:13:11.927] LOG: %cStart Phase PostSummonPhase color:green;
+[22:13:11.927] LOG: Ran PSP for: Sobble
+[22:13:11.932] LOG: %cStart Phase PostSummonPhase color:green;
+[22:13:11.934] LOG: %cStart Phase ShowAbilityPhase color:green;
+[22:13:12.239] LOG: %cStart Phase MessagePhase color:green;
+[22:13:12.650] LOG: %cStart Phase HideAbilityPhase color:green;
+[22:13:12.698] LOG: %cStart Phase PostSummonPhase color:green;
+[22:13:12.700] LOG: %cStart Phase PostSummonPhase color:green;
+[22:13:12.700] LOG: Ran PSP for: Mudbray
+[22:13:12.703] LOG: %cStart Phase PostSummonPhase color:green;
+[22:13:12.705] LOG: %cStart Phase PostSummonPhase color:green;
+[22:13:12.706] LOG: %cStart Phase PostSummonPhase color:green;
+[22:13:12.706] LOG: Ran PSP for: Varoom
+[22:13:12.709] LOG: %cStart Phase PostSummonPhase color:green;
+[22:13:12.710] LOG: %cStart Phase PostSummonPhase color:green;
+[22:13:12.710] LOG: %cStart Phase PostSummonPhase color:green;
+[22:13:12.710] LOG: Ran PSP for: Rattata
+[22:13:12.712] LOG: %cStart Phase PostSummonPhase color:green;
+[22:13:12.713] LOG: %cStart Phase PostSummonPhase color:green;
+[22:13:12.713] LOG: %cStart Phase PostSummonPhase color:green;
+[22:13:12.713] LOG: Ran PSP for: Scatterbug
+[22:13:12.714] LOG: %cStart Phase PostSummonPhase color:green;
+[22:13:12.714] LOG: %cStart Phase PostSummonPhase color:green;
+[22:13:12.715] LOG: %cStart Phase PostSummonPhase color:green;
+[22:13:12.715] LOG: Ran PSP for: Pidgey
+[22:13:12.715] LOG: %cStart Phase PostSummonPhase color:green;
+[22:13:12.715] LOG: %cStart Phase PostSummonPhase color:green;
+[22:13:12.715] LOG: %cStart Phase TurnInitPhase color:green;
+[22:13:12.716] LOG: %cStart Phase CommandPhase color:green;
+[22:13:19.551] LOG: Move: BLAZING_TORQUE Move targets: {"targets":[3,4,1],"multiple":false} 
+Player Pokemon: Varoom
+[22:13:19.552] LOG: %cStart Phase SelectTargetPhase color:green;
+[22:13:20.589] LOG: %cStart Phase CommandPhase color:green;
+[22:13:23.105] LOG: Move: FROST_BREATH Move targets: {"targets":[3,4,5,0,2],"multiple":false} 
+Player Pokemon: Sobble
+[22:13:23.107] LOG: %cStart Phase SelectTargetPhase color:green;
+[22:13:24.506] LOG: %cStart Phase CommandPhase color:green;
+[22:13:26.217] LOG: Move: BODY_PRESS Move targets: {"targets":[4,5,1],"multiple":false} 
+Player Pokemon: Mudbray
+[22:13:26.218] LOG: %cStart Phase SelectTargetPhase color:green;
+[22:13:26.678] LOG: %cStart Phase EnemyCommandPhase color:green;
+[22:13:26.686] LOG: Battle Seed: FXjFyYgq7v8pAJcS
+[22:13:26.698] LOG: Move Pool: ["Skitter Smack","Stun Spore","Poison Powder","Tackle"]
+[22:13:26.698] LOG: Move Scores: [4.828125,10,10,8]
+[22:13:26.698] LOG: Sorted Move Pool: ["Stun Spore","Poison Powder","Tackle","Skitter Smack"]
+[22:13:26.698] LOG: Chosen Move: Poison Powder
+[22:13:26.698] LOG: %cStart Phase EnemyCommandPhase color:green;
+[22:13:26.738] LOG: Move Pool: ["Tackle","Thunder Fang","Ice Fang","Fire Fang"]
+[22:13:26.738] LOG: Move Scores: [12,40,40,40]
+[22:13:26.738] LOG: Sorted Move Pool: ["Thunder Fang","Ice Fang","Fire Fang","Tackle"]
+[22:13:26.738] LOG: Chosen Move: Thunder Fang
+[22:13:26.738] LOG: %cStart Phase EnemyCommandPhase color:green;
+[22:13:26.752] LOG: Move Pool: ["Air Cutter","Sand Attack","Steel Wing","Peck"]
+[22:13:26.752] LOG: Move Scores: [25.5,2,9.75,14.625]
+[22:13:26.752] LOG: Sorted Move Pool: ["Air Cutter","Peck","Steel Wing","Sand Attack"]
+[22:13:26.752] LOG: Chosen Move: Sand Attack
+[22:13:26.752] LOG: %cStart Phase TurnStartPhase color:green;
+[22:13:26.766] LOG: %cStart Phase MovePhase color:green;
+[22:13:26.766] LOG: %cUser: Sobble
+Move: FROST_BREATH
+Use Mode: NORMAL color:orchid
+[22:13:26.779] LOG: %cStart Phase MessagePhase color:green;
+[22:13:26.900] LOG: %cStart Phase MoveEffectPhase color:green;
+[22:13:27.290] LOG: crit stage: +0
+[22:13:27.291] LOG: Move: Frost Breath | Base damage: 13.2 | Power: 60 | Source attack: 14 | Target defense: 6
+[22:13:27.291] LOG: Move: Frost Breath | Attack damage: 39
+[22:13:27.292] LOG: %cStart Phase DamageAnimPhase color:green;
+[22:13:27.301] LOG: %cStart Phase MessagePhase color:green;
+[22:13:27.666] LOG: %cStart Phase MessagePhase color:green;
+[22:13:28.066] LOG: %cStart Phase FaintPhase color:green;
+[22:13:28.071] WARN: cry/16 not found
+[22:13:28.177] LOG: %cStart Phase MessagePhase color:green;
+[22:13:28.450] LOG: %cStart Phase VictoryPhase color:green;
+[22:13:28.451] LOG: %cStart Phase ExpPhase color:green;
+[22:13:28.701] LOG: %cStart Phase ExpPhase color:green;
+[22:13:28.928] LOG: %cStart Phase ExpPhase color:green;
+[22:13:29.173] LOG: %cStart Phase MoveEndPhase color:green;
+[22:13:29.175] LOG: %cStart Phase MovePhase color:green;
+[22:13:29.175] LOG: %cUser: Mudbray
+Move: BODY_PRESS
+Use Mode: NORMAL color:orchid
+[22:13:29.182] LOG: %cStart Phase MessagePhase color:green;
+[22:13:29.355] LOG: %cStart Phase MoveEffectPhase color:green;
+[22:13:29.600] LOG: crit stage: +0
+[22:13:29.601] LOG: Move: Body Press | Base damage: 15.866666666666667 | Power: 80 | Source attack: 13 | Target defense: 6
+[22:13:29.601] LOG: Move: Body Press | Attack damage: 27
+[22:13:29.602] LOG: %cStart Phase DamageAnimPhase color:green;
+[22:13:29.612] LOG: %cStart Phase MessagePhase color:green;
+[22:13:30.005] LOG: %cStart Phase FaintPhase color:green;
+[22:13:30.008] WARN: cry/19 not found
+[22:13:30.113] LOG: %cStart Phase MessagePhase color:green;
+[22:13:30.356] LOG: %cStart Phase VictoryPhase color:green;
+[22:13:30.356] LOG: %cStart Phase ExpPhase color:green;
+[22:13:30.573] LOG: %cStart Phase ExpPhase color:green;
+[22:13:30.800] LOG: %cStart Phase ExpPhase color:green;
+[22:13:33.100] LOG: %cStart Phase MoveEndPhase color:green;
+[22:13:33.102] LOG: %cStart Phase MovePhase color:green;
+[22:13:33.102] LOG: %cUser: Varoom
+Move: BLAZING_TORQUE
+Use Mode: NORMAL color:orchid
+[22:13:33.106] LOG: %cStart Phase MessagePhase color:green;
+[22:13:33.316] LOG: %cStart Phase MoveEffectPhase color:green;
+[22:13:33.695] LOG: crit stage: +0
+[22:13:33.695] LOG: Move: Blazing Torque | Base damage: 19 | Power: 85 | Source attack: 15 | Target defense: 6
+[22:13:33.696] LOG: Move: Blazing Torque | Attack damage: 33
+[22:13:33.696] LOG: %cStart Phase DamageAnimPhase color:green;
+[22:13:33.706] LOG: %cStart Phase MessagePhase color:green;
+[22:13:34.100] LOG: %cStart Phase FaintPhase color:green;
+[22:13:34.729] LOG: %cStart Phase MessagePhase color:green;
+[22:13:35.045] LOG: %cStart Phase VictoryPhase color:green;
+[22:13:35.045] LOG: %cStart Phase ExpPhase color:green;
+[22:13:35.356] LOG: %cStart Phase ExpPhase color:green;
+[22:13:35.717] LOG: %cStart Phase ExpPhase color:green;
