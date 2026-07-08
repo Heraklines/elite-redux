@@ -542,4 +542,163 @@ describe.skipIf(!RUN)("co-op DUO biome choice: owner-alternated + mirrored cross
     ).toBe(watcherCounterBefore + 1);
     logs.flush();
   }, 300_000);
+
+  // =====================================================================================
+  // PROBE (#864): drive the REAL ErMapUiHandler owner path via the REAL ui.processInput mirror
+  // pump - the untested gap. The other scenarios call the captured onSelect DIRECTLY (mocking
+  // setMode), so they never exercise the real handler input -> confirmPick -> onSelect funnel NOR
+  // the real ui.processInput owner-drive/relay pump. This one does. Assert the owner emits the
+  // biomePick relay + advances the counter.
+  // =====================================================================================
+  it("PROBE: owner drives the REAL ER_MAP handler via real input -> emits biomePick relay + advances", async () => {
+    const { Button } = await import("#enums/buttons");
+    await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
+    const rig = await buildDuo(game, createLoopbackPair(), setCoopRuntime, toCoop);
+
+    rig.hostScene.currentBattle.waveIndex = 11;
+    rig.guestScene.currentBattle.waveIndex = 11;
+
+    setErPendingNodes([
+      { biome: BiomeId.FOREST, revealed: true },
+      { biome: BiomeId.VOLCANO, revealed: true },
+    ]);
+
+    const counterBefore = rig.hostRuntime.controller.interactionCounter();
+    const { ownerCtx } = ownerCtxFor(rig, counterBefore);
+
+    const sendSpy = vi.spyOn(CoopInteractionRelay.prototype, "sendInteractionChoice");
+
+    await withClient(ownerCtx, async () => {
+      const phase = new SelectBiomePhase();
+      phase.start();
+      // Poll across the #858 boundary barrier (owner alone -> times out at setCoopRendezvousWaitMs(50)),
+      // then the REAL ER_MAP handler opens.
+      let opened = false;
+      for (let i = 0; i < 120 && !opened; i++) {
+        await drainLoopback();
+        opened = ownerCtx.scene.ui.getMode() === UiMode.ER_MAP;
+      }
+      // eslint-disable-next-line no-console
+      console.log(
+        `[PROBE #864] after start: ui.getMode()=${ownerCtx.scene.ui.getMode()} (ER_MAP=${UiMode.ER_MAP}) opened=${opened}`,
+      );
+      if (opened) {
+        // Drive the REAL picker: RIGHT to the 2nd node (VOLCANO), ACTION to travel.
+        ownerCtx.scene.ui.processInput(Button.RIGHT);
+        ownerCtx.scene.ui.processInput(Button.ACTION);
+        await drainLoopback();
+      }
+    });
+
+    const biomePickSends = sendSpy.mock.calls.filter(c => c[1] === "biomePick");
+    // eslint-disable-next-line no-console
+    console.log(
+      `[PROBE #864] sendInteractionChoice calls=${JSON.stringify(sendSpy.mock.calls.map(c => ({ seq: c[0], kind: c[1], choice: c[2], data: c[3] })))} counterBefore=${counterBefore} counterAfter=${rig.hostRuntime.controller.interactionCounter()}`,
+    );
+    expect(biomePickSends.length, "the owner emitted a biomePick relay via the REAL handler input path").toBe(1);
+    logs.flush();
+  }, 300_000);
+
+  // =====================================================================================
+  // SCENARIO 6 (#864): the OWNER travels via a DETERMINISTIC terminal (NOT the World-Map picker) and
+  // MUST STILL relay the biome. The live P0: at a boundary the biome-pick owner changed biome WITHOUT
+  // emitting the biomePick relay (a non-picker terminal - a single revealed node / a travel-event
+  // target), so the watcher, parked on the map awaiting the pick, adopted a DIFFERENT deterministic
+  // fallback -> the two clients landed in different biomes ("map changed without letting me choose" on
+  // one, "Desynced waves" on the other).
+  //
+  // Here the OWNER is a chained crossroads-Leave whose SelectBiomePhase resolves to a SINGLE revealed
+  // node (a deterministic terminal that NEVER opens the picker). The WATCHER's SelectBiomePhase sees
+  // MULTIPLE nodes (a divergent-state boundary), opens the mirrored map, and awaits the owner's relay.
+  //
+  // FAILS-BEFORE: the single-node terminal advanced the counter but sent NO biomePick relay, so the
+  // watcher's #863 orphan backstop fired -> it fell back to generateNextBiome (a DIFFERENT biome than
+  // the owner's single node) -> the two engines DIVERGED.
+  // PASSES-AFTER: setNextBiomeAndEnd's owner funnel relays the single-node biome, so the watcher adopts
+  // it verbatim -> both engines land in the SAME biome.
+  // =====================================================================================
+  it("SCENARIO 6 (#864): owner travels via a DETERMINISTIC terminal -> still relays biomePick; watcher adopts the SAME biome", async () => {
+    await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
+    const rig = await buildDuo(game, createLoopbackPair(), setCoopRuntime, toCoop);
+
+    rig.hostScene.currentBattle.waveIndex = 11;
+    rig.guestScene.currentBattle.waveIndex = 11;
+
+    const counterBefore = rig.hostRuntime.controller.interactionCounter();
+    const { ownerCtx, watcherCtx } = ownerCtxFor(rig, counterBefore);
+    // The owner's single deterministic node - the biome BOTH engines must end up in.
+    const ownerBiome = BiomeId.VOLCANO;
+
+    const beginSpy = vi.spyOn(CoopUiMirror.prototype, "beginSession");
+    const sendSpy = vi.spyOn(CoopInteractionRelay.prototype, "sendInteractionChoice");
+    const guestSwitch = vi.spyOn(watcherCtx.scene.phaseManager, "unshiftNew");
+    const ownerSwitch = vi.spyOn(ownerCtx.scene.phaseManager, "unshiftNew");
+    const biomeArg = (spy: typeof guestSwitch): BiomeId | undefined =>
+      spy.mock.calls.find(c => c[0] === "SwitchBiomePhase")?.[1] as BiomeId | undefined;
+    const ownerCounterBefore = ownerCtx.runtime.controller.interactionCounter();
+
+    // ===== OWNER: a chained crossroads-Leave that resolves to a SINGLE revealed node (deterministic,
+    // never opens the picker). It must STILL relay the biome (#864). =====
+    const ownerCap = installUiCapture(ownerCtx.scene);
+    try {
+      setErPendingNodes([{ biome: ownerBiome, revealed: true }]); // single node -> deterministic terminal
+      await withClient(ownerCtx, async () => {
+        setCoopBiomeInteractionStart(counterBefore); // the crossroads Leave pinned this interaction on the owner
+        new SelectBiomePhase().start();
+        await drainLoopback();
+      });
+    } finally {
+      ownerCap.restore();
+    }
+
+    // The owner NEVER opened the picker (single node), yet it RELAYED the biome (#864 core fix).
+    const ownerBiomePickSends = sendSpy.mock.calls.filter(c => c[1] === "biomePick");
+    expect(
+      ownerBiomePickSends.length,
+      "the owner relayed a biomePick even though it travelled via a deterministic single-node terminal (#864)",
+    ).toBe(1);
+    expect(ownerBiomePickSends[0]?.[3], "the relay carries the owner's chosen biome verbatim").toEqual([ownerBiome]);
+    expect(biomeArg(ownerSwitch), "the owner switched to its single-node biome").toBe(ownerBiome);
+    // The owner advanced the interaction counter (so alternation + the #863 orphan backstop hold).
+    expect(
+      ownerCtx.runtime.controller.interactionCounter(),
+      "the owner advanced the interaction counter on its deterministic travel (#864)",
+    ).toBe(ownerCounterBefore + 1);
+
+    // ===== WATCHER: a divergent-state boundary (MULTIPLE nodes) -> opens the mirrored map + awaits the
+    // owner's relay, then adopts the owner's biome verbatim (NOT its own fallback). =====
+    const watcherTracker = installUiModeTracker(watcherCtx.scene);
+    try {
+      setErPendingNodes([
+        { biome: BiomeId.FOREST, revealed: true },
+        { biome: ownerBiome, revealed: true },
+      ]);
+      await withClient(watcherCtx, async () => {
+        setCoopBiomeInteractionStart(counterBefore); // the watcher's own chained pin (same interaction)
+        new SelectBiomePhase().start();
+        for (let i = 0; i < 80; i++) {
+          await drainLoopback();
+          if (biomeArg(guestSwitch) !== undefined) {
+            return;
+          }
+        }
+        throw new Error("biome pick WATCH HANG: the watcher never adopted the owner's deterministic biome (#864)");
+      });
+    } finally {
+      watcherTracker.restore();
+    }
+
+    // The watcher opened the mirrored MAP (real owner-alternated path) and then LEFT it.
+    expect(
+      beginSpy.mock.calls.some(c => c[0] === "watcher"),
+      "the watcher opened a mirrored MAP session",
+    ).toBe(true);
+    expect(watcherTracker.mode(), "the watcher's UI mode LEFT the map (not stuck in ER_MAP)").not.toBe(UiMode.ER_MAP);
+    // THE CONVERGENCE: both engines switch to the OWNER's biome (the watcher ADOPTED it, not a fallback).
+    expect(
+      biomeArg(guestSwitch),
+      "the watcher adopts the owner's biome verbatim (SAME biome, no divergence) (#864)",
+    ).toBe(ownerBiome);
+    logs.flush();
+  }, 300_000);
 });

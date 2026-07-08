@@ -2279,6 +2279,34 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
   },
   {
+    label: "(note) Co-op: the biome-pick OWNER always relays its biome, even on a non-picker travel (#864)",
+    description:
+      "CO-OP fix - verify with TWO clients (not a solo battle). Live wave-boundary P0: the biome-pick OWNER\n"
+      + "changed biome WITHOUT ever emitting the biomePick relay ('the map changed without letting me choose'\n"
+      + "on one client), so the WATCHER, parked on the mirrored map awaiting the owner's pick, adopted a\n"
+      + "DIFFERENT deterministic fallback biome ('Desynced waves', stuck at the old wave). Root cause: #848\n"
+      + "relay-wired ONLY the World-Map picker's on-select callback, so any OTHER biome-pick TERMINAL - a\n"
+      + "single revealed onward node (only one place to go), a travel-event target (Storm / Ultra Wormhole /\n"
+      + "Echo Chamber), or a chained crossroads-Leave that resolves deterministically - travelled ONE-SIDED\n"
+      + "and SILENT: no biomePick relay, so the two clients could land in different biomes. Fixed: the owner\n"
+      + "now relays the biome it travels to through a SINGLE terminal funnel (setNextBiomeAndEnd), so EVERY\n"
+      + "owner biome-travel - the picker pick, a deterministic single-node / travel-target resolution, or a\n"
+      + "fallback - emits the biomePick relay AND advances the interaction counter (so the #863 orphan\n"
+      + "backstop can rescue the watcher). The watcher adopts the owner's biome verbatim - never its own\n"
+      + "divergent fallback. DO (2 clients): reach a biome-end at a boundary where the onward map has a\n"
+      + "SINGLE route, or use a travel event (Storm / Wormhole) to set a destination, and cross the boundary.\n"
+      + "EXPECT: BOTH clients land in the SAME next biome and advance to the same wave - never one client on a\n"
+      + "new biome while the other is stuck 'desynced'. Duo-tested headlessly in\n"
+      + "test/tests/elite-redux/coop/coop-duo-biome-choice.test.ts (SCENARIO 6 + the real-handler PROBE).",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({ STARTING_WAVE_OVERRIDE: 1, STARTING_LEVEL_OVERRIDE: 50 });
+      return [
+        makeStarter(SpeciesId.SNORLAX, { moveset: [MoveId.TACKLE, MoveId.BODY_SLAM, MoveId.REST, MoveId.SNORE] }),
+      ];
+    },
+  },
+  {
     label: "(note) Co-op: a faint replacement must not instantly re-KO on the chooser (#807)",
     description:
       "CO-OP fix - verify with TWO clients (not a solo battle): when the GUEST's active mon FAINTS and\n"

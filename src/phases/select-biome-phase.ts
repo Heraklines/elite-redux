@@ -51,6 +51,21 @@ export class SelectBiomePhase extends BattlePhase {
   private coopAdvancePinned = -1;
   /** Co-op (#848): whether this phase completes a deferred crossroads-Leave interaction. */
   private coopChained = false;
+  /**
+   * Co-op (#864): whether the LOCAL client OWNS this biome interaction (so it must RELAY the chosen
+   * biome to the watcher). Set for a natural multi-node pick (in {@linkcode coopBiomePickFlow}) AND for a
+   * chained crossroads-Leave (from the pinned counter's parity, in {@linkcode start}). When true, EVERY
+   * terminal - the World-Map pick, a deterministic single-node / travel-target / random resolution, or
+   * an anti-hang fallback - relays through the single funnel in {@linkcode setNextBiomeAndEnd}, so the
+   * owner can NEVER travel one-sided-silently (the #864 P0: the owner changed biome without emitting the
+   * biomePick relay, freezing the watcher on the map screen).
+   */
+  private coopIsBiomeOwner = false;
+  /** Co-op (#864): the revealed onward node set (owner side), so the funnel can carry the picked INDEX
+   *  alongside the biome id. Null for a deterministic terminal that never built a node set. */
+  private coopRevealed: ErRouteNode[] | null = null;
+  /** Co-op (#864): guards the single owner biomePick relay send against a double-fire (idempotent). */
+  private coopBiomeRelaySent = false;
 
   start() {
     super.start();
@@ -74,6 +89,11 @@ export class SelectBiomePhase extends BattlePhase {
     if (coopController != null && !coopAutoResolve && coopBiomeInteractionInProgress()) {
       this.coopChained = true;
       this.coopAdvancePinned = coopBiomeInteractionStartValue();
+      // Co-op (#864): the crossroads pinned the counter + already decided the owner; adopt that ownership
+      // NOW (before any deterministic terminal runs) so a chained Leave that resolves to a single-node /
+      // travel-target biome (never opening the picker) STILL relays the biome to the watcher instead of
+      // travelling one-sided-silently.
+      this.coopIsBiomeOwner = coopController.isLocalOwnerAtCounter(this.coopAdvancePinned);
     }
 
     if (
@@ -244,6 +264,10 @@ export class SelectBiomePhase extends BattlePhase {
     }
     const pinned = this.coopAdvancePinned;
     const owns = spoofed || controller.isLocalOwnerAtCounter(pinned);
+    // Co-op (#864): record ownership + the node set so the single terminal funnel (setNextBiomeAndEnd)
+    // relays whatever biome the owner ends up travelling to - the picker pick OR a fallback.
+    this.coopIsBiomeOwner = owns;
+    this.coopRevealed = revealed;
     coopLog(
       "reward",
       `biome pick owner/watcher decision: pinnedStart=${pinned} role=${controller.role} spoof=${spoofed} chained=${this.coopChained} -> ${owns ? "OWNER" : "WATCHER"} (#848)`,
@@ -296,24 +320,18 @@ export class SelectBiomePhase extends BattlePhase {
       origin,
       onSelect: (biome: BiomeId) => {
         getCoopUiMirror()?.endSession();
-        this.coopBiomeOwnerCommit(revealed, pinned, biome);
+        this.coopBiomeOwnerCommit(pinned, biome);
       },
     });
     // Relay the owner's live cursor to the watcher's read-only copy (cosmetic; truth = the relay).
     getCoopUiMirror()?.beginSession("owner", UiMode.ER_MAP, mirrorSeq);
   }
 
-  /** OWNER terminal: relay the chosen biome (index + id), then apply it. */
-  private coopBiomeOwnerCommit(revealed: ErRouteNode[], pinned: number, biome: BiomeId): void {
-    const idx = revealed.findIndex(n => n.biome === biome);
-    try {
-      // Relay both the index AND the biome id: the watcher applies the biome verbatim, so a
-      // divergent revealed-list order could never land it in a different biome than the owner.
-      getCoopInteractionRelay()?.sendInteractionChoice(COOP_BIOME_PICK_SEQ_BASE + pinned, "biomePick", idx, [biome]);
-      coopLog("reward", `biome pick OWNER commit biome=${BiomeId[biome]} idx=${idx} pinnedStart=${pinned} (#848)`);
-    } catch {
-      coopWarn("reward", "biome pick OWNER relay send threw (handled - watcher heals on timeout) (#848)");
-    }
+  /** OWNER terminal: hand the chosen biome to the single funnel, which relays it + advances (#864). */
+  private coopBiomeOwnerCommit(pinned: number, biome: BiomeId): void {
+    coopLog("reward", `biome pick OWNER picked biome=${BiomeId[biome]} pinnedStart=${pinned} (#848)`);
+    // The relay + counter advance now happen in setNextBiomeAndEnd (the SINGLE terminal), so this pick
+    // and every other owner terminal (deterministic / fallback) relay identically - #864.
     this.setNextBiomeAndEnd(biome);
   }
 
@@ -410,6 +428,12 @@ export class SelectBiomePhase extends BattlePhase {
         }
       }
     }
+    // Co-op (#864): the SINGLE owner-relay funnel. If the LOCAL client owns this biome interaction, relay
+    // the biome it is travelling to - WHATEVER terminal produced it (the World-Map pick, a deterministic
+    // single-node / travel-target / random resolution, or an anti-hang fallback). The watcher applies this
+    // biome VERBATIM, so the owner can never travel one-sided-silently and the two clients can never land in
+    // different biomes. Idempotent (coopBiomeRelaySent) so the picker pick + this funnel never double-send.
+    this.coopRelayOwnerBiome(nextBiome);
     globalScene.phaseManager.unshiftNew("SwitchBiomePhase", nextBiome);
     // Co-op (#848): terminate the biome interaction with the single from-pinned advance (idempotent,
     // #837). Fires when this phase participated in an interaction: a chained crossroads-Leave (always)
@@ -421,5 +445,37 @@ export class SelectBiomePhase extends BattlePhase {
       }
     }
     this.end();
+  }
+
+  /**
+   * Co-op (#864): the OWNER relays the biome it is travelling to, so the watcher adopts it verbatim. Called
+   * from the single terminal {@linkcode setNextBiomeAndEnd}, so EVERY owner terminal relays identically -
+   * the World-Map pick AND any deterministic / fallback resolution. No-op unless the local client owns this
+   * biome interaction (a natural multi-node pick, or a chained crossroads-Leave), the counter is pinned, and
+   * the relay has not already fired. Never throws (the watcher heals on the #863 orphan backstop / timeout).
+   */
+  private coopRelayOwnerBiome(nextBiome: BiomeId): void {
+    if (!this.coopIsBiomeOwner || this.coopAdvancePinned < 0 || this.coopBiomeRelaySent) {
+      return;
+    }
+    this.coopBiomeRelaySent = true;
+    const idx = this.coopRevealed?.findIndex(n => n.biome === nextBiome) ?? -1;
+    try {
+      // Carry both the index AND the biome id: the watcher applies the biome verbatim, so a divergent
+      // revealed-list order (or a deterministic terminal with no node set, idx=-1) can never land it in a
+      // different biome than the owner.
+      getCoopInteractionRelay()?.sendInteractionChoice(
+        COOP_BIOME_PICK_SEQ_BASE + this.coopAdvancePinned,
+        "biomePick",
+        idx,
+        [nextBiome],
+      );
+      coopLog(
+        "reward",
+        `biome pick OWNER relay biome=${BiomeId[nextBiome]} idx=${idx} pinnedStart=${this.coopAdvancePinned} (#864)`,
+      );
+    } catch {
+      coopWarn("reward", "biome pick OWNER relay send threw (handled - watcher heals on orphan backstop) (#864)");
+    }
   }
 }
