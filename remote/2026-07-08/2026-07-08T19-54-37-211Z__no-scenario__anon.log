@@ -1,0 +1,258 @@
+url:      https://elite-redux-staging.pages.dev/
+build:    mrc9a598-g33b
+mode:     0  wave:?
+seed:     E82b3rX3A3hKRQdBk5V0OU0Q
+party:    
+enemy:    
+
+----- CONSOLE -----
+[19:48:17.264] LOG: %cStart Phase NextEncounterPhase color:green;
+[19:48:17.265] LOG: Starting species pool tier: COMMON
+[19:48:17.295] LOG: Pokemon: Wild Purrloin | Species ID: 509 | Level: 4 | Nature: Hardy (-)
+[19:48:17.295] LOG: Stats (IVs): HP: 17 (1), Atk: 11 (22), Def: 8 (6), Spatk: 10 (27), Spdef: 8 (15), Spd: 11 (9)
+[19:48:17.295] LOG: Ability: Sniper | Passive Ability: Prankster 
+[19:48:17.295] LOG: Moveset: ["Quick Attack","Fake Out","Hone Claws","After You"]
+[19:48:17.296] LOG: Starting species pool tier: COMMON
+[19:48:17.325] LOG: Pokemon: Wild Fletchling | Species ID: 661 | Level: 4 | Nature: Modest (+SpAtk/-Atk)
+[19:48:17.325] LOG: Stats (IVs): HP: 17 (0), Atk: 9 (31), Def: 9 (26), Spatk: 9 (1), Spdef: 8 (4), Spd: 10 (1)
+[19:48:17.325] LOG: Ability: Gale Wings | Passive Ability: Flock 
+[19:48:17.326] LOG: Moveset: ["Air Cutter","Flail","Growl","Peck"]
+[19:48:17.326] LOG: Starting species pool tier: COMMON
+[19:48:17.354] LOG: Pokemon: Wild Spinarak | Species ID: 167 | Level: 5 | Nature: Hasty (+Spd/-Def)
+[19:48:17.355] LOG: Stats (IVs): HP: 19 (0), Atk: 12 (25), Def: 9 (1), Spatk: 9 (14), Spdef: 11 (26), Spd: 10 (9)
+[19:48:17.356] LOG: Ability: Spider Lair | Passive Ability: Poison Touch 
+[19:48:17.356] LOG: Moveset: ["Poison Sting","Toxic Thread","Pounce","Fury Swipes"]
+[19:48:19.034] DEBUG: Session data saved to slot 0!
+[19:48:19.035] LOG: Wave Seed: {6?v}Nkx\Mhsu:o^z:m8y>7 6
+[19:48:21.231] LOG: %cStart Phase InitEncounterPhase color:green;
+[19:48:21.236] LOG: %cStart Phase PostSummonPhase color:green;
+[19:48:21.236] LOG: Ran PSP for: Purrloin
+[19:48:21.240] LOG: %cStart Phase PostSummonPhase color:green;
+[19:48:21.241] LOG: %cStart Phase PostSummonPhase color:green;
+[19:48:21.241] LOG: %cStart Phase PostSummonPhase color:green;
+[19:48:21.241] LOG: Ran PSP for: Fletchling
+[19:48:21.242] LOG: %cStart Phase PostSummonPhase color:green;
+[19:48:21.243] LOG: %cStart Phase PostSummonPhase color:green;
+[19:48:21.243] LOG: %cStart Phase PostSummonPhase color:green;
+[19:48:21.243] LOG: Ran PSP for: Spinarak
+[19:48:21.243] LOG: %cStart Phase PostSummonPhase color:green;
+[19:48:21.249] LOG: %cStart Phase ShowAbilityPhase color:green;
+[19:48:22.017] LOG: %cStart Phase MessagePhase color:green;
+[19:48:23.423] LOG: %cStart Phase HideAbilityPhase color:green;
+[19:48:23.553] LOG: %cStart Phase PostSummonPhase color:green;
+[19:48:23.553] LOG: %cStart Phase TurnInitPhase color:green;
+[19:48:23.553] LOG: %cStart Phase CommandPhase color:green;
+[19:48:25.098] DEBUG: Session data saved to slot 0!
+[19:48:26.565] LOG: Seed: j6i9MPTbqlO2XshG47j1ZGfy
+[19:48:26.565] LOG: Wave Seed: j6i9MPTbqlO2XshG47j1ZGfy 0
+[19:48:27.330] WARN: AnimationManager key already exists: prompt
+[19:48:27.330] WARN: AnimationManager key already exists: tera_sparkle
+[19:48:27.330] LOG: Seed: E82b3rX3A3hKRQdBk5V0OU0Q
+[19:48:27.330] LOG: Wave Seed: E82b3rX3A3hKRQdBk5V0OU0Q 0
+[19:48:32.219] LOG: %cStart Phase LoginPhase color:green;
+[19:48:32.684] LOG: Client Session: lQTDEUURp2UuN3Xrk8zi3AsRcpHBhXcO
+[19:48:33.226] LOG: %cStart Phase TitlePhase color:green;
+[19:48:33.231] LOG: Getting Session Slot id: %d 0
+[19:48:33.252] LOG: use seasonal splash messages true
+[19:49:35.051] LOG: [coop:lobby] start announce name=CappuTester
+[19:49:37.048] LOG: [coop:lobby] announced id=2538ac94-849d-4603-aa72-e30f23bc8e21 -> begin polling
+[19:49:39.198] LOG: [coop:lobby] poll players=0
+[19:49:42.718] LOG: [coop:lobby] poll players=0
+[19:49:46.073] LOG: [coop:lobby] poll players=0
+[19:49:49.400] LOG: [coop:lobby] poll players=0
+[19:49:52.665] LOG: [coop:lobby] poll players=0
+[19:49:55.984] LOG: [coop:lobby] poll players=0
+[19:49:59.249] LOG: [coop:lobby] poll players=0
+[19:50:02.606] LOG: [coop:lobby] poll players=0
+[19:50:05.887] LOG: [coop:lobby] poll players=0
+[19:50:09.118] LOG: [coop:lobby] poll players=0
+[19:50:12.431] LOG: [coop:lobby] poll players=0
+[19:50:12.593] LOG: [coop:lobby] cancel (id=2538ac94-849d-4603-aa72-e30f23bc8e21 connecting=false)
+[19:50:12.594] LOG: %cStart Phase TitlePhase color:green;
+[19:50:12.596] LOG: Getting Session Slot id: %d 0
+[19:50:12.614] LOG: use seasonal splash messages true
+[19:50:14.496] LOG: [coop:lobby] start announce name=CappuTester
+[19:50:16.027] LOG: [coop:lobby] announced id=81f85701-34bd-4419-a8ca-6c299b04144c -> begin polling
+[19:50:18.173] LOG: [coop:lobby] poll players=0
+[19:50:21.583] LOG: [coop:lobby] poll players=0
+[19:50:24.818] LOG: [coop:lobby] poll players=0
+[19:50:28.098] LOG: [coop:lobby] poll players=0
+[19:50:31.349] LOG: [coop:lobby] poll players=0
+[19:50:34.653] LOG: [coop:lobby] poll players=0
+[19:50:38.011] LOG: [coop:lobby] poll players=0
+[19:50:41.264] LOG: [coop:lobby] poll players=0
+[19:50:44.580] LOG: [coop:lobby] poll players=0
+[19:50:47.902] LOG: [coop:lobby] poll players=1
+[19:50:51.184] LOG: [coop:lobby] request target=71b8777e-51ba-48e3-936f-dc8c3b33a69e (self=81f85701-34bd-4419-a8ca-6c299b04144c)
+[19:50:51.223] LOG: [coop:lobby] poll players=1
+[19:50:54.744] LOG: [coop:lobby] poll: incoming request from=71b8777e-51ba-48e3-936f-dc8c3b33a69e name=JarilG
+[19:50:54.768] LOG: [coop:lobby] poll players=1
+[19:50:55.934] LOG: [coop:lobby] respond accept=true from=71b8777e-51ba-48e3-936f-dc8c3b33a69e (self=81f85701-34bd-4419-a8ca-6c299b04144c)
+[19:50:56.677] LOG: [coop:lobby] poll: incoming request from=71b8777e-51ba-48e3-936f-dc8c3b33a69e name=JarilG
+[19:50:56.687] LOG: [coop:lobby] poll players=1
+[19:50:57.776] LOG: [coop:lobby] respond accept=true from=71b8777e-51ba-48e3-936f-dc8c3b33a69e (self=81f85701-34bd-4419-a8ca-6c299b04144c)
+[19:50:58.290] LOG: [coop:launch] lobby connect code=9GJ53X role=host name=CappuTester
+[19:50:58.305] LOG: [coop:launch] connectCoopWithCode code=9GJ53X role=host username=CappuTester
+[19:50:58.310] LOG: [coop:launch] exchange SDP start code=9GJ53X role=host (ice=fetched)
+[19:50:59.244] WARN: [coop:lobby] respond failed (transient): that request is no longer pending -> keep browsing
+[19:50:59.752] LOG: [coop:launch] ICE from worker /coop/ice servers=1
+[19:51:01.186] LOG: [coop:lobby] cancel (id=81f85701-34bd-4419-a8ca-6c299b04144c connecting=true)
+[19:51:01.188] LOG: %cStart Phase TitlePhase color:green;
+[19:51:01.192] LOG: Getting Session Slot id: %d 0
+[19:51:01.214] LOG: use seasonal splash messages true
+[19:51:01.532] LOG: [coop:launch] host pushing offer code=9GJ53X (ICE gathered)
+[19:51:01.539] LOG: [coop:launch] pushSignal code=9GJ53X role=host sdpBytes=1443
+[19:51:02.899] LOG: [coop:launch] await peer signal start code=9GJ53X role=host timeout=60000ms
+[19:51:03.462] LOG: [coop:lobby] start announce name=CappuTester
+[19:51:04.998] LOG: [coop:lobby] announced id=6568369f-45b3-47ec-8f03-3d473f697083 -> begin polling
+[19:51:06.768] LOG: [coop:lobby] poll players=0
+[19:51:06.803] LOG: [coop:launch] await peer signal resolve code=9GJ53X role=host (1981b)
+[19:51:06.803] LOG: [coop:launch] host received answer code=9GJ53X -> setRemoteDescription
+[19:51:06.872] LOG: [coop:launch] iceConnectionState=checking code=9GJ53X role=host
+[19:51:06.953] LOG: [coop:launch] await data channel open (state=connecting timeout=30000ms)
+[19:51:06.962] LOG: [coop:launch] pcConnectionState=connecting code=9GJ53X role=host
+[19:51:07.967] LOG: [coop:launch] iceConnectionState=connected code=9GJ53X role=host
+[19:51:08.667] LOG: [coop:launch] pcConnectionState=connected code=9GJ53X role=host
+[19:51:08.873] LOG: [coop:launch] data channel OPEN
+[19:51:08.888] LOG: [coop:webrtc] ctor role=host readyState=open state=connected
+[19:51:08.892] LOG: [coop:launch] connectCoopSession role=host state=connected username=CappuTester netcode=authoritative
+[19:51:08.901] LOG: [coop:stream] streamer CONSTRUCT timeout=1200000ms onMessage registered
+[19:51:08.905] LOG: [coop:stream] guest REGISTER onGhostPool handler (bufferedEarly=false)
+[19:51:08.905] LOG: [coop:stream] host REGISTER onStateSyncRequest handler (was=false)
+[19:51:08.907] LOG: [coop:stream] host REGISTER onEnemyPartyRequest handler (was=false)
+[19:51:08.908] LOG: [coop:stream] guest REGISTER onWaveResolved handler (was=false)
+[19:51:08.908] LOG: [coop:stream] guest REGISTER onWaveEndState handler (was=false)
+[19:51:08.910] LOG: [coop:stream] watcher REGISTER onMeChecksum handler (was=false)
+[19:51:08.911] LOG: [coop:turn] host recorder: REGISTER live emitter (was=false)
+[19:51:08.916] LOG: [coop:session] coopAuthoritativeGuestPredicate INSTALLED
+[19:51:08.916] LOG: [coop:launch] peer session ready role=host netcode=authoritative -> connecting
+[19:51:08.917] LOG: [coop:launch] session connect role=host partnerRole=guest netcode=authoritative username=CappuTester version=er-coop-11 tiebreak=0.10824144280087389
+[19:51:08.918] LOG: [coop:webrtc] raw tx role=host t=hello bytes=106
+[19:51:09.028] LOG: [coop:checksum] dataFingerprint compute moveMap=e9b828360aafb9e2(1032) movesData=61fa3383767be347(1107) movesName=fad7fe8932ec09a1(1107) movesets=6eb276198552346d(1908) abilitiesData=3088ac8089021d9e(1047) abilitiesName=7c302bdd9cc50a0b(1047)
+[19:51:09.029] LOG: [coop:webrtc] raw tx role=host t=dataFingerprint bytes=329
+[19:51:09.030] LOG: [coop:launch] lobby connect: runtime ready but stopped -> discard code=9GJ53X
+[19:51:09.050] LOG: [coop:webrtc] raw rx role=host t=hello bytes=101 handlers=11
+[19:51:09.065] LOG: [coop:launch] hello recv partner=JarilG partnerRole=guest (local role=host; no conflict)
+[19:51:09.068] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[19:51:09.068] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[19:51:09.157] LOG: [coop:webrtc] raw rx role=host t=dataFingerprint bytes=329 handlers=11
+[19:51:09.162] LOG: [coop:checksum] MATCH - data tables identical across clients
+[19:51:09.985] LOG: [coop:lobby] poll players=0
+[19:51:13.215] LOG: [coop:lobby] poll players=0
+[19:51:13.947] LOG: [coop:interaction] interactionCounter() read -> 0 (role=host)
+[19:51:13.952] LOG: [coop:health] tick=0g turn=- wave=- counter=0 assertions=0 wait=-1ms peerBeat=- transport=connected
+[19:51:16.466] LOG: [coop:lobby] poll players=0
+[19:51:19.828] LOG: [coop:lobby] poll players=0
+[19:51:23.118] LOG: [coop:lobby] poll players=0
+[19:51:26.814] LOG: [coop:lobby] poll players=0
+[19:51:30.085] LOG: [coop:lobby] poll players=0
+[19:51:33.615] LOG: [coop:lobby] poll players=0
+[19:51:36.999] LOG: [coop:lobby] poll players=0
+[19:51:40.387] LOG: [coop:lobby] poll players=0
+[19:51:43.644] LOG: [coop:lobby] poll players=0
+[19:51:46.918] LOG: [coop:lobby] poll players=0
+[19:51:48.936] LOG: [coop:interaction] interactionCounter() read -> 0 (role=host)
+[19:51:48.936] LOG: [coop:health] tick=0g turn=- wave=- counter=0 assertions=0 wait=-1ms peerBeat=- transport=connected
+[19:51:50.224] LOG: [coop:lobby] poll players=0
+[19:51:53.468] LOG: [coop:lobby] poll players=0
+[19:51:56.776] LOG: [coop:lobby] poll players=1
+[19:52:00.228] LOG: [coop:lobby] poll players=1
+[19:52:00.304] LOG: [coop:lobby] request target=13fb5948-883f-4278-8a22-081b11099019 (self=6568369f-45b3-47ec-8f03-3d473f697083)
+[19:52:03.606] LOG: [coop:lobby] poll players=1
+[19:52:05.479] LOG: [coop:lobby] poll: incoming request from=13fb5948-883f-4278-8a22-081b11099019 name=JarilG
+[19:52:05.491] LOG: [coop:lobby] poll players=1
+[19:52:06.985] LOG: [coop:lobby] respond accept=true from=13fb5948-883f-4278-8a22-081b11099019 (self=6568369f-45b3-47ec-8f03-3d473f697083)
+[19:52:07.318] LOG: [coop:lobby] poll: incoming request from=13fb5948-883f-4278-8a22-081b11099019 name=JarilG
+[19:52:07.325] LOG: [coop:lobby] poll players=1
+[19:52:08.995] LOG: [coop:lobby] poll matched code=6PZJVD role=guest -> connect
+[19:52:09.008] LOG: [coop:launch] lobby connect code=6PZJVD role=guest name=CappuTester
+[19:52:09.017] LOG: [coop:launch] connectCoopWithCode code=6PZJVD role=guest username=CappuTester
+[19:52:09.018] LOG: [coop:launch] exchange SDP start code=6PZJVD role=guest (ice=fetched)
+[19:52:09.256] WARN: [coop:lobby] respond failed (transient): you were just matched elsewhere -> keep browsing
+[19:52:10.407] LOG: [coop:launch] ICE from worker /coop/ice servers=1
+[19:52:10.441] LOG: [coop:launch] await peer signal start code=6PZJVD role=guest timeout=60000ms
+[19:52:11.994] LOG: [coop:launch] await peer signal resolve code=6PZJVD role=guest (1978b)
+[19:52:11.997] LOG: [coop:launch] guest received offer code=6PZJVD -> answering
+[19:52:12.183] LOG: [coop:launch] iceConnectionState=checking code=6PZJVD role=guest
+[19:52:12.200] LOG: [coop:launch] pcConnectionState=connecting code=6PZJVD role=guest
+[19:52:12.458] LOG: [coop:launch] guest pushing answer code=6PZJVD (ICE gathered)
+[19:52:12.462] LOG: [coop:launch] pushSignal code=6PZJVD role=guest sdpBytes=1441
+[19:52:15.120] LOG: [coop:lobby] cancel (id=6568369f-45b3-47ec-8f03-3d473f697083 connecting=true)
+[19:52:15.124] LOG: %cStart Phase TitlePhase color:green;
+[19:52:15.130] LOG: Getting Session Slot id: %d 0
+[19:52:15.170] LOG: use seasonal splash messages true
+[19:52:15.676] LOG: [coop:launch] iceConnectionState=connected code=6PZJVD role=guest
+[19:52:15.877] LOG: [coop:launch] pcConnectionState=connected code=6PZJVD role=guest
+[19:52:16.249] LOG: [coop:launch] guest datachannel event label=coop state=open code=6PZJVD
+[19:52:16.253] LOG: [coop:launch] data channel already open
+[19:52:16.254] LOG: [coop:webrtc] ctor role=guest readyState=open state=connected
+[19:52:16.258] LOG: [coop:launch] connectCoopSession role=guest state=connected username=CappuTester netcode=authoritative
+[19:52:16.259] LOG: [coop:launch] clearCoopRuntime role=host netcode=authoritative gen->1
+[19:52:16.261] LOG: [coop:stream] streamer DISPOSE: cancel pending(turns=0 enemyParty=0 meBattle=0 stateSync=0) + null-out all handlers
+[19:52:16.261] LOG: [coop:relay] dispose() (no in-flight waiters)
+[19:52:16.262] LOG: [coop:pump] end session {"wasOwner":false,"seq":-1,"termSeq":-1}
+[19:52:16.263] LOG: [coop:webrtc] close() role=host state=connected
+[19:52:16.264] LOG: [coop:webrtc] state role=host connected -> closed
+[19:52:16.272] LOG: [coop:turn] host recorder: CLEAR (null-out) live emitter (was=true)
+[19:52:16.274] LOG: [coop:session] coopAuthoritativeGuestPredicate CLEARED (-> solo/host/lockstep reads false)
+[19:52:16.274] LOG: [coop:stream] streamer CONSTRUCT timeout=1200000ms onMessage registered
+[19:52:16.274] LOG: [coop:stream] guest REGISTER onGhostPool handler (bufferedEarly=false)
+[19:52:16.274] LOG: [coop:stream] host REGISTER onStateSyncRequest handler (was=false)
+[19:52:16.274] LOG: [coop:stream] host REGISTER onEnemyPartyRequest handler (was=false)
+[19:52:16.274] LOG: [coop:stream] guest REGISTER onWaveResolved handler (was=false)
+[19:52:16.274] LOG: [coop:stream] guest REGISTER onWaveEndState handler (was=false)
+[19:52:16.275] LOG: [coop:stream] watcher REGISTER onMeChecksum handler (was=false)
+[19:52:16.275] LOG: [coop:turn] host recorder: REGISTER live emitter (was=false)
+[19:52:16.275] LOG: [coop:session] coopAuthoritativeGuestPredicate INSTALLED
+[19:52:16.275] LOG: [coop:launch] peer session ready role=guest netcode=authoritative -> connecting
+[19:52:16.275] LOG: [coop:launch] session connect role=guest partnerRole=host netcode=authoritative username=CappuTester version=er-coop-11 tiebreak=0.27823428304102915
+[19:52:16.275] LOG: [coop:webrtc] raw tx role=guest t=hello bytes=107
+[19:52:16.327] LOG: [coop:checksum] dataFingerprint compute moveMap=e9b828360aafb9e2(1032) movesData=61fa3383767be347(1107) movesName=fad7fe8932ec09a1(1107) movesets=6eb276198552346d(1908) abilitiesData=3088ac8089021d9e(1047) abilitiesName=7c302bdd9cc50a0b(1047)
+[19:52:16.327] LOG: [coop:webrtc] raw tx role=guest t=dataFingerprint bytes=329
+[19:52:16.327] LOG: [coop:launch] lobby connect: runtime ready but stopped -> discard code=6PZJVD
+[19:52:16.328] LOG: [coop:webrtc] channel OPEN role=guest gen=0
+[19:52:16.353] WARN: [coop:webrtc] channel ERROR role=host readyState=closed err=User-Initiated Abort, reason=Close called
+[19:52:16.353] LOG: [coop:webrtc] channel CLOSE role=host state=closed gen=0
+[19:52:16.355] LOG: [coop:webrtc] raw rx role=guest t=hello bytes=101 handlers=11
+[19:52:16.355] LOG: [coop:launch] hello recv partner=JarilG partnerRole=host (local role=guest; no conflict)
+[19:52:16.355] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[19:52:16.355] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[19:52:16.356] LOG: [coop:webrtc] raw rx role=guest t=dataFingerprint bytes=329 handlers=11
+[19:52:16.356] LOG: [coop:checksum] MATCH - data tables identical across clients
+[19:52:16.356] LOG: [coop:webrtc] raw rx role=guest t=resumeStartNew bytes=22 handlers=11
+[19:52:16.356] LOG: [coop:launch] RECV resumeStartNew (#810 barrier release)
+[19:52:18.590] LOG: [coop:lobby] start announce name=CappuTester
+[19:52:20.265] LOG: [coop:lobby] announced id=6fccd23a-198b-4754-854a-4f7cff86cc3b -> begin polling
+[19:52:21.308] LOG: [coop:interaction] interactionCounter() read -> 0 (role=guest)
+[19:52:21.309] LOG: [coop:health] tick=1g turn=- wave=- counter=0 assertions=0 wait=-1ms peerBeat=- transport=connected
+[19:52:21.999] LOG: [coop:lobby] poll players=0
+[19:52:25.232] LOG: [coop:lobby] poll players=0
+[19:52:28.478] LOG: [coop:lobby] poll players=0
+[19:52:31.715] LOG: [coop:lobby] poll players=0
+[19:52:34.940] LOG: [coop:lobby] poll players=0
+[19:52:38.179] LOG: [coop:lobby] poll players=0
+[19:52:41.393] LOG: [coop:lobby] poll players=0
+[19:52:44.596] LOG: [coop:lobby] poll players=0
+[19:52:47.841] LOG: [coop:lobby] poll players=0
+[19:52:51.032] LOG: [coop:lobby] poll players=0
+[19:52:54.242] LOG: [coop:lobby] poll players=0
+[19:52:56.308] LOG: [coop:interaction] interactionCounter() read -> 0 (role=guest)
+[19:52:56.308] LOG: [coop:health] tick=1g turn=- wave=- counter=0 assertions=0 wait=-1ms peerBeat=- transport=connected
+[19:52:57.456] LOG: [coop:lobby] poll players=0
+[19:53:00.704] LOG: [coop:lobby] poll players=0
+[19:53:03.977] LOG: [coop:lobby] poll players=0
+[19:53:07.208] LOG: [coop:lobby] poll players=0
+[19:53:10.420] LOG: [coop:lobby] poll players=0
+[19:53:13.607] LOG: [coop:lobby] poll players=0
+[19:53:16.841] LOG: [coop:lobby] poll players=0
+[19:53:20.065] LOG: [coop:lobby] poll players=0
+[19:53:23.303] LOG: [coop:lobby] poll players=0
+[19:53:26.523] LOG: [coop:lobby] poll players=0
+[19:53:29.764] LOG: [coop:lobby] poll players=0
+[19:53:30.816] LOG: [coop:lobby] cancel (id=6fccd23a-198b-4754-854a-4f7cff86cc3b connecting=false)
+[19:53:30.816] LOG: [coop:session] isCoopAuthoritativeGuestGated -> true (authoritative GUEST gates a structural mutation)
+[19:53:30.816] LOG: %cStart Phase TitlePhase color:green;
+[19:53:30.818] LOG: Getting Session Slot id: %d 0
+[19:53:30.832] LOG: use seasonal splash messages true
+[19:53:31.286] LOG: [coop:interaction] interactionCounter() read -> 0 (role=guest)
+[19:53:31.289] LOG: [coop:health] tick=1g turn=- wave=- counter=0 assertions=0 wait=-1ms peerBeat=- transport=connected
