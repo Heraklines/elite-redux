@@ -389,6 +389,30 @@ export class CoopInteractionTurn {
     });
   }
 
+  /**
+   * #863: like {@linkcode awaitRemoteCounter} but with NO timeout and a CANCELLER, so a race LOSER leaves
+   * no dangling waiter (a lingering 20-min timer would retain the scene under vitest's `isolate:false`).
+   * Resolves once the peer's broadcast counter reaches `need`; the caller cancels it if its other race arm
+   * wins first. Resolves immediately when the peer is already there.
+   */
+  awaitRemoteCounterCancellable(need: number): { promise: Promise<void>; cancel: () => void } {
+    if (this.remoteSeen >= need) {
+      return { promise: Promise.resolve(), cancel: () => {} };
+    }
+    const entry: { need: number; resolve: () => void } = { need, resolve: () => {} };
+    const promise = new Promise<void>(resolve => {
+      entry.resolve = resolve;
+      this.remoteWaiters.push(entry);
+    });
+    const cancel = (): void => {
+      const i = this.remoteWaiters.indexOf(entry);
+      if (i >= 0) {
+        this.remoteWaiters.splice(i, 1);
+      }
+    };
+    return { promise, cancel };
+  }
+
   private noteRemote(counter: number): void {
     if (counter > this.remoteSeen) {
       this.remoteSeen = counter;

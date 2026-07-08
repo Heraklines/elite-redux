@@ -824,3 +824,91 @@ export class CoopInteractionRelay {
     }
   }
 }
+
+// =============================================================================
+// #863: one-sided ORPHAN backstop for the high-band watcher screens (biome pick / crossroads).
+//
+// The live wave-10 report ("partner chose map but I am stuck in the map screen"): the WATCHER pins the
+// biome-pick interaction, opens the mirrored ER_MAP, and awaits the owner's relayed pick on
+// `COOP_BIOME_PICK_SEQ_BASE + counter`. The owner picks + advances, but its relay never resolves the
+// watcher's waiter (a lost/raced pick at the wave boundary). The generic orphan-rescue -
+// `relay.cancelWaiters(seq => controller.peerAdvancedPastInteraction(seq))` - can NOT see these bands: it
+// compares the RELAY seq (BASE + counter) against the peer's broadcast COUNTER, so `peerAdvancedPast` is
+// always false for an offset band. And between waves there is no turn checksum / resync event to fire that
+// rescue at all, while the stall watchdog only recovers a MUTUAL stall (the owner here is NOT stalled - it
+// moved on). So the watcher freezes for the full COOP_BIOME_WAIT_MS (20 min), input-blocked by the still-
+// open cursor mirror. This helper closes that gap for the offset bands by checking the peer's advance
+// against the raw COUNTER (which the caller knows) instead of the relay seq.
+// =============================================================================
+
+/** The structural slice of the session controller this backstop needs (avoids a circular import). */
+export interface CoopPeerAdvanceProbe {
+  /** Cancellable await that resolves once the PEER broadcasts a counter strictly beyond `counter`
+   *  (owner committed + moved on). `cancel()` drops the waiter if the relayed pick wins the race first. */
+  awaitPeerAdvancePast(counter: number): { promise: Promise<void>; cancel: () => void };
+}
+
+/** When the owner is observed to have advanced past the interaction, how long to still let a genuinely
+ *  IN-FLIGHT owner pick land + WIN (correct biome) before dismissing to the deterministic fallback. Small,
+ *  since a lost pick never arrives; overridable for tests (default 750ms). */
+let coopOrphanGraceMs = 750;
+export function setCoopOrphanGraceMs(ms: number): void {
+  coopOrphanGraceMs = ms;
+}
+export function resetCoopOrphanGraceMs(): void {
+  coopOrphanGraceMs = 750;
+}
+export function getCoopOrphanGraceMs(): number {
+  return coopOrphanGraceMs;
+}
+
+/**
+ * WATCHER helper (#863): await the owner's relayed choice on `seq` (full COOP_BIOME_WAIT_MS, so the relay's
+ * own null is still the disconnected-owner terminal), BUT race it against a one-sided ORPHAN backstop - the
+ * OWNER advancing PAST the interaction pinned at `pinnedCounter` (it committed + moved on) while its pick
+ * relay never reached us (the live wave-10 "partner chose map, I'm stuck in the map screen"). A genuinely
+ * relayed pick always wins the race; even if the owner's advance broadcast beats the pick over the wire, a
+ * brief GRACE lets the in-flight pick land + win, so the correct biome is never raced into a needless
+ * fallback. Only a TRULY-lost pick falls through to null promptly, so the caller applies its deterministic
+ * fallback (self-heals via the host-authoritative wave-start sync) instead of freezing for 20 minutes.
+ *
+ * The relay `seq` for these high-band screens (biome pick / crossroads) is `BASE + counter`, NOT the raw
+ * counter, so the peer-advance MUST be probed by `pinnedCounter` - the generic seq-based orphan-rescue
+ * (`cancelWaiters(peerAdvancedPastInteraction)`) can't see these offset bands. With no controller this
+ * degrades to a plain single long await. Never throws.
+ */
+export async function awaitCoopChoiceWithOrphanBackstop(
+  relay: CoopInteractionRelay,
+  controller: CoopPeerAdvanceProbe | null,
+  seq: number,
+  pinnedCounter: number,
+  expectedKinds: readonly string[],
+): Promise<CoopInteractionChoice | null> {
+  const pick = relay.awaitInteractionChoice(seq, COOP_BIOME_WAIT_MS, expectedKinds);
+  if (controller == null) {
+    return pick;
+  }
+  const orphan = controller.awaitPeerAdvancePast(pinnedCounter);
+  const outcome = await Promise.race([
+    pick.then(res => ({ res }) as const),
+    orphan.promise.then(() => ({ orphaned: true }) as const),
+  ]);
+  if ("res" in outcome) {
+    orphan.cancel(); // the relayed pick (or the relay's own disconnected-owner null) won - drop the waiter
+    return outcome.res;
+  }
+  // Orphaned: the owner advanced PAST this interaction. Let a genuinely in-flight pick WIN within a brief
+  // grace; else dismiss to the deterministic fallback (null). Cancel the parked long `pick` waiter so it
+  // strands neither a 20-min timer nor a late resolve into a dead phase.
+  const graced = await Promise.race([pick, new Promise<null>(r => setTimeout(() => r(null), getCoopOrphanGraceMs()))]);
+  if (graced != null) {
+    return graced;
+  }
+  relay.cancelWaiters(s => s === seq);
+  coopWarn(
+    "relay",
+    `WATCHER orphan backstop: owner advanced PAST interaction ${pinnedCounter} with NO pick on seq=${seq} `
+      + "-> dismissing to the deterministic fallback (no 20-min map/crossroads freeze) (#863)",
+  );
+  return null;
+}

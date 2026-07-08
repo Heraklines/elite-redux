@@ -7,7 +7,7 @@ import {
   coopBiomePickerAutoResolvesInTest,
 } from "#data/elite-redux/coop/coop-biome-pin-state";
 import { coopLog, coopWarn } from "#data/elite-redux/coop/coop-debug";
-import { COOP_BIOME_WAIT_MS } from "#data/elite-redux/coop/coop-interaction-relay";
+import { awaitCoopChoiceWithOrphanBackstop } from "#data/elite-redux/coop/coop-interaction-relay";
 import { getCoopRendezvousWaitMs } from "#data/elite-redux/coop/coop-rendezvous";
 import {
   advanceCoopInteractionForContinuation,
@@ -336,12 +336,18 @@ export class SelectBiomePhase extends BattlePhase {
       coopWarn("reward", "biome pick WATCHER map failed to open (still awaiting relay) (#848)");
     }
     const relay = getCoopInteractionRelay();
+    // #863: bound the wait with the one-sided ORPHAN backstop. If the OWNER commits its pick + advances
+    // PAST this interaction but its relay never reaches us (the live wave-10 "partner chose map, I'm stuck
+    // in the map screen"), dismiss PROMPTLY to the deterministic fallback below instead of freezing on the
+    // 20-min relay timeout. A buffered/in-flight owner pick still wins, so the correct biome is preferred.
     const res =
       relay == null
         ? null
-        : await relay.awaitInteractionChoice(
+        : await awaitCoopChoiceWithOrphanBackstop(
+            relay,
+            getCoopController(),
             COOP_BIOME_PICK_SEQ_BASE + pinned,
-            COOP_BIOME_WAIT_MS,
+            pinned,
             COOP_BIOME_PICK_CHOICE_KINDS,
           );
     getCoopUiMirror()?.endSession();

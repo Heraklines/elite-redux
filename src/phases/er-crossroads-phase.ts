@@ -41,7 +41,7 @@ import {
   setCoopBiomeInteractionStart,
 } from "#data/elite-redux/coop/coop-biome-pin-state";
 import { coopLog, coopWarn } from "#data/elite-redux/coop/coop-debug";
-import { COOP_BIOME_WAIT_MS } from "#data/elite-redux/coop/coop-interaction-relay";
+import { awaitCoopChoiceWithOrphanBackstop } from "#data/elite-redux/coop/coop-interaction-relay";
 import { getCoopRendezvousWaitMs } from "#data/elite-redux/coop/coop-rendezvous";
 import {
   advanceCoopInteractionForContinuation,
@@ -280,12 +280,17 @@ export class ErCrossroadsPhase extends Phase {
       /* cosmetic - the awaited relay still drives the authoritative apply below */
     }
     const relay = getCoopInteractionRelay();
+    // #863: bound the wait with the one-sided ORPHAN backstop (same class as the biome pick). If the OWNER
+    // commits Stay/Leave + advances PAST this interaction but its relay never reaches us, dismiss PROMPTLY
+    // to the deterministic fallback below instead of freezing the crossroads screen on the 20-min timeout.
     const res =
       relay == null
         ? null
-        : await relay.awaitInteractionChoice(
+        : await awaitCoopChoiceWithOrphanBackstop(
+            relay,
+            getCoopController(),
             COOP_CROSSROADS_SEQ_BASE + pinned,
-            COOP_BIOME_WAIT_MS,
+            pinned,
             COOP_CROSSROADS_CHOICE_KINDS,
           );
     getCoopUiMirror()?.endSession();

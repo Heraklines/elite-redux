@@ -2247,6 +2247,38 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
   },
   {
+    label: "(note) Co-op: the biome-pick WATCHER never gets stuck in the map screen + phantom-ME visuals clear (#863)",
+    description:
+      "CO-OP fix - verify with TWO clients (not a solo battle). TWO residual softlocks after #858:\n"
+      + "(a) MAP-DISMISS: at a biome-end World-Map pick the interaction WATCHER opens the mirrored map and\n"
+      + "waits for the OWNER's relayed biome. If the owner picked + moved on but its pick relay was lost/raced\n"
+      + "at the wave boundary, the watcher had NO one-sided rescue (the generic orphan-rescue can't see the\n"
+      + "offset biome/crossroads seq band, there is no between-wave resync to fire it, and the stall watchdog\n"
+      + "only recovers a MUTUAL stall) - so the watcher FROZE on the map for 20 minutes, input-blocked by the\n"
+      + "open cursor mirror ('partner chose map but I am stuck in the map screen', live wave-10 build\n"
+      + "mrbdf344). Fixed: the watcher now also dismisses the moment it sees the OWNER advance PAST the\n"
+      + "interaction (committed + moved on), tearing down the map + closing the mirror and applying the\n"
+      + "deterministic fallback biome (self-heals via the host-authoritative wave sync). A genuinely relayed\n"
+      + "pick still wins, so the correct biome is preferred. Same backstop covers the every-5-waves crossroads.\n"
+      + "(b) PHANTOM-ME VISUALS: when the guest self-rolls an ME the host does NOT have (Delibird gift while\n"
+      + "the partner fights a normal battle, build mrbfz16x), the run drops the phantom ME back to a WILD\n"
+      + "battle - but the ME's intro sprite (the Delibird) LINGERED over the recovered battle. Fixed: the drop\n"
+      + "reuses the normal leave path's intro-visual teardown, guarded so it can never crash/hang the recovery.\n"
+      + "DO (2 clients): reach a biome-end World-Map pick; have ONE player drive it while the other watches\n"
+      + "(and separately, play until one client gets an ME the other does not). EXPECT: the watcher's map ALWAYS\n"
+      + "dismisses and the run proceeds (never a 20-minute stuck map screen); a dropped phantom ME leaves NO\n"
+      + "leftover event sprite over the battle. Duo/regression-tested headlessly in\n"
+      + "test/tests/elite-redux/coop/coop-duo-biome-choice.test.ts (ORPHAN scenario) and\n"
+      + "test/tests/elite-redux/coop/coop-me-phantom-drop.test.ts.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({ STARTING_WAVE_OVERRIDE: 1, STARTING_LEVEL_OVERRIDE: 50 });
+      return [
+        makeStarter(SpeciesId.SNORLAX, { moveset: [MoveId.TACKLE, MoveId.BODY_SLAM, MoveId.REST, MoveId.SNORE] }),
+      ];
+    },
+  },
+  {
     label: "(note) Co-op: a faint replacement must not instantly re-KO on the chooser (#807)",
     description:
       "CO-OP fix - verify with TWO clients (not a solo battle): when the GUEST's active mon FAINTS and\n"

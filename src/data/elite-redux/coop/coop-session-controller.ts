@@ -503,6 +503,18 @@ export class CoopSessionController {
   }
 
   /**
+   * #863: a CANCELLABLE await that resolves once the PEER has broadcast an interaction counter STRICTLY
+   * BEYOND `counter` (the owner committed its pick + advanced past this interaction). Event-driven off the
+   * peer's broadcast (no polling / no timer), so a watcher parked on the choice relay can be sprung PROMPTLY
+   * when the owner moved on but its pick relay was lost - the one-sided orphan the seq-based rescue can't see
+   * for the offset biome/crossroads bands. The caller `cancel()`s it if the relayed pick wins the race first,
+   * leaving no dangling waiter. Resolves immediately when the peer is ALREADY past.
+   */
+  awaitPeerAdvancePast(counter: number): { promise: Promise<void>; cancel: () => void } {
+    return this.interactionTurn.awaitRemoteCounterCancellable(counter + 1);
+  }
+
+  /**
    * Advance to the next interaction's owner (#633, P4). Call once per completed
    * interaction (a multi-step ME counts as one). BOTH clients advance LOCALLY +
    * deterministically (they process the same interactions in lockstep), so the

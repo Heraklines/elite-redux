@@ -40,7 +40,12 @@ import {
   setCoopBiomeInteractionStart,
   setCoopBiomePickerDrivenByTest,
 } from "#data/elite-redux/coop/coop-biome-pin-state";
-import { CoopInteractionRelay, setCoopWaveBarrierMs } from "#data/elite-redux/coop/coop-interaction-relay";
+import {
+  CoopInteractionRelay,
+  resetCoopOrphanGraceMs,
+  setCoopOrphanGraceMs,
+  setCoopWaveBarrierMs,
+} from "#data/elite-redux/coop/coop-interaction-relay";
 import { resetCoopRendezvousWaitMs, setCoopRendezvousWaitMs } from "#data/elite-redux/coop/coop-rendezvous";
 import { clearCoopRuntime, setCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
 import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
@@ -62,6 +67,7 @@ import {
   drainLoopback,
   installDuoLogCapture,
   withClient,
+  withClientSync,
 } from "#test/tools/coop-duo-harness";
 import Phaser from "phaser";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
@@ -111,6 +117,38 @@ function installUiCapture(scene: BattleScene): UiCapture {
   return cap;
 }
 
+/**
+ * #863: a REAL ui-mode TRACKER (vs {@linkcode installUiCapture}, which only records the config). Records
+ * the last target mode so a test can assert the watcher's UI mode LEAVES the map (the "stuck in the map
+ * screen" symptom is an observable UI-mode state, not just a config). Fires showText callbacks.
+ */
+function installUiModeTracker(scene: BattleScene): { mode: () => number; restore: () => void } {
+  const ui = scene.ui as unknown as {
+    setMode: (mode: number, ...args: unknown[]) => Promise<void>;
+    showText: (text: string, delay?: number | null, cb?: (() => void) | null, ...rest: unknown[]) => void;
+    getMode: () => number;
+  };
+  const realSetMode = ui.setMode.bind(ui);
+  const realShowText = ui.showText.bind(ui);
+  let cur = ui.getMode();
+  ui.setMode = (mode: number): Promise<void> => {
+    cur = mode;
+    return Promise.resolve();
+  };
+  ui.showText = (_text: string, _delay?: number | null, cb?: (() => void) | null): void => {
+    if (typeof cb === "function") {
+      cb();
+    }
+  };
+  return {
+    mode: () => cur,
+    restore: () => {
+      ui.setMode = realSetMode;
+      ui.showText = realShowText;
+    },
+  };
+}
+
 describe.skipIf(!RUN)("co-op DUO biome choice: owner-alternated + mirrored crossroads/World-Map pick (#848)", () => {
   let phaserGame: Phaser.Game;
   let game: GameManager;
@@ -123,6 +161,7 @@ describe.skipIf(!RUN)("co-op DUO biome choice: owner-alternated + mirrored cross
   beforeEach(() => {
     setCoopWaveBarrierMs(50);
     setCoopRendezvousWaitMs(50);
+    setCoopOrphanGraceMs(20); // #863: fast orphan-backstop poll for the stuck-map repro
     // This suite DRIVES the real crossroads / World-Map picker (the owner opens the actual screen and we
     // invoke its callbacks), so opt OUT of the vitest owner auto-resolve. Reset in afterEach (anti-latch).
     setCoopBiomePickerDrivenByTest();
@@ -142,6 +181,7 @@ describe.skipIf(!RUN)("co-op DUO biome choice: owner-alternated + mirrored cross
   afterEach(() => {
     setCoopWaveBarrierMs(60_000);
     resetCoopRendezvousWaitMs();
+    resetCoopOrphanGraceMs();
     resetCoopBiomePickerDrivenByTest();
     resetErBiomeStructure();
     setErPendingNodes([]);
@@ -414,6 +454,91 @@ describe.skipIf(!RUN)("co-op DUO biome choice: owner-alternated + mirrored cross
     expect(
       watcherCtx.runtime.controller.interactionCounter(),
       "the interaction still terminates (advances once) on fallback",
+    ).toBe(watcherCounterBefore + 1);
+    logs.flush();
+  }, 300_000);
+
+  // =====================================================================================
+  // SCENARIO 5 (#863): ORPHAN backstop - "partner chose map but I am stuck in the map screen".
+  //
+  // Live wave-10 report (build mrbdf344): the biome-pick WATCHER pins the interaction, opens the
+  // mirrored ER_MAP, and awaits the owner's relayed biome on COOP_BIOME_PICK_SEQ_BASE + counter. The
+  // OWNER picked + advanced PAST the interaction, but its relay never reached the watcher's waiter (a
+  // lost/raced pick at the wave boundary). The generic seq-based orphan-rescue can't see this OFFSET band
+  // (it compares the relay seq against the peer's COUNTER), there is no between-wave resync to fire it, and
+  // the stall watchdog only recovers a MUTUAL stall - so the watcher FROZE on the 20-min COOP_BIOME_WAIT_MS,
+  // input-blocked by the still-open cursor mirror.
+  //
+  // Here BOTH engines are real: the OWNER advances the shared interaction counter past the pinned biome
+  // pick (committed + moved on) WITHOUT ever relaying a biomePick choice. Unlike SCENARIO 4 (which forces
+  // EVERY relay await to time out), this leaves COOP_BIOME_WAIT_MS at its real 20-min value: only the
+  // one-sided ORPHAN backstop (owner-advanced-past, no pick) can dismiss the watcher.
+  //
+  // FAILS-BEFORE: with only the choice-relay await, the watcher's UI mode never leaves ER_MAP (it sits on
+  // the 20-min timeout) - the drain loop below never satisfies "mode left ER_MAP", so it throws.
+  // PASSES-AFTER: the orphan backstop returns null promptly, the watcher ends its mirror, tears the map
+  // down to MESSAGE, and applies the deterministic fallback biome (run proceeds).
+  // =====================================================================================
+  it("ORPHAN (#863): owner advances past the biome pick with NO relay -> watcher LEAVES the map + the run proceeds", async () => {
+    await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
+    const rig = await buildDuo(game, createLoopbackPair(), setCoopRuntime, toCoop);
+
+    rig.hostScene.currentBattle.waveIndex = 11;
+    rig.guestScene.currentBattle.waveIndex = 11;
+
+    setErPendingNodes([
+      { biome: BiomeId.FOREST, revealed: true },
+      { biome: BiomeId.VOLCANO, revealed: true },
+    ]);
+
+    const counterBefore = rig.hostRuntime.controller.interactionCounter();
+    const { ownerCtx, watcherCtx } = ownerCtxFor(rig, counterBefore);
+
+    const beginSpy = vi.spyOn(CoopUiMirror.prototype, "beginSession");
+    const watcherTracker = installUiModeTracker(watcherCtx.scene);
+    const switchSpy = vi.spyOn(watcherCtx.scene.phaseManager, "unshiftNew");
+    const watcherCounterBefore = watcherCtx.runtime.controller.interactionCounter();
+
+    // The OWNER commits + moves on WITHOUT relaying a biomePick: advance the shared interaction counter and
+    // broadcast it. The watcher receives ONLY this advance (never a pick) - the exact one-sided orphan.
+    withClientSync(ownerCtx, () => ownerCtx.runtime.controller.advanceInteraction(counterBefore));
+    await drainLoopback();
+
+    try {
+      await withClient(watcherCtx, async () => {
+        setCoopBiomeInteractionStart(counterBefore); // chained pin -> the watcher takes coopBiomePickWatch
+        const phase = new SelectBiomePhase();
+        phase.start();
+        for (let i = 0; i < 200; i++) {
+          await drainLoopback();
+          if (watcherTracker.mode() !== UiMode.ER_MAP && switchSpy.mock.calls.some(c => c[0] === "SwitchBiomePhase")) {
+            return;
+          }
+        }
+        throw new Error(
+          "biome pick ORPHAN HANG: the watcher never left ER_MAP - it is stuck on the 20-min relay timeout (#863 fails-before)",
+        );
+      });
+    } finally {
+      watcherTracker.restore();
+    }
+
+    // The watcher opened the MIRRORED map (so this is the real owner-alternated path), then LEFT it.
+    expect(
+      beginSpy.mock.calls.some(c => c[0] === "watcher"),
+      "the watcher opened a mirrored MAP session before the orphan dismiss",
+    ).toBe(true);
+    expect(watcherTracker.mode(), "the watcher's UI mode LEFT the map (not stuck in ER_MAP) (#863)").not.toBe(
+      UiMode.ER_MAP,
+    );
+    expect(
+      switchSpy.mock.calls.some(c => c[0] === "SwitchBiomePhase"),
+      "the run PROCEEDS: the watcher queued SwitchBiomePhase (deterministic fallback biome) (#863)",
+    ).toBe(true);
+    // The interaction terminates on the watcher (advances once), so alternation never freezes.
+    expect(
+      watcherCtx.runtime.controller.interactionCounter(),
+      "the interaction terminates (advances once) on the orphan dismiss",
     ).toBe(watcherCounterBefore + 1);
     logs.flush();
   }, 300_000);

@@ -1252,7 +1252,12 @@ export function transitionMysteryEncounterIntroVisuals(hide = true, destroy = tr
               pokemon.leaveField(true, true, true);
             });
 
-            globalScene.currentBattle.mysteryEncounter!.introVisuals = undefined;
+            // #863(b): the co-op #862 phantom-ME drop fires this teardown then nulls
+            // currentBattle.mysteryEncounter synchronously, so this tween's onComplete can run after the
+            // encounter is gone. Guard the deref (the normal leave path always has it present -> no-op there).
+            if (globalScene.currentBattle?.mysteryEncounter) {
+              globalScene.currentBattle.mysteryEncounter.introVisuals = undefined;
+            }
           }
           resolve(true);
         },

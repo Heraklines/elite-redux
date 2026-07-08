@@ -250,6 +250,19 @@ export class MysteryEncounterPhase extends Phase {
         coopWarn("me", "guest SELF-ROLLED an ME but the HOST has NONE this wave - dropping the phantom ME (#862)", {
           wave: globalScene.currentBattle?.waveIndex,
         });
+        // #863(b): EncounterPhase already rendered this phantom ME's intro visuals (a lingering Delibird
+        // sprite was seen overlaying the recovered battle). Reuse the SAME idempotent teardown the normal
+        // leave path uses to ease them out + destroy them, BEFORE we drop the encounter. Fully guarded +
+        // fire-and-forget: the cosmetic cleanup must NEVER throw or hang the recovery below (the buffered
+        // enemyPartySync + per-turn stream reconcile the WILD field from the host). The teardown's tween
+        // onComplete is null-guarded (encounter-phase-utils) so nulling the encounter right after is safe.
+        try {
+          void transitionMysteryEncounterIntroVisuals().catch(e =>
+            coopWarn("me", "phantom-ME intro-visual teardown rejected (handled) (#863)", e),
+          );
+        } catch (e) {
+          coopWarn("me", "phantom-ME intro-visual teardown threw synchronously (handled) (#863)", e);
+        }
         globalScene.currentBattle.mysteryEncounter = undefined;
         globalScene.currentBattle.battleType = BattleType.WILD;
         globalScene.phaseManager.unshiftNew("TurnInitPhase");
