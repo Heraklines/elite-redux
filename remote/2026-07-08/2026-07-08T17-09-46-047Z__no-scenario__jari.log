@@ -1,0 +1,266 @@
+url:      https://elite-redux-staging.pages.dev/
+build:    mrc9a598-g33b
+mode:     ?  wave:?
+seed:     YDqvkKLoeyReTFdOVrnJPZG9
+party:    
+enemy:    
+
+----- CONSOLE -----
+[16:58:38.490] LOG: [coop:lobby] poll players=1
+[16:58:41.280] LOG: [coop:lobby] poll players=1
+[16:58:44.489] LOG: [coop:lobby] poll players=1
+[16:58:47.330] LOG: [coop:lobby] poll players=1
+[16:58:50.499] LOG: [coop:lobby] poll players=1
+[16:58:52.980] LOG: [coop:lobby] poll players=1
+[16:58:55.395] LOG: [coop:lobby] poll players=1
+[16:58:57.910] LOG: [coop:lobby] poll players=1
+[16:59:00.353] LOG: [coop:lobby] poll players=1
+[16:59:02.802] LOG: [coop:lobby] poll players=1
+[16:59:05.257] LOG: [coop:lobby] poll players=1
+[16:59:07.829] LOG: [coop:lobby] poll players=1
+[16:59:10.341] LOG: [coop:lobby] poll players=1
+[16:59:12.741] LOG: [coop:lobby] poll players=1
+[16:59:15.417] LOG: [coop:lobby] poll players=1
+[16:59:17.860] LOG: [coop:lobby] poll players=1
+[16:59:20.322] LOG: [coop:lobby] poll players=1
+[16:59:22.778] LOG: [coop:lobby] poll players=1
+[16:59:25.202] LOG: [coop:lobby] poll players=1
+[16:59:27.685] LOG: [coop:lobby] poll players=1
+[16:59:30.131] LOG: [coop:lobby] poll players=1
+[16:59:32.607] LOG: [coop:lobby] poll players=1
+[16:59:35.047] LOG: [coop:lobby] poll players=1
+[16:59:37.574] LOG: [coop:lobby] poll players=1
+[16:59:40.018] LOG: [coop:lobby] poll players=1
+[16:59:42.470] LOG: [coop:lobby] poll players=1
+[16:59:44.896] LOG: [coop:lobby] poll players=1
+[16:59:47.311] LOG: [coop:lobby] poll players=1
+[16:59:49.776] LOG: [coop:lobby] poll players=1
+[16:59:52.296] LOG: [coop:lobby] poll players=1
+[16:59:55.262] LOG: [coop:lobby] poll players=1
+[16:59:58.287] LOG: [coop:lobby] poll players=1
+[17:00:01.404] LOG: [coop:lobby] poll players=1
+[17:00:04.286] LOG: [coop:lobby] poll players=1
+[17:00:07.363] LOG: [coop:lobby] poll players=1
+[17:00:10.292] LOG: [coop:lobby] poll players=1
+[17:00:13.629] LOG: [coop:lobby] poll players=1
+[17:00:16.097] LOG: [coop:lobby] poll players=1
+[17:00:18.589] LOG: [coop:lobby] poll players=1
+[17:00:21.031] LOG: [coop:lobby] poll players=1
+[17:00:24.305] LOG: [coop:lobby] poll players=1
+[17:00:27.499] LOG: [coop:lobby] poll players=1
+[17:00:30.262] LOG: [coop:lobby] poll players=1
+[17:00:33.391] LOG: [coop:lobby] poll players=1
+[17:00:36.472] LOG: [coop:lobby] poll players=1
+[17:00:40.193] LOG: [coop:lobby] poll players=1
+[17:00:43.423] LOG: [coop:lobby] poll players=1
+[17:00:46.285] LOG: [coop:lobby] poll players=1
+[17:00:49.350] LOG: [coop:lobby] poll players=0
+[17:00:52.288] LOG: [coop:lobby] poll players=1
+[17:00:55.268] LOG: [coop:lobby] poll players=1
+[17:00:58.271] LOG: [coop:lobby] poll players=1
+[17:01:01.298] LOG: [coop:lobby] poll players=1
+[17:01:04.299] LOG: [coop:lobby] poll players=1
+[17:01:07.633] LOG: [coop:lobby] poll players=1
+[17:01:10.418] LOG: [coop:lobby] poll players=1
+[17:01:13.272] LOG: [coop:lobby] poll players=0
+[17:01:16.290] LOG: [coop:lobby] poll players=2
+[17:01:19.304] LOG: [coop:lobby] poll players=2
+[17:01:22.300] LOG: [coop:lobby] poll players=2
+[17:01:25.280] LOG: [coop:lobby] poll players=2
+[17:01:28.280] LOG: [coop:lobby] poll players=2
+[17:01:31.395] LOG: [coop:lobby] poll players=2
+[17:01:34.277] LOG: [coop:lobby] poll players=2
+[17:01:37.478] LOG: [coop:lobby] poll players=2
+[17:01:40.251] LOG: [coop:lobby] poll players=2
+[17:01:43.725] LOG: [coop:lobby] poll players=2
+[17:01:46.276] LOG: [coop:lobby] poll players=2
+[17:01:50.551] LOG: [coop:lobby] poll players=2
+[17:01:53.320] LOG: [coop:lobby] poll players=2
+[17:01:56.324] LOG: [coop:lobby] poll players=2
+[17:01:59.440] LOG: [coop:lobby] poll players=2
+[17:02:02.268] LOG: [coop:lobby] poll players=2
+[17:02:05.357] LOG: [coop:lobby] poll players=2
+[17:02:08.265] LOG: [coop:lobby] poll players=2
+[17:02:11.327] LOG: [coop:lobby] poll players=2
+[17:02:14.321] LOG: [coop:lobby] poll players=2
+[17:02:17.462] LOG: [coop:lobby] poll players=2
+[17:02:20.341] LOG: [coop:lobby] poll players=2
+[17:02:23.286] LOG: [coop:lobby] poll players=2
+[17:02:26.420] LOG: [coop:lobby] poll players=2
+[17:02:29.759] LOG: [coop:lobby] poll players=2
+[17:02:32.397] LOG: [coop:lobby] poll players=2
+[17:02:35.268] LOG: [coop:lobby] poll players=2
+[17:02:38.277] LOG: [coop:lobby] poll players=2
+[17:02:41.322] LOG: [coop:lobby] poll players=2
+[17:02:44.317] LOG: [coop:lobby] poll players=2
+[17:02:47.285] LOG: [coop:lobby] poll players=2
+[17:02:50.424] LOG: [coop:lobby] poll players=2
+[17:02:53.332] LOG: [coop:lobby] poll players=2
+[17:02:56.281] LOG: [coop:lobby] poll players=2
+[17:02:59.309] LOG: [coop:lobby] poll players=2
+[17:03:02.252] LOG: [coop:lobby] poll players=2
+[17:03:05.285] LOG: [coop:lobby] poll players=2
+[17:03:08.323] LOG: [coop:lobby] poll players=2
+[17:03:11.305] LOG: [coop:lobby] poll players=2
+[17:03:14.384] LOG: [coop:lobby] poll players=2
+[17:03:17.338] LOG: [coop:lobby] poll players=2
+[17:03:20.382] LOG: [coop:lobby] poll players=2
+[17:03:23.316] LOG: [coop:lobby] poll players=2
+[17:03:26.266] LOG: [coop:lobby] poll players=2
+[17:03:29.727] LOG: [coop:lobby] poll players=2
+[17:03:32.488] LOG: [coop:lobby] poll players=2
+[17:03:35.434] LOG: [coop:lobby] poll players=2
+[17:03:38.433] LOG: [coop:lobby] poll players=2
+[17:03:41.265] LOG: [coop:lobby] poll players=2
+[17:03:45.213] LOG: [coop:lobby] poll players=2
+[17:03:48.259] LOG: [coop:lobby] poll players=2
+[17:03:51.292] LOG: [coop:lobby] poll players=2
+[17:03:54.278] LOG: [coop:lobby] poll players=2
+[17:03:57.309] LOG: [coop:lobby] poll players=2
+[17:04:00.287] LOG: [coop:lobby] poll players=2
+[17:04:03.284] LOG: [coop:lobby] poll players=2
+[17:04:06.923] LOG: [coop:lobby] poll players=2
+[17:04:11.488] LOG: [coop:lobby] poll players=2
+[17:04:15.191] LOG: [coop:lobby] poll players=2
+[17:04:18.418] LOG: [coop:lobby] poll players=2
+[17:04:21.665] LOG: [coop:lobby] poll players=2
+[17:04:25.528] LOG: [coop:lobby] poll players=2
+[17:04:28.317] LOG: [coop:lobby] poll players=2
+[17:04:31.306] LOG: [coop:lobby] poll players=2
+[17:04:34.279] LOG: [coop:lobby] poll players=2
+[17:04:37.605] LOG: [coop:lobby] poll players=2
+[17:04:40.278] LOG: [coop:lobby] poll players=2
+[17:04:43.361] LOG: [coop:lobby] poll players=2
+[17:04:46.281] LOG: [coop:lobby] poll players=2
+[17:04:49.373] LOG: [coop:lobby] poll players=2
+[17:04:52.296] LOG: [coop:lobby] poll players=2
+[17:04:55.289] LOG: [coop:lobby] poll players=2
+[17:04:58.415] LOG: [coop:lobby] poll players=2
+[17:05:01.475] LOG: [coop:lobby] poll players=2
+[17:05:04.295] LOG: [coop:lobby] poll players=2
+[17:05:07.314] LOG: [coop:lobby] poll players=2
+[17:05:10.312] LOG: [coop:lobby] poll players=2
+[17:05:13.291] LOG: [coop:lobby] poll players=2
+[17:05:16.275] LOG: [coop:lobby] poll players=2
+[17:05:19.702] LOG: [coop:lobby] poll players=2
+[17:05:22.369] LOG: [coop:lobby] poll players=2
+[17:05:24.962] LOG: [coop:lobby] request target=9393173a-7f8e-4758-a0bd-3554302ceb41 (self=6275ae5b-b8f0-41a7-b633-f3943a9416e0)
+[17:05:25.218] LOG: [coop:lobby] poll players=2
+[17:05:27.107] LOG: [coop:lobby] poll players=2
+[17:05:29.523] LOG: [coop:lobby] poll players=2
+[17:05:31.982] LOG: [coop:lobby] poll players=2
+[17:05:34.413] LOG: [coop:lobby] poll players=2
+[17:05:37.923] LOG: [coop:lobby] poll players=2
+[17:05:40.591] LOG: [coop:lobby] poll players=2
+[17:05:43.312] LOG: [coop:lobby] poll players=2
+[17:05:46.171] LOG: [coop:lobby] poll matched code=4F5R7B role=guest -> connect
+[17:05:46.171] LOG: [coop:launch] lobby connect code=4F5R7B role=guest name=JarilG
+[17:05:46.173] LOG: [coop:launch] connectCoopWithCode code=4F5R7B role=guest username=JarilG
+[17:05:46.173] LOG: [coop:launch] exchange SDP start code=4F5R7B role=guest (ice=fetched)
+[17:05:47.398] LOG: [coop:launch] ICE from worker /coop/ice servers=1
+[17:05:47.401] LOG: [coop:launch] await peer signal start code=4F5R7B role=guest timeout=60000ms
+[17:05:48.612] LOG: [coop:launch] await peer signal resolve code=4F5R7B role=guest (1445b)
+[17:05:48.612] LOG: [coop:launch] guest received offer code=4F5R7B -> answering
+[17:05:48.616] LOG: [coop:launch] iceConnectionState=checking code=4F5R7B role=guest
+[17:05:48.616] LOG: [coop:launch] pcConnectionState=connecting code=4F5R7B role=guest
+[17:05:49.581] LOG: [coop:launch] guest pushing answer code=4F5R7B (ICE gathered)
+[17:05:49.582] LOG: [coop:launch] pushSignal code=4F5R7B role=guest sdpBytes=1980
+[17:05:51.264] LOG: [coop:launch] iceConnectionState=connected code=4F5R7B role=guest
+[17:05:51.425] LOG: [coop:launch] pcConnectionState=connected code=4F5R7B role=guest
+[17:05:51.593] LOG: [coop:launch] guest datachannel event label=coop state=open code=4F5R7B
+[17:05:51.593] LOG: [coop:launch] data channel already open
+[17:05:51.594] LOG: [coop:webrtc] ctor role=guest readyState=open state=connected
+[17:05:51.594] LOG: [coop:launch] connectCoopSession role=guest state=connected username=JarilG netcode=authoritative
+[17:05:51.594] LOG: [coop:stream] streamer CONSTRUCT timeout=1200000ms onMessage registered
+[17:05:51.594] LOG: [coop:stream] guest REGISTER onGhostPool handler (bufferedEarly=false)
+[17:05:51.594] LOG: [coop:stream] host REGISTER onStateSyncRequest handler (was=false)
+[17:05:51.595] LOG: [coop:stream] host REGISTER onEnemyPartyRequest handler (was=false)
+[17:05:51.595] LOG: [coop:stream] guest REGISTER onWaveResolved handler (was=false)
+[17:05:51.595] LOG: [coop:stream] guest REGISTER onWaveEndState handler (was=false)
+[17:05:51.595] LOG: [coop:stream] watcher REGISTER onMeChecksum handler (was=false)
+[17:05:51.595] LOG: [coop:turn] host recorder: REGISTER live emitter (was=false)
+[17:05:51.595] LOG: [coop:session] coopAuthoritativeGuestPredicate INSTALLED
+[17:05:51.595] LOG: [coop:launch] peer session ready role=guest netcode=authoritative -> connecting
+[17:05:51.595] LOG: [coop:launch] session connect role=guest partnerRole=host netcode=authoritative username=JarilG version=er-coop-11 tiebreak=0.7864805304809699
+[17:05:51.596] LOG: [coop:webrtc] raw tx role=guest t=hello bytes=101
+[17:05:51.649] LOG: [coop:checksum] dataFingerprint compute moveMap=e9b828360aafb9e2(1032) movesData=61fa3383767be347(1107) movesName=fad7fe8932ec09a1(1107) movesets=6eb276198552346d(1908) abilitiesData=3088ac8089021d9e(1047) abilitiesName=7c302bdd9cc50a0b(1047)
+[17:05:51.655] LOG: [coop:webrtc] raw tx role=guest t=dataFingerprint bytes=329
+[17:05:51.655] LOG: [coop:launch] lobby connected code=4F5R7B role=guest -> onConnected
+[17:05:51.658] LOG: [coop:session] isCoopAuthoritativeGuestGated -> true (authoritative GUEST gates a structural mutation)
+[17:05:51.659] LOG: %cStart Phase SelectStarterPhase color:green;
+[17:05:51.660] LOG: [coop:webrtc] channel OPEN role=guest gen=0
+[17:05:51.660] LOG: [coop:webrtc] raw rx role=guest t=hello bytes=108 handlers=13
+[17:05:51.660] LOG: [coop:launch] hello recv partner=HolyReduxBeta partnerRole=host (local role=guest; no conflict)
+[17:05:51.661] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[17:05:51.661] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[17:05:51.661] LOG: [coop:webrtc] raw rx role=guest t=dataFingerprint bytes=329 handlers=13
+[17:05:51.662] LOG: [coop:checksum] MATCH - data tables identical across clients
+[17:05:57.357] LOG: [coop:interaction] interactionCounter() read -> 0 (role=guest)
+[17:05:57.357] LOG: [coop:health] tick=0g turn=- wave=- counter=0 assertions=0 wait=-1ms peerBeat=- transport=connected
+[17:06:05.983] WARN: [coop:webrtc] channel ERROR role=guest readyState=closed err=User-Initiated Abort, reason=Close called
+[17:06:05.983] LOG: [coop:webrtc] channel CLOSE role=guest state=connected gen=0
+[17:06:05.983] LOG: [coop:webrtc] state role=guest connected -> disconnected
+[17:06:05.983] WARN: [coop:runtime] partner channel disconnected -> cancelling pending co-op waits (no 20-minute strand)
+[17:06:05.983] LOG: [coop:relay] cancelWaiters() no orphaned waiters selected -> nothing cancelled (live waits spared)
+[17:06:05.984] LOG: [coop:launch] rejoin attempt 1 code=4F5R7B role=guest elapsed=0ms
+[17:06:05.984] LOG: [coop:launch] exchange SDP start code=4F5R7B role=guest (ice=fetched)
+[17:06:06.635] LOG: [coop:launch] ICE from worker /coop/ice servers=1
+[17:06:06.636] LOG: [coop:launch] await peer signal start code=4F5R7B role=guest timeout=60000ms
+[17:06:11.079] LOG: [coop:launch] iceConnectionState=disconnected code=4F5R7B role=guest
+[17:06:11.079] LOG: [coop:launch] pcConnectionState=disconnected code=4F5R7B role=guest
+[17:06:21.083] LOG: [coop:launch] pcConnectionState=failed code=4F5R7B role=guest
+[17:06:32.353] LOG: [coop:interaction] interactionCounter() read -> 0 (role=guest)
+[17:06:32.353] LOG: [coop:health] tick=0g turn=- wave=- counter=0 assertions=0 wait=-1ms peerBeat=- transport=disconnected
+[17:06:49.378] WARN: cry/449 not found
+[17:06:49.387] WARN: cry/556 not found
+[17:07:06.611] LOG: [coop:interaction] interactionCounter() read -> 0 (role=guest)
+[17:07:06.612] LOG: [coop:health] tick=0g turn=- wave=- counter=0 assertions=0 wait=-1ms peerBeat=- transport=disconnected
+[17:07:07.186] WARN: [coop:launch] await peer signal TIMEOUT code=4F5R7B role=guest after 60000ms
+[17:07:07.186] WARN: [coop:launch] rejoin attempt 1 failed (coop: timed out waiting for the partner to connect); retrying in 5s
+[17:07:12.213] LOG: [coop:launch] rejoin attempt 2 code=4F5R7B role=guest elapsed=66229ms
+[17:07:12.213] LOG: [coop:launch] exchange SDP start code=4F5R7B role=guest (ice=fetched)
+[17:07:13.599] LOG: [coop:launch] ICE from worker /coop/ice servers=1
+[17:07:13.600] LOG: [coop:launch] await peer signal start code=4F5R7B role=guest timeout=60000ms
+[17:07:36.613] LOG: [coop:interaction] interactionCounter() read -> 0 (role=guest)
+[17:07:36.613] LOG: [coop:health] tick=0g turn=- wave=- counter=0 assertions=0 wait=-1ms peerBeat=- transport=disconnected
+[17:07:57.418] WARN: Could not update system savedata! AbortError: signal is aborted without reason
+AbortError: signal is aborted without reason
+    at https://elite-redux-staging.pages.dev/assets/BBCodeText-DsPSSNhA.js:1:22449
+[17:07:57.418] ERROR: Unknown Error
+[17:08:06.618] LOG: [coop:interaction] interactionCounter() read -> 0 (role=guest)
+[17:08:06.618] LOG: [coop:health] tick=0g turn=- wave=- counter=0 assertions=0 wait=-1ms peerBeat=- transport=disconnected
+[17:08:15.062] WARN: [coop:launch] await peer signal TIMEOUT code=4F5R7B role=guest after 60000ms
+[17:08:15.063] WARN: [coop:launch] rejoin attempt 2 failed (coop: timed out waiting for the partner to connect); retrying in 5s
+[17:08:20.086] WARN: [coop:launch] rejoin grace EXPIRED code=4F5R7B role=guest after 2 attempts
+[17:08:20.086] WARN: [coop:runtime] rejoin FAILED (grace expired) -> continuing without the partner
+[17:08:20.086] WARN: [coop:lifecycle] disconnect role=host atMs=0 state active->grace graceWasOpen=false graceMs=120000 graceOpenedAt=0
+[17:08:20.087] LOG: [coop:session] isCoopAuthoritativeGuestGated -> true (authoritative GUEST gates a structural mutation)
+[17:08:20.087] LOG: %cStart Phase ShowdownResultPhase color:green;
+[17:08:20.087] WARN: [coop:webrtc] raw send DROP (not open) role=guest t=showdownVoid state=disconnected readyState=closed
+[17:08:20.087] LOG: [coop:launch] clearCoopRuntime role=guest netcode=authoritative gen->1
+[17:08:20.087] LOG: [coop:stream] streamer DISPOSE: cancel pending(turns=0 enemyParty=0 meBattle=0 stateSync=0) + null-out all handlers
+[17:08:20.088] LOG: [coop:relay] dispose() (no in-flight waiters)
+[17:08:20.088] LOG: [coop:pump] end session {"wasOwner":false,"seq":-1,"termSeq":-1}
+[17:08:20.088] LOG: [coop:webrtc] close() role=guest state=disconnected
+[17:08:20.088] LOG: [coop:webrtc] state role=guest disconnected -> closed
+[17:08:20.089] LOG: [coop:turn] host recorder: CLEAR (null-out) live emitter (was=true)
+[17:08:20.089] LOG: [coop:session] coopAuthoritativeGuestPredicate CLEARED (-> solo/host/lockstep reads false)
+[17:08:21.718] LOG: Seed: YDqvkKLoeyReTFdOVrnJPZG9
+[17:08:21.718] LOG: Wave Seed: YDqvkKLoeyReTFdOVrnJPZG9 0
+[17:08:21.719] LOG: %cStart Phase TitlePhase color:green;
+[17:08:21.721] LOG: Getting Session Slot id: %d 2
+[17:08:21.747] LOG: use seasonal splash messages true
+[17:08:23.673] LOG: Getting Session Slot id: %d 2
+[17:08:23.680] WARN: [coop:launch] loadSession slot=2 REFUSED: co-op save without a live partner connection (#807)
+[17:08:23.681] ERROR: TypeError: Cannot read properties of undefined (reading 'getStartingBiome')
+TypeError: Cannot read properties of undefined (reading 'getStartingBiome')
+    at TitlePhase.end (https://elite-redux-staging.pages.dev/assets/battle-scene-Kk4Dr9wQ.js:462:857)
+    at TitlePhase.loadSaveSlot (https://elite-redux-staging.pages.dev/assets/battle-scene-Kk4Dr9wQ.js:461:1362)
+[17:08:23.683] ERROR: [uncaught] Uncaught TypeError: Cannot read properties of undefined (reading 'challenges') @ https://elite-redux-staging.pages.dev/assets/er-ghost-teams-Dw3HBeWI.js:4:149955
+[17:08:23.684] ERROR: [unhandledrejection] TypeError: Cannot read properties of undefined (reading 'isCoop')
+TypeError: Cannot read properties of undefined (reading 'isCoop')
+    at UI.showText (https://elite-redux-staging.pages.dev/assets/battle-scene-Kk4Dr9wQ.js:1046:16647)
+    at TitlePhase.loadSaveSlot (https://elite-redux-staging.pages.dev/assets/battle-scene-Kk4Dr9wQ.js:461:1399)
+[17:08:25.366] ERROR: [uncaught] Uncaught TypeError: Cannot read properties of undefined (reading 'isCoop') @ https://elite-redux-staging.pages.dev/assets/battle-scene-Kk4Dr9wQ.js:1046:14473
+[17:08:25.590] ERROR: [uncaught] Uncaught TypeError: Cannot read properties of undefined (reading 'isCoop') @ https://elite-redux-staging.pages.dev/assets/battle-scene-Kk4Dr9wQ.js:1046:14473
+[17:08:38.088] ERROR: [uncaught] Uncaught TypeError: Cannot read properties of undefined (reading 'isCoop') @ https://elite-redux-staging.pages.dev/assets/battle-scene-Kk4Dr9wQ.js:1046:14473
