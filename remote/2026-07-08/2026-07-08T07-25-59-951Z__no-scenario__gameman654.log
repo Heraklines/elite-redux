@@ -1,0 +1,269 @@
+url:      https://elite-redux-staging.pages.dev/
+build:    mrbqqcbr-48yy
+mode:     0  wave:?
+seed:     ydfyarLzzLHO2k5nruyfzDh2
+party:    
+enemy:    
+
+----- COMMENT -----
+Going into settings during a Showdown battle and exiting causes the battle to close.
+
+----- CONSOLE -----
+[07:23:25.780] LOG: [coop:transport] send host t=battleEvent turn=1 seq=2 k=message
+[07:23:25.782] LOG: %cStart Phase DamageAnimPhase color:green;
+[07:23:25.790] LOG: [coop:transport] recv guest t=battleEvent turn=1 seq=1 k=hp handlers=4
+[07:23:25.790] LOG: [coop:transport] recv guest t=battleEvent turn=1 seq=2 k=message handlers=4
+[07:23:25.808] LOG: %cStart Phase MessagePhase color:green;
+[07:23:26.029] LOG: %cStart Phase MoveEndPhase color:green;
+[07:23:26.030] LOG: %cStart Phase CheckInterludePhase color:green;
+[07:23:26.030] LOG: %cStart Phase WeatherEffectPhase color:green;
+[07:23:26.031] LOG: %cStart Phase PositionalTagPhase color:green;
+[07:23:26.031] LOG: %cStart Phase BerryPhase color:green;
+[07:23:26.033] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[07:23:26.035] LOG: %cStart Phase TurnEndPhase color:green;
+[07:23:26.041] LOG: Applied Leftovers 
+[07:23:26.042] LOG: [coop:turn] host recorder: finalize turn=1 events=3 seq=3
+[07:23:26.044] LOG: [coop:checkpoint] build field=2 weather=0/0 terrain=0/0 arenaTags=0 money=0 mons=[bi0:sp567/hp282-291/st0/fnt0 bi2:sp10/hp231-231/st0/fnt0]
+[07:23:26.045] LOG: [coop:checkpoint] host capture field=2 weather=0 terrain=0 money=0 arenaTags=0 mons=[bi0:sp567/hp282-291/st0/fnt0 bi2:sp10/hp231-231/st0/fnt0]
+[07:23:26.056] LOG: [coop:checksum] capture digest=6be619a30bc1a142 field=2 biome=0 seed=SDYIR7wvBBOvI9L33Ld6uEUx weather=0 terrain=0 money=0 party=[567,10742,10667,1021,470,10782] partyLevels=[100,100,100,100,100,100] arenaTags=0 modifiers=7 heldItemsDigest=2 pokeballs=[0:5,1:0,2:0,3:0,4:0] mons=[bi0:sp567/hp282-291/st0/ab290/form0/tera0:5/boss0:0 bi2:sp10/hp231-231/st0/ab107/form0/tera0:6/boss0:0]
+[07:23:26.056] LOG: [coop:replay] host SEND turnResolution turn=1 events=3 checksum=6be619a30bc1a142 preimage=true fullField=2 authoritativeState=1
+[07:23:26.057] LOG: [coop:transport] send host t=turnResolution turn=1 events=3 checksum=6be619a30bc1a142
+[07:23:26.057] LOG: %cStart Phase PokemonHealPhase color:green;
+[07:23:26.062] LOG: [coop:transport] recv guest t=turnResolution turn=1 events=3 checksum=6be619a30bc1a142 handlers=4
+[07:23:26.266] LOG: %cStart Phase MessagePhase color:green;
+[07:23:26.546] LOG: %cStart Phase TurnInitPhase color:green;
+[07:23:26.546] LOG: %cStart Phase CommandPhase color:green;
+[07:23:31.151] WARN: cry/567 not found
+[07:23:32.920] WARN: cry/10742 not found
+[07:23:33.387] WARN: cry/10667 not found
+[07:23:33.617] WARN: cry/1021 not found
+[07:23:33.791] WARN: cry/470 not found
+[07:23:33.972] WARN: cry/10782 not found
+[07:23:36.146] LOG: Move: BRAVE_BIRD Move targets: {"targets":[2],"multiple":false} 
+Player Pokemon: Archeops
+[07:23:36.150] LOG: %cStart Phase EnemyCommandPhase color:green;
+[07:23:36.150] LOG: [coop:relay] showdown host requestEnemyCommand SEND turn=2 (awaiting peer)
+[07:23:36.151] LOG: [coop:transport] send host t=showdownCommandRequest turn=2
+[07:23:36.151] LOG: [coop:transport] recv guest t=showdownCommandRequest turn=2 handlers=4
+[07:23:36.151] LOG: [coop:transport] send guest t=showdownCommand turn=2 cmd=0 cursor=0
+[07:23:36.151] LOG: [coop:transport] recv host t=showdownCommand turn=2 cmd=0 cursor=0 handlers=12
+[07:23:36.152] LOG: [coop:relay] showdown recv command turn=2 command=0 -> resolved awaiting request
+[07:23:36.152] LOG: %cStart Phase TurnStartPhase color:green;
+[07:23:36.152] LOG: [coop:turn] host recorder: begin turn=2 (no prior open recording)
+[07:23:36.161] LOG: %cStart Phase MovePhase color:green;
+[07:23:36.161] LOG: %cUser: Archeops
+Move: BRAVE_BIRD
+Use Mode: NORMAL color:orchid
+[07:23:36.164] LOG: [coop:turn] host recorder: append turn=2 seq=0 k=moveUsed total=1 live=true
+[07:23:36.164] LOG: [coop:runtime] ME-stream live-event host turn=2 seq=0 k=moveUsed
+[07:23:36.164] LOG: [coop:replay] host EMIT live battleEvent turn=2 seq=0 k=moveUsed
+[07:23:36.164] LOG: [coop:transport] send host t=battleEvent turn=2 seq=0 k=moveUsed
+[07:23:36.167] LOG: %cStart Phase MessagePhase color:green;
+[07:23:36.168] LOG: [coop:transport] recv guest t=battleEvent turn=2 seq=0 k=moveUsed handlers=4
+[07:23:36.263] LOG: %cStart Phase MoveEffectPhase color:green;
+[07:23:36.264] LOG: [coop:turn] host recorder: append turn=2 seq=1 k=message total=2 live=true
+[07:23:36.265] LOG: [coop:runtime] ME-stream live-event host turn=2 seq=1 k=message
+[07:23:36.265] LOG: [coop:replay] host EMIT live battleEvent turn=2 seq=1 k=message
+[07:23:36.265] LOG: [coop:transport] send host t=battleEvent turn=2 seq=1 k=message
+[07:23:36.265] LOG: %cStart Phase ShowAbilityPhase color:green;
+[07:23:36.269] LOG: [coop:transport] recv guest t=battleEvent turn=2 seq=1 k=message handlers=4
+[07:23:36.433] LOG: %cStart Phase MessagePhase color:green;
+[07:23:36.712] LOG: %cStart Phase HideAbilityPhase color:green;
+[07:23:36.750] LOG: %cStart Phase MoveEndPhase color:green;
+[07:23:36.751] LOG: %cStart Phase MovePhase color:green;
+[07:23:36.751] LOG: %cUser: Caterpie
+Move: TACKLE
+Use Mode: NORMAL color:orchid
+[07:23:36.755] LOG: [coop:turn] host recorder: append turn=2 seq=2 k=moveUsed total=3 live=true
+[07:23:36.756] LOG: [coop:runtime] ME-stream live-event host turn=2 seq=2 k=moveUsed
+[07:23:36.756] LOG: [coop:replay] host EMIT live battleEvent turn=2 seq=2 k=moveUsed
+[07:23:36.756] LOG: [coop:transport] send host t=battleEvent turn=2 seq=2 k=moveUsed
+[07:23:36.759] LOG: %cStart Phase MessagePhase color:green;
+[07:23:36.762] LOG: [coop:transport] recv guest t=battleEvent turn=2 seq=2 k=moveUsed handlers=4
+[07:23:36.880] LOG: %cStart Phase MoveEffectPhase color:green;
+[07:23:36.884] LOG: Battle Seed: QWDuw7Mw87IePJrH
+[07:23:37.031] LOG: crit stage: +0
+[07:23:37.034] LOG: Move: Tackle | Base damage: 21.43132530120482 | Power: 40 | Source attack: 96 | Target defense: 166
+[07:23:37.036] LOG: Move: Tackle | Attack damage: 9
+[07:23:37.037] LOG: [coop:turn] host recorder: append turn=2 seq=3 k=hp total=4 live=true
+[07:23:37.038] LOG: [coop:runtime] ME-stream live-event host turn=2 seq=3 k=hp
+[07:23:37.038] LOG: [coop:replay] host EMIT live battleEvent turn=2 seq=3 k=hp
+[07:23:37.038] LOG: [coop:transport] send host t=battleEvent turn=2 seq=3 k=hp
+[07:23:37.039] LOG: [coop:turn] host recorder: append turn=2 seq=4 k=message total=5 live=true
+[07:23:37.039] LOG: [coop:runtime] ME-stream live-event host turn=2 seq=4 k=message
+[07:23:37.039] LOG: [coop:replay] host EMIT live battleEvent turn=2 seq=4 k=message
+[07:23:37.039] LOG: [coop:transport] send host t=battleEvent turn=2 seq=4 k=message
+[07:23:37.041] LOG: %cStart Phase DamageAnimPhase color:green;
+[07:23:37.045] LOG: [coop:transport] recv guest t=battleEvent turn=2 seq=3 k=hp handlers=4
+[07:23:37.045] LOG: [coop:transport] recv guest t=battleEvent turn=2 seq=4 k=message handlers=4
+[07:23:37.067] LOG: %cStart Phase MessagePhase color:green;
+[07:23:37.281] LOG: %cStart Phase MoveEndPhase color:green;
+[07:23:37.281] LOG: %cStart Phase CheckInterludePhase color:green;
+[07:23:37.282] LOG: %cStart Phase WeatherEffectPhase color:green;
+[07:23:37.282] LOG: %cStart Phase PositionalTagPhase color:green;
+[07:23:37.282] LOG: %cStart Phase BerryPhase color:green;
+[07:23:37.284] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[07:23:37.287] LOG: %cStart Phase TurnEndPhase color:green;
+[07:23:37.291] LOG: Applied Leftovers 
+[07:23:37.292] LOG: [coop:turn] host recorder: finalize turn=2 events=5 seq=5
+[07:23:37.293] LOG: [coop:checkpoint] build field=2 weather=0/0 terrain=0/0 arenaTags=0 money=0 mons=[bi0:sp567/hp282-291/st0/fnt0 bi2:sp10/hp231-231/st0/fnt0]
+[07:23:37.294] LOG: [coop:checkpoint] host capture field=2 weather=0 terrain=0 money=0 arenaTags=0 mons=[bi0:sp567/hp282-291/st0/fnt0 bi2:sp10/hp231-231/st0/fnt0]
+[07:23:37.307] LOG: [coop:checksum] capture digest=29041046e43ba610 field=2 biome=0 seed=SDYIR7wvBBOvI9L33Ld6uEUx weather=0 terrain=0 money=0 party=[567,10742,10667,1021,470,10782] partyLevels=[100,100,100,100,100,100] arenaTags=0 modifiers=7 heldItemsDigest=2 pokeballs=[0:5,1:0,2:0,3:0,4:0] mons=[bi0:sp567/hp282-291/st0/ab290/form0/tera0:5/boss0:0 bi2:sp10/hp231-231/st0/ab107/form0/tera0:6/boss0:0]
+[07:23:37.307] LOG: [coop:replay] host SEND turnResolution turn=2 events=5 checksum=29041046e43ba610 preimage=true fullField=2 authoritativeState=1
+[07:23:37.307] LOG: [coop:transport] send host t=turnResolution turn=2 events=5 checksum=29041046e43ba610
+[07:23:37.307] LOG: %cStart Phase PokemonHealPhase color:green;
+[07:23:37.312] LOG: [coop:transport] recv guest t=turnResolution turn=2 events=5 checksum=29041046e43ba610 handlers=4
+[07:23:37.520] LOG: %cStart Phase MessagePhase color:green;
+[07:23:37.796] LOG: %cStart Phase TurnInitPhase color:green;
+[07:23:37.797] LOG: %cStart Phase CommandPhase color:green;
+[07:23:38.180] LOG: Move: BRAVE_BIRD Move targets: {"targets":[2],"multiple":false} 
+Player Pokemon: Archeops
+[07:23:38.188] LOG: %cStart Phase EnemyCommandPhase color:green;
+[07:23:38.189] LOG: [coop:relay] showdown host requestEnemyCommand SEND turn=3 (awaiting peer)
+[07:23:38.189] LOG: [coop:transport] send host t=showdownCommandRequest turn=3
+[07:23:38.189] LOG: [coop:transport] recv guest t=showdownCommandRequest turn=3 handlers=4
+[07:23:38.190] LOG: [coop:transport] send guest t=showdownCommand turn=3 cmd=0 cursor=0
+[07:23:38.190] LOG: [coop:transport] recv host t=showdownCommand turn=3 cmd=0 cursor=0 handlers=12
+[07:23:38.190] LOG: [coop:relay] showdown recv command turn=3 command=0 -> resolved awaiting request
+[07:23:38.191] LOG: %cStart Phase TurnStartPhase color:green;
+[07:23:38.192] LOG: [coop:turn] host recorder: begin turn=3 (no prior open recording)
+[07:23:38.197] LOG: %cStart Phase MovePhase color:green;
+[07:23:38.198] LOG: %cUser: Archeops
+Move: BRAVE_BIRD
+Use Mode: NORMAL color:orchid
+[07:23:38.201] LOG: [coop:turn] host recorder: append turn=3 seq=0 k=moveUsed total=1 live=true
+[07:23:38.202] LOG: [coop:runtime] ME-stream live-event host turn=3 seq=0 k=moveUsed
+[07:23:38.202] LOG: [coop:replay] host EMIT live battleEvent turn=3 seq=0 k=moveUsed
+[07:23:38.202] LOG: [coop:transport] send host t=battleEvent turn=3 seq=0 k=moveUsed
+[07:23:38.206] LOG: %cStart Phase MessagePhase color:green;
+[07:23:38.207] LOG: [coop:transport] recv guest t=battleEvent turn=3 seq=0 k=moveUsed handlers=4
+[07:23:38.297] LOG: %cStart Phase MoveEffectPhase color:green;
+[07:23:38.299] LOG: Battle Seed: QWDuw7Mw87IePJrH
+[07:23:38.314] WARN: Texture "%s" has no frame "%s" PRAS- Brave Bird 1
+[07:23:38.563] WARN: Texture "%s" has no frame "%s" PRAS- Brave Bird 1
+[07:23:38.563] WARN: Texture "%s" has no frame "%s" PRAS- Brave Bird 1
+[07:23:38.580] WARN: Texture "%s" has no frame "%s" PRAS- Brave Bird 1
+[07:23:38.597] WARN: Texture "%s" has no frame "%s" PRAS- Brave Bird 1
+[07:23:38.613] WARN: Texture "%s" has no frame "%s" PRAS- Brave Bird 1
+[07:23:38.697] WARN: Texture "%s" has no frame "%s" PRAS- Brave Bird 1
+[07:23:38.697] WARN: Texture "%s" has no frame "%s" PRAS- Brave Bird 1
+[07:23:38.714] WARN: Texture "%s" has no frame "%s" PRAS- Brave Bird 1
+[07:23:38.730] WARN: Texture "%s" has no frame "%s" PRAS- Brave Bird 1
+[07:23:38.731] WARN: Texture "%s" has no frame "%s" PRAS- Brave Bird 1
+[07:23:38.731] WARN: Texture "%s" has no frame "%s" PRAS- Brave Bird 1
+[07:23:38.732] WARN: Texture "%s" has no frame "%s" PRAS- Brave Bird 1
+[07:23:38.780] WARN: Texture "%s" has no frame "%s" PRAS- Brave Bird 1
+[07:23:38.781] WARN: Texture "%s" has no frame "%s" PRAS- Brave Bird 1
+[07:23:38.796] WARN: Texture "%s" has no frame "%s" PRAS- Brave Bird 1
+[07:23:38.815] WARN: Texture "%s" has no frame "%s" PRAS- Brave Bird 1
+[07:23:38.815] WARN: Texture "%s" has no frame "%s" PRAS- Brave Bird 1
+[07:23:38.816] WARN: Texture "%s" has no frame "%s" PRAS- Brave Bird 1
+[07:23:38.816] WARN: Texture "%s" has no frame "%s" PRAS- Brave Bird 1
+[07:23:38.864] WARN: Texture "%s" has no frame "%s" PRAS- Brave Bird 1
+[07:23:38.864] WARN: Texture "%s" has no frame "%s" PRAS- Brave Bird 1
+[07:23:38.881] WARN: Texture "%s" has no frame "%s" PRAS- Brave Bird 1
+[07:23:38.897] WARN: Texture "%s" has no frame "%s" PRAS- Brave Bird 1
+[07:23:38.898] WARN: Texture "%s" has no frame "%s" PRAS- Brave Bird 1
+[07:23:38.899] WARN: Texture "%s" has no frame "%s" PRAS- Brave Bird 1
+[07:23:38.899] WARN: Texture "%s" has no frame "%s" PRAS- Brave Bird 1
+[07:23:38.964] WARN: Texture "%s" has no frame "%s" PRAS- Brave Bird 1
+[07:23:38.965] WARN: Texture "%s" has no frame "%s" PRAS- Brave Bird 1
+[07:23:38.984] WARN: Texture "%s" has no frame "%s" PRAS- Brave Bird 1
+[07:23:38.998] WARN: Texture "%s" has no frame "%s" PRAS- Brave Bird 1
+[07:23:38.999] WARN: Texture "%s" has no frame "%s" PRAS- Brave Bird 1
+[07:23:39.000] WARN: Texture "%s" has no frame "%s" PRAS- Brave Bird 1
+[07:23:39.000] WARN: Texture "%s" has no frame "%s" PRAS- Brave Bird 1
+[07:23:39.064] WARN: Texture "%s" has no frame "%s" PRAS- Brave Bird 1
+[07:23:39.349] LOG: crit stage: +0
+[07:23:39.351] LOG: Move: Brave Bird | Base damage: 302.4981132075472 | Power: 120 | Source attack: 316 | Target defense: 106
+[07:23:39.352] LOG: Move: Brave Bird | Attack damage: 825
+[07:23:39.353] LOG: [coop:turn] host recorder: append turn=3 seq=1 k=hp total=2 live=true
+[07:23:39.353] LOG: [coop:runtime] ME-stream live-event host turn=3 seq=1 k=hp
+[07:23:39.353] LOG: [coop:replay] host EMIT live battleEvent turn=3 seq=1 k=hp
+[07:23:39.353] LOG: [coop:transport] send host t=battleEvent turn=3 seq=1 k=hp
+[07:23:39.353] LOG: [coop:turn] host recorder: append turn=3 seq=2 k=faint total=3 live=true
+[07:23:39.353] LOG: [coop:runtime] ME-stream live-event host turn=3 seq=2 k=faint
+[07:23:39.353] LOG: [coop:replay] host EMIT live battleEvent turn=3 seq=2 k=faint
+[07:23:39.353] LOG: [coop:transport] send host t=battleEvent turn=3 seq=2 k=faint
+[07:23:39.354] LOG: [coop:turn] host recorder: append turn=3 seq=3 k=message total=4 live=true
+[07:23:39.354] LOG: [coop:runtime] ME-stream live-event host turn=3 seq=3 k=message
+[07:23:39.354] LOG: [coop:replay] host EMIT live battleEvent turn=3 seq=3 k=message
+[07:23:39.354] LOG: [coop:transport] send host t=battleEvent turn=3 seq=3 k=message
+[07:23:39.356] LOG: %cStart Phase DamageAnimPhase color:green;
+[07:23:39.359] LOG: [coop:transport] recv guest t=battleEvent turn=3 seq=1 k=hp handlers=4
+[07:23:39.360] LOG: [coop:transport] recv guest t=battleEvent turn=3 seq=2 k=faint handlers=4
+[07:23:39.360] LOG: [coop:transport] recv guest t=battleEvent turn=3 seq=3 k=message handlers=4
+[07:23:39.390] LOG: %cStart Phase MessagePhase color:green;
+[07:23:39.605] LOG: %cStart Phase FaintPhase color:green;
+[07:23:39.619] WARN: cry/10 not found
+[07:23:39.689] LOG: %cStart Phase MessagePhase color:green;
+[07:23:39.944] LOG: %cStart Phase VictoryPhase color:green;
+[07:23:39.951] LOG: %cStart Phase MoveEndPhase color:green;
+[07:23:39.952] LOG: %cStart Phase MovePhase color:green;
+[07:23:39.953] LOG: %cStart Phase MoveEndPhase color:green;
+[07:23:39.954] LOG: %cStart Phase CheckInterludePhase color:green;
+[07:23:39.955] LOG: %cStart Phase WeatherEffectPhase color:green;
+[07:23:39.955] LOG: %cStart Phase PositionalTagPhase color:green;
+[07:23:39.955] LOG: %cStart Phase BerryPhase color:green;
+[07:23:39.957] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[07:23:39.957] LOG: %cStart Phase TurnEndPhase color:green;
+[07:23:39.959] LOG: [coop:turn] host recorder: finalize turn=3 events=4 seq=4
+[07:23:39.961] LOG: [coop:checkpoint] build field=2 weather=0/0 terrain=0/0 arenaTags=0 money=0 mons=[bi0:sp567/hp291-291/st0/fnt0 bi2:sp10/hp0-231/st7/fnt1]
+[07:23:39.965] LOG: [coop:checkpoint] host capture field=2 weather=0 terrain=0 money=0 arenaTags=0 mons=[bi0:sp567/hp291-291/st0/fnt0 bi2:sp10/hp0-231/st7/fnt1]
+[07:23:39.977] LOG: [coop:checksum] capture digest=40bd5dba58b119d7 field=1 biome=0 seed=SDYIR7wvBBOvI9L33Ld6uEUx weather=0 terrain=0 money=0 party=[567,10742,10667,1021,470,10782] partyLevels=[100,100,100,100,100,100] arenaTags=0 modifiers=7 heldItemsDigest=1 pokeballs=[0:5,1:0,2:0,3:0,4:0] mons=[bi0:sp567/hp291-291/st0/ab290/form0/tera0:5/boss0:0]
+[07:23:39.980] LOG: [coop:replay] host SEND turnResolution turn=3 events=4 checksum=40bd5dba58b119d7 preimage=true fullField=2 authoritativeState=1
+[07:23:39.980] LOG: [coop:transport] send host t=turnResolution turn=3 events=4 checksum=40bd5dba58b119d7
+[07:23:39.980] LOG: %cStart Phase ShowdownEnemyFaintSwitchPhase color:green;
+[07:23:39.981] LOG: [coop:replay] versus host awaiting opponent replacement pick slot=0 seq=90000
+[07:23:39.984] LOG: [coop:relay] AWAIT interactionChoice seq=90000 timeoutMs=60000 expected=[switch] -> network-wait
+[07:23:39.986] LOG: [coop:transport] recv guest t=turnResolution turn=3 events=4 checksum=40bd5dba58b119d7 handlers=4
+[07:23:41.303] LOG: [coop:interaction] interactionCounter() read -> 0 (role=host)
+[07:23:41.303] LOG: [coop:health] tick=0g turn=4 wave=1 counter=0 assertions=0 wait=1318ms peerBeat=- transport=connected
+[07:24:16.294] LOG: [coop:interaction] interactionCounter() read -> 0 (role=host)
+[07:24:16.294] LOG: [coop:health] tick=0g turn=4 wave=1 counter=0 assertions=0 wait=36309ms peerBeat=- transport=connected
+[07:24:39.989] WARN: [coop:relay] AWAIT interactionChoice seq=90000 RESOLVE null (TIMEOUT or supersede) -> watcher leaves
+[07:24:39.990] LOG: [coop:replay] versus opponent replacement pick seq=90000 TIMED OUT -> AI auto-pick
+[07:24:39.992] LOG: %cStart Phase SwitchSummonPhase color:green;
+[07:24:40.234] LOG: Ray
+[07:24:40.351] WARN: cry/19 not found
+[07:24:40.453] LOG: %cStart Phase PostSummonPhase color:green;
+[07:24:40.453] LOG: Ran PSP for: Rattata
+[07:24:40.453] LOG: %cStart Phase PostSummonPhase color:green;
+[07:24:40.454] LOG: %cStart Phase PostSummonPhase color:green;
+[07:24:40.454] LOG: %cStart Phase CoopPushReplacementCheckpointPhase color:green;
+[07:24:40.454] LOG: [coop:checkpoint] build field=2 weather=0/0 terrain=0/0 arenaTags=0 money=0 mons=[bi0:sp567/hp291-291/st0/fnt0 bi2:sp19/hp201-201/st0/fnt0]
+[07:24:40.454] LOG: [coop:checkpoint] host capture field=2 weather=0 terrain=0 money=0 arenaTags=0 mons=[bi0:sp567/hp291-291/st0/fnt0 bi2:sp19/hp201-201/st0/fnt0]
+[07:24:40.454] LOG: [coop:checkpoint] host push OUT-OF-BAND replacement checkpoint (partner-slot auto-summon)
+[07:24:40.456] LOG: [coop:checksum] capture digest=7f28fdb2c6e59a78 field=2 biome=0 seed=SDYIR7wvBBOvI9L33Ld6uEUx weather=0 terrain=0 money=0 party=[567,10742,10667,1021,470,10782] partyLevels=[100,100,100,100,100,100] arenaTags=0 modifiers=7 heldItemsDigest=2 pokeballs=[0:5,1:0,2:0,3:0,4:0] mons=[bi0:sp567/hp291-291/st0/ab290/form0/tera0:5/boss0:0 bi2:sp19/hp201-201/st0/ab55/form0/tera0:0/boss0:0]
+[07:24:40.457] LOG: [coop:checksum] host SEND battleCheckpoint reason=replacement checksum=7f28fdb2c6e59a78 authoritativeState=1
+[07:24:40.457] LOG: [coop:transport] send host t=battleCheckpoint reason=replacement checksum=7f28fdb2c6e59a78
+[07:24:40.457] LOG: %cStart Phase TurnInitPhase color:green;
+[07:24:40.458] LOG: %cStart Phase CommandPhase color:green;
+[07:24:40.463] LOG: [coop:transport] recv guest t=battleCheckpoint reason=replacement checksum=7f28fdb2c6e59a78 handlers=4
+[07:24:51.291] LOG: [coop:interaction] interactionCounter() read -> 0 (role=host)
+[07:24:51.292] LOG: [coop:health] tick=0g turn=4 wave=1 counter=0 assertions=0 wait=-1ms peerBeat=- transport=connected
+[07:25:13.612] LOG: Seed: ilUf1O4vavQehO4wiZkeZFLo
+[07:25:13.612] LOG: Wave Seed: ilUf1O4vavQehO4wiZkeZFLo 0
+[07:25:14.396] WARN: AnimationManager key already exists: prompt
+[07:25:14.396] WARN: AnimationManager key already exists: tera_sparkle
+[07:25:14.398] LOG: Seed: ydfyarLzzLHO2k5nruyfzDh2
+[07:25:14.398] LOG: Wave Seed: ydfyarLzzLHO2k5nruyfzDh2 0
+[07:25:21.233] LOG: %cStart Phase LoginPhase color:green;
+[07:25:21.999] LOG: Client Session: 4BCIOxgjPAhaYv2r0YauP2ePtvMlTLAV
+[07:25:22.453] DEBUG: Using cached system data
+[07:25:22.717] LOG: %cStart Phase TitlePhase color:green;
+[07:25:22.738] LOG: use seasonal splash messages true
+[07:25:26.290] LOG: [coop:interaction] interactionCounter() read -> 0 (role=host)
+[07:25:26.291] LOG: [coop:health] tick=0g turn=- wave=- counter=0 assertions=0 wait=-1ms peerBeat=- transport=connected
+[07:25:26.792] LOG: Getting Session Slot id: %d 0
+[07:25:26.807] LOG: Getting Session Slot id: %d 1
+[07:25:26.818] LOG: Getting Session Slot id: %d 2
+[07:25:26.840] LOG: Getting Session Slot id: %d 3
+[07:25:26.860] LOG: Getting Session Slot id: %d 4
+[07:25:27.231] ERROR: Invalid save data JSON detected! Session not found.
+[07:25:27.232] ERROR: Invalid save data JSON detected! Session not found.
+[07:25:27.233] ERROR: Invalid save data JSON detected! Session not found.
+[07:25:27.234] ERROR: Invalid save data JSON detected! Session not found.
+[07:25:27.235] ERROR: Invalid save data JSON detected! Session not found.
+[07:25:27.808] WARN: Attempted to load save slot of -1 through load game menu!
+[07:25:27.842] LOG: use seasonal splash messages true
