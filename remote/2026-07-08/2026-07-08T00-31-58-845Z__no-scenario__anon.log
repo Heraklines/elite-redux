@@ -1,0 +1,136 @@
+url:      https://elite-redux-staging.pages.dev/
+build:    mrbc9nba-6vh1
+mode:     7  wave:1
+seed:     5RxnqFNGxCTxo6bjexLLFFvT
+party:    Charizard(L100 299hp f1), Annihilape(L100 361hp f0)
+enemy:    Steelix(L100), Kaiosea(L100)
+
+----- CONSOLE -----
+[00:28:57.181] LOG: %c %c %c %c %c Phaser v3.90.0 (WebGL | Web Audio) %c https://phaser.io/v390 background: #ff0000 background: #ffff00 background: #00ff00 background: #00ffff color: #ffffff; background: #000000 background: transparent
+[00:28:58.118] LOG: [ER] build mrbc9nba-6vh1
+[00:28:58.485] LOG: [dev-tools] loaded — 473 scenarios + Send Logs button
+[00:29:23.701] DEBUG: Destroying loading scene
+[00:29:23.701] DEBUG: Destroyed loading scene
+[00:29:23.932] LOG: Seed: 5RxnqFNGxCTxo6bjexLLFFvT
+[00:29:23.933] LOG: Wave Seed: 5RxnqFNGxCTxo6bjexLLFFvT 0
+[00:29:30.587] LOG: %cStart Phase LoginPhase color:green;
+[00:29:30.844] LOG: Client Session: jJ4rdcKoVLNaVK2IErd2yKw143obLZ1F
+[00:29:31.344] LOG: %cStart Phase TitlePhase color:green;
+[00:29:31.346] LOG: Getting Session Slot id: %d 4
+[00:29:31.372] LOG: use seasonal splash messages true
+[00:29:38.604] LOG: [coop:lobby] start announce name=Heraklines1
+[00:29:38.903] LOG: [coop:lobby] announced id=9a9d767b-2c01-4bdb-8a4c-c570c51d41ae -> begin polling
+[00:29:39.170] LOG: [coop:lobby] poll players=0
+[00:29:40.949] LOG: [coop:lobby] poll players=0
+[00:29:42.745] LOG: [coop:lobby] poll: incoming request from=f77282df-67b0-49a7-9a69-16bb143072e8 name=Heraklines1
+[00:29:42.749] LOG: [coop:lobby] poll players=1
+[00:29:43.498] LOG: [coop:lobby] respond accept=true from=f77282df-67b0-49a7-9a69-16bb143072e8 (self=9a9d767b-2c01-4bdb-8a4c-c570c51d41ae)
+[00:29:43.863] LOG: [coop:launch] lobby connect code=BG9UUH role=host name=Heraklines1
+[00:29:43.866] LOG: [coop:launch] connectCoopWithCode code=BG9UUH role=host username=Heraklines1
+[00:29:43.866] LOG: [coop:launch] exchange SDP start code=BG9UUH role=host (ice=fetched)
+[00:29:44.102] LOG: [coop:launch] ICE from worker /coop/ice servers=1
+[00:29:44.461] LOG: [coop:launch] host pushing offer code=BG9UUH (ICE gathered)
+[00:29:44.461] LOG: [coop:launch] pushSignal code=BG9UUH role=host sdpBytes=2101
+[00:29:44.711] LOG: [coop:launch] await peer signal start code=BG9UUH role=host timeout=60000ms
+[00:29:44.870] LOG: [coop:launch] iceConnectionState=checking code=BG9UUH role=host
+[00:29:44.870] LOG: [coop:launch] pcConnectionState=connecting code=BG9UUH role=host
+[00:29:46.206] LOG: [coop:launch] await peer signal resolve code=BG9UUH role=host (779b)
+[00:29:46.206] LOG: [coop:launch] host received answer code=BG9UUH -> setRemoteDescription
+[00:29:46.212] LOG: [coop:launch] await data channel open (state=connecting timeout=30000ms)
+[00:29:46.224] LOG: [coop:launch] iceConnectionState=connected code=BG9UUH role=host
+[00:29:46.240] LOG: [coop:launch] pcConnectionState=connected code=BG9UUH role=host
+[00:29:46.243] LOG: [coop:launch] data channel OPEN
+[00:29:46.244] LOG: [coop:webrtc] ctor role=host readyState=open state=connected
+[00:29:46.244] LOG: [coop:launch] connectCoopSession role=host state=connected username=Heraklines1 netcode=authoritative
+[00:29:46.245] LOG: [coop:stream] streamer CONSTRUCT timeout=1200000ms onMessage registered
+[00:29:46.245] LOG: [coop:stream] guest REGISTER onGhostPool handler (bufferedEarly=false)
+[00:29:46.245] LOG: [coop:stream] host REGISTER onStateSyncRequest handler (was=false)
+[00:29:46.246] LOG: [coop:stream] host REGISTER onEnemyPartyRequest handler (was=false)
+[00:29:46.246] LOG: [coop:stream] guest REGISTER onWaveResolved handler (was=false)
+[00:29:46.246] LOG: [coop:stream] guest REGISTER onWaveEndState handler (was=false)
+[00:29:46.246] LOG: [coop:stream] watcher REGISTER onMeChecksum handler (was=false)
+[00:29:46.246] LOG: [coop:turn] host recorder: REGISTER live emitter (was=false)
+[00:29:46.247] LOG: [coop:session] coopAuthoritativeGuestPredicate INSTALLED
+[00:29:46.247] LOG: [coop:launch] peer session ready role=host netcode=authoritative -> connecting
+[00:29:46.247] LOG: [coop:launch] session connect role=host partnerRole=guest netcode=authoritative username=Heraklines1 version=er-coop-11 tiebreak=0.3244385011487738
+[00:29:46.247] LOG: [coop:webrtc] raw tx role=host t=hello bytes=105
+[00:29:46.295] LOG: [coop:checksum] dataFingerprint compute moveMap=e9b828360aafb9e2(1032) movesData=61fa3383767be347(1107) movesName=fad7fe8932ec09a1(1107) movesets=6eb276198552346d(1908) abilitiesData=3088ac8089021d9e(1047) abilitiesName=7c302bdd9cc50a0b(1047)
+[00:29:46.300] LOG: [coop:webrtc] raw tx role=host t=dataFingerprint bytes=329
+[00:29:46.300] LOG: [coop:launch] lobby connected code=BG9UUH role=host -> onConnected
+[00:29:46.303] LOG: %cStart Phase SelectStarterPhase color:green;
+[00:29:46.304] LOG: [coop:webrtc] raw rx role=host t=hello bytes=106 handlers=13
+[00:29:46.304] LOG: [coop:launch] hello recv partner=Heraklines1 partnerRole=guest (local role=host; no conflict)
+[00:29:46.305] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[00:29:46.305] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[00:29:46.307] LOG: [coop:webrtc] raw rx role=host t=dataFingerprint bytes=329 handlers=13
+[00:29:46.307] LOG: [coop:checksum] MATCH - data tables identical across clients
+[00:29:52.560] LOG: [coop:interaction] interactionCounter() read -> 0 (role=host)
+[00:29:52.560] LOG: [coop:health] tick=0g turn=- wave=- counter=0 assertions=0 wait=-1ms peerBeat=- transport=connected
+[00:29:54.660] WARN: cry/4 not found
+[00:30:03.723] LOG: [coop:webrtc] raw tx role=host t=showdownTeam bytes=692
+[00:30:03.723] LOG: [coop:webrtc] raw tx role=host t=showdownReady bytes=51
+[00:30:26.236] LOG: [coop:interaction] interactionCounter() read -> 0 (role=host)
+[00:30:26.236] LOG: [coop:health] tick=0g turn=- wave=- counter=0 assertions=0 wait=-1ms peerBeat=- transport=connected
+[00:30:48.418] LOG: [coop:webrtc] raw rx role=host t=showdownTeam bytes=749 handlers=13
+[00:30:48.418] LOG: [coop:webrtc] raw rx role=host t=showdownReady bytes=51 handlers=13
+[00:30:48.418] LOG: [coop:rendezvous] ARRIVE point=showdown-ready (send) role=host
+[00:30:48.419] LOG: [coop:webrtc] raw tx role=host t=rendezvous bytes=43
+[00:30:48.419] LOG: [coop:rendezvous] AWAIT point=showdown-ready timeoutMs=600000 -> network-wait role=host
+[00:30:48.419] LOG: [coop:webrtc] raw rx role=host t=rendezvous bytes=43 handlers=13
+[00:30:48.419] LOG: [coop:rendezvous] RECV arrival point=showdown-ready -> deliver-to-waiter role=host
+[00:30:48.419] LOG: [coop:rendezvous] AWAIT point=showdown-ready RESOLVE both-arrived role=host
+[00:30:48.439] LOG: [coop:webrtc] raw tx role=host t=showdownStakeOffer bytes=106
+[00:30:48.460] LOG: [coop:webrtc] raw rx role=host t=showdownStakeOffer bytes=106 handlers=13
+[00:30:49.374] LOG: [coop:webrtc] raw rx role=host t=rendezvous bytes=50 handlers=13
+[00:30:49.374] LOG: [coop:rendezvous] RECV arrival point=showdown-wager-commit -> BUFFER (no waiter yet) role=host
+[00:30:50.884] LOG: [coop:rendezvous] ARRIVE point=showdown-wager-commit (send) role=host
+[00:30:50.884] LOG: [coop:webrtc] raw tx role=host t=rendezvous bytes=50
+[00:30:50.884] LOG: [coop:rendezvous] AWAIT point=showdown-wager-commit -> partner already arrived (buffer-hit) role=host
+[00:30:51.866] WARN: [asset-retry] load error key=PRAS-Dragon Dance BG - retry 1/2 with cache-buster
+[00:30:52.037] WARN: [asset-retry] load error key=PRAS-Dragon Dance BG - retry 2/2 via fastly mirror + cache-buster
+[00:30:53.338] ERROR: [asset-retry] PERMANENT load failure key=PRAS-Dragon Dance BG url=images/battle_anims/PRAS-Dragon Dance BG.png
+[00:30:53.342] LOG: Wave Seed: 6SyorGOHyDUyp7ckfyMMGGwU 1
+[00:30:53.346] LOG: %cStart Phase EncounterPhase color:green;
+[00:30:53.388] LOG: Pokemon: Foe Mega Steelix | Species ID: 208 | Level: 100 | Nature: Hardy (-)
+[00:30:53.388] LOG: Stats (IVs): HP: 291 (31), Atk: 326 (31), Def: 496 (31), Spatk: 146 (31), Spdef: 246 (31), Spd: 76 (31)
+[00:30:53.388] LOG: Ability: Primal Armor | Passive Ability: Lead Coat 
+[00:30:53.388] LOG: Moveset: ["Shore Up","Substitute","Protect","Self-Destruct"]
+[00:30:53.407] LOG: Pokemon: Foe Kaiosea | Species ID: 10026 | Level: 100 | Nature: Adamant (+Atk/-SpAtk)
+[00:30:53.407] LOG: Stats (IVs): HP: 321 (31), Atk: 308 (31), Def: 176 (31), Spatk: 149 (31), Spdef: 256 (31), Spd: 252 (31)
+[00:30:53.407] LOG: Ability: Lightning Rod | Passive Ability: Mighty Horn 
+[00:30:53.407] LOG: Moveset: ["Fishious Rend","Dragon Dance","Supercell Slam","Glacial Lance"]
+[00:30:53.880] WARN: [asset-retry] load error key=PRAS-Dragon Dance BG - retry 1/2 with cache-buster
+[00:30:54.059] WARN: [asset-retry] load error key=PRAS-Dragon Dance BG - retry 2/2 via fastly mirror + cache-buster
+[00:30:54.136] ERROR: [asset-retry] PERMANENT load failure key=PRAS-Dragon Dance BG url=images/battle_anims/PRAS-Dragon Dance BG.png
+[00:30:54.170] LOG: Generated AI funcs
+[00:30:54.171] LOG: [coop:replay] host SEND enemyPartySync wave=1 count=2 meType=-
+[00:30:54.171] LOG: [coop:webrtc] raw tx role=host t=enemyPartySync bytes=607
+[00:30:54.174] LOG: [coop:replay] host SEND launchSnapshot wave=1 sessionLen=9109
+[00:30:54.174] LOG: [coop:webrtc] raw tx role=host t=launchSnapshot bytes=10179
+[00:30:54.178] LOG: Wave Seed: 6SyorGOHyDUyp7ckfyMMGGwU 1
+[00:30:54.381] LOG: Dancer Heraklines1
+[00:30:58.322] LOG: Dancer Heraklines1
+[00:30:58.827] LOG: %cStart Phase SummonPhase color:green;
+[00:30:58.828] LOG: Heraklines1
+[00:30:58.994] WARN: cry/208-mega not found
+[00:30:59.099] LOG: %cStart Phase ShinySparklePhase color:green;
+[00:30:59.203] LOG: %cStart Phase ShinySparklePhase color:green;
+[00:30:59.307] LOG: %cStart Phase SummonPhase color:green;
+[00:30:59.487] WARN: cry/6-mega-x not found
+[00:30:59.591] LOG: %cStart Phase ShinySparklePhase color:green;
+[00:30:59.695] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[00:30:59.696] LOG: %cStart Phase InitEncounterPhase color:green;
+[00:30:59.698] LOG: %cStart Phase PostSummonPhase color:green;
+[00:30:59.698] LOG: Ran PSP for: Mega Charizard X
+[00:30:59.699] LOG: %cStart Phase PostSummonPhase color:green;
+[00:30:59.699] LOG: %cStart Phase PostSummonPhase color:green;
+[00:30:59.700] LOG: %cStart Phase PostSummonPhase color:green;
+[00:30:59.700] LOG: Ran PSP for: Mega Steelix
+[00:30:59.700] LOG: %cStart Phase PostSummonPhase color:green;
+[00:30:59.700] LOG: %cStart Phase PostSummonPhase color:green;
+[00:30:59.700] LOG: %cStart Phase TurnInitPhase color:green;
+[00:30:59.700] LOG: %cStart Phase CommandPhase color:green;
+[00:31:01.223] LOG: [coop:interaction] interactionCounter() read -> 0 (role=host)
+[00:31:01.223] LOG: [coop:health] tick=0g turn=1 wave=1 counter=0 assertions=0 wait=-1ms peerBeat=- transport=connected
+[00:31:31.856] LOG: [coop:interaction] interactionCounter() read -> 0 (role=host)
+[00:31:31.856] LOG: [coop:health] tick=0g turn=1 wave=1 counter=0 assertions=0 wait=-1ms peerBeat=- transport=connected
