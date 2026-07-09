@@ -1,0 +1,263 @@
+url:      https://elite-redux-staging.pages.dev/
+build:    mrc9a598-g33b
+mode:     4  wave:4
+seed:     8c4AxOrU4YVBXb7qdJtCftVg
+party:    Squawkabilly(L5 20hp f0), Whismur Redux(L6 27hp f0), Woobat(L6 13hp f0), Drilbur Redux(L5 23hp f0)
+enemy:    Sunkern(L4), Skwovet(L4), Sentret(L4)
+
+----- COMMENT -----
+There seems to be problems redirecting attacks. For exemple A KOs B, C will then fail attack on B, instead of finding another target
+
+----- CONSOLE -----
+[06:06:22.719] LOG: Applied X Speed 
+[06:06:22.726] LOG: %cStart Phase MessagePhase color:green;
+[06:06:22.975] LOG: %cStart Phase VictoryPhase color:green;
+[06:06:22.980] LOG: %cStart Phase ExpPhase color:green;
+[06:06:23.451] LOG: %cStart Phase ExpPhase color:green;
+[06:06:23.918] LOG: %cStart Phase ExpPhase color:green;
+[06:06:24.585] LOG: %cStart Phase MoveEndPhase color:green;
+[06:06:24.586] LOG: %cStart Phase HideAbilityPhase color:green;
+[06:06:24.685] LOG: %cStart Phase MoveEndPhase color:green;
+[06:06:24.685] LOG: %cStart Phase MovePhase color:green;
+[06:06:24.686] LOG: %cStart Phase MoveEndPhase color:green;
+[06:06:24.686] LOG: %cStart Phase CheckInterludePhase color:green;
+[06:06:24.686] LOG: %cStart Phase WeatherEffectPhase color:green;
+[06:06:24.686] LOG: %cStart Phase PositionalTagPhase color:green;
+[06:06:24.686] LOG: %cStart Phase BerryPhase color:green;
+[06:06:24.687] LOG: Applied X Speed 
+[06:06:24.687] LOG: Applied X Speed 
+[06:06:24.687] LOG: Applied X Speed 
+[06:06:24.687] LOG: Applied X Speed 
+[06:06:24.688] LOG: Applied X Speed 
+[06:06:24.688] LOG: Applied X Speed 
+[06:06:24.688] LOG: Applied X Speed 
+[06:06:24.688] LOG: Applied X Speed 
+[06:06:24.688] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[06:06:24.689] LOG: Applied X Speed 
+[06:06:24.689] LOG: Applied X Speed 
+[06:06:24.689] LOG: Applied X Speed 
+[06:06:24.689] LOG: Applied X Speed 
+[06:06:24.689] LOG: Applied X Speed 
+[06:06:24.689] LOG: Applied X Speed 
+[06:06:24.689] LOG: Applied X Speed 
+[06:06:24.689] LOG: Applied X Speed 
+[06:06:24.689] LOG: %cStart Phase TurnEndPhase color:green;
+[06:06:24.690] LOG: Applied X Speed 
+[06:06:24.690] LOG: Applied X Speed 
+[06:06:24.690] LOG: Applied X Speed 
+[06:06:24.690] LOG: Applied X Speed 
+[06:06:24.690] LOG: Applied X Speed 
+[06:06:24.691] LOG: Applied X Speed 
+[06:06:24.691] LOG: Applied X Speed 
+[06:06:24.691] LOG: Applied X Speed 
+[06:06:24.691] WARN: [coop:turn] host recorder: finalize with NO open recording -> turn=-1 events=0 (caller decides not to emit)
+[06:06:24.692] LOG: %cStart Phase BattleEndPhase color:green;
+[06:06:24.692] LOG: Battle Score: 81 (1 Turns x1)
+[06:06:24.692] LOG: Total Score: 154
+[06:06:24.726] LOG: %cStart Phase EggLapsePhase color:green;
+[06:06:24.726] LOG: %cStart Phase SelectModifierPhase color:green;
+[06:06:24.726] LOG: Wave Seed: ;f7D{RuX7\YE[e:tgMwFiwYj 3
+[06:06:24.730] LOG: Applied X Speed 
+[06:06:24.730] LOG: Applied X Speed 
+[06:06:24.730] LOG: Applied X Speed 
+[06:06:24.730] LOG: Applied X Speed 
+[06:06:24.730] LOG: Applied X Speed 
+[06:06:24.730] LOG: Applied X Speed 
+[06:06:24.731] LOG: Applied X Speed 
+[06:06:24.731] LOG: Applied X Speed 
+[06:06:24.731] LOG: Applied X Speed 
+[06:06:24.731] LOG: Applied X Speed 
+[06:06:24.731] LOG: Applied X Speed 
+[06:06:24.732] LOG: Applied X Speed 
+[06:06:24.732] LOG: Applied X Speed 
+[06:06:24.732] LOG: Applied X Speed 
+[06:06:24.732] LOG: Applied X Speed 
+[06:06:24.732] LOG: Applied X Speed 
+[06:06:24.732] LOG: Applied X Speed 
+[06:06:24.732] LOG: Applied X Speed 
+[06:06:24.733] LOG: Applied X Speed 
+[06:06:24.733] LOG: Applied X Speed 
+[06:06:24.733] LOG: Applied X Speed 
+[06:06:24.733] LOG: Applied X Speed 
+[06:06:24.733] LOG: Applied X Speed 
+[06:06:24.733] LOG: Applied X Speed 
+[06:06:24.734] LOG: Applied X Speed 
+[06:06:24.734] LOG: Applied X Speed 
+[06:06:24.734] LOG: Applied X Speed 
+[06:06:24.734] LOG: Applied X Speed 
+[06:06:24.734] LOG: Applied X Speed 
+[06:06:24.734] LOG: Applied X Speed 
+[06:06:24.735] LOG: Applied X Speed 
+[06:06:24.735] LOG: Applied X Speed 
+[06:06:24.735] LOG: Applied X Speed 
+[06:06:24.735] LOG: Applied X Speed 
+[06:06:24.735] LOG: Applied X Speed 
+[06:06:24.736] LOG: Applied X Speed 
+[06:06:24.736] LOG: Applied X Speed 
+[06:06:24.736] LOG: Applied X Speed 
+[06:06:24.736] LOG: Applied X Speed 
+[06:06:24.736] LOG: Applied X Speed 
+[06:06:24.736] LOG: Applied X Speed 
+[06:06:24.737] LOG: Applied X Speed 
+[06:06:24.737] LOG: Applied X Speed 
+[06:06:24.737] LOG: Applied X Speed 
+[06:06:24.737] LOG: Applied X Speed 
+[06:06:24.737] LOG: Applied X Speed 
+[06:06:24.737] LOG: Applied X Speed 
+[06:06:24.737] LOG: Applied X Speed 
+[06:06:24.737] LOG: Applied X Speed 
+[06:06:24.738] LOG: Applied X Speed 
+[06:06:24.738] LOG: Applied X Speed 
+[06:06:24.738] LOG: Applied X Speed 
+[06:06:24.738] LOG: Applied X Speed 
+[06:06:24.738] LOG: Applied X Speed 
+[06:06:24.738] LOG: Applied X Speed 
+[06:06:24.738] LOG: Applied X Speed 
+[06:06:24.739] LOG: Applied X Speed 
+[06:06:24.739] LOG: Applied X Speed 
+[06:06:24.739] LOG: Applied X Speed 
+[06:06:24.739] LOG: Applied X Speed 
+[06:06:24.739] LOG: Applied X Speed 
+[06:06:24.739] LOG: Applied X Speed 
+[06:06:24.739] LOG: Applied X Speed 
+[06:06:24.740] LOG: Applied X Speed 
+[06:06:24.741] LOG: 13 9 [2,3,4,5,6,7,8,9,10,22]
+[06:06:24.741] LOG: {"id":"NUGGET","localeKey":"modifierType:ModifierType.NUGGET","iconImage":"nugget","group":"money","soundName":"se/buy","tier":1,"moneyMultiplier":1,"moneyMultiplierDescriptorKey":"modifierType:ModifierType.MoneyRewardModifierType.extra.small"} 
+[06:06:24.741] LOG: 7 3 [3,4,5]
+[06:06:24.741] LOG: {"id":"TEMP_STAT_STAGE_BOOSTER","localeKey":"","iconImage":"x_defense","soundName":"se/restore","tier":0,"stat":2,"nameKey":"x_defense","quantityKey":"percentage"} 
+[06:06:24.741] LOG: 16 9 [2,3,4,5,6,7,8,9,10,22]
+[06:06:24.741] LOG: {"id":"ER_UPGRADED_MAP","localeKey":"","iconImage":"map","iconTint":16765514,"soundName":"se/restore","tier":1} 
+[06:06:24.741] LOG: 12 9 [2,3,4,5,6,7,8,9,10,22]
+[06:06:24.741] LOG: {"id":"SUPER_LURE","localeKey":"modifierType:ModifierType.SUPER_LURE","iconImage":"super_lure","group":"lure","soundName":"se/restore","tier":1,"maxBattles":15} 
+[06:06:29.769] LOG: %cStart Phase NewBattlePhase color:green;
+[06:06:29.769] LOG: Wave Seed: <g8E|SvY8]ZF\f;uhNxGjxZk 4
+[06:06:29.771] LOG: %cStart Phase NextEncounterPhase color:green;
+[06:06:29.776] LOG: Starting species pool tier: COMMON
+[06:06:29.833] LOG: Pokemon: Wild Sunkern | Species ID: 191 | Level: 4 | Nature: Sassy (+SpDef/-Spd)
+[06:06:29.833] LOG: Stats (IVs): HP: 18 (1), Atk: 10 (25), Def: 9 (8), Spatk: 10 (31), Spdef: 11 (29), Spd: 6 (10)
+[06:06:29.833] LOG: Ability: Grassy Surge | Passive Ability: Guilt Trip 
+[06:06:29.833] LOG: Moveset: ["Mega Drain","Growth","Encore","Flower Shield"]
+[06:06:29.833] LOG: Starting species pool tier: COMMON
+[06:06:29.874] LOG: Pokemon: Wild Skwovet | Species ID: 819 | Level: 4 | Nature: Naughty (+Atk/-SpDef)
+[06:06:29.874] LOG: Stats (IVs): HP: 19 (9), Atk: 10 (6), Def: 10 (25), Spatk: 8 (27), Spdef: 7 (9), Spd: 7 (11)
+[06:06:29.874] LOG: Ability: Cheap Tactics | Passive Ability: Gluttony 
+[06:06:29.874] LOG: Moveset: ["Tackle","Defense Curl","Berry Smash","Stockpile"]
+[06:06:29.874] LOG: Starting species pool tier: COMMON
+[06:06:29.916] LOG: Pokemon: Wild Sentret | Species ID: 161 | Level: 4 | Nature: Quirky (-)
+[06:06:29.916] LOG: Stats (IVs): HP: 17 (17), Atk: 9 (7), Def: 8 (28), Spatk: 8 (27), Spdef: 10 (27), Spd: 10 (7)
+[06:06:29.916] LOG: Ability: Sap Sipper | Passive Ability: Frisk 
+[06:06:29.916] LOG: Moveset: ["Scratch","Fury Swipes","Defense Curl"]
+[06:06:30.497] DEBUG: Session data saved to slot 0!
+[06:06:30.498] LOG: Wave Seed: <g8E|SvY8]ZF\f;uhNxGjxZk 4
+[06:06:31.185] WARN: cry/191 not found
+[06:06:31.185] WARN: cry/819 not found
+[06:06:31.185] WARN: cry/161 not found
+[06:06:31.987] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[06:06:31.988] LOG: %cStart Phase CheckSwitchPhase color:green;
+[06:06:31.988] LOG: %cStart Phase CheckSwitchPhase color:green;
+[06:06:31.988] LOG: %cStart Phase CheckSwitchPhase color:green;
+[06:06:31.988] LOG: %cStart Phase InitEncounterPhase color:green;
+[06:06:31.990] LOG: %cStart Phase PostSummonPhase color:green;
+[06:06:31.991] LOG: Ran PSP for: Sentret
+[06:06:31.993] LOG: %cStart Phase PostSummonPhase color:green;
+[06:06:31.994] LOG: %cStart Phase PostSummonPhase color:green;
+[06:06:31.995] LOG: Applied X Speed 
+[06:06:31.995] LOG: Applied X Speed 
+[06:06:31.996] LOG: Applied X Speed 
+[06:06:31.996] LOG: Applied X Speed 
+[06:06:31.996] LOG: Applied X Speed 
+[06:06:31.996] LOG: Applied X Speed 
+[06:06:31.997] LOG: Applied X Speed 
+[06:06:31.997] LOG: Applied X Speed 
+[06:06:31.998] LOG: Applied X Speed 
+[06:06:31.998] LOG: Applied X Speed 
+[06:06:31.998] LOG: Applied X Speed 
+[06:06:31.998] LOG: Applied X Speed 
+[06:06:31.998] LOG: Applied X Speed 
+[06:06:31.999] LOG: Applied X Speed 
+[06:06:31.999] LOG: Applied X Speed 
+[06:06:31.999] LOG: Applied X Speed 
+[06:06:31.999] LOG: Applied X Speed 
+[06:06:32.000] LOG: Applied X Speed 
+[06:06:32.000] LOG: Applied X Speed 
+[06:06:32.000] LOG: Applied X Speed 
+[06:06:32.000] LOG: Applied X Speed 
+[06:06:32.001] LOG: Applied X Speed 
+[06:06:32.001] LOG: Applied X Speed 
+[06:06:32.001] LOG: Applied X Speed 
+[06:06:32.001] LOG: Applied X Speed 
+[06:06:32.002] LOG: Applied X Speed 
+[06:06:32.002] LOG: Applied X Speed 
+[06:06:32.002] LOG: Applied X Speed 
+[06:06:32.002] LOG: Applied X Speed 
+[06:06:32.002] LOG: Applied X Speed 
+[06:06:32.003] LOG: Applied X Speed 
+[06:06:32.003] LOG: Applied X Speed 
+[06:06:32.003] LOG: %cStart Phase ShowAbilityPhase color:green;
+[06:06:32.552] LOG: %cStart Phase HideAbilityPhase color:green;
+[06:06:32.652] LOG: %cStart Phase PostSummonPhase color:green;
+[06:06:32.652] LOG: Ran PSP for: Skwovet
+[06:06:32.654] LOG: %cStart Phase PostSummonPhase color:green;
+[06:06:32.654] LOG: %cStart Phase MovePhase color:green;
+[06:06:32.654] LOG: %cUser: Skwovet
+Move: SCRATCH
+Use Mode: INDIRECT color:orchid
+[06:06:32.655] LOG: Applied X Speed 
+[06:06:32.655] LOG: Applied X Speed 
+[06:06:32.656] LOG: Applied X Speed 
+[06:06:32.656] LOG: Applied X Speed 
+[06:06:32.656] LOG: Applied X Speed 
+[06:06:32.657] LOG: Applied X Speed 
+[06:06:32.657] LOG: Applied X Speed 
+[06:06:32.657] LOG: Applied X Speed 
+[06:06:32.658] LOG: Applied X Speed 
+[06:06:32.658] LOG: Applied X Speed 
+[06:06:32.658] LOG: Applied X Speed 
+[06:06:32.658] LOG: Applied X Speed 
+[06:06:32.659] LOG: Applied X Speed 
+[06:06:32.659] LOG: Applied X Speed 
+[06:06:32.660] LOG: Applied X Speed 
+[06:06:32.660] LOG: Applied X Speed 
+[06:06:32.660] LOG: Applied X Speed 
+[06:06:32.661] LOG: Applied X Speed 
+[06:06:32.661] LOG: Applied X Speed 
+[06:06:32.662] LOG: Applied X Speed 
+[06:06:32.662] LOG: Applied X Speed 
+[06:06:32.663] LOG: Applied X Speed 
+[06:06:32.664] LOG: %cStart Phase MessagePhase color:green;
+[06:06:33.081] LOG: %cStart Phase MoveEffectPhase color:green;
+[06:06:33.084] LOG: Battle Seed: 0nV5YdhoJcbmMuoP
+[06:06:33.449] LOG: crit stage: +0
+[06:06:33.451] LOG: Move: Scratch | Base damage: 4.057142857142857 | Power: 40 | Source attack: 10 | Target defense: 14
+[06:06:33.451] LOG: Move: Scratch | Attack damage: 5
+[06:06:33.452] LOG: %cStart Phase DamageAnimPhase color:green;
+[06:06:33.523] LOG: %cStart Phase MoveEndPhase color:green;
+[06:06:33.523] LOG: %cStart Phase PostSummonPhase color:green;
+[06:06:33.523] LOG: %cStart Phase PostSummonPhase color:green;
+[06:06:33.523] LOG: Ran PSP for: Sunkern
+[06:06:33.525] LOG: %cStart Phase PostSummonPhase color:green;
+[06:06:33.531] LOG: Applied X Speed 
+[06:06:33.532] LOG: Applied X Speed 
+[06:06:33.532] LOG: Applied X Speed 
+[06:06:33.532] LOG: Applied X Speed 
+[06:06:33.532] LOG: Applied X Speed 
+[06:06:33.533] LOG: Applied X Speed 
+[06:06:33.533] LOG: Applied X Speed 
+[06:06:33.534] LOG: Applied X Speed 
+[06:06:33.534] LOG: Applied X Speed 
+[06:06:33.534] LOG: Applied X Speed 
+[06:06:33.534] LOG: Applied X Speed 
+[06:06:33.535] LOG: Applied X Speed 
+[06:06:33.535] LOG: Applied X Speed 
+[06:06:33.536] LOG: Applied X Speed 
+[06:06:33.536] LOG: Applied X Speed 
+[06:06:33.536] LOG: Applied X Speed 
+[06:06:33.536] LOG: Applied X Speed 
+[06:06:33.537] LOG: Applied X Speed 
+[06:06:33.538] LOG: Applied X Speed 
+[06:06:33.538] LOG: Applied X Speed 
+[06:06:33.538] LOG: Applied X Speed 
+[06:06:33.539] LOG: Applied X Speed 
+[06:06:33.540] LOG: %cStart Phase ShowAbilityPhase color:green;
+[06:06:34.052] LOG: %cStart Phase CommonAnimPhase color:green;
+[06:06:35.748] LOG: %cStart Phase MessagePhase color:green;
