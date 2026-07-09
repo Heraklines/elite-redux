@@ -1,0 +1,126 @@
+url:      https://elite-redux-staging.pages.dev/
+build:    mrc9a598-g33b
+mode:     6  wave:?
+seed:     vElZtVvTpo91M1wUB3UfR6S1
+party:    
+enemy:    
+
+----- COMMENT -----
+done selecting pokemons but partner got kicked with no players showing on his part
+
+----- CONSOLE -----
+[15:19:50.809] LOG: %c %c %c %c %c Phaser v3.90.0 (WebGL | Web Audio) %c https://phaser.io/v390 background: #ff0000 background: #ffff00 background: #00ff00 background: #00ffff color: #ffffff; background: #000000 background: transparent
+[15:19:51.287] LOG: [ER] build mrc9a598-g33b
+[15:19:51.376] LOG: [dev-tools] loaded — 476 scenarios + Send Logs button
+[15:19:56.034] DEBUG: Destroying loading scene
+[15:19:56.034] DEBUG: Destroyed loading scene
+[15:19:56.079] LOG: Seed: vElZtVvTpo91M1wUB3UfR6S1
+[15:19:56.079] LOG: Wave Seed: vElZtVvTpo91M1wUB3UfR6S1 0
+[15:19:57.564] LOG: %cStart Phase LoginPhase color:green;
+[15:19:57.725] LOG: Client Session: pjJHT2mO80aOZmjVoRm4T7KkGovSgCpa
+[15:19:57.932] DEBUG: Using cached system data
+[15:19:58.007] LOG: %cStart Phase TitlePhase color:green;
+[15:19:58.007] LOG: Getting Session Slot id: %d 1
+[15:19:58.018] LOG: use seasonal splash messages true
+[15:20:01.618] LOG: [coop:lobby] start announce name=sosos2001
+[15:20:01.957] LOG: [coop:lobby] announced id=e553cc64-be8b-41d7-943b-50553cef9d9d -> begin polling
+[15:20:02.318] LOG: [coop:lobby] poll players=0
+[15:20:04.167] LOG: [coop:lobby] poll players=0
+[15:20:06.021] LOG: [coop:lobby] poll players=1
+[15:20:07.322] LOG: [coop:lobby] request target=51bd3dba-dc43-4626-824c-a04747e071ea (self=e553cc64-be8b-41d7-943b-50553cef9d9d)
+[15:20:07.934] LOG: [coop:lobby] poll: incoming request from=51bd3dba-dc43-4626-824c-a04747e071ea name=moon
+[15:20:07.935] LOG: [coop:lobby] poll players=1
+[15:20:08.324] LOG: [coop:lobby] poll players=1
+[15:20:08.733] LOG: [coop:lobby] respond accept=true from=51bd3dba-dc43-4626-824c-a04747e071ea (self=e553cc64-be8b-41d7-943b-50553cef9d9d)
+[15:20:09.234] LOG: [coop:launch] lobby connect code=NPQJYX role=host name=sosos2001
+[15:20:09.234] LOG: [coop:launch] connectCoopWithCode code=NPQJYX role=host username=sosos2001
+[15:20:09.234] LOG: [coop:launch] exchange SDP start code=NPQJYX role=host (ice=fetched)
+[15:20:09.508] LOG: [coop:launch] ICE from worker /coop/ice servers=1
+[15:20:09.667] LOG: [coop:launch] host pushing offer code=NPQJYX (ICE gathered)
+[15:20:09.667] LOG: [coop:launch] pushSignal code=NPQJYX role=host sdpBytes=1975
+[15:20:09.943] LOG: [coop:launch] await peer signal start code=NPQJYX role=host timeout=60000ms
+[15:20:16.639] LOG: [coop:launch] await peer signal resolve code=NPQJYX role=host (1437b)
+[15:20:16.639] LOG: [coop:launch] host received answer code=NPQJYX -> setRemoteDescription
+[15:20:16.644] LOG: [coop:launch] iceConnectionState=checking code=NPQJYX role=host
+[15:20:16.646] LOG: [coop:launch] await data channel open (state=connecting timeout=30000ms)
+[15:20:16.646] LOG: [coop:launch] pcConnectionState=connecting code=NPQJYX role=host
+[15:20:16.777] LOG: [coop:launch] iceConnectionState=connected code=NPQJYX role=host
+[15:20:16.992] LOG: [coop:launch] pcConnectionState=connected code=NPQJYX role=host
+[15:20:17.129] LOG: [coop:launch] data channel OPEN
+[15:20:17.130] LOG: [coop:webrtc] ctor role=host readyState=open state=connected
+[15:20:17.130] LOG: [coop:launch] connectCoopSession role=host state=connected username=sosos2001 netcode=authoritative
+[15:20:17.130] LOG: [coop:stream] streamer CONSTRUCT timeout=1200000ms onMessage registered
+[15:20:17.130] LOG: [coop:stream] guest REGISTER onGhostPool handler (bufferedEarly=false)
+[15:20:17.131] LOG: [coop:stream] host REGISTER onStateSyncRequest handler (was=false)
+[15:20:17.131] LOG: [coop:stream] host REGISTER onEnemyPartyRequest handler (was=false)
+[15:20:17.131] LOG: [coop:stream] guest REGISTER onWaveResolved handler (was=false)
+[15:20:17.131] LOG: [coop:stream] guest REGISTER onWaveEndState handler (was=false)
+[15:20:17.131] LOG: [coop:stream] watcher REGISTER onMeChecksum handler (was=false)
+[15:20:17.131] LOG: [coop:turn] host recorder: REGISTER live emitter (was=false)
+[15:20:17.131] LOG: [coop:session] coopAuthoritativeGuestPredicate INSTALLED
+[15:20:17.131] LOG: [coop:launch] peer session ready role=host netcode=authoritative -> connecting
+[15:20:17.131] LOG: [coop:launch] session connect role=host partnerRole=guest netcode=authoritative username=sosos2001 version=er-coop-11 tiebreak=0.9943551168908601
+[15:20:17.131] LOG: [coop:webrtc] raw tx role=host t=hello bytes=103
+[15:20:17.159] LOG: [coop:checksum] dataFingerprint compute moveMap=e9b828360aafb9e2(1032) movesData=61fa3383767be347(1107) movesName=fad7fe8932ec09a1(1107) movesets=6eb276198552346d(1908) abilitiesData=3088ac8089021d9e(1047) abilitiesName=7c302bdd9cc50a0b(1047)
+[15:20:17.159] LOG: [coop:webrtc] raw tx role=host t=dataFingerprint bytes=329
+[15:20:17.159] LOG: [coop:launch] lobby connected code=NPQJYX role=host -> onConnected
+[15:20:17.160] LOG: [coop:launch] SEND resumeStartNew (#810 barrier release)
+[15:20:17.160] LOG: [coop:webrtc] raw tx role=host t=resumeStartNew bytes=22
+[15:20:17.277] LOG: [coop:webrtc] raw rx role=host t=hello bytes=99 handlers=11
+[15:20:17.277] LOG: [coop:launch] hello recv partner=moon partnerRole=guest (local role=host; no conflict)
+[15:20:17.277] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[15:20:17.277] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[15:20:17.303] LOG: [coop:webrtc] raw rx role=host t=dataFingerprint bytes=329 handlers=11
+[15:20:17.303] LOG: [coop:checksum] MATCH - data tables identical across clients
+[15:20:17.935] LOG: [coop-launch] title challenge-gate: role=host isCoopGuest=false -> SelectChallengePhase
+[15:20:17.935] LOG: %cStart Phase SelectChallengePhase color:green;
+[15:20:22.134] LOG: [coop:interaction] interactionCounter() read -> 0 (role=host)
+[15:20:22.134] LOG: [coop:health] tick=0g turn=- wave=- counter=0 assertions=0 wait=-1ms peerBeat=- transport=connected
+[15:20:31.789] LOG: %cStart Phase SelectStarterPhase color:green;
+[15:20:31.789] LOG: [coop-launch] startCoopSelect role=host partnerConnected=true partnerReady=false
+[15:20:31.867] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[15:20:31.867] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[15:20:46.935] LOG: %cSaving starter preferences color: blue
+[15:20:47.357] LOG: %cSaving starter preferences color: blue
+[15:20:47.730] LOG: %cSaving starter preferences color: blue
+[15:20:48.080] LOG: %cSaving starter preferences color: blue
+[15:20:48.569] LOG: %cSaving starter preferences color: blue
+[15:20:48.891] LOG: %cSaving starter preferences color: blue
+[15:20:51.495] WARN: cry/179 not found
+[15:20:55.497] LOG: %cSaving starter preferences color: blue
+[15:20:57.132] LOG: [coop:interaction] interactionCounter() read -> 0 (role=host)
+[15:20:57.132] LOG: [coop:health] tick=0g turn=- wave=- counter=0 assertions=0 wait=-1ms peerBeat=- transport=connected
+[15:20:57.845] WARN: cry/179 not found
+[15:21:09.889] WARN: cry/258 not found
+[15:21:14.673] LOG: [coop-runconfig] startRun role=host willBroadcast=true difficulty=youngster
+[15:21:14.673] LOG: [coop:runtime] host broadcast difficulty=youngster netcode=authoritative kind=coop (role=host)
+[15:21:14.673] LOG: [coop:webrtc] raw tx role=host t=runConfig bytes=589
+[15:21:14.673] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[15:21:14.673] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[15:21:14.673] LOG: [coop-launch] proceedIfReady launched=false localTeam=0 bothReady=false role=host partnerReady=false
+[15:21:14.673] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[15:21:14.673] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[15:21:14.674] LOG: [coop-launch] local team locked in: 2 mons, role=host
+[15:21:14.674] LOG: [coop:session] roster carry shinyLab speciesId=179 -> none
+[15:21:14.674] LOG: [coop:session] roster carry shinyLab speciesId=258 -> none
+[15:21:14.674] LOG: [coop:roster] add ACCEPT role=host speciesId=179 cost=2 hasStarter=true -> count=1 spent=2 remaining=3
+[15:21:14.674] LOG: [coop:roster] add ACCEPT role=host speciesId=258 cost=3 hasStarter=true -> count=2 spent=5 remaining=0
+[15:21:14.674] LOG: [coop:roster] replace role=host requested=2 accepted=2 spent=5 species=[179,258]
+[15:21:14.674] LOG: [coop:roster] rosterSync SEND role=host entries=2 ready=false spent=5 species=[179,258]
+[15:21:14.674] LOG: [coop:webrtc] raw tx role=host t=rosterSync bytes=655
+[15:21:14.674] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[15:21:14.674] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[15:21:14.674] LOG: [coop-launch] proceedIfReady launched=false localTeam=2 bothReady=false role=host partnerReady=false
+[15:21:14.674] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[15:21:14.674] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[15:21:14.674] LOG: [coop:roster] setLocalReady role=host localReady=true localCount=2 partnerReady=false -> bothReady=false
+[15:21:14.674] LOG: [coop:roster] rosterSync SEND role=host entries=2 ready=true spent=5 species=[179,258]
+[15:21:14.674] LOG: [coop:webrtc] raw tx role=host t=rosterSync bytes=654
+[15:21:14.674] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[15:21:14.674] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[15:21:14.674] LOG: [coop-launch] proceedIfReady launched=false localTeam=2 bothReady=false role=host partnerReady=false
+[15:21:14.674] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[15:21:14.674] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[15:21:14.674] LOG: [coop-launch] local ready, partner NOT ready -> waiting screen
+[15:21:27.134] LOG: [coop:interaction] interactionCounter() read -> 0 (role=host)
+[15:21:27.134] LOG: [coop:health] tick=0g turn=- wave=- counter=0 assertions=0 wait=-1ms peerBeat=- transport=connected
