@@ -1,0 +1,262 @@
+url:      https://elite-redux-staging.pages.dev/
+build:    mrc9a598-g33b
+mode:     7  wave:1
+seed:     Edsoxe0sDzuhWKvtwctDlF1L
+party:    Garchomp(L100 342hp f1), Pelipper(L100 255hp f0), Dialga(L100 322hp f0), Dracovish(L100 312hp f0), Sandy Shocks(L100 299hp f0), Zapdos(L100 292hp f0)
+enemy:    Turtwig(L100), Pichu(L100), Lugia(L100), Delphox(L100), Nymble(L100), Mesprit Redux(L100)
+
+----- COMMENT -----
+in showdown mega garchomp does not have mega in its name nor his sprite
+
+----- CONSOLE -----
+[15:55:29.810] LOG: use seasonal splash messages true
+[15:55:33.395] LOG: [coop:lobby] start announce name=sosos2001
+[15:55:33.798] LOG: [coop:lobby] announced id=f349485e-294f-46ae-8c87-390dab2ca596 -> begin polling
+[15:55:34.167] LOG: [coop:lobby] poll players=0
+[15:55:36.020] LOG: [coop:lobby] poll players=0
+[15:55:37.861] LOG: [coop:lobby] poll players=0
+[15:55:39.710] LOG: [coop:lobby] poll players=0
+[15:55:41.589] LOG: [coop:lobby] poll players=0
+[15:55:43.415] LOG: [coop:lobby] poll players=0
+[15:55:45.276] LOG: [coop:lobby] poll players=0
+[15:55:47.133] LOG: [coop:lobby] poll players=0
+[15:55:48.983] LOG: [coop:lobby] poll players=0
+[15:55:50.847] LOG: [coop:lobby] poll players=0
+[15:55:52.693] LOG: [coop:lobby] poll players=0
+[15:55:54.544] LOG: [coop:lobby] poll players=0
+[15:55:56.400] LOG: [coop:lobby] poll players=0
+[15:55:58.278] LOG: [coop:lobby] poll players=0
+[15:56:00.162] LOG: [coop:lobby] poll players=0
+[15:56:02.051] LOG: [coop:lobby] poll players=0
+[15:56:03.942] LOG: [coop:lobby] poll players=0
+[15:56:05.816] LOG: [coop:lobby] poll players=0
+[15:56:07.692] LOG: [coop:lobby] poll players=0
+[15:56:09.539] LOG: [coop:lobby] poll players=0
+[15:56:11.388] LOG: [coop:lobby] poll players=0
+[15:56:13.257] LOG: [coop:lobby] poll players=0
+[15:56:15.106] LOG: [coop:lobby] poll players=0
+[15:56:16.941] LOG: [coop:lobby] poll players=0
+[15:56:18.770] LOG: [coop:lobby] poll players=0
+[15:56:20.621] LOG: [coop:lobby] poll players=0
+[15:56:22.482] LOG: [coop:lobby] poll players=0
+[15:56:24.325] LOG: [coop:lobby] poll players=0
+[15:56:26.166] LOG: [coop:lobby] poll players=0
+[15:56:28.027] LOG: [coop:lobby] poll players=0
+[15:56:29.755] LOG: [coop:lobby] cancel (id=f349485e-294f-46ae-8c87-390dab2ca596 connecting=false)
+[15:56:29.755] LOG: %cStart Phase TitlePhase color:green;
+[15:56:29.755] LOG: Getting Session Slot id: %d 1
+[15:56:29.766] LOG: use seasonal splash messages true
+[15:56:33.452] LOG: [coop:lobby] start announce name=sosos2001
+[15:56:33.762] LOG: [coop:lobby] announced id=7354e27f-623f-4e37-acbf-33825bab5fc8 -> begin polling
+[15:56:34.096] LOG: [coop:lobby] poll players=0
+[15:56:35.934] LOG: [coop:lobby] poll players=0
+[15:56:37.827] LOG: [coop:lobby] poll players=0
+[15:56:39.689] LOG: [coop:lobby] poll players=0
+[15:56:41.556] LOG: [coop:lobby] poll players=0
+[15:56:43.417] LOG: [coop:lobby] poll players=0
+[15:56:43.932] LOG: [coop:lobby] cancel (id=7354e27f-623f-4e37-acbf-33825bab5fc8 connecting=false)
+[15:56:43.932] LOG: %cStart Phase TitlePhase color:green;
+[15:56:43.933] LOG: Getting Session Slot id: %d 1
+[15:56:43.940] LOG: use seasonal splash messages true
+[15:56:45.685] LOG: [coop:lobby] start announce name=sosos2001
+[15:56:46.035] LOG: [coop:lobby] announced id=3d946325-7965-4b82-96be-276680b6058c -> begin polling
+[15:56:46.413] LOG: [coop:lobby] poll players=0
+[15:56:47.621] LOG: [coop:lobby] cancel (id=3d946325-7965-4b82-96be-276680b6058c connecting=false)
+[15:56:47.622] LOG: [coop:launch] startLocalCoopSession username=sosos2001 netcode=authoritative kind=versus
+[15:56:47.622] LOG: [coop:transport] state host connecting -> connected
+[15:56:47.622] LOG: [coop:transport] state guest connecting -> connected
+[15:56:47.622] LOG: [coop:stream] streamer CONSTRUCT timeout=1200000ms onMessage registered
+[15:56:47.622] LOG: [coop:stream] guest REGISTER onGhostPool handler (bufferedEarly=false)
+[15:56:47.622] LOG: [coop:stream] host REGISTER onStateSyncRequest handler (was=false)
+[15:56:47.622] LOG: [coop:stream] host REGISTER onEnemyPartyRequest handler (was=false)
+[15:56:47.622] LOG: [coop:stream] guest REGISTER onWaveResolved handler (was=false)
+[15:56:47.622] LOG: [coop:stream] guest REGISTER onWaveEndState handler (was=false)
+[15:56:47.622] LOG: [coop:stream] watcher REGISTER onMeChecksum handler (was=false)
+[15:56:47.622] LOG: [coop:turn] host recorder: REGISTER live emitter (was=false)
+[15:56:47.623] LOG: [coop:session] coopAuthoritativeGuestPredicate INSTALLED
+[15:56:47.623] LOG: [coop:launch] local session ready role=host netcode=authoritative -> connecting
+[15:56:47.623] LOG: [coop:launch] session connect role=host partnerRole=guest netcode=authoritative username=sosos2001 version=er-coop-11 tiebreak=0.27878869448933585
+[15:56:47.623] LOG: [coop:transport] send host t=hello role=host v=er-coop-11 tiebreak=0.27878869448933585
+[15:56:47.655] LOG: [coop:checksum] dataFingerprint compute moveMap=e9b828360aafb9e2(1032) movesData=61fa3383767be347(1107) movesName=fad7fe8932ec09a1(1107) movesets=6eb276198552346d(1908) abilitiesData=3088ac8089021d9e(1047) abilitiesName=7c302bdd9cc50a0b(1047)
+[15:56:47.655] LOG: [coop:transport] send host t=dataFingerprint fp
+[15:56:47.656] LOG: %cStart Phase SelectStarterPhase color:green;
+[15:56:47.657] LOG: [coop:transport] recv guest t=hello role=host v=er-coop-11 tiebreak=0.27878869448933585 handlers=5
+[15:56:47.657] LOG: [coop:transport] recv guest t=dataFingerprint fp handlers=5
+[15:56:49.599] LOG: %cStart Phase TitlePhase color:green;
+[15:56:49.600] LOG: Getting Session Slot id: %d 1
+[15:56:49.609] LOG: use seasonal splash messages true
+[15:56:51.763] LOG: [coop:lobby] start announce name=sosos2001
+[15:56:52.098] LOG: [coop:lobby] announced id=ea5fe116-deb0-4288-8fe4-d1d294059883 -> begin polling
+[15:56:52.436] LOG: [coop:lobby] poll players=0
+[15:56:52.626] LOG: [coop:interaction] interactionCounter() read -> 0 (role=host)
+[15:56:52.626] LOG: [coop:health] tick=0g turn=- wave=- counter=0 assertions=0 wait=-1ms peerBeat=- transport=connected
+[15:56:54.293] LOG: [coop:lobby] poll players=0
+[15:56:56.166] LOG: [coop:lobby] poll players=0
+[15:56:58.043] LOG: [coop:lobby] poll players=0
+[15:56:59.903] LOG: [coop:lobby] poll players=0
+[15:57:01.806] LOG: [coop:lobby] poll players=0
+[15:57:03.682] LOG: [coop:lobby] poll players=1
+[15:57:05.690] LOG: [coop:lobby] poll: incoming request from=248c505c-c902-4f0f-a96e-476ff559b0ff name=moon
+[15:57:05.691] LOG: [coop:lobby] poll players=1
+[15:57:07.597] LOG: [coop:lobby] poll players=1
+[15:57:09.534] LOG: [coop:lobby] poll players=1
+[15:57:11.468] LOG: [coop:lobby] poll players=1
+[15:57:13.366] LOG: [coop:lobby] poll players=1
+[15:57:15.272] LOG: [coop:lobby] poll players=1
+[15:57:17.190] LOG: [coop:lobby] poll players=1
+[15:57:19.094] LOG: [coop:lobby] poll players=1
+[15:57:20.979] LOG: [coop:lobby] poll players=1
+[15:57:21.043] LOG: [coop:lobby] respond accept=true from=248c505c-c902-4f0f-a96e-476ff559b0ff (self=ea5fe116-deb0-4288-8fe4-d1d294059883)
+[15:57:21.557] LOG: [coop:launch] lobby connect code=XRUQ9Y role=host name=sosos2001
+[15:57:21.558] LOG: [coop:launch] connectCoopWithCode code=XRUQ9Y role=host username=sosos2001
+[15:57:21.558] LOG: [coop:launch] exchange SDP start code=XRUQ9Y role=host (ice=fetched)
+[15:57:21.889] LOG: [coop:launch] ICE from worker /coop/ice servers=1
+[15:57:22.038] LOG: [coop:launch] host pushing offer code=XRUQ9Y (ICE gathered)
+[15:57:22.038] LOG: [coop:launch] pushSignal code=XRUQ9Y role=host sdpBytes=1974
+[15:57:22.323] LOG: [coop:launch] await peer signal start code=XRUQ9Y role=host timeout=60000ms
+[15:57:26.508] LOG: [coop:launch] await peer signal resolve code=XRUQ9Y role=host (1439b)
+[15:57:26.508] LOG: [coop:launch] host received answer code=XRUQ9Y -> setRemoteDescription
+[15:57:26.509] LOG: [coop:launch] iceConnectionState=checking code=XRUQ9Y role=host
+[15:57:26.511] LOG: [coop:launch] await data channel open (state=connecting timeout=30000ms)
+[15:57:26.511] LOG: [coop:launch] pcConnectionState=connecting code=XRUQ9Y role=host
+[15:57:26.664] LOG: [coop:launch] iceConnectionState=connected code=XRUQ9Y role=host
+[15:57:26.861] LOG: [coop:launch] pcConnectionState=connected code=XRUQ9Y role=host
+[15:57:26.991] LOG: [coop:launch] data channel OPEN
+[15:57:26.992] LOG: [coop:webrtc] ctor role=host readyState=open state=connected
+[15:57:26.992] LOG: [coop:launch] connectCoopSession role=host state=connected username=sosos2001 netcode=authoritative
+[15:57:26.992] LOG: [coop:launch] clearCoopRuntime role=host netcode=authoritative gen->1
+[15:57:26.992] LOG: [coop:stream] streamer DISPOSE: cancel pending(turns=0 enemyParty=0 meBattle=0 stateSync=0) + null-out all handlers
+[15:57:26.992] LOG: [coop:relay] dispose() (no in-flight waiters)
+[15:57:26.992] LOG: [coop:pump] end session {"wasOwner":false,"seq":-1,"termSeq":-1}
+[15:57:26.992] LOG: [coop:transport] state host connected -> closed
+[15:57:26.992] LOG: [coop:transport] state guest connected -> disconnected
+[15:57:26.992] LOG: [coop:turn] host recorder: CLEAR (null-out) live emitter (was=true)
+[15:57:26.992] LOG: [coop:session] coopAuthoritativeGuestPredicate CLEARED (-> solo/host/lockstep reads false)
+[15:57:26.992] LOG: [coop:stream] streamer CONSTRUCT timeout=1200000ms onMessage registered
+[15:57:26.992] LOG: [coop:stream] guest REGISTER onGhostPool handler (bufferedEarly=false)
+[15:57:26.992] LOG: [coop:stream] host REGISTER onStateSyncRequest handler (was=false)
+[15:57:26.992] LOG: [coop:stream] host REGISTER onEnemyPartyRequest handler (was=false)
+[15:57:26.992] LOG: [coop:stream] guest REGISTER onWaveResolved handler (was=false)
+[15:57:26.992] LOG: [coop:stream] guest REGISTER onWaveEndState handler (was=false)
+[15:57:26.992] LOG: [coop:stream] watcher REGISTER onMeChecksum handler (was=false)
+[15:57:26.992] LOG: [coop:turn] host recorder: REGISTER live emitter (was=false)
+[15:57:26.992] LOG: [coop:session] coopAuthoritativeGuestPredicate INSTALLED
+[15:57:26.992] LOG: [coop:launch] peer session ready role=host netcode=authoritative -> connecting
+[15:57:26.992] LOG: [coop:launch] session connect role=host partnerRole=guest netcode=authoritative username=sosos2001 version=er-coop-11 tiebreak=0.6870136327601454
+[15:57:26.992] LOG: [coop:webrtc] raw tx role=host t=hello bytes=103
+[15:57:27.018] LOG: [coop:checksum] dataFingerprint compute moveMap=e9b828360aafb9e2(1032) movesData=61fa3383767be347(1107) movesName=fad7fe8932ec09a1(1107) movesets=6eb276198552346d(1908) abilitiesData=3088ac8089021d9e(1047) abilitiesName=7c302bdd9cc50a0b(1047)
+[15:57:27.018] LOG: [coop:webrtc] raw tx role=host t=dataFingerprint bytes=329
+[15:57:27.018] LOG: [coop:launch] lobby connected code=XRUQ9Y role=host -> onConnected
+[15:57:27.020] LOG: %cStart Phase SelectStarterPhase color:green;
+[15:57:27.771] LOG: [coop:webrtc] raw rx role=host t=hello bytes=100 handlers=13
+[15:57:27.772] LOG: [coop:launch] hello recv partner=moon partnerRole=guest (local role=host; no conflict)
+[15:57:27.772] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[15:57:27.772] LOG: [coop:owner] ownerOf(counter=0) seat=0 -> owner=host
+[15:57:27.772] LOG: [coop:webrtc] raw rx role=host t=dataFingerprint bytes=329 handlers=13
+[15:57:27.772] LOG: [coop:checksum] MATCH - data tables identical across clients
+[15:57:31.994] LOG: [coop:interaction] interactionCounter() read -> 0 (role=host)
+[15:57:31.994] LOG: [coop:health] tick=1g turn=- wave=- counter=0 assertions=0 wait=-1ms peerBeat=- transport=connected
+[15:57:40.282] WARN: cry/278 not found
+[15:58:06.994] LOG: [coop:interaction] interactionCounter() read -> 0 (role=host)
+[15:58:06.994] LOG: [coop:health] tick=1g turn=- wave=- counter=0 assertions=0 wait=-1ms peerBeat=- transport=connected
+[15:58:24.345] LOG: %cSaving starter preferences color: blue
+[15:58:24.684] LOG: %cSaving starter preferences color: blue
+[15:58:28.505] WARN: cry/443 not found
+[15:58:32.691] WARN: cry/443 not found
+[15:58:36.869] WARN: cry/443 not found
+[15:58:36.994] LOG: [coop:interaction] interactionCounter() read -> 0 (role=host)
+[15:58:36.995] LOG: [coop:health] tick=1g turn=- wave=- counter=0 assertions=0 wait=-1ms peerBeat=- transport=connected
+[15:58:38.266] WARN: cry/443 not found
+[15:58:46.116] WARN: cry/278 not found
+[15:58:56.801] LOG: [coop:webrtc] raw rx role=host t=showdownTeam bytes=1422 handlers=13
+[15:58:56.801] LOG: [coop:webrtc] raw rx role=host t=showdownReady bytes=51 handlers=13
+[15:59:06.995] LOG: [coop:interaction] interactionCounter() read -> 0 (role=host)
+[15:59:06.995] LOG: [coop:health] tick=1g turn=- wave=- counter=0 assertions=0 wait=-1ms peerBeat=- transport=connected
+[15:59:11.933] WARN: cry/483 not found
+[15:59:21.934] WARN: cry/882 not found
+[15:59:26.806] WARN: cry/989 not found
+[15:59:36.995] LOG: [coop:interaction] interactionCounter() read -> 0 (role=host)
+[15:59:36.995] LOG: [coop:health] tick=1g turn=- wave=- counter=0 assertions=0 wait=-1ms peerBeat=- transport=connected
+[15:59:38.418] WARN: cry/145 not found
+[15:59:39.846] LOG: [coop:webrtc] raw tx role=host t=showdownTeam bytes=1419
+[15:59:39.846] LOG: [coop:webrtc] raw tx role=host t=showdownReady bytes=51
+[15:59:39.847] LOG: [coop:rendezvous] ARRIVE point=showdown-ready (send) role=host
+[15:59:39.847] LOG: [coop:webrtc] raw tx role=host t=rendezvous bytes=43
+[15:59:39.847] LOG: [coop:rendezvous] AWAIT point=showdown-ready timeoutMs=600000 -> network-wait role=host
+[15:59:40.122] LOG: [coop:webrtc] raw rx role=host t=rendezvous bytes=43 handlers=13
+[15:59:40.122] LOG: [coop:rendezvous] RECV arrival point=showdown-ready -> deliver-to-waiter role=host
+[15:59:40.122] LOG: [coop:rendezvous] AWAIT point=showdown-ready RESOLVE both-arrived role=host
+[15:59:40.131] LOG: [coop:webrtc] raw tx role=host t=showdownStakeOffer bytes=106
+[15:59:40.141] LOG: [coop:webrtc] raw rx role=host t=showdownStakeOffer bytes=106 handlers=13
+[15:59:41.100] LOG: [coop:webrtc] raw tx role=host t=showdownStakeOffer bytes=107
+[15:59:42.294] LOG: [coop:webrtc] raw tx role=host t=showdownStakeOffer bytes=106
+[15:59:42.539] LOG: [coop:webrtc] raw tx role=host t=showdownStakeOffer bytes=108
+[15:59:43.850] LOG: [coop:webrtc] raw tx role=host t=showdownStakeOffer bytes=106
+[15:59:44.791] LOG: [coop:rendezvous] ARRIVE point=showdown-wager-commit (send) role=host
+[15:59:44.791] LOG: [coop:webrtc] raw tx role=host t=rendezvous bytes=50
+[15:59:44.791] LOG: [coop:rendezvous] AWAIT point=showdown-wager-commit timeoutMs=600000 -> network-wait role=host
+[15:59:57.355] LOG: [coop:webrtc] raw rx role=host t=rendezvous bytes=50 handlers=13
+[15:59:57.355] LOG: [coop:rendezvous] RECV arrival point=showdown-wager-commit -> deliver-to-waiter role=host
+[15:59:57.355] LOG: [coop:rendezvous] AWAIT point=showdown-wager-commit RESOLVE both-arrived role=host
+[16:00:00.141] LOG: Wave Seed: Fetpyf1tE{viXLwuxduEmG2M 1
+[16:00:00.143] LOG: %cStart Phase EncounterPhase color:green;
+[16:00:00.157] LOG: Pokemon: Foe Turtwig | Species ID: 387 | Level: 100 | Nature: Bashful (-)
+[16:00:00.157] LOG: Stats (IVs): HP: 251 (27), Atk: 170 (29), Def: 152 (19), Spatk: 125 (30), Spdef: 136 (21), Spd: 87 (20)
+[16:00:00.157] LOG: Ability: Grounded | Passive Ability: Overgrow 
+[16:00:00.157] LOG: Moveset: ["Bullet Seed","Fertile Fangs","Mega Drain","Stone Axe"]
+[16:00:00.165] LOG: Pokemon: Foe Pichu | Species ID: 172 | Level: 100 | Nature: Naive (+Spd/-SpDef)
+[16:00:00.165] LOG: Stats (IVs): HP: 176 (26), Atk: 116 (31), Def: 65 (30), Spatk: 103 (28), Spdef: 90 (26), Spd: 169 (28)
+[16:00:00.165] LOG: Ability: Electrocytes | Passive Ability: Short Circuit 
+[16:00:00.166] LOG: Moveset: ["Thunder Shock","Lightning Strike","Metronome","Play Nice"]
+[16:00:00.173] LOG: Pokemon: Foe Lugia | Species ID: 249 | Level: 100 | Nature: Relaxed (+Def/-Spd)
+[16:00:00.173] LOG: Stats (IVs): HP: 353 (31), Atk: 207 (22), Def: 325 (30), Spatk: 198 (13), Spdef: 334 (21), Spd: 223 (23)
+[16:00:00.174] LOG: Ability: Weather Control | Passive Ability: Imposing Wings 
+[16:00:00.174] LOG: Moveset: ["Aqua Fang","Dual Wingbeat","Gust","Water Pledge"]
+[16:00:00.182] LOG: Pokemon: Foe Mega Delphox | Species ID: 655 | Level: 100 | Nature: Bashful (-)
+[16:00:00.182] LOG: Stats (IVs): HP: 287 (27), Atk: 165 (22), Def: 173 (22), Spatk: 345 (22), Spdef: 284 (29), Spd: 300 (27)
+[16:00:00.182] LOG: Ability: Deadly Precision | Passive Ability: Hellblaze 
+[16:00:00.182] LOG: Moveset: ["Scratch","Growl","Fire Spin","Tri Attack"]
+[16:00:00.189] LOG: Pokemon: Foe Nymble | Species ID: 919 | Level: 100 | Nature: Bold (+Def/-Atk)
+[16:00:00.189] LOG: Stats (IVs): HP: 207 (31), Atk: 112 (28), Def: 126 (29), Spatk: 78 (31), Spdef: 85 (30), Spd: 126 (31)
+[16:00:00.189] LOG: Ability: Tinted Lens | Passive Ability: Violent Rush 
+[16:00:00.189] LOG: Moveset: ["Astonish","Detect","Double Kick","Lunge"]
+[16:00:00.197] LOG: Pokemon: Foe Mesprit Redux | Species ID: 10713 | Level: 100 | Nature: Lonely (+Atk/-Def)
+[16:00:00.197] LOG: Stats (IVs): HP: 270 (10), Atk: 282 (31), Def: 204 (22), Spatk: 248 (23), Spdef: 220 (15), Spd: 197 (22)
+[16:00:00.197] LOG: Ability: Soul Eater | Passive Ability: Levitate 
+[16:00:00.197] LOG: Moveset: ["Healing Wish","Imprison","Night Daze","Sharpen"]
+[16:00:00.458] LOG: Generated AI funcs
+[16:00:00.458] LOG: [coop:replay] host SEND enemyPartySync wave=1 count=6 meType=-1
+[16:00:00.458] LOG: [coop:webrtc] raw tx role=host t=enemyPartySync bytes=1921
+[16:00:00.459] LOG: [coop:replay] host SEND launchSnapshot wave=1 sessionLen=25872
+[16:00:00.460] LOG: [coop:webrtc] raw tx role=host t=launchSnapshot bytes=28836
+[16:00:00.461] LOG: Wave Seed: Fetpyf1tE{viXLwuxduEmG2M 1
+[16:00:00.867] LOG: Veteran moon
+[16:00:01.623] LOG: Dialogue saved as seen: dialogue:veteran.encounter.2
+[16:00:01.679] LOG: Veteran moon
+[16:00:02.378] LOG: %cStart Phase SummonPhase color:green;
+[16:00:02.379] LOG: moon
+[16:00:02.656] WARN: cry/387 not found
+[16:00:02.861] LOG: %cStart Phase SummonPhase color:green;
+[16:00:03.195] WARN: cry/445-mega not found
+[16:00:03.394] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[16:00:03.395] LOG: %cStart Phase InitEncounterPhase color:green;
+[16:00:03.396] LOG: %cStart Phase PostSummonPhase color:green;
+[16:00:03.396] LOG: Ran PSP for: Mega Garchomp
+[16:00:03.396] LOG: %cStart Phase PostSummonPhase color:green;
+[16:00:03.396] LOG: %cStart Phase PostSummonPhase color:green;
+[16:00:03.396] LOG: Ran PSP for: Turtwig
+[16:00:03.396] LOG: %cStart Phase PostSummonPhase color:green;
+[16:00:03.397] LOG: %cStart Phase ShowAbilityPhase color:green;
+[16:00:03.700] LOG: %cStart Phase HideAbilityPhase color:green;
+[16:00:03.750] LOG: %cStart Phase PostSummonPhase color:green;
+[16:00:03.751] LOG: %cStart Phase TurnInitPhase color:green;
+[16:00:03.751] LOG: %cStart Phase CommandPhase color:green;
+[16:00:11.561] LOG: Move: DRAGON_TAIL Move targets: {"targets":[2],"multiple":false} 
+Player Pokemon: Mega Garchomp
+[16:00:11.563] LOG: %cStart Phase EnemyCommandPhase color:green;
+[16:00:11.563] LOG: [coop:relay] showdown host requestEnemyCommand SEND turn=1 (awaiting peer)
+[16:00:11.563] LOG: [coop:webrtc] raw tx role=host t=showdownCommandRequest bytes=39
+[16:00:11.995] LOG: [coop:interaction] interactionCounter() read -> 0 (role=host)
+[16:00:11.995] LOG: [coop:health] tick=1g turn=1 wave=1 counter=0 assertions=0 wait=-1ms peerBeat=- transport=connected
+[16:00:41.995] LOG: [coop:interaction] interactionCounter() read -> 0 (role=host)
+[16:00:41.995] LOG: [coop:health] tick=1g turn=1 wave=1 counter=0 assertions=0 wait=-1ms peerBeat=- transport=connected
