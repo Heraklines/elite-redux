@@ -1621,6 +1621,17 @@ const COOP_SAVEDATA_DIGEST_EXCLUDED_KEYS: ReadonlySet<string> = new Set<string>(
   // diverged the digest at wave 52 on `waveIndex` + `erRelicBattleState.wave` ALONE (host 53 vs guest 52),
   // with every other checksum field matching.
   "waveIndex",
+  // #867: `battleType` is COUPLED to `waveIndex` - it is a per-wave property that changes at the wave
+  // boundary. During the SAME host-ahead crossing window the host reads its NEXT wave's battleType (e.g.
+  // TRAINER) while the guest still reads the just-played wave's (WILD), so the digest splits on battleType
+  // ALONE with every printed field matching (god-leg soak seed 20260709: `battleType host=1 guest=0`
+  // @post-turn wave 42, host already on the wave-43 TRAINER). It is EXCLUDED for the identical reason as
+  // waveIndex: it is a wave-crossing read-skew, not a state desync. A GENUINE wave-type divergence (a
+  // guest that mis-derived the wave TYPE) surfaces through the on-field ENEMY SPECIES the base field
+  // checksum hashes (a wild roll vs a trainer's party field different mons), and the wave TYPE itself is
+  // now host-authoritative + adopted by the guest (the enemyPartySync battleType verdict + the newBattle
+  // adopt in this fix), so the guest never re-derives a divergent value in the first place.
+  "battleType",
 ]);
 
 /**
