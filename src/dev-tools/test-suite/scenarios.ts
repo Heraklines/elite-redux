@@ -11219,6 +11219,43 @@ export const DEV_SCENARIOS: DevScenario[] = [
       ];
     },
   },
+  // Co-op - LOBBY handshake self-heals a lost runConfig/roster/ready frame (#868, 2 clients)
+  {
+    label: "(note) Co-op: lobby handshake self-heals a dropped frame (#868)",
+    description:
+      "#868 co-op LOBBY HANDSHAKE - NOT stageable in one client (it needs TWO live engines + a\n"
+      + "transport that can flap; the headless repro lives in\n"
+      + "test/tests/elite-redux/coop/coop-lobby-selfheal.test.ts).\n"
+      + "THE BUG: the lobby-critical state (runConfig, roster, ready) crossed the wire ONE-SHOT\n"
+      + "with no way to re-request or re-broadcast it. When a single lobby frame was lost - dropped\n"
+      + "on a channel flap (#805 hot-rejoin) or sent while the transport was momentarily down - the\n"
+      + "two clients were left permanently divergent: the GUEST sat at starter-select requesting the\n"
+      + "runConfig forever ('stuck on the pokemon select screen while teammate started'), or the HOST\n"
+      + "looped with partnerReady=false forever ('partner got kicked, no players showing'). The #805\n"
+      + "rejoin resync only healed BATTLE state, never the LOBBY, and the roster/ready direction had\n"
+      + "no re-request at all.\n"
+      + "THE FIX: the handshake is now self-healing. A symmetric requestRoster (mirror of the existing\n"
+      + "requestRunConfig) lets either side ask the peer to re-broadcast its roster+ready; a\n"
+      + "resyncLobbyState() re-establishes BOTH directions (hello + roster + ready + host runConfig +\n"
+      + "the peer re-requests) and runs automatically on a transport RECONNECT and on a short interval\n"
+      + "while a ready client waits for its partner. A lost lobby frame now converges instead of\n"
+      + "stranding.\n"
+      + "DO (needs 2 clients on the staging build, AUTHORITATIVE netcode): start a co-op run and, if\n"
+      + "you can, briefly kill/restore one client's network (or just play normally through team-select\n"
+      + "+ difficulty a few times to catch a real flap).\n"
+      + "EXPECT: neither client gets stuck at starter-select or on 'Waiting for your partner...'; a\n"
+      + "brief disconnect during the lobby recovers (the reconnect banner shows, then both proceed) and\n"
+      + "the run launches. VERIFY this (note) is the final check - the single-client suite cannot\n"
+      + "reproduce the 2-client lobby handshake strand.",
+    setup: () => {
+      resetDevOverrides();
+      return [
+        makeStarter(SpeciesId.SNORLAX, {
+          moveset: [MoveId.BODY_SLAM, MoveId.CRUNCH, MoveId.EARTHQUAKE, MoveId.REST],
+        }),
+      ];
+    },
+  },
   // Co-op - GUEST's OWN switch no longer desyncs (#633, coop-me-authoritative, 2 clients)
   {
     label: "(note) Co-op: GUEST switch no longer desyncs (#633)",

@@ -155,6 +155,33 @@ export class SelectStarterPhase extends Phase {
 
     let hostStarters: Starter[] = [];
     let launched = false;
+    // #868 self-healing lobby: while we are locally READY but the partner isn't yet, drive a periodic
+    // lobby resync so a lost lock-in frame (a rosterSync dropped on a channel flap, or sent while the
+    // transport was momentarily down) can never strand the run forever. `resyncLobbyState` re-broadcasts
+    // OUR roster+ready AND re-requests the partner's, so the strand heals in whichever direction lost a
+    // frame - the answering side of the handshake, not a blind resend (the live "partner got kicked, no
+    // players showing" host stall + the guest "stuck at starter-select" both reduce to a lost lobby frame
+    // with nothing re-answerable). Cleared the moment we launch or both sides are ready.
+    let lobbyResyncTimer: ReturnType<typeof setInterval> | null = null;
+    const stopLobbyResync = () => {
+      if (lobbyResyncTimer != null) {
+        clearInterval(lobbyResyncTimer);
+        lobbyResyncTimer = null;
+      }
+    };
+    const startLobbyResync = () => {
+      if (lobbyResyncTimer != null) {
+        return;
+      }
+      lobbyResyncTimer = setInterval(() => {
+        if (launched || controller.bothReady()) {
+          stopLobbyResync();
+          return;
+        }
+        console.log(`[coop-launch] lobby resync tick (waiting for partner) role=${controller.role} (#868)`);
+        controller.resyncLobbyState();
+      }, 2000);
+    };
     const proceedIfReady = () => {
       console.log(
         `[coop-launch] proceedIfReady launched=${launched} localTeam=${hostStarters.length} bothReady=${controller.bothReady()} role=${controller.role} partnerReady=${controller.partnerReady}`,
@@ -163,6 +190,7 @@ export class SelectStarterPhase extends Phase {
         return;
       }
       launched = true;
+      stopLobbyResync();
       // Build the merged launch party INTERLEAVED (host0, guest0, host1, ...) so
       // the two double leads (party[0]/party[1] = field slots 0/1) are the host's
       // and the guest's FIRST mon respectively - each player gets an active mon to
@@ -210,6 +238,8 @@ export class SelectStarterPhase extends Phase {
         // proceedIfReady the moment the partner readies, which then launches (host ->
         // SAVE_SLOT, guest -> battle) (#633).
         console.log("[coop-launch] local ready, partner NOT ready -> waiting screen");
+        // #868: begin the self-healing lobby resync loop so a lost lock-in can't strand us here forever.
+        startLobbyResync();
         void globalScene.ui.setMode(UiMode.MESSAGE).then(() => {
           // RACE GUARD (#633, live hang): both players lock in within a few ms of
           // each other right after the difficulty pick, so the partner can become

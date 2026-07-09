@@ -31,6 +31,7 @@ import { coopLog, coopWarn, isCoopDebug } from "#data/elite-redux/coop/coop-debu
 import { CoopRoster, type CoopRosterEntry } from "#data/elite-redux/coop/coop-roster";
 import { CoopInteractionTurn, type CoopPlayerId, coopSeatOfRole } from "#data/elite-redux/coop/coop-session";
 import type {
+  CoopConnectionState,
   CoopMessage,
   CoopNetcodeMode,
   CoopRole,
@@ -191,6 +192,15 @@ export class CoopSessionController {
 
   private readonly changeHandlers = new Set<(snap: CoopSessionSnapshot) => void>();
   private readonly offMessage: () => void;
+  private readonly offStateChange: () => void;
+  /**
+   * #868 self-healing lobby: true once the transport has reported a `disconnected` since we
+   * last resynced. A transition BACK to `connected` while this is set is a RECONNECT (a #805
+   * hot-rejoin swapped a fresh channel in), which lost every lobby frame sent while the channel
+   * was dark - so we re-establish the whole lobby handshake ({@linkcode resyncLobbyState}). The
+   * INITIAL `connecting -> connected` never sets this, so a fresh session doesn't double-announce.
+   */
+  private _sawDisconnect = false;
 
   constructor(transport: CoopTransport, opts: CoopSessionOptions = {}) {
     this.transport = transport;
@@ -200,6 +210,11 @@ export class CoopSessionController {
     this.username = opts.username ?? (transport.role === "host" ? "Player 1" : "Player 2");
     this.version = opts.version ?? "1";
     this.offMessage = transport.onMessage(msg => this.handleMessage(msg));
+    // #868: watch the transport lifecycle so a RECONNECT (channel flap -> #805 hot-rejoin)
+    // re-establishes the lobby handshake. Every lobby frame sent while the channel was dark is
+    // lost; the runtime's rejoin resync only heals BATTLE state (`isCoopAuthoritativeGuest`), so
+    // a flap DURING starter-select/difficulty-pick left the two clients permanently divergent.
+    this.offStateChange = transport.onStateChange(state => this.handleStateChange(state));
   }
 
   /** #807 C: true when the partner's hello carried a DIFFERENT protocol version. */
@@ -607,6 +622,77 @@ export class CoopSessionController {
   }
 
   /**
+   * #868 self-healing lobby: ask the peer to (re)send their roster + ready. The SYMMETRIC
+   * counterpart of {@linkcode requestRunConfig} for the OTHER stranding direction. A player's
+   * `rosterSync` (their picks + the `ready` lock-in) crosses the wire ONCE when they lock in; if
+   * that single frame is lost, the partner's `partnerReady` never flips and the run never launches
+   * (the live "partner got kicked, no players showing" / guest "stuck at starter-select" strand).
+   * A waiting client calls this and the peer re-broadcasts its roster (see the `requestRoster`
+   * handler), so a lost lock-in heals just like a lost runConfig. Harmless before the peer has picked.
+   */
+  requestRoster(): void {
+    this.transport.send({ t: "requestRoster" });
+  }
+
+  /**
+   * #868 self-healing lobby: re-establish EVERY lobby-critical state in BOTH directions. Idempotent
+   * and safe to call at any time the session lives. Called automatically on a RECONNECT (transport
+   * flap -> #805 hot-rejoin, see {@linkcode handleStateChange}) and driven on an interval by the
+   * waiting starter-select screen so a strand can never be permanent:
+   *   - re-announce our `hello` (so a partner that missed it re-learns our name/role),
+   *   - re-broadcast our roster + ready (heals a lost guest->host lock-in - case b),
+   *   - (HOST) re-broadcast the authoritative `runConfig` it already decided (heals a lost
+   *     host->guest difficulty broadcast - case a),
+   *   - pull the peer's state so a loss in the OTHER direction heals too (the guest re-requests
+   *     the runConfig; both re-request the roster).
+   * Every send is an idempotent snapshot / no-op re-request, so re-running it can never desync.
+   */
+  resyncLobbyState(): void {
+    coopLog(
+      "launch",
+      `resyncLobbyState role=${this.role} localReady=${this._localReady} partnerReady=${this._partnerReady} `
+        + `hasRunConfig=${this._runConfig != null} (#868 self-healing handshake)`,
+    );
+    // Re-announce identity (same shape as connect()'s hello).
+    this.transport.send({
+      t: "hello",
+      version: this.version,
+      username: this.username,
+      role: this.role,
+      tiebreak: this.tiebreak,
+    });
+    // Re-broadcast our own roster + ready.
+    this.broadcastLocal();
+    // The HOST re-broadcasts the run config it already decided (no-op before it has picked).
+    if (this.role === "host" && this._runConfig != null) {
+      this.broadcastRunConfig(this._runConfig);
+    }
+    // Pull the peer's lobby state (heals a loss in the direction we don't own).
+    if (this.role === "guest") {
+      this.requestRunConfig();
+    }
+    this.requestRoster();
+  }
+
+  /**
+   * #868: react to the transport lifecycle. A `disconnected` arms the reconnect flag; the next
+   * transition back to `connected` (a #805 hot-rejoin swapped a fresh channel in) is a RECONNECT
+   * and re-runs the lobby handshake so state lost while the channel was dark heals. The initial
+   * `connecting -> connected` is NOT a reconnect (the flag is unset), so a fresh session is quiet.
+   */
+  private handleStateChange(state: CoopConnectionState): void {
+    if (state === "disconnected") {
+      this._sawDisconnect = true;
+      return;
+    }
+    if (state === "connected" && this._sawDisconnect) {
+      this._sawDisconnect = false;
+      coopLog("launch", `transport RECONNECTED role=${this.role} -> resync lobby state (#868)`);
+      this.resyncLobbyState();
+    }
+  }
+
+  /**
    * The shared run config (host's choice of difficulty + challenges), or null
    * until the host has decided. The guest reads this to apply the host's run setup
    * instead of choosing its own.
@@ -685,6 +771,7 @@ export class CoopSessionController {
   /** Tear down: stop listening to the transport (does not close the transport). */
   dispose(): void {
     this.offMessage();
+    this.offStateChange();
     this.changeHandlers.clear();
   }
 
@@ -878,6 +965,14 @@ export class CoopSessionController {
           coopLog("runtime", "host re-broadcast on guest request");
           this.broadcastRunConfig(this._runConfig);
         }
+        break;
+      case "requestRoster":
+        // #868: the peer asked us to (re)send our roster + ready (the symmetric self-heal for the
+        // roster/ready direction). Re-broadcast the same idempotent snapshot; a partner that lost
+        // our lock-in now flips partnerReady and the run can launch. Both roles answer (either side
+        // can be the one waiting). Harmless before we have picked (an empty roster, ready=false).
+        coopLog("roster", `requestRoster RECV -> re-broadcast local roster+ready (role=${this.role}) (#868)`);
+        this.broadcastLocal();
         break;
       case "dataFingerprint": {
         // The peer's ER data-table fingerprint (#633, diagnostics). Diff it against OUR

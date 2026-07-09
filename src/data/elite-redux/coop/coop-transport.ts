@@ -912,6 +912,17 @@ export type CoopMessage =
    * a self-healing handshake (harmless no-op before the host has picked).
    */
   | { t: "requestRunConfig" }
+  /**
+   * Either client -> peer (#868 self-healing lobby handshake): "(re)send me your roster + ready".
+   * The SYMMETRIC counterpart of {@linkcode requestRunConfig} for the OTHER lobby-critical state.
+   * A player's `rosterSync` (their picks + the `ready` lock-in) is broadcast ONE-SHOT when they
+   * lock in; if that single frame is lost (dropped on a channel flap, or sent while the transport
+   * was momentarily down), the PARTNER's `partnerReady` stays false forever and the run never
+   * launches (the live "partner got kicked, no players showing" / "stuck at starter-select" strand).
+   * So a waiting client re-requests the peer's roster and the peer re-broadcasts it on every request
+   * (a harmless idempotent snapshot re-send) - the roster/ready direction now heals like runConfig.
+   */
+  | { t: "requestRoster" }
   /** A choice on an alternation-owned interaction screen (reward / shop / ME) (P4). */
   | { t: "interaction"; screen: string; choice: unknown }
   /**
