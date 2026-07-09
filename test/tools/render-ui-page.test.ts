@@ -899,6 +899,22 @@ const RECIPES: Record<string, Recipe> = {
       return []; // captureActive ignores this; satisfies the prepare return type
     },
   },
+  // Showdown construction-time vanilla mega. A vanilla-species mega built AT its mega
+  // formIndex directly at battle build (addPlayerPokemon(formIndex=1), no mid-run form
+  // change) - the same path the showdown teambuilder fields a picked mega stage. The PNG
+  // shows the MEGA Garchomp back sprite (er-slug art `elite-redux/garchomp_mega/back`), NOT
+  // the base Garchomp - i.e. the redirected form sprite resolves + loads at construction.
+  // Guards against a regression where the mega form falls back to the base texture; the
+  // matching cry-load fix is asserted in test/tests/elite-redux/showdown/showdown-mega-cry.test.ts.
+  "battle-showdown-mega": {
+    captureActive: true,
+    field: true,
+    prepare: async game => {
+      game.override.starterForms({ [SpeciesId.GARCHOMP]: 1 });
+      await game.classicMode.startBattle(SpeciesId.GARCHOMP);
+      return [];
+    },
+  },
   // Battlefield in a DOUBLE battle: two mons + stacked HP bars per side. Exercises the
   // slot-offset layout (fieldSpriteOffset / barSlotOffset) of the field renderer.
   "battle-field-doubles": {

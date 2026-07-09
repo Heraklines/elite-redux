@@ -1526,6 +1526,44 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
   },
   // ===========================================================================
+  // Presentation — construction-time vanilla mega (Mega Garchomp) sprite + cry
+  // ===========================================================================
+  {
+    label: "Mega Garchomp: sprite + cry at battle build",
+    description:
+      "Construction-time vanilla mega presentation (showdown teambuilder path). A\n"
+      + "vanilla-species mega picked as the FIELDED stage is built straight into its\n"
+      + "mega form at battle build (not a mid-run form change). The mega SPRITE lives\n"
+      + "under ER slug art but the CRY still uses the vanilla scheme (cry/445-mega),\n"
+      + "which the sprite redirect wrongly skipped - so Mega Garchomp came out MUTE and\n"
+      + "logged 'cry/445-mega not found'.\n"
+      + "\n"
+      + "DO: just start the battle and watch your lead get sent out (free-win Magikarp).\n"
+      + "EXPECT: the send-out says 'Go! Mega Garchomp!', the field sprite is the MEGA\n"
+      + "Garchomp (bulkier, red arm-blades), and its CRY PLAYS on entry - no silent\n"
+      + "send-out, no 'cry/445-mega not found' in the console. (The HP-bar panel showing\n"
+      + "'Garchomp' without the 'Mega' prefix is intended - the battle-info panel omits\n"
+      + "the form name for every form.)",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 100,
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.MAGIKARP,
+        ENEMY_LEVEL_OVERRIDE: 5,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+      });
+      return [
+        // Spawn directly in the Mega form (formIndex "mega") - megas are permanent in
+        // this fork, so the form sticks at summon with no stone / manual evolve. This is
+        // the same construction-time path the showdown teambuilder fields a mega stage.
+        makeStarter(SpeciesId.GARCHOMP, {
+          formIndex: formIndexContaining(SpeciesId.GARCHOMP, "mega"),
+          moveset: [MoveId.DRAGON_CLAW, MoveId.EARTHQUAKE, MoveId.STONE_EDGE, MoveId.SWORDS_DANCE],
+        }),
+      ];
+    },
+  },
+  // ===========================================================================
   // Combat — Terapagos Terastallizes into its PERMANENT Primal form
   // ===========================================================================
   {

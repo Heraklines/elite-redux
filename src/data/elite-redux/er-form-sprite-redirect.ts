@@ -59,18 +59,25 @@ function erSpriteId(slug: string, shiny?: boolean, variant?: number, back?: bool
   return `${backPrefix}er__${slug}${suffix}`;
 }
 
+/** ER-custom species live at id >= this cutoff; below it is a real vanilla-scheme species. */
+const VANILLA_ID_CUTOFF = 10000;
+
 /**
  * Redirect a single FORM object's sprite + icon to the ER-custom `slug` art, and
  * wrap its loadAssets to preload the per-slug icon atlas (mirroring
- * ErCustomSpecies.loadAssets) and force sprite-only. Always-on for this form
- * instance (the form IS the ER art). Idempotent via a per-object flag.
+ * ErCustomSpecies.loadAssets) and skip the nonexistent slug variant-colour palette
+ * (spriteOnly). The vanilla-scheme cry, when it exists, is re-queued explicitly (see
+ * inside). Always-on for this form instance (the form IS the ER art). Idempotent via
+ * a per-object flag.
  */
 export function installErFormSpriteRedirect(form: PokemonForm, slug: string): void {
   const fm = form as unknown as {
+    speciesId?: number;
     getSpriteAtlasPath(female: boolean, formIndex?: number, shiny?: boolean, variant?: number, back?: boolean): string;
     getSpriteId(female: boolean, formIndex?: number, shiny?: boolean, variant?: number, back?: boolean): string;
     getIconAtlasKey(formIndex?: number, shiny?: boolean, variant?: number): string;
     getIconId(female: boolean, formIndex?: number, shiny?: boolean, variant?: number): string;
+    getCryKey(formIndex?: number): string;
     loadAssets(
       female?: boolean,
       formIndex?: number,
@@ -98,7 +105,26 @@ export function installErFormSpriteRedirect(form: PokemonForm, slug: string): vo
     if (!globalScene.textures.exists(iconKey)) {
       globalScene.loadPokemonAtlas(iconKey, `elite-redux/${slug}/icon`);
     }
-    // Force sprite-only: ER art has no cry audio / no variantData colour entry.
+    // The SPRITE lives under the ER slug, but the CRY still resolves through the
+    // vanilla `getCryKey` scheme (`cry/445-mega`), and that audio EXISTS for a
+    // vanilla-species mega/primal. The spriteOnly=true below is needed to skip the
+    // nonexistent slug variant-colour palette, but it ALSO skips the base cry load
+    // — so a mon built straight INTO a redirected form (the Showdown teambuilder,
+    // or any construction-time mega, rather than a mid-run form change) was left
+    // mute and logged `cry/<id>-mega not found` when it tried to play. Re-queue the
+    // cry here for real vanilla-base forms only: an ER-custom base id (>= 10000)
+    // would crash the base `getCryKey` (its `id % 2000` lookup is undefined — see
+    // ErCustomSpecies.getCryKey) and is intentionally silent anyway. A vanilla base
+    // with no matching cry file just 404s harmlessly, exactly as before.
+    const speciesId = fm.speciesId ?? 0;
+    if (speciesId > 0 && speciesId < VANILLA_ID_CUTOFF) {
+      const cryKey = fm.getCryKey(formIndex);
+      if (cryKey && !globalScene.cache.audio.exists(cryKey)) {
+        globalScene.load.audio(cryKey, `audio/${cryKey}.m4a`);
+      }
+    }
+    // Force sprite-only: ER slug art has no variantData colour entry (the cry, when
+    // it exists, is queued explicitly above).
     return origLoadAssets(female, formIndex, shiny, variant, startLoad, back, true);
   };
 }
