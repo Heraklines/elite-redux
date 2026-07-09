@@ -78,4 +78,6 @@ export enum UiMode {
   GHOST_TRAINER_EDITOR,
   /** Showdown 1v1: the pre-battle WAGER screen (both teams previewed, stake picker, both-ready commit). */
   SHOWDOWN_WAGER,
+  /** Showdown 1v1: the full-screen Set Editor (identity column + field rows + shared search pane). */
+  SHOWDOWN_SET_EDITOR,
 }

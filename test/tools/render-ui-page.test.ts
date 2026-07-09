@@ -84,6 +84,7 @@ import {
 import { buildDemoConfig } from "#ui/er-shiny-lab-ui-handler";
 import { PartyUiMode } from "#ui/party-ui-handler";
 import { SaveSlotUiMode } from "#ui/save-slot-select-ui-handler";
+import { buildShowdownEditorDemoConfig, EditorField } from "#ui/showdown-set-editor-ui-handler";
 import type { ShowdownWagerArgs } from "#ui/showdown-wager-ui-handler";
 import { getModifierType } from "#utils/modifier-utils";
 import { getPokemonSpecies } from "#utils/pokemon-utils";
@@ -836,6 +837,60 @@ const RECIPES: Record<string, Recipe> = {
     // DOWN x2 walks onto a staked option (its "You: ..." offer + tier-match row change); ACTION on a
     // STAKED row surfaces the escrow-unavailable notice (no lock). The final -stepN shows that path.
     steps: [Button.DOWN, Button.DOWN, Button.ACTION],
+  },
+  // Showdown SET EDITOR (P1 layout core). The full-screen teambuilder Layer-3 editor for one
+  // team slot: top team strip + validity chips, the left identity column (sprite / stage strip /
+  // shiny chips / live stat bars / cost), the right field rows (ability / item / moves x4 /
+  // nature), and the bottom shared search pane. Driven by a self-contained honest Garchomp-line
+  // config (real move/ability/item metadata). Each recipe fixes a deterministic focus/pane state
+  // so the golden is stable; SHOWDOWN_mode gate is not needed (the handler is data-driven).
+  "showdown-editor": {
+    mode: UiMode.SHOWDOWN_SET_EDITOR,
+    prepare: () => [buildShowdownEditorDemoConfig()],
+    diffTolerance: 0,
+  },
+  // Move typeahead pane OPEN mid-filter: Move 1 focused, pane expanded, filter string "out"
+  // narrowing the legal move table (Name | Type | Cat | BP | Acc | PP | effect) with the
+  // highlighted-row description footer.
+  "showdown-editor-moves": {
+    mode: UiMode.SHOWDOWN_SET_EDITOR,
+    prepare: () => [
+      buildShowdownEditorDemoConfig({
+        initialField: EditorField.MOVE0,
+        initialPaneOpen: true,
+        initialFilter: "o",
+      }),
+    ],
+    diffTolerance: 0,
+  },
+  // Ability pane: the 3 actives (one LOCKED, grayed with reason) on the left + the 3 INNATES
+  // (always-on, informational, with descriptions) on the right. Ability row focused, pane open.
+  "showdown-editor-ability": {
+    mode: UiMode.SHOWDOWN_SET_EDITOR,
+    prepare: () => [buildShowdownEditorDemoConfig({ initialField: EditorField.ABILITY, initialPaneOpen: true })],
+    diffTolerance: 0,
+  },
+  // Nature pane: the free-pick nature grid with the +/- summary per entry; highlighted entry's
+  // footer notes the live stat-bar preview. Nature row focused, pane open.
+  "showdown-editor-nature": {
+    mode: UiMode.SHOWDOWN_SET_EDITOR,
+    prepare: () => [buildShowdownEditorDemoConfig({ initialField: EditorField.NATURE, initialPaneOpen: true })],
+    diffTolerance: 0,
+  },
+  // Item pane: the searchable showdown item pool (icon + name + effect line). Item row focused,
+  // pane open.
+  "showdown-editor-item": {
+    mode: UiMode.SHOWDOWN_SET_EDITOR,
+    prepare: () => [buildShowdownEditorDemoConfig({ initialField: EditorField.ITEM, initialPaneOpen: true })],
+    diffTolerance: 0,
+  },
+  // Input-plumbing proof (not the golden set): drive focus down to Move 1 and open its pane via
+  // processInput, so the harness exercises the real keyboard focus graph.
+  "showdown-editor-nav": {
+    mode: UiMode.SHOWDOWN_SET_EDITOR,
+    prepare: () => [buildShowdownEditorDemoConfig()],
+    steps: [Button.DOWN, Button.DOWN, Button.ACTION],
+    diffTolerance: 0,
   },
   // Demo of universal input driving: drives the real starter-select grid cursor. Each
   // `-stepN.png` shows the cursor highlight + detail panel moving - the same mechanism
