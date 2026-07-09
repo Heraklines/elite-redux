@@ -1,0 +1,286 @@
+url:      https://elite-redux-staging.pages.dev/
+build:    mrc9a598-g33b
+mode:     4  wave:30
+seed:     8c4AxOrU4YVBXb7qdJtCftVg
+party:    Squawkabilly(L22 59hp f0), Loudred Redux(L21 55hp f0), Swoobat(L22 9hp f0), Drilbur Redux(L17 53hp f0)
+enemy:    Shelmet(L20), Swadloon(L22), Dwebble(L21)
+
+----- COMMENT -----
+Sometimes when in a 3v2 position, i can't target the mon i want, only the one in the middle
+
+----- CONSOLE -----
+[18:57:18.868] WARN: BattlerTag INTERRUPTED is missing a score!
+[18:57:18.869] WARN: BattlerTag IGNORE_FLYING is missing a score!
+[18:57:18.869] WARN: BattlerTag INTERRUPTED is missing a score!
+[18:57:18.870] WARN: BattlerTag IGNORE_FLYING is missing a score!
+[18:57:18.870] WARN: BattlerTag INTERRUPTED is missing a score!
+[18:57:18.870] WARN: BattlerTag IGNORE_FLYING is missing a score!
+[18:57:18.871] WARN: BattlerTag INTERRUPTED is missing a score!
+[18:57:18.871] LOG: Move Pool: ["Smack Down"]
+[18:57:18.871] LOG: Move Scores: [21]
+[18:57:18.871] LOG: Sorted Move Pool: ["Smack Down"]
+[18:57:18.871] LOG: Chosen Move: Smack Down
+[18:57:18.871] LOG: %cStart Phase EnemyCommandPhase color:green;
+[18:57:18.874] LOG: Applied Eviolite 
+[18:57:18.876] LOG: Applied Eviolite 
+[18:57:18.883] LOG: Move Pool: ["Skitter Smack","Grass Pledge","Synthesis","Growth"]
+[18:57:18.883] LOG: Move Scores: [21,27,-7,0]
+[18:57:18.883] LOG: Sorted Move Pool: ["Grass Pledge","Skitter Smack","Growth","Synthesis"]
+[18:57:18.883] LOG: Chosen Move: Skitter Smack
+[18:57:18.883] LOG: %cStart Phase TurnStartPhase color:green;
+[18:57:18.919] LOG: %cStart Phase MovePhase color:green;
+[18:57:18.920] LOG: %cUser: Swoobat
+Move: SNARL
+Use Mode: NORMAL color:orchid
+[18:57:18.949] LOG: %cStart Phase MessagePhase color:green;
+[18:57:19.138] LOG: %cStart Phase MoveEffectPhase color:green;
+[18:57:19.140] LOG: Applied Wide Lens 
+[18:57:19.140] LOG: Applied X Accuracy 
+[18:57:19.506] LOG: crit stage: +0
+[18:57:19.507] LOG: Move: Snarl | Base damage: 26.923076923076923 | Power: 60 | Source attack: 50 | Target defense: 26
+[18:57:19.508] LOG: Move: Snarl | Attack damage: 14
+[18:57:19.509] LOG: %cStart Phase MessagePhase color:green;
+[18:57:20.256] LOG: %cStart Phase DamageAnimPhase color:green;
+[18:57:20.296] LOG: %cStart Phase StatStageChangePhase color:green;
+[18:57:20.895] LOG: %cStart Phase MessagePhase color:green;
+[18:57:21.621] LOG: %cStart Phase ShowAbilityPhase color:green;
+[18:57:22.160] LOG: %cStart Phase MovePhase color:green;
+[18:57:22.160] LOG: %cUser: Squawkabilly
+Move: SNARL
+Use Mode: INDIRECT color:orchid
+[18:57:22.175] LOG: %cStart Phase MessagePhase color:green;
+[18:57:22.539] LOG: %cStart Phase MoveEffectPhase color:green;
+[18:57:22.540] LOG: Applied X Accuracy 
+[18:57:22.905] LOG: crit stage: +0
+[18:57:22.906] LOG: Move: Snarl | Base damage: 22.16 | Power: 60 | Source attack: 42 | Target defense: 26
+[18:57:22.907] LOG: Move: Snarl | Attack damage: 12
+[18:57:22.914] LOG: Applied Golden Punch 
+[18:57:22.915] LOG: %cStart Phase DamageAnimPhase color:green;
+[18:57:22.942] LOG: %cStart Phase StatStageChangePhase color:green;
+[18:57:23.543] LOG: %cStart Phase MessagePhase color:green;
+[18:57:24.272] LOG: %cStart Phase MoveEndPhase color:green;
+[18:57:24.273] LOG: %cStart Phase HideAbilityPhase color:green;
+[18:57:24.359] LOG: %cStart Phase MoveEndPhase color:green;
+[18:57:24.363] LOG: %cStart Phase MovePhase color:green;
+[18:57:24.363] LOG: %cUser: Squawkabilly
+Move: TAILWIND
+Use Mode: NORMAL color:orchid
+[18:57:24.370] LOG: %cStart Phase MessagePhase color:green;
+[18:57:24.755] LOG: %cStart Phase MoveEffectPhase color:green;
+[18:57:26.145] LOG: %cStart Phase MessagePhase color:green;
+[18:57:26.947] LOG: %cStart Phase MoveEndPhase color:green;
+[18:57:26.949] LOG: %cStart Phase MovePhase color:green;
+[18:57:26.949] LOG: %cUser: Loudred Redux
+Move: HYPER_VOICE
+Use Mode: NORMAL color:orchid
+[18:57:26.957] LOG: %cStart Phase MessagePhase color:green;
+[18:57:27.371] LOG: %cStart Phase MoveEffectPhase color:green;
+[18:57:27.372] LOG: Applied X Accuracy 
+[18:57:27.372] LOG: Applied X Accuracy 
+[18:57:27.522] WARN: cry/10725 not found
+[18:57:27.522] WARN: cry/10725 not found
+[18:57:27.656] WARN: cry/10725 not found
+[18:57:27.656] WARN: cry/10725 not found
+[18:57:27.788] WARN: cry/10725 not found
+[18:57:27.788] WARN: cry/10725 not found
+[18:57:27.971] WARN: cry/10725 not found
+[18:57:27.971] WARN: cry/10725 not found
+[18:57:28.105] LOG: crit stage: +0
+[18:57:28.107] LOG: Move: Hyper Voice | Base damage: 39.546971428571425 | Power: 168.48 | Source attack: 39 | Target defense: 35
+[18:57:28.107] LOG: Move: Hyper Voice | Attack damage: 34
+[18:57:28.108] LOG: crit stage: +0
+[18:57:28.109] LOG: Move: Hyper Voice | Base damage: 52.544 | Power: 168.48 | Source attack: 39 | Target defense: 26
+[18:57:28.109] LOG: Move: Hyper Voice | Attack damage: 43
+[18:57:28.111] LOG: %cStart Phase MessagePhase color:green;
+[18:57:28.839] LOG: %cStart Phase DamageAnimPhase color:green;
+[18:57:28.879] LOG: %cStart Phase DamageAnimPhase color:green;
+[18:57:28.910] LOG: %cStart Phase CommonAnimPhase color:green;
+[18:57:29.357] LOG: %cStart Phase MessagePhase color:green;
+[18:57:30.071] LOG: %cStart Phase FaintPhase color:green;
+[18:57:31.451] LOG: %cStart Phase MessagePhase color:green;
+[18:57:31.622] LOG: %cStart Phase VictoryPhase color:green;
+[18:57:31.623] LOG: Applied Soothe Bell 
+[18:57:31.623] LOG: %cStart Phase ExpPhase color:green;
+[18:57:31.623] LOG: Applied Super EXP. Charm 
+[18:57:31.623] LOG: Applied EXP. Charm 
+[18:57:32.184] LOG: %cStart Phase ExpPhase color:green;
+[18:57:32.184] LOG: Applied Super EXP. Charm 
+[18:57:32.184] LOG: Applied EXP. Charm 
+[18:57:32.939] LOG: %cStart Phase LevelUpPhase color:green;
+[18:57:32.940] LOG: Applied Carbos 
+[18:57:33.733] LOG: %cStart Phase ExpPhase color:green;
+[18:57:33.733] LOG: Applied Super EXP. Charm 
+[18:57:33.733] LOG: Applied EXP. Charm 
+[18:57:34.105] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[18:57:34.106] LOG: Applied Super EXP. Charm 
+[18:57:34.106] LOG: Applied EXP. Charm 
+[18:57:34.792] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[18:57:34.991] LOG: %cStart Phase ShowAbilityPhase color:green;
+[18:57:35.540] LOG: %cStart Phase MovePhase color:green;
+[18:57:35.540] LOG: %cUser: Squawkabilly
+Move: HYPER_VOICE
+Use Mode: INDIRECT color:orchid
+[18:57:35.541] LOG: %cStart Phase MessagePhase color:green;
+[18:57:35.955] LOG: %cStart Phase MoveEffectPhase color:green;
+[18:57:35.955] LOG: Applied X Accuracy 
+[18:57:36.890] LOG: crit stage: +0
+[18:57:36.891] LOG: Move: Hyper Voice | Base damage: 24.464000000000002 | Power: 90 | Source attack: 42 | Target defense: 35
+[18:57:36.891] LOG: Move: Hyper Voice | Attack damage: 12
+[18:57:36.897] LOG: Applied Golden Punch 
+[18:57:36.897] LOG: %cStart Phase DamageAnimPhase color:green;
+[18:57:36.924] LOG: %cStart Phase MessagePhase color:green;
+[18:57:37.621] LOG: %cStart Phase MoveEndPhase color:green;
+[18:57:37.621] LOG: %cStart Phase HideAbilityPhase color:green;
+[18:57:37.707] LOG: %cStart Phase MoveEndPhase color:green;
+[18:57:37.708] LOG: %cStart Phase MovePhase color:green;
+[18:57:37.708] LOG: %cStart Phase MoveEndPhase color:green;
+[18:57:37.708] LOG: %cStart Phase MovePhase color:green;
+[18:57:37.708] LOG: %cUser: Swadloon
+Move: SKITTER_SMACK
+Use Mode: NORMAL color:orchid
+[18:57:37.721] LOG: %cStart Phase MessagePhase color:green;
+[18:57:38.139] LOG: %cStart Phase MoveEffectPhase color:green;
+[18:57:38.856] LOG: crit stage: +0
+[18:57:38.857] LOG: Move: Skitter Smack | Base damage: 16.6475 | Power: 70 | Source attack: 31 | Target defense: 32
+[18:57:38.858] LOG: Move: Skitter Smack | Attack damage: 24
+[18:57:38.858] LOG: %cStart Phase DamageAnimPhase color:green;
+[18:57:38.902] LOG: %cStart Phase StatStageChangePhase color:green;
+[18:57:39.494] LOG: %cStart Phase MessagePhase color:green;
+[18:57:40.139] LOG: %cStart Phase MoveEndPhase color:green;
+[18:57:40.140] LOG: %cStart Phase MovePhase color:green;
+[18:57:40.140] LOG: %cUser: Shelmet
+Move: SKITTER_SMACK
+Use Mode: NORMAL color:orchid
+[18:57:40.155] LOG: %cStart Phase MessagePhase color:green;
+[18:57:40.572] LOG: %cStart Phase MoveEffectPhase color:green;
+[18:57:41.291] LOG: crit stage: +0
+[18:57:41.293] LOG: Applied Eviolite 
+[18:57:41.293] LOG: Move: Skitter Smack | Base damage: 14.035820895522388 | Power: 126 | Source attack: 32 | Target defense: 67
+[18:57:41.294] LOG: Move: Skitter Smack | Attack damage: 10
+[18:57:41.303] LOG: %cStart Phase DamageAnimPhase color:green;
+[18:57:41.324] LOG: %cStart Phase MessagePhase color:green;
+[18:57:42.022] LOG: %cStart Phase StatStageChangePhase color:green;
+[18:57:42.628] LOG: %cStart Phase MessagePhase color:green;
+[18:57:43.354] LOG: %cStart Phase MoveEndPhase color:green;
+[18:57:43.354] LOG: %cStart Phase CheckInterludePhase color:green;
+[18:57:43.354] LOG: %cStart Phase WeatherEffectPhase color:green;
+[18:57:43.354] LOG: %cStart Phase PositionalTagPhase color:green;
+[18:57:43.354] LOG: %cStart Phase BerryPhase color:green;
+[18:57:43.359] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[18:57:43.362] LOG: %cStart Phase TurnEndPhase color:green;
+[18:57:43.378] WARN: [coop:turn] host recorder: finalize with NO open recording -> turn=-1 events=0 (caller decides not to emit)
+[18:57:43.378] LOG: %cStart Phase PokemonHealPhase color:green;
+[18:57:43.679] LOG: %cStart Phase MessagePhase color:green;
+[18:57:44.431] LOG: %cStart Phase PokemonHealPhase color:green;
+[18:57:44.431] LOG: %cStart Phase PokemonHealPhase color:green;
+[18:57:44.728] LOG: %cStart Phase MessagePhase color:green;
+[18:57:45.457] LOG: %cStart Phase TurnInitPhase color:green;
+[18:57:45.458] LOG: %cStart Phase CommandPhase color:green;
+[18:57:46.979] LOG: Move: PECK Move targets: {"targets":[3,4,1,2],"multiple":false} 
+Player Pokemon: Squawkabilly
+[18:57:46.984] LOG: %cStart Phase SelectTargetPhase color:green;
+[18:57:47.983] LOG: %cStart Phase CommandPhase color:green;
+[18:57:50.613] LOG: Move: HYPER_VOICE Move targets: {"targets":[3,4],"multiple":true} 
+Player Pokemon: Loudred Redux
+[18:57:50.615] LOG: %cStart Phase SelectTargetPhase color:green;
+[18:57:51.150] LOG: %cStart Phase CommandPhase color:green;
+[18:57:52.946] LOG: Move: ROUND Move targets: {"targets":[4,1],"multiple":false} 
+Player Pokemon: Swoobat
+[18:57:52.948] LOG: %cStart Phase SelectTargetPhase color:green;
+[18:58:06.985] LOG: %cStart Phase EnemyCommandPhase color:green;
+[18:58:07.005] LOG: Applied Eviolite 
+[18:58:07.008] LOG: Applied Eviolite 
+[18:58:07.011] LOG: Battle Seed: IiuqH9QGP1qOZapE
+[18:58:07.014] LOG: Move Pool: ["Skitter Smack","Bind","Withdraw","Yawn"]
+[18:58:07.015] LOG: Move Scores: [21,12,2,5]
+[18:58:07.015] LOG: Sorted Move Pool: ["Skitter Smack","Bind","Yawn","Withdraw"]
+[18:58:07.015] LOG: Chosen Move: Bind
+[18:58:07.015] LOG: %cStart Phase EnemyCommandPhase color:green;
+[18:58:07.020] LOG: Applied Eviolite 
+[18:58:07.025] LOG: Applied Eviolite 
+[18:58:07.034] LOG: Move Pool: ["Skitter Smack","Grass Pledge"]
+[18:58:07.034] LOG: Move Scores: [10.125,60]
+[18:58:07.034] LOG: Sorted Move Pool: ["Grass Pledge","Skitter Smack"]
+[18:58:07.034] LOG: Chosen Move: Grass Pledge
+[18:58:07.034] LOG: %cStart Phase TurnStartPhase color:green;
+[18:58:07.049] LOG: %cStart Phase MovePhase color:green;
+[18:58:07.050] LOG: %cUser: Swoobat
+Move: ROUND
+Use Mode: NORMAL color:orchid
+[18:58:07.061] LOG: %cStart Phase MessagePhase color:green;
+[18:58:07.271] LOG: %cStart Phase MoveEffectPhase color:green;
+[18:58:07.273] LOG: Applied Wide Lens 
+[18:58:07.274] LOG: Applied X Accuracy 
+[18:58:07.973] LOG: crit stage: +0
+[18:58:07.974] LOG: Move: Round | Base damage: 14.21942857142857 | Power: 72 | Source attack: 33 | Target defense: 42
+[18:58:07.974] LOG: Move: Round | Attack damage: 19
+[18:58:07.976] LOG: %cStart Phase DamageAnimPhase color:green;
+[18:58:08.012] LOG: %cStart Phase ShowAbilityPhase color:green;
+[18:58:08.544] LOG: %cStart Phase MovePhase color:green;
+[18:58:08.544] LOG: %cUser: Squawkabilly
+Move: ROUND
+Use Mode: INDIRECT color:orchid
+[18:58:08.548] LOG: %cStart Phase MessagePhase color:green;
+[18:58:08.906] LOG: %cStart Phase MoveEffectPhase color:green;
+[18:58:08.908] LOG: Applied X Accuracy 
+[18:58:09.608] LOG: crit stage: +0
+[18:58:09.609] LOG: Move: Round | Base damage: 26.96 | Power: 120 | Source attack: 42 | Target defense: 42
+[18:58:09.609] LOG: Move: Round | Attack damage: 38
+[18:58:09.617] LOG: Applied Golden Punch 
+[18:58:09.617] LOG: %cStart Phase DamageAnimPhase color:green;
+[18:58:09.641] LOG: %cStart Phase MoveEndPhase color:green;
+[18:58:09.641] LOG: %cStart Phase HideAbilityPhase color:green;
+[18:58:09.724] LOG: %cStart Phase MoveEndPhase color:green;
+[18:58:09.726] LOG: %cStart Phase MovePhase color:green;
+[18:58:09.726] LOG: %cUser: Squawkabilly
+Move: PECK
+Use Mode: NORMAL color:orchid
+[18:58:09.733] LOG: %cStart Phase MessagePhase color:green;
+[18:58:10.071] LOG: %cStart Phase MoveEffectPhase color:green;
+[18:58:10.072] LOG: Applied X Accuracy 
+[18:58:10.343] LOG: crit stage: +0
+[18:58:10.344] LOG: Move: Peck | Base damage: 5.915294117647059 | Power: 30 | Source attack: 32 | Target defense: 51
+[18:58:10.345] LOG: Move: Peck | Attack damage: 30
+[18:58:10.350] LOG: Applied Golden Punch 
+[18:58:10.351] LOG: %cStart Phase DamageAnimPhase color:green;
+[18:58:10.374] LOG: %cStart Phase MessagePhase color:green;
+[18:58:11.039] LOG: %cStart Phase MessagePhase color:green;
+[18:58:11.655] LOG: %cStart Phase FaintPhase color:green;
+[18:58:12.665] LOG: %cStart Phase MessagePhase color:green;
+[18:58:12.911] LOG: %cStart Phase VictoryPhase color:green;
+[18:58:12.912] LOG: Applied Soothe Bell 
+[18:58:12.912] LOG: %cStart Phase ExpPhase color:green;
+[18:58:12.912] LOG: Applied Super EXP. Charm 
+[18:58:12.912] LOG: Applied EXP. Charm 
+[18:58:13.850] LOG: %cStart Phase LevelUpPhase color:green;
+[18:58:14.564] LOG: %cStart Phase ExpPhase color:green;
+[18:58:14.564] LOG: Applied Super EXP. Charm 
+[18:58:14.564] LOG: Applied EXP. Charm 
+[18:58:15.408] LOG: %cStart Phase ExpPhase color:green;
+[18:58:15.408] LOG: Applied Super EXP. Charm 
+[18:58:15.408] LOG: Applied EXP. Charm 
+[18:58:16.089] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[18:58:16.089] LOG: Applied Super EXP. Charm 
+[18:58:16.089] LOG: Applied EXP. Charm 
+[18:58:16.774] LOG: %cStart Phase LevelUpPhase color:green;
+[18:58:17.649] LOG: %cStart Phase LearnMoveBatchPhase color:green;
+[18:58:24.600] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[18:58:24.792] LOG: %cStart Phase MoveEndPhase color:green;
+[18:58:24.796] LOG: %cStart Phase MovePhase color:green;
+[18:58:24.797] LOG: %cUser: Loudred Redux
+Move: HYPER_VOICE
+Use Mode: NORMAL color:orchid
+[18:58:24.806] LOG: %cStart Phase MessagePhase color:green;
+[18:58:25.223] LOG: %cStart Phase MoveEffectPhase color:green;
+[18:58:25.228] LOG: Applied X Accuracy 
+[18:58:25.374] WARN: cry/10725 not found
+[18:58:25.504] WARN: cry/10725 not found
+[18:58:25.640] WARN: cry/10725 not found
+[18:58:25.837] WARN: cry/10725 not found
+[18:58:25.974] LOG: crit stage: +0
+[18:58:25.978] LOG: Move: Hyper Voice | Base damage: 29.033819428571427 | Power: 168.48 | Source attack: 27 | Target defense: 35
+[18:58:25.979] LOG: Move: Hyper Voice | Attack damage: 20
+[18:58:25.982] LOG: %cStart Phase DamageAnimPhase color:green;
+[18:58:26.011] LOG: %cStart Phase CommonAnimPhase color:green;
+[18:58:26.456] LOG: %cStart Phase MessagePhase color:green;
+[18:58:27.188] LOG: %cStart Phase FaintPhase color:green;
