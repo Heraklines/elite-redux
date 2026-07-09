@@ -83,11 +83,42 @@ export class BiomeShopPhase extends SelectModifierPhase {
    * stock), even when the GUEST owns the ME pick - mirrors SelectModifierPhase's #828 option/pick split.
    */
   private coopBiomeOptionOwner = false;
+  /**
+   * Co-op (#866): true when THIS phase is a move-learn CONTINUATION copy (queued by
+   * {@linkcode SelectModifierPhase.applyModifier} when a TM / Memory Mushroom / Learner's Shroom /
+   * Ability Capsule is bought - the "escape the move-learn -> return to the shop" handler, #25). Such a
+   * copy re-opens the SAME biome grid on the ALREADY-pinned interaction, so it must NOT re-run the open
+   * handshake (re-roll + re-stream the stock, or spawn a SECOND watcher loop for the seq the live
+   * watcher already owns). Carried by the overridden {@linkcode copy}.
+   */
+  private coopBiomeContinuation = false;
 
   /** The biome market re-appears (not the vanilla reward screen) after the
    * party-target menu closes on a held-item / TM purchase. */
   protected override getModifierSelectMode(): UiMode {
     return UiMode.BIOME_SHOP;
+  }
+
+  /**
+   * Co-op (#866): a biome-market move-learn CONTINUATION copy must be the SAME phase type (re-opening
+   * the biome grid, not the vanilla reward row) AND carry the biome interaction PIN. The inherited
+   * {@linkcode SelectModifierPhase.copy} instead created a plain `SelectModifierPhase` and copied
+   * `coopInteractionStart` (which the biome market never pins - it pins {@linkcode coopBiomeStart}),
+   * yielding an UNPINNED, wrong-typed orphan: its terminal fired an asymmetric #837 "advance interaction
+   * SKIP unpinned" (never advancing the partner) and it opened a stray reward screen the watcher never
+   * mirrored - the wave-10 owner/watcher handshake stall. Build our OWN class, carrying the pin + roles +
+   * already-rolled stock, and mark it a continuation so {@linkcode start} re-opens WITHOUT re-handshaking.
+   */
+  override copy(): SelectModifierPhase {
+    const Ctor = this.constructor as new () => BiomeShopPhase;
+    const copied = new Ctor();
+    copied.shopOptions = this.shopOptions;
+    copied.qtys = this.qtys;
+    copied.coopBiomeStart = this.coopBiomeStart;
+    copied.coopBiomeOwner = this.coopBiomeOwner;
+    copied.coopBiomeOptionOwner = this.coopBiomeOptionOwner;
+    copied.coopBiomeContinuation = true;
+    return copied;
   }
 
   override start(): false | undefined {
@@ -131,8 +162,26 @@ export class BiomeShopPhase extends SelectModifierPhase {
       this.coopBiomeOptionOwner = optionOwner;
       coopLog(
         "reward",
-        `biome market roles: pinnedStart=${this.coopBiomeStart} inMe=${inMe} role=${coopController.role} spoof=${spoofed} pick=${pickOwner ? "OWNER" : "WATCHER"} option=${optionOwner ? "ROLL+STREAM" : "ADOPT"}`,
+        `biome market roles: pinnedStart=${this.coopBiomeStart} inMe=${inMe} role=${coopController.role} spoof=${spoofed} pick=${pickOwner ? "OWNER" : "WATCHER"} option=${optionOwner ? "ROLL+STREAM" : "ADOPT"} continuation=${this.coopBiomeContinuation}`,
       );
+      if (this.coopBiomeContinuation) {
+        // #866: a move-learn continuation copy re-opens the SAME grid on the already-pinned interaction.
+        // The pick WATCHER's live coopBiomeWatch loop still owns the seq, so its copy is INERT (a second
+        // loop would double-consume the owner's relayed buys); the pick OWNER just re-opens its inherited
+        // grid (no re-roll, no re-stream - the stock + qtys rode the copy). The terminal advance stays
+        // from-pinned via coopBiomeTerminal (idempotent), never the base's unpinned coopAdvanceInteraction.
+        if (!pickOwner) {
+          this.end();
+          return;
+        }
+        if (this.shopOptions.length === 0) {
+          this.coopBiomeTerminal();
+          this.end();
+          return;
+        }
+        this.openBiomeShop();
+        return;
+      }
       if (!pickOwner) {
         // PICK WATCHER: never opens the interactive market. coopBiomeWatch adopts the streamed stock
         // (option watcher) OR rolls + streams its own (the host on a GUEST-owned ME: option owner, pick
@@ -147,6 +196,19 @@ export class BiomeShopPhase extends SelectModifierPhase {
         return;
       }
       // else: pick owner AND option owner -> the normal roll + stream + drive owner path below.
+    }
+
+    // #866: a continuation copy (solo, or the co-op pick+option owner falling through above) re-opens the
+    // inherited grid WITHOUT re-rolling the stock. (Co-op pick+option owner already streamed on the first
+    // open; re-streaming an adopted list here is unnecessary and the watcher is past its stock await.)
+    if (this.coopBiomeContinuation) {
+      if (this.shopOptions.length === 0) {
+        this.coopBiomeTerminal();
+        this.end();
+        return;
+      }
+      this.openBiomeShop();
+      return;
     }
 
     this.buildStock();
