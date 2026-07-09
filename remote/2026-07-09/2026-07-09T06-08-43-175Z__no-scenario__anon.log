@@ -1,0 +1,271 @@
+url:      https://elite-redux-staging.pages.dev/
+build:    mrc9a598-g33b
+mode:     4  wave:4
+seed:     8c4AxOrU4YVBXb7qdJtCftVg
+party:    Squawkabilly(L6 21hp f0), Whismur Redux(L6 27hp f0), Woobat(L6 13hp f0), Drilbur Redux(L5 23hp f0)
+enemy:    Sunkern(L4), Skwovet(L4), Sentret(L4)
+
+----- COMMENT -----
+Parroting, and i suspect similar abilities, fail to copy moves if the target was killed, even though there are others alive that could be targeted
+
+----- CONSOLE -----
+[06:07:43.524] LOG: Applied X Speed 
+[06:07:43.524] LOG: Applied X Speed 
+[06:07:43.524] LOG: Applied X Speed 
+[06:07:43.525] LOG: Applied X Speed 
+[06:07:43.525] LOG: Applied X Speed 
+[06:07:43.526] WARN: cry/161 not found
+[06:07:43.720] LOG: Applied X Speed 
+[06:07:43.720] LOG: Applied X Speed 
+[06:07:43.720] LOG: Applied X Speed 
+[06:07:43.720] LOG: Applied X Speed 
+[06:07:43.720] LOG: Applied X Speed 
+[06:07:43.720] LOG: Applied X Speed 
+[06:07:43.721] LOG: Applied X Speed 
+[06:07:43.721] LOG: Applied X Speed 
+[06:07:43.721] LOG: Applied X Speed 
+[06:07:43.722] LOG: Applied X Speed 
+[06:07:43.722] LOG: Applied X Speed 
+[06:07:43.722] LOG: Applied X Speed 
+[06:07:43.722] LOG: Applied X Speed 
+[06:07:43.722] LOG: Applied X Speed 
+[06:07:43.723] LOG: Applied X Speed 
+[06:07:43.729] LOG: %cStart Phase MessagePhase color:green;
+[06:07:43.986] LOG: %cStart Phase VictoryPhase color:green;
+[06:07:43.987] LOG: %cStart Phase ExpPhase color:green;
+[06:07:44.552] LOG: %cStart Phase ExpPhase color:green;
+[06:07:45.084] LOG: %cStart Phase ExpPhase color:green;
+[06:07:45.417] LOG: %cStart Phase ShowAbilityPhase color:green;
+[06:07:45.955] LOG: Applied X Speed 
+[06:07:45.955] LOG: Applied X Speed 
+[06:07:45.955] LOG: Applied X Speed 
+[06:07:45.955] LOG: Applied X Speed 
+[06:07:45.956] LOG: Applied X Speed 
+[06:07:45.956] LOG: Applied X Speed 
+[06:07:45.956] LOG: Applied X Speed 
+[06:07:45.956] LOG: Applied X Speed 
+[06:07:45.956] LOG: Applied X Speed 
+[06:07:45.957] LOG: Applied X Speed 
+[06:07:45.957] LOG: Applied X Speed 
+[06:07:45.957] LOG: %cStart Phase MovePhase color:green;
+[06:07:45.957] LOG: %cUser: Squawkabilly
+Move: ECHOED_VOICE
+Use Mode: INDIRECT color:orchid
+[06:07:45.958] LOG: Applied X Speed 
+[06:07:45.958] LOG: Applied X Speed 
+[06:07:45.958] LOG: Applied X Speed 
+[06:07:45.958] LOG: Applied X Speed 
+[06:07:45.959] LOG: Applied X Speed 
+[06:07:45.959] LOG: Applied X Speed 
+[06:07:45.959] LOG: Applied X Speed 
+[06:07:45.959] LOG: Applied X Speed 
+[06:07:45.959] LOG: Applied X Speed 
+[06:07:45.960] LOG: Applied X Speed 
+[06:07:45.960] LOG: Applied X Speed 
+[06:07:45.960] LOG: Applied X Speed 
+[06:07:45.960] LOG: Applied X Speed 
+[06:07:45.961] LOG: Applied X Speed 
+[06:07:45.961] LOG: Applied X Speed 
+[06:07:45.962] LOG: %cStart Phase MessagePhase color:green;
+[06:07:46.415] LOG: %cStart Phase MessagePhase color:green;
+[06:07:47.049] LOG: %cStart Phase MoveEndPhase color:green;
+[06:07:47.050] LOG: %cStart Phase HideAbilityPhase color:green;
+[06:07:47.153] LOG: %cStart Phase MoveEndPhase color:green;
+[06:07:47.155] LOG: Applied X Speed 
+[06:07:47.156] LOG: Applied X Speed 
+[06:07:47.156] LOG: Applied X Speed 
+[06:07:47.156] LOG: Applied X Speed 
+[06:07:47.156] LOG: Applied X Speed 
+[06:07:47.157] LOG: Applied X Speed 
+[06:07:47.158] LOG: %cStart Phase MovePhase color:green;
+[06:07:47.158] LOG: %cUser: Squawkabilly
+Move: PECK
+Use Mode: NORMAL color:orchid
+[06:07:47.158] LOG: Applied X Speed 
+[06:07:47.158] LOG: Applied X Speed 
+[06:07:47.158] LOG: Applied X Speed 
+[06:07:47.159] LOG: Applied X Speed 
+[06:07:47.159] LOG: Applied X Speed 
+[06:07:47.159] LOG: Applied X Speed 
+[06:07:47.159] LOG: Applied X Speed 
+[06:07:47.159] LOG: Applied X Speed 
+[06:07:47.159] LOG: Applied X Speed 
+[06:07:47.160] LOG: Applied X Speed 
+[06:07:47.160] LOG: Applied X Speed 
+[06:07:47.160] LOG: Applied X Speed 
+[06:07:47.160] LOG: Applied X Speed 
+[06:07:47.161] LOG: Applied X Speed 
+[06:07:47.161] LOG: Applied X Speed 
+[06:07:47.162] LOG: Applied X Speed 
+[06:07:47.162] LOG: Applied X Speed 
+[06:07:47.163] LOG: Applied X Speed 
+[06:07:47.163] LOG: Applied X Speed 
+[06:07:47.163] LOG: Applied X Speed 
+[06:07:47.163] LOG: Applied X Speed 
+[06:07:47.163] LOG: Applied X Speed 
+[06:07:47.163] LOG: Applied X Speed 
+[06:07:47.164] LOG: Applied X Speed 
+[06:07:47.164] LOG: Applied X Speed 
+[06:07:47.164] LOG: Applied X Speed 
+[06:07:47.164] LOG: Applied X Speed 
+[06:07:47.165] LOG: Applied X Speed 
+[06:07:47.165] LOG: Applied X Speed 
+[06:07:47.165] LOG: Applied X Speed 
+[06:07:47.166] LOG: %cStart Phase MessagePhase color:green;
+[06:07:47.549] LOG: %cStart Phase MoveEffectPhase color:green;
+[06:07:47.985] LOG: crit stage: +0
+[06:07:47.987] LOG: Move: Peck | Base damage: 4.640000000000001 | Power: 30 | Source attack: 11 | Target defense: 10
+[06:07:47.987] LOG: Move: Peck | Attack damage: 6
+[06:07:47.988] LOG: %cStart Phase DamageAnimPhase color:green;
+[06:07:48.057] LOG: %cStart Phase MoveEffectPhase color:green;
+[06:07:48.518] LOG: crit stage: +0
+[06:07:48.519] LOG: Move: Peck | Base damage: 4.640000000000001 | Power: 30 | Source attack: 11 | Target defense: 10
+[06:07:48.520] LOG: Move: Peck | Attack damage: 5
+[06:07:48.521] LOG: %cStart Phase DamageAnimPhase color:green;
+[06:07:48.590] LOG: %cStart Phase MessagePhase color:green;
+[06:07:49.216] LOG: %cStart Phase MoveEndPhase color:green;
+[06:07:49.218] LOG: Applied X Speed 
+[06:07:49.219] LOG: Applied X Speed 
+[06:07:49.219] LOG: Applied X Speed 
+[06:07:49.220] LOG: %cStart Phase MovePhase color:green;
+[06:07:49.220] LOG: %cStart Phase MoveEndPhase color:green;
+[06:07:49.220] LOG: Applied X Speed 
+[06:07:49.221] LOG: %cStart Phase MovePhase color:green;
+[06:07:49.221] LOG: %cUser: Whismur Redux
+Move: SNARL
+Use Mode: NORMAL color:orchid
+[06:07:49.222] LOG: Applied X Speed 
+[06:07:49.222] LOG: Applied X Speed 
+[06:07:49.222] LOG: Applied X Speed 
+[06:07:49.222] LOG: Applied X Speed 
+[06:07:49.222] LOG: Applied X Speed 
+[06:07:49.223] LOG: Applied X Speed 
+[06:07:49.223] LOG: Applied X Speed 
+[06:07:49.223] LOG: Applied X Speed 
+[06:07:49.223] LOG: Applied X Speed 
+[06:07:49.224] LOG: Applied X Speed 
+[06:07:49.224] LOG: Applied X Speed 
+[06:07:49.224] LOG: Applied X Speed 
+[06:07:49.224] LOG: Applied X Speed 
+[06:07:49.224] LOG: Applied X Speed 
+[06:07:49.225] LOG: Applied X Speed 
+[06:07:49.226] LOG: Applied X Speed 
+[06:07:49.226] LOG: Applied X Speed 
+[06:07:49.226] LOG: Applied X Speed 
+[06:07:49.226] LOG: Applied X Speed 
+[06:07:49.227] LOG: Applied X Speed 
+[06:07:49.227] LOG: Applied X Speed 
+[06:07:49.227] LOG: Applied X Speed 
+[06:07:49.227] LOG: Applied X Speed 
+[06:07:49.227] LOG: Applied X Speed 
+[06:07:49.228] LOG: Applied X Speed 
+[06:07:49.228] LOG: Applied X Speed 
+[06:07:49.228] LOG: Applied X Speed 
+[06:07:49.228] LOG: Applied X Speed 
+[06:07:49.228] LOG: Applied X Speed 
+[06:07:49.229] LOG: Applied X Speed 
+[06:07:49.230] LOG: %cStart Phase MessagePhase color:green;
+[06:07:49.649] LOG: %cStart Phase MoveEffectPhase color:green;
+[06:07:50.219] LOG: crit stage: +0
+[06:07:50.221] LOG: Move: Snarl | Base damage: 9.488 | Power: 78 | Source attack: 12 | Target defense: 11
+[06:07:50.222] LOG: Move: Snarl | Attack damage: 7
+[06:07:50.223] LOG: crit stage: +0
+[06:07:50.223] LOG: Move: Snarl | Base damage: 13.766857142857145 | Power: 78 | Source attack: 12 | Target defense: 7
+[06:07:50.223] LOG: Move: Snarl | Attack damage: 9
+[06:07:50.225] LOG: %cStart Phase DamageAnimPhase color:green;
+[06:07:50.291] LOG: %cStart Phase StatStageChangePhase color:green;
+[06:07:50.894] LOG: %cStart Phase MessagePhase color:green;
+[06:07:51.616] LOG: %cStart Phase DamageAnimPhase color:green;
+[06:07:51.691] LOG: %cStart Phase CommonAnimPhase color:green;
+[06:07:52.416] LOG: %cStart Phase MessagePhase color:green;
+[06:07:53.216] LOG: %cStart Phase FaintPhase color:green;
+[06:07:53.224] LOG: Applied X Speed 
+[06:07:53.224] LOG: Applied X Speed 
+[06:07:53.224] LOG: Applied X Speed 
+[06:07:53.224] LOG: Applied X Speed 
+[06:07:53.224] LOG: Applied X Speed 
+[06:07:53.225] LOG: Applied X Speed 
+[06:07:53.225] LOG: Applied X Speed 
+[06:07:53.225] LOG: Applied X Speed 
+[06:07:53.225] LOG: Applied X Speed 
+[06:07:53.225] LOG: Applied X Speed 
+[06:07:53.226] WARN: cry/819 not found
+[06:07:53.418] LOG: Applied X Speed 
+[06:07:53.418] LOG: Applied X Speed 
+[06:07:53.418] LOG: Applied X Speed 
+[06:07:53.419] LOG: Applied X Speed 
+[06:07:53.419] LOG: Applied X Speed 
+[06:07:53.420] LOG: Applied X Speed 
+[06:07:53.420] LOG: Applied X Speed 
+[06:07:53.420] LOG: Applied X Speed 
+[06:07:53.421] LOG: Applied X Speed 
+[06:07:53.421] LOG: Applied X Speed 
+[06:07:53.427] LOG: %cStart Phase MessagePhase color:green;
+[06:07:53.687] LOG: %cStart Phase VictoryPhase color:green;
+[06:07:53.687] LOG: %cStart Phase ExpPhase color:green;
+[06:07:54.285] LOG: %cStart Phase LevelUpPhase color:green;
+[06:07:55.088] LOG: %cStart Phase ExpPhase color:green;
+[06:07:55.685] LOG: %cStart Phase ExpPhase color:green;
+[06:07:56.182] LOG: %cStart Phase ShowAbilityPhase color:green;
+[06:07:56.753] LOG: Applied X Speed 
+[06:07:56.754] LOG: Applied X Speed 
+[06:07:56.754] LOG: %cStart Phase MovePhase color:green;
+[06:07:56.754] LOG: %cUser: Squawkabilly
+Move: SNARL
+Use Mode: INDIRECT color:orchid
+[06:07:56.755] LOG: Applied X Speed 
+[06:07:56.755] LOG: Applied X Speed 
+[06:07:56.755] LOG: Applied X Speed 
+[06:07:56.755] LOG: Applied X Speed 
+[06:07:56.756] LOG: Applied X Speed 
+[06:07:56.756] LOG: Applied X Speed 
+[06:07:56.756] LOG: Applied X Speed 
+[06:07:56.756] LOG: Applied X Speed 
+[06:07:56.757] LOG: Applied X Speed 
+[06:07:56.757] LOG: Applied X Speed 
+[06:07:56.757] LOG: %cStart Phase MessagePhase color:green;
+[06:07:57.182] LOG: %cStart Phase MoveEffectPhase color:green;
+[06:07:57.751] LOG: crit stage: +0
+[06:07:57.753] LOG: Move: Snarl | Base damage: 9.2 | Power: 60 | Source attack: 15 | Target defense: 11
+[06:07:57.754] LOG: Move: Snarl | Attack damage: 8
+[06:07:57.755] LOG: %cStart Phase DamageAnimPhase color:green;
+[06:07:57.824] LOG: %cStart Phase StatStageChangePhase color:green;
+[06:07:58.422] LOG: %cStart Phase MessagePhase color:green;
+[06:07:59.182] LOG: %cStart Phase MoveEndPhase color:green;
+[06:07:59.183] LOG: %cStart Phase HideAbilityPhase color:green;
+[06:07:59.285] LOG: %cStart Phase MoveEndPhase color:green;
+[06:07:59.285] LOG: %cStart Phase MovePhase color:green;
+[06:07:59.285] LOG: %cStart Phase MoveEndPhase color:green;
+[06:07:59.285] LOG: %cStart Phase MovePhase color:green;
+[06:07:59.285] LOG: %cUser: Sunkern
+Move: MEGA_DRAIN
+Use Mode: NORMAL color:orchid
+[06:07:59.286] LOG: Applied X Speed 
+[06:07:59.286] LOG: Applied X Speed 
+[06:07:59.286] LOG: Applied X Speed 
+[06:07:59.286] LOG: Applied X Speed 
+[06:07:59.287] LOG: Applied X Speed 
+[06:07:59.287] LOG: Applied X Speed 
+[06:07:59.287] LOG: Applied X Speed 
+[06:07:59.287] LOG: Applied X Speed 
+[06:07:59.287] LOG: Applied X Speed 
+[06:07:59.287] LOG: Applied X Speed 
+[06:07:59.294] LOG: Applied X Speed 
+[06:07:59.294] LOG: Applied X Speed 
+[06:07:59.294] LOG: Applied X Speed 
+[06:07:59.294] LOG: Applied X Speed 
+[06:07:59.294] LOG: Applied X Speed 
+[06:07:59.294] LOG: Applied X Speed 
+[06:07:59.295] LOG: Applied X Speed 
+[06:07:59.295] LOG: Applied X Speed 
+[06:07:59.295] LOG: Applied X Speed 
+[06:07:59.295] LOG: Applied X Speed 
+[06:07:59.295] LOG: %cStart Phase MessagePhase color:green;
+[06:07:59.749] LOG: %cStart Phase MoveEffectPhase color:green;
+[06:08:00.984] LOG: crit stage: +0
+[06:08:00.986] LOG: Move: Mega Drain | Base damage: 3.0588235294117645 | Power: 50 | Source attack: 5 | Target defense: 17
+[06:08:00.987] LOG: Move: Mega Drain | Attack damage: 2
+[06:08:00.990] LOG: %cStart Phase DamageAnimPhase color:green;
+[06:08:01.058] LOG: %cStart Phase MessagePhase color:green;
+[06:08:01.782] LOG: %cStart Phase PokemonHealPhase color:green;
+[06:08:01.792] LOG: %cStart Phase MessagePhase color:green;
