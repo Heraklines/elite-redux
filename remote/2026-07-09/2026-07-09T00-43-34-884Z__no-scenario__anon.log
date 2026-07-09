@@ -1,0 +1,271 @@
+url:      https://elite-redux-staging.pages.dev/
+build:    mrc9a598-g33b
+mode:     4  wave:36
+seed:     0XyObFBq7hXjSsdv9xMD0yfC
+party:    Phione(L32 112hp f0), Lanturn(L32 130hp f0), Lumineon(L25 0hp f0), Mantyke(L23 0hp f0), Swablu Redux(L27 0hp f0), Prinplup(L31 0hp f0)
+enemy:    Golduck(L37), Clodsire(L37), Iron Heart(L37), Stonjourner(L37), Gengar(L37), Primeape(L37)
+
+----- COMMENT -----
+3 VS 2 bug again, caused by ai switching the turn I fainted a mon
+
+----- CONSOLE -----
+[00:42:02.211] LOG: %cStart Phase MessagePhase color:green;
+[00:42:02.474] LOG: %cStart Phase ShowAbilityPhase color:green;
+[00:42:02.638] LOG: %cStart Phase StatStageChangePhase color:green;
+[00:42:02.640] LOG: %cStart Phase MessagePhase color:green;
+[00:42:02.843] LOG: %cStart Phase HideAbilityPhase color:green;
+[00:42:02.869] LOG: %cStart Phase MoveEndPhase color:green;
+[00:42:02.869] LOG: Applied X Speed 
+[00:42:02.870] LOG: Applied X Speed 
+[00:42:02.870] LOG: Applied X Speed 
+[00:42:02.870] LOG: Applied X Speed 
+[00:42:02.871] LOG: Applied X Speed 
+[00:42:02.871] LOG: %cStart Phase MovePhase color:green;
+[00:42:02.871] LOG: %cUser: Phione
+Move: SURF
+Use Mode: NORMAL color:orchid
+[00:42:02.871] LOG: Applied X Speed 
+[00:42:02.872] LOG: Applied X Speed 
+[00:42:02.872] LOG: Applied X Speed 
+[00:42:02.873] LOG: Applied X Speed 
+[00:42:02.874] LOG: Applied X Speed 
+[00:42:02.874] LOG: Applied X Speed 
+[00:42:02.875] LOG: Applied X Speed 
+[00:42:02.875] LOG: Applied X Speed 
+[00:42:02.875] LOG: Applied X Speed 
+[00:42:02.876] LOG: Applied X Speed 
+[00:42:02.876] LOG: %cStart Phase MessagePhase color:green;
+[00:42:02.970] LOG: %cStart Phase MoveEffectPhase color:green;
+[00:42:02.972] LOG: crit stage: +0
+[00:42:02.972] LOG: Move: Surf | Base damage: 65.936 | Power: 135 | Source attack: 112 | Target defense: 70
+[00:42:02.972] LOG: Move: Surf | Attack damage: 31
+[00:42:02.973] LOG: crit stage: +0
+[00:42:02.973] LOG: Move: Surf | Base damage: 63.30849315068494 | Power: 135 | Source attack: 112 | Target defense: 73
+[00:42:02.973] LOG: Move: Surf | Attack damage: 69
+[00:42:02.975] LOG: %cStart Phase ShowAbilityPhase color:green;
+[00:42:03.129] LOG: %cStart Phase HideAbilityPhase color:green;
+[00:42:03.159] LOG: %cStart Phase MessagePhase color:green;
+[00:42:03.370] LOG: %cStart Phase DamageAnimPhase color:green;
+[00:42:03.384] LOG: %cStart Phase MessagePhase color:green;
+[00:42:03.589] LOG: %cStart Phase DamageAnimPhase color:green;
+[00:42:03.602] LOG: %cStart Phase MessagePhase color:green;
+[00:42:03.825] LOG: %cStart Phase MoveEndPhase color:green;
+[00:42:03.826] LOG: Applied X Speed 
+[00:42:03.826] LOG: Applied X Speed 
+[00:42:03.826] LOG: Applied X Speed 
+[00:42:03.826] LOG: Applied X Speed 
+[00:42:03.826] LOG: Applied X Speed 
+[00:42:03.827] LOG: Applied X Speed 
+[00:42:03.827] LOG: Applied X Speed 
+[00:42:03.827] LOG: Applied X Speed 
+[00:42:03.827] LOG: Applied X Speed 
+[00:42:03.827] LOG: %cStart Phase MovePhase color:green;
+[00:42:03.827] LOG: %cUser: Phione
+Move: SURF
+Use Mode: INDIRECT color:orchid
+[00:42:03.828] LOG: %cStart Phase MessagePhase color:green;
+[00:42:03.928] LOG: %cStart Phase MoveEffectPhase color:green;
+[00:42:03.929] LOG: crit stage: +0
+[00:42:03.930] LOG: Move: Surf | Base damage: 37.52 | Power: 75 | Source attack: 112 | Target defense: 70
+[00:42:03.930] LOG: Move: Surf | Attack damage: 21
+[00:42:03.930] LOG: crit stage: +0
+[00:42:03.931] LOG: Move: Surf | Base damage: 36.060273972602744 | Power: 75 | Source attack: 112 | Target defense: 73
+[00:42:03.931] LOG: Move: Surf | Attack damage: 37
+[00:42:03.931] LOG: %cStart Phase ShowAbilityPhase color:green;
+[00:42:04.087] LOG: %cStart Phase HideAbilityPhase color:green;
+[00:42:04.117] LOG: %cStart Phase MessagePhase color:green;
+[00:42:04.328] LOG: %cStart Phase DamageAnimPhase color:green;
+[00:42:04.342] LOG: %cStart Phase MessagePhase color:green;
+[00:42:04.546] LOG: %cStart Phase DamageAnimPhase color:green;
+[00:42:04.559] LOG: %cStart Phase MoveEndPhase color:green;
+[00:42:04.560] LOG: Applied X Speed 
+[00:42:04.560] LOG: Applied X Speed 
+[00:42:04.560] LOG: Applied X Speed 
+[00:42:04.560] LOG: Applied X Speed 
+[00:42:04.561] LOG: Applied X Speed 
+[00:42:04.561] LOG: Applied X Speed 
+[00:42:04.561] LOG: Applied X Speed 
+[00:42:04.561] LOG: Applied X Speed 
+[00:42:04.562] LOG: Applied X Speed 
+[00:42:04.562] LOG: %cStart Phase MovePhase color:green;
+[00:42:04.562] LOG: %cUser: Phione
+Move: SURF
+Use Mode: INDIRECT color:orchid
+[00:42:04.562] LOG: %cStart Phase MessagePhase color:green;
+[00:42:04.661] LOG: %cStart Phase MoveEffectPhase color:green;
+[00:42:04.662] LOG: crit stage: +0
+[00:42:04.663] LOG: Move: Surf | Base damage: 37.52 | Power: 75 | Source attack: 112 | Target defense: 70
+[00:42:04.663] LOG: Move: Surf | Attack damage: 20
+[00:42:04.663] LOG: crit stage: +0
+[00:42:04.664] LOG: Move: Surf | Base damage: 36.060273972602744 | Power: 75 | Source attack: 112 | Target defense: 73
+[00:42:04.664] LOG: Move: Surf | Attack damage: 39
+[00:42:04.664] LOG: %cStart Phase ShowAbilityPhase color:green;
+[00:42:04.820] LOG: %cStart Phase HideAbilityPhase color:green;
+[00:42:04.850] LOG: %cStart Phase MessagePhase color:green;
+[00:42:05.061] LOG: %cStart Phase DamageAnimPhase color:green;
+[00:42:05.075] LOG: %cStart Phase MessagePhase color:green;
+[00:42:05.279] LOG: %cStart Phase DamageAnimPhase color:green;
+[00:42:05.293] LOG: %cStart Phase FaintPhase color:green;
+[00:42:05.293] LOG: Applied X Speed 
+[00:42:05.293] LOG: Applied X Speed 
+[00:42:05.294] LOG: Applied X Speed 
+[00:42:05.294] LOG: Applied X Speed 
+[00:42:05.294] LOG: Applied X Speed 
+[00:42:05.294] LOG: Applied X Speed 
+[00:42:05.294] LOG: Applied X Speed 
+[00:42:05.295] LOG: Applied X Speed 
+[00:42:05.295] WARN: cry/10755 not found
+[00:42:05.353] LOG: Applied X Speed 
+[00:42:05.353] LOG: Applied X Speed 
+[00:42:05.353] LOG: Applied X Speed 
+[00:42:05.353] LOG: Applied X Speed 
+[00:42:05.354] LOG: Applied X Speed 
+[00:42:05.354] LOG: Applied X Speed 
+[00:42:05.354] LOG: Applied X Speed 
+[00:42:05.354] LOG: Applied X Speed 
+[00:42:05.355] LOG: %cStart Phase MessagePhase color:green;
+[00:42:05.546] LOG: %cStart Phase ShowAbilityPhase color:green;
+[00:42:05.711] LOG: %cStart Phase StatStageChangePhase color:green;
+[00:42:05.712] LOG: %cStart Phase MessagePhase color:green;
+[00:42:05.916] LOG: %cStart Phase HideAbilityPhase color:green;
+[00:42:05.941] LOG: %cStart Phase VictoryPhase color:green;
+[00:42:05.941] LOG: %cStart Phase MoveEndPhase color:green;
+[00:42:05.942] LOG: Applied X Speed 
+[00:42:05.942] LOG: Applied X Speed 
+[00:42:05.942] LOG: Applied X Speed 
+[00:42:05.942] LOG: Applied X Speed 
+[00:42:05.942] LOG: Applied X Speed 
+[00:42:05.943] LOG: %cStart Phase MovePhase color:green;
+[00:42:05.943] LOG: %cStart Phase MoveEndPhase color:green;
+[00:42:05.943] LOG: Applied X Speed 
+[00:42:05.943] LOG: Applied X Speed 
+[00:42:05.943] LOG: Applied X Speed 
+[00:42:05.943] LOG: Applied X Speed 
+[00:42:05.943] LOG: %cStart Phase MovePhase color:green;
+[00:42:05.943] LOG: %cStart Phase MoveEndPhase color:green;
+[00:42:05.944] LOG: Applied X Speed 
+[00:42:05.944] LOG: %cStart Phase MovePhase color:green;
+[00:42:05.944] LOG: %cUser: Golduck
+Move: BRINE
+Use Mode: NORMAL color:orchid
+[00:42:05.944] LOG: Applied X Speed 
+[00:42:05.944] LOG: Applied X Speed 
+[00:42:05.944] LOG: Applied X Speed 
+[00:42:05.945] LOG: Applied X Speed 
+[00:42:05.945] LOG: Applied X Speed 
+[00:42:05.946] LOG: Applied X Speed 
+[00:42:05.946] LOG: Applied X Speed 
+[00:42:05.946] LOG: Applied X Speed 
+[00:42:05.947] LOG: Applied X Speed 
+[00:42:05.947] LOG: Applied X Speed 
+[00:42:05.947] LOG: Applied X Speed 
+[00:42:05.948] LOG: Applied X Speed 
+[00:42:05.948] LOG: Applied X Speed 
+[00:42:05.949] LOG: Applied X Speed 
+[00:42:05.949] LOG: Applied X Speed 
+[00:42:05.949] LOG: Applied X Speed 
+[00:42:05.949] LOG: %cStart Phase MessagePhase color:green;
+[00:42:06.049] LOG: %cStart Phase MoveEffectPhase color:green;
+[00:42:06.050] LOG: %cStart Phase ShowAbilityPhase color:green;
+[00:42:06.207] LOG: %cStart Phase HideAbilityPhase color:green;
+[00:42:06.238] LOG: %cStart Phase MessagePhase color:green;
+[00:42:06.449] LOG: %cStart Phase MoveEndPhase color:green;
+[00:42:06.450] LOG: %cStart Phase MovePhase color:green;
+[00:42:06.450] LOG: %cUser: Lanturn
+Move: THUNDER_SHOCK
+Use Mode: NORMAL color:orchid
+[00:42:06.450] LOG: Applied X Speed 
+[00:42:06.450] LOG: Applied X Speed 
+[00:42:06.450] LOG: Applied X Speed 
+[00:42:06.450] LOG: Applied X Speed 
+[00:42:06.451] LOG: Applied X Speed 
+[00:42:06.451] LOG: Applied X Speed 
+[00:42:06.451] LOG: Applied X Speed 
+[00:42:06.452] LOG: Applied X Speed 
+[00:42:06.452] LOG: Applied X Speed 
+[00:42:06.452] LOG: Applied X Speed 
+[00:42:06.452] LOG: Applied X Speed 
+[00:42:06.452] LOG: Applied X Speed 
+[00:42:06.453] LOG: Applied X Speed 
+[00:42:06.453] LOG: Applied X Speed 
+[00:42:06.453] LOG: Applied X Speed 
+[00:42:06.453] LOG: Applied X Speed 
+[00:42:06.454] LOG: %cStart Phase MessagePhase color:green;
+[00:42:06.564] LOG: %cStart Phase MoveEffectPhase color:green;
+[00:42:06.565] LOG: crit stage: +0
+[00:42:06.565] LOG: Move: Thunder Shock | Base damage: 36.95619047619048 | Power: 80 | Source attack: 62 | Target defense: 42
+[00:42:06.566] LOG: Move: Thunder Shock | Attack damage: 48
+[00:42:06.566] LOG: %cStart Phase DamageAnimPhase color:green;
+[00:42:06.578] LOG: %cStart Phase ShowAbilityPhase color:green;
+[00:42:06.741] LOG: %cStart Phase StatStageChangePhase color:green;
+[00:42:06.742] LOG: Applied X Speed 
+[00:42:06.742] LOG: Applied X Speed 
+[00:42:06.742] LOG: %cStart Phase MessagePhase color:green;
+[00:42:06.952] LOG: %cStart Phase HideAbilityPhase color:green;
+[00:42:06.978] LOG: %cStart Phase MoveEndPhase color:green;
+[00:42:06.978] LOG: %cStart Phase CheckInterludePhase color:green;
+[00:42:06.978] LOG: %cStart Phase WeatherEffectPhase color:green;
+[00:42:06.978] LOG: %cStart Phase PositionalTagPhase color:green;
+[00:42:06.978] LOG: %cStart Phase BerryPhase color:green;
+[00:42:06.978] LOG: Applied X Speed 
+[00:42:06.978] LOG: Applied X Speed 
+[00:42:06.978] LOG: Applied X Speed 
+[00:42:06.978] LOG: Applied X Speed 
+[00:42:06.979] LOG: Applied X Speed 
+[00:42:06.979] LOG: Applied X Speed 
+[00:42:06.979] LOG: Applied X Speed 
+[00:42:06.980] LOG: Applied X Speed 
+[00:42:06.980] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[00:42:06.980] LOG: Applied X Speed 
+[00:42:06.980] LOG: Applied X Speed 
+[00:42:06.980] LOG: Applied X Speed 
+[00:42:06.980] LOG: Applied X Speed 
+[00:42:06.981] LOG: Applied X Speed 
+[00:42:06.981] LOG: Applied X Speed 
+[00:42:06.981] LOG: Applied X Speed 
+[00:42:06.982] LOG: Applied X Speed 
+[00:42:06.982] LOG: %cStart Phase TurnEndPhase color:green;
+[00:42:06.982] LOG: Applied X Speed 
+[00:42:06.982] LOG: Applied X Speed 
+[00:42:06.982] LOG: Applied X Speed 
+[00:42:06.983] LOG: Applied X Speed 
+[00:42:06.983] LOG: Applied X Speed 
+[00:42:06.983] LOG: Applied X Speed 
+[00:42:06.984] LOG: Applied X Speed 
+[00:42:06.984] LOG: Applied X Speed 
+[00:42:06.984] WARN: [coop:turn] host recorder: finalize with NO open recording -> turn=-1 events=0 (caller decides not to emit)
+[00:42:06.985] LOG: %cStart Phase PokemonHealPhase color:green;
+[00:42:06.985] LOG: %cStart Phase MessagePhase color:green;
+[00:42:07.183] LOG: %cStart Phase SwitchSummonPhase color:green;
+[00:42:07.183] LOG: Applied X Speed 
+[00:42:07.183] LOG: Applied X Speed 
+[00:42:07.183] LOG: Applied X Speed 
+[00:42:07.184] LOG: Applied X Speed 
+[00:42:07.184] LOG: Applied X Speed 
+[00:42:07.184] LOG: Applied X Speed 
+[00:42:07.262] LOG: Applied X Speed 
+[00:42:07.263] LOG: Applied X Speed 
+[00:42:07.263] LOG: Applied X Speed 
+[00:42:07.263] LOG: Applied X Speed 
+[00:42:07.263] LOG: Applied X Speed 
+[00:42:07.263] LOG: Applied X Speed 
+[00:42:07.264] LOG: Applied X Speed 
+[00:42:07.264] LOG: Applied X Speed 
+[00:42:07.413] LOG: Malik
+[00:42:07.486] LOG: Applied Calcium (enemy)
+[00:42:07.487] LOG: Applied Calcium (enemy)
+[00:42:07.620] LOG: Applied X Speed 
+[00:42:07.620] LOG: Applied X Speed 
+[00:42:07.620] LOG: Applied X Speed 
+[00:42:07.620] LOG: Applied X Speed 
+[00:42:07.621] LOG: Applied X Speed 
+[00:42:07.621] LOG: Applied X Speed 
+[00:42:07.621] LOG: Applied X Speed 
+[00:42:07.621] LOG: Applied X Speed 
+[00:42:07.622] LOG: Applied X Speed 
+[00:42:07.622] LOG: %cStart Phase PostSummonPhase color:green;
+[00:42:07.622] LOG: Ran PSP for: Clodsire
+[00:42:07.622] LOG: %cStart Phase PostSummonPhase color:green;
+[00:42:07.622] LOG: %cStart Phase PostSummonPhase color:green;
+[00:42:07.622] LOG: %cStart Phase TurnInitPhase color:green;
+[00:42:07.622] LOG: %cStart Phase CommandPhase color:green;
