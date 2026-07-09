@@ -1265,6 +1265,13 @@ export class SelectModifierPhase extends BattlePhase {
     spoofed: boolean,
   ): Promise<void> {
     await this.coopAwaitShopBarrier(spoofed);
+    // #872: the barrier wait (up to the 60s anti-hang) can resume AFTER the scene moved on (run over /
+    // wave torn down / this phase superseded). Opening the shop then reads currentBattle.waveIndex on
+    // null - an UNCAUGHT rejection that kills the client's phase machine (the live "game froze, only
+    // arrow keys work" class). Bail loudly instead; the phase machine has already moved past us.
+    if (!this.coopShopSceneAlive("post-barrier owner open")) {
+      return;
+    }
     if (coopIsWatcher) {
       // #828 guest pick-owner on a guest-owned ME: it does NOT roll (the HOST is the sole ME engine +
       // streamed the pool), so ADOPT the host's streamed options first, THEN open the owner screen.
@@ -1274,6 +1281,27 @@ export class SelectModifierPhase extends BattlePhase {
     this.resetModifierSelect(modifierSelectCallback);
     // Co-op (#633): relay our cursor so the partner's screen mirrors it live.
     this.coopBeginMirror("owner");
+  }
+
+  /**
+   * #872: is this shop phase still entitled to touch the screen after an async wait? A parked
+   * continuation (shop barrier / option adopt) can resolve long after the run ended or the phase
+   * machine moved on - opening the modifier UI then NPEs on the torn-down battle (getRerollCost reads
+   * currentBattle.waveIndex) or stomps whatever screen is actually current. False = log + walk away
+   * WITHOUT ending the phase (we are no longer the current phase; touching the manager would corrupt it).
+   */
+  private coopShopSceneAlive(context: string): boolean {
+    const battleGone = globalScene.currentBattle == null;
+    const superseded = globalScene.phaseManager.getCurrentPhase() !== this;
+    if (!battleGone && !superseded) {
+      return true;
+    }
+    coopWarn(
+      "reward",
+      `stale shop continuation DROPPED (${context}): battleGone=${battleGone} superseded=${superseded} `
+        + "- the scene moved on during an async wait; not opening the shop screen (#872 anti-freeze)",
+    );
+    return false;
   }
 
   /** Co-op (#839): block until the partner reaches the shop (or the anti-hang timeout fires). */
@@ -1394,6 +1422,10 @@ export class SelectModifierPhase extends BattlePhase {
    */
   private async startCoopOwnerAdoptOptions(modifierSelectCallback: ModifierSelectCallback): Promise<void> {
     await this.coopAdoptOwnerRewardOptions();
+    // #872: the adopt wait can also outlive the scene (see coopShopSceneAlive).
+    if (!this.coopShopSceneAlive("owner adopt-options open")) {
+      return;
+    }
     this.resetModifierSelect(modifierSelectCallback);
     // Co-op (#633): relay our cursor so the partner (the pick watcher) mirrors it live.
     this.coopBeginMirror("owner");
@@ -1420,6 +1452,11 @@ export class SelectModifierPhase extends BattlePhase {
     // streamer - it IS the streamer).
     if (this.coopAdoptsOptions) {
       await this.coopAdoptOwnerRewardOptions();
+      // #872: the adopt wait can resume after teardown - the setMode below reads
+      // currentBattle.waveIndex via getRerollCost and would NPE-kill the client.
+      if (!this.coopShopSceneAlive("watcher adopt-options open")) {
+        return;
+      }
     }
     // Open the SAME reward screen the owner drives (identical options/prices/money - now
     // guaranteed identical by the adopted list), with a NO-OP callback: the watcher's local
