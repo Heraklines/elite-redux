@@ -1,0 +1,282 @@
+url:      https://elite-redux-staging.pages.dev/
+build:    mrc9a598-g33b
+mode:     4  wave:12
+seed:     K2pVaxKuZNbP8GpkZKVMCmPF
+party:    Fogging(L9 26hp f0), Mantyke(L8 25hp f0), Electrike(L9 25hp f0), Croagunk(L6 0hp f0), Gulpin(L9 34hp f0)
+enemy:    Floette White(L7), Frillish(L8), Togetic(L8)
+
+----- COMMENT -----
+Togetic and Floette should probably not be in seabed, also my dry skin croagunk got OS by waterfall from arrokuda, which he should be immune from
+
+----- CONSOLE -----
+[05:51:57.022] LOG: Move Scores: [13.5,3,5,30]
+[05:51:57.022] LOG: Sorted Move Pool: ["Bubble Beam","Water Gun","Focus Energy","Lock-On"]
+[05:51:57.022] LOG: Chosen Move: Bubble Beam
+[05:51:57.022] LOG: %cStart Phase EnemyCommandPhase color:green;
+[05:51:57.056] LOG: Move Pool: ["Aqua Cutter","Waterfall","Aqua Jet","Peck"]
+[05:51:57.057] LOG: Move Scores: [27,27,5.4375,20]
+[05:51:57.057] LOG: Sorted Move Pool: ["Aqua Cutter","Waterfall","Peck","Aqua Jet"]
+[05:51:57.057] LOG: Chosen Move: Aqua Cutter
+[05:51:57.057] LOG: %cStart Phase TurnStartPhase color:green;
+[05:51:57.078] LOG: %cStart Phase MovePhase color:green;
+[05:51:57.079] LOG: %cUser: Fogging
+Move: GUST
+Use Mode: NORMAL color:orchid
+[05:51:57.105] LOG: %cStart Phase MessagePhase color:green;
+[05:51:57.369] LOG: %cStart Phase MoveEffectPhase color:green;
+[05:51:58.708] LOG: crit stage: +0
+[05:51:58.709] LOG: Move: Gust | Base damage: 8.656 | Power: 40 | Source attack: 16 | Target defense: 10
+[05:51:58.710] LOG: Move: Gust | Attack damage: 12
+[05:51:58.711] LOG: %cStart Phase DamageAnimPhase color:green;
+[05:51:58.780] LOG: %cStart Phase FaintPhase color:green;
+[05:51:59.786] LOG: %cStart Phase MessagePhase color:green;
+[05:52:00.008] LOG: %cStart Phase VictoryPhase color:green;
+[05:52:00.010] LOG: %cStart Phase ExpPhase color:green;
+[05:52:00.010] LOG: Applied Super EXP. Charm 
+[05:52:00.010] LOG: Applied EXP. Charm 
+[05:52:00.606] LOG: %cStart Phase LevelUpPhase color:green;
+[05:52:01.576] LOG: %cStart Phase ExpPhase color:green;
+[05:52:01.576] LOG: Applied Super EXP. Charm 
+[05:52:01.576] LOG: Applied EXP. Charm 
+[05:52:02.374] LOG: %cStart Phase ExpPhase color:green;
+[05:52:02.375] LOG: Applied Super EXP. Charm 
+[05:52:02.375] LOG: Applied EXP. Charm 
+[05:52:02.840] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[05:52:02.840] LOG: Applied Super EXP. Charm 
+[05:52:02.840] LOG: Applied EXP. Charm 
+[05:52:03.574] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[05:52:03.774] LOG: %cStart Phase MoveEndPhase color:green;
+[05:52:03.778] LOG: %cStart Phase MovePhase color:green;
+[05:52:03.778] LOG: %cUser: Remoraid
+Move: WATER_GUN
+Use Mode: NORMAL color:orchid
+[05:52:03.791] LOG: %cStart Phase MessagePhase color:green;
+[05:52:04.237] LOG: %cStart Phase MoveEffectPhase color:green;
+[05:52:05.106] LOG: crit stage: +0
+[05:52:05.108] LOG: Move: Water Gun | Base damage: 5.4559999999999995 | Power: 48 | Source attack: 15 | Target defense: 20
+[05:52:05.108] LOG: Move: Water Gun | Attack damage: 6
+[05:52:05.109] LOG: %cStart Phase DamageAnimPhase color:green;
+[05:52:05.178] LOG: %cStart Phase MessagePhase color:green;
+[05:52:05.904] LOG: %cStart Phase MoveEndPhase color:green;
+[05:52:05.908] LOG: %cStart Phase MovePhase color:green;
+[05:52:05.908] LOG: %cUser: Arrokuda
+Move: AQUA_CUTTER
+Use Mode: NORMAL color:orchid
+[05:52:05.923] LOG: %cStart Phase MessagePhase color:green;
+[05:52:06.370] LOG: %cStart Phase MoveEffectPhase color:green;
+[05:52:06.906] LOG: crit stage: +1
+[05:52:06.908] LOG: Move: Aqua Cutter | Base damage: 10.4 | Power: 75 | Source attack: 14 | Target defense: 12
+[05:52:06.908] LOG: Move: Aqua Cutter | Attack damage: 23
+[05:52:06.909] LOG: %cStart Phase DamageAnimPhase color:green;
+[05:52:06.979] LOG: %cStart Phase MoveEndPhase color:green;
+[05:52:06.980] LOG: %cStart Phase MovePhase color:green;
+[05:52:06.980] LOG: %cUser: Electrike
+Move: ELECTROWEB
+Use Mode: NORMAL color:orchid
+[05:52:06.985] LOG: %cStart Phase MessagePhase color:green;
+[05:52:07.336] LOG: %cStart Phase MoveEffectPhase color:green;
+[05:52:08.972] LOG: crit stage: +0
+[05:52:08.974] LOG: Move: Electroweb | Base damage: 27.42222222222222 | Power: 110 | Source attack: 20 | Target defense: 9
+[05:52:08.975] LOG: Move: Electroweb | Attack damage: 82
+[05:52:08.976] LOG: %cStart Phase DamageAnimPhase color:green;
+[05:52:09.045] LOG: %cStart Phase MessagePhase color:green;
+[05:52:09.737] LOG: %cStart Phase FaintPhase color:green;
+[05:52:09.749] WARN: cry/846 not found
+[05:52:09.947] LOG: %cStart Phase MessagePhase color:green;
+[05:52:10.211] LOG: %cStart Phase VictoryPhase color:green;
+[05:52:10.216] LOG: %cStart Phase ExpPhase color:green;
+[05:52:10.218] LOG: Applied Super EXP. Charm 
+[05:52:10.219] LOG: Applied EXP. Charm 
+[05:52:10.671] LOG: %cStart Phase ExpPhase color:green;
+[05:52:10.671] LOG: Applied Super EXP. Charm 
+[05:52:10.671] LOG: Applied EXP. Charm 
+[05:52:11.304] LOG: %cStart Phase ExpPhase color:green;
+[05:52:11.304] LOG: Applied Super EXP. Charm 
+[05:52:11.304] LOG: Applied EXP. Charm 
+[05:52:11.838] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[05:52:11.839] LOG: Applied Super EXP. Charm 
+[05:52:11.839] LOG: Applied EXP. Charm 
+[05:52:12.541] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[05:52:12.740] LOG: %cStart Phase MoveEndPhase color:green;
+[05:52:12.744] LOG: %cStart Phase MovePhase color:green;
+[05:52:12.744] LOG: %cUser: Mantyke
+Move: AIR_CUTTER
+Use Mode: NORMAL color:orchid
+[05:52:12.750] LOG: %cStart Phase MessagePhase color:green;
+[05:52:13.169] LOG: %cStart Phase MoveEffectPhase color:green;
+[05:52:13.907] LOG: crit stage: +1
+[05:52:13.910] LOG: Move: Air Cutter | Base damage: 4.74909090909091 | Power: 70 | Source attack: 9 | Target defense: 22
+[05:52:13.911] LOG: Move: Air Cutter | Attack damage: 6
+[05:52:13.912] LOG: %cStart Phase DamageAnimPhase color:green;
+[05:52:13.979] LOG: %cStart Phase MoveEndPhase color:green;
+[05:52:13.979] LOG: %cStart Phase MovePhase color:green;
+[05:52:13.979] LOG: %cStart Phase MoveEndPhase color:green;
+[05:52:13.979] LOG: %cStart Phase CheckInterludePhase color:green;
+[05:52:13.979] LOG: %cStart Phase WeatherEffectPhase color:green;
+[05:52:15.604] LOG: %cStart Phase PositionalTagPhase color:green;
+[05:52:15.604] LOG: %cStart Phase BerryPhase color:green;
+[05:52:15.609] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[05:52:15.613] LOG: %cStart Phase TurnEndPhase color:green;
+[05:52:15.623] LOG: Battle Seed: kopd4u638yJ9O7tC
+[05:52:15.624] WARN: [coop:turn] host recorder: finalize with NO open recording -> turn=-1 events=0 (caller decides not to emit)
+[05:52:15.624] LOG: %cStart Phase PokemonHealPhase color:green;
+[05:52:16.081] LOG: %cStart Phase MessagePhase color:green;
+[05:52:16.870] LOG: %cStart Phase ShowAbilityPhase color:green;
+[05:52:17.440] LOG: %cStart Phase StatStageChangePhase color:green;
+[05:52:18.049] LOG: %cStart Phase MessagePhase color:green;
+[05:52:18.838] LOG: %cStart Phase StatStageChangePhase color:green;
+[05:52:19.447] LOG: %cStart Phase MessagePhase color:green;
+[05:52:20.203] LOG: %cStart Phase HideAbilityPhase color:green;
+[05:52:20.306] LOG: %cStart Phase TurnInitPhase color:green;
+[05:52:20.307] LOG: %cStart Phase CommandPhase color:green;
+[05:52:21.598] LOG: Move: GUST Move targets: {"targets":[3,1,2],"multiple":false} 
+Player Pokemon: Fogging
+[05:52:21.601] LOG: %cStart Phase SelectTargetPhase color:green;
+[05:52:21.878] LOG: %cStart Phase CommandPhase color:green;
+[05:52:24.146] LOG: Move: NASTY_PLOT Move targets: {"targets":[1],"multiple":false} 
+Player Pokemon: Mantyke
+[05:52:24.149] LOG: %cStart Phase CommandPhase color:green;
+[05:52:25.677] LOG: Move: THUNDER_FANG Move targets: {"targets":[3,1],"multiple":false} 
+Player Pokemon: Electrike
+[05:52:25.679] LOG: %cStart Phase SelectTargetPhase color:green;
+[05:52:25.931] LOG: %cStart Phase EnemyCommandPhase color:green;
+[05:52:25.945] LOG: Move Pool: ["Water Gun","Bubble Beam"]
+[05:52:25.945] LOG: Move Scores: [6,14.25]
+[05:52:25.945] LOG: Sorted Move Pool: ["Bubble Beam","Water Gun"]
+[05:52:25.945] LOG: Chosen Move: Bubble Beam
+[05:52:25.945] LOG: %cStart Phase TurnStartPhase color:green;
+[05:52:25.951] LOG: %cStart Phase MovePhase color:green;
+[05:52:25.951] LOG: %cUser: Fogging
+Move: GUST
+Use Mode: NORMAL color:orchid
+[05:52:25.956] LOG: %cStart Phase MessagePhase color:green;
+[05:52:26.270] LOG: %cStart Phase MoveEffectPhase color:green;
+[05:52:27.607] LOG: crit stage: +0
+[05:52:27.609] LOG: Move: Gust | Base damage: 9.616 | Power: 40 | Source attack: 17 | Target defense: 10
+[05:52:27.609] LOG: Move: Gust | Attack damage: 13
+[05:52:27.610] LOG: %cStart Phase DamageAnimPhase color:green;
+[05:52:27.678] LOG: %cStart Phase MoveEndPhase color:green;
+[05:52:27.680] LOG: %cStart Phase MovePhase color:green;
+[05:52:27.680] LOG: %cUser: Electrike
+Move: THUNDER_FANG
+Use Mode: NORMAL color:orchid
+[05:52:27.684] LOG: %cStart Phase MessagePhase color:green;
+[05:52:28.070] LOG: %cStart Phase MoveEffectPhase color:green;
+[05:52:28.773] LOG: crit stage: +0
+[05:52:28.775] LOG: Move: Thunder Fang | Base damage: 6.538181818181818 | Power: 80 | Source attack: 18 | Target defense: 33
+[05:52:28.775] LOG: Move: Thunder Fang | Attack damage: 19
+[05:52:28.776] LOG: %cStart Phase DamageAnimPhase color:green;
+[05:52:28.846] LOG: %cStart Phase MessagePhase color:green;
+[05:52:29.537] LOG: %cStart Phase FaintPhase color:green;
+[05:52:30.548] LOG: %cStart Phase MessagePhase color:green;
+[05:52:30.795] LOG: %cStart Phase VictoryPhase color:green;
+[05:52:30.798] LOG: %cStart Phase ExpPhase color:green;
+[05:52:30.798] LOG: Applied Super EXP. Charm 
+[05:52:30.798] LOG: Applied EXP. Charm 
+[05:52:31.406] LOG: %cStart Phase ExpPhase color:green;
+[05:52:31.406] LOG: Applied Super EXP. Charm 
+[05:52:31.406] LOG: Applied EXP. Charm 
+[05:52:32.140] LOG: %cStart Phase LevelUpPhase color:green;
+[05:52:33.063] LOG: %cStart Phase ExpPhase color:green;
+[05:52:33.064] LOG: Applied Super EXP. Charm 
+[05:52:33.064] LOG: Applied EXP. Charm 
+[05:52:33.440] LOG: %cStart Phase ShowPartyExpBarPhase color:green;
+[05:52:33.440] LOG: Applied Super EXP. Charm 
+[05:52:33.440] LOG: Applied EXP. Charm 
+[05:52:34.141] LOG: %cStart Phase HidePartyExpBarPhase color:green;
+[05:52:34.373] LOG: %cStart Phase MoveEndPhase color:green;
+[05:52:34.374] LOG: %cStart Phase MovePhase color:green;
+[05:52:34.374] LOG: %cUser: Mantyke
+Move: NASTY_PLOT
+Use Mode: NORMAL color:orchid
+[05:52:34.377] LOG: %cStart Phase MessagePhase color:green;
+[05:52:34.803] LOG: %cStart Phase MoveEffectPhase color:green;
+[05:52:35.940] LOG: %cStart Phase StatStageChangePhase color:green;
+[05:52:36.547] LOG: %cStart Phase MessagePhase color:green;
+[05:52:37.304] LOG: %cStart Phase MoveEndPhase color:green;
+[05:52:37.305] LOG: %cStart Phase MovePhase color:green;
+[05:52:37.305] LOG: %cStart Phase MoveEndPhase color:green;
+[05:52:37.305] LOG: %cStart Phase CheckInterludePhase color:green;
+[05:52:37.305] LOG: %cStart Phase WeatherEffectPhase color:green;
+[05:52:38.938] LOG: %cStart Phase PositionalTagPhase color:green;
+[05:52:38.938] LOG: %cStart Phase BerryPhase color:green;
+[05:52:38.941] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[05:52:38.943] LOG: %cStart Phase TurnEndPhase color:green;
+[05:52:38.951] WARN: [coop:turn] host recorder: finalize with NO open recording -> turn=-1 events=0 (caller decides not to emit)
+[05:52:38.951] LOG: %cStart Phase PokemonHealPhase color:green;
+[05:52:39.413] LOG: %cStart Phase MessagePhase color:green;
+[05:52:40.169] LOG: %cStart Phase BattleEndPhase color:green;
+[05:52:40.170] LOG: Battle Score: 66 (3 Turns x0.84)
+[05:52:40.170] LOG: Total Score: 675
+[05:52:40.219] LOG: %cStart Phase ShowAbilityPhase color:green;
+[05:52:40.219] LOG: %cStart Phase MessagePhase color:green;
+[05:52:40.971] LOG: %cStart Phase HideAbilityPhase color:green;
+[05:52:41.074] LOG: %cStart Phase EggLapsePhase color:green;
+[05:52:41.075] LOG: %cStart Phase SelectModifierPhase color:green;
+[05:52:41.075] LOG: Wave Seed: V={alVeYm[CR{veVaXNx[Q 11
+[05:52:41.094] LOG: 1 0 [3,4,5]
+[05:52:41.094] LOG: {"id":"RARE_CANDY","localeKey":"modifierType:ModifierType.RARE_CANDY","iconImage":"rare_candy","soundName":"se/restore","tier":0} 
+[05:52:41.094] LOG: 6 3 [3,4,5]
+[05:52:41.094] LOG: {"id":"LURE","localeKey":"modifierType:ModifierType.LURE","iconImage":"lure","group":"lure","soundName":"se/restore","tier":0,"maxBattles":10} 
+[05:52:41.094] LOG: 1 0 [3,4,5]
+[05:52:41.094] LOG: {"id":"RARE_CANDY","localeKey":"modifierType:ModifierType.RARE_CANDY","iconImage":"rare_candy","soundName":"se/restore","tier":0} 
+[05:52:41.094] LOG: 9 3 [3,4,5]
+[05:52:41.094] LOG: {"id":"TM_CASE","localeKey":"","iconImage":"tm_case","soundName":"se/restore","tier":0} 
+[05:52:41.094] LOG: 2 0 [3,4,5]
+[05:52:41.094] LOG: {"id":"POTION","localeKey":"modifierType:ModifierType.POTION","iconImage":"potion","group":"potion","soundName":"se/restore","tier":0,"restorePoints":20,"restorePercent":10,"healStatus":false} 
+[05:52:50.428] LOG: %cStart Phase LevelUpPhase color:green;
+[05:52:51.343] LOG: %cStart Phase NewBattlePhase color:green;
+[05:52:51.344] LOG: Wave Seed: W>|bmWfZn\DS|wfWbYOy\R 12
+[05:52:51.348] LOG: %cStart Phase NextEncounterPhase color:green;
+[05:52:51.358] LOG: Starting species pool tier: COMMON
+[05:52:51.366] LOG: ER #419: elite BST cap (420 @ w12) - replacing Basculin (480) with Floette White (391)
+[05:52:51.416] LOG: Pokemon: Wild Floette White | Species ID: 10307 | Level: 7 | Nature: Calm (+SpDef/-Atk)
+[05:52:51.416] LOG: Stats (IVs): HP: 26 (9), Atk: 11 (25), Def: 16 (29), Spatk: 15 (1), Spdef: 20 (2), Spd: 12 (18)
+[05:52:51.416] LOG: Ability: Flower Veil | Passive Ability: Pastel Veil 
+[05:52:51.416] LOG: Moveset: ["Fairy Wind","Sweet Scent","Grass Knot"]
+[05:52:51.416] LOG: Starting species pool tier: COMMON
+[05:52:51.457] LOG: Pokemon: Wild Frillish | Species ID: 592 | Level: 8 | Nature: Mild (+SpAtk/-Def)
+[05:52:51.457] LOG: Stats (IVs): HP: 31 (15), Atk: 11 (5), Def: 12 (19), Spatk: 18 (14), Spdef: 19 (7), Spd: 12 (14)
+[05:52:51.457] LOG: Ability: Clear Body | Passive Ability: Water Absorb 
+[05:52:51.457] LOG: Moveset: ["Brine","Pain Split","Water Sport","Bubble Beam"]
+[05:52:51.457] LOG: Starting species pool tier: COMMON
+[05:52:51.459] LOG: ER #419: elite BST cap (420 @ w12) - replacing Basculin (480) with Togetic (405)
+[05:52:51.501] LOG: Pokemon: Wild Togetic | Species ID: 176 | Level: 8 | Nature: Adamant (+Atk/-SpAtk)
+[05:52:51.501] LOG: Stats (IVs): HP: 30 (10), Atk: 15 (23), Def: 19 (6), Spatk: 14 (11), Spdef: 22 (13), Spd: 11 (4)
+[05:52:51.501] LOG: Ability: Sweet Veil (P) | Passive Ability: Shield Dust 
+[05:52:51.501] LOG: Moveset: ["Happy Hour","Yawn","Encore","Growl"]
+[05:52:52.054] WARN: Could not load animation file for move 'happy-hour' 404 
+[05:52:52.944] LOG: Battle Seed: bIuT9pgdywbYRV4c
+[05:52:53.057] DEBUG: Session data saved to slot 0!
+[05:52:53.058] LOG: Wave Seed: W>|bmWfZn\DS|wfWbYOy\R 12
+[05:52:53.739] WARN: cry/10307 not found
+[05:52:53.740] WARN: cry/592 not found
+[05:52:54.639] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[05:52:54.640] LOG: %cStart Phase CheckSwitchPhase color:green;
+[05:52:54.640] LOG: %cStart Phase CheckSwitchPhase color:green;
+[05:52:54.640] LOG: %cStart Phase CheckSwitchPhase color:green;
+[05:52:54.640] LOG: %cStart Phase InitEncounterPhase color:green;
+[05:52:54.642] LOG: %cStart Phase PostSummonPhase color:green;
+[05:52:54.642] LOG: Ran PSP for: Floette White
+[05:52:54.645] LOG: %cStart Phase PostSummonPhase color:green;
+[05:52:54.647] LOG: %cStart Phase PostSummonPhase color:green;
+[05:52:54.647] LOG: %cStart Phase ShowAbilityPhase color:green;
+[05:52:55.174] LOG: %cStart Phase MovePhase color:green;
+[05:52:55.174] LOG: %cUser: Floette White
+Move: SAFEGUARD
+Use Mode: INDIRECT color:orchid
+[05:52:55.187] LOG: %cStart Phase MessagePhase color:green;
+[05:52:55.669] LOG: %cStart Phase MoveEffectPhase color:green;
+[05:52:55.718] LOG: %cStart Phase MessagePhase color:green;
+[05:52:56.604] LOG: %cStart Phase MoveEndPhase color:green;
+[05:52:56.605] LOG: %cStart Phase HideAbilityPhase color:green;
+[05:52:56.707] LOG: %cStart Phase PostSummonPhase color:green;
+[05:52:56.707] LOG: Ran PSP for: Frillish
+[05:52:56.710] LOG: %cStart Phase PostSummonPhase color:green;
+[05:52:56.710] LOG: %cStart Phase PostSummonPhase color:green;
+[05:52:56.710] LOG: %cStart Phase PostSummonPhase color:green;
+[05:52:56.710] LOG: Ran PSP for: Togetic
+[05:52:56.711] LOG: %cStart Phase PostSummonPhase color:green;
+[05:52:56.713] LOG: %cStart Phase PostSummonPhase color:green;
+[05:52:56.713] LOG: %cStart Phase TurnInitPhase color:green;
+[05:52:56.714] LOG: %cStart Phase CommandPhase color:green;
