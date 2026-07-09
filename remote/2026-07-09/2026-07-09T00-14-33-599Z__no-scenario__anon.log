@@ -1,0 +1,267 @@
+url:      https://elite-redux-staging.pages.dev/
+build:    mrc9a598-g33b
+mode:     0  wave:?
+seed:     OXslrFAp2ycYjswKKyccmxTl
+party:    
+enemy:    
+
+----- CONSOLE -----
+[00:13:13.687] LOG: %cStart Phase CommandPhase color:green;
+[00:13:14.185] LOG: Move: DRAGON_ASCENT Move targets: {"targets":[2],"multiple":false} 
+Player Pokemon: Rayquaza
+[00:13:14.189] LOG: %cStart Phase EnemyCommandPhase color:green;
+[00:13:14.190] LOG: %cStart Phase TurnStartPhase color:green;
+[00:13:14.191] LOG: %cStart Phase MovePhase color:green;
+[00:13:14.191] LOG: %cUser: Rayquaza
+Move: DRAGON_ASCENT
+Use Mode: NORMAL color:orchid
+[00:13:14.194] LOG: %cStart Phase MessagePhase color:green;
+[00:13:14.562] LOG: %cStart Phase MoveEffectPhase color:green;
+[00:13:14.564] LOG: Battle Seed: A2XVs1JgDKqjhn55
+[00:13:15.019] WARN: Texture "%s" has no frame "%s" PRAS- Dragon Ascent 1
+[00:13:15.037] WARN: Texture "%s" has no frame "%s" PRAS- Dragon Ascent 1
+[00:13:15.053] WARN: Texture "%s" has no frame "%s" PRAS- Dragon Ascent 1
+[00:13:15.269] WARN: Texture "%s" has no frame "%s" PRAS- Dragon Ascent 1
+[00:13:15.952] LOG: crit stage: +0
+[00:13:15.954] LOG: Move: Dragon Ascent | Base damage: 3765.2 | Power: 120 | Source attack: 336 | Target defense: 9
+[00:13:15.956] LOG: Move: Dragon Ascent | Attack damage: 2823
+[00:13:15.957] LOG: %cStart Phase DamageAnimPhase color:green;
+[00:13:15.986] LOG: %cStart Phase StatStageChangePhase color:green;
+[00:13:15.986] LOG: %cStart Phase FaintPhase color:green;
+[00:13:17.639] LOG: %cStart Phase MessagePhase color:green;
+[00:13:17.856] LOG: %cStart Phase VictoryPhase color:green;
+[00:13:17.857] LOG: %cStart Phase MoveEndPhase color:green;
+[00:13:17.858] LOG: %cStart Phase MovePhase color:green;
+[00:13:17.858] LOG: %cStart Phase MoveEndPhase color:green;
+[00:13:17.858] LOG: %cStart Phase CheckInterludePhase color:green;
+[00:13:17.858] LOG: %cStart Phase WeatherEffectPhase color:green;
+[00:13:17.858] LOG: %cStart Phase PositionalTagPhase color:green;
+[00:13:17.858] LOG: %cStart Phase BerryPhase color:green;
+[00:13:17.859] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[00:13:17.859] LOG: %cStart Phase TurnEndPhase color:green;
+[00:13:17.860] WARN: [coop:turn] host recorder: finalize with NO open recording -> turn=-1 events=0 (caller decides not to emit)
+[00:13:17.861] LOG: %cStart Phase BattleEndPhase color:green;
+[00:13:17.861] LOG: Battle Score: 13 (1 Turns x1)
+[00:13:17.861] LOG: Total Score: 82
+[00:13:17.870] LOG: %cStart Phase EggLapsePhase color:green;
+[00:13:17.870] LOG: %cStart Phase SelectModifierPhase color:green;
+[00:13:17.870] LOG: Wave Seed: gHhEDhbHuDiJj|IrC]| 17
+[00:13:17.872] LOG: 7 4 [2,3,4,5]
+[00:13:17.872] LOG: {"id":"TEMP_STAT_STAGE_BOOSTER","localeKey":"","iconImage":"x_attack","soundName":"se/restore","tier":0,"stat":1,"nameKey":"x_attack","quantityKey":"percentage"} 
+[00:13:17.872] LOG: 1 0 [2,3,4,5]
+[00:13:17.872] LOG: {"id":"RARE_CANDY","localeKey":"modifierType:ModifierType.RARE_CANDY","iconImage":"rare_candy","soundName":"se/restore","tier":0} 
+[00:13:17.872] LOG: 0 0 [2,3,4,5]
+[00:13:17.873] LOG: {"id":"POKEBALL","localeKey":"","iconImage":"pb","group":"pb","soundName":"se/pb_bounce_1","tier":0,"pokeballType":0,"count":5} 
+[00:13:17.873] LOG: 20 9 [2,3,4,5,6,7,8,9,10,22]
+[00:13:17.873] LOG: {"id":"BASE_STAT_BOOSTER","localeKey":"","iconImage":"carbos","soundName":"se/restore","tier":1,"stat":5,"key":"carbos"} 
+[00:13:17.873] LOG: 0 0 [2,3,4,5,6,7,8,9,10,22]
+[00:13:17.873] LOG: {"id":"GREAT_BALL","localeKey":"","iconImage":"gb","group":"pb","soundName":"se/pb_bounce_1","tier":1,"pokeballType":1,"count":5} 
+[00:13:17.873] LOG: 0 0 [2,3,4,5,6,7,8,9,10,22]
+[00:13:17.873] LOG: {"id":"GREAT_BALL","localeKey":"","iconImage":"gb","group":"pb","soundName":"se/pb_bounce_1","tier":1,"pokeballType":1,"count":5} 
+[00:13:17.874] LOG: 13 9 [2,3,4,5,6,7,8,9,10,22]
+[00:13:17.874] LOG: {"id":"NUGGET","localeKey":"modifierType:ModifierType.NUGGET","iconImage":"nugget","group":"money","soundName":"se/buy","tier":1,"moneyMultiplier":1,"moneyMultiplierDescriptorKey":"modifierType:ModifierType.MoneyRewardModifierType.extra.small"} 
+[00:13:21.464] LOG: %cStart Phase ErCrossroadsPhase color:green;
+[00:13:24.387] LOG: %cStart Phase SelectBiomePhase color:green;
+[00:13:24.387] LOG: Wave Seed: gHhEDhbHuDiJj|IrC]| 17
+[00:13:26.074] LOG: %cStart Phase SwitchBiomePhase color:green;
+[00:13:27.446] LOG: %cStart Phase NewBattlePhase color:green;
+[00:13:27.447] LOG: Wave Seed: hIiFEicIvEjKk}JsD^} 18
+[00:13:27.449] LOG: %cStart Phase ReturnPhase color:green;
+[00:13:27.797] LOG: %cStart Phase ShowTrainerPhase color:green;
+[00:13:28.144] LOG: %cStart Phase NewBiomeEncounterPhase color:green;
+[00:13:28.149] LOG: Starting species pool tier: UNCOMMON
+[00:13:28.179] LOG: Pokemon: Wild Magikarp | Species ID: 129 | Level: 5 | Nature: Modest (+SpAtk/-Atk)
+[00:13:28.179] LOG: Stats (IVs): HP: 18 (21), Atk: 5 (5), Def: 11 (10), Spatk: 8 (23), Spdef: 8 (30), Spd: 14 (28)
+[00:13:28.179] LOG: Ability: Marvel Scale | Passive Ability: Multiscale 
+[00:13:28.179] LOG: Moveset: ["Splash"]
+[00:13:28.181] LOG: Battle Seed: gxFc6EFvUbzbzReQ
+[00:13:28.276] DEBUG: Session data saved to slot 4!
+[00:13:28.277] LOG: Wave Seed: hIiFEicIvEjKk}JsD^} 18
+[00:13:29.641] LOG: %cStart Phase SummonPhase color:green;
+[00:13:30.556] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[00:13:30.560] LOG: %cStart Phase InitEncounterPhase color:green;
+[00:13:30.563] LOG: %cStart Phase PostSummonPhase color:green;
+[00:13:30.563] LOG: Ran PSP for: Rayquaza
+[00:13:30.564] LOG: %cStart Phase PostSummonPhase color:green;
+[00:13:30.565] LOG: %cStart Phase PostSummonPhase color:green;
+[00:13:30.565] LOG: Ran PSP for: Magikarp
+[00:13:30.565] LOG: %cStart Phase PostSummonPhase color:green;
+[00:13:30.566] LOG: %cStart Phase PostSummonPhase color:green;
+[00:13:30.566] LOG: %cStart Phase TurnInitPhase color:green;
+[00:13:30.567] LOG: %cStart Phase CommandPhase color:green;
+[00:13:32.007] LOG: Move: DRAGON_ASCENT Move targets: {"targets":[2],"multiple":false} 
+Player Pokemon: Rayquaza
+[00:13:32.014] LOG: %cStart Phase EnemyCommandPhase color:green;
+[00:13:32.015] LOG: %cStart Phase TurnStartPhase color:green;
+[00:13:32.017] LOG: %cStart Phase MovePhase color:green;
+[00:13:32.017] LOG: %cUser: Rayquaza
+Move: DRAGON_ASCENT
+Use Mode: NORMAL color:orchid
+[00:13:32.019] LOG: %cStart Phase MessagePhase color:green;
+[00:13:32.384] LOG: %cStart Phase MoveEffectPhase color:green;
+[00:13:32.832] WARN: Texture "%s" has no frame "%s" PRAS- Dragon Ascent 1
+[00:13:32.849] WARN: Texture "%s" has no frame "%s" PRAS- Dragon Ascent 1
+[00:13:32.866] WARN: Texture "%s" has no frame "%s" PRAS- Dragon Ascent 1
+[00:13:33.090] WARN: Texture "%s" has no frame "%s" PRAS- Dragon Ascent 1
+[00:13:33.765] LOG: crit stage: +0
+[00:13:33.768] LOG: Move: Dragon Ascent | Base damage: 3080.981818181818 | Power: 120 | Source attack: 336 | Target defense: 11
+[00:13:33.769] LOG: Move: Dragon Ascent | Attack damage: 2148
+[00:13:33.770] LOG: %cStart Phase DamageAnimPhase color:green;
+[00:13:33.799] LOG: %cStart Phase StatStageChangePhase color:green;
+[00:13:33.799] LOG: %cStart Phase StatStageChangePhase color:green;
+[00:13:34.396] LOG: %cStart Phase MessagePhase color:green;
+[00:13:35.084] LOG: %cStart Phase StatStageChangePhase color:green;
+[00:13:35.695] LOG: %cStart Phase MessagePhase color:green;
+[00:13:36.390] LOG: %cStart Phase FaintPhase color:green;
+[00:13:38.038] LOG: %cStart Phase MessagePhase color:green;
+[00:13:38.224] LOG: %cStart Phase VictoryPhase color:green;
+[00:13:38.224] LOG: %cStart Phase MoveEndPhase color:green;
+[00:13:38.224] LOG: %cStart Phase MovePhase color:green;
+[00:13:38.225] LOG: %cStart Phase MoveEndPhase color:green;
+[00:13:38.225] LOG: %cStart Phase CheckInterludePhase color:green;
+[00:13:38.225] LOG: %cStart Phase WeatherEffectPhase color:green;
+[00:13:38.225] LOG: %cStart Phase PositionalTagPhase color:green;
+[00:13:38.225] LOG: %cStart Phase BerryPhase color:green;
+[00:13:38.225] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[00:13:38.225] LOG: %cStart Phase TurnEndPhase color:green;
+[00:13:38.226] WARN: [coop:turn] host recorder: finalize with NO open recording -> turn=-1 events=0 (caller decides not to emit)
+[00:13:38.226] LOG: %cStart Phase BattleEndPhase color:green;
+[00:13:38.226] LOG: Battle Score: 14 (1 Turns x1)
+[00:13:38.226] LOG: Total Score: 96
+[00:13:38.231] LOG: %cStart Phase EggLapsePhase color:green;
+[00:13:38.231] LOG: %cStart Phase SelectModifierPhase color:green;
+[00:13:38.231] LOG: Wave Seed: hIiFEicIvEjKk}JsD^} 18
+[00:13:38.233] LOG: 15 7 [2,3,4,5,6,7,8,22]
+[00:13:38.233] LOG: GREAT 0
+[00:13:38.233] LOG: 9 7 [2,3,4,5,6,7,8,22]
+[00:13:38.233] LOG: {"id":"ELIXIR","localeKey":"modifierType:ModifierType.ELIXIR","iconImage":"elixir","group":"elixir","soundName":"se/restore","tier":1,"restorePoints":10} 
+[00:13:38.234] LOG: 17 6 [8,10,11,12,13,14,23]
+[00:13:38.234] LOG: {"id":"ATTACK_TYPE_BOOSTER","localeKey":"","iconImage":"sharp_beak","soundName":"se/restore","tier":2,"moveType":2,"boostPercent":20} 
+[00:13:38.234] LOG: 19 7 [2,3,4,5,6,7,8,22]
+[00:13:38.234] LOG: {"id":"ER_ABILITY_CAPSULE","localeKey":"","iconImage":"ability_capsule","soundName":"se/restore","tier":1} 
+[00:13:38.234] LOG: 21 7 [2,3,4,5,6,7,8,22]
+[00:13:38.235] LOG: GREAT 0
+[00:13:38.235] LOG: 13 7 [2,3,4,5,6,7,8,22]
+[00:13:38.235] LOG: {"id":"NUGGET","localeKey":"modifierType:ModifierType.NUGGET","iconImage":"nugget","group":"money","soundName":"se/buy","tier":1,"moneyMultiplier":1,"moneyMultiplierDescriptorKey":"modifierType:ModifierType.MoneyRewardModifierType.extra.small"} 
+[00:13:41.551] LOG: %cStart Phase NewBattlePhase color:green;
+[00:13:41.552] LOG: Wave Seed: iJjGFjdJwFkLl~KtE_~ 19
+[00:13:41.552] LOG: %cStart Phase NextEncounterPhase color:green;
+[00:13:41.553] LOG: Starting species pool tier: COMMON
+[00:13:41.565] LOG: Pokemon: Wild Magikarp | Species ID: 129 | Level: 5 | Nature: Bashful (-)
+[00:13:41.565] LOG: Stats (IVs): HP: 17 (14), Atk: 7 (27), Def: 11 (16), Spatk: 7 (14), Spdef: 7 (5), Spd: 13 (12)
+[00:13:41.565] LOG: Ability: Marvel Scale | Passive Ability: Multiscale 
+[00:13:41.565] LOG: Moveset: ["Splash"]
+[00:13:41.566] LOG: Battle Seed: Lg96D0SXbm7twXyh
+[00:13:41.653] DEBUG: Session data saved to slot 4!
+[00:13:41.654] LOG: Wave Seed: iJjGFjdJwFkLl~KtE_~ 19
+[00:13:43.051] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[00:13:43.051] LOG: %cStart Phase InitEncounterPhase color:green;
+[00:13:43.051] LOG: %cStart Phase PostSummonPhase color:green;
+[00:13:43.052] LOG: Ran PSP for: Magikarp
+[00:13:43.052] LOG: %cStart Phase PostSummonPhase color:green;
+[00:13:43.052] LOG: %cStart Phase PostSummonPhase color:green;
+[00:13:43.053] LOG: %cStart Phase TurnInitPhase color:green;
+[00:13:43.055] LOG: %cStart Phase CommandPhase color:green;
+[00:13:44.228] LOG: Move: DRAGON_ASCENT Move targets: {"targets":[2],"multiple":false} 
+Player Pokemon: Rayquaza
+[00:13:44.230] LOG: %cStart Phase EnemyCommandPhase color:green;
+[00:13:44.231] LOG: %cStart Phase TurnStartPhase color:green;
+[00:13:44.233] LOG: %cStart Phase MovePhase color:green;
+[00:13:44.233] LOG: %cUser: Rayquaza
+Move: DRAGON_ASCENT
+Use Mode: NORMAL color:orchid
+[00:13:44.235] LOG: %cStart Phase MessagePhase color:green;
+[00:13:44.602] LOG: %cStart Phase MoveEffectPhase color:green;
+[00:13:45.052] WARN: Texture "%s" has no frame "%s" PRAS- Dragon Ascent 1
+[00:13:45.068] WARN: Texture "%s" has no frame "%s" PRAS- Dragon Ascent 1
+[00:13:45.085] WARN: Texture "%s" has no frame "%s" PRAS- Dragon Ascent 1
+[00:13:45.306] WARN: Texture "%s" has no frame "%s" PRAS- Dragon Ascent 1
+[00:13:45.993] LOG: crit stage: +0
+[00:13:45.995] LOG: Applied Sharp Beak 
+[00:13:45.996] LOG: Move: Dragon Ascent | Base damage: 3696.7781818181816 | Power: 144 | Source attack: 336 | Target defense: 11
+[00:13:45.998] LOG: Move: Dragon Ascent | Attack damage: 2578
+[00:13:45.999] LOG: %cStart Phase DamageAnimPhase color:green;
+[00:13:46.025] LOG: %cStart Phase StatStageChangePhase color:green;
+[00:13:46.025] LOG: %cStart Phase StatStageChangePhase color:green;
+[00:13:46.617] LOG: %cStart Phase MessagePhase color:green;
+[00:13:47.314] LOG: %cStart Phase StatStageChangePhase color:green;
+[00:13:47.906] LOG: %cStart Phase MessagePhase color:green;
+[00:13:48.601] LOG: %cStart Phase FaintPhase color:green;
+[00:13:50.275] LOG: %cStart Phase MessagePhase color:green;
+[00:13:50.765] LOG: %cStart Phase VictoryPhase color:green;
+[00:13:50.766] LOG: %cStart Phase MoveEndPhase color:green;
+[00:13:50.766] LOG: %cStart Phase MovePhase color:green;
+[00:13:50.766] LOG: %cStart Phase MoveEndPhase color:green;
+[00:13:50.766] LOG: %cStart Phase CheckInterludePhase color:green;
+[00:13:50.766] LOG: %cStart Phase WeatherEffectPhase color:green;
+[00:13:50.766] LOG: %cStart Phase PositionalTagPhase color:green;
+[00:13:50.767] LOG: %cStart Phase BerryPhase color:green;
+[00:13:50.767] LOG: %cStart Phase CheckStatusEffectPhase color:green;
+[00:13:50.767] LOG: %cStart Phase TurnEndPhase color:green;
+[00:13:50.767] WARN: [coop:turn] host recorder: finalize with NO open recording -> turn=-1 events=0 (caller decides not to emit)
+[00:13:50.767] LOG: %cStart Phase BattleEndPhase color:green;
+[00:13:50.768] LOG: Battle Score: 13 (1 Turns x1)
+[00:13:50.768] LOG: Total Score: 109
+[00:13:50.781] LOG: %cStart Phase EggLapsePhase color:green;
+[00:13:50.782] LOG: %cStart Phase SelectModifierPhase color:green;
+[00:13:50.782] LOG: Wave Seed: iJjGFjdJwFkLl~KtE_~ 19
+[00:13:50.784] LOG: 11 7 [2,3,4,5,6,7,8,22]
+[00:13:50.784] LOG: {"id":"DIRE_HIT","localeKey":"modifierType:ModifierType.DIRE_HIT","iconImage":"dire_hit","soundName":"se/restore","tier":1} 
+[00:13:50.784] LOG: 20 7 [2,3,4,5,6,7,8,22]
+[00:13:50.784] LOG: {"id":"BASE_STAT_BOOSTER","localeKey":"","iconImage":"zinc","soundName":"se/restore","tier":1,"stat":4,"key":"zinc"} 
+[00:13:50.784] LOG: 13 7 [2,3,4,5,6,7,8,22]
+[00:13:50.785] LOG: {"id":"NUGGET","localeKey":"modifierType:ModifierType.NUGGET","iconImage":"nugget","group":"money","soundName":"se/buy","tier":1,"moneyMultiplier":1,"moneyMultiplierDescriptorKey":"modifierType:ModifierType.MoneyRewardModifierType.extra.small"} 
+[00:13:50.785] LOG: 8 2 [2,3]
+[00:13:50.785] LOG: {"id":"BERRY","localeKey":"","iconImage":"lum_berry","group":"berry","soundName":"se/restore","tier":0,"berryType":1} 
+[00:13:53.335] LOG: %cStart Phase NewBattlePhase color:green;
+[00:13:53.335] LOG: Wave Seed: jKkHGkeKxGlMmLuF` 20
+[00:13:53.336] LOG: Starting trainer pool tier: BOSS_RARE
+[00:13:53.336] LOG: Downgraded trainer rarity tier from BOSS_RARE to BOSS
+[00:13:53.339] LOG: %cStart Phase ReturnPhase color:green;
+[00:13:53.705] LOG: %cStart Phase ShowTrainerPhase color:green;
+[00:13:54.045] LOG: %cStart Phase NextEncounterPhase color:green;
+[00:13:54.075] LOG: Pokemon: Foe Magikarp | Species ID: 129 | Level: 5 | Nature: Brave (+Atk/-Spd)
+[00:13:54.076] LOG: Stats (IVs): HP: 17 (10), Atk: 8 (19), Def: 10 (12), Spatk: 6 (30), Spdef: 7 (26), Spd: 12 (23)
+[00:13:54.076] LOG: Ability: Guilt Trip | Passive Ability: Multiscale | Boss Bars: 2
+[00:13:54.076] LOG: Moveset: ["Splash"]
+[00:13:54.086] LOG: Pokemon: Foe Magikarp | Species ID: 129 | Level: 5 | Nature: Rash (+SpAtk/-SpDef)
+[00:13:54.086] LOG: Stats (IVs): HP: 17 (18), Atk: 7 (23), Def: 11 (23), Spatk: 7 (19), Spdef: 6 (19), Spd: 13 (23)
+[00:13:54.086] LOG: Ability: Marvel Scale | Passive Ability: Multiscale | Boss Bars: 2
+[00:13:54.086] LOG: Moveset: ["Splash"]
+[00:13:59.311] LOG: {"id":"BERRY","localeKey":"","iconImage":"sitrus_berry","group":"berry","soundName":"se/restore","tier":0,"berryType":0} (enemy)
+[00:13:59.311] LOG: {"id":"BASE_STAT_BOOSTER","localeKey":"","iconImage":"calcium","soundName":"se/restore","tier":1,"stat":3,"key":"calcium"} (enemy)
+[00:13:59.312] LOG: Battle Seed: dH7vQaakW5iskmaN
+[00:13:59.314] LOG: Applied Calcium (enemy)
+[00:13:59.314] LOG: Generated AI funcs
+[00:13:59.410] DEBUG: Session data saved to slot 4!
+[00:13:59.411] LOG: Wave Seed: jKkHGkeKxGlMmLuF` 20
+[00:14:00.084] LOG: Gym Leader Tate
+[00:14:02.376] LOG: Dialogue saved as seen: dialogue:tate.encounter.1
+[00:14:02.470] LOG: Gym Leader Tate
+[00:14:03.515] LOG: %cStart Phase SummonPhase color:green;
+[00:14:03.516] LOG: Tate
+[00:14:03.933] LOG: Applied Calcium (enemy)
+[00:14:04.375] LOG: %cStart Phase SummonPhase color:green;
+[00:14:05.307] LOG: %cStart Phase ToggleDoublePositionPhase color:green;
+[00:14:05.309] LOG: %cStart Phase InitEncounterPhase color:green;
+[00:14:05.311] LOG: %cStart Phase PostSummonPhase color:green;
+[00:14:05.311] LOG: Ran PSP for: Rayquaza
+[00:14:05.312] LOG: %cStart Phase PostSummonPhase color:green;
+[00:14:05.312] LOG: %cStart Phase PostSummonPhase color:green;
+[00:14:05.312] LOG: Ran PSP for: Magikarp
+[00:14:05.313] LOG: %cStart Phase PostSummonPhase color:green;
+[00:14:05.313] LOG: %cStart Phase PostSummonPhase color:green;
+[00:14:05.313] LOG: %cStart Phase TurnInitPhase color:green;
+[00:14:05.314] LOG: %cStart Phase CommandPhase color:green;
+[00:14:12.585] DEBUG: Session data saved to slot 4!
+[00:14:15.214] LOG: Seed: YzpWhvmeR4FLlhuTmOlUlUrm
+[00:14:15.214] LOG: Wave Seed: YzpWhvmeR4FLlhuTmOlUlUrm 0
+[00:14:15.697] WARN: AnimationManager key already exists: prompt
+[00:14:15.697] WARN: AnimationManager key already exists: tera_sparkle
+[00:14:15.698] LOG: Seed: OXslrFAp2ycYjswKKyccmxTl
+[00:14:15.698] LOG: Wave Seed: OXslrFAp2ycYjswKKyccmxTl 0
+[00:14:20.196] LOG: %cStart Phase LoginPhase color:green;
+[00:14:20.703] LOG: Client Session: I2HG1xofXb7gk4GB3j2OJu6Rm5jJLEO4
+[00:14:21.269] LOG: %cStart Phase TitlePhase color:green;
+[00:14:21.270] LOG: Getting Session Slot id: %d 4
+[00:14:21.276] LOG: use seasonal splash messages true
