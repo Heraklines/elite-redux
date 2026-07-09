@@ -67,10 +67,10 @@ describe.skipIf(!RUN)("coop #872 - stale shop continuation is dropped, not an NP
     expect(phase["coopShopSceneAlive"]("test: battle gone")).toBe(false);
   });
 
-  it("coopShopSceneAlive: false when the phase machine moved past this phase", () => {
+  it("coopShopSceneAlive: true while the battle is live - EVEN when another phase reports current (the duo-harness ctx-swap shape, must NOT over-fire)", () => {
     const phase = new SelectModifierPhase();
     installScene({ waveIndex: 45 }, { some: "other phase" });
-    expect(phase["coopShopSceneAlive"]("test: superseded")).toBe(false);
+    expect(phase["coopShopSceneAlive"]("test: ctx-swap")).toBe(true);
   });
 
   it("coopShopSceneAlive: true while the shop is legitimately live", () => {

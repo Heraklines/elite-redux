@@ -1285,21 +1285,21 @@ export class SelectModifierPhase extends BattlePhase {
 
   /**
    * #872: is this shop phase still entitled to touch the screen after an async wait? A parked
-   * continuation (shop barrier / option adopt) can resolve long after the run ended or the phase
-   * machine moved on - opening the modifier UI then NPEs on the torn-down battle (getRerollCost reads
-   * currentBattle.waveIndex) or stomps whatever screen is actually current. False = log + walk away
-   * WITHOUT ending the phase (we are no longer the current phase; touching the manager would corrupt it).
+   * continuation (shop barrier / option adopt) can resolve long after the run ended - opening the
+   * modifier UI then NPEs on the torn-down battle (getRerollCost reads currentBattle.waveIndex),
+   * an UNCAUGHT rejection that kills the client's phase machine (the live freeze class caught by
+   * the me-asym soak). False = log + walk away WITHOUT touching the phase manager. Deliberately
+   * ONLY the battle-gone check (the exact NPE precondition): a phase-currency check over-fires in
+   * the two-engine harness, where async continuations can resume under the OTHER client's ctx swap.
    */
   private coopShopSceneAlive(context: string): boolean {
-    const battleGone = globalScene.currentBattle == null;
-    const superseded = globalScene.phaseManager.getCurrentPhase() !== this;
-    if (!battleGone && !superseded) {
+    if (globalScene.currentBattle != null) {
       return true;
     }
     coopWarn(
       "reward",
-      `stale shop continuation DROPPED (${context}): battleGone=${battleGone} superseded=${superseded} `
-        + "- the scene moved on during an async wait; not opening the shop screen (#872 anti-freeze)",
+      `stale shop continuation DROPPED (${context}): currentBattle is gone `
+        + "- the run moved on during an async wait; not opening the shop screen (#872 anti-freeze)",
     );
     return false;
   }

@@ -220,6 +220,10 @@ const ME_CONTINUATION =
 const BIOME_BOUNDARY =
   "drive the two-engine biome-boundary crossroads/World-Map owner pick for real (setCoopBiomePickerDrivenByTest "
   + "+ owner/watcher parity + biome pick), re-deriving the ME-leg counter parities the extra tick shifts (#848 follow-up)";
+/** Follow-up shorthand for the one-time Stormglass relic weather pick (#130 co-op wiring). */
+const STORMGLASS_LEG =
+  "drive the Stormglass weather pick across both engines: stage the Stormglass relic on the duo rig, trigger the "
+  + "one-time ErStormglassPickerPhase prompt, host OWNER picks + relays, guest WATCHER adopts (kind/band stormglass)";
 /**
  * Follow-up shorthand for the mid-run CATCH surfaces. #843/#849 BUILD 1 LANDED the inline catch leg (the
  * coop-soak-driver `catchWaves` knob, proven green by coop-soak-catch.test.ts): on a designated WILD wave the
@@ -381,6 +385,16 @@ export const KNOWN_UNDRIVABLE: ReadonlyMap<string, UndrivableEntry> = new Map<st
       followupTask: BIOME_BOUNDARY,
     },
   ],
+  // #130: the one-time Stormglass relic weather pick (er-stormglass-picker-phase.ts). The relay IS wired
+  // (host OWNER commits + relays, watcher adopts with the COOP_BIOME_WAIT_MS heal), but the soak never
+  // grants the Stormglass relic, so the prompt never fires - undrivable until a leg stages the relic.
+  [
+    kindKey("stormglass"),
+    {
+      reason: "the one-time Stormglass weather pick needs the Stormglass relic, which the soak never grants",
+      followupTask: STORMGLASS_LEG,
+    },
+  ],
   [kindKey("bargain"), { reason: "the Bargain outcome relay is ME-gated", followupTask: ME_CONTINUATION }],
   [kindKey("coloBoard"), { reason: "the Colosseum board relay is ME-gated", followupTask: ME_CONTINUATION }],
   [kindKey("coloPick"), { reason: "the Colosseum pick relay is ME-gated", followupTask: ME_CONTINUATION }],
@@ -476,6 +490,13 @@ export const KNOWN_UNDRIVABLE: ReadonlyMap<string, UndrivableEntry> = new Map<st
     {
       reason: "the #848 World-Map biome-pick seq band auto-resolves in vitest (no relay send)",
       followupTask: BIOME_BOUNDARY,
+    },
+  ],
+  [
+    bandKey("stormglass"),
+    {
+      reason: "the Stormglass seq band needs the Stormglass relic, which the soak never grants (see kind:stormglass)",
+      followupTask: STORMGLASS_LEG,
     },
   ],
   [bandKey("bargain"), { reason: "the Bargain seq band is ME-gated", followupTask: ME_CONTINUATION }],
