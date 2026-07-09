@@ -591,6 +591,13 @@ export class SelectStarterPhase extends Phase {
       if (Overrides.GENDER_OVERRIDE !== null) {
         starterGender = Overrides.GENDER_OVERRIDE;
       }
+      // Showdown fairness (2026-07-10): a manifest-built mon (host's OWN party) fields the manifest's
+      // FREE nature and has its IVs FORCED to a perfect [31 x6]. The opponent party is built with the
+      // SAME forcing (buildShowdownEnemy), and the guest boots the host's post-build session snapshot,
+      // so the forced values flow to the guest verbatim — both engines recalculate identical stats,
+      // keeping the turn checksum in parity. Non-showdown paths (showdownMon == null) are unchanged.
+      const starterIvs = showdownMon ? [31, 31, 31, 31, 31, 31] : starter.ivs;
+      const starterNature = (showdownMon?.nature as Nature | undefined) ?? starter.nature;
       const starterPokemon = globalScene.addPlayerPokemon(
         species,
         globalScene.gameMode.getStartingLevel(),
@@ -599,8 +606,8 @@ export class SelectStarterPhase extends Phase {
         starterGender,
         starter.shiny,
         starter.variant,
-        starter.ivs,
-        starter.nature,
+        starterIvs,
+        starterNature,
       );
       if (starter.moveset) {
         starterPokemon.tryPopulateMoveset(starter.moveset, ignoreMovesetValidation);

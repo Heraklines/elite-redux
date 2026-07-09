@@ -86,7 +86,16 @@ export interface ShowdownMonManifest {
   shiny: boolean;
   variant: number;
   abilityIndex: number;
-  nature: number;
+  /**
+   * Showdown fairness (2026-07-10): the FREE nature. OPTIONAL — like `erShinyLab`, a new optional
+   * field must be OMITTED when absent (never carried as `undefined`), so the transport-canonical
+   * team hash stays byte-stable across the JSON round-trip both clients hash. `starterToManifest`
+   * always populates it (from the rolled nature; the Set Editor overwrites it with the player's
+   * pick), so it is present in every production manifest; the build/validate sites tolerate absence
+   * (a legacy/older-client manifest) by falling back to a deterministic default and skipping the
+   * nature collection check.
+   */
+  nature?: number | undefined;
   ivs: number[];
   moveset: number[];
   item: string;
@@ -178,7 +187,9 @@ function malformedReason(mon: unknown): string | null {
   if (!isInt(m.abilityIndex)) {
     return "abilityIndex must be an integer";
   }
-  if (!isInt(m.nature)) {
+  // nature is OPTIONAL (showdown fairness = free nature; a manifest may omit it and fall back to a
+  // deterministic default at build). When present it must still be an integer; absent is valid.
+  if (m.nature !== undefined && !isInt(m.nature)) {
     return "nature must be an integer";
   }
   if (typeof m.item !== "string") {
@@ -279,7 +290,8 @@ function checkCollection(
       message: `Ability ${mon.abilityIndex} is not unlocked (slot ${slot}).`,
     });
   }
-  if (!unlocks.isNatureUnlocked(mon.rootSpeciesId, mon.nature)) {
+  // Nature is collection-gated only when the manifest carries one — a free-pick manifest may omit it.
+  if (mon.nature !== undefined && !unlocks.isNatureUnlocked(mon.rootSpeciesId, mon.nature)) {
     out.push({
       rule: "collection",
       slot,

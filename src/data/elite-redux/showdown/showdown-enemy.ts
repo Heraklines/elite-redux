@@ -57,7 +57,8 @@ export function manifestToSerializedMon(m: ShowdownMonManifest): CoopSerializedP
     formIndex: m.formIndex,
     level: m.level,
     abilityIndex: m.abilityIndex,
-    nature: m.nature,
+    // nature is OPTIONAL on the manifest (showdown free nature); absent -> HARDY (0) deterministically.
+    nature: m.nature ?? 0,
     shiny: m.shiny,
     variant: m.variant,
     ivs: [...m.ivs],
