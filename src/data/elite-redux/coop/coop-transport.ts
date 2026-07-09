@@ -943,7 +943,7 @@ export type CoopMessage =
    * `wave`. The guest adopts these verbatim instead of regenerating (so it never rolls
    * its own enemy species/ability/IVs). Sent at encounter start.
    */
-  | { t: "enemyPartySync"; wave: number; enemies: CoopSerializedEnemy[]; meType?: number }
+  | { t: "enemyPartySync"; wave: number; enemies: CoopSerializedEnemy[]; meType?: number; battleType?: number }
   /**
    * Guest -> host (#633/#698, enemy-party handoff robustness): "(re)send me the enemy party
    * for `wave`". The host broadcasts `enemyPartySync` ONCE inside its EncounterPhase, AFTER the
@@ -1238,7 +1238,7 @@ function summarizeCoopMessage(msg: CoopMessage): string {
     case "requestStateSync":
       return `turn=${msg.turn} seq=${msg.seq}`;
     case "enemyPartySync":
-      return `wave=${msg.wave} enemies=${msg.enemies.length}`;
+      return `wave=${msg.wave} enemies=${msg.enemies.length}${msg.battleType === undefined ? "" : ` battleType=${msg.battleType}`}`;
     case "requestEnemyParty":
       return `wave=${msg.wave}`;
     case "launchSnapshot":

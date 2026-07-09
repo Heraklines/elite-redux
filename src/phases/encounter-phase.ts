@@ -293,6 +293,9 @@ export class EncounterPhase extends BattlePhase {
           wave,
           enemies,
           globalScene.currentBattle?.mysteryEncounter?.encounterType ?? COOP_WAVE_NO_ME,
+          // #867: state the host-authoritative WILD-vs-TRAINER verdict so the guest adopts it in
+          // newBattle instead of re-deriving via isWaveTrainer (the wave-42 saveDataDigest split).
+          globalScene.currentBattle?.battleType,
         );
       });
     } catch {

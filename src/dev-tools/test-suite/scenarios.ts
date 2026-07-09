@@ -2345,6 +2345,32 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
   },
   {
+    label: "(note) Co-op: the wave WILD-vs-TRAINER type is host-authoritative - the partner adopts it (#867)",
+    description:
+      "CO-OP fix - verify with TWO clients (not a solo battle). Live/soak data-tier P0: the PARTNER (the pure\n"
+      + "renderer) re-DERIVED each wave's WILD-vs-TRAINER type from its OWN isWaveTrainer roll (an\n"
+      + "arena-trainerChance / biome-overstay / seeded roll). Once its arena/overstay state drifts from the\n"
+      + "host that roll DIVERGES: at a TRAINER wave the host had battleType=TRAINER while the partner\n"
+      + "self-derived WILD (god-leg soak seed 20260709 wave 43). The saveDataDigest hashes\n"
+      + "currentBattle.battleType, so the two clients' per-turn checksum SPLIT - a MISMATCH every turn healed\n"
+      + "by an expensive full-state resync - and a 'wild'-thinking partner mishandled the trainer's mid-battle\n"
+      + "send-outs (the empty-enemy-slot symptom class). Root cause: the guest ROLLED the wave type instead of\n"
+      + "ADOPTING it, exactly the #862 (ME verdict) class one step over. Fixed: the host's wave-start\n"
+      + "enemyPartySync now ALSO states its authoritative battleType, and the guest ADOPTS it in newBattle\n"
+      + "(never rolling isWaveTrainer when the verdict is present). DO (2 clients): play a run across several\n"
+      + "waves that MIX wild and trainer battles (e.g. into the mid-game where trainer density climbs).\n"
+      + "EXPECT: both clients agree on every wave's type (no client showing a 'wild' encounter while the other\n"
+      + "fights a trainer), no per-turn resync churn on trainer waves. Duo-tested headlessly in\n"
+      + "test/tests/elite-redux/coop/coop-guest-battletype-adopt.test.ts + coop-wave-battletype-verdict.test.ts.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({ STARTING_WAVE_OVERRIDE: 1, STARTING_LEVEL_OVERRIDE: 50 });
+      return [
+        makeStarter(SpeciesId.SNORLAX, { moveset: [MoveId.TACKLE, MoveId.BODY_SLAM, MoveId.REST, MoveId.SNORE] }),
+      ];
+    },
+  },
+  {
     label: "(note) Co-op: a faint replacement must not instantly re-KO on the chooser (#807)",
     description:
       "CO-OP fix - verify with TWO clients (not a solo battle): when the GUEST's active mon FAINTS and\n"

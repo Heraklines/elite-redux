@@ -1889,11 +1889,35 @@ export class BattleScene extends SceneBase {
     // endgame waves where they spawn (no-op except once, around wave 150).
     maybePrefetchGhostTeams(waveIndex);
 
+    // #867: the co-op GUEST ADOPTS the host's authoritative WILD-vs-TRAINER verdict instead of
+    // re-deriving it via isWaveTrainer (an arena-trainerChance / biome-overstay / seeded roll that
+    // DIVERGES from the host once the guest's arena/overstay state drifts - the god-leg soak's wave-42
+    // saveDataDigest battleType split: host TRAINER, guest WILD, a checksum mismatch every turn + a
+    // "wild"-thinking guest that mishandles the trainer's mid-battle send-outs). Host-authoritative like
+    // the ME verdict below (#862): >=0 WILD/TRAINER is adopted; the MYSTERY_ENCOUNTER verdict falls
+    // through to the ME-verdict handling below; an absent sync falls back to the local roll (resync heals).
+    const coopBattleTypeVerdict =
+      this.gameMode.isCoop && getCoopController()?.role === "guest"
+        ? getCoopBattleStreamer()?.battleTypeForWave(waveIndex)
+        : undefined;
+    const coopAdoptedWaveTrainer =
+      coopBattleTypeVerdict === BattleType.TRAINER
+        ? true
+        : coopBattleTypeVerdict === BattleType.WILD
+          ? false
+          : undefined;
+    if (coopAdoptedWaveTrainer !== undefined) {
+      console.log(
+        `[coop:battletype] wave=${waveIndex} HOST verdict: ${coopAdoptedWaveTrainer ? "TRAINER" : "WILD"} - adopting (#867)`,
+      );
+    }
     resolved.battleType =
       !this.gameMode.hasTrainers || Overrides.DISABLE_STANDARD_TRAINERS_OVERRIDE
         ? BattleType.WILD
         : (Overrides.BATTLE_TYPE_OVERRIDE
-          ?? (this.gameMode.isWaveTrainer(waveIndex) ? BattleType.TRAINER : BattleType.WILD));
+          ?? ((coopAdoptedWaveTrainer ?? this.gameMode.isWaveTrainer(waveIndex))
+            ? BattleType.TRAINER
+            : BattleType.WILD));
 
     // ER Elite/Hell: inject extra rival (May/Brendan) encounters between the
     // canonical rival waves. Done BEFORE the mystery-encounter check so the
@@ -4701,9 +4725,8 @@ export class BattleScene extends SceneBase {
     } else if (
       this.gameMode.isCoop
       && getCoopController()?.role === "guest"
-      && getCoopBattleStreamer()?.meTypeForWave(this.currentBattle.waveIndex) !== undefined // #862: the verdict can now be the explicit NO-ME sentinel - never adopt that as a type
-      && // (reaching here with NO_ME means the wave-type guard raced; fall through to local pick).
-      getCoopBattleStreamer()?.meTypeForWave(this.currentBattle.waveIndex) !== COOP_WAVE_NO_ME
+      && getCoopBattleStreamer()?.meTypeForWave(this.currentBattle.waveIndex) !== undefined // #862: the verdict can now be the explicit NO-ME sentinel - never adopt that as a type // (reaching here with NO_ME means the wave-type guard raced; fall through to local pick).
+      && getCoopBattleStreamer()?.meTypeForWave(this.currentBattle.waveIndex) !== COOP_WAVE_NO_ME
     ) {
       // #825: the host's wave-start sync already told us its rolled ME type - adopt it
       // verbatim so both screens run the SAME encounter (live 'different events').

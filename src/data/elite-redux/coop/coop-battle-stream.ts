@@ -220,6 +220,23 @@ export class CoopBattleStreamer {
   /** GUEST (#825): the host's rolled ME type per wave (from enemyPartySync). */
   private readonly meTypeByWave = new Map<number, number>();
 
+  /** GUEST (#867): the host's authoritative WILD-vs-TRAINER verdict per wave (from enemyPartySync). */
+  private readonly battleTypeByWave = new Map<number, number>();
+
+  /**
+   * GUEST (#867): the host's authoritative `BattleType` for `wave`, if its wave-start sync arrived.
+   * The guest re-deriving the wave TYPE via `isWaveTrainer` (an arena-trainerChance / biome-overstay /
+   * seeded roll) diverges from the host once its arena/overstay state drifts - the god-leg soak's
+   * wave-42 `saveDataDigest` `battleType` split (host TRAINER, guest WILD), a checksum mismatch every
+   * turn until a resync heals it, and the "wild"-thinking guest mishandling the trainer's mid-battle
+   * send-outs. So the wave TYPE is HOST-AUTHORITATIVE: the guest adopts this verdict instead of rolling.
+   * `undefined` = no wave-start sync received yet (fall back to the local roll; the resync backstop
+   * still heals a late-arriving divergence).
+   */
+  battleTypeForWave(wave: number): number | undefined {
+    return this.battleTypeByWave.get(wave);
+  }
+
   /**
    * GUEST (#825/#862): the host's ME verdict for `wave`, if its wave-start sync arrived.
    * `>= 0` = the host rolled THIS MysteryEncounterType; {@linkcode COOP_WAVE_NO_ME} = the
@@ -244,9 +261,18 @@ export class CoopBattleStreamer {
   // --- HOST side --------------------------------------------------------------
 
   /** HOST: send the exact enemy party the guest must adopt verbatim for `wave`. */
-  sendEnemyParty(wave: number, enemies: CoopSerializedEnemy[], meType?: number): void {
-    coopLog("replay", `host SEND enemyPartySync wave=${wave} count=${enemies.length} meType=${meType ?? "-"}`);
-    this.transport.send({ t: "enemyPartySync", wave, enemies, ...(meType === undefined ? {} : { meType }) });
+  sendEnemyParty(wave: number, enemies: CoopSerializedEnemy[], meType?: number, battleType?: number): void {
+    coopLog(
+      "replay",
+      `host SEND enemyPartySync wave=${wave} count=${enemies.length} meType=${meType ?? "-"} battleType=${battleType ?? "-"}`,
+    );
+    this.transport.send({
+      t: "enemyPartySync",
+      wave,
+      enemies,
+      ...(meType === undefined ? {} : { meType }),
+      ...(battleType === undefined ? {} : { battleType }),
+    });
   }
 
   /**
@@ -1154,6 +1180,12 @@ export class CoopBattleStreamer {
         // generates its encounter AFTER the sync arrives adopts the host's roll.
         if (msg.meType !== undefined) {
           this.meTypeByWave.set(msg.wave, msg.meType);
+        }
+        // #867: remember the host's authoritative WILD-vs-TRAINER verdict so the guest's newBattle
+        // ADOPTS it instead of re-deriving the wave type via isWaveTrainer (which diverges once the
+        // guest's arena/overstay/RNG state drifts from the host - the wave-42 battleType desync).
+        if (msg.battleType !== undefined) {
+          this.battleTypeByWave.set(msg.wave, msg.battleType);
         }
         // Hand it straight to a parked awaitEnemyParty (consumed), else buffer for the
         // next consume/await. Either way fire any live handler.
