@@ -1,0 +1,116 @@
+url:      https://elite-redux-staging.pages.dev/
+build:    mrc9a598-g33b
+mode:     4  wave:130
+seed:     a5qRHMzZOO8LrcR4rrMOSleS
+party:    Phione(L114 309hp f0), Simipour(L59 199hp f0), Lanturn(L114 0hp f1), Altaria Redux(L114 52hp f1), Lucineon(L111 390hp f0), Quagsire(L110 228hp f1)
+enemy:    Houndoom(L120), Dragapult(L117), Sableye(L98)
+
+----- COMMENT -----
+Unknown why but game is bugged
+
+----- CONSOLE -----
+[05:57:15.439] LOG: %c %c %c %c %c Phaser v3.90.0 (WebGL | Web Audio) %c https://phaser.io/v390 background: #ff0000 background: #ffff00 background: #00ff00 background: #00ffff color: #ffffff; background: #000000 background: transparent
+[05:57:15.783] LOG: [ER] build mrc9a598-g33b
+[05:57:15.838] LOG: [dev-tools] loaded — 476 scenarios + Send Logs button
+[05:58:32.999] DEBUG: Destroying loading scene
+[05:58:32.999] DEBUG: Destroyed loading scene
+[05:58:33.042] LOG: Seed: 47n94xD7Hxvx5BJS7wnRmpzr
+[05:58:33.042] LOG: Wave Seed: 47n94xD7Hxvx5BJS7wnRmpzr 0
+[05:58:34.844] LOG: %cStart Phase LoginPhase color:green;
+[05:58:35.372] LOG: Client Session: elvbFINm1s6Wai1DIoIfgbqdt9OhYBrQ
+[05:58:35.671] DEBUG: Using cached system data
+[05:58:35.736] LOG: %cStart Phase TitlePhase color:green;
+[05:58:35.736] LOG: Getting Session Slot id: %d 2
+[05:58:35.749] LOG: use seasonal splash messages true
+[05:58:39.111] LOG: Getting Session Slot id: %d 0
+[05:58:39.116] LOG: Getting Session Slot id: %d 1
+[05:58:39.121] LOG: Getting Session Slot id: %d 2
+[05:58:39.125] LOG: Getting Session Slot id: %d 3
+[05:58:39.128] LOG: Getting Session Slot id: %d 4
+[05:59:15.199] LOG: Getting Session Slot id: %d 2
+[05:59:15.203] LOG: Wave Seed: a5qRHMzZOO8LrcR4rrMOSleS 0
+[05:59:15.203] LOG: Seed: a5qRHMzZOO8LrcR4rrMOSleS
+[05:59:15.223] LOG: Wave Seed: ã·óÔÊÏüÜÑÑºÎôåÔ¶ôôÏÑÕîçÕ 130
+[05:59:15.242] LOG: Applied Zinc 
+[05:59:15.242] LOG: Applied Iron 
+[05:59:15.242] LOG: Applied Calcium 
+[05:59:15.242] LOG: Applied Protein 
+[05:59:15.243] LOG: Applied Protein 
+[05:59:15.243] LOG: Applied Calcium 
+[05:59:15.243] LOG: Applied Soul Dew 
+[05:59:15.243] LOG: Applied Soul Dew 
+[05:59:15.245] LOG: Applied Zinc 
+[05:59:15.245] LOG: Applied Iron 
+[05:59:15.245] LOG: Applied Calcium 
+[05:59:15.246] LOG: Applied Protein 
+[05:59:15.246] LOG: Applied Protein 
+[05:59:15.246] LOG: Applied Calcium 
+[05:59:15.246] LOG: Applied Soul Dew 
+[05:59:15.246] LOG: Applied Soul Dew 
+[05:59:15.248] LOG: Applied Zinc 
+[05:59:15.248] LOG: Applied Iron 
+[05:59:15.248] LOG: Applied Calcium 
+[05:59:15.249] LOG: Applied Protein 
+[05:59:15.249] LOG: Applied Protein 
+[05:59:15.249] LOG: Applied Calcium 
+[05:59:15.249] LOG: Applied Soul Dew 
+[05:59:15.249] LOG: Applied Soul Dew 
+[05:59:15.251] LOG: Applied Carbos (enemy)
+[05:59:15.251] LOG: Applied Iron (enemy)
+[05:59:15.252] LOG: Applied Protein (enemy)
+[05:59:15.252] LOG: Applied Protein (enemy)
+[05:59:15.334] LOG: %cStart Phase EncounterPhase color:green;
+[05:59:15.337] LOG: Pokemon: Wild Houndoom | Species ID: 229 | Level: 120 | Nature: Quirky (-)
+[05:59:15.337] LOG: Stats (IVs): HP: 408 (22), Atk: 207 (9), Def: 353 (26), Spatk: 147 (19), Spdef: 305 (30), Spd: 233 (26)
+[05:59:15.337] LOG: Ability: Strong Jaw | Passive Ability: Nocturnal | Boss Bars: 2
+[05:59:15.337] LOG: Moveset: ["Rip and Tear","Punishment","Crunch","Poison Fang"]
+[05:59:15.337] LOG: Pokemon: Wild Dragapult | Species ID: 887 | Level: 117 | Nature: Naughty (+Atk/-SpDef)
+[05:59:15.337] LOG: Stats (IVs): HP: 461 (2), Atk: 235 (14), Def: 282 (17), Spatk: 213 (28), Spdef: 251 (15), Spd: 240 (25)
+[05:59:15.337] LOG: Ability: Clear Body | Passive Ability: Levitate | Boss Bars: 2
+[05:59:15.337] LOG: Moveset: ["Phantom Force","Overheat","Poltergeist","Dragon Rush"]
+[05:59:15.337] LOG: Pokemon: Wild Sableye | Species ID: 302 | Level: 98 | Nature: Hardy (-)
+[05:59:15.337] LOG: Stats (IVs): HP: 227 (22), Atk: 159 (4), Def: 156 (25), Spatk: 184 (23), Spdef: 169 (18), Spd: 160 (19)
+[05:59:15.337] LOG: Ability: Hypnotist | Passive Ability: Analytic | Boss Bars: 1
+[05:59:15.337] LOG: Moveset: ["Poltergeist","Recover","Parting Shot","Ghastly Echo"]
+[05:59:15.637] LOG: Applied Carbos (enemy)
+[05:59:15.637] LOG: Applied Iron (enemy)
+[05:59:15.638] LOG: Applied Protein (enemy)
+[05:59:15.638] LOG: Applied Protein (enemy)
+[05:59:15.639] LOG: Wave Seed: ã·óÔÊÏüÜÑÑºÎôåÔ¶ôôÏÑÕîçÕ 130
+[05:59:16.086] LOG: %cStart Phase SummonPhase color:green;
+[05:59:16.235] LOG: Applied Zinc 
+[05:59:16.236] LOG: Applied Iron 
+[05:59:16.236] LOG: Applied Calcium 
+[05:59:16.236] LOG: Applied Protein 
+[05:59:16.236] LOG: Applied Protein 
+[05:59:16.237] LOG: Applied Calcium 
+[05:59:16.237] LOG: Applied Soul Dew 
+[05:59:16.237] LOG: Applied Soul Dew 
+[05:59:16.356] LOG: %cStart Phase CheckSwitchPhase color:green;
+[05:59:17.000] LOG: %cStart Phase CheckSwitchPhase color:green;
+[05:59:18.667] LOG: %cStart Phase CheckSwitchPhase color:green;
+[05:59:18.667] LOG: %cStart Phase SummonMissingPhase color:green;
+[05:59:18.769] LOG: Applied Zinc 
+[05:59:18.769] LOG: Applied Iron 
+[05:59:18.769] LOG: Applied Calcium 
+[05:59:18.769] LOG: Applied Protein 
+[05:59:18.770] LOG: Applied Protein 
+[05:59:18.770] LOG: Applied Calcium 
+[05:59:18.770] LOG: Applied Soul Dew 
+[05:59:18.770] LOG: Applied Soul Dew 
+[05:59:18.799] WARN: cry/171-mega not found
+[05:59:18.901] LOG: %cStart Phase InitEncounterPhase color:green;
+[05:59:18.903] LOG: %cStart Phase PostSummonPhase color:green;
+[05:59:18.903] LOG: Ran PSP for: Dragapult
+[05:59:18.905] LOG: %cStart Phase PostSummonPhase color:green;
+[05:59:18.906] LOG: %cStart Phase PostSummonPhase color:green;
+[05:59:18.906] LOG: %cStart Phase PostSummonPhase color:green;
+[05:59:18.906] LOG: Ran PSP for: Houndoom
+[05:59:18.908] LOG: %cStart Phase PostSummonPhase color:green;
+[05:59:18.908] LOG: %cStart Phase PostSummonPhase color:green;
+[05:59:18.908] LOG: %cStart Phase PostSummonPhase color:green;
+[05:59:18.908] LOG: Ran PSP for: Sableye
+[05:59:18.909] LOG: %cStart Phase PostSummonPhase color:green;
+[05:59:18.909] LOG: %cStart Phase PostSummonPhase color:green;
+[05:59:18.909] LOG: %cStart Phase TurnInitPhase color:green;
+[05:59:18.913] LOG: %cStart Phase CommandPhase color:green;
