@@ -20,9 +20,9 @@ workshop; do not relitigate them.
 Always visible in the editor: 6 slot icons (item mini-icon overlay, cost badge),
 live validity chips (team size 1-6, mega count 0-1/1, cost caps: black shiny +
 cost>=10 unfieldable, max one 8-9), the 10-min pick-window countdown, partner
-ready status, and the WAGER PREVIEW (each mon's stake contribution; edits update
-the preview before commit — a thing Pokemon Showdown structurally cannot have).
-L/R (Q/E) cycles the editor between team mons directly.
+ready status. L/R (Q/E) cycles the editor between team mons directly.
+(Wager/stake preview in the strip: CUT from v1 per maintainer 2026-07-10 —
+wager integration comes later; the strip is validity + timing only.)
 
 ### Layer 2 — species entry (unchanged)
 The collection grid as today. Confirming a mon opens Layer 3.
@@ -128,8 +128,8 @@ Nature: Jolly
   text import/export as the preset backbone; named teams; live format
   validation with per-error naming.
 - Adapt: stage/form strip as a first-class identity control; innates panel;
-  locked-but-visible collection gating with reasons; wager preview in the
-  validity strip.
+  locked-but-visible collection gating with reasons. (Wager preview: later,
+  not v1.)
 - Skip: EV sliders/spread tools (no EV system), tier filters (no tiers).
 - Phase 3 (later, telemetry-driven — we record every fight): viable-first move
   sorting, "popular sets" per species, usage stats columns. Folders for teams,
@@ -140,7 +140,11 @@ Nature: Jolly
 - P1 — Editor core, replacing the current flow: new UiMode + handler, layout
   (team strip / identity column / field rows / shared pane), stage strip,
   ability+innates pane, item pane, move typeahead pane, nature pane, validity
-  strip + wager preview, Done wiring into the existing negotiate/wager flow.
+  strip (no wager preview), Done wiring into the existing negotiate/wager flow.
+  DESIGN PROCESS RULE (maintainer 2026-07-10): iterate the LAYOUT VISUALLY with
+  the render harness from the first commit — render the PNG, look at it, adjust,
+  re-render — until it is genuinely ergonomic, BEFORE wiring interaction logic.
+  "tsc passes" is not a layout review.
   Manifest nature + IV forcing + hash/duo coverage land here (engine change is
   small and gates the editor's nature row being real).
 - P2 — Presets: per-species sets, team presets, import/export + validation UX.
