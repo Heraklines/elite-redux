@@ -1,0 +1,65 @@
+===== COOP SOAK RESULT =====
+profile: level
+verdict: FAIL
+waves_requested: 55
+run: 28999758527 (main)
+timestamp: 2026-07-09T06-57-14Z
+
+----- driver lines -----
+[22m[39m[coop-soak] SEED=20260709 WAVES=55 - replay this run with:  SOAK_SEED=20260709 SOAK_WAVES=55 ER_SCENARIO=1 npx vitest run test/tests/elite-redux/coop/coop-soak.test.ts
+[22m[39m[coop-soak] scalar-lag wave 5 @post-shop: guest trails host (expected renderer lag, converges at re-mirror) - money host=330 guest=220
+[22m[39m[coop-soak] scalar-lag wave 8 @post-shop: guest trails host (expected renderer lag, converges at re-mirror) - money host=610 guest=330
+[22m[39m[coop-soak] scalar-lag wave 13 @post-shop: guest trails host (expected renderer lag, converges at re-mirror) - money host=800 guest=610
+[22m[39m[coop-soak] scalar-lag wave 14 @post-shop: guest trails host (expected renderer lag, converges at re-mirror) - money host=1000 guest=800
+[22m[39m[coop-soak] scalar-lag wave 19 @post-shop: guest trails host (expected renderer lag, converges at re-mirror) - money host=1660 guest=1000
+[22m[39m[coop-soak] scalar-lag wave 25 @post-shop: guest trails host (expected renderer lag, converges at re-mirror) - money host=3150 guest=2320
+[22m[39m[coop-soak] scalar-lag wave 27 @post-shop: guest trails host (expected renderer lag, converges at re-mirror) - money host=4240 guest=3150
+[22m[39m[coop-soak] scalar-lag wave 28 @post-shop: guest trails host (expected renderer lag, converges at re-mirror) - money host=5200 guest=4240
+[coop-soak] scalar-lag wave 30 @boss-post-shop: guest trails host (expected renderer lag, converges at re-mirror) - money host=7220 guest=5200
+[22m[39m[coop-soak] scalar-lag wave 35 @post-shop: guest trails host (expected renderer lag, converges at re-mirror) - money host=8990 guest=8070
+[22m[39m[coop-soak] scalar-lag wave 43 @post-shop: guest trails host (expected renderer lag, converges at re-mirror) - money host=10350 guest=8990
+[22m[39m[coop-soak] scalar-lag wave 44 @post-shop: guest trails host (expected renderer lag, converges at re-mirror) - money host=11130 guest=10350
+[22m[39m[coop-soak] scalar-lag wave 55 @post-shop: guest trails host (expected renderer lag, converges at re-mirror) - money host=12350 guest=10690
+[22m[39m[coop-soak] DONE seed=20260709 waves=55/55 resyncHeals=2 assertions=0 findings=0 trainerWaves=13 (fixed=5 random=8) skips={"mysteryEncounterDisabledV1":1} elapsedMs=85177
+
+----- vitest result tail -----
+[coop-soak-coverage]   SKIP situation:tera - the soak never terastallizes => FOLLOW-UP: drive a seeded terastallize (move.select tera flag)
+[coop-soak-coverage]   SKIP situation:transportFault - transport fault injection is covered by the dedicated fault test (coop-transport-fault), not the soak => FOLLOW-UP: none - covered by the Layer-A transport-fault test
+[coop-soak-coverage]   SKIP situation:trio - 3-player co-op (trio seating) is not stood up by the two-engine harness => FOLLOW-UP: extend the harness to a three-engine trio rig
+[coop-soak-coverage]   SKIP situation:triple - triple battles are not forced by the soak => FOLLOW-UP: run a triple-battle-style soak variant
+[coop-soak-coverage]   SKIP situation:willYouSwitch - the 'will you switch?' post-KO prompt is not driven => FOLLOW-UP: drive the will-you-switch prompt in the soak
+[coop-soak-coverage] 🔴 UNCLASSIFIED (in a registry but neither driven nor declared undrivable): [band:stormglass, kind:stormglass]
+[coop-soak-coverage] ===========================================
+[coop-soak-coverage] ENFORCING (profile=level, surveyed 55 >= 30 waves, seed 20260709).
+[coop-soak-coverage] ⚠ PROBABILISTIC cold across the 1 ledger run(s) so far (need 7 to enforce; WARN only): [situation:doublePlayerFaint, situation:enemySwitch, situation:hostHalfExhausted]
+
+[90mstdout[2m | test/tests/elite-redux/coop/coop-soak.test.ts[2m:149:3[22m[2m[2m > [22m[2mNIGHTLY co-op SOAK: seeded randomized two-engine run (#841)[2m > [22m[2mplays a seeded randomized co-op run asserting DIGEST/LOCKSTEP/NO-PARK/TEARDOWN each wave
+[22m[39m[2m> [22m[30m[48;2;193;98;222m Test finished! [49m[39m
+    Name: [38;2;0;136;134mNIGHTLY co-op SOAK: seeded randomized two-engine run (#841) > plays a seeded randomized co-op run asserting DIGEST/LOCKSTEP/NO-PARK/TEARDOWN each wave[39m
+    Result: [31m[1m✗ Failed[22m[39m [2min[22m [33m86252[39m[2mms[22m
+    File: [38;2;210;155;14melite-redux/test/tests/elite-redux/coop/coop-soak.test.ts:149:3[39m
+
+[33m[39m[31mx[39m
+
+[31m⎯⎯⎯⎯⎯⎯⎯[39m[1m[41m Failed Tests 1 [49m[22m[31m⎯⎯⎯⎯⎯⎯⎯[39m
+
+[41m[1m FAIL [22m[49m [30m[45m main [49m[39m test/tests/elite-redux/coop/coop-soak.test.ts[2m:149:3[22m[2m > [22mNIGHTLY co-op SOAK: seeded randomized two-engine run (#841)[2m > [22mplays a seeded randomized co-op run asserting DIGEST/LOCKSTEP/NO-PARK/TEARDOWN each wave
+[31m[1mError[22m: [coop-soak-coverage] COMPLETENESS BACKSTOP FAILED (seed 20260709, 55 waves):
+  - ANTI-SILENT-DROP: 2 surface(s) are in a registry but neither driven nor declared undrivable - CLASSIFY each (add to KNOWN_UNDRIVABLE with a follow-up task, or to GUARANTEED / PROBABILISTIC): [band:stormglass, kind:stormglass][39m
+[36m [2m❯[22m assertSoakCompleteness test/tools/coop-soak-coverage.ts:[2m1066:11[22m[39m
+    [90m1064|[39m
+    [90m1065|[39m   [35mif[39m (reds[33m.[39mlength [33m>[39m [34m0[39m) {
+    [90m1066|[39m     [35mthrow[39m [35mnew[39m [33mError[39m(
+    [90m   |[39m           [31m^[39m
+    [90m1067|[39m       `[coop-soak-coverage] COMPLETENESS BACKSTOP FAILED (seed ${opts.…
+    [90m1068|[39m         [33m+[39m reds[33m.[39m[34mmap[39m(r [33m=>[39m [32m`  - [39m[36m${[39mr[36m}[39m[32m`[39m)[33m.[39m[34mjoin[39m([32m"\n"[39m)[33m,[39m
+[90m [2m❯[22m test/tests/elite-redux/coop/coop-soak.test.ts:[2m248:7[22m[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯[22m[39m
+
+
+[2m Test Files [22m [1m[31m1 failed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[31m1 failed[39m[22m[90m (1)[39m
+[2m   Start at [22m 06:55:24
+[2m   Duration [22m 109.67s[2m (transform 17.72s, setup 21.87s, import 154ms, tests 86.73s, environment 743ms)[22m
+
