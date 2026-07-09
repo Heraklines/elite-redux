@@ -40,9 +40,11 @@ import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
 import { BattlerIndex } from "#enums/battler-index";
 import { Command } from "#enums/command";
 import { GameModes } from "#enums/game-modes";
+import { LearnMoveType } from "#enums/learn-move-type";
 import { MoveId } from "#enums/move-id";
 import { MysteryEncounterType } from "#enums/mystery-encounter-type";
 import { SpeciesId } from "#enums/species-id";
+import { LearnMovePhase } from "#phases/learn-move-phase";
 import { SelectModifierPhase } from "#phases/select-modifier-phase";
 import { GameManager } from "#test/framework/game-manager";
 import {
@@ -305,6 +307,75 @@ describe.skipIf(!RUN)("co-op DUO multi-wave: two real engines, real reward shop 
       result.continuationRemoved,
       "the guest's no-op LearnMovePhase REMOVED the continuation orphan (pre-#698 this hung)",
     ).toBe(true);
+
+    logs.flush();
+  }, 240_000);
+
+  // ===========================================================================================
+  // REGRESSION (#873): a reward-shop TM picked by ONE player (the shop owner) that TARGETS the
+  // PARTNER's mon must appear in the PARTNER's moveset. Live report (guest dragunfire): the host
+  // owner picked TM Surf onto a GUEST-owned mon; the pick relayed (the shop advanced) but the move
+  // never appeared on the reporting guest's copy. Root cause: a reward-shop TM queues a
+  // LearnMovePhase(LearnMoveType.TM) on BOTH clients (owner drives + applies, watcher applies the
+  // relayed pick), but the authoritative-GUEST branch of coopAuthoritativeLearnMove treated its own
+  // LearnMovePhase as a pure-renderer no-op for the EMPTY-slot case (deterministic auto-learn) - so
+  // the HOST auto-learned onto its copy while the guest ended WITHOUT learning. Bench-mon movesets
+  // are hashed NOWHERE (the per-turn checksum hashes ON-FIELD moves only; the session-save digest
+  // excludes the full party PokemonData), so no resync ever detected or healed the divergence. The
+  // fix: the mon-OWNER (recipient) applies the deterministic empty-slot learn itself, symmetric to
+  // the host - the #800/#831 recipient-drives pattern. This drives the exact LearnMovePhase the
+  // reward apply queues on each real engine and asserts the move lands on BOTH copies.
+  // ===========================================================================================
+  it("REGRESSION #873: an owner-picked reward-shop TM targeting the PARTNER's mon learns on BOTH engines", async () => {
+    await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
+    const pair = createLoopbackPair();
+    const rig = await buildDuo(game, pair, setCoopRuntime, toCoop);
+
+    // buildDuo tags field slot 1 coopOwner="guest" on BOTH scenes - the "partner's mon" the reporter
+    // owns. Its moveset is the forced [TACKLE, SPLASH] (2 moves) so an EMPTY slot exists (the reported
+    // Surf auto-learn path). A reward-shop TM's apply() queues exactly this LearnMovePhase(TM).
+    const GUEST_SLOT = 1;
+    const TM_MOVE = MoveId.SURF;
+
+    const before = withClientSync(rig.guestCtx, () => {
+      const mon = rig.guestScene.getPlayerParty()[GUEST_SLOT];
+      return {
+        owner: (mon as { coopOwner?: string }).coopOwner,
+        knows: mon.getMoveset(true).some(m => m?.moveId === TM_MOVE),
+      };
+    });
+    expect(before.owner, "target field slot 1 is owned by the guest (the partner's mon)").toBe("guest");
+    expect(before.knows, "the partner's mon does not already know the TM move").toBe(false);
+
+    // OWNER (host in the report): its LearnMovePhase for the guest-owned mon runs the authoritative
+    // host branch -> auto-learns the empty slot onto the HOST's copy of the merged party.
+    await withClient(rig.hostCtx, async () => {
+      new LearnMovePhase(GUEST_SLOT, TM_MOVE, LearnMoveType.TM).start();
+      await drainLoopback();
+    });
+
+    // RECIPIENT (the reporting guest, who OWNS the mon): its LearnMovePhase must ALSO learn the move
+    // onto the guest's copy. Pre-fix the authoritative-guest branch no-op-ended -> the move never
+    // appeared in the reporter's moveset.
+    await withClient(rig.guestCtx, async () => {
+      new LearnMovePhase(GUEST_SLOT, TM_MOVE, LearnMoveType.TM).start();
+      await drainLoopback();
+    });
+
+    const hostKnows = withClientSync(rig.hostCtx, () =>
+      rig.hostScene
+        .getPlayerParty()
+        [GUEST_SLOT].getMoveset(true)
+        .some(m => m?.moveId === TM_MOVE),
+    );
+    const guestKnows = withClientSync(rig.guestCtx, () =>
+      rig.guestScene
+        .getPlayerParty()
+        [GUEST_SLOT].getMoveset(true)
+        .some(m => m?.moveId === TM_MOVE),
+    );
+    expect(hostKnows, "the shop owner's (host) copy of the partner's mon learned the TM").toBe(true);
+    expect(guestKnows, "the partner's (guest) OWN copy learned the TM the owner picked for it").toBe(true);
 
     logs.flush();
   }, 240_000);

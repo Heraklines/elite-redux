@@ -254,6 +254,26 @@ export class LearnMovePhase extends PlayerPartyMemberPokemonPhase {
         this.coopGuestForwardOwnedLearnMove(move, pokemon);
         return;
       }
+      // #873 cross-ownership DROPPED-LEARN: when a reward-shop TM / TM Case / Learner's Shroom / free
+      // Memory Mushroom is bought - by EITHER player - for a GUEST-owned mon whose moveset has an EMPTY
+      // slot, the learn is a DETERMINISTIC auto-learn (no forget-picker, no human choice). The reward
+      // apply queues this real LearnMovePhase on BOTH clients; the HOST auto-learns onto its copy of the
+      // merged party (the empty-slot branch below), but pre-#873 the guest branch treated its OWN
+      // LearnMovePhase as a pure-renderer no-op and ended WITHOUT learning - so the move landed only on
+      // the host and the reporting guest (the mon's owner) never saw it ("partner picked a TM for me
+      // with Surf but it did not appear in my moveset"). Nothing heals it: a BENCH mon's moveset is
+      // hashed NOWHERE (the per-turn checksum hashes ON-FIELD moves only; the session-save digest
+      // excludes the full party PokemonData), so no resync ever detects or reconciles the divergence.
+      // Fix: the mon OWNER applies its own deterministic empty-slot learn HERE, symmetric to the host -
+      // the recipient-drives application (#800/#831). learnMove() runs the SAME #698 continuation cleanup
+      // (TM / free-Memory tryRemovePhase("SelectModifierPhase") + advance) the no-op branch below does,
+      // so this fully supersedes it for the guest-owned empty-slot case. There is NO double-render here:
+      // the persistent CoopReplayLearnMovePhase listener only spawns on a host `learnMoveForward`, which
+      // the host sends ONLY for a FULL guest-owned moveset (coopHostForwardLearnMove) - never here.
+      if (monOwner === "guest" && !movesetFull) {
+        this.learnMove(currentMoveset.length, move, pokemon);
+        return;
+      }
       // #698 stale-shop softlock: a TM Case / Memory-Mushroom (cost=-1) reward queues a back-out
       // "continuation" SelectModifierPhase copy alongside this LearnMovePhase (see
       // SelectModifierPhase.applyModifier queuesContinuation). On the HOST the real learnMove() deletes
