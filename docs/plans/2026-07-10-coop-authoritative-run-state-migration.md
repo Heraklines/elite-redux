@@ -1226,3 +1226,71 @@ state. W2e-R remediates the mechanism and re-scopes the claim honestly:
   already-applied and fall to its deterministic fallback → the WRONG biome (a live desync — the exact
   §8.5 hazard). The split stays until the keystone lets the journal drive the switch; then the ledger
   unifies and the dual-run relay retires.
+
+### 8.7 Wave-2f — THE KEYSTONE (post-battle wave-advance): the FIRST live-materializing surface
+
+Wave-2f migrated the post-battle wave-advance TAIL (`coop-replay-phases.ts` `maybeRunCoopWaveAdvance`)
+onto the operation model (`coop-wave-operation.ts`) — §2.5 item 4. It is the surface §8.6's KEYSTONE-BLOCKED
+residual named: the FIRST with a REGISTERED PRODUCTION LIVE-MUTATION SINK, proving a journal-delivered op
+can drive real guest mutation (the reviewer's central demand). What it establishes for every later surface:
+
+- **A HOST-DRIVEN surface (not owner-alternated).** The host is the sole engine that resolves a wave, so the
+  owner is ALWAYS the host seat (0), the host commits at its own wave-end (`broadcastCoopWaveResolved`, where
+  `waveResolved`/`waveEndState` already fire), and the guest is ALWAYS the watcher. The op is PINNED on the
+  WAVE INDEX (one advance per wave), so cross-wave stale ordering is structural — the typed successor of the
+  legacy `lastResolvedWave` double-advance guard. Its class is `op:wave`, DERIVED from the envelope's
+  `logicalPhase` ∈ {`WAVE_VICTORY`, `WAVE_FLEE`, `GAME_OVER`} (the next phase the transition enters, so the
+  envelope makes `logicalPhase` host-authoritative — the keystone).
+- **ONE LEDGER (P0-2 done here first).** UNLIKE the parked-era biome/ME/reward adapters (which keep a separate
+  `journalGuest` because they have no live sink and unifying would make the relay-adopt path see the journal's
+  `operationId` as already-applied and fall to the wrong fallback), the wave surface routes BOTH the
+  relay-adopt seam AND the journal-replay seam into ONE `CoopOperationGuest`, deduped by `operationId`. This
+  is safe because the MATERIALIZATION (building the tail) is deduped SEPARATELY by `lastResolvedWave`
+  (`coop-runtime`), NOT by the op ledger: `maybeRunCoopWaveAdvance` builds the tail whenever the
+  wave-guarded `consumeCoopPendingWaveAdvance` returns non-null, EVEN when the journal already pre-applied the
+  op (adopt then returns `stale:true`). So the tail is built exactly once regardless of which carrier consumes
+  the op first — the biome hazard (relay-adopt seeing the journal's op and falling to the wrong fallback) does
+  not exist because the build gate is the wave, not the ledger. The journal applier RE-KEYS the envelope to the
+  guest-local dense revision so the one shared applier stays on a single monotonic stream (the host revision is
+  used only by the durability manager's own `(cls, seq)` receive-ledger).
+- **The LIVE SINK feeds the existing safe-boundary queue.** `registerCoopOperationLiveSink("op:wave", …)` in
+  `coop-runtime` (`materializeCoopWaveAdvanceFromOp`) does NOT push phases from the durability handler
+  (mid-message, unsafe). It feeds the SAME `pendingWaveAdvance` queue the legacy `waveResolved` feeds, so the
+  tail rebuilds at the next SAFE turn boundary via `maybeRunCoopWaveAdvance` — ONE materialization site fed by
+  EITHER carrier. Guest-only + authoritative-only + wave-deduped; a normal (relay-present) run never
+  double-builds. This is the pattern a later surface's live sink copies: route into the surface's existing
+  safe-boundary applier, never mutate from the durability handler directly.
+- **STRICT-TAILS observe mode (§3 unlock).** With `logicalPhase` now host-authoritative for the between-wave
+  transition, `coop-renderer-gate.ts` gains a SEPARATE `strictTails` sub-flag (default OFF, never enforcing —
+  §6.3 evidence-only). When ON, a §3.3 boundary-tail phase the guest builds that the CURRENT adopted
+  `WAVE_ADVANCE` op did not sanction (`coopWaveAdvanceSanctionedTails`, pushed into the gate on adopt) logs
+  `[coop:gate] TAIL WOULD-BLOCK` and still RUNS — the warn-first evidence rollout mirroring the allowlist's
+  own `WOULD-BLOCK`. The op-sanctioned-construction enforce is a follow-up after clean soak evidence; DO NOT
+  flip it here.
+- **FAIL-LOUD, not derive.** Under flag-ON, an op that fails to adopt for a NON-stale reason (fail-closed
+  unknown kind / applier gap) logs LOUD and does NOT silently fall to the raw `pending.outcome` derivation
+  (the #859 phantom-dissolve + resync backstops recover). Only the flag-OFF path derives. A stale/duplicate is
+  a legitimate skip (the wave already advanced) — and, under one-ledger, is exactly the "journal pre-applied"
+  case where the tail must STILL build.
+
+**RESIDUALS (Wave-2f):**
+- **ME-boundary stays on the Wave-2c ME_TERMINAL op.** An ME-spawned battle victory
+  (`queueCoopMeBattleVictoryTail`) does NOT flow through `broadcastCoopWaveResolved` (VictoryPhase's
+  isMysteryEncounter branch returns before it), so no `WAVE_ADVANCE` is committed for ME battles. The payload
+  carries `meBoundary` for schema completeness + strict-tails accounting, but standard waves state
+  `meBoundary: "none"`. Routing the ME victory tail through `WAVE_ADVANCE` would conflict with the
+  `ME_TERMINAL` `battle` op — deliberately NOT done.
+- **The other surfaces' live sinks + ledger unification remain KEYSTONE-unblocked-but-not-yet-wired.** Wave-2f
+  proves the pattern for `op:wave`; wiring a real biome/reward/ME materializer + unifying their split ledgers
+  (§8.6 P0-2 residual) is now UNBLOCKED (the sink seam + the one-ledger recipe exist) but is per-surface
+  follow-up work, not done here.
+- **Capture presentation is not journal-recovered.** A journal-delivered wave-advance (relay lost) rebuilds the
+  phase tail but carries no `captureParty`/`capturePresentation` blob (those ride `waveResolved`); the caught
+  mon + party are reconciled by the DATA plane (`waveEndState`/checkpoint), the cosmetic ball-throw is skipped
+  on the recovery path. Acceptable — the control tail is what the journal recovers; the DATA plane owns the party.
+
+**Note on §3.3:** the KEYSTONE boundary-tail rows (`VictoryPhase`/`TrainerVictoryPhase`/`BattleEndPhase`/
+`NewBattlePhase`/`NextEncounterPhase`/`NewBiomeEncounterPhase`/`SwitchBiomePhase`/`GameOverPhase` + the ME/egg
+boundary companions) are now gated by the strict-tails observe mode above when it is ON — a tail is
+op-sanctioned by the adopted `WAVE_ADVANCE` op or it logs `TAIL WOULD-BLOCK`. They remain in the allowlist
+(the guest still constructs them); strict-tails is the evidence path toward op-sanctioned enforcement.
