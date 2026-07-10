@@ -790,7 +790,12 @@ file) per the coordination rule.
   `rendezvous`) provably NEVER on the wire — the journal is the mechanism (review finding 3 closed
   generically). The bespoke self-heals remain as backstops but are no longer the repair path.
 
-### 4.7 W2e implementation notes — the operation↔durability seam is CLOSED (final carrier architecture)
+### 4.7 W2e implementation notes — the operation↔durability seam (final carrier architecture)
+
+> **CORRECTION (W2e-R):** the "CLOSED" claim below is OVERSTATED — an accepted review found the seam
+> could ACK an op as applied while mutating NOTHING. See §8.6 for the P0 remediation + the honest residual
+> (production live materialization is keystone-blocked; the seam is added + the false-ACK fixed, not fully
+> closed). Read the notes below as the CARRIER architecture, not a correctness closure.
 
 Wave-2e plugged the operation ENVELOPE (W2a) into the durability JOURNAL (W2b) — the deliberate,
 documented parallel-lane seam ("the durability manager is a wired but passive scaffold UNTIL the
@@ -1180,3 +1185,44 @@ step every surface already satisfies for free, and one it must NOT skip:
   high-water; the receiver holds the same value in its ledger). This is a surface-agnostic fix in the
   save path, not per-surface, but a new surface's class must be a dense committed-op stream for it to hold.
 
+### 8.6 W2e-R — P0 remediation of the operation↔durability seam (CORRECTS the §4.7/§8.5 "CLOSED" claim)
+
+An accepted external review found §4.7/§8.5 OVERSTATED: the seam was NOT closed. The Wave-2e receiver
+could ACK an operation as APPLIED while performing ZERO game-state mutation — `CoopDurabilityManager`
+called a **void** apply hook then **unconditionally** `markApplied` + `coopAck`, and each surface's
+journal applier routed a replayed committed envelope into a **dedicated sidecar `journalGuest` that only
+recorded history**. So a lost legacy relay → journaled envelope → NO biome/party/money/phase mutation →
+an ACK claiming applied. The W2e convergence test missed it because it asserted JOURNAL HISTORY, not live
+state. W2e-R remediates the mechanism and re-scopes the claim honestly:
+
+- **The ACK is gated, and it means "durably received/recorded", never "live-mutated"** (P0-1). The apply
+  hook now returns a tri-state `CoopApplyOutcome` (`coop-durability.ts`): `applied`/`duplicate` (or a
+  legacy `void`) → ACK + ledger-advance (a `duplicate` ACKs too, so a cross-carrier / resend re-delivery
+  of an already-consumed op cannot spin the committer's resend loop); `rejected` (or a THROWN apply, now
+  caught) → NO ACK, NO advance, retriable. Gating the ACK on *live materialization* was explicitly
+  REJECTED: it re-opens the permanent `controlPlaneHighWater`/`saveDataDigest` divergence + resend churn
+  §4.7 closed (the host committer advances its journal high-water on commit; if the receiver never
+  ACK'd/markApplied, host=N vs guest=N-1 forever, and the 35-wave soak digest gate fails).
+- **The journal carrier now ROUTES a newly-consumed op INTO the ONE live-mutation seam**
+  (`routeCoopOperationToLiveSink` / `registerCoopOperationLiveSink`), not a history-only sidecar (P0-1
+  structural). A test registers a recording sink to PROVE the routing (the convergence proof now asserts
+  LIVE STATE — the op reached the seam — as PRIMARY, journal history secondary).
+- **The producer revision survives a cold resume** (P0-3). Each surface `CoopOperationHost` + guests now
+  initialize from the persisted per-class high-water via `setCoop<Surface>OperationRevisionFloor`, called
+  from `applyCoopControlPlaneSaveData` (keyed by op class). The producer continues at N+1 (not restart at
+  1), so the restored receiver ledger at N ACCEPTS it. Chosen over an epoch-bump-and-reset because W2b's
+  persistence already continues the counter/high-water monotonically (§1.4/§4.6); the epoch is unchanged,
+  so the restored receiver marks stay valid.
+
+**RESIDUALS (the seam is NOT yet fully closed — do not claim otherwise):**
+- **Production live materialization is KEYSTONE-BLOCKED.** No biome/reward/ME sink is registered in
+  production yet, because materializing a committed op on the guest (pushing `SwitchBiomePhase` etc. from
+  the durability handler) is the PARKED keystone wave-advance work (§2.5 item 4, §3). Until it lands, a
+  journal-delivered op in production is durably recorded + ACK'd but its LIVE state is reconciled by the
+  DATA plane (the rejoin snapshot), not by the journal. W2e-R closes the FALSE-ACK and adds the seam; it
+  does not itself switch the live biome from a lost relay.
+- **P0-2 (unify the two ledgers) is deliberately NOT done for biome.** With no live sink, unifying
+  `journalGuest` into `watchGuest` would make the relay-adopt path see the journal's `operationId` as
+  already-applied and fall to its deterministic fallback → the WRONG biome (a live desync — the exact
+  §8.5 hazard). The split stays until the keystone lets the journal drive the switch; then the ledger
+  unifies and the dual-run relay retires.
