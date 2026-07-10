@@ -48,7 +48,9 @@ import { recordCoopChecksumAssertion } from "#data/elite-redux/coop/coop-checksu
 import { logCanonicalDiff } from "#data/elite-redux/coop/coop-data-fingerprint";
 import { coopLog, coopWarn, isCoopDebug } from "#data/elite-redux/coop/coop-debug";
 import { COOP_FAINT_SWITCH_SEQ_BASE, isCoopFaintSwitchSeq } from "#data/elite-redux/coop/coop-interaction-relay";
+import { setCoopWaveTailSanction } from "#data/elite-redux/coop/coop-renderer-gate";
 import {
+  buildCoopWaveAdvancePayload,
   consumeCoopPendingWaveAdvance,
   coopHasPendingWaveAdvance,
   coopMeHandoffBattleWon,
@@ -71,6 +73,10 @@ import type {
   CoopFullBattleSnapshot,
   CoopFullMonSnapshot,
 } from "#data/elite-redux/coop/coop-transport";
+import {
+  adoptWaveAdvanceWatcherChoice,
+  isCoopWaveAdvanceOperationEnabled,
+} from "#data/elite-redux/coop/coop-wave-operation";
 import { doPokeballBounceAnim, getPokeballAtlasKey } from "#data/pokeball";
 import { BattleType } from "#enums/battle-type";
 import { BattlerIndex } from "#enums/battler-index";
@@ -1144,16 +1150,46 @@ export class CoopFinalizeTurnPhase extends Phase {
     // #790 regression fix (both entry points): a consumed wave advance is THE wave boundary -
     // clear the stale-duplicate mark here too so no path can carry it into the next wave.
     getCoopBattleStreamer()?.clearFinalizedMark();
+
+    // Wave-2f KEYSTONE (§2.5 item 4): ADOPT the host-STATED wave-advance through the operation primitive and
+    // construct the tail FROM the adopted op's transition instead of DERIVING it from the one-bit outcome.
+    // Dual-run: with the flag OFF this is a pass-through (adopt the reconstructed payload verbatim), so the
+    // legacy derivation runs unchanged; with it ON the SELECTION is op-gated (idempotent, stale-rejected).
+    const decision = adoptWaveAdvanceWatcherChoice({
+      payload: buildCoopWaveAdvancePayload(pending.outcome, pending.wave),
+      localRole: getCoopController()?.role ?? "guest",
+      wave: globalScene.currentBattle.waveIndex,
+      turn: globalScene.currentBattle.turn,
+    });
+    if (!decision.adopt) {
+      if (isCoopWaveAdvanceOperationEnabled() && !decision.stale) {
+        // FAIL LOUD (§2.5 item 4): a flag-ON guest with an unadoptable op must NOT silently derive the
+        // tail. The #859 phantom-dissolve + resync backstops remain the recovery path.
+        coopWarn(
+          "replay",
+          `guest wave-advance FAIL-LOUD (op ${decision.reason}) wave=${pending.wave} - NOT deriving (Wave-2f)`,
+        );
+        return;
+      }
+      // stale/dup (the wave already advanced): a legitimate skip, nothing to build.
+      coopLog("replay", `guest wave-advance op skip (${decision.reason}) wave=${pending.wave} (Wave-2f)`);
+      return;
+    }
+    // The transition to build FROM: the adopted op's host-stated payload (op-selected). op.outcome ==
+    // pending.outcome; the SELECTION is now op-gated. §3 strict-tails: sanction the boundary tails this op
+    // legitimately builds (observe-mode evidence - a tail outside the sanction logs TAIL WOULD-BLOCK).
+    const tail = decision.payload;
+    setCoopWaveTailSanction(decision.sanctionedTails);
     // DIAGNOSTIC (#633 trainer-victory deadlock): log the outcome + the guest's battleType so a live
     // capture confirms the guest queues the right tail. For a "win" on a TRAINER wave the VictoryPhase
     // it queues MUST go on to push TrainerVictoryPhase + SelectModifierPhase (the guest becomes the
     // reward-shop OWNER so the host's WATCHER wait resolves).
     coopLog(
       "replay",
-      `guest wave-advance outcome=${pending.outcome} wave=${pending.wave} battleType=${BattleType[globalScene.currentBattle.battleType]} queues=${pending.outcome === "win" || pending.outcome === "capture" ? "VictoryPhase" : pending.outcome === "flee" ? "BattleEnd+NewBattle" : "GameOverPhase"}`,
+      `guest wave-advance outcome=${tail.outcome} wave=${pending.wave} next=${tail.nextLogicalPhase} battleType=${BattleType[globalScene.currentBattle.battleType]} queues=${tail.outcome === "win" || tail.outcome === "capture" ? "VictoryPhase" : tail.outcome === "flee" ? "BattleEnd+NewBattle" : "GameOverPhase"} (op-selected)`,
     );
     try {
-      switch (pending.outcome) {
+      switch (tail.outcome) {
         case "win":
         case "capture": {
           // Co-op (#689 capture animation): play the cosmetic ball-throw + "caught!" line FIRST so it

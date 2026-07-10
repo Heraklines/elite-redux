@@ -1,0 +1,326 @@
+/*
+ * SPDX-FileCopyrightText: 2024-2026 Pagefault Games
+ * SPDX-License-Identifier: AGPL-3.0-only
+ */
+
+// =============================================================================
+// Co-op POST-BATTLE WAVE-ADVANCE operation - THE KEYSTONE (Wave-2f run-state migration,
+// docs/plans/2026-07-10-coop-authoritative-run-state-migration.md §2.5 item 4, §8.6).
+//
+// Pure-logic spec (no game engine): the wave-advance is the guest-constructed post-battle tail
+// migrated onto the authoritative operation model. This suite proves, engine-free:
+//   1. WATCHER adoption gating: a host-stated advance is adopted; a STALE advance for an EARLIER wave
+//      is REJECTED (stale:true = a legitimate skip, the lastResolvedWave successor); a DUPLICATE
+//      re-delivery of an already-applied advance is a no-op (invariant 5).
+//   2. FAIL-LOUD vs derive: a stale/dup rejection carries stale:true (the flag-ON caller skips); the
+//      flag-OFF pass-through adopts verbatim (legacy derivation). Only flag-OFF derives.
+//   3. Per-transition SANCTIONED TAILS: the boundary tails the op sanctions vary by outcome (wild win
+//      vs trainer victory vs biome boundary vs game-over vs egg-lapse) - the §3 strict-tails instrument.
+//   4. STRICT-TAILS gate (observe-only): a boundary tail the adopted op did NOT sanction logs
+//      `[coop:gate] TAIL WOULD-BLOCK` and still RUNS (never blocks); default OFF is a byte-for-byte no-op.
+//
+// The two-engine end-to-end + full-convergence proof (one per transition class) lives in
+// coop-duo-wave-operation.test.ts (ER_SCENARIO). This is the fast deterministic lifecycle spec.
+// =============================================================================
+
+import { setCoopAuthoritativeGuestPredicate } from "#data/elite-redux/coop/coop-authoritative-gate";
+import type { CoopWaveAdvancePayload } from "#data/elite-redux/coop/coop-operation-envelope";
+import {
+  COOP_RENDERER_ALLOWED_PHASES,
+  COOP_WAVE_TAIL_PHASES,
+  coopRendererGateNeutralizes,
+  getCoopTailWouldBlockLog,
+  isCoopStrictTailsMode,
+  resetCoopTailWouldBlockLog,
+  setCoopStrictTailsMode,
+  setCoopWaveTailSanction,
+} from "#data/elite-redux/coop/coop-renderer-gate";
+import {
+  adoptWaveAdvanceWatcherChoice,
+  commitWaveAdvanceOwnerIntent,
+  coopWaveAdvanceSanctionedTails,
+  isCoopWaveAdvanceOperationEnabled,
+  resetCoopWaveAdvanceOperationFlag,
+  resetCoopWaveAdvanceOperationState,
+  setCoopWaveAdvanceOperationEnabled,
+} from "#data/elite-redux/coop/coop-wave-operation";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
+
+/** Build a host-stated wave-advance payload (the shape the host commits / the guest reconstructs). */
+function payload(over: Partial<CoopWaveAdvancePayload> & { wave: number }): CoopWaveAdvancePayload {
+  const isVictory = (over.outcome ?? "win") === "win" || (over.outcome ?? "win") === "capture";
+  return {
+    outcome: "win",
+    nextLogicalPhase: isVictory ? "WAVE_VICTORY" : "WAVE_FLEE",
+    nextWave: over.wave + 1,
+    biomeChange: false,
+    eggLapse: false,
+    meBoundary: "none",
+    ...over,
+  };
+}
+
+describe("co-op WAVE-ADVANCE operation - the keystone (Wave-2f)", () => {
+  beforeEach(() => {
+    setCoopWaveAdvanceOperationEnabled(true);
+    resetCoopWaveAdvanceOperationState();
+  });
+  afterEach(() => {
+    resetCoopWaveAdvanceOperationFlag();
+    resetCoopWaveAdvanceOperationState();
+  });
+
+  // ── WATCHER adoption + stale/dup gating ──────────────────────────────────
+  describe("WATCHER adoption gating (invariants 5, 6)", () => {
+    it("adopts a host-stated advance and returns its payload + sanctioned tails", () => {
+      expect(isCoopWaveAdvanceOperationEnabled()).toBe(true);
+      const d = adoptWaveAdvanceWatcherChoice({
+        payload: payload({ wave: 5, victoryKind: "wild" }),
+        localRole: "guest",
+        wave: 5,
+        turn: 1,
+      });
+      expect(d.adopt).toBe(true);
+      if (d.adopt) {
+        expect(d.payload.wave).toBe(5);
+        expect(d.payload.outcome).toBe("win");
+        expect(d.sanctionedTails).toContain("VictoryPhase");
+      }
+    });
+
+    it("REJECTS (stale:true) a wave-advance for a wave STRICTLY BELOW the last adopted one (lastResolvedWave successor)", () => {
+      // Adopt wave 8 first (advances the cross-wave order to 8).
+      const adopted = adoptWaveAdvanceWatcherChoice({
+        payload: payload({ wave: 8, victoryKind: "wild" }),
+        localRole: "guest",
+        wave: 8,
+        turn: 1,
+      });
+      expect(adopted.adopt).toBe(true);
+      // A stale advance for an EARLIER wave 6 must be rejected as a legitimate skip.
+      const stale = adoptWaveAdvanceWatcherChoice({
+        payload: payload({ wave: 6, victoryKind: "wild" }),
+        localRole: "guest",
+        wave: 6,
+        turn: 1,
+      });
+      expect(stale.adopt).toBe(false);
+      if (!stale.adopt) {
+        expect(stale.reason).toBe("stale-or-duplicate");
+        expect(stale.stale, "a stale advance is a legitimate skip, not a fail-loud").toBe(true);
+      }
+    });
+
+    it("is a no-op (stale:true) on a DUPLICATE re-delivery of an already-applied advance (invariant 5)", () => {
+      const first = adoptWaveAdvanceWatcherChoice({
+        payload: payload({ wave: 10, victoryKind: "wild" }),
+        localRole: "guest",
+        wave: 10,
+        turn: 1,
+      });
+      expect(first.adopt).toBe(true);
+      const dup = adoptWaveAdvanceWatcherChoice({
+        payload: payload({ wave: 10, victoryKind: "wild" }),
+        localRole: "guest",
+        wave: 10,
+        turn: 1,
+      });
+      expect(dup.adopt).toBe(false);
+      if (!dup.adopt) {
+        expect(dup.stale).toBe(true);
+      }
+    });
+
+    it("adopts a STRICTLY-LATER wave after an earlier one (the run advances monotonically)", () => {
+      expect(
+        adoptWaveAdvanceWatcherChoice({ payload: payload({ wave: 3 }), localRole: "guest", wave: 3, turn: 1 }).adopt,
+      ).toBe(true);
+      expect(
+        adoptWaveAdvanceWatcherChoice({ payload: payload({ wave: 4 }), localRole: "guest", wave: 4, turn: 1 }).adopt,
+      ).toBe(true);
+    });
+  });
+
+  // ── flag-OFF pass-through (legacy derivation) ────────────────────────────
+  describe("dual-run flag semantics (§5.1)", () => {
+    it("flag OFF: pass-through adopt verbatim, NO operation gating (pure legacy derivation)", () => {
+      setCoopWaveAdvanceOperationEnabled(false);
+      // With the flag OFF a later wave then an earlier wave BOTH adopt (no stale gating - the legacy
+      // pending.outcome derivation is the caller's control, this layer is a pass-through).
+      expect(
+        adoptWaveAdvanceWatcherChoice({ payload: payload({ wave: 9 }), localRole: "guest", wave: 9, turn: 1 }).adopt,
+      ).toBe(true);
+      expect(
+        adoptWaveAdvanceWatcherChoice({ payload: payload({ wave: 7 }), localRole: "guest", wave: 7, turn: 1 }).adopt,
+        "flag OFF never stale-rejects (the caller derives)",
+      ).toBe(true);
+    });
+
+    it("a null payload is a no-op skip regardless of flag", () => {
+      const d = adoptWaveAdvanceWatcherChoice({ payload: null, localRole: "guest", wave: 1, turn: 1 });
+      expect(d.adopt).toBe(false);
+      if (!d.adopt) {
+        expect(d.stale).toBe(true);
+      }
+    });
+  });
+
+  // ── HOST commit smoke (exactly-once is the CoopOperationHost spec; here: no-op guards) ──
+  describe("HOST commit seam", () => {
+    it("is a no-op when the local client is NOT the host (the guest never commits a wave-advance)", () => {
+      // Must not throw; the guest is always the watcher for a host-driven wave-advance.
+      expect(() =>
+        commitWaveAdvanceOwnerIntent({ payload: payload({ wave: 2 }), localRole: "guest", wave: 2, turn: 1 }),
+      ).not.toThrow();
+    });
+
+    it("is a no-op when the flag is OFF, and never throws on the host path", () => {
+      setCoopWaveAdvanceOperationEnabled(false);
+      expect(() =>
+        commitWaveAdvanceOwnerIntent({ payload: payload({ wave: 2 }), localRole: "host", wave: 2, turn: 1 }),
+      ).not.toThrow();
+      setCoopWaveAdvanceOperationEnabled(true);
+      expect(() =>
+        commitWaveAdvanceOwnerIntent({ payload: payload({ wave: 2 }), localRole: "host", wave: 2, turn: 1 }),
+      ).not.toThrow();
+    });
+  });
+
+  // ── per-transition SANCTIONED TAILS (the §3 strict-tails instrument) ──────
+  describe("sanctioned tails per transition class (§3.3 KEYSTONE)", () => {
+    it("WILD win: Victory cascade WITHOUT TrainerVictoryPhase", () => {
+      const tails = coopWaveAdvanceSanctionedTails(payload({ wave: 5, outcome: "win", victoryKind: "wild" }));
+      expect(tails).toEqual(
+        expect.arrayContaining(["VictoryPhase", "BattleEndPhase", "NewBattlePhase", "NextEncounterPhase"]),
+      );
+      expect(tails).not.toContain("TrainerVictoryPhase");
+      expect(tails).not.toContain("GameOverPhase");
+    });
+
+    it("TRAINER victory: Victory cascade WITH TrainerVictoryPhase", () => {
+      const tails = coopWaveAdvanceSanctionedTails(payload({ wave: 5, outcome: "win", victoryKind: "trainer" }));
+      expect(tails).toContain("VictoryPhase");
+      expect(tails).toContain("TrainerVictoryPhase");
+    });
+
+    it("BIOME boundary: adds the biome-transition tail", () => {
+      const tails = coopWaveAdvanceSanctionedTails(
+        payload({ wave: 10, outcome: "win", victoryKind: "wild", biomeChange: true }),
+      );
+      expect(tails).toEqual(expect.arrayContaining(["SelectBiomePhase", "NewBiomeEncounterPhase", "SwitchBiomePhase"]));
+    });
+
+    it("EGG LAPSE: adds EggLapsePhase", () => {
+      const tails = coopWaveAdvanceSanctionedTails(payload({ wave: 5, outcome: "win", eggLapse: true }));
+      expect(tails).toContain("EggLapsePhase");
+    });
+
+    it("FLEE: BattleEnd -> NewBattle tail, no VictoryPhase", () => {
+      const tails = coopWaveAdvanceSanctionedTails(payload({ wave: 5, outcome: "flee" }));
+      expect(tails).toContain("BattleEndPhase");
+      expect(tails).toContain("NewBattlePhase");
+      expect(tails).not.toContain("VictoryPhase");
+    });
+
+    it("GAME OVER: only GameOverPhase", () => {
+      const tails = coopWaveAdvanceSanctionedTails(payload({ wave: 5, outcome: "gameOver" }));
+      expect(tails).toEqual(["GameOverPhase"]);
+    });
+
+    it("every sanctioned tail is a real allowlisted phase the guest constructs (no phantom names)", () => {
+      const all = new Set<string>([
+        ...coopWaveAdvanceSanctionedTails(
+          payload({ wave: 5, outcome: "win", victoryKind: "trainer", biomeChange: true, eggLapse: true }),
+        ),
+        ...coopWaveAdvanceSanctionedTails(payload({ wave: 5, outcome: "flee", biomeChange: true })),
+        ...coopWaveAdvanceSanctionedTails(payload({ wave: 5, outcome: "gameOver" })),
+      ]);
+      // A sanctioned tail is either a boundary-tail group member (strict-tails gated) OR a legitimately-
+      // constructed input-intent allowlist phase (e.g. SelectBiomePhase). Either way it must be a real
+      // allowlisted phase - never a phantom name.
+      for (const t of all) {
+        expect(
+          COOP_WAVE_TAIL_PHASES.has(t) || COOP_RENDERER_ALLOWED_PHASES.has(t),
+          `${t} must be a real allowlisted phase`,
+        ).toBe(true);
+      }
+    });
+  });
+});
+
+// =====================================================================================
+// STRICT-TAILS gate (observe-only): a boundary tail the current adopted op did NOT sanction logs
+// TAIL WOULD-BLOCK and still RUNS. Default OFF is a byte-for-byte no-op. Never blocks (§6.3).
+// =====================================================================================
+describe("co-op STRICT-TAILS renderer gate mode (Wave-2f, §3.3 observe-only)", () => {
+  beforeEach(() => {
+    setCoopStrictTailsMode(false);
+    setCoopWaveTailSanction(null);
+    resetCoopTailWouldBlockLog();
+    setCoopAuthoritativeGuestPredicate(() => true); // the authoritative guest (else the gate short-circuits)
+  });
+  afterEach(() => {
+    setCoopAuthoritativeGuestPredicate(null);
+    setCoopStrictTailsMode(false);
+    setCoopWaveTailSanction(null);
+    resetCoopTailWouldBlockLog();
+  });
+
+  it("defaults to OFF (strict-tails is not enabled by default)", () => {
+    expect(isCoopStrictTailsMode()).toBe(false);
+  });
+
+  it("OFF: never logs TAIL WOULD-BLOCK, never neutralizes a boundary tail (byte-for-byte today)", () => {
+    setCoopStrictTailsMode(false);
+    for (const tail of COOP_WAVE_TAIL_PHASES) {
+      expect(coopRendererGateNeutralizes(tail), `${tail} still runs`).toBe(false);
+    }
+    expect(getCoopTailWouldBlockLog()).toHaveLength(0);
+  });
+
+  it("ON, unsanctioned: logs TAIL WOULD-BLOCK but still RUNS (never blocks - evidence-gathering)", () => {
+    setCoopStrictTailsMode(true);
+    setCoopWaveTailSanction(["VictoryPhase"]); // only VictoryPhase is op-sanctioned this advance
+    // VictoryPhase is sanctioned -> no would-block.
+    expect(coopRendererGateNeutralizes("VictoryPhase")).toBe(false);
+    // BattleEndPhase is NOT sanctioned this advance -> would-block logged, but STILL RUNS.
+    expect(coopRendererGateNeutralizes("BattleEndPhase"), "strict-tails never blocks (observe)").toBe(false);
+    expect(getCoopTailWouldBlockLog()).toContain("BattleEndPhase");
+    expect(getCoopTailWouldBlockLog()).not.toContain("VictoryPhase");
+  });
+
+  it("ON with a matching sanction set: a fully-sanctioned tail produces ZERO would-block (the clean-run target)", () => {
+    setCoopStrictTailsMode(true);
+    const sanction = coopWaveAdvanceSanctionedTails({
+      wave: 12,
+      outcome: "win",
+      nextLogicalPhase: "WAVE_VICTORY",
+      nextWave: 13,
+      biomeChange: false,
+      eggLapse: true,
+      meBoundary: "none",
+      victoryKind: "wild",
+    });
+    setCoopWaveTailSanction(sanction);
+    for (const t of sanction) {
+      expect(coopRendererGateNeutralizes(t)).toBe(false);
+    }
+    expect(getCoopTailWouldBlockLog(), "a run whose tails match the op's sanction has zero would-block").toHaveLength(
+      0,
+    );
+  });
+
+  it("ON with NO adopted op (null sanction): every boundary tail would-block (a tail built without an op)", () => {
+    setCoopStrictTailsMode(true);
+    setCoopWaveTailSanction(null);
+    expect(coopRendererGateNeutralizes("VictoryPhase")).toBe(false); // still runs
+    expect(getCoopTailWouldBlockLog()).toContain("VictoryPhase");
+  });
+
+  it("ON: a non-boundary-tail allowlist phase is NEVER strict-tails checked", () => {
+    setCoopStrictTailsMode(true);
+    setCoopWaveTailSanction([]); // nothing sanctioned
+    expect(coopRendererGateNeutralizes("CommandPhase")).toBe(false); // input-intent, not a boundary tail
+    expect(getCoopTailWouldBlockLog()).not.toContain("CommandPhase");
+  });
+});

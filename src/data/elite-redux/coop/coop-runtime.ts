@@ -76,6 +76,7 @@ import {
   setCoopMeInteractionStart,
 } from "#data/elite-redux/coop/coop-me-pin-state";
 import { CoopMePump } from "#data/elite-redux/coop/coop-me-pump";
+import type { CoopWaveAdvancePayload } from "#data/elite-redux/coop/coop-operation-envelope";
 import {
   coopOperationDurabilityHooks,
   resetCoopOperationJournalLog,
@@ -109,6 +110,10 @@ import {
 } from "#data/elite-redux/coop/coop-transport";
 import { setCoopLiveEmitter } from "#data/elite-redux/coop/coop-turn-recorder";
 import { CoopUiMirror } from "#data/elite-redux/coop/coop-ui-mirror";
+import {
+  commitWaveAdvanceOwnerIntent,
+  resetCoopWaveAdvanceOperationState,
+} from "#data/elite-redux/coop/coop-wave-operation";
 import { setCoopGhostFetchSuppressed, setCoopGhostPool, setGhostPoolPublisher } from "#data/elite-redux/er-ghost-teams";
 import {
   beginReplayRecording,
@@ -125,6 +130,7 @@ import {
 import { ShowdownLifecycle } from "#data/elite-redux/showdown/showdown-lifecycle";
 import { otherRole } from "#data/elite-redux/showdown/showdown-outcome";
 import { ShowdownSpoof } from "#data/elite-redux/showdown/showdown-spoof";
+import { BattleType } from "#enums/battle-type";
 import { BattlerIndex } from "#enums/battler-index";
 import { Command } from "#enums/command";
 import { UiMode } from "#enums/ui-mode";
@@ -1662,6 +1668,41 @@ export function recordCoopPartnerSlotCommand(fieldIndex: number, command: Serial
  * `currentBattle.waveIndex`. Hard no-op unless we are in a live AUTHORITATIVE co-op run as the
  * HOST, so solo / non-host / lockstep play is byte-for-byte unaffected. Best-effort + guarded.
  */
+/**
+ * HOST: build the host-STATED complete wave-advance transition for the Wave-2f keystone operation
+ * (§2.5 item 4). The host reads the fields off its own resolving battle state: the victory kind (the
+ * battleType verdict, already host-authoritative per #867), the next logical phase (WAVE_VICTORY /
+ * WAVE_FLEE / GAME_OVER, so the envelope makes logicalPhase host-authoritative), the biome-change (the
+ * #863/#864 boundary), and the egg-lapse boundary. The guest ADOPTS this and constructs its tail FROM it
+ * instead of deriving from the one-bit outcome. Pure over globalScene at the wave-end call site.
+ */
+export function buildCoopWaveAdvancePayload(outcome: CoopWaveOutcome, wave: number): CoopWaveAdvancePayload {
+  const gameMode = globalScene.gameMode;
+  const isVictory = outcome === "win" || outcome === "capture";
+  const nextLogicalPhase = outcome === "gameOver" ? "GAME_OVER" : isVictory ? "WAVE_VICTORY" : "WAVE_FLEE";
+  // A biome boundary this advance crosses (the flee tail's SelectBiomePhase condition + the victory
+  // cascade's biome transition): random-biome mode, or the engine says the next wave enters a new biome.
+  const biomeChange = gameMode.hasRandomBiomes || globalScene.isNewBiome();
+  // An egg-lapse fires on a non-final victory advance (VictoryPhase pushes EggLapsePhase there).
+  const eggLapse = isVictory && (gameMode.isEndless || !gameMode.isWaveFinal(wave));
+  const payload: CoopWaveAdvancePayload = {
+    wave,
+    outcome,
+    nextLogicalPhase,
+    nextWave: outcome === "gameOver" ? wave : wave + 1,
+    biomeChange,
+    eggLapse,
+    meBoundary: "none", // an ME-spawned battle victory routes its OWN tail (queueCoopMeBattleVictoryTail).
+  };
+  if (isVictory) {
+    return {
+      ...payload,
+      victoryKind: globalScene.currentBattle.battleType === BattleType.TRAINER ? "trainer" : "wild",
+    };
+  }
+  return payload;
+}
+
 export function broadcastCoopWaveResolved(outcome: CoopWaveOutcome, presentation?: CoopCapturePresentation): void {
   if (!globalScene.gameMode.isCoop || active == null || getCoopNetcodeMode() !== "authoritative") {
     return;
@@ -1680,6 +1721,16 @@ export function broadcastCoopWaveResolved(outcome: CoopWaveOutcome, presentation
       `send waveResolved wave=${wave} outcome=${outcome}${captureParty == null ? "" : ` captureParty=${captureParty.length}`}${presentation == null ? "" : ` cap=sp${presentation.speciesId}`} (host)`,
     );
     active.battleStream.sendWaveResolved(wave, outcome, captureParty, presentation);
+    // Wave-2f KEYSTONE (§2.5 item 4): ALSO commit the host-stated WAVE_ADVANCE operation (dual-run - the
+    // legacy waveResolved above still carries the DATA the guest adopts; this op is the CONTROL statement
+    // that makes logicalPhase host-authoritative). Owner is the host seat; pinned on the wave. No-op when
+    // the flag is OFF. The host is the sole engine that resolves a wave, so it commits its own intent here.
+    commitWaveAdvanceOwnerIntent({
+      payload: buildCoopWaveAdvancePayload(outcome, wave),
+      localRole: active.controller.role,
+      wave,
+      turn: globalScene.currentBattle.turn,
+    });
   } catch (e) {
     /* a wave-resolved send failure must never break the host's post-battle flow */
     coopWarn("runtime", `send waveResolved failed wave=${wave} outcome=${outcome}`, e);
@@ -2094,6 +2145,9 @@ export function assembleCoopRuntime(
   // step 5) - drop any leftover ME op state so a new run's re-init-from-0 interaction counter can never
   // collide with a prior run's already-applied ME operationIds.
   resetCoopMeOperationState();
+  // Wave-2f: same fresh-control-plane reset for the post-battle wave-advance operation state (THE KEYSTONE) -
+  // a new run's wave index restarts, so drop any leftover host/guest applier + last-applied wave pin.
+  resetCoopWaveAdvanceOperationState();
   // #896 W2e-R2: a fresh assembly is a genuine RE-PAIR (new control plane), so drop any prior session's
   // negotiated capability set - the first hello of this session renegotiates it. A HOT rejoin does NOT
   // re-assemble (it pulls a snapshot in place), so this never clears a live negotiation on a flap.
@@ -2310,6 +2364,8 @@ export function clearCoopRuntime(): void {
   resetCoopRewardOperationState();
   // Wave-2c: same teardown for the mystery-encounter operation surface.
   resetCoopMeOperationState();
+  // Wave-2f: same teardown for the post-battle wave-advance operation surface (THE KEYSTONE).
+  resetCoopWaveAdvanceOperationState();
   learnMoveForwardInFlight.clear();
   learnMoveBatchForwardInFlight.clear();
   active.localTransport.close();

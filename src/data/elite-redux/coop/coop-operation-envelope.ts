@@ -88,7 +88,9 @@ export type CoopOperationKind =
   | "LEARN_MOVE" // learn-move accept/decline (#11)
   | "LEARN_MOVE_BATCH" // batch level-up learn panel (#12)
   | "STORMGLASS" // one-time weather pick (#16)
-  | "CATCH_FULL"; // wild-catch full-party release (#17)
+  | "CATCH_FULL" // wild-catch full-party release (#17)
+  // --- Wave-2f: the KEYSTONE post-battle wave-advance tail (§2.5 item 4, not a relay kind) ---
+  | "WAVE_ADVANCE"; // the host-stated between-wave transition the guest constructs its tail FROM (the keystone)
 
 /** A single unit of shared-run mutation moving through the lifecycle (§1.3). */
 export interface CoopPendingOperation {
@@ -242,6 +244,58 @@ export interface CoopQuizAnswerPayload {
 }
 
 // -----------------------------------------------------------------------------
+// Wave-2f: the KEYSTONE wave-advance payload (§2.5 item 4, WAVE_ADVANCE). This is NOT a relay kind -
+// it is the guest-constructed post-battle tail (coop-replay-phases.ts:1139-1212) migrated onto the
+// operation model. The host STATES the complete between-wave transition; the guest ADOPTS the committed
+// op and constructs the SAME phases (VictoryPhase / TrainerVictoryPhase / BattleEndPhase / NewBattlePhase
+// / SelectBiomePhase / GameOverPhase) by ADOPTION instead of DERIVATION. Committing this makes
+// logicalPhase host-authoritative for the between-wave transition - the keystone that lets §3's renderer
+// allowlist stop DENYING the boundary tails and start OP-SANCTIONING them (§3 strict-tails). The DATA
+// still rides waveResolved/waveEndState (dual-run); this op is the CONTROL statement.
+// -----------------------------------------------------------------------------
+
+/**
+ * The victory KIND for a win/capture wave-advance (§2.5 item 4): a WILD battle vs a TRAINER battle. The
+ * host STATES it (already host-authoritative per #867's battleType verdict); it drives whether the guest's
+ * VictoryPhase tail cascades into TrainerVictoryPhase (the trainer-win tail, #633). Absent for flee/gameOver.
+ */
+export type CoopWaveVictoryKind = "wild" | "trainer";
+
+/**
+ * The MYSTERY-ENCOUNTER boundary this wave-advance crosses, if any (#847). "none" = an ordinary battle
+ * wave; "battle-victory" = an ME-spawned battle the host won, whose victory tail the guest routes off the
+ * ME channel (queueCoopMeBattleVictoryTail) rather than the standard wave tail. Stating it on the op means
+ * the guest never INFERS "there is an ME battle turn" from a leftover chain (the #859/#860 phantom class).
+ */
+export type CoopWaveMeBoundary = "none" | "battle-victory";
+
+/**
+ * WAVE_ADVANCE intent/outcome (Wave-2f KEYSTONE, §2.5 item 4): the host-STATED complete post-battle
+ * transition off which the guest constructs its wave-end tail (coop-replay-phases.ts:1139-1212), instead
+ * of DERIVING it from a one-bit `waveResolved.outcome`. The host commits this at its own wave-end (where
+ * waveResolved/waveEndState are already emitted); the guest adopts the committed op and selects the SAME
+ * tail phases BY the op's stated transition. All fields are plain-JSON serializable.
+ */
+export interface CoopWaveAdvancePayload {
+  /** The wave that RESOLVED (the operation pin + the double-advance guard key, successor of lastResolvedWave). */
+  readonly wave: number;
+  /** The battle OUTCOME the host resolved (the successor of CoopWaveOutcome: win/capture/flee/gameOver). */
+  readonly outcome: "win" | "capture" | "flee" | "gameOver";
+  /** The logical phase the run transitions INTO (host-stated; the guest ADOPTS, never infers - §1.1). */
+  readonly nextLogicalPhase: CoopLogicalPhase;
+  /** The wave index the run advances TO (wave + 1 for a normal advance; == wave on a game-over). */
+  readonly nextWave: number;
+  /** Whether the transition crosses a BIOME boundary (drives SelectBiomePhase / references the biome ops, #863/#864). */
+  readonly biomeChange: boolean;
+  /** Whether an EGG-LAPSE fires on this advance (the guest's EggLapsePhase boundary tail). */
+  readonly eggLapse: boolean;
+  /** The ME-boundary this advance crosses, if any (#847); an ME-spawned battle victory routes its own tail. */
+  readonly meBoundary: CoopWaveMeBoundary;
+  /** The victory kind for win/capture (wild vs trainer, drives TrainerVictoryPhase); absent for flee/gameOver. */
+  readonly victoryKind?: CoopWaveVictoryKind;
+}
+
+// -----------------------------------------------------------------------------
 // Pure helpers: id mint/parse + closed-union guards. Zero engine dependency.
 // -----------------------------------------------------------------------------
 
@@ -307,6 +361,7 @@ const KNOWN_OPERATION_KINDS: ReadonlySet<CoopOperationKind> = new Set<CoopOperat
   "LEARN_MOVE_BATCH",
   "STORMGLASS",
   "CATCH_FULL",
+  "WAVE_ADVANCE",
 ]);
 
 /** True iff `phase` is a logical phase the guest recognizes (else it must fail closed, §1.7). */
