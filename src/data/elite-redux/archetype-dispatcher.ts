@@ -6942,15 +6942,28 @@ function dispatchBespokeR48(erAbilityId: number): DispatchResult | null {
       // a scripted Hyper Beam at the foe. (The prior wire boosted the holder's
       // own ATK — wrong mechanic — and used the broken base attr.)
       return ok([new OnOpponentStatRaiseScriptedMoveAbAttr({ moveId: MoveId.HYPER_BEAM, power: 150 })]);
-    case 444:
-      // Evaporate — "Takes no damage and sets Mist if hit by water."
+    case 444: {
+      // Evaporate — "Negates all Water-move damage AND sets Mist for 5 turns on
+      // the holder's side when hit by a Water move. Mist protects the whole team
+      // from stat reductions, INCLUDING self-drops." Vanilla Mist (checked in
+      // stat-stage-change-phase) only blocks OTHER-source drops (!selfTarget);
+      // to also cover the holder's OWN drops (Overheat / Close Combat / Draco
+      // Meteor) while the Evaporate-set Mist is up, add a SelfStatDropImmunity
+      // gated on the holder's own side holding the MIST tag.
+      const mistSelfDropImmunity = new SelfStatDropImmunityAbAttr();
+      mistSelfDropImmunity.addCondition(pokemon => {
+        const ownSide = pokemon.isPlayer() ? ArenaTagSide.PLAYER : ArenaTagSide.ENEMY;
+        return !!globalScene.arena.getTagOnSide(ArenaTagType.MIST, ownSide);
+      });
       return ok([
         new TypedImmunityWithArenaTagAbAttr({
           immuneType: PokemonType.WATER,
           arenaTag: ArenaTagType.MIST,
           turns: 5,
         }),
+        mistSelfDropImmunity,
       ]);
+    }
     case 457:
       // Phantom Pain — "Ghost-type moves deal normal damage to Normal." This is
       // OFFENSIVE: the holder's Ghost moves bypass Normal's Ghost immunity,
