@@ -37,6 +37,7 @@ import {
 } from "#data/elite-redux/coop/coop-battle-engine";
 import { CoopBattleStreamer } from "#data/elite-redux/coop/coop-battle-stream";
 import { CoopBattleSync } from "#data/elite-redux/coop/coop-battle-sync";
+import { resetCoopBiomeOperationState } from "#data/elite-redux/coop/coop-biome-operation";
 import { getCoopChecksumAssertionCount } from "#data/elite-redux/coop/coop-checksum-assert";
 import { coopLog, coopWarn, isCoopDebug } from "#data/elite-redux/coop/coop-debug";
 import {
@@ -1902,6 +1903,11 @@ export function assembleCoopRuntime(
     kind?: CoopSessionKind | undefined;
   } = {},
 ): CoopRuntime {
+  // Wave-2a: a fresh session assembly is a fresh control plane (§1.4) - clear any leftover biome-travel
+  // operation state so a new run's interaction counter (re-init from base 0, so it reuses the same seq
+  // addresses) can never collide with a prior run's already-applied operationIds. NOT a hot rejoin (that
+  // pulls a snapshot without re-assembling), so this never wipes a live pending op.
+  resetCoopBiomeOperationState();
   const controller = new CoopSessionController(transport, { username: opts.username, version: COOP_PROTOCOL_VERSION });
   // Pin the chosen netcode (#633, selectable A/B). On the HOST this is the source of
   // truth that rides along in broadcastRunConfig; on the GUEST it is only the pre-
@@ -2084,6 +2090,9 @@ export function clearCoopRuntime(): void {
   // A session teardown mid-faint-pick (disconnect / GameOver while a picker was open) must not leave the
   // watchdog-suppression pin set for the NEXT session - reset the depth to 0 (the pin is per-client global).
   resetCoopFaintSwitchWindows();
+  // Wave-2a: drop the biome-travel operation state (host/guest appliers + last-applied pin) so a new
+  // session's interaction counter (which re-inits from base 0) never collides with a prior session's ops.
+  resetCoopBiomeOperationState();
   learnMoveForwardInFlight.clear();
   learnMoveBatchForwardInFlight.clear();
   active.localTransport.close();

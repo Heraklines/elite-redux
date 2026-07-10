@@ -24,6 +24,10 @@
 // plain-JSON `ErDataFingerprint` (#633 diagnostics), so the transport stays the lowest layer.
 import type { ErDataFingerprint } from "#data/elite-redux/coop/coop-data-fingerprint";
 import { coopLog, isCoopDebug } from "#data/elite-redux/coop/coop-debug";
+// TYPE-ONLY (erased at runtime, so this stays the lowest layer): the authoritative control-plane
+// envelope (Wave-2 run-state migration, §1.1). The envelope module in turn imports only the
+// CoopAuthoritativeBattleStateV1 TYPE from here, so the cycle is fully type-level (no runtime cycle).
+import type { CoopAuthoritativeEnvelopeV1 } from "#data/elite-redux/coop/coop-operation-envelope";
 import type { ErRouteNode } from "#data/elite-redux/er-biome-routing";
 import type { GhostTeamSnapshot } from "#data/elite-redux/er-ghost-teams";
 import type { ErMapSaveData } from "#data/elite-redux/er-map-nodes";
@@ -43,7 +47,7 @@ export type CoopRole = "host" | "guest";
  * changes shape. Carried in the hello; a mismatch means one player runs a stale cached bundle -
  * the top source of unreproducible ghost bugs - and both get told to hard-refresh.
  */
-export const COOP_PROTOCOL_VERSION = "er-coop-11";
+export const COOP_PROTOCOL_VERSION = "er-coop-12";
 
 /**
  * Which co-op netcode the run uses (#633, selectable A/B). Two complete
@@ -1190,6 +1194,20 @@ export type CoopMessage =
    * legacy per-slot exp-delta relay it superseded has been removed; an older client ignores an unknown `t`).
    */
   | { t: "waveEndState"; wave: number; state: CoopAuthoritativeBattleStateV1 }
+  // ===========================================================================
+  // Authoritative CONTROL-plane envelope (Wave-2 run-state migration, §1.1 / §4).
+  // ADDITIVE + forward-safe: a client that never learns these `t` values ignores them
+  // via the unknown-`t` default arm (the same discipline waveEndState / showdown rely on).
+  // Paired clients share COOP_PROTOCOL_VERSION, so a field is present on both or neither
+  // (§5.2). Wave-2a's migrated biome surface rides the legacy relay carrier in dual-run
+  // (§5.1); these arms are the declared wire types the journal wave (Wave-2b) sends on.
+  // ===========================================================================
+  /** Host -> guest: the authoritative control+data envelope broadcast on every commit (§1.1). */
+  | { t: "envelope"; envelope: CoopAuthoritativeEnvelopeV1 }
+  /** Guest -> host: acknowledge applying through `revision` in `epoch`, so the host can stop resending (§4.2). */
+  | { t: "envelopeAck"; epoch: number; revision: number }
+  /** Guest -> host on rejoin: request the committed-op journal tail past `lastAppliedRevision` (§4.4). */
+  | { t: "reconnectSync"; epoch: number; lastAppliedRevision: number }
   // ===========================================================================
   // Showdown 1v1 PvP (A4): additive wire messages layered on the SAME co-op
   // transport. Purely new `t` values, so a co-op client that never speaks Showdown

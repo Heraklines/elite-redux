@@ -36,6 +36,7 @@
 
 import { globalScene } from "#app/global-scene";
 import { Phase } from "#app/phase";
+import { adoptBiomeWatcherChoice, commitBiomeOwnerIntent } from "#data/elite-redux/coop/coop-biome-operation";
 import {
   coopBiomePickerAutoResolvesInTest,
   setCoopBiomeInteractionStart,
@@ -256,6 +257,18 @@ export class ErCrossroadsPhase extends Phase {
     } catch {
       coopWarn("reward", "crossroads OWNER relay send threw (handled - watcher heals on timeout) (#848)");
     }
+    // Wave-2a: DUAL-RUN - additionally COMMIT the typed Stay/Leave intent through the authoritative
+    // operation primitive. No-op when the flag is OFF; the legacy relay above stays the fallback.
+    commitBiomeOwnerIntent({
+      kind: "CROSSROADS_PICK",
+      seq: COOP_CROSSROADS_SEQ_BASE + pinned,
+      pinned,
+      choice: moveOn ? 1 : 0,
+      payload: { optionIndex: moveOn ? 1 : 0 },
+      localRole: getCoopController()?.role ?? "guest",
+      wave: globalScene.currentBattle?.waveIndex ?? -1,
+      turn: 0,
+    });
     this.coopApply(pinned, moveOn);
   }
 
@@ -294,19 +307,31 @@ export class ErCrossroadsPhase extends Phase {
             COOP_CROSSROADS_CHOICE_KINDS,
           );
     getCoopUiMirror()?.endSession();
+    // Wave-2a: gate adoption through the authoritative operation primitive (idempotent + stale-/late-
+    // rejecting, the #861 shape). Flag OFF -> pass-through (legacy). A reject falls to the deterministic
+    // backstop below, exactly like a relay timeout.
+    const decision = adoptBiomeWatcherChoice({
+      kind: "CROSSROADS_PICK",
+      seq: COOP_CROSSROADS_SEQ_BASE + pinned,
+      pinned,
+      res: res == null ? null : { choice: res.choice, data: undefined },
+      localRole: getCoopController()?.role ?? "guest",
+      wave: globalScene.currentBattle?.waveIndex ?? -1,
+      turn: 0,
+    });
     let moveOn: boolean;
-    if (res == null) {
-      // ANTI-HANG (#848): disconnect / stall backstop. Both clients fall back to the SAME
-      // deterministic auto-resolve (leave once the locals turned hostile), so the fallback
-      // cannot desync - it is what both would independently compute off the shared wave index.
+    if (decision.adopt) {
+      moveOn = decision.choice === 1;
+      coopLog("reward", `crossroads WATCHER: owner pick received moveOn=${moveOn} pinnedStart=${pinned} (#848)`);
+    } else {
+      // ANTI-HANG (#848): disconnect / stall / stale-reject backstop. Both clients fall back to the SAME
+      // deterministic auto-resolve (leave once the locals turned hostile), so the fallback cannot desync -
+      // it is what both would independently compute off the shared wave index.
       moveOn = erHasNotoriety(globalScene.currentBattle?.waveIndex ?? 0);
       coopWarn(
         "reward",
-        `crossroads WATCHER: owner pick TIMEOUT/disconnect -> deterministic fallback moveOn=${moveOn} (#848)`,
+        `crossroads WATCHER: owner pick TIMEOUT/disconnect/reject(${decision.reason}) -> deterministic fallback moveOn=${moveOn} (#848)`,
       );
-    } else {
-      moveOn = res.choice === 1;
-      coopLog("reward", `crossroads WATCHER: owner pick received moveOn=${moveOn} pinnedStart=${pinned} (#848)`);
     }
     this.coopApply(pinned, moveOn);
   }

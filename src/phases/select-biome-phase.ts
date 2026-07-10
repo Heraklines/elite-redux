@@ -1,5 +1,6 @@
 import { globalScene } from "#app/global-scene";
 import { allBiomes } from "#data/data-lists";
+import { adoptBiomeWatcherChoice, commitBiomeOwnerIntent } from "#data/elite-redux/coop/coop-biome-operation";
 import {
   clearCoopBiomeInteractionStart,
   coopBiomeInteractionInProgress,
@@ -369,13 +370,27 @@ export class SelectBiomePhase extends BattlePhase {
             COOP_BIOME_PICK_CHOICE_KINDS,
           );
     getCoopUiMirror()?.endSession();
+    // Wave-2a: gate adoption through the authoritative operation primitive (idempotent by operationId,
+    // stale-/late-rejecting a pick from an earlier interaction or a prior epoch - the #861 shape). When the
+    // flag is OFF this passes the relay through verbatim (legacy fallback); a reject falls to the
+    // deterministic backstop below exactly like a relay timeout.
+    const decision = adoptBiomeWatcherChoice({
+      kind: "BIOME_PICK",
+      seq: COOP_BIOME_PICK_SEQ_BASE + pinned,
+      pinned,
+      res: res == null ? null : { choice: res.choice, data: res.data },
+      localRole: getCoopController()?.role ?? "guest",
+      wave: globalScene.currentBattle?.waveIndex ?? -1,
+      turn: 0,
+    });
+    const adopted = decision.adopt ? { choice: decision.choice, data: decision.data } : null;
     let biome: BiomeId;
-    if (res != null && res.data != null && res.data.length > 0) {
-      biome = res.data[0] as BiomeId;
+    if (adopted != null && adopted.data != null && adopted.data.length > 0) {
+      biome = adopted.data[0] as BiomeId;
       coopLog("reward", `biome pick WATCHER: owner biome=${BiomeId[biome]} received pinnedStart=${pinned} (#848)`);
-    } else if (res != null && res.choice >= 0 && res.choice < revealed.length) {
-      biome = revealed[res.choice].biome;
-      coopLog("reward", `biome pick WATCHER: owner idx=${res.choice} -> biome=${BiomeId[biome]} (#848)`);
+    } else if (adopted != null && adopted.choice >= 0 && adopted.choice < revealed.length) {
+      biome = revealed[adopted.choice].biome;
+      coopLog("reward", `biome pick WATCHER: owner idx=${adopted.choice} -> biome=${BiomeId[biome]} (#848)`);
     } else {
       // ANTI-HANG (#848): disconnect / stall backstop. Fall back to the SAME deterministic roll both
       // clients compute off the just-reset shared wave seed, so the fallback cannot desync.
@@ -474,6 +489,19 @@ export class SelectBiomePhase extends BattlePhase {
         "reward",
         `biome pick OWNER relay biome=${BiomeId[nextBiome]} idx=${idx} pinnedStart=${this.coopAdvancePinned} (#864)`,
       );
+      // Wave-2a: DUAL-RUN - additionally COMMIT the typed intent through the authoritative operation
+      // primitive (the host validates + commits exactly once). No-op when the flag is OFF; the legacy relay
+      // above is the fallback and stays live either way.
+      commitBiomeOwnerIntent({
+        kind: "BIOME_PICK",
+        seq: COOP_BIOME_PICK_SEQ_BASE + this.coopAdvancePinned,
+        pinned: this.coopAdvancePinned,
+        choice: idx,
+        payload: { biomeId: nextBiome, nodeIndex: idx },
+        localRole: getCoopController()?.role ?? "guest",
+        wave: globalScene.currentBattle?.waveIndex ?? -1,
+        turn: 0,
+      });
     } catch {
       coopWarn("reward", "biome pick OWNER relay send threw (handled - watcher heals on orphan backstop) (#864)");
     }
