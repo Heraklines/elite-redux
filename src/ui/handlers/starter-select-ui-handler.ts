@@ -4016,12 +4016,21 @@ export class StarterSelectUiHandler extends MessageUiHandler {
     // Collection/unlock snapshot for the shiny/ability chips + the egg-move gating in the move pane.
     const snapshot = buildUnlockSnapshot(gameData);
     const megaBudgetSpentBy = this.showdownMegaBudgetSpentByName(root);
+    // Innate (passive) candy-unlock state for the ABILITIES panel (B7 round-4 item 6): each of the 3
+    // innate slots is candy-gated on the PLAYER's own party (`hasPassive` player branch), so a locked
+    // slot shows its unlock cost. `getStarterDataEntry` pools `passiveAttr`/`candyCount` under the same
+    // line root the candy menu uses; the per-slot cost mirrors `isPassiveAvailable` exactly.
+    const passiveEntry = gameData.getStarterDataEntry(root);
+    const passiveBaseCost = getPassiveCandyCount(speciesStarterCosts[root] ?? 0);
     const unlocks = {
       ownedVariants: [0, 1, 2].filter(v => snapshot.isShinyUnlocked(root, v)),
       blackShinyOwned: gameData.starterData[root]?.erBlackShiny ?? false,
       unlockedAbilityIndices: [0, 1, 2].filter(i => snapshot.isAbilityUnlocked(root, i)),
       unlockedEggMoveBits: gameData.starterData[root]?.eggMoves ?? 0,
       megaBudgetSpent: this.showdownTeamHasOtherMega(root),
+      innateUnlockedSlots: [0, 1, 2].filter(s => isSlotUnlocked(passiveEntry?.passiveAttr ?? 0, s as PassiveSlot)),
+      innateSlotCandyCosts: [0, 1, 2].map(s => getErPassiveSlotCandyCost(passiveBaseCost, s)),
+      candyCount: passiveEntry?.candyCount ?? 0,
       // Omit-when-absent (exactOptionalPropertyTypes): only carry the name when a mega is actually spent.
       ...(megaBudgetSpentBy === undefined ? {} : { megaBudgetSpentBy }),
     };
@@ -4046,6 +4055,7 @@ export class StarterSelectUiHandler extends MessageUiHandler {
       rootSpeciesId: root,
       stage,
       set,
+      female: props.female,
       unlocks,
       team,
       activeSlot,

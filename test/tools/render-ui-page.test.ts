@@ -863,18 +863,20 @@ const RECIPES: Record<string, Recipe> = {
     ],
     diffTolerance: 0,
   },
-  // Ability pane: the 3 actives (one LOCKED, grayed with reason) on the left + the 3 INNATES
-  // (always-on, informational, with descriptions) on the right. Ability row focused, pane open.
+  // Ability row focused (round 4 - NO dropdown): the 1 ACTIVE ability is CYCLED in place (< active >
+  // chevrons) and the 3 INNATES read below, a LOCKED innate showing its candy unlock cost (item 6).
+  // This is also the locked-innate example render.
   "showdown-editor-ability": {
     mode: UiMode.SHOWDOWN_SET_EDITOR,
-    prepare: () => [buildShowdownEditorDemoConfig({ initialField: EditorField.ABILITY, initialPaneOpen: true })],
+    prepare: () => [buildShowdownEditorDemoConfig({ initialField: EditorField.ABILITY })],
     diffTolerance: 0,
   },
-  // Nature pane: the free-pick nature grid with the +/- summary per entry; highlighted entry's
-  // footer notes the live stat-bar preview. Nature row focused, pane open.
-  "showdown-editor-nature": {
+  // Move cell focused (no dropdown): the persistent bottom MOVE DESCRIPTION bar shows the focused
+  // move's full description (item 8) - the compact NATURE chip (cycled via the N hotkey) sits beside
+  // the item row. Proves the desc bar updates while focus merely sits on a move cell.
+  "showdown-editor-movedesc": {
     mode: UiMode.SHOWDOWN_SET_EDITOR,
-    prepare: () => [buildShowdownEditorDemoConfig({ initialField: EditorField.NATURE, initialPaneOpen: true })],
+    prepare: () => [buildShowdownEditorDemoConfig({ initialField: EditorField.MOVE1 })],
     diffTolerance: 0,
   },
   // Item pane: the searchable showdown item pool (icon + name + effect line). Item row focused,

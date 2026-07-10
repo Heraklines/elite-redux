@@ -9,25 +9,30 @@
 //
 // Opened when a mon is CONFIRMED from the collection grid. It is the single place a
 // player shapes one team slot: which STAGE of the line to field (base -> final ->
-// mega), the ability, held item, four moves, nature and shiny tier - every choice
+// mega), the ACTIVE ability, held item, four moves, nature and shiny tier - every choice
 // gated by the live collection, every choice showing its inline description.
 //
-// Layout (logical 320x180, x6 to screen) - round-3 redesign, game-native nine-slice chrome:
-//   - TOP micro TEAM STRIP: 6 slot icons + validity chips (size / mega / cost) + a
-//     pick-window countdown + a partner-ready line. (No wager preview - cut from v1.)
-//   - LEFT IDENTITY COLUMN (~1/3): the (harness-static) sprite, the evolution STAGE
-//     STRIP - enumerating EVERY owned fielded form incl. multiple megas per line
-//     (e.g. Garchomp's two megas) - shiny/variant chips, live STAT BARS, a cost badge.
-//   - RIGHT COLUMN (~2/3): four stacked WINDOWED section panels so the whole set reads at
-//     a glance without expanding anything:
-//       ABILITIES - the flagship ER feature: all FOUR abilities on the main screen (1 ACTIVE,
-//         focusable/changeable + marked, and the 3 always-on INNATES with compact descriptions),
-//       ITEM, MOVES (a compact 2x2 cell grid), NATURE.
-//   - SEARCH DROPDOWN: drawn ON TOP, only while a field is actively being searched. TYPE-TO-SEARCH:
-//     focusing a field is search-ready; alphanumeric input opens + filters the dropdown directly
-//     (no "press A to browse" ceremony), prefix-first ranked; A opens it unfiltered (controller);
-//     arrows navigate, Enter/A picks, B dismisses. Mobile/desktop keystrokes ride the
-//     {@linkcode ShowdownEditorTextInput} bridge into {@linkcode ShowdownSetEditorUiHandler.setFilter}.
+// Layout (logical 320x180, x6 to screen) - round-4 redesign:
+//   - TOP TEAM STRIP: a cohesive dark bar - 6 framed slot icons (active slot gold-framed) +
+//     uniform validity chips (size / mega / cost) + an integrated countdown + partner status.
+//   - HOTKEY LEGEND BAR: real key-glyph icons (the game's "keyboard" atlas) for the per-mon
+//     functions - Stage (F), Shiny (R), Ability (E), Nature (N) - mirroring starter select.
+//   - LEFT IDENTITY COLUMN (~1/3): the FULL front battle sprite, the species name + cost, type
+//     chips, the evolution STAGE STRIP (every owned fielded form incl. multiple megas), the
+//     restyled SHINY tier selector (off / T1 / T2 / T3 / T4=black, locked tiers marked) and the
+//     BASE stat bars with nature +/- coloring.
+//   - RIGHT COLUMN (~2/3): windowed section panels -
+//       ABILITIES - the 1 ACTIVE (CYCLABLE directly, no dropdown) + the 3 always-on INNATES; a
+//         locked innate shows its candy unlock cost (the player's own party respects the candy
+//         gate, so a locked innate is genuinely inactive - see the enemy-build asymmetry note).
+//       ITEM (+ a compact NATURE chip beside it), MOVES (a 2x2 cell grid).
+//   - MOVE DESCRIPTION BAR (bottom of the right column): a persistent bar that live-updates with
+//     the highlighted move's full description while navigating the move dropdown AND while focus
+//     sits on any of the 4 move cells.
+//   - SEARCH DROPDOWN: drawn ON TOP, only while an ITEM or MOVE field is actively being searched.
+//     TYPE-TO-SEARCH: focusing a field is search-ready; alphanumeric input opens + filters the
+//     dropdown directly (prefix-first ranked); A opens it unfiltered (controller); arrows navigate,
+//     Enter/A picks, B dismisses. (Ability + nature are CYCLED via hotkeys, not searched.)
 //
 // The handler consumes a plain {@linkcode ShowdownSetEditorConfig}; the flow wiring lives in
 // StarterSelect (grid confirm -> editor -> Done writes the manifest). See showdown-editor-flow.test.
@@ -50,6 +55,8 @@ import { SpeciesId } from "#enums/species-id";
 import { PERMANENT_STATS, Stat } from "#enums/stat";
 import { TextStyle } from "#enums/text-style";
 import { UiMode } from "#enums/ui-mode";
+import { getVariantIcon, getVariantTint, type Variant } from "#sprites/variant";
+import { SettingKeyboard } from "#system/settings-keyboard";
 import { addTextObject } from "#ui/text";
 import { UiHandler } from "#ui/ui-handler";
 import { addWindow } from "#ui/ui-theme";
@@ -72,7 +79,7 @@ export interface ShowdownEditorSet {
   nature: number;
   /** Whether the fielded look is shiny. */
   shiny: boolean;
-  /** Shiny variant tier (0..2); 3 marks a black shiny (unfieldable, stake-only). */
+  /** Shiny variant tier (0..2); a black shiny (tier 4 in the selector) is unfieldable, stake-only. */
   variant: number;
 }
 
@@ -86,7 +93,7 @@ export interface ShowdownEditorStage {
 export interface ShowdownEditorUnlocks {
   /** Owned shiny tiers, e.g. [0, 1]. A black shiny is tier 3 and always unfieldable. */
   ownedVariants: number[];
-  /** Whether the line's black shiny is owned (shown but marked stake-only). */
+  /** Whether the line's black shiny is owned (shown as T4 but marked stake-only / unfieldable). */
   blackShinyOwned: boolean;
   /** Which of the fielded species' 3 active-ability slots are unlocked (0..2). */
   unlockedAbilityIndices: number[];
@@ -96,6 +103,17 @@ export interface ShowdownEditorUnlocks {
   megaBudgetSpent: boolean;
   /** Which team slot spent the mega budget (for the greyed reason line). */
   megaBudgetSpentBy?: string;
+  /**
+   * Which of the line's 3 INNATE (passive) slots are candy-UNLOCKED. On the player's own showdown
+   * party a locked innate is genuinely INACTIVE (the player-side `hasPassive` candy gate), so the
+   * editor shows the unlock cost truthfully. (The opponent's enemy-build activates all innates -
+   * a pre-existing host/guest asymmetry, not corrected here.)
+   */
+  innateUnlockedSlots: number[];
+  /** The candy cost to unlock each of the 3 innate slots (`getErPassiveSlotCandyCost`). */
+  innateSlotCandyCosts: number[];
+  /** Candies available on the line (`starterData[root].candyCount`) - shown next to a locked innate. */
+  candyCount: number;
 }
 
 /** The whole editor config for one team slot. Plain data, so live wiring is trivial. */
@@ -106,6 +124,8 @@ export interface ShowdownSetEditorConfig {
   stage: ShowdownEditorStage;
   /** The set being edited. */
   set: ShowdownEditorSet;
+  /** Whether the fielded mon is female (for the full front sprite). */
+  female: boolean;
   /** Collection/unlock state. */
   unlocks: ShowdownEditorUnlocks;
   /** The 6-slot micro team strip; nulls are empty slots. */
@@ -148,7 +168,7 @@ export interface ShowdownEditorResult {
 /**
  * The mobile bridge seam. On a touch device, focusing a searchable field raises the NATIVE
  * keyboard through a hidden DOM input (the same infra login/nickname use). P1 stubs this
- * behind the interface; the NEXT task plugs a real implementation in via {@linkcode
+ * behind the interface; the flow plugs a real implementation in via {@linkcode
  * ShowdownSetEditorUiHandler.setTextInput}. Keyboard/controller need none of this.
  */
 export interface ShowdownEditorTextInput {
@@ -160,7 +180,11 @@ export interface ShowdownEditorTextInput {
 
 // ---- focus graph ------------------------------------------------------------------------------
 
-/** The focusable field rows (right column). Their order IS the up/down focus order. */
+/**
+ * The focusable field rows (right column). Their order IS the up/down focus order. Ability is
+ * focusable but CYCLED (not searched); item + the four moves keep the type-to-search dropdown.
+ * Nature is NOT a focus row in round 4 - it is cycled via the hotkey and shown as a chip.
+ */
 export enum EditorField {
   ABILITY = 0,
   ITEM = 1,
@@ -168,7 +192,6 @@ export enum EditorField {
   MOVE1 = 3,
   MOVE2 = 4,
   MOVE3 = 5,
-  NATURE = 6,
 }
 const FIELD_ORDER: EditorField[] = [
   EditorField.ABILITY,
@@ -177,7 +200,6 @@ const FIELD_ORDER: EditorField[] = [
   EditorField.MOVE1,
   EditorField.MOVE2,
   EditorField.MOVE3,
-  EditorField.NATURE,
 ];
 const MOVE_FIELDS: EditorField[] = [EditorField.MOVE0, EditorField.MOVE1, EditorField.MOVE2, EditorField.MOVE3];
 
@@ -187,61 +209,52 @@ const SCREEN_W = 320;
 const SCREEN_H = 180;
 const MARGIN = 3;
 
-const STRIP_H = 22;
-const BODY_Y = STRIP_H + 2; // 24
+const STRIP_H = 20; // top team strip
+const HOTKEY_Y = STRIP_H + 1; // 21
+const HOTKEY_H = 11; // key-glyph legend bar
+const BODY_Y = HOTKEY_Y + HOTKEY_H + 2; // 34
 
 const LEFT_X = MARGIN; // 3
-const LEFT_W = 100;
-const RIGHT_X = LEFT_X + LEFT_W + MARGIN; // 106
-const RIGHT_W = SCREEN_W - RIGHT_X - MARGIN; // 211
+const LEFT_W = 104;
+const RIGHT_X = LEFT_X + LEFT_W + MARGIN; // 110
+const RIGHT_W = SCREEN_W - RIGHT_X - MARGIN; // 207
 
-// The RIGHT column is four stacked, windowed section panels (game-native nine-slice chrome, not flat
-// fills) so the whole set reads at a glance without expanding anything:
-//   ABILITIES (the 1 active + 3 always-on innates - half of an ER mon's identity),
-//   ITEM, MOVES (a 2x2 grid of cells), NATURE.
-// The search DROPDOWN is drawn LAST, ON TOP, only while a field is actively being searched - there is
-// no idle "press A to browse" region. The left identity column stays full-height + always visible.
-const ABIL_Y = BODY_Y; // 24
-const ABIL_H = 60; // 24..84 - the 1 active + 3 innates block
-const ITEM_Y = ABIL_Y + ABIL_H + 2; // 86
-const ITEM_H = 20; // 86..106
-const MOVES_Y = ITEM_Y + ITEM_H + 2; // 108
-const MOVES_H = 46; // 108..154 - header + a 2x2 cell grid
-const NAT_Y = MOVES_Y + MOVES_H + 2; // 156
-const NAT_H = SCREEN_H - NAT_Y - MARGIN; // 21 -> ends at 177
+// The RIGHT column is windowed section panels (game-native nine-slice chrome) so the whole set reads
+// at a glance: ABILITIES (1 active + 3 innates), ITEM (+ nature chip), MOVES (2x2 cells). The MOVE
+// DESCRIPTION BAR pins the bottom. The search DROPDOWN floats ON TOP, only while an item/move field
+// is actively being searched.
+const ABIL_Y = BODY_Y; // 34
+const ABIL_H = 58; // 34..92 - the 1 active + 3 innates block
+const ITEM_Y = ABIL_Y + ABIL_H + 2; // 94
+const ITEM_H = 20; // 94..114
+const MOVES_Y = ITEM_Y + ITEM_H + 2; // 116
+const MOVES_H = 44; // 116..160 - header + a 2x2 cell grid
+const DESC_Y = MOVES_Y + MOVES_H + 2; // 162 - the persistent move-description bar
+const DESC_H = SCREEN_H - DESC_Y - MARGIN; // 15 -> ends at 177
 
-// The floating search dropdown (over the right column, drawn last). Anchored in a consistent band so
-// it always reads as the same control regardless of which field is focused.
+// The floating search dropdown (over the right column, drawn last). It stops ABOVE the move-desc bar
+// so the highlighted move's description stays visible in that bar while navigating the dropdown.
 const DROP_X = RIGHT_X;
 const DROP_W = RIGHT_W;
-const DROP_Y = ABIL_Y + 40; // drops from just under the ABILITIES header band, over the set
-const DROP_H = SCREEN_H - DROP_Y - MARGIN;
+const DROP_Y = ABIL_Y + 30;
+const DROP_H = DESC_Y - DROP_Y - 1;
 
 const ACCENT = 0x3d5a80; // focused-element fill
 const ACCENT_SOFT = 0x24344f; // focused-in-search (a field is open in the dropdown)
 const HEADER_BAND = 0x18233b; // dark navy band behind section headers (legible gold-on-dark)
 const CELL_DIM = 0x16223d; // solid dark inset for field boxes / move cells (contrast on light windows)
+const BAR_BG = 0x0e1626; // the cohesive dark bar behind the strip + hotkey legend
+const SLOT_BG = 0x1c2740; // a team-strip slot frame's inset
+const GOLD = 0xffd447; // focus / active accent edge
 
 // Font sizes (the addTextObject default is a huge 96; dense screens run ~22-52).
 const FONT_HDR = 34; // small section headers
 const FONT_NAME = 40; // ability / move names
-const FONT_DESC = 26; // inline descriptions
 const FONT_TINY = 22; // dense innate / cell metadata
-const FONT_CHIP = 34; // strip chips + shiny chips
+const FONT_CHIP = 30; // strip chips + shiny labels
 const FONT_TITLE = 52; // species name
 
 // ---- pure display helpers ---------------------------------------------------------------------
-
-/** Level-100, IV-31 stat value with nature multiplier applied (display-only). */
-function calcStat(base: number, statIndex: Stat, nature: Nature): number {
-  const iv = 31;
-  const level = 100;
-  if (statIndex === Stat.HP) {
-    return Math.floor(((2 * base + iv) * level) / 100) + level + 10;
-  }
-  const raw = Math.floor(((2 * base + iv) * level) / 100) + 5;
-  return Math.floor(raw * getNatureStatMultiplier(nature, statIndex));
-}
 
 /** A move-pane row: the move, whether it is locked (egg move not yet unlocked), and the reason. */
 interface MovePaneEntry {
@@ -294,12 +307,14 @@ export class ShowdownSetEditorUiHandler extends UiHandler {
   private paneScroll = 0;
   private filter = "";
   private textInput: ShowdownEditorTextInput | null = null;
+  /** Full-sprite atlas keys already requested this session (avoid re-queuing the same async load). */
+  private requestedSpriteKeys = new Set<string>();
 
   constructor() {
     super(UiMode.SHOWDOWN_SET_EDITOR);
   }
 
-  /** NEXT task: inject the mobile hidden-input bridge (keyboard/controller need none). */
+  /** The flow injects the mobile hidden-input bridge (keyboard/controller need none). */
   setTextInput(input: ShowdownEditorTextInput | null): void {
     this.textInput = input;
   }
@@ -320,17 +335,24 @@ export class ShowdownSetEditorUiHandler extends UiHandler {
       return false;
     }
     this.config = config;
+    // Shiny defaults to the HIGHEST owned rarity (maintainer: the small selector's default is your best
+    // shiny on that mon). Display-scoped like the rest of the P1 shiny picker; R cycles down to off.
+    if (!config.set.shiny && config.unlocks.ownedVariants.length > 0) {
+      config.set.shiny = true;
+      config.set.variant = Math.max(...config.unlocks.ownedVariants);
+    }
     this.field = config.initialField ?? EditorField.ABILITY;
-    this.paneOpen = config.initialPaneOpen ?? false;
+    // Ability is not searchable (it cycles), so a pane can only open on item/move fields.
+    this.paneOpen = (config.initialPaneOpen ?? false) && this.fieldIsSearchable(this.field);
     this.filter = config.initialFilter ?? "";
     this.paneCursor = config.initialPaneCursor ?? 0;
     this.paneScroll = 0;
     this.container.setVisible(true);
-    // Raise the type-to-search capture immediately: a focused field is search-ready with no ceremony
-    // (desktop keystrokes / mobile native keyboard both feed the typeahead). Headless: inert no-op.
     if (this.paneOpen) {
       this.ensurePaneCursorVisible();
     }
+    // Raise the type-to-search capture immediately: a focused searchable field is search-ready with no
+    // ceremony (desktop keystrokes / mobile native keyboard both feed the typeahead). Headless: no-op.
     this.openCapture();
     this.render();
     return true;
@@ -357,6 +379,11 @@ export class ShowdownSetEditorUiHandler extends UiHandler {
     return [...this.fieldedSpecies.getPassiveAbilities(this.config!.stage.formIndex)];
   }
 
+  /** Whether a field uses the type-to-search dropdown (item + the four moves; ability cycles). */
+  private fieldIsSearchable(field: EditorField): boolean {
+    return field === EditorField.ITEM || MOVE_FIELDS.includes(field);
+  }
+
   // ---- input ----------------------------------------------------------------------------------
 
   processInput(button: Button): boolean {
@@ -376,13 +403,16 @@ export class ShowdownSetEditorUiHandler extends UiHandler {
         handled = this.moveField(1);
         break;
       case Button.LEFT:
-        handled = this.cycleStage(-1);
+        // On the ability row LEFT/RIGHT cycles the ACTIVE ability directly (like starter select); on
+        // any other row it cycles the fielded STAGE (sprite / abilities / movepool all follow).
+        handled = this.field === EditorField.ABILITY ? this.cycleActiveAbility(-1) : this.cycleStage(-1);
         break;
       case Button.RIGHT:
-        handled = this.cycleStage(1);
+        handled = this.field === EditorField.ABILITY ? this.cycleActiveAbility(1) : this.cycleStage(1);
         break;
       case Button.ACTION:
-        handled = this.openPane();
+        // A searchable field opens its dropdown (controller path); the ability row cycles forward.
+        handled = this.field === EditorField.ABILITY ? this.cycleActiveAbility(1) : this.openPane();
         break;
       case Button.SUBMIT:
         // Start = Done: commit the edited stage + set back into the team (flow wiring).
@@ -395,16 +425,25 @@ export class ShowdownSetEditorUiHandler extends UiHandler {
         handled = true;
         break;
       case Button.CYCLE_FORM:
-        // Left shoulder: cycle to the previous already-picked team mon.
-        if (this.config!.onCycleTeam != null) {
-          this.config!.onCycleTeam(-1);
-          handled = true;
-        }
+        // F hotkey: cycle the fielded STAGE / form.
+        handled = this.cycleStage(1);
         break;
       case Button.CYCLE_SHINY:
-        // Right shoulder: cycle to the next already-picked team mon.
+        // R hotkey: cycle the shiny tier (off -> owned tiers).
+        handled = this.cycleShiny(1);
+        break;
+      case Button.CYCLE_ABILITY:
+        // E hotkey: cycle the ACTIVE ability (from any field).
+        handled = this.cycleActiveAbility(1);
+        break;
+      case Button.CYCLE_NATURE:
+        // N hotkey: cycle the nature (recolors the stat bars live).
+        handled = this.cycleNature(1);
+        break;
+      case Button.STATS:
+        // Shoulder: page between already-picked team mons.
         if (this.config!.onCycleTeam != null) {
-          this.config!.onCycleTeam(1);
+          this.config!.onCycleTeam(-1);
           handled = true;
         }
         break;
@@ -453,8 +492,8 @@ export class ShowdownSetEditorUiHandler extends UiHandler {
     const idx = FIELD_ORDER.indexOf(this.field);
     const next = (idx + dir + FIELD_ORDER.length) % FIELD_ORDER.length;
     this.field = FIELD_ORDER[next];
-    // Every field is search-ready: reset the capture buffer for the newly focused field so the first
-    // keystroke here filters THIS field's pool (no stale filter, no "browse" action).
+    // Every searchable field is search-ready: reset the capture buffer for the newly focused field so
+    // the first keystroke filters THIS field's pool (no stale filter, no "browse" action).
     this.filter = "";
     this.openCapture();
     this.render();
@@ -476,6 +515,78 @@ export class ShowdownSetEditorUiHandler extends UiHandler {
     } else if (this.config!.set.item === MEGA_STONE_ITEM) {
       this.config!.set.item = SHOWDOWN_ITEM_POOL[0];
     }
+    // A new stage can shift which active-ability slots are legal; keep the index in range.
+    this.config!.set.abilityIndex = Math.max(0, Math.min(this.config!.set.abilityIndex, 2));
+    this.render();
+    return true;
+  }
+
+  /**
+   * Cycle the ACTIVE ability among the fielded species' UNLOCKED actives (round-4 replacement for the
+   * old search dropdown). Locked / NONE / duplicate slots are SKIPPED (a locked slot can't be fielded,
+   * exactly as the old dropdown refused to pick it). Wraps; a no-op when only one active is selectable.
+   */
+  private cycleActiveAbility(dir: number): boolean {
+    const selectable = this.selectableAbilityIndices();
+    if (selectable.length <= 1) {
+      return false;
+    }
+    const cur = selectable.indexOf(this.config!.set.abilityIndex);
+    const nextPos = ((cur < 0 ? 0 : cur) + dir + selectable.length) % selectable.length;
+    this.config!.set.abilityIndex = selectable[nextPos];
+    this.render();
+    return true;
+  }
+
+  /** The active-ability slot indices that can actually be fielded (unlocked + a real, distinct ability). */
+  private selectableAbilityIndices(): number[] {
+    const ids = this.activeAbilityIds();
+    const unlocked = this.config!.unlocks.unlockedAbilityIndices;
+    const seen = new Set<number>();
+    const out: number[] = [];
+    ids.forEach((id, i) => {
+      if (!unlocked.includes(i) || id == null || seen.has(id)) {
+        return;
+      }
+      seen.add(id);
+      out.push(i);
+    });
+    return out.length > 0 ? out : [0];
+  }
+
+  /** R hotkey: cycle the shiny tier through OFF + the owned fieldable tiers (black T4 is never fielded). */
+  private cycleShiny(dir: number): boolean {
+    const states = this.fieldableShinyStates();
+    if (states.length <= 1) {
+      return false;
+    }
+    const set = this.config!.set;
+    const cur = states.findIndex(s => s.shiny === set.shiny && (!s.shiny || s.variant === set.variant));
+    const next = ((cur < 0 ? 0 : cur) + dir + states.length) % states.length;
+    set.shiny = states[next].shiny;
+    set.variant = states[next].variant;
+    this.render();
+    return true;
+  }
+
+  /** The ordered off/owned-tier states R cycles through (black shiny excluded - unfieldable). */
+  private fieldableShinyStates(): { shiny: boolean; variant: number }[] {
+    const owned = this.config!.unlocks.ownedVariants;
+    const states: { shiny: boolean; variant: number }[] = [{ shiny: false, variant: 0 }];
+    for (const tier of [0, 1, 2]) {
+      if (owned.includes(tier)) {
+        states.push({ shiny: true, variant: tier });
+      }
+    }
+    return states;
+  }
+
+  /** N hotkey: cycle the nature (free pick). Recolors the stat bars live. */
+  private cycleNature(dir: number): boolean {
+    const natures = (Object.values(Nature).filter(n => typeof n === "number") as number[]).sort((a, b) => a - b);
+    const cur = natures.indexOf(this.config!.set.nature);
+    const next = ((cur < 0 ? 0 : cur) + dir + natures.length) % natures.length;
+    this.config!.set.nature = natures[next];
     this.render();
     return true;
   }
@@ -484,18 +595,24 @@ export class ShowdownSetEditorUiHandler extends UiHandler {
    * Raise the type-to-search capture surface for the CURRENT field (desktop physical-keyboard capture /
    * mobile native keyboard). Every keystroke routes to {@linkcode setFilter}, which auto-opens the
    * dropdown on the first character - so on keyboard/touch you simply START TYPING, no button first.
-   * Headless (tests / render harness): the factory is absent, so this is an inert no-op.
+   * Only searchable fields (item / moves) capture; headless (tests / harness) is an inert no-op.
    */
   private openCapture(): void {
+    if (!this.fieldIsSearchable(this.field)) {
+      return;
+    }
     this.textInput?.open(this.filter, value => this.setFilter(value));
   }
 
   /**
-   * CONTROLLER path (A on a focused field): open the dropdown UNFILTERED with the current value
-   * pre-highlighted. Keyboard/touch users never need this - they just type - but it also re-raises the
-   * capture so they can immediately narrow.
+   * CONTROLLER path (A on a focused searchable field): open the dropdown UNFILTERED with the current
+   * value pre-highlighted. Keyboard/touch users never need this - they just type - but it also re-raises
+   * the capture so they can immediately narrow.
    */
   private openPane(): boolean {
+    if (!this.fieldIsSearchable(this.field)) {
+      return false;
+    }
     this.paneOpen = true;
     this.filter = "";
     this.paneCursor = this.currentPaneSelectionIndex();
@@ -516,11 +633,14 @@ export class ShowdownSetEditorUiHandler extends UiHandler {
 
   /**
    * The single typeahead entry point - fed by the capture surface (desktop keyboard / mobile native
-   * keyboard) AND the interaction tests. Typing on a focused field IS the search: the first character
-   * opens the dropdown with NO prior "browse"/A action, and each edit re-ranks (prefix-first) to the
-   * top match. This is the round-3 input model: no separate search button, no mode-switch.
+   * keyboard) AND the interaction tests. Typing on a focused searchable field IS the search: the first
+   * character opens the dropdown with NO prior "browse"/A action, and each edit re-ranks (prefix-first)
+   * to the top match. This is the round-3 input model, preserved for item + moves.
    */
   setFilter(value: string): void {
+    if (!this.fieldIsSearchable(this.field)) {
+      return;
+    }
     this.filter = value;
     if (value.length > 0 && !this.paneOpen) {
       this.paneOpen = true; // typing opens the dropdown directly
@@ -584,21 +704,10 @@ export class ShowdownSetEditorUiHandler extends UiHandler {
     return modType == null ? String(key) : (getModifierType(modType).name ?? String(key));
   }
 
-  private natureList(): number[] {
-    const all = Object.values(Nature).filter(n => typeof n === "number") as number[];
-    return this.filter
-      ? rankByFilter(all, n => getNatureName(n as Nature, false, false, true), this.filter)
-      : all.sort((a, b) => a - b);
-  }
-
   private paneRowCount(): number {
     switch (this.field) {
-      case EditorField.ABILITY:
-        return this.activeAbilityIds().length; // only the actives are selectable (innates are informational)
       case EditorField.ITEM:
         return this.itemKeys().length;
-      case EditorField.NATURE:
-        return this.natureList().length;
       default:
         return this.moveEntries().length;
     }
@@ -608,12 +717,8 @@ export class ShowdownSetEditorUiHandler extends UiHandler {
   private currentPaneSelectionIndex(): number {
     const cfg = this.config!;
     switch (this.field) {
-      case EditorField.ABILITY:
-        return Math.max(0, Math.min(cfg.set.abilityIndex, this.activeAbilityIds().length - 1));
       case EditorField.ITEM:
         return Math.max(0, this.itemKeys().indexOf(cfg.set.item as ShowdownItemKey));
-      case EditorField.NATURE:
-        return Math.max(0, this.natureList().indexOf(cfg.set.nature));
       default: {
         const slot = this.moveSlot();
         const cur = cfg.set.moves[slot];
@@ -634,9 +739,6 @@ export class ShowdownSetEditorUiHandler extends UiHandler {
   private selectPaneRow(): boolean {
     const cfg = this.config!;
     switch (this.field) {
-      case EditorField.ABILITY:
-        cfg.set.abilityIndex = this.paneCursor;
-        break;
       case EditorField.ITEM: {
         if (this.isMega) {
           return false; // mega slot is locked to the stone
@@ -648,9 +750,6 @@ export class ShowdownSetEditorUiHandler extends UiHandler {
         cfg.set.item = key;
         break;
       }
-      case EditorField.NATURE:
-        cfg.set.nature = this.natureList()[this.paneCursor] ?? cfg.set.nature;
-        break;
       default: {
         const entry = this.moveEntries()[this.paneCursor];
         if (entry == null || entry.locked) {
@@ -697,7 +796,7 @@ export class ShowdownSetEditorUiHandler extends UiHandler {
     content: string,
     style: TextStyle,
     originX = 0,
-    fontSize = FONT_DESC,
+    fontSize = FONT_TINY,
   ): Phaser.GameObjects.Text {
     const t = addTextObject(x, y, content, style, { fontSize: `${fontSize}px` });
     t.setOrigin(originX, 0);
@@ -706,6 +805,14 @@ export class ShowdownSetEditorUiHandler extends UiHandler {
 
   private fill(x: number, y: number, w: number, h: number, color: number, alpha = 1): void {
     this.add(globalScene.add.rectangle(x, y, w, h, color, alpha).setOrigin(0, 0));
+  }
+
+  /** A 1px outline rectangle (four thin fills) - used for slot / chip / cell frames. */
+  private outline(x: number, y: number, w: number, h: number, color: number): void {
+    this.fill(x, y, w, 1, color, 1);
+    this.fill(x, y + h - 1, w, 1, color, 1);
+    this.fill(x, y, 1, h, color, 1);
+    this.fill(x + w - 1, y, 1, h, color, 1);
   }
 
   private render(): void {
@@ -718,81 +825,95 @@ export class ShowdownSetEditorUiHandler extends UiHandler {
     this.fill(0, 0, SCREEN_W, SCREEN_H, 0x05070f, 1);
 
     this.renderStrip();
+    this.renderHotkeyBar();
     this.renderIdentityColumn();
     this.renderAbilitiesPanel();
     this.renderItemPanel();
     this.renderMovesPanel();
-    this.renderNaturePanel();
+    this.renderMoveDescBar();
     // The search dropdown is drawn LAST so it floats ON TOP of the set (only while actively searching).
     if (this.paneOpen) {
       this.renderDropdown();
     }
   }
 
-  // -- top micro team strip ---------------------------------------------------------------------
+  // -- top team strip (redesigned: one cohesive dark bar) ---------------------------------------
 
   private renderStrip(): void {
     const cfg = this.config!;
-    this.add(addWindow(0, 0, SCREEN_W, STRIP_H));
+    // A single cohesive dark bar (not a light window) with a thin top edge - ties the whole screen's
+    // dark chrome together (the round-3 light band read as "ugly").
+    this.fill(0, 0, SCREEN_W, STRIP_H, BAR_BG, 1);
+    this.fill(0, 0, SCREEN_W, 1, 0x2a3a5c, 1);
 
-    // 6 slot icons.
-    const iconStartX = 12;
-    const iconStepX = 15;
+    // 6 FRAMED slot icons - a proper inset frame each, the active slot gold-framed + brighter.
+    const slotW = 16;
+    const slotH = 16;
+    const slotY = 2;
+    const startX = 3;
     for (let i = 0; i < 6; i++) {
-      const x = iconStartX + i * iconStepX;
-      if (i === cfg.activeSlot) {
-        this.fill(x - 7, 2, 14, 17, ACCENT, 1);
-      }
+      const x = startX + i * (slotW + 1);
+      const active = i === cfg.activeSlot;
+      this.fill(x, slotY, slotW, slotH, active ? ACCENT : SLOT_BG, 1);
+      this.outline(x, slotY, slotW, slotH, active ? GOLD : 0x33436a);
       const mon = cfg.team[i];
       if (mon == null) {
-        this.text(x, 6, "·", TextStyle.SUMMARY_GRAY, 0.5);
+        this.text(x + slotW / 2, slotY + 4, "-", TextStyle.SUMMARY_GRAY, 0.5, FONT_CHIP);
         continue;
       }
-      this.renderStripIcon(mon, x, 3);
+      this.renderStripIcon(mon, x + slotW / 2, slotY + 1);
     }
 
-    // Validity chips.
+    // Validity chips - one uniform pill style (a dark pill + colored dot + colored label), no more
+    // flat green/red rectangles.
     const size = cfg.team.filter(m => m != null).length;
     const megaCount = cfg.team.filter(m => m != null && isMegaStage(m.speciesId, m.formIndex)).length;
     const highCost = cfg.team.filter(m => m != null && m.baseCost >= 8 && m.baseCost < 10).length;
-    let cx = 100;
+    let cx = startX + 6 * (slotW + 1) + 4;
     cx = this.chip(cx, `Team ${size}/6`, size >= 1 && size <= 6);
     cx = this.chip(cx, `Mega ${megaCount}/1`, megaCount <= 1);
-    cx = this.chip(cx, `Cost8+ ${highCost}/1`, highCost <= 1);
+    this.chip(cx, `Cost8+ ${highCost}/1`, highCost <= 1);
 
-    // Pick-window countdown (right) - LOAD-BEARING UX (the 10-minute clock). It sits on the light strip
-    // window, where faint gold read as unreadable (maintainer's render-review nit), so it gets a dark
-    // pill behind it and a bold high-contrast clock (gold, red under a minute).
+    // Integrated countdown + partner status (right), in the same pill language.
     const mm = Math.floor(cfg.pickSecondsLeft / 60);
     const ss = cfg.pickSecondsLeft % 60;
     const clock = `${mm}:${String(ss).padStart(2, "0")}`;
     const urgent = cfg.pickSecondsLeft <= 60;
-    this.fill(261, 1, 58, 20, 0x14213d, 1);
-    this.text(265, 3, "PICK", TextStyle.SUMMARY_GRAY, 0, 30);
-    this.text(315, 1, clock, urgent ? TextStyle.SUMMARY_RED : TextStyle.SUMMARY_GOLD, 1, 46);
-
-    // Partner-ready state (right, below the clock) - on the same dark pill so it is legible too.
-    const partner = cfg.partnerReady == null ? "Partner -" : cfg.partnerReady ? "Partner READY" : "Partner waiting";
-    this.text(315, 13, partner, cfg.partnerReady ? TextStyle.SUMMARY_GREEN : TextStyle.SUMMARY_GRAY, 1, 28);
+    const clockX = SCREEN_W - 3;
+    this.fill(SCREEN_W - 62, 2, 59, slotH, HEADER_BAND, 1);
+    this.outline(SCREEN_W - 62, 2, 59, slotH, 0x33436a);
+    this.text(SCREEN_W - 58, 3, "PICK", TextStyle.SUMMARY_GRAY, 0, FONT_TINY);
+    this.text(clockX - 3, 2, clock, urgent ? TextStyle.SUMMARY_RED : TextStyle.SUMMARY_GOLD, 1, FONT_NAME);
+    const partner = cfg.partnerReady == null ? "Foe -" : cfg.partnerReady ? "Foe READY" : "Foe waiting";
+    this.text(
+      clockX - 3,
+      11,
+      partner,
+      cfg.partnerReady ? TextStyle.SUMMARY_GREEN : TextStyle.SUMMARY_GRAY,
+      1,
+      FONT_TINY,
+    );
   }
 
   private chip(x: number, label: string, ok: boolean): number {
-    const w = label.length * 3.3 + 6;
-    this.fill(x, 5, w, 12, ok ? 0x1c3b1c : 0x4a1c1c, 1);
-    this.text(x + 3, 7, label, ok ? TextStyle.SUMMARY_GREEN : TextStyle.SUMMARY_RED, 0, FONT_CHIP);
+    const w = label.length * 3.0 + 10;
+    this.fill(x, 4, w, 12, HEADER_BAND, 1);
+    this.outline(x, 4, w, 12, ok ? 0x2f6d4a : 0x8a3030);
+    this.fill(x + 3, 8, 3, 3, ok ? 0x4bd08a : 0xe86464, 1); // status dot
+    this.text(x + 8, 6, label, ok ? TextStyle.SUMMARY_GREEN : TextStyle.SUMMARY_RED, 0, FONT_CHIP);
     return x + w + 3;
   }
 
-  private renderStripIcon(mon: ShowdownMonManifest, x: number, y: number): void {
+  private renderStripIcon(mon: ShowdownMonManifest, cx: number, y: number): void {
     const species = getPokemonSpecies(mon.speciesId as SpeciesId);
     if (species == null) {
       return;
     }
     const wantId = species.getIconId(false, mon.formIndex, mon.shiny, mon.variant);
     const icon = globalScene.add
-      .sprite(x, y, species.getIconAtlasKey(mon.formIndex, mon.shiny, mon.variant))
+      .sprite(cx, y, species.getIconAtlasKey(mon.formIndex, mon.shiny, mon.variant))
       .setOrigin(0.5, 0)
-      .setScale(0.42);
+      .setScale(0.44);
     icon.setFrame(wantId);
     if (icon.frame.name !== wantId) {
       const baseId = species.getIconId(false, mon.formIndex, false, 0);
@@ -803,6 +924,60 @@ export class ShowdownSetEditorUiHandler extends UiHandler {
     this.add(icon);
   }
 
+  // -- hotkey legend bar (real key-glyph icons) -------------------------------------------------
+
+  private renderHotkeyBar(): void {
+    this.fill(0, HOTKEY_Y, SCREEN_W, HOTKEY_H, BAR_BG, 1);
+    this.fill(0, HOTKEY_Y, SCREEN_W, 1, 0x1a2740, 1);
+    // The per-mon functions that exist in the editor, each with its real key glyph (mirrors the
+    // functions starter select exposes: form/stage, shiny, ability, nature). Directional cycling
+    // (LEFT/RIGHT) also drives stage + ability, but the hotkeys give a discoverable, bindable path.
+    let x = 4;
+    x = this.hotkey(x, SettingKeyboard.BUTTON_CYCLE_FORM, "F.png", "Stage");
+    x = this.hotkey(x, SettingKeyboard.BUTTON_CYCLE_SHINY, "R.png", "Shiny");
+    x = this.hotkey(x, SettingKeyboard.BUTTON_CYCLE_ABILITY, "E.png", "Ability");
+    this.hotkey(x, SettingKeyboard.BUTTON_CYCLE_NATURE, "N.png", "Nature");
+    // Commit hint on the right (the Done / Start action), same glyph language.
+    const doneLabel = "Done";
+    this.hotkeyRight(SCREEN_W - 3, "Return.png", doneLabel, doneLabel.length * 3.0 + 16);
+  }
+
+  /** Draw a key glyph + label, returning the next x. Uses the game's "keyboard" atlas (frame = key). */
+  private hotkey(x: number, setting: SettingKeyboard, defaultFrame: string, label: string): number {
+    const frame = this.keyFrame(setting, defaultFrame);
+    const glyph = globalScene.add
+      .sprite(x, HOTKEY_Y + 1, "keyboard", frame)
+      .setOrigin(0, 0)
+      .setScale(0.5);
+    this.add(glyph);
+    this.text(x + 11, HOTKEY_Y + 2, label, TextStyle.INSTRUCTIONS_TEXT, 0, FONT_TINY);
+    return x + 11 + label.length * 3.0 + 7;
+  }
+
+  /** Right-anchored key glyph + label (for the Done hint). */
+  private hotkeyRight(rightX: number, defaultFrame: string, label: string, width: number): void {
+    const x = rightX - width;
+    const glyph = globalScene.add
+      .sprite(x, HOTKEY_Y + 1, "keyboard", defaultFrame)
+      .setOrigin(0, 0)
+      .setScale(0.5);
+    this.add(glyph);
+    this.text(x + 11, HOTKEY_Y + 2, label, TextStyle.INSTRUCTIONS_TEXT, 0, FONT_TINY);
+  }
+
+  /** Resolve the bound key glyph frame for a setting (falls back to the default in headless). */
+  private keyFrame(setting: SettingKeyboard, defaultFrame: string): string {
+    try {
+      const icon = (globalScene as any).inputController?.getIconForLatestInputRecorded?.(setting);
+      if (typeof icon === "string" && globalScene.textures.get("keyboard")?.has?.(icon)) {
+        return icon;
+      }
+    } catch {
+      // headless / no controller - use the deterministic default frame.
+    }
+    return defaultFrame;
+  }
+
   // -- left identity column ---------------------------------------------------------------------
 
   private renderIdentityColumn(): void {
@@ -810,45 +985,76 @@ export class ShowdownSetEditorUiHandler extends UiHandler {
     this.add(addWindow(LEFT_X, BODY_Y, LEFT_W, SCREEN_H - BODY_Y - 2));
 
     const sp = this.fieldedSpecies;
-    const spriteCX = LEFT_X + LEFT_W / 2;
-    // Name (left) + cost badge (right) on the header line. A dark header BAND sits behind them: the
-    // identity window is a light panel, so pale-gold name text on it read low-contrast (maintainer's
-    // render-review nit). Gold-on-dark-navy matches the right-column field-row headers and is legible.
-    this.fill(LEFT_X + 2, BODY_Y + 2, LEFT_W - 4, 12, 0x14213d, 1);
+    // Name (left) + cost badge (right) on a dark header BAND (gold-on-dark, legible on the light panel).
+    this.fill(LEFT_X + 2, BODY_Y + 2, LEFT_W - 4, 12, HEADER_BAND, 1);
     this.text(LEFT_X + 5, BODY_Y + 3, sp.name, TextStyle.SUMMARY_GOLD, 0, FONT_TITLE);
     const rootCost = cfg.team[cfg.activeSlot]?.baseCost ?? 0;
     this.text(LEFT_X + LEFT_W - 4, BODY_Y + 4, `Cost ${rootCost}`, TextStyle.SUMMARY_GOLD, 1, FONT_HDR);
 
-    // Big (harness-static) sprite: the species icon enlarged as the identity portrait.
-    this.renderIdentitySprite(spriteCX, BODY_Y + 34);
+    // The FULL front battle sprite (item 2) - the game's full-scale art, sized around this column.
+    this.renderFullSprite(LEFT_X + LEFT_W / 2, BODY_Y + 40);
 
-    // Type chips (under the sprite).
-    this.renderTypeChips(spriteCX, BODY_Y + 55);
+    // Type chips under the sprite.
+    this.renderTypeChips(LEFT_X + LEFT_W / 2, BODY_Y + 64);
 
-    // Stage strip.
-    this.renderStageStrip(BODY_Y + 62);
+    // Stage strip (inline header).
+    this.renderStageStrip(BODY_Y + 70);
 
-    // Shiny / variant chips.
-    this.renderShinyChips(BODY_Y + 86);
+    // Compact shiny indicator (item 3).
+    this.renderShinySelector(BODY_Y + 94);
 
-    // Live stat bars.
-    this.renderStatBars(BODY_Y + 104);
+    // Base stat bars with nature +/- coloring (item 4).
+    this.renderStatBars(BODY_Y + 108);
   }
 
-  private renderIdentitySprite(cx: number, cy: number): void {
+  /**
+   * The FULL front battle sprite (not the small icon). Loads the species' front atlas and pins the
+   * first frame - a static portrait that follows stage / shiny / variant. In the render harness the
+   * repointed `loadPokemonAtlas` injects synchronously (so the same pass shows it); in the live game
+   * the async load re-renders on completion (icon fallback shown meanwhile).
+   */
+  private renderFullSprite(cx: number, cy: number): void {
     const cfg = this.config!;
     const sp = this.fieldedSpecies;
-    const wantId = sp.getIconId(false, cfg.stage.formIndex, cfg.set.shiny, cfg.set.variant);
-    const icon = globalScene.add
-      .sprite(cx, cy, sp.getIconAtlasKey(cfg.stage.formIndex, cfg.set.shiny, cfg.set.variant))
-      .setOrigin(0.5, 0.5)
-      .setScale(1.5);
-    icon.setFrame(wantId);
-    if (icon.frame.name !== wantId) {
-      const baseId = sp.getIconId(false, cfg.stage.formIndex, false, 0);
-      if (icon.texture.has(baseId)) {
-        icon.setFrame(baseId);
+    const female = cfg.female;
+    const formIndex = cfg.stage.formIndex;
+    const shiny = cfg.set.shiny;
+    const variant = cfg.set.variant as Variant;
+    const key = sp.getSpriteKey(female, formIndex, shiny, variant);
+    const atlasPath = sp.getSpriteAtlasPath(female, formIndex, shiny, variant);
+    if (!globalScene.textures.exists(key) && !this.requestedSpriteKeys.has(key)) {
+      this.requestedSpriteKeys.add(key);
+      globalScene.loadPokemonAtlas(key, atlasPath);
+      void sp
+        .loadAssets(female, formIndex, shiny, variant, true, false, true)
+        .then(() => {
+          this.requestedSpriteKeys.delete(key);
+          if (this.config != null) {
+            this.render();
+          }
+        })
+        .catch(() => {
+          this.requestedSpriteKeys.delete(key);
+        });
+    }
+    if (globalScene.textures.exists(key)) {
+      const spr = globalScene.add.sprite(cx, cy, key).setOrigin(0.5, 0.5).setScale(0.5);
+      const frames = globalScene.textures.get(key).getFrameNames();
+      if (frames.length > 0) {
+        spr.setFrame(frames.slice().sort()[0]);
       }
+      this.add(spr);
+      return;
+    }
+    // Live fallback while the atlas loads: the always-loaded icon, enlarged, so the panel is never blank.
+    const wantId = sp.getIconId(false, formIndex, shiny, variant);
+    const icon = globalScene.add
+      .sprite(cx, cy, sp.getIconAtlasKey(formIndex, shiny, variant))
+      .setOrigin(0.5, 0.5)
+      .setScale(1.6);
+    icon.setFrame(wantId);
+    if (icon.frame.name !== wantId && icon.texture.has(sp.getIconId(false, 0, false, 0))) {
+      icon.setFrame(sp.getIconId(false, 0, false, 0));
     }
     this.add(icon);
   }
@@ -879,6 +1085,7 @@ export class ShowdownSetEditorUiHandler extends UiHandler {
       const greyed = mega && cfg.unlocks.megaBudgetSpent && !isCurrent;
       if (isCurrent) {
         this.fill(x - 7, y + 7, 14, 14, ACCENT, 1);
+        this.outline(x - 7, y + 7, 14, 14, GOLD);
       }
       const sp = getPokemonSpecies(stage.speciesId as SpeciesId);
       const wantId = sp.getIconId(false, stage.formIndex, false, 0);
@@ -893,7 +1100,7 @@ export class ShowdownSetEditorUiHandler extends UiHandler {
       icon.setAlpha(greyed ? 0.35 : 1);
       this.add(icon);
       if (mega) {
-        this.text(x - 7, y + 5, "M", greyed ? TextStyle.SUMMARY_GRAY : TextStyle.SUMMARY_GOLD, 0, 30);
+        this.text(x - 7, y + 5, "M", greyed ? TextStyle.SUMMARY_GRAY : TextStyle.SUMMARY_GOLD, 0, 26);
       }
     });
     if (cfg.unlocks.megaBudgetSpent) {
@@ -903,60 +1110,66 @@ export class ShowdownSetEditorUiHandler extends UiHandler {
         `Mega used: ${cfg.unlocks.megaBudgetSpentBy ?? "team"}`,
         TextStyle.SUMMARY_GRAY,
         0,
-        26,
+        FONT_TINY,
       );
     }
   }
 
-  private renderShinyChips(y: number): void {
+  // -- compact SHINY indicator (starter-select style: one cyclable shiny-color star) -----------
+  // Small like starter select: a single shiny STAR in the currently-selected tier's colour (R cycles
+  // off -> owned tiers, defaulting to the highest owned rarity). No boxed grid, no tier labels.
+
+  private renderShinySelector(y: number): void {
     const cfg = this.config!;
     this.text(LEFT_X + 4, y, "SHINY", TextStyle.SUMMARY_HEADER, 0, FONT_HDR);
-    let x = LEFT_X + 6;
-    // Non-shiny is always available.
-    x = this.shinyChip(x, y + 8, "off", !cfg.set.shiny, true, "normal");
-    for (const tier of [0, 1, 2]) {
-      const owned = cfg.unlocks.ownedVariants.includes(tier);
-      const selected = cfg.set.shiny && cfg.set.variant === tier;
-      x = this.shinyChip(x, y + 8, `T${tier + 1}`, selected, owned, owned ? "owned" : "locked");
+    const sx = LEFT_X + 34;
+    if (cfg.set.shiny) {
+      const star = globalScene.add
+        .sprite(sx, y + 2, "shiny_icons")
+        .setOrigin(0.5, 0)
+        .setScale(0.6);
+      star.setFrame(getVariantIcon(cfg.set.variant as Variant));
+      star.setTint(getVariantTint(cfg.set.variant as Variant));
+      this.add(star);
+      this.text(sx + 8, y, `T${cfg.set.variant + 1}`, TextStyle.SUMMARY_GOLD, 0, FONT_TINY);
+    } else {
+      // Off: a dim hollow star so the control still reads as "shiny (off)".
+      const star = globalScene.add
+        .sprite(sx, y + 2, "shiny_icons")
+        .setOrigin(0.5, 0)
+        .setScale(0.6);
+      star.setFrame(getVariantIcon(0));
+      star.setTint(0x39404f);
+      this.add(star);
+      this.text(sx + 8, y, "off", TextStyle.SUMMARY_GRAY, 0, FONT_TINY);
     }
-    // Black shiny: visible but unfieldable.
-    if (cfg.unlocks.blackShinyOwned) {
-      this.shinyChip(x, y + 8, "Blk", false, false, "black");
-    }
+    // Cycle hint (mirrors the R hotkey in the legend).
+    this.text(LEFT_X + LEFT_W - 6, y, "R", TextStyle.INSTRUCTIONS_TEXT, 1, FONT_TINY);
   }
 
-  private shinyChip(x: number, y: number, label: string, selected: boolean, owned: boolean, kind: string): number {
-    const w = label.length * 3.4 + 6;
-    const bg = selected ? ACCENT : kind === "black" ? 0x2a1230 : owned ? 0x1c2b3b : 0x241820;
-    this.fill(x, y, w, 9, bg, 1);
-    const style =
-      kind === "black" ? TextStyle.SUMMARY_PINK : owned || selected ? TextStyle.WINDOW : TextStyle.SUMMARY_GRAY;
-    this.text(x + 3, y + 1, label, style, 0, FONT_CHIP);
-    return x + w + 2;
-  }
+  // -- BASE stat bars (item 4) with nature +/- coloring -----------------------------------------
 
   private renderStatBars(y: number): void {
     const cfg = this.config!;
     const sp = this.fieldedSpecies;
-    this.text(LEFT_X + 4, y, "STATS", TextStyle.SUMMARY_HEADER, 0, FONT_HDR);
+    this.text(LEFT_X + 4, y, "BASE STATS", TextStyle.SUMMARY_HEADER, 0, FONT_HDR);
     const labels = ["HP", "Atk", "Def", "SpA", "SpD", "Spe"];
-    const barX = LEFT_X + 22;
-    const barMaxW = 40;
-    const rowH = 6;
+    const barX = LEFT_X + 24;
+    const barMaxW = 46;
+    const rowH = 5;
     const nature = cfg.set.nature as Nature;
     PERMANENT_STATS.forEach((stat, i) => {
-      const ry = y + 9 + i * rowH;
-      const base = sp.baseStats[i];
-      const value = calcStat(base, stat, nature);
+      const ry = y + 8 + i * rowH;
+      const base = sp.baseStats[i]; // BASE stat, not a computed L100 value.
       const mult = stat === Stat.HP ? 1 : getNatureStatMultiplier(nature, stat);
       const color = mult > 1 ? 0xf08aa0 : mult < 1 ? 0x8aa0f0 : 0x8ad08a;
       const labelStyle = mult > 1 ? TextStyle.SUMMARY_PINK : mult < 1 ? TextStyle.SUMMARY_BLUE : TextStyle.SUMMARY_GRAY;
-      this.text(LEFT_X + 4, ry - 1, labels[i], labelStyle, 0, 30);
-      // Bar track + fill.
-      this.fill(barX, ry, barMaxW, 4, 0x1b2436, 1);
-      const w = Math.max(2, Math.min(1, base / 180) * barMaxW);
-      this.fill(barX, ry, w, 4, color, 1);
-      this.text(barX + barMaxW + 2, ry - 1, String(value), labelStyle, 0, 30);
+      this.text(LEFT_X + 4, ry - 1, labels[i], labelStyle, 0, 26);
+      // Bar track + fill, scaled by the base value against a 200-ceiling.
+      this.fill(barX, ry, barMaxW, 3, 0x1b2436, 1);
+      const w = Math.max(2, Math.min(1, base / 200) * barMaxW);
+      this.fill(barX, ry, w, 3, color, 1);
+      this.text(barX + barMaxW + 2, ry - 1, String(base), labelStyle, 0, 26);
     });
   }
 
@@ -964,7 +1177,7 @@ export class ShowdownSetEditorUiHandler extends UiHandler {
     return s.length > max ? `${s.slice(0, max - 2)}..` : s;
   }
 
-  // -- right column: four windowed section panels -----------------------------------------------
+  // -- right column: windowed section panels ----------------------------------------------------
 
   /** A game-native section header band (dark navy strip + gold title) at the top of a right panel. */
   private sectionHeader(panelY: number, title: string, rightNote?: string): void {
@@ -985,86 +1198,132 @@ export class ShowdownSetEditorUiHandler extends UiHandler {
     const openHere = this.field === field && this.paneOpen;
     this.fill(x, y, w, h, focused ? ACCENT : openHere ? ACCENT_SOFT : CELL_DIM, 1);
     if (focused) {
-      this.fill(x, y, 2, h, 0xffd447, 1);
+      this.fill(x, y, 2, h, GOLD, 1);
     }
   }
 
-  // -- ABILITIES panel: the flagship ER feature - all FOUR abilities on the main screen ----------
-  // 1 ACTIVE (focusable / changeable, marked) + 3 always-on INNATES (names + one-line descriptions,
-  // informational). This is half of an ER mon's identity and must read without expanding anything.
+  // -- ABILITIES panel: 1 CYCLABLE active + 3 always-on INNATES (candy-gated) --------------------
 
   private renderAbilitiesPanel(): void {
     const cfg = this.config!;
     this.add(addWindow(RIGHT_X, ABIL_Y, RIGHT_W, ABIL_H));
-    this.sectionHeader(ABIL_Y, "ABILITIES", "1 active + 3 innate");
+    const selectable = this.selectableAbilityIndices();
+    this.sectionHeader(ABIL_Y, "ABILITIES", selectable.length > 1 ? "< active > cyclable" : "1 active + 3 innate");
 
-    // The ACTIVE ability - the ONE selectable slot. Focus box + "ACTIVE" tag so it reads as editable.
+    // The ACTIVE ability - the ONE selectable slot, now CYCLED (no dropdown). Focus box + an "ACTIVE"
+    // tag + left/right chevrons so it reads as directly cyclable.
     const actives = this.activeAbilityIds();
     const activeId = actives[cfg.set.abilityIndex] ?? actives[0];
     const active = allAbilities[activeId];
     const ay = ABIL_Y + 14;
     this.focusBox(RIGHT_X + 3, ay, RIGHT_W - 6, 15, EditorField.ABILITY);
     this.tag(RIGHT_X + 6, ay + 2, "ACTIVE", 0x2f6d4a);
-    this.text(RIGHT_X + 34, ay + 1, active?.name ?? "-", TextStyle.SUMMARY_GOLD, 0, FONT_NAME);
-    this.text(RIGHT_X + 34, ay + 8, this.clip(active?.description ?? "", 62), TextStyle.SUMMARY_GRAY, 0, FONT_TINY);
+    if (selectable.length > 1) {
+      this.text(RIGHT_X + 30, ay + 3, "<", TextStyle.SUMMARY_GOLD, 0.5, FONT_HDR);
+      this.text(RIGHT_X + RIGHT_W - 8, ay + 3, ">", TextStyle.SUMMARY_GOLD, 0.5, FONT_HDR);
+    }
+    this.text(RIGHT_X + 36, ay + 1, active?.name ?? "-", TextStyle.SUMMARY_GOLD, 0, FONT_NAME);
+    this.text(RIGHT_X + 36, ay + 8, this.clip(active?.description ?? "", 60), TextStyle.SUMMARY_GRAY, 0, FONT_TINY);
 
-    // The 3 INNATES - always on, not editable. Name (bold) + compact description on one line each.
+    // The 3 INNATES - always-on for the LINE, but a locked slot is candy-gated (inactive on the
+    // player's own party), so a locked one shows its candy unlock cost; an unlocked one reads active.
     const innates = this.innateAbilityIds();
     const iy0 = ay + 17;
     innates.forEach((id, i) => {
       const ability = allAbilities[id];
+      if (ability == null) {
+        return;
+      }
       const iy = iy0 + i * 8;
-      this.fill(RIGHT_X + 7, iy + 2, 2, 2, 0xc78ce0, 1); // innate marker dot
-      this.text(RIGHT_X + 12, iy, this.clip(ability?.name ?? "-", 18), TextStyle.SUMMARY_PINK, 0, FONT_TINY);
-      this.text(RIGHT_X + 78, iy, this.clip(ability?.description ?? "", 44), TextStyle.SUMMARY_GRAY, 0, FONT_TINY);
+      const unlocked = cfg.unlocks.innateUnlockedSlots.includes(i);
+      // Innate marker dot: lit purple when active, dim when candy-locked.
+      this.fill(RIGHT_X + 7, iy + 2, 2, 2, unlocked ? 0xc78ce0 : 0x4a3a55, 1);
+      const nameStyle = unlocked ? TextStyle.SUMMARY_PINK : TextStyle.SHADOW_TEXT;
+      this.text(RIGHT_X + 12, iy, this.clip(ability.name, 16), nameStyle, 0, FONT_TINY);
+      if (unlocked) {
+        this.text(RIGHT_X + 78, iy, this.clip(ability.description ?? "", 44), TextStyle.SUMMARY_GRAY, 0, FONT_TINY);
+      } else {
+        // Locked: the candy icon + the slot's unlock cost, next to the innate (item 6).
+        this.renderCandyCost(RIGHT_X + 78, iy, cfg.unlocks.innateSlotCandyCosts[i] ?? 0);
+      }
     });
   }
 
-  // -- ITEM panel -------------------------------------------------------------------------------
-
-  private renderItemPanel(): void {
-    this.add(addWindow(RIGHT_X, ITEM_Y, RIGHT_W, ITEM_H));
-    this.focusBox(RIGHT_X + 3, ITEM_Y + 3, RIGHT_W - 6, ITEM_H - 6, EditorField.ITEM);
-    this.text(RIGHT_X + 7, ITEM_Y + 5, "ITEM", TextStyle.SUMMARY_HEADER, 0, FONT_HDR);
-    const vx = RIGHT_X + 40;
-    if (this.isMega) {
-      this.text(vx + 12, ITEM_Y + 4, "Mega Stone", TextStyle.SUMMARY_PINK, 0, FONT_NAME);
-      this.text(vx + 12, ITEM_Y + 12, "Auto-forced by the mega stage (locked).", TextStyle.SUMMARY_GRAY, 0, FONT_TINY);
-      return;
-    }
-    const key = this.config!.set.item as ShowdownItemKey;
-    const resolved = this.resolvedItem(key);
-    if (resolved?.iconImage) {
-      const icon = globalScene.add
-        .sprite(vx + 4, ITEM_Y + 8, "items", resolved.iconImage)
-        .setOrigin(0.5, 0.5)
-        .setScale(0.42);
-      this.add(icon);
-    }
-    this.text(vx + 12, ITEM_Y + 4, resolved?.name ?? String(key), TextStyle.SUMMARY_GOLD, 0, FONT_NAME);
+  /** A candy icon + "×cost" (locked-innate unlock cost). Greened when the line can afford it. */
+  private renderCandyCost(x: number, y: number, cost: number): void {
+    const candy = globalScene.add
+      .image(x + 3, y + 3, "candy")
+      .setOrigin(0.5, 0.5)
+      .setScale(0.3);
+    this.add(candy);
+    const affordable = this.config!.unlocks.candyCount >= cost;
     this.text(
-      vx + 12,
-      ITEM_Y + 12,
-      this.clip(resolved?.getDescription() ?? "", 58),
-      TextStyle.SUMMARY_GRAY,
+      x + 8,
+      y,
+      `×${cost} to unlock`,
+      affordable ? TextStyle.SUMMARY_GREEN : TextStyle.SUMMARY_GRAY,
       0,
       FONT_TINY,
     );
   }
 
-  // -- MOVES panel: a 2x2 grid of cells (compact, fits with the abilities block) -----------------
+  // -- ITEM panel (+ a compact NATURE chip beside it) -------------------------------------------
+
+  private renderItemPanel(): void {
+    const cfg = this.config!;
+    this.add(addWindow(RIGHT_X, ITEM_Y, RIGHT_W, ITEM_H));
+    // Item box takes the left ~2/3; the nature chip sits on the right (item 8: nature relocated, small).
+    const natureW = 62;
+    const itemW = RIGHT_W - 6 - natureW - 2;
+    this.focusBox(RIGHT_X + 3, ITEM_Y + 3, itemW, ITEM_H - 6, EditorField.ITEM);
+    this.text(RIGHT_X + 7, ITEM_Y + 5, "ITEM", TextStyle.SUMMARY_HEADER, 0, FONT_HDR);
+    const vx = RIGHT_X + 38;
+    if (this.isMega) {
+      this.text(vx, ITEM_Y + 4, "Mega Stone", TextStyle.SUMMARY_PINK, 0, FONT_NAME);
+      this.text(vx, ITEM_Y + 12, "Auto-forced (locked).", TextStyle.SUMMARY_GRAY, 0, FONT_TINY);
+    } else {
+      const key = cfg.set.item as ShowdownItemKey;
+      const resolved = this.resolvedItem(key);
+      if (resolved?.iconImage) {
+        const icon = globalScene.add
+          .sprite(vx, ITEM_Y + 9, "items", resolved.iconImage)
+          .setOrigin(0.5, 0.5)
+          .setScale(0.42);
+        this.add(icon);
+      }
+      this.text(vx + 8, ITEM_Y + 4, resolved?.name ?? String(key), TextStyle.SUMMARY_GOLD, 0, FONT_NAME);
+      this.text(
+        vx + 8,
+        ITEM_Y + 12,
+        this.clip(resolved?.getDescription() ?? "", 40),
+        TextStyle.SUMMARY_GRAY,
+        0,
+        FONT_TINY,
+      );
+    }
+
+    // Compact NATURE chip (cycled via the N hotkey). Shows the name + its +/- summary.
+    const nx = RIGHT_X + RIGHT_W - 3 - natureW;
+    this.fill(nx, ITEM_Y + 3, natureW, ITEM_H - 6, CELL_DIM, 1);
+    this.outline(nx, ITEM_Y + 3, natureW, ITEM_H - 6, 0x33436a);
+    this.text(nx + 3, ITEM_Y + 4, "NATURE", TextStyle.SUMMARY_HEADER, 0, FONT_TINY);
+    const summary = getNatureName(cfg.set.nature as Nature, true, false, true).replace(/\n/g, " ");
+    this.text(nx + 3, ITEM_Y + 11, this.clip(summary, 20), TextStyle.SUMMARY_GOLD, 0, FONT_TINY);
+  }
+
+  // -- MOVES panel: a 2x2 grid of cells ---------------------------------------------------------
 
   private renderMovesPanel(): void {
     this.add(addWindow(RIGHT_X, MOVES_Y, RIGHT_W, MOVES_H));
-    this.sectionHeader(MOVES_Y, "MOVES");
+    this.sectionHeader(MOVES_Y, "MOVES", "type to search");
     const cellW = (RIGHT_W - 9) / 2; // two columns with a small central gutter
-    const cellH = 16;
+    const cellH = 13;
     const gridY = MOVES_Y + 13;
     for (let slot = 0; slot < 4; slot++) {
       const col = slot % 2;
       const row = Math.floor(slot / 2);
       const cx = RIGHT_X + 3 + col * (cellW + 3);
-      const cy = gridY + row * (cellH + 1);
+      const cy = gridY + row * (cellH + 2);
       this.renderMoveCell(cx, cy, cellW, cellH, slot);
     }
   }
@@ -1073,47 +1332,73 @@ export class ShowdownSetEditorUiHandler extends UiHandler {
     this.focusBox(cx, cy, w, h, MOVE_FIELDS[slot]);
     const moveId = this.config!.set.moves[slot];
     if (moveId == null) {
-      this.text(cx + 5, cy + 5, `-- empty --  (${slot + 1})`, TextStyle.SUMMARY_GRAY, 0, FONT_DESC);
+      this.text(cx + 5, cy + 3, `-- empty --  (${slot + 1})`, TextStyle.SUMMARY_GRAY, 0, FONT_TINY);
       return;
     }
     const move = allMoves[moveId];
-    this.text(cx + 5, cy + 1, this.clip(move?.name ?? "-", 16), TextStyle.SUMMARY_GOLD, 0, FONT_DESC);
+    this.text(cx + 5, cy + 1, this.clip(move?.name ?? "-", 16), TextStyle.SUMMARY_GOLD, 0, FONT_TINY);
     if (!move) {
       return;
     }
     const tSpr = globalScene.add
-      .sprite(cx + 11, cy + 11, getLocalizedSpriteKey("types"), PokemonType[move.type].toLowerCase())
+      .sprite(cx + 10, cy + 9, getLocalizedSpriteKey("types"), PokemonType[move.type].toLowerCase())
       .setOrigin(0.5, 0.5)
-      .setScale(0.34);
+      .setScale(0.32);
     this.add(tSpr);
     const cSpr = globalScene.add
-      .sprite(cx + 27, cy + 11, "categories", MoveCategory[move.category].toLowerCase())
+      .sprite(cx + 26, cy + 9, "categories", MoveCategory[move.category].toLowerCase())
       .setOrigin(0.5, 0.5)
-      .setScale(0.5);
+      .setScale(0.42);
     this.add(cSpr);
     const bp = move.power > 0 ? String(move.power) : "-";
     const acc = move.accuracy > 0 ? String(move.accuracy) : "-";
-    this.text(cx + 38, cy + 9, `BP ${bp}`, TextStyle.SUMMARY_GRAY, 0, FONT_TINY);
-    this.text(cx + w - 4, cy + 9, `${acc}%`, TextStyle.SUMMARY_GRAY, 1, FONT_TINY);
+    this.text(cx + 36, cy + 7, `BP ${bp}`, TextStyle.SUMMARY_GRAY, 0, FONT_TINY);
+    this.text(cx + w - 4, cy + 7, `${acc}%`, TextStyle.SUMMARY_GRAY, 1, FONT_TINY);
   }
 
-  // -- NATURE panel -----------------------------------------------------------------------------
+  // -- persistent MOVE DESCRIPTION bar (item 8) -------------------------------------------------
+  // Live-updates with the highlighted move's full description while navigating the move dropdown AND
+  // while focus sits on any of the 4 move cells. When the focus is elsewhere it shows the focused
+  // ability / item description, so the bar is always useful.
 
-  private renderNaturePanel(): void {
-    this.add(addWindow(RIGHT_X, NAT_Y, RIGHT_W, NAT_H));
-    this.focusBox(RIGHT_X + 3, NAT_Y + 3, RIGHT_W - 6, NAT_H - 6, EditorField.NATURE);
-    this.text(RIGHT_X + 7, NAT_Y + 4, "NATURE", TextStyle.SUMMARY_HEADER, 0, FONT_HDR);
-    const name = getNatureName(this.config!.set.nature as Nature, false, false, true);
-    const summary = getNatureName(this.config!.set.nature as Nature, true, false, true).replace(/\n/g, " ");
-    this.text(RIGHT_X + 44, NAT_Y + 3, summary || name, TextStyle.SUMMARY_GOLD, 0, FONT_NAME);
-    this.text(
-      RIGHT_X + 44,
-      NAT_Y + 11,
-      "Free pick - recolors the stat bars live.",
-      TextStyle.SUMMARY_GRAY,
-      0,
-      FONT_TINY,
-    );
+  private renderMoveDescBar(): void {
+    this.add(addWindow(RIGHT_X, DESC_Y, RIGHT_W, DESC_H));
+    this.fill(RIGHT_X + 2, DESC_Y + 2, RIGHT_W - 4, DESC_H - 4, 0x0d1524, 1);
+    const info = this.descBarContent();
+    this.text(RIGHT_X + 5, DESC_Y + 2, info.title, TextStyle.SUMMARY_GOLD, 0, FONT_TINY);
+    this.text(RIGHT_X + 5, DESC_Y + 8, this.clip(info.desc, 74), TextStyle.SUMMARY_GRAY, 0, FONT_TINY);
+  }
+
+  /** The move (or field) whose description the bottom bar shows right now. */
+  private descBarContent(): { title: string; desc: string } {
+    // 1) Navigating the move dropdown -> the highlighted entry.
+    if (this.paneOpen && MOVE_FIELDS.includes(this.field)) {
+      const hi = this.moveEntries()[this.paneCursor];
+      if (hi != null) {
+        const move = allMoves[hi.moveId];
+        return { title: hi.name, desc: hi.locked ? hi.reason : (move?.effect ?? "") };
+      }
+    }
+    // 2) Focus on a move cell -> that cell's move.
+    if (MOVE_FIELDS.includes(this.field)) {
+      const moveId = this.config!.set.moves[this.moveSlot()];
+      if (moveId != null) {
+        const move = allMoves[moveId];
+        return { title: move?.name ?? "-", desc: move?.effect ?? "" };
+      }
+      return { title: `Move ${this.moveSlot() + 1}`, desc: "Empty slot - type to search the legal move pool." };
+    }
+    // 3) Otherwise: the focused field's own description.
+    if (this.field === EditorField.ITEM) {
+      if (this.isMega) {
+        return { title: "Mega Stone", desc: "Auto-forced by the mega stage (slot locked)." };
+      }
+      const resolved = this.resolvedItem(this.config!.set.item as ShowdownItemKey);
+      return { title: resolved?.name ?? "Item", desc: resolved?.getDescription() ?? "" };
+    }
+    const actives = this.activeAbilityIds();
+    const active = allAbilities[actives[this.config!.set.abilityIndex] ?? actives[0]];
+    return { title: active?.name ?? "Ability", desc: active?.description ?? "" };
   }
 
   /** A small solid label pill (e.g. the "ACTIVE" tag on the ability row). */
@@ -1128,12 +1413,11 @@ export class ShowdownSetEditorUiHandler extends UiHandler {
     return modType == null ? null : getModifierType(modType);
   }
 
-  // -- floating search DROPDOWN (drawn on top, only while actively searching) --------------------
+  // -- floating search DROPDOWN (item + moves; drawn on top, only while actively searching) ------
 
   private renderDropdown(): void {
     this.add(addWindow(DROP_X, DROP_Y, DROP_W, DROP_H));
-    // Search bar: the focused field's pool name + the live typed query with a caret. Typing filled it
-    // directly (no "browse" button) - an empty query means the controller opened it unfiltered.
+    // Search bar: the focused field's pool name + the live typed query with a caret.
     const barY = DROP_Y + 3;
     this.fill(DROP_X + 3, barY, DROP_W - 6, 11, HEADER_BAND, 1);
     this.text(DROP_X + 6, barY + 2, this.fieldName(this.field), TextStyle.SUMMARY_GOLD, 0, FONT_HDR);
@@ -1143,43 +1427,21 @@ export class ShowdownSetEditorUiHandler extends UiHandler {
       this.text(DROP_X + 70, barY + 2, "type to search", TextStyle.SHADOW_TEXT, 0, FONT_HDR);
     }
     const top = DROP_Y + 17;
-    switch (this.field) {
-      case EditorField.ABILITY:
-        this.renderAbilityDropdown(top);
-        break;
-      case EditorField.ITEM:
-        this.renderItemDropdown(top);
-        break;
-      case EditorField.NATURE:
-        this.renderNatureDropdown(top);
-        break;
-      default:
-        this.renderMoveDropdown(top);
-        break;
+    if (this.field === EditorField.ITEM) {
+      this.renderItemDropdown(top);
+    } else {
+      this.renderMoveDropdown(top);
     }
   }
 
   private fieldName(field: EditorField): string {
-    switch (field) {
-      case EditorField.ABILITY:
-        return "ABILITY";
-      case EditorField.ITEM:
-        return "ITEM";
-      case EditorField.NATURE:
-        return "NATURE";
-      default:
-        return `MOVE ${MOVE_FIELDS.indexOf(field) + 1}`;
+    if (field === EditorField.ITEM) {
+      return "ITEM";
     }
+    return `MOVE ${MOVE_FIELDS.indexOf(field) + 1}`;
   }
 
-  private static readonly DROP_FOOTER_Y = SCREEN_H - 12;
   private static readonly DROP_ROW_H = 11;
-
-  private dropFooter(desc: string): void {
-    const y = ShowdownSetEditorUiHandler.DROP_FOOTER_Y;
-    this.fill(DROP_X + 3, y, DROP_W - 6, 10, 0x0d1524, 1);
-    this.text(DROP_X + 6, y + 1, this.clip(desc, 68), TextStyle.SUMMARY_GRAY, 0, FONT_TINY);
-  }
 
   /** Highlight fill + return the row's baseline y for the i-th visible dropdown row. */
   private dropRow(index: number, top: number): number {
@@ -1198,28 +1460,26 @@ export class ShowdownSetEditorUiHandler extends UiHandler {
     for (let i = this.paneScroll; i < end; i++) {
       this.renderMoveDropRow(entries[i], i, top);
     }
-    const hi = entries[this.paneCursor];
-    const hiMove = hi ? allMoves[hi.moveId] : null;
-    this.dropFooter(hi?.locked ? hi.reason : (hiMove?.effect ?? ""));
+    // The highlighted move's full description lives in the persistent bottom bar (renderMoveDescBar).
   }
 
   private renderMoveDropRow(e: MovePaneEntry, i: number, top: number): void {
     const move = allMoves[e.moveId];
     const ry = this.dropRow(i, top);
     const style = e.locked ? TextStyle.SHADOW_TEXT : i === this.paneCursor ? TextStyle.WINDOW : TextStyle.SUMMARY_GRAY;
-    this.text(DROP_X + 8, ry + 1, this.clip(`${e.name}${e.locked ? " (egg)" : ""}`, 22), style, 0, FONT_DESC);
+    this.text(DROP_X + 8, ry + 1, this.clip(`${e.name}${e.locked ? " (egg)" : ""}`, 22), style, 0, FONT_TINY);
     if (!move) {
       return;
     }
     const tSpr = globalScene.add
-      .sprite(DROP_X + 120, ry + 4, getLocalizedSpriteKey("types"), PokemonType[move.type].toLowerCase())
+      .sprite(DROP_X + 118, ry + 4, getLocalizedSpriteKey("types"), PokemonType[move.type].toLowerCase())
       .setOrigin(0.5, 0.5)
       .setScale(0.34);
     tSpr.setAlpha(e.locked ? 0.4 : 1);
     this.add(tSpr);
-    this.text(DROP_X + 140, ry + 1, categoryLabel(move.category), style, 0, FONT_TINY);
-    this.text(DROP_X + 156, ry + 1, move.power > 0 ? `BP ${move.power}` : "BP -", style, 0, FONT_TINY);
-    this.text(DROP_X + 184, ry + 1, move.accuracy > 0 ? `${move.accuracy}%` : "-", style, 0, FONT_TINY);
+    this.text(DROP_X + 138, ry + 1, categoryLabel(move.category), style, 0, FONT_TINY);
+    this.text(DROP_X + 154, ry + 1, move.power > 0 ? `BP ${move.power}` : "BP -", style, 0, FONT_TINY);
+    this.text(DROP_X + 182, ry + 1, move.accuracy > 0 ? `${move.accuracy}%` : "-", style, 0, FONT_TINY);
   }
 
   private renderItemDropdown(top: number): void {
@@ -1238,82 +1498,9 @@ export class ShowdownSetEditorUiHandler extends UiHandler {
           .setScale(0.42);
         this.add(icon);
       }
-      this.text(DROP_X + 24, ry + 1, this.clip(resolved?.name ?? String(keys[i]), 26), style, 0, FONT_DESC);
+      this.text(DROP_X + 24, ry + 1, this.clip(resolved?.name ?? String(keys[i]), 26), style, 0, FONT_TINY);
       this.text(DROP_X + 122, ry + 2, this.clip(resolved?.getDescription() ?? "", 30), style, 0, FONT_TINY);
     }
-    const hi = this.resolvedItem(keys[this.paneCursor]);
-    this.dropFooter(hi?.getDescription() ?? "");
-  }
-
-  private renderAbilityDropdown(top: number): void {
-    // Only the 3 ACTIVES are selectable (the innates live on the main screen, always-on). Locked slots
-    // are grayed WITH the unlock reason, never hidden.
-    const cfg = this.config!;
-    const actives = this.activeAbilityIds();
-    actives.forEach((id, i) => {
-      const ry = this.dropRow(i, top + i * 2); // extra breathing room - only 3 rows
-      const unlocked = cfg.unlocks.unlockedAbilityIndices.includes(i);
-      const ability = allAbilities[id];
-      const style = unlocked
-        ? i === this.paneCursor
-          ? TextStyle.WINDOW
-          : TextStyle.SUMMARY_GOLD
-        : TextStyle.SHADOW_TEXT;
-      const mark = cfg.set.abilityIndex === i ? "(*) " : "( ) ";
-      this.text(
-        DROP_X + 8,
-        ry + 1,
-        `${mark}${ability?.name ?? "-"}${unlocked ? "" : "  [LOCKED]"}`,
-        style,
-        0,
-        FONT_NAME,
-      );
-      this.text(
-        DROP_X + 12,
-        ry + 8,
-        this.clip(unlocked ? (ability?.description ?? "") : "Unlock this ability slot in the collection.", 60),
-        TextStyle.SUMMARY_GRAY,
-        0,
-        FONT_TINY,
-      );
-    });
-    const hi = allAbilities[actives[this.paneCursor]];
-    const unlocked = cfg.unlocks.unlockedAbilityIndices.includes(this.paneCursor);
-    this.dropFooter(unlocked ? (hi?.description ?? "") : "Locked ability slot - unlock it in the collection.");
-  }
-
-  private renderNatureDropdown(top: number): void {
-    const natures = this.natureList();
-    const visible = ShowdownSetEditorUiHandler.PANE_VISIBLE_ROWS;
-    const start = this.paneScroll;
-    const end = Math.min(start + visible, natures.length);
-    for (let i = start; i < end; i++) {
-      const nat = natures[i];
-      const ry = this.dropRow(i, top);
-      const style =
-        i === this.paneCursor
-          ? TextStyle.WINDOW
-          : nat === this.config!.set.nature
-            ? TextStyle.SUMMARY_GOLD
-            : TextStyle.SUMMARY_GRAY;
-      this.text(DROP_X + 8, ry + 1, getNatureName(nat as Nature, false, false, true), style, 0, FONT_DESC);
-      this.text(
-        DROP_X + 70,
-        ry + 2,
-        getNatureName(nat as Nature, true, false, true)
-          .replace(/\n/g, " ")
-          .replace(/[()]/g, ""),
-        style,
-        0,
-        FONT_TINY,
-      );
-    }
-    const picked = natures[this.paneCursor];
-    this.dropFooter(
-      picked == null
-        ? ""
-        : `${getNatureName(picked as Nature, true, false, true).replace(/\n/g, " ")} - live stat-bar preview.`,
-    );
   }
 
   clear(): void {
@@ -1322,6 +1509,7 @@ export class ShowdownSetEditorUiHandler extends UiHandler {
     this.textInput?.close();
     this.container.setVisible(false);
     this.config = null;
+    this.requestedSpriteKeys.clear();
   }
 }
 
@@ -1372,12 +1560,17 @@ export function buildShowdownEditorDemoConfig(
       shiny: false,
       variant: 0,
     },
+    female: false,
     unlocks: {
       ownedVariants: [0, 1],
       blackShinyOwned: true,
       unlockedAbilityIndices: [0, 2],
       unlockedEggMoveBits: 0b0011,
       megaBudgetSpent: false,
+      // Innate slots: slot 0 unlocked (active), slots 1 + 2 candy-locked (show their unlock cost).
+      innateUnlockedSlots: [0],
+      innateSlotCandyCosts: [0, 35, 50],
+      candyCount: 40,
     },
     team,
     activeSlot: 2,

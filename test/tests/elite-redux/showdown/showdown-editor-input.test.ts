@@ -18,6 +18,7 @@
 // =============================================================================
 
 import { allMoves } from "#data/data-lists";
+import { Button } from "#enums/buttons";
 import type { MoveId } from "#enums/move-id";
 import { UiMode } from "#enums/ui-mode";
 import { GameManager } from "#test/framework/game-manager";
@@ -37,9 +38,12 @@ type EditorInternals = {
   filter: string;
   field: EditorField;
   paneCursor: number;
+  config: { set: { abilityIndex: number }; unlocks: { unlockedAbilityIndices: number[] } };
   setFilter(value: string): void;
   moveEntries(): { moveId: MoveId; name: string; locked: boolean }[];
   selectPaneRow(): boolean;
+  selectableAbilityIndices(): number[];
+  processInput(button: Button): boolean;
 };
 
 function buildEditor(
@@ -112,5 +116,34 @@ describe.skipIf(!RUN)("Showdown Set Editor type-to-search input model", () => {
     expect(internals.paneOpen, "picking closes the dropdown").toBe(false);
     expect(internals.filter, "no lingering filter after a pick").toBe("");
     expect(allMoves[chosen], "the chosen move resolves").toBeDefined();
+  });
+
+  // RED-PROOF (round 4): the ability search DROPDOWN is gone - the ACTIVE ability is CYCLED in place.
+  // Before this round the ability field opened a browse dropdown on A (paneOpen -> true); now A cycles
+  // the active ability with NO pane. This test is the proof the dropdown was replaced by cycling.
+  it("the ACTIVE ability field CYCLES in place - ACTION never opens a dropdown", () => {
+    const game = new GameManager(phaserGame);
+    const { internals } = buildEditor(game, EditorField.ABILITY);
+    expect(internals.paneOpen, "ability field starts with no dropdown").toBe(false);
+
+    // A on the ability field cycles the active ability - it does NOT open a search pane.
+    internals.processInput(Button.ACTION);
+    expect(internals.paneOpen, "ACTION on the ability field must NOT open a dropdown (cycling replaced it)").toBe(
+      false,
+    );
+  });
+
+  it("cycling the active ability lands only on UNLOCKED slots, skipping locked ones", () => {
+    const game = new GameManager(phaserGame);
+    const { internals } = buildEditor(game, EditorField.ABILITY);
+    const unlocked = internals.config.unlocks.unlockedAbilityIndices;
+    const selectable = internals.selectableAbilityIndices();
+
+    // Cycle a full lap; every landed index must be an UNLOCKED, selectable active slot (never a locked one).
+    for (let i = 0; i < selectable.length + 2; i++) {
+      internals.processInput(Button.CYCLE_ABILITY);
+      expect(unlocked, "cycling never lands on a locked ability slot").toContain(internals.config.set.abilityIndex);
+      expect(selectable, "cycling stays within the selectable actives").toContain(internals.config.set.abilityIndex);
+    }
   });
 });
