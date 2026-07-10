@@ -21,6 +21,7 @@ import type { GhostTrainerProfile } from "#data/elite-redux/er-ghost-profile";
 import type { ShowdownCommandRelay } from "#data/elite-redux/showdown/showdown-command-relay";
 import type { ShowdownSession } from "#data/elite-redux/showdown/showdown-session";
 import type { ShowdownMonManifest } from "#data/elite-redux/showdown/showdown-team";
+import type { Starter } from "#types/save-data";
 
 interface ShowdownBattleState {
   ownManifest: ShowdownMonManifest[];
@@ -123,6 +124,28 @@ export function fireShowdownRejoinResend(): void {
       console.warn("[showdown-rejoin] a rejoin re-sender threw (ignored)", err);
     }
   }
+}
+
+/**
+ * Team Menu (Phase D): the pre-built preset the player chose to enter the lobby with, reconstructed
+ * into engine {@linkcode Starter}s (via `manifestToStarter`). Set by the Team Menu's enter-lobby
+ * callback BEFORE pairing; CONSUMED by `SelectStarterPhase.startShowdownSelect`, which then SKIPS the
+ * interactive grid+editor teambuild and feeds these straight into the existing negotiate/wager pipeline.
+ * Absent (null) = the legacy in-lobby build path (kept code-tolerant, unreachable from the new flow).
+ * Single-use: consuming clears it, so a subsequent match never inherits a stale preset.
+ */
+let pendingPresetStarters: Starter[] | null = null;
+
+/** Stash the chosen preset's reconstructed starters for the next showdown launch (Team Menu -> lobby). */
+export function setPendingShowdownPresetStarters(starters: Starter[] | null): void {
+  pendingPresetStarters = starters;
+}
+
+/** Consume (read + clear) the pending preset starters. Returns null when the legacy build path applies. */
+export function consumePendingShowdownPresetStarters(): Starter[] | null {
+  const starters = pendingPresetStarters;
+  pendingPresetStarters = null;
+  return starters;
 }
 
 /**

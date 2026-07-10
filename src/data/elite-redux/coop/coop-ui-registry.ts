@@ -209,6 +209,11 @@ export const COOP_UI_REGISTRY: Record<UiMode, CoopUiClass> = {
   // wire (the C2 team exchange), never the editor UI. Never a co-op surface (versus is a distinct
   // GameMode, not isCoop).
   [UiMode.SHOWDOWN_SET_EDITOR]: "local-only",
+
+  // Showdown 1v1 TEAM PRESET MENU (the pre-pairing entry screen): LOCAL-ONLY by construction - it opens
+  // at the TITLE before any session exists, so it can never be a partner-owned interaction. Only the
+  // chosen preset's team manifests cross the wire later (the negotiate step), never this menu UI.
+  [UiMode.SHOWDOWN_TEAM_MENU]: "local-only",
 };
 
 /**

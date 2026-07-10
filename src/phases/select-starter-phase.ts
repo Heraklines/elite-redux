@@ -32,6 +32,7 @@ import { sanitizeGhostProfile } from "#data/elite-redux/er-ghost-profile";
 import { setErDifficulty } from "#data/elite-redux/er-run-difficulty";
 import {
   beginShowdownBattle,
+  consumePendingShowdownPresetStarters,
   disposePendingShowdownRelay,
   disposePendingShowdownSession,
   endShowdownBattle,
@@ -384,6 +385,17 @@ export class SelectStarterPhase extends Phase {
     const relay = new ShowdownCommandRelay(runtime.localTransport);
     setPendingShowdownSession(session);
     setPendingShowdownRelay(relay);
+    // Team Menu (Phase D): teams are now built + selected BEFORE pairing. When the player entered the
+    // lobby carrying a preset, its reconstructed starters are pending here - SKIP the interactive
+    // grid+editor teambuild entirely and feed the pre-built team straight into the negotiate/wager
+    // pipeline (both clients do this, so pairing leads near-immediately to the wager, no 10-minute pick
+    // wait). The legacy in-lobby STARTER_SELECT path below stays code-tolerant but is unreachable from
+    // the new entry flow (no pending preset -> it still opens, so a direct/legacy launch never breaks).
+    const presetStarters = consumePendingShowdownPresetStarters();
+    if (presetStarters != null) {
+      void this.runShowdownFlow(presetStarters, controller.role, session, relay);
+      return;
+    }
     globalScene.ui.setMode(UiMode.STARTER_SELECT, (starters: Starter[]) => {
       globalScene.ui.clearText();
       void this.runShowdownFlow(starters, controller.role, session, relay);

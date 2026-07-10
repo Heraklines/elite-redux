@@ -22,7 +22,10 @@ import { buildInfernoFeed } from "#data/elite-redux/er-community-challenge-infer
 import { applyCommunityChallengeToRun } from "#data/elite-redux/er-community-challenge-launch";
 import type { CommunityChallengeConfig } from "#data/elite-redux/er-community-challenges";
 import { resetCommunityRunState } from "#data/elite-redux/er-community-run-state";
+import { setPendingShowdownPresetStarters } from "#data/elite-redux/showdown/showdown-battle-state";
 import { syncShowdownPendingSettlements } from "#data/elite-redux/showdown/showdown-escrow-client";
+import { manifestToStarter, starterToManifest } from "#data/elite-redux/showdown/showdown-manifest";
+import { buildTeamMenuPresetViews, runShowdownPresetBuild } from "#data/elite-redux/showdown/showdown-team-menu-flow";
 import { Gender } from "#data/gender";
 import { BattleType } from "#enums/battle-type";
 import { GameModes } from "#enums/game-modes";
@@ -33,9 +36,12 @@ import { getBiomeKey } from "#field/arena";
 import type { Modifier } from "#modifiers/modifier";
 import { getDailyRunStarterModifiers, regenerateModifierPoolThresholds } from "#modifiers/modifier-type";
 import { vouchers } from "#system/voucher";
+import type { Starter } from "#types/save-data";
 import type { OptionSelectConfig, OptionSelectItem } from "#ui/abstract-option-select-ui-handler";
 import { CoopLobbyStage } from "#ui/coop-lobby-stage";
 import { SaveSlotUiMode } from "#ui/save-slot-select-ui-handler";
+import { DomShowdownEditorTextInput } from "#ui/showdown-editor-text-input";
+import type { ShowdownTeamMenuConfig, ShowdownTeamMenuUiHandler } from "#ui/showdown-team-menu-ui-handler";
 import { isLocalServerConnected } from "#utils/common";
 import { getPokemonSpecies } from "#utils/pokemon-utils";
 import i18next from "i18next";
@@ -161,14 +167,15 @@ export class TitlePhase extends Phase {
                 return true;
               },
             });
-            // Showdown (C1): a 1v1 PvP "versus" match on the SAME lobby/pairing flow as
-            // co-op, launching GameModes.SHOWDOWN with the versus session kind. Same
-            // dev/beta/devTools gate as co-op above.
-            // D3 ante lobby inserts here (stake wager between pairing and teambuild).
+            // Showdown (C1): a 1v1 PvP "versus" match. Entry flow is INVERTED (addendum 2026-07-11):
+            // clicking Showdown opens the TEAM PRESET MENU first (build/select a team BEFORE pairing),
+            // not the lobby. "Enter lobby with this team" then routes into the SAME lobby/pairing flow
+            // carrying the chosen preset, so both clients arrive pre-built and pairing leads
+            // near-immediately to the wager (no 10-minute in-lobby pick wait).
             options.push({
               label: GameMode.getModeName(GameModes.SHOWDOWN),
               handler: () => {
-                this.openCoopLobby(setModeAndEnd, "authoritative", "versus", GameModes.SHOWDOWN);
+                this.openShowdownTeamMenu(setModeAndEnd);
                 return true;
               },
             });
@@ -369,6 +376,97 @@ export class TitlePhase extends Phase {
     globalScene.ui.setMode(UiMode.MESSAGE);
     globalScene.ui.resetModeChain();
     globalScene.ui.showText("", null, () => globalScene.ui.setOverlayMode(UiMode.PROFILE, backToTitle));
+  }
+
+  /**
+   * Showdown 1v1 (Team Menu, addendum): open the TEAM PRESET MENU - the new pre-pairing entry screen.
+   * Teams are built + selected here, BEFORE the lobby. The menu's callbacks:
+   *   - onEnterLobby: reconstruct the chosen preset's starters and stash them, then open the EXISTING
+   *     pairing lobby carrying the versus session (the pre-built team skips the in-lobby teambuild).
+   *   - onCreate / onEdit: run the OFFLINE build (starter-select + editor, no session), then save.
+   *   - onRename / onDelete: persist to the account save (the handler updates its own view live).
+   *   - onExit: unwind back to the title.
+   * Opened via the DEFERRED pattern (setMode(MESSAGE)+resetModeChain()+showText callback) so returning
+   * true from the option handler cannot clobber the setMode - mirrors {@linkcode openProfileHub}.
+   */
+  private openShowdownTeamMenu(setModeAndEnd: (gameMode: GameModes) => void): void {
+    const { gameData } = globalScene;
+    const showMenu = (): void => {
+      const config: ShowdownTeamMenuConfig = {
+        presets: buildTeamMenuPresetViews(gameData),
+        onExit: () => {
+          void globalScene.ui.revertModes().then(() => {
+            globalScene.phaseManager.toTitleScreen();
+            super.end();
+          });
+        },
+        onRename: (idx, name) => gameData.renameShowdownTeamPreset(idx, name),
+        onDelete: idx => gameData.deleteShowdownTeamPreset(idx),
+        onCreate: () => this.openShowdownPresetBuild(undefined, showMenu),
+        onEdit: idx => this.openShowdownPresetBuild(idx, showMenu),
+        onEnterLobby: idx => {
+          const preset = gameData.listShowdownTeamPresets()[idx];
+          if (preset == null) {
+            showMenu();
+            return;
+          }
+          // Reconstruct the engine starters from the saved wire manifests and stash them; the versus
+          // launch (SelectStarterPhase.startShowdownSelect) consumes them + skips the grid teambuild.
+          setPendingShowdownPresetStarters(preset.mons.map(manifestToStarter));
+          this.openCoopLobby(setModeAndEnd, "authoritative", "versus", GameModes.SHOWDOWN);
+        },
+      };
+      void globalScene.ui.setMode(UiMode.SHOWDOWN_TEAM_MENU, config).then(() => {
+        const handler = globalScene.ui.getHandler();
+        (handler as ShowdownTeamMenuUiHandler).setTextInput?.(new DomShowdownEditorTextInput());
+      });
+    };
+    globalScene.ui.setMode(UiMode.MESSAGE);
+    globalScene.ui.resetModeChain();
+    globalScene.ui.showText("", null, () => showMenu());
+  }
+
+  /**
+   * Showdown 1v1 (Team Menu, Phase C): the OFFLINE create/edit build. Drives the SAME starter-select +
+   * Set Editor showdown teambuild the versus flow uses, but with NO live session (no pairing / ready
+   * barrier / countdown) - only `gameMode.isShowdown` gates the teambuild UI, so a local gameMode swap
+   * is enough. On a confirmed full team it names + saves the preset (in place when `editIndex` is set),
+   * then returns to the menu via `onSettled`. The name modal reuses the shared DOM-input text modal.
+   */
+  private openShowdownPresetBuild(editIndex: number | undefined, onSettled: () => void): void {
+    const { gameData } = globalScene;
+    const prevGameMode = this.gameMode;
+    globalScene.gameMode = getGameMode(GameModes.SHOWDOWN);
+    const defaultName =
+      editIndex === undefined ? "Team" : (gameData.listShowdownTeamPresets()[editIndex]?.name ?? "Team");
+    runShowdownPresetBuild(editIndex, defaultName, {
+      openStarterSelect: onLockIn => {
+        void globalScene.ui.setMode(UiMode.STARTER_SELECT, (starters: Starter[]) => {
+          globalScene.ui.clearText();
+          onLockIn(starters);
+        });
+      },
+      promptName: (def, onName) => {
+        globalScene.ui.setOverlayMode(
+          UiMode.COMMUNITY_CHALLENGE_TEXT,
+          {
+            buttonActions: [
+              (value: string) => globalScene.ui.revertMode().then(() => onName(value)),
+              () => globalScene.ui.revertMode().then(() => onName(null)),
+            ],
+          },
+          { title: "Name your team", fieldLabel: "Team name", initial: def },
+        );
+      },
+      toManifest: (starter: Starter) => starterToManifest(starter, gameData),
+      save: (name, mons, index) => gameData.saveShowdownTeamPreset(name, mons, index),
+      onSettled: () => {
+        // Restore the pre-build gameMode (the offline build only borrowed SHOWDOWN to drive the
+        // teambuild UI - no run was launched) and reopen the Team Menu with the saved team shown.
+        globalScene.gameMode = getGameMode(prevGameMode);
+        onSettled();
+      },
+    });
   }
 
   /**
