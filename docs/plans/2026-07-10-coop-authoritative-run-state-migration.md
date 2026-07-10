@@ -455,3 +455,150 @@ Rationale in one line: **start where the P0s are (biome, ME, reward), install th
 low-frequency in-battle and lobby surfaces last where a regression is most contained or most rare.**
 
 ---
+
+## 3. Renderer allowlist inventory
+
+Today the renderer gate is a DENYLIST of 6 phases (`coop-renderer-gate.ts:40-47`) with an explicit
+note that "later M-steps … tighten this toward a pure allowlist" (`:24-28`). This section enumerates
+EVERY phase registered in `PHASES` (`phase-manager.ts:173-307`) and classifies it, producing the
+authoritative allowlist a parallel agent is implementing. Their list is derived independently; THIS
+list is the cross-check — a disagreement on any row is a finding to reconcile before either ships.
+
+**Classification (guest = authoritative renderer):**
+- **presentation** — pure render/animation/narration, mutates no hashed shared state. Guest RUNS it
+  locally (ALLOW). These are the CoopReplay* family + cosmetic/info phases.
+- **input-intent** — collects a human choice and emits a typed intent (owner drives; watcher shows a
+  read-only spectator view). Guest RUNS it, but its output is an INTENT (invariant 2), never a direct
+  mutation. Post-migration these route through `runCoopInteraction` (`coop-interaction.ts:91`).
+- **mutating** — resolves/applies shared run state (RNG, damage, exp, capture, reward grant). Guest
+  must NOT run it (DENY); it renders the visible effect via a CoopReplay* phase and adopts the host's
+  checkpoint. This is the set the denylist covers today plus the reward/exp/capture resolution the
+  guest currently reaches only because the gate is conservative.
+- **host-only** — engine/AI/RNG generation or per-account resolution with no guest-render need; the
+  guest adopts the RESULT (enemy party, biome roll, egg, unlock) and never runs the phase.
+
+The ALLOWLIST the guest may run = {presentation} ∪ {input-intent}. Everything classified mutating or
+host-only FAILS CLOSED on the guest (invariant 8): if such a phase reaches the factory on a live
+authoritative guest, it is neutralized and logged (the existing `recordCoopRendererNeutralized`
+mechanism, `coop-renderer-gate.ts:67-71`), NOT run.
+
+### 3.1 presentation — ALLOW (guest runs locally)
+
+| Phase | Note |
+|-------|------|
+| `MessagePhase` | narration box; guest shows host-localized log lines (`coop-transport.ts:633-634`) |
+| `CommonAnimPhase` | shared VFX; no state |
+| `DamageAnimPhase` | hit flash; the numeric damage is in the checkpoint |
+| `MoveAnimPhase` / `LoadMoveAnimPhase` / `MoveHeaderPhase` / `MoveChargePhase` | move animation/asset load; resolution is host-only (`MovePhase` denied) |
+| `PokemonAnimPhase` | sprite anim |
+| `ShinySparklePhase` | cosmetic |
+| `ShowAbilityPhase` / `HideAbilityPhase` | ability flyout; the ability itself is host-resolved |
+| `ShowPartyExpBarPhase` / `HidePartyExpBarPhase` | exp bar chrome |
+| `ShowTrainerPhase` | trainer sprite intro |
+| `ScanIvsPhase` | per-client IV scanner readout |
+| `EndCardPhase` | run end card |
+| `CoopCaptureReplayPhase` | guest ball-throw replay (`coop-replay-phases.ts:1144`) |
+| `CoopFaintReplayPhase` | faint replay (renders the denied `FaintPhase`) |
+| `CoopHpDrainReplayPhase` | hp tween replay |
+| `CoopMoveAnimReplayPhase` | move anim replay (renders the denied `MovePhase`) |
+| `CoopStatStageReplayPhase` | stat tween replay (renders the denied `StatStageChangePhase`) |
+| `CoopStatusReplayPhase` | status change replay |
+| `CoopReplayTurnPhase` | the guest's turn-render driver (`coop-replay-phases.ts`) |
+| `CoopReplayMePhase` | ME render on the guest |
+| `CoopReplayLearnMovePhase` | learn-move render on the guest |
+| `CoopApplyResyncPhase` | applies a host resync snapshot at a safe boundary (`coop-replay-phases.ts:984`) |
+| `CoopFinalizeTurnPhase` | guest turn-finalize |
+| `CoopInertPhase` | deliberate no-op placeholder (renderer parking) |
+| `CoopPartnerSyncPhase` | partner-state sync render |
+
+### 3.2 input-intent — ALLOW (owner drives; emits typed intent, never a mutation)
+
+| Phase | Maps to operation (§2) |
+|-------|------------------------|
+| `CommandPhase` | battle command intent (`coop-transport.ts:859-866`); watcher-safe |
+| `SelectTargetPhase` | target-select intent (`UiMode.TARGET_SELECT`, `coop-ui-registry.ts:57`) |
+| `SelectModifierPhase` | REWARD_SELECT — reward/shop/reroll intent (#1) |
+| `SelectBiomePhase` | BIOME_PICK intent (#15) |
+| `ErCrossroadsPhase` | CROSSROADS_PICK intent (#14) |
+| `MysteryEncounterPhase` / `MysteryEncounterOptionSelectedPhase` | ME_PICK intent (#8) |
+| `ErQuizPhase` | QUIZ_ANSWER intent (#9) |
+| `BiomeShopPhase` / `BlackMarketShopPhase` / `ExoticShopPhase` / `ImportBazaarShopPhase` | SHOP_BUY intent (#5) |
+| `ColosseumChoicePhase` | COLO_PICK intent (#7) |
+| `TheBargainPhase` | BARGAIN intent (#6) |
+| `ErAbilityCapsulePhase` / `ErGreaterAbilityCapsulePhase` | ABILITY_PICK intent (#4) |
+| `ErStormglassPickerPhase` | STORMGLASS intent (#16; host-driven today) |
+| `LearnMovePhase` / `LearnMoveBatchPhase` | LEARN_MOVE / LEARN_MOVE_BATCH intent (#11/#12) |
+| `SwitchPhase` | FAINT_SWITCH / voluntary-switch intent (#2) |
+| `RevivalBlessingPhase` | REVIVAL intent (#3) |
+| `CoopGuestCatchFullPhase` | CATCH_FULL intent (#17) — guest-catcher drives |
+| `CoopGuestFaintSwitchPhase` | guest faint-switch driver (#2) |
+| `CoopGuestRevivalPhase` | guest revival driver (#3) |
+| `ErDexNavPhase` | per-client dex-nav selection (intent if it affects shared spawn; verify) |
+
+**REVIEW rows (classification uncertain — must be resolved with the parallel agent):**
+- `ErDexNavPhase` — if the dex-nav pick influences the shared encounter it is input-intent; if it is
+  a per-client cosmetic scan it is presentation. Determine from whether its result is hashed.
+- `SelectGenderPhase` — one-time per-account; likely host-only/local, but if it affects a shared
+  starter it is input-intent. Verify against the launch handshake.
+
+### 3.3 mutating — DENY (host resolves; guest renders via CoopReplay* + adopts checkpoint)
+
+Superset of today's denylist (`coop-renderer-gate.ts:40-47`, first 6 rows) plus the
+reward/exp/progression resolution the guest reaches today only because the gate is conservative.
+
+| Phase | In today's denylist? | Guest renders via |
+|-------|:---:|-------------------|
+| `MovePhase` | YES | `CoopMoveAnimReplayPhase` |
+| `MoveEffectPhase` | YES | checkpoint (damage/secondary) |
+| `FaintPhase` | YES | `CoopFaintReplayPhase` |
+| `StatStageChangePhase` | YES | `CoopStatStageReplayPhase` |
+| `AttemptCapturePhase` | YES | `CoopCaptureReplayPhase` + `captureParty` (`coop-transport.ts:1165-1169`) |
+| `EnemyCommandPhase` | YES | n/a (host-only AI roll) |
+| `MoveEndPhase` / `MoveReflectPhase` | NO — ADD | checkpoint |
+| `BerryPhase` | NO — ADD | checkpoint (berry heal/proc) |
+| `WeatherEffectPhase` | NO — ADD | checkpoint weather (`coop-transport.ts:653-654`) |
+| `PositionalTagPhase` | NO — ADD | checkpoint arena tags |
+| `ObtainStatusEffectPhase` / `ResetStatusPhase` / `PostTurnStatusEffectPhase` / `CheckStatusEffectPhase` | NO — ADD | `CoopStatusReplayPhase` / checkpoint |
+| `ExpPhase` / `PartyExpPhase` / `LevelUpPhase` / `LevelCapPhase` | NO — ADD | `waveEndState` progression apply (`coop-transport.ts:1192`) |
+| `EvolutionPhase` / `EndEvolutionPhase` / `FormChangePhase` / `QuietFormChangePhase` / `PokemonTransformPhase` | NO — ADD (RENDER-DUAL) | played per-client but the SPECIES/FORM result must come from the host state; today `EVOLUTION_SCENE` is local-only + deterministic (`coop-ui-registry.ts:160-162`). Verify determinism holds or route via checkpoint |
+| `PokemonHealPhase` / `PartyHealPhase` | NO — ADD | checkpoint hp |
+| `TeraPhase` | NO — ADD | checkpoint tera (`coop-transport.ts` tera field) |
+| `VictoryPhase` / `BattleEndPhase` / `TrainerVictoryPhase` | NO — ADD (KEYSTONE) | today the guest CONSTRUCTS these (`coop-replay-phases.ts:1163-1181`); post-migration the host STATES the logicalPhase and the guest renders the transition, not builds it |
+| `NewBattlePhase` / `NextEncounterPhase` / `NewBiomeEncounterPhase` / `SwitchBiomePhase` | NO — ADD | host-stated wave/biome transition (guest constructs today, `coop-replay-phases.ts:1170-1174`) |
+| `ModifierRewardPhase` / `MoneyRewardPhase` / `RibbonModifierRewardPhase` / `GameOverModifierRewardPhase` | NO — ADD | checkpoint money/modifiers (`coop-transport.ts:598,601-603`) |
+| `AddEnemyBuffModifierPhase` | NO — ADD | host-only enemy buff roll |
+| `SummonPhase` / `SummonMissingPhase` / `ShiftSummonPhase` / `SwitchSummonPhase` / `ReturnPhase` / `PostSummonPhase` / `ToggleDoublePositionPhase` | NO — ADD (RENDER-DUAL) | the SEATING is authoritative (field reconcile, `coop-battle-engine.ts:2815`); guest re-summons via the render differ (`coop-replay-phases.ts:2852`), does not roll |
+| `GameOverPhase` | NO — but has an isCoop render branch (`coop-replay-phases.ts:1178-1181`) | render-only on guest; host states GAME_OVER |
+| `PostGameOverPhase` / `PostMysteryEncounterPhase` / `MysteryEncounterRewardsPhase` / `MysteryEncounterBattlePhase` / `MysteryEncounterBattleStartCleanupPhase` | NO — ADD | host-resolved; guest adopts via ME channel (#8) |
+| `RevivalBlessingPhase` resolution half | (input-intent for the PICK; the APPLY is host-only) | split: intent vs commit |
+
+### 3.4 host-only — guest never runs (adopts the result)
+
+Engine generation, RNG, AI, per-account, or lifecycle phases with no guest-render requirement.
+
+| Phase | Why host-only |
+|-------|---------------|
+| `EncounterPhase` / `InitEncounterPhase` | rolls the enemy party; guest adopts `enemyPartySync`/`launchSnapshot` (`coop-transport.ts:987,1008`) |
+| `EnemyCommandPhase` | enemy AI roll (also in denylist) |
+| `TurnInitPhase` / `TurnStartPhase` / `TurnEndPhase` | host turn engine; guest loops via `CoopReplayTurnPhase`/`finishTurn` (`coop-replay-phases.ts:1027`) |
+| `CheckSwitchPhase` / `CheckInterludePhase` | host flow-control checks |
+| `EggHatchPhase` / `EggLapsePhase` / `EggSummaryPhase` | eggs are deterministic per-client (`coop-egg-determinism`, `coop-ui-registry.ts:161`) — host-only resolution, per-client scene |
+| `UnlockPhase` / `LoginPhase` | per-account |
+| `SelectStarterPhase` / `SelectChallengePhase` / `SelectGenderPhase` | pre-run; guest boots from `launchSnapshot` (`coop-ui-registry.ts:173-176`) |
+| `TitlePhase` / `UnavailablePhase` / `ReloadSessionPhase` | lifecycle / chrome |
+| `LLMDirectorStartPhase` / `LLMDirectorBeatPhase` / `LLMDirectorBiblePhase` | director generation; host-authoritative (verify co-op wiring) |
+| `CoopPushReplacementCheckpointPhase` | HOST-side checkpoint push (guest never runs; it RECEIVES) |
+| `ShowdownEnemyFaintSwitchPhase` / `ShowdownResultPhase` | versus-only, not co-op (`coop-ui-registry.ts:200-205`) |
+| `DynamicPhaseMarker` | queue-internal marker, not a real phase |
+
+### 3.5 Cross-check summary
+
+- Today's denylist (6) is a strict SUBSET of §3.3 (mutating). The migration EXPANDS the denied set to
+  the full §3.3 list and, crucially, INVERTS the default: unlisted → DENY (fail closed), not ALLOW.
+- The allowlist the guest may run is exactly §3.1 ∪ §3.2. Any phase not in those two tables must be
+  neutralized on a live authoritative guest.
+- The 4 REVIEW rows (`ErDexNavPhase`, `SelectGenderPhase`, the evolution/form RENDER-DUAL set, the
+  summon RENDER-DUAL set) are the only genuinely ambiguous classifications and MUST be reconciled
+  with the parallel agent's independently-derived list before the allowlist flips the default.
+
+---
