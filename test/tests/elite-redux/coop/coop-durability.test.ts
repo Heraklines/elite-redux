@@ -10,6 +10,7 @@
 
 import {
   COOP_DEFAULT_QUEUE_BOUNDS,
+  CoopDurabilityManager,
   CoopJournal,
   CoopOutboundQueue,
   CoopReceiveLedger,
@@ -19,7 +20,9 @@ import {
   isCoopDurableMessage,
   setCoopDurabilityEnabled,
 } from "#data/elite-redux/coop/coop-durability";
-import type { CoopMessage } from "#data/elite-redux/coop/coop-transport";
+import { CoopInteractionTurn } from "#data/elite-redux/coop/coop-session";
+import type { CoopMessage, CoopTransport } from "#data/elite-redux/coop/coop-transport";
+import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
 import { afterEach, describe, expect, it } from "vitest";
 
 /** A durable authoritative frame (wave resolution) keyed for the journal by class+seq externally. */
@@ -313,5 +316,78 @@ describe("durability §4.4: reconnect-from-revision (tail replay vs full-snapsho
     expect(j.needsFullSnapshot("envelope", 1)).toBe(false);
     expect(j.needsFullSnapshot("envelope", 5)).toBe(false);
     expect(j.tailFrom("envelope", 1)).toEqual([]);
+  });
+});
+
+describe("durability §4/§1.8: control-plane PERSISTENCE for cold-resume convergence", () => {
+  afterEach(() => setCoopDurabilityEnabled(true));
+
+  it("the interaction counter restores forward so alternating-owner PARITY survives a cold resume", () => {
+    // A resume that reset the counter from an ODD value to 0 would FLIP ownership (parity). Restoring it
+    // keeps the parity - the correctness point of persisting it.
+    const turn = new CoopInteractionTurn();
+    turn.restore(7); // persisted odd counter
+    expect(turn.toJSON()).toBe(7);
+    expect(CoopInteractionTurn.ownerOf(7)).toBe(turn.current()); // parity preserved
+    // Restore never rewinds below the live counter, and ignores an invalid value.
+    turn.restore(3);
+    expect(turn.toJSON()).toBe(7);
+    turn.restore(-1);
+    expect(turn.toJSON()).toBe(7);
+    turn.restore(9);
+    expect(turn.toJSON()).toBe(9);
+  });
+
+  it("the journal high-water + ledger applied marks round-trip through serialize/restore", () => {
+    const j = new CoopJournal();
+    j.commit("envelope", 1, durableMsg(1));
+    j.commit("envelope", 5, durableMsg(5));
+    j.commit("reward", 3, durableMsg(3));
+    expect(j.serializeHighWater()).toEqual({ envelope: 5, reward: 3 });
+
+    // A fresh journal restores the high-water so a later commit continues monotonically (does not reset).
+    const resumed = new CoopJournal();
+    resumed.restoreHighWater({ envelope: 5, reward: 3 });
+    expect(resumed.highWaterMark("envelope")).toBe(5);
+    resumed.commit("envelope", 6, durableMsg(6)); // continues past the persisted mark
+    expect(resumed.highWaterMark("envelope")).toBe(6);
+
+    const rx = new CoopReceiveLedger();
+    rx.markApplied("envelope", 4);
+    const marks = rx.serialize();
+    expect(marks).toEqual({ envelope: 4 });
+    const rx2 = new CoopReceiveLedger();
+    rx2.restore(marks);
+    expect(rx2.appliedThrough("envelope")).toBe(4);
+  });
+
+  it("the durability manager persists + restores its committer high-water and receiver applied marks", async () => {
+    setCoopDurabilityEnabled(true);
+    const pair: { host: CoopTransport; guest: CoopTransport } = createLoopbackPair();
+    const applied: number[] = [];
+    const host = new CoopDurabilityManager(pair.host);
+    const guest = new CoopDurabilityManager(pair.guest, {
+      extractKey: m => (m.t === "waveResolved" ? { cls: "wave", seq: m.wave } : null),
+      apply: e => applied.push((e.msg as { wave: number }).wave),
+    });
+    host.commit("wave", 1, durableMsg(1));
+    host.commit("wave", 2, durableMsg(2));
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(applied).toEqual([1, 2]);
+
+    // The committer's high-water + the receiver's applied marks are captured for the save...
+    expect(host.highWaterMarks()).toEqual({ wave: 2 });
+    expect(guest.appliedMarks()).toEqual({ wave: 2 });
+
+    // ...and restore onto a fresh manager (cold resume) so revisions continue past them, not from 0.
+    const resumedHost = new CoopDurabilityManager(createLoopbackPair().host);
+    resumedHost.restore({ wave: 2 }, {});
+    resumedHost.commit("wave", 3, durableMsg(3));
+    expect(resumedHost.highWaterMarks()).toEqual({ wave: 3 });
+
+    host.dispose();
+    guest.dispose();
   });
 });

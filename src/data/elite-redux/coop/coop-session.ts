@@ -558,6 +558,18 @@ export class CoopInteractionTurn {
     return this.counter;
   }
 
+  /**
+   * W2b (contract doc §4): restore the LIVE counter from a persisted `SessionSaveData` on a COLD resume, so
+   * the alternating-owner parity + revision ordering continue monotonically rather than resetting to 0.
+   * Clamps an invalid/negative value to the current counter (no-op) so an older save can never corrupt it.
+   * Only moves FORWARD (a resume never rewinds the counter below the fresh base).
+   */
+  restore(counter: number): void {
+    if (Number.isInteger(counter) && counter > this.counter) {
+      this.counter = counter;
+    }
+  }
+
   /** Restore from the persistent run record. */
   static fromJSON(counter: number): CoopInteractionTurn {
     const restored = Number.isInteger(counter) && counter >= 0 ? counter : 0;

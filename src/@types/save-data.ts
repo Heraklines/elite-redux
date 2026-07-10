@@ -1,5 +1,6 @@
 import type { PokeballCounts } from "#app/battle-scene";
 import type { Tutorial } from "#app/tutorial";
+import type { CoopControlPlaneSaveData } from "#data/elite-redux/coop/coop-runtime";
 import type { CommunityChallengeConfig } from "#data/elite-redux/er-community-challenges";
 import type { GhostTrainerProfile } from "#data/elite-redux/er-ghost-profile";
 import type { ErMapSaveData } from "#data/elite-redux/er-map-nodes";
@@ -164,6 +165,12 @@ export interface SessionSaveData {
    * catch gate survives a mid-run save/reload. Optional + absent for non-community runs.
    */
   communityAllowedSpecies?: number[];
+  /**
+   * Co-op W2b (contract doc §4): the CONTROL-PLANE snapshot - the interaction counter + durability journal
+   * high-water marks - so a COLD resume keeps alternating-owner parity + revision ordering CONTINUOUS
+   * instead of resetting to base 0. Optional + absent for every solo / pre-W2b save (fully save-compatible).
+   */
+  coopControlPlane?: CoopControlPlaneSaveData | undefined;
 }
 
 export interface Unlocks {

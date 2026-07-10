@@ -1306,6 +1306,17 @@ export interface CoopTransport {
    * report control-plane block.
    */
   lastRxMs?(): number | undefined;
+  /**
+   * W2b durability (§4.3, optional): the number of DURABLE frames currently held in the outbound queue
+   * because the channel is dark (backpressure depth). 0 / absent when nothing is queued or the transport
+   * has no queue (loopback). Surfaced in the health line + control-plane block.
+   */
+  outboundQueueDepth?(): number;
+  /**
+   * W2b durability (§4.3, optional): whether the outbound queue overflowed and dropped its backlog, so a
+   * reconnect-from-revision resync is owed. Absent on transports without a queue.
+   */
+  outboundQueueNeedsResync?(): boolean;
 }
 
 /**

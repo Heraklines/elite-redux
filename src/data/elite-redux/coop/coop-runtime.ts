@@ -40,6 +40,7 @@ import { CoopBattleSync } from "#data/elite-redux/coop/coop-battle-sync";
 import { resetCoopBiomeOperationState } from "#data/elite-redux/coop/coop-biome-operation";
 import { getCoopChecksumAssertionCount } from "#data/elite-redux/coop/coop-checksum-assert";
 import { coopLog, coopWarn, isCoopDebug } from "#data/elite-redux/coop/coop-debug";
+import { CoopDurabilityManager, isCoopDurabilityEnabled } from "#data/elite-redux/coop/coop-durability";
 import {
   COOP_DEX_SYNC_SEQ,
   CoopInteractionRelay,
@@ -704,6 +705,20 @@ function formatLastRx(transport: CoopTransport): string {
   return ms == null ? "-" : `${Math.round(ms / 1000)}s`;
 }
 
+/**
+ * W2b (contract doc §4): compact durability tokens for the health line + control-plane block -
+ * `journal=<depth>/<unacked>` (committed ops retained / committed-but-unacked) and `queue=<n>[!]`
+ * (outbound frames held while the channel is dark; `!` = the queue overflowed + owes a resync). `-`
+ * when durability is off / the transport has no queue accessor (loopback).
+ */
+export function formatCoopDurabilityHealth(runtime: CoopRuntime, transport: CoopTransport): string {
+  const d = runtime.durability;
+  const journal = d == null ? "-" : `${d.journalDepth()}/${d.unackedCount()}`;
+  const depth = transport.outboundQueueDepth?.() ?? 0;
+  const owes = transport.outboundQueueNeedsResync?.() ? "!" : "";
+  return `journal=${journal} queue=${depth}${owes}`;
+}
+
 export function wireCoopStallWatchdog(
   transport: CoopTransport,
   relay: CoopInteractionRelay,
@@ -743,7 +758,7 @@ export function wireCoopStallWatchdog(
         lastHealthAt = Date.now();
         coopLog(
           "health",
-          `tick=${coopSessionGeneration()}g turn=${globalScene.currentBattle?.turn ?? "-"} wave=${globalScene.currentBattle?.waveIndex ?? "-"} counter=${runtime.controller.interactionCounter?.() ?? "-"} assertions=${getCoopChecksumAssertionCount()} wait=${localMs}ms peerBeat=${peerBeat ? `${Math.round((Date.now() - peerBeat.at) / 1000)}s` : "-"} lastRx=${formatLastRx(transport)} transport=${transport.state}`,
+          `tick=${coopSessionGeneration()}g turn=${globalScene.currentBattle?.turn ?? "-"} wave=${globalScene.currentBattle?.waveIndex ?? "-"} counter=${runtime.controller.interactionCounter?.() ?? "-"} assertions=${getCoopChecksumAssertionCount()} wait=${localMs}ms peerBeat=${peerBeat ? `${Math.round((Date.now() - peerBeat.at) / 1000)}s` : "-"} lastRx=${formatLastRx(transport)} transport=${transport.state} ${formatCoopDurabilityHealth(runtime, transport)}`,
         );
       }
       // #806 faint-replacement suppression: a live human choosing (or the host awaiting) a faint
@@ -972,6 +987,19 @@ function wireCoopDisconnectReaction(transport: CoopTransport, relay: CoopInterac
             } catch {
               /* purge must never break the resync path */
             }
+            // W2b (contract doc §4.4): reconnect-from-revision. AFTER the buffer purge (so no stale pre-drop
+            // frame races the authoritative tail), replay the durability journal tail: the committer resends
+            // its committed-but-UNACKED ops and the receiver requests the tail after its last-applied
+            // revision. This recovers a committed-but-unacked message the buffer purge would otherwise drop -
+            // the exact hole review finding 3 named. Same epoch (Step 0 validated: the runtime + its op ids
+            // survive a hot rejoin in place), so pre-drop operationIds stay valid and are de-duped, not
+            // double-applied. A no-op until Wave-2a commits ops, and the full-snapshot pull below remains the
+            // deep-gap fallback (§4.4).
+            try {
+              runtime.durability?.reconnect();
+            } catch {
+              /* durability reconnect is best-effort; the full-snapshot pull below is the fallback */
+            }
             const seq = COOP_REJOIN_SYNC_SEQ_BASE + (Date.now() % 100_000);
             coopLog("resync", `post-rejoin full resync request seq=${seq}`);
             const gen = coopSessionGeneration(); // #808
@@ -1174,6 +1202,14 @@ export interface CoopRuntime {
    * Resolves true when the channel is re-established within the grace window.
    */
   rejoinDriver?: () => Promise<boolean>;
+  /**
+   * W2b APPLICATION-LEVEL DURABILITY (contract doc §4): the journal + ACK/resend + reconnect-from-revision
+   * engine. Present when {@linkcode isCoopDurabilityEnabled} at assembly (flag-gated, §5). A passive
+   * scaffold until Wave-2a's envelope commit path calls into it (`commit`/`extractKey`), but its
+   * `reconnect()` is already wired into the #805 rejoin path and its depth/unacked feed the health line +
+   * control-plane block. Disposed with the runtime.
+   */
+  durability?: CoopDurabilityManager | undefined;
 }
 
 let active: CoopRuntime | null = null;
@@ -1208,6 +1244,60 @@ export function getCoopRuntime(): CoopRuntime | null {
 /** Convenience: the live session controller, or null when not in a co-op run. */
 export function getCoopController(): CoopSessionController | null {
   return active?.controller ?? null;
+}
+
+/**
+ * W2b (contract doc §4): the co-op CONTROL-PLANE snapshot persisted into `SessionSaveData`. Carries the
+ * interaction counter (so a COLD resume keeps alternating-owner parity + revision ordering CONTINUOUS
+ * instead of resetting to base 0 - a resume from an odd counter no longer flips ownership) and the
+ * durability journal high-water marks (so committed-op revisions continue monotonically across the save
+ * boundary). Optional on the save; absent for every solo / pre-W2b save (fully backward-compatible).
+ */
+export interface CoopControlPlaneSaveData {
+  /** The alternating-owner interaction counter at save time (§1.8). */
+  interactionCounter: number;
+  /** Per-class committed-op high-water marks at save time (§4.1); `{}` when nothing was committed. */
+  journalHighWater: Record<string, number>;
+}
+
+/**
+ * W2b: capture the live co-op control-plane snapshot for `getSessionSaveData()`, or `undefined` when there
+ * is no live co-op run (so a solo save carries no field). Additive + guarded - never throws into the save.
+ */
+export function getCoopControlPlaneSaveData(): CoopControlPlaneSaveData | undefined {
+  const runtime = active;
+  if (runtime == null) {
+    return;
+  }
+  try {
+    return {
+      interactionCounter: runtime.controller.interactionCounter(),
+      journalHighWater: runtime.durability?.highWaterMarks() ?? {},
+    };
+  } catch {
+    return; // the control-plane snapshot must never break the save path
+  }
+}
+
+/**
+ * W2b: restore a persisted control-plane snapshot onto the live co-op runtime on a COLD resume (§4). Tolerant
+ * of an absent field (older/solo save -> no-op, the prior base-0 behavior). A HOT rejoin never calls this
+ * (the runtime + its live counter survive in place - Step 0 validated).
+ */
+export function applyCoopControlPlaneSaveData(data: CoopControlPlaneSaveData | undefined): void {
+  if (data == null) {
+    return;
+  }
+  const runtime = active;
+  if (runtime == null) {
+    return;
+  }
+  try {
+    runtime.controller.restoreInteractionCounter(data.interactionCounter);
+    runtime.durability?.restore(data.journalHighWater ?? {}, {});
+  } catch {
+    /* control-plane restore is best-effort; a resume must never hard-fail on it */
+  }
 }
 
 /**
@@ -1926,6 +2016,10 @@ export function assembleCoopRuntime(
   const uiMirror = new CoopUiMirror(transport);
   const mePump = new CoopMePump(interactionRelay);
   const rendezvous = new CoopRendezvous(transport);
+  // W2b (§4/§5): the application-level durability engine, flag-gated. A passive scaffold today (Wave-2a's
+  // envelope commit path plugs its ops in later); its reconnect() is wired into the #805 rejoin below and
+  // its journal depth/unacked feed the health line. Absent when the flag is OFF (legacy behavior).
+  const durability = isCoopDurabilityEnabled() ? new CoopDurabilityManager(transport) : undefined;
   const runtime: CoopRuntime = {
     controller,
     battleSync,
@@ -1935,6 +2029,7 @@ export function assembleCoopRuntime(
     mePump,
     rendezvous,
     localTransport: transport,
+    durability,
   };
   wireCoopGhostPoolSync(controller, battleStream);
   wireCoopResyncResponder(controller, battleStream);
@@ -2073,6 +2168,7 @@ export function clearCoopRuntime(): void {
   active.uiMirror.dispose();
   active.mePump.endSession();
   active.rendezvous.dispose();
+  active.durability?.dispose();
   active.spoof?.dispose();
   active.showdownSpoof?.dispose();
   // Drop the persistent move-learn forward listener + its in-flight slot set (#633 BUG3+5) so a

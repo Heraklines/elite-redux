@@ -569,13 +569,24 @@ export class CoopSessionController {
     this.emit();
   }
 
-  // #833 dangler cleanup: `restoreInteractionCounter(counter)` was removed here. It was
-  // PRODUCTION-DEAD - the interaction counter is not carried in `SessionSaveData`, so a real resume
-  // never had a value to restore; it re-initializes the counter identically on both clients from the
-  // fresh runtime assembly (see `interactionCounter()` above + `docs/coop-structural-gaps.md` Part 3
-  // for the save/resume-mid-interaction limitation). Wiring it into resume would first require adding
-  // the counter to `SessionSaveData` (a schema change, not a local seam), so the dead method was
-  // dropped rather than left dangling.
+  /**
+   * W2b (contract doc §4): RESTORE the interaction counter from a persisted `SessionSaveData`. The
+   * #833-era `restoreInteractionCounter` was dropped as production-dead precisely because the counter was
+   * NOT carried in the save; W2b adds `coopControlPlane` to `SessionSaveData` (populated at save, read at
+   * load), so the seam now has a real value to restore. Restoring it keeps the alternating-owner PARITY and
+   * the revision ordering CONTINUOUS across a cold resume rather than resetting to 0 - a resume from an ODD
+   * counter no longer silently FLIPS ownership. Tolerant of an absent/invalid value (older saves -> base 0,
+   * the prior behavior). A HOT rejoin does not use this (the runtime + its live counter survive in place,
+   * validated in Step 0); this is the COLD-resume path only.
+   */
+  restoreInteractionCounter(counter: number): void {
+    if (!Number.isFinite(counter) || counter < 0) {
+      return; // older save / invalid -> keep the fresh base-0 counter (prior behavior)
+    }
+    this.interactionTurn.restore(counter);
+    coopLog("interaction", `restoreInteractionCounter(${counter}) (role=${this.role}, cold-resume)`);
+    this.emit();
+  }
 
   /**
    * HOST: publish the authoritative run config (ER difficulty + challenge set) so

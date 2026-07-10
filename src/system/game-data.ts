@@ -20,8 +20,10 @@ import { isShowdownGuestFlipGated } from "#data/elite-redux/coop/coop-authoritat
 import { coopWarn } from "#data/elite-redux/coop/coop-debug";
 import { recordCoopResumeMarker } from "#data/elite-redux/coop/coop-resume-marker";
 import {
+  applyCoopControlPlaneSaveData,
   clearCoopRuntime,
   coopBroadcastDexSync,
+  getCoopControlPlaneSaveData,
   getCoopRuntime,
   purgeCoopBufferedArrivals,
   startLocalCoopSession,
@@ -1423,6 +1425,10 @@ export class GameData {
       // ER Community Challenge: persist the allowed-species whitelist so the catch gate
       // survives a mid-run reload (it gates the whole run, not just starter-select).
       communityAllowedSpecies: getCommunityAllowedSpecies() ?? undefined,
+      // Co-op W2b (contract doc §4): persist the control-plane snapshot (interaction counter + journal
+      // high-water) so a cold resume keeps alternating-owner parity + revision ordering. undefined for
+      // every solo save (no live co-op runtime), so non-co-op saves are byte-identical.
+      coopControlPlane: getCoopControlPlaneSaveData(),
     } as SessionSaveData;
   }
 
@@ -1596,6 +1602,9 @@ export class GameData {
     // ER Community Challenge: restore the allowed-species whitelist so the catch gate
     // keeps working after a mid-run reload (null/absent for non-community saves).
     setCommunityAllowedSpecies(fromSession.communityAllowedSpecies ?? null);
+    // Co-op W2b (contract doc §4): restore the control-plane snapshot onto the live co-op runtime so a COLD
+    // resume keeps alternating-owner parity + revision ordering continuous (absent/solo save -> no-op).
+    applyCoopControlPlaneSaveData(fromSession.coopControlPlane);
 
     globalScene.setSeed(fromSession.seed || globalScene.game.config.seed[0]);
     globalScene.resetSeed();
