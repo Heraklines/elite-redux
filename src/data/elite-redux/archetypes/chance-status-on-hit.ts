@@ -190,6 +190,15 @@ export interface ChanceStatusOnHitOptions {
 export class ChanceStatusOnHitAbAttr extends PostDefendAbAttr {
   private readonly chance: number;
   private readonly effects: readonly StatusEffect[];
+  // Unified outcome pool ([...statuses, ...tags]) picked from under the single
+  // chance roll (mirrors the offensive ChanceStatusOnAttackAbAttr). `status`
+  // outcomes inflict a StatusEffect on the attacker; `tag` outcomes an ER
+  // battler tag (e.g. Crispy Cream "30% burn OR frostbite when hit by contact").
+  private readonly outcomes: readonly (
+    | { kind: "status"; value: StatusEffect }
+    | { kind: "tag"; value: BattlerTagType }
+  )[];
+  private readonly hasTagOutcomes: boolean;
   private readonly contactRequired: boolean;
   private readonly contactExcluded: boolean;
   private readonly filter: ChanceStatusFilter | undefined;
@@ -201,8 +210,9 @@ export class ChanceStatusOnHitAbAttr extends PostDefendAbAttr {
     if (!(opts.chance >= 0 && opts.chance <= 100)) {
       throw new Error(`[ChanceStatusOnHitAbAttr] chance must be in [0, 100]; got ${opts.chance}`);
     }
-    if (opts.effects.length === 0) {
-      throw new Error("[ChanceStatusOnHitAbAttr] must configure at least one status effect");
+    const tags = opts.tags ?? [];
+    if (opts.effects.length + tags.length === 0) {
+      throw new Error("[ChanceStatusOnHitAbAttr] must configure at least one status effect or tag");
     }
     if (opts.contactRequired === true && opts.contactExcluded === true) {
       throw new Error("[ChanceStatusOnHitAbAttr] contactRequired and contactExcluded are mutually exclusive");
@@ -210,6 +220,11 @@ export class ChanceStatusOnHitAbAttr extends PostDefendAbAttr {
     super();
     this.chance = opts.chance;
     this.effects = opts.effects;
+    this.outcomes = [
+      ...opts.effects.map(value => ({ kind: "status" as const, value })),
+      ...tags.map(value => ({ kind: "tag" as const, value })),
+    ];
+    this.hasTagOutcomes = tags.length > 0;
     // contactRequired defaults:
     //  - TRUE when no filter and not contactExcluded (vanilla shape)
     //  - FALSE when a filter is set (filter is the gate)
@@ -298,8 +313,11 @@ export class ChanceStatusOnHitAbAttr extends PostDefendAbAttr {
     if (this.filter !== undefined && !checkChanceStatusFilter(this.filter, move)) {
       return false;
     }
-    // Attacker must be alive and unstatused (existing status blocks new one).
-    if (attacker.status) {
+    // Attacker must be unstatused for a STATUS-only pool (existing status blocks
+    // a new one). When the pool also carries tag outcomes (Crispy Cream), don't
+    // short-circuit here — a tag (frostbite) can still land on an already-statused
+    // attacker; the per-outcome applicability check below handles it.
+    if (!this.hasTagOutcomes && attacker.status) {
       return false;
     }
     // Roll the proc — 100% always passes, 0% never does.
@@ -312,12 +330,15 @@ export class ChanceStatusOnHitAbAttr extends PostDefendAbAttr {
         return false;
       }
     }
-    // Pick a status (uniform random if multiple configured) and verify the
-    // attacker can actually receive it. The same effect index is recomputed
-    // in apply via the same RNG seed (pokerogue convention — apply gets the
-    // matching index because the seed advances deterministically per dispatch).
-    const effect = this.pickEffect(pokemon);
-    return attacker.canSetStatus(effect, true, false, pokemon);
+    // Pick an outcome (uniform random across the status+tag pool) and verify the
+    // attacker can actually receive it. The same index is recomputed in apply via
+    // the same RNG seed (pokerogue convention — apply gets the matching index
+    // because the seed advances deterministically per dispatch).
+    const outcome = this.pickOutcome(pokemon);
+    if (outcome.kind === "status") {
+      return attacker.canSetStatus(outcome.value, true, false, pokemon);
+    }
+    return !attacker.getTag(outcome.value);
   }
 
   /**
@@ -332,8 +353,12 @@ export class ChanceStatusOnHitAbAttr extends PostDefendAbAttr {
     if (params.simulated) {
       return;
     }
-    const effect = this.pickEffect(pokemon);
-    attacker.trySetStatus(effect, pokemon);
+    const outcome = this.pickOutcome(pokemon);
+    if (outcome.kind === "status") {
+      attacker.trySetStatus(outcome.value, pokemon);
+    } else {
+      attacker.addTag(outcome.value, 0, undefined, pokemon.id);
+    }
   }
 
   /**
@@ -348,11 +373,13 @@ export class ChanceStatusOnHitAbAttr extends PostDefendAbAttr {
    * We mirror that order-of-operations exactly so the determinism story is
    * the same as Effect Spore et al.
    */
-  private pickEffect(pokemon: Parameters<PostDefendAbAttr["apply"]>[0]["pokemon"]): StatusEffect {
-    if (this.effects.length === 1) {
-      return this.effects[0];
+  private pickOutcome(
+    pokemon: Parameters<PostDefendAbAttr["apply"]>[0]["pokemon"],
+  ): { kind: "status"; value: StatusEffect } | { kind: "tag"; value: BattlerTagType } {
+    if (this.outcomes.length === 1) {
+      return this.outcomes[0];
     }
-    return this.effects[pokemon.randBattleSeedInt(this.effects.length)];
+    return this.outcomes[pokemon.randBattleSeedInt(this.outcomes.length)];
   }
 }
 

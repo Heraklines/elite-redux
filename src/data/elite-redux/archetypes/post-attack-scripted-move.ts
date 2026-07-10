@@ -55,6 +55,12 @@ export interface PostAttackScriptedMoveOptions {
    */
   readonly flagFilter?: MoveFlags;
   readonly magnitudeRange?: readonly [min: number, max: number];
+  /**
+   * When set, replace the scripted move's hardcoded-150 HpPowerAttr (Eruption)
+   * with an HP-ratio scaling from this base. Used by Volcano Rage's "50 BP
+   * Eruption follow-up that scales with the user's HP".
+   */
+  readonly hpScaledBasePower?: number;
 }
 
 export class PostAttackScriptedMoveAbAttr extends PostAttackAbAttr {
@@ -162,7 +168,10 @@ export class PostAttackScriptedMoveAbAttr extends PostAttackAbAttr {
       "MovePhase",
       pokemon,
       followUpTargets,
-      scriptedPokemonMove(this.opts.moveId, this.opts.power, { magnitudeRange: this.opts.magnitudeRange }),
+      scriptedPokemonMove(this.opts.moveId, this.opts.power, {
+        ...(this.opts.magnitudeRange === undefined ? {} : { magnitudeRange: this.opts.magnitudeRange }),
+        ...(this.opts.hpScaledBasePower === undefined ? {} : { hpScaledBasePower: this.opts.hpScaledBasePower }),
+      }),
       MoveUseMode.INDIRECT,
       MovePhaseTimingModifier.FIRST,
     );

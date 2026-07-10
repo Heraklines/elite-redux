@@ -5291,6 +5291,22 @@ export class HpPowerAttr extends VariablePowerAttr {
 }
 
 /**
+ * Elite Redux — base-configurable variant of {@linkcode HpPowerAttr}: power
+ * scales with the user's HP ratio from a configurable base (vanilla Eruption's
+ * HpPowerAttr hardcodes 150). Used by Volcano Rage's 50-BP Eruption follow-up.
+ */
+export class ScaledHpPowerAttr extends VariablePowerAttr {
+  constructor(private readonly baseAtFullHp: number) {
+    super();
+  }
+
+  apply(user: Pokemon, _target: Pokemon, _move: Move, args: any[]): boolean {
+    (args[0] as NumberHolder).value = toDmgValue(this.baseAtFullHp * user.getHpRatio());
+    return true;
+  }
+}
+
+/**
  * Attribute used for moves whose base power scales with the opponent's HP
  * Used for Crush Grip, Wring Out, and Hard Press
  * maxBasePower 100 for Hard Press, 120 for others
@@ -5885,6 +5901,18 @@ export class VariableDefAttr extends MoveAttr {
 export class DefDefAttr extends VariableDefAttr {
   apply(user: Pokemon, target: Pokemon, _move: Move, args: any[]): boolean {
     (args[0] as NumberHolder).value = target.getEffectiveStat(Stat.DEF, user);
+    return true;
+  }
+}
+
+/**
+ * Elite Redux — mirror of {@linkcode DefDefAttr} (Psyshock): a move damages
+ * against the target's Special Defense regardless of the move's category. Used
+ * by physical-category ER moves whose dex says "Hits SpDef" (Fairy Spheres).
+ */
+export class SpDefDefAttr extends VariableDefAttr {
+  apply(user: Pokemon, target: Pokemon, _move: Move, args: any[]): boolean {
+    (args[0] as NumberHolder).value = target.getEffectiveStat(Stat.SPDEF, user);
     return true;
   }
 }
@@ -10032,6 +10060,7 @@ const MoveAttrs = Object.freeze({
   LowHpPowerAttr,
   CompareWeightPowerAttr,
   HpPowerAttr,
+  ScaledHpPowerAttr,
   OpponentHighHpPowerAttr,
   TurnDamagedDoublePowerAttr,
   MagnitudePowerAttr,
@@ -10057,6 +10086,7 @@ const MoveAttrs = Object.freeze({
   DefAtkAttr,
   VariableDefAttr,
   DefDefAttr,
+  SpDefDefAttr,
   VariableAccuracyAttr,
   ThunderAccuracyAttr,
   StormAccuracyAttr,

@@ -3862,12 +3862,15 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
         new BlockWeatherDamageAttr(WeatherType.HAIL, WeatherType.SNOW),
       ]);
     case 382:
-      // Volcano Rage — "Triggers 50 BP Eruption after using a Fire-type move."
-      // Post-attack scripted Eruption follow-up, gated to FIRE-type triggers.
+      // Volcano Rage — "After using any Fire move, triggers a followup Eruption
+      // with 50 base power that scales with the user's current HP (50 BP at full
+      // health)." Eruption's HpPowerAttr hardcodes 150-BP-at-full scaling, and a
+      // plain `power` override is ignored by it — so swap in a 50-BP HP-scaling
+      // attr via hpScaledBasePower (was firing at 150 BP, 3x too strong).
       return ok([
         new PostAttackScriptedMoveAbAttr({
           moveId: MoveId.ERUPTION,
-          power: 50,
+          hpScaledBasePower: 50,
           typeFilter: [PokemonType.FIRE],
         }),
       ]);
@@ -6771,21 +6774,17 @@ function dispatchBespokeR48(erAbilityId: number): DispatchResult | null {
         new FlagDamageBoostAbAttr({ flag: MoveFlags.SLICING_MOVE, multiplier: 1.3 }),
       ]);
     case 892:
-      // Crispy Cream — "30% to inflict burn/frostbite when hit by contact."
-      // Audit-fix: the prior wire stacked two independent 30% procs that
-      // could BOTH land on a single hit (combined ~51%). Drop both to
-      // 15% so the joint probability ≈ 28% — closer to the spec's 30%
-      // intent (one of two outcomes, not both).
+      // Crispy Cream — "30% to inflict burn OR frostbite when hit by contact."
+      // ONE 30% roll on a contact hit that then picks a SINGLE outcome from
+      // {burn (status), ER_FROSTBITE (tag)} — pooled under the single roll, NOT
+      // two independent rolls (the prior 15%+15% approximation could still land
+      // both, and understated the 30% intent).
       return ok([
         new ChanceStatusOnHitAbAttr({
-          chance: 15,
+          chance: 30,
+          contactRequired: true,
           effects: [StatusEffect.BURN],
-          contactRequired: true,
-        }),
-        new ChanceBattlerTagOnHitAbAttr({
-          chance: 15,
           tags: [BattlerTagType.ER_FROSTBITE],
-          contactRequired: true,
         }),
       ]);
     // -------------------------------------------------------------------------

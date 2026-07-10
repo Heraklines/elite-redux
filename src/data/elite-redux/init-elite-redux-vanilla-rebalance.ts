@@ -952,12 +952,25 @@ const ABILITY_PATCHERS: ReadonlyMap<AbilityId, (ability: MutableAbility) => void
   ],
 
   // ===== Round 8: more ER-specific deltas =====
-  // 57 PLUS / 58 MINUS: vanilla +50% SpAtk if ally has Plus/Minus. ER
-  // "Deals double damage" — close to vanilla's effect; we mutate the
-  // baseline AllyStatMultiplier to 2.0 from 1.5 (functionally doubles
-  // outgoing damage when ally is present).
-  [AbilityId.PLUS, ab => mutateStatMultiplier(ab, Stat.SPATK, 2.0)],
-  [AbilityId.MINUS, ab => mutateStatMultiplier(ab, Stat.SPATK, 2.0)],
+  // 57 PLUS / 58 MINUS: ER "Doubles the damage this Pokemon deals, if and only if
+  // a Pokemon with the COMPLEMENTARY ability is on the field (Plus needs a Minus,
+  // Minus needs a Plus)." This is general OUTGOING damage (physical AND special),
+  // not the vanilla SpAtk-only +50% stat boost. Drop the vanilla conditional
+  // StatMultiplier and add a x2 move-power boost gated on a complementary ally.
+  [
+    AbilityId.PLUS,
+    ab => {
+      ab.attrs = ab.attrs.filter(a => !(a instanceof StatMultiplierAbAttr));
+      ab.attrs.push(new MovePowerBoostAbAttr(user => user.getAllies().some(a => a.hasAbility(AbilityId.MINUS)), 2));
+    },
+  ],
+  [
+    AbilityId.MINUS,
+    ab => {
+      ab.attrs = ab.attrs.filter(a => !(a instanceof StatMultiplierAbAttr));
+      ab.attrs.push(new MovePowerBoostAbAttr(user => user.getAllies().some(a => a.hasAbility(AbilityId.PLUS)), 2));
+    },
+  ],
 
   // 73 WHITE_SMOKE: vanilla "stat-drop immunity". ER COMPLETELY DIFFERENT
   // — "Sets Smokescreen for 3 turns on switch-in; Smokescreen raises the party's

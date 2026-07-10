@@ -32,7 +32,14 @@ import { PokemonMove } from "#data/moves/pokemon-move";
 import { MoveFlags } from "#enums/move-flags";
 import type { MoveId } from "#enums/move-id";
 import type { Pokemon } from "#field/pokemon";
-import { MagnitudePowerAttr, type Move, PreMoveMessageAttr, RechargeAttr } from "#moves/move";
+import {
+  HpPowerAttr,
+  MagnitudePowerAttr,
+  type Move,
+  PreMoveMessageAttr,
+  RechargeAttr,
+  ScaledHpPowerAttr,
+} from "#moves/move";
 import { randSeedIntRange } from "#utils/common";
 import type { NumberHolder } from "#utils/value-holder";
 import i18next from "i18next";
@@ -48,6 +55,13 @@ export interface ScriptedMoveOptions {
    * allowing normal actions next turn"). No-op for moves with no recharge.
    */
   readonly noRecharge?: boolean;
+  /**
+   * When set, replace the cloned move's {@linkcode HpPowerAttr} (vanilla's
+   * hardcoded 150-BP-at-full-HP scaling, used by Eruption) with a
+   * {@linkcode ScaledHpPowerAttr} whose base at full HP is this value. Used by
+   * Volcano Rage's "50 BP Eruption follow-up that scales with HP".
+   */
+  readonly hpScaledBasePower?: number;
   /**
    * Strip {@linkcode MoveFlags.REFLECTABLE} from the scripted cast so it is NOT
    * bounced back by Magic Bounce / Magic Coat onto the caster. Used by
@@ -95,6 +109,7 @@ class PowerOverriddenPokemonMove extends PokemonMove {
   private readonly magnitudeRange: readonly [min: number, max: number] | undefined;
   private readonly noRecharge: boolean;
   private readonly nonReflectable: boolean;
+  private readonly hpScaledBasePower: number | undefined;
   private cached: Move | undefined;
 
   constructor(moveId: MoveId, power: number | undefined, opts: ScriptedMoveOptions) {
@@ -104,6 +119,7 @@ class PowerOverriddenPokemonMove extends PokemonMove {
     this.bypassFirstMoveCondition = opts.bypassFirstMoveCondition ?? false;
     this.magnitudeRange = opts.magnitudeRange;
     this.noRecharge = opts.noRecharge ?? false;
+    this.hpScaledBasePower = opts.hpScaledBasePower;
     this.nonReflectable = opts.nonReflectable ?? false;
   }
 
@@ -133,6 +149,12 @@ class PowerOverriddenPokemonMove extends PokemonMove {
         // Drop the recharge so the scripted cast doesn't lock the holder next turn.
         // A NEW array on the clone — the registered move's shared attrs are untouched.
         clone.attrs = clone.attrs.filter(attr => !(attr instanceof RechargeAttr));
+      }
+      if (this.hpScaledBasePower !== undefined) {
+        // Swap the move's hardcoded-150 HpPowerAttr for a base-configurable one
+        // (Volcano Rage's 50-BP Eruption). New array — shared attrs untouched.
+        const base = this.hpScaledBasePower;
+        clone.attrs = clone.attrs.map(attr => (attr instanceof HpPowerAttr ? new ScaledHpPowerAttr(base) : attr));
       }
       if (this.nonReflectable) {
         // Clear the REFLECTABLE bit on the clone's own `flags` number (copied by

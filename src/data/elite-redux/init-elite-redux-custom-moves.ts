@@ -82,6 +82,7 @@ import {
   ResetStatsAttr,
   SelfStatusMove,
   SemiInvulnerableAttr,
+  SpDefDefAttr,
   StatStageChangeAttr,
   StatusEffectAttr,
   StatusMove,
@@ -806,7 +807,12 @@ function applyErMoveBespokeRiders(move: Move, erId: number): void {
       move.attr(LeechSeedAttr);
       break;
     // ---- Multi-hit (2–5) ----
-    case 790: // Fairy Spheres
+    case 790: // Fairy Spheres — 2–5 hits AND hits the target's Special Defense
+      // (split 6 = HITS_SPDEF; a physical-category move damaging vs SpDef, the
+      // move-side mirror of Psyshock).
+      move.attr(MultiHitAttr);
+      move.attr(SpDefDefAttr);
+      break;
     case 845: // Blazing Bone (fiery bone ×2–5; +1 priority is move data)
     case 947: // Toxic Needles (already has poison status)
     case 952: // Relentless Clobber
