@@ -66,6 +66,11 @@ class ChannelGate implements CoopTransport {
   }
 }
 
+/** A synthetic durable wave op keyed `(cls="wave", seq=wave)`. */
+function waveMsg(wave: number): CoopMessage {
+  return { t: "waveResolved", wave, outcome: "win" };
+}
+
 /** A recording receiver over a wave class - records every wave it NEWLY applies. */
 function recordingWaveHooks(applied: number[], outcome: () => CoopApplyOutcome = () => "applied"): CoopDurabilityHooks {
   return {
@@ -166,6 +171,44 @@ describe("W2e-R2 durability recovery completeness: guest-only reconnect + snapsh
     expect(hostMgr.unackedCount(), "the snapshot ACK caught the committer up to head -> nothing left to resend").toBe(
       0,
     );
+    hostMgr.dispose();
+    guestMgr.dispose();
+  });
+
+  // ===========================================================================================
+  // I3 - OVERFLOW RESYNC: when the bounded journal ring has EVICTED the ops the receiver is missing (the
+  // peer was gone long enough), a reconnect must DETECT the gap (the ring's oldest retained is past the
+  // receiver's acked position) and ESCALATE to a full-state resync - never silently resend an unusable
+  // partial tail that the receiver cannot apply (a gap at the evicted ops).
+  // EXPECTED RED (current code): the coopResyncAll path (resendUnackedTail) blindly resends the retained
+  // tail with NO deep-gap check, so an overflowed class gets an unusable partial tail and no escalation.
+  // ===========================================================================================
+  it.fails("I3: [RED] coopResyncAll on an overflowed class resends an unusable partial tail instead of escalating to a full snapshot", async () => {
+    const pair = createLoopbackPair();
+    const hostGate = new ChannelGate(pair.host);
+    const snapshots: number[] = [];
+    // Ring capacity 3: after 6 commits it retains 4,5,6 and EVICTS 1,2,3.
+    const hostMgr = new CoopDurabilityManager(hostGate, { sendFullSnapshot: (_cls, head) => snapshots.push(head) }, 3);
+    const guestMgr = new CoopDurabilityManager(pair.guest);
+
+    for (let w = 1; w <= 6; w++) {
+      hostMgr.commit("wave", w, waveMsg(w));
+    }
+    await flush();
+    hostGate.sentTypes.length = 0; // ignore the original commit broadcasts
+    snapshots.length = 0;
+
+    // The peer reconnected having ACKed nothing (acked=0). The ring's oldest retained (4) is past acked+1
+    // (=1), so the retained tail (4,5,6) is UNUSABLE (a gap at 1,2,3). coopResyncAll must escalate to a
+    // full snapshot rather than resend the unusable tail.
+    pair.guest.send({ t: "coopResyncAll" });
+    await flush();
+
+    expect(snapshots, "an overflowed deep gap must escalate to a full snapshot on coopResyncAll").toEqual([6]);
+    expect(
+      hostGate.sentTypes.filter(t => t === "waveResolved"),
+      "the unusable partial tail must NOT be resent for an overflowed class",
+    ).toEqual([]);
     hostMgr.dispose();
     guestMgr.dispose();
   });
