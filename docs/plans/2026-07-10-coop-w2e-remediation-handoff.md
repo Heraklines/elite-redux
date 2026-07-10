@@ -132,8 +132,10 @@ surface tests run; the full four-lane gate and final long soak have **not** yet 
 |---|---|---|---|
 | Biome travel / crossroads | `5d14d7296` | `c0bad7aeb` | `coop-duo-biome-operation.test.ts`: `DURABILITY: dropping only biomePick still materializes the committed op through the real guest travel path` (2/2 file green). The journal and relay now share one `CoopOperationGuest`; the production sink feeds the receiver's real biome/crossroads relay safe path. |
 | Reward + biome market | `fe8c5d60f` | `17db58d40` | `coop-duo-reward-operation.test.ts`: dropped reward relay still applies the committed party-target action/sub-pick (5/5 file green). `coop-duo-biome-market-continuation.test.ts`: dropped `biomeShop` buy + leave relays materialize the two-operation ordinal stream, money/party target, continuation pin, and terminal (2/2 file green). |
+| Mystery encounter | `8dc29c648`, `e7c4c9adc`, `a0c806100`, `fbf9830f8` | `b37467df9`, `f39eaa677`, `4d1267563`, `771fecbb4` | `coop-duo-me-operation.test.ts`: dropping the legacy 9M terminal or top-level `mePresent` still settles the real replay phase and adopts the host presentation (7/7 file green). Ordered top-level/repeated/subprompt presentations carry their complete host-rendered payload; raw and journal outcome carriers dedupe whichever order wins. Catch-full and yes/no helpers commit accepted guest `ME_SUB` proposals at the authority (`coop-me-catch-full-subprompt` 7/7; sibling channel/durability batch 14/14). The journal and live watcher now share one ME operation ledger. |
 
 Shared regression evidence for these commits: `coop-interaction-relay`, `coop-interaction-kind-validation`,
 `coop-operation-durability-remediation`, and `coop-operation-durability-convergence` = 29/29 green;
-`tsc --noEmit` produced zero errors in touched files. Residual: mystery-encounter live materialization and
-ledger unification is next; all later work items in section 6 remain open.
+`tsc --noEmit` produced zero errors in touched files. Mystery-specific regression batches added 7/7 duo,
+24/24 relay/durability, 7/7 catch-full, and 14/14 sibling channel/durability passes. The full four-lane gate
+and final long soak remain intentionally unclaimed. Next is #899; all later work items in section 6 remain open.
