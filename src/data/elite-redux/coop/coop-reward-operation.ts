@@ -224,9 +224,13 @@ export function resetCoopRewardOperationState(): void {
  * host + guests so the producer continues at floor+1 and the guests accept it. No-op for a fresh session.
  */
 export function setCoopRewardOperationRevisionFloor(hw: number): void {
-  // NEUTRALIZED for the failure-first RED commit: the producer still restarts at revision 0 on resume.
-  void hw;
-  void revisionFloor;
+  if (!Number.isFinite(hw) || hw <= 0 || hw === revisionFloor) {
+    return;
+  }
+  revisionFloor = hw;
+  authorityHost = null;
+  watchGuest = null;
+  journalWatchGuest = null;
 }
 
 // -----------------------------------------------------------------------------

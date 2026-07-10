@@ -614,10 +614,33 @@ export class CoopDurabilityManager {
       this.transport.send({ t: "coopResync", cls, from: this.ledger.appliedThrough(cls) });
       return;
     }
-    // In order: apply, advance, ACK cumulatively.
-    this.hooks.apply?.({ cls, seq, msg });
+    // In order: apply, then GATE the ACK + ledger advance on the apply OUTCOME (W2e-R P0-1). Before, a void
+    // apply was ALWAYS followed by markApplied + coopAck, so a receiver could claim an op applied while its
+    // applier did NOTHING (a rejected apply, or a thrown one - which previously escaped uncaught). Now:
+    //  - `applied`/`duplicate` (or a legacy `void` return) -> ACK + advance (a duplicate ACKs too, so a
+    //    cross-carrier / resend re-delivery of an already-consumed op can never spin the committer forever);
+    //  - `rejected` (or a thrown apply) -> do NOT ACK, do NOT advance: the op stays retriable (a later
+    //    resend / reconnect tail re-delivers it), which is the honest close of the ACK-without-mutation P0.
+    const outcome = this.safeApply({ cls, seq, msg });
+    if (outcome === "rejected") {
+      coopWarn("durability", `apply REJECTED cls=${cls} seq=${seq} -> no ack (retriable)`);
+      return;
+    }
     this.ledger.markApplied(cls, seq);
     this.transport.send({ t: "coopAck", cls, seq });
+  }
+
+  /** Run the apply hook, mapping a `void` return to `applied` (back-compat) and a THROW to `rejected` (retriable). */
+  private safeApply(entry: CoopJournalEntry): CoopApplyOutcome {
+    if (this.hooks.apply == null) {
+      return "applied"; // no receiver wired: the manager's own ledger advance is the only bookkeeping.
+    }
+    try {
+      return this.hooks.apply(entry) ?? "applied";
+    } catch (e) {
+      coopWarn("durability", `apply THREW cls=${entry.cls} seq=${entry.seq} (handled - retriable)`, e);
+      return "rejected";
+    }
   }
 
   /** Committer: serve a peer's reconnect request - replay the journal tail after `from`, or a full snapshot. */

@@ -43,6 +43,8 @@ import type { CoopBiomePickPayload } from "#data/elite-redux/coop/coop-operation
 import {
   coopOperationDurabilityHooks,
   getCoopOperationJournalApplied,
+  getCoopOperationLiveSinkInvoked,
+  registerCoopOperationLiveSink,
   resetCoopOperationJournalLog,
   setCoopOperationDurability,
 } from "#data/elite-redux/coop/coop-operation-journal";
@@ -102,7 +104,17 @@ const BESPOKE_SELFHEAL_TYPES = new Set([
   "rendezvous",
 ]);
 
-/** The biomeIds NEWLY applied via the journal on this client (proof observability), in order. */
+/**
+ * The biomeIds the journal carrier ROUTED INTO the live-mutation seam on this client, in order (W2e-R). This
+ * is the LIVE-STATE proxy the reviewer's core point demands: it proves the journal carrier drives the ONE
+ * mutation seam (the production biome materializer - pushing SwitchBiomePhase on the guest - is the parked
+ * keystone; the engine-free proof registers a recording sink), NOT merely that a sidecar history log grew.
+ */
+function liveBiomes(): number[] {
+  return getCoopOperationLiveSinkInvoked().map(e => (e.pendingOperation?.payload as CoopBiomePickPayload).biomeId);
+}
+
+/** SECONDARY (journal history): the biomeIds recorded in the receiver's idempotency ledger, in order. */
 function appliedBiomes(): number[] {
   return getCoopOperationJournalApplied().map(e => (e.pendingOperation?.payload as CoopBiomePickPayload).biomeId);
 }
@@ -122,11 +134,16 @@ describe("Wave-2e operation<->durability convergence: a cut committed op is repa
     setCoopBiomeOperationEnabled(true);
     resetCoopBiomeOperationState();
     resetCoopOperationJournalLog();
+    // W2e-R: register a recording LIVE-MUTATION sink so the convergence proof asserts LIVE STATE (the op
+    // reached the mutation seam), not just that the sidecar journal history grew (the reviewer's core point).
+    // A real materializer pushes SwitchBiomePhase on the guest (the parked keystone); the mock returns true.
+    registerCoopOperationLiveSink("op:biome", () => true);
     setCoopOperationDurability(null);
   });
 
   afterEach(() => {
     setCoopOperationDurability(null);
+    registerCoopOperationLiveSink("op:biome", null);
     resetCoopOperationJournalLog();
     resetCoopBiomeOperationState();
     resetCoopBiomeOperationFlag();
@@ -175,7 +192,10 @@ describe("Wave-2e operation<->durability convergence: a cut committed op is repa
     hostGate.cut = false;
     commitHostOwnedBiome(8, 13);
     await flush();
-    expect(appliedBiomes()).toEqual([10, 11, 12, 13]);
+    expect(liveBiomes(), "LIVE STATE: the cut op reached the mutation seam via the journal tail").toEqual([
+      10, 11, 12, 13,
+    ]);
+    expect(appliedBiomes(), "(secondary) journal history converged").toEqual([10, 11, 12, 13]);
 
     assertNoSelfHeal(hostGate, guestGate);
     expect(guestGate.sentTypes).toContain("coopResync"); // the generic tail request WAS the mechanism
@@ -209,7 +229,10 @@ describe("Wave-2e operation<->durability convergence: a cut committed op is repa
     hostMgr.reconnect();
     guestMgr.reconnect();
     await flush();
-    expect(appliedBiomes()).toEqual([20, 21]);
+    expect(liveBiomes(), "LIVE STATE: the committed-but-unacked op reached the mutation seam on reconnect").toEqual([
+      20, 21,
+    ]);
+    expect(appliedBiomes(), "(secondary) journal history converged").toEqual([20, 21]);
 
     assertNoSelfHeal(hostGate, guestGate);
     hostMgr.dispose();
@@ -253,7 +276,8 @@ describe("Wave-2e operation<->durability convergence: a cut committed op is repa
     hostMgr.reconnect();
     guestMgr.reconnect();
     await flush();
-    expect(appliedBiomes(), "the guest-minted op's committed envelope arrived via the journal").toEqual([30]);
+    expect(liveBiomes(), "LIVE STATE: the guest-minted op reached the mutation seam via the journal").toEqual([30]);
+    expect(appliedBiomes(), "(secondary) the committed envelope arrived via the journal").toEqual([30]);
 
     assertNoSelfHeal(hostGate, guestGate);
     hostMgr.dispose();
@@ -288,11 +312,13 @@ describe("Wave-2e operation<->durability convergence: a cut committed op is repa
       hostMgr.reconnect();
       guestMgr.reconnect();
       await flush();
-      if (appliedBiomes().length === N) {
+      if (liveBiomes().length === N) {
         break;
       }
     }
-    expect(appliedBiomes()).toEqual(Array.from({ length: N }, (_, i) => 100 + i));
+    const expected = Array.from({ length: N }, (_, i) => 100 + i);
+    expect(liveBiomes(), "LIVE STATE: every dropped op eventually reached the mutation seam").toEqual(expected);
+    expect(appliedBiomes(), "(secondary) journal history converged").toEqual(expected);
     hostMgr.dispose();
     guestMgr.dispose();
   });
@@ -308,6 +334,7 @@ describe("Wave-2e operation<->durability convergence: a cut committed op is repa
     commitHostOwnedBiome(2, 40);
     await flush();
     expect(hostGate.sentTypes).not.toContain("envelope");
+    expect(liveBiomes(), "LIVE STATE: nothing reached the mutation seam (durability OFF)").toEqual([]);
     expect(appliedBiomes()).toEqual([]);
     guestMgr.dispose();
 
@@ -322,6 +349,7 @@ describe("Wave-2e operation<->durability convergence: a cut committed op is repa
     commitHostOwnedBiome(2, 41);
     await flush();
     expect(hostGate2.sentTypes).not.toContain("envelope");
+    expect(liveBiomes(), "LIVE STATE: nothing reached the mutation seam (surface flag OFF)").toEqual([]);
     expect(appliedBiomes()).toEqual([]);
     hostMgr2.dispose();
     guestMgr2.dispose();

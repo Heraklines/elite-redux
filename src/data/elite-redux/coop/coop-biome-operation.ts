@@ -192,9 +192,14 @@ export function resetCoopBiomeOperationState(): void {
  * A no-op for a fresh session (floor 0). Idempotent for the same value.
  */
 export function setCoopBiomeOperationRevisionFloor(hw: number): void {
-  // NEUTRALIZED for the failure-first RED commit: the producer still restarts at revision 0 on resume.
-  void hw;
-  void revisionFloor;
+  if (!Number.isFinite(hw) || hw <= 0 || hw === revisionFloor) {
+    return;
+  }
+  revisionFloor = hw;
+  // Recreate the host + guests so the new floor takes effect on next use (they were created at the old floor).
+  authorityHost = null;
+  watchGuest = null;
+  journalWatchGuest = null;
 }
 
 // -----------------------------------------------------------------------------

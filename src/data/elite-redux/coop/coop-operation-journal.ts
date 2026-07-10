@@ -183,11 +183,17 @@ export function registerCoopOperationLiveSink(cls: string, sink: CoopOperationLi
  * Never throws (a sink failure must not withhold the ACK - durable delivery is a receiver-ledger fact).
  */
 export function routeCoopOperationToLiveSink(cls: string, envelope: CoopAuthoritativeEnvelopeV1): boolean {
-  // NEUTRALIZED for the failure-first RED commit: the journal carrier does NOT yet route into the live seam
-  // (it only records sidecar history), so a journal-delivered op mutates nothing. Wired in the remediation commit.
-  void cls;
-  void envelope;
-  return false;
+  liveSinkInvoked.push(envelope);
+  const sink = liveSinks.get(cls);
+  if (sink == null) {
+    return false;
+  }
+  try {
+    return sink(envelope);
+  } catch {
+    // A live-mutation failure is a DATA-plane concern; it must never withhold the durable-delivery ACK.
+    return false;
+  }
 }
 
 /**
