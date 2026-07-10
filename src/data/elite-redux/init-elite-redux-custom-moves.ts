@@ -689,7 +689,9 @@ function applyErMoveBespokeRiders(move: Move, erId: number): void {
     // ---- High critical-hit ratio ----
     case 772: // Pixie Slash
     case 773: // Seismic Blade
+    case 799: // Venom Bolt — "+1 crit" (20% poison from its chance-status row)
     case 803: // Blazing Arrow — +1 crit stage (dex "+1 crit chance"); 20% burn from its chance-status row
+    case 804: // Rocket Shot — "+1 crit rate" (Mega Launcher from its flag row)
     case 995: // Berserker Horn
       move.attr(HighCritAttr);
       break;

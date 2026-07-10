@@ -1245,21 +1245,10 @@ const ABILITY_PATCHERS: ReadonlyMap<AbilityId, (ability: MutableAbility) => void
     },
   ],
 
-  // 204 LIQUID_VOICE: vanilla converts Normal sound moves → Water.
-  // ER adds a 1.2x boost on sound moves.
-  [
-    AbilityId.LIQUID_VOICE,
-    ab => {
-      // doesFlagEffectApply (user-aware) so ER Festivities' dance->sound moves
-      // also get this boost.
-      ab.attrs.push(
-        new MovePowerBoostAbAttr(
-          (user, _t, move) => !!move && move.doesFlagEffectApply({ flag: MoveFlags.SOUND_BASED, user }),
-          1.2,
-        ),
-      );
-    },
-  ],
+  // 204 LIQUID_VOICE: the Normal-sound->Water conversion AND the 1.2x sound-move
+  // boost are BOTH already wired in init-abilities.ts (with the same user-aware
+  // SOUND_BASED check, so ER Festivities' dance->sound moves are covered). A rider
+  // here re-pushed a SECOND 1.2x, stacking to 1.44x — removed.
 
   // ===== Round 11: TypeImmunity-with-highest-Atk rewrites =====
   // Vanilla Lightning Rod / Storm Drain / Sap Sipper redirect their type
@@ -2521,15 +2510,6 @@ function rewriteStall(ability: MutableAbility): void {
       return !(td?.acted ?? false);
     }, 0.7),
   );
-}
-
-/**
- * Strip the WeightMultiplierAbAttr (or equivalent) from HEAVY_METAL. R1
- * already ADDED the Ghost/Dark damage reductions; we just need to remove
- * the weight-doubling effect since ER replaces it entirely.
- */
-function stripWeightMultiplier(ability: MutableAbility): void {
-  ability.attrs = ability.attrs.filter(a => a.constructor.name !== "WeightMultiplierAbAttr");
 }
 
 /**

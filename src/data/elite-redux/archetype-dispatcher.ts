@@ -4418,12 +4418,14 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
       // Partial wire.
       return ok([new FlagDamageBoostAbAttr({ flag: MoveFlags.HAMMER_BASED, multiplier: 1.1 })]);
     case 655:
-      // Smokey Maneuvers — "Evasion is boosted by 1.25x in fog." Uses the
-      // weather-stat-multiplier primitive with Stat.EVA.
+      // Smokey Maneuvers — "In fog, incoming moves targeting the holder have
+      // their accuracy reduced by 25%." Evasion divides the hit chance, so an EVA
+      // multiplier of 4/3 yields hit chance x0.75 (=-25% accuracy). (A 1.25x EVA
+      // only nets x0.80 = -20%, which understated the dex.)
       return ok([
         new WeatherStatMultiplierAbAttr({
           stat: Stat.EVA,
-          multiplier: 1.25,
+          multiplier: 4 / 3,
           weathers: [WeatherType.FOG],
         }),
       ]);
@@ -5444,20 +5446,23 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
         new DamageReductionAbAttr({ reduction: 0.5, filter: { kind: "move-type", type: PokemonType.GRASS } }),
       ]);
     case 342: {
-      // Seaweed — "Takes 1/2 dmg from Fire if Grass. Grass deals x2 dmg to
-      // Fire." Defensive 0.5 from Fire + offensive 2x vs Fire, BOTH gated on the
-      // holder currently being Grass-type (the "if Grass" predicate). isOfType
-      // honours Tera/typed-override defaults, so a holder that loses Grass loses
-      // the modifiers too.
-      const seaweedAttrs = buildTypeEffectivenessModAttrs({
-        type: PokemonType.FIRE,
-        offensiveMultiplier: 2.0,
-        defensiveMultiplier: 0.5,
-      });
-      for (const attr of seaweedAttrs) {
-        attr.addCondition(holder => holder.isOfType(PokemonType.GRASS));
-      }
-      return ok(seaweedAttrs);
+      // Seaweed — "IF the holder is Grass-type: takes 1/2 damage from Fire-type
+      // ATTACKS (moves), AND deals 2x damage to Fire-type POKEMON with its GRASS
+      // moves." Both gated on the holder being Grass (the "if Grass" predicate).
+      // The defensive half is correctly move-type-keyed (Fire moves). The
+      // offensive half must gate on BOTH the target being Fire-type AND the move
+      // being Grass-type — the shared OffensiveTypeMultiplier only checked the
+      // target's type, so it wrongly doubled a Grass holder's Earthquake vs Fire.
+      const grassGate = (holder: Pokemon) => holder.isOfType(PokemonType.GRASS);
+      const offensive = new MovePowerBoostAbAttr(
+        (user, target, move) =>
+          !!target && target.isOfType(PokemonType.FIRE) && user.getMoveType(move) === PokemonType.GRASS,
+        2.0,
+      );
+      const defensive = new ReceivedTypeDamageMultiplierAbAttr(PokemonType.FIRE, 0.5);
+      offensive.addCondition(grassGate);
+      defensive.addCondition(grassGate);
+      return ok([offensive, defensive]);
     }
     case 273:
       // Power Fists — "Iron Fist (punching) moves target Special Defense and
@@ -6075,14 +6080,14 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
         new SpeedBonusToStatAbAttr({ stat: Stat.SPATK, speedFraction: 0.2 }),
       ]);
     case 552:
-      // Terminal Velocity — "Special moves use 20% of its Speed stat
-      // additionally."
+      // Terminal Velocity — "Adds 20% of the holder's Speed to damage when using
+      // NON-CONTACT moves." Gate on non-contact (both offensive stats), NOT on
+      // special category (which wrongly skipped physical non-contact moves like
+      // Earthquake and wrongly boosted special CONTACT moves). ADD mode; raw Speed
+      // (getStat SPD, false) ignores Choice Scarf.
       return ok([
-        new SpeedBonusToStatAbAttr({
-          stat: Stat.SPATK,
-          speedFraction: 0.2,
-          filter: { category: "special" },
-        }),
+        new SpeedBonusToStatAbAttr({ stat: Stat.ATK, speedFraction: 0.2, filter: { contact: "non" } }),
+        new SpeedBonusToStatAbAttr({ stat: Stat.SPATK, speedFraction: 0.2, filter: { contact: "non" } }),
       ]);
     case 355:
       // Speed Force — "Contact moves use 20% of its Speed stat additionally."
