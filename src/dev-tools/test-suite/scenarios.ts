@@ -2126,6 +2126,35 @@ export const DEV_SCENARIOS: DevScenario[] = [
     },
   },
   {
+    label: "(note) Showdown Team Menu + Set Editor: rename Backspace / editor G-V cycling / rank chip",
+    description:
+      "UI/FLOW fixes - NON-battle screens, so verify at Title -> Showdown (the TEAM MENU) and inside a mon's\n"
+      + "SET EDITOR, not here. THREE live fixes:\n"
+      + "1) RENAME BACKSPACE (Team Menu): hover a saved team, press R to rename, then press BACKSPACE. It must\n"
+      + "   DELETE one character and stay in the rename box. Previously Backspace yanked you out of the whole\n"
+      + "   menu to the TITLE screen. Enter saves; Esc closes just the rename box (never the title).\n"
+      + "2) EDITOR TEAM-MON CYCLING (Set Editor): with >1 team mon, G = previous mon, V = next mon. They must\n"
+      + "   cycle from ANY field while browsing (incl. an item/move field). Previously the search text-capture\n"
+      + "   lingered on those fields and swallowed every printable hotkey (G/V and F/R/E/N) - all dead. To\n"
+      + "   SEARCH a move/item now, press A (Space) to open the dropdown, THEN type; Esc closes it and the\n"
+      + "   hotkeys are live again.\n"
+      + "3) RANK CHIP (Team Menu): the ranked-ladder badge is now a COMPACT one-line chip in the header (next\n"
+      + "   to the team count), not the big card that used to cover the preview's MOVESET. The full preview\n"
+      + "   (sprite, abilities+innates, item, all 4 moves) must be unobstructed.\n"
+      + "Rendered + asserted headlessly: test/tools/render-ui-page.test.ts (showdown-team-menu* incl. the two\n"
+      + "rank-chip pages) + test/tests/elite-redux/showdown/showdown-team-menu-input.test.ts (rename Backspace\n"
+      + "never exits) + showdown-editor-input.test.ts (capture lifecycle + G/V cycling).",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({ STARTING_WAVE_OVERRIDE: 1 });
+      return [
+        makeStarter(SpeciesId.GARCHOMP, {
+          moveset: [MoveId.EARTHQUAKE, MoveId.OUTRAGE, MoveId.STONE_EDGE, MoveId.SWORDS_DANCE],
+        }),
+      ];
+    },
+  },
+  {
     label: "(note) Co-op: level-up Move Learn panel is the SHARED synced path (#848)",
     description:
       "CO-OP fix - verify with TWO clients (not a solo battle): a level-up move-learn on a FULL\n"
