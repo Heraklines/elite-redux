@@ -2,7 +2,8 @@ import type { Pokemon } from "#app/field/pokemon";
 import { globalScene } from "#app/global-scene";
 import type { MovePhase } from "#app/phases/move-phase";
 import { PokemonPhasePriorityQueue } from "#app/queues/pokemon-phase-priority-queue";
-import type { MovePhaseTimingModifier } from "#enums/move-phase-timing-modifier";
+import { BattlerTagType } from "#enums/battler-tag-type";
+import { MovePhaseTimingModifier } from "#enums/move-phase-timing-modifier";
 import type { MovePriorityInBracket } from "#enums/move-priority-in-bracket";
 import type { PhaseConditionFunc } from "#types/phase-types";
 
@@ -22,8 +23,10 @@ export class MovePhasePriorityQueue extends PokemonPhasePriorityQueue<MovePhase>
    */
   private sortPostSpeed(): void {
     this.queue.sort((a, b) => {
-      if (b.timingModifier !== a.timingModifier) {
-        return b.timingModifier - a.timingModifier;
+      const aTiming = effectiveTimingModifier(a);
+      const bTiming = effectiveTimingModifier(b);
+      if (bTiming !== aTiming) {
+        return bTiming - aTiming;
       }
 
       const aPriority = getPriorityForMP(a);
@@ -91,6 +94,22 @@ export class MovePhasePriorityQueue extends PokemonPhasePriorityQueue<MovePhase>
     this.lastTurnOrder = [];
     super.clear();
   }
+}
+
+/**
+ * Effective timing modifier for a move phase. Elite Redux's Know Your Place
+ * (ER_QUASHED battler tag) forces the holder to move LAST "regardless of
+ * priority, speed, or other effects" — a true Quash — so it overrides the
+ * phase's own timing modifier here (this comparator takes full precedence over
+ * priority and speed).
+ * @param mp - The `MovePhase` to check
+ * @returns The timing modifier to sort by
+ */
+function effectiveTimingModifier(mp: MovePhase): MovePhaseTimingModifier {
+  if (mp.pokemon.getTag(BattlerTagType.ER_QUASHED)) {
+    return MovePhaseTimingModifier.LAST;
+  }
+  return mp.timingModifier;
 }
 
 /**

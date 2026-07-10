@@ -3042,6 +3042,10 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
     "PostFaintFormChangeAbAttr",
     "PostVictoryFormChangeAbAttr",
     "IceFaceFormChangeAbAttr",
+    // ER Patchwork's fog-restore of a busted disguise (identity, not a power
+    // spike) — carve out both hooks so the innate drives it without the unlock.
+    "FogRestoreDisguiseFormChangeAbAttr",
+    "PostSummonFogRestoreDisguiseAbAttr",
   ] as const satisfies readonly AbAttrString[];
 
   private abilityDrivesFormChange(ability: Ability | null | undefined): boolean {

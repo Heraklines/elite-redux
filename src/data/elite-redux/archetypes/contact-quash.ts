@@ -7,35 +7,31 @@
 // =============================================================================
 // Elite Redux — `contact-quash` archetype.
 //
-// PostDefend hook: on contact, apply the QUASH-equivalent (forces target to
-// move last) for N turns. Pokerogue lacks a true Quash tag, so we model
-// this via a SPEED penalty stat-stage (the dominant gameplay effect).
+// PostDefend hook: on contact, apply a true QUASH-equivalent to the ATTACKER —
+// it moves LAST within its priority bracket for N turns (the ER_QUASHED battler
+// tag, checked in Move.getPriorityModifier alongside ER_DRENCHED). This is a
+// persistent, switch-surviving tag, NOT the old -6 SPD stat-stage approximation.
 //
 // Wires:
 //   - 735 Know Your Place — "Contact attacks make foes move last for 5 turns."
-//
-// We approximate Quash by applying -6 SPD stage (effectively last) for the
-// rest of the turn; pokerogue's stat-stage resets on switch so this is
-// per-turn rather than 5-turn — best fit without a Quash tag.
 // =============================================================================
 
 import { PostDefendAbAttr } from "#abilities/ab-attrs";
-import type { PostMoveInteractionAbAttrParams } from "#types/ability-types";
-import { globalScene } from "#app/global-scene";
+import { BattlerTagType } from "#enums/battler-tag-type";
 import { MoveFlags } from "#enums/move-flags";
-import { Stat } from "#enums/stat";
+import type { PostMoveInteractionAbAttrParams } from "#types/ability-types";
 
 export interface ContactQuashOptions {
-  /** Stages of speed drop. Default -6 (Quash analog). */
-  readonly stages?: number;
+  /** How many turns the attacker is forced to move last. Default 5 (ER dex). */
+  readonly turns?: number;
 }
 
 export class ContactQuashAbAttr extends PostDefendAbAttr {
-  private readonly stages: number;
+  private readonly turns: number;
 
   constructor(options: ContactQuashOptions = {}) {
     super(false);
-    this.stages = options.stages ?? -6;
+    this.turns = options.turns ?? 5;
   }
 
   override canApply(params: PostMoveInteractionAbAttrParams): boolean {
@@ -51,12 +47,6 @@ export class ContactQuashAbAttr extends PostDefendAbAttr {
     if (simulated || !opponent) {
       return;
     }
-    globalScene.phaseManager.unshiftNew(
-      "StatStageChangePhase",
-      opponent.getBattlerIndex(),
-      false,
-      [Stat.SPD],
-      this.stages,
-    );
+    opponent.addTag(BattlerTagType.ER_QUASHED, this.turns);
   }
 }

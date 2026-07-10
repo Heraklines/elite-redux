@@ -4317,6 +4317,19 @@ export class ErEnrageTag extends SerializableBattlerTag {
 }
 
 /**
+ * ER Quashed (Know Your Place): while present the holder moves LAST within its
+ * move-priority bracket (checked in {@linkcode Move.getPriorityModifier}, the
+ * same path as ER_DRENCHED). Purely an ordering debuff, no HP effect. Default 5
+ * turns; ticks down at turn-end.
+ */
+export class ErQuashedTag extends SerializableBattlerTag {
+  public override readonly tagType = BattlerTagType.ER_QUASHED;
+  constructor(turnCount = 5) {
+    super(BattlerTagType.ER_QUASHED, BattlerTagLapseType.TURN_END, turnCount);
+  }
+}
+
+/**
  * Retrieves a {@linkcode BattlerTag} based on the provided tag type, turn count, source move, and source ID.
  * @param sourceId - The ID of the pokemon adding the tag
  * @returns The corresponding {@linkcode BattlerTag} object.
@@ -4540,6 +4553,8 @@ export function getBattlerTag(
       return new ErDrenchedTag();
     case BattlerTagType.ER_ENRAGE:
       return new ErEnrageTag();
+    case BattlerTagType.ER_QUASHED:
+      return new ErQuashedTag(turnCount || 5);
   }
 }
 
@@ -4685,6 +4700,7 @@ export type BattlerTagTypeMap = {
   [BattlerTagType.ER_DESPAIR]: ErDespairTag;
   [BattlerTagType.ER_DRENCHED]: ErDrenchedTag;
   [BattlerTagType.ER_ENRAGE]: ErEnrageTag;
+  [BattlerTagType.ER_QUASHED]: ErQuashedTag;
 };
 
 /**

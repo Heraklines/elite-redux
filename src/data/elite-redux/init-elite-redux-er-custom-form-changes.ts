@@ -127,6 +127,20 @@ interface ErCustomFormSpec {
    *     PostVictoryFormChangeAbAttr); ONE-WAY (no revert edge), like Greninja.
    */
   readonly trigger: FormChangeTriggerKind;
+  /**
+   * When true, ALSO register the `form -> ""` (revert) edge keyed on the SAME
+   * trigger, making the change bidirectional. Required for Disguise-style forms
+   * (Mimikyu tiers): vanilla DISGUISE resets to form 0 via
+   * PostBattleInitFormChangeAbAttr / PostFaintFormChangeAbAttr, both of which
+   * fire `triggerPokemonFormChange(.., SpeciesFormChangeAbilityTrigger)` — that
+   * no-ops (the busted disguise never heals) unless a `busted -> ""` ability
+   * edge exists. Vanilla Mimikyu registers both directions; the ER custom tiers
+   * were one-way, so their busted disguise never restored between battles / on
+   * faint. `"manual"` already auto-registers its revert edge, so this flag is
+   * only meaningful for `"ability"` / `"manual-oneway"`.
+   * @defaultValue `false`
+   */
+  readonly restorable?: boolean;
 }
 
 /**
@@ -159,25 +173,30 @@ const ER_CUSTOM_FORM_SPECS: readonly ErCustomFormSpec[] = [
     // Mimikyu has that edge; the Apex/Rayquaza tiers (separate ER species, not
     // forms) did NOT, so their Disguise silently did nothing. Inject the busted
     // counterpart as form index 1 + the ability edge - identical stats/abilities,
-    // so the swap is purely the broken-disguise sprite. One-way like Battle Bond;
-    // vanilla DISGUISE's PostBattleInitFormChangeAbAttr(()=>0) re-disguises each
-    // battle, so no revert edge is needed.
+    // so the swap is purely the broken-disguise sprite. RESTORABLE: DISGUISE
+    // resets to form 0 via PostBattleInit / PostFaint form-change attrs, which
+    // fire the ABILITY trigger — so a `busted -> ""` ability edge is required or
+    // the busted disguise never heals (vanilla Mimikyu registers both directions).
     baseErId: 2638, // SPECIES_MIMIKYU_APEX → pkrg 10821
     sourceErId: 2639, // SPECIES_MIMIKYU_APEX_BUSTED → pkrg 10822
     formKey: "busted",
     formName: "Busted",
     trigger: "ability",
+    restorable: true,
   },
   {
     // Disguise (Mimikyu Rayquaza, the stoneless-mega tier): Rayquaza ⇄ Primal on
     // a blocked hit. Same model as the Apex tier above; the mega tier's Disguise
-    // is ER 693 (Disguise + curse the attacker), which also routes through
-    // FormBlockDamageAbAttr's break path. Rayquaza's busted counterpart is Primal.
+    // is ER 693 (Patchwork = Disguise + curse the attacker + fog-restore), which
+    // also routes through FormBlockDamageAbAttr's break path. Rayquaza's busted
+    // counterpart is Primal. RESTORABLE (see the Apex entry) so the busted form
+    // heals via PostBattleInit / PostFaint and Patchwork's in-battle fog-restore.
     baseErId: 2584, // SPECIES_MIMIKYU_RAYQUAZA → pkrg 10767
     sourceErId: 1855, // SPECIES_MIMIKYU_PRIMAL (Rayquaza Busted) → pkrg 10447
     formKey: "busted",
     formName: "Busted",
     trigger: "ability",
+    restorable: true,
   },
   {
     // Flammable Coat (669): Lumbering Sloth → Engulfed on a Fire interaction,
@@ -467,8 +486,12 @@ function registerEdges(
     registered++;
   }
 
-  // Revert edge (manual / HP-threshold forms only — Battle Bond is one-way).
-  if (spec.trigger === "manual") {
+  // Revert edge (`form -> ""`): auto-registered for "manual" (HP-threshold,
+  // Wishiwashi-style bidirectional) forms, and for any spec flagged `restorable`
+  // (Disguise tiers — the revert edge is what lets PostBattleInit / PostFaint /
+  // fog-restore heal the busted form via the ability trigger). Battle-Bond-style
+  // one-way transforms register no revert edge.
+  if (spec.trigger === "manual" || spec.restorable) {
     const hasRevert = changes.some(c => c.preFormKey === spec.formKey && c.formKey === "");
     if (!hasRevert) {
       changes.push(new SpeciesFormChange(baseSpeciesId as SpeciesId, spec.formKey, "", makeTrigger(), true));

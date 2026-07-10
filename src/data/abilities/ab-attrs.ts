@@ -2175,6 +2175,49 @@ export class PostAttackApplyBattlerTagAbAttr extends PostAttackAbAttr {
 }
 
 /**
+ * Elite Redux — offensive counterpart of {@linkcode PostDefendAbilityGiveAbAttr}
+ * (Mummy / Lingering Aroma). When the HOLDER's contact move lands, it replaces
+ * the TARGET's ability with the given one (unless the target's ability is not
+ * suppressable, or the target already carries the giver ability). Used by Blood
+ * Stain, whose dex reads "when the user makes contact offensively **or
+ * defensively** with a Pokemon who does not have this ability, it replaces their
+ * current ability" — the defensive half is a separate
+ * {@linkcode PostDefendAbilityGiveAbAttr} on the same ability.
+ */
+export class PostAttackAbilityGiveAbAttr extends PostAttackAbAttr {
+  private readonly ability: AbilityId;
+
+  constructor(ability: AbilityId) {
+    super();
+    this.ability = ability;
+  }
+
+  override canApply(params: PostMoveInteractionAbAttrParams): boolean {
+    const { pokemon, opponent: target, move } = params;
+    return (
+      super.canApply(params)
+      && pokemon !== target
+      && move.doesFlagEffectApply({ flag: MoveFlags.MAKES_CONTACT, user: pokemon, target })
+      && target.getAbility().suppressable
+      && !target.getAbility().hasAttr("PostAttackAbilityGiveAbAttr")
+    );
+  }
+
+  override apply({ simulated, opponent: target }: PostMoveInteractionAbAttrParams): void {
+    if (!simulated) {
+      target.setTempAbility(allAbilities[this.ability]);
+    }
+  }
+
+  override getTriggerMessage({ pokemon }: PostMoveInteractionAbAttrParams, abilityName: string): string {
+    return i18next.t("abilityTriggers:postDefendAbilityGive", {
+      pokemonNameWithAffix: getPokemonNameWithAffix(pokemon),
+      abilityName,
+    });
+  }
+}
+
+/**
  * Elite Redux — on a landed damaging hit, removes a specific type from the
  * TARGET (ER Illuminate: "Removes Ghost-typing on target when landing an
  * attack"). If removing it would leave the target typeless, it becomes
@@ -4622,6 +4665,63 @@ export class IceFaceFormChangeAbAttr extends PostWeatherChangeAbAttr {
 }
 
 /**
+ * Elite Redux — Patchwork's "In fog, the disguise is restored ... when fog is
+ * set again." The fog analogue of {@linkcode IceFaceFormChangeAbAttr} (Eiscue's
+ * snow/hail restore): when the weather becomes FOG and the holder is in its
+ * BUSTED disguise form, restore the intact disguise by firing the ability
+ * form-change trigger (the `busted -> ""` revert edge resolves it back to form
+ * 0). Gated on the busted form index so a fog change can never BREAK an intact
+ * disguise (which shares the ability trigger in the opposite direction).
+ * @sealed
+ */
+export class FogRestoreDisguiseFormChangeAbAttr extends PostWeatherChangeAbAttr {
+  private readonly bustedFormIndex: number;
+
+  constructor(bustedFormIndex: number) {
+    super();
+    this.bustedFormIndex = bustedFormIndex;
+  }
+
+  override canApply({ pokemon, weather }: PostWeatherChangeAbAttrParams): boolean {
+    return pokemon.formIndex === this.bustedFormIndex && weather === WeatherType.FOG;
+  }
+
+  override apply({ simulated, pokemon }: PostWeatherChangeAbAttrParams): void {
+    if (!simulated) {
+      globalScene.triggerPokemonFormChange(pokemon, SpeciesFormChangeAbilityTrigger);
+    }
+  }
+}
+
+/**
+ * Elite Redux — Patchwork's "In fog, the disguise is restored immediately once
+ * per switch in." Complements {@linkcode FogRestoreDisguiseFormChangeAbAttr}
+ * ("when fog is set again"): on switch-in, if the weather is already FOG and the
+ * holder is in its busted disguise form, restore the intact disguise. Fires once
+ * per send-out (PostSummon's natural lifecycle) and no-ops if the disguise is
+ * already intact.
+ * @sealed
+ */
+export class PostSummonFogRestoreDisguiseAbAttr extends PostSummonAbAttr {
+  private readonly bustedFormIndex: number;
+
+  constructor(bustedFormIndex: number) {
+    super(false);
+    this.bustedFormIndex = bustedFormIndex;
+  }
+
+  override canApply({ pokemon }: AbAttrBaseParams): boolean {
+    return pokemon.formIndex === this.bustedFormIndex && globalScene.arena.weatherType === WeatherType.FOG;
+  }
+
+  override apply({ simulated, pokemon }: AbAttrBaseParams): void {
+    if (!simulated) {
+      globalScene.triggerPokemonFormChange(pokemon, SpeciesFormChangeAbilityTrigger);
+    }
+  }
+}
+
+/**
  * Adds a battler tag to the pokemon when the weather changes.
  * @sealed
  */
@@ -6992,6 +7092,7 @@ export const AbilityAttrs = Object.freeze({
   ForceSwitchOutImmunityAbAttr,
   ForewarnAbAttr,
   FormBlockDamageAbAttr,
+  FogRestoreDisguiseFormChangeAbAttr,
   FriskAbAttr,
   FullHpResistTypeAbAttr,
   GorillaTacticsAbAttr,
@@ -7028,6 +7129,7 @@ export const AbilityAttrs = Object.freeze({
   PokemonTypeChangeAbAttr,
   PostAllyStatStageChangeAbAttr,
   PostAttackAbAttr,
+  PostAttackAbilityGiveAbAttr,
   PostAttackApplyBattlerTagAbAttr,
   PostAttackApplyStatusEffectAbAttr,
   PostAttackRemoveTargetTypeAbAttr,
@@ -7063,6 +7165,7 @@ export const AbilityAttrs = Object.freeze({
   PostDefendWeatherChangeAbAttr,
   PostFaintAbAttr,
   PostFaintContactDamageAbAttr,
+  PostFaintFormChangeAbAttr,
   PostFaintHPDamageAbAttr,
   PostFaintUnsuppressedWeatherFormChangeAbAttr,
   PostIntimidateStatStageChangeAbAttr,
@@ -7083,6 +7186,7 @@ export const AbilityAttrs = Object.freeze({
   PostSummonClearWeatherAbAttr,
   PostSummonCopyAbilityAbAttr,
   PostSummonCopyAllyStatsAbAttr,
+  PostSummonFogRestoreDisguiseAbAttr,
   PostSummonFormChangeAbAttr,
   PostSummonFormChangeByWeatherAbAttr,
   PostSummonHealStatusAbAttr,

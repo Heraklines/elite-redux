@@ -189,7 +189,7 @@ export const ER_ABILITY_ARCHETYPES: Readonly<Record<number, ErAbilityArchetypeEn
   383: { erAbilityId: 383, archetype: "bespoke", params: null },
   384: { erAbilityId: 384, archetype: "bespoke", params: null },
   385: { erAbilityId: 385, archetype: "bespoke", params: null }, // Nosferatu: contact moves +20% dmg AND heal 1/2 of dmg dealt (composite — see dispatchBespoke)
-  393: { erAbilityId: 393, archetype: "type-conversion", params: {"sourceType":"NORMAL","targetType":"GHOST","multiplier":1.2} },
+  393: { erAbilityId: 393, archetype: "bespoke", params: null }, // Spectralize — hand-wired Ghost analog of Hydrate (Normal->Ghost + conditional Ghost STAB / 10% fear); see dispatchBespoke
   386: { erAbilityId: 386, archetype: "bespoke", params: null }, // Spectral Shroud: Spectralize (Normal→Ghost +1.2x) AND moves 30% badly-poison (composite — see dispatchBespoke)
   387: { erAbilityId: 387, archetype: "bespoke", params: null }, // Discipline: immune to confusion + Intimidate/Scare (CONFUSION isn't a vanilla StatusEffect — needs BattlerTagImmunity; see dispatchBespoke)
   388: { erAbilityId: 388, archetype: "bespoke", params: null },
@@ -417,10 +417,10 @@ export const ER_ABILITY_ARCHETYPES: Readonly<Record<number, ErAbilityArchetypeEn
   644: { erAbilityId: 644, archetype: "bespoke", params: null }, // Ice Cold Hunter: Ice moves hit twice IN HAIL (full power) + hail immunity (composite — see dispatchBespoke)
   645: { erAbilityId: 645, archetype: "bespoke", params: null },
   646: { erAbilityId: 646, archetype: "bespoke", params: null }, // Arc Flash: 50% burn when hit AND 50% paralyze when attacking on contact (composite — see dispatchBespoke)
-  647: { erAbilityId: 647, archetype: "composite-vanilla-mashup", params: {"parts":["Mighty Horn","Pixilate"]} },
+  647: { erAbilityId: 647, archetype: "bespoke", params: null }, // Unicorn: Mighty Horn (horn+drill ×1.3) + full Pixilate (Normal->Fairy, Fairy STAB, Fairy-user 10% infatuate) — see dispatchBespoke (the composite Pixilate part was a wrong flat boost)
   648: { erAbilityId: 648, archetype: "bespoke", params: null },
   649: { erAbilityId: 649, archetype: "bespoke", params: null },
-  650: { erAbilityId: 650, archetype: "chance-status-on-hit", params: {"chance":20,"status":"BURN","direction":"offense"} }, // Venoblaze Pincers: holder's move burns (desc; 1.2x physical handled separately)
+  650: { erAbilityId: 650, archetype: "bespoke", params: null }, // Venoblaze Pincers — 1.2x physical + 20% burn-or-poison on contact; see dispatchBespoke
   651: { erAbilityId: 651, archetype: "composite-vanilla-mashup", params: {"parts":["Celestial Blessing","Regenerator"]} },
   652: { erAbilityId: 652, archetype: "composite-vanilla-mashup", params: {"parts":["Unburden","Ripen"]} },
   653: { erAbilityId: 653, archetype: "bespoke", params: null },

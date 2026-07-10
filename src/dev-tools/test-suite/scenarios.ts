@@ -5188,8 +5188,8 @@ export const DEV_SCENARIOS: DevScenario[] = [
   {
     label: "Eerie Fog: Ominous Wind",
     description:
-      "#328 Eerie Fog — Ominous Wind deals 2× in fog (base 60 → 120).\n"
-      + "DO: use Ominous Wind on Wailord (bulky, survives).  EXPECT: a big chunk —\n"
+      "#328 Eerie Fog - Ominous Wind deals 2x in fog (base 55 -> 110).\n"
+      + "DO: use Ominous Wind on Wailord (bulky, survives). EXPECT: a big chunk,\n"
       + "roughly double what it would do without fog.",
     setup: () => {
       resetDevOverrides();
@@ -5197,12 +5197,106 @@ export const DEV_SCENARIOS: DevScenario[] = [
         STARTING_LEVEL_OVERRIDE: 60,
         STARTING_WAVE_OVERRIDE: 5,
         WEATHER_OVERRIDE: WeatherType.FOG,
-        MOVESET_OVERRIDE: [MoveId.OMINOUS_WIND, MoveId.SPLASH],
+        MOVESET_OVERRIDE: [MoveId.OMINOUS_WIND, MoveId.SHADOW_BALL, MoveId.CONFUSE_RAY, MoveId.PROTECT],
         ENEMY_SPECIES_OVERRIDE: SpeciesId.WAILORD,
         ENEMY_LEVEL_OVERRIDE: 60,
         ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
       });
-      return [makeStarter(SpeciesId.GASTLY, { moveset: [MoveId.OMINOUS_WIND, MoveId.SPLASH] })];
+      return [
+        makeStarter(SpeciesId.GASTLY, {
+          moveset: [MoveId.OMINOUS_WIND, MoveId.SHADOW_BALL, MoveId.CONFUSE_RAY, MoveId.PROTECT],
+        }),
+      ];
+    },
+  },
+  {
+    label: "Horn Drill: regular hit",
+    description:
+      "ER dex move fix - Horn Drill is a 95 BP / 100 accuracy regular attack, not an OHKO.\n"
+      + "DO: use Horn Drill. EXPECT: Wobbuffet takes normal damage even though Rhydon is\n"
+      + "lower level. It should NOT say 'But it failed!' and should NOT one-shot.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 50,
+        STARTING_WAVE_OVERRIDE: 5,
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.WOBBUFFET,
+        ENEMY_LEVEL_OVERRIDE: 100,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+      });
+      return [
+        makeStarter(SpeciesId.RHYDON, {
+          moveset: [MoveId.HORN_DRILL, MoveId.ROCK_SLIDE, MoveId.EARTHQUAKE, MoveId.PROTECT],
+        }),
+      ];
+    },
+  },
+  {
+    label: "Dragon Breath burns",
+    description:
+      "ER dex move fix - Dragon Breath is 20 BP with a guaranteed burn.\n"
+      + "DO: use Dragon Breath. EXPECT: Wobbuffet is burned after the hit, not paralyzed.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 50,
+        STARTING_WAVE_OVERRIDE: 5,
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.WOBBUFFET,
+        ENEMY_LEVEL_OVERRIDE: 80,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+      });
+      return [
+        makeStarter(SpeciesId.CHARIZARD, {
+          moveset: [MoveId.DRAGON_BREATH, MoveId.FLAMETHROWER, MoveId.AIR_SLASH, MoveId.PROTECT],
+        }),
+      ];
+    },
+  },
+  {
+    label: "Confusion: guaranteed",
+    description:
+      "ER dex move fix - Confusion's secondary effect is guaranteed.\n"
+      + "DO: use Confusion. EXPECT: Wobbuffet becomes confused every time.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 50,
+        STARTING_WAVE_OVERRIDE: 5,
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.WOBBUFFET,
+        ENEMY_LEVEL_OVERRIDE: 100,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+      });
+      return [
+        makeStarter(SpeciesId.ABRA, {
+          moveset: [MoveId.CONFUSION, MoveId.PSYBEAM, MoveId.LIGHT_SCREEN, MoveId.PROTECT],
+        }),
+      ];
+    },
+  },
+  {
+    label: "Ominous Wind spread",
+    description:
+      "ER dex move fix - Ominous Wind targets both opposing Pokemon in doubles.\n"
+      + "DO: have Gengar use Ominous Wind and Snorlax use Splash. EXPECT: both\n"
+      + "enemy Wobbuffet lose HP from the same Ominous Wind.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_LEVEL_OVERRIDE: 60,
+        STARTING_WAVE_OVERRIDE: 5,
+        BATTLE_STYLE_OVERRIDE: "double",
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.WOBBUFFET,
+        ENEMY_LEVEL_OVERRIDE: 100,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+      });
+      return [
+        makeStarter(SpeciesId.GENGAR, {
+          moveset: [MoveId.OMINOUS_WIND, MoveId.SHADOW_BALL, MoveId.CONFUSE_RAY, MoveId.PROTECT],
+        }),
+        makeStarter(SpeciesId.SNORLAX, {
+          moveset: [MoveId.SPLASH, MoveId.BODY_SLAM, MoveId.CRUNCH, MoveId.PROTECT],
+        }),
+      ];
     },
   },
   {
@@ -13607,6 +13701,167 @@ export const DEV_SCENARIOS: DevScenario[] = [
       if (lead) {
         lead.hp = Math.max(1, Math.floor(lead.getMaxHp() * 0.3));
       }
+    },
+  },
+  // ===========================================================================
+  // Ability - Know Your Place is a TRUE Quash (move last regardless of priority)
+  // ===========================================================================
+  {
+    label: "Ability: Know Your Place (true Quash)",
+    description:
+      "Know Your Place (2.65 dex): 'Contact attacks make foes move last for 5 turns\n"
+      + "regardless of priority, speed, or other effects.' It was a one-turn -6 SPD\n"
+      + "drop; now it is a real Quash.\n"
+      + "DO: let the foe hit your Snorlax with Tackle (contact) - the foe is now\n"
+      + "Quashed. Next turn, use Body Slam (normal priority) while the foe uses Quick\n"
+      + "Attack (+1 priority).\n"
+      + "EXPECT: your Body Slam still goes FIRST - the Quashed foe moves dead last even\n"
+      + "with a priority move. Before the fix a +1 Quick Attack would outspeed you.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_WAVE_OVERRIDE: 145,
+        STARTING_LEVEL_OVERRIDE: 100,
+        ABILITY_OVERRIDE: erAbility(5437), // Know Your Place
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.CHANSEY, // tanky, survives to keep acting
+        ENEMY_LEVEL_OVERRIDE: 100,
+        ENEMY_ABILITY_OVERRIDE: AbilityId.BALL_FETCH,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.TACKLE, MoveId.QUICK_ATTACK],
+      });
+      return [
+        makeStarter(SpeciesId.SNORLAX, {
+          moveset: [MoveId.BODY_SLAM, MoveId.REST, MoveId.PROTECT, MoveId.SPLASH],
+        }),
+      ];
+    },
+  },
+  // ===========================================================================
+  // Ability - Assassin's Tools is ONE pooled 30% proc (not two rolls)
+  // ===========================================================================
+  {
+    label: "Ability: Assassin's Tools (single pooled proc)",
+    description:
+      "Assassin's Tools (2.65 dex): 'Contact moves have a 30% chance to poison,\n"
+      + "paralyze, OR bleed.' It rolled TWO independent 30% chances (could inflict a\n"
+      + "status AND bleed at once, ~51% total); now it is ONE 30% roll that picks a\n"
+      + "single outcome.\n"
+      + "DO: attack the tanky foe with Tackle (contact) over several turns.\n"
+      + "EXPECT: roughly 30% of hits inflict exactly ONE of poison / paralysis / bleed -\n"
+      + "never a status AND bleed together on the same hit.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_WAVE_OVERRIDE: 145,
+        STARTING_LEVEL_OVERRIDE: 100,
+        ABILITY_OVERRIDE: erAbility(5394), // Assassin's Tools
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.CHANSEY, // Normal: poison- AND bleed-eligible
+        ENEMY_LEVEL_OVERRIDE: 100,
+        ENEMY_ABILITY_OVERRIDE: AbilityId.BALL_FETCH,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+      });
+      return [
+        makeStarter(SpeciesId.SNORLAX, {
+          moveset: [MoveId.TACKLE, MoveId.REST, MoveId.PROTECT, MoveId.SPLASH],
+        }),
+      ];
+    },
+  },
+  // ===========================================================================
+  // Ability - Unicorn's Pixilate: Normal moves become Fairy-type
+  // ===========================================================================
+  {
+    label: "Ability: Unicorn (Pixilate conversion)",
+    description:
+      "Unicorn (2.65 dex): 'Boosts horn and drill attacks 30%. Converts Normal moves\n"
+      + "to Fairy-type and Fairy STAB.' The Pixilate half was dropped (flat boost only);\n"
+      + "now Normal moves really become Fairy.\n"
+      + "DO: attack the Dragon-type foe (Salamence) with Tackle (a Normal move).\n"
+      + "EXPECT: 'It's super effective!' - Tackle is now a Fairy move (2x on the Dragon).\n"
+      + "Before the fix Tackle stayed Normal and dealt neutral damage.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_WAVE_OVERRIDE: 145,
+        STARTING_LEVEL_OVERRIDE: 100,
+        ABILITY_OVERRIDE: erAbility(5351), // Unicorn
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.SALAMENCE, // Dragon/Flying - Fairy is 2x
+        ENEMY_LEVEL_OVERRIDE: 100,
+        ENEMY_ABILITY_OVERRIDE: AbilityId.BALL_FETCH,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+      });
+      return [
+        makeStarter(SpeciesId.GARDEVOIR, {
+          moveset: [MoveId.TACKLE, MoveId.MOONBLAST, MoveId.REST, MoveId.SPLASH],
+        }),
+      ];
+    },
+  },
+  // ===========================================================================
+  // Ability - Blood Stain spreads the ABILITY (Mummy-style), not just bleed
+  // ===========================================================================
+  {
+    label: "Ability: Blood Stain (ability contagion)",
+    description:
+      "Blood Stain (2.65 dex): 'When the user makes contact offensively or defensively\n"
+      + "with a Pokemon who does not have this ability, it REPLACES their current\n"
+      + "ability and causes bleeding.' It only spread the bleed, not the ability; now it\n"
+      + "spreads Blood Stain itself (Mummy-style).\n"
+      + "DO: hit the tanky foe with Tackle (contact).\n"
+      + "EXPECT: the foe's ability is REPLACED with Blood Stain ('gave its target Blood\n"
+      + "Stain!') and it starts bleeding. Before the fix its ability was untouched.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_WAVE_OVERRIDE: 145,
+        STARTING_LEVEL_OVERRIDE: 100,
+        ABILITY_OVERRIDE: erAbility(5377), // Blood Stain
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.CHANSEY, // tanky, suppressable ability
+        ENEMY_LEVEL_OVERRIDE: 100,
+        ENEMY_ABILITY_OVERRIDE: AbilityId.BALL_FETCH,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+      });
+      return [
+        makeStarter(SpeciesId.SNORLAX, {
+          moveset: [MoveId.TACKLE, MoveId.REST, MoveId.PROTECT, MoveId.SPLASH],
+        }),
+      ];
+    },
+  },
+  // ===========================================================================
+  // Ability - Mimikyu disguise heals + Patchwork restores it in fog
+  // ===========================================================================
+  {
+    label: "Ability: Patchwork disguise restore (fog)",
+    description:
+      "The ER Mimikyu tiers (Apex / Rayquaza) never healed their busted disguise - the\n"
+      + "busted->intact form edge was missing, so the DISGUISE reset (between battles /\n"
+      + "on faint) no-op'd. Patchwork also restores the disguise in FOG.\n"
+      + "DO: let the foe break your Mimikyu Rayquaza's disguise (first damaging hit is\n"
+      + "blocked, the disguise busts). With fog on the field, switch to Snorlax and then\n"
+      + "switch Mimikyu back in.\n"
+      + "EXPECT: on switching back in during fog, the disguise is RESTORED (intact\n"
+      + "sprite, and it can block a hit again). Before the fix the disguise stayed busted\n"
+      + "forever - it never healed on switch, in fog, or between battles.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_WAVE_OVERRIDE: 145,
+        STARTING_LEVEL_OVERRIDE: 100,
+        WEATHER_OVERRIDE: WeatherType.FOG,
+        ABILITY_OVERRIDE: erAbility(5396), // Patchwork
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.CHANSEY,
+        ENEMY_LEVEL_OVERRIDE: 100,
+        ENEMY_ABILITY_OVERRIDE: AbilityId.BALL_FETCH,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.TACKLE],
+      });
+      return [
+        makeStarter(erSpecies(10767) /* Mimikyu Rayquaza */, {
+          moveset: [MoveId.SHADOW_CLAW, MoveId.PLAY_ROUGH, MoveId.REST, MoveId.PROTECT],
+        }),
+        makeStarter(SpeciesId.SNORLAX, {
+          moveset: [MoveId.BODY_SLAM, MoveId.REST, MoveId.PROTECT, MoveId.SPLASH],
+        }),
+      ];
     },
   },
 ];

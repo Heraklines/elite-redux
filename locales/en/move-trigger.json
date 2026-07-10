@@ -27,6 +27,7 @@
   "isTighteningFocus": "{{pokemonName}} is\ntightening its focus!",
   "lostFocus": "{{pokemonName}} lost its focus and couldn’t move!",
   "hidUnderwater": "{{pokemonName}} hid\nunderwater!",
+  "hidFromView": "{{pokemonName}} hid\nfrom view!",
   "soothingAromaWaftedThroughArea": "A soothing aroma wafted through the area!",
   "sprangUp": "{{pokemonName}} sprang up!",
   "choseDoomDesireAsDestiny": "{{pokemonName}} chose\nDoom Desire as its destiny!",

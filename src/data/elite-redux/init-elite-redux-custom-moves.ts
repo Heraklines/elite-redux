@@ -339,6 +339,10 @@ const ER_CHARGING_MOVES: Readonly<Record<number, { chargeTextKey: string; semiIn
   // 988 Toxic Plunge — "Dives into a pool of poison then strikes the next turn."
   // Dive clone: hide underwater during the charge, strike (+20% poison) turn 2.
   988: { chargeTextKey: "moveTriggers:hidUnderwater", semiInvulnerable: BattlerTagType.UNDERWATER },
+  // 972 Ready or Not — "Hides on the first turn, scares the foe on the second."
+  // Two-turn charge: hide from view (HIDDEN, semi-invulnerable) turn 1, strike
+  // (+30% flinch, from move.chance) turn 2.
+  972: { chargeTextKey: "moveTriggers:hidFromView", semiInvulnerable: BattlerTagType.HIDDEN },
 };
 
 /** Thin `StatusMove` subclass — see {@link ErCustomAttackMove} for the override rationale. */

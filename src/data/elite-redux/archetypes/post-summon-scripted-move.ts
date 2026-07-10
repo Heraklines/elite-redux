@@ -24,6 +24,7 @@ import { globalScene } from "#app/global-scene";
 import { scriptedPokemonMove } from "#data/elite-redux/archetypes/scripted-move-util";
 import type { MoveId } from "#enums/move-id";
 import { MoveUseMode } from "#enums/move-use-mode";
+import type { Pokemon } from "#field/pokemon";
 import type { AbAttrBaseParams } from "#types/ability-types";
 
 export interface PostSummonScriptedMoveOptions {
@@ -43,6 +44,12 @@ export interface PostSummonScriptedMoveOptions {
   readonly targetsSelf?: boolean;
   readonly oncePerBattleKey?: string;
   /**
+   * Cap the number of casts this battle (per wave). Requires
+   * {@linkcode oncePerBattleKey} as the counter key. Used by Wishmaker
+   * ("Uses Wish on switch-in. Three uses per battle." -> maxUsesPerBattle 3).
+   */
+  readonly maxUsesPerBattle?: number;
+  /**
    * When `true`, strip {@linkcode MoveFlags.REFLECTABLE} from the scripted cast
    * so a Magic Bounce / Magic Coat opponent does NOT bounce it back onto the
    * holder. The ability forced this move onto the opponent — it must not behave
@@ -58,16 +65,32 @@ export class PostSummonScriptedMoveAbAttr extends PostSummonAbAttr {
     super(false);
   }
 
+  /** How many times this ability has cast (this wave), for the count-capped variant. */
+  private countUses(pokemon: Pokemon): number {
+    const prefix = `${this.opts.oncePerBattleKey}#`;
+    let used = 0;
+    for (const k of pokemon.waveData.entryEffectsFired) {
+      if (k.startsWith(prefix)) {
+        used++;
+      }
+    }
+    return used;
+  }
+
   override canApply(params: AbAttrBaseParams): boolean {
     const { pokemon, simulated } = params;
     if (simulated) {
       return true;
     }
-    if (
-      this.opts.oncePerBattleKey !== undefined
-      && pokemon.waveData.entryEffectsFired.has(this.opts.oncePerBattleKey)
-    ) {
-      return false;
+    if (this.opts.oncePerBattleKey !== undefined) {
+      // Count-capped variant (Wishmaker: 3/battle): count `key#N` markers.
+      if (this.opts.maxUsesPerBattle !== undefined) {
+        if (this.countUses(pokemon) >= this.opts.maxUsesPerBattle) {
+          return false;
+        }
+      } else if (pokemon.waveData.entryEffectsFired.has(this.opts.oncePerBattleKey)) {
+        return false;
+      }
     }
     // Self-targeting buffs (Tailwind) fire regardless of who's on the field.
     if (this.opts.targetsSelf) {
@@ -97,7 +120,11 @@ export class PostSummonScriptedMoveAbAttr extends PostSummonAbAttr {
       targetIndex = opponents[0].getBattlerIndex();
     }
     if (this.opts.oncePerBattleKey !== undefined) {
-      pokemon.waveData.entryEffectsFired.add(this.opts.oncePerBattleKey);
+      if (this.opts.maxUsesPerBattle === undefined) {
+        pokemon.waveData.entryEffectsFired.add(this.opts.oncePerBattleKey);
+      } else {
+        pokemon.waveData.entryEffectsFired.add(`${this.opts.oncePerBattleKey}#${this.countUses(pokemon)}`);
+      }
     }
     // Self-targeting on-entry SET-UP casts (Air Blower's Tailwind, Let's Roll's
     // Defense Curl, …) must land regardless of flinch: they are ability-driven

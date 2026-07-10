@@ -52,7 +52,6 @@ import {
   AddArenaTagAttr,
   AddArenaTrapTagAttr,
   AddBattlerTagAttr,
-  AddTypeAttr,
   ClearWeatherAttr,
   ConfuseAttr,
   ErRandomBerryEffectAttr,
@@ -816,10 +815,11 @@ function dispatchBespokeMove(erMoveId: number): MoveDispatchResult {
       // Both primitives exist in vanilla; composed directly.
       return ok(0, [new SuppressAbilitiesAttr(), new ForceSwitchOutAttr(true)]);
     case 1005:
-      // Incite — adds the Dark type to the target AND enrages it. In ER,
-      // "enraged" is the vanilla TAUNT tag (per ER's TM12/Taunt text), so the
-      // enrage piece is AddBattlerTagAttr(TAUNT) on the foe.
-      return ok(0, [new AddTypeAttr(PokemonType.DARK), new AddBattlerTagAttr(BattlerTagType.TAUNT, false)]);
+      // Incite — "Adds the Dark type to the target and enrages them." Wired by
+      // applyErMoveBespokeRiders (AddTypeAttr(DARK) + the ER_ENRAGE recoil status)
+      // in init-elite-redux-custom-moves.ts; skip here so it isn't double-applied
+      // (the old TAUNT wiring predated the ER_ENRAGE status).
+      return skip("Incite wired by applyErMoveBespokeRiders (Dark type + ER_ENRAGE)");
     case 1006:
       // Toxic Terrain (er internal id 1006) — "Boosts Poison-type moves for 8
       // turns and deals 1/16 HP damage." Sets the ER-custom Toxic Terrain.

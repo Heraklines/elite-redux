@@ -1322,7 +1322,9 @@ export abstract class Move implements Localizable {
     const resolved = modifierHolder.value as MovePriorityInBracket;
     // ER Drenched: the holder moves LAST within its priority bracket while
     // drenched (Lagging-Tail-style, respecting priority brackets). Loses to an
-    // ability that already forces FIRST in-bracket.
+    // ability that already forces FIRST in-bracket. (Know Your Place's ER_QUASHED
+    // is a TRUE Quash — "move last regardless of priority" — handled in the move
+    // priority queue's timing-modifier sort, not here.)
     if (resolved !== MovePriorityInBracket.FIRST && user.getTag(BattlerTagType.ER_DRENCHED)) {
       return MovePriorityInBracket.LAST;
     }

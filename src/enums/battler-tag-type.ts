@@ -161,4 +161,11 @@ export enum BattlerTagType {
    * Berserk DNA, etc.
    */
   ER_ENRAGE = "ER_ENRAGE",
+  /**
+   * Elite Redux Quashed: the bearer moves LAST within its priority bracket
+   * (checked in {@linkcode Move.getPriorityModifier}, the same path as
+   * ER_DRENCHED) for a fixed number of turns. Applied by Know Your Place's
+   * contact attacks (5 turns). No HP effect; independent of the ER status tags.
+   */
+  ER_QUASHED = "ER_QUASHED",
 }

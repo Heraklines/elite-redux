@@ -155,6 +155,17 @@ export interface ChanceStatusOnHitOptions {
    * @defaultValue `false`
    */
   readonly contactExcluded?: boolean;
+  /**
+   * OFFENSIVE-ONLY (read by {@linkcode ChanceStatusOnAttackAbAttr}; ignored by
+   * the defensive {@linkcode ChanceStatusOnHitAbAttr}). Additional
+   * {@linkcode BattlerTagType} outcomes pooled together with {@linkcode effects}
+   * under the SINGLE `chance` roll: when the proc fires, one outcome is picked
+   * uniformly from `[...effects, ...tags]` and applied (status via `trySetStatus`,
+   * tag via `addTag`). Used by Assassin's Tools ("Contact moves have a 30% chance
+   * to poison, paralyze, OR bleed" — one 30% roll picking one of three, NOT three
+   * independent rolls). Leave `effects` non-empty or provide at least one tag.
+   */
+  readonly tags?: readonly BattlerTagType[];
 }
 
 /**
@@ -601,6 +612,14 @@ export class ChanceBattlerTagOnHitAbAttr extends PostDefendAbAttr {
 export class ChanceStatusOnAttackAbAttr extends PostAttackAbAttr {
   private readonly chance: number;
   private readonly effects: readonly StatusEffect[];
+  // The unified outcome pool ([...statuses, ...tags]) picked from under the
+  // single chance roll. `status` outcomes carry a StatusEffect; `tag` outcomes
+  // carry a BattlerTagType. Kept as a flat, index-stable array so `canApply`
+  // and `apply` pick the SAME entry from the deterministically-advancing seed.
+  private readonly outcomes: readonly (
+    | { kind: "status"; value: StatusEffect }
+    | { kind: "tag"; value: BattlerTagType }
+  )[];
   private readonly contactRequired: boolean;
   private readonly contactExcluded: boolean;
   private readonly filter: ChanceStatusFilter | undefined;
@@ -612,8 +631,9 @@ export class ChanceStatusOnAttackAbAttr extends PostAttackAbAttr {
     if (!(opts.chance >= 0 && opts.chance <= 100)) {
       throw new Error(`[ChanceStatusOnAttackAbAttr] chance must be in [0, 100]; got ${opts.chance}`);
     }
-    if (opts.effects.length === 0) {
-      throw new Error("[ChanceStatusOnAttackAbAttr] must configure at least one status effect");
+    const tags = opts.tags ?? [];
+    if (opts.effects.length + tags.length === 0) {
+      throw new Error("[ChanceStatusOnAttackAbAttr] must configure at least one status effect or tag");
     }
     if (opts.contactRequired === true && opts.contactExcluded === true) {
       throw new Error("[ChanceStatusOnAttackAbAttr] contactRequired and contactExcluded are mutually exclusive");
@@ -621,6 +641,10 @@ export class ChanceStatusOnAttackAbAttr extends PostAttackAbAttr {
     super();
     this.chance = opts.chance;
     this.effects = opts.effects;
+    this.outcomes = [
+      ...opts.effects.map(value => ({ kind: "status" as const, value })),
+      ...tags.map(value => ({ kind: "tag" as const, value })),
+    ];
     this.contactExcluded = opts.contactExcluded ?? false;
     this.contactRequired = opts.contactRequired ?? (opts.filter === undefined && !this.contactExcluded);
     this.filter = opts.filter;
@@ -677,8 +701,13 @@ export class ChanceStatusOnAttackAbAttr extends PostAttackAbAttr {
         return false;
       }
     }
-    const effect = this.pickEffect(pokemon);
-    return target.canSetStatus(effect, true, false, pokemon);
+    const outcome = this.pickOutcome(pokemon);
+    if (outcome.kind === "status") {
+      return target.canSetStatus(outcome.value, true, false, pokemon);
+    }
+    // A tag outcome that the target already carries can't re-apply (addTag
+    // no-ops on overlap), so skip it rather than "wasting" the proc silently.
+    return !target.getTag(outcome.value);
   }
 
   public override apply(params: PostMoveInteractionAbAttrParams): void {
@@ -686,15 +715,21 @@ export class ChanceStatusOnAttackAbAttr extends PostAttackAbAttr {
       return;
     }
     const { pokemon, opponent: target } = params;
-    const effect = this.pickEffect(pokemon);
-    target.trySetStatus(effect, pokemon);
+    const outcome = this.pickOutcome(pokemon);
+    if (outcome.kind === "status") {
+      target.trySetStatus(outcome.value, pokemon);
+    } else {
+      target.addTag(outcome.value, 0, undefined, pokemon.id);
+    }
   }
 
-  private pickEffect(pokemon: Parameters<PostAttackAbAttr["apply"]>[0]["pokemon"]): StatusEffect {
-    if (this.effects.length === 1) {
-      return this.effects[0];
+  private pickOutcome(
+    pokemon: Parameters<PostAttackAbAttr["apply"]>[0]["pokemon"],
+  ): { kind: "status"; value: StatusEffect } | { kind: "tag"; value: BattlerTagType } {
+    if (this.outcomes.length === 1) {
+      return this.outcomes[0];
     }
-    return this.effects[pokemon.randBattleSeedInt(this.effects.length)];
+    return this.outcomes[pokemon.randBattleSeedInt(this.outcomes.length)];
   }
 }
 
