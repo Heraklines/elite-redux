@@ -124,6 +124,14 @@ let authorityHost: CoopOperationHost | null = null;
 let watchGuest: CoopOperationGuest | null = null;
 
 /**
+ * A SEPARATE applier for the durability JOURNAL replay path (Wave-2e), distinct from `watchGuest`. In
+ * dual-run the LEGACY relay-adopt path (watchGuest) drives the phase's shop action, so the journal MUST
+ * NOT consume the operationId that path dedupes on. The journal is the DURABILITY ledger that converges the
+ * action history over a cut without touching the live adopt path. Lazily created; reset on session bounds.
+ */
+let journalWatchGuest: CoopOperationGuest | null = null;
+
+/**
  * The highest pinned interaction start the local client has ADOPTED any action at AS A WATCHER. A pick
  * pinned STRICTLY BELOW it is a leftover from a strictly-earlier interaction a later one superseded (the
  * #861 cross-interaction stale shape). Advanced ONLY on a watcher adoption. -1 = none yet.
@@ -184,6 +192,7 @@ export function setCoopRewardOperationEpoch(next: number): void {
 export function resetCoopRewardOperationState(): void {
   authorityHost = null;
   watchGuest = null;
+  journalWatchGuest = null;
   lastAdoptedStart = -1;
   lastLeftStart = -1;
   ownerOrdinal = 0;
@@ -208,6 +217,14 @@ function guest(): CoopOperationGuest {
     watchGuest = new CoopOperationGuest({ epoch });
   }
   return watchGuest;
+}
+
+/** The dedicated journal-replay applier (Wave-2e), separate from the live relay-adopt `guest()`. */
+function journalGuest(): CoopOperationGuest {
+  if (journalWatchGuest == null) {
+    journalWatchGuest = new CoopOperationGuest({ epoch });
+  }
+  return journalWatchGuest;
 }
 
 /** The operation kind for a surface (the §2 successor of the reward / biomeShop relay kinds). */
@@ -492,9 +509,9 @@ function applyJournaledRewardEnvelope(envelope: CoopAuthoritativeEnvelopeV1): bo
   if (op == null || op.status !== "applied") {
     return false;
   }
-  const g = guest();
+  const g = journalGuest();
   if (g.hasApplied(op.id)) {
-    return false; // dual-run: the live relay-adopt path already applied this action - the journal is a backstop.
+    return false; // already converged via the journal (a reconnect resend re-delivery) - idempotent no-op.
   }
   const res = g.applyEnvelope(envelope);
   if (res.kind !== "applied") {

@@ -1235,6 +1235,10 @@ export function coopSessionGeneration(): number {
 /** Register the live co-op session (called when a co-op run is being set up). */
 export function setCoopRuntime(runtime: CoopRuntime): void {
   active = runtime;
+  // Wave-2e: point the operation journal at THIS runtime's durability manager. Load-bearing in the duo
+  // harness, where two runtimes coexist in-process and `withClient` swaps the active one per pumped client -
+  // the migrated adapters' commit path must journal into the ACTIVE client's manager, not a stale global.
+  setCoopOperationDurability(runtime.durability ?? null);
   // Install the cycle-free authoritative-guest predicate (#633 B6) so `field/pokemon.ts` can gate the
   // Shedinja party-add without importing this module (which would close a value-level import cycle).
   setCoopAuthoritativeGuestPredicate(isCoopAuthoritativeGuest);

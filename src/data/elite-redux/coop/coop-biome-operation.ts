@@ -108,6 +108,15 @@ let authorityHost: CoopOperationHost | null = null;
 let watchGuest: CoopOperationGuest | null = null;
 
 /**
+ * A SEPARATE applier for the durability JOURNAL replay path (Wave-2e), distinct from `watchGuest`. In
+ * dual-run the LEGACY relay-adopt path (watchGuest) drives the phase's biome switch, so the journal MUST
+ * NOT consume the operationId that path dedupes on (that would make the live adopt see its own op as a
+ * duplicate and fall back). The journal is the DURABILITY ledger - it converges the op history over a cut
+ * without touching the live adopt path. Lazily created; reset on session boundaries.
+ */
+let journalWatchGuest: CoopOperationGuest | null = null;
+
+/**
  * The highest interaction-counter (pinned) value the local client has already ADOPTED a biome-travel op at
  * AS A WATCHER. Cross-op stale ordering runs on this (a pick pinned strictly BELOW it is a stale leftover
  * from an earlier interaction, §1.6). Advanced ONLY by a watcher adoption - never by the owner's own commit,
@@ -151,6 +160,7 @@ export function setCoopBiomeOperationEpoch(next: number): void {
 export function resetCoopBiomeOperationState(): void {
   authorityHost = null;
   watchGuest = null;
+  journalWatchGuest = null;
   lastAppliedPinned = -1;
 }
 
@@ -170,6 +180,14 @@ function guest(): CoopOperationGuest {
     watchGuest = new CoopOperationGuest({ epoch });
   }
   return watchGuest;
+}
+
+/** The dedicated journal-replay applier (Wave-2e), separate from the live relay-adopt `guest()`. */
+function journalGuest(): CoopOperationGuest {
+  if (journalWatchGuest == null) {
+    journalWatchGuest = new CoopOperationGuest({ epoch });
+  }
+  return journalWatchGuest;
 }
 
 /**
@@ -393,9 +411,9 @@ function applyJournaledBiomeEnvelope(envelope: CoopAuthoritativeEnvelopeV1): boo
   if (op == null || op.status !== "applied") {
     return false;
   }
-  const g = guest();
+  const g = journalGuest();
   if (g.hasApplied(op.id)) {
-    return false; // dual-run: the live relay-adopt path already applied this op - the journal is a backstop.
+    return false; // already converged via the journal (a reconnect resend re-delivery) - idempotent no-op.
   }
   const res = g.applyEnvelope(envelope);
   if (res.kind !== "applied") {
