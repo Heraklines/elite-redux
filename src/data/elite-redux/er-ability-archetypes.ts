@@ -576,7 +576,7 @@ export const ER_ABILITY_ARCHETYPES: Readonly<Record<number, ErAbilityArchetypeEn
   799: { erAbilityId: 799, archetype: "type-damage-boost", params: {"type":"ROCK","multiplier":1.3,"lowHpMultiplier":1.8,"lowHpThreshold":0.3333333333333333} },
   800: { erAbilityId: 800, archetype: "bespoke", params: null },
   801: { erAbilityId: 801, archetype: "composite-vanilla-mashup", params: {"parts":["Leaf Guard","Harvest"]} },
-  802: { erAbilityId: 802, archetype: "composite-vanilla-mashup", params: {"parts":["Chlorophyll","Solar Power"]} },
+  802: { erAbilityId: 802, archetype: "bespoke", params: null }, // Rite Of Spring: sun -> SPD x1.5 + highest attacking stat x1.5 (the Chlorophyll+Solar Power composite gave SPD x2, SpAtk-only, and an unwanted HP drain) — see dispatchBespoke
   803: { erAbilityId: 803, archetype: "entry-effect", params: {"effect":{"kind":"self-stat-boost","stat":"SPDEF","stages":1}} },
   804: { erAbilityId: 804, archetype: "bespoke", params: null },
   805: { erAbilityId: 805, archetype: "composite-vanilla-mashup", params: {"parts":["Tinted Lens","Sand Guard"]} },

@@ -59,6 +59,7 @@ import {
   ChangeMovePriorityAbAttr,
   ConditionalCritAbAttr,
   DefensiveStatSubstituteAbAttr,
+  FogRestoreDisguiseFormChangeAbAttr,
   FullHpResistTypeAbAttr,
   getWeatherCondition,
   HealFromBerryUseAbAttr,
@@ -71,10 +72,12 @@ import {
   PostAttackRemoveTargetTypeAbAttr,
   PostAttackStealHeldItemAbAttr,
   PostBiomeChangeWeatherChangeAbAttr,
+  PostDefendApplyBattlerTagAbAttr,
   PostDefendContactApplyTagChanceAbAttr,
   PostDefendStatStageChangeAbAttr,
   PostReceiveCritStatStageChangeAbAttr,
   PostSummonAbAttr,
+  PostSummonFogRestoreDisguiseAbAttr,
   PostSummonRemoveArenaTagAbAttr,
   PostSummonTerrainChangeAbAttr,
   PostSummonWeatherChangeAbAttr,
@@ -957,18 +960,61 @@ const ABILITY_PATCHERS: ReadonlyMap<AbilityId, (ability: MutableAbility) => void
   [AbilityId.MINUS, ab => mutateStatMultiplier(ab, Stat.SPATK, 2.0)],
 
   // 73 WHITE_SMOKE: vanilla "stat-drop immunity". ER COMPLETELY DIFFERENT
-  // — "Sets Smokescreen for 3 turns on switch-in". Add a Mist arena tag
-  // on entry (Mist is the engine equivalent of vanilla Smokescreen with
-  // stat-drop protection extended to side).
+  // — "Sets Smokescreen for 3 turns on switch-in; Smokescreen raises the party's
+  // evasiveness by 25%". Use the ER_SMOKESCREEN arena tag (which grants the +25%
+  // side evasion), NOT Mist (Mist only blocks stat drops and gives no evasion).
   [
     AbilityId.WHITE_SMOKE,
     ab => {
       ab.attrs.push(
         new EntryEffectAbAttr({
           kind: "set-screen-or-room",
-          tag: ArenaTagType.MIST,
+          tag: ArenaTagType.ER_SMOKESCREEN,
           turns: 3,
         }),
+      );
+    },
+  ],
+
+  // 209 DISGUISE: ER adds "In fog, the disguise is restored immediately once per
+  // switch in, or when fog is set again." Vanilla DISGUISE has no fog logic; wire
+  // the two fog-restore primitives (also used by Patchwork 693). Busted form is
+  // index 1 for every Disguise holder (disguised=0, busted=1).
+  [
+    AbilityId.DISGUISE,
+    ab => {
+      if (!ab.attrs.some(a => a instanceof FogRestoreDisguiseFormChangeAbAttr)) {
+        ab.attrs.push(new FogRestoreDisguiseFormChangeAbAttr(1), new PostSummonFogRestoreDisguiseAbAttr(1));
+      }
+    },
+  ],
+
+  // 448 ELECTROMORPHOSIS: ER dex is "when hit by ANY move, becomes charged"
+  // (vanilla charges only on a damaging hit). Replace the damaging-only CHARGED
+  // proc with an any-move one.
+  [
+    AbilityId.ELECTROMORPHOSIS,
+    ab => {
+      ab.attrs = ab.attrs.filter(a => !(a instanceof PostDefendApplyBattlerTagAbAttr));
+      ab.attrs.push(new PostDefendApplyBattlerTagAbAttr(() => true, BattlerTagType.CHARGED));
+    },
+  ],
+
+  // 251 SCREEN_CLEANER: ER dex removes Smokescreen too (vanilla only clears
+  // Reflect / Light Screen / Aurora Veil). Swap the removal attr for one that
+  // also clears ER_SMOKESCREEN. (The dex's "may re-set a screen while active"
+  // clause is a separate screen-set interaction, not covered here.)
+  [
+    AbilityId.SCREEN_CLEANER,
+    ab => {
+      ab.attrs = ab.attrs.filter(a => !(a instanceof PostSummonRemoveArenaTagAbAttr));
+      ab.attrs.push(
+        new PostSummonRemoveArenaTagAbAttr([
+          ArenaTagType.AURORA_VEIL,
+          ArenaTagType.LIGHT_SCREEN,
+          ArenaTagType.REFLECT,
+          ArenaTagType.ER_SMOKESCREEN,
+        ]),
       );
     },
   ],

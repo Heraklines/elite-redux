@@ -25,7 +25,7 @@
 // =============================================================================
 
 import { StatMultiplierAbAttr, type StatMultiplierAbAttrParams } from "#abilities/ab-attrs";
-import type { EffectiveStat, BattleStat } from "#enums/stat";
+import type { BattleStat, EffectiveStat } from "#enums/stat";
 import { Stat } from "#enums/stat";
 
 /** Filter shape — which moves trigger the speed bonus. */
@@ -56,6 +56,14 @@ export interface SpeedBonusToStatOptions {
    * meaningful "source" stats.
    */
   readonly sourceStat?: EffectiveStat;
+  /**
+   * When `true`, REPLACE the offensive stat with the (fractional) source stat
+   * instead of ADDING to it. Used by the "uses Speed INSTEAD OF Attack/SpAtk"
+   * abilities (Impulse, Momentum) — with `speedFraction: 1` the attacking stat
+   * becomes exactly the Speed value. Defaults to `false` (add mode, for the
+   * "+X% of Speed" abilities like Slipstream).
+   */
+  readonly replace?: boolean;
 }
 
 /**
@@ -69,6 +77,7 @@ export class SpeedBonusToStatAbAttr extends StatMultiplierAbAttr {
   private readonly speedFraction: number;
   private readonly bonusFilter: SpeedBonusFilter;
   private readonly sourceStat: EffectiveStat;
+  private readonly replace: boolean;
 
   constructor(options: SpeedBonusToStatOptions) {
     // Pass multiplier=1 to the parent so the base stat is unchanged; we add
@@ -81,6 +90,7 @@ export class SpeedBonusToStatAbAttr extends StatMultiplierAbAttr {
     this.speedFraction = options.speedFraction;
     this.bonusFilter = options.filter ?? {};
     this.sourceStat = options.sourceStat ?? Stat.SPD;
+    this.replace = options.replace ?? false;
   }
 
   override canApply(params: StatMultiplierAbAttrParams): boolean {
@@ -108,7 +118,9 @@ export class SpeedBonusToStatAbAttr extends StatMultiplierAbAttr {
 
   override apply(params: StatMultiplierAbAttrParams): void {
     const { pokemon, statVal } = params;
-    const sourceValue = pokemon.getStat(this.sourceStat, false);
-    statVal.value += Math.floor(sourceValue * this.speedFraction);
+    const bonus = Math.floor(pokemon.getStat(this.sourceStat, false) * this.speedFraction);
+    // Replace mode ("uses Speed INSTEAD OF Atk/SpAtk") overwrites the offensive
+    // stat; add mode ("+X% of Speed") stacks on top of it.
+    statVal.value = this.replace ? bonus : statVal.value + bonus;
   }
 }

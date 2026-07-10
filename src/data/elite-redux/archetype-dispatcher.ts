@@ -60,6 +60,7 @@ import {
   AddMoveFlagAbAttr,
   AllAttacksMultiHitAbAttr,
   AlwaysHitAbAttr,
+  ArenaTrapAbAttr,
   AttackTypeImmunityAbAttr,
   BadDreamsImmunityAbAttr,
   BattlerTagImmunityAbAttr,
@@ -3415,10 +3416,33 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
       biofilm.addCondition(() => globalScene.arena.terrain?.terrainType === TerrainType.TOXIC);
       return ok([biofilm]);
     }
+    case 802:
+      // Rite Of Spring — "Boosts the user's Speed and highest attacking stat by
+      // 50% when sun is active." Sun-gated SPD x1.5 + highest-of-{Atk,SpAtk}
+      // x1.5. (The old Chlorophyll+Solar Power composite gave SPD x2, boosted
+      // SpAtk only, and added an unwanted 1/8-HP-per-sun-turn drain.)
+      return ok([
+        new WeatherStatMultiplierAbAttr({
+          stat: Stat.SPD,
+          multiplier: 1.5,
+          weathers: [WeatherType.SUNNY, WeatherType.HARSH_SUN],
+        }),
+        new SelfHighestStatMultiplierAbAttr({
+          candidates: [Stat.ATK, Stat.SPATK],
+          multiplier: 1.5,
+          weathers: [WeatherType.SUNNY, WeatherType.HARSH_SUN],
+        }),
+      ]);
     case 546:
-      // Salt Circle — "Prevents opposing pokemon from fleeing on entry."
-      // Uses Mean Look mechanic.
-      return ok([new PostSummonScriptedMoveAbAttr({ moveId: MoveId.MEAN_LOOK })]);
+      // Salt Circle — "Prevents ALL opposing Pokemon from fleeing or switching
+      // when the user enters battle. Effect lasts until the user leaves field.
+      // Forced switches and pivot moves like Flip Turn still work." This is a
+      // continuous field trap (active exactly while the holder is on field), like
+      // Shadow Tag — NOT a one-shot Mean Look, which only trapped the single foe
+      // present at cast time and left it trapped after the holder switched out.
+      // ArenaTrapAbAttr excludes Ghost / Run Away inherently and does not block
+      // forced switches or self-switch moves, matching the dex.
+      return ok([new ArenaTrapAbAttr(() => true)]);
     case 677:
       // Petrify — "Clears stat buffs then lowers speed by one stage on entry."
       // Composite: clear all opponent stats (Haze-style) + speed -1.
@@ -4474,10 +4498,17 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
       // landed") — refine later with a status-cascade primitive.
       return ok([new ChanceBattlerTagOnHitAbAttr({ chance: 30, tags: [BattlerTagType.ER_FEAR] })]);
     case 468:
-      // Super Hot Goo — "Inflicts burn and lowers Speed on contact."
+      // Super Hot Goo — "Contact moves have a 30% chance to inflict burn and the
+      // user lowers the attacker's Speed by one stage when receiving a contact
+      // move." Both halves are CONTACT-gated: burn via ChanceStatusOnHit's
+      // default contactRequired, the SPD drop via an explicit MAKES_CONTACT flag
+      // filter (previously it fired on any connecting move).
       return ok([
         new ChanceStatusOnHitAbAttr({ chance: 30, effects: [StatusEffect.BURN] }),
-        new StatTriggerOnHitAbAttr({ stats: [{ stat: Stat.SPD, stages: -1 }] }),
+        new StatTriggerOnHitAbAttr({
+          stats: [{ stat: Stat.SPD, stages: -1 }],
+          filter: { flags: [MoveFlags.MAKES_CONTACT] },
+        }),
       ]);
     case 912:
       // Laser Drill — "Horn moves have a 50% burn chance."
@@ -5913,17 +5944,22 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
       // True substitution: contact moves use Speed as the attacking stat.
       return ok([new AttackStatSubstituteAbAttr({ physicalStat: Stat.SPD, specialStat: Stat.SPD, contactOnly: true })]);
     case 551:
-      // Impulse — "Non-contact moves use the Speed stat for damage."
+      // Impulse — "Non-contact moves use the Speed stat for damage INSTEAD OF
+      // Attack/Special Attack." Replace mode (statVal = Speed), not add mode
+      // (which gave Atk+Speed, ~2x). `getStat(SPD, false)` ignores Choice Scarf,
+      // honoring "Choice Scarf does not affect this ability."
       return ok([
         new SpeedBonusToStatAbAttr({
           stat: Stat.ATK,
           speedFraction: 1,
           filter: { contact: "non" },
+          replace: true,
         }),
         new SpeedBonusToStatAbAttr({
           stat: Stat.SPATK,
           speedFraction: 1,
           filter: { contact: "non" },
+          replace: true,
         }),
       ]);
     case 367:
