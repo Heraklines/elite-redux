@@ -122,3 +122,18 @@ interceptor timeout under load) are both the #899 scheduling-race class in the T
 bisect-exonerated from all product commits. Re-run any suspicious lane solo before attributing
 a red to code. Fixing #899 (event-driven rendezvous release + possibly a load-aware
 interceptor budget) will remove this triage tax.
+
+## 8. Continuation evidence (authoritative-surface live materializers)
+
+Work resumed on the same branch after this handoff. Claims below are intentionally limited to the
+surface tests run; the full four-lane gate and final long soak have **not** yet been rerun.
+
+| Surface | Failure-first RED | GREEN implementation | Live-state proof |
+|---|---|---|---|
+| Biome travel / crossroads | `5d14d7296` | `c0bad7aeb` | `coop-duo-biome-operation.test.ts`: `DURABILITY: dropping only biomePick still materializes the committed op through the real guest travel path` (2/2 file green). The journal and relay now share one `CoopOperationGuest`; the production sink feeds the receiver's real biome/crossroads relay safe path. |
+| Reward + biome market | `fe8c5d60f` | `17db58d40` | `coop-duo-reward-operation.test.ts`: dropped reward relay still applies the committed party-target action/sub-pick (5/5 file green). `coop-duo-biome-market-continuation.test.ts`: dropped `biomeShop` buy + leave relays materialize the two-operation ordinal stream, money/party target, continuation pin, and terminal (2/2 file green). |
+
+Shared regression evidence for these commits: `coop-interaction-relay`, `coop-interaction-kind-validation`,
+`coop-operation-durability-remediation`, and `coop-operation-durability-convergence` = 29/29 green;
+`tsc --noEmit` produced zero errors in touched files. Residual: mystery-encounter live materialization and
+ledger unification is next; all later work items in section 6 remain open.
