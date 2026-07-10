@@ -86,22 +86,25 @@ describe.skipIf(!RUN)("ER Ripen — resist berry 75% + Leppa 20 PP", () => {
     const player = game.scene.getPlayerPokemon()!;
     const enemy = game.scene.getEnemyPokemon()!;
 
-    // Use SPLASH (40 PP) as a live moveset instance. getMoveset() reads
-    // summonData.moveset during battle, so set it there (and avoid the
-    // MOVESET_OVERRIDE path, which returns throwaway copies each call).
+    // Use a live moveset instance. getMoveset() reads summonData.moveset during
+    // battle, so set it there (and avoid the MOVESET_OVERRIDE path, which
+    // returns throwaway copies each call).
     player.summonData.moveset = [new PokemonMove(MoveId.SPLASH)];
     enemy.summonData.moveset = [new PokemonMove(MoveId.SPLASH)];
     const pMove = player.getMoveset()[0];
     const eMove = enemy.getMoveset()[0];
+    const maxPp = pMove.getMovePp();
 
-    // Ripen player: deplete a move by 25 PP; Leppa restores 20 -> ppUsed 5.
-    pMove.ppUsed = 25;
+    // Fully deplete the move, then eat a Leppa.
+    pMove.ppUsed = maxPp;
+    eMove.ppUsed = maxPp;
+
+    // Ripen player: Leppa restores 20 PP.
     getBerryEffectFunc(BerryType.LEPPA)(player);
-    expect(pMove.ppUsed).toBe(5);
+    expect(maxPp - pMove.ppUsed, "Ripen Leppa restores 20 PP").toBe(20);
 
-    // Control (no Ripen): Leppa restores 10 -> ppUsed 15.
-    eMove.ppUsed = 25;
+    // Control (no Ripen): Leppa restores 10 PP.
     getBerryEffectFunc(BerryType.LEPPA)(enemy);
-    expect(eMove.ppUsed).toBe(15);
+    expect(maxPp - eMove.ppUsed, "plain Leppa restores 10 PP").toBe(10);
   });
 });
