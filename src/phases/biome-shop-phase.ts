@@ -448,20 +448,20 @@ export class BiomeShopPhase extends SelectModifierPhase {
       const decision = adoptRewardWatcherChoice({
         surface: "market",
         pinned: this.coopBiomeStart,
-        action: { choice: action.choice, data: action.data },
+        action: { choice: action.choice, data: action.data, operationId: action.operationId },
         terminal,
         localRole: getCoopController()?.role ?? "guest",
         wave: globalScene.currentBattle?.waveIndex ?? -1,
       });
-      if (terminal) {
-        break;
-      }
       if (!decision.adopt) {
         coopWarn(
           "reward",
           `biome market watcher op-gate rejected buy (${decision.reason}) seq=${seq} slot=${action.choice} - keep awaiting (Wave-2d)`,
         );
         continue;
+      }
+      if (terminal) {
+        break;
       }
       const slot = action.choice;
       const data = action.data ?? [];

@@ -58,6 +58,7 @@ import {
   withClient,
   withClientSync,
 } from "#test/tools/coop-duo-harness";
+import { wrapCoopFaultPair } from "#test/tools/coop-fault-transport";
 import Phaser from "phaser";
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
@@ -183,10 +184,19 @@ describe.skipIf(!RUN)("co-op DUO biome-market continuation buy (#866): pinned co
   // adopts + applies + leaves. The queued continuation must be a PINNED BiomeShopPhase, NO "SKIP
   // unpinned" WARN may fire, and both engines must advance the interaction counter exactly once.
   // ===========================================================================================
-  it("owner buys a TM + leaves, watcher mirrors: pinned continuation, no unpinned advance, lockstep", async () => {
+  it("durability: dropped biomeShop relays still materialize TM buy + leave in ordinal order", async () => {
     setCoopBiomeMarketTestSkip(false); // drive the REAL co-op market
     await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
-    const pair = createLoopbackPair();
+    const pair = wrapCoopFaultPair(
+      createLoopbackPair(),
+      {
+        drop: 1,
+        reorder: 0,
+        delay: 0,
+        faultable: msg => msg.t === "interactionChoice" && msg.kind === "biomeShop",
+      },
+      { seed: 0xb10e5a },
+    );
     const rig = await buildDuo(game, pair, setCoopRuntime, toCoop);
     wireGuestCommand(rig);
 
@@ -301,11 +311,10 @@ describe.skipIf(!RUN)("co-op DUO biome-market continuation buy (#866): pinned co
     expect(rig.hostRuntime.controller.interactionCounter(), "owner advanced the interaction once").toBe(
       counterBefore + 1,
     );
+    expect(pair.faultsInjected(), "the legacy market buy + leave stream must actually be dropped").toBeGreaterThan(0);
     // The continuation the buy queued is a PINNED BiomeShopPhase (carries coopBiomeStart), not the
     // unpinned plain-SelectModifierPhase orphan (pre-fix this array is empty - the copy had no coopBiomeStart).
-    expect(queuedContinuation.length, "the TM buy queued a BiomeShopPhase continuation (carries a biome pin)").toBe(
-      1,
-    );
+    expect(queuedContinuation.length, "the TM buy queued a BiomeShopPhase continuation (carries a biome pin)").toBe(1);
     expect(queuedContinuation[0].biomeStart, "the continuation inherited the market pin (counter 0)").toBe(
       counterBefore,
     );

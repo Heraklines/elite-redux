@@ -139,6 +139,8 @@ export interface CoopInteractionChoice {
    * wire; may be undefined for a synthetic choice.
    */
   kind?: string;
+  /** Local-only durable carrier correlation. Never serialized on the legacy interactionChoice wire arm. */
+  operationId?: string | undefined;
 }
 
 /** Options for {@linkcode CoopInteractionRelay} (timer injection for tests). */
@@ -335,8 +337,14 @@ export class CoopInteractionRelay {
    * second network carrier. A waiting phase wakes immediately; otherwise the choice is buffered until that
    * phase opens. The surface adapter still performs its normal operation-ledger adopt before mutating.
    */
-  materializeCommittedInteractionChoice(seq: number, kind: string, choice: number, data?: number[]): void {
-    this.deliverInteractionChoice(seq, { choice, data, kind });
+  materializeCommittedInteractionChoice(
+    seq: number,
+    kind: string,
+    choice: number,
+    data?: number[],
+    operationId?: string | undefined,
+  ): void {
+    this.deliverInteractionChoice(seq, { choice, data, kind, operationId });
   }
 
   /**

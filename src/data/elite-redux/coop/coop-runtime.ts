@@ -59,6 +59,7 @@ import { CoopDurabilityManager, isCoopDurabilityEnabled } from "#data/elite-redu
 import {
   COOP_DEX_SYNC_SEQ,
   CoopInteractionRelay,
+  coopBiomeShopSeq,
   isCoopFaintSwitchSeq,
   isCoopFaintSwitchWindowOpen,
   resetCoopFaintSwitchWindows,
@@ -82,6 +83,8 @@ import type {
   CoopAuthoritativeEnvelopeV1,
   CoopBiomePickPayload,
   CoopCrossroadsPickPayload,
+  CoopRewardActionPayload,
+  CoopShopBuyPayload,
   CoopWaveAdvancePayload,
 } from "#data/elite-redux/coop/coop-operation-envelope";
 import { parseCoopOperationId } from "#data/elite-redux/coop/coop-operation-envelope";
@@ -93,15 +96,19 @@ import {
 } from "#data/elite-redux/coop/coop-operation-journal";
 import { CoopRendezvous } from "#data/elite-redux/coop/coop-rendezvous";
 import {
+  armCoopRewardJournalMaterialization,
+  COOP_REWARD_ACTION_STRIDE,
   isCoopRewardOperationEnabled,
   resetCoopRewardOperationState,
   setCoopRewardOperationRevisionFloor,
 } from "#data/elite-redux/coop/coop-reward-operation";
 import {
   COOP_BIOME_PICK_SEQ_BASE,
+  COOP_BIOME_SHOP_CHOICE_KINDS,
   COOP_CROSSROADS_SEQ_BASE,
   COOP_ME_TERM_SEQ_BASE,
   COOP_REJOIN_SYNC_SEQ_BASE,
+  COOP_REWARD_CHOICE_KINDS,
   COOP_STORMGLASS_SEQ,
 } from "#data/elite-redux/coop/coop-seq-registry";
 import { coopFieldIndexOf, coopOwnerOfFieldSlot } from "#data/elite-redux/coop/coop-session";
@@ -1852,6 +1859,64 @@ function materializeCoopBiomeChoiceFromOp(runtime: CoopRuntime, envelope: CoopAu
   return false;
 }
 
+/** Feed one journal-led reward/market action into this receiver's existing safe FIFO apply loop. */
+function materializeCoopRewardActionFromOp(runtime: CoopRuntime, envelope: CoopAuthoritativeEnvelopeV1): boolean {
+  if (runtime.controller.netcodeMode !== "authoritative" || runtime.controller.role !== "guest") {
+    return false;
+  }
+  const op = envelope.pendingOperation;
+  const parsed = op == null ? null : parseCoopOperationId(op.id);
+  if (op == null || parsed == null || parsed.pinnedSeq < 0) {
+    return false;
+  }
+  const pinned = Math.floor(parsed.pinnedSeq / COOP_REWARD_ACTION_STRIDE);
+  const ordinal = parsed.pinnedSeq % COOP_REWARD_ACTION_STRIDE;
+  if (!Number.isSafeInteger(pinned) || !Number.isSafeInteger(ordinal) || ordinal < 0) {
+    return false;
+  }
+  if (op.kind === "REWARD") {
+    const payload = op.payload as CoopRewardActionPayload;
+    if (
+      typeof payload?.label !== "string"
+      || !COOP_REWARD_CHOICE_KINDS.some(kind => kind === payload.label)
+      || typeof payload.choice !== "number"
+      || typeof payload.terminal !== "boolean"
+      || (payload.data !== undefined && (!Array.isArray(payload.data) || !payload.data.every(Number.isFinite)))
+    ) {
+      return false;
+    }
+    runtime.interactionRelay.materializeCommittedInteractionChoice(
+      pinned,
+      payload.label,
+      payload.choice,
+      payload.data,
+      op.id,
+    );
+    armCoopRewardJournalMaterialization(op.id, pinned);
+    return true;
+  }
+  if (op.kind === "SHOP_BUY") {
+    const payload = op.payload as CoopShopBuyPayload;
+    if (
+      typeof payload?.slot !== "number"
+      || typeof payload.terminal !== "boolean"
+      || (payload.data !== undefined && (!Array.isArray(payload.data) || !payload.data.every(Number.isFinite)))
+    ) {
+      return false;
+    }
+    runtime.interactionRelay.materializeCommittedInteractionChoice(
+      coopBiomeShopSeq(pinned),
+      COOP_BIOME_SHOP_CHOICE_KINDS[0],
+      payload.slot,
+      payload.data,
+      op.id,
+    );
+    armCoopRewardJournalMaterialization(op.id, pinned);
+    return true;
+  }
+  return false;
+}
+
 /**
  * Co-op WAVE-END authoritative capture (#838): the HOST streams the COMPLETE post-exp authoritative
  * battle state (whole player + enemy party as serialized PokemonData, seating, arena, modifiers, money,
@@ -2323,6 +2388,7 @@ export function assembleCoopRuntime(
   // process there is one runtime; in the duo harness the final (guest) assembly intentionally owns the one
   // module-level sink, matching the sole receiver topology.
   registerCoopOperationLiveSink("op:biome", envelope => materializeCoopBiomeChoiceFromOp(runtime, envelope));
+  registerCoopOperationLiveSink("op:reward", envelope => materializeCoopRewardActionFromOp(runtime, envelope));
   wireCoopGhostPoolSync(controller, battleStream);
   wireCoopResyncResponder(controller, battleStream);
   wireCoopEnemyPartyResponder(controller, battleStream);

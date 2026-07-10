@@ -1507,7 +1507,7 @@ export class SelectModifierPhase extends BattlePhase {
       const decision = adoptRewardWatcherChoice({
         surface: "reward",
         pinned: this.coopInteractionStart,
-        action: { choice: action.choice, data: action.data },
+        action: { choice: action.choice, data: action.data, operationId: action.operationId },
         terminal: action.choice === COOP_INTERACTION_LEAVE,
         localRole: controller.role,
         wave: globalScene.currentBattle?.waveIndex ?? -1,
