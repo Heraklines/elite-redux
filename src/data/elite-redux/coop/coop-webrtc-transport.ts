@@ -85,6 +85,8 @@ export class WebRtcTransport implements CoopTransport {
   private readonly stateHandlers = new Set<(state: CoopConnectionState) => void>();
   /** #857 keepalive: cancel handle for the running ping timer (null until {@linkcode startKeepalive}). */
   private keepaliveCancel: (() => void) | null = null;
+  /** #diagnostics: epoch-ms the last inbound frame arrived (0 = none yet). Includes keepalive ping/pong. */
+  private lastRxAt = 0;
 
   constructor(role: CoopRole, wire: CoopWireChannel) {
     this.role = role;
@@ -235,7 +237,16 @@ export class WebRtcTransport implements CoopTransport {
     }
   }
 
+  /** #diagnostics: age (ms) of the last inbound frame (incl. keepalive), or undefined if none yet. */
+  lastRxMs(): number | undefined {
+    return this.lastRxAt === 0 ? undefined : Date.now() - this.lastRxAt;
+  }
+
   private receive(data: string): void {
+    // #diagnostics: stamp the last-received-frame time for ANY inbound frame (BEFORE the ping/pong
+    // swallow + the JSON parse) so a live-but-idle tab - which still receives ~5s keepalives - reads a
+    // small age, while a suspended/dead tab that stops sending even keepalives reads a growing one.
+    this.lastRxAt = Date.now();
     let parsed: unknown;
     try {
       parsed = JSON.parse(data);

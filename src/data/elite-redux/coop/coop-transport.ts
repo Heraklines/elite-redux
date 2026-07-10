@@ -1254,6 +1254,18 @@ export interface CoopTransport {
    * the in-process loopback (which has no wire-level error to report).
    */
   disconnectReason?(): string | undefined;
+  /**
+   * #diagnostics (optional): age in ms of the last ANY inbound frame received on this transport -
+   * INCLUDING transport-internal keepalive ping/pong - or `undefined` if nothing has been received
+   * yet. A PASSIVE read (no protocol change, no extra frames): it only stamps the arrival time the
+   * receive path already runs. This is the true heartbeat the #808 health-line `peerBeat` is NOT
+   * (`peerBeat` is only the age of the last STALL beat, which a healthy peer never sends). Because a
+   * live-but-idle tab still emits keepalive pings (~5s), a small `lastRxMs` means the peer is alive;
+   * a growing one means a SUSPENDED / dead tab that stopped sending even keepalives - so a stalled
+   * session can be told apart from a merely dropped operation. Surfaced in the health line + the
+   * report control-plane block.
+   */
+  lastRxMs?(): number | undefined;
 }
 
 /**
@@ -1356,6 +1368,8 @@ class LoopbackTransport implements CoopTransport {
   private peer: LoopbackTransport | null = null;
   private readonly msgHandlers = new Set<(msg: CoopMessage) => void>();
   private readonly stateHandlers = new Set<(state: CoopConnectionState) => void>();
+  /** #diagnostics: epoch-ms the last inbound frame was delivered to this endpoint (0 = none yet). */
+  private lastRxAt = 0;
 
   constructor(role: CoopRole) {
     this.role = role;
@@ -1403,6 +1417,8 @@ class LoopbackTransport implements CoopTransport {
         }
         return;
       }
+      // #diagnostics: stamp the last-received-frame time on the RECEIVING endpoint (passive read).
+      peer.lastRxAt = Date.now();
       if (isCoopDebug()) {
         coopLog(
           "transport",
@@ -1413,6 +1429,11 @@ class LoopbackTransport implements CoopTransport {
         h(msg);
       }
     });
+  }
+
+  /** #diagnostics: age (ms) of the last inbound frame, or undefined if none received yet. */
+  lastRxMs(): number | undefined {
+    return this.lastRxAt === 0 ? undefined : Date.now() - this.lastRxAt;
   }
 
   onMessage(handler: (msg: CoopMessage) => void): () => void {

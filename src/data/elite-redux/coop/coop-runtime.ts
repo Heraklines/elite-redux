@@ -697,6 +697,12 @@ let offStallWatchdog: (() => void) | null = null;
  * network wait. Converts every current AND FUTURE mutual-wait bug from a softlock into a
  * seconds-long self-healed hiccup with a loud log marker.
  */
+/** #diagnostics: format a transport's last-inbound-frame age as a compact `<n>s` / `-` health token. */
+function formatLastRx(transport: CoopTransport): string {
+  const ms = transport.lastRxMs?.();
+  return ms == null ? "-" : `${Math.round(ms / 1000)}s`;
+}
+
 export function wireCoopStallWatchdog(
   transport: CoopTransport,
   relay: CoopInteractionRelay,
@@ -736,7 +742,7 @@ export function wireCoopStallWatchdog(
         lastHealthAt = Date.now();
         coopLog(
           "health",
-          `tick=${coopSessionGeneration()}g turn=${globalScene.currentBattle?.turn ?? "-"} wave=${globalScene.currentBattle?.waveIndex ?? "-"} counter=${runtime.controller.interactionCounter?.() ?? "-"} assertions=${getCoopChecksumAssertionCount()} wait=${localMs}ms peerBeat=${peerBeat ? `${Math.round((Date.now() - peerBeat.at) / 1000)}s` : "-"} transport=${transport.state}`,
+          `tick=${coopSessionGeneration()}g turn=${globalScene.currentBattle?.turn ?? "-"} wave=${globalScene.currentBattle?.waveIndex ?? "-"} counter=${runtime.controller.interactionCounter?.() ?? "-"} assertions=${getCoopChecksumAssertionCount()} wait=${localMs}ms peerBeat=${peerBeat ? `${Math.round((Date.now() - peerBeat.at) / 1000)}s` : "-"} lastRx=${formatLastRx(transport)} transport=${transport.state}`,
         );
       }
       // #806 faint-replacement suppression: a live human choosing (or the host awaiting) a faint
