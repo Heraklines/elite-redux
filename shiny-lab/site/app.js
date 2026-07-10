@@ -24,7 +24,54 @@ function recomputeCL() {
 }
 
 const PALS = ["base", ...ALL_PALETTE];
-const SLOTKIND = { palette: PALS, surface: ALL_AURA, around: ALL_AROUND };
+const SLOTKIND = { palette: PALS, surface: ALL_AURA, around: ALL_AROUND, exotic: ALL_EXOTIC };
+// exotic effects carry their labels on the registry - fold them into the shared LABELS map
+for (const [exoId, exoDef] of Object.entries(EXOTIC)) {
+  LABELS[exoId] = exoDef.label;
+}
+
+// ---- exotic layer state: composited-look canvas + frame-history ring ----------
+const RING_N = 24; // ~2s of rendered-look history at the 80ms capture cadence
+let lookCv = null;
+let lookCtx = null;
+let ringCv = [];
+let ringHead = -1;
+let lastRingCap = 0;
+let pulseAt = Number.NEGATIVE_INFINITY;
+function ensureExoticCanvases() {
+  lookCv = document.createElement("canvas");
+  lookCv.width = PW;
+  lookCv.height = PH;
+  lookCtx = lookCv.getContext("2d");
+  ringCv = [];
+  ringHead = -1;
+  for (let i = 0; i < RING_N; i++) {
+    const cv = document.createElement("canvas");
+    cv.width = PW;
+    cv.height = PH;
+    ringCv.push(cv);
+  }
+}
+const ringGet = n => {
+  if (ringHead < 0) {
+    return lookCv;
+  }
+  const lag = Math.max(0, Math.min(RING_N - 1, Math.round(n)));
+  return ringCv[(ringHead - lag + RING_N * 4) % RING_N];
+};
+// the hero canvas grows while an exotic effect is equipped so copies have room to roam
+function heroDims() {
+  return slots.exotic ? { EW: Math.round(PW * 2), EH: Math.round(PH * 1.7) } : { EW: PW, EH: PH };
+}
+function resizeHero() {
+  if (PW <= 0 || PH <= 0) {
+    return; // no species loaded yet
+  }
+  const { EW, EH } = heroDims();
+  heroCv.width = EW;
+  heroCv.height = EH;
+  heroImg = heroCtx.createImageData(PW, PH);
+}
 
 // ---- sprite loading (CDN) ----------------------------------------------------
 const sheet = document.createElement("canvas");
@@ -361,7 +408,7 @@ function mkTile(kind, name) {
   const el = document.createElement("div");
   el.className = `tile ${kind}`;
   const pill = PARTIAL.has(name) ? '<span class="pill">partial</span>' : "";
-  const dotc = kind === "around" ? "aro" : kind === "surface" ? "aura" : "pal";
+  const dotc = kind === "around" ? "aro" : kind === "surface" ? "aura" : kind === "exotic" ? "exo" : "pal";
   el.innerHTML = `<div class="frame"><canvas></canvas></div>
     <div class="name"><span class="dot ${dotc}"></span>${name === "base" ? "Base" : LABELS[name]}${pill}</div>`;
   const cv = el.querySelector("canvas");
@@ -369,7 +416,7 @@ function mkTile(kind, name) {
   const slots =
     kind === "palette" ? { palette: name } : kind === "surface" ? { palette: "base", surface: name } : { around: name };
   el.addEventListener("click", () => setSlot(kind, name));
-  const tile = { kind, name, slots, cv, ctx, img: null, el, vis: true };
+  const tile = { kind, name, slots, cv, ctx, img: null, el, vis: true, exo: kind === "exotic" ? name : null };
   tiles.push(tile);
   io.observe(el);
   return el;
@@ -378,18 +425,19 @@ function buildGallery() {
   PALS.forEach(n => document.getElementById("palGrid").appendChild(mkTile("palette", n)));
   ALL_AURA.forEach(n => document.getElementById("surfGrid").appendChild(mkTile("surface", n)));
   ALL_AROUND.forEach(n => document.getElementById("aroGrid").appendChild(mkTile("around", n)));
+  ALL_EXOTIC.forEach(n => document.getElementById("exoGrid").appendChild(mkTile("exotic", n)));
   document.getElementById("palCount").textContent = ALL_PALETTE.length + 1;
   document.getElementById("surfCount").textContent = ALL_AURA.length;
   document.getElementById("aroCount").textContent = ALL_AROUND.length;
+  document.getElementById("exoCount").textContent = ALL_EXOTIC.length;
 }
 function resizeCanvases() {
-  heroCv.width = PW;
-  heroCv.height = PH;
-  heroImg = heroCtx.createImageData(PW, PH);
+  resizeHero();
+  ensureExoticCanvases();
   for (const t of tiles) {
     t.cv.width = PW;
     t.cv.height = PH;
-    t.img = t.ctx.createImageData(PW, PH);
+    t.img = t.exo ? null : t.ctx.createImageData(PW, PH);
   }
 }
 
@@ -397,7 +445,7 @@ function resizeCanvases() {
 const heroCv = document.getElementById("heroCanvas");
 const heroCtx = heroCv.getContext("2d");
 let heroImg = null;
-const slots = { palette: "glacier", surface: "", around: "auroraveil" };
+const slots = { palette: "glacier", surface: "", around: "auroraveil", exotic: "" };
 let speed = 1; // master speed (multiplies both layers)
 let palIntensity = 1;
 let surfIntensity = 1;
@@ -420,14 +468,17 @@ const nameOf = kind => {
   return !v || v === "base" ? "" : LABELS[v];
 };
 function refreshHero() {
-  const parts = [nameOf("palette"), nameOf("surface"), nameOf("around")].filter(Boolean);
+  const parts = [nameOf("palette"), nameOf("surface"), nameOf("around"), nameOf("exotic")].filter(Boolean);
   document.getElementById("heroName").textContent = parts.length > 0 ? parts.join("  +  ") : "Base";
   document.querySelector(".stage .glow").style.background =
-    `radial-gradient(circle, ${slots.around ? "#ffd27a" : slots.surface ? "#ff7ad9" : "#5ad1ff"}33, transparent 70%)`;
-  for (const k of ["palette", "surface", "around"]) {
+    `radial-gradient(circle, ${slots.exotic ? "#b78aff" : slots.around ? "#ffd27a" : slots.surface ? "#ff7ad9" : "#5ad1ff"}33, transparent 70%)`;
+  for (const k of ["palette", "surface", "around", "exotic"]) {
     document.getElementById("sel_" + k).value = slots[k];
   }
   tiles.forEach(t => t.el.classList.toggle("active", slots[t.kind] === t.name));
+  if (heroCv.width !== heroDims().EW) {
+    resizeHero();
+  }
 }
 function setSlot(kind, name) {
   slots[kind] = name === slots[kind] && kind !== "palette" ? "" : name;
@@ -435,7 +486,7 @@ function setSlot(kind, name) {
 }
 
 function wireControls() {
-  for (const k of ["palette", "surface", "around"]) {
+  for (const k of ["palette", "surface", "around", "exotic"]) {
     const sel = document.getElementById("sel_" + k);
     if (k !== "palette") {
       sel.appendChild(new Option("None", ""));
@@ -446,6 +497,9 @@ function wireControls() {
       refreshHero();
     });
   }
+  document.getElementById("pulse").addEventListener("click", () => {
+    pulseAt = performance.now();
+  });
   const cs = document.getElementById("sel_cluster");
   if (cs) {
     for (const [key, alg] of Object.entries(CLUSTERING)) {
@@ -503,6 +557,7 @@ function wireControls() {
     slots.palette = "base";
     slots.surface = "";
     slots.around = "";
+    slots.exotic = "";
     refreshHero();
   });
   document.getElementById("surprise").addEventListener("click", () => {
@@ -510,6 +565,7 @@ function wireControls() {
     slots.palette = pick(ALL_PALETTE);
     slots.surface = Math.random() < 0.5 ? "" : pick(ALL_AURA);
     slots.around = Math.random() < 0.4 ? "" : pick(ALL_AROUND);
+    slots.exotic = Math.random() < 0.35 ? pick(ALL_EXOTIC) : "";
     refreshHero();
   });
 }
@@ -547,9 +603,42 @@ function buildPicker() {
 // ---- loop --------------------------------------------------------------------
 let lastThumb = 0;
 let rr = 0;
+function exoEnv(t, EW, EH, ox, oy, dist, now, compact) {
+  return {
+    t,
+    look: lookCv,
+    ring: ringGet,
+    PW,
+    PH,
+    EW,
+    EH,
+    ox,
+    oy,
+    cx: dist.cx * PW,
+    cy: dist.cy * PH,
+    fy: dist.fy * PH,
+    seed: layerFx.aro.seed + curSpecies,
+    compact,
+    pulse: (now - pulseAt) / 1000,
+  };
+}
+function drawExoticScene(ctx2, exId, env) {
+  const ex = EXOTIC[exId];
+  ctx2.clearRect(0, 0, env.EW, env.EH);
+  ctx2.imageSmoothingEnabled = false;
+  if (ex && ex.behind) {
+    ex.behind(ctx2, env);
+  }
+  if (!(ex && ex.replacesBase)) {
+    ctx2.drawImage(lookCv, env.ox, env.oy);
+  }
+  if (ex && ex.front) {
+    ex.front(ctx2, env);
+  }
+}
 function loop(now) {
   requestAnimationFrame(loop);
-  if (frameBuf.length === 0 || !heroImg || !tiles[0] || !tiles[0].img) {
+  if (frameBuf.length === 0 || !heroImg || !lookCv || tiles.length === 0) {
     return;
   }
   const t = now / 1000;
@@ -558,11 +647,26 @@ function loop(now) {
   const ef = edgeFor(ai);
   const dist = distFor(ai);
   const fxp = fxLayerState();
+  // 1) composite the classic 3-slot look into the look canvas (per-pixel pass)
   renderLook(slots, cur, ef, dist, t * speed, heroImg.data, { pal: palIntensity, surf: surfIntensity, aro: aroIntensity }, fxp);
-  heroCtx.putImageData(heroImg, 0, 0);
+  lookCtx.putImageData(heroImg, 0, 0);
+  // 2) frame-history ring capture (~80ms cadence) for the exotic layer
+  if (now - lastRingCap > 80) {
+    lastRingCap = now;
+    ringHead = (ringHead + 1) % RING_N;
+    const rc = ringCv[ringHead].getContext("2d");
+    rc.clearRect(0, 0, PW, PH);
+    rc.drawImage(lookCv, 0, 0);
+  }
+  // 3) hero = exotic layers sandwiching the look (or a plain stamp when none equipped)
+  const EW = heroCv.width;
+  const EH = heroCv.height;
+  const ox = (EW - PW) >> 1;
+  const oy = Math.round((EH - PH) * 0.7);
+  drawExoticScene(heroCtx, slots.exotic, exoEnv(t * speed, EW, EH, ox, oy, dist, now, false));
   if (now - lastThumb > 60) {
     lastThumb = now;
-    const vis = tiles.filter(tl => tl.vis);
+    const vis = tiles.filter(tl => tl.vis && !tl.exo);
     const N = Math.min(vis.length, 16);
     for (let j = 0; j < N; j++) {
       const tl = vis[(rr + j) % vis.length];
@@ -570,6 +674,12 @@ function loop(now) {
       tl.ctx.putImageData(tl.img, 0, 0);
     }
     rr = vis.length > 0 ? (rr + N) % vis.length : 0;
+    // exotic tiles preview their effect applied to the CURRENT hero look (cheap 2D ops)
+    for (const tl of tiles) {
+      if (tl.exo && tl.vis) {
+        drawExoticScene(tl.ctx, tl.exo, exoEnv(t, PW, PH, 0, 0, dist, now, true));
+      }
+    }
   }
 }
 

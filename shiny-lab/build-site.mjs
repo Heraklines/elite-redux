@@ -6,6 +6,7 @@ const ERA = "../er-assets";
 
 const css = fs.readFileSync(`${DIR}/site/style.css`, "utf8");
 const fxSrc = fs.readFileSync(`${DIR}/fx.mjs`, "utf8").replace(/^export /gm, "");
+const exoticSrc = fs.readFileSync(`${DIR}/site/exotic.mjs`, "utf8").replace(/^export .*$/gm, "");
 const appJs = fs.readFileSync(`${DIR}/site/app.js`, "utf8");
 
 // pin the er-assets sha (jsDelivr serves cold files reliably only when pinned)
@@ -69,6 +70,7 @@ ${css}
     <span><span class="dot pal"></span><b>Palette</b> - crossplay-safe recolor</span>
     <span><span class="dot aura"></span><b>Surface FX</b> - on-sprite aura</span>
     <span><span class="dot aro"></span><b>Around FX</b> - aura around the mon (some partial)</span>
+    <span><span class="dot exo"></span><b>Exotic</b> - multi-sprite: copies, echoes, distortions</span>
     <span class="hint">mix one of each - click tiles or use the dropdowns</span>
   </div>
 </header>
@@ -85,6 +87,7 @@ ${css}
       <div class="row"><label class="lp">Palette</label><select id="sel_palette" class="sel"></select></div>
       <div class="row"><label class="ls">Surface FX</label><select id="sel_surface" class="sel"></select></div>
       <div class="row"><label class="la">Around FX</label><select id="sel_around" class="sel"></select></div>
+      <div class="row"><label class="lx">Exotic</label><select id="sel_exotic" class="sel"></select><button id="pulse" class="mini" title="Trigger event effects (Shatter)">&#9889;</button></div>
       <div class="row"><label class="lp">Clustering</label><select id="sel_cluster" class="sel" title="How the cluster palettes segment the sprite's colors"></select></div>
       <div class="row"><label>Speed (master)</label><input id="speed" type="range" min="0.1" max="3" step="0.05" value="1"></div>
       <div class="row"><label class="lp">Pal amount</label><input id="int_palette" type="range" min="0" max="1" step="0.02" value="1"></div>
@@ -130,6 +133,8 @@ ${css}
 <div class="grid" id="surfGrid"></div>
 <div class="section-title"><h3>Around FX</h3><span class="cnt"><span id="aroCount"></span></span><span>auras around the mon - glow, flames, orbits, backdrops (some partial)</span></div>
 <div class="grid" id="aroGrid"></div>
+<div class="section-title"><h3>Exotic (multi-sprite)</h3><span class="cnt"><span id="exoCount"></span></span><span>layered copies of the full look - depth orbits, time echoes, distortions, one-shots (&#9889; = press Pulse)</span></div>
+<div class="grid" id="exoGrid"></div>
 
 <footer>
   Prototype for the Elite Redux special-form shiny system. Sprites stream from the er-assets CDN (jsDelivr, pinned sha) like the game.
@@ -142,6 +147,7 @@ ${css}
 <script>window.LAB = ${JSON.stringify(data)};</script>
 <script>
 ${fxSrc}
+${exoticSrc}
 ${appJs}
 </script>
 </body>

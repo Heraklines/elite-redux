@@ -127,6 +127,13 @@ header p {
   background: var(--aro);
   box-shadow: 0 0 8px var(--aro);
 }
+.dot.exo {
+  background: #b78aff;
+  box-shadow: 0 0 8px #b78aff;
+}
+.lx {
+  color: #b78aff;
+}
 .legend .hint {
   color: var(--dim);
   font-style: italic;
