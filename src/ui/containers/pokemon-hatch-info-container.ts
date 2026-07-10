@@ -4,11 +4,21 @@ import { speciesEggMoves } from "#balance/moves/egg-moves";
 import { allMoves } from "#data/data-lists";
 import { getEggTierForSpecies } from "#data/egg";
 import type { EggHatchData } from "#data/egg-hatch-data";
+import { ensureErSpriteAnim } from "#data/elite-redux/er-form-sprite-redirect";
 import { Gender } from "#data/gender";
 import { PokemonType } from "#enums/pokemon-type";
 import { SpeciesId } from "#enums/species-id";
 import { TextStyle } from "#enums/text-style";
 import type { PlayerPokemon } from "#field/pokemon";
+import {
+  ErShinyLabSpriteFxOverlay,
+  type ErShinyLabSpriteSourceRef,
+  getErShinyLabPokemonSpriteSource,
+  getErShinyLabSpriteFxLookForPokemon,
+  getErShinyLabSpriteFxTime,
+  hasErShinyLabAnySpriteFx,
+  hasErShinyLabExactSpriteFx,
+} from "#sprites/er-shiny-lab-sprite-fx";
 import { addTextObject, updateCandyCountTextStyle } from "#ui/text";
 import { argbFromRgba, rgbHexToRgba } from "#utils/color-utils";
 import { padInt } from "#utils/common";
@@ -23,6 +33,11 @@ export class PokemonHatchInfoContainer extends PokemonInfoContainer {
   private currentPokemonSprite: Phaser.GameObjects.Sprite;
   /** Bumped on every displayPokemon() so out-of-order async loads can't apply a stale sprite. */
   private displayToken = 0;
+  /** The Pokemon currently shown, so the Shiny Lab FX timer can re-render its look. */
+  private currentPokemon: PlayerPokemon | null = null;
+  private shinyLabFxOverlay: ErShinyLabSpriteFxOverlay | null = null;
+  private shinyLabFxTimer: Phaser.Time.TimerEvent | null = null;
+  private shinyLabSpriteLoadKey: string | null = null;
   private pokemonNumberText: Phaser.GameObjects.Text;
   private pokemonNameText: Phaser.GameObjects.Text;
   private pokemonEggMovesContainer: Phaser.GameObjects.Container;
@@ -74,8 +89,15 @@ export class PokemonHatchInfoContainer extends PokemonInfoContainer {
     this.pokemonCandyCountText = addTextObject(14, 40, "x0", TextStyle.SUMMARY, { fontSize: "56px" }) //
       .setOrigin(0);
 
+    // Shiny Lab equipped-look overlay: a second sprite layered over the card sprite
+    // that carries the palette / surface / around FX (the egg-hatch summary card was
+    // the one surface where the equipped look never rendered).
+    this.shinyLabFxOverlay = new ErShinyLabSpriteFxOverlay(this.currentPokemonSprite, "egg-hatch-shiny-lab-fx");
+    this.shinyLabFxOverlay.getSprite().setVisible(false);
+
     this.pokemonListContainer.add([
       this.currentPokemonSprite,
+      this.shinyLabFxOverlay.getSprite(),
       this.pokemonNumberText,
       this.pokemonNameText,
       this.pokemonHatchedIcon,
@@ -125,6 +147,9 @@ export class PokemonHatchInfoContainer extends PokemonInfoContainer {
    */
   hideDisplayPokemon() {
     this.currentPokemonSprite.setVisible(false);
+    this.currentPokemon = null;
+    this.stopShinyLabFxTimer();
+    this.shinyLabFxOverlay?.hide(false);
   }
 
   /**
@@ -137,7 +162,10 @@ export class PokemonHatchInfoContainer extends PokemonInfoContainer {
     const formIndex = pokemon.formIndex;
     const shiny = pokemon.shiny;
     const variant = pokemon.variant;
+    this.currentPokemon = pokemon;
     this.currentPokemonSprite.setVisible(false);
+    this.shinyLabFxOverlay?.hide(false);
+    this.stopShinyLabFxTimer();
     // Guard against the rapid-cycling race: when the player flips between
     // hatched Pokémon quickly, an earlier (slower) loadAssets can resolve AFTER
     // a later one and play the wrong sprite, leaving it stuck on a previous
@@ -156,11 +184,118 @@ export class PokemonHatchInfoContainer extends PokemonInfoContainer {
       this.currentPokemonSprite.setPipelineData("variant", variant);
       this.currentPokemonSprite.setPipelineData("spriteKey", spriteKey);
       this.currentPokemonSprite.setVisible(true);
+      this.refreshShinyLabFx();
     });
     // Note: the per-entry cry is intentionally not played here. It would require
     // loading the .m4a (re-introducing the loader backlog that lags sprites) and
     // is cacophonous during rapid cycling; the cry already plays in the hatch
     // animation itself.
+  }
+
+  /**
+   * Render (or hide) the equipped Shiny Lab look over the current card sprite. Mirrors the
+   * summary-page surface: an owned palette/surface/around look composites onto a second sprite
+   * layered over the base one, and animated looks (surface / around) tick via a 100ms timer.
+   */
+  private refreshShinyLabFx(): void {
+    const pokemon = this.currentPokemon;
+    if (!pokemon || !this.shinyLabFxOverlay) {
+      return;
+    }
+    const look = getErShinyLabSpriteFxLookForPokemon(pokemon);
+    if (!hasErShinyLabAnySpriteFx(look)) {
+      this.shinyLabFxOverlay.hide();
+      this.stopShinyLabFxTimer();
+      return;
+    }
+    const baseSource = getErShinyLabPokemonSpriteSource(pokemon, true, look);
+    // A palette look renders from the BASE sprite, which may not be loaded yet (only the
+    // shiny card sprite was played) - fetch it, then re-refresh from the completion handler.
+    if (!globalScene.textures.exists(baseSource.key)) {
+      this.ensureShinyLabHatchSpriteLoaded(baseSource);
+      return;
+    }
+    const frame =
+      this.currentPokemonSprite.texture.key === baseSource.key ? this.currentPokemonSprite.frame?.name : null;
+    const source = frame == null ? baseSource : { ...baseSource, frame };
+    if (this.shinyLabFxOverlay.refresh(look, source, getErShinyLabSpriteFxTime())) {
+      this.currentPokemonSprite.setVisible(false);
+      if (hasErShinyLabExactSpriteFx(look)) {
+        this.startShinyLabFxTimer();
+      } else {
+        this.stopShinyLabFxTimer();
+      }
+    } else {
+      this.shinyLabFxOverlay.hide();
+      this.stopShinyLabFxTimer();
+    }
+  }
+
+  /** Load the base sprite atlas a palette look renders from, then re-refresh the FX. */
+  private ensureShinyLabHatchSpriteLoaded(source: ErShinyLabSpriteSourceRef): void {
+    if (globalScene.textures.exists(source.key)) {
+      ensureErSpriteAnim(source.key);
+      this.refreshShinyLabFx();
+      return;
+    }
+    if (!source.atlasPath || this.shinyLabSpriteLoadKey === source.key) {
+      return;
+    }
+    this.shinyLabSpriteLoadKey = source.key;
+    const completeEvent = `filecomplete-atlasjson-${source.key}`;
+    const cleanup = (): void => {
+      globalScene.load.off(completeEvent, onComplete);
+      globalScene.load.off(Phaser.Loader.Events.FILE_LOAD_ERROR, onError);
+      if (this.shinyLabSpriteLoadKey === source.key) {
+        this.shinyLabSpriteLoadKey = null;
+      }
+    };
+    const onComplete = (): void => {
+      cleanup();
+      if (this.currentPokemon) {
+        ensureErSpriteAnim(source.key);
+        this.refreshShinyLabFx();
+      }
+    };
+    const onError = (file: Phaser.Loader.File): void => {
+      if (file.key !== source.key) {
+        return;
+      }
+      cleanup();
+    };
+    globalScene.load.on(completeEvent, onComplete);
+    globalScene.load.on(Phaser.Loader.Events.FILE_LOAD_ERROR, onError);
+    globalScene.loadPokemonAtlas(source.key, source.atlasPath);
+    if (!globalScene.load.isLoading()) {
+      globalScene.load.start();
+    }
+    // The atlas may already have landed between the initial check and listener registration.
+    if (globalScene.textures.exists(source.key)) {
+      cleanup();
+      ensureErSpriteAnim(source.key);
+      this.refreshShinyLabFx();
+    }
+  }
+
+  private startShinyLabFxTimer(): void {
+    if (this.shinyLabFxTimer) {
+      return;
+    }
+    this.shinyLabFxTimer = globalScene.time.addEvent({
+      delay: 100,
+      loop: true,
+      callback: () => {
+        if (!this.currentPokemon) {
+          return;
+        }
+        this.refreshShinyLabFx();
+      },
+    });
+  }
+
+  private stopShinyLabFxTimer(): void {
+    this.shinyLabFxTimer?.remove();
+    this.shinyLabFxTimer = null;
   }
 
   /**
