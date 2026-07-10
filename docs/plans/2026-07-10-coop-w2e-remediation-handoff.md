@@ -44,7 +44,7 @@ Commits `65d144ddd`..`427ee944e` (8). Proof: 28 engine-free + 7 durability-seam 
 per-transition-class duo 5/5 (wild/trainer/biome@10/ME/game-over) + multiwave duo 5/5 in
 BOTH flag states + its own worktree 4-lane gate ALL GREEN (incl. lane P solo).
 
-## 3. New finding discovered today (by the new gate): #899 LANE P rendezvous flake
+## 3. #899 LANE P rendezvous queued-arrival race — fixed in continuation
 
 A LANE P red ("NO-PARK wave 2, enemies never all fainted") on the shared checkout was
 bisect-proven to be a **load-dependent harness flake, not a regression** — identical trees
@@ -57,6 +57,15 @@ do NOT weaken the invariant. Note the irony worth reviewing: the backstop-fires�
 proceed→drift shape is a miniature of the exact production class this migration kills, and
 LANE P caught it in the harness's own machinery on its second run. Tier-4 solo work and all
 co-op commits are exonerated; the parallel agent's WIP is exonerated.
+
+Continuation closure: `coop-rendezvous.test.ts` now locks the deterministic race where the partner queues
+its real loopback arrival and the injected vitest timeout fires before the delivery microtask. Previously
+the timeout deleted the waiter and proceeded unilaterally; the real arrival landed immediately afterward
+as an unusable buffer hit. Commit `4202d3beb` captures the RED and `2bced4b35` fixes it by giving queued
+transport events one delivery microtask before committing the timeout, then rechecking `partnerArrived`.
+Dead-partner and dropped-wire backstops stay loud and bounded. Proof: rendezvous primitive 10/10,
+production-wired pacing/biome boundary duo suites 8/8, and gating Lane P (12 waves) PASS in 111s. The hard
+invariant was not weakened.
 
 ## 4. Commit ledger (local feat, today, in order)
 
