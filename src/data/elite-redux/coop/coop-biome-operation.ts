@@ -45,6 +45,7 @@
 
 import { COOP_CAP_OP_BIOME, isCoopSurfaceCapabilityBlocked } from "#data/elite-redux/coop/coop-capabilities";
 import { coopLog, coopWarn } from "#data/elite-redux/coop/coop-debug";
+import type { CoopApplyOutcome } from "#data/elite-redux/coop/coop-durability";
 import {
   type CoopAuthoritativeEnvelopeV1,
   type CoopBiomePickPayload,
@@ -56,6 +57,7 @@ import {
 import {
   journalCoopCommittedEnvelope,
   registerCoopOperationApplier,
+  routeCoopOperationToLiveSink,
 } from "#data/elite-redux/coop/coop-operation-journal";
 import {
   type CoopCommitContext,
@@ -126,6 +128,17 @@ let journalWatchGuest: CoopOperationGuest | null = null;
 let lastAppliedPinned = -1;
 
 /**
+ * The surface-local revision FLOOR (W2e-R P0-3). On a COLD resume the durability receiver ledger is restored
+ * to the persisted per-class high-water N (coop-runtime.ts applyCoopControlPlaneSaveData), but the surface's
+ * CoopOperationHost + guest appliers are recreated at revision 0 - so the producer would emit revision 1 and
+ * the restored receiver would drop it as a stale duplicate (isDuplicate: 1 <= N). Flooring the host + guests
+ * to N makes the producer continue at N+1 and the guests accept it, keeping the committed-op revision stream
+ * MONOTONIC across the save boundary (§4.6 - the same monotonic-continue contract the counter/high-water use;
+ * the epoch is unchanged, so the restored receiver marks stay valid). 0 = fresh session (no resume).
+ */
+let revisionFloor = 0;
+
+/**
  * True iff the migrated (envelope-gated) biome-travel path is active; else pure legacy fallback (§5.1).
  * The local rollback flag (`enabled`) is the OUTER gate; the NEGOTIATED capability set is the inner one
  * (#896 W2e-R2): if the peer did not advertise "opSurface.biome", it is not in the intersection and the
@@ -169,6 +182,19 @@ export function resetCoopBiomeOperationState(): void {
   watchGuest = null;
   journalWatchGuest = null;
   lastAppliedPinned = -1;
+  revisionFloor = 0;
+}
+
+/**
+ * Seed the surface-local revision FLOOR from the persisted per-class high-water on a COLD resume (W2e-R
+ * P0-3). Called from `applyCoopControlPlaneSaveData` with `journalHighWater["op:biome"]`. Recreates the
+ * host + guests so the producer continues at floor+1 and the guests accept it (see {@linkcode revisionFloor}).
+ * A no-op for a fresh session (floor 0). Idempotent for the same value.
+ */
+export function setCoopBiomeOperationRevisionFloor(hw: number): void {
+  // NEUTRALIZED for the failure-first RED commit: the producer still restarts at revision 0 on resume.
+  void hw;
+  void revisionFloor;
 }
 
 // -----------------------------------------------------------------------------
@@ -177,14 +203,14 @@ export function resetCoopBiomeOperationState(): void {
 
 function host(): CoopOperationHost {
   if (authorityHost == null) {
-    authorityHost = new CoopOperationHost({ epoch });
+    authorityHost = new CoopOperationHost({ epoch, initialRevision: revisionFloor });
   }
   return authorityHost;
 }
 
 function guest(): CoopOperationGuest {
   if (watchGuest == null) {
-    watchGuest = new CoopOperationGuest({ epoch });
+    watchGuest = new CoopOperationGuest({ epoch, initialRevision: revisionFloor });
   }
   return watchGuest;
 }
@@ -192,7 +218,7 @@ function guest(): CoopOperationGuest {
 /** The dedicated journal-replay applier (Wave-2e), separate from the live relay-adopt `guest()`. */
 function journalGuest(): CoopOperationGuest {
   if (journalWatchGuest == null) {
-    journalWatchGuest = new CoopOperationGuest({ epoch });
+    journalWatchGuest = new CoopOperationGuest({ epoch, initialRevision: revisionFloor });
   }
   return journalWatchGuest;
 }
@@ -410,24 +436,35 @@ export function adoptBiomeWatcherChoice(params: CoopBiomeWatcherAdoptParams): Co
  * idempotent by operationId (invariant 5): a dual-run duplicate (the live relay already adopted it) is a
  * no-op. Returns true iff the op was NEWLY applied. No-op when the surface flag is OFF (pure legacy).
  */
-function applyJournaledBiomeEnvelope(envelope: CoopAuthoritativeEnvelopeV1): boolean {
+function applyJournaledBiomeEnvelope(envelope: CoopAuthoritativeEnvelopeV1): CoopApplyOutcome {
+  // Flag OFF / capability-blocked / a non-op frame is ACK'd + dropped (spin-safe): the committer would
+  // not send it in a consistent session, and returning "rejected" would spin its resend loop forever
+  // (W2e-R P0-1). The capability-gated predicate (#896 W2e-R2) keeps this symmetric with activation.
   if (!isCoopBiomeOperationEnabled()) {
-    return false;
+    return "duplicate";
   }
   const op = envelope.pendingOperation;
   if (op == null || op.status !== "applied") {
-    return false;
+    return "duplicate";
   }
   const g = journalGuest();
   if (g.hasApplied(op.id)) {
-    return false; // already converged via the journal (a reconnect resend re-delivery) - idempotent no-op.
+    return "duplicate"; // already converged via the journal (a reconnect resend re-delivery) - ACK, no re-apply.
   }
   const res = g.applyEnvelope(envelope);
   if (res.kind !== "applied") {
-    return false;
+    // A transient non-applicable result (a gap the manager already guards against, or a fail-closed):
+    // leave it retriable (do NOT ACK). Never a permanent condition (a permanent one is a duplicate above).
+    return "rejected";
   }
-  coopLog("reward", `biome op JOURNAL apply id=${op.id} rev=${envelope.revision} (Wave-2e)`);
-  return true;
+  // W2e-R P0-1: route the newly-consumed op INTO the ONE live-mutation seam (not a sidecar history log). The
+  // production biome materializer (pushing SwitchBiomePhase on the guest) is the PARKED keystone wave-advance
+  // work, so no sink is registered in production yet - the op is recorded + ACK'd as durably delivered and
+  // its live biome reconciled by the DATA plane (rejoin snapshot). A test registers a sink to PROVE the
+  // carrier routes here. See routeCoopOperationToLiveSink / the W2e-R residuals in the surface doc header.
+  routeCoopOperationToLiveSink("op:biome", envelope);
+  coopLog("reward", `biome op JOURNAL apply id=${op.id} rev=${envelope.revision} (Wave-2e/W2e-R)`);
+  return "applied";
 }
 
 // Register the biome-travel guest applier so the durability manager can route a resent / reconnect-tail

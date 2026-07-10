@@ -37,7 +37,11 @@ import {
 } from "#data/elite-redux/coop/coop-battle-engine";
 import { CoopBattleStreamer } from "#data/elite-redux/coop/coop-battle-stream";
 import { CoopBattleSync } from "#data/elite-redux/coop/coop-battle-sync";
-import { isCoopBiomeOperationEnabled, resetCoopBiomeOperationState } from "#data/elite-redux/coop/coop-biome-operation";
+import {
+  isCoopBiomeOperationEnabled,
+  resetCoopBiomeOperationState,
+  setCoopBiomeOperationRevisionFloor,
+} from "#data/elite-redux/coop/coop-biome-operation";
 import {
   COOP_CAP_DURABILITY_JOURNAL,
   COOP_CAP_OP_BIOME,
@@ -63,6 +67,7 @@ import {
   commitMeOwnerIntent,
   isCoopMeOperationEnabled,
   resetCoopMeOperationState,
+  setCoopMeOperationRevisionFloor,
 } from "#data/elite-redux/coop/coop-me-operation";
 import {
   coopMeHandoffBattleStarted,
@@ -80,6 +85,7 @@ import { CoopRendezvous } from "#data/elite-redux/coop/coop-rendezvous";
 import {
   isCoopRewardOperationEnabled,
   resetCoopRewardOperationState,
+  setCoopRewardOperationRevisionFloor,
 } from "#data/elite-redux/coop/coop-reward-operation";
 import { COOP_ME_TERM_SEQ_BASE, COOP_REJOIN_SYNC_SEQ_BASE } from "#data/elite-redux/coop/coop-seq-registry";
 import { coopFieldIndexOf, coopOwnerOfFieldSlot } from "#data/elite-redux/coop/coop-session";
@@ -1327,7 +1333,16 @@ export function applyCoopControlPlaneSaveData(data: CoopControlPlaneSaveData | u
     // Wave-2e: restore the converged marks into BOTH the committer high-water AND the receiver applied
     // ledger, so a resumed guest neither re-applies an already-applied op nor diverges from the host on the
     // post-resume digest (both peers restore the identical value, §4.6).
-    runtime.durability?.restore(data.journalHighWater ?? {}, data.journalHighWater ?? {});
+    const marks = data.journalHighWater ?? {};
+    runtime.durability?.restore(marks, marks);
+    // W2e-R P0-3: the durability RECEIVER ledger is restored to N above, but each surface's producer host is
+    // recreated at revision 0 - so without this it would emit revision 1 and the restored receiver would drop
+    // it as a stale duplicate (isDuplicate: 1 <= N). Floor each surface's producer + guests to its persisted
+    // per-class high-water so the committed-op revision stream continues MONOTONICALLY at N+1 across the resume
+    // (the epoch is unchanged, so the restored receiver marks stay valid; §1.4/§4.6 monotonic-continue contract).
+    setCoopBiomeOperationRevisionFloor(marks["op:biome"] ?? 0);
+    setCoopRewardOperationRevisionFloor(marks["op:reward"] ?? 0);
+    setCoopMeOperationRevisionFloor(marks["op:me"] ?? 0);
   } catch {
     /* control-plane restore is best-effort; a resume must never hard-fail on it */
   }

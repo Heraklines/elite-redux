@@ -505,6 +505,23 @@ export class CoopReceiveLedger {
 // -----------------------------------------------------------------------------
 
 /**
+ * The result of the receiver's apply hook (W2e-R P0-1). The receiver's ACK + ledger advance are GATED on
+ * this so the manager can never claim an op applied when the applier did NOT consume it (the review's
+ * ACK-without-mutation P0). The three cases are load-bearing (the Oracle-validated tri-state):
+ *  - `applied`   - the op was NEWLY consumed by the receiver (recorded in its idempotency ledger, and its
+ *    live-mutation seam invoked). ACK it + advance.
+ *  - `duplicate` - the op was ALREADY consumed (cross-carrier / resend re-delivery), or is a
+ *    non-applicable/malformed frame the receiver will never apply. ACK it + advance anyway (idempotent), so
+ *    a re-delivered-but-already-satisfied op can never spin the committer's resend loop forever.
+ *  - `rejected`  - the apply threw or hit a transient non-applicable state (a redelivery may succeed). Do
+ *    NOT ACK, do NOT advance the ledger - the op stays retriable. Never a permanent condition (a permanently
+ *    un-appliable frame is a `duplicate`, not a `rejected`), so it cannot wedge convergence.
+ * A `void`/`undefined` return is treated as `applied` (back-compat for the pre-W2e-R generic synthetic
+ * appliers that mutated unconditionally).
+ */
+export type CoopApplyOutcome = "applied" | "duplicate" | "rejected";
+
+/**
  * How the manager identifies + applies an inbound COMMITTED operation. Kept GENERIC (a `(class, seq)`
  * extractor + an apply callback) so the Wave-2a operation envelope plugs in as one class keyed by
  * `revision` WITHOUT this module importing the envelope type. When `extractKey` is absent the manager only
@@ -517,8 +534,13 @@ export interface CoopDurabilityHooks {
    * message is not a durable op (the manager ignores it). Wave-2a returns `{cls:"envelope", seq:revision}`.
    */
   extractKey?: (msg: CoopMessage) => { cls: string; seq: number } | null;
-  /** Apply an in-order committed op to shared state (the receiver's ONE mutation site). */
-  apply?: (entry: CoopJournalEntry) => void;
+  /**
+   * Apply an in-order committed op to shared state (the receiver's ONE mutation site). Returns a
+   * {@linkcode CoopApplyOutcome} that GATES the ACK + ledger advance (W2e-R P0-1): only an `applied` or
+   * `duplicate` result ACKs; a `rejected` result (or a thrown apply) leaves the op retriable. A `void`
+   * return is treated as `applied` (back-compat).
+   */
+  apply?: (entry: CoopJournalEntry) => CoopApplyOutcome | void;
   /**
    * Serve a FULL SNAPSHOT at head for a class when a reconnect gap is deeper than the ring (§4.4). Optional;
    * when absent the manager replays whatever the ring holds (the existing per-surface snapshot heal covers

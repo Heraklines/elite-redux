@@ -50,7 +50,11 @@
 // so there is no circular import.
 // =============================================================================
 
-import type { CoopDurabilityHooks, CoopDurabilityManager } from "#data/elite-redux/coop/coop-durability";
+import type {
+  CoopApplyOutcome,
+  CoopDurabilityHooks,
+  CoopDurabilityManager,
+} from "#data/elite-redux/coop/coop-durability";
 import type { CoopAuthoritativeEnvelopeV1, CoopLogicalPhase } from "#data/elite-redux/coop/coop-operation-envelope";
 
 /** The journaled durability class for a committed op, DERIVED from its logical phase (§4.1). */
@@ -70,16 +74,41 @@ export function coopOperationClassForPhase(phase: CoopLogicalPhase): string | nu
 
 /**
  * A surface's guest-side applier: route a replayed committed envelope INTO the surface's idempotent
- * guest applier (invariant 5). Returns true iff the op was NEWLY applied (false = a duplicate / late
- * re-delivery that was a no-op, or the surface flag is OFF). Registered by each adapter at import.
+ * guest applier (invariant 5) AND its live-mutation seam. Returns a {@linkcode CoopApplyOutcome} that
+ * GATES the durability manager's ACK (W2e-R P0-1): `applied` (newly consumed - ACK + advance),
+ * `duplicate` (already consumed / non-applicable frame - ACK + advance so a resend cannot spin), or
+ * `rejected` (a transient failure - do NOT ACK, stays retriable). Registered by each adapter at import.
  */
-export type CoopOperationEnvelopeApplier = (envelope: CoopAuthoritativeEnvelopeV1) => boolean;
+export type CoopOperationEnvelopeApplier = (envelope: CoopAuthoritativeEnvelopeV1) => CoopApplyOutcome;
+
+/**
+ * A surface's LIVE-MUTATION SINK (W2e-R P0-1): the ONE seam a journal-delivered committed op routes INTO to
+ * perform the REAL shared-run mutation on the receiver (biome switch / reward apply / ME control-flow),
+ * instead of only recording sidecar history. Invoked by the surface applier when it NEWLY consumes a
+ * journal-delivered op. Returns true iff the live mutation was materialized. When NO sink is registered (or
+ * it returns false) the op is still RECORDED + ACK'd (durable delivery is a receiver-ledger fact, not a
+ * live-mutation fact - see {@linkcode CoopApplyOutcome}); the live materialization is then the DATA-plane's
+ * job (a rejoin snapshot / the keystone wave-advance work). The sink lets a test PROVE the carrier routes
+ * into the mutation seam, and lets production wire a real materializer once the keystone lands.
+ */
+export type CoopOperationLiveSink = (envelope: CoopAuthoritativeEnvelopeV1) => boolean;
 
 /** The active session's durability manager, or null when durability is OFF / no session (set at assembly). */
 let activeDurability: CoopDurabilityManager | null = null;
 
 /** Per-class guest appliers (adapters register at import; keyed by {@linkcode coopOperationClassForPhase}). */
 const appliers = new Map<string, CoopOperationEnvelopeApplier>();
+
+/** Per-class LIVE-MUTATION sinks (the runtime/engine layer registers at session assembly; keyed by class). */
+const liveSinks = new Map<string, CoopOperationLiveSink>();
+
+/**
+ * Observability for the failure-first proof (W2e-R T1/T3): the committed envelopes for which the
+ * journal carrier INVOKED a live-mutation sink this session, in order. Distinct from
+ * {@linkcode journalApplied} (which records ledger consumption): this records ROUTING INTO the mutation
+ * seam. A test asserts a cut op arrives here to prove the journal path no longer only records history.
+ */
+const liveSinkInvoked: CoopAuthoritativeEnvelopeV1[] = [];
 
 /**
  * Test/diagnostic observability: the committed envelopes this client has NEWLY APPLIED via the journal
@@ -134,6 +163,34 @@ export function registerCoopOperationApplier(cls: string, applier: CoopOperation
 }
 
 /**
+ * Register (or clear, with `null`) the LIVE-MUTATION sink for a journaled class (W2e-R P0-1). The runtime
+ * installs a real materializer here at session assembly; a test installs a recording mock; clearing it
+ * leaves the journal path as a pure durable-delivery ledger (the op is still recorded + ACK'd, the live
+ * materialization deferred to the DATA plane). Keyed by {@linkcode coopOperationClassForPhase}.
+ */
+export function registerCoopOperationLiveSink(cls: string, sink: CoopOperationLiveSink | null): void {
+  if (sink == null) {
+    liveSinks.delete(cls);
+  } else {
+    liveSinks.set(cls, sink);
+  }
+}
+
+/**
+ * Route a NEWLY-consumed journal-delivered committed op INTO its class's live-mutation sink (W2e-R P0-1).
+ * Called by a surface applier the moment it newly consumes a journal op. Records the routing for the proof
+ * observability and returns whether the live mutation was materialized (false when no sink is registered).
+ * Never throws (a sink failure must not withhold the ACK - durable delivery is a receiver-ledger fact).
+ */
+export function routeCoopOperationToLiveSink(cls: string, envelope: CoopAuthoritativeEnvelopeV1): boolean {
+  // NEUTRALIZED for the failure-first RED commit: the journal carrier does NOT yet route into the live seam
+  // (it only records sidecar history), so a journal-delivered op mutates nothing. Wired in the remediation commit.
+  void cls;
+  void envelope;
+  return false;
+}
+
+/**
  * The `extractKey`/`apply` hooks the durability manager needs to carry the operation envelope as one
  * journaled class per surface (§4.6). `extractKey` recognizes the `envelope` frame + keys it
  * `(class, revision)`; `apply` routes the replayed envelope into the surface's idempotent guest applier
@@ -151,16 +208,20 @@ export function coopOperationDurabilityHooks(): CoopDurabilityHooks {
     },
     apply: entry => {
       if (entry.msg.t !== "envelope") {
-        return;
+        // Not an operation frame: nothing to apply, but ACK it so the committer's resend loop terminates.
+        return "duplicate";
       }
       const envelope = entry.msg.envelope;
       const applier = appliers.get(entry.cls);
       if (applier == null) {
-        return;
+        // No receiver for this class: ACK + drop (spin-safe) rather than reject-and-resend forever.
+        return "duplicate";
       }
-      if (applier(envelope)) {
+      const outcome = applier(envelope);
+      if (outcome === "applied") {
         journalApplied.push(envelope);
       }
+      return outcome;
     },
   };
 }
@@ -170,7 +231,13 @@ export function getCoopOperationJournalApplied(): readonly CoopAuthoritativeEnve
   return journalApplied;
 }
 
-/** Drop the journal-applied log (session boundary / test hygiene). Does NOT clear the applier registry. */
+/** The committed envelopes the journal carrier ROUTED INTO a live-mutation sink this session (W2e-R proof). */
+export function getCoopOperationLiveSinkInvoked(): readonly CoopAuthoritativeEnvelopeV1[] {
+  return liveSinkInvoked;
+}
+
+/** Drop the journal-applied + live-sink logs (session boundary / test hygiene). Keeps the applier registry. */
 export function resetCoopOperationJournalLog(): void {
   journalApplied.length = 0;
+  liveSinkInvoked.length = 0;
 }

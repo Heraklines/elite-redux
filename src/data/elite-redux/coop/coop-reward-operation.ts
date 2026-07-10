@@ -60,6 +60,7 @@
 
 import { COOP_CAP_OP_REWARD, isCoopSurfaceCapabilityBlocked } from "#data/elite-redux/coop/coop-capabilities";
 import { coopLog, coopWarn } from "#data/elite-redux/coop/coop-debug";
+import type { CoopApplyOutcome } from "#data/elite-redux/coop/coop-durability";
 import {
   type CoopAuthoritativeEnvelopeV1,
   type CoopOperationKind,
@@ -71,6 +72,7 @@ import {
 import {
   journalCoopCommittedEnvelope,
   registerCoopOperationApplier,
+  routeCoopOperationToLiveSink,
 } from "#data/elite-redux/coop/coop-operation-journal";
 import {
   type CoopCommitContext,
@@ -158,6 +160,14 @@ let watcherOrdinal = 0;
 let watcherOrdinalStart = -1;
 
 /**
+ * The surface-local revision FLOOR (W2e-R P0-3): seeded from the persisted per-class high-water on a COLD
+ * resume so the producer continues at floor+1 (matching the restored durability receiver), keeping the
+ * committed-op revision stream monotonic across the save boundary. See the biome adapter for the rationale.
+ * 0 = fresh session. The reward screen + biome market share ONE host (§8.2.1), so ONE floor serves both.
+ */
+let revisionFloor = 0;
+
+/**
  * True iff the migrated (envelope-gated) shop path is active; else pure legacy fallback (§5.1). The local
  * rollback flag (`enabled`) is the OUTER gate; the NEGOTIATED capability set is the inner one (#896
  * W2e-R2): if the peer did not advertise "opSurface.reward", it is not in the intersection and the surface
@@ -205,6 +215,18 @@ export function resetCoopRewardOperationState(): void {
   ownerOrdinalStart = -1;
   watcherOrdinal = 0;
   watcherOrdinalStart = -1;
+  revisionFloor = 0;
+}
+
+/**
+ * Seed the surface-local revision FLOOR from the persisted per-class high-water on a COLD resume (W2e-R
+ * P0-3). Called from `applyCoopControlPlaneSaveData` with `journalHighWater["op:reward"]`. Recreates the
+ * host + guests so the producer continues at floor+1 and the guests accept it. No-op for a fresh session.
+ */
+export function setCoopRewardOperationRevisionFloor(hw: number): void {
+  // NEUTRALIZED for the failure-first RED commit: the producer still restarts at revision 0 on resume.
+  void hw;
+  void revisionFloor;
 }
 
 // -----------------------------------------------------------------------------
@@ -213,14 +235,14 @@ export function resetCoopRewardOperationState(): void {
 
 function host(): CoopOperationHost {
   if (authorityHost == null) {
-    authorityHost = new CoopOperationHost({ epoch });
+    authorityHost = new CoopOperationHost({ epoch, initialRevision: revisionFloor });
   }
   return authorityHost;
 }
 
 function guest(): CoopOperationGuest {
   if (watchGuest == null) {
-    watchGuest = new CoopOperationGuest({ epoch });
+    watchGuest = new CoopOperationGuest({ epoch, initialRevision: revisionFloor });
   }
   return watchGuest;
 }
@@ -228,7 +250,7 @@ function guest(): CoopOperationGuest {
 /** The dedicated journal-replay applier (Wave-2e), separate from the live relay-adopt `guest()`. */
 function journalGuest(): CoopOperationGuest {
   if (journalWatchGuest == null) {
-    journalWatchGuest = new CoopOperationGuest({ epoch });
+    journalWatchGuest = new CoopOperationGuest({ epoch, initialRevision: revisionFloor });
   }
   return journalWatchGuest;
 }
@@ -507,24 +529,28 @@ export function adoptRewardWatcherChoice(params: CoopRewardWatcherAdoptParams): 
  * no-op. Returns true iff the action was NEWLY applied. No-op when the surface flag is OFF (pure legacy).
  * Both the reward screen and the biome market ride this one class ("op:reward"), sharing one applier.
  */
-function applyJournaledRewardEnvelope(envelope: CoopAuthoritativeEnvelopeV1): boolean {
+function applyJournaledRewardEnvelope(envelope: CoopAuthoritativeEnvelopeV1): CoopApplyOutcome {
   if (!isCoopRewardOperationEnabled()) {
-    return false;
+    // Flag OFF / capability-blocked: ACK + drop (spin-safe) - the committer would not send it in a consistent session.
+    return "duplicate";
   }
   const op = envelope.pendingOperation;
   if (op == null || op.status !== "applied") {
-    return false;
+    return "duplicate";
   }
   const g = journalGuest();
   if (g.hasApplied(op.id)) {
-    return false; // already converged via the journal (a reconnect resend re-delivery) - idempotent no-op.
+    return "duplicate"; // already converged via the journal (a reconnect resend re-delivery) - ACK, no re-apply.
   }
   const res = g.applyEnvelope(envelope);
   if (res.kind !== "applied") {
-    return false;
+    return "rejected"; // transient non-applicable (retriable); never a permanent condition (that is a duplicate above).
   }
-  coopLog("reward", `shop op JOURNAL apply kind=${op.kind} id=${op.id} rev=${envelope.revision} (Wave-2e)`);
-  return true;
+  // W2e-R P0-1: route the newly-consumed action INTO the ONE live-mutation seam (see the biome adapter). The
+  // production reward materializer is keystone-blocked; a test registers a sink to PROVE the routing.
+  routeCoopOperationToLiveSink("op:reward", envelope);
+  coopLog("reward", `shop op JOURNAL apply kind=${op.kind} id=${op.id} rev=${envelope.revision} (Wave-2e/W2e-R)`);
+  return "applied";
 }
 
 // Register the shared reward/market guest applier so the durability manager can route a resent /
