@@ -48,10 +48,12 @@ import { isMegaStage, listEvolutionStages, listMegaStages } from "#data/elite-re
 import { SHOWDOWN_ITEM_POOL, type ShowdownItemKey } from "#data/elite-redux/showdown/showdown-item-pool";
 import { collectShowdownLegalMoves, collectUnlockedEggMoves } from "#data/elite-redux/showdown/showdown-legal-moves";
 import { buildUnlockSnapshot, starterToManifest } from "#data/elite-redux/showdown/showdown-manifest";
+import { getShowdownPickWaitMs } from "#data/elite-redux/showdown/showdown-session";
 import {
   COST_CAP,
   HIGH_COST_MIN,
   MEGA_STONE_ITEM,
+  type ShowdownMonManifest,
   showdownFieldLegalityReason,
   validateShowdownTeam,
 } from "#data/elite-redux/showdown/showdown-team";
@@ -115,6 +117,13 @@ import { MessageUiHandler } from "#ui/message-ui-handler";
 import { MoveInfoOverlay } from "#ui/move-info-overlay";
 import { PokemonIconAnimHelper, PokemonIconAnimMode } from "#ui/pokemon-icon-anim-helper";
 import { ScrollBar } from "#ui/scroll-bar";
+import { DomShowdownEditorTextInput } from "#ui/showdown-editor-text-input";
+import type {
+  ShowdownEditorSet,
+  ShowdownEditorStage,
+  ShowdownSetEditorConfig,
+  ShowdownSetEditorUiHandler,
+} from "#ui/showdown-set-editor-ui-handler";
 import { StarterContainer } from "#ui/starter-container";
 import { StatsContainer } from "#ui/stats-container";
 import { addBBCodeTextObject, addTextObject, getTextColor, updateCandyCountTextStyle } from "#ui/text";
@@ -587,6 +596,12 @@ export class StarterSelectUiHandler extends MessageUiHandler {
     number,
     { speciesId: number; formIndex: number; item?: string | undefined; prevItem?: string | undefined }
   > = new Map();
+  /**
+   * Showdown: the wall-clock end of the 10-minute team-build pick window (`getShowdownPickWaitMs`),
+   * anchored on first opening the Set Editor. The editor's top-strip countdown reads the remaining
+   * seconds off this. Null (unset) until the first editor open; reset on handler teardown.
+   */
+  private showdownPickDeadline: number | null = null;
   private startCursorObj: Phaser.GameObjects.NineSlice;
   private randomCursorObj: Phaser.GameObjects.NineSlice;
   /** ER: cursor for the "Use Last Team" action (sits above the Random button). */
@@ -2532,6 +2547,15 @@ export class StarterSelectUiHandler extends MessageUiHandler {
             isPartyValid,
           );
 
+          // Showdown: the per-mon set is shaped in the full-screen SET EDITOR now, not the legacy
+          // form/item/move OPTION_SELECT. Grid-confirm opens it directly for a new eligible pick
+          // (create) or a small Edit/Remove menu for an in-party line. This REPLACES the vanilla
+          // options block below for showdown ONLY; every other mode falls through unchanged.
+          if (globalScene.gameMode.isShowdown) {
+            this.handleShowdownGridConfirm(isDupe, removeIndex, isValidForChallenge);
+            return true;
+          }
+
           const currentPartyValue = this.starterSpecies
             .map(s => s.generation)
             .reduce(
@@ -3898,6 +3922,291 @@ export class StarterSelectUiHandler extends MessageUiHandler {
     this.tryUpdateValue();
     this.tutorialActive = true;
     this.showText(message, undefined, () => this.showText("", 0, () => (this.tutorialActive = false)), undefined, true);
+  }
+
+  /**
+   * Showdown grid-confirm dispatch (flow wiring). A NEW eligible pick opens the full-screen SET EDITOR
+   * to CREATE the slot; an already-in-party line opens a small Edit/Remove party menu (editing re-opens
+   * the editor, remove pops the slot). The pick-time field-legality REJECTIONS (black shiny / cost cap /
+   * second cost-8+) fire HERE, before the editor opens, with the SAME messages the validator uses - so a
+   * field-illegal mon never reaches the editor. Non-showdown modes never reach this method.
+   */
+  private handleShowdownGridConfirm(isDupe: boolean, removeIndex: number, isValidForChallenge: boolean): void {
+    const ui = this.getUi();
+    if (isDupe) {
+      // In-party line: a 2-item party menu (edit the set, or remove the slot). NOT the legacy
+      // form/item/move menu - the set is shaped only in the editor now.
+      const options: OptionSelectItem[] = [
+        {
+          label: "Edit Set",
+          handler: () => {
+            this.openShowdownEditor(removeIndex);
+            return true;
+          },
+        },
+        {
+          label: i18next.t("starterSelectUiHandler:removeFromParty"),
+          handler: () => {
+            this.popStarter(removeIndex);
+            ui.setMode(UiMode.STARTER_SELECT);
+            return true;
+          },
+        },
+      ];
+      ui.setMode(UiMode.STARTER_SELECT).then(() =>
+        ui.setModeWithoutClear(UiMode.OPTION_SELECT, { options, maxOptions: 8, yOffset: 47 }),
+      );
+      return;
+    }
+    // New pick: the field-legality gate fires BEFORE the editor opens (same messages as the validator).
+    const rejection = this.showdownAddRejection(this.lastSpecies, this.getCurrentDexProps(this.lastSpecies.speciesId));
+    if (rejection !== null) {
+      this.rejectShowdownPick(rejection);
+      return;
+    }
+    if (!isValidForChallenge || this.starterSpecies.length >= this.getPartySizeLimit()) {
+      ui.playError();
+      return;
+    }
+    this.openShowdownEditor(-1);
+  }
+
+  /**
+   * Showdown (flow wiring): open the SET EDITOR for one team slot. `editIndex >= 0` EDITS an in-party
+   * mon (Done updates it in place); `editIndex < 0` CREATES a slot for the highlighted grid line (Done
+   * adds it). The config is a pure snapshot of the line's collection state; the Done/Cancel/team-cycle
+   * callbacks write back into the grid here.
+   */
+  private openShowdownEditor(editIndex: number): void {
+    const ui = this.getUi();
+    const species = editIndex >= 0 ? this.starterSpecies[editIndex] : this.lastSpecies;
+    const config = this.buildShowdownEditorConfig(species, species.speciesId, editIndex);
+    // Mobile/desktop native-keyboard bridge for the typeahead panes (the login/nickname DOM-input infra).
+    // The registered handler instance is reused across opens, so re-injecting each open is harmless.
+    const editor = ui.handlers[UiMode.SHOWDOWN_SET_EDITOR] as ShowdownSetEditorUiHandler | undefined;
+    editor?.setTextInput(new DomShowdownEditorTextInput());
+    // Open as an OVERLAY (chains onto the mode stack) rather than setMode: setMode would CLEAR this
+    // StarterSelect (hide its grid, reset its cursor), and returning via setMode(STARTER_SELECT) with no
+    // callback arg re-runs show() into an EMPTY screen (its init is gated on `args[0] instanceof
+    // Function`). As an overlay the grid stays alive underneath the editor's opaque backdrop, and the
+    // editor's Done/Cancel revertMode() back to it intact - no empty-screen softlock.
+    ui.setOverlayMode(UiMode.SHOWDOWN_SET_EDITOR, config);
+  }
+
+  /** Showdown (flow wiring): assemble the {@linkcode ShowdownSetEditorConfig} snapshot for one slot. */
+  private buildShowdownEditorConfig(species: PokemonSpecies, root: number, editIndex: number): ShowdownSetEditorConfig {
+    const { gameData } = globalScene;
+    const isEdit = editIndex >= 0;
+    const props = gameData.getSpeciesDexAttrProps(species, this.getCurrentDexProps(root));
+    const existing = isEdit ? this.starters[editIndex] : null;
+    const selection = this.showdownSelections.get(root);
+
+    // Fielded STAGE: edit -> the stored starter's stage; create -> a stored selection or the base grid form.
+    const stage: ShowdownEditorStage = {
+      speciesId: existing?.showdownSpeciesId ?? selection?.speciesId ?? root,
+      formIndex: existing?.showdownFormIndex ?? selection?.formIndex ?? props.formIndex,
+    };
+
+    // The editable SET - a FRESH copy (the editor mutates it in place, so edits only land on Done/commit).
+    const moves = (existing?.moveset ?? this.starterMoveset ?? []).slice(0, 4);
+    const set: ShowdownEditorSet = {
+      abilityIndex: existing?.abilityIndex ?? this.abilityCursor,
+      item: existing?.showdownItem ?? selection?.item ?? SHOWDOWN_ITEM_POOL[0],
+      moves: [0, 1, 2, 3].map(i => (moves[i] ?? null) as MoveId | null),
+      nature: existing?.nature ?? (this.natureCursor as unknown as Nature),
+      shiny: existing?.shiny ?? props.shiny,
+      variant: existing?.variant ?? props.variant,
+    };
+
+    // Collection/unlock snapshot for the shiny/ability chips + the egg-move gating in the move pane.
+    const snapshot = buildUnlockSnapshot(gameData);
+    const megaBudgetSpentBy = this.showdownMegaBudgetSpentByName(root);
+    // Innate (passive) candy-unlock state for the ABILITIES panel (B7 round-4 item 6): each of the 3
+    // innate slots is candy-gated on the PLAYER's own party (`hasPassive` player branch), so a locked
+    // slot shows its unlock cost. `getStarterDataEntry` pools `passiveAttr`/`candyCount` under the same
+    // line root the candy menu uses; the per-slot cost mirrors `isPassiveAvailable` exactly.
+    const passiveEntry = gameData.getStarterDataEntry(root);
+    const passiveBaseCost = getPassiveCandyCount(speciesStarterCosts[root] ?? 0);
+    const unlocks = {
+      ownedVariants: [0, 1, 2].filter(v => snapshot.isShinyUnlocked(root, v)),
+      blackShinyOwned: gameData.starterData[root]?.erBlackShiny ?? false,
+      unlockedAbilityIndices: [0, 1, 2].filter(i => snapshot.isAbilityUnlocked(root, i)),
+      unlockedEggMoveBits: gameData.starterData[root]?.eggMoves ?? 0,
+      megaBudgetSpent: this.showdownTeamHasOtherMega(root),
+      innateUnlockedSlots: [0, 1, 2].filter(s => isSlotUnlocked(passiveEntry?.passiveAttr ?? 0, s as PassiveSlot)),
+      innateSlotCandyCosts: [0, 1, 2].map(s => getErPassiveSlotCandyCost(passiveBaseCost, s)),
+      candyCount: passiveEntry?.candyCount ?? 0,
+      // Omit-when-absent (exactOptionalPropertyTypes): only carry the name when a mega is actually spent.
+      ...(megaBudgetSpentBy === undefined ? {} : { megaBudgetSpentBy }),
+    };
+
+    // LIVE 6-slot team strip: current picks as manifests + (create) a provisional slot for the mon being
+    // built, so the strip icons / validity chips / cost reflect the whole team including this edit.
+    const team: (ShowdownMonManifest | null)[] = [null, null, null, null, null, null];
+    this.starters.forEach((s, i) => {
+      if (i < 6) {
+        team[i] = starterToManifest(s, gameData);
+      }
+    });
+    const activeSlot = isEdit ? editIndex : this.starterSpecies.length;
+    if (!isEdit && activeSlot < 6) {
+      team[activeSlot] = this.buildProvisionalShowdownManifest(root, stage, set, props, gameData);
+    }
+
+    this.showdownPickDeadline ??= Date.now() + getShowdownPickWaitMs();
+    const pickSecondsLeft = Math.max(0, Math.ceil((this.showdownPickDeadline - Date.now()) / 1000));
+
+    return {
+      rootSpeciesId: root,
+      stage,
+      set,
+      female: props.female,
+      unlocks,
+      team,
+      activeSlot,
+      pickSecondsLeft,
+      // Versus "partner" = the opponent; the coop controller's readied flag is the best pre-Ready signal.
+      partnerReady: getCoopController()?.partnerReady ?? null,
+      onDone: result => this.commitShowdownEditor(species, root, editIndex, result),
+      // Done-time re-validation: build the PROVISIONAL team with this slot's edit applied and run the
+      // shared rule engine, returning the first violation (mega budget, cost caps, black-shiny, item
+      // legality, ...) so the editor refuses to commit an invalid set instead of silently building one.
+      validate: result => this.validateShowdownEditorSet(root, editIndex, props, result),
+      // Revert the overlay back to the (still-alive) grid - never setMode(STARTER_SELECT), which re-shows
+      // it empty (init gated on the callback arg).
+      onCancel: () => void this.getUi().revertMode(),
+      onCycleTeam: dir => this.cycleShowdownEditorTeam(editIndex, dir),
+    };
+  }
+
+  /**
+   * Showdown editor Done-time re-validation. Rebuilds the whole team as manifests with THIS slot's edited
+   * stage + set applied (create => appended, edit => replaced in place) and runs the shared
+   * {@linkcode validateShowdownTeam} rule engine. Returns the FIRST violation's message (the same wording
+   * the ready-time net uses) or null when the set is fully legal - so the editor refuses to commit an
+   * invalid team rather than letting the player build one silently.
+   */
+  private validateShowdownEditorSet(
+    root: number,
+    editIndex: number,
+    props: { female: boolean; formIndex: number; shiny: boolean; variant: number },
+    result: { stage: ShowdownEditorStage; set: ShowdownEditorSet },
+  ): string | null {
+    const { gameData } = globalScene;
+    const edited = this.buildProvisionalShowdownManifest(root, result.stage, result.set, props, gameData);
+    const manifests = this.starters.map((s, i) => (i === editIndex ? edited : starterToManifest(s, gameData)));
+    if (editIndex < 0) {
+      manifests.push(edited);
+    }
+    const violations = validateShowdownTeam(manifests, buildUnlockSnapshot(gameData), isMegaStage);
+    return violations.length > 0 ? violations[0].message : null;
+  }
+
+  /** Showdown: a provisional manifest for the not-yet-added mon (drives the strip's live slot). */
+  private buildProvisionalShowdownManifest(
+    root: number,
+    stage: ShowdownEditorStage,
+    set: ShowdownEditorSet,
+    props: { female: boolean; formIndex: number; shiny: boolean; variant: number },
+    gameData: typeof globalScene.gameData,
+  ): ShowdownMonManifest {
+    const temp: Starter = {
+      speciesId: root,
+      shiny: set.shiny,
+      variant: set.variant as Starter["variant"],
+      formIndex: props.formIndex,
+      female: props.female,
+      abilityIndex: set.abilityIndex,
+      passive: false,
+      nature: set.nature as Nature,
+      moveset: set.moves.filter((m): m is MoveId => m != null) as StarterMoveset,
+      pokerus: false,
+      ivs: [31, 31, 31, 31, 31, 31],
+      showdownSpeciesId: stage.speciesId,
+      showdownFormIndex: stage.formIndex,
+      showdownItem: set.item,
+    };
+    return starterToManifest(temp, gameData);
+  }
+
+  /** Showdown: the OTHER line's mega species name (for the editor's greyed "mega used" reason line). */
+  private showdownMegaBudgetSpentByName(rootSpeciesId: number): string | undefined {
+    const other = this.starters.find(
+      s => s.speciesId !== rootSpeciesId && isMegaStage(s.showdownSpeciesId ?? s.speciesId, s.showdownFormIndex ?? 0),
+    );
+    return other ? getPokemonSpecies(other.speciesId).name : undefined;
+  }
+
+  /**
+   * Showdown editor "Done": write the edited stage + set back into the team. EDIT stamps the existing
+   * starter in place (Cancel would have discarded); CREATE reuses {@linkcode addToParty} (icon/asset/
+   * starter-build) with the editor's ability/nature/moveset, the stage+item coming from the recorded
+   * selection. The nature lands on the starter, so {@linkcode starterToManifest} carries it into the
+   * wire manifest + team hash. Always returns to the grid.
+   */
+  private commitShowdownEditor(
+    species: PokemonSpecies,
+    root: number,
+    editIndex: number,
+    result: { stage: ShowdownEditorStage; set: ShowdownEditorSet },
+  ): void {
+    const ui = this.getUi();
+    const { stage, set } = result;
+    const moveset = set.moves.filter((m): m is MoveId => m != null) as StarterMoveset;
+    // Record the fielded stage + item so applyShowdownSelection / the party icon field the chosen stage.
+    this.showdownSelections.set(root, { speciesId: stage.speciesId, formIndex: stage.formIndex, item: set.item });
+
+    if (editIndex >= 0) {
+      // EDIT in place (shiny/variant stay grid-chosen; the editor does not change them in P1).
+      const starter = this.starters[editIndex];
+      starter.showdownSpeciesId = stage.speciesId;
+      starter.showdownFormIndex = stage.formIndex;
+      starter.showdownItem = set.item;
+      starter.abilityIndex = set.abilityIndex;
+      starter.nature = set.nature as Nature;
+      starter.moveset = moveset;
+      this.updatePartyIcon(this.starterSpecies[editIndex], editIndex);
+      if (this.lastSpecies?.speciesId === root) {
+        this.setSpeciesDetails(this.lastSpecies);
+      }
+      // Revert the overlay to the (still-alive) grid; setMode would re-show it empty (see openShowdownEditor).
+      void ui.revertMode();
+      return;
+    }
+    // CREATE: addToParty stamps the stage+item from showdownSelections (set above) and builds the icon.
+    // Revert the overlay back to the live grid first, then add to the party against its restored state.
+    void ui.revertMode();
+    const added = this.addToParty(
+      species,
+      this.getCurrentDexProps(root),
+      set.abilityIndex,
+      set.nature as Nature,
+      moveset,
+      this.teraCursor,
+    );
+    if (added) {
+      this.starterCursorObjs[this.starterSpecies.length - 1]
+        .setVisible(true)
+        .setPosition(this.cursorObj.x, this.cursorObj.y);
+      ui.playSelect();
+    } else {
+      ui.playError();
+    }
+  }
+
+  /**
+   * Showdown editor L/R team cycling: reopen the editor on the previous/next already-picked team mon.
+   * From a CREATE slot it enters the picked list at either end. Uncommitted create edits are discarded
+   * (cycling is navigation between committed slots).
+   */
+  private cycleShowdownEditorTeam(currentEditIndex: number, dir: number): void {
+    const count = this.starterSpecies.length;
+    if (count === 0) {
+      return;
+    }
+    const base = currentEditIndex >= 0 ? currentEditIndex : dir > 0 ? -1 : count;
+    const next = (((base + dir) % count) + count) % count;
+    this.openShowdownEditor(next);
   }
 
   /**

@@ -52,4 +52,41 @@ describe("showdownTeamHash transport-shape canonicality", () => {
       showdownTeamHash(JSON.parse(JSON.stringify([withUndefined]))),
     );
   });
+
+  // Showdown fairness (2026-07-10): `nature` is a FREE, OPTIONAL manifest field. It must obey the
+  // same transport-canonical omit-when-absent discipline as `erShinyLab` (both clients hash the
+  // exact wire shape, so an absent field must NOT appear as a `nature` key).
+  describe("optional nature field", () => {
+    it("hashes a manifest with nature PRESENT differently from one with nature ABSENT", () => {
+      const present = starterToManifest(starter({ nature: 5 }), emptyGameData);
+      const absent: Record<string, unknown> = { ...present };
+      delete absent.nature;
+      expect("nature" in present).toBe(true);
+      expect("nature" in absent).toBe(false);
+      expect(showdownTeamHash([present])).not.toBe(showdownTeamHash([absent as never]));
+    });
+
+    it("hashes two manifests with DIFFERENT natures differently (nature is in the hash)", () => {
+      const a = starterToManifest(starter({ nature: 0 }), emptyGameData);
+      const b = starterToManifest(starter({ nature: 12 }), emptyGameData);
+      expect(showdownTeamHash([a])).not.toBe(showdownTeamHash([b]));
+    });
+
+    it("an ABSENT nature produces NO `nature` key after the JSON round-trip (and a stable hash)", () => {
+      const absent: Record<string, unknown> = { ...starterToManifest(starter(), emptyGameData) };
+      delete absent.nature;
+      const rehydrated = JSON.parse(JSON.stringify(absent));
+      expect("nature" in rehydrated).toBe(false);
+      // Transport-canonical: the in-memory (already key-less) object hashes identically to its round-trip.
+      expect(showdownTeamHash([absent as never])).toBe(showdownTeamHash([rehydrated]));
+    });
+
+    it("treats `nature: undefined` identically to an omitted nature (the erShinyLab omit-void lesson)", () => {
+      const base = starterToManifest(starter(), emptyGameData);
+      const omitted: Record<string, unknown> = { ...base };
+      delete omitted.nature;
+      const withUndefined = { ...base, nature: undefined };
+      expect(showdownTeamHash([withUndefined as never])).toBe(showdownTeamHash([omitted as never]));
+    });
+  });
 });

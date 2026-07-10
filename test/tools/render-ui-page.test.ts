@@ -84,6 +84,8 @@ import {
 import { buildDemoConfig } from "#ui/er-shiny-lab-ui-handler";
 import { PartyUiMode } from "#ui/party-ui-handler";
 import { SaveSlotUiMode } from "#ui/save-slot-select-ui-handler";
+import { buildShowdownEditorDemoConfig, EditorField } from "#ui/showdown-set-editor-ui-handler";
+import { buildShowdownTeamMenuDemoConfig } from "#ui/showdown-team-menu-ui-handler";
 import type { ShowdownWagerArgs } from "#ui/showdown-wager-ui-handler";
 import { getModifierType } from "#utils/modifier-utils";
 import { getPokemonSpecies } from "#utils/pokemon-utils";
@@ -836,6 +838,139 @@ const RECIPES: Record<string, Recipe> = {
     // DOWN x2 walks onto a staked option (its "You: ..." offer + tier-match row change); ACTION on a
     // STAKED row surfaces the escrow-unavailable notice (no lock). The final -stepN shows that path.
     steps: [Button.DOWN, Button.DOWN, Button.ACTION],
+  },
+  // Showdown SET EDITOR (P1 layout core). The full-screen teambuilder Layer-3 editor for one
+  // team slot: top team strip + validity chips, the left identity column (sprite / stage strip /
+  // shiny chips / live stat bars / cost), the right field rows (ability / item / moves x4 /
+  // nature), and the bottom shared search pane. Driven by a self-contained honest Garchomp-line
+  // config (real move/ability/item metadata). Each recipe fixes a deterministic focus/pane state
+  // so the golden is stable; SHOWDOWN_mode gate is not needed (the handler is data-driven).
+  "showdown-editor": {
+    mode: UiMode.SHOWDOWN_SET_EDITOR,
+    prepare: () => [buildShowdownEditorDemoConfig()],
+    diffTolerance: 0,
+  },
+  // Move typeahead pane OPEN mid-filter: Move 1 focused, pane expanded, filter string "out"
+  // narrowing the legal move table (Name | Type | Cat | BP | Acc | PP | effect) with the
+  // highlighted-row description footer.
+  "showdown-editor-moves": {
+    mode: UiMode.SHOWDOWN_SET_EDITOR,
+    prepare: () => [
+      buildShowdownEditorDemoConfig({
+        initialField: EditorField.MOVE0,
+        initialPaneOpen: true,
+        initialFilter: "o",
+      }),
+    ],
+    diffTolerance: 0,
+  },
+  // Ability row focused (round 4 - NO dropdown): the 1 ACTIVE ability is CYCLED in place (< active >
+  // chevrons) and the 3 INNATES read below, a LOCKED innate showing its candy unlock cost (item 6).
+  // This is also the locked-innate example render.
+  "showdown-editor-ability": {
+    mode: UiMode.SHOWDOWN_SET_EDITOR,
+    prepare: () => [buildShowdownEditorDemoConfig({ initialField: EditorField.ABILITY })],
+    diffTolerance: 0,
+  },
+  // Move cell focused (no dropdown): the persistent bottom MOVE DESCRIPTION bar shows the focused
+  // move's full description (item 8) - the compact NATURE chip (cycled via the N hotkey) sits beside
+  // the item row. Proves the desc bar updates while focus merely sits on a move cell.
+  "showdown-editor-movedesc": {
+    mode: UiMode.SHOWDOWN_SET_EDITOR,
+    prepare: () => [buildShowdownEditorDemoConfig({ initialField: EditorField.MOVE1 })],
+    diffTolerance: 0,
+  },
+  // Item pane: the searchable showdown item pool (icon + name + effect line). Item row focused,
+  // pane open.
+  "showdown-editor-item": {
+    mode: UiMode.SHOWDOWN_SET_EDITOR,
+    prepare: () => [buildShowdownEditorDemoConfig({ initialField: EditorField.ITEM, initialPaneOpen: true })],
+    diffTolerance: 0,
+  },
+  // Mega stage fielded: the BASE STATS must reflect the FIELDED FORM (Mega Garchomp's spread), NOT the
+  // base species (base Garchomp) - the mega-stats fix. The full sprite, item lock + abilities also
+  // follow the mega form.
+  "showdown-editor-mega": {
+    mode: UiMode.SHOWDOWN_SET_EDITOR,
+    prepare: () => {
+      const mega = listMegaStages(SpeciesId.GIBLE)[0];
+      return [buildShowdownEditorDemoConfig({ stage: { speciesId: mega.speciesId, formIndex: mega.formIndex } })];
+    },
+    diffTolerance: 0,
+  },
+  // Input-plumbing proof (not the golden set): drive the round-3 focus -> open -> navigate -> PICK
+  // path through processInput. DOWN,DOWN focuses Move 1; ACTION opens its search dropdown (the
+  // controller/A path, no ceremony); DOWN moves the result cursor; ACTION commits the highlighted
+  // move and closes the dropdown. The final PNG is the set with Move 1 changed - proof the type/pick
+  // Bug 2 refusal banner: fielding a MEGA while the team's one mega budget is already spent, then
+  // pressing Done (SUBMIT) - the editor REFUSES with the specific "second mega" message instead of
+  // committing. The final step PNG shows the red banner over the greyed mega stage strip.
+  "showdown-editor-mega-blocked": {
+    mode: UiMode.SHOWDOWN_SET_EDITOR,
+    prepare: () => {
+      const base = buildShowdownEditorDemoConfig();
+      const mega = listMegaStages(SpeciesId.GIBLE)[0];
+      return [
+        {
+          ...base,
+          stage: { speciesId: mega.speciesId, formIndex: mega.formIndex },
+          unlocks: { ...base.unlocks, megaBudgetSpent: true, megaBudgetSpentBy: "Blastoise" },
+        },
+      ];
+    },
+    steps: [Button.SUBMIT],
+    diffTolerance: 0,
+  },
+  // LONG species name (Crabominable) + focused ABILITY row: the overlap golden gate (Bug 3). The identity
+  // NAME bar must clip clear of the cost badge, and the focused ACTIVE ability bar + its E glyph must sit
+  // INSIDE the abilities panel frame (not kiss/overrun it). Regenerating this pins the fixed geometry.
+  "showdown-editor-longname": {
+    mode: UiMode.SHOWDOWN_SET_EDITOR,
+    prepare: () => [
+      buildShowdownEditorDemoConfig({
+        rootSpeciesId: SpeciesId.CRABRAWLER,
+        stage: { speciesId: SpeciesId.CRABOMINABLE, formIndex: 0 },
+        initialField: EditorField.ABILITY,
+      }),
+    ],
+    diffTolerance: 0,
+  },
+  // Showdown TEAM PRESET MENU (addendum): the pre-pairing entry screen. Left = stylish preset boxes
+  // (name + validity marker + 6 mini icons) with a trailing create box; right = the hovered mon's
+  // full sprite + ability/innates + item + moveset (live preview). Multi-team with hover preview on
+  // the first team's first mon. Data-driven demo config (two valid teams + one invalid).
+  "showdown-team-menu": {
+    mode: UiMode.SHOWDOWN_TEAM_MENU,
+    prepare: () => [buildShowdownTeamMenuDemoConfig()],
+    diffTolerance: 0,
+  },
+  // Empty state: no saved presets -> the large "create your first team" affordance, cursor on it,
+  // the right panel inviting a build.
+  "showdown-team-menu-empty": {
+    mode: UiMode.SHOWDOWN_TEAM_MENU,
+    prepare: () => [buildShowdownTeamMenuDemoConfig({ presets: [], initialTeam: 0 })],
+    diffTolerance: 0,
+  },
+  // Invalid-team marker: hover the third (invalid) preset - its box shows the INVALID marker + red
+  // edge, and its preview still renders (confirm on it would explain, not enter the lobby).
+  "showdown-team-menu-invalid": {
+    mode: UiMode.SHOWDOWN_TEAM_MENU,
+    prepare: () => [buildShowdownTeamMenuDemoConfig({ initialTeam: 2, initialMon: 0 })],
+    diffTolerance: 0,
+  },
+  // Rename prompt: the in-handler rename overlay (same DOM-input infra as the editor search) composited
+  // over the menu, seeded with the hovered team's current name.
+  "showdown-team-menu-rename": {
+    mode: UiMode.SHOWDOWN_TEAM_MENU,
+    prepare: () => [buildShowdownTeamMenuDemoConfig({ initialTeam: 0, initialRenaming: true })],
+    diffTolerance: 0,
+  },
+  // interaction round-trips (the keystroke half is covered by showdown-editor-input.test.ts).
+  "showdown-editor-nav": {
+    mode: UiMode.SHOWDOWN_SET_EDITOR,
+    prepare: () => [buildShowdownEditorDemoConfig()],
+    steps: [Button.DOWN, Button.DOWN, Button.ACTION, Button.DOWN, Button.ACTION],
+    diffTolerance: 0,
   },
   // Demo of universal input driving: drives the real starter-select grid cursor. Each
   // `-stepN.png` shows the cursor highlight + detail panel moving - the same mechanism

@@ -30,7 +30,7 @@ import { normalizeErShinyLabSavedLook } from "#data/elite-redux/er-shiny-lab-eff
 import { getShowdownOpponentManifest } from "#data/elite-redux/showdown/showdown-battle-state";
 import { showdownHeldItemKey } from "#data/elite-redux/showdown/showdown-enemy";
 import type { ShowdownMonManifest } from "#data/elite-redux/showdown/showdown-team";
-import type { Nature } from "#enums/nature";
+import { Nature } from "#enums/nature";
 import { PartyMemberStrength } from "#enums/party-member-strength";
 import { TrainerSlot } from "#enums/trainer-slot";
 import type { EnemyPokemon, Pokemon } from "#field/pokemon";
@@ -99,7 +99,10 @@ function buildShowdownEnemy(mon: ShowdownMonManifest, slot: TrainerSlot): EnemyP
     enemy.formIndex = mon.formIndex;
   }
   enemy.abilityIndex = mon.abilityIndex;
-  enemy.nature = mon.nature as Nature;
+  // Showdown fairness (2026-07-10): the manifest's FREE nature. Optional on the wire — a manifest that
+  // omits it (legacy/older client) falls back to a FIXED default (never the constructor's random roll,
+  // which would desync the two clients' checksums).
+  enemy.nature = (mon.nature ?? Nature.HARDY) as Nature;
   enemy.shiny = mon.shiny;
   enemy.variant = mon.variant as Variant;
   // Task C7: restore the owner's per-mon Shiny Lab look, shiny-gated exactly like the ghost apply
@@ -108,9 +111,11 @@ function buildShowdownEnemy(mon: ShowdownMonManifest, slot: TrainerSlot): EnemyP
   // Black shinies are banned from showdown teams (B6), so the black tier is irrelevant here.
   enemy.customPokemonData.erShinyLabSuppressLocal = true;
   enemy.customPokemonData.erShinyLab = mon.shiny ? normalizeErShinyLabSavedLook(mon.erShinyLab) : undefined;
-  if (mon.ivs.length === 6) {
-    enemy.ivs = mon.ivs.map(iv => Math.max(0, Math.min(31, Math.floor(iv) || 0)));
-  }
+  // Showdown fairness (2026-07-10): IVs are FORCED to a perfect [31 x6] for both players — the
+  // manifest's own ivs are ignored on the wire. IDENTICAL forcing on the host's own party
+  // (select-starter-phase initBattle), so the two sides' recalculated stats — and thus the turn
+  // checksum — match. `calculateStats()` below applies them.
+  enemy.ivs = [31, 31, 31, 31, 31, 31];
   if (mon.moveset.length > 0) {
     const moves = mon.moveset.map(id => new PokemonMove(id));
     enemy.moveset = moves;

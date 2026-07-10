@@ -32,6 +32,7 @@ import { sanitizeGhostProfile } from "#data/elite-redux/er-ghost-profile";
 import { setErDifficulty } from "#data/elite-redux/er-run-difficulty";
 import {
   beginShowdownBattle,
+  consumePendingShowdownPresetStarters,
   disposePendingShowdownRelay,
   disposePendingShowdownSession,
   endShowdownBattle,
@@ -384,6 +385,17 @@ export class SelectStarterPhase extends Phase {
     const relay = new ShowdownCommandRelay(runtime.localTransport);
     setPendingShowdownSession(session);
     setPendingShowdownRelay(relay);
+    // Team Menu (Phase D): teams are now built + selected BEFORE pairing. When the player entered the
+    // lobby carrying a preset, its reconstructed starters are pending here - SKIP the interactive
+    // grid+editor teambuild entirely and feed the pre-built team straight into the negotiate/wager
+    // pipeline (both clients do this, so pairing leads near-immediately to the wager, no 10-minute pick
+    // wait). The legacy in-lobby STARTER_SELECT path below stays code-tolerant but is unreachable from
+    // the new entry flow (no pending preset -> it still opens, so a direct/legacy launch never breaks).
+    const presetStarters = consumePendingShowdownPresetStarters();
+    if (presetStarters != null) {
+      void this.runShowdownFlow(presetStarters, controller.role, session, relay);
+      return;
+    }
     globalScene.ui.setMode(UiMode.STARTER_SELECT, (starters: Starter[]) => {
       globalScene.ui.clearText();
       void this.runShowdownFlow(starters, controller.role, session, relay);
@@ -591,6 +603,13 @@ export class SelectStarterPhase extends Phase {
       if (Overrides.GENDER_OVERRIDE !== null) {
         starterGender = Overrides.GENDER_OVERRIDE;
       }
+      // Showdown fairness (2026-07-10): a manifest-built mon (host's OWN party) fields the manifest's
+      // FREE nature and has its IVs FORCED to a perfect [31 x6]. The opponent party is built with the
+      // SAME forcing (buildShowdownEnemy), and the guest boots the host's post-build session snapshot,
+      // so the forced values flow to the guest verbatim — both engines recalculate identical stats,
+      // keeping the turn checksum in parity. Non-showdown paths (showdownMon == null) are unchanged.
+      const starterIvs = showdownMon ? [31, 31, 31, 31, 31, 31] : starter.ivs;
+      const starterNature = (showdownMon?.nature as Nature | undefined) ?? starter.nature;
       const starterPokemon = globalScene.addPlayerPokemon(
         species,
         globalScene.gameMode.getStartingLevel(),
@@ -599,8 +618,8 @@ export class SelectStarterPhase extends Phase {
         starterGender,
         starter.shiny,
         starter.variant,
-        starter.ivs,
-        starter.nature,
+        starterIvs,
+        starterNature,
       );
       if (starter.moveset) {
         starterPokemon.tryPopulateMoveset(starter.moveset, ignoreMovesetValidation);

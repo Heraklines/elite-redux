@@ -170,7 +170,12 @@ export interface ShowdownMonManifestWire {
   shiny: boolean;
   variant: number;
   abilityIndex: number;
-  nature: number;
+  /**
+   * Showdown fairness (2026-07-10): the FREE nature. OPTIONAL and OMITTED-when-absent, mirroring the
+   * domain field and the `erShinyLab` transport discipline — the wire shape both clients hash must be
+   * byte-identical, so an absent nature is NEVER carried as `undefined`.
+   */
+  nature?: number | undefined;
   ivs: number[];
   moveset: number[];
   item: string;

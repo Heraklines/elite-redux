@@ -50,6 +50,15 @@ import { sanitizeTrainerFxSaveData, type TrainerFxSaveData } from "#data/elite-r
 import { getErUsedTrainerKeys, restoreErRunTrainerTracking } from "#data/elite-redux/er-trainer-runtime-hook";
 import { getErWardStoneEntries, restoreErWardStones } from "#data/elite-redux/er-ward-stones";
 import { swapSessionData } from "#data/elite-redux/showdown/showdown-side-swap";
+import type { ShowdownMonManifest } from "#data/elite-redux/showdown/showdown-team";
+import {
+  deletePreset,
+  makeShowdownTeamPreset,
+  renamePreset,
+  type ShowdownTeamPreset,
+  sanitizeShowdownTeamPresets,
+  upsertPreset,
+} from "#data/elite-redux/showdown/showdown-team-preset";
 import { pokemonFormChanges } from "#data/pokemon-forms";
 import type { PokemonSpecies } from "#data/pokemon-species";
 import { loadPositionalTag } from "#data/positional-tags/load-positional-tag";
@@ -305,6 +314,14 @@ export class GameData {
   public showdownAppliedSettlements: number[] = [];
 
   /**
+   * Showdown 1v1 (Team Menu): named TEAM presets, serialized in the account save so they
+   * survive a device change (superseding the earlier local-only v1 decision). Each preset is
+   * a named list of the wire manifests, fed straight into the negotiate pipeline at lobby entry.
+   * Optional for back-compat (absent = []); sanitized on load.
+   */
+  public showdownTeamPresets: ShowdownTeamPreset[] = [];
+
+  /**
    * @param fromRaw - If true, will skip initialization of fields that are normally randomized on new game start. Used for the admin panel; default `false`
    */
   constructor(fromRaw = false) {
@@ -345,6 +362,7 @@ export class GameData {
     this.autoEggRestock = defaultAutoEggRestockSettings();
     this.llmDirectorState = defaultDirectorState();
     this.showdownAppliedSettlements = [];
+    this.showdownTeamPresets = [];
     this.initDexData();
     this.initStarterData();
     this.applyLocalAllStartersDebug();
@@ -370,6 +388,7 @@ export class GameData {
       autoEggRestock: this.autoEggRestock,
       llmDirectorState: this.llmDirectorState,
       showdownAppliedSettlements: this.showdownAppliedSettlements.slice(0),
+      showdownTeamPresets: this.showdownTeamPresets.map(p => ({ ...p, mons: p.mons.map(m => ({ ...m })) })),
       freeLegendaryEggsGranted: this.freeLegendaryEggsGranted,
       erShinyLabAvailableEffects: this.erShinyLabAvailableEffects.slice(0),
       ghostProfile: this.ghostProfile,
@@ -395,6 +414,45 @@ export class GameData {
     }
     this.freeLegendaryEggsGranted = true;
     console.log("[er-gift] granted 2 free Legendary eggs (one-time)");
+  }
+
+  // --- Showdown TEAM PRESETS (account-save CRUD) --------------------------------------------
+  //
+  // Thin persistence wrappers over the PURE helpers in `showdown-team-preset.ts` (unit-tested
+  // there). Each mutation persists via `saveSystem` (best-effort cloud + local cache) so a
+  // preset created in the Team Menu survives a reload/device change. `saveSystem` is fired
+  // fire-and-forget - the menu updates its own local list from the returned array immediately.
+
+  /** All saved team presets (a live reference; the menu reads it each render for re-validation). */
+  public listShowdownTeamPresets(): ShowdownTeamPreset[] {
+    return this.showdownTeamPresets;
+  }
+
+  /**
+   * Save a team preset. When `index` names an existing preset the flow is EDITING it in place;
+   * otherwise a new preset is appended (capped). Returns the 0-based index of the saved preset.
+   */
+  public saveShowdownTeamPreset(name: string, mons: ShowdownMonManifest[], index?: number): number {
+    const preset = makeShowdownTeamPreset(name, mons);
+    this.showdownTeamPresets = upsertPreset(this.showdownTeamPresets, preset, index);
+    const savedIndex =
+      index !== undefined && index >= 0 && index < this.showdownTeamPresets.length
+        ? index
+        : this.showdownTeamPresets.length - 1;
+    void this.saveSystem();
+    return savedIndex;
+  }
+
+  /** Rename the preset at `index`, persisting the change. */
+  public renameShowdownTeamPreset(index: number, newName: string): void {
+    this.showdownTeamPresets = renamePreset(this.showdownTeamPresets, index, newName);
+    void this.saveSystem();
+  }
+
+  /** Delete the preset at `index`, persisting the change. */
+  public deleteShowdownTeamPreset(index: number): void {
+    this.showdownTeamPresets = deletePreset(this.showdownTeamPresets, index);
+    void this.saveSystem();
   }
 
   /**
@@ -923,6 +981,7 @@ export class GameData {
     this.showdownAppliedSettlements = Array.isArray(systemData.showdownAppliedSettlements)
       ? systemData.showdownAppliedSettlements.filter(n => Number.isInteger(n)).slice(-200)
       : [];
+    this.showdownTeamPresets = sanitizeShowdownTeamPresets(systemData.showdownTeamPresets);
     this.erShinyLabAvailableEffects =
       systemData.erShinyLabAvailableEffects?.map(v => Math.max(0, Math.min(255, Math.round(v)))) ?? [];
     this.ghostProfile = sanitizeGhostProfile(systemData.ghostProfile) ?? null;

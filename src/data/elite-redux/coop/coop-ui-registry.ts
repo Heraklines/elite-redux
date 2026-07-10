@@ -203,6 +203,17 @@ export const COOP_UI_REGISTRY: Record<UiMode, CoopUiClass> = {
   // now the NORMAL player-side COMMAND menu (Task F1 data-level side swap), so it needs no bespoke
   // entry here. Never a co-op surface (versus is a distinct GameMode, not isCoop).
   [UiMode.SHOWDOWN_WAGER]: "local-only",
+
+  // Showdown 1v1 versus SET EDITOR (Layer 3 teambuilder): LOCAL-ONLY by construction - each player
+  // shapes its OWN team slot on its OWN screen; only the resulting validated team manifest crosses the
+  // wire (the C2 team exchange), never the editor UI. Never a co-op surface (versus is a distinct
+  // GameMode, not isCoop).
+  [UiMode.SHOWDOWN_SET_EDITOR]: "local-only",
+
+  // Showdown 1v1 TEAM PRESET MENU (the pre-pairing entry screen): LOCAL-ONLY by construction - it opens
+  // at the TITLE before any session exists, so it can never be a partner-owned interaction. Only the
+  // chosen preset's team manifests cross the wire later (the negotiate step), never this menu UI.
+  [UiMode.SHOWDOWN_TEAM_MENU]: "local-only",
 };
 
 /**

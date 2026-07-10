@@ -2098,6 +2098,34 @@ export const DEV_SCENARIOS: DevScenario[] = [
     shopItems: [modifierTypes.RARER_CANDY, modifierTypes.RARER_CANDY],
   },
   {
+    label: "(note) Showdown Set Editor: navigation + mega stats + shiny (verify in versus teambuilder)",
+    description:
+      "UI/FLOW fix - this is a NON-battle screen, so verify it in the SHOWDOWN (versus) TEAMBUILDER, not\n"
+      + "here: Title -> Showdown -> pick/confirm a mon to open the full-screen Set Editor. CHECK:\n"
+      + "1) SIDE BUTTONS (Left/Right) always cycle the STAGE/form now - they are no longer hijacked by the\n"
+      + "   focused row. The 4 hotkeys work: F=Stage, R=Shiny, E=Ability, N=Nature.\n"
+      + "2) ESCAPE leaves the editor back to the grid from ANY state (a field OR an open move/item search).\n"
+      + "   Previously Escape was dead here and a follow-up press hit the grid's Start -> an EMPTY versus\n"
+      + "   battle (softlock). It must NEVER start a battle on the way out.\n"
+      + "3) MEGA STATS: cycle to a mega stage (e.g. Mega Venusaur / Mega Garchomp) - the BASE STATS panel\n"
+      + "   must show the MEGA form's spread, DIFFERENT from the base form (previously every mega showed the\n"
+      + "   base stats). Sprite + innates + the auto-locked Mega Stone item follow the mega form too.\n"
+      + "4) SHINY: a SINGLE colour-coded shiny star sits in the sprite's corner (R cycles off -> owned\n"
+      + "   tiers, default = your highest owned rarity), like starter select.\n"
+      + "Rendered + asserted headlessly: test/tools/render-ui-page.test.ts (showdown-editor* incl.\n"
+      + "showdown-editor-mega) + test/tests/elite-redux/showdown/showdown-editor-input.test.ts (Escape-leave\n"
+      + "+ ability cycling).",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({ STARTING_WAVE_OVERRIDE: 1 });
+      return [
+        makeStarter(SpeciesId.GARCHOMP, {
+          moveset: [MoveId.EARTHQUAKE, MoveId.OUTRAGE, MoveId.STONE_EDGE, MoveId.SWORDS_DANCE],
+        }),
+      ];
+    },
+  },
+  {
     label: "(note) Co-op: level-up Move Learn panel is the SHARED synced path (#848)",
     description:
       "CO-OP fix - verify with TWO clients (not a solo battle): a level-up move-learn on a FULL\n"

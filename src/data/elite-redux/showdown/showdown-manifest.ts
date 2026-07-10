@@ -18,7 +18,9 @@ import { SHOWDOWN_ITEM_POOL } from "#data/elite-redux/showdown/showdown-item-poo
 import { collectShowdownLegalMoves, collectUnlockedEggMoves } from "#data/elite-redux/showdown/showdown-legal-moves";
 import type { ShowdownMonManifest, UnlockSnapshot } from "#data/elite-redux/showdown/showdown-team";
 import { DexAttr } from "#enums/dex-attr";
-import type { Starter } from "#types/save-data";
+import { Nature } from "#enums/nature";
+import type { Variant } from "#sprites/variant";
+import type { Starter, StarterMoveset } from "#types/save-data";
 
 /** Every showdown mon is fielded at level 100 (the 6v6 format is fixed-level). */
 const SHOWDOWN_LEVEL = 100;
@@ -68,6 +70,47 @@ export function starterToManifest(starter: Starter, _gameData: ShowdownUnlockGam
     // real match; loopback tests can't see it because they pass objects by reference).
     ...(starter.shiny && starter.erShinyLab ? { erShinyLab: [...starter.erShinyLab] } : {}),
   };
+}
+
+/**
+ * INVERSE of {@linkcode starterToManifest}: rebuild the engine {@linkcode Starter} a stored preset
+ * manifest was serialized from. The Team Menu's "enter lobby with this preset" path (Phase D) skips
+ * the interactive grid+editor teambuild, so it reconstructs `Starter`s from the saved manifests and
+ * feeds them into the EXISTING negotiate/wager/battle pipeline unchanged.
+ *
+ * RULE (hash parity - the load-bearing property): `starterToManifest(manifestToStarter(m))` MUST be
+ * BYTE-IDENTICAL to `m`, because both clients hash the wire manifest at the ready gate. So the fielded
+ * species/form/item go into the `showdown*` fields (the manifest reads those first), the grid root is
+ * `rootSpeciesId`, and the omit-when-absent optionals (`nature` is always present from the editor;
+ * `erShinyLab` only on a shiny with a look) are reconstructed with the SAME presence discipline -
+ * a spurious `erShinyLab`/`nature` here would poison the hash exactly like the erShinyLab:undefined void.
+ * The `_gameData` param mirrors {@linkcode buildUnlockSnapshot}'s call signature; no lookups are needed
+ * (baseCost is recomputed from the raw table by `starterToManifest`, so it round-trips for free).
+ */
+export function manifestToStarter(mon: ShowdownMonManifest): Starter {
+  const starter: Starter = {
+    // The grid pick is the LINE ROOT; the fielded stage goes in the showdown* fields below.
+    speciesId: mon.rootSpeciesId,
+    shiny: mon.shiny,
+    variant: mon.variant as Variant,
+    // Base grid form (0); the fielded form is carried by showdownFormIndex, which the manifest reads first.
+    formIndex: 0,
+    female: false,
+    abilityIndex: mon.abilityIndex,
+    passive: false,
+    nature: (mon.nature ?? Nature.HARDY) as Nature,
+    moveset: (mon.moveset.length > 0 ? [...mon.moveset] : undefined) as StarterMoveset | undefined,
+    pokerus: false,
+    ivs: [...mon.ivs],
+    erBlackShiny: mon.erBlackShiny,
+    showdownSpeciesId: mon.speciesId,
+    showdownFormIndex: mon.formIndex,
+    showdownItem: mon.item,
+    // Match starterToManifest's presence discipline: the look rides ONLY on a shiny mon that carries one.
+    // The manifest stores the look as a plain number[]; the Starter field is the fixed-length tuple alias.
+    ...(mon.shiny && mon.erShinyLab ? { erShinyLab: [...mon.erShinyLab] as unknown as Starter["erShinyLab"] } : {}),
+  };
+  return starter;
 }
 
 /**
