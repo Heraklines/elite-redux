@@ -20,6 +20,10 @@ import { globalScene } from "#app/global-scene";
 import { Phase } from "#app/phase";
 import { modifierTypes } from "#data/data-lists";
 import { Egg } from "#data/egg";
+import {
+  adoptBargainWatcherOutcome,
+  commitBargainOwnerOutcome,
+} from "#data/elite-redux/coop/coop-bargain-operation";
 import { applyCoopMeOutcome, captureCoopMeOutcome } from "#data/elite-redux/coop/coop-battle-engine";
 import { coopLog, coopWarn } from "#data/elite-redux/coop/coop-debug";
 import { COOP_BARGAIN_SEQ_BASE, COOP_BIOME_WAIT_MS } from "#data/elite-redux/coop/coop-interaction-relay";
@@ -113,10 +117,21 @@ export class TheBargainPhase extends Phase {
     }
     this.coopBargainDone = true;
     try {
+      const outcome = captureCoopMeOutcome();
+      const controller = getCoopController();
+      if (controller != null) {
+        commitBargainOwnerOutcome({
+          pinned: this.coopBargainStart,
+          outcome,
+          localRole: controller.role,
+          wave: globalScene.currentBattle?.waveIndex ?? 0,
+          turn: globalScene.currentBattle?.turn ?? 0,
+        });
+      }
       getCoopInteractionRelay()?.sendInteractionOutcome(
         COOP_BARGAIN_SEQ_BASE + this.coopBargainStart,
         "bargain",
-        captureCoopMeOutcome(),
+        outcome,
       );
       coopLog("reward", `bargain OWNER terminal: outcome blob sent (pinnedStart=${this.coopBargainStart})`);
     } catch {
@@ -137,7 +152,17 @@ export class TheBargainPhase extends Phase {
       relay == null
         ? null
         : await relay.awaitInteractionOutcome(COOP_BARGAIN_SEQ_BASE + this.coopBargainStart, COOP_BIOME_WAIT_MS);
-    if (outcome?.k === "meResync") {
+    const controller = getCoopController();
+    const adopt =
+      controller != null
+      && adoptBargainWatcherOutcome({
+        pinned: this.coopBargainStart,
+        outcome,
+        localRole: controller.role,
+        wave: globalScene.currentBattle?.waveIndex ?? 0,
+        turn: globalScene.currentBattle?.turn ?? 0,
+      });
+    if (adopt && outcome?.k === "meResync") {
       coopLog("reward", "bargain WATCHER: outcome blob received -> converging");
       try {
         applyCoopMeOutcome(outcome);

@@ -185,6 +185,11 @@ export interface CoopShopBuyPayload {
   readonly terminal: boolean;
 }
 
+/** BARGAIN outcome: the host-stated full run-state blob applied by the watcher verbatim. */
+export interface CoopBargainPayload {
+  readonly outcome: CoopInteractionOutcome;
+}
+
 // -----------------------------------------------------------------------------
 // Wave-2c: mystery-encounter payloads (§2.1 #8/#9/#10, MYSTERY_ENCOUNTER phase). The ME surface is
 // owner-alternated with the choice-forwarding model (#693: the guest never runs the encounter

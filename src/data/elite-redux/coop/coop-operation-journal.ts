@@ -79,6 +79,19 @@ export function coopOperationClassForPhase(phase: CoopLogicalPhase): string | nu
   }
 }
 
+/** Resolve classes that share the generic INTERACTION logical phase by their closed operation kind. */
+function coopOperationClassForEnvelope(envelope: CoopAuthoritativeEnvelopeV1): string | null {
+  if (envelope.logicalPhase === "INTERACTION") {
+    switch (envelope.pendingOperation?.kind) {
+      case "BARGAIN":
+        return "op:bargain";
+      default:
+        return null;
+    }
+  }
+  return coopOperationClassForPhase(envelope.logicalPhase);
+}
+
 /**
  * A surface's guest-side applier: route a replayed committed envelope INTO the surface's idempotent
  * guest applier (invariant 5) AND its live-mutation seam. Returns a {@linkcode CoopApplyOutcome} that
@@ -149,7 +162,7 @@ export function journalCoopCommittedEnvelope(envelope: CoopAuthoritativeEnvelope
   if (manager == null) {
     return;
   }
-  const cls = coopOperationClassForPhase(envelope.logicalPhase);
+  const cls = coopOperationClassForEnvelope(envelope);
   if (cls == null) {
     return;
   }
@@ -214,7 +227,7 @@ export function coopOperationDurabilityHooks(): CoopDurabilityHooks {
   return {
     extractKey: msg => {
       if (msg.t === "envelope") {
-        const cls = coopOperationClassForPhase(msg.envelope.logicalPhase);
+        const cls = coopOperationClassForEnvelope(msg.envelope);
         return cls == null ? null : { cls, seq: msg.envelope.revision };
       }
       return null;

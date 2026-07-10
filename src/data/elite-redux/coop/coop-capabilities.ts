@@ -57,6 +57,8 @@ export const COOP_CAP_OP_ME: CoopCapabilityKey = "opSurface.me";
 export const COOP_CAP_OP_REWARD: CoopCapabilityKey = "opSurface.reward";
 /** The migrated post-battle wave-advance operation surface - THE KEYSTONE (coop-wave-operation.ts, §2.5 item 4). */
 export const COOP_CAP_OP_WAVE: CoopCapabilityKey = "opSurface.wave";
+/** The migrated Giratina bargain terminal operation (§2.5 item 5). */
+export const COOP_CAP_OP_BARGAIN: CoopCapabilityKey = "opSurface.bargain";
 /** The application-level durability journal (§4, coop-durability.ts / coop-operation-journal.ts). */
 export const COOP_CAP_DURABILITY_JOURNAL: CoopCapabilityKey = "durability.journal";
 /**

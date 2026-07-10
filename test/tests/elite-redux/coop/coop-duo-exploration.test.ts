@@ -25,6 +25,10 @@ import type { BattleScene } from "#app/battle-scene";
 import { getGameMode } from "#app/game-mode";
 import { globalScene, initGlobalScene } from "#app/global-scene";
 import Overrides from "#app/overrides";
+import {
+  resetCoopBargainOperationFlag,
+  setCoopBargainOperationEnabled,
+} from "#data/elite-redux/coop/coop-bargain-operation";
 import { clearCoopRuntime, getCoopInteractionRelay, setCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
 import { COOP_GUEST_FIELD_INDEX, COOP_HOST_FIELD_INDEX } from "#data/elite-redux/coop/coop-session";
 import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
@@ -92,6 +96,7 @@ describe.skipIf(!RUN)("co-op DUO exploration sweep (maintainer directive)", () =
   });
 
   afterEach(() => {
+    resetCoopBargainOperationFlag();
     setCoopBiomeMarketTestSkip(true);
     logs.dispose();
     clearCoopRuntime();
@@ -913,16 +918,23 @@ describe.skipIf(!RUN)("co-op DUO exploration sweep (maintainer directive)", () =
     logs.flush();
   }, 240_000);
 
-  it("DURABILITY #795: a dropped Giratina bargain outcome still materializes and keeps counters lockstep", async () => {
+  it.each([
+    { operationEnabled: true, droppedLegacy: true },
+    { operationEnabled: false, droppedLegacy: false },
+  ])("DURABILITY #795: Giratina bargain converges operation=$operationEnabled droppedLegacy=$droppedLegacy", async ({
+    operationEnabled,
+    droppedLegacy,
+  }) => {
     // The Bargain is the 4th owner/watcher surface: at most ONE deal per visit, so the whole
     // relay is a single comprehensive outcome blob (the proven ME-terminal resync) + a uniform
     // terminal. This probe drives the LEAVE path end-to-end across two engines; the deal-commit
     // path reuses applyCoopMeOutcome verbatim (already proven by the duo ME tests).
+    setCoopBargainOperationEnabled(operationEnabled);
     await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
     const pair = wrapCoopFaultPair(
       createLoopbackPair(),
       {
-        drop: 1,
+        drop: droppedLegacy ? 1 : 0,
         reorder: 0,
         delay: 0,
         faultable: msg => msg.t === "interactionOutcome" && msg.kind === "bargain",
@@ -987,7 +999,7 @@ describe.skipIf(!RUN)("co-op DUO exploration sweep (maintainer directive)", () =
       }
     });
     expect(ownerDone, "HARNESS: the owner bargain chain fully completed before exit").toBe(true);
-    expect(pair.faultsInjected(), "the legacy bargain outcome was actually dropped").toBe(1);
+    expect(pair.faultsInjected(), "the requested legacy bargain fault count was honored").toBe(droppedLegacy ? 1 : 0);
     expect(rig.hostRuntime.controller.interactionCounter(), "owner advanced the bargain interaction").toBe(
       counterBefore + 1,
     );
