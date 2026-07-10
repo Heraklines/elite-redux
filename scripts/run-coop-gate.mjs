@@ -123,21 +123,34 @@ function categorize() {
 }
 
 /**
+ * Per-lane vitest ISOLATION. The heavy engine/soak lanes (B, C) run with `--isolate` so EACH file gets a
+ * FRESH module registry (its own `globalScene`) - this is what actually kills #879: with the default
+ * `isolate: false`, a single duo file that fails to fully restore `globalScene` in afterEach leaves it
+ * broken for EVERY later file in the worker (a deterministic `undefined.play` cascade under single-fork, a
+ * nondeterministic one under multi-fork). `--isolate` removes the shared-state coupling entirely, so no file
+ * can poison another. Lane A (engine-free stub repros) is DELIBERATELY left on the default `--no-isolate`:
+ * those files intentionally CHAIN a real `globalScene` across the dir (capture prevGlobalScene -> restore),
+ * so isolating them would strand a stub with no real scene to chain; Lane A is already reliably green as-is.
+ */
+const LANE_ISOLATE = { A: false, B: true, C: true, Q: false };
+
+/**
  * Run one lane: a single `vitest run` over the lane's file list with `--no-file-parallelism` (one worker,
- * sequential, deterministic order) and ER_SCENARIO=1 (so the engine-gated files actually run). Returns the
- * lane result (pass/fail + duration + the parsed summary line).
+ * sequential, no ~11-fork load) + the lane's isolation ({@linkcode LANE_ISOLATE}) and ER_SCENARIO=1 (so the
+ * engine-gated files actually run). Returns the lane result (pass/fail + duration + the parsed summary line).
  */
 function runLane(name, files) {
   if (files.length === 0) {
     return { name, files: 0, ok: true, ms: 0, summary: "(no files)" };
   }
+  const isolate = LANE_ISOLATE[name] ? "--isolate" : "--no-isolate";
   // eslint-disable-next-line no-console
-  console.log(`\n=== LANE ${name}: ${files.length} files (sequential, single worker) ===`);
+  console.log(`\n=== LANE ${name}: ${files.length} files (sequential, single worker, ${isolate}) ===`);
   const started = Date.now();
   // shell:true + a single command STRING so Windows resolves `npx` (-> npx.cmd) via PATHEXT reliably (a bare
   // spawnSync("npx.cmd", argv) returns exit=null on this box). Coop test paths never contain spaces, so no
   // quoting is needed; the arg list stays well under the Windows command-line length limit.
-  const cmd = `npx vitest run ${files.join(" ")} --no-file-parallelism`;
+  const cmd = `npx vitest run ${files.join(" ")} --no-file-parallelism ${isolate}`;
   const res = spawnSync(cmd, {
     cwd: REPO_ROOT,
     env: { ...process.env, ER_SCENARIO: "1" },
