@@ -1687,14 +1687,23 @@ export function recordCoopPartnerSlotCommand(fieldIndex: number, command: Serial
  * instead of deriving from the one-bit outcome. Pure over globalScene at the wave-end call site.
  */
 export function buildCoopWaveAdvancePayload(outcome: CoopWaveOutcome, wave: number): CoopWaveAdvancePayload {
-  const gameMode = globalScene.gameMode;
   const isVictory = outcome === "win" || outcome === "capture";
   const nextLogicalPhase = outcome === "gameOver" ? "GAME_OVER" : isVictory ? "WAVE_VICTORY" : "WAVE_FLEE";
-  // A biome boundary this advance crosses (the flee tail's SelectBiomePhase condition + the victory
-  // cascade's biome transition): random-biome mode, or the engine says the next wave enters a new biome.
-  const biomeChange = gameMode.hasRandomBiomes || globalScene.isNewBiome();
-  // An egg-lapse fires on a non-final victory advance (VictoryPhase pushes EggLapsePhase there).
-  const eggLapse = isVictory && (gameMode.isEndless || !gameMode.isWaveFinal(wave));
+  // DEFENSIVE scene reads (the guest finalize path maybeRunCoopWaveAdvance must NEVER throw building the
+  // control statement - a missing / minimal scene must yield safe defaults so the outcome-driven tail STILL
+  // builds). A biome boundary = random-biome mode or the engine says the next wave enters a new biome; an
+  // egg-lapse fires on a non-final victory advance; the victory kind is the #867 host-authoritative battleType.
+  let biomeChange = false;
+  let eggLapse = false;
+  let victoryKind: "wild" | "trainer" = "wild";
+  try {
+    const gameMode = globalScene.gameMode;
+    biomeChange = (gameMode?.hasRandomBiomes ?? false) || globalScene.isNewBiome();
+    eggLapse = isVictory && ((gameMode?.isEndless ?? false) || !gameMode.isWaveFinal(wave));
+    victoryKind = globalScene.currentBattle.battleType === BattleType.TRAINER ? "trainer" : "wild";
+  } catch {
+    // minimal / stub scene: keep the safe defaults; the outcome-driven tail is unaffected.
+  }
   const payload: CoopWaveAdvancePayload = {
     wave,
     outcome,
@@ -1704,13 +1713,7 @@ export function buildCoopWaveAdvancePayload(outcome: CoopWaveOutcome, wave: numb
     eggLapse,
     meBoundary: "none", // an ME-spawned battle victory routes its OWN tail (queueCoopMeBattleVictoryTail).
   };
-  if (isVictory) {
-    return {
-      ...payload,
-      victoryKind: globalScene.currentBattle.battleType === BattleType.TRAINER ? "trainer" : "wild",
-    };
-  }
-  return payload;
+  return isVictory ? { ...payload, victoryKind } : payload;
 }
 
 export function broadcastCoopWaveResolved(outcome: CoopWaveOutcome, presentation?: CoopCapturePresentation): void {
