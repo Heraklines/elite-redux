@@ -25,17 +25,6 @@
 // follow-up (noted so the guarantee is not overclaimed).
 // =============================================================================
 
-import type {
-  CoopLogicalPhase,
-  CoopOperationKind,
-  CoopPendingOperation,
-} from "#data/elite-redux/coop/coop-operation-envelope";
-import { makeCoopOperationId } from "#data/elite-redux/coop/coop-operation-envelope";
-import {
-  type CoopCommitContext,
-  type CoopIntentValidator,
-  CoopOperationHost,
-} from "#data/elite-redux/coop/coop-operation-runtime";
 import {
   commitMeOwnerIntent,
   resetCoopMeOperationFlag,
@@ -43,6 +32,18 @@ import {
   setCoopMeOperationEnabled,
   setCoopMeOperationEpoch,
 } from "#data/elite-redux/coop/coop-me-operation";
+import type {
+  CoopLogicalPhase,
+  CoopOperationKind,
+  CoopPendingOperation,
+} from "#data/elite-redux/coop/coop-operation-envelope";
+import { makeCoopOperationId } from "#data/elite-redux/coop/coop-operation-envelope";
+import { coopOperationDurabilityHooks } from "#data/elite-redux/coop/coop-operation-journal";
+import {
+  type CoopCommitContext,
+  type CoopIntentValidator,
+  CoopOperationHost,
+} from "#data/elite-redux/coop/coop-operation-runtime";
 import type { CoopAuthoritativeBattleStateV1 } from "#data/elite-redux/coop/coop-transport";
 import { describe, expect, it, vi } from "vitest";
 
@@ -115,7 +116,7 @@ describe("W2e-R2 I5: pre-commit intent loss - owner re-send with the determinist
     }
   });
 
-  it("I5 production seam: a lost guest proposal is resent until the operation lifecycle resets", async () => {
+  it("I5 production seam: a lost guest proposal is resent until its committed envelope arrives", async () => {
     vi.useFakeTimers();
     setCoopMeOperationEnabled(true);
     resetCoopMeOperationState();
@@ -134,11 +135,31 @@ describe("W2e-R2 I5: pre-commit intent loss - owner re-send with the determinist
       });
 
       await vi.advanceTimersByTimeAsync(1_000);
-      expect(resend, "a dropped pre-commit proposal must be retried with the same relay payload").toHaveBeenCalledOnce();
+      expect(
+        resend,
+        "a dropped pre-commit proposal must be retried with the same relay payload",
+      ).toHaveBeenCalledOnce();
 
-      resetCoopMeOperationState();
+      const host = new CoopOperationHost({ epoch: EPOCH });
+      const committed = host.submit(
+        makeIntent(EPOCH, GUEST_OWNER, 8_000_003 * 8000 + 1000, { optionIndex: 1 }, "ME_PICK"),
+        makeCtx("MYSTERY_ENCOUNTER", 12, 0),
+        ACCEPT,
+      );
+      expect(committed.kind).toBe("committed");
+      if (committed.kind !== "committed") {
+        throw new Error("expected the authority to commit the resent ME proposal");
+      }
+      coopOperationDurabilityHooks().apply?.({
+        cls: "op:me",
+        seq: committed.envelope.revision,
+        msg: { t: "envelope", envelope: committed.envelope },
+      });
       await vi.advanceTimersByTimeAsync(5_000);
-      expect(resend, "session teardown must bound the proposal resend lifecycle").toHaveBeenCalledOnce();
+      expect(
+        resend,
+        "the authority's committed envelope must stop the proposal resend lifecycle",
+      ).toHaveBeenCalledOnce();
     } finally {
       resetCoopMeOperationFlag();
       resetCoopMeOperationState();

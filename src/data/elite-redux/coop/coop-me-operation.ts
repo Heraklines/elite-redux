@@ -187,6 +187,37 @@ let lastAppliedPinned = -1;
  */
 let revisionFloor = 0;
 
+/** Guest proposals are not journaled until the host commits them, so retry the legacy relay payload. */
+const ME_OWNER_INTENT_RETRY_MS = 1_000;
+const pendingOwnerIntentRetries = new Map<string, ReturnType<typeof setTimeout>>();
+
+function cancelOwnerIntentRetry(operationId: string): void {
+  const timer = pendingOwnerIntentRetries.get(operationId);
+  if (timer != null) {
+    clearTimeout(timer);
+    pendingOwnerIntentRetries.delete(operationId);
+  }
+}
+
+function armOwnerIntentRetry(operationId: string, resend: () => void): void {
+  cancelOwnerIntentRetry(operationId);
+  const retry = (): void => {
+    if (!pendingOwnerIntentRetries.has(operationId)) {
+      return;
+    }
+    try {
+      resend();
+    } catch (e) {
+      coopWarn("me", `ME owner intent resend threw id=${operationId}; retry remains armed`, e);
+    }
+    // A loopback/synchronous transport can deliver the committed envelope during `resend()`.
+    if (pendingOwnerIntentRetries.has(operationId)) {
+      pendingOwnerIntentRetries.set(operationId, setTimeout(retry, ME_OWNER_INTENT_RETRY_MS));
+    }
+  };
+  pendingOwnerIntentRetries.set(operationId, setTimeout(retry, ME_OWNER_INTENT_RETRY_MS));
+}
+
 /**
  * True iff the migrated (envelope-gated) ME path is active; else pure legacy fallback (§5.1). The local
  * rollback flag (`enabled`) is the OUTER gate; the NEGOTIATED capability set is the inner one (#896
@@ -226,6 +257,10 @@ export function setCoopMeOperationEpoch(next: number): void {
 
 /** Tear down all per-session operation state (called from assembleCoopRuntime + clearCoopRuntime + tests). Keeps the flag. */
 export function resetCoopMeOperationState(): void {
+  for (const timer of pendingOwnerIntentRetries.values()) {
+    clearTimeout(timer);
+  }
+  pendingOwnerIntentRetries.clear();
   authorityHost = null;
   watchGuest = null;
   journalLeadingTerminals.clear();
@@ -365,6 +400,8 @@ export interface CoopMeOwnerCommitParams {
   readonly localRole: CoopRole;
   readonly wave: number;
   readonly turn: number;
+  /** Re-send the identical guest->host relay proposal until its committed envelope confirms receipt. */
+  readonly resend?: (() => void) | undefined;
 }
 
 /**
@@ -401,6 +438,8 @@ export function commitMeOwnerIntent(params: CoopMeOwnerCommitParams): string | n
           `ME op OWNER commit non-committed (${res.kind}) id=${intent.id} - legacy relay carries it (Wave-2c)`,
         );
       }
+    } else if (params.resend != null) {
+      armOwnerIntentRetry(intent.id, params.resend);
     }
     // NOTE: the owner does NOT advance lastAppliedPinned - that is a WATCHER-only order (see its field
     // doc). The owner knows its own decision; only an adopted RELAY needs the stale-ordering guard.
@@ -573,6 +612,9 @@ function applyJournaledMeEnvelope(envelope: CoopAuthoritativeEnvelopeV1): CoopAp
   if (op == null || op.status !== "applied") {
     return "duplicate";
   }
+  // The committed envelope is the authority's receipt. Stop the pre-commit retry even if the live
+  // dual-run path already applied this operation and this journal delivery is therefore a duplicate.
+  cancelOwnerIntentRetry(op.id);
   const g = guest();
   if (g.hasApplied(op.id)) {
     return "duplicate"; // already converged via the journal (a reconnect resend re-delivery) - ACK, no re-apply.
