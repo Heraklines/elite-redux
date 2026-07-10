@@ -653,6 +653,24 @@ export class CoopDurabilityManager {
     return this.journal.serializeHighWater();
   }
 
+  /**
+   * The per-class control-plane high-water for the SESSION-SAVE DIGEST (§4.6): the max of the COMMITTER's
+   * journal high-water AND the RECEIVER's applied-through marks. A live session has exactly one committer
+   * (the host) and one receiver (the guest) per class, so the committer holds the value in its journal while
+   * the receiver holds the SAME converged value in its ledger. Taking the union makes both peers serialize
+   * the IDENTICAL value once caught up - the parity the saveDataDigest requires (a plain `highWaterMarks()`
+   * is populated only on the committer, so the digest would diverge the moment the host commits its first op).
+   */
+  controlPlaneHighWater(): Record<string, number> {
+    const out: Record<string, number> = { ...this.journal.serializeHighWater() };
+    for (const [cls, seq] of Object.entries(this.ledger.serialize())) {
+      if (!(cls in out) || seq > out[cls]) {
+        out[cls] = seq;
+      }
+    }
+    return out;
+  }
+
   /** The receiver's per-class applied marks (for session-save persistence, §4). */
   appliedMarks(): Record<string, number> {
     return this.ledger.serialize();

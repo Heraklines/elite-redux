@@ -1282,8 +1282,11 @@ export function getCoopControlPlaneSaveData(): CoopControlPlaneSaveData | undefi
   }
   try {
     return {
+      // Wave-2e: the UNION of the committer's journal high-water and the receiver's applied marks, so the
+      // host (committer) and guest (receiver) serialize the SAME converged value - a plain highWaterMarks()
+      // is populated only on the host, so the saveDataDigest would diverge the moment it commits an op.
       interactionCounter: runtime.controller.interactionCounter(),
-      journalHighWater: runtime.durability?.highWaterMarks() ?? {},
+      journalHighWater: runtime.durability?.controlPlaneHighWater() ?? {},
     };
   } catch {
     return; // the control-plane snapshot must never break the save path
@@ -1305,7 +1308,10 @@ export function applyCoopControlPlaneSaveData(data: CoopControlPlaneSaveData | u
   }
   try {
     runtime.controller.restoreInteractionCounter(data.interactionCounter);
-    runtime.durability?.restore(data.journalHighWater ?? {}, {});
+    // Wave-2e: restore the converged marks into BOTH the committer high-water AND the receiver applied
+    // ledger, so a resumed guest neither re-applies an already-applied op nor diverges from the host on the
+    // post-resume digest (both peers restore the identical value, §4.6).
+    runtime.durability?.restore(data.journalHighWater ?? {}, data.journalHighWater ?? {});
   } catch {
     /* control-plane restore is best-effort; a resume must never hard-fail on it */
   }
