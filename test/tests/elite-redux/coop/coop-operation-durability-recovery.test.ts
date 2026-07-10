@@ -259,4 +259,75 @@ describe("W2e-R2 durability recovery completeness: guest-only reconnect + snapsh
     hostMgr.dispose();
     guestMgr.dispose();
   });
+
+  // ===========================================================================================
+  // I6a - CHECKPOINT REPLAY LOADER (does-not-exist verification): the reviewer claimed the persisted
+  // control-plane checkpoint is not LOADED into the durability receiver on cold resume. W2e-R closed that:
+  // applyCoopControlPlaneSaveData (coop-runtime.ts, wired in game-data.ts save+load) calls
+  // durability.restore(marks, marks), which restores the RECEIVER LEDGER (not just the committer high-water).
+  // This test PROVES the receiver ledger is loaded: after a cold resume at N it rejects a stale op (<=N) and
+  // accepts the resumed producer's N+1. (Documented does-not-exist finding - no fix needed for this half.)
+  // ===========================================================================================
+  it("I6a: a cold resume LOADS the durability receiver ledger (rejects stale <=N, accepts the resumed N+1)", async () => {
+    const N = 5;
+    const pair = createLoopbackPair();
+    const applied: number[] = [];
+    const hostMgr = new CoopDurabilityManager(pair.host);
+    const guestMgr = new CoopDurabilityManager(pair.guest, recordingWaveHooks(applied));
+
+    // COLD RESUME at high-water N (exactly what applyCoopControlPlaneSaveData does: restore(marks, marks)).
+    hostMgr.restore({ wave: N }, { wave: N });
+    guestMgr.restore({ wave: N }, { wave: N });
+
+    // A stale re-delivery at/below N must be dropped by the restored receiver ledger (idempotent, no re-apply).
+    pair.host.send(waveMsg(N));
+    await flush();
+    expect(applied, "the restored receiver ledger rejects a stale op <= N").toEqual([]);
+
+    // The resumed producer continues MONOTONICALLY at N+1; the restored receiver ACCEPTS it.
+    hostMgr.commit("wave", N + 1, waveMsg(N + 1));
+    await flush();
+    expect(applied, "the restored receiver ledger accepts the resumed producer's N+1").toEqual([N + 1]);
+    hostMgr.dispose();
+    guestMgr.dispose();
+  });
+
+  // ===========================================================================================
+  // I6b - the CONNECTED residual: a cold resume restores the receiver ledger + committer high-water but NOT
+  // the committer's peer-ACK view. After a CONVERGED save both peers are at N, so the committer's acked view
+  // should also be N. Left at 0, the overflow-escalation (I3) fires SPURIOUSLY: the first post-resume op
+  // (N+1) that the guest has not yet ACKed makes the ring hold only [N+1], and with acked=0 the committer
+  // reads oldest(N+1) as a deep gap and escalates to a HEAVY full snapshot - even though the guest is a
+  // single revision behind and the ring holds exactly the op it needs.
+  // EXPECTED RED (current code): CoopDurabilityManager.restore does not restore the journal's acked map.
+  // ===========================================================================================
+  it.fails("I6b: [RED] a cold resume does not restore the committer's acked view -> a post-resume resend spuriously escalates to a full snapshot", async () => {
+    const N = 5;
+    const pair = createLoopbackPair();
+    const hostGate = new ChannelGate(pair.host);
+    const snapshots: number[] = [];
+    const applied: number[] = [];
+    const hostMgr = new CoopDurabilityManager(hostGate, { sendFullSnapshot: (_cls, head) => snapshots.push(head) });
+    const guestMgr = new CoopDurabilityManager(pair.guest, recordingWaveHooks(applied));
+
+    hostMgr.restore({ wave: N }, { wave: N });
+    guestMgr.restore({ wave: N }, { wave: N });
+
+    // The resumed producer commits N+1 while the channel is dark: the guest misses it + never ACKs it.
+    hostGate.cut = true;
+    hostMgr.commit("wave", N + 1, waveMsg(N + 1));
+    await flush();
+    expect(applied).toEqual([]);
+
+    // A reconnect resend. The guest is at N and needs exactly N+1, which the ring holds. The committer's
+    // acked view SHOULD be N (converged resume) -> serve the tail [N+1]. Left at 0 it treats oldest(N+1) as
+    // a deep gap and SPURIOUSLY escalates to a full snapshot (heavy) instead of serving the single op.
+    hostGate.cut = false;
+    pair.guest.send({ t: "coopResyncAll" });
+    await flush();
+    expect(snapshots, "a converged resume must not spuriously escalate to a full snapshot").toEqual([]);
+    expect(applied, "the guest gets the single missing op via the tail, not a heavy snapshot").toEqual([N + 1]);
+    hostMgr.dispose();
+    guestMgr.dispose();
+  });
 });
