@@ -1048,3 +1048,54 @@ one-line per-surface rollback (§5.4) — it reverts only the surface's DRIVE to
 envelope infrastructure keeps running harmlessly. CI/soak force legacy via the `<SURFACE>_OP=off` env
 override. The counter and the legacy relay are NEVER removed until every surface is migrated (§1.8, §5.4).
 
+### 8.4 Design deltas Wave-2c (mystery encounters) hit — what ME taught that biome didn't
+
+Wave-2c migrated the SECOND surface (mystery encounters: `mePresent`/`me`/`meSub`/`meBtn`/`quizAns` +
+the ME terminals, #8/#9/#10, the #859/#860/#862 cluster) onto the operation model, cloning
+`coop-me-operation.ts` structurally from `coop-biome-operation.ts`. Biome was a SINGLE, atomic,
+symmetric decision per interaction; the ME surface is none of those, so it amended the template in five
+ways every later MULTI-STEP / host-authoritative surface (reward shop, colosseum, bargain) will reuse:
+
+- **A surface interaction can be MULTI-STEP (biome was one op per pinned counter).** One pinned ME
+  interaction counter spans an ordered sequence of decisions: `ME_PRESENT` → `ME_PICK` → N `ME_SUB` /
+  `QUIZ_ANSWER` → `ME_TERMINAL`. Biome's operationId suffix was just the wire seq (one op per pinned
+  slot); here that would COLLIDE (a present and a pick share the 8M seq; repeated sub-picks / quiz
+  answers FIFO on one seq). The adapter mints the suffix from a per-kind + per-step address
+  (`meOpAddr(kind, seq, step)`) so every step of the SAME ME is a DISTINCT id for idempotent dedupe
+  (invariant 5). **Consequence for the cross-op stale-ordering guard (§8.2 delta 4):** it must advance
+  `lastAppliedPinned` ONLY at the TERMINAL, never on a mid-ME step — every step of one ME shares the
+  pinned counter, so advancing mid-ME would make the ME's own later steps false-trip the `pinned <
+  lastAppliedPinned` stale check. (Biome never hit this: its single op WAS its terminal.)
+- **Ownership is per-KIND, not one seat per interaction.** Biome's owner was always the counter-parity
+  seat. In an ME the presentation ack + the terminal are HOST-authoritative regardless of who owns the
+  encounter (the host is the sole ME engine, #693), while the pick/sub/button/quiz are owner-alternated.
+  So the adapter resolves the expected owner seat per kind (`ownerSeatFor`), and the parity validator is
+  passed that seat rather than deriving it from the pinned counter alone.
+- **The host-STATED terminal TYPE is the structural cure for the phantom class (#859/#860).** Biome had
+  one terminal shape; an ME terminal branches (`CoopMeTerminalKind`: `leave` vs `battle`). Committing the
+  TYPE on the `ME_TERMINAL` op means the watcher routes its terminal off the OPERATION (leave the
+  encounter vs boot the spawned battle) BEFORE it builds any phase — it can never infer "there is a battle
+  turn" from a leftover battle chain, which is exactly the #859/#860 phantom-turn softlock. A stale
+  battle-handoff from an earlier ME is then rejected by the same stale/dedupe gate, so it can't build the
+  phantom either. This is the first surface where the committed op's PAYLOAD (not just its existence)
+  drives a watcher control-flow branch.
+- **A single owner-alternated decision commits on TWO clients, at TWO sites.** A guest-owned `ME_PICK` is
+  MINTED on the guest (`handleGuestOptionSelect`, owner-side, a no-op-commit mint on the guest) but
+  COMMITTED on the host (`coopHostAwaitGuestIndex`, where the sole engine receives the relayed index) —
+  the host is the sole committer (invariant 3). Biome's owner committed on its own client because biome
+  had no host-relays-to-engine step. The host-owned pick has its OWN owner seam (`handleOptionSelect`,
+  gated to the host-owned branch, disjoint from the guest-owned commit).
+- **A battle-handoff ME has TWO terminals on the same wire seq.** The battle handoff at spawn
+  (`ME_TERMINAL` `battle`, step 0) and the TRUE post-battle leave (`ME_TERMINAL` `leave`, step 1) both
+  ride `9M + counter`; without distinct step ordinals the second would re-ACK the first's id and never
+  commit. (Biome's terminal fired exactly once.)
+
+Harness note (§8.2 delta 4, extended for a bidirectional handshake): the duo ME rig's
+`relayGuestMeOptionIndexOnly` sends the raw `me` wire DIRECTLY (bypassing `handleGuestOptionSelect`, for
+cross-ctx control), so the guest-side MINT isn't exercised by the harness — assert the HOST-side commit
+(the load-bearing invariant-3 proof) instead. And a guest-owned ME arms the host's
+`coopHostAwaitGuestIndex` await at ME entry: an assertion that THROWS mid-handshake aborts the drive
+before the await is resolved, leaking a pending promise that later fires `handleOptionSelect` under a
+LATER test's scene (an `encounteredEvents` under-read). Drive every guest-owned handshake to full settle
+BEFORE asserting.
+
