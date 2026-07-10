@@ -101,7 +101,17 @@ describe("#820 co-op wiring completeness (the two-factories guard)", () => {
     sources.push(readFileSync(join(root, "ui", "ui.ts"), "utf8"));
     const all = sources.join("\n");
 
+    // The authoritative-envelope wire types (Wave-2 run-state migration, §1.1/§4) are DECLARED ahead of
+    // their receiver: Wave-2a's migrated biome surface rides the legacy relay carrier in dual-run, so these
+    // arms are neither SENT nor RECEIVED yet - their sender AND receiver both land together in the journal
+    // wave (Wave-2b). They are therefore NOT the #820 sender-only hazard (no sender exists). Remove each from
+    // this allowlist as Wave-2b wires its receiver.
+    const DECLARED_AHEAD_OF_RECEIVER = new Set(["envelope", "envelopeAck", "reconnectSync"]);
+
     const missing = types.filter(t => {
+      if (DECLARED_AHEAD_OF_RECEIVER.has(t)) {
+        return false;
+      }
       // Receiver shapes: a switch case or a direct type test. Sender calls are
       // `send({ t: "x"` and do NOT match these.
       return !(all.includes(`case "${t}"`) || all.includes(`t === "${t}"`) || all.includes(`.t == "${t}"`));
