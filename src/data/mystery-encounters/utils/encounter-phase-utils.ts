@@ -9,6 +9,7 @@ import type { IEggOptions } from "#data/egg";
 import { Egg } from "#data/egg";
 import { coopLog, coopWarn } from "#data/elite-redux/coop/coop-debug";
 import { buildCoopEnemy } from "#data/elite-redux/coop/coop-enemy-builder";
+import { commitMeOwnerIntent, nextCoopMePresentationStep } from "#data/elite-redux/coop/coop-me-operation";
 import { coopMeInProgress, coopMeInteractionStartValue } from "#data/elite-redux/coop/coop-me-pin-state";
 import {
   coopGuestAwaitMeBattleParty,
@@ -153,6 +154,16 @@ export function coopHostStreamSecondaryAwaitIndex(labels: string[]): Promise<num
     labels: labels.length,
   });
   relay?.sendInteractionOutcome(seqMe, "mePresent", prompt);
+  commitMeOwnerIntent({
+    kind: "ME_PRESENT",
+    seq: seqMe,
+    pinned: coopMeInteractionStartValue(),
+    step: nextCoopMePresentationStep(),
+    payload: { present: true, presentation: prompt },
+    localRole: getCoopController()?.role ?? "host",
+    wave: globalScene?.currentBattle?.waveIndex ?? -1,
+    turn: 0,
+  });
   const awaited =
     relay?.awaitInteractionChoice(seqMe, COOP_ME_REPLAY_WAIT_MS, COOP_ME_CHOICE_KINDS) ?? Promise.resolve(null);
   return awaited.then(pick => {
@@ -191,6 +202,16 @@ export function coopHostStreamCatchFullAwaitSlot(pokemonName: string): Promise<n
   };
   coopLog("me", "host streams catch-FULL replace-or-skip sub-prompt + awaits guest slot (#855)", { seq: seqMe });
   relay?.sendInteractionOutcome(seqMe, "mePresent", prompt);
+  commitMeOwnerIntent({
+    kind: "ME_PRESENT",
+    seq: seqMe,
+    pinned: coopMeInteractionStartValue(),
+    step: nextCoopMePresentationStep(),
+    payload: { present: true, presentation: prompt },
+    localRole: getCoopController()?.role ?? "host",
+    wave: globalScene?.currentBattle?.waveIndex ?? -1,
+    turn: 0,
+  });
   const awaited =
     relay?.awaitInteractionChoice(seqMe, COOP_ME_REPLAY_WAIT_MS, COOP_ME_CHOICE_KINDS) ?? Promise.resolve(null);
   return awaited.then(pick => {
@@ -806,6 +827,16 @@ export function selectPokemonForOption(
       };
       coopLog("me", "host streams PARTY sub-prompt + awaits guest slot", { seq: seqMe });
       relay?.sendInteractionOutcome(seqMe, "mePresent", partyPrompt);
+      commitMeOwnerIntent({
+        kind: "ME_PRESENT",
+        seq: seqMe,
+        pinned: coopMeInteractionStartValue(),
+        step: nextCoopMePresentationStep(),
+        payload: { present: true, presentation: partyPrompt },
+        localRole: getCoopController()?.role ?? "host",
+        wave: globalScene?.currentBattle?.waveIndex ?? -1,
+        turn: 0,
+      });
       void relay?.awaitInteractionChoice(seqMe, COOP_ME_REPLAY_WAIT_MS, COOP_ME_CHOICE_KINDS).then(async pick => {
         // A null (disconnected guest) maps past the party tail => the not-selected branch.
         const slotIndex = pick?.choice ?? globalScene.getPlayerParty().length;
@@ -846,6 +877,16 @@ export function selectPokemonForOption(
           labels: secondaryOptions.length,
         });
         relay?.sendInteractionOutcome(seqMe, "mePresent", secondaryPrompt);
+        commitMeOwnerIntent({
+          kind: "ME_PRESENT",
+          seq: seqMe,
+          pinned: coopMeInteractionStartValue(),
+          step: nextCoopMePresentationStep(),
+          payload: { present: true, presentation: secondaryPrompt },
+          localRole: getCoopController()?.role ?? "host",
+          wave: globalScene?.currentBattle?.waveIndex ?? -1,
+          turn: 0,
+        });
         void relay?.awaitInteractionChoice(seqMe, COOP_ME_REPLAY_WAIT_MS, COOP_ME_CHOICE_KINDS).then(sec => {
           globalScene.currentBattle.mysteryEncounter!.setDialogueToken("selectedPokemon", pokemon.getNameToRender());
           const idx = sec?.choice ?? -1;

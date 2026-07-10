@@ -27,7 +27,7 @@
 
 import { globalScene } from "#app/global-scene";
 import { coopLog } from "#data/elite-redux/coop/coop-debug";
-import { commitMeOwnerIntent } from "#data/elite-redux/coop/coop-me-operation";
+import { commitMeOwnerIntent, nextCoopMePresentationStep } from "#data/elite-redux/coop/coop-me-operation";
 import {
   coopMeHandoffBattleStarted,
   coopMeInProgress,
@@ -124,7 +124,7 @@ export function coopQuizPublishAnswer(index: number, choice: number): void {
     step: index,
     payload: { questionIndex: index, choice },
     localRole: getCoopController()?.role ?? "guest",
-    wave: globalScene.currentBattle?.waveIndex ?? -1,
+    wave: globalScene?.currentBattle?.waveIndex ?? -1,
     turn: 0,
   });
 }
@@ -179,4 +179,14 @@ export function coopQuizHostStreamSession(questions: readonly unknown[], stopOnW
   };
   coopLog("me", `quiz HOST stream session count=${wireQuestions.length} stopOnWrong=${stopOnWrong} seq=${seq} (#818)`);
   getCoopInteractionRelay()?.sendInteractionOutcome(seq, "mePresent", outcome);
+  commitMeOwnerIntent({
+    kind: "ME_PRESENT",
+    seq,
+    pinned: coopMeInteractionStartValue(),
+    step: nextCoopMePresentationStep(),
+    payload: { present: true, presentation: outcome },
+    localRole: getCoopController()?.role ?? "host",
+    wave: globalScene.currentBattle?.waveIndex ?? -1,
+    turn: 0,
+  });
 }

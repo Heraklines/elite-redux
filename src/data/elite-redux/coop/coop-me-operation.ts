@@ -144,6 +144,14 @@ let authorityHost: CoopOperationHost | null = null;
 /** The watcher applier that gates adoption of a relayed decision. Lazily created; null until first use. */
 let watchGuest: CoopOperationGuest | null = null;
 
+/** Host presentation ordinal within the pinned ME (top-level, repeated rounds, then follow-up subprompts). */
+let ownerPresentationStep = 0;
+
+/** Allocate the next durable ME_PRESENT address step in host emission order. */
+export function nextCoopMePresentationStep(): number {
+  return ownerPresentationStep++;
+}
+
 /** ME interactions whose terminal carrier switched from raw legacy to the durable journal. */
 const journalLeadingTerminals = new Set<number>();
 
@@ -215,6 +223,7 @@ export function resetCoopMeOperationState(): void {
   watchGuest = null;
   journalLeadingTerminals.clear();
   pendingJournalMaterializations.clear();
+  ownerPresentationStep = 0;
   lastAppliedPinned = -1;
   revisionFloor = 0;
 }
