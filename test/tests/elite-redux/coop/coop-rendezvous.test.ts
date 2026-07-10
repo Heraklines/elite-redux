@@ -156,6 +156,24 @@ describe("co-op reciprocal rendezvous primitive (#839)", () => {
     host.dispose();
   });
 
+  it("#899 queued partner arrival wins when the vitest timeout fires before its delivery microtask", async () => {
+    const pair = createLoopbackPair();
+    const manual = makeManualScheduler();
+    const host = new CoopRendezvous(pair.host, { schedule: manual.schedule });
+    const guest = new CoopRendezvous(pair.guest);
+
+    const hostP = host.rendezvous("cmd:2:1");
+    guest.arrive("cmd:2:1"); // queues the real arrival on LoopbackTransport's delivery microtask
+    manual.fireAll(); // reproduce the loaded-pump race: wall timer fires before that queued delivery runs
+
+    const result = await hostP;
+    expect(result.timedOut, "the already-queued partner arrival must beat the test-only timeout backstop").toBe(false);
+    expect(host.partnerHasArrived("cmd:2:1")).toBe(true);
+
+    host.dispose();
+    guest.dispose();
+  });
+
   it("FAULT-INJECTION: the arrival is DROPPED on the wire -> both sides time out with the LOUD WARN", async () => {
     const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
     // Wrap the loopback so EVERY rendezvous arrival is dropped (a partner whose arrival never lands).
