@@ -1906,6 +1906,63 @@ function readBenchHpDigest(): [number, number, number][] {
   return out;
 }
 
+/** Fold ONE mon's moveset into a stable hex hash (#875): `fnv1a64` over the canonical `[[moveId, ppUsed], ...]`
+ *  slot list (slot order preserved). A learn/forget changes a moveId; a PP tick changes a ppUsed - either
+ *  moves the fold. Bench mons never tick PP, so this is constant per bench mon until a learn/forget. */
+function hashMonMoveset(mon: Pokemon): string {
+  try {
+    return fnv1a64(canonicalize(mon.getMoveset().map(m => [m?.moveId ?? 0, m?.ppUsed ?? 0] as [number, number])));
+  } catch {
+    return COOP_CHECKSUM_SENTINEL;
+  }
+}
+
+/**
+ * Read every OFF-FIELD (bench) player mon's MOVESET digest for the per-turn checksum (#875 bench-learn
+ * backstop). Returns `[partyIndex, movesetHashHex]` per bench mon, in slot order. Mirrors the slot model of
+ * {@linkcode readBenchHpDigest} exactly (bench = `i >= battlerCount`, NOT `mon.isOnField()`, so the guest's
+ * unreliable field/summon state can't misclassify a lead). ON-FIELD mons are EXCLUDED - their moveset is
+ * already hashed by the base {@linkcode readMoves} field; this extends the SAME coverage to the bench so a
+ * TM / Shroom LEARNED onto a HOST-owned bench mon (whose learn the guest's mirror dropped, #875) becomes a
+ * DETECTABLE divergence the resync heals. Fully guarded (a bad read must never break the checksum capture).
+ */
+function readBenchMovesDigest(): [number, string][] {
+  const out: [number, string][] = [];
+  try {
+    const party = globalScene.getPlayerParty();
+    const battlerCount = globalScene.currentBattle?.getBattlerCount() ?? 2;
+    for (let i = 0; i < party.length; i++) {
+      const mon = party[i];
+      if (mon == null || i < battlerCount) {
+        continue;
+      }
+      out.push([i, hashMonMoveset(mon)]);
+    }
+  } catch {
+    /* a bad party read must never break the checksum capture (caller falls back to the sentinel). */
+  }
+  return out;
+}
+
+/** Off-field ENEMY-party moveset digest - the egress mirror of {@linkcode readBenchMovesDigest}. */
+function readEnemyBenchMovesDigest(): [number, string][] {
+  const out: [number, string][] = [];
+  try {
+    const party = globalScene.getEnemyParty();
+    const battlerCount = globalScene.currentBattle?.getBattlerCount() ?? 2;
+    for (let i = 0; i < party.length; i++) {
+      const mon = party[i];
+      if (mon == null || i < battlerCount) {
+        continue;
+      }
+      out.push([i, hashMonMoveset(mon)]);
+    }
+  } catch {
+    /* a bad enemy-party read must never break the checksum capture */
+  }
+  return out;
+}
+
 /**
  * Capture the full authoritative battle state into its canonical checksum view. Read
  * ONLY at a stable turn boundary (start of CommandPhase) - never mid-resolution - so
@@ -1939,6 +1996,12 @@ export function captureCoopChecksumState(): CoopChecksumState {
     // miss it). Hashing each off-field mon's [slot, hp, fainted] makes that divergence DETECTABLE -> the
     // resync's benchParty heal revives it. Bench hp only moves on a revive/heal item, so no ordinary-turn noise.
     benchHp: readBenchHpDigest(),
+    // BENCH-mon moveset digest (#875): the field checksum hashes ON-FIELD movesets only, so a move LEARNED
+    // onto a HOST-owned BENCH mon (a reward-shop TM/Shroom whose learn the guest's mirror dropped) changed no
+    // species/level/on-field-move and was INVISIBLE to the checksum. Folding each bench mon's moveset makes it
+    // DETECTABLE; the guest adopts the host's bench movesets via the per-turn authoritative-state apply before
+    // it recomputes this, so a healthy run hashes identical values (adopt-then-hash, no resync noise).
+    benchMoves: readBenchMovesDigest(),
     money: globalScene.money,
     modifiers: readModifiers(),
     // On-field per-mon held-item digest (#633 RISKY #2/#3): a stack change (Bug-Bite/Knock-Off) or a
@@ -2029,6 +2092,9 @@ function captureVersusGuestChecksumState(): CoopChecksumState {
     party: enemyParty.map(p => p.species.speciesId),
     partyLevels: enemyParty.map(p => p.level),
     benchHp: readEnemyBenchHpDigest(),
+    // BENCH-mon moveset digest (#875), sourced from the guest's LOCAL ENEMY side (the host's team) in
+    // authoritative orientation - the egress mirror of the player-side benchMoves above.
+    benchMoves: readEnemyBenchMovesDigest(),
     money: globalScene.money,
     modifiers,
     heldItems,

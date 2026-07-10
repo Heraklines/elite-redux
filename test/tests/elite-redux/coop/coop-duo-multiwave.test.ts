@@ -37,6 +37,7 @@ import { resetCoopRendezvousWaitMs, setCoopRendezvousWaitMs } from "#data/elite-
 import { clearCoopRuntime, setCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
 import { COOP_GUEST_FIELD_INDEX, COOP_HOST_FIELD_INDEX } from "#data/elite-redux/coop/coop-session";
 import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
+import { PokemonMove } from "#data/moves/pokemon-move";
 import { BattlerIndex } from "#enums/battler-index";
 import { Command } from "#enums/command";
 import { GameModes } from "#enums/game-modes";
@@ -376,6 +377,80 @@ describe.skipIf(!RUN)("co-op DUO multi-wave: two real engines, real reward shop 
     );
     expect(hostKnows, "the shop owner's (host) copy of the partner's mon learned the TM").toBe(true);
     expect(guestKnows, "the partner's (guest) OWN copy learned the TM the owner picked for it").toBe(true);
+
+    logs.flush();
+  }, 240_000);
+
+  // ===========================================================================================
+  // REGRESSION (#875): the SYMMETRIC counterpart of #873. A reward-shop TM picked by EITHER player that
+  // targets a HOST-OWNED BENCH mon must appear on the GUEST's MIRROR copy of that mon, not just the host's.
+  // #873 fixed only the GUEST-owned recipient case; the HOST-owned case stayed a latent gap - the host
+  // auto-learned onto its authoritative copy while the guest's LearnMovePhase no-op-ended, so the guest's
+  // mirror never learned it. A BENCH mon's moveset was hashed NOWHERE by the base checksum (ON-FIELD moves
+  // only) and excluded from the session-save digest, so the divergence was INVISIBLE (until #875's benchMoves
+  // digest). Fix: the guest applies the SAME deterministic empty-slot learn onto its mirror (recipient-drives
+  // extended to the watcher). This drives the exact LearnMovePhase(TM) the reward apply queues on each real
+  // engine for a HOST-owned bench mon and asserts the move lands on BOTH copies (fails-before on the guest).
+  // ===========================================================================================
+  it("REGRESSION #875: an owner-picked reward-shop TM targeting a HOST-owned BENCH mon learns on BOTH engines", async () => {
+    // A 3-mon party in a double battle: slots 0/1 are the on-field leads (host/guest), slot 2 is a BENCH mon.
+    // buildDuo tags ONLY the two field leads (field[0]=host, field[1]=guest); a bench slot stays UNTAGGED, so
+    // its coopOwner defaults to "host" (the mon-owner default) - i.e. it is a HOST-owned bench mon, the exact
+    // #875 target. CHARIZARD is the bench mon whose owner (host) picks it a TM.
+    await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR, SpeciesId.CHARIZARD);
+    const pair = createLoopbackPair();
+    const rig = await buildDuo(game, pair, setCoopRuntime, toCoop);
+
+    const BENCH_SLOT = 2;
+    const TM_MOVE = MoveId.SURF;
+    // Give the bench mon a 2-move moveset (EMPTY slot -> the deterministic auto-learn path, no forget-picker)
+    // on BOTH engines' copies, exactly like the beforeEach's [TACKLE, SPLASH] field default. Set the raw
+    // moveset (not via MOVESET_OVERRIDE, which would mask the setMove the learn applies).
+    for (const scene of [rig.hostScene, rig.guestScene]) {
+      const benchMon = scene.getPlayerParty()[BENCH_SLOT];
+      expect(benchMon, "both engines have a bench mon at slot 2").not.toBeUndefined();
+      benchMon.moveset = [MoveId.TACKLE, MoveId.SPLASH].map(id => new PokemonMove(id));
+    }
+
+    const before = withClientSync(rig.guestCtx, () => {
+      const mon = rig.guestScene.getPlayerParty()[BENCH_SLOT];
+      return {
+        owner: (mon as { coopOwner?: string }).coopOwner ?? "host",
+        knows: mon.getMoveset(true).some(m => m?.moveId === TM_MOVE),
+      };
+    });
+    expect(before.owner, "the bench mon at slot 2 defaults to HOST-owned (untagged bench slot)").toBe("host");
+    expect(before.knows, "the host-owned bench mon does not already know the TM move").toBe(false);
+
+    // OWNER (host): its LearnMovePhase for the host-owned mon runs the authoritative host branch -> auto-learns
+    // the empty slot onto the HOST's authoritative copy.
+    await withClient(rig.hostCtx, async () => {
+      new LearnMovePhase(BENCH_SLOT, TM_MOVE, LearnMoveType.TM).start();
+      await drainLoopback();
+    });
+
+    // GUEST (mirror): its LearnMovePhase for the host-owned mon must ALSO learn onto the guest's mirror copy.
+    // Pre-#875 the authoritative-guest branch no-op-ended for a host-owned mon -> the move never appeared on
+    // the guest's mirror (the silent divergence). The #875 mirror-apply makes it learn here.
+    await withClient(rig.guestCtx, async () => {
+      new LearnMovePhase(BENCH_SLOT, TM_MOVE, LearnMoveType.TM).start();
+      await drainLoopback();
+    });
+
+    const hostKnows = withClientSync(rig.hostCtx, () =>
+      rig.hostScene
+        .getPlayerParty()
+        [BENCH_SLOT].getMoveset(true)
+        .some(m => m?.moveId === TM_MOVE),
+    );
+    const guestKnows = withClientSync(rig.guestCtx, () =>
+      rig.guestScene
+        .getPlayerParty()
+        [BENCH_SLOT].getMoveset(true)
+        .some(m => m?.moveId === TM_MOVE),
+    );
+    expect(hostKnows, "the host's authoritative copy of the host-owned bench mon learned the TM").toBe(true);
+    expect(guestKnows, "the guest's MIRROR copy of the host-owned bench mon learned the TM (#875 fix)").toBe(true);
 
     logs.flush();
   }, 240_000);

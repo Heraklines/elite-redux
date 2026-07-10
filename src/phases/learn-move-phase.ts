@@ -274,6 +274,31 @@ export class LearnMovePhase extends PlayerPartyMemberPokemonPhase {
         this.learnMove(currentMoveset.length, move, pokemon);
         return;
       }
+      // #875 cross-ownership DROPPED-LEARN, HOST-OWNED MIRROR: the SYMMETRIC counterpart of the #873 case
+      // above. When a reward-shop TM / TM Case / Learner's Shroom / free Memory Mushroom is bought - by
+      // EITHER player - for a HOST-owned mon whose moveset has an EMPTY slot, the learn is a DETERMINISTIC
+      // auto-learn (no forget-picker, no human choice). The reward apply queues this real LearnMovePhase on
+      // BOTH clients; the HOST auto-learns onto its authoritative copy (the empty-slot branch below), but
+      // pre-#875 the guest branch treated its LearnMovePhase as a pure-renderer no-op and ended WITHOUT
+      // learning - so the move landed on the host's copy while the guest's MIRROR of the host-owned mon
+      // never learned it (#873 fixed only the guest-OWNED recipient case). A BENCH mon's moveset is hashed
+      // NOWHERE by the base per-turn checksum (ON-FIELD moves only) and the session-save digest excludes the
+      // full party PokemonData, so the divergence is INVISIBLE to the checksum (until #875's benchMoves
+      // digest); the guest's mirror only re-converged opportunistically at the next per-turn authoritative
+      // state apply. Fix: the guest applies the SAME deterministic empty-slot learn onto its mirror HERE, so
+      // both engines' copies know the move IMMEDIATELY - the recipient-drives application (#800/#831/#873)
+      // extended from the mon's OWNER to its watcher MIRROR. learnMove() runs the SAME #698 continuation
+      // cleanup (TM / free-Memory tryRemovePhase("SelectModifierPhase") + advance) the no-op branch below
+      // does, so it fully supersedes it for the host-owned empty-slot case. There is NO double-render: the
+      // persistent CoopReplayLearnMovePhase listener only spawns on a host `learnMoveForward`, which the host
+      // sends ONLY for a FULL GUEST-owned moveset (coopHostForwardLearnMove) - never for a host-owned mon.
+      // The FULL-moveset host-owned case (host drives an interactive forget-picker; the forget slot is the
+      // host human's non-deterministic choice) is NOT mirrored here - it stays a no-op end and re-converges
+      // via the per-turn authoritative-state apply + the new benchMoves checksum (which now DETECTS it).
+      if (monOwner === "host" && !movesetFull) {
+        this.learnMove(currentMoveset.length, move, pokemon);
+        return;
+      }
       // #698 stale-shop softlock: a TM Case / Memory-Mushroom (cost=-1) reward queues a back-out
       // "continuation" SelectModifierPhase copy alongside this LearnMovePhase (see
       // SelectModifierPhase.applyModifier queuesContinuation). On the HOST the real learnMove() deletes

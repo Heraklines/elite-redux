@@ -51,6 +51,7 @@ const state = (over: Partial<CoopChecksumState> = {}): CoopChecksumState => ({
   party: [1, 4],
   partyLevels: [50, 48],
   benchHp: [[1, 120, 0]],
+  benchMoves: [[1, "aaaaaaaaaaaaaaaa"]],
   money: 1000,
   modifiers: [["EXP_CHARM", 1]],
   heldItems: [[0, "LEFTOVERS", 1]],
@@ -114,6 +115,7 @@ describe("co-op battle checksum pure core (#633, TRACK-2)", () => {
         party: [1, 4],
         partyLevels: [50, 48],
         benchHp: [[1, 120, 0]],
+        benchMoves: [[1, "aaaaaaaaaaaaaaaa"]],
         arenaTags: [],
         modifiers: [["EXP_CHARM", 1]],
         heldItems: [[0, "LEFTOVERS", 1]],
@@ -135,6 +137,7 @@ describe("co-op battle checksum pure core (#633, TRACK-2)", () => {
         party: [1, 4],
         partyLevels: [50, 48],
         benchHp: [[1, 120, 0]],
+        benchMoves: [[1, "aaaaaaaaaaaaaaaa"]],
         modifiers: [["EXP_CHARM", 1]],
         pokeballCounts: [
           [0, 5],
@@ -218,6 +221,13 @@ describe("co-op battle checksum pure core (#633, TRACK-2)", () => {
       // are unchanged), but a fainted BENCH mon revived on one client only. benchHp makes that hp/fainted
       // divergence detectable -> the resync's benchParty heal revives it (backstop for a lost revive relay).
       expect(checksumState(state({ benchHp: [[1, 0, 1]] }))).not.toBe(base);
+    });
+    it("a changed BENCH-mon moveset (#875 - a TM/Shroom learned on a HOST-owned bench mon the guest mirror dropped)", () => {
+      // The #875 latent gap: the base field checksum hashes ON-FIELD movesets only, so a reward-shop TM /
+      // Learner's Shroom learned onto a BENCH mon changes no species (party unchanged), no level (partyLevels
+      // unchanged), no hp/fainted (benchHp unchanged), and no on-field move - it was INVISIBLE. benchMoves
+      // folds each bench mon's moveset, so the divergence now trips the checksum -> the resync that heals it.
+      expect(checksumState(state({ benchMoves: [[1, "bbbbbbbbbbbbbbbb"]] }))).not.toBe(base);
     });
     it("a changed money", () => {
       expect(checksumState(state({ money: 999 }))).not.toBe(base);

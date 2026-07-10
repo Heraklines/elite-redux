@@ -133,6 +133,22 @@ export interface CoopChecksumState {
    * already hash hp; this extends the SAME coverage to the bench). Slot order is meaningful - do NOT sort.
    */
   benchHp: [number, number, number][];
+  /**
+   * BENCH-mon MOVESET digest (#875): one `[partyIndex, movesetHashHex]` entry per OFF-FIELD party mon, in
+   * slot order. `movesetHashHex` is a fold ({@linkcode fnv1a64} over the canonical `[[moveId, ppUsed], ...]`
+   * slot list) of the bench mon's moveset. The base {@linkcode field} checksum hashes ON-FIELD `moves` only,
+   * so a move LEARNED onto a BENCH mon - a reward-shop TM / Learner's Shroom / free Memory Mushroom the HOST
+   * picked for a HOST-owned bench mon (the #875 latent gap #873 left open, where the host applies the learn
+   * but the guest's MIRROR copy does not) - changed NO species (so `party` misses it), NO level (so
+   * `partyLevels` misses it), and NO on-field move (so `field` misses it): it was INVISIBLE to the checksum,
+   * so no resync ever detected it. Folding each bench mon's moveset makes that divergence DETECTABLE, so the
+   * checksum trips the same full-snapshot resync that HEALS it (the resync's authoritative-state apply
+   * rebuilds every mon's moveset from the host). CONVERGENCE (adopt-then-hash): the guest adopts the host's
+   * full party moveset - bench included - via the per-turn authoritative-state apply BEFORE it recomputes
+   * this hash, so a HEALTHY run hashes identical values every turn and this adds NO resync noise (bench
+   * movesets only move on a learn/forget). Slot order is meaningful - do NOT sort.
+   */
+  benchMoves: [number, string][];
   money: number;
   /** Persistent modifiers as `[typeId, stackCount]`, sorted by `typeId`. */
   modifiers: [string, number][];
