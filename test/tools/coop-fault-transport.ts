@@ -59,6 +59,48 @@ export const COOP_DEFAULT_CUE_TYPES: ReadonlySet<CoopMessageType> = new Set<Coop
 ]);
 
 /**
+ * The AUTHORITATIVE (source-of-truth) message classes the netcode design proves it CANNOT lose without a
+ * desync (the exact opposite of {@linkcode COOP_DEFAULT_CUE_TYPES}). Faulting these is OPT-IN (never in the
+ * default faultable set): a lost authoritative message is expected to either force a bounded recovery (an
+ * anti-hang backstop / a re-request self-heal) OR surface as a LOUD, classified stall - NEVER a silent
+ * divergence. Used to build a `faultable` predicate ({@linkcode faultableTypes}) or as the target of a
+ * deterministic single-shot drop ({@linkcode CoopFaultPair.armNextDrop}). The three HIGHEST-RISK boundaries
+ * the bounded authoritative-fault matrix drops around (reward pick / wave resolution / checkpoint):
+ *   - `turnResolution`   the per-turn checkpoint carrier (the guest's CoopReplayTurnPhase source of truth).
+ *   - `battleCheckpoint` an out-of-turn authoritative checkpoint (switch / capture / resume).
+ *   - `interactionChoice`/`rewardOptions`/`interactionOutcome` the reward/biome/ME alternation commit + pool.
+ *   - `waveResolved`/`waveEndState` the authoritative wave-advance + post-exp progression snapshot.
+ *   - `command`/`commandRequest` the partner-command relay (a slot's action for the turn).
+ *   - `stateSync`/`enemyPartySync`/`launchSnapshot`/`rendezvous` the resync + launch backbone.
+ */
+export const COOP_AUTHORITATIVE_TYPES: ReadonlySet<CoopMessageType> = new Set<CoopMessageType>([
+  "turnResolution",
+  "battleCheckpoint",
+  "interactionChoice",
+  "interactionOutcome",
+  "rewardOptions",
+  "waveResolved",
+  "waveEndState",
+  "command",
+  "commandRequest",
+  "stateSync",
+  "enemyPartySync",
+  "launchSnapshot",
+  "rendezvous",
+]);
+
+/**
+ * Build a `faultable` predicate that accepts EXACTLY the given message classes (opt-in per class). Pass a
+ * subset of {@linkcode COOP_AUTHORITATIVE_TYPES} to point the probabilistic drop/reorder/delay stream at the
+ * authoritative backbone instead of the default presentation cues. The returned predicate is pure (a Set
+ * membership read), so it is safe to reuse across sends.
+ */
+export function faultableTypes(types: Iterable<CoopMessageType>): (msg: CoopMessage) => boolean {
+  const set = new Set<CoopMessageType>(types);
+  return (msg: CoopMessage) => set.has(msg.t);
+}
+
+/**
  * A fault PROFILE: the per-message probabilities + tuning. `drop` + `reorder` + `delay` are independent
  * probabilities in [0, 1]; their SUM must be <= 1 (the remainder is the pass-through probability). Applied
  * only to a message the `faultable` predicate accepts (default {@linkcode COOP_DEFAULT_CUE_TYPES}).
@@ -97,6 +139,8 @@ export interface CoopFaultCounters {
   heldAtClose: number;
   /** Non-faultable messages passed straight through. */
   passthrough: number;
+  /** Deterministic single-shot drops fired (armed via {@linkcode CoopFaultPair.armNextDrop}) - the authoritative-fault leg. */
+  oneShotDropped: number;
 }
 
 function freshCounters(): CoopFaultCounters {
@@ -109,6 +153,7 @@ function freshCounters(): CoopFaultCounters {
     released: 0,
     heldAtClose: 0,
     passthrough: 0,
+    oneShotDropped: 0,
   };
 }
 
@@ -168,6 +213,13 @@ interface ProfileHolder {
  */
 class CoopFaultTransport implements CoopTransport {
   private readonly held: HeldMessage[] = [];
+  /**
+   * DETERMINISTIC single-shot drops (the authoritative-fault leg). A multiset of message classes each of
+   * which drops the NEXT matching send exactly once, then auto-disarms (the count is the number of pending
+   * one-shot drops for that class). Independent of the probabilistic `faultable` path, so it can target the
+   * authoritative backbone (which is NOT in the default faultable set) without widening the fuzz surface.
+   */
+  private readonly pendingDrops = new Map<CoopMessageType, number>();
 
   constructor(
     private readonly inner: CoopTransport,
@@ -197,6 +249,30 @@ class CoopFaultTransport implements CoopTransport {
   }
 
   /**
+   * Arm a DETERMINISTIC single-shot drop of the next message of `type` sent on THIS endpoint. Stacks (arming
+   * twice drops the next two). Used by the authoritative-fault test leg to drop exactly one high-risk
+   * authoritative message (a checkpoint / reward pick / wave-resolution) around a boundary and assert
+   * convergence-or-loud-timeout - never a silent divergence.
+   */
+  armDrop(type: CoopMessageType): void {
+    this.pendingDrops.set(type, (this.pendingDrops.get(type) ?? 0) + 1);
+  }
+
+  /** Consume a pending one-shot drop for `type` if one is armed. Returns true when the message must be dropped. */
+  private takeOneShotDrop(type: CoopMessageType): boolean {
+    const n = this.pendingDrops.get(type) ?? 0;
+    if (n <= 0) {
+      return false;
+    }
+    if (n === 1) {
+      this.pendingDrops.delete(type);
+    } else {
+      this.pendingDrops.set(type, n - 1);
+    }
+    return true;
+  }
+
+  /**
    * Decrement every message held from a PRIOR send call and release (deliver) the ones whose countdown hits
    * zero, in FIFO order. Called at the END of each send() so a message added THIS call is not ticked by its
    * own call - a `remaining: 1` (reorder) message is thus released on the NEXT send, i.e. AFTER the message
@@ -222,6 +298,14 @@ class CoopFaultTransport implements CoopTransport {
     // Not connected: hand straight to the inner transport (it logs + no-ops), no fault bookkeeping.
     if (this.inner.state !== "connected") {
       this.inner.send(msg);
+      return;
+    }
+    // DETERMINISTIC single-shot drop (authoritative-fault leg) - checked FIRST, so it can target an
+    // authoritative class that is NOT in the probabilistic `faultable` set. A dropped message still lets time
+    // pass for prior holds (a real drop does not freeze the channel), matching the probabilistic drop path.
+    if (this.takeOneShotDrop(msg.t)) {
+      this.counters.oneShotDropped += 1;
+      this.tickHeld();
       return;
     }
     if (!this.isFaultable(msg)) {
@@ -275,10 +359,17 @@ export interface CoopFaultPair {
   host: CoopTransport;
   guest: CoopTransport;
   counters: { host: CoopFaultCounters; guest: CoopFaultCounters };
-  /** Total faults injected across BOTH directions (drop + reorder + delay). Asserted > 0 so a run is not vacuous. */
+  /** Total faults injected across BOTH directions (drop + reorder + delay + one-shot drops). Asserted > 0 so a run is not vacuous. */
   faultsInjected(): number;
   /** Swap the live fault profile on BOTH endpoints mid-run (for a burst-then-recover test). */
   setProfile(profile: CoopFaultProfile): void;
+  /**
+   * Arm a DETERMINISTIC single-shot drop of the next message of `type` on the given direction(s) (default
+   * `"both"` - drops the next of `type` on whichever endpoint sends it first, which for a per-boundary
+   * authoritative class is the sole sender). The authoritative-fault leg's primitive: drop exactly one
+   * high-risk message around a boundary, then assert convergence-or-loud-timeout.
+   */
+  armNextDrop(type: CoopMessageType, direction?: "host" | "guest" | "both"): void;
 }
 
 /** Options for {@linkcode wrapCoopFaultPair}. */
@@ -319,7 +410,7 @@ export function wrapCoopFaultPair(
     guest,
     counters: { host: hostCounters, guest: guestCounters },
     faultsInjected(): number {
-      const f = (c: CoopFaultCounters) => c.dropped + c.reordered + c.delayed;
+      const f = (c: CoopFaultCounters) => c.dropped + c.reordered + c.delayed + c.oneShotDropped;
       return f(hostCounters) + f(guestCounters);
     },
     setProfile(next: CoopFaultProfile): void {
@@ -327,6 +418,14 @@ export function wrapCoopFaultPair(
       const resolved = resolveProfile(next);
       hostHolder.profile = resolved;
       guestHolder.profile = resolved;
+    },
+    armNextDrop(type: CoopMessageType, direction: "host" | "guest" | "both" = "both"): void {
+      if (direction === "host" || direction === "both") {
+        host.armDrop(type);
+      }
+      if (direction === "guest" || direction === "both") {
+        guest.armDrop(type);
+      }
     },
   };
 }

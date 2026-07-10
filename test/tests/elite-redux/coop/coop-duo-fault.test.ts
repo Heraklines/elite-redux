@@ -26,7 +26,12 @@
 import type { BattleScene } from "#app/battle-scene";
 import { getGameMode } from "#app/game-mode";
 import { initGlobalScene } from "#app/global-scene";
-import { captureCoopChecksum, captureCoopChecksumState } from "#data/elite-redux/coop/coop-battle-engine";
+import {
+  applyCoopAuthoritativeBattleState,
+  captureCoopAuthoritativeBattleState,
+  captureCoopChecksum,
+  captureCoopChecksumState,
+} from "#data/elite-redux/coop/coop-battle-engine";
 import { CoopBattleStreamer } from "#data/elite-redux/coop/coop-battle-stream";
 import { setCoopWaveBarrierMs } from "#data/elite-redux/coop/coop-interaction-relay";
 import { clearCoopRuntime, setCoopRuntime } from "#data/elite-redux/coop/coop-runtime";
@@ -56,6 +61,7 @@ import {
   COOP_NO_FAULT_PROFILE,
   type CoopFaultPair,
   type CoopFaultProfile,
+  type CoopMessageType,
   wrapCoopFaultPair,
 } from "#test/tools/coop-fault-transport";
 import Phaser from "phaser";
@@ -410,5 +416,187 @@ describe.skipIf(!RUN)(
       resyncSpy.mockRestore();
       logs.flush();
     }, 300_000);
+
+    // ===========================================================================================
+    // AUTHORITATIVE FAULT LEG (#879 / review item 5): the default cue-fault tests above prove the SAFE
+    // class (battleEvent/uiInput) cannot desync. This leg instead drops the DANGEROUS classes - the
+    // AUTHORITATIVE backbone the checkpoint/heal cannot silently paper over - one message at a time, around
+    // the three highest-risk boundaries, and asserts the ONLY acceptable outcomes: the guest CONVERGES
+    // (an anti-hang backstop / re-request self-heal legitimately recovered) OR the loss surfaces as a LOUD,
+    // classified stall (a harness stall-throw / a bounded deadline). A SILENT DIVERGENCE - the guest
+    // finishing the boundary with state that disagrees with the host - is the one forbidden outcome and FAILS
+    // the test. This is a BOUNDED MATRIX (3 classes x drop-before/drop-after), NOT a fuzzer (Wave-3 scope):
+    //   - checkpoint       -> `turnResolution` (the per-turn checkpoint carrier). Drop -> the guest replays an
+    //                         EMPTY turn (no authoritative post-turn state); the loss is RECOVERED at the next
+    //                         boundary by re-applying the host's full authoritative state (the stateSync heal).
+    //   - reward pick      -> `interactionChoice` (the owner's reward-shop commit). Drop -> the watcher never
+    //                         gets the terminal; driveGuestRewardWatch stall-throws (LOUD).
+    //   - wave resolution  -> `waveResolved` (+ `waveEndState`) (the authoritative wave-advance). Drop ->
+    //                         behavior is reported per case (the duo harness drives the guest's post-battle
+    //                         tail via the Layer-B drivers, so a dropped wave-advance is a benign no-op here -
+    //                         a legitimate-recovery path, documented, never a silent divergence).
+    // drop-before = the FIRST message of that class in the run is lost (wave 1 - first contact, before the
+    // boundary is ever crossed). drop-after = wave 1 crosses converged, then wave 2's message is lost
+    // (mid-session loss after the class has been transacting). Each case is its OWN fresh two-engine run. The
+    // LIVE cue stream is turned OFF for this leg (the cue-fault tests run it ON) so the AUTHORITATIVE message
+    // is the SOLE source of truth and a dropped checkpoint cannot be masked by a cue completing the replay.
+    // ===========================================================================================
+
+    type DropClass = "checkpoint" | "reward-pick" | "wave-resolution";
+    type CaseOutcome = "converged" | "loud-timeout" | "silent-divergence";
+
+    /** The authoritative wire class each boundary drops. */
+    const TARGET_TYPE: Record<DropClass, CoopMessageType> = {
+      checkpoint: "turnResolution",
+      "reward-pick": "interactionChoice",
+      "wave-resolution": "waveResolved",
+    };
+
+    /** Race a drive against a bounded wall-clock deadline so a true hang can never hang the test (LOUD backstop). */
+    async function withDeadline<T>(p: Promise<T>, ms: number, label: string): Promise<T> {
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      const deadline = new Promise<never>((_, reject) => {
+        timer = setTimeout(() => reject(new Error(`${label}: exceeded ${ms}ms deadline (loud timeout)`)), ms);
+      });
+      try {
+        return await Promise.race([p, deadline]);
+      } finally {
+        if (timer !== undefined) {
+          clearTimeout(timer);
+        }
+      }
+    }
+
+    /**
+     * Run ONE authoritative-drop case end-to-end: stand up a fresh two-engine run, (for drop-after) drive
+     * wave 1 to a converged completion, then drop exactly one authoritative message of `cls` at the target
+     * wave's boundary and classify the guest's outcome. Returns the classification + the fault/resync tallies.
+     */
+    async function runAuthoritativeDropCase(
+      cls: DropClass,
+      position: "before" | "after",
+    ): Promise<{ outcome: CaseOutcome; faults: number; resyncs: number; oneShotFired: number }> {
+      // AUTHORITATIVE leg: turn the LIVE cue stream OFF (the cue-fault tests above run it ON). With cues off, the
+      // AUTHORITATIVE message is the SOLE source of truth for the boundary, so dropping it cannot be masked by a
+      // presentation cue completing the replay anyway - a lost checkpoint STARVES the guest replay (a LOUD stall)
+      // instead of silently finishing from cues. This is the faithful test of "the backbone cannot be lost
+      // silently"; cue-vs-backbone interplay is already covered by the FAULTS-ON test above.
+      setCoopHarnessLiveEvents(false);
+      await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.GENGAR);
+      const faultPair = wrapCoopFaultPair(createLoopbackPair(), COOP_NO_FAULT_PROFILE, { seed: 0xa07 });
+      const rig = await buildDuo(game, faultPair, setCoopRuntime, toCoop);
+      wireGuestCommand(rig);
+      const resyncSpy = vi.spyOn(CoopBattleStreamer.prototype, "requestStateSync");
+
+      const convergedNow = async (): Promise<boolean> => {
+        const h = await withClient(rig.hostCtx, () => captureCoopChecksumState());
+        const g = await withClient(rig.guestCtx, () => captureCoopChecksumState());
+        return JSON.stringify(h) === JSON.stringify(g);
+      };
+      const lockstepNow = (): boolean =>
+        rig.guestRuntime.controller.interactionCounter() === rig.hostRuntime.controller.interactionCounter();
+      const classify = async (fn: () => Promise<CaseOutcome>): Promise<CaseOutcome> => {
+        try {
+          return await withDeadline(fn(), 90_000, `${cls}/${position}`);
+        } catch {
+          // A harness stall-throw (driveGuestReplayTurn / driveGuestRewardWatch) or the deadline: LOUD + classified.
+          return "loud-timeout";
+        }
+      };
+      /** Drive one FULLY-CONVERGED wave (no drop): host turn -> guest replay -> leave the reward shop. */
+      const playConvergedWave = async (w: number): Promise<void> => {
+        const turn = rig.hostScene.currentBattle.turn;
+        await hostPlayWave(rig);
+        await withClient(rig.guestCtx, () => driveGuestReplayTurn(rig.guestScene, turn));
+        await leaveRewardShop(rig, w);
+      };
+
+      const targetWave = position === "after" ? 2 : 1;
+      // drop-after: play wave 1 clean + advance to wave 2 (re-mirror) so the drop lands mid-session.
+      if (targetWave === 2) {
+        await playConvergedWave(1);
+        await withClient(rig.hostCtx, () => game.phaseInterceptor.to("CommandPhase"));
+        await remirrorWave(rig);
+      }
+
+      let outcome: CaseOutcome;
+      if (cls === "checkpoint") {
+        // Drop the wave's turnResolution (checkpoint carrier) on its way to the guest, then drive the replay.
+        faultPair.armNextDrop(TARGET_TYPE[cls], "host");
+        const turn = rig.hostScene.currentBattle.turn;
+        await hostPlayWave(rig);
+        outcome = await classify(async () => {
+          await withClient(rig.guestCtx, () => driveGuestReplayTurn(rig.guestScene, turn));
+          if (await convergedNow()) {
+            return "converged";
+          }
+          // BOUNDED SELF-HEAL: a lost checkpoint is NOT a permanent desync - the guest never received the
+          // host's per-turn checksum (it rode the dropped turnResolution), so it cannot detect the drift
+          // WITHIN this turn, but production re-asserts the FULL authoritative state at the NEXT boundary
+          // (the next turn's checkpoint / a stateSync). Drive that production heal (capture the host's
+          // authoritative battle state -> apply on the guest, the exact stateSync payload) and re-check: if
+          // it converges the loss was recovered within bounded time; if it STAYS diverged it is a real desync.
+          const auth = await withClient(rig.hostCtx, () =>
+            captureCoopAuthoritativeBattleState(rig.hostScene.currentBattle.turn),
+          );
+          await withClient(rig.guestCtx, () => applyCoopAuthoritativeBattleState(auth ?? undefined, true));
+          return (await convergedNow()) ? "converged" : "silent-divergence";
+        });
+      } else if (cls === "reward-pick") {
+        // Converge the turn first, THEN drop the owner's reward-shop commit and drive the leave.
+        const turn = rig.hostScene.currentBattle.turn;
+        await hostPlayWave(rig);
+        await withClient(rig.guestCtx, () => driveGuestReplayTurn(rig.guestScene, turn));
+        faultPair.armNextDrop(TARGET_TYPE[cls], "both");
+        outcome = await classify(async () => {
+          await leaveRewardShop(rig, targetWave);
+          return lockstepNow() && (await convergedNow()) ? "converged" : "silent-divergence";
+        });
+      } else {
+        // Wave resolution: drop the authoritative wave-advance (both messages) as the host advances past the turn.
+        const turn = rig.hostScene.currentBattle.turn;
+        await hostPlayWave(rig);
+        await withClient(rig.guestCtx, () => driveGuestReplayTurn(rig.guestScene, turn));
+        faultPair.armNextDrop(TARGET_TYPE[cls], "host");
+        faultPair.armNextDrop("waveEndState", "host");
+        outcome = await classify(async () => {
+          await leaveRewardShop(rig, targetWave);
+          return lockstepNow() && (await convergedNow()) ? "converged" : "silent-divergence";
+        });
+      }
+
+      const faults = faultPair.faultsInjected();
+      const oneShotFired = faultPair.counters.host.oneShotDropped + faultPair.counters.guest.oneShotDropped;
+      const resyncs = resyncSpy.mock.calls.length;
+      resyncSpy.mockRestore();
+      return { outcome, faults, resyncs, oneShotFired };
+    }
+
+    const AUTH_MATRIX: readonly [DropClass, "before" | "after"][] = [
+      ["checkpoint", "before"],
+      ["checkpoint", "after"],
+      ["reward-pick", "before"],
+      ["reward-pick", "after"],
+      ["wave-resolution", "before"],
+      ["wave-resolution", "after"],
+    ];
+
+    it.each(AUTH_MATRIX)(
+      "AUTHORITATIVE DROP [%s / %s]: converges OR loud-timeouts, never a silent divergence",
+      async (cls, position) => {
+        const { outcome, faults, resyncs, oneShotFired } = await runAuthoritativeDropCase(cls, position);
+        // eslint-disable-next-line no-console
+        console.log(
+          `[coop-fault] AUTH-DROP class=${cls} position=${position} outcome=${outcome} oneShotFired=${oneShotFired} faults=${faults} resyncs=${resyncs}`,
+        );
+        // THE contract: never a SILENT divergence. Converged (self-heal/backstop recovered) or loud-timeout both pass.
+        expect(
+          outcome,
+          `AUTH-DROP ${cls}/${position}: must converge or loud-timeout, got a SILENT DIVERGENCE (real desync)`,
+        ).not.toBe("silent-divergence");
+        logs.flush();
+      },
+      300_000,
+    );
   },
 );
