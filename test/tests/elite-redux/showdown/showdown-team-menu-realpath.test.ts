@@ -196,11 +196,74 @@ describe.runIf(RUN)("showdown team menu - real-path acceptance", () => {
     await confirmYesIfPrompted(); // Yes -> showdownBuildOnCancel -> settle -> reopen the menu
 
     expect(mode()).toBe(UiMode.SHOWDOWN_TEAM_MENU); // returned to the menu, NOT the title
+    // "stuck getting out of the custom starter select" red-proof: mode flipping to the menu is NOT
+    // enough - the GRID container must be HIDDEN, or it stays painted (and input-live under the menu),
+    // which is exactly what the player saw. The confirmExit CONFIRM is an unchained overlay, so the old
+    // `revertMode()` was a no-op and the grid was never cleared. Assert the source is gone + dest shown.
+    const grid: any = game.scene.ui.handlers[UiMode.STARTER_SELECT];
+    const menuHandler: any = game.scene.ui.handlers[UiMode.SHOWDOWN_TEAM_MENU];
+    expect(grid.starterSelectContainer.visible, "the grid must be HIDDEN once we exit to the menu").toBe(false);
+    expect(menuHandler.container.visible, "the Team Menu container is shown after the grid exit").toBe(true);
     // Live fix #5 net: settle must restore the LIVE gameMode OBJECT (the old code restored
     // getGameMode(phase.gameMode) where phase.gameMode is undefined at the title -> every
     // subsequent setMode crashed on gameMode.isCoop, live "naming doesn't advance").
     expect(game.scene.gameMode, "gameMode restored to a real object after settle").toBeDefined();
     expect(game.scene.gameMode.isShowdown).toBeFalsy(); // borrowed gameMode cleanly restored
     expect(game.scene.gameData.showdownTeamPresets.length).toBe(0); // nothing saved on cancel
+  });
+
+  it("G/V team-cycle: the editor RELOADS onto the sibling team mon (offline edit, dead-cycle red-proof)", async () => {
+    // A 2-mon preset -> EDIT seeds BOTH mons into the grid, so the editor has siblings to cycle between.
+    const mon = (root: SpeciesId, fielded: SpeciesId, move: MoveId) => ({
+      speciesId: fielded,
+      formIndex: 0,
+      level: 100,
+      shiny: false,
+      variant: 0,
+      abilityIndex: 0,
+      nature: 0,
+      ivs: [31, 31, 31, 31, 31, 31] as number[],
+      moveset: [move],
+      item: "LEFTOVERS",
+      rootSpeciesId: root,
+      erBlackShiny: false,
+      baseCost: 4,
+    });
+    game.scene.gameData.saveShowdownTeamPreset("Duo", [
+      mon(SpeciesId.GIBLE, SpeciesId.GARCHOMP, MoveId.EARTHQUAKE),
+      mon(SpeciesId.LARVITAR, SpeciesId.TYRANITAR, MoveId.CRUNCH),
+    ]);
+    const phase = new TitlePhase();
+    (phase as any).openShowdownTeamMenu(() => {});
+    await wait(400);
+    cycle(Button.CYCLE_ABILITY); // E -> seeded EDIT build
+    await wait(700);
+    expect(mode()).toBe(UiMode.STARTER_SELECT);
+    const grid: any = game.scene.ui.handlers[UiMode.STARTER_SELECT];
+    await grid.showdownSeedInFlight; // the seeded party loads its icons asynchronously
+    await wait(100);
+    expect(grid.starterSpecies.length, "both preset mons seeded into the grid").toBe(2);
+
+    // Open the Set Editor on slot 0, then cycle with V (next) and G (prev).
+    grid.openShowdownEditor(0);
+    await wait(200);
+    expect(mode(), "the Set Editor opened on slot 0").toBe(UiMode.SHOWDOWN_SET_EDITOR);
+    const editor: any = game.scene.ui.handlers[UiMode.SHOWDOWN_SET_EDITOR];
+    const slot0Root = editor.config.rootSpeciesId;
+
+    // V (CYCLE_TERA) = NEXT team mon. With the dead-cycle bug, openShowdownEditor's setOverlayMode
+    // no-ops (this.mode === SHOWDOWN_SET_EDITOR) and the editor keeps rendering slot 0; the fix
+    // re-renders in place so the config root actually changes to the sibling.
+    game.scene.ui.getHandler().processInput(Button.CYCLE_TERA);
+    await wait(200);
+    expect(mode(), "still in the editor after V").toBe(UiMode.SHOWDOWN_SET_EDITOR);
+    expect(editor.container.visible, "editor stays visible after cycling").toBe(true);
+    const slot1Root = editor.config.rootSpeciesId;
+    expect(slot1Root, "V reloaded the editor onto the OTHER team mon").not.toBe(slot0Root);
+
+    // G (CYCLE_GENDER) = PREV -> back to slot 0.
+    game.scene.ui.getHandler().processInput(Button.CYCLE_GENDER);
+    await wait(200);
+    expect(editor.config.rootSpeciesId, "G cycled back to the first mon").toBe(slot0Root);
   });
 });

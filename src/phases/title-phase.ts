@@ -378,6 +378,46 @@ export class TitlePhase extends Phase {
     globalScene.ui.showText("", null, () => globalScene.ui.setOverlayMode(UiMode.PROFILE, backToTitle));
   }
 
+  // ===========================================================================================
+  // OFFLINE TEAM-BUILD MODE GRAPH (audited 2026-07-11). Every edge in the offline build's screen
+  // graph, its transition kind, who hides the source container, and what re-shows the destination.
+  // The whole offline graph is now FADE-FREE (SHOWDOWN_SET_EDITOR + SHOWDOWN_TEAM_MENU are both
+  // noTransitionModes in ui.ts), so no edge can strand the black fade overlay opaque.
+  //
+  //  title game-mode select --("Showdown")--> TEAM MENU
+  //     kind: instant. openShowdownTeamMenu: setMode(MESSAGE)+resetModeChain()+showText("",cb) then
+  //     setMode(SHOWDOWN_TEAM_MENU). MESSAGE->menu is not a transition pair, so no fade. The empty-text
+  //     showText runs on the TITLE-context MessageUiHandler (which DOES fire its empty-text callback -
+  //     unlike the grid-context one, see fix #3 below), the clobber-safe deferral for a nested open.
+  //  TEAM MENU --("Create"/"Edit")--> GRID (STARTER_SELECT)
+  //     kind: single AWAITED fade (MESSAGE->STARTER_SELECT; STARTER_SELECT is a transitionMode). menu
+  //     hidden by setMode(MESSAGE) clearing it. openStarterSelect awaits setMode(MESSAGE); resetModeChain;
+  //     awaits setMode(STARTER_SELECT,{seed,onCancel}). NO empty-text showText hop (grid-context handler
+  //     never fires it - live fix #3). EDIT seeds the party strip via seedTeamFromStarters.
+  //  GRID --(confirm an eligible line / "Edit Set")--> SET EDITOR
+  //     kind: instant OVERLAY (setOverlayMode; SHOWDOWN_SET_EDITOR is noTransition). Grid is NOT cleared
+  //     - it stays alive under the editor's opaque backdrop. openShowdownEditor.
+  //  SET EDITOR --(cycle G / V / shoulder to a sibling team mon)--> SET EDITOR (same mode)
+  //     kind: instant IN-PLACE re-render. openShowdownEditor detects mode===editor and calls
+  //     editor.show([config]) directly (render() clears its dynamic children first). It CANNOT go through
+  //     setOverlayMode - that no-ops on this.mode===mode (the dead-G/V bug). No chain churn, no fade.
+  //  SET EDITOR --(Done / Cancel / Esc)--> GRID
+  //     kind: instant revertMode (lastMode SHOWDOWN_SET_EDITOR is noTransition). editor.clear() hides its
+  //     container; the grid was never hidden, so it is simply revealed. commitShowdownEditor / onCancel.
+  //  GRID --(top-level Cancel -> confirmExit CONFIRM -> Yes)--> TEAM MENU
+  //     kind: instant. The CONFIRM is an UNCHAINED overlay (setModeWithoutClear) over the still-visible
+  //     grid, so revertMode can't restore it; the grid is hidden by an EXPLICIT this.clear() in the Yes
+  //     handler (fix this round - it used to strand the grid visible), then settle()->showMenu()->
+  //     setMode(SHOWDOWN_TEAM_MENU) shows the menu (instant, noTransition).
+  //  GRID --(lock-in Start -> confirm -> name modal -> saved)--> TEAM MENU
+  //     kind: instant. tryStart's showdown branch setMode(STARTER_SELECT) restores the grid as active,
+  //     onLockIn opens the COMMUNITY_CHALLENGE_TEXT name modal (setOverlayMode, noTransition); its
+  //     revertMode returns to the grid; settle()->showMenu()->setMode(SHOWDOWN_TEAM_MENU) clears the grid
+  //     (getHandler()==grid) and shows the menu. Name-cancel takes the same terminal without saving.
+  //  TEAM MENU --("Enter lobby")--> versus pairing (leaves the offline graph); --(Exit)--> title
+  //     (revertModes()+toTitleScreen()). Menu-internal overlays (rename text, delete/enter CONFIRM) all
+  //     revert instantly back to the menu (lastMode noTransition).
+  // ===========================================================================================
   /**
    * Showdown 1v1 (Team Menu, addendum): open the TEAM PRESET MENU - the new pre-pairing entry screen.
    * Teams are built + selected here, BEFORE the lobby. The menu's callbacks:
@@ -422,9 +462,17 @@ export class TitlePhase extends Phase {
       handler?.setTextInput(new DomShowdownEditorTextInput());
       void globalScene.ui.setMode(UiMode.SHOWDOWN_TEAM_MENU, config);
     };
-    globalScene.ui.setMode(UiMode.MESSAGE);
-    globalScene.ui.resetModeChain();
-    globalScene.ui.showText("", null, () => showMenu());
+    // Clobber-safe deferral (reachable from the game-mode OPTION_SELECT handler, which returns true and
+    // clears the select): AWAIT setMode(MESSAGE) to tear the select down first, then open the menu
+    // DIRECTLY. No empty-text `showText("", ...)` hop - its callback is unreliable on a grid-context
+    // MessageUiHandler (the "menu never opens" / stuck-at-MESSAGE flake, exposed once the offline flow's
+    // fade timing shifted), and no unawaited setMode racing the open. Mirrors the openStarterSelect
+    // deferral (live fix #3) which uses this same awaited-MESSAGE pattern.
+    void (async () => {
+      await globalScene.ui.setMode(UiMode.MESSAGE);
+      globalScene.ui.resetModeChain();
+      showMenu();
+    })();
   }
 
   /**

@@ -154,6 +154,16 @@ const noTransitionModes = [
   // the screen never repainted ("frozen at starter select"). An INSTANT editor swap (no fade) removes the
   // race entirely - snappy is also the right feel for a teambuilder set editor.
   UiMode.SHOWDOWN_SET_EDITOR,
+  // Showdown Team Menu (offline build). SAME fade-strand class as the editor above: the menu is entered
+  // FROM the transition-mode STARTER_SELECT grid (grid-cancel exit + lock-in->name->menu both run
+  // `setMode(SHOWDOWN_TEAM_MENU)` while `this.mode` is STARTER_SELECT, and the grid open/exit sequence
+  // resets the mode chain), so without this the grid->menu hop runs `fadeOut(250)+delayedCall(100)+
+  // fadeIn(250)` and can overlap the grid's own in-flight fade - `fadeIn`'s `!overlayActive` guard then
+  // returns early and STRANDS the black overlay opaque over the menu ("stuck getting out of the custom
+  // starter select"). An instant menu swap removes the race; the menu is a full-screen panel, so a fade
+  // added nothing anyway. Every OTHER offline-flow edge is already instant (editor overlay + revert;
+  // COMMUNITY_CHALLENGE_TEXT name modal), so the whole offline screen graph is now fade-free.
+  UiMode.SHOWDOWN_TEAM_MENU,
 ];
 
 // biome-ignore lint/style/useNamingConvention: a unique case (only 2 letters)

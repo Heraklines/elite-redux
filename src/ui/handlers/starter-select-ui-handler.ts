@@ -4024,9 +4024,20 @@ export class StarterSelectUiHandler extends MessageUiHandler {
     // The registered handler instance is reused across opens, so re-injecting each open is harmless.
     const editor = ui.handlers[UiMode.SHOWDOWN_SET_EDITOR] as ShowdownSetEditorUiHandler | undefined;
     editor?.setTextInput(new DomShowdownEditorTextInput());
-    // Open as an OVERLAY (chains onto the mode stack) rather than setMode: setMode would CLEAR this
-    // StarterSelect (hide its grid, reset its cursor), and returning via setMode(STARTER_SELECT) with no
-    // callback arg re-runs show() into an EMPTY screen (its init is gated on `args[0] instanceof
+    // TEAM CYCLE (G / V / shoulder): when the editor is ALREADY the active mode, this is a slot switch,
+    // not a fresh open. `setOverlayMode(SHOWDOWN_SET_EDITOR)` would then be a NO-OP - `setModeInternal`
+    // early-returns on `this.mode === mode`, so the editor would keep rendering the OLD slot and G/V/
+    // shoulder would look dead ("the button to change the mon doesnt work"). Re-render the live editor
+    // handler in place with the new slot's config instead: mode is already correct, render() clears its
+    // dynamic children first (no leak), and there is no mode-chain churn or fade. This is the ONLY
+    // same-mode reopen path; the first open (from the grid) still chains as an overlay below.
+    if (ui.getMode() === UiMode.SHOWDOWN_SET_EDITOR) {
+      editor?.show([config]);
+      return;
+    }
+    // First open: as an OVERLAY (chains onto the mode stack) rather than setMode: setMode would CLEAR
+    // this StarterSelect (hide its grid, reset its cursor), and returning via setMode(STARTER_SELECT)
+    // with no callback arg re-runs show() into an EMPTY screen (its init is gated on `args[0] instanceof
     // Function`). As an overlay the grid stays alive underneath the editor's opaque backdrop, and the
     // editor's Done/Cancel revertMode() back to it intact - no empty-screen softlock.
     ui.setOverlayMode(UiMode.SHOWDOWN_SET_EDITOR, config);
@@ -7028,10 +7039,16 @@ export class StarterSelectUiHandler extends MessageUiHandler {
             const onCancel = this.showdownBuildOnCancel;
             this.showdownBuildOnCancel = null;
             this.clearText();
-            void ui.revertMode().then(() => {
-              this.blockInput = false;
-              onCancel();
-            });
+            // The confirmExit box is an UNCHAINED overlay (`setModeWithoutClear` above) painted over the
+            // still-visible grid, so `revertMode()` here is a no-op (nothing was pushed onto the mode
+            // chain) and the flow's follow-up `setMode(SHOWDOWN_TEAM_MENU)` clears the CONFIRM handler,
+            // NOT this grid - stranding `starterSelectContainer` VISIBLE under the menu (the "stuck
+            // getting out of the custom starter select menu" report). Tear THIS grid down explicitly
+            // (clear() hides its container + resets its state) before handing back to the flow, which
+            // opens the Team Menu instantly (SHOWDOWN_TEAM_MENU is a noTransitionMode - no fade race).
+            this.clear();
+            this.blockInput = false;
+            onCancel();
             return;
           }
           ui.setMode(UiMode.STARTER_SELECT);
