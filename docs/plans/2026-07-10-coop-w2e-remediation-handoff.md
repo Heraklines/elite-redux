@@ -148,3 +148,29 @@ Shared regression evidence for these commits: `coop-interaction-relay`, `coop-in
 `tsc --noEmit` produced zero errors in touched files. Mystery-specific regression batches added 7/7 duo,
 24/24 relay/durability, 7/7 catch-full, and 14/14 sibling channel/durability passes. The full four-lane gate
 and final long soak remain intentionally unclaimed. Next is #899; all later work items in section 6 remain open.
+
+## 9. Continuation evidence (I5 intent recovery + production snapshots)
+
+The next two recovery residuals from section 6 are now closed with failure-first commits. Claims remain
+limited to the named suites; the full four-lane gate and final long soak have not yet been rerun.
+
+- **I5 guest proposal resend:** `48544e564` records the RED (a lost guest-owned ME proposal never
+  retransmitted); `33d928b49` wires a lifecycle-bounded one-second retry for top-level ME picks and ME
+  sub-picks. Every retry reuses the same deterministic operation address; the authority's committed
+  envelope cancels it, including the cross-carrier duplicate case, and session reset clears all timers.
+  Earlier seam commits `c7e325b84` / `59552c093` expose the stable operation id. Proof:
+  `coop-operation-precommit-intent-loss.test.ts` 6/6 and the adjacent durability remediation suite 6/6.
+- **Snapshot revision adoption:** `acd822544` records the RED (a full `stateSync` discarded the operation
+  heads it already subsumed); `f2617bf04` stamps every production full snapshot with `journalHighWater`
+  and fast-forwards/ACKs every stamped class after the ME-boundary, stall-recovery, and hot-rejoin apply
+  paths. Proof: recovery suite I2/I2b.
+- **Deep-gap production carrier:** `d37710d51` records the RED (overflow escalation had no live snapshot
+  carrier); `3a2d33615` wires `sendFullSnapshot` to a reserved `stateSync` push, applies the heavy snapshot
+  on the guest, then ACKs the evicted range. The wire semantic is guarded by protocol version
+  `er-coop-13`, preventing mixed-build silent fallback. Proof: recovery I3/I3b, battle-stream 31/31,
+  capability/WebRTC 34/34. Touched-file TypeScript diagnostics: zero.
+
+The next implementation item is the checkpoint replay loader: `test/tools/coop-duo-harness.ts` must
+restore `trace.checkpoint` (mutated party, inventory, wave, money, and RNG state) instead of rebuilding
+every replay from the original launch roster. Journal coverage sweep and the remaining operation surfaces
+also remain open; no final “no gaps” claim is made.
