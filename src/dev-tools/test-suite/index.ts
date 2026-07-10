@@ -32,6 +32,9 @@ import {
   setPendingDevStarters,
 } from "#app/dev-tools/registry";
 import { globalScene } from "#app/global-scene";
+import { formatCoopControlPlane } from "#data/elite-redux/coop/coop-diagnostics";
+import { DEVLOG_REPLAY_TRACE_MARKER } from "#data/elite-redux/er-bug-report";
+import { getReplayTrace } from "#data/elite-redux/replay-recorder";
 import { GameModes } from "#enums/game-modes";
 import { UiMode } from "#enums/ui-mode";
 import { formatConsoleSnapshot } from "#utils/console-ring-buffer";
@@ -78,13 +81,50 @@ function captureStateHeader(): string {
   }
 }
 
+/**
+ * #diagnostics: capture the co-op control-plane block for a Send-Logs report, or `""` (solo / failure).
+ * Guarded so a snapshot failure never breaks the log capture.
+ */
+function captureControlPlaneBlock(): string {
+  try {
+    const block = formatCoopControlPlane();
+    return block ? `${block}\n\n` : "";
+  } catch {
+    return "";
+  }
+}
+
+/**
+ * #diagnostics: serialize the captured replay trace fenced by the SAME marker the in-game bug-report path
+ * uses ({@linkcode DEVLOG_REPLAY_TRACE_MARKER}), so `scripts/replay-run.mjs` can EXTRACT + re-drive a
+ * Send-Logs capture exactly like a bug-report capture. Guarded; `(none)` when nothing was recorded.
+ */
+function captureReplayTraceBlock(): string {
+  let trace = "(none)";
+  try {
+    const t = getReplayTrace();
+    if (t != null) {
+      trace = JSON.stringify(t);
+    }
+  } catch {
+    /* a serialize failure leaves "(none)" - the log still sends */
+  }
+  return `${DEVLOG_REPLAY_TRACE_MARKER}\n${trace}\n`;
+}
+
 function buildReport(comment?: string): string {
   const commentBlock = comment?.trim() ? `----- COMMENT -----\n${comment.trim()}\n\n` : "";
   const scenarioBlock = activeScenarioLabel ? `scenario: ${activeScenarioLabel}\n` : "";
   // Builder scenarios carry their share code so EVERY log is replayable:
   // paste the code into the Scenario Builder to rebuild the exact situation.
   const shareBlock = activeShareCode ? `share-code: ${activeShareCode}\n` : "";
-  return `${scenarioBlock}${shareBlock}${captureStateHeader()}\n\n${commentBlock}----- CONSOLE -----\n${formatConsoleSnapshot()}\n`;
+  // #diagnostics: PARITY with the in-game "Report a bug" path - a Send-Logs capture must carry EVERYTHING
+  // that path carries: the co-op control-plane snapshot AND the deterministic replay trace (previously
+  // Send Logs attached only the state header + console, so a tester-filed co-op hang was NOT replayable).
+  return (
+    `${scenarioBlock}${shareBlock}${captureStateHeader()}\n\n${commentBlock}`
+    + `${captureControlPlaneBlock()}----- CONSOLE -----\n${formatConsoleSnapshot()}\n\n${captureReplayTraceBlock()}`
+  );
 }
 
 /**
