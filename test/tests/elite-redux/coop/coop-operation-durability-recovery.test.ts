@@ -219,7 +219,7 @@ describe("W2e-R2 durability recovery completeness: guest-only reconnect + snapsh
   // EXPECTED RED (current code): commit() calls transport.send() unguarded, so a throwing send propagates
   // the throw out of commit() (breaking any caller that does not wrap it - e.g. the keystone applier).
   // ===========================================================================================
-  it.fails("I4: [RED] a commit whose send THROWS propagates the throw out of commit()", async () => {
+  it("I4: a commit whose send THROWS stays journaled + retriable, does not break the committer, and resends on reconnect", async () => {
     let dead = true;
     const applied: number[] = [];
     const pair = createLoopbackPair();

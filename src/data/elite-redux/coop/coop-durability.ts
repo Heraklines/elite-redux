@@ -580,8 +580,16 @@ export class CoopDurabilityManager {
    * `seq` MUST be monotonic per class (the envelope's `revision`).
    */
   commit(cls: string, seq: number, msg: CoopMessage): void {
+    // Journal BEFORE the send, so a send that THROWS (a DEAD channel at send time - a real WebRTC
+    // InvalidStateError, not merely a dark/queued channel) leaves the op journaled + retriable: the unacked
+    // tail retains it and a reconnect resends it. Catch the throw so it never breaks the committer (the
+    // op is not dropped - it stays in the journal for the reconnect tail / coopResyncAll to recover).
     this.journal.commit(cls, seq, msg);
-    this.transport.send(msg);
+    try {
+      this.transport.send(msg);
+    } catch (e) {
+      coopWarn("durability", `commit send THREW cls=${cls} seq=${seq} (op stays journaled + retriable)`, e);
+    }
   }
 
   /** Handle an inbound wire message: the ACK/reconnect arms, plus (if wired) the durable op stream. */
