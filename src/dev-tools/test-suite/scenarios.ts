@@ -14117,4 +14117,210 @@ export const DEV_SCENARIOS: DevScenario[] = [
       ];
     },
   },
+  // ===========================================================================
+  // TIER-5 audit fixes
+  // ===========================================================================
+  {
+    label: "Ability: Fae Hunter (1.5x to / 0.5x from Fairy)",
+    description:
+      "Fae Hunter (2.65 dex): 'Deals 1.5x TO Fairy-type Pokemon and takes 0.5x FROM\n"
+      + "Fairy-type Pokemon - based on the POKEMON's types, not the move's.' The 0.5x used\n"
+      + "to gate on the move's type; now it gates on the attacker being Fairy-type.\n"
+      + "DO: attack the Fairy foe (Gardevoir) with any move (Body Slam), and let it hit you\n"
+      + "with a NON-Fairy move (Psychic).\n"
+      + "EXPECT: your move deals ~1.5x to the Fairy foe; the foe's non-Fairy Psychic still\n"
+      + "only deals HALF (0.5x) to you because the ATTACKER is Fairy-type.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_WAVE_OVERRIDE: 145,
+        STARTING_LEVEL_OVERRIDE: 100,
+        ABILITY_OVERRIDE: erAbility(5178), // Fae Hunter
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.GARDEVOIR,
+        ENEMY_LEVEL_OVERRIDE: 100,
+        ENEMY_ABILITY_OVERRIDE: AbilityId.BALL_FETCH,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.PSYCHIC],
+      });
+      return [
+        makeStarter(SpeciesId.SNORLAX, { moveset: [MoveId.BODY_SLAM, MoveId.REST, MoveId.PROTECT, MoveId.SPLASH] }),
+      ];
+    },
+  },
+  {
+    label: "Ability: Wildfire (50 BP Fire Spin on entry)",
+    description:
+      "Wildfire (2.65 dex): 'Uses a 50 BP Fire Spin on switch-in (traps 4-5 turns, 1/8 HP\n"
+      + "each turn).' It was firing the port's 35 BP Fire Spin.\n"
+      + "DO: start the battle - Wildfire auto-uses Fire Spin on entry.\n"
+      + "EXPECT: the foe is trapped and chipped 1/8 each turn; the initial hit is a 50 BP\n"
+      + "Fire Spin (a bit stronger than before).",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_WAVE_OVERRIDE: 145,
+        STARTING_LEVEL_OVERRIDE: 100,
+        ABILITY_OVERRIDE: erAbility(5420), // Wildfire
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.CHANSEY,
+        ENEMY_LEVEL_OVERRIDE: 100,
+        ENEMY_ABILITY_OVERRIDE: AbilityId.BALL_FETCH,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+      });
+      return [
+        makeStarter(SpeciesId.CHARIZARD, {
+          moveset: [MoveId.FLAMETHROWER, MoveId.REST, MoveId.PROTECT, MoveId.SPLASH],
+        }),
+      ];
+    },
+  },
+  {
+    label: "Move: Web Shot (sets Sticky Web + high crit)",
+    description:
+      "Web Shot (2.65 dex): 'Sets up Sticky Web. +1 crit chance. Archer boost.' Only the\n"
+      + "Archer boost was wired; the hazard + crit were missing.\n"
+      + "DO: use Web Shot on the foe.\n"
+      + "EXPECT: STICKY WEB is set on the foe's side ('Sticky web was laid out...'), so the\n"
+      + "next foe to switch in has its Speed lowered; Web Shot also crits more often.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_WAVE_OVERRIDE: 145,
+        STARTING_LEVEL_OVERRIDE: 100,
+        ABILITY_OVERRIDE: AbilityId.BALL_FETCH,
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.CHANSEY,
+        ENEMY_LEVEL_OVERRIDE: 100,
+        ENEMY_ABILITY_OVERRIDE: AbilityId.BALL_FETCH,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+      });
+      return [
+        makeStarter(SpeciesId.ARIADOS, {
+          moveset: [erMove(5048) /* Web Shot */, MoveId.REST, MoveId.PROTECT, MoveId.SPLASH],
+        }),
+      ];
+    },
+  },
+  {
+    label: "Ability: Tectonize (Normal moves become Ground)",
+    description:
+      "Tectonize (2.65 dex): 'Normal moves become Ground-type; if the holder is Ground-type\n"
+      + "it is immune to Stealth Rock/Spikes, otherwise gains Ground STAB.' The conversion +\n"
+      + "hazard immunity were missing (only a flat boost existed).\n"
+      + "DO: attack the Electric foe (Magneton) with Tackle (a Normal move).\n"
+      + "EXPECT: 'It's super effective!' - Tackle is now a Ground move (2x on Electric). A\n"
+      + "Ground-type Tectonize holder would also take no Stealth Rock / Spikes damage.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_WAVE_OVERRIDE: 145,
+        STARTING_LEVEL_OVERRIDE: 100,
+        ABILITY_OVERRIDE: erAbility(5046), // Tectonize
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.MAGNETON,
+        ENEMY_LEVEL_OVERRIDE: 100,
+        ENEMY_ABILITY_OVERRIDE: AbilityId.BALL_FETCH,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+      });
+      return [
+        makeStarter(SpeciesId.GARCHOMP, { moveset: [MoveId.TACKLE, MoveId.EARTHQUAKE, MoveId.REST, MoveId.SPLASH] }),
+      ];
+    },
+  },
+  {
+    label: "Ability: Draconize (Normal->Dragon, neutral vs Fairy)",
+    description:
+      "Draconize (2.65 dex): 'Normal moves become Dragon-type; if the holder is Dragon-type\n"
+      + "its Dragon moves deal NEUTRAL damage vs Fairy, otherwise it gains Dragon STAB.' The\n"
+      + "conversion + Fairy override were missing.\n"
+      + "DO: as Dragon-type Garchomp, attack the Fairy foe (Gardevoir) with Tackle (Normal).\n"
+      + "EXPECT: Tackle is now a Dragon move that HITS the Fairy for NEUTRAL damage (not the\n"
+      + "usual 0x immunity), thanks to the holder being Dragon-type.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_WAVE_OVERRIDE: 145,
+        STARTING_LEVEL_OVERRIDE: 100,
+        ABILITY_OVERRIDE: erAbility(5149), // Draconize
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.GARDEVOIR,
+        ENEMY_LEVEL_OVERRIDE: 100,
+        ENEMY_ABILITY_OVERRIDE: AbilityId.BALL_FETCH,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+      });
+      return [
+        makeStarter(SpeciesId.GARCHOMP, { moveset: [MoveId.TACKLE, MoveId.DRAGON_CLAW, MoveId.REST, MoveId.SPLASH] }),
+      ];
+    },
+  },
+  {
+    label: "Ability: Big Leaves (highest attacking stat in sun)",
+    description:
+      "Big Leaves (2.65 dex): among its sun effects, 'raises the HIGHEST attacking stat by\n"
+      + "50% in sun.' It was boosting Sp.Atk only, so a physical attacker got nothing.\n"
+      + "DO: in harsh sun, attack with the physical attacker Machamp.\n"
+      + "EXPECT: your physical hits are ~50% stronger in sun (your Attack, the higher stat,\n"
+      + "gets the boost - not just Sp.Atk). You also outspeed (+50% Speed) and cure status.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_WAVE_OVERRIDE: 145,
+        STARTING_LEVEL_OVERRIDE: 100,
+        WEATHER_OVERRIDE: WeatherType.SUNNY,
+        ABILITY_OVERRIDE: erAbility(5111), // Big Leaves
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.CHANSEY,
+        ENEMY_LEVEL_OVERRIDE: 100,
+        ENEMY_ABILITY_OVERRIDE: AbilityId.BALL_FETCH,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+      });
+      return [
+        makeStarter(SpeciesId.MACHAMP, { moveset: [MoveId.CLOSE_COMBAT, MoveId.REST, MoveId.PROTECT, MoveId.SPLASH] }),
+      ];
+    },
+  },
+  {
+    label: "Ability: Mycelium Might (status ignores type immunity)",
+    description:
+      "Mycelium Might (2.65 dex): 'Status moves bypass all immunities and type resistances\n"
+      + "(but move last).' The type-immunity bypass was missing.\n"
+      + "DO: use Thunder Wave on the GROUND-type foe (Golem). Try Toxic on a Steel foe too.\n"
+      + "EXPECT: Thunder Wave PARALYZES the Ground-type (normally immune), and Toxic poisons\n"
+      + "a Steel-type - status moves ignore the type immunity. Your status move moves last.",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_WAVE_OVERRIDE: 145,
+        STARTING_LEVEL_OVERRIDE: 100,
+        ABILITY_OVERRIDE: AbilityId.MYCELIUM_MIGHT,
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.GOLEM,
+        ENEMY_LEVEL_OVERRIDE: 100,
+        ENEMY_ABILITY_OVERRIDE: AbilityId.BALL_FETCH,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.SPLASH],
+      });
+      return [
+        makeStarter(SpeciesId.GENGAR, {
+          moveset: [MoveId.THUNDER_WAVE, MoveId.TOXIC, MoveId.SHADOW_BALL, MoveId.SPLASH],
+        }),
+      ];
+    },
+  },
+  {
+    label: "Ability: Determination (SpAtk up when statused)",
+    description:
+      "Determination (2.65 dex): '+50% Special Attack when the holder has ANY status; also\n"
+      + "prevents frostbite from reducing Special Attack.' The frostbite tag wasn't counted.\n"
+      + "DO: let the foe burn you (Will-O-Wisp), then fire a special move.\n"
+      + "EXPECT: once statused (burn/poison/frostbite), your special moves hit ~50% harder;\n"
+      + "and a frostbitten Determination holder's Sp.Atk is NOT cut (the ability waives it).",
+    setup: () => {
+      resetDevOverrides();
+      setOverrides({
+        STARTING_WAVE_OVERRIDE: 145,
+        STARTING_LEVEL_OVERRIDE: 100,
+        ABILITY_OVERRIDE: erAbility(5236), // Determination
+        ENEMY_SPECIES_OVERRIDE: SpeciesId.CHANSEY,
+        ENEMY_LEVEL_OVERRIDE: 100,
+        ENEMY_ABILITY_OVERRIDE: AbilityId.BALL_FETCH,
+        ENEMY_MOVESET_OVERRIDE: [MoveId.WILL_O_WISP],
+      });
+      return [
+        makeStarter(SpeciesId.GARDEVOIR, { moveset: [MoveId.PSYCHIC, MoveId.REST, MoveId.PROTECT, MoveId.SPLASH] }),
+      ];
+    },
+  },
 ];
