@@ -1043,12 +1043,27 @@ export const ER_SHINY_LAB_EFFECT_ACHV: Record<string, string> = {
   camo: "DAVID_AND_GOLIATH",
   duosunset: "DYNAMIC_DUO",
   starmap: "SHARED_TRIUMPH",
-  heatshimmer: "DOUBLE_TROUBLE_HELL",
+  heatshimmer: "CENTURY_OF_TROUBLE",
   vortex: "GHOST_TRIAD",
   neonwire: "ONE_TURN_CLEAR",
   lavacracks: "TRIAD_OF_HELL",
   luminous: "CENTER_STAGE",
   vaporwave: "FASHIONISTA",
+  // --- #900 follow-up 2: difficulty-calibrated thematic gates (APPEND-ONLY) ---
+  // Each id below is verified against the current PALETTE/SURFACE/AROUND arrays.
+  // PHANTOM_FORMATION: the Double Team echo aura (Triples + Ghost = a phantom formation).
+  echoes: "PHANTOM_FORMATION",
+  // COCYTUS (frozen Triples-only apex): the triple-echo Double Team variant + a glacial aura.
+  triecho: "COCYTUS",
+  nuclearwinter: "COCYTUS",
+  // MONOCHROME_REQUIEM: the Gen-1 dithered greyscale surface.
+  genone: "MONOCHROME_REQUIEM",
+  // APEX_PREDATOR: a stalking-shadow (hunter) aura.
+  creepingshadow: "APEX_PREDATOR",
+  // GIUDECCA (frozen betrayal circle): the dark/frozen "Frozen Abyss" palette.
+  blackice: "GIUDECCA",
+  // RAGS_TO_RICHES: the two-material patina-bronze palette.
+  agedbronze: "RAGS_TO_RICHES",
 };
 
 /** Nicer display hints for achv keys that humanize badly; the rest are derived. */

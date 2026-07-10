@@ -88,8 +88,13 @@ export type RewardSpec =
   | { kind: "eggs"; tier: EggTier; count: number; shiny?: boolean; species?: SpeciesId }
   /** `count` egg-gacha vouchers of a type (Regular/Plus/Premium/Golden = 1/5/10/25 pulls). */
   | { kind: "voucher"; voucherType: VoucherType; count: number }
-  /** A guaranteed shiny at tier 1/2/3 (hard challenges only). */
-  | { kind: "shiny"; tier: 1 | 2 | 3; species: SpeciesId | "random" }
+  /**
+   * A guaranteed shiny (hard challenges only). `tier: "random"` rolls a variant tier 1-3
+   * at grant time (never the black tier). `minCost` restricts a `"random"` species roll to
+   * starters whose base cost is at least that value (skill/rarity scaling - reused by later
+   * feats), and is ignored for a fixed species.
+   */
+  | { kind: "shiny"; tier: 1 | 2 | 3 | "random"; species: SpeciesId | "random"; minCost?: number }
   /** The apex-only black shiny (separate ER tier-4 path). */
   | { kind: "blackShiny"; species: SpeciesId | "random" }
   /** A specific Pokemon, caught (normal). */
@@ -344,15 +349,22 @@ export const ER_ACHIEVEMENT_REWARDS: Record<string, RewardSpec | RewardSpec[]> =
   DUELIST: { kind: "voucher", voucherType: VoucherType.PLUS, count: 1 },
   VETERAN_DUELIST: { kind: "eggs", tier: EggTier.EPIC, count: 1 },
   LEGENDARY_DUELIST: { kind: "shiny", tier: 2, species: "random" },
-  HIGH_ROLLER: { kind: "voucher", voucherType: VoucherType.PLUS, count: 1 },
+  // Difficulty rebalance: a staked PvP win is a real risk -> Premium voucher (keep rosegold gate).
+  HIGH_ROLLER: { kind: "voucher", voucherType: VoucherType.PREMIUM, count: 1 },
   // Bumped to tier-2 shiny per maintainer feedback (a shiny-staked win is a real risk).
   ALL_IN: { kind: "shiny", tier: 2, species: "random" },
+  // Consolation for LOSING a shiny you staked in a wager (settlement takes your shiny mon).
+  // A random shiny of a random variant tier 1-3 (never the apex black tier).
+  THE_HOUSE_REMEMBERS: { kind: "shiny", tier: "random", species: "random" },
   FLAWLESS_DUEL: { kind: "voucher", voucherType: VoucherType.PREMIUM, count: 1 },
   DAVID_AND_GOLIATH: { kind: "voucher", voucherType: VoucherType.PREMIUM, count: 1 },
   GOOD_SPORT: { kind: "candyTeam", perMon: 10 },
   // #900 follow-up skill/restriction feats (escalating, sibling to David and Goliath).
-  RAW_TALENT: { kind: "shiny", tier: 1, species: "random" },
+  // Showdown is mega-heavy, so a mega-less win is genuinely hard: a tier-1 shiny of a
+  // COST-5+ species (the min-cost roll), not the blanket "single-battle = low" scale.
+  RAW_TALENT: { kind: "shiny", tier: 1, species: "random", minCost: 5 },
   BUDGET_CHAMPION: { kind: "voucher", voucherType: VoucherType.PREMIUM, count: 1 },
+  // Keeps the tier-1 shiny; the patina-bronze palette gate is folded in via ER_SHINY_LAB_EFFECT_ACHV.
   RAGS_TO_RICHES: { kind: "shiny", tier: 1, species: "random" },
   APEX_PREDATOR: { kind: "shiny", tier: 2, species: "random" },
 
@@ -368,19 +380,29 @@ export const ER_ACHIEVEMENT_REWARDS: Record<string, RewardSpec | RewardSpec[]> =
   GENEROUS_SOUL: { kind: "candyTeam", perMon: 10 },
   GUARDIAN_ANGEL: { kind: "candyTeam", perMon: 15 },
   SHARED_TRIUMPH: { kind: "eggs", tier: EggTier.LEGENDARY, count: 1 },
-  // Difficulty-gated (Hell): a guaranteed shiny like the other Hell-tier feats.
-  DOUBLE_TROUBLE_HELL: { kind: "shiny", tier: 2, species: "random" },
+  // Reach wave 100 in co-op on Hell (renamed from the old wave-25 DOUBLE_TROUBLE_HELL, which
+  // was not reward-worthy). A single-battle-class feat, not a full run: tier-1 shiny + 1
+  // Premium voucher (keeps the heatshimmer gate via ER_SHINY_LAB_EFFECT_ACHV).
+  CENTURY_OF_TROUBLE: [
+    { kind: "shiny", tier: 1, species: "random" },
+    { kind: "voucher", voucherType: VoucherType.PREMIUM, count: 1 },
+  ],
 
   // --- Battle: Triple Battle feats ----------------------------------------
   THREES_COMPANY: { kind: "candyTeam", perMon: 10 },
-  TRIPLE_THREAT: { kind: "voucher", voucherType: VoucherType.PLUS, count: 1 },
+  // Ten triple wins is a 5%-frequency grind (triples rarely roll): Premium voucher, not Plus.
+  TRIPLE_THREAT: { kind: "voucher", voucherType: VoucherType.PREMIUM, count: 1 },
   TRIPLE_DOWN: { kind: "eggs", tier: EggTier.EPIC, count: 1 },
   CENTER_STAGE: { kind: "eggs", tier: EggTier.EPIC, count: 1 },
   HOLD_THE_LINE: { kind: "voucher", voucherType: VoucherType.PLUS, count: 1 },
   GHOST_TRIAD: { kind: "candyTeam", perMon: 15 },
   ONE_TURN_CLEAR: { kind: "voucher", voucherType: VoucherType.PREMIUM, count: 1 },
-  // Difficulty-gated (Hell): a guaranteed shiny.
-  TRIAD_OF_HELL: { kind: "shiny", tier: 2, species: "random" },
+  // A single-battle Hell feat, NOT a full run: it must not outrank a full-run clear, so
+  // 1 Premium voucher + 1 Rare egg instead of a guaranteed shiny (keeps the lavacracks gate).
+  TRIAD_OF_HELL: [
+    { kind: "voucher", voucherType: VoucherType.PREMIUM, count: 1 },
+    { kind: "eggs", tier: EggTier.RARE, count: 1 },
+  ],
 
   // --- Collection: Shiny Lab feats ----------------------------------------
   FASHIONISTA: { kind: "candyTeam", perMon: 10 },
@@ -403,6 +425,10 @@ export const ER_ACHIEVEMENT_REWARDS: Record<string, RewardSpec | RewardSpec[]> =
   THE_UPSIDE_DOWN: { kind: "shiny", tier: 2, species: "random" },
   MONOCHROME_REQUIEM: { kind: "shiny", tier: 2, species: "random" },
   TYPECAST_TRIO: [{ kind: "eggs", tier: EggTier.EPIC, count: 1 }, { kind: "voucher", voucherType: VoucherType.PREMIUM, count: 1 }],
+  // Complete a run with Triples Only + Ghost Trainers active (any difficulty). A full-run
+  // clear: 1 Epic egg here + the +2 Premium run-completion bonus via RUN_COMPLETION_ACHV_IDS,
+  // plus the Double Team ("echoes") aura gate folded in via ER_SHINY_LAB_EFFECT_ACHV.
+  PHANTOM_FORMATION: { kind: "eggs", tier: EggTier.EPIC, count: 1 },
 };
 
 /**
@@ -465,6 +491,8 @@ const RUN_COMPLETION_ACHV_IDS = new Set<string>([
   "THE_UPSIDE_DOWN",
   "MONOCHROME_REQUIEM",
   "TYPECAST_TRIO",
+  // #900 follow-up 2: Triples Only + Ghost Trainers full-run clear (any difficulty).
+  "PHANTOM_FORMATION",
 ]);
 
 /** The +2 Premium-voucher bonus a full-run-completion achievement gets, else nothing. */
@@ -619,9 +647,10 @@ function applyRewardSpec(spec: RewardSpec): GrantedReward | null {
       return { text: describeRewardSpec(spec) ?? "" };
     }
     case "shiny": {
-      const species = resolveSpecies(spec.species);
-      grantShiny(species, spec.tier);
-      return { text: describeRewardSpec(spec, { species }) ?? "", iconSpecies: species, shiny: true, variant: spec.tier - 1 };
+      const tier = resolveShinyTier(spec.tier);
+      const species = resolveSpecies(spec.species, spec.minCost);
+      grantShiny(species, tier);
+      return { text: describeRewardSpec(spec, { species }) ?? "", iconSpecies: species, shiny: true, variant: tier - 1 };
     }
     case "blackShiny": {
       const species = resolveSpecies(spec.species);
@@ -750,12 +779,28 @@ function effectLabel(effectId: string): string {
   return ER_SHINY_LAB_EFFECT_INDEX.get(effectId)?.label ?? effectId;
 }
 
-/** Resolve a reward species: a fixed id passes through; "random" rolls a starter. */
-function resolveSpecies(species: SpeciesId | "random"): SpeciesId {
+/** Resolve a random-shiny variant tier: a fixed tier passes through; "random" rolls 1-3 (never black). */
+function resolveShinyTier(tier: 1 | 2 | 3 | "random"): 1 | 2 | 3 {
+  // Unseeded like the species roll (cosmetic, needs no reproducibility across players).
+  return tier === "random" ? ((Math.floor(Math.random() * 3) + 1) as 1 | 2 | 3) : tier;
+}
+
+/**
+ * Resolve a reward species: a fixed id passes through; "random" rolls a starter. When
+ * `minCost` is given, a "random" roll is restricted to starters whose base cost is at
+ * least that value (falls back to the full pool if the filter is somehow empty).
+ */
+function resolveSpecies(species: SpeciesId | "random", minCost?: number): SpeciesId {
   if (species !== "random") {
     return species;
   }
-  const pool = Object.keys(speciesStarterCosts).map(Number) as SpeciesId[];
+  let pool = Object.keys(speciesStarterCosts).map(Number) as SpeciesId[];
+  if (minCost != null) {
+    const filtered = pool.filter(id => (speciesStarterCosts[id] ?? 0) >= minCost);
+    if (filtered.length > 0) {
+      pool = filtered;
+    }
+  }
   // Use an UNSEEDED pick, NOT randSeedItem: an achievement unlocks with the battle RNG at a
   // fixed / reset state that is identical across players, so the seeded pick handed EVERY player
   // the same species (Scorbunny). A reward roll is cosmetic and needs no reproducibility, so

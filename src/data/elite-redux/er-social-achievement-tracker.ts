@@ -120,6 +120,11 @@ export function evaluateShowdownResult(ctx: ShowdownResultContext, counters: Sho
   if (counters.matchesPlayed >= 10) {
     ids.push("GOOD_SPORT");
   }
+  // The House Remembers: LOSE a match where you staked a shiny (settlement transfers it away).
+  // A loss-side feat (gambler's consolation), so it sits outside the win-only block below.
+  if (!ctx.won && ctx.staked && ctx.stakeShiny) {
+    ids.push("THE_HOUSE_REMEMBERS");
+  }
   if (ctx.won) {
     ids.push("FIRST_BLOOD");
     // Lifetime win-count records (renamed from RIVAL_RECORD_N to the Duelist ranks).
@@ -279,8 +284,10 @@ export function evaluateCoopWaveWon(ctx: CoopWaveContext): string[] {
   if (ctx.isWaveFinal) {
     ids.push("DYNAMIC_DUO");
   }
-  if (ctx.waveIndex >= 25 && ctx.difficultyHell) {
-    ids.push("DOUBLE_TROUBLE_HELL");
+  // Century of Trouble: reach wave 100 in co-op on Hell (retuned up from the old wave-25 gate,
+  // which was not reward-worthy).
+  if (ctx.waveIndex >= 100 && ctx.difficultyHell) {
+    ids.push("CENTURY_OF_TROUBLE");
   }
   return ids;
 }

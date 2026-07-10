@@ -619,6 +619,11 @@
     "name_female": "Apex Predator",
     "description": "Win at least 80% of your Showdown matches, with 25 or more matches played."
   },
+  "theHouseRemembers": {
+    "name": "The House Remembers",
+    "name_female": "The House Remembers",
+    "description": "Lose a Showdown wager in which you staked a shiny Pokemon."
+  },
   "flawlessDuel": {
     "name": "Flawless Duel",
     "name_female": "Flawless Duel",
@@ -679,10 +684,10 @@
     "name_female": "Shared Triumph",
     "description": "Catch a legendary Pokemon during a co-op run."
   },
-  "doubleTroubleHell": {
-    "name": "Double Trouble",
-    "name_female": "Double Trouble",
-    "description": "Clear wave 25 or beyond in a co-op run on Hell difficulty."
+  "centuryOfTrouble": {
+    "name": "Century of Trouble",
+    "name_female": "Century of Trouble",
+    "description": "Clear wave 100 or beyond in a co-op run on Hell difficulty."
   },
   "threesCompany": {
     "name": "Three's Company",
@@ -783,5 +788,10 @@
     "name": "Typecast Trio",
     "name_female": "Typecast Trio",
     "description": "Win a run with both the Mono-Type and Triples Only challenges active."
+  },
+  "phantomFormation": {
+    "name": "Phantom Formation",
+    "name_female": "Phantom Formation",
+    "description": "Win a run with both the Triples Only and Ghost Trainers challenges active."
   }
 }

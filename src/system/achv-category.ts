@@ -175,6 +175,7 @@ const ACHV_CATEGORY_OVERRIDES: Record<string, AchvCategory> = {
   BUDGET_CHAMPION: AchvCategory.VERSUS,
   RAGS_TO_RICHES: AchvCategory.VERSUS,
   APEX_PREDATOR: AchvCategory.VERSUS,
+  THE_HOUSE_REMEMBERS: AchvCategory.VERSUS,
 
   // --- Co-op: the shared-run feats (#900) ---
   BETTER_TOGETHER: AchvCategory.COOP,
@@ -186,7 +187,7 @@ const ACHV_CATEGORY_OVERRIDES: Record<string, AchvCategory> = {
   GENEROUS_SOUL: AchvCategory.COOP,
   GUARDIAN_ANGEL: AchvCategory.COOP,
   SHARED_TRIUMPH: AchvCategory.COOP,
-  DOUBLE_TROUBLE_HELL: AchvCategory.COOP,
+  CENTURY_OF_TROUBLE: AchvCategory.COOP,
 
   // --- Battle: the Triple Battle feats (#900) ---
   THREES_COMPANY: AchvCategory.BATTLE,

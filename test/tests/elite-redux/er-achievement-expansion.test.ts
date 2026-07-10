@@ -71,6 +71,13 @@ const NEW_ACHVS: NewAchvSpec[] = [
     category: AchvCategory.VERSUS,
   },
   {
+    key: "THE_HOUSE_REMEMBERS",
+    localizationKey: "theHouseRemembers",
+    icon: "soul_dew",
+    score: 50,
+    category: AchvCategory.VERSUS,
+  },
+  {
     key: "FLAWLESS_DUEL",
     localizationKey: "flawlessDuel",
     icon: "focus_sash",
@@ -138,8 +145,8 @@ const NEW_ACHVS: NewAchvSpec[] = [
     category: AchvCategory.COOP,
   },
   {
-    key: "DOUBLE_TROUBLE_HELL",
-    localizationKey: "doubleTroubleHell",
+    key: "CENTURY_OF_TROUBLE",
+    localizationKey: "centuryOfTrouble",
     icon: "dread_plate",
     score: 100,
     category: AchvCategory.COOP,
@@ -257,6 +264,13 @@ const NEW_ACHVS: NewAchvSpec[] = [
     score: 100,
     category: AchvCategory.CHALLENGE,
   },
+  {
+    key: "PHANTOM_FORMATION",
+    localizationKey: "phantomFormation",
+    icon: "ghost_gem",
+    score: 120,
+    category: AchvCategory.CHALLENGE,
+  },
 ];
 
 /** Tier is derived purely from score (see Achv.getTier). */
@@ -284,8 +298,8 @@ describe("ER achievement expansion wave (#900) - registry + locale + category", 
     { name: string; name_female: string; description: string }
   >;
 
-  it("adds 43 new/revised achievements across Versus / Co-op / Triples / Shiny Lab / Challenge", () => {
-    expect(NEW_ACHVS).toHaveLength(43);
+  it("adds 45 new/revised achievements across Versus / Co-op / Triples / Shiny Lab / Challenge", () => {
+    expect(NEW_ACHVS).toHaveLength(45);
   });
 
   it("registers each with the expected id, localizationKey, icon, score, and tier", () => {
@@ -346,7 +360,7 @@ describe("ER achievement expansion wave (#900) - Shiny Lab effect gates", () => 
     DAVID_AND_GOLIATH: "camo",
     DYNAMIC_DUO: "duosunset",
     SHARED_TRIUMPH: "starmap",
-    DOUBLE_TROUBLE_HELL: "heatshimmer",
+    CENTURY_OF_TROUBLE: "heatshimmer",
     GHOST_TRIAD: "vortex",
     ONE_TURN_CLEAR: "neonwire",
     TRIAD_OF_HELL: "lavacracks",

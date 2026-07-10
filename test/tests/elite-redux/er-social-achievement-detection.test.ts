@@ -125,12 +125,38 @@ describe("#900 evaluateShowdownResult", () => {
     ).not.toContain("DAVID_AND_GOLIATH");
   });
 
-  it("a loss unlocks no win feats", () => {
+  it("a loss unlocks no WIN feats", () => {
+    // A plain (non-shiny) staked loss earns nothing (no participation floor reached either).
     const ids = evaluateShowdownResult(
-      { ...baseShowdown, won: false, staked: true, stakeShiny: true, ownTeamCost: 5, oppTeamCost: 30 },
+      { ...baseShowdown, won: false, staked: true, stakeShiny: false, ownTeamCost: 5, oppTeamCost: 30 },
       { matchesPlayed: 3, wins: 0 },
     );
     expect(ids).toEqual([]);
+  });
+
+  it("The House Remembers fires on a loss where a shiny was staked (loss-side consolation)", () => {
+    const shinyLoss = evaluateShowdownResult(
+      { ...baseShowdown, won: false, staked: true, stakeShiny: true },
+      { matchesPlayed: 3, wins: 0 },
+    );
+    expect(shinyLoss).toEqual(["THE_HOUSE_REMEMBERS"]);
+    // No win feats sneak in on a loss.
+    expect(shinyLoss).not.toContain("HIGH_ROLLER");
+    expect(shinyLoss).not.toContain("ALL_IN");
+    // A shiny-staked WIN earns the win feats, not the consolation.
+    const shinyWin = evaluateShowdownResult(
+      { ...baseShowdown, won: true, staked: true, stakeShiny: true },
+      { matchesPlayed: 3, wins: 1 },
+    );
+    expect(shinyWin).not.toContain("THE_HOUSE_REMEMBERS");
+    expect(shinyWin).toEqual(expect.arrayContaining(["HIGH_ROLLER", "ALL_IN"]));
+    // A non-shiny staked loss earns nothing.
+    expect(
+      evaluateShowdownResult(
+        { ...baseShowdown, won: false, staked: true, stakeShiny: false },
+        { matchesPlayed: 3, wins: 0 },
+      ),
+    ).not.toContain("THE_HOUSE_REMEMBERS");
   });
 });
 
@@ -160,10 +186,10 @@ describe("#900 evaluateCoopWaveWon", () => {
     expect(coop(200, { isWaveFinal: false })).not.toContain("DYNAMIC_DUO");
   });
 
-  it("Double Trouble needs wave 25+ AND Hell", () => {
-    expect(coop(25, { difficultyHell: true })).toContain("DOUBLE_TROUBLE_HELL");
-    expect(coop(25, { difficultyHell: false })).not.toContain("DOUBLE_TROUBLE_HELL");
-    expect(coop(24, { difficultyHell: true })).not.toContain("DOUBLE_TROUBLE_HELL");
+  it("Century of Trouble needs wave 100+ AND Hell", () => {
+    expect(coop(100, { difficultyHell: true })).toContain("CENTURY_OF_TROUBLE");
+    expect(coop(100, { difficultyHell: false })).not.toContain("CENTURY_OF_TROUBLE");
+    expect(coop(99, { difficultyHell: true })).not.toContain("CENTURY_OF_TROUBLE");
   });
 });
 

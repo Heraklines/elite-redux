@@ -534,11 +534,13 @@ export function getAchievementDescription(localizationKey: string): string {
     case "budgetChampion":
     case "ragsToRiches":
     case "apexPredator":
+    case "theHouseRemembers":
     case "cocytus":
     case "giudecca":
     case "theUpsideDown":
     case "monochromeRequiem":
     case "typecastTrio":
+    case "phantomFormation":
     case "highRoller":
     case "allIn":
     case "flawlessDuel":
@@ -553,7 +555,7 @@ export function getAchievementDescription(localizationKey: string): string {
     case "generousSoul":
     case "guardianAngel":
     case "sharedTriumph":
-    case "doubleTroubleHell":
+    case "centuryOfTrouble":
     case "threesCompany":
     case "tripleThreat":
     case "tripleDown":
@@ -1291,6 +1293,8 @@ export const achvs = {
   BUDGET_CHAMPION: new Achv("budgetChampion", "budgetChampion.description", "nugget", 50),
   RAGS_TO_RICHES: new Achv("ragsToRiches", "ragsToRiches.description", "big_nugget", 75),
   APEX_PREDATOR: new Achv("apexPredator", "apexPredator.description", "scope_lens", 75),
+  // Gambler's consolation: LOSE a shiny you staked in a Showdown wager (settlement takes it).
+  THE_HOUSE_REMEMBERS: new Achv("theHouseRemembers", "theHouseRemembers.description", "soul_dew", 50),
 
   // --- Co-op: shared-run feats --------------------------------------------
   CO_OP_INITIATE: new Achv("coOpInitiate", "coOpInitiate.description", "linking_cord", 25),
@@ -1302,7 +1306,8 @@ export const achvs = {
   GENEROUS_SOUL: new Achv("generousSoul", "generousSoul.description", "soul_dew", 25),
   GUARDIAN_ANGEL: new Achv("guardianAngel", "guardianAngel.description", "focus_sash", 50),
   SHARED_TRIUMPH: new Achv("sharedTriumph", "sharedTriumph.description", "legendary_egg", 100),
-  DOUBLE_TROUBLE_HELL: new Achv("doubleTroubleHell", "doubleTroubleHell.description", "dread_plate", 100),
+  // Reach wave 100 in co-op on Hell (renamed + retuned from the old wave-25 Double Trouble).
+  CENTURY_OF_TROUBLE: new Achv("centuryOfTrouble", "centuryOfTrouble.description", "dread_plate", 100),
 
   // --- Battle: Triple Battle feats ----------------------------------------
   THREES_COMPANY: new Achv("threesCompany", "threesCompany.description", "multi_lens", 25),
@@ -1377,6 +1382,17 @@ export const achvs = {
       && challengeActive(Challenges.TRIPLES_ONLY)
       && !inverseAndFlipStatAchievementsBlock()
       && !passivesChallengeAchievementsBlock(),
+  ),
+  // Win a run with Triples Only + Ghost Trainers both active, at ANY difficulty. Same
+  // challenge-stack detection pattern as COCYTUS (fired from the game-over ChallengeAchv
+  // loop); a full-run clear, so the +2 Premium run-completion bonus applies and it gates
+  // the Double Team ("echoes") aura via ER_SHINY_LAB_EFFECT_ACHV.
+  PHANTOM_FORMATION: new ChallengeAchv(
+    "phantomFormation",
+    "phantomFormation.description",
+    "ghost_gem",
+    120,
+    () => challengeActive(Challenges.TRIPLES_ONLY) && challengeActive(Challenges.GHOST_TRAINERS),
   ),
 };
 
