@@ -42,8 +42,8 @@
 // it is exhaustively unit-testable headlessly.
 // =============================================================================
 
-import { coopLog } from "#data/elite-redux/coop/coop-debug";
-import type { CoopMessage } from "#data/elite-redux/coop/coop-transport";
+import { coopLog, coopWarn } from "#data/elite-redux/coop/coop-debug";
+import type { CoopMessage, CoopTransport } from "#data/elite-redux/coop/coop-transport";
 
 /** The wire `t` values of a co-op message (the discriminant of the CoopMessage union). */
 export type CoopMessageType = CoopMessage["t"];
@@ -391,6 +391,29 @@ export class CoopJournal {
   classes(): string[] {
     return [...this.byClass.keys()];
   }
+
+  /**
+   * The per-class high-water marks, for persistence into the session save (§1.4/§4). A COLD resume restores
+   * these so the committed-op revision stream continues MONOTONICALLY across the save boundary rather than
+   * resetting to 0 - which keeps ownership parity + revision ordering stable through a resume.
+   */
+  serializeHighWater(): Record<string, number> {
+    const out: Record<string, number> = {};
+    for (const [cls, seq] of this.highWater) {
+      out[cls] = seq;
+    }
+    return out;
+  }
+
+  /** Restore per-class high-water marks (§4) from a persisted snapshot; a later commit continues past them. */
+  restoreHighWater(marks: Record<string, number>): void {
+    for (const cls of Object.keys(marks)) {
+      const seq = marks[cls];
+      if (Number.isFinite(seq) && seq > (this.highWater.get(cls) ?? 0)) {
+        this.highWater.set(cls, seq);
+      }
+    }
+  }
 }
 
 // -----------------------------------------------------------------------------
@@ -444,5 +467,196 @@ export class CoopReceiveLedger {
    */
   adoptSnapshot(cls: string, seq: number): void {
     this.markApplied(cls, seq);
+  }
+
+  /** The classes this receiver has applied at least one op for (to request a tail per class on reconnect). */
+  serializeClasses(): string[] {
+    return [...this.lastApplied.keys()];
+  }
+
+  /** The per-class applied marks, for persistence into the session save (§4). */
+  serialize(): Record<string, number> {
+    const out: Record<string, number> = {};
+    for (const [cls, seq] of this.lastApplied) {
+      out[cls] = seq;
+    }
+    return out;
+  }
+
+  /** Restore per-class applied marks (§4) from a persisted snapshot. */
+  restore(marks: Record<string, number>): void {
+    for (const cls of Object.keys(marks)) {
+      this.markApplied(cls, marks[cls]);
+    }
+  }
+}
+
+// -----------------------------------------------------------------------------
+// CoopDurabilityManager (§4.2/§4.4): the ACK / resend / reconnect protocol engine
+// -----------------------------------------------------------------------------
+
+/**
+ * How the manager identifies + applies an inbound COMMITTED operation. Kept GENERIC (a `(class, seq)`
+ * extractor + an apply callback) so the Wave-2a operation envelope plugs in as one class keyed by
+ * `revision` WITHOUT this module importing the envelope type. When `extractKey` is absent the manager only
+ * runs the ACK/reconnect protocol (a passive scaffold - no inbound op is ever applied), which is exactly
+ * the production state UNTIL Wave-2a commits its first op.
+ */
+export interface CoopDurabilityHooks {
+  /**
+   * Extract the `(class, seq)` key of an inbound message that IS a committed durable op, or null if the
+   * message is not a durable op (the manager ignores it). Wave-2a returns `{cls:"envelope", seq:revision}`.
+   */
+  extractKey?: (msg: CoopMessage) => { cls: string; seq: number } | null;
+  /** Apply an in-order committed op to shared state (the receiver's ONE mutation site). */
+  apply?: (entry: CoopJournalEntry) => void;
+  /**
+   * Serve a FULL SNAPSHOT at head for a class when a reconnect gap is deeper than the ring (§4.4). Optional;
+   * when absent the manager replays whatever the ring holds (the existing per-surface snapshot heal covers
+   * the deep gap in that case, so this is not required for correctness of the shallow-gap path).
+   */
+  sendFullSnapshot?: (cls: string, headRevision: number) => void;
+}
+
+/**
+ * The application-level durability engine (§4.2/§4.4). ONE per live session; both clients hold one. It:
+ *  - (committer) `commit(cls, seq, msg)` journals a committed op and broadcasts it; `reconnect()` resends
+ *    the committed-but-unacked tail (or replies to a peer's `coopResync` with the tail / a full snapshot);
+ *  - (receiver) applies an inbound durable op idempotently by `(class, seq)` (§1.6), ACKs cumulatively, and
+ *    on a revision GAP or a hot rejoin requests the tail via `coopResync`.
+ *
+ * Engine-free: it touches only the injected {@linkcode CoopTransport} + the journal/ledger. It installs ONE
+ * `onMessage` handler for the `coopAck` / `coopResync` arms and (when `extractKey` is provided) the durable
+ * op stream. Idempotent + safe to leave inert (no `extractKey`) as a scaffold.
+ */
+export class CoopDurabilityManager {
+  private readonly journal: CoopJournal;
+  private readonly ledger = new CoopReceiveLedger();
+  private readonly off: () => void;
+
+  constructor(
+    private readonly transport: CoopTransport,
+    private readonly hooks: CoopDurabilityHooks = {},
+    journalCapacity = 256,
+  ) {
+    this.journal = new CoopJournal(journalCapacity);
+    this.off = transport.onMessage(msg => this.onMessage(msg));
+  }
+
+  /**
+   * COMMIT a durable op (committer side): journal it (so it can be resent/replayed) then broadcast it. The
+   * broadcast rides the transport's outbound queue, so a send while the channel is dark is not lost (§4.3).
+   * `seq` MUST be monotonic per class (the envelope's `revision`).
+   */
+  commit(cls: string, seq: number, msg: CoopMessage): void {
+    this.journal.commit(cls, seq, msg);
+    this.transport.send(msg);
+  }
+
+  /** Handle an inbound wire message: the ACK/reconnect arms, plus (if wired) the durable op stream. */
+  private onMessage(msg: CoopMessage): void {
+    if (msg.t === "coopAck") {
+      this.journal.ack(msg.cls, msg.seq);
+      return;
+    }
+    if (msg.t === "coopResync") {
+      this.serveResync(msg.cls, msg.from);
+      return;
+    }
+    const key = this.hooks.extractKey?.(msg) ?? null;
+    if (key == null) {
+      return; // not a durable op (or no receiver wired) - ignore
+    }
+    this.receiveOp(key.cls, key.seq, msg);
+  }
+
+  /** Receiver: apply an inbound committed op idempotently by `(cls, seq)` (§1.6), then ACK / request tail. */
+  private receiveOp(cls: string, seq: number, msg: CoopMessage): void {
+    if (this.ledger.isDuplicate(cls, seq)) {
+      // Already applied (a safe resend, §4.2): re-ACK so the committer stops resending, do NOT re-apply.
+      this.transport.send({ t: "coopAck", cls, seq: this.ledger.appliedThrough(cls) });
+      return;
+    }
+    if (this.ledger.hasGap(cls, seq)) {
+      // A revision was missed: do NOT apply out of order - request the tail after our last-applied (§4.4).
+      coopWarn("durability", `gap cls=${cls} got=${seq} have=${this.ledger.appliedThrough(cls)} -> request tail`);
+      this.transport.send({ t: "coopResync", cls, from: this.ledger.appliedThrough(cls) });
+      return;
+    }
+    // In order: apply, advance, ACK cumulatively.
+    this.hooks.apply?.({ cls, seq, msg });
+    this.ledger.markApplied(cls, seq);
+    this.transport.send({ t: "coopAck", cls, seq });
+  }
+
+  /** Committer: serve a peer's reconnect request - replay the journal tail after `from`, or a full snapshot. */
+  private serveResync(cls: string, from: number): void {
+    if (this.journal.needsFullSnapshot(cls, from)) {
+      const head = this.journal.highWaterMark(cls);
+      coopLog("durability", `resync cls=${cls} from=${from} DEEPER than ring -> full snapshot at head=${head}`);
+      this.hooks.sendFullSnapshot?.(cls, head);
+      // Still replay whatever the ring holds after the snapshot's head is caught up elsewhere; if no snapshot
+      // hook is wired, the ring replay below is the best-effort heal (the per-surface snapshot covers the rest).
+    }
+    const tail = this.journal.tailFrom(cls, from);
+    coopLog("durability", `resync cls=${cls} from=${from} -> replay ${tail.length} entries`);
+    for (const e of tail) {
+      this.transport.send(e.msg);
+    }
+  }
+
+  /**
+   * RECONNECT (§4.4), called after a #805 hot rejoin's channel swap. Symmetric + idempotent:
+   *  - committer: resend the committed-but-unacked tail for every class (a message lost in the blip that
+   *    was committed-but-unacked is recovered here - the piece the buffer purge dropped before W2b);
+   *  - receiver: request the tail after our last-applied revision for every class we have applied, so a
+   *    committed op we never saw is replayed. Both are no-ops when there is nothing owed.
+   */
+  reconnect(): void {
+    // Committer side: proactively resend the unacked tail (the peer may have missed the last broadcasts).
+    for (const cls of this.journal.classes()) {
+      const tail = this.journal.resendTail(cls);
+      if (tail.length > 0) {
+        coopLog("durability", `reconnect resend cls=${cls} unacked=${tail.length}`);
+        for (const e of tail) {
+          this.transport.send(e.msg);
+        }
+      }
+    }
+    // Receiver side: request the tail after our last-applied revision for every class we track.
+    for (const cls of this.ledger.serializeClasses()) {
+      this.transport.send({ t: "coopResync", cls, from: this.ledger.appliedThrough(cls) });
+    }
+  }
+
+  /** Journal depth (retained committed entries) - surfaced in the health line + control-plane block. */
+  journalDepth(): number {
+    return this.journal.depth();
+  }
+
+  /** Committed-but-unacked count - surfaced in the health line + control-plane block. */
+  unackedCount(): number {
+    return this.journal.unackedCount();
+  }
+
+  /** The committer's per-class high-water marks (for session-save persistence, §4). */
+  highWaterMarks(): Record<string, number> {
+    return this.journal.serializeHighWater();
+  }
+
+  /** The receiver's per-class applied marks (for session-save persistence, §4). */
+  appliedMarks(): Record<string, number> {
+    return this.ledger.serialize();
+  }
+
+  /** Restore persisted high-water + applied marks on a cold resume (§4), so revisions continue monotonically. */
+  restore(highWater: Record<string, number>, applied: Record<string, number>): void {
+    this.journal.restoreHighWater(highWater);
+    this.ledger.restore(applied);
+  }
+
+  /** Tear down the wire handler. */
+  dispose(): void {
+    this.off();
   }
 }

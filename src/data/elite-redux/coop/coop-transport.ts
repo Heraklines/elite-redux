@@ -1209,6 +1209,28 @@ export type CoopMessage =
   /** Guest -> host on rejoin: request the committed-op journal tail past `lastAppliedRevision` (§4.4). */
   | { t: "reconnectSync"; epoch: number; lastAppliedRevision: number }
   // ===========================================================================
+  // W2b APPLICATION-LEVEL DURABILITY (contract doc §4.2/§4.4): the ACK + reconnect
+  // arms of the durability layer. Purely additive `t` values keyed on a GENERIC
+  // (class, seq) pair so the Wave-2a operation envelope plugs in later as one
+  // journaled class keyed by `revision` (envelopeAck / reconnectSync in the doc are
+  // the envelope-specialized names of exactly these). A client that never learns
+  // durability ignores them via the unknown-`t` default arm (forward-safe).
+  // ===========================================================================
+  /**
+   * Receiver -> committer (§4.2): a CUMULATIVE acknowledgement that this client has APPLIED committed class
+   * `cls` through revision `seq`. The committer tracks it and stops resending everything at/below `seq`;
+   * anything above is the resend tail. Cumulative (not per-frame) so it stays cheap on the 5s-keepalive
+   * channel - the guest acks its last-applied revision, not every frame.
+   */
+  | { t: "coopAck"; cls: string; seq: number }
+  /**
+   * Receiver -> committer (§4.4, reconnect-from-revision): "resend class `cls`'s committed tail after
+   * revision `from`". Sent on a #805 hot rejoin (carrying the last-applied revision instead of a turn, the
+   * successor of `requestStateSync`). The committer replays the journal tail after `from`, or falls back to
+   * a full `stateSync` snapshot when the gap is deeper than the journal ring.
+   */
+  | { t: "coopResync"; cls: string; from: number }
+  // ===========================================================================
   // Showdown 1v1 PvP (A4): additive wire messages layered on the SAME co-op
   // transport. Purely new `t` values, so a co-op client that never speaks Showdown
   // ignores them via the unknown-kind default arm (forward-safe, same rule as above).
@@ -1353,6 +1375,10 @@ function summarizeCoopMessage(msg: CoopMessage): string {
       return "(re)request";
     case "rendezvous":
       return `point=${msg.point}`;
+    case "coopAck":
+      return `cls=${msg.cls} seq=${msg.seq}`;
+    case "coopResync":
+      return `cls=${msg.cls} from=${msg.from}`;
     case "showdownStakeOffer":
       return `offer=sp${msg.offer.speciesId} shiny=${msg.offer.shiny} v=${msg.offer.variant} cost=${msg.offer.cost}`;
     case "showdownStakeLock":
