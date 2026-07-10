@@ -559,13 +559,33 @@ deterministic sequencer order that keeps the shared-scene chain intact is FRAGME
 stub-scene file first has no real scene to chain, and 2-17 files fail NONDETERMINISTICALLY (every one
 passing solo), plus heavy duo files time out under ~11-fork load (#879).
 
-The gate fixes this with SCHEDULING ONLY (no assertion is weakened). It splits the dir into three lanes -
-A (engine-free / light), B (heavy duo + engine), C (soak) - and runs each in a SINGLE worker with
-`--no-file-parallelism` (deterministic order, no fork fragmentation), one lane at a time (no contention).
-`exit 0 = all gating lanes green`. Flags: `--list` prints the lane composition, `--lane A|B|C` runs one.
-Files that fail PRE-EXISTINGLY (nonzero even SOLO on a clean HEAD - not a scheduling issue) live in the
-script's `QUARANTINE` map and run in a loud NON-GATING pass; fix those separately, never by weakening the
-gate. When you add a co-op test, it is auto-categorized by filename + ER_SCENARIO gate - no gate edit needed.
+The gate fixes this with SCHEDULING ONLY (no assertion is weakened). It splits the dir into four lanes -
+A (engine-free / light), B (heavy duo + engine), C (soak, harness fidelity), P (production-fidelity soak) -
+and runs each in a SINGLE worker with `--no-file-parallelism` (deterministic order, no fork fragmentation),
+one lane at a time (no contention). `exit 0 = all gating lanes green`. Flags: `--list` prints the lane
+composition, `--lane A|B|C|P` runs one. Files that fail PRE-EXISTINGLY (nonzero even SOLO on a clean HEAD -
+not a scheduling issue) live in the script's `QUARANTINE` map and run in a loud NON-GATING pass; fix those
+separately, never by weakening the gate. When you add a co-op test, it is auto-categorized by filename +
+ER_SCENARIO gate - no gate edit needed.
+
+**LANE P - the GATING production-fidelity soak (#897).** Lane C runs the soaks in the driver's DEFAULT
+"harness" fidelity: the driver heals the guest through convenient seams a live client never takes (a full
+per-wave re-mirror of the guest player party + `healGuestFromHost`, and guest commands read from the HOST's
+authoritative slot), which keeps the soak fast + green but MASKS the "guest replay has DRIFTED" divergence
+class live co-op still hits. Lane P runs ONE bounded soak (`coop-soak-fidelity-gate.test.ts`) with
+`SOAK_FIDELITY=production` (env supplied by the lane, `SOAK_WAVES=PROD_FIDELITY_GATE_WAVES`): NO harness
+heals (the guest heals only via the production checksum-mismatch resync analogue) and guest commands are
+sourced from the guest's OWN rendered scene, so a stale guest fails LOUDLY. It is GATING and, crucially,
+does NOT swallow a hard invariant: the non-gating *evidence* test `coop-soak-fidelity.test.ts` (also in the
+dir) catches a hard LOCKSTEP/NO-PARK/TEARDOWN breach and reports it as a "classified terminal", asserting
+only that wave 1 ran (so a breach after wave 1 still passes - the reviewer's finding); the lane-P gate test
+lets `SoakInvariantError` throw, so any hard-invariant breach = nonzero exit = GATE RED, and it asserts the
+FULL bounded wave count was surveyed (anti-silent-pass-after-wave-1). The SOFTER co-op-fidelity classes
+(unhealed DIGEST divergences - the #891 guest money-lag class - and the per-turn production checksum
+ASSERTION count) are gated only where they hold CLEAN at the bounded depth on HEAD; a still-open class is
+scoped OUT report-only behind a `HONEST_*_GATE` constant with a loud TODO naming it + #891 (honest scoping,
+never a weakened assertion). Lane P is bounded to `PROD_FIDELITY_GATE_WAVES` waves to stay wall-clock-cheap;
+the long 35/150-wave god soak stays in the evidence test / the nightly job.
 
 ## Record -> Replay - a reported bug ships with a replayable trace (#record-replay)
 
