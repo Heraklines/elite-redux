@@ -16,8 +16,19 @@
 // rest of the app initialises.
 // =============================================================================
 
-/** Maximum number of retained log lines (oldest are dropped first). */
-const LIMIT = 250;
+/**
+ * Maximum number of retained log lines (oldest are dropped first).
+ *
+ * Sized for CO-OP triage (#diagnostics): verbose co-op logging is ON by default (see
+ * `coop-debug.ts` `COOP_DEBUG_DEFAULT`), so a live session emits many lines/second (per-transport
+ * frame, per-battle-event, the 30s health line). At the old 250-line cap the INITIATING event of a
+ * hang scrolled out of the buffer within seconds, so a "Report a bug" / "Send Logs" capture taken
+ * once the player noticed the freeze no longer contained the cause. 2000 lines keeps roughly a
+ * minute+ of that verbose stream so the trigger survives to triage. Cost is memory-only and small:
+ * each entry is capped at {@linkcode MAX_LINE_CHARS} and lines are typically short, so the buffer is
+ * well under a couple hundred KB even when full - it is never serialized except in a report.
+ */
+const LIMIT = 2000;
 
 /** Max characters kept per line, to bound a single huge log entry. */
 const MAX_LINE_CHARS = 2000;
