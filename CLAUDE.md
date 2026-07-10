@@ -549,6 +549,24 @@ next file's `beforeEach` captures, so even back-to-back swapping files chain a r
 only bites full-directory ER_SCENARIO runs (CI's default suite skips these), so it slips a single-file
 green - always run the WHOLE `coop/` dir before shipping a new co-op test.
 
+### 🔴 Running the whole `coop/` dir - use the GATE, not a bare `vitest run` (#879)
+
+**Run `pnpm coop:gate` (script: `scripts/run-coop-gate.mjs`). That IS the "run the whole `coop/` dir"
+command now - one green run = the co-op dir is shippable.** Do NOT ship off a bare
+`ER_SCENARIO=1 npx vitest run test/tests/elite-redux/coop/`: vitest's default pool spreads the 136 files
+across ~one-fork-per-core workers, and with `isolate: false` each fork has its OWN `globalScene`, so the
+deterministic sequencer order that keeps the shared-scene chain intact is FRAGMENTED - a fork that gets a
+stub-scene file first has no real scene to chain, and 2-17 files fail NONDETERMINISTICALLY (every one
+passing solo), plus heavy duo files time out under ~11-fork load (#879).
+
+The gate fixes this with SCHEDULING ONLY (no assertion is weakened). It splits the dir into three lanes -
+A (engine-free / light), B (heavy duo + engine), C (soak) - and runs each in a SINGLE worker with
+`--no-file-parallelism` (deterministic order, no fork fragmentation), one lane at a time (no contention).
+`exit 0 = all gating lanes green`. Flags: `--list` prints the lane composition, `--lane A|B|C` runs one.
+Files that fail PRE-EXISTINGLY (nonzero even SOLO on a clean HEAD - not a scheduling issue) live in the
+script's `QUARANTINE` map and run in a loud NON-GATING pass; fix those separately, never by weakening the
+gate. When you add a co-op test, it is auto-categorized by filename + ER_SCENARIO gate - no gate edit needed.
+
 ## Record -> Replay - a reported bug ships with a replayable trace (#record-replay)
 
 🔴 **The point: a live bug report carries a deterministic `ReplayTrace`, and the harness re-runs that
