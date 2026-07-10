@@ -457,9 +457,19 @@ export class TitlePhase extends Phase {
       defaultName,
       {
         openStarterSelect: (onLockIn, onCancel, seed) => {
-          const openGrid = () => {
-            globalScene.ui
-              .setMode(
+          // Live fix #3 (2026-07-10): NO showText hop. Fix #2's awaited-MESSAGE chain logged
+          // "MESSAGE settled" live and then went silent - `showText("", ...)` on the real
+          // MessageUiHandler never invoked its callback for empty text, so openGrid() never ran.
+          // (The Team Menu's identical-looking bounce works only because ITS showText runs on the
+          // title-context handler, which does fire.) The hop added nothing but that risk: open the
+          // grid DIRECTLY with awaited transitions and a breadcrumb at every step, so any residual
+          // live failure names its exact step in the console instead of a silent no-op.
+          void (async () => {
+            try {
+              await globalScene.ui.setMode(UiMode.MESSAGE);
+              globalScene.ui.resetModeChain();
+              console.log(`[showdown-build] MESSAGE settled -> opening starter-select (seed=${seed.length})`);
+              await globalScene.ui.setMode(
                 UiMode.STARTER_SELECT,
                 (starters: Starter[]) => {
                   globalScene.ui.clearText();
@@ -474,33 +484,10 @@ export class TitlePhase extends Phase {
                     onCancel();
                   },
                 },
-              )
-              // Surface (don't silently swallow) a failed open so a live regression leaves a console
-              // breadcrumb instead of an inert "nothing happened" screen.
-              .catch(err => console.error("[showdown-build] starter-select open failed", err));
-          };
-          // Open via the DEFERRED MESSAGE pattern (mirrors openShowdownTeamMenu / openProfileHub). The
-          // CREATE/EDIT path arrives here from INSIDE the Team Menu's CONFIRM yes-callback
-          // (`revertMode().then(onCreate)`); opening a transition-mode screen (STARTER_SELECT is in
-          // `transitionModes`) directly on top of that confirm teardown left the grid unshown on the
-          // LIVE client ("pressing create doesn't take me to starter select"). Bouncing through MESSAGE
-          // + resetModeChain first hands setMode a clean, settled mode to transition FROM - the same
-          // reason the Team Menu itself is opened this way. resetModeChain is safe: the build never
-          // reverts back to the menu (it reopens it via showMenu in `settle`).
-          // SEQUENCED, not fire-and-forget (live fix #2, 2026-07-10): the previous chain issued
-          // setMode(MESSAGE) UNAWAITED and ran resetModeChain()+showText() synchronously while the
-          // Team Menu (a transition screen) was still tearing down - the text callback landed on the
-          // wrong handler and openGrid() was never invoked: silent no-op, player stranded on the
-          // menu, no breadcrumb (nothing rejected). Await MESSAGE first so showText provably runs on
-          // the MESSAGE handler, then open the grid from a settled mode.
-          void (async () => {
-            try {
-              await globalScene.ui.setMode(UiMode.MESSAGE);
-              globalScene.ui.resetModeChain();
-              console.log(`[showdown-build] MESSAGE settled -> opening starter-select (seed=${seed.length})`);
-              globalScene.ui.showText("", null, () => openGrid());
+              );
+              console.log("[showdown-build] starter-select OPEN");
             } catch (err) {
-              console.error("[showdown-build] MESSAGE bounce failed", err);
+              console.error("[showdown-build] starter-select open failed", err);
             }
           })();
         },
