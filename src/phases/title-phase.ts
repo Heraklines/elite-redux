@@ -487,9 +487,22 @@ export class TitlePhase extends Phase {
           // + resetModeChain first hands setMode a clean, settled mode to transition FROM - the same
           // reason the Team Menu itself is opened this way. resetModeChain is safe: the build never
           // reverts back to the menu (it reopens it via showMenu in `settle`).
-          globalScene.ui.setMode(UiMode.MESSAGE);
-          globalScene.ui.resetModeChain();
-          globalScene.ui.showText("", null, () => openGrid());
+          // SEQUENCED, not fire-and-forget (live fix #2, 2026-07-10): the previous chain issued
+          // setMode(MESSAGE) UNAWAITED and ran resetModeChain()+showText() synchronously while the
+          // Team Menu (a transition screen) was still tearing down - the text callback landed on the
+          // wrong handler and openGrid() was never invoked: silent no-op, player stranded on the
+          // menu, no breadcrumb (nothing rejected). Await MESSAGE first so showText provably runs on
+          // the MESSAGE handler, then open the grid from a settled mode.
+          void (async () => {
+            try {
+              await globalScene.ui.setMode(UiMode.MESSAGE);
+              globalScene.ui.resetModeChain();
+              console.log(`[showdown-build] MESSAGE settled -> opening starter-select (seed=${seed.length})`);
+              globalScene.ui.showText("", null, () => openGrid());
+            } catch (err) {
+              console.error("[showdown-build] MESSAGE bounce failed", err);
+            }
+          })();
         },
         promptName: (def, onName) => {
           globalScene.ui.setOverlayMode(

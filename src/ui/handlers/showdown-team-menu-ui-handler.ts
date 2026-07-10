@@ -300,7 +300,10 @@ export class ShowdownTeamMenuUiHandler extends UiHandler {
   private confirmRow(): boolean {
     const cfg = this.config!;
     if (this.onCreateRow) {
-      this.prompt("Create a new team?", () => cfg.onCreate?.());
+      // Maintainer (live, 2026-07-10): NO yes/no prompt on create - confirm goes STRAIGHT into the
+      // build flow. This also removes the revertMode()-race the prompt introduced (the unawaited
+      // overlay teardown swallowed the build flow's MESSAGE bounce, stranding the player back here).
+      cfg.onCreate?.();
       return true;
     }
     const preset = this.hoveredPreset();
