@@ -12,6 +12,7 @@ import { coopLog, coopWarn } from "#data/elite-redux/coop/coop-debug";
 import { adoptCoopEnemiesStructural } from "#data/elite-redux/coop/coop-enemy-builder";
 import type { CoopInteractionChoice } from "#data/elite-redux/coop/coop-interaction-relay";
 import { meBattleHandoffKey } from "#data/elite-redux/coop/coop-me-battle-handoff";
+import { adoptMeWatcherChoice, commitMeOwnerIntent } from "#data/elite-redux/coop/coop-me-operation";
 import {
   coopMeHandoffBattleStarted,
   coopMeInteractionStartValue,
@@ -410,6 +411,19 @@ export class CoopReplayMePhase extends Phase {
     }
     coopLog("me", "guest relays top-level ME pick", { seq: this.seq, kind: ME_CHOICE_KIND, index });
     relay.sendInteractionChoice(this.seq, ME_CHOICE_KIND, index); // P1 on seq_me
+    // Wave-2c: DUAL-RUN - additionally mint the typed ME_PICK intent through the authoritative operation
+    // primitive. The guest OWNS this pick (odd counter); it mints the intent here, the HOST commits it on
+    // its adopt seam (coopHostAwaitGuestIndex). No-op when the flag is OFF; the legacy relay above is the
+    // fallback and stays live either way. Never throws.
+    commitMeOwnerIntent({
+      kind: "ME_PICK",
+      seq: this.seq,
+      pinned: this.interactionCounter,
+      payload: { optionIndex: index },
+      localRole: getCoopController()?.role ?? "guest",
+      wave: globalScene.currentBattle?.waveIndex ?? -1,
+      turn: 0,
+    });
     // #831: for a REPEATED option-select round (delve / Safari) beginNewRound reset pickSent so THIS pick is
     // allowed, and this re-armed race INHERITS the live 9M terminal arm (awaitOutcomeThenTerminal reads
     // this.liveTerminalArm) rather than re-awaiting the inbox - a fast host's buffered LEAVE is never lost.
@@ -420,9 +434,25 @@ export class CoopReplayMePhase extends Phase {
    * GUEST-OWNED ME sub-pick (#633 BLOCK-3): a party-target slot or a secondary-option index. Relayed on
    * the SAME seq_me (CHOICE inbox, FIFO); the host consumes one per sub-prompt site (ADD-2b).
    */
+  /** Wave-2c: monotonic sub-pick ordinal within this ME (party/secondary/catch-full sub-picks FIFO on seq_me),
+   *  so every sub-pick of the SAME ME mints a DISTINCT ME_SUB operationId (the multi-step delta over biome). */
+  private subPickStep = 0;
+
   public relayGuestSubPick(value: number): void {
     coopLog("me", "guest relays ME sub-pick", { seq: this.seq, kind: ME_SUBPICK_KIND, value });
     getCoopInteractionRelay()?.sendInteractionChoice(this.seq, ME_SUBPICK_KIND, value); // P1b on seq_me (FIFO)
+    // Wave-2c: DUAL-RUN - mint the typed ME_SUB intent (the guest owner's captured slot/index). The step
+    // ordinal disambiguates repeated sub-picks that FIFO on the same seq. No-op when the flag is OFF.
+    commitMeOwnerIntent({
+      kind: "ME_SUB",
+      seq: this.seq,
+      pinned: this.interactionCounter,
+      step: this.subPickStep++,
+      payload: { value },
+      localRole: getCoopController()?.role ?? "guest",
+      wave: globalScene.currentBattle?.waveIndex ?? -1,
+      turn: 0,
+    });
   }
 
   /**
@@ -735,21 +765,42 @@ export class CoopReplayMePhase extends Phase {
    * `settled` guard inside finishWithoutLeaving / leaveDefensive.
    */
   private handleTerminalAction(action: CoopInteractionChoice | null): void {
+    // Wave-2c (#859/#860 phantom class): gate the terminal through the authoritative operation primitive.
+    // The host STATES the ME's resolution (leave vs battle) on the committed ME_TERMINAL op, so the watcher
+    // routes its terminal off the OPERATION, never by inferring "there is a battle turn" from a leftover
+    // battle chain. DUAL-RUN: the legacy 9M sentinel still carries the resolution and is the fallback; the
+    // op's stated terminal (derived from the SAME sentinel) is preferred when adopted, so routing is
+    // byte-identical while the decision is now operation-derived. A stale battle-handoff from an EARLIER ME
+    // is REJECTED by the gate (adopt:false), so it can never build the phantom battle chain (#859).
+    const legacyIsBattle = action != null && action.choice === COOP_ME_BATTLE_HANDOFF;
+    const terminalDecision = adoptMeWatcherChoice({
+      kind: "ME_TERMINAL",
+      seq: this.seqTerm,
+      pinned: this.interactionCounter,
+      res: action == null ? null : { choice: action.choice, data: action.data },
+      terminal: legacyIsBattle ? "battle" : "leave",
+      hostTurn: action?.data?.[0],
+      localRole: getCoopController()?.role ?? "guest",
+      wave: globalScene.currentBattle?.waveIndex ?? -1,
+      turn: 0,
+    });
+    const isBattleTerminal = terminalDecision.adopt ? terminalDecision.terminal === "battle" : legacyIsBattle;
     coopLog("me", "host terminal resolved", {
       seqTerm: this.seqTerm,
       action: action == null ? "null" : action.choice,
-      isHandoff: action?.choice === COOP_ME_BATTLE_HANDOFF,
+      isHandoff: isBattleTerminal,
+      viaOperation: terminalDecision.adopt,
     });
     try {
       // The host spawned a battle from this ME (#633 ME battle handoff): do NOT leave the
       // encounter. End here so the existing host-authoritative ME-battle path runs (the guest
       // already adopts the host's boss + replays the spawned battle via the battle relay).
-      if (action != null && action.choice === COOP_ME_BATTLE_HANDOFF) {
-        coopLog("me", "battle-handoff sentinel on seq_term; finishing without leaving", {
+      if (isBattleTerminal) {
+        coopLog("me", "battle-handoff terminal (operation-stated); finishing without leaving", {
           seqTerm: this.seqTerm,
-          hostTurn: action.data?.[0],
+          hostTurn: action?.data?.[0],
         });
-        this.finishWithoutLeaving(action.data?.[0]);
+        this.finishWithoutLeaving(action?.data?.[0]);
         return;
       }
     } catch {

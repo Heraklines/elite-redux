@@ -6,6 +6,7 @@ import { captureCoopChecksum, captureCoopMeOutcome } from "#data/elite-redux/coo
 import { COOP_WAVE_NO_ME } from "#data/elite-redux/coop/coop-battle-stream";
 import { coopLog, coopWarn } from "#data/elite-redux/coop/coop-debug";
 import { COOP_INTERACTION_LEAVE } from "#data/elite-redux/coop/coop-interaction-relay";
+import { commitMeOwnerIntent } from "#data/elite-redux/coop/coop-me-operation";
 import {
   coopMeHandoffBattleStarted,
   coopMeInProgress,
@@ -189,6 +190,22 @@ function coopEndMePump(): void {
     const termSeq = COOP_ME_TERM_SEQ_BASE + coopMeInteractionStartValue();
     coopLog("me", "post-handoff ME END: sending TRUE leave terminal (#822)", { termSeq });
     relay?.sendInteractionChoice(termSeq, "meBtn", COOP_INTERACTION_LEAVE);
+  }
+  // Wave-2c: DUAL-RUN - commit the typed ME_TERMINAL {leave} op (the host states the ME resolved as a
+  // non-battle leave). For a post-battle-handoff ME this is the TRUE ME-end leave (step 1, distinct id
+  // from the earlier battle-handoff terminal committed at coopMeOwnerRelayBattleHandoff step 0); a plain
+  // non-battle ME uses step 0. No-op when the flag is OFF. Host-driven regardless of who owns the ME.
+  if (controller.role === "host") {
+    commitMeOwnerIntent({
+      kind: "ME_TERMINAL",
+      seq: COOP_ME_TERM_SEQ_BASE + coopMeInteractionStartValue(),
+      pinned: coopMeInteractionStartValue(),
+      step: coopMeHandoffBattleStarted() ? 1 : 0,
+      payload: { terminal: "leave" },
+      localRole: "host",
+      wave: globalScene.currentBattle?.waveIndex ?? -1,
+      turn: 0,
+    });
   }
   pump.endOwner();
   // Both clients advance LOCALLY + idempotently (keyed to the ME's start counter), so the
@@ -381,6 +398,18 @@ export class MysteryEncounterPhase extends Phase {
         tokens: Object.keys(present.tokens).length,
       });
       getCoopInteractionRelay()?.sendInteractionOutcome(seqMe, "mePresent", present);
+      // Wave-2c: DUAL-RUN - commit the typed ME_PRESENT op (the host-authoritative ME-presence verdict,
+      // #862). Host-driven regardless of who owns the ME (the host is the sole engine, #693). No-op when
+      // the flag is OFF; the legacy presentation stream above is the fallback and stays live either way.
+      commitMeOwnerIntent({
+        kind: "ME_PRESENT",
+        seq: seqMe,
+        pinned: coopMeInteractionStartValue(),
+        payload: { present: true },
+        localRole: getCoopController()?.role ?? "host",
+        wave: globalScene.currentBattle?.waveIndex ?? -1,
+        turn: 0,
+      });
     } catch {
       coopWarn("me", "host presentation send threw; guest degrades to local re-derivation", {
         counter: coopMeInteractionStartValue(),
@@ -463,6 +492,17 @@ export class MysteryEncounterPhase extends Phase {
         index: choice.choice,
         encounter: MysteryEncounterType[encounter.encounterType],
       });
+      // Wave-2c: DUAL-RUN - the AUTHORITY (host) COMMITS the guest-owned ME_PICK it just received
+      // (invariant 3, the guest minted the intent at handleGuestOptionSelect). No-op when the flag is OFF.
+      commitMeOwnerIntent({
+        kind: "ME_PICK",
+        seq: seqMe,
+        pinned: coopMeInteractionStartValue(),
+        payload: { optionIndex: choice.choice },
+        localRole: "host",
+        wave: globalScene.currentBattle?.waveIndex ?? -1,
+        turn: 0,
+      });
       hideCoopControllerTag(); // #817: the pick landed - the tag comes down before the engine runs it
       // Input-free option apply (the same path the local handler uses): drives onPre / onOption /
       // onPost; the engine sub-prompts (party target / secondary menu) await the guest's relayed
@@ -479,6 +519,30 @@ export class MysteryEncounterPhase extends Phase {
   handleOptionSelect(option: MysteryEncounterOption, index: number): boolean {
     // Set option selected flag
     globalScene.currentBattle.mysteryEncounter!.selectedOption = option;
+
+    // Wave-2c: DUAL-RUN - commit the HOST-OWNED top-level ME_PICK op (the host drives its own selector off
+    // local input, so there is no relayed `me` to commit at coopHostAwaitGuestIndex; this is its owner
+    // seam). Gated to a co-op authoritative host that OWNS this ME and to the TOP-LEVEL pick (a repeated
+    // round is carried by the round mechanism). Disjoint from the guest-owned commit (which only fires when
+    // the guest owns the ME). No-op when the flag is OFF / solo / guest-owned / a sub-round. Never throws.
+    if (
+      !this.optionSelectSettings
+      && globalScene.gameMode.isCoop
+      && getCoopNetcodeMode() === "authoritative"
+      && getCoopController()?.role === "host"
+      && (getCoopController()?.isLocalOwnerAtCounter(coopMeInteractionStartValue()) ?? false)
+      && coopMeInProgress()
+    ) {
+      commitMeOwnerIntent({
+        kind: "ME_PICK",
+        seq: COOP_ME_PUMP_SEQ_BASE + coopMeInteractionStartValue(),
+        pinned: coopMeInteractionStartValue(),
+        payload: { optionIndex: index },
+        localRole: "host",
+        wave: globalScene.currentBattle?.waveIndex ?? -1,
+        turn: 0,
+      });
+    }
 
     // #record-replay (single-player): capture the ME option pick (top-level "me" vs a followup "meSub").
     // No-op unless recording / in co-op (co-op drives the ME via its pump, which owns that path).

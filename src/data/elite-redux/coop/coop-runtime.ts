@@ -50,6 +50,7 @@ import {
 } from "#data/elite-redux/coop/coop-interaction-relay";
 import { COOP_DISCONNECT_GRACE_MS } from "#data/elite-redux/coop/coop-lifecycle";
 import { meBattleHandoffKey } from "#data/elite-redux/coop/coop-me-battle-handoff";
+import { commitMeOwnerIntent, resetCoopMeOperationState } from "#data/elite-redux/coop/coop-me-operation";
 import {
   coopMeHandoffBattleStarted,
   coopMeHandoffBattleWaveValue,
@@ -59,7 +60,7 @@ import {
 import { CoopMePump } from "#data/elite-redux/coop/coop-me-pump";
 import { CoopRendezvous } from "#data/elite-redux/coop/coop-rendezvous";
 import { resetCoopRewardOperationState } from "#data/elite-redux/coop/coop-reward-operation";
-import { COOP_REJOIN_SYNC_SEQ_BASE } from "#data/elite-redux/coop/coop-seq-registry";
+import { COOP_ME_TERM_SEQ_BASE, COOP_REJOIN_SYNC_SEQ_BASE } from "#data/elite-redux/coop/coop-seq-registry";
 import { coopFieldIndexOf, coopOwnerOfFieldSlot } from "#data/elite-redux/coop/coop-session";
 import { CoopSessionController } from "#data/elite-redux/coop/coop-session-controller";
 import { SpoofGuest } from "#data/elite-redux/coop/coop-spoof-guest";
@@ -1895,7 +1896,23 @@ export function coopMeOwnerRelayBattleHandoff(): void {
   }
   try {
     coopLog("me", "owner-relay battle-handoff sentinel (end pump, run spawned battle)");
-    pump.relayMeBattleHandoff(globalScene.currentBattle?.turn);
+    const hostTurn = globalScene.currentBattle?.turn;
+    pump.relayMeBattleHandoff(hostTurn);
+    // Wave-2c: DUAL-RUN - commit the typed ME_TERMINAL {battle} op. The host STATES that this ME resolved
+    // as a battle spawn BEFORE the guest builds its ME-battle phases, so the guest routes off the operation
+    // (finishWithoutLeaving) rather than inferring a battle turn from a leftover chain (#859/#860). Step 0
+    // (the TRUE post-battle leave later uses step 1). No-op when the flag is OFF; the 9M sentinel is the
+    // dual-run fallback. Host-authoritative handoff path only.
+    commitMeOwnerIntent({
+      kind: "ME_TERMINAL",
+      seq: COOP_ME_TERM_SEQ_BASE + coopMeInteractionStartValue(),
+      pinned: coopMeInteractionStartValue(),
+      step: 0,
+      payload: hostTurn === undefined ? { terminal: "battle" } : { terminal: "battle", hostTurn },
+      localRole: active.controller.role,
+      wave: globalScene.currentBattle?.waveIndex ?? -1,
+      turn: 0,
+    });
   } catch (e) {
     /* a relay failure must never break the owner's ME battle setup */
     coopWarn("me", "owner-relay battle-handoff failed", e);
@@ -2001,6 +2018,10 @@ export function assembleCoopRuntime(
   resetCoopBiomeOperationState();
   // Wave-2d: same fresh-control-plane reset for the reward-shop + biome-market operation state (SURFACE 3).
   resetCoopRewardOperationState();
+  // Wave-2c: the mystery-encounter operation surface shares the same fresh-control-plane discipline (§8
+  // step 5) - drop any leftover ME op state so a new run's re-init-from-0 interaction counter can never
+  // collide with a prior run's already-applied ME operationIds.
+  resetCoopMeOperationState();
   const controller = new CoopSessionController(transport, { username: opts.username, version: COOP_PROTOCOL_VERSION });
   // Pin the chosen netcode (#633, selectable A/B). On the HOST this is the source of
   // truth that rides along in broadcastRunConfig; on the GUEST it is only the pre-
@@ -2194,6 +2215,8 @@ export function clearCoopRuntime(): void {
   resetCoopBiomeOperationState();
   // Wave-2d: drop the reward-shop + biome-market operation state too (SURFACE 3).
   resetCoopRewardOperationState();
+  // Wave-2c: same teardown for the mystery-encounter operation surface.
+  resetCoopMeOperationState();
   learnMoveForwardInFlight.clear();
   learnMoveBatchForwardInFlight.clear();
   active.localTransport.close();

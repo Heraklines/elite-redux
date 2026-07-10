@@ -27,6 +27,7 @@
 
 import { globalScene } from "#app/global-scene";
 import { coopLog } from "#data/elite-redux/coop/coop-debug";
+import { commitMeOwnerIntent } from "#data/elite-redux/coop/coop-me-operation";
 import {
   coopMeHandoffBattleStarted,
   coopMeInProgress,
@@ -113,6 +114,19 @@ export function coopQuizPublishAnswer(index: number, choice: number): void {
   const seq = coopQuizAnswerSeq(counter, index);
   coopLog("me", `quiz DRIVE publish answer index=${index} choice=${choice} seq=${seq} counter=${counter} (#818)`);
   getCoopInteractionRelay()?.sendInteractionChoice(seq, "quizAns", choice);
+  // Wave-2c: DUAL-RUN - mint the typed QUIZ_ANSWER op (the ME owner's committed answer). The per-question
+  // seq + index keep every answer a DISTINCT operationId (order-proof, #818). No-op when the flag is OFF;
+  // the legacy quizAns relay above is the fallback and stays live either way. Never throws.
+  commitMeOwnerIntent({
+    kind: "QUIZ_ANSWER",
+    seq,
+    pinned: counter,
+    step: index,
+    payload: { questionIndex: index, choice },
+    localRole: getCoopController()?.role ?? "guest",
+    wave: globalScene.currentBattle?.waveIndex ?? -1,
+    turn: 0,
+  });
 }
 
 /**

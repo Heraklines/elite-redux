@@ -184,6 +184,64 @@ export interface CoopShopBuyPayload {
 }
 
 // -----------------------------------------------------------------------------
+// Wave-2c: mystery-encounter payloads (§2.1 #8/#9/#10, MYSTERY_ENCOUNTER phase). The ME surface is
+// owner-alternated with the choice-forwarding model (#693: the guest never runs the encounter
+// engine); each ME decision the owner makes becomes one typed operation. The kinds (ME_PRESENT /
+// ME_PICK / ME_SUB / ME_BUTTON / ME_TERMINAL / QUIZ_ANSWER) are already in the closed union above.
+// -----------------------------------------------------------------------------
+
+/**
+ * The terminal RESOLUTION of a mystery encounter (#859/#860/#862). The host STATES this on the
+ * committed ME_TERMINAL op so the WATCHER routes its terminal deterministically off the operation
+ * (leave the encounter vs boot the spawned battle) instead of INFERRING "there is a battle turn"
+ * from a leftover battle chain (the #859/#860 phantom-turn class this migration makes structurally
+ * impossible - the committed op states the outcome/type BEFORE the watcher builds phases).
+ */
+export type CoopMeTerminalKind =
+  | "leave" // the ME ended (non-battle): the watcher leaves the encounter + advances the alternation
+  | "battle"; // an option spawned a battle: the watcher finishes WITHOUT leaving (the battle runs host-authoritative)
+
+/** ME_PICK intent/outcome: the top-level option index the ME owner selected (#8, guest->host forward). */
+export interface CoopMePickPayload {
+  /** The option index the owner chose in the ME selector. */
+  readonly optionIndex: number;
+}
+
+/** ME_SUB intent/outcome: a sub-prompt pick (party target slot / secondary menu index / catch-full slot, #855). */
+export interface CoopMeSubPayload {
+  /** The captured sub-pick value (a party slot index, a secondary-menu index, or a catch-full replace slot). */
+  readonly value: number;
+}
+
+/** ME_BUTTON intent/outcome: one meaningful owner button press relayed to the watcher (#633 pump). */
+export interface CoopMeButtonPayload {
+  /** The button code the owner pressed (a Button enum value). */
+  readonly button: number;
+}
+
+/** ME_PRESENT intent/outcome: the host's presentation-handoff ack (#8, host-authoritative ME presence verdict, #862). */
+export interface CoopMePresentPayload {
+  /** Whether the host has an ME this wave (the #862 host-authoritative presence verdict; false = the guest self-rolled a phantom). */
+  readonly present: boolean;
+}
+
+/** ME_TERMINAL intent/outcome: the ME's terminal transition (#10). Carries the host-stated resolution (#859). */
+export interface CoopMeTerminalPayload {
+  /** The terminal resolution the host committed: leave (non-battle) or battle (an option spawned a fight). */
+  readonly terminal: CoopMeTerminalKind;
+  /** For a battle terminal, the host's current battle turn to align the guest's ME-battle boot (#822). Absent for leave. */
+  readonly hostTurn?: number;
+}
+
+/** QUIZ_ANSWER intent/outcome: one committed answer of an embedded ME quiz minigame (#9/#818). */
+export interface CoopQuizAnswerPayload {
+  /** The 0-based question index this answer is for (per-question, order-proof, #818). */
+  readonly questionIndex: number;
+  /** The committed answer choice index. */
+  readonly choice: number;
+}
+
+// -----------------------------------------------------------------------------
 // Pure helpers: id mint/parse + closed-union guards. Zero engine dependency.
 // -----------------------------------------------------------------------------
 
