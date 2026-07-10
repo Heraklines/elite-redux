@@ -3522,9 +3522,13 @@ async function handleShowdownRankResult(
   if (rankRoleOf(match, auth.u) === null) {
     return json({ error: "not a participant" }, 403, cors);
   }
+  // Capture whether the match was ALREADY resolved BEFORE this report, so a duplicate/retry report
+  // of an already-settled match can never re-apply the ladder progression (rank rows are mutable, not
+  // append-only — double-applying would corrupt them). Progression applies ONLY on the transition.
+  const wasResolved = match.state !== "open";
   const applied = applyRankReport(match, auth.u, winner as RankRole, now);
   await persistRankMatchStmt(env, applied.match).run();
-  if (applied.resolution === "settled") {
+  if (applied.resolution === "settled" && !wasResolved) {
     const events = await applyRankSettlement(env, applied.match, auth.u, now);
     const seasonId = seasonIdFromTime(now);
     const row = await env.DB.prepare("SELECT * FROM showdown_ranks WHERE uid = ?1").bind(auth.u).first();
