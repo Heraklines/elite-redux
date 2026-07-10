@@ -15,6 +15,7 @@
 import {
   createArrangement,
   DOUBLE_FORMAT,
+  fieldSpriteOffset,
   formatById,
   legacyFormat,
   SINGLE_FORMAT,
@@ -22,6 +23,7 @@ import {
   TRIPLE_FORMAT,
 } from "#data/battle-format";
 import { BattlerIndex } from "#enums/battler-index";
+import { FieldPosition } from "#enums/field-position";
 import { describe, expect, it } from "vitest";
 
 const arrFor = (f: typeof SINGLE_FORMAT) => createArrangement(f);
@@ -137,5 +139,25 @@ describe("battle-format: lookups", () => {
     expect(formatById("triple")).toBe(TRIPLE_FORMAT);
     expect(formatById("quad")).toBeNull();
     expect(formatById(null)).toBeNull();
+  });
+});
+
+describe("battle-format sprite offsets", () => {
+  it("raises only the player-side triple wings", () => {
+    expect(fieldSpriteOffset(FieldPosition.LEFT, 3, true)).toEqual([-58, 4]);
+    expect(fieldSpriteOffset(FieldPosition.RIGHT, 3, true)).toEqual([58, 4]);
+
+    expect(fieldSpriteOffset(FieldPosition.LEFT, 3, false)).toEqual([-58, 10]);
+    expect(fieldSpriteOffset(FieldPosition.RIGHT, 3, false)).toEqual([58, 10]);
+    expect(fieldSpriteOffset(FieldPosition.CENTER, 3, true)).toEqual([0, -8]);
+    expect(fieldSpriteOffset(FieldPosition.CENTER, 3, false)).toEqual([0, -8]);
+  });
+
+  it("leaves the legacy single/double layout side-independent", () => {
+    for (const playerSide of [false, true]) {
+      expect(fieldSpriteOffset(FieldPosition.CENTER, 1, playerSide)).toEqual([0, 0]);
+      expect(fieldSpriteOffset(FieldPosition.LEFT, 2, playerSide)).toEqual([-32, -8]);
+      expect(fieldSpriteOffset(FieldPosition.RIGHT, 2, playerSide)).toEqual([32, 0]);
+    }
   });
 });

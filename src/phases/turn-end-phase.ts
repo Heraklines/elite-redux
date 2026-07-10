@@ -191,6 +191,16 @@ export class TurnEndPhase extends FieldPhase {
       if (active.length !== 2) {
         continue;
       }
+      // Do not transpose field slots while a legal reserve can still refill the vacancy.
+      // FaintPhase queues the replacement against the FAINTED slot's fieldIndex, but that
+      // SwitchSummonPhase runs after TurnEnd. Moving a wing survivor into the empty centre
+      // here changes which Pokemon that queued fieldIndex resolves to: the replacement then
+      // benches the healthy survivor and leaves the fainted mon in the wing (the live 3v2
+      // report, most visible when another foe voluntarily switched in the same turn).
+      // Only close ranks when the side will genuinely remain at two battlers.
+      if (party.slice(capacity).some(p => p?.isAllowedInBattle())) {
+        continue;
+      }
       const [lo, hi] = active; // lo.i < hi.i
       if (
         arrangement.isAdjacent(arrangement.locate(lo.p.getBattlerIndex()), arrangement.locate(hi.p.getBattlerIndex()))

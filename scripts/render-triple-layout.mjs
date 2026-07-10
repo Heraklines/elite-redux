@@ -23,13 +23,13 @@ const CENTER = 0;
 const LEFT = 1;
 const RIGHT = 2;
 
-function fieldSpriteOffset(position, capacity) {
+function fieldSpriteOffset(position, capacity, playerSide = false) {
   if (capacity >= 3) {
     if (position === LEFT) {
-      return [-58, 10];
+      return [-58, playerSide ? 4 : 10];
     }
     if (position === RIGHT) {
-      return [58, 10];
+      return [58, playerSide ? 4 : 10];
     }
     return [0, -8];
   }
@@ -86,7 +86,7 @@ function drawField(ctx, originX, scale, capacity, label) {
     const barAnchor = player ? { x: 150, y: 150 } : { x: 28, y: 24 };
     for (let slot = 0; slot < capacity; slot++) {
       const pos = posForSlot(slot, capacity);
-      const [ox, oy] = fieldSpriteOffset(pos, capacity);
+      const [ox, oy] = fieldSpriteOffset(pos, capacity, player);
       const cx = base.x + ox;
       const cy = base.y + oy;
       ctx.globalAlpha = 0.85;

@@ -1350,14 +1350,15 @@ export const DEV_SCENARIOS: DevScenario[] = [
     label: "(triple) Trainer reserves refill fainted slots (no lasting 2v3)",
     description:
       "Triple trainer-battle guard. Reported: 'if the trainer has 4 pokemon, it will sometimes\n"
-      + "fail to send out a new pokemon and will resume it as a 2v3'. Single KOs, wing KOs,\n"
-      + "spread-move double-KOs and end-of-turn poison faints are all covered by unit tests\n"
-      + "(test/tools/repro-triple-battle-bugs-3.test.ts '#5a-#5d' - all green); if you can still\n"
-      + "reproduce a lasting 2v3, REPORT THE EXACT SITUATION (which slot fainted, from what).\n"
-      + "DO: fight triple TRAINER battles; KO foes in different slots, incl. two in one turn with\n"
-      + "Earthquake, while the trainer still has reserves.\n"
+      + "fail to send out a new pokemon and will resume it as a 2v3'. The remaining live repro was\n"
+      + "a CENTRE foe fainting while the trainer still had reserves, especially on a turn where a\n"
+      + "different foe switched. Turn-end formation shifting moved a healthy wing into the queued\n"
+      + "replacement slot, so the replacement benched that survivor and left the KO in the wing.\n"
+      + "DO: fight triple TRAINER battles and KO the CENTRE foe while reserves remain. Also try it\n"
+      + "on a turn where another foe voluntarily switches; use Earthquake/Surf for repeat attempts.\n"
       + "EXPECT: every KO'd slot is refilled while reserves remain - the enemy side never stays\n"
-      + "short-handed.",
+      + "short-handed. The two survivors shift inward only when there is NO legal reserve.\n"
+      + "(Headless regression: repro-triple-battle-bugs-3 '#5e'.)",
     setup: () => {
       resetDevOverrides();
       setOverrides({

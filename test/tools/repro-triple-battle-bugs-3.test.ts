@@ -32,6 +32,7 @@ import { MoveId } from "#enums/move-id";
 import { SpeciesId } from "#enums/species-id";
 import { Stat } from "#enums/stat";
 import { TrainerType } from "#enums/trainer-type";
+import { Trainer } from "#field/trainer";
 import { getMoveTargets } from "#moves/move-utils";
 import type { CommandPhase } from "#phases/command-phase";
 import { GameManager } from "#test/framework/game-manager";
@@ -227,6 +228,72 @@ describe.skipIf(!RUN)("repro: triple-battle bugs round 3 (2026-07-07 report)", (
       `#5d: after poison faint -> ${living.length} living; slot0 fainted=${field[0].isFainted()}; reserve onField=${reserve.isOnField()}`,
     );
     expect(living.length, "the poison-fainted slot was refilled").toBe(3);
+  }, 120_000);
+
+  // ---------------------------------------------------------------------------
+  // #5e - LIVE 2026-07-09 report: the trainer voluntarily switches one active
+  //       while a DIFFERENT active faints in the same turn. Earlier coverage
+  //       tested KOs and switches separately, never their shared party reorder.
+  // ---------------------------------------------------------------------------
+  it("#5e enemy: AI switch plus a different-slot KO in one turn still refills all 3 slots", async () => {
+    game.override
+      .battleType(BattleType.TRAINER)
+      .randomTrainer({ trainerType: TrainerType.ACE_TRAINER })
+      .battleStyle("triple")
+      .criticalHits(false)
+      .startingLevel(100)
+      .enemyLevel(50)
+      .enemyMoveset(MoveId.HARDEN)
+      .moveset([MoveId.TACKLE, MoveId.HARDEN])
+      .ability(AbilityId.BALL_FETCH)
+      .enemyAbility(AbilityId.BALL_FETCH);
+    await game.classicMode.startBattle(SpeciesId.SNORLAX, SpeciesId.SNORLAX, SpeciesId.SNORLAX);
+
+    const field = globalScene.getEnemyField();
+    expect(field.length).toBe(3);
+    const battle = globalScene.currentBattle;
+    battle.enemyParty.length = 3;
+    const switchIn = globalScene.addEnemyPokemon(getPokemonSpecies(SpeciesId.SHUCKLE), 50, field[0].trainerSlot);
+    const faintReserve = globalScene.addEnemyPokemon(getPokemonSpecies(SpeciesId.CATERPIE), 50, field[0].trainerSlot);
+    battle.enemyParty.push(switchIn, faintReserve);
+
+    // Deterministically force only the first EnemyCommandPhase to choose party[3].
+    // Later enemy command phases use the real scorer, so this models exactly one
+    // voluntary AI switch rather than corrupting all three commands with one target.
+    const realScores = Trainer.prototype.getPartyMemberMatchupScores;
+    let scoreCalls = 0;
+    vi.spyOn(Trainer.prototype, "getPartyMemberMatchupScores").mockImplementation(
+      function (trainerSlot, forSwitch, useBestMove) {
+        scoreCalls++;
+        if (scoreCalls === 1) {
+          return [[3, 1_000_000]];
+        }
+        if (scoreCalls <= 3) {
+          return []; // the other two active enemies stay in; exactly one voluntary switch
+        }
+        return realScores.call(this, trainerSlot, forSwitch, useBestMove); // faint replacement uses real AI
+      },
+    );
+
+    // Slot 0 switches to Shuckle before moves resolve. A player in slot 1 KOs the
+    // DIFFERENT enemy slot 1; the faint replacement must account for the party swap
+    // and use the remaining healthy reserve without collapsing to a lasting 3v2.
+    const enemyIdx = field.map(e => e.getBattlerIndex());
+    const koTarget = field[1];
+    koTarget.hp = 1;
+    game.move.select(MoveId.HARDEN, 0);
+    game.move.select(MoveId.TACKLE, 1, enemyIdx[1]);
+    game.move.select(MoveId.HARDEN, 2);
+    await game.toNextTurn();
+
+    const living = globalScene.getEnemyField(true);
+    console.log(
+      `#5e: living=${living.length}; switchIn=${switchIn.isOnField()}; faintReserve=${faintReserve.isOnField()}; field=[${living.map(p => p.name).join(",")}]`,
+    );
+    expect(switchIn.isOnField(), "the voluntary switch completed").toBe(true);
+    expect(koTarget.isFainted(), "a different active enemy fainted in the same turn").toBe(true);
+    expect(living.length, "the trainer returns to three live field slots").toBe(3);
+    expect(faintReserve.isOnField(), "the remaining reserve fills the fainted slot").toBe(true);
   }, 120_000);
 
   // ---------------------------------------------------------------------------
