@@ -342,6 +342,7 @@ import { ER_CLASSIFIER_FLAG_TO_MOVE_FLAG } from "#data/elite-redux/er-flag-mappi
 import { ER_ID_MAP } from "#data/elite-redux/er-id-map";
 import { TerrainType } from "#data/terrain";
 import { AbilityId } from "#enums/ability-id";
+import { ArenaTagSide } from "#enums/arena-tag-side";
 import { ArenaTagType } from "#enums/arena-tag-type";
 import { BattlerTagType } from "#enums/battler-tag-type";
 import { ErMoveId } from "#enums/er-move-id";
@@ -2562,16 +2563,25 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
           poisonHealRecovers: true,
         }),
       ]);
-    case 447:
-      // Furnace — +2 Speed when hit by Rock-type moves. The ER text says "by
-      // rocks" — interpreted as type-keyed (matches the existing
-      // {@linkcode StatTriggerOnHitAbAttr} filter shape used by Inflatable).
+    case 447: {
+      // Furnace — "+2 Speed when hit by a Rock move OR when switching in with
+      // Stealth Rock present on the holder's own side." The on-hit half is the
+      // type-keyed {@linkcode StatTriggerOnHitAbAttr} (matches Inflatable); the
+      // switch-in half is a self-target {@linkcode PostSummonStatStageChangeAbAttr}
+      // gated on Stealth Rock being on the HOLDER's own side at summon.
+      const furnaceEntry = new PostSummonStatStageChangeAbAttr([Stat.SPD], 2, true);
+      furnaceEntry.addCondition(pokemon => {
+        const ownSide = pokemon.isPlayer() ? ArenaTagSide.PLAYER : ArenaTagSide.ENEMY;
+        return !!globalScene.arena.getTagOnSide(ArenaTagType.STEALTH_ROCK, ownSide);
+      });
       return ok([
         new StatTriggerOnHitAbAttr({
           stats: [{ stat: Stat.SPD, stages: 2 }],
           filter: { types: [PokemonType.ROCK] },
         }),
+        furnaceEntry,
       ]);
+    }
     case 518:
       // Spiteful — Reduces attacker's PP by 4 on contact. The 4-PP reduction
       // matches vanilla Spite (the move) so the proc has a symmetric mental
