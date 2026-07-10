@@ -67,6 +67,7 @@ import {
   type CoopPendingOperation,
   type CoopQuizAnswerPayload,
   makeCoopOperationId,
+  parseCoopOperationId,
 } from "#data/elite-redux/coop/coop-operation-envelope";
 import {
   journalCoopCommittedEnvelope,
@@ -101,6 +102,7 @@ export type CoopMeOperationPayload =
 export interface CoopMeRelayResult {
   readonly choice: number;
   readonly data?: number[] | undefined;
+  readonly operationId?: string | undefined;
 }
 
 /** The watcher's adoption verdict for a relayed ME decision. */
@@ -142,13 +144,17 @@ let authorityHost: CoopOperationHost | null = null;
 /** The watcher applier that gates adoption of a relayed decision. Lazily created; null until first use. */
 let watchGuest: CoopOperationGuest | null = null;
 
-/**
- * A SEPARATE applier for the durability JOURNAL replay path (Wave-2e), distinct from `watchGuest`. In
- * dual-run the LEGACY relay-adopt path (watchGuest) drives the phase's ME control-flow, so the journal MUST
- * NOT consume the operationId that path dedupes on. The journal is the DURABILITY ledger that converges the
- * ME step history over a cut without touching the live adopt path. Lazily created; reset on session bounds.
- */
-let journalWatchGuest: CoopOperationGuest | null = null;
+/** ME interactions whose terminal carrier switched from raw legacy to the durable journal. */
+const journalLeadingTerminals = new Set<number>();
+
+/** Journal-consumed terminal operations waiting for the replay phase's safe terminal handler. */
+const pendingJournalMaterializations = new Set<string>();
+
+/** Arm a journal-led terminal before its production sink feeds the real 9M waiter. */
+export function armCoopMeJournalTerminal(operationId: string, pinned: number): void {
+  journalLeadingTerminals.add(pinned);
+  pendingJournalMaterializations.add(operationId);
+}
 
 /**
  * The highest interaction-counter (pinned) value the local client has already ADOPTED an ME op at AS A
@@ -207,7 +213,8 @@ export function setCoopMeOperationEpoch(next: number): void {
 export function resetCoopMeOperationState(): void {
   authorityHost = null;
   watchGuest = null;
-  journalWatchGuest = null;
+  journalLeadingTerminals.clear();
+  pendingJournalMaterializations.clear();
   lastAppliedPinned = -1;
   revisionFloor = 0;
 }
@@ -224,7 +231,6 @@ export function setCoopMeOperationRevisionFloor(hw: number): void {
   revisionFloor = hw;
   authorityHost = null;
   watchGuest = null;
-  journalWatchGuest = null;
 }
 
 // -----------------------------------------------------------------------------
@@ -243,14 +249,6 @@ function guest(): CoopOperationGuest {
     watchGuest = new CoopOperationGuest({ epoch, initialRevision: revisionFloor });
   }
   return watchGuest;
-}
-
-/** The dedicated journal-replay applier (Wave-2e), separate from the live relay-adopt `guest()`. */
-function journalGuest(): CoopOperationGuest {
-  if (journalWatchGuest == null) {
-    journalWatchGuest = new CoopOperationGuest({ epoch, initialRevision: revisionFloor });
-  }
-  return journalWatchGuest;
 }
 
 /**
@@ -437,7 +435,21 @@ export function adoptMeWatcherChoice(params: CoopMeWatcherAdoptParams): CoopMeAd
   try {
     const ownerSeat = ownerSeatFor(params.kind, params.pinned);
     const addr = meOpAddr(params.kind, params.seq, params.step ?? 0);
-    const opId = makeCoopOperationId(epoch, ownerSeat, addr);
+    const derivedOpId = makeCoopOperationId(epoch, ownerSeat, addr);
+    const relayedOp = params.res.operationId == null ? null : parseCoopOperationId(params.res.operationId);
+    const addrBase = meOpAddr(params.kind, params.seq, 0);
+    if (
+      params.res.operationId != null
+      && (relayedOp == null
+        || relayedOp.epoch !== epoch
+        || relayedOp.owner !== ownerSeat
+        || relayedOp.pinnedSeq < addrBase
+        || relayedOp.pinnedSeq >= addrBase + 1000
+        || (params.step !== undefined && relayedOp.pinnedSeq !== addr))
+    ) {
+      return { adopt: false, reason: "stale-or-duplicate" };
+    }
+    const opId = params.res.operationId ?? derivedOpId;
     const payload = buildAdoptPayload(params);
     const intent: CoopPendingOperation = { id: opId, kind: params.kind, owner: ownerSeat, status: "proposed", payload };
 
@@ -461,11 +473,29 @@ export function adoptMeWatcherChoice(params: CoopMeWatcherAdoptParams): CoopMeAd
     // applied op (same operationId), can NEVER overwrite the live decision. The pinned counter is
     // monotonic across MEs; within one ME every step shares the pinned counter, so the `<` guard never
     // trips between an ME's own steps (it only rejects a decision from a strictly-earlier interaction).
-    if (params.pinned < lastAppliedPinned || guest().hasApplied(opId)) {
+    if (params.pinned < lastAppliedPinned) {
       coopWarn(
         "me",
         `ME op WATCHER REJECT stale/dup kind=${params.kind} id=${opId} pinned=${params.pinned} lastApplied=${lastAppliedPinned} (Wave-2c)`,
       );
+      return { adopt: false, reason: "stale-or-duplicate" };
+    }
+
+    if (params.kind === "ME_TERMINAL" && journalLeadingTerminals.has(params.pinned) && relayedOp == null) {
+      return { adopt: false, reason: "await-journal" };
+    }
+
+    if (guest().hasApplied(opId)) {
+      if (params.kind === "ME_TERMINAL" && relayedOp != null && pendingJournalMaterializations.delete(opId)) {
+        lastAppliedPinned = params.pinned;
+        return {
+          adopt: true,
+          kind: params.kind,
+          terminal: params.terminal,
+          hostTurn: params.hostTurn,
+        };
+      }
+      coopWarn("me", `ME op WATCHER REJECT duplicate kind=${params.kind} id=${opId} (Wave-2c)`);
       return { adopt: false, reason: "stale-or-duplicate" };
     }
 
@@ -524,16 +554,20 @@ function applyJournaledMeEnvelope(envelope: CoopAuthoritativeEnvelopeV1): CoopAp
   if (op == null || op.status !== "applied") {
     return "duplicate";
   }
-  const g = journalGuest();
+  const g = guest();
   if (g.hasApplied(op.id)) {
     return "duplicate"; // already converged via the journal (a reconnect resend re-delivery) - ACK, no re-apply.
   }
-  const res = g.applyEnvelope(envelope);
+  const res = g.applyEnvelope({
+    ...envelope,
+    sessionEpoch: epoch,
+    revision: g.getLastAppliedRevision() + 1,
+  });
   if (res.kind !== "applied") {
     return "rejected"; // transient non-applicable (retriable); never a permanent condition (that is a duplicate above).
   }
-  // W2e-R P0-1: route the newly-consumed ME step INTO the ONE live-mutation seam (see the biome adapter). The
-  // production ME materializer is keystone-blocked; a test registers a sink to PROVE the routing.
+  // Route newly-consumed ME operations into the production live sink. Supported terminal operations feed
+  // the tagged host-stated sentinel into the existing 9M safe terminal handler.
   routeCoopOperationToLiveSink("op:me", envelope);
   coopLog("me", `ME op JOURNAL apply kind=${op.kind} id=${op.id} rev=${envelope.revision} (Wave-2e/W2e-R)`);
   return "applied";

@@ -58,6 +58,7 @@ import { coopLog, coopWarn, isCoopDebug } from "#data/elite-redux/coop/coop-debu
 import { CoopDurabilityManager, isCoopDurabilityEnabled } from "#data/elite-redux/coop/coop-durability";
 import {
   COOP_DEX_SYNC_SEQ,
+  COOP_INTERACTION_LEAVE,
   CoopInteractionRelay,
   coopBiomeShopSeq,
   isCoopFaintSwitchSeq,
@@ -67,6 +68,7 @@ import {
 import { COOP_DISCONNECT_GRACE_MS } from "#data/elite-redux/coop/coop-lifecycle";
 import { meBattleHandoffKey } from "#data/elite-redux/coop/coop-me-battle-handoff";
 import {
+  armCoopMeJournalTerminal,
   commitMeOwnerIntent,
   isCoopMeOperationEnabled,
   resetCoopMeOperationState,
@@ -78,11 +80,12 @@ import {
   coopMeInteractionStartValue,
   setCoopMeInteractionStart,
 } from "#data/elite-redux/coop/coop-me-pin-state";
-import { CoopMePump } from "#data/elite-redux/coop/coop-me-pump";
+import { COOP_ME_BATTLE_HANDOFF, CoopMePump } from "#data/elite-redux/coop/coop-me-pump";
 import type {
   CoopAuthoritativeEnvelopeV1,
   CoopBiomePickPayload,
   CoopCrossroadsPickPayload,
+  CoopMeTerminalPayload,
   CoopRewardActionPayload,
   CoopShopBuyPayload,
   CoopWaveAdvancePayload,
@@ -1917,6 +1920,41 @@ function materializeCoopRewardActionFromOp(runtime: CoopRuntime, envelope: CoopA
   return false;
 }
 
+/** Feed a journal-delivered, host-stated ME terminal into the receiver's existing 9M terminal waiter. */
+function materializeCoopMeTerminalFromOp(runtime: CoopRuntime, envelope: CoopAuthoritativeEnvelopeV1): boolean {
+  if (runtime.controller.netcodeMode !== "authoritative" || runtime.controller.role !== "guest") {
+    return false;
+  }
+  const op = envelope.pendingOperation;
+  const parsed = op == null ? null : parseCoopOperationId(op.id);
+  if (op == null || op.kind !== "ME_TERMINAL" || op.owner !== 0 || parsed == null) {
+    return false;
+  }
+  const seq = Math.floor(parsed.pinnedSeq / 8000);
+  const kindTag = Math.floor((parsed.pinnedSeq % 8000) / 1000);
+  const pinned = seq - COOP_ME_TERM_SEQ_BASE;
+  const payload = op.payload as CoopMeTerminalPayload;
+  if (
+    kindTag !== 4
+    || !Number.isSafeInteger(pinned)
+    || pinned < 0
+    || pinned >= 100_000
+    || (payload?.terminal !== "leave" && payload?.terminal !== "battle")
+    || (payload.hostTurn !== undefined && !Number.isFinite(payload.hostTurn))
+  ) {
+    return false;
+  }
+  runtime.interactionRelay.materializeCommittedInteractionChoice(
+    seq,
+    "meBtn",
+    payload.terminal === "battle" ? COOP_ME_BATTLE_HANDOFF : COOP_INTERACTION_LEAVE,
+    payload.hostTurn === undefined ? undefined : [payload.hostTurn],
+    op.id,
+  );
+  armCoopMeJournalTerminal(op.id, pinned);
+  return true;
+}
+
 /**
  * Co-op WAVE-END authoritative capture (#838): the HOST streams the COMPLETE post-exp authoritative
  * battle state (whole player + enemy party as serialized PokemonData, seating, arena, modifiers, money,
@@ -2389,6 +2427,7 @@ export function assembleCoopRuntime(
   // module-level sink, matching the sole receiver topology.
   registerCoopOperationLiveSink("op:biome", envelope => materializeCoopBiomeChoiceFromOp(runtime, envelope));
   registerCoopOperationLiveSink("op:reward", envelope => materializeCoopRewardActionFromOp(runtime, envelope));
+  registerCoopOperationLiveSink("op:me", envelope => materializeCoopMeTerminalFromOp(runtime, envelope));
   wireCoopGhostPoolSync(controller, battleStream);
   wireCoopResyncResponder(controller, battleStream);
   wireCoopEnemyPartyResponder(controller, battleStream);

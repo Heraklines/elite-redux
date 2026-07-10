@@ -777,13 +777,20 @@ export class CoopReplayMePhase extends Phase {
       kind: "ME_TERMINAL",
       seq: this.seqTerm,
       pinned: this.interactionCounter,
-      res: action == null ? null : { choice: action.choice, data: action.data },
+      res: action == null ? null : { choice: action.choice, data: action.data, operationId: action.operationId },
       terminal: legacyIsBattle ? "battle" : "leave",
       hostTurn: action?.data?.[0],
       localRole: getCoopController()?.role ?? "guest",
       wave: globalScene.currentBattle?.waveIndex ?? -1,
       turn: 0,
     });
+    if (!terminalDecision.adopt && terminalDecision.reason === "await-journal") {
+      const relay = getCoopInteractionRelay();
+      if (relay != null) {
+        this.awaitHostTerminal(relay);
+        return;
+      }
+    }
     const isBattleTerminal = terminalDecision.adopt ? terminalDecision.terminal === "battle" : legacyIsBattle;
     coopLog("me", "host terminal resolved", {
       seqTerm: this.seqTerm,
