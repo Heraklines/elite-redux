@@ -36,7 +36,7 @@
 // behaves EXACTLY as before (pure legacy derivation). The #859/#860 phantom-dissolve + abort
 // backstops REMAIN (this op supersedes their trigger but they stay as belt-and-suspenders).
 //
-// FLAG (§5.4): `isCoopWaveAdvanceOperationEnabled()`. Default ON, gated by the SAME er-coop-12
+// FLAG (§5.4): `isCoopWaveAdvanceOperationEnabled()`. Default ON, gated by the SAME er-coop-13
 // protocol-version handshake as biome/ME/reward (COOP_PROTOCOL_VERSION; no new bump - no new wire
 // arm, the wave decision's DATA still rides the existing waveResolved/waveEndState). CI/soak force
 // legacy via COOP_WAVE_OP=off. State is per-session and reset on assembleCoopRuntime / clearCoopRuntime.
@@ -92,7 +92,7 @@ export type CoopWaveAdvanceAdoptDecision =
 // -----------------------------------------------------------------------------
 
 /**
- * Default ON. Activation is HARD-GATED by the SAME er-coop-12 protocol-version handshake as biome/ME/reward
+ * Default ON. Activation is HARD-GATED by the SAME er-coop-13 protocol-version handshake as biome/ME/reward
  * (the COOP_PROTOCOL_VERSION check): a mixed-build pair refuses to pair / banners, so a live session has both
  * peers on the envelope build. The legacy derivation path remains selectable (rollback = set false). No new
  * wire arm is added, so no version bump is needed (the wave decision's DATA rides the existing waveResolved).

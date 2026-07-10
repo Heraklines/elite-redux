@@ -53,7 +53,7 @@
 // surface behaves EXACTLY as before (pure legacy pass-through).
 //
 // FLAG (§5.4): `isCoopRewardOperationEnabled()`. Default ON, version-gated by the existing
-// COOP_PROTOCOL_VERSION (er-coop-12; NO new wire arms this wave - the control fields ride the existing
+// COOP_PROTOCOL_VERSION (er-coop-13; NO new wire arms this wave - the control fields ride the existing
 // relay carrier, the Wave-2a "carrier" delta). `COOP_REWARD_OP=off` forces legacy for CI/soak/rollback.
 // State is per-session and reset on session boundaries (assembleCoopRuntime / clearCoopRuntime).
 // =============================================================================
@@ -107,7 +107,7 @@ export type CoopRewardAdoptDecision =
 
 /**
  * Default ON. Activation is HARD-GATED by the #806 protocol-version handshake (COOP_PROTOCOL_VERSION,
- * er-coop-12): a mixed-build pair refuses to pair / banners, so a live session has both peers on the
+ * er-coop-13): a mixed-build pair refuses to pair / banners, so a live session has both peers on the
  * envelope build. The legacy path stays selectable (rollback = set false). CI/soak force legacy via
  * the COOP_REWARD_OP=off env override.
  */

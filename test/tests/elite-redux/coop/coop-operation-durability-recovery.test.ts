@@ -19,6 +19,7 @@
 //              for that class so requests no coopResync, and the host never proactively resends.
 // =============================================================================
 
+import { CoopBattleStreamer } from "#data/elite-redux/coop/coop-battle-stream";
 import {
   type CoopApplyOutcome,
   type CoopDurabilityHooks,
@@ -26,7 +27,6 @@ import {
   type CoopJournalEntry,
   setCoopDurabilityEnabled,
 } from "#data/elite-redux/coop/coop-durability";
-import { CoopBattleStreamer } from "#data/elite-redux/coop/coop-battle-stream";
 import { adoptCoopSnapshotHighWater } from "#data/elite-redux/coop/coop-runtime";
 import type { CoopConnectionState, CoopMessage, CoopRole, CoopTransport } from "#data/elite-redux/coop/coop-transport";
 import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";

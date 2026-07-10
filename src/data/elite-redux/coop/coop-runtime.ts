@@ -265,6 +265,53 @@ export function adoptCoopSnapshotHighWater(
   }
 }
 
+/** Host-side deep-gap escalation: push a heavy snapshot stamped at the evicted class's journal head. */
+function sendCoopDurabilitySnapshot(
+  controller: CoopSessionController,
+  battleStream: CoopBattleStreamer,
+  cls: string,
+  headRevision: number,
+): void {
+  if (controller.role !== "host") {
+    return;
+  }
+  try {
+    const snapshot = captureCoopFullSnapshot();
+    if (snapshot == null) {
+      coopWarn("resync", `durability snapshot unavailable cls=${cls} head=${headRevision}`);
+      return;
+    }
+    const stamped = {
+      ...snapshot,
+      journalHighWater: { [cls]: headRevision },
+    } satisfies CoopFullBattleSnapshot;
+    battleStream.sendDurabilitySnapshot(compressToBase64(JSON.stringify(stamped)));
+  } catch (e) {
+    coopWarn("resync", `durability snapshot send failed cls=${cls} head=${headRevision}`, e);
+  }
+}
+
+/** Guest-side deep-gap application: mutate live state, then ACK exactly the revisions it subsumed. */
+function wireCoopDurabilitySnapshotReceiver(
+  controller: CoopSessionController,
+  battleStream: CoopBattleStreamer,
+  durability: CoopDurabilityManager | undefined,
+): void {
+  battleStream.onDurabilitySnapshot(blob => {
+    if (controller.role !== "guest") {
+      return;
+    }
+    try {
+      const snapshot = JSON.parse(decompressFromBase64(blob)) as CoopFullBattleSnapshot;
+      applyCoopFullSnapshot(snapshot, isCoopAuthoritativeGuest());
+      adoptCoopSnapshotHighWater(durability, snapshot);
+      coopLog("resync", `durability deep-gap snapshot applied blob=${blob.length}b`);
+    } catch (e) {
+      coopWarn("resync", "durability deep-gap snapshot apply failed", e);
+    }
+  });
+}
+
 /**
  * Co-op enemy-party RE-REQUEST responder (#633/#698, handoff robustness): the HOST answers a
  * guest's `requestEnemyParty` by RE-broadcasting its enemy party for that wave - but ONLY when
@@ -2458,8 +2505,13 @@ export function assembleCoopRuntime(
   // envelope in via the journal bridge's extractKey/apply hooks, so a committed op is journaled + ACKed +
   // resendable end-to-end (no longer a passive scaffold). Its reconnect() is wired into the #805 rejoin
   // below and its journal depth/unacked feed the health line. Absent when the flag is OFF (legacy behavior).
+  const operationDurabilityHooks = coopOperationDurabilityHooks();
   const durability = isCoopDurabilityEnabled()
-    ? new CoopDurabilityManager(transport, coopOperationDurabilityHooks())
+    ? new CoopDurabilityManager(transport, {
+        ...operationDurabilityHooks,
+        sendFullSnapshot: (cls, headRevision) =>
+          sendCoopDurabilitySnapshot(controller, battleStream, cls, headRevision),
+      })
     : undefined;
   // Install the active manager so the migrated surface adapters' commit path journals into it (Wave-2e).
   // null when durability is OFF -> journalCoopCommittedEnvelope is a no-op (pure legacy dual-run).
@@ -2484,6 +2536,7 @@ export function assembleCoopRuntime(
   registerCoopOperationLiveSink("op:me", envelope => materializeCoopMeOperationFromOp(runtime, envelope));
   wireCoopGhostPoolSync(controller, battleStream);
   wireCoopResyncResponder(controller, battleStream, durability);
+  wireCoopDurabilitySnapshotReceiver(controller, battleStream, durability);
   wireCoopEnemyPartyResponder(controller, battleStream);
   wireCoopWaveResolved(controller, battleStream);
   wireCoopWaveEndState(controller, battleStream);

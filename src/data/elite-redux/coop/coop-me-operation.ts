@@ -37,7 +37,7 @@
 // behaves EXACTLY as before (pure legacy fallback).
 //
 // FLAG (adjudication (b), §5.4): `isCoopMeOperationEnabled()`. Default ON, gated by the
-// SAME er-coop-12 protocol-version handshake as biome (COOP_PROTOCOL_VERSION; no new bump -
+// SAME er-coop-13 protocol-version handshake as biome (COOP_PROTOCOL_VERSION; no new bump -
 // no new wire arm, the ME decision's DATA still rides the existing relay/checkpoint). Paired
 // clients share the version, so a session is either both-envelope or both-legacy, never half.
 // The legacy path stays selectable - `setCoopMeOperationEnabled(false)` is the one-line
@@ -122,7 +122,7 @@ export type CoopMeAdoptDecision =
 // -----------------------------------------------------------------------------
 
 /**
- * Default ON. Activation is HARD-GATED by the SAME er-coop-12 protocol-version handshake as biome (the
+ * Default ON. Activation is HARD-GATED by the SAME er-coop-13 protocol-version handshake as biome (the
  * COOP_PROTOCOL_VERSION check): a mixed-build pair refuses to pair / banners, so a live session has both
  * peers on the envelope build. The legacy path remains selectable (rollback = set false). No new wire
  * arm is added, so no new version bump is needed (the ME decision's DATA rides the existing relay).
