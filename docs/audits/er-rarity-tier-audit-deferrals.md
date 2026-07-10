@@ -6,23 +6,26 @@ moves by mon-count). The vast majority of findings were fixed and committed with
 headless + vitest verification; the items below were deliberately deferred with
 reasons. Pick them up when the noted blocker clears.
 
-## 1. In-game dev-suite scenarios for tier-6 and tier-7 fixes
+## 1. In-game dev-suite scenarios for tier-6, tier-7 and tier-8 fixes
 
 **Status:** owed. Tiers 3, 4, 5 got their `src/dev-tools/test-suite/scenarios.ts`
-entries; tiers 6 and 7 did not.
+entries; tiers 6, 7 and 8 did not.
 
 **Why deferred:** `scenarios.ts` was under continuous edit *and* commit by a
 concurrent process on `feat/elite-redux-port` throughout the audit session.
 Appending to it risked entangling that process's unfinished hunks in an audit
-commit. Every tier-6/7 fix is already covered by a vitest regression test
+commit. Every tier-6/7/8 fix is already covered by a vitest regression test
 (`er-*.test.ts`) and a green headless-runner scenario, so this is the
 complementary human-testing tier only.
 
 **To do:** once `scenarios.ts` is stable, add DO/EXPECT scenarios (same pattern
-as the tier-3/4/5 blocks already in the file) for the combat-observable tier-6/7
-fixes — e.g. Furnace, Retriever, Mystic Blades, Evaporate, Vengeful Spirit,
-Illusion, Forecast, Ripen (tier-6); Egoist, Cutthroat, Soul Linker, Pitfall,
-Aurora Borealis, Chrome Coat, Cryomancy (tier-7).
+as the tier-3/4/5 blocks already in the file) for the combat-observable fixes —
+e.g. Furnace, Retriever, Mystic Blades, Evaporate, Vengeful Spirit, Illusion,
+Forecast, Ripen (tier-6); Egoist, Cutthroat, Soul Linker, Pitfall, Aurora
+Borealis, Chrome Coat, Cryomancy (tier-7); Terminal Velocity, Smokey Maneuvers,
+Seaweed, Deadly Precision (SE-gate), Tactical Retreat (per-battle reset), Web
+Spinner (doubles spread), Intoxicate/Emanate/Solar Flare (-ate conditional),
+Ghastly Echo (sound + switch) (tier-8).
 
 ## 2. Shallow Grave (er 629) — true post-faint revive (APPROXIMATION)
 
@@ -41,6 +44,24 @@ revive cannot be represented. The 25%-once and fog gating are correct.
 revive (faint the mon → flag it → revive to 25% in the `SwitchSummonPhase` path),
 which is engine work, not a param tweak. **Backup Power (er 899)** shares the
 exact same endure-instead-of-revive approximation and should be fixed together.
+
+## 2b. Ghastly Echo (er move 848) — +50% switch-in boost (PARTIAL, tier-8)
+
+**Dex (longDescription):** "Deals damage and switches. Switch-in gets 50% boost
+for 1 turn. Sound-based."
+
+**Current:** damage + force-switch-out are wired, and the tier-8 fix ADDED the
+missing `SOUND_BASED` flag (verified: Soundproof now blocks it). The **+50%
+move-power boost on the incoming replacement mon for its first turn is
+DEFERRED** (a `// ...DEFERRED` comment sits in `init-elite-redux-custom-moves.ts`
+case 848).
+
+**Blocker:** same shape as the revive above — genuine engine work.
+`ForceSwitchOutAttr` has no handle on the *replacement* (chosen later in
+`SwitchSummonPhase`), and there is no existing "empower-the-switch-in" battler
+tag to hang a one-turn ×1.5 power boost on. Needs a new tag applied to whoever
+switches in next, consumed on its first move. Fix when the switch-in-empower tag
+exists.
 
 ## 3. `er-ability-rom-descriptions.ts` slug misalignment (387–392)
 
