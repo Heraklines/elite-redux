@@ -991,22 +991,24 @@ export class ShowdownSetEditorUiHandler extends UiHandler {
     const rootCost = cfg.team[cfg.activeSlot]?.baseCost ?? 0;
     this.text(LEFT_X + LEFT_W - 4, BODY_Y + 4, `Cost ${rootCost}`, TextStyle.SUMMARY_GOLD, 1, FONT_HDR);
 
+    // Identity column vertical rhythm (clean, non-overlapping at 1080p): sprite -> type chips ->
+    // STAGE strip -> BASE STATS, each with its own band and a few px of breathing room.
     // The FULL front battle sprite (item 2) - the game's full-scale art, sized around this column.
     const spriteCx = LEFT_X + LEFT_W / 2;
-    const spriteCy = BODY_Y + 42;
+    const spriteCy = BODY_Y + 38;
     this.renderFullSprite(spriteCx, spriteCy);
     // Shinyness is shown ONLY by 4 cyclable shiny symbols tucked into the sprite's corner (item 3 /
     // maintainer follow-up) - no separate shiny row.
     this.renderSpriteShinyCorner(spriteCx, spriteCy);
 
     // Type chips under the sprite.
-    this.renderTypeChips(LEFT_X + LEFT_W / 2, BODY_Y + 68);
+    this.renderTypeChips(spriteCx, BODY_Y + 62);
 
-    // Stage strip (inline header).
-    this.renderStageStrip(BODY_Y + 74);
+    // Stage strip (inline header) - sits clear below the type chips.
+    this.renderStageStrip(BODY_Y + 70);
 
-    // Base stat bars with nature +/- coloring (item 4) - pulled up now the shiny row is gone.
-    this.renderStatBars(BODY_Y + 92);
+    // Base stat bars with nature +/- coloring (item 4) - starts below the stage strip, not over it.
+    this.renderStatBars(BODY_Y + 96);
   }
 
   /**
@@ -1040,7 +1042,7 @@ export class ShowdownSetEditorUiHandler extends UiHandler {
         });
     }
     if (globalScene.textures.exists(key)) {
-      const spr = globalScene.add.sprite(cx, cy, key).setOrigin(0.5, 0.5).setScale(0.5);
+      const spr = globalScene.add.sprite(cx, cy, key).setOrigin(0.5, 0.5).setScale(0.44);
       const frames = globalScene.textures.get(key).getFrameNames();
       if (frames.length > 0) {
         spr.setFrame(frames.slice().sort()[0]);
@@ -1131,8 +1133,8 @@ export class ShowdownSetEditorUiHandler extends UiHandler {
       { variant: 2, black: false },
       { variant: 2, black: true },
     ];
-    const bx = cx + 21; // just inside the sprite's right edge
-    const top = cy - 24; // top-right corner
+    const bx = cx + 20; // just inside the sprite's right edge
+    const top = cy - 20; // top-right corner
     const step = 11;
     // A subtle dark backing so the stars read over the sprite art.
     this.fill(bx - 6, top - 2, 13, tiers.length * step + 2, 0x0b1120, 0.55);
@@ -1165,7 +1167,7 @@ export class ShowdownSetEditorUiHandler extends UiHandler {
     const labels = ["HP", "Atk", "Def", "SpA", "SpD", "Spe"];
     const barX = LEFT_X + 24;
     const barMaxW = 46;
-    const rowH = 6; // roomier than before, but keeps Spe clear of the panel bottom
+    const rowH = 5; // keeps all six rows (through Spe) clear of the panel bottom
     const nature = cfg.set.nature as Nature;
     PERMANENT_STATS.forEach((stat, i) => {
       const ry = y + 9 + i * rowH;
