@@ -217,6 +217,13 @@ export class UiInputs {
       case UiMode.POKEDEX_PAGE:
         this.buttonTouch();
         break;
+      case UiMode.SHOWDOWN_SET_EDITOR:
+        // Showdown Set Editor: MENU (Escape) LEAVES the editor back to the grid. Without this the key
+        // was dead here, and the user's next "get me out" press landed on the exposed StarterSelect -
+        // where MENU maps to buttonTouch -> tryStart -> an empty versus battle (the softlock). Route it
+        // into the editor's own MENU handler instead.
+        globalScene.ui.processInput(Button.MENU);
+        break;
       case UiMode.MENU:
         globalScene.ui.revertMode();
         globalScene.playSound("ui/select");

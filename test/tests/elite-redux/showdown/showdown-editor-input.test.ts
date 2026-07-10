@@ -146,4 +146,38 @@ describe.skipIf(!RUN)("Showdown Set Editor type-to-search input model", () => {
       expect(selectable, "cycling stays within the selectable actives").toContain(internals.config.set.abilityIndex);
     }
   });
+
+  // SOFTLOCK FIX (round 4): Escape (Button.MENU) must LEAVE the editor via onCancel. Before, MENU was
+  // unhandled here, so the user's escape press fell through to the exposed StarterSelect where MENU maps
+  // to Start -> an empty versus battle. The editor now CONSUMES MENU as a leave, from a field AND from
+  // an open dropdown, so it can never bubble to a stray Start.
+  function buildEditorWithCancel(
+    game: GameManager,
+    field: EditorField,
+  ): { internals: EditorInternals; cancels: () => number } {
+    const registered = game.scene.ui.handlers[UiMode.SHOWDOWN_SET_EDITOR] as ShowdownSetEditorUiHandler;
+    const handler = new (registered.constructor as new () => ShowdownSetEditorUiHandler)();
+    handler.setup();
+    let count = 0;
+    handler.show([buildShowdownEditorDemoConfig({ initialField: field, onCancel: () => (count += 1) })]);
+    return { internals: handler as unknown as EditorInternals, cancels: () => count };
+  }
+
+  it("Escape (MENU) on a field leaves the editor (never a fall-through Start)", () => {
+    const game = new GameManager(phaserGame);
+    const { internals, cancels } = buildEditorWithCancel(game, EditorField.ABILITY);
+    const handled = internals.processInput(Button.MENU);
+    expect(handled, "the editor consumes MENU so it can't bubble").toBe(true);
+    expect(cancels(), "MENU leaves the editor via onCancel").toBe(1);
+  });
+
+  it("Escape (MENU) from an OPEN move dropdown leaves the WHOLE editor", () => {
+    const game = new GameManager(phaserGame);
+    const { internals, cancels } = buildEditorWithCancel(game, EditorField.MOVE0);
+    internals.setFilter("o"); // opens the search dropdown
+    expect(internals.paneOpen, "the dropdown is open").toBe(true);
+    const handled = internals.processInput(Button.MENU);
+    expect(handled, "MENU is consumed from the open dropdown").toBe(true);
+    expect(cancels(), "MENU from the open dropdown leaves the whole editor").toBe(1);
+  });
 });

@@ -886,6 +886,17 @@ const RECIPES: Record<string, Recipe> = {
     prepare: () => [buildShowdownEditorDemoConfig({ initialField: EditorField.ITEM, initialPaneOpen: true })],
     diffTolerance: 0,
   },
+  // Mega stage fielded: the BASE STATS must reflect the FIELDED FORM (Mega Garchomp's spread), NOT the
+  // base species (base Garchomp) - the mega-stats fix. The full sprite, item lock + abilities also
+  // follow the mega form.
+  "showdown-editor-mega": {
+    mode: UiMode.SHOWDOWN_SET_EDITOR,
+    prepare: () => {
+      const mega = listMegaStages(SpeciesId.GIBLE)[0];
+      return [buildShowdownEditorDemoConfig({ stage: { speciesId: mega.speciesId, formIndex: mega.formIndex } })];
+    },
+    diffTolerance: 0,
+  },
   // Input-plumbing proof (not the golden set): drive the round-3 focus -> open -> navigate -> PICK
   // path through processInput. DOWN,DOWN focuses Move 1; ACTION opens its search dropdown (the
   // controller/A path, no ceremony); DOWN moves the result cursor; ACTION commits the highlighted

@@ -351,9 +351,8 @@ export class ShowdownSetEditorUiHandler extends UiHandler {
     if (this.paneOpen) {
       this.ensurePaneCursorVisible();
     }
-    // Raise the type-to-search capture immediately: a focused searchable field is search-ready with no
-    // ceremony (desktop keystrokes / mobile native keyboard both feed the typeahead). Headless: no-op.
-    this.openCapture();
+    // The native capture is raised only when a search pane is actually open (see syncCapture).
+    this.syncCapture();
     this.render();
     return true;
   }
@@ -403,15 +402,15 @@ export class ShowdownSetEditorUiHandler extends UiHandler {
         handled = this.moveField(1);
         break;
       case Button.LEFT:
-        // On the ability row LEFT/RIGHT cycles the ACTIVE ability directly (like starter select); on
-        // any other row it cycles the fielded STAGE (sprite / abilities / movepool all follow).
-        handled = this.field === EditorField.ABILITY ? this.cycleActiveAbility(-1) : this.cycleStage(-1);
+        // LEFT/RIGHT ALWAYS cycle the fielded STAGE / form (sprite / abilities / movepool / stats all
+        // follow) - the side buttons are never hijacked by the focused row. Ability cycles via E / A.
+        handled = this.cycleStage(-1);
         break;
       case Button.RIGHT:
-        handled = this.field === EditorField.ABILITY ? this.cycleActiveAbility(1) : this.cycleStage(1);
+        handled = this.cycleStage(1);
         break;
       case Button.ACTION:
-        // A searchable field opens its dropdown (controller path); the ability row cycles forward.
+        // A searchable field opens its dropdown (controller path); the ability row cycles the active.
         handled = this.field === EditorField.ABILITY ? this.cycleActiveAbility(1) : this.openPane();
         break;
       case Button.SUBMIT:
@@ -421,6 +420,12 @@ export class ShowdownSetEditorUiHandler extends UiHandler {
         break;
       case Button.CANCEL:
         // B = Back: discard and return to the grid (flow wiring).
+        this.config!.onCancel?.();
+        handled = true;
+        break;
+      case Button.MENU:
+        // Escape: leave the editor to the grid. Consumed HERE so it can never bubble to the exposed
+        // StarterSelect (where MENU maps to Start -> an empty versus battle - the reported softlock).
         this.config!.onCancel?.();
         handled = true;
         break;
@@ -478,7 +483,14 @@ export class ShowdownSetEditorUiHandler extends UiHandler {
         handled = this.selectPaneRow();
         break;
       case Button.CANCEL:
+        // B = step back: close the dropdown but stay in the editor.
         this.closePane();
+        handled = true;
+        break;
+      case Button.MENU:
+        // Escape from an open dropdown leaves the WHOLE editor to the grid (not just the pane), so the
+        // user is never trapped and the exposed StarterSelect can't turn a stray Escape into Start.
+        this.config!.onCancel?.();
         handled = true;
         break;
     }
@@ -492,10 +504,10 @@ export class ShowdownSetEditorUiHandler extends UiHandler {
     const idx = FIELD_ORDER.indexOf(this.field);
     const next = (idx + dir + FIELD_ORDER.length) % FIELD_ORDER.length;
     this.field = FIELD_ORDER[next];
-    // Every searchable field is search-ready: reset the capture buffer for the newly focused field so
-    // the first keystroke filters THIS field's pool (no stale filter, no "browse" action).
+    // Moving to a new field (pane closed) drops any stale filter + native capture; the new field's own
+    // search opens on demand (A / tap).
     this.filter = "";
-    this.openCapture();
+    this.syncCapture();
     this.render();
     return true;
   }
@@ -592,16 +604,18 @@ export class ShowdownSetEditorUiHandler extends UiHandler {
   }
 
   /**
-   * Raise the type-to-search capture surface for the CURRENT field (desktop physical-keyboard capture /
-   * mobile native keyboard). Every keystroke routes to {@linkcode setFilter}, which auto-opens the
-   * dropdown on the first character - so on keyboard/touch you simply START TYPING, no button first.
-   * Only searchable fields (item / moves) capture; headless (tests / harness) is an inert no-op.
+   * Sync the text-input capture surface to the CURRENT state. The DOM/native input is focused ONLY while
+   * a search dropdown is actively OPEN on a searchable field (item / moves) - so on a bare focused field
+   * the game keeps the keyboard and every game button works normally: the F/R/E/N hotkeys, X/Cancel,
+   * arrows and Escape are NOT swallowed as typed characters (the round-4 navigation fix). Opening the
+   * pane (A / tap) raises the capture; leaving it drops the native keyboard. Headless: inert no-op.
    */
-  private openCapture(): void {
-    if (!this.fieldIsSearchable(this.field)) {
-      return;
+  private syncCapture(): void {
+    if (this.paneOpen && this.fieldIsSearchable(this.field)) {
+      this.textInput?.open(this.filter, value => this.setFilter(value));
+    } else {
+      this.textInput?.close();
     }
-    this.textInput?.open(this.filter, value => this.setFilter(value));
   }
 
   /**
@@ -618,7 +632,7 @@ export class ShowdownSetEditorUiHandler extends UiHandler {
     this.paneCursor = this.currentPaneSelectionIndex();
     this.paneScroll = 0;
     this.ensurePaneCursorVisible();
-    this.openCapture();
+    this.syncCapture();
     this.render();
     return true;
   }
@@ -626,8 +640,8 @@ export class ShowdownSetEditorUiHandler extends UiHandler {
   private closePane(): void {
     this.paneOpen = false;
     this.filter = "";
-    // Reopen the capture at field level so the NEXT keystroke starts a fresh search with no ceremony.
-    this.openCapture();
+    // Drop the native keyboard now the search is closed; the game keyboard drives the bare field again.
+    this.syncCapture();
     this.render();
   }
 
@@ -937,9 +951,11 @@ export class ShowdownSetEditorUiHandler extends UiHandler {
     x = this.hotkey(x, SettingKeyboard.BUTTON_CYCLE_SHINY, "R.png", "Shiny");
     x = this.hotkey(x, SettingKeyboard.BUTTON_CYCLE_ABILITY, "E.png", "Ability");
     this.hotkey(x, SettingKeyboard.BUTTON_CYCLE_NATURE, "N.png", "Nature");
-    // Commit hint on the right (the Done / Start action), same glyph language.
-    const doneLabel = "Done";
-    this.hotkeyRight(SCREEN_W - 3, "Return.png", doneLabel, doneLabel.length * 3.0 + 16);
+    // Leave + commit hints on the right (Esc = back out to the grid; Enter = commit). These use WIDE
+    // glyphs (ESC / ENTER), so their labels sit further right than the narrow-letter hotkeys.
+    const doneW = "Done".length * 3.0 + 22;
+    this.hotkeyRight(SCREEN_W - 3, "ENTER.png", "Done", doneW);
+    this.hotkeyRight(SCREEN_W - 3 - doneW - 4, "ESC.png", "Leave", "Leave".length * 3.0 + 22);
   }
 
   /** Draw a key glyph + label, returning the next x. Uses the game's "keyboard" atlas (frame = key). */
@@ -954,7 +970,7 @@ export class ShowdownSetEditorUiHandler extends UiHandler {
     return x + 11 + label.length * 3.0 + 7;
   }
 
-  /** Right-anchored key glyph + label (for the Done hint). */
+  /** Right-anchored key glyph + label (wide ESC / ENTER glyphs, so the label offset is larger). */
   private hotkeyRight(rightX: number, defaultFrame: string, label: string, width: number): void {
     const x = rightX - width;
     const glyph = globalScene.add
@@ -962,7 +978,7 @@ export class ShowdownSetEditorUiHandler extends UiHandler {
       .setOrigin(0, 0.5)
       .setScale(0.5);
     this.add(glyph);
-    this.text(x + 11, HOTKEY_Y + 3, label, TextStyle.INSTRUCTIONS_TEXT, 0, FONT_TINY);
+    this.text(x + 16, HOTKEY_Y + 3, label, TextStyle.INSTRUCTIONS_TEXT, 0, FONT_TINY);
   }
 
   /** Resolve the bound key glyph frame for a setting (falls back to the default in headless). */
@@ -1119,43 +1135,23 @@ export class ShowdownSetEditorUiHandler extends UiHandler {
     }
   }
 
-  // -- 4 cyclable shiny symbols in the sprite corner (starter-select style) ----------------------
-  // Shinyness is indicated ONLY here: 4 shiny-color stars (T1/T2/T3 + T4 black) stacked in the
-  // sprite's top-right corner. R cycles off -> owned tiers (default = highest owned); the SELECTED
-  // tier is boxed/bright, unowned tiers are dim, T4 (black shiny) is shown but unfieldable.
+  // -- single colour-coded shiny star in the sprite corner (exactly starter select) --------------
+  // Like starter select's `pokemonShinyIcon`: ONE shiny star whose COLOUR encodes the tier
+  // (getVariantTint - T1 gold / T2 cyan / T3 red). Shown only when shiny; R cycles off -> owned
+  // tiers (default = highest owned). No star at all when not shiny.
 
   private renderSpriteShinyCorner(cx: number, cy: number): void {
     const cfg = this.config!;
-    const owned = cfg.unlocks.ownedVariants;
-    const tiers: { variant: number; black: boolean }[] = [
-      { variant: 0, black: false },
-      { variant: 1, black: false },
-      { variant: 2, black: false },
-      { variant: 2, black: true },
-    ];
-    const bx = cx + 20; // just inside the sprite's right edge
-    const top = cy - 20; // top-right corner
-    const step = 11;
-    // A subtle dark backing so the stars read over the sprite art.
-    this.fill(bx - 6, top - 2, 13, tiers.length * step + 2, 0x0b1120, 0.55);
-    this.outline(bx - 6, top - 2, 13, tiers.length * step + 2, 0x2a3550);
-    tiers.forEach((t, i) => {
-      const sy = top + i * step;
-      const tierOwned = t.black ? cfg.unlocks.blackShinyOwned : owned.includes(t.variant);
-      const selected = !t.black && cfg.set.shiny && cfg.set.variant === t.variant;
-      if (selected) {
-        this.fill(bx - 5, sy - 1, 11, 10, ACCENT, 1);
-        this.outline(bx - 5, sy - 1, 11, 10, GOLD);
-      }
-      const star = globalScene.add
-        .sprite(bx, sy + 4, "shiny_icons")
-        .setOrigin(0.5, 0.5)
-        .setScale(0.5);
-      star.setFrame(getVariantIcon(t.variant as Variant));
-      star.setTint(t.black ? 0x0a0a0a : getVariantTint(t.variant as Variant));
-      star.setAlpha(tierOwned ? (selected ? 1 : 0.8) : 0.25);
-      this.add(star);
-    });
+    if (!cfg.set.shiny) {
+      return;
+    }
+    const star = globalScene.add
+      .sprite(cx + 20, cy - 18, "shiny_icons")
+      .setOrigin(0.5, 0.5)
+      .setScale(0.55);
+    star.setFrame(getVariantIcon(cfg.set.variant as Variant));
+    star.setTint(getVariantTint(cfg.set.variant as Variant));
+    this.add(star);
   }
 
   // -- BASE stat bars (item 4) with nature +/- coloring -----------------------------------------
@@ -1163,6 +1159,12 @@ export class ShowdownSetEditorUiHandler extends UiHandler {
   private renderStatBars(y: number): void {
     const cfg = this.config!;
     const sp = this.fieldedSpecies;
+    // ER megas/primals are FORMS on the base species (listMegaStages -> {speciesId, formIndex}), and
+    // each form carries its OWN baseStats. Read the fielded FORM's stats, not the species-level (form 0)
+    // ones, so Mega Venusaur shows its mega spread rather than base Venusaur's.
+    const formIndex = cfg.stage.formIndex;
+    const statSource =
+      sp.forms.length > 0 && sp.forms[formIndex]?.baseStats ? sp.forms[formIndex].baseStats : sp.baseStats;
     this.text(LEFT_X + 4, y, "BASE STATS", TextStyle.SUMMARY_HEADER, 0, FONT_HDR);
     const labels = ["HP", "Atk", "Def", "SpA", "SpD", "Spe"];
     const barX = LEFT_X + 24;
@@ -1171,7 +1173,7 @@ export class ShowdownSetEditorUiHandler extends UiHandler {
     const nature = cfg.set.nature as Nature;
     PERMANENT_STATS.forEach((stat, i) => {
       const ry = y + 9 + i * rowH;
-      const base = sp.baseStats[i]; // BASE stat, not a computed L100 value.
+      const base = statSource[i]; // BASE stat of the fielded FORM, not a computed L100 value.
       const mult = stat === Stat.HP ? 1 : getNatureStatMultiplier(nature, stat);
       const color = mult > 1 ? 0xf08aa0 : mult < 1 ? 0x8aa0f0 : 0x8ad08a;
       const labelStyle = mult > 1 ? TextStyle.SUMMARY_PINK : mult < 1 ? TextStyle.SUMMARY_BLUE : TextStyle.SUMMARY_GRAY;
@@ -1219,10 +1221,10 @@ export class ShowdownSetEditorUiHandler extends UiHandler {
     const cfg = this.config!;
     this.add(addWindow(RIGHT_X, ABIL_Y, RIGHT_W, ABIL_H));
     const selectable = this.selectableAbilityIndices();
-    this.sectionHeader(ABIL_Y, "ABILITIES", selectable.length > 1 ? "< active > cyclable" : "1 active + 3 innate");
+    this.sectionHeader(ABIL_Y, "ABILITIES", selectable.length > 1 ? "E: cycle active" : "1 active + 3 innate");
 
-    // The ACTIVE ability - the ONE selectable slot, now CYCLED (no dropdown). Focus box + an "ACTIVE"
-    // tag + left/right chevrons so it reads as directly cyclable.
+    // The ACTIVE ability - the ONE selectable slot, CYCLED via the E hotkey (or A on this row). A key
+    // glyph on the right advertises E; LEFT/RIGHT are reserved for stage cycling now, so no chevrons.
     const actives = this.activeAbilityIds();
     const activeId = actives[cfg.set.abilityIndex] ?? actives[0];
     const active = allAbilities[activeId];
@@ -1230,8 +1232,16 @@ export class ShowdownSetEditorUiHandler extends UiHandler {
     this.focusBox(RIGHT_X + 3, ay, RIGHT_W - 6, 15, EditorField.ABILITY);
     this.tag(RIGHT_X + 6, ay + 2, "ACTIVE", 0x2f6d4a);
     if (selectable.length > 1) {
-      this.text(RIGHT_X + 30, ay + 3, "<", TextStyle.SUMMARY_GOLD, 0.5, FONT_HDR);
-      this.text(RIGHT_X + RIGHT_W - 8, ay + 3, ">", TextStyle.SUMMARY_GOLD, 0.5, FONT_HDR);
+      const eGlyph = globalScene.add
+        .sprite(
+          RIGHT_X + RIGHT_W - 10,
+          ay + 7,
+          "keyboard",
+          this.keyFrame(SettingKeyboard.BUTTON_CYCLE_ABILITY, "E.png"),
+        )
+        .setOrigin(0.5, 0.5)
+        .setScale(0.45);
+      this.add(eGlyph);
     }
     this.text(RIGHT_X + 36, ay + 1, active?.name ?? "-", TextStyle.SUMMARY_GOLD, 0, FONT_NAME);
     this.text(RIGHT_X + 36, ay + 8, this.clip(active?.description ?? "", 78), TextStyle.SUMMARY_GRAY, 0, FONT_TINY);
@@ -1326,7 +1336,7 @@ export class ShowdownSetEditorUiHandler extends UiHandler {
 
   private renderMovesPanel(): void {
     this.add(addWindow(RIGHT_X, MOVES_Y, RIGHT_W, MOVES_H));
-    this.sectionHeader(MOVES_Y, "MOVES", "type to search");
+    this.sectionHeader(MOVES_Y, "MOVES", "A: search");
     const cellW = (RIGHT_W - 9) / 2; // two columns with a small central gutter
     const cellH = 13;
     const gridY = MOVES_Y + 13;
@@ -1397,7 +1407,7 @@ export class ShowdownSetEditorUiHandler extends UiHandler {
         const move = allMoves[moveId];
         return { title: move?.name ?? "-", desc: move?.effect ?? "" };
       }
-      return { title: `Move ${this.moveSlot() + 1}`, desc: "Empty slot - type to search the legal move pool." };
+      return { title: `Move ${this.moveSlot() + 1}`, desc: "Empty slot - press A to search the legal move pool." };
     }
     // 3) Otherwise: the focused field's own description.
     if (this.field === EditorField.ITEM) {
