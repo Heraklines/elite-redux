@@ -111,6 +111,15 @@ const COOP_DURABILITY_DEFAULT = true;
 
 function readInitialDurabilityEnabled(): boolean {
   try {
+    // Env override FIRST (headless tests / CI: exercise both flag states without a DOM). `1`/`0`.
+    const env = (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env
+      ?.ER_COOP_DURABILITY;
+    if (env === "1" || env === "true") {
+      return true;
+    }
+    if (env === "0" || env === "false") {
+      return false;
+    }
     const loc = (globalThis as { location?: { search?: string } }).location;
     if (loc?.search) {
       const q = new URLSearchParams(loc.search).get("coopdurability");
