@@ -1196,18 +1196,22 @@ export type CoopMessage =
   | { t: "waveEndState"; wave: number; state: CoopAuthoritativeBattleStateV1 }
   // ===========================================================================
   // Authoritative CONTROL-plane envelope (Wave-2 run-state migration, §1.1 / §4).
-  // ADDITIVE + forward-safe: a client that never learns these `t` values ignores them
+  // ADDITIVE + forward-safe: a client that never learns this `t` value ignores it
   // via the unknown-`t` default arm (the same discipline waveEndState / showdown rely on).
   // Paired clients share COOP_PROTOCOL_VERSION, so a field is present on both or neither
-  // (§5.2). Wave-2a's migrated biome surface rides the legacy relay carrier in dual-run
-  // (§5.1); these arms are the declared wire types the journal wave (Wave-2b) sends on.
+  // (§5.2). Wave-2e SENDS this arm: a committed operation rides it through the durability
+  // journal (journalCoopCommittedEnvelope -> CoopDurabilityManager.commit), so it is now
+  // received (extractKey/apply in coop-operation-journal.ts) as well as sent - no longer a
+  // declared-ahead-of-receiver arm. The legacy relay carrier keeps firing in dual-run (§5.1).
+  //
+  // WIRE CONSOLIDATION (Wave-2e, §4.6): the doc's envelope-specialized ack/reconnect names
+  // (`envelopeAck` / `reconnectSync`) are RETIRED - they never shipped a sender or receiver.
+  // The generic W2b `coopAck { cls, seq }` / `coopResync { cls, from }` arms (below) ARE the
+  // envelope's ack + reconnect, class-parameterized (the envelope is class "op:<surface>",
+  // seq = revision). One ack/reconnect family serves every journaled class.
   // ===========================================================================
   /** Host -> guest: the authoritative control+data envelope broadcast on every commit (§1.1). */
   | { t: "envelope"; envelope: CoopAuthoritativeEnvelopeV1 }
-  /** Guest -> host: acknowledge applying through `revision` in `epoch`, so the host can stop resending (§4.2). */
-  | { t: "envelopeAck"; epoch: number; revision: number }
-  /** Guest -> host on rejoin: request the committed-op journal tail past `lastAppliedRevision` (§4.4). */
-  | { t: "reconnectSync"; epoch: number; lastAppliedRevision: number }
   // ===========================================================================
   // W2b APPLICATION-LEVEL DURABILITY (contract doc §4.2/§4.4): the ACK + reconnect
   // arms of the durability layer. Purely additive `t` values keyed on a GENERIC

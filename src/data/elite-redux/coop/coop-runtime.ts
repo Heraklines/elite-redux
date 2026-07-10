@@ -58,6 +58,11 @@ import {
   setCoopMeInteractionStart,
 } from "#data/elite-redux/coop/coop-me-pin-state";
 import { CoopMePump } from "#data/elite-redux/coop/coop-me-pump";
+import {
+  coopOperationDurabilityHooks,
+  resetCoopOperationJournalLog,
+  setCoopOperationDurability,
+} from "#data/elite-redux/coop/coop-operation-journal";
 import { CoopRendezvous } from "#data/elite-redux/coop/coop-rendezvous";
 import { resetCoopRewardOperationState } from "#data/elite-redux/coop/coop-reward-operation";
 import { COOP_ME_TERM_SEQ_BASE, COOP_REJOIN_SYNC_SEQ_BASE } from "#data/elite-redux/coop/coop-seq-registry";
@@ -2040,10 +2045,17 @@ export function assembleCoopRuntime(
   const uiMirror = new CoopUiMirror(transport);
   const mePump = new CoopMePump(interactionRelay);
   const rendezvous = new CoopRendezvous(transport);
-  // W2b (§4/§5): the application-level durability engine, flag-gated. A passive scaffold today (Wave-2a's
-  // envelope commit path plugs its ops in later); its reconnect() is wired into the #805 rejoin below and
-  // its journal depth/unacked feed the health line. Absent when the flag is OFF (legacy behavior).
-  const durability = isCoopDurabilityEnabled() ? new CoopDurabilityManager(transport) : undefined;
+  // W2b/W2e (§4/§5): the application-level durability engine, flag-gated. Wave-2e plugs the operation
+  // envelope in via the journal bridge's extractKey/apply hooks, so a committed op is journaled + ACKed +
+  // resendable end-to-end (no longer a passive scaffold). Its reconnect() is wired into the #805 rejoin
+  // below and its journal depth/unacked feed the health line. Absent when the flag is OFF (legacy behavior).
+  const durability = isCoopDurabilityEnabled()
+    ? new CoopDurabilityManager(transport, coopOperationDurabilityHooks())
+    : undefined;
+  // Install the active manager so the migrated surface adapters' commit path journals into it (Wave-2e).
+  // null when durability is OFF -> journalCoopCommittedEnvelope is a no-op (pure legacy dual-run).
+  setCoopOperationDurability(durability ?? null);
+  resetCoopOperationJournalLog();
   const runtime: CoopRuntime = {
     controller,
     battleSync,
@@ -2193,6 +2205,10 @@ export function clearCoopRuntime(): void {
   active.mePump.endSession();
   active.rendezvous.dispose();
   active.durability?.dispose();
+  // Wave-2e: drop the active-manager reference so a post-teardown adapter commit does not journal into a
+  // disposed manager, and clear the journal-applied proof log for the next session.
+  setCoopOperationDurability(null);
+  resetCoopOperationJournalLog();
   active.spoof?.dispose();
   active.showdownSpoof?.dispose();
   // Drop the persistent move-learn forward listener + its in-flight slot set (#633 BUG3+5) so a

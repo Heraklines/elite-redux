@@ -45,12 +45,17 @@
 
 import { coopLog, coopWarn } from "#data/elite-redux/coop/coop-debug";
 import {
+  type CoopAuthoritativeEnvelopeV1,
   type CoopBiomePickPayload,
   type CoopCrossroadsPickPayload,
   type CoopOperationKind,
   type CoopPendingOperation,
   makeCoopOperationId,
 } from "#data/elite-redux/coop/coop-operation-envelope";
+import {
+  journalCoopCommittedEnvelope,
+  registerCoopOperationApplier,
+} from "#data/elite-redux/coop/coop-operation-journal";
 import {
   type CoopCommitContext,
   type CoopIntentValidator,
@@ -251,6 +256,10 @@ export function commitBiomeOwnerIntent(params: CoopBiomeOwnerCommitParams): void
     if (params.localRole === "host") {
       const res = host().submit(intent, controlContext(params.wave, params.turn), ownerParityValidator(params.pinned));
       if (res.kind === "committed") {
+        // COMMIT -> JOURNAL (Wave-2e, §4.1/§4.2): register the committed op with the durability journal so
+        // a resend / reconnect tail can replay it. Rides ALONGSIDE the legacy relay (dual-run); no-op when
+        // durability is OFF. The DATA still travels on the existing checkpoint (§1.2).
+        journalCoopCommittedEnvelope(res.envelope);
         coopLog(
           "reward",
           `biome op OWNER commit kind=${params.kind} rev=${res.envelope.revision} id=${intent.id} (Wave-2a)`,
@@ -320,6 +329,11 @@ export function adoptBiomeWatcherChoice(params: CoopBiomeWatcherAdoptParams): Co
         coopWarn("reward", `biome op WATCHER(host) commit REJECTED (${res.kind}) id=${opId} -> fallback (Wave-2a)`);
         return { adopt: false, reason: `host-${res.kind}` };
       }
+      if (res.kind === "committed") {
+        // COMMIT -> JOURNAL (Wave-2e): the host is the sole committer of a GUEST-owned pick; journal the
+        // authoritative envelope it just produced so a cut is healed by the journal, not a bespoke self-heal.
+        journalCoopCommittedEnvelope(res.envelope);
+      }
     }
 
     // Stale / duplicate rejection (invariant 6, the #861 shape): a pick pinned STRICTLY BELOW one we already
@@ -359,3 +373,38 @@ export function adoptBiomeWatcherChoice(params: CoopBiomeWatcherAdoptParams): Co
     return { adopt: false, reason: "threw" };
   }
 }
+
+// -----------------------------------------------------------------------------
+// Journal replay seam (Wave-2e, §4.2/§4.4): route a resent / reconnect-tail committed envelope INTO the
+// idempotent guest applier - NOT around it - so a cut op re-applies exactly once by operationId.
+// -----------------------------------------------------------------------------
+
+/**
+ * Apply a committed biome-travel envelope delivered by the durability journal (a resend or reconnect
+ * tail). Routes into the SAME {@linkcode CoopOperationGuest} the live relay-adopt path uses, so it is
+ * idempotent by operationId (invariant 5): a dual-run duplicate (the live relay already adopted it) is a
+ * no-op. Returns true iff the op was NEWLY applied. No-op when the surface flag is OFF (pure legacy).
+ */
+function applyJournaledBiomeEnvelope(envelope: CoopAuthoritativeEnvelopeV1): boolean {
+  if (!enabled) {
+    return false;
+  }
+  const op = envelope.pendingOperation;
+  if (op == null || op.status !== "applied") {
+    return false;
+  }
+  const g = guest();
+  if (g.hasApplied(op.id)) {
+    return false; // dual-run: the live relay-adopt path already applied this op - the journal is a backstop.
+  }
+  const res = g.applyEnvelope(envelope);
+  if (res.kind !== "applied") {
+    return false;
+  }
+  coopLog("reward", `biome op JOURNAL apply id=${op.id} rev=${envelope.revision} (Wave-2e)`);
+  return true;
+}
+
+// Register the biome-travel guest applier so the durability manager can route a resent / reconnect-tail
+// `op:biome` envelope into it (one-way dep: adapter -> journal bridge; runs at import).
+registerCoopOperationApplier("op:biome", applyJournaledBiomeEnvelope);

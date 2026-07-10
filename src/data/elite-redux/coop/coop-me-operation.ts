@@ -54,6 +54,7 @@
 
 import { coopLog, coopWarn } from "#data/elite-redux/coop/coop-debug";
 import {
+  type CoopAuthoritativeEnvelopeV1,
   type CoopMeButtonPayload,
   type CoopMePickPayload,
   type CoopMePresentPayload,
@@ -65,6 +66,10 @@ import {
   type CoopQuizAnswerPayload,
   makeCoopOperationId,
 } from "#data/elite-redux/coop/coop-operation-envelope";
+import {
+  journalCoopCommittedEnvelope,
+  registerCoopOperationApplier,
+} from "#data/elite-redux/coop/coop-operation-journal";
 import {
   type CoopCommitContext,
   type CoopIntentValidator,
@@ -323,6 +328,9 @@ export function commitMeOwnerIntent(params: CoopMeOwnerCommitParams): void {
     if (params.localRole === "host") {
       const res = host().submit(intent, controlContext(params.wave, params.turn), seatValidator(ownerSeat));
       if (res.kind === "committed") {
+        // COMMIT -> JOURNAL (Wave-2e, §4.1/§4.2): register the committed ME step with the durability journal
+        // (resend / reconnect replay). Rides ALONGSIDE the legacy relay (dual-run); no-op when durability OFF.
+        journalCoopCommittedEnvelope(res.envelope);
         coopLog("me", `ME op OWNER commit kind=${params.kind} rev=${res.envelope.revision} id=${intent.id} (Wave-2c)`);
       } else {
         coopWarn(
@@ -393,6 +401,11 @@ export function adoptMeWatcherChoice(params: CoopMeWatcherAdoptParams): CoopMeAd
         coopWarn("me", `ME op WATCHER(host) commit REJECTED (${res.kind}) id=${opId} -> fallback (Wave-2c)`);
         return { adopt: false, reason: `host-${res.kind}` };
       }
+      if (res.kind === "committed") {
+        // COMMIT -> JOURNAL (Wave-2e): the host is the sole committer of a GUEST-owned ME step; journal the
+        // authoritative envelope so a cut is healed by the journal, not a bespoke self-heal.
+        journalCoopCommittedEnvelope(res.envelope);
+      }
     }
 
     // Stale / duplicate rejection (invariant 6, the #861 shape): a decision pinned STRICTLY BELOW one we
@@ -442,6 +455,41 @@ export function adoptMeWatcherChoice(params: CoopMeWatcherAdoptParams): CoopMeAd
     return { adopt: false, reason: "threw" };
   }
 }
+
+// -----------------------------------------------------------------------------
+// Journal replay seam (Wave-2e, §4.2/§4.4): route a resent / reconnect-tail committed envelope INTO the
+// idempotent guest applier - NOT around it - so a cut ME step re-applies exactly once by operationId.
+// -----------------------------------------------------------------------------
+
+/**
+ * Apply a committed ME-step envelope delivered by the durability journal (resend or reconnect tail).
+ * Routes into the SAME {@linkcode CoopOperationGuest} the live relay-adopt path uses, so it is idempotent
+ * by operationId (invariant 5): a dual-run duplicate (the live relay already adopted it) is a no-op.
+ * Returns true iff the step was NEWLY applied. No-op when the surface flag is OFF (pure legacy).
+ */
+function applyJournaledMeEnvelope(envelope: CoopAuthoritativeEnvelopeV1): boolean {
+  if (!enabled) {
+    return false;
+  }
+  const op = envelope.pendingOperation;
+  if (op == null || op.status !== "applied") {
+    return false;
+  }
+  const g = guest();
+  if (g.hasApplied(op.id)) {
+    return false; // dual-run: the live relay-adopt path already applied this step - the journal is a backstop.
+  }
+  const res = g.applyEnvelope(envelope);
+  if (res.kind !== "applied") {
+    return false;
+  }
+  coopLog("me", `ME op JOURNAL apply kind=${op.kind} id=${op.id} rev=${envelope.revision} (Wave-2e)`);
+  return true;
+}
+
+// Register the ME guest applier so the durability manager can route a resent / reconnect-tail `op:me`
+// envelope into it (one-way dep: adapter -> journal bridge; runs at import).
+registerCoopOperationApplier("op:me", applyJournaledMeEnvelope);
 
 /** Build the typed adopt payload from the relayed result + params, discriminated per kind. */
 function buildAdoptPayload(params: CoopMeWatcherAdoptParams): CoopMeOperationPayload {

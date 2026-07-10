@@ -60,12 +60,17 @@
 
 import { coopLog, coopWarn } from "#data/elite-redux/coop/coop-debug";
 import {
+  type CoopAuthoritativeEnvelopeV1,
   type CoopOperationKind,
   type CoopPendingOperation,
   type CoopRewardActionPayload,
   type CoopShopBuyPayload,
   makeCoopOperationId,
 } from "#data/elite-redux/coop/coop-operation-envelope";
+import {
+  journalCoopCommittedEnvelope,
+  registerCoopOperationApplier,
+} from "#data/elite-redux/coop/coop-operation-journal";
 import {
   type CoopCommitContext,
   type CoopIntentValidator,
@@ -321,6 +326,9 @@ export function commitRewardOwnerIntent(params: CoopRewardOwnerCommitParams): vo
         ownerParityValidator(params.pinned),
       );
       if (res.kind === "committed") {
+        // COMMIT -> JOURNAL (Wave-2e, §4.1/§4.2): register the committed action with the durability journal
+        // (resend / reconnect replay). Rides ALONGSIDE the legacy relay (dual-run); no-op when durability OFF.
+        journalCoopCommittedEnvelope(res.envelope);
         coopLog(
           "reward",
           `${params.surface} op OWNER commit label=${params.label} rev=${res.envelope.revision} id=${opId} (Wave-2d)`,
@@ -416,6 +424,11 @@ export function adoptRewardWatcherChoice(params: CoopRewardWatcherAdoptParams): 
         coopWarn("reward", `${params.surface} op WATCHER(host) commit REJECTED (${res.kind}) id=${opId} (Wave-2d)`);
         return { adopt: false, reason: `host-${res.kind}` };
       }
+      if (res.kind === "committed") {
+        // COMMIT -> JOURNAL (Wave-2e): the host is the sole committer of a GUEST-owned action; journal the
+        // authoritative envelope so a cut is healed by the journal, not a bespoke self-heal.
+        journalCoopCommittedEnvelope(res.envelope);
+      }
     }
 
     // Exact re-delivery of an already-applied action is a no-op (invariant 5).
@@ -458,6 +471,42 @@ export function adoptRewardWatcherChoice(params: CoopRewardWatcherAdoptParams): 
     return { adopt: true };
   }
 }
+
+// -----------------------------------------------------------------------------
+// Journal replay seam (Wave-2e, §4.2/§4.4): route a resent / reconnect-tail committed envelope INTO the
+// idempotent guest applier - NOT around it - so a cut action re-applies exactly once by operationId.
+// -----------------------------------------------------------------------------
+
+/**
+ * Apply a committed reward/market action envelope delivered by the durability journal (resend or reconnect
+ * tail). Routes into the SAME {@linkcode CoopOperationGuest} the live relay-adopt path uses, so it is
+ * idempotent by operationId (invariant 5): a dual-run duplicate (the live relay already adopted it) is a
+ * no-op. Returns true iff the action was NEWLY applied. No-op when the surface flag is OFF (pure legacy).
+ * Both the reward screen and the biome market ride this one class ("op:reward"), sharing one applier.
+ */
+function applyJournaledRewardEnvelope(envelope: CoopAuthoritativeEnvelopeV1): boolean {
+  if (!enabled) {
+    return false;
+  }
+  const op = envelope.pendingOperation;
+  if (op == null || op.status !== "applied") {
+    return false;
+  }
+  const g = guest();
+  if (g.hasApplied(op.id)) {
+    return false; // dual-run: the live relay-adopt path already applied this action - the journal is a backstop.
+  }
+  const res = g.applyEnvelope(envelope);
+  if (res.kind !== "applied") {
+    return false;
+  }
+  coopLog("reward", `shop op JOURNAL apply kind=${op.kind} id=${op.id} rev=${envelope.revision} (Wave-2e)`);
+  return true;
+}
+
+// Register the shared reward/market guest applier so the durability manager can route a resent /
+// reconnect-tail `op:reward` envelope into it (one-way dep: adapter -> journal bridge; runs at import).
+registerCoopOperationApplier("op:reward", applyJournaledRewardEnvelope);
 
 /** Build the typed per-kind payload for a surface (a REWARD action or a SHOP_BUY action). */
 function buildPayload(
