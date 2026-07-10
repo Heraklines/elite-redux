@@ -602,3 +602,116 @@ Engine generation, RNG, AI, per-account, or lifecycle phases with no guest-rende
   with the parallel agent's independently-derived list before the allowlist flips the default.
 
 ---
+
+## 4. Transport durability design
+
+Today the WebRTC transport `send()` DROPS a frame when the channel is not open — silently, with no
+queue and no ACK (`coop-webrtc-transport.ts:184-199`: `if (this._state !== "connected" || readyState
+!== "open") { ...warn...; return; }`). The only durability is self-healing re-request loops bolted on
+per surface (`requestRunConfig` `coop-transport.ts:948-955`, `requestRoster` #868 `:956-965`,
+`requestEnemyParty` `:988-997`, `requestStateSync` on checksum mismatch `:975-981`) plus a full
+snapshot pull on rejoin (`coop-runtime.ts:958-989`). Each is a bespoke patch for one lost message.
+The envelope model needs ONE durability layer under all of them.
+
+### 4.1 What is journaled
+
+The application-level journal records **committed operations only** — i.e. every envelope that
+advanced `revision` (transition `committed → applied`, §1.3). Concretely, the host appends
+`{ revision, epoch, operationId, logicalPhase, envelope }` to an in-memory ring the moment it
+commits. NOT journaled:
+- `proposed` intents (they are not yet authoritative; a lost intent is re-proposed by the owner, §4.2);
+- `rejected` / `superseded` ops (no state changed, nothing to replay);
+- presentation-only traffic (`battleEvent` `coop-transport.ts:1041`, cosmetic `uiInput` `:1143`) —
+  these are explicitly declared unable to desync (`:1037-1039`: "a dropped/reordered/late
+  `battleEvent` only stutters the animation; it can never desync the guest"), so they are never
+  journaled or resent; the checkpoint reconciles them.
+
+The journal is the authoritative, totally-ordered history of committed operations within an epoch.
+Its entries are keyed by `revision` (dense, monotonic, gap-detectable, §1.5). It is bounded (a ring
+of the last N revisions — size TBD by the implementer, but ≥ the deepest reconnect gap observed in
+soak; a guest further behind than the ring falls back to a full `stateSync` snapshot, §4.4). The ring
+cap mirrors the existing bounded diagnostic ring pattern (`coop-renderer-gate.ts:49-51`).
+
+### 4.2 ACK / resend
+
+- **Guest → host ACK.** The guest, after applying an envelope, sends `{ t: "envelopeAck"; epoch;
+  revision }` (new additive message). The host tracks the guest's last-acked revision.
+- **Host resend.** If the host commits `revision = R` and does not see an ACK for it within a bound,
+  it resends the journal entry for `R`. Resend is SAFE because guest application is idempotent by
+  `(epoch, revision, id)` (§1.6): a re-delivered envelope the guest already applied is a no-op. This
+  replaces the per-surface "re-broadcast on every request" idempotent-resend pattern
+  (`coop-transport.ts:952-953,963-964`) with one mechanism.
+- **Intent resend (guest-owned ops).** A `proposed` intent is not journaled, so the OWNER is
+  responsible for resending it until it sees its operation reach `committed`/`applied` (or a
+  `rejected`) in an envelope. This is the typed successor of the existing owner-relay resend loops.
+- **Reciprocal barriers collapse to ACKs.** The rendezvous "both may proceed" barrier (§2.3) becomes
+  "host has committed `revision = R` AND guest has acked `R`." The named barriers
+  (`cmd:`/`shop:`/`biomepick:`) are retired as their surface migrates.
+
+### 4.3 Outbound queue + backpressure bounds
+
+Replace the drop-on-not-open (`coop-webrtc-transport.ts:185-193`) with a bounded outbound queue:
+- When `readyState !== "open"`, ENQUEUE the frame instead of dropping it; flush FIFO on the channel's
+  `open` event. This directly fixes the "frames sent while the channel was dark are LOST"
+  hazard the rejoin path calls out (`coop-runtime.ts:942-943`).
+- **Bounds (backpressure).** The queue is bounded by BOTH count and bytes. On overflow the policy is
+  NOT to drop arbitrary frames (that reintroduces silent loss) but to COLLAPSE: because the journal is
+  revision-keyed and idempotent, a full outbound queue can be replaced by a single "resync-from-
+  revision-R" request (§4.4) — the newest authoritative state supersedes every queued older envelope.
+  Presentation frames (`battleEvent`, cosmetic `uiInput`) are the FIRST to shed under backpressure
+  (they are declared desync-safe, §4.1), before any journaled envelope.
+- **Keepalive stays.** The 5s keepalive (`coop-webrtc-transport.ts:162-182`, #857) is orthogonal and
+  unchanged — it keeps the channel from idle-teardown; the queue handles frames while it is briefly
+  down. Do NOT enqueue keepalive pings (they are time-sensitive, `sendKeepalive` `:173-182`).
+
+### 4.4 Reconnect-from-revision protocol (invariant 7)
+
+Today rejoin restores DATA only (`coop-runtime.ts:957` "The GUEST missed events while dark: pull the
+host's full authoritative snapshot") and explicitly does NOT restore the pending operation. The new
+protocol returns checkpoint + current pending operation + journal tail:
+
+1. On rejoin (SAME epoch, §1.4), the guest sends `{ t: "reconnectSync"; epoch; lastAppliedRevision }`
+   (successor of `requestStateSync` `coop-transport.ts:981`, carrying a revision instead of a turn).
+2. The host responds based on the gap:
+   - **Gap within the journal ring** (`lastAppliedRevision` ≥ `headRevision − ringSize`): send the
+     journal TAIL — every committed envelope from `lastAppliedRevision + 1` to head, in order, PLUS
+     the current `pendingOperation` (even if still `proposed`/`committed`, so the guest re-enters the
+     in-flight interaction rather than restarting it — this is the piece rejoin drops today).
+   - **Gap deeper than the ring**: fall back to a full `stateSync` snapshot
+     (`CoopFullBattleSnapshot`, `coop-transport.ts:457,975`) at the head revision, then the pending
+     operation. This is the existing heavy-snapshot path, now revision-stamped.
+3. The guest applies the tail idempotently (§1.6), lands at head revision, adopts the pending
+   operation, and resumes. Because the epoch is unchanged, its pre-drop `operationId`s are still
+   valid, so an in-flight op it had already proposed is de-duped, not double-applied.
+4. Buffer hygiene from #861 is preserved: the guest still purges pre-drop relay/rendezvous buffers
+   (`coop-runtime.ts:959-967`) before applying the tail, so no stale pre-drop frame races the
+   authoritative tail. Under the envelope this is belt-and-suspenders (the epoch+revision guard
+   already rejects them) but is kept until the legacy relays are fully retired.
+
+The load-bearing addition over today: **the pending operation travels with the reconnect**, so a
+partner who dropped mid-shop / mid-ME / mid-biome-pick resumes that exact interaction. This closes the
+"resume landing INSIDE an in-progress interaction is not restorable" gap the counter comment records
+(`coop-session-controller.ts:497-500`) — for a HOT REJOIN (same epoch). A cold RESUME (new epoch)
+still restarts the interaction from the top, which is acceptable and unchanged (§1.4).
+
+### 4.5 "Fail closed" concretely (invariant 8)
+
+For an unknown `logicalPhase` or unknown `pendingOperation.kind` on the guest (§1.7):
+1. Do NOT run any local phase or open any local prompt. (Contrast today: an unlisted phase RUNS
+   because the gate is a denylist, `coop-renderer-gate.ts:59-60`; an unclassified UI mode only WARNS,
+   `ui.ts:792-793`.)
+2. Hold at the last known-good applied state (last envelope whose phase/kind the guest recognized).
+3. Emit a diagnostic (reuse `recordCoopRendererNeutralized` / `coopWarn`, `coop-renderer-gate.ts:67`,
+   `ui.ts:800-801`) so the harness proves the guest ran nothing unknown.
+4. Request a reconnect-sync (§4.4) — treat the unknown envelope as a gap to be re-fetched, on the
+   assumption the guest is on a stale build (the protocol-version handshake, §5, should already have
+   flagged this: `versionMismatch` `coop-session-controller.ts:847-852`).
+5. If the unknown persists after resync (genuinely newer host on an incompatible protocol), surface
+   the existing hard-refresh banner (`coop-runtime.ts:717-719,881-882`) rather than degrade into
+   local play — a guest that cannot understand the host's control plane must STOP, not improvise.
+
+The renderer gate's own harness proof mechanism (the neutralized-log,
+`coop-renderer-gate.ts:73-81`) becomes the fail-closed proof: the allowlist harness asserts the guest
+neutralized every mutating/host-only/unknown phase and ran only §3.1 ∪ §3.2.
+
+---
