@@ -59,6 +59,8 @@ export const COOP_CAP_OP_REWARD: CoopCapabilityKey = "opSurface.reward";
 export const COOP_CAP_OP_WAVE: CoopCapabilityKey = "opSurface.wave";
 /** The migrated Giratina bargain terminal operation (§2.5 item 5). */
 export const COOP_CAP_OP_BARGAIN: CoopCapabilityKey = "opSurface.bargain";
+/** The migrated multi-round colosseum board/pick stream (§2.5 item 5). */
+export const COOP_CAP_OP_COLOSSEUM: CoopCapabilityKey = "opSurface.colosseum";
 /** The application-level durability journal (§4, coop-durability.ts / coop-operation-journal.ts). */
 export const COOP_CAP_DURABILITY_JOURNAL: CoopCapabilityKey = "durability.journal";
 /**

@@ -190,6 +190,11 @@ export interface CoopBargainPayload {
   readonly outcome: CoopInteractionOutcome;
 }
 
+/** COLO_PICK stream: repeated host-stated boards and owner decisions within one pinned gauntlet. */
+export type CoopColosseumPayload =
+  | { readonly type: "board"; readonly labels: string[] }
+  | { readonly type: "decision"; readonly index: number };
+
 // -----------------------------------------------------------------------------
 // Wave-2c: mystery-encounter payloads (§2.1 #8/#9/#10, MYSTERY_ENCOUNTER phase). The ME surface is
 // owner-alternated with the choice-forwarding model (#693: the guest never runs the encounter

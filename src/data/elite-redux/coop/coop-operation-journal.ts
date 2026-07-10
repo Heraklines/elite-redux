@@ -85,6 +85,8 @@ function coopOperationClassForEnvelope(envelope: CoopAuthoritativeEnvelopeV1): s
     switch (envelope.pendingOperation?.kind) {
       case "BARGAIN":
         return "op:bargain";
+      case "COLO_PICK":
+        return "op:colosseum";
       default:
         return null;
     }

@@ -32,6 +32,10 @@ import {
   coopColosseumStreamBoard,
   runColosseumGuestRoundLoop,
 } from "#data/elite-redux/coop/coop-colosseum";
+import {
+  resetCoopColosseumOperationFlag,
+  setCoopColosseumOperationEnabled,
+} from "#data/elite-redux/coop/coop-colosseum-operation";
 import { COOP_INTERACTION_LEAVE, CoopInteractionRelay } from "#data/elite-redux/coop/coop-interaction-relay";
 import { setCoopMeInteractionStart } from "#data/elite-redux/coop/coop-me-pin-state";
 import { COOP_ME_TERM_SEQ_BASE } from "#data/elite-redux/coop/coop-me-pump";
@@ -52,6 +56,7 @@ const BOARD_LABELS = ["CONTINUE (risk for S+)", "CASH OUT (claim S)"];
 
 describe("co-op Colosseum between-rounds board relay (#829)", () => {
   afterEach(() => {
+    resetCoopColosseumOperationFlag();
     clearCoopRuntime();
     setCoopMeInteractionStart(-1); // drop the ME pin so the next file starts clean
   });
@@ -92,6 +97,15 @@ describe("co-op Colosseum between-rounds board relay (#829)", () => {
     coopColosseumSendDecision(1); // CASH OUT
     const decision = await guestRelay.awaitInteractionChoice(seq);
     expect(decision?.choice).toBe(1);
+  });
+
+  it("keeps the pure legacy board/pick carriers working when the operation flag is off", async () => {
+    setCoopColosseumOperationEnabled(false);
+    const { seq, guestRelay } = rig(4);
+    coopColosseumStreamBoard([...BOARD_LABELS]);
+    expect((await guestRelay.awaitInteractionOutcome(seq))?.k).toBe("mePresent");
+    coopColosseumSendDecision(COLOSSEUM_CASH_OUT);
+    expect((await guestRelay.awaitInteractionChoice(seq))?.choice).toBe(COLOSSEUM_CASH_OUT);
   });
 
   it("DURABILITY: dropping only coloBoard still materializes the committed board for the guest", async () => {

@@ -53,6 +53,7 @@ import {
   COOP_CAP_DURABILITY_JOURNAL,
   COOP_CAP_OP_BARGAIN,
   COOP_CAP_OP_BIOME,
+  COOP_CAP_OP_COLOSSEUM,
   COOP_CAP_OP_ME,
   COOP_CAP_OP_REWARD,
   COOP_CAP_OP_WAVE,
@@ -61,6 +62,12 @@ import {
   clearNegotiatedCoopCapabilities,
 } from "#data/elite-redux/coop/coop-capabilities";
 import { getCoopChecksumAssertionCount } from "#data/elite-redux/coop/coop-checksum-assert";
+import {
+  COOP_COLOSSEUM_ACTION_STRIDE,
+  isCoopColosseumOperationEnabled,
+  resetCoopColosseumOperationState,
+  setCoopColosseumOperationRevisionFloor,
+} from "#data/elite-redux/coop/coop-colosseum-operation";
 import { coopLog, coopWarn, isCoopDebug } from "#data/elite-redux/coop/coop-debug";
 import { CoopDurabilityManager, isCoopDurabilityEnabled } from "#data/elite-redux/coop/coop-durability";
 import {
@@ -92,6 +99,7 @@ import type {
   CoopAuthoritativeEnvelopeV1,
   CoopBargainPayload,
   CoopBiomePickPayload,
+  CoopColosseumPayload,
   CoopCrossroadsPickPayload,
   CoopMePickPayload,
   CoopMePresentPayload,
@@ -120,6 +128,7 @@ import {
   COOP_BARGAIN_SEQ_BASE,
   COOP_BIOME_PICK_SEQ_BASE,
   COOP_BIOME_SHOP_CHOICE_KINDS,
+  COOP_COLOSSEUM_SEQ_BASE,
   COOP_CROSSROADS_SEQ_BASE,
   COOP_ME_PUMP_SEQ_BASE,
   COOP_ME_TERM_SEQ_BASE,
@@ -1458,6 +1467,7 @@ export function applyCoopControlPlaneSaveData(data: CoopControlPlaneSaveData | u
     // (the epoch is unchanged, so the restored receiver marks stay valid; §1.4/§4.6 monotonic-continue contract).
     setCoopBiomeOperationRevisionFloor(marks["op:biome"] ?? 0);
     setCoopBargainOperationRevisionFloor(marks["op:bargain"] ?? 0);
+    setCoopColosseumOperationRevisionFloor(marks["op:colosseum"] ?? 0);
     setCoopRewardOperationRevisionFloor(marks["op:reward"] ?? 0);
     setCoopMeOperationRevisionFloor(marks["op:me"] ?? 0);
     // Wave-2f KEYSTONE (W2e-R P0-3): floor the wave-advance producer + guest so a resumed run continues the
@@ -2029,6 +2039,39 @@ function materializeCoopBargainOutcomeFromOp(runtime: CoopRuntime, envelope: Coo
   return true;
 }
 
+/** Feed one journal-delivered colosseum board/pick into the receiver's existing safe FIFOs. */
+function materializeCoopColosseumActionFromOp(runtime: CoopRuntime, envelope: CoopAuthoritativeEnvelopeV1): boolean {
+  if (runtime.controller.netcodeMode !== "authoritative" || runtime.controller.role !== "guest") {
+    return false;
+  }
+  const op = envelope.pendingOperation;
+  const parsed = op == null ? null : parseCoopOperationId(op.id);
+  const payload = op?.payload as CoopColosseumPayload | undefined;
+  if (op?.kind !== "COLO_PICK" || parsed == null || parsed.pinnedSeq < 0 || payload == null) {
+    return false;
+  }
+  const pinned = Math.floor(parsed.pinnedSeq / COOP_COLOSSEUM_ACTION_STRIDE);
+  if (!Number.isSafeInteger(pinned) || pinned < 0) {
+    return false;
+  }
+  const seq = COOP_COLOSSEUM_SEQ_BASE + pinned;
+  if (payload.type === "board" && Array.isArray(payload.labels) && payload.labels.every(label => typeof label === "string")) {
+    runtime.interactionRelay.materializeCommittedInteractionOutcome(seq, {
+      k: "mePresent",
+      tokens: {},
+      meetsReqs: [],
+      labels: [],
+      subPrompt: { kind: "secondary", labels: [...payload.labels] },
+    });
+    return true;
+  }
+  if (payload.type === "decision" && Number.isSafeInteger(payload.index)) {
+    runtime.interactionRelay.materializeCommittedInteractionChoice(seq, "coloPick", payload.index, undefined, op.id);
+    return true;
+  }
+  return false;
+}
+
 /** Feed journal-delivered ME presentation/terminal operations into the receiver's existing safe waiters. */
 function materializeCoopMeOperationFromOp(runtime: CoopRuntime, envelope: CoopAuthoritativeEnvelopeV1): boolean {
   if (runtime.controller.netcodeMode !== "authoritative" || runtime.controller.role !== "guest") {
@@ -2459,6 +2502,9 @@ function buildLocalCoopCapabilities(): CoopCapabilityKey[] {
   if (isCoopBargainOperationEnabled()) {
     caps.push(COOP_CAP_OP_BARGAIN);
   }
+  if (isCoopColosseumOperationEnabled()) {
+    caps.push(COOP_CAP_OP_COLOSSEUM);
+  }
   if (isCoopMeOperationEnabled()) {
     caps.push(COOP_CAP_OP_ME);
   }
@@ -2503,6 +2549,7 @@ export function assembleCoopRuntime(
   // pulls a snapshot without re-assembling), so this never wipes a live pending op.
   resetCoopBiomeOperationState();
   resetCoopBargainOperationState();
+  resetCoopColosseumOperationState();
   // Wave-2d: same fresh-control-plane reset for the reward-shop + biome-market operation state (SURFACE 3).
   resetCoopRewardOperationState();
   // Wave-2c: the mystery-encounter operation surface shares the same fresh-control-plane discipline (§8
@@ -2572,6 +2619,7 @@ export function assembleCoopRuntime(
   // module-level sink, matching the sole receiver topology.
   registerCoopOperationLiveSink("op:biome", envelope => materializeCoopBiomeChoiceFromOp(runtime, envelope));
   registerCoopOperationLiveSink("op:bargain", envelope => materializeCoopBargainOutcomeFromOp(runtime, envelope));
+  registerCoopOperationLiveSink("op:colosseum", envelope => materializeCoopColosseumActionFromOp(runtime, envelope));
   registerCoopOperationLiveSink("op:reward", envelope => materializeCoopRewardActionFromOp(runtime, envelope));
   registerCoopOperationLiveSink("op:me", envelope => materializeCoopMeOperationFromOp(runtime, envelope));
   wireCoopGhostPoolSync(controller, battleStream);
@@ -2738,6 +2786,7 @@ export function clearCoopRuntime(): void {
   // session's interaction counter (which re-inits from base 0) never collides with a prior session's ops.
   resetCoopBiomeOperationState();
   resetCoopBargainOperationState();
+  resetCoopColosseumOperationState();
   // Wave-2d: drop the reward-shop + biome-market operation state too (SURFACE 3).
   resetCoopRewardOperationState();
   // Wave-2c: same teardown for the mystery-encounter operation surface.
