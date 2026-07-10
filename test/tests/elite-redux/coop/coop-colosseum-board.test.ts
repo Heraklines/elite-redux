@@ -43,6 +43,7 @@ import {
 } from "#data/elite-redux/coop/coop-runtime";
 import type { CoopInteractionOutcome, CoopMessage, CoopSerializedEnemy } from "#data/elite-redux/coop/coop-transport";
 import { createLoopbackPair } from "#data/elite-redux/coop/coop-transport";
+import { wrapCoopFaultPair } from "#test/tools/coop-fault-transport";
 import { COLOSSEUM_CASH_OUT, COLOSSEUM_CONTINUE } from "#ui/colosseum-ui-handler";
 import { afterEach, describe, expect, it } from "vitest";
 
@@ -91,6 +92,32 @@ describe("co-op Colosseum between-rounds board relay (#829)", () => {
     coopColosseumSendDecision(1); // CASH OUT
     const decision = await guestRelay.awaitInteractionChoice(seq);
     expect(decision?.choice).toBe(1);
+  });
+
+  it("DURABILITY: dropping only coloBoard still materializes the committed board for the guest", async () => {
+    const pair = wrapCoopFaultPair(
+      createLoopbackPair(),
+      {
+        drop: 1,
+        reorder: 0,
+        delay: 0,
+        faultable: msg => msg.t === "interactionOutcome" && msg.kind === "coloBoard",
+      },
+      { seed: 0xc010 },
+    );
+    const hostRuntime = assembleCoopRuntime(pair.host, { username: "Host", netcodeMode: "authoritative" });
+    const guestRuntime = assembleCoopRuntime(pair.guest, { username: "Guest", netcodeMode: "authoritative" });
+    setCoopRuntime(hostRuntime);
+    setCoopMeInteractionStart(4);
+
+    coopColosseumStreamBoard([...BOARD_LABELS]);
+    const present = await guestRuntime.interactionRelay.awaitInteractionOutcome(coopColosseumSeq(4), 25);
+
+    expect(pair.faultsInjected(), "the raw coloBoard carrier was actually dropped").toBe(1);
+    expect(present?.k, "the committed board reached the real guest outcome FIFO").toBe("mePresent");
+    if (present?.k === "mePresent") {
+      expect(present.subPrompt).toEqual({ kind: "secondary", labels: BOARD_LABELS });
+    }
   });
 
   it("awaits the guest owner's relayed decision index (guest-owned)", async () => {
