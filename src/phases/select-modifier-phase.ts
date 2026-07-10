@@ -9,6 +9,7 @@ import {
 } from "#data/elite-redux/coop/coop-interaction-relay";
 import { coopGiveMonToPartner } from "#data/elite-redux/coop/coop-party-ops";
 import { getCoopRendezvousWaitMs } from "#data/elite-redux/coop/coop-rendezvous";
+import { adoptRewardWatcherChoice, commitRewardOwnerIntent } from "#data/elite-redux/coop/coop-reward-operation";
 import { reconstructRewardOptions, serializeRewardOptions } from "#data/elite-redux/coop/coop-reward-options";
 import {
   coopMeInProgress,
@@ -1107,6 +1108,19 @@ export class SelectModifierPhase extends BattlePhase {
       );
     }
     getCoopInteractionRelay()?.sendInteractionChoice(this.coopInteractionStart, label, choice, wire);
+    // Wave-2d: DUAL-RUN - additionally COMMIT the typed intent through the authoritative operation
+    // primitive (the host validates + commits exactly once). No-op when the flag is OFF; the legacy relay
+    // above is the fallback and stays live either way. terminal = a skip/leave that ends the interaction.
+    commitRewardOwnerIntent({
+      surface: "reward",
+      pinned: this.coopInteractionStart,
+      label,
+      choice,
+      data: wire,
+      terminal: choice === COOP_INTERACTION_LEAVE,
+      localRole: controller.role,
+      wave: globalScene.currentBattle?.waveIndex ?? -1,
+    });
   }
 
   /** OWNER (#633 Fix #2): stream the rolled reward-option list for THIS reroll round so the
@@ -1485,6 +1499,25 @@ export class SelectModifierPhase extends BattlePhase {
         globalScene.ui.setMode(UiMode.MESSAGE).then(() => super.end());
         this.coopAdvanceInteraction();
         return;
+      }
+      // Wave-2d: gate adoption through the authoritative operation primitive (idempotent by operationId,
+      // stale-/late-rejecting a pick from an earlier interaction or after this one left - the #861 shape).
+      // When the flag is OFF this passes through verbatim (legacy). A reject IGNORES the action + keeps
+      // awaiting the authoritative terminal, exactly like the existing #854 out-of-range guard.
+      const decision = adoptRewardWatcherChoice({
+        surface: "reward",
+        pinned: this.coopInteractionStart,
+        action: { choice: action.choice, data: action.data },
+        terminal: action.choice === COOP_INTERACTION_LEAVE,
+        localRole: controller.role,
+        wave: globalScene.currentBattle?.waveIndex ?? -1,
+      });
+      if (!decision.adopt) {
+        coopWarn(
+          "reward",
+          `WATCHER op-gate rejected relayed action (${decision.reason}) seq=${seq} choice=${action.choice} - keep awaiting terminal (Wave-2d)`,
+        );
+        continue;
       }
       if (this.applyRelayedRewardAction(action)) {
         return;

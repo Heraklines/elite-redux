@@ -58,6 +58,7 @@ import {
 } from "#data/elite-redux/coop/coop-me-pin-state";
 import { CoopMePump } from "#data/elite-redux/coop/coop-me-pump";
 import { CoopRendezvous } from "#data/elite-redux/coop/coop-rendezvous";
+import { resetCoopRewardOperationState } from "#data/elite-redux/coop/coop-reward-operation";
 import { COOP_REJOIN_SYNC_SEQ_BASE } from "#data/elite-redux/coop/coop-seq-registry";
 import { coopFieldIndexOf, coopOwnerOfFieldSlot } from "#data/elite-redux/coop/coop-session";
 import { CoopSessionController } from "#data/elite-redux/coop/coop-session-controller";
@@ -1998,6 +1999,8 @@ export function assembleCoopRuntime(
   // addresses) can never collide with a prior run's already-applied operationIds. NOT a hot rejoin (that
   // pulls a snapshot without re-assembling), so this never wipes a live pending op.
   resetCoopBiomeOperationState();
+  // Wave-2d: same fresh-control-plane reset for the reward-shop + biome-market operation state (SURFACE 3).
+  resetCoopRewardOperationState();
   const controller = new CoopSessionController(transport, { username: opts.username, version: COOP_PROTOCOL_VERSION });
   // Pin the chosen netcode (#633, selectable A/B). On the HOST this is the source of
   // truth that rides along in broadcastRunConfig; on the GUEST it is only the pre-
@@ -2189,6 +2192,8 @@ export function clearCoopRuntime(): void {
   // Wave-2a: drop the biome-travel operation state (host/guest appliers + last-applied pin) so a new
   // session's interaction counter (which re-inits from base 0) never collides with a prior session's ops.
   resetCoopBiomeOperationState();
+  // Wave-2d: drop the reward-shop + biome-market operation state too (SURFACE 3).
+  resetCoopRewardOperationState();
   learnMoveForwardInFlight.clear();
   learnMoveBatchForwardInFlight.clear();
   active.localTransport.close();

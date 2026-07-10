@@ -30,6 +30,7 @@ import {
   coopBiomeShopSeq,
 } from "#data/elite-redux/coop/coop-interaction-relay";
 import { coopMeInProgress, coopMeInteractionStartValue } from "#data/elite-redux/coop/coop-me-pin-state";
+import { adoptRewardWatcherChoice, commitRewardOwnerIntent } from "#data/elite-redux/coop/coop-reward-operation";
 import { reconstructRewardOptions, serializeRewardOptions } from "#data/elite-redux/coop/coop-reward-options";
 import {
   advanceCoopInteractionForContinuation,
@@ -340,6 +341,18 @@ export class BiomeShopPhase extends SelectModifierPhase {
         "biomeShop",
         COOP_INTERACTION_LEAVE,
       );
+      // Wave-2d: DUAL-RUN - COMMIT the market LEAVE terminal through the operation primitive (advances the
+      // late-after-leave watermark on the watcher's adopt). No-op when the flag is OFF.
+      commitRewardOwnerIntent({
+        surface: "market",
+        pinned: this.coopBiomeStart,
+        label: "biomeShop",
+        choice: COOP_INTERACTION_LEAVE,
+        data: undefined,
+        terminal: true,
+        localRole: getCoopController()?.role ?? "guest",
+        wave: globalScene.currentBattle?.waveIndex ?? -1,
+      });
     }
     // #832 (audit P1#5, defect c): advanceCoopInteractionForContinuation SUPPRESSES its own advance while
     // an ME is in progress (its coopMeInProgress guard) - the whole ME counts as ONE alternation step,
@@ -424,8 +437,31 @@ export class BiomeShopPhase extends SelectModifierPhase {
     const seq = coopBiomeShopSeq(this.coopBiomeStart);
     for (;;) {
       const action = await relay.awaitInteractionChoice(seq, COOP_BIOME_WAIT_MS, COOP_BIOME_SHOP_CHOICE_KINDS);
-      if (action == null || action.choice === COOP_INTERACTION_LEAVE) {
+      if (action == null) {
         break;
+      }
+      const terminal = action.choice === COOP_INTERACTION_LEAVE;
+      // Wave-2d: gate adoption through the authoritative operation primitive (idempotent by operationId,
+      // stale-/late-rejecting a buy from an earlier interaction or after this market left - the #861 shape).
+      // When the flag is OFF this passes through verbatim (legacy). The LEAVE terminal always ends the loop
+      // (the gate still records its watermark); a rejected non-terminal buy is IGNORED (keep awaiting).
+      const decision = adoptRewardWatcherChoice({
+        surface: "market",
+        pinned: this.coopBiomeStart,
+        action: { choice: action.choice, data: action.data },
+        terminal,
+        localRole: getCoopController()?.role ?? "guest",
+        wave: globalScene.currentBattle?.waveIndex ?? -1,
+      });
+      if (terminal) {
+        break;
+      }
+      if (!decision.adopt) {
+        coopWarn(
+          "reward",
+          `biome market watcher op-gate rejected buy (${decision.reason}) seq=${seq} slot=${action.choice} - keep awaiting (Wave-2d)`,
+        );
+        continue;
       }
       const slot = action.choice;
       const data = action.data ?? [];
@@ -475,6 +511,18 @@ export class BiomeShopPhase extends SelectModifierPhase {
         coopBoughtSlot,
         [partySlot, globalScene.money],
       );
+      // Wave-2d: DUAL-RUN - COMMIT the typed market-buy intent through the operation primitive (the host
+      // validates + commits exactly once). No-op when the flag is OFF; the legacy relay above is the fallback.
+      commitRewardOwnerIntent({
+        surface: "market",
+        pinned: this.coopBiomeStart,
+        label: "biomeShop",
+        choice: coopBoughtSlot,
+        data: [partySlot, globalScene.money],
+        terminal: false,
+        localRole: getCoopController()?.role ?? "guest",
+        wave: globalScene.currentBattle?.waveIndex ?? -1,
+      });
     }
     if (cost !== -1 && this.pendingIndex >= 0 && this.pendingIndex < this.qtys.length) {
       this.qtys[this.pendingIndex] = Math.max(0, this.qtys[this.pendingIndex] - 1);
