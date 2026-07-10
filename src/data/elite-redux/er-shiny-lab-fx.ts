@@ -163,6 +163,7 @@ export function computeDist(buf, FW, FH, PAD) {
   let cx = 0;
   let cy = 0;
   let cnt = 0;
+  let maxY = -1;
   for (let py = 0; py < PH; py++) {
     for (let px = 0; px < PW; px++) {
       const sx = px - PAD;
@@ -173,6 +174,9 @@ export function computeDist(buf, FW, FH, PAD) {
         cx += px;
         cy += py;
         cnt++;
+        if (py > maxY) {
+          maxY = py;
+        }
       }
     }
   }
@@ -214,7 +218,16 @@ export function computeDist(buf, FW, FH, PAD) {
       d[y * PW + x] = v;
     }
   }
-  return { PW, PH, d, cx: cnt ? cx / cnt / PW : 0.5, cy: cnt ? cy / cnt / PH : 0.45 };
+  // fy = the FEET line (bottom of the silhouette, normalized) - ground-anchored
+  // FX center on this instead of guessing from the centroid.
+  return {
+    PW,
+    PH,
+    d,
+    cx: cnt ? cx / cnt / PW : 0.5,
+    cy: cnt ? cy / cnt / PH : 0.45,
+    fy: maxY >= 0 ? (maxY + 1) / PH : 0.82,
+  };
 }
 
 // ---- color clustering (k-means on the sprite's real palette) --------------
@@ -1588,6 +1601,1362 @@ AROUND.staticfield = (nx, ny, df, t) => {
   const s = h2(Math.floor(nx * 90) * 1.1 + Math.floor(t * 22) * 7.3, Math.floor(ny * 100) * 1.7);
   const m = clamp(1 - df / 24);
   return [s, s, s, s > 0.5 ? m * 0.5 : 0];
+};
+// Around FX in AROUND_OVERLAY are ALSO evaluated on sprite pixels (df=0) and
+// composited OVER the mon - so an orbit can pass in front of and behind the body.
+// Inside the effect: skip the "behind" half when df <= 0.01 (the sprite occludes it).
+export const AROUND_OVERLAY = new Set([
+  "helix",
+  "atomrings",
+  "windribbons",
+  "ribbonloop",
+  "planets",
+  "lightcage",
+  "chains",
+  "hexdome",
+  "orbitdebris",
+  "starcircle",
+  "cometorbit",
+  "emberspiral",
+  "runeorbit",
+  "fogbank",
+  "zaps",
+]);
+// Energy Helix: a double strand winding around the mon, front arcs over the sprite.
+AROUND.helix = (nx, ny, df, t, c) => {
+  const env = smooth(0.04, 0.16, ny) * smooth(0.98, 0.86, ny);
+  if (env <= 0) {
+    return [0, 0, 0, 0];
+  }
+  const phase = ny * 9 - t * 2.0;
+  let a = 0;
+  let bright = 0;
+  for (let s = 0; s < 2; s++) {
+    const p = phase + s * Math.PI;
+    const px = c.cx + Math.sin(p) * 0.18;
+    const depth = Math.cos(p);
+    if (depth < 0 && df <= 0.01) {
+      continue; // behind the mon
+    }
+    const strand = smooth(0.024, 0.007, Math.abs(nx - px));
+    const k = strand * (depth < 0 ? 0.45 : 1);
+    if (k > a) {
+      a = k;
+      bright = depth * 0.5 + 0.5;
+    }
+  }
+  const col = mix3(hx("1f6fd0"), hx("aef4ff"), bright);
+  return [col[0], col[1], col[2], a * env * 0.95];
+};
+// Atomic Orbit: three tilted electron rings; near halves sweep in front of the mon.
+AROUND.atomrings = (nx, ny, df, t, c) => {
+  let a = 0;
+  let col = [0.6, 0.95, 1.0];
+  for (let i = 0; i < 3; i++) {
+    const rot = (i * Math.PI) / 3 + t * 0.22 * (i % 2 ? -1 : 1);
+    const dx = nx - c.cx;
+    const dy = ny - c.cy;
+    const ux = dx * Math.cos(rot) + dy * Math.sin(rot);
+    const uy = -dx * Math.sin(rot) + dy * Math.cos(rot);
+    const px = ux / 0.36;
+    const py = uy / 0.13;
+    const rr = Math.hypot(px, py);
+    const front = py > 0;
+    if (!front && df <= 0.01) {
+      continue;
+    }
+    const ring = smooth(0.05, 0.012, Math.abs(rr - 1) * 0.36) * (front ? 1 : 0.4);
+    const ea = Math.atan2(py, px);
+    const et = t * 1.8 + i * 2.1;
+    const edot = Math.pow(Math.max(0, Math.cos(ea - et)), 40) * smooth(0.2, 0.05, Math.abs(rr - 1)) * (front ? 1.4 : 0);
+    const k = ring * 0.55 + edot;
+    if (k > a) {
+      a = k;
+      col = mix3(hx("48c8ff"), hx("fff2b0"), clamp(edot * 2));
+    }
+  }
+  return [col[0], col[1], col[2], clamp(a)];
+};
+// Nuclear Winter: soft glowing ash-snow drifting down through a toxic haze.
+AROUND.nuclearwinter = (nx, ny, df, t) => {
+  let k = 0;
+  for (let i = 0; i < 2; i++) {
+    const cell = 12 + i * 7;
+    const fx0 = nx + Math.sin((ny + t * 0.2) * 4 + i * 2) * 0.04;
+    const fy = ny - t * (0.09 + i * 0.05);
+    const cx0 = Math.floor(fx0 * cell);
+    const cy0 = Math.floor(fy * cell);
+    if (h2(cx0 * 1.3 + i * 7, cy0 * 1.7) < 0.76) {
+      continue;
+    }
+    const jx = h2(cx0 + 7, cy0) * 0.5 + 0.25;
+    const jy = h2(cx0, cy0 + 3) * 0.5 + 0.25;
+    const lx = fract(fx0 * cell) - jx;
+    const ly = fract(fy * cell) - jy;
+    const glowp = 0.6 + 0.4 * Math.sin(t * 2 + h2(cy0, cx0) * 15);
+    k = Math.max(k, Math.pow(clamp(1 - Math.hypot(lx, ly) * 2.8), 2.2) * glowp);
+  }
+  const m = clamp(1 - df / 26);
+  const haze = clamp(fbm(nx * 4, ny * 4 + t * 0.1) * clamp(1 - df / 30) * smooth(0.4, 0.9, ny) * 1.3 - 0.35);
+  return [mix(0.3, 0.8, k), mix(0.55, 1.0, k), mix(0.4, 0.82, k), clamp(k * 1.1 + haze * 0.5) * m];
+};
+// Sinister Sun: a black sun with a crimson corona looming behind the mon.
+AROUND.sinistersun = (nx, ny, df, t, c) => {
+  const sx = nx - c.cx;
+  const sy = (ny - (c.cy - 0.24)) * 1.05;
+  const r = Math.hypot(sx, sy);
+  const ang = Math.atan2(sy, sx);
+  const disc = smooth(0.012, -0.006, r - 0.15);
+  const jag = 0.018 * Math.sin(ang * 13 + t * 0.7) + 0.011 * Math.sin(ang * 29 - t * 1.2);
+  const corona = smooth(0.085, 0.0, Math.abs(r - 0.175 - jag)) * (0.65 + 0.35 * Math.sin(t * 2.6 + ang * 5));
+  const rays = Math.pow(Math.max(0, Math.sin(ang * 7 - t * 0.3)), 16) * smooth(0.5, 0.18, r) * smooth(0.12, 0.18, r);
+  const heat = clamp(corona + rays);
+  const col = mix3([0.04, 0.0, 0.03], [0.85, 0.09, 0.1], heat);
+  return [col[0], col[1], col[2], clamp(disc * 0.96 + corona * 0.85 + rays * 0.55)];
+};
+// HD Stars: smooth anti-aliased 4/5-point stars (deliberately NOT pixel art).
+const _starSdf = (lx, ly, points, rot) => {
+  const ang = Math.atan2(ly, lx) + rot;
+  const rr = Math.hypot(lx, ly);
+  const spoke = 0.5 + 0.5 * Math.cos(ang * points);
+  const rad = mix(0.1, 0.52, Math.pow(spoke, 3));
+  return smooth(rad, rad * 0.45, rr);
+};
+AROUND.hdstars = (nx, ny, df, t) => {
+  const cell = 6;
+  const cx0 = Math.floor(nx * cell);
+  const cy0 = Math.floor(ny * cell);
+  if (h2(cx0 * 2.1, cy0 * 1.9) < 0.45) {
+    return [0, 0, 0, 0];
+  }
+  const jx = h2(cx0 + 7, cy0) * 0.4 + 0.3;
+  const jy = h2(cx0, cy0 + 3) * 0.4 + 0.3;
+  const tw = Math.pow(0.5 + 0.5 * Math.sin(t * 2.2 + h2(cy0, cx0) * 20), 2);
+  const size = 0.55 + 0.5 * tw;
+  const lx = ((fract(nx * cell) - jx) * 2) / size;
+  const ly = ((fract(ny * cell) - jy) * 2) / size;
+  const s = _starSdf(lx, ly, h2(cx0, cy0) > 0.5 ? 5 : 4, t * 0.25 + cx0);
+  const glow = Math.pow(clamp(1 - Math.hypot(lx, ly) * 0.85), 3) * 0.55;
+  const cross =
+    (smooth(0.09, 0.02, Math.abs(lx)) + smooth(0.09, 0.02, Math.abs(ly))) * smooth(1.3, 0.2, Math.hypot(lx, ly)) * 0.4;
+  const m = clamp(1 - df / 26);
+  const col = mix3([1, 0.95, 0.78], [0.78, 0.9, 1], h2(cx0 * 3, cy0));
+  return [col[0], col[1], col[2], clamp(s * (0.6 + 0.4 * tw) + (glow + cross) * tw) * m];
+};
+// Double Team: red/blue after-images of the mon itself, offset left + right
+// (the triples "triple shadow" idea - needs the sprite sampler c.spr).
+AROUND.echoes = (nx, ny, df, t, c) => {
+  if (!c.spr) {
+    return [0, 0, 0, 0];
+  }
+  const sway = 0.012 * Math.sin(t * 1.5);
+  let out = [0, 0, 0, 0];
+  for (const [dir, tint] of [
+    [-1, [1.0, 0.28, 0.4]],
+    [1, [0.34, 0.6, 1.0]],
+  ]) {
+    const s2 = c.spr(nx - dir * (0.09 + sway * dir), ny + Math.abs(sway) * 0.4);
+    if (s2[3] > 0.02) {
+      const L = 0.3 + luma(s2[0], s2[1], s2[2]) * 0.7;
+      const a = 0.55 * s2[3];
+      if (a > out[3]) {
+        out = [tint[0] * L, tint[1] * L, tint[2] * L, a];
+      }
+    }
+  }
+  return out;
+};
+// Double Team Tri: like Double Team but the after-images are SOLID colours - the
+// two echoes take the two other hues of a triad built from the mon's dominant
+// colour (c.main, the most colorful cluster centroid), so mon + echoes read as a
+// complementary tri palette. Only a hint of the sprite's own shading is kept.
+AROUND.triecho = (nx, ny, df, t, c) => {
+  if (!c.spr) {
+    return [0, 0, 0, 0];
+  }
+  const sway = 0.014 * Math.sin(t * 1.5);
+  const base = c.main ? rgb2hsv(c.main[0], c.main[1], c.main[2]) : [0.6, 0.7, 0.85];
+  const sat = Math.max(0.6, base[1]);
+  let out = [0, 0, 0, 0];
+  for (const [dir, rot] of [
+    [-1, 1 / 3],
+    [1, 2 / 3],
+  ]) {
+    const s2 = c.spr(nx - dir * (0.1 + sway * dir), ny + Math.abs(sway) * 0.4);
+    if (s2[3] > 0.02) {
+      const L = luma(s2[0], s2[1], s2[2]);
+      const col = hsv2rgb(fract(base[0] + rot), sat, clamp(0.5 + L * 0.4));
+      const a = 0.68 * s2[3];
+      if (a > out[3]) {
+        out = [col[0], col[1], col[2], a];
+      }
+    }
+  }
+  return out;
+};
+// Ground Mist: white rolling fog hugging the mon's feet (pairs with Rising Mist).
+AROUND.lowmist = (nx, ny, df, t, c) => {
+  const gy = c?.fy ?? 0.82;
+  const reg = smooth(gy - 0.34, gy + 0.03, ny);
+  const n = fbm(nx * 4 + t * 0.14, ny * 5 - t * 0.06);
+  const m = clamp(1 - df / 20);
+  return [0.88, 0.92, 0.97, clamp(n * reg * m * 1.9 - 0.25) * 0.85];
+};
+
+// ============== v7 around FX ==============
+// Meteor Shower: fat burning streaks raking down diagonally, heads white-hot.
+AROUND.meteors = (nx, ny, df, t) => {
+  const p = nx * 0.76 + ny * 0.64;
+  const q = nx * 0.64 - ny * 0.76;
+  const lane = Math.floor(q * 6);
+  if (h2(lane, 5) < 0.42) {
+    return [0, 0, 0, 0];
+  }
+  const across = Math.abs(fract(q * 6) - 0.5);
+  const w = smooth(0.34, 0.08, across);
+  const ph = fract(p * 0.9 - t * (0.5 + h2(lane, 1) * 0.3) + h2(lane, 2));
+  const head = Math.pow(smooth(0.07, 0.0, ph), 2) * 1.6;
+  const trail = smooth(0.4, 0.0, ph) * 0.85;
+  const m = clamp(1 - df / 32);
+  const k = (head + trail) * w * m;
+  return [1, clamp(0.7 + head * 0.3), clamp(0.4 + head * 0.55), clamp(k)];
+};
+// Thunderstorm: driving rain always, jagged bolts + a sky flash in bursts.
+AROUND.stormstrikes = (nx, ny, df, t, c) => {
+  const m = clamp(1 - df / 32);
+  const colr = Math.floor(nx * 34);
+  const rph = fract(ny * 2.2 - t * (1.6 + h2(colr, 1) * 0.8) + h2(colr, 2));
+  const rain = smooth(0.0, 0.08, rph) * smooth(0.3, 0.08, rph) * (h2(colr, 4) > 0.35 ? 0.5 : 0);
+  const gloom = clamp(fbm(nx * 3, ny * 3 - t * 0.15) * smooth(0.5, 0.1, ny) * 1.2 - 0.4) * 0.5;
+  const slot = Math.floor(t * 1.6);
+  const on = h2(slot, 7) > 0.66;
+  let bolt = 0;
+  let flash = 0;
+  if (on) {
+    const colx = c.cx + (h2(slot, 3) - 0.5) * 0.55;
+    const jag = (fbm(2.5, ny * 6 + slot) - 0.5) * 0.16;
+    const age = fract(t * 1.6);
+    const decay = smooth(0.55, 0.05, age);
+    bolt = smooth(0.022, 0.004, Math.abs(nx - colx - jag)) * smooth(0.02, 0.18, ny) * decay * 1.3;
+    flash = 0.2 * decay;
+  }
+  const k = clamp(rain * 0.8 + gloom + bolt + flash);
+  const bright = clamp(0.55 + bolt + flash * 2);
+  return [bright * 0.92, bright * 0.95, bright, k * m];
+};
+// Rainbow Arc: a soft rainbow arches over the mon.
+AROUND.rainbowarc = (nx, ny, df, t, c) => {
+  if (ny > c.cy) {
+    return [0, 0, 0, 0];
+  }
+  const r = Math.hypot(nx - c.cx, (ny - c.cy) * 1.15);
+  const band = smooth(0.3, 0.34, r) * (1 - smooth(0.46, 0.5, r));
+  const hue = clamp((0.48 - r) / 0.2);
+  const m = clamp(1 - df / 34);
+  return [...hsv2rgb(hue * 0.8, 0.8, 1), band * m * 0.65 * (0.85 + 0.15 * Math.sin(t))];
+};
+// Autumn Gust: big warm leaves tumbling sideways on the wind, with a stem vein.
+AROUND.autumnleaves = (nx, ny, df, t) => {
+  const cell = 6;
+  const fx0 = nx - t * 0.2;
+  const fy = ny + Math.sin(nx * 5 + t * 1.3) * 0.035;
+  const cx0 = Math.floor(fx0 * cell);
+  const cy0 = Math.floor(fy * cell);
+  if (h2(cx0 * 1.7, cy0 * 1.3) < 0.72) {
+    return [0, 0, 0, 0];
+  }
+  const rot = t * (1 + h2(cx0, cy0)) + h2(cy0, cx0) * 7;
+  const lx0 = (fract(fx0 * cell) - 0.5) * 2.1;
+  const ly0 = (fract(fy * cell) - 0.5) * 2.1;
+  const lx = lx0 * Math.cos(rot) - ly0 * Math.sin(rot);
+  const ly = lx0 * Math.sin(rot) + ly0 * Math.cos(rot);
+  const leaf = Math.abs(lx) + Math.abs(ly * 1.7) < 0.4 ? 1 : 0;
+  const vein = Math.abs(ly) < 0.03 && Math.abs(lx) < 0.34 ? 0.25 : 0;
+  const shade = 0.75 + 0.25 * Math.sin(rot * 2);
+  const col = ramp(["7a3a10", "c05a14", "e0912a", "d4b03a"].map(hx), h2(cx0 * 3, cy0));
+  const m = clamp(1 - df / 26);
+  return [clamp(col[0] * shade - vein), clamp(col[1] * shade - vein), clamp(col[2] * shade - vein), leaf * m * 0.95];
+};
+// Music Notes: big golden eighth-notes bobbing upward around the mon.
+AROUND.musicnotes = (nx, ny, df, t) => {
+  const cell = 5;
+  const fy = ny + t * 0.14;
+  const cx0 = Math.floor(nx * cell);
+  const cy0 = Math.floor(fy * cell);
+  if (h2(cx0 * 2.3, cy0 * 1.9) < 0.7) {
+    return [0, 0, 0, 0];
+  }
+  const lx = (fract(nx * cell) - 0.5) * 2 + Math.sin(t * 2 + cy0 * 3) * 0.08;
+  const ly = (fract(fy * cell) - 0.5) * 2;
+  const head = Math.hypot((lx + 0.16) * 1.15, (ly + 0.3) * 1.5) < 0.2 ? 1 : 0;
+  const stem = Math.abs(lx - 0.0) < 0.045 && ly > -0.32 && ly < 0.42 ? 1 : 0;
+  const flag = ly > 0.14 && ly < 0.44 && lx > 0.0 && lx < 0.18 - (ly - 0.14) * 0.35 ? 1 : 0;
+  const note = Math.max(head, stem, flag);
+  const halo = Math.pow(clamp(1 - Math.hypot(lx, ly) * 1.4), 3) * 0.25;
+  const m = clamp(1 - df / 26);
+  const gold = 0.8 + 0.2 * Math.sin(t * 3 + cx0);
+  return [1 * gold, 0.9 * gold, 0.5 * gold, clamp(note + halo) * m];
+};
+// Butterflies: bright wings genuinely flapping as they wander around the mon.
+AROUND.butterflies = (nx, ny, df, t) => {
+  const cell = 5;
+  const fx0 = nx + Math.sin(t * 0.8 + ny * 4) * 0.05;
+  const fy = ny + Math.cos(t * 0.6 + nx * 4) * 0.05;
+  const cx0 = Math.floor(fx0 * cell);
+  const cy0 = Math.floor(fy * cell);
+  if (h2(cx0 * 1.9, cy0 * 2.1) < 0.74) {
+    return [0, 0, 0, 0];
+  }
+  const flap = 0.3 + 0.7 * Math.abs(Math.sin(t * 5 + h2(cx0, cy0) * 9));
+  const lx = (fract(fx0 * cell) - 0.5) * 2.2;
+  const ly = (fract(fy * cell) - 0.5) * 2.2;
+  const wing =
+    Math.hypot((Math.abs(lx) - 0.2 * flap) / (0.22 * flap), ly / 0.3) < 1 && Math.abs(lx) > 0.03 ? 1 : 0;
+  const bodySeg = Math.abs(lx) < 0.035 && Math.abs(ly) < 0.2 ? 1 : 0;
+  const col = hsv2rgb(fract(h2(cy0, cx0) * 3), 0.75, 1);
+  const m = clamp(1 - df / 24);
+  if (bodySeg) {
+    return [0.2, 0.15, 0.1, m * 0.95];
+  }
+  const patt = 0.75 + 0.25 * Math.sin(lx * 30 + ly * 20);
+  return [col[0] * patt, col[1] * patt, col[2] * patt, wing * m * 0.95];
+};
+// Bat Swarm: dark flapping silhouettes wheeling through the gloom.
+AROUND.batswarm = (nx, ny, df, t) => {
+  const cell = 5.5;
+  const fx0 = nx - t * 0.12;
+  const fy = ny + Math.sin(t * 2 + Math.floor(fx0 * cell)) * 0.03;
+  const cx0 = Math.floor(fx0 * cell);
+  const cy0 = Math.floor(fy * cell);
+  if (h2(cx0 * 2.7, cy0 * 1.3) < 0.7) {
+    return [0, 0, 0, 0];
+  }
+  const lx = (fract(fx0 * cell) - 0.5) * 2.2;
+  const ly = (fract(fy * cell) - 0.5) * 2.2;
+  const flap = Math.sin(t * 8 + h2(cx0, cy0) * 9) * 0.35;
+  const wingY = Math.abs(lx) * (0.5 + flap);
+  const wing = Math.abs(ly - wingY + 0.1) < 0.12 - Math.abs(lx) * 0.12 && Math.abs(lx) < 0.55 ? 1 : 0;
+  const head = Math.hypot(lx / 0.09, (ly + 0.12) / 0.12) < 1 ? 1 : 0;
+  const m = clamp(1 - df / 28);
+  return [0.08, 0.05, 0.12, Math.max(wing, head) * m * 0.95];
+};
+// Moonrise: a pale crescent and a few stars hanging behind one shoulder.
+AROUND.moonrise = (nx, ny, df, t, c) => {
+  const mx = c.cx - 0.27;
+  const my = c.cy - 0.3;
+  const r1 = Math.hypot(nx - mx, ny - my);
+  const r2 = Math.hypot(nx - mx + 0.045, ny - my - 0.015);
+  const cres = smooth(0.008, 0.0, r1 - 0.11) * smooth(0.0, 0.012, r2 - 0.105);
+  const glow = Math.pow(clamp(1 - r1 / 0.3), 3) * 0.25;
+  let star = 0;
+  if (ny < c.cy) {
+    const sc = 16;
+    const scx = Math.floor(nx * sc);
+    const scy = Math.floor(ny * sc);
+    if (h2(scx * 1.7, scy * 2.3) > 0.85) {
+      const slx = fract(nx * sc) - (h2(scx + 3, scy) * 0.5 + 0.25);
+      const sly = fract(ny * sc) - (h2(scx, scy + 5) * 0.5 + 0.25);
+      const tw = Math.pow(0.5 + 0.5 * Math.sin(t * 2.5 + h2(scy, scx) * 25), 3);
+      star = Math.pow(clamp(1 - Math.hypot(slx, sly) * 4), 2) * tw;
+    }
+  }
+  const a = clamp(cres * 0.95 + glow + star);
+  return [0.92, 0.93, 0.85, a];
+};
+// Geyser: real droplet arcs - water beads launch up and fall in parabolas.
+AROUND.geyser = (nx, ny, df, t, c) => {
+  const bx = c.cx;
+  const by = c.fy ?? c.cy + 0.34; // erupts from the feet line
+  let k = 0;
+  for (let i = 0; i < 14; i++) {
+    const ph = fract(t * 0.55 + h2(i, 1));
+    const vx = (h2(i, 2) - 0.5) * 0.55;
+    const px = bx + vx * ph;
+    const py = by - (1.15 * ph - 1.3 * ph * ph) * (0.5 + h2(i, 3) * 0.35);
+    const d = Math.hypot(nx - px, ny - py);
+    k = Math.max(k, Math.pow(clamp(1 - d * 14), 1.8) * (1 - ph * 0.35));
+  }
+  const mist = clamp(fbm(nx * 6, ny * 6 + t) * smooth(0.3, 0.05, Math.hypot(nx - bx, (ny - by) * 1.6)) - 0.28) * 0.8;
+  return [0.68, 0.87, 1.0, clamp(k * 1.5 + mist)];
+};
+// Whirlpool: swirling water rings coiling at the feet.
+AROUND.whirlpool = (nx, ny, df, t, c) => {
+  const gy = c.fy ?? c.cy + 0.34; // ellipse CENTERED on the feet line, not hanging below it
+  const ey = (ny - gy) * 2.6;
+  const fx0 = nx - c.cx;
+  const r = Math.hypot(fx0, ey);
+  const ang = Math.atan2(ey, fx0);
+  const swirl = Math.sin(ang * 3 + r * 26 - t * 4);
+  const band = smooth(0.5, 0.42, r) * smooth(0.06, 0.14, r) * (ny > c.cy ? 1 : 0);
+  const a = smooth(0.35, 0.9, swirl) * band;
+  return [0.4 + a * 0.3, 0.7, 1.0, a * 0.8];
+};
+// Wind Ribbons: white wind streams wrap the body, front and behind - and they
+// stay wrapped AROUND the mon instead of smearing across the whole frame.
+AROUND.windribbons = (nx, ny, df, t, c) => {
+  let a = 0;
+  let bright = 0.7;
+  const hug = smooth(0.5, 0.34, Math.abs(nx - c.cx));
+  if (hug <= 0) {
+    return [0, 0, 0, 0];
+  }
+  for (let b = 0; b < 3; b++) {
+    const py = c.cy - 0.22 + b * 0.19 + 0.025 * Math.sin(t * 2 + b * 2 + nx * 6);
+    const band = smooth(0.04, 0.012, Math.abs(ny - py));
+    if (band <= 0) {
+      continue;
+    }
+    const ph = fract(nx * 1.6 - t * (0.5 + b * 0.13) + b * 0.37);
+    const front = Math.sin(ph * Math.PI * 2) > 0;
+    if (!front && df <= 0.01) {
+      continue;
+    }
+    const streak = smooth(0.1, 0.4, ph) * smooth(0.95, 0.55, ph);
+    const k = band * streak * (front ? 1 : 0.45) * hug;
+    if (k > a) {
+      a = k;
+      bright = front ? 1 : 0.55;
+    }
+  }
+  return [0.85 * bright, 0.95 * bright, bright, a * 0.9];
+};
+// Ribbon Dancer: one wide rainbow ribbon looping around the mon.
+AROUND.ribbonloop = (nx, ny, df, t, c) => {
+  const py = c.cy + 0.26 * Math.sin(nx * 5.5 - t * 1.3);
+  const seg = Math.sin(nx * 2.75 - t * 0.65);
+  const front = seg > 0;
+  if (!front && df <= 0.01) {
+    return [0, 0, 0, 0];
+  }
+  const band = smooth(0.06, 0.02, Math.abs(ny - py));
+  const env = smooth(0.02, 0.12, nx) * smooth(0.98, 0.88, nx);
+  const col = hsv2rgb(fract(nx * 0.8 + t * 0.12), 0.85, front ? 1 : 0.55);
+  return [col[0], col[1], col[2], band * env * (front ? 0.95 : 0.5)];
+};
+// Blade Flurry: bright slash arcs flashing across.
+AROUND.slashes = (nx, ny, df, t, c) => {
+  let a = 0;
+  for (let i = 0; i < 3; i++) {
+    const ph = fract(t * 0.55 + i / 3);
+    const env = smooth(0.02, 0.1, ph) * smooth(0.4, 0.18, ph);
+    if (env <= 0) {
+      continue;
+    }
+    const rot = h2(Math.floor(t * 0.55 + i / 3) * 3 + i, 1) * Math.PI;
+    const dx = nx - c.cx;
+    const dy = ny - c.cy;
+    const ux = dx * Math.cos(rot) + dy * Math.sin(rot);
+    const uy = -dx * Math.sin(rot) + dy * Math.cos(rot);
+    const core = smooth(0.022, 0.004, Math.abs(uy - ux * ux * 0.6)) * smooth(0.55, 0.35, Math.abs(ux));
+    const glow = smooth(0.07, 0.01, Math.abs(uy - ux * ux * 0.6)) * smooth(0.55, 0.3, Math.abs(ux)) * 0.45;
+    a = Math.max(a, (core * 1.4 + glow) * env);
+  }
+  return [1, 0.98, 0.88, clamp(a * 1.3)];
+};
+// Tiny Planets: a shaded planet + moons orbiting through the scene.
+AROUND.planets = (nx, ny, df, t, c) => {
+  let out = [0, 0, 0, 0];
+  const bodies = [
+    [0.5, 0.34, 0.13, 0.05, 0.58, true],
+    [2.4, 0.3, 0.11, 0.028, 0.12, false],
+    [1.3, 0.38, 0.16, 0.02, 0.86, false],
+  ];
+  for (const [spd, rx, ry, rad, hue, ringed] of bodies) {
+    const th = t * spd;
+    const px = c.cx + Math.cos(th) * rx;
+    const py = c.cy + Math.sin(th) * ry;
+    const front = Math.sin(th) > 0;
+    if (!front && df <= 0.01) {
+      continue;
+    }
+    const d = Math.hypot(nx - px, ny - py);
+    const disc = smooth(rad, rad * 0.75, d);
+    if (disc > 0) {
+      const shade = clamp(0.45 + ((px - nx) / rad) * 0.4);
+      const col = hsv2rgb(hue, 0.6, (front ? 1 : 0.5) * shade);
+      if (disc * 0.95 > out[3]) {
+        out = [col[0], col[1], col[2], disc * 0.95];
+      }
+    }
+    if (ringed) {
+      const ring = smooth(0.006, 0.0, Math.abs(Math.hypot((nx - px) * 1, (ny - py) * 3.2) - rad * 1.9));
+      if (ring * 0.8 > out[3]) {
+        const col = hsv2rgb(hue, 0.3, front ? 0.95 : 0.5);
+        out = [col[0], col[1], col[2], ring * 0.8];
+      }
+    }
+  }
+  return out;
+};
+// Clockwork: golden gears turning behind the mon.
+AROUND.clockwork = (nx, ny, df, t, c) => {
+  let a = 0;
+  let hub = 0;
+  const gears = [
+    [c.cx - 0.2, c.cy - 0.12, 0.14, 8, 0.5],
+    [c.cx + 0.18, c.cy + 0.08, 0.1, 7, -0.7],
+    [c.cx + 0.02, c.cy - 0.3, 0.08, 6, 0.9],
+  ];
+  for (const [gx, gy, rad, teeth, spd] of gears) {
+    const dx = nx - gx;
+    const dy = ny - gy;
+    const r = Math.hypot(dx, dy);
+    const ang = Math.atan2(dy, dx);
+    const tooth = Math.sin(ang * teeth - t * spd * teeth) > 0 ? 0.026 : 0;
+    a = Math.max(a, smooth(0.022, 0.0, Math.abs(r - rad - tooth)));
+    a = Math.max(a, smooth(0.014, 0.0, Math.abs(r - rad * 0.42)));
+    const spoke = Math.pow(Math.max(0, Math.cos(ang * 3 - t * spd * 3)), 30) * (r < rad * 0.95 && r > rad * 0.42 ? 1 : 0);
+    a = Math.max(a, spoke * 0.8);
+    hub = Math.max(hub, smooth(rad * 0.18, 0.0, r));
+  }
+  const m = clamp(1 - df / 30);
+  const k = clamp(a + hub) * m;
+  return [0.88, 0.7, 0.3, k * 0.92];
+};
+// Fireworks: shells bursting in sequence around the mon.
+AROUND.fireworks = (nx, ny, df, t) => {
+  let out = [0, 0, 0, 0];
+  for (let i = 0; i < 2; i++) {
+    const slot = Math.floor(t * 0.7 + i * 0.5);
+    const age = fract(t * 0.7 + i * 0.5);
+    const bx = 0.15 + h2(slot, 1 + i) * 0.7;
+    const by = 0.1 + h2(slot, 3 + i) * 0.35;
+    const dx = nx - bx;
+    const dy = ny - by;
+    const r = Math.hypot(dx, dy);
+    const ang = Math.atan2(dy, dx);
+    const ray = Math.pow(Math.max(0, Math.cos(ang * 9 + h2(slot, 5) * 9)), 14);
+    const shell = smooth(0.075, 0.0, Math.abs(r - age * 0.42)) * ray * (1 - age) * 1.4;
+    const core = Math.pow(clamp(1 - r * 6), 2) * smooth(0.3, 0.05, age);
+    const spark = h2(Math.floor(nx * 40), Math.floor(ny * 40) + slot) > 0.94 && r < age * 0.44 ? (1 - age) * 0.9 : 0;
+    const k = clamp(shell + core + spark);
+    if (k > out[3]) {
+      const col = hsv2rgb(fract(h2(slot, 8) + i * 0.3), 0.75, 1);
+      out = [col[0], col[1], col[2], k];
+    }
+  }
+  return out;
+};
+// Sand Gust: stinging desert wind blowing through.
+AROUND.sandgust = (nx, ny, df, t) => {
+  const row = Math.floor(ny * 36);
+  const ph = fract(nx * 1.6 - t * (0.9 + h2(row, 1) * 0.7) + h2(row, 2));
+  const streak = smooth(0.0, 0.08, ph) * smooth(0.4, 0.08, ph) * (h2(row, 4) > 0.45 ? 1 : 0);
+  const haze = clamp(fbm(nx * 3 - t * 0.5, ny * 5) * smooth(0.25, 0.6, ny) - 0.3) * 0.6;
+  const m = clamp(1 - df / 28);
+  return [0.85, 0.72, 0.48, clamp(streak * 0.7 + haze) * m];
+};
+// Spotlights: two stage beams sweeping from above.
+AROUND.spotlights = (nx, ny, df, t) => {
+  let a = 0;
+  for (const s of [-1, 1]) {
+    const ox = 0.5 + s * 0.42;
+    const swing = Math.sin(t * 0.8 + s) * 0.35;
+    const dirx = -s * 0.35 + swing;
+    const px = ox + dirx * ny;
+    a = Math.max(a, smooth(0.1 * (0.3 + ny), 0.0, Math.abs(nx - px)) * clamp(0.9 - ny * 0.4));
+  }
+  const m = clamp(1 - df / 36);
+  return [1, 0.96, 0.8, a * m * 0.55];
+};
+// Cage of Light: golden bars enclose the mon - the near bars pass in front.
+AROUND.lightcage = (nx, ny, df, t, c) => {
+  const s = 7;
+  const idx = Math.floor(nx * s);
+  const front = idx % 2 === 0;
+  if (!front && df <= 0.01) {
+    return [0, 0, 0, 0];
+  }
+  const wob = 0.015 * Math.sin(t * 1.2 + idx * 2);
+  const bar = smooth(0.055, 0.02, Math.abs(fract(nx * s + wob) - 0.5));
+  const env = smooth(0.02, 0.12, ny) * smooth(0.98, 0.88, ny);
+  const pulse = 0.8 + 0.2 * Math.sin(t * 2.5 + idx);
+  return [1 * pulse, 0.85 * pulse, 0.4 * pulse, bar * env * (front ? 0.9 : 0.5)];
+};
+// Chained: actual iron links - alternating flat and edge-on ovals - orbiting the body.
+AROUND.chains = (nx, ny, df, t, c) => {
+  const dx = nx - c.cx;
+  const dy = (ny - c.cy) * 1.25;
+  const rr = Math.hypot(dx, dy);
+  const ang = Math.atan2(dy, dx);
+  const front = dy > 0;
+  if (!front && df <= 0.01) {
+    return [0, 0, 0, 0];
+  }
+  const R = 0.38;
+  const u = ((ang + t * 0.45) / (Math.PI * 2)) * 12;
+  const li = Math.floor(u);
+  const lu = (fract(u) - 0.5) * 0.2;
+  const lv = rr - R;
+  const flat = li % 2 === 0;
+  const ringd = Math.abs(Math.hypot(lu / (flat ? 0.085 : 0.05), lv / (flat ? 0.035 : 0.014)) - 1);
+  const link = smooth(0.55, 0.15, ringd);
+  const glint = Math.pow(Math.max(0, Math.sin(ang * 6 + t * 2)), 10) * 0.45;
+  const v = (front ? 0.58 : 0.32) + glint;
+  return [v, v, clamp(v * 1.06), clamp(link * 1.4) * (front ? 0.95 : 0.55)];
+};
+// Feather Fall: big soft feathers rocking down, each with a visible quill.
+AROUND.featherfall = (nx, ny, df, t) => {
+  const cell = 5.5;
+  const fy = ny - t * 0.09;
+  const fx0 = nx + Math.sin((ny + t * 0.2) * 5) * 0.05;
+  const cx0 = Math.floor(fx0 * cell);
+  const cy0 = Math.floor(fy * cell);
+  if (h2(cx0 * 1.3, cy0 * 2.3) < 0.72) {
+    return [0, 0, 0, 0];
+  }
+  const rot = Math.sin(t * 2 + h2(cx0, cy0) * 8) * 0.7 + 0.5;
+  const lx0 = (fract(fx0 * cell) - 0.5) * 2.1;
+  const ly0 = (fract(fy * cell) - 0.5) * 2.1;
+  const lx = lx0 * Math.cos(rot) - ly0 * Math.sin(rot);
+  const ly = lx0 * Math.sin(rot) + ly0 * Math.cos(rot);
+  const body = Math.hypot(lx / 0.42, ly / 0.16) < 1 && lx > -0.42 ? 1 : 0;
+  const quill = Math.abs(ly) < 0.022 && Math.abs(lx) < 0.42 ? 0.3 : 0;
+  const barbs = 0.85 + 0.15 * Math.sin(lx * 40 + ly * 8);
+  const m = clamp(1 - df / 26);
+  const v = (0.86 + h2(cy0, cx0) * 0.14) * barbs;
+  return [clamp(v - quill), clamp(v - quill), clamp(v * 1.03 - quill), body * m * 0.92];
+};
+// Will-o-Wisps: teal spirit orbs with fading trails circling the mon.
+AROUND.spiritorbs = (nx, ny, df, t, c) => {
+  let a = 0;
+  for (let i = 0; i < 3; i++) {
+    const spd = 0.7 + i * 0.25;
+    const rx = 0.26 + i * 0.07;
+    const ry = 0.16 + i * 0.05;
+    for (let k = 0; k < 5; k++) {
+      const th = t * spd + i * 2.1 - k * 0.12;
+      const px = c.cx + Math.cos(th) * rx;
+      const py = c.cy + Math.sin(th * 1.3) * ry;
+      const d = Math.hypot(nx - px, ny - py);
+      a = Math.max(a, smooth(0.045, 0.005, d) * (1 - k / 5) * (k === 0 ? 1 : 0.5));
+    }
+  }
+  return [0.45, 1.0, 0.9, clamp(a) * 0.95];
+};
+// Event Horizon: a black hole looms behind - dark disc, lensing ring, infalling streaks.
+AROUND.eventhorizon = (nx, ny, df, t, c) => {
+  const dx = nx - c.cx;
+  const dy = ny - c.cy;
+  const r = Math.hypot(dx, dy);
+  const ang = Math.atan2(dy, dx);
+  const disc = smooth(0.01, -0.01, r - 0.17);
+  const ring = smooth(0.02, 0.004, Math.abs(r - 0.19)) * (0.8 + 0.2 * Math.sin(ang * 3 + t));
+  const spiral = smooth(0.55, 0.95, Math.sin(ang * 2 + Math.log(r + 0.05) * 10 + t * 1.5)) * smooth(0.42, 0.2, r) * smooth(0.16, 0.22, r);
+  const col = mix3([0.01, 0.0, 0.03], [0.85, 0.6, 1.0], clamp(ring + spiral * 0.7));
+  return [col[0], col[1], col[2], clamp(disc * 0.97 + ring * 0.9 + spiral * 0.5)];
+};
+// Card Storm: playing cards flipping end-over-end around the mon.
+AROUND.cardstorm = (nx, ny, df, t) => {
+  const cell = 7;
+  const fy = ny + t * 0.12;
+  const cx0 = Math.floor(nx * cell);
+  const cy0 = Math.floor(fy * cell);
+  if (h2(cx0 * 2.9, cy0 * 1.7) < 0.8) {
+    return [0, 0, 0, 0];
+  }
+  const flip = Math.cos(t * 3 + h2(cx0, cy0) * 9);
+  const lx = (fract(nx * cell) - 0.5) * 2.1;
+  const ly = (fract(fy * cell) - 0.5) * 2.1;
+  const card = Math.abs(lx) < 0.42 * Math.max(0.08, Math.abs(flip)) && Math.abs(ly) < 0.55 ? 1 : 0;
+  const face = flip > 0;
+  const pip = face && Math.hypot(lx / Math.max(0.12, Math.abs(flip)), ly) < 0.16 ? 1 : 0;
+  const red = h2(cx0, cy0 + 1) > 0.5;
+  const m = clamp(1 - df / 26);
+  const base = face ? 0.97 : 0.4;
+  return [
+    clamp(base - pip * (red ? 0.1 : 0.85) + (face ? 0 : 0.1)),
+    clamp(base - pip * 0.85),
+    clamp(base - pip * 0.85 + (face ? 0 : 0.25)),
+    card * m * 0.95,
+  ];
+};
+// Coin Rain: spinning gold coins tumbling down.
+AROUND.coinrain = (nx, ny, df, t) => {
+  const cell = 9;
+  const fy = ny - t * 0.28;
+  const cx0 = Math.floor(nx * cell);
+  const cy0 = Math.floor(fy * cell);
+  if (h2(cx0 * 1.9, cy0 * 2.7) < 0.8) {
+    return [0, 0, 0, 0];
+  }
+  const spin = Math.sin(t * 5 + h2(cx0, cy0) * 9);
+  const lx = (fract(nx * cell) - 0.5) * 2.1;
+  const ly = (fract(fy * cell) - 0.5) * 2.1;
+  const w = Math.max(0.12, Math.abs(spin));
+  const rd = Math.hypot(lx / w, ly / 0.42);
+  const coin = rd < 1 ? 1 : 0;
+  const rim = rd > 0.72 ? 0.28 : 0;
+  const glint = Math.pow(Math.max(0, spin), 6) * (rd < 0.7 ? 1 : 0);
+  const m = clamp(1 - df / 26);
+  return [clamp(0.88 - rim + glint * 0.12), clamp(0.7 - rim + glint * 0.28), clamp(0.22 - rim * 0.1 + glint * 0.3), coin * m];
+};
+// Levitating Shards: crystal fragments bobbing in slow orbit.
+AROUND.shardlevitate = (nx, ny, df, t, c) => {
+  let out = [0, 0, 0, 0];
+  for (let i = 0; i < 6; i++) {
+    const th = (i / 6) * Math.PI * 2 + t * 0.2;
+    const px = c.cx + Math.cos(th) * (0.3 + h2(i, 1) * 0.1);
+    const py = c.cy + Math.sin(th) * 0.2 + Math.sin(t * 1.5 + i * 1.7) * 0.03;
+    const rot = t * 0.5 + i;
+    const dx0 = nx - px;
+    const dy0 = ny - py;
+    const lx = dx0 * Math.cos(rot) - dy0 * Math.sin(rot);
+    const ly = dx0 * Math.sin(rot) + dy0 * Math.cos(rot);
+    const shard = Math.abs(lx) * 2.2 + Math.abs(ly) * 0.9 < 0.062 ? 1 : 0;
+    if (shard) {
+      const grad = clamp(0.6 + ly * 8);
+      const glint = Math.pow(Math.max(0, Math.sin(t * 3 + i * 2)), 8) * 0.6;
+      out = [clamp(0.55 * grad + glint), clamp(0.85 * grad + glint), clamp(1.0 * grad + glint), 0.95];
+    } else {
+      const halo = Math.pow(clamp(1 - Math.hypot(dx0, dy0) * 14), 2) * 0.3;
+      if (halo > out[3]) {
+        out = [0.5, 0.8, 1.0, halo];
+      }
+    }
+  }
+  const m = clamp(1 - df / 30);
+  return [out[0], out[1], out[2], out[3] * m];
+};
+// Smoke Rings: lazy vapor toroids rising and widening.
+AROUND.smokerings = (nx, ny, df, t, c) => {
+  let a = 0;
+  for (let i = 0; i < 3; i++) {
+    const ph = fract(t * 0.14 + i / 3);
+    const py = c.cy + 0.32 - ph * 0.75;
+    const rw = 0.08 + ph * 0.3;
+    const d = Math.abs(Math.hypot((nx - c.cx) / rw, (ny - py) / 0.045) - 1);
+    a = Math.max(a, smooth(0.5, 0.1, d) * (1 - ph) * 0.7);
+  }
+  return [0.75, 0.75, 0.8, a];
+};
+// Radar Sweep: a green HUD ring with a sweeping wedge and blips.
+AROUND.radarsweep = (nx, ny, df, t, c) => {
+  const dx = nx - c.cx;
+  const dy = (ny - c.cy) * 1.1;
+  const r = Math.hypot(dx, dy);
+  const ang = Math.atan2(dy, dx);
+  const ring = smooth(0.008, 0.0, Math.abs(r - 0.4)) + smooth(0.005, 0.0, Math.abs(r - 0.26)) * 0.5;
+  const sweepd = fract((ang - t * 1.1) / (Math.PI * 2));
+  const wedge = smooth(0.25, 0.0, sweepd) * smooth(0.44, 0.36, r) * 0.5;
+  const blip = h2(Math.floor(nx * 20), Math.floor(ny * 20)) > 0.96 && r < 0.42 ? Math.pow(1 - sweepd, 3) : 0;
+  const k = clamp(ring * 0.8 + wedge + blip);
+  return [0.3, 1.0, 0.5, k * 0.85];
+};
+// Hell Sigil: a burning pentagram seal beneath the mon.
+AROUND.hellsigil = (nx, ny, df, t, c) => {
+  const ex = nx - c.cx;
+  const ey = (ny - (c.cy + 0.34)) * 2.6;
+  const r = Math.hypot(ex, ey);
+  const ring = smooth(0.025, 0.0, Math.abs(r - 0.22));
+  let star = 0;
+  for (let i = 0; i < 5; i++) {
+    const a1 = (i / 5) * Math.PI * 2 + t * 0.3;
+    const a2 = (((i + 2) % 5) / 5) * Math.PI * 2 + t * 0.3;
+    const x1 = Math.cos(a1) * 0.22;
+    const y1 = Math.sin(a1) * 0.22;
+    const x2 = Math.cos(a2) * 0.22;
+    const y2 = Math.sin(a2) * 0.22;
+    const ddx = x2 - x1;
+    const ddy = y2 - y1;
+    const tt = clamp(((ex - x1) * ddx + (ey - y1) * ddy) / (ddx * ddx + ddy * ddy));
+    star = Math.max(star, smooth(0.012, 0.0, Math.hypot(ex - x1 - ddx * tt, ey - y1 - ddy * tt)));
+  }
+  const pulse = 0.7 + 0.3 * Math.sin(t * 2.8);
+  return [1.0, 0.15, 0.08, clamp(ring + star) * pulse * 0.95];
+};
+// Laser Show: colored beams fanning from behind the mon.
+AROUND.lasershow = (nx, ny, df, t, c) => {
+  let out = [0, 0, 0, 0];
+  for (let i = 0; i < 5; i++) {
+    const ang = -Math.PI / 2 + (i - 2) * 0.35 + Math.sin(t * 0.9 + i) * 0.25;
+    const dx = nx - c.cx;
+    const dy = ny - (c.cy + 0.1);
+    const along = dx * Math.cos(ang) + dy * Math.sin(ang);
+    const across = -dx * Math.sin(ang) + dy * Math.cos(ang);
+    if (along < 0.05) {
+      continue;
+    }
+    const beam = smooth(0.012, 0.002, Math.abs(across)) * clamp(1 - along * 0.8);
+    if (beam > out[3]) {
+      const col = hsv2rgb(fract(i * 0.2 + t * 0.05), 0.9, 1);
+      out = [col[0], col[1], col[2], beam];
+    }
+  }
+  return [out[0], out[1], out[2], out[3] * 0.85];
+};
+// Glyph Rain: green data columns cascading behind the mon.
+AROUND.glyphrain = (nx, ny, df, t) => {
+  const gx = Math.floor(nx * 16);
+  const ph = fract(ny * 1.4 - t * (0.45 + h2(gx, 1) * 0.5) + h2(gx, 3));
+  const on = h2(gx, Math.floor(ny * 26) + Math.floor(t * 6)) > 0.45 ? 1 : 0;
+  const head = smooth(0.1, 0.0, ph);
+  const trail = smooth(0.5, 0.04, ph) * 0.6;
+  const m = clamp(1 - df / 30);
+  const k = (head + trail) * on * m;
+  return [clamp(0.3 + head * 0.7), 1.0, 0.45, clamp(k) * 0.9];
+};
+// Ring of Fire: a burning ground ring encircling the feet.
+AROUND.firering = (nx, ny, df, t, c) => {
+  const ex = nx - c.cx;
+  const ey = (ny - (c.fy ?? c.cy + 0.33)) * 2.7; // ring centered on the feet line
+  const r = Math.hypot(ex, ey);
+  const ang = Math.atan2(ey, ex);
+  const n = fbm(ang * 1.6 + 5, t * 1.4);
+  const lift = smooth(0.3, 0.0, Math.abs(r - 0.26)) * smooth(0.0, -0.35, ey) * n;
+  const ring = smooth(0.05, 0.0, Math.abs(r - 0.26)) * (0.6 + 0.4 * n);
+  const k = clamp(ring + lift * 1.6);
+  return [...ramp(G.inferno, clamp(0.35 + k * 0.6)), clamp(k * 1.3)];
+};
+// Creeping Shadow: a dark pool below, tendrils climbing the air behind.
+AROUND.creepingshadow = (nx, ny, df, t, c) => {
+  const pool = smooth(0.45, 0.1, Math.hypot(nx - c.cx, (ny - (c.fy ?? c.cy + 0.36)) * 3.2)) * 0.85;
+  const n = fbm(nx * 6 + 9, ny * 5 - t * 0.5);
+  const tendril = clamp(n * clamp(1 - df / 12) * smooth(0.2, 0.7, ny) * 2.2 - 0.75);
+  const a = clamp(pool + tendril);
+  return [0.06, 0.02, 0.12, a * 0.92];
+};
+// Equalizer: audio bars bouncing along the ground line (= the feet line).
+AROUND.equalizer = (nx, ny, df, t, c) => {
+  const gy = (c?.fy ?? 0.96) + 0.02;
+  const gx = Math.floor(nx * 18);
+  const hgt = 0.06 + 0.2 * h2(gx, Math.floor(t * 5)) * (0.6 + 0.4 * Math.sin(t * 3 + gx));
+  const bar = Math.abs(fract(nx * 18) - 0.5) < 0.32 && ny > gy - hgt && ny < gy + 0.01 ? 1 : 0;
+  const m = clamp(1 - df / 26);
+  const col = hsv2rgb(mix(0.35, 0.0, clamp(hgt / 0.26)), 0.9, 1);
+  return [col[0], col[1], col[2], bar * m * 0.95];
+};
+// Confetti: fat multicolor scraps tumbling down thick. Party time.
+AROUND.confetti = (nx, ny, df, t) => {
+  const m = clamp(1 - df / 28);
+  for (let layer = 0; layer < 2; layer++) {
+    const cell = 8 + layer * 4;
+    const fy = ny - t * (0.18 + layer * 0.08);
+    const fx0 = nx + Math.sin((ny + t * 0.4) * 6 + layer * 2) * 0.025;
+    const cx0 = Math.floor(fx0 * cell);
+    const cy0 = Math.floor(fy * cell);
+    if (h2(cx0 * 1.7 + layer * 9, cy0 * 2.1) < 0.55) {
+      continue;
+    }
+    const rot = t * 3 + h2(cx0, cy0) * 9;
+    const lx0 = (fract(fx0 * cell) - 0.5) * 2.2;
+    const ly0 = (fract(fy * cell) - 0.5) * 2.2;
+    const lx = lx0 * Math.cos(rot) - ly0 * Math.sin(rot);
+    const ly = lx0 * Math.sin(rot) + ly0 * Math.cos(rot);
+    const flutter = Math.max(0.25, Math.abs(Math.sin(rot * 1.4)));
+    if (Math.abs(lx) < 0.4 && Math.abs(ly) < 0.16 * flutter) {
+      const col = hsv2rgb(fract(h2(cy0, cx0) * 5), 0.9, 1);
+      const shade = 0.7 + 0.3 * Math.sin(rot);
+      return [col[0] * shade, col[1] * shade, col[2] * shade, m];
+    }
+  }
+  return [0, 0, 0, 0];
+};
+// Personal Raincloud: a gloomy cloud rains on the mon alone.
+AROUND.raincloud = (nx, ny, df, t, c) => {
+  const cy0 = c.cy - 0.42;
+  let cloud = 0;
+  for (const [ox, s] of [
+    [-0.1, 0.09],
+    [0.0, 0.12],
+    [0.1, 0.08],
+  ]) {
+    cloud = Math.max(cloud, smooth(s, s * 0.4, Math.hypot(nx - c.cx - ox, (ny - cy0) * 1.6)));
+  }
+  const puff = fbm(nx * 8 + t * 0.2, ny * 8) * 0.35;
+  const colr = Math.floor(nx * 44);
+  const under = ny > cy0 + 0.05 && ny < c.cy + 0.35 && Math.abs(nx - c.cx) < 0.15;
+  const rph = fract(ny * 3.2 - t * 2.4 + h2(colr, 1));
+  const drop = under && h2(colr, 3) > 0.35 ? smooth(0.0, 0.05, rph) * smooth(0.22, 0.05, rph) * 0.75 : 0;
+  const flash = h2(Math.floor(t * 1.8), 5) > 0.88 ? smooth(0.6, 0.95, fract(t * 1.8)) * cloud : 0;
+  const v = 0.38 + puff * 0.3 + flash * 1.4;
+  return [clamp(v * 0.95), clamp(v * 0.95), clamp(v * 1.08), clamp(cloud * (0.75 + puff) + drop + flash * 0.5)];
+};
+// Portal: a swirling violet gateway stands open behind the mon.
+AROUND.portal = (nx, ny, df, t, c) => {
+  const dx = (nx - c.cx) / 0.2;
+  const dy = (ny - c.cy) / 0.32;
+  const r = Math.hypot(dx, dy);
+  const ang = Math.atan2(dy, dx);
+  const rim = smooth(0.12, 0.02, Math.abs(r - 1)) * (0.8 + 0.2 * Math.sin(ang * 5 + t * 3));
+  const inner = r < 1 ? smooth(0.3, 0.9, fbm(ang * 0.8 + t * 0.4, r * 3 - t * 0.6)) * (1 - r * 0.5) : 0;
+  const col = mix3(hx("1a0430"), hx("c04aff"), clamp(rim + inner * 0.7));
+  return [col[0], col[1], col[2], clamp(rim * 0.95 + inner * 0.8)];
+};
+// Manga Burst: comic speedlines radiating out from the mon.
+AROUND.speedlines = (nx, ny, df, t, c) => {
+  const ang = Math.atan2(ny - c.cy, nx - c.cx);
+  const sector = Math.floor(((ang / (Math.PI * 2)) + 0.5) * 44);
+  const ln = h2(sector, 3 + Math.floor(t * 2));
+  const thin = smooth(0.35, 0.9, Math.pow(Math.max(0, Math.cos((((ang / (Math.PI * 2)) + 0.5) * 44 - sector - 0.5) * Math.PI)), 8));
+  const r = Math.hypot(nx - c.cx, ny - c.cy);
+  const reach = smooth(0.24 + ln * 0.12, 0.34 + ln * 0.12, r);
+  return [0.95, 0.95, 0.98, thin * reach * (ln > 0.25 ? 0.85 : 0)];
+};
+// Lock-On: a targeting reticle spinning around the mon.
+AROUND.lockon = (nx, ny, df, t, c) => {
+  const dx = nx - c.cx;
+  const dy = (ny - c.cy) * 1.15;
+  const r = Math.hypot(dx, dy);
+  const ang = Math.atan2(dy, dx) + t * 0.9;
+  const dash = fract((ang / (Math.PI * 2)) * 4) < 0.6 ? 1 : 0;
+  const ring = smooth(0.012, 0.002, Math.abs(r - 0.34)) * dash;
+  const tick = Math.pow(Math.max(0, Math.cos(ang * 4)), 60) * smooth(0.035, 0.008, Math.abs(r - 0.34)) * 1.5;
+  const pulse = 0.75 + 0.25 * Math.sin(t * 5);
+  return [0.3, 1.0, 0.95, clamp(ring + tick) * pulse * 0.9];
+};
+// Hex Barrier: a hexfield dome shimmers around the whole mon.
+AROUND.hexdome = (nx, ny, df, t, c) => {
+  const dx = nx - c.cx;
+  const dy = (ny - c.cy) * 1.12;
+  const r = Math.hypot(dx, dy);
+  if (r > 0.5) {
+    return [0, 0, 0, 0];
+  }
+  const rim = smooth(0.05, 0.0, Math.abs(r - 0.44)) * (0.7 + 0.3 * Math.sin(t * 2));
+  const s = 14;
+  const qx = (nx * s) / 1.5;
+  const qy = ny * s * 0.866 - qx * 0.5;
+  const hx0 = Math.round(qx);
+  const hy0 = Math.round(qy);
+  const lx = (qx - hx0) * 1.5;
+  const ly = (qy - hy0 + (qx - hx0) * 0.5) * 1.155;
+  const hd = Math.max(Math.abs(lx) * 0.866 + Math.abs(ly) * 0.5, Math.abs(ly));
+  const grid = smooth(0.38, 0.46, hd) * smooth(0.48, 0.38, r) * 0.12;
+  const ripple = smooth(0.05, 0.0, Math.abs(r - fract(t * 0.45) * 0.48)) * smooth(0.38, 0.46, hd) * 0.5;
+  return [0.4, 0.9, 1.0, clamp(rim * 0.9 + grid + ripple)];
+};
+// Guardian Wings: two arcs of soft light unfurl behind the shoulders.
+AROUND.guardianwings = (nx, ny, df, t, c) => {
+  let a = 0;
+  const flap = 1 + 0.08 * Math.sin(t * 1.4);
+  for (const s of [-1, 1]) {
+    const dx = (nx - (c.cx + s * 0.2)) / (0.13 * flap);
+    const dy = (ny - (c.cy - 0.06)) / (0.3 * flap);
+    const r = Math.hypot(dx, dy);
+    const outer = Math.sign(dx) === s;
+    if (!outer) {
+      continue;
+    }
+    a = Math.max(a, smooth(0.4, 0.05, Math.abs(r - 1)) * clamp(1.1 - ny));
+  }
+  return [1.0, 0.96, 0.8, a * 0.7];
+};
+// Snow Globe: the mon sealed in a glass globe with drifting snow.
+AROUND.snowglobe = (nx, ny, df, t, c) => {
+  const dx = nx - c.cx;
+  const dy = ny - c.cy;
+  const r = Math.hypot(dx, dy);
+  const R = 0.46;
+  const rim = smooth(0.012, 0.002, Math.abs(r - R));
+  const glint = smooth(0.1, 0.02, Math.hypot(nx - (c.cx - 0.2), ny - (c.cy - 0.28))) * 0.5;
+  let flake = 0;
+  if (r < R) {
+    const sc = 22;
+    const fx0 = nx + Math.sin((ny + t * 0.25) * 5) * 0.03;
+    const fy = ny - t * 0.13;
+    const scx = Math.floor(fx0 * sc);
+    const scy = Math.floor(fy * sc);
+    if (h2(scx * 1.1, scy * 1.7) > 0.86) {
+      const slx = fract(fx0 * sc) - (h2(scx + 3, scy) * 0.5 + 0.25);
+      const sly = fract(fy * sc) - (h2(scx, scy + 5) * 0.5 + 0.25);
+      flake = Math.pow(clamp(1 - Math.hypot(slx, sly) * 3.4), 2);
+    }
+  }
+  const base = smooth(0.03, 0.0, Math.abs(ny - (c.cy + R * 0.9))) * smooth(0.4, 0.2, Math.abs(dx));
+  return [0.92, 0.95, 1.0, clamp(rim * 0.9 + glint + flake * 0.95 + base * 0.6)];
+};
+// Orbit Debris: chunks of rock tumbling around the mon.
+AROUND.orbitdebris = (nx, ny, df, t, c) => {
+  let out = [0, 0, 0, 0];
+  for (let i = 0; i < 5; i++) {
+    const th = t * (0.35 + h2(i, 2) * 0.3) + i * 1.26;
+    const px = c.cx + Math.cos(th) * (0.3 + h2(i, 1) * 0.08);
+    const py = c.cy + Math.sin(th) * (0.13 + h2(i, 3) * 0.04);
+    const front = Math.sin(th) > 0;
+    if (!front && df <= 0.01) {
+      continue;
+    }
+    const d = Math.hypot(nx - px, ny - py);
+    const rad = 0.02 + h2(i, 5) * 0.015;
+    const lump = rad * (0.8 + 0.35 * Math.sin(Math.atan2(ny - py, nx - px) * 5 + i));
+    const rock = smooth(lump, lump * 0.6, d);
+    if (rock > out[3]) {
+      const v = (front ? 0.55 : 0.3) * (0.7 + 0.3 * Math.sin(i * 3 + t));
+      out = [v, clamp(v * 0.92), clamp(v * 0.8), rock];
+    }
+  }
+  return out;
+};
+// Star Ring: big golden stars orbiting the mon with sparkle trails, front and behind.
+AROUND.starcircle = (nx, ny, df, t, c) => {
+  let out = [0, 0, 0, 0];
+  for (let i = 0; i < 6; i++) {
+    const th = t * 0.7 + (i / 6) * Math.PI * 2;
+    const px = c.cx + Math.cos(th) * 0.31;
+    const py = c.cy + Math.sin(th) * 0.13;
+    const front = Math.sin(th) > 0;
+    if (!front && df <= 0.01) {
+      continue;
+    }
+    const s = _starSdf((nx - px) / 0.085, (ny - py) / 0.085, 5, th);
+    const glow = Math.pow(clamp(1 - Math.hypot(nx - px, ny - py) / 0.09), 2) * 0.4;
+    let k = clamp(s + glow) * (front ? 1 : 0.55);
+    for (let tr = 1; tr <= 3; tr++) {
+      const th2 = th - tr * 0.09;
+      const tx = c.cx + Math.cos(th2) * 0.31;
+      const ty = c.cy + Math.sin(th2) * 0.13;
+      k = Math.max(k, Math.pow(clamp(1 - Math.hypot(nx - tx, ny - ty) / 0.035), 2) * (1 - tr / 4) * (front ? 0.7 : 0.35));
+    }
+    if (k > out[3]) {
+      const v = front ? 1 : 0.55;
+      out = [v, 0.88 * v, 0.45 * v, k];
+    }
+  }
+  return out;
+};
+// Falling Star: one grand shooting star sails past, again and again.
+AROUND.fallingstar = (nx, ny, df, t) => {
+  const ph = fract(t * 0.22);
+  const px = -0.2 + ph * 1.5;
+  const py = 0.12 + ph * 0.3;
+  const dx = nx - px;
+  const dy = ny - py;
+  const head = Math.pow(clamp(1 - Math.hypot(dx, dy) * 9), 4);
+  const along = dx * -0.98 + dy * -0.2;
+  const across = dx * 0.2 + dy * -0.98;
+  const trail = along > 0 && along < 0.4 ? smooth(0.02, 0.002, Math.abs(across)) * (1 - along / 0.4) * 0.8 : 0;
+  const sparkle = trail > 0 && h2(Math.floor(nx * 50), Math.floor(ny * 50) + Math.floor(t * 12)) > 0.85 ? 0.6 : 0;
+  const vis = smooth(0.0, 0.06, ph) * smooth(1.0, 0.85, ph);
+  return [1, 0.95, 0.75, clamp(head + trail + sparkle) * vis];
+};
+// Zero-G Lift: rocks and dust visibly floating upward, shaded like debris.
+AROUND.gravitylift = (nx, ny, df, t) => {
+  const m = clamp(1 - df / 26);
+  for (let layer = 0; layer < 2; layer++) {
+    const cell = 7 + layer * 5;
+    const fy = ny + t * (0.09 + layer * 0.05);
+    const fx0 = nx + Math.sin(t * 0.7 + Math.floor(fy * cell) * 2) * 0.015;
+    const cx0 = Math.floor(fx0 * cell);
+    const cy0 = Math.floor(fy * cell);
+    if (h2(cx0 * 1.7 + layer * 3, cy0 * 1.9) < 0.7) {
+      continue;
+    }
+    const lx = (fract(fx0 * cell) - 0.5) * 2;
+    const ly = (fract(fy * cell) - 0.5) * 2;
+    const wob = 0.75 + 0.35 * Math.sin(Math.atan2(ly, lx) * 4 + h2(cx0, cy0) * 12);
+    const rad = (0.2 + h2(cy0, cx0) * 0.2) * wob;
+    if (Math.hypot(lx, ly) < rad) {
+      const lit = clamp(0.55 - ly * 1.4);
+      const v = (0.4 + h2(cx0 + 1, cy0) * 0.3) * (0.6 + lit);
+      return [clamp(v), clamp(v * 0.93), clamp(v * 0.82), m * 0.95];
+    }
+  }
+  return [0, 0, 0, 0];
+};
+// Shock Pulse: the mon's own silhouette echoes outward as energy rings.
+AROUND.shockpulse = (nx, ny, df, t) => {
+  let a = 0;
+  for (let i = 0; i < 2; i++) {
+    const ph = fract(t * 0.6 + i * 0.5);
+    const iso = df / 20 - ph;
+    a = Math.max(a, smooth(0.09, 0.0, Math.abs(iso)) * (1 - ph));
+  }
+  return [0.55, 0.95, 1.0, a * 0.85];
+};
+// Fog Bank: two drifting fog layers. The back layer swallows the midsection
+// behind the mon (as before); a second FRONT layer (fogbank is in AROUND_OVERLAY,
+// so it also draws OVER the sprite, df=0 there) drifts the other way and gets
+// steadily thicker toward the bottom of the box.
+AROUND.fogbank = (nx, ny, df, t) => {
+  const n2 = fbm(nx * 2.4 + t * 0.14 + 9.2, ny * 4.6 + 3.7);
+  const grow = smooth(0.34, 0.98, ny);
+  const front = clamp(n2 * 1.45 - 0.3 + grow * 0.3) * grow * 0.9;
+  if (df < 0.5) {
+    // overlay pass: only the front layer covers the mon
+    return [0.9, 0.92, 0.96, front];
+  }
+  const n = fbm(nx * 3 - t * 0.18, ny * 6);
+  const band = smooth(0.32, 0.55, ny) * smooth(0.95, 0.72, ny);
+  const m = clamp(1 - df / 36);
+  const back = clamp(n * band * 1.6 - 0.25) * m * 0.85;
+  const a = clamp(back + front * (1 - back * 0.5));
+  const fmix = a > 0 ? clamp(front / (front + back + 1e-6)) : 0;
+  return [mix(0.85, 0.9, fmix), mix(0.87, 0.92, fmix), mix(0.92, 0.96, fmix), a];
+};
+// Comet Orbit: a blazing head with a long ember tail circles through the scene.
+AROUND.cometorbit = (nx, ny, df, t, c) => {
+  const th = t * 1.1;
+  let out = [0, 0, 0, 0];
+  for (let k = 0; k < 14; k++) {
+    const a = th - k * 0.06;
+    const px = c.cx + Math.cos(a) * 0.33;
+    const py = c.cy + Math.sin(a) * 0.15;
+    const front = Math.sin(a) > 0;
+    if (!front && df <= 0.01) {
+      continue;
+    }
+    const fade = 1 - k / 14;
+    const rad = k === 0 ? 0.05 : 0.032 * fade + 0.008;
+    const d = Math.hypot(nx - px, ny - py);
+    const jit = k === 0 ? 1 : 0.7 + h2(k, Math.floor(t * 8)) * 0.5;
+    const dot = Math.pow(clamp(1 - d / rad), 1.6) * fade * jit * (front ? 1 : 0.5);
+    if (dot > out[3]) {
+      const col = k === 0 ? [1, 0.98, 0.9] : mix3([1, 0.8, 0.3], [0.9, 0.3, 0.08], k / 14);
+      out = [col[0], col[1], col[2], dot];
+    }
+  }
+  return out;
+};
+// Petal Vortex: cherry petals caught in a slow cyclone around the body.
+AROUND.petalvortex = (nx, ny, df, t, c) => {
+  let out = [0, 0, 0, 0];
+  for (let i = 0; i < 12; i++) {
+    const spd = 0.7 + h2(i, 1) * 0.5;
+    const a = t * spd + i * 0.53;
+    const rr = 0.16 + h2(i, 2) * 0.24 + 0.03 * Math.sin(t * 2 + i);
+    const lift = fract(t * 0.09 + h2(i, 3));
+    const px = c.cx + Math.cos(a) * rr;
+    const py = c.cy + 0.3 - lift * 0.62 + Math.sin(a) * rr * 0.3;
+    const rot = a * 2.2;
+    const dx0 = nx - px;
+    const dy0 = ny - py;
+    const lx = dx0 * Math.cos(rot) - dy0 * Math.sin(rot);
+    const ly = dx0 * Math.sin(rot) + dy0 * Math.cos(rot);
+    if (Math.hypot(lx / 0.028, ly / 0.016) < 1) {
+      const shade = 0.85 + 0.15 * Math.sin(rot);
+      out = [1 * shade, (0.68 + h2(i, 4) * 0.18) * shade, 0.85 * shade, 0.95];
+    }
+  }
+  const m = clamp(1 - df / 28);
+  return [out[0], out[1], out[2], out[3] * m];
+};
+// Ember Spiral: fire motes climbing a spiral path around the mon, front and behind.
+AROUND.emberspiral = (nx, ny, df, t, c) => {
+  let out = [0, 0, 0, 0];
+  for (let i = 0; i < 14; i++) {
+    const ph = fract(t * 0.2 + i / 14);
+    const a = ph * Math.PI * 5 + i * 1.7;
+    const front = Math.sin(a) > 0;
+    if (!front && df <= 0.01) {
+      continue;
+    }
+    const px = c.cx + Math.cos(a) * (0.25 + ph * 0.05);
+    const py = c.cy + 0.32 - ph * 0.66;
+    const d = Math.hypot(nx - px, ny - py);
+    const size = 0.055 * (1 - ph * 0.45);
+    const dot = Math.pow(clamp(1 - d / size), 2) * (1 - ph * 0.3);
+    const tw = 0.7 + 0.3 * Math.sin(t * 6 + i * 3);
+    const kk = dot * tw * (front ? 1 : 0.5);
+    if (kk > out[3]) {
+      out = [1, clamp(0.5 + ph * 0.35), 0.12, kk];
+    }
+  }
+  return out;
+};
+// Rune Orbit: glowing sigil plates wheeling around the mon, front and behind.
+AROUND.runeorbit = (nx, ny, df, t, c) => {
+  let out = [0, 0, 0, 0];
+  for (let i = 0; i < 5; i++) {
+    const a = t * 0.6 + (i / 5) * Math.PI * 2;
+    const front = Math.sin(a) > 0;
+    if (!front && df <= 0.01) {
+      continue;
+    }
+    const px = c.cx + Math.cos(a) * 0.32;
+    const py = c.cy + Math.sin(a) * 0.14;
+    const lx = (nx - px) / 0.055;
+    const ly = (ny - py) / 0.07;
+    if (Math.abs(lx) > 1.6 || Math.abs(ly) > 1.6) {
+      continue;
+    }
+    const id = h2(i * 3.3, 7.7);
+    let st = smooth(0.24, 0.08, Math.abs(lx));
+    st = Math.max(st, smooth(0.22, 0.06, Math.abs(ly - (id - 0.5))));
+    st = Math.max(st, smooth(0.22, 0.06, Math.abs(ly - lx * (id > 0.5 ? 0.7 : -0.7))));
+    const inPlate = smooth(1.05, 0.9, Math.max(Math.abs(lx), Math.abs(ly)));
+    const halo = Math.pow(clamp(1 - Math.hypot(lx, ly) / 1.6), 2) * 0.3;
+    const pulse = 0.7 + 0.3 * Math.sin(t * 3 + i * 2);
+    const kk = clamp(st * inPlate + inPlate * 0.2 + halo) * pulse * (front ? 1 : 0.5);
+    if (kk > out[3]) {
+      out = [0.45, 1.0, 0.85, kk];
+    }
+  }
+  return out;
+};
+// Prism Rain: falling crystal slivers flashing rainbow as they catch the light.
+AROUND.prismrain = (nx, ny, df, t) => {
+  const cell = 8;
+  const fy = ny - t * 0.28;
+  const cx0 = Math.floor(nx * cell);
+  const cy0 = Math.floor(fy * cell);
+  if (h2(cx0 * 1.9, cy0 * 1.3) < 0.68) {
+    return [0, 0, 0, 0];
+  }
+  const lx = (fract(nx * cell) - 0.5) * 2;
+  const ly = (fract(fy * cell) - 0.5) * 2;
+  const tilt = (h2(cx0, cy0) - 0.5) * 1.2;
+  const sx = lx + ly * tilt;
+  const sliver = Math.abs(sx) < 0.11 && Math.abs(ly) < 0.5 ? 1 : 0;
+  const flash = Math.pow(0.5 + 0.5 * Math.sin(t * 4 + h2(cy0, cx0) * 20), 3);
+  const glow = Math.pow(clamp(1 - Math.hypot(sx, ly) * 1.8), 3) * flash * 0.4;
+  const col = mix3([0.8, 0.92, 1], hsv2rgb(fract(h2(cx0, cy0) + t * 0.15), 0.85, 1), flash);
+  const m = clamp(1 - df / 26);
+  return [col[0], col[1], col[2], clamp(sliver * (0.5 + 0.5 * flash) + glow) * m];
+};
+// Lightning Zaps: jagged bolts snap off the body in random directions, briefly
+// and not too often - most of the time nothing shows. Each bolt has a random
+// length (0.5x-1.5x), and every fired bolt chains: a 20% roll spawns one more in
+// the same instant, re-rolled recursively (hard cap 10 total) - so now and then
+// the mon overcharges and bursts with bolts. Bolts also roll a DEPTH: ~45% are
+// FRONT bolts that arc over the sprite (zaps is in AROUND_OVERLAY; the overlay
+// pass calls with df=0), the rest stay behind the mon.
+AROUND.zaps = (nx, ny, df, t, c) => {
+  const onBody = df <= 0.01;
+  const dx = nx - c.cx;
+  const dy = ny - c.cy;
+  const r = Math.hypot(dx, dy);
+  if (r < 0.03) {
+    return [0, 0, 0, 0];
+  }
+  const angP = Math.atan2(dy, dx);
+  let a = 0;
+  let hot = 0;
+  const MAXB = 10;
+  let budget = MAXB;
+  for (let k = 0; k < 2 && budget > 0; k++) {
+    const cyc = t * 1.3 + k * 0.41 + h2(k + 1 + FXSEED, 9.2) * 5;
+    const slot = Math.floor(cyc);
+    // most windows stay empty (the 2nd base bolt much more so)
+    if (h2(slot * 1.31 + 0.17 + FXSEED, 11 + k * 7) > (k === 0 ? 0.45 : 0.22)) {
+      continue;
+    }
+    const life = fract(cyc);
+    const flash = smooth(0.0, 0.03, life) * smooth(0.3, 0.12, life);
+    if (flash <= 0.02) {
+      continue;
+    }
+    for (let j = 0; j < MAXB && budget > 0; j++) {
+      // the window's first bolt always draws; each extra needs a fresh 20% roll
+      if (j > 0 && h2(slot * 2.7 + j * 13.3 + FXSEED, 29 + k * 5) > 0.2) {
+        break;
+      }
+      budget--;
+      const front = h2(slot * 3.1 + j * 19 + k * 7.3, 4.9) < 0.45;
+      if (onBody && !front) {
+        continue; // behind the mon
+      }
+      const fl2 = flash * (0.7 + 0.3 * h2(slot + j * 7, k + 3.3));
+      const ang0 = h2(slot + k * 17 + j * 39 + FXSEED * 1.3, 3.7) * Math.PI * 2;
+      const len = 0.5 + h2(slot + j * 23, k * 9 + 6.1); // 0.5x .. 1.5x
+      let da = angP - ang0;
+      da = Math.atan2(Math.sin(da), Math.cos(da));
+      if (Math.abs(da) > 1.2) {
+        continue;
+      }
+      // jagged perpendicular displacement along the ray, finer kinks on top
+      const jig =
+        (vnoise(r * 26 + slot * 5.13 + j * 61, slot * 9.7 + k * 37.1 + j * 17) - 0.5) * 0.09 * Math.min(1, r * 7) +
+        (vnoise(r * 70 + slot * 3.7 + j * 31, slot * 4.3 + k * 23.7) - 0.5) * 0.022;
+      const off = Math.abs(r * Math.sin(da) - jig);
+      const width = 0.011 + r * 0.01;
+      const reach = smooth(0.55 * len, 0.42 * len, r);
+      const beam = smooth(width, width * 0.25, off) * reach;
+      const glow = smooth(width * 4.5, width, off) * reach * 0.3;
+      const kk = (beam + glow) * fl2;
+      if (kk > a) {
+        a = kk;
+        hot = smooth(0.26, 0.08, r);
+      }
+    }
+  }
+  return [mix(0.78, 1, hot), mix(0.88, 1, hot), 1, clamp(a) * 0.95];
+};
+// Sakura Blossoms: five-petal cherry blossoms drifting gently down with a lazy
+// sway, loose petals fluttering between them.
+AROUND.blossoms = (nx, ny, df, t, c) => {
+  const m = clamp(1 - df / 30);
+  if (m <= 0) {
+    return [0, 0, 0, 0];
+  }
+  let out = [0, 0, 0, 0];
+  for (let layer = 0; layer < 2; layer++) {
+    const cell = (layer === 0 ? 5 : 8) * FXSCALE;
+    const fall = layer === 0 ? 0.05 : 0.085;
+    const fy = ny - t * fall;
+    const fx0 = nx + Math.sin(ny * 2.2 + t * 0.4 + layer * 2.6) * 0.035;
+    const cx0 = Math.floor(fx0 * cell);
+    const cy0 = Math.floor(fy * cell);
+    if (h2(cx0 * 1.7 + layer * 13.1 + FXSEED, cy0 * 2.3 + layer * 7.7 - FXSEED) < (layer === 0 ? 0.62 : 0.55)) {
+      continue;
+    }
+    const jx = 0.3 + h2(cx0 + 4.2, cy0 + 1.1) * 0.4;
+    const jy = 0.3 + h2(cx0 + 8.8, cy0 + 3.3) * 0.4;
+    const lx = fract(fx0 * cell) - jx;
+    const ly = fract(fy * cell) - jy;
+    const spin = t * (0.5 + h2(cx0, cy0 + 9) * 0.6) * (h2(cx0 + 2, cy0) > 0.5 ? 1 : -1) + h2(cx0, cy0) * 6;
+    if (layer === 0) {
+      // a full five-petal blossom, slowly rotating
+      const R = 0.18 + h2(cx0 + 1, cy0 + 5) * 0.07;
+      const d = Math.hypot(lx, ly);
+      const ang = Math.atan2(ly, lx);
+      const rr = R * (0.58 + 0.42 * Math.abs(Math.cos((ang - spin * 0.5) * 2.5)));
+      if (d < rr && out[3] < 0.95) {
+        const rim = smooth(0.5, 1.0, d / rr);
+        const col = mix3(hx("ffe3ee"), hx("ff9ec8"), rim);
+        const heart = smooth(0.32, 0.1, d / R);
+        const cc = mix3(col, hx("ffd23a"), heart * 0.5);
+        out = [cc[0], cc[1], cc[2], 0.95];
+      }
+    } else {
+      // a single loose petal, fluttering end over end
+      const ca = Math.cos(spin);
+      const sa2 = Math.sin(spin);
+      const px2 = lx * ca - ly * sa2;
+      const py2 = lx * sa2 + ly * ca;
+      const flut = Math.max(0.3, Math.abs(Math.sin(spin * 1.3)));
+      if (Math.hypot(px2 / 0.16, py2 / (0.09 * flut)) < 1 && out[3] < 0.85) {
+        const shade = 0.82 + 0.18 * Math.sin(spin);
+        out = [shade, 0.72 * shade, 0.85 * shade, 0.85];
+      }
+    }
+  }
+  return [out[0], out[1], out[2], out[3] * m];
+};
+// Paper Lanterns: warm glowing lanterns floating up around the mon.
+AROUND.paperlanterns = (nx, ny, df, t) => {
+  const cell = 6;
+  const fy = ny + t * 0.07;
+  const fx0 = nx + Math.sin(t * 0.5 + Math.floor(fy * cell)) * 0.02;
+  const cx0 = Math.floor(fx0 * cell);
+  const cy0 = Math.floor(fy * cell);
+  if (h2(cx0 * 2.1, cy0 * 2.9) < 0.8) {
+    return [0, 0, 0, 0];
+  }
+  const lx = (fract(fx0 * cell) - 0.5) * 2.2;
+  const ly = (fract(fy * cell) - 0.5) * 2.2;
+  const sway = Math.sin(t * 1.2 + cx0 * 2) * 0.06;
+  const bx = lx - sway;
+  const body = Math.pow(Math.abs(bx / 0.28), 3) + Math.pow(Math.abs(ly / 0.36), 3) < 1 ? 1 : 0;
+  const cap = Math.abs(ly + 0.4) < 0.045 && Math.abs(bx) < 0.16 ? 1 : 0;
+  const base = Math.abs(ly - 0.4) < 0.04 && Math.abs(bx) < 0.14 ? 1 : 0;
+  const rib = body && Math.abs(Math.sin(bx * 16)) > 0.88 ? 0.18 : 0;
+  const inner = Math.pow(clamp(1 - Math.hypot(bx, ly) * 2.2), 2);
+  const glow = Math.pow(clamp(1 - Math.hypot(bx, ly) * 1.3), 2) * 0.45;
+  const warm = 0.78 + 0.22 * Math.sin(t * 2 + h2(cx0, cy0) * 9);
+  const m = clamp(1 - df / 28);
+  if (cap || base) {
+    return [0.45 * warm, 0.2 * warm, 0.1 * warm, 0.95 * m];
+  }
+  if (body) {
+    return [
+      clamp((0.95 + inner * 0.05) * warm - rib),
+      clamp((0.5 + inner * 0.4) * warm - rib),
+      clamp((0.18 + inner * 0.25) * warm - rib),
+      0.95 * m,
+    ];
+  }
+  return [1, 0.7, 0.3, glow * warm * m];
 };
 
 export const ALL_PALETTE = Object.keys(PALETTE);

@@ -1,6 +1,7 @@
 import type { ErShinyLabLoadout, ErShinyLabParams } from "#data/elite-redux/er-shiny-lab-effects";
 import {
   AROUND,
+  AROUND_OVERLAY,
   AURA,
   blendCol,
   clamp,
@@ -223,7 +224,31 @@ export function renderErShinyLabLook(
 
   const doTint = params.tintMode > 0;
   const [tintH, tintS] = params.tintMode === 1 ? resolvePaletteTint(pal, ctx, clusters) : [0.58, 0.85];
-  const ac = { cx: dist.cx, cy: dist.cy };
+
+  // Padded-normalized sprite sampler for around-FX that echo the mon (Double Team /
+  // Double Team Tri) - maps a padded-canvas uv back to the raw source pixel.
+  const sprPad = (nx: number, ny: number): number[] => {
+    const sx2 = Math.round(nx * pw - 0.5) - pad;
+    const sy2 = Math.round(ny * ph - 0.5) - pad;
+    if (sx2 < 0 || sy2 < 0 || sx2 >= fw || sy2 >= fh) {
+      return [0, 0, 0, 0];
+    }
+    const i2 = (sy2 * fw + sx2) * 4;
+    return [buf[i2], buf[i2 + 1], buf[i2 + 2], buf[i2 + 3]];
+  };
+  // Dominant (most colorful) cluster color - Double Team Tri builds its triad from it.
+  let mainCol: number[] | null = null;
+  if (clusters) {
+    let best = -1;
+    for (const cen of clusters.cent) {
+      const hsv = rgb2hsv(cen[0], cen[1], cen[2]);
+      if (hsv[1] * hsv[2] > best) {
+        best = hsv[1] * hsv[2];
+        mainCol = cen;
+      }
+    }
+  }
+  const ac = { cx: dist.cx, cy: dist.cy, fy: dist.fy, spr: sprPad, main: mainCol };
 
   for (let py = 0; py < ph; py++) {
     for (let px = 0; px < pw; px++) {
@@ -287,6 +312,24 @@ export function renderErShinyLabLook(
             a = mix(aPal, a, amounts.surf);
           }
           col = blended;
+        }
+        // Front pass for 3D around-FX (helix / atomic orbit / chains / ...): the effect
+        // is ALSO drawn OVER the sprite so a near arc can pass in front of the body. The
+        // effect culls its own "behind" half at df=0. Still a single output buffer - this
+        // is a per-pixel composite, not a separate sprite/layer.
+        if (aro && AROUND_OVERLAY.has(aro)) {
+          const nx = (px + 0.5) / pw;
+          const ny = (py + 0.5) / ph;
+          const res = AROUND[aro](nx, ny, 0, t, ac);
+          let rc = [res[0], res[1], res[2]];
+          if (doTint && !NO_TINT.has(aro)) {
+            rc = tintTo(rc, tintH, tintS);
+          }
+          const oa = res[3] * amounts.aro;
+          if (oa > 0) {
+            col = [mix(col[0], rc[0], oa), mix(col[1], rc[1], oa), mix(col[2], rc[2], oa)];
+            a = Math.min(1, a + oa * (1 - a));
+          }
         }
         out[k] = col[0] * 255;
         out[k + 1] = col[1] * 255;
