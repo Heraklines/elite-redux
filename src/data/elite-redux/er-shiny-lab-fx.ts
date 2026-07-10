@@ -556,8 +556,267 @@ export const PALETTE = {
     const hsv = rgb2hsv(cen[0], cen[1], cen[2]);
     return hsv2rgb(hsv[0], clamp(hsv[1] * 1.25), Math.round(hsv[2] * 4) / 4);
   },
+  // --- v6 (Discord brainstorm) ---
+  // Blueprint: dark linework -> white/pale cyan, everything else -> flat low-contrast
+  // blues (posterized so it reads as a technical drawing, not a gradient).
+  blueprint: (r, g, b) => {
+    const L = luma(r, g, b);
+    if (L < 0.2) {
+      return mix3(hx("cfe4ff"), hx("ffffff"), smooth(0.2, 0.0, L));
+    }
+    const t = Math.round(smooth(0.18, 1.0, L) * 2) / 2; // 3 flat steps, gentle spread
+    return ramp(["1b4c9c", "2560b4", "3274c8"].map(hx), t);
+  },
+  // Who's That...?: the quiz silhouette. Pure black, with the very lightest source
+  // tones lifted a hair toward navy so the shape still reads on dark backdrops.
+  whosthat: (r, g, b) => mix3(hx("000000"), hx("121631"), smooth(0.55, 1.0, luma(r, g, b))),
+  // Lavender Ghost (GB Haunter): whites stay, blacks become pale lavender, the
+  // mid-tones collapse to a dark purple body. The old version used hard if-cuts
+  // (0.16 / 0.8), which banded ugly seams on smooth-shaded mons and turned
+  // mostly-mid-luma sprites into an unreadable black blob - now the three zones
+  // crossfade smoothly and the body keeps a readable purple ramp.
+  lavender: (r, g, b) => {
+    const L = luma(r, g, b);
+    const shadow = mix3(hx("b9a6dc"), hx("d4c4ee"), clamp(L / 0.16));
+    const body = ramp(["120a20", "251638", "382250"].map(hx), smooth(0.16, 0.8, L));
+    const c = mix3(shadow, body, smooth(0.1, 0.24, L));
+    return mix3(c, [r, g, b], smooth(0.7, 0.86, L));
+  },
+  // Overexposed: darken the lightest colours, push everything else close to white -
+  // the sprite's highlights become its linework.
+  overexposed: (r, g, b) => {
+    const [h, s] = rgb2hsv(r, g, b);
+    const L = luma(r, g, b);
+    if (L > 0.68) {
+      return hsv2rgb(h, clamp(s * 1.1 + 0.15), 0.32 - (L - 0.68) * 0.35);
+    }
+    return hsv2rgb(h, s * 0.22, clamp(0.86 + L * 0.14));
+  },
+  // Hyperpigment: way oversaturated, with value clamps so nothing collapses flat.
+  hyperpigment: (r, g, b) => {
+    const [h, s, v] = rgb2hsv(r, g, b);
+    return hsv2rgb(h, Math.pow(s, 0.42), clamp(v, 0.14, 0.95));
+  },
+  // Pop Art: hue quantized to bold ink buckets, saturation cranked, 3 flat values.
+  popart: (r, g, b) => {
+    const [h, s, v] = rgb2hsv(r, g, b);
+    const hq = fract(Math.round(h * 6) / 6 + 0.02);
+    const vq = 0.3 + (Math.round(smooth(0.05, 0.95, v) * 2) / 2) * 0.68;
+    return hsv2rgb(hq, clamp(s * 1.7 + 0.15), vq);
+  },
+  // ============== v7 palettes: materials & worlds ==============
+  platinum: (r, g, b) => ramp(["15161c", "3d4250", "9aa3b5", "e8ecf5", "ffffff"].map(hx), Math.pow(luma(r, g, b), 0.95)),
+  brass: (r, g, b) => ramp(["191006", "4a3512", "9a7a24", "d4b45a", "f6e8b0"].map(hx), luma(r, g, b)),
+  // Patina Bronze: bronze metal in the shadows, oxidized teal patina blooming
+  // across the highlights - two materials, not one ramp.
+  agedbronze: (r, g, b) => {
+    const L = luma(r, g, b);
+    const bronze = ramp(["140c04", "4a3010", "8a5a1e", "c89a4a"].map(hx), clamp(L * 1.5));
+    const patina = ramp(["1e6a5a", "3aa88a", "8ae0c0"].map(hx), clamp((L - 0.5) * 2.2));
+    return mix3(bronze, patina, smooth(0.5, 0.78, L));
+  },
+  ivory: (r, g, b) => ramp(["4a3a28", "8a7458", "cdbba0", "f2e9d8", "fffdf4"].map(hx), Math.pow(luma(r, g, b), 0.9)),
+  // Ember Ash: charcoal body whose DEEPEST shadows glow like live coals.
+  emberash: (r, g, b) => {
+    const L = luma(r, g, b);
+    const gray = ramp(["1a1a1e", "3a3a40", "6a6a72", "a8a8b0"].map(hx), L);
+    return mix3(gray, [1.0, 0.35, 0.06], smooth(0.22, 0.0, L) * 0.95);
+  },
+  lapis: (r, g, b) => ramp(["0a1030", "142a68", "2050b0", "4a80d8", "f0cd6a"].map(hx), Math.pow(luma(r, g, b), 1.05)),
+  vermilion: (r, g, b) => ramp(["1a0505", "6a1208", "c8321a", "f06038", "ffd8b8"].map(hx), luma(r, g, b)),
+  // Twilight Neon: dusky indigo body - but the brightest touches snap to hot pink.
+  periwinkle: (r, g, b) => {
+    const L = luma(r, g, b);
+    if (L > 0.78) {
+      return mix3(hx("ff3a9a"), hx("ffb8e0"), (L - 0.78) / 0.22);
+    }
+    return ramp(["12102a", "28245a", "44408a", "6a68b0"].map(hx), L / 0.78);
+  },
+  // Velvet Noir: crushed blacks, deep merlot mids, champagne highlights - a film grade.
+  wine: (r, g, b) => {
+    const Lc = smooth(0.16, 0.92, luma(r, g, b));
+    return ramp(["050203", "2a060e", "6a1024", "a83a4a", "e8cba0"].map(hx), Lc);
+  },
+  honeyamber: (r, g, b) => ramp(["241203", "5c3608", "a86a10", "e8a828", "ffe090"].map(hx), Math.pow(luma(r, g, b), 0.85)),
+  stormcloud: (r, g, b) => ramp(["10141c", "2c3648", "55647e", "9ab0c8", "b8f0ff"].map(hx), luma(r, g, b)),
+  peacock: (r, g, b) => ramp(["0c1a20", "104a52", "178a78", "46c8a8", "f0d060"].map(hx), luma(r, g, b)),
+  flamingo: (r, g, b) => ramp(["3a1420", "8a3048", "e06a78", "ffa8a0", "ffe8d8"].map(hx), luma(r, g, b)),
+  cyberpunk: (r, g, b) => ramp(["0a0618", "251048", "6a1a7a", "e0247a", "ffd23a"].map(hx), Math.pow(luma(r, g, b), 0.9)),
+  matrixgreen: (r, g, b) => ramp(["020a02", "0a3a0a", "10801a", "30d040", "c8ffb0"].map(hx), luma(r, g, b)),
+  opal: (r, g, b) => {
+    const L = luma(r, g, b);
+    return mix3(hsv2rgb(fract(L * 2.6 + 0.6), 0.32, clamp(0.72 + L * 0.28)), [1, 1, 1], 0.3);
+  },
+  dragonfruit: (r, g, b) => ramp(["1a1408", "3a7a3a", "e83a8a", "ff88b8", "fff0f4"].map(hx), luma(r, g, b)),
+  // Tidepool: three-zone split - deep teal shadows, wet-sand mids, aqua-foam lights.
+  lagoon: (r, g, b) => {
+    const L = luma(r, g, b);
+    const deep = mix3(hx("04303a"), hx("0e6a6a"), clamp(L * 2.4));
+    const sand = mix3(hx("9a8458"), hx("cbb684"), clamp((L - 0.35) * 3));
+    const foam = mix3(hx("5ee0d0"), hx("f0fff6"), clamp((L - 0.7) * 3.2));
+    return mix3(mix3(deep, sand, smooth(0.3, 0.45, L)), foam, smooth(0.62, 0.8, L));
+  },
+  // Heat Mirage: the hue itself shimmers - it oscillates between sand and sky
+  // as brightness rises, like air over hot dunes.
+  mirage: (r, g, b) => {
+    const L = luma(r, g, b);
+    const hue = fract(0.1 + 0.09 * Math.sin(L * 11) + L * 0.35);
+    return hsv2rgb(hue, 0.42 + 0.18 * Math.sin(L * 17), clamp(0.3 + L * 0.72));
+  },
+  // Eclipse: near-black body, only the very brightest tones ignite as corona.
+  eclipse: (r, g, b) => ramp(["050408", "0e0c14", "1a1722", "2a2433", "ff8a1a"].map(hx), Math.pow(luma(r, g, b), 1.1)),
+  midnightoil: (r, g, b) => ramp(["05070c", "0e1c2a", "14424a", "7a2a6a", "e070a8"].map(hx), luma(r, g, b)),
+  terracotta: (r, g, b) => ramp(["3a1a10", "7a3a22", "c06a3a", "e8a070", "ffe0c0"].map(hx), luma(r, g, b)),
+  porcelaindelft: (r, g, b) => ramp(["24406a", "5a7ab8", "c8d8ea", "f4f8fc", "ffffff"].map(hx), Math.pow(luma(r, g, b), 0.7)),
+  seafoam: (r, g, b) => ramp(["14342c", "2a6a58", "5ab890", "aae8cc", "f0fff6"].map(hx), luma(r, g, b)),
+  glowworm: (r, g, b) => ramp(["0a0e0a", "1c2a1e", "2a4a3a", "4ad0a0", "d8ffe8"].map(hx), Math.pow(luma(r, g, b), 1.1)),
+  voidfire: (r, g, b) => ramp(["05010a", "2a0a5a", "6a1ad0", "3a8af0", "c8f0ff"].map(hx), Math.pow(luma(r, g, b), 0.9)),
+  petrol: (r, g, b) => ramp(["0a1210", "144038", "1a6a58", "2a6a9a", "8a7ae0"].map(hx), luma(r, g, b)),
+  // Sandstone: hard-banded strata - warm and cool bands alternate by brightness.
+  duststorm: (r, g, b) => {
+    const L = luma(r, g, b);
+    const bi = Math.min(4, Math.floor(clamp(L) * 5));
+    const warm = ["3a2412", "72522c", "9a7040", "c89a58", "e8cf9a"].map(hx);
+    const cool = ["2e2a24", "5e564a", "8a8072", "b4ac9a", "ded8cc"].map(hx);
+    return bi % 2 === 0 ? warm[bi] : cool[bi];
+  },
+  watermelon: (r, g, b) => ramp(["143a1e", "2a7a3a", "8ae06a", "ffb8c8", "ff5a7a"].map(hx), luma(r, g, b)),
+  cyanotype: (r, g, b) => ramp(["0a1e4a", "10306a", "2a5a9a", "7aa8d8", "f4f8ff"].map(hx), Math.pow(luma(r, g, b), 0.65)),
+  coralreef: (r, g, b) => ramp(["0e2a2e", "14666a", "e86a4a", "ffa88a", "fff0e0"].map(hx), luma(r, g, b)),
+  // Ultra Grape: royal purple depths - and the highlights clash into acid green.
+  grape: (r, g, b) => {
+    const L = luma(r, g, b);
+    if (L > 0.76) {
+      return mix3(hx("9ae02a"), hx("e8ffb0"), (L - 0.76) / 0.24);
+    }
+    return ramp(["140a1e", "3a1a4a", "6a2a8a", "a45ac8"].map(hx), L / 0.76);
+  },
+  mintchoco: (r, g, b) => ramp(["120c08", "38281c", "6a4c30", "a8e0c8", "e8fff0"].map(hx), luma(r, g, b)),
+  sherbet: (r, g, b) => ramp(["ffb0a0", "ffd8a0", "fff4b8", "c8f0c0", "b0d8ff"].map(hx), luma(r, g, b)),
+  gunmetal: (r, g, b) => ramp(["0c0e12", "23272e", "41474f", "6a7078", "9aa2ac"].map(hx), luma(r, g, b)),
+  arcticnight: (r, g, b) => ramp(["061024", "0e2a4a", "1a4a7a", "2a8a8a", "6af0c0"].map(hx), luma(r, g, b)),
+  // Frozen Abyss: near-black glacial depths; highlights crack into hard cyan ice.
+  blackice: (r, g, b) => {
+    const L = luma(r, g, b);
+    if (L > 0.72) {
+      return mix3(hx("5ae0ff"), hx("f0feff"), (L - 0.72) / 0.28);
+    }
+    return ramp(["01040a", "07101c", "10202e", "1c3242"].map(hx), L / 0.72);
+  },
+  // Sunlit Grove: cool leaf-green shade split-toned into warm golden sunlight.
+  meadow: (r, g, b) => {
+    const L = luma(r, g, b);
+    return mix3(hsv2rgb(0.36, 0.72, clamp(L * 0.85 + 0.07)), hsv2rgb(0.14, 0.72, clamp(L * 1.12)), smooth(0.4, 0.8, L));
+  },
+  // ============== v7 palettes: techniques ==============
+  // Complement: rotate every hue 180 deg but KEEP its brightness (unlike Negative).
+  complement: (r, g, b) => {
+    const [h, s, v] = rgb2hsv(r, g, b);
+    return hsv2rgb(fract(h + 0.5), s, v);
+  },
+  hueplus: (r, g, b) => {
+    const [h, s, v] = rgb2hsv(r, g, b);
+    return hsv2rgb(fract(h + 0.25), s, v);
+  },
+  hueminus: (r, g, b) => {
+    const [h, s, v] = rgb2hsv(r, g, b);
+    return hsv2rgb(fract(h + 0.75), s, v);
+  },
+  xenoswap: (r, g, b) => [b, r, g],
+  // Split-tone: cinematic teal shadows / orange highlights, luma preserved.
+  splitteal: (r, g, b) => {
+    const L = luma(r, g, b);
+    return mix3(hsv2rgb(0.52, 0.55, clamp(L * 0.95 + 0.04)), hsv2rgb(0.07, 0.6, clamp(L * 1.08)), smooth(0.25, 0.75, L));
+  },
+  splitroyal: (r, g, b) => {
+    const L = luma(r, g, b);
+    return mix3(hsv2rgb(0.75, 0.6, clamp(L * 0.9 + 0.05)), hsv2rgb(0.12, 0.7, clamp(L * 1.05)), smooth(0.3, 0.8, L));
+  },
+  pastelize: (r, g, b) => {
+    const [h, s, v] = rgb2hsv(r, g, b);
+    return hsv2rgb(h, s * 0.35, clamp(0.55 + v * 0.45));
+  },
+  noir: (r, g, b) => {
+    const L = smooth(0.16, 0.84, luma(r, g, b));
+    return [clamp(L * 0.92), clamp(L * 0.96), clamp(L * 1.06)];
+  },
+  infraredfilm: (r, g, b) => ramp(["2a020a", "7a0a2a", "d02a5a", "ff8ab0", "fff0f4"].map(hx), Math.pow(luma(r, g, b), 0.75)),
+  virtualboy: (r, g, b, c) =>
+    c ? clusterTone(["100000", "5a0000", "c81020", "ff4a3a"].map(hx), c.clRank(r, g, b), c.K, 0.5) : [r, g, b],
+  // CGA: hard-quantize to the classic cyan/magenta/white/black 4-color mode.
+  cga: (r, g, b) => {
+    const opts = [
+      [0.04, 0.04, 0.04],
+      [0.2, 0.9, 0.95],
+      [0.95, 0.2, 0.9],
+      [0.98, 0.98, 0.98],
+    ];
+    let bi = 0;
+    let bd = 9;
+    for (let i = 0; i < 4; i++) {
+      const d = (r - opts[i][0]) ** 2 + (g - opts[i][1]) ** 2 + (b - opts[i][2]) ** 2;
+      if (d < bd) {
+        bd = d;
+        bi = i;
+      }
+    }
+    return opts[bi];
+  },
+  poster: (r, g, b) => [Math.round(r * 3) / 3, Math.round(g * 3) / 3, Math.round(b * 3) / 3],
+  glassbody: (r, g, b) => {
+    const [h, s, v] = rgb2hsv(r, g, b);
+    return mix3(hsv2rgb(h, s * 0.5, clamp(v * 0.7 + 0.3)), [0.78, 0.95, 1.0], 0.45);
+  },
+  phantom: (r, g, b) => {
+    const [, s, v] = rgb2hsv(r, g, b);
+    return hsv2rgb(0.72, clamp(s * 0.4 + 0.25), clamp(0.45 + v * 0.55));
+  },
+  heatmap: (r, g, b) => ramp(["101060", "2a3af0", "2ae8e8", "ffe83a", "ff5a1a", "fff0d8"].map(hx), luma(r, g, b)),
+  // Hue Glide: hue slides with brightness - shadows and highlights drift apart.
+  hueglide: (r, g, b) => {
+    const [h, s, v] = rgb2hsv(r, g, b);
+    return hsv2rgb(fract(h + luma(r, g, b) * 0.45), clamp(s * 1.05), v);
+  },
+  stencil: (r, g, b) => (luma(r, g, b) > 0.5 ? [0.96, 0.96, 0.94] : [0.06, 0.06, 0.08]),
+  // ============== v7 cluster combos ==============
+  duoice: (r, g, b, c) =>
+    c ? clusterTone(["0e2440", "bfe8ff"].map(hx), c.clRank(r, g, b), c.K, luma(r, g, b)) : [r, g, b],
+  creamsicle: (r, g, b, c) =>
+    c ? clusterTone(["c05010", "ffe9c9"].map(hx), c.clRank(r, g, b), c.K, luma(r, g, b)) : [r, g, b],
+  duoviolet: (r, g, b, c) =>
+    c ? clusterTone(["3a0a6a", "aef03a"].map(hx), c.clRank(r, g, b), c.K, luma(r, g, b)) : [r, g, b],
+  duogold: (r, g, b, c) =>
+    c ? clusterTone(["a87818", "fffaf0"].map(hx), c.clRank(r, g, b), c.K, luma(r, g, b)) : [r, g, b],
+  bumblebee: (r, g, b, c) =>
+    c ? clusterTone(["141208", "ffd018"].map(hx), c.clRank(r, g, b), c.K, luma(r, g, b)) : [r, g, b],
+  duosakura: (r, g, b, c) =>
+    c ? clusterTone(["4a1a3a", "ffd8e8"].map(hx), c.clRank(r, g, b), c.K, luma(r, g, b)) : [r, g, b],
+  trinebula: (r, g, b, c) =>
+    c ? clusterTone(["1a0a4a", "b02ad0", "3ae0ff"].map(hx), c.clRank(r, g, b), c.K, luma(r, g, b)) : [r, g, b],
+  triocean: (r, g, b, c) =>
+    c ? clusterTone(["0a1e4a", "148aa0", "e8fff4"].map(hx), c.clRank(r, g, b), c.K, luma(r, g, b)) : [r, g, b],
+  triember: (r, g, b, c) =>
+    c ? clusterTone(["120604", "c81f1a", "ffb63a"].map(hx), c.clRank(r, g, b), c.K, luma(r, g, b)) : [r, g, b],
+  tripoison: (r, g, b, c) =>
+    c ? clusterTone(["140a1e", "6a1aa0", "b8f03a"].map(hx), c.clRank(r, g, b), c.K, luma(r, g, b)) : [r, g, b],
+  quadautumn: (r, g, b, c) =>
+    c
+      ? clusterTone(["3a0e14", "a03a1a", "e08a24", "f6e0b8"].map(hx), c.clRank(r, g, b), c.K, luma(r, g, b))
+      : [r, g, b],
+  quadcyber: (r, g, b, c) =>
+    c
+      ? clusterTone(["0a0a12", "ff2a8a", "22d0ff", "ffe83a"].map(hx), c.clRank(r, g, b), c.K, luma(r, g, b))
+      : [r, g, b],
+  pentaretro: (r, g, b, c) =>
+    c
+      ? clusterTone(["2a2416", "6a5a2a", "b08a3a", "d8c890", "7aa8a0"].map(hx), c.clRank(r, g, b), c.K, luma(r, g, b))
+      : [r, g, b],
+  pentagalaxy: (r, g, b, c) =>
+    c
+      ? clusterTone(["0a0a2a", "4a1a8a", "b02ad0", "2ac8e8", "f0f4ff"].map(hx), c.clRank(r, g, b), c.K, luma(r, g, b))
+      : [r, g, b],
 };
-export const PALETTE_ALPHA = { spectral: 0.62 };
+export const PALETTE_ALPHA = { spectral: 0.62, glassbody: 0.6, phantom: 0.55 };
 export const CLUSTER_PAL = new Set([
   "duoink",
   "duoneon",
@@ -573,6 +832,21 @@ export const CLUSTER_PAL = new Set([
   "pentajewel",
   "gameboy",
   "retro",
+  "virtualboy",
+  "duoice",
+  "creamsicle",
+  "duoviolet",
+  "duogold",
+  "bumblebee",
+  "duosakura",
+  "trinebula",
+  "triocean",
+  "triember",
+  "tripoison",
+  "quadautumn",
+  "quadcyber",
+  "pentaretro",
+  "pentagalaxy",
 ]);
 
 // ===========================================================================
