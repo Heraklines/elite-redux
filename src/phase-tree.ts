@@ -114,6 +114,21 @@ export class PhaseTree {
   }
 
   /**
+   * #diagnostics: the names of every queued {@linkcode Phase}, in the ORDER they will run (deepest
+   * level first, then array order within a level - mirroring {@linkcode getNextPhase}). A read-only
+   * snapshot for a co-op bug report's control-plane block; never mutates the tree.
+   */
+  public queuedPhaseNames(): string[] {
+    const names: string[] = [];
+    for (let i = this.levels.length - 1; i >= 0; i--) {
+      for (const phase of this.levels[i]) {
+        names.push(phase.phaseName);
+      }
+    }
+    return names;
+  }
+
+  /**
    * Find and return the first {@linkcode Phase} in the Tree matching the given conditions.
    * @param phaseName - The {@linkcode PhaseString | name} of the Phase to search for
    * @param phaseFilter - An optional {@linkcode PhaseConditionFunc} to add conditions to the search

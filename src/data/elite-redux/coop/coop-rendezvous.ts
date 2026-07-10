@@ -148,6 +148,20 @@ export class CoopRendezvous {
   }
 
   /**
+   * #diagnostics: a compact, read-only snapshot of the rendezvous barrier state (which sync points
+   * THIS client has arrived at, which the PARTNER has, and which are currently being awaited). For a
+   * bug report's control-plane block: a point in `awaiting` that the partner has NOT arrived at is a
+   * one-sided barrier the run is parked on. Pure read; never mutates barrier state.
+   */
+  describeArrivals(): { localArrived: string[]; partnerArrived: string[]; awaiting: string[] } {
+    return {
+      localArrived: [...this.localArrived],
+      partnerArrived: [...this.partnerArrived],
+      awaiting: [...this.pending.keys()],
+    };
+  }
+
+  /**
    * Signal (idempotently) that THIS client has reached sync `point`. A duplicate arrival for a point
    * already sent is a no-op on the wire (the send is suppressed). Does NOT block - a client that only
    * needs to LET the partner proceed (without waiting itself) calls this; the FASTER player calls

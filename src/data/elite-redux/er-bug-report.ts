@@ -20,6 +20,7 @@
 
 import { globalScene } from "#app/global-scene";
 import { version } from "#package.json";
+import { formatCoopControlPlane } from "#data/elite-redux/coop/coop-diagnostics";
 import { getErDifficulty } from "#data/elite-redux/er-run-difficulty";
 import { getReplayTrace } from "#data/elite-redux/replay-recorder";
 import { formatConsoleSnapshot } from "#utils/console-ring-buffer";
@@ -47,6 +48,13 @@ export interface BugReport {
    * ships with a replayable trace the duo harness can re-run to reproduce + verify a fix.
    */
   replayTrace: string | null;
+  /**
+   * #diagnostics: the co-op CONTROL-PLANE snapshot (role / phase queue / awaited interaction / rendezvous
+   * / transport lastRx), or `""` for a solo run / menu report. Assembled at report time from the live
+   * runtime so a hung co-op session ships with the distributed-systems state a hang is actually diagnosed
+   * from (a screenshot / the plain state header cannot show it).
+   */
+  controlPlane: string;
 }
 
 export interface BugReportResult {
@@ -109,7 +117,20 @@ export function buildBugReport(description: string): BugReport {
     state: captureState(),
     logs: formatConsoleSnapshot(),
     replayTrace: captureReplayTrace(),
+    controlPlane: captureControlPlane(),
   };
+}
+
+/**
+ * #diagnostics: capture the co-op control-plane snapshot for the report, or `""` (solo / capture
+ * failure). Guarded so a snapshot failure never breaks the bug-report path (the report still ships).
+ */
+function captureControlPlane(): string {
+  try {
+    return formatCoopControlPlane();
+  } catch {
+    return "";
+  }
 }
 
 /** A human-readable subject line for the report. */
@@ -218,6 +239,8 @@ function buildDevLogText(report: BugReport): string {
     "----- DESCRIPTION -----",
     report.description.trim() || "(none)",
     "",
+    // #diagnostics: the co-op control-plane block (omitted for a solo run / menu report, where it is "").
+    ...(report.controlPlane ? [report.controlPlane, ""] : []),
     "----- CONSOLE -----",
     report.logs,
     "",

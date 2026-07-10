@@ -362,6 +362,15 @@ export class PhaseManager {
   }
 
   /**
+   * #diagnostics: the names of the queued phases, in the order they will run (read-only). Assembled on
+   * demand for a co-op bug report's control-plane block so a stuck queue's shape is captured with the
+   * report. Covers the static phase queue (the dynamic-queue manager holds only transient in-turn phases).
+   */
+  getQueuedPhaseNames(): string[] {
+    return this.phaseQueue.queuedPhaseNames();
+  }
+
+  /**
    * Add one or more Phases to the end of the queue.
    * They will run once all phases already in the queue have ended.
    * @param phases - One or more {@linkcode Phase}s to add

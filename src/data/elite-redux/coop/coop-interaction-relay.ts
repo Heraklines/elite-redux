@@ -603,6 +603,22 @@ export class CoopInteractionRelay {
   }
 
   /**
+   * #diagnostics: a compact, read-only snapshot of the interaction relay's CURRENTLY-AWAITED picks
+   * (the seq being blocked on, the kinds that seq legitimately accepts, and how long it has been
+   * parked). Assembled ON DEMAND for a bug report's control-plane block - a parked/growing wait here
+   * is the pending interaction the whole session is blocked on (the top co-op softlock signature).
+   * Pure read; never mutates relay state.
+   */
+  describeAwaitedInteractions(): { seq: number; ageMs: number; expectedKinds: readonly string[] }[] {
+    const now = Date.now();
+    const out: { seq: number; ageMs: number; expectedKinds: readonly string[] }[] = [];
+    for (const [seq, since] of this.pendingSince) {
+      out.push({ seq, ageMs: now - since, expectedKinds: this.pending.get(seq)?.expectedKinds ?? [] });
+    }
+    return out.sort((a, b) => a.seq - b.seq);
+  }
+
+  /**
    * #821: fired when rewardOptions are BUFFERED with no waiter (the ME embedded-shop case:
    * the owner's engine opened its shop while the watcher is parked in the ME await).
    * Phase-scoped - CoopReplayMePhase assigns it on entry and clears it on settle.
