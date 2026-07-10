@@ -1,4 +1,17 @@
-# Wave-2f KEYSTONE — PARKED (awaiting Wave-2e applier remediation)
+# Wave-2f KEYSTONE — ✅ UNPARKED + INTEGRATED (W2e-R applier remediation is live)
+
+> **RESOLVED 2026-07-10.** The W2e-R transactional-applier remediation landed on
+> `feat/elite-redux-port` (`97d797970`); the keystone was rebased onto it and RE-TARGETED onto the
+> remediated seam. The wave surface is now the FIRST with a registered production live-mutation sink
+> + ONE ledger — the proof a journal-delivered op can LIVE-materialize. See `docs/plans/…-migration.md`
+> §8.7 for the authoritative writeup. Integration commits: `8c419ca1b` (feat), `db5b4dff9` (durability
+> proof test), `d136e80d5` (§8.7). All 5 parked-era applier assumptions below were re-validated and
+> resolved as noted inline. This file is retained as the design-decision record; the sections below
+> describe the ORIGINAL parked state and remain accurate as history.
+
+The original park record follows.
+
+---
 
 Parked per orchestrator directive: an external review found P0 defects in the Wave-2e
 operation/durability **applier** layer that this keystone commits through. This file records
