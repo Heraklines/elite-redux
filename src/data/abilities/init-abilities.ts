@@ -192,6 +192,7 @@ import { getPokemonNameWithAffix } from "#app/messages";
 import { GroundedTag } from "#data/battler-tags";
 import { allAbilities, allMoves } from "#data/data-lists";
 import { OffensiveTypeChartOverrideAbAttr } from "#data/elite-redux/archetypes/offensive-type-chart-override";
+import { PostWeatherMoveFollowUpAbAttr } from "#data/elite-redux/archetypes/post-weather-move-follow-up";
 import { SpeciesFormChangeAbilityTrigger } from "#data/form-change-triggers";
 import { Gender } from "#data/gender";
 import { pokemonFormChanges } from "#data/pokemon-forms";
@@ -567,6 +568,8 @@ export function initAbilities() {
     new AbBuilder(AbilityId.FORECAST, 3, -2) //
       .uncopiable()
       .unreplaceable()
+      // ER: Forecast is unsuppressable and works under Mold Breaker.
+      .unsuppressable()
       .attr(NoFusionAbilityAbAttr)
       .attr(PostSummonFormChangeByWeatherAbAttr)
       // ER (#450): FOG removed from the revert-to-Normal list - Forecast now maps
@@ -576,6 +579,9 @@ export function initAbilities() {
         WeatherType.SANDSTORM,
         WeatherType.STRONG_WINDS,
       ])
+      // ER: after the holder USES a weather-setting move, follow up with a
+      // 100 BP Weather Ball matching the newly-set weather.
+      .attr(PostWeatherMoveFollowUpAbAttr, MoveId.WEATHER_BALL)
       .build(),
     new AbBuilder(AbilityId.STICKY_HOLD, 3) //
       .attr(BlockItemTheftAbAttr)

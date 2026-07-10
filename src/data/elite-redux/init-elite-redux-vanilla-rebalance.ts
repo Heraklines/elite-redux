@@ -1298,10 +1298,11 @@ const ABILITY_PATCHERS: ReadonlyMap<AbilityId, (ability: MutableAbility) => void
   // 261 STALWART: vanilla "ignore foe redirection". ER same.
   // 263 DRAGONS_MAW: vanilla 1.5x Dragon. ER same.
 
-  // 51 FORECAST: vanilla form-change with weather. ER says also "Attacks when
-  // setting weather". Form-change is per-species custom; the "attack on
-  // weather-set" rider would need a generic PostWeatherSet → MovePhase
-  // hook that doesn't exist. Defer.
+  // 51 FORECAST: vanilla form-change with weather. ER also: "when USING a
+  // weather-setting move, follow up with a 100 BP Weather Ball", plus
+  // unsuppressable. Now WIRED in init-abilities.ts via the PostMoveUsed surface
+  // (PostWeatherMoveFollowUpAbAttr — the same hook Dancer uses) + .unsuppressable().
+  // No longer deferred.
 
   // 50 PICKUP: already added (placeholder).
   // 64 HUSTLE: already added.
