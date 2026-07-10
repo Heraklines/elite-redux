@@ -1,0 +1,63 @@
+===== COOP SOAK RESULT =====
+profile: god
+verdict: FAIL
+waves_requested: 150
+run: 29074943854 (main)
+timestamp: 2026-07-10T06-53-01Z
+
+----- driver lines -----
+[22m[39m[coop-soak] SEED=20260710 WAVES=150 - replay this run with:  SOAK_SEED=20260710 SOAK_WAVES=150 ER_SCENARIO=1 npx vitest run test/tests/elite-redux/coop/coop-soak.test.ts
+[22m[39m[coop-soak] scalar-lag wave 5 @post-shop: guest trails host (expected renderer lag, converges at re-mirror) - money host=110 guest=0
+[22m[39m[coop-soak] scalar-lag wave 8 @post-shop: guest trails host (expected renderer lag, converges at re-mirror) - money host=390 guest=110
+[22m[39m[coop-soak] scalar-lag wave 13 @post-shop: guest trails host (expected renderer lag, converges at re-mirror) - money host=580 guest=390
+[22m[39m[coop-soak] scalar-lag wave 14 @post-shop: guest trails host (expected renderer lag, converges at re-mirror) - money host=780 guest=580
+[coop-soak] scalar-lag wave 20 @boss-post-shop: guest trails host (expected renderer lag, converges at re-mirror) - money host=2090 guest=780
+[22m[39m[coop-soak] scalar-lag wave 25 @post-shop: guest trails host (expected renderer lag, converges at re-mirror) - money host=3580 guest=2750
+[22m[39m[coop-soak] scalar-lag wave 27 @post-shop: guest trails host (expected renderer lag, converges at re-mirror) - money host=4670 guest=3580
+[22m[39m[coop-soak] scalar-lag wave 28 @post-shop: guest trails host (expected renderer lag, converges at re-mirror) - money host=5630 guest=4670
+[22m[39m[coop-soak] scalar-lag wave 35 @post-shop: guest trails host (expected renderer lag, converges at re-mirror) - money host=6550 guest=5630
+[22m[39m[coop-soak] scalar-lag wave 42 @post-shop: guest trails host (expected renderer lag, converges at re-mirror) - money host=8940 guest=7490
+[22m[39m[coop-soak] scalar-lag wave 43 @post-shop: guest trails host (expected renderer lag, converges at re-mirror) - money host=10880 guest=10050
+[31m[1mSoakInvariantError[22m: [coop-soak] NO-PARK invariant breached at wave 49 (seed 20260710): wave driving threw (strand/stall): guest reward WATCH HANG: watcher neither left nor advanced past interaction 44 after 32 drains (owner terminal never arrived) - see dev-logs/coop-duo/. Artifact + both logs: /home/runner/work/elite-redux/elite-redux/dev-logs/coop-soak/2026-07-10T06-53-00-924Z__seed-20260710__wave-49. Replay: SOAK_SEED=20260710[39m
+
+----- vitest result tail -----
+[33m[coop:relay] AWAIT interactionChoice seq=27 -> STICKY-CANCELLED (resync rescue) resolve null[39m
+
+[90mstdout[2m | test/tests/elite-redux/coop/coop-soak.test.ts[2m:149:3[22m[2m[2m > [22m[2mNIGHTLY co-op SOAK: seeded randomized two-engine run (#841)[2m > [22m[2mplays a seeded randomized co-op run asserting DIGEST/LOCKSTEP/NO-PARK/TEARDOWN each wave
+[22m[39m[coop:reward] WATCHER timed out waiting for partner -> leaving reward screen
+[38;2;0;60;189mUI mode changed from MODIFIER_SELECT (=6) to MESSAGE (=0)![39m
+
+[90mstdout[2m | test/tests/elite-redux/coop/coop-soak.test.ts[2m:149:3[22m[2m[2m > [22m[2mNIGHTLY co-op SOAK: seeded randomized two-engine run (#841)[2m > [22m[2mplays a seeded randomized co-op run asserting DIGEST/LOCKSTEP/NO-PARK/TEARDOWN each wave
+[22m[39m[2m> [22m[30m[48;2;193;98;222m Test finished! [49m[39m
+    Name: [38;2;0;136;134mNIGHTLY co-op SOAK: seeded randomized two-engine run (#841) > plays a seeded randomized co-op run asserting DIGEST/LOCKSTEP/NO-PARK/TEARDOWN each wave[39m
+    Result: [31m[1m✗ Failed[22m[39m [2min[22m [33m65359[39m[2mms[22m
+    File: [38;2;210;155;14melite-redux/test/tests/elite-redux/coop/coop-soak.test.ts:149:3[39m
+
+[90mstdout[2m | test/tests/elite-redux/coop/coop-soak.test.ts
+[22m[39m[34mContinue to the next wave.[39m
+[34mContinue to the next wave.[39m
+
+[33m[39m[31mx[39m
+
+[31m⎯⎯⎯⎯⎯⎯⎯[39m[1m[41m Failed Tests 1 [49m[22m[31m⎯⎯⎯⎯⎯⎯⎯[39m
+
+[41m[1m FAIL [22m[49m [30m[45m main [49m[39m test/tests/elite-redux/coop/coop-soak.test.ts[2m:149:3[22m[2m > [22mNIGHTLY co-op SOAK: seeded randomized two-engine run (#841)[2m > [22mplays a seeded randomized co-op run asserting DIGEST/LOCKSTEP/NO-PARK/TEARDOWN each wave
+[31m[1mSoakInvariantError[22m: [coop-soak] NO-PARK invariant breached at wave 49 (seed 20260710): wave driving threw (strand/stall): guest reward WATCH HANG: watcher neither left nor advanced past interaction 44 after 32 drains (owner terminal never arrived) - see dev-logs/coop-duo/. Artifact + both logs: /home/runner/work/elite-redux/elite-redux/dev-logs/coop-soak/2026-07-10T06-53-00-924Z__seed-20260710__wave-49. Replay: SOAK_SEED=20260710[39m
+[36m [2m❯[22m fail test/tools/coop-soak-driver.ts:[2m1210:11[22m[39m
+    [90m1208|[39m       phaseState: phaseStateDump(rig),
+    [90m1209|[39m     });
+    [90m1210|[39m     throw new SoakInvariantError(invariant, seed, wave, detail, dir);
+    [90m   |[39m           [31m^[39m
+    [90m1211|[39m   };
+    [90m1212|[39m
+[90m [2m❯[22m runCoopSoak test/tools/coop-soak-driver.ts:[2m2317:7[22m[39m
+[90m [2m❯[22m test/tests/elite-redux/coop/coop-soak.test.ts:[2m167:22[22m[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯[22m[39m
+
+
+[2m Test Files [22m [1m[31m1 failed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[31m1 failed[39m[22m[90m (1)[39m
+[2m   Start at [22m 06:51:32
+[2m   Duration [22m 88.26s[2m (transform 17.50s, setup 21.44s, import 153ms, tests 65.81s, environment 705ms)[22m
+
