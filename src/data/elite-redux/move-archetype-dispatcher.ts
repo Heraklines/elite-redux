@@ -613,16 +613,12 @@ function dispatchBespokeMove(erMoveId: number): MoveDispatchResult {
       // with selfSwitch=true matches U-Turn/Volt Switch semantics.
       return ok(0, [new ForceSwitchOutAttr(true)]);
     case 832:
-      // Boiling Flame — Fire move that deals 1.5x damage in rain. We attach a
-      // MovePowerMultiplierAttr that inspects active weather at apply-time;
-      // also tag the move as WEATHER_BASED so ER weather-syncing abilities
-      // pick it up.
-      return ok(MoveFlags.WEATHER_BASED, [
-        new MovePowerMultiplierAttr((_u, _t, _m) => {
-          const wt = globalScene.arena.weather?.weatherType;
-          return wt === WeatherType.RAIN || wt === WeatherType.HEAVY_RAIN ? 1.5 : 1;
-        }),
-      ]);
+      // Boiling Flame — "deals increased damage in rain". ONLY the WEATHER_BASED
+      // flag is set here (so ER weather-syncing abilities pick it up); the actual
+      // rain power boost is the x3 rider in applyErMoveBespokeRiders (case 832),
+      // which nets ~1.5x after Fire's natural 0.5x rain halving. Wiring a boost
+      // here too would double-apply it (~2.25x).
+      return ok(MoveFlags.WEATHER_BASED, []);
     case 834:
       // Double Lariat — hits both foes (target field handles that), silences
       // hit targets via THROAT_CHOPPED tag (2 turn duration matches Throat

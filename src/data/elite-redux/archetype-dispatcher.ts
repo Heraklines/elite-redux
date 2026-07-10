@@ -134,6 +134,7 @@ import {
   SuppressWeatherEffectAbAttr,
   SwitchWhileRampagingAbAttr,
   UserFieldMoveTypePowerBoostAbAttr,
+  WeightMultiplierAbAttr,
 } from "#abilities/ab-attrs";
 import { globalScene } from "#app/global-scene";
 import { TrappedTag } from "#data/battler-tags";
@@ -2891,16 +2892,17 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
         new StatMultiplierAbAttr(Stat.SPD, 0.9),
       ]);
     case 539:
-      // Chrome Coat — "Reduces special damage taken by 40%, but decreases Speed
-      // by 10%." Special-side twin of Lead Coat (296): the prior
-      // damage-reduction-generic row dropped the Speed penalty. (Weight-triple
-      // clause has no battle primitive — omitted.)
+      // Chrome Coat — "Reduces special damage taken by 40%, decreases Speed by
+      // 10%, and TRIPLES the holder's weight." Special-side twin of Lead Coat
+      // (296). The weight-triple (affects Heavy Slam / Low Kick / Grass Knot /
+      // etc.) is wired via WeightMultiplierAbAttr (the Heavy/Light Metal primitive).
       return ok([
         new DamageReductionAbAttr({
           reduction: 0.4,
           filter: { kind: "category", category: MoveCategory.SPECIAL },
         }),
         new StatMultiplierAbAttr(Stat.SPD, 0.9),
+        new WeightMultiplierAbAttr(3),
       ]);
     case 306:
       // Nocturnal — "Boosts own Dark moves by 1.25x. Takes -25% dmg from
