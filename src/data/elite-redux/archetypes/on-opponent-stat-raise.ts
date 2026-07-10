@@ -17,13 +17,20 @@
 // "react when a foe raises its stats" semantics we need.
 //
 // Wires:
-//   - Egoist (555) — "Raises its own stats when foes raise theirs."
-//     `new OnOpponentStatRaiseAbAttr({ stats: [{ATK,+1},{SPATK,+1},{SPD,+1}] })`
+//   - Egoist (555) — "Copies stat boosts that enemy Pokemon receive and applies
+//     them to itself (the SAME stat, the SAME number of stages). Does not copy
+//     other Egoist boosts." — `new OnOpponentStatRaiseAbAttr()`.
 //
-// (The earlier implementation extended PostStatStageChangeAbAttr, which fires
-// on the SUBJECT of the change, not the reacting holder, and whose canApply had
-// a `!pokemon.isPlayer` method-reference bug that made it ALWAYS return false —
-// so Egoist never triggered. This rewrite fixes both.)
+// (The earlier implementation extended PostStatStageChangeAbAttr, which fires on
+// the SUBJECT of the change, not the reacting holder — so Egoist never triggered.
+// A follow-up rewrite rode the Opportunist hook but then IGNORED the foe's actual
+// raise, unconditionally granting a hardcoded ATK+1/SpAtk+1/SpD+1 regardless of
+// which stat/how many stages the foe raised — so a foe's Iron Defense (+2 Def)
+// gave the holder +1 Atk/SpAtk/SpD. This version drops that override: the base
+// `StatStageChangeCopyAbAttr.apply` mirrors the EXACT (stat, stages) the opponent
+// gained and pushes the copy with `canBeCopied=false` — which is both the dex's
+// "same stat, same stages" and its "does not copy other Egoist boosts" (a copy
+// that can't itself be copied can never chain off another Egoist/Opportunist).)
 // =============================================================================
 
 import { StatStageChangeCopyAbAttr, type StatStageChangeCopyAbAttrParams } from "#abilities/ab-attrs";
@@ -31,68 +38,15 @@ import { globalScene } from "#app/global-scene";
 import { scriptedPokemonMove } from "#data/elite-redux/archetypes/scripted-move-util";
 import type { MoveId } from "#enums/move-id";
 import { MoveUseMode } from "#enums/move-use-mode";
-import type { BattleStat } from "#enums/stat";
-
-/** A single stat-stage delta the holder gains in response to a foe's raise. */
-export interface OnOpponentStatRaiseChange {
-  readonly stat: BattleStat;
-  readonly stages: number;
-}
-
-/** Construction options for {@linkcode OnOpponentStatRaiseAbAttr}. */
-export interface OnOpponentStatRaiseOptions {
-  /** Stat-stage deltas dispatched on the holder when a foe makes a copyable raise. */
-  readonly stats: readonly OnOpponentStatRaiseChange[];
-}
 
 /**
- * Parameterized AbAttr implementing the `on-opponent-stat-raise` archetype by
- * extending the registered `StatStageChangeCopyAbAttr` (Opportunist) hook.
+ * `on-opponent-stat-raise` archetype for Egoist (555). A pure marker subclass of
+ * the registered `StatStageChangeCopyAbAttr` (Opportunist) hook: it copies the
+ * exact stat + stage count the foe gained, with the copy pushed as uncopyable
+ * (base-class behavior). No `apply` override — mirroring is what the dex wants.
  */
 export class OnOpponentStatRaiseAbAttr extends StatStageChangeCopyAbAttr {
-  private readonly stats: readonly OnOpponentStatRaiseChange[];
-
-  constructor(options: OnOpponentStatRaiseOptions) {
-    super();
-    if (options.stats.length === 0) {
-      throw new Error("[OnOpponentStatRaiseAbAttr] options.stats must be non-empty");
-    }
-    for (const change of options.stats) {
-      if (change.stages === 0) {
-        throw new Error(`[OnOpponentStatRaiseAbAttr] stages must be non-zero; got 0 for stat ${change.stat}`);
-      }
-    }
-    this.stats = options.stats;
-  }
-
-  /** Read-only accessor (tests). */
-  public getStats(): readonly OnOpponentStatRaiseChange[] {
-    return this.stats;
-  }
-
-  override apply({ pokemon, simulated }: StatStageChangeCopyAbAttrParams): void {
-    if (simulated) {
-      return;
-    }
-    // `pokemon` is the HOLDER (the foe of whoever raised). Apply the configured
-    // boost to it — NOT a copy of the exact buff (that's vanilla Opportunist).
-    for (const change of this.stats) {
-      globalScene.phaseManager.unshiftNew(
-        "StatStageChangePhase",
-        pokemon.getBattlerIndex(),
-        true,
-        [change.stat],
-        change.stages,
-        true,
-        false,
-        // canBeCopied=false, like vanilla Opportunist's copy: a reactive boost must
-        // never itself count as a copyable raise, or two reactive holders (Egoist vs
-        // an Opportunist/Egoist foe) ping-pong boosts forever - the live "Egoist kept
-        // chaining forever" freeze after a Dragon Dance.
-        false,
-      );
-    }
-  }
+  private declare readonly _erMarker: never;
 }
 
 /** Construction options for {@linkcode OnOpponentStatRaiseScriptedMoveAbAttr}. */

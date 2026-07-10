@@ -27,6 +27,7 @@
 
 import { PostAttackAbAttr, type PostMoveInteractionAbAttrParams } from "#abilities/ab-attrs";
 import { globalScene } from "#app/global-scene";
+import type { AbilityId } from "#enums/ability-id";
 import { HitResult } from "#enums/hit-result";
 import { MysteryEncounterType } from "#enums/mystery-encounter-type";
 import { toDmgValue } from "#utils/common";
@@ -46,28 +47,47 @@ export interface SelfDamageOnAttackOptions {
    * / Blood Price recoil are unaffected. Self-restoring: works normally after.
    */
   readonly soulLink?: boolean;
+  /**
+   * When set (Soul Linker), the self-damage is cancelled if the TARGET has this
+   * ability (the "does not activate against ANOTHER Soul Linker" clause). Pass the
+   * runtime AbilityId of Soul Linker (ER 332).
+   */
+  readonly cancelIfTargetHasAbility?: AbilityId;
 }
 
 export class SelfDamageOnAttackAbAttr extends PostAttackAbAttr {
   private readonly basis: SelfDamageBasis;
   private readonly fraction: number;
   private readonly soulLink: boolean;
+  private readonly cancelIfTargetHasAbility: AbilityId | undefined;
 
   constructor(options: SelfDamageOnAttackOptions) {
     super();
     this.basis = options.basis;
     this.fraction = options.fraction;
     this.soulLink = options.soulLink ?? false;
+    this.cancelIfTargetHasAbility = options.cancelIfTargetHasAbility;
   }
 
   override canApply(params: PostMoveInteractionAbAttrParams): boolean {
-    const { simulated, damage, pokemon } = params;
+    const { simulated, damage, pokemon, opponent: target } = params;
     // Soul Linker is suppressed inside the Fun and Games (Wobbuffet) minigame.
     if (
       this.soulLink
       && globalScene.currentBattle?.mysteryEncounter?.encounterType === MysteryEncounterType.FUN_AND_GAMES
     ) {
       return false;
+    }
+    if (this.soulLink) {
+      // Dex: Soul Linker does not activate when either Pokemon is KO'd. Skip the
+      // offensive recoil when this hit KO'd the target.
+      if (target?.isFainted()) {
+        return false;
+      }
+      // Dex: does not activate against ANOTHER Soul Linker.
+      if (this.cancelIfTargetHasAbility != null && target?.hasAbility(this.cancelIfTargetHasAbility)) {
+        return false;
+      }
     }
     // Damaging move (super) + actually connected for damage this hit.
     if (!super.canApply(params) || simulated || damage <= 0) {

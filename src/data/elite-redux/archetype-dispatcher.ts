@@ -192,6 +192,7 @@ import {
   ConsumeFirstFlaggedMovePriorityAbAttr,
   FirstFlaggedMovePriorityAbAttr,
   FirstTurnPriorityClampAbAttr,
+  RearmFirstFlaggedMoveOnMoveAbAttr,
 } from "#data/elite-redux/archetypes/first-move-priority";
 import { FirstTurnStatMultiplierAbAttr } from "#data/elite-redux/archetypes/first-turn-stat-multiplier";
 import { FlagDamageBoostAbAttr } from "#data/elite-redux/archetypes/flag-damage-boost";
@@ -3212,15 +3213,22 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
       // double-counting.
       return ok([new StabAddAbAttr()]);
     case 291:
-      // Aurora Borealis — "Ice-type moves gain STAB. Moves always benefit
-      // from hail." Wire the Ice STAB add via StabAdd(ICE). The "always
-      // benefit from hail" piece (boosting Ice-typed moves under hail
-      // regardless of typing match) overlaps the StabAdd boost on this
-      // user — a Sub-Zero Ninetales firing Ice Beam already gets the StabAdd
-      // because Ice ≠ source type — but the hail-perma-boost piece would
-      // need a weather-keyed type boost (WeatherTypeBoost exists for type-
-      // gated, but not for cross-type "always benefit from"). Partial wire.
-      return ok([new StabAddAbAttr({ targetType: PokemonType.ICE })]);
+      // Aurora Borealis — "Grants STAB to all Ice moves regardless of the
+      // holder's typing. Weather Ball becomes Ice-type with DOUBLED power. Aurora
+      // Veil works without hail/snow. Weather-based Ice moves (Blizzard) never
+      // miss."
+      //   1. Ice STAB for any user — StabAdd(ICE).
+      //   2. Weather Ball -> Ice + x2 power — handled in move.ts via
+      //      `userActsInIce` (WeatherBallTypeAttr + the move's power multiplier).
+      //   3. Aurora Veil usable without hail/snow — the move's `.condition` calls
+      //      `userActsInIce`, true for an Aurora Borealis holder.
+      //   4. Blizzard never misses regardless of weather — a ConditionalAlwaysHit
+      //      keyed on the move being Blizzard (the weather-perfect-accuracy Ice
+      //      move), analogous to the fog never-miss wires elsewhere.
+      return ok([
+        new StabAddAbAttr({ targetType: PokemonType.ICE }),
+        new ConditionalAlwaysHitAbAttr({ moveIds: [MoveId.BLIZZARD] }),
+      ]);
     case 297:
       // Amphibious — "Water moves gain STAB. Can't become drenched."
       // Water STAB add via StabAdd(WATER), plus the drench-immunity marker
@@ -3933,6 +3941,19 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
       return ok([
         new FirstFlaggedMovePriorityAbAttr(MoveFlags.SLICING_MOVE),
         new ConsumeFirstFlaggedMovePriorityAbAttr(MoveFlags.SLICING_MOVE, true),
+      ]);
+    case 743:
+      // Cutthroat — "On entry, gives +1 priority to the FIRST Keen Edge (slicing)
+      // move used. Consumed after landing any Keen Edge move. Resets if Sharpen is
+      // used." Same one-shot slicing-priority as Edgelord (882), minus the KO
+      // re-arm, plus the Sharpen re-arm: using Sharpen clears the used-flag so the
+      // next slicing move regains the boost. Was approximated by the generic
+      // priority-modifier (every slicing move on the switch-in turn, no consume,
+      // no Sharpen reset).
+      return ok([
+        new FirstFlaggedMovePriorityAbAttr(MoveFlags.SLICING_MOVE),
+        new ConsumeFirstFlaggedMovePriorityAbAttr(MoveFlags.SLICING_MOVE),
+        new RearmFirstFlaggedMoveOnMoveAbAttr(MoveId.SHARPEN),
       ]);
     case 791:
       // DNA Scramble — "Changes forms based on the move used." Implemented
@@ -4770,18 +4791,12 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
       // out when any stat is lowered (incl. self-drops), once per battle.
       return ok([new SelfSwitchOnStatLowerAbAttr()]);
     case 555:
-      // Egoist — "Raises its own stats when foes raise theirs." Wire via
-      // new OnOpponentStatRaiseAbAttr — boosts holder's ATK/SPATK/SPD +1
-      // whenever any opponent raises any stat.
-      return ok([
-        new OnOpponentStatRaiseAbAttr({
-          stats: [
-            { stat: Stat.ATK, stages: 1 },
-            { stat: Stat.SPATK, stages: 1 },
-            { stat: Stat.SPD, stages: 1 },
-          ],
-        }),
-      ]);
+      // Egoist — "Copies stat boosts that enemy Pokemon receive and applies them
+      // to itself (the same stat, the same number of stages). Does not copy other
+      // Egoist boosts." Rides the Opportunist copy hook: mirrors the foe's exact
+      // (stat, stages) raise, pushed uncopyable so it never chains off another
+      // Egoist/Opportunist.
+      return ok([new OnOpponentStatRaiseAbAttr()]);
     // -------------------------------------------------------------------------
     // Round 41 — heal-block via HEAL_BLOCK BattlerTag application
     // -------------------------------------------------------------------------
@@ -4995,14 +5010,26 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
     // -------------------------------------------------------------------------
     // Round 36 — vanilla PostDefendContactDamage wires (mirror-damage cluster)
     // -------------------------------------------------------------------------
-    case 332:
-      // Soul Linker — "Enemies take all the damage they deal, same for this
-      // Pokemon." Full reflect: attacker takes the damage it dealt to the
-      // holder, AND the holder takes the damage it deals (offensive side).
+    case 332: {
+      // Soul Linker — "When the holder takes a direct hit, the attacker takes
+      // identical damage. When the holder lands a direct hit, the holder also
+      // takes that much damage. Does NOT activate when either Pokemon is KO'd,
+      // from Pain Split, or against ANOTHER Soul Linker." Full reflect: attacker
+      // takes the damage it dealt to the holder, AND the holder takes the damage
+      // it deals (offensive side). The KO / vs-another-Soul-Linker exclusions are
+      // enforced inside each attr (Pain Split is excluded by construction — it
+      // isn't a direct damaging hit).
+      const soulLinkerId = ER_ID_MAP.abilities[332] as AbilityId;
       return ok([
-        new ReflectDamageOnDefendAbAttr(),
-        new SelfDamageOnAttackAbAttr({ basis: "damageDealt", fraction: 1.0, soulLink: true }),
+        new ReflectDamageOnDefendAbAttr({ cancelIfAttackerHasAbility: soulLinkerId }),
+        new SelfDamageOnAttackAbAttr({
+          basis: "damageDealt",
+          fraction: 1.0,
+          soulLink: true,
+          cancelIfTargetHasAbility: soulLinkerId,
+        }),
       ]);
+    }
     case 341:
       // Fort Knox — "Blocks most damage boosting and multihit abilities."
       // Suppression of opponent abilities — needs new primitive (similar to

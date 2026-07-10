@@ -465,6 +465,36 @@ export class RaiseHighestOffenseDefenseStatAttr extends MoveEffectAttr {
 }
 
 /**
+ * ER Pitfall (937): "30% chance to TRAP the target AND make attacks always hit
+ * it." Both effects share a SINGLE `move.chance` roll — either both land or
+ * neither. The previous wiring used two independent `AddBattlerTagAttr`s, each
+ * rolling `move.chance` separately (P(both) ~= 9%, and frequently only one of
+ * the two applied). This attr rolls once and, on success, applies both
+ * `TRAPPED` (4-5 turns) and `ALWAYS_GET_HIT` together.
+ */
+export class PitfallTrapAndAlwaysHitAttr extends MoveEffectAttr {
+  constructor() {
+    super(false); // targets the foe
+  }
+
+  override apply(user: Pokemon, target: Pokemon, move: Move, args?: any[]): boolean {
+    if (!super.apply(user, target, move, args)) {
+      return false;
+    }
+    // Single shared roll against the move's chance (30). A negative/100 chance
+    // always applies, matching AddBattlerTagAttr's own gating.
+    const moveChance = this.getMoveChance(user, target, move, this.selfTarget, true);
+    if (moveChance >= 0 && moveChance !== 100 && user.randBattleSeedInt(100) >= moveChance) {
+      return false;
+    }
+    const trapTurns = user.randBattleSeedIntRange(4, 5);
+    const trapped = target.addTag(BattlerTagType.TRAPPED, trapTurns, move.id, user.id);
+    const flagged = target.addTag(BattlerTagType.ALWAYS_GET_HIT, 0, move.id, user.id);
+    return trapped || flagged;
+  }
+}
+
+/**
  * Dispatch a `type-conversion` classifier row. The only mode the classifier
  * emits today is `best-effectiveness` with a candidate types array. The
  * status-chance sibling (if present) wires the same way as flag-tagged-move.

@@ -4155,6 +4155,25 @@ export function userActsInSun(user: Pokemon | null | undefined): boolean {
   );
 }
 
+/**
+ * ER Aurora Borealis: the holder acts as if hail/snow is up for Ice-weather
+ * purposes regardless of the actual (or absent/suppressed) weather. Used to make
+ * Weather Ball Ice-typed + doubled and Aurora Veil settable without hail/snow.
+ * Also true when real hail/snow is active for any user (so the callers stay
+ * correct for non-Aurora-Borealis mons).
+ */
+export function userActsInIce(user: Pokemon | null | undefined): boolean {
+  if (user?.hasAbility(ErAbilityId.AURORA_BOREALIS as unknown as AbilityId)) {
+    return true;
+  }
+  const weather = globalScene.arena.weather;
+  return (
+    !!weather
+    && !weather.isEffectSuppressed()
+    && (weather.weatherType === WeatherType.HAIL || weather.weatherType === WeatherType.SNOW)
+  );
+}
+
 export class WeatherInstantChargeAttr extends InstantChargeAttr {
   /**
    * The weather types that allow the move to be charged instantly.
@@ -6412,6 +6431,13 @@ export class WeatherBallTypeAttr extends VariableMoveTypeAttr {
     // regardless of (or absent) weather.
     if (userActsInSun(user)) {
       moveType.value = PokemonType.FIRE;
+      return true;
+    }
+
+    // ER Aurora Borealis: Weather Ball becomes Ice-type as if in hail, regardless
+    // of (or absent) weather. (Power is doubled by the move's power multiplier.)
+    if (userActsInIce(user)) {
+      moveType.value = PokemonType.ICE;
       return true;
     }
 
@@ -11279,6 +11305,11 @@ export function initMoves() {
         if (userActsInSun(user)) {
           return 2;
         }
+        // ER Aurora Borealis: Weather Ball acts as if in hail (Ice-type), so it
+        // doubles power even with no (or suppressed) weather.
+        if (userActsInIce(user)) {
+          return 2;
+        }
         const weather = globalScene.arena.weather;
         if (!weather) {
           return 1;
@@ -12634,12 +12665,10 @@ export function initMoves() {
     new AttackMove(MoveId.BRUTAL_SWING, PokemonType.DARK, MoveCategory.PHYSICAL, 60, 100, 20, -1, 0, 7) //
       .target(MoveTarget.ALL_NEAR_OTHERS),
     new StatusMove(MoveId.AURORA_VEIL, PokemonType.ICE, -1, 20, -1, 0, 7)
-      .condition(() => {
-        const weather = globalScene.arena.weather;
-        if (weather == null || weather.isEffectSuppressed()) {
-          return false;
-        }
-        return weather.weatherType === WeatherType.HAIL || weather.weatherType === WeatherType.SNOW;
+      .condition(user => {
+        // ER Aurora Borealis: Aurora Veil works without hail/snow. `userActsInIce`
+        // returns true for an Aurora Borealis holder OR while real hail/snow is up.
+        return userActsInIce(user);
       }, 3)
       .attr(AddArenaTagAttr, ArenaTagType.AURORA_VEIL, 5, true)
       .target(MoveTarget.USER_SIDE),

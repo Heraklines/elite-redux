@@ -15,6 +15,7 @@ import {
 import { allMoves } from "#data/data-lists";
 import { HitResult } from "#enums/hit-result";
 import type { MoveFlags } from "#enums/move-flags";
+import type { MoveId } from "#enums/move-id";
 
 const USED_FLAG = Symbol("FirstMovePriority.used");
 
@@ -103,6 +104,36 @@ export class ConsumeFirstFlaggedMoveOnUseAbAttr extends ExecutedMoveAbAttr {
 
   override apply({ pokemon }: AbAttrBaseParams): void {
     setUsedPriority(pokemon, true);
+  }
+}
+
+/**
+ * Re-arms the one-shot {@linkcode FirstFlaggedMovePriorityAbAttr} boost when the
+ * holder USES a specific move. This is the ER Cutthroat (743) "Resets if Sharpen
+ * is used" clause: after the entry's first Keen Edge move has spent the +1
+ * priority (consumed by {@linkcode ConsumeFirstFlaggedMovePriorityAbAttr}), using
+ * Sharpen clears the used-flag so the NEXT slicing move regains the boost.
+ *
+ * Like {@linkcode ConsumeFirstFlaggedMoveOnUseAbAttr}, it extends
+ * `ExecutedMoveAbAttr`, which fires when the move is pushed to history - so it
+ * re-arms on the status move Sharpen regardless of whether it "lands".
+ */
+export class RearmFirstFlaggedMoveOnMoveAbAttr extends ExecutedMoveAbAttr {
+  private readonly moveId: MoveId;
+
+  constructor(moveId: MoveId) {
+    super(false);
+    this.moveId = moveId;
+  }
+
+  override canApply({ pokemon }: AbAttrBaseParams): boolean {
+    // The just-executed move is the most recent history entry.
+    const lastMove = pokemon.getLastXMoves(1)[0];
+    return lastMove != null && lastMove.move === this.moveId;
+  }
+
+  override apply({ pokemon }: AbAttrBaseParams): void {
+    setUsedPriority(pokemon, false);
   }
 }
 

@@ -11,6 +11,7 @@
 // tests give a safety net that nothing crashes on import + instantiation.
 // =============================================================================
 
+import { StatStageChangeCopyAbAttr } from "#abilities/ab-attrs";
 import { CounterAttackOnHitAbAttr } from "#data/elite-redux/archetypes/counter-attack-on-hit";
 import { HpThresholdFormChangeAbAttr } from "#data/elite-redux/archetypes/hp-threshold-form-change";
 import { OnOpponentStatRaiseAbAttr } from "#data/elite-redux/archetypes/on-opponent-stat-raise";
@@ -47,21 +48,15 @@ describe("CounterAttackOnHitAbAttr", () => {
 
 describe("HpThresholdFormChangeAbAttr", () => {
   it("rejects threshold <= 0", () => {
-    expect(() =>
-      new HpThresholdFormChangeAbAttr({ hpThreshold: 0, targetFormKey: "mega" }),
-    ).toThrow(/hpThreshold/);
+    expect(() => new HpThresholdFormChangeAbAttr({ hpThreshold: 0, targetFormKey: "mega" })).toThrow(/hpThreshold/);
   });
 
   it("rejects threshold > 1", () => {
-    expect(() =>
-      new HpThresholdFormChangeAbAttr({ hpThreshold: 1.5, targetFormKey: "mega" }),
-    ).toThrow(/hpThreshold/);
+    expect(() => new HpThresholdFormChangeAbAttr({ hpThreshold: 1.5, targetFormKey: "mega" })).toThrow(/hpThreshold/);
   });
 
   it("rejects empty targetFormKey", () => {
-    expect(() =>
-      new HpThresholdFormChangeAbAttr({ hpThreshold: 0.5, targetFormKey: "" }),
-    ).toThrow(/targetFormKey/);
+    expect(() => new HpThresholdFormChangeAbAttr({ hpThreshold: 0.5, targetFormKey: "" })).toThrow(/targetFormKey/);
   });
 
   it("accepts standard 50% threshold", () => {
@@ -74,46 +69,25 @@ describe("HpThresholdFormChangeAbAttr", () => {
   });
 
   it("accepts boundary threshold of 1.0", () => {
-    expect(() =>
-      new HpThresholdFormChangeAbAttr({ hpThreshold: 1.0, targetFormKey: "mega" }),
-    ).not.toThrow();
+    expect(() => new HpThresholdFormChangeAbAttr({ hpThreshold: 1.0, targetFormKey: "mega" })).not.toThrow();
   });
 });
 
 describe("OnOpponentStatRaiseAbAttr", () => {
-  it("rejects empty stats", () => {
-    expect(() => new OnOpponentStatRaiseAbAttr({ stats: [] })).toThrow(/non-empty/);
-  });
-
-  it("rejects zero-stage entries", () => {
-    expect(() =>
-      new OnOpponentStatRaiseAbAttr({ stats: [{ stat: Stat.ATK, stages: 0 }] }),
-    ).toThrow(/non-zero/);
-  });
-
-  it("accepts multi-stat construction", () => {
-    const attr = new OnOpponentStatRaiseAbAttr({
-      stats: [
-        { stat: Stat.ATK, stages: 1 },
-        { stat: Stat.SPATK, stages: 1 },
-        { stat: Stat.SPD, stages: 1 },
-      ],
-    });
+  it("is a StatStageChangeCopyAbAttr (Egoist copies the foe's exact raise)", () => {
+    const attr = new OnOpponentStatRaiseAbAttr();
     expect(attr).toBeInstanceOf(OnOpponentStatRaiseAbAttr);
+    expect(attr).toBeInstanceOf(StatStageChangeCopyAbAttr);
   });
 });
 
 describe("PostTurnScriptedMoveAbAttr", () => {
   it("rejects non-positive everyNTurns", () => {
-    expect(() =>
-      new PostTurnScriptedMoveAbAttr({ moveId: MoveId.ABSORB, everyNTurns: 0 }),
-    ).toThrow(/everyNTurns/);
+    expect(() => new PostTurnScriptedMoveAbAttr({ moveId: MoveId.ABSORB, everyNTurns: 0 })).toThrow(/everyNTurns/);
   });
 
   it("rejects non-integer everyNTurns", () => {
-    expect(() =>
-      new PostTurnScriptedMoveAbAttr({ moveId: MoveId.ABSORB, everyNTurns: 1.5 }),
-    ).toThrow(/everyNTurns/);
+    expect(() => new PostTurnScriptedMoveAbAttr({ moveId: MoveId.ABSORB, everyNTurns: 1.5 })).toThrow(/everyNTurns/);
   });
 
   it("defaults everyNTurns to 1", () => {
@@ -132,9 +106,7 @@ describe("PostTurnScriptedMoveAbAttr", () => {
 
 describe("SpeedBonusToStatAbAttr", () => {
   it("rejects non-positive speedFraction", () => {
-    expect(() =>
-      new SpeedBonusToStatAbAttr({ stat: Stat.ATK, speedFraction: 0 }),
-    ).toThrow(/speedFraction/);
+    expect(() => new SpeedBonusToStatAbAttr({ stat: Stat.ATK, speedFraction: 0 })).toThrow(/speedFraction/);
   });
 
   it("accepts standard 0.2 bonus", () => {

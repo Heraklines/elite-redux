@@ -47,7 +47,7 @@ import { ER_FLAG_NAMES_LIST } from "#data/elite-redux/er-flag-mapping";
 import { ER_ID_MAP } from "#data/elite-redux/er-id-map";
 import { ER_MOVE_ARCHETYPES, type ErMoveArchetypeKind } from "#data/elite-redux/er-move-archetypes";
 import { ER_MOVES } from "#data/elite-redux/er-moves";
-import { dispatchMoveArchetype } from "#data/elite-redux/move-archetype-dispatcher";
+import { dispatchMoveArchetype, PitfallTrapAndAlwaysHitAttr } from "#data/elite-redux/move-archetype-dispatcher";
 import {
   AddArenaTrapTagAttr,
   AddBattlerTagAttr,
@@ -927,9 +927,10 @@ function applyErMoveBespokeRiders(move: Move, erId: number): void {
       move.attr(MovePowerMultiplierAttr, u => (u?.tempSummonData?.waveTurnCount === 1 ? 2 : 1));
       break;
     // ---- Trap + make the target always-hittable ----
-    case 937: // Pitfall — 30% trap the foe and make attacks always hit it
-      move.attr(AddBattlerTagAttr, BattlerTagType.TRAPPED, false, false, 4, 5);
-      move.attr(AddBattlerTagAttr, BattlerTagType.ALWAYS_GET_HIT, false, false, 0, 0);
+    case 937: // Pitfall — ONE 30% roll trapping the foe AND making attacks always
+      // hit it (both effects share the single roll). Was two independent
+      // AddBattlerTagAttr rolls (P(both) ~= 9%, often only one landed).
+      move.attr(PitfallTrapAndAlwaysHitAttr);
       break;
     // ---- Boost-drain (clears the target's stat stages) ----
     case 950: // Eerie Fog — sets fog (WeatherChange wired) + drains foe boosts

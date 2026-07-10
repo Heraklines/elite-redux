@@ -514,13 +514,20 @@ export const ER_ABILITY_ARCHETYPES: Readonly<Record<number, ErAbilityArchetypeEn
   740: { erAbilityId: 740, archetype: "bespoke", params: null },
   741: { erAbilityId: 741, archetype: "composite-vanilla-mashup", params: {"parts":["Swift Swim","Stall"]} },
   742: { erAbilityId: 742, archetype: "bespoke", params: null },
+  // 743 Cutthroat: "On entry, gives +1 priority to the FIRST Keen Edge (slicing) move
+  // used. Consumed after landing any Keen Edge move. Resets if Sharpen is used." The
+  // slicing-move twin of Edgelord (882) plus a Sharpen re-arm; moved to bespoke (see
+  // dispatchBespoke case 743). The old priority-modifier approximation gave EVERY
+  // slicing move +1 on the switch-in turn, never consumed, ignored Sharpen.
+  //
+  // (Superseded classifier note, kept for history:)
   // 743 Cutthroat: "first slicing move on each entry gets +1 priority". The classifier
   // dropped the SLICING filter, leaving a BARE priority that gave EVERY move +1 (the
   // "random outspeed" bug). Restored the SLICING_MOVE filter + the first-turn (entry-
   // turn, waveTurnCount===1) gate - ER's standard approximation of "first move per
   // entry" (same as Coil Up 302 / Sidewinder 676). Minor divergence: a slicing move
   // used on a LATER turn won't qualify (the literal "first per entry" isn't tracked).
-  743: { erAbilityId: 743, archetype: "priority-modifier", params: {"priority":1,"filter":{"flag":"SLICING_MOVE"},"condition":{"kind":"first-turn"}} },
+  743: { erAbilityId: 743, archetype: "bespoke", params: null }, // Cutthroat — first Keen Edge move per entry gets +1 priority, consumed on landing a slicing move, re-armed by Sharpen (see dispatchBespoke case 743)
   744: { erAbilityId: 744, archetype: "composite-vanilla-mashup", params: {"parts":["Sand Stream","Sand Force"]} },
   745: { erAbilityId: 745, archetype: "bespoke", params: null },
   746: { erAbilityId: 746, archetype: "composite-vanilla-mashup", params: {"parts":["Desolate Land","Earth Eater"]} },
