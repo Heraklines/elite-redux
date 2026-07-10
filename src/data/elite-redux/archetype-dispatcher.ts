@@ -1992,6 +1992,12 @@ function dispatchComposite(erAbilityId: number, visited: Set<number>): DispatchR
       }),
     );
   }
+  // Imposing Wings 688 (er371 AIR_BASED 1.3x + Levitate) — the composite covers
+  // the wing/wind/air +30% boost and the Ground immunity, but NOT the dex's
+  // separate "+25% to FLYING-type moves" (AIR_BASED is a move flag, not the type).
+  if (erAbilityId === 688) {
+    out.push(new TypeDamageBoostAbAttr({ type: PokemonType.FLYING, multiplier: 1.25 }));
+  }
   // Sludgy Mix 726 (Intoxicate + Punk Rock) — the Intoxicate part wires the
   // Normal→Poison conversion + STAB but NOT its "if the user is Poison-type, its
   // Poison moves gain a 10% bad-poison chance" rider; append it, gated on the
@@ -2901,6 +2907,11 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
       return ok([
         new EntryEffectAbAttr({ kind: "add-self-type", type: PokemonType.DRAGON }),
         new AttackTypeImmunityAbAttr(PokemonType.GROUND),
+        // FloatAbAttr ungrounds the holder so it also dodges grounded field
+        // effects (Spikes / grounded terrain), per "immunity to ... field effects
+        // that require you to be grounded" — AttackTypeImmunity alone only blocks
+        // Ground MOVES, it does not affect isGrounded().
+        new FloatAbAttr(),
       ]);
     case 328:
       // Overwhelm — "Hits Fairies with Dragon moves. Immune to Intimidate and
@@ -3268,13 +3279,18 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
     // explicitly here.
     // -------------------------------------------------------------------------
     case 313:
-      // Dragonslayer — 1.5x to Dragons, 0.5x from Dragons.
+      // Dragonslayer — "1.5x TO Dragon-type Pokemon, 0.5x FROM Dragon-type
+      // Pokemon, based on the attacker/defender POKEMON types (not move types)."
+      // The shared buildTypeEffectivenessModAttrs gates the DEFENSIVE half on the
+      // incoming MOVE's type (wrong); wire it directly like Fae Hunter/Firefighter
+      // so defense gates on the ATTACKER's Pokemon type.
       return ok([
-        ...buildTypeEffectivenessModAttrs({
-          type: PokemonType.DRAGON,
-          offensiveMultiplier: 1.5,
-          defensiveMultiplier: 0.5,
-        }),
+        new OffensiveTypeMultiplierAbAttr(PokemonType.DRAGON, 1.5),
+        new ReceivedMoveDamageMultiplierAbAttr(
+          (_target, attacker) => attacker.isOfType(PokemonType.DRAGON),
+          0.5,
+          false,
+        ),
       ]);
     case 344:
       // Poison Absorb — "Redirects Poison moves. Absorbs them, healing 25% HP.
@@ -4240,22 +4256,20 @@ export function dispatchBespoke(erAbilityId: number): DispatchResult {
         new ReceivedMoveDamageMultiplierAbAttr((_target, attacker) => attacker.isOfType(PokemonType.FAIRY), 0.5, false),
       ]);
     case 445:
-      // Lumberjack — 1.5x to Grass, 0.5x from Grass.
+      // Lumberjack — "1.5x TO Grass Pokemon, 0.5x FROM Grass Pokemon, based on the
+      // attacker/defender POKEMON types (not move types)." Wire defense on the
+      // attacker's Pokemon type (see Fae Hunter 442 / Dragonslayer 313).
       return ok([
-        ...buildTypeEffectivenessModAttrs({
-          type: PokemonType.GRASS,
-          offensiveMultiplier: 1.5,
-          defensiveMultiplier: 0.5,
-        }),
+        new OffensiveTypeMultiplierAbAttr(PokemonType.GRASS, 1.5),
+        new ReceivedMoveDamageMultiplierAbAttr((_target, attacker) => attacker.isOfType(PokemonType.GRASS), 0.5, false),
       ]);
     case 526:
-      // Monster Hunter — 1.5x to Dark, 0.5x from Dark.
+      // Monster Hunter — "1.5x TO Dark Pokemon, 0.5x FROM Dark Pokemon, based on
+      // the attacker/defender POKEMON types (not move types)." Wire defense on the
+      // attacker's Pokemon type (see Fae Hunter 442 / Dragonslayer 313).
       return ok([
-        ...buildTypeEffectivenessModAttrs({
-          type: PokemonType.DARK,
-          offensiveMultiplier: 1.5,
-          defensiveMultiplier: 0.5,
-        }),
+        new OffensiveTypeMultiplierAbAttr(PokemonType.DARK, 1.5),
+        new ReceivedMoveDamageMultiplierAbAttr((_target, attacker) => attacker.isOfType(PokemonType.DARK), 0.5, false),
       ]);
     case 804:
       // Firefighter — "1.5x damage to Fire-type Pokemon and 0.5x damage when

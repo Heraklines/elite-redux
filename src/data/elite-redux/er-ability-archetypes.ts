@@ -396,7 +396,7 @@ export const ER_ABILITY_ARCHETYPES: Readonly<Record<number, ErAbilityArchetypeEn
   623: { erAbilityId: 623, archetype: "bespoke", params: null },
   624: { erAbilityId: 624, archetype: "type-conversion", params: {"sourceType":"NORMAL","targetType":"ICE","multiplier":1.2,"flag":"SOUND_BASED"} },
   625: { erAbilityId: 625, archetype: "bespoke", params: null },
-  626: { erAbilityId: 626, archetype: "chance-status-on-hit", params: {"chance":30,"status":"BLEED","filter":{"flag":"SOUND_BASED"},"direction":"offense"} }, // Resonance: holder's SOUND move bleeds (desc)
+  626: { erAbilityId: 626, archetype: "chance-status-on-hit", params: {"chance":50,"status":"BLEED","filter":{"flag":"SOUND_BASED"},"direction":"offense"} }, // Resonance: holder's SOUND moves have a 50% chance to bleed (dex)
   627: { erAbilityId: 627, archetype: "bespoke", params: null },
   628: { erAbilityId: 628, archetype: "priority-modifier", params: {"condition":{"kind":"max-hp"},"priority":1,"filter":{"type":"FAIRY"}} },
   629: { erAbilityId: 629, archetype: "bespoke", params: null },

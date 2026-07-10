@@ -1040,6 +1040,12 @@ function applyErMoveBespokeRiders(move: Move, erId: number): void {
       move.attr(HighCritAttr);
       move.attr(AddBattlerTagAttr, BattlerTagType.ER_BLEED, false, false, 4, 6);
       break;
+    case 809: // Jagged Horns — "10% flinch chance. 10% bleed chance." The
+      // flag-tagged archetype wires the 10% flinch (move.chance) + HORN_BASED;
+      // add the SEPARATE, independently-rolled 10% ER_BLEED (4-6 turns like the
+      // other bleed moves) that the archetype's single statusChance slot dropped.
+      move.attr(AddBattlerTagAttr, BattlerTagType.ER_BLEED, false, false, 4, 6);
+      break;
     // ---- Damaging move that also makes the user eat one of its own berries ----
     case 830: // Berry Smash — "Deals damage. User eats their berry." The classifier
       // only tagged it HAMMER_BASED (applied via the flag-tagged-move dispatch) and

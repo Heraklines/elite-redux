@@ -461,15 +461,23 @@ const ABILITY_PATCHERS: ReadonlyMap<AbilityId, (ability: MutableAbility) => void
       ab.attrs.push(new MovePowerBoostAbAttr((_user, _target, move) => move.category === MoveCategory.PHYSICAL, 1.2));
     },
   ],
-  // HEAVY_METAL: vanilla doubles weight; ER replaces that entirely with
-  // "take half damage from Ghost and Dark". Strip the weight attr AND add
-  // the Ghost/Dark damage reductions.
+  // HEAVY_METAL: ER dex is "takes half damage from Ghost and Dark AND doubles
+  // weight" — the weight-doubling is KEPT (the dex still lists it), only the
+  // Ghost/Dark resist is ADDED on top of vanilla's WeightMultiplierAbAttr(2).
   [
     AbilityId.HEAVY_METAL,
     ab => {
-      stripWeightMultiplier(ab);
       ab.attrs.push(new ReceivedTypeDamageMultiplierAbAttr(PokemonType.GHOST, 0.5));
       ab.attrs.push(new ReceivedTypeDamageMultiplierAbAttr(PokemonType.DARK, 0.5));
+    },
+  ],
+  // ROCKY_PAYLOAD: ER dex is "boosts Rock-type AND throwing-based moves by 50%".
+  // Vanilla already gives the Rock-type +50%; add the throwing-move (THROW_BASED)
+  // +50% on top (Fling, Egg Bomb, Rock Throw/Slide/Tomb/Wrecker, Grav Apple, ...).
+  [
+    AbilityId.ROCKY_PAYLOAD,
+    ab => {
+      ab.attrs.push(new MovePowerBoostAbAttr((_user, _target, move) => move.hasFlag(MoveFlags.THROW_BASED), 1.5));
     },
   ],
   // LIGHT_METAL: weight 0.5x + 1.3x Speed.
