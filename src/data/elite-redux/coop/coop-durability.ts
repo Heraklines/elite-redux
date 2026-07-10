@@ -594,6 +594,13 @@ export class CoopDurabilityManager {
       this.serveResync(msg.cls, msg.from);
       return;
     }
+    if (msg.t === "coopResyncAll") {
+      // #898: the peer reconnected and asked us (the committer) to proactively replay our full
+      // committed-but-unacked tail. This is the ONLY path that recovers the FIRST op of a fresh class -
+      // the receiver could not name it in a per-class `coopResync` because it is not in its ledger.
+      this.resendUnackedTail("coopResyncAll");
+      return;
+    }
     const key = this.hooks.extractKey?.(msg) ?? null;
     if (key == null) {
       return; // not a durable op (or no receiver wired) - ignore
@@ -664,22 +671,33 @@ export class CoopDurabilityManager {
    *  - committer: resend the committed-but-unacked tail for every class (a message lost in the blip that
    *    was committed-but-unacked is recovered here - the piece the buffer purge dropped before W2b);
    *  - receiver: request the tail after our last-applied revision for every class we have applied, so a
-   *    committed op we never saw is replayed. Both are no-ops when there is nothing owed.
+   *    committed op we never saw is replayed, AND broadcast a class-agnostic `coopResyncAll` so the
+   *    COMMITTER proactively replays its full unacked tail - the only path that recovers the FIRST op of
+   *    a fresh class (#898: production reconnects ONLY the guest, and a never-seen class is not in the
+   *    guest's ledger so it can never be named in a per-class `coopResync`; the host's unacked tail
+   *    retains that op regardless). Both are no-ops when there is nothing owed.
    */
   reconnect(): void {
     // Committer side: proactively resend the unacked tail (the peer may have missed the last broadcasts).
+    this.resendUnackedTail("reconnect");
+    // Receiver side: request the tail after our last-applied revision for every class we track...
+    for (const cls of this.ledger.serializeClasses()) {
+      this.transport.send({ t: "coopResync", cls, from: this.ledger.appliedThrough(cls) });
+    }
+    // ...and a class-agnostic request so the committer replays classes we have NEVER seen (#898).
+    this.transport.send({ t: "coopResyncAll" });
+  }
+
+  /** Committer: resend the committed-but-unacked tail for EVERY class (§4.2/§4.4). Idempotent (receiver dedupes). */
+  private resendUnackedTail(reason: string): void {
     for (const cls of this.journal.classes()) {
       const tail = this.journal.resendTail(cls);
       if (tail.length > 0) {
-        coopLog("durability", `reconnect resend cls=${cls} unacked=${tail.length}`);
+        coopLog("durability", `${reason} resend cls=${cls} unacked=${tail.length}`);
         for (const e of tail) {
           this.transport.send(e.msg);
         }
       }
-    }
-    // Receiver side: request the tail after our last-applied revision for every class we track.
-    for (const cls of this.ledger.serializeClasses()) {
-      this.transport.send({ t: "coopResync", cls, from: this.ledger.appliedThrough(cls) });
     }
   }
 

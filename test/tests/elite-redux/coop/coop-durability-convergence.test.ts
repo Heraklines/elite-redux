@@ -153,11 +153,11 @@ describe("W2b durability convergence (§4.2/§4.4): a cut authoritative op is re
     await flush();
     expect(applied).toEqual([1, 2]);
 
-    // #805 hot rejoin: the channel is re-established and BOTH sides run reconnect(). The host resends its
-    // committed-but-unacked tail (3); the guest converges. This is precisely the message the buffer purge
-    // dropped before W2b.
+    // #805 hot rejoin: the channel is re-established. PRODUCTION TOPOLOGY (#898): only the GUEST runs
+    // reconnect() (coop-runtime.ts gates it behind isCoopAuthoritativeGuest()). Its coopResync (known
+    // class) + coopResyncAll make the host resend its committed-but-unacked tail (3); the guest converges.
+    // This is precisely the message the buffer purge dropped before W2b.
     hostGate.cut = false;
-    host.reconnect();
     guest.reconnect();
     await flush();
     expect(applied).toEqual([1, 2, 3]);
@@ -220,8 +220,7 @@ describe("W2b durability convergence (§4.2/§4.4): a cut authoritative op is re
     host.commit("wave", 2, waveOp(2));
     await flush();
     hostGate.cut = false;
-    host.reconnect();
-    guest.reconnect();
+    guest.reconnect(); // production single-sided reconnect (#898)
     await flush();
     expect(applied).toEqual([1, 2]);
     host.dispose();
@@ -264,8 +263,7 @@ describe("W2b durability convergence (§4.4): the FAULT TRANSPORT drops authorit
     // re-requests the next missing revision; the tail replay is idempotent).
     pair.setProfile(COOP_NO_FAULT_PROFILE);
     for (let round = 0; round < N + 2; round++) {
-      host.reconnect();
-      guest.reconnect();
+      guest.reconnect(); // production single-sided reconnect (#898): coopResyncAll drives the host resend
       await flush();
       if (applied.length === N) {
         break;

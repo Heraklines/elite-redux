@@ -96,7 +96,7 @@ describe("W2e-R2 durability recovery completeness: guest-only reconnect + snapsh
   // coopResync is sent for it; and production never runs reconnect() on the host, so the host never
   // proactively resends its committed-but-unacked tail. The op is permanently lost, both sides idle.
   // ===========================================================================================
-  it.fails("I1: [RED] a GUEST-ONLY reconnect does NOT recover the dropped FIRST op of a fresh class (never-seen class)", async () => {
+  it("I1: a GUEST-ONLY reconnect recovers the dropped FIRST op of a fresh class via coopResyncAll (#898)", async () => {
     const pair = createLoopbackPair();
     const hostGate = new ChannelGate(pair.host);
     const applied: number[] = [];

@@ -1248,6 +1248,16 @@ export type CoopMessage =
    * a full `stateSync` snapshot when the gap is deeper than the journal ring.
    */
   | { t: "coopResync"; cls: string; from: number }
+  /**
+   * Receiver -> committer (§4.4, #898 reconnect asymmetry): a CLASS-AGNOSTIC "resend your entire
+   * committed-but-unacked tail, for EVERY class". Broadcast by the reconnecting side (production
+   * reconnects only the GUEST, `coop-runtime.ts`), because a per-class `coopResync` can only ask for
+   * classes the receiver has ALREADY seen - the FIRST op of a never-seen class, if dropped, is not in
+   * the receiver's ledger, so it can never be named in a `coopResync`. This asks the committer to
+   * proactively replay its unacked tail (which retains that op regardless of the receiver's ledger),
+   * closing the never-seen-class hole. Forward-safe: an older client ignores it via the unknown-`t` arm.
+   */
+  | { t: "coopResyncAll" }
   // ===========================================================================
   // Showdown 1v1 PvP (A4): additive wire messages layered on the SAME co-op
   // transport. Purely new `t` values, so a co-op client that never speaks Showdown

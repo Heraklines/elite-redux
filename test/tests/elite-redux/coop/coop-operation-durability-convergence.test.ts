@@ -223,10 +223,10 @@ describe("Wave-2e operation<->durability convergence: a cut committed op is repa
     await flush();
     expect(appliedBiomes()).toEqual([20]);
 
-    // #805 hot rejoin: the channel recovers and both sides run reconnect(). The host resends its
-    // committed-but-unacked tail; the guest converges - precisely the message the buffer purge dropped pre-W2b.
+    // #805 hot rejoin: the channel recovers. PRODUCTION TOPOLOGY (#898): only the GUEST reconnects; its
+    // coopResync + coopResyncAll make the host resend its committed-but-unacked tail; the guest converges -
+    // precisely the message the buffer purge dropped pre-W2b.
     hostGate.cut = false;
-    hostMgr.reconnect();
     guestMgr.reconnect();
     await flush();
     expect(liveBiomes(), "LIVE STATE: the committed-but-unacked op reached the mutation seam on reconnect").toEqual([
@@ -271,9 +271,11 @@ describe("Wave-2e operation<->durability convergence: a cut committed op is repa
     // (held in the host MANAGER, independent of the adapter) still holds the committed envelope.
     resetCoopBiomeOperationState();
 
-    // Hot rejoin: the host resends its committed-but-unacked tail; the guest applies it via the journal.
+    // Hot rejoin: PRODUCTION TOPOLOGY (#898) - only the GUEST reconnects. The guest has NEVER applied
+    // op:biome (its channel was cut for the sole op), so it cannot name the class in a per-class coopResync;
+    // its coopResyncAll makes the host proactively resend its unacked tail, and the guest applies it via the
+    // journal. (This is exactly the never-seen-class case the #898 fix closes.)
     hostGate.cut = false;
-    hostMgr.reconnect();
     guestMgr.reconnect();
     await flush();
     expect(liveBiomes(), "LIVE STATE: the guest-minted op reached the mutation seam via the journal").toEqual([30]);
@@ -309,8 +311,7 @@ describe("Wave-2e operation<->durability convergence: a cut committed op is repa
     // replay is idempotent, so it converges to the full, in-order op history despite the drops.
     pair.setProfile(COOP_NO_FAULT_PROFILE);
     for (let round = 0; round < N + 2; round++) {
-      hostMgr.reconnect();
-      guestMgr.reconnect();
+      guestMgr.reconnect(); // production single-sided reconnect (#898): coopResyncAll drives the host resend
       await flush();
       if (liveBiomes().length === N) {
         break;
