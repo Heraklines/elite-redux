@@ -417,6 +417,21 @@ export class ShowdownTeamMenuUiHandler extends UiHandler {
     this.closeRename();
   }
 
+  /**
+   * Live fix #4 (2026-07-10, the REAL create-button root cause): this handler had NO clear()
+   * override, so the menu's container was NEVER hidden - once shown it stayed painted OVER every
+   * mode that followed. setMode(STARTER_SELECT) succeeded (both breadcrumbs logged), the grid was
+   * open and receiving input UNDERNEATH, and the player just kept seeing the frozen team menu.
+   * Headless tests asserted the MODE switched (true) but never that the old screen actually left.
+   */
+  clear(): void {
+    super.clear();
+    this.textInput?.close();
+    this.renaming = false;
+    this.notice = null;
+    this.container.setVisible(false);
+  }
+
   private closeRename(): void {
     this.renaming = false;
     this.textInput?.close();

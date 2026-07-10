@@ -77,6 +77,11 @@ describe.runIf(RUN)("showdown team menu - real-path acceptance", () => {
     expect(mode()).toBe(UiMode.STARTER_SELECT);
     // The build borrowed SHOWDOWN to drive the teambuild UI.
     expect(game.scene.gameMode.isShowdown).toBe(true);
+    // Live fix #4 regression net: the mode switching is NOT enough - the menu's container must
+    // actually be HIDDEN, or it keeps rendering over the (open, input-receiving) grid, which is
+    // exactly what the player saw ("still the same issue" with both open-breadcrumbs logged).
+    const menuHandler = game.scene.ui.handlers[UiMode.SHOWDOWN_TEAM_MENU] as any;
+    expect(menuHandler?.container?.visible, "the Team Menu container is hidden once the grid opens").toBe(false);
   });
 
   it("Issue 2: backing out of the build returns to the Team Menu and restores the gameMode", async () => {
