@@ -4930,6 +4930,20 @@ export abstract class Pokemon extends Phaser.GameObjects.Container {
       return 1;
     }
 
+    // ER Relic Stone (866): while a Relic Stone holder OTHER than the attacker is
+    // on the field, no other battler benefits from STAB — neither the base 1.5
+    // typing STAB nor any ability-granted STAB (Adaptability/StabBoostAbAttr) nor
+    // the Tera boost. The holder itself keeps its STAB (p !== source).
+    const relicStoneSuppressed = globalScene
+      .getField()
+      .some(
+        p =>
+          p != null && p !== source && !p.isFainted() && p.hasAbility(ErAbilityId.RELIC_STONE as unknown as AbilityId),
+      );
+    if (relicStoneSuppressed) {
+      return 1;
+    }
+
     const sourceTypes = source.getTypes(false, false);
     const sourceTeraType = source.getTeraType();
     const moveType = source.getMoveType(move);

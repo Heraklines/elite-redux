@@ -1909,6 +1909,19 @@ export class MoveEffectAttr extends MoveAttr {
 
     if (!selfEffect) {
       applyAbAttrs("IgnoreMoveEffectsAbAttr", { pokemon: target, move, simulated: !showAbility, chance: moveChance });
+      // ER Desert Cloak (412): side-wide secondary-effect immunity. Consult the
+      // target's WHOLE field (self + allies — getAlliesGenerator walks the side
+      // in speed order, including the target itself) for the user-field variant,
+      // so an ally of the holder is protected too. Distinct from the holder-only
+      // Shield Dust dispatch above, which stays single-target.
+      for (const fieldMon of target.getAlliesGenerator()) {
+        applyAbAttrs("UserFieldIgnoreMoveEffectsAbAttr", {
+          pokemon: fieldMon,
+          move,
+          simulated: !showAbility,
+          chance: moveChance,
+        });
+      }
     }
 
     // ER Lucky Heart (#387): flat +15 percentage points per stack to POSITIVE

@@ -122,6 +122,10 @@ import {
   StatTriggerOnHitAbAttr,
   StatTriggerOnStatLoweredAbAttr,
 } from "#data/elite-redux/archetypes/stat-trigger-on-event";
+import {
+  ToxicTerrainSelfPoisonOnSummonAbAttr,
+  ToxicTerrainSelfPoisonOnTerrainChangeAbAttr,
+} from "#data/elite-redux/archetypes/toxic-terrain-self-poison";
 import { TypeDamageBoostAbAttr } from "#data/elite-redux/archetypes/type-damage-boost";
 import { TypeImmunityHighestAttackStatStageAbAttr } from "#data/elite-redux/archetypes/type-immunity-highest-attack-stat-stage";
 import { ER_ABILITIES } from "#data/elite-redux/er-abilities";
@@ -533,11 +537,14 @@ const ABILITY_PATCHERS: ReadonlyMap<AbilityId, (ability: MutableAbility) => void
   ],
 
   // ===== MAJOR — Status / damage riders =====
-  // TOXIC_BOOST: +50% Atk if poisoned + immune to poison damage.
+  // TOXIC_BOOST: +50% Atk if poisoned (vanilla) + immune to poison damage +
+  // self-poisons in Toxic Terrain regardless of grounding (ER dex).
   [
     AbilityId.TOXIC_BOOST,
     ab => {
       ab.attrs.push(new BlockStatusDamageAbAttr(StatusEffect.POISON, StatusEffect.TOXIC));
+      ab.attrs.push(new ToxicTerrainSelfPoisonOnSummonAbAttr());
+      ab.attrs.push(new ToxicTerrainSelfPoisonOnTerrainChangeAbAttr());
     },
   ],
   // WEAK_ARMOR: was vanilla "physical hit"; ER says "contact hit".

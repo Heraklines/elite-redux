@@ -1445,6 +1445,24 @@ export class IgnoreMoveEffectsAbAttr extends PreDefendAbAttr {
   }
 }
 
+/**
+ * Elite Redux — user-field variant of {@linkcode IgnoreMoveEffectsAbAttr}. Where
+ * Shield Dust (`IgnoreMoveEffectsAbAttr`) only nullifies an incoming move's
+ * secondary-effect chance for its OWN holder, this nullifies it for the holder
+ * AND every ally. Dispatched at the effect-chance site by iterating the target's
+ * whole field (self + allies, mirroring {@linkcode UserFieldStatusEffectImmunityAbAttr}).
+ * Used by Desert Cloak (412) to make its sand secondary-effect immunity side-wide.
+ */
+export class UserFieldIgnoreMoveEffectsAbAttr extends PreDefendAbAttr {
+  override canApply({ chance }: ModifyMoveEffectChanceAbAttrParams): boolean {
+    return chance.value > 0;
+  }
+
+  override apply({ chance }: ModifyMoveEffectChanceAbAttrParams): void {
+    chance.value = 0;
+  }
+}
+
 export class FieldPreventExplosiveMovesAbAttr extends CancelInteractionAbAttr {}
 
 export interface FieldMultiplyStatAbAttrParams extends AbAttrBaseParams {
@@ -7269,6 +7287,7 @@ export const AbilityAttrs = Object.freeze({
   TypeImmunityAbAttr,
   TypeImmunityHealAbAttr,
   UserFieldBattlerTagImmunityAbAttr,
+  UserFieldIgnoreMoveEffectsAbAttr,
   UserFieldMoveTypePowerBoostAbAttr,
   UserFieldStatusEffectImmunityAbAttr,
   VariableMovePowerAbAttr,

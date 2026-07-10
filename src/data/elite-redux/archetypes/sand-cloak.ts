@@ -16,7 +16,9 @@
 //      Veil) so the holder AND its allies are immune to all status while sand
 //      is up.
 //   2. SandSecondaryEffectImmunityAbAttr — zeroes incoming move secondary-
-//      effect chance on the holder (extends Shield Dust's IgnoreMoveEffectsAbAttr).
+//      effect chance SIDE-WIDE (holder + allies). Extends the user-field
+//      UserFieldIgnoreMoveEffectsAbAttr (NOT holder-only Shield Dust), which the
+//      effect-chance site consults across the whole target field.
 //
 // Wires:
 //   - 412 Desert Cloak — "Protects its side from status and secondary effects
@@ -25,8 +27,8 @@
 
 import {
   ConditionalUserFieldStatusEffectImmunityAbAttr,
-  IgnoreMoveEffectsAbAttr,
   type ModifyMoveEffectChanceAbAttrParams,
+  UserFieldIgnoreMoveEffectsAbAttr,
 } from "#abilities/ab-attrs";
 import { globalScene } from "#app/global-scene";
 import { WeatherType } from "#enums/weather-type";
@@ -44,7 +46,7 @@ export class SandStatusImmunityAbAttr extends ConditionalUserFieldStatusEffectIm
   }
 }
 
-export class SandSecondaryEffectImmunityAbAttr extends IgnoreMoveEffectsAbAttr {
+export class SandSecondaryEffectImmunityAbAttr extends UserFieldIgnoreMoveEffectsAbAttr {
   override canApply(params: ModifyMoveEffectChanceAbAttrParams): boolean {
     return sandActive() && super.canApply(params);
   }
